@@ -204,7 +204,14 @@
    "things to do when it rains",
    "indoor fun",
    "paint night",
-   "day spa"
+   "day spa",
+   "free museum",
+   "free museums",
+   "free gallery",
+   "free galleries",
+   "free art gallery",
+   "free art galleries",
+   "free admission museum"
   ],
   "tour": [
    "guided tours",
@@ -422,6 +429,21 @@
    "late night food",
    "late night eats",
    "night owl"
+  ],
+  "free_entry": [
+   "free museum",
+   "free museums",
+   "free gallery",
+   "free galleries",
+   "free art gallery",
+   "free art galleries",
+   "by donation",
+   "admission by donation",
+   "entry by donation",
+   "pay what you can",
+   "pay what you wish",
+   "free to visit",
+   "free admission museum"
   ]
  },
  "collections": {
@@ -1421,6 +1443,14 @@
    "sails",
    "sailing courses",
    "yachts"
+  ],
+  "heritage": [
+   "museum",
+   "history",
+   "historic",
+   "historical",
+   "archives",
+   "heritage site"
   ]
  },
  "termLabels": {

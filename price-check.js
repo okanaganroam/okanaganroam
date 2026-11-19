@@ -154,7 +154,8 @@ CREATE TABLE IF NOT EXISTS price_check_runs (
       // page behind it (so the weekly check never reads it). A free tasting reads "Free tasting"; a free tour (basis
       // 'Free', tour test 4, 2026-11-17) reads "Free".
       if (o.reviewer === OWNER_REVIEWER) {
-        prices[id] = Number(o.from_price) === 0 ? { label: o.basis === 'Free' ? 'Free' : 'Free tasting', conf: 'owner', owner: true } : { from: Number(o.from_price), conf: 'owner', owner: true, ...(o.per ? { per: o.per } : {}), ...(o.basis ? { basis: o.basis } : {}) };
+        // Indoor test 1 (2026-11-19): a by-donation museum (basis 'By donation') reads "By donation", never "Free".
+        prices[id] = Number(o.from_price) === 0 ? { label: o.basis === 'Free' || o.basis === 'By donation' ? o.basis : 'Free tasting', conf: 'owner', owner: true } : { from: Number(o.from_price), conf: 'owner', owner: true, ...(o.per ? { per: o.per } : {}), ...(o.basis ? { basis: o.basis } : {}) };
         continue;
       }
       const base = prices[id] || original[id] || {};

@@ -10028,13 +10028,16 @@ function seasonTagShortText(st) {
 // 7 AM" and "Closed Dec 25, reopens Dec 26."). Only for a one-day closure, when the status line itself names today's
 // special closure (the words in brackets) and says when the place opens again; a closure notice shown ahead of time stays.
 const STATUS_SAYS_CLOSURE_RE = /^Closed today \([^()]+\).*\b(?:Opens|Reopens)\b/;
+// A yearly break with its reopening day: "Closed between seasons · Reopens Jul 1", or (indoor test 1, 2026-11-19) a break
+// the owner named, "Closed for the winter break · Reopens Jan 15" (never "Closed for the season", a season of its own).
+const STATUS_BREAK_RE = /^Closed (?:between seasons\b|for (?!the season\b)[^\u00b7]+\u00b7 Reopens\b)/;
 function statusSaysClosureToday(line) { return !!line && STATUS_SAYS_CLOSURE_RE.test(String(line.text || '')); }
 // One day only ("Closed Dec 25, reopens Dec 26."): a closure of several days keeps its line, which gives the dates
 // ("Closed Oct 21–28, reopens Oct 29.").
 const ONE_DAY_CLOSURE_TAG_RE = /\s*<p class="season-tag season-tag-temp_closed">(?:<span[^>]*>[\s\S]*?<\/span>)?\s*Closed [A-Za-z]+\.? \d{1,2}, reopens [^<\u2013-]*<\/p>/;
 function cardSeasonOnce(chunk, line) {
   // Tour test 7: "Closed between seasons · Reopens Jul 1" says the break and its end: no second "Closed May 1–Jun 30" line.
-  if (line && /^Closed between seasons\b/.test(String(line.text || ''))) return chunk.replace(/\s*<p class="season-tag season-tag-temp_closed">[\s\S]*?<\/p>/, '');
+  if (line && STATUS_BREAK_RE.test(String(line.text || ''))) return chunk.replace(/\s*<p class="season-tag season-tag-temp_closed">[\s\S]*?<\/p>/, '');
   if (statusSaysClosureToday(line)) return chunk.replace(ONE_DAY_CLOSURE_TAG_RE, '');
   return line && line.state === 'seasonal' ? chunk.replace(/\s*<p class="season-tag season-tag-closed">[\s\S]*?<\/p>/, '') : chunk;
 }
@@ -20849,7 +20852,7 @@ function breadcrumbNavHtml(items) {
 // Dog Friendly collection badge and every price or amenity chip.
 function freeChipFirst(html) {
   const chips = html.match(/<span class="chip[^"]*"[^>]*>.*?<\/span>/g) || [];
-  const i = chips.findIndex((c) => c.replace(/<[^>]+>/g, '').trim() === 'Free');
+  const i = chips.findIndex((c) => /^(?:Free|By donation)$/.test(c.replace(/<[^>]+>/g, '').trim()));
   if (i <= 0) return html;
   return [chips[i], ...chips.slice(0, i), ...chips.slice(i + 1)].join(' ');
 }
@@ -23884,10 +23887,12 @@ const TOUR_APPOINTMENT_LINE_FR = 'Réservez à l’avance · sorties sur réserv
 //   year     'all' | 'seasonal'                the season answer from the Hours step
 //   visit    'appointment'                     no set hours (shows, classes or by appointment): the winery's path
 //   cuisine_was  the researched words (venues.cuisine) the kinds replaced, put back when the kinds are taken back
+//   suggested  the suggested donation in dollars (indoor test 1, 2026-11-19): typed in the price box's place, labelled
+//            "Suggested amount (optional)", under By donation; used only while the price answer is 'donation'
 //   price    the adult price in dollars, only through the 'indoor_price' field (live up to INDOOR_PRICE_LIVE_MAX; higher
 //            waits for our check), also the card's price; free 'free' | 'donation' (Free entry / by donation, price 0).
 const { INDOOR_KINDS, INDOOR_LENGTHS, INDOOR_BOOK, INDOOR_AGES } = require('./portal-completeness');
-const INDOOR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'year', 'visit'];
+const INDOOR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'year', 'visit', 'suggested'];
 const INDOOR_KINDS_MAX = 3;
 const INDOOR_PRICE_LIVE_MAX = 300;
 const INDOOR_PRICE_MAX = 5000;
@@ -23929,7 +23934,16 @@ const INDOOR_BOOK_LINES = { no: ['Walk-ins welcome: no need to book.', 'Sans ré
   busy: ['Walk-ins welcome. Book ahead for weekends and busy times.', 'Sans réservation. Réservez pour les fins de semaine et les périodes achalandées.'],
   ahead: ['Please book ahead.', 'Réservez à l’avance.'] };
 const INDOOR_AGE_LINES = { all: ['All ages.', 'Tous les âges.'], 5: ['Ages 5 and up.', 'À partir de 5 ans.'], 8: ['Ages 8 and up.', 'À partir de 8 ans.'], 12: ['Ages 12 and up.', 'À partir de 12 ans.'], 16: ['Ages 16 and up.', 'À partir de 16 ans.'], 19: ['19 and over.', '19 ans et plus.'] };
-const INDOOR_FREE_LINES = { free: ['Free entry.', 'Entrée gratuite.'], donation: ['Free (by donation).', 'Gratuit (contribution volontaire).'] };
+// Indoor test 1 (2026-11-19; Margaret): by donation says so ("By donation (suggested $5)."), never "Free".
+const INDOOR_FREE_LINES = { free: ['Free entry.', 'Entrée gratuite.'], donation: ['By donation.', 'Contribution volontaire.'] };
+const INDOOR_DONATION_CARD_LABEL = 'By donation';
+const INDOOR_SUGGESTED_ERROR = 'Please enter the suggested amount in dollars, like 5, or leave it empty.';
+// "By donation (suggested $5)." / « Contribution volontaire (suggérée : 5 $). » (no amount: "By donation.").
+function indoorDonationLine(suggested, fr = false) {
+  const n = typeof suggested === 'number' && Number.isFinite(suggested) && suggested > 0 ? suggested : null;
+  if (n == null) return INDOOR_FREE_LINES.donation[fr ? 1 : 0];
+  return fr ? `Contribution volontaire (suggérée : ${tourMoney(n, true)}).` : `By donation (suggested ${tourMoney(n, false)}).`;
+}
 const INDOOR_APPOINTMENT_LINE = 'Times vary · check before you go';
 const INDOOR_APPOINTMENT_LINE_FR = 'Heures variables · vérifiez avant d’y aller';
 let venueIndoorInfoCache = null;
@@ -23994,6 +24008,8 @@ function writeVenueIndoorInfo(venueId, info) {
 function indoorInfoAnswers(venueId) { const o = { ...venueIndoorInfo(venueId) }; delete o.price; delete o.free; delete o.cuisine_was; return o; }
 function indoorPrice(venueId) { const f = venueIndoorInfo(venueId).price; return typeof f === 'number' && Number.isFinite(f) && f > 0 ? f : null; }
 function indoorFree(venueId) { return tourFreeOf(venueIndoorInfo(venueId)); }
+// The suggested donation (a number) while the answer is By donation, or null.
+function indoorSuggested(venueId) { const t = venueIndoorInfo(venueId); return tourFreeOf(t) === 'donation' && typeof t.suggested === 'number' && t.suggested > 0 ? t.suggested : null; }
 // What the 'indoor_price' field holds: the adult price (a number), 'free' / 'donation', or null.
 function indoorPriceValue(venueId) { return indoorFree(venueId) || indoorPrice(venueId); }
 // -> { value } (a number from 1 to INDOOR_PRICE_MAX, 'free' or 'donation'; null clears) or { error }. "$25", "25 $",
@@ -24022,6 +24038,7 @@ function cleanIndoorInfoPart(key, x) {
   if (key === 'adult') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
   if (key === 'year') return ['all', 'seasonal'].includes(x) ? { value: x } : { error: TOUR_INFO_ERROR };
   if (key === 'visit') return x === 'appointment' ? { value: x } : { error: TOUR_INFO_ERROR };
+  if (key === 'suggested') { const c = cleanIndoorPrice(x); return c.error || typeof c.value !== 'number' || c.value > INDOOR_PRICE_LIVE_MAX ? { error: INDOOR_SUGGESTED_ERROR } : { value: c.value }; }
   return { error: TOUR_INFO_ERROR };
 }
 // The lines the answers write, in both languages ({ label: { en, fr } }); a label left out is not answered.
@@ -24034,7 +24051,8 @@ function indoorVisitLines(venue, info) {
   else if (t.year === 'all') out.Season = { en: 'All year.', fr: 'Toute l’année.' };
   if (INDOOR_LENGTHS.includes(t.length)) out['Time needed'] = { en: INDOOR_LENGTH_LINES[t.length][0], fr: INDOOR_LENGTH_LINES[t.length][1] };
   const free = tourFreeOf(t), price = typeof t.price === 'number' && t.price > 0 ? t.price : null;
-  if (free) out.Prices = { en: INDOOR_FREE_LINES[free][0], fr: INDOOR_FREE_LINES[free][1] };
+  if (free === 'donation') out.Prices = { en: indoorDonationLine(t.suggested, false), fr: indoorDonationLine(t.suggested, true) };
+  else if (free) out.Prices = { en: INDOOR_FREE_LINES[free][0], fr: INDOOR_FREE_LINES[free][1] };
   else if (price != null) out.Prices = { en: `Adults ${tourMoney(price, false)}.`, fr: `Adultes : ${tourMoney(price, true)}.` };
   if (INDOOR_AGES.includes(String(t.age || ''))) {
     const a = INDOOR_AGE_LINES[String(t.age)];
@@ -24055,7 +24073,7 @@ function writeIndoorVisitRows(venueId, now = new Date()) {
 // The owner's price as the card price ("From $25 · Adult admission", or "Free"), or taken off (null).
 function indoorCardPrice(venueId) {
   const p = indoorPrice(venueId), free = indoorFree(venueId);
-  try { if (free) priceCheck.setOwnerPrice(venueId, 0, TOUR_FREE_CARD_LABEL); else priceCheck.setOwnerPrice(venueId, p, p == null ? null : 'Adult admission'); } catch (e) { console.error(`[owner-portal] card price for indoor #${venueId} failed: ${e.message}`); }
+  try { if (free) priceCheck.setOwnerPrice(venueId, 0, free === 'donation' ? INDOOR_DONATION_CARD_LABEL : TOUR_FREE_CARD_LABEL); else priceCheck.setOwnerPrice(venueId, p, p == null ? null : 'Adult admission'); } catch (e) { console.error(`[owner-portal] card price for indoor #${venueId} failed: ${e.message}`); }
 }
 // Build My Trip's facts from the owner's own answers (nothing when not answered).
 function indoorPlannerFacts(venueId) {
@@ -24067,15 +24085,25 @@ function indoorPlannerFacts(venueId) {
     ...(INDOOR_LENGTHS.includes(t.length) ? { indoorLength: t.length } : {}),
     ...(typeof t.price === 'number' && Number.isFinite(t.price) && t.price > 0 ? { indoorPrice: t.price } : {}),
     ...(tourFreeOf(t) ? { indoorFree: tourFreeOf(t) } : {}),
+    ...(indoorSuggested(venueId) != null ? { indoorSuggested: indoorSuggested(venueId) } : {}),
   };
 }
 // Research's starting price (the card's "From $X", or a "$25" in its Prices / Admission line), a suggestion only.
 function indoorResearchPrice(venue) {
   const e = CARD_PRICES[String(venue.id)]; if (e && !e.owner && Number(e.from) > 0) return Number(e.from);
   const info = venueVisitInfo(venue.id) || {}; const mine = new Set(info.owner_labels || []);
-  const r = (info.rows || []).find((x) => x && /^(?:prices?|rates?|admission|tickets?|cost)$/i.test(x.label) && !mine.has(x.label));
+  // Indoor test 1: a line she has since replaced (owner_was) still offers its amount ("suggested $5").
+  const r = (info.rows || []).find((x) => x && /^(?:prices?|rates?|admission|tickets?|cost)$/i.test(x.label) && !mine.has(x.label)) || ((info.owner_was || {}).Prices && (info.owner_was || {}).Prices.text ? { text: info.owner_was.Prices.text } : null);
   const m = r && /\$\s?(\d{1,3})(?:\.\d{2})?(?!\d)/.exec(String(r.text || ''));
   return m && Number(m[1]) > 0 ? Number(m[1]) : null;
+}
+// Indoor test 1 (2026-11-19): research's Prices line says by donation ("Admission by donation: suggested $5 per adult")
+// -> true. The setup then pre-picks By donation with research's amount (a suggestion, saved only with the screen).
+function indoorResearchDonation(venue) {
+  const info = venueVisitInfo(venue.id) || {}; const mine = new Set(info.owner_labels || []);
+  const was = (info.owner_was || {}).Prices;
+  const r = (info.rows || []).find((x) => x && /^(?:prices?|rates?|admission|tickets?|cost)$/i.test(x.label) && !mine.has(x.label));
+  return /\bdonations?\b|pay what you can/i.test(String((r && r.text) || (was && was.text) || ''));
 }
 // The kinds research's words name (the name first, then the story), up to 3, as the starting picks of "What kind of place
 // are you?" ("We picked these from your page"). Saved only when the owner taps Save.
@@ -24327,7 +24355,7 @@ function venueCardHtml(venue, opts = {}) {
   // Reopens Dec 15", "Closed today (Between seasons…)") drops the closed pill on its photo, so it is said once (all types,
   // as winery and brewery cards on the Food & Drink pages already did).
   const statusSaysClosed = !!(opts.statusLine && (opts.statusLine.state === 'seasonal' || /^Closed\b/i.test(String(opts.statusLine.text || ''))));
-  const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to) && !(cardSeasonTag && cardSeasonTag.kind === 'closed' && statusSaysClosed) && !(cardSeasonTag && cardSeasonTag.kind === 'temp_closed' && cardSeasonTag.current && cardSeasonTag.from === cardSeasonTag.to && statusSaysClosureToday(opts.statusLine)) && !(cardSeasonTag && cardSeasonTag.kind === 'temp_closed' && cardSeasonTag.current && opts.statusLine && /^Closed between seasons\b/.test(String(opts.statusLine.text || '')))
+  const advisoryHtml = (advisoryNote !== null && advisoryNote !== undefined && !venue.redirect_to) && !(cardSeasonTag && cardSeasonTag.kind === 'closed' && statusSaysClosed) && !(cardSeasonTag && cardSeasonTag.kind === 'temp_closed' && cardSeasonTag.current && cardSeasonTag.from === cardSeasonTag.to && statusSaysClosureToday(opts.statusLine)) && !(cardSeasonTag && cardSeasonTag.kind === 'temp_closed' && cardSeasonTag.current && opts.statusLine && STATUS_BREAK_RE.test(String(opts.statusLine.text || '')))
     ? `\n        ${cardSeasonTag ? seasonTagHtml(cardSeasonTag, opts.seasonEndLabel) : advisoryNoticeHtml(advisoryNote)}`
     : '';
   // Card redesign (2026-10-28): on themed cards the Hidden Gem / Local Favourite badge sits on the photo (CARD_V2_CSS),
@@ -24341,8 +24369,11 @@ function venueCardHtml(venue, opts = {}) {
   const tourFactChips = isTourCard
     ? [tourFacts.price ? `<span class="chip chip-feat chip-price">${uiIcon('tag', '1.1em', true)}${escapeHtml(tourFacts.price.replace(/ \/ person$/, ''))}</span>` : '', tourFacts.time ? `<span class="chip chip-feat">${uiIcon('clock', '1.1em', true)}${escapeHtml(tourFacts.time)}</span>` : ''].filter(Boolean).join(' ')
     : '';
+  // Indoor test 1 (2026-11-19; Margaret): a card whose price chip already says "Free" or "By donation" drops the Free
+  // badge chip beside it ("Free · Free"). The Free to Visit badge itself stays on (filters, the page).
+  const priceSaysFree = !!(tourFacts && /^(?:Free|By donation)$/.test(String(tourFacts.price || '')));
   const chipsHtml = isTourCard
-    ? `<p class="chips">${photoTagChips}${capChips(freeChipFirst([tourFactChips, editorialChips.slice(photoTagChips.length), cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges })].filter(Boolean).join(' ')), 2, 2)}</p>`
+    ? `<p class="chips">${photoTagChips}${capChips(freeChipFirst([tourFactChips, editorialChips.slice(photoTagChips.length), cardBadgeChipsHtml(priceSaysFree ? { ...venue, free_entry: 0 } : venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges })].filter(Boolean).join(' ')), 2, 2)}</p>`
     : themed
     ? `<p class="chips">${photoTagChips}${capChips(freeChipFirst(editorialChips.slice(photoTagChips.length) + ' ' + cardBadgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges, allBadges })), maxChips - 1, maxChips - 1).replace(/( \/ person)(<\/span>)/g, '$2')}</p>`
     : `<p class="chips">${capChips(editorialChips + badgeChipsHtml(venue, { skipDogFriendly: showDogFriendly || hideDogBadges }), 0)}</p>`;
@@ -38739,6 +38770,8 @@ const FR_STATUS_DAYS = { Mon: 'lun.', Tue: 'mar.', Wed: 'mer.', Thu: 'jeu.', Fri
 // « Fermé du 11 oct. au 3 nov. ».
 const FR_STATUS_MONTHS = { Jan: 'janv.', Feb: 'f\u00e9vr.', Mar: 'mars', Apr: 'avr.', May: 'mai', Jun: 'juin', Jul: 'juil.', Aug: 'ao\u00fbt', Sep: 'sept.', Sept: 'sept.', Oct: 'oct.', Nov: 'nov.', Dec: 'd\u00e9c.' };
 const FR_STATUS_CLOSED_RANGE = /^Closed today \(Closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\.? (\d{1,2})\s*(?:-|\u2013|\u2014|to|until)\s*(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sept?|Oct|Nov|Dec)\.? )?(\d{1,2})\)/;
+// Indoor test 1 (2026-11-19): the breaks owners name, in French ("Closed for the winter break").
+const FR_BREAK_WORDS = { 'the holidays': 'pour les Fêtes', 'the winter break': 'pour la pause d’hiver', 'winter break': 'pour la pause d’hiver', 'the christmas break': 'pour les Fêtes', 'christmas': 'pour Noël', 'the holiday break': 'pour les Fêtes', 'the holiday season': 'pour les Fêtes', 'the spring break': 'pour la relâche du printemps', 'spring break': 'pour la relâche du printemps', 'renovations': 'pour rénovations', 'the winter': 'pour l’hiver' };
 function frStatusText(text) {
   const day1 = (d) => (d === '1' ? '1er' : d);
   text = String(text).replace(FR_STATUS_CLOSED_RANGE, (m, m1, d1, m2, d2) => (m2 && m2 !== m1
@@ -38760,6 +38793,8 @@ function frStatusText(text) {
     .replace(/ \u00b7 Reopens (early|mid-|late) ?(January|February|March|April|May|June|July|August|September|October|November|December) \(snow permitting\)$/, (m, p, mo) => ` \u00b7 Rouvre ${tourSnowWhen(`${String(MONTH_LONG.indexOf(mo) + 1).padStart(2, '0')}-${p === 'early' ? '05' : p === 'late' ? '25' : '15'}`, true)}${TOUR_SNOW_WORDS.fr}`)
     // Tour test 7: the break between two seasons (« Fermé entre les saisons · Réouverture le 1er juil. »).
     .replace(/^Closed between seasons((?: \([^()]*\))?) \u00b7 Reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m, note, mo, d) => `Ferm\u00e9 entre les saisons${note} \u00b7 R\u00e9ouverture le ${d === '1' ? '1er' : d} ${FR_STATUS_MONTHS[mo]}`)
+    // Indoor test 1 (2026-11-19): a named break (« Fermé pour la pause d’hiver · Réouverture le 15 janv. »).
+    .replace(/^Closed for ((?!the season\b)[^\u00b7]+?) \u00b7 Reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m, what, mo, d) => `Ferm\u00e9 ${FR_BREAK_WORDS[String(what).toLowerCase()] || 'pour une pause'} \u00b7 R\u00e9ouverture le ${d === '1' ? '1er' : d} ${FR_STATUS_MONTHS[mo]}`)
     .replace('Closed today \u00b7 Opens ', 'Ferm\u00e9 aujourd\u2019hui \u00b7 ouvre ')
     .replace('Closed \u00b7 Opens ', 'Ferm\u00e9 \u00b7 ouvre ')
     .replace('Closed today', 'Ferm\u00e9 aujourd\u2019hui')
@@ -40782,7 +40817,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     : venueOpenStatus(statusHours, venueAdvisoryNote !== undefined && !seasonNonBlockingIds(opts.now || new Date()).has(venue.id), opts.now || new Date());
   // Tour test 7 (Whistler, 2026-11-17): "Closed between seasons · Reopens Jul 1" says the break and its end; the notice
   // box under it ("Closed May 1–Jun 30, reopens Jul 1.") said it again.
-  try { if (openStatus && /^Closed between seasons\b/.test(String(openStatus.text || '')) && venueAdvisoryNote !== undefined && /^Closed\b[^.]*\breopens\b/i.test(String(parseAdvisoryNote(venueAdvisoryNote).text || ''))) venueAdvisoryHtml = ''; } catch (e) { /* keep it */ }
+  try { if (openStatus && STATUS_BREAK_RE.test(String(openStatus.text || '')) && venueAdvisoryNote !== undefined && /^Closed\b[^.]*\breopens\b/i.test(String(parseAdvisoryNote(venueAdvisoryNote).text || ''))) venueAdvisoryHtml = ''; } catch (e) { /* keep it */ }
   const openStatusHtml = showStatusHtml || (openStatus
     ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(venue.type === 'tour' ? tourOffRequestSay(venue.id, fr ? frStatusText(openStatus.text) : openStatus.text, fr) : fr ? frStatusText(openStatus.text) : openStatus.text)}${venue.type === 'tour' && ((openStatus.state !== 'appointment' && venueWeatherToday(venue.id, opts.now || new Date())) || (openStatus.state !== 'seasonal' && !/^Closed for the season/.test(String(openStatus.text || '')) && tourWeatherAll(venue.id))) ? escapeHtml(fr ? ' · selon la météo' : ' · weather permitting') : ''}${hoursHtml && !wineryApptAllYear ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
     : '');
@@ -52344,7 +52379,7 @@ function ownerValueText(field, value) {
     if (o.year) parts.push(o.year === 'all' ? 'Open all year' : 'Seasonal');
     return parts.length ? parts.join(' · ') : '(none)';
   }
-  if (field === 'indoor_price') return value == null ? '(none)' : value === 'free' ? 'Free entry' : value === 'donation' ? 'Free (by donation)' : `Adults ${tourMoney(Number(value), false)}`;
+  if (field === 'indoor_price') return value == null ? '(none)' : value === 'free' ? 'Free entry' : value === 'donation' ? 'By donation' : `Adults ${tourMoney(Number(value), false)}`;
   if (field === 'indoor_info') {
     const o = value && typeof value === 'object' ? value : {};
     const parts = [];
@@ -52353,6 +52388,7 @@ function ownerValueText(field, value) {
     if (o.book) parts.push(INDOOR_BOOK_LINES[o.book] ? INDOOR_BOOK_LINES[o.book][0].replace(/\.$/, '') : o.book);
     if (o.age) parts.push(`${INDOOR_AGE_LINES[o.age] ? INDOOR_AGE_LINES[o.age][0].replace(/\.$/, '') : o.age}${o.adult ? ', under 18s with an adult' : ''}`);
     if (o.visit === 'appointment') parts.push('No set hours (shows or classes only)');
+    if (typeof o.suggested === 'number') parts.push(`Suggested donation ${tourMoney(o.suggested, false)}`);
     if (o.year) parts.push(o.year === 'all' ? 'Open all year' : 'Seasonal');
     return parts.length ? parts.join(' · ') : '(none)';
   }
@@ -57063,7 +57099,13 @@ function researchedMenuOwnerCard(venue, pub, base, lang = 'en') {
 function renderMenuAppPage(found, opts) {
   const { venue } = found;
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
-  const t = { ...MENU_APP_STRINGS[lang], ...(isPriceList(venue) ? priceListAppStrings(menuKind(venue), lang) : {}), ...(brewSetupType(venue.type) ? breweryMenuAppStrings(venue, lang) : {}) };
+  const t0 = { ...MENU_APP_STRINGS[lang], ...(isPriceList(venue) ? priceListAppStrings(menuKind(venue), lang) : {}), ...(brewSetupType(venue.type) ? breweryMenuAppStrings(venue, lang) : {}) };
+  // Indoor test 1 (2026-11-19; Margaret): "Type them in myself" from the setup's Your prices felt like leaving the setup for
+  // the full editor. Opened from the setup (its way back is the setup's #more list), an indoor place's screen says it is
+  // part of the setup, and its way back says so too.
+  const fromSetup = venue.type === 'indoor' && /\/setup#more$/.test(String(opts.back || ''));
+  const t = fromSetup ? { ...t0, title: lang === 'fr' ? 'Vos tarifs (dans votre configuration)' : 'Your prices (part of your setup)', typeTitle: lang === 'fr' ? 'Vos tarifs (dans votre configuration)' : 'Your prices (part of your setup)',
+    back: lang === 'fr' ? '&larr; Retour à votre configuration' : '&larr; Back to your setup' } : t0;
   const plain = (s) => String(s).replace(/&amp;/g, '&').replace(/&rsquo;/g, '\u2019').replace(/&nbsp;/g, '\u00a0').replace(/&Eacute;/g, '\u00c9').replace(/&eacute;/g, '\u00e9').replace(/&egrave;/g, '\u00e8').replace(/&agrave;/g, '\u00e0');
   const pub = publishedMenu(venue.id);
   const state = menuStateJson(venue, opts.mode === 'admin' ? db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(opts.menuId) : activeMenuDraft(venue.id));
@@ -57848,7 +57890,7 @@ function renderOwnerSetupPage(found, opts) {
       indoorKinds: INDOOR_KINDS_SHOWN.map((k) => ({ k, t: INDOOR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), indoorKindsTop: INDOOR_KINDS_TOP,
       kindLength: INDOOR_KIND_LENGTH, kindBook: INDOOR_KIND_BOOK, kindAge: INDOOR_KIND_AGE, artsKinds: INDOOR_ARTS_KINDS,
       suggestKinds: (snap.indoor_info || {}).kinds ? [] : indoorKindSuggestion(venue),
-      researchFee: indoorResearchPrice(venue), researchFree: !!venue.free_entry && snap.indoor_price == null,
+      researchFee: indoorResearchPrice(venue), researchFree: (!!venue.free_entry || indoorResearchDonation(venue)) && snap.indoor_price == null, researchDonation: indoorResearchDonation(venue),
       bookingKnown: (!snap.booking_url && (venueVisitInfo(venue.id) || {}).booking_url) || '',
     } : {}),
     // Pub test (Whistler, 2026-11-14): research's "Minors until 9 PM" pre-picks that answer on a pub's Who's welcome
@@ -57980,7 +58022,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true"><input type="file" id="suDoorPick" accept="image/jpeg,image/*" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), dropHappyHour: tour || indoor, extraTopics: setupHereHelpTopics(venue, steps, withSetupNightsTopic(venue.type, (tour ? [statusTopic, ...TOUR_SETUP_HELP_TOPICS.map(tourYearlyBreakWords), TOUR_SETUP_SEASON_HELP_TOPIC] : indoor ? [statusTopic, ...INDOOR_SETUP_HELP_TOPICS.map(indoorClosureWords)] : cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type).map(helpHereInSetup)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_CHANGE_LATER_HELP_TOPIC, SETUP_WHO_SEES_HELP_TOPIC, tour ? TOUR_THIRD_STRETCH_HELP_TOPIC : SETUP_THIRD_STRETCH_HELP_TOPIC, SETUP_OPEN_HOLIDAYS_HELP_TOPIC], /* Tour test 15: a tour's day hours are departures, never lunch and dinner or brunch: its own 'hours' answer only. */ (tour ? [] : [SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC]).map((x) => (cafe ? cafeSecondTimeWords(x) : pub || brewery ? betweenSecondTimeWords(x) : x)), [setupClosuresHelpTopic(venue.type), setupClosureFixHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : []))) })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), dropHappyHour: tour || indoor, extraTopics: setupHereHelpTopics(venue, steps, withSetupNightsTopic(venue.type, (tour ? [statusTopic, ...TOUR_SETUP_HELP_TOPICS.map(tourYearlyBreakWords), TOUR_SETUP_SEASON_HELP_TOPIC] : indoor ? [statusTopic, ...INDOOR_SETUP_HELP_TOPICS.map(indoorClosureWords)] : cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type).map(helpHereInSetup)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_CHANGE_LATER_HELP_TOPIC, SETUP_WHO_SEES_HELP_TOPIC, tour ? TOUR_THIRD_STRETCH_HELP_TOPIC : SETUP_THIRD_STRETCH_HELP_TOPIC, SETUP_OPEN_HOLIDAYS_HELP_TOPIC], /* Tour test 15: a tour's day hours are departures, never lunch and dinner or brunch: its own 'hours' answer only. */ (tour ? [] : [SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC]).map((x) => (cafe ? cafeSecondTimeWords(x) : pub || brewery || indoor ? betweenSecondTimeWords(x) : x)), [setupClosuresHelpTopic(venue.type), setupClosureFixHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : []))) })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -58955,7 +58997,7 @@ const INDOOR_SETUP_HELP_TOPICS = [
     keys: ['gift card', 'gift cards', 'gift certificate', 'gift certificates', 'voucher', 'vouchers', 'gift shop', 'shop', 'store', 'merch', 'members', 'membership'],
     keysFr: ['carte cadeau', 'cartes cadeaux', 'certificat cadeau', 'bon cadeau', 'boutique', 'magasin', 'membres', 'abonnement'],
     a: '<p>A gift shop: tap <strong>Gift shop</strong> in <strong>Good to know</strong> (museums and galleries), or say it in one line there. Gift cards and memberships go in your story, in <strong>Your story and Known for</strong>, like <em>Gift cards and memberships at the front desk or online.</em> Membership prices can go in <strong>Your prices</strong>. There’s no separate box, to keep it short.</p>',
-    aFr: '<p>Une boutique : touchez <strong>Boutique</strong> dans <strong>Bon à savoir</strong> (musées et galeries), ou dites-le en une ligne. Les cartes-cadeaux et les abonnements vont dans votre histoire, dans <strong>Votre histoire et ce pour quoi vous êtes connus</strong>, comme <em>Cartes-cadeaux et abonnements à l’accueil ou en ligne.</em> Les prix des abonnements peuvent aller dans <strong>Vos tarifs</strong>. Il n’y a pas de case à part, pour rester court.</p>' },
+    aFr: '<p>Une boutique : touchez <strong>Boutique sur place</strong> dans <strong>Bon à savoir</strong> (musées et galeries), ou dites-le en une ligne. Les cartes-cadeaux et les abonnements vont dans votre histoire, dans <strong>Votre histoire et ce pour quoi vous êtes connus</strong>, comme <em>Cartes-cadeaux et abonnements à l’accueil ou en ligne.</em> Les prix des abonnements peuvent aller dans <strong>Vos tarifs</strong>. Il n’y a pas de case à part, pour rester court.</p>' },
   { id: 'indoor-access', pages: ['setup', 'edit'], over: ['features', 'parking-paid', 'parking-free'],
     q: 'Wheelchair access, elevators and accessible washrooms', qFr: 'Accès en fauteuil roulant, ascenseurs et toilettes accessibles',
     keys: ['wheelchair', 'wheelchair accessible', 'accessible', 'accessibility', 'elevator', 'elevators', 'ramp', 'stairs', 'step free', 'accessible washroom', 'mobility', 'stroller', 'strollers', 'service dog', 'service dogs', 'sensory', 'quiet hours', 'sensory friendly'],
@@ -73803,7 +73845,7 @@ module.exports = {
   COCKTAIL_SETUP_PART1, COCKTAIL_SETUP_PART2, COCKTAIL_SETUP_HELP_TOPICS, COCKTAIL_OWNER_BADGES, COCKTAIL_PRICE_LIVE_MAX, cocktailKidsWelcome, cocktailPriceOf, cocktailPriceGuess, pubSetupType, visitSlotsFor,
   websiteIsInstagramLink, BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, plannerKidsUntil, breweryListTile, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, dogsOutsideOnly, dogsPatioOnly, dogsFrLineEnglish, tripMonthWeekdayDate, kitchenSeasonsClean, setupHereHelpTopics, breweryFoodRowOn, breweryVisitLines, pubKitchenOn, ownerFrLineText, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
   descriptionShrank, tourInActivity, TOUR_KIND_ACTIVITY, ownerTextFlagsHtml, ownerTextClean, ownerFrDescState, tourTripItems, tourTextMonths, tourWaterMonths, tourKindSeasons, tourKindSeasonsEach, tourKindSeasonWords, tourKindSeasonGuess, tourTwoSeasons, tourKindSeasonsAsked, tourPriceWhy, tourYearlyBreaksText, tourStoryWords, tourLengthRange, dogsSomeTrips, tourPriceWhy, TOUR_ADDON_LINE_RE, TOUR_KIND_ORDER, dogsChipSentences,
-  INDOOR_SETUP_ON, INDOOR_SETUP_PART1, INDOOR_SETUP_PART2, INDOOR_SETUP_HELP_TOPICS, INDOOR_KIND_LABELS_OWNER, INDOOR_KINDS_SHOWN, venueIndoorInfo, indoorInfoAnswers, indoorPrice, indoorPriceValue, writeIndoorVisitRows, indoorVisitLines, indoorPlannerFacts, indoorKindsText, indoorKindSuggestion, cleanIndoorPrice,
+  INDOOR_SETUP_ON, INDOOR_SETUP_PART1, INDOOR_SETUP_PART2, INDOOR_SETUP_HELP_TOPICS, INDOOR_KIND_LABELS_OWNER, INDOOR_KINDS_SHOWN, venueIndoorInfo, indoorInfoAnswers, indoorPrice, indoorPriceValue, writeIndoorVisitRows, indoorVisitLines, indoorPlannerFacts, indoorKindsText, indoorKindSuggestion, cleanIndoorPrice, indoorSuggested, indoorDonationLine,
   TOUR_SETUP_PART1, TOUR_SETUP_PART2, TOUR_SETUP_HELP_TOPICS, TOUR_OWNER_BADGES, TOUR_PRICE_LIVE_MAX, TOUR_KIND_LABELS_OWNER, TOUR_KIND_PUBLIC, TOUR_KINDS_SHOWN, tourKindsText, tourCuisineFr, tourCardKind, openSeasonStretches, openStretchesText, venueTapListWords, ownerVisitResearchKeys, cardSeasonOnce, statusSaysClosureToday, venueMenuPreviewHtml, venueTourInfo, tourInfoAnswers, tourPrice, writeTourVisitRows, tourVisitLines, ownerTourPriceWaiting, tourResearchPrice, tourResearchLength, tourKindSuggestion, tourPlannerFacts, cleanTourPrice, apptLineFor,
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS, cafeHelpTopics, cafePlannerWords, cafeVisitTicks, cafeSpendGuessInfo,

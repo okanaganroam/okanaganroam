@@ -95,6 +95,8 @@ const FR_TEXT = {
   'Groups': 'Groupes',
   'Happy hour': '5 à 7',
   'Free': 'Gratuit',
+  // Indoor test 1 (2026-11-19): a by-donation place's card price.
+  'By donation': 'Contribution volontaire',
   'Arts & culture': 'Arts et culture',
   'Kid Friendly': 'Adapté aux enfants',
   'Kid-Friendly': 'Adapté aux enfants',

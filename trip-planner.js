@@ -1867,6 +1867,28 @@ function tourRentalPrice(v, ctx) {
   const it = pool[0];
   return { cents: Math.round(num(it.price) * 100), label: 'Rental', labelFr: 'Location', source: null, item: it.name, unit: it.price, unitFr: it.priceFr || it.price };
 }
+// Indoor test 1 (2026-11-19; Margaret's museum closes Dec 24 – Jan 14 every year): a request with no exact date ("a museum
+// in Summerland in January", or no date at all) that overlaps one of the owner's yearly closures says so on the card
+// ("Closed Dec 24 – Jan 14 every year"). Dated plans already leave the place out on its closed days.
+const CLOSURE_MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const CLOSURE_MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+function yearlyClosureNote(v, ctx) {
+  if (!v || !Array.isArray(v.ownerClosures) || !v.ownerClosures.length || (ctx && ctx.requirements && ctx.requirements.startDate)) return null;
+  const month = ctx && ctx.seasonInfo && ctx.seasonInfo.named === 'month' && Number.isInteger(ctx.seasonInfo.month) ? ctx.seasonInfo.month : null;
+  const inside = (x, a, b) => (a <= b ? x >= a && x <= b : x >= a || x <= b);
+  const today = ctx && /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) ? String(ctx.tripDate) : ownerClosureToday();
+  const soon = (() => { const d = new Date(`${today}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 30); return d.toISOString().slice(0, 10); })();
+  const hit = v.ownerClosures.find((c) => {
+    if (!c || !c.yearly || !/^\d{4}-\d{2}-\d{2}$/.test(String(c.from)) || !/^\d{4}-\d{2}-\d{2}$/.test(String(c.to || c.from))) return false;
+    const a = String(c.from).slice(5), b = String(c.to || c.from).slice(5);
+    if (month) { for (let d = 1; d <= 31; d++) if (inside(`${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`, a, b)) return true; return false; }
+    return String(c.from) <= soon && String(c.to || c.from) >= today;
+  });
+  if (!hit) return null;
+  const md = (iso, fr) => { const m = Number(iso.slice(5, 7)) - 1, d = Number(iso.slice(8, 10)); return fr ? `${d === 1 ? '1er' : d} ${CLOSURE_MONTHS_FR[m]}` : `${CLOSURE_MONTHS_EN[m]} ${d}`; };
+  const from = String(hit.from), to = String(hit.to || hit.from);
+  return { en: `Closed ${md(from, false)}${to !== from ? ` \u2013 ${md(to, false)}` : ''} every year`, fr: `Fermé ${to !== from ? `du ${md(from, true)} au ${md(to, true)}` : `le ${md(from, true)}`} chaque année` };
+}
 function publicVenue(v, ctx) {
   // Winery test 5 (2026-11-12): a winery's own tasting fee comes before a published price ("Check price per person" showed
   // with a $10 owner fee); a free tasting says so.
@@ -1895,6 +1917,9 @@ function publicVenue(v, ctx) {
     // too; it read « Prix par personne à vérifier ».
     ...(fee === 0 || ((v.type === 'brewery' || v.type === 'distillery') && v.flightFee === 0) ? { freeTasting: true } : {}),
     ...(tourIsFree ? { freeTour: v.tourFree } : {}),
+    ...(yearlyClosureNote(v, ctx) ? { yearlyClosure: yearlyClosureNote(v, ctx) } : {}),
+    // Indoor test 1 (2026-11-19; Margaret): a by-donation museum says "By donation (suggested $5)", never "Free entry".
+    ...(v.type === 'indoor' && v.indoorFree === 'donation' ? { byDonation: typeof v.indoorSuggested === 'number' && v.indoorSuggested > 0 ? v.indoorSuggested : true } : {}),
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     ...(cost ? { cost } : {}),
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.type === 'cocktail' ? 'Cocktail lounge' : v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : BREWERY_KIND_LABEL[v.type === 'brewery' && v.breweryKind] ? BREWERY_KIND_LABEL[v.breweryKind][0] : ctx ? (v.type === 'indoor' ? indoorVenueLabel(ctx, v, 'singular') : typeLabel(ctx, v.type, 'singular')) : v.type,

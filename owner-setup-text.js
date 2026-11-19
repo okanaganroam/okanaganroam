@@ -2476,13 +2476,42 @@ fr.indoor = {
   fitRest: 'Ça dépassait {max} caractères, alors nous avons gardé jusqu’à la dernière phrase complète. Laissé de côté : « {rest} ». Touchez Enregistrer de nouveau pour le garder ainsi.',
   moreQ: 'Plus sur votre endroit',
 };
+// Indoor test 1 (2026-11-19; Margaret, a by-donation museum): By donation keeps the adult price box, as the suggested amount.
+// Indoor test 1: no "lunch & dinner" on an indoor place's day card (a pool or a theatre that closes in between).
+Object.assign(en.indoor, { addSecond: '+ Add a second time (if you close in between)', twoTimesMax: 'Up to two times a day.' });
+Object.assign(fr.indoor, { addSecond: '+ Ajouter une deuxième plage (si vous fermez entre les deux)', twoTimesMax: 'Jusqu’à deux plages par jour.' });
+Object.assign(en.indoor, { tsuggLabel: 'Suggested amount (optional)', tdonationCard: 'By donation', tsuggNeed: 'Just the number, like 5. No suggested amount? Leave the box empty.',
+  seaClosuresHint: 'Closed over Christmas or for a winter break? Add it under Closures in More about your place.',
+  tpriceLeadDonation: 'Your card will say “By donation”.', tpriceSavedDonation: 'Your page and your card say “By donation” now.' });
+Object.assign(fr.indoor, { tsuggLabel: 'Montant suggéré (facultatif)', tdonationCard: 'Contribution volontaire', tsuggNeed: 'Seulement le chiffre, par exemple 5. Pas de montant suggéré? Laissez la case vide.',
+  seaClosuresHint: 'Fermé pendant les Fêtes ou pour une pause d’hiver? Ajoutez-le sous Fermetures dans Plus sur votre endroit.',
+  tpriceLeadDonation: 'Votre fiche indiquera « Contribution volontaire ».', tpriceSavedDonation: 'Votre page et votre fiche indiquent « Contribution volontaire » maintenant.' });
+// Indoor test 1 (2026-11-19; Margaret: "I don't speak French, do I have to update the French description"): the
+// finish screen's French line says it's optional and we translate it.
+Object.assign(en.indoor, { frDescOld: 'Optional: we translate your story into French for you. Speak French?', frDescGo: 'Check the French yourself' });
+Object.assign(fr.indoor, { frDescOld: 'Facultatif : nous traduisons votre histoire en français pour vous. Vous parlez français?', frDescGo: 'Vérifiez le français vous-même' });
 // Good to know quick answers for indoor places, and the Groups line's. Presets: the page shows each in its own language.
+// Indoor test 1 (2026-11-19; Margaret's museum was offered grip socks and a waiver): the Good to know chips follow the main
+// kind (good_to_know_kinds: arts = museums, galleries, libraries; active = climbing, trampolines, play centres, pools;
+// spa = spas and yoga; general = the rest). No more chips than before on any screen (7 at most).
 en.indoor.quick = Object.assign({}, en.quick, {
   good_to_know: ['Grip socks required', 'Lockers available', 'Waiver to sign before you play', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site', 'Arrive 15 minutes early'],
+  good_to_know_kinds: {
+    arts: ['Free on the first Sunday', 'Gift shop', 'Bags can be left at the desk', 'Guided tours on request', 'No flash photography', 'Free parking on site', 'Café or snack bar on site'],
+    active: ['Grip socks required', 'Waiver to sign before you play', 'Lockers available', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site', 'Arrive 15 minutes early'],
+    spa: ['Arrive 15 minutes early', 'Bring a swimsuit', 'Robes and towels provided', 'Lockers available', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site'],
+    general: ['Arrive 15 minutes early', 'Book ahead on weekends', 'Lockers available', 'Free parking on site', 'Café or snack bar on site'],
+  },
   groups: ['Birthday parties with a private room', 'School groups welcome', 'Private bookings on request'],
 });
 fr.indoor.quick = Object.assign({}, fr.quick, {
   good_to_know: ['Chaussettes antidérapantes obligatoires', 'Casiers offerts', 'Décharge à signer avant de jouer', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place', 'Arrivez 15 minutes d’avance'],
+  good_to_know_kinds: {
+    arts: ['Gratuit le premier dimanche', 'Boutique sur place', 'Sacs à laisser à l’accueil', 'Visites guidées sur demande', 'Photos sans flash', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
+    active: ['Chaussettes antidérapantes obligatoires', 'Décharge à signer avant de jouer', 'Casiers offerts', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place', 'Arrivez 15 minutes d’avance'],
+    spa: ['Arrivez 15 minutes d’avance', 'Apportez votre maillot', 'Peignoirs et serviettes fournis', 'Casiers offerts', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
+    general: ['Arrivez 15 minutes d’avance', 'Réservez pour les fins de semaine', 'Casiers offerts', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
+  },
   groups: ['Fêtes d’anniversaire avec salle privée', 'Groupes scolaires bienvenus', 'Réservations privées sur demande'],
 });
 (function frSpaces(o) {

@@ -1513,6 +1513,8 @@ function renderScript(d) {
     }
     // Winery test 5 (2026-11-12): a winery whose owner says tastings are free.
     if (v.freeTasting) return '<p class="t3-stop-price" data-cost-cents="0">' + esc(french ? 'Dégustation gratuite' : 'Free tasting') + '</p>';
+    // Indoor test 1 (2026-11-19): a place its owner marked by donation, with the suggested amount when she gave one.
+    if (v.byDonation) return '<p class="t3-stop-price" data-cost-cents="0"><strong>' + esc(french ? 'Contribution volontaire' : 'By donation') + '</strong>' + esc(typeof v.byDonation === 'number' ? (french ? ' (suggérée\u00a0: ' + cad(Math.round(v.byDonation * 100)) + ')' : ' (suggested ' + cad(Math.round(v.byDonation * 100)) + ')') : '') + '</p>';
     // Tour test 4 (Whistler, 2026-11-17): a tour its operator marked free, or by donation.
     if (v.freeTour) return '<p class="t3-stop-price" data-cost-cents="0"><strong>' + esc(french ? 'Gratuit' : 'Free') + '</strong>' + esc(v.freeTour === 'donation' ? (french ? ' (contribution volontaire)' : ' (pay what you want)') : '') + '</p>';
     return '<p class="t3-stop-price"' + (v.freeEntry ? ' data-cost-cents="0"' : '') + '>'
@@ -1565,6 +1567,8 @@ function renderScript(d) {
       + '<div class="t3-card-tags">' + badgesHtml(v) + '</div>'
       + '<div class="t3-card-body">'
       + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + (v.hoursByOwner ? ' <span class="t3-nowrap">' + esc(lang() === 'fr' ? '(confirmés par l’entreprise)' : '(confirmed by the business)') + '</span>' : /venue page|page du lieu/i.test(v.listedHours) ? '' : ' <span class="t3-nowrap"><span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></span>') + '</p>' : '')
+      // Indoor test 1 (2026-11-19): a yearly closure in the month asked for (or the next weeks, with no date).
+      + (v.yearlyClosure ? '<p class="t3-hours t3-closure">' + esc(lang() === 'fr' ? v.yearlyClosure.fr : v.yearlyClosure.en) + '</p>' : '')
       // Happy hour deals (2026-10-26): a stop timed inside the venue's happy hour says what is on.
       + (stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? '5 à 7' + (stop.happyHourWhenFr ? ' (' + esc(stop.happyHourWhenFr) + ')' : '') + '\u00a0: <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')
       // Weekly specials (2026-10-27): a stop on its special's day ("Tonight: Taco Tuesday · $3 tacos").

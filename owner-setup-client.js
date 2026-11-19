@@ -649,7 +649,10 @@
   S.savedTourPrice = CUR[PRICE_F] == null ? null : CUR[PRICE_F];
   // Indoor places (2026-11-19): research's price, or its Free badge, pre-picked as a suggestion (saved only with the screen);
   // the kinds research's words name pre-picked the same way; and each kind's usual visit, walk-ins answer and age.
-  if (INDOOR && S.tour.price == null && C.researchFree) { S.tour.free = 'free'; S.tour.price = 0; S.tour.priceGuessed = true; }
+  // Indoor test 1 (2026-11-19; Margaret): By donation keeps a suggested amount in the price box's place ("Suggested amount
+  // (optional)"); research's "by donation: suggested $5" pre-picks By donation and $5, saved only with the screen.
+  S.tour.sugg = INDOOR && typeof TI.suggested === 'number' ? TI.suggested : null; S.tour.suggText = null;
+  if (INDOOR && S.tour.price == null && C.researchFree) { S.tour.free = C.researchDonation ? 'donation' : 'free'; S.tour.price = 0; S.tour.priceGuessed = true; if (C.researchDonation && S.tour.sugg == null && typeof C.researchFee === 'number') S.tour.sugg = C.researchFee; }
   else if (INDOOR && S.tour.price == null && typeof C.researchFee === 'number') { S.tour.price = C.researchFee; S.tour.priceGuessed = true; }
   if (INDOOR && !S.tour.kinds.length && (C.suggestKinds || []).length) { S.tour.kinds = C.suggestKinds.slice(0, 3); S.tour.kindsGuessed = true; }
   function indoorGuess(){
@@ -773,6 +776,7 @@
     }
     if ((x = v('suBookUrl')) !== null && TL) S.bookUrl = x;
     if ((x = v('suBring')) !== null) S.tour.bring = x;
+    if ((x = v('suTsugg')) !== null) S.tour.suggText = x;
   }
   // One-of-a-few answers and chips on S.tour (data-tpick="length:half"); the kinds are on/off chips (data-tkind).
   // Tour test 12: the rule for younger guests as chosen ("Under 19s need a parent or guardian to sign the waiver").
@@ -798,7 +802,7 @@
   function tourRentalsOnly(){ var ks = (S.tour && S.tour.kinds) || []; return ks.length > 0 && ks.every(function(k){ return k === 'rentals'; }); }
   // Tour test 12: a second price after the first ("2nd jump same day $69"): the nudge to Your tours and prices.
   function tourPriceLead(){ var l0 = tourPriceLead0(); return S.tour.priceFirst && T.tpriceFirst ? l0 + ' ' + T.tpriceFirst : l0; }
-  function tourPriceLead0(){ var n = S.tour.price; return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n) }); }
+  function tourPriceLead0(){ var n = S.tour.price; return S.tour.free === 'donation' && T.tpriceLeadDonation ? T.tpriceLeadDonation : S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n) }); }
   // "$16" / "16 $".
   function cpText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }
@@ -1480,8 +1484,11 @@
     if (!en || /\b(?:le|la|les|et|avec|nos|des|est|pour|du|au|aux|une?|groupes|bienvenus?|réserv\w*|salle|souper|dîner|seulement|terrasse|enfants|chiens)\b/i.test(t)) return '';
     return '<p class="su-hint su-enhint" id="' + id + '">' + h((noQuick && T.lineEnglishHintNoQuick ? T.lineEnglishHintNoQuick : T.lineEnglishHint) + dropsEn) + '</p>';
   }
+  // Indoor test 1 (2026-11-19): an indoor place's Good to know chips by its main kind (owner-setup-text.js good_to_know_kinds).
+  var INDOOR_CHIP_GROUP = { museum: 'arts', gallery: 'arts', library: 'arts', climbing: 'active', kids: 'active', pool: 'active', spa: 'spa', yoga: 'spa' };
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
+    if (key === 'good_to_know' && INDOOR && (T.quick || {}).good_to_know_kinds) { var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : TI.kinds) || [])[0]; var lk = k0 ? T.quick.good_to_know_kinds[INDOOR_CHIP_GROUP[k0] || 'general'] : null; if (lk && lk.length) l = lk; }
     // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
     // isn't offered "Patio only".
     if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;
@@ -1536,11 +1543,18 @@
   function hDone(d){ return '<button type="button" class="su-toggle su-hdone" data-hclose="' + d + '" aria-label="' + h(fill(T.hoursDoneDayAria, { day: (C.longDays || {})[d] || dayName(d) })) + '">' + h(T.hoursDoneDay) + '</button>'; }
   // "Closes at midnight or later?" Midnight · 1 AM · 2 AM: one tap sets that day's closing time.
   var LATE = ['00:00', '01:00', '02:00'];
+  // Indoor test 1 (2026-11-19): a place whose kinds are all quiet daytime ones (museum, gallery, library, classes) has no
+  // "Open after midnight?" row and no "+ Add a second time" on its day cards. Theatres, bowling, arcades and casinos keep
+  // them. The kinds picked (or pre-picked) on What kind of place; none yet: shown as before.
+  var INDOOR_QUIET = ['museum', 'gallery', 'library', 'classes'];
+  function indoorQuietKinds(){ if (!INDOOR) return false; var ks = (S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : TI.kinds) || []; return ks.length > 0 && ks.every(function(k){ return INDOOR_QUIET.indexOf(k) >= 0; }); }
   function lateBtns(d, j, y){
     // Café test 1 (Whistler, 2026-11-15): no "Open after midnight?" row on a café's day card.
     if (C.cafe) return '';
     // Tour test 1 (Whistler, 2026-11-16): nor on a tour's (trips don't run past midnight).
     if (C.tour) return '';
+    // Indoor test 1 (2026-11-19; Margaret, a museum): nor on a museum's, gallery's, library's or class studio's.
+    if (indoorQuietKinds()) return '';
     var c = y[1] === '24:00' ? '00:00' : y[1];
     return '<div class="su-samerow su-laterow" role="group" aria-label="' + h(fill(T.lateQ, { day: dayName(d) })) + '"><span class="su-latelbl">' + h(T.lateLbl) + '</span>' + LATE.map(function(t){ return '<button type="button" class="su-toggle su-latebtn" aria-pressed="' + (c === t ? 'true' : 'false') + '" data-late="' + d + ':' + j + ':' + t + '">' + h(t12(t)) + '</button>'; }).join('') + '</div>';
   }
@@ -1656,9 +1670,9 @@
     // Tours (2026-11-16): the kinds, the town and the price as the card shows it ("From $129").
     // Indoor places (2026-11-19): the kinds, the town and the price as the card shows it ("Adults $25", "Free").
     if (C.indoor) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
-      + h([(TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([(TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     if (C.tour) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
-      + h([S.tourWords || C.tourWords || (TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? (T.tfreeCard || 'Free') : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([S.tourWords || C.tourWords || (TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? (T.tfreeCard || 'Free') : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     // Breweries (2026-11-12): the kind, the town and the flight price as the card shows it ("From $12").
     if (C.brewery) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([S.place && CUR.place_type ? (C.placeShow || {})[S.place] || S.place : C.typeLabel, C.regionLabel, S.savedFlight === 0 ? T.feeCardFree : S.savedFlight != null ? fill(T.feeCard, { x: flightText(S.savedFlight) }) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
@@ -2169,7 +2183,7 @@
           + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '">' + (w.length > 1 ? '<button type="button" class="su-toggle su-rmtime" data-rmtime="' + d + ':' + j + '" aria-label="' + h(T.removeSecond + (C.lang === 'fr' ? '\u00a0: ' : ': ') + t12(y[0]) + ' – ' + t12(y[1])) + '"><span aria-hidden="true">✕</span> ' + h(T.removeSecond) + '</button>' : '') + '</div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + brewQuick(d, j, y, w.length - 1) + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
             // Restaurant test 1 (Whistler, 2026-11-14): lunch and dinner on one day, as the edit page's "+ second time" (two
             // ranges at most, the server's rule). With two, "✕ Remove this time" on each (the one added may be the first).
-            + (w.length < 2 && T.addSecond ? '<div class="su-samerow"><button type="button" class="su-toggle su-addtime" data-addtime="' + d + '">' + h(T.addSecond) + '</button></div>' : '')
+            + (w.length < 2 && T.addSecond && !indoorQuietKinds() ? '<div class="su-samerow"><button type="button" class="su-toggle su-addtime" data-addtime="' + d + '">' + h(T.addSecond) + '</button></div>' : '')
             // Restaurant test 3 (Whistler, 2026-11-15): with two times the button goes; the card says why, and how breakfast
             // that runs into lunch fits (start the first time earlier).
             + (w.length >= 2 && T.twoTimesMax ? '<p class="su-hint su-twotimes">' + h(T.twoTimesMax) + '</p>' : '')
@@ -2336,7 +2350,9 @@
         + (ip.priceGuessed && (ip.free || (ip.price != null && !isNaN(ip.price))) && T.tpriceGuess ? '<p class="su-sent su-research" id="suFeeGuess">' + h(T.tpriceGuess) + '</p>' : '')
         + (CUR.indoor_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.indoor_price_waiting) })) + '</p>' : '') + msgs()
         + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suFreeChips">' + ['free', 'donation'].map(function(f){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ip.free === f ? 'true' : 'false') + '" data-ifree="' + f + '">' + h(tourFreeWord(f)) + '</button>'; }).join('') + '</div>'
-        + (ip.free ? '' : field('suTprice', T.tpriceLabel, boxVal('suTprice', ip.price), { max: 40 }) + '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>')
+        // Indoor test 1: By donation keeps the box, as "Suggested amount (optional)".
+        + (ip.free === 'donation' && T.tsuggLabel ? field('suTsugg', T.tsuggLabel, ip.suggText != null ? ip.suggText : ip.sugg != null ? String(ip.sugg) : '', { max: 12, mode: 'decimal' }) + '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>'
+          : ip.free ? '' : field('suTprice', T.tpriceLabel, boxVal('suTprice', ip.price), { max: 40 }) + '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThis, '', false, 'priceSave') + '</div>' + skip('price');
     } else if (s === 'booking' && INDOOR) {
       // Indoor places (2026-11-19): walk-ins or book ahead (one tap), then the booking or tickets link (optional).
@@ -3173,6 +3189,9 @@
     var stale = seaStaleOf(ch.hours_seasons || CUR.hours_seasons || []), addNext = !!S.seaAddNext; S.seaAddNext = false;
     saveAll('hours', listH, null, addNext ? seaStepOf(Math.min(S.seaList.filter(function(o){ return o.on; }).length, SEA_MAX - 1)) : KITCHEN_Q ? 'hours:kitchen' : CLO_SUB ? 'closures' : null, function(){
       if (CLO_SUB) { S.hoursJust = true; S.hoursNone = false; } else if (C.closuresTile) delete S.savedLine.hours;
+      // Indoor test 1 (2026-11-19; Margaret, closed Christmas to mid-January): with summer and winter hours just saved, one
+      // line points to Closures for a holiday break (no new step). Not when a yearly closure is already saved.
+      if (INDOOR && T.seaClosuresHint && ch.hours_seasons && ch.hours_seasons.length && !(CUR.closures || []).some(function(c){ return c && c.yearly; })) S.savedLine.hours = T.savedLive + ' ' + T.seaClosuresHint;
       CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? week : JSON.stringify(week); S.seaStale = stale.length ? stale : null;
       if (tourApptOff) { delete AI.visit; S.wine.visit = ''; }
       tticksSaved(tkpH);
@@ -4245,13 +4264,18 @@
     if (k === 'priceSave' && INDOOR) {
       readTour(); var ipf = S.tour.free, ipb = el('suTprice') ? el('suTprice').value : '', ipp = ipf ? 0 : tourPriceNumber(ipb);
       if (!ipf && (ipp == null || isNaN(ipp))) { S.nudge = T.tpriceNeed; S.badField = 'suTprice'; return render(); }
+      // Indoor test 1: the suggested donation (optional; empty takes it off).
+      var isg = null;
+      if (ipf === 'donation' && S.tour.suggText != null && String(S.tour.suggText).trim()) { isg = tourPriceNumber(S.tour.suggText); if (isg == null || isNaN(isg) || isg > (C.feeLiveMax || 300)) { S.nudge = T.tsuggNeed; S.badField = 'suTsugg'; return render(); } }
+      else if (ipf === 'donation' && S.tour.suggText == null) isg = S.tour.sugg;
       var ipl = [], ival = ipf || ipp;
+      if (ipf === 'donation' && isg !== (typeof TI.suggested === 'number' ? TI.suggested : null)) ipl.push(tinfo({ suggested: isg }));
       if (ival !== S.savedTourPrice || (CUR.indoor_price_waiting != null && ival !== CUR.indoor_price_waiting)) ipl.push(tprice(ival));
       // Free entry is the Free to Visit badge too (on with free, off with a price), so the Free filters agree with the card.
       var ifreeB = !!ipf; if (ifreeB !== !!(S.savedBadges.free_entry || (CUR.badges || {}).free_entry) && ipl.length) ipl.push({ badges: { free_entry: ifreeB } });
       var ilive = ipf || ipp <= (C.feeLiveMax || 300);
-      S.savedLine.price = ipf ? T.tpriceSavedFree : ilive ? T.tpriceSavedLive : fill(T.tpriceSavedDay, { x: tourMoney(ipp), n: tourMoney(C.feeLiveMax || 300) });
-      return saveAll('price', ipl, null, null, function(){ if (ilive) { S.savedTourPrice = ival; CUR.indoor_price = ival; CUR.indoor_price_waiting = null; } else CUR.indoor_price_waiting = ipp; S.tour.priceGuessed = false; S.savedBadges.free_entry = ifreeB; });
+      S.savedLine.price = ipf === 'donation' && T.tpriceSavedDonation ? T.tpriceSavedDonation : ipf ? T.tpriceSavedFree : ilive ? T.tpriceSavedLive : fill(T.tpriceSavedDay, { x: tourMoney(ipp), n: tourMoney(C.feeLiveMax || 300) });
+      return saveAll('price', ipl, null, null, function(){ if (ilive) { S.savedTourPrice = ival; CUR.indoor_price = ival; CUR.indoor_price_waiting = null; } else CUR.indoor_price_waiting = ipp; S.tour.priceGuessed = false; S.savedBadges.free_entry = ifreeB; if (ipf === 'donation') { TI.suggested = isg; if (isg == null) delete TI.suggested; S.tour.sugg = isg; S.tour.suggText = null; } });
     }
     if (k === 'bookingSave' && INDOOR) {
       readTour(); var ib0 = S.tour, ibu = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null; if (ibu !== null) S.bookUrl = ibu;
@@ -4666,7 +4690,9 @@
     // Indoor places (2026-11-19): Free entry / By donation (a tap again takes it back; the price box comes back empty).
     Array.prototype.forEach.call(screen.querySelectorAll('[data-ifree]'), function(b){ b.onclick = function(){
       var f = b.getAttribute('data-ifree'); S.tour.priceGuessed = false;
-      if (S.tour.free === f) { S.tour.free = ''; S.tour.price = null; S.rawBox.suTprice = ''; } else { S.tour.free = f; S.tour.price = 0; S.rawBox.suTprice = tourFreeWord(f); }
+      // Indoor test 1: a price she typed before tapping By donation becomes the suggested amount.
+      readTour(); var typed0 = S.tour.price;
+      if (S.tour.free === f) { S.tour.free = ''; S.tour.price = null; S.rawBox.suTprice = ''; } else { if (f === 'donation' && S.tour.sugg == null && S.tour.suggText == null && typeof typed0 === 'number' && typed0 > 0) S.tour.sugg = typed0; S.tour.free = f; S.tour.price = 0; S.rawBox.suTprice = tourFreeWord(f); }
       S.nudge = ''; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tks]'), function(b){ b.onclick = function(){ var q15 = b.getAttribute('data-tks').split(':'); S.tour.ks[q15[0]] = q15[1]; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tadult]'), function(b){ b.onclick = function(){ S.tour.adult = !S.tour.adult; redraw(); }; });

@@ -391,7 +391,12 @@ function statusAt(parsed, clock) {
   if (current.closure && current.closure.yearly && current.closure.from && current.closure.to) {
     var cf = Date.UTC(Number(current.closure.from.slice(0, 4)), Number(current.closure.from.slice(5, 7)) - 1, Number(current.closure.from.slice(8, 10)));
     var ct = Date.UTC(Number(current.closure.to.slice(0, 4)), Number(current.closure.to.slice(5, 7)) - 1, Number(current.closure.to.slice(8, 10)));
-    if ((ct - cf) / 86400000 >= 13) { var back = new Date(ct + 86400000); out.betweenSeasons = { reopens: back.toISOString().slice(0, 10) }; }
+    if ((ct - cf) / 86400000 >= 13) {
+      var back = new Date(ct + 86400000); out.betweenSeasons = { reopens: back.toISOString().slice(0, 10) };
+      // Indoor test 1 (2026-11-19): a break of up to about six weeks over Christmas is the holidays, not a season.
+      var x25 = Date.UTC(Number(current.closure.from.slice(0, 4)), 11, 25), y25 = Date.UTC(Number(current.closure.to.slice(0, 4)) - 1, 11, 25);
+      if ((ct - cf) / 86400000 <= 45 && ((x25 >= cf && x25 <= ct) || (y25 >= cf && y25 <= ct))) out.betweenSeasons.holidays = true;
+    }
   }
   return out;
 }
@@ -435,6 +440,12 @@ function hoursStatusLabel(status, clock) {
     return { state: 'open', text: 'Open now · Closes ' + closes };
   }
   if (status.betweenSeasons && status.betweenSeasons.reopens) {
+    // Indoor test 1 (2026-11-19; Margaret's museum, closed Dec 24 – Jan 14): a break the owner named ("Closed for the
+    // winter break. Back mid-January.") says so, and a Christmas break is the holidays: "Closed for the winter break ·
+    // Reopens Jan 15", one line, never "Closed between seasons" for a museum's holiday break.
+    var own = /^\s*closed for ((?!the season\b)[^.!\u00b7()]{3,40}?)\s*(?:[.!]|$)/i.exec(status.closedNote || '');
+    var brk = own ? 'Closed for ' + own[1] : status.betweenSeasons.holidays ? 'Closed for the holidays' : '';
+    if (brk) return { state: 'closed', text: brk + ' · Reopens ' + MONTHS[Number(status.betweenSeasons.reopens.slice(5, 7)) - 1] + ' ' + Number(status.betweenSeasons.reopens.slice(8, 10)) };
     // The owner's own note follows when it says something else than the break itself ("Between seasons. Back July 1.").
     var bn = status.closedNote && !/^(?:holiday|temporary closure)$/.test(status.closedNote) && !/\b(?:seasons?|back|reopen\w*|return\w*|closed)\b/i.test(status.closedNote) ? ' (' + status.closedNote + ')' : '';
     return { state: 'closed', text: 'Closed between seasons' + bn + ' · Reopens ' + MONTHS[Number(status.betweenSeasons.reopens.slice(5, 7)) - 1] + ' ' + Number(status.betweenSeasons.reopens.slice(8, 10)) };
