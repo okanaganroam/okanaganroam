@@ -512,7 +512,8 @@ test('10. wording and small items: "end of February", "tap Next", "Address or me
   const c = cfgOf((await get(`/owner/${t}/setup`)).text), f = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
   assert.equal(c.t.hoursBack, 'We put back the hours you had before. Check them, then tap Next.');
   assert.match(f.t.hoursBack, /puis touchez Suivant\.$/);
-  assert.equal(c.t.streetLabel, 'Address or meeting point'); assert.equal(f.t.streetLabel, 'Adresse ou point de rencontre');
+  // Tour test 15 (Dayton): the business address.
+  assert.equal(c.t.streetLabel, 'Address (your office or main spot)'); assert.equal(f.t.streetLabel, 'Adresse (votre bureau ou point principal)');
   const rc = cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text);
   assert.equal(rc.t.streetLabel, 'Street address'); assert.equal(rc.t.hoursBack, c.t.hoursBack);
   // Category words: one list, one capital; acronyms and hyphenated names stay.
@@ -525,10 +526,11 @@ test('10. wording and small items: "end of February", "tap Next", "Address or me
   assert.equal(app.getVenue(v.id).cuisine, 'Walking tours & food tours');
   // The page: "Category" (not Cuisine) for a tour, and "Meeting point" once the Basics question is confirmed.
   assert.match(plain(page(v, 'en')), /Good to Know Category Walking tours & food tours Address Gyro Park/);
+  // Tour test 15 (Dayton, 2026-11-18): a tour's address stays "Address" (no meeting-point label).
   await progress(t, 'basics');
-  assert.equal(app.tourAddressIsMeetingPoint(app.getVenue(v.id)), true);
-  assert.match(plain(page(v, 'en')), /Category Walking tours & food tours Meeting point Gyro Park, 99 Main St, Penticton/);
-  assert.match(plain(page(v, 'fr')), /Catégorie Visites à pied et visites gourmandes Point de rencontre Gyro Park/);
+  assert.equal(app.tourAddressIsMeetingPoint(app.getVenue(v.id)), false);
+  assert.match(plain(page(v, 'en')), /Category Walking tours & food tours Address Gyro Park, 99 Main St, Penticton/);
+  assert.match(plain(page(v, 'fr')), /Catégorie Visites à pied et visites gourmandes Adresse Gyro Park/);
   const rest = mk('restaurant', { cuisine: 'Canadian' });
   await progress(tokenFor(rest.id), 'basics');
   assert.match(plain(page(rest, 'en')), /Cuisine Canadian Address /);

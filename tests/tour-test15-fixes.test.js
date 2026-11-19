@@ -196,14 +196,18 @@ test('4. the price screen: a per-boat, per-board or hourly rental goes to Your t
   const r = await change(t, { tour_price: '30/hr per boat' });
   assert.equal(r.status, 400); assert.doesNotMatch(JSON.stringify(r.body), /Private tours/);
   // The client rule and its hint.
-  assert.match(CLIENT, /if \(!priv && tourRentalPriceWords\(rest\)\) return 'unit';/);
   assert.match(CLIENT, /tourRentalKinds\(\) && T\.tpriceMoreRentals \? T\.tpriceMoreRentals : T\.tpriceMore/);
   assert.match(text.en.tour.tpriceMoreRentals, /Rentals priced per boat, board or hour go in “Your tours and prices”/);
   assert.match(text.fr.tour.tpriceMoreRentals, /par planche/);
-  const rw = new Function('S', 'TI', 'TOUR', `${fnBody(CLIENT, 'tourRentalKinds')}\n${fnBody(CLIENT, 'tourRentalPriceWords')}\nreturn tourRentalPriceWords;`);
-  assert.equal(rw({ tour: { kinds: ['paddle', 'rentals'] } }, {}, true)('/hr per boat'), true);
-  assert.equal(rw({ tour: { kinds: ['boat'] } }, {}, true)('per boat'), false);
-  assert.equal(rw({ tour: { kinds: ['paddle'] } }, {}, true)('whole boat charter'), false);
+  // The client's own rule, run (with the page's kinds, and without).
+  const src = ['moneyHead', 'feeHours', 'priceSwiss', 'priceTrim', 'tourPriceWhy'].map((n) => fnBody(CLIENT, n)).join('\n');
+  const cw = (kinds) => new Function('S', `${src}\nreturn tourPriceWhy;`)(kinds ? { tour: { kinds } } : undefined);
+  assert.equal(cw(['paddle', 'rentals', 'snowshoe'])('30/hr per boat'), 'unit');
+  assert.equal(cw(['paddle'])('45 per canoe'), 'unit');
+  assert.equal(cw(['boat'])('650 per boat'), 'group');
+  assert.equal(cw(['paddle', 'boat'])('1200 whole boat charter'), 'group');
+  assert.equal(cw(null)('30/hr per boat'), 'unit');
+  assert.equal(cw(null)('650 per boat'), 'group');
 });
 
 test('5. a rental request’s trip card shows his own rental price; French planner words for canoe, kayak, SUP, raquettes and fondue', async () => {

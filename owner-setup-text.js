@@ -2061,7 +2061,8 @@ Object.assign(en.tour, {
   tpriceNeed: 'Just the number, like 189. Free or by donation? Type free.',
   tpriceSavedFree: 'Your page and your card say “Free” now.', tfreeCard: 'Free', tfreeWords: { free: 'Free', donation: 'By donation' },
   dogQ: 'Which trips can dogs join?', dogEx: 'Dogs on a leash welcome on our walks, not on the food tour.',
-  streetLabel: 'Address or meeting point',
+  // Tour test 15 (Dayton, 2026-11-18): the business address; guests get the meeting spot when they book.
+  streetLabel: 'Address (your office or main spot)',
   // The chip's words as she taps them ("On some trips (say which)"); the box gets the quick answer itself ("On some trips").
   dogChipLabels: ['On every trip', 'On some trips (say which)', 'On a leash'],
   // The page's sentences for the first two chips (server.js dogsChipSentences).
@@ -2076,7 +2077,7 @@ Object.assign(fr.tour, {
   tpriceNeed: 'Seulement le chiffre, par exemple 189. Gratuit ou contribution volontaire? Écrivez gratuit.',
   tpriceSavedFree: 'Votre page et votre fiche indiquent « Gratuit » maintenant.', tfreeCard: 'Gratuit', tfreeWords: { free: 'Gratuit', donation: 'Contribution volontaire' },
   dogQ: 'À quelles sorties les chiens peuvent-ils venir?', dogEx: 'Chiens en laisse bienvenus à nos marches, pas à la visite gourmande.',
-  streetLabel: 'Adresse ou point de rencontre',
+  streetLabel: 'Adresse (votre bureau ou point principal)',
   dogChipLabels: ['À toutes les sorties', 'À certaines sorties (dites lesquelles)', 'En laisse'],
   quickDogsFull: ['Chiens bienvenus à toutes les sorties', 'Chiens bienvenus à certaines sorties'],
 });

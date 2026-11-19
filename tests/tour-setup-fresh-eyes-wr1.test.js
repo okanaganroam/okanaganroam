@@ -238,8 +238,8 @@ test('B5: a rejected price keeps what was typed (every price box)', () => {
 test('B6: the edit page and the meeting spot read like a tour; a restaurant keeps its words', async () => {
   const { t } = await jess();
   const e = (await get(`/owner/${t}`)).text;
-  assert.match(e, /Help people find your meeting spot/);
-  assert.match(e, /A photo taken where people meet you/);
+  // Tour test 15 (Dayton, 2026-11-18): no meeting-spot tile for tours.
+  assert.doesNotMatch(e, /Help people find your meeting spot/);
   assert.match(e, /Special trips, classes and more/);
   assert.match(e, /Dogs, parking, access, price range…/);
   assert.match(e, /your trips, your guides and your guests/);
@@ -248,7 +248,7 @@ test('B6: the edit page and the meeting spot read like a tour; a restaurant keep
   assert.doesNotMatch(e, /Stand on the sidewalk or street/);
   assert.doesNotMatch(e, /your space, food, drinks/);
   const ef = (await get(`/fr/owner/${t}`)).text;
-  assert.match(ef, /Aidez les gens à trouver votre point de rencontre/);
+  assert.doesNotMatch(ef, /Aidez les gens à trouver votre point de rencontre/);
   assert.match(ef, /Sorties spéciales, ateliers et plus/);
   const r = mk('restaurant');
   const re = (await get(`/owner/${tokenFor(r.id)}`)).text;

@@ -287,9 +287,10 @@ test('10. minor: Groups counter, French unit words and lengths on the list, priv
   const { v } = await planFixtures();
   const frList = plain(app.renderVenueMenuPage(app.getVenue(v.id), app.publishedMenu(v.id), { lang: 'fr' }));
   assert.match(frList, /69 \$ par vélo/); assert.match(frList, /2,5 heures/); assert.doesNotMatch(frList, /per bike|2\.5 hours/);
-  assert.match(frList, /4 activités/);
+  // Tour test 15: rentals are counted as rentals (« 2 activités et 2 locations »).
+  assert.match(frList, /2 activités et 2 locations/);
   const enList = plain(app.renderVenueMenuPage(app.getVenue(v.id), app.publishedMenu(v.id), { lang: 'en' }));
-  assert.match(enList, /\$69 per bike/); assert.match(enList, /\(?4 tours|4 activities|4 trips/);
+  assert.match(enList, /\$69 per bike/); assert.match(enList, /2 tours and 2 rentals/);
   for (const x of ['Private group or corporate booking', 'Private groups', 'Groupes privés', 'Sorties privées']) assert.ok(app.TOUR_ADDON_LINE_RE.test(x), x);
   assert.ok(!app.TOUR_ADDON_LINE_RE.test('Full day private boat'));
   // The private price box takes "1500 $ et plus" (server, as the edit page sends it).

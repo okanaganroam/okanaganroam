@@ -248,7 +248,8 @@ test('4. Help: the winter-only trip, office hours, change it later, can my boss 
   assert.match(SERVER, /async function notifyReviewDecision\(kind, id, action/);
   assert.match(SERVER, /function ownerDecisionRecipients\(venueId, senderEmail\)/);
   assert.match(SERVER, /function notifyOwnersOfNewLogin\(venue, newAccount\)/);
-  assert.match(hb.topic('tour-meeting').a, /drag the pin to your meeting spot/);
+  // Tour test 15 (Dayton): no meeting-spot step for tours; guests get the spot when they book.
+  assert.match(hb.topic('tour-meeting').a, /Guests get the exact meeting spot when they book/);
   assert.equal(hb.best('our office is not the meeting point').id, 'tour-meeting');
   assert.equal(hb.best('We do ATV tours, which one do I pick?').id, 'tour-kinds-other');
   assert.match(hb.topic('tour-lead-time').a, /pick the <strong>longest<\/strong> notice/);

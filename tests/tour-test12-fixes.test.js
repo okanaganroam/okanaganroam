@@ -229,16 +229,18 @@ test('5. "Weather permitting" on a stretch of other hours: the hours block, "Ope
   assert.ok(text.en.seaWeather && text.fr.seaWeather);
 });
 
-test('7a. Close by and its distances start from the approved meeting spot (not the office pin); a pickup operator keeps the office', async () => {
+// Tour test 15 (Dayton, 2026-11-18): tours have no meeting-spot step; a tour's Close by starts from its business pin, and a
+// meeting spot sent before stays stored, unused.
+test('7a. Close by and its distances start from the business pin for a tour (a stored meeting spot is not used)', async () => {
   const { v } = await kayla({ latitude: 50.0870, longitude: -123.0400 });
   const near = mk('cafe', { name: 'Gravel Lot Coffee', latitude: 50.0350, longitude: -123.1100 });
   const far = mk('cafe', { name: 'Office Coffee', latitude: 50.0872, longitude: -123.0402 });
   db.prepare("INSERT INTO venue_arrival_points (venue_id, file, preview_key, lat, lng, status) VALUES (?, 't12.jpg', ?, 50.0352, -123.1102, 'approved')").run(v.id, `t12-${v.id}`);
   const o = app.venueCloseByOrigin(app.getVenue(v.id));
-  assert.equal(o.latitude, 50.0352);
+  assert.equal(o.latitude, 50.0870);
   const nb = app.getNearbyVenues(app.getVenue(v.id));
-  assert.equal(nb.find((x) => x.id === near.id).distance_km < 0.1, true);
-  assert.ok(nb.find((x) => x.id === far.id).distance_km > 5);
+  assert.equal(nb.find((x) => x.id === far.id).distance_km < 0.1, true);
+  assert.ok(nb.find((x) => x.id === near.id).distance_km > 5);
 });
 
 test('7b. links pulled out of pasted text: a booking link with an emoji or #linkinbio, an instagram.com/<name> link', async () => {

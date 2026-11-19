@@ -664,10 +664,6 @@
   function priceSwiss(x){ return String(x == null ? '' : x).trim().replace(/^(?:CHF|SFr\.?|Fr\.)\s*/i, '').replace(/(\d)\s*CHF\b\.?/i, '$1').replace(/(\d)[.,][-\u2013\u2014]+/, '$1'); }
   function priceTrim(x){ return priceSwiss(x).replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
   function tourRentalKinds(){ return TOUR && ((S.tour && S.tour.kinds) || TI.kinds || []).some(function(k){ return k === 'rentals' || k === 'paddle'; }); }
-  function tourRentalPriceWords(rest){
-    return (tourRentalKinds() || /(?:^|[\s\/])(?:hours?|hrs?|hr|h|heures?)\b|\bhourly\b|\brentals?\b|\blocations?\b/.test(rest))
-      && /\b(?:boats?|boards?|canoes?|kayaks?|sups?|paddle ?boards?|bateaux?|planches?|canots?|embarcations?)\b/.test(rest) && !/\b(?:whole|entire|charters?|nolis\w*|private|priv[ée]e?s?)\b/.test(rest);
-  }
   function tourPriceWhy(x, priv){
     var TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|rafts?|radeaux?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?)\b/;
     // Tour test 7 (Whistler, 2026-11-17): days, nights and hours are not units: "$750/day" is a day rate for the group
@@ -699,7 +695,9 @@
     // Tour test 15 (Whistler, 2026-11-18; Dave: "30/hr per boat", canoe and kayak rentals): with Rentals or Paddle picked, or
     // words that say rental or per hour, a price per boat, board, canoe or kayak is a rental ('unit': Your tours and prices),
     // never a private tour. A whole-boat charter or a private trip stays 'group' (server.js tourPriceWhy, the same rule).
-    if (!priv && tourRentalPriceWords(rest)) return 'unit';
+    // (Self-contained: the kinds are read from the page's state when there is one.)
+    var rentKinds = typeof S !== 'undefined' && S && S.tour && (S.tour.kinds || []).some(function(k){ return k === 'rentals' || k === 'paddle'; });
+    if (!priv && (rentKinds || /(?:^|[\s\/])(?:hours?|hrs?|hr|h|heures?)\b|\bhourly\b|\brentals?\b|\blocations?\b/.test(rest)) && /\b(?:boats?|boards?|canoes?|kayaks?|sups?|paddle ?boards?|bateaux?|planches?|canots?|embarcations?)\b/.test(rest) && !/\b(?:whole|entire|charters?|nolis\w*|private|priv[ée]e?s?)\b/.test(rest)) return 'unit';
     if (!TOUR_UNIT_RE.test(rest) && (DAY_RE.test(rest) || HOUR_RE.test(rest))) {
       if (priv) rest = rest.replace(RATE_STRIP, ' ').replace(/\s+/g, ' ').trim();
       else if (!TOUR_GROUP_RE.test(rest)) return DAY_RE.test(rest) ? 'day' : 'hourly';

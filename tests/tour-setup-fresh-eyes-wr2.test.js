@@ -415,7 +415,8 @@ test('9 + 10 + Minor: the edit page and the wording table for a tour (EN/FR); «
   assert.equal(sp(T.labels.menu), 'Vos sorties et tarifs');
   assert.match(sp(T.tprivQ), /^Sorties privées/);
   assert.match(sp(T.noSetHoursSaved), /sorties sur réservation/);
-  assert.match(sp(T.basicsQ), /^Est-ce bien ici qu’on vous rejoint \? Votre téléphone et votre site Web sont-ils exacts \?$/);
+  // Tour test 15 (Dayton): tours have no meeting-spot question; Basics asks for the address.
+  assert.match(sp(T.basicsQ), /^Est-ce bien votre adresse, votre téléphone et votre site Web \?$/);
   assert.equal(sp(T.photosQ), 'Ajoutez des photos de vos sorties');
   assert.equal(sp(T.moreQ), 'Plus de détails sur votre entreprise');
   assert.ok(T.quick.good_to_know.map(sp).includes('Navette depuis l’hôtel offerte'));
@@ -440,11 +441,12 @@ test('9 + 10 + Minor: the edit page and the wording table for a tour (EN/FR); «
   assert.doesNotMatch(pf, /Lien du menu/);
   assert.match(pf, /Sorties spéciales, ateliers ou cours/);
   assert.doesNotMatch(pf, /Musique en direct, dégustations, marchés/);
-  assert.match(ef, />POINT DE RENCONTRE<\/text>/);
+  // Tour test 15 (Dayton, 2026-11-18): no meeting-spot section on a tour's edit page.
+  assert.doesNotMatch(ef, />POINT DE RENCONTRE<\/text>/);
   assert.doesNotMatch(ef, />VOTRE COMMERCE<\/text>/);
-  assert.match(pf, /Prendre la photo du point de rencontre/);
+  assert.doesNotMatch(pf, /Prendre la photo du point de rencontre/);
   assert.doesNotMatch(pf, /de le point/);
-  assert.match(pf, /aider les visiteurs à trouver votre point de rencontre/);
+  assert.doesNotMatch(pf, /aider les visiteurs à trouver votre point de rencontre/);
   assert.match(pf, /À partir de 85 \$ par personne/);
   assert.doesNotMatch(pf, /\$\$\$\s?: 30 à 60 \$ par personne/);
   assert.match(ef, /<span class="op-fold-hint">À partir de 85[\s\u00a0\u202f]\$ par personne<\/span>/);
@@ -455,7 +457,7 @@ test('9 + 10 + Minor: the edit page and the wording table for a tour (EN/FR); «
   assert.match(pe, /Tours and prices sent to us/);
   assert.match(pe, /Prices link \(optional\)/);
   assert.match(pe, /Special trips, workshops or classes/);
-  assert.match(ee, />MEETING SPOT<\/text>/);
+  assert.doesNotMatch(ee, />MEETING SPOT<\/text>/);
   assert.match(pe, /From \$85 a person/);
   assert.match(pe, /Change my season/);
   assert.doesNotMatch(pe, /When you open and close/);
