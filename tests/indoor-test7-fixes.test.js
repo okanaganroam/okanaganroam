@@ -156,6 +156,8 @@ test('4. Gallery Good to know chips: for sale, shipping, monthly exhibition; no 
   const g = await openSetup(base, t, { hash: 'bring' });
   for (const c of ['Most art is for sale', 'We can ship your purchase', 'New exhibition every month']) assert.ok(g.has(`[data-quick="${c}"]`), c);
   assert.ok(!g.has('[data-quick="Free on the first Sunday"]'));
+  assert.match(g.text(), /Most art is for sale, and we can ship it/);
+  assert.doesNotMatch(g.text(), /Grip socks/);
   // A free museum doesn't see the first-Sunday chip either; a paid one does.
   const mus = mk('indoor', { name: 'Museum T7', cuisine: 'Museum' }); const tm = tokenFor(mus.id);
   await ok(change(tm, { indoor_info: { kinds: ['museum'], length: '1-2h', book: 'no', age: 'all' }, indoor_price: 'free' }));
