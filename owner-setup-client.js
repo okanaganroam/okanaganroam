@@ -665,7 +665,11 @@
     var HOUR_RE = /(?:^|[\s\/])(?:hours?|hrs?|hr|h|heures?)\b|\bhourly\b|\bhoraire\b/;
     var RATE_STRIP = /(?:^|[\s\/])(?:(?:per|a|an|par|the|la|le|each|by the|[àa] la|[àa] l|de l|pour la|pour une?)\s+)?(?:full[\s-]+)?(?:days?|nights?|jours?|journ[ée]es?|nuits?|nuit[ée]es?|hours?|hrs?|hr|h|heures?)\b(?:\s+rate)?|\b(?:daily|nightly|hourly)(?:\s+rate)?\b|\b(?:day|hour) rate\b|\b(?:tarif|taux) (?:journalier|quotidien|horaire)\b|\bhoraire\b/g;
     var LEN_RE = /(?:^|\s)(?:for|pour|sur)\s+(?:a\s+|an\s+)?\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|(?:^|\s)\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|\b(?:multi[\s-]?days?|several days|plusieurs jours)\b/;
-    var PER_ONE_RE = /^(?:\/\s*|(?:per|a|an|par|each|la|le)\s+)(?:persons?|people|personnes?|pers|jumps?|sauts?|rides?|seats?|places?|guests?|riders?|adults?|adultes?|heads?|tickets?|billets?|participants?|passengers?|passagers?|swings?|flights?|vols?|tours?|trips?|sorties?|descentes?|runs?)\b|^(?:pp|p\.p\.?|each|ea|chacun)(?![a-z])/;
+    // Tour test 14 (Lucía): per student, child, kid, skier, rider or participant is per person; per lesson is for the group
+    // ('lesson': Private tours; accepted in the private box). (server.js tourPriceWhy, the same rule.)
+    var PER_ONE_RE = /^(?:\/\s*|(?:per|a|an|par|each|la|le)\s+)(?:persons?|people|personnes?|pers|jumps?|sauts?|rides?|seats?|places?|guests?|riders?|adults?|adultes?|heads?|tickets?|billets?|participants?|passengers?|passagers?|swings?|flights?|vols?|tours?|trips?|sorties?|descentes?|runs?|students?|[ée]tudiants?|child|children|kids?|enfants?|skiers?|skieu(?:r|rs|se|ses)|snowboarders?|learners?|[ée]l[èe]ves?)\b|^(?:pp|p\.p\.?|each|ea|chacun)(?![a-z])/;
+    var PER_LESSON_RE = /^(?:\/\s*|(?:per|a|an|par|pour|each|by the|the|la|le)\s+)(?:(?:private|group|semi[- ]private|half[- ]day|full[- ]day|2[- ]hour|3[- ]hour|priv[ée]e?s?)\s+)*(?:lessons?|le[çc]ons?|cours|class(?:es)?|sessions?|s[ée]ances?)\b/;
+    var COUNT_RANGE_RE = /\(?\s*(?:for |up to |pour |jusqu à |max\.? )?\d+\s*(?:-|–|to|à|a)\s*\d+\s*(?:ppl|people|pax|persons?|guests?|personnes?|pers|adults?|adultes?|skiers?|students?|riders?)?\s*\)?/g;
     var TOUR_GROUP_RE = /\b(?:boats?|charters?|groups?|vessels?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?|class(?:es)?|classes?|schools?|[ée]coles?)\b/;
     var raw = priceTrim(x); if (!raw || !/\d/.test(raw)) return '';
     if (feeHours(raw)) return 'hours';
@@ -686,13 +690,14 @@
     }
     // Tour test 8: a price per sled, vehicle or bike stays per unit even when it says who fits (server.js, same rule).
     if (!priv && TOUR_UNIT_RE.test(rest) && !TOUR_GROUP_RE.test(rest)) return 'unit';
+    if (PER_LESSON_RE.test(rest)) return priv ? (/\d/.test(rest.replace(COUNT_RANGE_RE, ' ').replace(/(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d+|\/\s*\d+|\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/g, '')) ? 'many' : '') : 'lesson';
     var group = TOUR_GROUP_RE.test(rest)
       || /(?:^|\s|\/)(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d/.test(rest) || /^\/\s*\d/.test(rest) || /\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/.test(rest);
     if (group) return priv ? (/\d/.test(rest.replace(/(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d+|\/\s*\d+|\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/g, '')) ? 'many' : '') : 'group';
     if (/\d/.test(rest)) return 'many';
     var left = rest.replace(/^(?:cad|ca|dollars?|\$)\s*/, '').replace(/\b(?:plus|\+)?\s*(?:tax(?:es)?|gst|tps|tvq|tx)(?:\s*(?:incl(?:uded)?|in|extra|en sus))?\b/g, ' ').replace(/^(?:\/|per|a|an|par|pour|by|la|le)\s*/, '')
       // Tour test 13: per flight / ride / jump / trip / seat, with an adjective ("per tandem flight"), is per person.
-      .replace(/^(?:(?:tandem|classic|standard|solo|single|basic|regular|shared|scenic|intro|introductory|discovery|biplace|duo)\s+)*(?:persons?|personnes?|pers|pp|p\.p\.?|ppl|pax|adults?|adultes?|guests?|head|t[êe]te|each|chacun|ea|seats?|places?|riders?|cavali[eè]re?s?|child|children|kids?|enfants?|participants?|passengers?|passagers?|flights?|vols?|rides?|jumps?|sauts?|trips?|tours?|sorties?|excursions?|tickets?|billets?)(?![a-zà-ÿ])\.?/, '').replace(/[\s.,+\/-]+/g, '');
+      .replace(/^(?:(?:tandem|classic|standard|solo|single|basic|regular|shared|scenic|intro|introductory|discovery|biplace|duo)\s+)*(?:persons?|personnes?|pers|pp|p\.p\.?|ppl|pax|adults?|adultes?|guests?|head|t[êe]te|each|chacun|ea|seats?|places?|riders?|cavali[eè]re?s?|child|children|kids?|enfants?|participants?|passengers?|passagers?|flights?|vols?|rides?|jumps?|sauts?|trips?|tours?|sorties?|excursions?|tickets?|billets?|students?|[ée]tudiants?|skiers?|skieu(?:r|rs|se|ses)|snowboarders?|learners?|[ée]l[èe]ves?)(?![a-zà-ÿ])\.?/, '').replace(/[\s.,+\/-]+/g, '');
     if (!left) return '';
     // A price per bike, per rental, per hour… (not in the private box: that one only takes the whole-trip price).
     if (!priv && (TOUR_UNIT_RE.test(rest) || (/^(?:\/|per |par |an? |the |by the |[àa] l |de l )\s*[a-zà-ÿ]/.test(rest) && !/^(?:\/|per|par|an?|the|by the|[àa] l|de l)\s*(?:child|children|kids?|enfants?|youth|jeunes?|students?|[ée]tudiants?|seniors?|a[iî]n[ée]s?|famil(?:y|le)|couples?|tours?|trips?|sorties?|visites?|rides?|excursions?|flights?|vols?|activit\w*)\b/.test(rest)))) return 'unit';
@@ -1146,8 +1151,25 @@
     return statusHtml(S.done);
   };
   // Runs saves one after another; any error stops and shows it.
+  // Tour test 14 (Whistler, 2026-11-18; Lucía, Gboard): a word the phone keyboard split in two ("snow board", "Black comb")
+  // in what's about to be saved: asked once ("Did you mean snowboard?"), never changed for her; Save again keeps it.
+  // (owner-text-clean.js localWordSplits, the same words; the admin card flags it too.)
+  // Tour test 14: where two sentences ran together in a line ("moreMore", "welcome.: please"), or ''.
+  function runOnText(t){ var m = /[a-zà-ÿ]{2,}[A-ZÀ-Þ][a-zà-ÿ]{2,}/.exec(String(t || '')) || /\S*[.!?]\s*[:;]\s*\S*|\S*[:;]\s*\.\S*/.exec(String(t || '')); return m ? m[0] : ''; }
+  function splitWords(text){
+    var out = [], t = String(text || '');
+    (C.localJoins || []).forEach(function(w){
+      for (var i = 3; i <= w.length - 3; i++) {
+        var m = new RegExp('(^|[^A-Za-zÀ-ÿ])(' + w.slice(0, i) + '[ \u00a0]+' + w.slice(i) + ')(?![A-Za-zÀ-ÿ])', 'i').exec(t);
+        if (m && !out.some(function(x){ return x.said.toLowerCase() === m[2].toLowerCase(); })) out.push({ said: m[2], word: /^[A-Z]/.test(w) || !/^[A-Z]/.test(m[2]) ? w : w.charAt(0).toUpperCase() + w.slice(1) });
+      }
+    });
+    return out;
+  }
   function saveAll(step, list, forced, to, onOk){
     if (S.busy) return;
+    var sw = splitWords(JSON.stringify(list || []).replace(/\\[nrt]/g, ' ')), swKey = sw.map(function(x){ return x.said; }).join('|');
+    if (sw.length && T.splitWord && S.splitAsked !== swKey) { S.splitAsked = swKey; S.nudge = fill(T.splitWord, { said: sw[0].said, word: sw[0].word }); return render(); }
     S.busy = true; S.error = ''; render();
     var statuses = [];
     var next = function(i){
@@ -2903,17 +2925,21 @@
   // Tour test 13 (Whistler, 2026-11-18; Matthias, Dayton approved): two ticks on the "by booking only" and "part of the
   // year" screens (no new screen): "Every trip is weather permitting" and "Off-season trips by request" (part of the year
   // only). Saved with that screen's answer, as tour_info.weather_all / off_request (true, or null to take it back).
-  function tticks(){ if (!S.tticks) S.tticks = { weather_all: TI.weather_all === true, off_request: TI.off_request === true }; return S.tticks; }
+  // Tour test 14 (Whistler, 2026-11-18; Lucía, ski lessons): a third tick with the season dates, "Opening day depends on
+  // snow" (tour_info.snow_open): the page says "Reopens late November (snow permitting)".
+  function tticks(){ if (!S.tticks) S.tticks = { weather_all: TI.weather_all === true, off_request: TI.off_request === true, snow_open: TI.snow_open === true }; return S.tticks; }
   function tticksHtml(withOff){
     if (!TOUR || !T.tWeatherAll) return '';
     var tk = tticks(), chip = function(key, label){ return '<button type="button" class="su-chip su-chip-wide" id="suTick_' + key + '" aria-pressed="' + (tk[key] ? 'true' : 'false') + '" data-act="tourTick:' + key + '">' + h(label) + '</button>'; };
-    return '<div class="su-chips su-tticks" role="group" aria-label="' + h(T.tTicksLabel || '') + '" style="margin:6px 0 12px">' + chip('weather_all', T.tWeatherAll) + (withOff && T.tOffRequest ? chip('off_request', T.tOffRequest) : '') + '</div>';
+    return '<div class="su-chips su-tticks" role="group" aria-label="' + h(T.tTicksLabel || '') + '" style="margin:6px 0 12px">' + chip('weather_all', T.tWeatherAll) + (withOff && T.tOffRequest ? chip('off_request', T.tOffRequest) : '') + (withOff && T.tSnowOpen ? chip('snow_open', T.tSnowOpen) : '') + '</div>';
   }
   function tticksPart(seasonal){
     if (!TOUR || !S.tticks) return null;
     var o = {}, tk = S.tticks, offNow = !!(tk.off_request && seasonal);
     if (!!tk.weather_all !== (TI.weather_all === true)) o.weather_all = tk.weather_all ? true : null;
     if (offNow !== (TI.off_request === true)) o.off_request = offNow ? true : null;
+    var snowNow = !!(tk.snow_open && seasonal);
+    if (snowNow !== (TI.snow_open === true)) o.snow_open = snowNow ? true : null;
     return Object.keys(o).length ? { tour_info: o } : null;
   }
   function tticksSaved(part){ if (!part) return; Object.keys(part.tour_info).forEach(function(k){ if (part.tour_info[k] === null) delete TI[k]; else TI[k] = part.tour_info[k]; }); }
@@ -2921,7 +2947,7 @@
     var ov = openVal(S.openSea), y = ov ? 'seasonal' : 'all', list = [];
     var tkp = tticksPart(!!ov); if (tkp) list.push(tkp);
     if (ov !== (CUR.open_months || '')) list.push({ open_months: ov });
-    if (y !== S.savedWYear) list.push(apptPart({ year: y }));
+    if (y !== (S.savedWYear || AI.year || '')) list.push(apptPart({ year: y }));
     saveAll('hours', list, null, COMBO ? 'closures' : null, function(){
       tticksSaved(tkp);
       if (COMBO) { S.hoursJust = true; S.hoursNone = true; } else S.savedLine.hours = T.noSetHoursSaved;
@@ -2981,7 +3007,8 @@
     if (S.openTouched) { var ov = openVal(S.openSea); if (ov !== (CUR.open_months || '')) ch.open_months = ov; if (C.cafe && (ov ? 'seasonal' : 'all') !== S.savedYear) listH.push({ cafe_info: { year: ov ? 'seasonal' : 'all' } }); if (C.brewery && !C.distillery && (ov ? 'seasonal' : 'all') !== S.savedYear) listH.push(yearPart(ov ? 'seasonal' : 'all')); }
     // Wineries (2026-11-12): the off-season answer (all year, closed part of the year, or by appointment).
     var wyNew = APPT && S.wYearPick ? (S.wYearPick === 'appointment' ? 'appointment' : openVal(S.openSea) ? 'seasonal' : 'all') : '';
-    if (wyNew && (wyNew !== S.savedWYear || (wyNew === 'appointment' && JSON.stringify(S.wine.season) !== JSON.stringify(AI.season || null)))) listH.push(apptPart(wyNew === 'appointment' ? { year: wyNew, season: S.wine.season } : { year: wyNew }));
+    // Tour test 14: a year answer the setup already has (her tour_info.year) is not saved again as a change.
+    if (wyNew && (wyNew !== (S.savedWYear || AI.year || '') || (wyNew === 'appointment' && JSON.stringify(S.wine.season) !== JSON.stringify(AI.season || null)))) listH.push(apptPart(wyNew === 'appointment' ? { year: wyNew, season: S.wine.season } : { year: wyNew }));
     // Tours (2026-11-16): set hours saved again take "By booking only" back (its own screen is this one).
     var tourApptOff = TOUR && AI.visit === 'appointment';
     if (tourApptOff) listH.push({ tour_info: { visit: null } });
@@ -3992,6 +4019,9 @@
     if (k === 'brewGroupsSave') {
       var gFit = overMax('suGroupsLine', 180); if (gFit !== false) { S.brew.groups = gFit; return render(); }
       readBrew(); var gline = String(S.brew.groups || '').trim(), gbu = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null;
+      // Tour test 14 (Lucía): "Groups of 6 or moreMore than 4 people?… welcome.: please book ahead." went live. Two sentences
+      // run together (a lowercase letter then a capital, or ".:") are asked about once; Save again keeps the line.
+      var ro = runOnText(gline); if (ro && T.runOn && S.runOnAsked !== gline) { S.runOnAsked = gline; S.nudge = fill(T.runOn, { x: ro }); S.badField = 'suGroupsLine'; return render(); }
       if (gbu && !siteOk(gbu)) { S.nudge = T.bookLinkBad; S.badField = 'suBookUrl'; return render(); }
       if (gline && linkIn(gline)) { S.nudge = T.groupsNoLink; return render(); }
       var glinkCh = gbu !== null && !!gbu && gbu !== (CUR.booking_url || C.bookingKnown || '');
@@ -4046,8 +4076,8 @@
         // Tour test 5: say why ("per boat" -> Private tours; a trip length first; two prices) instead of trimming.
         var pwhy = tourPriceWhy(el('suTprice') ? el('suTprice').value : '');
         // Tour test 6: per bike / per rental -> Your tours and prices (a rentals-only company: its lowest rental price here).
-        S.nudge = pwhy === 'group' && T.tpriceGroup ? T.tpriceGroup : pwhy === 'day' && T.tpriceDay ? T.tpriceDay : pwhy === 'length' && T.tpriceLength ? T.tpriceLength : pwhy === 'hourly' && T.tpriceHourly ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceHourly) : pwhy === 'unit' && T.tpriceUnit ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceVehicle && /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|vehicles?|v[ée]hicules?|cars?|voitures?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|kayaks?|canoes?|canots?|rafts?|radeaux?)\b/i.test(el('suTprice') ? el('suTprice').value : '') ? T.tpriceVehicle : T.tpriceUnit) : pwhy === 'hours' && T.tpriceHours ? T.tpriceHours : pwhy === 'many' && T.tpriceOne ? T.tpriceOne : pwhy === 'words' && T.tpriceWords ? T.tpriceWords : T.tpriceNeed;
-        S.groupMove = pwhy === 'group' || pwhy === 'day' ? tourPriceNumber(el('suTprice').value) : null; S.badField = 'suTprice'; return render();
+        S.nudge = pwhy === 'group' && T.tpriceGroup ? T.tpriceGroup : pwhy === 'day' && T.tpriceDay ? T.tpriceDay : pwhy === 'length' && T.tpriceLength ? T.tpriceLength : pwhy === 'hourly' && T.tpriceHourly ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceHourly) : pwhy === 'unit' && T.tpriceUnit ? (tourRentalsOnly() && T.tpriceUnitRentals ? T.tpriceUnitRentals : T.tpriceVehicle && /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|vehicles?|v[ée]hicules?|cars?|voitures?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|kayaks?|canoes?|canots?|rafts?|radeaux?)\b/i.test(el('suTprice') ? el('suTprice').value : '') ? T.tpriceVehicle : T.tpriceUnit) : pwhy === 'hours' && T.tpriceHours ? T.tpriceHours : pwhy === 'many' && T.tpriceOne ? T.tpriceOne : pwhy === 'words' && T.tpriceWords ? T.tpriceWords : pwhy === 'lesson' && T.tpriceLesson ? T.tpriceLesson : T.tpriceNeed;
+        S.groupMove = pwhy === 'group' || pwhy === 'day' || pwhy === 'lesson' ? tourPriceNumber(el('suTprice').value) : null; S.badField = 'suTprice'; return render();
       }
       if (pv != null && isNaN(pv)) { var vwhy = tourPriceWhy(el('suTpriv') ? el('suTpriv').value : '', true); S.nudge = vwhy === 'hours' && T.tpriceHours ? T.tpriceHours : T.tprivNeed; S.badField = 'suTpriv'; return render(); }
       var pl = [];
@@ -4204,7 +4234,9 @@
     if (k === 'socialUnsure') { S.savedLine[v] = T.savedUnsure; return record(v, 'unsure'); }
     if (k === 'doorTake') { gps(); return el('suDoorCam').click(); }
     // Tour test 12: "Choose a photo I took there" (its own GPS, read from the photo).
-    if (k === 'tourTick') { var tk0 = tticks(); tk0[v] = !tk0[v]; S.dirty = 'hours'; var ty = window.scrollY; render(); window.scrollTo(0, ty); var tb = el('suTick_' + v); if (tb) tb.focus(); return; }
+    // Tour test 14 (Lucía): the tick toggles in place, without drawing the screen again: a re-render put the date boxes
+    // back to what was saved, so the dates she had just picked were wiped.
+    if (k === 'tourTick') { var tk0 = tticks(); tk0[v] = !tk0[v]; S.dirty = 'hours'; var tb = el('suTick_' + v); if (tb) { tb.setAttribute('aria-pressed', tk0[v] ? 'true' : 'false'); tb.focus(); return; } var ty = window.scrollY; render(); window.scrollTo(0, ty); return; }
     if (k === 'doorPick') { var dp = el('suDoorPick'); return dp ? dp.click() : null; }
     // Tour test 13: the photo with no location, sent with the listing's address (its pin): we place the pin from the photo.
     if (k === 'doorPickAddr') { if (!S.door.photo || !C.pin) return render(); S.door.mapFail = true; S.door.addrOnly = true; S.door.spot = { lat: C.pin.lat, lng: C.pin.lng }; S.door.fromPhoto = true; S.door.noGpsPhoto = false; S.nudge = ''; return go('door:pin'); }
@@ -4384,7 +4416,10 @@
       // ("Private room for 20. Groups of 10 or more: please book ahead").
       // Tour test 9 (Whistler, 2026-11-18; Tanis): "Groups of up to 20School and group programs…" went live: the size line
       // ends with ". " so what she types next starts its own sentence (as the Good to know answers do).
-      readBrew(); S.brew.groups = groupsKeep(S.brew.groups).concat([groupsSizeLine(+b.getAttribute('data-bgroup'))]).join('. ') + '. '; (S.chipFilled = S.chipFilled || {}).suGroupsLine = S.brew.groups; S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+      readBrew(); S.brew.groups = groupsKeep(S.brew.groups).concat([groupsSizeLine(+b.getAttribute('data-bgroup'))]).join('. ') + '. '; (S.chipFilled = S.chipFilled || {}).suGroupsLine = S.brew.groups; S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y);
+      // Tour test 14 (Lucía, Pixel): her tap on the box after a size chip put the cursor mid-line, so her words went inside
+      // "Groups of 6 or more: please book ahead." The box takes the focus with the cursor at the end (as the quick chips do).
+      var gb = el('suGroupsLine'); if (gb) { try { gb.focus({ preventScroll: true }); var gl0 = gb.value.length; gb.setSelectionRange(gl0, gl0); } catch (e) { /* older phones */ } } }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-bq]'), function(b){ b.onclick = function(){ readTimes(); var q11 = b.getAttribute('data-bq').split(':'), wk = W(), w11 = wk[q11[0]] && wk[q11[0]][+q11[1]]; if (!w11) return; w11[+q11[2]] = q11[3] + ':' + q11[4]; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     // Tours (2026-11-16): one-of-a-few answers, the kinds (up to 3), "under 18s with an adult" and "no online bookings".
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tpick]'), function(b){ b.onclick = function(){
@@ -4447,6 +4482,8 @@
       // Tour test 10 (Whistler, 2026-11-18; Gord): a chip's words ran into his typing ("rain or shine long pants"). As the
       // group-size chips do, a sentence chip ends with ". " so what is typed next starts a new sentence (saved trimmed).
       if (sep === '. ' && v && qk !== 'takeout') v = v.replace(/[\s]+$/, '').replace(/([^.!?])$/, '$1.') + ' ';
+      // Tour test 14 (Lucía): no double space inside the line (a space she typed after an earlier chip's ". ").
+      v = v.replace(/([^\s])[ \u00a0]{2,}(?=\S)/g, '$1 ');
       box.value = v.slice(0, box.maxLength > 0 ? box.maxLength : 180); box._qPrev = box.value; countUpdate(box); mark();
       // Tour test 11 (Whistler, 2026-11-18; Min-jun dictates): a Good to know chip puts the cursor in the box, at the end.
       // Tour test 12 (Whistler, 2026-11-18; Kayla tapped a Groups chip and typed: her words went nowhere): Groups too.
@@ -4545,6 +4582,11 @@
       // to it. Writing a new story is an explicit choice: the ✕ or "Clear it and write my own" under the hint (the owner
       // sees research's text above what she types, and the reviewer sees both before it goes live).
       var pre = ((inp.tagName !== 'TEXTAREA' && inp.id !== 'suUrl' && inp.id !== 'suCq' && !!inp.value) || researchLine) && !chipOwn, first = true;
+      // Tour test 14 (Lucía, Pixel): the first tap into a box a chip just filled puts the cursor at the end, wherever the
+      // finger landed (her words went into the middle of the chip's sentence).
+      // Tour test 14: a space typed right after a chip's ". " is not a second space.
+      inp.addEventListener('input', function(){ if (inp._qPrev && / $/.test(inp._qPrev) && inp.value === inp._qPrev + ' ') { inp.value = inp._qPrev; try { var nq = inp.value.length; inp.setSelectionRange(nq, nq); } catch (e) {} } });
+      inp.addEventListener('click', function(){ if (!(S.chipFilled && S.chipFilled[inp.id] != null && S.chipFilled[inp.id] === inp.value) || inp._chipEnd) return; inp._chipEnd = true; try { var ne = inp.value.length; if (inp.selectionStart !== ne || inp.selectionEnd !== ne) inp.setSelectionRange(ne, ne); } catch (e) {} });
       inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) { inp.select(); inp._autoSel = Date.now(); } else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
       // "…or tap again to add to it": a second tap on the story box while our own select is still on it puts the cursor
       // at the end (most phones do this themselves; where the tap leaves the text selected, this does it). The first

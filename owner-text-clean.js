@@ -176,6 +176,28 @@ function nameMisspellings(text, known) {
   return out;
 }
 
+// Tour test 14 (Whistler, 2026-11-18; Lucía, Gboard): words the phone keyboard split in two ("snow board", "Black comb",
+// "Creek side"): [{ said, word }]. The same on every Roam site for the common words (snowboard, ski-in…); each site's own
+// place words come from trip-site.js (localWordJoins). "Whistler's" is fine (a possessive, not a split). Flagged, never
+// changed: the owner is nudged in the setup and the admin card says so.
+// ("zip line" and "paddle board" are written both ways, so they are not on the list.)
+const COMMON_WORD_JOINS = ['snowboard', 'snowboarding', 'snowboarder', 'snowboarders', 'snowboards', 'snowshoe', 'snowshoes', 'snowshoeing', 'snowmobile', 'snowmobiles', 'snowmobiling', 'snowcat', 'backcountry'];
+function localWordSplits(text, joins) {
+  const t = String(text || '');
+  const out = [];
+  for (const word of [...COMMON_WORD_JOINS, ...(joins || [])]) {
+    const w = String(word);
+    // Every place the word could be split in two (both halves 3 letters or more): "snow board", "Black comb".
+    for (let i = 3; i <= w.length - 3; i++) {
+      const a = w.slice(0, i), b = w.slice(i);
+      const re = new RegExp(`(?<![\\p{L}])${a}[ \\u00a0]+${b}(?![\\p{L}])`, 'iu');
+      const m = re.exec(t);
+      if (m && !out.some((x) => x.said.toLowerCase() === m[0].toLowerCase())) out.push({ said: m[0], word: /^[A-Z]/.test(w) ? w : (/^[A-Z]/.test(m[0]) ? w[0].toUpperCase() + w.slice(1) : w) });
+    }
+  }
+  return out;
+}
+
 // Tour test 12 (Whistler, 2026-11-18; Kayla pastes her Instagram captions: "160ft canyon jump 🤯 #sendit", "online waiver
 // b4 you arrive!! Closed in high winds ⚠️ #safetyfirst", "bday groups get 10% off 🎉 DM us"). The same on every Roam site.
 // socialTidy: a run of #hashtags at the end of a line goes (every text); on the short live lines (Known for, Good to know,
@@ -219,4 +241,4 @@ function socialFlags(text) {
   return out;
 }
 
-module.exports = { socialTidy, socialFlags, EMOJI_RE, dictatedPunctuation, dictationLeftovers, knownNameCaps, buildKnownNames, placeCoreName, nameMisspellings, editDistance, LANGUAGE_NAMES, PLACE_COMMON_WORDS };
+module.exports = { localWordSplits, COMMON_WORD_JOINS, socialTidy, socialFlags, EMOJI_RE, dictatedPunctuation, dictationLeftovers, knownNameCaps, buildKnownNames, placeCoreName, nameMisspellings, editDistance, LANGUAGE_NAMES, PLACE_COMMON_WORDS };

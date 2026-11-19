@@ -2083,21 +2083,27 @@ Object.assign(fr.tour, {
 // boat" read as $650 a person, "2 hrs $95pp" as $2). The box says why and offers the Private tours box; the lead says "a person".
 Object.assign(en.tour, {
   tpriceLeadPick: 'Your card will say “From {x} a person”.',
-  tpriceGroup: 'Priced per boat or per group? Put it in Private tours below.',
+  tpriceGroup: 'Priced per boat, per group or per lesson? Put it in Private tours below.',
   tpriceGroupMove: 'Put {x} in Private tours', tpriceGroupMoved: 'Moved to Private tours. Now type a price for one person, like 95.',
   tpriceHours: 'That starts with a trip length. Type just the price, like 95.',
   tpriceOne: 'One price here: your lowest for one person, like 95. Other prices and extras go in “Your tours and prices”.',
   tpriceWords: 'We read the price but not the words after it. Type just the number, like 189, or “189 per person”.',
-  tpriceMore: 'Several trips, or a winter and a summer price? Put the lowest here. All of them go in “Your tours and prices”, the first of the extra details. Priced per boat? Use Private tours below.',
+  tpriceLesson: 'A price per lesson for your group? Put it in Private tours',
+  runOn: 'Two sentences may have run together here: “{x}”. Check the line and tap Save, or tap Save again to keep it.',
+  splitWord: 'Did you mean “{word}”? We see “{said}”, which a phone keyboard often splits in two. Fix it in the box and tap Save, or tap Save again to keep it.',
+  tpriceMore: 'Several trips, or a winter and a summer price? Put the lowest here. All of them go in “Your tours and prices”, the first of the extra details. Priced per boat, per group or per lesson? Use Private tours below.',
 });
 Object.assign(fr.tour, {
   tpriceLeadPick: 'Votre fiche indiquera « À partir de {x} par personne ».',
-  tpriceGroup: 'Un prix par bateau ou par groupe? Mettez-le dans Sorties privées, plus bas.',
+  tpriceGroup: 'Un prix par bateau, par groupe ou par cours? Mettez-le dans Sorties privées, plus bas.',
   tpriceGroupMove: 'Mettre {x} dans Sorties privées', tpriceGroupMoved: 'Déplacé dans Sorties privées. Écrivez maintenant un prix pour une personne, par exemple 95.',
   tpriceHours: 'Ça commence par une durée. Écrivez seulement le prix, par exemple 95.',
   tpriceOne: 'Un seul prix ici : votre plus bas pour une personne, par exemple 95. Les autres prix et les extras vont dans « Vos sorties et tarifs ».',
   tpriceWords: 'Nous lisons le prix, mais pas les mots qui suivent. Écrivez seulement le chiffre, par exemple 189, ou « 189 par personne ».',
-  tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos sorties et tarifs », le premier des détails facultatifs. Un prix par bateau? Utilisez Sorties privées, plus bas.',
+  tpriceLesson: 'Un prix par cours pour votre groupe? Mettez-le dans Sorties privées',
+  runOn: 'Deux phrases semblent collées ici : « {x} ». Vérifiez la ligne et touchez Enregistrer, ou touchez Enregistrer de nouveau pour la garder.',
+  splitWord: 'Vouliez-vous dire « {word} »? Nous voyons « {said} », qu’un clavier de téléphone sépare souvent en deux. Corrigez-le dans la case et touchez Enregistrer, ou touchez Enregistrer de nouveau pour le garder.',
+  tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos sorties et tarifs », le premier des détails facultatifs. Un prix par bateau, par groupe ou par cours? Utilisez Sorties privées, plus bas.',
 });
 // Tour test 5: by-booking tours' Groups question (everyone books), the meeting-spot examples with a dock or marina.
 Object.assign(en.tour, {
@@ -2120,14 +2126,14 @@ Object.assign(en.tour, {
   tpriceUnit: 'Priced per bike or per rental? Put your lowest per-person trip price here; list the per-bike price in Your tours and prices.',
   tpriceUnitRentals: 'Rentals only? Put your lowest rental price here (just the number, like 69), and say “per bike” in Your tours and prices.',
   tpriceUnitGo: 'Open Your tours and prices', tpriceUnitBack: 'Back to your price',
-  tpriceMore: 'Several trips, or a winter and a summer price? Put the lowest here. All of them go in “Your tours and prices”, the first of the extra details. Priced per boat? Use Private tours below. Priced per bike or per rental? Put it in Your tours and prices.',
+  tpriceMore: 'Several trips, or a winter and a summer price? Put the lowest here. All of them go in “Your tours and prices”, the first of the extra details. Priced per boat, per group or per lesson? Use Private tours below. Priced per bike or per rental? Put it in Your tours and prices.',
   tpriceLeadPickUnit: 'Your card will say “From {x}”.',
 });
 Object.assign(fr.tour, {
   tpriceUnit: 'Prix par vélo ou par location? Mettez votre prix le plus bas par personne ici; le prix par vélo va dans Vos sorties et tarifs.',
   tpriceUnitRentals: 'Seulement de la location? Mettez votre prix de location le plus bas ici (seulement le chiffre, par exemple 69), et écrivez « par vélo » dans Vos sorties et tarifs.',
   tpriceUnitGo: 'Ouvrir Vos sorties et tarifs', tpriceUnitBack: 'Retour à votre prix',
-  tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos sorties et tarifs », le premier des détails facultatifs. Un prix par bateau? Utilisez Sorties privées, plus bas. Un prix par vélo ou par location? Mettez-le dans Vos sorties et tarifs.',
+  tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos sorties et tarifs », le premier des détails facultatifs. Un prix par bateau, par groupe ou par cours? Utilisez Sorties privées, plus bas. Un prix par vélo ou par location? Mettez-le dans Vos sorties et tarifs.',
   tpriceLeadPickUnit: 'Votre fiche indiquera « À partir de {x} ».',
 });
 Object.assign(en.tour, { doorPhotoLeadLand: 'Stand where people meet you (the office, the trailhead, the start of the course), with your sign or vehicle in the picture if you can. Your device will ask to share your location, so visitors get directions to this spot.' });
@@ -2234,7 +2240,7 @@ Object.assign(en.tour, {
   doorPick: 'Choose a photo I took there', doorPickSub: 'We read the spot from the photo’s location',
   doorPickNoGps: 'That photo has no location saved in it. Send it with your address and we’ll place the pin for you, or tap “Yes, I’m here” next time you’re there.',
   // Tour test 13: two ticks on the "by booking only" and "part of the year" screens.
-  tWeatherAll: 'Every trip is weather permitting', tOffRequest: 'Off-season trips by request', tTicksLabel: 'Also true for your trips',
+  tWeatherAll: 'Every trip is weather permitting', tOffRequest: 'Off-season trips by request', tSnowOpen: 'Opening day depends on snow', tTicksLabel: 'Also true for your trips',
   // Tour test 13: the fallback for a photo with no location (as when the map won't load).
   doorPickAddr: 'Send it with my address and you place the pin', doorPickAddrSub: 'We look at your photo and put the pin on the spot, usually within a day',
   doorAddrQ: 'Send your meeting-spot photo', doorAddrLead: 'Your photo goes with your address. We place the pin on the spot from your photo, usually within a day.',
@@ -2247,7 +2253,7 @@ Object.assign(en.tour, {
 Object.assign(fr.tour, {
   doorPick: 'Choisir une photo prise sur place', doorPickSub: 'Nous lisons l’endroit dans la position de la photo',
   doorPickNoGps: 'Cette photo ne contient pas de position. Envoyez-la avec votre adresse et nous placerons l’épingle pour vous, ou touchez « Oui, j’y suis » la prochaine fois que vous y êtes.',
-  tWeatherAll: 'Chaque sortie dépend de la météo', tOffRequest: 'Hors saison, sorties sur demande', tTicksLabel: 'Vrai aussi pour vos sorties',
+  tWeatherAll: 'Chaque sortie dépend de la météo', tOffRequest: 'Hors saison, sorties sur demande', tSnowOpen: 'La date d’ouverture dépend de l’enneigement', tTicksLabel: 'Vrai aussi pour vos sorties',
   doorPickAddr: 'L’envoyer avec mon adresse, vous placez l’épingle', doorPickAddrSub: 'Nous regardons votre photo et plaçons l’épingle au bon endroit, habituellement en moins d’une journée',
   doorAddrQ: 'Envoyez la photo de votre point de rencontre', doorAddrLead: 'Votre photo part avec votre adresse. Nous plaçons l’épingle au bon endroit d’après votre photo, habituellement en moins d’une journée.',
   pickupBtn: 'Nous allons vous chercher (aux hôtels du village)', pickupSub: 'Votre page indique « Prise en charge : hôtels du village », avec votre bureau pour l’itinéraire',

@@ -22651,7 +22651,10 @@ const { TOUR_KINDS, TOUR_LENGTHS, TOUR_BOOK, TOUR_AGES } = require('./portal-com
 //   off_request  true         … and "Off-season trips by request" (part of the year only): the page says "Closed for the
 //                             season (trips by request)", and Build My Trip lists him off-season with a "by request, rare"
 //                             note instead of leaving him out. His in-season closed days stay closed.
-const TOUR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'adult_age', 'adult_waiver', 'private', 'year', 'visit', 'private_per', 'private_min', 'pickup', 'weather_all', 'off_request'];
+//   snow_open    true         Tour test 14 (Whistler, 2026-11-18; Lucía, ski lessons; the loop brief): "Opening day depends
+//                             on snow", a tick with the season dates (part of the year only). The status line and the hours
+//                             say "Reopens late November (snow permitting)" (EN + FR) instead of the exact first day.
+const TOUR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'adult_age', 'adult_waiver', 'private', 'year', 'visit', 'private_per', 'private_min', 'pickup', 'weather_all', 'off_request', 'snow_open'];
 const TOUR_KINDS_MAX = 3;
 const TOUR_INFO_ERROR = 'Some of the information could not be read. Please reload the page and try again.';
 // Heli-skiing and multi-day trips cost well over $500 a person: a price up to $1,000 goes live at once, a higher one is
@@ -23001,14 +23004,20 @@ const TOUR_RATE_STRIP_RE = /(?:^|[\s\/])(?:(?:per|a|an|par|the|la|le|each|by the
 const TOUR_LENGTH_PRICE_RE = /(?:^|\s)(?:for|pour|sur)\s+(?:a\s+|an\s+)?\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|(?:^|\s)\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b|\b(?:multi[\s-]?days?|several days|plusieurs jours)\b/;
 const TOUR_LENGTH_HEAD_RE = /^\s*\d+\s*-?\s*(?:days?|nights?|jours?|nuits?|nuit[ée]es?)\b/i;
 const TOUR_GROUP_PRICE_RE = /\b(?:boats?|charters?|groups?|vessels?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?|class(?:es)?|classes?|schools?|[ée]coles?)\b/;
-const TOUR_PER_ONE_RE = /^(?:\/\s*|(?:per|a|an|par|each|la|le)\s+)(?:persons?|people|personnes?|pers|jumps?|sauts?|rides?|seats?|places?|guests?|riders?|adults?|adultes?|heads?|tickets?|billets?|participants?|passengers?|passagers?|swings?|flights?|vols?|tours?|trips?|sorties?|descentes?|runs?)\b|^(?:pp|p\.p\.?|each|ea|chacun)(?![a-z])/;
+// Tour test 14 (Whistler, 2026-11-18; Lucía, ski lessons): per student, child, kid, skier, rider, snowboarder or participant
+// is per person too ("249 per student" was refused).
+const TOUR_PER_ONE_RE = /^(?:\/\s*|(?:per|a|an|par|each|la|le)\s+)(?:persons?|people|personnes?|pers|jumps?|sauts?|rides?|seats?|places?|guests?|riders?|adults?|adultes?|heads?|tickets?|billets?|participants?|passengers?|passagers?|swings?|flights?|vols?|tours?|trips?|sorties?|descentes?|runs?|students?|[ée]tudiants?|child|children|kids?|enfants?|skiers?|skieu(?:r|rs|se|ses)|snowboarders?|learners?|[ée]l[èe]ves?)\b|^(?:pp|p\.p\.?|each|ea|chacun)(?![a-z])/;
+// Tour test 14: a price per lesson (or class, session) is for the group: Private tours ("$249 per lesson" got the bike
+// and rentals message). In the private box it is accepted, with who it's for ("599 per lesson (1-4 people)").
+const TOUR_PER_LESSON_RE = /^(?:\/\s*|(?:per|a|an|par|pour|each|by the|the|la|le)\s+)(?:(?:private|group|semi[- ]private|half[- ]day|full[- ]day|2[- ]hour|3[- ]hour|priv[ée]e?s?)\s+)*(?:lessons?|le[çc]ons?|cours|class(?:es)?|sessions?|s[ée]ances?)\b/;
+const TOUR_COUNT_RANGE_RE = /\(?\s*(?:for |up to |pour |jusqu à |max\.? )?\d+\s*(?:-|–|to|à|a)\s*\d+\s*(?:ppl|people|pax|persons?|guests?|personnes?|pers|adults?|adultes?|skiers?|students?|riders?)?\s*\)?/g;
 // Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding): the Swiss "189.-" / "189.–" and "CHF 189" read as 189.
 function tourPriceSwiss(x) { return String(x == null ? '' : x).trim().replace(/^(?:CHF|SFr\.?|Fr\.)\s*/i, '').replace(/(\d)\s*CHF\b\.?/i, '$1').replace(/(\d)[.,][-\u2013\u2014]+/, '$1'); }
 // Tour test 13: per flight / ride / jump / trip / tour / seat / passenger / person / pp, with an adjective ("per tandem
 // flight", "a classic ride"), is a price per person. A note in brackets with no numbers and no group, unit or rate words
 // ("(Classic tandem)") is the tour's name, not a price rule.
 const TOUR_PER_ONE_ADJ = '(?:(?:tandem|classic|standard|solo|single|basic|regular|shared|scenic|intro|introductory|discovery|biplace|duo)\\s+)*';
-const TOUR_PER_ONE_NOUNS = '(?:persons?|personnes?|pers|pp|p\\.p\\.?|ppl|pax|adults?|adultes?|guests?|head|t[êe]te|each|chacun|ea|seats?|places?|riders?|cavali[eè]re?s?|child|children|kids?|enfants?|participants?|passengers?|passagers?|flights?|vols?|rides?|jumps?|sauts?|trips?|tours?|sorties?|excursions?|tickets?|billets?)';
+const TOUR_PER_ONE_NOUNS = '(?:persons?|personnes?|pers|pp|p\\.p\\.?|ppl|pax|adults?|adultes?|guests?|head|t[êe]te|each|chacun|ea|seats?|places?|riders?|cavali[eè]re?s?|child|children|kids?|enfants?|participants?|passengers?|passagers?|flights?|vols?|rides?|jumps?|sauts?|trips?|tours?|sorties?|excursions?|tickets?|billets?|students?|[ée]tudiants?|skiers?|skieu(?:r|rs|se|ses)|snowboarders?|learners?|[ée]l[èe]ves?)';
 function tourPriceLabelDrop(rest) { return rest.replace(/\(([^()\d]*)\)/g, (all, inner) => (TOUR_GROUP_PRICE_RE.test(inner.toLowerCase()) || TOUR_UNIT_RE.test(inner.toLowerCase()) || TOUR_DAY_RATE_RE.test(inner.toLowerCase()) || TOUR_HOUR_RATE_RE.test(inner.toLowerCase()) ? all : ' ')); }
 function tourPriceTrim(x) { return tourPriceSwiss(x).replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
 function tourPriceWhy(x, priv = false) {
@@ -23034,6 +23043,7 @@ function tourPriceWhy(x, priv = false) {
   // fits ("349 per sled (2 adults or 1 adult + 2 kids)" offered "Put $349 in Private tours"): one sled is not a private tour.
   if (!priv && TOUR_UNIT_RE.test(rest) && !TOUR_GROUP_PRICE_RE.test(rest)) return 'unit';
   const countRe = /(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d+|\/\s*\d+|\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/g;
+  if (TOUR_PER_LESSON_RE.test(rest)) return priv ? (/\d/.test(rest.replace(TOUR_COUNT_RANGE_RE, ' ').replace(countRe, '')) ? 'many' : '') : 'lesson';
   const group = TOUR_GROUP_PRICE_RE.test(rest)
     || /(?:^|\s|\/)(?:for|per|pour|par|up to|jusqu à|jusqu a|max)\s*(?:a |an )?\d/.test(rest) || /^\/\s*\d/.test(rest) || /\d+\s*(?:ppl|people|pax|persons|guests|personnes|pers|adults|adultes)\b/.test(rest);
   if (group) return priv ? (/\d/.test(rest.replace(countRe, '')) ? 'many' : '') : 'group';
@@ -23048,6 +23058,7 @@ function tourPriceWhy(x, priv = false) {
 const TOUR_PRICE_WHY_ERRORS = { group: 'Priced per boat or per group? Put it in Private tours, and your lowest price for one person here.', unit: 'Priced per bike or per rental? Put your lowest per-person trip price here; list the per-bike price in Your tours and prices.', hours: 'That starts with a trip length. Type just the price, like 95.', many: 'One price here: your lowest for one person, like 95. Other prices go in your tours and prices list.',
   day: 'A day rate for your group? Put it in Private tours below, and your lowest price for one person here.', hourly: 'An hourly rate? Type your lowest price for one person here, and list hourly rates in Your tours and prices.',
   words: 'We read the price but not the words after it. Type just the number, like 189, or “189 per person”.',
+  lesson: 'A price per lesson for your group? Put it in Private tours, and your lowest price for one person here.',
   length: 'That’s a trip length. Type just the price for one person, like 1450, and list each trip in Your tours and prices.' };
 // Tour test 8: a per-sled or per-vehicle price says so (it said "per bike").
 const TOUR_VEHICLE_WORDS_RE = /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|vehicles?|v[ée]hicules?|cars?|voitures?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|kayaks?|canoes?|canots?|rafts?|radeaux?)\b/i;
@@ -23085,7 +23096,7 @@ function cleanTourInfoPart(key, x) {
   if (key === 'pickup') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
   if (key === 'adult_age') return String(x) === '19' ? { value: '19' } : { error: TOUR_INFO_ERROR };
   if (key === 'adult_waiver') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
-  if (key === 'weather_all' || key === 'off_request') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
+  if (key === 'weather_all' || key === 'off_request' || key === 'snow_open') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
   return { error: TOUR_INFO_ERROR };
 }
 // Tour test 13: every trip runs weather permitting (his own tick).
@@ -23093,6 +23104,18 @@ function tourWeatherAll(venueId) { return venueTourInfo(venueId).weather_all ===
 // Tour test 13: off-season trips by request (his own tick; only with a season of part of the year).
 function tourOffRequest(venueId) { const t = venueTourInfo(venueId); return t.off_request === true && t.year !== 'all'; }
 const TOUR_OFF_REQUEST_WORDS = { en: ' (trips by request)', fr: ' (sorties sur demande)' };
+// Tour test 14: the opening day depends on snow (her own tick; only with a season of part of the year).
+function tourSnowOpen(venueId) { const t = venueTourInfo(venueId); return t.snow_open === true && t.year !== 'all'; }
+const TOUR_SNOW_MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+// 'MM-DD' or an ISO date -> "late November" / « fin novembre » (early: days 1–10, mid: 11–20, late: 21 on).
+function tourSnowWhen(md, fr = false) {
+  const m = /(?:^|-)(\d{2})-(\d{2})$/.exec(String(md || ''));
+  if (!m) return '';
+  const mo = Number(m[1]), d = Number(m[2]);
+  if (fr) return `${d <= 10 ? 'début' : d <= 20 ? 'mi-' : 'fin'}${d <= 20 && d > 10 ? '' : ' '}${TOUR_SNOW_MONTHS_FR[mo - 1]}`;
+  return `${d <= 10 ? 'early' : d <= 20 ? 'mid-' : 'late'}${d <= 20 && d > 10 ? '' : ' '}${MONTH_LONG[mo - 1]}`;
+}
+const TOUR_SNOW_WORDS = { en: ' (snow permitting)', fr: ' (selon l’enneigement)' };
 // "Closed for the season" / « Fermé pour la saison » with "(trips by request)" after it, for a tour that ticked it.
 function tourOffRequestSay(venueId, text, fr = false) {
   if (!text || !tourOffRequest(venueId)) return text;
@@ -30696,6 +30719,7 @@ function appointmentLineFor(venueId, noticeText) {
   const winter = rows.filter((r) => r.label === 'Winter' || r.label === 'Tastings').map((r) => r.text).join(' ');
   return /appointment|by reservation|reservations? (?:only|(?:are |is )?required)/i.test(`${noticeText || ''} ${winter}`) ? 'By appointment \u00b7 call ahead' : null;
 }
+function tourSnowOpenSafe(venueId) { try { return tourSnowOpen(venueId); } catch (e) { return false; } }
 function shortReopenDate(iso, today) {
   if (!iso || !parseLocalDate(iso)) return '';
   const md = `${SEASON_TAG_MONTHS[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}`;
@@ -30706,6 +30730,8 @@ function blockedStatusLine(venueId, noticeText, seasonState, today) {
   if (seasonState && seasonState.kind === 'closed') {
     // Tour test 13: a tour that takes off-season trips by request says so ("Closed for the season (trips by request)").
     const cs = tourOffRequestSay(venueId, 'Closed for the season');
+    // Tour test 14: an opening day that depends on snow reads "Reopens late November (snow permitting)".
+    if (seasonState.reopens && tourSnowOpenSafe(venueId) && tourSnowWhen(seasonState.reopens)) return { state: 'seasonal', text: `${cs} \u00b7 Reopens ${tourSnowWhen(seasonState.reopens)}${TOUR_SNOW_WORDS.en}` };
     return { state: 'seasonal', text: seasonState.reopens ? `${cs} \u00b7 Reopens ${shortReopenDate(seasonState.reopens, today)}` : cs };
   }
   if (seasonState && seasonState.kind === 'temp_closed' && seasonState.current) {
@@ -38031,6 +38057,8 @@ function frStatusText(text) {
     .replace('By appointment \u00b7 call ahead', 'Sur rendez-vous \u00b7 appelez avant')
     // Tour test 2 (Whistler, 2026-11-16): a by-booking tour's line under its name on the French page.
     .replace(TOUR_APPOINTMENT_LINE, TOUR_APPOINTMENT_LINE_FR)
+    // Tour test 14: « Rouvre fin novembre (selon l’enneigement) ».
+    .replace(/ \u00b7 Reopens (early|mid-|late) ?(January|February|March|April|May|June|July|August|September|October|November|December) \(snow permitting\)$/, (m, p, mo) => ` \u00b7 Rouvre ${tourSnowWhen(`${String(MONTH_LONG.indexOf(mo) + 1).padStart(2, '0')}-${p === 'early' ? '05' : p === 'late' ? '25' : '15'}`, true)}${TOUR_SNOW_WORDS.fr}`)
     // Tour test 7: the break between two seasons (« Fermé entre les saisons · Réouverture le 1er juil. »).
     .replace(/^Closed between seasons((?: \([^()]*\))?) \u00b7 Reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m, note, mo, d) => `Ferm\u00e9 entre les saisons${note} \u00b7 R\u00e9ouverture le ${d === '1' ? '1er' : d} ${FR_STATUS_MONTHS[mo]}`)
     .replace('Closed today \u00b7 Opens ', 'Ferm\u00e9 aujourd\u2019hui \u00b7 ouvre ')
@@ -39528,6 +39556,17 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${wl}`) : `<h2>${L('Hours', 'Heures')}</h2>${wl}`;
   }
   if (venue.type === 'tour' && hoursHtml) hoursHtml = tourOffRequestSay(venue.id, hoursHtml, fr);
+  // Tour test 14 (Whistler, 2026-11-18; Lucía): "Reopens late November (snow permitting)." under the hours while closed
+  // for the season, "Opening day depends on snow (usually late November)." in it.
+  if (venue.type === 'tour' && tourSnowOpen(venue.id)) {
+    const os = tourOpenSeason(venue.id), today = todayLocal(opts.now || new Date()).slice(5, 10);
+    const when = os ? tourSnowWhen(os.from, fr) : '';
+    if (when) {
+      const out = os.from <= os.to ? (today < os.from || today > os.to) : (today < os.from && today > os.to);
+      const sl = `<p class="venue-hours-snow">${escapeHtml(out ? L(`Reopens ${when}${TOUR_SNOW_WORDS.en}.`, `Rouvre ${when}${TOUR_SNOW_WORDS.fr}.`) : L(`Opening day depends on snow (usually ${when}).`, `La date d’ouverture dépend de l’enneigement (habituellement ${when}).`))}</p>`;
+      hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${sl}`) : `<h2>${L('Hours', 'Heures')}</h2>${sl}`;
+    }
+  }
   // Winery test 1 (2026-11-12): the off-season answer under the hours, from the owner's walk-in dates
   // ("Nov 1 – Apr 30: by appointment, call ahead").
   const wineryOffLine = wineryOffSeasonLineHtml(venue, fr);
@@ -49380,13 +49419,16 @@ function groupsChipStops(text) {
 function ownerTextClean(text, opts = {}) {
   let t = ownerTextCleanLib.socialTidy(String(text == null ? '' : text), { short: !!opts.short });
   t = ownerTextCleanLib.dictatedPunctuation(t, { multiline: !!opts.multiline });
+  // Tour test 14 (Lucía): a chip's sentence ends with ". " and her space after it made two ("included.  Rental"): one.
+  if (opts.short) t = t.replace(/([^\s])[ \u00a0]{2,}(?=\S)/g, '$1 ');
   if (opts.groups) t = groupsChipStops(t);
   if (opts.caps !== false) t = sentenceCaps(t);
   return ownerTextCleanLib.knownNameCaps(t, ownerKnownNames(), { fr: !!opts.fr });
 }
 // For the admin card: dictation words left standing, and close misspellings of a known place ("Jeffrey lakes").
+const TRIP_SITE_LOCAL_JOINS = (() => { try { return require('./trip-site.js').localWordJoins || []; } catch (e) { return []; } })();
 function ownerTextFlags(texts) {
-  const left = new Set(), miss = [];
+  const left = new Set(), miss = [], splits = [];
   const social = { hashtags: [], emojis: false, dm: false, b4: false };
   for (const t of texts || []) {
     if (typeof t !== 'string' || !t) continue;
@@ -49396,8 +49438,10 @@ function ownerTextFlags(texts) {
     if (sf.emojis) social.emojis = true; if (sf.dm) social.dm = true; if (sf.b4) social.b4 = true;
     ownerTextCleanLib.dictationLeftovers(t).forEach((w) => left.add(w));
     for (const m of ownerTextCleanLib.nameMisspellings(t, ownerKnownNames())) if (!miss.some((x) => x.said.toLowerCase() === m.said.toLowerCase())) miss.push(m);
+    // Tour test 14: words the phone keyboard split in two ("snow board", "Black comb").
+    for (const m of ownerTextCleanLib.localWordSplits(t, TRIP_SITE_LOCAL_JOINS)) if (!splits.some((x) => x.said.toLowerCase() === m.said.toLowerCase())) splits.push(m);
   }
-  return { leftovers: [...left], misspellings: miss, social };
+  return { leftovers: [...left], misspellings: miss, social, splits };
 }
 // Tour test 12: the admin card's line for social-media text.
 const SOCIAL_FLAG_TITLE = 'Hashtags / emojis / ‘DM us’ from social media';
@@ -49410,7 +49454,9 @@ function ownerTextFlagsHtml(texts) {
   const f = ownerTextFlags(texts);
   return (f.leftovers.length ? `<div class="rv-warn rv-dictation">Spoken punctuation left in: ${f.leftovers.map((w) => `“${adminReviewEsc(w)}”`).join(', ')}. Fix it in the box before approving (the owner may have dictated it).</div>` : '')
     + socialFlagHtml(f.social)
-    + (f.misspellings.length ? `<div class="rv-warn rv-spelling">Check the spelling: ${f.misspellings.map((m) => `“${adminReviewEsc(m.said)}” may be ${adminReviewEsc(m.name)}`).join('; ')}. Nothing was changed automatically.</div>` : '');
+    + (f.misspellings.length ? `<div class="rv-warn rv-spelling">Check the spelling: ${f.misspellings.map((m) => `“${adminReviewEsc(m.said)}” may be ${adminReviewEsc(m.name)}`).join('; ')}. Nothing was changed automatically.</div>` : '')
+    // Tour test 14 (Whistler, 2026-11-18; Lucía, Gboard): "snow board" and "Black comb" went live with no flag.
+    + (f.splits && f.splits.length ? `<div class="rv-warn rv-splits">Split by the phone keyboard? ${f.splits.map((m) => `“${adminReviewEsc(m.said)}” may be ${adminReviewEsc(m.word)}`).join('; ')}. Nothing was changed automatically.</div>` : '');
 }
 // A text with no capital letter except the ones sentenceCaps gave it (typed all in lower case), for the review card.
 function typedAllLowercase(text) {
@@ -53706,7 +53752,12 @@ const MENU_UNIT_WORDS_FR = [[/\bper e-?bike\b/i, 'par vélo électrique'], [/\bp
   [/\bper boat\b/i, 'par bateau'], [/\bper vehicle\b/i, 'par véhicule'], [/\bper sled\b/i, 'par traîneau'], [/\bper snowmobile\b/i, 'par motoneige'], [/\bper couple\b/i, 'par couple'], [/\bper family\b/i, 'par famille'], [/\bper room\b/i, 'par chambre'],
   // Tour test 7: a group size after a day rate (« 750 $ par jour, jusqu’à 4 personnes »).
   [/\bup to (\d{1,2})(?: people| persons| guests)?\b/i, 'jusqu’à $1 personnes']];
-const MENU_PRICE_WORDS_FR = [[/\bper person\b/i, 'par personne'], [/\bper (?:tandem )?flight\b/i, 'par vol'], [/\bper jump\b/i, 'par saut'], [/\bper ride\b/i, 'par balade'], [/\bper seat\b/i, 'par place'], [/\bper adult\b/i, 'par adulte'], [/\bper child\b/i, 'par enfant'], [/\bper group\b/i, 'par groupe'], [/^from\b/i, 'À partir de'], ...MENU_UNIT_WORDS_FR];
+const MENU_PRICE_WORDS_FR = [[/\bper person\b/i, 'par personne'], [/\bper (?:tandem )?flight\b/i, 'par vol'], [/\bper jump\b/i, 'par saut'], [/\bper ride\b/i, 'par balade'], [/\bper seat\b/i, 'par place'], [/\bper adult\b/i, 'par adulte'], [/\bper child\b/i, 'par enfant'], [/\bper group\b/i, 'par groupe'], [/^from\b/i, 'À partir de'],
+  // Tour test 14 (Whistler, 2026-11-18; Lucía): « 1 295 $ par enfant for the week ». The unit words of a lesson price
+  // (known words only; the rest stays as typed).
+  [/\bper kid\b/i, 'par enfant'], [/\bper (?:student|skier|learner)\b/i, 'par élève'], [/\bper participant\b/i, 'par participant'], [/\bper (?:private )?lesson\b/i, 'par cours'], [/\bper class\b/i, 'par cours'],
+  [/\bfor the week\b/i, 'pour la semaine'], [/\bper week\b/i, 'par semaine'], [/\bfor the day\b/i, 'pour la journée'], [/\bfor (\d) days\b/i, 'pour $1 jours'],
+  [/\b(\d{1,2})\s*(?:-|–|to)\s*(\d{1,2}) (?:people|persons|guests)\b/i, '$1 à $2 personnes'], [/^on request$/i, 'Sur demande'], ...MENU_UNIT_WORDS_FR];
 // A typed-up trip length in French (« 2.5 hours » -> « 2,5 heures », "half day" -> « demi-journée »): known words only.
 function menuDurationFr(d) {
   const t = String(d || '').trim();
@@ -53719,10 +53770,13 @@ function menuDurationFr(d) {
   return t;
 }
 function menuPriceWithWords(p, lang = 'en') {
+  // Tour test 14 (Lucía): a percentage is never dollars ("$15% off with our code", saved by an older editor, reads "15% off").
+  p = String(p).replace(/^\$\s?(?=\d{1,3}(?:[.,]\d{1,2})?\s?%)/, '');
   // Tour test 8 (Whistler, 2026-11-17): who a price is for, in brackets after it ("349 per sled (2 adults, or 1 adult + 2
   // kids)"), read as a second number and left the price without its "$". The brackets are kept as typed.
   const par = /^(.*\S)(\s*\([^()]*\d[^()]*\))$/.exec(String(p));
-  if (par && /^\D*\d/.test(par[1])) { const head = menuPriceWithWords(par[1], lang); return `${head}${par[2]}`; }
+  // Tour test 14: on the French page, known words in the brackets too (« (1 à 4 personnes) »).
+  if (par && /^\D*\d/.test(par[1])) { const head = menuPriceWithWords(par[1], lang); let tail = par[2]; if (lang === 'fr') for (const [re, word] of MENU_PRICE_WORDS_FR) if (!/\^/.test(re.source)) tail = tail.replace(re, word); return `${head}${tail}`; }
   if (/[$€£]|\b(?:cad|usd)\b/i.test(p)) {
     let q = p;
     // Tour test 8: "$349 per sled" typed in English, on the French page « 349 $ par traîneau ».
@@ -53733,7 +53787,7 @@ function menuPriceWithWords(p, lang = 'en') {
   }
   // Tour test 7: a group size after the words is fine ("750 per day, up to 4 people" -> "$750 per day, up to 4 people").
   const m = /^((?:from|starting at|starts at|only|à partir de|a partir de|dès)\s+)?(\d{1,3}(?:,\d{3})+|\d{1,5})((?:[.,]\d{1,2})?)(\s*\D*?(?:(?:up to|max(?:imum)?|for up to|jusqu.à|jusqu.a)\s+\d{1,2}\b\D*)?)$/i.exec(p);
-  if (!m || (!m[1] && !m[4].trim())) return p;
+  if (!m || (!m[1] && !m[4].trim())) return lang === 'fr' && /^on request$/i.test(String(p).trim()) ? 'Sur demande' : p;
   if (/^\s*(?:hours?|hrs?|h\b|min|mins|minutes?|days?|nights?|km|kms|miles?|holes?|%|people|persons|guests|pieces?|pcs|oz|ml|l\b|g\b|kg|x\b)/i.test(m[4])) return p;
   const fr = lang === 'fr';
   const whole0 = m[2].replace(/,/g, '');
@@ -56016,7 +56070,8 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     var t = e.target;
     if (C.kind !== 'tours' || !t.hasAttribute || t.getAttribute('data-f') !== 'price') return;
     var v = String(t.value || '').trim();
-    if (/^\d/.test(v) && !/[$€£]|\b(?:cad|usd)\b/i.test(v) && !/^\d+\s*(?:hours?|hrs?|h|min|mins|minutes?|days?|nights?)\b/i.test(v)) { t.value = '$' + v; var it = currentItem(); if (it) { it.price = t.value; it.check = false; save(); } }
+    // Tour test 14 (Lucía): never on a percentage ("15% off with our code" became "$15% off…").
+    if (/^\d/.test(v) && !/[$€£%]|\b(?:cad|usd)\b|\bpercent\b|\bpour ?cent\b/i.test(v) && !/^\d+\s*(?:hours?|hrs?|h|min|mins|minutes?|days?|nights?)\b/i.test(v)) { t.value = '$' + v; var it = currentItem(); if (it) { it.price = t.value; it.check = false; save(); } }
   });
   app.addEventListener('click', function(e){
     if (!e.target.closest) return;
@@ -56845,6 +56900,9 @@ function renderOwnerSetupPage(found, opts) {
     // Breweries (2026-11-12): the kinds, a kind and a food the name or research suggests (pre-selected only, saved when
     // she taps Save), research's flight price as a starting point, and the quick flight prices' live limit.
     ...(brewery ? breweryCfg(venue, snap, fr) : {}),
+    // Tour test 14 (Whistler, 2026-11-18; Lucía, Gboard): the words a phone keyboard splits ("snow board", "Black comb"),
+    // so a save that has one asks once before it goes (every type; never changed for her).
+    localJoins: ownerTextCleanLib.COMMON_WORD_JOINS.concat(TRIP_SITE_LOCAL_JOINS),
     // Tours (2026-11-16): the kinds (chips), how long, the quick prices and their live limit, and research's price and
     // length as suggestions (pre-picked with "We picked this from your page", saved only when she taps Save).
     ...(tour ? {
