@@ -1908,6 +1908,9 @@ function publicVenue(v, ctx) {
   // Indoor places (2026-11-19): the owner's own adult price ("$25 · Admission"); free entry says Free (freeEntry).
   const indoorFrom = v.type === 'indoor' && !v.indoorFree && typeof v.indoorPrice === 'number' && Number.isFinite(v.indoorPrice) && v.indoorPrice > 0 ? v.indoorPrice : null;
   const cost = tourIsFree || (v.type === 'indoor' && v.indoorFree) ? null : rental ? rental : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
+    // Indoor test 2 (2026-11-19; Jordan): a price per room, lane, game or group reads as the page says it ("From $120 per
+    // room (2–6 players)"), never "per person", and stays out of the per-person estimate.
+    : indoorFrom && Array.isArray(v.indoorPerLine) ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null, perGroup: v.indoorPer, unit: v.indoorPerLine[0], unitFr: v.indoorPerLine[1] }
     : indoorFrom ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null }
     : cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
     : fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }

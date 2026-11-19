@@ -97,6 +97,8 @@ const FR_TEXT = {
   'Free': 'Gratuit',
   // Indoor test 1 (2026-11-19): a by-donation place's card price.
   'By donation': 'Contribution volontaire',
+  // Indoor test 2 (2026-11-19): a price for a whole room, lane, game or group (the card's small line under the price).
+  'Per room': 'Par salle', 'Per lane': 'Par allée', 'Per game': 'Par partie', 'Per group': 'Par groupe',
   'Arts & culture': 'Arts et culture',
   'Kid Friendly': 'Adapté aux enfants',
   'Kid-Friendly': 'Adapté aux enfants',
@@ -1088,6 +1090,8 @@ const MONTHS_LONG = { January: 'janvier', February: 'février', March: 'mars', A
 const SEASON_DATE = '(January|February|March|April|May|June|July|August|September|October|November|December) (\\d{1,2})(?:, (\\d{4}))?';
 const seasonDate = (m, i) => `${m[i + 1] === '1' ? '1er' : m[i + 1]} ${MONTHS_LONG[m[i]]}${m[i + 2] ? ` ${m[i + 2]}` : ''}`;
 const FR_PATTERNS = [
+  // Indoor test 2 (2026-11-19): a card price per room, lane, game or group ("From $120 / room" -> « À partir de 120 $ / salle »).
+  [/^From \$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?) \/ (room|lane|game|group)$/, (m) => `À partir de ${m[1].replace(/,/g, '\u00a0').replace('.', ',')}\u00a0$ / ${{ room: 'salle', lane: 'allée', game: 'partie', group: 'groupe' }[m[2]]}`],
   // What's On (2026-10-19): the month headings past next week, a one-day "Showing Sun Oct 18" under the dates, and
   // "No more live music tonight. Next:" above the next three events of that kind.
   [/^Later in (January|February|March|April|May|June|July|August|September|October|November|December)$/, (m) => `Plus tard en ${MONTHS_LONG[m[1]]}`],

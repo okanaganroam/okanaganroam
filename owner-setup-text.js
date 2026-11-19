@@ -2486,6 +2486,19 @@ Object.assign(en.indoor, { tsuggLabel: 'Suggested amount (optional)', tdonationC
 Object.assign(fr.indoor, { tsuggLabel: 'Montant suggéré (facultatif)', tdonationCard: 'Contribution volontaire', tsuggNeed: 'Seulement le chiffre, par exemple 5. Pas de montant suggéré? Laissez la case vide.',
   seaClosuresHint: 'Fermé pendant les Fêtes ou pour une pause d’hiver? Ajoutez-le sous Fermetures dans Plus sur votre endroit.',
   tpriceLeadDonation: 'Votre fiche indiquera « Contribution volontaire ».', tpriceSavedDonation: 'Votre page et votre fiche indiquent « Contribution volontaire » maintenant.' });
+// Indoor test 2 (2026-11-19; Jordan, escape rooms: "120 per room" was saved as $120 a person): a price for a whole room, lane,
+// game or group. One small choice under the price box (Per person, the default / Per room or group); "per room", "per lane",
+// "per game", "per group" or "per party" in the box picks it for her, and "2-6 players" or "up to 8" says who it's for.
+Object.assign(en.indoor, { iperChips: { person: 'Per person', group: 'Per room or group' }, iperWords: { room: 'room', lane: 'lane', game: 'game', group: 'group' },
+  iperOne: { room: 'Price for one room, in dollars', lane: 'Price for one lane, in dollars', game: 'Price for one game, in dollars', group: 'Price for one group, in dollars' },
+  tpriceLeadPer: 'Your page will say “{page}”. Your card: “From {x} / {u}”.', ipageLine: 'From {x} per {u}{size}', isizeRange: ' ({a}–{b} {who})', isizeUpTo: ' (up to {b} {who})', iwho: { players: 'players', people: 'people' },
+  iperRead: 'You typed a price per {u}, so we picked Per room or group. Tap Per person if it’s for one person.',
+  iperNeed: 'Is that price for a whole {u}? Tap Per room or group. Or type the price for one person, like 25.', tpriceCardPer: 'From {x} / {u}' });
+Object.assign(fr.indoor, { iperChips: { person: 'Par personne', group: 'Par salle ou groupe' }, iperWords: { room: 'salle', lane: 'allée', game: 'partie', group: 'groupe' },
+  iperOne: { room: 'Prix pour une salle, en dollars', lane: 'Prix pour une allée, en dollars', game: 'Prix pour une partie, en dollars', group: 'Prix pour un groupe, en dollars' },
+  tpriceLeadPer: 'Votre page indiquera « {page} ». Votre fiche : « À partir de {x} / {u} ».', ipageLine: 'À partir de {x} par {u}{size}', isizeRange: ' ({a} à {b} {who})', isizeUpTo: ' (jusqu’à {b} {who})', iwho: { players: 'joueurs', people: 'personnes' },
+  iperRead: 'Vous avez écrit un prix par {u}, alors nous avons choisi Par salle ou groupe. Touchez Par personne si c’est pour une personne.',
+  iperNeed: 'Ce prix est-il pour {one}? Touchez Par salle ou groupe. Ou écrivez le prix pour une personne, par exemple 25.', iperOneFr: { room: 'toute une salle', lane: 'toute une allée', game: 'toute une partie', group: 'tout un groupe' }, tpriceCardPer: 'À partir de {x} / {u}' });
 // Indoor test 1 (2026-11-19; Margaret: "I don't speak French, do I have to update the French description"): the
 // finish screen's French line says it's optional and we translate it.
 Object.assign(en.indoor, { frDescOld: 'Optional: we translate your story into French for you. Speak French?', frDescGo: 'Check the French yourself' });

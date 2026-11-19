@@ -56,7 +56,7 @@ const ASKED = [
   // Price
   ['en', 'what price do i put, we have adult child and senior prices', ['indoor-price']],
   ['en', 'kids are $12 and adults $18, where does the kids price go', ['indoor-price']],
-  ['en', 'we charge per room not per person', ['indoor-price']],
+  ['en', 'we charge per room not per person', ['indoor-per-room']],
   ['en', 'we have memberships and a family pass', ['indoor-price', 'indoor-gift']],
   ['en', 'admission is by donation', ['indoor-free']],
   ['en', 'we are free to visit', ['indoor-free']],
@@ -136,6 +136,39 @@ const ASKED = [
   ['fr', 'la contribution suggérée est de 5 $', ['indoor-free']],
   ['fr', 'visites de groupe sur rendez-vous', ['indoor-groups']],
   ['fr', 'nous prenons une pause d’hiver', ['indoor-yearly-break']],
+  // Indoor test 2 (2026-11-19; Jordan, an escape room and arcade bar): every question in his help log, and its French twin.
+  ['en', 'we price per room not per person', ['indoor-per-room']],
+  ['en', 'escape rooms must be booked online but arcade is walk in', ['indoor-booking']],
+  ['en', 'arcade is all ages until 8 then 19+', ['indoor-age']],
+  ['en', 'escape rooms are 10+ with an adult, 16+ on their own', ['indoor-age']],
+  ['en', 'do you list birthday party packages', ['indoor-groups']],
+  ['en', 'corporate team building is a big part of what we do', ['indoor-groups']],
+  ['en', 'we have a bar, can I add happy hour', ['indoor-bar']],
+  ['en', 'where do I put that the arcade is walk in', ['indoor-booking']],
+  ['en', 'school groups by appointment only', ['indoor-groups']],
+  ['en', 'we are run by volunteers, do I need to be the owner', ['not-owner']],
+  ['en', 'we close from Christmas until mid-January', ['indoor-yearly-break']],
+  ['en', 'I don\'t speak French, do I have to write it in French', ['indoor-french']],
+  ['en', 'kids get in free', ['indoor-price']],
+  ['en', 'can my manager also edit this', ['not-owner', 'staff']],
+  ['en', 'the arcade is 19+ after 8pm will that show', ['indoor-age']],
+  ['en', 'how do I change the price, it says adults but we charge per room', ['indoor-per-room']],
+  ['fr', 'notre prix est par salle, pas par personne', ['indoor-per-room']],
+  ['fr', 'les jeux d’évasion doivent être réservés en ligne mais l’arcade est sans réservation', ['indoor-booking']],
+  ['fr', 'l’arcade est pour tous les âges jusqu’à 20 h, puis 19 ans et plus', ['indoor-age']],
+  ['fr', 'les jeux d’évasion sont pour les 10 ans et plus avec un adulte, 16 ans et plus seuls', ['indoor-age']],
+  ['fr', 'affichez-vous les forfaits de fête d’anniversaire', ['indoor-groups']],
+  ['fr', 'la consolidation d’équipe pour les entreprises est une grosse partie de ce que nous faisons', ['indoor-groups']],
+  ['fr', 'nous avons un bar, puis-je ajouter un 5 à 7', ['indoor-bar']],
+  ['fr', 'où est-ce que je mets que l’arcade est sans réservation', ['indoor-booking']],
+  ['fr', 'groupes scolaires sur rendez-vous seulement', ['indoor-groups']],
+  ['fr', 'nous sommes gérés par des bénévoles, dois-je être le propriétaire', ['not-owner']],
+  ['fr', 'nous fermons de Noël jusqu’à la mi-janvier', ['indoor-yearly-break']],
+  ['fr', 'je ne parle pas anglais, dois-je écrire la description en anglais', ['indoor-french']],
+  ['fr', 'les enfants entrent gratuitement', ['indoor-price']],
+  ['fr', 'est-ce que mon gérant peut aussi modifier ceci', ['not-owner', 'staff']],
+  ['fr', 'l’arcade est 19 ans et plus après 20 h, est-ce que ça va paraître', ['indoor-age']],
+  ['fr', 'comment changer le prix, ça dit adultes mais nous chargeons par salle', ['indoor-per-room']],
 ];
 
 test('every indoor owner question lands on the right indoor topic (EN + FR)', async () => {
@@ -151,7 +184,17 @@ test('every indoor owner question lands on the right indoor topic (EN + FR)', as
 test('indoor answers never talk about happy hour, menus of food or tours; the fill-all answer says only the 7 essentials matter', async () => {
   const { en, fr } = await setupFor('indoor');
   const plain = (h) => String(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-  for (const t of en.topics.filter((x) => /^indoor-/.test(x.id))) assert.doesNotMatch(plain(t.a) + plain(t.aFr), /happy hour|5 [aà] 7|your tours|vos sorties/i, t.id);
+  for (const t of en.topics.filter((x) => /^indoor-/.test(x.id) && x.id !== 'indoor-bar')) assert.doesNotMatch(plain(t.a) + plain(t.aFr), /happy hour|5 [aà] 7|your tours|vos sorties/i, t.id);
+  // Indoor test 2: the one answer that names happy hour says it isn't listed for indoor places, and offers Good to know.
+  assert.match(plain(en.topic('indoor-bar').a), /Happy hour isn’t listed for indoor places\. Say you have a bar in Good to know/);
+  assert.match(plain(fr.topic('indoor-bar').aFr), /Le 5 à 7 n’est pas affiché pour les endroits intérieurs/);
+  // The mixed-booking and ages answers (indoor test 2) name only buttons the screen shows.
+  assert.match(plain(en.topic('indoor-booking').a), /Pick what’s true for your main activity, and add the exception under Good to know/);
+  assert.doesNotMatch(plain(en.topic('indoor-booking').a), /We don’t take bookings online/);
+  assert.match(plain(en.topic('indoor-age').a), /pick the youngest age anyone can come/i);
+  assert.match(plain(en.topic('indoor-age').a), /Put rules by activity or time under Good to know/);
+  assert.doesNotMatch(plain(en.topic('indoor-groups').a), /\. or /);
+  assert.match(plain(en.topic('not-owner').a), /^\s*No — managers, staff and volunteers can use this link too/);
   assert.match(plain(en.topic('indoor-fill-all').a), /Only the 7 essentials matter/);
   assert.match(plain(fr.topic('indoor-fill-all').aFr), /Seuls les 7 essentiels comptent/);
   assert.equal(en.topics.some((x) => /happy hour/i.test(x.q)), false);

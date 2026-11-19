@@ -1507,6 +1507,9 @@ function renderScript(d) {
       // Tour test 15 (Whistler, 2026-11-18): a rental asked for shows the operator's own rental price as typed ("Canoe rental:
       // $45 per boat per hour"), not a price per person.
       if (cost.label === 'Rental' && cost.unit) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc((cost.item ? cost.item + ': ' : '') + (french ? cost.unitFr || cost.unit : cost.unit)) + '</strong></p>';
+      // Indoor test 2 (2026-11-19): a price for a whole room, lane or group ("From $120 per room (2–6 players)"): never "per
+      // person", and not added to the per-person estimate.
+      if (cost.perGroup && cost.unit) return '<p class="t3-stop-price"><strong>' + esc(french ? cost.unitFr || cost.unit : cost.unit) + '</strong></p>';
       if (fromWord) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(fromWord + cad(cost.cents)) + '</strong></p>';
       return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(cad(cost.cents) + (french ? ' / personne' : ' per person')) + '</strong> · '
         + esc(french ? cost.labelFr : cost.label) + (typeof cost.source === 'string' && cost.source.startsWith('https://') ? ' · <a ' + hrefAttr(cost.source) + '>' + esc(french ? 'Source' : 'Price source') + '</a>' : '') + '</p>';

@@ -23889,10 +23889,29 @@ const TOUR_APPOINTMENT_LINE_FR = 'Réservez à l’avance · sorties sur réserv
 //   cuisine_was  the researched words (venues.cuisine) the kinds replaced, put back when the kinds are taken back
 //   suggested  the suggested donation in dollars (indoor test 1, 2026-11-19): typed in the price box's place, labelled
 //            "Suggested amount (optional)", under By donation; used only while the price answer is 'donation'
+//   per      'room' | 'lane' | 'game' | 'group'   (indoor test 2, 2026-11-19; Jordan's escape rooms) the price is for a
+//            whole room, lane, game or group, not a person: the page says "From $120 per room (2–6 players).", the card
+//            "From $120 / room", Build My Trip never "per person". No per: the price is for one adult.
+//   per_min, per_max   who that price is for (2–6 players, up to 8 people), read from her typed words; optional
 //   price    the adult price in dollars, only through the 'indoor_price' field (live up to INDOOR_PRICE_LIVE_MAX; higher
 //            waits for our check), also the card's price; free 'free' | 'donation' (Free entry / by donation, price 0).
 const { INDOOR_KINDS, INDOOR_LENGTHS, INDOOR_BOOK, INDOOR_AGES } = require('./portal-completeness');
-const INDOOR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'year', 'visit', 'suggested'];
+const INDOOR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'year', 'visit', 'suggested', 'per', 'per_min', 'per_max'];
+// Indoor test 2 (2026-11-19): a price for a whole room, lane, game or group ({ per }), its words on the page and the card.
+const INDOOR_PER_UNITS = ['room', 'lane', 'game', 'group'];
+const INDOOR_PER_WORDS = { room: ['room', 'salle'], lane: ['lane', 'allée'], game: ['game', 'partie'], group: ['group', 'groupe'] };
+// "players" for games, escape rooms, bowling and curling; "people" for everything else.
+const INDOOR_PLAYER_KINDS = ['escape', 'games', 'bowling', 'curling'];
+// "From $120 per room (2–6 players)." / « À partir de 120 $ par salle (2 à 6 joueurs). »
+function indoorPerLine(t, price, fr = false) {
+  const per = INDOOR_PER_UNITS.includes(t && t.per) ? t.per : null;
+  if (!per || !(price > 0)) return null;
+  const players = (Array.isArray(t.kinds) ? t.kinds : []).some((k) => INDOOR_PLAYER_KINDS.includes(k));
+  const who = players ? (fr ? 'joueurs' : 'players') : (fr ? 'personnes' : 'people');
+  const lo = Number.isInteger(t.per_min) && t.per_min > 0 ? t.per_min : null, hi = Number.isInteger(t.per_max) && t.per_max > 0 ? t.per_max : null;
+  const size = lo && hi && lo < hi ? (fr ? ` (${lo} à ${hi} ${who})` : ` (${lo}\u2013${hi} ${who})`) : hi ? (fr ? ` (jusqu’à ${hi} ${who})` : ` (up to ${hi} ${who})`) : '';
+  return fr ? `À partir de ${tourMoney(price, true)} par ${INDOOR_PER_WORDS[per][1]}${size}.` : `From ${tourMoney(price, false)} per ${INDOOR_PER_WORDS[per][0]}${size}.`;
+}
 const INDOOR_KINDS_MAX = 3;
 const INDOOR_PRICE_LIVE_MAX = 300;
 const INDOOR_PRICE_MAX = 5000;
@@ -24039,6 +24058,8 @@ function cleanIndoorInfoPart(key, x) {
   if (key === 'year') return ['all', 'seasonal'].includes(x) ? { value: x } : { error: TOUR_INFO_ERROR };
   if (key === 'visit') return x === 'appointment' ? { value: x } : { error: TOUR_INFO_ERROR };
   if (key === 'suggested') { const c = cleanIndoorPrice(x); return c.error || typeof c.value !== 'number' || c.value > INDOOR_PRICE_LIVE_MAX ? { error: INDOOR_SUGGESTED_ERROR } : { value: c.value }; }
+  if (key === 'per') return INDOOR_PER_UNITS.includes(x) ? { value: x } : { error: TOUR_INFO_ERROR };
+  if (key === 'per_min' || key === 'per_max') return Number.isInteger(x) && x >= 1 && x <= 999 ? { value: x } : { error: TOUR_INFO_ERROR };
   return { error: TOUR_INFO_ERROR };
 }
 // The lines the answers write, in both languages ({ label: { en, fr } }); a label left out is not answered.
@@ -24053,6 +24074,7 @@ function indoorVisitLines(venue, info) {
   const free = tourFreeOf(t), price = typeof t.price === 'number' && t.price > 0 ? t.price : null;
   if (free === 'donation') out.Prices = { en: indoorDonationLine(t.suggested, false), fr: indoorDonationLine(t.suggested, true) };
   else if (free) out.Prices = { en: INDOOR_FREE_LINES[free][0], fr: INDOOR_FREE_LINES[free][1] };
+  else if (price != null && indoorPerLine(t, price)) out.Prices = { en: indoorPerLine(t, price), fr: indoorPerLine(t, price, true) };
   else if (price != null) out.Prices = { en: `Adults ${tourMoney(price, false)}.`, fr: `Adultes : ${tourMoney(price, true)}.` };
   if (INDOOR_AGES.includes(String(t.age || ''))) {
     const a = INDOOR_AGE_LINES[String(t.age)];
@@ -24073,7 +24095,9 @@ function writeIndoorVisitRows(venueId, now = new Date()) {
 // The owner's price as the card price ("From $25 · Adult admission", or "Free"), or taken off (null).
 function indoorCardPrice(venueId) {
   const p = indoorPrice(venueId), free = indoorFree(venueId);
-  try { if (free) priceCheck.setOwnerPrice(venueId, 0, free === 'donation' ? INDOOR_DONATION_CARD_LABEL : TOUR_FREE_CARD_LABEL); else priceCheck.setOwnerPrice(venueId, p, p == null ? null : 'Adult admission'); } catch (e) { console.error(`[owner-portal] card price for indoor #${venueId} failed: ${e.message}`); }
+  // Indoor test 2: a price per room, lane, game or group says so ("From $120 / room").
+  const per = INDOOR_PER_UNITS.includes(venueIndoorInfo(venueId).per) ? venueIndoorInfo(venueId).per : null;
+  try { if (free) priceCheck.setOwnerPrice(venueId, 0, free === 'donation' ? INDOOR_DONATION_CARD_LABEL : TOUR_FREE_CARD_LABEL); else if (p != null && per) priceCheck.setOwnerPrice(venueId, p, `Per ${INDOOR_PER_WORDS[per][0]}`, INDOOR_PER_WORDS[per][0]); else priceCheck.setOwnerPrice(venueId, p, p == null ? null : 'Adult admission'); } catch (e) { console.error(`[owner-portal] card price for indoor #${venueId} failed: ${e.message}`); }
 }
 // Build My Trip's facts from the owner's own answers (nothing when not answered).
 function indoorPlannerFacts(venueId) {
@@ -24084,6 +24108,8 @@ function indoorPlannerFacts(venueId) {
     ...(INDOOR_BOOK.includes(t.book) ? { indoorBook: t.book } : {}),
     ...(INDOOR_LENGTHS.includes(t.length) ? { indoorLength: t.length } : {}),
     ...(typeof t.price === 'number' && Number.isFinite(t.price) && t.price > 0 ? { indoorPrice: t.price } : {}),
+    // Indoor test 2: a price per room, lane, game or group, as the page says it (never "per person" in Build My Trip).
+    ...(typeof t.price === 'number' && t.price > 0 && !tourFreeOf(t) && indoorPerLine(t, t.price) ? { indoorPer: t.per, indoorPerLine: [indoorPerLine(t, t.price).replace(/\.$/, ''), indoorPerLine(t, t.price, true).replace(/\.$/, '')] } : {}),
     ...(tourFreeOf(t) ? { indoorFree: tourFreeOf(t) } : {}),
     ...(indoorSuggested(venueId) != null ? { indoorSuggested: indoorSuggested(venueId) } : {}),
   };
@@ -57888,6 +57914,8 @@ function renderOwnerSetupPage(found, opts) {
     ...(indoor ? {
       allSteps: INDOOR_SETUP_PART1.concat(INDOOR_SETUP_PART2), feeLiveMax: INDOOR_PRICE_LIVE_MAX, bringMax: TOUR_GOOD_TO_KNOW_MAX,
       indoorKinds: INDOOR_KINDS_SHOWN.map((k) => ({ k, t: INDOOR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), indoorKindsTop: INDOOR_KINDS_TOP,
+      // Indoor test 2: the card's short words for each kind, for the preview ("Escape room · arcade, VR & laser tag").
+      indoorKindWords: Object.fromEntries(Object.entries(INDOOR_KIND_WORDS).map(([k, w]) => [k, w[fr ? 1 : 0]])),
       kindLength: INDOOR_KIND_LENGTH, kindBook: INDOOR_KIND_BOOK, kindAge: INDOOR_KIND_AGE, artsKinds: INDOOR_ARTS_KINDS,
       suggestKinds: (snap.indoor_info || {}).kinds ? [] : indoorKindSuggestion(venue),
       researchFee: indoorResearchPrice(venue), researchFree: (!!venue.free_entry || indoorResearchDonation(venue)) && snap.indoor_price == null, researchDonation: indoorResearchDonation(venue),
@@ -58928,10 +58956,10 @@ const INDOOR_SETUP_HELP_TOPICS = [
   { id: 'indoor-price', pages: ['setup', 'edit'], over: ['price-range', 'avg-spend', 'cost'], noRelated: ['price-range', 'avg-spend', 'cost'],
     q: 'What price do I put? Kids, seniors, families…', qFr: 'Quel prix mettre? Enfants, aînés, familles…',
     // Indoor test 1: "kids get in free" is a kids' price (Your prices), not the minimum age.
-    keys: ['kids get in free', 'kids free', 'kids are free', 'children free', 'children are free', 'free for kids', 'free for children', 'kids get in', 'under 5 free', 'under 12 free', 'price', 'prices', 'what price', 'which price', 'admission', 'admission price', 'entry fee', 'ticket price', 'tickets', 'how much', 'kids price', 'child price', 'children price', 'senior', 'seniors', 'student', 'students', 'family price', 'family pass', 'membership', 'memberships', 'season pass', 'punch card', 'day pass', 'drop in rate', 'per game', 'per hour', 'per room', 'per lane', 'two prices', 'different prices', 'adult price', 'taxes', 'gst'],
-    keysFr: ['enfants entrent gratuitement', 'les enfants entrent gratuitement', 'gratuit pour les enfants', 'enfants gratuits', 'gratuit pour enfants', 'prix', 'quel prix', 'entree', 'prix d entree', 'billet', 'billets', 'combien', 'prix enfant', 'enfants', 'aines', 'etudiants', 'prix famille', 'forfait familial', 'abonnement', 'passe de saison', 'carte', 'par partie', 'par heure', 'par salle', 'prix adulte', 'taxes'],
-    a: '<p>In <strong>Price</strong>, put the price for one adult (the regular admission, or your lowest per-person price for a room, a game or a class). Your card shows it. Kids’, seniors’ and family prices, passes and memberships go in <strong>Your prices</strong> (in More about your place): type each one with its price, like <em>Kids under 12: Free</em>.</p>',
-    aFr: '<p>Dans <strong>Prix</strong>, indiquez le prix pour un adulte (l’entrée habituelle, ou votre prix le plus bas par personne pour une salle, une partie ou un cours). Votre fiche l’affiche. Les prix pour enfants, aînés et familles, les laissez-passer et les abonnements vont dans <strong>Vos tarifs</strong> (dans Plus sur votre endroit) : tapez chacun avec son prix, comme <em>Enfants de moins de 12 ans : gratuit</em>.</p>' },
+    keys: ['kids get in free', 'kids free', 'kids are free', 'children free', 'children are free', 'free for kids', 'free for children', 'kids get in', 'under 5 free', 'under 12 free', 'price', 'prices', 'what price', 'which price', 'admission', 'admission price', 'entry fee', 'ticket price', 'tickets', 'how much', 'kids price', 'child price', 'children price', 'senior', 'seniors', 'student', 'students', 'family price', 'family pass', 'membership', 'memberships', 'season pass', 'punch card', 'day pass', 'drop in rate', 'per hour', 'two prices', 'different prices', 'adult price', 'taxes', 'gst'],
+    keysFr: ['enfants entrent gratuitement', 'les enfants entrent gratuitement', 'gratuit pour les enfants', 'enfants gratuits', 'gratuit pour enfants', 'prix', 'quel prix', 'entree', 'prix d entree', 'billet', 'billets', 'combien', 'prix enfant', 'enfants', 'aines', 'etudiants', 'prix famille', 'forfait familial', 'abonnement', 'passe de saison', 'carte', 'par heure', 'prix adulte', 'taxes'],
+    a: '<p>In <strong>Price</strong>, put the price for one adult (the regular admission, or your lowest per-person price for a game or a class). Your card shows it. Priced per room, lane or group? Tap <strong>Per room or group</strong> under the box. Kids’, seniors’ and family prices, passes and memberships go in <strong>Your prices</strong> (in More about your place): type each one with its price, like <em>Kids under 12: Free</em>.</p>',
+    aFr: '<p>Dans <strong>Prix</strong>, indiquez le prix pour un adulte (l’entrée habituelle, ou votre prix le plus bas par personne pour une partie ou un cours). Votre fiche l’affiche. Un prix par salle, par allée ou par groupe? Touchez <strong>Par salle ou groupe</strong> sous la case. Les prix pour enfants, aînés et familles, les laissez-passer et les abonnements vont dans <strong>Vos tarifs</strong> (dans Plus sur votre endroit) : tapez chacun avec son prix, comme <em>Enfants de moins de 12 ans : gratuit</em>.</p>' },
   { id: 'indoor-free', pages: ['setup', 'edit'], over: ['indoor-price', 'cost', 'features'], noRelated: ['cost'],
     q: 'We’re free (or by donation)', qFr: 'C’est gratuit (ou contribution volontaire)',
     keys: ['free entry', 'free admission', 'admission is free', 'we are free', 'were free', 'it s free', 'no charge', 'no admission', 'by donation', 'donation', 'donations', 'suggested donation', 'suggested donation is', 'the suggested donation', 'suggested amount', 'suggested', 'pay what you can', 'pay what you want', 'free to visit', 'free museum', 'free gallery'],
@@ -58939,12 +58967,31 @@ const INDOOR_SETUP_HELP_TOPICS = [
     // Indoor test 1 (2026-11-19; Margaret): by donation says "By donation" (not "Free"), with the suggested amount she types.
     a: '<p>In <strong>Price</strong>, tap <strong>Free entry</strong> or <strong>By donation</strong>. Your card says “Free” or “By donation”, and you show under Free to Visit. A suggested donation? Under <strong>By donation</strong>, type it in <strong>Suggested amount (optional)</strong>: your page says “By donation (suggested $5)”. Some shows or classes cost extra? Add them in <strong>Your prices</strong>.</p>',
     aFr: '<p>Dans <strong>Prix</strong>, touchez <strong>Entrée gratuite</strong> ou <strong>Contribution volontaire</strong>. Votre fiche indique « Gratuit » ou « Contribution volontaire », et vous paraissez sous Gratuit. Une contribution suggérée? Sous <strong>Contribution volontaire</strong>, inscrivez-la dans <strong>Montant suggéré (facultatif)</strong> : votre page indique « Contribution volontaire (suggérée : 5 $) ». Des spectacles ou des cours sont payants? Ajoutez-les dans <strong>Vos tarifs</strong>.</p>' },
+  // Indoor test 2 (2026-11-19; Jordan, escape rooms: "we price per room not per person", "it says adults but we charge per
+  // room"): the Per room or group choice on the Price screen.
+  { id: 'indoor-per-room', pages: ['setup', 'edit'], over: ['indoor-price', 'cost', 'menu-add', 'indoor-groups'], noRelated: ['cost'],
+    q: 'We price per room, lane or group, not per person', qFr: 'Notre prix est par salle, par allée ou par groupe, pas par personne',
+    keys: ['per room', 'per room not per person', 'price per room', 'priced per room', 'charge per room', 'we charge per room', 'by the room', 'the whole room', 'for the room', 'per lane', 'by the lane', 'per group', 'per party', 'per team', 'per booking', 'per game', 'not per person', 'not by the person', 'isnt per person', 'not a person', 'it says adults', 'says adults', 'says adult', 'adult price is wrong', 'not an adult price', 'players', '2 6 players', 'up to 6 players', 'room price', 'lane price', 'group price', 'private room price'],
+    keysFr: ['par salle', 'prix par salle', 'pour la salle', 'toute la salle', 'par allee', 'par piste', 'par groupe', 'par equipe', 'par partie', 'par reservation', 'pas par personne', 'ca dit adultes', 'indique adultes', 'prix adulte est faux', 'joueurs', 'prix de la salle', 'prix du groupe'],
+    a: '<p>In <strong>Price</strong>, type your price and tap <strong>Per room or group</strong> under the box (typing “120 per room” picks it for you). Add who it’s for, like <em>120 per room 2-6 players</em>: your page says “From $120 per room (2–6 players)” and your card “From $120 / room”. Build My Trip never calls it a price per person.</p><p>Other prices, like a per-person arcade card or party packages, go in <strong>Your prices</strong>.</p>',
+    aFr: '<p>Dans <strong>Prix</strong>, écrivez votre prix et touchez <strong>Par salle ou groupe</strong> sous la case (écrire « 120 par salle » le choisit pour vous). Ajoutez pour qui, comme <em>120 par salle 2-6 joueurs</em> : votre page indique « À partir de 120 $ par salle (2 à 6 joueurs) » et votre fiche « À partir de 120 $ / salle ». Planifier mon voyage n’en parle jamais comme d’un prix par personne.</p><p>Les autres prix, comme une carte d’arcade par personne ou les forfaits de fête, vont dans <strong>Vos tarifs</strong>.</p>' },
+  // Indoor test 2 (Jordan: "we have a bar, can I add happy hour" got "I'm not sure"): happy hour isn't listed for indoor
+  // places (Dayton's rule); the bar goes under Good to know.
+  { id: 'indoor-bar', pages: ['setup', 'edit'], over: ['features', 'indoor-good-to-know'], keepHappy: true,
+    q: 'We have a bar or serve drinks', qFr: 'Nous avons un bar ou servons des boissons',
+    keys: ['happy hour', 'happy hours', 'add happy hour', 'can i add happy hour', 'we have a bar', 'have a bar', 'a bar', 'bar', 'arcade bar', 'licensed', 'liquor', 'liquor license', 'beer', 'beer and wine', 'wine', 'cocktails', 'drinks', 'drink specials', 'drink deals', 'serve alcohol', 'alcohol'],
+    keysFr: ['5 a 7', 'cinq a sept', 'happy hour', 'ajouter un 5 a 7', 'nous avons un bar', 'un bar', 'bar', 'permis d alcool', 'biere', 'vin', 'cocktails', 'boissons', 'speciaux sur les boissons', 'alcool'],
+    a: '<p>Happy hour isn’t listed for indoor places. Say you have a bar in <strong>Good to know</strong>, in one line, like <em>Bar with beer and wine</em>. Anything else about your drinks? Tap <strong>Message us</strong> and Dayton will reply.</p>',
+    aFr: '<p>Le 5 à 7 n’est pas affiché pour les endroits intérieurs. Dites que vous avez un bar dans <strong>Bon à savoir</strong>, en une ligne, comme <em>Bar avec bière et vin</em>. Autre chose sur vos boissons? Touchez <strong>Écrivez-nous</strong> et Dayton vous répondra.</p>' },
   { id: 'indoor-booking', pages: ['setup', 'edit'], over: ['booking-link', 'links', 'tour-booking-only'],
     q: 'Walk-ins, or do people need to book?', qFr: 'Sans réservation, ou faut-il réserver?',
-    keys: ['walk in', 'walk ins', 'walkins', 'walk-ins', 'drop in', 'drop ins', 'book ahead', 'booking', 'bookings', 'reservations', 'reserve', 'do people need to book', 'need to book', 'book online', 'tickets online', 'buy tickets', 'booking link', 'fareharbor', 'eventbrite', 'on eventbrite', 'ticketmaster', 'tickets', 'sell tickets', 'we sell tickets', 'ticketing', 'book on weekends', 'busy on weekends', 'appointments', 'appointment'],
-    keysFr: ['sans reservation', 'reserver', 'reservation', 'reservations', 'faut il reserver', 'reserver en ligne', 'billets en ligne', 'acheter des billets', 'lien de reservation', 'rendez vous', 'fins de semaine'],
-    a: '<p>In <strong>Booking</strong>, tap one: <strong>Walk-ins welcome</strong>, <strong>Walk-ins welcome, but book ahead for busy times</strong>, or <strong>Please book ahead</strong>. Then paste your booking or tickets link (FareHarbor, Eventbrite, your own website): your page gets a Book button. No online booking? Tap <strong>We don’t take bookings online</strong>.</p>',
-    aFr: '<p>Dans <strong>Réservations</strong>, touchez une réponse : <strong>Sans réservation</strong>, <strong>Sans réservation, mais réservez pour les périodes achalandées</strong>, ou <strong>Réservez à l’avance</strong>. Collez ensuite votre lien de réservation ou de billets (FareHarbor, Eventbrite, votre site) : votre page a un bouton Réserver. Pas de réservation en ligne? Touchez <strong>Nous ne prenons pas de réservations en ligne</strong>.</p>' },
+    keys: ['walk in', 'walk ins', 'walkins', 'walk-ins', 'drop in', 'drop ins', 'book ahead', 'booking', 'bookings', 'reservations', 'reserve', 'do people need to book', 'need to book', 'book online', 'tickets online', 'buy tickets', 'booking link', 'fareharbor', 'eventbrite', 'on eventbrite', 'ticketmaster', 'tickets', 'sell tickets', 'we sell tickets', 'ticketing', 'book on weekends', 'busy on weekends', 'appointments', 'appointment',
+      // Indoor test 2 (Jordan): rooms booked online, the arcade walk-in.
+      'booked online', 'must be booked', 'is walk in', 'arcade is walk in', 'walk in only', 'but walk in', 'some need booking', 'some walk in', 'mixed', 'both'],
+    keysFr: ['sans reservation', 'reserver', 'reservation', 'reservations', 'faut il reserver', 'reserver en ligne', 'billets en ligne', 'acheter des billets', 'lien de reservation', 'rendez vous', 'fins de semaine', 'reservees en ligne', 'doivent etre reservees', 'sans reservation pour', 'les deux'],
+    // Indoor test 2 (2026-11-19; Jordan): a place where some things book ahead and others are walk-in picks its main one.
+    a: '<p>In <strong>Booking</strong>, tap one: <strong>Walk-ins welcome</strong>, <strong>Walk-ins welcome, but book ahead for busy times</strong>, or <strong>Please book ahead</strong>. Then paste your booking or tickets link (FareHarbor, Eventbrite, your own website): your page gets a Book button.</p><p>Some things book ahead and some are walk-in (like rooms online and the arcade walk-in)? Pick what’s true for your main activity, and add the exception under <strong>Good to know</strong>, like <em>Arcade: walk-ins welcome</em>.</p>',
+    aFr: '<p>Dans <strong>Réservations</strong>, touchez une réponse : <strong>Sans réservation</strong>, <strong>Sans réservation, mais réservez pour les périodes achalandées</strong>, ou <strong>Réservez à l’avance</strong>. Collez ensuite votre lien de réservation ou de billets (FareHarbor, Eventbrite, votre site) : votre page a un bouton Réserver.</p><p>Certaines activités se réservent et d’autres non (les salles en ligne, l’arcade sans réservation)? Choisissez ce qui vaut pour votre activité principale, et ajoutez l’exception sous <strong>Bon à savoir</strong>, comme <em>Arcade : sans réservation</em>.</p>' },
   { id: 'indoor-no-hours', pages: ['setup', 'edit'], over: ['hours', 'setup-season', 'tour-booking-only', 'closures'],
     // Indoor test 1 (2026-11-19; Margaret): "school groups by appointment only" landed here, and the button would have
     // taken her real hours off. Only shows or classes with no open hours; appointment words go to Booking or Groups.
@@ -58961,19 +59008,23 @@ const INDOOR_SETUP_HELP_TOPICS = [
     aFr: '<p>Inscrivez les heures où vos portes sont ouvertes (touchez <strong>+ Ajouter une deuxième plage</strong> pour un jour avec une pause). Les heures précises des bains, des périodes libres ou des séances vont dans <strong>Bon à savoir</strong> en une ligne (« Bains libres tous les jours de 13 h à 15 h et de 18 h 30 à 20 h »), ou dans <strong>Vos tarifs</strong> à côté de chaque prix.</p>' },
   { id: 'indoor-age', pages: ['setup', 'edit'], over: ['features', 'kids'],
     q: 'Minimum age, kids and adults only', qFr: 'Âge minimum, enfants et adultes seulement',
-    keys: ['age', 'ages', 'minimum age', 'min age', 'how old', 'kids', 'children', 'child', 'toddlers', 'babies', 'family', 'families', 'teens', 'adults only', '19+', '19 only', '19 and over', 'casino 19', 'only 19', '18+', 'under 18', 'with an adult', 'supervised', 'parent must stay', 'kids under', 'kids only', 'no kids'],
-    keysFr: ['age', 'ages', 'age minimum', 'quel age', 'enfants', 'enfant', 'tout petits', 'bebes', 'famille', 'familles', 'ados', 'adultes seulement', '19 ans', 'moins de 18', 'avec un adulte', 'supervise', 'pas d enfants'],
-    a: '<p>In <strong>Who can come</strong>, tap your youngest age: All ages, 5+, 8+, 12+, 16+ or 19+. Tap <strong>Under 18s come with an adult</strong> if they do. All ages or 5+ puts you in Kids welcome and family trips in Build My Trip; 12+ and older keeps you out of them. A play centre for little ones only? Tap All ages and say “for kids 0 to 12” under <strong>Good to know</strong>.</p>',
-    aFr: '<p>Dans <strong>Qui peut venir</strong>, touchez l’âge minimum : Tous les âges, 5+, 8+, 12+, 16+ ou 19+. Touchez <strong>Les moins de 18 ans viennent avec un adulte</strong> si c’est le cas. Tous les âges ou 5+ vous place dans Enfants bienvenus et dans les voyages en famille de Planifier mon voyage; 12+ et plus vous en garde à l’écart. Une aire de jeux pour les petits seulement? Touchez Tous les âges et écrivez « pour les enfants de 0 à 12 ans » sous <strong>Bon à savoir</strong>.</p>' },
+    keys: ['age', 'ages', 'minimum age', 'min age', 'how old', 'kids', 'children', 'child', 'toddlers', 'babies', 'family', 'families', 'teens', 'adults only', '19+', '19 only', '19 and over', 'casino 19', 'only 19', '18+', 'under 18', 'with an adult', 'supervised', 'parent must stay', 'kids under', 'kids only', 'no kids', 'all ages until', 'then 19', '19 after', 'after 8pm', 'after 8 pm', 'on their own', '10+', '16+', 'will that show', 'age rules', 'ages change'],
+    keysFr: ['age', 'ages', 'age minimum', 'quel age', 'enfants', 'enfant', 'tout petits', 'bebes', 'famille', 'familles', 'ados', 'adultes seulement', '19 ans', 'moins de 18', 'avec un adulte', 'supervise', 'pas d enfants', 'tous les ages jusqu', '19 ans apres', 'apres 20 h', 'seuls', '10 ans', '16 ans'],
+    // Indoor test 2 (2026-11-19; Jordan: "arcade is all ages until 8 then 19+", "escape rooms are 10+ with an adult"): the
+    // youngest age anyone can come, rules by activity or time under Good to know; the adult button only where it shows.
+    a: '<p>In <strong>Who can come</strong>, pick the youngest age anyone can come: All ages, 5+, 8+, 12+, 16+ or 19+. After 5+, 8+, 12+ or 16+, <strong>Under 18s come with an adult</strong> shows if you need it. Put rules by activity or time under <strong>Good to know</strong>, like <em>Arcade 19+ after 8 PM</em> or <em>Escape rooms: 10+ with an adult, 16+ on their own</em>.</p><p>All ages or 5+ puts you in Kids welcome and family trips in Build My Trip; 12+ and older keeps you out of them.</p>',
+    aFr: '<p>Dans <strong>Qui peut venir</strong>, choisissez l’âge minimum pour venir : Tous les âges, 5+, 8+, 12+, 16+ ou 19+. Après 5+, 8+, 12+ ou 16+, <strong>Les moins de 18 ans viennent avec un adulte</strong> paraît si vous en avez besoin. Les règles selon l’activité ou l’heure vont sous <strong>Bon à savoir</strong>, comme <em>Arcade 19+ après 20 h</em> ou <em>Jeux d’évasion : 10+ avec un adulte, 16+ seuls</em>.</p><p>Tous les âges ou 5+ vous place dans Enfants bienvenus et dans les voyages en famille de Planifier mon voyage; 12+ et plus vous en garde à l’écart.</p>' },
   // Indoor test 1: "school groups by appointment only" / "group tours by appointment": a group word with an appointment word
   // is this answer (allOf), never "We don't have set hours".
   { id: 'indoor-groups', pages: ['setup', 'edit'], over: ['booking-link', 'tour-groups', 'indoor-booking', 'indoor-no-hours'],
     q: 'Birthday parties, school groups and private bookings', qFr: 'Fêtes d’anniversaire, groupes scolaires et réservations privées',
     allOf: [['group', 'school', 'scolair', 'field'], ['appointment', 'rendez', 'arrangement', 'request', 'demande']],
-    keys: ['school groups by appointment', 'groups by appointment', 'group tours', 'group tours by appointment', 'school tours', 'school and group tours', 'tours by appointment', 'guided tours', 'school visits', 'class visits', 'birthday', 'birthdays', 'birthday party', 'birthday parties', 'parties', 'party', 'party room', 'party packages', 'school groups', 'field trips', 'groups', 'group', 'big groups', 'corporate', 'team building', 'private booking', 'private event', 'private events', 'rent the space', 'rentals', 'venue rental', 'buyout', 'stag', 'bachelorette'],
+    keys: ['school groups by appointment', 'groups by appointment', 'group tours', 'group tours by appointment', 'school tours', 'school and group tours', 'tours by appointment', 'guided tours', 'school visits', 'class visits', 'birthday', 'birthdays', 'birthday party', 'birthday parties', 'parties', 'party', 'party room', 'party packages', 'school groups', 'field trips', 'groups', 'group', 'big groups', 'corporate', 'team building', 'private booking', 'private event', 'private events', 'rent the space', 'rentals', 'venue rental', 'buyout', 'stag', 'bachelorette', 'corporate team building', 'team building is', 'party packages', 'birthday party packages', 'company party', 'office party', 'christmas party'],
     keysFr: ['groupes scolaires sur rendez vous', 'groupes sur rendez vous', 'visites de groupe', 'visites scolaires', 'visites guidees', 'anniversaire', 'anniversaires', 'fete', 'fetes', 'fete d anniversaire', 'salle de fete', 'forfaits', 'groupes scolaires', 'sorties scolaires', 'groupes', 'groupe', 'entreprise', 'consolidation d equipe', 'reservation privee', 'evenement prive', 'location de salle', 'enterrement de vie'],
-    a: '<p>Open <strong>Groups and parties</strong> in More about your place. Tap a size (“Groups of 10 or more: please book ahead”) and add a line in your own words, like <em>School groups and guided tours by appointment.</em> or <em>Birthday parties with a private room for up to 20.</em> Party packages and their prices go in <strong>Your prices</strong>. Your open hours stay as they are.</p>',
-    aFr: '<p>Ouvrez <strong>Groupes et fêtes</strong> dans Plus sur votre endroit. Touchez une taille (« Groupes de 10 personnes ou plus : réservez à l’avance ») et ajoutez une ligne dans vos mots, comme <em>Groupes scolaires et visites guidées sur rendez-vous.</em> ou <em>Fêtes d’anniversaire avec salle privée jusqu’à 20 personnes.</em> Les forfaits de fête et leurs prix vont dans <strong>Vos tarifs</strong>. Vos heures d’ouverture restent comme elles sont.</p>' },
+    // Indoor test 2 (2026-11-19): the examples without the stray full stop (". or Birthday"); team building is named, since
+    // Build My Trip and search look for it in this line.
+    a: '<p>Open <strong>Groups and parties</strong> in More about your place. Tap a size (“Groups of 10 or more: please book ahead”) and add a line in your own words, like <em>School groups and guided tours by appointment</em>, <em>Birthday parties with a private room for up to 20</em> or <em>Corporate team building for up to 40</em>. Build My Trip and search find you for birthday parties and team building from this line. Party packages and their prices go in <strong>Your prices</strong>. Your open hours stay as they are.</p>',
+    aFr: '<p>Ouvrez <strong>Groupes et fêtes</strong> dans Plus sur votre endroit. Touchez une taille (« Groupes de 10 personnes ou plus : réservez à l’avance ») et ajoutez une ligne dans vos mots, comme <em>Groupes scolaires et visites guidées sur rendez-vous</em>, <em>Fêtes d’anniversaire avec salle privée jusqu’à 20 personnes</em> ou <em>Consolidation d’équipe pour les entreprises, jusqu’à 40 personnes</em>. Planifier mon voyage et la recherche vous trouvent pour les fêtes d’anniversaire et la consolidation d’équipe grâce à cette ligne. Les forfaits de fête et leurs prix vont dans <strong>Vos tarifs</strong>. Vos heures d’ouverture restent comme elles sont.</p>' },
   { id: 'indoor-good-to-know', pages: ['setup', 'edit'], over: ['plan-visit'],
     q: 'Socks, lockers, waivers: where do I say that?', qFr: 'Chaussettes, casiers, décharges : où le dire?',
     keys: ['socks', 'grip socks', 'lockers', 'locker', 'towels', 'swimsuit', 'what to bring', 'what to wear', 'wear', 'bring', 'waiver', 'waivers', 'sign a waiver', 'shoes', 'bowling shoes', 'rentals included', 'quiet', 'cell phones', 'photos allowed', 'no photos', 'food and drink', 'cafe on site', 'snack bar', 'good to know', 'rules', 'dress code', 'arrive early'],
@@ -61543,8 +61594,9 @@ const OWNER_HELP_TOPICS = [
       'volunteer', 'volunteers', 'a volunteer', 'run by volunteers', 'volunteer run', 'volunteer coordinator', 'coordinator', 'need to be the owner', 'have to be the owner', 'be the owner', 'other volunteers', 'other volunteers use this', 'can others use this', 'others use this', 'other people use this', 'more than one person', 'society', 'non profit', 'nonprofit', 'charity', 'board member', 'our board', 'board of directors', 'committee', 'curator', 'executive director', 'director'],
     keysFr: ['pas le proprietaire', 'pas la proprietaire', 'pas proprietaire', 'je travaille', 'je suis employe', 'je suis employee', 'je suis le gerant', 'je suis la gerante', 'responsable marketing', 'responsable des reseaux sociaux', 'marketing', 'au nom de', 'pour mon patron', 'puis je modifier', 'ai je le droit', 'le droit de modifier', 'ma fille', 'mon fils', 'ma femme', 'mon mari', 'ma conjointe', 'mon conjoint', 's occupe de mes courriels', 'fait mes courriels', 'peut elle entrer', 'peut il entrer', 'peut elle y acceder', 'peut il y acceder',
       'benevole', 'benevoles', 'geres par des benevoles', 'gere par des benevoles', 'etre le proprietaire', 'etre la proprietaire', 'autres benevoles', 'd autres benevoles', 'd autres personnes', 'societe', 'organisme', 'organisme sans but lucratif', 'conseil d administration', 'coordonnatrice', 'coordonnateur', 'coordinatrice', 'conservatrice', 'conservateur', 'directrice', 'directeur'],
-    a: '<p><strong>Yes.</strong> Managers, marketing and staff can update the page too. Anyone the business trusts with this private link can use it.</p><ul><li>Best: each person makes their <strong>own login</strong>. {ON}, they tap <strong>Create a login</strong> and use their own email. Please don’t share one password.</li><li>Signed in, <strong>People with access</strong> shows everyone who can update the page, and you can remove people added after you.</li><li>The same rules apply to everyone: quick answers go live straight away, and a new website, description or link is checked first, usually within a day.</li></ul>',
-    aFr: '<p><strong>Oui.</strong> Les gérants, le marketing et le personnel peuvent aussi mettre la page à jour. Toute personne à qui l’entreprise confie ce lien privé peut l’utiliser.</p><ul><li>Le mieux : chaque personne crée <strong>son propre compte</strong>. {ON}, elle touche <strong>Créer un compte</strong> et utilise son propre courriel. Évitez de partager un mot de passe.</li><li>Une fois connecté, <strong>Personnes ayant accès</strong> montre toutes les personnes qui peuvent modifier la page, et vous pouvez retirer celles ajoutées après vous.</li><li>Les mêmes règles s’appliquent à tous : les réponses rapides sont en ligne tout de suite, et un nouveau site Web, une description ou un lien sont vérifiés d’abord, en général d’ici un jour.</li></ul>' },
+    // Indoor test 2 (2026-11-19; Jordan: "do I need to be the owner" was answered "Yes."): it says no, you don't need to be.
+    a: '<p><strong>No — managers, staff and volunteers can use this link too.</strong> You don’t need to be the owner: anyone the business trusts with this private link can update the page.</p><ul><li>Best: each person makes their <strong>own login</strong>. {ON}, they tap <strong>Create a login</strong> and use their own email. Please don’t share one password.</li><li>Signed in, <strong>People with access</strong> shows everyone who can update the page, and you can remove people added after you.</li><li>The same rules apply to everyone: quick answers go live straight away, and a new website, description or link is checked first, usually within a day.</li></ul>',
+    aFr: '<p><strong>Non — les gérants, le personnel et les bénévoles peuvent aussi utiliser ce lien.</strong> Pas besoin d’être le propriétaire : toute personne à qui l’entreprise confie ce lien privé peut mettre la page à jour.</p><ul><li>Le mieux : chaque personne crée <strong>son propre compte</strong>. {ON}, elle touche <strong>Créer un compte</strong> et utilise son propre courriel. Évitez de partager un mot de passe.</li><li>Une fois connecté, <strong>Personnes ayant accès</strong> montre toutes les personnes qui peuvent modifier la page, et vous pouvez retirer celles ajoutées après vous.</li><li>Les mêmes règles s’appliquent à tous : les réponses rapides sont en ligne tout de suite, et un nouveau site Web, une description ou un lien sont vérifiés d’abord, en général d’ici un jour.</li></ul>' },
   { id: 'photo-order', over: ['photo-main', 'photo-add'], q: 'How do I change the order of my photos?', qFr: 'Comment changer l’ordre de mes photos?', pages: ['edit', 'setup'],
     keys: ['photo order', 'order of my photos', 'order of the photos', 'order of photos', 'reorder', 'reorder photos', 'rearrange', 'rearrange photos', 'change the order', 'move a photo', 'move photo', 'move my photo', 'sort photos', 'which photo comes first', 'photo first', 'swap photos'],
     keysFr: ['ordre des photos', 'ordre de mes photos', 'changer l ordre', 'reorganiser', 'deplacer une photo', 'deplacer la photo', 'trier les photos', 'quelle photo en premier'],
@@ -62126,7 +62178,7 @@ function ownerHelpWidgetHtml(page, opts = {}) {
     signedIn: !!opts.signedIn,
     start: opts.start || OWNER_HELP_START[page],
     // A page's own topic with the same id as a general one replaces it (cafés' "How does Set up your page work?").
-    topics: (opts.extraTopics || []).concat(OWNER_HELP_TOPICS.filter((t) => !(opts.extraTopics || []).some((x) => x.id === t.id))).filter((t) => (!t.avgSpendOnly || opts.avgSpend) && (!t.completenessOnly || opts.completeness)).map((t) => ({ id: t.id, q: t.q, qFr: typeof t.qFr === 'string' ? OWNER_SETUP_STRINGS.frSpacing(t.qFr) : t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [], noRelated: t.noRelated || [], ...(t.allOf ? { allOf: t.allOf } : {}),
+    topics: (opts.extraTopics || []).concat(OWNER_HELP_TOPICS.filter((t) => !(opts.extraTopics || []).some((x) => x.id === t.id))).filter((t) => (!t.avgSpendOnly || opts.avgSpend) && (!t.completenessOnly || opts.completeness)).map((t) => ({ id: t.id, q: t.q, qFr: typeof t.qFr === 'string' ? OWNER_SETUP_STRINGS.frSpacing(t.qFr) : t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [], noRelated: t.noRelated || [], ...(t.allOf ? { allOf: t.allOf } : {}), ...(t.keepHappy ? { keepHappy: true } : {}),
       a: helpEditHref(inPortal ? ownerHelpPortalWording(ownerHelpAnswer(t.a, 'en', mode), 'en') : ownerHelpAnswer(t.a, 'en', mode), opts.editHref),
       aFr: helpEditHref(frSpacingHtml(inPortal ? ownerHelpPortalWording(ownerHelpAnswer(t.aFr, 'fr', mode), 'fr') : ownerHelpAnswer(t.aFr, 'fr', mode)), opts.editHref) })),
     rules: OWNER_HELP_ERROR_RULES.map(([re, id]) => [re.source, id]),
@@ -62160,7 +62212,8 @@ function ownerHelpWidgetHtml(page, opts = {}) {
   if (opts.noHappyHour) {
     const isHh = (t) => HELP_HAPPY_RE.test(`${t.q} ${t.qFr}`);
     cfg.noChip = cfg.topics.filter(isHh).map((t) => t.id);
-    cfg.topics = cfg.topics.map((t) => (isHh(t) ? t : { ...t, a: helpWithoutHappyHour(t.a), aFr: helpWithoutHappyHour(t.aFr) }));
+    // Indoor test 2: an answer that says happy hour isn't offered (keepHappy) keeps those words.
+    cfg.topics = cfg.topics.map((t) => (isHh(t) || t.keepHappy ? t : { ...t, a: helpWithoutHappyHour(t.a), aFr: helpWithoutHappyHour(t.aFr) }));
   }
   const u = OWNER_HELP_UI[lang];
   return `<style>${OWNER_HELP_CSS}</style>
@@ -63860,6 +63913,8 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         if (field === 'indoor_info') {
           const v = value && typeof value === 'object' ? value : {};
           writeVenueIndoorInfo(venue.id, { ...Object.fromEntries(INDOOR_INFO_PARTS.filter((k) => v[k] != null).map((k) => [k, v[k]])), ...(typeof all.price === 'number' ? { price: all.price } : {}), ...(tourFreeOf(all) ? { free: all.free } : {}) });
+          // Indoor test 2: per room / per person changed with the price kept: the card follows.
+          if ((all.per || null) !== (v.per || null) && indoorPrice(venue.id) != null) indoorCardPrice(venue.id);
         } else {
           const p = typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
           writeVenueIndoorInfo(venue.id, { ...indoorInfoAnswers(venue.id), ...(p != null ? { price: p } : TOUR_FREE_WORDS.includes(value) ? { price: 0, free: value } : {}) });

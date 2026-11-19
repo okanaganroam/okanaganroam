@@ -51,6 +51,7 @@
   // kind seasons) stay TOUR only.
   var INDOOR = !!C.indoor, TL = TOUR || INDOOR;
   var INFO_F = INDOOR ? 'indoor_info' : 'tour_info', PRICE_F = INDOOR ? 'indoor_price' : 'tour_price';
+  var INDOOR_PER = ['room', 'lane', 'game', 'group'];
   function tinfo(o){ var x = {}; x[INFO_F] = o; return x; }
   function tprice(v){ var x = {}; x[PRICE_F] = v; return x; }
   // A day newly opened in the hours editor: 11 AM – 9 PM; a tour's is 9 AM – 5 PM (tour test 2, Whistler, 2026-11-16).
@@ -652,6 +653,9 @@
   // Indoor test 1 (2026-11-19; Margaret): By donation keeps a suggested amount in the price box's place ("Suggested amount
   // (optional)"); research's "by donation: suggested $5" pre-picks By donation and $5, saved only with the screen.
   S.tour.sugg = INDOOR && typeof TI.suggested === 'number' ? TI.suggested : null; S.tour.suggText = null;
+  // Indoor test 2 (2026-11-19; Jordan): the price is per person ('') or for a whole room, lane, game or group (TI.per), with
+  // who it's for (2–6 players). The box then holds her words ("120 per room (2–6 players)"), which say all of it.
+  S.tour.per = INDOOR && INDOOR_PER.indexOf(TI.per) >= 0 && !S.tour.free ? TI.per : ''; S.tour.perMin = S.tour.per && TI.per_min ? TI.per_min : null; S.tour.perMax = S.tour.per && TI.per_max ? TI.per_max : null; S.tour.perTapped = ''; S.tour.perAuto = false;
   if (INDOOR && S.tour.price == null && C.researchFree) { S.tour.free = C.researchDonation ? 'donation' : 'free'; S.tour.price = 0; S.tour.priceGuessed = true; if (C.researchDonation && S.tour.sugg == null && typeof C.researchFee === 'number') S.tour.sugg = C.researchFee; }
   else if (INDOOR && S.tour.price == null && typeof C.researchFee === 'number') { S.tour.price = C.researchFee; S.tour.priceGuessed = true; }
   if (INDOOR && !S.tour.kinds.length && (C.suggestKinds || []).length) { S.tour.kinds = C.suggestKinds.slice(0, 3); S.tour.kindsGuessed = true; }
@@ -765,7 +769,17 @@
   function tourFreeWord(f){ return (T.tfreeWords || {})[f] || (f === 'donation' ? 'By donation' : 'Free'); }
   function readTour(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
-    if ((x = v('suTprice')) !== null) { var fw = tourFreeRead(x), np = fw ? 0 : tourPriceRead(x); S.tour.priceFirst = !fw && tourPriceWhy(x) === 'first'; if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; S.tour.free = fw; }
+    if ((x = v('suTprice')) !== null) { var fw = tourFreeRead(x), np = fw ? 0 : tourPriceRead(x); S.tour.priceFirst = !fw && tourPriceWhy(x) === 'first'; if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; S.tour.free = fw;
+      // Indoor test 2: per room / lane / game / group words pick Per room or group (unless she tapped Per person), and say
+      // who it's for; with Per room or group on, the number at the start is the price.
+      if (INDOOR && !fw) {
+        var pr = indoorPerRead(x); S.tour.ptext = x;
+        if (pr.per && S.tour.perTapped !== 'person') { S.tour.perAuto = S.tour.per !== pr.per || S.tour.perAuto; S.tour.per = pr.per; }
+        else if (!pr.per && S.tour.perAuto) { S.tour.per = ''; S.tour.perAuto = false; }
+        if (S.tour.per) { S.tour.perMin = pr.min; S.tour.perMax = pr.max; var nn = tourPriceNumber(x); S.tour.price = nn == null ? (String(x).trim() ? NaN : null) : nn; S.tour.priceFirst = false; }
+        S.tour.perWords = pr.per;
+      }
+    }
     if ((x = v('suTpriv')) !== null) {
       S.tour.priv = tourPriceRead(x, true);
       // Tour test 11: "150 per hour … minimum 3 hours" typed in the box picks Per hour and 3 hours (a tap can change them).
@@ -797,12 +811,48 @@
     return /^\d{1,3}(\.\d{1,2})?$/.test(f) && +f <= 500 && (id === 'suCfee' ? +f > 0 : true);
   }
   function tourKindName(k){ var o = (C.tourKinds || C.indoorKinds || []).filter(function(x){ return x.k === k; })[0]; return o ? o.t : k; }
+  // Indoor test 2 (2026-11-19): the card's short words for the kinds ("Escape room · arcade, VR & laser tag"), as the server
+  // writes them (server.js indoorKindsText), for the preview.
+  function indoorKindsShort(ks){
+    var l = (ks || []).filter(function(k, i, a){ return (C.indoorKindWords || {})[k] && a.indexOf(k) === i; }).map(function(k){ return C.indoorKindWords[k]; });
+    if (!l.length) return '';
+    var ll = l.map(function(x, i){ return i && !/^(?:VR|SUP)\b/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x; });
+    if (ll.length > 1 && ll.some(function(x){ return /&|,| et /.test(x); })) return ll.join(' · ');
+    return ll.length === 1 ? ll[0] : ll.slice(0, -1).join(', ') + (C.lang === 'fr' ? ' et ' : ' & ') + ll[ll.length - 1];
+  }
+  // Indoor test 2 (2026-11-19; Jordan: "120 per room 2-6 players" was saved as $120 a person): a price for a whole room, lane,
+  // game or group. -> { per: 'room' | 'lane' | 'game' | 'group' | '', min, max } from her words ("per room", "/lane", "par
+  // salle", "per party", "for the group"; "2-6 players", "up to 8", « jusqu'à 8 joueurs »).
+  function indoorPerRead(x){
+    var t = ' ' + String(x == null ? '' : x).toLowerCase().replace(/[’']/g, ' ').replace(/\s+/g, ' ') + ' ', out = { per: '', min: null, max: null };
+    var m = /(?:\bper|\/|\ban?|\bpar|\beach|\bfor (?:the|a|an|your|one)|\bpour (?:la|le|une?|votre)|\bla|\ble|\bthe)\s*(?:(?:whole|entire|private|full|priv[ée]e?|enti[èe]re?|toute? la|tout le)\s+)?(rooms?|salles?|chambres?|lanes?|all[ée]es?|pistes?|games?|partie|groups?|groupes?|party|parties|teams?|[ée]quipes?|bookings?)\b/.exec(t);
+    if (m) out.per = /^(?:room|salle|chambre)/.test(m[1]) ? 'room' : /^(?:lane|all|piste)/.test(m[1]) ? 'lane' : /^(?:game|partie$)/.test(m[1]) ? 'game' : 'group';
+    var rest = t.replace(/^\s*(?:from|starting at|[àa] partir de|d[èe]s)?\s*(?:ca)?\$?\s*\d{1,5}(?:[.,]\d{1,2})?\s*\$?/, ' ');
+    var who = '(?:players?|people|persons?|ppl|pax|guests?|kids?|joueurs?|personnes?|pers|enfants?)';
+    var r = new RegExp('(?:^|[\\s(])(\\d{1,2})\\s*(?:-|–|—|to|à|a)\\s*(\\d{1,2})(?!\\d)(?:\\s*' + who + ')?').exec(rest);
+    var u = new RegExp('(?:up to|max(?:imum)?\\.?|jusqu [àa]|for|pour)\\s*(\\d{1,2})(?!\\d)\\s*' + who + '?|(?:^|[\\s(])(\\d{1,2})\\s*' + who + '\\b').exec(rest);
+    if (r && +r[1] > 0 && +r[1] < +r[2]) { out.min = +r[1]; out.max = +r[2]; }
+    else if (u && +(u[1] || u[2]) > 1) out.max = +(u[1] || u[2]);
+    return out;
+  }
+  // Per room or group with nothing typed to say which: an escape room's is a room, bowling's a lane, the rest a group.
+  function indoorPerDefault(){ var k0 = ((S.tour && S.tour.kinds) || [])[0]; return k0 === 'escape' ? 'room' : k0 === 'bowling' ? 'lane' : 'group'; }
+  function indoorPlayers(){ return ((S.tour && S.tour.kinds) || []).some(function(k){ return ['escape', 'games', 'bowling', 'curling'].indexOf(k) >= 0; }); }
+  // "From $120 per room (2–6 players)" (what her page will say; server.js indoorPerLine, the same words).
+  function indoorPerPage(n){
+    var st = S.tour, who = (T.iwho || {})[indoorPlayers() ? 'players' : 'people'] || '';
+    var size = st.perMin && st.perMax && st.perMin < st.perMax ? fill(T.isizeRange, { a: st.perMin, b: st.perMax, who: who }) : st.perMax ? fill(T.isizeUpTo, { b: st.perMax, who: who }) : '';
+    return fill(T.ipageLine, { x: tourMoney(n), u: (T.iperWords || {})[st.per] || st.per, size: size });
+  }
+  // The box's words for a saved per-room price, so the box says all of it when she comes back ("120 per room (2–6 players)").
+  function indoorPerBox(){ var st = S.tour; if (!st.per || typeof st.price !== 'number' || !(st.price > 0)) return null; return indoorPerPage(st.price).replace(/^(?:From|[ÀA] partir de)\s*/i, '').replace(/^\$/, '').replace(/\u00a0\$/, '').replace(/^(\d+(?:[.,]\d+)?)\s*\$?\s*/, '$1 '); }
   // The card's price line as she types it ("Your card will say “From $129”").
   // Tour test 6: a rentals-only company (its only kind is Rentals): the card says "From $69" without "a person".
   function tourRentalsOnly(){ var ks = (S.tour && S.tour.kinds) || []; return ks.length > 0 && ks.every(function(k){ return k === 'rentals'; }); }
   // Tour test 12: a second price after the first ("2nd jump same day $69"): the nudge to Your tours and prices.
   function tourPriceLead(){ var l0 = tourPriceLead0(); return S.tour.priceFirst && T.tpriceFirst ? l0 + ' ' + T.tpriceFirst : l0; }
-  function tourPriceLead0(){ var n = S.tour.price; if (S.tour.free === 'donation' && T.tpriceLeadDonation) return T.tpriceLeadDonation; return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n) }); }
+  function tourPriceLead0(){ var n = S.tour.price; if (S.tour.free === 'donation' && T.tpriceLeadDonation) return T.tpriceLeadDonation;
+    if (INDOOR && S.tour.per && !S.tour.free && T.tpriceLeadPer) return n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPer, { page: indoorPerPage(n), x: tourMoney(n), u: (T.iperWords || {})[S.tour.per] || S.tour.per }); return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n) }); }
   // "$16" / "16 $".
   function cpText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }
@@ -1670,7 +1720,7 @@
     // Tours (2026-11-16): the kinds, the town and the price as the card shows it ("From $129").
     // Indoor places (2026-11-19): the kinds, the town and the price as the card shows it ("Adults $25", "Free").
     if (C.indoor) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
-      + h([(TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([indoorKindsShort(TI.kinds) || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' && TI.per && T.tpriceCardPer ? fill(T.tpriceCardPer, { x: tourMoney(S.savedTourPrice), u: (T.iperWords || {})[TI.per] || TI.per }) : typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     if (C.tour) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([S.tourWords || C.tourWords || (TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? (T.tfreeCard || 'Free') : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     // Breweries (2026-11-12): the kind, the town and the flight price as the card shows it ("From $12").
@@ -2352,7 +2402,11 @@
         + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suFreeChips">' + ['free', 'donation'].map(function(f){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ip.free === f ? 'true' : 'false') + '" data-ifree="' + f + '">' + h(tourFreeWord(f)) + '</button>'; }).join('') + '</div>'
         // Indoor test 1: By donation keeps the box, as "Suggested amount (optional)".
         + (ip.free === 'donation' && T.tsuggLabel ? field('suTsugg', T.tsuggLabel, ip.suggText != null ? ip.suggText : ip.sugg != null ? String(ip.sugg) : '', { max: 12, mode: 'decimal' }) + '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>'
-          : ip.free ? '' : field('suTprice', T.tpriceLabel, boxVal('suTprice', ip.price), { max: 40 }) + '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>')
+          : ip.free ? '' : field('suTprice', ip.per && T.iperOne ? T.iperOne[ip.per] : T.tpriceLabel, ip.ptext != null ? ip.ptext : ip.per && indoorPerBox() ? indoorPerBox() : boxVal('suTprice', ip.price), { max: 60 })
+            // Indoor test 2: Per person (the default) / Per room or group, right under the box.
+            + (T.iperChips ? '<div class="su-chips" role="group" aria-label="' + h(T.iperChips.person + ' / ' + T.iperChips.group) + '" id="suPerChips">' + ['person', 'group'].map(function(u){ var on = u === 'group' ? !!ip.per : !ip.per; return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (on ? 'true' : 'false') + '" data-iper="' + u + '">' + h(T.iperChips[u]) + '</button>'; }).join('') + '</div>'
+              + '<p class="su-sent su-research" id="suPerRead"' + (ip.per && ip.perAuto ? '' : ' hidden') + '>' + h(ip.per ? fill(T.iperRead, { u: (T.iperWords || {})[ip.per] || ip.per }) : '') + '</p>' : '')
+            + '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThis, '', false, 'priceSave') + '</div>' + skip('price');
     } else if (s === 'booking' && INDOOR) {
       // Indoor places (2026-11-19): walk-ins or book ahead (one tap), then the booking or tickets link (optional).
@@ -4264,18 +4318,26 @@
     if (k === 'priceSave' && INDOOR) {
       readTour(); var ipf = S.tour.free, ipb = el('suTprice') ? el('suTprice').value : '', ipp = ipf ? 0 : tourPriceNumber(ipb);
       if (!ipf && (ipp == null || isNaN(ipp))) { S.nudge = T.tpriceNeed; S.badField = 'suTprice'; return render(); }
+      // Indoor test 2 (Jordan): a price per room, lane, game or group is never saved as a price for one person. Per person
+      // with words that say otherwise ("per room", "per boat", "for 4 people"): ask, and offer Per room or group.
+      var iper = ipf ? '' : S.tour.per || '';
+      if (!ipf && !iper && T.iperNeed) { var iw = S.tour.perWords || (['unit', 'group', 'lesson', 'day', 'hourly'].indexOf(tourPriceWhy(ipb)) >= 0 ? indoorPerDefault() : ''); if (iw) { var iu = (T.iperWords || {})[iw] || iw; S.nudge = fill(T.iperNeed, { u: iu, one: (T.iperOneFr || {})[iw] || iu }); S.badField = 'suTprice'; return render(); } }
+      var ipmin = iper && S.tour.perMin ? S.tour.perMin : null, ipmax = iper && S.tour.perMax ? S.tour.perMax : null;
       // Indoor test 1: the suggested donation (optional; empty takes it off).
       var isg = null;
       if (ipf === 'donation' && S.tour.suggText != null && String(S.tour.suggText).trim()) { isg = tourPriceNumber(S.tour.suggText); if (isg == null || isNaN(isg) || isg > (C.feeLiveMax || 300)) { S.nudge = T.tsuggNeed; S.badField = 'suTsugg'; return render(); } }
       else if (ipf === 'donation' && S.tour.suggText == null) isg = S.tour.sugg;
       var ipl = [], ival = ipf || ipp;
-      if (ipf === 'donation' && isg !== (typeof TI.suggested === 'number' ? TI.suggested : null)) ipl.push(tinfo({ suggested: isg }));
+      var iio = {};
+      if (ipf === 'donation' && isg !== (typeof TI.suggested === 'number' ? TI.suggested : null)) iio.suggested = isg;
+      if (iper !== (TI.per || '') || ipmin !== (TI.per_min || null) || ipmax !== (TI.per_max || null)) { iio.per = iper || null; iio.per_min = ipmin; iio.per_max = ipmax; }
+      if (Object.keys(iio).length) ipl.push(tinfo(iio));
       if (ival !== S.savedTourPrice || (CUR.indoor_price_waiting != null && ival !== CUR.indoor_price_waiting)) ipl.push(tprice(ival));
       // Free entry is the Free to Visit badge too (on with free, off with a price), so the Free filters agree with the card.
       var ifreeB = !!ipf; if (ifreeB !== !!(S.savedBadges.free_entry || (CUR.badges || {}).free_entry) && ipl.length) ipl.push({ badges: { free_entry: ifreeB } });
       var ilive = ipf || ipp <= (C.feeLiveMax || 300);
       S.savedLine.price = ipf === 'donation' && T.tpriceSavedDonation ? T.tpriceSavedDonation : ipf ? T.tpriceSavedFree : ilive ? T.tpriceSavedLive : fill(T.tpriceSavedDay, { x: tourMoney(ipp), n: tourMoney(C.feeLiveMax || 300) });
-      return saveAll('price', ipl, null, null, function(){ if (ilive) { S.savedTourPrice = ival; CUR.indoor_price = ival; CUR.indoor_price_waiting = null; } else CUR.indoor_price_waiting = ipp; S.tour.priceGuessed = false; S.savedBadges.free_entry = ifreeB; if (ipf === 'donation') { TI.suggested = isg; if (isg == null) delete TI.suggested; S.tour.sugg = isg; S.tour.suggText = null; } });
+      return saveAll('price', ipl, null, null, function(){ if (ilive) { S.savedTourPrice = ival; CUR.indoor_price = ival; CUR.indoor_price_waiting = null; } else CUR.indoor_price_waiting = ipp; S.tour.priceGuessed = false; S.savedBadges.free_entry = ifreeB; if (iper) { TI.per = iper; S.tour.per = iper; } else { delete TI.per; S.tour.per = ''; } if (ipmin) TI.per_min = ipmin; else delete TI.per_min; if (ipmax) TI.per_max = ipmax; else delete TI.per_max; S.tour.ptext = null; S.tour.perAuto = false; S.tour.perTapped = ''; if (ipf === 'donation') { TI.suggested = isg; if (isg == null) delete TI.suggested; S.tour.sugg = isg; S.tour.suggText = null; } });
     }
     if (k === 'bookingSave' && INDOOR) {
       readTour(); var ib0 = S.tour, ibu = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null; if (ibu !== null) S.bookUrl = ibu;
@@ -4694,10 +4756,20 @@
       readTour(); var typed0 = S.tour.price;
       if (S.tour.free === f) { S.tour.free = ''; S.tour.price = null; S.rawBox.suTprice = ''; } else { if (f === 'donation' && S.tour.sugg == null && S.tour.suggText == null && typeof typed0 === 'number' && typed0 > 0) S.tour.sugg = typed0; S.tour.free = f; S.tour.price = 0; S.rawBox.suTprice = tourFreeWord(f); }
       S.nudge = ''; redraw(); }; });
+    // Indoor test 2: Per person / Per room or group (a tap; her words in the box stay).
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-iper]'), function(b){ b.onclick = function(){
+      readTour(); var u = b.getAttribute('data-iper'); S.tour.perTapped = u; S.tour.perAuto = false;
+      if (u === 'person') { S.tour.per = ''; S.tour.perMin = null; S.tour.perMax = null; var tb = el('suTprice'); if (tb) { var fw2 = tourFreeRead(tb.value); S.tour.price = fw2 ? 0 : tourPriceRead(tb.value); } }
+      else if (!S.tour.per) { S.tour.per = S.tour.perWords || indoorPerDefault(); readTour(); }
+      S.nudge = ''; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tks]'), function(b){ b.onclick = function(){ var q15 = b.getAttribute('data-tks').split(':'); S.tour.ks[q15[0]] = q15[1]; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tadult]'), function(b){ b.onclick = function(){ S.tour.adult = !S.tour.adult; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tnobook]'), function(b){ b.onclick = function(){ readTour(); var bu2 = el('suBookUrl'); if (bu2) S.bookUrl = bu2.value; S.tour.noBook = !S.tour.noBook; redraw(); }; });
-    var tpi = el('suTprice'); if (tpi && TL) tpi.addEventListener('input', function(){ readTour(); var ld = el('suTpriceLead'); if (ld) ld.textContent = tourPriceLead(); var fg = el('suFeeGuess'); if (fg && !S.tour.priceGuessed) fg.hidden = true; var fh = el('suFreeHint'); if (fh) fh.hidden = !!S.tour.free; });
+    var tpi = el('suTprice'); if (tpi && TL) tpi.addEventListener('input', function(){ readTour(); var ld = el('suTpriceLead'); if (ld) ld.textContent = tourPriceLead();
+      // Indoor test 2: per room words pick Per room or group as she types (the box keeps her focus).
+      if (INDOOR && el('suPerChips')) { Array.prototype.forEach.call(screen.querySelectorAll('[data-iper]'), function(b){ var u = b.getAttribute('data-iper'); b.setAttribute('aria-pressed', (u === 'group' ? !!S.tour.per : !S.tour.per) ? 'true' : 'false'); });
+        var pq = el('suPerRead'); if (pq) { pq.hidden = !(S.tour.per && S.tour.perAuto); pq.textContent = S.tour.per ? fill(T.iperRead, { u: (T.iperWords || {})[S.tour.per] || S.tour.per }) : ''; }
+        var pl = screen.querySelector('label[for="suTprice"]'); if (pl) pl.textContent = S.tour.per && T.iperOne ? T.iperOne[S.tour.per] : T.tpriceLabel; } var fg = el('suFeeGuess'); if (fg && !S.tour.priceGuessed) fg.hidden = true; var fh = el('suFreeHint'); if (fh) fh.hidden = !!S.tour.free; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-wpick]'), function(b){ b.onclick = function(){
       readWine(); var q8 = b.getAttribute('data-wpick').split(':'), key8 = q8[0], val8 = key8 === 'groups' ? +q8[1] : q8[1];
       S.wine[key8] = String(S.wine[key8]) === String(val8) ? (key8 === 'groups' ? 0 : '') : val8; redraw(); }; });
@@ -4966,7 +5038,7 @@
   screen.addEventListener('input', function(e){ countUpdate(e.target); });
   var kitchenTyped = function(e){ if (!e.target || e.target.id !== 'suKto') return; var n = el('suKitchenWarn'); if (!n) return; var t = kitchenWarn(e.target.value); n.textContent = t; n.hidden = !t; };
   screen.addEventListener('input', kitchenTyped); screen.addEventListener('change', kitchenTyped);
-  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-addtime],[data-rmtime],[data-copyevery],[data-copywe],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc],[data-wpick],[data-fee],[data-wnobook],[data-xq],[data-bpick],[data-bfee],[data-btogo],[data-bgroup],[data-bq],[data-tpick],[data-tkind],[data-tadult],[data-tnobook],[data-ifree]') : null; if (t) mark(); }, true);
+  screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-addtime],[data-rmtime],[data-copyevery],[data-copywe],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc],[data-wpick],[data-fee],[data-wnobook],[data-xq],[data-bpick],[data-bfee],[data-btogo],[data-bgroup],[data-bq],[data-tpick],[data-tkind],[data-tadult],[data-tnobook],[data-ifree],[data-iper]') : null; if (t) mark(); }, true);
   // Kept as the owner taps and types, and once more on the way out.
   var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
   screen.addEventListener('input', drSoon); screen.addEventListener('change', drSoon); screen.addEventListener('click', function(){ setTimeout(drSave, 0); });
