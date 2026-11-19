@@ -64,12 +64,15 @@ function tanis(o = {}) {
   return { v, t: tokenFor(v.id) };
 }
 
-test('0. a request during her yearly break says when she reopens (no date asked: today; first, while she is the only cultural tour)', async () => {
+test('0. a request during her yearly break plans the day she reopens (no date asked; tour test 18), and a named request says when she reopens', async () => {
   const v = mk('tour', { name: 'Osoyoos Story Walks Words', region: 'osoyoos', latitude: 49.03, longitude: -119.46, address: '1 Main St, Osoyoos', cuisine: '', rating: 4.9, reviews: 211 });
   ok(await change(tokenFor(v.id), { tour_info: { kinds: ['cultural'], length: '2-3h', year: 'all' }, closures: [{ from: '04-01', to: '04-30', yearly: true }, { from: '11-01', to: '11-30', yearly: true }] }));
   const now = new Date('2026-11-18T12:00:00-08:00');
   const kind = app.runTripPlan({ text: 'cultural tour in Osoyoos' }, now);
-  assert.ok((kind.warnings || []).some((w) => w.startsWith(`${v.name} matches but is closed on November 18. It reopens December 1.`)), JSON.stringify([kind.kind, kind.warnings, kind.notes, itemsOf(kind).map((x) => x.venue.name)]));
+  // Tour test 18 (2026-11-18): an undated request during her yearly break is planned for the day she reopens, with a note
+  // (it said "matches but is closed on November 18. It reopens December 1." and planned nothing).
+  assert.ok(itemsOf(kind).some((x) => x.venue.id === v.id) && kind.comingSeason && kind.comingSeason.date === '2026-12-01', JSON.stringify([kind.kind, kind.warnings, kind.notes, itemsOf(kind).map((x) => x.venue.name)]));
+  assert.equal(kind.notes[0], 'This tour is closed on November 18, so this plan is for December 1, when it reopens. Pick your own dates any time.');
   const named = app.runTripPlan({ text: 'Osoyoos Story Walks Words' }, now);
   assert.ok((named.warnings || []).some((w) => /opens again on December 1|reopens December 1/.test(w) && w.includes(v.name)), JSON.stringify(named.warnings));
   assert.match(require('../trip-french-copy.js').t3FrenchText(`${v.name} matches but is closed on November 18. It reopens December 1. Ask again with another date to plan it.`), /Réouverture le 1er décembre/);

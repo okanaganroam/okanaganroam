@@ -3034,7 +3034,7 @@
       S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length;
       // Tour test 18 (Whistler, 2026-11-18): with Closures as its own tile, the closure the month picker just saved counts:
       // the tile says it's on the page, never "not done yet".
-      if (!CLO_SUB && (!S.done.closures || S.done.closures === 'skip' || S.done.closures === 'later' || S.done.closures === 'no')) progress('closures', st === 'day' ? 'day' : 'live').then(function(){ if (!S.busy) render(); });
+      if (!CLO_SUB && (!S.done.closures || S.done.closures === 'skip' || S.done.closures === 'later' || S.done.closures === 'no')) progress('closures', st === 'day' ? 'day' : 'live').then(function(ok){ if (!ok || !S.busy) render(); });
       S.months = {}; for (var i = from; ; i = i % 12 + 1) { S.months[i] = true; if (i === to) break; }
       S.closedM = null; S.openMonthsBack = false;
       S.openDraft = { from: pad2(from) + '-01', to: pad2(to) + '-' + MLAST[to - 1] };
