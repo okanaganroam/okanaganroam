@@ -4,6 +4,7 @@
 // Groups line ran together, "15% off" became "$15% off", "snow board" and "Black comb" went live unflagged.
 // The Help questions are in tour-help-routing.test.js.
 // Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
+// Ported to Okanagan Roam (2026-11-18, Whistler #199): on Okanagan fixtures (Kelowna, Vernon, Coldstream, Penticton, Big White).
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');

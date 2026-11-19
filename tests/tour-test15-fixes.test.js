@@ -7,6 +7,7 @@
 // make their bookings"); the page shows the business address.
 // The Help questions are in tour-help-routing.test.js.
 // Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
+// Ported to Okanagan Roam (2026-11-18, Whistler #199): on Okanagan fixtures (Kelowna, Vernon, Coldstream, Penticton, Big White).
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -65,12 +66,12 @@ const TOURS = [
     { name: 'SUP rental', description: '', price: '$30 per board per hour', duration: '1 hour' },
     { name: 'Sunset guided paddle', description: 'Kids 6+. Leaves from the dock about 2 hours before sunset.', price: '$89 per person', duration: '2 hours' }] },
   { name: 'Winter snowshoe tours (mid-Dec to March)', items: [
-    { name: 'Guided snowshoe tour', description: 'Snowshoes and poles included. Kids 6+. Meet at the Olympic Plaza ticket booth.', price: '$99 per person', duration: '2 hours' },
+    { name: 'Guided snowshoe tour', description: 'Snowshoes and poles included. Kids 6+. Meet at the Big White ticket booth.', price: '$99 per person', duration: '2 hours' },
     { name: 'Fondue snowshoe evening', description: 'Evening snowshoe by headlamp, then a cheese and chocolate fondue dinner in a heated yurt. Dinner included. Kids 6+.', price: '$179 per person', duration: '3 hours' }] },
 ];
-const STORY = 'Summer on Alta Lake: rent a canoe, kayak or SUP by the hour from our dock at Lakeside Park, or join our 2-hour guided sunset paddle. Winter: guided snowshoe tours from downtown Kelowna, and our fondue snowshoe evening with dinner in a heated yurt. Closed spring and fall.';
+const STORY = 'Summer on Wood Lake: rent a canoe, kayak or SUP by the hour from our dock at Lakeside Park, or join our 2-hour guided sunset paddle. Winter: guided snowshoe tours from downtown Kelowna, and our fondue snowshoe evening with dinner in a heated yurt. Closed spring and fall.';
 async function dave(o = {}, info = {}) {
-  const v = mk('tour', { name: `Alta Lake Paddle & Snowshoe ${n + 1}`, cuisine: 'Canoe & kayak rentals', rating: 4.7, reviews: 211, address: 'Lakeside Park, 4320 Alta Lake Rd, Kelowna', latitude: 49.8823, longitude: -119.5109,
+  const v = mk('tour', { name: `Wood Lake Paddle & Snowshoe ${n + 1}`, cuisine: 'Canoe & kayak rentals', rating: 4.7, reviews: 211, address: 'Lakeside Park, 4320 Wood Lake Rd, Kelowna', latitude: 49.8823, longitude: -119.5109,
     description: STORY, description_fr: 'Location de canots et de kayaks sur le lac Alta au parc Lakeside.', hours: JSON.stringify(WK('09:00', '21:00')), kid_friendly: 1, ...o });
   const t = tokenFor(v.id);
   ok(await change(t, { tour_info: { kinds: ['paddle', 'rentals', 'snowshoe'], length: '1-2h', book: 'same_day', age: 'all', year: 'seasonal', snow_open: true, ...info } }));
@@ -99,8 +100,8 @@ const plan = (q, lang) => app.runTripPlan({ text: q, ...(lang ? { lang } : {}) }
 const fnBody = (src, name) => { const i = src.indexOf(`function ${name}(`); let d = 0, j = src.indexOf('{', i); for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && !--d) return src.slice(i, k + 1); } return ''; };
 const SERVER = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
 // Each test adds a copy of his listing (the same answers): any copy counts.
-const inPlan = (p) => namesOf(p).some((x) => /^Alta Lake Paddle & Snowshoe/.test(x));
-const hisStop = (p) => itemsOf(p).find((x) => /^Alta Lake Paddle & Snowshoe/.test(x.venue.name));
+const inPlan = (p) => namesOf(p).some((x) => /^Wood Lake Paddle & Snowshoe/.test(x));
+const hisStop = (p) => itemsOf(p).find((x) => /^Wood Lake Paddle & Snowshoe/.test(x.venue.name));
 module.exports = { getText, start, stop, app, db, dave, world, plan, namesOf, itemsOf, textOf, page, plain, change, ok, approveAll, tokenFor, mk, postJson, WK, TOURS, STORY, text, CLIENT, sent, NOW };
 if (process.env.T15_DEBUG) return;
 
@@ -244,11 +245,11 @@ test('6. search: SUP, stand up paddle and paddleboard are one thing; a tour whos
 
 test('8. the finish screen: a story saved on this visit sets storySentNow, and the French-description line is held back there (run, not read)', () => {
   const fn = new Function('S', 'C', 'T', 'h', 'location', `${fnBody(CLIENT, 'storyWaiting')}\n${fnBody(CLIENT, 'frDescOld')}\nreturn { storyWaiting, frDescOld };`);
-  const S = { storySent: 'Summer on Alta Lake…', done: {} }, C = { lang: 'en', frDesc: 'research', frStoryQueues: true }, T = { frDescOld: 'Your French description is the old one:', frDescGo: 'update it?' };
+  const S = { storySent: 'Summer on Wood Lake…', done: {} }, C = { lang: 'en', frDesc: 'research', frStoryQueues: true }, T = { frDescOld: 'Your French description is the old one:', frDescGo: 'update it?' };
   const f = fn(S, C, T, (x) => String(x), { pathname: '/owner/abc/setup' });
   assert.match(f.frDescOld(false), /^$/, 'nothing before the story is saved');
   f.storyWaiting();
-  assert.equal(S.storySentNow, true); assert.equal(C.storyPending, 'Summer on Alta Lake…');
+  assert.equal(S.storySentNow, true); assert.equal(C.storyPending, 'Summer on Wood Lake…');
   assert.equal(f.frDescOld(true), '', 'held back on the finish screen');
   assert.match(f.frDescOld(false), /suFrDescOld/, 'the story screen keeps it');
   const S2 = { storySent: '', done: {} }; fn(S2, {}, T, String, {}).storyWaiting(); assert.ok(!S2.storySentNow);
@@ -268,7 +269,7 @@ test('11. a family with a 4-year-old in July: his all-ages paddling and rentals 
   world();
   const { v } = await dave();
   // (Each test adds another copy of his listing; any of them counts.)
-  const his = (p) => namesOf(p).some((x) => /^Alta Lake Paddle & Snowshoe/.test(x));
+  const his = (p) => namesOf(p).some((x) => /^Wood Lake Paddle & Snowshoe/.test(x));
   assert.ok(his(plan('family activity with a 4 year old in July')), JSON.stringify(namesOf(plan('family activity with a 4 year old in July'))));
   assert.ok(his(plan('canoe with our 4 year old in July')));
   assert.ok(!his(plan('family activity with a 4 year old in April')), 'closed in spring');
@@ -297,7 +298,7 @@ test('14. tours have no meeting-spot step (Dayton): no door step or tile, Basics
   // A spot sent earlier stays stored, unused.
   db.prepare("INSERT INTO venue_arrival_points (venue_id, file, preview_key, lat, lng, distance_m, status) VALUES (?, 'x.jpg', ?, 49.9021, -119.4891, 2000, 'approved')").run(v.id, `k15-${v.id}`);
   const html = page(v, 'en', NOW);
-  assert.match(plain(html), /Address Lakeside Park, 4320 Alta Lake Rd, Kelowna/);
+  assert.match(plain(html), /Address Lakeside Park, 4320 Wood Lake Rd, Kelowna/);
   assert.doesNotMatch(plain(html), /Meeting point/);
   assert.doesNotMatch(html, /49\.9021/);
   const r = await postJson(`/owner/${t}/arrival`, { image: 'data:image/jpeg;base64,AAAA', lat: 49.882, lng: -119.509, rights: true });

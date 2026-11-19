@@ -5,6 +5,7 @@
 // The setup checks here run the real setup page script (tests/setup-sim.js): they press the buttons the screen drew.
 // The Help questions are in tour-help-routing.test.js.
 // Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
+// Ported to Okanagan Roam (2026-11-18, Whistler #199): on Okanagan fixtures (Kelowna, Vernon, Coldstream, Penticton, Big White).
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');

@@ -144,7 +144,9 @@ module.exports = {
   },
 
   // French requests: place words the interpreter turns into English.
-  frenchRequests: { regions: { 'kelowna ouest': 'west kelowna', 'ouest de kelowna': 'west kelowna', 'chutes okanagan': 'okanagan falls' }, places: [], lakes: [['lac okanagan', 'okanagan lake']] },
+  frenchRequests: { regions: { 'kelowna ouest': 'west kelowna', 'ouest de kelowna': 'west kelowna', 'chutes okanagan': 'okanagan falls' },
+    // Tour test 11 port (2026-11-18): « canyon Myra » (the day trips' Myra Canyon), like Whistler's « lacs Joffre ».
+    places: [['canyon myra', 'myra canyon']], lakes: [['lac okanagan', 'okanagan lake'], ['lac kalamalka', 'kalamalka lake']] },
 
   // The Build My Trip page.
   page: {

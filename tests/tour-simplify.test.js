@@ -4,6 +4,7 @@
 // and closures leave Part 1 and become an optional tile in Part 2, "Closures and holidays". Nothing is deleted (the edit
 // page keeps them all), saved closures keep working, other types are unchanged, and Help names the new link and tile.
 // Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
+// Ported to Okanagan Roam (2026-11-18, Whistler #199): on Okanagan fixtures (Kelowna, Vernon, Coldstream, Penticton, Big White).
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');

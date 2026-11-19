@@ -767,7 +767,7 @@ test("tour test 11 answers: sightseeing kind, pickup option, airport shuttles ar
   const { en, fr } = await setupFor("tour");
   const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
   assert.match(plain(en.topic("tour-kinds-sightseeing").a), /Sightseeing and day trips/); assert.match(plain(fr.topic("tour-kinds-sightseeing").aFr), /Visites touristiques et excursions d’une journée/);
-  assert.match(plain(en.topic("tour-pickup").a), /We pick you up \(from hotels in Whistler Village\)/); assert.match(plain(en.topic("tour-pickup").a), /Pickup: hotels in Whistler Village/);
+  assert.match(plain(en.topic("tour-pickup").a), /We pick you up \(from hotels in Penticton\)/); assert.match(plain(en.topic("tour-pickup").a), /Pickup: hotels in Penticton/); // Okanagan port: the page's town (Penticton)
   assert.match(plain(en.topic("tour-airport-shuttle").a), /Airport shuttles and transfers aren’t tours/); assert.match(plain(en.topic("tour-airport-shuttle").a), /story or under Good to know/);
   assert.match(plain(en.topic("tour-private-hourly").a), /from \$150\/hour \(3-hour minimum\)/); assert.match(plain(fr.topic("tour-private-hourly").aFr), /150 \$ l’heure \(minimum de 3 heures\)/);
   assert.match(plain(en.topic("tour-one-trip-season").a), /Only in the evening\? Put the times/);
@@ -954,7 +954,7 @@ test("tour test 15: every Help question (EN or ES, and its French twin) lands on
   assert.ok(!en.topics.some((t) => t.id === "setup-split-hours" || t.id === "setup-third-time"));
 });
 test("tour test 15: Help on a tour's tours-and-prices page starts with tour chips and answers tour questions", async () => {
-  const v = app.createVenue({ name: "Help Routing Menu 15", slug: "help-routing-menu-15", region: "whistler", type: "tour", latitude: 50.116, longitude: -122.957, address: "1 Main St, Whistler", description: "A fixture." });
+  const v = app.createVenue({ name: "Help Routing Menu 15", slug: "help-routing-menu-15", region: "kelowna", type: "tour", latitude: 49.888, longitude: -119.496, address: "1 Main St, Kelowna", description: "A fixture." });
   const t = app.createOwnerLink(v.id, {}).url.split("/owner/")[1];
   const html = await get(`/owner/${t}/menu`);
   const m = /<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(html);
@@ -1044,7 +1044,7 @@ const ASKED17 = [
   ["17-v2", "en", "winter is $189 and summer $149, which one do i put", ["tour-two-prices"], "l'hiver c'est 189 $ et l'été 149 $, lequel je mets"],
 ];
 test("tour test 17: every Help question (EN and its French twin) lands on the right topic", async () => {
-  const { en, fr } = await setupFor("tour", { cuisine: "Whitewater rafting", region: "squamish" });
+  const { en, fr } = await setupFor("tour", { cuisine: "Whitewater rafting", region: "vernon" });
   assert.equal(ASKED17.filter((x) => !/v/.test(x[0])).length, 13);
   const wrong = [];
   for (const [k, lang, q, want, qFr] of ASKED17) {
@@ -1055,14 +1055,14 @@ test("tour test 17: every Help question (EN and its French twin) lands on the ri
   assert.deepEqual(wrong, []);
 });
 test("tour test 17 answers: pickup and shuttle name her town and say when to tap the button; the weather answer names the tick", async () => {
-  const { en, fr } = await setupFor("tour", { region: "squamish" });
+  const { en, fr } = await setupFor("tour", { region: "vernon" });
   const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/[  ]/g, " ").replace(/\s+/g, " ");
   const pk = plain(en.topic("tour-pickup").a);
-  assert.match(pk, /Free pickup from hotels in Squamish\? Tap We pick you up \(from hotels in Squamish\)/);
+  assert.match(pk, /Free pickup from hotels in Vernon\? Tap We pick you up \(from hotels in Vernon\)/);
   assert.match(pk, /Leave the button off/);
-  assert.match(plain(fr.topic("tour-pickup").aFr), /aux hôtels de Squamish/);
+  assert.match(plain(fr.topic("tour-pickup").aFr), /aux hôtels de Vernon/);
   const sh = plain(en.topic("tour-shuttle").a);
-  assert.match(sh, /Leave We pick you up off/); assert.match(sh, /Shuttle from Whistler: \$25/);
+  assert.match(sh, /Leave We pick you up off/); assert.match(sh, /Shuttle from Kelowna airport: \$25/); assert.match(sh, /free pickup from hotels in Vernon/);
   assert.doesNotMatch(sh, /can also go in Your tours and prices/);
   assert.doesNotMatch(plain(fr.topic("tour-shuttle").aFr), /peut aussi aller dans/);
   assert.match(plain(en.topic("tour-weather").a), /Anything else about your season\? and tick Every trip is weather permitting/);
