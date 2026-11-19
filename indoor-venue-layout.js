@@ -10,6 +10,22 @@ const { introFrom } = require('./food-drink-venue-layout');
 const BOOKING_LABELS = /^(booking|bookings|reservations?|pricing|prices?|rates?|tickets?|admission|cost|green fees)$/i;
 const plain = (html) => String(html || '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
 
+// Indoor test 2 (2026-11-19; Jordan): after the owner answered, the line said "From e-exit.ca ↗, checked 2026-11-19" while
+// the French page said « Source : l’établissement, vérifié le 19 nov. 2026 ». Every line the owner's own: "Source: the
+// business, checked Nov 19, 2026"; some of research's left: "Sources: the business and e-exit.ca ↗"; the date in words.
+const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function checkedText(d) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(d || '')); return m ? `${SHORT_MONTHS[Number(m[2]) - 1]} ${Number(m[3])}, ${m[1]}` : String(d || ''); }
+function sourceLine(p, e, external) {
+  const vi = p.visitInfo;
+  if (!vi) return '';
+  const own = new Set([...(Array.isArray(vi.owner_labels) ? vi.owner_labels : []), ...(Array.isArray(vi.owner_dropped) ? vi.owner_dropped.filter((r) => r && r.owned).map((r) => r.label) : [])]);
+  const rows = Array.isArray(vi.rows) ? vi.rows : [];
+  const when = vi.checked_at ? `, checked ${e(checkedText(vi.checked_at))}` : '';
+  const link = vi.source_url ? external(vi.source_url, e(hostOf(vi.source_url))) : '';
+  if (own.size && rows.length && rows.every((r) => own.has(r.label))) return `<p class="gb-source">Source: the business${when}</p>`;
+  if (own.size) return `<p class="gb-source">Sources: the business and ${link || 'our research'}${when}</p>`;
+  return link ? `<p class="gb-source">From ${link}${when}</p>` : '';
+}
 function renderIndoorLayout(p) {
   const e = p.escapeHtml, v = p.venue;
   const visitRows = (p.visitInfo && p.visitInfo.rows) || [];
@@ -44,7 +60,7 @@ function renderIndoorLayout(p) {
         ${book ? `<div class="gb-desktop-book">${book}<p class="gb-help">Opens the booking page in a new tab.</p></div>` : ''}
         ${price ? `<p class="gb-price-line"><strong>${price}</strong> <span>price level</span></p>` : ''}
         ${costRows.map(rowHtml).join('')}
-        ${p.visitInfo && p.visitInfo.source_url ? `<p class="gb-source">From ${external(p.visitInfo.source_url, e(hostOf(p.visitInfo.source_url)))}${p.visitInfo.checked_at ? `, checked ${e(p.visitInfo.checked_at)}` : ''}</p>` : ''}
+        ${sourceLine(p, e, external)}
       </aside>` : '';
 
   const visitBody = [...glance.map(([label, text]) => rowHtml({ label, text })), ...otherRows.map(rowHtml)].join('');

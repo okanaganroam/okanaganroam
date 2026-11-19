@@ -147,3 +147,128 @@ test('3. Groups (real taps): a size chip keeps every sentence he typed, and repl
   await sim.click('[data-bgroup="8"]');
   assert.equal(sim.doc.getElementById('suGroupsLine').value.trim(), 'Corporate team building and birthday parties. Private room for 20. Kids parties on weekends. Groups of 8 or more: please book ahead.');
 });
+
+// A small Kelowna for the planner and search checks: Jordan's place (with his Groups line), a gallery that closes at 5,
+// a winery that closes at 5:30, a climbing gym, a pub open to 1 AM and a few restaurants.
+const DAY = (a, b) => Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [[a, b]]]));
+let town = null;
+const kelowna = async () => {
+  if (town) return town;
+  const j = escape({ name: 'Exit Kelowna T2 Main', rating: 4.9, reviews: 400, great_groups: 1, kid_friendly: 1 });
+  const t = tokenFor(j.id);
+  await ok(change(t, { indoor_info: { kinds: ['escape', 'games'], length: '1-2h', book: 'ahead', age: 'all' } }));
+  await ok(change(t, { visit_rows: { groups: 'Corporate team building and birthday parties. Groups of 10 or more: please book ahead.' } }));
+  const others = [
+    mk('indoor', { name: 'Kelowna Art Gallery T2', description: 'A public art gallery downtown.', rating: 4.7, reviews: 300, hours: JSON.stringify(DAY('10:00', '17:00')), arts_culture: 1 }),
+    mk('winery', { name: 'Lakeview Winery T2', description: 'A winery with a tasting room.', rating: 4.8, reviews: 900, hours: JSON.stringify(DAY('11:00', '17:30')) }),
+    mk('indoor', { name: 'Kelowna Climbing T2', description: 'A bouldering and climbing gym.', rating: 4.8, reviews: 200, hours: JSON.stringify(DAY('10:00', '22:00')) }),
+    mk('pub', { name: 'Late Taps Pub T2', description: 'A pub with pool tables and late food.', rating: 4.4, reviews: 900, hours: JSON.stringify(DAY('11:00', '01:00')), open_late: 1 }),
+    ...[1, 2, 3, 4, 5, 6].map((i) => mk('restaurant', { name: `Late Kitchen ${i} T2`, cuisine: 'Canadian', description: 'A restaurant with a late kitchen.', rating: 4.5 + i / 100, reviews: 1000 + i, hours: JSON.stringify(DAY('11:00', '23:30')), open_late: 1 })),
+  ];
+  town = { j, others };
+  return town;
+};
+const names = (p) => itemsOf(p).map((x) => x.venue.name);
+
+test('2. "team building activity / event / ideas / outing" are "team building": his Groups line puts him first (Build My Trip and search); birthday party and arcade bar find him', async () => {
+  const { j } = await kelowna();
+  for (const q of ['team building in Kelowna', 'team building activity in Kelowna', 'team building event kelowna', 'team building ideas Kelowna', 'team-building outing kelowna']) {
+    const p = app.runTripPlan({ text: q }, NOW);
+    assert.equal(names(p)[0], j.name, `${q}: ${names(p).join(', ')}`);
+    const stop = itemsOf(p).find((x) => x.venue.id === j.id);
+    assert.ok((stop.why || stop.reasons || []).join(' ').includes('Offers team building, from its listing') || JSON.stringify(stop).includes('Offers team building'), q);
+  }
+  const bd = app.runTripPlan({ text: 'kids birthday party in kelowna' }, NOW);
+  assert.ok(names(bd).includes(j.name), names(bd).join(', '));
+  // Search: first for team building and birthday parties, and among the first for an arcade bar.
+  for (const q of ['team building', 'team building activity kelowna', 'birthday party kelowna', 'kids birthday party']) {
+    const r = app.runDiscovery(q, { limit: 40, now: NOW });
+    assert.equal((r.results.items || [])[0] && r.results.items[0].name, j.name, `${q}: ${(r.results.items || []).map((x) => x.name).join(', ')}`);
+  }
+  const ab = app.runDiscovery('arcade bar kelowna', { limit: 40, now: NOW });
+  assert.ok((ab.results.items || []).slice(0, 3).some((x) => x.id === j.id), (ab.results.items || []).map((x) => x.name).join(', '));
+});
+
+test('5. late night: an indoor place open past 11 PM counts for late-night requests (on that day); no Open Late badge is written', async () => {
+  const { j } = await kelowna();
+  const fri = app.runTripPlan({ text: 'late night fun Kelowna Friday after 11' }, NOW);
+  const st = itemsOf(fri).find((x) => x.venue.id === j.id);
+  assert.ok(st, names(fri).join(', '));
+  assert.ok(JSON.stringify(st).includes('Open until 1 AM'), JSON.stringify(st).slice(0, 800));
+  // Closed on Tuesday: not a late-night stop then.
+  const tue = app.runTripPlan({ text: 'late night Tuesday in kelowna' }, NOW);
+  assert.ok(!names(tue).includes(j.name), names(tue).join(', '));
+  // Search finds him for late night; the stored badge stays off.
+  const r = app.runDiscovery('late night kelowna', { limit: 200, now: NOW });
+  assert.ok((r.results.items || []).some((x) => x.id === j.id));
+  assert.equal(Number(app.getVenue(j.id).open_late || 0), 0);
+});
+
+test('6. a list for a stated time leaves out places their hours prove closed then ("Friday at 11 PM" never offers the gallery or the winery)', async () => {
+  const { j, others } = await kelowna();
+  const gallery = others[0], winery = others[1];
+  for (const q of ['something to do Friday at 11pm in Kelowna', 'late night fun Kelowna Friday after 11']) {
+    const p = app.runTripPlan({ text: q }, NOW);
+    const n = names(p);
+    assert.ok(!n.includes(gallery.name) && !n.includes(winery.name), `${q}: ${n.join(', ')}`);
+  }
+  const p = app.runTripPlan({ text: 'something to do Friday at 11pm in Kelowna' }, NOW);
+  assert.ok(names(p).includes(j.name), names(p).join(', '));
+  // The same request at 3 PM keeps them.
+  const day = app.runTripPlan({ text: 'something to do Friday at 3pm in Kelowna' }, NOW);
+  assert.ok(names(day).includes(gallery.name) || names(day).includes(winery.name), names(day).join(', '));
+});
+
+test('7. after the owner answers, the English page\'s source line matches the French: "Source: the business, checked Nov 19, 2026"', async () => {
+  const v = escape();
+  setBox(v.id, { rows: [{ label: 'Prices', text: '$35 per person.' }], source_url: 'https://e-exit.example/kelowna/', checked_at: '2026-10-31' });
+  const t = tokenFor(v.id);
+  const before = plain(page(v));
+  assert.match(before, /From e-exit\.example ↗ ?, checked Oct 31, 2026/);
+  await ok(change(t, { indoor_info: { kinds: ['escape'], length: '1-2h', book: 'ahead' } }));
+  await ok(change(t, { indoor_price: 120 }));
+  const en = plain(page(v)), fr = plain(page(v, 'fr'));
+  const when = /checked (\w{3} \d{1,2}, \d{4})/.exec(en);
+  assert.ok(/Source: the business, checked \w{3} \d{1,2}, \d{4}/.test(en), en.slice(0, 3000));
+  assert.doesNotMatch(en, /From e-exit\.example/);
+  assert.match(fr, /Source : l’établissement, vérifié le/);
+  assert.ok(when);
+});
+
+test('8. polish: short kind words in the setup preview, the Good to know example by kind, Back and Skip on the prices link screen, no donation pre-filled from an adult price', async () => {
+  const v = escape({ website: 'https://e-exit.example' });
+  const t = tokenFor(v.id);
+  await ok(change(t, { indoor_info: { kinds: ['escape', 'games'], length: '1-2h' } }));
+  // The preview card (the finish screen): "Escape room · arcade, VR & laser tag", not the chip's long label.
+  const fin = await openSetup(base, t, { hash: 'more' });
+  await fin.click(fin.acts().find((a) => /^doneNow2?$|^go:finish$/.test(a)) || 'doneNow2');
+  assert.match(fin.text(), /Escape room · arcade, VR &amp; laser tag|Escape room · arcade, VR & laser tag/);
+  assert.doesNotMatch(fin.text(), /Arcade, VR, laser tag or karting/);
+  // Good to know: no grip socks example for an escape room; a climbing gym keeps it.
+  const gk = await openSetup(base, t, { hash: 'bring' });
+  assert.doesNotMatch(gk.text(), /Grip socks required \(we sell/);
+  assert.match(gk.text(), /Arrive 15 minutes early\. Free parking behind the building\./);
+  const c = mk('indoor', { name: 'Climb T2 Polish', description: 'A climbing gym.' });
+  const tc = tokenFor(c.id);
+  await ok(change(tc, { indoor_info: { kinds: ['climbing'], length: '1-2h' } }));
+  const gc = await openSetup(base, tc, { hash: 'bring' });
+  assert.match(gc.text(), /Grip socks required \(we sell them for \$3\)/);
+  // The prices link screen: Back to the choices and Skip.
+  const w = await openSetup(base, t, { hash: 'menu' });
+  await w.click('go:menu:web');
+  assert.ok(w.acts().includes('go:menu'), w.acts().join(' | '));
+  assert.ok(w.acts().some((a) => /^skip:menu$|^after:menu$/.test(a)), w.acts().join(' | '));
+  await w.click('go:menu');
+  assert.ok(w.acts().includes('go:menu:web'), w.acts().join(' | '));
+  // A museum whose research says by donation and has an adult price: By donation is picked, the box starts empty.
+  const m = mk('indoor', { name: 'Museum T2 Donation', description: 'A local history museum.', free_entry: 1 });
+  setBox(m.id, { rows: [{ label: 'Admission', text: 'By donation. Adults $10 for special exhibitions.' }], source_url: 'https://museum.example', checked_at: '2026-10-20' });
+  const sm = await openSetup(base, tokenFor(m.id), { hash: 'price' });
+  assert.ok(sm.has('[data-ifree="donation"][aria-pressed="true"]'), sm.text().slice(0, 400));
+  assert.equal(sm.doc.getElementById('suTsugg').value, '');
+  // Research's own "suggested $5" still starts the box (indoor test 1).
+  const m2 = mk('indoor', { name: 'Museum T2 Suggested', description: 'A local history museum.', free_entry: 1 });
+  setBox(m2.id, { rows: [{ label: 'Prices', text: 'Admission by donation: suggested $5 per adult.' }], source_url: 'https://museum.example', checked_at: '2026-10-20' });
+  const sm2 = await openSetup(base, tokenFor(m2.id), { hash: 'price' });
+  assert.equal(sm2.doc.getElementById('suTsugg').value, '5');
+});

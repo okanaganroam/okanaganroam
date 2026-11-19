@@ -24238,6 +24238,16 @@ function indoorResearchDonation(venue) {
   const r = (info.rows || []).find((x) => x && /^(?:prices?|rates?|admission|tickets?|cost)$/i.test(x.label) && !mine.has(x.label));
   return /\bdonations?\b|pay what you can/i.test(String((r && r.text) || (was && was.text) || ''));
 }
+// Indoor test 2 (2026-11-19): research's suggested donation ("by donation: suggested $5", "suggested donation $10") -> 5,
+// or null. The setup's Suggested amount box starts from this only (an adult price is not a suggested donation).
+function indoorResearchSuggested(venue) {
+  const info = venueVisitInfo(venue.id) || {}; const mine = new Set(info.owner_labels || []);
+  const was = (info.owner_was || {}).Prices;
+  const r = (info.rows || []).find((x) => x && /^(?:prices?|rates?|admission|tickets?|cost)$/i.test(x.label) && !mine.has(x.label));
+  const t = String((r && r.text) || (was && was.text) || '');
+  const m = /\bsuggested(?:\s+donation)?(?:\s+(?:of|is|at))?\s*:?\s*\$\s?(\d{1,3})(?:\.\d{2})?(?!\d)|\$\s?(\d{1,3})(?:\.\d{2})?\s+suggested\b/i.exec(t);
+  return m && /\bdonations?\b|pay what you can/i.test(t) ? Number(m[1] || m[2]) : null;
+}
 // The kinds research's words name (the name first, then the story), up to 3, as the starting picks of "What kind of place
 // are you?" ("We picked these from your page"). Saved only when the owner taps Save.
 const INDOOR_KIND_HINTS = [['escape', /escape (?:room|game)s?/], ['bowling', /bowl|\blanes\b/], ['gallery', /galler(?:y|ies)|art warehouse|art cent(?:re|er)|centre for contemporary art|arts? council/],
@@ -58026,6 +58036,8 @@ function renderOwnerSetupPage(found, opts) {
       kindLength: INDOOR_KIND_LENGTH, kindBook: INDOOR_KIND_BOOK, kindAge: INDOOR_KIND_AGE, artsKinds: INDOOR_ARTS_KINDS,
       suggestKinds: (snap.indoor_info || {}).kinds ? [] : indoorKindSuggestion(venue),
       researchFee: indoorResearchPrice(venue), researchFree: (!!venue.free_entry || indoorResearchDonation(venue)) && snap.indoor_price == null, researchDonation: indoorResearchDonation(venue),
+      // Indoor test 2: the suggested donation box starts from research's own "suggested $5", never its adult price.
+      researchSuggested: indoorResearchSuggested(venue),
       bookingKnown: (!snap.booking_url && (venueVisitInfo(venue.id) || {}).booking_url) || '',
     } : {}),
     // Pub test (Whistler, 2026-11-14): research's "Minors until 9 PM" pre-picks that answer on a pub's Who's welcome

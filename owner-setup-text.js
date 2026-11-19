@@ -2499,6 +2499,11 @@ Object.assign(fr.indoor, { iperChips: { person: 'Par personne', group: 'Par sall
   tpriceLeadPer: 'Votre page indiquera « {page} ». Votre fiche : « À partir de {x} / {u} ».', ipageLine: 'À partir de {x} par {u}{size}', isizeRange: ' ({a} à {b} {who})', isizeUpTo: ' (jusqu’à {b} {who})', iwho: { players: 'joueurs', people: 'personnes' },
   iperRead: 'Vous avez écrit un prix par {u}, alors nous avons choisi Par salle ou groupe. Touchez Par personne si c’est pour une personne.',
   iperNeed: 'Ce prix est-il pour {one}? Touchez Par salle ou groupe. Ou écrivez le prix pour une personne, par exemple 25.', iperOneFr: { room: 'toute une salle', lane: 'toute une allée', game: 'toute une partie', group: 'tout un groupe' }, tpriceCardPer: 'À partir de {x} / {u}' });
+// Indoor test 2 (2026-11-19): the Good to know example by the main kind (like its chips): no grip socks for an escape room.
+Object.assign(en.indoor, { bringExKinds: { arts: 'Gift shop by the entrance. No flash photography.', active: 'Grip socks required (we sell them for $3). Lockers available.',
+  spa: 'Bring a swimsuit. Robes and towels provided.', general: 'Arrive 15 minutes early. Free parking behind the building.' } });
+Object.assign(fr.indoor, { bringExKinds: { arts: 'Boutique à l’entrée. Photos sans flash.', active: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Casiers offerts.',
+  spa: 'Apportez votre maillot. Peignoirs et serviettes fournis.', general: 'Arrivez 15 minutes d’avance. Stationnement gratuit derrière le bâtiment.' } });
 // Indoor test 1 (2026-11-19; Margaret: "I don't speak French, do I have to update the French description"): the
 // finish screen's French line says it's optional and we translate it.
 Object.assign(en.indoor, { frDescOld: 'Optional: we translate your story into French for you. Speak French?', frDescGo: 'Check the French yourself' });

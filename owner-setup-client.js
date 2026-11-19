@@ -656,7 +656,7 @@
   // Indoor test 2 (2026-11-19; Jordan): the price is per person ('') or for a whole room, lane, game or group (TI.per), with
   // who it's for (2–6 players). The box then holds her words ("120 per room (2–6 players)"), which say all of it.
   S.tour.per = INDOOR && INDOOR_PER.indexOf(TI.per) >= 0 && !S.tour.free ? TI.per : ''; S.tour.perMin = S.tour.per && TI.per_min ? TI.per_min : null; S.tour.perMax = S.tour.per && TI.per_max ? TI.per_max : null; S.tour.perTapped = ''; S.tour.perAuto = false;
-  if (INDOOR && S.tour.price == null && C.researchFree) { S.tour.free = C.researchDonation ? 'donation' : 'free'; S.tour.price = 0; S.tour.priceGuessed = true; if (C.researchDonation && S.tour.sugg == null && typeof C.researchFee === 'number') S.tour.sugg = C.researchFee; }
+  if (INDOOR && S.tour.price == null && C.researchFree) { S.tour.free = C.researchDonation ? 'donation' : 'free'; S.tour.price = 0; S.tour.priceGuessed = true; if (C.researchDonation && S.tour.sugg == null && typeof C.researchSuggested === 'number') S.tour.sugg = C.researchSuggested; }
   else if (INDOOR && S.tour.price == null && typeof C.researchFee === 'number') { S.tour.price = C.researchFee; S.tour.priceGuessed = true; }
   if (INDOOR && !S.tour.kinds.length && (C.suggestKinds || []).length) { S.tour.kinds = C.suggestKinds.slice(0, 3); S.tour.kindsGuessed = true; }
   function indoorGuess(){
@@ -1598,6 +1598,9 @@
   // Indoor test 1 (2026-11-19): a place whose kinds are all quiet daytime ones (museum, gallery, library, classes) has no
   // "Open after midnight?" row and no "+ Add a second time" on its day cards. Theatres, bowling, arcades and casinos keep
   // them. The kinds picked (or pre-picked) on What kind of place; none yet: shown as before.
+  // Indoor test 2 (2026-11-19; Jordan's escape room was shown "Grip socks required"): the Good to know example follows the
+  // main kind, as its chips do (owner-setup-text.js bringExKinds).
+  function indoorBringEx(){ if (!C.indoor || !T.bringExKinds) return T.bringEx; var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; return T.bringExKinds[INDOOR_CHIP_GROUP[k0] || 'general'] || T.bringEx; }
   var INDOOR_QUIET = ['museum', 'gallery', 'library', 'classes'];
   function indoorQuietKinds(){ if (!C.indoor) return false; var st = typeof S !== 'undefined' && S.tour, ks = (st && st.kinds && st.kinds.length ? st.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || []; return ks.length > 0 && ks.every(function(k){ return INDOOR_QUIET.indexOf(k) >= 0; }); }
   function lateBtns(d, j, y){
@@ -2473,7 +2476,7 @@
       // Tour test 1 (Whistler, 2026-11-16): research's line, untouched, says it came from online (a tap on an answer replaces it) (tour test 16: a tap adds to it).
       var bRes = !!bv && bv === ((CUR.visit_rows || {}).good_to_know || '') && (C.visitResearch || []).indexOf('good_to_know') >= 0;
       x = doneLine('bring') + q(T.bringQ, T.bringLead) + (bRes && T.bringGuess ? '<p class="su-sent su-research" id="suBringGuess">' + h(T.bringGuess) + '</p>' : '') + msgs() + enLineHint(bv === ((CUR.visit_rows || {}).good_to_know || '') ? bv : '', 'suBringEn', false, 'good_to_know') + quick('good_to_know', 'suBring', bv)
-        + '<label class="su-sr" for="suBring">' + h(T.bringQ) + '</label><textarea class="su-field su-line" id="suBring" maxlength="' + (BRING_MAX + 600) + '" rows="4" aria-describedby="suBringCount">' + h(bv) + '</textarea>' + countLine('suBring', bv, BRING_MAX) + ex(T.bringEx)
+        + '<label class="su-sr" for="suBring">' + h(T.bringQ) + '</label><textarea class="su-field su-line" id="suBring" maxlength="' + (BRING_MAX + 600) + '" rows="4" aria-describedby="suBringCount">' + h(bv) + '</textarea>' + countLine('suBring', bv, BRING_MAX) + ex(indoorBringEx())
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'bringSave') + '</div>' + skip('bring');
     } else if (s === 'winery') {
       // Wineries (2026-11-12): "What kind of winery?" (one of five) and "Food here?" on one screen. A restaurant on the estate
@@ -2631,7 +2634,9 @@
         // Café test 5 (2026-11-12): hidden while the box already holds that address (it read as a puzzle beside it).
         + (site ? '<p class="su-hint" id="suUseSiteRow"' + (urlNow.trim() === site ? ' hidden' : '') + '><button type="button" class="su-link su-usesite" data-act="urlBack">' + h(fill(T.useSite, { site: siteHost })) + '</button></p>' : '')
         + (s === 'menu:web' ? '' : ex(fill(p[0] === 'happy' ? T.webExHappy : T.webExSpecials, { site: siteHost || 'yourplace.com' })))
-        + '<div class="su-stack">' + big('✓', T.useAddress, s === 'menu:web' ? '' : T.webCopy, false, s === 'menu:web' ? 'menuWebSave' : 'sheetWebSave:' + p[0]) + '</div>';
+        + '<div class="su-stack">' + big('✓', T.useAddress, s === 'menu:web' ? '' : T.webCopy, false, s === 'menu:web' ? 'menuWebSave' : 'sheetWebSave:' + p[0]) + '</div>'
+        // Indoor test 2 (2026-11-19; Jordan): the prices link screen had no way back to the other choices and no skip.
+        + (s === 'menu:web' ? '<div class="su-skip" id="suWebBack"><button type="button" class="su-link" data-act="go:menu">' + h(T.back) + '</button></div>' + skip('menu') : '');
     } else if (s === 'menu:email') {
       var mail = 'mailto:' + C.email + '?subject=' + encodeURIComponent(fill(T.mailSubject, { name: C.name }));
       x = q(T.emailQ, fill(T.emailLead, { name: C.name })) + '<div class="su-row su-mail"><span aria-hidden="true">✉️</span><span id="suEm">' + h(C.email) + '</span><button type="button" data-act="copy">' + h(T.copy) + '</button></div><p class="su-note" id="suCopied" role="status"></p>'
