@@ -71,7 +71,7 @@ function renderOutdoorLayout(p) {
     </section>
     <nav class="kl-nav" aria-label="Page sections">${nav}</nav>
     <div class="kl-grid">
-      <div class="kl-main">${about}${before}${hours}${p.visitHtml || ''}${p.gallery || ''}</div>
+      <div class="kl-main">${about}${before}${p.menuHtml ? `<section class="kl-card kl-prices">${p.menuHtml}</section>` : ''}${hours}${p.visitHtml || ''}${p.gallery || ''}</div>
       ${where}
     </div>
     ${p.visitorHtml || ''}${p.eventsHtml || ''}

@@ -42,7 +42,9 @@ function renderIndoorLayout(p) {
   const save = p.actions.filter((a) => /fav-btn|trip-btn/.test(a));
   const mainButton = book || (directions ? directions.replace(/class="[^"]*"/, 'class="gb-book"') : '');
 
-  const { intro, rest } = introFrom(p.venue.description);
+  // Indoor test 5 (2026-11-19; Chris): the intro showed only the first two sentences of his three-sentence story (the
+  // trampoline park was folded away). A short story shows whole; a longer one up to about 300 characters.
+  const { intro, rest } = indoorIntro(p.venue.description);
 
   // Quick facts: short recorded values only (the editorial glance rows).
   const tiles = glance.filter(([, text]) => String(text).length <= 30).slice(0, 4)
@@ -55,6 +57,9 @@ function renderIndoorLayout(p) {
   // The price level is shown once: in Getting here when the details already carry a Price row, otherwise here.
   const price = v.price && !/class="label">Price</.test(p.detailRows || '') ? '$'.repeat(Math.min(4, Math.max(1, Number(v.price) || 1))) : '';
 
+  // Indoor test 5 (2026-11-19; Chris typed 7 prices; the French page listed them, the English page never did): the owner's
+  // typed price list shows here as on the French page ("See all prices & rates (7)").
+  const pricesCard = p.menuHtml ? `<section class="gb-card gb-prices" id="gbPrices">${p.menuHtml}</section>` : '';
   const bookingCard = book || costRows.length
     ? `<aside class="gb-card gb-booking" id="gbBooking"><p class="gb-eyebrow">${book ? 'Plan a time' : 'Good to know'}</p><h2>${book ? 'Book your visit' : 'Prices &amp; booking'}</h2>
         ${book ? `<div class="gb-desktop-book">${book}<p class="gb-help">Opens the booking page in a new tab.</p></div>` : ''}
@@ -71,7 +76,7 @@ function renderIndoorLayout(p) {
     ? `<section class="gb-card gb-contact" id="gbContact"><p class="gb-eyebrow">Meet you there</p><h2>Getting here 📍</h2>${p.detailRows ? `<div class="venue-key-info">${p.detailRows}</div>` : ''}${p.locationHtml || ''}<div class="gb-contact-actions">${directions}${contactActions.join('')}</div></section>` : '';
   const hoursCard = p.hoursHtml ? `<section class="gb-card gb-hours" id="gbHours"><div class="venue-section venue-hours" id="venueHours">${p.hoursHtml}</div></section>` : '';
 
-  const nav = [['gbOverview', 'Overview'], bookingCard && ['gbBooking', book ? 'Book' : 'Prices'], visitCard && ['gbVisit', 'Your visit'], contactCard && ['gbContact', 'Getting here'], hoursCard && ['gbHours', 'Hours']]
+  const nav = [['gbOverview', 'Overview'], bookingCard ? ['gbBooking', book ? 'Book' : 'Prices'] : pricesCard && ['gbPrices', 'Prices'], visitCard && ['gbVisit', 'Your visit'], contactCard && ['gbContact', 'Getting here'], hoursCard && ['gbHours', 'Hours']]
     .filter(Boolean).map(([id, label]) => `<a href="#${id}">${label}</a>`).join('');
 
   const more = (rest || p.guideLinks)
@@ -88,7 +93,7 @@ function renderIndoorLayout(p) {
         ${tiles.length >= 2 ? `<div class="gb-quick">${tiles.join('')}</div>` : ''}
         ${save.length ? `<div class="gb-save"${p.ctaRowAttrs}>${save.join('')}</div><p class="gb-help">♡ Favorite saves this place for later. Add to trip puts it on your trip list.</p>` : ''}
       </section>
-      ${bookingCard}${visitCard}${contactCard}${hoursCard}
+      ${bookingCard}${pricesCard}${visitCard}${contactCard}${hoursCard}
     </div>
     ${p.gallery || ''}${more}
     ${p.eventsHtml || ''}${p.visitorHtml || ''}
@@ -118,6 +123,15 @@ const JUMP_SCRIPT = `<script>
   })();
   </script>`;
 
+function indoorIntro(description) {
+  const text = String(description || '').replace(/\s+/g, ' ').trim();
+  if (text.length <= 320) return { intro: text, rest: false };
+  const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z0-9"“])/);
+  let intro = sentences[0];
+  for (let i = 1; i < sentences.length && (intro + ' ' + sentences[i]).length <= 300; i++) intro += ' ' + sentences[i];
+  if (intro.length > 320) intro = intro.slice(0, 300).replace(/[\s,;:]+\S*$/, '') + '…';
+  return { intro, rest: intro !== text };
+}
 function hostOf(url) {
   try { return new URL(url).hostname.replace(/^www\./, ''); } catch (err) { return 'the source'; }
 }
