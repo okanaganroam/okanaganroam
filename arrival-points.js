@@ -106,6 +106,7 @@ function createArrivalPoints(deps) {
     if (edge < LIMITS.min_edge) return deps.respond(res, 400, { ok: false, error: E.small });
     if (edge > LIMITS.max_edge) return deps.respond(res, 400, { ok: false, error: E.photo });
     const { venue } = found;
+    if (typeof deps.allowed === 'function' && !deps.allowed(venue)) return deps.respond(res, 400, { ok: false, error: E.generic });
     const pin = venue.latitude != null && validPoint(Number(venue.latitude), Number(venue.longitude)) ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null;
     const d = decide({ point, device, accuracy, pin, signedIn, addrOnly: body.addr_only === true, picked: typeof body.picked === 'boolean' ? body.picked : null });
     if (d.distance !== null && d.distance > LIMITS.too_far_m) return deps.respond(res, 400, { ok: false, error: E.far });

@@ -1791,7 +1791,8 @@ en.tour = {
     story: 'Your story and Known for', bring: 'Good to know', groups: 'Groups and private bookings', social: 'Instagram and Facebook', door: 'Where do people meet you?' },
   noLabels: { social: 'not on Instagram or Facebook', groups: 'no big groups', booking: 'no online bookings' },
   stStoryKnown: 'Known for on your page, story within a day', stGroupsLink: 'on your page, new booking link within a day',
-  basicsQ: 'Is this where people meet you, and your phone and website?',
+  // Dayton (2026-11-18, tour test 15): tours have no meeting-spot question; the address is the business address.
+  basicsQ: 'Is this your address, phone and website?',
   photosLead: 'Your trips, your guides, your guests having fun. Three photos is perfect.', photosNoMore: 'No, I’m done with photos',
   // When you run (the Hours step)
   allYearClosed: 'We only run part of the year', allYearClosedSub: 'Like a winter season, December to April. You pick the dates.',
@@ -1855,7 +1856,7 @@ fr.tour = {
     story: 'Votre histoire et ce pour quoi vous êtes connus', bring: 'Bon à savoir', groups: 'Groupes et réservations privées', social: 'Instagram et Facebook', door: 'Où vous rejoint-on?' },
   noLabels: { social: 'pas sur Instagram ni Facebook', groups: 'pas de grands groupes', booking: 'pas de réservations en ligne' },
   stStoryKnown: 'Votre spécialité est en ligne; votre histoire le sera d’ici un jour', stGroupsLink: 'sur votre page, nouveau lien de réservation d’ici un jour',
-  basicsQ: 'Est-ce bien ici qu’on vous rejoint? Votre téléphone et votre site Web sont-ils exacts?',
+  basicsQ: 'Est-ce bien votre adresse, votre téléphone et votre site Web?',
   photosLead: 'Vos sorties, vos guides, vos clients qui s’amusent. Trois photos, c’est parfait.', photosNoMore: 'Non, j’ai fini les photos',
   allYearClosed: 'Nous ne partons qu’une partie de l’année', allYearClosedSub: 'Par exemple une saison d’hiver, de décembre à avril. Vous choisissez les dates.',
   hoursQ: 'Est-ce que ce sont toujours vos heures?', needOpenDayAppt: 'Indiquez au moins un jour où vous partez. Pas d’heures fixes? Touchez « Nous n’avons pas d’heures fixes » plus bas.',
