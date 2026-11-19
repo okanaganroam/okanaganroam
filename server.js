@@ -4593,7 +4593,7 @@ function discoveryGroupsLines() {
   try {
     for (const r of db.prepare("SELECT venue_id, info FROM venue_visit_info WHERE info LIKE '%Groups%' OR info LIKE '%Good to know%'").all()) {
       let o = null; try { o = JSON.parse(r.info); } catch (e) { o = null; }
-      const t = o && Array.isArray(o.rows) ? o.rows.filter((x) => x && (x.label === 'Groups' || x.label === 'Good to know') && x.text).map((x) => String(x.text)).join(' ') : '';
+      const t = o ? visitLinesText(o, ['Groups', 'Good to know']).replace(/ ; /g, ' ') : ''; // indoor test 5: set-aside owner lines too
       if (t) map.set(r.venue_id, norm(t));
     }
   } catch (e) { /* none */ }
@@ -5537,6 +5537,8 @@ function smartFamilyWhy(v) {
   if (SMART_FAMILY_OUTSIDE.has(v.type) && SMART_FAMILY_PARK_RE.test(String(v.row.name || ''))) return 'Park or playground';
   return false;
 }
+// Indoor test 5: a kids' party ("kids birthday party", « fête d’anniversaire pour enfants »).
+const SMART_PARTY_WORDS = ['birthday party', 'birthday parties', 'bday party', 'b day party', 'birthday', 'party', 'parties', 'kids party', 'kids parties', 'fete d anniversaire', 'fetes d anniversaire', 'anniversaire', 'fete', 'fetes'];
 const SMART_FAMILY_WORDS = ['kids', 'kid', 'children', 'child', 'family', 'families', 'toddler', 'toddlers', 'little ones', 'enfants', 'enfant', 'famille', 'familles', 'en famille'];
 const SMART_RAINY_WORDS = ['rainy day', 'rainy days', 'rainy', 'rain', 'raining', 'wet day', 'indoor', 'indoors', 'inside', 'jour de pluie', 'pluie', 'pluvieux', 'pluvieuse', 'interieur', 'interieures', 'interieurs', 'a l interieur'];
 const SMART_DATE_WORDS = ['date night', 'date nights', 'date idea', 'date ideas', 'romantic', 'romance', 'anniversary', 'anniversary dinner', 'romantique', 'en amoureux', 'soiree romantique', 'tete a tete'];
@@ -6198,6 +6200,22 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
   // interpreter reads "brunch" as a cuisine too; that must not count as some
   // other request and block the breakfast/brunch routing below.
   const others = intent.cuisines.filter((c) => !/^(breakfast|brunch)/i.test(c)).length || intent.collections.length || intent.activities.length;
+
+  // Indoor test 5 (2026-11-19; Chris: "kids birthday party in Vernon" listed the 89 Kid-Friendly places in Vernon, A-Z,
+  // restaurants and trails among them): a kids' birthday party is the town's indoor Family Fun places, the ones whose own
+  // Groups or Good to know line offers parties first. No town: the Indoor hub's Family Fun.
+  const party = smartHas(folded, SMART_PARTY_WORDS) && smartHas(folded, SMART_FAMILY_WORDS) && !smartHas(folded, SMART_DATE_WORDS);
+  if (party && T.every((t) => t === 'indoor') && !intent.cuisines.length && F.every((f) => f === 'kid_friendly')) {
+    const notes = getIndoorAlsoNotes();
+    const partyLine = (v) => /\b(?:birthday|birthdays|bday|parties|party|anniversaire|fetes?)\b/i.test(smartFold(indoorVisitSearchText(v.id)));
+    const fam = (v) => v.type === 'indoor' && v.region === region && indoorExperiencesOf(v.row, notes.get(v.id)).includes('family');
+    const list = () => smartPickVenues((v) => (fam(v) ? (partyLine(v) ? 'Hosts birthday parties (its own listing)' : 'Indoor family fun') : false),
+      (v) => (partyLine(v) ? 10 : 0) + (/\bbirthday|parties\b/i.test(String(v.row.description || '')) ? 3 : 0) + indoorRecommendedScore(v.row));
+    if (region && list().length) {
+      return { key: 'party', heading: `Kids’ birthday parties in ${town}`, headingFr: `Fêtes d’anniversaire pour enfants à ${town}`, guides: [], list };
+    }
+    if (!region && countIndoorHubVenues() >= MIN_CATEGORY_VENUES) return { key: 'party', url: `/indoor${discoveryQueryString({ types: ['family'], regions: [] })}` };
+  }
 
   // Search ranking (2026-10-18): an activity ("escape room", "go karts in kelowna") -> the places that have it,
   // name matches first. Only when nothing else is asked for, and only when a place in that town has it.
@@ -7000,7 +7018,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
   try {
     for (const r of db.prepare("SELECT venue_id, info FROM venue_visit_info WHERE info LIKE '%Groups%' OR info LIKE '%Good to know%'").all()) {
       let o = null; try { o = JSON.parse(r.info); } catch (e) { o = null; }
-      const t = o && Array.isArray(o.rows) ? o.rows.filter((x) => x && (x.label === 'Groups' || x.label === 'Good to know') && x.text).map((x) => String(x.text)).join(' ') : '';
+      const t = o ? visitLinesText(o, ['Groups', 'Good to know']).replace(/ ; /g, ' ') : ''; // indoor test 5: set-aside owner lines too
       if (t) groupsById.set(r.venue_id, normalize(t).slice(0, 600));
     }
   } catch (e) { /* none */ }
@@ -23742,6 +23760,19 @@ function tourListText(venueId) {
   } catch (e) { return ''; }
 }
 // Tour test 12: the typed list and the owner's own lines as one search text (for /browse and the category search box).
+// Indoor test 5 (2026-11-19; Chris's "Birthday party packages from $249 for 10 kids" was a Groups line the full box set
+// aside (owner_dropped, owned), so search and Build My Trip never read it): a place's own lines with these labels, from its
+// rows and from the owner's own set-aside lines.
+function visitLinesText(info, labels) {
+  if (!info) return '';
+  const want = (r) => r && typeof r.text === 'string' && r.text.trim() && labels.includes(String(r.label || ''));
+  const rows = (Array.isArray(info.rows) ? info.rows : []).filter(want);
+  const dropped = (Array.isArray(info.owner_dropped) ? info.owner_dropped : []).filter((r) => want(r) && r.owned && !rows.some((x) => x.label === r.label));
+  return rows.concat(dropped).map((r) => r.text).join(' ; ');
+}
+function indoorVisitSearchText(venueId) {
+  try { return visitLinesText(venueVisitInfo(venueId), ['Known for', 'Good to know', 'Groups']); } catch (e) { return ''; }
+}
 function tourSearchExtraText(venueId) { return [tourListText(venueId), tourVisitSearchText(venueId)].filter(Boolean).join(' ; '); }
 function tourVisitSearchText(venueId) {
   try { const info = venueVisitInfo(venueId) || {}; return (info.rows || []).filter((r) => r && typeof r.text === 'string' && /^(?:known for|good to know|groups)$/i.test(String(r.label || ''))).map((r) => r.text).join(' ; '); } catch (e) { return ''; }
@@ -33692,7 +33723,7 @@ function renderIndoorHubPage(indoorVenues, golfVenues, alsoVenues, notes, filter
   };
   const payload = {};
   for (const v of venues) {
-    payload[String(v.id)] = { c: expById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: recommendedRank.get(v.id) };
+    payload[String(v.id)] = { c: expById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''} ${v.type === 'indoor' ? indoorVisitSearchText(v.id) : ''}`), o: recommendedRank.get(v.id) };
     const st = openInfo.byId.get(v.id);
     if (st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
   }
