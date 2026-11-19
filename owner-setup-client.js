@@ -1764,7 +1764,10 @@
   function statusRows(steps){
     return list(steps.map(function(s){
       var d = half(s) ? 'half' : nowSt(s, fin(s)) || 'none', k = d === 'live' || d === 'day' || d === 'no' || d === 'unsure' ? '✓' : d === 'email' ? '✉' : d === 'later' ? '🕓' : d === 'skip' ? '–' : '○';
-      return '<li class="su-li-btn"><button type="button" class="su-rowbtn" data-act="edit:' + s + '"><span class="su-k su-k-' + d + '" aria-hidden="true">' + k + '</span><span>' + h(T.labels[s]) + ' <span class="su-dim">· ' + h(stText(s, d)) + (s === 'music' && musicEventsLine() ? ' · ' + h(musicEventsLine()) : (s === 'music' && musicOftenLine() ? ' · ' + h(musicOftenLine()) : '')) + '</span></span><span class="su-chev" aria-hidden="true">›</span></button></li>';
+      // Indoor test 8 (2026-11-19): with Free entry or By donation, Your prices is optional and already counts: never "not done yet".
+      var optFree = s === 'menu' && (d === 'none' || d === 'skip') && freeIndoor() && T.stMenuFree;
+      if (optFree) { d = 'live'; k = '✓'; }
+      return '<li class="su-li-btn"><button type="button" class="su-rowbtn" data-act="edit:' + s + '"><span class="su-k su-k-' + d + '" aria-hidden="true">' + k + '</span><span>' + h(T.labels[s]) + ' <span class="su-dim">· ' + h(optFree ? T.stMenuFree : stText(s, d)) + (s === 'music' && musicEventsLine() ? ' · ' + h(musicEventsLine()) : (s === 'music' && musicOftenLine() ? ' · ' + h(musicOftenLine()) : '')) + '</span></span><span class="su-chev" aria-hidden="true">›</span></button></li>';
     }).join(''));
   }
   // Pub test 3 (Whistler, 2026-11-14): the spend's − and + move $2 at a time ($1 at a time was slow from $18 to $26); cafés
@@ -1986,6 +1989,9 @@
     var sc = S.score || {}; if (leftList().length || Math.max(sc.pct || 0, sc.soon || 0) >= 100) return [];
     var out = [], seen = {};
     (sc.left || []).forEach(function(it){ var st = itemStep(it.k) || ITEM_STEP[it.k], lab = C.lang === 'fr' ? it.fr : it.en; if (!st || STEPS.indexOf(st.split(':')[0]) < 0) return; if (seen[st]) return addName(out, st, lab); seen[st] = true; out.push({ step: st, label: lab, items: true }); });
+    // Indoor test 8 (2026-11-19; a free walk-in gallery's last screen said 97% and named nothing): an item no setup screen
+    // answers is still named, with "Change an answer" as its way in.
+    if (!out.length && INDOOR) (sc.left || []).forEach(function(it){ var lab = C.lang === 'fr' ? it.fr : it.en; if (lab && !seen['start']) { seen['start'] = true; out.push({ step: 'start', label: lab, items: true }); } else if (lab) addName(out, 'start', lab); });
     return out;
   }
   // One "To reach 100%" row (pub test 3, 2026-11-10). The front door says it waits for a visit; the average spend, when

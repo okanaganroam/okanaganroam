@@ -661,7 +661,9 @@ function doneMap(input, today) {
         // Indoor test 7 (2026-11-19; Robert's free gallery, stuck at 93%): Free entry or By donation answers Your prices too
         // (nothing to list; anything that costs extra is optional).
         ...(i.indoorPrice === 'free' || i.indoorPrice === 'donation' ? { menu: true } : {}),
-        booking_link: nonBlank(i.bookingUrl),
+        // Indoor test 8 (2026-11-19; a free walk-in gallery stuck at 97%: the checklist wanted the booking link the setup folds
+        // away for walk-ins): Walk-ins welcome with no link answers it.
+        booking_link: nonBlank(i.bookingUrl) || t.book === 'no',
         indoor_booking: INDOOR_BOOK.includes(t.book),
         indoor_ages: INDOOR_AGES.includes(String(t.age || '')),
         access: ['wheelchair_accessible', 'free_parking'].some((k) => feats.has(k)) || !!i.offerAnswered,

@@ -2385,6 +2385,7 @@ en.indoor = {
   menuQ: 'How should we add your prices?', menuLead: 'Every ticket, pass, class or party package and what it costs. A photo of your price sheet or a link to your prices page is perfect. It’s optional.',
   // Indoor test 7 (2026-11-19): a free or by-donation place has nothing it must list here.
   menuFreeSub: 'Anything that costs extra, like classes or tours? Optional',
+  stMenuFree: 'optional: free entry already counts',
   menuLeadFree: 'Entry is free, so you can skip this. Anything that costs extra, like classes or tours? A photo of the price list or a link is perfect.',
   snap: 'Take a photo of your price sheet', snapSub: 'Or your brochure, one page at a time', upload: 'Upload your price list', uploadSub: 'A file or photos from your phone or computer',
   web: 'My prices are on my website', menuSocial: 'My prices are on Facebook or Instagram',
@@ -2464,6 +2465,7 @@ fr.indoor = {
   hoursSavedNow: '✓ Vos heures sont enregistrées.', hoursSentNow: '✓ Vos heures sont envoyées.', igLead: 'Écrivez votre nom Instagram, comme @votreendroit.',
   menuQ: 'Comment ajouter vos tarifs?', menuLead: 'Chaque billet, laissez-passer, cours ou forfait de fête et son prix. Une photo de votre grille tarifaire ou un lien vers votre page de prix, c’est parfait. C’est facultatif.',
   menuFreeSub: 'Quelque chose de payant, comme des cours ou des visites? Facultatif',
+  stMenuFree: 'facultatif : l’entrée gratuite compte déjà',
   menuLeadFree: 'L’entrée est gratuite, vous pouvez donc passer cette étape. Quelque chose de payant, comme des cours ou des visites? Une photo de la liste de prix ou un lien, c’est parfait.',
   snap: 'Photographier votre grille tarifaire', snapSub: 'Ou votre brochure, une page à la fois', upload: 'Téléverser votre liste de prix', uploadSub: 'Un fichier ou des photos de votre téléphone ou ordinateur',
   web: 'Mes tarifs sont sur mon site Web', menuSocial: 'Mes tarifs sont sur Facebook ou Instagram',

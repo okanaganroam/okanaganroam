@@ -189,3 +189,48 @@ test('5b. The French heading keeps the time asked (« mardi à 19 h »)', () => 
   assert.match(String(h), /mardi à 19 h/);
   assert.doesNotMatch(String(h), /Tuesday|7 PM/);
 });
+
+const OPEN = JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['10:00', '17:00']]])));
+const photos = (v) => {
+  db.prepare('UPDATE venues SET image_url = ? WHERE id = ?').run(`/images/owner/t8main${v.id}.jpg`, v.id);
+  for (const i of [1, 2]) db.prepare("INSERT INTO owner_photos (venue_id, file, preview_key, width, height, bytes, credit, rights_confirmed_at, status, ip_hash, submitted_at, reviewed_at, reviewed_by) VALUES (?, ?, ?, 1200, 800, 50000, 'Owner', datetime('now'), 'approved', 'x', datetime('now'), datetime('now'), 'test')").run(v.id, `t8x${v.id}-${i}.jpg`, `pk8${v.id}x${i}`);
+};
+const progress = (t, step, status) => postJson(`/owner/${t}/setup/progress`, { step, status });
+const score = (v) => app.setupScore({ venue: app.getVenue(v.id), happyHourTimes: null });
+
+test('6. Every kind: free and walk-in, "Have a booking page?" left closed, reaches 100%: Your prices shows optional-done, the last screen says 100%, the portal checklist agrees', async () => {
+  for (const k of IK.INDOOR_KIND_TEXT_KINDS) {
+    const v = mk('indoor', { name: `Walk ${k} T8 ${n + 1}`, cuisine: '', description: `${STORY} Locally owned and run by the same family for three generations, right in the middle of town.`, hours: OPEN });
+    photos(v);
+    const t = tokenFor(v.id);
+    await ok(change(t, { indoor_info: { kinds: [k], length: '1h', book: 'no', age: 'all', year: 'all' } }));
+    // Price: Free entry (real taps).
+    const sp = await openSetup(base, t, { hash: 'price' });
+    if (!/aria-pressed="true" data-ifree="free"/.test(sp.screen())) await sp.click('[data-ifree="free"]');
+    await sp.click('priceSave');
+    // Booking: walk-ins welcome; the folded "Have a booking page?" is left closed (no link, no "we don't" tap).
+    const sb = await openSetup(base, t, { hash: 'booking' });
+    await sb.click('[data-tpick="book:no"]');
+    assert.ok(sb.has('#suBookFold'), `${k}: the booking link folds behind "Have a booking page?"`);
+    await sb.click('bookingSave');
+    const sg = await openSetup(base, t, { hash: 'groups' });
+    await sg.click('no:groups');
+    await ok(change(t, { visit_rows: { known_for: 'Local favourites', good_to_know: 'Free parking on site' }, hours_checked: true }));
+    await ok(change(t, { not_offered: ['facebook', 'pyv_groups'], instagram_url: 'https://www.instagram.com/t8place' }));
+    assert.equal((await progress(t, 'offer', 'live')).status, 200);
+    const r = score(v);
+    assert.deepEqual(r.left, [], `${k}: ${JSON.stringify(r.left)}`);
+    assert.equal(r.pct, 100, k);
+    // The setup list: Your prices is optional and done, never "not done yet".
+    const st = await openSetup(base, t, { hash: 'start' });
+    assert.match(st.text(), /Your prices · optional: free entry already counts/, k);
+    // The last screen: 100%, nothing "to reach".
+    const f = await openSetup(base, t, { hash: 'more' });
+    await f.click(f.acts().find((a) => /^go:finish$|^doneNow2?$/.test(a)) || 'doneNow2');
+    assert.doesNotMatch(f.text(), /To reach 100%/, k);
+    assert.match(f.text(), /100\s*%/, k);
+    // The portal's checklist says the same.
+    const portal = plain(await fetch(`${base}/owner/${t}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((x) => x.text()));
+    assert.match(portal, /Your page is complete/, `${k}: portal`);
+  }
+});
