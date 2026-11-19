@@ -2381,6 +2381,9 @@ en.indoor = {
   hoursSavedNow: '✓ Your hours are saved.', hoursSentNow: '✓ Your hours are sent.', igLead: 'Type your Instagram name, like @yourplace.',
   // Your prices (the menu feature in price words)
   menuQ: 'How should we add your prices?', menuLead: 'Every ticket, pass, class or party package and what it costs. A photo of your price sheet or a link to your prices page is perfect. It’s optional.',
+  // Indoor test 7 (2026-11-19): a free or by-donation place has nothing it must list here.
+  menuFreeSub: 'Anything that costs extra, like classes or tours? Optional',
+  menuLeadFree: 'Entry is free, so you can skip this. Anything that costs extra, like classes or tours? A photo of the price list or a link is perfect.',
   snap: 'Take a photo of your price sheet', snapSub: 'Or your brochure, one page at a time', upload: 'Upload your price list', uploadSub: 'A file or photos from your phone or computer',
   web: 'My prices are on my website', menuSocial: 'My prices are on Facebook or Instagram',
   emailQ: 'Email your prices to us', emailLead: 'Send a photo or a file of your price list. Put “{name}” in the subject.', mailSubject: 'Prices for {name}',
@@ -2457,6 +2460,8 @@ fr.indoor = {
   socialQ: 'Instagram et Facebook', socialLead: 'Remplissez ceux que vous avez. Votre page y mène.', socialNeed: 'Écrivez votre Instagram ou votre Facebook, ou touchez une réponse sous chacun.',
   hoursSavedNow: '✓ Vos heures sont enregistrées.', hoursSentNow: '✓ Vos heures sont envoyées.', igLead: 'Écrivez votre nom Instagram, comme @votreendroit.',
   menuQ: 'Comment ajouter vos tarifs?', menuLead: 'Chaque billet, laissez-passer, cours ou forfait de fête et son prix. Une photo de votre grille tarifaire ou un lien vers votre page de prix, c’est parfait. C’est facultatif.',
+  menuFreeSub: 'Quelque chose de payant, comme des cours ou des visites? Facultatif',
+  menuLeadFree: 'L’entrée est gratuite, vous pouvez donc passer cette étape. Quelque chose de payant, comme des cours ou des visites? Une photo de la liste de prix ou un lien, c’est parfait.',
   snap: 'Photographier votre grille tarifaire', snapSub: 'Ou votre brochure, une page à la fois', upload: 'Téléverser votre liste de prix', uploadSub: 'Un fichier ou des photos de votre téléphone ou ordinateur',
   web: 'Mes tarifs sont sur mon site Web', menuSocial: 'Mes tarifs sont sur Facebook ou Instagram',
   emailQ: 'Envoyez-nous vos tarifs par courriel', emailLead: 'Envoyez une photo ou un fichier de votre liste de prix. Indiquez « {name} » dans l’objet.', mailSubject: 'Tarifs de {name}',
@@ -2524,8 +2529,9 @@ Object.assign(en.indoor, { webLeadTickets: 'We filled in your tickets page. If y
   storyExKinds: { theatre: 'A 443-seat community theatre since 1979, with plays, concerts and comedy nights from September to June.', museum: 'A volunteer-run museum of local history, with a pioneer cabin and hands-on displays for kids.',
     escape: 'A family-run escape room since 2016, with six themed rooms for 2 to 8 players.', spa: 'A small day spa with a eucalyptus steam room, a cedar sauna and massage by appointment.',
     climbing: 'A bouldering gym with new problems every week, a kids’ wall and gear to rent.', general: 'A local, family-run place since 2010. Friendly staff and something for every age.',
-    classes: 'A sunny pottery studio: drop in to paint a mug, or sign up for a wheel class. We glaze and fire your pieces for you.' },
-  knownExKinds: { theatre: 'Plays, concerts and comedy nights, Thursday to Saturday at 7:30 PM', museum: 'Local history and a hands-on kids’ corner', escape: 'Six themed rooms, great for birthdays',
+    classes: 'A sunny pottery studio: drop in to paint a mug, or sign up for a wheel class. We glaze and fire your pieces for you.',
+    gallery: 'A downtown gallery showing Okanagan painters and sculptors, with a new exhibition every month. Most of the art is for sale.' },
+  knownExKinds: { gallery: 'Local painters and sculptors, with a new show every month', theatre: 'Plays, concerts and comedy nights, Thursday to Saturday at 7:30 PM', museum: 'Local history and a hands-on kids’ corner', escape: 'Six themed rooms, great for birthdays',
     spa: 'Steam room, sauna and massage', climbing: 'Bouldering for all levels, with a kids’ wall', general: 'Friendly, local and great on a rainy day',
     classes: 'Paint-your-own pottery and beginner wheel classes' } });
 Object.assign(fr.indoor, { webLeadTickets: 'Nous avons inscrit votre page de billets. Si vos prix sont sur une autre page, changez-la.', researchLine: 'Nous avons choisi ceux-ci d’après ce que nous avons trouvé en ligne. Décochez tout ce qui est faux.', noSetHoursHint: 'Spectacles ou cours seulement? Touchez ceci. Mettez les heures de billetterie dans Bon à savoir, comme « Billetterie : mar.–ven. 11 h–16 h et une heure avant les spectacles. »',
@@ -2536,8 +2542,9 @@ Object.assign(fr.indoor, { webLeadTickets: 'Nous avons inscrit votre page de bil
   storyExKinds: { theatre: 'Un théâtre communautaire de 443 places depuis 1979 : pièces, concerts et soirées d’humour de septembre à juin.', museum: 'Un musée d’histoire locale tenu par des bénévoles, avec une cabane de pionniers et des activités pour les enfants.',
     escape: 'Un jeu d’évasion familial depuis 2016, avec six salles thématiques pour 2 à 8 joueurs.', spa: 'Un petit spa de jour avec bain de vapeur à l’eucalyptus, sauna de cèdre et massages sur rendez-vous.',
     climbing: 'Un centre de bloc avec de nouveaux problèmes chaque semaine, un mur pour enfants et de l’équipement à louer.', general: 'Un endroit local et familial depuis 2010. Une équipe accueillante et quelque chose pour tous les âges.',
-    classes: 'Un atelier de poterie ensoleillé : passez peindre une tasse, ou inscrivez-vous à un cours de tour. Nous émaillons et cuisons vos pièces.' },
-  knownExKinds: { theatre: 'Pièces, concerts et soirées d’humour, du jeudi au samedi à 19 h 30', museum: 'L’histoire locale et un coin pour les enfants', escape: 'Six salles thématiques, idéal pour les anniversaires',
+    classes: 'Un atelier de poterie ensoleillé : passez peindre une tasse, ou inscrivez-vous à un cours de tour. Nous émaillons et cuisons vos pièces.',
+    gallery: 'Une galerie du centre-ville qui expose des peintres et sculpteurs de l’Okanagan, avec une nouvelle exposition chaque mois. La plupart des œuvres sont à vendre.' },
+  knownExKinds: { gallery: 'Des peintres et sculpteurs d’ici, avec une nouvelle exposition chaque mois', theatre: 'Pièces, concerts et soirées d’humour, du jeudi au samedi à 19 h 30', museum: 'L’histoire locale et un coin pour les enfants', escape: 'Six salles thématiques, idéal pour les anniversaires',
     spa: 'Bain de vapeur, sauna et massages', climbing: 'Du bloc pour tous les niveaux, avec un mur pour enfants', general: 'Accueillant, local et parfait un jour de pluie',
     classes: 'La poterie à peindre soi-même et des cours de tour pour débutants' } });
 // Indoor test 1 (2026-11-19; Margaret: "I don't speak French, do I have to update the French description"): the
@@ -2552,6 +2559,8 @@ en.indoor.quick = Object.assign({}, en.quick, {
   good_to_know: ['Grip socks required', 'Lockers available', 'Waiver to sign before you play', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site', 'Arrive 15 minutes early'],
   good_to_know_kinds: {
     arts: ['Free on the first Sunday', 'Gift shop', 'Bags can be left at the desk', 'Guided tours on request', 'No flash photography', 'Free parking on site', 'Café or snack bar on site'],
+    // Indoor test 7 (2026-11-19; Robert, a commercial gallery, was offered a museum's chips): a gallery's own set.
+    gallery: ['Most art is for sale', 'We can ship your purchase', 'New exhibition every month', 'Gift shop', 'Guided tours on request', 'No flash photography', 'Free parking on site'],
     active: ['Grip socks required', 'Waiver to sign before you play', 'Lockers available', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site', 'Arrive 15 minutes early'],
     spa: ['Arrive 15 minutes early', 'Bring a swimsuit', 'Robes and towels provided', 'Lockers available', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site'],
     general: ['Arrive 15 minutes early', 'Book ahead on weekends', 'Lockers available', 'Free parking on site', 'Café or snack bar on site'],
@@ -2566,6 +2575,7 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
   good_to_know: ['Chaussettes antidérapantes obligatoires', 'Casiers offerts', 'Décharge à signer avant de jouer', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place', 'Arrivez 15 minutes d’avance'],
   good_to_know_kinds: {
     arts: ['Gratuit le premier dimanche', 'Boutique sur place', 'Sacs à laisser à l’accueil', 'Visites guidées sur demande', 'Photos sans flash', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
+    gallery: ['La plupart des œuvres sont à vendre', 'Nous pouvons expédier votre achat', 'Nouvelle exposition chaque mois', 'Boutique sur place', 'Visites guidées sur demande', 'Photos sans flash', 'Stationnement gratuit sur place'],
     active: ['Chaussettes antidérapantes obligatoires', 'Décharge à signer avant de jouer', 'Casiers offerts', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place', 'Arrivez 15 minutes d’avance'],
     spa: ['Arrivez 15 minutes d’avance', 'Apportez votre maillot', 'Peignoirs et serviettes fournis', 'Casiers offerts', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
     general: ['Arrivez 15 minutes d’avance', 'Réservez pour les fins de semaine', 'Casiers offerts', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],

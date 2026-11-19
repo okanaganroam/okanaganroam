@@ -30,7 +30,8 @@
 const K = {};
 const PRICES_PAGE = ['Prices & rates', 'Tarifs'];
 
-K.gallery = { quiet: true, gtk: 'arts', ex: 'general', arts: true,
+// Indoor test 7 (2026-11-19; Robert): a gallery's own Good to know chips and story / Known for examples (museums keep theirs).
+K.gallery = { quiet: true, gtk: 'gallery', ex: 'gallery', arts: true,
   en: { price: { page: 'Admission from {x}.', basis: 'Adult admission', label: 'Adult admission, in dollars', ph: 'Your regular adult admission', lead: 'Your regular adult admission. It shows on your card.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Admission for adults, seniors, students and kids, memberships and tours, with their prices. A photo of your price list or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; guided tours by appointment', ages: 'Kids under 12 with an adult', gift: 'Gift shop by the entrance; memberships at the front desk', prices: 'Seniors $8, kids under 12 free' },

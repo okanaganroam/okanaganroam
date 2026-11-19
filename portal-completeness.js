@@ -658,6 +658,9 @@ function doneMap(input, today) {
         visit_length: INDOOR_LENGTHS.includes(t.length),
         season: nonBlank(i.openMonths) || !!i.hasSeasons || t.year === 'all' || apptOnly,
         indoor_price: (typeof i.indoorPrice === 'number' && Number.isFinite(i.indoorPrice) && i.indoorPrice > 0) || i.indoorPrice === 'free' || i.indoorPrice === 'donation',
+        // Indoor test 7 (2026-11-19; Robert's free gallery, stuck at 93%): Free entry or By donation answers Your prices too
+        // (nothing to list; anything that costs extra is optional).
+        ...(i.indoorPrice === 'free' || i.indoorPrice === 'donation' ? { menu: true } : {}),
         booking_link: nonBlank(i.bookingUrl),
         indoor_booking: INDOOR_BOOK.includes(t.book),
         indoor_ages: INDOOR_AGES.includes(String(t.age || '')),

@@ -21995,7 +21995,9 @@ function venueBadgeChipsHtml(venue, { fr = false, skipDogFriendly = false, skipH
   const pub = venue.type === 'pub';
   const sports = pub ? pubSportsText(venue, fr) : '';
   return BOOL_FIELDS.filter((f) => venue[f] && !(skipDogFriendly && f === 'dog_friendly') && !(skipHappyHour && f === 'happy_hour') && f !== 'open_early' && f !== 'open_late' && !(pub && f === 'kid_friendly'))
-    .sort((x, y) => order.indexOf(VENUE_BADGE_GROUP[x] || 'place') - order.indexOf(VENUE_BADGE_GROUP[y] || 'place'))
+    .sort((x, y) => order.indexOf(VENUE_BADGE_GROUP[x] || 'place') - order.indexOf(VENUE_BADGE_GROUP[y] || 'place')
+      // Indoor test 7 (2026-11-19; Robert's free gallery led with Kid-Friendly): Free to Visit comes first among the people badges.
+      || (x === 'free_entry' ? -1 : y === 'free_entry' ? 1 : 0))
     .map((f) => {
       const icon = (CARD_BADGE_SHORT[f] || [])[0];
       const label = f === 'sports_tv' && sports ? (fr ? `Sports à la télé : ${sports}` : `Sports on TV: ${sports}`) : (f === 'kid_friendly' && kidsChipLabel(venue, fr)) || (f === 'dog_friendly' && dogsOutsideOnly(venue) && (fr ? 'Chiens à l’extérieur seulement' : 'Dogs outside only')) || (fr ? frBadgeLabel(f) : BADGE_LABELS[f].title);
@@ -50687,6 +50689,14 @@ function fitToLimit(raw, max) {
   return { text: t.slice(0, cut).trim().replace(/[,;:–—-]+$/, '').trim(), rest: t.slice(cut).trim() };
 }
 // The five lines as the box holds them now: { known_for, reservations, takeout, dietary, groups } ('' when none).
+// Indoor test 7 (2026-11-19): a real groups line on the page (a Groups row, or a Good to know row about groups, stored or
+// in the owner's waiting update), the only thing that contradicts "We can't take big groups".
+function ownerHasRealGroupsLine(venueId, pendingRows) {
+  const vi = venueVisitInfo(venueId) || {};
+  if ((vi.rows || []).some((r) => r && r.text && (r.label === 'Groups' || (r.label === 'Good to know' && VISIT_GROUPS_RE.test(r.text))))) return true;
+  const g = pendingRows && typeof pendingRows === 'object' ? pendingRows.groups : '';
+  return typeof g === 'string' && g.trim() !== '' && VISIT_GROUPS_RE.test(g) ? true : typeof g === 'string' && g.trim() !== '' && visitSlotsFor(venueId).find((s) => s.key === 'groups').labels.length === 1;
+}
 function ownerVisitRows(venueId) {
   const info = venueVisitInfo(venueId) || {};
   // Winery test 2: a line of the owner's set aside because the box was full (owner_dropped, owned) still counts as hers.
@@ -52278,7 +52288,11 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
         const inp = gatherCompletenessInput(venue, current, happyHourTimes);
         const done = portalCompleteness.doneMap(inp, todayLocal());
         // A Happy Hour badge on the page also "shows this" (live check 2026-11-08): untick it first.
-        if (added.some((k) => done[k] || (k === 'happy_hour' && inp.happyHourBadge))) errors.not_offered = OWNER_NOT_OFFERED_ERRORS.has;
+        // Indoor test 7 (2026-11-19; Robert, a gallery): a Good to know line ("Most art is for sale") also counts toward
+        // Groups on the checklist, so "We can't take big groups" was refused. Only a real groups line (a Groups row, or a
+        // Good to know row that is about groups) contradicts that answer.
+        const realGroups = () => ownerHasRealGroupsLine(venue.id, current.visit_rows);
+        if (added.some((k) => (k === 'pyv_groups' ? realGroups() : done[k]) || (k === 'happy_hour' && inp.happyHourBadge))) errors.not_offered = OWNER_NOT_OFFERED_ERRORS.has;
       }
       if (!errors.not_offered && JSON.stringify(next) !== JSON.stringify(current.not_offered || [])) changes.not_offered = next;
     }
@@ -57933,7 +57947,10 @@ function setupScore(found) {
   return { pct: r.pct, soon: r.pctWithWaiting, badge: portalCompleteness.badgeState(r, venueIsClaimed(venue.id)), ...(frOnly ? { frOnly: true } : {}), ...(frOnlyKeys.length ? { frOnlyKeys } : {}),
     // Winery test 3 (2026-11-12): and what will be missing once what she sent is checked (a short story replacing a
     // long description), so "Nearly there" can name it.
-    left: r.missing.filter((it) => !it.waiting).concat(r.lost || []).map((it) => ({ k: it.key, en: it.en, fr: it.fr })) };
+    left: r.missing.filter((it) => !it.waiting).concat(r.lost || []).map((it) => ({ k: it.key, en: it.en, fr: it.fr })),
+    // Indoor test 7 (2026-11-19; one source of truth): every item this type is scored on, so the last screen lists a skipped
+    // step only while one of its items is still in `left` (Groups was listed though the checklist had it done).
+    keys: portalCompleteness.itemsFor(venue.type).map((it) => it.key) };
 }
 // Brewery test 1 (2026-11-12): "Your answers so far" kept saying "within a day" after we'd checked everything. Which
 // setup steps still have something waiting for our check, worked out from what is waiting right now (the pending update,
@@ -59347,8 +59364,8 @@ const INDOOR_SETUP_HELP_TOPICS = [
     keys: ['free entry', 'free admission', 'admission is free', 'we are free', 'were free', 'it s free', 'no charge', 'no admission', 'by donation', 'donation', 'donations', 'suggested donation', 'suggested donation is', 'the suggested donation', 'suggested amount', 'suggested', 'pay what you can', 'pay what you want', 'free to visit', 'free museum', 'free gallery'],
     keysFr: ['entree gratuite', 'entree libre', 'c est gratuit', 'gratuit', 'gratuite', 'contribution volontaire', 'contribution suggeree', 'la contribution suggeree', 'montant suggere', 'don', 'dons', 'don suggere', 'payez ce que vous voulez'],
     // Indoor test 1 (2026-11-19; Margaret): by donation says "By donation" (not "Free"), with the suggested amount she types.
-    a: '<p>In <strong>Price</strong>, tap <strong>Free entry</strong> or <strong>By donation</strong>. Your card says “Free” or “By donation”, and you show under Free to Visit. A suggested donation? Under <strong>By donation</strong>, type it in <strong>Suggested amount (optional)</strong>: your page says “By donation (suggested $5)”. Some shows or classes cost extra? Add them in <strong>Your prices</strong>.</p>',
-    aFr: '<p>Dans <strong>Prix</strong>, touchez <strong>Entrée gratuite</strong> ou <strong>Contribution volontaire</strong>. Votre fiche indique « Gratuit » ou « Contribution volontaire », et vous paraissez sous Gratuit. Une contribution suggérée? Sous <strong>Contribution volontaire</strong>, inscrivez-la dans <strong>Montant suggéré (facultatif)</strong> : votre page indique « Contribution volontaire (suggérée : 5 $) ». Des spectacles ou des cours sont payants? Ajoutez-les dans <strong>Vos tarifs</strong>.</p>' },
+    a: '<p>In <strong>Price</strong>, tap <strong>Free entry</strong> or <strong>By donation</strong>. Your card says “Free” or “By donation”, and you show under Free to Visit. A suggested donation? Under <strong>By donation</strong>, type it in <strong>Suggested amount (optional)</strong>: your page says “By donation (suggested $5)”. Some shows or classes cost extra? Add them in <strong>Your prices</strong>. Nothing that costs extra? You can skip Your prices: free entry already counts toward 100%.</p><p>Art or gifts for sale? You don’t list their prices; say so in <strong>Good to know</strong>, like <em>Most art is for sale</em>.</p>',
+    aFr: '<p>Dans <strong>Prix</strong>, touchez <strong>Entrée gratuite</strong> ou <strong>Contribution volontaire</strong>. Votre fiche indique « Gratuit » ou « Contribution volontaire », et vous paraissez sous Gratuit. Une contribution suggérée? Sous <strong>Contribution volontaire</strong>, inscrivez-la dans <strong>Montant suggéré (facultatif)</strong> : votre page indique « Contribution volontaire (suggérée : 5 $) ». Des spectacles ou des cours sont payants? Ajoutez-les dans <strong>Vos tarifs</strong>. Rien de payant? Vous pouvez passer Vos tarifs : l’entrée gratuite compte déjà pour le 100 %.</p><p>Des œuvres ou des cadeaux à vendre? Inutile d’en donner les prix; dites-le dans <strong>Bon à savoir</strong>, comme <em>La plupart des œuvres sont à vendre</em>.</p>' },
   // Indoor test 2 (2026-11-19; Jordan, escape rooms: "we price per room not per person", "it says adults but we charge per
   // room"): the Per room or group choice on the Price screen.
   { id: 'indoor-per-room', pages: ['setup', 'edit'], over: ['indoor-price', 'cost', 'menu-add', 'indoor-groups'], noRelated: ['cost'],
@@ -59436,8 +59453,10 @@ const INDOOR_SETUP_HELP_TOPICS = [
     aFr: '<p>Ouvrez <strong>Groupes et fêtes</strong> dans Plus sur votre endroit. Touchez une taille (« Groupes de 10 personnes ou plus : réservez à l’avance ») et ajoutez une ligne dans vos mots, comme <em>Groupes scolaires et visites guidées sur rendez-vous</em>, <em>Fêtes d’anniversaire avec salle privée jusqu’à 20 personnes</em> ou <em>Consolidation d’équipe pour les entreprises, jusqu’à 40 personnes</em>. Planifier mon voyage et la recherche vous trouvent pour les fêtes d’anniversaire et la consolidation d’équipe grâce à cette ligne. Les forfaits de fête et leurs prix vont dans <strong>Vos tarifs</strong>. Vos heures d’ouverture restent comme elles sont.</p>' },
   { id: 'indoor-good-to-know', pages: ['setup', 'edit'], over: ['plan-visit'],
     q: 'Socks, lockers, waivers: where do I say that?', qFr: 'Chaussettes, casiers, décharges : où le dire?',
-    keys: ['socks', 'grip socks', 'lockers', 'locker', 'towels', 'swimsuit', 'what to bring', 'what to wear', 'wear', 'bring', 'waiver', 'waivers', 'sign a waiver', 'shoes', 'bowling shoes', 'rentals included', 'quiet', 'cell phones', 'photos allowed', 'no photos', 'food and drink', 'cafe on site', 'snack bar', 'good to know', 'rules', 'dress code', 'arrive early'],
-    keysFr: ['chaussettes', 'casiers', 'casier', 'serviettes', 'maillot', 'quoi apporter', 'quoi porter', 'decharge', 'signer une decharge', 'souliers', 'chaussures', 'photos permises', 'pas de photos', 'nourriture', 'casse croute', 'bon a savoir', 'regles', 'code vestimentaire', 'arriver tot'],
+    keys: ['socks', 'grip socks', 'lockers', 'locker', 'towels', 'swimsuit', 'what to bring', 'what to wear', 'wear', 'bring', 'waiver', 'waivers', 'sign a waiver', 'shoes', 'bowling shoes', 'rentals included', 'quiet', 'cell phones', 'photos allowed', 'no photos', 'food and drink', 'cafe on site', 'snack bar', 'good to know', 'rules', 'dress code', 'arrive early',
+      // Indoor test 7 (Robert: "we ship art anywhere in canada" got "I'm not sure").
+      'ship', 'ships', 'we ship', 'shipping', 'ship art', 'ship anywhere', 'ship your purchase', 'we can ship', 'most art is for sale'],
+    keysFr: ['chaussettes', 'casiers', 'casier', 'serviettes', 'maillot', 'quoi apporter', 'quoi porter', 'decharge', 'signer une decharge', 'souliers', 'chaussures', 'photos permises', 'pas de photos', 'nourriture', 'casse croute', 'bon a savoir', 'regles', 'code vestimentaire', 'arriver tot', 'expedier', 'expedition', 'nous expedions', 'livraison des oeuvres'],
     a: '<p>Open <strong>Good to know</strong> in More about your place. Tap the answers that fit (“Grip socks required”, “Lockers available”, “Waiver to sign before you play”) or type a line in your own words. It shows in “Plan your visit” on your page.</p>',
     aFr: '<p>Ouvrez <strong>Bon à savoir</strong> dans Plus sur votre endroit. Touchez les réponses qui conviennent (« Chaussettes antidérapantes obligatoires », « Casiers offerts », « Décharge à signer avant de jouer ») ou écrivez une ligne dans vos mots. Elle paraît dans « Planifiez votre visite » sur votre page.</p>' },
   { id: 'indoor-visit-length', pages: ['setup', 'edit'], over: ['tour-lengths'],
@@ -59464,10 +59483,11 @@ const INDOOR_SETUP_HELP_TOPICS = [
     keysFr: ['fauteuil roulant', 'accessible', 'accessibilite', 'ascenseur', 'rampe', 'escaliers', 'sans marche', 'toilettes accessibles', 'mobilite', 'poussette', 'poussettes', 'chien d assistance', 'sensoriel', 'heures calmes'],
     a: '<p>In <strong>Who can come</strong>, tick <strong>Wheelchair accessible</strong> if people can get in and around without steps, and <strong>Service dogs welcome</strong>. Anything more (an elevator to the second floor, stroller parking, sensory-friendly hours) goes in one line under <strong>Good to know</strong>.</p>',
     aFr: '<p>Dans <strong>Qui peut venir</strong>, cochez <strong>Accessible en fauteuil roulant</strong> si l’on peut entrer et circuler sans marches, et <strong>Chiens d’assistance bienvenus</strong>. Le reste (un ascenseur vers l’étage, un espace pour les poussettes, des heures adaptées sensoriellement) va en une ligne sous <strong>Bon à savoir</strong>.</p>' },
-  { id: 'indoor-exhibits', pages: ['setup', 'edit'], over: ['event-add', 'events'],
+  // Indoor test 7: "we have a new exhibition every month" is this topic, not the generic repeating-event answer.
+  { id: 'indoor-exhibits', pages: ['setup', 'edit'], over: ['event-add', 'events', 'event-repeat'],
     q: 'Our exhibitions or shows change', qFr: 'Nos expositions ou spectacles changent',
-    keys: ['exhibit', 'exhibits', 'exhibition', 'exhibitions', 'exhibitions change', 'exhibits change', 'exhibitions change every month', 'change every month', 'rotating exhibitions', 'new exhibit', 'current show', 'shows change', 'whats on', 'what s on', 'events', 'event', 'opening night', 'artist talk', 'season lineup', 'program', 'programs', 'camps', 'workshops this month'],
-    keysFr: ['exposition', 'expositions', 'expositions changent', 'changent chaque mois', 'expositions changent chaque mois', 'expositions temporaires', 'nouvelle exposition', 'spectacles', 'a l affiche', 'evenements', 'evenement', 'vernissage', 'programmation', 'camps', 'ateliers'],
+    keys: ['exhibit', 'exhibits', 'exhibition', 'exhibitions', 'exhibitions change', 'exhibits change', 'exhibitions change every month', 'change every month', 'rotating exhibitions', 'new exhibit', 'new exhibition', 'new exhibitions', 'exhibition every month', 'new show every month', 'new show each month', 'current show', 'shows change', 'whats on', 'what s on', 'events', 'event', 'opening night', 'artist talk', 'season lineup', 'program', 'programs', 'camps', 'workshops this month'],
+    keysFr: ['exposition', 'expositions', 'nouvelle exposition chaque mois', 'exposition chaque mois', 'expositions changent', 'changent chaque mois', 'expositions changent chaque mois', 'expositions temporaires', 'nouvelle exposition', 'spectacles', 'a l affiche', 'evenements', 'evenement', 'vernissage', 'programmation', 'camps', 'ateliers'],
     a: '<p>Each exhibition, show, camp or workshop is an event: add it with <strong>Add an event</strong> on your page (after the setup). It shows on What’s On and on your page once we’ve checked it. Your story can say what kind of shows you have; it doesn’t need the dates.</p>',
     aFr: '<p>Chaque exposition, spectacle, camp ou atelier est un événement : ajoutez-le avec <strong>Ajouter un événement</strong> sur votre page (après la configuration). Il paraît dans À l’affiche et sur votre page une fois vérifié. Votre histoire peut dire quel genre de spectacles vous présentez; elle n’a pas besoin des dates.</p>' },
   // Indoor test 1 (2026-11-19; Margaret): "I don't speak French, do I have to update the French description" got the
@@ -59488,6 +59508,22 @@ const INDOOR_SETUP_HELP_TOPICS = [
     aFr: '<p>Ajoutez-la comme une fermeture : <strong>__STEPFR__</strong>, touchez <strong>__ADDFR__</strong>, choisissez le premier et le dernier jour (comme du 24 décembre au 14 janvier) et cochez <strong>Chaque année</strong>. Votre page indique Fermé pendant ce temps, et quand vous rouvrez, et Planifier mon voyage ne vous propose pas ces jours-là. Gardez vos heures habituelles comme elles sont.</p>' },
   // Indoor test 6 (2026-11-19; Priya, a pottery and paint studio: "we have evening classes outside our normal hours, do I
   // put those in?" twice got "I'm not sure", so she stretched her hours to 9 PM, next to "Drop in any time we're open").
+  // Indoor test 7 (2026-11-19; Robert, a gallery: "first friday openings 6 to 8" got "I'm not sure", and "opening night is
+  // outside my hours, do I change my hours?" got the hours answer, which invites a wrong fact): an opening, reception,
+  // vernissage, first Friday or artist talk is an event; the hours stay the open-door hours.
+  { id: 'indoor-openings', pages: ['setup', 'edit'], over: ['indoor-exhibits', 'event-repeat', 'event-add', 'events', 'hours', 'indoor-class-nights', 'indoor-no-hours', 'setup-split-hours'],
+    q: 'Openings, receptions and artist talks', qFr: 'Vernissages, réceptions et rencontres avec les artistes',
+    keys: ['openings', 'opening night', 'opening nights', 'opening reception', 'opening receptions', 'reception', 'receptions', 'vernissage', 'vernissages', 'first friday', 'first fridays', 'artist talk', 'artist talks', 'artists talk', 'exhibition opening', 'exhibit opening', 'show opening', 'art opening', 'opening party', 'meet the artist', 'meet the artists', 'outside my hours', 'outside of my hours', 'outside of our hours'],
+    keysFr: ['vernissage', 'vernissages', 'reception', 'receptions', 'premier vendredi', 'premiers vendredis', 'rencontre avec l artiste', 'rencontre avec les artistes', 'soiree d ouverture', 'ouverture de l exposition', 'en dehors de mes heures'],
+    a: '<p>Keep your hours as your open-door hours; add the opening as an event. On your page (after the setup), tap <strong>Add an event</strong> and give it the first date and its time, like 6 to 8 PM. Happens every month? In <strong>Repeats or other dates?</strong>, write the pattern, like “first Friday of each month”. It shows on What’s On and on your page once we’ve checked it, usually within a day.</p>',
+    aFr: '<p>Gardez vos heures comme heures d’ouverture des portes; ajoutez le vernissage comme un événement. Sur votre page (après la configuration), touchez <strong>Ajouter un événement</strong> et indiquez la première date et l’heure, comme de 18 h à 20 h. Ça revient chaque mois? Dans <strong>Récurrent ou autres dates?</strong>, décrivez le rythme, comme « le premier vendredi de chaque mois ». Il paraît dans À l’affiche et sur votre page une fois vérifié, en général d’ici un jour.</p>' },
+  // Indoor test 7 (Robert: "can I list our artists", "can I put the names of the artists we represent" got "I'm not sure").
+  { id: 'indoor-artists', pages: ['setup', 'edit'], over: ['indoor-exhibits', 'story', 'description'],
+    q: 'Can I name our artists?', qFr: 'Puis-je nommer nos artistes?',
+    keys: ['artists', 'our artists', 'list our artists', 'list the artists', 'artists we represent', 'we represent', 'represent', 'artist names', 'names of the artists', 'names of our artists', 'name our artists', 'the artists', 'painters we show', 'our painters', 'our sculptors'],
+    keysFr: ['artistes', 'nos artistes', 'les artistes', 'artistes que nous representons', 'nous representons', 'representons', 'noms des artistes', 'nommer nos artistes', 'nos peintres'],
+    a: '<p>Yes: name them in your story, in <strong>Your story and Known for</strong>, like <em>Paintings by Jane Doe, Sam Lee and other Okanagan artists</em>, or in your Known for line. Each exhibition goes in as an event: tap <strong>Add an event</strong> on your page (after the setup).</p>',
+    aFr: '<p>Oui : nommez-les dans votre histoire, dans <strong>Votre histoire et ce pour quoi vous êtes connus</strong>, comme <em>Des toiles de Jeanne Tremblay, Sam Lee et d’autres artistes de l’Okanagan</em>, ou dans votre ligne Connu pour. Chaque exposition s’ajoute comme un événement : touchez <strong>Ajouter un événement</strong> sur votre page (après la configuration).</p>' },
   { id: 'indoor-class-nights', pages: ['setup', 'edit'], over: ['hours', 'indoor-no-hours', 'indoor-swim-times', 'event-add', 'setup-split-hours'],
     q: 'Classes outside our open hours', qFr: 'Des cours en dehors de nos heures d’ouverture',
     keys: ['evening classes', 'evening class', 'night classes', 'night class', 'class nights', 'classes at night', 'classes in the evening', 'outside our hours', 'outside our normal hours', 'outside normal hours', 'outside opening hours', 'outside our opening hours', 'outside open hours', 'after we close', 'after closing', 'after hours classes', 'classes after hours', 'late classes', 'evening workshops', 'evening sessions'],
@@ -59514,11 +59550,14 @@ const INDOOR_SETUP_HELP_TOPICS = [
     keysFr: ['menu', 'liste de prix', 'tarifs', 'grille tarifaire', 'tous mes tarifs', 'forfaits', 'laissez passer', 'televerser', 'brochure', 'les taper', 'taper les prix', 'pas de grille', 'les taper moi meme'],
     a: '<p>Open <strong>Your prices</strong> (the first of the extra details). Take a photo of your price sheet, upload it, or give us the link to your prices page; we type it up and it shows on your page as “Prices &amp; rates” within a day.</p><p>No price sheet? Tap <strong>Type them in myself</strong>: add each ticket, pass or class with its price, then tap Publish.</p>',
     aFr: '<p>Ouvrez <strong>Vos tarifs</strong> (le premier des détails facultatifs). Photographiez votre grille tarifaire, téléversez-la, ou donnez-nous le lien de votre page de prix; nous la retranscrivons et elle paraît sur votre page sous « Tarifs » d’ici un jour.</p><p>Pas de grille? Touchez <strong>Je les tape moi-même</strong> : ajoutez chaque billet, laissez-passer ou cours avec son prix, puis touchez Publier.</p>' },
-  { id: 'indoor-cost', pages: ['setup', 'edit'], over: ['cost'], q: 'Is this free? Do you take a booking fee?', qFr: 'Est-ce gratuit? Prenez-vous des frais de réservation?',
-    keys: ['is this free', 'cost me', 'fee', 'fees', 'booking fee', 'commission', 'commissions', 'subscription', 'how much does this cost', 'catch', 'really free', 'is it really free', 'whats the catch', 'hidden fee', 'hidden fees', 'do you charge'],
-    keysFr: ['est ce gratuit', 'frais', 'frais de reservation', 'commission', 'abonnement', 'combien ca coute', 'vraiment gratuit', 'attrape', 'frais caches', 'vous chargez'],
-    a: '<p>Yes, it’s really free, and there’s no catch. No cost, ever, and no commission: people book or buy tickets with you directly. We never take a cut.</p>',
-    aFr: '<p>Oui, c’est vraiment gratuit, et il n’y a pas d’attrape. Aucuns frais, jamais, et aucune commission : les gens réservent ou achètent leurs billets directement chez vous. Nous ne prenons jamais de pourcentage.</p>' },
+  // Indoor test 7 (Robert: "what is the catch, are you going to sell me advertising" got the "who am I" answer).
+  { id: 'indoor-cost', pages: ['setup', 'edit'], over: ['cost', 'scam', 'about'], q: 'Is this free? Do you take a booking fee?', qFr: 'Est-ce gratuit? Prenez-vous des frais de réservation?',
+    keys: ['is this free', 'cost me', 'fee', 'fees', 'booking fee', 'commission', 'commissions', 'subscription', 'how much does this cost', 'catch', 'really free', 'is it really free', 'whats the catch', 'hidden fee', 'hidden fees', 'do you charge',
+      'the catch', 'what is the catch', 'advertising', 'advertise', 'ads', 'sell me', 'selling me', 'sell me advertising', 'sell me ads', 'upsell', 'upselling', 'up sell', 'sales pitch', 'scam', 'is this a scam', 'is it a scam'],
+    keysFr: ['est ce gratuit', 'frais', 'frais de reservation', 'commission', 'abonnement', 'combien ca coute', 'vraiment gratuit', 'attrape', 'frais caches', 'vous chargez',
+      'l attrape', 'publicite', 'de la publicite', 'me vendre', 'vendre de la publicite', 'arnaque', 'une arnaque', 'est ce une arnaque'],
+    a: '<p>Yes, it’s really free, and there’s no catch. No cost, ever, and no commission: people book or buy tickets with you directly. We never take a cut. It’s a real guide to the Okanagan run by Dayton, and nothing here asks for a credit card.</p>',
+    aFr: '<p>Oui, c’est vraiment gratuit, et il n’y a pas d’attrape. Aucuns frais, jamais, et aucune commission : les gens réservent ou achètent leurs billets directement chez vous. Nous ne prenons jamais de pourcentage. C’est un vrai guide de l’Okanagan tenu par Dayton, et rien ici ne vous demande de carte de crédit.</p>' },
 ];
 // Indoor test 4 (2026-11-19; Lauren, a day spa: Help gave her arcade and escape-room examples, a museum's gift shop, and two
 // price questions got the restaurant "Price range" answer). The indoor answers in the place's own kind's words
@@ -59593,8 +59632,9 @@ function indoorKindHelpTopics(topics, kinds, price = 25) {
       keysFr: t.keysFr.concat(['le reste de mes prix', 'mes autres prix', 'autres prix', 'prix des soins', 'chaque soin', 'nos soins', 'soins', 'prix des massages', 'nos massages', 'massage de 60', 'massage de 90', '60 min', '90 min', 'ou vont ils', 'carte des soins', 'horaire des cours', 'prix des services', 'chaque service', 'chaque service a un prix', 'services']),
       // Indoor test 6 (Priya): the button her prices page really has ("Looks good, send it!" on her link, "Looks good,
       // publish!" signed in), and for a class schedule, that the Book button opens it.
-      a: Object.fromEntries(['in', 'link', 'out'].map((m) => [m, `<p>Open <strong>Your prices</strong> (the first of the extra details). Take a photo of your ${E(en.prices.noun)}, upload it, or give us the link to it; we type it up and it shows on your page as “${E(en.prices.page)}” within a day.</p><p>No ${E(en.prices.noun)} to send? Tap <strong>Type them in myself</strong>: add each one with its price, like <em>${E(en.help.prices)}</em>, then tap <strong>${m === 'in' ? 'Looks good, publish!' : 'Looks good, send it!'}</strong>.</p>${/schedule/.test(en.prices.noun) ? '<p>Your schedule is online? Paste its link in <strong>Booking</strong>: your page’s <strong>Book</strong> button opens it, so people see each class and its dates.</p>' : ''}`])),
-      aFr: Object.fromEntries(['in', 'link', 'out'].map((m) => [m, `<p>Ouvrez <strong>Vos tarifs</strong> (le premier des détails facultatifs). Photographiez votre ${E(fr.prices.noun)}, téléversez-la, ou donnez-nous son lien; nous la retranscrivons et elle paraît sur votre page sous « ${E(fr.prices.page)} » d’ici un jour.</p><p>Rien à envoyer? Touchez <strong>Je les tape moi-même</strong> : ajoutez chacun avec son prix, comme <em>${E(fr.help.prices)}</em>, puis touchez <strong>${m === 'in' ? 'C’est bon, publier !' : 'C’est bon, envoyer !'}</strong>.</p>${/horaire/.test(fr.prices.noun) ? '<p>Votre horaire est en ligne? Collez son lien dans <strong>Réservation</strong> : le bouton <strong>Réserver</strong> de votre page l’ouvre, pour que l’on voie chaque cours et ses dates.</p>' : ''}`])) };
+      // Indoor test 7 (Robert, a free gallery): nothing to list when entry is free.
+      a: Object.fromEntries(['in', 'link', 'out'].map((m) => [m, `<p>Free entry? You can skip this.</p><p>Open <strong>Your prices</strong> (the first of the extra details). Take a photo of your ${E(en.prices.noun)}, upload it, or give us the link to it; we type it up and it shows on your page as “${E(en.prices.page)}” within a day.</p><p>No ${E(en.prices.noun)} to send? Tap <strong>Type them in myself</strong>: add each one with its price, like <em>${E(en.help.prices)}</em>, then tap <strong>${m === 'in' ? 'Looks good, publish!' : 'Looks good, send it!'}</strong>.</p>${/schedule/.test(en.prices.noun) ? '<p>Your schedule is online? Paste its link in <strong>Booking</strong>: your page’s <strong>Book</strong> button opens it, so people see each class and its dates.</p>' : ''}`])),
+      aFr: Object.fromEntries(['in', 'link', 'out'].map((m) => [m, `<p>Entrée gratuite? Vous pouvez passer cette étape.</p><p>Ouvrez <strong>Vos tarifs</strong> (le premier des détails facultatifs). Photographiez votre ${E(fr.prices.noun)}, téléversez-la, ou donnez-nous son lien; nous la retranscrivons et elle paraît sur votre page sous « ${E(fr.prices.page)} » d’ici un jour.</p><p>Rien à envoyer? Touchez <strong>Je les tape moi-même</strong> : ajoutez chacun avec son prix, comme <em>${E(fr.help.prices)}</em>, puis touchez <strong>${m === 'in' ? 'C’est bon, publier !' : 'C’est bon, envoyer !'}</strong>.</p>${/horaire/.test(fr.prices.noun) ? '<p>Votre horaire est en ligne? Collez son lien dans <strong>Réservation</strong> : le bouton <strong>Réserver</strong> de votre page l’ouvre, pour que l’on voie chaque cours et ses dates.</p>' : ''}`])) };
     return t;
   // Indoor test 5: the English indoor page's box is “Your visit” (indoor-venue-layout.js), not “Plan your visit”.
   }).map((t) => (t && typeof t.a === 'string' && /“Plan your visit”/.test(t.a) ? { ...t, a: t.a.replace(/“Plan your visit”/g, '“Your visit”') } : t));

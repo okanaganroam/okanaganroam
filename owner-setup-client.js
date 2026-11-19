@@ -62,6 +62,16 @@
   // The checklist item -> the screen that answers it, for this type.
   var TOUR_ITEM_STEP = { menu: 'menu', tour_kind: 'tour', tour_length: 'tour', tour_price: 'price', booking_link: 'booking', book_ahead: 'booking', tour_ages: 'offer', access: 'offer', pyv_known: 'story', pyv_groups: 'groups', arrival: 'door', season: 'hours:year' };
   var INDOOR_ITEM_STEP = { menu: 'menu', indoor_kind: 'indoor', visit_length: 'indoor', indoor_price: 'price', booking_link: 'booking', indoor_booking: 'booking', indoor_ages: 'offer', access: 'offer', pyv_known: 'story', pyv_groups: 'groups', season: 'hours:year' };
+  // Indoor test 7: Free entry or By donation saved (Your prices is then optional: nothing to list).
+  // Indoor test 7: the kinds where "All ages" means "fine to bring kids", not a family outing (no Kids welcome tick).
+  var INDOOR_NOT_FAMILY = ['gallery', 'casino', 'library', 'theatre'];
+  function indoorFamilyKinds(){
+    var ks = (S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : TI && TI.kinds) || [];
+    if (!ks.length) return true;
+    var story = String(CUR.description || '') + ' ' + String(((CUR.visit_rows || {}).known_for) || '');
+    return ks.some(function(k){ return INDOOR_NOT_FAMILY.indexOf(k) < 0 || (k === 'theatre' && /\b(?:kids?|children)[’']?s?\s+(?:shows?|theatre|theater|plays?)|family (?:shows?|theatre|theater)|pour enfants/i.test(story)); });
+  }
+  function freeIndoor(){ return INDOOR && (CUR.indoor_price === 'free' || CUR.indoor_price === 'donation' || S.savedTourPrice === 'free' || S.savedTourPrice === 'donation'); }
   function itemStep(k){ return (INDOOR && INDOOR_ITEM_STEP[k]) || (TOUR && TOUR_ITEM_STEP[k]) || (C.winery && WINERY_ITEM_STEP[k]) || (C.brewery && BREWERY_ITEM_STEP[k]) || (CK && COCKTAIL_ITEM_STEP[k]) || ''; }
   var DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   var el = function(id){ return document.getElementById(id); };
@@ -1571,7 +1581,9 @@
   var INDOOR_CHIP_GROUP = { get: function(k){ return indoorGroupOf(k, 'chipGroup'); } };
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
-    if (key === 'good_to_know' && C.indoor && (T.quick || {}).good_to_know_kinds) { var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; var lk = k0 ? T.quick.good_to_know_kinds[INDOOR_CHIP_GROUP.get(k0)] : null; if (lk && lk.length) l = lk; }
+    if (key === 'good_to_know' && C.indoor && (T.quick || {}).good_to_know_kinds) { var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; var lk = k0 ? T.quick.good_to_know_kinds[INDOOR_CHIP_GROUP.get(k0)] : null; if (lk && lk.length) l = lk;
+      // Indoor test 7 (2026-11-19): "Free on the first Sunday" makes no sense when entry is always free.
+      if (freeIndoor()) l = l.filter(function(c){ return !/first Sunday|premier dimanche/i.test(c); }); }
     // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
     // isn't offered "Patio only".
     if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;
@@ -1913,6 +1925,14 @@
     return '<p class="su-hint" id="suFrDescEnLead" lang="en">' + h(E.lead) + ' <a class="su-link" id="suFrDescLeave" data-act="frLeave" href="' + h(en) + '">' + h(E.leave) + '</a></p>';
   }
   function frOnlyFinish(){ var noFr = !CUR.description_fr && T.frOnlyFinishNoStory; return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish"' + (noFr ? ' data-nostory="1"' : '') + '>' + h(noFr ? fill(T.frOnlyFinishNoStory, { story: T.labels.story }) : T.frOnlyFinish) + '</p>' : ''; }
+  // Indoor test 7 (2026-11-19; Robert's gallery): one source of truth with the checklist. A skipped step whose scored items
+  // are all done (none of them in the score's `left`) is not "To reach 100%" (Groups was listed while the checklist said done).
+  function scoredDone(k){
+    var sc = S.score; if (!sc || !sc.keys || !sc.left) return false;
+    var mine = sc.keys.filter(function(key){ var st = itemStep(key) || ITEM_STEP[key] || ''; return st.split(':')[0] === k; });
+    if (!mine.length) return false;
+    return !sc.left.some(function(it){ return mine.indexOf(it.k) >= 0; });
+  }
   function leftList(){
     var out = [], seen = {};
     // Never an item she already answered or sent (pub fresh-eyes, 2026-11-10: Takeout ticked on "What you offer" and a
@@ -1923,6 +1943,7 @@
       if (k === 'spend' && S.spendNotSure) return; // "Not sure? Skip": not asked again on this screen
       if (tickedBy[k] && S.badges[tickedBy[k]]) return;
       if (C.pub && (k === 'book' || k === 'takeout')) return; // not part of a pub's score
+      if (scoredDone(k)) return; // indoor test 7: the checklist has every item of this step done
       if (k === 'menu' && tapOnly()) { if (C.menuKnown) return; seen[k] = true; out.push({ step: k, label: T.finishTap || T.labels[k] }); return; }
       seen[k] = true; out.push({ step: k, label: T.labels[k] });
     });
@@ -2166,7 +2187,8 @@
         + '<div class="su-skip" style="margin-top:14px"><button type="button" class="su-link" id="suChangeAnswer" data-act="go:start">' + h(T.changeAnswer) + '</button></div>';
     } else if (s === 'more') {
       // Part 2: optional, any order. A tick on the ones already answered.
-      var tile2 = function(k){ var d = S.done[k], on = d && d !== 'skip'; return '<button type="button" class="su-tile" aria-pressed="' + (on ? 'true' : 'false') + '" data-act="open:' + k + '"><span class="su-e" aria-hidden="true">' + (P2_ICONS[k] || '•') + '</span>' + h(T.labels[k]) + (on ? '<span class="su-tile-sub">' + h(capFirst(stText(k, nowSt(k, d)))) + '</span>' : '') + '</button>'; };
+      // Indoor test 7 (2026-11-19; Robert's free gallery): with Free entry or By donation, Your prices is optional and says so.
+      var tile2 = function(k){ var d = S.done[k], on = d && d !== 'skip', fr7 = !on && k === 'menu' && freeIndoor() && T.menuFreeSub; return '<button type="button" class="su-tile" aria-pressed="' + (on ? 'true' : 'false') + '" data-act="open:' + k + '"' + (fr7 ? ' id="suMenuFreeTile"' : '') + '><span class="su-e" aria-hidden="true">' + (P2_ICONS[k] || '•') + '</span>' + h(T.labels[k]) + (on ? '<span class="su-tile-sub">' + h(capFirst(stText(k, nowSt(k, d)))) + '</span>' : fr7 ? '<span class="su-tile-sub">' + h(T.menuFreeSub) + '</span>' : '') + '</button>'; };
       var top4 = P2.filter(function(k){ return TOP2.indexOf(k) >= 0; }), rest2 = P2.filter(function(k){ return TOP2.indexOf(k) < 0; });
       var restOpen = S.moreOpen || rest2.some(function(k){ return S.done[k] && S.done[k] !== 'skip'; });
       x = q(T.moreQ, T.moreLead) + msgs() + '<div class="su-tiles">' + top4.map(tile2).join('') + '</div>' + (rest2.length ? '<details class="su-fold" id="suFold"' + (restOpen ? ' open' : '') + '><summary>' + h(T.fewMore) + '</summary><div class="su-tiles">' + rest2.map(tile2).join('') + '</div></details>' : '')
@@ -2654,7 +2676,7 @@
       var sentM = S.done.menu === 'day';
       // Sent already: say so in the heading, Next is the main button, and a newer menu is the smaller choice (as photos).
       x = (sentM ? q(T.menuSentQ) + msgs() + '<div class="su-stack" style="margin-bottom:22px">' + big('➜', nextLabel('menu'), '', false, 'after:menu') + '</div><h2 class="su-h2">' + h(T.menuNewer) + '</h2>'
-          : (S.done.menu === 'email' ? '<p class="su-sent">' + h(T.menuSentEmail) + '</p>' : '') + q(T.menuQ, T.menuLead) + msgs())
+          : (S.done.menu === 'email' ? '<p class="su-sent">' + h(T.menuSentEmail) + '</p>' : '') + q(T.menuQ, freeIndoor() && T.menuLeadFree ? T.menuLeadFree : T.menuLead) + msgs())
         + '<div class="su-stack">' + (INDOOR && FINE ? '' : big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam')) + big('📄', T.upload, T.uploadSub, true, 'go:menu:upload') + (C.website ? big('🌐', T.web, '', true, 'go:menu:web') : '') + big('📘', T.menuSocial, fbKnown() ? fill(T.menuFbKnown, { x: siteDomain(fbKnown()) }) : '', true, 'go:menu:social')
         // Café test 2 (2026-11-11): flavours that change every day ("see Instagram / Facebook / the board").
         + (C.cafe ? big('🔄', iceKind() ? T.menuDailyIce : T.menuDaily, T.menuDailySub, true, 'go:menu:daily') : '')
@@ -4195,6 +4217,9 @@
         var iad = S.tour.age !== '19' && S.tour.age !== 'all' && S.tour.adult; if (iad !== (TI.adult === true)) ia.adult = iad ? true : null;
         if (Object.keys(ia).length) list.unshift(tinfo(ia));
         var ikids = S.tour.age === 'all' || S.tour.age === '5';
+        // Indoor test 7 (2026-11-19; Robert's commercial gallery showed Kid-Friendly first): All ages never ticks Kids welcome
+        // for a gallery, casino, library or theatre (unless it has kids' shows); the badge stays as it was there.
+        if (ikids && !indoorFamilyKinds()) ikids = !!S.savedBadges.kid_friendly;
         if (ikids !== !!S.savedBadges.kid_friendly) list.push({ badges: { kid_friendly: ikids } });
         return saveAll('offer', list, null, offerNext('offer'), function(){ if (ia.age) TI.age = ia.age; if ('adult' in ia) { if (ia.adult) TI.adult = true; else delete TI.adult; } S.badges.kid_friendly = ikids; S.tour.ageGuessed = false; });
       }
