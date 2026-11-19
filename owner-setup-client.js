@@ -2256,6 +2256,9 @@
         // days (summer/winter, which reset its days to the usual week, are not offered then; one season only).
         // Brewery test 3 (Whistler, 2026-11-16): back to change one day with stretches stored, the first button keeps them
         // ("Yes, all year" then "No, keep them" was the only way through, and it scared her).
+        // Indoor test 10 (2026-11-19; Sandra's August maintenance shutdown had no place here): a short yearly shutdown is a
+        // closure, said in one line (indoor places only).
+        + (T.allYearShutHint ? '<p class="su-hint" id="suShutHint">' + h(T.allYearShutHint) + '</p>' : '')
         + '<div class="su-stack">' + (stS.length && T.yearKeep ? big('✓', T.yearKeep, '', false, 'yearKeep') : '') + big(stS.length && T.yearKeep ? '✕' : '✓', stS.length && T.yearKeep && T.allYearSame ? T.allYearSame : T.allYearYes, '', !!(stS.length && T.yearKeep), 'yearAll') + (TL && !stS.length ? big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed') : '') + (stS.length ? stS.map(function(st){ return big('✎', fill(T.seaChange, st), T.seaChangeSub, true, 'yearSeasonEdit:' + st.i); }).join('')
           // Brewery test 1 (Whistler, 2026-11-15): a second stretch (a spring and a fall shoulder season), then a third.
           + seaMoreWrap(stS.length > 1, (stS.length < SEA_MAX && S.seaList.length < SEA_MAX && T.seaAdd ? big('🍂', stS.length > 1 ? T.seaAdd3 : T.seaAdd, stS.length > 1 ? T.seaAdd3Sub : T.seaAddSub, true, 'yearSeasonAdd') : '')) : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
@@ -4588,7 +4591,9 @@
       // Tour test 16: no double spaces in the saved line (a space typed after a chip's ". ").
       readTour(); var br = String(S.tour.bring != null ? S.tour.bring : '').replace(/([^\s])[ \u00a0]{2,}(?=\S)/g, '$1 ').trim();
       if (!br) { S.nudge = T.bringNeed; return render(); }
-      if (linkIn(br)) { S.nudge = T.bringNoLink; return render(); }
+      // Indoor test 10 (2026-11-19; Sandra's "see vernon.ca" came back with the server's edit-page wording): a bare web
+      // address counts too, as the server reads it, so the setup's own words show.
+      if (linkIn(br) || /\b[a-z0-9-]+\.(?:com|ca|net|org|io|co|app|menu|restaurant|site|online|shop)\b/i.test(br)) { S.nudge = T.bringNoLink; return render(); }
       // Indoor test 9 (2026-11-19; Melissa's "… Sensory-friendly hour Tuesdays 9-10am" had no final period): a line of
       // sentences ends with a period, as Groups does.
       if (TL && /[.!?]\s/.test(br) && /[A-Za-z0-9\u00c0-\u024f)]$/.test(br)) { br += '.'; S.tour.bring = br; }

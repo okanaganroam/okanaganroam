@@ -363,8 +363,51 @@ test('indoor test 8: leagues are Good to know, cosmic bowling is Known for plus 
   assert.doesNotMatch(plain(spa.en.topic(BZ).a) + plain(spa.en.topic(TH).a), /bowling|lanes/i);
 });
 
+// Indoor test 10 (2026-11-19; Sandra, communications coordinator for a city aquatic centre): every question in her Help
+// log, with where it belongs, and a French twin of each.
+const OWNER = ['not-owner', 'staff'], PR = 'photo-rights', CC = 'closures-count', AO = 'indoor-also-offer', AC = 'indoor-access';
+const SANDRA = [
+  ['I work for the city, not the owner. Am I allowed to fill this in?', OWNER, 'je travaille pour la ville, pas le propriétaire. Ai-je le droit de remplir ceci?'],
+  ['annual maintenance shutdown in August', [YB], 'fermeture annuelle pour entretien en août'],
+  ['we close 2 weeks every August for maintenance, the dates change a bit each year', [YB], 'nous fermons 2 semaines chaque mois d’août pour l’entretien, les dates changent un peu chaque année'],
+  ['prices for adult youth child family', [P], 'prix pour adulte, jeune, enfant et famille'],
+  ['can we link our schedule PDF', [SW], 'peut-on mettre un lien vers notre horaire en PDF'],
+  ['swim times change every season', [SW], 'les heures des bains changent selon la saison'],
+  ['kids under 8 must be with an adult in the water, where does that go', [A], 'les enfants de moins de 8 ans doivent être avec un adulte dans l’eau'],
+  ['the photos belong to the City of Vernon, not me. Can I still tick this?', [PR], 'les photos appartiennent à la Ville de Vernon, pas à moi. Puis-je quand même cocher la case?'],
+  ['we are closed on all stat holidays, every year', CLOSE, 'nous sommes fermés tous les jours fériés, chaque année'],
+  ['it says you can list up to 20 closures but I only picked 12', [CC], 'on indique jusqu’à 20 fermetures mais j’en ai choisi seulement 12'],
+  ['I work for the city, not the owner', OWNER, 'je travaille pour la ville, je ne suis pas le propriétaire'],
+  ['where do I put our weight room and fitness classes', [AO], 'où mettre notre salle de musculation et nos cours de mise en forme'],
+  ['accessible change rooms and a pool lift', [AC], 'vestiaires accessibles et lève-personne pour la piscine'],
+  ['10 visit passes and memberships', [P], 'cartes de 10 entrées et abonnements'],
+  ['how do I change the photos order', ['photo-order'], 'comment changer l’ordre des photos'],
+  ['the shutdown dates change a bit every year', [YB], 'les dates de l’arrêt pour entretien changent un peu chaque année'],
+];
+const SANDRA_WANT = Object.fromEntries(SANDRA.map(([q, want]) => [q, want]));
+test('indoor test 10: Sandra\'s Help questions (a city pool) land on the right answer, in English and in French', async () => {
+  const b = await botsFor('pool');
+  const wrong = [];
+  for (const [q, want, qFr] of SANDRA) {
+    const r = b.en.best(q), f = b.fr.best(qFr);
+    if (!r || !want.includes(r.id)) wrong.push(`en "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+    if (!f || !want.includes(f.id)) wrong.push(`fr "${qFr}" -> ${f && f.id} (want ${want.join(' or ')})`);
+  }
+  assert.deepEqual(wrong, []);
+  // What the answers say.
+  assert.match(plain(b.en.topic(PR).a), /Yes, if you’re allowed to share them/);
+  assert.match(plain(b.en.topic(CC).a), /counts once, even with This year and next/);
+  assert.match(plain(b.en.topic(SW).a), /Swim times change by season, see our website/);
+  assert.match(plain(b.en.topic(SW).a), /Website button links to it/);
+  assert.match(plain(b.en.topic(YB).a), /dates change a bit each year/);
+  assert.match(plain(b.en.topic(AO).a), /Known for/);
+  assert.match(plain(b.fr.topic(PR).aFr), /Oui, si vous avez le droit de les partager/);
+  assert.match(plain(b.en.topic(P).a), /Drop-in from \$6\.50/);
+  assert.doesNotMatch(plain(b.en.topic(P).a), /\$25/);
+});
+
 // Every question in the 8 indoor help logs lands on an answer, on the page where it was asked, for the kind of place it was.
-const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids' };
+const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool' };
 // The misrouted ones, with where they belong.
 const LOG_WANT = {
   'we price per room not per person': [R], 'how do I change the price, it says adults but we charge per room': [R],
@@ -380,6 +423,8 @@ const LOG_WANT = {
   'kids under 1 are cheaper how do i show that': [P], 'we sell 10 visit passes': [P], 'the book button should say book a party': [BK],
   'the age thing only goes up to all ages but we are 0 to 10': [A], 'price is per kid, parents are free': [P], 'party rooms book online but play is drop in': [BK],
   'grip socks are mandatory where does that go': [GTK],
+  // Indoor test 10 (Sandra, a city pool): her five "I'm not sure"s and the ones that need a better answer.
+  ...SANDRA_WANT,
 };
 test('every question in the 8 indoor help logs lands on an answer (the misrouted ones on the right one)', async () => {
   const wrong = [];

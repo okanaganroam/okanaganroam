@@ -298,6 +298,17 @@ const BUSY_THEME = {
   other: ['Busiest on weekends and school holidays', 'Family night Fridays 5–8 PM', 'every Friday', 'Plus achalandé les fins de semaine et pendant les congés scolaires', 'Soirée familiale le vendredi de 17 h à 20 h', 'chaque vendredi'],
 };
 for (const [k, t] of Object.entries(BUSY_THEME)) if (K[k]) { Object.assign(K[k].en.help, { busy: t[0], theme: t[1], repeat: t[2] }); Object.assign(K[k].fr.help, { busy: t[3], theme: t[4], repeat: t[5] }); }
+// Indoor test 10 (2026-11-19; Sandra's pool was told her card says "Drop-in from $25"): the example price Help uses for
+// each kind before the owner has typed one (a pool's drop-in is never $25).
+const EX_PRICE = { gallery: 10, museum: 12, theatre: 25, cinema: 14, spa: 65, pool: 7.5, climbing: 22, games: 15, escape: 30, bowling: 6.5, kids: 14, classes: 40, curling: 30, yoga: 20, casino: 40, library: 10, other: 15 };
+for (const [k, x] of Object.entries(EX_PRICE)) if (K[k]) K[k].exPrice = x;
+// Indoor test 10 (2026-11-19; Sandra's pool: "Drop-in from $7.50" while kids pay $3.50): when the owner's typed prices list a
+// lower price than her main one, the main one says what it is instead of "from": [en, fr] ("Adult drop-in $7.50.").
+const EXACT = { gallery: ['Adult admission', 'Entrée adulte'], museum: ['Adult admission', 'Entrée adulte'], theatre: ['Adult ticket', 'Billet adulte'], cinema: ['Adult ticket', 'Billet adulte'],
+  spa: ['Adult price', 'Prix adulte'], pool: ['Adult drop-in', 'Entrée adulte à la séance'], climbing: ['Adult pass', 'Laissez-passer adulte'], games: ['Per person', 'Par personne'],
+  escape: ['Per person', 'Par personne'], bowling: ['One game', 'Une partie'], kids: ['Kids', 'Enfants'], classes: ['Per class', 'Par cours'], curling: ['Adults', 'Adultes'],
+  yoga: ['Drop-in class', 'Cours à la séance'], casino: ['Adults', 'Adultes'], library: ['Adults', 'Adultes'], other: ['Adult admission', 'Entrée adulte'] };
+for (const [k, x] of Object.entries(EXACT)) if (K[k]) { K[k].en.price.exact = x[0]; K[k].fr.price.exact = x[1]; }
 const INDOOR_KIND_TEXT = K;
 const INDOOR_KIND_TEXT_KINDS = Object.keys(K);
 // The kind a place reads in: its main kind (the first the owner picked), else 'other'.
@@ -307,12 +318,13 @@ function indoorKindText(kinds, lang) {
   const k = indoorKindKey(kinds), e = K[k], w = e[lang === 'fr' ? 'fr' : 'en'];
   // The prices link's words on the page: "See prices & rates" / « Voir les tarifs », a spa's "See the spa menu".
   const see = w.prices.page === PRICES_PAGE[lang === 'fr' ? 1 : 0] ? (lang === 'fr' ? 'Voir les tarifs' : 'See prices & rates') : lang === 'fr' ? `Voir la ${w.prices.page.toLowerCase()}` : `See the ${w.prices.page.toLowerCase()}`;
-  return { kind: k, boxOffice: !!e.boxOffice, arts: !!e.arts, quiet: !!e.quiet, day: !!(e.day || e.quiet), gtk: e.gtk || 'general', ex: e.ex || 'general', ...w, prices: { ...w.prices, see } };
+  return { kind: k, exPrice: e.exPrice || 15, boxOffice: !!e.boxOffice, arts: !!e.arts, quiet: !!e.quiet, day: !!(e.day || e.quiet), gtk: e.gtk || 'general', ex: e.ex || 'general', ...w, prices: { ...w.prices, see } };
 }
 // "Tickets from $25." with the price written in.
 function indoorPriceLine(kinds, money, lang) { return indoorKindText(kinds, lang).price.page.replace('{x}', money); }
 // The card's small lines in both languages (English -> French), for french-text.js.
-const INDOOR_BASIS_FR = Object.fromEntries(Object.values(K).map((e) => [e.en.price.basis, e.fr.price.basis]).concat(Object.values(K).map((e) => [e.en.prices.page, e.fr.prices.page])));
+const INDOOR_BASIS_FR = Object.fromEntries(Object.values(K).map((e) => [e.en.price.basis, e.fr.price.basis]).concat(Object.values(K).map((e) => [e.en.prices.page, e.fr.prices.page]))
+  .concat(Object.values(K).map((e) => [e.en.price.exact, e.fr.price.exact])));
 // The kinds whose words name what the request asks ("massage" -> spa), from the search words.
 // Indoor test 10 (2026-11-19, the vocabulary audit): phrases that hold a kind's word but name something else: lawn bowling
 // and bowling greens (Sports & Recreation), an outdoor pool, a pool table or pool hall.

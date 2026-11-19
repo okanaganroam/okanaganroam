@@ -246,9 +246,10 @@ test('indoor test 4: a spa’s questions (Lauren’s help log, EN + FR) land on 
   assert.equal(en.topic('avg-spend'), undefined);
   // The answers are a spa's: its own price words and examples, no arcade, escape room or museum gift shop.
   const plain = (h) => String(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
-  assert.match(plain(en.topic('indoor-price').a), /put your lowest price \(a pass or your shortest treatment\)\. Your card and your page say “From \$25”/);
+  // Indoor test 10: before a price is typed, the example is the kind's own (a spa's $65, never $25 for every kind).
+  assert.match(plain(en.topic('indoor-price').a), /put your lowest price \(a pass or your shortest treatment\)\. Your card and your page say “From \$65”/);
   assert.match(plain(en.topic('indoor-price').a), /Massage: 60 min \$130, 90 min \$175/);
-  assert.match(plain(fr.topic('indoor-price').aFr), /« À partir de 25 \$ »/);
+  assert.match(plain(fr.topic('indoor-price').aFr), /« À partir de 65 \$ »/);
   assert.match(plain(en.topic('menu-add').a), /shows on your page as “Spa menu”/);
   assert.match(plain(fr.topic('menu-add').aFr), /« Carte des soins »/);
   assert.match(plain(en.topic('indoor-gift').a), /Gift cards for treatments and spa days/);
@@ -430,7 +431,9 @@ test('indoor answers never talk about happy hour, menus of food or tours; the fi
   assert.match(plain(en.topic('indoor-age').a), /pick the youngest age anyone can come/i);
   assert.match(plain(en.topic('indoor-age').a), /Put rules by activity or time under Good to know/);
   assert.doesNotMatch(plain(en.topic('indoor-groups').a), /\. or /);
-  assert.match(plain(en.topic('not-owner').a), /^\s*No — managers, staff and volunteers can use this link too/);
+  // Indoor test 10: it starts "Yes — you don’t need to be the owner" (Sandra, city staff: "Am I allowed to fill this in?").
+  assert.match(plain(en.topic('not-owner').a), /^\s*Yes — you don’t need to be the owner; managers, staff and volunteers can use this link too/);
+  assert.match(plain(fr.topic('not-owner').aFr), /^\s*Oui — pas besoin d’être le propriétaire/);
   assert.match(plain(en.topic('indoor-fill-all').a), /Only the 7 essentials matter/);
   assert.match(plain(fr.topic('indoor-fill-all').aFr), /Seuls les 7 essentiels comptent/);
   assert.equal(en.topics.some((x) => /happy hour/i.test(x.q)), false);

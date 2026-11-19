@@ -1703,13 +1703,16 @@ function scoreVenue(v, ctx) {
     if (nt) { const t = nightClock(nt.n.start), dn = planDate ? WEEKDAY_NAMES[WEEKDAYS[(new Date(`${planDate}T12:00:00Z`).getUTCDay() + 6) % 7]] : null; add('night', 30, dn && t && nt.title.length <= 40 ? `${nt.title} on ${dn} at ${t}, from its listing` : null); continue; }
     const m = foodMatch(v, ft);
     if (!m) continue;
-    if (m.cuisine) add('food', 18, `Listed cuisine: ${v.cuisineLabel || ft.cuisine} — matches “${ft.term}”`);
+    // Indoor test 10: a place that isn't food or drink has a category, not a cuisine ("Listed as Pool — matches “pool”").
+    if (m.cuisine) add('food', 18, DINING_TYPES.includes(v.type) || ['winery', 'brewery', 'distillery'].includes(v.type) ? `Listed cuisine: ${v.cuisineLabel || ft.cuisine} — matches “${ft.term}”` : `Listed as ${v.cuisineLabel || ft.cuisine} — matches “${ft.term}”`);
     // Restaurant test 3 (Whistler, 2026-11-15): "family Saturday brunch at 9am" picked a café that only mentions brunch over
     // the family restaurant listed as Breakfast & Brunch (open at 8). A brunch or breakfast place by its listed cuisine is
     // what was asked for, like a cuisine match, and ahead of a word in a name.
     else if (m.inCui && /^(?:brunch|breakfast)$/.test(ft.term)) add('food', 26 + (m.inName ? 4 : 0) + (m.inDesc ? 4 : 0), `Listed cuisine: ${v.cuisineLabel || v.cuisine} — matches “${ft.term}”`);
     else {
-      const where = [m.inName && 'name', m.inCui && 'cuisine', m.inDesc && 'description'].filter(Boolean);
+      // Indoor test 10 (2026-11-19; "Mentions “pool” in its cuisine and description" for a pool): only food places have a
+      // cuisine; anywhere else it is the place's category.
+      const where = [m.inName && 'name', m.inCui && (DINING_TYPES.includes(v.type) || ['winery', 'brewery', 'distillery'].includes(v.type) ? 'cuisine' : 'category'), m.inDesc && 'description'].filter(Boolean);
       // A loose word in a restaurant's description ("desert", "quiet") counts for less than a dish it serves.
       // 2026-10-28: "a cozy dinner" is about the meal, so a cozy restaurant counts in full, not as a loose word.
       const loose = DINING_TYPES.includes(v.type) && !m.inName && !m.inCui && !DISH_WORDS_RE.test(ft.term) && !/^(?:brunch|breakfast)$/.test(ft.term) && !(VIBE_TERM_RE.test(ft.term) && vibeMealAsked(ctx));
@@ -5199,6 +5202,15 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
     let cursor=dayStart??options.startMinutes??requirements.startMinutes??tourStart??nightLead??(first?.preSki?480:null)??morningStart??({morning:540,midday:720,afternoon:780,evening:1080}[first?.daypart]||({morning:540,afternoon:780,evening:1080}[requirements.daypart])||540),previous=null,provisional=false;
     // Round 7 (2026-10-19): a road trip's day that opens with a long drive leaves around 9 AM and starts its first stop
     // after the drive ("leave about 6:33 AM" for a 9 AM hike in Mount Currie after Pemberton).
+    // Indoor test 10 (2026-11-19; "lane swim Vernon early morning" was planned at 9 AM; the pool opens at 6:30): an early
+    // morning request starts at the first place's own opening time when that is earlier than the usual 9 AM (never
+    // before 5 AM).
+    if(assumed&&requirements.earlyMorning&&group.day===1&&first?.venue&&cursor>=540){
+      const fv=byId.get(first.venue.id);
+      const h=fv&&fv.hours?(fv._hours||(fv._hours=parseVenueHours(fv.hours))).days[weekday]:null;
+      const opens=h&&h.status==='open'&&h.ranges.length?h.ranges[0][0]:null;
+      if(Number.isFinite(opens)&&opens>=300&&opens<cursor)cursor=opens;
+    }
     const driveIn=plan.days.find(d=>d.day===group.day)?.driveIn;
     if(driveIn&&driveIn.maxMinutes>=30&&dayStart==null&&cursor<=600)cursor=Math.ceil((Math.max(cursor,540)+driveIn.maxMinutes)/15)*15;
     if(assumed&&first?.venue&&/\b(?:dinner|supper)\b/i.test(first.label||'')){
@@ -6860,6 +6872,11 @@ function addSuggestedTimes(result, input) {
   const first = stops.find((x) => x.venue || x.event);
   const tries = ['evening', 'night'].includes(first && first.daypart) ? [1020, 960, 900, 1110] : ['afternoon', 'late'].includes(first && first.daypart) ? [720, 840, 900] : [600, 660, 720, 480];
   for (const m of tries) { if (!best || !best.untimed) break; if (fixedStart != null && m < fixedStart) continue; const t = run(m); if (t && t.untimed < best.untimed) best = t; }
+  // Indoor test 10 (2026-11-19; "lane swim Vernon early morning": the pool opens at 6 AM on weekdays, 9 on Saturdays):
+  // an early-morning request with no day named is timed on the typical day whose first stop opens earliest.
+  if (best && req.earlyMorning && !fixedDate && !WEEKDAYS.includes(input.startWeekday) && best.rows[0] && Number.isFinite(best.rows[0].startMinutes)) {
+    for (const wd of [5, 4, 1]) { const t = run(null, typicalDate(input, result, wd)); if (t && t.untimed <= best.untimed && t.rows[0] && Number.isFinite(t.rows[0].startMinutes) && t.rows[0].startMinutes < best.rows[0].startMinutes) best = t; }
+  }
   // With no weekday named, a Friday or Thursday is tried when a stop is closed on the Saturday (or the Sunday after).
   if (best && best.untimed && !fixedDate && !WEEKDAYS.includes(input.startWeekday)) for (const wd of [5, 4]) { const t = run(null, typicalDate(input, result, wd)); if (t && t.untimed < best.untimed) best = t; if (!best.untimed) break; }
   // A crawl's lunch that falls after the first tasting (a brewery that opens at 4 PM) is its dinner.

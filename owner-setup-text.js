@@ -2329,6 +2329,8 @@ en.indoor = {
   // Your hours
   allYearClosed: 'We’re closed part of the year', allYearClosedSub: 'Like open May to September only. You pick the dates.',
   seaMore: 'Different hours in summer or winter?', allYearLead: 'Closed, or on different hours, for part of the year? Say so here.',
+  // Indoor test 10 (2026-11-19): a maintenance shutdown is a closure.
+  allYearShutHint: 'Closed a week or two each year, like a maintenance shutdown? Add it under Closures and holidays.',
   noDogsSub: 'Not inside', noDogsSubInside: 'Not inside',
   hoursQ: 'Are these still your hours?', needOpenDayAppt: 'Please set at least one open day. No set hours? Tap “We don’t have set hours” below.',
   noSetHours: 'We don’t have set hours (shows or classes only)', noSetHoursNow: 'No set hours: shows or classes only ✓',
@@ -2364,7 +2366,7 @@ en.indoor = {
   // Good to know
   bringQ: 'Good to know', bringLead: 'Anything people should know before they come? Two or three short lines.',
   bringEx: 'Grip socks required (we sell them for $3). Lockers available.',
-  bringNeed: 'Please type a line, or tap one of the answers below.', bringNoLink: 'Please leave links out of this line. Your booking link has its own box on Walk-ins or booking.',
+  bringNeed: 'Please type a line, or tap one of the answers below.', bringNoLink: 'Please leave links out of this line. Your website goes in Address, phone and website, and your Website button links to it. Write “see our website” instead.',
   bringGuess: 'We found this online. Check it. Answers you tap below are added after it.',
   bringClash: 'Found online, may not match your answers: check it. Type your own line below, or skip to leave it as it is.',
   // Your story and Known for
@@ -2419,6 +2421,7 @@ fr.indoor = {
   photosQ: 'Ajoutez des photos de votre endroit', photosLead: 'Votre espace, ce qu’on y fait, vos clients qui s’amusent. Trois photos, c’est parfait.', photosNoMore: 'Non, j’ai fini les photos',
   allYearClosed: 'Nous fermons une partie de l’année', allYearClosedSub: 'Par exemple ouvert de mai à septembre seulement. Vous choisissez les dates.',
   seaMore: 'Des heures différentes l’été ou l’hiver?', allYearLead: 'Fermé, ou des heures différentes, une partie de l’année? Dites-le ici.',
+  allYearShutHint: 'Fermé une semaine ou deux chaque année, comme pour un arrêt d’entretien? Ajoutez-le dans Fermetures et jours fériés.',
   noDogsSub: 'Pas à l’intérieur', noDogsSubInside: 'Pas à l’intérieur',
   hoursQ: 'Est-ce que ce sont toujours vos heures?', needOpenDayAppt: 'Indiquez au moins un jour d’ouverture. Pas d’heures fixes? Touchez « Nous n’avons pas d’heures fixes » plus bas.',
   noSetHours: 'Nous n’avons pas d’heures fixes (spectacles ou cours seulement)', noSetHoursNow: 'Pas d’heures fixes : spectacles ou cours seulement ✓',
@@ -2449,7 +2452,7 @@ fr.indoor = {
   tageNeed: 'Touchez l’âge minimum que vous acceptez (ou Tous les âges).',
   bringQ: 'Bon à savoir', bringLead: 'Quelque chose à savoir avant de venir? Deux ou trois courtes lignes.',
   bringEx: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Casiers offerts.',
-  bringNeed: 'Écrivez une ligne, ou touchez une des réponses ci-dessous.', bringNoLink: 'Gardez les liens hors de cette ligne. Votre lien de réservation a sa propre case dans Sans réservation ou réserver.',
+  bringNeed: 'Écrivez une ligne, ou touchez une des réponses ci-dessous.', bringNoLink: 'Gardez les liens hors de cette ligne. Votre site Web va dans Adresse, téléphone et site Web, et votre bouton Site Web y mène. Écrivez plutôt « voyez notre site Web ».',
   bringGuess: 'Nous avons trouvé ceci en ligne. Vérifiez-le. Les réponses touchées ci-dessous s’ajoutent après.',
   bringClash: 'Trouvé en ligne, peut ne pas correspondre à vos réponses : vérifiez-le. Tapez votre propre ligne ci-dessous, ou passez pour le laisser tel quel.',
   storyQ: 'Parlez de votre endroit aux visiteurs', storyLabel: 'À propos de votre endroit', storyEx: 'Un jeu d’évasion familial depuis 2016, avec six salles thématiques pour 2 à 8 joueurs.',
