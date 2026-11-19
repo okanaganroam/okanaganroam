@@ -1561,6 +1561,29 @@
   // a size chip (no t) keeps every sentence but an older size line (or a bare "Groups welcome", which the size line says
   // better: cocktail test 3); only a quick answer drops what it says itself.
   function groupsKeep(v, t, sibs){ if (!t) return sentencesOf(v).filter(function(x){ return !isSizeLine(x) && !/^(?:(?:large|big|small) )?(?:groups?|parties) (?:are )?(?:welcome|ok|okay)(?:,? call ahead)?$|^(?:great|good) for groups$|^group[- ]friendly$|^groupes? bienvenus?$/i.test(String(x).trim()); }); return sentencesOf(v).filter(function(x){ return groupsFact(x) && !(has(x, t) || saysIt(x, t, sibs)); }); }
+  // Indoor test 8 (2026-11-19; Gary): a quick answer or a size rebuilt the line from its sentences, so research's "Groups
+  // welcome; private bookings" came back as "Groups welcome. Private bookings". The sentences kept, with their own
+  // punctuation (";" stays ";"), then the new one.
+  function keepPieces(v, keep){
+    var parts = String(v || '').split(/([.;!?]+(?:\s+|$))/), out = '';
+    for (var i = 0; i < parts.length; i += 2) { var tx = parts[i] || '', sp = parts[i + 1] || ''; var k = tx.replace(/[\s.;]+$/, '').trim(); if (k && keep.indexOf(k) >= 0) out += tx + sp; }
+    return out.replace(/\s+$/, '');
+  }
+  function addPiece(base, t){ base = String(base || '').replace(/[\s]+$/, ''); if (!base) return t; return (/[.;!?:]$/.test(base) ? base : base + '.') + ' ' + t; }
+  // Indoor test 8 (Gary: research's Groups line plus his two chips went over 180, and at Save his chips were the part
+  // cut): over the limit, research's sentences go first (from the end), never the owner's taps. -> { v, rest } or null.
+  function trimResearch(v, pre, lim, keepT){
+    var t = String(v || '').trim(); if (t.length <= lim || !pre) return null;
+    var res = sentencesOf(pre).filter(function(x){ return x !== keepT; }); if (!res.length) return null;
+    var parts = t.split(/([.;!?]+(?:\s+|$))/), gone = [];
+    for (var i = parts.length - 1 - ((parts.length - 1) % 2); i >= 0 && t.length > lim; i -= 2) {
+      var k = (parts[i] || '').replace(/[\s.;]+$/, '').trim(); if (!k || res.indexOf(k) < 0) continue;
+      gone.unshift(k); parts[i] = ''; parts[i + 1] = ''; t = parts.join('').replace(/^[\s.;,]+/, '').replace(/\s{2,}/g, ' ').trim();
+    }
+    return gone.length ? { v: t, rest: gone.join('. ') } : null;
+  }
+  function trimNoteSet(boxId, rest){ S.trimNote = rest ? { box: boxId, step: S.step, text: fill(T.trimResearch || '{rest}', { rest: rest.length > 90 ? rest.slice(0, 88) + '…' : rest }) } : null; var n = el(boxId + 'Trim'); if (n) { n.textContent = S.trimNote ? S.trimNote.text : ''; n.hidden = !S.trimNote; } }
+  function trimNoteHtml(boxId){ var on = S.trimNote && S.trimNote.box === boxId && S.trimNote.step === S.step; return '<p class="su-hint su-trim" id="' + boxId + 'Trim" role="status"' + (on ? '' : ' hidden') + '>' + (on ? h(S.trimNote.text) : '') + '</p>'; }
   // Cocktail test 2 (2026-11-13): in the French setup, a line filled in from the page that is in English ("Groups
   // welcome", "Recommended for dinner") says so, like the story box: « Ce texte est en anglais… ».
   // Pub test 2 (Whistler, 2026-11-14): without "or tap a quick answer" on a screen that has none (noQuick).
@@ -2570,7 +2593,7 @@
       var bRes = !!bv && bv === ((CUR.visit_rows || {}).good_to_know || '') && (C.visitResearch || []).indexOf('good_to_know') >= 0;
       x = doneLine('bring') + q(T.bringQ, T.bringLead) + (bRes && T.bringGuess ? '<p class="su-sent su-research" id="suBringGuess">' + h(T.bringGuess) + '</p>' : '')
         + (gClash && T.bringClash ? '<p class="su-sent su-research su-clash" id="suBringClash">' + h(T.bringClash) + '</p><p class="su-example" id="suBringFound">“' + h(gRes) + '”</p>' : '') + msgs() + enLineHint(bv === ((CUR.visit_rows || {}).good_to_know || '') ? bv : '', 'suBringEn', false, 'good_to_know') + quick('good_to_know', 'suBring', bv)
-        + '<label class="su-sr" for="suBring">' + h(T.bringQ) + '</label><textarea class="su-field su-line" id="suBring" maxlength="' + (BRING_MAX + 600) + '" rows="4" aria-describedby="suBringCount">' + h(bv) + '</textarea>' + countLine('suBring', bv, BRING_MAX) + ex(indoorBringEx())
+        + '<label class="su-sr" for="suBring">' + h(T.bringQ) + '</label><textarea class="su-field su-line" id="suBring" maxlength="' + (BRING_MAX + 600) + '" rows="4" aria-describedby="suBringCount">' + h(bv) + '</textarea>' + countLine('suBring', bv, BRING_MAX) + trimNoteHtml('suBring') + ex(indoorBringEx())
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'bringSave') + '</div>' + skip('bring');
     } else if (s === 'winery') {
       // Wineries (2026-11-12): "What kind of winery?" (one of five) and "Food here?" on one screen. A restaurant on the estate
@@ -2941,7 +2964,7 @@
         // Tour test 9 (Whistler, 2026-11-18; Tanis, school programs of about 30): a last size, "21+ or whole classes", in
         // the same question (an option, not a new field).
         + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suGroupSizes">' + (TOUR ? [4].concat(GROUP_SIZES, T.groupsChipBig ? [21] : []) : GROUP_SIZES).map(function(n){ var on = sentencesOf(gl).indexOf(groupsSizeLine(n)) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip' + (n === 21 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (n === 21 && T.groupsChipBig ? h(T.groupsChipBig) : S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>'
-        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TL) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TL ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 780, area: true, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + ex(T.groupsEx)
+        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TL) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TL ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 780, area: true, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + trimNoteHtml('suGroupsLine') + ex(T.groupsEx)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180, area: true }) : '')
         // Tour test 1 (Whistler, 2026-11-16): a tour is asked for its booking link once, on Booking; here only when not given.
         + (TL && (CUR.booking_url || C.bookingKnown || String(S.bookUrl || '').trim() || S.tour.noBook) ? ''
@@ -4859,10 +4882,20 @@
       // ("Private room for 20. Groups of 10 or more: please book ahead").
       // Tour test 9 (Whistler, 2026-11-18; Tanis): "Groups of up to 20School and group programs…" went live: the size line
       // ends with ". " so what she types next starts its own sentence (as the Good to know answers do).
-      readBrew(); S.brew.groups = groupsKeep(S.brew.groups).concat([groupsSizeLine(+b.getAttribute('data-bgroup'))]).join('. ') + '. '; (S.chipFilled = S.chipFilled || {}).suGroupsLine = S.brew.groups; S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y);
+      readBrew(); S.brew.groups = addPiece(keepPieces(S.brew.groups, groupsKeep(S.brew.groups)), groupsSizeLine(+b.getAttribute('data-bgroup')) + '.') + ' ';
+      var gpre = String(((CUR.visit_rows || {}).groups) || '').trim(), gtr = gpre && (C.visitResearch || []).indexOf('groups') >= 0 ? trimResearch(S.brew.groups, gpre, 180, groupsSizeLine(+b.getAttribute('data-bgroup'))) : null;
+      if (gtr) { S.brew.groups = gtr.v + ' '; S.trimNote = { box: 'suGroupsLine', step: S.step, text: fill(T.trimResearch || '{rest}', { rest: gtr.rest.length > 90 ? gtr.rest.slice(0, 88) + '…' : gtr.rest }) }; } (S.chipFilled = S.chipFilled || {}).suGroupsLine = S.brew.groups; S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y);
       // Tour test 14 (Lucía, Pixel): her tap on the box after a size chip put the cursor mid-line, so her words went inside
       // "Groups of 6 or more: please book ahead." The box takes the focus with the cursor at the end (as the quick chips do).
       var gb = el('suGroupsLine'); if (gb) { try { gb.focus({ preventScroll: true }); var gl0 = gb.value.length; gb.setSelectionRange(gl0, gl0); } catch (e) { /* older phones */ } } }; });
+    // Indoor test 8 (Gary cleared the Groups box and 10+ stayed pressed, with nothing saved): typing in the box (or
+    // clearing it) re-lights the sizes and quick answers from what the box says.
+    var gsx = el('suGroupsLine'); if (gsx) gsx.addEventListener('input', function(){
+      var gv = gsx.value, gs = sentencesOf(gv).filter(function(x){ return isSizeLine(x) || /book|réserv/i.test(x); })[0] || '', gn = (/\b(\d{1,2})\b/.exec(gs) || [])[1];
+      Array.prototype.forEach.call(screen.querySelectorAll('[data-bgroup]'), function(c){ var n0 = +c.getAttribute('data-bgroup'); c.setAttribute('aria-pressed', sentencesOf(gv).indexOf(groupsSizeLine(n0)) >= 0 || (!!gn && +gn === n0) ? 'true' : 'false'); });
+      var qs = Array.prototype.filter.call(screen.querySelectorAll('[data-quick]'), function(c){ return c.getAttribute('data-box') === 'suGroupsLine'; }), ql = qs.map(function(c){ return c.getAttribute('data-quick'); });
+      qs.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(gv, c.getAttribute('data-quick'), ql) ? 'true' : 'false'); });
+      if (!gv.trim() && S.trimNote) trimNoteSet('suGroupsLine', ''); });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-bq]'), function(b){ b.onclick = function(){ readTimes(); var q11 = b.getAttribute('data-bq').split(':'), wk = W(), w11 = wk[q11[0]] && wk[q11[0]][+q11[1]]; if (!w11) return; w11[+q11[2]] = q11[3] + ':' + q11[4]; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     // Tours (2026-11-16): one-of-a-few answers, the kinds (up to 3), "under 18s with an adult" and "no online bookings".
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tpick]'), function(b){ b.onclick = function(){
@@ -4943,7 +4976,7 @@
       // Tour test 16 (Whistler, 2026-11-18; Tom): not a tour's Good to know. Its research line is a fact of its own ("Bring
       // binoculars."), not an answer the chip replaces (as a dogs or booking line is), so the chip is added after it and he
       // sees both in the box; it had vanished from his page without a word.
-      else if (v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0 && !(TL && qk === 'good_to_know')) v = (qk === 'groups' ? groupsKeep(v, t, sibs) : []).concat([t]).join(sep);
+      else if (v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0 && !(TL && qk === 'good_to_know')) v = qk === 'groups' && sep === '. ' ? addPiece(keepPieces(v, groupsKeep(v, t, sibs)), t) : (qk === 'groups' ? groupsKeep(v, t, sibs) : []).concat([t]).join(sep);
       else if (saysIt(v, t, sibs)) return;
       else v = v ? v.replace(/[\s.,]+$/, '') + sep + t : t;
       // Tour test 10 (Whistler, 2026-11-18; Gord): a chip's words ran into his typing ("rain or shine long pants"). As the
@@ -4951,6 +4984,8 @@
       if (sep === '. ' && v && qk !== 'takeout') v = v.replace(/[\s]+$/, '').replace(/([^.!?])$/, '$1.') + ' ';
       // Tour test 14 (Lucía): no double space inside the line (a space she typed after an earlier chip's ". ").
       v = v.replace(/([^\s])[ \u00a0]{2,}(?=\S)/g, '$1 ');
+      var lim0 = qk === 'groups' ? 180 : qk === 'good_to_know' ? BRING_MAX : 0, tr0 = lim0 && pre && (C.visitResearch || []).indexOf(qk) >= 0 ? trimResearch(v, pre, lim0, t) : null;
+      if (tr0) { v = tr0.v + (sep === '. ' && !/[.!?]$/.test(tr0.v) ? '.' : '') + ' '; trimNoteSet(box.id, tr0.rest); } else if (lim0 && S.trimNote && S.trimNote.box === box.id && v.trim().length <= lim0) trimNoteSet(box.id, '');
       box.value = v.slice(0, box.maxLength > 0 ? box.maxLength : 180); box._qPrev = box.value; countUpdate(box); mark();
       // Tour test 11 (Whistler, 2026-11-18; Min-jun dictates): a Good to know chip puts the cursor in the box, at the end.
       // Tour test 12 (Whistler, 2026-11-18; Kayla tapped a Groups chip and typed: her words went nowhere): Groups too.

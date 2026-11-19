@@ -1984,6 +1984,7 @@ Object.assign(en.tour, {
   // Tour test 13: text past the limit, kept to its last full sentence (Save again to keep it).
   countOver: '{n} / {max}: {d} over. When you save, we keep it to the last full sentence.',
   fitRest: 'That was over {max} characters, so we kept it to the last full sentence. Left out: “{rest}”. Tap Save again to keep it as it is now.',
+  trimResearch: 'To fit your answers in, we took out part of the line we found online: “{rest}”. Your own taps and words stay.',
   fitRestTour: 'That was over {max} characters, so we kept it to the last full sentence. Left out: “{rest}”. Put the rest in a tour’s description (in Your tours and prices) or under Groups. Tap Save again to keep it as it is now.',
   quickOld: { good_to_know: ['Hotel pickup available'], groups: ['Private tours available'] },
   doorRights: 'I took this photo or have permission to share it, and Okanagan Roam may show it to help visitors find your meeting spot.',
@@ -1996,6 +1997,7 @@ Object.assign(fr.tour, {
   countOf: '{n} / {max}', countFull: 'C’est la limite ({max} caractères). Raccourcissez une ligne pour en ajouter.',
   countOver: '{n} / {max} : {d} de trop. À l’enregistrement, nous gardons jusqu’à la dernière phrase complète.',
   fitRest: 'Ça dépassait {max} caractères, alors nous avons gardé jusqu’à la dernière phrase complète. Laissé de côté : « {rest} ». Touchez Enregistrer de nouveau pour le garder ainsi.',
+  trimResearch: 'Pour faire place à vos réponses, nous avons retiré une partie de la ligne trouvée en ligne : « {rest} ». Vos réponses et vos mots restent.',
   fitRestTour: 'Ça dépassait {max} caractères, alors nous avons gardé jusqu’à la dernière phrase complète. Laissé de côté : « {rest} ». Mettez le reste dans la description d’une sortie (dans Vos sorties et tarifs) ou sous Groupes. Touchez Enregistrer de nouveau pour le garder ainsi.',
   quickOld: { good_to_know: ['Cueillette à l’hôtel offerte'], groups: ['Visites privées offertes'] },
   photosQ: 'Ajoutez des photos de vos sorties', moreQ: 'Plus de détails sur votre entreprise',
@@ -2403,6 +2405,7 @@ en.indoor = {
   countOf: '{n} / {max}', countFull: 'That’s the limit ({max} characters). Shorten a line to add more.',
   countOver: '{n} / {max}: {d} over. When you save, we keep it to the last full sentence.',
   fitRest: 'That was over {max} characters, so we kept it to the last full sentence. Left out: “{rest}”. Tap Save again to keep it as it is now.',
+  trimResearch: 'To fit your answers in, we took out part of the line we found online: “{rest}”. Your own taps and words stay.',
 };
 fr.indoor = {
   hiLead: 'Préparons votre page, une question à la fois. Les 7 essentiels prennent environ 5 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
@@ -2481,6 +2484,7 @@ fr.indoor = {
   countOf: '{n} / {max}', countFull: 'C’est la limite ({max} caractères). Raccourcissez une ligne pour en ajouter.',
   countOver: '{n} / {max} : {d} de trop. À l’enregistrement, nous gardons jusqu’à la dernière phrase complète.',
   fitRest: 'Ça dépassait {max} caractères, alors nous avons gardé jusqu’à la dernière phrase complète. Laissé de côté : « {rest} ». Touchez Enregistrer de nouveau pour le garder ainsi.',
+  trimResearch: 'Pour faire place à vos réponses, nous avons retiré une partie de la ligne trouvée en ligne : « {rest} ». Vos réponses et vos mots restent.',
   moreQ: 'Plus sur votre endroit',
 };
 // Indoor test 1 (2026-11-19; Margaret, a by-donation museum): By donation keeps the adult price box, as the suggested amount.
