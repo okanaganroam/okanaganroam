@@ -67,7 +67,7 @@ function erik(o = {}) {
 
 test('1. price box: "$750/day" is a day rate for the group (Private tours, with the move button), "1450 for 3 days" a trip length; the private box takes a day rate (EN + FR)', async () => {
   const ctx = {}; vm.createContext(ctx);
-  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceTrim') + clientFn('tourPriceWhy') + clientFn('tourPriceRead') + clientFn('tourPriceNumber'), ctx);
+  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceSwiss') + clientFn('priceTrim') + clientFn('tourPriceWhy') + clientFn('tourPriceRead') + clientFn('tourPriceNumber'), ctx);
   const why = (x, priv) => vm.runInContext(`tourPriceWhy(${JSON.stringify(x)}, ${!!priv})`, ctx);
   const rd = (x, priv) => vm.runInContext(`tourPriceRead(${JSON.stringify(x)}, ${!!priv})`, ctx);
   for (const x of ['$750/day', '750 per day', '750 a day', '750 per day, up to 4 people', '750 daily', '800 per night', '750 $ par jour', '750 $ la journée']) {

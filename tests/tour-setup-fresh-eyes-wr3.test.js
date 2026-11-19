@@ -373,7 +373,8 @@ test('7. length: "Up to 1 hour" first, on the page too; research’s range start
   assert.equal(text.fr.tour.pctRaise, undefined);
   assert.equal(text.fr.pctRaise, 'Ajoutez plus de détails pour l’augmenter.');
   assert.match(text.fr.tour.tlengths['1h'], /^Jusqu’à 1\sheure$/);
-  assert.deepEqual(Object.keys(text.en.tour.tlengths), ['1h', '2-3h', 'half', 'full', 'multi']);
+  // Tour test 13: "1 to 2 hours" after it.
+  assert.deepEqual(Object.keys(text.en.tour.tlengths), ['1h', '1-2h', '2-3h', 'half', 'full', 'multi']);
   const { v, t } = karen();
   ok(await change(t, { tour_info: { kinds: ['flight', 'heli', 'other'], length: '1h', year: 'all', age: 'all' } }));
   const lines = app.tourVisitLines(app.getVenue(v.id));
@@ -409,7 +410,7 @@ test('8. every price box takes words after the number', async () => {
   // The setup's own reader, as the page runs it.
   // Tour test 5 (2026-11-17): the reader also says why it refuses ("650 per boat"), so it brings tourPriceWhy and feeHours.
   const head = /  function moneyHead\(x\)\{.*\}\n/.exec(CLIENT)[0], read = /  function tourPriceRead\(x, priv\)\{.*\}\n/.exec(CLIENT)[0];
-  const why = /  function feeHours\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function priceTrim\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function tourPriceWhy\(x, priv\)\{[\s\S]*?\n  \}\n/.exec(CLIENT)[0];
+  const why = /  function feeHours\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function priceSwiss\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function priceTrim\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function tourPriceWhy\(x, priv\)\{[\s\S]*?\n  \}\n/.exec(CLIENT)[0];
   const ctx = {}; vm.createContext(ctx); vm.runInContext(`${head}${why}${read}`, ctx);
   const rd = (x) => vm.runInContext(`tourPriceRead(${JSON.stringify(x)})`, ctx);
   for (const [typed, want] of [['$189.00 per person', 189], ['189 pp', 189], ['189 $ par personne', 189], ['189 $ par personne', 189], ['1 500 $ par personne', 1500], ['$1,500 CAD', 1500], ['CA$189 per person', 189], ['129 each', 129], ['12.50/person', 12.5], ['12,50 $', 12.5], ['3900+', 3900], ['129', 129], ['', null]]) assert.equal(rd(typed), want, typed);

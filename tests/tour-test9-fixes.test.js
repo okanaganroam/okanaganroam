@@ -225,7 +225,7 @@ test('8. setup: group size "21+ or whole classes" and ". " after a size; Type th
   assert.match(CLIENT, /concat\(\[groupsSizeLine\(\+b\.getAttribute\('data-bgroup'\)\)\]\)\.join\('\. '\) \+ '\. '/);
   // Typed tours on the setup's screen: the edit page's own editor, opened on typing.
   assert.equal(text.en.tour.menuType, 'Type them in myself'); assert.equal(text.fr.tour.menuType, 'Je les tape moi-même');
-  assert.match(CLIENT, /id="suMenuType" href="' \+ h\(location\.pathname\.replace\(\/\\\/setup\\\/\?\$\/, '\/menu'\) \+ '#type'\)/);
+  assert.match(CLIENT, /id="suMenuType" href="' \+ h\(location\.pathname\.replace\(\/\\\/setup\\\/\?\$\/, '\/menu'\) \+ '\?from=setup#type'\)/);
   assert.match(SERVER, /if \(location\.hash === '#type'\) \{ var tyb = app\.querySelector\('\[data-act="type"\]'\); if \(tyb\) tyb\.click\(\); \}/);
   // Prices: per canoe, kayak or raft gets the per-vehicle words; per class or school is a group (Private tours).
   for (const x of ['190 per canoe (up to 3 people)', '$45 per kayak', '950 per raft']) { assert.equal(app.tourPriceWhy(x), 'unit', x); assert.match(app.cleanTourPrice(x, true, false).error, /Priced per sled, boat or vehicle\?/, x); }
@@ -259,7 +259,7 @@ test('9. keyboard: a chip keeps the focus after the screen redraws; the 3-kind l
   assert.match(CLIENT, /srLive\.setAttribute\('aria-live', 'polite'\)/);
   assert.match(CLIENT, /function q\(title, lead\)\{ return '<h1 id="suQ">'/);
   assert.match(CLIENT, /role="group" aria-labelledby="suQ" id="suTourKinds"/);
-  assert.match(CLIENT, /tchips\('length', \['1h', '2-3h', 'half', 'full', 'multi'\], T\.tlengths, T\.tlengthQ, 'suLenQ'\)/);
+  assert.match(CLIENT, /tchips\('length', \['1h', '1-2h', '2-3h', 'half', 'full', 'multi'\], T\.tlengths, T\.tlengthQ, 'suLenQ'\)/);
   // Tour test 10 (2026-11-18): with 8+ and 10+.
   assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '8', '10', '12', '14', '16', '19'\], T\.tages, T\.tageQ, 'suAgeQ'\)/);
   assert.match(CLIENT, /\.su-closures-save'\); if \(csave\) csave\.addEventListener\('focusin'/);

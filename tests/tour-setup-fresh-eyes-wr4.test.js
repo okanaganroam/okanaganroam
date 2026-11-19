@@ -557,7 +557,7 @@ test('11. bug 12, the safe part: a published list with trips of different length
   assert.match(en, /Booking Book at least a day ahead\.(?! Varies)/);
   assert.match(en, /Ages All ages\. Varies by tour: see Tours & prices\./);
   assert.match(fr, /Durée De 75 minutes à 3 heures\. Varie selon la sortie : voir Sorties et tarifs\./);
-  assert.match(fr, /Réservation Réservez au moins la veille\. Varie selon la sortie : voir Sorties et tarifs\./);
+  assert.match(fr, /Réservation Réservez au moins la veille\.(?! Varie)/);
   assert.doesNotMatch(en, /Prices From \$35 a person\. Varies/);
   // Nothing stored changes, and the card's length chip is as it was.
   assert.equal(box(v.id).rows.find((x) => x.label === 'Time needed').text, 'Up to 1 hour.');

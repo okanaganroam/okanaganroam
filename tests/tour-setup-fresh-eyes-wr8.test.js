@@ -99,7 +99,7 @@ test('1. dogs: guests’ own dogs on the chips (EN + FR), no research pre-tick f
 
 test('2. per-sled and per-vehicle prices: their own nudge, never the Private tours move (EN + FR, client and server)', async () => {
   const ctx = {}; vm.createContext(ctx);
-  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceTrim') + clientFn('tourPriceWhy'), ctx);
+  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceSwiss') + clientFn('priceTrim') + clientFn('tourPriceWhy'), ctx);
   const why = (x) => vm.runInContext(`tourPriceWhy(${JSON.stringify(x)}, false)`, ctx);
   for (const x of ['$349 per sled', '349/sled', '349 per sled (2 adults or 1 adult + 2 kids)', '$349 per sled for 2 people', '200 per ATV', '99 per machine', '349 $ par traîneau (2 adultes)', '$69/bike', '69 per bike for 2 hours']) {
     assert.equal(why(x), 'unit', x); assert.equal(app.tourPriceWhy(x), 'unit', `server ${x}`);

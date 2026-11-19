@@ -166,19 +166,21 @@ test('3 + 6. a tour’s French Good to know shows on the French page; the box ho
   assert.ok(fr.includes('poids minimum de 40 kg'));
   // The English page has no English line for it (French-only answer), as before.
   assert.doesNotMatch(plain(page(v, 'en', new Date('2027-07-15T19:00:00Z'))), /Remboursement complet/);
-  // 241 characters is refused in plain words; every other line and every other type keeps 180.
-  const long = await change(t, { visit_rows: { good_to_know: 'x'.repeat(241) } });
+  // Tour test 13: a tour's Good to know holds 320 now. 321 characters is refused in plain words; every other line and
+  // every other type keeps 180.
+  const long = await change(t, { visit_rows: { good_to_know: 'x'.repeat(321) } });
   assert.equal(long.status, 400);
-  assert.match(JSON.stringify(long.body), /Good to know to 240 characters/);
+  assert.match(JSON.stringify(long.body), /Good to know to 320 characters/);
   const known = await change(t, { visit_rows: { known_for: 'y '.repeat(95).trim() } });
   assert.equal(known.status, 400);
   const lounge = mk('cocktail');
   assert.equal((await change(tokenFor(lounge.id), { visit_rows: { good_to_know: 'z '.repeat(95).trim() } })).status, 400);
   // The setup: the limit and the counter.
   const c = cfgOf((await get(`/owner/${t}/setup`)).text);
-  assert.equal(c.bringMax, 240);
+  assert.equal(c.bringMax, 320);
   assert.match(c.t.countFull, /limit/);
-  assert.match(CLIENT, /maxlength="' \+ BRING_MAX \+ '"/);
+  // Tour test 13: room past the limit, so a paste isn't cut mid-word; Save keeps it to the last full sentence.
+  assert.match(CLIENT, /maxlength="' \+ \(BRING_MAX \+ 600\) \+ '"/);
   assert.match(CLIENT, /countLine\('suBring', bv, BRING_MAX\)/);
   assert.match(CLIENT, /screen\.addEventListener\('input', function\(e\)\{ countUpdate\(e\.target\); \}\);/);
   // The two slot lists agree for every setup type.

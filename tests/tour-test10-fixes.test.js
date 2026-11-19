@@ -283,7 +283,7 @@ test('10. price per rider, child, kid, adult or person saves; per sleigh is stil
   for (const x of ['75 per rider', '$75 per rider', '25 per child', '25 per kid', '95 per adult', '95 per person', '95 pp', '75 a rider']) assert.equal(app.tourPriceWhy(x), '', x);
   assert.equal(app.tourPriceWhy('200 per sleigh'), 'unit');
   const ctx = {}; vm.createContext(ctx);
-  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceTrim') + clientFn('tourPriceWhy'), ctx);
+  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceSwiss') + clientFn('priceTrim') + clientFn('tourPriceWhy'), ctx);
   for (const x of ['75 per rider', '25 per child', '25 per kid', '95 per adult']) assert.equal(vm.runInContext(`tourPriceWhy(${JSON.stringify(x)}, false)`, ctx), '', x);
   const { t } = await gord();
   ok(await change(t, { tour_price: 75 }));

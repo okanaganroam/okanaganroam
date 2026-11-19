@@ -75,7 +75,7 @@ function sky() {
 
 test('1. per-unit prices: "69 par vélo", "$69/bike", "$40 per hour" are never a price per person; the nudge points to Your tours and prices (EN + FR)', async () => {
   const ctx = {}; vm.createContext(ctx);
-  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceTrim') + clientFn('tourPriceWhy') + clientFn('tourPriceRead') + clientFn('tourPriceNumber'), ctx);
+  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceSwiss') + clientFn('priceTrim') + clientFn('tourPriceWhy') + clientFn('tourPriceRead') + clientFn('tourPriceNumber'), ctx);
   const why = (x, priv) => vm.runInContext(`tourPriceWhy(${JSON.stringify(x)}, ${!!priv})`, ctx);
   const rd = (x, priv) => vm.runInContext(`tourPriceRead(${JSON.stringify(x)}, ${!!priv})`, ctx);
   // Tour test 7 (2026-11-17): a bare hourly or day rate is its own case now ('hourly' / 'day'), still never a price per person.
@@ -87,7 +87,8 @@ test('1. per-unit prices: "69 par vélo", "$69/bike", "$40 per hour" are never a
   for (const x of ['650 per boat', '$650 per group', '1100 for the whole raft', '650 per charter']) { assert.equal(why(x), 'group', x); assert.equal(app.tourPriceWhy(x), 'group', x); }
   for (const [x, want] of [['69', 69], ['$159 pp', 159], ['159 $ par personne', 159], ['95 per seat', 95], ['from 79', 79], ['à partir de 79 $', 79]]) { assert.equal(rd(x), want, x); }
   // Tour test 10 (2026-11-18; Dayton): per rider, child, kid or adult is per person now ("75 per rider" couldn't be saved).
-  for (const x of ['95 per tour']) assert.equal(why(x), 'many', x);
+  // Tour test 13 (Dayton): per flight / ride / trip / tour is per person now.
+  for (const x of ['95 per tour']) assert.equal(why(x), '', x);
   for (const x of ['95 per child', '75 per rider']) assert.equal(why(x), '', x);
   // The private box: "1500$ et plus", "from 1500", "1 500 $ et plus" read as the number (they were refused).
   for (const [x, want] of [['1500$ et plus', 1500], ['from 1500', 1500], ['1 500 $ et plus', 1500], ['$1,500+', 1500], ['1500 and up', 1500], ['à partir de 1500', 1500]]) { assert.equal(rd(x, true), want, x); assert.deepEqual(app.cleanTourPrice(x), { value: want }, `server ${x}`); }
@@ -273,7 +274,7 @@ test('9. French-only lines: the finish screen and the edit pages name them (« C
 
 test('10. minor: Groups counter, French unit words and lengths on the list, private lines not counted, private "1500 $ et plus", shoulder hours grouped, land meeting-spot words', async () => {
   // Groups line: a counter like Good to know (180).
-  assert.match(CLIENT, /field\('suGroupsLine', T\.groupsLineLabel, gl, \{ max: 180, data: 'aria-describedby="suGroupsLineCount"' \}\) \+ countLine\('suGroupsLine', gl, 180\)/);
+  assert.match(CLIENT, /field\('suGroupsLine', T\.groupsLineLabel, gl, \{ max: 780, data: 'aria-describedby="suGroupsLineCount"' \}\) \+ countLine\('suGroupsLine', gl, 180\)/);
   // French price list words and lengths (known words only).
   const sp = (x) => String(x).replace(/[\u00a0\u202f]/g, ' ');
   assert.equal(sp(app.menuPriceLabel('69 per bike', 'fr')), '69 $ par vélo');
