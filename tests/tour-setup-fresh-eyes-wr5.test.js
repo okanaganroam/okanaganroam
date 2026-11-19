@@ -87,24 +87,28 @@ function rob() {
 test('1. price box: "650 per boat" and other worded prices are never trimmed; per boat points to Private tours; "2 hrs $95pp" is refused; per person is fine (EN + FR)', async () => {
   // The setup's own reader, as the page runs it.
   const ctx = {}; vm.createContext(ctx);
-  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceTrim') + clientFn('tourPriceWhy') + clientFn('tourPriceRead') + clientFn('tourPriceNumber'), ctx);
+  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceSwiss') + clientFn('priceTrim') + clientFn('tourPriceWhy') + clientFn('tourPriceRead') + clientFn('tourPriceNumber'), ctx);
   const why = (x, priv) => vm.runInContext(`tourPriceWhy(${JSON.stringify(x)}, ${!!priv})`, ctx);
   const rd = (x, priv) => vm.runInContext(`tourPriceRead(${JSON.stringify(x)}, ${!!priv})`, ctx);
   for (const x of ['650 per boat', '650/boat', '$650 for 4 ppl', '650 per charter', '650 for the whole boat', '$650 per group', '1100 for up to 6']) { assert.equal(why(x), 'group', x); assert.ok(Number.isNaN(rd(x)), x); }
   for (const x of ['2 hrs $95pp', '2 hr 95', '4-8 hrs', '90 min $45']) { assert.equal(why(x), 'hours', x); assert.ok(Number.isNaN(rd(x)), x); }
-  for (const x of ['650 or 1100', '650 + 75 extra', '95 adults']) { assert.equal(why(x), 'many', x); assert.ok(Number.isNaN(rd(x)), x); }
+  for (const x of ['650 or 1100', '650 + 75 extra']) { assert.equal(why(x), 'many', x); assert.ok(Number.isNaN(rd(x)), x); }
+  // Tour test 13: one price and words we can't read is 'words' (its own message), no longer "One price here".
+  assert.equal(why('95 adults'), 'words'); assert.ok(Number.isNaN(rd('95 adults')));
   for (const [x, want] of [['$162 pp', 162], ['162 per person', 162], ['162 pp', 162], ['$189.00 per person', 189], ['189 $ par personne', 189], ['129 each', 129], ['95 a person', 95], ['95 per person + tax', 95], ['12.50/person', 12.5], ['$1,500', 1500], ['1 500 $', 1500]]) assert.equal(rd(x), want, x);
   // The private box takes per-boat words (that is what it is for), never a trip length.
   for (const [x, want] of [['650 per boat', 650], ['$1,100 for the whole boat', 1100], ['650 for 4 people', 650]]) assert.equal(rd(x, true), want, x);
   assert.ok(Number.isNaN(rd('2 hrs 650', true)));
   assert.equal(vm.runInContext('tourPriceNumber("650 per boat")', ctx), 650);
   // The nudges and the lead (EN + FR); the move button; the hint says where a boat price goes.
-  assert.equal(text.en.tour.tpriceGroup, 'Priced per boat or per group? Put it in Private tours below.');
-  assert.match(text.fr.tour.tpriceGroup, /par bateau ou par groupe\s?\? Mettez-le dans Sorties privées/);
+  assert.equal(text.en.tour.tpriceGroup, 'Priced per boat, per group or per lesson? Put it in Private tours below.'); // tour test 14: per lesson too
+  assert.match(text.fr.tour.tpriceGroup, /par bateau, par groupe ou par cours\s?\? Mettez-le dans Sorties privées/);
   assert.equal(text.en.tour.tpriceLeadPick, 'Your card will say “From {x} a person”.');
   assert.equal(text.fr.tour.tpriceLeadPick, 'Votre fiche indiquera « À partir de {x} par personne ».');
   assert.match(text.en.tour.tpriceHours, /starts with a trip length/); assert.match(text.en.tour.tpriceOne, /One price here/);
-  assert.match(text.en.tour.tpriceMore, /Priced per boat\? Use Private tours below\./);
+  // Tour test 16 (2026-11-18): the line under the box is one short line now ("The adult price…"); per boat, per group and
+  // per lesson are in Help, and the nudge after Save (above) still says Private tours.
+  assert.match(text.en.tour.tpriceMore, /^The adult price\./);
   assert.match(CLIENT, /if \(k === 'tpriceToPriv'\)/);
   assert.match(CLIENT, /S\.nudge = pwhy === 'group' && T\.tpriceGroup \? T\.tpriceGroup : /);
   // The server reads the same way (the edit page sends text): per-person refused with the reason, private takes per boat.
@@ -179,12 +183,13 @@ test('6. kinds: whales on the wildlife chip, "More kinds" stays open, the catego
   assert.match(CLIENT, /id="suKindsMore"' \+ \(S\.tourMoreOpen \|\| tRest\.some/);
   assert.match(CLIENT, /kmo\.addEventListener\('toggle', function\(\)\{ S\.tourMoreOpen = kmo\.open; \}\)/);
   const kt = app.tourKindsText;
-  // Tap order no longer matters.
-  assert.equal(kt(['wildlife', 'fishing', 'boat'], false, 'Fishing charters & whale watching'), kt(['boat', 'fishing', 'wildlife'], false, 'Fishing charters & whale watching'));
+  // Tour test 17 (2026-11-18): the owner's own chip order, once each (an untick and retick moves a kind to the end).
+  assert.equal(kt(['wildlife', 'fishing', 'boat', 'fishing'], false, 'Fishing charters & whale watching'), kt(['wildlife', 'fishing', 'boat'], false, 'Fishing charters & whale watching'));
   const words = kt(['wildlife', 'fishing', 'boat'], false, 'Fishing charters & whale watching');
   assert.match(words, /Fishing charters/); assert.match(words, /[Ww]hale watching/); assert.doesNotMatch(words, /Fishing charters.*· Fishing$/);
   assert.equal(kt(['wildlife'], false, 'Whale watching'), 'Whale watching');
-  assert.equal(kt(['wildlife'], false, ''), 'Wildlife and bear viewing');
+  assert.equal(kt(['wildlife'], false, ''), 'Wildlife viewing'); //tour test 17: bears only when the listing's words say bears
+  assert.equal(kt(['wildlife'], false, 'Bear viewing tours'), 'Wildlife and bear viewing');
   // A ticked kind puts the tour under its filter (Lake & Boats for fishing), its name saying nothing about boats.
   const v = mk('tour', { name: 'Penticton Anglers Wr5', cuisine: 'Guided trips', description: 'Guided trips with a local guide.' });
   assert.equal(app.tourInActivity(app.getVenue(v.id), 'lake'), false);
@@ -245,12 +250,12 @@ test('10. the card never pairs one trip’s price with another’s length: a lis
   assert.equal(app.tourLengthRange([120, 120]), null);
   assert.equal(app.tourLengthRange([90]), null);
   const src = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
-  assert.match(src, /if \(tourFacts && tourFacts\.time && venue\.type === 'tour'\) \{ const lv = tourListInfo\(venue\.id\); if \(lv\.length\) tourFacts\.time = tourLengthRange\(lv\.mins\); \}/);
+  assert.match(src, /if \(tourFacts && tourFacts\.time && venue\.type === 'tour'\) \{ const lv = tourListInfo\(venue\.id\); if \(lv\.length\) tourFacts\.time = tourLengthRange\(lv\.mins, lv\.hiMins\); \}/);
   // From whistlerroam #186: the list item's own "How long" box is read first.
   assert.match(src, /const t = `\$\{it\.duration \|\| ''\} \$\{it\.name \|\| ''\} \$\{it\.description \|\| ''\}`\.toLowerCase\(\);/);
   // The planner's slot for a tour is its own trip length.
   const tp = fs.readFileSync(path.join(ROOT, 'trip-planner.js'), 'utf8');
-  assert.match(tp, /const TOUR_LENGTH_MINUTES = \{ '1h': 60, '2-3h': 150, half: 240, full: 480, multi: 480 \};/);
+  assert.match(tp, /const TOUR_LENGTH_MINUTES = \{ '1h': 60, '1-2h': 90, '2-3h': 150, half: 240, full: 480, multi: 480 \};/);
 });
 
 test('11 + Minor + wording: header at 360, "add it", "On some trips: …", Groups for by-booking, the tour count, the counter, the edit page hours, the dock example', async () => {

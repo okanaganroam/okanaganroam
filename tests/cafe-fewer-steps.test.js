@@ -110,9 +110,10 @@ test('holidays and closures inside Hours: saved through the hours flow, recorded
   assert.equal(cfg.t.labels.hours, 'Hours and holidays');
   assert.equal(cfg.progress.done.closures, 'live', 'the stored closures answer is still sent to the page');
   const js = app.OWNER_SETUP_SCRIPT || fs.readFileSync(path.join(__dirname, '..', 'owner-setup-client.js'), 'utf8');
-  assert.match(js, /COMBO \? 'closures' : null/, 'a café\'s hours save goes straight on to its closures');
+  assert.match(js, /CLO_SUB \? 'closures' : null/, 'a café\'s hours save goes straight on to its closures'); // tour simplify: CLO_SUB is COMBO without the tours
   // Wineries (2026-11-12) share the rule: COMBO is cafés and wineries.
-  assert.match(js, /if \(COMBO && step === 'hours'\) return go\('closures'\)/);
+  assert.match(js, /if \(CLO_SUB && step === 'hours'\) return go\('closures'\)/);
+  assert.match(js, /var CLO_SUB = COMBO && !C\.closuresTile;/);
   assert.match(js, /var COMBO = !!\(C\.combo \|\| C\.cafe\);/);
 });
 

@@ -67,7 +67,7 @@ function erik(o = {}) {
 
 test('1. price box: "$750/day" is a day rate for the group (Private tours, with the move button), "1450 for 3 days" a trip length; the private box takes a day rate (EN + FR)', async () => {
   const ctx = {}; vm.createContext(ctx);
-  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceTrim') + clientFn('tourPriceWhy') + clientFn('tourPriceRead') + clientFn('tourPriceNumber'), ctx);
+  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceSwiss') + clientFn('priceTrim') + clientFn('tourPriceWhy') + clientFn('tourPriceRead') + clientFn('tourPriceNumber'), ctx);
   const why = (x, priv) => vm.runInContext(`tourPriceWhy(${JSON.stringify(x)}, ${!!priv})`, ctx);
   const rd = (x, priv) => vm.runInContext(`tourPriceRead(${JSON.stringify(x)}, ${!!priv})`, ctx);
   for (const x of ['$750/day', '750 per day', '750 a day', '750 per day, up to 4 people', '750 daily', '800 per night', '750 $ par jour', '750 $ la journée']) {
@@ -87,10 +87,10 @@ test('1. price box: "$750/day" is a day rate for the group (Private tours, with 
   assert.equal(text.en.tour.tpriceDay, 'A day rate for your group? Put it in Private tours below, and your lowest price for one person here.');
   assert.equal(text.en.tour.tpriceLength, 'That’s a trip length. Type just the price for one person, like 1450, and list each trip in Your tours and prices.');
   assert.match(text.fr.tour.tpriceDay, /^Un tarif à la journée pour votre groupe\s?\?/); assert.match(text.fr.tour.tpriceLength, /^Ça, c’est une durée\./);
-  assert.match(text.en.tour.tprivLead, /a day rate is fine here/); assert.match(text.fr.tour.tprivLead, /un tarif à la journée convient ici/);
+  assert.match(text.en.tour.tprivLead, /a day rate/); assert.match(text.fr.tour.tprivLead, /un tarif à la journée/); // tour test 16: shorter
   assert.equal(text.en.tour.tprivNeed, 'Just the number, like 750. Say “a day, up to 4” in Your tours and prices.');
   assert.match(CLIENT, /pwhy === 'day' && T\.tpriceDay \? T\.tpriceDay : pwhy === 'length' && T\.tpriceLength \? T\.tpriceLength/);
-  assert.match(CLIENT, /S\.groupMove = pwhy === 'group' \|\| pwhy === 'day' \? tourPriceNumber/);
+  assert.match(CLIENT, /S\.groupMove = pwhy === 'group' \|\| pwhy === 'day' \|\| pwhy === 'lesson' \? tourPriceNumber/); // tour test 14: per lesson too
   assert.match(CLIENT, /S\.nudge === T\.tpriceGroup \|\| S\.nudge === T\.tpriceDay\) && S\.groupMove != null/);
   // Server: "$750/day" in the per-person box is refused with the day-rate reason; nothing saved. In the private box it saves 750.
   const { v, t } = erik();
@@ -111,7 +111,8 @@ test('2. category words: a pre-picked kind he unticks takes its research words o
   assert.doesNotMatch(app.tourKindsText(['snowshoe', 'other'], false, was), /heli/i);
   assert.doesNotMatch(app.tourKindsText(['snowshoe', 'other'], true, was), /h[ée]li/i);
   // A word no chip would have pre-picked stays ("photography").
-  assert.equal(app.tourKindsText(['snowshoe'], false, 'Ski touring & photography'), 'Ski touring & photography');
+  // Tour test 11 (2026-11-18): picking any kind replaces research's words; a leftover no picked kind covers goes.
+  assert.equal(app.tourKindsText(['snowshoe'], false, 'Ski touring & photography'), 'Ski touring');
   // Saved through the setup: the listing's category and the French card both lose heli-skiing.
   const { v, t } = erik();
   const r = ok(await change(t, { tour_info: { kinds: ['snowshoe', 'guide'] } }));
@@ -166,7 +167,7 @@ test('5. card length: a list of 1- to 5-day trips is "1–5 days" (« 1 à 5 jou
   assert.match(plain(card), /1–5 days/); assert.doesNotMatch(plain(card), /8 hr/);
   assert.match(plain(cardOf((await get('/fr/penticton/tours')).text, v.name)), /1 à 5 jours/);
   const p = plain(page(v));
-  assert.match(p, /A full day \(about 8 hours\)\. Varies by tour: see Tours & prices\./);
+  assert.match(p, /Time needed 1 day to 5 days\. Varies by tour: see Tours & prices\./); // tour test 11: the range
   // The list's prices with "$" and the thousands comma (display only).
   assert.match(p, /\$750 per day, up to 4 people/); assert.match(p, /\$1,450/); assert.match(p, /\$2,600/);
   assert.match(plain(page(v, 'fr')), /750 \$ par jour, jusqu’à 4 personnes/); assert.match(plain(page(v, 'fr')), /1 450 \$/);

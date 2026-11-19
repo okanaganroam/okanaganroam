@@ -103,7 +103,7 @@ test('A. "Your tours and prices": the menu step leads Part 2, every word says to
   for (const k of MENU_KEYS) assert.doesNotMatch(String(f.t[k]), /\bmenus?\b/i, `fr ${k}: ${f.t[k]}`);
   // The price step points to it; a ticket on its tile, never the plate or the mug.
   assert.match(c.t.tpriceMore, /Your tours and prices/);
-  assert.match(CLIENT, /if \(TOUR\) \{ P2_ICONS\.bring = '🎒'; P2_ICONS\.door = '📍'; P2_ICONS\.menu = '🎟️'; \}/);
+  assert.match(CLIENT, /if \(TOUR\) \{ P2_ICONS\.bring = '🎒'; P2_ICONS\.door = '📍'; P2_ICONS\.menu = '🎟️'; P2_ICONS\.closures = '🗓️'; \}/); // tour simplify: the Closures and holidays tile
   // Other types keep their menu words.
   const r = mk('restaurant');
   assert.equal(cfgOf((await get(`/owner/${tokenFor(r.id)}/setup`)).text).t.labels.menu, 'Menu');
@@ -150,8 +150,8 @@ test('A. the edit page, the venue page and the list page say "Tours & prices" / 
 
 test('B1. saving the kinds keeps her own words (ATV), the chip names ATV, ATV pre-picks, and a summer season drops "Winter"', async () => {
   const { v, t } = await jess();
-  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[0], 'ATV, bungee, climbing, ropes courses or canyoning'); // tour test 6 adds ropes courses
-  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[1], 'VTT, saut à l’élastique, escalade, hébertisme ou canyonisme');
+  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[0], 'Ropes, treetop, bungee, ATV, climbing or canyoning'); // tour test 6 adds ropes courses
+  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[1], 'Hébertisme, parcours dans les arbres, saut à l’élastique, VTT, escalade ou canyonisme');
   // Pre-picks: snowmobile and the ATV chip.
   const c = cfgOf((await get(`/owner/${t}/setup`)).text);
   assert.deepEqual(c.suggestKinds, ['snowmobile', 'adventure']);
@@ -169,9 +169,9 @@ test('B1. saving the kinds keeps her own words (ATV), the chip names ATV, ATV pr
   assert.equal(app.getVenue(v.id).cuisine, 'Snowmobile & ATV tours');
   ok(await change(t, { tour_info: { kinds: ['snowmobile', 'adventure', 'other'] } }));
   // Tour test 7: the chips pre-picked from these words (snowmobile, ziplines, snowshoe) that are left unticked take their
-  // words off; words no pre-picked chip covered (RZR, rafting) stay.
-  assert.equal(app.tourKindsText(['snowmobile'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, RZR & rafting');
-  assert.equal(app.tourKindsText(['snowmobile', 'zipline'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours, ziplines, RZR & rafting');
+  // words off. Tour test 11 (2026-11-18): picking any kind replaces research's words; a leftover no picked kind covers goes.
+  assert.equal(app.tourKindsText(['snowmobile'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours');
+  assert.equal(app.tourKindsText(['snowmobile', 'zipline'], false, 'Ziplines, RZR, rafting, snowmobile & snowshoe tours'), 'Snowmobile tours & ziplines');
   assert.equal(app.tourKindsText(['adventure'], false, 'Bungee jumping'), 'Bungee jumping');
   assert.equal(app.tourKindsText(['adventure'], false, ''), 'Adventure'); // tour test 6: the short word, never the chip's whole label
   // The card's season word: "Winter" only while she runs in winter alone.
@@ -230,7 +230,7 @@ test('B4: Good to know from research says so, and is marked as research (a tap r
 
 test('B5: a rejected price keeps what was typed (every price box)', () => {
   assert.match(CLIENT, /var PRICE_BOXES = \['suTprice', 'suTpriv', 'suCfee', 'suFee'\];/);
-  for (const id of ['suTprice', 'suTpriv', 'suCfee']) assert.match(CLIENT, new RegExp(`field\\('${id}', T\\.\\w+, boxVal\\('${id}'`));
+  for (const id of ['suTprice', 'suTpriv', 'suCfee']) assert.match(CLIENT, new RegExp(`field\\('${id}', [^,]*?T\\.\\w+, boxVal\\('${id}'`)); // tour test 14: the private box's label can be "Private lessons"
   assert.equal((CLIENT.match(/field\('suFee', T\.feeLabel, boxVal\('suFee'/g) || []).length, 2);
   assert.doesNotMatch(CLIENT, /isNaN\(tp\.price\) \? '' : String\(tp\.price\)/);
 });
@@ -238,8 +238,8 @@ test('B5: a rejected price keeps what was typed (every price box)', () => {
 test('B6: the edit page and the meeting spot read like a tour; a restaurant keeps its words', async () => {
   const { t } = await jess();
   const e = (await get(`/owner/${t}`)).text;
-  assert.match(e, /Help people find your meeting spot/);
-  assert.match(e, /A photo taken where people meet you/);
+  // Tour test 15 (Dayton, 2026-11-18): no meeting-spot tile for tours.
+  assert.doesNotMatch(e, /Help people find your meeting spot/);
   assert.match(e, /Special trips, classes and more/);
   assert.match(e, /Dogs, parking, access, price range…/);
   assert.match(e, /your trips, your guides and your guests/);
@@ -248,7 +248,7 @@ test('B6: the edit page and the meeting spot read like a tour; a restaurant keep
   assert.doesNotMatch(e, /Stand on the sidewalk or street/);
   assert.doesNotMatch(e, /your space, food, drinks/);
   const ef = (await get(`/fr/owner/${t}`)).text;
-  assert.match(ef, /Aidez les gens à trouver votre point de rencontre/);
+  assert.doesNotMatch(ef, /Aidez les gens à trouver votre point de rencontre/);
   assert.match(ef, /Sorties spéciales, ateliers et plus/);
   const r = mk('restaurant');
   const re = (await get(`/owner/${tokenFor(r.id)}`)).text;

@@ -298,7 +298,9 @@ test('Review 7: saving the holidays reads the saved open season only, never an u
   assert.equal(off('2026-12-25', true), false);
   const off2 = new Function('S', 'CUR', 'openSeaOf', src + '; return offSeason;')({ openSea: null }, { open_months: '04-15:10-15' }, openSeaOf);
   assert.equal(off2('2026-12-25', true), true);
-  const save = /if \(k === 'closuresNone' \|\| k === 'closuresSave'\) \{[\s\S]*?\.concat\(S\.extra\);/.exec(CLIENT)[0];
+  // Tour test 17 (2026-11-18): the list the Closures screen sends is closuresOut() (the months screen saves a yearly break with it).
+  assert.match(CLIENT, /if \(k === 'closuresNone' \|\| k === 'closuresSave'\) \{\s*var out = k === 'closuresNone' \? S\.extra\.slice\(\) : closuresOut\(\);/);
+  const save = /function closuresOut\(\)\{[\s\S]*?\.concat\(S\.extra\);/.exec(CLIENT)[0];
   assert.doesNotMatch(save, /holCovered\(o\)|offSeason\(o\.next\)/);
   assert.equal((save.match(/holCovered\(o, true\)/g) || []).length, 2);
   assert.match(save, /offSeason\(o\.next, true\)/);

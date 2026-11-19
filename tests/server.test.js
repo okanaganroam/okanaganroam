@@ -23588,7 +23588,8 @@ test('Tours & prices (2026-10-17): tour operators use the uploader for their pri
     assert.deepEqual(kinds, ['tours'], 'the reader is told it is a price list');
     const pub = await post(`${mb}/publish`, { data: s.menu.data });
     assert.equal(pub.body.live, false);
-    assert.match(sent.at(-1)._subject, /\[PENDING REVIEW\] Tours & prices from Prices Fixture Tours \(3 tours\)/);
+    // Tour test 14 port (2026-11-18): the email counts tours as the page does; a private charter line isn't a trip (tour test 6).
+    assert.match(sent.at(-1)._subject, /\[PENDING REVIEW\] Tours & prices from Prices Fixture Tours \(2 tours\)/);
     const cookie = (await post('/admin/review/login', { token: LYV_TOKEN })).setCookie.split(';')[0];
     assert.match(await get('/admin/review', cookie).then((r) => r.text()), /Tours &amp; prices #\d+|Tours & prices #\d+/);
     assert.equal((await post(`/admin/review/menu/${s.menu.id}/publish`, { data: s.menu.data }, cookie)).body.live, true);

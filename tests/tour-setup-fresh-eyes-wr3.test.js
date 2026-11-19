@@ -190,7 +190,7 @@ test('2b. from whistlerroam #183: a wildlife tour request is not also a category
   assert.match(fs.readFileSync(path.join(ROOT, 'trip-planner.js'), 'utf8'), /const WILDLIFE_TOUR_WORDS_RE = /);
   // A heli-ski company's "summer heli-biking" with Bike tours picked keeps the kind's words ("bike tour" still finds it).
   assert.equal(app.tourKindsText(['heli', 'bike'], false, 'Heli-skiing & summer heli-biking'), 'Heli-skiing · Bike and e-bike tours');
-  assert.equal(app.tourKindsText(['raft', 'wildlife'], false, 'Whitewater rafting & bear viewing tours'), 'Wildlife and bear viewing · Whitewater rafting') // list order (tour test 5);
+  assert.equal(app.tourKindsText(['raft', 'wildlife'], false, 'Whitewater rafting & bear viewing tours'), 'Whitewater rafting · Wildlife and bear viewing'); // tour test 17: the owner's own chip order
 });
 
 test('3. cards: on a tour card with Complete & Verified the price and length sit whole on the line under the badge (tour cards only)', async () => {
@@ -248,7 +248,8 @@ test('4. Help: the winter-only trip, office hours, change it later, can my boss 
   assert.match(SERVER, /async function notifyReviewDecision\(kind, id, action/);
   assert.match(SERVER, /function ownerDecisionRecipients\(venueId, senderEmail\)/);
   assert.match(SERVER, /function notifyOwnersOfNewLogin\(venue, newAccount\)/);
-  assert.match(hb.topic('tour-meeting').a, /drag the pin to your meeting spot/);
+  // Tour test 15 (Dayton): no meeting-spot step for tours; guests get the spot when they book.
+  assert.match(hb.topic('tour-meeting').a, /Guests get the exact meeting spot when they book/);
   assert.equal(hb.best('our office is not the meeting point').id, 'tour-meeting');
   assert.equal(hb.best('We do ATV tours, which one do I pick?').id, 'tour-kinds-other');
   assert.match(hb.topic('tour-lead-time').a, /pick the <strong>longest<\/strong> notice/);
@@ -313,8 +314,8 @@ test('5. "by booking only" keeps the weekly hours for "Add my hours" (every type
 test('6. public category words: short page words per kind, never a side of a chip her words don’t say; the same set on the preview, the cards and both pages', async () => {
   const kt = app.tourKindsText;
   // Karen: research "Helicopter tours, heli-skiing & heli-hiking", Scenic or helicopter flights + Heli-skiing + Something else.
-  assert.equal(kt(['flight', 'heli', 'other'], false, 'Helicopter tours, heli-skiing & heli-hiking'), 'Heli-skiing, helicopter flights & heli-hiking'); // list order (tour test 5)
-  assert.equal(kt(['flight', 'heli', 'other'], true, 'Helicopter tours, heli-skiing & heli-hiking'), 'Héliski, vols en hélicoptère et héli-randonnée'); // list order (tour test 5); tour test 6: leftovers in French
+  assert.equal(kt(['flight', 'heli', 'other'], false, 'Helicopter tours, heli-skiing & heli-hiking'), 'Helicopter flights & heli-skiing'); // list order (tour test 5); // Tour test 11 (2026-11-18): picking any kind replaces research's words; a leftover no picked kind covers goes. // tour test 17: the owner's own chip order
+  assert.equal(kt(['flight', 'heli', 'other'], true, 'Helicopter tours, heli-skiing & heli-hiking'), 'Vols en hélicoptère et héliski'); // list order (tour test 5); tour test 11: research's leftover words go once a kind is picked // tour test 17: the owner's own chip order
   // A chip that covers several things: only the side her words name; all of it when they name none or every side.
   assert.equal(kt(['flight'], false, ''), 'Helicopter & scenic flights');
   assert.equal(kt(['flight'], true, ''), 'Vols en hélicoptère et panoramiques');
@@ -340,7 +341,7 @@ test('6. public category words: short page words per kind, never a side of a chi
   // The whole way through: saved kinds -> the listing's words, the save's answer, the setup's preview, the cards, the pages.
   const { v, t } = karen();
   const saved = ok(await change(t, { tour_info: { kinds: ['flight', 'heli', 'other'], length: '1h', year: 'all', age: 'all' } }));
-  const EN = 'Heli-skiing, helicopter flights & heli-hiking', FR = 'Héliski, vols en hélicoptère et héli-randonnée'; // tour test 6: leftovers said in French; // tour test 5: list order; // tour test 4: one capital in the list
+  const EN = 'Helicopter flights & heli-skiing', FR = 'Vols en hélicoptère et héliski'; // tour test 17: the owner's own chip order; // Tour test 11 (2026-11-18): picking any kind replaces research's words; a leftover no picked kind covers goes. // tour test 6: leftovers said in French; // tour test 5: list order; // tour test 4: one capital in the list
   assert.equal(app.getVenue(v.id).cuisine, EN);
   if (saved.body.tour_words) assert.deepEqual(saved.body.tour_words, { en: EN, fr: FR });
   const again = ok(await change(t, { tour_info: { kinds: ['flight', 'heli', 'other'], length: '1h', year: 'all', age: 'all', book: '48h' } }));
@@ -373,7 +374,8 @@ test('7. length: "Up to 1 hour" first, on the page too; research’s range start
   assert.equal(text.fr.tour.pctRaise, undefined);
   assert.equal(text.fr.pctRaise, 'Ajoutez plus de détails pour l’augmenter.');
   assert.match(text.fr.tour.tlengths['1h'], /^Jusqu’à 1\sheure$/);
-  assert.deepEqual(Object.keys(text.en.tour.tlengths), ['1h', '2-3h', 'half', 'full', 'multi']);
+  // Tour test 13: "1 to 2 hours" after it.
+  assert.deepEqual(Object.keys(text.en.tour.tlengths), ['1h', '1-2h', '2-3h', 'half', 'full', 'multi']);
   const { v, t } = karen();
   ok(await change(t, { tour_info: { kinds: ['flight', 'heli', 'other'], length: '1h', year: 'all', age: 'all' } }));
   const lines = app.tourVisitLines(app.getVenue(v.id));
@@ -409,7 +411,7 @@ test('8. every price box takes words after the number', async () => {
   // The setup's own reader, as the page runs it.
   // Tour test 5 (2026-11-17): the reader also says why it refuses ("650 per boat"), so it brings tourPriceWhy and feeHours.
   const head = /  function moneyHead\(x\)\{.*\}\n/.exec(CLIENT)[0], read = /  function tourPriceRead\(x, priv\)\{.*\}\n/.exec(CLIENT)[0];
-  const why = /  function feeHours\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function priceTrim\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function tourPriceWhy\(x, priv\)\{[\s\S]*?\n  \}\n/.exec(CLIENT)[0];
+  const why = /  function feeHours\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function priceSwiss\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function priceTrim\(x\)\{.*\}\n/.exec(CLIENT)[0] + /  function tourPriceWhy\(x, priv\)\{[\s\S]*?\n  \}\n/.exec(CLIENT)[0];
   const ctx = {}; vm.createContext(ctx); vm.runInContext(`${head}${why}${read}`, ctx);
   const rd = (x) => vm.runInContext(`tourPriceRead(${JSON.stringify(x)})`, ctx);
   for (const [typed, want] of [['$189.00 per person', 189], ['189 pp', 189], ['189 $ par personne', 189], ['189 $ par personne', 189], ['1 500 $ par personne', 1500], ['$1,500 CAD', 1500], ['CA$189 per person', 189], ['129 each', 129], ['12.50/person', 12.5], ['12,50 $', 12.5], ['3900+', 3900], ['129', 129], ['', null]]) assert.equal(rd(typed), want, typed);
@@ -451,8 +453,9 @@ test('9. the price note says "per person" with the limit from the config; a held
   const priv = ok(await change(t, { tour_info: { private: 3900 } }));
   assert.deepEqual(priv.body.live, ['tour_info']);
   assert.match(plain(page(v, 'en')), /From \$189 a person\. Private tours from \$3,900\./);
-  assert.match(text.en.tour.tprivLead, /It shows on your page right away/);
-  assert.match(text.fr.tour.tprivLead, /Il s’affiche sur votre page tout de suite/);
+  // Tour test 16 (2026-11-18): the price screen's small print is one short line; "shows right away" is in Help.
+  assert.match(text.en.tour.tprivLead, /^One price for the whole group/);
+  assert.match(text.fr.tour.tprivLead, /^Un seul prix pour tout le groupe/);
 });
 
 test('10. the venue page’s short "Tours & prices" list keeps its section names; a restaurant’s short menu is unchanged', async () => {

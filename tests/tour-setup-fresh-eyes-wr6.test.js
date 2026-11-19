@@ -75,7 +75,7 @@ function sky() {
 
 test('1. per-unit prices: "69 par vélo", "$69/bike", "$40 per hour" are never a price per person; the nudge points to Your tours and prices (EN + FR)', async () => {
   const ctx = {}; vm.createContext(ctx);
-  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceTrim') + clientFn('tourPriceWhy') + clientFn('tourPriceRead') + clientFn('tourPriceNumber'), ctx);
+  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceSwiss') + clientFn('priceTrim') + clientFn('tourPriceWhy') + clientFn('tourPriceRead') + clientFn('tourPriceNumber'), ctx);
   const why = (x, priv) => vm.runInContext(`tourPriceWhy(${JSON.stringify(x)}, ${!!priv})`, ctx);
   const rd = (x, priv) => vm.runInContext(`tourPriceRead(${JSON.stringify(x)}, ${!!priv})`, ctx);
   // Tour test 7 (2026-11-17): a bare hourly or day rate is its own case now ('hourly' / 'day'), still never a price per person.
@@ -87,7 +87,8 @@ test('1. per-unit prices: "69 par vélo", "$69/bike", "$40 per hour" are never a
   for (const x of ['650 per boat', '$650 per group', '1100 for the whole raft', '650 per charter']) { assert.equal(why(x), 'group', x); assert.equal(app.tourPriceWhy(x), 'group', x); }
   for (const [x, want] of [['69', 69], ['$159 pp', 159], ['159 $ par personne', 159], ['95 per seat', 95], ['from 79', 79], ['à partir de 79 $', 79]]) { assert.equal(rd(x), want, x); }
   // Tour test 10 (2026-11-18; Dayton): per rider, child, kid or adult is per person now ("75 per rider" couldn't be saved).
-  for (const x of ['95 per tour']) assert.equal(why(x), 'many', x);
+  // Tour test 13 (Dayton): per flight / ride / trip / tour is per person now.
+  for (const x of ['95 per tour']) assert.equal(why(x), '', x);
   for (const x of ['95 per child', '75 per rider']) assert.equal(why(x), '', x);
   // The private box: "1500$ et plus", "from 1500", "1 500 $ et plus" read as the number (they were refused).
   for (const [x, want] of [['1500$ et plus', 1500], ['from 1500', 1500], ['1 500 $ et plus', 1500], ['$1,500+', 1500], ['1500 and up', 1500], ['à partir de 1500', 1500]]) { assert.equal(rd(x, true), want, x); assert.deepEqual(app.cleanTourPrice(x), { value: want }, `server ${x}`); }
@@ -100,8 +101,9 @@ test('1. per-unit prices: "69 par vélo", "$69/bike", "$40 per hour" are never a
   assert.equal(text.en.tour.tpriceUnit, 'Priced per bike or per rental? Put your lowest per-person trip price here; list the per-bike price in Your tours and prices.');
   assert.match(text.fr.tour.tpriceUnit, /^Prix par vélo ou par location\s?\? Mettez votre prix le plus bas par personne ici\s?; le prix par vélo va dans Vos sorties et tarifs\.$/);
   assert.match(text.en.tour.tpriceUnitRentals, /^Rentals only\?/); assert.match(text.fr.tour.tpriceUnitRentals, /^Seulement de la location/);
-  assert.match(text.en.tour.tpriceMore, /per boat\? Use Private tours below\. Priced per bike or per rental\? Put it in Your tours and prices\.$/);
-  assert.match(text.fr.tour.tpriceMore, /par vélo ou par location\s?\? Mettez-le dans Vos sorties et tarifs\.$/);
+  // Tour test 16 (2026-11-18): one short line under the box; per bike / per rental is said by the nudge after Save (above).
+  assert.match(text.en.tour.tpriceMore, /Your tours and prices/);
+  assert.match(text.fr.tour.tpriceMore, /Vos sorties et tarifs/);
   assert.match(CLIENT, /pwhy === 'unit' && T\.tpriceUnit \?/);
   assert.match(CLIENT, /if \(k === 'tpriceToMenu'\) \{ readTour\(\); S\.menuReturn = 'price'; return go\('menu'\); \}/);
   assert.match(CLIENT, /if \(step === 'menu' && S\.menuReturn\)/);
@@ -134,20 +136,21 @@ test('2. category words: no "ATV, bungee…" for a zipline park; treetop / ropes
   const was = 'Ziplines, treetop adventure course & e-bike rentals';
   const en = kt(['zipline', 'bike', 'adventure'], false, was), fr = kt(['zipline', 'bike', 'adventure'], true, was);
   assert.doesNotMatch(en + fr, /ATV|bungee|VTT|élastique|canyon/i);
-  assert.equal(en, 'E-bike rentals, ziplines & treetop adventure course');
-  assert.equal(fr, 'Location de vélos électriques, tyrolienne et parcours dans les arbres (hébertisme)');
+  assert.equal(en, 'Ziplines, E-bike rentals & treetop adventure course'); // tour test 17: the owner's own chip order
+  assert.equal(fr, 'Tyrolienne, location de vélos électriques et parcours dans les arbres (hébertisme)');
   assert.doesNotMatch(fr, /treetop|rentals|course/i);
   // Nothing narrower: the kind's short word.
   assert.equal(kt(['adventure'], false, ''), 'Adventure'); assert.equal(kt(['adventure'], true, ''), 'Aventure');
   assert.equal(kt(['adventure'], false, 'ATV tours'), 'ATV tours'); assert.equal(kt(['adventure'], true, 'ATV tours'), 'Sorties en quad (VTT)');
   // The label (chip) names ropes courses; the words are on the adventure kind.
-  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[0], 'ATV, bungee, climbing, ropes courses or canyoning');
-  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[1], 'VTT, saut à l’élastique, escalade, hébertisme ou canyonisme');
+  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[0], 'Ropes, treetop, bungee, ATV, climbing or canyoning');
+  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[1], 'Hébertisme, parcours dans les arbres, saut à l’élastique, VTT, escalade ou canyonisme');
   for (const w of ['Treetop adventure course', 'High ropes course', 'Adventure park', 'Parc d’aventure', 'Hébertisme', 'Parcours d’arbre en arbre'])
     assert.ok(app.tourKindSuggestion({ cuisine: w, name: 'X' }).includes('adventure'), w);
   // Leftovers no picked kind covers: English kept on English pages; French says it in French or leaves it off.
-  assert.equal(kt(['zipline'], false, 'Ziplines & heli-hiking'), 'Ziplines & heli-hiking');
-  assert.equal(kt(['zipline'], true, 'Ziplines & heli-hiking'), 'Tyrolienne et héli-randonnée');
+  // Tour test 11 (2026-11-18): picking any kind replaces research's words; a leftover no picked kind covers goes.
+  assert.equal(kt(['zipline'], false, 'Ziplines & heli-hiking'), 'Ziplines');
+  assert.equal(kt(['zipline'], true, 'Ziplines & heli-hiking'), 'Tyrolienne');
   assert.equal(kt(['zipline'], true, 'Ziplines & sunset yoga'), 'Tyrolienne');
   // Tour test 7 (2026-11-17): ATV words pre-pick the adventure chip; with only Ziplines saved, he unticked it, so they go.
   assert.equal(kt(['zipline'], true, 'Ziplines & ATV tours'), 'Tyrolienne');
@@ -272,7 +275,7 @@ test('9. French-only lines: the finish screen and the edit pages name them (« C
 
 test('10. minor: Groups counter, French unit words and lengths on the list, private lines not counted, private "1500 $ et plus", shoulder hours grouped, land meeting-spot words', async () => {
   // Groups line: a counter like Good to know (180).
-  assert.match(CLIENT, /field\('suGroupsLine', T\.groupsLineLabel, gl, \{ max: 180, data: 'aria-describedby="suGroupsLineCount"' \}\) \+ countLine\('suGroupsLine', gl, 180\)/);
+  assert.match(CLIENT, /field\('suGroupsLine', T\.groupsLineLabel, gl, \{ max: 780, data: 'aria-describedby="suGroupsLineCount"' \}\) \+ countLine\('suGroupsLine', gl, 180\)/);
   // French price list words and lengths (known words only).
   const sp = (x) => String(x).replace(/[\u00a0\u202f]/g, ' ');
   assert.equal(sp(app.menuPriceLabel('69 per bike', 'fr')), '69 $ par vélo');
@@ -285,9 +288,10 @@ test('10. minor: Groups counter, French unit words and lengths on the list, priv
   const { v } = await planFixtures();
   const frList = plain(app.renderVenueMenuPage(app.getVenue(v.id), app.publishedMenu(v.id), { lang: 'fr' }));
   assert.match(frList, /69 \$ par vélo/); assert.match(frList, /2,5 heures/); assert.doesNotMatch(frList, /per bike|2\.5 hours/);
-  assert.match(frList, /4 activités/);
+  // Tour test 15: rentals are counted as rentals (« 2 activités et 2 locations »).
+  assert.match(frList, /2 activités et 2 locations/);
   const enList = plain(app.renderVenueMenuPage(app.getVenue(v.id), app.publishedMenu(v.id), { lang: 'en' }));
-  assert.match(enList, /\$69 per bike/); assert.match(enList, /\(?4 tours|4 activities|4 trips/);
+  assert.match(enList, /\$69 per bike/); assert.match(enList, /2 tours and 2 rentals/);
   for (const x of ['Private group or corporate booking', 'Private groups', 'Groupes privés', 'Sorties privées']) assert.ok(app.TOUR_ADDON_LINE_RE.test(x), x);
   assert.ok(!app.TOUR_ADDON_LINE_RE.test('Full day private boat'));
   // The private price box takes "1500 $ et plus" (server, as the edit page sends it).

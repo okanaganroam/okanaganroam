@@ -257,7 +257,8 @@ test('the setup’s year question, the second period’s screen and its words (E
   assert.match(s, /if \(k === 'seaRemove'\) \{ readTimes\(\); S\.dropI = S\.seaI; return go\('hours:yeardrop'\); \}/);
   // A stored period she didn't open on this visit is sent back exactly as stored.
   // (Tour test 10: and its "Open on holidays" unchanged.)
-  assert.match(s, /if \(s0 && !so\.dirty && \(s0\.holidays === true\) === !!so\.holidays\) \{ list\.push\(s0\); continue; \}/);
+  // (Tour test 12: and its "Weather permitting" unchanged.)
+  assert.match(s, /if \(s0 && !so\.dirty && \(s0\.holidays === true\) === !!so\.holidays && \(s0\.weather === true\) === !!so\.weather\) \{ list\.push\(s0\); continue; \}/);
   // "Yes, all year" with periods stored names every one that would go.
   assert.match(s, /if \(k === 'yearAll' && storedSeas\(\)\.length\) \{ S\.dropI = null; return go\('hours:yeardrop'\); \}/);
   for (const L of ['en', 'fr']) for (const k of ['seasonEditQSecond', 'seasonEditLeadDates', 'seaAdd', 'seaAddSub', 'seaAddLink', 'seaCopy', 'seaRemove', 'seaDropQ', 'seaDropLead', 'seaDropYes', 'seasonOverlap', 'seaStale', 'seaStaleYes', 'seaStaleDone']) {

@@ -166,19 +166,21 @@ test('3 + 6. a tour’s French Good to know shows on the French page; the box ho
   assert.ok(fr.includes('poids minimum de 40 kg'));
   // The English page has no English line for it (French-only answer), as before.
   assert.doesNotMatch(plain(page(v, 'en', new Date('2027-07-15T19:00:00Z'))), /Remboursement complet/);
-  // 241 characters is refused in plain words; every other line and every other type keeps 180.
-  const long = await change(t, { visit_rows: { good_to_know: 'x'.repeat(241) } });
+  // Tour test 13: a tour's Good to know holds 320 now. 321 characters is refused in plain words; every other line and
+  // every other type keeps 180.
+  const long = await change(t, { visit_rows: { good_to_know: 'x'.repeat(321) } });
   assert.equal(long.status, 400);
-  assert.match(JSON.stringify(long.body), /Good to know to 240 characters/);
+  assert.match(JSON.stringify(long.body), /Good to know to 320 characters/);
   const known = await change(t, { visit_rows: { known_for: 'y '.repeat(95).trim() } });
   assert.equal(known.status, 400);
   const lounge = mk('cocktail');
   assert.equal((await change(tokenFor(lounge.id), { visit_rows: { good_to_know: 'z '.repeat(95).trim() } })).status, 400);
   // The setup: the limit and the counter.
   const c = cfgOf((await get(`/owner/${t}/setup`)).text);
-  assert.equal(c.bringMax, 240);
+  assert.equal(c.bringMax, 320);
   assert.match(c.t.countFull, /limit/);
-  assert.match(CLIENT, /maxlength="' \+ BRING_MAX \+ '"/);
+  // Tour test 13: room past the limit, so a paste isn't cut mid-word; Save keeps it to the last full sentence.
+  assert.match(CLIENT, /maxlength="' \+ \(BRING_MAX \+ 600\) \+ '"/);
   assert.match(CLIENT, /countLine\('suBring', bv, BRING_MAX\)/);
   assert.match(CLIENT, /screen\.addEventListener\('input', function\(e\)\{ countUpdate\(e\.target\); \}\);/);
   // The two slot lists agree for every setup type.
@@ -220,9 +222,10 @@ test('4 + 5. the French status line, and the off-season hours block of a by-book
 test('8 + 9 (approved): a 5+ age and "48 hours ahead", their page lines and Build My Trip notes', async () => {
   const { v, t } = await marc();
   // Tour test 10 (2026-11-18): 8+ and 10+ too.
-  assert.deepEqual(pc.TOUR_AGES, ['all', '5', '6', '8', '10', '12', '16', '19']);
-  assert.deepEqual(pc.TOUR_BOOK, ['same_day', 'day', '48h', 'week', 'no']);
-  assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '8', '10', '12', '16', '19'\]/);
+  assert.deepEqual(pc.TOUR_AGES, ['all', '5', '6', '8', '10', '12', '14', '16', '19']);
+  // Tour test 16 (2026-11-18): 'ahead' is "Yes" with no how-far-ahead chip ("Book ahead.").
+  assert.deepEqual(pc.TOUR_BOOK, ['same_day', 'day', '48h', 'week', 'no', 'ahead']);
+  assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '8', '10', '12', '14', '16', '19'\]/);
   assert.match(CLIENT, /tchips\('book', \['same_day', 'day', '48h', 'week'\]/);
   // Tour test 10 (2026-11-18): 8+ and 10+ keep Kids welcome too.
   assert.match(CLIENT, /var kidsOn = S\.tour\.age === 'all' \|\| S\.tour\.age === '5' \|\| S\.tour\.age === '6' \|\| S\.tour\.age === '8' \|\| S\.tour\.age === '10';/);
@@ -266,10 +269,10 @@ test('8 + 9 (approved): a 5+ age and "48 hours ahead", their page lines and Buil
 
 test('12. kinds keep her own words ("Whitewater"), read naturally, and French cards say the kinds in French', async () => {
   const { v } = await marc();
-  // Tour test 5 (2026-11-17): the kinds read in the setup's list order, not the order they were tapped.
-  assert.equal(app.getVenue(v.id).cuisine, 'Wildlife and bear viewing · Whitewater rafting');
-  assert.equal(app.tourKindsText(['raft', 'wildlife'], false, 'Whitewater rafting & bear viewing tours'), 'Wildlife and bear viewing · Whitewater rafting');
-  assert.equal(app.tourKindsText(['raft', 'wildlife'], true), 'Observation de la faune et des ours · Rafting');
+  // Tour test 17 (2026-11-18): the kinds read in the owner's own chip order (Rafting, then Wildlife).
+  assert.equal(app.getVenue(v.id).cuisine, 'Whitewater rafting · Wildlife and bear viewing');
+  assert.equal(app.tourKindsText(['raft', 'wildlife'], false, 'Whitewater rafting & bear viewing tours'), 'Whitewater rafting · Wildlife and bear viewing');
+  assert.equal(app.tourKindsText(['raft', 'wildlife'], true), 'Rafting et observation de la faune'); // tour test 17: the owner's own chip order, no bears said
   // Test 1's results stand.
   assert.equal(app.tourKindsText(['snowmobile', 'adventure'], false, 'Snowmobile & ATV tours'), 'Snowmobile tours & ATV tours');
   // Tour test 7 (2026-11-17): the ATV chip pre-picked from these words, left unticked, takes them off.
@@ -278,18 +281,18 @@ test('12. kinds keep her own words ("Whitewater"), read naturally, and French ca
   assert.equal(app.tourKindsText(['raft'], false, 'Rafting'), 'Rafting');
   assert.equal(app.tourKindsText(['other'], false, 'ATV tours'), '');
   // French cards: the kinds in French, and the chip.
-  assert.equal(app.frCardMetaText('Penticton &middot; Wildlife and bear viewing · Whitewater rafting'), 'Penticton &middot; Observation de la faune et des ours · Rafting');
+  assert.equal(app.frCardMetaText('Penticton &middot; Whitewater rafting · Wildlife and bear viewing'), 'Penticton &middot; Rafting · Observation de la faune et des ours');
   const chip = '<!DOCTYPE html><html><body><span class="chip complete-verified-badge" style="x"><span aria-hidden="true" style="y">&#10003;</span>Complete &amp; Verified</span></body></html>';
   assert.match(app.frenchTwinHtml(chip, '/penticton/tours'), /Complète et vérifiée<\/span>/);
   const cat = await get('/fr/penticton/tours');
   assert.equal(cat.status, 200);
   const card = (cat.text.split('<li class="venue-card"').slice(1).find((x) => x.includes('Riviere Sauvage Rafting')) || '');
-  assert.ok(card.includes('Observation de la faune et des ours · Rafting'), card.replace(/\s+/g, ' ').slice(0, 700));
+  assert.ok(card.includes('Rafting · Observation de la faune et des ours'), card.replace(/\s+/g, ' ').slice(0, 700));
   assert.doesNotMatch(card, /Wildlife and bear viewing/);
   assert.doesNotMatch(card, /visites sur réservation/);
   const catEn = await get('/penticton/tours');
   const cardEn = (catEn.text.split('<li class="venue-card"').slice(1).find((x) => x.includes('Riviere Sauvage Rafting')) || '');
-  assert.ok(cardEn.includes('Wildlife and bear viewing · Whitewater rafting'), cardEn.replace(/\s+/g, ' ').slice(0, 700));
+  assert.ok(cardEn.includes('Whitewater rafting · Wildlife and bear viewing'), cardEn.replace(/\s+/g, ' ').slice(0, 700));
 });
 
 test('7. Build My Trip: bear viewing, French wildlife and outing words, ages, the French slot heading, heli biking and quad', async () => {
@@ -413,7 +416,8 @@ test('9 + 10 + Minor: the edit page and the wording table for a tour (EN/FR); «
   assert.equal(sp(T.labels.menu), 'Vos sorties et tarifs');
   assert.match(sp(T.tprivQ), /^Sorties privées/);
   assert.match(sp(T.noSetHoursSaved), /sorties sur réservation/);
-  assert.match(sp(T.basicsQ), /^Est-ce bien ici qu’on vous rejoint \? Votre téléphone et votre site Web sont-ils exacts \?$/);
+  // Tour test 15 (Dayton): tours have no meeting-spot question; Basics asks for the address.
+  assert.match(sp(T.basicsQ), /^Est-ce bien votre adresse, votre téléphone et votre site Web \?$/);
   assert.equal(sp(T.photosQ), 'Ajoutez des photos de vos sorties');
   assert.equal(sp(T.moreQ), 'Plus de détails sur votre entreprise');
   assert.ok(T.quick.good_to_know.map(sp).includes('Navette depuis l’hôtel offerte'));
@@ -438,11 +442,12 @@ test('9 + 10 + Minor: the edit page and the wording table for a tour (EN/FR); «
   assert.doesNotMatch(pf, /Lien du menu/);
   assert.match(pf, /Sorties spéciales, ateliers ou cours/);
   assert.doesNotMatch(pf, /Musique en direct, dégustations, marchés/);
-  assert.match(ef, />POINT DE RENCONTRE<\/text>/);
+  // Tour test 15 (Dayton, 2026-11-18): no meeting-spot section on a tour's edit page.
+  assert.doesNotMatch(ef, />POINT DE RENCONTRE<\/text>/);
   assert.doesNotMatch(ef, />VOTRE COMMERCE<\/text>/);
-  assert.match(pf, /Prendre la photo du point de rencontre/);
+  assert.doesNotMatch(pf, /Prendre la photo du point de rencontre/);
   assert.doesNotMatch(pf, /de le point/);
-  assert.match(pf, /aider les visiteurs à trouver votre point de rencontre/);
+  assert.doesNotMatch(pf, /aider les visiteurs à trouver votre point de rencontre/);
   assert.match(pf, /À partir de 85 \$ par personne/);
   assert.doesNotMatch(pf, /\$\$\$\s?: 30 à 60 \$ par personne/);
   assert.match(ef, /<span class="op-fold-hint">À partir de 85[\s\u00a0\u202f]\$ par personne<\/span>/);
@@ -453,7 +458,7 @@ test('9 + 10 + Minor: the edit page and the wording table for a tour (EN/FR); «
   assert.match(pe, /Tours and prices sent to us/);
   assert.match(pe, /Prices link \(optional\)/);
   assert.match(pe, /Special trips, workshops or classes/);
-  assert.match(ee, />MEETING SPOT<\/text>/);
+  assert.doesNotMatch(ee, />MEETING SPOT<\/text>/);
   assert.match(pe, /From \$85 a person/);
   assert.match(pe, /Change my season/);
   assert.doesNotMatch(pe, /When you open and close/);

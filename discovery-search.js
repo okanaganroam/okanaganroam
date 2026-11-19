@@ -206,6 +206,10 @@ function searchVenues(intent, venues) {
   if (cuisines.length) {
     for (const ft of intent.foodTerms || []) {
       if (ft.cuisine && cuisines.includes(ft.cuisine) && DISH_WORDS[ft.term]) dishWords.push({ term: ft.term, words: DISH_WORDS[ft.term] });
+      // Tour test 14 (Whistler, 2026-11-18): a tour category one listing happens to use ("Ski lessons") is also a tour that
+      // says it another way ("Adaptive ski & snowboard lessons", "Ski clinics", "Nordic ski school"): the term's own
+      // descriptionSynonyms, after the exact category, for tours only.
+      else if (ft.cuisine && cuisines.includes(ft.cuisine) && TERM_SYNONYMS[ft.term]) dishWords.push({ term: ft.term, words: TERM_SYNONYMS[ft.term], tourOnly: true });
     }
   }
 
@@ -225,6 +229,7 @@ function searchVenues(intent, venues) {
         // A dish word the venue itself uses: the best-placed mention wins.
         let best = null;
         for (const d of dishWords) {
+          if (d.tourOnly && v.type !== 'tour') continue;
           for (const w of d.words) {
             const m = termMatch(v, w);
             if (m && (!best || termWeight(m) > termWeight(best.m))) best = { m, term: d.term };

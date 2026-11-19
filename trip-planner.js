@@ -187,6 +187,26 @@ function tourAgeFit(v, ctx) {
 // Tours & prices) whose name shares an activity word with the request ("mushing" / "Mush your own team") and whose own
 // age is above the youngest child named. Returns { name, age, young, word } or null.
 const ITEM_AGE_SKIP = new Set(['tour', 'tours', 'trip', 'trips', 'ride', 'rides', 'visit', 'visits', 'with', 'your', 'our', 'own', 'the', 'and', 'for', 'kid', 'kids', 'child', 'children', 'adult', 'adults', 'year', 'years', 'old', 'family', 'day', 'days', 'hour', 'hours', 'half', 'full', 'guided', 'private', 'group', 'from', 'per', 'person', 'people']);
+// Tour test 17 (Whistler, 2026-11-18; Sarah): the trip on the operator's list a plan times (v.tourItems with their own
+// length `mins` and departures `departs`): the one the request names ("family float", "family rafting" -> the family
+// trip), never one too old for the youngest child or out of its own months; else the first with departure times; else
+// the first. Null when no trip has a length or departures of its own (the operator's answers are used then).
+const TOUR_TRIP_SKIP = new Set(['tour', 'tours', 'trip', 'trips', 'with', 'year', 'years', 'old', 'without', 'near', 'from', 'around', 'want', 'like', 'some', 'this', 'that', 'july', 'june', 'august', 'september', 'october', 'may', 'january', 'february', 'march', 'april', 'november', 'december',
+  // The site's own town words (trip-site.js commonNameWords: Okanagan, Kelowna, Penticton… on Okanagan Roam).
+  ...(SITE.commonNameWords || [])]);
+function tourTripFor(v, text, month) {
+  const all = Array.isArray(v && v.tourItems) ? v.tourItems.filter((x) => x && x.name) : [];
+  if (!all.some((x) => x.mins || (x.departs && x.departs.length))) return null;
+  const q = normWords(text || '');
+  const ages = requestKidAges(q), young = ages.length ? Math.min(...ages) : null;
+  const words = new Set(q.split(' ').filter((w) => w.length >= 4 && !TOUR_TRIP_SKIP.has(w)).map(itemAgeStem));
+  const family = young != null || /\b(?:famil\w*|kids?|children|child|enfants?)\b/.test(q);
+  const fits = (it) => !(young != null && Number(it.age) > young) && !(month && Array.isArray(it.months) && it.months.length && !it.months.includes(month));
+  const pool = all.filter(fits).length ? all.filter(fits) : all;
+  const score = (it) => { const own = normWords(it.name).split(' ').filter((w) => w.length >= 4).map(itemAgeStem); let n = own.filter((w) => words.has(w)).length * 2; if (family && (it.kids || own.some((w) => /^famil/.test(w)))) n += 3; return n; };
+  const ranked = pool.map((it, i) => ({ it, i, s: score(it), d: it.departs && it.departs.length ? 1 : 0 })).sort((a, b) => b.s - a.s || b.d - a.d || a.i - b.i);
+  return ranked[0] ? ranked[0].it : null;
+}
 function itemAgeStem(w) { return String(w || '').replace(/(?:ing|ers?|es|s|ed)$/, ''); }
 function tourItemTooYoung(v, ctx) {
   const young = kidsYoungest(ctx);
@@ -1093,6 +1113,34 @@ function tourHorseOff(v, m) {
 }
 // A horseback request in a month when only the operator's winter kind runs: left out, and never offered as "closed for the
 // season" or an optional idea (he isn't closed: his sleigh rides run).
+// Tour test 15 (Whistler, 2026-11-18; Dave: summer canoe and kayak rentals, winter snowshoe tours; Dayton approved): the
+// season each of the operator's kinds runs (v.tourKindSeasons, his own answer or the server's guess). A request whose
+// kinds of his all run in the other season leaves him out ("snowshoe in July", "kayak in January"), quietly: he isn't
+// closed, his other kind runs then. Winter is November to April, summer May to October.
+const KIND_SEASON_WINTER_MONTHS = [11, 12, 1, 2, 3, 4];
+const KIND_SEASON_ASK_WORDS = {
+  paddle: /\b(?:kayak\w*|canoe\w*|canot\w*|sup|paddl\w*|pagaie|stand up paddle)\b/, rentals: /\b(?:rentals?|rent|renting|hire|location|louer)\b/,
+  snowshoe: /\b(?:snow ?shoe\w*|raquettes?)\b/, raft: /\braft\w*\b/, boat: /\b(?:boat\w*|cruise\w*|bateau\w*|croisi\w*)\b/, jetboat: /\bjet ?boat\w*\b/,
+  fishing: /\b(?:fishing|p[eê]che)\b/, bike: /\b(?:bike\w*|biking|cycling|v[eé]lo\w*)\b/, snowmobile: /\b(?:snowmobil\w*|motoneige\w*)\b/,
+  dogsled: /\b(?:dog ?sled\w*|mushing|tra[iî]neau\w* [aà] chiens)\b/, sleigh: /\b(?:sleigh\w*)\b/, heli: /\b(?:heli ?ski\w*|cat ?ski\w*|heliski\w*)\b/,
+  lessons: /\b(?:ski lessons?|snowboard lessons?|ski school|cours de ski)\b/, horseback: /\b(?:horse\w*|trail rides?|riding)\b/, zipline: /\bzip ?lin\w*\b/,
+};
+function kindSeasonOff(season, m) { return season === 'summer' ? KIND_SEASON_WINTER_MONTHS.includes(m) : season === 'winter' ? !KIND_SEASON_WINTER_MONTHS.includes(m) : false; }
+// His kinds the request asks for (its planner kinds, or its own words).
+function kindSeasonAsked(v, ctx) {
+  const seasons = v && v.tourKindSeasons;
+  if (!seasons || typeof seasons !== 'object') return [];
+  const pk = (ctx && ctx.plannerKinds) || [];
+  const words = normWords(`${(ctx && ctx.askText) || ''} ${(ctx && ctx.queryText) || ''}`);
+  return Object.keys(seasons).filter((k) => ((tripRequirements.TOUR_KIND_PLANNER || {})[k] || []).some((x) => pk.includes(x)) || (KIND_SEASON_ASK_WORDS[k] && KIND_SEASON_ASK_WORDS[k].test(words)));
+}
+function kindSeasonBlocked(v, ctx) {
+  if (!v || v.type !== 'tour' || !v.tourKindSeasons || !ctx || namedInRequest(v, ctx)) return false;
+  const m = tripMonthOf(ctx);
+  if (!m) return false;
+  const asked = kindSeasonAsked(v, ctx);
+  return asked.length > 0 && asked.every((k) => kindSeasonOff(v.tourKindSeasons[k], m));
+}
 function horseOffBlocked(v, ctx) {
   if (!v || v.type !== 'tour' || !ctx || !(ctx.plannerKinds || []).includes('horseback') || (ctx.plannerKinds || []).includes('sleigh_ride') || namedInRequest(v, ctx)) return false;
   const m = tripMonthOf(ctx);
@@ -1112,7 +1160,7 @@ function offSeasonBlocked(v, ctx) {
     if (!inRange && !/\byear round\b/.test(sub)) return true;
   }
   // Winter-only tours: heli-skiing, cat-skiing, snowmobile, dog-sled and sleigh tours, ice fishing, ski touring courses.
-  if (v.type === 'tour' && /\b(?:heli ?skiing|heliskiing|cat ?skiing|snowcat|snowmobile|snowmobiling|dog ?sled\w*|sleigh|ice fishing|ski touring|avalanche|snowshoe tours?|ski school|ski lessons?|snowboard lessons?|ski (?:and|&) snowboard|nordic ski|adaptive ski|ski clinics?|biathlon)\b/.test(sub) && !/\b(?:rafting|zipline|ziplines|atv|rzr|summer|year round)\b/.test(sub) && SNOW_SEASON_OFF.concat([5]).includes(m) && !skiWordsAsked(text) && !ownerSeasonOpenOn(v, ctx) && !namesAskedOffSnowKind(v, ctx)) return true;
+  if (v.type === 'tour' && /\b(?:heli ?skiing|heliskiing|cat ?skiing|snowcat|snowmobile|snowmobiling|dog ?sled\w*|sleigh|ice fishing|ski touring|avalanche|snowshoe tours?|ski school|ski lessons?|snowboard lessons?|ski (?:and|&) snowboard|nordic ski|adaptive ski|ski clinics?|biathlon)\b/.test(sub) && !/\b(?:rafting|zipline|ziplines|atv|rzr|summer|year round)\b/.test(sub) && SNOW_SEASON_OFF.concat([5]).includes(m) && (!skiWordsAsked(text) || (v.plannerKinds || []).includes('ski_lessons')) && !ownerSeasonOpenOn(v, ctx) && !namesAskedOffSnowKind(v, ctx)) return true;
   // Tour test 9 (Whistler, 2026-11-18; Tanis): a canoe, kayak, rafting or boat tour asked for is checked against its own
   // season, as outdoor paddling is. A summer-only canoe on a list ("Summer: Canoe paddle", "Canoe (June to September)")
   // was planned on January 16 by a cultural-tour company open all year. Its list's months for its water trips win; with
@@ -1242,6 +1290,7 @@ function eligible(v, ctx, strict) {
   if (specialistOutdoorBlocked(v, ctx)) return false;
   if (!ctx.ignoreSeason && offSeasonBlocked(v, ctx)) return false;
   if (horseOffBlocked(v, ctx)) return false;
+  if (!ctx.ignoreSeason && kindSeasonBlocked(v, ctx)) return false;
   // A restaurant or café closed with no reopening date is not planned for any date (2026-10-25: a September honeymoon got
   // Alta Bistro, closed with no reopening announced). Seasonal sights keep the usual closed-season window.
   if (!ctx.ignoreSeason && DINING_TYPES.includes(v.type) && v.seasonClosedToday && v.seasonReopens === null && !(SKI_HILL_REGIONS.includes(v.region) && skiWordsAsked(ctx.queryText || ''))) return false;
@@ -1258,7 +1307,7 @@ function eligible(v, ctx, strict) {
   // A named month or season is judged in that month (2026-10-25: "mountain biking in June" lost the bike park, closed today).
   // 2026-10-25 (tools audit): a plan with no month named is judged on its planned date (today, tomorrow, "this weekend")
   // with the same rules, so a closure with no reopening date counts even when the place has usual months.
-  if (!ctx.ignoreSeason && !ctx.itinerary && !ctx.requirements && (ctx.tripDate ? seasonClosedOnTrip(v, { date: ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month) ? monthDate(ctx.seasonInfo.month, ctx.tripDate) : ctx.tripDate }) : v.seasonClosedToday)) return false;
+  if (!ctx.ignoreSeason && !ctx.itinerary && !ctx.requirements && (ctx.tripDate ? seasonClosedOnTrip(v, { date: ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month) ? monthDate(ctx.seasonInfo.month, ctx.tripDate) : ctx.tripDate }) : v.seasonClosedToday && !v.tourOffRequest)) return false;
   if (!ctx.itinerary && !ctx.requirements && v.ownerClosures && seasonClosedOnTrip({ ownerClosures: v.ownerClosures }, null)) return false;
   // 2026-10-25: the off-season rules (no outdoor rink in October, no water park in April, no beach in November unless
   // asked for) apply in every step that picks a place, not only the main day builder; a late-afternoon filler put
@@ -1328,6 +1377,11 @@ function eligible(v, ctx, strict) {
 const VIBE_TERM_RE = /^(?:cozy|cosy|intimate|quiet|romantic|candlelit|candle lit)$/;
 const VIBE_MEAL_RE = /\b(?:cozy|cosy|intimate|quiet|romantic|candlelit)(?: [a-z]+)? (?:dinners?|lunch(?:es)?|meals?|restaurants?|brunch|breakfast|supper|dining)\b/;
 function vibeMealAsked(ctx) { return VIBE_MEAL_RE.test(normWords(ctx.queryText || '')); }
+// Tour test 16 (Whistler, 2026-11-18; Tom picks guests up at their hotels; "bear tour without a car" never used it): a request
+// with no car, or one that asks to be picked up, puts the tours with hotel pickup (the owner's own answer) first, and their
+// card says "Hotel pickup".
+const PICKUP_ASK_RE = /\b(?:no car|no cars|without (?:a |our |my |any )?car|car free|carfree|(?:do not|don t|dont) (?:have|own|drive)(?: a car)?|no vehicle|no rental car|hotel pick ?ups?|pick ?ups? (?:from|at) (?:the |our |my )?hotels?|pick (?:us|me|them) up|picks? (?:you|people|guests) up|picked up|pick up|pickup|sans (?:voiture|auto|vehicule)|pas de (?:voiture|vehicule|char)|prise en charge|venir nous chercher|nous chercher|cueillette)\b/;
+function pickupAsked(ctx) { return PICKUP_ASK_RE.test(normWords((ctx && (ctx.queryText || ctx.requirements?.text)) || '')); }
 function scoreVenue(v, ctx) {
   const reasons = [];
   let score = 0;
@@ -1335,6 +1389,17 @@ function scoreVenue(v, ctx) {
 
   // A place the visitor named (2026-10-25: "lunch at Araxi" got another restaurant) wins its slot in every kind of plan.
   if (namedInRequest(v, ctx)) add('named', 60, 'You asked for this place');
+  // Tour test 13 (Whistler, 2026-11-18; Matthias): a plain "scenic flight" puts the planes and helicopters before a tandem
+  // paragliding operator (a scenic flight too, labelled paragliding on its stop).
+  if (paraglideForScenic(v, ctx) && !namedInRequest(v, ctx)) add('air_sport', -45, null);
+  // Tour test 14: a lesson operator whose own words name the language or adaptive lessons asked for comes first.
+  if (Array.isArray(ctx.plannerKinds) && ctx.plannerKinds.includes('ski_lessons')) { const lf = lessonFit(v, ctx); if (lf) add('lesson_fit', lf, null); }
+  // Tour test 15: an operator whose own trip includes the meal asked for ("fondue snowshoe dinner") comes first.
+  if (tourMealItem(v, ctx)) add('tour_meal', 25, null);
+  // Tour test 16: hotel pickup for a request with no car or one that asks to be picked up.
+  if (v.type === 'tour' && v.tourPickup && pickupAsked(ctx)) add('pickup', 40, 'Hotel pickup');
+  // Tour test 13: out of his season by request only: after the operators running then.
+  if (seasonOffRequest(v, ctx) && !namedInRequest(v, ctx)) add('off_request', -30, null);
   // An indoor kind named in the request (2026-10-25: "yoga and wine" got an art gallery): places of that kind first.
   const kindWord = (ctx.queryText || '').match(INDOOR_KIND_RE);
   if (kindWord && ['indoor', 'outdoor', 'beach'].includes(v.type) && normWords(v.cuisine || '').replace(/skatepark/g, 'skate park').includes(kindWord[1].replace(/skatepark/, 'skate park').replace(/^skate ?park$/, 'skate park'))) add('kind_asked', 45, null);
@@ -1752,7 +1817,10 @@ function occasionScore(v, ctx, add) {
 }
 
 function why(reasons) {
-  const sorted = reasons.filter((r) => r.text).slice().sort((a, b) => b.weight - a.weight);
+  // Tour test 17 (Whistler, 2026-11-18; Sarah): "Hotel pickup" was the 4th reason of a rafting tour ("Matches your request
+  // for rafting", "Rentals or guided trips…", "…tours & experiences" weigh more) and never reached the card's two lines.
+  // When it is there, it is the first line.
+  const sorted = reasons.filter((r) => r.text).slice().sort((a, b) => (b.code === 'pickup') - (a.code === 'pickup') || b.weight - a.weight);
   return sorted.slice(0, 3).map((r) => r.text);
 }
 
@@ -1764,6 +1832,22 @@ function breweryIsCidery(v) {
   return /\bcider\w*\b/.test(normWords((v && v.cuisine) || '')) && !/\bbrew\w*\b/.test(normWords((v && v.cuisine) || ''));
 }
 const BREWERY_KIND_LABEL = { Brewery: ['Brewery', 'Microbrasserie'], Cidery: ['Cidery', 'Cidrerie'], 'Taphouse or beer hall': ['Taphouse', 'Bar à bières'], Distillery: ['Distillery', 'Distillerie'] };
+// A rental request ("canoe rental in July", the rentals kind) -> his typed rental with a price, the one whose name shares a
+// word with the request first, the lowest otherwise: { cents, label: 'Rental', item, unit, unitFr }. Null otherwise.
+function tourRentalPrice(v, ctx) {
+  if (!v || !ctx || !Array.isArray(v.tourItems)) return null;
+  const ask = normWords(`${ctx.askText || ''} ${ctx.queryText || ''}`);
+  if (!((ctx.plannerKinds || []).includes('rentals') || /\b(?:rentals?|rent|hire|location|louer)\b/.test(ask))) return null;
+  const rentals = v.tourItems.filter((it) => it && it.name && it.price && /\b(?:rentals?|hire|location)\b/i.test(it.name) && /\d/.test(it.price) && !/\bper (?:person|adult)\b/i.test(it.price));
+  if (!rentals.length) return null;
+  const num = (p) => { const m = /(\d{1,5}(?:[.,]\d{1,2})?)/.exec(String(p).replace(/(\d),(\d{3})(?!\d)/g, '$1$2')); return m ? Number(m[1].replace(',', '.')) : NaN; };
+  const words = new Set(ask.split(' ').filter((w) => w.length >= 3 && !/^(?:rentals?|hire|location|july|june|august|september|january|february|march|december)$/.test(w) && !(SITE.commonNameWords || []).includes(w)).map(itemAgeStem));
+  const named = rentals.filter((it) => normWords(it.name).split(' ').some((w) => w.length >= 3 && words.has(itemAgeStem(w)) && !/^rentals?$/.test(w)));
+  const pool = (named.length ? named : rentals).filter((it) => Number.isFinite(num(it.price)) && num(it.price) > 0).sort((a, b) => num(a.price) - num(b.price));
+  if (!pool.length) return null;
+  const it = pool[0];
+  return { cents: Math.round(num(it.price) * 100), label: 'Rental', labelFr: 'Location', source: null, item: it.name, unit: it.price, unitFr: it.priceFr || it.price };
+}
 function publicVenue(v, ctx) {
   // Winery test 5 (2026-11-12): a winery's own tasting fee comes before a published price ("Check price per person" showed
   // with a $10 owner fee); a free tasting says so.
@@ -1777,7 +1861,10 @@ function publicVenue(v, ctx) {
   // Tour test 4 (Whistler, 2026-11-17): a tour its operator marked free (or by donation) says "Free", counts $0 in the
   // estimate, and never shows a researched price beside it.
   const tourIsFree = v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation');
-  const cost = tourIsFree ? null : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
+  // Tour test 15 (Whistler, 2026-11-18; Dave): a rental asked for shows his own rental price as typed ("Canoe rental: $45 per
+  // boat per hour"), not the tours' "From $89".
+  const rental = v.type === 'tour' && !tourIsFree ? tourRentalPrice(v, ctx) : null;
+  const cost = tourIsFree ? null : rental ? rental : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
     : cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
     : fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
     : flight ? (v.type === 'distillery' ? { cents: Math.round(flight * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : { cents: Math.round(flight * 100), label: 'Flight', labelFr: 'Palette de dégustation', source: null }) : tripStopPrice(v.url, v.id);
@@ -1899,12 +1986,118 @@ const TOUR_BOOK_AHEAD_NOTES = {
   day: 'Book at least a day ahead (the operator’s own answer).',
   '48h': 'Book at least 48 hours ahead (the operator’s own answer).',
   week: 'Book at least a week ahead (the operator’s own answer).',
+  ahead: 'Book ahead (the operator’s own answer).',
   no: 'No need to book (the operator’s own answer).',
 };
+// Tour test 18 (Whistler, 2026-11-18; Priya: tours every 30 minutes, booked online): "Call ahead for the times" only when
+// nothing better is known. Her own typed tours' "every 30 minutes" -> "Tours leave every 30 minutes."; her booking link ->
+// "Book a time online." (both when both are true).
+function tourBookAheadNote(v) {
+  const bn = TOUR_BOOK_AHEAD_NOTES[v && v.tourBookAhead];
+  if (!bn || v.tourBookAhead !== 'same_day') return bn;
+  const every = Number(v.tourEveryMinutes) > 0 ? `Tours leave every ${v.tourEveryMinutes} minutes.` : '';
+  const online = v.tourBookOnline ? 'Book a time online.' : '';
+  if (!every && !online) return bn;
+  return bn.replace(/ Call ahead for the times\.$/, ` ${[every, online].filter(Boolean).join(' ')}`);
+}
 const TOUR_AGE6_NOTE = 'Ages 6 and up (the operator’s own answer).';
 // Tour test 2 (Whistler, 2026-11-16): any minimum age the operator set (5+, 6+, 12+, 16+) is said on a kids trip that
 // includes the tour ("with our 14-year-old" and a 12+ tour: "Ages 12 and up").
 // Tour test 3 (Whistler, 2026-11-17): "All ages" is said too when the request names an age ("with our 10-year-old").
+const TOUR_WEATHER_NOTE = 'Runs weather permitting at this time of year (the operator’s own answer).';
+// Tour test 14 (Whistler, 2026-11-18; Lucía, private ski and snowboard lessons): the words of a lesson request that are
+// about the lesson, not words a listing must contain.
+const LESSON_LANGS = ['spanish', 'portuguese', 'french', 'german', 'italian', 'japanese', 'korean', 'mandarin', 'cantonese', 'chinese', 'dutch', 'swedish', 'hebrew', 'arabic', 'hindi', 'punjabi', 'russian', 'polish', 'czech', 'english'];
+const LESSON_REQUEST_WORDS_RE = new RegExp(`^(?:${LESSON_LANGS.join('|')}|espanol|portugues|speaking|speaks|speak|spoken|language|languages|bilingual|adaptive|disability|disabilities|disabled|week|weeks|weekly|lesson|lessons|instructor|instructors|private|camp|camps|school|schools|coach|coaching|clinic|clinics|learn|learning|beginner|beginners|level|levels|day camp|sit ski|sit skiing|snow board)$`);
+// The language a lesson request names ("Spanish speaking ski instructor", « moniteur hispanophone » arrives as Spanish).
+function lessonLanguageAsked(ctx) { const t = normWords((ctx && (ctx.requirements && ctx.requirements.text || ctx.queryText)) || ''); const m = new RegExp(`\\b(${LESSON_LANGS.filter((l) => l !== 'english').join('|')}|espanol|portugues)\\b`).exec(t); return m ? ({ espanol: 'spanish', portugues: 'portuguese' }[m[1]] || m[1]) : null; }
+function lessonAdaptiveAsked(ctx) { return /\b(?:adaptive|disabilit\w*|disabled|sit ?ski\w*|wheelchair|visually impaired|blind|autism|autistic|neurodiver\w*|special needs)\b/.test(normWords((ctx && (ctx.requirements && ctx.requirements.text || ctx.queryText)) || '')); }
+// The operator's own words about a lesson (name, category, Known for, typed tours, its story).
+// Tour test 15 (Whistler, 2026-11-18; Dave's "Fondue snowshoe evening … Dinner included"): a request that asks for a meal
+// with the tour ("fondue snowshoe dinner", "dinner snowshoe tour") -> the operator's own trip that includes one (v.tourItems
+// meal, read from its own words), the trip whose name shares a word with the request first. Null otherwise.
+const TOUR_MEAL_ASK_RE = /\b(?:fondue|dinners?|suppers?|meals?|lunch|repas|d[îi]ner|souper)\b/;
+function tourMealItem(v, ctx) {
+  if (!v || v.type !== 'tour' || !ctx || !Array.isArray(v.tourItems)) return null;
+  const ask = normWords(ctx.askText || ctx.queryText || '');
+  if (!TOUR_MEAL_ASK_RE.test(ask)) return null;
+  const meals = v.tourItems.filter((it) => it && it.name && it.meal);
+  if (!meals.length) return null;
+  const words = new Set(ask.split(' ').filter((w) => w.length >= 4).map(itemAgeStem));
+  return meals.find((it) => normWords(it.name).split(' ').some((w) => w.length >= 4 && words.has(itemAgeStem(w)))) || meals[0];
+}
+function tourMealNote(v, ctx) {
+  const it = tourMealItem(v, ctx);
+  if (!it) return null;
+  const meal = { dinner: 'Dinner', lunch: 'Lunch', meal: 'A meal', supper: 'Supper', brunch: 'Brunch', breakfast: 'Breakfast' }[it.meal] || 'A meal';
+  return `${meal} included on the ${it.name} (the operator’s own words).`;
+}
+function lessonOwnText(v) { return [v.name, v.cuisine, v.knownFor, ...(Array.isArray(v.tourItems) ? v.tourItems.map((it) => it && it.name) : []), v.plannerDescription || v.description || ''].filter(Boolean).join(' . '); }
+// The lesson stop's notes, each from the listing's own words: the kids' ages it names, the language asked for, adaptive.
+function lessonNotes(v, ctx) {
+  const out = [];
+  if (!v || v.type !== 'tour' || !Array.isArray(v.plannerKinds) || !v.plannerKinds.includes('ski_lessons')) return out;
+  const own = lessonOwnText(v);
+  const asked = normWords((ctx && (ctx.requirements && ctx.requirements.text || ctx.queryText)) || '');
+  const kids = !!(ctx && (ctx.kids || kidsYoungest(ctx) != null)) || /\b(?:kids?|children|child|son|daughter|camp|camps|\d{1,2} ?(?:year|yr)s? ?old)\b/.test(asked);
+  if (kids) {
+    const m = /\b(?:kids?|children|child|youth|camp)[^.]{0,60}?\(?\bages?\s*(\d{1,2})\s*(?:-|–|to|à)\s*(\d{1,2})\)?/i.exec(own) || /\bages?\s*(\d{1,2})\s*(?:-|–|to)\s*(\d{1,2})\b/i.exec(own);
+    if (m) out.push(`Kids’ lessons: ages ${m[1]} to ${m[2]} (the operator’s own words).`);
+  }
+  const lang = lessonLanguageAsked(ctx);
+  if (lang) {
+    const Lang = lang[0].toUpperCase() + lang.slice(1);
+    const re = new RegExp(`\\b${lang}\\b|\\b${{ spanish: 'espa[nñ]ol', portuguese: 'portugu[eê]s' }[lang] || lang}\\b`, 'i');
+    out.push(re.test(own) ? `Lessons in ${Lang} (the operator’s own words).` : `Ask about lessons in ${Lang} when you book.`);
+  }
+  if (lessonAdaptiveAsked(ctx)) {
+    if (/\b(?:adaptive|sit ?-?ski\w*|disabilit\w*|visually impaired|neurodivers\w*)\b/i.test(own)) out.push('Adaptive lessons (the operator’s own words): tell them what you need when you book.');
+  }
+  return out;
+}
+// Whether a lesson operator's own words name the language or adaptive lessons asked for.
+function lessonOwnFits(v, ctx) {
+  const own = lessonOwnText(v), lang = lessonLanguageAsked(ctx);
+  if (lessonAdaptiveAsked(ctx)) return /\b(?:adaptive|sit ?-?ski\w*|disabilit\w*)\b/i.test(own);
+  return !!lang && new RegExp(`\\b${lang}\\b|\\b${{ spanish: 'espa[nñ]ol', portuguese: 'portugu[eê]s' }[lang] || lang}\\b`, 'i').test(own);
+}
+// How well a lesson operator fits the request's language and adaptive asks (its own words), for ranking.
+function lessonFit(v, ctx) {
+  if (!v || v.type !== 'tour' || !Array.isArray(v.plannerKinds) || !v.plannerKinds.includes('ski_lessons')) return 0;
+  const own = lessonOwnText(v);
+  let s = 0;
+  const lang = lessonLanguageAsked(ctx);
+  if (lang && new RegExp(`\\b${lang}\\b|\\b${{ spanish: 'espa[nñ]ol', portuguese: 'portugu[eê]s' }[lang] || lang}\\b`, 'i').test(own)) s += 30;
+  if (lessonAdaptiveAsked(ctx) && /\b(?:adaptive|sit ?-?ski\w*|disabilit\w*)\b/i.test(own)) s += 30;
+  // An adaptive program (adaptive is its whole program: its own name or category) first for an adaptive request.
+  if (lessonAdaptiveAsked(ctx) && /\badaptive\b/i.test(`${v.name} ${v.cuisine || ''}`)) s += 15;
+  // A downhill request: a downhill school before a Nordic one (and the reverse).
+  const asked = normWords((ctx && (ctx.requirements && ctx.requirements.text || ctx.queryText)) || '');
+  const nordicAsk = /\b(?:nordic|cross country|x c|classic|skate ski\w*)\b/.test(asked), nordicOwn = /\b(?:nordic|cross country)\b/i.test(`${v.name} ${v.cuisine || ''}`);
+  if (nordicAsk !== nordicOwn) s -= 35;
+  // An adaptive program (its own name or category says adaptive) after the others when adaptive wasn't asked for.
+  if (!lessonAdaptiveAsked(ctx) && /\badaptive\b/i.test(`${v.name} ${v.cuisine || ''}`)) s -= 12;
+  if (/\bsnow ?board/.test(asked) && /\bsnow ?board/i.test(own)) s += 6;
+  return s;
+}
+// Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding): on a "scenic flight" plan, his stop says what it is.
+const PARAGLIDE_SCENIC_NOTE = 'Paragliding: a tandem flight with a pilot, not a plane or helicopter.';
+// Tour test 13: his two ticks, "Every trip is weather permitting" and "Off-season trips by request".
+const TOUR_WEATHER_ALL_NOTE = 'Every trip runs weather permitting (the operator’s own answer).';
+const TOUR_OFF_REQUEST_NOTE = 'Out of season: trips by request only, and rare (the operator’s own answer).';
+function paraglideForScenic(v, ctx) {
+  const asked = (ctx && Array.isArray(ctx.plannerKinds)) ? ctx.plannerKinds : [];
+  return !!(v && v.type === 'tour' && asked.includes('scenic_flight') && !asked.includes('paragliding') && Array.isArray(v.plannerKinds) && v.plannerKinds.includes('paragliding'));
+}
+// The trip's own day as 'MM-DD' (a month alone reads as its 15th), or null.
+function tripMdOf(ctx) {
+  const iso = ctx.requirements && /^\d{4}-\d{2}-\d{2}$/.test(ctx.requirements.startDate || '') ? ctx.requirements.startDate : null;
+  if (iso) return iso.slice(5, 10);
+  const m = tripMonthOf(ctx);
+  if (m && !(ctx.tripDate && Number(String(ctx.tripDate).slice(5, 7)) === m)) return `${String(m).padStart(2, '0')}-15`;
+  return ctx.tripDate && /^\d{4}-\d{2}-\d{2}/.test(String(ctx.tripDate)) ? String(ctx.tripDate).slice(5, 10) : null;
+}
+const tourAdultNote = (r) => (r.waiver ? `Under ${r.age}s need a parent or guardian to sign the waiver.` : `Under ${r.age}s come with an adult.`);
 const tourAgeNote = (age) => (age === 'all' ? 'All ages welcome (the operator’s own answer).' : age === '6' ? TOUR_AGE6_NOTE : `Ages ${age} and up (the operator’s own answer).`);
 // Round 11 (2026-10-20): an outfitter or charter listed as an outdoor place (Hoodoo Adventure Company, Al-ways Fishing
 // Charters) is booked too, not a walk-in stop: it gets the booking note and is not a first pick for an open slot.
@@ -2118,12 +2311,35 @@ function stopFrom(v, scored, extra, ctx) {
   if (v && v.ownerHours) caveats = caveats.map((c) => c.replace(/ \u2014 check (?:before|the day) you go$/, ''));
   if (ctx && ctx.features && isDogTrip(ctx) && DINING_TYPES.includes(v.type) && !(v.features.dog_friendly || v.collections.includes('dog_friendly'))) caveats.push(`Not listed as dog-friendly on ${SITE.brand}, so plan this one without your dog or check with them first`);
   // Round 10 (2026-10-19): a tour company runs at set times; it is booked, not dropped in on.
-  if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]; if (!caveats.includes(bn)) caveats.push(bn); }
+  if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = tourBookAheadNote(v); if (!caveats.includes(bn)) caveats.push(bn); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
   // Tour test 4 (Whistler, 2026-11-17), bug 12: the operator's one booking and age answer stands for several unlike trips
   // (its own Tours & prices list names different lengths or ages): say so, once.
   if (v && v.type === 'tour' && v.tourVaries && (TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead] || v.tourMinAge) && !caveats.includes(TOUR_VARIES_NOTE)) caveats.push(TOUR_VARIES_NOTE);
-  if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|8|10|12|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
+  if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|8|10|12|14|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
+  // Tour test 13: a paragliding operator on a "scenic flight" plan is labelled paragliding, and an air-sport operator's
+  // own "who can fly" line (weight, run a few steps) is on its stop.
+  if (paraglideForScenic(v, ctx) && !caveats.includes(PARAGLIDE_SCENIC_NOTE)) caveats.push(PARAGLIDE_SCENIC_NOTE);
+  // Tour test 15: a meal asked with the tour ("fondue snowshoe dinner") and one of the operator's own trips that includes it.
+  { const mn = tourMealNote(v, ctx); if (mn && !caveats.includes(mn)) caveats.push(mn); }
+  // Tour test 14: a ski-lesson operator's notes from its own words (kids' ages, the language asked for, adaptive).
+  if (ctx && Array.isArray(ctx.plannerKinds) && ctx.plannerKinds.includes('ski_lessons')) for (const n of lessonNotes(v, ctx)) if (!caveats.includes(n)) caveats.push(n);
+  if (v && v.type === 'tour' && v.tourFitNote && Array.isArray(v.plannerKinds) && v.plannerKinds.includes('paragliding')) { const fn = `Good to know (the operator’s own words): ${v.tourFitNote}`; if (!caveats.includes(fn)) caveats.push(fn); }
+  // Tour test 12 (Whistler, 2026-11-18; Kayla: winter weekends only, weather permitting): on the dates of a stretch the
+  // operator runs weather permitting, the stop says so.
+  if (v && v.type === 'tour' && v.tourWeatherAll && !caveats.includes(TOUR_WEATHER_ALL_NOTE)) caveats.push(TOUR_WEATHER_ALL_NOTE);
+  if (seasonOffRequest(v, ctx) && !caveats.includes(TOUR_OFF_REQUEST_NOTE)) caveats.push(TOUR_OFF_REQUEST_NOTE);
+  if (ctx && v && v.type === 'tour' && !v.tourWeatherAll && Array.isArray(v.tourWeather) && v.tourWeather.length) {
+    const md = tripMdOf(ctx);
+    const inR = (x, a, b) => (a <= b ? x >= a && x <= b : x >= a || x <= b);
+    if (md && v.tourWeather.some((z) => inR(md, z.from, z.to)) && !caveats.includes(TOUR_WEATHER_NOTE)) caveats.push(TOUR_WEATHER_NOTE);
+  }
+  // Tour test 12 (Whistler, 2026-11-18; Kayla, 14+, under 19s need a parent or guardian to sign the waiver): the operator's
+  // own rule for younger guests, on the stop of a trip with kids or teens younger than the rule's age (or of unknown age).
+  if (ctx && v && v.type === 'tour' && v.tourAdultRule && (ctx.kids || kidsYoungest(ctx) != null) && (kidsYoungest(ctx) == null || kidsYoungest(ctx) < v.tourAdultRule.age)) {
+    const an = tourAdultNote(v.tourAdultRule);
+    if (!caveats.includes(an)) caveats.push(an);
+  }
   // Tour test 6 (Whistler, 2026-11-17): the request names a child's age and the operator's published list has a trip for
   // older children only ("Treetop course, ages 7+" with a 6-year-old): say so, the lowest such age.
   // Tour test 8 (Whistler, 2026-11-17): the request names the activity a list item is for ("mushing with our 14-year-old",
@@ -2329,6 +2545,13 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
     if ((perType[s.v.type] || 0) >= RECOMMENDATION_PER_TYPE && !(ctx.types.size === 1 && ctx.types.has(s.v.type)) && !(ctx.activities.size && !ctx.types.size)) continue;
     perType[s.v.type] = (perType[s.v.type] || 0) + 1;
     out.push(stopFrom(s.v, s, regionReason(s.v, ctx), ctx));
+  }
+  // Tour test 18 (Whistler, 2026-11-18; "something for my 4 year old in July"): a plain kids' request lists parks, beaches
+  // and museums; an all-ages tour (the operator's own answer) with the Kid-Friendly badge may take the last place when no
+  // tour made the list, so families see one. Never ahead of the places that ranked higher.
+  if (ctx.kids && !ctx.types.size && !ctx.activities.size && !(ctx.plannerKinds || []).length && out.length && !out.some((x) => x.venue && x.venue.type === 'tour')) {
+    const t = scored.find((x) => x.v.type === 'tour' && x.v.tourMinAge === 'all' && x.v.features && x.v.features.kid_friendly);
+    if (t) { const st = stopFrom(t.v, t, regionReason(t.v, ctx), ctx); if (out.length >= count) out[out.length - 1] = st; else out.push(st); }
   }
   return { items: out, total: scored.length };
 }
@@ -2666,7 +2889,8 @@ function familyAvoid(v) {
 const OFF_SEASON_MONTHS = { beach: [10, 11, 12, 1, 2, 3, 4], golf: [10, 11, 12, 1, 2, 3] };
 // Snow-only outings (2026-10-19, round 7): a July Big White plan had snowshoe tours, dog sledding and a sleigh ride.
 const WINTER_ONLY_RE = /\b(?:snowshoe|snowshoes|snowshoeing|dog sled|dog sledding|sleigh|sleighs|tube park|tubing|snowmobiles?|snowmobiling|snowcats?|cat skiing|heli skiing|fat bike trails?|fat biking|skating|rink|cross country ski|nordic|ski trails|twinkling|winter)\b/; // 2026-10-25: plurals ("Monashee Powder Snowcats" was planned in October)
-function winterOnly(v) { return ['outdoor', 'tour'].includes(v.type) && WINTER_ONLY_RE.test(v.textName || normWords(v.name)); }
+// Tour test 14: a ski or snowboard lesson operator is a winter place (unless its owner said it runs all year).
+function winterOnly(v) { return ['outdoor', 'tour'].includes(v.type) && (WINTER_ONLY_RE.test(v.textName || normWords(v.name)) || (v.type === 'tour' && Array.isArray(v.plannerKinds) && v.plannerKinds.includes('ski_lessons') && !v.tourYearAll)); }
 // Warm-weather outings (round 9, 2026-10-19): ice cream in January and the Speedway or a beach in November were picked.
 // From November to March they are only planned when the request names them.
 const SUMMER_ONLY_RE = /\b(?:ice cream|gelato|frozen yogurt|froyo|creamery|speedway|go karts?|gokarts?|waterslides?|water ?park|splash ?pad|mini golf|minigolf|beach|beaches|paddle ?boards?|paddle (?:centre|center|club)|sup|kayak rentals?|boat rentals?|parasail|parasailing|wakeboard|cable park|bumper boats?)\b/;
@@ -4134,6 +4358,8 @@ function buildSkiDays(facts, ctx, days, pinned) {
   let spaPlanned = false;
   const golfAsked = /\bgolf\w*\b/.test(text);
   let golfPlanned = false;
+  const lessonAsked = Array.isArray(ctx.plannerKinds) && ctx.plannerKinds.includes('ski_lessons');
+  let lessonPlanned = false;
   // Village dining is judged for the ski season (2026-10-18): an undated ski trip is "for when the lifts are running",
   // so a restaurant that is closed until the resort opens still counts; a named month is judged in that month.
   const plusDays = (iso, n) => new Date(new Date(`${iso}T12:00:00Z`).getTime() + n * 86400000).toISOString().slice(0, 10);
@@ -4167,6 +4393,24 @@ function buildSkiDays(facts, ctx, days, pinned) {
     const village = SKI_VILLAGE_FOR_HILL[region] || null;
     const dayPool = pool.filter((v) => (v.region === region || (village && v.region === village)) && v.id !== (resort && resort.id) && !seasonClosedOnTrip(v, { date }) && tripRequirements.venueAllowed(v, ctx.requirements, d, ctx.tripDate))
       .map((v) => (skiDate && v.seasonClosedToday && SKI_HILL_REGIONS.includes(v.region) && v.hours && !v.seasonHours ? { ...v, hours: null, _hours: undefined } : v));
+    // Tour test 14 (Whistler, 2026-11-18; Lucía): "ski lessons", "snowboard lesson for my 8 year old", "kids ski camp week":
+    // the lesson operator is planned next to the resort on the first ski day, as "add a lesson" (lessons are never just a
+    // resort ski day). Its notes (kids' ages, the language asked for, adaptive) come from its own words.
+    if (d === 1 && lessonAsked && !pin('lesson')) {
+      const near = (v) => v.region === region || (village && v.region === village);
+      // Undated, the ski day is "for when the lifts are running": a school that opens in the season's first weeks counts.
+      const lessonOpen = (v) => !seasonClosedOnTrip(v, { date }) || (!datedTrip && !(ctx.seasonInfo && ctx.seasonInfo.named === 'month') && date && !seasonClosedOnTrip(v, { date: plusDays(date, 21) }));
+      // Judged on the ski date (lessonOpen), not today (a school closed until the lifts open is still the season's school).
+      const lessonCtx = { ...seasonCtx, ignoreSeason: true };
+      const cands = facts.filter((v) => v.type === 'tour' && Array.isArray(v.plannerKinds) && v.plannerKinds.includes('ski_lessons') && !used.has(v.id) && !ctx.exclude.has(v.id) && eligible(v, lessonCtx, false) && lessonOpen(v) && tripRequirements.venueAllowed(v, ctx.requirements, d, ctx.tripDate))
+        .map((v) => ({ v, score: base(v).score + (near(v) ? 10 : 0) + lessonFit(v, ctx), reasons: base(v).reasons }));
+      const lesson = themePick(cands);
+      // An adaptive or language request: the next school whose own words fit too is named on the stop ("adaptive ski
+      // lessons": the adaptive program, and the private school that teaches adaptive lessons on request).
+      const also = lesson && (lessonAdaptiveAsked(ctx) || lessonLanguageAsked(ctx)) ? cands.filter((c) => c.v.id !== lesson.v.id && lessonOwnFits(c.v, ctx)).sort((a, b) => b.score - a.score)[0] : null;
+      const alsoNote = also ? [`Also teaches ${lessonAdaptiveAsked(ctx) ? 'adaptive lessons' : `in ${lessonLanguageAsked(ctx)[0].toUpperCase()}${lessonLanguageAsked(ctx).slice(1)}`} (its own words): ${also.v.name}.`] : [];
+      if (lesson) { used.add(lesson.v.id); lessonPlanned = true; stops.push({ ...themeStop(ctx, 'morning', lesson.v, { reasons: lesson.reasons }, null, [{ code: 'theme', text: `Add a lesson${resort ? ` at ${resort.name}` : ''}`, weight: 5 }], alsoNote), lessonStop: true }); }
+    }
     const hillPool = dayPool.filter((v) => v.region === region);
     const townPool = village && dayPool.some((v) => v.region === village) ? dayPool.filter((v) => v.region === village) : dayPool;
     // "A nice dinner" is $$$ or fine dining at the hill where there is one, and says so when there isn't (2026-10-18).
@@ -4246,8 +4490,10 @@ function buildSkiDays(facts, ctx, days, pinned) {
     }
     if (dinner) { used.add(dinner.v.id); stops.push(themeStop(ctx, 'evening', dinner.v, { reasons: dinner.reasons }, dinner.fit, [], (dinner.caveats || []).concat(repeat ? [`Also planned on an earlier evening — few dinner spots at the hill are listed on ${SITE.brand}`] : []))); }
     else { stops.push({ daypart: 'evening', label: PLAN_DAYPART_LABELS.evening, venue: null, reasons: [], why: [], caveats: [] }); warnings.push(`No dinner spot open that evening was found at the hill for day ${d}.`); }
-    out.push({ day: d, region, regionLabel: region ? regionLabel(ctx, region) : null, stops: stops.sort((x, y) => dayparts.indexOf(x.daypart) - dayparts.indexOf(y.daypart)), missingFocus: [] });
+    // The lesson goes first on its morning (lesson, then the ski day), so the ski day's times start after it.
+    out.push({ day: d, region, regionLabel: region ? regionLabel(ctx, region) : null, stops: stops.sort((x, y) => dayparts.indexOf(x.daypart) - dayparts.indexOf(y.daypart) || (y.lessonStop ? 1 : 0) - (x.lessonStop ? 1 : 0)), missingFocus: [] });
   }
+  if (lessonAsked && !lessonPlanned) warnings.push('No ski or snowboard lesson company open on these dates is listed near the hill.');
   return { days: out, warnings, dayparts, themed: 'ski', notes };
 }
 
@@ -4705,7 +4951,11 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         const longHike=!trailTime&&one?.visits?.[0]?.durationSource!=='listing'?longDayHikeMinutes(candidate):null;
         // Tour test 5 (Whistler, 2026-11-17): a tour's own trip length (the operator's answer: half a day) sets its slot (a named
         // fishing charter was planned for 2 hours).
-        const ownTourMin=candidate.type==='tour'?TOUR_LENGTH_MINUTES[candidate.tourLength]||null:null;
+        // Tour test 17 (Whistler, 2026-11-18; Sarah: the Elaho leaves at 8 AM for a full day, the family float is 2.5 hours and
+        // was planned 8–10:30 AM): the trip of his list the request is for, with its own length and its own departures.
+        const ownTrip=candidate.type==='tour'?tourTripFor(candidate,requirements.text||input.text||'',date?Number(String(date).slice(5,7)):0):null;
+        const ownTourMin=candidate.type==='tour'?(ownTrip&&ownTrip.mins)||TOUR_LENGTH_MINUTES[candidate.tourLength]||null:null;
+        const tourDeps=ownTrip?(ownTrip.departs||[]):candidate.tourDepartures;
         let duration=Math.min(candidate.indoorGolf?120:1440,stop.gapFill||stop.afterSki?gapFillMinutes(candidate):trailTime||longHike||ownTourMin||(one?.complete?one.maxMinutes:hiking?180:(VISIT_ALLOWANCE[candidate.type]||60)));
         // Setting up camp (2026-10-25) is about 45 minutes, not a three-hour outdoor visit.
         if(stop.campBase)duration=45;
@@ -4770,12 +5020,24 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         const earlyDinner=Math.min(Number.isFinite(stop.dinnerFrom)?stop.dinnerFrom:Infinity,Number.isFinite(stop.keepStart)&&stop.keepStart>=DINNER_EARLIEST?stop.keepStart:Infinity);
         // Pub test 3 (Whistler, 2026-11-14): a meal's own time ("dinner at 7 PM", "lunch at 12:30 pm") is when it starts.
         const askedMeal=!beforeEvent&&requirements.mealMinutes?(isDinnerStop(stop)?requirements.mealMinutes.dinner:isLunchStop(stop)?requirements.mealMinutes.lunch:null):null;
-        const partStart=Number.isFinite(askedMeal)?askedMeal:isDinnerStop(stop)&&!beforeEvent&&earlyDinner<partStart0?earlyDinner:partStart0;
+        // Tour test 11 (Whistler, 2026-11-18; Min-jun's 9-hour Joffre Lakes trip was planned 1 PM–9 PM): a full-day tour (the
+        // operator's "A full day" or "Several days") starts in the morning, whatever part of the day it was put in.
+        const fullDayTour=candidate.type==='tour'&&(ownTourMin||0)>=360&&!isDinnerStop(stop)&&!isLunchStop(stop)&&!beforeEvent;
+        const partStart=Number.isFinite(askedMeal)?askedMeal:fullDayTour?Math.min(partStart0,540):isDinnerStop(stop)&&!beforeEvent&&earlyDinner<partStart0?earlyDinner:partStart0;
         // Round 9: a stop kept through a Swap starts no earlier than it did (keepStart, from the plan on screen).
         // Round 11 (2026-10-20): the swapped stop before a show is timed by the show, not by the old stop's start (a second
         // dinner Swap before a 7:30 PM show left no dinner: the new place was a little further and could not start at 5:15).
         const fillStart=Math.max(stop.gapFill&&Number.isFinite(stop.fillStart)?stop.fillStart:0,Number.isFinite(stop.keepStart)&&!(beforeEvent&&stop.swapSlot)?stop.keepStart:0,nightStop&&(stop===nightStop||stop.listedNight)&&askedNightStart(stop)!=null?askedNightStart(stop):0);
-        let range=ranges.find(([a,b])=>Math.max(a,earliest,partStart,fillStart)+duration<=Math.min(b,1440,beforeEvent?eventStart-30-(eventTravel?.maxMinutes||0):1440));
+        // Tour test 16 (Whistler, 2026-11-18; Tom's tours leave at 7 AM and 5:30 PM; the plan put him at 1–3:30 PM): a tour
+        // with its own departure times starts at the one nearest the part of the day it was put in that fits its hours.
+        let dep=null,depRange=null;
+        if(candidate.type==='tour'&&Array.isArray(tourDeps)&&tourDeps.length&&!stop.gapFill&&!beforeEvent&&!Number.isFinite(askedMeal)){
+          // The time asked for ("evening bear tour"), else the part of the day the stop is in.
+          const anchor=Math.max(partStart,fillStart)||(Number.isFinite(requirements.startMinutes)?requirements.startMinutes:0)||({morning:540,midday:720,afternoon:780,late:930,evening:1080,night:1080}[stop.daypart]||earliest);
+          // The day's first stop may start with an early departure (a 7 AM bear tour on a day planned from 9 AM).
+          for(const t of tourDeps){if(t<earliest&&!(!previous&&t>=360))continue;const r=ranges.find(([a,b])=>a<=t&&t+duration<=Math.min(b,1440));if(!r)continue;if(dep==null||Math.abs(t-anchor)<Math.abs(dep-anchor))dep=t,depRange=r;}
+        }
+        let range=depRange||ranges.find(([a,b])=>Math.max(a,earliest,partStart,fillStart)+duration<=Math.min(b,1440,beforeEvent?eventStart-30-(eventTravel?.maxMinutes||0):1440));
         // Round 9: before a fixed-time event (a 2 PM escape room), lunch or a walk is shortened to fit -- an hour for a
         // meal, 45 minutes for a visit -- rather than a "Timing conflict".
         let squeezed=null;
@@ -4794,7 +5056,7 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
           if(squeezed!=null&&squeezed<least)range=null;
         }
         if(!range)return {bad:true};
-        let start=Math.max(range[0],earliest,partStart,fillStart);
+        let start=dep!=null?dep:Math.max(range[0],earliest,partStart,fillStart);
         // Round 9 (2026-10-19): an outdoor filler (one swapped in too) starts early enough to end 30 minutes before sunset.
         if(stop.gapFill&&['outdoor','beach'].includes(candidate.type)&&!candidate.indoorGolf){const light=tripRequirements.estimateDaylight(date,candidate);if(light&&start+duration>light.sunsetMinutes-30)start=Math.max(range[0],earliest,Math.floor((light.sunsetMinutes-30-duration)/5)*5);}
         // Lunch is lunch (2026-10-19): it starts by about 13:30 unless the morning itself runs later; a place that only
@@ -4821,7 +5083,7 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
             if(start>t-10&&start-t<=60&&early<start&&early+Math.max(visit,TOUR_ALLOWANCE+15)<=limit){start=early;visit=Math.max(visit,t+TOUR_ALLOWANCE-start);break;}
           }
         }
-        return {start,end:start+visit,wait:start-earliest,transfer,unknownHours, textHours:!!textHours,provisional:unknownHours||hiking||!!textHours||!one?.complete||guessed||guessedTransfer,listingTiming:!!textHours||one?.visits?.[0]?.durationSource==='listing'};
+        return {start,end:start+visit,wait:start-earliest,transfer,unknownHours,departure:dep!=null, textHours:!!textHours,provisional:unknownHours||hiking||!!textHours||!one?.complete||guessed||guessedTransfer,listingTiming:!!textHours||one?.visits?.[0]?.durationSource==='listing'};
       };
       let timed=fit(v);
       // Round 8 (2026-10-19): a ski day is on the hill from about 9 AM to 3:30 PM; lunch is a break on the hill inside
@@ -4873,6 +5135,9 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         }
       }
       const item={day:group.day,date,venueId:v?.id,status:timed?.bad?'unmet':timed?(timed.provisional||provisional?'provisional':'estimated'):'unverified',assumedStart:assumed};
+      // Tour test 16: a tour's time on the card is its own departure ("departure": true), or "Book a departure time" when the
+      // operator listed none (bookDeparture), never a made-up afternoon slot. Rentals-only operators keep their hours.
+      if(v&&v.type==='tour'&&timed&&!timed.bad){if(timed.departure)item.departure=true;else if(requirements.startMinutes==null&&!(Array.isArray(v.tourKinds)&&v.tourKinds.length&&v.tourKinds.every(k=>k==='rentals')))item.bookDeparture=true;}
       let note;
       if(timed&&!timed.bad){
         Object.assign(item,{startMinutes:timed.start,endMinutes:timed.end,waitMinutes:timed.wait,transferMinutes:timed.transfer});
@@ -5744,7 +6009,7 @@ function trailMinutes(v) {
 }
 // Planning allowances (minutes) for a visit with no estimate of its own (2026-10-19).
 // The operator's own trip length answer (server.js TOUR_LENGTHS) in minutes; 'multi' (several days) is a full day here.
-const TOUR_LENGTH_MINUTES = { '1h': 60, '2-3h': 150, half: 240, full: 480, multi: 480 };
+const TOUR_LENGTH_MINUTES = { '1h': 60, '1-2h': 90, '2-3h': 150, half: 240, full: 480, multi: 480 };
 const VISIT_ALLOWANCE = { outdoor: 90, beach: 120, indoor: 90, tour: 120, sport: 90, golf: 240, cafe: 40, restaurant: 90, pub: 90, brewery: 60, winery: 75, distillery: 60, cocktail: 60 };
 // An evening meal (2026-10-19): a stop labelled dinner, or a restaurant or pub in the evening slot. Its time is never
 // pulled forward into the afternoon.
@@ -6837,6 +7102,9 @@ function planTripUnchecked(input) {
   if (requirements.startDate && /^next week$/i.test(String(requirements.dateSource || '').trim())) intent.unsupported = (intent.unsupported || []).filter((u) => String(u).toLowerCase() !== 'next week');
   const consumed = tripRequirements.consumedTerms(requirements);
   if (requirements.items.some(i=>i.kind==='transport')) intent.unsupported = (intent.unsupported || []).filter(u=>!['no car','car free','without a car','on foot','walkable'].includes(String(u).toLowerCase()));
+  // Tour test 16: "can you pick us up" / "hotel pickup" is read (tours with hotel pickup first), not an unknown word.
+  if (PICKUP_ASK_RE.test(normWords(requirements.text || input.text || ''))) intent.unsupported = (intent.unsupported || []).filter(u=>!/^(?:pick|picks|picked|pickup|pickups|pick up|hotel pickup|hotel pick up|prise|charge|prise en charge|cueillette)$/.test(String(u).toLowerCase()));
+  if (PICKUP_ASK_RE.test(normWords(requirements.text || input.text || ''))) intent.foodTerms = (intent.foodTerms || []).filter((f)=>!(f && !f.cuisine && /^(?:pick|picks|picked|pickup|pickups|pick up|hotel|hotels|prise|charge|cueillette)$/.test(String(f.term || '').toLowerCase())));
   // "No driving after 6pm" is an evening rule the plan applies (2026-10-18), not something it ignores; a request with
   // it is a day plan even without a length ("wine tour in Brackendale, no driving after 6pm").
   const eveningWalk = requirements.items.find(i=>i.kind==='evening_walk');
@@ -6850,12 +7118,26 @@ function planTripUnchecked(input) {
   // viewing tour near Squamish on July 20" found only listings with exactly those words and left the rafting company
   // that runs bear tours as "Another listing". The wildlife tour kind covers those words.
   if (requirements.items.some(i => i.kind === 'venue_kind' && i.value === 'wildlife_tour' && i.strength === 'must')) intent.foodTerms = intent.foodTerms.filter(f => !(f.cuisine && WILDLIFE_TOUR_WORDS_RE.test(normWords(f.term))));
+  // Tour test 13 (Whistler, 2026-11-18; Matthias): the paragliding kind covers its own words ("paragliding" came back as
+  // a category word to match, “paragliding” in the summary).
+  if (requirements.items.some(i => i.kind === 'venue_kind' && i.value === 'paragliding' && i.strength === 'must')) intent.foodTerms = intent.foodTerms.filter(f => !tripRequirements.KINDS.paragliding.test(normWords(f.term)) && !/^(?:tandem|gliding|glide|flights?)$/.test(normWords(f.term)));
+  // Tour test 14 (Whistler, 2026-11-18; Lucía, private ski lessons): the lesson kinds cover their own words, and a lesson
+  // request's language ("Spanish speaking"), "adaptive" and "week" are notes on the lesson stop, not words to find
+  // ("Places that mention “spanish”, “speaking” and “instructor”").
+  // The broader pass: "rock climbing lessons", "mountain bike coaching", "sailing course" too (“lessons” to find).
+  for (const k of ['ski_lessons', 'kite_lessons', 'shooting', 'mountain_guide', 'bike_tour', 'boat_tour', 'paddle_tour']) {
+    if (!requirements.items.some(i => i.kind === 'venue_kind' && i.value === k && i.strength === 'must')) continue;
+    intent.foodTerms = intent.foodTerms.filter(f => { const w = normWords(f.term); return !(['ski_lessons', 'kite_lessons', 'shooting'].includes(k) && tripRequirements.KINDS[k].test(w)) && !LESSON_REQUEST_WORDS_RE.test(w); });
+  }
   // Every tour kind (2026-11-17, after Whistler tour test 5): a fishing trip, heli-skiing or a snowshoe tour is that kind of
   // tour, not also the fishing, skiing or snowshoeing activity ("Fishing charter in Squamish" planned 8 lakes and beaches).
   {
     const kindMust = (k) => requirements.items.some(i => i.kind === 'venue_kind' && i.value === k && i.strength === 'must');
     const asked = normWords(requirements.text || input.text || '');
-    const dropActs = [...(kindMust('fishing_tour') ? ['fishing', ...(/\b(?:nature|wildlife|birds?|birding|eagles?)\b/.test(asked) ? [] : ['nature']), ...(/\b(?:swim\w*|beach\w*|paddl\w*|kayak\w*|water sports?)\b/.test(asked) ? [] : ['water'])] : []), ...(kindMust('heli_ski') ? ['skiing', 'winter'] : []), ...(kindMust('snowshoe_tour') ? ['snowshoeing', 'winter'] : []), ...(kindMust('ski_touring') || kindMust('avalanche_course') ? ['skiing', 'winter'] : []), ...(kindMust('multi_day_tour') || kindMust('mountain_guide') ? ['hiking'] : [])];
+    const dropActs = [...(kindMust('fishing_tour') ? ['fishing', ...(/\b(?:nature|wildlife|birds?|birding|eagles?)\b/.test(asked) ? [] : ['nature']), ...(/\b(?:swim\w*|beach\w*|paddl\w*|kayak\w*|water sports?)\b/.test(asked) ? [] : ['water'])] : []), ...(kindMust('heli_ski') ? ['skiing', 'winter'] : []), ...(kindMust('snowshoe_tour') ? ['snowshoeing', 'winter'] : []), ...(kindMust('ski_touring') || kindMust('avalanche_course') ? ['skiing', 'winter'] : []), ...(kindMust('multi_day_tour') || kindMust('mountain_guide') ? ['hiking'] : []),
+      // Tour test 14 broader pass: "mountain bike lessons / coaching / camp" is the bike school, not also the trails.
+      ...(kindMust('bike_tour') && /\b(?:lessons?|coaching|camps?|clinics?|schools?)\b/.test(asked) ? ['cycling'] : []),
+      ...(kindMust('mountain_guide') && /\b(?:lessons?|courses?|camps?|schools?|instruction)\b/.test(asked) ? ['adventure'] : [])];
     if (dropActs.length) {
       intent.activities = (intent.activities || []).filter(a => !dropActs.includes(a));
       requirements = { ...requirements, items: requirements.items.filter(i => !(i.kind === 'activity' && dropActs.includes(i.value)) && !(i.kind === 'type' && i.value === 'outdoor' && dropActs.includes('skiing') && !(intent.types || []).includes('outdoor'))) };
@@ -6893,6 +7175,14 @@ function planTripUnchecked(input) {
     intent.activities = (intent.activities || []).filter((a) => !['winter', 'skiing'].includes(a));
     input = { ...input, requirements, skiOffSeason: skiOff };
   }
+  // Tour test 14 (Whistler, 2026-11-18; Lucía): a ski or snowboard lesson asked for in the ski season (or with no date) is a
+  // ski day with the lesson added ("Spanish speaking ski instructor" and "adaptive ski lessons" were lists of places that
+  // mention “spanish” or “adaptive”, "kids ski camp week in March" said "No ski hill could be fitted"). Undated before the
+  // lifts open, the ski day plans the coming season (buildSkiDays) and says when the hill opens.
+  if (!skiOff && ['find', 'recommend'].includes(intent.mode) && !length && !input.trip?.multi && requirements.items.some(i => i.kind === 'venue_kind' && i.value === 'ski_lessons' && i.strength === 'must') && skiWordsAsked(normWords(requirements.text || input.text || ''))) {
+    intent.mode = 'plan'; intent.days = intent.days || 1;
+    intent.foodTerms = (intent.foodTerms || []).filter((f) => f.cuisine);
+  }
   if (input.trip?.explicitStops && length?.value > 1) input.trip = null;
   if (intent.mode === 'events' && length && (!input.trip?.multi || length.value > 1)) {
     intent.mode = 'plan'; intent.days = requirements.items.find(i => i.kind === 'days').value;
@@ -6906,7 +7196,7 @@ function planTripUnchecked(input) {
   // A single rainy day ("rainy Sunday in Whistler") is about indoor places; the weekday is just when it is.
   if (intent.mode==='find' && !intent.types?.length && requirements.items.some(i=>i.kind==='rainy'&&i.strength==='must'&&!i.dayIndex)) intent.types=['indoor'];
   const requestedKinds = requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
-  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour'].includes(i.value)?'tour':'indoor'))];
+  if (!intent.types?.length && requestedKinds.length) intent.types = [...new Set(requestedKinds.map(i=>tripRequirements.isSportKind(i.value)?'sport':['horseback','sunset','park','walk','easy_walk','challenging_hike'].includes(i.value)?'outdoor':tripRequirements.TOUR_PLANNER_KINDS.includes(i.value)?'tour':'indoor'))];
   {
     const trip = tripRequirements.expandTripComponents(input.trip || {regions:intent.regions||[],party:intent.party||{},when:intent.when}, requirements);
     const tripEvents = (input.tripEvents || []).slice();
@@ -6945,7 +7235,7 @@ function planTripUnchecked(input) {
   if(requirements.items.some(i=>i.kind==='feature'&&i.value==='dog_friendly')) intent.party = { ...intent.party, dog:false };
   if(requirements.items.some(i=>i.kind==='excluded_kind')) {
     const kinds=requirements.items.filter(i=>i.kind==='excluded_kind').map(i=>i.value);
-    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour'].includes(k)?'tour':'indoor'));
+    const categories=new Set(kinds.map(k=>['park','sunset','horseback','walk','easy_walk','challenging_hike'].includes(k)?'outdoor':tripRequirements.TOUR_PLANNER_KINDS.includes(k)?'tour':'indoor'));
     intent.excluded={...intent.excluded,types:(intent.excluded?.types||[]).filter(t=>!categories.has(t))};
   }
   if(input.trip?.explicitStops && ['date_night','romantic'].includes(intent.occasion))input.trip={...input.trip,outingOccasion:intent.occasion};
@@ -8405,7 +8695,18 @@ function ownerClosureToday() {
 }
 const OPERATING_MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
 const OPERATING_PERIOD_RE = new RegExp(`\\b(?:opens?|operates?|runs?)\\s+(?:daily\\s+)?(?:from\\s+)?(${OPERATING_MONTHS.join('|')})\\s+(?:to|through|until|into)\\s+(?:(?:early|mid|late)\\s+)?(${OPERATING_MONTHS.join('|')})\\b`);
+// Tour test 13 (Whistler, 2026-11-18; Matthias: "winter only by request"): a tour that ticked "Off-season trips by
+// request" is not closed for its season (its stop says "by request, rare": seasonOffRequest); its owner closures are.
 function seasonClosedOnTrip(v, season) {
+  if (v && v.tourOffRequest && !(v.ownerClosures && v.ownerClosures.some((c) => ((season && season.date) || ownerClosureToday()) >= c.from && ((season && season.date) || ownerClosureToday()) <= c.to))) return false;
+  return seasonClosedOnTripRaw(v, season);
+}
+function seasonOffRequest(v, ctx) {
+  if (!v || !v.tourOffRequest) return false;
+  const date = ctx && ctx.tripDate ? (ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month) ? monthDate(ctx.seasonInfo.month, ctx.tripDate) : ctx.tripDate) : null;
+  return date ? seasonClosedOnTripRaw({ ...v, ownerClosures: undefined }, { date }) : !!v.seasonClosedToday;
+}
+function seasonClosedOnTripRaw(v, season) {
   const d = season && season.date;
   // An owner's special closure (2026-10-18): closed on those dates, or today when the plan has no date.
   if (v.ownerClosures && v.ownerClosures.some((c) => (d || ownerClosureToday()) >= c.from && (d || ownerClosureToday()) <= c.to)) return true;
@@ -9071,6 +9372,8 @@ function scheduleNotes(result, ctx) {
 }
 
 module.exports = {
+  // Tour test 17 (Whistler, 2026-11-18)
+  regionMinutes, PICKUP_ASK_RE, KIND_SEASON_ASK_WORDS, kindSeasonOff, tourTripFor, normWords,
   dropNameOnlyTypes,
   skiWordsAsked,
   // Site audit (2026-10-27)

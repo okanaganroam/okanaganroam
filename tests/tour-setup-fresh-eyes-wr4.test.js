@@ -209,7 +209,8 @@ test('1. a free or by-donation tour: typed in the same price box, stored with th
   assert.match(CLIENT, /if \(pfree !== S\.savedTourPrice \|\| CUR\.tour_price_waiting != null\) pl\.push\(\{ tour_price: pfree \}\);/);
   assert.match(CLIENT, /return S\.tour\.free && T\.tpriceLeadFree \? T\.tpriceLeadFree :/);
   assert.match(CLIENT, /S\.savedTourPrice === 'free' \|\| S\.savedTourPrice === 'donation' \? \(T\.tfreeCard \|\| 'Free'\)/);
-  assert.match(CLIENT, /field\('suTprice', T\.tpriceLabel, boxVal\('suTprice', tp\.price\), \{ max: 40 \}\) \+ \(T\.tpriceFreeTip \? '<p class="su-hint" id="suFreeTip">'/);
+  // Tour test 16 (2026-11-18): "Free or by donation? Type free." moved from under the price box to Help (tour-price); the
+  // price screen's one line and a typed "free" saving are run in tour-test16-fixes.test.js (13 and 17).
   assert.match(CLIENT, /C\.researchFreeHint && S\.savedTourPrice == null && !tp\.free && T\.tpriceFreeHint \? '<p class="su-sent su-research" id="suFreeHint">'/);
 });
 
@@ -512,23 +513,25 @@ test('10. wording and small items: "end of February", "tap Next", "Address or me
   const c = cfgOf((await get(`/owner/${t}/setup`)).text), f = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
   assert.equal(c.t.hoursBack, 'We put back the hours you had before. Check them, then tap Next.');
   assert.match(f.t.hoursBack, /puis touchez Suivant\.$/);
-  assert.equal(c.t.streetLabel, 'Address or meeting point'); assert.equal(f.t.streetLabel, 'Adresse ou point de rencontre');
+  // Tour test 15 (Dayton): the business address.
+  assert.equal(c.t.streetLabel, 'Address (your office or main spot)'); assert.equal(f.t.streetLabel, 'Adresse (votre bureau ou point principal)');
   const rc = cfgOf((await get(`/owner/${tokenFor(mk('restaurant').id)}/setup`)).text);
   assert.equal(rc.t.streetLabel, 'Street address'); assert.equal(rc.t.hoursBack, c.t.hoursBack);
   // Category words: one list, one capital; acronyms and hyphenated names stay.
   assert.equal(app.tourKindsText(['walking', 'food'], false, 'Walking tours & food tours'), 'Walking tours & food tours');
   assert.equal(app.tourKindsText(['walking', 'food'], true, 'Walking tours & food tours'), 'Visites à pied et visites gourmandes');
   assert.equal(app.tourKindsText(['snowmobile', 'dogsled'], false, ''), 'Snowmobile tours & dog sledding');
-  assert.equal(app.tourKindsText(['fishing', 'raft', 'jetboat'], false, ''), 'Jet boat tours, fishing & rafting') // list order (tour test 5);
+  assert.equal(app.tourKindsText(['fishing', 'raft', 'jetboat'], false, ''), 'Fishing, rafting & jet boat tours'); // tour test 17: the owner's own chip order (was list order, tour test 5)
   assert.equal(app.tourKindsText(['snowmobile', 'adventure'], false, 'Snowmobile & ATV tours'), 'Snowmobile tours & ATV tours');
   ok(await change(t, { tour_info: { kinds: ['walking', 'food'], length: '1h' } }));
   assert.equal(app.getVenue(v.id).cuisine, 'Walking tours & food tours');
   // The page: "Category" (not Cuisine) for a tour, and "Meeting point" once the Basics question is confirmed.
   assert.match(plain(page(v, 'en')), /Good to Know Category Walking tours & food tours Address Gyro Park/);
+  // Tour test 15 (Dayton, 2026-11-18): a tour's address stays "Address" (no meeting-point label).
   await progress(t, 'basics');
-  assert.equal(app.tourAddressIsMeetingPoint(app.getVenue(v.id)), true);
-  assert.match(plain(page(v, 'en')), /Category Walking tours & food tours Meeting point Gyro Park, 99 Main St, Penticton/);
-  assert.match(plain(page(v, 'fr')), /Catégorie Visites à pied et visites gourmandes Point de rencontre Gyro Park/);
+  assert.equal(app.tourAddressIsMeetingPoint(app.getVenue(v.id)), false);
+  assert.match(plain(page(v, 'en')), /Category Walking tours & food tours Address Gyro Park, 99 Main St, Penticton/);
+  assert.match(plain(page(v, 'fr')), /Catégorie Visites à pied et visites gourmandes Adresse Gyro Park/);
   const rest = mk('restaurant', { cuisine: 'Canadian' });
   await progress(tokenFor(rest.id), 'basics');
   assert.match(plain(page(rest, 'en')), /Cuisine Canadian Address /);
@@ -551,11 +554,13 @@ test('11. bug 12, the safe part: a published list with trips of different length
   list([{ name: 'History walk', price: 'Pay what you want', description: '75 minutes · Every day at 10 AM and 2 PM. All ages.' }, { name: 'Food tasting tour', price: '$129', description: '3 hours · Thursday to Sunday at 4 PM. Tastings are for 19 and over.' }, { name: 'Private walk', price: 'From $400' }]);
   assert.deepEqual(app.tourListVaries(v.id), { length: true, ages: true });
   const en = plain(page(v, 'en')), fr = plain(page(v, 'fr'));
-  assert.match(en, /Time needed Up to 1 hour\. Varies by tour: see Tours & prices\./);
-  assert.match(en, /Booking Book at least a day ahead\. Varies by tour: see Tours & prices\./);
+  // Tour test 11 (2026-11-18): Time needed gives the shortest to the longest trip when they vary.
+  assert.match(en, /Time needed 75 minutes to 3 hours\. Varies by tour: see Tours & prices\./);
+  // Tour test 13: Booking says "Varies by tour" only when a typed tour has its own booking words (none here).
+  assert.match(en, /Booking Book at least a day ahead\.(?! Varies)/);
   assert.match(en, /Ages All ages\. Varies by tour: see Tours & prices\./);
-  assert.match(fr, /Durée Jusqu’à 1 heure\. Varie selon la sortie : voir Sorties et tarifs\./);
-  assert.match(fr, /Réservation Réservez au moins la veille\. Varie selon la sortie : voir Sorties et tarifs\./);
+  assert.match(fr, /Durée De 75 minutes à 3 heures\. Varie selon la sortie : voir Sorties et tarifs\./);
+  assert.match(fr, /Réservation Réservez au moins la veille\.(?! Varie)/);
   assert.doesNotMatch(en, /Prices From \$35 a person\. Varies/);
   // Nothing stored changes, and the card's length chip is as it was.
   assert.equal(box(v.id).rows.find((x) => x.label === 'Time needed').text, 'Up to 1 hour.');

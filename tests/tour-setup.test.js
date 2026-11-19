@@ -68,13 +68,16 @@ test('a tour gets its own setup: 7 essentials, 5 optional screens, tour words, a
   const t = tokenFor(v.id);
   assert.deepEqual(app.setupParts('tour').part1, ['basics', 'hours', 'tour', 'price', 'booking', 'offer', 'photos']);
   // Tour test 1 (2026-11-16): "Your tours and prices" (the menu feature in tour words) leads the optional screens.
-  assert.deepEqual(app.setupParts('tour').part2, ['menu', 'story', 'bring', 'groups', 'social', 'door']);
+  // Tour test 15 (Dayton, 2026-11-18): no 'door' (meeting spot) step for tours.
+  // Tour simplify (Dayton, 2026-11-18): holidays and closures are an optional tile, the last of the extra details.
+  assert.deepEqual(app.setupParts('tour').part2, ['menu', 'story', 'bring', 'groups', 'social', 'closures']);
   const r = await get(`/owner/${t}/setup`);
   assert.equal(r.status, 200);
   const c = cfgOf(r.text);
   assert.equal(c.tour, true);
   assert.equal(c.combo, true);
-  assert.deepEqual(c.steps, ['basics', 'hours', 'tour', 'price', 'booking', 'offer', 'photos', 'menu', 'story', 'bring', 'groups', 'social', 'door']);
+  assert.deepEqual(c.steps, ['basics', 'hours', 'tour', 'price', 'booking', 'offer', 'photos', 'menu', 'story', 'bring', 'groups', 'social', 'closures']);
+  assert.equal(c.closuresTile, true);
   assert.equal(c.t.labels.hours, 'When you run');
   assert.equal(c.t.labels.door, 'Where do people meet you?');
   assert.equal(c.t.noSetHours, 'We don’t have set hours. Trips are by booking only');
@@ -280,7 +283,7 @@ test('Build My Trip: the season, the minimum age with kids, and the operator’s
   assert.match(famNotes, /Ages 6 and up \(the operator’s own answer\)\./);
   assert.match(famNotes, /Same-day bookings are often fine/);
   // The planner's facts for a tour, and the kids rule itself.
-  assert.deepEqual(app.tourPlannerFacts(v.id), { tourMinAge: '16', tourBookAhead: 'day', tourLength: '2-3h', tourPrice: 189, tourKinds: ['snowmobile'] });
+  assert.deepEqual(app.tourPlannerFacts(v.id), { tourMinAge: '16', tourAdultRule: { age: 18, waiver: false }, tourBookAhead: 'day', tourLength: '2-3h', tourPrice: 189, tourKinds: ['snowmobile'] });
   const tp = require('../trip-planner.js');
   assert.equal(tp.kidsAllowed({ type: 'tour', tourMinAge: '16' }), false);
   assert.equal(tp.kidsAllowed({ type: 'tour', tourMinAge: '12' }), false);
@@ -331,7 +334,7 @@ test('help topics for tours, in English and French, on the setup and the edit pa
     'private tour price': 'tour-price', 'price per person': 'tour-price',
     'minimum age': 'tour-age', 'can kids come': 'tour-age',
     'we run multi-day trips': 'tour-multiday',
-    'our office is not the meeting point': 'tour-meeting', 'hotel pickup': 'tour-meeting',
+    'our office is not the meeting point': 'tour-meeting', 'hotel pickup': 'tour-pickup', // tour test 11: the pickup option's own answer
     'we sell gift cards': 'tour-gift',
     'private bookings for groups': 'tour-groups',
     'how long until it shows on my page': 'setup-live-when',

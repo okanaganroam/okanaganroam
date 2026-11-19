@@ -403,11 +403,17 @@ function t3DayPinLayout(points, assets) {
 }
 // A stop card's "why" lines (round 14, 2026-10-20): at most two, without the listed hours (shown once, as the hours line
 // below; « Les horaires varient… » was printed twice in French) or a straight-line distance.
+// Tour test 18 (Whistler, 2026-11-18): "Hotel pickup" (asked for, and the operator's own answer) was the first "why" line,
+// inside the closed "Why it fits" box, so nobody saw it. It is its own line on the card, always shown (t3PickupLine), and
+// not repeated in the box.
+function t3PickupLine(stop) {
+  return ((stop && stop.why) || []).find((w) => /^(?:Hotel pickup|Prise en charge à l\u2019hôtel)$/.test(w)) || '';
+}
 function t3WhyLines(stop) {
   const v = (stop && stop.venue) || {};
-  return ((stop && stop.why) || []).filter((w) => !(v.listedHours && (/^(Listed hours|Horaires indiqu\u00e9s|Les horaires varient)/.test(w) || w === v.listedHours)) && !/\(straight line\)/.test(w)).slice(0, 2);
+  return ((stop && stop.why) || []).filter((w) => !/^(?:Hotel pickup|Prise en charge à l\u2019hôtel)$/.test(w) && !(v.listedHours && (/^(Listed hours|Horaires indiqu\u00e9s|Les horaires varient)/.test(w) || w === v.listedHours)) && !/\(straight line\)/.test(w)).slice(0, 2);
 }
-const CLIENT_HELPERS_SRC = [t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
+const CLIENT_HELPERS_SRC = [t3PickupLine, t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
   ...SITE_PAGE.examples,
@@ -690,6 +696,7 @@ function renderStyles() {
   .t3-badge-more { background: none; border: 1px dashed rgba(42,107,103,0.45); color: var(--teal-deep, #1E4F4C); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 0.76rem; font-weight: 800; cursor: pointer; min-height: 44px; } /* round 9 (2026-10-19): 44px tap target */
   .t3-badges li.is-collection { background: rgba(201,162,39,0.16); color: #6B5410; }
   .t3-hours { margin: 0 0 8px; font-size: 0.84rem; color: rgba(27,43,58,0.8); }
+  .t3-pickup { margin: 0 0 8px; font-size: 0.86rem; font-weight: 800; color: #1F5450; }
   .t3-hh { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: #7C2D12; }
   .t3-sp { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: #1E4F4C; }
   .t3-wn { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: #4B3A78; }
@@ -1440,6 +1447,8 @@ function renderScript(d) {
       var r = rows[i];
       if (day != null && r.day !== day) continue;
       var hit = s.event ? r.eventId === s.event.id : (s.venue && r.venueId === s.venue.id);
+      // Tour test 16 (Whistler, 2026-11-18): a tour with no departure times of its own says so, never a made-up slot.
+      if (hit && r.bookDeparture) return lang() === 'fr' ? 'Réservez une heure de départ' : 'Book a departure time';
       if (hit && typeof r.startMinutes === 'number') return clockLabel(r.startMinutes) + (typeof r.endMinutes === 'number' ? '–' + clockLabel(r.endMinutes) : '');
     }
     return '';
@@ -1495,6 +1504,9 @@ function renderScript(d) {
       // Cocktail lounges (2026-11-13): "Cocktails from $16" / « Cocktails à partir de 16 $ » (cocktail test 2: one French
       // wording, the card's « À partir de », not « dès »).
       var fromWord = cost.label === 'Flight' ? (french ? 'Palettes à partir de ' : 'Flights from ') : cost.label === 'Tasting' ? (french ? 'Dégustations à partir de ' : 'Tastings from ') : cost.label === 'Cocktail' ? (french ? 'Cocktails à partir de ' : 'Cocktails from ') : cost.label === 'Tour' ? (french ? 'À partir de ' : 'From ') : '';
+      // Tour test 15 (Whistler, 2026-11-18): a rental asked for shows the operator's own rental price as typed ("Canoe rental:
+      // $45 per boat per hour"), not a price per person.
+      if (cost.label === 'Rental' && cost.unit) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc((cost.item ? cost.item + ': ' : '') + (french ? cost.unitFr || cost.unit : cost.unit)) + '</strong></p>';
       if (fromWord) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(fromWord + cad(cost.cents)) + '</strong></p>';
       return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(cad(cost.cents) + (french ? ' / personne' : ' per person')) + '</strong> · '
         + esc(french ? cost.labelFr : cost.label) + (typeof cost.source === 'string' && cost.source.startsWith('https://') ? ' · <a ' + hrefAttr(cost.source) + '>' + esc(french ? 'Source' : 'Price source') + '</a>' : '') + '</p>';
@@ -1559,6 +1571,7 @@ function renderScript(d) {
       + (stop.specialLine ? '<p class="t3-sp">' + (lang() === 'fr' && stop.specialsFr ? esc(stop.specialLineLabelFr) + ' : <span' + (stop.specialLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.specialsFr) + '</span>' : esc(stop.specialLine)) + '</p>' : '')
       // Weekly nights (2026-10-27): an evening stop on one of the venue's nights ("Tonight: Trivia at 7 PM").
       + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : lang() === 'fr' && stop.nightLineFr ? esc(stop.nightLineFr) : esc(stop.nightLine)) + '</p>' : '')
+      + (t3PickupLine(stop) ? '<p class="t3-pickup">\u2713 ' + esc(t3PickupLine(stop)) + '</p>' : '')
       + (why ? '<details class="t3-fit"><summary>' + esc(tx('tripv3.whyFits')) + '</summary><ul class="t3-why">' + why + '</ul></details>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
@@ -1926,7 +1939,7 @@ function renderScript(d) {
       // three or four screens down on a phone.
       var stopCount=timeline.filter(function(r){return !r.notScheduledMeal;}).length;
       html+='<details class="t3-warnings t3-timeline" aria-label="'+(french?'Horaire du voyage':'Trip timeline')+'"><summary><strong>'+(french?'Votre horaire':'Your timeline')+'</strong> · '+(french?stopCount+(stopCount===1?' arrêt':' arrêts')+', heures et trajets':stopCount+(stopCount===1?' stop':' stops')+', times and travel')+'</summary><p>'+(french?'Visites et trajets estimés; heures des événements indiquées par les fiches. Confirmez avant de partir.':'Visits and travel are estimates; event times come from listings. Confirm before visiting.')+'</p><ol>'+timeline.map(function(row,n){
-        var time=row.notScheduledMeal?(french?'Non planifié':'Not scheduled'):Number.isFinite(row.startMinutes)?clock(row.startMinutes)+(Number.isFinite(row.endMinutes)?'–'+clock(row.endMinutes):' · '+(french?'fin inconnue':'end unknown')):(french?'Horaire à confirmer':'Timing unverified');
+        var time=row.notScheduledMeal?(french?'Non planifié':'Not scheduled'):row.bookDeparture?(french?'Réservez une heure de départ':'Book a departure time'):Number.isFinite(row.startMinutes)?clock(row.startMinutes)+(Number.isFinite(row.endMinutes)?'–'+clock(row.endMinutes):' · '+(french?'fin inconnue':'end unknown')):(french?'Horaire à confirmer':'Timing unverified');
         if(row.mealWindow)time=(french?'Arrivée possible pour le souper : ':'Possible dinner arrival: ')+clock(row.mealWindow.earliestStartMinutes)+'–'+clock(row.mealWindow.latestStartMinutes);
         var detail=[];
         if(row.mealWindow)detail.push(french?'Fenêtre conditionnelle selon les horaires indiqués; trajet et service en cuisine à confirmer. Aucun horaire de visite fixé.':'Conditional window based on listed hours; travel and kitchen service need confirmation. No visit time is scheduled.');
@@ -2636,4 +2649,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { t3WhyLines, t3ClosedDayText, t3MissingClosedText, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3PickupLine, t3WhyLines, t3ClosedDayText, t3MissingClosedText, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };

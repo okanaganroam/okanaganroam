@@ -13,7 +13,9 @@ const http = require("node:http");
 const vm = require("node:vm");
 
 const DB_FILE = path.join(__dirname, "..", "okanagan.db");
-if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
+// Tour test 16 (2026-11-18): the -wal and -shm files go too. Run in the same `node --test` call as another file that
+// rebuilt the database, a left-over -wal from that run was replayed into this fresh file (the two passed only alone).
+for (const s of ["", "-wal", "-shm", "-journal"]) { try { fs.unlinkSync(DB_FILE + s); } catch (e) { /* not there */ } }
 process.env.ENRICHMENT_ADMIN_TOKEN = "tour-help-admin-token";
 delete process.env.BREVO_API_KEY;
 const app = require("../server.js");
@@ -465,9 +467,10 @@ test("tour test 7 answers: group words for a day rate (no boat), private-only sa
   assert.match(pb, /whole group/); assert.match(pb, /day rate/i); assert.doesNotMatch(pb, /\$650 for 4|163/);
   assert.match(plain(en.topic("tour-private-only").a), /^ ?Yes\b/); assert.match(plain(fr.topic("tour-private-only").aFr), /^ ?Oui\b/);
   assert.match(plain(en.topic("tour-hide-price").a), /^ ?Yes, if you have a private price/);
-  assert.match(plain(en.topic("tour-course-dates").a), /Your tours and prices/); assert.match(plain(en.topic("tour-course-dates").a), /Don’t add course days under Holidays/);
+  assert.match(plain(en.topic("tour-course-dates").a), /Your tours and prices/); assert.match(plain(en.topic("tour-course-dates").a), /Don’t add course days under Closures and holidays/); // tour simplify: the closures tile
   assert.match(plain(en.topic("tour-certs").a), /story/); assert.match(plain(en.topic("tour-fitness").a), /Good to know/); assert.match(plain(en.topic("tour-gear").a), /Good to know/);
-  assert.match(plain(en.topic("tour-meeting-varies").a), /Keep your office/);
+  // Tour test 15 (Dayton): no meeting-spot step for tours; the office or main spot is the address.
+  assert.match(plain(en.topic("tour-meeting-varies").a), /put your main spot or office in Basics/);
   assert.match(plain(en.topic("tour-kinds-guide").a), /Mountain guiding, mountaineering or avalanche courses/);
 });
 
@@ -564,7 +567,7 @@ test("tour test 8 answers: own dogs say No guests’ dogs, per sled is not Priva
   assert.match(plain(en.topic("tour-kids-price").a), /Keep Price for one adult/); assert.doesNotMatch(plain(en.topic("tour-kids-price").a), /lowest/);
   assert.match(plain(en.topic("setup-change-later").a), /Change an answer/); assert.match(plain(en.topic("setup-change-later").a), /Would you rather have us do it\?/);
   assert.match(plain(fr.topic("setup-change-later").aFr), /Vous préférez que nous le fassions/);
-  assert.match(plain(en.topic("setup-closure-fix").a), /✕ next to the wrong dates/); assert.match(plain(en.topic("setup-closure-fix").a), /When you run/);
+  assert.match(plain(en.topic("setup-closure-fix").a), /✕ next to the wrong dates/); assert.match(plain(en.topic("setup-closure-fix").a), /Closures and holidays ?, in More about your tours/); // tour simplify: the closures tile
   assert.match(plain(en.topic("tour-kinds-kennel").a), /Farm, ranch or kennel visits/); assert.match(plain(en.topic("tour-shuttle").a), /Good to know/);
   assert.match(plain(en.topic("tour-gear").a), /Good to know/);
 });
@@ -652,7 +655,8 @@ test("tour test 9 answers: the cultural kind, one side of a kind, Indigenous-own
   assert.match(plain(en.topic("tour-yearly-break").a), /Every year/); assert.doesNotMatch(en.topic("tour-yearly-break").a, /__/); assert.doesNotMatch(fr.topic("tour-yearly-break").aFr, /__/);
   assert.match(plain(en.topic("tour-groups").a), /21\+ or whole classes/); assert.match(plain(fr.topic("tour-groups").aFr), /21\+ ou classes entières/);
   assert.match(plain(en.topic("tour-culture-story").a), /Your story and Known for/);
-  assert.match(plain(en.topic("tour-meeting-varies").a), /Where do people meet you\?/);
+  // Tour test 15 (Dayton): no "Where do people meet you?" step for tours any more.
+  assert.match(plain(en.topic("tour-meeting-varies").a), /Guests get the exact meeting spot when they book/);
   assert.match(plain(en.topic("fr-desc-old").a), /Leave it to us/); assert.match(plain(en.topic("menu-add").a), /Type them in myself/); assert.match(plain(fr.topic("menu-add").aFr), /Je les tape moi-même/);
 });
 
@@ -728,4 +732,390 @@ test("tour test 10 answers: three stretches with the spring-and-fall tip, Open o
   assert.match(plain(en.topic("tour-price-rules").a), /Your tours and prices/); assert.match(plain(en.topic("tour-price-rules").a), /2 person minimum/);
   assert.match(plain(en.topic("not-owner").a), /Managers, marketing and staff can update the page too/);
   assert.match(plain(en.topic("tour-one-trip-season").a), /Stay “all year”/);
+});
+
+// Tour test 11 (Whistler, 2026-11-18; Min-jun, a private sightseeing van company: hotel pickups, Korean and Japanese
+// guides, a private van per hour with a 3-hour minimum, an airport shuttle that isn't a tour; he dictates, no punctuation).
+// His 12 questions as typed (shots 013-015, 042-050), each with a French twin. Help missed 4 (the sightseeing kind twice,
+// the airport shuttle, the card's words) and half-answered 3 (hotel pickup, per van per hour, the shuttle again).
+const ASKED11 = [
+  ["11-013", "we do sightseeing tour by van which one i pick", ["tour-kinds-sightseeing"], "on fait des visites touristiques en van, lequel je choisis"],
+  ["11-014", "airport shuttle can i add", ["tour-airport-shuttle"], "navette aéroport je peux l'ajouter"],
+  ["11-015", "joffre lake day trip what kind", ["tour-kinds-sightseeing"], "excursion d'une journée au lac Joffre, quel genre"],
+  ["11-042", "we pick up from hotel where to write", ["tour-pickup"], "on prend les gens à leur hôtel, où l'écrire"],
+  ["11-043", "how to say we speak korean and japanese", ["tour-languages"], "comment dire qu'on parle coréen et japonais"],
+  ["11-044", "need park pass for joffre where to tell", ["tour-licence"], "il faut un laissez-passer du parc pour Joffre, où le dire"],
+  ["11-045", "airport shuttle can i add", ["tour-airport-shuttle"], "est-ce que je peux ajouter une navette vers l'aéroport"],
+  ["11-046", "price is per van per hour minimum 3 hours", ["tour-private-hourly"], "le prix est par van à l'heure, minimum 3 heures"],
+  ["11-047", "if weather bad we refund where i say", ["tour-weather"], "si la météo est mauvaise on rembourse, où je le dis"],
+  ["11-048", "joffre tour only summer other tours all year", ["tour-one-trip-season"], "la sortie Joffre seulement l'été, les autres toute l'année"],
+  ["11-049", "village lights tour only winter evening", ["tour-one-trip-season"], "la sortie des lumières du village seulement le soir en hiver"],
+  ["11-050", "how i change sightseeing tours and airport shuttles words on my card", ["tour-category-word"], "comment changer les mots visites touristiques et navettes sur ma fiche"],
+];
+test("tour test 11: every Help question (EN + its French twin) lands on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Sightseeing tours & airport shuttles" });
+  assert.equal(ASKED11.length, 12);
+  const wrong = [];
+  for (const [k, q, want, qFr] of ASKED11) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r.id)) wrong.push(`${k} EN "${q}" -> ${r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf.id} (want ${want.join(" or ")})`);
+  }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 11 answers: sightseeing kind, pickup option, airport shuttles aren't tours, per hour with a minimum, evening times, card words; no 'your culture' in the story answer", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-kinds-sightseeing").a), /Sightseeing and day trips/); assert.match(plain(fr.topic("tour-kinds-sightseeing").aFr), /Visites touristiques et excursions d’une journée/);
+  assert.match(plain(en.topic("tour-pickup").a), /We pick you up \(from hotels in Penticton\)/); assert.match(plain(en.topic("tour-pickup").a), /Pickup: hotels in Penticton/); // Okanagan port: the page's town (Penticton)
+  assert.match(plain(en.topic("tour-airport-shuttle").a), /Airport shuttles and transfers aren’t tours/); assert.match(plain(en.topic("tour-airport-shuttle").a), /story or under Good to know/);
+  assert.match(plain(en.topic("tour-private-hourly").a), /from \$150\/hour \(3-hour minimum\)/); assert.match(plain(fr.topic("tour-private-hourly").aFr), /150 \$ l’heure \(minimum de 3 heures\)/);
+  assert.match(plain(en.topic("tour-one-trip-season").a), /Only in the evening\? Put the times/);
+  assert.match(plain(en.topic("tour-category-word").a), /Words we found online/);
+  assert.doesNotMatch(plain(en.topic("tour-culture-story").a), /your culture/);
+});
+
+// Tour test 12 (Whistler, 2026-11-18; Kayla, a bungee and giant swing site: 14+, under 19s need a parent or guardian to sign
+// the waiver; a second jump and a video package as extras; Instagram captions; winter weekends only, weather permitting).
+// Her 12 questions as typed (shots 057-065, 096-097), each with a French twin. Help missed 4 and half-answered 1.
+const ASKED12 = [
+  ["12-057", "where do i put the waiver link", ["tour-waiver"], "où je mets le lien de la décharge"],
+  ["12-058", "video package is extra where", ["tour-extras"], "le forfait vidéo est en extra, où le mettre"],
+  ["12-058b", "can i add gift cards", ["tour-gift", "tour-extras"], "est-ce que je peux ajouter des cartes-cadeaux"],
+  ["12-059", "age 14 but under 19 needs parent", ["tour-age"], "14 ans mais les moins de 19 ans ont besoin d'un parent"],
+  ["12-060", "weather closures how do people know", ["tour-weather", "tour-weather-permitting"], "fermetures météo, comment les gens le savent"],
+  ["12-061", "winter weekends only weather permitting", ["tour-weather-permitting"], "seulement les fins de semaine d'hiver, selon la météo"],
+  ["12-062", "second jump is cheaper how do i show that", ["tour-extras"], "le deuxième saut est moins cher, comment le montrer"],
+  ["12-063", "meeting spot is a gravel lot not our office", ["tour-meeting"], "le point de rencontre est un stationnement de gravier, pas notre bureau"],
+  ["12-064", "how do i get rid of the hashtags", ["tour-hashtags"], "comment enlever les hashtags"],
+  ["12-065", "we charge per hour 2 hour minimum for private groups", ["tour-private-hourly"], "on charge à l'heure, minimum 2 heures pour les groupes privés"],
+  ["12-096", "airport shuttle can i add", ["tour-airport-shuttle"], "navette aéroport je peux l'ajouter"],
+  ["12-097", "there's no 14 option", ["tour-age"], "il n'y a pas de 14 ans"],
+];
+test("tour test 12: every Help question (EN + its French twin) lands on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Bungee jumping & giant swing" });
+  assert.equal(ASKED12.length, 12);
+  const wrong = [];
+  for (const [k, q, want, qFr] of ASKED12) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r.id)) wrong.push(`${k} EN "${q}" -> ${r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf.id} (want ${want.join(" or ")})`);
+  }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 12 answers: Extras section, the waiver in Good to know, hashtags tidied, the 14+ chip and the waiver choice, Weather permitting, a generic per-hour noun", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-extras").a), /add a section called Extras/); assert.match(plain(fr.topic("tour-extras").aFr), /section nommée Extras/);
+  assert.match(plain(en.topic("tour-waiver").a), /Good to know/); assert.match(plain(en.topic("tour-waiver").a), /parent or guardian to sign/);
+  assert.match(plain(en.topic("tour-hashtags").a), /Edit the box/); assert.match(plain(en.topic("tour-hashtags").a), /DM us/);
+  assert.match(plain(en.topic("tour-age").a), /14\+/); assert.match(plain(en.topic("tour-age").a), /need a parent or guardian to sign the waiver/); assert.match(plain(fr.topic("tour-age").aFr), /14\+/);
+  assert.match(plain(en.topic("tour-weather-permitting").a), /No, different in winter/); assert.match(plain(en.topic("tour-weather-permitting").a), /Closed/); assert.match(plain(en.topic("tour-weather-permitting").a), /Weather permitting \(these dates\)/);
+  assert.match(plain(en.topic("tour-private-hourly").a), /Private tours from \$150\/hour \(3-hour minimum\)/); assert.doesNotMatch(en.topic("tour-private-hourly").q, /van/i);
+});
+// Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding in Pemberton; a Swiss pilot whose English is formal and
+// German-flavoured). Help answered 3 of his 12 right. His 12 questions, each with a French twin.
+const ASKED13 = [
+  ["13-1", "The flight time is confirmed the day before by text message. Where can I write this?", ["tour-confirm-pay"], "L'heure du vol est confirmée la veille par texto. Où puis-je l'écrire?"],
+  ["13-2", "The payment is after the landing, in cash or by card. Where do I indicate this?", ["tour-confirm-pay"], "Le paiement se fait après l'atterrissage, en argent comptant ou par carte. Où l'indiquer?"],
+  ["13-3", "Where can I indicate the weight of the passengers? It must be between 25 and 110 kg.", ["tour-weight"], "Où puis-je indiquer le poids des passagers? Il doit être entre 25 et 110 kg."],
+  ["13-4", "I have chosen a photo of the landing field but nothing happens. The photo has no location?", ["tour-photo-no-location"], "J'ai choisi une photo du terrain d'atterrissage mais rien ne se passe. La photo n'a pas de position?"],
+  ["13-5", "My Good to know text is too long, it was cut in the middle of a word", ["tour-too-long"], "Mon texte Bon à savoir est trop long, il a été coupé au milieu d'un mot"],
+  ["13-6", "The price of 189 per flight is refused. What must I write?", ["tour-price-refused"], "Le prix de 189 par vol est refusé. Que dois-je écrire?"],
+  ["13-7", "In the winter we are flying only on request. How can I say this?", ["tour-off-request"], "En hiver, nous volons seulement sur demande. Comment le dire?"],
+  ["13-8", "All our flights are weather permitting, not only some dates", ["tour-weather-all"], "Tous nos vols dépendent de la météo, pas seulement certaines dates"],
+  ["13-9", "Which kind must I take for tandem paragliding?", ["tour-kinds-paraglide"], "Quel genre dois-je prendre pour le parapente biplace?"],
+  ["13-10", "Why is my category helicopter? We are doing paragliding, not helicopter.", ["tour-kinds-paraglide"], "Pourquoi ma catégorie est hélicoptère? Nous faisons du parapente, pas de l'hélicoptère."],
+  ["13-11", "Is it possible to confirm the bookings by SMS the morning of the flight?", ["tour-confirm-pay"], "Est-il possible de confirmer les réservations par SMS le matin du vol?"],
+  ["13-12", "The meeting point is the landing field next to the airport, not our office.", ["tour-meeting"], "Le point de rencontre est le terrain d'atterrissage à côté de l'aéroport, pas notre bureau."],
+];
+test("tour test 13: every Help question (EN + its French twin) lands on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Paragliding" });
+  assert.equal(ASKED13.length, 12);
+  const wrong = [];
+  for (const [k, q, want, qFr] of ASKED13) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r && r.id)) wrong.push(`${k} EN "${q}" -> ${r && r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf && rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf && rf.id} (want ${want.join(" or ")})`);
+  }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 13 answers: confirm and pay in Good to know, the no-location photo, a tours 'too long', 189 per person, the two ticks, paragliding", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-confirm-pay").a), /Good to know/);
+  // Tour test 15 (Dayton): tours send no meeting-spot photo.
+  assert.match(plain(en.topic("tour-photo-no-location").a), /Tours don’t send a meeting-spot photo/);
+  assert.match(plain(en.topic("tour-too-long").a), /320/); assert.match(plain(en.topic("tour-too-long").a), /Your tours and prices/);
+  assert.match(plain(en.topic("tour-price-refused").a), /189 per person/);
+  assert.match(plain(en.topic("tour-off-request").a), /Off-season trips by request/); assert.match(plain(fr.topic("tour-off-request").aFr), /Hors saison, sorties sur demande/);
+  assert.match(plain(en.topic("tour-weather-all").a), /Every trip is weather permitting/);
+  assert.match(plain(en.topic("tour-kinds-paraglide").a), /Paragliding, skydiving or hang gliding/);
+  assert.match(plain(en.topic("tour-kinds-what").a), /Paragliding/);
+});
+// Tour test 14 (Whistler, 2026-11-18; Lucía, private ski and snowboard lessons on a Pixel; some questions in Spanish). Help
+// answered 5 of her 18 right. Her questions (help-log.json, exact wording), with a French twin, and her Spanish ones asked
+// as she asked them: a Spanish question is answered in English (never French).
+const ASKED14 = [
+  ["14-1", "en", "opening day changes every year", ["tour-snow-open"], "la date d'ouverture change chaque année"],
+  ["14-2", "en", "season depends on snow, we open when the mountain opens", ["tour-snow-open"], "la saison dépend de la neige, on ouvre quand la montagne ouvre"],
+  ["14-3", "en", "ski lessons not in the list?", ["tour-kinds-lessons"], "les cours de ski ne sont pas dans la liste?"],
+  ["14-4", "es", "clases de esqui privadas, cual escojo", ["tour-kinds-lessons"], "cours de ski privés, lequel je choisis"],
+  ["14-5", "en", "my price is per lesson for 1 to 4 people not per person", ["tour-lesson-packages"], "mon prix est par cours pour 1 à 4 personnes, pas par personne"],
+  ["14-6", "en", "lift ticket not included where do i say", ["tour-not-included"], "billet de remontée non compris, où je le dis"],
+  ["14-7", "en", "kids camp 5 days how", ["tour-lesson-packages"], "camp pour enfants de 5 jours comment"],
+  ["14-8", "en", "adaptive lessons on request where", ["tour-adaptive"], "cours adaptés sur demande, où"],
+  ["14-9", "es", "¿puedo poner que hablamos español?", ["tour-languages"], "est-ce que je peux dire que nous parlons espagnol?"],
+  ["14-10", "en", "cancel more than 72 h full refund where", ["tour-weather"], "annulation plus de 72 h remboursement complet où"],
+  ["14-11", "en", "we teach in spanish and portuguese too", ["tour-languages"], "nous enseignons aussi en espagnol et en portugais"],
+  ["14-12", "en", "instructors speak Spanish and Portuguese", ["tour-languages"], "nos moniteurs parlent espagnol et portugais"],
+  ["14-13", "es", "hablamos español y portugués", ["tour-languages"], "nous parlons espagnol et portugais"],
+  ["14-14", "en", "adaptive lessons for skiers with disabilities", ["tour-adaptive"], "cours adaptés pour skieurs handicapés"],
+  ["14-15", "en", "rentals not included, we give a discount code", ["tour-not-included"], "location non comprise, on donne un code de rabais"],
+  ["14-16", "en", "first time adult package where", ["tour-lesson-packages"], "forfait première fois pour adultes où"],
+  ["14-17", "en", "ski school sign at gondola base is our meeting spot", ["tour-meeting"], "l'enseigne de l'école de ski au pied de la télécabine est notre point de rencontre"],
+  ["14-18", "en", "lessons are for 1 to 4 people of similar level", ["tour-lesson-packages"], "les cours sont pour 1 à 4 personnes de même niveau"],
+  ["14-19", "en", "lessons confirmed the day before by text", ["tour-confirm-pay"], "cours confirmés la veille par texto"],
+  ["14-20", "en", "pay at the end, cash or card", ["tour-confirm-pay"], "paiement à la fin, comptant ou par carte"],
+  ["14-21", "en", "my photo has no location", ["tour-photo-no-location"], "ma photo n'a pas de position"],
+  ["14-22", "en", "good to know too long", ["tour-too-long"], "bon à savoir trop long"],
+  ["14-23", "en", "it says it cant read my price", ["tour-price-refused"], "il dit qu'il ne peut pas lire mon prix"],
+];
+test("tour test 14: every Help question (EN or ES, and its French twin) lands on the right topic; Spanish is answered in English", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Ski lessons" });
+  assert.equal(ASKED14.length, 23);
+  const wrong = [];
+  for (const [k, lang, q, want, qFr] of ASKED14) {
+    const r = en.best(q), rf = fr.best(qFr), rs = fr.best(q);
+    if (!want.includes(r && r.id)) wrong.push(`${k} ${lang.toUpperCase()} "${q}" -> ${r && r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf && rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf && rf.id} (want ${want.join(" or ")})`);
+    if (lang === "es") {
+      if (r.lang !== "en") wrong.push(`${k} "${q}" answered in ${r.lang} on the English page`);
+      if (rs.lang !== "en") wrong.push(`${k} "${q}" answered in ${rs.lang} on the French page`);
+    } else if (r.lang !== "en") wrong.push(`${k} "${q}" answered in ${r.lang}`);
+    if (rf.lang !== "fr") wrong.push(`${k} FR "${qFr}" answered in ${rf.lang}`);
+  }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 14 answers: the lessons kind, packages and Private tours, not included, adaptive (not off-season), the snow tick, the season button's own words, generic examples", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-kinds-lessons").a), /Ski and snowboard lessons/); assert.match(plain(fr.topic("tour-kinds-lessons").aFr), /Cours de ski et de planche/);
+  assert.match(plain(en.topic("tour-lesson-packages").a), /Your tours and prices/); assert.match(plain(en.topic("tour-lesson-packages").a), /Private tours/); assert.match(plain(en.topic("tour-lesson-packages").a), /Who can come/);
+  assert.match(plain(en.topic("tour-not-included").a), /Good to know/);
+  assert.match(plain(en.topic("tour-adaptive").a), /Good to know/); assert.match(plain(en.topic("tour-adaptive").a), /Your tours and prices/); assert.match(plain(en.topic("tour-adaptive").a), /isn’t Off-season trips by request/);
+  assert.match(plain(en.topic("tour-snow-open").a), /Opening day depends on snow/); assert.match(plain(en.topic("tour-snow-open").a), /Every trip is weather permitting/); assert.match(plain(en.topic("tour-snow-open").a), /We only run part of the year/);
+  assert.match(plain(fr.topic("tour-snow-open").aFr), /La date d’ouverture dépend de l’enneigement/);
+  assert.match(plain(en.topic("setup-season").a), /We only run part of the year/); assert.doesNotMatch(plain(en.topic("setup-season").a), /We’re closed part of the year/);
+  assert.doesNotMatch(plain(en.topic("tour-confirm-pay").a), /landing|flight/i); assert.doesNotMatch(plain(fr.topic("tour-confirm-pay").aFr), /atterrissage|vol\b/i);
+  assert.match(plain(en.topic("tour-kinds-other").a), /Ski and snowboard lessons/);
+  assert.match(plain(en.topic("tour-price-refused").a), /Per student/);
+});
+// Tour test 15 (Whistler, 2026-11-18; Dave, summer canoe, kayak and SUP rentals and a sunset paddle, winter snowshoe tours and
+// a fondue night; an iPad). Help got 2 of 13 right. His questions (help-log.json, exact wording), with a French twin; his
+// Spanish one answered in English. Tours have no meeting-spot step (Dayton, 2026-11-18): meeting-spot questions get "guests
+// get the exact meeting spot when they book".
+const ASKED15 = [
+  ["15-1", "en", "different meeting spot summer vs winter", ["tour-meeting"], "point de rencontre différent l'été et l'hiver"],
+  ["15-2", "en", "we meet at the dock in summer and the olympic plaza ticket booth in winter, how do I put two meeting spots", ["tour-meeting"], "on se rejoint au quai l'été et à la billetterie de l'Olympic Plaza l'hiver, comment mettre deux points de rencontre"],
+  ["15-3", "en", "open mid june to early sept and mid dec to end of march, closed in between. how?", ["tour-season"], "ouvert de mi-juin à début septembre et de mi-décembre à fin mars, fermé entre les deux. comment?"],
+  ["15-4", "en", "rentals priced per boat per hour", ["tour-per-unit"], "location à l'heure par bateau"],
+  ["15-5", "en", "canoe rental is $45 an hour for the boat, not per person. sunset paddle is $89 per person", ["tour-per-unit"], "la location de canot est 45 $ de l'heure par bateau, pas par personne"],
+  ["15-6", "en", "book online, same day is fine if theres space. rentals can walk up", ["tour-same-day", "tour-lead-time"], "réservation en ligne, le jour même ça va s'il reste de la place"],
+  ["15-7", "en", "kids in canoe any age but tours 6+", ["tour-age", "tour-ages-per-trip"], "les enfants de tout âge en canot mais les sorties 6 ans et plus"],
+  ["15-8", "en", "fondue tour includes dinner", ["tour-includes-meal"], "la sortie fondue comprend le souper"],
+  ["15-9", "en", "how do i show which tours are summer and which are winter", ["tour-kind-seasons"], "comment montrer quelles sorties sont l'été et lesquelles l'hiver"],
+  ["15-10", "en", "different meeting spot summer vs winter", ["tour-meeting"], "deux points de rencontre selon la saison"],
+  ["15-11", "es", "¿Cómo pongo dos lugares de encuentro, uno en verano y otro en invierno?", ["tour-meeting"], "comment mettre deux lieux de rencontre, un l'été et un l'hiver?"],
+  ["15-12", "en", "summer vs winter tours", ["tour-kind-seasons"], "sorties d'été et sorties d'hiver"],
+  ["15-13", "en", "includes dinner", ["tour-includes-meal"], "souper inclus"],
+];
+test("tour test 15: every Help question (EN or ES, and its French twin) lands on the right topic; no tour meeting-spot step in the answers", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Canoe & kayak rentals" });
+  assert.equal(ASKED15.length, 13);
+  const wrong = [];
+  for (const [k, lang, q, want, qFr] of ASKED15) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r && r.id)) wrong.push(`${k} ${lang.toUpperCase()} "${q}" -> ${r && r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf && rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf && rf.id} (want ${want.join(" or ")})`);
+    if (r.lang !== "en") wrong.push(`${k} "${q}" answered in ${r.lang}`);
+    if (rf.lang !== "fr") wrong.push(`${k} FR "${qFr}" answered in ${rf.lang}`);
+  }
+  assert.deepEqual(wrong, []);
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-meeting").a), /Guests get the exact meeting spot when they book/);
+  assert.match(plain(fr.topic("tour-meeting").aFr), /point de rencontre exact à la réservation/);
+  for (const t of en.topics) assert.doesNotMatch(plain(t.a || ""), /Where do people meet you\?|Send it with my address/, t.id);
+  assert.match(plain(en.topic("tour-per-unit").a), /Canoe rental: \$45 per boat per hour/);
+  assert.match(plain(en.topic("tour-includes-meal").a), /Dinner included/);
+  assert.match(plain(en.topic("tour-kind-seasons").a), /Which season does each run\?/);
+  // The day-hours answer has no restaurant words on a tour's setup.
+  assert.doesNotMatch(plain(en.topic("hours").a), /lunch|dinner|brunch/i);
+  assert.ok(!en.topics.some((t) => t.id === "setup-split-hours" || t.id === "setup-third-time"));
+});
+test("tour test 15: Help on a tour's tours-and-prices page starts with tour chips and answers tour questions", async () => {
+  const v = app.createVenue({ name: "Help Routing Menu 15", slug: "help-routing-menu-15", region: "kelowna", type: "tour", latitude: 49.888, longitude: -119.496, address: "1 Main St, Kelowna", description: "A fixture." });
+  const t = app.createOwnerLink(v.id, {}).url.split("/owner/")[1];
+  const html = await get(`/owner/${t}/menu`);
+  const m = /<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(html);
+  const cfg = JSON.parse(m[1]);
+  assert.deepEqual(cfg.start, ["menu-add", "tour-includes-meal", "tour-kind-seasons", "tour-per-unit"]);
+  const bot = helpBot(html);
+  assert.equal(bot.best("fondue tour includes dinner").id, "tour-includes-meal");
+  assert.equal(bot.best("how do i show which tours are summer and which are winter").id, "tour-kind-seasons");
+  assert.match(bot.topic("menu-add").q, /tours and prices/);
+});
+// Tour test 16 (Whistler, 2026-11-18; Tom, Coast Mountain Bear Tours: bear viewing by 4x4, a kids' price, a private vehicle,
+// hotel pickup). His 17 questions (help-log.json, exact wording), each with a French twin, and a few plain variants.
+const ASKED16 = [
+  ["16-1", "en", "do i need to say where we meet", ["tour-meeting"], "faut-il dire où on se rencontre"],
+  ["16-2", "en", "we pick up from hotels or they can come to the office", ["tour-pickup"], "on vient chercher les gens à leur hôtel ou ils viennent au bureau"],
+  ["16-3", "en", "we're closed all winter", ["tour-season"], "on est fermé tout l'hiver"],
+  ["16-4", "en", "tours go out morning and evening, what do i put for hours", ["hours", "tour-times", "tour-office-hours"], "les sorties partent le matin et le soir, quelles heures je mets"],
+  ["16-5", "en", "kids price how", ["tour-kids-price"], "prix enfants comment"],
+  ["16-6", "en", "private truck for up to 6 people is $895 where does that go", ["tour-private-price"], "le véhicule privé jusqu'à 6 personnes c'est 895 $, ça va où"],
+  ["16-7", "en", "tours sell out fast can i say book early", ["tour-sell-out"], "nos sorties affichent complet vite, je peux dire de réserver tôt"],
+  ["16-8", "en", "do i have to fill all of this out", ["tour-fill-all"], "est-ce que je dois tout remplir"],
+  ["16-9", "en", "where do i put the private vehicle price", ["tour-private-price"], "où je mets le prix du véhicule privé"],
+  ["16-10", "en", "kids 5 and up only, under 5 not allowed", ["tour-age"], "enfants de 5 ans et plus seulement"],
+  ["16-11", "en", "the pickup button didnt do anything", ["tour-pickup"], "le bouton de prise en charge ne fait rien"],
+  ["16-12", "en", "how do i say tours sell out", ["tour-sell-out"], "comment dire que nos sorties affichent complet"],
+  ["16-13", "en", "we meet at the dock in summer and the plaza in winter", ["tour-meeting"], "on se rejoint au quai l'été et à la place l'hiver"],
+  ["16-14", "en", "we close between seasons in spring and fall", ["tour-season"], "on ferme entre les saisons au printemps et à l'automne"],
+  ["16-15", "en", "canoe rentals are per boat per hour", ["tour-per-unit"], "la location de canot est par bateau par heure"],
+  ["16-16", "en", "our snowshoe tour includes dinner", ["tour-includes-meal"], "notre sortie en raquettes comprend le souper"],
+  ["16-17", "en", "kayaks only in summer, snowshoe only in winter", ["tour-kind-seasons"], "kayak seulement l'été, raquettes seulement l'hiver"],
+  // Other words for the same things.
+  ["16-v1", "en", "private van for up to 8, $1200", ["tour-private-price"], "fourgonnette privée jusqu'à 8 personnes, 1200 $"],
+  ["16-v2", "en", "private vehicle up to 6 where", ["tour-private-price"], "véhicule privé jusqu'à 6, où"],
+  ["16-v3", "en", "do I need to fill everything in", ["tour-fill-all"], "faut-il tout remplir"],
+  ["16-v4", "en", "is all of this required", ["tour-fill-all"], "est-ce que tout est obligatoire"],
+  ["16-v5", "en", "we fill up in summer", ["tour-sell-out"], "nos sorties se remplissent l'été"],
+  ["16-v6", "en", "book early, we sell out", ["tour-sell-out"], "réservez tôt, on affiche complet"],
+  ["16-v7", "en", "kayak in summer and snowshoe in winter", ["tour-kind-seasons"], "kayak l'été et raquette l'hiver"],
+  ["16-v8", "en", "we do kayaking summer and snowshoeing winter", ["tour-kind-seasons"], "on fait du kayak en été et de la raquette en hiver"],
+  ["16-v9", "en", "closed for the winter", ["tour-season"], "fermé pour l'hiver"],
+  ["16-v10", "en", "pickup button doesnt work", ["tour-pickup"], "le bouton prise en charge ne marche pas"],
+];
+test("tour test 16: every Help question (EN and its French twin) lands on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Wildlife and bear viewing" });
+  assert.equal(ASKED16.filter((x) => !/v/.test(x[0])).length, 17);
+  const wrong = [];
+  for (const [k, lang, q, want, qFr] of ASKED16) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r && r.id)) wrong.push(`${k} ${lang.toUpperCase()} "${q}" -> ${r && r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf && rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf && rf.id} (want ${want.join(" or ")})`);
+    if (rf.lang !== "fr") wrong.push(`${k} FR "${qFr}" answered in ${rf.lang}`);
+  }
+  assert.deepEqual(wrong, []);
+  // "up to N" is still an age without a price or "private".
+  assert.equal(en.best("kids up to 5 go free").id === "tour-private-price", false);
+});
+test("tour test 16 answers: Private tours box, Yes book ahead + Good to know, only the 7 essentials, the setup's own season button", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/[  ]/g, " ").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-private-price").a), /^ ?Put it in Private tours , the box under Price/);
+  assert.match(plain(fr.topic("tour-private-price").aFr), /Sorties privées/);
+  assert.match(plain(en.topic("tour-sell-out").a), /tap Yes/); assert.match(plain(en.topic("tour-sell-out").a), /Good to know/); assert.match(plain(en.topic("tour-sell-out").a), /How far ahead is optional/);
+  assert.match(plain(en.topic("tour-fill-all").a), /No\. Only the 7 essentials matter; everything in More about your tours is optional\. You can stop any time and come back with your link\./);
+  assert.match(plain(fr.topic("tour-fill-all").aFr), /Seuls les 7 essentiels comptent/);
+  assert.match(plain(en.topic("tour-season").a), /We only run part of the year/);
+  assert.doesNotMatch(plain(en.topic("tour-season").a), /Open some months only/);
+});
+
+// Tour test 17 (Whistler, 2026-11-18; Sarah, Sea to Sky Whitewater, rafting in Squamish, winter eagle floats, a paid
+// shuttle from Whistler). Her 13 questions as typed (help-log.json), each with a French twin.
+const ASKED17 = [
+  ["17-007", "en", "shuttle from whistler costs extra", ["tour-shuttle"], "la navette depuis Whistler coûte en plus"],
+  ["17-010", "en", "eagle floats only in winter, rafting may to sept", ["tour-season", "setup-season", "tour-kind-seasons"], "les descentes des aigles seulement l'hiver, le rafting de mai à sept"],
+  ["17-012", "en", "trips sometimes cancel for high water", ["tour-weather"], "les sorties sont parfois annulées à cause des hautes eaux"],
+  ["17-020", "en", "our trips are different lengths, full day and 2 hours", ["tour-lengths"], "nos sorties ont des durées différentes, une journée et 2 heures"],
+  ["17-021", "en", "eagle float is winter only, rafting is summer", ["tour-kind-seasons"], "la descente des aigles c'est seulement l'hiver, le rafting c'est l'été"],
+  ["17-023", "en", "which price do i put, elaho is 219 and family float is 129", ["tour-price", "tour-two-prices", "tour-several-prices"], "quel prix je mets, l'Elaho est 219 et la descente familiale 129"],
+  ["17-026", "en", "different ages for different trips", ["tour-ages-per-trip"], "des âges différents pour différentes sorties"],
+  ["17-057", "en", "do i have to fill all of this out", ["tour-fill-all"], "est-ce que je dois tout remplir"],
+  ["17-058", "en", "we are closed all winter except eagle floats", ["tour-season", "setup-season"], "nous sommes fermés tout l'hiver sauf les descentes des aigles"],
+  ["17-059", "en", "private raft for our group of 8", ["tour-groups", "tour-private-price"], "raft privé pour notre groupe de 8"],
+  ["17-060", "en", "our summer trips sell out, book early", ["tour-sell-out"], "nos sorties d'été affichent complet, réservez tôt"],
+  ["17-061", "en", "rafting in summer, eagle floats in winter", ["tour-kind-seasons"], "le rafting l'été, les descentes des aigles l'hiver"],
+  ["17-062", "en", "the pickup is only from whistler and costs extra, is that ok", ["tour-shuttle"], "la prise en charge est seulement depuis Whistler et coûte en plus, c'est correct?"],
+  // Both seasons named without a kind of trip stay where they were.
+  ["17-v1", "en", "different summer and winter hours", ["seasonal-hours"], "des heures différentes l'été et l'hiver"],
+  ["17-v2", "en", "winter is $189 and summer $149, which one do i put", ["tour-two-prices"], "l'hiver c'est 189 $ et l'été 149 $, lequel je mets"],
+];
+test("tour test 17: every Help question (EN and its French twin) lands on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Whitewater rafting", region: "vernon" });
+  assert.equal(ASKED17.filter((x) => !/v/.test(x[0])).length, 13);
+  const wrong = [];
+  for (const [k, lang, q, want, qFr] of ASKED17) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r && r.id)) wrong.push(`${k} ${lang.toUpperCase()} "${q}" -> ${r && r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf && rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf && rf.id} (want ${want.join(" or ")})`);
+  }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 17 answers: pickup and shuttle name her town and say when to tap the button; the weather answer names the tick", async () => {
+  const { en, fr } = await setupFor("tour", { region: "vernon" });
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/[  ]/g, " ").replace(/\s+/g, " ");
+  const pk = plain(en.topic("tour-pickup").a);
+  assert.match(pk, /Free pickup from hotels in Vernon\? Tap We pick you up \(from hotels in Vernon\)/);
+  assert.match(pk, /Leave the button off/);
+  assert.match(plain(fr.topic("tour-pickup").aFr), /aux hôtels de Vernon/);
+  const sh = plain(en.topic("tour-shuttle").a);
+  assert.match(sh, /Leave We pick you up off/); assert.match(sh, /Shuttle from Kelowna airport: \$25/); assert.match(sh, /free pickup from hotels in Vernon/);
+  assert.doesNotMatch(sh, /can also go in Your tours and prices/);
+  assert.doesNotMatch(plain(fr.topic("tour-shuttle").aFr), /peut aussi aller dans/);
+  assert.match(plain(en.topic("tour-weather").a), /Anything else about your season\? and tick Every trip is weather permitting/);
+  assert.match(plain(fr.topic("tour-weather").aFr), /Chaque sortie dépend de la météo/);
+  for (const t of en.topics) assert.doesNotMatch(String(t.a || ""), /hotels in the village/, t.id);
+});
+
+// Tour test 18 (Whistler, 2026-11-18; Priya, Treetop Zip Whistler: year-round ziplines and a treetop walk, winter night zips
+// on weekends, child prices, tours every 30 minutes). Her 22 questions as typed (help-log.json), each with a French twin.
+const ASKED18 = [
+  ["18-006", "en", "we have different summer and winter hours", ["seasonal-hours"], "nous avons des heures différentes l'été et l'hiver"],
+  ["18-007", "en", "how do I show we run every 30 minutes", ["tour-times"], "comment montrer que nous partons toutes les 30 minutes"],
+  ["18-008", "en", "tours leave every half hour from 9 to 5", ["tour-times"], "les sorties partent toutes les demi-heures de 9 h à 17 h"],
+  ["18-015", "en", "night zips only on winter weekends", ["tour-one-trip-season", "tour-kind-seasons"], "les tyroliennes de nuit seulement les fins de semaine d'hiver"],
+  ["18-019", "en", "which kind for our treetop walk", ["tour-kinds-pick"], "quel genre pour notre marche dans les arbres"],
+  ["18-021", "en", "child pricing for 6 to 12", ["tour-kids-price"], "tarifs enfants pour les 6 à 12 ans"],
+  ["18-022", "en", "we have 4 products at different prices, which one goes here", ["tour-two-prices", "tour-several-prices", "tour-price"], "nous avons 4 produits à des prix différents, lequel va ici"],
+  ["18-024", "en", "we book online but walk-ups are ok if there is space", ["tour-same-day"], "on réserve en ligne mais sans réservation c'est correct s'il reste de la place"],
+  ["18-030", "en", "treetop walk is all ages but ziplines are 6+", ["tour-age", "tour-ages-per-trip"], "la marche dans les arbres est pour tous les âges mais les tyroliennes c'est 6+"],
+  ["18-031", "en", "where do I put weight limits 25 to 125 kg", ["tour-weight"], "où je mets les limites de poids de 25 à 125 kg"],
+  ["18-040", "en", "do I have to fill all of this out", ["tour-fill-all"], "est-ce que je dois tout remplir"],
+  ["18-041", "en", "shuttle from whistler costs extra", ["tour-shuttle"], "la navette depuis Whistler coûte en plus"],
+  ["18-042", "en", "we cancel for high winds", ["tour-weather"], "on annule quand il y a de forts vents"],
+  ["18-043", "en", "ziplines all year, night zips only in winter", ["tour-kind-seasons"], "tyroliennes toute l'année, tyroliennes de nuit seulement l'hiver"],
+  ["18-044", "en", "our tours sell out in summer", ["tour-sell-out"], "nos sorties affichent complet l'été"],
+  ["18-045", "en", "private tours for up to 12", ["tour-private-price", "tour-groups"], "sorties privées jusqu'à 12 personnes"],
+  ["18-046", "en", "how do I change my winter hours later", ["seasonal-hours"], "comment changer mes heures d'hiver plus tard"],
+  ["18-047", "en", "when will my tours and prices show", ["photo-pending", "menu-add", "setup-live-when"], "quand mes sorties et tarifs vont-ils paraître"],
+  ["18-050", "en", "where do I put departure times", ["tour-times"], "où je mets les heures de départ"],
+  ["18-051", "en", "kids price", ["tour-kids-price"], "prix enfants"],
+  ["18-052", "en", "we have a winter night tour on weekends only", ["tour-one-trip-season", "tour-kind-seasons"], "nous avons une sortie de nuit l'hiver seulement les fins de semaine"],
+  ["18-053", "en", "can I show different prices for children", ["tour-kids-price"], "puis-je montrer des prix différents pour les enfants"],
+  // Rephrasings of the three she got wrong.
+  ["18-v1", "en", "kayaks all year, snowshoe tours only in winter", ["tour-kind-seasons"], "kayaks toute l'année, raquettes seulement l'hiver"],
+  ["18-v2", "en", "tours leave every 15 min", ["tour-times"], "départs toutes les 15 minutes"],
+  ["18-v3", "en", "kids pricing", ["tour-kids-price"], "tarification enfants"],
+  ["18-v4", "en", "children pricing", ["tour-kids-price"], "tarifs pour les enfants"],
+  ["18-v5", "en", "we leave every hour", ["tour-times"], "on part toutes les heures"],
+];
+test("tour test 18: every Help question (EN and its French twin) lands on the right topic; a year-round company is never told it runs part of the year", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Ziplines" });
+  assert.equal(ASKED18.filter((x) => !/v/.test(x[0])).length, 22);
+  const wrong = [];
+  for (const [k, lang, q, want, qFr] of ASKED18) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r && r.id)) wrong.push(`${k} ${lang.toUpperCase()} "${q}" -> ${r && r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf && rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf && rf.id} (want ${want.join(" or ")})`);
+    if (rf.lang !== "fr") wrong.push(`${k} FR "${qFr}" answered in ${rf.lang}`);
+  }
+  assert.deepEqual(wrong, []);
+  // One trip's season said without a kind word stays one trip's season ("the rest all year", "other tours all year").
+  assert.equal(en.best("joffre tour only summer other tours all year").id, "tour-one-trip-season");
+  assert.equal(fr.best("les vélos seulement l'été, le reste toute l'année").id, "tour-one-trip-season");
+  // Closed for the winter is still the season answer.
+  assert.equal(en.best("closed for the winter").id, "tour-season");
 });

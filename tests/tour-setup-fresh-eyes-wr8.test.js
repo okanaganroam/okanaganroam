@@ -99,7 +99,7 @@ test('1. dogs: guests’ own dogs on the chips (EN + FR), no research pre-tick f
 
 test('2. per-sled and per-vehicle prices: their own nudge, never the Private tours move (EN + FR, client and server)', async () => {
   const ctx = {}; vm.createContext(ctx);
-  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceTrim') + clientFn('tourPriceWhy'), ctx);
+  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceSwiss') + clientFn('priceTrim') + clientFn('tourPriceWhy'), ctx);
   const why = (x) => vm.runInContext(`tourPriceWhy(${JSON.stringify(x)}, false)`, ctx);
   for (const x of ['$349 per sled', '349/sled', '349 per sled (2 adults or 1 adult + 2 kids)', '$349 per sled for 2 people', '200 per ATV', '99 per machine', '349 $ par traîneau (2 adultes)', '$69/bike', '69 per bike for 2 hours']) {
     assert.equal(why(x), 'unit', x); assert.equal(app.tourPriceWhy(x), 'unit', `server ${x}`);
@@ -118,13 +118,15 @@ test('2. per-sled and per-vehicle prices: their own nudge, never the Private tou
   assert.match(JSON.stringify(r.body), /Priced per sled, boat or vehicle\?/);
 });
 
-test('3. Open in Google Maps uses the approved meeting spot (the pin is not moved); the admin note says so', async () => {
+// Tour test 15 (Dayton, 2026-11-18): tours have no meeting-spot step; a tour's Maps link is its business pin, and a
+// meeting spot approved before stays stored, unused. Other types keep their storefront spot (venueMapsPoint).
+test('3. Open in Google Maps uses a tour’s business pin (a stored meeting spot is not used); the admin note stays for other types', async () => {
   const { v } = linda({ latitude: 49.9, longitude: -119.1 });
   assert.match(page(v), /maps\/search\/\?api=1&amp;query=49\.9,-119\.1|maps\/search\/\?api=1&query=49\.9,-119\.1/);
   db.prepare("INSERT INTO venue_arrival_points (venue_id, file, preview_key, lat, lng, status) VALUES (?, 'wr8-test.jpg', ?, 49.4521, -119.6011, 'approved')").run(v.id, `wr8-${v.id}`);
   const h = page(v);
-  assert.match(h, /maps\/search\/\?api=1&(?:amp;)?query=49\.4521,-119\.6011/);
-  assert.doesNotMatch(h, /query=49\.9,-119\.1/);
+  assert.match(h, /query=49\.9,-119\.1/);
+  assert.doesNotMatch(h, /query=49\.4521,-119\.6011/);
   assert.equal(app.getVenue(v.id).latitude, 49.9);
   assert.match(SERVER, /An approved meeting or storefront spot is what \\u201cOpen in Google Maps\\u201d uses\./);
 });
@@ -175,7 +177,7 @@ test('6. the French description left from our research is named with a link to t
   const edit = (await get(`/owner/${t}`)).text;
   assert.match(edit, /id="opFrDescOld">Your French description is the old one from our research: <a href="\/fr\/owner\/[^"]+\/setup#story"/);
   assert.equal(text.en.frDescOld, 'Your French description is the old one from our research:');
-  assert.match(CLIENT, /\(frOnlyNamed\(\) \|\| frOnlyFinish\(\)\) \+ frDescOld\(\)/);
+  assert.match(CLIENT, /\(frOnlyNamed\(\) \|\| frOnlyFinish\(\)\) \+ frDescOld\(true\)/); // tour test 14: the finish screen's call (not when the translation is queued)
   assert.match(CLIENT, /x = doneLine\('story'\) \+ q\(T\.storyQ, T\.storyLead\) \+ frDescOld\(\)/);
   assert.equal(app.getVenue(v.id).description_fr, 'Traîneau à chiens et motoneige en famille avec des huskys. Chiens bienvenus !');
   // A place whose French description is the owner's own: nothing said.
@@ -216,7 +218,7 @@ test('8. follow-up: a mountain guide keeps Ski touring; guiding and avalanche co
   assert.equal(app.tourKindsText(['guide'], false, 'Backcountry guiding', 'Guiding outfit run by an ACMG mountain guide. AST 1 and AST 2 avalanche courses, intro ski touring, crevasse rescue.'), 'Mountain guiding & ski touring');
   assert.equal(app.tourKindsText(['guide'], true, 'Backcountry guiding', 'intro ski touring'), 'Guide de montagne et ski de randonnée');
   assert.equal(app.tourKindsText(['guide'], false, 'Mountain guides, ski touring & avalanche courses'), 'Mountain guiding, avalanche courses & ski touring');
-  assert.equal(app.tourKindsText(['guide', 'snowshoe'], false, 'Ski touring, mountaineering & avalanche courses'), 'Ski touring, mountain guiding & avalanche courses');
+  assert.equal(app.tourKindsText(['guide', 'snowshoe'], false, 'Ski touring, mountaineering & avalanche courses'), 'Mountain guiding, avalanche courses & ski touring'); // tour test 17: the owner's own chip order
   // Erik (test 7): his unticked heli-skiing still goes; ski touring (his own) stays.
   assert.doesNotMatch(app.tourKindsText(['guide'], false, 'Ski touring, heli-skiing & avalanche courses'), /heli/i);
   assert.deepEqual(app.tourKindSuggestion({ cuisine: 'Backcountry guiding', name: '' }), ['guide']);

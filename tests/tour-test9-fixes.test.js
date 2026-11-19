@@ -64,12 +64,15 @@ function tanis(o = {}) {
   return { v, t: tokenFor(v.id) };
 }
 
-test('0. a request during her yearly break says when she reopens (no date asked: today; first, while she is the only cultural tour)', async () => {
+test('0. a request during her yearly break plans the day she reopens (no date asked; tour test 18), and a named request says when she reopens', async () => {
   const v = mk('tour', { name: 'Osoyoos Story Walks Words', region: 'osoyoos', latitude: 49.03, longitude: -119.46, address: '1 Main St, Osoyoos', cuisine: '', rating: 4.9, reviews: 211 });
   ok(await change(tokenFor(v.id), { tour_info: { kinds: ['cultural'], length: '2-3h', year: 'all' }, closures: [{ from: '04-01', to: '04-30', yearly: true }, { from: '11-01', to: '11-30', yearly: true }] }));
   const now = new Date('2026-11-18T12:00:00-08:00');
   const kind = app.runTripPlan({ text: 'cultural tour in Osoyoos' }, now);
-  assert.ok((kind.warnings || []).some((w) => w.startsWith(`${v.name} matches but is closed on November 18. It reopens December 1.`)), JSON.stringify([kind.kind, kind.warnings, kind.notes, itemsOf(kind).map((x) => x.venue.name)]));
+  // Tour test 18 (2026-11-18): an undated request during her yearly break is planned for the day she reopens, with a note
+  // (it said "matches but is closed on November 18. It reopens December 1." and planned nothing).
+  assert.ok(itemsOf(kind).some((x) => x.venue.id === v.id) && kind.comingSeason && kind.comingSeason.date === '2026-12-01', JSON.stringify([kind.kind, kind.warnings, kind.notes, itemsOf(kind).map((x) => x.venue.name)]));
+  assert.equal(kind.notes[0], 'This tour is closed on November 18, so this plan is for December 1, when it reopens. Pick your own dates any time.');
   const named = app.runTripPlan({ text: 'Osoyoos Story Walks Words' }, now);
   assert.ok((named.warnings || []).some((w) => /opens again on December 1|reopens December 1/.test(w) && w.includes(v.name)), JSON.stringify(named.warnings));
   assert.match(require('../trip-french-copy.js').t3FrenchText(`${v.name} matches but is closed on November 18. It reopens December 1. Ask again with another date to plan it.`), /Réouverture le 1er décembre/);
@@ -225,14 +228,15 @@ test('8. setup: group size "21+ or whole classes" and ". " after a size; Type th
   assert.match(CLIENT, /concat\(\[groupsSizeLine\(\+b\.getAttribute\('data-bgroup'\)\)\]\)\.join\('\. '\) \+ '\. '/);
   // Typed tours on the setup's screen: the edit page's own editor, opened on typing.
   assert.equal(text.en.tour.menuType, 'Type them in myself'); assert.equal(text.fr.tour.menuType, 'Je les tape moi-même');
-  assert.match(CLIENT, /id="suMenuType" href="' \+ h\(location\.pathname\.replace\(\/\\\/setup\\\/\?\$\/, '\/menu'\) \+ '#type'\)/);
+  assert.match(CLIENT, /id="suMenuType" href="' \+ h\(location\.pathname\.replace\(\/\\\/setup\\\/\?\$\/, '\/menu'\) \+ '\?from=setup#type'\)/);
   assert.match(SERVER, /if \(location\.hash === '#type'\) \{ var tyb = app\.querySelector\('\[data-act="type"\]'\); if \(tyb\) tyb\.click\(\); \}/);
   // Prices: per canoe, kayak or raft gets the per-vehicle words; per class or school is a group (Private tours).
   for (const x of ['190 per canoe (up to 3 people)', '$45 per kayak', '950 per raft']) { assert.equal(app.tourPriceWhy(x), 'unit', x); assert.match(app.cleanTourPrice(x, true, false).error, /Priced per sled, boat or vehicle\?/, x); }
   for (const x of ['400 per class', '400 for the whole class', '400 per school group']) assert.equal(app.tourPriceWhy(x), 'group', x);
   // The setup's own copy of the rule says the same.
   assert.match(clientFn('tourPriceWhy'), /canots\?\|rafts\?\|radeaux\?\|boards\?/); assert.match(clientFn('tourPriceWhy'), /\|class\(\?:es\)\?\|classes\?\|schools\?\|\[ée\]coles\?\)/);
-  assert.match(CLIENT, /voiturettes\?\|kayaks\?\|canoes\?\|canots\?\|rafts\?\|radeaux\?\)\\b\/i\.test\(el\('suTprice'\)/);
+  // Tour test 15: boats and boards too.
+  assert.match(CLIENT, /voiturettes\?\|kayaks\?\|canoes\?\|canots\?\|rafts\?\|radeaux\?\|boats\?\|bateaux\?\|boards\?\|planches\?\|sups\?\)\\b\/i\.test\(el\('suTprice'\)/);
   // Holidays: the official name, and National Indigenous Peoples Day on June 21 (every type).
   assert.equal(text.en.holidays.truth, 'National Day for Truth and Reconciliation'); assert.equal(text.fr.holidays.truth, 'Journée nationale de la vérité et de la réconciliation');
   assert.equal(text.en.holidays.indigenous, 'National Indigenous Peoples Day'); assert.equal(text.fr.holidays.indigenous, 'Journée nationale des peuples autochtones');
@@ -255,13 +259,13 @@ test('9. keyboard: a chip keeps the focus after the screen redraws; the 3-kind l
   assert.match(CLIENT, /function focusKey\(\)\{/);
   assert.match(CLIENT, /var keepSel = focusKey\(\), keepNudge = S\.keepNudgeFocus;/);
   assert.match(CLIENT, /else if \(keepSel\) \{ var kf = null; try \{ kf = screen\.querySelector\(keepSel\); \}/);
-  assert.match(CLIENT, /S\.nudge = T\.tkindMax; S\.keepNudgeFocus = true;[^\n]*srSay\(T\.tkindMax\)/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 12).
   assert.match(CLIENT, /srLive\.setAttribute\('aria-live', 'polite'\)/);
   assert.match(CLIENT, /function q\(title, lead\)\{ return '<h1 id="suQ">'/);
   assert.match(CLIENT, /role="group" aria-labelledby="suQ" id="suTourKinds"/);
-  assert.match(CLIENT, /tchips\('length', \['1h', '2-3h', 'half', 'full', 'multi'\], T\.tlengths, T\.tlengthQ, 'suLenQ'\)/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 11).
   // Tour test 10 (2026-11-18): with 8+ and 10+.
-  assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '8', '10', '12', '16', '19'\], T\.tages, T\.tageQ, 'suAgeQ'\)/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 11).
   assert.match(CLIENT, /\.su-closures-save'\); if \(csave\) csave\.addEventListener\('focusin'/);
   // Help: Tab and Shift+Tab stay inside the open dialog.
   assert.match(SERVER, /if \(e\.key !== 'Tab' \|\| panel\.hidden\) return;/);

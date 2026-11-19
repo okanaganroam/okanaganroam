@@ -82,6 +82,10 @@ module.exports = {
   skiOffMonths: [5, 6, 7, 8, 9, 10],
   skiHillNameRe: /\b(?:big white|silver ?star|apex|baldy)\b/,
   skiTownLabels: null,
+  // Tour test 14 port (2026-11-18): local words the phone keyboard splits in two ("Summer land", "Peach land"). Flagged in
+  // the setup and on the admin card, never changed (owner-text-clean.js localWordSplits). Short and safe: "Big White"
+  // is two words, and "SilverStar" is left off (Silver Star Provincial Park is written with a space).
+  localWordJoins: ['Summerland', 'Peachland', 'Naramata', 'Okanagan'],
   // A plan in ski season with no ski day suggests one when it is in a town next to a hill.
   skiSuggestion: { months: [12, 1, 2, 3], hillNameRe: null, hillForTown: { 'big-white': 'big-white', silverstar: 'silverstar', apex: 'apex', baldy: 'baldy' } },
 
@@ -140,7 +144,9 @@ module.exports = {
   },
 
   // French requests: place words the interpreter turns into English.
-  frenchRequests: { regions: { 'kelowna ouest': 'west kelowna', 'ouest de kelowna': 'west kelowna', 'chutes okanagan': 'okanagan falls' }, places: [], lakes: [['lac okanagan', 'okanagan lake']] },
+  frenchRequests: { regions: { 'kelowna ouest': 'west kelowna', 'ouest de kelowna': 'west kelowna', 'chutes okanagan': 'okanagan falls' },
+    // Tour test 11 port (2026-11-18): « canyon Myra » (the day trips' Myra Canyon), like Whistler's « lacs Joffre ».
+    places: [['canyon myra', 'myra canyon']], lakes: [['lac okanagan', 'okanagan lake'], ['lac kalamalka', 'kalamalka lake']] },
 
   // The Build My Trip page.
   page: {

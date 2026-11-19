@@ -22,7 +22,7 @@ const di = require('./discovery-intent.js');
 
 // Unmistakably French words: one is enough. (Words English visitors also
 // type -- pour, propose, organise, distilleries, belvedere -- are left out.)
-const STRONG = new Set(('helicoptere helicopteres motoneige motoneiges pres chutes grimpeurs grimpeuses ours aigles saumons tyrolienne tyroliennes nocturne arrets musee musees evasion guidee guidees visites atelier ateliers obligatoire obligatoirement seulement vegetarien vegetariens vegetarienne vegetariennes avec jours journee journees enfants enfant chien chiens chienne vignoble vignobles vin vins souper soupers '
+const STRONG = new Set(('moniteur moniteurs monitrice monitrices lecons hispanophone hispanophones lusophone parapente parapentes parachutisme deltaplane helicoptere helicopteres motoneige motoneiges pres chutes grimpeurs grimpeuses ours aigles saumons tyrolienne tyroliennes nocturne arrets musee musees evasion guidee guidees visites atelier ateliers obligatoire obligatoirement seulement vegetarien vegetariens vegetarienne vegetariennes avec jours journee journees enfants enfant chien chiens chienne vignoble vignobles vin vins souper soupers '
   + 'nouvel reveillon valentin paques magasinage magasiner boutiques librairie equitation promenade skateparc planchodrome randonnee randonnees rando plage plages pluie pleut pluvieux pluvieuse semaine nous je quoi faire voudrais voudrions '
   + 'aimerais aimerions cherche cherchons sejour itineraire activites demain aujourdhui lundi mardi mercredi jeudi '
   + 'vendredi samedi dimanche janvier fevrier avril juin juillet aout septembre octobre novembre decembre hiver printemps '
@@ -49,6 +49,20 @@ const STRONG_ON_FRENCH_PAGE = new Set(['brasserie', 'brasseries', 'cidrerie', 'c
 // interpreter's own English phrases (discovery-intent.js), so nothing here
 // can introduce a meaning the planner does not already have. '' drops a word.
 const PHRASES = [
+  // Tour test 15 (Whistler, 2026-11-18; Dave, canoe, kayak and SUP rentals, a sunset paddle, snowshoe and fondue evenings):
+  // « location de canot à Whistler en juillet » read « location of canoe » and found nothing. Rentals by what is rented
+  // (singular and plural, canoë too), the paddle at sunset, the snowshoe-and-fondue evening (a snowshoe tour, not a
+  // fondue restaurant).
+  ['location de canot', 'canoe rental'], ['location de canoe', 'canoe rental'], ['location de canoes', 'canoe rentals'], ['location de canots', 'canoe rentals'],
+  ['location de kayaks', 'kayak rentals'], ['location de kayak', 'kayak rental'], ['location de sup', 'paddleboard rental'], ['location de planches a pagaie', 'paddleboard rentals'],
+  ['location de planche a pagaie', 'paddleboard rental'], ['location de planche', 'paddleboard rental'], ['location d embarcations', 'canoe and kayak rentals'], ['location d embarcation', 'canoe and kayak rental'],
+  ['location de canots et kayaks', 'canoe and kayak rentals'], ['location de canot et kayak', 'canoe and kayak rental'], ['location de raquettes', 'snowshoe rentals'],
+  ['pagaie au coucher du soleil', 'sunset paddle'], ['sortie en pagaie au coucher du soleil', 'sunset paddle tour'], ['kayak au coucher du soleil', 'sunset kayak'], ['canot au coucher du soleil', 'sunset canoe'],
+  ['au coucher du soleil', 'at sunset'], ['coucher du soleil', 'sunset'], ['coucher de soleil', 'sunset'],
+  ['soiree fondue en raquettes', 'fondue snowshoe evening'], ['souper fondue en raquettes', 'fondue snowshoe dinner'], ['raquettes et fondue', 'fondue snowshoe'], ['raquette et fondue', 'fondue snowshoe'],
+  ['fondue en raquettes', 'fondue snowshoe'], ['raquettes fondue', 'fondue snowshoe'], ['raquette fondue', 'fondue snowshoe'], ['raquettes avec fondue', 'fondue snowshoe'], ['raquettes avec souper', 'dinner snowshoe'],
+  ['sortie de pagaie', 'paddle tour'], ['sortie en pagaie', 'paddle tour'], ['excursion en pagaie', 'paddle tour'], ['pagaie guidee', 'guided paddle'], ['sortie guidee en canot', 'guided canoe tour'], ['sortie guidee en kayak', 'guided kayak tour'],
+  ['canoe kayak', 'canoe and kayak'], ['stand up paddle', 'paddleboarding'],
   ['salle d evasion', 'escape room'], ['salles d evasion', 'escape rooms'],
   ['jeu d evasion', 'escape room'], ['jeux d evasion', 'escape rooms'],
   // Tour test 4 (Whistler, 2026-11-17): « visite gourmande » was searched for as the word « gourmande ». A food tour, and
@@ -287,6 +301,32 @@ const PHRASES = [
   ['visite du chenil', 'kennel visit'], ['visite de chenil', 'kennel visit'], ['visite au chenil', 'kennel visit'], ['visiter le chenil', 'kennel visit'], ['visites du chenil', 'kennel visits'], ['chenil', 'kennel'], ['chenils', 'kennels'],
   ['visite des chiots', 'puppy visit'], ['visite aux chiots', 'puppy visit'], ['rencontrer les chiots', 'puppy visit'], ['rencontrer les huskys', 'meet the huskies'],
   ['avec notre chiot', 'with my dog'], ['avec mon chiot', 'with my dog'],
+  // Tour test 14 (Whistler, 2026-11-18; Lucía, private ski lessons): « cours de ski », « leçons de ski », « moniteur »,
+  // « école de ski » and « cours de planche » found nothing in the planner. Kiteboarding and target shooting too (the broader
+  // pass over Whistler's real tours).
+  ['cours prives de ski', 'private ski lessons'], ['cours prive de ski', 'private ski lesson'], ['cours de ski prives', 'private ski lessons'], ['cours de ski prive', 'private ski lesson'],
+  ['cours de ski et de planche a neige', 'ski and snowboard lessons'], ['cours de ski et de planche', 'ski and snowboard lessons'], ['cours de ski et de snowboard', 'ski and snowboard lessons'],
+  ['cours de planche a neige', 'snowboard lessons'], ['cours de planche', 'snowboard lessons'], ['cours de snowboard', 'snowboard lessons'], ['cours de surf des neiges', 'snowboard lessons'],
+  ['cours de ski adapte', 'adaptive ski lessons'], ['cours de ski adaptes', 'adaptive ski lessons'], ['ski adapte', 'adaptive ski'], ['cours de ski de fond', 'cross country ski lessons'],
+  ['cours de ski', 'ski lessons'], ['lecons de ski', 'ski lessons'], ['lecon de ski', 'ski lesson'], ['lecons de planche a neige', 'snowboard lessons'], ['lecons de snowboard', 'snowboard lessons'],
+  ['ecoles de ski', 'ski schools'], ['ecole de ski', 'ski school'], ['ecole de planche a neige', 'snowboard school'], ['camp de ski', 'ski camp'], ['camps de ski', 'ski camps'], ['camp de jour', 'day camp'],
+  ['monitrices de ski', 'ski instructors'], ['moniteurs de ski', 'ski instructors'], ['monitrice de ski', 'ski instructor'], ['moniteur de ski', 'ski instructor'], ['moniteurs', 'instructors'], ['monitrices', 'instructors'], ['moniteur', 'instructor'], ['monitrice', 'instructor'],
+  ['qui parle espagnol', 'spanish speaking'], ['parlant espagnol', 'spanish speaking'], ['hispanophone', 'spanish speaking'], ['en espagnol', 'in spanish'], ['qui parle portugais', 'portuguese speaking'], ['en portugais', 'in portuguese'],
+  ['cours de kitesurf', 'kitesurf lessons'], ['cours de kite', 'kite lessons'], ['cours de wing foil', 'wing foil lessons'], ['cours de wingfoil', 'wing foil lessons'], ['cours de planche a voile', 'windsurf lessons'],
+  ['tir a la cible', 'target shooting'], ['champ de tir', 'shooting range'], ['stand de tir', 'shooting range'],
+  ['cours de voile', 'sailing lessons'], ['sortie en voilier', 'sailing trip'], ['sorties en voilier', 'sailing trips'], ['croisiere en voilier', 'sailing cruise'], ['balade en voilier', 'sailing trip'],
+  ['cours d escalade', 'rock climbing lessons'], ['ecole d escalade', 'climbing school'], ['guide d escalade', 'rock climbing guide'], ['guides d escalade', 'rock climbing guides'], ['camp d escalade', 'climbing camp'],
+  ['cours de velo de montagne', 'mountain bike lessons'], ['camp de velo', 'bike camp'], ['cours de vtt', 'mountain bike lessons'],
+  // Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding): « parapente », « parachutisme », « deltaplane »
+  // found nothing in the planner (only search read them).
+  ['vol en parapente biplace', 'tandem paragliding'], ['parapente biplace', 'tandem paragliding'], ['vol en parapente', 'paragliding'], ['vols en parapente', 'paragliding'], ['parapentes', 'paragliding'], ['parapente', 'paragliding'],
+  ['saut en parachute', 'skydiving'], ['sauts en parachute', 'skydiving'], ['parachutisme', 'skydiving'], ['saut en tandem', 'tandem skydiving'], ['deltaplanes', 'hang gliding'], ['deltaplane', 'hang gliding'], ['vol libre', 'paragliding'],
+  // Tour test 11 (Whistler, 2026-11-18; Min-jun, sightseeing vans): « visite touristique », « excursion d’une journée »,
+  // « route panoramique », « visite en van » and « chutes d’eau » (the place names, « lacs Joffre », are each site's: trip-site.js).
+  ['visites touristiques', 'sightseeing tours'], ['visite touristique', 'sightseeing tour'], ['excursions d une journee', 'day trips'], ['excursion d une journee', 'day trip'],
+  ['excursion a la journee', 'day trip'], ['sortie d une journee', 'day trip'], ['route panoramique', 'scenic drive'], ['routes panoramiques', 'scenic drives'], ['visite en van', 'van tour'],
+  ['visite en fourgonnette', 'van tour'], ['visites en van', 'van tours'], ['chutes d eau', 'waterfalls'],
+  ['prise en charge a l hotel', 'hotel pickup'], ['ramassage a l hotel', 'hotel pickup'], ['cueillette a l hotel', 'hotel pickup'],
   // Tour test 9 (Whistler, 2026-11-18): « visite culturelle autochtone » read as two place words and found nothing.
   ['visite culturelle autochtone', 'indigenous cultural tour'], ['visites culturelles autochtones', 'indigenous cultural tours'], ['visite autochtone', 'indigenous tour'], ['visites autochtones', 'indigenous tours'],
   ['visite culturelle', 'cultural tour'], ['visites culturelles', 'cultural tours'], ['sortie culturelle', 'cultural tour'], ['culture autochtone', 'indigenous culture'], ['cultures autochtones', 'indigenous culture'],

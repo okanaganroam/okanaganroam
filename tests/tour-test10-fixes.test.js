@@ -89,7 +89,7 @@ test('1. "Sleigh rides" kind (EN + FR): the list, Winter & Snow, its page words,
   assert.ok(completeness.TOUR_KINDS.includes('sleigh'));
   assert.deepEqual(app.TOUR_KIND_LABELS_OWNER.sleigh, ['Sleigh rides', 'Promenades en traîneau']);
   assert.equal(app.TOUR_KIND_ACTIVITY.sleigh, 'winter');
-  assert.equal(app.tourKindsText(['horseback', 'sleigh'], false), 'Horseback riding & sleigh rides');
+  assert.equal(app.tourKindsText(['horseback', 'sleigh'], false), 'Horseback riding & sleigh rides'); // tour test 17: the owner's own chip order
   assert.match(app.tourKindsText(['horseback', 'sleigh'], true), /promenades en traîneau/i);
   // Research's "Trail rides & sleigh rides" pre-picks both; "horse-drawn" alone isn't horseback; « traîneau à chiens » is dogs.
   assert.deepEqual(app.tourKindSuggestion({ cuisine: 'Trail rides & sleigh rides', name: '' }), ['sleigh', 'horseback']);
@@ -188,9 +188,9 @@ test('4. "Open on holidays" inside a stretch: Family Day and Christmas week open
 });
 
 test('5. 8+ and 10+ ages; a trip\'s own age ("Riders 8+ (pony rides under 8)" under Good to know, or "8+" on the trip): no trail ride for a 6-year-old, pony rides for a 5-year-old', async () => {
-  assert.deepEqual(completeness.TOUR_AGES, ['all', '5', '6', '8', '10', '12', '16', '19']);
+  assert.deepEqual(completeness.TOUR_AGES, ['all', '5', '6', '8', '10', '12', '14', '16', '19']);
   assert.equal(text.en.tour.tages[8], '8+'); assert.equal(text.fr.tour.tages[10], '10+');
-  assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '8', '10', '12', '16', '19'\]/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 11).
   const kid = mk('tour', { name: 'Eight Plus Canoe', cuisine: 'Canoe tours' });
   ok(await change(tokenFor(kid.id), { tour_info: { kinds: ['paddle'], age: '8', year: 'all' } }));
   assert.match(plain(page(kid)), /Ages 8 and up\./); assert.match(plain(page(kid, 'fr')), /À partir de 8 ans\./);
@@ -283,7 +283,7 @@ test('10. price per rider, child, kid, adult or person saves; per sleigh is stil
   for (const x of ['75 per rider', '$75 per rider', '25 per child', '25 per kid', '95 per adult', '95 per person', '95 pp', '75 a rider']) assert.equal(app.tourPriceWhy(x), '', x);
   assert.equal(app.tourPriceWhy('200 per sleigh'), 'unit');
   const ctx = {}; vm.createContext(ctx);
-  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceTrim') + clientFn('tourPriceWhy'), ctx);
+  vm.runInContext(clientFn('moneyHead') + clientFn('feeHours') + clientFn('priceSwiss') + clientFn('priceTrim') + clientFn('tourPriceWhy'), ctx);
   for (const x of ['75 per rider', '25 per child', '25 per kid', '95 per adult']) assert.equal(vm.runInContext(`tourPriceWhy(${JSON.stringify(x)}, false)`, ctx), '', x);
   const { t } = await gord();
   ok(await change(t, { tour_price: 75 }));
@@ -319,10 +319,10 @@ test('13. sentence capitals on what he types (story, Known for, Good to know, to
   assert.equal(box.rows.find((r) => r.label === 'Good to know').text, 'Wear closed-toe shoes. Riders 8+ (pony rides under 8) and under 230 lb.');
   ok(await change(t, { visit_rows: { known_for: 'quiet horses and big mountain views' } }));
   assert.equal(JSON.parse(db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(v.id).info).rows.find((r) => r.label === 'Known for').text, 'Quiet horses and big mountain views');
-  const r = await change(t, { description: 'family ranch in pemberton meadows since 1979. trail rides 1 or 2 hrs or half day with lunch, pony rides for little ones.' });
+  const r = await change(t, { description: 'family ranch in penticton meadows since 1979. trail rides 1 or 2 hrs or half day with lunch, pony rides for little ones.' });
   ok(r);
   const req = db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND changes LIKE '%description%' ORDER BY id DESC LIMIT 1").get(v.id);
-  assert.match(JSON.parse(req.changes).description, /^Family ranch in pemberton meadows since 1979\. Trail rides/);
+  assert.match(JSON.parse(req.changes).description, /^Family ranch in Penticton meadows since 1979\. Trail rides/); // tour test 11: names the site knows get capitals (Okanagan: Penticton)
   const card = app.renderAdminChangeCard({ id: req.id, venue_name: v.name, submitted_at: req.submitted_at || '2026-11-18', listing_url: '/x', changes: JSON.parse(req.changes), previous: {}, note: '' });
   assert.match(card, /Typed all lowercase/);
   // Typed tour names (his own list from the edit page) start with a capital.

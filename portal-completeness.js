@@ -298,14 +298,18 @@ if (BREWERY_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-
 // The order the chips show in: the 12 most common first (Whistler's 64 tours and Okanagan's 84), then the rest.
 // Tour test 10 (Whistler, 2026-11-18; Gord; Dayton approved): "Sleigh rides" (horse-drawn), after snowshoe (More kinds on
 // Okanagan; Whistler orders its chips with TOUR_KINDS_SHOWN).
-const TOUR_KINDS = ['heli', 'snowmobile', 'dogsled', 'jetboat', 'boat', 'horseback', 'fishing', 'wildlife', 'bike', 'zipline', 'wine', 'walking', 'cultural', 'snowshoe', 'sleigh', 'paddle', 'raft', 'adventure', 'guide', 'flight', 'food', 'farm', 'rentals', 'other'];
-const TOUR_LENGTHS = ['1h', '2-3h', 'half', 'full', 'multi'];
+const TOUR_KINDS = ['heli', 'snowmobile', 'dogsled', 'jetboat', 'boat', 'horseback', 'fishing', 'wildlife', 'bike', 'zipline', 'wine', 'walking', 'cultural', 'snowshoe', 'sleigh', 'paddle', 'raft', 'adventure', 'guide', 'flight', 'food', 'farm', 'rentals', 'sightseeing', 'paraglide', 'lessons', 'other'];
+// Tour test 13 (Whistler, 2026-11-18; Dayton approved): "1 to 2 hours".
+const TOUR_LENGTHS = ['1h', '1-2h', '2-3h', 'half', 'full', 'multi'];
 // Tour test 2 (Whistler, 2026-11-16; Dayton approved): "48 hours ahead" and a 5+ age.
-const TOUR_BOOK = ['same_day', 'day', '48h', 'week', 'no'];
+// Tour test 16 (Whistler, 2026-11-18): 'ahead' is "Yes" with no how-far-ahead chip ("Book ahead.").
+const TOUR_BOOK = ['same_day', 'day', '48h', 'week', 'no', 'ahead'];
 // Tour test 10 (Whistler, 2026-11-18; Gord, a horseback ranch; Dayton approved): 8+ and 10+ (riders 8 and up).
-const TOUR_AGES = ['all', '5', '6', '8', '10', '12', '16', '19'];
+const TOUR_AGES = ['all', '5', '6', '8', '10', '12', '14', '16', '19'];
 const TOUR_ITEMS = [
-  R('address_pin', { w: 3, en: 'Where people meet you', fr: 'Où l’on vous rejoint', whyEn: 'Your meeting spot or office, with the map pin on it.', whyFr: 'Votre point de rencontre ou votre bureau, avec l’épingle sur la carte.' }),
+  // Dayton (2026-11-18, tour test 15): tours have no meeting-spot step (guests get the exact spot when they book): the
+  // address is the business address, and the meeting-spot photo item's 2 points moved here.
+  R('address_pin', { w: 5, en: 'Address and map pin', fr: 'Adresse et position sur la carte', whyEn: 'Your office or main spot, with the map pin on it. Guests get the exact meeting spot when they book.', whyFr: 'Votre bureau ou votre point principal, avec l’épingle sur la carte. Les clients reçoivent le point de rencontre exact à la réservation.' }),
   R('phone', { w: 4, whyEn: 'The number people call to book or ask about a trip.', whyFr: 'Le numéro que l’on appelle pour réserver ou poser une question.' }),
   R('website', { w: 3 }),
   { key: 'tour_kind', group: 'tour', w: 3, fix: true, target: { setup: 'tour' }, fields: ['tour_info'],
@@ -336,7 +340,6 @@ const TOUR_ITEMS = [
   R('pyv_groups', { group: 'yourvisit', w: 3, en: 'Groups and private trips', fr: 'Groupes et sorties privées', whyEn: 'Private tours? From what size should groups call ahead?', whyFr: 'Sorties privées? À partir de quelle taille les groupes doivent-ils appeler?', target: { setup: 'groups' } }),
   R('instagram', { w: 3 }),
   R('facebook', { w: 3 }),
-  R('arrival', { w: 2, en: 'Meeting spot photo and exact spot', fr: 'Photo du point de rencontre et emplacement exact', whyEn: 'Stand where people meet you (your door, the dock, the trailhead) and take one photo.', whyFr: 'Placez-vous là où l’on vous rejoint (votre porte, le quai, le départ du sentier) et prenez une photo.' }),
   R('owner_confirmed', { w: 2 }),
 ];
 if (TOUR_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: tour weights must sum to 100');
@@ -657,6 +660,9 @@ function scoreCompleteness(input, opts) {
   // "Not sure / someone else runs it" (pub test 6, 2026-11-10): Instagram and Facebook count as answered (no nagging),
   // but are not a "we don't have one" (never in `declared`).
   const unsure = new Set(((input && input.unsureKeys) || []).filter((k) => k === 'instagram' || k === 'facebook'));
+  // Tour test 17 (Whistler, 2026-11-18; Sarah: Instagram set, Facebook blank, held at 97%): for tours, Instagram or Facebook
+  // is done; the other one isn't asked for. Tours only (the other types keep both items as they were).
+  if (input && input.type === 'tour' && (done.instagram || done.facebook)) { unsure.add('instagram'); unsure.add('facebook'); }
   const pending = o.pending || new Set();
   const photosWaiting = Math.max(0, Number(input && input.pendingPhotos) || 0);
   const na = {};

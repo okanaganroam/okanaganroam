@@ -1,5 +1,5 @@
 {
- "_about": "Phrases that mean the same thing on any Roam site (2026-10-28). Copied as is to a new site; added to the code's base tables. types/features/collections/activities/occasions/budget/pace/cuisineSynonyms: more ways to say each value. descriptionSynonyms: a word the visitor uses -> words a listing's description uses for the same thing (searched when the word is not a category). termLabels: how a searched word reads in a plan summary instead of in quotes. Keys must match the site's own values; an unknown key is ignored.",
+ "_about": "Phrases that mean the same thing on any Roam site (2026-10-28). Copied as is to a new site; added to the code's base tables. types/features/collections/activities/occasions/budget/pace/cuisineSynonyms: more ways to say each value. descriptionSynonyms: a word the visitor uses -> words a listing's description uses for the same thing (searched when the word is not a category). termLabels: how a searched word reads in a plan summary instead of in quotes. Keys must match the site's own values; an unknown key is ignored. Tour test 13 (2026-11-18): paragliding, skydiving and hang gliding are their own group (descriptionSynonyms + termLabels here; the planner's paragliding kind in trip-requirements.js). Tour test 14 (2026-11-18): ski and snowboard lessons, ski schools, instructors, kids' ski camps and adaptive skiing (the planner's ski_lessons kind), and the broader pass over Whistler's real tours: kiteboarding and wing foil lessons, target shooting, rock climbing lessons, mountain bike lessons, sailing.",
  "types": {
   "restaurant": [
    "a bite",
@@ -1289,6 +1289,138 @@
    "viewpoint",
    "lookout",
    "murals"
+  ],
+  "paragliding": [
+   "paraglide",
+   "paraglides",
+   "paraglider",
+   "tandem paragliding",
+   "tandem flight",
+   "tandem flights",
+   "parapente",
+   "skydiving",
+   "skydive",
+   "parachute",
+   "hang gliding",
+   "hang glider",
+   "speed flying"
+  ],
+  "paraglide": [
+   "paragliding",
+   "paraglider",
+   "tandem paragliding",
+   "tandem flight",
+   "parapente"
+  ],
+  "skydiving": [
+   "skydive",
+   "tandem skydive",
+   "parachute",
+   "parachuting",
+   "parachutisme"
+  ],
+  "parapente": [
+   "paragliding",
+   "paraglide",
+   "tandem paragliding"
+  ],
+  "hang gliding": [
+   "hang glider",
+   "hang gliding",
+   "deltaplane"
+  ],
+  "ski lessons": [
+   "ski lesson",
+   "ski and snowboard lessons",
+   "ski & snowboard lessons",
+   "snowboard lessons",
+   "snow board lessons",
+   "ski school",
+   "ski clinics",
+   "ski clinic",
+   "nordic ski school",
+   "ski instructors",
+   "adaptive ski",
+   "private ski"
+  ],
+  "ski lesson": [
+   "ski lessons",
+   "ski and snowboard lessons",
+   "ski & snowboard lessons",
+   "ski school",
+   "ski clinics",
+   "nordic ski school"
+  ],
+  "snowboard lessons": [
+   "snowboard lesson",
+   "ski and snowboard lessons",
+   "ski & snowboard lessons",
+   "snow board lessons",
+   "snowboard school",
+   "ski school"
+  ],
+  "ski school": [
+   "ski lessons",
+   "ski and snowboard lessons",
+   "ski & snowboard lessons",
+   "ski school",
+   "nordic ski school",
+   "ski clinics"
+  ],
+  "ski instructor": [
+   "ski lessons",
+   "ski and snowboard lessons",
+   "ski & snowboard lessons",
+   "ski school",
+   "instructors"
+  ],
+  "kids ski camp": [
+   "kids camp",
+   "ski lessons",
+   "ski and snowboard lessons",
+   "ski school"
+  ],
+  "adaptive ski": [
+   "adaptive ski",
+   "adaptive lessons",
+   "sit-ski",
+   "adaptive sports"
+  ],
+  "kiteboarding lessons": [
+   "kiteboarding",
+   "wing foil lessons",
+   "wing foil",
+   "kite lessons"
+  ],
+  "wing foil lessons": [
+   "wing foil",
+   "wing-foil",
+   "kiteboarding"
+  ],
+  "target shooting": [
+   "shooting",
+   "shooting range",
+   "biathlon"
+  ],
+  "rock climbing lessons": [
+   "climbing school",
+   "climbing courses",
+   "rock climbing courses",
+   "climbing camps",
+   "rock climbing guides",
+   "climbing guides"
+  ],
+  "mountain bike lessons": [
+   "coaching",
+   "skills coaching",
+   "bike school",
+   "mountain bike school"
+  ],
+  "sailing": [
+   "sailing trips",
+   "sails",
+   "sailing courses",
+   "yachts"
   ]
  },
  "termLabels": {
@@ -1471,6 +1603,74 @@
   "north": {
    "en": "",
    "fr": ""
+  },
+  "paragliding": {
+   "en": "paragliding",
+   "fr": "parapente"
+  },
+  "paraglide": {
+   "en": "paragliding",
+   "fr": "parapente"
+  },
+  "parapente": {
+   "en": "paragliding",
+   "fr": "parapente"
+  },
+  "skydiving": {
+   "en": "skydiving",
+   "fr": "parachutisme"
+  },
+  "hang gliding": {
+   "en": "hang gliding",
+   "fr": "deltaplane"
+  },
+  "ski lessons": {
+   "en": "ski and snowboard lessons",
+   "fr": "cours de ski et de planche"
+  },
+  "ski lesson": {
+   "en": "ski and snowboard lessons",
+   "fr": "cours de ski et de planche"
+  },
+  "snowboard lessons": {
+   "en": "snowboard lessons",
+   "fr": "cours de planche"
+  },
+  "ski school": {
+   "en": "ski schools",
+   "fr": "écoles de ski"
+  },
+  "ski instructor": {
+   "en": "ski instructors",
+   "fr": "moniteurs de ski"
+  },
+  "kids ski camp": {
+   "en": "kids’ ski camps",
+   "fr": "camps de ski pour enfants"
+  },
+  "adaptive ski": {
+   "en": "adaptive skiing",
+   "fr": "ski adapté"
+  },
+  "kiteboarding lessons": {
+   "en": "kiteboarding lessons",
+   "fr": "cours de kitesurf"
+  },
+  "wing foil lessons": {
+   "en": "wing foil lessons",
+   "fr": "cours de wing foil"
+  },
+  "target shooting": {
+   "en": "target shooting",
+   "fr": "tir à la cible"
+  },
+  "rock climbing lessons": {
+   "en": "rock climbing lessons",
+   "fr": "cours d’escalade"
+  },
+  "mountain bike lessons": {
+   "en": "mountain bike lessons",
+   "fr": "cours de vélo de montagne"
   }
  },
  "originPlaces": ["australia", "sydney", "melbourne", "brisbane", "perth", "auckland", "new zealand", "london", "england", "uk", "u k", "united kingdom", "britain", "scotland", "ireland", "dublin", "france", "paris", "germany", "berlin", "munich", "netherlands", "amsterdam", "belgium", "switzerland", "zurich", "italy", "rome", "milan", "spain", "madrid", "barcelona", "portugal", "sweden", "stockholm", "norway", "oslo", "denmark", "copenhagen", "finland", "poland", "europe", "asia", "japan", "tokyo", "osaka", "kyoto", "korea", "south korea", "seoul", "china", "beijing", "shanghai", "hong kong", "taiwan", "singapore", "india", "delhi", "mumbai", "bangalore", "dubai", "uae", "israel", "mexico", "brazil", "argentina", "chile", "colombia", "south africa", "nigeria", "egypt", "texas", "california", "new york", "florida", "chicago", "boston", "los angeles", "san francisco", "the states", "the us", "usa", "u s a", "america", "ontario", "quebec", "alberta", "manitoba", "saskatchewan", "nova scotia", "winnipeg", "ottawa", "halifax", "toronto", "montreal", "calgary", "edmonton", "vancouver", "overseas", "abroad", "out of town", "out of province", "out of country"]
