@@ -496,6 +496,16 @@ function renderStyles() {
 
   /* How it works (before the first plan). */
   .t3-how { padding: 34px 0 56px; }
+  /* Trip SEO (2026-11-18): the plain text under the planner (intro, example trips, FAQ), see t3AboutHtml. */
+  .t3-about { padding: 24px 0 56px; }
+  .t3-about h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: clamp(1.2rem, 2vw, 1.45rem); color: var(--ref-navy); margin: 28px 0 10px; }
+  .t3-about h2:first-child { margin-top: 0; }
+  .t3-about p { max-width: 70ch; margin: 0 0 10px; font-size: 0.97rem; line-height: 1.6; }
+  .t3-about-examples { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; max-width: 900px; }
+  .t3-about-examples a { display: inline-flex; align-items: center; min-height: 44px; box-sizing: border-box; padding: 8px 16px; border-radius: 999px; background: #fff; border: 1px solid rgba(27,43,58,0.22); color: var(--ref-navy); font-weight: 700; font-size: 0.9rem; line-height: 1.3; text-decoration: none; }
+  .t3-about-examples a:hover { background: rgba(27,43,58,0.06); text-decoration: underline; }
+  html[lang="fr"] .t3 .t3-about-examples a.t3-fr { display: inline-flex; }
+  .t3-about-faq h3 { font-size: 1rem; font-weight: 800; margin: 18px 0 4px; color: var(--ref-navy); }
   .t3-how h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: clamp(1.25rem, 2vw, 1.5rem); color: var(--ref-navy); margin: 0 0 16px; }
   .t3-how-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 0; padding: 0; list-style: none; }
   .t3-how-grid li { background: #fff; border-radius: 12px; padding: 18px; box-shadow: 0 10px 22px -18px rgba(27,43,58,0.45); font-size: 0.92rem; line-height: 1.5; }
@@ -851,6 +861,33 @@ function t3SampleCardHtml(d) {
       </div>`;
 }
 
+// Trip SEO (2026-11-18): an answer-first intro, example trips and a short FAQ under the planner, in plain server-rendered
+// text (SITE_PAGE.seo). English and French both render; html[lang] shows one, like the rest of this page. Each example is
+// a link to /trip?q=<request>, which runs it like a shared link (t3QueryToState); those addresses are noindex and
+// canonical to /trip (server.js), so they are never pages of their own. A site without SITE_PAGE.seo shows nothing.
+function t3AboutHtml(d) {
+  const x = SITE_PAGE.seo;
+  if (!x) return '';
+  const esc = d.esc;
+  const two = (o) => `<span class="t3-en">${esc(o.en)}</span><span class="t3-fr" lang="fr">${esc(o.fr)}</span>`;
+  const examples = x.examples.map((e) => `
+      <li><a class="t3-en" href="/trip?q=${esc(encodeURIComponent(e.en))}">${esc(e.en)}</a><a class="t3-fr" lang="fr" href="/trip?q=${esc(encodeURIComponent(e.fr))}">${esc(e.fr)}</a></li>`).join('');
+  const faq = x.faq.map((f) => `
+      <h3>${two(f.q)}</h3>
+      <p>${two(f.a)}</p>`).join('');
+  return `<section class="t3-wrap t3-about" id="t3About" aria-labelledby="t3AboutTitle">
+    <h2 id="t3AboutTitle">${two(x.introHeading)}</h2>
+    <p>${two({ en: x.intro.en.join(' '), fr: x.intro.fr.join(' ') })}</p>
+    <h2>${two(x.examplesHeading)}</h2>
+    <p>${two(x.examplesNote)}</p>
+    <ul class="t3-about-examples">${examples}
+    </ul>
+    <div class="t3-about-faq">
+      <h2>${two(x.faqHeading)}</h2>${faq}
+    </div>
+  </section>`;
+}
+
 function renderBody(d) {
   const esc = d.esc;
   // data-i18n: /scripts/app.js shows these in the visitor's language (the
@@ -892,6 +929,7 @@ function renderBody(d) {
     ${t3SampleCardHtml(d)}
   </details>
   <section class="t3-wrap t3-result" id="t3Result" hidden aria-labelledby="t3Headline"></section>
+  ${t3AboutHtml(d)}
 </main>`;
 }
 
@@ -2564,7 +2602,7 @@ function renderTripPlannerV3Page(d) {
 <title>${d.esc(d.title)}</title>
 <meta name="description" content="${d.esc(d.description)}">
 <link rel="canonical" href="${d.canonical}">
-${d.preview ? '<meta name="robots" content="noindex">\n' : ''}${d.faviconLink || ''}
+${d.preview ? '<meta name="robots" content="noindex">\n' : d.noindex ? '<meta name="robots" content="noindex, follow">\n' : ''}${d.faviconLink || ''}
 <meta property="og:site_name" content="${FR_SITE.brand}">
 <meta property="og:title" content="${d.esc(d.title)}">
 <meta property="og:description" content="${d.esc(d.description)}">

@@ -42193,7 +42193,13 @@ function tripSamplePlan(now = Date.now()) {
   tripSampleCache = { at: now, value };
   return value;
 }
-function renderTripPlannerV3Page({ preview = false } = {}) {
+// Trip SEO (2026-11-18): /trip had 6 Search Console impressions in 90 days and ranked for no itinerary or trip-planner
+// search, so its title and description now use the words people search ("Okanagan trip planner", "itinerary"); the
+// "Build My Trip" name stays on the page. noindex: a /trip address with a query (?q= example and shared-plan links,
+// ?region= from the town pages, campaign tags) is noindex, follow and canonical to /trip, so no new indexable page.
+const TRIP_PAGE_TITLE = 'Okanagan Trip Planner: Free Day-by-Day Itinerary | Okanagan Roam';
+const TRIP_PAGE_DESCRIPTION = 'Plan an Okanagan trip in one sentence: a free day-by-day itinerary for Kelowna, Penticton, Vernon and wine country, built from places open on your dates.';
+function renderTripPlannerV3Page({ preview = false, noindex = false } = {}) {
   if (!tripPlannerV3PageModule) return renderTripPlannerPage(isTripPlannerV2Enabled());
   const canonical = 'https://okanaganroam.com/trip';
   let tripTrayHtml = '';
@@ -42210,8 +42216,8 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
   }
   return withPlanShareButton(tripPlannerV3PageModule.renderTripPlannerV3Page({
     esc: escapeHtml,
-    title: 'Build My Trip \u2014 Okanagan Roam',
-    description: 'Describe your Okanagan trip and get a day-by-day plan built from real wineries, restaurants, beaches and more, with why each stop fits.',
+    title: TRIP_PAGE_TITLE,
+    description: TRIP_PAGE_DESCRIPTION,
     canonical,
     faviconLink: FAVICON_LINKS,
     breadcrumbJson: JSON.stringify(breadcrumbListSchema([{ name: 'Home', url: 'https://okanaganroam.com/' }, { name: 'Build My Trip', url: canonical }])),
@@ -42227,6 +42233,7 @@ function renderTripPlannerV3Page({ preview = false } = {}) {
     mapHeaders: tripV3MapHeaders(),
     appScriptSrc: APP_JS_SRC,
     preview,
+    noindex,
   }));
 }
 
@@ -69421,12 +69428,15 @@ const server = http.createServer(async (req, res) => {
         });
         return res.end();
       }
+      // Any query (?q= examples and shared plans, ?region=, campaign tags): noindex, follow, canonical /trip (trip SEO).
+      const tripHasQuery = Object.keys(query || {}).length > 0;
       if (tripPlannerV3ActiveFor(req)) {
-        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview' });
+        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview', noindex: tripHasQuery });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
         return res.end(html);
       }
-      const html = renderTripPlannerPage(isTripPlannerV2Enabled());
+      let html = renderTripPlannerPage(isTripPlannerV2Enabled());
+      if (tripHasQuery && !/<meta name="robots"/.test(html.split('</head>')[0])) html = html.replace(/(<link rel="canonical" href="[^"]*">\n?)/, '<meta name="robots" content="noindex, follow">\n$1');
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(html);
     }
