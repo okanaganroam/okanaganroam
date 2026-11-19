@@ -6775,6 +6775,26 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
   return { run, q, plan, venues, why, guides, fuzzy, events, now, nameOnly, pinnedIds };
 }
 // Round 12 (2026-10-20): a /search page that would show nothing: no places, no events, no page of its own to go to.
+// Indoor test 9 (2026-11-19; "indoor playground Kelowna" missed Melissa's play centre next door in West Kelowna): a search
+// that names an indoor kind in one town with fewer than two places of that kind there takes in the towns right around it,
+// as Build My Trip does (TRIP_SITE nearTowns; tripIndoorKindNearTowns).
+function searchIndoorNearTowns(run, text, lang) {
+  const kinds = tripIndoorKindsAsked(text);
+  const regions = (run && run.intent && run.intent.regions) || [];
+  if (!kinds.length || regions.length !== 1 || !(TRIP_NEAR_TOWNS[regions[0]] || []).length) return run;
+  const TR = require('./trip-requirements');
+  const ofKind = (r) => ((r && r.results && r.results.items) || []).filter((x) => { const v = getVenue(x.id); if (!v || v.type !== 'indoor') return false; const k = venueIndoorInfo(v.id).kinds; return TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) ? { indoorKinds: k } : {}) }).some((pk) => kinds.includes(pk)); }).length;
+  const have = ofKind(run);
+  if (have >= 2) return run;
+  const town = regions[0], label = REGION_LABELS[town];
+  const re = new RegExp(`(^|[^A-Za-z])${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![A-Za-z])`, 'i');
+  if (!re.test(text)) return run;
+  const towns = [town, ...TRIP_NEAR_TOWNS[town]].map((r) => REGION_LABELS[r]);
+  const wider = runDiscovery(text.replace(re, (m, pre) => `${pre}${towns.slice(0, -1).join(', ')} and ${towns[towns.length - 1]}`), { limit: SEARCH_PAGE_MAX_RESULTS, lang });
+  if (ofKind(wider) <= have) return run;
+  wider.query = run.query; wider.searchText = run.searchText;
+  return wider;
+}
 function searchRunEmpty(run) {
   if (!run || run.intent.mode === 'events' || run.results.total || (run.events && run.events.total)) return false;
   try { const m = searchPageModel(run); return !m.venues.length && !m.events.total && !(m.plan && m.plan.url) && !m.guides.length && !m.fuzzy.length; } catch (e) { return false; }
@@ -70144,6 +70164,7 @@ const server = http.createServer(async (req, res) => {
       }
       let run = runDiscovery(searchText, { limit: SEARCH_PAGE_MAX_RESULTS, lang: res.twinLang === 'fr' ? 'fr' : 'en' });
       run.query = q; run.searchText = searchText;
+      try { run = searchIndoorNearTowns(run, searchText, res.twinLang === 'fr' ? 'fr' : 'en'); } catch (e) { /* as found */ }
       // Round 12 (2026-10-20): "pizz", "sush", "caf", "burg" and "piza" found nothing. When the words as typed find
       // nothing at all, the last word is read as the search word it starts (or nearly spells) and the page says so.
       let shortFix = [];

@@ -111,12 +111,17 @@ test('Site search (/search and /fr/search): every kind\'s place is offered for i
   assert.deepEqual(fails, []);
 });
 
-test('A named kind with nothing in the town itself takes in the towns right around it: "indoor playground Kelowna" offers the West Kelowna play centre (EN + FR)', async () => {
+test('A named kind with nothing in the town itself takes in the towns right around it: "indoor playground Kelowna" offers the West Kelowna play centre (Build My Trip and search, EN + FR)', async () => {
   const v = app.createVenue({ slug: 'indoor-pm-wk-play', type: 'indoor', region: 'west-kelowna', name: 'Westside Kidz Play Centre', cuisine: 'Indoor playground', description: 'Indoor play centre for kids 0 to 10.',
     latitude: 49.83, longitude: -119.62, address: '2374 Bering Rd, West Kelowna, BC', phone: '250-555-0199', website: 'https://example.com', hours: DAY('09:00', '17:00'), rating: 4.4, reviews: 70 });
   await ok(change(tokenFor(v.id), { indoor_info: { kinds: ['kids'], length: '1-2h', age: 'all', year: 'all' } }));
   for (const q of ['indoor playground Kelowna', 'indoor playground in Kelowna', 'aire de jeux intérieure à Kelowna', 'aire de jeux intérieure à West Kelowna']) {
     const p = app.runTripPlan({ text: q }, NOW);
     assert.ok(itemsOf(p).some((x) => x.venue.id === v.id), `${q}: ${itemsOf(p).map((x) => x.venue.name).slice(0, 6).join(' | ')} ${(p.notes || []).join(' ')}`);
+  }
+  // Site search too (EN and FR).
+  for (const [lang, q] of [['en', 'indoor playground Kelowna'], ['en', 'play centre in Kelowna'], ['fr', 'aire de jeux intérieure à Kelowna']]) {
+    const r = await fetch(`${base}${lang === 'fr' ? '/fr' : ''}/search?q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } });
+    assert.ok(plain(await r.text()).includes('Westside Kidz Play Centre'), `search ${lang} "${q}" -> ${r.url.replace(base, '')}`);
   }
 });
