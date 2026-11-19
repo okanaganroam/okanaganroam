@@ -2293,7 +2293,9 @@
         + (S.nudge && (S.nudge === T.tpriceGroup || S.nudge === T.tpriceDay) && S.groupMove != null && T.tpriceGroupMove ? '<div class="su-stack su-seaskip" id="suTpriceMove">' + big('➜', fill(T.tpriceGroupMove, { x: tourMoney(S.groupMove) }), '', true, 'tpriceToPriv') + '</div>' : '')
         + (S.nudge && (S.nudge === T.tpriceUnit || S.nudge === T.tpriceUnitRentals || S.nudge === T.tpriceHourly || (T.tpriceVehicle && S.nudge === T.tpriceVehicle)) && T.tpriceUnitGo && STEPS.indexOf('menu') >= 0 ? '<div class="su-stack su-seaskip" id="suTpriceUnitGo">' + big('➜', T.tpriceUnitGo, '', true, 'tpriceToMenu') + '</div>' : '')
         // The per-person box takes words too ("free", "by donation"), so it opens the letters keyboard (no number pad).
-        + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { max: 40 }) + (T.tpriceFreeTip ? '<p class="su-hint" id="suFreeTip">' + h(T.tpriceFreeTip) + '</p>' : '') + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(tourRentalKinds() && T.tpriceMoreRentals ? T.tpriceMoreRentals : T.tpriceMore) + '</p>' : '')
+        // Tour test 16 (Whistler, 2026-11-18; Tom): one short line under the box ("The adult price…"); free tours, the
+        // checked-first limit and per-boat prices are in Help (the limit is also said after a save over it).
+        + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { max: 40 }) + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(tourRentalKinds() && T.tpriceMoreRentals ? T.tpriceMoreRentals : T.tpriceMore) + '</p>' : '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>')
         // Tour test 14 (Lucía): a lesson company's box says "Private lessons" (her page says "Private lessons from $599").
         + '<h2 class="su-h2">' + h(tourLessonsKind() && T.tprivQLessons ? T.tprivQLessons : T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', tourLessonsKind() && T.tprivLabelLessons ? T.tprivLabelLessons : T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 40 })
         // Tour test 11: whole trip or per hour, and the minimum hours of an hourly price.
@@ -2315,7 +2317,7 @@
     } else if (s === 'bring') {
       // Tours (2026-11-16): what to bring or wear and the weather calls, in the "Good to know" line (no new field).
       var bv = S.tour.bring != null ? S.tour.bring : ((CUR.visit_rows || {}).good_to_know || '');
-      // Tour test 1 (Whistler, 2026-11-16): research's line, untouched, says it came from online (a tap on an answer replaces it).
+      // Tour test 1 (Whistler, 2026-11-16): research's line, untouched, says it came from online (a tap on an answer replaces it) (tour test 16: a tap adds to it).
       var bRes = !!bv && bv === ((CUR.visit_rows || {}).good_to_know || '') && (C.visitResearch || []).indexOf('good_to_know') >= 0;
       x = doneLine('bring') + q(T.bringQ, T.bringLead) + (bRes && T.bringGuess ? '<p class="su-sent su-research" id="suBringGuess">' + h(T.bringGuess) + '</p>' : '') + msgs() + enLineHint(bv === ((CUR.visit_rows || {}).good_to_know || '') ? bv : '', 'suBringEn', false, 'good_to_know') + quick('good_to_know', 'suBring', bv)
         + '<label class="su-sr" for="suBring">' + h(T.bringQ) + '</label><textarea class="su-field su-line" id="suBring" maxlength="' + (BRING_MAX + 600) + '" rows="4" aria-describedby="suBringCount">' + h(bv) + '</textarea>' + countLine('suBring', bv, BRING_MAX) + ex(T.bringEx)
@@ -4148,8 +4150,9 @@
     }
     if (k === 'bookingSave') {
       readTour(); var tb0 = S.tour, bu1 = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null; if (bu1 !== null) S.bookUrl = bu1;
-      var bk0 = tb0.bookYes === 'no' ? 'no' : tb0.bookYes === 'yes' ? tb0.book : '';
-      if (tb0.bookYes === 'yes' && !tb0.book) { S.nudge = T.taheadNeed; return render(); }
+      // Tour test 16 (Whistler, 2026-11-18; Tom): "Yes" saves on its own ("Book ahead"); how far ahead is optional (it made
+      // him pick a rule, "at least a week", for "tours sell out", and Save bounced until he did).
+      var bk0 = tb0.bookYes === 'no' ? 'no' : tb0.bookYes === 'yes' ? (tb0.book || 'ahead') : '';
       if (!bk0 && !bu1 && !tb0.noBook) { S.nudge = T.tbookNeed; return render(); }
       if (bu1 && !siteOk(bu1)) { S.nudge = T.bookLinkBad; S.badField = 'suBookUrl'; return render(); }
       var bl = [];
@@ -4164,7 +4167,8 @@
     }
     if (k === 'bringSave') {
       var brFit = overMax('suBring', BRING_MAX); if (brFit !== false) { S.tour.bring = brFit; return render(); }
-      readTour(); var br = String(S.tour.bring != null ? S.tour.bring : '').trim();
+      // Tour test 16: no double spaces in the saved line (a space typed after a chip's ". ").
+      readTour(); var br = String(S.tour.bring != null ? S.tour.bring : '').replace(/([^\s])[ \u00a0]{2,}(?=\S)/g, '$1 ').trim();
       if (!br) { S.nudge = T.bringNeed; return render(); }
       if (linkIn(br)) { S.nudge = T.bringNoLink; return render(); }
       var brSame = br === ((CUR.visit_rows || {}).good_to_know || '') && (C.visitResearch || []).indexOf('good_to_know') < 0;
@@ -4529,7 +4533,10 @@
       else if (v && qk === 'dogs' && S.dogGuessed && C.suggestDogNote && v === String(C.suggestDogNote).trim()) { v = t; S.dogGuessed = false; }
       // Research's untouched line is replaced by the tap, except a Groups fact the chip doesn't carry ("Private room for
       // 20" stays when Buyouts is tapped).
-      else if (v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0) v = (qk === 'groups' ? groupsKeep(v, t, sibs) : []).concat([t]).join(sep);
+      // Tour test 16 (Whistler, 2026-11-18; Tom): not a tour's Good to know. Its research line is a fact of its own ("Bring
+      // binoculars."), not an answer the chip replaces (as a dogs or booking line is), so the chip is added after it and he
+      // sees both in the box; it had vanished from his page without a word.
+      else if (v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0 && !(TOUR && qk === 'good_to_know')) v = (qk === 'groups' ? groupsKeep(v, t, sibs) : []).concat([t]).join(sep);
       else if (saysIt(v, t, sibs)) return;
       else v = v ? v.replace(/[\s.,]+$/, '') + sep + t : t;
       // Tour test 10 (Whistler, 2026-11-18; Gord): a chip's words ran into his typing ("rain or shine long pants"). As the

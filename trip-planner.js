@@ -1956,6 +1956,7 @@ const TOUR_BOOK_AHEAD_NOTES = {
   day: 'Book at least a day ahead (the operator’s own answer).',
   '48h': 'Book at least 48 hours ahead (the operator’s own answer).',
   week: 'Book at least a week ahead (the operator’s own answer).',
+  ahead: 'Book ahead (the operator’s own answer).',
   no: 'No need to book (the operator’s own answer).',
 };
 const TOUR_AGE6_NOTE = 'Ages 6 and up (the operator’s own answer).';

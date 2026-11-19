@@ -16,7 +16,8 @@ function makeDom() {
     const el = {
       tagName: String(tag).toUpperCase(), attrs: { ...attrs }, kids: [], parentNode: null, listeners: {}, style: {}, _html: '', _text: '',
       value: attrs.value != null ? attrs.value : '', checked: 'checked' in attrs, disabled: 'disabled' in attrs, hidden: 'hidden' in attrs, files: [], maxLength: attrs.maxlength ? +attrs.maxlength : -1,
-      selectionStart: null, selectionEnd: null, onclick: null,
+      selectionStart: null, selectionEnd: null, onclick: null, options: [], selectedIndex: 0,
+      get attributes() { return Object.entries(this.attrs).map(([name, value]) => ({ name, value })); },
       get id() { return this.attrs.id || ''; }, set id(v) { this.attrs.id = v; byId.set(v, this); },
       get className() { return this.attrs.class || ''; }, set className(v) { this.attrs.class = v; },
       get innerHTML() { return this._html; },
@@ -55,6 +56,7 @@ function makeDom() {
       remove: (...c) => { el.attrs.class = el.classList.list().filter((x) => !c.includes(x)).join(' '); },
       toggle: (c, on) => { const has = el.classList.contains(c); if (on === undefined ? !has : on) el.classList.add(c); else el.classList.remove(c); return !has; },
     };
+    el.defaultValue = el.value;
     if (attrs.id) byId.set(attrs.id, el);
     return el;
   };
@@ -73,15 +75,15 @@ function makeDom() {
       while ((a = ATTR_RE.exec(as))) { if (!a[1]) continue; attrs[a[1].toLowerCase()] = unesc(a[2] != null ? a[2] : a[3] != null ? a[3] : ''); }
       const e = mk(tag, attrs), cur = stack[stack.length - 1];
       e.parentNode = cur.el || parent; cur.kids.push(e);
-      if (tag === 'textarea') { const end = html.indexOf('</textarea>', last); e.value = unesc(html.slice(last, end < 0 ? html.length : end)); e._html = html.slice(last, end); last = end < 0 ? html.length : end + 11; re.lastIndex = last; continue; }
+      if (tag === 'textarea') { const end = html.indexOf('</textarea>', last); e.value = e.defaultValue = unesc(html.slice(last, end < 0 ? html.length : end)); e._html = html.slice(last, end); last = end < 0 ? html.length : end + 11; re.lastIndex = last; continue; }
       if (!VOID.has(tag) && !m[0].endsWith('/>')) stack.push({ el: e, kids: e.kids, tag, from: last });
     }
     for (const d of stack.slice(1)) d.el._html = html.slice(d.from);
     return top;
   }
   function matches(e, sel) {
-    return String(sel).split(',').some((one) => {
-      const s = one.trim().split(/\s+/).pop(); // descendant selectors: the last part only
+    return String(sel).split(/,(?![^\[]*\])/).some((one) => {
+      const s = (/(?:^|\s)([a-z]*(?:[#.][\w-]+|\[[^\]]*\])*)$/i.exec(one.trim()) || [, ''])[1]; // descendant selectors: the last part only
       const m = /^([a-z]*)((?:[#.][\w-]+|\[[^\]]+\])*)$/i.exec(s); if (!m) return false;
       if (m[1] && e.tagName !== m[1].toUpperCase()) return false;
       const parts = m[2].match(/[#.][\w-]+|\[[^\]]+\]/g) || [];

@@ -1816,7 +1816,7 @@ en.tour = {
   tbookQ: 'How do people book?', tbookLead: 'Your booking link puts a Book button on your page.',
   bookLinkLabel: 'Booking link', bookLinkEx: 'your website’s booking page, or your FareHarbor or Rezdy page', noBookLink: 'We don’t take bookings online',
   bookLinkBad: 'Please check the booking link, for example yourtours.com/book.',
-  taheadQ: 'Do people need to book ahead?', taheadYesNo: { yes: 'Yes', no: 'No, people can just come by' }, taheadHow: 'How far ahead?',
+  taheadQ: 'Do people need to book ahead?', taheadYesNo: { yes: 'Yes', no: 'No, people can just come by' }, taheadHow: 'How far ahead? (optional)',
   taheads: { same_day: 'Same day is fine', day: 'A day ahead', '48h': '48 hours ahead', week: 'A week ahead' },
   taheadNeed: 'Please tap how far ahead people should book.', tbookNeed: 'Please add your booking link, or answer “Do people need to book ahead?”.',
   tbookSavedLink: 'Your answers are on your page now. We check a new booking link first, usually within a day.',
@@ -1876,7 +1876,7 @@ fr.tour = {
   tbookQ: 'Comment réserve-t-on?', tbookLead: 'Votre lien de réservation ajoute un bouton Réserver à votre page.',
   bookLinkLabel: 'Lien de réservation', bookLinkEx: 'la page de réservation de votre site, ou votre page FareHarbor ou Rezdy', noBookLink: 'Nous ne prenons pas de réservations en ligne',
   bookLinkBad: 'Vérifiez le lien de réservation, par exemple vosactivites.com/reserver.',
-  taheadQ: 'Faut-il réserver à l’avance?', taheadYesNo: { yes: 'Oui', no: 'Non, on peut simplement passer' }, taheadHow: 'Combien de temps à l’avance?',
+  taheadQ: 'Faut-il réserver à l’avance?', taheadYesNo: { yes: 'Oui', no: 'Non, on peut simplement passer' }, taheadHow: 'Combien de temps à l’avance? (facultatif)',
   taheads: { same_day: 'Le jour même, c’est correct', day: 'La veille', '48h': '48 heures à l’avance', week: 'Une semaine à l’avance' },
   taheadNeed: 'Touchez combien de temps à l’avance réserver.', tbookNeed: 'Ajoutez votre lien de réservation, ou répondez à « Faut-il réserver à l’avance? ».',
   tbookSavedLink: 'Vos réponses sont sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
@@ -1940,7 +1940,7 @@ Object.assign(en.tour, {
   addSecond: '+ Add a second time (only if you close in between)', twoTimesMax: 'Up to two times a day.',
   departHint: 'Departures at set times? Set one time from your first departure to when the last trip gets back (like 9 AM – 5 PM), and list the departure times in Your tours and prices.',
   noDogsSub: 'Not on any trip', noDogsSubInside: 'Not on any trip',
-  bringGuess: 'We found this online. Check it: change any words, or tap the answers below to use them instead.',
+  bringGuess: 'We found this online. Check it. Answers you tap below are added after it.',
 });
 Object.assign(fr.tour, {
   labels: Object.assign({}, fr.tour.labels, { menu: 'Vos sorties et tarifs', hours: 'Vos heures et votre saison' }),
@@ -1963,7 +1963,7 @@ Object.assign(fr.tour, {
   addSecond: '+ Ajouter une deuxième plage (seulement si vous fermez entre les deux)', twoTimesMax: 'Jusqu’à deux plages par jour.',
   departHint: 'Des départs à heures fixes? Indiquez une seule plage, de votre premier départ jusqu’au retour de la dernière sortie (comme 9 h – 17 h), et nommez les heures de départ dans Vos sorties et tarifs.',
   noDogsSub: 'Sur aucune sortie', noDogsSubInside: 'Sur aucune sortie',
-  bringGuess: 'Nous avons trouvé ceci en ligne. Vérifiez-le : changez les mots, ou touchez les réponses ci-dessous pour les utiliser à la place.',
+  bringGuess: 'Nous avons trouvé ceci en ligne. Vérifiez-le. Les réponses touchées ci-dessous s’ajoutent après.',
   // The French wording table (tour test 1).
   allYearClosed: 'Nous offrons des sorties une partie de l’année seulement',
   tpriceQ: 'Combien coûte une sortie par personne?',
@@ -2291,6 +2291,20 @@ Object.assign(en.tour, {
 Object.assign(fr.tour, {
   tFold: 'Autre chose sur votre saison?', seaMore: 'Plus d’options',
   openTwice: 'Fermé deux fois par année, comme au printemps et à l’automne? Ajoutez chaque période sous « Fermetures et jours fériés » (dans Plus de détails sur votre entreprise) et cochez « Chaque année ».',
+});
+// Tour test 16 (Whistler, 2026-11-18; Tom, bear viewing with a kids' price and a private vehicle): the price screen was a
+// wall of small print, and "Put the lowest here" read as the kids' price while Help said the price for one adult. One short
+// line under the box says the adult price; the rest (free tours, the checked-first limit, per-boat prices) is in Help. The
+// per-boat and rental nudges after Save (tour test 15) are unchanged.
+Object.assign(en.tour, {
+  tpriceMore: 'The adult price. Kids’ prices and other trips go in “Your tours and prices”.',
+  tpriceMoreRentals: 'The adult price. Kids’ prices, other trips and per-boat rentals go in “Your tours and prices”.',
+  tprivLead: 'One price for the whole group, like a private vehicle or a day rate.',
+});
+Object.assign(fr.tour, {
+  tpriceMore: 'Le prix adulte. Les prix enfants et les autres sorties vont dans « Vos sorties et tarifs ».',
+  tpriceMoreRentals: 'Le prix adulte. Les prix enfants, les autres sorties et les locations par bateau vont dans « Vos sorties et tarifs ».',
+  tprivLead: 'Un seul prix pour tout le groupe, comme un véhicule privé ou un tarif à la journée.',
 });
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {

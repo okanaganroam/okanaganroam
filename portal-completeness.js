@@ -302,7 +302,8 @@ const TOUR_KINDS = ['heli', 'snowmobile', 'dogsled', 'jetboat', 'boat', 'horseba
 // Tour test 13 (Whistler, 2026-11-18; Dayton approved): "1 to 2 hours".
 const TOUR_LENGTHS = ['1h', '1-2h', '2-3h', 'half', 'full', 'multi'];
 // Tour test 2 (Whistler, 2026-11-16; Dayton approved): "48 hours ahead" and a 5+ age.
-const TOUR_BOOK = ['same_day', 'day', '48h', 'week', 'no'];
+// Tour test 16 (Whistler, 2026-11-18): 'ahead' is "Yes" with no how-far-ahead chip ("Book ahead.").
+const TOUR_BOOK = ['same_day', 'day', '48h', 'week', 'no', 'ahead'];
 // Tour test 10 (Whistler, 2026-11-18; Gord, a horseback ranch; Dayton approved): 8+ and 10+ (riders 8 and up).
 const TOUR_AGES = ['all', '5', '6', '8', '10', '12', '14', '16', '19'];
 const TOUR_ITEMS = [

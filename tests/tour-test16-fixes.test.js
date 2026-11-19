@@ -108,3 +108,45 @@ test('2. Help examples follow his kind: a bear tour never sees a dock, a sled ri
   const nen = (await cfgOf(`/owner/${tokenFor(none.id)}/setup`)).topics;
   assert.match(nen.find((x) => x.id === 'tour-kids-price').a, /Sled ride/);
 });
+
+test('3. Booking: "Yes" saves on its own (no how-far-ahead chip, no Save bounce), the page says "Book ahead"; a chip still saves its own rule', async () => {
+  const { v, t } = await tom({}, { book: undefined });
+  assert.equal(app.venueTourInfo(v.id).book, undefined);
+  const sim = await openSetup(base, t, { hash: 'booking' });
+  await sim.click('[data-tpick="bookYes:yes"]');
+  assert.match(sim.text(), /How far ahead\? \(optional\)/);
+  await sim.click('bookingSave');
+  assert.equal(app.venueTourInfo(v.id).book, 'ahead', 'saved without a chip');
+  assert.doesNotMatch(sim.text(), /Please tap how far ahead/);
+  approveAll(v.id);
+  assert.match(plain(page(v)), /Booking:? Book ahead\./);
+  assert.match(plain(page(v, 'fr')), /Réservez à l’avance\./);
+  // Build My Trip says it too.
+  const p = plan('bear viewing in July');
+  const stop = itemsOf(p).find((x) => x.venue.id === v.id);
+  if (stop) assert.ok(stop.caveats.includes('Book ahead (the operator’s own answer).'), JSON.stringify(stop.caveats));
+  // A chip is still his rule.
+  const sim2 = await openSetup(base, t, { hash: 'booking' });
+  await sim2.click('[data-tpick="book:48h"]');
+  await sim2.click('bookingSave');
+  assert.equal(app.venueTourInfo(v.id).book, '48h');
+});
+
+test('4. Good to know: a chip is added after the research line ("Bring binoculars." stays, in the box and on the page), with no double spaces', async () => {
+  const { v, t } = await tom();
+  db.prepare('INSERT INTO venue_visit_info (venue_id, info) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET info = excluded.info').run(v.id, JSON.stringify({ rows: [{ label: 'Good to know', text: 'Bring binoculars.' }], booking_url: null, source_url: 'https://example.com', checked_at: '2026-11-01' }));
+  const sim = await openSetup(base, t, { hash: 'bring' });
+  assert.equal(sim.doc.getElementById('suBring').value, 'Bring binoculars.');
+  assert.match(sim.text(), /Answers you tap below are added after it/);
+  await sim.click('[data-quick="Dress for the weather"]');
+  await sim.click('[data-quick="Hotel pickup available"]');
+  const box = sim.doc.getElementById('suBring');
+  assert.equal(box.value, 'Bring binoculars. Dress for the weather. Hotel pickup available. ');
+  // A space typed after the chip's ". " is not saved as two.
+  await sim.type('suBring', box.value + ' Tours sell out in summer,  book early.');
+  await sim.click('bringSave');
+  approveAll(v.id);
+  const en = plain(page(v));
+  assert.match(en, /Bring binoculars\. Dress for the weather\. Hotel pickup available\. Tours sell out in summer, book early\./);
+  assert.doesNotMatch(app.venueVisitInfo(v.id).rows.find((r) => r.label === 'Good to know').text, / {2}/);
+});
