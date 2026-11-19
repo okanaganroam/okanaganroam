@@ -49,6 +49,20 @@ const STRONG_ON_FRENCH_PAGE = new Set(['brasserie', 'brasseries', 'cidrerie', 'c
 // interpreter's own English phrases (discovery-intent.js), so nothing here
 // can introduce a meaning the planner does not already have. '' drops a word.
 const PHRASES = [
+  // Tour test 15 (Whistler, 2026-11-18; Dave, canoe, kayak and SUP rentals, a sunset paddle, snowshoe and fondue evenings):
+  // « location de canot à Whistler en juillet » read « location of canoe » and found nothing. Rentals by what is rented
+  // (singular and plural, canoë too), the paddle at sunset, the snowshoe-and-fondue evening (a snowshoe tour, not a
+  // fondue restaurant).
+  ['location de canot', 'canoe rental'], ['location de canoe', 'canoe rental'], ['location de canoes', 'canoe rentals'], ['location de canots', 'canoe rentals'],
+  ['location de kayaks', 'kayak rentals'], ['location de kayak', 'kayak rental'], ['location de sup', 'paddleboard rental'], ['location de planches a pagaie', 'paddleboard rentals'],
+  ['location de planche a pagaie', 'paddleboard rental'], ['location de planche', 'paddleboard rental'], ['location d embarcations', 'canoe and kayak rentals'], ['location d embarcation', 'canoe and kayak rental'],
+  ['location de canots et kayaks', 'canoe and kayak rentals'], ['location de canot et kayak', 'canoe and kayak rental'], ['location de raquettes', 'snowshoe rentals'],
+  ['pagaie au coucher du soleil', 'sunset paddle'], ['sortie en pagaie au coucher du soleil', 'sunset paddle tour'], ['kayak au coucher du soleil', 'sunset kayak'], ['canot au coucher du soleil', 'sunset canoe'],
+  ['au coucher du soleil', 'at sunset'], ['coucher du soleil', 'sunset'], ['coucher de soleil', 'sunset'],
+  ['soiree fondue en raquettes', 'fondue snowshoe evening'], ['souper fondue en raquettes', 'fondue snowshoe dinner'], ['raquettes et fondue', 'fondue snowshoe'], ['raquette et fondue', 'fondue snowshoe'],
+  ['fondue en raquettes', 'fondue snowshoe'], ['raquettes fondue', 'fondue snowshoe'], ['raquette fondue', 'fondue snowshoe'], ['raquettes avec fondue', 'fondue snowshoe'], ['raquettes avec souper', 'dinner snowshoe'],
+  ['sortie de pagaie', 'paddle tour'], ['sortie en pagaie', 'paddle tour'], ['excursion en pagaie', 'paddle tour'], ['pagaie guidee', 'guided paddle'], ['sortie guidee en canot', 'guided canoe tour'], ['sortie guidee en kayak', 'guided kayak tour'],
+  ['canoe kayak', 'canoe and kayak'], ['stand up paddle', 'paddleboarding'],
   ['salle d evasion', 'escape room'], ['salles d evasion', 'escape rooms'],
   ['jeu d evasion', 'escape room'], ['jeux d evasion', 'escape rooms'],
   // Tour test 4 (Whistler, 2026-11-17): « visite gourmande » was searched for as the word « gourmande ». A food tour, and

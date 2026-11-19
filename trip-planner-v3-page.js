@@ -1495,6 +1495,9 @@ function renderScript(d) {
       // Cocktail lounges (2026-11-13): "Cocktails from $16" / « Cocktails à partir de 16 $ » (cocktail test 2: one French
       // wording, the card's « À partir de », not « dès »).
       var fromWord = cost.label === 'Flight' ? (french ? 'Palettes à partir de ' : 'Flights from ') : cost.label === 'Tasting' ? (french ? 'Dégustations à partir de ' : 'Tastings from ') : cost.label === 'Cocktail' ? (french ? 'Cocktails à partir de ' : 'Cocktails from ') : cost.label === 'Tour' ? (french ? 'À partir de ' : 'From ') : '';
+      // Tour test 15 (Whistler, 2026-11-18): a rental asked for shows the operator's own rental price as typed ("Canoe rental:
+      // $45 per boat per hour"), not a price per person.
+      if (cost.label === 'Rental' && cost.unit) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc((cost.item ? cost.item + ': ' : '') + (french ? cost.unitFr || cost.unit : cost.unit)) + '</strong></p>';
       if (fromWord) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(fromWord + cad(cost.cents)) + '</strong></p>';
       return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(cad(cost.cents) + (french ? ' / personne' : ' per person')) + '</strong> · '
         + esc(french ? cost.labelFr : cost.label) + (typeof cost.source === 'string' && cost.source.startsWith('https://') ? ' · <a ' + hrefAttr(cost.source) + '>' + esc(french ? 'Source' : 'Price source') + '</a>' : '') + '</p>';

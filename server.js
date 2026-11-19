@@ -22203,7 +22203,7 @@ function tourListInfo(venueId) {
       // words include, for a "fondue snowshoe dinner" request (trip-planner.js tourMealNote); and its price as typed, for a
       // rental request's trip card ("$45 per boat per hour" instead of the tours' "From $89").
       const meal = (/\b(dinner|lunch|meal|supper|brunch|breakfast)s? (?:is |are )?included\b|\b(?:includes?|including|with) (?:an? |the )?(?:\w+ ){0,3}?(dinner|lunch|meal|supper|brunch|breakfast)\b|\b(fondue)\b|\b(d[îi]ner|repas|souper) (?:est )?inclus\b/i.exec(t) || []).slice(1).find(Boolean);
-      out.items.push({ name: String(it.name).slice(0, 80), ...(own.length ? { age: Math.max(...own) } : {}), ...(kids ? { kids: true } : {}), ...(meal ? { meal: /fondue/i.test(meal) ? 'dinner' : /d[îi]ner|souper/i.test(meal) ? 'dinner' : /repas/i.test(meal) ? 'meal' : meal.toLowerCase() } : {}), ...(it.price ? { price: String(it.price).slice(0, 40) } : {}) });
+      out.items.push({ name: String(it.name).slice(0, 80), ...(own.length ? { age: Math.max(...own) } : {}), ...(kids ? { kids: true } : {}), ...(meal ? { meal: /fondue/i.test(meal) ? 'dinner' : /d[îi]ner|souper/i.test(meal) ? 'dinner' : /repas/i.test(meal) ? 'meal' : meal.toLowerCase() } : {}), ...(it.price ? { price: menuPriceLabel(String(it.price).slice(0, 60)), priceFr: menuPriceLabel(String(it.price).slice(0, 60), 'fr') } : {}) });
     }
     if (items.length < 2) return out;
     const mins = [], ages = [];
@@ -53828,7 +53828,7 @@ function menuPriceAmount(n, lang = 'en') {
 // Tour test 6 (Whistler, 2026-11-17): the unit words of a typed-up list (« 69 $ per bike » on the French page) are said in
 // French too: per bike, per e-bike, per hour, per day, per rental, per kayak, per boat… (known words only).
 const MENU_UNIT_WORDS_FR = [[/\bper e-?bike\b/i, 'par vélo électrique'], [/\bper bike\b/i, 'par vélo'], [/\bper bicycle\b/i, 'par vélo'], [/\bper hour\b|\/ ?(?:hr|hour)\b/i, 'de l’heure'], [/\bper day\b/i, 'par jour'],
-  [/\bper half[- ]day\b/i, 'par demi-journée'], [/\bper rental\b/i, 'par location'], [/\bper kayak\b/i, 'par kayak'], [/\bper canoe\b/i, 'par canot'], [/\bper (?:sup|paddle ?board)\b/i, 'par planche'],
+  [/\bper half[- ]day\b/i, 'par demi-journée'], [/\bper rental\b/i, 'par location'], [/\bper kayak\b/i, 'par kayak'], [/\bper canoe\b/i, 'par canot'], [/\bper (?:sup|paddle ?board|board)\b/i, 'par planche'],
   [/\bper boat\b/i, 'par bateau'], [/\bper vehicle\b/i, 'par véhicule'], [/\bper sled\b/i, 'par traîneau'], [/\bper snowmobile\b/i, 'par motoneige'], [/\bper couple\b/i, 'par couple'], [/\bper family\b/i, 'par famille'], [/\bper room\b/i, 'par chambre'],
   // Tour test 7: a group size after a day rate (« 750 $ par jour, jusqu’à 4 personnes »).
   [/\bup to (\d{1,2})(?: people| persons| guests)?\b/i, 'jusqu’à $1 personnes']];

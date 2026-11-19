@@ -1802,6 +1802,22 @@ function breweryIsCidery(v) {
   return /\bcider\w*\b/.test(normWords((v && v.cuisine) || '')) && !/\bbrew\w*\b/.test(normWords((v && v.cuisine) || ''));
 }
 const BREWERY_KIND_LABEL = { Brewery: ['Brewery', 'Microbrasserie'], Cidery: ['Cidery', 'Cidrerie'], 'Taphouse or beer hall': ['Taphouse', 'Bar à bières'], Distillery: ['Distillery', 'Distillerie'] };
+// A rental request ("canoe rental in July", the rentals kind) -> his typed rental with a price, the one whose name shares a
+// word with the request first, the lowest otherwise: { cents, label: 'Rental', item, unit, unitFr }. Null otherwise.
+function tourRentalPrice(v, ctx) {
+  if (!v || !ctx || !Array.isArray(v.tourItems)) return null;
+  const ask = normWords(`${ctx.askText || ''} ${ctx.queryText || ''}`);
+  if (!((ctx.plannerKinds || []).includes('rentals') || /\b(?:rentals?|rent|hire|location|louer)\b/.test(ask))) return null;
+  const rentals = v.tourItems.filter((it) => it && it.name && it.price && /\b(?:rentals?|hire|location)\b/i.test(it.name) && /\d/.test(it.price) && !/\bper (?:person|adult)\b/i.test(it.price));
+  if (!rentals.length) return null;
+  const num = (p) => { const m = /(\d{1,5}(?:[.,]\d{1,2})?)/.exec(String(p).replace(/(\d),(\d{3})(?!\d)/g, '$1$2')); return m ? Number(m[1].replace(',', '.')) : NaN; };
+  const words = new Set(ask.split(' ').filter((w) => w.length >= 3 && !/^(?:rentals?|hire|location|whistler|july|june|august|september|january|february|march|december)$/.test(w)).map(itemAgeStem));
+  const named = rentals.filter((it) => normWords(it.name).split(' ').some((w) => w.length >= 3 && words.has(itemAgeStem(w)) && !/^rentals?$/.test(w)));
+  const pool = (named.length ? named : rentals).filter((it) => Number.isFinite(num(it.price)) && num(it.price) > 0).sort((a, b) => num(a.price) - num(b.price));
+  if (!pool.length) return null;
+  const it = pool[0];
+  return { cents: Math.round(num(it.price) * 100), label: 'Rental', labelFr: 'Location', source: null, item: it.name, unit: it.price, unitFr: it.priceFr || it.price };
+}
 function publicVenue(v, ctx) {
   // Winery test 5 (2026-11-12): a winery's own tasting fee comes before a published price ("Check price per person" showed
   // with a $10 owner fee); a free tasting says so.
@@ -1815,7 +1831,10 @@ function publicVenue(v, ctx) {
   // Tour test 4 (Whistler, 2026-11-17): a tour its operator marked free (or by donation) says "Free", counts $0 in the
   // estimate, and never shows a researched price beside it.
   const tourIsFree = v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation');
-  const cost = tourIsFree ? null : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
+  // Tour test 15 (Whistler, 2026-11-18; Dave): a rental asked for shows his own rental price as typed ("Canoe rental: $45 per
+  // boat per hour"), not the tours' "From $89".
+  const rental = v.type === 'tour' && !tourIsFree ? tourRentalPrice(v, ctx) : null;
+  const cost = tourIsFree ? null : rental ? rental : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
     : cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
     : fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
     : flight ? (v.type === 'distillery' ? { cents: Math.round(flight * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : { cents: Math.round(flight * 100), label: 'Flight', labelFr: 'Palette de dégustation', source: null }) : tripStopPrice(v.url, v.id);
