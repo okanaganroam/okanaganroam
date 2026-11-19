@@ -3531,6 +3531,9 @@
       S.addr = el('suAddr').value; S.phone = el('suPhone').value; S.site = el('suSite').value;
       // Tour test 11 (Whistler, 2026-11-18; Min-jun dictated "we pick up from your hotel" into the Address box): a nudge
       // once, toward the pickup option; Save again keeps it as typed.
+      // Tour test 15 (Whistler, 2026-11-18; Dave typed "Summer: dock at Lakeside Park, 4320 Alta Lake Rd. Winter: Olympic Plaza
+      // ticket booth"): two addresses or summer/winter words get one nudge (Save again keeps it as typed).
+      if (TOUR && T.addrTwoSpots && ((/\b(?:summer|winter|hiver)\b/i.test(S.addr) || /(?:^|[^a-zà-ÿ])[ée]t[ée](?![a-zà-ÿ])/i.test(S.addr)) || (S.addr.match(/\b\d{2,6}\s+[A-Za-zÀ-ÿ]/g) || []).length >= 2 || /\s(?:or|and|ou|et)\s+\d{2,6}\s/i.test(S.addr)) && S.addrNudged !== S.addr) { S.addrNudged = S.addr; S.nudge = T.addrTwoSpots; S.badField = 'suAddr'; return render(); }
       if (TOUR && T.addrPickup && /\bpick\s*-?\s*ups?\b|\bpicks? (?:you|them|people|guests) up\b|\bhotels?\b|\bwe come to you\b|\bcueillette\b|\bprise en charge\b|\bh[ôo]tels?\b/i.test(S.addr) && S.addrNudged !== S.addr) { S.addrNudged = S.addr; S.nudge = T.addrPickup; S.badField = 'suAddr'; return render(); }
       var ch = {}; if (S.addr.trim() !== (CUR.address || '')) ch.address = S.addr; if (phoneChanged(S.phone)) ch.phone = S.phone;
       // Website (2026-11-10): typed as "example.com" is fine (the server adds https://); it's checked first, like today.

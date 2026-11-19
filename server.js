@@ -22338,7 +22338,7 @@ function tourKindSeasonWords(venueId, fr = false) {
   for (const [season, en, frw] of [['summer', 'Summer', 'Été'], ['winter', 'Winter', 'Hiver'], ['both', 'All year', 'Toute l’année']]) {
     const kinds = Object.keys(ks).filter((k) => ks[k] === season);
     if (!kinds.length) continue;
-    const words = tourKindsText(kinds, fr, was, tourStoryWords(venueId, v && v.description), tourOwnWords(venueId));
+    const words = tourKindsText(kinds, fr, was, tourStoryWords(venueId, v && v.description), tourOwnWords(venueId), Object.keys(ks));
     if (!words) continue;
     const low = /^[A-ZÀ-Þ][a-zà-ÿ’' -]/.test(words) && !/^(?:Indigenous|First Nations?)\b/.test(words) ? words.charAt(0).toLowerCase() + words.slice(1) : words;
     out.push(`${fr ? frw : en}${fr ? '\u00a0: ' : ': '}${low}`);
@@ -22958,7 +22958,9 @@ const TOUR_KIND_ORDER = TOUR_KINDS;
 // Mountain School and Black Sheep Adventure Sports went "Ski touring" -> "Mountain guiding" on save.
 const TOUR_KIND_ALSO_DOES = { guide: [[/ski[- ]?tour|backcountry ski|splitboard|ski mountaineering/, 'Ski touring', 'Ski de randonnée']] };
 const TOUR_KINDS_REPLACE_RESEARCH = true;
-function tourKindsText(kinds, fr = false, was = '', story = '', ownWords = '') {
+// Tour test 15: `allKinds` (every kind he picked) when the words are for some of them only (one season's kinds): a part
+// another picked kind covers isn't taken for an unticked chip.
+function tourKindsText(kinds, fr = false, was = '', story = '', ownWords = '', allKinds = null) {
   const picked = (kinds || []).filter((k) => k !== 'other' && TOUR_KIND_LABELS_OWNER[k]).sort((a, b) => TOUR_KIND_ORDER.indexOf(a) - TOUR_KIND_ORDER.indexOf(b));
   // Tour test 3: the French words use the listing's own words too (which side of a chip they name, and the parts no kind
   // covers, kept as typed: "Heli-hiking"), so the French card and page show the same set as the English ones.
@@ -22968,7 +22970,7 @@ function tourKindsText(kinds, fr = false, was = '', story = '', ownWords = '') {
   const pre = tourKindSuggestion({ cuisine: was, name: '' }).filter((k) => TOUR_KIND_ORDER.includes(k));
   // A part a picked kind also does (TOUR_KIND_ALSO_DOES) is not dropped for an unticked chip that claimed it too.
   const alsoDone = (p) => picked.some((k) => (TOUR_KIND_ALSO_DOES[k] || []).some(([re]) => re.test(String(p).toLowerCase())));
-  const unticked = (p) => pre.some((k) => !picked.includes(k) && tourKindCovers(k, p)) && !alsoDone(p);
+  const unticked = (p) => pre.some((k) => !picked.includes(k) && !(allKinds || []).includes(k) && tourKindCovers(k, p)) && !alsoDone(p);
   const parts0 = tourWordParts(was).filter((p) => p.split(/\s+/).some((w) => !TOUR_WORDS_GENERIC.test(w)));
   const parts = parts0.filter((p) => !unticked(p));
   // No kind of ours picked (nothing, or only "Something else"): the listing keeps its own words exactly, less the parts
@@ -22993,9 +22995,10 @@ function tourKindsText(kinds, fr = false, was = '', story = '', ownWords = '') {
   // Tour test 5: a part two picked kinds cover goes to the kind its first own word names ("Fishing charters" is Fishing,
   // not "Boat tours and charters"); then the earlier kind in the list.
   const namePos = (k, p) => { const words = TOUR_KIND_LABELS_OWNER[k][0].toLowerCase().split(/[^a-z-]+/).filter((w) => w && !/^(?:and|or)$/.test(w) && !TOUR_WORDS_GENERIC.test(w)); const i = p.toLowerCase().split(/\s+/).findIndex((w) => words.includes(w) || words.includes(w.replace(/s$/, ''))); return i < 0 ? 99 : i; };
-  const before = (k2, k, p) => namePos(k2, p) < namePos(k, p) || (namePos(k2, p) === namePos(k, p) && picked.indexOf(k2) < picked.indexOf(k));
+  const claimers = Array.isArray(allKinds) ? allKinds.filter((k) => k !== 'other' && TOUR_KIND_LABELS_OWNER[k]).sort((a, c) => TOUR_KIND_ORDER.indexOf(a) - TOUR_KIND_ORDER.indexOf(c)) : picked;
+  const before = (k2, k, p) => namePos(k2, p) < namePos(k, p) || (namePos(k2, p) === namePos(k, p) && claimers.indexOf(k2) < claimers.indexOf(k));
   for (const k of picked) {
-    const mine = parts.filter((p) => tourKindCovers(k, p) && !picked.some((k2) => k2 !== k && tourKindCovers(k2, p) && before(k2, k, p)));
+    const mine = parts.filter((p) => tourKindCovers(k, p) && !claimers.some((k2) => k2 !== k && tourKindCovers(k2, p) && before(k2, k, p)));
     // Tour test 7: the guide kind always says its public word ("Mountain guiding", or "Avalanche courses" when that is all).
     const own = fr || k === 'guide' ? [] : k === 'adventure' ? mine : mine.some((p) => saysMore(k, p)) && mine.every((p) => namesKind(k, p)) ? mine.map(cap) : [];
     // Tour test 8: a kind whose sides may come from the story (farm: "kennel visits with puppies") when its category names none.
@@ -23013,7 +23016,7 @@ function tourKindsText(kinds, fr = false, was = '', story = '', ownWords = '') {
   // Tour test 12 (Whistler, 2026-11-18; Kayla picked Bungee / Adventure and research's "giant swing" left her card): a
   // research part the owner's own story or Known for says too stays (her own words back it up).
   for (const p of TOUR_KINDS_REPLACE_RESEARCH ? parts.filter((p) => tourOwnSays(ownWords, p)) : parts) {
-    if (picked.some((k) => tourKindCovers(k, p))) continue;
+    if (claimers.some((k) => tourKindCovers(k, p))) continue;
     if (!fr) { push(cap(p)); continue; }
     const known = TOUR_PART_FR.find(([re]) => re.test(p.toLowerCase()));
     const other = known ? null : TOUR_KIND_HINTS.find(([k2, re]) => re.test(p.toLowerCase()) && TOUR_KIND_LABELS_OWNER[k2]);
@@ -50979,9 +50982,11 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   const changes = {};
   const current = ownerVenueSnapshot(venue, happyHourTimes);
   const input = body && typeof body.changes === 'object' && body.changes && !Array.isArray(body.changes) ? body.changes : null;
-  if (!input) return { changes, previous: {}, errors: { form: 'Nothing was sent. Please try again.' } };
+  // Tour test 15 (round 4 follow-up): every early return carries `same` and `badgesSame`, so the caller answers 400, not 500
+  // ("reading 'filter'" on an unknown change key).
+  if (!input) return { changes, previous: {}, same: [], badgesSame: [], errors: { form: 'Nothing was sent. Please try again.' } };
   const unknown = Object.keys(input).filter((k) => !OWNER_CHANGE_FIELDS.includes(k));
-  if (unknown.length) return { changes, previous: {}, errors: { form: 'Some of the information could not be read. Please reload the page and try again.' } };
+  if (unknown.length) return { changes, previous: {}, same: [], badgesSame: [], errors: { form: 'Some of the information could not be read. Please reload the page and try again.' } };
 
   if ('hours' in input) {
     // Winery test 4 (2026-11-12): "We don't have set hours. Visits are by appointment": a winery that is (or, in this same
