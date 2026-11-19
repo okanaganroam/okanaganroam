@@ -24150,6 +24150,8 @@ const INDOOR_KINDS_TOP = 12;
 // The Indoor & Rainy Day hub's experience chips each kind puts a place under (indoorExperiencesOf), as well as its name.
 const INDOOR_KIND_EXPERIENCE = { gallery: ['arts'], museum: ['arts'], theatre: ['theatre'], cinema: ['theatre'], spa: ['spas'], pool: ['family'], climbing: ['family'],
   games: ['games', 'family'], escape: ['games'], bowling: ['games', 'family'], kids: ['family'] };
+// Kinds that are Family Fun when the owner says All ages or 5+ (indoor test 6).
+const INDOOR_FAMILY_IF_ALL_AGES = ['classes', 'cinema', 'escape'];
 // Kinds that are arts and culture (the Arts & Culture badge goes on with them; never taken off).
 const INDOOR_ARTS_KINDS = ['gallery', 'museum', 'theatre'];
 // Starting answers a kind suggests (pre-picked on the screen with "We picked this for you: check it"; saved only with it).
@@ -32413,10 +32415,13 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
     // A word of three letters or fewer matches only as a whole word ("spa"
     // never finds "space"); synonyms below still widen it.
     var alts = [w.length <= 3 ? w + ' ' : w];
-    var stem = w.length > 3 && /s$/.test(w) && !/ss$/.test(w) ? w.replace(/ies$/, 'y').replace(/s$/, '') : w;
+    var stem = w.length > 3 && /s$/.test(w) && !/ss$/.test(w) ? (/(?:ss|sh|ch|x)es$/.test(w) ? w.replace(/es$/, '') : w.replace(/ies$/, 'y').replace(/s$/, '')) : w;
     // The singular too ("burgers" -> "burger"); a short one only as a whole
     // word ("taco " but not "earl" inside "early").
     if (stem !== w) alts.push(stem.length >= 5 ? stem : stem + ' ');
+    // Indoor test 6 (2026-11-19): the plural too, where it isn't the word
+    // plus an s ("party" finds "parties"); "class" already finds "classes".
+    if (w.length > 3 && /[^aeiou]y$/.test(w)) alts.push(w.replace(/y$/, 'ies'));
     (FD_SYN[w] || FD_SYN[stem] || []).forEach(function(a){ if (alts.indexOf(a) === -1) alts.push(a); });
     return alts;
   }
@@ -33615,6 +33620,9 @@ function indoorExperiencesOf(v, note) {
   // Indoor places (2026-11-19): the kinds the owner picked put the place under their chips too.
   const ownKinds = v.type === 'indoor' && v.id != null ? (venueIndoorInfo(v.id).kinds || []) : [];
   const own = new Set(ownKinds.flatMap((k) => INDOOR_KIND_EXPERIENCE[k] || []));
+  // Indoor test 6 (2026-11-19; Priya's All ages paint-your-own pottery studio was missing from "kids birthday party
+  // penticton"): a classes place, a cinema or an escape room whose owner said All ages or 5+ is Family Fun too.
+  if (v.type === 'indoor' && v.id != null && ['all', '5'].includes(String(venueIndoorInfo(v.id).age || '')) && ownKinds.some((k) => INDOOR_FAMILY_IF_ALL_AGES.includes(k))) own.add('family');
   // Not Family Fun when the owner said 12+ or older.
   if (v.type === 'indoor' && v.id != null && ['12', '16', '19'].includes(String(venueIndoorInfo(v.id).age || ''))) own.delete('family');
   for (const e of INDOOR_HUB_EXPERIENCES) {

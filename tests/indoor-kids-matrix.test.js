@@ -1,0 +1,186 @@
+// Indoor test 6 (2026-11-19; Priya's All ages pottery and paint studio in Penticton was left out of every kids, rainy-day,
+// family and kids' birthday plan, as Chris's climbing park was in test 5): one place of EVERY indoor kind (indoor-kinds.js),
+// each in its own town with the owner's own ages (All ages, or the kind's natural age) and a Groups party line, against a
+// few generic competitors (a gallery, a theatre, a casino, a spa). For each kind, Build My Trip's kids requests, the site
+// search and the Indoor hub's own search for "kids birthday party <town>". Family kinds are offered; a casino, a spa and a
+// 19+ place never are. So the kids/family gap can't come back for any kind.
+// Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const fs = require('node:fs');
+const http = require('node:http');
+const vm = require('node:vm');
+
+const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
+for (const s of ['', '-wal', '-shm', '-journal']) { try { fs.unlinkSync(DB_FILE + s); } catch (e) { /* not there */ } }
+process.env.ENRICHMENT_ADMIN_TOKEN = 'indoor-matrix-admin-token';
+process.env.TRIP_PLANNER_V3 = 'on';
+process.env.DISCOVERY_SEARCH = 'on';
+delete process.env.BREVO_API_KEY;
+delete process.env.BADGE_REMINDERS;
+const app = require('../server.js');
+const IK = require('../indoor-kinds.js');
+app.setVenueSubmissionTransport(async () => {});
+if (app.setOwnerEmailTransport) app.setOwnerEmailTransport(async () => {});
+
+// Every kind, its own town, a name and category a real place of that kind would have, and the owner's own age answer.
+// expect: 'yes' (offered for kids and families), 'no' (never offered to kids), 'any' (quiet kinds: allowed, not required).
+const KINDS = {
+  gallery: { town: 'armstrong', name: 'Hilltop Art Gallery', cuisine: 'Art gallery', age: 'all', expect: 'any' },
+  museum: { town: 'coldstream', name: 'Coldstream Science Museum', cuisine: 'Science centre', age: 'all', expect: 'yes' },
+  theatre: { town: 'enderby', name: 'Enderby Stage Theatre', cuisine: 'Live theatre', age: 'all', expect: 'any' },
+  cinema: { town: 'kaleden', name: 'Kaleden Picture House', cuisine: 'Movie theatre', age: 'all', expect: 'yes' },
+  spa: { town: 'lake-country', name: 'Lake Country Day Spa', cuisine: 'Day spa', age: '16', expect: 'no' },
+  pool: { town: 'lumby', name: 'Lumby Aquatic Centre', cuisine: 'Pool', age: 'all', expect: 'yes' },
+  climbing: { town: 'naramata', name: 'Naramata Bouldering Co', cuisine: 'Climbing gym', age: 'all', expect: 'yes' },
+  games: { town: 'okanagan-falls', name: 'OK Falls Arcade & Laser Tag', cuisine: 'Arcade', age: 'all', expect: 'yes' },
+  escape: { town: 'oliver', name: 'Oliver Escape Rooms', cuisine: 'Escape room', age: 'all', expect: 'yes' },
+  bowling: { town: 'osoyoos', name: 'Osoyoos Lanes', cuisine: 'Bowling alley', age: 'all', expect: 'yes' },
+  kids: { town: 'peachland', name: 'Peachland Play Place', cuisine: 'Indoor playground', age: 'all', expect: 'yes' },
+  classes: { town: 'penticton', name: 'Penticton Clay & Paint Studios', cuisine: 'Pottery studio', age: 'all', expect: 'yes' },
+  curling: { town: 'summerland', name: 'Summerland Curling Club', cuisine: 'Curling', age: 'all', expect: 'any' },
+  yoga: { town: 'vernon', name: 'Vernon Yoga Loft', cuisine: 'Yoga studio', age: 'all', expect: 'any' },
+  casino: { town: 'west-kelowna', name: 'Westside Casino', cuisine: 'Casino', age: '19', expect: 'no' },
+  library: { town: 'kelowna', name: 'Kelowna Branch Library', cuisine: 'Library', age: 'all', expect: 'any' },
+  other: { town: 'big-white', name: 'Big White Indoor Fun Centre', cuisine: 'Indoor activity', age: 'all', expect: 'any' },
+};
+const TOWN_LABELS = { 'lake-country': 'Lake Country', 'okanagan-falls': 'Okanagan Falls', 'west-kelowna': 'West Kelowna', 'big-white': 'Big White' };
+const TOWN_NAME = (r) => TOWN_LABELS[r] || r[0].toUpperCase() + r.slice(1);
+
+const DAY = (a, b) => JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [[a, b]]])));
+let n = 0;
+const mk = (o) => app.createVenue({ slug: `indoor-mx-${++n}`, type: 'indoor', latitude: 49.5 + n / 3000, longitude: -119.6, address: `${100 + n} Main St, BC`,
+  phone: '250-555-0166', website: 'https://example.com', hours: DAY('10:00', '20:00'), rating: 4.4, reviews: 80, ...o });
+const tokenFor = (id) => app.createOwnerLink(id, { reset: true }).url.split('/owner/')[1];
+let srv, base, ipN = 0;
+const change = (t, changes) => fetch(`${base}/owner/${t}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.96.${Math.floor(++ipN / 250)}.${ipN % 250 + 1}` },
+  body: JSON.stringify({ changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) }).then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})) }));
+const ok = async (p) => { const r = await p; assert.ok(r.status === 200 || r.status === 201, JSON.stringify(r.body)); return r; };
+const NOW = new Date('2026-11-19T12:00:00-08:00');
+const itemsOf = (p) => [...((p.outing && p.outing.stops) || []), ...((p.itinerary && p.itinerary.stops) || []), ...(p.days || []).flatMap((d) => d.stops || []), ...(p.recommendations || [])].filter((x) => x && x.venue);
+const idsOf = (p) => itemsOf(p).map((x) => x.venue.id);
+const plain = (h) => String(h).replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&#39;|&rsquo;/g, '’').replace(/\s+/g, ' ');
+
+const placed = {}; // kind -> { v, comps }
+test.before(async () => {
+  srv = http.createServer(app.server.listeners('request')[0]); await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`;
+  for (const [kind, k] of Object.entries(KINDS)) {
+    const town = TOWN_NAME(k.town);
+    const v = mk({ region: k.town, name: `${k.name} MX`, cuisine: k.cuisine, description: `${k.name} in ${town}.`, rating: 4.3, reviews: 60 });
+    const t = tokenFor(v.id);
+    await ok(change(t, { indoor_info: { kinds: [kind], length: '1-2h', book: 'busy', age: k.age, year: 'all' } }));
+    await ok(change(t, { visit_rows: { groups: 'Groups of 10 or more: please book ahead. Kids’ birthday parties with a private room.' } }));
+    // Generic competitors, better rated, with no owner answers: three family places nobody answered for (a fun centre, a
+    // museum and a pool, which used to fill every indoor slot), then the ones never for kids (a casino and a spa, last two).
+    const comps = [
+      mk({ region: k.town, name: `${town} Fun Centre MX`, cuisine: 'Family fun centre', description: 'Bowling, an arcade and laser tag.', rating: 4.7, reviews: 300, kid_friendly: 1 }),
+      mk({ region: k.town, name: `${town} Museum & Archives MX`, cuisine: 'Museum', description: 'Local history museum.', rating: 4.7, reviews: 300, kid_friendly: 1 }),
+      mk({ region: k.town, name: `${town} Leisure Pool MX`, cuisine: 'Pool', description: 'A leisure pool with a lazy river and a waterslide.', rating: 4.7, reviews: 300, kid_friendly: 1 }),
+      mk({ region: k.town, name: `${town} Public Art Gallery MX`, cuisine: 'Art gallery', description: 'A public art gallery with rotating exhibitions.', rating: 4.8, reviews: 400 }),
+      mk({ region: k.town, name: `${town} Playhouse Theatre MX`, cuisine: 'Live theatre', description: 'A live theatre.', rating: 4.8, reviews: 500 }),
+      mk({ region: k.town, name: `${town} Lake City Casino MX`, cuisine: 'Casino', description: 'Slots and table games. 19+.', rating: 4.9, reviews: 900 }),
+      mk({ region: k.town, name: `${town} Nordic Spa MX`, cuisine: 'Spa', description: 'A day spa with massage and facials.', rating: 4.9, reviews: 800 }),
+    ];
+    placed[kind] = { v, comps, town };
+  }
+});
+test.after(() => srv && srv.close());
+
+const ASKS = (town) => [
+  { q: `rainy day with kids in ${town}`, young: null },
+  { q: `family fun in ${town}`, young: null },
+  { q: `kids birthday party in ${town}`, young: null },
+  { q: `things to do with a 6 year old in ${town}`, young: 6 },
+];
+
+test('Every indoor kind in indoor-kinds.js is in the matrix', () => {
+  assert.deepEqual(Object.keys(KINDS).sort(), IK.INDOOR_KIND_TEXT_KINDS.slice().sort());
+});
+
+test('Build My Trip: every family kind is offered for kids, rainy-day, family, birthday and "6 year old" requests; a casino, a spa or a 19+ place never', () => {
+  const fails = [];
+  for (const [kind, k] of Object.entries(KINDS)) {
+    const { v, comps, town } = placed[kind];
+    for (const { q, young } of ASKS(town)) {
+      const p = app.runTripPlan({ text: q }, NOW);
+      const ids = idsOf(p);
+      const names = itemsOf(p).map((x) => x.venue.name).join(' | ');
+      const tooYoung = young != null && /^\d+$/.test(k.age) && young < Number(k.age);
+      if (k.expect === 'yes' && !tooYoung && !ids.includes(v.id)) fails.push(`${kind}: "${q}" leaves it out (${names})`);
+      if ((k.expect === 'no' || tooYoung) && ids.includes(v.id)) fails.push(`${kind}: "${q}" offers it (${names})`);
+      for (const c of comps.slice(-2)) if (ids.includes(c.id)) fails.push(`${kind}: "${q}" offers ${c.name}`);
+    }
+  }
+  assert.deepEqual(fails, []);
+});
+
+test('An 8+ escape room is offered when the kids named are 8 or older, never for a 6 year old or kids of unknown age', async () => {
+  const v = mk({ region: 'osoyoos', name: 'Osoyoos Escape Co MX', cuisine: 'Escape room', description: 'Two escape rooms.', rating: 4.9, reviews: 400 });
+  await ok(change(tokenFor(v.id), { indoor_info: { kinds: ['escape'], length: '1-2h', age: '8', year: 'all' } }));
+  assert.ok(idsOf(app.runTripPlan({ text: 'rainy day with a 10 year old in Osoyoos' }, NOW)).includes(v.id), '10 year old');
+  assert.ok(!idsOf(app.runTripPlan({ text: 'things to do with a 6 year old in Osoyoos' }, NOW)).includes(v.id), '6 year old');
+  assert.ok(!idsOf(app.runTripPlan({ text: 'family fun in Osoyoos' }, NOW)).includes(v.id), 'kids of unknown age');
+});
+
+test('A 19+ place of a family kind (an arcade bar) is never offered to kids', () => {
+  const v = mk({ region: 'oliver', name: 'Oliver Arcade Bar MX', cuisine: 'Arcade bar', description: 'Retro arcade games and craft beer.', rating: 4.9, reviews: 900 });
+  const t = tokenFor(v.id);
+  return ok(change(t, { indoor_info: { kinds: ['games'], length: '1-2h', age: '19', year: 'all' } })).then(() => {
+    for (const { q } of ASKS('Oliver')) assert.ok(!idsOf(app.runTripPlan({ text: q }, NOW)).includes(v.id), q);
+  });
+});
+
+// The Indoor hub's own search, run with the page's real client functions (fdFold .. fdPlan) on its own search data.
+async function hubSearch(lang) {
+  const html = await fetch(`${base}${lang === 'fr' ? '/fr' : ''}/indoor`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text());
+  const scripts = [...html.matchAll(/<script(?![^>]*application\/json)[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join('\n');
+  const a = scripts.indexOf('function fdFold('), b = scripts.indexOf('var searchPlan = ');
+  assert.ok(a > 0 && b > a, 'the hub has its search functions');
+  const src = scripts.slice(a, b).replace(/^\s*var HEART_USE[\s\S]*$/m, '');
+  const dataJson = (id) => { const m = new RegExp(`<script type="application/json" id="${id}">([\\s\\S]*?)</script>`).exec(html); return m ? JSON.parse(m[1]) : null; };
+  return { html, src, dataJson };
+}
+
+test('Search: "kids birthday party <town>" finds every family kind in site search, and the Indoor hub\'s own search matches party/parties and class/classes', async () => {
+  const fails = [];
+  for (const [kind, k] of Object.entries(KINDS)) {
+    if (k.expect !== 'yes') continue;
+    const { v, comps, town } = placed[kind];
+    const r = await fetch(`${base}/search?q=${encodeURIComponent(`kids birthday party ${town}`)}`, { redirect: 'manual', headers: { 'User-Agent': 'okanaganroam-check/1.0' } });
+    const h = plain(await r.text());
+    if (!h.includes(v.name)) fails.push(`site search ${kind} (${town}): missing`);
+    for (const c of comps.slice(-2)) if (h.includes(c.name)) fails.push(`site search ${kind}: lists ${c.name}`);
+  }
+  // The hub's search: the page's own fold, plural/singular and every-word rules on each card's search text.
+  const { html, src } = await hubSearch('en');
+  const cardText = {};
+  for (const m of html.matchAll(/data-venue-id="(\d+)"[^>]*data-venue-name="([^"]*)"/g)) cardText[m[1]] = m[2];
+  // The page's filter data: inline, or (a big list) loaded from /cards/rest/<hash>.json as the page's own script does.
+  const tag = /<script type="application\/json" id="fdVenueData"([^>]*)>([\s\S]*?)<\/script>/.exec(html);
+  assert.ok(tag, 'the hub has its data tag');
+  const rest = /data-rest="([^"]+)"/.exec(tag[1]);
+  const data = rest ? await fetch(`${base}/cards/rest/${rest[1]}.json`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.json()) : JSON.parse(tag[2] || '{}');
+  const ctx = { cards: [], welcoming: false, DATA: data };
+  for (const [kind, k] of Object.entries(KINDS)) {
+    const { v, town } = placed[kind];
+    const d = data[v.id] || {};
+    ctx.cards.push({ id: v.id, kind, expect: k.expect, town, text: `${v.name} ${town} ${d.k || ''}` });
+  }
+  vm.createContext(ctx);
+  vm.runInContext(`${src}\nthis.__plan = fdPlan; this.__hit = fdHit; this.__fold = fdFold;`, ctx);
+  ctx.cards.forEach((c) => { c.__fd = ctx.__fold(c.text); });
+  for (const c of ctx.cards) {
+    if (c.expect !== 'yes') continue;
+    const plan = ctx.__plan(`kids birthday party ${c.town}`);
+    if (!plan.groups.every((alts) => ctx.__hit(c.__fd, alts))) fails.push(`hub search ${c.kind}: misses (${c.__fd.slice(0, 160)})`);
+  }
+  // party ↔ parties, class ↔ classes, both ways.
+  const one = (text, q) => { const f = ctx.__fold(text); return ctx.__plan(q).groups.every((alts) => ctx.__hit(f, alts)); };
+  if (!one('Kids’ birthday parties', 'birthday party')) fails.push('hub search: party finds parties');
+  if (!one('Private birthday party room', 'birthday parties')) fails.push('hub search: parties finds party');
+  if (!one('Wheel classes for adults', 'wheel class')) fails.push('hub search: class finds classes');
+  if (!one('A wheel class for adults', 'wheel classes')) fails.push('hub search: classes finds class');
+  assert.deepEqual(fails, []);
+});

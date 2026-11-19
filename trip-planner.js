@@ -1632,6 +1632,10 @@ function scoreVenue(v, ctx) {
       // Indoor test 2: an indoor place matched on its hours says how late it's open ("Open until 1 AM"), not a badge.
       else if (f === 'open_late' && v.lateClose) add('feature', 8, `Open until ${v.lateClose}`);
       else add('feature', 8, `Has the ${featureLabel(ctx, f)} badge`);
+    } else if (f === 'kid_friendly' && v.type === 'indoor' && ownerKidsAges(v)) {
+      // Indoor test 6: an indoor owner's own All ages or 5+ counts as much as the Kid-Friendly badge (its reason is
+      // kids_owner_ages' "All ages welcome (the owner's own answer)").
+      add('feature', 8, null);
     }
     if (f === 'live_music') {
       const nm = venueNight(v, 'live_music', ctxPlanDate(ctx));
@@ -1742,7 +1746,7 @@ function scoreVenue(v, ctx) {
   // On a rainy day the places people actually visit indoors come first; clubs, companies and studios last.
   if (ctx.rainy && v.type === 'indoor') {
     if (RAIN_BACKUP_GOOD_WORDS.some((w) => textHas(v.textName, w))) add('rainy_attraction', 5, 'A good rainy-day pick');
-    if (RAIN_BACKUP_NICHE_WORDS.some((w) => textHas(v.textName, w))) add('rainy_niche', -10, null);
+    if (RAIN_BACKUP_NICHE_WORDS.some((w) => textHas(v.textName, w)) && !ownVisitorKind(v)) add('rainy_niche', -10, null);
   }
   // "A hike with a view": a trail with the Lake View badge before one without.
   if (ctx.lake && ctx.activities.has('hiking') && v.type === 'outdoor' && v.features.lake_view && (v.activities || []).includes('hiking')) add('hike_view', 15, 'A trail with a lake view');
@@ -1839,10 +1843,19 @@ const FAMILY_INDOOR_KINDS = ['climbing', 'kids', 'bowling', 'games', 'cinema', '
 const FAMILY_PLANNER_KINDS = ['climbing', 'bowling', 'arcade', 'museum'];
 const KIDS_QUIET_INDOOR_KINDS = ['gallery', 'theatre', 'classes', 'library', 'curling', 'yoga'];
 function indoorKindsOf(v) { return v.plannerKinds && v.plannerKinds.length ? v.plannerKinds : tripRequirements.inferPlannerKinds(v); }
+// Indoor test 6 (2026-11-19; Priya's All ages pottery and paint studio): an owner's own All ages or 5+ outweighs a kind's
+// "quiet" read. A classes place (paint-your-own pottery, kids' art classes) or an escape room the owner says is for all
+// ages is a family kind;
+// a gallery, theatre or library whose owner says All ages is no longer pushed down for kids. An owner who picked a kind of
+// place people visit is never read as a member gym or a recording studio from its name ("Donut House Studios").
+const FAMILY_IF_ALL_AGES_KINDS = ['classes', 'escape'];
+const NICHE_OWN_KINDS = ['casino', 'yoga', 'other'];
+function ownerKidsAges(v) { return !!v && ['all', '5'].includes(String(v.indoorMinAge || '')); }
+function ownVisitorKind(v) { const own = v && v.type === 'indoor' && Array.isArray(v.indoorKinds) ? v.indoorKinds : []; return own.length > 0 && own.some((k) => !NICHE_OWN_KINDS.includes(k)); }
 function familyIndoorPlace(v) {
   if (!v || v.type !== 'indoor') return false;
   const own = Array.isArray(v.indoorKinds) ? v.indoorKinds : [];
-  if (own.length) return own.some((k) => FAMILY_INDOOR_KINDS.includes(k));
+  if (own.length) return own.some((k) => FAMILY_INDOOR_KINDS.includes(k)) || (ownerKidsAges(v) && own.some((k) => FAMILY_IF_ALL_AGES_KINDS.includes(k)));
   return indoorKindsOf(v).some((k) => FAMILY_PLANNER_KINDS.includes(k)) || /\b(?:science (?:centre|center)|trampoline|indoor playground|play centre|play center|cinemas?|movie theatre|aquatic centre|leisure pool)\b/.test(`${v.textName || ''} ${normWords(v.cuisine || '')}`);
 }
 function indoorAppeal(v, ctx, add) {
@@ -1852,12 +1865,14 @@ function indoorAppeal(v, ctx, add) {
   if (ctx.kids || ctx.rainy) {
     const own = Array.isArray(v.indoorKinds) ? v.indoorKinds : [];
     if (familyIndoorPlace(v)) add('family_kind', ctx.kids ? 12 : 6, ctx.kids ? 'Indoor fun for the whole family' : null);
-    else if (ctx.kids && (own.length ? own.every((k) => KIDS_QUIET_INDOOR_KINDS.includes(k)) : kinds.some((k) => ['gallery', 'theatre'].includes(k)))) add('kids_quiet_kind', -10, null);
-    if (ctx.kids && ['all', '5'].includes(String(v.indoorMinAge || ''))) add('kids_owner_ages', 8, v.indoorMinAge === 'all' ? 'All ages welcome (the owner’s own answer)' : 'Kids 5 and up welcome (the owner’s own answer)');
+    else if (ctx.kids && !(own.length && ownerKidsAges(v)) && (own.length ? own.every((k) => KIDS_QUIET_INDOOR_KINDS.includes(k)) : kinds.some((k) => ['gallery', 'theatre'].includes(k)))) add('kids_quiet_kind', -10, null);
+    // Indoor test 6: the owner's own answer puts a family place ahead of unanswered ones of the same standing (a classes
+    // place no longer loses every slot to a fun centre and a museum nobody answered for).
+    if (ctx.kids && ownerKidsAges(v)) add('kids_owner_ages', familyIndoorPlace(v) ? 20 : 8, v.indoorMinAge === 'all' ? 'All ages welcome (the owner’s own answer)' : 'Kids 5 and up welcome (the owner’s own answer)');
   }
   const asked = (ctx.foodTerms || []).map((f) => f.term);
   const niche = INDOOR_NICHE_WORDS.find((w) => (textHas(v.textName, w) || textHas(v.textDesc, w)) && !asked.some((a) => w.includes(a) || a.includes(w)));
-  if (niche && !kinds.some((k) => INDOOR_VISITOR_KINDS.includes(k))) add('indoor_niche', -9, null);
+  if (niche && !kinds.some((k) => INDOOR_VISITOR_KINDS.includes(k)) && !ownVisitorKind(v)) add('indoor_niche', -9, null);
 }
 
 // Indoor test 2 (2026-11-19; Jordan: "team building activity in Kelowna" and "birthday party kelowna" left out his escape
@@ -7559,7 +7574,7 @@ function rainBackups(result, input, intent) {
     .map((v) => {
       let score = (v.rating || 4) * 2;
       if (RAIN_BACKUP_GOOD_WORDS.some((w) => textHas(v.textName, w))) score += 12; else if (RAIN_BACKUP_GOOD_WORDS.some((w) => textHas(v.textDesc, w))) score += 6;
-      if (RAIN_BACKUP_NICHE_WORDS.some((w) => textHas(v.textName, w))) score -= 15;
+      if (RAIN_BACKUP_NICHE_WORDS.some((w) => textHas(v.textName, w)) && !ownVisitorKind(v)) score -= 15;
       if (party.kids && v.features.kid_friendly) score += 5;
       if (party.kids && RAIN_BACKUP_KIDS_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textDesc, w))) score += 10;
       if (v.collections.includes('indoor_also') || v.collections.includes('local_favorite') || v.collections.includes('hidden_gem')) score += 3;
