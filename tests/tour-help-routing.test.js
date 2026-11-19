@@ -848,3 +848,61 @@ test("tour test 13 answers: confirm and pay in Good to know, the no-location pho
   assert.match(plain(en.topic("tour-kinds-paraglide").a), /Paragliding, skydiving or hang gliding/);
   assert.match(plain(en.topic("tour-kinds-what").a), /Paragliding/);
 });
+// Tour test 14 (Whistler, 2026-11-18; Lucía, private ski and snowboard lessons on a Pixel; some questions in Spanish). Help
+// answered 5 of her 18 right. Her questions (help-log.json, exact wording), with a French twin, and her Spanish ones asked
+// as she asked them: a Spanish question is answered in English (never French).
+const ASKED14 = [
+  ["14-1", "en", "opening day changes every year", ["tour-snow-open"], "la date d'ouverture change chaque année"],
+  ["14-2", "en", "season depends on snow, we open when the mountain opens", ["tour-snow-open"], "la saison dépend de la neige, on ouvre quand la montagne ouvre"],
+  ["14-3", "en", "ski lessons not in the list?", ["tour-kinds-lessons"], "les cours de ski ne sont pas dans la liste?"],
+  ["14-4", "es", "clases de esqui privadas, cual escojo", ["tour-kinds-lessons"], "cours de ski privés, lequel je choisis"],
+  ["14-5", "en", "my price is per lesson for 1 to 4 people not per person", ["tour-lesson-packages"], "mon prix est par cours pour 1 à 4 personnes, pas par personne"],
+  ["14-6", "en", "lift ticket not included where do i say", ["tour-not-included"], "billet de remontée non compris, où je le dis"],
+  ["14-7", "en", "kids camp 5 days how", ["tour-lesson-packages"], "camp pour enfants de 5 jours comment"],
+  ["14-8", "en", "adaptive lessons on request where", ["tour-adaptive"], "cours adaptés sur demande, où"],
+  ["14-9", "es", "¿puedo poner que hablamos español?", ["tour-languages"], "est-ce que je peux dire que nous parlons espagnol?"],
+  ["14-10", "en", "cancel more than 72 h full refund where", ["tour-weather"], "annulation plus de 72 h remboursement complet où"],
+  ["14-11", "en", "we teach in spanish and portuguese too", ["tour-languages"], "nous enseignons aussi en espagnol et en portugais"],
+  ["14-12", "en", "instructors speak Spanish and Portuguese", ["tour-languages"], "nos moniteurs parlent espagnol et portugais"],
+  ["14-13", "es", "hablamos español y portugués", ["tour-languages"], "nous parlons espagnol et portugais"],
+  ["14-14", "en", "adaptive lessons for skiers with disabilities", ["tour-adaptive"], "cours adaptés pour skieurs handicapés"],
+  ["14-15", "en", "rentals not included, we give a discount code", ["tour-not-included"], "location non comprise, on donne un code de rabais"],
+  ["14-16", "en", "first time adult package where", ["tour-lesson-packages"], "forfait première fois pour adultes où"],
+  ["14-17", "en", "ski school sign at gondola base is our meeting spot", ["tour-meeting"], "l'enseigne de l'école de ski au pied de la télécabine est notre point de rencontre"],
+  ["14-18", "en", "lessons are for 1 to 4 people of similar level", ["tour-lesson-packages"], "les cours sont pour 1 à 4 personnes de même niveau"],
+  ["14-19", "en", "lessons confirmed the day before by text", ["tour-confirm-pay"], "cours confirmés la veille par texto"],
+  ["14-20", "en", "pay at the end, cash or card", ["tour-confirm-pay"], "paiement à la fin, comptant ou par carte"],
+  ["14-21", "en", "my photo has no location", ["tour-photo-no-location"], "ma photo n'a pas de position"],
+  ["14-22", "en", "good to know too long", ["tour-too-long"], "bon à savoir trop long"],
+  ["14-23", "en", "it says it cant read my price", ["tour-price-refused"], "il dit qu'il ne peut pas lire mon prix"],
+];
+test("tour test 14: every Help question (EN or ES, and its French twin) lands on the right topic; Spanish is answered in English", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Ski lessons" });
+  assert.equal(ASKED14.length, 23);
+  const wrong = [];
+  for (const [k, lang, q, want, qFr] of ASKED14) {
+    const r = en.best(q), rf = fr.best(qFr), rs = fr.best(q);
+    if (!want.includes(r && r.id)) wrong.push(`${k} ${lang.toUpperCase()} "${q}" -> ${r && r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf && rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf && rf.id} (want ${want.join(" or ")})`);
+    if (lang === "es") {
+      if (r.lang !== "en") wrong.push(`${k} "${q}" answered in ${r.lang} on the English page`);
+      if (rs.lang !== "en") wrong.push(`${k} "${q}" answered in ${rs.lang} on the French page`);
+    } else if (r.lang !== "en") wrong.push(`${k} "${q}" answered in ${r.lang}`);
+    if (rf.lang !== "fr") wrong.push(`${k} FR "${qFr}" answered in ${rf.lang}`);
+  }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 14 answers: the lessons kind, packages and Private tours, not included, adaptive (not off-season), the snow tick, the season button's own words, generic examples", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-kinds-lessons").a), /Ski and snowboard lessons/); assert.match(plain(fr.topic("tour-kinds-lessons").aFr), /Cours de ski et de planche/);
+  assert.match(plain(en.topic("tour-lesson-packages").a), /Your tours and prices/); assert.match(plain(en.topic("tour-lesson-packages").a), /Private tours/); assert.match(plain(en.topic("tour-lesson-packages").a), /Who can come/);
+  assert.match(plain(en.topic("tour-not-included").a), /Good to know/);
+  assert.match(plain(en.topic("tour-adaptive").a), /Good to know/); assert.match(plain(en.topic("tour-adaptive").a), /Your tours and prices/); assert.match(plain(en.topic("tour-adaptive").a), /isn’t Off-season trips by request/);
+  assert.match(plain(en.topic("tour-snow-open").a), /Opening day depends on snow/); assert.match(plain(en.topic("tour-snow-open").a), /Every trip is weather permitting/); assert.match(plain(en.topic("tour-snow-open").a), /We only run part of the year/);
+  assert.match(plain(fr.topic("tour-snow-open").aFr), /La date d’ouverture dépend de l’enneigement/);
+  assert.match(plain(en.topic("setup-season").a), /We only run part of the year/); assert.doesNotMatch(plain(en.topic("setup-season").a), /We’re closed part of the year/);
+  assert.doesNotMatch(plain(en.topic("tour-confirm-pay").a), /landing|flight/i); assert.doesNotMatch(plain(fr.topic("tour-confirm-pay").aFr), /atterrissage|vol\b/i);
+  assert.match(plain(en.topic("tour-kinds-other").a), /Ski and snowboard lessons/);
+  assert.match(plain(en.topic("tour-price-refused").a), /Per student/);
+});
