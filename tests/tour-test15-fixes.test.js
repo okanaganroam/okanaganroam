@@ -6,7 +6,7 @@
 // Dayton (2026-11-18): tours have no meeting-spot step ("most tour operators have where their meeting spots are when people
 // make their bookings"); the page shows the business address.
 // The Help questions are in tour-help-routing.test.js.
-// Runs on a throwaway database (like server.test.js); the runner puts whistler.db back afterwards.
+// Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -14,7 +14,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
 
-const DB_FILE = path.join(__dirname, '..', 'whistler.db');
+const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 // Tour test 16 (2026-11-18): the -wal and -shm files go too. Run in the same `node --test` call as another file that
 // rebuilt the database, a left-over -wal from that run was replayed into this fresh file (the two passed only alone).
 for (const s of ['', '-wal', '-shm', '-journal']) { try { fs.unlinkSync(DB_FILE + s); } catch (e) { /* not there */ } }
@@ -35,8 +35,8 @@ const CLIENT = fs.readFileSync(path.join(ROOT, 'owner-setup-client.js'), 'utf8')
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const WK = (o, c) => Object.fromEntries(DAYS.map((d) => [d, [[o, c]]]));
 let n = 0;
-const mk = (type, o = {}) => app.createVenue({ name: `Tour T15 ${++n}`, slug: `tour-t15-${n}`, region: 'whistler', type, latitude: 50.116 + n / 3000, longitude: -122.957,
-  rating: 4.6, reviews: 120, address: `${500 + n} Main St, Whistler`, phone: '604-555-0144', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')),
+const mk = (type, o = {}) => app.createVenue({ name: `Tour T15 ${++n}`, slug: `tour-t15-${n}`, region: 'kelowna', type, latitude: 49.888 + n / 3000, longitude: -119.496,
+  rating: 4.6, reviews: 120, address: `${500 + n} Main St, Kelowna`, phone: '250-555-0144', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')),
   description: 'A fixture used only by the tour test 15 tests.', ...o });
 const tokenFor = (id) => app.createOwnerLink(id, {}).url.split('/owner/')[1];
 let ipN = 0, srv, base;
@@ -47,7 +47,7 @@ const postJson = (p, body) => fetch(base + p, { method: 'POST', headers: { 'Cont
   .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})) }));
 const change = (t, changes) => postJson(`/owner/${t}/changes?from=setup`, { changes, from_setup: true, setup_frequency: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 })
   .then((r) => ({ ...r, status: r.status === 201 ? 200 : r.status }));
-const getText = (p) => fetch(base + p, { headers: { 'User-Agent': 'whistlerroam-check/1.0' } }).then(async (r) => ({ status: r.status, text: await r.text() }));
+const getText = (p) => fetch(base + p, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then(async (r) => ({ status: r.status, text: await r.text() }));
 const ok = (r) => { assert.equal(r.status, 200, JSON.stringify(r.body)); return r; };
 const page = (v, lang = 'en', now) => app.renderVenuePage(app.getVenue(v.id), [], [], [], { lang, ...(now ? { now } : {}) });
 const plain = (h) => h.replace(/<svg[\s\S]*?<\/svg>/g, '').replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&#39;|&rsquo;/g, '’').replace(/\s+/g, ' ');
@@ -68,9 +68,9 @@ const TOURS = [
     { name: 'Guided snowshoe tour', description: 'Snowshoes and poles included. Kids 6+. Meet at the Olympic Plaza ticket booth.', price: '$99 per person', duration: '2 hours' },
     { name: 'Fondue snowshoe evening', description: 'Evening snowshoe by headlamp, then a cheese and chocolate fondue dinner in a heated yurt. Dinner included. Kids 6+.', price: '$179 per person', duration: '3 hours' }] },
 ];
-const STORY = 'Summer on Alta Lake: rent a canoe, kayak or SUP by the hour from our dock at Lakeside Park, or join our 2-hour guided sunset paddle. Winter: guided snowshoe tours from Whistler Village, and our fondue snowshoe evening with dinner in a heated yurt. Closed spring and fall.';
+const STORY = 'Summer on Alta Lake: rent a canoe, kayak or SUP by the hour from our dock at Lakeside Park, or join our 2-hour guided sunset paddle. Winter: guided snowshoe tours from downtown Kelowna, and our fondue snowshoe evening with dinner in a heated yurt. Closed spring and fall.';
 async function dave(o = {}, info = {}) {
-  const v = mk('tour', { name: `Alta Lake Paddle & Snowshoe ${n + 1}`, cuisine: 'Canoe & kayak rentals', rating: 4.7, reviews: 211, address: 'Lakeside Park, 4320 Alta Lake Rd, Whistler', latitude: 50.1103, longitude: -122.9719,
+  const v = mk('tour', { name: `Alta Lake Paddle & Snowshoe ${n + 1}`, cuisine: 'Canoe & kayak rentals', rating: 4.7, reviews: 211, address: 'Lakeside Park, 4320 Alta Lake Rd, Kelowna', latitude: 49.8823, longitude: -119.5109,
     description: STORY, description_fr: 'Location de canots et de kayaks sur le lac Alta au parc Lakeside.', hours: JSON.stringify(WK('09:00', '21:00')), kid_friendly: 1, ...o });
   const t = tokenFor(v.id);
   ok(await change(t, { tour_info: { kinds: ['paddle', 'rentals', 'snowshoe'], length: '1-2h', book: 'same_day', age: 'all', year: 'seasonal', snow_open: true, ...info } }));
@@ -87,7 +87,7 @@ let world0 = null;
 function world() {
   if (world0) return world0;
   world0 = {
-    eco: mk('tour', { name: 'Whistler Eco Tours T15', cuisine: 'Canoe, kayak, SUP & hiking tours', rating: 4.8, reviews: 600, description: 'Guided canoe and kayak tours on the River of Golden Dreams, SUP lessons and guided hikes.' }),
+    eco: mk('tour', { name: 'Kelowna Eco Tours T15', cuisine: 'Canoe, kayak, SUP & hiking tours', rating: 4.8, reviews: 600, description: 'Guided canoe and kayak tours on the River of Golden Dreams, SUP lessons and guided hikes.' }),
     snow: mk('tour', { name: 'Blackcomb Snowmobile T15', cuisine: 'Snowmobile & dog sled tours', rating: 4.7, reviews: 900, description: 'Snowmobile and dog sled tours in winter.' }),
     lake: mk('beach', { name: 'Lakeside Park T15', cuisine: 'Beach', rating: 4.6, reviews: 500, description: 'A lakeside park with a swimming dock and a canoe launch.' }),
   };
@@ -119,8 +119,8 @@ test('1. Build My Trip: his headline tours plan him (sunset paddle, guided paddl
     assert.ok(!items.some((i) => i.kind === 'type' && i.value === 'restaurant'), q);
   }
   // A plain fondue is still a restaurant.
-  assert.match(r.tripRequestSynonyms('fondue in whistler'), /fondue restaurant/);
-  for (const q of ['sunset paddle tour in August', 'guided paddle in July', 'SUP tour in August', 'fondue snowshoe dinner in February', 'snowshoe tour Whistler in January']) assert.ok(inPlan(plan(q), v), `${q}: ${JSON.stringify(namesOf(plan(q)))}`);
+  assert.match(r.tripRequestSynonyms('fondue in kelowna'), /fondue restaurant/);
+  for (const q of ['sunset paddle tour in August', 'guided paddle in July', 'SUP tour in August', 'fondue snowshoe dinner in February', 'snowshoe tour Kelowna in January']) assert.ok(inPlan(plan(q), v), `${q}: ${JSON.stringify(namesOf(plan(q)))}`);
   const fondue = hisStop(plan('fondue snowshoe dinner in February'));
   assert.ok(fondue.caveats.includes('Dinner included on the Fondue snowshoe evening (the operator’s own words).'), JSON.stringify(fondue.caveats));
   assert.ok(!namesOf(plan('fondue snowshoe dinner in February')).includes('Fondue House T15'));
@@ -133,7 +133,7 @@ test('2. the season each kind runs (A): stored on tour_info.kind_seasons, read f
   // No answer: his typed sections ("Summer rentals and tours", "Winter snowshoe tours") and the defaults.
   assert.deepEqual(app.tourKindSeasons(v.id), { snowshoe: 'winter', paddle: 'summer', rentals: 'summer' });
   for (const q of ['kayak in January', 'snowshoe in July', 'canoe rental in January', 'snowshoe tour in August']) assert.ok(!inPlan(plan(q), v), `${q}: ${JSON.stringify(namesOf(plan(q)))}`);
-  for (const q of ['kayak in July', 'snowshoe in January', 'canoe rental Whistler in July', 'things to do in January']) assert.ok(inPlan(plan(q), v), `${q}: ${JSON.stringify(namesOf(plan(q)))}`);
+  for (const q of ['kayak in July', 'snowshoe in January', 'canoe rental Kelowna in July', 'things to do in January']) assert.ok(inPlan(plan(q), v), `${q}: ${JSON.stringify(namesOf(plan(q)))}`);
   // His own answer wins, and is checked.
   ok(await change(t, { tour_info: { kind_seasons: { paddle: 'summer', rentals: 'both', snowshoe: 'winter' } } }));
   assert.deepEqual(app.venueTourInfo(v.id).kind_seasons, { paddle: 'summer', rentals: 'both', snowshoe: 'winter' });
@@ -215,17 +215,17 @@ test('4. the price screen: a per-boat, per-board or hourly rental goes to Your t
 test('5. a rental request’s trip card shows his own rental price; French planner words for canoe, kayak, SUP, raquettes and fondue', async () => {
   world();
   const { v } = await dave();
-  const c = hisStop(plan('canoe rental Whistler in July'));
+  const c = hisStop(plan('canoe rental Kelowna in July'));
   assert.deepEqual([c.venue.cost.label, c.venue.cost.item, c.venue.cost.unit, c.venue.cost.unitFr], ['Rental', 'Canoe rental', '$45 per boat per hour', '45 $ par bateau de l’heure']);
   const sup = hisStop(plan('SUP rental in July'));
   assert.equal(sup.venue.cost.unitFr, '30 $ par planche de l’heure');
   assert.equal(hisStop(plan('sunset paddle in July')).venue.cost.label, 'Tour');
   assert.match(fs.readFileSync(path.join(ROOT, 'trip-planner-v3-page.js'), 'utf8'), /cost\.label === 'Rental' && cost\.unit/);
   const frw = require('../trip-planner-fr.js');
-  assert.equal(frw.tripPlannerText('location de canot à Whistler en juillet'), 'canoe rental at whistler in july');
+  assert.equal(frw.tripPlannerText('location de canot à Kelowna en juillet'), 'canoe rental at kelowna in july');
   assert.equal(frw.tripPlannerText('raquettes et fondue en février'), 'fondue snowshoe in february');
   assert.equal(frw.tripPlannerText('pagaie au coucher du soleil en août'), 'sunset paddle in august');
-  for (const [q, inIt] of [['location de canot à Whistler en juillet', true], ['location de canoë à Whistler en juillet', true], ['raquettes et fondue en février', true], ['planche à pagaie en juillet', true], ['kayak en janvier', false]]) assert.equal(inPlan(plan(q, 'fr'), v), inIt, q);
+  for (const [q, inIt] of [['location de canot à Kelowna en juillet', true], ['location de canoë à Kelowna en juillet', true], ['raquettes et fondue en février', true], ['planche à pagaie en juillet', true], ['kayak en janvier', false]]) assert.equal(inPlan(plan(q, 'fr'), v), inIt, q);
   for (const q of ['stand up paddle in July', 'SUP rental in July', 'paddleboard rental in July', 'paddle board in August']) assert.ok(inPlan(plan(q), v), q);
 });
 
@@ -295,12 +295,12 @@ test('14. tours have no meeting-spot step (Dayton): no door step or tile, Basics
   assert.ok(!completeness.itemsFor('tour').some((i) => i.key === 'arrival'));
   assert.equal(completeness.itemsFor('tour').reduce((a, i) => a + i.w, 0), 100);
   // A spot sent earlier stays stored, unused.
-  db.prepare("INSERT INTO venue_arrival_points (venue_id, file, preview_key, lat, lng, distance_m, status) VALUES (?, 'x.jpg', ?, 50.1301, -122.9501, 2000, 'approved')").run(v.id, `k15-${v.id}`);
+  db.prepare("INSERT INTO venue_arrival_points (venue_id, file, preview_key, lat, lng, distance_m, status) VALUES (?, 'x.jpg', ?, 49.9021, -119.4891, 2000, 'approved')").run(v.id, `k15-${v.id}`);
   const html = page(v, 'en', NOW);
-  assert.match(plain(html), /Address Lakeside Park, 4320 Alta Lake Rd, Whistler/);
+  assert.match(plain(html), /Address Lakeside Park, 4320 Alta Lake Rd, Kelowna/);
   assert.doesNotMatch(plain(html), /Meeting point/);
-  assert.doesNotMatch(html, /50\.1301/);
-  const r = await postJson(`/owner/${t}/arrival`, { image: 'data:image/jpeg;base64,AAAA', lat: 50.11, lng: -122.97, rights: true });
+  assert.doesNotMatch(html, /49\.9021/);
+  const r = await postJson(`/owner/${t}/arrival`, { image: 'data:image/jpeg;base64,AAAA', lat: 49.882, lng: -119.509, rights: true });
   assert.equal(r.status, 400);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM venue_arrival_points WHERE venue_id = ?').get(v.id).n, 1);
   // The Address box nudge.

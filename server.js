@@ -7470,6 +7470,14 @@ function runTripPlan(args, now = new Date()) {
 // EN and FR. Other kinds of place are unchanged (a dinner near Whistler stays in Whistler).
 const TRIP_TOUR_NEAR_MINUTES = 60;
 const TRIP_TOUR_NEAR_RE = /\b(?:near|around|close to|from|out of|pr[eè]s de|proche de|autour de|depuis|au d[ée]part de)\s+([a-zà-ÿ .'’-]+?)(?=\s+(?:in|on|this|next|for|with|without|no|le|la|les|en|ce|cet|cette|pour|avec|sans|au|du)\b|[,.!?;]|$)/i;
+// The middle of each town's listings ({ region: { lat, lng } }), for a site whose trip-site.js lists no town centres.
+function tripRegionCentresFromListings() {
+  try {
+    const out = {};
+    for (const r of db.prepare('SELECT region, AVG(latitude) AS lat, AVG(longitude) AS lng FROM venues WHERE region IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL GROUP BY region').all()) out[r.region] = { lat: r.lat, lng: r.lng };
+    return out;
+  } catch (e) { return null; }
+}
 function tripTourNearTown(plan, args, now = new Date()) {
   if (!plan || args.swap || args.pinned || args.excludeVenueIds) return plan;
   const text = String(args.text || '');
@@ -7483,15 +7491,20 @@ function tripTourNearTown(plan, args, now = new Date()) {
   if (!rest) return plan;
   const wider = runTripPlanCore({ ...args, text: rest }, now);
   const tp = tripPlannerModule();
-  const cents = TRIP_SITE.townCentres || null;
+  // Okanagan port: a site with no town centres or drive legs in trip-site.js measures from its listings' positions (the
+  // planner's own regionCentroids rule).
+  const cents = TRIP_SITE.townCentres && Object.keys(TRIP_SITE.townCentres).length ? TRIP_SITE.townCentres : tripRegionCentresFromListings();
   const mins = (r) => { try { return tp.regionMinutes(cents, town, r); } catch (e) { return Infinity; } };
   const have = new Set(stopsOf(plan).map((x) => x.venue.id));
   const near = [];
   for (const x of stopsOf(wider)) if (isTour(x) && !have.has(x.venue.id) && !near.some((y) => y.venue.id === x.venue.id) && x.venue.region !== town && mins(x.venue.region) <= TRIP_TOUR_NEAR_MINUTES) near.push(x);
-  if (!near.length) return plan;
+  // Okanagan port: a list plan that already took in the towns around (Okanagan's "near" plans do) is ranked and noted the
+  // same way, with nothing new to add.
+  const away = stopsOf(plan).filter((x) => isTour(x) && x.venue.region !== town && mins(x.venue.region) <= TRIP_TOUR_NEAR_MINUTES);
+  if (!near.length && !away.length) return plan;
   const pickAsk = tp.PICKUP_ASK_RE.test(tp.normWords(text));
   const fit = (x) => (pickAsk && tourPickup(x.venue) ? 1 : 0);
-  const towns = [...new Set(near.map((x) => x.venue.region))].sort((a, b) => mins(a) - mins(b)).map((r) => REGION_LABELS[r]);
+  const towns = [...new Set(near.concat(away).map((x) => x.venue.region))].sort((a, b) => mins(a) - mins(b)).map((r) => REGION_LABELS[r]);
   const townText = towns.length > 1 ? `${towns.slice(0, -1).join(', ')} and ${towns[towns.length - 1]}` : towns[0];
   const note = `This includes tours within about an hour of ${REGION_LABELS[town]}, in ${townText}.`;
   const rank = (list) => list.map((x, i) => [x, i]).sort((a, b) => fit(b[0]) - fit(a[0]) || mins(a[0].venue.region) - mins(b[0].venue.region) || a[1] - b[1]).map((y) => y[0]);

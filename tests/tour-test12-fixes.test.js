@@ -3,7 +3,7 @@
 // "DM us"). Ages 14+, under 19s need a parent or guardian to sign the waiver; an online waiver; the meeting spot is a
 // gravel lot off Hwy 99, not the office; winter is weekends only, weather permitting).
 // The Help questions are in tour-help-routing.test.js.
-// Runs on a throwaway database (like server.test.js); the runner puts whistler.db back afterwards.
+// Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -12,7 +12,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const vm = require('node:vm');
 
-const DB_FILE = path.join(__dirname, '..', 'whistler.db');
+const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
 process.env.ENRICHMENT_ADMIN_TOKEN = 'tour-t12-admin-token';
 process.env.TRIP_PLANNER_V3 = 'on';
@@ -35,14 +35,14 @@ const PLANNER = fs.readFileSync(path.join(ROOT, 'trip-planner.js'), 'utf8');
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const WK = (o, c) => Object.fromEntries(DAYS.map((d) => [d, [[o, c]]]));
 let n = 0;
-const mk = (type, o = {}) => app.createVenue({ name: `Tour T12 ${++n}`, slug: `tour-t12-${n}`, region: 'whistler', type, latitude: 50.116 + n / 3000, longitude: -122.957,
-  rating: 4.6, reviews: 120, address: `${500 + n} Main St, Whistler`, phone: '604-555-0142', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')),
+const mk = (type, o = {}) => app.createVenue({ name: `Tour T12 ${++n}`, slug: `tour-t12-${n}`, region: 'kelowna', type, latitude: 49.888 + n / 3000, longitude: -119.496,
+  rating: 4.6, reviews: 120, address: `${500 + n} Main St, Kelowna`, phone: '250-555-0142', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')),
   description: 'A fixture used only by the tour test 12 tests.', ...o });
 const tokenFor = (id) => app.createOwnerLink(id, {}).url.split('/owner/')[1];
 let ipN = 0, srv, base;
 test.before(async () => { srv = http.createServer(app.server.listeners('request')[0]); await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`; });
 test.after(() => srv && srv.close());
-const get = (p) => fetch(base + p, { redirect: 'manual', headers: { 'User-Agent': 'whistlerroam-check/1.0' } }).then(async (r) => ({ status: r.status, text: await r.text() }));
+const get = (p) => fetch(base + p, { redirect: 'manual', headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then(async (r) => ({ status: r.status, text: await r.text() }));
 const postJson = (p, body) => fetch(base + p, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.72.${Math.floor(++ipN / 250)}.${ipN % 250 + 1}` }, body: JSON.stringify(body) })
   .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})) }));
 const change = (t, changes) => postJson(`/owner/${t}/changes?from=setup`, { changes, from_setup: true, setup_frequency: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 })
@@ -67,8 +67,8 @@ const TOURS = [
     { name: 'Gift cards 🎁', price: 'any amount', description: 'Perfect birthday gift. Buy online' }] },
 ];
 async function kayla(o = {}) {
-  const v = mk('tour', { name: `Cheakamus Canyon Bungee ${n + 1}`, cuisine: 'Bungee jumping & giant swing', rating: 4.9, reviews: 211, address: '1080 Millar Creek Rd, Whistler',
-    description: 'Bungee jumps and a giant canyon swing over the Cheakamus River south of Whistler. Check in at our office in Function Junction.',
+  const v = mk('tour', { name: `Cheakamus Canyon Bungee ${n + 1}`, cuisine: 'Bungee jumping & giant swing', rating: 4.9, reviews: 211, address: '1080 Millar Creek Rd, Kelowna',
+    description: 'Bungee jumps and a giant canyon swing over the Cheakamus River south of Kelowna. Check in at our office in Function Junction.',
     description_fr: 'Sauts à l’élastique et balançoire géante au-dessus de la rivière Cheakamus. Enregistrement à notre bureau de Function Junction.', hours: JSON.stringify(WK('09:00', '18:00')), ...o });
   const t = tokenFor(v.id);
   ok(await change(t, { tour_info: { kinds: ['adventure'], length: '1h', book: 'day', age: '14', adult: true, adult_age: '19', adult_waiver: true, year: 'all' } }));
@@ -105,10 +105,10 @@ test('1. age: a 14+ chip and the under 18s / under 19s, "come with an adult" / "
 test('1b. Build My Trip: a 12- or 13-year-old leaves her out; a 16-year-old plans her with "Under 19s need a parent or guardian to sign the waiver"', async () => {
   const { v } = await kayla();
   for (const age of [12, 13]) {
-    const p = plan(`bungee jump in Whistler in July with our ${age}-year-old`);
+    const p = plan(`bungee jump in Kelowna in July with our ${age}-year-old`);
     assert.ok(!namesOf(p).includes(v.name), `${age}: ${JSON.stringify(namesOf(p))}`);
   }
-  const p16 = plan('bungee jump in Whistler in July with our 16-year-old');
+  const p16 = plan('bungee jump in Kelowna in July with our 16-year-old');
   const stop = itemsOf(p16).find((x) => x.venue.name === v.name);
   assert.ok(stop, JSON.stringify([p16.kind, namesOf(p16)]));
   assert.ok((stop.caveats || []).includes('Under 19s need a parent or guardian to sign the waiver.'), JSON.stringify(stop.caveats));
@@ -124,11 +124,11 @@ test('2. social caption text: trailing hashtags and the short lines’ emojis go
   assert.equal(s('Weight 40-150kg ⚖️ online waiver b4 you arrive!! Closed in high winds ⚠️ #safetyfirst', { short: true }), 'Weight 40-150kg online waiver before you arrive! Closed in high winds');
   assert.equal(s('Stag/stagette + bday groups get 10% off 🎉 DM us', { short: true }), 'Stag/stagette + bday groups get 10% off DM us');
   // The story keeps its emojis inside; the hashtag run at the end goes.
-  assert.equal(s('🤯 JUMP 160ft 🔥 #sendit our crew is stoked 💪 do the waiver ✍️ #Whistler #bungee #yolo'), '🤯 JUMP 160ft 🔥 #sendit our crew is stoked 💪 do the waiver');
-  assert.equal(s('We are Whistler’s #1 canyon swing'), 'We are Whistler’s #1 canyon swing');
+  assert.equal(s('🤯 JUMP 160ft 🔥 #sendit our crew is stoked 💪 do the waiver ✍️ #Kelowna #bungee #yolo'), '🤯 JUMP 160ft 🔥 #sendit our crew is stoked 💪 do the waiver');
+  assert.equal(s('We are Kelowna’s #1 canyon swing'), 'We are Kelowna’s #1 canyon swing');
   assert.equal(s('© 2026 Acme® tours', { short: true }), '© 2026 Acme® tours');
   // The capitalizer leaves # words alone.
-  assert.equal(app.ownerTextClean('#whistler bungee: see you in whistler'), '#whistler bungee: see you in Whistler');
+  assert.equal(app.ownerTextClean('#kelowna bungee: see you in kelowna'), '#kelowna bungee: see you in Kelowna');
   const { v, t } = await kayla();
   ok(await change(t, { visit_rows: { known_for: '160ft canyon jump 🤯 #sendit', good_to_know: 'Wear closed-toe shoes. online waiver b4 you arrive!! Closed in high winds ⚠️ #safetyfirst', groups: 'Groups of 8 or more: please book ahead. bday groups get 10% off 🎉 DM us' } }));
   approveAll(v.id);
@@ -140,10 +140,10 @@ test('2. social caption text: trailing hashtags and the short lines’ emojis go
   const req = db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? AND changes LIKE '%address%' ORDER BY id DESC LIMIT 1").get(v.id);
   assert.equal(JSON.parse(req.changes).address, 'Gravel lot off Hwy 99 right after the Cheakamus bridge NOT our office');
   // The admin cards: the social flag; no "Whistler's" misspelling flag.
-  const card = app.renderAdminChangeCard({ id: 1, venue_name: v.name, submitted_at: '2026-11-18', listing_url: '/x', changes: { description: '🤯 JUMP #sendit Whistler’s only canyon bungee. Whistler\'s best. DM us', visit_rows: { groups: 'bday 10% off DM us' } }, previous: {}, note: '' });
+  const card = app.renderAdminChangeCard({ id: 1, venue_name: v.name, submitted_at: '2026-11-18', listing_url: '/x', changes: { description: '🤯 JUMP #sendit Kelowna’s only canyon bungee. Kelowna\'s best. DM us', visit_rows: { groups: 'bday 10% off DM us' } }, previous: {}, note: '' });
   assert.match(card, /Hashtags \/ emojis \/ ‘DM us’ from social media/); assert.match(card, /“#sendit”/); assert.match(card, /“DM us”/);
-  assert.doesNotMatch(card, /may be Whistler/);
-  assert.deepEqual(clean.nameMisspellings("Whistler's only canyon bungee", { phrases: [], words: ['Whistler'] }), []);
+  assert.doesNotMatch(card, /may be Kelowna/);
+  assert.deepEqual(clean.nameMisspellings("Kelowna's only canyon bungee", { phrases: [], words: ['Kelowna'] }), []);
   const menuCard = app.typedTourFlagsHtml(app.getVenue(v.id), JSON.stringify({ sections: [{ items: [{ name: 'Swing 🎢', price: '$119', description: 'DM us for groups' }] }] }));
   assert.match(menuCard, /Hashtags \/ emojis \/ ‘DM us’ from social media/);
   // The tours editor flags it too.
@@ -151,7 +151,7 @@ test('2. social caption text: trailing hashtags and the short lines’ emojis go
   // Typed tours: names lose emojis and trailing hashtags; descriptions their trailing hashtags.
   const m = await postJson(`/owner/${t}/menu/manual`, {});
   assert.ok([200, 201].includes(m.status), JSON.stringify(m.body));
-  const s1 = await postJson(`/owner/${t}/menu/save`, { data: { sections: [{ name: '', items: [{ name: '🤯 Bungee Jump 160ft 🔥', price: '$139', description: 'Jump off the bridge! #sendit #whistlerbungee' }] }] } });
+  const s1 = await postJson(`/owner/${t}/menu/save`, { data: { sections: [{ name: '', items: [{ name: '🤯 Bungee Jump 160ft 🔥', price: '$139', description: 'Jump off the bridge! #sendit #kelownabungee' }] }] } });
   assert.equal(s1.status, 200, JSON.stringify(s1.body));
   const draft = db.prepare("SELECT data FROM venue_menus WHERE venue_id = ? AND status IN ('draft', 'ready') ORDER BY id DESC LIMIT 1").get(v.id);
   const it = JSON.parse(draft.data).sections[0].items[0];
@@ -175,7 +175,7 @@ test('3. "$139 per jump 🔥 2nd jump same day $69" saves 139 per person; "same 
 test('4. her new English story with research French: the translation is queued (as "Leave it to us"); the French page shows her English story with « Description en anglais »', async () => {
   const { v, t } = await kayla();
   sent.length = 0;
-  const story = 'Whistler’s only canyon bungee and giant swing over the Cheakamus River. Check in 30 minutes early at the gravel lot off Hwy 99, not our office, and do the online waiver before you come.';
+  const story = 'Kelowna’s only canyon bungee and giant swing over the Cheakamus River. Check in 30 minutes early at the gravel lot off Hwy 99, not our office, and do the online waiver before you come.';
   ok(await change(t, { description: story }));
   const q = db.prepare("SELECT * FROM venue_menus WHERE venue_id = ? AND help_kind = 'fr_story' AND status = 'help'").all(v.id);
   assert.equal(q.length, 1);
@@ -217,7 +217,7 @@ test('5. "Weather permitting" on a stretch of other hours: the hours block, "Ope
   assert.equal((await change(rt, { hours_seasons: [{ from: '11-01', to: '04-30', label: '', hours: winter, weather: true }] })).status, 400);
   // The planner: the facts carry the stretch; a January plan's stop says so.
   assert.deepEqual(app.tourPlannerFacts(v.id).tourWeather, [{ from: '11-01', to: '04-30' }]);
-  const p = plan('bungee jump in Whistler in January');
+  const p = plan('bungee jump in Kelowna in January');
   const stop = itemsOf(p).find((x) => x.venue.name === v.name);
   assert.ok(stop, JSON.stringify([p.kind, namesOf(p)]));
   assert.ok((stop.caveats || []).includes('Runs weather permitting at this time of year (the operator’s own answer).'), JSON.stringify(stop.caveats));
@@ -232,12 +232,12 @@ test('5. "Weather permitting" on a stretch of other hours: the hours block, "Ope
 // Tour test 15 (Dayton, 2026-11-18): tours have no meeting-spot step; a tour's Close by starts from its business pin, and a
 // meeting spot sent before stays stored, unused.
 test('7a. Close by and its distances start from the business pin for a tour (a stored meeting spot is not used)', async () => {
-  const { v } = await kayla({ latitude: 50.0870, longitude: -123.0400 });
-  const near = mk('cafe', { name: 'Gravel Lot Coffee', latitude: 50.0350, longitude: -123.1100 });
-  const far = mk('cafe', { name: 'Office Coffee', latitude: 50.0872, longitude: -123.0402 });
-  db.prepare("INSERT INTO venue_arrival_points (venue_id, file, preview_key, lat, lng, status) VALUES (?, 't12.jpg', ?, 50.0352, -123.1102, 'approved')").run(v.id, `t12-${v.id}`);
+  const { v } = await kayla({ latitude: 49.8590, longitude: -119.5790 });
+  const near = mk('cafe', { name: 'Gravel Lot Coffee', latitude: 49.8070, longitude: -119.6490 });
+  const far = mk('cafe', { name: 'Office Coffee', latitude: 49.8592, longitude: -119.5792 });
+  db.prepare("INSERT INTO venue_arrival_points (venue_id, file, preview_key, lat, lng, status) VALUES (?, 't12.jpg', ?, 49.8072, -119.6492, 'approved')").run(v.id, `t12-${v.id}`);
   const o = app.venueCloseByOrigin(app.getVenue(v.id));
-  assert.equal(o.latitude, 50.0870);
+  assert.equal(o.latitude, 49.8590);
   const nb = app.getNearbyVenues(app.getVenue(v.id));
   assert.equal(nb.find((x) => x.id === far.id).distance_km < 0.1, true);
   assert.ok(nb.find((x) => x.id === near.id).distance_km > 5);

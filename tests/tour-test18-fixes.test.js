@@ -5,7 +5,7 @@
 // card's booking line, the French price line, the "Hotel pickup" line on the card, an undated request during a yearly
 // closure, a young child's plain request, and the adventure kind's label. The setup checks run the real setup page script
 // (tests/setup-sim.js). Her Help questions are in tour-help-routing.test.js.
-// Runs on a throwaway database (like server.test.js); the runner puts whistler.db back afterwards.
+// Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -13,7 +13,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
 
-const DB_FILE = path.join(__dirname, '..', 'whistler.db');
+const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 for (const s of ['', '-wal', '-shm', '-journal']) { try { fs.unlinkSync(DB_FILE + s); } catch (e) {} }
 process.env.ENRICHMENT_ADMIN_TOKEN = 'tour-t18-admin-token';
 process.env.TRIP_PLANNER_V3 = 'on';
@@ -31,8 +31,8 @@ if (app.setOwnerEmailTransport) app.setOwnerEmailTransport(async () => {});
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const WK = (o, c) => Object.fromEntries(DAYS.map((d) => [d, [[o, c]]]));
 let n = 0;
-const mk = (type, o = {}) => app.createVenue({ name: `Tour T18 ${++n}`, slug: `tour-t18-${n}`, region: 'whistler', type, latitude: 50.116 + n / 3000, longitude: -122.957,
-  rating: 4.4, reviews: 90, address: `${600 + n} Main St, Whistler`, phone: '604-555-0178', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')),
+const mk = (type, o = {}) => app.createVenue({ name: `Tour T18 ${++n}`, slug: `tour-t18-${n}`, region: 'kelowna', type, latitude: 49.888 + n / 3000, longitude: -119.496,
+  rating: 4.4, reviews: 90, address: `${600 + n} Main St, Kelowna`, phone: '250-555-0178', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')),
   description: 'A fixture used only by the tour test 18 tests.', ...o });
 const tokenFor = (id) => app.createOwnerLink(id, { reset: true }).url.split('/owner/')[1];
 let ipN = 0, srv, base;
@@ -57,9 +57,9 @@ const TOURS = [{ name: 'Tours', items: [
   { name: 'Superfly 10-Line Tour', description: 'Ten lines including our longest and highest. Leaves every 30 minutes. Ages 6+, weight 25–125 kg.', price: '$179 adult, 139 child (6–12)', duration: '3 hours' },
   { name: 'Treetop Walk', description: 'Suspension bridges and platforms in the canopy, no zipping. All ages.', price: '$39 adult, 25 child (6–12), under 6 free', duration: '1.5 hours' },
   { name: 'Night Zip (winter weekends)', description: 'Friday and Saturday evenings, December to March, 5–9 PM. Ages 6+.', price: '$149 adult, 119 child (6–12)', duration: '2 hours' }] }];
-const STORY = 'Fly through the old-growth forest on our 5-line tour or the 10-line Superfly, or stroll the canopy on our Treetop Walk (all ages). Tours leave from our base office in Whistler Village, all year.';
+const STORY = 'Fly through the old-growth forest on our 5-line tour or the 10-line Superfly, or stroll the canopy on our Treetop Walk (all ages). Tours leave from our base office in downtown Kelowna, all year.';
 async function priya(o = {}, info = {}, { tours = TOURS, booking = true, closures = null } = {}) {
-  const v = mk('tour', { name: `Treetop Zip Whistler ${n + 1}`, cuisine: 'Ziplines', rating: 4.8, reviews: 211, address: '4165 Springs Lane, Whistler', latitude: 50.1146, longitude: -122.9554,
+  const v = mk('tour', { name: `Treetop Zip Kelowna ${n + 1}`, cuisine: 'Ziplines', rating: 4.8, reviews: 211, address: '4165 Springs Lane, Kelowna', latitude: 49.8866, longitude: -119.4944,
     description: STORY, hours: JSON.stringify(WK('08:30', '19:00')), kid_friendly: 1, ...o });
   const t = tokenFor(v.id);
   ok(await change(t, { tour_info: { kinds: ['zipline', 'adventure'], length: '2-3h', book: 'same_day', age: 'all', year: 'all', ...info } }));
@@ -135,7 +135,7 @@ test('3. The Closures tile is done once the month picker saved a yearly closure'
 });
 
 test('4. Trip card: same-day booking with her booking link says "Book a time online", her typed tours\' "every 30 minutes" says "Tours leave every 30 minutes" (EN + FR); "Call ahead" only when neither is known', async () => {
-  const cav = (v) => { const it = itemsOf(plan('ziplining in Whistler in August', onlyMe(v))).find((x) => x.venue.id === v.id); assert.ok(it, 'planned'); return it.caveats.find((c) => /^Same-day bookings/.test(c)); };
+  const cav = (v) => { const it = itemsOf(plan('ziplining in Kelowna in August', onlyMe(v))).find((x) => x.venue.id === v.id); assert.ok(it, 'planned'); return it.caveats.find((c) => /^Same-day bookings/.test(c)); };
   const both = await priya();
   assert.equal(cav(both.v), 'Same-day bookings are often fine (the operator’s own answer). Tours leave every 30 minutes. Book a time online.');
   assert.equal(frCopy.t3FrenchText(cav(both.v)), 'Réserver le jour même convient souvent (réponse de l’entreprise). Départs toutes les 30 minutes. Réservez une heure en ligne.');
@@ -170,11 +170,11 @@ test('5. French price line: the words we know are said in French even when anoth
 });
 
 test('6. "Hotel pickup": the trip API stop leads with it, and the v3 card shows it as its own line (outside the closed Why it fits box, not repeated in it), EN + FR', async () => {
-  const bike = mk('tour', { name: 'Squamish E-Bike T18', region: 'squamish', cuisine: 'E-bike tours', latitude: 49.70, longitude: -123.15, address: '1 Cleveland Ave, Squamish' });
+  const bike = mk('tour', { name: 'Vernon E-Bike T18', region: 'vernon', cuisine: 'E-bike tours', latitude: 50.27, longitude: -119.27, address: '1 Cleveland Ave, Vernon' });
   const t = tokenFor(bike.id);
   ok(await change(t, { tour_info: { kinds: ['bike'], length: '2-3h', book: 'day', age: '12', year: 'all', pickup: true } }));
   approveAll(bike.id);
-  const r = await postJson('/api/trip/plan', { text: 'e-bike tour in Squamish in June, we have no car, hotel pickup please' });
+  const r = await postJson('/api/trip/plan', { text: 'e-bike tour in Vernon in June, we have no car, hotel pickup please' });
   assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 300));
   const stop = itemsOf(r.body).find((x) => x.venue.id === bike.id);
   assert.ok(stop, JSON.stringify(itemsOf(r.body).map((x) => x.venue.name)));
@@ -187,7 +187,7 @@ test('6. "Hotel pickup": the trip API stop leads with it, and the v3 card shows 
   assert.equal(v3.t3PickupLine(frStop), 'Prise en charge à l’hôtel');
   assert.ok(!v3.t3WhyLines(frStop).includes('Prise en charge à l’hôtel'));
   // Without pickup asked, no line.
-  const r2 = await postJson('/api/trip/plan', { text: 'e-bike tour in Squamish in June' });
+  const r2 = await postJson('/api/trip/plan', { text: 'e-bike tour in Vernon in June' });
   const s2 = itemsOf(r2.body).find((x) => x.venue.id === bike.id);
   assert.ok(s2); assert.equal(v3.t3PickupLine(s2), '');
   db.prepare("UPDATE venues SET type = 'outdoor' WHERE id = ?").run(bike.id);

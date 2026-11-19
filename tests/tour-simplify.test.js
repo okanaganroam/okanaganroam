@@ -3,7 +3,7 @@
 // link, "Anything else about your season?" (open when one is on); the third stretch sits behind "More options"; holidays
 // and closures leave Part 1 and become an optional tile in Part 2, "Closures and holidays". Nothing is deleted (the edit
 // page keeps them all), saved closures keep working, other types are unchanged, and Help names the new link and tile.
-// Runs on a throwaway database (like server.test.js); the runner puts whistler.db back afterwards.
+// Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -12,7 +12,7 @@ const fs = require('node:fs');
 const http = require('node:http');
 const vm = require('node:vm');
 
-const DB_FILE = path.join(__dirname, '..', 'whistler.db');
+const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
 process.env.ENRICHMENT_ADMIN_TOKEN = 'tour-simplify-admin-token';
 delete process.env.BREVO_API_KEY;
@@ -29,10 +29,10 @@ const WK = (o, c) => Object.fromEntries(DAYS.map((d) => [d, [[o, c]]]));
 let n = 0, srv, base;
 test.before(async () => { srv = http.createServer(app.server.listeners('request')[0]); await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`; });
 test.after(() => srv && srv.close());
-const mk = (type, o = {}) => app.createVenue({ name: `Simplify ${++n}`, slug: `tour-simplify-${n}`, region: 'whistler', type, latitude: 50.116 + n / 3000, longitude: -122.957,
-  address: `${600 + n} Main St, Whistler`, phone: '604-555-0166', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')), description: 'A fixture used only by the tour simplify tests.', ...o });
+const mk = (type, o = {}) => app.createVenue({ name: `Simplify ${++n}`, slug: `tour-simplify-${n}`, region: 'kelowna', type, latitude: 49.888 + n / 3000, longitude: -119.496,
+  address: `${600 + n} Main St, Kelowna`, phone: '250-555-0166', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')), description: 'A fixture used only by the tour simplify tests.', ...o });
 const tokenFor = (id) => app.createOwnerLink(id, {}).url.split('/owner/')[1];
-const get = (p) => fetch(base + p, { headers: { 'User-Agent': 'whistlerroam-check/1.0' } }).then((r) => r.text());
+const get = (p) => fetch(base + p, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text());
 const cfgOf = (html) => JSON.parse(/window\.SETUP_CFG = (\{.*?\});<\/script>/s.exec(html)[1]);
 const helpBot = (html) => {
   const m = /<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>\s*<script>([\s\S]*?)<\/script>/.exec(html);

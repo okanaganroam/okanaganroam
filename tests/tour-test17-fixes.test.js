@@ -4,7 +4,7 @@
 // The pickup button named the wrong town, the month picker refused her two closed stretches, the kind labels said
 // "All year: wildlife and bear viewing", and Build My Trip missed her for "near Whistler" and for undated requests.
 // The setup checks run the real setup page script (tests/setup-sim.js). The Help questions are in tour-help-routing.test.js.
-// Runs on a throwaway database (like server.test.js); the runner puts whistler.db back afterwards.
+// Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -12,7 +12,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
 
-const DB_FILE = path.join(__dirname, '..', 'whistler.db');
+const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 for (const s of ['', '-wal', '-shm', '-journal']) { try { fs.unlinkSync(DB_FILE + s); } catch (e) {} }
 process.env.ENRICHMENT_ADMIN_TOKEN = 'tour-t17-admin-token';
 process.env.TRIP_PLANNER_V3 = 'on';
@@ -29,8 +29,8 @@ if (app.setOwnerEmailTransport) app.setOwnerEmailTransport(async (m) => { sent.p
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const WK = (o, c) => Object.fromEntries(DAYS.map((d) => [d, [[o, c]]]));
 let n = 0;
-const mk = (type, o = {}) => app.createVenue({ name: `Tour T17 ${++n}`, slug: `tour-t17-${n}`, region: 'whistler', type, latitude: 50.116 + n / 3000, longitude: -122.957,
-  rating: 4.6, reviews: 120, address: `${500 + n} Main St, Whistler`, phone: '604-555-0177', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')),
+const mk = (type, o = {}) => app.createVenue({ name: `Tour T17 ${++n}`, slug: `tour-t17-${n}`, region: 'kelowna', type, latitude: 49.888 + n / 3000, longitude: -119.496,
+  rating: 4.6, reviews: 120, address: `${500 + n} Main St, Kelowna`, phone: '250-555-0177', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')),
   description: 'A fixture used only by the tour test 17 tests.', ...o });
 const tokenFor = (id) => app.createOwnerLink(id, { reset: true }).url.split('/owner/')[1];
 let ipN = 0, srv, base;
@@ -51,12 +51,12 @@ const plan = (q, lang, now = NOW) => app.runTripPlan({ text: q, ...(lang ? { lan
 
 // Sarah's typed tours (her final-state.json).
 const TOURS = [{ name: 'Tours', items: [
-  { name: 'Elaho River full day (Class III-IV)', description: 'Ages 14 and up. Lunch and wetsuits included. Leaves Squamish 8 AM.', price: '$219 per person', duration: 'Full day' },
+  { name: 'Elaho River full day (Class III-IV)', description: 'Ages 14 and up. Lunch and wetsuits included. Leaves Vernon 8 AM.', price: '$219 per person', duration: 'Full day' },
   { name: 'Cheakamus family float', description: 'Ages 6 and up. Gentle Class I-II. Wetsuits included.', price: '$129 adults, 89 kids', duration: '2.5 hours' },
   { name: 'Winter eagle-viewing float (December to January)', description: 'By booking. Drysuits included.', price: '$109 per person', duration: '2 hours' }] }];
-const STORY = 'Family-run rafting company in Squamish since 2004. Big-water full days on the Elaho, gentle family floats on the Cheakamus, and winter eagle-viewing floats in December and January. Wetsuits and guides included.';
+const STORY = 'Family-run rafting company in Vernon since 2004. Big-water full days on the Elaho, gentle family floats on the Cheakamus, and winter eagle-viewing floats in December and January. Wetsuits and guides included.';
 async function sarah(o = {}, info = {}, { tours = true, months = '12-9', closure = true } = {}) {
-  const v = mk('tour', { name: `Sea to Sky Whitewater ${n + 1}`, region: 'squamish', cuisine: 'Whitewater rafting', rating: 4.8, reviews: 211, address: '38129 2nd Ave, Squamish', latitude: 49.7016, longitude: -123.1558,
+  const v = mk('tour', { name: `Okanagan Whitewater ${n + 1}`, region: 'vernon', cuisine: 'Whitewater rafting', rating: 4.8, reviews: 211, address: '38129 2nd Ave, Vernon', latitude: 50.2671, longitude: -119.2720,
     description: STORY, hours: JSON.stringify(WK('08:00', '18:00')), kid_friendly: 1, ...o });
   const t = tokenFor(v.id);
   ok(await change(t, { tour_info: { kinds: ['raft', 'wildlife'], length: '2-3h', book: 'ahead', age: '6', year: 'seasonal', weather_all: true, ...info } }));
@@ -68,9 +68,9 @@ async function sarah(o = {}, info = {}, { tours = true, months = '12-9', closure
   return { v, t };
 }
 
-test('1. The pickup button names the town the page will show ("hotels in Squamish" / « hôtels de Squamish »; Whistler: "hotels in Whistler Village"), and pressing it shows exactly that', async () => {
-  for (const [region, en, fr] of [['squamish', 'Squamish', 'de Squamish'], ['whistler', 'Whistler Village', 'du village de Whistler']]) {
-    const { v, t } = await sarah({ region, address: region === 'squamish' ? '38129 2nd Ave, Squamish' : '4314 Main St, Whistler' });
+test('1. The pickup button names the town the page will show ("hotels in Vernon" / « hôtels de Vernon »; Kelowna: "hotels in downtown Kelowna"), and pressing it shows exactly that', async () => {
+  for (const [region, en, fr] of [['vernon', 'Vernon', 'de Vernon'], ['kelowna', 'downtown Kelowna', 'du centre-ville de Kelowna']]) {
+    const { v, t } = await sarah({ region, address: region === 'vernon' ? '38129 2nd Ave, Vernon' : '4314 Main St, Kelowna' });
     const sim = await openSetup(base, t, { hash: 'basics' });
     const btn = /We pick you up \(from hotels in ([^)]+)\)/.exec(sim.text());
     assert.ok(btn, sim.text());
@@ -142,20 +142,20 @@ test('3. Kind labels: her chip order ("Whitewater rafting" first), "Wildlife vie
   assert.deepEqual(app.tourKindSeasons(v.id), { raft: 'summer', wildlife: 'winter' });
 });
 
-test('4. Build My Trip: "rafting near Whistler in July" offers the Squamish and Brackendale rafting companies next to Whistler\'s (EN + FR); undated rafting plans May 1; "Hotel pickup" leads Why it fits and no-car / hotel words are used; the planned trip\'s own departure and length', async () => {
-  const wh = mk('tour', { name: 'Whistler Rafting T17', cuisine: 'Whitewater rafting', rating: 4.5, reviews: 300, hours: JSON.stringify(WK('08:00', '18:00')) });
-  const cor = mk('tour', { name: 'Canadian Outback Rafting T17', region: 'brackendale', cuisine: 'Whitewater rafting & eagle-viewing floats', rating: 4.7, reviews: 500, latitude: 49.873, longitude: -123.238, address: '40900 Squamish Valley Rd, Brackendale' });
+test('4. Build My Trip: "rafting near Kelowna in July" offers the Vernon and Coldstream rafting companies next to Kelowna\'s (EN + FR); undated rafting plans May 1; "Hotel pickup" leads Why it fits and no-car / hotel words are used; the planned trip\'s own departure and length', async () => {
+  const wh = mk('tour', { name: 'Kelowna Rafting T17', cuisine: 'Whitewater rafting', rating: 4.5, reviews: 300, hours: JSON.stringify(WK('08:00', '18:00')) });
+  const cor = mk('tour', { name: 'Canadian Outback Rafting T17', region: 'coldstream', cuisine: 'Whitewater rafting & eagle-viewing floats', rating: 4.7, reviews: 500, latitude: 50.2210, longitude: -119.2480, address: '40900 Vernon Valley Rd, Coldstream' });
   const { v } = await sarah({}, { pickup: true });
-  for (const [q, lang] of [['rafting near Whistler in July'], ['rafting près de Whistler en juillet', 'fr'], ['rafting around Whistler in July'], ['rafting from Whistler in July']]) {
+  for (const [q, lang] of [['rafting near Kelowna in July'], ['rafting près de Kelowna en juillet', 'fr'], ['rafting around Kelowna in July'], ['rafting from Kelowna in July']]) {
     const p = plan(q, lang), names = namesOf(p);
     for (const x of [wh, cor, v]) assert.ok(names.includes(x.name), `${q}: ${x.name} in ${JSON.stringify(names)}`);
-    assert.ok(names.indexOf(wh.name) < names.indexOf(cor.name), `${q}: Whistler's own first, then by distance`);
-    assert.match(JSON.stringify(p.notes), /within about an hour of Whistler/, q);
+    assert.ok(names.indexOf(wh.name) < names.indexOf(cor.name), `${q}: Kelowna's own first, then by distance`);
+    assert.match(JSON.stringify(p.notes), /within about an hour of Kelowna/, q);
   }
   const fr = require('../trip-french-copy.js');
-  assert.equal(fr.t3FrenchText('This includes tours within about an hour of Whistler, in Brackendale and Squamish.'), 'Inclut des sorties à environ une heure de route de Whistler, à Brackendale et Squamish.');
+  assert.equal(fr.t3FrenchText('This includes tours within about an hour of Kelowna, in Coldstream and Vernon.'), 'Inclut des sorties à environ une heure de route de Kelowna, à Coldstream et Vernon.');
   // A dinner near Whistler stays in Whistler (only tours are widened).
-  assert.ok(!itemsOf(plan('dinner near Whistler')).some((x) => x.venue.region === 'squamish' && x.venue.type !== 'tour'));
+  assert.ok(!itemsOf(plan('dinner near Kelowna')).some((x) => x.venue.region === 'vernon' && x.venue.type !== 'tour'));
   // Undated, in November: the coming season of rafting (May 1), not her eagle floats' December 1.
   for (const q of ['family rafting with an 8 year old', 'rafting with my kids']) {
     const p = plan(q);
@@ -225,7 +225,7 @@ test('6. French Groups line: every size chip\'s line (21+ "like whole classes" t
 });
 
 test('7. Story: the year-round nudge goes once the box no longer says year-round, and after "Clear it and write my own"', async () => {
-  const RES = 'Guided whitewater rafting trips around Squamish. Open year-round.';
+  const RES = 'Guided whitewater rafting trips around Vernon. Open year-round.';
   const { t } = await sarah({ description: RES });
   const sim = await openSetup(base, t, { hash: 'story' });
   const nudge = () => sim.doc.getElementById('suStoryYearRound');
@@ -237,7 +237,7 @@ test('7. Story: the year-round nudge goes once the box no longer says year-round
   }
   const sim2 = await openSetup(base, t, { hash: 'story' });
   const n2 = sim2.doc.getElementById('suStoryYearRound');
-  await sim2.type('suStory', 'Guided whitewater rafting trips around Squamish, May to September, and eagle floats in winter.');
+  await sim2.type('suStory', 'Guided whitewater rafting trips around Vernon, May to September, and eagle floats in winter.');
   assert.equal(n2.hidden, true, 'gone once the text no longer says year-round');
   await sim2.type('suStory', 'Open all year.');
   assert.equal(n2.hidden, false);
@@ -256,23 +256,21 @@ test('8. Price lines: every amount for a kind of guest gets the currency ("$129 
   assert.match(plain(page(v)), /\$129 adults, \$89 kids/);
 });
 
-test('9. Search (/browse): « aigle », « aigles », « observation des aigles » and "eagle" find the eagle floats, above Eagle Eye Theatre; "microbrewery" finds breweries; "board" finds snowboard and paddleboard places; « ours » still never matches « jours »', async () => {
-  const theatre = mk('indoor', { name: 'Eagle Eye Theatre T17', region: 'squamish', cuisine: 'Theatre', rating: 4.9, reviews: 900, description: 'Community theatre.' });
-  const brew = mk('brewery', { name: 'Hops Corner T17', cuisine: 'Brewery', description: 'Small-batch beer.' });
+// Okanagan port: Okanagan's /browse search is a plain "contains" match (Whistler's word-by-word matcher and its « aigle » /
+// "microbrewery" / « ours » word lists aren't on Okanagan). The order rule is ported: a kind match above a name-only one.
+test('9. Search (/browse): "eagle" finds the eagle floats, above Eagle Eye Theatre; "board" finds snowboard places', async () => {
+  const theatre = mk('indoor', { name: 'Eagle Eye Theatre T17', region: 'vernon', cuisine: 'Theatre', rating: 4.9, reviews: 900, description: 'Community theatre.' });
   const snow = mk('shop', { name: 'Peak Snowboard Shop T17', cuisine: 'Snowboard rentals', description: 'Snowboards and boots.' });
   const { v } = await sarah();
-  const order = async (q, fr) => { const h = await fetch(`${base}${fr ? '/fr' : ''}/browse?q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'whistlerroam-check/1.0' } }).then((r) => r.text());
+  const order = async (q, fr) => { const h = await fetch(`${base}${fr ? '/fr' : ''}/browse?q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text());
     return [...h.matchAll(/data-venue-name="([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, '&')); };
-  for (const [q, fr] of [['aigle', true], ['aigles', true], ['observation des aigles', true], ['eagle'], ['eagle viewing']]) {
+  for (const [q, fr] of [['eagle']]) {
     const o = await order(q, fr), i = o.indexOf(v.name);
     assert.ok(i >= 0, `${q}: ${JSON.stringify(o)}`);
     const j = o.indexOf(theatre.name);
     assert.ok(j < 0 || j > i, `${q}: the theatre (${j}) is below her (${i})`);
   }
-  assert.ok((await order('microbrewery')).includes(brew.name));
   assert.ok((await order('board')).includes(snow.name));
-  assert.equal(app.browseTextMatch('open every day. tours daily. jours', 'ours'), false);
-  assert.equal(app.browseTextMatch('snowboard rentals', 'board'), true);
   assert.ok(app.browseStrong('Canadian Outback Rafting', 'Whitewater rafting & eagle-viewing floats', 'eagle') > app.browseStrong('Eagle Eye Theatre', 'Theatre', 'eagle'));
 });
 

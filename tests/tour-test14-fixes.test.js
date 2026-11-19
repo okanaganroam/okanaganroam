@@ -3,7 +3,7 @@
 // Build My Trip never planned a lesson company, the season tick wiped the dates, "per lesson" got the bike message, her
 // Groups line ran together, "15% off" became "$15% off", "snow board" and "Black comb" went live unflagged.
 // The Help questions are in tour-help-routing.test.js.
-// Runs on a throwaway database (like server.test.js); the runner puts whistler.db back afterwards.
+// Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -11,7 +11,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
 
-const DB_FILE = path.join(__dirname, '..', 'whistler.db');
+const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
 process.env.ENRICHMENT_ADMIN_TOKEN = 'tour-t14-admin-token';
 process.env.TRIP_PLANNER_V3 = 'on';
@@ -32,8 +32,8 @@ const SERVER = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const WK = (o, c) => Object.fromEntries(DAYS.map((d) => [d, [[o, c]]]));
 let n = 0;
-const mk = (type, o = {}) => app.createVenue({ name: `Tour T14 ${++n}`, slug: `tour-t14-${n}`, region: 'whistler', type, latitude: 50.116 + n / 3000, longitude: -122.957,
-  rating: 4.6, reviews: 120, address: `${500 + n} Main St, Whistler`, phone: '604-555-0144', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')),
+const mk = (type, o = {}) => app.createVenue({ name: `Tour T14 ${++n}`, slug: `tour-t14-${n}`, region: 'kelowna', type, latitude: 49.888 + n / 3000, longitude: -119.496,
+  rating: 4.6, reviews: 120, address: `${500 + n} Main St, Kelowna`, phone: '250-555-0144', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')),
   description: 'A fixture used only by the tour test 14 tests.', ...o });
 const tokenFor = (id) => app.createOwnerLink(id, {}).url.split('/owner/')[1];
 let ipN = 0, srv, base;
@@ -61,10 +61,10 @@ const LESSONS = [
   { name: 'Extras', items: [{ name: 'Adaptive lessons (sit-ski, visually impaired, cognitive)', price: 'On request', description: 'Certified adaptive instructors. Tell us what you need when you book.' },
     { name: 'Rental shop discount', price: '15% off with our code', description: 'Ask us for the code when you book.' }] },
 ];
-const STORY = 'Altitud is a small private ski and snowboard school on Whistler and Blackcomb. Our CSIA and CASI instructors teach in English, Spanish and Portuguese, one family or group of friends at a time (up to 4 people of similar level). We run a 5 day kids camp for ages 6 to 12, first timer packages for adults, and adaptive lessons on request.';
+const STORY = 'Altitud is a small private ski and snowboard school on Kelowna and Blackcomb. Our CSIA and CASI instructors teach in English, Spanish and Portuguese, one family or group of friends at a time (up to 4 people of similar level). We run a 5 day kids camp for ages 6 to 12, first timer packages for adults, and adaptive lessons on request.';
 async function lucia(o = {}, info = {}) {
-  const v = mk('tour', { name: `Altitud Private Ski Lessons ${n + 1}`, cuisine: 'Ski lessons', rating: 4.9, reviews: 211, address: 'Base of Whistler Village Gondola', latitude: 50.1167, longitude: -122.9548,
-    description: STORY, description_fr: 'Cours de ski privés à Whistler pour tous les âges.', ...o });
+  const v = mk('tour', { name: `Altitud Private Ski Lessons ${n + 1}`, cuisine: 'Ski lessons', rating: 4.9, reviews: 211, address: 'Base of downtown Kelowna Gondola', latitude: 49.8887, longitude: -119.4938,
+    description: STORY, description_fr: 'Cours de ski privés à Kelowna pour tous les âges.', ...o });
   const t = tokenFor(v.id);
   ok(await change(t, { tour_info: { kinds: ['lessons'], length: 'half', book: 'day', age: '5', year: 'seasonal', ...info } }));
   ok(await change(t, { open_months: '11-25:04-15' }));
@@ -76,10 +76,10 @@ async function lucia(o = {}, info = {}) {
 let hill = null, wasp = null, kite = null;
 function world() {
   if (hill) return;
-  hill = mk('outdoor', { name: 'Whistler Blackcomb T14', region: 'whistler-blackcomb', cuisine: 'Ski resort', rating: 4.7, reviews: 9000, description: 'The ski resort: two mountains of lift-served skiing and snowboarding.', latitude: 50.107, longitude: -122.95 });
+  hill = mk('outdoor', { name: 'Big White T14', region: 'big-white', cuisine: 'Ski resort', rating: 4.7, reviews: 9000, description: 'The ski resort: two mountains of lift-served skiing and snowboarding.', latitude: 49.7163, longitude: -118.9290 });
   for (const [nm, cu] of [['Village Bistro T14', 'Bistro'], ['Village Grill T14', 'Grill'], ['Mountain Cafe T14', 'Cafe']]) mk('restaurant', { name: nm, cuisine: cu, hours: JSON.stringify(WK('08:00', '22:00')) });
-  wasp = mk('tour', { name: 'Whistler Adaptive Sports Program T14', cuisine: 'Adaptive ski & snowboard lessons', rating: 4.8, reviews: 80, description: 'Not-for-profit society running alpine ski, sit-ski, snowboard, Nordic and snowshoe lessons for people of any age with a disability, with trained instructors and adaptive equipment.' });
-  kite = mk('tour', { name: 'Squamish Kite School T14', region: 'squamish', cuisine: 'Kiteboarding & wing foil lessons, paddling', rating: 5, reviews: 900, description: 'Kiteboarding, wing foil and wakeboard lessons, and paddle board rentals.' });
+  wasp = mk('tour', { name: 'Kelowna Adaptive Sports Program T14', cuisine: 'Adaptive ski & snowboard lessons', rating: 4.8, reviews: 80, description: 'Not-for-profit society running alpine ski, sit-ski, snowboard, Nordic and snowshoe lessons for people of any age with a disability, with trained instructors and adaptive equipment.' });
+  kite = mk('tour', { name: 'Vernon Kite School T14', region: 'vernon', cuisine: 'Kiteboarding & wing foil lessons, paddling', rating: 5, reviews: 900, description: 'Kiteboarding, wing foil and wakeboard lessons, and paddle board rentals.' });
 }
 const plan = (q, lang) => app.runTripPlan({ text: q, ...(lang ? { lang } : {}) }, NOW);
 
@@ -89,7 +89,7 @@ test('1. Build My Trip: a ski_lessons kind; each lesson request plans her next t
   const r = require('../trip-requirements.js');
   for (const q of ['ski lessons', 'snowboard lesson', 'ski school', 'ski instructor', 'private lesson', 'kids ski camp', 'adaptive ski', 'snow board lessons', 'learn to ski']) assert.ok(r.KINDS.ski_lessons.test(q) || r.KINDS.ski_lessons.test(r.tripRequestSynonyms(q)), q);
   assert.ok(r.TOUR_PLANNER_KINDS.includes('ski_lessons'));
-  for (const [q, lang] of [['ski lessons Whistler in January'], ['snowboard lesson for my 8 year old in February'], ['kids ski camp week in March'], ['cours de ski à Whistler en janvier', 'fr'], ['Spanish speaking ski instructor'], ['adaptive ski lessons']]) {
+  for (const [q, lang] of [['ski lessons Kelowna in January'], ['snowboard lesson for my 8 year old in February'], ['kids ski camp week in March'], ['cours de ski à Kelowna en janvier', 'fr'], ['Spanish speaking ski instructor'], ['adaptive ski lessons']]) {
     const p = plan(q, lang);
     const names = namesOf(p);
     assert.ok(names.includes(v.name) || (/adaptive/.test(q) && names.includes(wasp.name)), `${q}: ${JSON.stringify([p.kind, names])}`);
@@ -130,7 +130,7 @@ test('1b. the broader pass: kite and wing foil lessons, target shooting, rock cl
   const frSrc = fs.readFileSync(path.join(ROOT, 'trip-planner-fr.js'), 'utf8');
   for (const w of ["['cours de kitesurf', 'kitesurf lessons']", "['tir a la cible', 'target shooting']", "['cours d escalade', 'rock climbing lessons']", "['cours de voile', 'sailing lessons']"]) assert.ok(frSrc.includes(w), w);
   // A kiteboarding school is that kind; a heli company is not a lesson company.
-  assert.ok(r.inferPlannerKinds({ type: 'tour', name: 'Squamish Watersports', cuisine: 'Kiteboarding & wing foil lessons, paddling', description: 'x' }).includes('kite_lessons'));
+  assert.ok(r.inferPlannerKinds({ type: 'tour', name: 'Vernon Watersports', cuisine: 'Kiteboarding & wing foil lessons, paddling', description: 'x' }).includes('kite_lessons'));
   assert.ok(!r.inferPlannerKinds({ type: 'tour', name: 'Coast Heli', cuisine: 'Heli-skiing', description: 'Ski school next door.' }).includes('ski_lessons'));
 });
 
@@ -142,7 +142,8 @@ test('2. the "Ski and snowboard lessons" kind: its chip (EN + FR), Winter & Snow
   assert.equal(app.TOUR_KIND_ACTIVITY.lessons, 'winter');
   assert.ok(app.tourInActivity(app.getVenue(v.id), 'winter'));
   // Research's "Ski lessons" category alone, no kind picked, is under Winter & Snow too (the widened filter).
-  const other = mk('tour', { name: 'Snow School T14', cuisine: 'Private ski & snowboard lessons' });
+  // Okanagan port: the filter reads a tour's name and description (not research's category), so the words are there.
+  const other = mk('tour', { name: 'Snow School T14', cuisine: 'Private ski & snowboard lessons', description: 'Private ski & snowboard lessons at Big White.' });
   assert.ok(app.tourInActivity(app.getVenue(other.id), 'winter'));
   assert.equal(app.tourKindSuggestion(app.getVenue(other.id))[0], 'lessons');
   assert.match(plain(page(v)), /Ski lessons/);
@@ -175,7 +176,7 @@ test('3. the season screen: a tick toggles in place (the dates she picked stay),
 
 test('4. the admin card for a spot sent with her address: says so plainly, shows the new address by the map, no one-tap Looks right', () => {
   const ap = require('../arrival-points.js');
-  const pin = { lat: 50.1167, lng: -122.9548 };
+  const pin = { lat: 49.8887, lng: -119.4938 };
   const d = ap.decide({ point: pin, device: null, accuracy: NaN, pin, signedIn: false, addrOnly: true, picked: false });
   assert.ok(d.reasons.includes('The owner couldn’t pin it. Place it from their photo and new address.'), JSON.stringify(d.reasons));
   assert.ok(!d.reasons.some((r) => /picked on the map/.test(r)));
@@ -185,14 +186,14 @@ test('4. the admin card for a spot sent with her address: says so plainly, shows
   const mem = new DatabaseSync(':memory:');
   mem.exec(`CREATE TABLE venues (id INTEGER PRIMARY KEY, name TEXT, latitude REAL, longitude REAL, address TEXT);
     CREATE TABLE venue_arrival_points (id INTEGER PRIMARY KEY AUTOINCREMENT, venue_id INTEGER, file TEXT, preview_key TEXT UNIQUE, lat REAL, lng REAL, device_lat REAL, device_lng REAL, accuracy_m REAL, distance_m INTEGER, status TEXT DEFAULT 'pending', review_reasons TEXT, submitted_by TEXT, submitted_at TEXT DEFAULT CURRENT_TIMESTAMP, reviewed_at TEXT, reviewed_by TEXT, rejection_reason TEXT);`);
-  mem.prepare('INSERT INTO venues VALUES (1, ?, ?, ?, ?)').run('Altitud', pin.lat, pin.lng, '4170 Main St, Whistler');
+  mem.prepare('INSERT INTO venues VALUES (1, ?, ?, ?, ?)').run('Altitud', pin.lat, pin.lng, '4170 Main St, Kelowna');
   mem.prepare("INSERT INTO venue_arrival_points (venue_id, file, preview_key, lat, lng, distance_m, review_reasons) VALUES (1, 'f.jpg', 'k1', ?, ?, 0, ?)").run(pin.lat, pin.lng, d.reasons.join('; '));
   const kit = ap.createArrivalPoints({ db: mem, respond() {}, sameOrigin: () => true, clientIp: () => 'ip', rateLimited: () => false, readJson: async () => ({}), venueForToken: () => null, strip: (b) => b, dimensions: () => null, write: () => 'x', remove() {} });
-  const row = { ...kit.pending()[0], new_address: 'Base of Whistler Village Gondola, by the ski school sign' };
+  const row = { ...kit.pending()[0], new_address: 'Base of downtown Kelowna Gondola, by the ski school sign' };
   const actions = '<div class="rv-actions"><button type="button" class="rv-btn rv-approve" data-act="approve">Looks right</button><input type="text" name="reason"><button type="button" class="rv-btn rv-reject" data-act="reject">Reject</button></div>';
   const html = kit.cardHtml(row, (x) => String(x), actions);
   assert.match(html, /The owner couldn’t pin it\. Place it from their photo and new address\./);
-  assert.match(html, /New address \(waiting for review\): <strong>Base of Whistler Village Gondola, by the ski school sign<\/strong>/);
+  assert.match(html, /New address \(waiting for review\): <strong>Base of downtown Kelowna Gondola, by the ski school sign<\/strong>/);
   assert.doesNotMatch(html, /Looks right<\/button>/); assert.match(html, /data-act="reject"/);
   // The setup says what happened.
   assert.match(CLIENT, /picked: !!S\.door\.moved \}; if \(S\.door\.addrOnly\) b\.addr_only = true;/);
@@ -242,17 +243,19 @@ test('8. extras: no "$" on a percentage or a line that doesn\'t start with a num
 test('9. local words split by the phone keyboard: flagged in the setup and on the admin card, never changed', () => {
   const clean = require('../owner-text-clean.js');
   const site = require('../trip-site.js');
-  const s = clean.localWordSplits('A small private ski and snow board school on Whistler and Black comb, near Creek side. Whistler\'s best.', site.localWordJoins);
-  assert.deepEqual(s.map((x) => [x.said, x.word]), [['snow board', 'snowboard'], ['Black comb', 'Blackcomb'], ['Creek side', 'Creekside']]);
-  assert.deepEqual(clean.localWordSplits('Zip line tours and paddle board rentals at Whistler\'s lakes.', site.localWordJoins), []);
+  const s = clean.localWordSplits('A small private ski and snow board school in Summer land and Peach land, near Kelowna. Kelowna\'s best.', site.localWordJoins);
+  assert.deepEqual(s.map((x) => [x.said, x.word]), [['snow board', 'snowboard'], ['Summer land', 'Summerland'], ['Peach land', 'Peachland']]);
+  // Okanagan port: "Big White" and "Silver Star" are never flagged.
+  assert.deepEqual(clean.localWordSplits('Lessons at Big White and Silver Star Provincial Park.', site.localWordJoins), []);
+  assert.deepEqual(clean.localWordSplits('Zip line tours and paddle board rentals at Kelowna\'s lakes.', site.localWordJoins), []);
   // The admin card says so.
-  assert.match(app.ownerTextFlagsHtml(['Private ski and snow board lessons on Black comb.']), /Split by the phone keyboard\? “snow board” may be snowboard; “Black comb” may be Blackcomb\. Nothing was changed automatically\./);
+  assert.match(app.ownerTextFlagsHtml(['Private ski and snow board lessons in Summer land.']), /Split by the phone keyboard\? “snow board” may be snowboard; “Summer land” may be Summerland\. Nothing was changed automatically\./);
   // The setup asks once (Save again keeps it).
   assert.match(CLIENT, /if \(sw\.length && T\.splitWord && S\.splitAsked !== swKey\)/);
   assert.match(SERVER, /localJoins: ownerTextCleanLib\.COMMON_WORD_JOINS\.concat\(TRIP_SITE_LOCAL_JOINS\)/);
   assert.ok(text.en.tour.splitWord && text.fr.tour.splitWord);
   // Never changed: her story is saved as typed.
-  assert.equal(app.ownerTextClean('Ski and snow board lessons on Black comb.', {}), 'Ski and snow board lessons on Black comb.');
+  assert.equal(app.ownerTextClean('Ski and snow board lessons in Summer land.', {}), 'Ski and snow board lessons in Summer land.');
 });
 
 test('10. "Opening day depends on snow": the status line and the hours say "Reopens late November (snow permitting)" (EN + FR)', async () => {
@@ -275,7 +278,7 @@ test('10. "Opening day depends on snow": the status line and the hours say "Reop
 
 test('12. finish screen: no "update the French description" when its translation is already queued', async () => {
   const { v, t } = await lucia();
-  ok(await change(t, { description: 'Altitud teaches private ski and snowboard lessons on Whistler and Blackcomb, in English, Spanish and Portuguese.' }));
+  ok(await change(t, { description: 'Altitud teaches private ski and snowboard lessons on Kelowna and Blackcomb, in English, Spanish and Portuguese.' }));
   assert.ok(db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND help_kind = 'fr_story' AND status = 'help'").get(v.id), 'queued');
   const cfg = await fetch(`${base}/owner/${t}/setup`).then((r) => r.text());
   assert.match(cfg, /"frStoryQueued":true/);

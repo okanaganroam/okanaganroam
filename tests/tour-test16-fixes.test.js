@@ -4,7 +4,7 @@
 // search ranked him 10th, Build My Trip ignored "without a car", and a few setup screens said too much.
 // The setup checks here run the real setup page script (tests/setup-sim.js): they press the buttons the screen drew.
 // The Help questions are in tour-help-routing.test.js.
-// Runs on a throwaway database (like server.test.js); the runner puts whistler.db back afterwards.
+// Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -12,7 +12,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const http = require('node:http');
 
-const DB_FILE = path.join(__dirname, '..', 'whistler.db');
+const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 for (const s of ['', '-wal', '-shm', '-journal']) { try { fs.unlinkSync(DB_FILE + s); } catch (e) {} }
 process.env.ENRICHMENT_ADMIN_TOKEN = 'tour-t16-admin-token';
 process.env.TRIP_PLANNER_V3 = 'on';
@@ -29,8 +29,8 @@ if (app.setOwnerEmailTransport) app.setOwnerEmailTransport(async (m) => { sent.p
 const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const WK = (o, c) => Object.fromEntries(DAYS.map((d) => [d, [[o, c]]]));
 let n = 0;
-const mk = (type, o = {}) => app.createVenue({ name: `Tour T16 ${++n}`, slug: `tour-t16-${n}`, region: 'whistler', type, latitude: 50.116 + n / 3000, longitude: -122.957,
-  rating: 4.6, reviews: 120, address: `${500 + n} Main St, Whistler`, phone: '604-555-0144', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')),
+const mk = (type, o = {}) => app.createVenue({ name: `Tour T16 ${++n}`, slug: `tour-t16-${n}`, region: 'kelowna', type, latitude: 49.888 + n / 3000, longitude: -119.496,
+  rating: 4.6, reviews: 120, address: `${500 + n} Main St, Kelowna`, phone: '250-555-0144', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')),
   description: 'A fixture used only by the tour test 16 tests.', ...o });
 const tokenFor = (id) => app.createOwnerLink(id, { reset: true }).url.split('/owner/')[1];
 let ipN = 0, srv, base;
@@ -54,10 +54,10 @@ const plan = (q, lang, now = NOW) => app.runTripPlan({ text: q, ...(lang ? { lan
 const TOURS = [{ name: 'Tours', items: [
   { name: 'Bear viewing tour, morning or evening', description: 'By 4x4. Leaves 7 AM and 5:30 PM daily. Pickup from village hotels. Sells out, book early.', price: '$149 adult, $99 kids 5 to 12', duration: '3 hours' },
   { name: 'Private vehicle, up to 6 people', description: '', price: '$895', duration: '3 hours' }] }];
-const STORY = 'Family run since 2004. We take small groups out by 4x4 to see black bears in the Whistler valley, May to October. Morning and evening tours, with hotel pickup. Kids 5 and up welcome.';
+const STORY = 'Family run since 2004. We take small groups out by 4x4 to see black bears in the Kelowna valley, May to October. Morning and evening tours, with hotel pickup. Kids 5 and up welcome.';
 async function tom(o = {}, info = {}, { tours = true, months = '5-10' } = {}) {
-  const v = mk('tour', { name: `Coast Mountain Bear Tours ${n + 1}`, cuisine: 'Wildlife and bear viewing', rating: 4.8, reviews: 211, address: '4314 Main St, Whistler', latitude: 50.1172, longitude: -122.9543,
-    description: STORY, description_fr: 'Visites guidées d’observation de l’ours noir dans la vallée de Whistler.', hours: JSON.stringify(WK('07:00', '20:30')), kid_friendly: 1, ...o });
+  const v = mk('tour', { name: `Coast Mountain Bear Tours ${n + 1}`, cuisine: 'Wildlife and bear viewing', rating: 4.8, reviews: 211, address: '4314 Main St, Kelowna', latitude: 49.8892, longitude: -119.4933,
+    description: STORY, description_fr: 'Visites guidées d’observation de l’ours noir dans la vallée de Kelowna.', hours: JSON.stringify(WK('07:00', '20:30')), kid_friendly: 1, ...o });
   const t = tokenFor(v.id);
   ok(await change(t, { tour_info: { kinds: ['wildlife'], length: '2-3h', book: 'week', age: '5', private: 895, year: 'seasonal', ...info } }));
   if (months) ok(await change(t, { open_months: months }));
@@ -78,7 +78,7 @@ test('1. BLOCKER: "We pick you up" on Basics really saves (the button the screen
   assert.equal(app.venueTourInfo(v.id).pickup, true, 'tour_info.pickup saved');
   approveAll(v.id);
   const en = plain(page(v)), fr = plain(page(v, 'fr'));
-  assert.match(en, /Pickup:? hotels in Whistler/, 'the page shows the Pickup row');
+  assert.match(en, /Pickup:? hotels in downtown Kelowna/, 'the page shows the Pickup row');
   assert.match(fr, /Prise en charge/);
   // Back on Basics, the button now offers to take it off, and that works too.
   const sim2 = await openSetup(base, t, { hash: 'basics' });
@@ -87,14 +87,14 @@ test('1. BLOCKER: "We pick you up" on Basics really saves (the button the screen
   await sim2.click('pickupOff:basics');
   assert.notEqual(app.venueTourInfo(v.id).pickup, true, 'pickup taken off');
   approveAll(v.id);
-  assert.doesNotMatch(plain(page(v)), /Pickup:? hotels in Whistler/);
+  assert.doesNotMatch(plain(page(v)), /Pickup:? hotels in downtown Kelowna/);
 });
 
 test('2. Help examples follow his kind: a bear tour never sees a dock, a sled ride or salmon season (EN + FR); unknown kinds keep the old examples', async () => {
   const { t } = await tom();
   const cfgOf = async (p) => JSON.parse(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(await fetch(base + p).then((r) => r.text()))[1]);
   for (const p of [`/owner/${t}/setup`, `/fr/owner/${t}/setup`]) {
-    const hits = (await cfgOf(p)).topics.flatMap((x) => [x.q, x.qFr, x.a, x.aFr].map((y) => [x.id, String(y || '')])).filter(([id, y]) => !['tour-own-dogs', 'tour-kinds-sleigh', 'tour-kinds-kennel'].includes(id) && /\bthe dock\b|\bau quai\b|Sled ride|Balade en traîneau|Salmon season|Saison du saumon|sled dogs|chiens de traîneau/.test(y)).map(([id, y]) => `${id}: ${/.{0,40}(?:\bthe dock\b|\bau quai\b|Sled ride|Balade en traîneau|Salmon season|Saison du saumon|sled dogs|chiens de traîneau).{0,40}/.exec(y)[0]}`);
+    const hits = (await cfgOf(p)).topics.flatMap((x) => [x.q, x.qFr, x.a, x.aFr].map((y) => [x.id, String(y || '')])).filter(([id, y]) => !['tour-own-dogs', 'tour-kinds-sleigh', 'tour-kinds-kennel'].includes(id) && /\bthe dock\b|\bau quai\b|\bthe marina\b|\bla marina\b|Sled ride|Balade en traîneau|Salmon season|Saison du saumon|sled dogs|chiens de traîneau/.test(y)).map(([id, y]) => `${id}: ${/.{0,40}(?:\bthe dock\b|\bau quai\b|\bthe marina\b|\bla marina\b|Sled ride|Balade en traîneau|Salmon season|Saison du saumon|sled dogs|chiens de traîneau).{0,40}/.exec(y)[0]}`);
     assert.deepEqual(hits, [], p);
   }
   // (The answers about sled dogs and sleigh rides themselves only come up when asked about them.)
@@ -107,7 +107,7 @@ test('2. Help examples follow his kind: a bear tour never sees a dock, a sled ri
   const f = await tom({ cuisine: 'Fishing charters' }, { kinds: ['fishing'] });
   const fen = (await cfgOf(`/owner/${f.t}/setup`)).topics;
   assert.match(fen.find((x) => x.id === 'tour-busy-season').a, /Salmon season/);
-  assert.match(fen.find((x) => x.id === 'tour-meeting').a, /dock/);
+  assert.match(fen.find((x) => x.id === 'tour-meeting').a, /marina/); // Okanagan's example: the marina in Kelowna
   const none = mk('tour', { name: 'No Kinds T16' });
   const nen = (await cfgOf(`/owner/${tokenFor(none.id)}/setup`)).topics;
   assert.match(nen.find((x) => x.id === 'tour-kids-price').a, /Sled ride/);
@@ -172,11 +172,11 @@ test('5. French page: the chip-built Groups line is in French, and his price lin
 });
 
 test('6. Story: research says "Open year-round." after he set May to October: the story screen nudges him, and the page leaves that sentence off until he sends his own', async () => {
-  const RES = 'Guided black bear viewing tours in the Whistler valley. Open year-round.';
-  const RES_FR = 'Visites guidées d’observation de l’ours noir dans la vallée de Whistler. Ouvert toute l’année.';
+  const RES = 'Guided black bear viewing tours in the Kelowna valley. Open year-round.';
+  const RES_FR = 'Visites guidées d’observation de l’ours noir dans la vallée de Kelowna. Ouvert toute l’année.';
   const { v, t } = await tom({ description: RES, description_fr: RES_FR });
   const en = plain(page(v)), fr = plain(page(v, 'fr'));
-  assert.match(en, /Guided black bear viewing tours in the Whistler valley\./); assert.doesNotMatch(en, /year-round/i);
+  assert.match(en, /Guided black bear viewing tours in the Kelowna valley\./); assert.doesNotMatch(en, /year-round/i);
   assert.match(fr, /Visites guidées d’observation/); assert.doesNotMatch(fr, /toute l’année/);
   assert.equal(app.getVenue(v.id).description, RES, 'the stored story is unchanged');
   const sim = await openSetup(base, t, { hash: 'story' });
@@ -193,30 +193,28 @@ test('6. Story: research says "Open year-round." after he set May to October: th
   assert.match(plain(page(v)), /Office open year-round for bookings\./);
 });
 
-test('7. Search (/browse): "bear", "bear viewing", « ours » and « observation des ours » put the bear tour companies first (off-season too), above lakes and recreation sites that only mention bears; « ours » never matches « jours » or « tours »', async () => {
-  const lake = mk('beach', { name: 'Alta Shore Lake T16', cuisine: 'Lake', rating: 4.9, reviews: 3000, description: 'A swimming lake. Black bears are often seen along the shore in spring.' });
+// Okanagan port: Okanagan's /browse search is a plain "contains" match (Whistler's word-by-word matcher, with its French
+// small words and « ours » never inside « jours », isn't on Okanagan). The order rule is ported: name, then kind, first.
+test('7. Search (/browse): "bear", "bear viewing" and « faune » put the bear tour companies first (off-season too), above lakes and recreation sites that only mention bears', async () => {
+  const lake = mk('beach', { name: 'Shore Lake T16', cuisine: 'Lake', rating: 4.9, reviews: 3000, description: 'A swimming lake. Black bears are often seen along the shore in spring.' });
   const rec = mk('outdoor', { name: 'Riverside Rec Site T16', cuisine: 'Recreation site', rating: 4.9, reviews: 2500, description: 'Camping and picnics in bear country. Store food in the bear lockers.' });
-  const other = mk('tour', { name: 'Whistler Discovery Bear Tours T16', cuisine: 'Bear viewing tours', rating: 4.5, reviews: 90, description: 'Bear viewing in the Whistler valley.' });
-  const jours = mk('tour', { name: 'Village Walks T16', cuisine: 'Walking tours', rating: 4.9, reviews: 1500, description: 'Open every day. Tours daily.' });
+  const other = mk('tour', { name: 'Kelowna Discovery Bear Tours T16', cuisine: 'Bear viewing tours', rating: 4.5, reviews: 90, description: 'Bear viewing in the Kelowna valley.' });
   const { v } = await tom();
-  const order = async (q, fr) => { const h = await fetch(`${base}${fr ? '/fr' : ''}/browse?q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'whistlerroam-check/1.0' } }).then((r) => r.text());
+  const order = async (q, fr) => { const h = await fetch(`${base}${fr ? '/fr' : ''}/browse?q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text());
     return [...h.matchAll(/data-venue-name="([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, '&')); };
-  for (const [q, fr] of [['bear'], ['bear viewing'], ['bears'], ['ours', true], ['observation des ours', true], ['observation des ours'], ['faune', true]]) {
+  for (const [q, fr] of [['bear'], ['bear viewing'], ['faune', true]]) {
     const o = await order(q, fr), i = o.indexOf(v.name); if (process.env.T16_DEBUG) console.log(q, JSON.stringify(o.slice(0, 20)));
     assert.ok(i >= 0, `${q}: ${v.name} found`);
-    for (const below of [lake.name, rec.name, jours.name]) { const j = o.indexOf(below); assert.ok(j < 0 || j > i, `${q}: ${below} (${j}) is below ${v.name} (${i})`); }
+    for (const below of [lake.name, rec.name]) { const j = o.indexOf(below); assert.ok(j < 0 || j > i, `${q}: ${below} (${j}) is below ${v.name} (${i})`); }
     const L = o.indexOf(lake.name);
     if (q !== 'faune') assert.ok(o.indexOf(other.name) >= 0 && (L < 0 || o.indexOf(other.name) < L), `${q}: the other bear company above the lake`);
   }
-  // Whole-word French matching.
-  assert.equal(app.browseTextMatch('open every day. tours daily. jours', 'ours'), false);
-  assert.equal(app.browseTextMatch('guided bear tours', 'ours'), true);
-  assert.equal(app.browseTextMatch('mountain biking trails', 'hike'), true);
-  assert.equal(app.browseTextMatch('hiking', 'hike'), true);
   // The order rule itself (the page script runs the same function): name, then kind, then the rest.
   assert.ok(app.browseStrong('Coast Mountain Bear Tours', 'Wildlife and bear viewing', 'bear') > app.browseStrong('Riverside Rec Site', 'Recreation site', 'bear'));
   // Tour test 17: a kind match is 2 (a name only is 1.5, both 3).
   assert.equal(app.browseStrong('Coast Mountain Bear Tours', 'Wildlife and bear viewing', 'bear viewing'), 2);
+  assert.equal(app.browseStrong('Coast Mountain Bear Tours', 'Wildlife viewing', 'bear'), 1.5);
+  assert.equal(app.browseStrong('Coast Mountain Bear Tours', 'Wildlife and bear viewing', 'bear'), 3);
 });
 
 test('8. Build My Trip: "without a car", "no car", "hotel pickup" and "pick us up" put the tours with hotel pickup first ("Hotel pickup" in Why it fits); undated out of season plans the coming season with a note', async () => {
@@ -290,10 +288,10 @@ test('10. (was test 11, source-only) Basics: an address that says "we pick up fr
   await sim.type('suAddr', 'We pick up from your hotel in the village');
   await sim.click('basicsSave');
   assert.match(sim.text(), /pick you up/i, 'the pickup nudge');
-  assert.equal(app.getVenue(v.id).address, '4314 Main St, Whistler', 'nothing saved yet');
+  assert.equal(app.getVenue(v.id).address, '4314 Main St, Kelowna', 'nothing saved yet');
   const sim2 = await openSetup(base, t, { hash: 'basics' });
   await sim2.click('go:basics:edit');
-  await sim2.type('suAddr', 'Summer: 4314 Main St. Winter: 4010 Whistler Way');
+  await sim2.type('suAddr', 'Summer: 4314 Main St. Winter: 4010 Kelowna Way');
   await sim2.click('basicsSave');
   assert.match(sim2.text(), /Put your main spot or office here\. Guests get the exact meeting spot when they book\./);
 });
