@@ -562,6 +562,9 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
         for(const v of taxonomy.venues||[])if(v.type==='sport')matchText=matchText.split(venueName(v.name)).join(' '.repeat(venueName(v.name).length));
         matchText=matchText.replace(/\bskate ?parks?\b/g,x=>' '.repeat(x.length));
       }
+      // Indoor test 5 (2026-11-19; "trampoline park Vernon on Christmas Day" planned a bike park): a trampoline, bike, water
+      // or skate park is one phrase, never a park.
+      if(kind==='park')matchText=matchText.replace(/\b(?:trampoline|bike|water|skate) ?parks?\b/g,x=>' '.repeat(x.length));
       let m=re.exec(matchText);
       // Tour test 4: the "walk" in "ghost walk" / "lights walk" / "history walk" is the walking tour, not a trail.
       if(m&&['walk','easy_walk'].includes(kind)){const wt=KINDS.walking_tour.exec(matchText)||REQUEST_KINDS.walking_tour.exec(matchText);if(wt&&m.index>=wt.index&&m.index+m[0].length<=wt.index+wt[0].length)m=null;}

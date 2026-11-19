@@ -1382,6 +1382,8 @@ function eligible(v, ctx, strict) {
   if ((ctx.kids || ctx.occasion === 'family' || /\b(?:teens?|teenagers?|tweens?|adolescents)\b/.test(ctx.queryText || '')) && !/\b(?:spa|spas|sauna|massage)\b/.test(ctx.queryText || '') && (spaPlace(v) || /\b(?:pilates|yoga|breathwork|wellness studio|massage)\b/.test(normWords(v.cuisine || '')))) return false;
   if (ctx.kids) {
     if (!kidsAllowed(v, ctx)) return false;
+    // Indoor test 5: a casino (its kind or its own words) or a place whose own words say 19+ is never a kids' stop.
+    if (v.type === 'indoor' && !namedInRequest(v, ctx) && ((Array.isArray(v.indoorKinds) && v.indoorKinds.includes('casino')) || /\bcasinos?\b/.test(`${v.textName || normWords(v.name || '')} ${normWords(v.cuisine || '')}`) || (!v.indoorMinAge && indoorMinAgeOf(v) >= 18))) return false;
   }
   // Tour test 7 (Whistler, 2026-11-17): a child's age named without "kids" ("with our 15-year-old") still leaves out a tour
   // whose own minimum age is above it (a 16+ mountaineering guide was planned with "Ages 16 and up"); tooYoungNotes says why.
@@ -8060,6 +8062,19 @@ function planTripCore(input) {
   }
   result.recommendations = rec.items;
   result.totalMatches = rec.total;
+  // Indoor test 5 (2026-11-19; "bouldering in Vernon on Christmas Day" listed Kelowna's gyms and never said why Chris's
+  // park wasn't there): a place of the kind asked for, in the town asked for, closed that day by its owner's own closure
+  // says so ("The Rock Garden is closed Dec 25 (Christmas Day).").
+  if (rec.items.length && /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) && (ctx.plannerKinds || []).length && ctx.regions.length) {
+    const d = String(ctx.tripDate);
+    const shut = (f) => f && Array.isArray(f.ownerClosures) && f.ownerClosures.find((c) => c && (c.yearly ? (String(c.from).slice(5) <= String(c.to || c.from).slice(5) ? d.slice(5) >= String(c.from).slice(5) && d.slice(5) <= String(c.to || c.from).slice(5) : d.slice(5) >= String(c.from).slice(5) || d.slice(5) <= String(c.to || c.from).slice(5)) : d >= String(c.from) && d <= String(c.to || c.from)));
+    const shown = new Set(rec.items.map((i) => i.venue && i.venue.id));
+    const closedHere = buildRecommendations(facts, { ...ctx, ignoreSeason: true }, 3).items.map((x) => x.venue && facts.find((f) => f.id === x.venue.id)).filter((f) => f && !shown.has(f.id) && shut(f));
+    for (const f of closedHere.slice(0, 2)) {
+      const c = shut(f), note = String(c.note || '').trim();
+      result.warnings.unshift(`${f.name} is closed ${CLOSURE_MONTHS_EN[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}${note ? ` (${note})` : ''}.`);
+    }
+  }
   // Audit fix (2026-10-27): the list's own day, when the request named one, so the trip API can add that day's weekly
   // nights and happy hour to each place ("Tonight: Trivia 7:30–9 PM").
   { const listDate = ctxPlanDate(ctx); if (listDate) result.listDate = listDate; }
