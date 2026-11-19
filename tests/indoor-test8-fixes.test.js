@@ -255,3 +255,28 @@ test('7. Add an event from his private link: no email needed (optional, pre-fill
   // The public form still needs one.
   assert.ok(v);
 });
+
+test('8. Bowling Good to know chips (leagues, licensed lounge, bumpers), its own story and Known for examples; every kind has its own examples', async () => {
+  const { t } = await gary();
+  await ok(change(t, { indoor_info: { kinds: ['bowling'], length: '1-2h', book: 'busy', age: 'all' } }));
+  const g = await openSetup(base, t, { hash: 'bring' });
+  for (const c of ['Leagues on weeknights: call ahead', 'Licensed lounge', 'Bumpers for kids']) assert.ok(g.has(`[data-quick="${c}"]`), c);
+  assert.ok(!g.has('[data-quick="Grip socks required"]'));
+  const fr = await openSetup(base, t, { hash: 'bring', lang: 'fr' });
+  assert.ok(fr.has('[data-quick="Salon avec permis d’alcool"]'));
+  const st = await openSetup(base, t, { hash: 'story' });
+  assert.match(st.text(), /cosmic bowling on weekends/);
+  assert.match(st.text(), /Cosmic bowling Fri &(?:amp;)? Sat 9 PM–midnight/);
+  assert.doesNotMatch(st.text(), /family-run place since 2010/);
+  // Every kind (but "something else") has a story and Known for example of its own, in both languages.
+  for (const lang of ['en', 'fr']) {
+    const I = T[lang].indoor, seenS = new Map(), seenK = new Map();
+    for (const k of IK.INDOOR_KIND_TEXT_KINDS.filter((x) => x !== 'other')) {
+      const ex = IK.indoorKindText([k], lang).ex;
+      assert.ok(I.storyExKinds[ex] && I.knownExKinds[ex], `${lang} ${k}`);
+      assert.ok(!seenS.has(I.storyExKinds[ex]), `${lang} ${k} shares a story example with ${seenS.get(I.storyExKinds[ex])}`);
+      assert.ok(!seenK.has(I.knownExKinds[ex]), `${lang} ${k} shares a Known for example with ${seenK.get(I.knownExKinds[ex])}`);
+      seenS.set(I.storyExKinds[ex], k); seenK.set(I.knownExKinds[ex], k);
+    }
+  }
+});

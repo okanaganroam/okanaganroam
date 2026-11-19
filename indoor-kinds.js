@@ -67,7 +67,7 @@ K.theatre = { gtk: 'shows', ex: 'theatre', boxOffice: true,
     groups: { chips: ['Tarifs de groupe pour 10 personnes ou plus', 'Location de la salle pour événements privés', 'Matinées scolaires sur demande'], lead: 'Touchez une taille, puis ajoutez les tarifs de groupe, la location de la salle ou les spectacles scolaires dans vos mots.', ex: 'Tarifs de groupe pour 10 personnes ou plus. La salle se loue pour des événements privés' },
     search: ['théâtre', 'pièce de théâtre', 'pièces', 'spectacle', 'spectacles', 'concert', 'concerts', 'humour', 'comédie musicale'] } };
 
-K.cinema = { gtk: 'shows', ex: 'general',
+K.cinema = { gtk: 'shows', ex: 'cinema',
   en: { price: { page: 'Tickets from {x}.', basis: 'Tickets', label: 'Regular adult ticket, in dollars', ph: 'Your regular adult ticket', lead: 'Your regular adult ticket. It shows on your card.' },
     prices: { noun: 'tickets page', page: PRICES_PAGE[0], lead: 'Your ticket prices for adults, kids and seniors, and cheap nights. A link to your tickets page is perfect. It’s optional.' },
     help: { walkin: 'Tickets at the door or online', ages: 'All ages; check each film’s rating', gift: 'Gift cards at the box office', prices: 'Kids and seniors $10, Tuesdays $8' },
@@ -91,7 +91,7 @@ K.spa = { day: true, gtk: 'spa', ex: 'spa',
     groups: { chips: ['Forfaits pour couples', 'Fêtes de mariage et fêtes privées', 'Réservation privée du spa sur demande'], lead: 'Touchez une taille, puis ajoutez les forfaits pour couples, les fêtes de mariage ou les réservations privées dans vos mots.', ex: 'Forfaits pour couples. Fêtes de mariage jusqu’à 8 personnes' },
     search: ['spa', 'spas', 'spa de jour', 'massage', 'massages', 'massage en couple', 'soin du visage', 'soins du visage', 'hydrothérapie', 'sauna', 'spa nordique', 'bien-être'] } };
 
-K.pool = { day: true, gtk: 'pool', ex: 'general',
+K.pool = { day: true, gtk: 'pool', ex: 'pool',
   en: { price: { page: 'Drop-in from {x}.', basis: 'Drop-in', label: 'Adult drop-in, in dollars', ph: 'Your adult drop-in price', lead: 'Your adult drop-in price. It shows on your card.' },
     prices: { noun: 'rates page', page: PRICES_PAGE[0], lead: 'Drop-in, passes and lessons for adults, kids and families, with their prices. A photo of your rates or a link to your rates page is perfect. It’s optional.' },
     help: { walkin: 'Drop in during public swims; lessons need booking', ages: 'All ages; under 8 with an adult in the water', gift: 'Gift cards and passes at the front desk', prices: 'Kids $4, 10-visit pass $60' },
@@ -115,7 +115,7 @@ K.climbing = { day: true, gtk: 'active', ex: 'climbing',
     groups: { chips: ['Fêtes d’anniversaire', 'Groupes scolaires et camps', 'Consolidation d’équipe et réservations privées'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes scolaires ou la consolidation d’équipe dans vos mots.', ex: 'Fêtes d’anniversaire jusqu’à 12 grimpeurs. Groupes scolaires et camps bienvenus' },
     search: ['escalade', 'centre d’escalade', 'escalade de bloc', 'trampoline', 'parc de trampolines', 'parkour'] } };
 
-K.games = { gtk: 'general', ex: 'general',
+K.games = { gtk: 'general', ex: 'games',
   en: { price: { page: 'From {x}.', basis: 'Games and passes', label: 'Your lowest price for one person (a game or a pass), in dollars', ph: 'Like one VR game or a laser tag round', lead: 'Your lowest price for one person: a game or a pass. It shows on your card.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Each game, pass and party package and what it costs. A photo of your price list or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Arcade: walk-ins welcome. VR and laser tag best booked', ages: 'All ages; 19+ after 8 PM', gift: 'Gift cards and game cards at the counter', prices: 'Laser tag $15 a round, VR $25 for 30 min' },
@@ -139,7 +139,7 @@ K.escape = { gtk: 'general', ex: 'escape',
     groups: { chips: ['Fêtes d’anniversaire', 'Événements d’entreprise et consolidation d’équipe', 'Réservations privées sur demande'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, la consolidation d’équipe ou les réservations privées dans vos mots.', ex: 'Fêtes d’anniversaire avec salle privée jusqu’à 20 personnes. Consolidation d’équipe jusqu’à 40 personnes' },
     search: ['jeu d’évasion', 'jeux d’évasion', 'salle d’évasion', 'escape game'] } };
 
-K.bowling = { gtk: 'general', ex: 'general',
+K.bowling = { gtk: 'bowling', ex: 'bowling',
   en: { price: { page: 'From {x} per game.', basis: 'Per game', label: 'Price for one game, one person, in dollars', ph: 'Priced per lane? Tap Per room or group below', lead: 'The price for one game for one person. Priced per lane? Tap Per room or group. It shows on your card.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Games, lanes by the hour, shoe rental and party packages, with their prices. A photo of your price list or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; book lanes for weekends', ages: 'All ages; bumpers for kids', gift: 'Gift cards at the front counter', prices: 'Shoes $3, lane $45 an hour' },
@@ -151,7 +151,7 @@ K.bowling = { gtk: 'general', ex: 'general',
     groups: { chips: ['Fêtes d’anniversaire', 'Événements d’entreprise et consolidation d’équipe', 'Ligues et réservations privées'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, la consolidation d’équipe ou les ligues dans vos mots.', ex: 'Forfaits pour fêtes d’anniversaire jusqu’à 20 personnes. Soirées de quilles pour les entreprises' },
     search: ['quilles', 'salle de quilles', 'petites quilles', 'grosses quilles'] } };
 
-K.kids = { day: true, gtk: 'active', ex: 'general',
+K.kids = { day: true, gtk: 'active', ex: 'kids',
   en: { price: { page: 'Kids from {x}.', basis: 'Per child', label: 'Price for one child, in dollars', ph: 'Your regular price for one child', lead: 'The price for one child. It shows on your card.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Kids’ and toddlers’ prices, passes and party packages, with their prices. A photo of your price list or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; parties booked ahead', ages: 'Kids 0 to 12 with an adult', gift: 'Gift cards and 10-visit passes at the front desk', prices: 'Toddlers $9, adults free' },
@@ -179,7 +179,7 @@ K.classes = { quiet: true, gtk: 'classes', ex: 'classes', boxOffice: true,
     groups: { chips: ['Fêtes et ateliers privés', 'Ateliers de consolidation d’équipe', 'Cours d’anniversaire pour enfants'], lead: 'Touchez une taille, puis ajoutez les fêtes privées, la consolidation d’équipe ou les cours d’anniversaire dans vos mots.', ex: 'Ateliers privés jusqu’à 12 personnes. Cours de consolidation d’équipe' },
     search: ['atelier', 'ateliers', 'poterie', 'cours de poterie', 'cours de peinture', 'cours de cuisine', 'céramique', 'créatif', 'créative', 'quelque chose de créatif', 'bricolage', 'peinture sur poterie', 'camp de jour', 'camps de jour', 'camp d’été', 'camps d’été', 'camp pour enfants'] } };
 
-K.curling = { gtk: 'general', ex: 'general',
+K.curling = { gtk: 'general', ex: 'curling',
   en: { price: { page: 'From {x} per person.', basis: 'Per person', label: 'Price for one person (like learn to curl), in dollars', ph: 'Like a learn-to-curl session', lead: 'The price for one person, like a learn-to-curl session. It shows on your card.' },
     prices: { noun: 'rates page', page: PRICES_PAGE[0], lead: 'Learn to curl, drop-in, leagues and ice rental, with their prices. A photo of your rates or a link to your rates page is perfect. It’s optional.' },
     help: { walkin: 'Learn to curl by booking; spectators welcome', ages: 'Ages 8 and up; juniors with a coach', gift: 'Gift certificates at the club', prices: 'Ice rental $150 a sheet for 2 hours' },
@@ -191,7 +191,7 @@ K.curling = { gtk: 'general', ex: 'general',
     groups: { chips: ['Événements de curling d’entreprise', 'Séances d’initiation en groupe', 'Location de glace privée'], lead: 'Touchez une taille, puis ajoutez les événements d’entreprise, les initiations en groupe ou la location de glace dans vos mots.', ex: 'Événements de curling d’entreprise jusqu’à 32 personnes. Location de glace privée' },
     search: ['curling', 'initiation au curling', 'club de curling'] } };
 
-K.yoga = { gtk: 'general', ex: 'general',
+K.yoga = { gtk: 'general', ex: 'yoga',
   en: { price: { page: 'Drop-in classes from {x}.', basis: 'Drop-in class', label: 'Drop-in class price, in dollars', ph: 'Your drop-in class price', lead: 'Your drop-in class price. It shows on your card.' },
     prices: { noun: 'class schedule', page: PRICES_PAGE[0], lead: 'Drop-in, class passes, memberships and workshops, with their prices. A photo of your price list or a link to your class schedule is perfect. It’s optional.' },
     help: { walkin: 'Drop in, or book a spot online', ages: '16+; family yoga on Sundays', gift: 'Gift cards and class passes online or at the studio', prices: '10-class pass $180, first week $30' },
@@ -203,7 +203,7 @@ K.yoga = { gtk: 'general', ex: 'general',
     groups: { chips: ['Cours privés de groupe', 'Cours de mieux-être pour entreprises', 'Retraites et ateliers'], lead: 'Touchez une taille, puis ajoutez les cours privés, le mieux-être en entreprise ou les retraites dans vos mots.', ex: 'Cours privés de groupe jusqu’à 15 personnes. Cours de mieux-être pour entreprises' },
     search: ['yoga', 'yoga chaud', 'pilates', 'cours de mise en forme', 'barre'] } };
 
-K.casino = { gtk: 'general', ex: 'general',
+K.casino = { gtk: 'general', ex: 'casino',
   en: { price: { page: 'Entry from {x}.', basis: 'Entry', label: 'Entry price, if you charge one, in dollars', ph: 'Free to get in? Tap Free entry', lead: 'The price to get in, if there is one. It shows on your card.' },
     prices: { noun: 'promotions page', page: PRICES_PAGE[0], lead: 'Show tickets, dining and promotions, with their prices. A link to your promotions page is perfect. It’s optional.' },
     help: { walkin: 'Walk in any time; 19+ with ID', ages: '19+ with valid ID', gift: 'Gift cards at the cashier', prices: 'Show tickets from $45' },
@@ -215,7 +215,7 @@ K.casino = { gtk: 'general', ex: 'general',
     groups: { chips: ['Forfaits de groupe avec repas', 'Événements privés et fêtes', 'Voyages en autocar bienvenus'], lead: 'Touchez une taille, puis ajoutez les forfaits de groupe, les événements privés ou les voyages en autocar dans vos mots.', ex: 'Forfaits de groupe avec souper et spectacle. Voyages en autocar bienvenus' },
     search: ['casino', 'casinos', 'machines à sous', 'poker', 'tables de jeu', 'bingo'] } };
 
-K.library = { quiet: true, gtk: 'general', ex: 'general',
+K.library = { quiet: true, gtk: 'general', ex: 'library',
   en: { price: { page: 'From {x}.', basis: 'Programs', label: 'Price, if you charge one, in dollars', ph: 'Free to visit? Tap Free entry', lead: 'The price of a visit or a program, if there is one. It shows on your card.' },
     prices: { noun: 'programs page', page: PRICES_PAGE[0], lead: 'Programs, workshops and room bookings, with their prices. A link to your programs page is perfect. It’s optional.' },
     help: { walkin: 'Walk in any time; programs by sign-up', ages: 'All ages; story time for kids on Saturdays', gift: 'Library cards are free for residents', prices: 'Most programs free; some workshops $5' },

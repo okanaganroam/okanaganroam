@@ -2516,11 +2516,13 @@ Object.assign(fr.indoor, { iperChips: { person: 'Par personne', group: 'Par sall
 Object.assign(en.indoor, { bringExKinds: { gallery: 'Most art is for sale, and we can ship it. Free parking behind the gallery.', arts: 'Gift shop by the entrance. No flash photography.', active: 'Grip socks required (we sell them for $3). Lockers available.',
   spa: 'Bring a swimsuit. Robes and towels provided.', general: 'Arrive 15 minutes early. Free parking behind the building.',
   shows: 'Doors open 30 minutes before the show. Free parking behind the building.', pool: 'Bring a swimsuit and a towel. Lockers by the change rooms.',
-  classes: 'Wear clothes that can get messy. Painted pieces are fired and ready in about a week.' } });
+  classes: 'Wear clothes that can get messy. Painted pieces are fired and ready in about a week.',
+  bowling: 'Leagues use most lanes on weeknights: call ahead. Licensed lounge. Bumpers for kids.' } });
 Object.assign(fr.indoor, { bringExKinds: { gallery: 'La plupart des œuvres sont à vendre, et nous pouvons les expédier. Stationnement gratuit derrière la galerie.', arts: 'Boutique à l’entrée. Photos sans flash.', active: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Casiers offerts.',
   spa: 'Apportez votre maillot. Peignoirs et serviettes fournis.', general: 'Arrivez 15 minutes d’avance. Stationnement gratuit derrière le bâtiment.',
   shows: 'Portes ouvertes 30 minutes avant le spectacle. Stationnement gratuit derrière le bâtiment.', pool: 'Apportez votre maillot et une serviette. Casiers près des vestiaires.',
-  classes: 'Portez des vêtements qui peuvent se salir. Les pièces peintes sont cuites et prêtes en une semaine environ.' } });
+  classes: 'Portez des vêtements qui peuvent se salir. Les pièces peintes sont cuites et prêtes en une semaine environ.',
+  bowling: 'Les ligues occupent la plupart des allées en semaine : appelez avant. Salon avec permis d’alcool. Bandes pour les enfants.' } });
 // Indoor test 3 (2026-11-19; Diane, a community theatre in Penticton, shows only). Wording only: no new fields or chips.
 // - The hint under "We don't have set hours": box office hours go in Good to know, never as the hours (they turned into
 //   "Closed Saturdays" for a Saturday-night theatre).
@@ -2536,10 +2538,13 @@ Object.assign(en.indoor, { webLeadTickets: 'We filled in your tickets page. If y
     escape: 'A family-run escape room since 2016, with six themed rooms for 2 to 8 players.', spa: 'A small day spa with a eucalyptus steam room, a cedar sauna and massage by appointment.',
     climbing: 'A bouldering gym with new problems every week, a kids’ wall and gear to rent.', general: 'A local, family-run place since 2010. Friendly staff and something for every age.',
     classes: 'A sunny pottery studio: drop in to paint a mug, or sign up for a wheel class. We glaze and fire your pieces for you.',
-    gallery: 'A downtown gallery showing Okanagan painters and sculptors, with a new exhibition every month. Most of the art is for sale.' },
+    gallery: 'A downtown gallery showing Okanagan painters and sculptors, with a new exhibition every month. Most of the art is for sale.',
+    // Indoor test 8 (2026-11-19): every kind has its own story and Known for examples.
+    cinema: 'An independent two-screen cinema since 1948, showing new releases, classics and kids’ matinees, with real butter on the popcorn.', pool: 'A community aquatic centre with a lap pool, a leisure pool with a lazy river and a waterslide, and swim lessons for every age.', games: 'An arcade with 60 games, two VR stations and a laser tag arena. Great for birthdays and rainy days.', bowling: 'Five-pin bowling since 1962: 24 lanes, cosmic bowling on weekends, an arcade corner and a licensed lounge.', kids: 'An indoor playground for kids 0 to 12, with a three-level play structure, a toddler zone and a café for parents.', curling: 'A friendly curling club with four sheets of ice, learn-to-curl nights for beginners and a lounge over the ice.', yoga: 'A bright yoga studio with hot and gentle classes, beginner series and a drop-in rate for visitors.', casino: 'A casino with slots, table games and a live poker room, plus a restaurant and shows on weekends. 19+.', library: 'A public library branch with free Wi-Fi, story time for kids and quiet study space. Visitors welcome.' },
   knownExKinds: { gallery: 'Local painters and sculptors, with a new show every month', theatre: 'Plays, concerts and comedy nights, Thursday to Saturday at 7:30 PM', museum: 'Local history and a hands-on kids’ corner', escape: 'Six themed rooms, great for birthdays',
     spa: 'Steam room, sauna and massage', climbing: 'Bouldering for all levels, with a kids’ wall', general: 'Friendly, local and great on a rainy day',
-    classes: 'Paint-your-own pottery and beginner wheel classes' } });
+    classes: 'Paint-your-own pottery and beginner wheel classes',
+    cinema: 'New releases, classic film nights and cheap Tuesdays', pool: 'The lazy river, the waterslide and family swims', games: 'Retro arcade games, VR and laser tag', bowling: 'Cosmic bowling Fri & Sat 9 PM–midnight', kids: 'A three-level play structure and toddler time', curling: 'Learn-to-curl nights and a lounge over the ice', yoga: 'Hot yoga and beginner-friendly classes', casino: 'Live poker and weekend shows', library: 'Story time and a cozy reading room' } });
 Object.assign(fr.indoor, { webLeadTickets: 'Nous avons inscrit votre page de billets. Si vos prix sont sur une autre page, changez-la.', researchLine: 'Nous avons choisi ceux-ci d’après ce que nous avons trouvé en ligne. Décochez tout ce qui est faux.', noSetHoursHint: 'Spectacles ou cours seulement? Touchez ceci. Mettez les heures de billetterie dans Bon à savoir, comme « Billetterie : mar.–ven. 11 h–16 h et une heure avant les spectacles. »',
   ibookQShow: 'Faut-il acheter les billets à l’avance?', ibooksShow: { no: 'Billets à la porte, c’est parfait', busy: 'Billets à la porte, mais achetez d’avance pour les spectacles populaires', ahead: 'Achetez vos billets à l’avance' },
   ibookNeedShow: 'Touchez une réponse : billets à la porte, ou d’avance.',
@@ -2549,10 +2554,12 @@ Object.assign(fr.indoor, { webLeadTickets: 'Nous avons inscrit votre page de bil
     escape: 'Un jeu d’évasion familial depuis 2016, avec six salles thématiques pour 2 à 8 joueurs.', spa: 'Un petit spa de jour avec bain de vapeur à l’eucalyptus, sauna de cèdre et massages sur rendez-vous.',
     climbing: 'Un centre de bloc avec de nouveaux problèmes chaque semaine, un mur pour enfants et de l’équipement à louer.', general: 'Un endroit local et familial depuis 2010. Une équipe accueillante et quelque chose pour tous les âges.',
     classes: 'Un atelier de poterie ensoleillé : passez peindre une tasse, ou inscrivez-vous à un cours de tour. Nous émaillons et cuisons vos pièces.',
-    gallery: 'Une galerie du centre-ville qui expose des peintres et sculpteurs de l’Okanagan, avec une nouvelle exposition chaque mois. La plupart des œuvres sont à vendre.' },
+    gallery: 'Une galerie du centre-ville qui expose des peintres et sculpteurs de l’Okanagan, avec une nouvelle exposition chaque mois. La plupart des œuvres sont à vendre.',
+    cinema: 'Un cinéma indépendant de deux salles depuis 1948 : nouveautés, classiques et matinées pour enfants, avec du vrai beurre sur le maïs soufflé.', pool: 'Un centre aquatique communautaire avec un bassin de longueurs, une piscine récréative avec rivière paresseuse et glissade d’eau, et des cours de natation pour tous les âges.', games: 'Une arcade de 60 jeux, deux postes de réalité virtuelle et une arène de laser tag. Parfait pour les anniversaires et les jours de pluie.', bowling: 'Des petites quilles depuis 1962 : 24 allées, des quilles cosmiques la fin de semaine, un coin arcade et un salon avec permis d’alcool.', kids: 'Une aire de jeux intérieure pour les 0 à 12 ans, avec une structure sur trois niveaux, un coin pour les tout-petits et un café pour les parents.', curling: 'Un club de curling sympathique avec quatre pistes, des soirées d’initiation pour débutants et un salon qui donne sur la glace.', yoga: 'Un studio de yoga lumineux avec des cours chauds et doux, des séries pour débutants et un tarif à la séance pour les visiteurs.', casino: 'Un casino avec machines à sous, tables de jeu et salle de poker, un restaurant et des spectacles la fin de semaine. 19 ans et plus.', library: 'Une succursale de bibliothèque publique avec Wi-Fi gratuit, l’heure du conte pour les enfants et des espaces d’étude calmes. Visiteurs bienvenus.' },
   knownExKinds: { gallery: 'Des peintres et sculpteurs d’ici, avec une nouvelle exposition chaque mois', theatre: 'Pièces, concerts et soirées d’humour, du jeudi au samedi à 19 h 30', museum: 'L’histoire locale et un coin pour les enfants', escape: 'Six salles thématiques, idéal pour les anniversaires',
     spa: 'Bain de vapeur, sauna et massages', climbing: 'Du bloc pour tous les niveaux, avec un mur pour enfants', general: 'Accueillant, local et parfait un jour de pluie',
-    classes: 'La poterie à peindre soi-même et des cours de tour pour débutants' } });
+    classes: 'La poterie à peindre soi-même et des cours de tour pour débutants',
+    cinema: 'Nouveautés, soirées de classiques et mardis à prix réduit', pool: 'La rivière paresseuse, la glissade d’eau et les bains familiaux', games: 'Jeux d’arcade rétro, réalité virtuelle et laser tag', bowling: 'Quilles cosmiques ven. et sam. de 21 h à minuit', kids: 'Une structure de jeux sur trois niveaux et le temps des tout-petits', curling: 'Les soirées d’initiation et un salon qui donne sur la glace', yoga: 'Le yoga chaud et des cours pour débutants', casino: 'Le poker et les spectacles de fin de semaine', library: 'L’heure du conte et une salle de lecture chaleureuse' } });
 // Indoor test 1 (2026-11-19; Margaret: "I don't speak French, do I have to update the French description"): the
 // finish screen's French line says it's optional and we translate it.
 // Indoor test 7 (2026-11-19): the booking link folds behind this for a walk-in place.
@@ -2577,6 +2584,8 @@ en.indoor.quick = Object.assign({}, en.quick, {
     shows: ['Arrive 15 minutes early', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site'],
     pool: ['Bring a swimsuit', 'Lockers available', 'Arrive 15 minutes early', 'Free parking on site', 'Café or snack bar on site'],
     classes: ['Wear clothes that can get messy', 'Pieces ready in about a week', 'Book ahead on weekends', 'Free parking on site', 'Arrive 15 minutes early'],
+    // Indoor test 8 (2026-11-19; Gary's bowling centre had the generic chips): leagues, the lounge and bumpers.
+    bowling: ['Leagues on weeknights: call ahead', 'Licensed lounge', 'Bumpers for kids', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site'],
   },
   groups: ['Birthday parties with a private room', 'School groups welcome', 'Private bookings on request'],
 });
@@ -2591,6 +2600,7 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
     shows: ['Arrivez 15 minutes d’avance', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
     pool: ['Apportez votre maillot', 'Casiers offerts', 'Arrivez 15 minutes d’avance', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
     classes: ['Portez des vêtements qui peuvent se salir', 'Pièces prêtes en une semaine environ', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Arrivez 15 minutes d’avance'],
+    bowling: ['Ligues en semaine : appelez avant', 'Salon avec permis d’alcool', 'Bandes pour les enfants', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
   },
   groups: ['Fêtes d’anniversaire avec salle privée', 'Groupes scolaires bienvenus', 'Réservations privées sur demande'],
 });
