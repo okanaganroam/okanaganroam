@@ -1267,7 +1267,8 @@
   function savedKept(step){ return step === 'offer' && !CK && !S.badges.sports_tv && !S.storyFixed && !!sportsBit(); }
   // The text the story box started from: the story she sent (not checked yet), or the page's.
   function storyBase(){ return String(C.storyPending || storyCur()).trim(); }
-  function storyWaiting(){ if (S.storySent) C.storyPending = S.storySent; }
+  // Tour test 15: a story saved on this visit (the finish screen then holds back the French-description line: frDescOld).
+  function storyWaiting(){ if (S.storySent) { C.storyPending = S.storySent; S.storySentNow = true; } }
   function savedText(step){
     var how = S.done[step], many = step === 'photos' && S.lastBatch > 1;
     var title = how === 'email' ? T.emailTitle2 : how === 'later' ? T.laterTitle : how === 'no' || how === 'unsure' ? T.gotIt : how === 'day' ? T.sentTitle : T.savedTitle;

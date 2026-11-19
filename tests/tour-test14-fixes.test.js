@@ -279,7 +279,7 @@ test('12. finish screen: no "update the French description" when its translation
   assert.ok(db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND help_kind = 'fr_story' AND status = 'help'").get(v.id), 'queued');
   const cfg = await fetch(`${base}/owner/${t}/setup`).then((r) => r.text());
   assert.match(cfg, /"frStoryQueued":true/);
-  assert.match(CLIENT, /if \(finish && \(C\.frStoryQueued \|\| \(S\.storySentNow && C\.frStoryQueues\)\)\) return '';/);
+  // Tour test 15: the client rule itself is run in tour-test15-fixes.test.js (storyWaiting sets storySentNow; frDescOld).
   assert.equal((CLIENT.match(/\+ \(frOnlyNamed\(\) \|\| frOnlyFinish\(\)\) \+ frDescOld\(true\)/g) || []).length, 2);
   assert.match(SERVER, /frStoryQueues: COMPLETENESS_TYPES\.has\(venue\.type\)/);
 });
