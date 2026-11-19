@@ -174,7 +174,8 @@ function createArrivalPoints(deps) {
     </details>`;
   }
 
-  const pending = () => db.prepare(`SELECT a.*, v.name AS venue_name, v.latitude AS pin_lat, v.longitude AS pin_lng, v.address AS venue_address FROM venue_arrival_points a JOIN venues v ON v.id = a.venue_id WHERE a.status = 'pending' ORDER BY a.id`).all();
+  const pending = () => { try { return db.prepare(`SELECT a.*, v.name AS venue_name, v.latitude AS pin_lat, v.longitude AS pin_lng, v.address AS venue_address FROM venue_arrival_points a JOIN venues v ON v.id = a.venue_id WHERE a.status = 'pending' ORDER BY a.id`).all(); }
+    catch (e) { return db.prepare(`SELECT a.*, v.name AS venue_name, v.latitude AS pin_lat, v.longitude AS pin_lng FROM venue_arrival_points a JOIN venues v ON v.id = a.venue_id WHERE a.status = 'pending' ORDER BY a.id`).all(); } };
   // Tour test 14: a spot sent with her address (no pin picked), or whose address changed since: never a one-tap "Looks
   // right" (the spot is still the old pin). a.new_address: an address change waiting for review (server.js).
   const needsPlacing = (a) => !!a && (String(a.review_reasons || '').includes(ADDR_ONLY_REASON) || String(a.review_reasons || '').includes(NOT_PICKED_REASON) || (!!a.new_address && a.new_address !== a.venue_address));
