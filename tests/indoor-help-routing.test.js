@@ -260,6 +260,67 @@ test('indoor test 4: a spa’s questions (Lauren’s help log, EN + FR) land on 
   }
 });
 
+// Indoor test 5 (2026-11-19; Chris, a climbing and trampoline park, $20, All ages): every question in his help log
+// (help-log.json) and its French twin. Timed passes, toddler time, memberships and "the rest of my prices" are the price
+// answers (the box, then Your prices with his kind's examples); PD-day camps are the Groups answer (its school and camp chip,
+// and events for dated camps).
+const CLIMB_ASKED = [
+  ['en', 'closed christmas day only', ['closures']],
+  ['en', 'jump passes are 60 min $22 or 90 min $28, not a day pass. what do i put', ['indoor-price']],
+  ['en', 'toddler time is cheaper', ['indoor-price', 'menu-add']],
+  ['en', 'waiver has to be signed online before they come', ['indoor-good-to-know']],
+  ['en', 'kids under 7 need an adult inside with them', ['indoor-age']],
+  ['en', 'how do I show our birthday party packages', ['indoor-groups']],
+  ['en', 'memberships?', ['indoor-price', 'menu-add']],
+  ['en', 'school PD day camps', ['indoor-groups']],
+  ['en', 'what price do I put', ['indoor-price']],
+  ['en', 'can people just walk in', ['indoor-booking']],
+  ['en', 'where do i put the gift shop', ['indoor-gift']],
+  ['en', 'where do the rest of my prices go', ['menu-add', 'indoor-price']],
+  ['en', 'where do i put treatment prices', ['menu-add']],
+  ['en', 'our service prices are per 30 minutes', ['menu-add']],
+  ['en', 'where do I put our waiver link', ['indoor-good-to-know']],
+  ['en', 'grip socks are extra', ['indoor-good-to-know']],
+  ['en', 'kids price', ['indoor-price', 'menu-add']],
+  ['fr', 'fermé le jour de Noël seulement', ['closures']],
+  ['fr', 'les sauts sont 60 min 22 $ ou 90 min 28 $, pas un laissez-passer d’un jour. quoi mettre', ['indoor-price']],
+  ['fr', 'le temps des tout-petits est moins cher', ['indoor-price', 'menu-add']],
+  ['fr', 'la décharge se signe en ligne avant de venir', ['indoor-good-to-know']],
+  ['fr', 'comment montrer nos forfaits de fête d’anniversaire', ['indoor-groups']],
+  ['fr', 'abonnements?', ['indoor-price', 'menu-add']],
+  ['fr', 'camps de journée pédagogique', ['indoor-groups']],
+  ['fr', 'où va le reste de mes prix', ['menu-add', 'indoor-price']],
+  ['fr', 'prix des enfants', ['indoor-price', 'menu-add']],
+  ['fr', 'est-ce que les gens peuvent venir sans réserver', ['indoor-booking']],
+];
+
+test('indoor test 5: a climbing and trampoline park’s questions (Chris’s help log, EN + FR) land on the indoor answers, with his own price', async () => {
+  const v = app.createVenue({ name: `Rock Garden Help ${++n}`, slug: `indoor-help-${n}`, region: 'vernon', type: 'indoor', latitude: 50.25, longitude: -119.26, address: `${n} 14th Ave, Vernon`, description: 'Indoor climbing gym and trampoline park.' });
+  const t = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const ch = (changes) => fetch(`${base}/owner/${t}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify({ changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) }).then((r) => r.status);
+  assert.ok([200, 201].includes(await ch({ indoor_info: { kinds: ['climbing'], length: '1-2h', book: 'busy', age: 'all' } })));
+  assert.ok([200, 201].includes(await ch({ indoor_price: 20 })));
+  const en = helpBot(await get(`/owner/${t}/setup`)), fr = helpBot(await get(`/fr/owner/${t}/setup`));
+  const wrong = [];
+  for (const [lang, q, want] of CLIMB_ASKED) {
+    const r = (lang === 'fr' ? fr : en).best(q);
+    if (!r || !want.includes(r.id)) wrong.push(`[${lang}] "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+  }
+  assert.deepEqual(wrong, []);
+  // Every question in his real log lands somewhere ("I’m not sure" no more).
+  const log = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'drafts', 'fresh-eyes-indoor5-2026-11-19', 'help-log.json'), 'utf8'));
+  for (const x of log.filter((y) => !/^\[/.test(y.q))) { const r = en.best(x.q); assert.ok(r && r.id, `${x.q} -> nothing`); }
+  const plain = (h) => String(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  // His own price, his kind's words and examples; "put your…".
+  assert.match(plain(en.topic('indoor-price').a), /put your lowest adult pass \(day or timed\)\. Your card and your page say “Passes from \$20”/);
+  assert.match(plain(en.topic('indoor-price').a), /Gear rental \$8, 10-visit punch card \$180/);
+  assert.match(plain(fr.topic('indoor-price').aFr), /indiquez votre laissez-passer adulte le moins cher \(journée ou durée\)\. Votre fiche et votre page indiquent « Laissez-passer à partir de 20 \$ »/);
+  assert.doesNotMatch(plain(en.topic('indoor-price').a), /\$25/);
+  assert.match(plain(en.topic('indoor-groups').a), /School and camp groups/);
+  assert.match(plain(en.topic('indoor-groups').a), /Add an event/);
+  assert.match(plain(fr.topic('indoor-groups').aFr), /Groupes scolaires et camps/);
+});
+
 test('every indoor owner question lands on the right indoor topic (EN + FR)', async () => {
   const { en, fr } = await setupFor('indoor', { cuisine: '' });
   const wrong = [];
