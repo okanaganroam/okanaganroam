@@ -82,9 +82,10 @@ module.exports = {
   skiOffMonths: [5, 6, 7, 8, 9, 10],
   skiHillNameRe: /\b(?:big white|silver ?star|apex|baldy)\b/,
   skiTownLabels: null,
-  // Tour test 14 (Whistler, 2026-11-18; Lucía on a Pixel with Gboard): local words the phone keyboard splits in two ("Black
-  // comb", "Creek side"). Flagged in the setup and on the admin card, never changed (owner-text-clean.js localWordSplits).
-  localWordJoins: ['Blackcomb', 'Creekside', 'Brandywine', 'Cheakamus', 'Callaghan', 'Garibaldi', 'Brackendale'],
+  // Tour test 14 port (2026-11-18): local words the phone keyboard splits in two ("Summer land", "Peach land"). Flagged in
+  // the setup and on the admin card, never changed (owner-text-clean.js localWordSplits). Short and safe: "Big White"
+  // is two words, and "SilverStar" is left off (Silver Star Provincial Park is written with a space).
+  localWordJoins: ['Summerland', 'Peachland', 'Naramata', 'Okanagan'],
   // A plan in ski season with no ski day suggests one when it is in a town next to a hill.
   skiSuggestion: { months: [12, 1, 2, 3], hillNameRe: null, hillForTown: { 'big-white': 'big-white', silverstar: 'silverstar', apex: 'apex', baldy: 'baldy' } },
 

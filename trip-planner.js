@@ -191,7 +191,9 @@ const ITEM_AGE_SKIP = new Set(['tour', 'tours', 'trip', 'trips', 'ride', 'rides'
 // length `mins` and departures `departs`): the one the request names ("family float", "family rafting" -> the family
 // trip), never one too old for the youngest child or out of its own months; else the first with departure times; else
 // the first. Null when no trip has a length or departures of its own (the operator's answers are used then).
-const TOUR_TRIP_SKIP = new Set(['tour', 'tours', 'trip', 'trips', 'with', 'year', 'years', 'old', 'without', 'near', 'from', 'around', 'want', 'like', 'some', 'this', 'that', 'july', 'june', 'august', 'september', 'october', 'may', 'january', 'february', 'march', 'april', 'november', 'december', 'whistler', 'squamish', 'pemberton']);
+const TOUR_TRIP_SKIP = new Set(['tour', 'tours', 'trip', 'trips', 'with', 'year', 'years', 'old', 'without', 'near', 'from', 'around', 'want', 'like', 'some', 'this', 'that', 'july', 'june', 'august', 'september', 'october', 'may', 'january', 'february', 'march', 'april', 'november', 'december',
+  // The site's own town words (trip-site.js commonNameWords: Okanagan, Kelowna, Penticton… on Okanagan Roam).
+  ...(SITE.commonNameWords || [])]);
 function tourTripFor(v, text, month) {
   const all = Array.isArray(v && v.tourItems) ? v.tourItems.filter((x) => x && x.name) : [];
   if (!all.some((x) => x.mins || (x.departs && x.departs.length))) return null;
@@ -1839,7 +1841,7 @@ function tourRentalPrice(v, ctx) {
   const rentals = v.tourItems.filter((it) => it && it.name && it.price && /\b(?:rentals?|hire|location)\b/i.test(it.name) && /\d/.test(it.price) && !/\bper (?:person|adult)\b/i.test(it.price));
   if (!rentals.length) return null;
   const num = (p) => { const m = /(\d{1,5}(?:[.,]\d{1,2})?)/.exec(String(p).replace(/(\d),(\d{3})(?!\d)/g, '$1$2')); return m ? Number(m[1].replace(',', '.')) : NaN; };
-  const words = new Set(ask.split(' ').filter((w) => w.length >= 3 && !/^(?:rentals?|hire|location|whistler|july|june|august|september|january|february|march|december)$/.test(w)).map(itemAgeStem));
+  const words = new Set(ask.split(' ').filter((w) => w.length >= 3 && !/^(?:rentals?|hire|location|july|june|august|september|january|february|march|december)$/.test(w) && !(SITE.commonNameWords || []).includes(w)).map(itemAgeStem));
   const named = rentals.filter((it) => normWords(it.name).split(' ').some((w) => w.length >= 3 && words.has(itemAgeStem(w)) && !/^rentals?$/.test(w)));
   const pool = (named.length ? named : rentals).filter((it) => Number.isFinite(num(it.price)) && num(it.price) > 0).sort((a, b) => num(a.price) - num(b.price));
   if (!pool.length) return null;
