@@ -1337,6 +1337,10 @@ Object.assign(FR_TEXT, Object.fromEntries(Object.entries({
   'today': 'aujourd’hui',
   'tomorrow': 'demain',
   'Times vary': 'Horaires variables',
+  // Indoor test 3 (2026-11-19): a show place's status line, whole (it read « Horaires variables · check before you go »).
+  'Times vary · check before you go': 'Horaires variables · vérifiez avant d’y aller',
+  'Hosts comedy': 'Présente de l’humour', 'Hosts live music': 'Présente de la musique en direct', 'Hosts plays': 'Présente des pièces de théâtre',
+  'check show dates': 'vérifiez les dates des spectacles', 'Check show dates': 'Vérifiez les dates des spectacles',
   'From': 'Du',
   'From:': 'Du :',
   'Example photo': 'Photo d’exemple',

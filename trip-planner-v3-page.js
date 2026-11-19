@@ -181,16 +181,25 @@ function t3ClosedDayText(c,fr){
 function t3MissingClosedText(step,fr){
   var alts=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string';});
   var closed=alts.filter(function(a){return t3ClosedDayText(a.closedDay,fr);});
-  if(!closed.length||alts.some(function(a){return !t3ClosedDayText(a.closedDay,fr)&&['another_listing','confirm_hours','different_time'].indexOf(a.reasonCode)>=0;}))return null;
+  if(!closed.length||alts.some(function(a){return !t3ClosedDayText(a.closedDay,fr)&&['another_listing','confirm_hours','different_time','show_dates'].indexOf(a.reasonCode)>=0;}))return null;
   return closed.map(function(a){var t=t3ClosedDayText(a.closedDay,fr);return a.name+(fr?' — '+t:' is '+(/ only/.test(t)?'open '+t:t.charAt(0).toLowerCase()+t.slice(1)));}).join(fr?' ; ':'; ')+'.';
 }
 
+// Indoor test 3 (2026-11-19; "comedy show in Penticton" found nothing): "Places that host comedy: Cleland Community Theatre
+// — check show dates" (« Lieux qui présentent de l’humour : … — vérifiez les dates des spectacles »).
+function t3ShowPlacesHtml(p,fr,esc,hrefAttr){
+ var sp=p&&p.showPlaces;if(!sp||!Array.isArray(sp.places))return '';
+ var places=sp.places.filter(function(x){return x&&typeof x.name==='string'&&typeof x.url==='string'&&/^\/(?!\/)/.test(x.url);});
+ if(!places.length)return '';
+ var head=fr?'Lieux qui présentent '+String(sp.whatFr||'des spectacles')+'\u00a0: ':'Places that host '+String(sp.what||'shows')+': ';
+ return '<p class="t3-empty t3-showplaces">'+esc(head)+places.map(function(x){return '<a '+hrefAttr(x.url)+'>'+esc(x.name)+'</a>';}).join(', ')+esc(fr?' — vérifiez les dates des spectacles':' — check show dates')+'</p>';
+}
 function t3OptionalAlternativesHtml(step,fr,esc){
  const hrefAttr=u=>['href','"'+esc(u)+'"'].join('='); // see hrefAttr in the page script
  const alternatives=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);});
  if(!alternatives.length)return '';
- const labels=fr?{intro:'Options facultatives à considérer. Choisissez-en une si vous le souhaitez ; elle ne sera pas ajoutée automatiquement.',similar:'Activité similaire',region:'Autre région',time:'À un autre moment',hours:'Horaires à confirmer',listing:'Autre fiche',adults:'Adultes seulement (19 ans et plus)',appt:'Sur rendez-vous · appelez avant'}:{intro:'Optional ideas to consider. Choose one if you like; it will not be added automatically.',similar:'Similar activity',region:'Another region',time:'Try another time',hours:'Confirm hours',listing:'Another listing',adults:'Adults only (19+)',appt:'By appointment · call ahead'};
- const reason={similar_activity:labels.similar,different_region:labels.region,different_time:labels.time,confirm_hours:labels.hours,another_listing:labels.listing,adults_only:labels.adults};
+ const labels=fr?{intro:'Options facultatives à considérer. Choisissez-en une si vous le souhaitez ; elle ne sera pas ajoutée automatiquement.',similar:'Activité similaire',region:'Autre région',time:'À un autre moment',hours:'Horaires à confirmer',listing:'Autre fiche',adults:'Adultes seulement (19 ans et plus)',shows:'Vérifiez les dates des spectacles',appt:'Sur rendez-vous · appelez avant'}:{intro:'Optional ideas to consider. Choose one if you like; it will not be added automatically.',similar:'Similar activity',region:'Another region',time:'Try another time',hours:'Confirm hours',listing:'Another listing',adults:'Adults only (19+)',shows:'Check show dates',appt:'By appointment · call ahead'};
+ const reason={similar_activity:labels.similar,different_region:labels.region,different_time:labels.time,confirm_hours:labels.hours,another_listing:labels.listing,adults_only:labels.adults,show_dates:labels.shows};
  return '<div class="t3-optional-alternatives"><p>'+esc(labels.intro)+'</p><ul>'+alternatives.map(function(a){return '<li><a '+hrefAttr(a.url)+'>'+esc(a.name)+'</a>'+(function(){var r=a.appointment&&a.reasonCode==='another_listing'?'':(t3ClosedDayText(a.closedDay,fr)||reason[a.reasonCode]||'');var parts=[r,a.appointment?labels.appt:''].filter(Boolean);return parts.length?' — '+esc(parts.join(' · ')):'';})()+'</li>';}).join('')+'</ul></div>';
 }
 
@@ -413,7 +422,7 @@ function t3WhyLines(stop) {
   const v = (stop && stop.venue) || {};
   return ((stop && stop.why) || []).filter((w) => !/^(?:Hotel pickup|Prise en charge à l\u2019hôtel)$/.test(w) && !(v.listedHours && (/^(Listed hours|Horaires indiqu\u00e9s|Les horaires varient)/.test(w) || w === v.listedHours)) && !/\(straight line\)/.test(w)).slice(0, 2);
 }
-const CLIENT_HELPERS_SRC = [t3PickupLine, t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
+const CLIENT_HELPERS_SRC = [t3ShowPlacesHtml, t3PickupLine, t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
   ...SITE_PAGE.examples,
@@ -2060,6 +2069,8 @@ function renderScript(d) {
     } else {
       html += '<p class="t3-empty">' + esc(tx('tripv3.tryTelling')) + '</p>';
     }
+    // Indoor test 3 (2026-11-19): no dated show fits a show request: the theatres in town whose own words say they host it.
+    html += t3ShowPlacesHtml(p, lang() === 'fr', esc, hrefAttr);
     if (hasStops) html += '<p class="t3-estimate" data-t3-estimate hidden aria-live="polite"></p>';
     html += tripDetails;
     if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" ' + hrefAttr(p.seeAll.url) + '>' + esc(tx('tripv3.seeAll')) + '</a>';
@@ -2656,4 +2667,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { t3PickupLine, t3WhyLines, t3ClosedDayText, t3MissingClosedText, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3ShowPlacesHtml, t3PickupLine, t3WhyLines, t3ClosedDayText, t3MissingClosedText, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };

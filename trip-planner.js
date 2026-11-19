@@ -5174,7 +5174,15 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
             if(start>t-10&&start-t<=60&&early<start&&early+Math.max(visit,TOUR_ALLOWANCE+15)<=limit){start=early;visit=Math.max(visit,t+TOUR_ALLOWANCE-start);break;}
           }
         }
-        return {start,end:start+visit,wait:start-earliest,transfer,unknownHours,departure:dep!=null, textHours:!!textHours,provisional:unknownHours||hiking||!!textHours||!one?.complete||guessed||guessedTransfer,listingTiming:!!textHours||one?.visits?.[0]?.durationSource==='listing'};
+        // Indoor test 3 (2026-11-19; Diane's theatre was planned 7:38–9:08 PM, the end of dinner plus the walk): an evening
+        // stop at a show place starts at its show time ("7:30 PM" in its own words) when that is within 20 minutes, else on
+        // the nearest half hour, never at an odd minute. Within its hours (when it has any) and the next fixed time.
+        if(candidate.showPlace&&['evening','night'].includes(stop.daypart)&&dep==null&&!stop.gapFill&&!beforeEvent){
+          const top=Math.min(range[1],1440);
+          const want=Number.isFinite(candidate.showStart)&&Math.abs(candidate.showStart-start)<=20?candidate.showStart:Math.round(start/30)*30;
+          if(want>=range[0]&&want+visit<=top)start=want;else{const up=Math.ceil(start/30)*30;if(up+visit<=top)start=up;}
+        }
+        return {start,end:start+visit,wait:Math.max(0,start-earliest),transfer,unknownHours,departure:dep!=null, textHours:!!textHours,provisional:unknownHours||hiking||!!textHours||!one?.complete||guessed||guessedTransfer,listingTiming:!!textHours||one?.visits?.[0]?.durationSource==='listing'};
       };
       let timed=fit(v);
       // Round 8 (2026-10-19): a ski day is on the hill from about 9 AM to 3:30 PM; lunch is a break on the hill inside
@@ -7499,7 +7507,7 @@ const REQUIREMENT_FEATURE_WORDS = { dog_friendly: 'dog friendly', kid_friendly: 
 // An unmet request whose offered places are all closed that day (the page's "Not included: … is closed Mondays").
 function requirementClosedOnly(i) {
   const alts = (i && Array.isArray(i.optionalAlternatives) ? i.optionalAlternatives : i && Array.isArray(i.alternatives) ? i.alternatives : []).filter((a) => a && typeof a.name === 'string');
-  return alts.some((a) => a.closedDay) && !alts.some((a) => !a.closedDay && ['another_listing', 'confirm_hours', 'different_time'].includes(a.reasonCode));
+  return alts.some((a) => a.closedDay) && !alts.some((a) => !a.closedDay && ['another_listing', 'confirm_hours', 'different_time', 'show_dates'].includes(a.reasonCode));
 }
 function requirementWarning(i) {
   if (i.kind === 'event') {
@@ -7523,6 +7531,18 @@ function requirementWarning(i) {
   return i.reason || null;
 }
 
+// Indoor test 3 (2026-11-19; Diane's theatre: box office Tue–Fri 11–4 as its hours, shows Thursday to Saturday at 7:30 PM):
+// a show place (server.js indoorShowPlace) plays on a night when it has a show on What's On that date, when its own words
+// name that day with its shows, or when its own words talk of shows without naming days. Its listed hours (often the box
+// office's) then never make it "Closed" that night: it is offered with "Check show dates" instead. It is never planned
+// into the itinerary on this alone (nothing says it is open), so the safety net only changes the reason shown.
+function showPlaceOn(v, date, weekday) {
+  if (!v || !v.showPlace) return false;
+  if (date && Array.isArray(v.showDates) && v.showDates.includes(date)) return true;
+  const wd = weekday ? String(weekday).toLowerCase().slice(0, 3) : null;
+  if (Array.isArray(v.showDays) && v.showDays.length) return !!wd && v.showDays.includes(wd);
+  return !!v.showWords;
+}
 // Closed all day on the trip's date (from its date, or the asked weekday): listed as closed that day in its own week.
 function dayClosedAllDay(v, date, weekday) {
   const wd = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? WEEKDAYS[(new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7] : weekday ? String(weekday).toLowerCase().slice(0, 3) : null;
@@ -7602,8 +7622,12 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       // Brewery test 4 follow-up (2026-11-13): it's offered only with the day it's closed ("Closed Mondays (Oct–Apr) · try
       // Tue–Sun"), never as "Another listing"; without that fact it's still left out.
       const closedWd = !daypart && dayClosedAllDay(venue, visitDate, weekday) ? (/^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? WEEKDAYS[(new Date(`${visitDate}T12:00:00Z`).getUTCDay() + 6) % 7] : String(weekday || '').toLowerCase().slice(0, 3)) : null;
-      const closedAll = closedWd ? closedDayInfo(venue, closedWd) : null;
-      if (closedWd && !closedAll) continue;
+      // Indoor test 3: a show place on a show night is never "Closed" by its (box office) hours.
+      const showDate = /^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? visitDate : null;
+      const showWd = closedWd || (showDate ? WEEKDAYS[(new Date(`${showDate}T12:00:00Z`).getUTCDay() + 6) % 7] : weekday ? String(weekday).toLowerCase().slice(0, 3) : null);
+      const showNight = daypart !== 'morning' && showPlaceOn(venue, showDate, showWd);
+      const closedAll = closedWd && !showNight ? closedDayInfo(venue, closedWd) : null;
+      if (closedWd && !closedAll && !showNight) continue;
       const exact = tripRequirements.matches(venue, item);
       const kinds = venue.plannerKinds || tripRequirements.inferPlannerKinds(venue);
       const related = !exact && adjacent.some(k => kinds.includes(k) || (venue.activities || []).includes(k));
@@ -7624,7 +7648,8 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       // not "Another listing".
       if (!closedAll && input.intent?.party?.kids && venue.ownerAdultsOnly && !kidsAllowed(venue)) reasonCode = 'adults_only';
       if (closedAll && reasonCode !== 'different_time') continue;
-      const closedDay = closedAll || (reasonCode === 'different_time' && weekday ? closedDayInfo(venue, weekday) : null);
+      if (showNight && !related && local && ['different_time', 'confirm_hours', 'another_listing'].includes(reasonCode)) reasonCode = 'show_dates';
+      const closedDay = showNight ? null : closedAll || (reasonCode === 'different_time' && weekday ? closedDayInfo(venue, weekday) : null);
       candidates.push({
         id: venue.id, name: venue.name, url: venue.url, region: venue.region, type: venue.type,
         reasonCode, ...(byAppointment ? { appointment: true } : {}), ...(closedDay ? { closedDay } : {}), _exact: exact, _local: local, _rating: Number(venue.rating) || 0,
@@ -8003,7 +8028,7 @@ function planTripCore(input) {
     // match are closed all that day says why, like the day plans do: "The Velvet Door is closed Mondays · try Wed–Sun."
     const wd = String(ctx.startWeekday || '').toLowerCase().slice(0, 3);
     const anyDay = WEEKDAYS.includes(wd) ? buildRecommendations(facts, { ...ctx, startWeekday: null, whenDaypart: null }, 3).items.filter((s) => s.venue) : [];
-    const closedLines = anyDay.map((st) => { const f = facts.find((x) => x.id === st.venue.id); const c = f && closedDayInfo(f, wd); return c ? `${f.name} is ${closedDayEnglish(c)}` : null; }).filter(Boolean);
+    const closedLines = anyDay.map((st) => { const f = facts.find((x) => x.id === st.venue.id); const c = f && !showPlaceOn(f, null, wd) && closedDayInfo(f, wd); return c ? `${f.name} is ${closedDayEnglish(c)}` : null; }).filter(Boolean);
     if (closedLines.length && closedLines.length === anyDay.length) result.warnings.push(`${closedLines.join('; ')}.`);
     else result.warnings.push(`No ${SITE.brand} listings match every part of that request.`);
   }

@@ -109,7 +109,8 @@ function makeDom() {
 }
 
 // Opens /owner/<token>/setup (or /fr/...) like a phone would. -> { click, type, screen, text, settle, window }
-async function openSetup(base, token, { lang = 'en', hash = '' } = {}) {
+// fine: true is a computer with a mouse (matchMedia('(pointer:fine)') matches), as on a desktop.
+async function openSetup(base, token, { lang = 'en', hash = '', fine = false } = {}) {
   const url = `${lang === 'fr' ? '/fr' : ''}/owner/${token}/setup`;
   const html = await fetch(base + url, { headers: { 'User-Agent': 'whistlerroam-check/1.0' } }).then((r) => r.text());
   const cfgM = /<script>window\.SETUP_CFG = ([\s\S]*?);<\/script>\s*<script>([\s\S]*?)<\/script>/.exec(html);
@@ -130,7 +131,7 @@ async function openSetup(base, token, { lang = 'en', hash = '' } = {}) {
     location: { pathname: url, search: '', hash: hash ? '#' + hash : '', href: base + url, origin: base },
     history: { state: null, length: 1, pushState(s) { this.state = s; }, replaceState(s) { this.state = s; }, back() {} },
     sessionStorage: store(), localStorage: store(), innerWidth: 360, innerHeight: 780, scrollY: 0, pageYOffset: 0,
-    matchMedia: () => ({ matches: false, addEventListener() {}, addListener() {} }),
+    matchMedia: (q) => ({ matches: !!fine && /pointer:\s*fine|hover:\s*hover/.test(String(q)), addEventListener() {}, addListener() {} }),
     addEventListener() {}, removeEventListener() {}, scrollTo() {}, scrollBy() {}, requestAnimationFrame: (f) => setTimeout(f, 0), getComputedStyle: () => ({}),
     setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {}, console, JSON, Date, Math, Promise, URL, URLSearchParams, FormData: class { append() {} }, Blob: class {}, Intl,
     alert() {}, confirm: () => true,

@@ -169,6 +169,29 @@ const ASKED = [
   ['fr', 'est-ce que mon gérant peut aussi modifier ceci', ['not-owner', 'staff']],
   ['fr', 'l’arcade est 19 ans et plus après 20 h, est-ce que ça va paraître', ['indoor-age']],
   ['fr', 'comment changer le prix, ça dit adultes mais nous chargeons par salle', ['indoor-per-room']],
+  // Indoor test 3 (2026-11-19; Diane, a community theatre with shows only): every question she typed (help-log.json), and
+  // the same in French.
+  ['en', 'we dont have regular hours, only show times', ['indoor-no-hours']],
+  ['en', 'box office hours vs show times', ['indoor-no-hours']],
+  ['en', 'we are closed july and august', ['indoor-closed-months']],
+  ['en', 'ticket prices change every show', ['indoor-ticket-prices']],
+  ['en', 'tickets online or by phone, or at the door if seats are left', ['indoor-booking']],
+  ['en', 'some shows are 19+', ['indoor-age']],
+  ['en', 'we have a bar in the lobby, can I add happy hour', ['indoor-bar']],
+  ['en', 'tickets online but the summer camp is walk in', ['indoor-booking']],
+  ['en', 'kids shows all ages but comedy is 19+', ['indoor-age']],
+  ['en', 'I am the manager not the owner, can I do this?', ['not-owner', 'staff']],
+  ['en', 'we have 30 shows a season, do I add them all one by one', ['indoor-season-list']],
+  ['en', 'prices vary', ['indoor-ticket-prices']],
+  ['fr', 'nous n’avons pas d’heures régulières, seulement des heures de spectacle', ['indoor-no-hours']],
+  ['fr', 'heures de billetterie ou heures des spectacles', ['indoor-no-hours']],
+  ['fr', 'nous sommes fermés en juillet et en août', ['indoor-closed-months']],
+  ['fr', 'le prix des billets change à chaque spectacle', ['indoor-ticket-prices']],
+  ['fr', 'billets en ligne ou par téléphone, ou à la porte s’il reste des places', ['indoor-booking']],
+  ['fr', 'certains spectacles sont 19 ans et plus', ['indoor-age']],
+  ['fr', 'nous avons un bar dans le hall, puis-je ajouter un 5 à 7', ['indoor-bar']],
+  ['fr', 'je suis la gérante, pas la propriétaire, puis-je faire ceci?', ['not-owner', 'staff']],
+  ['fr', 'pouvez-vous ajouter toute notre saison de spectacles', ['indoor-season-list']],
 ];
 
 test('every indoor owner question lands on the right indoor topic (EN + FR)', async () => {

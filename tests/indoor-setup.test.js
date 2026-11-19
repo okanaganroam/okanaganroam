@@ -172,7 +172,7 @@ test('5. no set hours (a theatre with shows only): one tap; the page says times 
   assert.equal(app.venueIndoorInfo(v.id).visit, 'appointment');
   const en = plain(page(v));
   assert.match(en, /Times vary · check before you go/);
-  assert.match(plain(page(v, 'fr')), /Heures variables · vérifiez avant d’y aller/);
+  assert.match(plain(page(v, 'fr')), /Horaires variables · vérifiez avant d’y aller/);
   const r = await getText(`/owner/${t}/setup/progress`);
   const done = pc.doneMap({ type: 'indoor', indoorInfo: app.venueIndoorInfo(v.id) }, '2026-11-19');
   assert.equal(done.hours, true); assert.equal(done.season, true);

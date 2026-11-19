@@ -24,7 +24,7 @@ const en = {
   hoursQ: 'Are these still your hours?', closed: 'Closed', open: 'Open', hoursEditQ: 'Change your hours', hoursEditLead: 'Tap a time to change it.',
   sameAs: 'Same as {day}', opens: '{day} opens', closes: '{day} closes', to: 'to', saveHours: 'Save my hours', needOpenDay: 'Please set at least one day you’re open.',
   winterQ: 'Different hours part of the year?', winterHint: 'For example, shorter winter hours from November to April.', whichMonths: 'Which months?', hoursThen: 'Hours in those months',
-  winterNeedMonths: 'Please tap the months for your other hours.', noHours: 'We don’t have your hours yet. Tap “Change them” to add them.', addHours: 'Add my hours',
+  winterNeedMonths: 'Please tap the months for your other hours.', noHours: 'We don’t have your hours yet. Tap “Add my hours” to add them.', addHours: 'Add my hours',
   seasonQ: 'Do you close for part of the year?', seasonLead: 'For example, open May to October, or closed in January.', allYear: 'No, we’re open all year', partYear: 'Yes, we close for part of the year',
   monthsQ: 'Which months are you open?', monthsLead: 'Tap every month you’re open. When you’re closed, your page says “Closed for the season” and when you reopen.', saveSeason: 'Save my season',
   monthsInRow: 'Please pick months in a row, like May to October.', monthsNeed: 'Please tap the months you’re open.',
@@ -112,7 +112,7 @@ const fr = {
   hoursQ: 'Est-ce que ce sont toujours vos heures?', closed: 'Fermé', open: 'Ouvert', hoursEditQ: 'Modifier vos heures', hoursEditLead: 'Touchez une heure pour la changer.',
   sameAs: 'Comme {day}', opens: '{day} ouverture', closes: '{day} fermeture', to: 'à', saveHours: 'Enregistrer mes heures', needOpenDay: 'Indiquez au moins un jour d’ouverture.',
   winterQ: 'D’autres heures une partie de l’année?', winterHint: 'Par exemple, des heures d’hiver plus courtes de novembre à avril.', whichMonths: 'Quels mois?', hoursThen: 'Heures pendant ces mois',
-  winterNeedMonths: 'Touchez les mois de vos autres heures.', noHours: 'Nous n’avons pas encore vos heures. Touchez « Les modifier » pour les ajouter.', addHours: 'Ajouter mes heures',
+  winterNeedMonths: 'Touchez les mois de vos autres heures.', noHours: 'Nous n’avons pas encore vos heures. Touchez « Ajouter mes heures » pour les ajouter.', addHours: 'Ajouter mes heures',
   seasonQ: 'Fermez-vous une partie de l’année?', seasonLead: 'Par exemple, ouvert de mai à octobre, ou fermé en janvier.', allYear: 'Non, nous sommes ouverts toute l’année', partYear: 'Oui, nous fermons une partie de l’année',
   monthsQ: 'Quels mois êtes-vous ouvert?', monthsLead: 'Touchez chaque mois où vous êtes ouvert. Quand vous êtes fermé, votre page indique « Fermé pour la saison » et la date de réouverture.', saveSeason: 'Enregistrer ma saison',
   monthsInRow: 'Choisissez des mois qui se suivent, comme de mai à octobre.', monthsNeed: 'Touchez les mois où vous êtes ouvert.',
@@ -2414,7 +2414,7 @@ fr.indoor = {
   noDogsSub: 'Pas à l’intérieur', noDogsSubInside: 'Pas à l’intérieur',
   hoursQ: 'Est-ce que ce sont toujours vos heures?', needOpenDayAppt: 'Indiquez au moins un jour d’ouverture. Pas d’heures fixes? Touchez « Nous n’avons pas d’heures fixes » plus bas.',
   noSetHours: 'Nous n’avons pas d’heures fixes (spectacles ou cours seulement)', noSetHoursNow: 'Pas d’heures fixes : spectacles ou cours seulement ✓',
-  noSetHoursSaved: 'Vos anciennes heures de la semaine sont retirées de votre page. Elle indique « Heures variables · vérifiez avant d’y aller ».',
+  noSetHoursSaved: 'Vos anciennes heures de la semaine sont retirées de votre page. Elle indique « Horaires variables · vérifiez avant d’y aller ».',
   yearNoSetQ: 'Êtes-vous ouvert toute l’année?', yearNoSetLead: 'Si vous êtes ouvert seulement une saison, par exemple de mai à septembre, touchez ce choix et indiquez vos dates.',
   yearNoSetYes: 'Oui, toute l’année', yearNoSetKeep: 'Oui, ce sont mes dates', yearNoSetChange: 'Modifier mes dates',
   tkindQ: 'Quel genre d’endroit êtes-vous?', tkindLead: 'Choisissez-en jusqu’à 3, le principal d’abord. Ils paraissent sur votre fiche et aident la recherche et Planifier mon voyage à vous trouver.',
@@ -2504,6 +2504,32 @@ Object.assign(en.indoor, { bringExKinds: { arts: 'Gift shop by the entrance. No 
   spa: 'Bring a swimsuit. Robes and towels provided.', general: 'Arrive 15 minutes early. Free parking behind the building.' } });
 Object.assign(fr.indoor, { bringExKinds: { arts: 'Boutique à l’entrée. Photos sans flash.', active: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Casiers offerts.',
   spa: 'Apportez votre maillot. Peignoirs et serviettes fournis.', general: 'Arrivez 15 minutes d’avance. Stationnement gratuit derrière le bâtiment.' } });
+// Indoor test 3 (2026-11-19; Diane, a community theatre in Penticton, shows only). Wording only: no new fields or chips.
+// - The hint under "We don't have set hours": box office hours go in Good to know, never as the hours (they turned into
+//   "Closed Saturdays" for a Saturday-night theatre).
+// - A theatre (its main kind) is asked about tickets, and its price is its lowest regular ticket ("Tickets from $25").
+// - A range ("$25 - $55", "25 to 55") is read as its low number.
+// - The story and Known for examples follow the main kind (like the Good to know example).
+Object.assign(en.indoor, { webLeadTickets: 'We filled in your tickets page. If your prices are on another page, change it.', researchLine: 'We picked these from what we found online. Untick anything that’s wrong.', noSetHoursHint: 'Shows or classes only? Tap this. Put box office hours in Good to know, like “Box office: Tue–Fri 11–4 and an hour before shows.”',
+  ibookQShow: 'Do people need tickets ahead?', ibooksShow: { no: 'Tickets at the door are fine', busy: 'Tickets at the door, but buy ahead for busy shows', ahead: 'Please buy tickets ahead' },
+  ibookNeedShow: 'Please tap one: tickets at the door, or buy ahead.',
+  tpriceLeadShow: 'Your lowest regular adult ticket. It shows on your card.', tpriceLeadPickShow: 'Your page will say “Tickets from {x}”.', tpriceLabelShow: 'Lowest regular adult ticket, in dollars',
+  tpricePhShow: 'Varies by show? Your lowest regular ticket.', tpriceCardShow: 'Tickets from {x}', tpriceRangeLead: 'We’ll show From {x}, your lowest price.', tpriceRangeLeadShow: 'We’ll show “Tickets from {x}”, your lowest price.',
+  storyExKinds: { theatre: 'A 443-seat community theatre since 1979, with plays, concerts and comedy nights from September to June.', museum: 'A volunteer-run museum of local history, with a pioneer cabin and hands-on displays for kids.',
+    escape: 'A family-run escape room since 2016, with six themed rooms for 2 to 8 players.', spa: 'A small day spa with a eucalyptus steam room, a cedar sauna and massage by appointment.',
+    climbing: 'A bouldering gym with new problems every week, a kids’ wall and gear to rent.', general: 'A local, family-run place since 2010. Friendly staff and something for every age.' },
+  knownExKinds: { theatre: 'Plays, concerts and comedy nights, Thursday to Saturday at 7:30 PM', museum: 'Local history and a hands-on kids’ corner', escape: 'Six themed rooms, great for birthdays',
+    spa: 'Steam room, sauna and massage', climbing: 'Bouldering for all levels, with a kids’ wall', general: 'Friendly, local and great on a rainy day' } });
+Object.assign(fr.indoor, { webLeadTickets: 'Nous avons inscrit votre page de billets. Si vos prix sont sur une autre page, changez-la.', researchLine: 'Nous avons choisi ceux-ci d’après ce que nous avons trouvé en ligne. Décochez tout ce qui est faux.', noSetHoursHint: 'Spectacles ou cours seulement? Touchez ceci. Mettez les heures de billetterie dans Bon à savoir, comme « Billetterie : mar.–ven. 11 h–16 h et une heure avant les spectacles. »',
+  ibookQShow: 'Faut-il acheter les billets à l’avance?', ibooksShow: { no: 'Billets à la porte, c’est parfait', busy: 'Billets à la porte, mais achetez d’avance pour les spectacles populaires', ahead: 'Achetez vos billets à l’avance' },
+  ibookNeedShow: 'Touchez une réponse : billets à la porte, ou d’avance.',
+  tpriceLeadShow: 'Votre billet adulte régulier le moins cher. Il paraît sur votre fiche.', tpriceLeadPickShow: 'Votre page indiquera « Billets à partir de {x} ».', tpriceLabelShow: 'Billet adulte régulier le moins cher, en dollars',
+  tpricePhShow: 'Ça varie selon le spectacle? Votre billet régulier le moins cher.', tpriceCardShow: 'Billets à partir de {x}', tpriceRangeLead: 'Nous indiquerons À partir de {x}, votre prix le plus bas.', tpriceRangeLeadShow: 'Nous indiquerons « Billets à partir de {x} », votre prix le plus bas.',
+  storyExKinds: { theatre: 'Un théâtre communautaire de 443 places depuis 1979 : pièces, concerts et soirées d’humour de septembre à juin.', museum: 'Un musée d’histoire locale tenu par des bénévoles, avec une cabane de pionniers et des activités pour les enfants.',
+    escape: 'Un jeu d’évasion familial depuis 2016, avec six salles thématiques pour 2 à 8 joueurs.', spa: 'Un petit spa de jour avec bain de vapeur à l’eucalyptus, sauna de cèdre et massages sur rendez-vous.',
+    climbing: 'Un centre de bloc avec de nouveaux problèmes chaque semaine, un mur pour enfants et de l’équipement à louer.', general: 'Un endroit local et familial depuis 2010. Une équipe accueillante et quelque chose pour tous les âges.' },
+  knownExKinds: { theatre: 'Pièces, concerts et soirées d’humour, du jeudi au samedi à 19 h 30', museum: 'L’histoire locale et un coin pour les enfants', escape: 'Six salles thématiques, idéal pour les anniversaires',
+    spa: 'Bain de vapeur, sauna et massages', climbing: 'Du bloc pour tous les niveaux, avec un mur pour enfants', general: 'Accueillant, local et parfait un jour de pluie' } });
 // Indoor test 1 (2026-11-19; Margaret: "I don't speak French, do I have to update the French description"): the
 // finish screen's French line says it's optional and we translate it.
 Object.assign(en.indoor, { frDescOld: 'Optional: we translate your story into French for you. Speak French?', frDescGo: 'Check the French yourself' });

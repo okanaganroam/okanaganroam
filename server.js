@@ -5666,6 +5666,14 @@ function smartFuzzyWinner(matches) {
   return top.length === 1 ? top[0].venue : null;
 }
 
+// Indoor test 3 (2026-11-19): the theatres in a town whose own words say they host comedy, live music or plays, as search
+// list rows ({ row, why, rank }); the same places as Build My Trip's fallback (showPlacesFor).
+function searchShowPlaces(region, key) {
+  const ask = SHOW_ASKS.find((a) => a.key === key);
+  if (!ask || !region) return [];
+  const byId = new Map(discoverySearchVenues().map((v) => [v.id, v]));
+  return showPlacesFor(ask, [region]).map((x) => byId.get(x.id)).filter(Boolean).map((v) => ({ row: v.row, why: `Hosts ${ask.en} · check show dates`, rank: 0 }));
+}
 // Venues for a plan's own list (breakfast, a winery with a restaurant), best first.
 function smartPickVenues(test, rank) {
   const out = [];
@@ -6095,7 +6103,9 @@ const SEARCH_NARROW_TOPICS = [
   { key: 'comedy', heading: 'Comedy', headingFr: 'Humour', applies: (folded, intent) => (intent.regions || []).length === 1 || /\bclubs?\b/.test(folded),
     words: ['comedy', 'comedy show', 'comedy shows', 'comedy night', 'comedy nights', 'comedy club', 'comedy clubs', 'comedy lounge', 'comedian', 'comedians', 'improv', 'stand up comedy'], extra: ['club', 'clubs', 'lounge', 'lounges'],
     test: (e) => searchShowKind(e) === 'comedy', rank: (e) => (SEARCH_COMEDY_RE.test(String(e.name || '')) ? 1 : 0),
-    places: (region) => smartPickVenues((v) => (!region || v.region === region) && SEARCH_COMEDY_PLACE_RE.test(String(v.row.name || '')) && 'Comedy club', (v) => foodDrinkRecommendedScore(v.row)),
+    // Indoor test 3 (2026-11-19): and the town's theatres whose own words say they host comedy ("Hosts comedy · check show dates").
+    places: (region) => { const clubs = smartPickVenues((v) => (!region || v.region === region) && SEARCH_COMEDY_PLACE_RE.test(String(v.row.name || '')) && 'Comedy club', (v) => foodDrinkRecommendedScore(v.row));
+      return clubs.concat(searchShowPlaces(region, 'comedy').filter((x) => !clubs.some((c) => c.row.id === x.row.id))); },
     guide: '/guides/okanagan-comedy-shows',
     emptyText: 'No comedy nights are listed here for the next few weeks yet. See the whole valley in our Comedy & Live Shows guide.', emptyTextFr: 'Aucune soirée d’humour n’est encore annoncée ici pour les prochaines semaines. Voyez toute la vallée dans notre guide de l’humour et des spectacles.' },
 ];
@@ -6107,6 +6117,7 @@ const SEARCH_EVENT_TOPICS = [
     words: ['show', 'shows', 'a show', 'the show', 'live show', 'live shows', 'stage show', 'stage shows', 'performance', 'performances', 'live performance', 'live performances',
       'spectacle', 'spectacles', 'un spectacle'],
     test: (e) => !!searchShowKind(e), rank: (e) => ({ comedy: 4, theatre: 3, show: 2, music: 1 })[searchShowKind(e)] || 0,
+    places: (region) => (region ? searchShowPlaces(region, 'plays').concat(searchShowPlaces(region, 'music')).filter((x, i, a) => a.findIndex((y) => y.row.id === x.row.id) === i) : []),
     emptyText: 'No shows are listed for the next few weeks yet. See everything on What’s On.', emptyTextFr: 'Aucun spectacle n’est encore annoncé pour les prochaines semaines. Voyez tout ce qui se passe dans À l’affiche.' },
   { key: 'classical', heading: 'Classical music', headingFr: 'Musique classique',
     words: ['classical', 'classical music', 'classical concert', 'classical concerts', 'symphony', 'symphonies', 'symphony orchestra', 'orchestra', 'orchestras', 'chamber music', 'string quartet',
@@ -7031,6 +7042,12 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       ...(v.type === 'tour' ? tourPlannerFacts(v.id) : {}),
       // Indoor places (2026-11-19): the owner's own kinds, minimum age, walk-ins or book ahead, visit length and price.
       ...(v.type === 'indoor' ? indoorPlannerFacts(v.id) : {}),
+      // Indoor test 3 (2026-11-19): a show place's own show days and time (its Known for, then its story) and its dated
+      // shows on What's On, so Build My Trip never calls it "Closed" on a night its own words or a listed show say it plays.
+      ...(v.type === 'indoor' && indoorShowPlace(venueIndoorInfo(v.id)) ? (() => {
+        const w = ownShowWords(`${knownForById.get(v.id) || ''}. ${v.description || ''}`), dates = venueShowDates(v.id, seasonToday);
+        return { showPlace: true, ...(w && w.days ? { showDays: w.days } : {}), ...(w && w.start != null ? { showStart: w.start } : {}), ...(w ? { showWords: true } : {}), ...(dates.length ? { showDates: dates } : {}) };
+      })() : {}),
       // Winery test 5 (2026-11-12): the owner's tasting fee (live), so a stop says "$10 per person · Tasting" or "Free tasting".
       ...(v.type === 'winery' && wineryTastingFee(v.id) != null ? { tastingFee: wineryTastingFee(v.id) } : {}),
       // Breweries (2026-11-12): the owner's flight price (live), and the kind they picked ("Cidery"), so a stop shows the
@@ -7535,7 +7552,50 @@ function runTripPlan(args, now = new Date()) {
   try { plan = tripTourComingSeason(plan, args, now); } catch (e) { console.error(`[trip] coming season: ${e.message}`); }
   try { plan = tripTourNearTown(plan, args, now); } catch (e) { console.error(`[trip] tours near a town: ${e.message}`); }
   try { plan = tripPickupWordsUsed(plan, args); } catch (e) { /* keep the plan */ }
+  try { plan = tripShowPlacesFallback(plan, args); } catch (e) { console.error(`[trip] show places: ${e.message}`); }
   return plan;
+}
+// Indoor test 3 (2026-11-19; "comedy show in Penticton" found nothing while Diane's theatre hosts comedy nights): a show
+// request ("comedy", "live music", "a concert", "a play") with no dated event that fits, in Build My Trip and search, falls
+// back to the places of the theatre kind in that town whose own words (story, Known for, kinds) say it: "Places that host
+// comedy: Cleland Community Theatre — check show dates". They are never planned as a show; the visitor checks the dates.
+const SHOW_ASKS = [
+  { key: 'comedy', ask: /\b(?:comedy|comedians?|stand ?up|improv|d? ?humou?r)\b/, own: /\b(?:comedy|comedians?|comedic|stand[- ]?up|improv|humour|humor)\b/i, en: 'comedy', fr: 'de l’humour' },
+  { key: 'music', ask: /\b(?:live music|concerts?|gigs?|live bands?|musique (?:en direct|live)|spectacles? de musique)\b/, own: /\b(?:concerts?|live music|music|musicians?|bands?|symphon(?:y|ies)|orchestras?|musique)\b/i, en: 'live music', fr: 'de la musique en direct' },
+  { key: 'plays', ask: /\b(?:a play|plays|the play|stage plays?|musicals?|live theatre|live theater|pieces? de theatre)\b/, own: /\b(?:plays?|productions?|musicals?|live theat(?:re|er)|stage|pièces?)\b/i, en: 'plays', fr: 'des pièces de théâtre' },
+];
+function showAskOf(text) {
+  const t = discoveryIntentModule().normalizeDiscoveryText(String(text || ''));
+  return SHOW_ASKS.find((a) => a.ask.test(t)) || null;
+}
+// -> [{ id, name, url, region }] (best first), or [].
+function showPlacesFor(ask, regions) {
+  if (!ask) return [];
+  const rs = new Set(regions || []);
+  const known = new Map();
+  try { for (const r of db.prepare("SELECT venue_id, info FROM venue_visit_info WHERE info LIKE '%Known for%'").all()) { let o = null; try { o = JSON.parse(r.info); } catch (e) { o = null; } const row = o && Array.isArray(o.rows) ? o.rows.find((x) => x && x.label === 'Known for' && x.text) : null; if (row) known.set(r.venue_id, String(row.text)); } } catch (e) { /* none */ }
+  const out = [];
+  for (const v of db.prepare("SELECT * FROM venues WHERE type = 'indoor' AND redirect_to IS NULL AND slug IS NOT NULL").all()) {
+    if (rs.size && !rs.has(v.region)) continue;
+    if (!REGION_LABELS[v.region]) continue;
+    const kinds = venueIndoorInfo(v.id).kinds;
+    const theatre = Array.isArray(kinds) && kinds.length ? kinds.includes('theatre') : indoorKindSuggestion(v).includes('theatre');
+    if (!theatre) continue;
+    if (!ask.own.test(`${v.description || ''} ${known.get(v.id) || ''} ${v.cuisine || ''}`)) continue;
+    out.push({ id: v.id, name: v.name, url: `/${v.region}/${CATEGORY_SLUGS.indoor}/${v.slug}`, region: v.region, _r: Number(v.rating) || 0 });
+  }
+  return out.sort((a, b) => b._r - a._r || String(a.name).localeCompare(String(b.name))).slice(0, 4).map(({ _r, ...x }) => x);
+}
+function tripShowPlacesFallback(plan, args) {
+  if (!plan || args.swap || args.pinned) return plan;
+  const empty = plan.kind === 'events' ? !(plan.events || []).length : tripPlanEmpty(plan) && (plan.kind === 'discover' || plan.kind === 'recommendations');
+  if (!empty) return plan;
+  const ask = showAskOf(args.text);
+  if (!ask) return plan;
+  const regions = ((plan.overview && plan.overview.regions) || []).map((r) => r.slug).filter(Boolean);
+  const places = showPlacesFor(ask, regions);
+  if (!places.length) return plan;
+  return { ...plan, showPlaces: { what: ask.en, whatFr: ask.fr, places } };
 }
 // Tour test 17 (Whistler, 2026-11-18; Sarah, rafting in Squamish; "rafting near Whistler in July" listed only Whistler's
 // company): a request for a tour or activity "near", "from" or "around" a town takes in the tours within about an hour's
@@ -24050,7 +24110,11 @@ function indoorDonationLine(suggested, fr = false) {
   return fr ? `Contribution volontaire (suggérée : ${tourMoney(n, true)}).` : `By donation (suggested ${tourMoney(n, false)}).`;
 }
 const INDOOR_APPOINTMENT_LINE = 'Times vary · check before you go';
-const INDOOR_APPOINTMENT_LINE_FR = 'Heures variables · vérifiez avant d’y aller';
+// Indoor test 3 (2026-11-19): « Horaires variables » (the What's On words, so a card never reads half English: the line
+// is also turned to French whole wherever a status line is, frStatusText).
+const INDOOR_APPOINTMENT_LINE_FR = 'Horaires variables · vérifiez avant d’y aller';
+// Indoor test 3: a show place: its main kind (the first the owner picked) is live theatre, music or comedy.
+function indoorShowPlace(t) { return !!t && Array.isArray(t.kinds) && t.kinds[0] === 'theatre'; }
 let venueIndoorInfoCache = null;
 let indoorCuisineFrMap = null;
 function clearVenueIndoorInfoCache() { venueIndoorInfoCache = null; indoorCuisineFrMap = null; }
@@ -24127,6 +24191,9 @@ function cleanIndoorPrice(x) {
   if (typeof x === 'string') {
     const m = /^\s*(?:from\s+|[àa] partir de\s+)?(?:CA)?\$?\s*(\d{1,4}(?:[.,]\d{1,2})?)\s*\$?\s*(?:(?:per |par |\/|an? |for an? |pour un )?(?:adults?|adultes?|person|personne|pp)\b.*)?$/i.exec(x);
     if (m) t = Number(m[1].replace(',', '.'));
+    // Indoor test 3 (2026-11-19; Diane: "$25 - $55" was refused): a range of prices is its low number ("From $25").
+    const r = m ? null : /^\s*(?:from\s+|[àa] partir de\s+)?(?:CA)?\$?\s*(\d{1,4}(?:[.,]\d{1,2})?)\s*\$?\s*(?:-|–|—|to|à|a|au)\s*\$?\s*(\d{1,4}(?:[.,]\d{1,2})?)\s*\$?\s*(?:(?:per |par |a |an |\/)?(?:tickets?|billets?|adults?|adultes?|person|personne|pp)\b.*)?$/i.exec(x);
+    if (r && Number(r[2].replace(',', '.')) > Number(r[1].replace(',', '.'))) t = Number(r[1].replace(',', '.'));
   }
   if (!Number.isFinite(t) || t <= 0 || t > INDOOR_PRICE_MAX) return { error: INDOOR_PRICE_ERROR };
   return { value: Math.round(t * 100) / 100 };
@@ -24161,6 +24228,9 @@ function indoorVisitLines(venue, info) {
   if (free === 'donation') out.Prices = { en: indoorDonationLine(t.suggested, false), fr: indoorDonationLine(t.suggested, true) };
   else if (free) out.Prices = { en: INDOOR_FREE_LINES[free][0], fr: INDOOR_FREE_LINES[free][1] };
   else if (price != null && indoorPerLine(t, price)) out.Prices = { en: indoorPerLine(t, price), fr: indoorPerLine(t, price, true) };
+  // Indoor test 3 (2026-11-19; Diane's theatre said "Adults $25"): a show place (its main kind is live theatre, music or
+  // comedy) says "Tickets from $25." (« Billets à partir de 25 $. »): its lowest regular ticket.
+  else if (price != null && indoorShowPlace(t)) out.Prices = { en: `Tickets from ${tourMoney(price, false)}.`, fr: `Billets à partir de ${tourMoney(price, true)}.` };
   else if (price != null) out.Prices = { en: `Adults ${tourMoney(price, false)}.`, fr: `Adultes : ${tourMoney(price, true)}.` };
   if (INDOOR_AGES.includes(String(t.age || ''))) {
     const a = INDOOR_AGE_LINES[String(t.age)];
@@ -24183,7 +24253,7 @@ function indoorCardPrice(venueId) {
   const p = indoorPrice(venueId), free = indoorFree(venueId);
   // Indoor test 2: a price per room, lane, game or group says so ("From $120 / room").
   const per = INDOOR_PER_UNITS.includes(venueIndoorInfo(venueId).per) ? venueIndoorInfo(venueId).per : null;
-  try { if (free) priceCheck.setOwnerPrice(venueId, 0, free === 'donation' ? INDOOR_DONATION_CARD_LABEL : TOUR_FREE_CARD_LABEL); else if (p != null && per) priceCheck.setOwnerPrice(venueId, p, `Per ${INDOOR_PER_WORDS[per][0]}`, INDOOR_PER_WORDS[per][0]); else priceCheck.setOwnerPrice(venueId, p, p == null ? null : 'Adult admission'); } catch (e) { console.error(`[owner-portal] card price for indoor #${venueId} failed: ${e.message}`); }
+  try { if (free) priceCheck.setOwnerPrice(venueId, 0, free === 'donation' ? INDOOR_DONATION_CARD_LABEL : TOUR_FREE_CARD_LABEL); else if (p != null && per) priceCheck.setOwnerPrice(venueId, p, `Per ${INDOOR_PER_WORDS[per][0]}`, INDOOR_PER_WORDS[per][0]); else priceCheck.setOwnerPrice(venueId, p, p == null ? null : indoorShowPlace(venueIndoorInfo(venueId)) ? 'Tickets' : 'Adult admission'); } catch (e) { console.error(`[owner-portal] card price for indoor #${venueId} failed: ${e.message}`); }
 }
 // Build My Trip's facts from the owner's own answers (nothing when not answered).
 function indoorPlannerFacts(venueId) {
@@ -24199,6 +24269,46 @@ function indoorPlannerFacts(venueId) {
     ...(tourFreeOf(t) ? { indoorFree: tourFreeOf(t) } : {}),
     ...(indoorSuggested(venueId) != null ? { indoorSuggested: indoorSuggested(venueId) } : {}),
   };
+}
+// Indoor test 3 (2026-11-19; Diane's community theatre: box office Tue–Fri 11–4 as its hours, shows Thursday to Saturday at
+// 7:30 PM, and Build My Trip said "Closed Saturdays · try Tue–Fri" for a Saturday-night show). A show place's own words
+// about its shows (Known for, then its story): the days it names with show words ("Thursday to Saturday", "Fridays and
+// Saturdays", "Sat"), and the show time it names ("7:30 PM" -> 1170). Read only for show places (indoorShowPlace).
+// -> { days: ['thu', 'fri', 'sat'] | null, start: 1170 | null, says: true } or null when the words say nothing of shows.
+const SHOW_WORDS_RE = /\b(?:shows?|showtimes?|show times|performances?|concerts?|plays?|comedy|stand[- ]?up|improv|musicals?|curtain|opera|ballet|symphon(?:y|ies)|recitals?|screenings?|nights?|matinees?|spectacles?|représentations?|soirées?|pièces?|humour)\b/i;
+const SHOW_DAY_WORDS = [['mon', /\bmon(?:day)?s?\b|\blundis?\b/], ['tue', /\btue(?:s|sday)?s?\b|\bmardis?\b/], ['wed', /\bwed(?:nesday)?s?\b|\bmercredis?\b/], ['thu', /\bthu(?:r|rs|rsday)?s?\b|\bjeudis?\b/],
+  ['fri', /\bfri(?:day)?s?\b|\bvendredis?\b/], ['sat', /\bsat(?:urday)?s?\b|\bsamedis?\b/], ['sun', /\bsun(?:day)?s?\b|\bdimanches?\b/]];
+const SHOW_WEEK = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+function ownShowWords(text) {
+  const t = String(text || '').toLowerCase().replace(/[’']/g, "'");
+  if (!t.trim() || !SHOW_WORDS_RE.test(t)) return null;
+  const dayAt = (w) => { const hit = SHOW_DAY_WORDS.find(([, re]) => re.test(w.trim())); return hit ? hit[0] : null; };
+  const days = new Set();
+  // Ranges first: "Thursday to Saturday", "Thu–Sat", « du jeudi au samedi ».
+  const dayRe = '(mon(?:day)?|tue(?:s|sday)?|wed(?:nesday)?|thu(?:r|rs|rsday)?|fri(?:day)?|sat(?:urday)?|sun(?:day)?|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)s?';
+  const rangeRe = new RegExp(`\\b${dayRe}\\s*(?:-|–|—|to|through|thru|until|au|à)\\s*${dayRe}\\b`, 'g');
+  let m; let rest = t;
+  while ((m = rangeRe.exec(t))) {
+    const a = SHOW_WEEK.indexOf(dayAt(m[1])), b = SHOW_WEEK.indexOf(dayAt(m[2]));
+    if (a < 0 || b < 0) continue;
+    for (let i = a; ; i = (i + 1) % 7) { days.add(SHOW_WEEK[i]); if (i === b) break; }
+    rest = rest.replace(m[0], ' ');
+  }
+  for (const [d, re] of SHOW_DAY_WORDS) if (re.test(rest)) days.add(d);
+  if (/\b(?:nightly|every night|every evening|tous les soirs)\b/.test(t)) SHOW_WEEK.forEach((d) => days.add(d));
+  // The show time: "7:30 PM", "7:30pm", "at 8", « 19 h 30 ».
+  let start = null;
+  const pm = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/.exec(t);
+  const h24 = /\b(1[2-9]|2[0-3])\s*h\s*(\d{2})?\b/.exec(t);
+  if (pm) { let h = Number(pm[1]) % 12; if (pm[3] === 'pm') h += 12; start = h * 60 + Number(pm[2] || 0); }
+  else if (h24) start = Number(h24[1]) * 60 + Number(h24[2] || 0);
+  return { days: days.size ? SHOW_WEEK.filter((d) => days.has(d)) : null, start: start != null && start >= 600 && start <= 1380 ? start : null, says: true };
+}
+// The dates (YYYY-MM-DD, from today) a show place has a scheduled show on What's On (events linked to it), or [].
+function venueShowDates(venueId, today) {
+  try {
+    return db.prepare("SELECT DISTINCT o.start_date AS d FROM event_occurrences o JOIN events e ON e.id = o.event_id WHERE e.venue_id = ? AND o.start_date >= ? AND o.status = 'scheduled' AND (e.status IS NULL OR e.status IN ('scheduled', 'approved', 'live')) ORDER BY o.start_date LIMIT 120").all(venueId, today).map((r) => r.d);
+  } catch (e) { return []; }
 }
 // Indoor test 2 (2026-11-19; Jordan, open to 1 AM on Fridays and Saturdays, left out of "late night kelowna"): an indoor
 // place open past 11 PM counts for a late-night request in Build My Trip and search. Matched on its hours (on the trip's
@@ -29767,7 +29877,7 @@ ${golfEngagementHeadHtml(type, true, 'category')}
   ${venues.length === 0
     ? (sportsAlso.length ? '' : `<p class="subtitle">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel)} right now.</p>`)
     : `<p class="subtitle">${venues.length} verified ${escapeHtml(categoryCountNoun(type, label, venues.length))} in ${escapeHtml(regionLabel)}.</p>
-  ${cardsHtml}`}${sportsAlsoHtml ? '\n  ' + sportsAlsoHtml : ''}
+  ${type === 'indoor' ? townIndoorExperienceChips(region, venues) : ''}${cardsHtml}`}${sportsAlsoHtml ? '\n  ' + sportsAlsoHtml : ''}
   ${guideLinks}${comboLinksHtml ? `\n  ${comboLinksHtml}` : ''}
   <a class="cta" href="/${region}">Back to all of ${escapeHtml(regionLabel)}</a>
   ${usesThemedCategoryLayout(type) ? '</main>' : ''}
@@ -30589,6 +30699,17 @@ const INDOOR_EXPERIENCES = [
   { slug: 'spas', label: 'Spas', pattern: /spa\b|thermal|sauna|steam/i, banner: { src: '/images/indoor/activity-spas.jpg', alt: 'A calm indoor spa pool lined with loungers', pos: 50 }, heading: 'Spas in the Okanagan', intro: 'Spas, saunas and warm pools to unwind in when the weather turns \u2014 a relaxing way to spend a grey day.' },
   { slug: 'theatre', label: 'Theatre', pattern: /theatre|theater|cinema|actors studio|performing arts/i, banner: { src: '/images/indoor/activity-theatre.jpg', alt: 'An audience waiting in front of a red stage curtain', pos: 85 }, heading: 'Theatre & Cinema in the Okanagan', intro: 'Live theatre, performing arts centres and cinemas across the valley \u2014 plays, concerts and films for a night out of the rain.' },
 ];
+// Indoor test 3 (2026-11-19; the Penticton indoor page had no Theatre chip, only the all-valley hub had one): a town's
+// indoor page shows the experiences listed in that town (Theatre with a theatre there), each opening the Indoor hub
+// filtered to that town and experience. Only the experiences that have a place there; no new page.
+function townIndoorExperienceChips(region, venues) {
+  const counts = new Map();
+  for (const v of venues || []) for (const e of indoorExperiencesOf(v, '')) if (e !== 'golf') counts.set(e, (counts.get(e) || 0) + 1);
+  const shown = INDOOR_EXPERIENCES.filter((e) => counts.get(e.slug));
+  if (!shown.length) return '';
+  return `<nav class="indoor-experience-filters" aria-label="Choose an indoor experience">${shown.map((e) => `<a href="/indoor?regions=${encodeURIComponent(region)}&amp;types=${encodeURIComponent(e.slug)}">${escapeHtml(e.label)} <span>(${counts.get(e.slug)})</span></a>`).join('\n')}</nav>
+  `;
+}
 function indoorExperienceMatches(venue, slug) {
   const choice = INDOOR_EXPERIENCES.find((c) => c.slug === slug);
   if (!choice) return true;
@@ -38932,6 +39053,8 @@ function frStatusText(text) {
     .replace('By appointment \u00b7 call ahead', 'Sur rendez-vous \u00b7 appelez avant')
     // Tour test 2 (Whistler, 2026-11-16): a by-booking tour's line under its name on the French page.
     .replace(TOUR_APPOINTMENT_LINE, TOUR_APPOINTMENT_LINE_FR)
+    // Indoor test 3 (2026-11-19): a show place's line, whole (it read « Horaires variables · check before you go »).
+    .replace(INDOOR_APPOINTMENT_LINE, INDOOR_APPOINTMENT_LINE_FR)
     // Tour test 14: « Rouvre fin novembre (selon l’enneigement) ».
     .replace(/ \u00b7 Reopens (early|mid-|late) ?(January|February|March|April|May|June|July|August|September|October|November|December) \(snow permitting\)$/, (m, p, mo) => ` \u00b7 Rouvre ${tourSnowWhen(`${String(MONTH_LONG.indexOf(mo) + 1).padStart(2, '0')}-${p === 'early' ? '05' : p === 'late' ? '25' : '15'}`, true)}${TOUR_SNOW_WORDS.fr}`)
     // Tour test 7: the break between two seasons (« Fermé entre les saisons · Réouverture le 1er juil. »).
@@ -51519,6 +51642,26 @@ function wineryVisitTicks(venue, badges) {
   // Restaurant test 3 (2026-11-15): an owner's own answer to an extra tile (free parking) is logged as feature_<key>.
   return out.filter((k) => !(badges || {})[k] && !owned.has(k) && !owned.has(`feature_${k}`) && !(k === 'dog_friendly' && no.has('dogs')));
 }
+// Indoor test 3 (2026-11-19; Diane's theatre: research's Good to know said "Four wheelchair spaces; elevator to the theatre"):
+// an indoor place's research lines (Accessibility, Good to know, Getting there) that say wheelchair, accessible, elevator or
+// ramp pre-tick Wheelchair accessible on Who can come, as a suggestion only ("We picked these…"), saved only with the
+// screen. Never over the owner's own answer, and never with "not accessible", "no elevator" or "stairs only".
+function indoorVisitTicks(venue, badges) {
+  const out = wineryVisitTicks(venue, badges).filter((k) => k === 'wheelchair_accessible' || k === 'free_parking');
+  if (out.includes('wheelchair_accessible')) return out;
+  const info = venueVisitInfo(venue.id) || {};
+  const mine = new Set(info.owner_labels || []);
+  const was = info.owner_was || {};
+  const text = [...(info.rows || []).filter((r) => r && typeof r.text === 'string' && !mine.has(r.label) && /^(?:accessibility|wheelchair access|good to know|know before you go|getting there|tips?)$/i.test(r.label)).map((r) => r.text),
+    ...Object.entries(was).filter(([k, x]) => /^(?:accessibility|good to know|getting there)$/i.test(k) && x && typeof x.text === 'string').map(([, x]) => x.text)].join(' ');
+  if (!/\bwheelchairs?\b|\b(?:wheelchair[- ])?accessible\b|\belevators?\b|\blifts? to\b|\bramps?\b|\bstep-?free\b/i.test(text)
+    || /\bnot (?:fully |wheelchair )?accessible\b|\binaccessible\b|\bno (?:wheelchair|ramp|elevator|lift)s?\b|\bstairs only\b|\bonly by stairs\b/i.test(text)) return out;
+  if ((badges || {}).wheelchair_accessible) return out;
+  let owned = new Set();
+  try { owned = new Set(db.prepare("SELECT DISTINCT field_name FROM venue_enrichment_log WHERE venue_id = ? AND source = 'venue_owner'").all(venue.id).map((r) => r.field_name)); } catch (e) { return out; }
+  if (owned.has('wheelchair_accessible') || owned.has('feature_wheelchair_accessible')) return out;
+  return [...out, 'wheelchair_accessible'];
+}
 // Restaurant test 1 (Whistler, 2026-11-14): research's Plan your visit "Reservations: Recommended" (or required,
 // essential, accepted) pre-ticks Takes reservations on "What you offer", as a suggestion while the screen is unsaved.
 // -> ['takes_reservations'] or []. Never once the owner has answered it, or with walk-ins only / no reservations.
@@ -58038,6 +58181,7 @@ function renderOwnerSetupPage(found, opts) {
       researchFee: indoorResearchPrice(venue), researchFree: (!!venue.free_entry || indoorResearchDonation(venue)) && snap.indoor_price == null, researchDonation: indoorResearchDonation(venue),
       // Indoor test 2: the suggested donation box starts from research's own "suggested $5", never its adult price.
       researchSuggested: indoorResearchSuggested(venue),
+      visitTicks: indoorVisitTicks(venue, snap.badges),
       bookingKnown: (!snap.booking_url && (venueVisitInfo(venue.id) || {}).booking_url) || '',
     } : {}),
     // Pub test (Whistler, 2026-11-14): research's "Minors until 9 PM" pre-picks that answer on a pub's Who's welcome
@@ -59115,10 +59259,33 @@ const INDOOR_SETUP_HELP_TOPICS = [
     // Indoor test 1 (2026-11-19; Margaret): "school groups by appointment only" landed here, and the button would have
     // taken her real hours off. Only shows or classes with no open hours; appointment words go to Booking or Groups.
     q: 'We don’t have set hours (shows or classes only)', qFr: 'Nous n’avons pas d’heures fixes (spectacles ou cours seulement)',
-    keys: ['no set hours', 'no hours', 'shows only', 'show times', 'showtimes', 'only open for shows', 'only for events', 'events only', 'box office', 'box office hours', 'classes only', 'performances', 'concerts', 'movie times', 'times vary', 'it varies'],
-    keysFr: ['pas d heures fixes', 'pas d heures', 'spectacles seulement', 'heures des spectacles', 'billetterie', 'cours seulement', 'representations', 'concerts', 'horaire des films', 'ca varie'],
-    a: '<p>Only if you have no open hours at all (shows or classes only): in your hours, tap <strong>We don’t have set hours (shows or classes only)</strong>. Your page then says “Times vary · check before you go” instead of open and closed times. Box office hours? Put those in as your hours instead. Your shows go on What’s On: add them with <strong>Add an event</strong> on your page.</p><p>Open set hours, with groups or tours by appointment? Keep your hours, and say so in <strong>Groups and parties</strong>.</p>',
-    aFr: '<p>Seulement si vous n’avez aucune heure d’ouverture (spectacles ou cours seulement) : dans vos heures, touchez <strong>Nous n’avons pas d’heures fixes (spectacles ou cours seulement)</strong>. Votre page indique alors « Heures variables · vérifiez avant d’y aller » au lieu des heures d’ouverture. Des heures de billetterie? Inscrivez-les plutôt comme vos heures. Vos spectacles vont dans À l’affiche : ajoutez-les avec <strong>Ajouter un événement</strong> sur votre page.</p><p>Des heures fixes, avec des groupes ou des visites sur rendez-vous? Gardez vos heures et dites-le dans <strong>Groupes et fêtes</strong>.</p>' },
+    // Indoor test 3 (2026-11-19; Diane, a theatre with shows only): this answer told her to put her box office hours in as
+    // her hours, and Build My Trip then said "Closed Saturdays" for a Saturday-night theatre. Box office hours go in Good
+    // to know; the hours say "We don't have set hours".
+    keys: ['no set hours', 'no hours', 'shows only', 'show times', 'showtimes', 'only show times', 'only open for shows', 'only for events', 'events only', 'box office', 'box office hours', 'box office hours vs show times', 'classes only', 'performances', 'concerts', 'movie times', 'times vary', 'it varies',
+      'no regular hours', 'dont have regular hours', 'we dont have regular hours', 'not regular hours', 'no opening hours', 'only open when there is a show', 'open for shows'],
+    keysFr: ['pas d heures fixes', 'pas d heures', 'spectacles seulement', 'heures des spectacles', 'billetterie', 'heures de billetterie', 'cours seulement', 'representations', 'concerts', 'horaire des films', 'ca varie', 'pas d heures regulieres', 'pas d horaire regulier', 'heures d ouverture de la billetterie'],
+    a: '<p>Shows or classes only? In your hours, tap <strong>We don’t have set hours (shows or classes only)</strong>. Put box office hours in <strong>Good to know</strong>, like <em>Box office: Tue–Fri 11–4 and an hour before shows.</em> Your page then says “Times vary · check before you go” instead of open and closed times. Your shows go on What’s On: add them with <strong>Add an event</strong> on your page.</p><p>Open set hours, with groups or tours by appointment? Keep your hours, and say so in <strong>Groups and parties</strong>.</p>',
+    aFr: '<p>Spectacles ou cours seulement? Dans vos heures, touchez <strong>Nous n’avons pas d’heures fixes (spectacles ou cours seulement)</strong>. Mettez les heures de billetterie dans <strong>Bon à savoir</strong>, comme <em>Billetterie : mar.–ven. 11 h–16 h et une heure avant les spectacles.</em> Votre page indique alors « Horaires variables · vérifiez avant d’y aller » au lieu des heures d’ouverture. Vos spectacles vont dans À l’affiche : ajoutez-les avec <strong>Ajouter un événement</strong> sur votre page.</p><p>Des heures fixes, avec des groupes ou des visites sur rendez-vous? Gardez vos heures et dites-le dans <strong>Groupes et fêtes</strong>.</p>' },
+  // Indoor test 3 (2026-11-19; Diane): three questions that dead-ended at "I'm not sure".
+  { id: 'indoor-ticket-prices', pages: ['setup', 'edit'], over: ['indoor-price', 'price-range', 'avg-spend', 'cost', 'menu-add'], noRelated: ['cost'],
+    q: 'Our ticket prices change every show', qFr: 'Le prix de nos billets change à chaque spectacle',
+    keys: ['ticket prices change', 'ticket prices change every show', 'prices change every show', 'price changes every show', 'prices vary', 'price varies', 'prices change', 'varies by show', 'depends on the show', 'depending on the show', 'different for every show', 'every show is different', 'each show is different', 'change every show', 'different prices for each show', 'prices are different for each show', 'price range', 'range of prices', 'from 25 to 55', 'between', 'sliding scale'],
+    keysFr: ['le prix change', 'les prix changent', 'prix des billets change', 'les prix varient', 'le prix varie', 'selon le spectacle', 'chaque spectacle', 'different pour chaque spectacle', 'ca depend du spectacle', 'fourchette de prix'],
+    a: '<p>Put your lowest regular adult ticket, like <em>25</em>. Your card says <strong>From $25</strong>. Link your tickets page in <strong>Your prices</strong> (in More about your place), so people see each show’s price.</p>',
+    aFr: '<p>Indiquez votre billet adulte régulier le moins cher, comme <em>25</em>. Votre fiche indique <strong>À partir de 25 $</strong>. Mettez le lien de votre page de billets dans <strong>Vos tarifs</strong> (dans Plus sur votre endroit), pour que les gens voient le prix de chaque spectacle.</p>' },
+  { id: 'indoor-closed-months', pages: ['setup', 'edit'], over: ['indoor-seasonal', 'setup-season', 'seasonal-hours', 'closures', 'hours', 'season', 'indoor-yearly-break'],
+    q: 'We’re closed for whole months (like July and August)', qFr: 'Nous fermons des mois entiers (comme juillet et août)',
+    keys: ['closed july and august', 'we are closed july and august', 'closed in july and august', 'closed july', 'closed in july', 'closed august', 'closed in august', 'closed for july', 'closed for august', 'july and august', 'closed for the summer', 'closed all summer', 'closed in the summer', 'closed summers', 'dark in summer', 'dark in the summer', 'summer break', 'off in summer', 'closed for whole months', 'whole months', 'closed for months', 'closed for a few months', 'closed some months', 'closed june', 'closed in june', 'closed september', 'no shows in summer', 'no shows in july'],
+    keysFr: ['fermes en juillet et en aout', 'ferme en juillet et aout', 'nous sommes fermes en juillet', 'fermes en juillet', 'ferme en juillet', 'ferme en aout', 'fermes en aout', 'juillet et aout', 'ferme l ete', 'fermes l ete', 'ferme tout l ete', 'des mois entiers', 'mois entiers', 'ferme des mois', 'pause d ete', 'relache l ete'],
+    a: '<p>On <strong>Are these your hours all year?</strong>, tap <strong>We’re closed part of the year</strong>, then <strong>Closed for whole months?</strong> and click the months you’re closed (like July and August). They repeat every year; your page says “Closed for the season” then, and Build My Trip doesn’t plan you.</p>',
+    aFr: '<p>À <strong>Ces heures sont-elles les mêmes toute l’année?</strong>, touchez <strong>Nous fermons une partie de l’année</strong>, puis <strong>Fermé des mois entiers?</strong> et touchez les mois où vous êtes fermé (comme juillet et août). Ils reviennent chaque année; votre page indique alors « Fermé pour la saison » et Planifier mon voyage ne vous propose pas.</p>' },
+  { id: 'indoor-season-list', pages: ['setup', 'edit'], over: ['indoor-exhibits', 'event-add', 'events', 'menu-add', 'indoor-seasonal'],
+    q: 'We have a whole season of shows', qFr: 'Nous avons toute une saison de spectacles',
+    keys: ['season list', 'our season list', 'season brochure', 'season program', 'season schedule', 'season of shows', 'whole season', 'many shows', 'lots of shows', 'so many shows', 'a lot of shows', '30 shows', 'dozens of shows', 'all our shows', 'all the shows', 'add all our shows', 'add all the shows', 'every show', 'each show', 'too many events', 'add an event is long', 'add an event takes too long', 'shows every week', 'list of shows', 'show list'],
+    keysFr: ['saison de spectacles', 'notre saison de spectacles', 'toute notre saison', 'liste de la saison', 'brochure de la saison', 'programmation de la saison', 'toute la saison', 'beaucoup de spectacles', 'plusieurs spectacles', 'tous nos spectacles', 'tous les spectacles', 'chaque spectacle de la saison', 'liste des spectacles', 'trop d evenements'],
+    a: '<p>Send your season list or brochure with <strong>Message us</strong> and we’ll add the shows to What’s On for you. One show at a time? Use <strong>Add an event</strong> on your page.</p>',
+    aFr: '<p>Envoyez la liste ou la brochure de votre saison avec <strong>Écrivez-nous</strong> et nous ajouterons les spectacles à À l’affiche pour vous. Un spectacle à la fois? Utilisez <strong>Ajouter un événement</strong> sur votre page.</p>' },
   { id: 'indoor-swim-times', pages: ['setup', 'edit'], over: ['hours', 'setup-split-hours'],
     q: 'Our public swim or drop-in times change by day', qFr: 'Nos bains libres ou périodes libres changent selon le jour',
     keys: ['public swim', 'swim times', 'swim schedule', 'lane swim', 'drop in times', 'drop in schedule', 'open gym', 'open climb', 'schedule', 'timetable', 'sessions', 'session times', 'skate times', 'public skate'],
@@ -74019,7 +74186,7 @@ module.exports = {
   COCKTAIL_SETUP_PART1, COCKTAIL_SETUP_PART2, COCKTAIL_SETUP_HELP_TOPICS, COCKTAIL_OWNER_BADGES, COCKTAIL_PRICE_LIVE_MAX, cocktailKidsWelcome, cocktailPriceOf, cocktailPriceGuess, pubSetupType, visitSlotsFor,
   websiteIsInstagramLink, BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, plannerKidsUntil, breweryListTile, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, dogsOutsideOnly, dogsPatioOnly, dogsFrLineEnglish, tripMonthWeekdayDate, kitchenSeasonsClean, setupHereHelpTopics, breweryFoodRowOn, breweryVisitLines, pubKitchenOn, ownerFrLineText, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
   descriptionShrank, tourInActivity, TOUR_KIND_ACTIVITY, ownerTextFlagsHtml, ownerTextClean, ownerFrDescState, tourTripItems, tourTextMonths, tourWaterMonths, tourKindSeasons, tourKindSeasonsEach, tourKindSeasonWords, tourKindSeasonGuess, tourTwoSeasons, tourKindSeasonsAsked, tourPriceWhy, tourYearlyBreaksText, tourStoryWords, tourLengthRange, dogsSomeTrips, tourPriceWhy, TOUR_ADDON_LINE_RE, TOUR_KIND_ORDER, dogsChipSentences,
-  INDOOR_SETUP_ON, INDOOR_SETUP_PART1, INDOOR_SETUP_PART2, INDOOR_SETUP_HELP_TOPICS, INDOOR_KIND_LABELS_OWNER, INDOOR_KINDS_SHOWN, venueIndoorInfo, indoorInfoAnswers, indoorPrice, indoorPriceValue, writeIndoorVisitRows, indoorVisitLines, indoorPlannerFacts, indoorKindsText, indoorKindSuggestion, cleanIndoorPrice, indoorSuggested, indoorDonationLine,
+  INDOOR_SETUP_ON, INDOOR_SETUP_PART1, INDOOR_SETUP_PART2, INDOOR_SETUP_HELP_TOPICS, INDOOR_KIND_LABELS_OWNER, INDOOR_KINDS_SHOWN, venueIndoorInfo, clearVenueIndoorInfoCache, writeVenueIndoorInfo, indoorInfoAnswers, indoorPrice, indoorPriceValue, writeIndoorVisitRows, indoorVisitLines, indoorPlannerFacts, indoorKindsText, indoorKindSuggestion, cleanIndoorPrice, indoorSuggested, indoorDonationLine,
   TOUR_SETUP_PART1, TOUR_SETUP_PART2, TOUR_SETUP_HELP_TOPICS, TOUR_OWNER_BADGES, TOUR_PRICE_LIVE_MAX, TOUR_KIND_LABELS_OWNER, TOUR_KIND_PUBLIC, TOUR_KINDS_SHOWN, tourKindsText, tourCuisineFr, tourCardKind, openSeasonStretches, openStretchesText, venueTapListWords, ownerVisitResearchKeys, cardSeasonOnce, statusSaysClosureToday, venueMenuPreviewHtml, venueTourInfo, tourInfoAnswers, tourPrice, writeTourVisitRows, tourVisitLines, ownerTourPriceWaiting, tourResearchPrice, tourResearchLength, tourKindSuggestion, tourPlannerFacts, cleanTourPrice, apptLineFor,
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS, cafeHelpTopics, cafePlannerWords, cafeVisitTicks, cafeSpendGuessInfo,

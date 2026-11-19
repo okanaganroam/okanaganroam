@@ -778,6 +778,8 @@
         else if (!pr.per && S.tour.perAuto) { S.tour.per = ''; S.tour.perAuto = false; }
         if (S.tour.per) { S.tour.perMin = pr.min; S.tour.perMax = pr.max; var nn = tourPriceNumber(x); S.tour.price = nn == null ? (String(x).trim() ? NaN : null) : nn; S.tour.priceFirst = false; }
         S.tour.perWords = pr.per;
+        // Indoor test 3 (Diane: "$25 - $55" was refused): a range is its low number.
+        var rl = S.tour.per ? null : indoorRangeLow(x); S.tour.range = rl != null; if (rl != null) { S.tour.price = rl; S.tour.priceFirst = false; }
       }
     }
     if ((x = v('suTpriv')) !== null) {
@@ -852,6 +854,9 @@
   // Tour test 12: a second price after the first ("2nd jump same day $69"): the nudge to Your tours and prices.
   function tourPriceLead(){ var l0 = tourPriceLead0(); return S.tour.priceFirst && T.tpriceFirst ? l0 + ' ' + T.tpriceFirst : l0; }
   function tourPriceLead0(){ var n = S.tour.price; if (S.tour.free === 'donation' && T.tpriceLeadDonation) return T.tpriceLeadDonation;
+    // Indoor test 3: a range typed ("$25 - $55") says what we'll show; a show place's lead is about tickets.
+    if (INDOOR && !S.tour.free && !S.tour.per && S.tour.range && n > 0 && T.tpriceRangeLead) return fill(indoorShow() ? T.tpriceRangeLeadShow : T.tpriceRangeLead, { x: tourMoney(n) });
+    if (INDOOR && !S.tour.free && !S.tour.per && indoorShow()) return n == null || isNaN(n) ? T.tpriceLeadShow : fill(T.tpriceLeadPickShow, { x: tourMoney(n) });
     if (INDOOR && S.tour.per && !S.tour.free && T.tpriceLeadPer) return n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPer, { page: indoorPerPage(n), x: tourMoney(n), u: (T.iperWords || {})[S.tour.per] || S.tour.per }); return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n) }); }
   // "$16" / "16 $".
   function cpText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
@@ -1602,6 +1607,15 @@
   // Indoor test 2 (2026-11-19; Jordan's escape room was shown "Grip socks required"): the Good to know example follows the
   // main kind, as its chips do (owner-setup-text.js bringExKinds).
   function indoorBringEx(){ if (!C.indoor || !T.bringExKinds) return T.bringEx; var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; return T.bringExKinds[INDOOR_CHIP_GROUP[k0] || 'general'] || T.bringEx; }
+  // Indoor test 3 (2026-11-19; Diane, a community theatre): the main kind (the first picked, or pre-picked), and whether it
+  // is a show place (live theatre, music or comedy): it is asked about tickets, and its price is its lowest regular ticket.
+  function indoorMainKind(){ if (!C.indoor) return ''; return ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0] || ''; }
+  function indoorShow(){ return indoorMainKind() === 'theatre' && !!T.ibookQShow; }
+  // The story and Known for examples by the main kind (owner-setup-text.js storyExKinds / knownExKinds).
+  var INDOOR_EX_GROUP = { theatre: 'theatre', cinema: 'theatre', museum: 'museum', gallery: 'museum', library: 'museum', escape: 'escape', games: 'escape', bowling: 'escape', spa: 'spa', yoga: 'spa', climbing: 'climbing', kids: 'climbing', pool: 'climbing' };
+  function indoorExFor(key, dflt){ var m = T[key]; if (!C.indoor || !m) return dflt; return m[INDOOR_EX_GROUP[indoorMainKind()] || 'general'] || dflt; }
+  // "$25 - $55", "25 to 55", « 25 à 55 $ »: a range of prices -> its low number (the card shows "From $25"), else null.
+  function indoorRangeLow(x){ var m = /^\s*(?:from\s+|[àa] partir de\s+)?(?:CA)?\$?\s*(\d{1,4}(?:[.,]\d{1,2})?)\s*\$?\s*(?:-|–|—|to|à|a|au)\s*\$?\s*(\d{1,4}(?:[.,]\d{1,2})?)\s*\$?\s*(?:(?:per |par |a |an |\/)?(?:tickets?|billets?|adults?|adultes?|person|personne|pp)\b.*)?$/i.exec(String(x == null ? '' : x)); if (!m) return null; var a = +m[1].replace(',', '.'), b = +m[2].replace(',', '.'); return a > 0 && b > a ? a : null; }
   var INDOOR_QUIET = ['museum', 'gallery', 'library', 'classes'];
   function indoorQuietKinds(){ if (!C.indoor) return false; var st = typeof S !== 'undefined' && S.tour, ks = (st && st.kinds && st.kinds.length ? st.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || []; return ks.length > 0 && ks.every(function(k){ return INDOOR_QUIET.indexOf(k) >= 0; }); }
   function lateBtns(d, j, y){
@@ -1650,7 +1664,7 @@
   function fbKnown(){ return S.fb || CUR.facebook_url || ''; }
   function siteShown(){ return CUR.website ? siteDomain(CUR.website) : (S.notOffered.indexOf('website') >= 0 ? T.noWebsiteSaid : T.noWebsiteYet); }
   // Cocktail test 3 (2026-11-14): opts.sr keeps the label for screen readers only, when the heading just above says the same.
-  function field(id, label, value, opts){ opts = opts || {}; return '<label class="' + (opts.sr ? 'su-sr' : 'su-q') + '" for="' + id + '">' + h(label) + '</label><input class="su-field" id="' + id + '" type="' + (opts.type || 'text') + '"' + (opts.mode ? ' inputmode="' + opts.mode + '"' : '') + (opts.max ? ' maxlength="' + opts.max + '"' : '') + ' value="' + h(value) + '" autocomplete="off"' + (opts.data ? ' ' + opts.data : '') + '>'; }
+  function field(id, label, value, opts){ opts = opts || {}; return '<label class="' + (opts.sr ? 'su-sr' : 'su-q') + '" for="' + id + '">' + h(label) + '</label><input class="su-field" id="' + id + '" type="' + (opts.type || 'text') + '"' + (opts.mode ? ' inputmode="' + opts.mode + '"' : '') + (opts.max ? ' maxlength="' + opts.max + '"' : '') + (opts.ph ? ' placeholder="' + h(opts.ph) + '"' : '') + ' value="' + h(value) + '" autocomplete="off"' + (opts.data ? ' ' + opts.data : '') + '>'; }
   function list(items){ return '<ul class="su-done-list">' + items + '</ul>'; }
   // Pub test 3 (Whistler, 2026-11-14): the Events row names each saved event that isn't every week ("Open mic: 1st of the month").
   function musicOftenLine(){
@@ -1726,7 +1740,7 @@
     // Tours (2026-11-16): the kinds, the town and the price as the card shows it ("From $129").
     // Indoor places (2026-11-19): the kinds, the town and the price as the card shows it ("Adults $25", "Free").
     if (C.indoor) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
-      + h([indoorKindsShort(TI.kinds) || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' && TI.per && T.tpriceCardPer ? fill(T.tpriceCardPer, { x: tourMoney(S.savedTourPrice), u: (T.iperWords || {})[TI.per] || TI.per }) : typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([indoorKindsShort(TI.kinds) || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' && TI.per && T.tpriceCardPer ? fill(T.tpriceCardPer, { x: tourMoney(S.savedTourPrice), u: (T.iperWords || {})[TI.per] || TI.per }) : typeof S.savedTourPrice === 'number' ? fill(indoorShow() && T.tpriceCardShow ? T.tpriceCardShow : T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     if (C.tour) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([S.tourWords || C.tourWords || (TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? (T.tfreeCard || 'Free') : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     // Breweries (2026-11-12): the kind, the town and the flight price as the card shows it ("From $12").
@@ -2408,7 +2422,7 @@
         + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suFreeChips">' + ['free', 'donation'].map(function(f){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ip.free === f ? 'true' : 'false') + '" data-ifree="' + f + '">' + h(tourFreeWord(f)) + '</button>'; }).join('') + '</div>'
         // Indoor test 1: By donation keeps the box, as "Suggested amount (optional)".
         + (ip.free === 'donation' && T.tsuggLabel ? field('suTsugg', T.tsuggLabel, ip.suggText != null ? ip.suggText : ip.sugg != null ? String(ip.sugg) : '', { max: 12, mode: 'decimal' }) + '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>'
-          : ip.free ? '' : field('suTprice', ip.per && T.iperOne ? T.iperOne[ip.per] : T.tpriceLabel, ip.ptext != null ? ip.ptext : ip.per && indoorPerBox() ? indoorPerBox() : boxVal('suTprice', ip.price), { max: 60 })
+          : ip.free ? '' : field('suTprice', ip.per && T.iperOne ? T.iperOne[ip.per] : indoorShow() ? T.tpriceLabelShow : T.tpriceLabel, ip.ptext != null ? ip.ptext : ip.per && indoorPerBox() ? indoorPerBox() : boxVal('suTprice', ip.price), { max: 60, ph: indoorShow() ? T.tpricePhShow : '' })
             // Indoor test 2: Per person (the default) / Per room or group, right under the box.
             + (T.iperChips ? '<div class="su-chips" role="group" aria-label="' + h(T.iperChips.person + ' / ' + T.iperChips.group) + '" id="suPerChips">' + ['person', 'group'].map(function(u){ var on = u === 'group' ? !!ip.per : !ip.per; return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (on ? 'true' : 'false') + '" data-iper="' + u + '">' + h(T.iperChips[u]) + '</button>'; }).join('') + '</div>'
               + '<p class="su-sent su-research" id="suPerRead"' + (ip.per && ip.perAuto ? '' : ' hidden') + '>' + h(ip.per ? fill(T.iperRead, { u: (T.iperWords || {})[ip.per] || ip.per }) : '') + '</p>' : '')
@@ -2417,8 +2431,8 @@
     } else if (s === 'booking' && INDOOR) {
       // Indoor places (2026-11-19): walk-ins or book ahead (one tap), then the booking or tickets link (optional).
       var ib = S.tour, ibNow = S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '';
-      x = doneLine('booking') + '<h1 id="suQ">' + h(T.ibookQ) + '</h1>' + (ib.bookGuessed && ib.book && T.guessKind ? '<p class="su-sent su-research" id="suBookGuess">' + h(T.guessKind) + '</p>' : '') + msgs()
-        + tbig('book', ['no', 'busy', 'ahead'], T.ibooks, null, 'suQ')
+      x = doneLine('booking') + '<h1 id="suQ">' + h(indoorShow() ? T.ibookQShow : T.ibookQ) + '</h1>' + (ib.bookGuessed && ib.book && T.guessKind ? '<p class="su-sent su-research" id="suBookGuess">' + h(T.guessKind) + '</p>' : '') + msgs()
+        + tbig('book', ['no', 'busy', 'ahead'], indoorShow() ? T.ibooksShow : T.ibooks, null, 'suQ')
         + '<h2 class="su-h2" id="suLinkQ">' + h(T.tbookQ) + '</h2><p class="su-hint">' + h(T.tbookLead) + '</p>'
         + (ib.noBook ? '' : field('suBookUrl', T.bookLinkLabel, ibNow, { mode: 'url', max: 300 }) + ex(T.bookLinkEx))
         + (CUR.booking_url || C.bookingKnown ? '' : '<div class="su-chips" role="group" aria-labelledby="suLinkQ"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ib.noBook ? 'true' : 'false') + '" data-tnobook="1">' + h(T.noBookLink) + '</button></div>')
@@ -2591,7 +2605,7 @@
       // Sent already: say so in the heading, Next is the main button, and a newer menu is the smaller choice (as photos).
       x = (sentM ? q(T.menuSentQ) + msgs() + '<div class="su-stack" style="margin-bottom:22px">' + big('➜', nextLabel('menu'), '', false, 'after:menu') + '</div><h2 class="su-h2">' + h(T.menuNewer) + '</h2>'
           : (S.done.menu === 'email' ? '<p class="su-sent">' + h(T.menuSentEmail) + '</p>' : '') + q(T.menuQ, T.menuLead) + msgs())
-        + '<div class="su-stack">' + big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam') + big('📄', T.upload, T.uploadSub, true, 'go:menu:upload') + (C.website ? big('🌐', T.web, '', true, 'go:menu:web') : '') + big('📘', T.menuSocial, fbKnown() ? fill(T.menuFbKnown, { x: siteDomain(fbKnown()) }) : '', true, 'go:menu:social')
+        + '<div class="su-stack">' + (INDOOR && FINE ? '' : big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam')) + big('📄', T.upload, T.uploadSub, INDOOR && FINE ? sentM : true, 'go:menu:upload') + (C.website ? big('🌐', T.web, '', true, 'go:menu:web') : '') + big('📘', T.menuSocial, fbKnown() ? fill(T.menuFbKnown, { x: siteDomain(fbKnown()) }) : '', true, 'go:menu:social')
         // Café test 2 (2026-11-11): flavours that change every day ("see Instagram / Facebook / the board").
         + (C.cafe ? big('🔄', iceKind() ? T.menuDailyIce : T.menuDaily, T.menuDailySub, true, 'go:menu:daily') : '')
         // Tour test 9 (Whistler, 2026-11-18; Tanis, no price sheet): "Type them in myself" opens the edit page's own typed
@@ -2628,8 +2642,11 @@
       // Pub test 9 (2026-11-10): never the website's query or #fragment, so a tracked link (…/?utm_source=okanaganroam) is
       // never prefilled for "add the page after the /". Brewery test 4: its path is kept (siteUrl).
       var site = siteUrl(C.website), siteHost = siteHostOf(C.website);
-      var lead2 = s === 'menu:web' ? (site ? T.webLead : T.webLeadEmpty) : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
-      var urlNow = S.webUrl != null ? S.webUrl : site;
+      // Indoor test 3 (2026-11-19; Diane's theatre was offered the city's page, not the tickets link she had just saved): an
+      // indoor place's saved booking or tickets link (or, for a theatre, the one research found) fills the box first.
+      var tixUrl = INDOOR && s === 'menu:web' && T.webLeadTickets ? ((S.done.booking && S.bookUrl && /\S\.\S/.test(S.bookUrl) ? S.bookUrl : '') || CUR.booking_url || (indoorShow() ? C.bookingKnown : '') || '') : '';
+      var lead2 = s === 'menu:web' ? (tixUrl ? T.webLeadTickets : site ? T.webLead : T.webLeadEmpty) : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
+      var urlNow = S.webUrl != null ? S.webUrl : tixUrl || site;
       x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, urlNow, { mode: 'url', max: 300 })
         // Pub test 7 (2026-11-10): one tap for the website she typed or we have ("Use sandbarpub.ca"); never one being removed.
         // Café test 5 (2026-11-12): hidden while the box already holds that address (it read as a puzzle beside it).
@@ -2649,7 +2666,7 @@
       // Winery test 2 (2026-11-12): research's Plan your visit lines (free parking, step-free, dogs welcome) pre-tick their
       // tiles the same way: suggestions only, saved with this screen, while it has never been saved.
       // Pub test 3 (Whistler, 2026-11-14): pubs too (research's "Free parking" in Good to know), only on an untouched tile.
-      if ((C.winery || C.brewery || C.pub || C.restaurant) && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
+      if ((C.winery || C.brewery || C.pub || C.restaurant || INDOOR) && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
       // Café test 1 (Whistler, 2026-11-15): cafés too (research's "Free Wi-Fi" and "Free parking"); never over her "No Wi-Fi".
       if (C.cafe && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'wifi' && S.noWifi)) return false; S.badges[k] = true; return true; }); }
       // Pub test 5: tiles pre-ticked from our research say so, above the tiles (until the owner has saved this screen).
@@ -2805,12 +2822,12 @@
       // while the story is still ours. (The page leaves that sentence off until he sends his own.)
       var yrSay = TOUR && T.storyYearRound && (S.savedWYear || TI.year) === 'seasonal' && C.storyResearch && !C.storyPending && S.story === storyCur() && /\byear[- ]round\b|\ball year\b|toute l[’']ann[ée]e|(?:^|\s)à l[’']ann[ée]e/i.test(S.story);
       x = doneLine('story') + q(T.storyQ, T.storyLead) + frDescOld() + frDescEnLead() + (yrSay ? '<p class="su-sent su-research" id="suStoryYearRound">' + h(T.storyYearRound) + '</p>' : '') + (sb2 ? '<p class="su-sent su-research" id="suStoryHint">' + h(fill(T.storySportsHint, { bit: sb2 })) + '</p>' : '') + msgs() + (C.storyPending && S.story === C.storyPending && T.storyPendingHint ? '<p class="su-sent" id="suStoryPending" role="status">' + h(T.storyPendingHint) + '</p>' : storyCur() ? '<p class="su-hint" id="suStoryEdit">' + h(T.storyEnglishHint && S.story === CUR.description && (String(CUR.description).match(/\b(?:the|and|with|from|our|its|of|is)\b/gi) || []).length >= 2 && !/\b(?:le|la|les|et|avec|nos|des|est)\b/i.test(CUR.description) ? T.storyEnglishHint : C.storyResearch && !C.storyPending && S.story === storyCur() && T.storyResearchHint ? T.storyResearchHint : T.storyEditHint) + '</p>' + (C.storyResearch && !C.storyPending && S.story === storyCur() && T.storyReplaceLink ? '<p class="su-hint" id="suStoryReplaceRow"><button type="button" class="su-link" id="suStoryReplace">' + h(T.storyReplaceLink) + '</button></p>' : '') : '') + '<label class="su-sr" for="suStory">' + h(T.storyLabel) + '</label><textarea class="su-field su-area" id="suStory" maxlength="1200">' + h(S.story) + '</textarea>'
-        + '<p class="su-count' + (L2 >= STORY_OK ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= STORY_OK ? T.storyGood : T.storyCount) + '</p>' + ex(kindText('story') || T.storyEx)
+        + '<p class="su-count' + (L2 >= STORY_OK ? ' su-ok' : '') + '" id="suCount">' + h(L2 >= STORY_OK ? T.storyGood : T.storyCount) + '</p>' + ex(kindText('story') || indoorExFor('storyExKinds', T.storyEx))
         // Wineries (2026-11-12): the Known for line on the same screen (on the page right away).
         + (C.winery ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>' + enLineHint(S.wine.known === ((CUR.visit_rows || {}).known_for || '') ? S.wine.known : '', 'suKnownEn', true, 'known_for') + field('suKnown', T.knownQ, S.wine.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
         + (FOLD ? '<h2 class="su-h2">' + h(T.knownQ) + '</h2><p class="su-hint">' + h(T.knownLead) + '</p>'
           // Tour test 3 (Whistler, 2026-11-17): research's Known for line, untouched, says it came from online (tours).
-          + (T.knownGuess && !!S.brew.known && S.brew.known === ((CUR.visit_rows || {}).known_for || '') && (C.visitResearch || []).indexOf('known_for') >= 0 ? '<p class="su-sent su-research" id="suKnownGuess">' + h(T.knownGuess) + '</p>' : '') + enLineHint(S.brew.known === ((CUR.visit_rows || {}).known_for || '') ? S.brew.known : '', 'suKnownEn', true, 'known_for') + field('suKnown', T.knownQ, S.brew.known, { max: 180, sr: true }) + ex(T.knownEx) : '')
+          + (T.knownGuess && !!S.brew.known && S.brew.known === ((CUR.visit_rows || {}).known_for || '') && (C.visitResearch || []).indexOf('known_for') >= 0 ? '<p class="su-sent su-research" id="suKnownGuess">' + h(T.knownGuess) + '</p>' : '') + enLineHint(S.brew.known === ((CUR.visit_rows || {}).known_for || '') ? S.brew.known : '', 'suKnownEn', true, 'known_for') + field('suKnown', T.knownQ, S.brew.known, { max: 180, sr: true }) + ex(indoorExFor('knownExKinds', T.knownEx)) : '')
         + '<div class="su-stack">' + big('✓', C.winery || FOLD ? T.saveThese : T.saveThis, '', false, 'storySave') + '</div>' + skip('story');
     } else if (s === 'book') { x = yesNo('book', T.bookQ, '', T.bookYes, T.bookNo);
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
@@ -3099,7 +3116,7 @@
     S.weekKept = null; try { window.sessionStorage.removeItem('suWeekKept:' + C.base); } catch (e) {} try { window.localStorage.removeItem('suWeekKept:' + C.base); } catch (e) {}
     S.weekBack = true; return true;
   }
-  function noSetBtn(){ return APPT && T.noSetHours ? big('📞', T.noSetHours, '', true, 'noSetHours') : ''; }
+  function noSetBtn(){ return APPT && T.noSetHours ? big('📞', T.noSetHours, T.noSetHoursHint || '', true, 'noSetHours') : ''; }
   function noSetHoursSave(){
     var none = {}; DAYS.forEach(function(d){ none[d] = []; });
     // Tour test 3 (Whistler, 2026-11-17): one wrong tap wiped all seven days ("Add my hours" started with every day
@@ -3842,7 +3859,9 @@
     if (k === 'openNone' || k === 'openSave') {
       var oNew = null; S.splitSaved = '';
       if (k === 'openSave') {
-        var of = mdRead('suOf'), ot = mdRead('suOt'); S.openDraft = { from: of, to: ot };
+        // Indoor test 3: straight from the months picked, the dates they make (not read back from the screen).
+        var useDraft = S.openFromMonths && S.openDraft && S.openDraft.from && S.openDraft.to; S.openFromMonths = false;
+        var of = useDraft ? S.openDraft.from : mdRead('suOf'), ot = useDraft ? S.openDraft.to : mdRead('suOt'); S.openDraft = { from: of, to: ot };
         if (!of || !ot) { S.nudge = T.openNeed; return render(); }
         if (of === ot) { S.nudge = T.openSameDay; return render(); }
         oNew = { from: of, to: ot };
@@ -3943,8 +3962,13 @@
       if (r.bad) { S.nudge = T.monthsClosedOneHere || T.monthsClosedInRow; S.nudgeLink = T.monthsClosedOneHere ? 'closures' : ''; return render(); }
       S.months = openM; S.closedM = null;
       // Café test 2: the quick path from "When are you open each year?" fills its dates with the whole months.
+      var monthsBack = S.openMonthsBack;
       if (S.openMonthsBack) { S.openMonthsBack = false; S.openDraft = { from: pad2(r.a) + '-01', to: pad2(r.b) + '-' + MLAST[r.b - 1] }; }
-      S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render();
+      S.step = S.hist.pop() || 'closures'; S.nudge = ''; render();
+      // Indoor test 3 (2026-11-19; Diane, closed July and August): the months picked from "When are you open each year?" are
+      // saved straight away (she landed back on the dates screen and had to save again): the screen's own main Save.
+      if (INDOOR && monthsBack && S.step === 'hours:open') { S.openFromMonths = true; return act(S.openFrom === 'hours' ? 'openSave:same' : 'openSave:only'); }
+      return;
     }
     if (k === 'monthsClear') { S.months = {}; S.closedM = null; if (S.step !== 'closures') S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'closuresNone' || k === 'closuresSave') {
@@ -4324,7 +4348,7 @@
       return saveAll('indoor', il, null, null, function(){ Object.keys(ii0).forEach(function(kk){ TI[kk] = ii0[kk]; }); S.tour.lengthGuessed = false; S.tour.kindsGuessed = false; });
     }
     if (k === 'priceSave' && INDOOR) {
-      readTour(); var ipf = S.tour.free, ipb = el('suTprice') ? el('suTprice').value : '', ipp = ipf ? 0 : tourPriceNumber(ipb);
+      readTour(); var ipf = S.tour.free, ipb = el('suTprice') ? el('suTprice').value : '', ipp = ipf ? 0 : !S.tour.per && indoorRangeLow(ipb) != null ? indoorRangeLow(ipb) : tourPriceNumber(ipb);
       if (!ipf && (ipp == null || isNaN(ipp))) { S.nudge = T.tpriceNeed; S.badField = 'suTprice'; return render(); }
       // Indoor test 2 (Jordan): a price per room, lane, game or group is never saved as a price for one person. Per person
       // with words that say otherwise ("per room", "per boat", "for 4 people"): ask, and offer Per room or group.
