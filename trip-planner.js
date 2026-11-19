@@ -1776,7 +1776,8 @@ function scoreVenue(v, ctx) {
   // was day 2 of a plain Whistler weekend).
   if (!ctx.kids && v.type === 'indoor' && KIDS_ONLY_RE.test(`${v.textName || ''} ${v.textDesc || normWords(v.plannerDescription || v.description || '')}`)) add('kids_only', -30, null);
   if (ctx.kids && v.type === 'indoor' && RAIN_BACKUP_KIDS_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textDesc, w))) add('kids_indoor_fun', 8, 'Indoor fun for kids');
-  if (ctx.rainy && v.type === 'indoor' && /\b(?:ranch|farm|garden|gardens|orchard)\b/.test(v.textName || '')) add('rainy_mostly_outdoors', -8, null);
+  // Indoor test 5: not for a place whose owner picked its indoor kind ("The Rock Garden" is a climbing gym).
+  if (ctx.rainy && v.type === 'indoor' && !(Array.isArray(v.indoorKinds) && v.indoorKinds.length) && /\b(?:ranch|farm|garden|gardens|orchard)\b/.test(v.textName || '')) add('rainy_mostly_outdoors', -8, null);
   // A party that doesn't drink is not sent to a winery or brewery restaurant for dinner (2026-10-14).
   if (ctx.alcoholFree && DINING_TYPES.includes(v.type) && ALCOHOL_SETTING_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textDesc, w))) add('alcohol_setting', -12, null);
   if (ctx.avoid.has(v.id)) add('avoid', -20, null);
@@ -1825,10 +1826,33 @@ function ownStopPhoto(v) {
 }
 const STOP_PHOTO_KEYS = new Set(['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery', 'winery', 'beach', 'golf', 'outdoor', 'hiking', 'viewpoints', 'water', 'cycling', 'adventure', 'winter', 'indoor', 'arts', 'family', 'games', 'spa', 'theatre', 'tour', 'tour-wine', 'tour-lake', 'tour-farm', 'tour-bike', 'sport', 'ski', 'restaurant-noodle']);
 function isDogTrip(ctx) { return !!(ctx.dog || ctx.features.includes('dog_friendly') || (ctx.requirements?.items || []).some((i) => i.kind === 'feature' && i.value === 'dog_friendly')); }
+// Indoor test 5 (2026-11-19; Chris's climbing and trampoline park, owner-confirmed All ages, was left out of every "rainy day
+// with kids" / "family fun" plan in Vernon while galleries and a theatre were offered). The cause: a request that names no
+// indoor kind builds its facts without planner kinds (buildTripPlannerFacts(false) gives plannerKinds: []), and an empty list
+// was read as "no kinds", so his climbing kind never counted (no +10 for kids), "climbing gym" read as a member gym (-9) and
+// "The Rock Garden" as a garden (-8). Now the kinds are worked out when the list is empty, and for kids and rainy days the
+// family kinds (climbing and trampolines, indoor play, bowling, arcades, cinemas, pools, museums and science centres) come
+// first, an owner's own All ages or 5+ ahead of unanswered places, and galleries and theatres after them.
+const FAMILY_INDOOR_KINDS = ['climbing', 'kids', 'bowling', 'games', 'cinema', 'pool', 'museum'];
+const FAMILY_PLANNER_KINDS = ['climbing', 'bowling', 'arcade', 'museum'];
+const KIDS_QUIET_INDOOR_KINDS = ['gallery', 'theatre', 'classes', 'library', 'curling', 'yoga'];
+function indoorKindsOf(v) { return v.plannerKinds && v.plannerKinds.length ? v.plannerKinds : tripRequirements.inferPlannerKinds(v); }
+function familyIndoorPlace(v) {
+  if (!v || v.type !== 'indoor') return false;
+  const own = Array.isArray(v.indoorKinds) ? v.indoorKinds : [];
+  if (own.length) return own.some((k) => FAMILY_INDOOR_KINDS.includes(k));
+  return indoorKindsOf(v).some((k) => FAMILY_PLANNER_KINDS.includes(k)) || /\b(?:science (?:centre|center)|trampoline|indoor playground|play centre|play center|cinemas?|movie theatre|aquatic centre|leisure pool)\b/.test(`${v.textName || ''} ${normWords(v.cuisine || '')}`);
+}
 function indoorAppeal(v, ctx, add) {
   if (v.type !== 'indoor') return;
-  const kinds = v.plannerKinds || tripRequirements.inferPlannerKinds(v);
+  const kinds = indoorKindsOf(v);
   if (kinds.some((k) => INDOOR_VISITOR_KINDS.includes(k))) add('indoor_attraction', ctx.kids && kinds.some((k) => ['bowling', 'arcade', 'climbing', 'museum'].includes(k)) ? 10 : 7, null);
+  if (ctx.kids || ctx.rainy) {
+    const own = Array.isArray(v.indoorKinds) ? v.indoorKinds : [];
+    if (familyIndoorPlace(v)) add('family_kind', ctx.kids ? 12 : 6, ctx.kids ? 'Indoor fun for the whole family' : null);
+    else if (ctx.kids && (own.length ? own.every((k) => KIDS_QUIET_INDOOR_KINDS.includes(k)) : kinds.some((k) => ['gallery', 'theatre'].includes(k)))) add('kids_quiet_kind', -10, null);
+    if (ctx.kids && ['all', '5'].includes(String(v.indoorMinAge || ''))) add('kids_owner_ages', 8, v.indoorMinAge === 'all' ? 'All ages welcome (the owner’s own answer)' : 'Kids 5 and up welcome (the owner’s own answer)');
+  }
   const asked = (ctx.foodTerms || []).map((f) => f.term);
   const niche = INDOOR_NICHE_WORDS.find((w) => (textHas(v.textName, w) || textHas(v.textDesc, w)) && !asked.some((a) => w.includes(a) || a.includes(w)));
   if (niche && !kinds.some((k) => INDOOR_VISITOR_KINDS.includes(k))) add('indoor_niche', -9, null);
