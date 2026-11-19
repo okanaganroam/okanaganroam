@@ -82,7 +82,7 @@ const plan = (q) => app.runTripPlan({ text: q }, NOW);
 test('1. age: a 14+ chip and the under 18s / under 19s, "come with an adult" / "need a parent or guardian to sign the waiver" choice; the Ages line (EN + FR) and Kid-friendly', async () => {
   assert.ok(completeness.TOUR_AGES.includes('14'));
   assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '8', '10', '12', '14', '16', '19'\]/);
-  assert.match(CLIENT, /tchips\('adultAge', \['18', '19'\], T\.tadultAges/); assert.match(CLIENT, /tchips\('adultHow', \['adult', 'waiver'\], T\.tadultHows/);
+  assert.match(CLIENT, /tchips\('adultAge', \['18', '19'\], T\.tadultAges, /); assert.match(CLIENT, /tchips\('adultHow', \['adult', 'waiver'\], T\.tadultHows, /);
   for (const L of [text.en.tour, text.fr.tour]) { assert.equal(L.tages[14], '14+'); assert.ok(L.tadultAges && L.tadultHows && L.tadultRule); }
   assert.equal(text.en.tour.tadultHows.waiver, 'need a parent or guardian to sign the waiver');
   const { v, t } = await kayla();
