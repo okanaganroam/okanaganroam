@@ -10,7 +10,8 @@ const KINDS = {
   walk: /\b(?:walk|walks|walking trails?|walking paths?|promenade|walkway|stroll|boardwalk|seawall)\b/,
   // Indoor test 9 (2026-11-19): a science or discovery centre is a museum.
   // Indoor test 10: an art museum is a gallery.
-  museum: /\b(?:(?<!art )museums?|science (?:centres?|centers?)|discovery (?:centres?|centers?))\b/,
+  // Indoor test 11 (2026-11-19; "hands-on science for kids Vernon" found a class place): hands-on science is a museum too.
+  museum: /\b(?:(?<!art )museums?|science (?:centres?|centers?)|discovery (?:centres?|centers?)|hands on science|science (?:for kids|exhibits?|museums?)|planetariums?)\b/,
   gallery: /\b(?:galler(?:y|ies)|art warehouse|arts? centre|arts? center|art museums?)\b/,
   escape: /\b(?:escape (?:rooms?|games?)|puzzle rooms?)\b/,
   // Indoor test 4 (2026-11-19): the bowling words of indoor-kinds.js too (tenpin, 5-pin, « quilles »).
@@ -162,7 +163,7 @@ const REQUEST_KINDS = {
   // Indoor test 6 (2026-11-19; Priya's paint-your-own pottery studio): "something creative", hands-on, make-your-own and
   // art-class words, and kids' camps ask for a class or workshop place (a listing still needs pottery/class words of its
   // own, or the owner's Classes & workshops kind). "summer camp" was read as Camping.
-  pottery: /\b(?:ceramics? class(?:es)?|something creative|get creative|creative|crafty|arts and crafts|hands on|make something|make (?:our|your|my) own|diy|paint your own(?: pottery)?|pottery painting|paint and sip|paint nights?|painting class(?:es)?|art class(?:es)?|art camps?|summer camps?|day camps?|kids? camps?|spring break camps?|pd day camps?|poterie|ateliers? creatifs?|quelque chose de creatif|bricolage|camps? de jour|camps? d ete)\b/,
+  pottery: /\b(?:ceramics? class(?:es)?|something creative|get creative|creative|crafty|arts and crafts|hands on(?! science)|make something|make (?:our|your|my) own|diy|paint your own(?: pottery)?|pottery painting|paint and sip|paint nights?|painting class(?:es)?|art class(?:es)?|art camps?|summer camps?|day camps?|kids? camps?|spring break camps?|pd day camps?|poterie|ateliers? creatifs?|quelque chose de creatif|bricolage|camps? de jour|camps? d ete)\b/,
   // Indoor test 9 (2026-11-19): "see a play" and "a musical" ask for live theatre; "see a movie" and "films" for a cinema
   // (a listing still needs theatre or cinema words of its own, or the owner's kind).
   // ("catch a show" and "a live show" stay What's On and dinner-and-a-show requests.)
@@ -772,6 +773,14 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
 // evening is a one-day plan for that window (timeWindow, read by explicitOutingComponents), on the named day.
 const WINDOW_START={morning:540,afternoon:780,evening:1020};
 function isoAdd(iso,n){return new Date(new Date(`${iso}T12:00:00Z`).getTime()+n*86400000).toISOString().slice(0,10);}
+// Indoor test 11 (2026-11-19; "Vernon on a Monday in July" planned Monday November 23): a weekday in a named month is the
+// next such day in that month (server.js tripMonthWeekdayDate does the same for a list of places).
+function monthWeekday(ref,weekday,month){
+  if(!ref||weekday<0||!Number.isInteger(month)||month<1||month>12)return null;
+  let d=ref;
+  for(let n=0;n<400;n++,d=isoAdd(d,1)){if(Number(d.slice(5,7))===month&&new Date(`${d}T12:00:00Z`).getUTCDay()===weekday)return d;}
+  return null;
+}
 function bareTimeWindow(out,intent={},trip={},referenceDate=null){
   const i=intent||{},when=i.when||null;
   const empty=k=>!(i[k]||[]).length;
@@ -800,7 +809,7 @@ function bareTimeWindow(out,intent={},trip={},referenceDate=null){
   // Round 13 (2026-10-21): "Saturday in Pemberton" (a town and a weekday, nothing else) is a one-day plan on that day,
   // not an Ideas list. "What can we do Saturday in Pemberton" still asks for ideas.
   if(!window&&weekday>=0&&ref&&!out.daypart&&!when?.preset&&!/\b(?:what|where|things?|ideas?|suggest\w*|recommend\w*|anything|something)\b/.test(out.text||'')){
-    out.startDate=isoAdd(ref,(weekday-wd+7)%7);out.dateSource=out.dateSource||'the day you named';
+    out.startDate=monthWeekday(ref,weekday,i.month)||isoAdd(ref,(weekday-wd+7)%7);out.dateSource=out.dateSource||'the day you named';
     out.items.push({id:'weekday-day',kind:'days',value:1,strength:'must',sourceText:String(when.weekday),dayIndex:null,weekday:null});
     out.planDays=1;
     return out;
@@ -809,7 +818,7 @@ function bareTimeWindow(out,intent={},trip={},referenceDate=null){
   out.timeWindow=window;
   out.startMinutes=WINDOW_START[window];
   if(ref){
-    if(weekday>=0)out.startDate=isoAdd(ref,(weekday-wd+7)%7);
+    if(weekday>=0)out.startDate=monthWeekday(ref,weekday,i.month)||isoAdd(ref,(weekday-wd+7)%7);
     else if(when?.relative==='tomorrow')out.startDate=isoAdd(ref,1);
     else if(/\btonight\b/.test(out.text||'')||when?.preset==='today'){out.startDate=ref;out.windowToday=true;}
     else if(when?.preset==='this-weekend')out.startDate=wd===0||wd===6?ref:isoAdd(ref,6-wd);

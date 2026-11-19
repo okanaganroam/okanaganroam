@@ -224,3 +224,38 @@ test('Indoor test 10: Sports & Recreation and beach searches still list what the
   assert.deepEqual(IK.indoorKindsNamedIn(`bowling green in ${TOWN}`), []);
   assert.deepEqual(IK.indoorKindsNamedIn('pool table bar'), []);
 });
+
+// Indoor test 11 (2026-11-19; Kim's science centre: "science centre Vernon" listed a weekends-only museum first, and
+// "hands-on science for kids" missed her): within a kind, the place whose name or own lines say the request's own words
+// comes first, in a list and as the itinerary's pick. Every kind: two places of the kind in one town, the better-rated one
+// without the word; the request names the word.
+const OWN = {
+  gallery: ['Watercolour', 'watercolour gallery in {T}'], museum: ['Dinosaur', 'dinosaur museum {T}'], theatre: ['Shakespeare', 'shakespeare theatre in {T}'], cinema: ['IMAX', 'imax cinema {T}'],
+  spa: ['Salt Cave', 'salt cave spa {T}'], pool: ['Diving', 'diving pool in {T}'], climbing: ['Ninja', 'ninja climbing gym {T}'], games: ['Pinball', 'pinball arcade {T}'],
+  escape: ['Heist', 'heist escape room {T}'], bowling: ['Candlepin', 'candlepin bowling {T}'], kids: ['Ball Pit', 'ball pit indoor playground {T}'], classes: ['Glassblowing', 'glassblowing class {T}'],
+  curling: ['Bonspiel', 'bonspiel curling club {T}'], yoga: ['Aerial', 'aerial yoga class {T}'], casino: ['Blackjack', 'blackjack casino {T}'], library: ['Makerspace', 'makerspace library {T}'],
+};
+test('Indoor test 11: within a kind, the place whose name or own lines say the request\'s words comes first (Build My Trip list and day plan), every kind', async () => {
+  const T2 = 'Peachland', R2 = 'peachland', fails = [];
+  const want = {};
+  for (const [kind, [word]] of Object.entries(OWN)) {
+    const k = KINDS[kind], i = Object.keys(OWN).indexOf(kind);
+    // The better-rated one first (plain), then hers (her word in the name for half the kinds, in her story for the rest).
+    const plainV = app.createVenue({ slug: `indoor-pm-own-a-${kind}`, type: 'indoor', region: R2, name: `Peachland ${k.cuisine} ${i}`, cuisine: k.cuisine, description: `A ${k.cuisine.toLowerCase()} in ${T2}.`,
+      latitude: 49.77 + i / 2000, longitude: -119.73, address: `${200 + i} Beach Ave, Peachland, BC`, phone: '250-555-0166', website: 'https://example.com', hours: DAY('10:00', '20:00'), rating: 4.9, reviews: 900, kid_friendly: 1 });
+    const own = app.createVenue({ slug: `indoor-pm-own-b-${kind}`, type: 'indoor', region: R2, name: i % 2 ? `${word} ${k.cuisine} House` : `Lakeside ${k.cuisine} Co ${i}`, cuisine: k.cuisine,
+      description: i % 2 ? `A ${k.cuisine.toLowerCase()} in ${T2}.` : `A ${k.cuisine.toLowerCase()} in ${T2}, known for its ${word.toLowerCase()} nights.`,
+      latitude: 49.771 + i / 2000, longitude: -119.731, address: `${300 + i} Beach Ave, Peachland, BC`, phone: '250-555-0167', website: 'https://example.com', hours: DAY('10:00', '20:00'), rating: 4.0, reviews: 20, kid_friendly: 1 });
+    for (const x of [plainV, own]) await ok(change(tokenFor(x.id), { indoor_info: { kinds: [kind], length: '1-2h', age: kind === 'casino' ? '19' : 'all', year: 'all' } }));
+    want[kind] = own;
+  }
+  for (const [kind, [, q0]] of Object.entries(OWN)) {
+    const q = q0.replace('{T}', T2);
+    const items = itemsOf(app.runTripPlan({ text: q }, NOW)).filter((x) => x.venue.region === R2 && x.venue.type === 'indoor');
+    if (!items.length || items[0].venue.id !== want[kind].id) fails.push(`list ${kind}: "${q}" -> ${items.map((x) => x.venue.name).slice(0, 4).join(' | ')}`);
+    const dq = `${q} on Saturday afternoon`;
+    const di = itemsOf(app.runTripPlan({ text: dq }, NOW)).filter((x) => x.venue.region === R2 && x.venue.type === 'indoor');
+    if (di.length && di[0].venue.id !== want[kind].id) fails.push(`day ${kind}: "${dq}" -> ${di.map((x) => x.venue.name).slice(0, 4).join(' | ')}`);
+  }
+  assert.deepEqual(fails, []);
+});

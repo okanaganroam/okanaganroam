@@ -110,3 +110,37 @@ test('1b. Closures: a holiday on a closed Monday is tappable as "Open this holid
   assert.equal(holidaysOf(v.id), false);
   assert.match(f.text(), /Ouvrir ce jour férié/);
 });
+
+test('3. "Vernon on a Monday in July" is planned on the next Monday in July (day plan and list, EN + FR)', async () => {
+  const { v, t } = await kim({ name: 'Okanagan Science Centre T11 July' });
+  // Open daily in July and August.
+  const daily = Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['10:00', '17:00']]]));
+  await ok(change(t, { hours_seasons: [{ from: '07-01', to: '08-31', label: '', hours: daily }] }));
+  for (const q of ['Vernon on a Monday in July', 'Vernon un lundi en juillet']) {
+    const p = app.runTripPlan({ text: q }, NOW);
+    assert.ok((p.notes || []).includes('Trip starts on 2027-07-05 (Okanagan calendar date).'), `${q}: ${JSON.stringify(p.notes)}`);
+    assert.ok((p.days || []).length === 1 && p.days[0].date === '2027-07-05', q);
+  }
+  for (const q of ['science centre in Vernon on a Monday in July', 'centre des sciences à Vernon un lundi en juillet']) {
+    const p = app.runTripPlan({ text: q }, NOW);
+    assert.ok(itemsOf(p).some((x) => x.venue.id === v.id), `${q}: ${itemsOf(p).map((x) => x.venue.name).join(' | ')} ${JSON.stringify(p.warnings)}`);
+  }
+  // A plain Monday is still the coming one.
+  const mon = app.runTripPlan({ text: 'Vernon on Monday' }, NOW);
+  assert.ok((mon.notes || []).includes('Trip starts on 2026-11-23 (Okanagan calendar date).'), JSON.stringify(mon.notes));
+});
+
+test('4. Her own words rank her first: "science centre Vernon" and "hands-on science for kids Vernon" (list and itinerary) ahead of a better-rated weekends-only museum; one open that day beats one closed', async () => {
+  const weekendsOnly = JSON.stringify({ mon: null, tue: null, wed: null, thu: null, fri: null, sat: [['10:00', '16:00']], sun: [['10:00', '16:00']] });
+  const other = mk({ name: 'Canadian Wildlife Museum T11', cuisine: 'Museum', description: 'Wildlife mounts and dioramas.', hours: weekendsOnly, rating: 4.9, reviews: 800, kid_friendly: 1 });
+  await ok(change(tokenFor(other.id), { indoor_info: { kinds: ['museum'], length: '1-2h', book: 'no', age: 'all', year: 'all' }, indoor_price: 10 }));
+  const { v } = await kim({ name: 'Okanagan Science Centre T11 Words', rating: 4.2, reviews: 60 });
+  for (const q of ['science centre Vernon', 'hands-on science for kids Vernon', 'hands on science Vernon', 'planetarium in Vernon', 'centre des sciences à Vernon']) {
+    const items = itemsOf(app.runTripPlan({ text: q }, NOW)).filter((x) => x.venue.type === 'indoor');
+    assert.equal(items[0] && items[0].venue.id, v.id, `${q}: ${items.map((x) => x.venue.name).join(' | ')}`);
+  }
+  for (const q of ['Vernon science centre early morning', 'science centre in Vernon on Thursday morning', 'a museum in Vernon on Thursday morning']) {
+    const items = itemsOf(app.runTripPlan({ text: q }, NOW)).filter((x) => x.venue.type === 'indoor');
+    assert.ok(items.length && items[0].venue.id !== other.id, `${q}: ${items.map((x) => x.venue.name).join(' | ')}`);
+  }
+});

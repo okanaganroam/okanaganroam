@@ -766,7 +766,7 @@ function indoorAskedLabel(text, form) {
   // Indoor test 6 (2026-11-19; Priya: "paint your own pottery" read "Indoor & rainy day spots, “paint” and “own”", "art
   // class" read "Art galleries"): a class, workshop, make-your-own or kids' camp request says so.
   if (/\b(?:summer|day|kids?|art|spring break|pd day) camps?\b/.test(q)) return form === 'singular' ? 'Kids’ camp' : 'Kids’ camps';
-  if (/\b(?:class|classes|workshops?|pottery|ceramics|paint your own|creative|crafty|arts and crafts|hands on|make something|make (?:our|your|my) own|diy|paint nights?|paint and sip)\b/.test(q)) return form === 'singular' ? 'Class or workshop' : 'Classes & Workshops';
+  if (/\b(?:class|classes|workshops?|pottery|ceramics|paint your own|creative|crafty|arts and crafts|hands on(?! science)|make something|make (?:our|your|my) own|diy|paint nights?|paint and sip)\b/.test(q)) return form === 'singular' ? 'Class or workshop' : 'Classes & Workshops';
   const gallery = /\b(?:galleries|gallery|art)\b/.test(q), museum = /\bmuseums?\b/.test(q);
   if (gallery && museum) return form === 'singular' ? 'Museum or Gallery' : 'Museums & Galleries';
   if (gallery) return form === 'singular' ? 'Art Gallery' : 'Art Galleries';
@@ -1109,6 +1109,27 @@ function plannerExcludedPlace(v) {
 const GENERAL_STOP_RE = /\b(?:museums?|galler(?:y|ies)|art centre|cultural centre|heritage|nordic spa|spa|viewpoints?|lookouts?|waterfalls?|falls|gondola|provincial park|lake park|town park)\b/;
 const GENERAL_STOP_CAVEAT = 'Nothing matching that part of your request fits this time, so this is one of the area’s general things to do.';
 function spaPlace(v) { return !!v && (!v.type || v.type === 'indoor') && ((Array.isArray(v.indoorKinds) && v.indoorKinds.includes('spa')) || /\b(?:spa|spas|sauna|scandinave|massage|thermal)\b/.test(`${v.textName || normWords(v.name || '')} ${normWords(v.cuisine || '')}`)); }
+// Indoor test 11: the request's own words (not the town, the day, the time or the party) that an indoor place's name or own
+// lines say (not its kind's own words). 25 a word in its name, 18 in its own lines, at most 50.
+const OWN_WORDS_SKIP = new Set(('a an the and or of in on at to for with near by from my our your we us me i is are be this that these those it its some any '
+  + 'kids kid children child family families toddler toddlers teens adults adult people group groups friends couple '
+  + 'day days today tonight tomorrow weekend week morning afternoon evening night early late am pm noon time hour hours '
+  + 'monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december '
+  + 'things thing stuff something somewhere place places spot spots fun do go see visit trip plan ideas idea activity activities indoor indoors inside rainy rain open best good great nice '
+  + 'year old years olds age ages christmas boxing holiday holidays long what where can could should would want like le la les des du de un une et en pour avec au aux').split(/\s+/));
+function ownWordsFit(v, ctx) {
+  if (!v || v.type !== 'indoor') return 0;
+  const regionWords = new Set((ctx.regions || []).flatMap((r) => String(r).split('-')));
+  const words = [...new Set(normWords(ctx.queryText || '').split(' ').filter((w) => w.length > 2 && !OWN_WORDS_SKIP.has(w) && !regionWords.has(w) && !/^\d/.test(w)))];
+  if (!words.length) return 0;
+  const name = ` ${v.textName || normWords(v.name || '')} `, own = ` ${v.textDesc || normWords(v.plannerDescription || v.description || '')} ${normWords(v.knownFor || '')} ${normWords(v.groupsText || '')} `;
+  const has = (t, w) => t.includes(` ${w} `) || t.includes(` ${w}s `) || (w.endsWith('s') && t.includes(` ${w.slice(0, -1)} `));
+  // The kind's own words ("climbing gym", "museum") are the kind, already ranked; only the other words count.
+  const kindText = ` ${normWords(v.cuisine || '')} `;
+  let n = 0;
+  for (const w of words) if (!has(kindText, w)) n += has(name, w) ? 25 : has(own, w) ? 18 : 0;
+  return Math.min(50, n);
+}
 // Indoor test 4 (2026-11-19; Lauren: "couples massage Kelowna Saturday" planned another spa): what a spa request names, and
 // how many of those its own words say (its name, story, Known for and Groups lines, its kind). "couples massage" -> 2 for a
 // spa whose Known for says massage and whose Groups line offers couples' packages.
@@ -1509,6 +1530,12 @@ function scoreVenue(v, ctx) {
     if (BIG_HIKE_ASKED_RE.test(ctx.queryText || '')) add('long_hike_asked', 15, 'A full-day hike, as asked');
     else if (!namedInRequest(v, ctx)) add('long_hike', -18, null);
   }
+  // Indoor test 11 (2026-11-19; Kim: "science centre Vernon" listed a weekends-only museum and the archives first, and a
+  // morning itinerary picked that museum): within a kind, an indoor place whose name or own lines (story, Known for, Groups)
+  // say the request's own words comes first.
+  { const ow = ownWordsFit(v, ctx); if (ow) add('own_words', ow, null); }
+  // ... and one open on the planned day beats one its own week lists closed all that day.
+  if (v.type === 'indoor' && (ctx.tripDate || ctx.startWeekday) && dayClosedAllDay(v, /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) ? ctx.tripDate : null, ctx.startWeekday)) add('closed_that_day', -35, null);
   // Indoor test 4 (2026-11-19): a spa whose own words say the massage, facial, couples or hydrotherapy asked for comes first.
   { const sf = spaFocusHits(v, ctx); if (sf) add('spa_focus', 30 + sf * 25, null); }
   // 2026-10-28: "a spa" puts a destination spa (Scandinave's hot pools and saunas) ahead of a hotel treatment room or a
