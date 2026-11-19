@@ -628,7 +628,7 @@
   var BI = clone(CUR.brewery_info || {});
   S.brew = { food: BI.food || '', trucks: BI.trucks || (BI.food === 'trucks' ? 'most_days' : ''), outside: BI.outside || '', kmode: (BI.kitchen || {}).mode || '', kcloses: (BI.kitchen || {}).closes || beforeClose(),
     fee: CUR.flight_fee == null ? null : CUR.flight_fee, feeOther: false, noFlights: BI.no_flights === true, togo: {}, waived: BI.waived || '',
-    known: (CUR.visit_rows || {}).known_for || '', groups: (CUR.visit_rows || {}).groups || '', book: (CUR.visit_rows || {}).reservations || '' };
+    known: (CUR.visit_rows || {}).known_for || '', groups: (CUR.visit_rows || {}).groups || (C.indoor ? C.groupsFound || '' : ''), book: (CUR.visit_rows || {}).reservations || '' };
   (BI.to_go || []).forEach(function(k){ S.brew.togo[k] = true; });
   // Distilleries (Decided 1): the kind is Distillery, never asked (and never sent: it isn't stored).
   if (C.distillery) { S.place = 'Distillery'; CUR.place_type = 'Distillery'; }
@@ -2608,12 +2608,17 @@
       // Indoor test 6 (2026-11-19; Priya said Walk-ins welcome and All ages; research's line said "Studio is by appointment
       // only"): a researched line that contradicts her own answers is shown as found online, flagged, and never put in her box
       // as hers. Skipping leaves it as it is (never silently dropped); her own line replaces it.
-      var gRes = (C.visitResearch || []).indexOf('good_to_know') >= 0 ? ((CUR.visit_rows || {}).good_to_know || '') : '', gClash = bringClash(gRes);
-      var bv = S.tour.bring != null ? S.tour.bring : gClash ? '' : ((CUR.visit_rows || {}).good_to_know || '');
+      // Indoor test 11 (2026-11-19; Kim: the box opened empty and research's line was lost): an empty box starts from what
+      // research found (C.gtkFound: its Good to know line, and the exceptions her walk-in answer replaced), as found online.
+      // Only the sentences that contradict her answers are flagged and kept out (the rest are pre-filled).
+      var gOwn = (CUR.visit_rows || {}).good_to_know || '', gIsRes = (C.visitResearch || []).indexOf('good_to_know') >= 0 || (!gOwn && !!C.gtkFound);
+      var gRes = gIsRes ? (gOwn || C.gtkFound || '') : '', gParts = sentencesOf(gRes), gBad = gParts.filter(bringClash), gClash = gBad.length ? gBad.join('. ') + '.' : '';
+      var gFill = gClash ? gParts.filter(function(p0){ return !bringClash(p0); }).map(function(p0){ return p0 + '.'; }).join(' ') : gRes;
+      var bv = S.tour.bring != null ? S.tour.bring : gIsRes ? gFill : gOwn;
       // Tour test 1 (Whistler, 2026-11-16): research's line, untouched, says it came from online (a tap on an answer replaces it) (tour test 16: a tap adds to it).
-      var bRes = !!bv && bv === ((CUR.visit_rows || {}).good_to_know || '') && (C.visitResearch || []).indexOf('good_to_know') >= 0;
+      var bRes = !!bv && gIsRes && bv === gFill;
       x = doneLine('bring') + q(T.bringQ, T.bringLead) + (bRes && T.bringGuess ? '<p class="su-sent su-research" id="suBringGuess">' + h(T.bringGuess) + '</p>' : '')
-        + (gClash && T.bringClash ? '<p class="su-sent su-research su-clash" id="suBringClash">' + h(T.bringClash) + '</p><p class="su-example" id="suBringFound">“' + h(gRes) + '”</p>' : '') + msgs() + enLineHint(bv === ((CUR.visit_rows || {}).good_to_know || '') ? bv : '', 'suBringEn', false, 'good_to_know') + quick('good_to_know', 'suBring', bv)
+        + (gClash && T.bringClash ? '<p class="su-sent su-research su-clash" id="suBringClash">' + h(T.bringClash) + '</p><p class="su-example" id="suBringFound">“' + h(gClash) + '”</p>' : '') + msgs() + enLineHint(bv === ((CUR.visit_rows || {}).good_to_know || '') ? bv : '', 'suBringEn', false, 'good_to_know') + quick('good_to_know', 'suBring', bv)
         + '<label class="su-sr" for="suBring">' + h(T.bringQ) + '</label><textarea class="su-field su-line" id="suBring" maxlength="' + (BRING_MAX + 600) + '" rows="4" aria-describedby="suBringCount">' + h(bv) + '</textarea>' + countLine('suBring', bv, BRING_MAX) + trimNoteHtml('suBring') + ex(indoorBringEx())
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'bringSave') + '</div>' + skip('bring');
     } else if (s === 'winery') {
@@ -2990,7 +2995,9 @@
         // the same question (an option, not a new field).
         + '<div class="su-chips" role="group" aria-labelledby="' + (gKids ? 'suGroupSizesQ' : 'suQ') + '" id="suGroupSizes">' + (TOUR ? [4].concat(GROUP_SIZES, T.groupsChipBig ? [21] : []) : GROUP_SIZES).map(function(n){ var on = sentencesOf(gl).indexOf(groupsSizeLine(n)) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip' + (n === 21 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (n === 21 && T.groupsChipBig ? h(T.groupsChipBig) : S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>';
       var gLine = enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TL) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TL ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 780, area: true, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + trimNoteHtml('suGroupsLine') + ex(T.groupsEx);
-      x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
+      // Indoor test 11 (Kim): research's Groups line, untouched, says it came from online, as Known for and Good to know do.
+      var gGuess = INDOOR && T.groupsGuess && !!gl && ((gl === ((CUR.visit_rows || {}).groups || '') && (C.visitResearch || []).indexOf('groups') >= 0) || (!(CUR.visit_rows || {}).groups && gl === C.groupsFound)) ? '<p class="su-sent su-research" id="suGroupsGuess">' + h(T.groupsGuess) + '</p>' : '';
+      x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs() + gGuess
         + (gKids ? gLine + gSizes + gNone : gNone + gSizes + gLine)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180, area: true }) : '')
         // Tour test 1 (Whistler, 2026-11-16): a tour is asked for its booking link once, on Booking; here only when not given.
@@ -4612,8 +4619,8 @@
       // Indoor test 9 (2026-11-19; Melissa's "… Sensory-friendly hour Tuesdays 9-10am" had no final period): a line of
       // sentences ends with a period, as Groups does.
       if (TL && /[.!?]\s/.test(br) && /[A-Za-z0-9\u00c0-\u024f)]$/.test(br)) { br += '.'; S.tour.bring = br; }
-      var brSame = br === ((CUR.visit_rows || {}).good_to_know || '') && (C.visitResearch || []).indexOf('good_to_know') < 0;
-      return saveAll('bring', brSame ? [] : [{ visit_rows: { good_to_know: br } }], null, null, function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.good_to_know = br; S.visit.good_to_know = br; C.visitResearch = (C.visitResearch || []).filter(function(kk){ return kk !== 'good_to_know'; }); });
+      var brSame = br === ((CUR.visit_rows || {}).good_to_know || '') && (C.visitResearch || []).indexOf('good_to_know') < 0 && !(!(CUR.visit_rows || {}).good_to_know && C.gtkFound);
+      return saveAll('bring', brSame ? [] : [{ visit_rows: { good_to_know: br } }], null, null, function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.good_to_know = br; S.visit.good_to_know = br; C.gtkFound = ''; C.visitResearch = (C.visitResearch || []).filter(function(kk){ return kk !== 'good_to_know'; }); });
     }
     // ---------- Wineries (2026-11-12) ----------
     if (k === 'yearAppt') { S.apptDraft = null; return go('hours:appt'); }

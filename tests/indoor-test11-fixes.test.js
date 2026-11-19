@@ -144,3 +144,47 @@ test('4. Her own words rank her first: "science centre Vernon" and "hands-on sci
     assert.ok(items.length && items[0].venue.id !== other.id, `${q}: ${items.map((x) => x.venue.name).join(' | ')}`);
   }
 });
+
+const RESEARCH = (id) => db.prepare('INSERT INTO venue_visit_info (venue_id, info) VALUES (?, ?)').run(id, JSON.stringify({ rows: [
+  { label: 'Known for', text: 'Hands-on science museum: Vern the animatronic ankylosaurus, dino dig pit, axolotls and a planetarium.' },
+  { label: 'Prices', text: 'Adults $12; seniors, students and youth 3 to 18 $7; under 3 free; family (2 adults, 2 kids) $35. Plus GST.' },
+  { label: 'Booking', text: 'Buy tickets in person at the front desk. Planetarium shows need pre-registration. Groups of 10+ book 7 days ahead.' },
+  { label: 'Ages', text: 'Kids under 16 must be with an adult. Rocks to Roots dig and garden area is for ages 5 and under.' },
+  { label: 'Groups', text: 'Birthday parties from $250 for up to 12 kids, 2 hours with a party room; exclusive after-hours party $500.' },
+  { label: 'Good to know', text: 'Wear socks for the dino dig pit. No elevator to level 2 or the planetarium. Sensory backpacks and earmuffs to borrow.' }],
+  source_url: 'https://okscience.ca/', checked_at: '2026-10-31' }));
+const rowsOf = (id) => JSON.parse(db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(id).info);
+
+test('5. Good to know and Groups pre-fill research as found online; her walk-in answer keeps "Planetarium shows need pre-registration" as a Good to know suggestion; a clashing sentence is flagged, the rest pre-filled', async () => {
+  const v = mk({ name: 'Okanagan Science Centre T11 Research', cuisine: 'Museum', description: STORY });
+  RESEARCH(v.id);
+  const t = tokenFor(v.id);
+  await ok(change(t, { indoor_info: { kinds: ['museum'], length: '1-2h', book: 'no', age: 'all', year: 'all' }, indoor_price: 12 }));
+  // Her walk-in answer replaced research's Booking line; research's Good to know was set aside (the box was full).
+  assert.ok(!rowsOf(v.id).rows.some((r) => r.label === 'Good to know'));
+  const g = await openSetup(base, t, { hash: 'bring' });
+  assert.match(g.text(), /We found this online\. Check it\./);
+  assert.equal(g.doc.getElementById('suBring').value, 'Wear socks for the dino dig pit. No elevator to level 2 or the planetarium. Sensory backpacks and earmuffs to borrow. Planetarium shows need pre-registration.');
+  // She checks it and saves: hers now (owner's taps are never trimmed; the research note goes).
+  await g.click('bringSave');
+  const gtk = rowsOf(v.id).rows.find((r) => r.label === 'Good to know');
+  assert.match(gtk.text, /Planetarium shows need pre-registration\./);
+  assert.ok(rowsOf(v.id).owner_labels.includes('Good to know'));
+  const g2 = await openSetup(base, t, { hash: 'bring' });
+  assert.doesNotMatch(g2.text(), /We found this online/);
+  // Groups: research's line, said to be found online.
+  const gr = await openSetup(base, t, { hash: 'groups' });
+  assert.match(gr.text(), /We found this online\. Check it, and change any words that aren’t right\. /);
+  assert.match(gr.text(), /Birthday parties from \$250/);
+  const grFr = await openSetup(base, t, { hash: 'groups', lang: 'fr' });
+  assert.match(grFr.text(), /Nous avons trouvé ceci en ligne/);
+  // Round 6's flag: a research sentence that contradicts her answers (by appointment, while she said walk-ins) is shown as
+  // found online and kept out of her box; the other sentences are pre-filled.
+  const w = mk({ name: 'Okanagan Science Centre T11 Clash', cuisine: 'Museum', description: STORY });
+  db.prepare('INSERT INTO venue_visit_info (venue_id, info) VALUES (?, ?)').run(w.id, JSON.stringify({ rows: [{ label: 'Good to know', text: 'Gallery is by appointment only. Free parking out back.' }], source_url: 'https://example.com', checked_at: '2026-10-31' }));
+  const tw = tokenFor(w.id);
+  await ok(change(tw, { indoor_info: { kinds: ['museum'], length: '1-2h', book: 'no', age: 'all', year: 'all' }, indoor_price: 12 }));
+  const c = await openSetup(base, tw, { hash: 'bring' });
+  assert.equal(c.doc.getElementById('suBring').value, 'Free parking out back.');
+  assert.match(c.text(), /“Gallery is by appointment only\.”/);
+});

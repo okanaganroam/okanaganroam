@@ -1735,6 +1735,7 @@ en.stillAdd = 'You can still add'; fr.stillAdd = 'Vous pouvez encore ajouter';
 // A holiday that is always on a weekday the place is closed (Family Day for a place closed Mondays).
 en.holClosedDay = 'You’re closed {day}s'; fr.holClosedDay = 'Vous êtes fermé le {day}';
 // Indoor test 11 (2026-11-19; Kim, open on long-weekend Mondays): a holiday on a day she's usually closed can be opened.
+en.groupsGuess = 'We found this online. Check it, and change any words that aren’t right.'; fr.groupsGuess = 'Nous avons trouvé ceci en ligne. Vérifiez-le et changez les mots qui ne conviennent pas.';
 en.holOpenThis = 'Open this holiday'; fr.holOpenThis = 'Ouvrir ce jour férié';
 en.holOpenOn = 'Open (Open on holidays is on)'; fr.holOpenOn = 'Ouvert (Ouvert les jours fériés est activé)';
 en.holOpenNote = 'Open on holidays is on: stat holidays and Christmas week days you’re usually closed show open, with your weekend hours. Closed on one, like Christmas Day? Tap it above. Tap an open holiday to turn this off.';

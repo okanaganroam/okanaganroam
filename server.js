@@ -51154,6 +51154,33 @@ function ownerVisitResearchKeys(venueId) {
   let tourType = false; try { tourType = ['tour', 'indoor'].includes((db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type); } catch (e) { tourType = false; }
   return visitSlotsFor(venueId).filter((slot) => slot.key !== 'menu' && (slot.key !== 'good_to_know' || tourType)).filter((slot) => { const r = rows[visitSlotRowIndex(slot, rows, mine)]; return !!(r && r.text && !mine.has(r.label)); }).map((slot) => slot.key);
 }
+// Indoor test 11 (2026-11-19; Kim's science centre): what research found for an indoor place's Good to know box while the
+// box holds no line of hers: research's own Good to know line (still shown, or set aside when the box was full), and the
+// exceptions in research's Booking line that her booking answer replaced ("Planetarium shows need pre-registration."; not
+// the group sizes, which are Groups). '' when her own line is there or research had nothing.
+const GTK_BOOK_EXCEPTION_RE = /\bpre-?regist\w*|\bneeds? (?:to be )?(?:booked|booking|reserv\w*|pre-?\w+)|\bmust be booked\b|\b(?:book|reserve)d? (?:ahead|in advance)\b|\breservations? (?:needed|required)\b|\bsold separately\b/i;
+function indoorGtkFound(venueId) {
+  try {
+    const info = venueVisitInfo(venueId) || {};
+    const owned = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
+    if (owned.has('Good to know')) return '';
+    const rows = info.rows || [], dropped = Array.isArray(info.owner_dropped) ? info.owner_dropped : [];
+    const gtk = (rows.find((r) => r && r.label === 'Good to know' && r.text) || dropped.find((r) => r && !r.owned && r.label === 'Good to know' && r.text) || {}).text || '';
+    const was = info.owner_was && info.owner_was.Booking && owned.has('Booking') ? String(info.owner_was.Booking.text || '') : '';
+    const extra = was.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter((x) => x && GTK_BOOK_EXCEPTION_RE.test(x) && !VISIT_GROUPS_RE.test(x) && !String(gtk).includes(x.replace(/\.$/, '')));
+    return [String(gtk).trim(), ...extra.map((x) => (/[.!?]$/.test(x) ? x : `${x}.`))].filter(Boolean).join(' ');
+  } catch (e) { return ''; }
+}
+// ... and research's Groups line set aside when the box was full (her Good to know took its place), for her Groups box.
+function indoorGroupsFound(venueId) {
+  try {
+    const info = venueVisitInfo(venueId) || {};
+    const owned = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
+    if (owned.has('Groups') || (info.rows || []).some((r) => r && r.label === 'Groups' && r.text)) return '';
+    const d = (Array.isArray(info.owner_dropped) ? info.owner_dropped : []).find((r) => r && !r.owned && r.label === 'Groups' && r.text);
+    return d ? String(d.text).trim() : '';
+  } catch (e) { return ''; }
+}
 // Writes the owner's lines into the stored box (an Undo writes the old ones back). Rows the owner left alone (Menu,
 // Patio...) and the booking button stay. A changed line loses its old "More" link. -> the new info JSON (or null).
 function writeOwnerVisitRows(venueId, value, now = new Date()) {
@@ -58828,6 +58855,9 @@ function renderOwnerSetupPage(found, opts) {
     researchTicks: setupResearchTicks(venue, offerGroups.flatMap((g) => g.keys)),
     // Winery test 5: Plan your visit lines that are still research's, so a quick-answer chip replaces them.
     visitResearch: ownerVisitResearchKeys(venue.id),
+    // Indoor test 11 (2026-11-19; Kim: Good to know opened empty, research's line set aside and "Planetarium shows need
+    // pre-registration" gone with her walk-in answer): research's lines for her Good to know box, pre-filled as found online.
+    ...(venue.type === 'indoor' ? { gtkFound: indoorGtkFound(venue.id), groupsFound: indoorGroupsFound(venue.id) } : {}),
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
     credit: String(venue.name || '').replace(/[<>]/g, '').trim().slice(0, 80),
     minEdge: OWNER_PHOTO_MIN_EDGE, menuMinEdge: MENU_MIN_EDGE, pdfMax: MENU_PDF_MAX_BYTES, maxPages: MENU_MAX_PAGES, maxPhotos: OWNER_PHOTO_PENDING_LIMIT,
