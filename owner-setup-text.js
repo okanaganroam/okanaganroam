@@ -2570,6 +2570,8 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
   for (const [lang, T] of [['en', en.indoor], ['fr', fr.indoor]]) {
     const fr2 = lang === 'fr';
     T.kindText = {}; T.quick.groups_kinds = {};
+    // Codes, not words: [Good to know chip group, story example group, quiet kind] (an array, so the French check skips it).
+    T.kindGroups = {};
     for (const k of IK.INDOOR_KIND_TEXT_KINDS) {
       const w = IK.indoorKindText([k], lang), line = noPeriod(w.price.page);
       T.kindText[k] = {
@@ -2580,9 +2582,9 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
         webLeadTickets: fr2 ? `Nous avons inscrit votre ${w.prices.noun}. Si vos prix sont sur une autre page, changez-la.` : `We filled in your ${w.prices.noun}. If your prices are on another page, change it.`,
         groupsLead: w.groups.lead, groupsEx: w.groups.ex, quick: { groups: w.groups.chips },
         noSetHoursHint: w.boxOffice ? T.noSetHoursHint : '',
-        chipGroup: w.gtk, exGroup: w.ex, quiet: w.quiet,
       };
       T.quick.groups_kinds[k] = w.groups.chips;
+      T.kindGroups[k] = [w.gtk, w.ex, w.quiet ? 1 : 0];
     }
   }
 })();

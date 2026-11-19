@@ -1556,7 +1556,7 @@
   // Indoor test 1 (2026-11-19): an indoor place's Good to know chips by its main kind (owner-setup-text.js good_to_know_kinds).
   // Indoor test 4 (2026-11-19): which chips and examples each kind gets comes from indoor-kinds.js (kindText chipGroup /
   // exGroup), so a pool is never offered grip socks and a yoga studio never a swimsuit.
-  function indoorGroupOf(k, key){ var o = (T0.kindText || {})[k]; return (o && o[key]) || 'general'; }
+  function indoorGroupOf(k, key){ var o = (T0.kindGroups || {})[k]; return (o && o[key === 'exGroup' ? 1 : 0]) || 'general'; }
   var INDOOR_CHIP_GROUP = { get: function(k){ return indoorGroupOf(k, 'chipGroup'); } };
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
@@ -1630,7 +1630,7 @@
   // "$25 - $55", "25 to 55", « 25 à 55 $ »: a range of prices -> its low number (the card shows "From $25"), else null.
   function indoorRangeLow(x){ var m = /^\s*(?:from\s+|[àa] partir de\s+)?(?:CA)?\$?\s*(\d{1,4}(?:[.,]\d{1,2})?)\s*\$?\s*(?:-|–|—|to|à|a|au)\s*\$?\s*(\d{1,4}(?:[.,]\d{1,2})?)\s*\$?\s*(?:(?:per |par |a |an |\/)?(?:tickets?|billets?|adults?|adultes?|person|personne|pp)\b.*)?$/i.exec(String(x == null ? '' : x)); if (!m) return null; var a = +m[1].replace(',', '.'), b = +m[2].replace(',', '.'); return a > 0 && b > a ? a : null; }
   // Indoor test 4: the quiet kinds come from indoor-kinds.js (kindText quiet): museums, galleries, libraries, classes.
-  function indoorQuietKinds(){ if (!C.indoor) return false; var st = typeof S !== 'undefined' && S.tour, ks = (st && st.kinds && st.kinds.length ? st.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || []; return ks.length > 0 && ks.every(function(k){ return !!((T0.kindText || {})[k] || {}).quiet; }); }
+  function indoorQuietKinds(){ if (!C.indoor) return false; var st = typeof S !== 'undefined' && S.tour, ks = (st && st.kinds && st.kinds.length ? st.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || []; return ks.length > 0 && ks.every(function(k){ return !!((T0.kindGroups || {})[k] || [])[2]; }); }
   function lateBtns(d, j, y){
     // Café test 1 (Whistler, 2026-11-15): no "Open after midnight?" row on a café's day card.
     if (C.cafe) return '';
