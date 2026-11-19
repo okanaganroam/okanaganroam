@@ -2501,6 +2501,8 @@ fr.indoor = {
 // Indoor test 1 (2026-11-19; Margaret, a by-donation museum): By donation keeps the adult price box, as the suggested amount.
 // Indoor test 1: no "lunch & dinner" on an indoor place's day card (a pool or a theatre that closes in between).
 Object.assign(en.indoor, { addSecond: '+ Add a second time (if you close in between)', twoTimesMax: 'Up to two times a day.' });
+// Indoor test 11 (2026-11-19; Kim: a closed day said "Open this day" on one row and "Reopen" on another): one wording.
+Object.assign(en.indoor, { reopenDay: 'Open this day' }); Object.assign(fr.indoor, { reopenDay: 'Ouvrir ce jour' });
 Object.assign(fr.indoor, { addSecond: '+ Ajouter une deuxième plage (si vous fermez entre les deux)', twoTimesMax: 'Jusqu’à deux plages par jour.' });
 Object.assign(en.indoor, { tsuggLabel: 'Suggested amount (optional)', tdonationCard: 'By donation', tsuggNeed: 'Just the number, like 5. No suggested amount? Leave the box empty.',
   seaClosuresHint: 'Closed over Christmas or for a winter break? Add it under Closures in More about your place.',

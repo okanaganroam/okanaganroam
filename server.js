@@ -7768,9 +7768,10 @@ function tripKindClosureNotes(plan, args, now) {
   if (!plan || args.swap || args.pinned) return plan;
   const text = String(args.text || '');
   let kinds = tripIndoorKindsAsked(text);
+  const anyKind = !kinds.length && Array.isArray(plan.days) && plan.days.length === 1;
   // A plain swim outside the lake season is the pool (runTripPlanCore reads it the same way).
   if (!kinds.includes('pool') && TRIP_SWIM_OFF_MONTHS.includes(Number(String(plan.listDate || ((plan.schedule || []).find((r) => r && r.date) || {}).date || todayLocal(now)).slice(5, 7))) && /\b(?:swim|swimming|nager|baignade|natation)\b/i.test(text)) kinds = kinds.concat('pool');
-  if (!kinds.length) return plan;
+  if (!kinds.length && !anyKind) return plan;
   let en = text;
   try { en = tripPlannerFrModule().tripPlannerText(en, buildTripPlannerTaxonomy()); } catch (e) { /* as typed */ }
   const di = discoveryIntentModule();
@@ -7780,6 +7781,25 @@ function tripKindClosureNotes(plan, args, now) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return plan;
   const own = ((plan.overview && plan.overview.regions) || []).map((r) => r && r.slug).filter(Boolean);
   if (!own.length) return plan;
+  // Indoor test 11 (2026-11-19; "a day in Vernon with kids on Boxing Day" said nothing of the places closed that day): a
+  // one-day plan with no kind asked, on a stat holiday, names the indoor places in its own towns that their owners closed
+  // that day, in one line ("Closed Dec 26 (Boxing Day): Okanagan Science Centre.").
+  if (anyKind) {
+    if (!(hoursModule && hoursModule.holidayOn(date))) return plan;
+    const inPlan0 = new Set((plan.days || []).flatMap((d) => d.stops || []).filter((x) => x && x.venue).map((x) => x.venue.id));
+    const M0 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const shut = [];
+    for (const v of db.prepare(`SELECT * FROM venues WHERE type = 'indoor' AND redirect_to IS NULL AND region IN (${own.map(() => '?').join(',')}) ORDER BY name`).all(...own)) {
+      if (inPlan0.has(v.id)) continue;
+      const c = (venueHoursExtras(v.id).closures || []).find((x) => x && date >= String(x.from) && date <= String(x.to || x.from));
+      if (c) shut.push({ name: v.name, note: String(c.note || '').trim().replace(/[.!]\s*$/, '') });
+    }
+    if (!shut.length) return plan;
+    const notes = [...new Set(shut.map((x) => x.note).filter(Boolean))];
+    const line = `Closed ${M0[Number(date.slice(5, 7)) - 1]} ${Number(date.slice(8, 10))}${notes.length === 1 ? ` (${notes[0]})` : ''}: ${shut.slice(0, 5).map((x) => x.name).join(', ')}.`;
+    if (![...(plan.warnings || []), ...(plan.notes || [])].includes(line)) plan.warnings = (plan.warnings || []).concat(line);
+    return plan;
+  }
   const regions = new Set(own.concat(own.flatMap((r) => TRIP_NEAR_TOWNS[r] || [])));
   const inPlan = new Set([...(plan.recommendations || []), ...((plan.outing && plan.outing.stops) || []), ...((plan.itinerary && plan.itinerary.stops) || []), ...(plan.days || []).flatMap((d) => d.stops || [])]
     .filter((x) => x && x.venue).map((x) => x.venue.id));
@@ -24518,8 +24538,11 @@ function indoorOwnWords(venueId) {
     return `${v.name || ''} ${v.description || ''} ${kf}`;
   } catch (e) { return ''; }
 }
+// Indoor test 11 (2026-11-19; Kim's science centre read "Museum"): a museum whose own words say science or discovery centre
+// is called that.
+const INDOOR_SCIENCE_CENTRE_RE = /\b(?:science|discovery) (?:centres?|centers?)\b/i;
 function indoorKindsText(kinds, fr = false, own = null) {
-  const l = (kinds || []).filter((k, i, a) => INDOOR_KIND_WORDS[k] && a.indexOf(k) === i).map((k, i) => (k === 'games' && i > 0 && own != null && !INDOOR_GAMES_FULL_RE.test(own) ? INDOOR_GAMES_SHORT : INDOOR_KIND_WORDS[k])[fr ? 1 : 0]);
+  const l = (kinds || []).filter((k, i, a) => INDOOR_KIND_WORDS[k] && a.indexOf(k) === i).map((k, i) => (k === 'games' && i > 0 && own != null && !INDOOR_GAMES_FULL_RE.test(own) ? INDOOR_GAMES_SHORT : k === 'museum' && own != null && INDOOR_SCIENCE_CENTRE_RE.test(own) ? ['Science centre', 'Centre des sciences'] : INDOOR_KIND_WORDS[k])[fr ? 1 : 0]);
   if (!l.length) return '';
   const lower = (x, i) => (i && !/^(?:VR|SUP)\b/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x);
   const ll = l.map(lower);
@@ -24536,7 +24559,7 @@ function indoorCuisineFr(text) {
         const en = o && Array.isArray(o.kinds) ? indoorKindsText(o.kinds) : '';
         if (en && en === r.c) indoorCuisineFrMap.set(String(r.c), indoorKindsText(o.kinds, true));
         // Indoor test 8: "Bowling & arcade" (games second, no VR words of its own).
-        else if (o && Array.isArray(o.kinds) && o.kinds.indexOf('games') > 0) { const own = indoorOwnWords(r.id); if (indoorKindsText(o.kinds, false, own) === r.c) indoorCuisineFrMap.set(String(r.c), indoorKindsText(o.kinds, true, own)); }
+        else if (o && Array.isArray(o.kinds) && (o.kinds.indexOf('games') > 0 || o.kinds.includes('museum'))) { const own = indoorOwnWords(r.id); if (indoorKindsText(o.kinds, false, own) === r.c) indoorCuisineFrMap.set(String(r.c), indoorKindsText(o.kinds, true, own)); }
       }
     } catch (e) { /* no table yet */ }
   }
@@ -68679,13 +68702,13 @@ ${renderGolfHeaderHtml()}
              ask either). The full page keeps the fields. "Happy hour" reads « 5 à 7 » in French. */ ''}
           ${/* Tour test 2 (Whistler, 2026-11-16): a tour runs a season (and may be by booking only): no "opening hours". */ ''}${venue.type === 'tour' ? (wineryApptOnly ? tile('hours', '&#128339;', L('Change my season', 'Modifier ma saison'), L('When you run. Trips are by booking only', 'Quand vous offrez des sorties (sur réservation seulement)')) : tile('hours', '&#128339;', L('Change my hours or season', 'Modifier mes heures ou ma saison'), L('When you run', 'Quand vous offrez des sorties'))) : tile('hours', '&#128339;', L('Change my hours', 'Modifier mes heures'), L('When you open and close', 'Vos heures d’ouverture'))}
           ${tile('photos', '&#128247;', L('Add photos', 'Ajouter des photos'), L('From your phone or computer', 'Depuis votre téléphone ou ordinateur'))}
-          ${/* Tour test 1 (Whistler, 2026-11-16): a tour's tile is its tours and prices with a ticket; any price list gets a price tag, never the plate. */ ''}${hasMenu ? `<a class="op-task" href="${menuHref}"><span class="op-task-icon" aria-hidden="true">${venue.type === 'tour' ? '&#127903;' : isPriceList(venue) ? '&#127991;' : '&#127869;'}</span><span class="op-task-text"><strong>${venue.type === 'tour' ? L('Update my tours &amp; prices', 'Mettre à jour mes sorties et tarifs') : isPriceList(venue) ? L('Update my prices', 'Mettre à jour mes prix') : venue.type === 'cocktail' ? L('Update my menu or cocktail list', 'Mettre à jour mon menu ou ma carte des cocktails') : brewSetupType(venue.type) ? L(breweryListTile(venue).en[0], breweryListTile(venue).fr[0]) : L('Update my menu', 'Mettre à jour mon menu')}</strong><span>${venue.type === 'cocktail' ? L('Snap your cocktail list or menu', 'Photographiez votre carte des cocktails ou votre menu') : brewSetupType(venue.type) ? L(breweryListTile(venue).en[1], breweryListTile(venue).fr[1]) : venue.type === 'tour' ? L('A photo or a link to your price list', 'Une photo ou un lien vers votre liste de prix') : L('Just take a photo of it', 'Prenez-le simplement en photo')}</span></span></a>` : ''}
+          ${/* Tour test 1 (Whistler, 2026-11-16): a tour's tile is its tours and prices with a ticket; any price list gets a price tag, never the plate. */ ''}${hasMenu ? `<a class="op-task" href="${menuHref}"><span class="op-task-icon" aria-hidden="true">${venue.type === 'tour' ? '&#127903;' : isPriceList(venue) ? '&#127991;' : '&#127869;'}</span><span class="op-task-text"><strong>${venue.type === 'tour' ? L('Update my tours &amp; prices', 'Mettre à jour mes sorties et tarifs') : isPriceList(venue) ? L('Update my prices', 'Mettre à jour mes prix') : venue.type === 'cocktail' ? L('Update my menu or cocktail list', 'Mettre à jour mon menu ou ma carte des cocktails') : brewSetupType(venue.type) ? L(breweryListTile(venue).en[0], breweryListTile(venue).fr[0]) : L('Update my menu', 'Mettre à jour mon menu')}</strong><span>${venue.type === 'cocktail' ? L('Snap your cocktail list or menu', 'Photographiez votre carte des cocktails ou votre menu') : brewSetupType(venue.type) ? L(breweryListTile(venue).en[1], breweryListTile(venue).fr[1]) : venue.type === 'tour' ? L('A photo or a link to your price list', 'Une photo ou un lien vers votre liste de prix') : venue.type === 'indoor' ? (() => { const ik = indoorHelpKinds(venue); return L(`A photo or a link to your ${escapeHtml(indoorKindsModule.indoorKindText(ik, 'en').prices.noun)}`, `Une photo ou un lien vers votre ${escapeHtml(indoorKindsModule.indoorKindText(ik, 'fr').prices.noun)}`); })() : L('Just take a photo of it', 'Prenez-le simplement en photo')}</span></span></a>` : ''}
           ${portalFields(venue.type).arrivalTile ? tile('arrival', '&#128205;', venue.type === 'tour' ? L('Help people find your meeting spot', 'Aidez les gens à trouver votre point de rencontre') : L('Help people find your door', 'Aidez les gens à trouver votre porte'), venue.type === 'tour' ? L('A photo taken where people meet you, on your phone', 'Une photo prise là où l’on vous rejoint, avec votre téléphone') : venue.type === 'winery' ? L('A photo of your tasting room door, taken outside on your phone', 'Une photo de la porte de votre salle de dégustation, prise dehors avec votre téléphone') : L('A storefront photo, taken outside on your phone', 'Une photo de la devanture, prise dehors avec votre téléphone')) : ''}
           ${ownerVideoEnabled() ? tile('video', '&#127916;', L('Share a video', 'Partager une vidéo'), L('A short clip we can turn into a reel', 'Un court clip que nous transformerons en reel')) : ''}
-          ${venue.type === 'winery' ? '' : tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), venue.type === 'tour' ? L('Special trips, classes and more', 'Sorties spéciales, ateliers et plus') : L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
+          ${venue.type === 'winery' ? '' : tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), venue.type === 'tour' ? L('Special trips, classes and more', 'Sorties spéciales, ateliers et plus') : venue.type === 'indoor' ? L('Shows, classes, demos and more', 'Spectacles, cours, démonstrations et plus') : L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
           ${tile('contact', '&#9742;', L('Phone, website or description', 'Téléphone, site Web ou description'), L('Your contact details and your story', 'Vos coordonnées et votre présentation'))}
           ${showHappyHour && venue.type !== 'winery' ? tile('happy', venue.type === 'cocktail' ? '&#127864;' : fr ? '&#127865;' : venue.type === 'distillery' ? '&#127864;' : '&#127867;', L('Happy hour', '5 à 7'), L('Your times and what’s on special', 'Vos heures et vos spéciaux')) : ''}
-          ${venue.type === 'tour' ? tile('more', '&#11088;', L('Features', 'Caractéristiques'), L('Dogs, parking, access, price range…', 'Chiens, stationnement, accès, gamme de prix…')) : tile('more', '&#11088;', L('Features and deals', 'Caractéristiques et spéciaux'), L('Dog friendly, patio, price range…', 'Chiens admis, terrasse, gamme de prix…'))}
+          ${/* Indoor test 11 (2026-11-19; Kim's science centre was offered "patio, price range"): an indoor place's own words. */ ''}${venue.type === 'indoor' ? tile('more', '&#11088;', L('Features', 'Caractéristiques'), L('Kids, access, parking, groups…', 'Enfants, accès, stationnement, groupes…')) : venue.type === 'tour' ? tile('more', '&#11088;', L('Features', 'Caractéristiques'), L('Dogs, parking, access, price range…', 'Chiens, stationnement, accès, gamme de prix…')) : tile('more', '&#11088;', L('Features and deals', 'Caractéristiques et spéciaux'), L('Dog friendly, patio, price range…', 'Chiens admis, terrasse, gamme de prix…'))}
         </div>
         ${/* Distillery test 3 (2026-11-13): the weekly tours/nights editor (how often, every other week) is one tap from the list. */ ''}
         ${showNights && venue.type !== 'winery' ? `<p class="op-all-link op-nights-link"><a href="#tours-events">${venue.type === 'distillery' ? L('Tours &amp; events: days and how often', 'Visites et événements : jours et fréquence') : venue.type === 'cocktail' ? L('Events: days and how often', 'Événements : jours et fréquence') : venue.type === 'cafe' || venue.type === 'brewery' || venue.type === 'restaurant' ? L('Weekly events: days and how often', 'Événements de la semaine : jours et fréquence') : L('Weekly nights: days and how often', 'Soirées de la semaine : jours et fréquence')}</a></p>${pendingOftenHtml}` : ''}

@@ -226,7 +226,8 @@ function t3FrenchTextCore(value){
  { const FR_SHORT={Jan:'janv.',Feb:'févr.',Mar:'mars',Apr:'avr.',May:'mai',Jun:'juin',Jul:'juill.',Aug:'août',Sep:'sept.',Oct:'oct.',Nov:'nov.',Dec:'déc.'};
    text=text.replace(/^(.+) is closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?: \((.+)\))?\.$/,(_,n,m,d,h)=>n+' est fermé le '+frDom(d)+' '+FR_SHORT[m]+(h?' ('+(FR_HOLIDAYS[h.replace(/'/g,'’')]||h)+')':'')+'.');
    // Indoor test 8 (2026-11-19): the places of the kind asked closed that day by their owner ("Closed Dec 25: A, B.").
-   text=text.replace(/^Closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2}): (.+)\.$/,(_,m,d,n)=>'Fermés le '+frDom(d)+' '+FR_SHORT[m]+' : '+n+'.'); }
+   // Indoor test 11: with the holiday's name on the generic day plan ("Closed Dec 26 (Boxing Day): A.").
+   text=text.replace(/^Closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?: \((.+?)\))?: (.+)\.$/,(_,m,d,h,n)=>'Fermés le '+frDom(d)+' '+FR_SHORT[m]+(h?' ('+(FR_HOLIDAYS[h.replace(/'/g,'’')]||h)+')':'')+' : '+n+'.'); }
  // Indoor test 8: the owner's own line quoted on a stop.
  text=text.replace(/^(“.+”) \(the owner’s own words\)$/,'$1 (les mots de l’établissement)');
  text=text.replace(/^These places match but are closed on (\w+) (\d{1,2}): (.+?)\. Ask again with another date to plan them\.$/,(_,m,d,n)=>'Ces lieux correspondent, mais sont fermés le '+frDom(d)+' '+(FR_MONTHS_BY_EN[m]||m)+' : '+n.replace(/ and (?!.* and )/,' et ')+'. Essayez une autre date pour les planifier.');

@@ -21,6 +21,7 @@ delete process.env.BADGE_REMINDERS;
 const app = require('../server.js');
 const db = require('../db.js');
 const { openSetup } = require('./setup-sim.js');
+const frCopy = require('../trip-french-copy.js');
 app.setVenueSubmissionTransport(async () => {});
 if (app.setOwnerEmailTransport) app.setOwnerEmailTransport(async () => {});
 
@@ -243,4 +244,29 @@ test('9. French page while her story waits for French: research\'s French stays 
   assert.ok(at >= 0);
   assert.doesNotMatch(hub.slice(at, at + 600), /\$12/);
   assert.match(hub.slice(at, at + 600), /12 \$/);
+});
+
+test('10. Polish: no Free parking chip in Good to know (the Free parking tile asks it); "Open this day" on every closed day; the landing page speaks museum; a science centre is called one; the generic day plan names holiday closures (EN + FR)', async () => {
+  const { v, t } = await kim({ name: 'Okanagan Science Centre T11 Polish' });
+  const g = await openSetup(base, t, { hash: 'bring' });
+  assert.ok(g.has('[data-quick="Gift shop"]'));
+  assert.ok(!g.has('[data-quick="Free parking on site"]'));
+  // Closed days: "Open this day", never "Reopen".
+  const h = await openSetup(base, t, { hash: 'hours:edit' });
+  await h.click('[data-hoff="tue"]');
+  assert.match(h.text(), /Open this day/);
+  assert.doesNotMatch(h.text(), /\bReopen\b/);
+  // The landing page: no patio or price range, and the price tile names the kind's own list.
+  const land = plain(await (await fetch(`${base}/owner/${t}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } })).text());
+  assert.doesNotMatch(land, /patio, price range/);
+  assert.match(land, /Kids, access, parking, groups/);
+  assert.match(land, /Shows, classes, demos and more/);
+  // Her category follows her own words: a science centre.
+  assert.equal(app.getVenue(v.id).cuisine, 'Science centre');
+  assert.match(plain(pageHtml(v, 'fr')), /Centre des sciences/);
+  // A generic day plan on a stat holiday names her holiday closure.
+  await ok(change(t, { closures: [{ from: '2026-12-26', to: '2026-12-26', note: 'Boxing Day' }] }));
+  const p = app.runTripPlan({ text: 'a day in Vernon with kids on Boxing Day' }, NOW);
+  assert.ok((p.warnings || []).some((w) => /^Closed Dec 26 \(Boxing Day\): .*Okanagan Science Centre T11 Polish/.test(w)), JSON.stringify(p.warnings));
+  assert.equal(frCopy.t3FrenchText('Closed Dec 26 (Boxing Day): A.'), 'Fermés le 26 déc. (le lendemain de Noël) : A.');
 });

@@ -1611,7 +1611,10 @@
     var l = (T.quick || {})[key]; if (!l) return '';
     if (key === 'good_to_know' && C.indoor && (T.quick || {}).good_to_know_kinds) { var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; var lk = k0 ? T.quick.good_to_know_kinds[INDOOR_CHIP_GROUP.get(k0)] : null; if (lk && lk.length) l = lk;
       // Indoor test 7 (2026-11-19): "Free on the first Sunday" makes no sense when entry is always free.
-      if (freeIndoor()) l = l.filter(function(c){ return !/first Sunday|premier dimanche/i.test(c); }); }
+      if (freeIndoor()) l = l.filter(function(c){ return !/first Sunday|premier dimanche/i.test(c); });
+      // Indoor test 11 (2026-11-19; Kim was asked about free parking twice): free parking is the Free parking tile in What you
+      // offer, so its Good to know chip isn't offered (unless her line already says it, so she can take it out).
+      l = l.filter(function(c){ return !/^(?:Free parking on site|Stationnement gratuit sur place)$/i.test(c) || saysIt(value, c, l); }); }
     // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
     // isn't offered "Patio only".
     if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;
@@ -5138,7 +5141,9 @@
       // Tour test 14 (Lucía, Pixel): the first tap into a box a chip just filled puts the cursor at the end, wherever the
       // finger landed (her words went into the middle of the chip's sentence).
       // Tour test 14: a space typed right after a chip's ". " is not a second space.
-      inp.addEventListener('input', function(){ if (inp._qPrev && / $/.test(inp._qPrev) && inp.value === inp._qPrev + ' ') { inp.value = inp._qPrev; try { var nq = inp.value.length; inp.setSelectionRange(nq, nq); } catch (e) {} } });
+      // Indoor test 11 (2026-11-19; Kim): no double space after a chip, also when a phone keyboard puts a space before the word
+      // it adds (" School") after the chip's own ". ".
+      inp.addEventListener('input', function(){ if (inp._qPrev && / $/.test(inp._qPrev) && inp.value.indexOf(inp._qPrev + ' ') === 0) { inp.value = inp._qPrev + inp.value.slice(inp._qPrev.length + 1).replace(/^ +/, ''); inp._qPrev = inp.value === inp._qPrev ? inp._qPrev : ''; try { var nq = inp.value.length; inp.setSelectionRange(nq, nq); } catch (e) {} } });
       inp.addEventListener('click', function(){ if (!(S.chipFilled && S.chipFilled[inp.id] != null && S.chipFilled[inp.id] === inp.value) || inp._chipEnd) return; inp._chipEnd = true; try { var ne = inp.value.length; if (inp.selectionStart !== ne || inp.selectionEnd !== ne) inp.setSelectionRange(ne, ne); } catch (e) {} });
       inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) { inp.select(); inp._autoSel = Date.now(); } else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
       // "…or tap again to add to it": a second tap on the story box while our own select is still on it puts the cursor
