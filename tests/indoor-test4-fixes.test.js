@@ -179,7 +179,7 @@ test('5. What kind of place: a kind already picked folds to "Spa, sauna or welln
   const sim = await openSetup(base, t, { hash: 'indoor' });
   const all = sim.doc.getElementById('suKindsAll');
   assert.ok(all && all.getAttribute('hidden') !== null, sim.screen().slice(0, 1500));
-  assert.match(sim.doc.getElementById('suKindsPicked').textContent, /Spa, sauna or wellness ✓ · Change/);
+  assert.match(sim.doc.getElementById('suKindsPicked').textContent, /^Spa, sauna or wellness ✓ · Change/);
   assert.match(sim.text(), /We picked this from your page\. Not right\? Tap Change\./);
   assert.ok(sim.acts().includes('indoorSave'));
   // Save comes right after the fold and the length chips (the long list is hidden).

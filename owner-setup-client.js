@@ -2426,8 +2426,9 @@
       // picked (or pre-picked from her page) shows as one line, "Spa, sauna or wellness ✓ · Change", so Save is on the first
       // screen. Change opens the whole list (it stays open on this visit).
       var iFold = S.tour.kinds.length > 0 && !S.kindsOpen && !S.nudge;
-      x = doneLine('indoor') + q(T.tkindQ, T.tkindLead) + (S.tour.kindsGuessed && T.kindsGuess ? '<p class="su-sent su-research" id="suKindsGuess">' + h(iFold && S.tour.kinds.length === 1 && T.kindsGuessFold ? T.kindsGuessFold : T.kindsGuess) + '</p>' : '') + msgs()
-        + (iFold ? '<p class="su-sent su-kinds-picked" id="suKindsPicked"><strong>' + h(S.tour.kinds.map(tourKindName).join(', ')) + ' ✓</strong> · <button type="button" class="su-link" data-act="kindsChange" aria-controls="suKindsAll" aria-expanded="false">' + h(T.kindsChange || 'Change') + '</button></p>' : '')
+      x = doneLine('indoor') + q(T.tkindQ, T.tkindLead) + (S.tour.kindsGuessed && T.kindsGuess && !iFold ? '<p class="su-sent su-research" id="suKindsGuess">' + h(T.kindsGuess) + '</p>' : '') + msgs()
+        // Folded, the "we picked this" line sits in the same box, so Save stays on the first phone screen.
+        + (iFold ? '<p class="su-sent su-kinds-picked" id="suKindsPicked"><strong>' + h(S.tour.kinds.map(tourKindName).join(', ')) + ' ✓</strong> · <button type="button" class="su-link" data-act="kindsChange" aria-controls="suKindsAll" aria-expanded="false">' + h(T.kindsChange || 'Change') + '</button>' + (S.tour.kindsGuessed && T.kindsGuessFold ? '<br><small id="suKindsGuess">' + h(S.tour.kinds.length === 1 ? T.kindsGuessFold : T.kindsGuess) + '</small>' : '') + '</p>' : '')
         + '<div id="suKindsAll"' + (iFold ? ' hidden' : '') + '><div class="su-chips su-kinds" role="group" aria-labelledby="suQ" id="suIndoorKinds">' + iTop.map(ichip).join('') + '</div>'
         + (iRest.length ? '<details class="su-kinds" id="suKindsMore"' + (S.tourMoreOpen || iRest.some(function(o){ return S.tour.kinds.indexOf(o.k) >= 0; }) ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + iRest.map(ichip).join('') + '</div></details>' : '')
         + (S.tour.kinds.length ? '<p class="su-sent" id="suTourPicked">' + h(fill(T.picked, { list: S.tour.kinds.map(tourKindName).join(', ') })) + '</p>' : '') + '</div>'
