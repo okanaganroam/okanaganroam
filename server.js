@@ -24220,6 +24220,8 @@ function indoorCuisineFr(text) {
 function writeVenueIndoorInfo(venueId, info) {
   const cur = venueIndoorInfo(venueId);
   const clean = Object.fromEntries([...INDOOR_INFO_PARTS, 'price', 'free'].filter((k) => info && info[k] != null && info[k] !== '').map((k) => [k, info[k]]));
+  // Indoor test 5: arts_auto (internal) = the Arts & Culture badge was put on by an arts kind, so it may come off with it.
+  if (info && 'arts_auto' in info ? info.arts_auto === true : !!cur.arts_auto) clean.arts_auto = true;
   if (TOUR_FREE_WORDS.includes(clean.free)) clean.price = 0; else { delete clean.free; if (!(clean.price > 0)) delete clean.price; }
   let v = null; try { v = db.prepare('SELECT cuisine FROM venues WHERE id = ?').get(venueId); } catch (e) { v = null; }
   const was0 = 'cuisine_was' in cur ? cur.cuisine_was : (v && v.cuisine != null ? String(v.cuisine) : '');
@@ -24236,7 +24238,12 @@ function writeVenueIndoorInfo(venueId, info) {
   try { clearVenueCuisinesCache(); } catch (e) { /* not loaded yet */ }
 }
 // The answers without the price and the kept research words (what the instant 'indoor_info' field holds).
-function indoorInfoAnswers(venueId) { const o = { ...venueIndoorInfo(venueId) }; delete o.price; delete o.free; delete o.cuisine_was; return o; }
+function indoorInfoAnswers(venueId) { const o = { ...venueIndoorInfo(venueId) }; delete o.price; delete o.free; delete o.cuisine_was; delete o.arts_auto; return o; }
+// Indoor test 5 (2026-11-19; Chris tried Museum, then went back to Climbing: the Arts & Culture badge the museum kind had
+// put on stayed). The badge an arts kind (gallery, museum, theatre) put on itself comes off when the kinds no longer have
+// one. A badge the owner set (or research set before) is never touched.
+const indoorArtsKindIn = (kinds) => (Array.isArray(kinds) ? kinds : []).some((k) => INDOOR_ARTS_KINDS.includes(k));
+function setIndoorArtsAuto(venueId, on) { const cur = venueIndoorInfo(venueId); if (!!cur.arts_auto === !!on || (!on && !Object.keys(cur).length)) return; writeVenueIndoorInfo(venueId, { ...cur, arts_auto: !!on }); }
 function indoorPrice(venueId) { const f = venueIndoorInfo(venueId).price; return typeof f === 'number' && Number.isFinite(f) && f > 0 ? f : null; }
 function indoorFree(venueId) { return tourFreeOf(venueIndoorInfo(venueId)); }
 // The suggested donation (a number) while the answer is By donation, or null.
@@ -56097,6 +56104,16 @@ const MENU_APP_STRINGS = {
 };
 
 // Price lists (tours, golf, other prices, 2026-10-17): the same screens, worded for a price list. No diet tags.
+// Indoor test 5 (2026-11-19; Chris's price typer said "What it is (like Adult admission)" and "Section name, like
+// Admission" for jump passes): an indoor place's typer in its kind's words (indoor-kinds.js typer).
+function indoorMenuAppStrings(venue, lang) {
+  const w = indoorKindsModule.indoorKindText(venueIndoorInfo(venue.id).kinds || indoorKindSuggestion(venue), lang).prices.typer;
+  if (!w) return {};
+  const E = escapeHtml;
+  return lang === 'fr'
+    ? { dishName: `Ce que c&rsquo;est (ex. ${E(w.item)})`, namePh: `ex. ${w.item}`, sectionPh: `Nom de la section, ex. ${w.section}`, firstSection: w.section }
+    : { dishName: `What it is (like ${E(w.item)})`, namePh: `like ${w.item}`, sectionPh: `Section name, like ${w.section}`, firstSection: w.section };
+}
 function priceListAppStrings(kind, lang) {
   const w = PRICE_LIST_WORDS[kind];
   const e = w.en, f = w.fr;
@@ -56129,7 +56146,7 @@ function priceListAppStrings(kind, lang) {
       webNothing: 'Nous avons trouv&eacute; la page, mais pas de prix dessus. Essayez plut&ocirc;t une photo, ou touchez &laquo;&nbsp;Pouvez-vous le faire pour moi&nbsp;?&nbsp;&raquo;',
       typeTitle: `Tapez ${f.listHtml}`, typeIntro: kind === 'tours'
         ? 'Ajoutez chaque activit&eacute; avec sa dur&eacute;e et son prix (la description est facultative). Touchez le nom d&rsquo;une section pour le changer.'
-        : `Ajoutez chaque ${f.item} avec son prix (la description est facultative). Touchez le nom d&rsquo;une section pour le changer.`,
+        : `Ajoutez chaque ${f.item === 'tarif' ? '&eacute;l&eacute;ment' : f.item} avec son prix (la description est facultative). Touchez le nom d&rsquo;une section pour le changer.`,
       firstSection: kind === 'tours' ? 'Activit\u00e9s' : 'Tarifs', namePh: kind === 'tours' ? 'ex. Visite des vignobles' : kind === 'golf' ? 'ex. 18 trous, semaine' : 'ex. Entr\u00e9e adulte',
       pricePh: kind === 'tours' ? 'ex. 129 par personne' : 'ex. 75',
       // Wording for the business type (2026-10-18), not the menu's "Entrées".
@@ -56165,7 +56182,7 @@ function priceListAppStrings(kind, lang) {
     webNothing: 'We found the page, but couldn&rsquo;t pick out prices on it. Try a photo instead, or tap &ldquo;Can you do it for me?&rdquo;',
     typeTitle: `Type in ${e.what}`, typeIntro: kind === 'tours'
       ? 'Add each tour with how long it takes and its price (the description is optional). Tap a section name to change it.'
-      : `Add each ${e.item} with its price (the description is optional). Tap a section name to change it.`,
+      : `Add each ${e.item === 'price' ? 'one' : e.item} with its price (the description is optional). Tap a section name to change it.`,
     firstSection: kind === 'tours' ? 'Tours' : kind === 'golf' ? 'Green fees' : 'Prices', namePh: kind === 'tours' ? 'like Wine Tour' : kind === 'golf' ? 'like 18 holes, weekday' : 'like Adult admission',
     pricePh: kind === 'tours' ? 'like 129 per person' : 'like 75',
     // Wording for the business type (2026-10-18), not the menu's "Starters".
@@ -56346,9 +56363,12 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     for (var si = 0; si < data.sections.length; si++) for (var ii = 0; ii < data.sections[si].items.length; ii++) if (data.sections[si].items[ii].check) return si + ':' + ii;
     return null;
   }
-  function openAndShow(key){
+  // Indoor test 5 (2026-11-19; Chris, 360px): "Type them in myself" opened scrolled past its intro (the first line was
+  // scrolled to the middle and focused). The first line opens with the page at its top (atTop), focused without scrolling.
+  function openAndShow(key, atTop){
     openItem = key; reviewScreen();
     var box = app.querySelector('.mn-open');
+    if (box && atTop) { var inp0 = box.querySelector('input'); window.scrollTo(0, 0); if (inp0) { try { inp0.focus({ preventScroll: true }); } catch (e0) { /* older phones */ } } window.scrollTo(0, 0); return; }
     if (box) { if (box.scrollIntoView) box.scrollIntoView({ block: 'center' }); var inp = box.querySelector('input'); if (inp) inp.focus(); }
   }
   // Removes dishes left with no name (a new line the owner didn't fill in).
@@ -57360,7 +57380,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       return api('/manual', {}).then(function(r){
         if (!r || !r.ok) return startScreen(r && r.error ? h(r.error) : T.failed);
         S = r; typing = true; data = { sections: [{ name: T.firstSectionText, note: '', items: [blankItem()] }] };
-        openAndShow('0:0');
+        openAndShow('0:0', true);
       });
     }
     if (act === 'up' || act === 'down') {
@@ -57449,7 +57469,7 @@ function researchedMenuOwnerCard(venue, pub, base, lang = 'en') {
 function renderMenuAppPage(found, opts) {
   const { venue } = found;
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
-  const t0 = { ...MENU_APP_STRINGS[lang], ...(isPriceList(venue) ? priceListAppStrings(menuKind(venue), lang) : {}), ...(brewSetupType(venue.type) ? breweryMenuAppStrings(venue, lang) : {}) };
+  const t0 = { ...MENU_APP_STRINGS[lang], ...(isPriceList(venue) ? priceListAppStrings(menuKind(venue), lang) : {}), ...(brewSetupType(venue.type) ? breweryMenuAppStrings(venue, lang) : {}), ...(venue.type === 'indoor' ? indoorMenuAppStrings(venue, lang) : {}) };
   // Indoor test 1 (2026-11-19; Margaret): "Type them in myself" from the setup's Your prices felt like leaving the setup for
   // the full editor. Opened from the setup (its way back is the setup's #more list), an indoor place's screen says it is
   // part of the setup, and its way back says so too.
@@ -58240,7 +58260,7 @@ function renderOwnerSetupPage(found, opts) {
       indoorKinds: INDOOR_KINDS_SHOWN.map((k) => ({ k, t: INDOOR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), indoorKindsTop: INDOOR_KINDS_TOP,
       // Indoor test 2: the card's short words for each kind, for the preview ("Escape room · arcade, VR & laser tag").
       indoorKindWords: Object.fromEntries(Object.entries(INDOOR_KIND_WORDS).map(([k, w]) => [k, w[fr ? 1 : 0]])),
-      kindLength: INDOOR_KIND_LENGTH, kindBook: INDOOR_KIND_BOOK, kindAge: INDOOR_KIND_AGE, artsKinds: INDOOR_ARTS_KINDS,
+      kindLength: INDOOR_KIND_LENGTH, kindBook: INDOOR_KIND_BOOK, kindAge: INDOOR_KIND_AGE, artsKinds: INDOOR_ARTS_KINDS, artsAuto: !!venueIndoorInfo(venue.id).arts_auto,
       suggestKinds: (snap.indoor_info || {}).kinds ? [] : indoorKindSuggestion(venue),
       researchFee: indoorResearchPrice(venue), researchFree: (!!venue.free_entry || indoorResearchDonation(venue)) && snap.indoor_price == null, researchDonation: indoorResearchDonation(venue),
       // Indoor test 2: the suggested donation box starts from research's own "suggested $5", never its adult price.
@@ -64336,6 +64356,13 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         if (field === 'indoor_info') {
           const v = value && typeof value === 'object' ? value : {};
           writeVenueIndoorInfo(venue.id, { ...Object.fromEntries(INDOOR_INFO_PARTS.filter((k) => v[k] != null).map((k) => [k, v[k]])), ...(typeof all.price === 'number' ? { price: all.price } : {}), ...(tourFreeOf(all) ? { free: all.free } : {}) });
+          // Indoor test 5: no arts kind any more, and the badge was the kind's own: it comes off (with an Undo line).
+          if (all.arts_auto && !indoorArtsKindIn(v.kinds)) {
+            const badgeOn = !!(db.prepare('SELECT arts_culture FROM venues WHERE id = ?').get(venue.id) || {}).arts_culture;
+            const ownTap = values && values.badges && typeof values.badges === 'object' && 'arts_culture' in values.badges;
+            if (badgeOn && !ownTap) { updateVenue(venue.id, { arts_culture: 0 }); log.run(venue.id, 'arts_culture', '1', '0', meta.reason, meta.batch_id, reviewer); venue.arts_culture = 0; }
+            setIndoorArtsAuto(venue.id, false);
+          }
           // Indoor test 2: per room / per person changed with the price kept: the card follows.
           // Indoor test 4: and a new main kind words the card again ("Tickets" -> "Treatments and passes").
           if (((all.per || null) !== (v.per || null) || indoorKindsModule.indoorKindKey(all.kinds) !== indoorKindsModule.indoorKindKey(v.kinds)) && indoorPrice(venue.id) != null) indoorCardPrice(venue.id);
@@ -64491,6 +64518,9 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         const was = venueOwnerFeatures(venue.id);
         for (const [k, on] of Object.entries(value)) {
           if (ALL_OWNER_FEATURES.includes(k)) { extra[k] = on; log.run(venue.id, `feature_${k}`, was[k] ? '1' : '0', on ? '1' : '0', meta.reason, meta.batch_id, reviewer); continue; }
+          // Indoor test 5: Arts & Culture put on with an arts kind in the same save (the setup's kind screen) is the kind's;
+          // any other Arts & Culture tap is the owner's own, never taken off by a kind.
+          if (k === 'arts_culture' && venue.type === 'indoor') { try { setIndoorArtsAuto(venue.id, !!on && !venue[k] && !!(values && values.indoor_info && indoorArtsKindIn(values.indoor_info.kinds))); } catch (e) { /* keep */ } }
           update[k] = on;
           log.run(venue.id, k, String(venue[k] ? 1 : 0), on ? '1' : '0', meta.reason, meta.batch_id, reviewer);
         }
@@ -65812,6 +65842,9 @@ function ownerFieldLabelsFor(venue, fr) {
   // Brewery test 3 (Whistler, 2026-11-16): "Listing update: Weekly events" for a brewery (its setup's and page's word).
   // Tour test 2 (Whistler, 2026-11-16): a tour's "menu link" is its prices link (« lien des tarifs »).
   if (venue.type === 'tour') return { ...base, menu_url: fr ? 'Lien des tarifs' : 'Prices link' };
+  // Indoor test 5 (2026-11-19; Chris's log said "Adult price" for his passes): the price in its kind's word ("Passes",
+  // "Tickets", "Treatments and passes").
+  if (venue.type === 'indoor') { let w = null; try { w = indoorKindsModule.indoorKindText(venueIndoorInfo(venue.id).kinds, fr ? 'fr' : 'en').price.basis; } catch (e) { w = null; } return w ? { ...base, indoor_price: fr ? `Prix (${w.toLowerCase()})` : `Price (${w.toLowerCase()})` } : base; }
   if (venue.type === 'brewery') { let k = ''; try { k = breweryWordsKind(venue); } catch (e) { k = ''; } const ev = { weekly_nights: fr ? 'Événements de la semaine' : 'Weekly events' }; return k === 'Cidery' ? { ...base, ...ev, brewery_info: fr ? 'Réponses sur votre cidrerie' : 'Your cidery answers' } : { ...base, ...ev }; }
   return base;
 }
@@ -67471,7 +67504,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     clFirst: L('Please pick the first day of each closure.', 'Choisissez le premier jour de chaque fermeture.'),
     clOrder: L('A closure can\u2019t end before it starts.', 'Une fermeture ne peut pas finir avant de commencer.'),
     fields: Object.fromEntries(Object.entries(OWNER_FIELD_WORDS[fr ? 'fr' : 'en']).filter(([k]) => (k !== 'avg_spend' || avgSpendOn) && (!['not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows'].includes(k) || completeOn))
-      .map(([k, w]) => [k, ['brewery_info', 'flight_fee', 'weekly_nights', 'menu_url'].includes(k) && ownerFieldLabelsFor(venue, fr)[k] !== (fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS)[k] ? ownerFieldLabelsFor(venue, fr)[k].toLowerCase() : w])),
+      .map(([k, w]) => [k, ['brewery_info', 'flight_fee', 'weekly_nights', 'menu_url', 'indoor_price'].includes(k) && ownerFieldLabelsFor(venue, fr)[k] !== (fr ? OWNER_FIELD_LABELS_FR : OWNER_FIELD_LABELS)[k] ? ownerFieldLabelsFor(venue, fr)[k].toLowerCase() : w])),
     and: L(' and ', ' et '),
     hoursBoth: L('Please fill in both times for each day you are open.', 'Indiquez les deux heures pour chaque jour d’ouverture.'),
     hoursBlank: L('Add the times for {day}, or tick Closed.', 'Ajoutez les heures du {day} ou cochez Fermé.'),

@@ -10,6 +10,8 @@
 //   boxOffice  the "box office hours go in Good to know" hint under "We don't have set hours" (theatres and classes only)
 //   arts       a gift shop is one of its Good to know chips (Help names it)
 //   quiet      a quiet daytime kind: no "Open after midnight?" row or second time on its day cards (indoor test 1)
+//   day        a daytime kind (indoor test 5: play centres, climbing and trampolines, pools, spas; every quiet kind too): no
+//              "Open after midnight?" row (theatres, bowling, arcades, casinos and cinemas keep it)
 //   gtk        which Good to know chips and example it gets (owner-setup-text.js good_to_know_kinds: arts, active, spa, general)
 //   ex         which story and Known for example it gets (storyExKinds / knownExKinds: theatre, museum, escape, spa,
 //              climbing, general), so a bowling alley never sees an escape room's example or a pool a climbing gym's
@@ -74,7 +76,7 @@ K.cinema = { gtk: 'general', ex: 'general',
     groups: { chips: ['Projections privées', 'Billets de groupe pour 10 personnes ou plus', 'Fêtes d’anniversaire avec un film'], lead: 'Touchez une taille, puis ajoutez les projections privées, les billets de groupe ou les fêtes dans vos mots.', ex: 'Projections privées jusqu’à 120 personnes. Forfaits pour fêtes d’anniversaire' },
     search: ['cinéma', 'cinémas', 'film', 'films', 'salle de cinéma'] } };
 
-K.spa = { gtk: 'spa', ex: 'spa',
+K.spa = { day: true, gtk: 'spa', ex: 'spa',
   en: { price: { page: 'From {x}.', basis: 'Treatments and passes', label: 'Your lowest price (a pass or your shortest treatment)', ph: 'Like a day pass or a 30-minute treatment', lead: 'Your lowest price: a pass or your shortest treatment. It shows on your card.' },
     prices: { noun: 'spa menu', page: 'Spa menu', lead: 'Every treatment, pass and package and what it costs, like a 60-minute massage. A photo of your spa menu or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Hydrotherapy circuit: walk-ins welcome. Treatments by appointment', ages: '16+ for treatments, 19+ for the circuit', gift: 'Gift cards for treatments and spa days, at the front desk or online', prices: 'Massage: 60 min $130, 90 min $175' },
@@ -86,7 +88,7 @@ K.spa = { gtk: 'spa', ex: 'spa',
     groups: { chips: ['Forfaits pour couples', 'Fêtes de mariage et fêtes privées', 'Réservation privée du spa sur demande'], lead: 'Touchez une taille, puis ajoutez les forfaits pour couples, les fêtes de mariage ou les réservations privées dans vos mots.', ex: 'Forfaits pour couples. Fêtes de mariage jusqu’à 8 personnes' },
     search: ['spa', 'spas', 'spa de jour', 'massage', 'massages', 'massage en couple', 'soin du visage', 'soins du visage', 'hydrothérapie', 'sauna', 'spa nordique', 'bien-être'] } };
 
-K.pool = { gtk: 'general', ex: 'general',
+K.pool = { day: true, gtk: 'general', ex: 'general',
   en: { price: { page: 'Drop-in from {x}.', basis: 'Drop-in', label: 'Adult drop-in, in dollars', ph: 'Your adult drop-in price', lead: 'Your adult drop-in price. It shows on your card.' },
     prices: { noun: 'rates page', page: PRICES_PAGE[0], lead: 'Drop-in, passes and lessons for adults, kids and families, with their prices. A photo of your rates or a link to your rates page is perfect. It’s optional.' },
     help: { walkin: 'Drop in during public swims; lessons need booking', ages: 'All ages; under 8 with an adult in the water', gift: 'Gift cards and passes at the front desk', prices: 'Kids $4, 10-visit pass $60' },
@@ -98,7 +100,7 @@ K.pool = { gtk: 'general', ex: 'general',
     groups: { chips: ['Fêtes d’anniversaire avec salle de fête', 'Groupes scolaires bienvenus', 'Location de la piscine ou d’une salle sur demande'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes scolaires ou les locations dans vos mots.', ex: 'Fêtes d’anniversaire avec salle de fête. Location de la piscine sur demande' },
     search: ['piscine', 'piscines', 'baignade', 'bain libre', 'nage en couloir', 'centre récréatif', 'centre aquatique', 'glissade d’eau'] } };
 
-K.climbing = { gtk: 'active', ex: 'climbing',
+K.climbing = { day: true, gtk: 'active', ex: 'climbing',
   en: { price: { page: 'Passes from {x}.', basis: 'Passes', label: 'Your lowest adult pass (day or timed)', ph: 'Like a day pass or a 60-minute jump', lead: 'Your lowest adult pass: a day pass or a timed jump. It shows on your card.' },
     prices: { noun: 'rates page', page: PRICES_PAGE[0], lead: 'Day passes, punch cards, memberships, lessons and gear rental, with their prices. A photo of your rates or a link to your rates page is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; intro lessons by booking', ages: 'All ages; under 14 with an adult', gift: 'Gift cards and punch cards at the front desk', prices: 'Gear rental $8, 10-visit punch card $180' },
@@ -146,7 +148,7 @@ K.bowling = { gtk: 'general', ex: 'general',
     groups: { chips: ['Fêtes d’anniversaire', 'Événements d’entreprise et consolidation d’équipe', 'Ligues et réservations privées'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, la consolidation d’équipe ou les ligues dans vos mots.', ex: 'Forfaits pour fêtes d’anniversaire jusqu’à 20 personnes. Soirées de quilles pour les entreprises' },
     search: ['quilles', 'salle de quilles', 'petites quilles', 'grosses quilles'] } };
 
-K.kids = { gtk: 'active', ex: 'general',
+K.kids = { day: true, gtk: 'active', ex: 'general',
   en: { price: { page: 'Kids from {x}.', basis: 'Per child', label: 'Price for one child, in dollars', ph: 'Your regular price for one child', lead: 'The price for one child. It shows on your card.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Kids’ and toddlers’ prices, passes and party packages, with their prices. A photo of your price list or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; parties booked ahead', ages: 'Kids 0 to 12 with an adult', gift: 'Gift cards and 10-visit passes at the front desk', prices: 'Toddlers $9, adults free' },
@@ -230,6 +232,27 @@ K.other = { gtk: 'general', ex: 'general',
     groups: { chips: ['Fêtes d’anniversaire avec salle privée', 'Groupes scolaires bienvenus', 'Réservations privées sur demande'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes scolaires ou les réservations privées dans vos mots.', ex: 'Fêtes d’anniversaire avec salle privée jusqu’à 20 personnes. Groupes scolaires bienvenus' },
     search: ['activité intérieure', 'activités intérieures', 'jour de pluie'] } };
 
+// Indoor test 5 (2026-11-19; Chris): the price typer's example line and section, per kind: [en item, en section, fr item, fr section].
+const TYPER = {
+  gallery: ['Adult admission', 'Admission', 'Entrée adulte', 'Entrée'],
+  museum: ['Adult admission', 'Admission', 'Entrée adulte', 'Entrée'],
+  theatre: ['Adult ticket, evening show', 'Tickets', 'Billet adulte, spectacle du soir', 'Billets'],
+  cinema: ['Adult ticket', 'Tickets', 'Billet adulte', 'Billets'],
+  spa: ['60-min massage', 'Treatments', 'Massage de 60 min', 'Soins'],
+  pool: ['Adult drop-in', 'Drop-in', 'Entrée adulte à la séance', 'À la séance'],
+  climbing: ['60-min jump pass', 'Passes', 'Saut de 60 min', 'Laissez-passer'],
+  games: ['VR game, 30 min', 'Games', 'Partie de réalité virtuelle, 30 min', 'Jeux'],
+  escape: ['Private room for 2 to 6', 'Rooms', 'Salle privée pour 2 à 6', 'Salles'],
+  bowling: ['One game, one person', 'Games', 'Une partie, une personne', 'Parties'],
+  kids: ['Toddler play pass', 'Play passes', 'Laissez-passer tout-petits', 'Laissez-passer'],
+  classes: ['Wheel class, 2 hours', 'Classes', 'Cours de tour, 2 heures', 'Cours'],
+  curling: ['Learn to curl, 2 hours', 'Curling', 'Initiation au curling, 2 heures', 'Curling'],
+  yoga: ['Drop-in class', 'Classes', 'Cours à la séance', 'Cours'],
+  casino: ['Show ticket', 'Shows', 'Billet de spectacle', 'Spectacles'],
+  library: ['Workshop', 'Programs', 'Atelier', 'Programmes'],
+  other: ['Adult admission', 'Prices', 'Entrée adulte', 'Tarifs'],
+};
+for (const [k, t] of Object.entries(TYPER)) if (K[k]) { K[k].en.prices.typer = { item: t[0], section: t[1] }; K[k].fr.prices.typer = { item: t[2], section: t[3] }; }
 const INDOOR_KIND_TEXT = K;
 const INDOOR_KIND_TEXT_KINDS = Object.keys(K);
 // The kind a place reads in: its main kind (the first the owner picked), else 'other'.
@@ -239,7 +262,7 @@ function indoorKindText(kinds, lang) {
   const k = indoorKindKey(kinds), e = K[k], w = e[lang === 'fr' ? 'fr' : 'en'];
   // The prices link's words on the page: "See prices & rates" / « Voir les tarifs », a spa's "See the spa menu".
   const see = w.prices.page === PRICES_PAGE[lang === 'fr' ? 1 : 0] ? (lang === 'fr' ? 'Voir les tarifs' : 'See prices & rates') : lang === 'fr' ? `Voir la ${w.prices.page.toLowerCase()}` : `See the ${w.prices.page.toLowerCase()}`;
-  return { kind: k, boxOffice: !!e.boxOffice, arts: !!e.arts, quiet: !!e.quiet, gtk: e.gtk || 'general', ex: e.ex || 'general', ...w, prices: { ...w.prices, see } };
+  return { kind: k, boxOffice: !!e.boxOffice, arts: !!e.arts, quiet: !!e.quiet, day: !!(e.day || e.quiet), gtk: e.gtk || 'general', ex: e.ex || 'general', ...w, prices: { ...w.prices, see } };
 }
 // "Tickets from $25." with the price written in.
 function indoorPriceLine(kinds, money, lang) { return indoorKindText(kinds, lang).price.page.replace('{x}', money); }

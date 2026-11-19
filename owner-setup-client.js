@@ -1631,13 +1631,15 @@
   function indoorRangeLow(x){ var m = /^\s*(?:from\s+|[àa] partir de\s+)?(?:CA)?\$?\s*(\d{1,4}(?:[.,]\d{1,2})?)\s*\$?\s*(?:-|–|—|to|à|a|au)\s*\$?\s*(\d{1,4}(?:[.,]\d{1,2})?)\s*\$?\s*(?:(?:per |par |a |an |\/)?(?:tickets?|billets?|adults?|adultes?|person|personne|pp)\b.*)?$/i.exec(String(x == null ? '' : x)); if (!m) return null; var a = +m[1].replace(',', '.'), b = +m[2].replace(',', '.'); return a > 0 && b > a ? a : null; }
   // Indoor test 4: the quiet kinds come from indoor-kinds.js (kindText quiet): museums, galleries, libraries, classes.
   function indoorQuietKinds(){ if (!C.indoor) return false; var st = typeof S !== 'undefined' && S.tour, ks = (st && st.kinds && st.kinds.length ? st.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || []; return ks.length > 0 && ks.every(function(k){ return !!((T0.kindGroups || {})[k] || [])[2]; }); }
+  function indoorDayKinds(){ if (!C.indoor) return false; var st = typeof S !== 'undefined' && S.tour, ks = (st && st.kinds && st.kinds.length ? st.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || []; return ks.length > 0 && ks.every(function(k){ return !!((T0.kindGroups || {})[k] || [])[3]; }); }
   function lateBtns(d, j, y){
     // Café test 1 (Whistler, 2026-11-15): no "Open after midnight?" row on a café's day card.
     if (C.cafe) return '';
     // Tour test 1 (Whistler, 2026-11-16): nor on a tour's (trips don't run past midnight).
     if (C.tour) return '';
     // Indoor test 1 (2026-11-19; Margaret, a museum): nor on a museum's, gallery's, library's or class studio's.
-    if (indoorQuietKinds()) return '';
+    // Indoor test 5 (Chris): nor on any daytime kind's (indoor play, climbing and trampolines, pools, spas too).
+    if (indoorQuietKinds() || indoorDayKinds()) return '';
     var c = y[1] === '24:00' ? '00:00' : y[1];
     return '<div class="su-samerow su-laterow" role="group" aria-label="' + h(fill(T.lateQ, { day: dayName(d) })) + '"><span class="su-latelbl">' + h(T.lateLbl) + '</span>' + LATE.map(function(t){ return '<button type="button" class="su-toggle su-latebtn" aria-pressed="' + (c === t ? 'true' : 'false') + '" data-late="' + d + ':' + j + ':' + t + '">' + h(t12(t)) + '</button>'; }).join('') + '</div>';
   }
@@ -1665,7 +1667,7 @@
   function digitsOf(v){ var d = String(v || '').replace(/\D/g, ''); return d.length === 11 && d.charAt(0) === '1' ? d.slice(1) : d; }
   // Indoor test 4 (2026-11-19; Lauren's phone showed raw, 2508600188): a 10-digit number reads 250-860-0188 (11 digits
   // starting with 1: 1-800-555-0100). Anything else, as written.
-  function phoneShow(v){ var t = String(v == null ? '' : v).trim(), d = t.replace(/\D/g, ''); if (!/^[\d\s().+-]+$/.test(t)) return t; if (d.length === 10) return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6); if (d.length === 11 && d.charAt(0) === '1') return '1-' + d.slice(1, 4) + '-' + d.slice(4, 7) + '-' + d.slice(7); return t; }
+  function phoneShow(v){ var t = String(v == null ? '' : v).trim(), d = t.replace(/\D/g, ''); if (!/^[\d\s().+-]+$/.test(t)) return t; if (d.length === 10) return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6); if (d.length === 11 && d.charAt(0) === '1') return d.slice(1, 4) + '-' + d.slice(4, 7) + '-' + d.slice(7); return t; } // indoor test 5: as the page shows it (no "1-")
   function phoneChanged(v){ return digitsOf(v) !== digitsOf(CUR.phone) || (!String(v || '').trim()) !== !CUR.phone; }
   // Pub test 3 follow-up (2026-11-10): a new phone goes live straight away, but with a new address or website on the
   // same screen the step still says "Sent". Say which part is already on the page.
@@ -1680,7 +1682,9 @@
   function fbKnown(){ return S.fb || CUR.facebook_url || ''; }
   function siteShown(){ return CUR.website ? siteDomain(CUR.website) : (S.notOffered.indexOf('website') >= 0 ? T.noWebsiteSaid : T.noWebsiteYet); }
   // Cocktail test 3 (2026-11-14): opts.sr keeps the label for screen readers only, when the heading just above says the same.
-  function field(id, label, value, opts){ opts = opts || {}; return '<label class="' + (opts.sr ? 'su-sr' : 'su-q') + '" for="' + id + '">' + h(label) + '</label><input class="su-field" id="' + id + '" type="' + (opts.type || 'text') + '"' + (opts.mode ? ' inputmode="' + opts.mode + '"' : '') + (opts.max ? ' maxlength="' + opts.max + '"' : '') + (opts.ph ? ' placeholder="' + h(opts.ph) + '"' : '') + ' value="' + h(value) + '" autocomplete="off"' + (opts.data ? ' ' + opts.data : '') + '>'; }
+  // Indoor test 5 (2026-11-19; Chris, 360px Android): a line that takes chip text (Groups, Booking) is a wrapping box like Good
+  // to know (opts.area), so the whole line shows and the caret after a chip is visibly at its end.
+  function field(id, label, value, opts){ opts = opts || {}; if (opts.area) return '<label class="' + (opts.sr ? 'su-sr' : 'su-q') + '" for="' + id + '">' + h(label) + '</label><textarea class="su-field su-line" id="' + id + '" rows="2"' + (opts.max ? ' maxlength="' + opts.max + '"' : '') + (opts.ph ? ' placeholder="' + h(opts.ph) + '"' : '') + ' autocomplete="off"' + (opts.data ? ' ' + opts.data : '') + '>' + h(value) + '</textarea>'; return '<label class="' + (opts.sr ? 'su-sr' : 'su-q') + '" for="' + id + '">' + h(label) + '</label><input class="su-field" id="' + id + '" type="' + (opts.type || 'text') + '"' + (opts.mode ? ' inputmode="' + opts.mode + '"' : '') + (opts.max ? ' maxlength="' + opts.max + '"' : '') + (opts.ph ? ' placeholder="' + h(opts.ph) + '"' : '') + ' value="' + h(value) + '" autocomplete="off"' + (opts.data ? ' ' + opts.data : '') + '>'; }
   function list(items){ return '<ul class="su-done-list">' + items + '</ul>'; }
   // Pub test 3 (Whistler, 2026-11-14): the Events row names each saved event that isn't every week ("Open mic: 1st of the month").
   function musicOftenLine(){
@@ -2249,6 +2253,7 @@
           // (it was also a paragraph at the top).
           : q(T.hoursEditQ, T.hoursEditLead)) + (TOUR && T.departHint ? '<p class="su-hint" id="suDepartHint">' + h(T.departHint) + '</p>' : '') + (!seas && S.weekBack && T.hoursBack ? '<p class="su-sent" id="suHoursBack">' + h(T.hoursBack) + '</p>' : '') + msgs() + '<div class="su-hdays">' + DAYS.map(function(d, i){
         var w = wk[d], prev = i > 0 ? wk[DAYS[i - 1]] : null, mon = i > 1 ? wk.mon : null;
+        var sameH = function(a, b){ return JSON.stringify(a || null) === JSON.stringify(b || null); }, sameP = !!prev && !sameH(w, prev), sameM = !!mon && !sameH(w, mon) && !(prev && sameH(prev, mon));
         if (!hop[d]) return '<div class="su-day su-hrow" id="suRow' + d + '"><div class="su-hsum"><b>' + h(dayName(d)) + '</b><span>' + (w ? h(w.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ')) : h(T.closed)) + '</span>'
           + (w && lateNote(d, w[w.length - 1]) && w[w.length - 1][1] !== '00:00' && w[w.length - 1][1] !== '24:00' ? '<small>' + h(lateNote(d, w[w.length - 1])) + '</small>' : '') + '</div>'
           // Pub test 7 (2026-11-10): one tap marks a day Closed (or opens it again) right from the list; Change is for times.
@@ -2273,7 +2278,9 @@
             // Restaurant test 3 (Whistler, 2026-11-15): with two times the button goes; the card says why, and how breakfast
             // that runs into lunch fits (start the first time earlier).
             + (w.length >= 2 && T.twoTimesMax ? '<p class="su-hint su-twotimes">' + h(T.twoTimesMax) + '</p>' : '')
-            + (prev || mon ? '<div class="su-samerow">' + (prev ? '<button type="button" class="su-toggle su-same" data-same="' + d + '">' + h(fill(T.sameAs, { day: longDay(DAYS[i - 1]) })) + '</button>' : '') + (mon ? '<button type="button" class="su-toggle su-same" data-samemon="' + d + '">' + h(T.sameAsMon) + '</button>' : '') + '</div>' : '')
+            // Indoor test 5 (2026-11-19; Chris, 25 taps on a 360px phone): no "Same as" that would change nothing (the day
+            // already has those hours), and no "Same as Monday" beside a "Same as <day>" that copies the same hours.
+            + (sameP || sameM ? '<div class="su-samerow">' + (sameP ? '<button type="button" class="su-toggle su-same" data-same="' + d + '">' + h(fill(T.sameAs, { day: longDay(DAYS[i - 1]) })) + '</button>' : '') + (sameM ? '<button type="button" class="su-toggle su-same" data-samemon="' + d + '">' + h(T.sameAsMon) + '</button>' : '') + '</div>' : '')
             + '<div class="su-samerow su-copyrow" role="group" aria-label="' + h(T.copyTo) + '"><span class="su-latelbl">' + h(T.copyTo) + '</span><button type="button" class="su-toggle" data-copyall="' + d + '">' + h(DAYS.every(function(x){ return x === d || copyGets(d, x); }) ? T.copyAll : T.copyOpen) + '</button>'
             // The other season (pub test 6): "Every day" opens the closed days too ("open daily in summer" in one tap).
             // Café test 6 (2026-11-12): not when the first button already says "Every day" (every day open: two identical buttons).
@@ -2884,8 +2891,8 @@
         // Tour test 9 (Whistler, 2026-11-18; Tanis, school programs of about 30): a last size, "21+ or whole classes", in
         // the same question (an option, not a new field).
         + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suGroupSizes">' + (TOUR ? [4].concat(GROUP_SIZES, T.groupsChipBig ? [21] : []) : GROUP_SIZES).map(function(n){ var on = sentencesOf(gl).indexOf(groupsSizeLine(n)) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip' + (n === 21 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (n === 21 && T.groupsChipBig ? h(T.groupsChipBig) : S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>'
-        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TL) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TL ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 780, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + ex(T.groupsEx)
-        + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
+        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TL) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TL ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 780, area: true, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + ex(T.groupsEx)
+        + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180, area: true }) : '')
         // Tour test 1 (Whistler, 2026-11-16): a tour is asked for its booking link once, on Booking; here only when not given.
         + (TL && (CUR.booking_url || C.bookingKnown || String(S.bookUrl || '').trim() || S.tour.noBook) ? ''
           : '<div id="suBookBox" style="margin-top:14px">' + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p></div>')
@@ -4372,8 +4379,13 @@
       if (il0 !== (TI.length || '')) ii0.length = il0;
       var il = Object.keys(ii0).length ? [tinfo(ii0)] : [];
       // A gallery, museum or live theatre is Arts & Culture (the badge goes on with the kind; never taken off here).
-      if (ik0.some(function(kk){ return (C.artsKinds || []).indexOf(kk) >= 0; }) && !S.savedBadges.arts_culture && !(CUR.badges || {}).arts_culture) il.push({ badges: { arts_culture: true } });
-      return saveAll('indoor', il, null, null, function(){ Object.keys(ii0).forEach(function(kk){ TI[kk] = ii0[kk]; }); S.tour.lengthGuessed = false; S.tour.kindsGuessed = false; });
+      var artsNow = ik0.some(function(kk){ return (C.artsKinds || []).indexOf(kk) >= 0; }), artsAdd = artsNow && !S.savedBadges.arts_culture && !(CUR.badges || {}).arts_culture;
+      if (artsAdd && il.length) il.push({ badges: { arts_culture: true } });
+      // Indoor test 5: the server takes the kind's own badge off when no arts kind is left (C.artsAuto); the screens follow.
+      var artsOff = !artsNow && C.artsAuto && il.length;
+      return saveAll('indoor', il, null, null, function(){ Object.keys(ii0).forEach(function(kk){ TI[kk] = ii0[kk]; }); S.tour.lengthGuessed = false; S.tour.kindsGuessed = false;
+        if (artsAdd && il.length) C.artsAuto = true;
+        if (artsOff) { C.artsAuto = false; CUR.badges = CUR.badges || {}; CUR.badges.arts_culture = false; if (S.badges) S.badges.arts_culture = false; if (S.savedBadges) S.savedBadges.arts_culture = false; } });
     }
     if (k === 'priceSave' && INDOOR) {
       readTour(); var ipf = S.tour.free, ipb = el('suTprice') ? el('suTprice').value : '', ipp = ipf ? 0 : !S.tour.per && indoorRangeLow(ipb) != null ? indoorRangeLow(ipb) : tourPriceNumber(ipb);
@@ -4883,7 +4895,8 @@
       // Tour test 13 (Matthias, keyboard and mouse): into an empty box, the chip keeps the focus so the next chip is one Tab
       // away (it took about 14). A finger tap still goes to the box (type straight after a chip), and a box that already
       // had text still takes the focus at its end (tour test 12).
-      if ((qk === 'good_to_know' || qk === 'groups') && (!wasEmpty || touchTap)) { try { box.focus(); var bl = box.value.length; box.setSelectionRange(bl, bl); } catch (e9) { /* older phones */ } }
+      // Indoor test 5 (Chris): every chip box, so what is typed next goes at the end, never mid-line.
+      if (!wasEmpty || touchTap) { try { box.focus(); var bl = box.value.length; box.setSelectionRange(bl, bl); } catch (e9) { /* older phones */ } }
       mine.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(box.value, c.getAttribute('data-quick'), sibs) ? 'true' : 'false'); });
     }; });
     var fold = el('suFold'); if (fold) fold.addEventListener('toggle', function(){ S.moreOpen = fold.open; });

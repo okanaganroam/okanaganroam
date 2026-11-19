@@ -2570,7 +2570,8 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
   for (const [lang, T] of [['en', en.indoor], ['fr', fr.indoor]]) {
     const fr2 = lang === 'fr';
     T.kindText = {}; T.quick.groups_kinds = {};
-    // Codes, not words: [Good to know chip group, story example group, quiet kind] (an array, so the French check skips it).
+    // Codes, not words: [Good to know chip group, story example group, quiet kind, daytime kind] (an array, so the French
+    // check skips it). Daytime (indoor test 5): no "Open after midnight?" row.
     T.kindGroups = {};
     for (const k of IK.INDOOR_KIND_TEXT_KINDS) {
       const w = IK.indoorKindText([k], lang), line = noPeriod(w.price.page);
@@ -2584,7 +2585,7 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
         noSetHoursHint: w.boxOffice ? T.noSetHoursHint : '',
       };
       T.quick.groups_kinds[k] = w.groups.chips;
-      T.kindGroups[k] = [w.gtk, w.ex, w.quiet ? 1 : 0];
+      T.kindGroups[k] = [w.gtk, w.ex, w.quiet ? 1 : 0, w.day ? 1 : 0];
     }
   }
 })();
