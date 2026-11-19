@@ -188,3 +188,28 @@ test('6. Story: research says "Open year-round." after he set May to October: th
   approveAll(v.id);
   assert.match(plain(page(v)), /Office open year-round for bookings\./);
 });
+
+test('7. Search (/browse): "bear", "bear viewing", « ours » and « observation des ours » put the bear tour companies first (off-season too), above lakes and recreation sites that only mention bears; « ours » never matches « jours » or « tours »', async () => {
+  const lake = mk('beach', { name: 'Alta Shore Lake T16', cuisine: 'Lake', rating: 4.9, reviews: 3000, description: 'A swimming lake. Black bears are often seen along the shore in spring.' });
+  const rec = mk('outdoor', { name: 'Riverside Rec Site T16', cuisine: 'Recreation site', rating: 4.9, reviews: 2500, description: 'Camping and picnics in bear country. Store food in the bear lockers.' });
+  const other = mk('tour', { name: 'Whistler Discovery Bear Tours T16', cuisine: 'Bear viewing tours', rating: 4.5, reviews: 90, description: 'Bear viewing in the Whistler valley.' });
+  const jours = mk('tour', { name: 'Village Walks T16', cuisine: 'Walking tours', rating: 4.9, reviews: 1500, description: 'Open every day. Tours daily.' });
+  const { v } = await tom();
+  const order = async (q, fr) => { const h = await fetch(`${base}${fr ? '/fr' : ''}/browse?q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'whistlerroam-check/1.0' } }).then((r) => r.text());
+    return [...h.matchAll(/data-venue-name="([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, '&')); };
+  for (const [q, fr] of [['bear'], ['bear viewing'], ['bears'], ['ours', true], ['observation des ours', true], ['observation des ours'], ['faune', true]]) {
+    const o = await order(q, fr), i = o.indexOf(v.name); if (process.env.T16_DEBUG) console.log(q, JSON.stringify(o.slice(0, 20)));
+    assert.ok(i >= 0, `${q}: ${v.name} found`);
+    for (const below of [lake.name, rec.name, jours.name]) { const j = o.indexOf(below); assert.ok(j < 0 || j > i, `${q}: ${below} (${j}) is below ${v.name} (${i})`); }
+    const L = o.indexOf(lake.name);
+    if (q !== 'faune') assert.ok(o.indexOf(other.name) >= 0 && (L < 0 || o.indexOf(other.name) < L), `${q}: the other bear company above the lake`);
+  }
+  // Whole-word French matching.
+  assert.equal(app.browseTextMatch('open every day. tours daily. jours', 'ours'), false);
+  assert.equal(app.browseTextMatch('guided bear tours', 'ours'), true);
+  assert.equal(app.browseTextMatch('mountain biking trails', 'hike'), true);
+  assert.equal(app.browseTextMatch('hiking', 'hike'), true);
+  // The order rule itself (the page script runs the same function): name, then kind, then the rest.
+  assert.ok(app.browseStrong('Coast Mountain Bear Tours', 'Wildlife and bear viewing', 'bear') > app.browseStrong('Riverside Rec Site', 'Recreation site', 'bear'));
+  assert.equal(app.browseStrong('Coast Mountain Bear Tours', 'Wildlife and bear viewing', 'bear viewing'), 1);
+});

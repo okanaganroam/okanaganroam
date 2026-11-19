@@ -43869,6 +43869,20 @@ function browseCuisines(venues) {
 }
 // Everything the text search looks at, lower-cased, for one venue (the client
 // builds the same words from the card, so server and browser agree).
+// Tour test 16 (Whistler, 2026-11-18; ported 2026-11-18): with a search typed, a place whose name matches comes first,
+// then one whose kind matches (its type, cuisine or tour kinds), then the rest, each in the usual order (closed for the
+// season or not). Okanagan's /browse search is a plain "contains" match, so the order reads the same match. Shared
+// verbatim by the server render and the page script (BROWSE_STRONG_SRC).
+function browseStrong(name, kindText, q) {
+  var n = String(name || '').toLowerCase();
+  return (n.indexOf(q) !== -1 ? 2 : 0) + ((n + ' ' + String(kindText || '')).toLowerCase().indexOf(q) !== -1 ? 1 : 0);
+}
+const BROWSE_STRONG_SRC = browseStrong.toString();
+// The words of a tour's own kinds (EN and FR), for the search's "kind" match.
+function browseTourKindWords(v) {
+  if (!v || v.type !== 'tour') return '';
+  try { return (venueTourInfo(v.id).kinds || []).map((k) => (TOUR_KIND_LABELS_OWNER[k] || []).join(' ')).join(' '); } catch (e) { return ''; }
+}
 function browseSearchText(v, cats, feats, note = '') {
   return [v.name, REGION_LABELS[v.region] || '', cats.map(browseTypeLabel).join(' '),
     feats.map((k) => FD_HUB_LABEL_BY_FEATURE[k] || k).join(' '), v.cuisine || '', v.description || '', note].join(' ').toLowerCase();
@@ -44133,7 +44147,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
     if (/^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(own)) return ` data-ph="own" style="${cardPhotoVars('fd-ph', own)}" data-lz`;
     return ' data-ph="none"';
   };
-  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { showRegion: true, showTypeLabel: true, themed: true, appLabels: true, excerpt: true })
+  const allCardsHtml = renderCategoryCardsHtml('restaurant', venues, getHiddenGemVenueIds(), '', getCollectionVenueIds('local_favorite'), advisoryNotes, getDogFriendlyNotes(), { ...(opts.keepOrder ? { keepOrder: true } : {}), showRegion: true, showTypeLabel: true, themed: true, appLabels: true, excerpt: true })
     .replace(/<li class="venue-card" data-venue-id="(\d+)"/g, (m, id) => `<li class="venue-card" data-bh-i="${orderById.get(Number(id))}" data-venue-id="${id}"${photoAttr(id)}`);
   let cardChunks = allCardsHtml.split('<li class="venue-card"').slice(1)
     .map((x) => ('<li class="venue-card"' + x.replace(/\s*<\/ul>\s*$/, '')).replace(/\n\s+/g, '\n').split(APP_FAV_HEART_OUTLINE).join(FD_HEART_USE));
@@ -44256,6 +44270,7 @@ function bhStart(){
   var openCountEl = document.getElementById('bhOpenNowCount');
   var favToggle = document.getElementById('bhFavOnly');
   var applyBtns = Array.prototype.slice.call(document.querySelectorAll('[data-bh-apply]'));
+  ${BROWSE_STRONG_SRC}
   var searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
   var openOn = false, favOn = false, cuisine = '', price = '', sortKey = '';
   var ordered = cards;
@@ -44311,8 +44326,10 @@ function bhStart(){
     var parts = [card.getAttribute('data-venue-name') || '', LABELS.regions[d.r] || '',
                  d.c.map(function(t){ return LABELS.types[t] || t; }).join(' '),
                  d.f.map(function(k){ return LABELS.features[k] || k; }).join(' '),
-                 d.cu || '', meta ? meta.textContent : '', desc ? desc.textContent : '', d.n || '', d.k || ''];
+                 d.cu || '', meta ? meta.textContent : '', desc ? desc.textContent : '', d.n || '', d.k || '', d.kw || ''];
     card.__bh = parts.join(' ').toLowerCase();
+    // Tour test 16: what the search's "name" and "kind" order reads (browseStrong).
+    card.__bhKind = [LABELS.regions[d.r] || '', d.c.map(function(t){ return LABELS.types[t] || t; }).join(' '), d.f.map(function(k){ return LABELS.features[k] || k; }).join(' '), d.cu || '', d.kw || ''].join(' ');
   });
   function pressed(list, attr){ return list.filter(function(c){ return c.getAttribute('aria-pressed') === 'true'; }).map(function(c){ return c.getAttribute(attr); }); }
   function dataOf(card){ return DATA[card.getAttribute('data-venue-id')] || { c: [], f: [], r: '', cu: '', p: 0, rt: 0 }; }
@@ -44385,7 +44402,14 @@ function bhStart(){
   function apply(historyMode){
     var types = pressed(typeChips, 'data-bh-type'), features = pressed(featureChips, 'data-bh-feature'), regions = pressed(regionChips, 'data-region');
     var favs = favOn ? favSet() : null;
-    var matches = ordered.filter(function(card){
+    // Tour test 16: with a search typed and the Recommended order, name matches first, then kind matches (as the server
+    // drew them), then the rest in the usual order.
+    var list = ordered;
+    if (searchTerm && !sortKey) {
+      var sc = {}; ordered.forEach(function(c){ sc[c.getAttribute('data-venue-id')] = browseStrong(c.getAttribute('data-venue-name') || '', c.__bhKind || '', searchTerm); });
+      list = ordered.slice().sort(function(a, b){ return sc[b.getAttribute('data-venue-id')] - sc[a.getAttribute('data-venue-id')] || Number(a.getAttribute('data-bh-i')) - Number(b.getAttribute('data-bh-i')); });
+    }
+    var matches = list.filter(function(card){
       var id = card.getAttribute('data-venue-id'), d = dataOf(card);
       return bhMatches(types, features, regions, cuisine, price, d) && (!openOn || !!OPEN_IDS[id]) && (!favs || !!favs[id]) && (!searchTerm || (card.__bh || '').indexOf(searchTerm) !== -1);
     });
@@ -44725,7 +44749,7 @@ function renderBrowseHubPage(venues, filter = null, now = new Date()) {
   const advisoryNotes = getAdvisoryNotes();
   const openInfo = foodDrinkOpenNowInfo(venues, advisoryNotes, now, { requireVerified: false });
   const q = f.q.toLowerCase();
-  const textMatch = (v) => !q || browseSearchText(v, catsById.get(v.id) || [], featsById.get(v.id) || [], `${noteOf(v)} ${tourTextOf(v)}`).includes(q);
+  const textMatch = (v) => !q || browseSearchText(v, catsById.get(v.id) || [], featsById.get(v.id) || [], `${noteOf(v)} ${tourTextOf(v)} ${browseTourKindWords(v)}`).includes(q);
   const pool = f.openNow ? venues.filter((v) => openInfo.openIds.has(v.id)) : venues;
   // Favourites live in the visitor's browser: the server cannot apply them, the
   // page script does on load.
@@ -44753,6 +44777,9 @@ function renderBrowseHubPage(venues, filter = null, now = new Date()) {
     if (note) payload[String(v.id)].n = note;
     const tt = tourTextOf(v);
     if (tt) payload[String(v.id)].k = descSearchWords(`${v.description || ''} ${tt}`);
+    // Tour test 16: a tour's own kinds (EN and FR words), for the search's kind match.
+    const kw = browseTourKindWords(v);
+    if (kw) payload[String(v.id)].kw = kw;
     const st = openInfo.byId.get(v.id);
     if (st && st.eligible) payload[String(v.id)].h = st.hours;
   }
@@ -44762,10 +44789,17 @@ function renderBrowseHubPage(venues, filter = null, now = new Date()) {
   // count, as on Food & Drink (it was A-Z, opening on "13th Street Viewpoint").
   const recommended = browseRecommendedOrder(venues);
   let listVenues = recommended;
+  // Tour test 16 port: a search puts places whose name, then kind, matches first, then the rest in the usual order.
+  if (q && f.sort !== 'name' && f.sort !== 'rating') {
+    const strong = (v) => browseStrong(v.name, [REGION_LABELS[v.region] || '', (catsById.get(v.id) || []).map(browseTypeLabel).join(' '), (featsById.get(v.id) || []).map((k) => FD_HUB_LABEL_BY_FEATURE[k] || k).join(' '), v.cuisine || '', browseTourKindWords(v)].join(' '), q);
+    const rank = new Map(recommended.map((v, i) => [v.id, i]));
+    listVenues = recommended.slice().sort((a, b) => strong(b) - strong(a) || rank.get(a.id) - rank.get(b.id));
+  }
   if (f.sort === 'rating') listVenues = recommended.slice().sort((a, b) => ((Number(b.rating) || -1) - (Number(a.rating) || -1)));
   if (f.sort === 'name') listVenues = venues;
   const orderById = new Map(recommended.map((v, i) => [v.id, i]));
-  const cardsHtml = browseBatchedCardsHtml(listVenues, matchIds, matching.length, advisoryNotes, openInfo.byId, orderById, { restSrc: `/browse/cards.json?h=${browseRestJson(venues, now).hash}` });
+  // Tour test 16: a search's own order (name, then kind matches first) is kept, closed for the season or not.
+  const cardsHtml = browseBatchedCardsHtml(listVenues, matchIds, matching.length, advisoryNotes, openInfo.byId, orderById, { restSrc: `/browse/cards.json?h=${browseRestJson(venues, now).hash}`, keepOrder: listVenues !== recommended && !f.sort });
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -73276,7 +73310,7 @@ module.exports = {
   seasonTagHtml,
   seasonTagShortText,
   seasonClosedLast,
-  browseRecommendedOrder,
+  browseRecommendedOrder, browseStrong,
   advisoryNotOperating,
   advisoryNotOperatingIds,
   legacyTripAdvisoryUnavailable,
