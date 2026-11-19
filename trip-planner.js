@@ -1127,19 +1127,30 @@ const KIND_SEASON_ASK_WORDS = {
 };
 function kindSeasonOff(season, m) { return season === 'summer' ? KIND_SEASON_WINTER_MONTHS.includes(m) : season === 'winter' ? !KIND_SEASON_WINTER_MONTHS.includes(m) : false; }
 // His kinds the request asks for (its planner kinds, or its own words).
+// 2026-11-19: or, with nothing to say on his page (open all year, one season), the season of each of his 2+ kinds
+// (v.tourKindSeasonsEach): a Paddle + Snowshoe company open all year was left out of "paddle tour in July".
+function kindSeasonsOf(v) { return (v && (v.tourKindSeasons || v.tourKindSeasonsEach)) || null; }
 function kindSeasonAsked(v, ctx) {
-  const seasons = v && v.tourKindSeasons;
+  const seasons = kindSeasonsOf(v);
   if (!seasons || typeof seasons !== 'object') return [];
   const pk = (ctx && ctx.plannerKinds) || [];
   const words = normWords(`${(ctx && ctx.askText) || ''} ${(ctx && ctx.queryText) || ''}`);
   return Object.keys(seasons).filter((k) => ((tripRequirements.TOUR_KIND_PLANNER || {})[k] || []).some((x) => pk.includes(x)) || (KIND_SEASON_ASK_WORDS[k] && KIND_SEASON_ASK_WORDS[k].test(words)));
 }
 function kindSeasonBlocked(v, ctx) {
-  if (!v || v.type !== 'tour' || !v.tourKindSeasons || !ctx || namedInRequest(v, ctx)) return false;
+  if (!v || v.type !== 'tour' || !kindSeasonsOf(v) || !ctx || namedInRequest(v, ctx)) return false;
   const m = tripMonthOf(ctx);
   if (!m) return false;
   const asked = kindSeasonAsked(v, ctx);
-  return asked.length > 0 && asked.every((k) => kindSeasonOff(v.tourKindSeasons[k], m));
+  return asked.length > 0 && asked.every((k) => kindSeasonOff(kindSeasonsOf(v)[k], m));
+}
+// 2026-11-19: a kind of his the request asks for runs in month m. The snow-season rule (offSeasonSkip's winterOnly) read
+// "Snowshoeing" in a Paddle + Snowshoe company's category and dropped it from every July plan, a paddle request too:
+// it judges the kind asked for, not every kind he has.
+function askedKindRunsIn(v, ctx, m) {
+  const seasons = kindSeasonsOf(v);
+  if (!seasons || !m || v.type !== 'tour') return false;
+  return kindSeasonAsked(v, ctx).some((k) => !kindSeasonOff(seasons[k], m));
 }
 function horseOffBlocked(v, ctx) {
   if (!v || v.type !== 'tour' || !ctx || !(ctx.plannerKinds || []).includes('horseback') || (ctx.plannerKinds || []).includes('sleigh_ride') || namedInRequest(v, ctx)) return false;
@@ -2918,7 +2929,7 @@ function offSeasonSkip(v, ctx) {
   // 2026-10-25: most of November is off too -- outdoor rinks open in December and the ski hills in late November; a
   // weekend plan dated Oct 31 put Stuart Park's rink on its Sunday, November 1.
   const earlyNovember = month === 11 && Number((ctx.tripDate || '').slice(8, 10)) < 25;
-  if (month && (SKI_OFF_MONTHS.includes(month) || earlyNovember) && winterOnly(v) && (ctx.skiOffSeason || !ctx.activities.has('winter')) && !ownerSeasonOpenOn(v, ctx)) return true;
+  if (month && (SKI_OFF_MONTHS.includes(month) || earlyNovember) && winterOnly(v) && (ctx.skiOffSeason || !ctx.activities.has('winter')) && !ownerSeasonOpenOn(v, ctx) && !askedKindRunsIn(v, ctx, month)) return true;
   if (month && SHOULDER_MONTHS.includes(month)) {
     const w = SHOULDER_CLOSED_RE.exec(v.textName || normWords(v.name));
     if (w && !normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || '').includes(w[0].split(' ')[0])) return true;
