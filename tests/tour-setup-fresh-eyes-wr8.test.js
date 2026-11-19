@@ -175,7 +175,7 @@ test('6. the French description left from our research is named with a link to t
   const edit = (await get(`/owner/${t}`)).text;
   assert.match(edit, /id="opFrDescOld">Your French description is the old one from our research: <a href="\/fr\/owner\/[^"]+\/setup#story"/);
   assert.equal(text.en.frDescOld, 'Your French description is the old one from our research:');
-  assert.match(CLIENT, /\(frOnlyNamed\(\) \|\| frOnlyFinish\(\)\) \+ frDescOld\(\)/);
+  assert.match(CLIENT, /\(frOnlyNamed\(\) \|\| frOnlyFinish\(\)\) \+ frDescOld\(true\)/); // tour test 14: the finish screen's call (not when the translation is queued)
   assert.match(CLIENT, /x = doneLine\('story'\) \+ q\(T\.storyQ, T\.storyLead\) \+ frDescOld\(\)/);
   assert.equal(app.getVenue(v.id).description_fr, 'Traîneau à chiens et motoneige en famille avec des huskys. Chiens bienvenus !');
   // A place whose French description is the owner's own: nothing said.

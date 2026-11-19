@@ -668,7 +668,7 @@
     // Tour test 14 (Lucía): per student, child, kid, skier, rider or participant is per person; per lesson is for the group
     // ('lesson': Private tours; accepted in the private box). (server.js tourPriceWhy, the same rule.)
     var PER_ONE_RE = /^(?:\/\s*|(?:per|a|an|par|each|la|le)\s+)(?:persons?|people|personnes?|pers|jumps?|sauts?|rides?|seats?|places?|guests?|riders?|adults?|adultes?|heads?|tickets?|billets?|participants?|passengers?|passagers?|swings?|flights?|vols?|tours?|trips?|sorties?|descentes?|runs?|students?|[ée]tudiants?|child|children|kids?|enfants?|skiers?|skieu(?:r|rs|se|ses)|snowboarders?|learners?|[ée]l[èe]ves?)\b|^(?:pp|p\.p\.?|each|ea|chacun)(?![a-z])/;
-    var PER_LESSON_RE = /^(?:\/\s*|(?:per|a|an|par|pour|each|by the|the|la|le)\s+)(?:(?:private|group|semi[- ]private|half[- ]day|full[- ]day|2[- ]hour|3[- ]hour|priv[ée]e?s?)\s+)*(?:lessons?|le[çc]ons?|cours|class(?:es)?|sessions?|s[ée]ances?)\b/;
+    var PER_LESSON_RE = /^(?:\/\s*|(?:per|a|an|par|pour|each|by the|the|la|le)\s+)(?:(?:private|group|semi[- ]private|half[- ]day|full[- ]day|2[- ]hour|3[- ]hour|priv[ée]e?s?)\s+)*(?:lessons?|le[çc]ons?|cours|sessions?|s[ée]ances?)\b/;
     var COUNT_RANGE_RE = /\(?\s*(?:for |up to |pour |jusqu à |max\.? )?\d+\s*(?:-|–|to|à|a)\s*\d+\s*(?:ppl|people|pax|persons?|guests?|personnes?|pers|adults?|adultes?|skiers?|students?|riders?)?\s*\)?/g;
     var TOUR_GROUP_RE = /\b(?:boats?|charters?|groups?|vessels?|helicopters?|jeeps?|whole|private|bateaux?|groupes?|nolis\w*|embarcations?|priv[ée]e?s?|class(?:es)?|classes?|schools?|[ée]coles?)\b/;
     var raw = priceTrim(x); if (!raw || !/\d/.test(raw)) return '';
@@ -1711,10 +1711,11 @@
   }
   // Tour test 8 (Whistler, 2026-11-17): her English story is new and the French description is still our research's. One
   // line with a link to the French story box (the French setup's story screen); nothing is translated.
-  function frDescOld(){
-    // Tour test 14 (Lucía): a story saved on this visit over research's French queues its translation (server.js
-    // queueFrStoryTranslation), so the finish screen doesn't ask her to update the French description too.
-    if (C.lang === 'fr' || !T.frDescOld || !(C.frDesc === 'old' || (C.frDesc === 'research' && S.done.story && !S.storySentNow)) || (S.storySentNow && C.frStoryQueues)) return '';
+  function frDescOld(finish){
+    // Tour test 14 (Lucía): on the finish screen, not when her French translation is already queued, or her story saved on
+    // this visit over research's French queued it (server.js queueFrStoryTranslation).
+    if (finish && (C.frStoryQueued || (S.storySentNow && C.frStoryQueues))) return '';
+    if (C.lang === 'fr' || !T.frDescOld || !(C.frDesc === 'old' || (C.frDesc === 'research' && (S.done.story || S.storySentNow)))) return '';
     var href = location.pathname.replace(/^\/(?:fr\/)?owner\//, '/fr/owner/') + '#story';
     // Tour test 9 (Whistler, 2026-11-18; Tanis): the link no longer saves French as her language (her English link and the
     // home page then went to /fr). It only opens the French story box.
@@ -2702,7 +2703,7 @@
           // Brewery test 1 port (2026-11-16): "Add your tap list" stays in view (a no-kitchen brewery never saw it in the fold).
           + (left.some(tapItem) ? '<div class="su-stack" id="suTapOpen">' + left.filter(tapItem).map(leftItem).join('') + '</div>' : '')
           + (left.some(function(o){ return !tapItem(o); }) ? '<details class="su-later" id="suLater"><summary>' + h(T.addLater) + '</summary><p class="su-hint">' + h(T.addLaterLead) + '</p><div class="su-stack">' + left.filter(function(o){ return !tapItem(o); }).map(leftItem).join('') + '</div></details>' : '')
-          + (frOnlyNamed() || frOnlyFinish()) + frDescOld()
+          + (frOnlyNamed() || frOnlyFinish()) + frDescOld(true)
           + (C.cafe && T.finishEvents ? '<p class="su-hint" id="suFinishEvents">' + h(T.finishEvents) + '</p>' : '') + changeLink;
       } else
       x = '<div class="su-saved" style="padding-top:4px"><h1>' + h(gaps.length ? T.finishAlmost : !left.length ? T.finishQ : allDone() && onlyDoor ? T.finishHome : allDone() ? T.finishAlmost : T.finishSoFar) + '</h1></div>' + scoreBox()
@@ -2712,7 +2713,7 @@
         // Distillery test 1 (Whistler, 2026-11-16): "About 100% complete" sat over "To reach 100%" (a cocktail list isn't
         // part of the score without a kitchen, but its tile was still open). At 100 the open tiles are "You can still add".
         + (left.length ? '<h2 class="su-h2" id="suLeftH">' + h((sc.soon < sc.pct ? sc.soon : Math.max(sc.pct, sc.soon || 0)) >= 100 && T.stillAdd ? T.stillAdd : T.toReach) + '</h2><div class="su-stack">' + left.map(leftItem).join('') + '</div>' : '')
-        + (frOnlyNamed() || frOnlyFinish()) + frDescOld()
+        + (frOnlyNamed() || frOnlyFinish()) + frDescOld(true)
         // Café test 1 (Whistler, 2026-11-15): a café's setup has no events screen, so the last screen says where they go.
         + (C.cafe && T.finishEvents ? '<p class="su-hint" id="suFinishEvents">' + h(T.finishEvents) + '</p>' : '')
         + preview()

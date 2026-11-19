@@ -23012,7 +23012,7 @@ const TOUR_GROUP_PRICE_RE = /\b(?:boats?|charters?|groups?|vessels?|helicopters?
 const TOUR_PER_ONE_RE = /^(?:\/\s*|(?:per|a|an|par|each|la|le)\s+)(?:persons?|people|personnes?|pers|jumps?|sauts?|rides?|seats?|places?|guests?|riders?|adults?|adultes?|heads?|tickets?|billets?|participants?|passengers?|passagers?|swings?|flights?|vols?|tours?|trips?|sorties?|descentes?|runs?|students?|[ée]tudiants?|child|children|kids?|enfants?|skiers?|skieu(?:r|rs|se|ses)|snowboarders?|learners?|[ée]l[èe]ves?)\b|^(?:pp|p\.p\.?|each|ea|chacun)(?![a-z])/;
 // Tour test 14: a price per lesson (or class, session) is for the group: Private tours ("$249 per lesson" got the bike
 // and rentals message). In the private box it is accepted, with who it's for ("599 per lesson (1-4 people)").
-const TOUR_PER_LESSON_RE = /^(?:\/\s*|(?:per|a|an|par|pour|each|by the|the|la|le)\s+)(?:(?:private|group|semi[- ]private|half[- ]day|full[- ]day|2[- ]hour|3[- ]hour|priv[ée]e?s?)\s+)*(?:lessons?|le[çc]ons?|cours|class(?:es)?|sessions?|s[ée]ances?)\b/;
+const TOUR_PER_LESSON_RE = /^(?:\/\s*|(?:per|a|an|par|pour|each|by the|the|la|le)\s+)(?:(?:private|group|semi[- ]private|half[- ]day|full[- ]day|2[- ]hour|3[- ]hour|priv[ée]e?s?)\s+)*(?:lessons?|le[çc]ons?|cours|sessions?|s[ée]ances?)\b/;
 const TOUR_COUNT_RANGE_RE = /\(?\s*(?:for |up to |pour |jusqu à |max\.? )?\d+\s*(?:-|–|to|à|a)\s*\d+\s*(?:ppl|people|pax|persons?|guests?|personnes?|pers|adults?|adultes?|skiers?|students?|riders?)?\s*\)?/g;
 // Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding): the Swiss "189.-" / "189.–" and "CHF 189" read as 189.
 function tourPriceSwiss(x) { return String(x == null ? '' : x).trim().replace(/^(?:CHF|SFr\.?|Fr\.)\s*/i, '').replace(/(\d)\s*CHF\b\.?/i, '$1').replace(/(\d)[.,][-\u2013\u2014]+/, '$1'); }
@@ -50464,8 +50464,6 @@ function ownerDescriptionWasHers(venue, field = 'description') {
 function ownerFrDescState(venue) {
   try {
     if (!venue || !String(venue.description_fr || '').trim() || ownerDescriptionWasHers(venue, 'description_fr') || ownerLinkPending(venue.id, 'description_fr')) return '';
-    // Tour test 14 (Whistler, 2026-11-18; Lucía): her French translation is already queued (fr_story): nothing to ask her.
-    if (db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND help_kind = ? AND status IN ('help', 'draft') LIMIT 1").get(venue.id, SETUP_FR_STORY_KIND)) return '';
     return ownerDescriptionWasHers(venue) || ownerLinkPending(venue.id, 'description') ? 'old' : 'research';
   } catch (e) { return ''; }
 }
@@ -56964,7 +56962,9 @@ function renderOwnerSetupPage(found, opts) {
     // Cocktail test 2 (2026-11-13): the French setup's story is the French description (description_fr).
     storyPending: ownerLinkPending(venue.id, fr ? 'description_fr' : 'description') || '',
     // Tour test 8: the French description is still research's ('old' once her English story is hers), every type.
-    frStoryQueues: COMPLETENESS_TYPES.has(venue.type), frDesc: fr ? '' : ownerFrDescState(venue), frDescFr: fr ? ownerFrDescState(venue) : '', storyResearch: fr && venue.description_fr ? !ownerDescriptionWasHers(venue, 'description_fr') : !ownerDescriptionWasHers(venue),
+    // Tour test 14 (Whistler, 2026-11-18; Lucía): the finish screen doesn't ask her to update the French description when
+    // its translation is already queued (frStoryQueued), or her story saved on this visit queues it (frStoryQueues).
+    frStoryQueues: COMPLETENESS_TYPES.has(venue.type), frStoryQueued: (() => { try { return !!db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND help_kind = ? AND status IN ('help', 'draft') LIMIT 1").get(venue.id, SETUP_FR_STORY_KIND); } catch (e) { return false; } })(), frDesc: fr ? '' : ownerFrDescState(venue), frDescFr: fr ? ownerFrDescState(venue) : '', storyResearch: fr && venue.description_fr ? !ownerDescriptionWasHers(venue, 'description_fr') : !ownerDescriptionWasHers(venue),
     // Restaurant test 1 (2026-11-14): "Alpine / European" stored from research starts the food list with those picks.
     suggestCuisines: (cur.cuisines || []).some((c) => OWNER_CUISINES.includes(c)) ? [] : ownerCuisineSuggestions(cur.cuisines),
     // Restaurant test 3 (Whistler, 2026-11-15): research's "Free parking" pre-ticks the Free parking tile too, as for pubs

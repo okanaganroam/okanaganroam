@@ -230,7 +230,7 @@ test('B4: Good to know from research says so, and is marked as research (a tap r
 
 test('B5: a rejected price keeps what was typed (every price box)', () => {
   assert.match(CLIENT, /var PRICE_BOXES = \['suTprice', 'suTpriv', 'suCfee', 'suFee'\];/);
-  for (const id of ['suTprice', 'suTpriv', 'suCfee']) assert.match(CLIENT, new RegExp(`field\\('${id}', T\\.\\w+, boxVal\\('${id}'`));
+  for (const id of ['suTprice', 'suTpriv', 'suCfee']) assert.match(CLIENT, new RegExp(`field\\('${id}', [^,]*?T\\.\\w+, boxVal\\('${id}'`)); // tour test 14: the private box's label can be "Private lessons"
   assert.equal((CLIENT.match(/field\('suFee', T\.feeLabel, boxVal\('suFee'/g) || []).length, 2);
   assert.doesNotMatch(CLIENT, /isNaN\(tp\.price\) \? '' : String\(tp\.price\)/);
 });

@@ -101,12 +101,12 @@ test('1. price box: "650 per boat" and other worded prices are never trimmed; pe
   assert.ok(Number.isNaN(rd('2 hrs 650', true)));
   assert.equal(vm.runInContext('tourPriceNumber("650 per boat")', ctx), 650);
   // The nudges and the lead (EN + FR); the move button; the hint says where a boat price goes.
-  assert.equal(text.en.tour.tpriceGroup, 'Priced per boat or per group? Put it in Private tours below.');
-  assert.match(text.fr.tour.tpriceGroup, /par bateau ou par groupe\s?\? Mettez-le dans Sorties privées/);
+  assert.equal(text.en.tour.tpriceGroup, 'Priced per boat, per group or per lesson? Put it in Private tours below.'); // tour test 14: per lesson too
+  assert.match(text.fr.tour.tpriceGroup, /par bateau, par groupe ou par cours\s?\? Mettez-le dans Sorties privées/);
   assert.equal(text.en.tour.tpriceLeadPick, 'Your card will say “From {x} a person”.');
   assert.equal(text.fr.tour.tpriceLeadPick, 'Votre fiche indiquera « À partir de {x} par personne ».');
   assert.match(text.en.tour.tpriceHours, /starts with a trip length/); assert.match(text.en.tour.tpriceOne, /One price here/);
-  assert.match(text.en.tour.tpriceMore, /Priced per boat\? Use Private tours below\./);
+  assert.match(text.en.tour.tpriceMore, /Priced per boat, per group or per lesson\? Use Private tours below\./); // tour test 14: per group or lesson too
   assert.match(CLIENT, /if \(k === 'tpriceToPriv'\)/);
   assert.match(CLIENT, /S\.nudge = pwhy === 'group' && T\.tpriceGroup \? T\.tpriceGroup : /);
   // The server reads the same way (the edit page sends text): per-person refused with the reason, private takes per boat.

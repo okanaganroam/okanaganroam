@@ -277,8 +277,10 @@ test('12. finish screen: no "update the French description" when its translation
   const { v, t } = await lucia();
   ok(await change(t, { description: 'Altitud teaches private ski and snowboard lessons on Whistler and Blackcomb, in English, Spanish and Portuguese.' }));
   assert.ok(db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND help_kind = 'fr_story' AND status = 'help'").get(v.id), 'queued');
-  assert.equal(app.ownerFrDescState(app.getVenue(v.id)), '');
-  assert.match(CLIENT, /\(S\.storySentNow && C\.frStoryQueues\)\) return '';/);
+  const cfg = await fetch(`${base}/owner/${t}/setup`).then((r) => r.text());
+  assert.match(cfg, /"frStoryQueued":true/);
+  assert.match(CLIENT, /if \(finish && \(C\.frStoryQueued \|\| \(S\.storySentNow && C\.frStoryQueues\)\)\) return '';/);
+  assert.equal((CLIENT.match(/\+ \(frOnlyNamed\(\) \|\| frOnlyFinish\(\)\) \+ frDescOld\(true\)/g) || []).length, 2);
   assert.match(SERVER, /frStoryQueues: COMPLETENESS_TYPES\.has\(venue\.type\)/);
 });
 

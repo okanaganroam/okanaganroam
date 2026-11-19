@@ -90,7 +90,7 @@ test('1. price box: "$750/day" is a day rate for the group (Private tours, with 
   assert.match(text.en.tour.tprivLead, /a day rate is fine here/); assert.match(text.fr.tour.tprivLead, /un tarif à la journée convient ici/);
   assert.equal(text.en.tour.tprivNeed, 'Just the number, like 750. Say “a day, up to 4” in Your tours and prices.');
   assert.match(CLIENT, /pwhy === 'day' && T\.tpriceDay \? T\.tpriceDay : pwhy === 'length' && T\.tpriceLength \? T\.tpriceLength/);
-  assert.match(CLIENT, /S\.groupMove = pwhy === 'group' \|\| pwhy === 'day' \? tourPriceNumber/);
+  assert.match(CLIENT, /S\.groupMove = pwhy === 'group' \|\| pwhy === 'day' \|\| pwhy === 'lesson' \? tourPriceNumber/); // tour test 14: per lesson too
   assert.match(CLIENT, /S\.nudge === T\.tpriceGroup \|\| S\.nudge === T\.tpriceDay\) && S\.groupMove != null/);
   // Server: "$750/day" in the per-person box is refused with the day-rate reason; nothing saved. In the private box it saves 750.
   const { v, t } = erik();
