@@ -155,7 +155,8 @@ module.exports = {
     storagePrefix: 'okanagan',
     siteUrl: 'https://okanaganroam.com',
     mapCredit: { en: 'Powered by Geoapify', fr: 'Fourni par Geoapify', url: 'https://www.geoapify.com/' },
-    title: 'Build your Okanagan trip', titleFr: 'Planifiez votre voyage dans l’Okanagan',
+    // The H1 (2026-11-18, trip SEO): the words people search for; the "Build My Trip" name stays as the eyebrow above it.
+    title: 'Okanagan trip planner', titleFr: 'Planificateur de voyage dans l’Okanagan',
     examples: ['3 days in Kelowna: wineries, easy walks and great food', '2 days in Penticton with the kids', 'A romantic weekend in Naramata', 'What can we do around Penticton if it rains?'],
     placeholder: 'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food.',
     townExamples: {
@@ -168,5 +169,67 @@ module.exports = {
     sampleText: 'ask for &ldquo;a happy hour crawl in Penticton&rdquo; and you get stops like Yellow Dog Brewing and BNA Brewing, each one timed inside its happy hour, with the deals.',
     sampleTitle: 'A happy hour crawl in Penticton',
     sampleStopLabel: { en: 'Happy hour', fr: '5 à 7' },
+    // Trip SEO (2026-11-18): the plain text under the planner (an answer-first intro, example trips and a short FAQ), so
+    // search engines and visitors see what the page does before anything is typed. Server-rendered below the planner
+    // (the tool stays first). Each example opens /trip?q=<request>, which runs the request like a shared link; those
+    // addresses are noindex and canonical to /trip (server.js), so they never become pages of their own.
+    // Examples checked against the planner on 2026-11-18 (winter-appropriate; no Naramata Bench wine trip, most of its
+    // tasting rooms close for the winter).
+    seo: {
+      introHeading: { en: 'Plan an Okanagan itinerary in one sentence', fr: 'Planifiez un itinéraire dans l’Okanagan en une phrase' },
+      intro: {
+        en: [
+          'Build My Trip is a free Okanagan trip planner: describe your trip in one sentence and get a day-by-day itinerary for Kelowna, Penticton, Vernon, wine country or the ski hills.',
+          'It only picks places that are open on your dates, with each stop timed inside its listed hours, and there’s nothing to sign up for.',
+          'You get a plan that says why each stop fits, and you can swap stops, add them to My Trip and share it with your group.',
+        ],
+        fr: [
+          'Planifier mon voyage est un planificateur de voyage gratuit pour l’Okanagan\u00a0: décrivez votre voyage en une phrase et obtenez un itinéraire jour par jour pour Kelowna, Penticton, Vernon, les vignobles ou les stations de ski.',
+          'Il ne choisit que des lieux ouverts à vos dates, chaque arrêt étant prévu pendant ses heures d’ouverture affichées, et aucune inscription n’est nécessaire.',
+          'Vous obtenez un plan qui explique pourquoi chaque arrêt convient. Vous pouvez remplacer des arrêts, les ajouter à Mon voyage et partager le plan avec votre groupe.',
+        ],
+      },
+      examplesHeading: { en: 'Example trips', fr: 'Exemples de voyages' },
+      examplesNote: { en: 'Each one opens a ready plan you can change.', fr: 'Chacun ouvre un plan prêt à modifier.' },
+      examples: [
+        { en: '2 days in Kelowna', fr: '2 jours à Kelowna' },
+        { en: 'A wine weekend in West Kelowna', fr: 'Une fin de semaine vinicole à West Kelowna' },
+        { en: 'Ski day at Big White and dinner after', fr: 'Une journée de ski à Big White et un souper après' },
+        { en: 'A family day in Kelowna with skating and pizza', fr: 'Une journée en famille à Kelowna avec du patin et de la pizza' },
+        { en: 'Date night in Kelowna', fr: 'Une soirée en amoureux à Kelowna' },
+        { en: 'A winter weekend in Penticton', fr: 'Une fin de semaine d’hiver à Penticton' },
+      ],
+      faqHeading: { en: 'Planning an Okanagan trip: questions', fr: 'Planifier un voyage dans l’Okanagan\u00a0: questions' },
+      faq: [
+        {
+          q: { en: 'How many days do you need in the Okanagan?', fr: 'Combien de jours faut-il prévoir dans l’Okanagan\u202f?' },
+          a: {
+            en: 'A weekend is enough for one town, such as Kelowna or Penticton, with a few wineries, a walk and good meals. With 3 or 4 days you can add a second town or a day on the ski hill. Build My Trip plans anything from one evening to 7 days.',
+            fr: 'Une fin de semaine suffit pour une ville, comme Kelowna ou Penticton, avec quelques vignobles, une promenade et de bons repas. Avec 3 ou 4 jours, vous pouvez ajouter une deuxième ville ou une journée de ski. Planifier mon voyage prépare tout, d’une soirée à 7 jours.',
+          },
+        },
+        {
+          q: { en: 'Is the Okanagan worth visiting in winter?', fr: 'L’Okanagan vaut-il la peine en hiver\u202f?' },
+          a: {
+            en: 'Yes, if you plan around what’s open. Big White, SilverStar, Apex and Baldy have ski and snow days, and most wineries in Kelowna and West Kelowna keep their tasting rooms open, while many on the Naramata Bench close until spring. Build My Trip leaves out places that are closed for the season on your dates.',
+            fr: 'Oui, si vous planifiez selon ce qui est ouvert. Big White, SilverStar, Apex et Baldy offrent des journées de ski et de neige, et la plupart des vignobles de Kelowna et de West Kelowna gardent leur salle de dégustation ouverte, alors que plusieurs vignobles du Naramata Bench ferment jusqu’au printemps. Planifier mon voyage écarte les lieux fermés pour la saison à vos dates.',
+          },
+        },
+        {
+          q: { en: 'Is Build My Trip free?', fr: 'Planifier mon voyage est-il gratuit\u202f?' },
+          a: {
+            en: 'Yes. There’s no account, sign-up or payment. Type your trip, get the plan, then swap or remove stops, add them to My Trip and share the link with your group.',
+            fr: 'Oui. Aucun compte, aucune inscription, aucun paiement. Décrivez votre voyage, obtenez le plan, puis remplacez ou retirez des arrêts, ajoutez-les à Mon voyage et partagez le lien avec votre groupe.',
+          },
+        },
+        {
+          q: { en: 'Does it only show places that are open?', fr: 'Montre-t-il seulement des lieux ouverts\u202f?' },
+          a: {
+            en: 'It plans each stop inside the place’s listed hours and leaves out places that are closed for the season on your dates. Hours can change, especially around holidays, so check with the place before you go.',
+            fr: 'Il prévoit chaque arrêt pendant les heures d’ouverture affichées du lieu et écarte les lieux fermés pour la saison à vos dates. Les heures peuvent changer, surtout pendant les fêtes\u00a0: vérifiez auprès du lieu avant d’y aller.',
+          },
+        },
+      ],
+    },
   },
 };
