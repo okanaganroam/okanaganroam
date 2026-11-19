@@ -35,7 +35,9 @@ const STRONG = new Set(('moniteur moniteurs monitrice monitrices lecons hispanop
   // 2026-10-18: "un week-end vinicole", "où les chiens sont acceptés" (ouu is the tokenizer's où).
   + 'vinicole vinicoles viticole viticoles oenologique acceptes admis bienvenus ouu '
   // Search gaps (2026-10-18): "végétalien whistler" and "abordable squamish" were read as unknown words.
-  + 'vegetalien vegetalienne vegetaliens vegetaliennes vegane veganes abordable abordables').split(' '));
+  + 'vegetalien vegetalienne vegetaliens vegetaliennes vegane veganes abordable abordables '
+  // Indoor test 9 (2026-11-19): the indoor kinds' own French words.
+  + 'interieure interieures interieurs quilles piscine piscines bibliotheque bibliotheques galerie galeries escalade evasion conte').split(' '));
 // Common French function words: two different ones are needed.
 const WEAK = new Set(('le la les l des du de d un une et ou au aux en dans sur chez pour mon ma mes nos notre votre vos est sont '
   + 'que qui ce cette ces il y').split(' '));
@@ -81,6 +83,28 @@ const PHRASES = [
   ['galerie d art', 'art gallery'], ['galeries d art', 'art galleries'],
   ['musee', 'museum'], ['musees', 'museums'], ['galerie', 'art gallery'], ['galeries', 'art galleries'],
   ['salle d escalade', 'climbing gym'], ['quilles', 'bowling'], ['cinema', 'cinema'],
+  // Indoor test 9 (2026-11-19; Melissa's play centre: « aire de jeux intérieure à West Kelowna » read « aire of jeux
+  // interieure » and found nothing): every indoor kind's French words (indoor-kinds.js), read without accents, as the
+  // English words the planner's indoor kinds already know (trip-requirements.js KINDS).
+  ['aire de jeux interieure', 'indoor playground'], ['aires de jeux interieures', 'indoor playgrounds'], ['aire de jeu interieure', 'indoor playground'],
+  ['aire de jeux interieure pour enfants', 'indoor playground for kids'], ['parc interieur pour enfants', 'indoor playground for kids'], ['parc interieur', 'indoor playground'], ['parcs interieurs', 'indoor playgrounds'],
+  ['centre de jeux interieur', 'indoor playground'], ['centre de jeux', 'play centre'], ['centres de jeux', 'play centres'], ['jeux interieurs', 'indoor play'], ['jeux pour tout petits', 'toddler play'],
+  ['centre d escalade', 'climbing gym'], ['salles d escalade', 'climbing gyms'], ['escalade de bloc', 'bouldering'], ['escalade interieure', 'indoor climbing'],
+  ['parc de trampolines', 'trampoline park'], ['parc de trampoline', 'trampoline park'], ['parcs de trampolines', 'trampoline parks'], ['centre de trampolines', 'trampoline park'],
+  ['salle d arcade', 'arcade'], ['salles d arcade', 'arcades'], ['salle de jeux d arcade', 'arcade'], ['jeux d arcade', 'arcade games'], ['realite virtuelle', 'virtual reality'], ['lancer de hache', 'axe throwing'],
+  ['salle de quilles', 'bowling alley'], ['salles de quilles', 'bowling alleys'], ['jouer aux quilles', 'bowling'], ['petites quilles', '5 pin bowling'], ['grosses quilles', 'ten pin bowling'],
+  ['salle de cinema', 'movie theatre'], ['salles de cinema', 'movie theatres'], ['voir un film', 'see a movie'], ['aller au cinema', 'cinema'],
+  ['piece de theatre', 'a play'], ['pieces de theatre', 'plays'], ['salle de spectacle', 'theatre'], ['salles de spectacle', 'theatres'], ['salle de spectacles', 'theatre'], ['theatre', 'theatre'], ['theatres', 'theatres'],
+  ['piscine interieure', 'indoor pool'], ['piscines interieures', 'indoor pools'], ['piscine publique', 'public pool'], ['piscine', 'pool'], ['piscines', 'pools'],
+  ['bain libre', 'public swim'], ['bains libres', 'public swim'], ['nage en couloir', 'lane swim'], ['centre aquatique', 'aquatic centre'], ['centres aquatiques', 'aquatic centres'], ['centre recreatif', 'rec centre'],
+  ['spa de jour', 'day spa'], ['spa nordique', 'nordic spa'], ['massage en couple', 'couples massage'], ['massages en couple', 'couples massage'], ['soin du visage', 'facial'], ['soins du visage', 'facials'],
+  ['cours de peinture', 'painting class'], ['peinture sur poterie', 'paint your own pottery'], ['atelier de peinture', 'painting class'],
+  ['initiation au curling', 'learn to curl'], ['club de curling', 'curling club'],
+  ['cours de yoga', 'yoga class'], ['yoga chaud', 'hot yoga'], ['cours de mise en forme', 'fitness class'],
+  ['machines a sous', 'slot machines'], ['machine a sous', 'slot machines'], ['tables de jeu', 'table games'],
+  ['bibliotheque publique', 'public library'], ['bibliotheque', 'library'], ['bibliotheques', 'libraries'], ['heure du conte', 'story time'],
+  ['centre des sciences', 'science centre'], ['centre de sciences', 'science centre'], ['centre scientifique', 'science centre'],
+  ['activites interieures', 'indoor activities'], ['activite interieure', 'indoor activity'], ['quand il pleut', 'when it rains'], ['jour de pluie', 'rainy day'],
   ['obligatoirement', 'must'], ['obligatoire', 'must'], ['seulement', 'only'], ['idealement', 'ideally'],
   ['repas vegetariens', 'vegetarian meals'], ['repas vegetariens seulement', 'only vegetarian meals'],
   ['jour 1', 'day 1'], ['jour 2', 'day 2'], ['jour 3', 'day 3'], ['jour 4', 'day 4'],

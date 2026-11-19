@@ -331,7 +331,7 @@ function indoorKindsNamedIn(text) {
 const INDOOR_TYPE_WORD_SKIP = new Set(['history', 'heritage', 'heritage site', 'exhibition', 'exhibitions', 'exposition', 'expositions', 'concert', 'concerts', 'comedy', 'musical', 'musicals',
   'live show', 'a play', 'live theatre', 'pièce de théâtre', 'comédie musicale', 'pool', 'pools', 'swim', 'swimming', 'piscine', 'piscines', 'baignade', 'waterslide', 'glissade d’eau', 'mini golf', 'mini-golf', 'go karts', 'go-karts', 'karting',
   'workshop', 'workshops', 'atelier', 'ateliers', 'wellness', 'bien-être', 'rainy day', 'indoor activity', 'indoor activities', 'things to do when it rains', 'activité intérieure',
-  'activités intérieures', 'jour de pluie', 'story time', 'storytime', 'heure du conte', 'film', 'films', 'spectacle', 'spectacles', 'humour', 'art', 'theatre', 'theater', 'théâtre',
+  'activités intérieures', 'jour de pluie', 'film', 'films', 'spectacle', 'spectacles', 'humour', 'art', 'theatre', 'theater', 'théâtre',
   'cours', 'barre', 'bingo', 'poker', 'gym', 'histoire', 'patrimoine', 'site patrimonial', 'pièces', 'climbing', 'rock climbing', 'escalade', 'pottery', 'poterie', 'céramique', 'ceramics', 'axe throwing', 'lancer de hache', 'trampoline', 'parkour', 'ninja', 'vr', 'bowl', 'play area', 'aire de jeux', 'kids play']);
 // The words that mean "an indoor place" in search and Build My Trip ("facial", "bouldering", "lane swim", "tenpin",
 // "learn to curl", "slots", « soin du visage »).

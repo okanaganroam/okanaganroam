@@ -4521,7 +4521,9 @@ function buildDiscoverySearchVenues() {
     venues.push({
       id: row.id, name: row.name, region: row.region, type: row.type,
       cuisine: String(row.cuisine || '').toLowerCase().trim(),
-      cuisines: venueCuisineList(row).map((c) => String(c).toLowerCase().trim()),
+      // Indoor test 9 (2026-11-19): an indoor place's owner-picked kinds are its categories too (its category reads "Pool & rec
+      // centre", so "indoor pool" -> "pool" missed it).
+      cuisines: [...new Set([...venueCuisineList(row).map((c) => String(c).toLowerCase().trim()), ...(row.type === 'indoor' ? (venueIndoorInfo(row.id).kinds || []).flatMap((k) => (indoorKindsModule.INDOOR_KIND_TEXT[k] ? indoorKindsModule.INDOOR_KIND_TEXT[k].en.search.slice(0, 2) : [])) : [])])],
       // Tour test 11 (Whistler, 2026-11-18): a tour's own typed tours (names and descriptions) and its Plan your visit lines
       // (Good to know: "Hotel pickup available") are searched with its story ("village lights tour", "hotel pickup"); each
       // part is read on its own (the reader keeps about 500 characters of one text).
@@ -5359,6 +5361,18 @@ const SEARCH_PHRASE_REWRITES = [
     'art opening', 'art openings', 'art class', 'art classes', 'art camp', 'art camps', 'art studio', 'art studios', 'art centre', 'art center', 'art museum', 'art museums', 'art supplies',
     'art deco', 'street art', 'martial art', 'martial arts', 'art d', 'arts and culture', 'art and culture', 'body art', 'nail art', 'kids art', 'art party', 'art parties', 'art lesson', 'art lessons',
     'art workshop', 'art workshops', 'pop art', 'digital art', 'indigenous art', 'first nations art'].map((x) => [x, x]),
+  // Indoor test 9 (2026-11-19; the EN + FR planner and search matrix, tests/indoor-planner-matrix.test.js): what visitors
+  // type for an indoor kind, read as that kind's own word ("story time" and « heure du conte » are the library, "poker"
+  // the casino, « jouer aux quilles » bowling); "to visit" adds nothing to a gallery or museum.
+  ['gallery to visit', 'gallery'], ['galleries to visit', 'galleries'], ['museum to visit', 'museum'], ['museums to visit', 'museums'],
+  ['live theatre', 'theatre'], ['live theater', 'theatre'], ['see a play', 'theatre'], ['watch a play', 'theatre'], ['see a show', 'theatre'],
+  ['salle de spectacle', 'theatre'], ['salle de spectacles', 'theatre'], ['salles de spectacle', 'theatre'], ['piece de theatre', 'theatre'], ['pieces de theatre', 'theatre'],
+  ['indoor pool', 'pool'], ['indoor pools', 'pool'], ['indoor swimming pool', 'pool'], ['piscine interieure', 'pool'], ['piscines interieures', 'pool'], ['piscine publique', 'pool'],
+  ['jouer aux quilles', 'bowling'], ['salle de quilles', 'bowling'], ['parc interieur pour enfants', 'indoor playground'], ['parc interieur', 'indoor playground'], ['parcs interieurs', 'indoor playground'],
+  ['aire de jeux interieure', 'indoor playground'], ['aires de jeux interieures', 'indoor playground'], ['centre de jeux', 'indoor playground'], ['centres de jeux', 'indoor playground'],
+  ['atelier de poterie', 'pottery'], ['ateliers de poterie', 'pottery'], ['cours de poterie', 'pottery'],
+  ['poker', 'casino'], ['slots', 'casino'], ['slot machines', 'casino'], ['machines a sous', 'casino'], ['machine a sous', 'casino'],
+  ['story time', 'library'], ['storytime', 'library'], ['heure du conte', 'library'], ['public library', 'library'], ['bibliotheque publique', 'library'],
   ['haunted house', 'haunted'], ['haunted houses', 'haunted'], ['haunted attraction', 'haunted'], ['haunted attractions', 'haunted'],
   ['toboggan', 'sledding'], ['toboggans', 'sledding'], ['tobogganing', 'sledding'], ['toboggan hill', 'sledding'], ['toboggan hills', 'sledding'],
   ['sledding hill', 'sledding'], ['sledding hills', 'sledding'], ['sled hill', 'sledding'], ['sleds', 'sledding'],
@@ -5421,7 +5435,9 @@ function discoverySearchText(text, lang) {
     try { return searchPhraseRewrites(text); } catch (e) { return text; }
   }
   let t = text;
-  try { t = frSearchSynonyms(text); } catch (e) { t = text; }
+  // Indoor test 9: the indoor kinds' French phrases (« piscine intérieure », « jouer aux quilles ») before the word list.
+  try { t = searchPhraseRewrites(t); } catch (e) { t = text; }
+  try { t = frSearchSynonyms(t); } catch (e) { /* as read so far */ }
   try { t = searchPhraseRewrites(t); } catch (e) { /* as read so far */ }
   try { return tripPlannerFrModule().tripPlannerText(t, buildDiscoveryTaxonomy(), { frenchPage: true }); } catch (e) { return t; }
 }
@@ -7627,6 +7643,7 @@ function runTripPlan(args, now = new Date()) {
       }
     }
   } catch (e) { plan = first; }
+  if (plan === first) { try { plan = tripIndoorKindNearTowns(first, args, now); } catch (e) { plan = first; } }
   // 2026-10-25: "the Okanagan in spring" / "the Okanagan in July" came back "We couldn't work out a plan": a season or
   // month with no other ask is read as things to do then.
   try {
@@ -7647,6 +7664,58 @@ function runTripPlan(args, now = new Date()) {
   try { plan = tripPickupWordsUsed(plan, args); } catch (e) { /* keep the plan */ }
   try { plan = tripShowPlacesFallback(plan, args); } catch (e) { console.error(`[trip] show places: ${e.message}`); }
   return plan;
+}
+// Indoor test 9 (2026-11-19; Melissa's play centre in West Kelowna: "indoor playground Kelowna" left her out, and Kelowna
+// itself has none): a request that names an indoor kind (trip-requirements.js KINDS, the planner kinds of indoor-kinds.js)
+// in one town with fewer than two places of that kind there takes in the towns right around it (TRIP_SITE nearTowns:
+// Kelowna -> West Kelowna and Lake Country), with the same note as "near Kelowna". French requests too (« à Kelowna »).
+const TRIP_INDOOR_PLANNER_KINDS = [...new Set(Object.values(require('./trip-requirements').INDOOR_KIND_PLANNER).flat())];
+function tripIndoorKindsAsked(text) {
+  const TR = require('./trip-requirements');
+  let en = String(text || '');
+  try { en = tripPlannerFrModule().tripPlannerText(en, buildTripPlannerTaxonomy()); } catch (e) { /* as typed */ }
+  const t = ` ${String(en).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()} `;
+  return TRIP_INDOOR_PLANNER_KINDS.filter((k) => TR.KINDS[k] && TR.KINDS[k].test(t));
+}
+function tripIndoorKindNearTowns(first, args, now) {
+  if (!first || args.swap || args.pinned) return first;
+  const text = String(args.text || '');
+  const kinds = tripIndoorKindsAsked(text);
+  if (!kinds.length) return first;
+  const fold = (x) => String(x).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const folded = fold(text);
+  // The one town the request names (the longest label first, so "West Kelowna" is never read as "Kelowna").
+  const labels = Object.keys(REGION_LABELS).map((r) => [r, REGION_LABELS[r]]).sort((a, b) => b[1].length - a[1].length);
+  let town = null, at = -1, used = folded;
+  for (const [r, label] of labels) {
+    const m = new RegExp(`(^|[^a-z])${fold(label).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![a-z])`).exec(used);
+    if (!m) continue;
+    if (town) return first; // two towns named: the request already says where
+    town = r; at = m.index + m[1].length;
+    used = used.slice(0, at) + ' '.repeat(label.length) + used.slice(at + label.length);
+  }
+  if (!town || !(TRIP_NEAR_TOWNS[town] || []).length) return first;
+  const TR = require('./trip-requirements');
+  const ofKind = (p) => (p ? [...(p.recommendations || []), ...((p.outing && p.outing.stops) || []), ...((p.itinerary && p.itinerary.stops) || []), ...(p.days || []).flatMap((d) => d.stops || [])] : [])
+    .filter((x) => x && x.venue && x.venue.type === 'indoor').filter((x, i, a) => a.findIndex((y) => y.venue.id === x.venue.id) === i)
+    .filter((x) => { const v = getVenue(x.venue.id); if (!v) return false; const k = venueIndoorInfo(v.id).kinds; return TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) ? { indoorKinds: k } : {}) }).some((pk) => kinds.includes(pk)); });
+  const firstKind = ofKind(first);
+  if (firstKind.filter((x) => x.venue.region === town).length >= 2) return first;
+  const label = REGION_LABELS[town];
+  const fr = /\u00e0\s*$|\ba\s*$/i.test(fold(text.slice(0, at)).replace(/\s+$/, ' ')) && tripPlannerFrModule().tripPlannerText(text, buildTripPlannerTaxonomy()) !== text;
+  const towns = [town, ...TRIP_NEAR_TOWNS[town]].map((r) => REGION_LABELS[r]);
+  const listed = `${towns.slice(0, -1).join(', ')} ${fr ? 'et' : 'and'} ${towns[towns.length - 1]}`;
+  const before = text.slice(0, at);
+  const lead = /(?:\bin|\bnear|\baround|\u00e0|\bpr[eè]s de)\s*$/i.test(before) || !before.trim() ? '' : (fr ? 'à ' : 'in ');
+  const wider = runTripPlanCore({ ...args, text: `${before}${lead}${listed}${text.slice(at + label.length)}` }, now);
+  const widerKind = ofKind(wider);
+  if (tripPlanEmpty(wider) || widerKind.length <= firstKind.length) return first;
+  const near = towns.slice(1), nearText = near.length > 1 ? `${near.slice(0, -1).join(', ')} and ${near[near.length - 1]}` : near[0];
+  const note = !firstKind.length ? `Nothing in ${label} itself matched, so this includes ${nearText} nearby.` : `This includes ${nearText}, right next to ${label}.`;
+  wider.notes = [note].concat(wider.notes || []);
+  wider.contextNotes = [note].concat(wider.contextNotes || []);
+  wider.query = first.query;
+  return wider;
 }
 // Indoor test 3 (2026-11-19; "comedy show in Penticton" found nothing while Diane's theatre hosts comedy nights): a show
 // request ("comedy", "live music", "a concert", "a play") with no dated event that fits, in Build My Trip and search, falls
@@ -8771,7 +8840,9 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     .replace(/\b(?:happy hour cocktails?|cocktails? (?:at|during|for) (?:a |the )?happy hour|cocktail happy hours?)\b/gi, 'happy hour')
     // Indoor test 2 (2026-11-19; Jordan): "team building activity / event / ideas / outing" is "team building" (the words
     // after it were read as an outdoor activity or a What's On event).
-    .replace(TEAM_BUILDING_WORDS_RE, 'team building');
+    .replace(TEAM_BUILDING_WORDS_RE, 'team building')
+    // Indoor test 9 (2026-11-19): "story time" on its own (« heure du conte ») is the library's (it planned nothing).
+    .replace(/\b(?:story ?times?|storytimes?)\b/gi, (m, at, all) => (/\blibrar(?:y|ies)\b/i.test(all) ? m : `library ${m}`));
   // Build My Trip fixes (2026-11-18): "a day on the mountain / on the slopes" in the ski months is a ski day (trip-planner.js
   // mountainDayText); the month is the one the request names, else its date, else today's.
   {

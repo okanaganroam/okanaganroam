@@ -8,14 +8,25 @@ const KINDS = {
   challenging_hike: /\b(?:challenging|strenuous|steep|difficult)(?: \w+){0,2} (?:hikes?|hiking|trails?)\b/,
   easy_walk: /\b(?:easy|gentle|flat|short) (?:walk|walks|walking trail|walking path|hikes?|hiking trail)\b/,
   walk: /\b(?:walk|walks|walking trails?|walking paths?|promenade|walkway|stroll|boardwalk|seawall)\b/,
-  museum: /\bmuseums?\b/,
+  // Indoor test 9 (2026-11-19): a science or discovery centre is a museum.
+  museum: /\b(?:museums?|science (?:centres?|centers?)|discovery (?:centres?|centers?))\b/,
   gallery: /\b(?:galler(?:y|ies)|art warehouse|arts? centre|arts? center)\b/,
-  escape: /\bescape rooms?\b/,
+  escape: /\b(?:escape (?:rooms?|games?)|puzzle rooms?)\b/,
   // Indoor test 4 (2026-11-19): the bowling words of indoor-kinds.js too (tenpin, 5-pin, « quilles »).
   bowling: /\b(?:bowling|bowling alley|lanes|ten ?pin|5 pin|five pin|10 pin|quilles)\b/,
-  climbing: /\b(?:climbing gyms?|bouldering|indoor climbing|trampoline parks?|escalade de bloc|centre d escalade)\b/,
-  arcade: /\b(?:arcades?|laser tag)\b/,
-  theatre: /\b(?:theatres?|theaters?|cinema|performing arts)\b/,
+  climbing: /\b(?:climbing gyms?|bouldering|indoor climbing|trampoline parks?|trampolines?|ninja (?:gyms?|parks?|courses?)|parkour|escalade de bloc|centre d escalade|salle d escalade)\b/,
+  arcade: /\b(?:arcades?|laser tag|virtual reality|vr (?:games?|arcades?|centres?|centers?)|realite virtuelle)\b/,
+  // Indoor test 9 (2026-11-19): a cinema is its own kind ("movie theatre" is a cinema, never live theatre).
+  theatre: /\b(?:(?<!movie )(?<!picture )theatres?|(?<!movie )(?<!picture )theaters?|performing arts|playhouses?)\b/,
+  cinema: /\b(?:cinemas?|cineplex|movie theat(?:re|er)s?|movies?|picture house|salle de cinema)\b/,
+  // Indoor test 9 (2026-11-19; Melissa's play centre: "indoor playground Kelowna" read only "indoor"): every indoor kind
+  // is a planner kind, read from the request and from a listing's own words. An outdoor playground is a park.
+  playground: /\b(?:indoor (?:playgrounds?|play(?: centres?| centers?| areas?| places?| spaces?)?)|play (?:centres?|centers?|places?|cafes?)|playplaces?|soft play|toddler play|kids? play (?:centres?|centers?|areas?|zones?)|bouncy castles?|aires? de jeux interieures?|centres? de jeux)\b/,
+  pool: /\b(?:indoor pools?|swimming pools?|leisure pools?|wave pools?|public pools?|lane swim(?:ming)?|public swim(?:ming)?|aquatic (?:centres?|centers?)|aquatics? centres?|rec(?:reation)? (?:centres?|centers?)|piscines?(?: interieures?)?|bain libre|centre aquatique|centre recreatif)\b/,
+  curling: /\b(?:curling(?: clubs?| rinks?)?|learn to curl)\b/,
+  yoga: /\b(?:yoga|hot yoga|pilates|barre (?:class(?:es)?|studios?)|spin class(?:es)?|fitness class(?:es)?|yoga chaud)\b/,
+  casino: /\b(?:casinos?|slot machines?|slots|poker|table games|machines a sous)\b/,
+  library: /\b(?:librar(?:y|ies)|story ?time|bibliotheques?|heure du conte)\b/,
   spa: /\b(?:spas?|thermal spa|sauna experience|saunas?|floating sauna|massages?|wellness|facials?|hydrotherapy|hydrotherapie|soins? du visage|steam rooms?|nordic spa|spa nordique)\b/, // 2026-10-25: saunas and wellness studios; indoor test 4: facials and hydrotherapy
   wine_tour: /\b(?:wine tours?|winery tours?|vineyard tours?)\b/,
   // Tour test 5 (Whistler, 2026-11-17): jet boats and boat charters are boat tours too ("boat charter", "yacht charter"; a
@@ -147,6 +158,10 @@ const REQUEST_KINDS = {
   // art-class words, and kids' camps ask for a class or workshop place (a listing still needs pottery/class words of its
   // own, or the owner's Classes & workshops kind). "summer camp" was read as Camping.
   pottery: /\b(?:something creative|get creative|creative|crafty|arts and crafts|hands on|make something|make (?:our|your|my) own|diy|paint your own(?: pottery)?|pottery painting|paint and sip|paint nights?|painting class(?:es)?|art class(?:es)?|art camps?|summer camps?|day camps?|kids? camps?|spring break camps?|pd day camps?|poterie|ateliers? creatifs?|quelque chose de creatif|bricolage|camps? de jour|camps? d ete)\b/,
+  // Indoor test 9 (2026-11-19): "see a play" and "a musical" ask for live theatre; "see a movie" and "films" for a cinema
+  // (a listing still needs theatre or cinema words of its own, or the owner's kind).
+  theatre: /\b(?:(?:see|watch|catch) a (?:play|show|musical)|a play(?! (?:centres?|centers?|places?|areas?|ground|cafes?|structures?|zones?))|stage plays?|musicals?|live shows?)\b/,
+  cinema: /\b(?:(?:see|watch|catch) a (?:movie|film|flick)|films?|voir un film)\b/,
   scenic_flight: /\b(?:float ?planes?|seaplanes?|scenic (?:(?:helicopter|heli|plane|air) (?:flights?|tours?)|flights?)|scenic (?:or|and) helicopter flights?|helicopter (?:tours?|flights?|rides?|sightseeing|trips?)|heli (?:tours?|flights?|rides?)|helicopters?|flightseeing|glacier landings?)\b/,
 };
 const HELI_SKI_LISTING_RE=/\b(?:heli ?ski(?:ing|s)?|heliski\w*|heli ?board\w*|cat ?ski(?:ing|s)?|catski\w*|snowcat skiing)\b/;
@@ -161,14 +176,24 @@ const TOUR_KIND_PLANNER = { fishing: ['fishing_tour'], boat: ['boat_tour'], jetb
   // Tour test 14 (Lucía): the Ski and snowboard lessons kind.
   lessons: ['ski_lessons'] };
 // Indoor places (2026-11-19, the indoor easy setup): the owner's kinds (venue_indoor_info.kinds) -> the planner kinds they are.
-// A place is that kind whatever its name says (a gallery called "Caetani Cultural Centre" is a gallery). Kinds with no
-// planner kind of their own (pools, curling, yoga, casinos, the library) keep the words they had.
-const INDOOR_KIND_PLANNER = { gallery: ['gallery'], museum: ['museum'], theatre: ['theatre'], cinema: ['theatre'], spa: ['spa'], climbing: ['climbing'], games: ['arcade'], escape: ['escape'],
-  bowling: ['bowling'], classes: ['pottery'] };
+// A place is that kind whatever its name says (a gallery called "Caetani Cultural Centre" is a gallery). Since indoor
+// test 9 every indoor kind has a planner kind of its own (a cinema is no longer a theatre).
+const INDOOR_KIND_PLANNER = { gallery: ['gallery'], museum: ['museum'], theatre: ['theatre'], cinema: ['cinema'], spa: ['spa'], climbing: ['climbing'], games: ['arcade'], escape: ['escape'],
+  bowling: ['bowling'], classes: ['pottery'], kids: ['playground'], pool: ['pool'], curling: ['curling'], yoga: ['yoga'], casino: ['casino'], library: ['library'] };
+// Indoor test 9: each indoor planner kind's request words (indoor-kinds.js search words, English and French, plus the
+// words of its own request phrases), read as the kind and not as words a listing must hold.
+const INDOOR_KIND_REQUEST_WORDS = (() => {
+  const IK = require('./indoor-kinds'); const out = {};
+  const extra = { cinema: 'see watch catch a movie movies film films flick theatre theater picture house voir un', theatre: 'see watch catch a play plays show shows musical musicals stage live playhouse', playground: 'indoor play playground playgrounds centre centres center centers place places soft toddler kids kid bouncy castle castles area zone', pool: 'indoor pool pools swim swimming lane public leisure wave rec recreation centre centres center aquatic aquatics', library: 'public story time storytime', casino: 'slot slots machines machine poker table games', yoga: 'class classes hot studio', curling: 'learn to curl club rink', museum: 'science discovery centre center', escape: 'escape room rooms game games puzzle', arcade: 'virtual reality vr laser tag games', climbing: 'climbing gym bouldering trampoline trampolines park parks ninja parkour' };
+  for (const [k, pks] of Object.entries(INDOOR_KIND_PLANNER)) for (const pk of pks) out[pk] = `${out[pk] || ''} ${IK.INDOOR_KIND_TEXT[k].en.search.concat(IK.INDOOR_KIND_TEXT[k].fr.search).join(' ')} ${extra[pk] || ''}`;
+  return out;
+})();
+// Indoor test 9: the kinds only an indoor listing can be (a hotel's "indoor pool" or a winery's "library wines" is not one).
+const INDOOR_ONLY_PLANNER_KINDS = new Set(['playground', 'pool', 'curling', 'yoga', 'casino', 'library', 'cinema']);
 // Every planner kind that is a tour listing (one list: the request reader, the plan's types and the excluded kinds all
 // use it, so a new tour kind is added once).
 const TOUR_PLANNER_KINDS = ['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour','sightseeing_tour','paragliding','ski_lessons','kite_lessons','shooting'];
-const LABELS = {ski_lessons:'ski or snowboard lesson',kite_lessons:'kiteboarding or wing foil lesson',shooting:'target shooting',sightseeing_tour:'sightseeing tour',sleigh_ride:'sleigh ride',cultural_tour:'cultural tour',kennel_visit:'kennel visit',ski_touring:'ski touring',avalanche_course:'avalanche course',multi_day_tour:'multi-day trip',mountain_guide:'mountain guide',adventure_park:'adventure park',skating:'skating',farm:'farm',shopping:'shopping',zipline:'ziplining',bungee:'bungee jumping',paragliding:'paragliding',rafting:'rafting',scenic_flight:'scenic flight',heli_hike:'heli-hiking',fishing_tour:'fishing trip',snowshoe_tour:'snowshoe tour',heli_ski:'heli-skiing',rentals:'rentals',bike_tour:'bike tour',paddle_tour:'paddle tour',food_tour:'food tour',walking_tour:'walking tour',atv:'ATV tour',snowmobile_tour:'snowmobile tour',wildlife_tour:'wildlife tour',via_ferrata:'via ferrata',bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',pottery:'pottery class',snow_tour:'snow experience',hiking:'hiking'};
+const LABELS = {ski_lessons:'ski or snowboard lesson',kite_lessons:'kiteboarding or wing foil lesson',shooting:'target shooting',sightseeing_tour:'sightseeing tour',sleigh_ride:'sleigh ride',cultural_tour:'cultural tour',kennel_visit:'kennel visit',ski_touring:'ski touring',avalanche_course:'avalanche course',multi_day_tour:'multi-day trip',mountain_guide:'mountain guide',adventure_park:'adventure park',skating:'skating',farm:'farm',shopping:'shopping',zipline:'ziplining',bungee:'bungee jumping',paragliding:'paragliding',rafting:'rafting',scenic_flight:'scenic flight',heli_hike:'heli-hiking',fishing_tour:'fishing trip',snowshoe_tour:'snowshoe tour',heli_ski:'heli-skiing',rentals:'rentals',bike_tour:'bike tour',paddle_tour:'paddle tour',food_tour:'food tour',walking_tour:'walking tour',atv:'ATV tour',snowmobile_tour:'snowmobile tour',wildlife_tour:'wildlife tour',via_ferrata:'via ferrata',bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',cinema:'cinema',playground:'indoor playground',pool:'pool',curling:'curling',yoga:'yoga class',casino:'casino',library:'library',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',pottery:'pottery class',snow_tour:'snow experience',hiking:'hiking'};
 const WALKING_TRANSPORT = /\b(?:no car|(?:we |i )?(?:do not|don t|dont) drive|(?:rely|relying) on (?:public )?(?:transit|buses|the bus)|public transit|no vehicle|without (?:a |our |my )?car|do not have (?:a |our |my )?car|don t have (?:a |our |my )?car|no driving|car free|on foot|walkable|(?:walk|walking) between (?:the )?(?:stops|places|venues))\b/g;
 // "No driving after 6pm", "no driving at night" (2026-10-18): only the evening is on foot, so it is an evening rule,
 // not a car-free trip (it used to plan one winery a day inside a 1.5 km walking radius).
@@ -271,6 +296,7 @@ function inferPlannerKinds(v) {
   const text = norm([v.name,v.description,v.textName,v.textDesc,v.type==='tour'?v.cuisine:''].filter(Boolean).join(' '));
   const name = norm(v.name);
   return Object.entries(v.type==='sport'?{...KINDS,...SPORT_KINDS}:KINDS).filter(([kind,re]) => {
+    if (INDOOR_ONLY_PLANNER_KINDS.has(kind)&&v.type&&v.type!=='indoor') return false;
     if (kind==='challenging_hike') {
       if(v.type!=='outdoor')return false;
       return String(v.description||v.textDesc||'').split(/[.;!]/).map(norm).some(c=>re.test(c)&&! /\b(?:near|nearby|no|not|without)\b/.test(c));
@@ -839,6 +865,8 @@ function consumedTerms(requirements) {
     if (i.kind === 'feature') add(`${i.value.replace(/_/g, ' ')} meals meal only must verified`);
     if (i.kind === 'activity') add(i.value==='viewpoints'?'sunset viewpoints viewpoint watch place to':i.value);
     // From Whistler Roam #188 (2026-11-17): the new tour kinds' own words too ("cat skiing in Whistler" kept "cat" as a word to find).
+    // Indoor test 9: an indoor kind's own words are the kind ("story time" is the library, never a word its listing must hold).
+    if (i.kind === 'venue_kind' && INDOOR_KIND_REQUEST_WORDS[i.value]) add(INDOOR_KIND_REQUEST_WORDS[i.value]);
     if (i.kind === 'venue_kind') add(`${LABELS[i.value]} ${i.value==='sunset'?'watch place to':i.value==='cooking'?'classes':i.value==='horseback'?'horse riding':i.value==='scenic_flight'?'helicopter helicopters heli flights flightseeing glacier landing landings float plane planes floatplane seaplane ride rides':i.value==='heli_hike'?'helihiking heli hike hikes':i.value==='food_tour'?'food foodie culinary tasting tours':i.value==='walking_tour'?'walking walk walks tours lights light lantern night evening ghost history historic historical heritage guided winter christmas holiday':i.value==='heli_ski'?'heli ski skis skiing heliski heliskiing heliboarding board boarding cat catski catskiing snowcat snowcats':i.value==='snowshoe_tour'?'snowshoe snowshoes snowshoeing guided tours trips outings excursions':i.value==='fishing_tour'?'fishing charter charters trip trips tours guide guides guided guiding salmon sturgeon sport':i.value==='rentals'?'equipment gear outdoor adventure rental rentals':i.value==='adventure_park'?'adventure park parks aerial treetop tree top ropes course courses high trekking':i.value==='bike_tour'?'guided bike bikes biking e ebike cycling mountain road gravel tours rides trips':i.value==='paddle_tour'?'guided kayak kayaking canoe canoeing sup paddle paddleboard paddling tours trips excursions lessons outings':i.value==='ski_touring'?'ski skis skiing touring tour tours backcountry splitboard splitboarding mountaineering skimo alpine guided guide guides lesson lessons':i.value==='avalanche_course'?'avalanche course courses training safety skills awareness class classes certification ast 1 2 one two':i.value==='multi_day_tour'?'hut huts trip trips multi day days multiday overnight hike hikes hiking trek treks trekking traverse traverses expedition expeditions backpacking guided tour tours stay stays 1 2 3 4 5 6 7 two three four five six seven':i.value==='paragliding'?'paragliding paraglide paraglides paraglider paragliders para gliding glide glider gliders tandem flight flights skydiving skydive skydives sky dive diving parachute parachuting hang speed flying fly riding paramotor paramotoring':i.value==='mountain_guide'?'mountain guide guides guided guiding mountaineering alpinism alpine climb climbs climbing glacier ascent ascents summit summits ice acmg ifmga':i.value==='ski_lessons'?'ski skis skiing snowboard snowboarding snow board boarding lesson lessons school schools instructor instructors instruction coaching coach clinic clinics camp camps class classes course courses program private group kids kid children child adult adults adaptive sit beginner beginners first time timer learn learning to nordic cross country teacher teachers':i.value==='kite_lessons'?'kite kiteboard kiteboarding kitesurf kitesurfing kiting wing foil foiling windsurf windsurfing wakeboard wakeboarding lesson lessons school clinic clinics coaching course courses camp camps class classes instruction':i.value==='shooting'?'target shooting range ranges guided lesson lessons session sessions experience clay trap skeet biathlon rifle':''}`);
   }
   return terms;
