@@ -280,3 +280,34 @@ test('8. Bowling Good to know chips (leagues, licensed lounge, bumpers), its own
     }
   }
 });
+
+test('9. Polish: long URLs wrap at 360; "Your prices are live ✓" once approved; a card says its category\'s kind, never "Indoor attraction" when clear; no Mon–Fri while Monday is closed', async () => {
+  // Long URLs wrap (the setup and the owner pages).
+  const { v, t } = await gary();
+  await ok(change(t, { indoor_info: { kinds: ['bowling'], length: '1-2h', book: 'busy', age: 'all' } }));
+  const html = await fetch(`${base}/owner/${t}/setup`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text());
+  assert.match(html, /body\.owner-setup \.su-wrap \{[^}]*overflow-wrap: anywhere/);
+  const portal = await fetch(`${base}/owner/${t}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text());
+  assert.match(portal, /body\.owner-page \.op-hint, body\.owner-page \.op-wrap a[^{]*\{ overflow-wrap: anywhere; \}/);
+  // Prices: sent, then live once published (nothing waiting).
+  garyPrices(v.id);
+  const m = await openSetup(base, t, { hash: 'menu' });
+  m.window.SETUP_CFG.waiting = [];
+  assert.equal(T.en.indoor.menuLiveQ, 'Your prices are live ✓');
+  assert.equal(T.fr.indoor.menuLiveQ, 'Vos tarifs sont en ligne ✓');
+  // Card labels: no owner kind, a clear category.
+  const mcc = mk('indoor', { name: 'McCurdy Bowl T8', cuisine: 'Bowling alley', description: 'Ten-pin bowling.', rating: 4.9, reviews: 900 });
+  const card = itemsOf(app.runTripPlan({ text: 'bowling in Kelowna' }, NOW)).find((x) => x.venue.id === mcc.id);
+  assert.ok(card, 'McCurdy is in the plan');
+  assert.equal(card.venue.typeLabel, 'Bowling');
+  assert.equal(card.venue.typeLabelFr, 'Quilles');
+  // No Mon–Fri while Monday is closed.
+  const closedMon = mk('indoor', { name: 'Closed Mondays T8', hours: JSON.stringify({ mon: null, tue: [['10:00', '17:00']], wed: [['10:00', '17:00']], thu: [['10:00', '17:00']], fri: [['10:00', '17:00']], sat: [['10:00', '17:00']], sun: null }) });
+  const tc = tokenFor(closedMon.id);
+  await ok(change(tc, { indoor_info: { kinds: ['bowling'], length: '1-2h' } }));
+  const s = await openSetup(base, tc, { hash: 'hours' });
+  await s.click('go:hours:edit');
+  await s.click('[data-hopen="tue"]');
+  assert.ok(s.has('[data-copytuesat="tue"]'));
+  assert.ok(!s.has('[data-copywk="tue"]'));
+});

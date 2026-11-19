@@ -816,7 +816,14 @@ function indoorCardKind(v) {
   if (own) return INDOOR_CARD_WORDS[own];
   const c = String(v.cuisine || '').trim().toLowerCase();
   const hit = c && Object.values(INDOOR_CARD_WORDS).find((w) => w[0].toLowerCase() === c);
-  return hit || null;
+  if (hit) return hit;
+  // Indoor test 8 (2026-11-19; "BOWLING" beside "INDOOR ATTRACTION" for McCurdy Bowling Centre): with no owner kind, the
+  // kind its category names ("Bowling alley" -> Bowling), else its name ("Planet Lazer" stays an indoor attraction).
+  const IK = require('./indoor-kinds');
+  const named = (t) => IK.indoorKindsNamedIn(t).filter((k) => INDOOR_CARD_WORDS[k]);
+  const fromCat = c ? named(c) : [];
+  const k = fromCat.length === 1 ? fromCat[0] : !c ? (named(v.name || '').length === 1 ? named(v.name || '')[0] : null) : null;
+  return k ? INDOOR_CARD_WORDS[k] : null;
 }
 function indoorVenueLabel(ctx, v, form = 'singular') {
   const asked = indoorAskedLabel(ctx.queryText, form);

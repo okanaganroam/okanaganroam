@@ -60754,7 +60754,7 @@ const PUB_SETUP_HELP_TOPICS = [
 ];
 const OWNER_SETUP_CSS = `
   body.owner-setup { --su-ink: #1B2B3A; --su-soft: #5E544C; --su-line: #DDD5C7; --su-card: #FFFDF8; --su-teal: #1E4F4C; --su-gold: #A07A1B; --su-good: #1E6B3A; --su-good-bg: #E3F1E8; --su-warn: #8A2A1B; --su-warn-bg: #FBE9E5; }
-  body.owner-setup .su-wrap { max-width: 480px; margin: 0 auto; padding: 8px 0 48px; color: var(--su-ink); font-size: 19px; line-height: 1.45; }
+  body.owner-setup .su-wrap { max-width: 480px; margin: 0 auto; padding: 8px 0 48px; color: var(--su-ink); font-size: 19px; line-height: 1.45; overflow-wrap: anywhere; }
   body.owner-setup .su-top { min-height: 48px; display: flex; align-items: center; }
   body.owner-setup .su-link { background: none; border: 0; color: var(--su-teal); font: inherit; font-weight: 800; font-size: 17px; padding: 10px 4px; min-height: 48px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
   body.owner-setup .su-progress { margin: 4px 0 18px; }
@@ -67914,6 +67914,8 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.owner-page .op-copy button { background: var(--sand-deep, #EFE6D6); border: 0; border-radius: 999px; padding: 5px 14px; min-height: 40px; margin: 2px 4px 2px 0; font: inherit; font-weight: 800; color: var(--ref-navy); cursor: pointer; }
   body.owner-page .op-copy-done { font-weight: 700; color: #2E7D4F; }
   body.owner-page .op-hint { font-size: 0.84rem; color: rgba(42,32,25,0.8); margin: 4px 0 8px; }
+  /* Indoor test 8 (2026-11-19): a long Facebook or booking URL never pushes the owner pages sideways at 360px. */
+  body.owner-page .op-hint, body.owner-page .op-wrap a, body.owner-page .lyv-error, body.owner-page .op-done { overflow-wrap: anywhere; }
   body.owner-page .lyv-error { font-size: 0.85rem; font-weight: 700; color: #C0392B; margin-top: 6px; }
   body.owner-page .lyv-hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
   body.owner-page .op-done { display: none; background: #E9F6EE; border-radius: 14px; padding: 18px; font-weight: 600; }

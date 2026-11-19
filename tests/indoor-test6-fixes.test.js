@@ -110,8 +110,10 @@ test('3. Hours copy (real taps): "Mon–Fri" never opens a Monday she sees Close
   await s.click('go:hours:edit');
   await s.click('[data-hopen="tue"]');
   await s.click('[data-dayopen="tue"]');
-  assert.ok(s.has('[data-copytuesat="tue"]'), 'Tue–Sat beside Mon–Fri');
-  await s.click('[data-copywk="tue"]');
+  assert.ok(s.has('[data-copytuesat="tue"]'), 'Tue–Sat in place of Mon–Fri');
+  // Indoor test 8: Mon–Fri is not offered while Monday is closed (the same rule as Tue–Sat).
+  assert.ok(!s.has('[data-copywk="tue"]'), 'no Mon–Fri while Monday is closed');
+  await s.click('[data-copytuesat="tue"]');
   assert.match(row(s, 'mon'), /Closed/);
   assert.doesNotMatch(row(s, 'mon'), /AM|PM/, 'Monday stays closed');
   assert.match(row(s, 'fri'), /AM – .*PM/);

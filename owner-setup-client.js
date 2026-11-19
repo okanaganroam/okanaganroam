@@ -2351,7 +2351,8 @@
             + '<div class="su-samerow su-copyrow" role="group" aria-label="' + h(T.copyTo) + '"><span class="su-latelbl">' + h(T.copyTo) + '</span><button type="button" class="su-toggle" data-copyall="' + d + '">' + h(DAYS.every(function(x){ return x === d || copyGets(d, x); }) ? T.copyAll : T.copyOpen) + '</button>'
             // The other season (pub test 6): "Every day" opens the closed days too ("open daily in summer" in one tap).
             // Café test 6 (2026-11-12): not when the first button already says "Every day" (every day open: two identical buttons).
-            + (seas && !othersClosed(d) && !DAYS.every(function(x){ return x === d || copyGets(d, x); }) ? '<button type="button" class="su-toggle" data-copyevery="' + d + '">' + h(T.copyAll) + '</button>' : '') + '<button type="button" class="su-toggle" data-copywk="' + d + '">' + h(T.copyWeek) + '</button>'
+            + (seas && !othersClosed(d) && !DAYS.every(function(x){ return x === d || copyGets(d, x); }) ? '<button type="button" class="su-toggle" data-copyevery="' + d + '">' + h(T.copyAll) + '</button>' : '') + (T.copyTueSat && !W().mon ? '' : '<button type="button" class="su-toggle" data-copywk="' + d + '">' + h(T.copyWeek) + '</button>')
+            // Indoor test 8 (2026-11-19): no Mon–Fri while Monday is closed (Tue–Sat is the one then), the same rule as Tue–Sat.
             // Café test 5 (2026-11-12): Sat–Sun beside Mon–Fri (same rule: a day marked Closed stays closed).
             // Brewery test 2 (Whistler, 2026-11-16): from Friday, "Saturday" alone too (Fri and Sat close late, Sunday
             // doesn't: Sat–Sun made Sunday close at midnight as well).
@@ -2711,7 +2712,8 @@
     } else if (s === 'menu') {
       var sentM = S.done.menu === 'day';
       // Sent already: say so in the heading, Next is the main button, and a newer menu is the smaller choice (as photos).
-      x = (sentM ? q(T.menuSentQ) + msgs() + '<div class="su-stack" style="margin-bottom:22px">' + big('➜', nextLabel('menu'), '', false, 'after:menu') + '</div><h2 class="su-h2">' + h(T.menuNewer) + '</h2>'
+      // Indoor test 8 (2026-11-19; Gary): "Your prices are sent ✓" stayed after we had put them live.
+      x = (sentM ? q(nowSt('menu', 'day') === 'live' && T.menuLiveQ ? T.menuLiveQ : T.menuSentQ) + msgs() + '<div class="su-stack" style="margin-bottom:22px">' + big('➜', nextLabel('menu'), '', false, 'after:menu') + '</div><h2 class="su-h2">' + h(T.menuNewer) + '</h2>'
           : (S.done.menu === 'email' ? '<p class="su-sent">' + h(T.menuSentEmail) + '</p>' : '') + q(T.menuQ, freeIndoor() && T.menuLeadFree ? T.menuLeadFree : T.menuLead) + msgs())
         + '<div class="su-stack">' + (INDOOR && FINE ? '' : big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam')) + big('📄', T.upload, T.uploadSub, true, 'go:menu:upload') + (C.website ? big('🌐', T.web, '', true, 'go:menu:web') : '') + big('📘', T.menuSocial, fbKnown() ? fill(T.menuFbKnown, { x: siteDomain(fbKnown()) }) : '', true, 'go:menu:social')
         // Café test 2 (2026-11-11): flavours that change every day ("see Instagram / Facebook / the board").
