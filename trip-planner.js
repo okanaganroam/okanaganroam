@@ -235,6 +235,14 @@ function kidsAllowed(v) {
   // Tour test 1: with the kids' ages named, a tour whose minimum is at or below the youngest is fine ("our 14-year-old" and
   // a 12+ tour); one above it is not.
   // Tour test 10: a trip the request names that is for older riders than the youngest child (tourAgeFit).
+  // Indoor places (2026-11-19): the owner's own minimum age. All ages or 5+ is fine for a family; 8+ when the kids' ages
+  // say so; 12+, 16+ or 19+ never is (a kids trip doesn't say how old the kids are). Unanswered: as before.
+  if (v.type === 'indoor' && v.indoorMinAge) {
+    if (v.indoorMinAge === 'all') return true;
+    const youngI = kidsYoungest(ctx);
+    if (youngI != null && /^\d+$/.test(v.indoorMinAge)) return youngI >= Number(v.indoorMinAge);
+    return v.indoorMinAge === '5';
+  }
   if (v.type === 'tour' && tourAgeFit(v, ctx).out) return false;
   if (v.type === 'tour' && v.tourMinAge) {
     if (v.tourMinAge === 'all') return true;
@@ -1875,7 +1883,10 @@ function publicVenue(v, ctx) {
   // Tour test 15 (Whistler, 2026-11-18; Dave): a rental asked for shows his own rental price as typed ("Canoe rental: $45 per
   // boat per hour"), not the tours' "From $89".
   const rental = v.type === 'tour' && !tourIsFree ? tourRentalPrice(v, ctx) : null;
-  const cost = tourIsFree ? null : rental ? rental : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
+  // Indoor places (2026-11-19): the owner's own adult price ("$25 · Admission"); free entry says Free (freeEntry).
+  const indoorFrom = v.type === 'indoor' && !v.indoorFree && typeof v.indoorPrice === 'number' && Number.isFinite(v.indoorPrice) && v.indoorPrice > 0 ? v.indoorPrice : null;
+  const cost = tourIsFree || (v.type === 'indoor' && v.indoorFree) ? null : rental ? rental : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
+    : indoorFrom ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null }
     : cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
     : fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
     : flight ? (v.type === 'distillery' ? { cents: Math.round(flight * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : { cents: Math.round(flight * 100), label: 'Flight', labelFr: 'Palette de dégustation', source: null }) : tripStopPrice(v.url, v.id);
@@ -1892,7 +1903,7 @@ function publicVenue(v, ctx) {
     ...(v.type === 'cocktail' ? { typeLabelFr: 'Bar à cocktails' } : {}),
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
     // Tour test 4: no $-$$$$ tier beside a tour's own price ("Free · $$", "From $35 · $$").
-    rating: v.rating, reviews: v.reviews, price: tourIsFree || tourFrom ? null : v.price, freeEntry: !!v.features?.free_entry, address: v.address || null,
+    rating: v.rating, reviews: v.reviews, price: tourIsFree || tourFrom || indoorFrom || (v.type === 'indoor' && v.indoorFree) ? null : v.price, freeEntry: !!v.features?.free_entry || (v.type === 'indoor' && !!v.indoorFree), address: v.address || null,
     // The venue's own photo when it has one (2026-10-17); otherwise a photo of
     // the kind of place (the site's category photos), labelled as an example.
     photo: ownStopPhoto(v), // real photos only (2026-10-28): no example photo for a place without its own
@@ -1992,6 +2003,11 @@ function coldMonthIceCream(v, date) {
 const TOUR_BOOKING_NOTE = 'Tours run at set times: book ahead with the operator and plan the day around the time you get.';
 // Tours (2026-11-16): the operator's own "book ahead" answer replaces the general note.
 const TOUR_VARIES_NOTE = 'Length, ages and booking can differ by tour: see this operator’s Tours & prices.';
+// Indoor places (2026-11-19): the owner's own walk-ins answer on the stop ("Walk-ins welcome" needs no note).
+const INDOOR_BOOK_NOTES = {
+  busy: 'Walk-ins welcome; book ahead for weekends and busy times (the owner’s own answer).',
+  ahead: 'Book ahead (the owner’s own answer).',
+};
 const TOUR_BOOK_AHEAD_NOTES = {
   same_day: 'Same-day bookings are often fine (the operator’s own answer). Call ahead for the times.',
   day: 'Book at least a day ahead (the operator’s own answer).',
@@ -2322,6 +2338,7 @@ function stopFrom(v, scored, extra, ctx) {
   if (v && v.ownerHours) caveats = caveats.map((c) => c.replace(/ \u2014 check (?:before|the day) you go$/, ''));
   if (ctx && ctx.features && isDogTrip(ctx) && DINING_TYPES.includes(v.type) && !(v.features.dog_friendly || v.collections.includes('dog_friendly'))) caveats.push(`Not listed as dog-friendly on ${SITE.brand}, so plan this one without your dog or check with them first`);
   // Round 10 (2026-10-19): a tour company runs at set times; it is booked, not dropped in on.
+  if (v && v.type === 'indoor' && INDOOR_BOOK_NOTES[v.indoorBook] && !caveats.includes(INDOOR_BOOK_NOTES[v.indoorBook])) caveats.push(INDOOR_BOOK_NOTES[v.indoorBook]);
   if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = tourBookAheadNote(v); if (!caveats.includes(bn)) caveats.push(bn); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
   // Tour test 4 (Whistler, 2026-11-17), bug 12: the operator's one booking and age answer stands for several unlike trips
