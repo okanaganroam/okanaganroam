@@ -5790,7 +5790,7 @@ function trailMinutes(v) {
 }
 // Planning allowances (minutes) for a visit with no estimate of its own (2026-10-19).
 // The operator's own trip length answer (server.js TOUR_LENGTHS) in minutes; 'multi' (several days) is a full day here.
-const TOUR_LENGTH_MINUTES = { '1h': 60, '2-3h': 150, half: 240, full: 480, multi: 480 };
+const TOUR_LENGTH_MINUTES = { '1h': 60, '1-2h': 90, '2-3h': 150, half: 240, full: 480, multi: 480 };
 const VISIT_ALLOWANCE = { outdoor: 90, beach: 120, indoor: 90, tour: 120, sport: 90, golf: 240, cafe: 40, restaurant: 90, pub: 90, brewery: 60, winery: 75, distillery: 60, cocktail: 60 };
 // An evening meal (2026-10-19): a stop labelled dinner, or a restaurant or pub in the evening slot. Its time is never
 // pulled forward into the afternoon.

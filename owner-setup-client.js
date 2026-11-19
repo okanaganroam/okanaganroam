@@ -5,6 +5,19 @@
 // within a day. Words: owner-setup-text.js. Approved mockup: drafts/easy-setup-mockup-2026-11-09/full-setup.html (v5).
 (function(){
   var C = window.SETUP_CFG, T = C.t, CUR = C.cur;
+  // Tour test 13 (Whistler, 2026-11-18; Matthias on a Windows laptop with a mouse): "tap" and "Take a photo · Opens your
+  // camera" on a computer. With a mouse or trackpad (pointer:fine) the words say "click" (« cliquez ») and "Choose a
+  // photo". Only the screen's own words: chip answers that are saved (lists) and "tap list" / "on tap" stay as they are.
+  var FINE = false; try { FINE = !!(window.matchMedia && window.matchMedia('(pointer:fine)').matches); } catch (eF) { FINE = false; }
+  function deskWords(o){
+    Object.keys(o).forEach(function(k){
+      var x = o[k];
+      if (typeof x === 'string') o[k] = x.replace(/(^|[^\w’'])(on |your |the |pour )?([Tt])ap(ped|ping|s)?\b(?! ?(?:list|room|water|beer|handles?))/g, function(m, pre, art, t, end){ if (art || end === 's') return m; return pre + (t === 'T' ? 'C' : 'c') + 'lick' + (end === 'ped' ? 'ed' : end === 'ping' ? 'ing' : ''); })
+        .replace(/\b([Tt])ouchez\b/g, function(m, t){ return (t === 'T' ? 'C' : 'c') + 'liquez'; }).replace(/\b([Tt])oucher\b/g, function(m, t){ return (t === 'T' ? 'C' : 'c') + 'liquer'; });
+      else if (x && typeof x === 'object' && !Array.isArray(x) && k !== 'quick' && k !== 'labels') deskWords(x);
+    });
+  }
+  if (FINE && T) { deskWords(T); if (T.choosePhoto) { T.take = T.choosePhoto; T.takeSub = ''; } }
   var STEPS = C.steps, P1 = C.part1, P2 = C.part2;
   // Cafés and wineries: holidays and closures end the Hours step; Instagram and Facebook are one screen ('social').
   var COMBO = !!(C.combo || C.cafe);
@@ -1401,7 +1414,20 @@
   // Tour test 2 (Whistler, 2026-11-16): Good to know stopped mid-sentence at the limit with no word. A visible counter
   // ("212 / 240") that says so at the limit; a tour's Good to know holds 240 (C.bringMax, the server's own limit).
   var BRING_MAX = C.bringMax || 180;
-  function countText(n, max){ return n >= max && T.countFull ? fill(T.countFull, { max: max }) : fill(T.countOf || '{n} / {max}', { n: n, max: max }); }
+  // Tour test 13 (Whistler, 2026-11-18; Matthias pasted a long line: the box cut it at the limit, "If we cancel b", and it
+  // was saved): the boxes no longer cut a paste (their maxlength has room past the limit); at Save, text over the limit is
+  // kept to its last full sentence (or word), the box shows it, and the message says where the rest goes. Nothing is saved
+  // until Save is tapped again. (server.js fitToLimit, the same rule.)
+  function fitLine(raw, max){
+    var t = String(raw == null ? '' : raw).trim().replace(/\s+/g, ' ');
+    if (t.length <= max) return { text: t, rest: '' };
+    var head = t.slice(0, max + 1), re = /[.!?\u2026](?=\s|$)/g, m, cut = -1;
+    while ((m = re.exec(head.slice(0, max)))) cut = m.index + 1;
+    if (cut < Math.floor(max / 2)) { var sp = head.lastIndexOf(' '); cut = sp > 0 ? sp : max; }
+    return { text: t.slice(0, cut).trim().replace(/[,;:\u2013\u2014-]+$/, '').trim(), rest: t.slice(cut).trim() };
+  }
+  function overMax(boxId, max){ var b = el(boxId); if (!b) return false; var f = fitLine(b.value, max); if (!f.rest) return false; b.value = f.text; S.nudge = fill(TOUR && T.fitRestTour ? T.fitRestTour : T.fitRest || '{max}', { max: max, rest: f.rest.length > 90 ? f.rest.slice(0, 88) + '…' : f.rest }); return f.text; }
+  function countText(n, max){ return n > max && T.countOver ? fill(T.countOver, { n: n, max: max, d: n - max }) : n >= max && T.countFull ? fill(T.countFull, { max: max }) : fill(T.countOf || '{n} / {max}', { n: n, max: max }); }
   function countLine(boxId, value, max){ var n = String(value || '').length; return '<p class="su-hint su-count' + (n >= max ? ' su-count-full' : '') + '" id="' + boxId + 'Count" data-count="' + boxId + '" data-max="' + max + '" aria-live="polite">' + h(countText(n, max)) + '</p>'; }
   function countUpdate(box){ if (!box || !box.id) return; var c = el(box.id + 'Count'); if (!c) return; var max = +c.getAttribute('data-max'), n = box.value.length; c.textContent = countText(n, max); c.className = 'su-hint su-count' + (n >= max ? ' su-count-full' : ''); }
   function ex(x){ return '<p class="su-example">' + h(fill(T.example, { x: x })) + '</p>'; }
@@ -2207,7 +2233,7 @@
         + (tRest.length ? '<details class="su-kinds" id="suKindsMore"' + (S.tourMoreOpen || tRest.some(function(o){ return S.tour.kinds.indexOf(o.k) >= 0; }) ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + tRest.map(kchip).join('') + '</div></details>' : '')
         + (S.tour.kinds.length ? '<p class="su-sent" id="suTourPicked">' + h(fill(T.picked, { list: S.tour.kinds.map(tourKindName).join(', ') })) + '</p>' : '')
         + '<h2 class="su-h2" id="suLenQ">' + h(T.tlengthQ) + '</h2>' + (S.tour.lengthGuessed && S.tour.length === C.researchLength && T.guessCheck ? '<p class="su-sent su-research" id="suLengthGuess">' + h(T.guessCheck) + '</p>' : '')
-        + tchips('length', ['1h', '2-3h', 'half', 'full', 'multi'], T.tlengths, T.tlengthQ, 'suLenQ')
+        + tchips('length', ['1h', '1-2h', '2-3h', 'half', 'full', 'multi'], T.tlengths, T.tlengthQ, 'suLenQ')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'tourSave') + '</div>' + skip('tour');
     } else if (s === 'price') {
       // Tours (2026-11-16): "From $__ per person" in one box ("$129", "129 $" or "1,500" all work), and private tours.
@@ -2244,7 +2270,7 @@
       // Tour test 1 (Whistler, 2026-11-16): research's line, untouched, says it came from online (a tap on an answer replaces it).
       var bRes = !!bv && bv === ((CUR.visit_rows || {}).good_to_know || '') && (C.visitResearch || []).indexOf('good_to_know') >= 0;
       x = doneLine('bring') + q(T.bringQ, T.bringLead) + (bRes && T.bringGuess ? '<p class="su-sent su-research" id="suBringGuess">' + h(T.bringGuess) + '</p>' : '') + msgs() + enLineHint(bv === ((CUR.visit_rows || {}).good_to_know || '') ? bv : '', 'suBringEn', false, 'good_to_know') + quick('good_to_know', 'suBring', bv)
-        + '<label class="su-sr" for="suBring">' + h(T.bringQ) + '</label><textarea class="su-field su-line" id="suBring" maxlength="' + BRING_MAX + '" rows="4" aria-describedby="suBringCount">' + h(bv) + '</textarea>' + countLine('suBring', bv, BRING_MAX) + ex(T.bringEx)
+        + '<label class="su-sr" for="suBring">' + h(T.bringQ) + '</label><textarea class="su-field su-line" id="suBring" maxlength="' + (BRING_MAX + 600) + '" rows="4" aria-describedby="suBringCount">' + h(bv) + '</textarea>' + countLine('suBring', bv, BRING_MAX) + ex(T.bringEx)
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'bringSave') + '</div>' + skip('bring');
     } else if (s === 'winery') {
       // Wineries (2026-11-12): "What kind of winery?" (one of five) and "Food here?" on one screen. A restaurant on the estate
@@ -2361,7 +2387,7 @@
         + (C.cafe ? big('🔄', iceKind() ? T.menuDailyIce : T.menuDaily, T.menuDailySub, true, 'go:menu:daily') : '')
         // Tour test 9 (Whistler, 2026-11-18; Tanis, no price sheet): "Type them in myself" opens the edit page's own typed
         // tours editor (the menu screen, started on typing), the one that worked well there.
-        + (TOUR && T.menuType ? '<a class="su-big su-alt" id="suMenuType" href="' + h(location.pathname.replace(/\/setup\/?$/, '/menu') + '#type') + '"><span class="su-ico" aria-hidden="true">⌨️</span><span>' + h(T.menuType) + (T.menuTypeSub ? '<small>' + h(T.menuTypeSub) + '</small>' : '') + '</span></a>' : '')
+        + (TOUR && T.menuType ? '<a class="su-big su-alt" id="suMenuType" href="' + h(location.pathname.replace(/\/setup\/?$/, '/menu') + '?from=setup#type') + '"><span class="su-ico" aria-hidden="true">⌨️</span><span>' + h(T.menuType) + (T.menuTypeSub ? '<small>' + h(T.menuTypeSub) + '</small>' : '') + '</span></a>' : '')
         + big('✉️', T.emailIt, '', true, 'go:menu:email') + '</div>' + (sentM ? '' : skip('menu'));
     } else if (s === 'menu:daily') {
       var mdw = S.cafe.menuDaily || '';
@@ -2573,7 +2599,7 @@
     } else if (s === 'book:yes' || s === 'takeout:yes' || s === 'groups:yes' || s === 'known') {
       var cfg = { 'book:yes': ['reservations', T.bookHowQ, '', T.bookEx], 'takeout:yes': ['takeout', T.takeoutHowQ, '', T.takeoutEx], 'groups:yes': ['groups', T.groupsHowQ, '', T.groupsEx], known: ['known_for', T.knownQ, T.knownLead, T.knownEx] }[s];
       var qk = quick(cfg[0], 'suLine', S.visit[cfg[0]] || '');
-      x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + enLineHint(S.visit[cfg[0]] === ((CUR.visit_rows || {})[cfg[0]] || '') ? S.visit[cfg[0]] : '', 'suLineEn', !qk, cfg[0]) + qk + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" data-vk="' + h(cfg[0]) + '" maxlength="180" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
+      x = doneLine(base(s)) + q(cfg[1], cfg[2]) + msgs() + enLineHint(S.visit[cfg[0]] === ((CUR.visit_rows || {})[cfg[0]] || '') ? S.visit[cfg[0]] : '', 'suLineEn', !qk, cfg[0]) + qk + '<label class="su-sr" for="suLine">' + h(cfg[1]) + '</label><textarea class="su-field su-line" id="suLine" data-vk="' + h(cfg[0]) + '" maxlength="780" rows="2">' + h(S.visit[cfg[0]] || '') + '</textarea>' + ex(cfg[3])
         // Pub test 9 (2026-11-10): the booking link has its box right here (the same one as the edit page's "Name, address &
         // links"), and a link typed into the line above is offered a move into it instead of being refused.
         + (s === 'book:yes' ? '<div class="su-day su-movelink" id="suMoveLink" role="status"' + (S.linkOffer ? '' : ' hidden') + '><p class="su-q" style="margin-top:0">' + h(T.linkInLine) + '</p><div class="su-stack">' + big('➜', T.moveLink, S.linkOffer || '', false, 'moveLink') + '</div></div>'
@@ -2598,7 +2624,7 @@
         // Tour test 9 (Whistler, 2026-11-18; Tanis, school programs of about 30): a last size, "21+ or whole classes", in
         // the same question (an option, not a new field).
         + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suGroupSizes">' + (TOUR ? [4].concat(GROUP_SIZES, T.groupsChipBig ? [21] : []) : GROUP_SIZES).map(function(n){ var on = sentencesOf(gl).indexOf(groupsSizeLine(n)) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip' + (n === 21 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (n === 21 && T.groupsChipBig ? h(T.groupsChipBig) : S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>'
-        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TOUR) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TOUR ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 180, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + ex(T.groupsEx)
+        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TOUR) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TOUR ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 780, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + ex(T.groupsEx)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180 }) : '')
         // Tour test 1 (Whistler, 2026-11-16): a tour is asked for its booking link once, on Booking; here only when not given.
         + (TOUR && (CUR.booking_url || C.bookingKnown || String(S.bookUrl || '').trim() || S.tour.noBook) ? ''
@@ -3964,6 +3990,7 @@
       return saveAll('flights', fl, null, null, function(){ Object.keys(bi2).forEach(function(kk){ if (bi2[kk] == null) delete BI[kk]; else BI[kk] = bi2[kk]; }); if (fb2.noFlights) { S.savedFlight = null; CUR.flight_fee = null; } else if (ff <= C.feeLiveMax) { S.savedFlight = ff; CUR.flight_fee = ff; CUR.flight_fee_waiting = null; } else if (ff !== S.savedFlight) CUR.flight_fee_waiting = ff; fb2.feeGuessed = false; S.togoGuessed = false; });
     }
     if (k === 'brewGroupsSave') {
+      var gFit = overMax('suGroupsLine', 180); if (gFit !== false) { S.brew.groups = gFit; return render(); }
       readBrew(); var gline = String(S.brew.groups || '').trim(), gbu = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null;
       if (gbu && !siteOk(gbu)) { S.nudge = T.bookLinkBad; S.badField = 'suBookUrl'; return render(); }
       if (gline && linkIn(gline)) { S.nudge = T.groupsNoLink; return render(); }
@@ -4057,6 +4084,7 @@
       return saveAll('booking', bl, null, null, function(){ if (bk0) TI.book = bk0; if (blinkCh) CUR.booking_url = bu1; });
     }
     if (k === 'bringSave') {
+      var brFit = overMax('suBring', BRING_MAX); if (brFit !== false) { S.tour.bring = brFit; return render(); }
       readTour(); var br = String(S.tour.bring != null ? S.tour.bring : '').trim();
       if (!br) { S.nudge = T.bringNeed; return render(); }
       if (linkIn(br)) { S.nudge = T.bringNoLink; return render(); }
@@ -4145,6 +4173,7 @@
       S.storySent = S.story; return saveAll('story', [storyOut(S.story)], null, null, storyWaiting); }
     if (k === 'moveLink') { var ln = el('suLine'), bu = el('suBookUrl'), got = linkIn(ln ? ln.value : ''); if (!got || !bu) return; bu.value = got.url; S.bookUrl = got.url; ln.value = got.rest; S.visit.reservations = got.rest; S.linkOffer = ''; S.nudge = ''; render(); var b2 = el('suBookUrl'); if (b2) b2.scrollIntoView({ block: 'center' }); return; }
     if (k === 'lineSave') {
+      var lnFit = overMax('suLine', 180); if (lnFit !== false) { S.visit[p[2]] = lnFit; return render(); }
       var step = p[1], key = p[2], line = el('suLine').value.trim();
       // The booking link (pub test 9): its own box on this screen; a link in the line is offered a move, never refused.
       var bkUrl = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null; if (bkUrl !== null) S.bookUrl = bkUrl;
@@ -4393,8 +4422,10 @@
       var xl9 = el('suXl' + i9), xt9 = el('suXt' + i9); if (xl9) xl9.value = e9.label; if (xt9) xt9.value = e9.text; mark(); drSave(); redraw(); }; });
     // The social screen's "We're not on it" / "Not sure" answers (cafés).
     Array.prototype.forEach.call(screen.querySelectorAll('[data-soc]'), function(b){ b.onclick = function(){ readSocial(); var q7 = b.getAttribute('data-soc').split(':'); S.socNo[q7[0]] = S.socNo[q7[0]] === q7[1] ? '' : q7[1]; S.nudge = ''; var y = window.scrollY; render(); window.scrollTo(0, y); mark(); }; });
-    Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onclick = function(){
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-quick]'), function(b){ b.onpointerdown = function(pe){ b._pt = pe && pe.pointerType || ''; }; b.onclick = function(ce){
       var box = el(b.getAttribute('data-box')), t = b.getAttribute('data-quick'), sep = b.getAttribute('data-sep'), v = box.value.trim(), qk = b.getAttribute('data-key');
+      // Tour test 13 (Whistler, 2026-11-18; Matthias, keyboard): was the box empty, and was this a finger tap?
+      var wasEmpty = !v, touchTap = (ce && ce.pointerType === 'touch') || b._pt === 'touch' || b._pt === 'pen'; b._pt = '';
       // Cocktail test 3 (2026-11-14): only this box's chips (a Groups tap never re-lit the Reservations chips).
       var mine = Array.prototype.filter.call(screen.querySelectorAll('[data-quick]'), function(c){ return c.getAttribute('data-box') === b.getAttribute('data-box'); }), sibs = mine.map(function(c){ return c.getAttribute('data-quick'); });
       // Winery test 5 (2026-11-12): "Dogs welcome on the patio. Patio only" went live. The box still holding research's
@@ -4419,7 +4450,10 @@
       box.value = v.slice(0, box.maxLength > 0 ? box.maxLength : 180); box._qPrev = box.value; countUpdate(box); mark();
       // Tour test 11 (Whistler, 2026-11-18; Min-jun dictates): a Good to know chip puts the cursor in the box, at the end.
       // Tour test 12 (Whistler, 2026-11-18; Kayla tapped a Groups chip and typed: her words went nowhere): Groups too.
-      if (qk === 'good_to_know' || qk === 'groups') { try { box.focus(); var bl = box.value.length; box.setSelectionRange(bl, bl); } catch (e9) { /* older phones */ } }
+      // Tour test 13 (Matthias, keyboard and mouse): into an empty box, the chip keeps the focus so the next chip is one Tab
+      // away (it took about 14). A finger tap still goes to the box (type straight after a chip), and a box that already
+      // had text still takes the focus at its end (tour test 12).
+      if ((qk === 'good_to_know' || qk === 'groups') && (!wasEmpty || touchTap)) { try { box.focus(); var bl = box.value.length; box.setSelectionRange(bl, bl); } catch (e9) { /* older phones */ } }
       mine.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(box.value, c.getAttribute('data-quick'), sibs) ? 'true' : 'false'); });
     }; });
     var fold = el('suFold'); if (fold) fold.addEventListener('toggle', function(){ S.moreOpen = fold.open; });

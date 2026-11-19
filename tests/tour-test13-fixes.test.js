@@ -154,3 +154,113 @@ test('4. door screen: a photo with no location says so, and offers "Send it with
   assert.ok(text.fr.tour.doorPickAddr);
   assert.match(text.en.tour.doorPickNoGps, /Send it with your address/);
 });
+
+test('2. prices: per flight / ride / tandem flight, the Swiss "189.-" and "CHF 189" save 189; one price with words we can’t read says so (not "One price here")', () => {
+  for (const x of ['$189 per flight', '$189 per tandem flight', '$189 per ride', '189.- per flight (Classic tandem)', 'CHF 189.-', 'CHF 189', '189.–', '$189 per classic flight', '189 per seat', '189 pp', '$189 per passenger']) {
+    assert.deepEqual(app.cleanTourPrice(x, true), { value: 189 }, x);
+    assert.equal(app.tourPriceWhy(x), '', x);
+  }
+  // Test 12's mixed line, and the old nudges, as before.
+  assert.equal(app.tourPriceWhy('$139 per jump 🔥 2nd jump same day $69'), 'first');
+  assert.deepEqual(app.cleanTourPrice('$139 per jump 🔥 2nd jump same day $69', true), { value: 139 });
+  assert.equal(app.tourPriceWhy('650 per boat'), 'group'); assert.equal(app.tourPriceWhy('$69/bike'), 'unit'); assert.equal(app.tourPriceWhy('$750/day'), 'day');
+  assert.equal(app.tourPriceWhy('2 hrs $95pp'), 'hours'); assert.equal(app.tourPriceWhy('95 or 120'), 'many');
+  assert.equal(app.tourPriceWhy('$95 (per boat)'), 'group');
+  // One number and words we can't read: 'words', its own message.
+  assert.equal(app.tourPriceWhy('189 great value'), 'words');
+  assert.match(app.cleanTourPrice('189 great value', true).error, /Type just the number, like 189, or “189 per person”/);
+  assert.match(text.en.tour.tpriceWords, /189 per person/); assert.ok(text.fr.tour.tpriceWords);
+  // The setup reads the box the same way.
+  const fn = new Function(`${/function feeHours\(x\)\{[^\n]*\n/.exec(CLIENT)[0]}${/function moneyHead\(x\)\{[^\n]*\n/.exec(CLIENT)[0]}${/function priceSwiss\(x\)\{[^\n]*\n/.exec(CLIENT)[0]}${/function priceTrim\(x\)\{[^\n]*\n/.exec(CLIENT)[0]}${/function tourPriceWhy\(x, priv\)\{[\s\S]*?\n  \}\n/.exec(CLIENT)[0]}${/function tourPriceRead\(x, priv\)\{[^\n]*\n/.exec(CLIENT)[0]} return { why: tourPriceWhy, read: tourPriceRead };`)();
+  for (const x of ['$189 per flight', '$189 per tandem flight', '$189 per ride', '189.- per flight (Classic tandem)', 'CHF 189.-']) assert.equal(fn.read(x), 189, x);
+  assert.equal(fn.why('$139 per jump 🔥 2nd jump same day $69'), 'first'); assert.equal(fn.why('189 great value'), 'words');
+  assert.match(CLIENT, /pwhy === 'words' && T\.tpriceWords \? T\.tpriceWords/);
+});
+
+test('3. the Paragliding, skydiving or hang gliding kind: under More kinds, Air & Heli plus Adventure, its page words (EN + FR), research words', async () => {
+  assert.ok(completeness.TOUR_KINDS.includes('paraglide'));
+  assert.ok(app.TOUR_KINDS_SHOWN.indexOf('paraglide') >= 12, 'under More kinds');
+  assert.deepEqual(app.TOUR_KIND_LABELS_OWNER.paraglide, ['Paragliding, skydiving or hang gliding', 'Parapente, parachutisme ou deltaplane']);
+  // Research saying paragliding pre-picks this kind, never the ATV / bungee one.
+  assert.deepEqual(app.tourKindSuggestion({ cuisine: 'Tandem paragliding', name: 'Pemberton Tandem Paragliding' }), ['paraglide']);
+  assert.ok(!app.tourKindSuggestion({ cuisine: 'Skydiving', name: 'Whistler Skydiving' }).includes('adventure'));
+  const { v } = await matthias();
+  assert.equal(app.getVenue(v.id).cuisine, 'Paragliding');
+  assert.match(plain(page(v, 'fr')), /Parapente/);
+  assert.doesNotMatch(plain(page(v)), /Helicopter/);
+  assert.ok(app.tourInActivity(app.getVenue(v.id), 'air'), 'Air & Heli');
+  assert.ok(app.tourInActivity(app.getVenue(v.id), 'adventure'), 'Adventure');
+  assert.match(app.tourKindsText(['paraglide'], false, 'Tandem paragliding', '', ''), /^(?:Tandem p|P)aragliding$/);
+  assert.equal(app.tourKindsText(['paraglide'], true, 'Skydiving', '', ''), 'Parachutisme');
+  // A research word his typed tours say stays with his kinds (as his story or Known for would keep it).
+  assert.match(app.tourOwnWords(v.id), /Classic tandem flight/);
+  assert.match(app.tourKindsText(['paraglide'], false, 'Paragliding & thermal soaring', '', 'Classic tandem flight ; Thermal soaring flight'), /thermal soaring/i);
+  assert.doesNotMatch(app.tourKindsText(['paraglide'], false, 'Paragliding & thermal soaring', '', ''), /thermal soaring/i);
+});
+
+test('6. Good to know: a tour holds 320; text past a limit is kept to its last full sentence (never cut mid-word), with where the rest goes', async () => {
+  const long = 'Passengers must weigh between 25 and 110 kg and be able to run a few steps. Wear closed-toe shoes. The flight time is confirmed by text message the evening before or in the morning. Payment after the landing, by card or cash. If we cancel because of the weather, you can rebook for free or get a full refund. Thank you very much for your understanding and see you soon.';
+  assert.ok(long.length > 320);
+  const f = app.fitToLimit(long, 320);
+  assert.ok(f.text.length <= 320 && /[.!?]$/.test(f.text), f.text);
+  assert.ok(f.rest.startsWith('Thank you') || f.rest.startsWith('If we cancel'), f.rest);
+  const w = app.fitToLimit('word '.repeat(60), 180); assert.ok(w.text.length <= 180 && /word$/.test(w.text));
+  // The server never saves a line cut mid-word at the limit.
+  const cut = long.slice(0, 320);
+  assert.ok(app.ownerVisitText(cut, 320).error, cut.slice(-20));
+  assert.equal(app.ownerVisitText(f.text, 320).text, f.text);
+  const { v, t } = await matthias();
+  ok(await change(t, { visit_rows: { good_to_know: f.text } })); approveAll(v.id);
+  assert.equal(rowOf(v.id, 'Good to know'), f.text);
+  assert.equal((await change(t, { visit_rows: { good_to_know: cut } })).status, 400);
+  // The setup: room past the limit in the box (a paste isn't cut), the trim at Save, the message, the other limited boxes.
+  assert.match(CLIENT, /id="suBring" maxlength="' \+ \(BRING_MAX \+ 600\) \+ '"/);
+  assert.match(CLIENT, /var brFit = overMax\('suBring', BRING_MAX\);/); assert.match(CLIENT, /var lnFit = overMax\('suLine', 180\);/); assert.match(CLIENT, /var gFit = overMax\('suGroupsLine', 180\);/);
+  assert.match(text.en.tour.fitRestTour || text.en.fitRestTour, /a tour’s description \(in Your tours and prices\) or under Groups/);
+  assert.ok((text.fr.tour.fitRestTour || text.fr.fitRestTour) && (text.fr.tour.countOver || text.fr.countOver) && (text.en.tour.countOver || text.en.countOver));
+});
+
+test('8a. extras: an "Options and vouchers" section, "+ $49" add-ons and a gift voucher aren’t tours (page, /prices, admin card)', async () => {
+  for (const n of ['Options and vouchers', 'Add-ons', 'Add ons', 'Extras', 'Upgrades', 'Options & extras', 'Options et bons cadeaux']) assert.ok(app.tourExtrasSection(n), n);
+  for (const n of ['Tours', 'Winter tours', 'Options for groups and families']) assert.ok(!app.tourExtrasSection(n), n);
+  assert.equal(app.tourTripItems({ sections: TOURS }).length, 2);
+  assert.equal(app.tourTripItems({ sections: [{ name: 'Tours', items: [{ name: 'Flight', price: '$189' }, { name: 'GoPro', price: '+$49' }, { name: 'Photos', price: '+ $29' }, { name: 'Gift voucher', price: 'From $189' }] }] }).length, 1);
+  const { v } = await matthias();
+  assert.match(plain(page(v)), /See all tours & prices \(2 tours\)/);
+});
+
+test('8b. small things: back to setup #more, chip focus, the 1 to 2 hours chip and the time range, the spelling flag, desktop words', async () => {
+  // "Back to my listing" from the typed-tours editor opened from the setup goes back to the setup's optional list.
+  assert.match(CLIENT, /\/menu'\) \+ '\?from=setup#type'/);
+  const { v, t } = await matthias();
+  const ed = await get(`/owner/${t}/menu?from=setup`);
+  assert.match(ed.text, new RegExp(`"back":"[^"]*/owner/${t}/setup#more"`));
+  const ed2 = await get(`/owner/${t}/menu`);
+  assert.doesNotMatch(ed2.text, /setup#more/);
+  // Good to know chips: an empty box keeps the focus on the chip (keyboard and mouse); a finger tap, or a box with text, goes to the box.
+  assert.match(CLIENT, /var wasEmpty = !v, touchTap = \(ce && ce\.pointerType === 'touch'\)/);
+  // Time needed: "20–30 min" and "45–60 min" read "20 minutes to 1 hour"; a "1 to 2 hours" chip.
+  assert.match(plain(page(v)), /Time needed 20 minutes to 1 hour\. Varies by tour/);
+  assert.ok(completeness.TOUR_LENGTHS.includes('1-2h'));
+  assert.match(CLIENT, /tchips\('length', \['1h', '1-2h', '2-3h', 'half', 'full', 'multi'\]/);
+  assert.equal(text.en.tour.tlengths['1-2h'], '1 to 2 hours'); assert.equal(text.fr.tour.tlengths['1-2h'], '1 à 2 heures');
+  ok(await change(t, { tour_info: { length: '1-2h' } }));
+  assert.equal(app.venueTourInfo(v.id).length, '1-2h');
+  // Booking: no "Varies by tour" when no typed tour has its own booking words.
+  assert.match(plain(page(v)), /Booking Book at least a day ahead\.(?! Varies)/);
+  // The admin spelling flag: only words that look like a place name.
+  const clean = require('../owner-text-clean.js');
+  assert.deepEqual(clean.nameMisspellings('Longer flight in the afternoon thermals.', { phrases: [], words: ['Loggers'] }), []);
+  assert.equal(clean.nameMisspellings('We fly near Pemberon every day.', { phrases: [], words: ['Pemberton'] }).length, 1);
+  assert.equal(clean.nameMisspellings('A hike to Jeffrey lakes and squamsh.', { phrases: ['Joffre Lakes'], words: ['Squamish'] }).length, 2);
+  // Desktop words: "click" and "Choose a photo" with a mouse (pointer:fine).
+  assert.match(CLIENT, /window\.matchMedia\('\(pointer:fine\)'\)\.matches/);
+  assert.equal(text.en.choosePhoto, 'Choose a photo'); assert.ok(text.fr.choosePhoto);
+});
+
+test('9. French prices in one format ("+ 49 $ par vol"); English as typed', () => {
+  assert.equal(app.menuPriceLabel('+ $49 per flight', 'fr'), '+ 49 $ par vol');
+  assert.equal(app.menuPriceLabel('$189 per flight', 'fr'), '189 $ par vol');
+  assert.equal(app.menuPriceLabel('+ $49 per flight', 'en'), '+ $49 per flight');
+  assert.equal(app.menuPriceLabel('From $189', 'fr'), 'À partir de 189 $');
+});

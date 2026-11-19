@@ -553,7 +553,8 @@ test('11. bug 12, the safe part: a published list with trips of different length
   const en = plain(page(v, 'en')), fr = plain(page(v, 'fr'));
   // Tour test 11 (2026-11-18): Time needed gives the shortest to the longest trip when they vary.
   assert.match(en, /Time needed 75 minutes to 3 hours\. Varies by tour: see Tours & prices\./);
-  assert.match(en, /Booking Book at least a day ahead\. Varies by tour: see Tours & prices\./);
+  // Tour test 13: Booking says "Varies by tour" only when a typed tour has its own booking words (none here).
+  assert.match(en, /Booking Book at least a day ahead\.(?! Varies)/);
   assert.match(en, /Ages All ages\. Varies by tour: see Tours & prices\./);
   assert.match(fr, /Durée De 75 minutes à 3 heures\. Varie selon la sortie : voir Sorties et tarifs\./);
   assert.match(fr, /Réservation Réservez au moins la veille\. Varie selon la sortie : voir Sorties et tarifs\./);

@@ -809,3 +809,42 @@ test("tour test 12 answers: Extras section, the waiver in Good to know, hashtags
   assert.match(plain(en.topic("tour-weather-permitting").a), /No, different in winter/); assert.match(plain(en.topic("tour-weather-permitting").a), /Closed/); assert.match(plain(en.topic("tour-weather-permitting").a), /Weather permitting \(these dates\)/);
   assert.match(plain(en.topic("tour-private-hourly").a), /Private tours from \$150\/hour \(3-hour minimum\)/); assert.doesNotMatch(en.topic("tour-private-hourly").q, /van/i);
 });
+// Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding in Pemberton; a Swiss pilot whose English is formal and
+// German-flavoured). Help answered 3 of his 12 right. His 12 questions, each with a French twin.
+const ASKED13 = [
+  ["13-1", "The flight time is confirmed the day before by text message. Where can I write this?", ["tour-confirm-pay"], "L'heure du vol est confirmée la veille par texto. Où puis-je l'écrire?"],
+  ["13-2", "The payment is after the landing, in cash or by card. Where do I indicate this?", ["tour-confirm-pay"], "Le paiement se fait après l'atterrissage, en argent comptant ou par carte. Où l'indiquer?"],
+  ["13-3", "Where can I indicate the weight of the passengers? It must be between 25 and 110 kg.", ["tour-weight"], "Où puis-je indiquer le poids des passagers? Il doit être entre 25 et 110 kg."],
+  ["13-4", "I have chosen a photo of the landing field but nothing happens. The photo has no location?", ["tour-photo-no-location"], "J'ai choisi une photo du terrain d'atterrissage mais rien ne se passe. La photo n'a pas de position?"],
+  ["13-5", "My Good to know text is too long, it was cut in the middle of a word", ["tour-too-long"], "Mon texte Bon à savoir est trop long, il a été coupé au milieu d'un mot"],
+  ["13-6", "The price of 189 per flight is refused. What must I write?", ["tour-price-refused"], "Le prix de 189 par vol est refusé. Que dois-je écrire?"],
+  ["13-7", "In the winter we are flying only on request. How can I say this?", ["tour-off-request"], "En hiver, nous volons seulement sur demande. Comment le dire?"],
+  ["13-8", "All our flights are weather permitting, not only some dates", ["tour-weather-all"], "Tous nos vols dépendent de la météo, pas seulement certaines dates"],
+  ["13-9", "Which kind must I take for tandem paragliding?", ["tour-kinds-paraglide"], "Quel genre dois-je prendre pour le parapente biplace?"],
+  ["13-10", "Why is my category helicopter? We are doing paragliding, not helicopter.", ["tour-kinds-paraglide"], "Pourquoi ma catégorie est hélicoptère? Nous faisons du parapente, pas de l'hélicoptère."],
+  ["13-11", "Is it possible to confirm the bookings by SMS the morning of the flight?", ["tour-confirm-pay"], "Est-il possible de confirmer les réservations par SMS le matin du vol?"],
+  ["13-12", "The meeting point is the landing field next to the airport, not our office.", ["tour-meeting"], "Le point de rencontre est le terrain d'atterrissage à côté de l'aéroport, pas notre bureau."],
+];
+test("tour test 13: every Help question (EN + its French twin) lands on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Paragliding" });
+  assert.equal(ASKED13.length, 12);
+  const wrong = [];
+  for (const [k, q, want, qFr] of ASKED13) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r && r.id)) wrong.push(`${k} EN "${q}" -> ${r && r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf && rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf && rf.id} (want ${want.join(" or ")})`);
+  }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 13 answers: confirm and pay in Good to know, the no-location photo, a tours 'too long', 189 per person, the two ticks, paragliding", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-confirm-pay").a), /Good to know/);
+  assert.match(plain(en.topic("tour-photo-no-location").a), /Send it with my address and you place the pin/);
+  assert.match(plain(en.topic("tour-too-long").a), /320/); assert.match(plain(en.topic("tour-too-long").a), /Your tours and prices/);
+  assert.match(plain(en.topic("tour-price-refused").a), /189 per person/);
+  assert.match(plain(en.topic("tour-off-request").a), /Off-season trips by request/); assert.match(plain(fr.topic("tour-off-request").aFr), /Hors saison, sorties sur demande/);
+  assert.match(plain(en.topic("tour-weather-all").a), /Every trip is weather permitting/);
+  assert.match(plain(en.topic("tour-kinds-paraglide").a), /Paragliding, skydiving or hang gliding/);
+  assert.match(plain(en.topic("tour-kinds-what").a), /Paragliding/);
+});

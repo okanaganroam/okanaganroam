@@ -299,7 +299,8 @@ if (BREWERY_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-
 // Tour test 10 (Whistler, 2026-11-18; Gord; Dayton approved): "Sleigh rides" (horse-drawn), after snowshoe (More kinds on
 // Okanagan; Whistler orders its chips with TOUR_KINDS_SHOWN).
 const TOUR_KINDS = ['heli', 'snowmobile', 'dogsled', 'jetboat', 'boat', 'horseback', 'fishing', 'wildlife', 'bike', 'zipline', 'wine', 'walking', 'cultural', 'snowshoe', 'sleigh', 'paddle', 'raft', 'adventure', 'guide', 'flight', 'food', 'farm', 'rentals', 'sightseeing', 'paraglide', 'other'];
-const TOUR_LENGTHS = ['1h', '2-3h', 'half', 'full', 'multi'];
+// Tour test 13 (Whistler, 2026-11-18; Dayton approved): "1 to 2 hours".
+const TOUR_LENGTHS = ['1h', '1-2h', '2-3h', 'half', 'full', 'multi'];
 // Tour test 2 (Whistler, 2026-11-16; Dayton approved): "48 hours ahead" and a 5+ age.
 const TOUR_BOOK = ['same_day', 'day', '48h', 'week', 'no'];
 // Tour test 10 (Whistler, 2026-11-18; Gord, a horseback ranch; Dayton approved): 8+ and 10+ (riders 8 and up).

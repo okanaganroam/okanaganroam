@@ -258,7 +258,8 @@ test('7b. links pulled out of pasted text: a booking link with an emoji or #link
 });
 
 test('7c. the Groups chip focuses the box at the end; research words her own story says stay with her kinds', () => {
-  assert.match(CLIENT, /if \(qk === 'good_to_know' \|\| qk === 'groups'\) \{ try \{ box\.focus\(\); var bl = box\.value\.length; box\.setSelectionRange\(bl, bl\);/);
+  // Tour test 13: a box that already has text still takes the focus at its end (an empty one only for a finger tap).
+  assert.match(CLIENT, /if \(\(qk === 'good_to_know' \|\| qk === 'groups'\) && \(!wasEmpty \|\| touchTap\)\) \{ try \{ box\.focus\(\); var bl = box\.value\.length; box\.setSelectionRange\(bl, bl\);/);
   assert.match(app.tourKindsText(['adventure'], false, 'Bungee jumping & giant swing', '', 'Our giant swing over the canyon'), /giant swing/i);
   assert.doesNotMatch(app.tourKindsText(['adventure'], false, 'Bungee jumping & giant swing', '', ''), /giant swing/i);
   assert.equal(app.tourKindsText(['sightseeing'], false, 'Sightseeing tours & airport shuttles', '', ''), 'Sightseeing tours');

@@ -136,14 +136,28 @@ function nameMisspellings(text, known) {
   const t = String(text || '');
   const k = known || { phrases: [], words: [] };
   const out = [];
-  const tokens = [...t.matchAll(/[A-Za-zÀ-ÿ’']+/g)].map((m) => m[0]);
+  const tm = [...t.matchAll(/[A-Za-zÀ-ÿ’']+/g)];
+  const tokens = tm.map((m) => m[0]);
+  // Tour test 13 (Whistler, 2026-11-18; Matthias: "Longer flight in the afternoon thermals" was flagged "may be Loggers"):
+  // only a word that looks like a place name: capitalized in mid-sentence, or followed by Lake(s), Falls, Creek…
+  const PLACE_NEXT = /^(?:lakes?|falls|creek|creeks|river|mountain|mount|mt|peak|peaks|park|trail|trails|valley|glacier|road|rd|street|st|bay|beach|pass|meadows?|canyon|ridge|hut|basin|provincial|village|lac|chutes?|rivi[eè]re|mont)$/i;
+  // (Or after a place word: "to squamsh", "near Pemberon", "Joffre Lakes and squamsh".)
+  const PLACE_BEFORE = /^(?:to|in|near|from|at|around|via|towards?|past|until|till|à|vers|pr[eè]s)$/i;
+  const placeLike = (i, depth = 0) => {
+    if (PLACE_NEXT.test((tokens[i + 1] || '').replace(/[’']s$/, ''))) return true;
+    if (i > 0 && PLACE_BEFORE.test(tokens[i - 1])) return true;
+    if (depth < 2 && i > 1 && /^(?:and|or|et|ou)$/i.test(tokens[i - 1]) && (PLACE_NEXT.test(tokens[i - 2]) || placeLike(i - 2, depth + 1))) return true;
+    if (!/^[A-ZÀ-Þ]/.test(tokens[i])) return false;
+    const before = t.slice(0, tm[i].index).replace(/\s+$/, '');
+    return !!before && !/[.!?:;\n…"“«(]$/.test(before);
+  };
   const lowerKnown = new Set([...(k.words || []), ...(k.phrases || []).flatMap((p) => p.split(/\s+/))].map((w) => w.toLowerCase()));
   const seen = new Set();
   const targets = [...(k.phrases || []).map((p) => p.split(/\s+/)), ...(k.words || []).map((w) => [w])].filter((ws) => ws[0].length >= 5);
   for (let i = 0; i < tokens.length; i++) {
     // Tour test 12: a possessive or a quote mark is not part of the word ("Whistler's" is Whistler).
     const w = tokens[i].toLowerCase().replace(/[’']s$/, '').replace(/^[’']+|[’']+$/g, '');
-    if (w.length < 5 || lowerKnown.has(w) || LANGUAGE_NAMES.some((x) => x.toLowerCase() === w)) continue;
+    if (w.length < 5 || lowerKnown.has(w) || LANGUAGE_NAMES.some((x) => x.toLowerCase() === w) || !placeLike(i)) continue;
     for (const ws of targets) {
       const head = ws[0].toLowerCase();
       if (head[0] !== w[0]) continue;
