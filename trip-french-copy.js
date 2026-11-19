@@ -436,6 +436,8 @@ function t3FrenchTextCore(value){
  text=text.replace(/^Also teaches adaptive lessons \(its own words\): (.+)\.$/,'Donne aussi des cours adaptés (selon l’entreprise) : $1.');
  // Tour test 13: a paragliding operator on a "scenic flight" plan; its own "who can fly" line (in its words, English).
  text=text.replace(/^Paragliding: a tandem flight with a pilot, not a plane or helicopter\.$/,'Parapente : un vol en biplace avec un pilote, pas un avion ni un hélicoptère.');
+ // Tour test 15: the meal on the operator's own trip (its name stays as typed).
+ text=text.replace(/^(Dinner|Lunch|A meal|Supper|Brunch|Breakfast) included on the (.+) \(the operator’s own words\)\.$/,(_,m,x)=>({Dinner:'Souper',Lunch:'Dîner',Supper:'Souper',Brunch:'Brunch',Breakfast:'Déjeuner'}[m]||'Repas')+' inclus avec « '+x+' » (selon l’entreprise).');
  text=text.replace(/^Good to know \(the operator’s own words\): (.+)$/,(_,x)=>'À savoir (les mots de l’entreprise, en anglais) : '+x);
  // Tour test 13: his two ticks.
  text=text.replace(/^Every trip runs weather permitting \(the operator’s own answer\)\.$/,'Chaque sortie dépend de la météo (réponse de l’entreprise).');

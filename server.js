@@ -22199,7 +22199,11 @@ function tourListInfo(venueId) {
       const t = `${it.name || ''} ${it.description || ''}`.toLowerCase();
       const own = [...t.matchAll(/\b(\d{1,2})\s*(?:\+|and (?:over|up|older)|ans et plus|ans \+)|\bages? (\d{1,2})\s*(?:\+|and (?:over|up|older)|to)\b|\b[àa] partir de (\d{1,2}) ans\b/g)].map((mm) => Number(mm[1] || mm[2] || mm[3])).filter((n) => n >= 2 && n <= 19);
       const kids = !own.length && /\b(?:pony|ponies|poney|poneys|under \d{1,2}|kids?|children|child|little ones?|toddlers?|all ages|enfants?|tous les [âa]ges|moins de \d{1,2} ans)\b/.test(t);
-      out.items.push({ name: String(it.name).slice(0, 80), ...(own.length ? { age: Math.max(...own) } : {}), ...(kids ? { kids: true } : {}) });
+      // Tour test 15 (Whistler, 2026-11-18; Dave's "Fondue snowshoe evening … Dinner included"): the meal a trip's own
+      // words include, for a "fondue snowshoe dinner" request (trip-planner.js tourMealNote); and its price as typed, for a
+      // rental request's trip card ("$45 per boat per hour" instead of the tours' "From $89").
+      const meal = (/\b(dinner|lunch|meal|supper|brunch|breakfast)s? (?:is |are )?included\b|\b(?:includes?|including|with) (?:an? |the )?(?:\w+ ){0,3}?(dinner|lunch|meal|supper|brunch|breakfast)\b|\b(fondue)\b|\b(d[îi]ner|repas|souper) (?:est )?inclus\b/i.exec(t) || []).slice(1).find(Boolean);
+      out.items.push({ name: String(it.name).slice(0, 80), ...(own.length ? { age: Math.max(...own) } : {}), ...(kids ? { kids: true } : {}), ...(meal ? { meal: /fondue/i.test(meal) ? 'dinner' : /d[îi]ner|souper/i.test(meal) ? 'dinner' : /repas/i.test(meal) ? 'meal' : meal.toLowerCase() } : {}), ...(it.price ? { price: String(it.price).slice(0, 40) } : {}) });
     }
     if (items.length < 2) return out;
     const mins = [], ages = [];
@@ -22259,6 +22263,66 @@ function tourTextMonths(text) {
 const TOUR_HORSE_ITEM_RE = /\b(?:trail rides?|horse\w*|horseback|riding|rides?|pack trips?|pony|ponies|chevaux|cheval|[ée]quitation|randonn[ée]es? [àa] cheval)\b/i;
 function tourHorseMonths(venueId) { return tourItemMonths(venueId, TOUR_HORSE_ITEM_RE, /\bsleighs?\b|tra[iî]neau/i); }
 function tourWaterMonths(venueId) { return tourItemMonths(venueId, TOUR_WATER_ITEM_RE, null); }
+// Tour test 15 (Whistler, 2026-11-18; Dave: summer canoe, kayak and SUP rentals and a sunset paddle, winter snowshoe tours;
+// Dayton approved one new input): the season each picked kind runs, tour_info.kind_seasons { kind: 'summer' | 'winter' |
+// 'both' }. Asked only when it's needed (2+ kinds and two seasons, and a kind whose season isn't plain from its kind), on
+// the kinds screen, pre-filled. Without his answer: his typed tours' section names ("Summer rentals…", "Winter snowshoe
+// tours"), then these defaults.
+const TOUR_KIND_SEASON_VALUES = ['summer', 'winter', 'both'];
+const TOUR_KIND_SEASON_DEFAULT = { snowshoe: 'winter', sleigh: 'winter', dogsled: 'winter', snowmobile: 'winter', lessons: 'winter', heli: 'winter',
+  paddle: 'summer', raft: 'summer', boat: 'summer', jetboat: 'summer', fishing: 'summer', bike: 'summer' };
+// The kind's season from his own typed tours: the sections named for a season whose trips are that kind.
+function tourKindSeasonFromList(venueId, kind) {
+  try {
+    const m = publishedMenu(venueId);
+    if (!m || menuIsUnconfirmedResearch(m)) return null;
+    const hint = kind === 'rentals' ? /\brentals?\b|\blocations?\b/i : (TOUR_KIND_HINTS.find(([k]) => k === kind) || [])[1];
+    if (!hint) return null;
+    const got = new Set();
+    for (const sec of m.data.sections || []) {
+      const months = tourTextMonths(sec.name) || tourTextMonths(sec.note);
+      if (!months) continue;
+      const winter = months.some((x) => [12, 1, 2].includes(x)), summer = months.some((x) => [6, 7, 8].includes(x));
+      if (winter === summer) continue;
+      if ((sec.items || []).some((it) => hint.test(`${it.name || ''} ${it.description || ''}`.toLowerCase()) || hint.test(String(sec.name || '').toLowerCase()) && kind === 'rentals' && /\brental/i.test(String(it.name || '')))) got.add(winter ? 'winter' : 'summer');
+    }
+    return got.size === 1 ? [...got][0] : got.size === 2 ? 'both' : null;
+  } catch (e) { return null; }
+}
+function tourKindSeasonGuess(venueId, kind) { return tourKindSeasonFromList(venueId, kind) || TOUR_KIND_SEASON_DEFAULT[kind] || 'both'; }
+// Two seasons: his hours have a second season, or his open stretches are two (a closed break between), or one stretch
+// takes in both January and July.
+function tourTwoSeasons(venueId) {
+  try {
+    if ((venueHoursExtras(venueId).seasons || []).length) return true;
+    const om = (venueLinks(venueId) || {}).open_months;
+    if (!om) return false;
+    if (openSeasonStretches(venueId, om)) return true;
+    const ex = hoursModule.parseOpenSeason(om);
+    const m = /^(\d{1,2})-(\d{1,2})$/.exec(String(om));
+    const a = m ? Number(m[1]) : ex && ex.from ? Number(String(ex.from).slice(0, 2)) : 0, b = m ? Number(m[2]) : ex && ex.to ? Number(String(ex.to).slice(0, 2)) : 0;
+    if (!a || !b) return false;
+    const inR = (x) => (a <= b ? x >= a && x <= b : x >= a || x <= b);
+    return inR(1) && inR(7);
+  } catch (e) { return false; }
+}
+// Whether the setup asks: 2+ kinds, two seasons, and a kind whose season isn't plain (a guess of "both").
+function tourKindSeasonsAsked(venueId, kinds) {
+  const ks = (kinds || []).filter((k) => k !== 'other');
+  return ks.length >= 2 && tourTwoSeasons(venueId) && ks.some((k) => tourKindSeasonGuess(venueId, k) === 'both');
+}
+// The season of each picked kind, as Build My Trip and the page use it: his answer, else (2+ kinds and two seasons) the
+// guess. Null when there's nothing to say.
+function tourKindSeasons(venueId) {
+  const t = venueTourInfo(venueId);
+  const ks = (Array.isArray(t.kinds) ? t.kinds : []).filter((k) => k !== 'other');
+  if (ks.length < 2) return null;
+  const own = t.kind_seasons && typeof t.kind_seasons === 'object' ? t.kind_seasons : null;
+  if (!own && (t.year === 'all' || !tourTwoSeasons(venueId))) return null;
+  const out = {};
+  for (const k of ks) out[k] = own && TOUR_KIND_SEASON_VALUES.includes(own[k]) ? own[k] : tourKindSeasonGuess(venueId, k);
+  return Object.values(out).some((x) => x !== 'both') ? out : null;
+}
 function tourItemMonths(venueId, ITEM_RE, NOT_RE) {
   try {
     const m = publishedMenu(venueId);
@@ -22657,7 +22721,9 @@ const { TOUR_KINDS, TOUR_LENGTHS, TOUR_BOOK, TOUR_AGES } = require('./portal-com
 //   snow_open    true         Tour test 14 (Whistler, 2026-11-18; Lucía, ski lessons; the loop brief): "Opening day depends
 //                             on snow", a tick with the season dates (part of the year only). The status line and the hours
 //                             say "Reopens late November (snow permitting)" (EN + FR) instead of the exact first day.
-const TOUR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'adult_age', 'adult_waiver', 'private', 'year', 'visit', 'private_per', 'private_min', 'pickup', 'weather_all', 'off_request', 'snow_open'];
+//   kind_seasons {paddle:'summer', snowshoe:'winter', rentals:'both'}  Tour test 15 (Whistler, 2026-11-18; Dave; Dayton approved):
+//                             the season each picked kind runs (tourKindSeasons). Only picked kinds are kept.
+const TOUR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'adult_age', 'adult_waiver', 'private', 'year', 'visit', 'private_per', 'private_min', 'pickup', 'weather_all', 'off_request', 'snow_open', 'kind_seasons'];
 const TOUR_KINDS_MAX = 3;
 const TOUR_INFO_ERROR = 'Some of the information could not be read. Please reload the page and try again.';
 // Heli-skiing and multi-day trips cost well over $500 a person: a price up to $1,000 goes live at once, a higher one is
@@ -23100,6 +23166,10 @@ function cleanTourInfoPart(key, x) {
   if (key === 'adult_age') return String(x) === '19' ? { value: '19' } : { error: TOUR_INFO_ERROR };
   if (key === 'adult_waiver') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
   if (key === 'weather_all' || key === 'off_request' || key === 'snow_open') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
+  if (key === 'kind_seasons') {
+    if (!x || typeof x !== 'object' || Array.isArray(x) || Object.keys(x).some((k) => !TOUR_KINDS.includes(k) || !TOUR_KIND_SEASON_VALUES.includes(x[k]))) return { error: TOUR_INFO_ERROR };
+    return Object.keys(x).length ? { value: { ...x } } : { value: null };
+  }
   return { error: TOUR_INFO_ERROR };
 }
 // Tour test 13: every trip runs weather permitting (his own tick).
@@ -23374,6 +23444,8 @@ function tourPlannerFacts(venueId) {
     ...(tourListInfo(venueId).mins.some((m) => m >= 1440) ? { tourMultiDay: true } : {}),
     // Tour test 4: the kinds the operator picked ('food', 'walking'…), so "food tour" and "walking tour" find it.
     ...(Array.isArray(t.kinds) && t.kinds.length ? { tourKinds: t.kinds.slice() } : {}),
+    // Tour test 15: the season each of his kinds runs (his answer, or his typed tours' section names, or the defaults).
+    ...(() => { const ks = tourKindSeasons(venueId); return ks ? { tourKindSeasons: ks } : {}; })(),
     // Tour test 9: the months her list's water trips run (a summer-only canoe is never planned in January).
     ...(() => { const w = tourWaterMonths(venueId); return w ? { tourWaterMonths: w } : {}; })(),
     // Tour test 10 (Whistler, 2026-11-18; Gord): each trip's own age, and his "Riders 8+" line (trip-planner.js tourAgeFit);
@@ -51359,6 +51431,8 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       // Tour test 11: an hourly unit and its minimum go with a private price only (the minimum with the hourly unit).
       if (!(typeof next.private === 'number' && next.private > 0)) { delete next.private_per; delete next.private_min; }
       if (next.private_per !== 'hour') delete next.private_min;
+      // Tour test 15: a kind's season goes with that kind (unpicking a kind drops its season).
+      if (next.kind_seasons) { const ks = Object.fromEntries(Object.entries(next.kind_seasons).filter(([k]) => Array.isArray(next.kinds) && next.kinds.includes(k))); if (Object.keys(ks).length) next.kind_seasons = ks; else delete next.kind_seasons; }
       const ordered = Object.fromEntries(TOUR_INFO_PARTS.filter((k) => k in next).map((k) => [k, next[k]]));
       if (!errors.tour_info && JSON.stringify(ordered) !== JSON.stringify(Object.fromEntries(TOUR_INFO_PARTS.filter((k) => k in cur).map((k) => [k, cur[k]])))) changes.tour_info = ordered;
     }
