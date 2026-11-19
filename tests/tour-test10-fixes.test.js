@@ -319,10 +319,10 @@ test('13. sentence capitals on what he types (story, Known for, Good to know, to
   assert.equal(box.rows.find((r) => r.label === 'Good to know').text, 'Wear closed-toe shoes. Riders 8+ (pony rides under 8) and under 230 lb.');
   ok(await change(t, { visit_rows: { known_for: 'quiet horses and big mountain views' } }));
   assert.equal(JSON.parse(db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(v.id).info).rows.find((r) => r.label === 'Known for').text, 'Quiet horses and big mountain views');
-  const r = await change(t, { description: 'family ranch in pemberton meadows since 1979. trail rides 1 or 2 hrs or half day with lunch, pony rides for little ones.' });
+  const r = await change(t, { description: 'family ranch in penticton meadows since 1979. trail rides 1 or 2 hrs or half day with lunch, pony rides for little ones.' });
   ok(r);
   const req = db.prepare("SELECT * FROM owner_change_requests WHERE venue_id = ? AND changes LIKE '%description%' ORDER BY id DESC LIMIT 1").get(v.id);
-  assert.match(JSON.parse(req.changes).description, /^Family ranch in Pemberton meadows since 1979\. Trail rides/); // tour test 11: names the site knows get capitals
+  assert.match(JSON.parse(req.changes).description, /^Family ranch in Penticton meadows since 1979\. Trail rides/); // tour test 11: names the site knows get capitals (Okanagan: Penticton)
   const card = app.renderAdminChangeCard({ id: req.id, venue_name: v.name, submitted_at: req.submitted_at || '2026-11-18', listing_url: '/x', changes: JSON.parse(req.changes), previous: {}, note: '' });
   assert.match(card, /Typed all lowercase/);
   // Typed tour names (his own list from the edit page) start with a capital.

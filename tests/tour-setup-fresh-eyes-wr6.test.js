@@ -136,8 +136,8 @@ test('2. category words: no "ATV, bungee…" for a zipline park; treetop / ropes
   const was = 'Ziplines, treetop adventure course & e-bike rentals';
   const en = kt(['zipline', 'bike', 'adventure'], false, was), fr = kt(['zipline', 'bike', 'adventure'], true, was);
   assert.doesNotMatch(en + fr, /ATV|bungee|VTT|élastique|canyon/i);
-  assert.equal(en, 'E-bike rentals, ziplines & treetop adventure course');
-  assert.equal(fr, 'Location de vélos électriques, tyrolienne et parcours dans les arbres (hébertisme)');
+  assert.equal(en, 'Ziplines, E-bike rentals & treetop adventure course'); // tour test 17: the owner's own chip order
+  assert.equal(fr, 'Tyrolienne, location de vélos électriques et parcours dans les arbres (hébertisme)');
   assert.doesNotMatch(fr, /treetop|rentals|course/i);
   // Nothing narrower: the kind's short word.
   assert.equal(kt(['adventure'], false, ''), 'Adventure'); assert.equal(kt(['adventure'], true, ''), 'Aventure');
