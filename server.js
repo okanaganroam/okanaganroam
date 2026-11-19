@@ -492,7 +492,7 @@ function rowToVenue(row) {
       const closures = upcomingClosures(x.closures);
       if (x.seasons.length) v.hours_seasonal = x.seasons;
       if (closures.length) v.special_closures = closures;
-      if (x.seasons.length || closures.length) v.hours_live = hoursWithExtras(v);
+      if (x.seasons.length || closures.length || x.holidays) v.hours_live = hoursWithExtras(v);
     }
   }
   return v;
@@ -50710,6 +50710,8 @@ function rememberOwnerContact(venueId, email) {
 // replaces the English description).
 const OWNER_CHANGE_FIELDS = ['hours', 'phone', 'website', 'description', 'description_fr', 'badges', 'happy_hour', 'name', 'address', 'menu_url', 'booking_url', 'instagram_url', 'facebook_url', 'tiktok_url', 'open_months',
   'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'avg_spend', 'not_offered', 'cuisine', 'cuisines', 'place_type', 'hours_checked', 'visit_rows',
+  // Indoor test 11 (2026-11-19): the usual week's "Open on holidays" (venue_hours_extra.holidays).
+  'hours_holidays',
   // Pubs (2026-11-10): kitchen hours, who's welcome and the sports shown (venue_pub_info).
   'pub_info',
   // Cafés (2026-11-10): their answers (venue_cafe_info) and their two links (online ordering, pre-orders), checked first.
@@ -51403,7 +51405,7 @@ function hoursExtrasMap() {
   if (!hoursExtraCache || Date.now() - hoursExtraCache.at > 60000) {
     const map = new Map();
     try {
-      for (const r of db.prepare('SELECT venue_id, seasons, closures FROM venue_hours_extra').all()) {
+      for (const r of db.prepare('SELECT * FROM venue_hours_extra').all()) {
         let seasons = [], closures = [];
         try { seasons = JSON.parse(r.seasons || '[]') || []; } catch (e) { seasons = []; }
         try { closures = JSON.parse(r.closures || '[]') || []; } catch (e) { closures = []; }
@@ -51418,7 +51420,9 @@ function hoursExtrasMap() {
           const y = Number(todayLocal().slice(0, 4));
           closures = hoursModule.expandYearlyClosures(raw, y - 1, y + 2);
         }
-        if (seasons.length || closures.length) map.set(r.venue_id, { seasons, closures, raw });
+        // Indoor test 11: the usual week's own "Open on holidays" (venue_hours_extra.holidays).
+        const holidays = r.holidays === 1;
+        if (seasons.length || closures.length || holidays) map.set(r.venue_id, { seasons, closures, raw, holidays });
       }
     } catch (e) { /* table missing in an old copy: no extras */ }
     hoursExtraCache = { at: Date.now(), map };
@@ -51429,7 +51433,7 @@ function clearHoursExtraCache() { hoursExtraCache = null; }
 // -> { seasons: [...], closures: [...] } (both lists empty when the venue has none).
 function venueHoursExtras(venueId) {
   const x = hoursExtrasMap().get(venueId);
-  return x ? { seasons: x.seasons, closures: x.closures, raw: x.raw || x.closures } : { seasons: [], closures: [], raw: [] };
+  return x ? { seasons: x.seasons, closures: x.closures, raw: x.raw || x.closures, holidays: !!x.holidays } : { seasons: [], closures: [], raw: [], holidays: false };
 }
 // The closures an owner keeps (café test 2): as stored (a yearly rule stays one row), without dated ones already over.
 function ownerClosuresKept(venueId, today = todayLocal()) {
@@ -51447,12 +51451,13 @@ function hoursWithExtras(v, now = new Date()) {
   const x = v && raw ? hoursExtrasMap().get(v.id) : null;
   if (!x) return raw;
   const closures = upcomingClosures(x.closures, now);
-  if (!x.seasons.length && !closures.length) return raw;
+  if (!x.seasons.length && !closures.length && !x.holidays) return raw;
   let obj;
   try { obj = JSON.parse(raw); } catch (e) { return raw; }
   if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return raw;
   if (x.seasons.length) obj._seasons = x.seasons;
   if (closures.length) obj._closures = closures;
+  if (x.holidays) obj._holidays = true;
   return JSON.stringify(obj);
 }
 // The plain week that applies on a date (a seasonal set, or the usual hours), for readers that only know weekdays
@@ -51469,6 +51474,17 @@ function weekJsonOn(v, date) {
         if (src) { week[wd] = week[src]; return JSON.stringify(week); }
       }
     } catch (e) { /* the stretch as stored */ }
+  }
+  // Indoor test 11 (Kim: closed Sundays and Mondays, open on long-weekend Mondays): the usual week's own "Open on holidays"
+  // works the same way outside a stretch.
+  if (!s && v && v.hours && hoursModule && hoursModule.holidayOn(String(date).slice(0, 10)) && venueHoursExtras(v.id).holidays) {
+    try {
+      const wd = localWeekdayKey(String(date).slice(0, 10)), week = JSON.parse(v.hours);
+      if (week && typeof week === 'object' && !Array.isArray(week) && (!Array.isArray(week[wd]) || !week[wd].length)) {
+        const src = ['sat', 'sun', 'fri', 'mon', 'tue', 'wed', 'thu'].find((d) => Array.isArray(week[d]) && week[d].length);
+        if (src) { week[wd] = week[src]; return JSON.stringify(week); }
+      }
+    } catch (e) { /* the week as stored */ }
   }
   return s ? JSON.stringify(s.hours) : v ? v.hours : null;
 }
@@ -52002,6 +52018,7 @@ function ownerVenueSnapshot(venue, happyHourTimes) {
     // Price range, seasonal hours and special closures (2026-10-18). Closures already over are left out.
     price_range: venue.price ? String(venue.price) : '',
     hours_seasons: venueHoursExtras(venue.id).seasons,
+    hours_holidays: venueHoursExtras(venue.id).holidays,
     closures: ownerClosuresKept(venue.id),
     // Happy hour deals (2026-10-26): { deals, deals_fr, source, checked_at } or null. The owner sends { deals,
     // deals_fr }; the source and date are kept here so an Undo can put the old ones back.
@@ -52861,6 +52878,11 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       if (!errors.hours_seasons && JSON.stringify(out) !== JSON.stringify(current.hours_seasons || [])) changes.hours_seasons = out;
     }
   }
+  // Indoor test 11 (2026-11-19; Kim): the usual week's "Open on holidays", one choice (true or false).
+  if ('hours_holidays' in input) {
+    if (typeof input.hours_holidays !== 'boolean') errors.hours_holidays = 'The holidays answer could not be read. Please reload the page and try again.';
+    else if (input.hours_holidays !== !!current.hours_holidays) changes.hours_holidays = input.hours_holidays;
+  }
   // Special closures (2026-10-18): dates or date ranges from today on, with an optional short note.
   if ('closures' in input) {
     const list = input.closures;
@@ -53157,17 +53179,17 @@ function listOwnerChanges(status = 'pending') {
 
 const OWNER_FIELD_LABELS = { hours: 'Hours', phone: 'Phone', website: 'Website', description: 'Description', description_fr: 'French description', badges: 'Badges', happy_hour: 'Happy hour',
   name: 'Business name', address: 'Address', menu_url: 'Menu link', booking_url: 'Booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok', open_months: 'Season',
-  price_range: 'Price range', hours_seasons: 'Seasonal hours', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights',
+  price_range: 'Price range', hours_seasons: 'Seasonal hours', hours_holidays: 'Open on holidays', closures: 'Special closures', happy_hour_deals: 'Happy hour deals', specials: 'Weekly specials', weekly_nights: 'Weekly nights',
   avg_spend: 'Average spend per person', not_offered: 'Things you don’t offer', cuisine: 'Cuisine', cuisines: 'What you serve', place_type: 'Kind of place', hours_checked: 'Hours confirmed', visit_rows: 'Plan your visit',
   pub_info: 'Kitchen, who’s welcome and sports', cafe_info: 'Your café answers', cafe_links: 'Ordering links', winery_info: 'Your winery answers', tasting_fee: 'Tasting price', brewery_info: 'Your taproom answers', flight_fee: 'Flight price', cocktail_price: 'Cocktail price', tour_info: 'Your tour answers', tour_price: 'Price per person', indoor_info: 'Your answers', indoor_price: 'Adult price' };
 // The field names owners read in messages, in each language (2026-10-18; the page script uses the same list).
 const OWNER_FIELD_WORDS = {
   fr: { hours: 'heures', open_months: 'saison', phone: 'téléphone', website: 'site Web', description: 'description', description_fr: 'description en français', badges: 'caractéristiques', happy_hour: '5 à 7',
     name: 'nom de l’entreprise', address: 'adresse', menu_url: 'lien du menu', booking_url: 'lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok',
-    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du 5 à 7', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', cuisines: 'ce que vous servez', place_type: 'genre d’endroit', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite', pub_info: 'cuisine, âge des clients et sports', cafe_info: 'réponses sur votre café', cafe_links: 'liens pour commander', winery_info: 'réponses sur votre vignoble', tasting_fee: 'prix de la dégustation', brewery_info: 'réponses sur votre salle', flight_fee: 'prix de la palette de dégustation', cocktail_price: 'prix d’un cocktail', tour_info: 'réponses sur vos activités', tour_price: 'prix par personne', indoor_info: 'vos réponses', indoor_price: 'prix adulte' },
+    price_range: 'gamme de prix', hours_seasons: 'heures saisonnières', hours_holidays: 'ouvert les jours fériés', closures: 'fermetures spéciales', happy_hour_deals: 'spéciaux du 5 à 7', specials: 'spéciaux de la semaine', weekly_nights: 'soirées de la semaine', avg_spend: 'dépense moyenne par personne', not_offered: 'ce que vous n’offrez pas', cuisine: 'cuisine', cuisines: 'ce que vous servez', place_type: 'genre d’endroit', hours_checked: 'heures confirmées', visit_rows: 'planifier la visite', pub_info: 'cuisine, âge des clients et sports', cafe_info: 'réponses sur votre café', cafe_links: 'liens pour commander', winery_info: 'réponses sur votre vignoble', tasting_fee: 'prix de la dégustation', brewery_info: 'réponses sur votre salle', flight_fee: 'prix de la palette de dégustation', cocktail_price: 'prix d’un cocktail', tour_info: 'réponses sur vos activités', tour_price: 'prix par personne', indoor_info: 'vos réponses', indoor_price: 'prix adulte' },
   en: { hours: 'hours', open_months: 'season', phone: 'phone', website: 'website', description: 'description', description_fr: 'French description', badges: 'badges', happy_hour: 'happy hour',
     name: 'business name', address: 'address', menu_url: 'menu link', booking_url: 'booking link', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok',
-    price_range: 'price range', hours_seasons: 'seasonal hours', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', cuisines: 'what you serve', place_type: 'kind of place', hours_checked: 'hours confirmed', visit_rows: 'plan your visit', pub_info: 'kitchen, who’s welcome and sports', cafe_info: 'your café answers', cafe_links: 'ordering links', winery_info: 'your winery answers', tasting_fee: 'tasting price', brewery_info: 'your taproom answers', flight_fee: 'flight price', cocktail_price: 'cocktail price', tour_info: 'your tour answers', tour_price: 'price per person', indoor_info: 'your answers', indoor_price: 'adult price' },
+    price_range: 'price range', hours_seasons: 'seasonal hours', hours_holidays: 'open on holidays', closures: 'special closures', happy_hour_deals: 'happy hour deals', specials: 'weekly specials', weekly_nights: 'weekly nights', avg_spend: 'average spend per person', not_offered: 'things you don’t offer', cuisine: 'cuisine', cuisines: 'what you serve', place_type: 'kind of place', hours_checked: 'hours confirmed', visit_rows: 'plan your visit', pub_info: 'kitchen, who’s welcome and sports', cafe_info: 'your café answers', cafe_links: 'ordering links', winery_info: 'your winery answers', tasting_fee: 'tasting price', brewery_info: 'your taproom answers', flight_fee: 'flight price', cocktail_price: 'cocktail price', tour_info: 'your tour answers', tour_price: 'price per person', indoor_info: 'your answers', indoor_price: 'adult price' },
 };
 // "hours, phone and description" / "heures, téléphone et description".
 function ownerFieldNames(list, lang = 'en') {
@@ -53288,6 +53310,7 @@ function ownerValueText(field, value) {
       ? value.map((x) => `${x.label || 'Seasonal hours'} ${hoursExtraRangeText(x.from, x.to)}: ${ownerWeekText(JSON.stringify(x.hours))}`).join(' | ')
       : '(none)';
   }
+  if (field === 'hours_holidays') return value ? 'Open on holidays (stat holidays and Christmas week)' : 'Closed on holidays that fall on a closed day';
   if (field === 'closures') {
     return Array.isArray(value) && value.length ? value.map((c) => `${hoursExtraRangeText(c.from, c.to)}${c.note ? ` (${c.note})` : ''}`).join('; ') : '(none)';
   }
@@ -58096,7 +58119,7 @@ ${lang === 'fr' ? frenchHeaderFragment(renderGolfHeaderHtml()) : renderGolfHeade
   </div></main>
 <script>window.MENU_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${MENU_APP_SCRIPT}</script>
-${opts.mode === 'admin' ? '' : ownerHelpWidgetHtml('menu', { signedIn: opts.mode === 'account', lang, ...(venue.type === 'indoor' && INDOOR_SETUP_ON ? { dropHappyHour: true, noHappyHour: true, dropTopics: INDOOR_HELP_DROP_TOPICS, extraTopics: indoorKindHelpTopics(INDOOR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('menu') && x.id !== 'menu-add'), indoorHelpKinds(venue), indoorHelpPrice(venue)) } : venue.type === 'tour' ? { dropHappyHour: true, noHappyHour: true, start: TOUR_MENU_HELP_START, extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x && x.id) } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('menu')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('menu')) } : {}) })}
+${opts.mode === 'admin' ? '' : ownerHelpWidgetHtml('menu', { signedIn: opts.mode === 'account', lang, ...(venue.type === 'indoor' && INDOOR_SETUP_ON ? { dropHappyHour: true, noHappyHour: true, dropTopics: INDOOR_HELP_DROP_TOPICS, extraTopics: indoorKindHelpTopics(INDOOR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('menu') && x.id !== 'menu-add'), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpExact(venue)) } : venue.type === 'tour' ? { dropHappyHour: true, noHappyHour: true, start: TOUR_MENU_HELP_START, extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x && x.id) } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('menu')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('menu')) } : {}) })}
 </body>
 </html>`;
 }
@@ -58419,7 +58442,7 @@ function setupScore(found) {
 const SETUP_WAITING_FIELD_STEPS = {
   name: ['basics'], address: ['basics'], phone: ['basics'], website: ['basics'], description: ['story'], description_fr: ['story'], menu_url: ['menu'],
   booking_url: ['groups', 'visit', 'book', 'booking'], instagram_url: ['instagram', 'social'], facebook_url: ['facebook', 'social'], tiktok_url: ['social'],
-  hours: ['hours'], hours_seasons: ['hours'], open_months: ['hours'], hours_checked: ['hours'], closures: ['closures', 'hours'],
+  hours: ['hours'], hours_seasons: ['hours'], hours_holidays: ['hours', 'closures'], open_months: ['hours'], hours_checked: ['hours'], closures: ['closures', 'hours'],
   happy_hour: ['happy'], happy_hour_deals: ['happy'], specials: ['specials'], weekly_nights: ['music'], badges: ['offer'], not_offered: ['offer'],
   price_range: ['spend'], avg_spend: ['spend'], tasting_fee: ['tastings'], flight_fee: ['flights'], cocktail_price: ['spend'], cafe_links: ['order', 'sellout'], tour_price: ['price'], indoor_price: ['price'],
 };
@@ -58604,7 +58627,7 @@ function renderOwnerSetupPage(found, opts) {
   try { const pm = db.prepare("SELECT preview_key FROM owner_photos WHERE venue_id = ? AND status = 'pending' AND main_requested = 1 ORDER BY id DESC LIMIT 1").get(venue.id); if (pm) pendingMain = `/owner-photos/preview/${pm.preview_key}.jpg`; } catch (e) { pendingMain = ''; }
   const cur = {
     address: snap.address, phone: snap.phone, website: snap.website || '', description: snap.description, description_fr: snap.description_fr || '', hours: snap.hours, open_months: snap.open_months || '',
-    hours_seasons: snap.hours_seasons || [], closures: snap.closures || [], avg_spend: snap.avg_spend ? { amount: snap.avg_spend.amount, source: snap.avg_spend.source, ...(snap.avg_spend.exact != null ? { exact: snap.avg_spend.exact } : {}) } : null,
+    hours_seasons: snap.hours_seasons || [], hours_holidays: !!snap.hours_holidays, closures: snap.closures || [], avg_spend: snap.avg_spend ? { amount: snap.avg_spend.amount, source: snap.avg_spend.source, ...(snap.avg_spend.exact != null ? { exact: snap.avg_spend.exact } : {}) } : null,
     cuisines: snap.cuisines || [], place_type: snap.place_type || '', badges: snap.badges, happy_hour: snap.happy_hour,
     happy_hour_deals: snap.happy_hour_deals ? { deals: snap.happy_hour_deals.deals || [], deals_fr: snap.happy_hour_deals.deals_fr || [] } : null,
     happy_blocks: setupHappyBlocks(found, lang),
@@ -58911,7 +58934,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true"><input type="file" id="suDoorPick" accept="image/jpeg,image/*" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), dropHappyHour: tour || indoor, ...(indoor ? { dropTopics: INDOOR_HELP_DROP_TOPICS } : {}), extraTopics: setupHereHelpTopics(venue, steps, withSetupNightsTopic(venue.type, (tour ? [statusTopic, ...TOUR_SETUP_HELP_TOPICS.map(tourYearlyBreakWords), TOUR_SETUP_SEASON_HELP_TOPIC] : indoor ? [statusTopic, ...indoorKindHelpTopics(INDOOR_SETUP_HELP_TOPICS.map(indoorClosureWords), indoorHelpKinds(venue), indoorHelpPrice(venue))] : cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type).map(helpHereInSetup)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_CHANGE_LATER_HELP_TOPIC, SETUP_WHO_SEES_HELP_TOPIC, tour ? TOUR_THIRD_STRETCH_HELP_TOPIC : SETUP_THIRD_STRETCH_HELP_TOPIC, SETUP_OPEN_HOLIDAYS_HELP_TOPIC], /* Tour test 15: a tour's day hours are departures, never lunch and dinner or brunch: its own 'hours' answer only. */ (tour ? [] : [SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC]).map((x) => (cafe ? cafeSecondTimeWords(x) : indoor ? indoorHoursHelpWords(betweenSecondTimeWords(x), venue) : pub || brewery ? betweenSecondTimeWords(x) : x)).filter(Boolean), [setupClosuresHelpTopic(venue.type), setupClosureFixHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : []))) })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), dropHappyHour: tour || indoor, ...(indoor ? { dropTopics: INDOOR_HELP_DROP_TOPICS } : {}), extraTopics: setupHereHelpTopics(venue, steps, withSetupNightsTopic(venue.type, (tour ? [statusTopic, ...TOUR_SETUP_HELP_TOPICS.map(tourYearlyBreakWords), TOUR_SETUP_SEASON_HELP_TOPIC] : indoor ? [statusTopic, ...indoorKindHelpTopics(INDOOR_SETUP_HELP_TOPICS.map(indoorClosureWords), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpExact(venue))] : cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type).map(helpHereInSetup)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_CHANGE_LATER_HELP_TOPIC, SETUP_WHO_SEES_HELP_TOPIC, tour ? TOUR_THIRD_STRETCH_HELP_TOPIC : SETUP_THIRD_STRETCH_HELP_TOPIC, SETUP_OPEN_HOLIDAYS_HELP_TOPIC], /* Tour test 15: a tour's day hours are departures, never lunch and dinner or brunch: its own 'hours' answer only. */ (tour ? [] : [SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC]).map((x) => (cafe ? cafeSecondTimeWords(x) : indoor ? indoorHoursHelpWords(betweenSecondTimeWords(x), venue) : pub || brewery ? betweenSecondTimeWords(x) : x)).filter(Boolean), [setupClosuresHelpTopic(venue.type), setupClosureFixHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : []))) })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -59796,6 +59819,33 @@ const TOUR_SETUP_HELP_TOPICS = [
 // shows it ("What kind of place", "Price", "Booking", "Who can come", "Good to know", "Groups and parties").
 const INDOOR_SETUP_HELP_TOPICS = [
   SETUP_NO_WEBSITE_HELP_TOPIC,
+  // Indoor test 11 (2026-11-19; Kim, a science centre closed Sundays and Mondays: "we open extra on long weekend mondays" got
+  // the extras answer, "open on family day and thanksgiving monday" the theme nights one). The usual week's Open on
+  // holidays, on the hours screen or from a holiday tile on Closures.
+  { id: 'indoor-holiday-open', pages: ['setup', 'edit'], over: ['hours-open-holidays', 'indoor-extras', 'indoor-theme-nights', 'hours', 'closures', 'setup-closures', 'setup-closure-fix', 'seasonal-hours', 'setup-season', 'indoor-seasonal', 'indoor-closed-months', 'indoor-yearly-break', 'event-repeat', 'event-add'],
+    q: 'We open on long-weekend Mondays and stat holidays', qFr: 'Nous ouvrons les lundis des longues fins de semaine et les jours fériés',
+    allOf: [['open', 'extra', 'ouvert', 'ouvre', 'ouvrons'], ['holiday', 'stat', 'family', 'thanksgiving', 'long', 'easter', 'victoria', 'ferie', 'feries', 'famille', 'grace', 'paques']],
+    keys: ['long weekend', 'long weekends', 'long weekend mondays', 'long weekend monday', 'long-weekend mondays', 'holiday mondays', 'holiday monday', 'stat holidays', 'stat holiday', 'open stat holidays', 'open on stat holidays', 'open on holidays', 'open holidays', 'open on family day', 'family day', 'thanksgiving monday', 'open on thanksgiving', 'easter monday', 'open on a holiday', 'open this holiday', 'closed mondays except holidays', 'except long weekends'],
+    keysFr: ['longue fin de semaine', 'longues fins de semaine', 'lundis feries', 'lundi ferie', 'jours feries', 'jour ferie', 'ouvert les jours feries', 'ouverts les jours feries', 'ouvert le jour de la famille', 'jour de la famille', 'action de grace', 'lundi de paques', 'ouvrir ce jour ferie'],
+    a: '<p>On your hours screen (<strong>Hours</strong>, then <strong>Change them</strong>), under the days, tap <strong>Open on holidays (stat holidays and Christmas week)</strong>. Or on <strong>Closures and holidays</strong>, tap a holiday that says <strong>You’re closed Mondays · Open this holiday</strong>: it turns on the same choice.</p><p>Your page then shows you open on long-weekend Mondays like Family Day and Thanksgiving, and on Christmas week days you’re usually closed, with your weekend hours, and Build My Trip plans you then. Closed on one of them, like Christmas Day? Tap it under <strong>Holidays</strong> on Closures: a closure always wins.</p>',
+    aFr: '<p>À l’écran de vos heures (<strong>Heures</strong>, puis <strong>Les modifier</strong>), sous les jours, touchez <strong>Ouvert les jours fériés (et la semaine de Noël)</strong>. Ou dans <strong>Fermetures et jours fériés</strong>, touchez un jour férié qui indique <strong>Vous êtes fermé le lundi · Ouvrir ce jour férié</strong> : il active le même choix.</p><p>Votre page vous montre alors ouvert les lundis des longues fins de semaine, comme le jour de la Famille et l’Action de grâce, et les jours de la semaine de Noël où vous êtes habituellement fermé, avec vos heures de fin de semaine, et Planifier mon voyage vous propose ces jours-là. Fermé l’un de ces jours, comme Noël? Touchez-le sous <strong>Jours fériés</strong> dans Fermetures : une fermeture l’emporte toujours.</p>' },
+  // Indoor test 11 (Kim: "open daily in july and august" was told to mark July and August closed). Open every day in some
+  // months is summer hours, never "We're closed part of the year".
+  { id: 'indoor-summer-daily', pages: ['setup', 'edit'], over: ['indoor-closed-months', 'indoor-seasonal', 'setup-season', 'seasonal-hours', 'hours', 'season', 'closures', 'indoor-yearly-break', 'setup-closures'],
+    q: 'We’re open every day in summer (like July and August)', qFr: 'Nous sommes ouverts tous les jours l’été (comme en juillet et en août)',
+    allOf: [['open', 'ouvert', 'ouvre', 'ouvrons'], ['daily', 'every', '7', 'seven', 'tous', 'chaque', 'sept', 'quotidien'], ['july', 'august', 'june', 'september', 'summer', 'month', 'juillet', 'aout', 'juin', 'septembre', 'ete', 'mois', 'spring', 'winter', 'christmas', 'printemps', 'hiver', 'noel', 'break', 'relache']],
+    keys: ['open daily in', 'open daily in july', 'open daily in summer', 'open every day in', 'open every day in july', 'open every day in summer', 'open 7 days in', 'open 7 days a week in', 'open seven days in', 'daily in july', 'daily in july and august', 'daily in summer', 'every day in july', 'every day in summer', 'open daily july and august', 'open daily in july and august', 'extra days in summer', 'more days in summer', 'longer hours in summer', 'open mondays in summer', 'open sundays in summer'],
+    keysFr: ['ouvert tous les jours en juillet', 'ouverts tous les jours en juillet', 'tous les jours en juillet et aout', 'tous les jours l ete', 'ouvert tous les jours l ete', 'ouvert 7 jours', 'sept jours sur sept l ete', 'ouvert chaque jour en ete', 'plus de jours l ete'],
+    a: '<p>That’s your summer hours, not a closure. In your hours, after the days, tap <strong>Different hours in summer or winter?</strong>, then <strong>No, different in summer</strong>. Pick the months (like July and August), then on each day you’re usually closed tap <strong>Open this day</strong> (or open one day and tap <strong>Copy these hours to: Every day</strong>). Save. Your page shows every day open in those months, and your usual hours the rest of the year; Build My Trip plans you then.</p><p>Don’t tap <strong>We’re closed part of the year</strong>: that’s for months you’re closed.</p>',
+    aFr: '<p>Ce sont vos heures d’été, pas une fermeture. Dans vos heures, après les jours, touchez <strong>Des heures différentes l’été ou l’hiver?</strong>, puis <strong>Non, elles changent en été</strong>. Choisissez les mois (comme juillet et août), puis, pour chaque jour habituellement fermé, touchez <strong>Ouvrir ce jour</strong> (ou ouvrez un jour et touchez <strong>Copier ces heures à : Tous les jours</strong>). Enregistrez. Votre page vous montre ouvert tous les jours ces mois-là, et vos heures habituelles le reste de l’année; Planifier mon voyage vous propose alors.</p><p>Ne touchez pas <strong>Nous fermons une partie de l’année</strong> : c’est pour les mois où vous êtes fermé.</p>' },
+  // Indoor test 11 (Kim: "we're a non-profit, does locally owned apply" got the not-the-owner answer).
+  { id: 'indoor-local-owned', pages: ['setup', 'edit'], over: ['not-owner', 'features', 'badges', 'badge-wrong', 'staff'],
+    q: 'Does Locally owned apply to a non-profit?', qFr: 'Propriété locale s’applique-t-elle à un organisme sans but lucratif?',
+    allOf: [['local', 'locale', 'locally'], ['owned', 'own', 'apply', 'count', 'non', 'nonprofit', 'profit', 'charity', 'society', 'community', 'city', 'municipal', 'propriete', 'proprietaire', 'organisme', 'lucratif', 'communautaire', 'ville', 'applique', 'compte']],
+    keys: ['locally owned', 'locally owned apply', 'does locally owned apply', 'is locally owned for', 'locally owned non profit', 'locally owned nonprofit', 'local owned', 'locally run', 'run locally', 'local non profit', 'local society', 'local charity'],
+    keysFr: ['propriete locale', 'la propriete locale', 'propriete locale s applique', 'organisme local', 'gere localement', 'sans but lucratif local', 'organisme sans but lucratif'],
+    a: '<p>Yes, if you’re run here. <strong>Locally owned</strong> means owned or run in the valley: non-profits, societies, co-ops and community groups count when they’re run locally. A chain or a place run from a head office elsewhere doesn’t. Tick it in <strong>What you offer</strong>.</p>',
+    aFr: '<p>Oui, si vous êtes gérés ici. <strong>Propriété locale</strong> veut dire possédé ou géré dans la vallée : les organismes sans but lucratif, les sociétés, les coopératives et les groupes communautaires comptent s’ils sont gérés localement. Une chaîne ou un endroit géré par un siège ailleurs, non. Cochez-la dans <strong>Ce que vous offrez</strong>.</p>' },
   { id: 'indoor-fill-all', pages: ['setup', 'edit'], over: ['easy-setup', 'setup-change-later', 'setup-live-when', 'setup-status'],
     q: 'Do I have to fill all of this in?', qFr: 'Dois-je tout remplir?',
     keys: ['fill all of this', 'fill all this', 'fill all of this out', 'fill everything', 'fill everything in', 'fill everything out', 'fill it all', 'fill it all out', 'have to fill', 'need to fill', 'do i have to fill', 'do i need to fill', 'have to answer everything', 'answer everything', 'all of this required', 'is all of this required', 'is this required', 'required', 'mandatory', 'so many questions', 'too many questions', 'how many questions', 'how long does this take', 'skip', 'do all of these', 'have to do all', 'answer all', 'answer all of it'],
@@ -59971,10 +60021,12 @@ const INDOOR_SETUP_HELP_TOPICS = [
   // generic Description answer.
   { id: 'indoor-french', pages: ['setup', 'edit'], over: ['french', 'description', 'fr-desc-old', 'story'],
     q: 'Do I have to write the French description?', qFr: 'Dois-je écrire la description en français?',
-    keys: ['dont speak french', 'i dont speak french', 'do not speak french', 'i do not speak french', 'no french', 'french description', 'the french description', 'update the french', 'update the french description', 'have to update the french', 'write in french', 'write the french', 'french text', 'need french', 'have to do the french', 'do it in french'],
-    keysFr: ['description en francais', 'description francaise', 'la description francaise', 'ecrire en francais', 'ecrire la description en francais', 'je ne parle pas francais', 'je ne parle pas anglais', 'description en anglais', 'ecrire en anglais', 'mettre a jour la description', 'dois je traduire'],
-    a: '<p><strong>No.</strong> It’s optional: we translate it for you. Write your story in English only; your French page gets the French within a day. You never have to touch the French description.</p>',
-    aFr: '<p><strong>Non.</strong> C’est facultatif : nous la traduisons pour vous. Écrivez votre histoire dans une seule langue; nous faisons l’autre version d’ici un jour. Vous n’avez jamais à toucher à la description dans l’autre langue.</p>' },
+    // Indoor test 11 (Kim: "will my page be in french" got the portal's French answer): her page's French.
+    allOf: [['page', 'listing', 'visitors', 'fiche', 'visiteurs'], ['french', 'francais', 'anglais']],
+    keys: ['will my page be in french', 'my page in french', 'page in french', 'is my page in french', 'french version', 'french version of my page', 'french page', 'my french page', 'listing in french', 'french visitors', 'dont speak french', 'i dont speak french', 'do not speak french', 'i do not speak french', 'no french', 'french description', 'the french description', 'update the french', 'update the french description', 'have to update the french', 'write in french', 'write the french', 'french text', 'need french', 'have to do the french', 'do it in french'],
+    keysFr: ['ma page en francais', 'page en francais', 'ma fiche en francais', 'version francaise', 'version anglaise', 'ma page en anglais', 'description en francais', 'description francaise', 'la description francaise', 'ecrire en francais', 'ecrire la description en francais', 'je ne parle pas francais', 'je ne parle pas anglais', 'description en anglais', 'ecrire en anglais', 'mettre a jour la description', 'dois je traduire'],
+    a: '<p>Your page has a French version. We write the French for your own lines, usually within a day.</p><p>You don’t have to write the French description: it’s optional, and we translate it for you. Write your story in English only. You never have to touch the French description.</p>',
+    aFr: '<p>Votre page a une version anglaise et une version française. Nous écrivons l’autre langue pour vos propres lignes, habituellement d’ici un jour.</p><p><strong>Non</strong>, vous n’avez pas à écrire l’autre description. C’est facultatif : nous la traduisons pour vous. Écrivez votre histoire dans une seule langue; nous faisons l’autre version d’ici un jour. Vous n’avez jamais à toucher à la description dans l’autre langue.</p>' },
   // Indoor test 1: "we close from Christmas until the middle of January" got "I'm not sure". A yearly break is a closure
   // with Every year ticked (the screen's words are filled in by indoorClosureWords).
   { id: 'indoor-yearly-break', pages: ['setup', 'edit'], over: ['closures', 'setup-closure-fix', 'indoor-seasonal', 'seasonal-hours', 'setup-season', 'hours', 'season'],
@@ -60046,10 +60098,10 @@ const INDOOR_SETUP_HELP_TOPICS = [
   // is a Known for line (search and Build My Trip read it) plus an event that repeats on What's On.
   { id: 'indoor-theme-nights', pages: ['setup', 'edit'], over: ['event-repeat', 'event-add', 'events', 'indoor-exhibits', 'indoor-age', 'closures', 'hours', 'indoor-bar', 'indoor-busy-times', 'seasonal-hours'],
     q: 'Theme nights and weekly events (cosmic bowling, trivia, open mic)', qFr: 'Soirées à thème et événements chaque semaine (quilles cosmiques, quiz, micro ouvert)',
-    allOf: [['cosmic', 'cosmi', 'glow', 'theme', 'trivia', 'karaoke', 'retro', 'candle', 'chandelle', 'ladies', 'dames', 'femme', 'mic', 'micro', 'poker', 'tournament', 'tournoi', 'paint', 'peinture', 'story', 'conte', 'famil', 'toddler', 'petit', 'learn', 'initiation', 'bingo', 'cheap', 'toonie', 'improv', 'impro', 'live', 'quiz'],
+    allOf: [['demo', 'show', 'spectacle', 'science', 'cosmic', 'cosmi', 'glow', 'theme', 'trivia', 'karaoke', 'retro', 'candle', 'chandelle', 'ladies', 'dames', 'femme', 'mic', 'micro', 'poker', 'tournament', 'tournoi', 'paint', 'peinture', 'story', 'conte', 'famil', 'toddler', 'petit', 'learn', 'initiation', 'bingo', 'cheap', 'toonie', 'improv', 'impro', 'live', 'quiz'],
       ['night', 'soir', 'every', 'chaque', 'weekly', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche', 'morning', 'matin']],
-    keys: ['cosmic bowling', 'cosmic', 'glow bowling', 'glow', 'black light', 'theme night', 'theme nights', 'trivia', 'trivia night', 'karaoke', 'open mic', 'retro night', 'ladies night', 'family night', 'family sundays', 'story time', 'storytime', 'paint night', 'poker tournament', 'poker tournaments', 'cheap tuesdays', 'cheap tuesday', 'toonie tuesday', 'weekly event', 'weekly events', 'every friday', 'every saturday', 'every week', 'friday and saturday nights', 'saturday nights', 'friday nights', 'candlelight', 'live music', 'toddler time', 'toddler mornings', 'learn to curl nights'],
-    keysFr: ['quilles cosmiques', 'cosmiques', 'soiree a theme', 'soirees a theme', 'quiz', 'karaoke', 'micro ouvert', 'soiree retro', 'soiree des dames', 'heure du conte', 'soiree peinture', 'tournoi de poker', 'chaque semaine', 'chaque vendredi', 'chaque samedi', 'vendredi et samedi soir', 'chandelles', 'musique live', 'temps des tout petits', 'dimanches en famille'],
+    keys: ['demo', 'demos', 'weekly demo', 'weekly demos', 'free demo', 'science saturdays', 'saturdays at', 'sundays at', 'every saturday at', 'weekly show', 'weekly shows', 'shows at', 'demos at', 'cosmic bowling', 'cosmic', 'glow bowling', 'glow', 'black light', 'theme night', 'theme nights', 'trivia', 'trivia night', 'karaoke', 'open mic', 'retro night', 'ladies night', 'family night', 'family sundays', 'story time', 'storytime', 'paint night', 'poker tournament', 'poker tournaments', 'cheap tuesdays', 'cheap tuesday', 'toonie tuesday', 'weekly event', 'weekly events', 'every friday', 'every saturday', 'every week', 'friday and saturday nights', 'saturday nights', 'friday nights', 'candlelight', 'live music', 'toddler time', 'toddler mornings', 'learn to curl nights'],
+    keysFr: ['demonstration', 'demonstrations', 'demo', 'demos', 'chaque samedi a', 'samedis de la science', 'spectacle chaque semaine', 'quilles cosmiques', 'cosmiques', 'soiree a theme', 'soirees a theme', 'quiz', 'karaoke', 'micro ouvert', 'soiree retro', 'soiree des dames', 'heure du conte', 'soiree peinture', 'tournoi de poker', 'chaque semaine', 'chaque vendredi', 'chaque samedi', 'vendredi et samedi soir', 'chandelles', 'musique live', 'temps des tout petits', 'dimanches en famille'],
     a: '<p>Put it in your <strong>Known for</strong> line (in Your story and Known for), like <em>Cosmic bowling Fri &amp; Sat 9 PM–midnight</em>: search and Build My Trip read it. Then put it on What’s On: on your page (after the setup), tap <strong>Add an event</strong>, give it the first date and its time, and in <strong>Repeats or other dates?</strong> write “every Friday and Saturday”. Keep your hours as your open-door hours.</p>',
     aFr: '<p>Mettez-la dans votre ligne <strong>Connu pour</strong> (dans Votre histoire et ce pour quoi vous êtes connus), comme <em>Quilles cosmiques ven. et sam. de 21 h à minuit</em> : la recherche et Planifier mon voyage la lisent. Ajoutez-la ensuite à À l’affiche : sur votre page (après la configuration), touchez <strong>Ajouter un événement</strong>, indiquez la première date et l’heure, et dans <strong>Récurrent ou autres dates?</strong> écrivez « chaque vendredi et samedi ». Gardez vos heures comme heures d’ouverture des portes.</p>' },
   // Indoor test 8 (Gary: "shoe rental extra" got "I'm not sure", and "price is per game but lanes can be booked by the
@@ -60095,14 +60147,19 @@ function indoorHelpKinds(venue) {
 // examples use is the owner's own when there is one.
 // Indoor test 10 (2026-11-19; Sandra's pool: "Drop-in from $25"): before the owner types a price, the kind's own example.
 function indoorHelpPrice(venue) { return (venue && indoorPrice(venue.id)) || indoorKindsModule.indoorKindText(venue ? indoorHelpKinds(venue) : ['other'], 'en').exPrice; }
-function indoorKindHelpTopics(topics, kinds, price = null) {
+// Indoor test 11 (2026-11-19; Kim: Help said "Admission from $12" while her page said "Adult admission $12"): the owner
+// side says the page's own words, "Adult admission $12" (price.exact) when her typed prices list a lower one, else
+// "Admission $12" (the kind's words without "from").
+function indoorOwnerPriceWords(k, exact) { return exact ? `${k.price.exact} {x}` : String(k.price.page).replace(/\.$/, '').replace(/ from \{x\}$/, ' {x}').replace(/ à partir de \{x\}$/, ' {x}'); }
+function indoorHelpExact(venue) { try { return !!(venue && indoorPriceExact(venue.id)); } catch (e) { return false; } }
+function indoorKindHelpTopics(topics, kinds, price = null, exact = false) {
   const E = escapeHtml;
   const en = indoorKindsModule.indoorKindText(kinds, 'en'), fr = indoorKindsModule.indoorKindText(kinds, 'fr');
   if (!(Number(price) > 0)) price = en.exPrice;
   // Indoor test 5: "put your adult admission", never "put adult day pass".
   const label = (k) => { const l = k.price.label.replace(/, (?:in dollars|en dollars)$/, ''); return /^(?:your|votre)\b/i.test(l) ? l : `${k === fr ? 'votre' : 'your'} ${l.charAt(0).toLowerCase()}${l.slice(1)}`; };
   const money = (lang) => { const n = Number(price) > 0 ? Number(price) : en.exPrice; const t = Number.isInteger(n) ? String(n) : n.toFixed(2); return lang === 'fr' ? `${t.replace('.', ',')} $` : `$${t}`; };
-  const say = (k, lang) => k.price.page.replace('{x}', money(lang)).replace(/\.$/, '');
+  const say = (k, lang) => indoorOwnerPriceWords(k, exact).replace('{x}', money(lang));
   // Indoor test 5: a camp (a PD-day or school camp) is a Groups line (the kind's school or camp chip) and, on set dates, an event.
   const campChip = (k) => k.groups.chips.find((c) => /camp|school|scolaire/i.test(c)) || k.groups.chips[0];
   const players = INDOOR_HELP_PLAYER_KINDS.includes(en.kind);
@@ -65202,6 +65259,15 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         continue;
       }
       // Seasonal hours and special closures (2026-10-18): venue_hours_extra.
+      // Indoor test 11: the usual week's "Open on holidays" (venue_hours_extra.holidays, 1 or NULL).
+      if (field === 'hours_holidays') {
+        const beforeRow = db.prepare('SELECT holidays AS v FROM venue_hours_extra WHERE venue_id = ?').get(venue.id);
+        db.prepare('INSERT INTO venue_hours_extra (venue_id, holidays) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET holidays = excluded.holidays, updated_at = CURRENT_TIMESTAMP').run(venue.id, value ? 1 : null);
+        clearHoursExtraCache();
+        log.run(venue.id, 'hours_holidays', beforeRow && beforeRow.v ? '1' : '0', value ? '1' : '0', meta.reason, meta.batch_id, reviewer);
+        applied.push(field);
+        continue;
+      }
       if (field === 'hours_seasons' || field === 'closures') {
         const col = field === 'hours_seasons' ? 'seasons' : 'closures';
         const beforeRow = db.prepare(`SELECT ${col} AS v FROM venue_hours_extra WHERE venue_id = ?`).get(venue.id);
@@ -65234,7 +65300,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
     }
     // New seasonal hours or closures from the owner also count as the owner checking the hours (2026-10-18): the
     // venue page then says "Hours checked" with today's date. Undo puts the old provenance back instead.
-    const extrasTouched = chosen.includes('hours_seasons') || chosen.includes('closures');
+    const extrasTouched = chosen.includes('hours_seasons') || chosen.includes('closures') || chosen.includes('hours_holidays');
     if (extrasTouched && !chosen.includes('hours') && venue.hours) {
       const u = opts.undo ? (opts.undoMeta || {}) : { hours_source: 'venue_owner', hours_checked_at: todayLocal(now) };
       const next = { hours_source: u.hours_source || null, hours_checked_at: u.hours_checked_at || null };
@@ -65362,7 +65428,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
     } catch (e) { console.error(`[owner-portal] tour lines for #${venue.id} failed: ${e.message}`); }
   }
   // Indoor places (2026-11-19): the same for their Season line.
-  if (venue.type === 'indoor' && ['open_months', 'hours', 'hours_seasons', 'closures'].some((f) => chosen.includes(f))) {
+  if (venue.type === 'indoor' && ['open_months', 'hours', 'hours_seasons', 'hours_holidays', 'closures'].some((f) => chosen.includes(f))) {
     try {
       const w = writeIndoorVisitRows(venue.id, now);
       if (w.before !== w.after) db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
@@ -65376,7 +65442,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
 // A signed-in owner's own facts go live at once; a new name, address, website or link still waits for review (they
 // change what the listing IS, and are the fields a wrong person would most want to change). An edit link alone stays
 // fully reviewed: a link can be forwarded or found in an old email, while a login is one person with a password.
-const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info', 'cafe_info', 'winery_info', 'tasting_fee', 'brewery_info', 'flight_fee', 'cocktail_price', 'tour_info', 'tour_price', 'indoor_info', 'indoor_price']);
+const OWNER_INSTANT_FIELDS = new Set(['hours', 'open_months', 'phone', 'description', 'badges', 'happy_hour', 'price_range', 'hours_seasons', 'hours_holidays', 'closures', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info', 'cafe_info', 'winery_info', 'tasting_fee', 'brewery_info', 'flight_fee', 'cocktail_price', 'tour_info', 'tour_price', 'indoor_info', 'indoor_price']);
 // Also live straight away from the edit link alone (2026-11-08): one whole-dollar number that carries no link, name or
 // address, so a forwarded link can't do harm with it; it is logged, shown in "Your updates" and has Undo.
 // "We don't have one" answers (2026-11-08) too: they carry no link or text and show nowhere public.
@@ -65405,7 +65471,7 @@ function ownerFieldInstantValue(field, value) { return !(field === 'tour_price' 
 // Phone (pub test 3, 2026-11-10) too: the old number stayed on the public "Call" button until someone reviewed the change.
 // Only a real North American number passes from the setup (ownerNanpPhone), and like every instant save it is logged with
 // the number it replaced, in "Your updates", with Undo.
-const OWNER_SETUP_LINK_INSTANT_FIELDS = new Set(['hours', 'open_months', 'hours_seasons', 'closures', 'badges', 'happy_hour', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info', 'cafe_info', 'winery_info', 'brewery_info', 'tour_info', 'indoor_info', 'phone']);
+const OWNER_SETUP_LINK_INSTANT_FIELDS = new Set(['hours', 'open_months', 'hours_seasons', 'hours_holidays', 'closures', 'badges', 'happy_hour', 'happy_hour_deals', 'specials', 'weekly_nights', 'pub_info', 'cafe_info', 'winery_info', 'brewery_info', 'tour_info', 'indoor_info', 'phone']);
 // More instant saves than this for one listing in a day, and the rest wait for review (a stolen login can't churn it).
 const OWNER_INSTANT_DAILY_LIMIT = 30;
 function ownerInstantCountToday(venueId) {
@@ -65415,6 +65481,7 @@ function ownerInstantCountToday(venueId) {
 function ownerFieldEquals(field, a, b) {
   if (field === 'hours' || field === 'happy_hour') return sameJsonWeek(a || null, b || null);
   if (field === 'hours_seasons' || field === 'closures') return JSON.stringify(a || []) === JSON.stringify(b || []);
+  if (field === 'hours_holidays') return !!a === !!b;
   if (field === 'happy_hour_deals') return sameHappyHourDeals(a || null, b || null);
   if (field === 'specials') return sameSpecials(a || null, b || null);
   if (field === 'weekly_nights') return sameWeeklyNights(a || null, b || null);
@@ -66535,7 +66602,7 @@ const OWNER_BADGE_LABELS_FR = { dog_friendly: 'Accepte les chiens', vegan: 'Vég
   great_groups: 'Idéal pour les groupes', happy_hour: '5 à 7', free_entry: 'Gratuit', arts_culture: 'Arts et culture' };
 const OWNER_FIELD_LABELS_FR = { hours: 'Heures', phone: 'Téléphone', website: 'Site Web', description: 'Description', description_fr: 'Description en français', badges: 'Caractéristiques', happy_hour: '5 à 7',
   name: 'Nom de l’entreprise', address: 'Adresse', menu_url: 'Lien du menu', booking_url: 'Lien de réservation', instagram_url: 'Instagram', facebook_url: 'Facebook', tiktok_url: 'TikTok', open_months: 'Saison',
-  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du 5 à 7', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite',
+  price_range: 'Gamme de prix', hours_seasons: 'Heures saisonnières', hours_holidays: 'Ouvert les jours fériés', closures: 'Fermetures spéciales', happy_hour_deals: 'Spéciaux du 5 à 7', specials: 'Spéciaux de la semaine', weekly_nights: 'Soirées de la semaine', avg_spend: 'Dépense moyenne par personne', not_offered: 'Ce que vous n’offrez pas', cuisine: 'Cuisine', hours_checked: 'Heures confirmées', visit_rows: 'Planifier la visite',
   pub_info: 'Cuisine, âge des clients et sports', cafe_info: 'Réponses sur votre café', cafe_links: 'Liens pour commander', winery_info: 'Réponses sur votre vignoble', tasting_fee: 'Prix de la dégustation', brewery_info: 'Réponses sur votre salle', flight_fee: 'Prix de la palette de dégustation', cocktail_price: 'Prix d’un cocktail', tour_info: 'Réponses sur vos activités', tour_price: 'Prix par personne', indoor_info: 'Vos réponses', indoor_price: 'Prix adulte' };
 // "We don't have one" answers in the owner's words, for "Your updates" (restaurants).
 const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['vegan, vegetarian or gluten-free options', 'd’options véganes, végétariennes ou sans gluten'], happy_hour: ['a happy hour', 'de 5 à 7'],
@@ -67541,7 +67608,7 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
   try { week = live.hours ? (typeof live.hours === 'string' ? JSON.parse(live.hours) : live.hours) : null; } catch (e) { week = null; }
   return portalCompleteness.renderCompleteness(portalCompleteness.scoreCompleteness(input, { today: todayLocal(), pending, liveFields: ownerCompletenessLiveFields(signedIn) }), {
     // Café test 4 (2026-11-11): the checklist without the percent and badge talk at the top of the edit page.
-    fr, canDecline: true, noScore: true, winery: venue.type === 'winery', brewery: brewSetupType(venue.type), distillery: venue.type === 'distillery', tour: venue.type === 'tour', indoor: venue.type === 'indoor', apptOnly: apptType(venue.type) && apptAnswers(venue.id, venue.type).visit === 'appointment',
+    fr, canDecline: true, noScore: true, winery: venue.type === 'winery', brewery: brewSetupType(venue.type), distillery: venue.type === 'distillery', tour: venue.type === 'tour', indoor: venue.type === 'indoor', indoorExact: venue.type === 'indoor' && indoorHelpExact(venue), apptOnly: apptType(venue.type) && apptAnswers(venue.id, venue.type).visit === 'appointment',
     menuHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/menu`, lang) : ownerPath(`/owner/account/venue/${venue.id}/menu`, lang),
     setupHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang),
     hoursText: input.hasHours && week && !pending.has('hours') ? portalCompleteness.hoursLine(week, fr) : '',
@@ -69759,7 +69826,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
   });
 })();
 </script>
-${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: completeOn ? venue.id : null, noHappyHour: !happyHourAllowed(venue), dropHappyHour: venue.type === 'tour' || venue.type === 'indoor', ...(venue.type === 'indoor' && INDOOR_SETUP_ON ? { extraTopics: indoorKindHelpTopics(INDOOR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')).map(indoorClosureWords), indoorHelpKinds(venue), indoorHelpPrice(venue)), dropTopics: INDOOR_HELP_DROP_TOPICS } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: cafeHelpTopics('edit').filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'tour' ? { extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')).map(tourYearlyBreakWords).concat([TOUR_THIRD_STRETCH_HELP_TOPIC, SETUP_OPEN_HOLIDAYS_HELP_TOPIC]) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
+${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: completeOn ? venue.id : null, noHappyHour: !happyHourAllowed(venue), dropHappyHour: venue.type === 'tour' || venue.type === 'indoor', ...(venue.type === 'indoor' && INDOOR_SETUP_ON ? { extraTopics: indoorKindHelpTopics(INDOOR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')).map(indoorClosureWords), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpExact(venue)), dropTopics: INDOOR_HELP_DROP_TOPICS } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: cafeHelpTopics('edit').filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'tour' ? { extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')).map(tourYearlyBreakWords).concat([TOUR_THIRD_STRETCH_HELP_TOPIC, SETUP_OPEN_HOLIDAYS_HELP_TOPIC]) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
 </body>
 </html>`;
 }

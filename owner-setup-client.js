@@ -880,7 +880,7 @@
   function tourPriceLead0(){ var n = S.tour.price; if (S.tour.free === 'donation' && T.tpriceLeadDonation) return T.tpriceLeadDonation;
     // Indoor test 3: a range typed ("$25 - $55") says what we'll show. Indoor test 4: every kind's lead is its own (kindWords).
     if (INDOOR && !S.tour.free && !S.tour.per && S.tour.range && n > 0 && T.tpriceRangeLead) return fill(T.tpriceRangeLead, { x: tourMoney(n) });
-    if (INDOOR && S.tour.per && !S.tour.free && T.tpriceLeadPer) return n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPer, { page: indoorPerPage(n), x: tourMoney(n), u: (T.iperWords || {})[S.tour.per] || S.tour.per }); return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n) }); }
+    if (INDOOR && S.tour.per && !S.tour.free && T.tpriceLeadPer) return n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPer, { page: indoorPerPage(n), x: tourMoney(n), u: (T.iperWords || {})[S.tour.per] || S.tour.per }); return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : INDOOR && C.indoorExact && T.tpriceLeadPickExact ? T.tpriceLeadPickExact : T.tpriceLeadPick, { x: tourMoney(n) }); }
   // "$16" / "16 $".
   function cpText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }
@@ -1008,6 +1008,9 @@
   function HO(){ if (seaIsStep(S.step)) { if (!S.sea.open) S.sea.open = {}; return S.sea.open; } return S.hoursOpen || (S.hoursOpen = {}); }
   // Closures: holidays are tiles, the rest are listed.
   var HOL = holidays();
+  // Indoor test 11 (2026-11-19; Kim, closed Sundays and Mondays, open on long-weekend Mondays): the usual week's own
+  // "Open on holidays" (stored hours_holidays), the same choice a stretch of other hours has.
+  S.mainHol = CUR.hours_holidays === true;
   // A stored closure is a holiday tile only when its note is that holiday's own name (or empty): a note the owner wrote
   // ("Staff party") stays a row of its own, so saving again never rewrites it.
   function holNote(key){ return String(T.holidays[key]).replace(/[()&<>]/g, ''); }
@@ -1814,7 +1817,7 @@
     // Tours (2026-11-16): the kinds, the town and the price as the card shows it ("From $129").
     // Indoor places (2026-11-19): the kinds, the town and the price as the card shows it ("Adults $25", "Free").
     if (C.indoor) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
-      + h([indoorKindsShort(TI.kinds) || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' && TI.per && T.tpriceCardPer ? fill(T.tpriceCardPer, { x: tourMoney(S.savedTourPrice), u: (T.iperWords || {})[TI.per] || TI.per }) : typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([indoorKindsShort(TI.kinds) || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' && TI.per && T.tpriceCardPer ? fill(T.tpriceCardPer, { x: tourMoney(S.savedTourPrice), u: (T.iperWords || {})[TI.per] || TI.per }) : typeof S.savedTourPrice === 'number' ? fill(C.indoorExact && T.tpriceCardExact ? T.tpriceCardExact : T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     if (C.tour) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([S.tourWords || C.tourWords || (TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? (T.tfreeCard || 'Free') : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     // Breweries (2026-11-12): the kind, the town and the flight price as the card shows it ("From $12").
@@ -2370,6 +2373,8 @@
         // Tour test 10 (Dayton approved): "Open on holidays" inside the stretch, one choice (stat holidays like Family Day and
         // Christmas week then show open with this stretch's weekend hours). Only when the stretch has a closed day.
         + (seas && T.seaHolidays && DAYS.some(function(d){ return !(wk[d] || []).length; }) ? '<div class="su-chips" role="group" aria-labelledby="suSeaHolH" style="margin:4px 0 10px"><p class="su-hint" id="suSeaHolH" style="width:100%;margin:0 0 4px">' + h(T.seaHolidaysQ) + '</p><button type="button" class="su-chip su-chip-wide" id="suSeaHol" aria-pressed="' + (S.sea.holidays ? 'true' : 'false') + '" data-act="seaHolidays">' + h(T.seaHolidays) + '</button></div>' : '')
+        // Indoor test 11 (Kim): the same "Open on holidays" on the usual week's screen, whenever a day is closed.
+        + (!seas && INDOOR && T.seaHolidays && DAYS.some(function(d){ return !(wk[d] || []).length; }) && DAYS.some(function(d){ return (wk[d] || []).length; }) ? '<div class="su-chips" role="group" aria-labelledby="suMainHolH" style="margin:4px 0 10px"><p class="su-hint" id="suMainHolH" style="width:100%;margin:0 0 4px">' + h(T.seaHolidaysQ) + '</p><button type="button" class="su-chip su-chip-wide" id="suMainHol" aria-pressed="' + (S.mainHol ? 'true' : 'false') + '" data-act="mainHolidays">' + h(T.seaHolidays) + '</button></div>' : '')
         // Tour test 12 (Whistler, 2026-11-18; Kayla: winter weekends only, weather permitting; Dayton approved): "Weather
         // permitting" inside the stretch, one choice (tours only): the planner, the status line and the hours block say so.
         + (seas && TOUR && T.seaWeather ? '<div class="su-chips" role="group" style="margin:4px 0 10px"><button type="button" class="su-chip su-chip-wide" id="suSeaWeather" aria-pressed="' + (S.sea.weather ? 'true' : 'false') + '" data-act="seaWeather">' + h(T.seaWeather) + '</button></div>' : '')
@@ -2416,7 +2421,13 @@
         + '<button type="button" class="su-more" data-act="go:closures:add">' + h(T.anotherDay) + '</button>'
         // Café test 4 (2026-11-11): "We're closed part of the year" is asked once, in Hours ("Are these your hours all
         // year?"). This screen only shows a saved open season, with Change.
-        + '<h2 class="su-h2" id="suHolQ">' + h(T.holidaysH) + '</h2><div class="su-tiles" role="group" aria-labelledby="suHolQ">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ var cov = holCovered(o); var wkc = !cov && S.closures.indexOf(o.key) < 0 && T.holClosedDay ? holWeekClosed(o) : ''; return '<button type="button" class="su-tile' + (cov || wkc ? ' su-covered' : '') + '" aria-pressed="' + (cov || S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"' + (cov ? ' disabled' : '') + (wkc ? ' disabled data-wkc="' + wkc + '"' : '') + '><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + (cov ? '<span class="su-tile-sub su-covered-note">' + h(!coveredBy(o.date) && T.holSeason ? T.holSeason : T.holCovered) + '</span>' : wkc ? '<span class="su-tile-sub su-covered-note">' + h(fill(T.holClosedDay, { day: longDay(wkc) })) + '</span>' : '') + '</button>'; }).join('') + '</div>'
+        + '<h2 class="su-h2" id="suHolQ">' + h(T.holidaysH) + '</h2><div class="su-tiles" role="group" aria-labelledby="suHolQ">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ var cov = holCovered(o); var wkc = !cov && S.closures.indexOf(o.key) < 0 && T.holClosedDay ? holWeekClosed(o) : '';
+          // Indoor test 11 (Kim): a holiday on a day she's usually closed is tappable: "Open this holiday" turns on Open on
+          // holidays (stored hours_holidays: every such holiday, as the hours screen's chip; there's no per-holiday store).
+          var hop2 = wkc && INDOOR && T.holOpenThis;
+          if (hop2) return '<button type="button" class="su-tile' + (S.mainHol ? '' : ' su-covered') + '" aria-pressed="' + (S.mainHol ? 'true' : 'false') + '" data-holopen="' + o.key + '"><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + '<span class="su-tile-sub su-covered-note">' + h(S.mainHol ? T.holOpenOn : fill(T.holClosedDay, { day: longDay(wkc) }) + ' · ' + T.holOpenThis) + '</span></button>';
+          return '<button type="button" class="su-tile' + (cov || wkc ? ' su-covered' : '') + '" aria-pressed="' + (cov || S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"' + (cov ? ' disabled' : '') + (wkc ? ' disabled data-wkc="' + wkc + '"' : '') + '><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + (cov ? '<span class="su-tile-sub su-covered-note">' + h(!coveredBy(o.date) && T.holSeason ? T.holSeason : T.holCovered) + '</span>' : wkc ? '<span class="su-tile-sub su-covered-note">' + h(fill(T.holClosedDay, { day: longDay(wkc) })) + '</span>' : '') + '</button>'; }).join('') + '</div>'
+        + (INDOOR && S.mainHol && T.holOpenNote ? '<p class="su-hint" id="suHolOpenNote">' + h(T.holOpenNote) + '</p>' : '')
         + (HOL.length > HOL_FEW ? '<button type="button" class="su-more" data-act="holAll">' + h(S.holAll ? T.holFewer : fill(T.holAll, { n: HOL.length })) + '</button>' : '')
         // Café test 1 (Whistler, 2026-11-15): a holiday tile is closed all day; an early close is a message to us.
         + (T.holEarly ? '<p class="su-hint" id="suHolEarly">' + h(T.holEarly) + '</p>' : '')
@@ -3342,6 +3353,8 @@
     if (!windowsOk(S.week)) { S.nudge = T.needOpenDay; return render(); }
     var week = {}; DAYS.forEach(function(d){ week[d] = S.week[d] || []; });
     var ch = { hours: week, hours_checked: true };
+    // Indoor test 11: the usual week's "Open on holidays", sent only when it changed.
+    if (INDOOR && !!S.mainHol !== (CUR.hours_holidays === true)) ch.hours_holidays = !!S.mainHol;
     // Seasonal hours not answered on this visit: left exactly as stored.
     if (S.seaTouched) {
       // Brewery test 1 (Whistler, 2026-11-15): one or two periods. A stored one not opened on this visit is sent back exactly
@@ -3396,6 +3409,7 @@
       // line points to Closures for a holiday break (no new step). Not when a yearly closure is already saved.
       if (C.indoor && T.seaClosuresHint && ch.hours_seasons && ch.hours_seasons.length && !(CUR.closures || []).some(function(c){ return c && c.yearly; })) S.savedLine.hours = T.savedLive + ' ' + T.seaClosuresHint;
       CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? week : JSON.stringify(week); S.seaStale = stale.length ? stale : null;
+      if ('hours_holidays' in ch) CUR.hours_holidays = ch.hours_holidays;
       if (tourApptOff) { delete AI.visit; S.wine.visit = ''; }
       tticksSaved(tkpH);
       if (wyNew) { S.savedWYear = wyNew; S.wine.year = wyNew; AI.year = wyNew; if (C.distillery) S.savedYear = wyNew; if (wyNew === 'appointment') AI.season = S.wine.season; else { delete AI.season; S.wine.season = null; } S.wYearPick = ''; }
@@ -3938,6 +3952,7 @@
     }
     if (k === 'yearSeasonAdd') { seaAddStart(); return go(seaStepOf(S.seaList.length - 1)); }
     // Tour test 10 (Dayton approved): "Open on holidays" inside the stretch on screen.
+    if (k === 'mainHolidays') { readTimes(); S.mainHol = !S.mainHol; S.dirty = 'hours'; mark(); var my = window.scrollY; render(); window.scrollTo(0, my); var mb = el('suMainHol'); if (mb) mb.focus(); return; }
     if (k === 'seaHolidays') { readTimes(); S.sea.holidays = !S.sea.holidays; S.sea.dirty = true; S.seaTouched = true; S.dirty = 'hours'; mark(); var hy = window.scrollY; render(); window.scrollTo(0, hy); var hb = el('suSeaHol'); if (hb) hb.focus(); return; }
     if (k === 'seaWeather') { readTimes(); S.sea.weather = !S.sea.weather; S.sea.dirty = true; S.seaTouched = true; S.dirty = 'hours'; mark(); var wy = window.scrollY; render(); window.scrollTo(0, wy); var wb = el('suSeaWeather'); if (wb) wb.focus(); return; }
     if (k === 'hoursSaveAdd') { S.seaAddNext = true; hoursSave(); S.seaAddNext = false; return; }
@@ -4817,6 +4832,8 @@
       mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-same]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-same'), i = DAYS.indexOf(d), wk = W(); wk[d] = clone(wk[DAYS[i - 1]]); render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-yearly]'), function(b){ b.onchange = function(){ var k = b.getAttribute('data-yearly'); S.everyYear[k] = !yearlyOn(k); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+    // Indoor test 11: "Open this holiday" saves Open on holidays straight away (one choice for every such holiday).
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-holopen]'), function(b){ b.onclick = function(){ if (S.busy) return; var on = !S.mainHol; S.busy = true; change({ hours_holidays: on }).then(function(st){ S.busy = false; if (st) { S.mainHol = on; CUR.hours_holidays = on; } var y = window.scrollY; render(); window.scrollTo(0, y); var nb = screen.querySelector('[data-holopen="' + b.getAttribute('data-holopen') + '"]'); if (nb) nb.focus(); }); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-hol]'), function(b){ b.onclick = function(){ if (b.disabled) return; var k = b.getAttribute('data-hol'), i = S.closures.indexOf(k); if (i >= 0) S.closures.splice(i, 1); else S.closures.push(k); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     var cfIn = el('suCf'); if (cfIn) cfIn.oninput = cfIn.onchange = function(){ S.addFrom = cfIn.value; var ce = el('suCends'); if (ce) ce.textContent = closeEnds(cfIn.value); };
     var cyIn = el('suCyear'); if (cyIn) cyIn.onchange = function(){ S.addYearly = cyIn.checked; };

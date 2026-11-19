@@ -1299,6 +1299,9 @@ CREATE TABLE IF NOT EXISTS venue_hours_extra (
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
 `);
+// Indoor test 11 (2026-11-19; Kim, a science centre closed Sundays and Mondays but open on long-weekend Mondays): the usual
+// week's own "Open on holidays" (the same choice a stretch of other hours stores as holidays: true). 1 = on.
+if (!db.prepare('PRAGMA table_info(venue_hours_extra)').all().some((c) => c.name === 'holidays')) db.exec('ALTER TABLE venue_hours_extra ADD COLUMN holidays INTEGER');
 
 // Plan your visit (2026-10-29): what a visitor needs before driving out, from the venue's own site -- for a winery its
 // tastings (price, booking), extras, group rule, on-site restaurant and winter hours. info: canonical JSON

@@ -118,6 +118,8 @@ function parseHours(raw) {
       .map((x) => ({ from: x.from, to: x.to || x.from, note: typeof x.note === 'string' ? x.note : '', ...(x.yearly === true ? { yearly: true } : {}) }));
     if (closures.length) out.closures = closures;
   }
+  // Indoor test 11 (2026-11-19): the usual week's own "Open on holidays" (server.js hoursWithExtras, venue_hours_extra.holidays).
+  if (obj._holidays === true) out.holidays = true;
   return out;
 }
 
@@ -257,12 +259,14 @@ function dayOnDate(parsed, date) {
   if (parsed.gate && gateClosedOn(parsed.gate, date)) return { status: 'closed', closure: { from: date, to: date, note: '' }, placeClosed: true };
   const s = seasonOn(parsed, date);
   if (s && s.holidays && s.days[wd] && s.days[wd].status === 'closed' && holidayOn(date)) { var hd = holidayDayOf(s.days); if (hd) return { status: 'open', ranges: hd.ranges, holiday: true }; }
+  // Indoor test 11: outside a stretch, the usual week's own "Open on holidays" does the same with the usual week.
+  if (!s && parsed.holidays && parsed.days[wd] && parsed.days[wd].status === 'closed' && holidayOn(date)) { var hu = holidayDayOf(parsed.days); if (hu) return { status: 'open', ranges: hu.ranges, holiday: true }; }
   return s ? s.days[wd] : parsed.days[wd];
 }
 // The week as it really runs from `clock.date`: today and the next five days by date, and yesterday (for a night
 // that runs past midnight) in the seventh weekday slot. Without a date, or with nothing extra, it is `parsed`.
 function hoursForClock(parsed, clock) {
-  if (!parsed || !(parsed.seasons || parsed.closures || parsed.gate) || !clock || !/^\d{4}-\d{2}-\d{2}$/.test(clock.date || '')) return parsed;
+  if (!parsed || !(parsed.seasons || parsed.closures || parsed.gate || parsed.holidays) || !clock || !/^\d{4}-\d{2}-\d{2}$/.test(clock.date || '')) return parsed;
   const days = {};
   for (let off = -1; off <= 5; off++) {
     const d = shiftDate(clock.date, off);

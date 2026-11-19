@@ -1734,6 +1734,11 @@ en.brewery.kindDistillery.tapWords = tapWordsEn('cocktail list'); fr.brewery.kin
 en.stillAdd = 'You can still add'; fr.stillAdd = 'Vous pouvez encore ajouter';
 // A holiday that is always on a weekday the place is closed (Family Day for a place closed Mondays).
 en.holClosedDay = 'You’re closed {day}s'; fr.holClosedDay = 'Vous êtes fermé le {day}';
+// Indoor test 11 (2026-11-19; Kim, open on long-weekend Mondays): a holiday on a day she's usually closed can be opened.
+en.holOpenThis = 'Open this holiday'; fr.holOpenThis = 'Ouvrir ce jour férié';
+en.holOpenOn = 'Open (Open on holidays is on)'; fr.holOpenOn = 'Ouvert (Ouvert les jours fériés est activé)';
+en.holOpenNote = 'Open on holidays is on: stat holidays and Christmas week days you’re usually closed show open, with your weekend hours. Closed on one, like Christmas Day? Tap it above. Tap an open holiday to turn this off.';
+fr.holOpenNote = 'Ouvert les jours fériés est activé : les jours fériés et les jours de la semaine de Noël où vous êtes habituellement fermé s’affichent ouverts, avec vos heures de fin de semaine. Fermé l’un d’eux, comme Noël? Touchez-le ci-dessus. Touchez un jour férié ouvert pour désactiver.';
 // Tour test 5 (Whistler, 2026-11-17): the box is no longer selected on its first tap (one tap and typing wiped Rob's
 // description): typing adds to the end, and replacing it is the link under the hint (or the ✕).
 en.storyResearchHint = 'This is what your page says now. Typing adds to the end of it.';
@@ -2636,7 +2641,12 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
       T.kindText[k] = {
         tpriceLabel: w.price.label, tpricePh: w.price.ph, tpriceLead: w.price.lead,
         tpriceLeadPick: fr2 ? `Votre page indiquera « ${line} ».` : `Your page will say “${line}”.`,
-        tpriceCard: line, tpriceRangeLead: fr2 ? `Nous indiquerons « ${line} », votre prix le plus bas.` : `We’ll show “${line}”, your lowest price.`,
+        // Indoor test 11 (2026-11-19; Kim: "Admission from $12" on the price screen and the finish preview while her page said
+        // "Adult admission $12"): the page's own words, "Adult admission $12" once her typed prices list a lower one
+        // (C.indoorExact), else "Admission $12".
+        tpriceCard: line.replace(/ from \{x\}$/, ' {x}').replace(/ à partir de \{x\}$/, ' {x}'), tpriceCardExact: `${w.price.exact} {x}`,
+        tpriceLeadPickExact: fr2 ? `Votre page indiquera « ${w.price.exact} {x} ».` : `Your page will say “${w.price.exact} {x}”.`,
+        tpriceRangeLead: fr2 ? `Nous indiquerons « ${line} », votre prix le plus bas.` : `We’ll show “${line}”, your lowest price.`,
         menuLead: w.prices.lead, menuTypeSub: w.prices.typeSub, pricesNoun: w.prices.noun, pricesPage: w.prices.page,
         webLeadTickets: fr2 ? `Nous avons inscrit votre ${w.prices.noun}. Si vos prix sont sur une autre page, changez-la.` : `We filled in your ${w.prices.noun}. If your prices are on another page, change it.`,
         groupsLead: w.groups.lead, groupsEx: w.groups.ex, quick: { groups: w.groups.chips },

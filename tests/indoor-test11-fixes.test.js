@@ -1,0 +1,112 @@
+// Indoor test 11 (2026-11-19; Kim, staff at a non-profit science centre in Vernon: hands-on exhibits, a planetarium, live
+// animals, Science Saturdays demos at 11 and 2; adult $12, child $9, family $38; open Tuesday to Saturday, daily in July and
+// August and on long-weekend Mondays). Each fix from her report, checked with the real setup page script and real taps
+// (tests/setup-sim.js), Build My Trip, search and the public pages. Her Help questions are in the Help matrix
+// (tests/indoor-help-matrix.test.js); the name-word requests of every kind in tests/indoor-planner-matrix.test.js.
+// Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const fs = require('node:fs');
+const http = require('node:http');
+
+const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
+for (const s of ['', '-wal', '-shm', '-journal']) { try { fs.unlinkSync(DB_FILE + s); } catch (e) { /* not there */ } }
+process.env.ENRICHMENT_ADMIN_TOKEN = 'indoor-test11-admin-token';
+process.env.TRIP_PLANNER_V3 = 'on';
+process.env.DISCOVERY_SEARCH = 'on';
+delete process.env.BREVO_API_KEY;
+delete process.env.BADGE_REMINDERS;
+const app = require('../server.js');
+const db = require('../db.js');
+const { openSetup } = require('./setup-sim.js');
+app.setVenueSubmissionTransport(async () => {});
+if (app.setOwnerEmailTransport) app.setOwnerEmailTransport(async () => {});
+
+const HOURS = JSON.stringify({ mon: null, tue: [['10:00', '17:00']], wed: [['10:00', '17:00']], thu: [['10:00', '17:00']], fri: [['10:00', '17:00']], sat: [['10:00', '17:00']], sun: null });
+const STORY = 'The Okanagan Science Centre is a hands-on science centre in Polson Park with rotating interactive exhibits, planetarium shows and live animals.';
+let n = 0;
+const mk = (o = {}) => app.createVenue({ name: `Indoor T11 Fixture ${++n}`, slug: `indoor-t11-${n}`, region: 'vernon', type: 'indoor', latitude: 50.2608 + n / 3000, longitude: -119.2702,
+  address: `${2700 + n} Hwy 6, Vernon, BC`, phone: '250-555-0136', website: 'https://example.com', hours: HOURS, description: 'A fixture used only by the indoor test 11 checks.', ...o });
+const tokenFor = (id) => app.createOwnerLink(id, { reset: true }).url.split('/owner/')[1];
+let srv, base, ipN = 0;
+test.before(async () => { srv = http.createServer(app.server.listeners('request')[0]); await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`; });
+test.after(() => srv && srv.close());
+const postJson = (p, body) => fetch(base + p, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.84.${Math.floor(++ipN / 250)}.${ipN % 250 + 1}` }, body: JSON.stringify(body) })
+  .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})) }));
+const change = (t, changes) => postJson(`/owner/${t}/changes?from=setup`, { changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 });
+const ok = async (p) => { const r = await p; assert.ok(r.status === 200 || r.status === 201, JSON.stringify(r.body)); return r; };
+const NOW = new Date('2026-11-19T12:00:00-08:00');
+const plain = (h) => String(h).replace(/<svg[\s\S]*?<\/svg>/g, '').replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&middot;/g, '·').replace(/&amp;/g, '&').replace(/&#39;|&rsquo;/g, '’').replace(/\s+/g, ' ');
+const pageHtml = (v, lang = 'en', now = NOW) => app.renderVenuePage(app.getVenue(v.id), [], [], [], { lang, now });
+const itemsOf = (p) => [...((p.outing && p.outing.stops) || []), ...((p.itinerary && p.itinerary.stops) || []), ...(p.days || []).flatMap((d) => d.stops || []), ...(p.recommendations || [])].filter((x) => x && x.venue);
+const holidaysOf = (id) => { const r = db.prepare('SELECT holidays FROM venue_hours_extra WHERE venue_id = ?').get(id); return !!(r && r.holidays); };
+
+// Kim's place: her story, her answers.
+const kim = async (o = {}, info = {}) => {
+  const v = mk({ name: `Okanagan Science Centre T11 ${n + 1}`, cuisine: 'Museum', description: STORY, kid_friendly: 1, ...o });
+  const t = tokenFor(v.id);
+  await ok(change(t, { indoor_info: { kinds: ['museum'], length: '1-2h', book: 'no', age: 'all', year: 'all', ...info }, indoor_price: 12 }));
+  return { v, t };
+};
+const FAMILY_DAY = new Date('2027-02-15T12:00:00-08:00');
+
+test('1. Long-weekend Mondays: "Open on holidays" on the usual hours screen (a day is closed), saved as hours_holidays; Family Day shows open on the page and in Build My Trip', async () => {
+  const { v, t } = await kim();
+  // Before: closed on Family Day.
+  assert.match(plain(pageHtml(v, 'en', FAMILY_DAY)), /Closed/);
+  const g = await openSetup(base, t, { hash: 'hours:edit' });
+  assert.ok(g.has('#suMainHol'), g.text().slice(0, 400));
+  assert.match(g.text(), /Open on a holiday that falls on a closed day\? Open on holidays \(stat holidays and Christmas week\)/);
+  await g.click('mainHolidays');
+  assert.equal(g.doc.getElementById('suMainHol').getAttribute('aria-pressed'), 'true');
+  await g.click('hoursNext');
+  await g.click('yearAll');
+  assert.equal(holidaysOf(v.id), true);
+  // The status line on Family Day (a Monday): open, with her Saturday hours. A usual Monday stays closed.
+  const fam = plain(pageHtml(v, 'en', FAMILY_DAY));
+  assert.match(fam, /Open now|Open ·|Open until|Closes 5/i);
+  assert.doesNotMatch(fam.slice(0, fam.indexOf('Hours') > 0 ? fam.indexOf('Hours') : 400), /Closed today/);
+  const usual = app.venueOpenOn ? null : null; void usual;
+  const wk = JSON.parse(app.weekJsonOn(app.getVenue(v.id), '2027-02-15'));
+  assert.deepEqual(wk.mon, [['10:00', '17:00']]);
+  assert.equal(JSON.parse(app.weekJsonOn(app.getVenue(v.id), '2027-02-22')).mon, null);
+  // Build My Trip on Family Day plans her.
+  const p = app.runTripPlan({ text: 'science centre in Vernon on Family Day' }, NOW);
+  assert.ok(itemsOf(p).some((x) => x.venue.id === v.id), JSON.stringify(itemsOf(p).map((x) => x.venue.name)));
+  // Turning it off again.
+  const g2 = await openSetup(base, t, { hash: 'hours:edit' });
+  assert.equal(g2.doc.getElementById('suMainHol').getAttribute('aria-pressed'), 'true');
+  await ok(change(t, { hours_holidays: false }));
+  assert.equal(holidaysOf(v.id), false);
+  // Open every day: no choice to make.
+  const { t: t2 } = await kim();
+  await ok(change(t2, { hours: { mon: [['10:00', '17:00']], tue: [['10:00', '17:00']], wed: [['10:00', '17:00']], thu: [['10:00', '17:00']], fri: [['10:00', '17:00']], sat: [['10:00', '17:00']], sun: [['10:00', '17:00']] } }));
+  const g3 = await openSetup(base, t2, { hash: 'hours:edit' });
+  assert.ok(!g3.has('#suMainHol'));
+});
+
+test('1b. Closures: a holiday on a closed Monday is tappable as "Open this holiday" (turns on Open on holidays for all, saved straight away), EN + FR', async () => {
+  const { v, t } = await kim();
+  const g = await openSetup(base, t, { hash: 'closures' });
+  if (g.has('[data-act="holAll"]')) await g.click('holAll');
+  assert.ok(g.has('[data-holopen="family"]'), g.text().slice(0, 600));
+  assert.match(g.text(), /You’re closed Mondays · Open this holiday/);
+  await g.click('[data-holopen="family"]');
+  assert.equal(holidaysOf(v.id), true);
+  assert.match(g.text(), /Open \(Open on holidays is on\)/);
+  assert.match(g.text(), /Open on holidays is on: stat holidays and Christmas week days you’re usually closed show open/);
+  // Christmas Day stays a closure tile: a closure always wins.
+  assert.ok(g.has('[data-hol="xmas"]'));
+  await g.click('[data-hol="xmas"]');
+  await g.click('closuresSave');
+  assert.equal(app.weekJsonOn(app.getVenue(v.id), '2026-12-25') !== null, true);
+  const f = await openSetup(base, t, { hash: 'closures', lang: 'fr' });
+  if (f.has('[data-act="holAll"]')) await f.click('holAll');
+  assert.match(f.text(), /Ouvert \(Ouvert les jours fériés est activé\)/);
+  // Tapping an open one turns it off.
+  await f.click('[data-holopen="family"]');
+  assert.equal(holidaysOf(v.id), false);
+  assert.match(f.text(), /Ouvrir ce jour férié/);
+});
