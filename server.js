@@ -24243,8 +24243,20 @@ function venueIndoorInfo(venueId) {
   return venueIndoorInfoCache.get(Number(venueId)) || {};
 }
 // "Escape room", "Museum & art gallery", "Arcade, VR & laser tag, bowling & escape room" (the owner's tap order).
-function indoorKindsText(kinds, fr = false) {
-  const l = (kinds || []).filter((k, i, a) => INDOOR_KIND_WORDS[k] && a.indexOf(k) === i).map((k) => INDOOR_KIND_WORDS[k][fr ? 1 : 0]);
+// Indoor test 8 (2026-11-19; Gary's bowling centre with an arcade corner read "Bowling · arcade, VR & laser tag" on his card
+// and page): when games is not the main kind, it says "arcade", unless the place's own words (its name, story or Known for)
+// say VR, laser tag or karting.
+const INDOOR_GAMES_FULL_RE = /\b(?:vr|virtual reality|laser[- ]?tag|go[- ]?karts?|karting|r[ée]alit[ée] virtuelle)\b/i;
+const INDOOR_GAMES_SHORT = ['Arcade', 'Arcade'];
+function indoorOwnWords(venueId) {
+  try {
+    const v = db.prepare('SELECT name, description FROM venues WHERE id = ?').get(venueId) || {};
+    const kf = ((venueVisitInfo(venueId) || {}).rows || []).filter((r) => r && /^known for$/i.test(r.label || '')).map((r) => r.text).join(' ');
+    return `${v.name || ''} ${v.description || ''} ${kf}`;
+  } catch (e) { return ''; }
+}
+function indoorKindsText(kinds, fr = false, own = null) {
+  const l = (kinds || []).filter((k, i, a) => INDOOR_KIND_WORDS[k] && a.indexOf(k) === i).map((k, i) => (k === 'games' && i > 0 && own != null && !INDOOR_GAMES_FULL_RE.test(own) ? INDOOR_GAMES_SHORT : INDOOR_KIND_WORDS[k])[fr ? 1 : 0]);
   if (!l.length) return '';
   const lower = (x, i) => (i && !/^(?:VR|SUP)\b/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x);
   const ll = l.map(lower);
@@ -24256,10 +24268,12 @@ function indoorCuisineFr(text) {
   if (!indoorCuisineFrMap) {
     indoorCuisineFrMap = new Map();
     try {
-      for (const r of db.prepare("SELECT v.cuisine AS c, t.info AS info FROM venue_indoor_info t JOIN venues v ON v.id = t.venue_id WHERE v.type = 'indoor' AND v.cuisine IS NOT NULL AND v.cuisine != ''").all()) {
+      for (const r of db.prepare("SELECT v.id AS id, v.cuisine AS c, t.info AS info FROM venue_indoor_info t JOIN venues v ON v.id = t.venue_id WHERE v.type = 'indoor' AND v.cuisine IS NOT NULL AND v.cuisine != ''").all()) {
         let o = null; try { o = JSON.parse(r.info); } catch (e) { o = null; }
         const en = o && Array.isArray(o.kinds) ? indoorKindsText(o.kinds) : '';
         if (en && en === r.c) indoorCuisineFrMap.set(String(r.c), indoorKindsText(o.kinds, true));
+        // Indoor test 8: "Bowling & arcade" (games second, no VR words of its own).
+        else if (o && Array.isArray(o.kinds) && o.kinds.indexOf('games') > 0) { const own = indoorOwnWords(r.id); if (indoorKindsText(o.kinds, false, own) === r.c) indoorCuisineFrMap.set(String(r.c), indoorKindsText(o.kinds, true, own)); }
       }
     } catch (e) { /* no table yet */ }
   }
@@ -24275,7 +24289,7 @@ function writeVenueIndoorInfo(venueId, info) {
   if (TOUR_FREE_WORDS.includes(clean.free)) clean.price = 0; else { delete clean.free; if (!(clean.price > 0)) delete clean.price; }
   let v = null; try { v = db.prepare('SELECT cuisine FROM venues WHERE id = ?').get(venueId); } catch (e) { v = null; }
   const was0 = 'cuisine_was' in cur ? cur.cuisine_was : (v && v.cuisine != null ? String(v.cuisine) : '');
-  const words = indoorKindsText(clean.kinds);
+  const words = indoorKindsText(clean.kinds, false, indoorOwnWords(venueId));
   if (v && words) {
     clean.cuisine_was = was0;
     if ((v.cuisine || '') !== words) db.prepare('UPDATE venues SET cuisine = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(words, venueId);
@@ -58341,6 +58355,8 @@ function renderOwnerSetupPage(found, opts) {
       indoorKinds: INDOOR_KINDS_SHOWN.map((k) => ({ k, t: INDOOR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), indoorKindsTop: INDOOR_KINDS_TOP,
       // Indoor test 2: the card's short words for each kind, for the preview ("Escape room · arcade, VR & laser tag").
       indoorKindWords: Object.fromEntries(Object.entries(INDOOR_KIND_WORDS).map(([k, w]) => [k, w[fr ? 1 : 0]])),
+      // Indoor test 8: games after the main kind reads "arcade" unless his own words say VR, laser tag or karting.
+      indoorGamesShort: INDOOR_GAMES_FULL_RE.test(indoorOwnWords(venue.id)) ? '' : INDOOR_GAMES_SHORT[fr ? 1 : 0],
       kindLength: INDOOR_KIND_LENGTH, kindBook: INDOOR_KIND_BOOK, kindAge: INDOOR_KIND_AGE, artsKinds: INDOOR_ARTS_KINDS, artsAuto: !!venueIndoorInfo(venue.id).arts_auto,
       suggestKinds: (snap.indoor_info || {}).kinds ? [] : indoorKindSuggestion(venue),
       researchFee: indoorResearchPrice(venue), researchFree: (!!venue.free_entry || indoorResearchDonation(venue)) && snap.indoor_price == null, researchDonation: indoorResearchDonation(venue),

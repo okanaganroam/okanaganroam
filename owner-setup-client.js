@@ -840,7 +840,7 @@
   // Indoor test 2 (2026-11-19): the card's short words for the kinds ("Escape room · arcade, VR & laser tag"), as the server
   // writes them (server.js indoorKindsText), for the preview.
   function indoorKindsShort(ks){
-    var l = (ks || []).filter(function(k, i, a){ return (C.indoorKindWords || {})[k] && a.indexOf(k) === i; }).map(function(k){ return C.indoorKindWords[k]; });
+    var l = (ks || []).filter(function(k, i, a){ return (C.indoorKindWords || {})[k] && a.indexOf(k) === i; }).map(function(k, i){ return k === 'games' && i > 0 && C.indoorGamesShort ? C.indoorGamesShort : C.indoorKindWords[k]; });
     if (!l.length) return '';
     var ll = l.map(function(x, i){ return i && !/^(?:VR|SUP)\b/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x; });
     if (ll.length > 1 && ll.some(function(x){ return /&|,| et /.test(x); })) return ll.join(' · ');

@@ -103,3 +103,28 @@ test('2b. Good to know: research text plus chips over the limit trims research, 
   for (const c of chipEls.slice(0, 3)) assert.ok(val.includes(c.getAttribute('data-quick')), `${c.getAttribute('data-quick')} kept: ${val}`);
   assert.ok(val.length <= max, `${val.length} > ${max}: ${val}`);
 });
+
+test('3. Games as a second kind says "arcade" (card, page, preview, EN + FR) unless his own words say VR, laser tag or karting', async () => {
+  const { v, t } = await gary();
+  await ok(change(t, { indoor_info: { kinds: ['bowling', 'games'], length: '1-2h', book: 'busy', age: 'all' } }));
+  assert.equal(app.getVenue(v.id).cuisine, 'Bowling & arcade');
+  const en = plain(pageHtml(v)), fr = plain(pageHtml(v, 'fr'));
+  assert.ok(en.includes('Bowling & arcade'), 'EN page');
+  assert.doesNotMatch(en, /VR & laser tag/);
+  assert.ok(fr.includes('Quilles et arcade'), 'FR page');
+  assert.doesNotMatch(fr, /réalité virtuelle et laser tag/);
+  // The card (the cards data the lists use).
+  const card = plain(await fetch(`${base}/indoor`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text()));
+  assert.doesNotMatch(card, new RegExp(`${v.name}[^|]{0,80}VR & laser tag`));
+  // The setup's preview words.
+  const g = await openSetup(base, t, { hash: 'more' });
+  assert.equal(g.cfg.indoorGamesShort, 'Arcade');
+  // His own words say laser tag: the full words.
+  const { v: v2, t: t2 } = await gary({ name: 'Lanes & Laser Tag T8', description: 'Bowling with a laser tag arena.' });
+  await ok(change(t2, { indoor_info: { kinds: ['bowling', 'games'], length: '1-2h' } }));
+  assert.equal(app.getVenue(v2.id).cuisine, 'Bowling · arcade, VR & laser tag');
+  // Games as the main kind keeps its own words.
+  const { v: v3, t: t3 } = await gary({ name: 'Arcade Hall T8' });
+  await ok(change(t3, { indoor_info: { kinds: ['games'], length: '1-2h' } }));
+  assert.equal(app.getVenue(v3.id).cuisine, 'Arcade, VR & laser tag');
+});
