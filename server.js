@@ -23266,6 +23266,17 @@ function tourMoney(n, fr) {
   return fr ? `${String(t).replace('.', ',').replace(/\s/g, ' ')} $` : `$${t}`;
 }
 // The season the Hours step stored (open_months), as { from, to } 'MM-DD', or null.
+// Tour test 15: with two open stretches (a closed break between), whether today is in the break just before the stretch
+// that opens on the snow (os.from). -> true / false, or null with one stretch (the note's own rule then).
+function tourSnowNoteOn(venueId, os, today) {
+  let list = null; try { list = openSeasonStretches(venueId, (venueLinks(venueId) || {}).open_months); } catch (e) { list = null; }
+  if (!list || list.length < 2 || !os) return null;
+  const i = list.findIndex((r) => r.from === os.from);
+  if (i < 0) return null;
+  const prev = list[(i - 1 + list.length) % list.length];
+  // The break runs from the day after prev.to to the day before os.from (it may wrap the new year).
+  return prev.to <= os.from ? today > prev.to && today < os.from : today > prev.to || today < os.from;
+}
 function tourOpenSeason(venueId) {
   const om = String((venueLinks(venueId) || {}).open_months || '');
   const m = /^(\d{1,2})-(\d{1,2})$/.exec(om), x = /^(\d{2}-\d{2}):(\d{2}-\d{2})$/.exec(om);
@@ -39707,8 +39718,11 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const when = os ? tourSnowWhen(os.from, fr) : '';
     if (when) {
       const out = os.from <= os.to ? (today < os.from || today > os.to) : (today < os.from && today > os.to);
-      const sl = `<p class="venue-hours-snow">${escapeHtml(out ? L(`Reopens ${when}${TOUR_SNOW_WORDS.en}.`, `Rouvre ${when}${TOUR_SNOW_WORDS.fr}.`) : L(`Opening day depends on snow (usually ${when}).`, `La date d’ouverture dépend de l’enneigement (habituellement ${when}).`))}</p>`;
-      hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${sl}`) : `<h2>${L('Hours', 'Heures')}</h2>${sl}`;
+      // Tour test 15 (Whistler, 2026-11-18; Dave: summer June 15 – September 5, winter from December 15 snow permitting):
+      // with two stretches, the note is only for the break before the snow opening (never in summer or the spring break).
+      const gapOk = tourSnowNoteOn(venue.id, os, today);
+      const sl = gapOk === false ? '' : `<p class="venue-hours-snow">${escapeHtml(out ? L(`Reopens ${when}${TOUR_SNOW_WORDS.en}.`, `Rouvre ${when}${TOUR_SNOW_WORDS.fr}.`) : L(`Opening day depends on snow (usually ${when}).`, `La date d’ouverture dépend de l’enneigement (habituellement ${when}).`))}</p>`;
+      if (sl) hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${sl}`) : `<h2>${L('Hours', 'Heures')}</h2>${sl}`;
     }
   }
   // Winery test 1 (2026-11-12): the off-season answer under the hours, from the owner's walk-in dates
@@ -39965,6 +39979,16 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // notice shown ahead of time ("Closed Dec 25–26, reopens Dec 27.") sits near the top on the days it applies.
   const venueAdvisoryNote = venue.redirect_to ? undefined : getAdvisoryNotes(opts.now || new Date()).get(venue.id);
   let venueAdvisoryHtml = venueAdvisoryNote !== undefined ? `\n  ${fr ? advisoryNoticeHtml(venueAdvisoryNote, frAdvisoryText).replace(/Check before you go/g, '\u00c0 v\u00e9rifier avant d\u2019y aller').replace('Official source: ', 'Source officielle : ').replace('Official source', 'Source officielle') : advisoryNoticeHtml(venueAdvisoryNote)}` : '';
+  // Tour test 15 (Whistler, 2026-11-18; Dave): an opening day that depends on snow reads the same in the notice as in the
+  // hours: "Closed for the season. Reopens mid-December (snow permitting)." (it said "Reopens December 15.").
+  if (venue.type === 'tour' && venueAdvisoryHtml && tourSnowOpenSafe(venue.id)) {
+    const os = tourOpenSeason(venue.id), when = os ? tourSnowWhen(os.from, fr) : '';
+    const said = /^Closed for the season\. Reopens ([A-Z][a-z]+) (\d{1,2})(?:, \d{4})?\./.exec(parseAdvisoryNote(venueAdvisoryNote).text || '');
+    if (when && said && MONTH_LONG.indexOf(said[1]) + 1 === Number(os.from.slice(0, 2)) && Number(said[2]) === Number(os.from.slice(3))) {
+      const t = fr ? `Fermé pour la saison. Rouvre ${when}${TOUR_SNOW_WORDS.fr}.` : `Closed for the season. Reopens ${when}${TOUR_SNOW_WORDS.en}.`;
+      venueAdvisoryHtml = venueAdvisoryHtml.replace(/(<p class="venue-advisory-text">)[^<]*(<\/p>)/, (m, a, b) => `${a}${escapeHtml(t)}${b}`);
+    }
+  }
   // Golf-only "At a glance" card ('' for every other category, and for a
   // golf venue with no curated facts, so their markup is unchanged).
   const golfGlanceHtml = golfAtAGlanceHtml(venue, fr);
