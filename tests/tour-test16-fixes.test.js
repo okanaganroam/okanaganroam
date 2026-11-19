@@ -402,3 +402,13 @@ test('17. (was tour tests 4 and 15, source-only) Price screen: "free" typed in t
   assert.match(sr.text(), /Kids’ prices, other trips and per-boat rentals go in “Your tours and prices”/);
   assert.doesNotMatch(sim.text(), /per-boat rentals/);
 });
+
+test('18. Departure times: the hours screen and Help both say "in Your tours and prices" (EN + FR)', async () => {
+  const text = require('../owner-setup-text.js');
+  assert.match(text.en.tour.departHint, /list the departure times in Your tours and prices\.$/);
+  assert.match(text.fr.tour.departHint, /nommez les heures de départ dans Vos sorties et tarifs\.$/);
+  const { t } = await tom();
+  const cfg = JSON.parse(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(await fetch(`${base}/owner/${t}/setup`).then((r) => r.text()))[1]);
+  for (const id of ['tour-times', 'hours']) assert.match(cfg.topics.find((x) => x.id === id).a, /Your tours and prices/, id);
+  for (const x of cfg.topics) assert.doesNotMatch(x.a || '', /departure times in your story/i, x.id);
+});
