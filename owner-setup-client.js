@@ -1518,7 +1518,9 @@
   function groupsSizeLine(n){ return n === 21 && T.groupsLineBig ? (S.groupsBooked && T.groupsLineBigBooked ? T.groupsLineBigBooked : T.groupsLineBig) : fill(T.groupsLine, { n: n }); }
   function groupsFact(x){ return !isSizeLine(x) && (/\d/.test(x) || /\b(?:private|room|rooms|buyouts?|patio|semi|lounge|section|salle|privée?s?|privatis\w*|terrasse|mezzanine|loft)/i.test(x)); }
   // The facts of a line to keep under a new size line or quick answer, without what the chip itself says.
-  function groupsKeep(v, t, sibs){ return sentencesOf(v).filter(function(x){ return groupsFact(x) && !(t && (has(x, t) || saysIt(x, t, sibs))); }); }
+  // Indoor test 2 (2026-11-19; Jordan typed "Corporate team building and birthday parties", tapped 10+, and lost his words):
+  // a size chip (no t) keeps every sentence but an older size line; only a quick answer drops what it says itself.
+  function groupsKeep(v, t, sibs){ if (!t) return sentencesOf(v).filter(function(x){ return !isSizeLine(x); }); return sentencesOf(v).filter(function(x){ return groupsFact(x) && !(has(x, t) || saysIt(x, t, sibs)); }); }
   // Cocktail test 2 (2026-11-13): in the French setup, a line filled in from the page that is in English ("Groups
   // welcome", "Recommended for dinner") says so, like the story box: « Ce texte est en anglais… ».
   // Pub test 2 (Whistler, 2026-11-14): without "or tap a quick answer" on a screen that has none (noQuick).

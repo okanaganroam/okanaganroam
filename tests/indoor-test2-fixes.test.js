@@ -128,3 +128,22 @@ test('1b. per room: Per person tapped with "per room" words asks instead of savi
   assert.equal(fi.per, 'group'); assert.equal(fi.per_max, 8);
   assert.ok(plain(page(f, 'fr')).includes('À partir de 90 $ par groupe (jusqu’à 8 joueurs).'));
 });
+
+test('3. Groups (real taps): a size chip keeps every sentence he typed, and replaces only an older size line', async () => {
+  const v = escape();
+  const t = tokenFor(v.id);
+  const sim = await openSetup(base, t, { hash: 'groups' });
+  await sim.type('suGroupsLine', 'Corporate team building and birthday parties. Private room for 20');
+  await sim.click('[data-bgroup="10"]');
+  assert.equal(sim.doc.getElementById('suGroupsLine').value.trim(), 'Corporate team building and birthday parties. Private room for 20. Groups of 10 or more: please book ahead.');
+  // Another size replaces the size line only.
+  await sim.click('[data-bgroup="12"]');
+  const box = sim.doc.getElementById('suGroupsLine').value.trim();
+  assert.equal(box, 'Corporate team building and birthday parties. Private room for 20. Groups of 12 or more: please book ahead.');
+  assert.ok(sim.has('[data-bgroup="12"][aria-pressed="true"]'));
+  assert.ok(sim.has('[data-bgroup="10"][aria-pressed="false"]'));
+  // He types more after the chip: it starts its own sentence and nothing is lost.
+  await sim.type('suGroupsLine', `${box} Kids parties on weekends`);
+  await sim.click('[data-bgroup="8"]');
+  assert.equal(sim.doc.getElementById('suGroupsLine').value.trim(), 'Corporate team building and birthday parties. Private room for 20. Kids parties on weekends. Groups of 8 or more: please book ahead.');
+});

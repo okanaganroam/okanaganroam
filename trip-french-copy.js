@@ -399,6 +399,10 @@ function t3FrenchTextCore(value){
  const FR_WORDS={romantic:'romantique',intimate:'intime',candlelit:'aux chandelles','candle lit':'aux chandelles','date night':'soirée en amoureux',sunset:'coucher de soleil',cozy:'chaleureux',cosy:'chaleureux','year-round':'toute l’année'};
  text=text.replace(/^Has the (.+) badge$/,(raw,b)=>FR_BADGES[b]?'Possède le badge '+FR_BADGES[b]:raw);
  text=text.replace(/^An? (.+?) suits an? (.+)$/,(raw,t,o)=>FR_TYPES[t.toLowerCase()]&&FR_OCCASIONS[o]?FR_TYPES[t.toLowerCase()]+' convient à '+FR_OCCASIONS[o]:raw);
+ // Indoor test 2 (2026-11-19): an indoor place open late by its hours, and a Groups line that offers what was asked.
+ text=text.replace(/^Open until (\d{1,2})(?::(\d{2}))? (AM|PM)$/,(_,h,m,ap)=>'Ouvert jusqu’à '+(Number(h)%12+(ap==='PM'?12:0))+' h'+(m?' '+m:'')).replace(/^Open until midnight$/,'Ouvert jusqu’à minuit');
+ if(text==='Offers team building, from its listing')return 'Offre la consolidation d’équipe, selon sa fiche';
+ if(text==='Hosts birthday parties, from its listing')return 'Accueille les fêtes d’anniversaire, selon sa fiche';
  text=text.replace(/^Its description mentions “(.+)”$/,(_,w)=>'Sa description mentionne « '+(FR_WORDS[w]||w)+' »');
  // Audit fix (2026-10-27): the weekly nights and specials a place lists (trip-planner.js scoreVenue), and a named place.
  const FR_NIGHTS={trivia:'un quiz',karaoke:'un karaoké',bingo:'un bingo','open mic':'une scène ouverte',comedy:'une soirée humour','run club':'un club de course','games night':'une soirée jeux','paint night':'une soirée peinture','live music':'de la musique en direct'};

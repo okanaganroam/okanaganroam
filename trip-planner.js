@@ -560,6 +560,9 @@ function buildContext(intent, labels, options) {
     lake: intent.lake === true,
     plannerKinds: opts.requirements ? opts.requirements.items.filter(i => i.kind === 'venue_kind' && i.strength === 'must').map(i => i.value) : intent.plannerKinds || [],
     requirements: opts.requirements || null,
+    // Indoor test 2 (2026-11-19): the clock time the request names (server.js askedMinutes), kept for a list of places
+    // even when no other requirement was (requestedTimeFit).
+    askedMinutes: Number.isFinite(opts.askedMinutes) ? opts.askedMinutes : null,
     queryText: normWords(opts.text || ''),
     // Tour test 10: the request's own words before the shorthand ("trail ride", "pony ride" both read "horseback riding"),
     // for the trips it names (tourAgeFit).
@@ -1366,6 +1369,8 @@ function eligible(v, ctx, strict) {
       if (BADGE_TYPES.includes(v.type) && !v.features.kid_friendly && !kidsKitchenMeal(v, ctx)) return false;
       continue; // outdoor/beach/golf: family heuristic, never claimed as a badge
     }
+    // Indoor test 2 (2026-11-19): an indoor place open past 11 PM by its hours (server.js indoorLateClose) is a late-night stop.
+    if (f === 'open_late' && v.type === 'indoor') { if (!v.features.open_late) return false; continue; }
     if (BADGE_TYPES.includes(v.type)) { if (!v.features[f]) return false; } else if (strict) return false;
   }
   if (ctx.plannerKinds.length && ['indoor', 'tour', 'sport'].includes(v.type) && !ctx.plannerKinds.some(k => (v.plannerKinds || tripRequirements.inferPlannerKinds(v)).includes(k))) return false;
@@ -1587,6 +1592,8 @@ function scoreVenue(v, ctx) {
       // offered for "Has the Live Music badge" (her second Friday read that way; her music is the first Friday).
       const nmOther = f === 'live_music' && ctxPlanDate(ctx) ? venueNight(v, 'live_music', ctxPlanDate(ctx)) : null;
       if (nmOther && !nmOther.on) add('night_other_day', -20, null);
+      // Indoor test 2: an indoor place matched on its hours says how late it's open ("Open until 1 AM"), not a badge.
+      else if (f === 'open_late' && v.lateClose) add('feature', 8, `Open until ${v.lateClose}`);
       else add('feature', 8, `Has the ${featureLabel(ctx, f)} badge`);
     }
     if (f === 'live_music') {
@@ -1680,6 +1687,7 @@ function scoreVenue(v, ctx) {
   }
   if (v.indoorGolf && !ctx.rainy) add('indoor_golf', -8, null); // a real course first, unless it rains
   indoorAppeal(v, ctx, add);
+  groupsAskScore(v, ctx, add);
   // "Things to do" / "something fun" without a kind of place: activities before food and drink (2026-10-14: "something
   // fun to do in Whistler" listed cafes and restaurants first).
   const q = ctx.queryText || '';
@@ -1791,6 +1799,23 @@ function indoorAppeal(v, ctx, add) {
   if (niche && !kinds.some((k) => INDOOR_VISITOR_KINDS.includes(k))) add('indoor_niche', -9, null);
 }
 
+// Indoor test 2 (2026-11-19; Jordan: "team building activity in Kelowna" and "birthday party kelowna" left out his escape
+// rooms, whose Groups line says "Corporate team building and birthday parties"): a team building or birthday party request
+// puts the places whose own Groups or Good to know line offers it first, then the kinds of place people book for it.
+const TEAM_ASK_RE = /\b(?:team building|teambuilding|corporate (?:events?|outings?|party|parties|groups?)|company (?:outings?|party|parties|events?)|office (?:party|parties)|staff (?:party|parties))\b/;
+const BIRTHDAY_ASK_RE = /\b(?:birthday (?:party|parties|packages?)|kids? birthday|bday party)\b/;
+const TEAM_LINE_RE = /\b(?:team building|teambuilding|corporate|company (?:events?|outings?|party|parties)|office (?:party|parties)|staff (?:party|parties))\b/;
+const PARTY_KINDS = ['escape', 'arcade', 'bowling', 'climbing'];
+function groupsAskScore(v, ctx, add) {
+  const q = normWords(`${ctx.askText || ''} ${ctx.queryText || ''}`);
+  const team = TEAM_ASK_RE.test(q), bday = BIRTHDAY_ASK_RE.test(q);
+  if (!team && !bday) return;
+  const g = v.groupsText || '';
+  const kinds = v.type === 'indoor' ? (v.plannerKinds || tripRequirements.inferPlannerKinds(v)) : [];
+  if (team && TEAM_LINE_RE.test(g)) add('groups_line', 24, 'Offers team building, from its listing');
+  else if (bday && /\bbirthday/.test(g)) add('groups_line', 24, 'Hosts birthday parties, from its listing');
+  else if (kinds.some((k) => PARTY_KINDS.includes(k))) add('groups_kind', 8, null);
+}
 function occasionScore(v, ctx, add) {
   const o = ctx.scoringOccasion;
   if (!o) return;
@@ -2473,7 +2498,10 @@ function requestedTimeFit(v, ctx, opts = {}) {
   // the time. A place whose listed hours prove it closed then is left out (it closed at 4, or is closed that day); one
   // that opens within the next 90 minutes stays, below the places already open ("at 7am": open at 7 before opens at 8).
   // Only for a list of places (buildRecommendations): a plan of several stops starts at that time and runs on from it.
-  const at = opts.list && !live && weekday && ctx.requirements && Number.isFinite(ctx.requirements.startMinutes) && !ctx.requirements.dinnerAtClock ? ctx.requirements.startMinutes : null;
+  // Indoor test 2 (2026-11-19): or the time alone (ctx.askedMinutes) when nothing else kept the requirements ("Friday at
+  // 11 PM" listed an art centre and wineries that close at 6).
+  const askedAt = ctx.requirements && Number.isFinite(ctx.requirements.startMinutes) ? (ctx.requirements.dinnerAtClock ? null : ctx.requirements.startMinutes) : Number.isFinite(ctx.askedMinutes) ? ctx.askedMinutes : null;
+  const at = opts.list && !live && weekday && askedAt != null ? askedAt : null;
   if (at != null && parsed.known) {
     const open = openAtMinute(parsed, weekday, at);
     if (open === false) {
@@ -2607,6 +2635,13 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
   // tour made the list, so families see one. Never ahead of the places that ranked higher.
   if (ctx.kids && !ctx.types.size && !ctx.activities.size && !(ctx.plannerKinds || []).length && out.length && !out.some((x) => x.venue && x.venue.type === 'tour')) {
     const t = scored.find((x) => x.v.type === 'tour' && x.v.tourMinAge === 'all' && x.v.features && x.v.features.kid_friendly);
+    if (t) { const st = stopFrom(t.v, t, regionReason(t.v, ctx), ctx); if (out.length >= count) out[out.length - 1] = st; else out.push(st); }
+  }
+  // Indoor test 2 (2026-11-19; Jordan's escape rooms and arcade, open to 1 AM): a late-night list of only food and drink
+  // keeps its last place for the best indoor place open late by its hours (an arcade, bowling, a show), so a late-night
+  // request shows something to do as well. Never ahead of the places that ranked higher.
+  if ((ctx.features || []).includes('open_late') && !ctx.types.size && !ctx.kids && out.length >= 4 && !out.some((x) => x.venue && x.venue.type === 'indoor')) {
+    const t = scored.find((x) => x.v.type === 'indoor' && x.v.lateClose);
     if (t) { const st = stopFrom(t.v, t, regionReason(t.v, ctx), ctx); if (out.length >= count) out[out.length - 1] = st; else out.push(st); }
   }
   return { items: out, total: scored.length };

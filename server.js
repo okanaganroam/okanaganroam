@@ -4515,6 +4515,8 @@ function buildDiscoverySearchVenues() {
     if (!REGION_LABELS[row.region] || !CATEGORY_SLUGS[row.type]) continue;
     const features = {};
     for (const f of BOOL_FIELDS) if (badgeOnPublic(row, f)) features[f] = true;
+    // Indoor test 2: an indoor place open past 11 PM on some day is found by "late night" too (matched on its hours).
+    if (row.type === 'indoor' && !features.open_late && indoorLateClose(row.hours) != null) features.open_late = true;
     const m = member.get(row.id) || { collections: [], activities: [], fdTypes: [] };
     venues.push({
       id: row.id, name: row.name, region: row.region, type: row.type,
@@ -4559,7 +4561,7 @@ function discoverySearchVenues() {
 // Heuristics (occasion, budget) are NOT applied here -- they are reported
 // back as not applied. An intent with nothing to filter on returns no venues
 // rather than the whole directory.
-function selectDiscoveryVenues(intent, limit = DISCOVERY_DEFAULT_LIMIT) {
+function selectDiscoveryVenues(intent, limit = DISCOVERY_DEFAULT_LIMIT, text = '') {
   const none = { applied: [], notApplied: [] };
   if (!intent) return { total: 0, items: [], exclusions: none };
   if (intent.mode === 'navigate' && intent.exactVenue) {
@@ -4567,12 +4569,65 @@ function selectDiscoveryVenues(intent, limit = DISCOVERY_DEFAULT_LIMIT) {
     return v ? { total: 1, items: [discoveryVenueItem(v, [])], exclusions: none } : { total: 0, items: [], exclusions: none };
   }
   if (intent.mode === 'events' || intent.mode === 'unknown') return { total: 0, items: [], exclusions: none };
-  const found = discoverySearchModule().searchVenues(intent, discoverySearchVenues());
+  const found = discoveryAskRank(text, intent, discoverySearchModule().searchVenues(intent, discoverySearchVenues()));
   return {
     total: found.total,
     items: found.items.slice(0, limit).map((x) => discoveryVenueItem(x.venue.row, x.matchedOn)),
     exclusions: found.exclusions,
   };
+}
+// Indoor test 2 (2026-11-19; Jordan): "team building", "birthday party kelowna", "kids birthday party" listed indoor places
+// A–Z or no indoor place at all, and "arcade bar kelowna" put his arcade bar 24th. These requests put first the places
+// whose own Groups or Good to know line offers it (added when the words alone didn't find them, inside the request's towns
+// and badges), then indoor places of a kind people book for it; an arcade bar is a place that is both.
+const SEARCH_TEAM_RE = /\b(?:team building|teambuilding|corporate (?:events?|outings?|party|parties)|company (?:outings?|party|parties|events?)|office (?:party|parties)|staff (?:party|parties))\b/;
+const SEARCH_BDAY_RE = /\b(?:birthday (?:party|parties|packages?)|kids? birthday|bday party)\b/;
+const SEARCH_ARCADE_BAR_RE = /\b(?:arcade bars?|barcades?)\b/;
+const GROUPS_TEAM_LINE_RE = /\b(?:team building|teambuilding|corporate|company (?:events?|outings?|party|parties)|office (?:party|parties)|staff (?:party|parties))\b/;
+const PARTY_INDOOR_KINDS = ['escape', 'games', 'bowling', 'kids', 'climbing'];
+let discoveryGroupsCache = null;
+function discoveryGroupsLines() {
+  const version = db.prepare('SELECT total_changes() AS n').get().n;
+  if (discoveryGroupsCache && discoveryGroupsCache.version === version) return discoveryGroupsCache.map;
+  const map = new Map(), norm = discoveryIntentModule().normalizeDiscoveryText;
+  try {
+    for (const r of db.prepare("SELECT venue_id, info FROM venue_visit_info WHERE info LIKE '%Groups%' OR info LIKE '%Good to know%'").all()) {
+      let o = null; try { o = JSON.parse(r.info); } catch (e) { o = null; }
+      const t = o && Array.isArray(o.rows) ? o.rows.filter((x) => x && (x.label === 'Groups' || x.label === 'Good to know') && x.text).map((x) => String(x.text)).join(' ') : '';
+      if (t) map.set(r.venue_id, norm(t));
+    }
+  } catch (e) { /* none */ }
+  discoveryGroupsCache = { version, map };
+  return map;
+}
+function discoveryAskRank(text, intent, found) {
+  const t = discoveryIntentModule().normalizeDiscoveryText(String(text || ''));
+  const team = SEARCH_TEAM_RE.test(t), bday = SEARCH_BDAY_RE.test(t), arcadeBar = SEARCH_ARCADE_BAR_RE.test(t);
+  if (!team && !bday && !arcadeBar) return found;
+  const lines = discoveryGroupsLines(), ds = discoverySearchModule();
+  const own = (v) => { const g = lines.get(v.id) || ''; return (team && GROUPS_TEAM_LINE_RE.test(g)) || (bday && /\bbirthday/.test(g)); };
+  const words = (v) => ` ${v.textName || ''} ${v.textCuisine || ''} ${v.textDesc || ''} ${lines.get(v.id) || ''} `;
+  const arcadeOf = (v) => / arcades? /.test(words(v)) || (v.type === 'indoor' && (venueIndoorInfo(v.id).kinds || []).includes('games'));
+  const rank = (v) => {
+    if ((team || bday) && own(v)) return 3;
+    if (arcadeBar && arcadeOf(v) && (/ (?:bar|bars|pub|beer|taps?|licensed) /.test(words(v)) || v.type === 'pub')) return 3;
+    if (arcadeBar && arcadeOf(v)) return 2;
+    if ((team || bday) && v.type === 'indoor' && (venueIndoorInfo(v.id).kinds || []).some((k) => PARTY_INDOOR_KINDS.includes(k))) return 2;
+    return 0;
+  };
+  const items = found.items.slice();
+  if (team || bday) {
+    const R = intent.regions || [], F = intent.features || [], plan = found.exclusions || ds.exclusionPlan(intent.excluded);
+    const have = new Set(items.map((x) => x.venue.id));
+    for (const v of discoverySearchVenues()) {
+      if (have.has(v.id) || !own(v) || (R.length && !R.includes(v.region)) || !F.every((f) => v.features && v.features[f])) continue;
+      if (plan.applied && plan.applied.length && ds.isExcluded(v, plan)) continue;
+      items.push({ venue: v, matchedOn: [team ? 'groups:team building' : 'groups:birthday parties'] });
+    }
+  }
+  const r = new Map(items.map((x) => [x.venue.id, rank(x.venue)]));
+  const sorted = items.map((x, i) => [x, i]).sort((a, b) => r.get(b[0].venue.id) - r.get(a[0].venue.id) || a[1] - b[1]).map((x) => x[0]);
+  return { ...found, total: sorted.length, items: sorted };
 }
 // Only fields the database already holds -- nothing computed or invented.
 function discoveryVenueItem(v, matchedOn) {
@@ -4803,7 +4858,7 @@ function runDiscovery(text, { limit = DISCOVERY_DEFAULT_LIMIT, now = new Date(),
   // French pass 6 (2026-10-19): a French search also matches words in the places' French descriptions (not in the JSON).
   if (lang === 'fr') Object.defineProperty(intent, 'frenchText', { value: true });
   const destination = resolveDiscoveryDestination(intent);
-  let venues = selectDiscoveryVenues(intent, limit);
+  let venues = selectDiscoveryVenues(intent, limit, text);
   const events = selectDiscoveryEvents(intent, limit, now, null, { text });
   // Search pass 5 (2026-10-19): no place has every word -> the places that have some of them, most words first,
   // unless the words nearly spell a place's name ("mision hill" still offers Mission Hill under "Did you mean").
@@ -6899,6 +6954,16 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       if (row) knownForById.set(r.venue_id, String(row.text).slice(0, 200));
     }
   } catch (e) { /* none */ }
+  // Indoor test 2 (2026-11-19; Jordan): each place's Groups and Good to know lines ("Corporate team building and birthday
+  // parties"), so team building and birthday party requests put the places that offer them first.
+  const groupsById = new Map();
+  try {
+    for (const r of db.prepare("SELECT venue_id, info FROM venue_visit_info WHERE info LIKE '%Groups%' OR info LIKE '%Good to know%'").all()) {
+      let o = null; try { o = JSON.parse(r.info); } catch (e) { o = null; }
+      const t = o && Array.isArray(o.rows) ? o.rows.filter((x) => x && (x.label === 'Groups' || x.label === 'Good to know') && x.text).map((x) => String(x.text)).join(' ') : '';
+      if (t) groupsById.set(r.venue_id, normalize(t).slice(0, 600));
+    }
+  } catch (e) { /* none */ }
   // Recognised places (2026-10-25, data/acclaimed-restaurants.json): award and readers' poll results with their sources,
   // so Build My Trip can put memorable places first on special trips (the listings have no ratings).
   const acclaimed = tripAcclaimedById();
@@ -6944,6 +7009,9 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       cuisines: venueCuisineList(v).map((c) => String(c).toLowerCase().trim()),
       textName: normalize(v.name || ''), textCuisine: normalize(venueCuisineList(v).join(' ') || v.cuisine || ''), textDesc: normalize(`${v.description || ''}${knownForById.has(v.id) ? ` ${knownForById.get(v.id)}` : ''}${v.type === 'shop' ? ' shop shops shopping store stores' : ''}${v.type === 'cafe' ? cafePlannerWords(v) : ''}`),
       ...(v.type === 'shop' ? { isShop: true } : {}),
+      ...(groupsById.has(v.id) ? { groupsText: groupsById.get(v.id) } : {}),
+      // Indoor test 2: an indoor place open past 11 PM (on the trip's day, when there is one) is a late-night stop.
+      ...(v.type === 'indoor' && !features.open_late && indoorLateClose(weekJsonOn(v, hoursDate), parseLocalDate(onDate) ? onDate : null) != null ? (features.open_late = true, { lateClose: lateCloseText(indoorLateClose(weekJsonOn(v, hoursDate), parseLocalDate(onDate) ? onDate : null)) }) : {}),
       features, collections: m.collections, activities: [...new Set([...(preparePlannerKinds ? [...m.activities, ...requirementModule.inferPlannerActivities(v)] : m.activities), ...(preparePlannerKinds && requirementModule.inferPlannerKinds(v).includes('skating') ? ['winter'] : []), ...(v.type === 'sport' && /\b(?:bike|pump track|dirt jumps|bmx)\b/i.test(v.cuisine || '') ? ['cycling'] : []), ...(v.type === 'tour' && /\b(?:adventure|adventures|aventure|tree ?top|ropes? course\w*|zip ?lin\w*|bungee|bungy|raft\w*|atv|rzr|via ferrata|snowmobil\w*|heli\w*|flight\w*|floatplane|kayak\w*|canoe\w*|climb\w*|canyoning|paraglid\w*|jet ?boat)/i.test(v.cuisine || '') ? ['adventure'] : []), ...(v.type === 'sport' && /\b(?:adventure parks?|aerial parks?|tree ?top|ropes? courses?|obstacle courses?)\b/i.test(v.cuisine || '') ? ['adventure'] : []), ...(v.type === 'tour' && /\b(?:bear|wildlife|eagle|whale|birding|nature walk|salmon)/i.test(v.cuisine || '') ? ['nature'] : []), ...(/\bski resort\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(/\b(?:skating rink|arena|curling)\b/i.test(v.cuisine || '') ? ['winter'] : []), ...(/\bnordic\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(v.type === 'tour' && /\b(?:kayak\w*|canoe\w*|sup|paddle\w*|rafting|sailing|boat tours?|wing foil|kite\w*|river floats?)/i.test(v.cuisine || '') ? ['water'] : [])])], fdTypes: m.fdTypes,
       ...(acclaimed.has(v.id) ? { acclaim: acclaimed.get(v.id) } : {}),
       // Hours checked after the place's closure was recorded are its season's hours (2026-10-25: on-mountain dining).
@@ -8518,6 +8586,16 @@ function tripAnyClassListed() {
   try { for (const list of allVenueWeeklyNights().values()) if ((list || []).some((n) => n && n.kind === 'class')) return true; } catch (e) { /* no nights table */ }
   return false;
 }
+// Indoor test 2 (2026-11-19): "team building activity", "team-building event", "teambuilding ideas", "team building
+// outings" -> "team building" (Build My Trip and search read them the same).
+// "late night fun Friday after 11" -> 1380 (11 PM): "after 9", "after 10:30", "after 11" with a night word and no AM/PM.
+function lateAfterMinutes(text) {
+  const t = String(text || '').toLowerCase();
+  if (!/\b(?:late[\s-]night|tonight|night|nightlife|after dark|late)\b/.test(t)) return null;
+  const m = /\bafter\s+(9|10|11)(?::([0-5]\d))?\b(?!\s*(?:a\.?m\b|p\.?m\b|o.?clock in the morning|hours?\b|hrs?\b|mins?\b|minutes?\b|years?\b|\$))/.exec(t);
+  return m ? (Number(m[1]) + 12) * 60 + Number(m[2] || 0) : null;
+}
+const TEAM_BUILDING_WORDS_RE = /\bteam[\s-]?building(?:\s+(?:activit(?:y|ies)|events?|ideas?|outings?|days?|nights?|games?|exercises?|experiences?|venues?|places?|spots?|fun|things to do))+\b|\bteambuilding\b/gi;
 function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   // 2026-11-05: trip-length, clock-time, holiday-weekend and tour wording made plain; a beer, cider or distillery "tour" is a run of
@@ -8537,7 +8615,10 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     // A plain "class" is read this way only while some place lists a class at all; with none it stays the passing word it was.
     .replace(OWN_CLASS_WORDS_RE, 'masterclass').replace(OWN_CLASS_BARE_RE, (m, lead) => (tripAnyClassListed() ? `${lead || ''}masterclass` : m))
     // "Happy hour cocktails" is a happy hour anywhere that has one then (a distillery, a pub), not only cocktail lounges.
-    .replace(/\b(?:happy hour cocktails?|cocktails? (?:at|during|for) (?:a |the )?happy hour|cocktail happy hours?)\b/gi, 'happy hour');
+    .replace(/\b(?:happy hour cocktails?|cocktails? (?:at|during|for) (?:a |the )?happy hour|cocktail happy hours?)\b/gi, 'happy hour')
+    // Indoor test 2 (2026-11-19; Jordan): "team building activity / event / ideas / outing" is "team building" (the words
+    // after it were read as an outdoor activity or a What's On event).
+    .replace(TEAM_BUILDING_WORDS_RE, 'team building');
   // Build My Trip fixes (2026-11-18): "a day on the mountain / on the slopes" in the ski months is a ski day (trip-planner.js
   // mountainDayText); the month is the one the request names, else its date, else today's.
   {
@@ -8771,6 +8852,11 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   { const late = extracted.windowClock && !extracted.windowClock.rolled ? extracted.windowClock.start : null; if (late && !overrides?.startDate && Number.isFinite(extracted.startMinutes) && extracted.startMinutes < late) extracted.startMinutes = late; }
   if(overrides?.dayStartMinutes)extracted.dayStartMinutes=overrides.dayStartMinutes;
   if(overrides?.shortWalkVenueIds)extracted.shortWalkVenueIds=overrides.shortWalkVenueIds;
+  // Indoor test 2 (2026-11-19; Jordan's "Friday at 11 PM" listed an art centre and wineries closed by then): a time the
+  // request names was dropped when nothing else kept the requirements (no date, no daypart), so a list of places never
+  // checked it. It now goes to the planner on its own (askedMinutes), used only to leave out places a list's listed hours
+  // prove closed at that time. "Late night … after 11" (no AM/PM) is 11 PM.
+  const askedMinutes = Number.isFinite(extracted.startMinutes) && !extracted.dinnerAtClock ? extracted.startMinutes : lateAfterMinutes(requirementsText);
   let requirements = overrides?.shortWalkVenueIds || overrides?.dayStartMinutes || overrides?.startDate || overrides?.startMinutes!==undefined || extracted.startDate || extracted.daypart || extracted.morningStart != null || extracted.onlyRequested || Number.isInteger(extracted.explicitMealCount) || extracted.conflicts.length || extracted.items.some(i => !['days', 'base', 'type'].includes(i.kind)) ? extracted : null;
   if (requirements) {
     trip = requirementModule.expandTripComponents(trip.multi ? trip : {...trip, regions:intent.regions || [], party:intent.party || trip.party, when:intent.when || trip.when}, requirements);
@@ -9060,7 +9146,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
       return selectedNamedEvent ? sel.items.filter(e => e.id === selectedNamedEvent.id) : sel.items;
     });
     const plan = planner.planTrip({
-      intent, trip, tripEvents, requirements, text: requirementsText, ownTourAsked: OWN_TOUR_WORDS_RE.test(planText), budgetMode: overrides?.budgetMode,
+      intent, trip, tripEvents, requirements, askedMinutes, text: requirementsText, ownTourAsked: OWN_TOUR_WORDS_RE.test(planText), budgetMode: overrides?.budgetMode,
       facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now)),
       labels: tripPlannerLabels(),
       seed,
@@ -9109,7 +9195,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   }
   const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now, eventCalendar) : null;
   const plan = tripPlannerModule().planTrip({
-    intent, requirements, text: requirementsText, ownTourAsked: OWN_TOUR_WORDS_RE.test(planText), budgetMode: overrides?.budgetMode, nearAnchor, niceDinnerOnce, lengthOverride: Number.isInteger(overrides?.days) ? overrides.days : null,
+    intent, requirements, askedMinutes, text: requirementsText, ownTourAsked: OWN_TOUR_WORDS_RE.test(planText), budgetMode: overrides?.budgetMode, nearAnchor, niceDinnerOnce, lengthOverride: Number.isInteger(overrides?.days) ? overrides.days : null,
     facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now)),
     labels: tripPlannerLabels(),
     seed,
@@ -24113,6 +24199,27 @@ function indoorPlannerFacts(venueId) {
     ...(tourFreeOf(t) ? { indoorFree: tourFreeOf(t) } : {}),
     ...(indoorSuggested(venueId) != null ? { indoorSuggested: indoorSuggested(venueId) } : {}),
   };
+}
+// Indoor test 2 (2026-11-19; Jordan, open to 1 AM on Fridays and Saturdays, left out of "late night kelowna"): an indoor
+// place open past 11 PM counts for a late-night request in Build My Trip and search. Matched on its hours (on the trip's
+// day when there is one); no Open Late badge is written for indoor places (HOURS_BADGE_TYPES is unchanged), so nothing
+// stored changes and no badge shows on its card. -> the latest close past 11 PM, in minutes (1500 = 1 AM), or null.
+const INDOOR_LATE_AFTER_MINUTES = 23 * 60;
+function indoorLateClose(hoursRaw, date = null) {
+  if (!hoursModule || !hoursRaw) return null;
+  let parsed = null; try { parsed = hoursModule.parseHours(hoursRaw); } catch (e) { return null; }
+  if (!parsed || !parsed.known) return null;
+  const days = date ? [localWeekdayKey(String(date).slice(0, 10))] : hoursModule.HOURS_WEEKDAYS;
+  let best = null;
+  for (const d of days) { const day = parsed.days[d]; if (day && day.status === 'open') for (const [, to] of day.ranges) if (to > INDOOR_LATE_AFTER_MINUTES && (best == null || to > best)) best = to; }
+  return best;
+}
+// 1500 -> "1 AM", 1440 -> "midnight", 1410 -> "11:30 PM".
+function lateCloseText(min) {
+  const m = ((min % 1440) + 1440) % 1440;
+  if (m === 0) return 'midnight';
+  const h = Math.floor(m / 60), mm = m % 60, h12 = h % 12 || 12;
+  return `${h12}${mm ? `:${String(mm).padStart(2, '0')}` : ''} ${h < 12 ? 'AM' : 'PM'}`;
 }
 // Research's starting price (the card's "From $X", or a "$25" in its Prices / Admission line), a suggestion only.
 function indoorResearchPrice(venue) {
