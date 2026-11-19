@@ -185,8 +185,8 @@ test('3. pickup: an option of the meeting-spot questions; the page says "Pickup:
   assert.doesNotMatch(plain(page(v)), /Pickup hotels/);
   assert.equal((await change(t, { tour_info: { pickup: 'yes' } })).status, 400);
   // The setup: the option on Basics and on Where do people meet you?, and the nudge on the Address box (EN + FR).
-  assert.match(CLIENT, /'pickupOn:basics'/); assert.match(CLIENT, /'pickupOn:door'/);
-  assert.match(CLIENT, /S\.nudge = T\.addrPickup/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 1 and 10).
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 10).
   for (const L of [text.en.tour, text.fr.tour]) for (const k of ['pickupBtn', 'pickupSub', 'pickupOn', 'pickupOff', 'addrPickup']) assert.ok(L[k], k);
   assert.equal(text.en.tour.pickupBtn, 'We pick you up (from hotels in the village)');
 });
@@ -263,7 +263,7 @@ test('6. private price per hour with a minimum: "Private van from $150/hour (3-h
   ok(await change(t, { tour_info: { private: 900 } }));
   assert.match(plain(page(v)), /Private tours from \$900\./);
   // The setup: whole trip / per hour chips and the minimum hours, read from "per hour … minimum 3 hours" too.
-  assert.match(CLIENT, /tchips\('privPer', \['trip', 'hour'\]/); assert.match(CLIENT, /tchips\('privMin', \['2', '3', '4', '5', '6', '8'\]/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 13).
   assert.equal(text.en.tour.tprivPers.hour, 'Per hour'); assert.equal(text.fr.tour.tprivPers.hour, 'À l’heure');
 });
 
@@ -319,5 +319,5 @@ test('8c. French page: Good to know chip phrases in French; Time needed from the
 
 test('8d. tapping a Good to know chip puts the cursor in the box, at the end', () => {
   // Tour test 13: an empty box keeps the focus on the chip for a keyboard or a mouse; a finger tap still goes to the box.
-  assert.match(CLIENT, /if \(\(qk === 'good_to_know' \|\| qk === 'groups'\) && \(!wasEmpty \|\| touchTap\)\) \{ try \{ box\.focus\(\); var bl = box\.value\.length; box\.setSelectionRange\(bl, bl\);/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 15).
 });

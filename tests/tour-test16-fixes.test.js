@@ -277,3 +277,128 @@ test('9. Build My Trip times: his own departures ("Leaves 7 AM and 5:30 PM") pla
   const page3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
   assert.ok(page3.includes("'Book a departure time'") && page3.includes("'Réservez une heure de départ'"));
 });
+
+// ---- Source-only checks from earlier rounds, now run on the real page script (tests/setup-sim.js) ----
+// Each replaces an assert.match(CLIENT, …) that only read the source (the kind of check that let the pickup bug live
+// through five rounds). The old lines say where their behaviour test is now.
+
+test('10. (was test 11, source-only) Basics: an address that says "we pick up from your hotel" gets the pickup nudge once, then saves as typed; two addresses get the two-spots nudge (was test 15, source-only)', async () => {
+  const { v, t } = await tom();
+  const sim = await openSetup(base, t, { hash: 'basics' });
+  await sim.click('go:basics:edit');
+  await sim.type('suAddr', 'We pick up from your hotel in the village');
+  await sim.click('basicsSave');
+  assert.match(sim.text(), /pick you up/i, 'the pickup nudge');
+  assert.equal(app.getVenue(v.id).address, '4314 Main St, Whistler', 'nothing saved yet');
+  const sim2 = await openSetup(base, t, { hash: 'basics' });
+  await sim2.click('go:basics:edit');
+  await sim2.type('suAddr', 'Summer: 4314 Main St. Winter: 4010 Whistler Way');
+  await sim2.click('basicsSave');
+  assert.match(sim2.text(), /Put your main spot or office here\. Guests get the exact meeting spot when they book\./);
+});
+
+test('11. (was tests 9, 10, 12 and 13, source-only) Who can come and What you offer: the age, under-18 and length chips the screen draws save what they say', async () => {
+  const { v, t } = await tom({}, { age: undefined, length: undefined });
+  const offer = await openSetup(base, t, { hash: 'offer' });
+  const ages = offer.doc.getElementById('suScreen').querySelectorAll('[data-tpick^="age:"]').map((b) => b.getAttribute('data-tpick').slice(4));
+  assert.deepEqual(ages, ['all', '5', '6', '8', '10', '12', '14', '16', '19']);
+  await offer.click('[data-tpick="age:8"]');
+  await offer.click('[data-tadult]');
+  await offer.click('[data-tpick="adultAge:19"]');
+  await offer.click('[data-tpick="adultHow:waiver"]');
+  await offer.click('offerSave');
+  const ti = app.venueTourInfo(v.id);
+  assert.equal(ti.age, '8'); assert.equal(ti.adult, true); assert.equal(ti.adult_age, '19'); assert.equal(ti.adult_waiver, true);
+  const tour = await openSetup(base, t, { hash: 'tour' });
+  const lens = tour.doc.getElementById('suScreen').querySelectorAll('[data-tpick^="length:"]').map((b) => b.getAttribute('data-tpick').slice(7));
+  assert.deepEqual(lens, ['1h', '1-2h', '2-3h', 'half', 'full', 'multi']);
+  await tour.click('[data-tpick="length:half"]');
+  await tour.click('tourSave');
+  assert.equal(app.venueTourInfo(v.id).length, 'half');
+});
+
+test('12. (was test 9, source-only) What you offer: a fourth kind says "Up to 3" and is not added; (was test 15) two kinds in two seasons save each one\'s season', async () => {
+  const { v, t } = await tom({}, { kinds: ['wildlife', 'snowshoe', 'paddle'], year: 'seasonal' }, { months: '12-10' });
+  const sim = await openSetup(base, t, { hash: 'tour' });
+  const free = sim.doc.getElementById('suScreen').querySelectorAll('[data-tkind]').map((b) => b.getAttribute('data-tkind')).find((k) => !['wildlife', 'snowshoe', 'paddle'].includes(k));
+  await sim.click(`[data-tkind="${free}"]`);
+  assert.match(sim.text(), /Up to 3/);
+  assert.ok(sim.doc.getElementById('suScreen').querySelector(`[data-tkind="${free}"]`).getAttribute('aria-pressed') !== 'true');
+  if (sim.has('[data-tks]')) {
+    const ks = sim.doc.getElementById('suScreen').querySelectorAll('[data-tks]').map((b) => b.getAttribute('data-tks'));
+    const pick = ks.find((x) => x.startsWith('snowshoe:') && x.endsWith(':both')) || ks.find((x) => x.endsWith(':both'));
+    await sim.click(`[data-tks="${pick}"]`);
+    await sim.click('tourSave');
+    assert.equal(app.venueTourInfo(v.id).kind_seasons[pick.split(':')[0]], 'both');
+  }
+});
+
+test('13. (was test 11, source-only) Price: a private price per hour with a 3-hour minimum saves its unit and minimum; (was tests 12 and 13) "$349 per sled" in the per-person box is not saved and gets the per-unit nudge', async () => {
+  const { v, t } = await tom();
+  const sim = await openSetup(base, t, { hash: 'price' });
+  await sim.type('suTpriv', '150');
+  await sim.click('[data-tpick="privPer:hour"]');
+  await sim.click('[data-tpick="privMin:3"]');
+  await sim.click('priceSave');
+  const ti = app.venueTourInfo(v.id);
+  assert.equal(ti.private, 150); assert.equal(ti.private_per, 'hour'); assert.equal(ti.private_min, 3);
+  const sim2 = await openSetup(base, t, { hash: 'price' });
+  await sim2.type('suTprice', '$349 per sled');
+  await sim2.click('priceSave');
+  assert.equal(app.venueTourInfo(v.id).price, 149, 'not saved');
+  assert.match(sim2.text(), /Your tours and prices/);
+  // The price screen is one short line under the box now (tour test 16).
+  assert.match(sim.text() + sim2.text(), /The adult price\./);
+  assert.doesNotMatch(sim2.text(), /Free or by donation\? Type free\./);
+});
+
+test('14. (was test 13, source-only) Good to know: a line over the limit is cut at the last whole sentence on Save, says what was left out, and Save again keeps it', async () => {
+  const { v, t } = await tom();
+  const sim = await openSetup(base, t, { hash: 'bring' });
+  const long = 'Dress in layers. ' + 'Bring a warm hat and gloves for the evening tours. '.repeat(8);
+  await sim.type('suBring', long);
+  await sim.click('bringSave');
+  const kept = sim.doc.getElementById('suBring').value;
+  assert.ok(kept.length < long.length && /\.$/.test(kept.trim()), kept);
+  assert.notEqual((app.venueVisitInfo(v.id) || { rows: [] }).rows.find((r) => r.label === 'Good to know')?.text, long.trim());
+  await sim.click('bringSave');
+  approveAll(v.id);
+  assert.equal(app.venueVisitInfo(v.id).rows.find((r) => r.label === 'Good to know').text, kept.trim());
+});
+
+test('15. (was tests 11, 12 and 13, source-only) a Good to know chip tapped with a finger puts the cursor in the box, at the end', async () => {
+  const { t } = await tom();
+  const sim = await openSetup(base, t, { hash: 'bring' });
+  const chip = sim.doc.getElementById('suScreen').querySelector('[data-quick="Dress for the weather"]');
+  chip.onclick({ pointerType: 'touch', preventDefault() {} }); await sim.settle();
+  const box = sim.doc.getElementById('suBring');
+  assert.equal(sim.doc.activeElement, box);
+  assert.equal(box.selectionStart, box.value.length);
+});
+
+test('16. (was tour simplify, source-only) the season ticks: "Anything else about your season?" opens them, and a tick turns on in place (the tourTick handler, run)', async () => {
+  const { v, t } = await tom();
+  const sim = await openSetup(base, t, { hash: 'hours:year' });
+  if (!sim.has('#suTfold')) await sim.click('yearClosed');
+  assert.ok(sim.has('#suTfold'), sim.acts().join(' | '));
+  if (!sim.has('[data-act^="tourTick:"]')) await sim.click('#suTfold');
+  const tick = sim.doc.getElementById('suScreen').querySelector('[data-act^="tourTick:"]');
+  assert.ok(tick, sim.acts().join(' | '));
+  const key = tick.getAttribute('data-act').split(':')[1];
+  await sim.click(`[data-act="tourTick:${key}"]`);
+  assert.equal(sim.doc.getElementById('suTick_' + key).getAttribute('aria-pressed'), 'true');
+  void v;
+});
+
+test('17. (was tour tests 4 and 15, source-only) Price screen: "free" typed in the box saves a free tour; a rentals company sees the rentals line under the box', async () => {
+  const { v, t } = await tom();
+  const sim = await openSetup(base, t, { hash: 'price' });
+  await sim.type('suTprice', 'free');
+  await sim.click('priceSave');
+  approveAll(v.id);
+  assert.match(plain(page(v)), /Prices:? Free\./);
+  const r = await tom({ name: 'Paddle Rentals T16', cuisine: 'Canoe & kayak rentals' }, { kinds: ['paddle', 'rentals'] });
+  const sr = await openSetup(base, r.t, { hash: 'price' });
+  assert.match(sr.text(), /Kids’ prices, other trips and per-boat rentals go in “Your tours and prices”/);
+  assert.doesNotMatch(sim.text(), /per-boat rentals/);
+});

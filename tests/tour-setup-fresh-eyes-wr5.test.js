@@ -106,7 +106,9 @@ test('1. price box: "650 per boat" and other worded prices are never trimmed; pe
   assert.equal(text.en.tour.tpriceLeadPick, 'Your card will say “From {x} a person”.');
   assert.equal(text.fr.tour.tpriceLeadPick, 'Votre fiche indiquera « À partir de {x} par personne ».');
   assert.match(text.en.tour.tpriceHours, /starts with a trip length/); assert.match(text.en.tour.tpriceOne, /One price here/);
-  assert.match(text.en.tour.tpriceMore, /Priced per boat, per group or per lesson\? Use Private tours below\./); // tour test 14: per group or lesson too
+  // Tour test 16 (2026-11-18): the line under the box is one short line now ("The adult price…"); per boat, per group and
+  // per lesson are in Help, and the nudge after Save (above) still says Private tours.
+  assert.match(text.en.tour.tpriceMore, /^The adult price\./);
   assert.match(CLIENT, /if \(k === 'tpriceToPriv'\)/);
   assert.match(CLIENT, /S\.nudge = pwhy === 'group' && T\.tpriceGroup \? T\.tpriceGroup : /);
   // The server reads the same way (the edit page sends text): per-person refused with the reason, private takes per boat.

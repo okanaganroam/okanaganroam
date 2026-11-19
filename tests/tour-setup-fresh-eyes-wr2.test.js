@@ -223,7 +223,8 @@ test('8 + 9 (approved): a 5+ age and "48 hours ahead", their page lines and Buil
   const { v, t } = await marc();
   // Tour test 10 (2026-11-18): 8+ and 10+ too.
   assert.deepEqual(pc.TOUR_AGES, ['all', '5', '6', '8', '10', '12', '14', '16', '19']);
-  assert.deepEqual(pc.TOUR_BOOK, ['same_day', 'day', '48h', 'week', 'no']);
+  // Tour test 16 (2026-11-18): 'ahead' is "Yes" with no how-far-ahead chip ("Book ahead.").
+  assert.deepEqual(pc.TOUR_BOOK, ['same_day', 'day', '48h', 'week', 'no', 'ahead']);
   assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '8', '10', '12', '14', '16', '19'\]/);
   assert.match(CLIENT, /tchips\('book', \['same_day', 'day', '48h', 'week'\]/);
   // Tour test 10 (2026-11-18): 8+ and 10+ keep Kids welcome too.

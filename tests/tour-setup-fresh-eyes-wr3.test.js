@@ -453,8 +453,9 @@ test('9. the price note says "per person" with the limit from the config; a held
   const priv = ok(await change(t, { tour_info: { private: 3900 } }));
   assert.deepEqual(priv.body.live, ['tour_info']);
   assert.match(plain(page(v, 'en')), /From \$189 a person\. Private tours from \$3,900\./);
-  assert.match(text.en.tour.tprivLead, /It shows on your page right away/);
-  assert.match(text.fr.tour.tprivLead, /Il s’affiche sur votre page tout de suite/);
+  // Tour test 16 (2026-11-18): the price screen's small print is one short line; "shows right away" is in Help.
+  assert.match(text.en.tour.tprivLead, /^One price for the whole group/);
+  assert.match(text.fr.tour.tprivLead, /^Un seul prix pour tout le groupe/);
 });
 
 test('10. the venue page’s short "Tours & prices" list keeps its section names; a restaurant’s short menu is unchanged', async () => {

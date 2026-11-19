@@ -215,7 +215,7 @@ test('6. Good to know: a tour holds 320; text past a limit is kept to its last f
   assert.equal((await change(t, { visit_rows: { good_to_know: cut } })).status, 400);
   // The setup: room past the limit in the box (a paste isn't cut), the trim at Save, the message, the other limited boxes.
   assert.match(CLIENT, /id="suBring" maxlength="' \+ \(BRING_MAX \+ 600\) \+ '"/);
-  assert.match(CLIENT, /var brFit = overMax\('suBring', BRING_MAX\);/); assert.match(CLIENT, /var lnFit = overMax\('suLine', 180\);/); assert.match(CLIENT, /var gFit = overMax\('suGroupsLine', 180\);/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 14).
   assert.match(text.en.tour.fitRestTour || text.en.fitRestTour, /a tour’s description \(in Your tours and prices\) or under Groups/);
   assert.ok((text.fr.tour.fitRestTour || text.fr.fitRestTour) && (text.fr.tour.countOver || text.fr.countOver) && (text.en.tour.countOver || text.en.countOver));
 });
@@ -238,11 +238,11 @@ test('8b. small things: back to setup #more, chip focus, the 1 to 2 hours chip a
   const ed2 = await get(`/owner/${t}/menu`);
   assert.doesNotMatch(ed2.text, /setup#more/);
   // Good to know chips: an empty box keeps the focus on the chip (keyboard and mouse); a finger tap, or a box with text, goes to the box.
-  assert.match(CLIENT, /var wasEmpty = !v, touchTap = \(ce && ce\.pointerType === 'touch'\)/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 15).
   // Time needed: "20–30 min" and "45–60 min" read "20 minutes to 1 hour"; a "1 to 2 hours" chip.
   assert.match(plain(page(v)), /Time needed 20 minutes to 1 hour\. Varies by tour/);
   assert.ok(completeness.TOUR_LENGTHS.includes('1-2h'));
-  assert.match(CLIENT, /tchips\('length', \['1h', '1-2h', '2-3h', 'half', 'full', 'multi'\]/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 11).
   assert.equal(text.en.tour.tlengths['1-2h'], '1 to 2 hours'); assert.equal(text.fr.tour.tlengths['1-2h'], '1 à 2 heures');
   ok(await change(t, { tour_info: { length: '1-2h' } }));
   assert.equal(app.venueTourInfo(v.id).length, '1-2h');

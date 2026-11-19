@@ -7459,7 +7459,8 @@ function tripTourComingSeason(plan, args, now = new Date()) {
   if (!plan || args.swap || args.pinned || args.overrides?.startDate || TRIP_DATED_RE.test(text) || !TRIP_TOUR_ASK_RE.test(text)) return plan;
   const tourIn = (p) => [...((p.outing && p.outing.stops) || []), ...((p.itinerary && p.itinerary.stops) || []), ...(p.days || []).flatMap((d) => d.stops || []), ...(p.recommendations || [])].some((x) => x && x.venue && x.venue.type === 'tour');
   if (tourIn(plan)) return plan;
-  const fr = /[àâçéèêëîïôûù]/i.test(text) || /\b(?:sortie|visite|ours|sans voiture)\b/i.test(text);
+  // A tour that matched but is only closed a few days or weeks (a yearly break) already says when it reopens.
+  if ((plan.warnings || []).some((w) => / matches but is closed on /.test(String(w)))) return plan;
   for (let k = 1; k <= 8; k++) {
     const d = new Date(now.getTime()); d.setDate(1); d.setMonth(d.getMonth() + k); d.setHours(12, 0, 0, 0);
     const later = runTripPlanCore(args, d);
@@ -61025,7 +61026,8 @@ const OWNER_HELP_SCRIPT = String.raw`
     var KS_RE = /\b(?:kayak\w*|canoe\w*|paddl\w*|sups?|raft\w*|bikes?|biking|atvs?|ziplin\w*|hikes?|hiking|snowshoe\w*|snowmobil\w*|sled\w*|sleigh\w*|skis?|skiing|fishing|boats?|rentals?|canots?|pagaie|raquettes?|velos?|motoneiges?|traineaux?|randonnees?|tyroliennes?|peche|bateaux?|locations?)(?: [a-z]+){0,2}? ((?:only |seulement |just )?(?:in |en |l |during )?(?:the )?(summer|ete|winter|hiver)s?(?: only| seulement)?)\b/g;
     var ksM, ksSum = 0, ksWin = 0; KS_RE.lastIndex = 0;
     while ((ksM = KS_RE.exec(x))) { if (/summer|ete/.test(ksM[2])) ksSum++; else ksWin++; }
-    if (ksSum && ksWin) x = x.replace(KS_RE, function(m, sea){ return m.slice(0, m.length - sea.length) + 'kindseason'; }).replace(/\s+/g, ' ').trim();
+    // (Not heli-skiing and heli-biking: that is one company's two seasons, the season answer.)
+    if (ksSum && ksWin && !/\bheli\b/.test(x)) x = x.replace(KS_RE, function(m, sea){ return m.slice(0, m.length - sea.length) + 'kindseason'; }).replace(/\s+/g, ' ').trim();
     // Tour test 6 (Whistler, 2026-11-17): a length written « 2h30 » / "1h30" is one key word (two of them read as trip
     // lengths: « tyrolienne 2h30, parcours 1h30 »).
     x = x.replace(/\b\d{1,2} ?h ?[0-5]\d\b/g, ' hhmm ').replace(/\s+/g, ' ').trim();

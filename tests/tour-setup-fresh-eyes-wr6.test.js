@@ -101,8 +101,9 @@ test('1. per-unit prices: "69 par vélo", "$69/bike", "$40 per hour" are never a
   assert.equal(text.en.tour.tpriceUnit, 'Priced per bike or per rental? Put your lowest per-person trip price here; list the per-bike price in Your tours and prices.');
   assert.match(text.fr.tour.tpriceUnit, /^Prix par vélo ou par location\s?\? Mettez votre prix le plus bas par personne ici\s?; le prix par vélo va dans Vos sorties et tarifs\.$/);
   assert.match(text.en.tour.tpriceUnitRentals, /^Rentals only\?/); assert.match(text.fr.tour.tpriceUnitRentals, /^Seulement de la location/);
-  assert.match(text.en.tour.tpriceMore, /per boat, per group or per lesson\? Use Private tours below\. Priced per bike or per rental\? Put it in Your tours and prices\.$/); // tour test 14: per group or lesson too
-  assert.match(text.fr.tour.tpriceMore, /par vélo ou par location\s?\? Mettez-le dans Vos sorties et tarifs\.$/);
+  // Tour test 16 (2026-11-18): one short line under the box; per bike / per rental is said by the nudge after Save (above).
+  assert.match(text.en.tour.tpriceMore, /Your tours and prices/);
+  assert.match(text.fr.tour.tpriceMore, /Vos sorties et tarifs/);
   assert.match(CLIENT, /pwhy === 'unit' && T\.tpriceUnit \?/);
   assert.match(CLIENT, /if \(k === 'tpriceToMenu'\) \{ readTour\(\); S\.menuReturn = 'price'; return go\('menu'\); \}/);
   assert.match(CLIENT, /if \(step === 'menu' && S\.menuReturn\)/);

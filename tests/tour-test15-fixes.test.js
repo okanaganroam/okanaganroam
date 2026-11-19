@@ -15,7 +15,9 @@ const fs = require('node:fs');
 const http = require('node:http');
 
 const DB_FILE = path.join(__dirname, '..', 'whistler.db');
-if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
+// Tour test 16 (2026-11-18): the -wal and -shm files go too. Run in the same `node --test` call as another file that
+// rebuilt the database, a left-over -wal from that run was replayed into this fresh file (the two passed only alone).
+for (const s of ['', '-wal', '-shm', '-journal']) { try { fs.unlinkSync(DB_FILE + s); } catch (e) { /* not there */ } }
 process.env.ENRICHMENT_ADMIN_TOKEN = 'tour-t15-admin-token';
 process.env.TRIP_PLANNER_V3 = 'on';
 delete process.env.AVG_SPEND_PUBLIC;
@@ -158,8 +160,8 @@ test('2b. the setup asks only when needed: 2+ kinds, two seasons, and a kind who
   assert.match(html.text, /"tourTwoSeasons":true/);
   assert.match(html.text, /"kindSeasonGuess":\{[^}]*"snowshoe":"winter"/);
   assert.match(CLIENT, /function ksShown\(\)\{ var ks = ksKinds\(\); return ks\.length >= 2 && ksTwoSeasons\(\) && \(ks\.some/);
-  assert.match(CLIENT, /data-tks="/);
-  assert.match(CLIENT, /if \(ksShown\(\)\) \{ var ks0 = \{\}; ksKinds\(\)\.forEach/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 12).
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 12).
   assert.equal(text.en.tour.ksQ, 'Which season does each run?');
   assert.deepEqual(text.fr.tour.ksOpts, { summer: 'Été', winter: 'Hiver', both: 'Les deux' });
   // The client's rule, run.
@@ -196,9 +198,9 @@ test('4. the price screen: a per-boat, per-board or hourly rental goes to Your t
   const r = await change(t, { tour_price: '30/hr per boat' });
   assert.equal(r.status, 400); assert.doesNotMatch(JSON.stringify(r.body), /Private tours/);
   // The client rule and its hint.
-  assert.match(CLIENT, /tourRentalKinds\(\) && T\.tpriceMoreRentals \? T\.tpriceMoreRentals : T\.tpriceMore/);
-  assert.match(text.en.tour.tpriceMoreRentals, /Rentals priced per boat, board or hour go in “Your tours and prices”/);
-  assert.match(text.fr.tour.tpriceMoreRentals, /par planche/);
+  // Tour test 16 (2026-11-18): shorter, and the rentals line is shown on the real price screen in tour-test16-fixes (17).
+  assert.match(text.en.tour.tpriceMoreRentals, /per-boat rentals go in “Your tours and prices”/);
+  assert.match(text.fr.tour.tpriceMoreRentals, /locations par bateau/);
   // The client's own rule, run (with the page's kinds, and without).
   const src = ['moneyHead', 'feeHours', 'priceSwiss', 'priceTrim', 'tourPriceWhy'].map((n) => fnBody(CLIENT, n)).join('\n');
   const cw = (kinds) => new Function('S', `${src}\nreturn tourPriceWhy;`)(kinds ? { tour: { kinds } } : undefined);
@@ -302,7 +304,7 @@ test('14. tours have no meeting-spot step (Dayton): no door step or tile, Basics
   assert.equal(r.status, 400);
   assert.equal(db.prepare('SELECT COUNT(*) AS n FROM venue_arrival_points WHERE venue_id = ?').get(v.id).n, 1);
   // The Address box nudge.
-  assert.match(CLIENT, /if \(TOUR && T\.addrTwoSpots && /);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 10).
   assert.equal(text.en.tour.addrTwoSpots, 'Put your main spot or office here. Guests get the exact meeting spot when they book.');
 });
 

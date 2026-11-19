@@ -87,7 +87,7 @@ test('1. price box: "$750/day" is a day rate for the group (Private tours, with 
   assert.equal(text.en.tour.tpriceDay, 'A day rate for your group? Put it in Private tours below, and your lowest price for one person here.');
   assert.equal(text.en.tour.tpriceLength, 'That’s a trip length. Type just the price for one person, like 1450, and list each trip in Your tours and prices.');
   assert.match(text.fr.tour.tpriceDay, /^Un tarif à la journée pour votre groupe\s?\?/); assert.match(text.fr.tour.tpriceLength, /^Ça, c’est une durée\./);
-  assert.match(text.en.tour.tprivLead, /a day rate is fine here/); assert.match(text.fr.tour.tprivLead, /un tarif à la journée convient ici/);
+  assert.match(text.en.tour.tprivLead, /a day rate/); assert.match(text.fr.tour.tprivLead, /un tarif à la journée/); // tour test 16: shorter
   assert.equal(text.en.tour.tprivNeed, 'Just the number, like 750. Say “a day, up to 4” in Your tours and prices.');
   assert.match(CLIENT, /pwhy === 'day' && T\.tpriceDay \? T\.tpriceDay : pwhy === 'length' && T\.tpriceLength \? T\.tpriceLength/);
   assert.match(CLIENT, /S\.groupMove = pwhy === 'group' \|\| pwhy === 'day' \|\| pwhy === 'lesson' \? tourPriceNumber/); // tour test 14: per lesson too

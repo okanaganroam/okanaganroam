@@ -209,7 +209,8 @@ test('1. a free or by-donation tour: typed in the same price box, stored with th
   assert.match(CLIENT, /if \(pfree !== S\.savedTourPrice \|\| CUR\.tour_price_waiting != null\) pl\.push\(\{ tour_price: pfree \}\);/);
   assert.match(CLIENT, /return S\.tour\.free && T\.tpriceLeadFree \? T\.tpriceLeadFree :/);
   assert.match(CLIENT, /S\.savedTourPrice === 'free' \|\| S\.savedTourPrice === 'donation' \? \(T\.tfreeCard \|\| 'Free'\)/);
-  assert.match(CLIENT, /field\('suTprice', T\.tpriceLabel, boxVal\('suTprice', tp\.price\), \{ max: 40 \}\) \+ \(T\.tpriceFreeTip \? '<p class="su-hint" id="suFreeTip">'/);
+  // Tour test 16 (2026-11-18): "Free or by donation? Type free." moved from under the price box to Help (tour-price); the
+  // price screen's one line and a typed "free" saving are run in tour-test16-fixes.test.js (13 and 17).
   assert.match(CLIENT, /C\.researchFreeHint && S\.savedTourPrice == null && !tp\.free && T\.tpriceFreeHint \? '<p class="su-sent su-research" id="suFreeHint">'/);
 });
 

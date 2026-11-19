@@ -13,7 +13,9 @@ const http = require("node:http");
 const vm = require("node:vm");
 
 const DB_FILE = path.join(__dirname, "..", "okanagan.db");
-if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
+// Tour test 16 (2026-11-18): the -wal and -shm files go too. Run in the same `node --test` call as another file that
+// rebuilt the database, a left-over -wal from that run was replayed into this fresh file (the two passed only alone).
+for (const s of ["", "-wal", "-shm", "-journal"]) { try { fs.unlinkSync(DB_FILE + s); } catch (e) { /* not there */ } }
 process.env.ENRICHMENT_ADMIN_TOKEN = "tour-help-admin-token";
 delete process.env.BREVO_API_KEY;
 const app = require("../server.js");

@@ -256,13 +256,13 @@ test('9. keyboard: a chip keeps the focus after the screen redraws; the 3-kind l
   assert.match(CLIENT, /function focusKey\(\)\{/);
   assert.match(CLIENT, /var keepSel = focusKey\(\), keepNudge = S\.keepNudgeFocus;/);
   assert.match(CLIENT, /else if \(keepSel\) \{ var kf = null; try \{ kf = screen\.querySelector\(keepSel\); \}/);
-  assert.match(CLIENT, /S\.nudge = T\.tkindMax; S\.keepNudgeFocus = true;[^\n]*srSay\(T\.tkindMax\)/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 12).
   assert.match(CLIENT, /srLive\.setAttribute\('aria-live', 'polite'\)/);
   assert.match(CLIENT, /function q\(title, lead\)\{ return '<h1 id="suQ">'/);
   assert.match(CLIENT, /role="group" aria-labelledby="suQ" id="suTourKinds"/);
-  assert.match(CLIENT, /tchips\('length', \['1h', '1-2h', '2-3h', 'half', 'full', 'multi'\], T\.tlengths, T\.tlengthQ, 'suLenQ'\)/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 11).
   // Tour test 10 (2026-11-18): with 8+ and 10+.
-  assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '8', '10', '12', '14', '16', '19'\], T\.tages, T\.tageQ, 'suAgeQ'\)/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 11).
   assert.match(CLIENT, /\.su-closures-save'\); if \(csave\) csave\.addEventListener\('focusin'/);
   // Help: Tab and Shift+Tab stay inside the open dialog.
   assert.match(SERVER, /if \(e\.key !== 'Tab' \|\| panel\.hidden\) return;/);

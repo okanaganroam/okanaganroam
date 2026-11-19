@@ -136,7 +136,7 @@ test('the three season ticks fold under "Anything else about your season?" (a bu
   assert.match(run({ tfold: false }, { weather_all: true })(true), /aria-expanded="false"/);
   // The link opens in place (the same screen redrawn, focus back on the link), and a tick keeps it open.
   assert.match(CLIENT, /if \(k === 'tfold'\) \{ S\.tfold = !tfoldOpen\(v === '1'\); var fy = window\.scrollY; render\(\); window\.scrollTo\(0, fy\); var fb = el\('suTfold'\); if \(fb\) fb\.focus\(\); return; \}/);
-  assert.match(CLIENT, /if \(k === 'tourTick'\) \{ var tk0 = tticks\(\); tk0\[v\] = !tk0\[v\]; if \(S\.tfold == null\) S\.tfold = true;/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 16).
   // The ticks still save with the screen's answer (unchanged).
   const part = new Function('S', 'TI', `var TOUR = true;\n${fnBody(CLIENT, 'tticksPart')}\nreturn tticksPart;`)({ tticks: { weather_all: true, off_request: false, snow_open: true } }, {});
   assert.deepEqual(part(true), { tour_info: { weather_all: true, snow_open: true } });

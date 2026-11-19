@@ -81,8 +81,8 @@ const plan = (q) => app.runTripPlan({ text: q }, NOW);
 
 test('1. age: a 14+ chip and the under 18s / under 19s, "come with an adult" / "need a parent or guardian to sign the waiver" choice; the Ages line (EN + FR) and Kid-friendly', async () => {
   assert.ok(completeness.TOUR_AGES.includes('14'));
-  assert.match(CLIENT, /tchips\('age', \['all', '5', '6', '8', '10', '12', '14', '16', '19'\]/);
-  assert.match(CLIENT, /tchips\('adultAge', \['18', '19'\], T\.tadultAges, /); assert.match(CLIENT, /tchips\('adultHow', \['adult', 'waiver'\], T\.tadultHows, /);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 11).
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 11).
   for (const L of [text.en.tour, text.fr.tour]) { assert.equal(L.tages[14], '14+'); assert.ok(L.tadultAges && L.tadultHows && L.tadultRule); }
   assert.equal(text.en.tour.tadultHows.waiver, 'need a parent or guardian to sign the waiver');
   const { v, t } = await kayla();
@@ -261,7 +261,7 @@ test('7b. links pulled out of pasted text: a booking link with an emoji or #link
 
 test('7c. the Groups chip focuses the box at the end; research words her own story says stay with her kinds', () => {
   // Tour test 13: a box that already has text still takes the focus at its end (an empty one only for a finger tap).
-  assert.match(CLIENT, /if \(\(qk === 'good_to_know' \|\| qk === 'groups'\) && \(!wasEmpty \|\| touchTap\)\) \{ try \{ box\.focus\(\); var bl = box\.value\.length; box\.setSelectionRange\(bl, bl\);/);
+  // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 15).
   assert.match(app.tourKindsText(['adventure'], false, 'Bungee jumping & giant swing', '', 'Our giant swing over the canyon'), /giant swing/i);
   assert.doesNotMatch(app.tourKindsText(['adventure'], false, 'Bungee jumping & giant swing', '', ''), /giant swing/i);
   assert.equal(app.tourKindsText(['sightseeing'], false, 'Sightseeing tours & airport shuttles', '', ''), 'Sightseeing tours');
