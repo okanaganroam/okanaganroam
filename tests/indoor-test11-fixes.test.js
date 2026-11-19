@@ -41,6 +41,7 @@ const NOW = new Date('2026-11-19T12:00:00-08:00');
 const plain = (h) => String(h).replace(/<svg[\s\S]*?<\/svg>/g, '').replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&middot;/g, '·').replace(/&amp;/g, '&').replace(/&#39;|&rsquo;/g, '’').replace(/\s+/g, ' ');
 const pageHtml = (v, lang = 'en', now = NOW) => app.renderVenuePage(app.getVenue(v.id), [], [], [], { lang, now });
 const itemsOf = (p) => [...((p.outing && p.outing.stops) || []), ...((p.itinerary && p.itinerary.stops) || []), ...(p.days || []).flatMap((d) => d.stops || []), ...(p.recommendations || [])].filter((x) => x && x.venue);
+const approveAll = (id) => { for (const r of db.prepare("SELECT id FROM owner_change_requests WHERE venue_id = ? AND status = 'pending'").all(id)) app.approveOwnerChange(r.id, 'admin:test'); app.clearHoursExtraCache(); };
 const holidaysOf = (id) => { const r = db.prepare('SELECT holidays FROM venue_hours_extra WHERE venue_id = ?').get(id); return !!(r && r.holidays); };
 
 // Kim's place: her story, her answers.
@@ -210,4 +211,36 @@ test('8. Search: Known for is read ("dinosaurs vernon"), kids in Vernon puts fam
   assert.match(spFr, /Aucun lieu de ce genre \(piscine\) à Vernon\. Les plus proches : Kelowna Aquatic Centre T11 \(Kelowna\)/);
   const none = await searchText('xqzvbn plorf vernon');
   assert.doesNotMatch(none, /cuisine/);
+});
+
+test('9. French page while her story waits for French: research\'s French stays when she only added to research\'s story; her price names are queued for French; FR cards say « 12 $ »', async () => {
+  const research = 'The Okanagan Science Centre is a hands-on science centre in Polson Park with rotating interactive exhibits, planetarium shows and live animals.';
+  const v = mk({ name: 'Okanagan Science Centre T11 French', cuisine: 'Museum', description: research, description_fr: 'L’Okanagan Science Centre est un centre scientifique interactif du parc Polson, avec des expositions en rotation, des spectacles de planétarium et des animaux vivants.' });
+  const t = tokenFor(v.id);
+  await ok(change(t, { indoor_info: { kinds: ['museum'], length: '1-2h', book: 'no', age: 'all', year: 'all' }, indoor_price: 12 }));
+  await ok(change(t, { description: `${research} We run school field trips by booking, summer and spring-break camps, and weekend birthday parties.` }));
+  approveAll(v.id);
+  assert.match(app.getVenue(v.id).description, /weekend birthday parties/);
+  const fr = plain(pageHtml(v, 'fr'));
+  assert.match(fr, /un centre scientifique interactif du parc Polson/);
+  assert.doesNotMatch(fr, /Description en anglais/);
+  // A rewritten story (research's words gone) still shows her English until it is translated (tour test 12).
+  const w = mk({ name: 'Okanagan Science Centre T11 Rewrite', cuisine: 'Museum', description: research, description_fr: 'Un centre scientifique au parc Polson, avec des expositions et des animaux vivants.' });
+  const tw = tokenFor(w.id);
+  await ok(change(tw, { indoor_info: { kinds: ['museum'], length: '1-2h', book: 'no', age: 'all', year: 'all' }, indoor_price: 12 }));
+  await ok(change(tw, { description: 'A small science museum with a planetarium and a dino dig pit, run by volunteers. School groups by booking.' }));
+  approveAll(w.id);
+  assert.match(plain(pageHtml(w, 'fr')), /Description en anglais/);
+  // Her typed prices: the names are queued for French, once.
+  const id = Number(db.prepare("INSERT INTO venue_menus (venue_id, status, data, submitted_by, source) VALUES (?, 'ready', ?, 'owner-link', 'owner')").run(v.id, JSON.stringify({ sections: [{ name: 'Admission', note: '', items: [{ name: 'Adult admission', description: '', price: '12', dietary: [], check: false }, { name: 'Child (3–18)', description: '', price: '9', dietary: [], check: false }] }] })).lastInsertRowid);
+  assert.equal(app.publishMenu(id, 'dayton').ok, true);
+  const q = db.prepare("SELECT help_note FROM venue_menus WHERE venue_id = ? AND help_kind = 'fr_lines'").all(v.id).map((r) => r.help_note);
+  assert.ok(q.some((x) => /Prices: Admission \| Adult admission \| Child \(3–18\)/.test(x)), JSON.stringify(q));
+  // French cards: « 12 $ ».
+  app.indoorCardPrice(v.id);
+  const hub = plain(await (await fetch(`${base}/fr/vernon/indoor`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } })).text());
+  const at = hub.indexOf(v.name);
+  assert.ok(at >= 0);
+  assert.doesNotMatch(hub.slice(at, at + 600), /\$12/);
+  assert.match(hub.slice(at, at + 600), /12 \$/);
 });

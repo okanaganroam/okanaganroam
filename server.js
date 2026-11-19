@@ -39370,6 +39370,9 @@ function frenchTwinHtml(html, enPath, search = '') {
   // Indoor test 9 (2026-11-19): a hub card's folded badges ("3 more features" / "Fewer features") in French too.
   html = html.replace(/<span class="fd-more-label">(\d+) more features?<\/span><span class="fd-less-label">Fewer features<\/span>/g, (m, n) => `<span class="fd-more-label">${n} autre${Number(n) === 1 ? '' : 's'} caractéristique${Number(n) === 1 ? '' : 's'}</span><span class="fd-less-label">Moins de caractéristiques</span>`);
   html = html.replace(/(<span class="fd-extra-feature">)([^<]*)(<\/span>)/g, (m, a, t, b) => { const f = frText(frDecode(t)); return f == null ? m : `${a}${escapeHtml(f)}${b}`; });
+  // Indoor test 11 (2026-11-19; Kim's card said "$12" on French pages): a card's price reads « 12 $ ».
+  html = html.replace(/(<div class="fd-price-context"><strong>)\$(\d+(?:\.\d{1,2})?)(<\/strong>)/g, (m, a, n, b) => `${a}${tourMoney(Number(n), true)}${b}`)
+    .replace(/(<span class="chip chip-feat chip-price">(?:<svg[\s\S]{0,1200}?<\/svg>)?)\$(\d+(?:\.\d{1,2})?)(<\/span>)/g, (m, a, n, b) => `${a}${tourMoney(Number(n), true)}${b}`);
   // Brewery test 3 (2026-11-13): a card's "+6" chip names the folded badges in French too (title and aria-label).
   html = html.replace(/<span class="chip chip-more" title="([^"]*)" aria-label="(\d+) more: [^"]*">/g, (m, t, n) => {
     const names = frDecode(t).split(', ').map((x) => { const f = frText(x); return f == null ? x : f; }).join(', ');
@@ -52182,7 +52185,18 @@ function ownerFrDescState(venue) {
 function ownerFrDescEnglishShown(venue) {
   try {
     if (!venue || !String(venue.description_fr || '').trim() || !String(venue.description || '').trim()) return false;
-    return ownerDescriptionWasHers(venue) && !ownerDescriptionWasHers(venue, 'description_fr') && ownerLinkPending(venue.id, 'description_fr') == null;
+    return ownerDescriptionWasHers(venue) && !ownerDescriptionWasHers(venue, 'description_fr') && ownerLinkPending(venue.id, 'description_fr') == null && !ownerStoryKeptResearch(venue);
+  } catch (e) { return false; }
+}
+// Indoor test 11 (2026-11-19; Kim kept research's story and added one sentence, and the French page switched to her English
+// with « Description en anglais »): when her story still says everything research's English said (she only added to it),
+// research's French is still accurate, so the French page keeps it until hers is translated (queued as before).
+function ownerStoryKeptResearch(venue) {
+  try {
+    const first = db.prepare(`SELECT previous FROM owner_change_requests WHERE venue_id = ? AND status = 'approved' AND changes LIKE '%"description"%' ORDER BY id ASC LIMIT 1`).get(venue.id);
+    const was = first ? String((JSON.parse(first.previous) || {}).description || '').trim() : '';
+    const norm = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    return !!was && norm(was).length >= 40 && norm(venue.description).includes(norm(was));
   } catch (e) { return false; }
 }
 // Tour test 12: her English story was sent and the French one is research's: the same translation request "Leave it to us"
@@ -52222,6 +52236,18 @@ async function queueFrLinesTranslation(venue, rows, contactEmail) {
     notifyInBackground(`French lines for venue #${venue.id}`, () => sendMenuHelpEmail(v, m, { note, contactEmail: contactEmail || null, contactPhone: '' }));
     return true;
   } catch (e) { console.error(`[owner-portal] French lines request for venue #${venue && venue.id} failed: ${e.message}`); return false; }
+}
+function queueFrPriceNames(venueId, data) {
+  const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
+  if (!v || v.type !== 'indoor') return false;
+  const names = [...new Set(((data && data.sections) || []).flatMap((sec) => [sec && sec.name, ...((sec && sec.items) || []).map((it) => it && it.name)]).map((x) => String(x || '').trim()).filter(Boolean))];
+  if (!names.length) return false;
+  const note = `Their price names are in English: please write the French for them on their listing (queued automatically). Prices: ${names.join(' | ')}`.slice(0, 1500);
+  if (db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND help_kind = ? AND help_note = ? AND status IN ('help', 'draft') LIMIT 1").get(venueId, SETUP_FR_LINES_KIND, note)) return false;
+  const id = Number(db.prepare("INSERT INTO venue_menus (venue_id, status, submitted_by, help_kind, help_note, submitted_at) VALUES (?, 'help', 'owner:auto', ?, ?, datetime('now'))").run(venueId, SETUP_FR_LINES_KIND, note).lastInsertRowid);
+  const m = db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(id);
+  notifyInBackground(`French price names for venue #${venueId}`, () => sendMenuHelpEmail(v, m, { note, contactEmail: null, contactPhone: '' }));
+  return true;
 }
 function ownerLinkPending(venueId, field) {
   try {
@@ -56015,6 +56041,9 @@ function publishMenu(menuId, reviewer) {
   // Indoor test 9: a kids' place's Prices line reads its typed prices ("Kids $14." when a lower one is listed).
   // Indoor test 10: every kind, and its card too ("$7.50 · Adult drop-in").
   try { if ((db.prepare('SELECT type FROM venues WHERE id = ?').get(menu.venue_id) || {}).type === 'indoor') { writeIndoorVisitRows(menu.venue_id); indoorCardPrice(menu.venue_id); } } catch (e) { /* keep the lines */ }
+  // Indoor test 11 (2026-11-19; Kim's French page listed "Adult admission 12 $"): an indoor owner's typed price names are
+  // queued for French with her lines (fr_lines), once per list.
+  try { if (/^owner/.test(String(menu.submitted_by || '')) || /^owner/.test(String(reviewer || ''))) queueFrPriceNames(menu.venue_id, parseMenuData(menu.data)); } catch (e) { /* not queued */ }
   return { ok: true, venue_id: menu.venue_id };
 }
 function rejectMenu(menuId, reviewer, reason) {
@@ -75277,6 +75306,7 @@ module.exports = {
   venueHoursExtras,
   clearHoursExtraCache,
   weekJsonOn,
+  publishMenu, queueFrPriceNames, indoorGtkFound, indoorGroupsFound,
   ownerVenueSummary,
   renderAdminReviewPage,
   ownerSignupStats,
