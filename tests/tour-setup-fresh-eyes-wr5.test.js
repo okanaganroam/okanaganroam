@@ -183,12 +183,13 @@ test('6. kinds: whales on the wildlife chip, "More kinds" stays open, the catego
   assert.match(CLIENT, /id="suKindsMore"' \+ \(S\.tourMoreOpen \|\| tRest\.some/);
   assert.match(CLIENT, /kmo\.addEventListener\('toggle', function\(\)\{ S\.tourMoreOpen = kmo\.open; \}\)/);
   const kt = app.tourKindsText;
-  // Tap order no longer matters.
-  assert.equal(kt(['wildlife', 'fishing', 'boat'], false, 'Fishing charters & whale watching'), kt(['boat', 'fishing', 'wildlife'], false, 'Fishing charters & whale watching'));
+  // Tour test 17 (2026-11-18): the owner's own chip order, once each (an untick and retick moves a kind to the end).
+  assert.equal(kt(['wildlife', 'fishing', 'boat', 'fishing'], false, 'Fishing charters & whale watching'), kt(['wildlife', 'fishing', 'boat'], false, 'Fishing charters & whale watching'));
   const words = kt(['wildlife', 'fishing', 'boat'], false, 'Fishing charters & whale watching');
   assert.match(words, /Fishing charters/); assert.match(words, /[Ww]hale watching/); assert.doesNotMatch(words, /Fishing charters.*· Fishing$/);
   assert.equal(kt(['wildlife'], false, 'Whale watching'), 'Whale watching');
-  assert.equal(kt(['wildlife'], false, ''), 'Wildlife and bear viewing');
+  assert.equal(kt(['wildlife'], false, ''), 'Wildlife viewing'); //tour test 17: bears only when the listing's words say bears
+  assert.equal(kt(['wildlife'], false, 'Bear viewing tours'), 'Wildlife and bear viewing');
   // A ticked kind puts the tour under its filter (Lake & Boats for fishing), its name saying nothing about boats.
   const v = mk('tour', { name: 'Penticton Anglers Wr5', cuisine: 'Guided trips', description: 'Guided trips with a local guide.' });
   assert.equal(app.tourInActivity(app.getVenue(v.id), 'lake'), false);

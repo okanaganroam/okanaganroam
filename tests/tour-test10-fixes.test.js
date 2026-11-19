@@ -89,7 +89,7 @@ test('1. "Sleigh rides" kind (EN + FR): the list, Winter & Snow, its page words,
   assert.ok(completeness.TOUR_KINDS.includes('sleigh'));
   assert.deepEqual(app.TOUR_KIND_LABELS_OWNER.sleigh, ['Sleigh rides', 'Promenades en traîneau']);
   assert.equal(app.TOUR_KIND_ACTIVITY.sleigh, 'winter');
-  assert.equal(app.tourKindsText(['horseback', 'sleigh'], false), 'Horseback riding & sleigh rides');
+  assert.equal(app.tourKindsText(['horseback', 'sleigh'], false), 'Horseback riding & sleigh rides'); // tour test 17: the owner's own chip order
   assert.match(app.tourKindsText(['horseback', 'sleigh'], true), /promenades en traîneau/i);
   // Research's "Trail rides & sleigh rides" pre-picks both; "horse-drawn" alone isn't horseback; « traîneau à chiens » is dogs.
   assert.deepEqual(app.tourKindSuggestion({ cuisine: 'Trail rides & sleigh rides', name: '' }), ['sleigh', 'horseback']);

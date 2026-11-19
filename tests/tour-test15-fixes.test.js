@@ -177,8 +177,8 @@ test('2b. the setup asks only when needed: 2+ kinds, two seasons, and a kind who
 
 test('3. the page and the edit page say which kind runs when (EN and FR); no "rentals" twice', async () => {
   const { v, t } = await dave();
-  assert.equal(app.getVenue(v.id).cuisine, 'Snowshoeing, canoe & kayak rentals');
-  assert.equal(app.tourKindsText(['paddle', 'rentals', 'snowshoe'], false, 'Canoe & kayak rentals', STORY, ''), 'Snowshoeing, canoe & kayak rentals');
+  assert.equal(app.getVenue(v.id).cuisine, 'Canoe, kayak rentals & snowshoeing'); // tour test 17: the owner's own chip order
+  assert.equal(app.tourKindsText(['paddle', 'rentals', 'snowshoe'], false, 'Canoe & kayak rentals', STORY, ''), 'Canoe, kayak rentals & snowshoeing'); // tour test 17: the owner's own chip order
   const en = plain(page(v, 'en', NOW)), fr = plain(page(v, 'fr', NOW));
   assert.match(en, /Category Summer: canoe & kayak rentals · Winter: snowshoeing/);
   assert.match(fr, /Catégorie Été : kayak, canot et location · Hiver : raquette/);

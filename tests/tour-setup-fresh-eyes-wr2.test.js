@@ -269,10 +269,10 @@ test('8 + 9 (approved): a 5+ age and "48 hours ahead", their page lines and Buil
 
 test('12. kinds keep her own words ("Whitewater"), read naturally, and French cards say the kinds in French', async () => {
   const { v } = await marc();
-  // Tour test 5 (2026-11-17): the kinds read in the setup's list order, not the order they were tapped.
-  assert.equal(app.getVenue(v.id).cuisine, 'Wildlife and bear viewing · Whitewater rafting');
-  assert.equal(app.tourKindsText(['raft', 'wildlife'], false, 'Whitewater rafting & bear viewing tours'), 'Wildlife and bear viewing · Whitewater rafting');
-  assert.equal(app.tourKindsText(['raft', 'wildlife'], true), 'Observation de la faune et des ours · Rafting');
+  // Tour test 17 (2026-11-18): the kinds read in the owner's own chip order (Rafting, then Wildlife).
+  assert.equal(app.getVenue(v.id).cuisine, 'Whitewater rafting · Wildlife and bear viewing');
+  assert.equal(app.tourKindsText(['raft', 'wildlife'], false, 'Whitewater rafting & bear viewing tours'), 'Whitewater rafting · Wildlife and bear viewing');
+  assert.equal(app.tourKindsText(['raft', 'wildlife'], true), 'Rafting et observation de la faune'); // tour test 17: the owner's own chip order, no bears said
   // Test 1's results stand.
   assert.equal(app.tourKindsText(['snowmobile', 'adventure'], false, 'Snowmobile & ATV tours'), 'Snowmobile tours & ATV tours');
   // Tour test 7 (2026-11-17): the ATV chip pre-picked from these words, left unticked, takes them off.
@@ -281,18 +281,18 @@ test('12. kinds keep her own words ("Whitewater"), read naturally, and French ca
   assert.equal(app.tourKindsText(['raft'], false, 'Rafting'), 'Rafting');
   assert.equal(app.tourKindsText(['other'], false, 'ATV tours'), '');
   // French cards: the kinds in French, and the chip.
-  assert.equal(app.frCardMetaText('Penticton &middot; Wildlife and bear viewing · Whitewater rafting'), 'Penticton &middot; Observation de la faune et des ours · Rafting');
+  assert.equal(app.frCardMetaText('Penticton &middot; Whitewater rafting · Wildlife and bear viewing'), 'Penticton &middot; Rafting · Observation de la faune et des ours');
   const chip = '<!DOCTYPE html><html><body><span class="chip complete-verified-badge" style="x"><span aria-hidden="true" style="y">&#10003;</span>Complete &amp; Verified</span></body></html>';
   assert.match(app.frenchTwinHtml(chip, '/penticton/tours'), /Complète et vérifiée<\/span>/);
   const cat = await get('/fr/penticton/tours');
   assert.equal(cat.status, 200);
   const card = (cat.text.split('<li class="venue-card"').slice(1).find((x) => x.includes('Riviere Sauvage Rafting')) || '');
-  assert.ok(card.includes('Observation de la faune et des ours · Rafting'), card.replace(/\s+/g, ' ').slice(0, 700));
+  assert.ok(card.includes('Rafting · Observation de la faune et des ours'), card.replace(/\s+/g, ' ').slice(0, 700));
   assert.doesNotMatch(card, /Wildlife and bear viewing/);
   assert.doesNotMatch(card, /visites sur réservation/);
   const catEn = await get('/penticton/tours');
   const cardEn = (catEn.text.split('<li class="venue-card"').slice(1).find((x) => x.includes('Riviere Sauvage Rafting')) || '');
-  assert.ok(cardEn.includes('Wildlife and bear viewing · Whitewater rafting'), cardEn.replace(/\s+/g, ' ').slice(0, 700));
+  assert.ok(cardEn.includes('Whitewater rafting · Wildlife and bear viewing'), cardEn.replace(/\s+/g, ' ').slice(0, 700));
 });
 
 test('7. Build My Trip: bear viewing, French wildlife and outing words, ages, the French slot heading, heli biking and quad', async () => {

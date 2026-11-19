@@ -215,7 +215,8 @@ test('7. Search (/browse): "bear", "bear viewing", « ours » and « observation
   assert.equal(app.browseTextMatch('hiking', 'hike'), true);
   // The order rule itself (the page script runs the same function): name, then kind, then the rest.
   assert.ok(app.browseStrong('Coast Mountain Bear Tours', 'Wildlife and bear viewing', 'bear') > app.browseStrong('Riverside Rec Site', 'Recreation site', 'bear'));
-  assert.equal(app.browseStrong('Coast Mountain Bear Tours', 'Wildlife and bear viewing', 'bear viewing'), 1);
+  // Tour test 17: a kind match is 2 (a name only is 1.5, both 3).
+  assert.equal(app.browseStrong('Coast Mountain Bear Tours', 'Wildlife and bear viewing', 'bear viewing'), 2);
 });
 
 test('8. Build My Trip: "without a car", "no car", "hotel pickup" and "pick us up" put the tours with hotel pickup first ("Hotel pickup" in Why it fits); undated out of season plans the coming season with a note', async () => {

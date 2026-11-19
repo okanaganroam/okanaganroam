@@ -274,6 +274,9 @@ function inferPlannerKinds(v) {
     // else instead (a zipline and treetop park picked it for its ropes course: "We have no ATVs").
     if (kind==='atv'&&v.type==='tour'&&Array.isArray(v.tourKinds)&&v.tourKinds.includes('adventure')&&!re.test(text)&&/\b(?:tree ?top|ropes?|adventure parks?|bungee|bungy|climb\w*|canyon\w*|via ferrata|paraglid\w*|skydiv\w*|zip ?lines?)\b/.test(text)) return false;
     if (v.type==='tour'&&Array.isArray(v.tourKinds)&&v.tourKinds.some(k=>(TOUR_KIND_PLANNER[k]||[]).includes(kind))) return true;
+    // Tour test 17 (Whistler, 2026-11-18): a tour's own "Wildlife viewing" (the chip's page words) or "eagle viewing" is a
+    // wildlife tour; a viewing area or a boardwalk (not a tour) isn't.
+    if (kind==='wildlife_tour'&&v.type==='tour'&&/\bwildlife viewing\b|\beagle (?:viewing|watching)\b/.test(text)) return true;
     if (kind==='fishing_tour') return v.type==='tour'&&(re.test(text)||/\b(?:fishing|angling)\b/.test(text));
     // From Whistler Roam #188 (2026-11-17, real-data check): heli-skiing is read from the listing's own name and category words (its
     // description when it has no category), and a snowcat sightseeing tour is not cat-skiing. "Heli-skiing in Whistler"

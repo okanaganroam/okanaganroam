@@ -218,7 +218,7 @@ test('8. follow-up: a mountain guide keeps Ski touring; guiding and avalanche co
   assert.equal(app.tourKindsText(['guide'], false, 'Backcountry guiding', 'Guiding outfit run by an ACMG mountain guide. AST 1 and AST 2 avalanche courses, intro ski touring, crevasse rescue.'), 'Mountain guiding & ski touring');
   assert.equal(app.tourKindsText(['guide'], true, 'Backcountry guiding', 'intro ski touring'), 'Guide de montagne et ski de randonnée');
   assert.equal(app.tourKindsText(['guide'], false, 'Mountain guides, ski touring & avalanche courses'), 'Mountain guiding, avalanche courses & ski touring');
-  assert.equal(app.tourKindsText(['guide', 'snowshoe'], false, 'Ski touring, mountaineering & avalanche courses'), 'Ski touring, mountain guiding & avalanche courses');
+  assert.equal(app.tourKindsText(['guide', 'snowshoe'], false, 'Ski touring, mountaineering & avalanche courses'), 'Mountain guiding, avalanche courses & ski touring'); // tour test 17: the owner's own chip order
   // Erik (test 7): his unticked heli-skiing still goes; ski touring (his own) stays.
   assert.doesNotMatch(app.tourKindsText(['guide'], false, 'Ski touring, heli-skiing & avalanche courses'), /heli/i);
   assert.deepEqual(app.tourKindSuggestion({ cuisine: 'Backcountry guiding', name: '' }), ['guide']);

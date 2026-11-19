@@ -521,7 +521,7 @@ test('10. wording and small items: "end of February", "tap Next", "Address or me
   assert.equal(app.tourKindsText(['walking', 'food'], false, 'Walking tours & food tours'), 'Walking tours & food tours');
   assert.equal(app.tourKindsText(['walking', 'food'], true, 'Walking tours & food tours'), 'Visites à pied et visites gourmandes');
   assert.equal(app.tourKindsText(['snowmobile', 'dogsled'], false, ''), 'Snowmobile tours & dog sledding');
-  assert.equal(app.tourKindsText(['fishing', 'raft', 'jetboat'], false, ''), 'Jet boat tours, fishing & rafting') // list order (tour test 5);
+  assert.equal(app.tourKindsText(['fishing', 'raft', 'jetboat'], false, ''), 'Fishing, rafting & jet boat tours'); // tour test 17: the owner's own chip order (was list order, tour test 5)
   assert.equal(app.tourKindsText(['snowmobile', 'adventure'], false, 'Snowmobile & ATV tours'), 'Snowmobile tours & ATV tours');
   ok(await change(t, { tour_info: { kinds: ['walking', 'food'], length: '1h' } }));
   assert.equal(app.getVenue(v.id).cuisine, 'Walking tours & food tours');
