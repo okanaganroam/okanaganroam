@@ -1124,8 +1124,9 @@ const OWN_WORDS_KIND = { gallery: ['art', 'gallery', 'galleries', 'exhibit', 'ex
 function ownWordsFit(v, ctx) {
   if (!v || v.type !== 'indoor') return 0;
   // Within a kind: only with a kind asked, and only places of that kind.
-  if (!(ctx.plannerKinds || []).length) return 0;
-  { let pk = []; try { pk = v._pk || (v._pk = tripRequirements.inferPlannerKinds(v)); } catch (e) { pk = []; } if (!pk.some((k) => ctx.plannerKinds.includes(k))) return 0; }
+  // Only an indoor kind asked (a bike rental request is never re-ranked by an indoor place's words).
+  if (!(ctx.plannerKinds || []).length || !ctx.plannerKinds.every((k) => OWN_WORDS_KIND[k])) return 0;
+  { let pk = []; try { pk = Array.isArray(v.plannerKinds) && v.plannerKinds.length ? v.plannerKinds : tripRequirements.inferPlannerKinds(v); } catch (e) { pk = []; } if (!pk.some((k) => ctx.plannerKinds.includes(k))) return 0; }
   const regionWords = new Set((ctx.regions || []).flatMap((r) => String(r).split('-')));
   const words = [...new Set(normWords(ctx.queryText || '').split(' ').filter((w) => w.length > 2 && !OWN_WORDS_SKIP.has(w) && !regionWords.has(w) && !/^\d/.test(w)))];
   if (!words.length) return 0;
