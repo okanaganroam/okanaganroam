@@ -59580,6 +59580,10 @@ function indoorKindHelpTopics(topics, kinds, price = 25) {
     if (t.id === 'indoor-good-to-know' && chips('en').length >= 3) return { ...t,
       a: t.a.replace(/\(“Grip socks required”, “Lockers available”, “Waiver to sign before you play”\)/, `(${chips('en').slice(0, 3).map((x) => `“${E(x)}”`).join(', ')})`),
       aFr: t.aFr.replace(/\(« Chaussettes antidérapantes obligatoires », « Casiers offerts », « Décharge à signer avant de jouer »\)/, `(${chips('fr').slice(0, 3).map((x) => `« ${E(x)} »`).join(', ')})`) };
+    // Indoor test 6 (Priya): no "+ Add a second time" for a kind whose day cards don't have it.
+    if (t.id === 'indoor-swim-times' && en.quiet) return { ...t,
+      a: t.a.replace(/ \(tap <strong>\+ Add a second time<\/strong> on a day with a break\)/, ''),
+      aFr: t.aFr.replace(/ \(touchez <strong>\+ Ajouter une deuxième plage<\/strong> pour un jour avec une pause\)/, '') };
     // Indoor test 6 (Priya): a classes place keeps its open studio hours and puts class nights in Good to know.
     if (t.id === 'indoor-class-nights' && en.kind === 'classes') return { ...t,
       a: t.a.replace('Keep your hours as the hours your doors are open (when people can walk in)', 'Keep your hours as your open studio hours (when people can drop in)').replace('<em>Evening classes Wed &amp; Fri', '<em>Evening wheel classes Wed &amp; Fri'),

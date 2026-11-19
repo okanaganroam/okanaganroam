@@ -1146,7 +1146,7 @@
     var book = S.tour.book || TI.book || '', age = S.tour.age || TI.age || '';
     return ((book === 'no' || book === 'busy') && CLASH_BOOK_RE.test(line)) || ((age === 'all' || age === '5') && CLASH_AGE_RE.test(line));
   }
-  function copyGets(d, x){ var w = W(); return x !== d && (!!w[x] || (othersClosed(d) && !(S.closedTap || {})[S.step + x] && !HO()[x])); }
+  function copyGets(d, x){ var w = W(), open = typeof HO === 'function' ? HO() : {}; return x !== d && (!!w[x] || (othersClosed(d) && !(S.closedTap || {})[S.step + x] && !open[x])); }
   function nthMonday(y, mo, nth){ var d = new Date(y, mo, 1); var n = 0; while (true) { if (d.getDay() === 1 && ++n === nth) return d; d.setDate(d.getDate() + 1); } }
   // Pub test 5 (2026-11-10): every BC stat holiday, not only Dec 24 to Easter Monday (Thanksgiving couldn't be entered).
   // Each one's next date from today, in date order; "This year and next" saves next year's own date (fn(year + 1): the

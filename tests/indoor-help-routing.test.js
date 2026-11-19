@@ -389,6 +389,8 @@ test('indoor test 6: a pottery and paint studio’s questions (Priya’s help lo
   assert.doesNotMatch(hoursFr, /deuxième plage|après minuit/);
   assert.match(hours, /Evening classes outside these hours\? Keep your hours as your open studio hours/);
   assert.equal(en.topic('setup-split-hours'), undefined);
+  assert.doesNotMatch(plain(en.topic('indoor-swim-times').a), /Add a second time/);
+  assert.doesNotMatch(plain(fr.topic('indoor-swim-times').aFr), /deuxième plage/);
   // Her prices: her button's words ("Looks good, send it!" on her link), and the Book button opens her schedule.
   assert.match(plain(en.topic('menu-add').a), /then tap Looks good, send it!/);
   assert.doesNotMatch(plain(en.topic('menu-add').a), /tap Publish/);
