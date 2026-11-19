@@ -99,8 +99,6 @@ test('1. Build My Trip: paragliding is its own kind; "paraglide", « parapente �
   // A plain "scenic flight": the helicopter and floatplane first; he comes after them, labelled paragliding.
   const sf = plan('scenic flights in Pemberton in July');
   const names = namesOf(sf);
-  const fp = plan('floatplane in Pemberton'); console.log('FP', fp.kind, JSON.stringify(namesOf(fp)), JSON.stringify(fp.notes||'').slice(0,300), fp.totalMatches);
-  console.log('SF', sf.totalMatches,  sf.kind, JSON.stringify(itemsOf(sf).map((x) => [x.venue.name, x.score, x.why])).slice(0, 1500));
   assert.ok(names.includes(heli.name) && names.includes(fly.name), JSON.stringify(names));
   if (names.includes(v.name)) {
     assert.ok(names.indexOf(v.name) > names.indexOf(heli.name) && names.indexOf(v.name) > names.indexOf(fly.name), JSON.stringify(names));
@@ -109,4 +107,50 @@ test('1. Build My Trip: paragliding is its own kind; "paraglide", « parapente �
   }
   const vocab = require('../data/vocabulary/shared.json');
   assert.ok(vocab.termLabels.paragliding && vocab.descriptionSynonyms.paragliding, 'its own group in shared.json');
+});
+
+test('5. two ticks: "Every trip is weather permitting" and "Off-season trips by request" (status line, hours block, planner; EN + FR)', async () => {
+  const { v, t } = await matthias({}, { year: 'seasonal' });
+  const none = Object.fromEntries(DAYS.map((d) => [d, []]));
+  ok(await change(t, { hours: none, hours_checked: true, tour_info: { visit: 'appointment' } }));
+  ok(await change(t, { open_months: '04-01:10-31' }));
+  ok(await change(t, { tour_info: { weather_all: true, off_request: true } }));
+  approveAll(v.id);
+  assert.equal(app.venueTourInfo(v.id).weather_all, true);
+  assert.equal((await change(t, { tour_info: { weather_all: 'yes' } })).status, 400);
+  const jul = new Date('2026-07-15T11:00:00-07:00');
+  const en = plain(page(v, 'en', jul)), fr = plain(page(v, 'fr', jul));
+  assert.match(en, /Every trip is weather permitting\./); assert.match(fr, /Chaque sortie dépend de la météo\./);
+  assert.match(en, /Book ahead · tours by reservation · weather permitting/);
+  const nov = plain(page(v, 'en', NOW)), novFr = plain(page(v, 'fr', NOW));
+  assert.match(nov, /Closed for the season \(trips by request\)/, nov.slice(0, 2500));
+  assert.match(novFr, /Fermé pour la saison \(sorties sur demande\)/);
+  // The planner: off-season, listed with "by request, rare"; every trip weather permitting.
+  const p = plan('paragliding in Pemberton in January');
+  const stop = itemsOf(p).find((x) => x.venue.name === v.name);
+  assert.ok(stop, JSON.stringify([p.kind, namesOf(p)]));
+  assert.ok(stop.caveats.includes('Out of season: trips by request only, and rare (the operator’s own answer).'), JSON.stringify(stop.caveats));
+  assert.ok(stop.caveats.includes('Every trip runs weather permitting (the operator’s own answer).'), JSON.stringify(stop.caveats));
+  const pj = plan('paragliding in Pemberton in July');
+  const sj = itemsOf(pj).find((x) => x.venue.name === v.name);
+  assert.ok(!sj.caveats.includes('Out of season: trips by request only, and rare (the operator’s own answer).'));
+  const fc = require('../trip-french-copy.js');
+  assert.equal(fc.t3FrenchText('Out of season: trips by request only, and rare (the operator’s own answer).'), 'Hors saison : sorties sur demande seulement, et rares (réponse de l’entreprise).');
+  assert.equal(fc.t3FrenchText('Every trip runs weather permitting (the operator’s own answer).'), 'Chaque sortie dépend de la météo (réponse de l’entreprise).');
+  // Without the tick, off-season is left out as before.
+  ok(await change(t, { tour_info: { off_request: null } })); approveAll(v.id);
+  assert.ok(!namesOf(plan('paragliding in Pemberton in January')).includes(v.name));
+  assert.doesNotMatch(plain(page(v, 'en', NOW)), /trips by request/);
+  // In-season closed days stay closed (an owner closure).
+  // The setup: the two ticks on the existing screens (tours only), EN + FR.
+  assert.match(CLIENT, /tticksHtml\(true\)/); assert.match(CLIENT, /msgs\(\) \+ tticksHtml\(!!S\.openSea\)/);
+  for (const L of [text.en.tour, text.fr.tour]) assert.ok(L.tWeatherAll && L.tOffRequest);
+});
+
+test('4. door screen: a photo with no location says so, and offers "Send it with my address and you place the pin"', () => {
+  assert.match(CLIENT, /\+ msgs\(\) \+ \(TOUR && S\.door\.noGpsPhoto && C\.pin && T\.doorPickAddr/);
+  assert.match(CLIENT, /if \(k === 'doorPickAddr'\) \{[^\n]*S\.door\.mapFail = true; S\.door\.addrOnly = true;/);
+  assert.equal(text.en.tour.doorPickAddr, 'Send it with my address and you place the pin');
+  assert.ok(text.fr.tour.doorPickAddr);
+  assert.match(text.en.tour.doorPickNoGps, /Send it with your address/);
 });

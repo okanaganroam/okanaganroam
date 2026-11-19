@@ -1962,7 +1962,7 @@
       // gets its own short day-by-day list (any day can be open, even one closed in the usual week).
       var mrN = S.sea.on ? monthRun(S.sea.months) : null, stS = storedSeas(), sea2 = S.seaList[1] && S.seaList[1].on && S.seaList[1].src ? S.seaList[1] : null, sea3 = S.seaList[2] && S.seaList[2].on && S.seaList[2].src ? S.seaList[2] : null;
       // Tour test 2 (Whistler, 2026-11-16): by booking only (no weekly hours): "Do you run trips all year?" Two choices.
-      if (noSetYear()) x = q(T.yearNoSetQ, T.yearNoSetLead) + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + msgs()
+      if (noSetYear()) x = q(T.yearNoSetQ, T.yearNoSetLead) + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + msgs() + tticksHtml(!!S.openSea)
         + '<div class="su-stack" id="suYearNoSet">' + (S.openSea ? big('✓', T.yearNoSetKeep, '', false, 'noSetKeep') + big('✎', T.yearNoSetChange, '', true, 'yearClosed') + big('✕', T.yearNoSetYes, '', true, 'noSetAll')
           : (S.savedWYear === 'all' && T.youSaid ? '<p class="su-sent" id="suYearSaid">' + h(fill(T.youSaid, { a: T.yearNoSetYes })) + '</p>' : '') + big('✓', T.yearNoSetYes, '', false, 'noSetAll', S.savedWYear === 'all' ? ' aria-pressed="true"' : '') + big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed')) + '</div>';
       else x = q(T.allYearQ, storedSea() && T.allYearLeadSea ? T.allYearLeadSea : T.allYearLead) + (APPT && S.wine.year === 'appointment' && S.wine.season ? '<p class="su-sent su-seasonnow" id="suApptNow">' + h(wSeasonText(S.wine.season)) + '</p>' : '') + (S.openSea ? '<p class="su-sent su-seasonnow" id="suOpenNow">' + h(openText(S.openSea)) + '</p>' : '') + (mrN && mrN.a ? '<p class="su-sent su-seasonnow" id="suSeasonNow">' + h(seaNamed() ? fill(T.seasonNow, { kind: T.seasonWord[S.sea.kind] || T.seasonWord.summer, a: monthName(mrN.a - 1), b: monthName(mrN.b - 1) }) : fill(T.seasonNowSpan, { span: seaSpan(S.sea) })) + '</p>' : '') + (sea2 && seaSpan(sea2) ? '<p class="su-sent su-seasonnow" id="suSeasonNow2">' + h(fill(T.seasonNowSpan, { span: seaSpan(sea2) })) + '</p>' : '') + (sea3 && seaSpan(sea3) ? '<p class="su-sent su-seasonnow" id="suSeasonNow3">' + h(fill(T.seasonNowSpan, { span: seaSpan(sea3) })) + '</p>' : '') + msgs()
@@ -1997,6 +1997,7 @@
         // Restaurant test 1 (Whistler, 2026-11-14): closed twice a year is two yearly closures ("Every year"), and the ones
         // already saved are named.
         + (T.openTwice ? '<p class="su-hint su-twice">' + h(T.openTwice) + (yearlyClosed().length ? ' ' + h(fill(T.openTwiceHave, { list: andList(yearlyClosed()) }).replace(/\.\.$/, '.')) : '') + '</p>' : '')
+        + tticksHtml(true)
         + '<div class="su-stack">' + (fromHours ? big('✓', T.openSame, T.openSameSub, false, 'openSave:same') + big('☀️', T.openSummer, T.openSummerSub, true, 'openSave:summer') : big('✓', T.openSaveOnly, '', false, 'openSave:only'))
         + big('✕', T.allYearBtn, '', true, 'openNone') + '</div>';
     } else if (s === 'hours:edit' || seaIsStep(s)) {
@@ -2615,7 +2616,11 @@
       x = doneLine('social') + q(T.socialQ, T.socialLead) + msgs() + socialPart('instagram') + socialPart('facebook')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'socialBoth') + '</div>' + skip('social');
     } else if (s === 'door') {
-      x = doneLine('door') + q(T.doorQ, fill(C.brewery && T.doorLeadCidery && (S.place || CUR.place_type) === 'Cidery' ? T.doorLeadCidery : T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2><div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + (TOUR && T.doorPick ? big('🖼', T.doorPick, T.doorPickSub, true, 'doorPick') : '') + (TOUR && T.pickupBtn ? (TI.pickup ? big('✕', T.pickupOff, '', true, 'pickupOff:door') : big('🚐', T.pickupBtn, T.pickupSub, true, 'pickupOn:door')) : '') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>'
+      x = doneLine('door') + q(T.doorQ, fill(C.brewery && T.doorLeadCidery && (S.place || CUR.place_type) === 'Cidery' ? T.doorLeadCidery : T.doorLead, { type: C.typeWord })) + '<h2 class="su-h2">' + h(fill(T.doorHere, { type: C.typeWord })) + '</h2>'
+        // Tour test 13 (Whistler, 2026-11-18; Matthias): a photo with no location said nothing (this screen had no msgs()).
+        // It says so now, and offers the same fallback as a map that won't load: send it with the address, we place the pin.
+        + msgs() + (TOUR && S.door.noGpsPhoto && C.pin && T.doorPickAddr ? '<div class="su-stack" id="suDoorAddrWrap">' + big('✉️', T.doorPickAddr, T.doorPickAddrSub, false, 'doorPickAddr') + '</div>' : '')
+        + '<div class="su-stack">' + big('📍', T.imHere, '', false, 'go:door:photo') + (TOUR && T.doorPick ? big('🖼', T.doorPick, T.doorPickSub, true, 'doorPick') : '') + (TOUR && T.pickupBtn ? (TI.pickup ? big('✕', T.pickupOff, '', true, 'pickupOff:door') : big('🚐', T.pickupBtn, T.pickupSub, true, 'pickupOn:door')) : '') + big('🕓', T.notNow, T.notNowSub, true, 'later:door') + '</div>'
         // Tour test 11: the pickup option of the meeting-spot question.
         + (TOUR && T.pickupBtn && TI.pickup ? '<p class="su-sent" id="suPickupDoor">' + h(T.pickupOn) + '</p>' : '');
     } else if (s === 'door:photo') {
@@ -2625,7 +2630,7 @@
       x = q(T.doorPhotoQ, landTour ? T.doorPhotoLeadLand : T.doorPhotoLead) + msgs() + (S.door.photo ? '<img class="su-door" src="' + S.door.photo + '" alt="">' : '')
         + '<div class="su-stack">' + (S.door.photo ? big('➜', T.checkPin, '', false, 'go:door:pin') : '') + big('📷', S.door.photo ? T.takeAgain : T.take, '', !!S.door.photo, 'doorTake') + '</div>';
     } else if (s === 'door:pin') {
-      x = (S.door.mapFail ? q(T.mapFailQ, '') : q(T.pinQ, T.pinLead)) + '<p class="su-hint" id="suGps" role="status">' + h(S.door.mapFail ? T.mapFail : S.door.best ? '' : S.door.noLoc ? T.noGps : T.finding) + '</p>' + (S.door.mapFail ? '' : '<div id="suMap" class="su-map"></div>') + msgs()
+      x = (S.door.addrOnly && T.doorAddrQ ? q(T.doorAddrQ, '') : S.door.mapFail ? q(T.mapFailQ, '') : q(T.pinQ, T.pinLead)) + '<p class="su-hint" id="suGps" role="status">' + h(S.door.addrOnly && T.doorAddrLead ? T.doorAddrLead : S.door.mapFail ? T.mapFail : S.door.best ? '' : S.door.noLoc ? T.noGps : T.finding) + '</p>' + (S.door.mapFail ? '' : '<div id="suMap" class="su-map"></div>') + msgs()
         + '<label class="su-tick' + (S.nudge === T.doorRightsNeed ? ' su-need' : '') + '"><input type="checkbox" id="suDoorRights"' + (S.door.rights ? ' checked' : '') + '><span>' + h(T.doorRights) + '</span></label>'
         + '<div class="su-stack">' + big('✓', S.error ? T.tryAgain : S.door.mapFail ? T.mapFailSend : T.doorSend, '', false, 'doorSend') + '</div>';
     } else if (s === 'finish') {
@@ -2869,11 +2874,30 @@
   // No weekly hours (by booking / by appointment only): the season question has no hours words, and its answer is saved
   // on its own (the open dates and the "all year / part of the year" answer), never with a week of hours.
   function noSetYear(){ return APPT && AI.visit === 'appointment' && !!T.yearNoSetQ && !(S.week && DAYS.some(function(d){ return S.week[d]; })); }
+  // Tour test 13 (Whistler, 2026-11-18; Matthias, Dayton approved): two ticks on the "by booking only" and "part of the
+  // year" screens (no new screen): "Every trip is weather permitting" and "Off-season trips by request" (part of the year
+  // only). Saved with that screen's answer, as tour_info.weather_all / off_request (true, or null to take it back).
+  function tticks(){ if (!S.tticks) S.tticks = { weather_all: TI.weather_all === true, off_request: TI.off_request === true }; return S.tticks; }
+  function tticksHtml(withOff){
+    if (!TOUR || !T.tWeatherAll) return '';
+    var tk = tticks(), chip = function(key, label){ return '<button type="button" class="su-chip su-chip-wide" id="suTick_' + key + '" aria-pressed="' + (tk[key] ? 'true' : 'false') + '" data-act="tourTick:' + key + '">' + h(label) + '</button>'; };
+    return '<div class="su-chips su-tticks" role="group" aria-label="' + h(T.tTicksLabel || '') + '" style="margin:6px 0 12px">' + chip('weather_all', T.tWeatherAll) + (withOff && T.tOffRequest ? chip('off_request', T.tOffRequest) : '') + '</div>';
+  }
+  function tticksPart(seasonal){
+    if (!TOUR || !S.tticks) return null;
+    var o = {}, tk = S.tticks, offNow = !!(tk.off_request && seasonal);
+    if (!!tk.weather_all !== (TI.weather_all === true)) o.weather_all = tk.weather_all ? true : null;
+    if (offNow !== (TI.off_request === true)) o.off_request = offNow ? true : null;
+    return Object.keys(o).length ? { tour_info: o } : null;
+  }
+  function tticksSaved(part){ if (!part) return; Object.keys(part.tour_info).forEach(function(k){ if (part.tour_info[k] === null) delete TI[k]; else TI[k] = part.tour_info[k]; }); }
   function seasonOnlySave(){
     var ov = openVal(S.openSea), y = ov ? 'seasonal' : 'all', list = [];
+    var tkp = tticksPart(!!ov); if (tkp) list.push(tkp);
     if (ov !== (CUR.open_months || '')) list.push({ open_months: ov });
     if (y !== S.savedWYear) list.push(apptPart({ year: y }));
     saveAll('hours', list, null, COMBO ? 'closures' : null, function(){
+      tticksSaved(tkp);
       if (COMBO) { S.hoursJust = true; S.hoursNone = true; } else S.savedLine.hours = T.noSetHoursSaved;
       CUR.open_months = ov; S.savedWYear = y; S.wine.year = y; AI.year = y; if (C.distillery) S.savedYear = y; delete AI.season; S.wine.season = null; S.openTouched = false; S.wYearPick = '';
     });
@@ -2935,12 +2959,14 @@
     // Tours (2026-11-16): set hours saved again take "By booking only" back (its own screen is this one).
     var tourApptOff = TOUR && AI.visit === 'appointment';
     if (tourApptOff) listH.push({ tour_info: { visit: null } });
+    var tkpH = tticksPart(!!openVal(S.openTouched ? S.openSea : null) || !!(CUR.open_months && !S.openTouched)); if (tkpH) listH.push(tkpH);
     // Bug 9 (brewery test 1): a usual day changed on this visit while a stored period still has that day's old time.
     var stale = seaStaleOf(ch.hours_seasons || CUR.hours_seasons || []), addNext = !!S.seaAddNext; S.seaAddNext = false;
     saveAll('hours', listH, null, addNext ? seaStepOf(Math.min(S.seaList.filter(function(o){ return o.on; }).length, SEA_MAX - 1)) : KITCHEN_Q ? 'hours:kitchen' : COMBO ? 'closures' : null, function(){
       if (COMBO) { S.hoursJust = true; S.hoursNone = false; }
       CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? week : JSON.stringify(week); S.seaStale = stale.length ? stale : null;
       if (tourApptOff) { delete AI.visit; S.wine.visit = ''; }
+      tticksSaved(tkpH);
       if (wyNew) { S.savedWYear = wyNew; S.wine.year = wyNew; AI.year = wyNew; if (C.distillery) S.savedYear = wyNew; if (wyNew === 'appointment') AI.season = S.wine.season; else { delete AI.season; S.wine.season = null; } S.wYearPick = ''; }
       if (ch.hours_seasons) {
         CUR.hours_seasons = ch.hours_seasons;
@@ -3541,8 +3567,9 @@
       if (C.cafe && (ovc ? 'seasonal' : 'all') !== S.savedYear) lc.push({ cafe_info: { year: ovc ? 'seasonal' : 'all' } });
       if (C.brewery && !C.distillery && (ovc ? 'seasonal' : 'all') !== S.savedYear) lc.push(yearPart(ovc ? 'seasonal' : 'all'));
       if (APPT && S.savedWYear !== 'appointment' && (ovc ? 'seasonal' : 'all') !== S.savedWYear) { lc.push(apptPart({ year: ovc ? 'seasonal' : 'all' })); S.savedWYear = ovc ? 'seasonal' : 'all'; S.wine.year = S.savedWYear; if (C.distillery) S.savedYear = S.savedWYear; }
+      var tkpC = tticksPart(!!ovc); if (tkpC) lc.push(tkpC);
       if (!lc.length) { S.openTouched = false; S.step = S.hist.pop() || 'closures'; return render(); }
-      return saveAll('closures', lc, null, 'closures', function(){ CUR.open_months = ovc; S.openTouched = false; S.hist.pop(); S.hist.pop(); });
+      return saveAll('closures', lc, null, 'closures', function(){ tticksSaved(tkpC); CUR.open_months = ovc; S.openTouched = false; S.hist.pop(); S.hist.pop(); });
     }
     // Pub test 3 (Whistler, 2026-11-14): the stored season, as it is (its dates and its own day hours).
     if (k === 'yearSeasonEdit') { seaUse(S.seaList[+v] ? +v : 0); if (APPT) S.wYearPick = 'all'; S.sea.on = true; S.sea.open = {}; S.sea.dirty = true; S.seaTouched = true; S.dirty = 'hours'; return go(seaStepOf(S.seaI)); }
@@ -4148,7 +4175,10 @@
     if (k === 'socialUnsure') { S.savedLine[v] = T.savedUnsure; return record(v, 'unsure'); }
     if (k === 'doorTake') { gps(); return el('suDoorCam').click(); }
     // Tour test 12: "Choose a photo I took there" (its own GPS, read from the photo).
+    if (k === 'tourTick') { var tk0 = tticks(); tk0[v] = !tk0[v]; S.dirty = 'hours'; var ty = window.scrollY; render(); window.scrollTo(0, ty); var tb = el('suTick_' + v); if (tb) tb.focus(); return; }
     if (k === 'doorPick') { var dp = el('suDoorPick'); return dp ? dp.click() : null; }
+    // Tour test 13: the photo with no location, sent with the listing's address (its pin): we place the pin from the photo.
+    if (k === 'doorPickAddr') { if (!S.door.photo || !C.pin) return render(); S.door.mapFail = true; S.door.addrOnly = true; S.door.spot = { lat: C.pin.lat, lng: C.pin.lng }; S.door.fromPhoto = true; S.door.noGpsPhoto = false; S.nudge = ''; return go('door:pin'); }
     if (k === 'doorSend') return doorSend();
   }
   function wire(){
@@ -4509,7 +4539,8 @@
     var rd = new FileReader();
     rd.onload = function(){
       var at = exifGps(rd.result);
-      if (!at) { S.nudge = T.doorPickNoGps; S.error = ''; var y0 = window.scrollY; render(); window.scrollTo(0, y0); return; }
+      // Tour test 13: kept, so "Send it with my address" can send it (the pin is placed by us from the photo).
+      if (!at) { S.nudge = T.doorPickNoGps; S.error = ''; S.door.noGpsPhoto = true; loadImage(f).then(function(r){ S.door.photo = jpeg(r.img, 1600).toDataURL('image/jpeg', 0.85); var y0 = window.scrollY; render(); window.scrollTo(0, y0); var ab = el('suDoorAddrWrap'); ab = ab && ab.querySelector('button'); if (ab) try { ab.focus(); } catch (e2) {} }, function(){ S.error = T.cantOpen; render(); }); return; }
       loadImage(f).then(function(r){ S.door.photo = jpeg(r.img, 1600).toDataURL('image/jpeg', 0.85); S.door.spot = { lat: at.lat, lng: at.lng }; S.door.moved = true; S.door.best = null; S.door.fromPhoto = true; S.error = ''; S.nudge = ''; go('door:pin'); }, function(){ S.error = T.cantOpen; render(); });
     };
     rd.onerror = function(){ S.error = T.cantOpen; render(); };

@@ -22624,7 +22624,13 @@ const { TOUR_KINDS, TOUR_LENGTHS, TOUR_BOOK, TOUR_AGES } = require('./portal-com
 //   adult_age    '19'         Tour test 12 (Whistler, 2026-11-18; Kayla, a bungee site: 14+, under 19s need a parent or
 //                             guardian to sign the waiver; Dayton approved): the "under 18s" rule is for under 19s.
 //   adult_waiver true         … and they need a parent or guardian to sign the waiver (not "come with an adult").
-const TOUR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'adult_age', 'adult_waiver', 'private', 'year', 'visit', 'private_per', 'private_min', 'pickup'];
+//   weather_all  true         Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding; Dayton approved): "Every
+//                             trip is weather permitting", a tick on the "by booking only" and "part of the year" screens.
+//                             The status line, the hours block and a Build My Trip note say it (EN + FR).
+//   off_request  true         … and "Off-season trips by request" (part of the year only): the page says "Closed for the
+//                             season (trips by request)", and Build My Trip lists him off-season with a "by request, rare"
+//                             note instead of leaving him out. His in-season closed days stay closed.
+const TOUR_INFO_PARTS = ['kinds', 'length', 'book', 'age', 'adult', 'adult_age', 'adult_waiver', 'private', 'year', 'visit', 'private_per', 'private_min', 'pickup', 'weather_all', 'off_request'];
 const TOUR_KINDS_MAX = 3;
 const TOUR_INFO_ERROR = 'Some of the information could not be read. Please reload the page and try again.';
 // Heli-skiing and multi-day trips cost well over $500 a person: a price up to $1,000 goes live at once, a higher one is
@@ -23043,7 +23049,18 @@ function cleanTourInfoPart(key, x) {
   if (key === 'pickup') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
   if (key === 'adult_age') return String(x) === '19' ? { value: '19' } : { error: TOUR_INFO_ERROR };
   if (key === 'adult_waiver') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
+  if (key === 'weather_all' || key === 'off_request') return x === true ? { value: true } : { error: TOUR_INFO_ERROR };
   return { error: TOUR_INFO_ERROR };
+}
+// Tour test 13: every trip runs weather permitting (his own tick).
+function tourWeatherAll(venueId) { return venueTourInfo(venueId).weather_all === true; }
+// Tour test 13: off-season trips by request (his own tick; only with a season of part of the year).
+function tourOffRequest(venueId) { const t = venueTourInfo(venueId); return t.off_request === true && t.year !== 'all'; }
+const TOUR_OFF_REQUEST_WORDS = { en: ' (trips by request)', fr: ' (sorties sur demande)' };
+// "Closed for the season" / « Fermé pour la saison » with "(trips by request)" after it, for a tour that ticked it.
+function tourOffRequestSay(venueId, text, fr = false) {
+  if (!text || !tourOffRequest(venueId)) return text;
+  return String(text).replace(fr ? /Ferm(?:é|\u00e9|&eacute;) pour la saison(?! \(sorties)/g : /Closed for the season(?! \(trips)/g, (m) => m + TOUR_OFF_REQUEST_WORDS[fr ? 'fr' : 'en']);
 }
 // "$129" / "129 $", "$1,500" / "1 500 $".
 function tourMoney(n, fr) {
@@ -23261,6 +23278,9 @@ function tourPlannerFacts(venueId) {
   const t = venueTourInfo(venueId);
   return {
     ...(() => { const f = tourFitNote(venueId); return f ? { tourFitNote: f } : {}; })(),
+    // Tour test 13: every trip weather permitting; off-season trips by request.
+    ...(t.weather_all === true ? { tourWeatherAll: true } : {}),
+    ...(tourOffRequest(venueId) ? { tourOffRequest: true } : {}),
     ...(TOUR_AGES.includes(String(t.age || '')) ? { tourMinAge: String(t.age) } : {}),
     // Tour test 12: the stretches the owner runs weather permitting (a note on the trip card on those dates).
     ...(() => { const w = venueWeatherStretches(venueId); return w.length ? { tourWeather: w } : {}; })(),
@@ -30646,7 +30666,9 @@ function shortReopenDate(iso, today) {
 // -> { state, text } | null
 function blockedStatusLine(venueId, noticeText, seasonState, today) {
   if (seasonState && seasonState.kind === 'closed') {
-    return { state: 'seasonal', text: seasonState.reopens ? `Closed for the season \u00b7 Reopens ${shortReopenDate(seasonState.reopens, today)}` : 'Closed for the season' };
+    // Tour test 13: a tour that takes off-season trips by request says so ("Closed for the season (trips by request)").
+    const cs = tourOffRequestSay(venueId, 'Closed for the season');
+    return { state: 'seasonal', text: seasonState.reopens ? `${cs} \u00b7 Reopens ${shortReopenDate(seasonState.reopens, today)}` : cs };
   }
   if (seasonState && seasonState.kind === 'temp_closed' && seasonState.current) {
     const back = shortReopenDate(addLocalDays(seasonState.to, 1), today);
@@ -39461,6 +39483,13 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const seasonLine = `<p class="venue-season" style="margin:0 0 10px;font-weight:700">${fr ? (exactSeason ? 'Ouvert du ' : /^[aeiouyàâéèêëîïôûü]/i.test(monthsText) ? 'Ouvert d’' : 'Ouvert de ') : 'Open '}${escapeHtml(monthsText)}${fr ? (exactSeason ? ' chaque année' : '') : ' each year'}</p>`;
     hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${seasonLine}`) : `<h2>${L('Season', 'Saison')}</h2>${seasonLine}`;
   }
+  // Tour test 13 (Whistler, 2026-11-18; Matthias): "Every trip is weather permitting" under the hours, and "Closed for the
+  // season (trips by request)" when he ticked off-season trips by request.
+  if (venue.type === 'tour' && tourWeatherAll(venue.id)) {
+    const wl = `<p class="venue-hours-weather">${L('Every trip is weather permitting.', 'Chaque sortie dépend de la météo.')}</p>`;
+    hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${wl}`) : `<h2>${L('Hours', 'Heures')}</h2>${wl}`;
+  }
+  if (venue.type === 'tour' && hoursHtml) hoursHtml = tourOffRequestSay(venue.id, hoursHtml, fr);
   // Winery test 1 (2026-11-12): the off-season answer under the hours, from the owner's walk-in dates
   // ("Nov 1 – Apr 30: by appointment, call ahead").
   const wineryOffLine = wineryOffSeasonLineHtml(venue, fr);
@@ -39940,7 +39969,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // box under it ("Closed May 1–Jun 30, reopens Jul 1.") said it again.
   try { if (openStatus && /^Closed between seasons\b/.test(String(openStatus.text || '')) && venueAdvisoryNote !== undefined && /^Closed\b[^.]*\breopens\b/i.test(String(parseAdvisoryNote(venueAdvisoryNote).text || ''))) venueAdvisoryHtml = ''; } catch (e) { /* keep it */ }
   const openStatusHtml = showStatusHtml || (openStatus
-    ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(fr ? frStatusText(openStatus.text) : openStatus.text)}${venue.type === 'tour' && openStatus.state !== 'appointment' && venueWeatherToday(venue.id, opts.now || new Date()) ? escapeHtml(fr ? ' · selon la météo' : ' · weather permitting') : ''}${hoursHtml && !wineryApptAllYear ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
+    ? `<p class="venue-open-status" data-open="${openStatus.state}" id="venueOpenStatus">${escapeHtml(venue.type === 'tour' ? tourOffRequestSay(venue.id, fr ? frStatusText(openStatus.text) : openStatus.text, fr) : fr ? frStatusText(openStatus.text) : openStatus.text)}${venue.type === 'tour' && ((openStatus.state !== 'appointment' && venueWeatherToday(venue.id, opts.now || new Date())) || (openStatus.state !== 'seasonal' && !/^Closed for the season/.test(String(openStatus.text || '')) && tourWeatherAll(venue.id))) ? escapeHtml(fr ? ' · selon la météo' : ' · weather permitting') : ''}${hoursHtml && !wineryApptAllYear ? ` <a href="#venueHours">${L('See hours', 'Voir les heures')}</a>` : ''}</p>`
     : '');
   // Happy hour line (2026-10-23), right under the open-now line; worked out on the server like it.
   const happyHourHtml = happyHour && happyHour.live

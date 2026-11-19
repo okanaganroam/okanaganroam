@@ -429,6 +429,9 @@ function t3FrenchTextCore(value){
  // Tour test 13: a paragliding operator on a "scenic flight" plan; its own "who can fly" line (in its words, English).
  text=text.replace(/^Paragliding: a tandem flight with a pilot, not a plane or helicopter\.$/,'Parapente : un vol en biplace avec un pilote, pas un avion ni un hélicoptère.');
  text=text.replace(/^Good to know \(the operator’s own words\): (.+)$/,(_,x)=>'À savoir (les mots de l’entreprise, en anglais) : '+x);
+ // Tour test 13: his two ticks.
+ text=text.replace(/^Every trip runs weather permitting \(the operator’s own answer\)\.$/,'Chaque sortie dépend de la météo (réponse de l’entreprise).');
+ text=text.replace(/^Out of season: trips by request only, and rare \(the operator’s own answer\)\.$/,'Hors saison : sorties sur demande seulement, et rares (réponse de l’entreprise).');
  // Tour test 12: the operator's rule for younger guests.
  text=text.replace(/^Under (18|19)s need a parent or guardian to sign the waiver\.$/,(_,n)=>'Les moins de '+n+' ans ont besoin qu’un parent ou tuteur signe la décharge.');
  text=text.replace(/^Under (18|19)s come with an adult\.$/,(_,n)=>'Les moins de '+n+' ans viennent avec un adulte.');

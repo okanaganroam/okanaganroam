@@ -2225,7 +2225,12 @@ Object.assign(fr, {
 // "Where do people meet you?"), the hourly unit and minimum of the Private tours price, and the nudge on the Address box.
 Object.assign(en.tour, {
   doorPick: 'Choose a photo I took there', doorPickSub: 'We read the spot from the photo’s location',
-  doorPickNoGps: 'That photo has no location saved in it. Tap “Yes, I’m here” next time you’re there, or “Not right now”.',
+  doorPickNoGps: 'That photo has no location saved in it. Send it with your address and we’ll place the pin for you, or tap “Yes, I’m here” next time you’re there.',
+  // Tour test 13: two ticks on the "by booking only" and "part of the year" screens.
+  tWeatherAll: 'Every trip is weather permitting', tOffRequest: 'Off-season trips by request', tTicksLabel: 'Also true for your trips',
+  // Tour test 13: the fallback for a photo with no location (as when the map won't load).
+  doorPickAddr: 'Send it with my address and you place the pin', doorPickAddrSub: 'We look at your photo and put the pin on the spot, usually within a day',
+  doorAddrQ: 'Send your meeting-spot photo', doorAddrLead: 'Your photo goes with your address. We place the pin on the spot from your photo, usually within a day.',
   pickupBtn: 'We pick you up (from hotels in the village)', pickupSub: 'Your page says “Pickup: hotels in the village”, with your office for directions',
   pickupOn: '✓ You pick people up from their hotels. Your address is your office.', pickupOff: 'We don’t pick people up',
   addrPickup: 'That reads like a pickup, not an address. Type your office’s street address here; then tap “We pick you up (from hotels in the village)”. Tap Save again to keep it as typed.',
@@ -2234,7 +2239,10 @@ Object.assign(en.tour, {
 });
 Object.assign(fr.tour, {
   doorPick: 'Choisir une photo prise sur place', doorPickSub: 'Nous lisons l’endroit dans la position de la photo',
-  doorPickNoGps: 'Cette photo ne contient pas de position. Touchez « Oui, j’y suis » la prochaine fois que vous y êtes, ou « Pas maintenant ».',
+  doorPickNoGps: 'Cette photo ne contient pas de position. Envoyez-la avec votre adresse et nous placerons l’épingle pour vous, ou touchez « Oui, j’y suis » la prochaine fois que vous y êtes.',
+  tWeatherAll: 'Chaque sortie dépend de la météo', tOffRequest: 'Hors saison, sorties sur demande', tTicksLabel: 'Vrai aussi pour vos sorties',
+  doorPickAddr: 'L’envoyer avec mon adresse, vous placez l’épingle', doorPickAddrSub: 'Nous regardons votre photo et plaçons l’épingle au bon endroit, habituellement en moins d’une journée',
+  doorAddrQ: 'Envoyez la photo de votre point de rencontre', doorAddrLead: 'Votre photo part avec votre adresse. Nous plaçons l’épingle au bon endroit d’après votre photo, habituellement en moins d’une journée.',
   pickupBtn: 'Nous allons vous chercher (aux hôtels du village)', pickupSub: 'Votre page indique « Prise en charge : hôtels du village », avec votre bureau pour l’itinéraire',
   pickupOn: '✓ Vous allez chercher les gens à leur hôtel. Votre adresse est celle de votre bureau.', pickupOff: 'Nous n’allons pas chercher les gens',
   addrPickup: 'Cela ressemble à une prise en charge, pas à une adresse. Inscrivez ici l’adresse de votre bureau, puis touchez « Nous allons vous chercher (aux hôtels du village) ». Touchez Enregistrer de nouveau pour la garder telle quelle.',

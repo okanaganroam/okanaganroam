@@ -1258,7 +1258,7 @@ function eligible(v, ctx, strict) {
   // A named month or season is judged in that month (2026-10-25: "mountain biking in June" lost the bike park, closed today).
   // 2026-10-25 (tools audit): a plan with no month named is judged on its planned date (today, tomorrow, "this weekend")
   // with the same rules, so a closure with no reopening date counts even when the place has usual months.
-  if (!ctx.ignoreSeason && !ctx.itinerary && !ctx.requirements && (ctx.tripDate ? seasonClosedOnTrip(v, { date: ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month) ? monthDate(ctx.seasonInfo.month, ctx.tripDate) : ctx.tripDate }) : v.seasonClosedToday)) return false;
+  if (!ctx.ignoreSeason && !ctx.itinerary && !ctx.requirements && (ctx.tripDate ? seasonClosedOnTrip(v, { date: ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month) ? monthDate(ctx.seasonInfo.month, ctx.tripDate) : ctx.tripDate }) : v.seasonClosedToday && !v.tourOffRequest)) return false;
   if (!ctx.itinerary && !ctx.requirements && v.ownerClosures && seasonClosedOnTrip({ ownerClosures: v.ownerClosures }, null)) return false;
   // 2026-10-25: the off-season rules (no outdoor rink in October, no water park in April, no beach in November unless
   // asked for) apply in every step that picks a place, not only the main day builder; a late-afternoon filler put
@@ -1338,6 +1338,8 @@ function scoreVenue(v, ctx) {
   // Tour test 13 (Whistler, 2026-11-18; Matthias): a plain "scenic flight" puts the planes and helicopters before a tandem
   // paragliding operator (a scenic flight too, labelled paragliding on its stop).
   if (paraglideForScenic(v, ctx) && !namedInRequest(v, ctx)) add('air_sport', -45, null);
+  // Tour test 13: out of his season by request only: after the operators running then.
+  if (seasonOffRequest(v, ctx) && !namedInRequest(v, ctx)) add('off_request', -30, null);
   // An indoor kind named in the request (2026-10-25: "yoga and wine" got an art gallery): places of that kind first.
   const kindWord = (ctx.queryText || '').match(INDOOR_KIND_RE);
   if (kindWord && ['indoor', 'outdoor', 'beach'].includes(v.type) && normWords(v.cuisine || '').replace(/skatepark/g, 'skate park').includes(kindWord[1].replace(/skatepark/, 'skate park').replace(/^skate ?park$/, 'skate park'))) add('kind_asked', 45, null);
@@ -1911,6 +1913,9 @@ const TOUR_AGE6_NOTE = 'Ages 6 and up (the operator’s own answer).';
 const TOUR_WEATHER_NOTE = 'Runs weather permitting at this time of year (the operator’s own answer).';
 // Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding): on a "scenic flight" plan, his stop says what it is.
 const PARAGLIDE_SCENIC_NOTE = 'Paragliding: a tandem flight with a pilot, not a plane or helicopter.';
+// Tour test 13: his two ticks, "Every trip is weather permitting" and "Off-season trips by request".
+const TOUR_WEATHER_ALL_NOTE = 'Every trip runs weather permitting (the operator’s own answer).';
+const TOUR_OFF_REQUEST_NOTE = 'Out of season: trips by request only, and rare (the operator’s own answer).';
 function paraglideForScenic(v, ctx) {
   const asked = (ctx && Array.isArray(ctx.plannerKinds)) ? ctx.plannerKinds : [];
   return !!(v && v.type === 'tour' && asked.includes('scenic_flight') && !asked.includes('paragliding') && Array.isArray(v.plannerKinds) && v.plannerKinds.includes('paragliding'));
@@ -2149,7 +2154,9 @@ function stopFrom(v, scored, extra, ctx) {
   if (v && v.type === 'tour' && v.tourFitNote && Array.isArray(v.plannerKinds) && v.plannerKinds.includes('paragliding')) { const fn = `Good to know (the operator’s own words): ${v.tourFitNote}`; if (!caveats.includes(fn)) caveats.push(fn); }
   // Tour test 12 (Whistler, 2026-11-18; Kayla: winter weekends only, weather permitting): on the dates of a stretch the
   // operator runs weather permitting, the stop says so.
-  if (ctx && v && v.type === 'tour' && Array.isArray(v.tourWeather) && v.tourWeather.length) {
+  if (v && v.type === 'tour' && v.tourWeatherAll && !caveats.includes(TOUR_WEATHER_ALL_NOTE)) caveats.push(TOUR_WEATHER_ALL_NOTE);
+  if (seasonOffRequest(v, ctx) && !caveats.includes(TOUR_OFF_REQUEST_NOTE)) caveats.push(TOUR_OFF_REQUEST_NOTE);
+  if (ctx && v && v.type === 'tour' && !v.tourWeatherAll && Array.isArray(v.tourWeather) && v.tourWeather.length) {
     const md = tripMdOf(ctx);
     const inR = (x, a, b) => (a <= b ? x >= a && x <= b : x >= a || x <= b);
     if (md && v.tourWeather.some((z) => inR(md, z.from, z.to)) && !caveats.includes(TOUR_WEATHER_NOTE)) caveats.push(TOUR_WEATHER_NOTE);
@@ -8447,7 +8454,18 @@ function ownerClosureToday() {
 }
 const OPERATING_MONTHS = ['january','february','march','april','may','june','july','august','september','october','november','december'];
 const OPERATING_PERIOD_RE = new RegExp(`\\b(?:opens?|operates?|runs?)\\s+(?:daily\\s+)?(?:from\\s+)?(${OPERATING_MONTHS.join('|')})\\s+(?:to|through|until|into)\\s+(?:(?:early|mid|late)\\s+)?(${OPERATING_MONTHS.join('|')})\\b`);
+// Tour test 13 (Whistler, 2026-11-18; Matthias: "winter only by request"): a tour that ticked "Off-season trips by
+// request" is not closed for its season (its stop says "by request, rare": seasonOffRequest); its owner closures are.
 function seasonClosedOnTrip(v, season) {
+  if (v && v.tourOffRequest && !(v.ownerClosures && v.ownerClosures.some((c) => ((season && season.date) || ownerClosureToday()) >= c.from && ((season && season.date) || ownerClosureToday()) <= c.to))) return false;
+  return seasonClosedOnTripRaw(v, season);
+}
+function seasonOffRequest(v, ctx) {
+  if (!v || !v.tourOffRequest) return false;
+  const date = ctx && ctx.tripDate ? (ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month) ? monthDate(ctx.seasonInfo.month, ctx.tripDate) : ctx.tripDate) : null;
+  return date ? seasonClosedOnTripRaw({ ...v, ownerClosures: undefined }, { date }) : !!v.seasonClosedToday;
+}
+function seasonClosedOnTripRaw(v, season) {
   const d = season && season.date;
   // An owner's special closure (2026-10-18): closed on those dates, or today when the plan has no date.
   if (v.ownerClosures && v.ownerClosures.some((c) => (d || ownerClosureToday()) >= c.from && (d || ownerClosureToday()) <= c.to)) return true;
