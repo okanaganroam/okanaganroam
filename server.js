@@ -24501,8 +24501,7 @@ function indoorKidsRange(venue, info) {
     const t = info || venueIndoorInfo(venue.id);
     if (String(t.age || '') !== 'all') return null;
     const kidsKind = indoorKindsModule.indoorKindKey(t.kinds) === 'kids';
-    const vi = venueVisitInfo(venue.id) || {}, mine = new Set(Array.isArray(vi.owner_labels) ? vi.owner_labels : []);
-    const own = (vi.rows || []).filter((r) => r && /^(?:known for|good to know)$/i.test(r.label || '') && mine.has(r.label)).map((r) => String(r.text || ''));
+    const own = indoorOwnLines(venue.id);
     for (const text of [venue.description || '', ...own]) {
       for (const part of String(text).split(/(?<=[.;!?])\s+/)) {
         const m = INDOOR_KIDS_RANGE_RE.exec(part);
@@ -24555,7 +24554,9 @@ function indoorPartyBooking(venue, bookingUrl) {
   try {
     if (!venue || venue.type !== 'indoor' || venueIndoorInfo(venue.id).book !== 'no') return false;
     if (INDOOR_PARTY_WORDS_RE.test(String(bookingUrl || '').replace(/[-_/.?=&]+/g, ' '))) return true;
-    const rows = (venueVisitInfo(venue.id) || {}).rows || [];
+    // Her Groups line, in the box or set aside by a full box (owner_dropped: the page still shows it).
+    const info = venueVisitInfo(venue.id) || {};
+    const rows = [...(info.rows || []), ...(Array.isArray(info.owner_dropped) ? info.owner_dropped : [])];
     return rows.some((r) => r && /^groups?$/i.test(r.label || '') && INDOOR_PARTY_WORDS_RE.test(String(r.text || '')));
   } catch (e) { return false; }
 }
@@ -24570,7 +24571,10 @@ function indoorCardPrice(venueId) {
 function indoorOwnLines(venueId, labelRe = /^(?:known for|good to know)$/i) {
   try {
     const info = venueVisitInfo(venueId) || {}, mine = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
-    return (info.rows || []).filter((r) => r && typeof r.text === 'string' && labelRe.test(r.label || '') && mine.has(r.label))
+    // Indoor test 9: her lines set aside by a full box (owner_dropped, hers) count too: the page still shows them.
+    const parked = (Array.isArray(info.owner_dropped) ? info.owner_dropped : []).filter((r) => r && r.owned && !(info.rows || []).some((x) => x && x.label === r.label));
+    for (const r of parked) mine.add(r.label);
+    return (info.rows || []).concat(parked).filter((r) => r && typeof r.text === 'string' && labelRe.test(r.label || '') && mine.has(r.label))
       .flatMap((r) => String(r.text).split(/(?<=[.;!?])\s+|;\s*/)).map((x) => x.replace(/[\s.;]+$/, '').trim()).filter((x) => x.length >= 4).slice(0, 8);
   } catch (e) { return []; }
 }
@@ -40961,7 +40965,9 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // GolfCourse and every other category keeps label.singular.
   const golfDetail = venue.type === 'golf' ? golfDetailsFor([venue]).get(`${venue.region}/${venue.slug}`) : undefined;
   const golfKindLabel = (venue.type === 'golf' && isIndoorGolfVenue(venue)) ? L('Indoor Golf', 'Golf int\u00e9rieur')
-    : (golfData && golfData.isPracticeFacility(golfDetail)) ? L('Driving Range & Practice', 'Champ de pratique') : label.singular;
+    : (golfData && golfData.isPracticeFacility(golfDetail)) ? L('Driving Range & Practice', 'Champ de pratique')
+    // Indoor test 9: a French indoor page's hero says its category (« Aire de jeux intérieure »), as its top line does.
+    : fr && indoorFrTopLabel(venue) ? indoorFrTopLabel(venue) : label.singular;
 
   // Map link (built here so the address row can carry it).
   // Tour test 8 (Whistler, 2026-11-17; Linda): an approved meeting / storefront spot is where people go, so "Open in Google

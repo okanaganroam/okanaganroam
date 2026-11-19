@@ -144,7 +144,7 @@ test('4. Groups for a kids place: the party chips and her line first, then "Scho
 });
 
 test('6. French page: her own English lines stay whole (no chip phrase translated inside them) and are queued for their French; the hub card\'s "more features" is French; the top label is her category', async () => {
-  const { v, t } = await melissa();
+  const { v, t } = await melissa({ description_fr: 'Centre de jeux intérieur à West Kelowna pour les enfants de 0 à 10 ans, avec une grande structure de jeu.' });
   const before = db.prepare("SELECT COUNT(*) AS n FROM venue_menus WHERE venue_id = ? AND help_kind = 'fr_lines'").get(v.id).n;
   await ok(change(t, { visit_rows: { good_to_know: 'Grip socks required. Socks are $3 if you forget. An adult must stay with their kids.', groups: 'Birthday parties with a party room. Private party rooms on weekends, book online.' } }));
   const fr = plain(pageHtml(v, 'fr'));
@@ -162,6 +162,9 @@ test('6. French page: her own English lines stay whole (no chip phrase translate
   // The top label says her category.
   assert.match(fr, /Aire de jeux intérieure · West Kelowna/);
   assert.doesNotMatch(fr, /Activité intérieure · West Kelowna/);
+  const live = await fetch(`${base}/fr/west-kelowna/indoor/${app.getVenue(v.id).slug}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text());
+  const hero = (/class="venue-hero-type">([^<]*)</.exec(live) || [])[1];
+  assert.equal(hero, 'Aire de jeux intérieure');
   // The hub card's folded features.
   const hub = await fetch(`${base}/fr/indoor`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text());
   assert.doesNotMatch(hub, /\d+ more features?</);
@@ -170,7 +173,10 @@ test('6. French page: her own English lines stay whole (no chip phrase translate
 
 test('7. "Why it fits" quotes her own line for a word of the request (sensory) and for a party request (party rooms)', async () => {
   const { v, t } = await melissa({ name: 'Sensory Kidz T9', description: `${STORY} Quiet sensory-friendly hour every Tuesday 9 to 10 AM.` });
-  await ok(change(t, { visit_rows: { good_to_know: 'Grip socks required. Sensory-friendly hour Tuesdays 9-10am.', groups: 'Birthday parties with a party room. Private party rooms on weekends, book online.' } }));
+  // Her Known for too: a full box sets her Groups line aside (owner_dropped); it still counts.
+  await ok(change(t, { visit_rows: { good_to_know: 'Grip socks required. Sensory-friendly hour Tuesdays 9-10am.', groups: 'Birthday parties with a party room. Private party rooms on weekends, book online.', known_for: 'West Kelowna indoor playground: bouncy house, inflatable slides and a padded toddler zone.' } }));
+  setLink(v.id, 'https://example.com/book');
+  assert.match(plain(pageHtml(v)), /Book a party/, 'her Groups line set aside still makes it a party link');
   const stopOf = (p) => itemsOf(p).find((x) => x.venue.id === v.id);
   const s1 = stopOf(app.runTripPlan({ text: 'sensory friendly activity for my son in West Kelowna' }, NOW));
   assert.ok(s1, 'she is in the sensory plan');
