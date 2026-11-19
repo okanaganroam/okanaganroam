@@ -802,7 +802,7 @@
   function tourRentalsOnly(){ var ks = (S.tour && S.tour.kinds) || []; return ks.length > 0 && ks.every(function(k){ return k === 'rentals'; }); }
   // Tour test 12: a second price after the first ("2nd jump same day $69"): the nudge to Your tours and prices.
   function tourPriceLead(){ var l0 = tourPriceLead0(); return S.tour.priceFirst && T.tpriceFirst ? l0 + ' ' + T.tpriceFirst : l0; }
-  function tourPriceLead0(){ var n = S.tour.price; return S.tour.free === 'donation' && T.tpriceLeadDonation ? T.tpriceLeadDonation : S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n) }); }
+  function tourPriceLead0(){ var n = S.tour.price; if (S.tour.free === 'donation' && T.tpriceLeadDonation) return T.tpriceLeadDonation; return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n) }); }
   // "$16" / "16 $".
   function cpText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }
@@ -1488,7 +1488,7 @@
   var INDOOR_CHIP_GROUP = { museum: 'arts', gallery: 'arts', library: 'arts', climbing: 'active', kids: 'active', pool: 'active', spa: 'spa', yoga: 'spa' };
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
-    if (key === 'good_to_know' && INDOOR && (T.quick || {}).good_to_know_kinds) { var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : TI.kinds) || [])[0]; var lk = k0 ? T.quick.good_to_know_kinds[INDOOR_CHIP_GROUP[k0] || 'general'] : null; if (lk && lk.length) l = lk; }
+    if (key === 'good_to_know' && C.indoor && (T.quick || {}).good_to_know_kinds) { var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; var lk = k0 ? T.quick.good_to_know_kinds[INDOOR_CHIP_GROUP[k0] || 'general'] : null; if (lk && lk.length) l = lk; }
     // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
     // isn't offered "Patio only".
     if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;
@@ -1547,7 +1547,7 @@
   // "Open after midnight?" row and no "+ Add a second time" on its day cards. Theatres, bowling, arcades and casinos keep
   // them. The kinds picked (or pre-picked) on What kind of place; none yet: shown as before.
   var INDOOR_QUIET = ['museum', 'gallery', 'library', 'classes'];
-  function indoorQuietKinds(){ if (!INDOOR) return false; var ks = (S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : TI.kinds) || []; return ks.length > 0 && ks.every(function(k){ return INDOOR_QUIET.indexOf(k) >= 0; }); }
+  function indoorQuietKinds(){ if (!C.indoor) return false; var st = typeof S !== 'undefined' && S.tour, ks = (st && st.kinds && st.kinds.length ? st.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || []; return ks.length > 0 && ks.every(function(k){ return INDOOR_QUIET.indexOf(k) >= 0; }); }
   function lateBtns(d, j, y){
     // Café test 1 (Whistler, 2026-11-15): no "Open after midnight?" row on a café's day card.
     if (C.cafe) return '';
@@ -2183,7 +2183,7 @@
           + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '">' + (w.length > 1 ? '<button type="button" class="su-toggle su-rmtime" data-rmtime="' + d + ':' + j + '" aria-label="' + h(T.removeSecond + (C.lang === 'fr' ? '\u00a0: ' : ': ') + t12(y[0]) + ' – ' + t12(y[1])) + '"><span aria-hidden="true">✕</span> ' + h(T.removeSecond) + '</button>' : '') + '</div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + brewQuick(d, j, y, w.length - 1) + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
             // Restaurant test 1 (Whistler, 2026-11-14): lunch and dinner on one day, as the edit page's "+ second time" (two
             // ranges at most, the server's rule). With two, "✕ Remove this time" on each (the one added may be the first).
-            + (w.length < 2 && T.addSecond && !indoorQuietKinds() ? '<div class="su-samerow"><button type="button" class="su-toggle su-addtime" data-addtime="' + d + '">' + h(T.addSecond) + '</button></div>' : '')
+            + (indoorQuietKinds() ? '' : (w.length < 2 && T.addSecond ? '<div class="su-samerow"><button type="button" class="su-toggle su-addtime" data-addtime="' + d + '">' + h(T.addSecond) + '</button></div>' : ''))
             // Restaurant test 3 (Whistler, 2026-11-15): with two times the button goes; the card says why, and how breakfast
             // that runs into lunch fits (start the first time earlier).
             + (w.length >= 2 && T.twoTimesMax ? '<p class="su-hint su-twotimes">' + h(T.twoTimesMax) + '</p>' : '')
@@ -3191,7 +3191,7 @@
       if (CLO_SUB) { S.hoursJust = true; S.hoursNone = false; } else if (C.closuresTile) delete S.savedLine.hours;
       // Indoor test 1 (2026-11-19; Margaret, closed Christmas to mid-January): with summer and winter hours just saved, one
       // line points to Closures for a holiday break (no new step). Not when a yearly closure is already saved.
-      if (INDOOR && T.seaClosuresHint && ch.hours_seasons && ch.hours_seasons.length && !(CUR.closures || []).some(function(c){ return c && c.yearly; })) S.savedLine.hours = T.savedLive + ' ' + T.seaClosuresHint;
+      if (C.indoor && T.seaClosuresHint && ch.hours_seasons && ch.hours_seasons.length && !(CUR.closures || []).some(function(c){ return c && c.yearly; })) S.savedLine.hours = T.savedLive + ' ' + T.seaClosuresHint;
       CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? week : JSON.stringify(week); S.seaStale = stale.length ? stale : null;
       if (tourApptOff) { delete AI.visit; S.wine.visit = ''; }
       tticksSaved(tkpH);
