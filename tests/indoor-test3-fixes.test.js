@@ -123,6 +123,8 @@ test('4 + 5. Price for a theatre: "Tickets from $25" on the page, card and previ
   assert.match(sim.screen(), /Lowest regular adult ticket, in dollars/);
   await sim.type('suTprice', '$25 - $55');
   assert.equal(sim.doc.getElementById('suTpriceLead').textContent, 'We’ll show “Tickets from $25”, your lowest price.');
+  // The box keeps its ticket label while she types (it went back to "Adult price").
+  assert.equal(sim.doc.getElementById('suScreen').querySelector('label[for="suTprice"]').textContent, 'Lowest regular adult ticket, in dollars');
   await sim.click('priceSave');
   assert.equal(app.indoorPrice(v.id), 25);
   const en = plain(page(v)), fr = plain(page(v, 'fr'));

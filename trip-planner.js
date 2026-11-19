@@ -7621,13 +7621,14 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       // closed Wednesdays in winter) was still offered as "Another listing" (hoursFit is only checked with a daypart).
       // Brewery test 4 follow-up (2026-11-13): it's offered only with the day it's closed ("Closed Mondays (Oct–Apr) · try
       // Tue–Sun"), never as "Another listing"; without that fact it's still left out.
-      const closedWd = !daypart && dayClosedAllDay(venue, visitDate, weekday) ? (/^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? WEEKDAYS[(new Date(`${visitDate}T12:00:00Z`).getUTCDay() + 6) % 7] : String(weekday || '').toLowerCase().slice(0, 3)) : null;
       // Indoor test 3: a show place on a show night is never "Closed" by its (box office) hours.
       const showDate = /^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? visitDate : null;
-      const showWd = closedWd || (showDate ? WEEKDAYS[(new Date(`${showDate}T12:00:00Z`).getUTCDay() + 6) % 7] : weekday ? String(weekday).toLowerCase().slice(0, 3) : null);
+      const showWd = showDate ? WEEKDAYS[(new Date(`${showDate}T12:00:00Z`).getUTCDay() + 6) % 7] : weekday ? String(weekday).toLowerCase().slice(0, 3) : null;
       const showNight = daypart !== 'morning' && showPlaceOn(venue, showDate, showWd);
-      const closedAll = closedWd && !showNight ? closedDayInfo(venue, closedWd) : null;
-      if (closedWd && !closedAll && !showNight) continue;
+      const closedWd = !daypart && dayClosedAllDay(venue, visitDate, weekday) ? (/^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? WEEKDAYS[(new Date(`${visitDate}T12:00:00Z`).getUTCDay() + 6) % 7] : String(weekday || '').toLowerCase().slice(0, 3)) : null;
+      let closedAll = closedWd ? closedDayInfo(venue, closedWd) : null;
+      if (closedWd && !closedAll) continue;
+      if (showNight) closedAll = null;
       const exact = tripRequirements.matches(venue, item);
       const kinds = venue.plannerKinds || tripRequirements.inferPlannerKinds(venue);
       const related = !exact && adjacent.some(k => kinds.includes(k) || (venue.activities || []).includes(k));

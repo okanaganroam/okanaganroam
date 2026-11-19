@@ -2605,7 +2605,7 @@
       // Sent already: say so in the heading, Next is the main button, and a newer menu is the smaller choice (as photos).
       x = (sentM ? q(T.menuSentQ) + msgs() + '<div class="su-stack" style="margin-bottom:22px">' + big('➜', nextLabel('menu'), '', false, 'after:menu') + '</div><h2 class="su-h2">' + h(T.menuNewer) + '</h2>'
           : (S.done.menu === 'email' ? '<p class="su-sent">' + h(T.menuSentEmail) + '</p>' : '') + q(T.menuQ, T.menuLead) + msgs())
-        + '<div class="su-stack">' + (INDOOR && FINE ? '' : big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam')) + big('📄', T.upload, T.uploadSub, INDOOR && FINE ? sentM : true, 'go:menu:upload') + (C.website ? big('🌐', T.web, '', true, 'go:menu:web') : '') + big('📘', T.menuSocial, fbKnown() ? fill(T.menuFbKnown, { x: siteDomain(fbKnown()) }) : '', true, 'go:menu:social')
+        + '<div class="su-stack">' + (INDOOR && FINE ? '' : big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam')) + big('📄', T.upload, T.uploadSub, true, 'go:menu:upload') + (C.website ? big('🌐', T.web, '', true, 'go:menu:web') : '') + big('📘', T.menuSocial, fbKnown() ? fill(T.menuFbKnown, { x: siteDomain(fbKnown()) }) : '', true, 'go:menu:social')
         // Café test 2 (2026-11-11): flavours that change every day ("see Instagram / Facebook / the board").
         + (C.cafe ? big('🔄', iceKind() ? T.menuDailyIce : T.menuDaily, T.menuDailySub, true, 'go:menu:daily') : '')
         // Tour test 9 (Whistler, 2026-11-18; Tanis, no price sheet): "Type them in myself" opens the edit page's own typed
@@ -2644,9 +2644,10 @@
       var site = siteUrl(C.website), siteHost = siteHostOf(C.website);
       // Indoor test 3 (2026-11-19; Diane's theatre was offered the city's page, not the tickets link she had just saved): an
       // indoor place's saved booking or tickets link (or, for a theatre, the one research found) fills the box first.
+      var lead2 = s === 'menu:web' ? (site ? T.webLead : T.webLeadEmpty) : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
+      var urlNow = S.webUrl != null ? S.webUrl : site;
       var tixUrl = INDOOR && s === 'menu:web' && T.webLeadTickets ? ((S.done.booking && S.bookUrl && /\S\.\S/.test(S.bookUrl) ? S.bookUrl : '') || CUR.booking_url || (indoorShow() ? C.bookingKnown : '') || '') : '';
-      var lead2 = s === 'menu:web' ? (tixUrl ? T.webLeadTickets : site ? T.webLead : T.webLeadEmpty) : p[0] === 'happy' ? T.webWhereHappy : T.webWhereSpecials;
-      var urlNow = S.webUrl != null ? S.webUrl : tixUrl || site;
+      if (tixUrl) { lead2 = T.webLeadTickets; if (S.webUrl == null) urlNow = tixUrl; }
       x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, urlNow, { mode: 'url', max: 300 })
         // Pub test 7 (2026-11-10): one tap for the website she typed or we have ("Use sandbarpub.ca"); never one being removed.
         // Café test 5 (2026-11-12): hidden while the box already holds that address (it read as a puzzle beside it).
@@ -2666,7 +2667,10 @@
       // Winery test 2 (2026-11-12): research's Plan your visit lines (free parking, step-free, dogs welcome) pre-tick their
       // tiles the same way: suggestions only, saved with this screen, while it has never been saved.
       // Pub test 3 (Whistler, 2026-11-14): pubs too (research's "Free parking" in Good to know), only on an untouched tile.
-      if ((C.winery || C.brewery || C.pub || C.restaurant || INDOOR) && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
+      if ((C.winery || C.brewery || C.pub || C.restaurant) && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'dog_friendly' && S.noDogs)) return false; S.badges[k] = true; return true; }); }
+      // Indoor test 3 (2026-11-19): indoor places too (research's "Four wheelchair spaces; elevator" pre-ticks Wheelchair
+      // accessible, "We picked these…"; saved only with this screen).
+      if (INDOOR && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k]) return false; S.badges[k] = true; return true; }); }
       // Café test 1 (Whistler, 2026-11-15): cafés too (research's "Free Wi-Fi" and "Free parking"); never over her "No Wi-Fi".
       if (C.cafe && !S.done.offer && !S.visitTicksSet) { S.visitTicksSet = true; S.visitTicked = (C.visitTicks || []).filter(function(k){ if (S.badges[k] || (k === 'wifi' && S.noWifi)) return false; S.badges[k] = true; return true; }); }
       // Pub test 5: tiles pre-ticked from our research say so, above the tiles (until the owner has saved this screen).
@@ -4801,7 +4805,7 @@
       // Indoor test 2: per room words pick Per room or group as she types (the box keeps her focus).
       if (INDOOR && el('suPerChips')) { Array.prototype.forEach.call(screen.querySelectorAll('[data-iper]'), function(b){ var u = b.getAttribute('data-iper'); b.setAttribute('aria-pressed', (u === 'group' ? !!S.tour.per : !S.tour.per) ? 'true' : 'false'); });
         var pq = el('suPerRead'); if (pq) { pq.hidden = !(S.tour.per && S.tour.perAuto); pq.textContent = S.tour.per ? fill(T.iperRead, { u: (T.iperWords || {})[S.tour.per] || S.tour.per }) : ''; }
-        var pl = screen.querySelector('label[for="suTprice"]'); if (pl) pl.textContent = S.tour.per && T.iperOne ? T.iperOne[S.tour.per] : T.tpriceLabel; } var fg = el('suFeeGuess'); if (fg && !S.tour.priceGuessed) fg.hidden = true; var fh = el('suFreeHint'); if (fh) fh.hidden = !!S.tour.free; });
+        var pl = screen.querySelector('label[for="suTprice"]'); if (pl) pl.textContent = S.tour.per && T.iperOne ? T.iperOne[S.tour.per] : indoorShow() ? T.tpriceLabelShow : T.tpriceLabel; } var fg = el('suFeeGuess'); if (fg && !S.tour.priceGuessed) fg.hidden = true; var fh = el('suFreeHint'); if (fh) fh.hidden = !!S.tour.free; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-wpick]'), function(b){ b.onclick = function(){
       readWine(); var q8 = b.getAttribute('data-wpick').split(':'), key8 = q8[0], val8 = key8 === 'groups' ? +q8[1] : q8[1];
       S.wine[key8] = String(S.wine[key8]) === String(val8) ? (key8 === 'groups' ? 0 : '') : val8; redraw(); }; });

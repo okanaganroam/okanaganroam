@@ -6103,9 +6103,10 @@ const SEARCH_NARROW_TOPICS = [
   { key: 'comedy', heading: 'Comedy', headingFr: 'Humour', applies: (folded, intent) => (intent.regions || []).length === 1 || /\bclubs?\b/.test(folded),
     words: ['comedy', 'comedy show', 'comedy shows', 'comedy night', 'comedy nights', 'comedy club', 'comedy clubs', 'comedy lounge', 'comedian', 'comedians', 'improv', 'stand up comedy'], extra: ['club', 'clubs', 'lounge', 'lounges'],
     test: (e) => searchShowKind(e) === 'comedy', rank: (e) => (SEARCH_COMEDY_RE.test(String(e.name || '')) ? 1 : 0),
-    // Indoor test 3 (2026-11-19): and the town's theatres whose own words say they host comedy ("Hosts comedy · check show dates").
-    places: (region) => { const clubs = smartPickVenues((v) => (!region || v.region === region) && SEARCH_COMEDY_PLACE_RE.test(String(v.row.name || '')) && 'Comedy club', (v) => foodDrinkRecommendedScore(v.row));
-      return clubs.concat(searchShowPlaces(region, 'comedy').filter((x) => !clubs.some((c) => c.row.id === x.row.id))); },
+    places: (region) => smartPickVenues((v) => (!region || v.region === region) && SEARCH_COMEDY_PLACE_RE.test(String(v.row.name || '')) && 'Comedy club', (v) => foodDrinkRecommendedScore(v.row)),
+    // Indoor test 3 (2026-11-19): with no comedy night listed in town, the town's theatres whose own words say they host
+    // comedy ("Hosts comedy · check show dates").
+    showKeys: ['comedy'],
     guide: '/guides/okanagan-comedy-shows',
     emptyText: 'No comedy nights are listed here for the next few weeks yet. See the whole valley in our Comedy & Live Shows guide.', emptyTextFr: 'Aucune soirée d’humour n’est encore annoncée ici pour les prochaines semaines. Voyez toute la vallée dans notre guide de l’humour et des spectacles.' },
 ];
@@ -6117,7 +6118,7 @@ const SEARCH_EVENT_TOPICS = [
     words: ['show', 'shows', 'a show', 'the show', 'live show', 'live shows', 'stage show', 'stage shows', 'performance', 'performances', 'live performance', 'live performances',
       'spectacle', 'spectacles', 'un spectacle'],
     test: (e) => !!searchShowKind(e), rank: (e) => ({ comedy: 4, theatre: 3, show: 2, music: 1 })[searchShowKind(e)] || 0,
-    places: (region) => (region ? searchShowPlaces(region, 'plays').concat(searchShowPlaces(region, 'music')).filter((x, i, a) => a.findIndex((y) => y.row.id === x.row.id) === i) : []),
+    showKeys: ['plays', 'music'],
     emptyText: 'No shows are listed for the next few weeks yet. See everything on What’s On.', emptyTextFr: 'Aucun spectacle n’est encore annoncé pour les prochaines semaines. Voyez tout ce qui se passe dans À l’affiche.' },
   { key: 'classical', heading: 'Classical music', headingFr: 'Musique classique',
     words: ['classical', 'classical music', 'classical concert', 'classical concerts', 'symphony', 'symphonies', 'symphony orchestra', 'orchestra', 'orchestras', 'chamber music', 'string quartet',
@@ -6227,7 +6228,13 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
       headingFr: `${eventTopic.headingFr}${town ? ` à ${town}` : ''}`,
       emptyText: eventTopic.emptyText, emptyTextFr: eventTopic.emptyTextFr,
       guides: comedyGuide ? [{ path: comedyGuide.path, heading: comedyGuide.heading }] : [],
-      list: () => (eventTopic.places ? eventTopic.places(region) : []),
+      list: () => {
+        const own = eventTopic.places ? eventTopic.places(region) : [];
+        // Indoor test 3: nothing dated in town: the theatres there whose own words say they host it.
+        if (!region || !eventTopic.showKeys || (searchTopicEvents(eventTopic, R, now).items || []).length) return own;
+        const more = eventTopic.showKeys.flatMap((k) => searchShowPlaces(region, k));
+        return own.concat(more.filter((x, i) => !own.some((c) => c.row.id === x.row.id) && more.findIndex((y) => y.row.id === x.row.id) === i));
+      },
       events: () => searchTopicEvents(eventTopic, R, now),
     };
   }
@@ -59270,7 +59277,7 @@ const INDOOR_SETUP_HELP_TOPICS = [
   // Indoor test 3 (2026-11-19; Diane): three questions that dead-ended at "I'm not sure".
   { id: 'indoor-ticket-prices', pages: ['setup', 'edit'], over: ['indoor-price', 'price-range', 'avg-spend', 'cost', 'menu-add'], noRelated: ['cost'],
     q: 'Our ticket prices change every show', qFr: 'Le prix de nos billets change à chaque spectacle',
-    keys: ['ticket prices change', 'ticket prices change every show', 'prices change every show', 'price changes every show', 'prices vary', 'price varies', 'prices change', 'varies by show', 'depends on the show', 'depending on the show', 'different for every show', 'every show is different', 'each show is different', 'change every show', 'different prices for each show', 'prices are different for each show', 'price range', 'range of prices', 'from 25 to 55', 'between', 'sliding scale'],
+    keys: ['ticket prices change', 'ticket prices change every show', 'prices change every show', 'price changes every show', 'prices vary', 'price varies', 'prices change', 'varies by show', 'depends on the show', 'depending on the show', 'different for every show', 'every show is different', 'each show is different', 'change every show', 'different prices for each show', 'prices are different for each show', 'range of prices', 'ticket price range', 'sliding scale'],
     keysFr: ['le prix change', 'les prix changent', 'prix des billets change', 'les prix varient', 'le prix varie', 'selon le spectacle', 'chaque spectacle', 'different pour chaque spectacle', 'ca depend du spectacle', 'fourchette de prix'],
     a: '<p>Put your lowest regular adult ticket, like <em>25</em>. Your card says <strong>From $25</strong>. Link your tickets page in <strong>Your prices</strong> (in More about your place), so people see each show’s price.</p>',
     aFr: '<p>Indiquez votre billet adulte régulier le moins cher, comme <em>25</em>. Votre fiche indique <strong>À partir de 25 $</strong>. Mettez le lien de votre page de billets dans <strong>Vos tarifs</strong> (dans Plus sur votre endroit), pour que les gens voient le prix de chaque spectacle.</p>' },
