@@ -79,8 +79,11 @@ function renderIndoorLayout(p) {
   const nav = [['gbOverview', 'Overview'], bookingCard ? ['gbBooking', book ? 'Book' : 'Prices'] : pricesCard && ['gbPrices', 'Prices'], visitCard && ['gbVisit', 'Your visit'], contactCard && ['gbContact', 'Getting here'], hoursCard && ['gbHours', 'Hours']]
     .filter(Boolean).map(([id, label]) => `<a href="#${id}">${label}</a>`).join('');
 
-  const more = (rest || p.guideLinks)
-    ? `<section class="gb-card gb-more"><h2>A little more about ${e(v.name)}</h2><details class="gb-fold"><summary>The space</summary><p>${e(v.description || '')}</p>${p.guideLinks || ''}</details></section>` : '';
+  // Indoor test 7 (2026-11-19; Robert): with the whole story already the intro, "The space" repeated it word for word. It
+  // shows only when it has more to say; the guide links stay on their own.
+  const more = rest
+    ? `<section class="gb-card gb-more"><h2>A little more about ${e(v.name)}</h2><details class="gb-fold"><summary>The space</summary><p>${e(v.description || '')}</p>${p.guideLinks || ''}</details></section>`
+    : p.guideLinks ? `<section class="gb-card gb-more">${p.guideLinks}</section>` : '';
 
   return `<div id="gbLayout" class="gb-generic">
     <nav class="gb-nav" aria-label="Page sections">${nav}</nav>

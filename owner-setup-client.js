@@ -71,6 +71,8 @@
     var story = String(CUR.description || '') + ' ' + String(((CUR.visit_rows || {}).known_for) || '');
     return ks.some(function(k){ return INDOOR_NOT_FAMILY.indexOf(k) < 0 || (k === 'theatre' && /\b(?:kids?|children)[’']?s?\s+(?:shows?|theatre|theater|plays?)|family (?:shows?|theatre|theater)|pour enfants/i.test(story)); });
   }
+  // Indoor test 7: an indoor place where people just walk in, with no booking link yet: its booking boxes fold away.
+  function walkInFold(link){ return INDOOR && !!T.haveBookPage && !String(link || '').trim() && ((S.tour && S.tour.book) || (TI && TI.book)) === 'no'; }
   function freeIndoor(){ return INDOOR && (CUR.indoor_price === 'free' || CUR.indoor_price === 'donation' || S.savedTourPrice === 'free' || S.savedTourPrice === 'donation'); }
   function itemStep(k){ return (INDOOR && INDOOR_ITEM_STEP[k]) || (TOUR && TOUR_ITEM_STEP[k]) || (C.winery && WINERY_ITEM_STEP[k]) || (C.brewery && BREWERY_ITEM_STEP[k]) || (CK && COCKTAIL_ITEM_STEP[k]) || ''; }
   var DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -2326,7 +2328,8 @@
             // doesn't: Sat–Sun made Sunday close at midnight as well).
             + (d === 'fri' && T.copySat && copyGets('fri', 'sat') ? '<button type="button" class="su-toggle" data-copysat="fri">' + h(T.copySat) + '</button>' : '')
             // Indoor test 6 (Priya): closed Mondays, open Tuesday to Saturday: "Tue–Sat" beside Mon–Fri, only when Monday is closed.
-            + (T.copyTueSat && !W().mon && TUE_SAT.indexOf(d) >= 0 ? '<button type="button" class="su-toggle" data-copytuesat="' + d + '">' + h(T.copyTueSat) + '</button>' : '')
+            // Indoor test 7 (Robert, closed Monday and Tuesday): not when Tuesday itself is closed.
+            + (T.copyTueSat && !W().mon && W().tue && TUE_SAT.indexOf(d) >= 0 ? '<button type="button" class="su-toggle" data-copytuesat="' + d + '">' + h(T.copyTueSat) + '</button>' : '')
             + '<button type="button" class="su-toggle" data-copywe="' + d + '">' + h(T.copyWeekend) + '</button>' + hDone(d) + '</div>'
             // Said once, under the first open card (café test 5: it repeated under every open day).
             + (!seas && d === firstOpenCard && DAYS.some(function(x){ return x !== d && !copyGets(d, x); }) ? '<p class="su-hint su-copynote">' + h(T.copyClosedNote) + '</p>' : '') : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
@@ -2500,9 +2503,13 @@
       var ib = S.tour, ibNow = S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '';
       x = doneLine('booking') + '<h1 id="suQ">' + h(indoorShow() ? T.ibookQShow : T.ibookQ) + '</h1>' + (ib.bookGuessed && ib.book && T.guessKind ? '<p class="su-sent su-research" id="suBookGuess">' + h(T.guessKind) + '</p>' : '') + msgs()
         + tbig('book', ['no', 'busy', 'ahead'], indoorShow() ? T.ibooksShow : T.ibooks, null, 'suQ')
+        // Indoor test 7 (2026-11-19; Robert's walk-in gallery): with walk-ins welcome and no link yet, the booking link
+        // folds behind "Have a booking page?" (it still saves the same way when opened).
+        + (walkInFold(ibNow) ? '<details class="su-fold" id="suBookFold"><summary>' + h(T.haveBookPage) + '</summary>' : '')
         + '<h2 class="su-h2" id="suLinkQ">' + h(T.tbookQ) + '</h2><p class="su-hint">' + h(T.tbookLead) + '</p>'
         + (ib.noBook ? '' : field('suBookUrl', T.bookLinkLabel, ibNow, { mode: 'url', max: 300 }) + ex(T.bookLinkEx))
         + (CUR.booking_url || C.bookingKnown ? '' : '<div class="su-chips" role="group" aria-labelledby="suLinkQ"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ib.noBook ? 'true' : 'false') + '" data-tnobook="1">' + h(T.noBookLink) + '</button></div>')
+        + (walkInFold(ibNow) ? '</details>' : '')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'bookingSave') + '</div>' + skip('booking');
     } else if (s === 'tour') {
       // Tours (2026-11-16): "What do you offer?" (up to 3 kinds; the 12 most common open, the rest under "More kinds") and
@@ -2938,7 +2945,9 @@
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180, area: true }) : '')
         // Tour test 1 (Whistler, 2026-11-16): a tour is asked for its booking link once, on Booking; here only when not given.
         + (TL && (CUR.booking_url || C.bookingKnown || String(S.bookUrl || '').trim() || S.tour.noBook) ? ''
-          : '<div id="suBookBox" style="margin-top:14px">' + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p></div>')
+          : (walkInFold(S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '') ? '<details class="su-fold" id="suBookFold" style="margin-top:14px"><summary>' + h(T.haveBookPage) + '</summary>' : '')
+            + '<div id="suBookBox" style="margin-top:14px">' + field('suBookUrl', T.bookLinkLabel, S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '', { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + '<p class="su-hint">' + h(T.bookLinkHint) + '</p></div>'
+            + (walkInFold(S.bookUrl != null ? S.bookUrl : CUR.booking_url || C.bookingKnown || '') ? '</details>' : ''))
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'brewGroupsSave') + '</div>' + skip('groups');
     } else if (s === 'groups') { x = yesNo('groups', T.groupsQ, T.groupsLead);
     } else if (s === 'instagram' || s === 'facebook') {

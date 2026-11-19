@@ -175,6 +175,8 @@ function t3FrenchTextCore(value){
   const one=(part)=>part.replace(/^(.+) is open (\w{3})(?:([–,]) ?(\w{3}))? only(?: \((\w{3})–(\w{3})\))?$/,(_,n,a,sep,b,m1,m2)=>n+' — Seulement '+(b?(sep==='–'?'du '+FRL[a]+' au '+FRL[b]:'le '+FRL[a]+' et le '+FRL[b]):'le '+FRL[a])+(m1?' ('+FRM[m1]+'–'+FRM[m2]+')':''));
   if(!/; .+ is closed /.test(text))return text.slice(0,-1).split('; ').map(one).join(' ; ')+'.';
  }
+ // Indoor test 7 (2026-11-19): the places that match but are closed all that weekday ("Closed Mondays: A, B.").
+ text=text.replace(/^Closed (Mondays|Tuesdays|Wednesdays|Thursdays|Fridays|Saturdays|Sundays): (.+)\.$/,(_,d,n)=>`Fermés le ${({Mondays:'lundi',Tuesdays:'mardi',Wednesdays:'mercredi',Thursdays:'jeudi',Fridays:'vendredi',Saturdays:'samedi',Sundays:'dimanche'})[d]} : ${n}.`);
  // Cocktail test 1 (2026-11-13): a list for a named day whose matches are closed all that day.
  if(/^.+ is closed (?:Mondays|Tuesdays|Wednesdays|Thursdays|Fridays|Saturdays|Sundays)(?: \([A-Z][a-z]{2}–[A-Z][a-z]{2}\))? · try [^;]+(?:; .+ is closed .+)*\.$/.test(text)){
   const FRL={Mondays:'lundi',Tuesdays:'mardi',Wednesdays:'mercredi',Thursdays:'jeudi',Fridays:'vendredi',Saturdays:'samedi',Sundays:'dimanche'},FRD={Mon:'lundi',Tue:'mardi',Wed:'mercredi',Thu:'jeudi',Fri:'vendredi',Sat:'samedi',Sun:'dimanche'},FRS={Mon:'lun',Tue:'mar',Wed:'mer',Thu:'jeu',Fri:'ven',Sat:'sam',Sun:'dim'};

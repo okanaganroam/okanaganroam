@@ -803,6 +803,21 @@ function indoorAskedFits(asked, v) {
   if (/[Rr]ental/.test(asked)) return !!v.isShop || /\b(?:rentals?|rent|hire)\b/.test(t);
   return true;
 }
+// The page words of each indoor kind (server.js INDOOR_KIND_WORDS), English and French.
+const INDOOR_CARD_WORDS = {
+  gallery: ['Art gallery', 'Galerie d’art'], museum: ['Museum', 'Musée'], theatre: ['Live theatre & shows', 'Théâtre et spectacles'], cinema: ['Cinema', 'Cinéma'],
+  spa: ['Spa & sauna', 'Spa et sauna'], pool: ['Pool & rec centre', 'Piscine et centre récréatif'], climbing: ['Climbing & trampoline', 'Escalade et trampoline'],
+  games: ['Arcade, VR & laser tag', 'Arcade, réalité virtuelle et laser tag'], escape: ['Escape room', 'Jeu d’évasion'], bowling: ['Bowling', 'Quilles'],
+  kids: ['Indoor playground', 'Aire de jeux intérieure'], classes: ['Classes & workshops', 'Cours et ateliers'], curling: ['Curling', 'Curling'],
+  yoga: ['Yoga & fitness classes', 'Yoga et cours de mise en forme'], casino: ['Casino', 'Casino'], library: ['Library', 'Bibliothèque'],
+};
+function indoorCardKind(v) {
+  const own = Array.isArray(v.indoorKinds) ? v.indoorKinds.find((k) => INDOOR_CARD_WORDS[k]) : null;
+  if (own) return INDOOR_CARD_WORDS[own];
+  const c = String(v.cuisine || '').trim().toLowerCase();
+  const hit = c && Object.values(INDOOR_CARD_WORDS).find((w) => w[0].toLowerCase() === c);
+  return hit || null;
+}
 function indoorVenueLabel(ctx, v, form = 'singular') {
   const asked = indoorAskedLabel(ctx.queryText, form);
   if (!asked || indoorAskedFits(asked, v)) return typeLabel(ctx, 'indoor', form);
@@ -2041,6 +2056,9 @@ function publicVenue(v, ctx) {
     // Brewery test 3 (2026-11-13): the kind the owner picked (« Cidrerie »), in French too.
     ...(v.type === 'brewery' && BREWERY_KIND_LABEL[v.breweryKind] ? { typeLabelFr: BREWERY_KIND_LABEL[v.breweryKind][1] } : {}),
     ...(v.type === 'cocktail' ? { typeLabelFr: 'Bar à cocktails' } : {}),
+    // Indoor test 7 (2026-11-19; Robert's card read "Indoor attraction" in one plan and "Art gallery" in another): an indoor
+    // place's card always says its own kind (the owner's main kind, else its listed kind), in French too.
+    ...(v.type === 'indoor' && indoorCardKind(v) ? { typeLabel: indoorCardKind(v)[0], typeLabelFr: indoorCardKind(v)[1] } : {}),
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
     // Tour test 4: no $-$$$$ tier beside a tour's own price ("Free · $$", "From $35 · $$").
     rating: v.rating, reviews: v.reviews, price: tourIsFree || tourFrom || indoorFrom || (v.type === 'indoor' && v.indoorFree) ? null : v.price, freeEntry: !!v.features?.free_entry || (v.type === 'indoor' && !!v.indoorFree), address: v.address || null,
@@ -8131,6 +8149,19 @@ function planTripCore(input) {
   result.recommendations = rec.items;
   result.totalMatches = rec.total;
   if (rec.items.length && homeClosedLines.length) result.warnings.unshift(`${homeClosedLines.join('; ')}.`);
+  // Indoor test 7 (2026-11-19; "art gallery Kelowna Monday" quietly left out Robert's gallery and the Kelowna Art Gallery,
+  // both closed Mondays, because another gallery was open): a list for a named weekday and a kind of place names the ones
+  // that match but are closed all that day ("Closed Mondays: Hambleton Galleries, Kelowna Art Gallery."), in the same town too.
+  if (rec.items.length && !homeClosedLines.length && (ctx.plannerKinds || []).length && !borrowedTown) {
+    const wd = String(ctx.startWeekday || '').toLowerCase().slice(0, 3);
+    if (WEEKDAYS.includes(wd)) {
+      const shown = new Set(rec.items.map((i) => i.venue && i.venue.id));
+      const shut = buildRecommendations(facts, { ...ctx, startWeekday: null, whenDaypart: null }).items.map((x) => x.venue && facts.find((f) => f.id === x.venue.id))
+        .filter((f) => f && !shown.has(f.id) && !showPlaceOn(f, null, wd) && closedDayInfo(f, wd)).map((f) => f.name);
+      const ENL = { mon: 'Mondays', tue: 'Tuesdays', wed: 'Wednesdays', thu: 'Thursdays', fri: 'Fridays', sat: 'Saturdays', sun: 'Sundays' };
+      if (shut.length) result.warnings.push(`Closed ${ENL[wd]}: ${shut.slice(0, 5).join(', ')}.`);
+    }
+  }
   // Indoor test 5 (2026-11-19; "bouldering in Vernon on Christmas Day" listed Kelowna's gyms and never said why Chris's
   // park wasn't there): a place of the kind asked for, in the town asked for, closed that day by its owner's own closure
   // says so ("The Rock Garden is closed Dec 25 (Christmas Day).").

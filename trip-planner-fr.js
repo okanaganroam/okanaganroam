@@ -79,7 +79,7 @@ const PHRASES = [
   ['atelier de poterie', 'pottery class'], ['cours de poterie', 'pottery class'],
   ['atelier de ceramique', 'pottery class'], ['cours de ceramique', 'pottery class'],
   ['galerie d art', 'art gallery'], ['galeries d art', 'art galleries'],
-  ['musee', 'museum'], ['musees', 'museums'], ['galerie', 'gallery'], ['galeries', 'galleries'],
+  ['musee', 'museum'], ['musees', 'museums'], ['galerie', 'art gallery'], ['galeries', 'art galleries'],
   ['salle d escalade', 'climbing gym'], ['quilles', 'bowling'], ['cinema', 'cinema'],
   ['obligatoirement', 'must'], ['obligatoire', 'must'], ['seulement', 'only'], ['idealement', 'ideally'],
   ['repas vegetariens', 'vegetarian meals'], ['repas vegetariens seulement', 'only vegetarian meals'],
@@ -370,7 +370,7 @@ const PHRASES = [
   ['marches', 'markets'],
   ['marche fermier', 'farmers market'], ['marche des fermiers', 'farmers market'], ['marche public', 'farmers market'],
   ['marches publics', 'farmers markets'], ['marche de producteurs', 'farmers market'], ['marches fermiers', 'farmers markets'],
-  ['partie de hockey', 'hockey game'], ['match de hockey', 'hockey game'], ['galerie', 'gallery'], ['galeries', 'galleries'],
+  ['partie de hockey', 'hockey game'], ['match de hockey', 'hockey game'], ['galerie', 'art gallery'], ['galeries', 'art galleries'],
   ['quoi de neuf', 'whats on'], ['ce qui se passe', 'whats on'],
   // who is coming
   ['avec mon chien', 'with my dog'], ['avec ma chienne', 'with my dog'], ['avec le chien', 'with the dog'],

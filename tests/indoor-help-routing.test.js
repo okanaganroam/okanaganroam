@@ -442,3 +442,58 @@ test('other types keep their own help: no indoor topics on a tour or a restauran
   for (const id of ['indoor-fill-all', 'indoor-price', 'indoor-booking', 'indoor-groups']) { assert.equal(tour.en.topic(id), undefined, id); assert.equal(rest.en.topic(id), undefined, id); }
   assert.equal(rest.en.best('price range').id, 'price-range');
 });
+
+// Indoor test 7 (2026-11-19; Robert, a commercial art gallery in Kelowna: free entry, art for sale and shipped, a new
+// exhibition every month with a First Friday opening reception 6–8 PM): every question in his help log, with its French twin.
+const GALLERY_ASKED = [
+  ['en', 'is there a fee for this', ['indoor-cost']],
+  ['en', 'what is the catch, are you going to sell me advertising', ['indoor-cost']],
+  ['en', 'is this a scam', ['indoor-cost']],
+  ['en', 'are you going to upsell me', ['indoor-cost']],
+  ['en', 'do you charge commission on art sales', ['indoor-cost']],
+  ['en', 'first friday openings 6 to 8', ['indoor-openings']],
+  ['en', 'we have an opening reception the first friday of every month from 6 to 8, where does that go?', ['indoor-openings']],
+  ['en', 'opening night is outside my hours, do I change my hours?', ['indoor-openings']],
+  ['en', 'vernissage', ['indoor-openings']],
+  ['en', 'artist talk on saturday', ['indoor-openings']],
+  ['en', 'exhibition opening', ['indoor-openings']],
+  ['en', 'entry is free but the art is for sale', ['indoor-free']],
+  ['en', 'entry is free, do I need to put the prices of the paintings here?', ['indoor-free']],
+  ['en', 'we have a new exhibition every month', ['indoor-exhibits']],
+  ['en', 'can I list our artists', ['indoor-artists']],
+  ['en', 'can I put the names of the artists we represent', ['indoor-artists']],
+  ['en', 'we ship art anywhere in canada', ['indoor-good-to-know']],
+  ['en', 'we do shipping', ['indoor-good-to-know']],
+  ['en', 'how do I change my opening hours', ['hours']],
+  ['fr', 'y a-t-il des frais pour ça', ['indoor-cost']],
+  ['fr', 'quelle est l’attrape, allez-vous me vendre de la publicité', ['indoor-cost']],
+  ['fr', 'est-ce une arnaque', ['indoor-cost']],
+  ['fr', 'vernissage le premier vendredi de 18 h à 20 h', ['indoor-openings']],
+  ['fr', 'nous avons une réception le premier vendredi de chaque mois', ['indoor-openings']],
+  ['fr', 'l’entrée est gratuite mais les œuvres sont à vendre', ['indoor-free']],
+  ['fr', 'nouvelle exposition chaque mois', ['indoor-exhibits']],
+  ['fr', 'puis-je nommer les artistes que nous représentons', ['indoor-artists']],
+  ['fr', 'nous expédions partout au Canada', ['indoor-good-to-know']],
+];
+test('indoor test 7: a gallery’s questions (Robert’s help log, EN + FR) land on the right answers; openings are events, the free answer says Your prices can be skipped', async () => {
+  const v = app.createVenue({ name: `Hambleton Help ${++n}`, slug: `indoor-help-${n}`, region: 'kelowna', type: 'indoor', latitude: 49.89, longitude: -119.49, address: `${n} Ellis St, Kelowna`, description: 'A commercial art gallery.', cuisine: 'Art gallery' });
+  const t = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const ch = (changes) => fetch(`${base}/owner/${t}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify({ changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) }).then((r) => r.status);
+  assert.ok([200, 201].includes(await ch({ indoor_info: { kinds: ['gallery'], length: '1h', book: 'no', age: 'all' }, indoor_price: 'free' })));
+  const en = helpBot(await get(`/owner/${t}/setup`)), fr = helpBot(await get(`/fr/owner/${t}/setup`));
+  const wrong = [];
+  for (const [lang, q, want] of GALLERY_ASKED) {
+    const r = (lang === 'fr' ? fr : en).best(q);
+    if (!r || !want.includes(r.id)) wrong.push(`[${lang}] "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+  }
+  assert.deepEqual(wrong, []);
+  // Every question in his real log lands somewhere ("I’m not sure" no more).
+  const log = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'drafts', 'fresh-eyes-indoor7-2026-11-19', 'help-log.json'), 'utf8'));
+  for (const x of log.filter((y) => !/^\[/.test(y.q))) { const r = en.best(x.q); assert.ok(r && r.id, `${x.q} -> nothing`); }
+  const plain = (h) => String(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  assert.match(plain(en.topic('indoor-openings').a), /Keep your hours as your open-door hours; add the opening as an event/);
+  assert.match(plain(fr.topic('indoor-openings').aFr), /ajoutez le vernissage comme un événement/);
+  assert.match(plain(en.topic('menu-add').a), /^\s*Free entry\? You can skip this\./);
+  assert.match(plain(en.topic('indoor-free').a), /You can skip Your prices/);
+  assert.match(plain(en.topic('indoor-cost').a), /no catch/);
+});

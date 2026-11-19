@@ -2549,6 +2549,9 @@ Object.assign(fr.indoor, { webLeadTickets: 'Nous avons inscrit votre page de bil
     classes: 'La poterie à peindre soi-même et des cours de tour pour débutants' } });
 // Indoor test 1 (2026-11-19; Margaret: "I don't speak French, do I have to update the French description"): the
 // finish screen's French line says it's optional and we translate it.
+// Indoor test 7 (2026-11-19): the booking link folds behind this for a walk-in place.
+Object.assign(en.indoor, { haveBookPage: 'Have a booking page?' });
+Object.assign(fr.indoor, { haveBookPage: 'Vous avez une page de réservation?' });
 Object.assign(en.indoor, { frDescOld: 'Optional: we translate your story into French for you. Speak French?', frDescGo: 'Check the French yourself' });
 Object.assign(fr.indoor, { frDescOld: 'Facultatif : nous traduisons votre histoire en français pour vous. Vous parlez français?', frDescGo: 'Vérifiez le français vous-même' });
 // Good to know quick answers for indoor places, and the Groups line's. Presets: the page shows each in its own language.

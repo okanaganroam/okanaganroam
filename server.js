@@ -5348,6 +5348,17 @@ function searchShortWord(w, targets, isKnown) {
 // listed every coffee house, "sleigh ride" and "dog sled" every tour (dog read as the dog-friendly badge), "toboggan
 // hill" every winery on a hill, "u pick" Pick Thai. A place's own name is never rewritten.
 const SEARCH_PHRASE_REWRITES = [
+  // Indoor test 7 (2026-11-19; Robert's gallery): sculpture, paintings and a bare "art" mean the galleries ("sculpture" found
+  // nothing, « art gratuit » listed pubs). Phrases that already say what they are keep their own words.
+  ['sculpture', 'art gallery'], ['sculptures', 'art gallery'], ['sculptor', 'art gallery'], ['sculptors', 'art gallery'], ['paintings', 'art gallery'], ['art', 'art gallery'],
+  // "first friday" is the monthly art night, not a date (a weekday would turn off the art shows topic).
+  ['first friday', 'art walk'], ['first fridays', 'art walk'], ['first friday art', 'art walk'], ['first friday art walk', 'art walk'], ['premier vendredi', 'art walk'], ['premiers vendredis', 'art walk'], ['premier friday', 'art walk'],
+  ['art gratuit', 'free art gallery'], ['galerie gratuite', 'free art gallery'], ['galeries gratuites', 'free art galleries'], ['galerie d art gratuite', 'free art gallery'],
+  ['museum gratuit', 'free museum'], ['musee gratuit', 'free museum'], ['musees gratuits', 'free museums'],
+  ...['art gallery', 'art galleries', 'art show', 'art shows', 'art exhibition', 'art exhibitions', 'art exhibit', 'art exhibits', 'art sale', 'art sales', 'art walk', 'art walks', 'art crawl',
+    'art opening', 'art openings', 'art class', 'art classes', 'art camp', 'art camps', 'art studio', 'art studios', 'art centre', 'art center', 'art museum', 'art museums', 'art supplies',
+    'art deco', 'street art', 'martial art', 'martial arts', 'art d', 'arts and culture', 'art and culture', 'body art', 'nail art', 'kids art', 'art party', 'art parties', 'art lesson', 'art lessons',
+    'art workshop', 'art workshops', 'pop art', 'digital art', 'indigenous art', 'first nations art'].map((x) => [x, x]),
   ['haunted house', 'haunted'], ['haunted houses', 'haunted'], ['haunted attraction', 'haunted'], ['haunted attractions', 'haunted'],
   ['toboggan', 'sledding'], ['toboggans', 'sledding'], ['tobogganing', 'sledding'], ['toboggan hill', 'sledding'], ['toboggan hills', 'sledding'],
   ['sledding hill', 'sledding'], ['sledding hills', 'sledding'], ['sled hill', 'sledding'], ['sleds', 'sledding'],
@@ -5986,7 +5997,9 @@ function smartFreePick(region, features) {
     if (v.type === 'beach') return 'Beach';
     if (v.type === 'outdoor' && v.activities.some((a) => SMART_FREE_ACTIVITIES.includes(a))) return v.activities.includes('viewpoints') ? 'Viewpoint' : 'Park or trail';
     return false;
-  }, (v) => (v.row.free_entry ? 30 : 0) + (SMART_FREE_DESC_RE.test(String(v.row.description || '')) ? 20 : 0) + (SMART_FREE_TYPES.has(v.type) ? 10 : 0) + foodDrinkRecommendedScore(v.row));
+  // Indoor test 7 (2026-11-19; Robert's free gallery sat deep in "free things to do kelowna"): the places with the Free to
+  // Visit badge lead, then the ones whose own words say entry is free, then the parks and beaches.
+  }, (v) => (v.row.free_entry ? 100000 : 0) + (SMART_FREE_DESC_RE.test(String(v.row.description || '')) ? 50000 : 0) + (SMART_FREE_TYPES.has(v.type) ? 10 : 0) + foodDrinkRecommendedScore(v.row));
 }
 
 // Open now: the places open right now by their listed hours (the same hours engine as the cards), for the rest of
@@ -6053,6 +6066,8 @@ const SEARCH_TRADE_SHOW_RE = /\b(?:trade ?shows?|home shows?|home (?:and|&) gard
 const SEARCH_DOG_SHOW_RE = /\b(?:dog shows?|kennel club|agility trials?|dog trials?|obedience trials?|dock diving|herding trials?)\b/i;
 const SEARCH_ART_SHOW_RE = /\b(?:art shows?|exhibitions?|exhibits?|art sales?|vernissage|retrospective|solo show|group show|members show)\b/i;
 const SEARCH_DRIVE_IN_RE = /\bdrive[- ]?ins?\b/i;
+// Indoor test 7: a gallery or museum by its name or kind (the art shows topic lists them beside the events).
+const SEARCH_GALLERY_PLACE_RE = /\b(?:galler(?:y|ies)|art cent(?:re|er)|art warehouse|museums?|galeries?|musées?)\b/i;
 const SEARCH_COMEDY_PLACE_RE = /\b(?:comedy|improv)\b/i;
 const SEARCH_KIDS_SHOW_RE = /\b(?:kids?|children'?s?|family|families|junior|jr|youth|puppets?|puppetry|storytime|ages? \d)\b/i;
 const SEARCH_KIDS_SHOW_DESC_RE = /\b(?:for (?:the )?(?:kids|children|little ones|young audiences|young people|the whole family)|children'?s (?:show|theatre|theater|concert|entertainer|performer|musical|play)|kids'? (?:show|concert|entertainer|musical|play)|family (?:show|concert|musical|theatre|theater|entertainment|performance|matinee)|puppet\w*|storytime|ages? \d|young audiences)\b/i;
@@ -6120,9 +6135,13 @@ const SEARCH_NARROW_TOPICS = [
     test: (e) => SEARCH_DOG_SHOW_RE.test(`${e.name || ''} ${String(e.description || '').slice(0, 300)}`), rank: () => 0,
     emptyText: 'No dog shows are listed for the next few weeks yet. Looking for places that welcome dogs? See Dog Friendly Finds.', emptyTextFr: 'Aucune exposition canine n’est encore annoncée pour les prochaines semaines. Vous cherchez des endroits qui acceptent les chiens? Voyez Endroits qui acceptent les chiens.' },
   { key: 'art_show', heading: 'Art shows & exhibitions', headingFr: 'Expositions d’art',
-    words: ['art show', 'art shows', 'art exhibition', 'art exhibitions', 'art exhibit', 'art exhibits', 'exhibition', 'exhibitions', 'exhibit', 'exhibits', 'gallery show', 'gallery shows', 'art sale', 'art sales', 'vernissage', 'vernissages', 'exposition', 'expositions', 'exposition d art', 'expositions d art'],
-    test: (e) => SEARCH_ART_SHOW_RE.test(String(e.name || '')) || ((e.categories || []).includes('arts-culture') && /\b(?:exhibitions?|exhibits?|art show|vernissage)\b/i.test(String(e.description || '').slice(0, 300))),
+    words: ['art show', 'art shows', 'art exhibition', 'art exhibitions', 'art exhibit', 'art exhibits', 'exhibition', 'exhibitions', 'exhibit', 'exhibits', 'gallery show', 'gallery shows', 'art sale', 'art sales', 'vernissage', 'vernissages', 'exposition', 'expositions', 'exposition d art', 'expositions d art',
+      // Indoor test 7 (2026-11-19; "first friday kelowna" fell back to all 557 places): openings and art walks are art
+      // events, and the town's galleries and museums show under them.
+      'first friday', 'first fridays', 'art walk', 'art walks', 'art crawl', 'opening reception', 'opening receptions', 'art opening', 'art openings', 'artist talk', 'artist talks', 'premier vendredi', 'premiers vendredis'],
+    test: (e) => SEARCH_ART_SHOW_RE.test(String(e.name || '')) || /\b(?:first fridays?|opening receptions?|art walks?|artist talks?|art openings?)\b/i.test(String(e.name || '')) || ((e.categories || []).includes('arts-culture') && /\b(?:exhibitions?|exhibits?|art show|vernissage|opening reception)\b/i.test(String(e.description || '').slice(0, 300))),
     rank: (e) => (SEARCH_ART_SHOW_RE.test(String(e.name || '')) ? 1 : 0),
+    places: (region) => smartPickVenues((v) => (!region || v.row.region === region) && v.row.type === 'indoor' && SEARCH_GALLERY_PLACE_RE.test(`${v.row.name || ''} ${v.row.cuisine || ''}`) && (/museum|musée/i.test(`${v.row.name || ''} ${v.row.cuisine || ''}`) ? 'Museum' : 'Art gallery'), (v) => (v.row.free_entry ? 1 : 0)),
     emptyText: 'No art shows are listed for the next few weeks yet. See the galleries on Indoor & Rainy Day.', emptyTextFr: 'Aucune exposition d’art n’est encore annoncée pour les prochaines semaines. Voyez les galeries dans Activités intérieures.' },
   { key: 'drive_in', heading: 'Drive-in movies', headingFr: 'Ciné-parcs', ignoreTypes: ['indoor'], extra: ['theatre', 'theater', 'cinema', 'movies', 'movie'],
     words: ['drive in', 'drive ins', 'drive in theatre', 'drive in theater', 'drive in theatres', 'drive in theaters', 'drive in movie', 'drive in movies', 'drive in cinema', 'cine parc', 'cine parcs', 'cineparc'],
@@ -41079,7 +41098,17 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const venueEventCard = (e) => {
     const when = fr ? (e.nextDate ? (e.nextEndDate && e.nextDate < todayLocal() && e.nextEndDate >= todayLocal() ? `Jusqu\u2019au ${frDateShort(e.nextEndDate)}` : frDateShort(e.nextDate)) : '') : upcomingEventDateLabel(e.nextDate, e.nextEndDate);
     const cat = fr ? '' : (e.primaryCategory && WHATSON_CATEGORY_BY_KEY[e.primaryCategory] ? WHATSON_CATEGORY_BY_KEY[e.primaryCategory].label : '');
-    const meta = [when, cat].filter(Boolean).map(escapeHtml).join(' &middot; ');
+    // Indoor test 7 (2026-11-19; Robert's First Friday reception showed "Fri Dec 4" only): the start time, and how many
+    // more dates it has ("6 PM · +3 more dates").
+    let tm = '', more = '';
+    try {
+      const occ = db.prepare("SELECT start_date, start_time FROM event_occurrences WHERE event_id = ? AND status = 'scheduled' AND COALESCE(end_date, start_date) >= ? ORDER BY start_date, start_time").all(e.id, todayLocal(opts.now || new Date()));
+      const first = occ.find((o) => o.start_date === e.nextDate) || occ[0];
+      if (first && first.start_time) tm = happyHourTimeText(hoursModule.hoursTimeToMinutes(first.start_time), fr);
+      const n = new Set(occ.map((o) => o.start_date)).size - 1;
+      if (n > 0) more = fr ? `+${n} autre${n === 1 ? '' : 's'} date${n === 1 ? '' : 's'}` : `+${n} more date${n === 1 ? '' : 's'}`;
+    } catch (err) { tm = ''; more = ''; }
+    const meta = [when && tm ? `${when}, ${tm}` : when, more, cat].filter(Boolean).map(escapeHtml).join(' &middot; ');
     return `<div class="related-card"><a href="/${e.region}/events/${e.slug}">${escapeHtml(e.name)}</a>${meta ? `<p class="related-meta">${meta}</p>` : ''}</div>`;
   };
   const venueEventsRest = venueEvents.slice(VENUE_EVENTS_SHOWN);
@@ -65651,10 +65680,28 @@ function renderAdminPhotoCard(p, live) {
     </article>`;
 }
 
+// Indoor test 7 (2026-11-19; Robert's First Friday reception): an event date that falls on one of the place's own closure
+// days or its weekly closed day is flagged for the reviewer (a warning only: an opening outside open hours is normal).
+// -> 'Heads up: …' or ''.
+function eventClosureClash(venueId, ymd) {
+  try {
+    if (!venueId || !/^\d{4}-\d{2}-\d{2}$/.test(String(ymd || ''))) return '';
+    const d = String(ymd).slice(0, 10);
+    const cl = ((venueHoursExtras(venueId) || {}).closures || []).find((c) => c && c.from && d >= c.from && d <= (c.to || c.from));
+    const v = db.prepare('SELECT name, hours FROM venues WHERE id = ?').get(venueId);
+    if (!v) return '';
+    if (cl) return `Heads up: ${v.name} is closed on ${formatSubmissionLocalDate(d)}${cl.note ? ` (${cl.note})` : ''}. Check the date with them.`;
+    let h = null; try { h = v.hours ? JSON.parse(v.hours) : null; } catch (e) { h = null; }
+    const wd = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(`${d}T12:00:00Z`).getUTCDay()];
+    if (h && typeof h === 'object' && wd in h && !h[wd]) return `Heads up: ${v.name} is closed ${({ sun: 'Sundays', mon: 'Mondays', tue: 'Tuesdays', wed: 'Wednesdays', thu: 'Thursdays', fri: 'Fridays', sat: 'Saturdays' })[wd]} by its hours. Fine for an opening or a private event; otherwise check the date.`;
+  } catch (e) { return ''; }
+  return '';
+}
 function renderAdminEventCard(s) {
   const when = `${formatSubmissionLocalDate(s.start_date)}${s.end_date && s.end_date !== s.start_date ? ` – ${formatSubmissionLocalDate(s.end_date)}` : ''}${s.all_day || !s.start_time ? '' : `, ${formatSubmissionLocalTime(s.start_time)}${s.end_time ? `–${formatSubmissionLocalTime(s.end_time)}` : ''}`}`;
   const dups = s.possible_existing_events || [];
-  const dupHtml = dups.length ? `<div class="rv-warn">Possibly already listed: ${dups.map((d) => adminReviewEsc(d.name)).join(', ')}</div>` : '';
+  const dupHtml = (dups.length ? `<div class="rv-warn">Possibly already listed: ${dups.map((d) => adminReviewEsc(d.name)).join(', ')}</div>` : '')
+    + (() => { const w = eventClosureClash(s.owner_venue_id || s.venue_id, s.start_date); return w ? `<div class="rv-warn rv-closed-day">${adminReviewEsc(w)}</div>` : ''; })();
   const dupOpt = dups.length ? `<label class="rv-opt"><input type="checkbox" name="notdup" data-ids="${dups.map((d) => d.event_id).join(',')}">Not a duplicate</label>` : '';
   return `<article class="rv-card" data-kind="event" data-id="${s.id}">
       <h3>${adminReviewEsc(s.name)}</h3>
@@ -74505,6 +74552,7 @@ module.exports = {
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS, cafeHelpTopics, cafePlannerWords, cafeVisitTicks, cafeSpendGuessInfo,
   PUB_SETUP_PART1, PUB_SETUP_PART2, PUB_SETUP_HELP_TOPICS, HH_TIMES_HELP_TOPIC, setupParts, PUB_PLACE_TYPES, placeTypesFor, PUB_CUISINES_POPULAR, PUB_OWNER_BADGES, ownerExtraBadgesFor, venuePubInfo, writeVenuePubInfo,
   pubInfoLinesHtml, minorsLineText, pubSportsText, kidFriendlyPublic, pubKidsWelcome, badgeTrueSql, patioPublic, badgeOnPublic, ownerNanpPhone, pubHighlights, PUB_KIDS_WELCOME_POLICIES, guardedAmenityRemoveUpdate, undoAmenityRemoval, clearVenuePubInfoCache,
+  eventClosureClash,
   SETUP_STEPS, SETUP_PART1, SETUP_PART2, setupState, setupProgress, saveSetupProgress, setupScore, OWNER_SETUP_LINK_INSTANT_FIELDS, OWNER_EXTRA_BADGES, OWNER_EXTRA_BADGE_LABELS, venueOwnerFeatures, activeMenuDraft, avgSpendPublicText, AVG_SPEND_PUBLIC_TEXT,
   validateAvgSpend, guardedAvgSpendUpdate, currentAvgSpendJson, venueAvgSpend, avgSpendPublic, ownerAvgSpendAmount, OWNER_LINK_INSTANT_FIELDS, OWNER_HELP_TOPICS, OWNER_NONE_WORDS, venueNotOffered, notOfferedBlocked, guardedAmenityCorrectUpdate, OWNER_CUISINES, ownerCuisineSet,
   validateSpecials, guardedSpecialsUpdate, currentSpecialsJson, venueSpecialsList, specialsTodayFor, specialsShown, specialsStale, venueServesAlcohol,
