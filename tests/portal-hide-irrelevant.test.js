@@ -17,9 +17,10 @@ const FOOD_BADGES = ['vegan', 'vegetarian', 'gluten_free', 'nonalcoholic', 'spor
 const badgeVisible = (html, badge) => new RegExp(`<label class="amenity-check"><input type="checkbox" name="badge" value="${badge}"`).test(html);
 const hasArrival = (html) => /data-pick="arrival"/.test(html) || /id="arrival"/.test(html);
 
-test('map: only beach, outdoor and shop lose the storefront tile', () => {
-  for (const t of ['beach', 'outdoor', 'shop']) assert.equal(app.portalFields(t).arrivalTile, false, t);
-  for (const t of Object.keys(app.CATEGORY_SLUGS).filter((x) => !['beach', 'outdoor', 'shop'].includes(x))) assert.equal(app.portalFields(t).arrivalTile, true, t);
+// Tour test 15 (Dayton, 2026-11-18): tours have no meeting-spot step either (guests get the spot when they book).
+test('map: only beach, outdoor, shop and tour lose the storefront tile', () => {
+  for (const t of ['beach', 'outdoor', 'shop', 'tour']) assert.equal(app.portalFields(t).arrivalTile, false, t);
+  for (const t of Object.keys(app.CATEGORY_SLUGS).filter((x) => !['beach', 'outdoor', 'shop', 'tour'].includes(x))) assert.equal(app.portalFields(t).arrivalTile, true, t);
   assert.equal(app.portalFields('a-type-added-later').arrivalTile, true);
 });
 
@@ -34,12 +35,12 @@ test('owner page: what each category sees', async () => {
     return fetch(`http://127.0.0.1:${srv.address().port}/owner/${token}`).then((r) => r.text());
   };
   try {
-    for (const t of ['cafe', 'winery', 'pub', 'restaurant', 'brewery', 'tour', 'golf']) {
+    for (const t of ['cafe', 'winery', 'pub', 'restaurant', 'brewery', 'golf']) {
       const html = await page(t);
       assert.ok(hasArrival(html), `${t} still has the storefront tile and section`);
       assert.ok(badgeVisible(html, 'patio'), `${t} still offers patio`);
     }
-    for (const t of ['beach', 'outdoor', 'shop']) {
+    for (const t of ['beach', 'outdoor', 'shop', 'tour']) {
       const html = await page(t);
       assert.ok(!hasArrival(html), `${t} has no storefront tile or section`);
     }

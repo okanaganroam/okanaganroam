@@ -232,7 +232,8 @@ test('8. setup: group size "21+ or whole classes" and ". " after a size; Type th
   for (const x of ['400 per class', '400 for the whole class', '400 per school group']) assert.equal(app.tourPriceWhy(x), 'group', x);
   // The setup's own copy of the rule says the same.
   assert.match(clientFn('tourPriceWhy'), /canots\?\|rafts\?\|radeaux\?\|boards\?/); assert.match(clientFn('tourPriceWhy'), /\|class\(\?:es\)\?\|classes\?\|schools\?\|\[ée\]coles\?\)/);
-  assert.match(CLIENT, /voiturettes\?\|kayaks\?\|canoes\?\|canots\?\|rafts\?\|radeaux\?\)\\b\/i\.test\(el\('suTprice'\)/);
+  // Tour test 15: boats and boards too.
+  assert.match(CLIENT, /voiturettes\?\|kayaks\?\|canoes\?\|canots\?\|rafts\?\|radeaux\?\|boats\?\|bateaux\?\|boards\?\|planches\?\|sups\?\)\\b\/i\.test\(el\('suTprice'\)/);
   // Holidays: the official name, and National Indigenous Peoples Day on June 21 (every type).
   assert.equal(text.en.holidays.truth, 'National Day for Truth and Reconciliation'); assert.equal(text.fr.holidays.truth, 'Journée nationale de la vérité et de la réconciliation');
   assert.equal(text.en.holidays.indigenous, 'National Indigenous Peoples Day'); assert.equal(text.fr.holidays.indigenous, 'Journée nationale des peuples autochtones');
