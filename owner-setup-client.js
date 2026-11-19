@@ -1167,6 +1167,17 @@
     var rows = STEPS.filter(function(k){ return done[k] && done[k] !== 'skip'; }).map(function(k){ return '<li>' + h(cl(T.labels[k])) + h(stText(k, nowSt(k, done[k], waiting))) + '</li>'; }).join('');
     return '<p>' + T.helpYes + '</p>' + (rows ? '<ul>' + rows + '</ul>' : '<p>' + h(T.helpNone) + '</p>') + '<p>' + h(T.helpTail) + (done.spend === 'live' && !C.spendPublic && !CK ? ' ' + h(T.helpSpend) : '') + '</p>';
   }
+  // Tour test 18 (Whistler, 2026-11-18; Priya on the Hours screen): Help said "Set up your page → Change an answer → Hours"
+  // while she was already there. On the Hours screen, that path reads "right here".
+  window.ohbHere = function(html, lang){
+    if (base(S.step) !== 'hours') return html;
+    var fr = lang === 'fr', arrow = '\\s*(?:\u2192|&rarr;)\\s*';
+    var path = fr ? '<strong>Configurez votre page</strong>' + arrow + '<strong>Modifier une réponse</strong>' + arrow + '<strong>Heures</strong>'
+      : '<strong>Set up your page</strong>' + arrow + '<strong>Change an answer</strong>' + arrow + '<strong>Hours</strong>';
+    return String(html)
+      .replace(new RegExp((fr ? 'Le plus simple\\s*:\\s*' : 'Easiest:\\s*') + path + '\\.\\s*', 'g'), fr ? 'Ici même, sur cet écran\u00a0: ' : 'Right here, on this screen: ')
+      .replace(new RegExp(path, 'g'), fr ? 'ici même, sur cet écran' : 'right here, on this screen');
+  };
   window.ohbLive = window.ohbLive || {};
   window.ohbLive['setup-status'] = function(lang, update){
     try { fetch(C.base + '/setup/progress', { headers: { 'Accept': 'application/json' }, credentials: 'same-origin', cache: 'no-store' }).then(function(r){ return r.json(); }).then(function(j){ if (j && j.ok && j.progress && j.progress.done) { if (j.waiting) C.waiting = j.waiting; update(statusHtml(j.progress.done, j.waiting)); } }).catch(function(){}); } catch (e) {}
@@ -3021,6 +3032,9 @@
       S.busy = false;
       if (!st) { if (!had) S.extra.pop(); return render(); }
       S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length;
+      // Tour test 18 (Whistler, 2026-11-18): with Closures as its own tile, the closure the month picker just saved counts:
+      // the tile says it's on the page, never "not done yet".
+      if (!CLO_SUB && (!S.done.closures || S.done.closures === 'skip' || S.done.closures === 'later' || S.done.closures === 'no')) progress('closures', st === 'day' ? 'day' : 'live').then(function(){ if (!S.busy) render(); });
       S.months = {}; for (var i = from; ; i = i % 12 + 1) { S.months[i] = true; if (i === to) break; }
       S.closedM = null; S.openMonthsBack = false;
       S.openDraft = { from: pad2(from) + '-01', to: pad2(to) + '-' + MLAST[to - 1] };

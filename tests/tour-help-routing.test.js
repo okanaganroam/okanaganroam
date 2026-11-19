@@ -1069,3 +1069,53 @@ test("tour test 17 answers: pickup and shuttle name her town and say when to tap
   assert.match(plain(fr.topic("tour-weather").aFr), /Chaque sortie dépend de la météo/);
   for (const t of en.topics) assert.doesNotMatch(String(t.a || ""), /hotels in the village/, t.id);
 });
+
+// Tour test 18 (Whistler, 2026-11-18; Priya, Treetop Zip Whistler: year-round ziplines and a treetop walk, winter night zips
+// on weekends, child prices, tours every 30 minutes). Her 22 questions as typed (help-log.json), each with a French twin.
+const ASKED18 = [
+  ["18-006", "en", "we have different summer and winter hours", ["seasonal-hours"], "nous avons des heures différentes l'été et l'hiver"],
+  ["18-007", "en", "how do I show we run every 30 minutes", ["tour-times"], "comment montrer que nous partons toutes les 30 minutes"],
+  ["18-008", "en", "tours leave every half hour from 9 to 5", ["tour-times"], "les sorties partent toutes les demi-heures de 9 h à 17 h"],
+  ["18-015", "en", "night zips only on winter weekends", ["tour-one-trip-season", "tour-kind-seasons"], "les tyroliennes de nuit seulement les fins de semaine d'hiver"],
+  ["18-019", "en", "which kind for our treetop walk", ["tour-kinds-pick"], "quel genre pour notre marche dans les arbres"],
+  ["18-021", "en", "child pricing for 6 to 12", ["tour-kids-price"], "tarifs enfants pour les 6 à 12 ans"],
+  ["18-022", "en", "we have 4 products at different prices, which one goes here", ["tour-two-prices", "tour-several-prices", "tour-price"], "nous avons 4 produits à des prix différents, lequel va ici"],
+  ["18-024", "en", "we book online but walk-ups are ok if there is space", ["tour-same-day"], "on réserve en ligne mais sans réservation c'est correct s'il reste de la place"],
+  ["18-030", "en", "treetop walk is all ages but ziplines are 6+", ["tour-age", "tour-ages-per-trip"], "la marche dans les arbres est pour tous les âges mais les tyroliennes c'est 6+"],
+  ["18-031", "en", "where do I put weight limits 25 to 125 kg", ["tour-weight"], "où je mets les limites de poids de 25 à 125 kg"],
+  ["18-040", "en", "do I have to fill all of this out", ["tour-fill-all"], "est-ce que je dois tout remplir"],
+  ["18-041", "en", "shuttle from whistler costs extra", ["tour-shuttle"], "la navette depuis Whistler coûte en plus"],
+  ["18-042", "en", "we cancel for high winds", ["tour-weather"], "on annule quand il y a de forts vents"],
+  ["18-043", "en", "ziplines all year, night zips only in winter", ["tour-kind-seasons"], "tyroliennes toute l'année, tyroliennes de nuit seulement l'hiver"],
+  ["18-044", "en", "our tours sell out in summer", ["tour-sell-out"], "nos sorties affichent complet l'été"],
+  ["18-045", "en", "private tours for up to 12", ["tour-private-price", "tour-groups"], "sorties privées jusqu'à 12 personnes"],
+  ["18-046", "en", "how do I change my winter hours later", ["seasonal-hours"], "comment changer mes heures d'hiver plus tard"],
+  ["18-047", "en", "when will my tours and prices show", ["photo-pending", "menu-add", "setup-live-when"], "quand mes sorties et tarifs vont-ils paraître"],
+  ["18-050", "en", "where do I put departure times", ["tour-times"], "où je mets les heures de départ"],
+  ["18-051", "en", "kids price", ["tour-kids-price"], "prix enfants"],
+  ["18-052", "en", "we have a winter night tour on weekends only", ["tour-one-trip-season", "tour-kind-seasons"], "nous avons une sortie de nuit l'hiver seulement les fins de semaine"],
+  ["18-053", "en", "can I show different prices for children", ["tour-kids-price"], "puis-je montrer des prix différents pour les enfants"],
+  // Rephrasings of the three she got wrong.
+  ["18-v1", "en", "kayaks all year, snowshoe tours only in winter", ["tour-kind-seasons"], "kayaks toute l'année, raquettes seulement l'hiver"],
+  ["18-v2", "en", "tours leave every 15 min", ["tour-times"], "départs toutes les 15 minutes"],
+  ["18-v3", "en", "kids pricing", ["tour-kids-price"], "tarification enfants"],
+  ["18-v4", "en", "children pricing", ["tour-kids-price"], "tarifs pour les enfants"],
+  ["18-v5", "en", "we leave every hour", ["tour-times"], "on part toutes les heures"],
+];
+test("tour test 18: every Help question (EN and its French twin) lands on the right topic; a year-round company is never told it runs part of the year", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Ziplines" });
+  assert.equal(ASKED18.filter((x) => !/v/.test(x[0])).length, 22);
+  const wrong = [];
+  for (const [k, lang, q, want, qFr] of ASKED18) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r && r.id)) wrong.push(`${k} ${lang.toUpperCase()} "${q}" -> ${r && r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf && rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf && rf.id} (want ${want.join(" or ")})`);
+    if (rf.lang !== "fr") wrong.push(`${k} FR "${qFr}" answered in ${rf.lang}`);
+  }
+  assert.deepEqual(wrong, []);
+  // One trip's season said without a kind word stays one trip's season ("the rest all year", "other tours all year").
+  assert.equal(en.best("joffre tour only summer other tours all year").id, "tour-one-trip-season");
+  assert.equal(fr.best("les vélos seulement l'été, le reste toute l'année").id, "tour-one-trip-season");
+  // Closed for the winter is still the season answer.
+  assert.equal(en.best("closed for the winter").id, "tour-season");
+});

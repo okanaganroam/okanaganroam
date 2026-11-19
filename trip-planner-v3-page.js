@@ -403,11 +403,17 @@ function t3DayPinLayout(points, assets) {
 }
 // A stop card's "why" lines (round 14, 2026-10-20): at most two, without the listed hours (shown once, as the hours line
 // below; « Les horaires varient… » was printed twice in French) or a straight-line distance.
+// Tour test 18 (Whistler, 2026-11-18): "Hotel pickup" (asked for, and the operator's own answer) was the first "why" line,
+// inside the closed "Why it fits" box, so nobody saw it. It is its own line on the card, always shown (t3PickupLine), and
+// not repeated in the box.
+function t3PickupLine(stop) {
+  return ((stop && stop.why) || []).find((w) => /^(?:Hotel pickup|Prise en charge à l\u2019hôtel)$/.test(w)) || '';
+}
 function t3WhyLines(stop) {
   const v = (stop && stop.venue) || {};
-  return ((stop && stop.why) || []).filter((w) => !(v.listedHours && (/^(Listed hours|Horaires indiqu\u00e9s|Les horaires varient)/.test(w) || w === v.listedHours)) && !/\(straight line\)/.test(w)).slice(0, 2);
+  return ((stop && stop.why) || []).filter((w) => !/^(?:Hotel pickup|Prise en charge à l\u2019hôtel)$/.test(w) && !(v.listedHours && (/^(Listed hours|Horaires indiqu\u00e9s|Les horaires varient)/.test(w) || w === v.listedHours)) && !/\(straight line\)/.test(w)).slice(0, 2);
 }
-const CLIENT_HELPERS_SRC = [t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
+const CLIENT_HELPERS_SRC = [t3PickupLine, t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
   ...SITE_PAGE.examples,
@@ -690,6 +696,7 @@ function renderStyles() {
   .t3-badge-more { background: none; border: 1px dashed rgba(42,107,103,0.45); color: var(--teal-deep, #1E4F4C); border-radius: 999px; padding: 3px 10px; font: inherit; font-size: 0.76rem; font-weight: 800; cursor: pointer; min-height: 44px; } /* round 9 (2026-10-19): 44px tap target */
   .t3-badges li.is-collection { background: rgba(201,162,39,0.16); color: #6B5410; }
   .t3-hours { margin: 0 0 8px; font-size: 0.84rem; color: rgba(27,43,58,0.8); }
+  .t3-pickup { margin: 0 0 8px; font-size: 0.86rem; font-weight: 800; color: #1F5450; }
   .t3-hh { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: #7C2D12; }
   .t3-sp { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: #1E4F4C; }
   .t3-wn { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: #4B3A78; }
@@ -1564,6 +1571,7 @@ function renderScript(d) {
       + (stop.specialLine ? '<p class="t3-sp">' + (lang() === 'fr' && stop.specialsFr ? esc(stop.specialLineLabelFr) + ' : <span' + (stop.specialLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.specialsFr) + '</span>' : esc(stop.specialLine)) + '</p>' : '')
       // Weekly nights (2026-10-27): an evening stop on one of the venue's nights ("Tonight: Trivia at 7 PM").
       + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : lang() === 'fr' && stop.nightLineFr ? esc(stop.nightLineFr) : esc(stop.nightLine)) + '</p>' : '')
+      + (t3PickupLine(stop) ? '<p class="t3-pickup">\u2713 ' + esc(t3PickupLine(stop)) + '</p>' : '')
       + (why ? '<details class="t3-fit"><summary>' + esc(tx('tripv3.whyFits')) + '</summary><ul class="t3-why">' + why + '</ul></details>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
       + '</div>'
@@ -2641,4 +2649,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { t3WhyLines, t3ClosedDayText, t3MissingClosedText, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3PickupLine, t3WhyLines, t3ClosedDayText, t3MissingClosedText, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };

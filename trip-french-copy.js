@@ -198,7 +198,9 @@ function t3FrenchTextCore(value){
  // Tour test 17: tours within about an hour of the town asked for.
  text=text.replace(/^This includes tours within about an hour of (.+?), in (.+)\.$/,(_,a,b)=>`Inclut des sorties à environ une heure de route de ${a}, à ${b.replace(/ and /g,' et ')}.`);
  { const M={January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'};
-   text=text.replace(/^This tour isn’t running in (\w+), so this plan is for (\w+) 1, when the season starts\. Pick your own dates any time\.$/,(_,a,b)=>`Cette sortie n’a pas lieu en ${M[a]||a}; ce plan est donc pour le 1er ${M[b]||b}, au début de la saison. Choisissez vos dates quand vous voulez.`); }
+   text=text.replace(/^This tour isn’t running in (\w+), so this plan is for (\w+) 1, when the season starts\. Pick your own dates any time\.$/,(_,a,b)=>`Cette sortie n’a pas lieu en ${M[a]||a}; ce plan est donc pour le 1er ${M[b]||b}, au début de la saison. Choisissez vos dates quand vous voulez.`);
+   // Tour test 18: an undated request during a yearly closure, planned for the day it reopens.
+   text=text.replace(/^This tour is closed on (\w+) (\d{1,2}), so this plan is for (\w+) (\d{1,2}), when it reopens\. Pick your own dates any time\.$/,(_,a,n,b,m)=>`Cette sortie est fermée le ${n==='1'?'1er':n} ${M[a]||a}; ce plan est donc pour le ${m==='1'?'1er':m} ${M[b]||b}, à sa réouverture. Choisissez vos dates quand vous voulez.`); }
  text=text.replace(/^A quick stop on the drive$/,'Un arrêt rapide sur la route');
  const accessPrefix='Access / schedule from the listing: “',accessSuffix='” Confirm access and scheduling with the operator before visiting.';
  if(text.startsWith(accessPrefix)&&text.endsWith(accessSuffix))return 'Accès / horaires selon la fiche (texte original) : « '+text.slice(accessPrefix.length,-accessSuffix.length)+' » Confirmez l’accès et les horaires auprès de l’exploitant avant de partir.';
@@ -424,6 +426,8 @@ function t3FrenchTextCore(value){
  text=text.replace(/^By appointment only \(the distillery’s own answer\)\. Book ahead\.$/,'Sur rendez-vous seulement (réponse de la distillerie). Réservez à l’avance.');
  // Tours (2026-11-16): the operator's own book-ahead and age answers.
  text=text.replace(/^Same-day bookings are often fine \(the operator’s own answer\)\. Call ahead for the times\.$/,'Réserver le jour même convient souvent (réponse de l’entreprise). Appelez pour connaître les heures.');
+ // Tour test 18 (Whistler, 2026-11-18): the same-day line with her own departures and booking link.
+ text=text.replace(/^Same-day bookings are often fine \(the operator’s own answer\)\.((?: Tours leave every \d{1,3} minutes\.)?)((?: Book a time online\.)?)$/,(w,ev,on)=>(ev||on)?'Réserver le jour même convient souvent (réponse de l’entreprise).'+(ev?' Départs toutes les '+ev.match(/\d+/)[0]+' minutes.':'')+(on?' Réservez une heure en ligne.':''):w);
  text=text.replace(/^Book at least a day ahead \(the operator’s own answer\)\.$/,'Réservez au moins la veille (réponse de l’entreprise).');
  text=text.replace(/^Book at least 48 hours ahead \(the operator’s own answer\)\.$/,'Réservez au moins 48 heures à l’avance (réponse de l’entreprise).');
  text=text.replace(/^Book at least a week ahead \(the operator’s own answer\)\.$/,'Réservez au moins une semaine à l’avance (réponse de l’entreprise).');

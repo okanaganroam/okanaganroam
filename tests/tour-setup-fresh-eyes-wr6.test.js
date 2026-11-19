@@ -143,8 +143,8 @@ test('2. category words: no "ATV, bungee…" for a zipline park; treetop / ropes
   assert.equal(kt(['adventure'], false, ''), 'Adventure'); assert.equal(kt(['adventure'], true, ''), 'Aventure');
   assert.equal(kt(['adventure'], false, 'ATV tours'), 'ATV tours'); assert.equal(kt(['adventure'], true, 'ATV tours'), 'Sorties en quad (VTT)');
   // The label (chip) names ropes courses; the words are on the adventure kind.
-  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[0], 'ATV, bungee, climbing, ropes courses or canyoning');
-  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[1], 'VTT, saut à l’élastique, escalade, hébertisme ou canyonisme');
+  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[0], 'Ropes, treetop, bungee, ATV, climbing or canyoning');
+  assert.equal(app.TOUR_KIND_LABELS_OWNER.adventure[1], 'Hébertisme, parcours dans les arbres, saut à l’élastique, VTT, escalade ou canyonisme');
   for (const w of ['Treetop adventure course', 'High ropes course', 'Adventure park', 'Parc d’aventure', 'Hébertisme', 'Parcours d’arbre en arbre'])
     assert.ok(app.tourKindSuggestion({ cuisine: w, name: 'X' }).includes('adventure'), w);
   // Leftovers no picked kind covers: English kept on English pages; French says it in French or leaves it off.

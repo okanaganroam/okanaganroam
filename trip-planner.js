@@ -1987,6 +1987,17 @@ const TOUR_BOOK_AHEAD_NOTES = {
   ahead: 'Book ahead (the operator’s own answer).',
   no: 'No need to book (the operator’s own answer).',
 };
+// Tour test 18 (Whistler, 2026-11-18; Priya: tours every 30 minutes, booked online): "Call ahead for the times" only when
+// nothing better is known. Her own typed tours' "every 30 minutes" -> "Tours leave every 30 minutes."; her booking link ->
+// "Book a time online." (both when both are true).
+function tourBookAheadNote(v) {
+  const bn = TOUR_BOOK_AHEAD_NOTES[v && v.tourBookAhead];
+  if (!bn || v.tourBookAhead !== 'same_day') return bn;
+  const every = Number(v.tourEveryMinutes) > 0 ? `Tours leave every ${v.tourEveryMinutes} minutes.` : '';
+  const online = v.tourBookOnline ? 'Book a time online.' : '';
+  if (!every && !online) return bn;
+  return bn.replace(/ Call ahead for the times\.$/, ` ${[every, online].filter(Boolean).join(' ')}`);
+}
 const TOUR_AGE6_NOTE = 'Ages 6 and up (the operator’s own answer).';
 // Tour test 2 (Whistler, 2026-11-16): any minimum age the operator set (5+, 6+, 12+, 16+) is said on a kids trip that
 // includes the tour ("with our 14-year-old" and a 12+ tour: "Ages 12 and up").
@@ -2298,7 +2309,7 @@ function stopFrom(v, scored, extra, ctx) {
   if (v && v.ownerHours) caveats = caveats.map((c) => c.replace(/ \u2014 check (?:before|the day) you go$/, ''));
   if (ctx && ctx.features && isDogTrip(ctx) && DINING_TYPES.includes(v.type) && !(v.features.dog_friendly || v.collections.includes('dog_friendly'))) caveats.push(`Not listed as dog-friendly on ${SITE.brand}, so plan this one without your dog or check with them first`);
   // Round 10 (2026-10-19): a tour company runs at set times; it is booked, not dropped in on.
-  if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]; if (!caveats.includes(bn)) caveats.push(bn); }
+  if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = tourBookAheadNote(v); if (!caveats.includes(bn)) caveats.push(bn); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
   // Tour test 4 (Whistler, 2026-11-17), bug 12: the operator's one booking and age answer stands for several unlike trips
   // (its own Tours & prices list names different lengths or ages): say so, once.
@@ -2532,6 +2543,13 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
     if ((perType[s.v.type] || 0) >= RECOMMENDATION_PER_TYPE && !(ctx.types.size === 1 && ctx.types.has(s.v.type)) && !(ctx.activities.size && !ctx.types.size)) continue;
     perType[s.v.type] = (perType[s.v.type] || 0) + 1;
     out.push(stopFrom(s.v, s, regionReason(s.v, ctx), ctx));
+  }
+  // Tour test 18 (Whistler, 2026-11-18; "something for my 4 year old in July"): a plain kids' request lists parks, beaches
+  // and museums; an all-ages tour (the operator's own answer) with the Kid-Friendly badge may take the last place when no
+  // tour made the list, so families see one. Never ahead of the places that ranked higher.
+  if (ctx.kids && !ctx.types.size && !ctx.activities.size && !(ctx.plannerKinds || []).length && out.length && !out.some((x) => x.venue && x.venue.type === 'tour')) {
+    const t = scored.find((x) => x.v.type === 'tour' && x.v.tourMinAge === 'all' && x.v.features && x.v.features.kid_friendly);
+    if (t) { const st = stopFrom(t.v, t, regionReason(t.v, ctx), ctx); if (out.length >= count) out[out.length - 1] = st; else out.push(st); }
   }
   return { items: out, total: scored.length };
 }
