@@ -402,12 +402,83 @@ test('indoor test 10: Sandra\'s Help questions (a city pool) land on the right a
   assert.match(plain(b.en.topic(YB).a), /dates change a bit each year/);
   assert.match(plain(b.en.topic(AO).a), /Known for/);
   assert.match(plain(b.fr.topic(PR).aFr), /Oui, si vous avez le droit de les partager/);
-  assert.match(plain(b.en.topic(P).a), /Drop-in from \$6\.50/);
+  assert.match(plain(b.en.topic(P).a), /Drop-in \$6\.50/); // indoor test 11: the owner side says the page's words without "from"
   assert.doesNotMatch(plain(b.en.topic(P).a), /\$25/);
 });
 
+// Indoor test 11 (2026-11-19; Kim, staff at a non-profit science centre): every question in her Help log, with where it
+// belongs, and a French twin of each.
+const HO = 'indoor-holiday-open', SD = 'indoor-summer-daily', LO = 'indoor-local-owned', FRN = 'indoor-french';
+const KIM = [
+  ['school field trips by booking', [BK, G], 'sorties scolaires sur réservation'],
+  ['we\'re a non-profit, does locally owned apply', [LO], 'nous sommes un organisme sans but lucratif, la propriété locale s’applique-t-elle?'],
+  ['the photos belong to the science centre not me, can I tick this', [PR], 'les photos appartiennent au centre des sciences, pas à moi, puis-je cocher la case?'],
+  ['science saturdays demos at 11 and 2', [TH], 'démonstrations scientifiques chaque samedi à 11 h et 14 h'],
+  ['summer and spring break camps', [G], 'camps d’été et de la relâche'],
+  ['we do a free demo every saturday at 11am and 2pm, where does that go', [TH], 'nous faisons une démonstration gratuite chaque samedi à 11 h et 14 h, où la mettre?'],
+  ['we open extra on long weekend mondays', [HO], 'nous ouvrons aussi les lundis des longues fins de semaine'],
+  ['open daily in july and august', [SD], 'ouvert tous les jours en juillet et août'],
+  ['we\'re a non-profit, staff not owner', OWNER, 'nous sommes un organisme sans but lucratif, je suis employée, pas propriétaire'],
+  ['family pass price', [P], 'prix du laissez-passer familial'],
+  ['where do memberships go', [P, GF], 'où mettre les abonnements'],
+  ['we open on long weekend mondays', [HO], 'nous ouvrons les lundis des longues fins de semaine'],
+  ['open on family day and thanksgiving monday', [HO], 'ouvert le jour de la Famille et le lundi de l’Action de grâce'],
+  ['planetarium shows need booking', [BK, GTK], 'les spectacles du planétarium se réservent'],
+  ['weight room and fitness classes', [AO], 'salle de musculation et cours de mise en forme'],
+  ['shutdown dates change every year', [YB], 'les dates de fermeture changent chaque année'],
+  ['our schedule is a pdf on our website', [SW, GTK], 'notre horaire est un PDF sur notre site'],
+  ['will my page be in french', [FRN], 'ma page sera-t-elle en anglais aussi?'],
+  ['is it ok to say wheelchair accessible if the planetarium is upstairs', [AC], 'puis-je dire accessible en fauteuil roulant si le planétarium est à l’étage?'],
+  ['summer camps and spring break camps', [G], 'camps d’été et camps de la relâche'],
+  // Her other words for the same things.
+  ['open stat holidays', [HO], 'ouvert les jours fériés'],
+  ['long weekend mondays', [HO], 'les lundis des longues fins de semaine'],
+  ['open on thanksgiving monday', [HO], 'ouvert le lundi de l’Action de grâce'],
+  ['open every day in july and august', [SD], 'ouverts tous les jours en juillet et en août'],
+  ['open 7 days in summer', [SD], 'ouvert 7 jours sur 7 l’été'],
+];
+const KIM_WANT = Object.fromEntries(KIM.map(([q, want]) => [q, want]));
+test('indoor test 11: Kim\'s Help questions (a science centre) land on the right answer, in English and in French; open daily in some months is never "We\'re closed part of the year"', async () => {
+  const b = await botsFor('museum');
+  const wrong = [];
+  for (const [q, want, qFr] of KIM) {
+    const r = b.en.best(q), f = b.fr.best(qFr);
+    if (!r || !want.includes(r.id)) wrong.push(`en "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+    if (!f || !want.includes(f.id)) wrong.push(`fr "${qFr}" -> ${f && f.id} (want ${want.join(' or ')})`);
+  }
+  assert.deepEqual(wrong, []);
+  // The opposite guard: being open more in some months never goes to the closed-months answer, for every kind; being
+  // closed in some months still does.
+  const OPEN_MORE = ['open daily in july and august', 'open every day in summer', 'we are open 7 days a week in july', 'open daily during spring break', 'ouvert tous les jours en juillet et août', 'ouvert 7 jours sur 7 l’été'];
+  const CLOSED = ['we are closed july and august', 'closed for the summer', 'nous sommes fermés en juillet et août'];
+  for (const kind of ['museum', 'pool', 'gallery', 'kids', 'bowling', 'theatre']) {
+    const bk = await botsFor(kind);
+    for (const q of OPEN_MORE) { const r = (/[éû’]|ouvert/.test(q) ? bk.fr : bk.en).best(q); if (!r || r.id === CM || r.id === 'setup-season' || r.id === 'indoor-seasonal') wrong.push(`${kind} "${q}" -> ${r && r.id}`); }
+    for (const q of CLOSED) { const r = (/[éû’]/.test(q) ? bk.fr : bk.en).best(q); if (!r || r.id !== CM) wrong.push(`${kind} closed "${q}" -> ${r && r.id}`); }
+  }
+  assert.deepEqual(wrong, []);
+  // What the answers say.
+  const ho = plain(b.en.topic(HO).a), hoFr = plain(b.fr.topic(HO).aFr);
+  assert.match(ho, /Open on holidays \(stat holidays and Christmas week\)/);
+  assert.match(ho, /Open this holiday/);
+  assert.match(ho, /Family Day and Thanksgiving/);
+  assert.match(hoFr, /Ouvrir ce jour férié/);
+  const sd = plain(b.en.topic(SD).a);
+  assert.match(sd, /Different hours in summer or winter\? , then No, different in summer/);
+  assert.match(sd, /Open this day/);
+  assert.match(sd, /Don’t tap We’re closed part of the year/);
+  assert.match(plain(b.en.topic(LO).a), /non-profits, societies, co-ops and community groups count when they’re run locally/);
+  assert.match(plain(b.en.topic(FRN).a), /^ ?Your page has a French version\. We write the French for your own lines, usually within a day\./);
+  const th = plain(b.en.topic(TH).a);
+  assert.match(th, /Known for/);
+  assert.match(th, /Add an event/);
+  // The price answers say the page's own words: "Admission $12" (no "from") before any lower typed price.
+  assert.match(plain(b.en.topic(P).a), /“Admission \$12”/);
+  assert.doesNotMatch(plain(b.en.topic(P).a) + plain(b.en.topic(X).a), /Admission from/);
+});
+
 // Every question in the 8 indoor help logs lands on an answer, on the page where it was asked, for the kind of place it was.
-const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool' };
+const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum' };
 // The misrouted ones, with where they belong.
 const LOG_WANT = {
   'we price per room not per person': [R], 'how do I change the price, it says adults but we charge per room': [R],
@@ -425,6 +496,8 @@ const LOG_WANT = {
   'grip socks are mandatory where does that go': [GTK],
   // Indoor test 10 (Sandra, a city pool): her five "I'm not sure"s and the ones that need a better answer.
   ...SANDRA_WANT,
+  // Indoor test 11 (Kim, a science centre).
+  ...KIM_WANT,
 };
 test('every question in the 8 indoor help logs lands on an answer (the misrouted ones on the right one)', async () => {
   const wrong = [];
