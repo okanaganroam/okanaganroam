@@ -193,14 +193,16 @@ K.curling = { gtk: 'general', ex: 'curling',
     groups: { chips: ['Événements de curling d’entreprise', 'Séances d’initiation en groupe', 'Location de glace privée'], lead: 'Touchez une taille, puis ajoutez les événements d’entreprise, les initiations en groupe ou la location de glace dans vos mots.', ex: 'Événements de curling d’entreprise jusqu’à 32 personnes. Location de glace privée' },
     search: ['curling', 'initiation au curling', 'club de curling'] } };
 
-K.yoga = { gtk: 'general', ex: 'yoga',
-  en: { price: { page: 'Drop-in classes from {x}.', basis: 'Drop-in class', label: 'Drop-in class price, in dollars', ph: 'Your drop-in class price', lead: 'Your drop-in class price. It shows on your card.' },
+// Indoor test 12 (2026-11-19; Jess's yoga studio: "Drop-in classes from $22" for one drop-in price): single, the price is
+// one drop-in class, said without "from" on the page, the card and in Build My Trip ("Drop-in class $22", « Cours à la carte 22 $ »).
+K.yoga = { gtk: 'yoga', ex: 'yoga', single: true,
+  en: { price: { page: 'Drop-in class {x}.', basis: 'Drop-in class', label: 'Drop-in class price, in dollars', ph: 'Your drop-in class price', lead: 'Your drop-in class price. It shows on your card.' },
     prices: { noun: 'class schedule', page: PRICES_PAGE[0], lead: 'Drop-in, class passes, memberships and workshops, with their prices. A photo of your price list or a link to your class schedule is perfect. It’s optional.' },
     help: { walkin: 'Drop in, or book a spot online', ages: '16+; family yoga on Sundays', gift: 'Gift cards and class passes online or at the studio', prices: '10-class pass $180, first week $30' },
     groups: { chips: ['Private group classes', 'Corporate wellness classes', 'Retreats and workshops'], lead: 'Tap a size, then add private classes, corporate wellness or retreats in your own words.', ex: 'Private group classes for up to 15. Corporate wellness classes' },
     search: ['yoga', 'hot yoga', 'pilates', 'fitness class', 'fitness classes', 'barre', 'spin class'] },
-  fr: { price: { page: 'Cours à la séance à partir de {x}.', basis: 'Cours à la séance', label: 'Prix d’un cours à la séance, en dollars', ph: 'Votre prix pour un cours à la séance', lead: 'Votre prix pour un cours à la séance. Il paraît sur votre fiche.' },
-    prices: { noun: 'horaire des cours', page: PRICES_PAGE[1], lead: 'Les cours à la séance, les cartes de cours, les abonnements et les ateliers, avec leurs prix. Une photo de votre liste de prix ou un lien vers votre horaire des cours, c’est parfait. C’est facultatif.' },
+  fr: { price: { page: 'Cours à la carte {x}.', basis: 'Cours à la carte', label: 'Prix d’un cours à la carte, en dollars', ph: 'Votre prix pour un cours à la carte', lead: 'Votre prix pour un cours à la carte. Il paraît sur votre fiche.' },
+    prices: { noun: 'horaire des cours', page: PRICES_PAGE[1], lead: 'Les cours à la carte, les cartes de cours, les abonnements et les ateliers, avec leurs prix. Une photo de votre liste de prix ou un lien vers votre horaire des cours, c’est parfait. C’est facultatif.' },
     help: { walkin: 'À la séance, ou réservez une place en ligne', ages: '16+; yoga en famille le dimanche', gift: 'Cartes-cadeaux et cartes de cours en ligne ou au studio', prices: 'Carte de 10 cours 180 $, première semaine 30 $' },
     groups: { chips: ['Cours privés de groupe', 'Cours de mieux-être pour entreprises', 'Retraites et ateliers'], lead: 'Touchez une taille, puis ajoutez les cours privés, le mieux-être en entreprise ou les retraites dans vos mots.', ex: 'Cours privés de groupe jusqu’à 15 personnes. Cours de mieux-être pour entreprises' },
     search: ['yoga', 'yoga chaud', 'pilates', 'cours de mise en forme', 'barre'] } };
@@ -256,7 +258,7 @@ const TYPER = {
   kids: ['Toddler play pass', 'Play passes', 'Laissez-passer tout-petits', 'Laissez-passer'],
   classes: ['Wheel class, 2 hours', 'Classes', 'Cours de tour, 2 heures', 'Cours'],
   curling: ['Learn to curl, 2 hours', 'Curling', 'Initiation au curling, 2 heures', 'Curling'],
-  yoga: ['Drop-in class', 'Classes', 'Cours à la séance', 'Cours'],
+  yoga: ['Drop-in class', 'Classes', 'Cours à la carte', 'Cours'],
   casino: ['Show ticket', 'Shows', 'Billet de spectacle', 'Spectacles'],
   library: ['Workshop', 'Programs', 'Atelier', 'Programmes'],
   other: ['Adult admission', 'Prices', 'Entrée adulte', 'Tarifs'],
@@ -307,8 +309,47 @@ for (const [k, x] of Object.entries(EX_PRICE)) if (K[k]) K[k].exPrice = x;
 const EXACT = { gallery: ['Adult admission', 'Entrée adulte'], museum: ['Adult admission', 'Entrée adulte'], theatre: ['Adult ticket', 'Billet adulte'], cinema: ['Adult ticket', 'Billet adulte'],
   spa: ['Adult price', 'Prix adulte'], pool: ['Adult drop-in', 'Entrée adulte à la séance'], climbing: ['Adult pass', 'Laissez-passer adulte'], games: ['Per person', 'Par personne'],
   escape: ['Per person', 'Par personne'], bowling: ['One game', 'Une partie'], kids: ['Kids', 'Enfants'], classes: ['Per class', 'Par cours'], curling: ['Adults', 'Adultes'],
-  yoga: ['Drop-in class', 'Cours à la séance'], casino: ['Adults', 'Adultes'], library: ['Adults', 'Adultes'], other: ['Adult admission', 'Entrée adulte'] };
+  yoga: ['Drop-in class', 'Cours à la carte'], casino: ['Adults', 'Adultes'], library: ['Adults', 'Adultes'], other: ['Adult admission', 'Entrée adulte'] };
 for (const [k, x] of Object.entries(EXACT)) if (K[k]) { K[k].en.price.exact = x[0]; K[k].fr.price.exact = x[1]; }
+// Indoor test 12 (2026-11-19; Jess's price box was pre-filled with $80, research's "1 month unlimited intro pass $80"): the
+// words a research price line must name for its amount to pre-fill the kind's Price box (the kind's own basis: a drop-in,
+// a single class, an adult admission, a day pass…), and the words that make a line something else (an intro offer, a pass
+// or card of several visits, a membership, a package, a discount day). No such line: the box starts empty.
+const PREFILL = {
+  gallery: /\b(?:adults?|admission|general admission|entry|entrance)\b|\bentr[ée]e\b/i,
+  museum: /\b(?:adults?|admission|general admission|entry|entrance)\b|\bentr[ée]e\b/i,
+  theatre: /\b(?:adults?|tickets?|general admission|admission)\b|\bbillets?\b/i,
+  cinema: /\b(?:adults?|tickets?|general admission|admission)\b|\bbillets?\b/i,
+  spa: /\b(?:treatments?|massages?|facials?|day pass|circuit|pass|sessions?|hydrotherapy|sauna)\b|\bsoins?\b/i,
+  pool: /\b(?:drop[- ]?ins?|admission|public swim|swim|adults?)\b|\b[àa] la s[ée]ance\b/i,
+  climbing: /\b(?:day pass|drop[- ]?ins?|pass|jump|jumps|sessions?|admission|climb(?:ing)?|adults?)\b/i,
+  games: /\b(?:games?|rounds?|per (?:person|player)|sessions?|laser tag|vr|mini golf)\b|\bpartie\b/i,
+  escape: /\b(?:per (?:person|player)|players?|persons?)\b|\bjoueurs?\b/i,
+  bowling: /\b(?:per game|one game|games?|per person)\b|\bpartie\b/i,
+  kids: /\b(?:per child|child(?:ren)?|kids?|play|drop[- ]?ins?|admission|day pass)\b|\benfants?\b/i,
+  classes: /\b(?:class(?:es)?|workshops?|sessions?|drop[- ]?ins?)\b|\b(?:cours|atelier)\b/i,
+  curling: /\b(?:learn to curl|sessions?|drop[- ]?ins?|per person|adults?)\b/i,
+  yoga: /\b(?:drop[- ]?ins?(?: class(?:es)?)?|single class|one class|casual class|class drop[- ]?in)\b|\b(?:[àa] la (?:carte|s[ée]ance))\b/i,
+  casino: /\b(?:entry|admission|cover)\b|\bentr[ée]e\b/i,
+  library: /\b(?:programs?|workshops?|admission)\b|\bateliers?\b/i,
+  other: /\b(?:admission|per person|entry|tickets?|drop[- ]?ins?|day pass|adults?)\b/i,
+};
+const PREFILL_NOT_RE = /\b(?:intro(?:ductory)?|new (?:students?|clients?|members?|customers?)|first (?:week|class|visit|month|time|timers?)|trial|unlimited|memberships?|members?|packages?|bundles?|punch|cards?|carte de \d+|\d+[- ]?(?:class|visit|session|pack|jump)s?|\d+ (?:weeks?|months?|days?)|weekly|monthly|annual|yearly|season|discount|deal|specials?|promo\w*|tuesdays?|cheap|groups?|private|part(?:y|ies)|per hour|an hour|hourly|lanes?|rentals?|rent|abonnements?|forfaits?|rabais)\b/i;
+const PREFILL_PASS_RE = /\b(?:pass(?:es)?|laissez[- ]passer)\b/i;
+// The pre-fill price in one research price line (or a card price's basis line) for a kind, or null.
+function indoorPrefillPrice(kinds, text, amount = null) {
+  const k = indoorKindKey(kinds), basis = PREFILL[k] || PREFILL.other;
+  const passOk = /pass/.test(basis.source);
+  const pieces = String(text || '').split(/[;\n•|]|\.(?=\s|$)|,\s+|\s+(?:or|ou)\s+/);
+  for (const piece of pieces) {
+    if (!basis.test(piece) || PREFILL_NOT_RE.test(piece) || (!passOk && PREFILL_PASS_RE.test(piece))) continue;
+    if (amount != null) return amount;
+    const m = /\$\s?(\d{1,3}(?:[.,]\d{2})?)(?!\d)|(\d{1,3}(?:[.,]\d{2})?)\s?\$/.exec(piece);
+    const n = m ? Number(String(m[1] || m[2]).replace(',', '.')) : NaN;
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
 const INDOOR_KIND_TEXT = K;
 const INDOOR_KIND_TEXT_KINDS = Object.keys(K);
 // The kind a place reads in: its main kind (the first the owner picked), else 'other'.
@@ -318,7 +359,7 @@ function indoorKindText(kinds, lang) {
   const k = indoorKindKey(kinds), e = K[k], w = e[lang === 'fr' ? 'fr' : 'en'];
   // The prices link's words on the page: "See prices & rates" / « Voir les tarifs », a spa's "See the spa menu".
   const see = w.prices.page === PRICES_PAGE[lang === 'fr' ? 1 : 0] ? (lang === 'fr' ? 'Voir les tarifs' : 'See prices & rates') : lang === 'fr' ? `Voir la ${w.prices.page.toLowerCase()}` : `See the ${w.prices.page.toLowerCase()}`;
-  return { kind: k, exPrice: e.exPrice || 15, boxOffice: !!e.boxOffice, arts: !!e.arts, quiet: !!e.quiet, day: !!(e.day || e.quiet), gtk: e.gtk || 'general', ex: e.ex || 'general', ...w, prices: { ...w.prices, see } };
+  return { kind: k, exPrice: e.exPrice || 15, single: !!e.single, boxOffice: !!e.boxOffice, arts: !!e.arts, quiet: !!e.quiet, day: !!(e.day || e.quiet), gtk: e.gtk || 'general', ex: e.ex || 'general', ...w, prices: { ...w.prices, see } };
 }
 // "Tickets from $25." with the price written in.
 function indoorPriceLine(kinds, money, lang) { return indoorKindText(kinds, lang).price.page.replace('{x}', money); }
@@ -354,4 +395,4 @@ const INDOOR_TYPE_WORD_SKIP = new Set(['history', 'heritage', 'heritage site', '
 // "learn to curl", "slots", « soin du visage »).
 const INDOOR_TYPE_WORDS = [...new Set(Object.values(K).flatMap((e) => e.en.search.concat(e.fr.search)).filter((w) => !INDOOR_TYPE_WORD_SKIP.has(w)))];
 
-module.exports = { INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };
+module.exports = { indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };

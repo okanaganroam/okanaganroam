@@ -2231,6 +2231,7 @@ const INDOOR_BOOK_NOTES = {
   busy: 'Walk-ins welcome; book ahead for weekends and busy times (the owner’s own answer).',
   ahead: 'Book ahead (the owner’s own answer).',
 };
+const INDOOR_CLASS_TIME_NOTE = 'Book a class time: see the schedule on their Book button (the owner’s own answer).';
 const TOUR_BOOK_AHEAD_NOTES = {
   same_day: 'Same-day bookings are often fine (the operator’s own answer). Call ahead for the times.',
   day: 'Book at least a day ahead (the operator’s own answer).',
@@ -2627,7 +2628,13 @@ function stopFrom(v, scored, extra, ctx) {
   if (ctx && ctx.features && isDogTrip(ctx) && DINING_TYPES.includes(v.type) && !(v.features.dog_friendly || v.collections.includes('dog_friendly'))) caveats.push(`Not listed as dog-friendly on ${SITE.brand}, so plan this one without your dog or check with them first`);
   // Round 10 (2026-10-19): a tour company runs at set times; it is booked, not dropped in on.
   // Indoor test 8: his own busy line for the evening asked stands in for the general walk-ins answer.
-  if (v && v.type === 'indoor' && INDOOR_BOOK_NOTES[v.indoorBook] && !caveats.includes(INDOOR_BOOK_NOTES[v.indoorBook]) && !(ownLine && ownLine.busy && v.indoorBook !== 'ahead')) caveats.push(INDOOR_BOOK_NOTES[v.indoorBook]);
+  // Indoor test 12 (2026-11-19; Jess's yoga studio, classes only with a schedule link): no "Hours not listed" for it; its
+  // stop says to book a class time instead of the general book-ahead answer.
+  if (v && v.type === 'indoor' && v.indoorClassTimes === true) {
+    reasons = reasons.filter((r) => r.code !== 'hours' && !/^Listed hours/.test(r.text || ''));
+    caveats = caveats.filter((c) => !c.startsWith(UNKNOWN_HOURS_CAVEAT.replace(/ — .*$/, '')) && !/listed hours/i.test(c));
+    if (!caveats.includes(INDOOR_CLASS_TIME_NOTE)) caveats.push(INDOOR_CLASS_TIME_NOTE);
+  } else if (v && v.type === 'indoor' && INDOOR_BOOK_NOTES[v.indoorBook] && !caveats.includes(INDOOR_BOOK_NOTES[v.indoorBook]) && !(ownLine && ownLine.busy && v.indoorBook !== 'ahead')) caveats.push(INDOOR_BOOK_NOTES[v.indoorBook]);
   if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = tourBookAheadNote(v); if (!caveats.includes(bn)) caveats.push(bn); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
   // Tour test 4 (Whistler, 2026-11-17), bug 12: the operator's one booking and age answer stands for several unlike trips

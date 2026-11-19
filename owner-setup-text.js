@@ -2529,13 +2529,16 @@ Object.assign(en.indoor, { bringExKinds: { gallery: 'Most art is for sale, and w
   shows: 'Doors open 30 minutes before the show. Free parking behind the building.', pool: 'Bring a swimsuit and a towel. Lockers by the change rooms.',
   classes: 'Wear clothes that can get messy. Painted pieces are fired and ready in about a week.',
   bowling: 'Leagues use most lanes on weeknights: call ahead. Licensed lounge. Bumpers for kids.',
-  kids: 'Grip socks required (we sell them for $3). An adult stays with their kids. Coffee for parents.' } });
+  kids: 'Grip socks required (we sell them for $3). An adult stays with their kids. Coffee for parents.',
+  // Indoor test 12 (2026-11-19): a yoga studio's own example.
+  yoga: 'Hot room classes: bring water and a towel. Mats to rent for $3. Arrive 15 minutes early.' } });
 Object.assign(fr.indoor, { bringExKinds: { gallery: 'La plupart des œuvres sont à vendre, et nous pouvons les expédier. Stationnement gratuit derrière la galerie.', arts: 'Boutique à l’entrée. Photos sans flash.', active: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Casiers offerts.',
   spa: 'Apportez votre maillot. Peignoirs et serviettes fournis.', general: 'Arrivez 15 minutes d’avance. Stationnement gratuit derrière le bâtiment.',
   shows: 'Portes ouvertes 30 minutes avant le spectacle. Stationnement gratuit derrière le bâtiment.', pool: 'Apportez votre maillot et une serviette. Casiers près des vestiaires.',
   classes: 'Portez des vêtements qui peuvent se salir. Les pièces peintes sont cuites et prêtes en une semaine environ.',
   bowling: 'Les ligues occupent la plupart des allées en semaine : appelez avant. Salon avec permis d’alcool. Bandes pour les enfants.',
-  kids: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Un adulte reste avec ses enfants. Café pour les parents.' } });
+  kids: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Un adulte reste avec ses enfants. Café pour les parents.',
+  yoga: 'Cours en salle chaude : apportez de l’eau et une serviette. Tapis à louer pour 3 $. Arrivez 15 minutes d’avance.' } });
 // Indoor test 3 (2026-11-19; Diane, a community theatre in Penticton, shows only). Wording only: no new fields or chips.
 // - The hint under "We don't have set hours": box office hours go in Good to know, never as the hours (they turned into
 //   "Closed Saturdays" for a Saturday-night theatre).
@@ -2605,6 +2608,9 @@ en.indoor.quick = Object.assign({}, en.quick, {
     classes: ['Wear clothes that can get messy', 'Pieces ready in about a week', 'Book ahead on weekends', 'Free parking on site', 'Arrive 15 minutes early'],
     // Indoor test 8 (2026-11-19; Gary's bowling centre had the generic chips): leagues, the lounge and bumpers.
     bowling: ['Leagues on weeknights: call ahead', 'Licensed lounge', 'Bumpers for kids', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site'],
+    // Indoor test 12 (2026-11-19; Jess's hot yoga studio was offered a café, lockers and "Book ahead on weekends"): yoga and
+    // fitness studios' own set.
+    yoga: ['Bring water and a towel', 'Mats to rent', 'Arrive 15 minutes early', 'Free parking on site'],
   },
   groups: ['Birthday parties with a private room', 'School groups welcome', 'Private bookings on request'],
 });
@@ -2621,6 +2627,7 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
     pool: ['Apportez votre maillot', 'Casiers offerts', 'Arrivez 15 minutes d’avance', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
     classes: ['Portez des vêtements qui peuvent se salir', 'Pièces prêtes en une semaine environ', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Arrivez 15 minutes d’avance'],
     bowling: ['Ligues en semaine : appelez avant', 'Salon avec permis d’alcool', 'Bandes pour les enfants', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
+    yoga: ['Apportez de l’eau et une serviette', 'Tapis à louer', 'Arrivez 15 minutes d’avance', 'Stationnement gratuit sur place'],
   },
   groups: ['Fêtes d’anniversaire avec salle privée', 'Groupes scolaires bienvenus', 'Réservations privées sur demande'],
 });

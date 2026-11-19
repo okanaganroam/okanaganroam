@@ -689,6 +689,9 @@
     if (!k0) return;
     if ((!S.tour.length || S.tour.lengthGuessed) && !TI.length && (C.kindLength || {})[k0]) { S.tour.length = C.kindLength[k0]; S.tour.lengthGuessed = true; }
     if ((!S.tour.book || S.tour.bookGuessed) && !TI.book && (C.kindBook || {})[k0]) { S.tour.book = C.kindBook[k0]; S.tour.bookGuessed = true; }
+    // Indoor test 12 (2026-11-19): research's price pre-fills only for the kind it names (a yoga drop-in, a museum's adult
+    // admission); another main kind picked takes its own, or an empty box.
+    if (C.researchFeeKinds && !S.tour.free && (S.tour.price == null || S.tour.priceGuessed) && CUR.indoor_price == null) { var rf = C.researchFeeKinds[k0]; if (typeof rf === 'number') { S.tour.price = rf; S.tour.priceGuessed = true; } else if (S.tour.priceGuessed) { S.tour.price = null; S.tour.priceGuessed = false; } }
     if ((!S.tour.age || S.tour.ageGuessed) && !TI.age) { var ag = (S.tour.kinds || []).map(function(k){ return (C.kindAge || {})[k]; }).filter(Boolean)[0] || ''; if (ag) { S.tour.age = ag; S.tour.ageGuessed = true; } else if (S.tour.ageGuessed) { S.tour.age = ''; S.tour.ageGuessed = false; } }
   }
   indoorGuess();
@@ -840,7 +843,7 @@
   // Indoor test 2 (2026-11-19): the card's short words for the kinds ("Escape room · arcade, VR & laser tag"), as the server
   // writes them (server.js indoorKindsText), for the preview.
   function indoorKindsShort(ks){
-    var l = (ks || []).filter(function(k, i, a){ return (C.indoorKindWords || {})[k] && a.indexOf(k) === i; }).map(function(k, i){ return k === 'games' && i > 0 && C.indoorGamesShort ? C.indoorGamesShort : C.indoorKindWords[k]; });
+    var l = (ks || []).filter(function(k, i, a){ return (C.indoorKindWords || {})[k] && a.indexOf(k) === i; }).map(function(k, i){ return k === 'games' && i > 0 && C.indoorGamesShort ? C.indoorGamesShort : k === 'museum' && C.indoorScienceCentre ? C.indoorScienceCentre : C.indoorKindWords[k]; });
     if (!l.length) return '';
     var ll = l.map(function(x, i){ return i && !/^(?:VR|SUP)\b/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x; });
     if (ll.length > 1 && ll.some(function(x){ return /&|,| et /.test(x); })) return ll.join(' · ');
@@ -1614,7 +1617,10 @@
       if (freeIndoor()) l = l.filter(function(c){ return !/first Sunday|premier dimanche/i.test(c); });
       // Indoor test 11 (2026-11-19; Kim was asked about free parking twice): free parking is the Free parking tile in What you
       // offer, so its Good to know chip isn't offered (unless her line already says it, so she can take it out).
-      l = l.filter(function(c){ return !/^(?:Free parking on site|Stationnement gratuit sur place)$/i.test(c) || saysIt(value, c, l); }); }
+      l = l.filter(function(c){ return !/^(?:Free parking on site|Stationnement gratuit sur place)$/i.test(c) || saysIt(value, c, l); });
+      // Indoor test 12 (2026-11-19; Jess answered "No, please book ahead" and was offered "Book ahead on weekends"): no
+      // weekend booking chip when every visit is booked ahead.
+      if (((S.tour && S.tour.book) || (TI && TI.book)) === 'ahead') l = l.filter(function(c){ return !/^(?:Book ahead on weekends|Réservez pour les fins de semaine)$/i.test(c) || saysIt(value, c, l); }); }
     // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
     // isn't offered "Patio only".
     if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;

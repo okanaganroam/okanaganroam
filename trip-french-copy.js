@@ -280,6 +280,7 @@ function t3FrenchTextCore(value){
  const phrases=[
   // Indoor test 3 (2026-11-19): a show place's status line, whole.
   ['Times vary · check before you go','Horaires variables · vérifiez avant d’y aller'],
+  ['Class times: see the schedule','Horaires des cours : voir l’horaire'],
  // Brewery test 3 (Whistler, 2026-11-16): a place's own listed live music (first, before the shorter phrases inside them).
   ['No one-off live-music event is on What’s On for that date, so this is a place that lists live music that night on its own page.','Aucun spectacle de musique ponctuel n’est dans À l’affiche à cette date; voici un endroit qui annonce de la musique en direct ce soir-là sur sa propre fiche.'],
   ['These are places that list live music that night on their own page; check with them before you go.','Ces endroits annoncent de la musique en direct ce soir-là sur leur propre fiche; vérifiez auprès d’eux avant de partir.'],
@@ -459,6 +460,7 @@ function t3FrenchTextCore(value){
  text=text.replace(/^Walk-ins welcome; book ahead for weekends and busy times \(the owner’s own answer\)\.$/,'Sans réservation; réservez pour les fins de semaine et les périodes achalandées (réponse de l’établissement).');
  text=text.replace(/^For kids (\d{1,2}) to (\d{1,2}) \(the owner’s own words\)(\.?)$/,(_,a,b,d)=>`Pour les enfants de ${a} à ${b} ans (selon l’établissement)${d}`); // indoor test 9
  text=text.replace(/^Book ahead \(the owner’s own answer\)\.$/,'Réservez à l’avance (réponse de l’établissement).');
+ text=text.replace(/^Book a class time: see the schedule on their Book button \(the owner’s own answer\)\.$/,'Réservez une heure de cours : voyez l’horaire avec leur bouton Réserver (réponse de l’établissement).'); // indoor test 12
  text=text.replace(/^Book ahead \(the operator’s own answer\)\.$/,'Réservez à l’avance (réponse de l’entreprise).');
  // Tour test 4 (2026-11-17): several unlike trips behind one answer.
  text=text.replace(/^Length, ages and booking can differ by tour: see this operator’s Tours & prices\.$/,'La durée, l’âge et la réservation peuvent varier selon la sortie : voyez Sorties et tarifs de cette entreprise.');
