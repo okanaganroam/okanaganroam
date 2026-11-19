@@ -1938,7 +1938,7 @@ Object.assign(en.tour, {
   tpriceMore: 'Several trips, or a winter and a summer price? Put the lowest here. All of them go in “Your tours and prices”, the first of the extra details.',
   // The hours editor: departures, not lunch and dinner; nothing after midnight.
   addSecond: '+ Add a second time (only if you close in between)', twoTimesMax: 'Up to two times a day.',
-  departHint: 'Departures at set times? Set one time from your first departure to when the last trip gets back (like 9 AM – 5 PM), and list the departure times in your story.',
+  departHint: 'Departures at set times? Set one time from your first departure to when the last trip gets back (like 9 AM – 5 PM), and list the departure times in Your tours and prices.',
   noDogsSub: 'Not on any trip', noDogsSubInside: 'Not on any trip',
   bringGuess: 'We found this online. Check it: change any words, or tap the answers below to use them instead.',
 });
@@ -1961,7 +1961,7 @@ Object.assign(fr.tour, {
   helpTail: 'Les photos, vos sorties et tarifs et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau site Web si vous les avez modifiés. Un nouveau numéro de téléphone et tout le reste sont en ligne tout de suite.',
   tpriceMore: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez le plus bas ici. Tous vont dans « Vos sorties et tarifs », le premier des détails facultatifs.',
   addSecond: '+ Ajouter une deuxième plage (seulement si vous fermez entre les deux)', twoTimesMax: 'Jusqu’à deux plages par jour.',
-  departHint: 'Des départs à heures fixes? Indiquez une seule plage, de votre premier départ jusqu’au retour de la dernière sortie (comme 9 h – 17 h), et nommez les heures de départ dans votre histoire.',
+  departHint: 'Des départs à heures fixes? Indiquez une seule plage, de votre premier départ jusqu’au retour de la dernière sortie (comme 9 h – 17 h), et nommez les heures de départ dans Vos sorties et tarifs.',
   noDogsSub: 'Sur aucune sortie', noDogsSubInside: 'Sur aucune sortie',
   bringGuess: 'Nous avons trouvé ceci en ligne. Vérifiez-le : changez les mots, ou touchez les réponses ci-dessous pour les utiliser à la place.',
   // The French wording table (tour test 1).

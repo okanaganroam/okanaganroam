@@ -85,3 +85,26 @@ test('1. BLOCKER: "We pick you up" on Basics really saves (the button the screen
   approveAll(v.id);
   assert.doesNotMatch(plain(page(v)), /Pickup:? hotels in Whistler/);
 });
+
+test('2. Help examples follow his kind: a bear tour never sees a dock, a sled ride or salmon season (EN + FR); unknown kinds keep the old examples', async () => {
+  const { t } = await tom();
+  const cfgOf = async (p) => JSON.parse(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(await fetch(base + p).then((r) => r.text()))[1]);
+  for (const p of [`/owner/${t}/setup`, `/fr/owner/${t}/setup`]) {
+    const hits = (await cfgOf(p)).topics.flatMap((x) => [x.q, x.qFr, x.a, x.aFr].map((y) => [x.id, String(y || '')])).filter(([id, y]) => !['tour-own-dogs', 'tour-kinds-sleigh', 'tour-kinds-kennel'].includes(id) && /\bthe dock\b|\bau quai\b|Sled ride|Balade en traîneau|Salmon season|Saison du saumon|sled dogs|chiens de traîneau/.test(y)).map(([id, y]) => `${id}: ${/.{0,40}(?:\bthe dock\b|\bau quai\b|Sled ride|Balade en traîneau|Salmon season|Saison du saumon|sled dogs|chiens de traîneau).{0,40}/.exec(y)[0]}`);
+    assert.deepEqual(hits, [], p);
+  }
+  // (The answers about sled dogs and sleigh rides themselves only come up when asked about them.)
+  const en = (await cfgOf(`/owner/${t}/setup`)).topics, fr = (await cfgOf(`/fr/owner/${t}/setup`)).topics;
+  assert.match(en.find((x) => x.id === 'tour-kids-price').a, /Bear viewing tour: \$149 adult, \$99 kids 5 to 12\./);
+  assert.match(en.find((x) => x.id === 'tour-busy-season').a, /Bear season May to October: book early/);
+  assert.match(fr.find((x) => x.id === 'tour-busy-season').aFr, /Saison des ours de mai à octobre/);
+  assert.match(en.find((x) => x.id === 'tour-meeting').a, /we meet at our office/);
+  // A fishing charter keeps salmon season and the dock; a listing with no kinds yet keeps every example.
+  const f = await tom({ cuisine: 'Fishing charters' }, { kinds: ['fishing'] });
+  const fen = (await cfgOf(`/owner/${f.t}/setup`)).topics;
+  assert.match(fen.find((x) => x.id === 'tour-busy-season').a, /Salmon season/);
+  assert.match(fen.find((x) => x.id === 'tour-meeting').a, /dock/);
+  const none = mk('tour', { name: 'No Kinds T16' });
+  const nen = (await cfgOf(`/owner/${tokenFor(none.id)}/setup`)).topics;
+  assert.match(nen.find((x) => x.id === 'tour-kids-price').a, /Sled ride/);
+});

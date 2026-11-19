@@ -963,3 +963,60 @@ test("tour test 15: Help on a tour's tours-and-prices page starts with tour chip
   assert.equal(bot.best("how do i show which tours are summer and which are winter").id, "tour-kind-seasons");
   assert.match(bot.topic("menu-add").q, /tours and prices/);
 });
+// Tour test 16 (Whistler, 2026-11-18; Tom, Coast Mountain Bear Tours: bear viewing by 4x4, a kids' price, a private vehicle,
+// hotel pickup). His 17 questions (help-log.json, exact wording), each with a French twin, and a few plain variants.
+const ASKED16 = [
+  ["16-1", "en", "do i need to say where we meet", ["tour-meeting"], "faut-il dire où on se rencontre"],
+  ["16-2", "en", "we pick up from hotels or they can come to the office", ["tour-pickup"], "on vient chercher les gens à leur hôtel ou ils viennent au bureau"],
+  ["16-3", "en", "we're closed all winter", ["tour-season"], "on est fermé tout l'hiver"],
+  ["16-4", "en", "tours go out morning and evening, what do i put for hours", ["hours", "tour-times", "tour-office-hours"], "les sorties partent le matin et le soir, quelles heures je mets"],
+  ["16-5", "en", "kids price how", ["tour-kids-price"], "prix enfants comment"],
+  ["16-6", "en", "private truck for up to 6 people is $895 where does that go", ["tour-private-price"], "le véhicule privé jusqu'à 6 personnes c'est 895 $, ça va où"],
+  ["16-7", "en", "tours sell out fast can i say book early", ["tour-sell-out"], "nos sorties affichent complet vite, je peux dire de réserver tôt"],
+  ["16-8", "en", "do i have to fill all of this out", ["tour-fill-all"], "est-ce que je dois tout remplir"],
+  ["16-9", "en", "where do i put the private vehicle price", ["tour-private-price"], "où je mets le prix du véhicule privé"],
+  ["16-10", "en", "kids 5 and up only, under 5 not allowed", ["tour-age"], "enfants de 5 ans et plus seulement"],
+  ["16-11", "en", "the pickup button didnt do anything", ["tour-pickup"], "le bouton de prise en charge ne fait rien"],
+  ["16-12", "en", "how do i say tours sell out", ["tour-sell-out"], "comment dire que nos sorties affichent complet"],
+  ["16-13", "en", "we meet at the dock in summer and the plaza in winter", ["tour-meeting"], "on se rejoint au quai l'été et à la place l'hiver"],
+  ["16-14", "en", "we close between seasons in spring and fall", ["tour-season"], "on ferme entre les saisons au printemps et à l'automne"],
+  ["16-15", "en", "canoe rentals are per boat per hour", ["tour-per-unit"], "la location de canot est par bateau par heure"],
+  ["16-16", "en", "our snowshoe tour includes dinner", ["tour-includes-meal"], "notre sortie en raquettes comprend le souper"],
+  ["16-17", "en", "kayaks only in summer, snowshoe only in winter", ["tour-kind-seasons"], "kayak seulement l'été, raquettes seulement l'hiver"],
+  // Other words for the same things.
+  ["16-v1", "en", "private van for up to 8, $1200", ["tour-private-price"], "fourgonnette privée jusqu'à 8 personnes, 1200 $"],
+  ["16-v2", "en", "private vehicle up to 6 where", ["tour-private-price"], "véhicule privé jusqu'à 6, où"],
+  ["16-v3", "en", "do I need to fill everything in", ["tour-fill-all"], "faut-il tout remplir"],
+  ["16-v4", "en", "is all of this required", ["tour-fill-all"], "est-ce que tout est obligatoire"],
+  ["16-v5", "en", "we fill up in summer", ["tour-sell-out"], "nos sorties se remplissent l'été"],
+  ["16-v6", "en", "book early, we sell out", ["tour-sell-out"], "réservez tôt, on affiche complet"],
+  ["16-v7", "en", "kayak in summer and snowshoe in winter", ["tour-kind-seasons"], "kayak l'été et raquette l'hiver"],
+  ["16-v8", "en", "we do kayaking summer and snowshoeing winter", ["tour-kind-seasons"], "on fait du kayak en été et de la raquette en hiver"],
+  ["16-v9", "en", "closed for the winter", ["tour-season"], "fermé pour l'hiver"],
+  ["16-v10", "en", "pickup button doesnt work", ["tour-pickup"], "le bouton prise en charge ne marche pas"],
+];
+test("tour test 16: every Help question (EN and its French twin) lands on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Wildlife and bear viewing" });
+  assert.equal(ASKED16.filter((x) => !/v/.test(x[0])).length, 17);
+  const wrong = [];
+  for (const [k, lang, q, want, qFr] of ASKED16) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r && r.id)) wrong.push(`${k} ${lang.toUpperCase()} "${q}" -> ${r && r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf && rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf && rf.id} (want ${want.join(" or ")})`);
+    if (rf.lang !== "fr") wrong.push(`${k} FR "${qFr}" answered in ${rf.lang}`);
+  }
+  assert.deepEqual(wrong, []);
+  // "up to N" is still an age without a price or "private".
+  assert.equal(en.best("kids up to 5 go free").id === "tour-private-price", false);
+});
+test("tour test 16 answers: Private tours box, Yes book ahead + Good to know, only the 7 essentials, the setup's own season button", async () => {
+  const { en, fr } = await setupFor("tour");
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/[  ]/g, " ").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-private-price").a), /^ ?Put it in Private tours , the box under Price/);
+  assert.match(plain(fr.topic("tour-private-price").aFr), /Sorties privées/);
+  assert.match(plain(en.topic("tour-sell-out").a), /tap Yes/); assert.match(plain(en.topic("tour-sell-out").a), /Good to know/); assert.match(plain(en.topic("tour-sell-out").a), /How far ahead is optional/);
+  assert.match(plain(en.topic("tour-fill-all").a), /No\. Only the 7 essentials matter; everything in More about your tours is optional\. You can stop any time and come back with your link\./);
+  assert.match(plain(fr.topic("tour-fill-all").aFr), /Seuls les 7 essentiels comptent/);
+  assert.match(plain(en.topic("tour-season").a), /We only run part of the year/);
+  assert.doesNotMatch(plain(en.topic("tour-season").a), /Open some months only/);
+});
