@@ -4525,7 +4525,7 @@ function buildDiscoverySearchVenues() {
       // Tour test 11 (Whistler, 2026-11-18): a tour's own typed tours (names and descriptions) and its Plan your visit lines
       // (Good to know: "Hotel pickup available") are searched with its story ("village lights tour", "hotel pickup"); each
       // part is read on its own (the reader keeps about 500 characters of one text).
-      textName: normalize(row.name || ''), textCuisine: normalize(venueCuisineList(row).join(' ') || row.cuisine || ''), textDesc: [row.description || '', ...(row.type === 'tour' ? [...tourListText(row.id).split(' ; '), ...tourVisitSearchText(row.id).split(' ; ')] : [])].filter(Boolean).map((x) => normalize(x)).join(' '), textDescFr: normalize(row.description_fr || ''),
+      textName: normalize(row.name || ''), textCuisine: normalize(venueCuisineList(row).join(' ') || row.cuisine || ''), textDesc: [row.description || '', ...(row.type === 'tour' ? [...tourListText(row.id).split(' ; '), ...tourVisitSearchText(row.id).split(' ; ')] : []), ...(row.type === 'indoor' ? indoorSearchExtraText(row.id).split(' ; ') : [])].filter(Boolean).map((x) => normalize(x)).join(' '), textDescFr: [row.description_fr || '', ...(row.type === 'indoor' ? indoorSearchExtraText(row.id, true).split(' ; ') : [])].filter(Boolean).map((x) => normalize(x)).join(' '),
       // Tour test 12 (Whistler, 2026-11-18; "bungee gift cards" listed only a gift shop): a tour is in the activities its
       // tours filter puts it under (Adventure, Winter…), so a search that names one finds it (and its typed list).
       features, collections: m.collections, activities: row.type === 'tour' ? [...new Set([...m.activities, ...OUTDOOR_ACTIVITIES.filter((a) => TOUR_ACTIVITIES.some((x) => x.slug === a.slug) && tourInActivity(row, a.slug)).map((a) => a.slug),
@@ -23821,6 +23821,23 @@ function visitLinesText(info, labels) {
 function indoorVisitSearchText(venueId) {
   try { return visitLinesText(venueVisitInfo(venueId), ['Known for', 'Good to know', 'Groups']); } catch (e) { return ''; }
 }
+// Indoor test 8 (2026-11-19; Gary: "cosmic bowling" and "arcade kelowna" missed his bowling centre in site search): what
+// search reads for an indoor place besides its name, category and story: the owner's Known for, Good to know and Groups
+// lines, the names of the owner's own prices ("Cosmic bowling, unlimited", "Shoe rental") and the words of the kinds the
+// owner picked (games after the main kind: only "arcade" unless the place's own words say VR, laser tag or karting).
+function indoorSearchExtraText(venueId, fr = false) {
+  const out = [indoorVisitSearchText(venueId)];
+  try {
+    const row = publishedMenuRow(venueId);
+    if (row && row.source !== 'research') { const d = parseMenuData(row.data); for (const sec of (d && d.sections) || []) for (const it of sec.items || []) if (it && it.name) out.push(String(it.name)); }
+  } catch (e) { /* no prices */ }
+  try {
+    const kinds = venueIndoorInfo(venueId).kinds || [];
+    const full = kinds.indexOf('games') > 0 ? INDOOR_GAMES_FULL_RE.test(indoorOwnWords(venueId)) : true;
+    kinds.forEach((k, i) => { const e = indoorKindsModule.INDOOR_KIND_TEXT[k]; if (!e) return; out.push((k === 'games' && i > 0 && !full ? (fr ? ['arcade', 'arcades', 'salle d’arcade'] : ['arcade', 'arcades']) : e[fr ? 'fr' : 'en'].search).join(' ; ')); });
+  } catch (e) { /* no kinds */ }
+  return out.filter(Boolean).join(' ; ');
+}
 function tourSearchExtraText(venueId) { return [tourListText(venueId), tourVisitSearchText(venueId)].filter(Boolean).join(' ; '); }
 function tourVisitSearchText(venueId) {
   try { const info = venueVisitInfo(venueId) || {}; return (info.rows || []).filter((r) => r && typeof r.text === 'string' && /^(?:known for|good to know|groups)$/i.test(String(r.label || ''))).map((r) => r.text).join(' ; '); } catch (e) { return ''; }
@@ -33800,7 +33817,7 @@ function renderIndoorHubPage(indoorVenues, golfVenues, alsoVenues, notes, filter
   };
   const payload = {};
   for (const v of venues) {
-    payload[String(v.id)] = { c: expById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''} ${v.type === 'indoor' ? indoorVisitSearchText(v.id) : ''}`), o: recommendedRank.get(v.id) };
+    payload[String(v.id)] = { c: expById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''} ${v.type === 'indoor' ? indoorSearchExtraText(v.id) : ''}`), o: recommendedRank.get(v.id) };
     const st = openInfo.byId.get(v.id);
     if (st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
   }

@@ -128,3 +128,27 @@ test('3. Games as a second kind says "arcade" (card, page, preview, EN + FR) unl
   await ok(change(t3, { indoor_info: { kinds: ['games'], length: '1-2h' } }));
   assert.equal(app.getVenue(v3.id).cuisine, 'Arcade, VR & laser tag');
 });
+
+// Gary's prices, as he typed them (published).
+const garyPrices = (id) => db.prepare("INSERT INTO venue_menus (venue_id, status, data, submitted_by, submitted_at, published_at, source) VALUES (?, 'published', ?, 'owner-link', datetime('now'), datetime('now'), 'owner')").run(id, JSON.stringify({ sections: [{ name: 'Games', note: '', items: [
+  { name: 'One game, one person', description: '', price: '6.50', dietary: [], check: false }, { name: 'Shoe rental', description: '', price: '3', dietary: [], check: false },
+  { name: 'Lane by the hour (up to 6 people)', description: 'Per lane, per hour', price: '45', dietary: [], check: false }, { name: 'Glow pins unlimited (Fri & Sat 9 PM–midnight)', description: 'Per person', price: '25', dietary: [], check: false }] }] }));
+const siteSearch = async (q, lang = 'en') => plain(await fetch(`${base}${lang === 'fr' ? '/fr' : ''}/search?q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text()));
+
+test('4. Search (site and hub) reads his Known for, Good to know, price names and owner-picked kinds: "cosmic bowling" and "arcade kelowna" find him', async () => {
+  const { v, t } = await gary({ name: 'Capri Five Pin Centre T8', cuisine: '', description: 'Five-pin centre in the Capri mall since 1962.' });
+  await ok(change(t, { indoor_info: { kinds: ['bowling', 'games'], length: '1-2h', book: 'busy', age: 'all' } }));
+  await ok(change(t, { visit_rows: { known_for: 'Cosmic bowling Fri & Sat 9 PM–midnight', good_to_know: 'Leagues use most lanes Mon–Thu after 6, call ahead. Licensed lounge.' } }));
+  garyPrices(v.id);
+  for (const q of ['cosmic bowling', 'arcade kelowna', 'glow pins', 'shoe rental']) assert.ok((await siteSearch(q)).includes(v.name), `site search "${q}"`);
+  // French site search reads the kinds' French words.
+  assert.ok((await siteSearch('quilles kelowna', 'fr')).includes(v.name), 'site search « quilles kelowna »');
+  // The hub's own search words.
+  const hub = await fetch(`${base}/indoor`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text());
+  const tag = /<script type="application\/json" id="fdVenueData"([^>]*)>([\s\S]*?)<\/script>/.exec(hub);
+  const rest = /data-rest="([^"]+)"/.exec(tag[1]);
+  const data = rest ? await fetch(`${base}/cards/rest/${rest[1]}.json`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.json()) : JSON.parse(tag[2] || '{}');
+  const k = (data[v.id] || {}).k || '';
+  for (const w of ['cosmic', 'arcade', 'glow', 'lounge']) assert.ok(k.split(' ').includes(w), `hub words have ${w}: ${k}`);
+  assert.ok(!k.split(' ').includes('laser'), 'no laser tag words he never said');
+});
