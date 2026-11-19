@@ -14693,7 +14693,7 @@ test('Stage 3.4: /search shows the visitor\'s words, the interpretation, correct
   assert.ok(only.html.includes('We understood what you don’t want'));
   assert.ok(!only.html.includes('Search the directory for'));
   const none = await page('xqzvbn plorf');
-  assert.ok(none.html.includes('We couldn’t find any places whose name, listed cuisine or description mentions those words.'));
+  assert.ok(none.html.includes('We couldn’t find any places whose name, category or description mentions those words.'));
   // Smarter search (2026-10-18): the directory link keeps the words (?q=)
   // plus from=search, so /browse shows them instead of sending a lone ?q=
   // straight back to /search (Stage 3.6 had made it a plain /browse).

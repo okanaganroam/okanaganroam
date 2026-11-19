@@ -188,3 +188,26 @@ test('5. Good to know and Groups pre-fill research as found online; her walk-in 
   assert.equal(c.doc.getElementById('suBring').value, 'Free parking out back.');
   assert.match(c.text(), /“Gallery is by appointment only\.”/);
 });
+
+const searchText = async (q, lang = 'en') => plain(await (await fetch(`${base}${lang === 'fr' ? '/fr' : ''}/search?q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } })).text());
+test('8. Search: Known for is read ("dinosaurs vernon"), kids in Vernon puts family indoor places first (not trails), and a kind Vernon lacks says so and lists the nearest of that kind only (EN + FR); no "cuisine" in the no-match line', async () => {
+  const { v, t } = await kim({ name: 'Okanagan Science Centre T11 Search' });
+  await ok(change(t, { visit_rows: { known_for: 'Hands-on science: Vern the animatronic ankylosaurus, dino dig pit, axolotls and a planetarium.' } }));
+  assert.match(await searchText('dinosaurs vernon'), /Okanagan Science Centre T11 Search/);
+  // Kids: her place ahead of a kid-friendly trail and park.
+  mk({ name: 'Allan Creek Park Trail T11', type: 'outdoor', cuisine: 'Trail', description: 'An easy creek trail through a park.', kid_friendly: 1, rating: 4.9, reviews: 900 });
+  const kids = await searchText('things to do with kids in Vernon');
+  assert.ok(kids.indexOf(v.name) >= 0 && kids.indexOf(v.name) < kids.indexOf('Allan Creek Park Trail T11'), kids.slice(0, 600));
+  // No pool in Vernon: says so, lists the Kelowna pool, never disc golf or a casino.
+  mk({ name: 'Polson Disc Golf T11', type: 'sport', cuisine: 'Disc golf', description: 'An 18-hole disc golf course.' });
+  mk({ name: 'Lake City Casino T11', cuisine: 'Casino', description: 'Slots and table games.' });
+  const pool = app.createVenue({ name: 'Kelowna Aquatic Centre T11', slug: 'indoor-t11-kpool', region: 'kelowna', type: 'indoor', cuisine: 'Pool', description: 'A 25 m lap pool and a leisure pool.', latitude: 49.88, longitude: -119.47, address: '1800 Parkinson Way, Kelowna, BC', hours: HOURS });
+  await ok(change(tokenFor(pool.id), { indoor_info: { kinds: ['pool'], length: '1-2h', book: 'no', age: 'all', year: 'all' }, indoor_price: 7 }));
+  const sp = await searchText('swimming pool Vernon');
+  assert.match(sp, /No pools in Vernon\. Nearest: Kelowna Aquatic Centre T11 \(Kelowna\)/);
+  assert.doesNotMatch(sp, /Polson Disc Golf T11|Lake City Casino T11|Okanagan Science Centre/);
+  const spFr = await searchText('piscine à Vernon', 'fr');
+  assert.match(spFr, /Aucun lieu de ce genre \(piscine\) à Vernon\. Les plus proches : Kelowna Aquatic Centre T11 \(Kelowna\)/);
+  const none = await searchText('xqzvbn plorf vernon');
+  assert.doesNotMatch(none, /cuisine/);
+});

@@ -5519,6 +5519,7 @@ function discoveryMatchedOnText(m) {
   return `Mentions “${key}” in its ${where.join(' and ')}`;
 }
 function discoveryNoteText(n, labels) {
+  if (n.code === 'kind_nearest') return n.en;
   const region = (r) => labels.regions[r] || r;
   const typeP = (t) => (labels.types[t] ? labels.types[t].plural.toLowerCase() : t);
   const what = (f, v) => (f === 'region' ? `not in ${region(v)}` : f === 'type' ? `no ${typeP(v)}` : f === 'cuisine' ? `no ${v}`
@@ -5542,7 +5543,8 @@ function discoveryNoteText(n, labels) {
 const SEARCH_EMPTY_TEXT = {
   exclusion_only: 'We understood what you don’t want, but that alone doesn’t narrow anything down. Tell us what you’d like instead, for example “restaurants in Kelowna”.',
   needs_more: 'Add a kind of place or a town, for example “wineries in Naramata” or “beaches in Penticton”, and we’ll show real places.',
-  no_match_for_words: 'We couldn’t find any places whose name, listed cuisine or description mentions those words.',
+  // Indoor test 11 (2026-11-19): "cuisine" read oddly for a museum search ("dinosaurs vernon"); every place has a category.
+  no_match_for_words: 'We couldn’t find any places whose name, category or description mentions those words.',
   no_results: 'No places match all of that. Try fewer words or another town.',
   ambiguous: 'More than one place has that name. Pick the one you mean:',
 };
@@ -5591,9 +5593,24 @@ const SMART_FAMILY_OUTSIDE = new Set(['beach', 'outdoor', 'sport']);
 const SMART_FAMILY_PARK_RE = /\b(?:park|parks|playground|spray park|splash pad|water park|petting|farm|zoo|mini golf|beach)\b/i;
 function smartFamilyWhy(v) {
   if (kidFriendlyPublic(v.row) || (v.features && v.features.kid_friendly)) return 'Kid-friendly';
+  // Indoor test 11: an indoor place whose owner answered All ages (or under 5s) is for kids too.
+  if (v.type === 'indoor') { let info = {}; try { info = venueIndoorInfo(v.id) || {}; } catch (e) { info = {}; } if ((info.age === 'all' || info.age === '5') && !(info.kinds || []).some((k) => k === 'casino' || k === 'spa')) return 'Kid-friendly'; }
   if (v.type === 'beach') return 'Beach';
   if (SMART_FAMILY_OUTSIDE.has(v.type) && SMART_FAMILY_PARK_RE.test(String(v.row.name || ''))) return 'Park or playground';
   return false;
+}
+// Indoor test 11 (2026-11-19; Kim: "things to do with kids in Vernon" listed trails first in November, A to Z, her science
+// centre not on page 1): indoor places of a family kind (play centres, climbing, bowling, arcades, pools, museums and science
+// centres, cinemas, libraries) and the ones whose owner answered they're for all ages come first, then other indoor places;
+// parks, trails and beaches come next in their season (May to October) and after everything else out of it.
+const SMART_FAMILY_INDOOR_KINDS = ['kids', 'climbing', 'bowling', 'games', 'pool', 'museum', 'cinema', 'library'];
+function smartFamilyRank(v, now = new Date()) {
+  if (v.type === 'indoor') {
+    let info = {}; try { info = venueIndoorInfo(v.id) || {}; } catch (e) { info = {}; }
+    return (info.kinds || []).some((k) => SMART_FAMILY_INDOOR_KINDS.includes(k)) || info.age === 'all' || info.age === '5' ? 4 : 2.5;
+  }
+  if (SMART_FAMILY_OUTSIDE.has(v.type)) return [5, 6, 7, 8, 9, 10].includes(Number(todayLocal(now).slice(5, 7))) ? 2 : 0;
+  return 0;
 }
 // Indoor test 5: a kids' party ("kids birthday party", « fête d’anniversaire pour enfants »).
 const SMART_PARTY_WORDS = ['birthday party', 'birthday parties', 'bday party', 'b day party', 'birthday', 'party', 'parties', 'kids party', 'kids parties', 'fete d anniversaire', 'fetes d anniversaire', 'anniversaire', 'fete', 'fetes'];
@@ -6531,7 +6548,7 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
           heading: `Things to do with kids in ${town}`,
           headingFr: `Activités pour enfants à ${town}`,
           guides: guide ? [{ path: guide.path, heading: guide.heading }] : [],
-          list: () => smartPickVenues((v) => v.region === region && smartFamilyWhy(v), (v) => (SMART_FAMILY_OUTSIDE.has(v.type) ? 2 : 0) + (kidFriendlyPublic(v.row) ? 1 : 0) + foodDrinkRecommendedScore(v.row) / 10),
+          list: () => smartPickVenues((v) => v.region === region && smartFamilyWhy(v), (v) => smartFamilyRank(v, now) + (kidFriendlyPublic(v.row) ? 1 : 0) + foodDrinkRecommendedScore(v.row) / 10),
           events: () => searchEventsFor({ regions: R, test: (e) => (e.categories || []).includes('family-kids'), now }),
         };
       }
@@ -6620,7 +6637,7 @@ function renderSearchPage(run, opts = {}) {
 const SEARCH_EMPTY_TEXT_FR = {
   exclusion_only: 'Nous avons compris ce que vous ne voulez pas, mais cela seul ne précise rien. Dites-nous plutôt ce que vous aimeriez, par exemple « restaurants à Kelowna ».',
   needs_more: 'Ajoutez un type de lieu ou une ville, par exemple « vignobles à Naramata » ou « plages à Penticton », et nous vous montrerons de vrais lieux.',
-  no_match_for_words: 'Aucun lieu dont le nom, la cuisine indiquée ou la description mentionne ces mots.',
+  no_match_for_words: 'Aucun lieu dont le nom, la catégorie ou la description mentionne ces mots.',
   no_results: 'Aucun lieu ne correspond à tout cela. Essayez avec moins de mots ou une autre ville.',
   ambiguous: 'Plusieurs lieux portent ce nom. Choisissez celui que vous cherchez :',
 };
@@ -6688,6 +6705,7 @@ function discoveryMatchedOnTextFr(m) {
 const FR_SEARCH_OCCASIONS = { date_night: 'soirée en amoureux', romantic: 'sortie romantique', rainy_day: 'jour de pluie', family: 'sortie en famille',
   celebration: 'célébration', group_getaway: 'escapade en groupe', relaxing: 'détente', adventure: 'aventure', adults: 'entre adultes' };
 function discoveryNoteTextFr(n, labels) {
+  if (n.code === 'kind_nearest') return n.fr;
   const what = (f, v) => (f === 'region' ? `pas à ${labels.regions[v] || v}` : f === 'type' ? `sans ${frSearchTypePlural(v, labels)}` : f === 'cuisine' ? `sans ${v}`
     : f === 'collection' ? `sauf ${FR_SEARCH_COLLECTIONS[v] || v}` : f === 'activity' ? `sans ${frSearchLabel(labels.activities[v] || v).toLowerCase()}`
       : f === 'budget' ? 'rien de haut de gamme' : f === 'feature' ? `sans « ${frSearchLabel(labels.features[v] || v)} »` : `pas « ${v} »`);
@@ -6821,6 +6839,35 @@ function searchIndoorNearTowns(run, text, lang) {
   if (ofKind(wider) <= have) return run;
   wider.query = run.query; wider.searchText = run.searchText;
   return wider;
+}
+// Indoor test 11 (2026-11-19; Kim: "swimming pool Vernon", a town with no pool on the site, listed disc golf, VR and a
+// casino): a kind of indoor place named for one town that has none, even with the towns around it, says so ("No pools in
+// Vernon.") and lists the nearest places of that kind, nearest first, and nothing else.
+const SEARCH_KIND_PLURALS = { pool: ['pools', 'piscine'], museum: ['museums', 'musée'], gallery: ['art galleries', 'galerie d’art'], theatre: ['theatres', 'théâtre'], cinema: ['cinemas', 'cinéma'],
+  spa: ['spas', 'spa'], climbing: ['climbing gyms', 'salle d’escalade'], arcade: ['arcades', 'salle d’arcade'], escape: ['escape rooms', 'jeu d’évasion'], bowling: ['bowling alleys', 'salle de quilles'],
+  pottery: ['class or workshop places', 'atelier ou cours'], playground: ['indoor playgrounds', 'aire de jeux intérieure'], curling: ['curling clubs', 'club de curling'], yoga: ['yoga or fitness studios', 'studio de yoga ou de mise en forme'],
+  casino: ['casinos', 'casino'], library: ['libraries', 'bibliothèque'] };
+function searchKindNearest(run, text) {
+  const kinds = tripIndoorKindsAsked(text).filter((k) => SEARCH_KIND_PLURALS[k]);
+  const regions = (run && run.intent && run.intent.regions) || [];
+  if (kinds.length !== 1 || regions.length !== 1 || !(run.intent.textTerms || []).every((w) => tripIndoorKindsAsked(w).includes(kinds[0]))) return run;
+  const TR = require('./trip-requirements');
+  const isKind = (row) => { if (!row || row.type !== 'indoor') return false; const k = venueIndoorInfo(row.id).kinds; return TR.inferPlannerKinds({ ...row, ...(Array.isArray(k) ? { indoorKinds: k } : {}) }).includes(kinds[0]); };
+  if (((run.results && run.results.items) || []).some((x) => isKind(getVenue(x.id)))) return run;
+  const all = discoverySearchVenues();
+  const here = all.filter((v) => v.row.region === regions[0] && Number.isFinite(Number(v.row.latitude)) && Number.isFinite(Number(v.row.longitude)) && v.row.latitude != null);
+  if (!here.length) return run;
+  const c = { lat: here.reduce((a, v) => a + Number(v.row.latitude), 0) / here.length, lng: here.reduce((a, v) => a + Number(v.row.longitude), 0) / here.length };
+  const km = (v) => { const dLat = (Number(v.row.latitude) - c.lat) * 111, dLng = (Number(v.row.longitude) - c.lng) * 111 * Math.cos(c.lat * Math.PI / 180); return Math.sqrt(dLat * dLat + dLng * dLng); };
+  const near = all.filter((v) => v.row.region !== regions[0] && v.row.latitude != null && isKind(v.row)).map((v) => [v, km(v)]).sort((a, b) => a[1] - b[1]).slice(0, 6).map((x) => x[0]);
+  const town = REGION_LABELS[regions[0]] || regions[0], [en, fr] = SEARCH_KIND_PLURALS[kinds[0]];
+  const names = near.slice(0, 3).map((v) => `${v.row.name} (${REGION_LABELS[v.row.region] || v.row.region})`);
+  const note = { code: 'kind_nearest', field: 'kind', value: kinds[0],
+    en: `No ${en} in ${town}.${names.length ? ` Nearest: ${names.join(', ')}.` : ''}`, fr: `Aucun lieu de ce genre (${fr}) à ${town}.${names.length ? ` Les plus proches : ${names.join(', ')}.` : ''}` };
+  const out = { ...run, results: { kind: near.length ? 'venues' : 'none', total: near.length, items: near.map((v) => discoveryVenueItem(v.row, [`kind:${kinds[0]}`])), exclusions: run.results.exclusions } };
+  out.presentation = { ...run.presentation, notes: [note, ...((run.presentation && run.presentation.notes) || [])] };
+  if (run.textEvents) Object.defineProperty(out, 'textEvents', { value: run.textEvents, enumerable: false });
+  return out;
 }
 function searchRunEmpty(run) {
   if (!run || run.intent.mode === 'events' || run.results.total || (run.events && run.events.total)) return false;
@@ -70475,6 +70522,7 @@ const server = http.createServer(async (req, res) => {
       let run = runDiscovery(searchText, { limit: SEARCH_PAGE_MAX_RESULTS, lang: res.twinLang === 'fr' ? 'fr' : 'en' });
       run.query = q; run.searchText = searchText;
       try { run = searchIndoorNearTowns(run, searchText, res.twinLang === 'fr' ? 'fr' : 'en'); } catch (e) { /* as found */ }
+      try { run = searchKindNearest(run, searchText); } catch (e) { /* as found */ }
       // Round 12 (2026-10-20): "pizz", "sush", "caf", "burg" and "piza" found nothing. When the words as typed find
       // nothing at all, the last word is read as the search word it starts (or nearly spells) and the page says so.
       let shortFix = [];

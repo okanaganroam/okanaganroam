@@ -226,3 +226,22 @@ test('A 12-year-old: every family kind is offered; a play centre for kids 0 to 1
   }
   assert.ok(idsOf(app.runTripPlan({ text: 'rainy day with a 4 year old in Peachland' }, NOW)).includes(play.id), 'a 4-year-old');
 });
+
+// Indoor test 11 (2026-11-19; Kim's science centre was not on page 1 of "things to do with kids in Vernon": 89 places A to
+// Z, trails first in November). Site search for every family kind's town: the owner's family place comes before the trails
+// and parks, and a casino or a spa is never listed.
+test('Search: "things to do with kids in <town>" lists every family kind\'s place ahead of the town\'s trails and parks, never a casino or spa', async () => {
+  const fails = [];
+  for (const [kind, k] of Object.entries(KINDS)) {
+    if (k.expect !== 'yes') continue;
+    const { v, comps, town } = placed[kind];
+    const trail = mk({ region: k.town, type: 'outdoor', name: `${town} Creek Park Trail MX ${kind}`, cuisine: 'Trail', description: 'An easy creek trail through a park.', kid_friendly: 1, rating: 4.9, reviews: 900 });
+    const r = await fetch(`${base}/search?q=${encodeURIComponent(`things to do with kids in ${town}`)}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } });
+    const h = plain(await r.text());
+    const at = h.indexOf(v.name), tr = h.indexOf(trail.name);
+    if (at < 0) fails.push(`${kind} (${town}): missing`);
+    else if (tr >= 0 && tr < at) fails.push(`${kind} (${town}): the trail comes first`);
+    for (const c of comps.slice(-2)) if (h.includes(c.name)) fails.push(`${kind}: lists ${c.name}`);
+  }
+  assert.deepEqual(fails, []);
+});

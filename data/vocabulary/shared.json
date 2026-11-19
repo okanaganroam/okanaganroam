@@ -911,6 +911,24 @@
   ]
  },
  "descriptionSynonyms": {
+  "dinosaur": [
+   "dinosaurs",
+   "dino",
+   "dinos",
+   "ankylosaurus",
+   "fossil",
+   "fossils",
+   "paleontology"
+  ],
+  "dinosaurs": [
+   "dinosaur",
+   "dino",
+   "dinos",
+   "ankylosaurus",
+   "fossil",
+   "fossils",
+   "paleontology"
+  ],
   "cozy": [
    "cosy",
    "fireplace",
