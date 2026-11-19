@@ -2279,6 +2279,19 @@ Object.assign(fr.tour, {
   tpriceMoreRentals: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez ici votre prix le plus bas pour une personne. Les locations à prix par bateau, par planche ou à l’heure vont dans « Vos sorties et tarifs », le premier des détails facultatifs. Un bateau nolisé au complet ou une sortie pour un seul groupe va dans Sorties privées, plus bas.',
   addrTwoSpots: 'Inscrivez ici votre point principal ou votre bureau. Les clients reçoivent le point de rencontre exact à la réservation.',
 });
+// Tour simplify (Dayton, 2026-11-18: "we want to keep this nice and easy for businesses to do and not overwhelming for
+// them. if its overwhelming they will give up"): the three season ticks fold under one link, the third stretch sits behind
+// "More options", and holidays and closures are an optional tile of their own (the last of the extra details).
+Object.assign(en.tour.labels, { closures: 'Closures and holidays' });
+Object.assign(fr.tour.labels, { closures: 'Fermetures et jours fériés' });
+Object.assign(en.tour, {
+  tFold: 'Anything else about your season?', seaMore: 'More options',
+  openTwice: 'Closed twice a year, like a spring and a fall shoulder season? Add each one under “Closures and holidays” (in More about your tours) and tick “Every year”.',
+});
+Object.assign(fr.tour, {
+  tFold: 'Autre chose sur votre saison?', seaMore: 'Plus d’options',
+  openTwice: 'Fermé deux fois par année, comme au printemps et à l’automne? Ajoutez chaque période sous « Fermetures et jours fériés » (dans Plus de détails sur votre entreprise) et cochez « Chaque année ».',
+});
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

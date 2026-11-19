@@ -21,6 +21,9 @@
   var STEPS = C.steps, P1 = C.part1, P2 = C.part2;
   // Cafés and wineries: holidays and closures end the Hours step; Instagram and Facebook are one screen ('social').
   var COMBO = !!(C.combo || C.cafe);
+  // Tour simplify (Dayton, 2026-11-18): a tour's holidays and closures are an optional Part 2 tile ("Closures and
+  // holidays"), not the end of its Hours step. CLO_SUB: the closures screen is the second part of the Hours step.
+  var CLO_SUB = COMBO && !C.closuresTile;
   // Wineries (2026-11-12): the tasting price's quick buttons, and where each of their checklist items is answered.
   var QUICK_FEES = [0, 5, 10, 15, 20, 25];
   var WINERY_ITEM_STEP = { winery_kind: 'winery', food_here: 'winery', tasting_price: 'tastings', visit_how: 'visit', booking_link: 'visit', winery_groups: 'visit', access: 'offer', dogs_kids: 'offer', pyv_known: 'story', arrival: 'door' };
@@ -1220,19 +1223,19 @@
   function inP2(step){ return P2.indexOf(step) >= 0; }
   // Cafés (13 screens, 2026-11-11): holidays and closures are the second part of the Hours step (no number or row of their
   // own; the 'closures' answer is still recorded). Instagram and Facebook are one screen, 'social'.
-  function sub(b){ return COMBO && b === 'closures'; }
+  function sub(b){ return CLO_SUB && b === 'closures'; }
   function isStep(b){ return STEPS.indexOf(b) >= 0 || sub(b); }
   function stepOf(b){ return sub(b) ? 'hours' : b; }
   // Café test 6 (2026-11-12): a café's Hours step is two parts (the hours, then holidays and closures). It only counts
   // as done once the closures part is saved or skipped; leaving on the closures screen used to show Hours ✓ and
   // "Carry on" went past the holidays. fin(k) is the step's answer as far as progress goes.
   // (Hours skipped or put off as a whole: nothing half-done, as before.)
-  function half(k){ var d = S.done.hours; return COMBO && k === 'hours' && !!d && d !== 'skip' && d !== 'later' && !S.done.closures; }
+  function half(k){ var d = S.done.hours; return CLO_SUB && k === 'hours' && !!d && d !== 'skip' && d !== 'later' && !S.done.closures; }
   function fin(k){ return half(k) ? '' : S.done[k]; }
   function allDone(){ return STEPS.every(function(k){ return fin(k) || (k === 'menu' && tapOnly()); }); }
   function p1Done(){ return P1.every(function(k){ return fin(k); }); }
   function p2Count(){ return P2.filter(function(k){ return fin(k); }).length; }
-  function nextOf(step){ if (COMBO && step === 'hours') return 'closures'; step = stepOf(step); if (inP2(step)) return allDone() ? 'finish' : 'more'; var i = P1.indexOf(step); return P1[i + 1] || 'ess'; }
+  function nextOf(step){ if (CLO_SUB && step === 'hours') return 'closures'; step = stepOf(step); if (inP2(step)) return allDone() ? 'finish' : 'more'; var i = P1.indexOf(step); return P1[i + 1] || 'ess'; }
   // The hours part saved but not the holidays: carry on at the holidays and closures.
   function firstOpen(){ for (var i = 0; i < P1.length; i++) if (!fin(P1[i])) return half(P1[i]) ? 'closures' : P1[i]; return allDone() ? 'finish' : 'more'; }
   // Already ticked "Takes reservations" (or said how to order, or "Great for groups"): straight to "How do people book?".
@@ -1310,7 +1313,7 @@
   function after(step){ if (step === 'story' && S.storyReturn) { var sr = S.storyReturn; S.storyReturn = ''; return after(sr); }
     if (step === 'menu' && S.menuReturn) { var mr = S.menuReturn; S.menuReturn = ''; S.nudge = ''; return go(mr); }
     // A café's hours always go on to its holidays and closures (the same step); where to after that is decided there.
-    if (COMBO && step === 'hours') return go('closures'); if (S.toEss) { S.toEss = false; return go('ess'); } if (S.toList) { S.toList = false; S.hist = []; S.listBack = true; return go('start'); } if (S.toFinish) { S.toFinish = false; return go('finish'); } go(nextOf(step)); }
+    if (CLO_SUB && step === 'hours') return go('closures'); if (S.toEss) { S.toEss = false; return go('ess'); } if (S.toList) { S.toList = false; S.hist = []; S.listBack = true; return go('start'); } if (S.toFinish) { S.toFinish = false; return go('finish'); } go(nextOf(step)); }
   // A picker whose picks were already sent: Back goes to the question before it (never "Send these 0 photos").
   function emptyPicker(st){ return (st === 'photos:review' && !S.photos.length) || (st === 'menu:upload' && !S.menuFiles.length && S.done.menu) || (st === 'menu:cam' && !S.menuPages.length && S.done.menu) || (/^(happy|specials):sheet$/.test(st) && !S.sheetFiles.length && S.done[base(st)]); }
   // Back goes to the previous question, never to a "Saved" screen (that question then shows what was sent).
@@ -1338,7 +1341,7 @@
   // ---------- Pieces ----------
   function big(icon, text, sub, alt, act, attrs){ return '<button type="button" class="su-big' + (alt ? ' su-alt' : '') + '" data-act="' + act + '"' + (attrs || '') + '><span class="su-ico" aria-hidden="true">' + icon + '</span><span>' + h(text) + (sub ? '<small>' + h(sub) + '</small>' : '') + '</span></button>'; }
   // An answered question never offers "Skip this for now" (it used to turn a sent menu into "skipped"): it offers Next.
-  function nextLabel(step){ if (step === 'story' && S.storyReturn) return nextLabel(S.storyReturn); if (step === 'menu' && S.menuReturn && T.tpriceUnitBack) return T.tpriceUnitBack; if (COMBO && step === 'hours') return fill(T.nextStep, { step: T.labels.closures }); if (S.toEss) return T.seeFinish; if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
+  function nextLabel(step){ if (step === 'story' && S.storyReturn) return nextLabel(S.storyReturn); if (step === 'menu' && S.menuReturn && T.tpriceUnitBack) return T.tpriceUnitBack; if (CLO_SUB && step === 'hours') return fill(T.nextStep, { step: T.labels.closures }); if (S.toEss) return T.seeFinish; if (S.toList) return T.backToList; var nx = S.toFinish ? 'finish' : nextOf(step); return nx === 'finish' ? T.finish : nx === 'ess' ? T.seeFinish : nx === 'more' ? T.backToMore : fill(T.nextStep, { step: T.labels[nx] }); }
   function skip(step){
     // Bug-check (2026-11-12): a café's hours saved but not its holidays: "Next: Holidays and closures", never "Skip".
     if (half(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
@@ -1592,7 +1595,7 @@
   if (CK) P2_ICONS.music = '🎶';
   // Tours (2026-11-16): a backpack for Good to know (what to bring), a pin for the meeting spot.
   // Tour test 1 (2026-11-16): a ticket for "Your tours and prices" (never the plate or the mug).
-  if (TOUR) { P2_ICONS.bring = '🎒'; P2_ICONS.door = '📍'; P2_ICONS.menu = '🎟️'; }
+  if (TOUR) { P2_ICONS.bring = '🎒'; P2_ICONS.door = '📍'; P2_ICONS.menu = '🎟️'; P2_ICONS.closures = '🗓️'; }
   // "87 %" in French, as the line beside it says (café test 6).
   function pct(n){ return n + (C.lang === 'fr' ? '\u00a0%' : '%'); }
   function scoreBox(raise){
@@ -1760,7 +1763,7 @@
       if (k === 'menu' && tapOnly()) { if (C.menuKnown) return; seen[k] = true; out.push({ step: k, label: T.finishTap || T.labels[k] }); return; }
       seen[k] = true; out.push({ step: k, label: T.labels[k] });
     });
-    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k], chk = st, lab = C.lang === 'fr' ? it.fr : it.en; if (COMBO && (it.k === 'instagram' || it.k === 'facebook')) { if (socialGiven()) return; st = 'social'; lab = T.labels.social; } if (itemStep(it.k)) st = chk = itemStep(it.k); if (COMBO && st === 'closures') st = chk = 'hours'; if (!st || (st === 'spend' && S.spendNotSure)) return; if (seen[st]) return addName(out, st, lab); if (chk.indexOf(':') < 0 && answered(chk) && !C.brewery) return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: lab, items: true }); });
+    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k], chk = st, lab = C.lang === 'fr' ? it.fr : it.en; if (COMBO && (it.k === 'instagram' || it.k === 'facebook')) { if (socialGiven()) return; st = 'social'; lab = T.labels.social; } if (itemStep(it.k)) st = chk = itemStep(it.k); if (CLO_SUB && st === 'closures') st = chk = 'hours'; if (!st || (st === 'spend' && S.spendNotSure)) return; if (seen[st]) return addName(out, st, lab); if (chk.indexOf(':') < 0 && answered(chk) && !C.brewery) return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: lab, items: true }); });
     return out;
   }
   // Pub test (Whistler, 2026-11-14): at 96% only "Dietary options" was offered, though Games was open too (both are
@@ -2039,7 +2042,7 @@
         // ("Yes, all year" then "No, keep them" was the only way through, and it scared her).
         + '<div class="su-stack">' + (stS.length && T.yearKeep ? big('✓', T.yearKeep, '', false, 'yearKeep') : '') + big(stS.length && T.yearKeep ? '✕' : '✓', stS.length && T.yearKeep && T.allYearSame ? T.allYearSame : T.allYearYes, '', !!(stS.length && T.yearKeep), 'yearAll') + (TOUR && !stS.length ? big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed') : '') + (stS.length ? stS.map(function(st){ return big('✎', fill(T.seaChange, st), T.seaChangeSub, true, 'yearSeasonEdit:' + st.i); }).join('')
           // Brewery test 1 (Whistler, 2026-11-15): a second stretch (a spring and a fall shoulder season), then a third.
-          + (stS.length < SEA_MAX && S.seaList.length < SEA_MAX && T.seaAdd ? big('🍂', stS.length > 1 ? T.seaAdd3 : T.seaAdd, stS.length > 1 ? T.seaAdd3Sub : T.seaAddSub, true, 'yearSeasonAdd') : '') : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
+          + seaMoreWrap(stS.length > 1, (stS.length < SEA_MAX && S.seaList.length < SEA_MAX && T.seaAdd ? big('🍂', stS.length > 1 ? T.seaAdd3 : T.seaAdd, stS.length > 1 ? T.seaAdd3Sub : T.seaAddSub, true, 'yearSeasonAdd') : '')) : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
           // Restaurant test 3 (Whistler, 2026-11-15): a shoulder season is neither summer nor winter: the season screen with no
           // months set, the date boxes open, and she picks the dates.
           + (T.allYearPart ? big('🍂', T.allYearPart, T.allYearPartSub, true, 'yearSeason:part') : ''))
@@ -2143,7 +2146,8 @@
         + '<div class="su-stack">' + (seas ? big('✓', T.saveHours, '', false, 'hoursSave') : big('➜', T.hoursNext, '', false, 'hoursNext') + noSetBtn()) + '</div>'
         // Brewery test 1 (Whistler, 2026-11-15): the first period's screen says a second can follow; with two stored, either can go.
         // Tour test 10: the second's screen says a third can follow.
-        + (seas && S.seaI === S.seaList.length - 1 && S.seaList.length < SEA_MAX && T.seaAddLink ? '<div class="su-skip"><button type="button" class="su-link" id="suSeaAddLink" data-act="hoursSaveAdd">' + h(S.seaI >= 1 && T.seaAddLink3 ? T.seaAddLink3 : T.seaAddLink) + '</button></div>' : '')
+        // Tour simplify (2026-11-18): a tour's third-stretch link sits behind "More options" (two stretches look as before).
+        + seaMoreWrap(S.seaI >= 1, (seas && S.seaI === S.seaList.length - 1 && S.seaList.length < SEA_MAX && T.seaAddLink ? '<div class="su-skip"><button type="button" class="su-link" id="suSeaAddLink" data-act="hoursSaveAdd">' + h(S.seaI >= 1 && T.seaAddLink3 ? T.seaAddLink3 : T.seaAddLink) + '</button></div>' : ''))
         + (seas && S.sea.src && seaOther && seaOther.on && seaOther.src && T.seaRemove ? '<div class="su-skip"><button type="button" class="su-link" id="suSeaRemove" data-act="seaRemove">' + h(T.seaRemove) + '</button></div>' : '');
     } else if (s === 'hours:kitchen') {
       var ks = S.kitchen.mode ? '<p class="su-sent">' + h(fill(T.kitchenSaid[S.kitchen.mode], { t: t12(S.kitchen.closes) })) + '</p>' : '';
@@ -2170,7 +2174,7 @@
     } else if (s === 'closures') {
       var nothing = !S.closures.length && !S.extra.length && !S.openSea;
       var changedC = closuresKey() !== S.closuresWas, newC = S.closures.filter(function(k){ return S.closuresSaved.indexOf(k) < 0 && !HOL.some(function(o){ return o.key === k && holCovered(o); }); }).length + Math.max(0, S.extra.length - S.savedExtra);
-      x = (COMBO && S.hoursJust ? '<p class="su-sent" id="suHoursSaved">' + h(S.hoursNone && T.noSetHoursSaved ? T.noSetHoursSaved : S.done.hours === 'day' ? T.hoursSentNow : T.hoursSavedNow) + '</p>' + (S.hoursNone ? '' : hoursRecap()) : changedC ? '' : doneLine('closures')) + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
+      x = (CLO_SUB && S.hoursJust ? '<p class="su-sent" id="suHoursSaved">' + h(S.hoursNone && T.noSetHoursSaved ? T.noSetHoursSaved : S.done.hours === 'day' ? T.hoursSentNow : T.hoursSavedNow) + '</p>' + (S.hoursNone ? '' : hoursRecap()) : changedC ? '' : doneLine('closures')) + q(T.closuresQ, T.closuresLead) + msgs() + (S.added ? '<p class="su-sent" id="suAdded">' + h(fill(T.added, { x: S.added })) + '</p>' : '')
         + S.extra.map(function(c, i){ return '<div class="su-row" style="margin-bottom:10px"><span aria-hidden="true">📅</span><span>' + h(closureLabel(c) + (c.note ? ' · ' + c.note : '')) + '</span><button type="button" data-xdel="' + i + '" aria-label="' + h(T.closeRemove ? fill(T.closeRemove, { x: closureLabel(c) }) : T.remove) + '">✕</button></div>'; }).join('')
         // Café test 2 (2026-11-11): one place for the closed part of the year (the Hours answer). Shown here with Change.
         + (S.openSea ? '<div class="su-row su-openrow" style="margin-bottom:10px"><span aria-hidden="true">🗓️</span><span>' + h(openText(S.openSea)) + '</span><button type="button" class="su-link" data-act="openEdit" aria-label="' + h(T.openChange) + '">' + h(T.openChange) + '</button></div>' : '')
@@ -2938,8 +2942,8 @@
     // Tour test 2 (Whistler, 2026-11-16): "by booking only" went straight to the closures and the season was never asked
     // (the page then said "All year"). The same "all year / part of the year" question comes next, without hours words;
     // wineries and distilleries by appointment only had the same hole.
-    saveAll('hours', [ch], null, T.yearNoSetQ ? 'hours:year' : COMBO ? 'closures' : null, function(){
-      if (COMBO) { S.hoursJust = true; S.hoursNone = true; } else S.savedLine.hours = T.noSetHoursSaved;
+    saveAll('hours', [ch], null, T.yearNoSetQ ? 'hours:year' : CLO_SUB ? 'closures' : null, function(){
+      if (CLO_SUB) { S.hoursJust = true; S.hoursNone = true; } else S.savedLine.hours = T.noSetHoursSaved;
       weekKept(keptWeek); AI.visit = 'appointment'; S.wine.visit = 'appointment'; var nw = {}; DAYS.forEach(function(d){ nw[d] = null; }); CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? nw : JSON.stringify(nw);
       S.week = {}; DAYS.forEach(function(d){ S.week[d] = null; }); S.hoursOpenSet = false; S.seaList.forEach(function(o){ o.on = false; }); S.seaTouched = false; S.openTouched = false; S.wYearPick = '';
     });
@@ -2956,8 +2960,19 @@
   function tticksHtml(withOff){
     if (!TOUR || !T.tWeatherAll) return '';
     var tk = tticks(), chip = function(key, label){ return '<button type="button" class="su-chip su-chip-wide" id="suTick_' + key + '" aria-pressed="' + (tk[key] ? 'true' : 'false') + '" data-act="tourTick:' + key + '">' + h(label) + '</button>'; };
-    return '<div class="su-chips su-tticks" role="group" aria-label="' + h(T.tTicksLabel || '') + '" style="margin:6px 0 12px">' + chip('weather_all', T.tWeatherAll) + (withOff && T.tOffRequest ? chip('off_request', T.tOffRequest) : '') + (withOff && T.tSnowOpen ? chip('snow_open', T.tSnowOpen) : '') + '</div>';
+    var chips = '<div class="su-chips su-tticks" id="suSeaTicks" role="group" aria-label="' + h(T.tTicksLabel || '') + '" style="margin:6px 0 12px">' + chip('weather_all', T.tWeatherAll) + (withOff && T.tOffRequest ? chip('off_request', T.tOffRequest) : '') + (withOff && T.tSnowOpen ? chip('snow_open', T.tSnowOpen) : '') + '</div>';
+    if (!T.tFold) return chips;
+    // Tour simplify (Dayton, 2026-11-18: "if its overwhelming they will give up"): the ticks fold under one link, "Anything
+    // else about your season?", that opens in place (no new screen). It starts open when a tick shown here is already on.
+    var open = tfoldOpen(withOff);
+    return '<div class="su-tfold"><button type="button" class="su-link" id="suTfold" aria-expanded="' + (open ? 'true' : 'false') + '"' + (open ? ' aria-controls="suSeaTicks"' : '') + ' data-act="tfold:' + (withOff ? 1 : 0) + '" style="padding-left:0">' + h(T.tFold) + '</button>' + (open ? chips : '') + '</div>';
   }
+  // Tour simplify: "More options" (a link that opens in place) in front of the third-stretch button or link.
+  // Tour simplify (2026-11-18): the third stretch's button (the year question, two stretches stored) and link (the second
+  // stretch's screen) sit behind "More options" for tours (T.seaMore); every other type, and the second stretch, as before.
+  function seaMoreWrap(third, html){ return third && html && T.seaMore ? seaMoreHtml(html) : html; }
+  function seaMoreHtml(inner){ return '<div class="su-skip su-seamore"><button type="button" class="su-link" id="suSeaMore" aria-expanded="' + (S.seaMore ? 'true' : 'false') + '"' + (S.seaMore ? ' aria-controls="suSeaMoreBox"' : '') + ' data-act="seaMore">' + h(T.seaMore) + '</button></div>' + (S.seaMore ? '<div id="suSeaMoreBox">' + inner + '</div>' : ''); }
+  function tfoldOpen(withOff){ if (S.tfold != null) return S.tfold; var tk = tticks(); return !!(tk.weather_all || (withOff && (tk.off_request || tk.snow_open))); }
   function tticksPart(seasonal){
     if (!TOUR || !S.tticks) return null;
     var o = {}, tk = S.tticks, offNow = !!(tk.off_request && seasonal);
@@ -2973,9 +2988,9 @@
     var tkp = tticksPart(!!ov); if (tkp) list.push(tkp);
     if (ov !== (CUR.open_months || '')) list.push({ open_months: ov });
     if (y !== (S.savedWYear || AI.year || '')) list.push(apptPart({ year: y }));
-    saveAll('hours', list, null, COMBO ? 'closures' : null, function(){
+    saveAll('hours', list, null, CLO_SUB ? 'closures' : null, function(){
       tticksSaved(tkp);
-      if (COMBO) { S.hoursJust = true; S.hoursNone = true; } else S.savedLine.hours = T.noSetHoursSaved;
+      if (CLO_SUB) { S.hoursJust = true; S.hoursNone = true; } else S.savedLine.hours = T.noSetHoursSaved;
       CUR.open_months = ov; S.savedWYear = y; S.wine.year = y; AI.year = y; if (C.distillery) S.savedYear = y; delete AI.season; S.wine.season = null; S.openTouched = false; S.wYearPick = '';
     });
   }
@@ -3040,8 +3055,8 @@
     var tkpH = tticksPart(!!openVal(S.openTouched ? S.openSea : null) || !!(CUR.open_months && !S.openTouched)); if (tkpH) listH.push(tkpH);
     // Bug 9 (brewery test 1): a usual day changed on this visit while a stored period still has that day's old time.
     var stale = seaStaleOf(ch.hours_seasons || CUR.hours_seasons || []), addNext = !!S.seaAddNext; S.seaAddNext = false;
-    saveAll('hours', listH, null, addNext ? seaStepOf(Math.min(S.seaList.filter(function(o){ return o.on; }).length, SEA_MAX - 1)) : KITCHEN_Q ? 'hours:kitchen' : COMBO ? 'closures' : null, function(){
-      if (COMBO) { S.hoursJust = true; S.hoursNone = false; }
+    saveAll('hours', listH, null, addNext ? seaStepOf(Math.min(S.seaList.filter(function(o){ return o.on; }).length, SEA_MAX - 1)) : KITCHEN_Q ? 'hours:kitchen' : CLO_SUB ? 'closures' : null, function(){
+      if (CLO_SUB) { S.hoursJust = true; S.hoursNone = false; } else if (C.closuresTile) delete S.savedLine.hours;
       CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? week : JSON.stringify(week); S.seaStale = stale.length ? stale : null;
       if (tourApptOff) { delete AI.visit; S.wine.visit = ''; }
       tticksSaved(tkpH);
@@ -4268,7 +4283,10 @@
     // Tour test 12: "Choose a photo I took there" (its own GPS, read from the photo).
     // Tour test 14 (Lucía): the tick toggles in place, without drawing the screen again: a re-render put the date boxes
     // back to what was saved, so the dates she had just picked were wiped.
-    if (k === 'tourTick') { var tk0 = tticks(); tk0[v] = !tk0[v]; S.dirty = 'hours'; var tb = el('suTick_' + v); if (tb) { tb.setAttribute('aria-pressed', tk0[v] ? 'true' : 'false'); tb.focus(); return; } var ty = window.scrollY; render(); window.scrollTo(0, ty); return; }
+    if (k === 'tfold') { S.tfold = !tfoldOpen(v === '1'); var fy = window.scrollY; render(); window.scrollTo(0, fy); var fb = el('suTfold'); if (fb) fb.focus(); return; }
+    // Tour simplify: "More options" on the stretch screens shows the third-stretch link (in place).
+    if (k === 'seaMore') { S.seaMore = !S.seaMore; var my = window.scrollY; render(); window.scrollTo(0, my); var mb = el('suSeaMore'); if (mb) mb.focus(); return; }
+    if (k === 'tourTick') { var tk0 = tticks(); tk0[v] = !tk0[v]; if (S.tfold == null) S.tfold = true; S.dirty = 'hours'; var tb = el('suTick_' + v); if (tb) { tb.setAttribute('aria-pressed', tk0[v] ? 'true' : 'false'); tb.focus(); return; } var ty = window.scrollY; render(); window.scrollTo(0, ty); return; }
     if (k === 'doorPick') { var dp = el('suDoorPick'); return dp ? dp.click() : null; }
     // Tour test 13: the photo with no location, sent with the listing's address (its pin): we place the pin from the photo.
     if (k === 'doorPickAddr') { if (!S.door.photo || !C.pin) return render(); S.door.mapFail = true; S.door.addrOnly = true; S.door.spot = { lat: C.pin.lat, lng: C.pin.lng }; S.door.fromPhoto = true; S.door.noGpsPhoto = false; S.nudge = ''; return go('door:pin'); }

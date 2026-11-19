@@ -69,13 +69,15 @@ test('a tour gets its own setup: 7 essentials, 5 optional screens, tour words, a
   assert.deepEqual(app.setupParts('tour').part1, ['basics', 'hours', 'tour', 'price', 'booking', 'offer', 'photos']);
   // Tour test 1 (2026-11-16): "Your tours and prices" (the menu feature in tour words) leads the optional screens.
   // Tour test 15 (Dayton, 2026-11-18): no 'door' (meeting spot) step for tours.
-  assert.deepEqual(app.setupParts('tour').part2, ['menu', 'story', 'bring', 'groups', 'social']);
+  // Tour simplify (Dayton, 2026-11-18): holidays and closures are an optional tile, the last of the extra details.
+  assert.deepEqual(app.setupParts('tour').part2, ['menu', 'story', 'bring', 'groups', 'social', 'closures']);
   const r = await get(`/owner/${t}/setup`);
   assert.equal(r.status, 200);
   const c = cfgOf(r.text);
   assert.equal(c.tour, true);
   assert.equal(c.combo, true);
-  assert.deepEqual(c.steps, ['basics', 'hours', 'tour', 'price', 'booking', 'offer', 'photos', 'menu', 'story', 'bring', 'groups', 'social']);
+  assert.deepEqual(c.steps, ['basics', 'hours', 'tour', 'price', 'booking', 'offer', 'photos', 'menu', 'story', 'bring', 'groups', 'social', 'closures']);
+  assert.equal(c.closuresTile, true);
   assert.equal(c.t.labels.hours, 'When you run');
   assert.equal(c.t.labels.door, 'Where do people meet you?');
   assert.equal(c.t.noSetHours, 'We don’t have set hours. Trips are by booking only');

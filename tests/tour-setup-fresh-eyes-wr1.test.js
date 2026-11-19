@@ -103,7 +103,7 @@ test('A. "Your tours and prices": the menu step leads Part 2, every word says to
   for (const k of MENU_KEYS) assert.doesNotMatch(String(f.t[k]), /\bmenus?\b/i, `fr ${k}: ${f.t[k]}`);
   // The price step points to it; a ticket on its tile, never the plate or the mug.
   assert.match(c.t.tpriceMore, /Your tours and prices/);
-  assert.match(CLIENT, /if \(TOUR\) \{ P2_ICONS\.bring = '🎒'; P2_ICONS\.door = '📍'; P2_ICONS\.menu = '🎟️'; \}/);
+  assert.match(CLIENT, /if \(TOUR\) \{ P2_ICONS\.bring = '🎒'; P2_ICONS\.door = '📍'; P2_ICONS\.menu = '🎟️'; P2_ICONS\.closures = '🗓️'; \}/); // tour simplify: the Closures and holidays tile
   // Other types keep their menu words.
   const r = mk('restaurant');
   assert.equal(cfgOf((await get(`/owner/${tokenFor(r.id)}/setup`)).text).t.labels.menu, 'Menu');

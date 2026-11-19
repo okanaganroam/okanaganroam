@@ -465,7 +465,7 @@ test("tour test 7 answers: group words for a day rate (no boat), private-only sa
   assert.match(pb, /whole group/); assert.match(pb, /day rate/i); assert.doesNotMatch(pb, /\$650 for 4|163/);
   assert.match(plain(en.topic("tour-private-only").a), /^ ?Yes\b/); assert.match(plain(fr.topic("tour-private-only").aFr), /^ ?Oui\b/);
   assert.match(plain(en.topic("tour-hide-price").a), /^ ?Yes, if you have a private price/);
-  assert.match(plain(en.topic("tour-course-dates").a), /Your tours and prices/); assert.match(plain(en.topic("tour-course-dates").a), /Don’t add course days under Holidays/);
+  assert.match(plain(en.topic("tour-course-dates").a), /Your tours and prices/); assert.match(plain(en.topic("tour-course-dates").a), /Don’t add course days under Closures and holidays/); // tour simplify: the closures tile
   assert.match(plain(en.topic("tour-certs").a), /story/); assert.match(plain(en.topic("tour-fitness").a), /Good to know/); assert.match(plain(en.topic("tour-gear").a), /Good to know/);
   // Tour test 15 (Dayton): no meeting-spot step for tours; the office or main spot is the address.
   assert.match(plain(en.topic("tour-meeting-varies").a), /put your main spot or office in Basics/);
@@ -565,7 +565,7 @@ test("tour test 8 answers: own dogs say No guests’ dogs, per sled is not Priva
   assert.match(plain(en.topic("tour-kids-price").a), /Keep Price for one adult/); assert.doesNotMatch(plain(en.topic("tour-kids-price").a), /lowest/);
   assert.match(plain(en.topic("setup-change-later").a), /Change an answer/); assert.match(plain(en.topic("setup-change-later").a), /Would you rather have us do it\?/);
   assert.match(plain(fr.topic("setup-change-later").aFr), /Vous préférez que nous le fassions/);
-  assert.match(plain(en.topic("setup-closure-fix").a), /✕ next to the wrong dates/); assert.match(plain(en.topic("setup-closure-fix").a), /When you run/);
+  assert.match(plain(en.topic("setup-closure-fix").a), /✕ next to the wrong dates/); assert.match(plain(en.topic("setup-closure-fix").a), /Closures and holidays ?, in More about your tours/); // tour simplify: the closures tile
   assert.match(plain(en.topic("tour-kinds-kennel").a), /Farm, ranch or kennel visits/); assert.match(plain(en.topic("tour-shuttle").a), /Good to know/);
   assert.match(plain(en.topic("tour-gear").a), /Good to know/);
 });
