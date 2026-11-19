@@ -245,3 +245,21 @@ test('Search: "things to do with kids in <town>" lists every family kind\'s plac
   }
   assert.deepEqual(fails, []);
 });
+
+// Indoor test 12 (2026-11-19; Jess's hot yoga studio is 16+): "yoga with my 12 year old" never offers a 16+ studio, offers an
+// all-ages one, and a plain "yoga in <town>" (no kids) still offers the 16+ studio. A class place with no set hours and a
+// schedule link is never "Hours not listed" on a kids' plan either.
+test('Indoor test 12: a 16+ yoga studio is never offered with a 12-year-old; an all-ages one is; with no kids the 16+ one is', async () => {
+  const town = 'Summerland', region = 'summerland';
+  const sixteen = mk({ region, name: 'Summerland Hot Yoga 16 MX', cuisine: 'Yoga studio', description: 'A hot yoga studio. Ages 16 and up.', rating: 4.9, reviews: 200 });
+  const t16 = tokenFor(sixteen.id);
+  await ok(change(t16, { indoor_info: { kinds: ['yoga'], length: '1h', book: 'ahead', age: '16', year: 'all' } }));
+  const family = mk({ region, name: 'Summerland Family Yoga MX', cuisine: 'Yoga studio', description: 'Yoga for all ages, family yoga on Sundays.', rating: 4.2, reviews: 30 });
+  await ok(change(tokenFor(family.id), { indoor_info: { kinds: ['yoga'], length: '1h', book: 'busy', age: 'all', year: 'all' } }));
+  for (const q of [`yoga with my 12 year old in ${town}`, `yoga class for me and my 12 year old in ${town}`, `cours de yoga avec mon enfant de 12 ans à ${town}`]) {
+    const ids = idsOf(app.runTripPlan({ text: q }, NOW));
+    assert.ok(!ids.includes(sixteen.id), q);
+    assert.ok(ids.includes(family.id), `${q}: ${ids.join(',')}`);
+  }
+  assert.ok(idsOf(app.runTripPlan({ text: `hot yoga in ${town}` }, NOW)).includes(sixteen.id));
+});

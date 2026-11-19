@@ -1443,7 +1443,10 @@ function eligible(v, ctx, strict) {
     if (v.type === 'golf' && !v.indoorGolf) return false;
   }
   // Spas and saunas are adults' places (2026-10-25: a family day in Brackendale ended at a sauna).
-  if ((ctx.kids || ctx.occasion === 'family' || /\b(?:teens?|teenagers?|tweens?|adolescents)\b/.test(ctx.queryText || '')) && !/\b(?:spa|spas|sauna|massage)\b/.test(ctx.queryText || '') && (spaPlace(v) || /\b(?:pilates|yoga|breathwork|wellness studio|massage)\b/.test(normWords(v.cuisine || '')))) return false;
+  // Indoor test 12 (2026-11-19): "yoga with my 12 year old" asks for yoga: a yoga studio whose owner said All ages (or an age
+  // the kids named meet) is offered; a 16+ one still never is (kidsAllowed).
+  const yogaAsked = /\b(?:yoga|pilates)\b/.test(ctx.queryText || '') && v.type === 'indoor' && !!v.indoorMinAge && ctx.kids && kidsAllowed(v, ctx);
+  if ((ctx.kids || ctx.occasion === 'family' || /\b(?:teens?|teenagers?|tweens?|adolescents)\b/.test(ctx.queryText || '')) && !/\b(?:spa|spas|sauna|massage)\b/.test(ctx.queryText || '') && (spaPlace(v) || (!yogaAsked && /\b(?:pilates|yoga|breathwork|wellness studio|massage)\b/.test(normWords(v.cuisine || ''))))) return false;
   if (ctx.kids) {
     if (!kidsAllowed(v, ctx)) return false;
     // Indoor test 5: a casino (its kind or its own words) or a place whose own words say 19+ is never a kids' stop.

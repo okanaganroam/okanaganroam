@@ -259,3 +259,28 @@ test('Indoor test 11: within a kind, the place whose name or own lines say the r
   }
   assert.deepEqual(fails, []);
 });
+
+// Indoor test 12 (2026-11-19; Jess: "yoga class in Kelowna Saturday morning" became a day in three towns, her studio at 1 PM
+// and a drive to Peachland for dinner). "<activity> in <town> <day> <daypart>" for several kinds, EN + FR, with and without
+// the town (Peachland, next door, has a place of every kind now): the place of the asked kind is in the daypart asked, the
+// request stays one activity (no day plan), and with a town every stop is in that town.
+const DAYPART = [
+  ['yoga', 'yoga class in {T} Saturday morning', 'morning'], ['yoga', 'cours de yoga à {T} samedi matin', 'morning'], ['yoga', 'yoga Saturday morning', 'morning'],
+  ['bowling', 'bowling in {T} Friday evening', 'evening'], ['bowling', 'quilles à {T} vendredi soir', 'evening'], ['bowling', 'bowling Friday evening', 'evening'],
+  ['museum', 'museum in {T} Sunday afternoon', 'afternoon'], ['museum', 'musée à {T} dimanche après-midi', 'afternoon'], ['museum', 'museum Sunday afternoon', 'afternoon'],
+  ['spa', 'spa in {T} Saturday afternoon', 'afternoon'], ['escape', 'escape room in {T} Friday evening', 'evening'], ['cinema', 'cinéma à {T} samedi soir', 'evening'],
+];
+test('Indoor test 12: "<activity> in <town> <day> morning/afternoon/evening" puts that kind\'s place in that part of the day, one activity, in the town asked (EN + FR)', () => {
+  const fails = [];
+  for (const [kind, q0, part] of DAYPART) {
+    const q = q0.replace('{T}', TOWN), townAsked = q0.includes('{T}');
+    const p = app.runTripPlan({ text: q }, NOW);
+    const items = itemsOf(p);
+    const hit = items.find((x) => x.venue.type === 'indoor' && fitsKind(x.venue, kind));
+    if (p.kind === 'day_plan') fails.push(`${kind}: "${q}" is a day plan (${items.map((x) => x.venue.name).join(' | ')})`);
+    if (!hit) { fails.push(`${kind}: "${q}" has no ${kind} (${items.map((x) => x.venue.name).join(' | ')})`); continue; }
+    if (hit.daypart && hit.daypart !== part) fails.push(`${kind}: "${q}" puts ${hit.venue.name} in the ${hit.daypart}`);
+    if (townAsked && items.some((x) => x.venue.region !== REGION)) fails.push(`${kind}: "${q}" goes to ${items.filter((x) => x.venue.region !== REGION).map((x) => `${x.venue.name} (${x.venue.region})`).join(', ')}`);
+  }
+  assert.deepEqual(fails, []);
+});

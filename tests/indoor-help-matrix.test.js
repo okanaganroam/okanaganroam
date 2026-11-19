@@ -477,8 +477,51 @@ test('indoor test 11: Kim\'s Help questions (a science centre) land on the right
   assert.doesNotMatch(plain(b.en.topic(P).a) + plain(b.en.topic(X).a), /Admission from/);
 });
 
+// Indoor test 12 (2026-11-19; Jess, a hot yoga and Pilates studio open only around its classes): every question in her Help
+// log, with where it belongs, and a French twin of each.
+const CH = 'indoor-class-hours';
+const JESS = [
+  ['we\'re only open around class times', [CH], 'nous ouvrons seulement autour des cours'],
+  ['class schedule changes weekly', [CH], 'l’horaire des cours change chaque semaine'],
+  ['online booking required, classes fill up', [BK], 'la réservation en ligne est obligatoire, les cours sont pleins'],
+  ['intro offer 2 weeks for $49', [P, M], 'offre d’introduction 2 semaines pour 49 $'],
+  ['mat rental $3', [X], 'location de tapis 3 $'],
+  ['we have about 30 classes a week from 6am to 8pm, what hours do I put', [CH], 'nous avons environ 30 cours par semaine de 6 h à 20 h, quelles heures mettre?'],
+  ['intro offer: 2 weeks unlimited for $49 where does that go', [P, M], 'offre d’introduction : 2 semaines illimitées pour 49 $, où la mettre?'],
+  ['how do I add my class schedule', [M, CH], 'comment ajouter notre horaire des cours'],
+  ['will my page be in French', [FRN], 'ma page sera-t-elle en français?'],
+  ['we\'re locally owned, does that badge apply', [LO], 'nous sommes une entreprise locale, ce badge s’applique-t-il?'],
+  ['we run a free community class every Sunday at 9', [TH, 'event-repeat'], 'nous offrons un cours communautaire gratuit chaque dimanche à 9 h'],
+  ['can kids come', [A], 'les enfants peuvent-ils venir?'],
+  ['do I need to update my hours every week', [CH], 'dois-je mettre à jour mes heures chaque semaine?'],
+  ['we\'re open daily in July and August', [SD], 'nous sommes ouverts tous les jours en juillet et août'],
+  // Her other words for the same things.
+  ['booking is required', [BK], 'la réservation est obligatoire'],
+  ['you must book online', [BK], 'il faut réserver en ligne'],
+  ['new student special', [P, M], 'offre pour les nouveaux élèves'],
+  ['what hours for classes', [CH], 'quelles heures pour les cours?'],
+];
+const JESS_WANT = Object.fromEntries(JESS.map(([q, want]) => [q, want]));
+test('indoor test 12: Jess\'s Help questions (a hot yoga studio) land on the right answer, in English and in French; the class-times answer says what to put', async () => {
+  const b = await botsFor('yoga');
+  const wrong = [];
+  for (const [q, want, qFr] of JESS) {
+    const r = b.en.best(q), f = b.fr.best(qFr);
+    if (!r || !want.includes(r.id)) wrong.push(`en "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+    if (!f || !want.includes(f.id)) wrong.push(`fr "${qFr}" -> ${f && f.id} (want ${want.join(' or ')})`);
+  }
+  assert.deepEqual(wrong, []);
+  assert.match(plain(b.en.topic(CH).a), /put your first class start to your last class end\. Or tap We don’t have set hours : your Book link shows the schedule/);
+  assert.match(plain(b.en.topic(CH).a), /You never need to update hours weekly/);
+  assert.match(plain(b.en.topic(BK).a), /Tap No, please book ahead and paste your booking link/);
+  // No "Free entry?" line on a paid studio's prices answer; the class kinds have the class-times answer, the others don't.
+  assert.doesNotMatch(plain(b.en.topic(M).a), /Free entry\?/);
+  assert.ok((await botsFor('classes')).en.topic(CH));
+  for (const k of ['museum', 'pool', 'bowling', 'theatre']) assert.equal((await botsFor(k)).en.topic(CH), undefined, k);
+});
+
 // Every question in the 8 indoor help logs lands on an answer, on the page where it was asked, for the kind of place it was.
-const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum' };
+const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga' };
 // The misrouted ones, with where they belong.
 const LOG_WANT = {
   'we price per room not per person': [R], 'how do I change the price, it says adults but we charge per room': [R],
@@ -498,6 +541,8 @@ const LOG_WANT = {
   ...SANDRA_WANT,
   // Indoor test 11 (Kim, a science centre).
   ...KIM_WANT,
+  // Indoor test 12 (Jess, a hot yoga studio).
+  ...JESS_WANT,
 };
 test('every question in the 8 indoor help logs lands on an answer (the misrouted ones on the right one)', async () => {
   const wrong = [];
