@@ -1972,7 +1972,7 @@ function why(reasons) {
   // Tour test 17 (Whistler, 2026-11-18; Sarah): "Hotel pickup" was the 4th reason of a rafting tour ("Matches your request
   // for rafting", "Rentals or guided trips…", "…tours & experiences" weigh more) and never reached the card's two lines.
   // When it is there, it is the first line.
-  const sorted = reasons.filter((r) => r.text).slice().sort((a, b) => (b.code === 'pickup') - (a.code === 'pickup') || b.weight - a.weight);
+  const sorted = reasons.filter((r) => r.text).slice().sort((a, b) => (b.code === 'pickup') - (a.code === 'pickup') || (b.code === 'owner_line') - (a.code === 'owner_line') || b.weight - a.weight);
   return sorted.slice(0, 3).map((r) => r.text);
 }
 
@@ -2478,8 +2478,49 @@ function placeReasons(v, ctx) {
   if (ctx && ctx.kids && v.features && v.features.kid_friendly) out.push({ code: 'place', text: 'Has the Kid-Friendly badge', weight: 5 });
   return out;
 }
+// Indoor test 8 (2026-11-19; Gary's bowling centre: "bowling Kelowna Tuesday 7 PM" said walk-ins are welcome while his own
+// line says leagues fill the lanes then; "cosmic bowling … Saturday night" never quoted his cosmic bowling line): the
+// owner's own Known for or Good to know sentence that names the day (or a range or "weeknights" that covers it) asked, the
+// evening one first for an evening; for a weekday evening, his line about leagues or busy times. -> { text, busy } or null.
+const OWN_DAY_RE = { mon: /\bmon(?:day)?s?\b|\blun(?:di)?s?\b/, tue: /\btue(?:s|sday)?s?\b|\bmar(?:di)?s?\b/, wed: /\bwed(?:nesday)?s?\b|\bmer(?:credi)?s?\b/, thu: /\bthu(?:r|rs|rsday)?s?\b|\bjeu(?:di)?s?\b/,
+  fri: /\bfri(?:day)?s?\b|\bven(?:dredi)?s?\b/, sat: /\bsat(?:urday)?s?\b|\bsam(?:edi)?s?\b/, sun: /\bsun(?:day)?s?\b|\bdim(?:anche)?s?\b/ };
+const OWN_BUSY_RE = /\b(?:leagues?|ligues?|busy|busiest|limited|full|fill|fills|sold out|sell out|reserved|call ahead|book ahead|achaland\w*|pleins?|pleines?|r[ée]serv\w*|appelez)\b/i;
+const OWN_EVENING_RE = /\b(?:nights?|evenings?|tonight|soirs?|soir[ée]es?|pm|after [5-9]|apr[èe]s (?:1[7-9]|2[0-3]) ?h)\b|\b(?:[5-9]|1[01])(?::\d\d)? ?pm\b|\b(?:1[7-9]|2[0-3]) ?h\b|midnight|minuit/i;
+function ownLineDays(text) {
+  const t = String(text || '').toLowerCase().replace(/[’']/g, "'");
+  const days = new Set();
+  for (const d of WEEKDAYS) if (OWN_DAY_RE[d].test(t)) days.add(d);
+  // Ranges: "Mon–Thu", "Mon to Thu", « lun. au jeu. ».
+  const dw = '(mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun|lun|mar|mer|jeu|ven|sam|dim)[a-z]*\\.?';
+  const r = new RegExp(`\\b${dw}\\s*(?:-|–|—|to|through|thru|au|à)\\s*${dw}`).exec(t);
+  if (r) {
+    const key = (x) => ({ mon: 'mon', tue: 'tue', tues: 'tue', wed: 'wed', thu: 'thu', thur: 'thu', thurs: 'thu', fri: 'fri', sat: 'sat', sun: 'sun', lun: 'mon', mar: 'tue', mer: 'wed', jeu: 'thu', ven: 'fri', sam: 'sat', dim: 'sun' })[x];
+    let i = WEEKDAYS.indexOf(key(r[1])); const j = WEEKDAYS.indexOf(key(r[2]));
+    if (i >= 0 && j >= 0) for (let n = 0; n < 7; n++) { days.add(WEEKDAYS[i]); if (i === j) break; i = (i + 1) % 7; }
+  }
+  if (/\bweeknights?\b|\bweekdays?\b|\ben semaine\b/.test(t)) ['mon', 'tue', 'wed', 'thu'].forEach((d) => days.add(d));
+  if (/\bweekends?\b|\bfins? de semaine\b/.test(t)) ['sat', 'sun'].forEach((d) => days.add(d));
+  return days;
+}
+function indoorOwnTimeLine(v, ctx) {
+  if (!v || v.type !== 'indoor' || !Array.isArray(v.indoorOwnLines) || !v.indoorOwnLines.length || !ctx) return null;
+  const wd = String(ctx.startWeekday || '').toLowerCase().slice(0, 3);
+  const at = askedClockOf(ctx);
+  const evening = ctx.whenDaypart === 'evening' || (at != null && at >= 17 * 60) || /\b(?:night|tonight|evening|soir|soiree)\b/.test(normWords(ctx.queryText || ''));
+  if (!WEEKDAYS.includes(wd) && !evening) return null;
+  const lines = v.indoorOwnLines.map((text) => ({ text, days: ownLineDays(text), eve: OWN_EVENING_RE.test(text), busy: OWN_BUSY_RE.test(text) }));
+  const onDay = (l) => !WEEKDAYS.includes(wd) || l.days.has(wd);
+  const weekdayEve = evening && ['mon', 'tue', 'wed', 'thu'].includes(wd);
+  const pick = (weekdayEve && lines.find((l) => l.busy && l.days.size && onDay(l)))
+    || (evening && lines.find((l) => l.days.size && onDay(l) && l.eve))
+    || (WEEKDAYS.includes(wd) && lines.find((l) => l.days.size && onDay(l)))
+    || (evening && !WEEKDAYS.includes(wd) && lines.find((l) => l.eve && !l.busy));
+  return pick ? { text: `“${pick.text}” (the owner’s own words)`, busy: pick.busy } : null;
+}
 function stopFrom(v, scored, extra, ctx) {
   let reasons = scored.reasons.concat(extra || []);
+  const ownLine = indoorOwnTimeLine(v, ctx);
+  if (ownLine && !reasons.some((r) => r.text === ownLine.text)) reasons = [{ code: 'owner_line', text: ownLine.text, weight: 60 }].concat(reasons);
   const own = placeReasons(v, ctx || {});
   if (own.length) {
     // "Matches your request for a museum" and "... for museums" are one reason; the existing line stays.
@@ -2505,7 +2546,8 @@ function stopFrom(v, scored, extra, ctx) {
   if (v && v.ownerHours) caveats = caveats.map((c) => c.replace(/ \u2014 check (?:before|the day) you go$/, ''));
   if (ctx && ctx.features && isDogTrip(ctx) && DINING_TYPES.includes(v.type) && !(v.features.dog_friendly || v.collections.includes('dog_friendly'))) caveats.push(`Not listed as dog-friendly on ${SITE.brand}, so plan this one without your dog or check with them first`);
   // Round 10 (2026-10-19): a tour company runs at set times; it is booked, not dropped in on.
-  if (v && v.type === 'indoor' && INDOOR_BOOK_NOTES[v.indoorBook] && !caveats.includes(INDOOR_BOOK_NOTES[v.indoorBook])) caveats.push(INDOOR_BOOK_NOTES[v.indoorBook]);
+  // Indoor test 8: his own busy line for the evening asked stands in for the general walk-ins answer.
+  if (v && v.type === 'indoor' && INDOOR_BOOK_NOTES[v.indoorBook] && !caveats.includes(INDOOR_BOOK_NOTES[v.indoorBook]) && !(ownLine && ownLine.busy && v.indoorBook !== 'ahead')) caveats.push(INDOOR_BOOK_NOTES[v.indoorBook]);
   if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = tourBookAheadNote(v); if (!caveats.includes(bn)) caveats.push(bn); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
   // Tour test 4 (Whistler, 2026-11-17), bug 12: the operator's one booking and age answer stands for several unlike trips
@@ -4782,9 +4824,21 @@ function whereText(ctx) {
 
 // The time the visitor asked about, in their terms: "tonight",
 // "tomorrow morning", "on Saturday afternoon".
+// Indoor test 8: the clock time a request names ("Tuesday 7 PM", "at 7:30 pm"), or null.
+function askedClockOf(ctx) {
+  if (!ctx) return null;
+  if (ctx.requirements && Number.isFinite(ctx.requirements.startMinutes)) return ctx.requirements.dinnerAtClock ? null : ctx.requirements.startMinutes;
+  if (Number.isFinite(ctx.askedMinutes)) return ctx.askedMinutes;
+  const m = /\b(1[0-2]|[1-9])(?::([0-5]\d))?\s*([ap])\.?\s?m\b/i.exec(String(ctx.queryText || ''));
+  return m ? (Number(m[1]) % 12) * 60 + Number(m[2] || 0) + (/p/i.test(m[3]) ? 720 : 0) : null;
+}
 function whenText(ctx) {
   const w = ctx.when;
   if (!w) return '';
+  // Indoor test 8 (2026-11-19; "bowling Kelowna Tuesday 7 PM" read "on Tuesday"): an indoor request keeps its clock time.
+  const asked0 = askedClockOf(ctx);
+  const at = asked0 != null && ctx.types && ctx.types.has && ctx.types.has('indoor') && w.weekday && !w.now && w.preset !== 'today' ? asked0 : null;
+  if (at != null) return `on ${w.weekday[0].toUpperCase()}${w.weekday.slice(1)} at ${kidsClock(at)}`;
   const part = ctx.whenDaypart;
   if (w.preset === 'today' && w.now) return 'right now';
   if (w.preset === 'today') return part === 'evening' ? 'tonight' : part ? `this ${part}` : 'today';
@@ -8183,6 +8237,15 @@ function planTripCore(input) {
       const c = shut(f), note = String(c.note || '').trim();
       result.warnings.unshift(`${f.name} is closed ${CLOSURE_MONTHS_EN[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}${note ? ` (${note})` : ''}.`);
     }
+    if (closedHere.length > 2) result.warnings.push(`Closed ${CLOSURE_MONTHS_EN[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}: ${closedHere.slice(0, 6).map((f) => f.name).join(', ')}.`);
+  }
+  // Indoor test 8 (2026-11-19; "bowling on Christmas Day" left Gary out with no word): with no town asked, the places of the
+  // kind asked that are closed that day by their owner's own closure are named, as weekly closures are ("Closed Dec 25: …").
+  if (rec.items.length && /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) && (ctx.plannerKinds || []).length && !ctx.regions.length) {
+    const d = String(ctx.tripDate);
+    const shown = new Set(rec.items.map((i) => i.venue && i.venue.id));
+    const closedAll = buildRecommendations(facts, { ...ctx, ignoreSeason: true }).items.map((x) => x.venue && facts.find((f) => f.id === x.venue.id)).filter((f) => f && !shown.has(f.id) && ownerClosureOn(f, d));
+    if (closedAll.length) result.warnings.push(`Closed ${CLOSURE_MONTHS_EN[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}: ${closedAll.slice(0, 6).map((f) => f.name).join(', ')}.`);
   }
   // Audit fix (2026-10-27): the list's own day, when the request named one, so the trip API can add that day's weekly
   // nights and happy hour to each place ("Tonight: Trivia 7:30–9 PM").

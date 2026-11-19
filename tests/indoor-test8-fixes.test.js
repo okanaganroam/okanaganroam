@@ -152,3 +152,40 @@ test('4. Search (site and hub) reads his Known for, Good to know, price names an
   for (const w of ['cosmic', 'arcade', 'glow', 'lounge']) assert.ok(k.split(' ').includes(w), `hub words have ${w}: ${k}`);
   assert.ok(!k.split(' ').includes('laser'), 'no laser tag words he never said');
 });
+
+test('5. Build My Trip "Why it fits" quotes his own line for the day and time asked; the header keeps "7 PM"; Christmas Day names the bowling places closed', async () => {
+  const { v, t } = await gary({ name: 'Glenmore Lanes T8', region: 'kelowna' });
+  await ok(change(t, { indoor_info: { kinds: ['bowling', 'games'], length: '1-2h', book: 'busy', age: 'all' } }));
+  await ok(change(t, { visit_rows: { known_for: 'Cosmic bowling Fri & Sat 9 PM–midnight', good_to_know: 'Leagues use most lanes Mon–Thu after 6, call ahead. Licensed lounge.' } }));
+  const stopOf = (p) => itemsOf(p).find((x) => x.venue.id === v.id);
+  // Tuesday 7 PM: his leagues line, not "walk-ins welcome"; the header keeps the time.
+  const tue = app.runTripPlan({ text: 'bowling Kelowna Tuesday 7 PM' }, NOW);
+  const st = stopOf(tue);
+  assert.ok(st, 'he is in the Tuesday 7 PM plan');
+  const lines = [...(st.why || []), ...(st.caveats || [])].join(' | ');
+  assert.match(lines, /Leagues use most lanes Mon–Thu after 6, call ahead/);
+  assert.doesNotMatch(lines, /Walk-ins welcome; book ahead/);
+  assert.match(JSON.stringify(tue.summary || ''), /7 PM/);
+  // Saturday night: his cosmic bowling line.
+  const sat = stopOf(app.runTripPlan({ text: 'bowling in Kelowna on Saturday night' }, NOW));
+  assert.ok(sat, 'he is in the Saturday night plan');
+  assert.match((sat.why || []).join(' | '), /Cosmic bowling Fri & Sat 9 PM–midnight/);
+  // French: the same line, said to be his own words.
+  const fr = require('../trip-french-copy.js');
+  assert.match(fr.t3FrenchText('“Cosmic bowling Fri & Sat 9 PM–midnight” (the owner’s own words)'), /les mots de l’établissement/);
+  assert.equal(fr.t3FrenchText('Closed Dec 25: Glenmore Lanes, Rutland Bowl.'), 'Fermés le 25 déc. : Glenmore Lanes, Rutland Bowl.');
+  // Christmas Day: closed by his own closure, named.
+  await ok(change(t, { closures: [{ from: '2026-12-25', to: '2026-12-25', note: 'Christmas Day' }] }));
+  const other = mk('indoor', { name: 'Rutland Bowl T8', cuisine: 'Bowling alley', description: 'Ten-pin bowling.', rating: 4.2, reviews: 50 });
+  await ok(change(tokenFor(other.id), { indoor_info: { kinds: ['bowling'], length: '1-2h' } }));
+  const xmas = app.runTripPlan({ text: 'bowling on Christmas Day' }, NOW);
+  assert.ok(!idsOf(xmas).includes(v.id), 'not planned on his closed day');
+  assert.match((xmas.warnings || []).join(' '), new RegExp(`Closed Dec 25: [^.]*${v.name}`));
+});
+
+test('5b. The French heading keeps the time asked (« mardi à 19 h »)', () => {
+  const fr = require('../trip-french-copy.js');
+  const h = fr.t3FrenchSummary ? fr.t3FrenchSummary('Indoor & rainy day spots in Kelowna on Tuesday at 7 PM.') : '';
+  assert.match(String(h), /mardi à 19 h/);
+  assert.doesNotMatch(String(h), /Tuesday|7 PM/);
+});

@@ -21,6 +21,8 @@ function frHeadingWhen(w){
  if(!w)return '';
  let m;
  if((m=/^on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?: (morning|afternoon|evening))?$/.exec(w)))return ' '+FR_HEADING_DAYS[m[1]]+(m[2]?' '+FR_HEADING_PARTS[m[2]]:'');
+ // Indoor test 8 (2026-11-19): an indoor list keeps the time asked ("on Tuesday at 7 PM" -> « mardi à 19 h »).
+ if((m=/^on (Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday) at (1[0-2]|[1-9])(?::([0-5]\d))? (AM|PM)$/.exec(w))){const hh=(Number(m[2])%12)+(m[4]==='PM'?12:0);return ' '+FR_HEADING_DAYS[m[1]]+' à '+hh+' h'+(m[3]&&m[3]!=='00'?' '+m[3]:'');}
  if((m=/^tomorrow(?: (morning|afternoon|evening))?$/.exec(w)))return ' demain'+(m[1]?' '+FR_HEADING_PARTS[m[1]]:'');
  return {'this weekend':' cette fin de semaine',today:' aujourd’hui',tonight:' ce soir','right now':' en ce moment','this morning':' ce matin','this afternoon':' cet après-midi','this evening':' ce soir'}[w]??null;
 }
@@ -31,7 +33,7 @@ function frHeadingWhere(w){
  return 'à '+(towns.length>1?towns.slice(0,-1).join(', ')+' et '+towns[towns.length-1]:towns[0]);
 }
 const FR_HEADING_OCCASIONS={'a date night':'pour une soirée en amoureux','a romantic outing':'pour une sortie romantique','a family trip':'pour une sortie en famille','a rainy day':'pour un jour de pluie','a celebration':'pour une célébration','a group getaway':'pour une escapade en groupe','a relaxing getaway':'pour une escapade relaxante','an adventure':'pour une aventure','an adults-only trip':'pour une sortie entre adultes'};
-const FR_HEADING_WHEN_RE='(?: (on (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?: (?:morning|afternoon|evening))?|tomorrow(?: (?:morning|afternoon|evening))?|this weekend|today|tonight|right now|this morning|this afternoon|this evening))?';
+const FR_HEADING_WHEN_RE='(?: (on (?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?: (?:morning|afternoon|evening)| at (?:1[0-2]|[1-9])(?::[0-5]\\d)? (?:AM|PM))?|tomorrow(?: (?:morning|afternoon|evening))?|this weekend|today|tonight|right now|this morning|this afternoon|this evening))?';
 // Distillery test 2 (2026-11-13): the plan's summary sentence (trip-planner.js buildSummary) in French. It stayed in English
 // (« A one-day plan around Naramata, focused on distilleries… ») whenever the plan had no stop to name.
 function frSummaryItems(list){
@@ -220,7 +222,11 @@ function t3FrenchTextCore(value){
  text=text.replace(/^(.+?) matches but is closed on (\w+) (\d{1,2})\.(?: It reopens (\w+) (\d{1,2})\.)? Ask again with another date to plan it\.$/,(_,n,m,d,rm,rd)=>n+' correspond, mais est fermé le '+frDom(d)+' '+(FR_MONTHS_BY_EN[m]||m)+'.'+(rm?' Réouverture le '+(rd==='1'?'1er':rd)+' '+(FR_MONTHS_BY_EN[rm]||rm)+'.':'')+' Essayez une autre date pour le planifier.');
  // Indoor test 5 (2026-11-19): a place of the kind asked for, closed that day by its owner ("… is closed Dec 25 (Christmas Day).").
  { const FR_SHORT={Jan:'janv.',Feb:'févr.',Mar:'mars',Apr:'avr.',May:'mai',Jun:'juin',Jul:'juill.',Aug:'août',Sep:'sept.',Oct:'oct.',Nov:'nov.',Dec:'déc.'};
-   text=text.replace(/^(.+) is closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?: \((.+)\))?\.$/,(_,n,m,d,h)=>n+' est fermé le '+frDom(d)+' '+FR_SHORT[m]+(h?' ('+(FR_HOLIDAYS[h.replace(/'/g,'’')]||h)+')':'')+'.'); }
+   text=text.replace(/^(.+) is closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?: \((.+)\))?\.$/,(_,n,m,d,h)=>n+' est fermé le '+frDom(d)+' '+FR_SHORT[m]+(h?' ('+(FR_HOLIDAYS[h.replace(/'/g,'’')]||h)+')':'')+'.');
+   // Indoor test 8 (2026-11-19): the places of the kind asked closed that day by their owner ("Closed Dec 25: A, B.").
+   text=text.replace(/^Closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2}): (.+)\.$/,(_,m,d,n)=>'Fermés le '+frDom(d)+' '+FR_SHORT[m]+' : '+n+'.'); }
+ // Indoor test 8: the owner's own line quoted on a stop.
+ text=text.replace(/^(“.+”) \(the owner’s own words\)$/,'$1 (les mots de l’établissement)');
  text=text.replace(/^These places match but are closed on (\w+) (\d{1,2}): (.+?)\. Ask again with another date to plan them\.$/,(_,m,d,n)=>'Ces lieux correspondent, mais sont fermés le '+frDom(d)+' '+(FR_MONTHS_BY_EN[m]||m)+' : '+n.replace(/ and (?!.* and )/,' et ')+'. Essayez une autre date pour les planifier.');
  // Tour test 8 (Whistler, 2026-11-17): a named place judged on the asked date (with the day it opens again), a dog trip
  // at a place not listed as dog-friendly, and a list item's own age for the asked activity.

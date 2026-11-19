@@ -24407,6 +24407,13 @@ function indoorCardPrice(venueId) {
   try { if (free) priceCheck.setOwnerPrice(venueId, 0, free === 'donation' ? INDOOR_DONATION_CARD_LABEL : TOUR_FREE_CARD_LABEL); else if (p != null && per) priceCheck.setOwnerPrice(venueId, p, `Per ${INDOOR_PER_WORDS[per][0]}`, INDOOR_PER_WORDS[per][0]); else priceCheck.setOwnerPrice(venueId, p, p == null ? null : indoorKindsModule.indoorKindText(venueIndoorInfo(venueId).kinds, 'en').price.basis); } catch (e) { console.error(`[owner-portal] card price for indoor #${venueId} failed: ${e.message}`); }
 }
 // Build My Trip's facts from the owner's own answers (nothing when not answered).
+function indoorOwnLines(venueId) {
+  try {
+    const info = venueVisitInfo(venueId) || {}, mine = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
+    return (info.rows || []).filter((r) => r && typeof r.text === 'string' && /^(?:known for|good to know)$/i.test(r.label || '') && mine.has(r.label))
+      .flatMap((r) => String(r.text).split(/(?<=[.;!?])\s+|;\s*/)).map((x) => x.replace(/[\s.;]+$/, '').trim()).filter((x) => x.length >= 4).slice(0, 8);
+  } catch (e) { return []; }
+}
 function indoorPlannerFacts(venueId) {
   const t = venueIndoorInfo(venueId);
   return {
@@ -24419,6 +24426,10 @@ function indoorPlannerFacts(venueId) {
     ...(typeof t.price === 'number' && t.price > 0 && !tourFreeOf(t) && indoorPerLine(t, t.price) ? { indoorPer: t.per, indoorPerLine: [indoorPerLine(t, t.price).replace(/\.$/, ''), indoorPerLine(t, t.price, true).replace(/\.$/, '')] } : {}),
     ...(tourFreeOf(t) ? { indoorFree: tourFreeOf(t) } : {}),
     ...(indoorSuggested(venueId) != null ? { indoorSuggested: indoorSuggested(venueId) } : {}),
+    // Indoor test 8 (2026-11-19; Gary): the owner's own Known for and Good to know lines, sentence by sentence, so Build My
+    // Trip's "Why it fits" can quote the one that names the day or time asked ("Cosmic bowling Fri & Sat 9 PM–midnight"
+    // for Saturday night, "Leagues use most lanes Mon–Thu after 6" for Tuesday at 7). Owner lines only, never research.
+    ...(() => { const l = indoorOwnLines(venueId); return l.length ? { indoorOwnLines: l } : {}; })(),
     // Indoor test 4 (2026-11-19; Lauren's spa read "$65 per person · Admission"): the kind's own price line ("From {x}",
     // "Tickets from {x}", « À partir de {x} »), as the page says it.
     ...(typeof t.price === 'number' && t.price > 0 && !tourFreeOf(t) ? { indoorPriceLine: ['en', 'fr'].map((l) => indoorKindsModule.indoorKindText(t.kinds, l).price.page.replace(/\.$/, '')) } : {}),
