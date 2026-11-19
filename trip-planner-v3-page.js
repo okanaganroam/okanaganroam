@@ -1520,6 +1520,8 @@ function renderScript(d) {
       // person", and not added to the per-person estimate.
       if (cost.perGroup && cost.unit) return '<p class="t3-stop-price"><strong>' + esc(french ? cost.unitFr || cost.unit : cost.unit) + '</strong></p>';
       if (fromWord) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(fromWord + cad(cost.cents)) + '</strong></p>';
+      // Indoor test 4 (2026-11-19): an indoor place's price in its kind's own words ("From $65", "Tickets from $25").
+      if (typeof cost.line === 'string' && cost.line.indexOf('{x}') >= 0) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc((french && typeof cost.lineFr === 'string' ? cost.lineFr : cost.line).replace('{x}', cad(cost.cents))) + '</strong></p>';
       return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(cad(cost.cents) + (french ? ' / personne' : ' per person')) + '</strong> · '
         + esc(french ? cost.labelFr : cost.label) + (typeof cost.source === 'string' && cost.source.startsWith('https://') ? ' · <a ' + hrefAttr(cost.source) + '>' + esc(french ? 'Source' : 'Price source') + '</a>' : '') + '</p>';
     }

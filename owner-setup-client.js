@@ -526,6 +526,18 @@
   // keeps the last one. One inside a query (…?u=https://…) is left alone.
   function lastHttp(u){ u = String(u || ''); var re = /https?:\/\//gi, m, last = -1, n = 0; while ((m = re.exec(u))) { n++; last = m.index; } return n > 1 && last > 0 && !/[=?&]$/.test(u.slice(0, last)) ? u.slice(last) : u; }
   function kindWords(){
+    // Indoor test 4 (2026-11-19; Lauren, a day spa): the words of the main kind (owner-setup-text.js kindText, from
+    // indoor-kinds.js) over the indoor words: the price box's label, placeholder and lead, the preview, Your prices, the
+    // Groups lead, example and chips, and the box office hint only for theatres and classes. No kind yet: the general ones.
+    if (C.indoor && T0.kindText) {
+      var ik = T0.kindText[indoorMainKind()] || T0.kindText.other;
+      if (!ik) { T = T0; return; }
+      var ti = {};
+      Object.keys(T0).forEach(function(key){ ti[key] = T0[key]; });
+      Object.keys(ik).forEach(function(key){ var a = ti[key], b = ik[key]; ti[key] = b && typeof b === 'object' && !Array.isArray(b) && a && typeof a === 'object' ? Object.assign({}, a, b) : b; });
+      T = ti;
+      return;
+    }
     if (!C.brewery) return;
     var k = S.place || CUR.place_type || '';
     // Distilleries (2026-11-13): spirits words (T.kindDistillery). A brewery whose kind is Distillery keeps the neutral ones.
@@ -854,9 +866,8 @@
   // Tour test 12: a second price after the first ("2nd jump same day $69"): the nudge to Your tours and prices.
   function tourPriceLead(){ var l0 = tourPriceLead0(); return S.tour.priceFirst && T.tpriceFirst ? l0 + ' ' + T.tpriceFirst : l0; }
   function tourPriceLead0(){ var n = S.tour.price; if (S.tour.free === 'donation' && T.tpriceLeadDonation) return T.tpriceLeadDonation;
-    // Indoor test 3: a range typed ("$25 - $55") says what we'll show; a show place's lead is about tickets.
-    if (INDOOR && !S.tour.free && !S.tour.per && S.tour.range && n > 0 && T.tpriceRangeLead) return fill(indoorShow() ? T.tpriceRangeLeadShow : T.tpriceRangeLead, { x: tourMoney(n) });
-    if (INDOOR && !S.tour.free && !S.tour.per && indoorShow()) return n == null || isNaN(n) ? T.tpriceLeadShow : fill(T.tpriceLeadPickShow, { x: tourMoney(n) });
+    // Indoor test 3: a range typed ("$25 - $55") says what we'll show. Indoor test 4: every kind's lead is its own (kindWords).
+    if (INDOOR && !S.tour.free && !S.tour.per && S.tour.range && n > 0 && T.tpriceRangeLead) return fill(T.tpriceRangeLead, { x: tourMoney(n) });
     if (INDOOR && S.tour.per && !S.tour.free && T.tpriceLeadPer) return n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPer, { page: indoorPerPage(n), x: tourMoney(n), u: (T.iperWords || {})[S.tour.per] || S.tour.per }); return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n) }); }
   // "$16" / "16 $".
   function cpText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
@@ -1650,6 +1661,9 @@
   // Phone (pub test 3, 2026-11-10): a new number goes on the page straight away; the server checks it is a real North
   // American number and writes it as 250-555-0123. The same digits typed another way are not a change.
   function digitsOf(v){ var d = String(v || '').replace(/\D/g, ''); return d.length === 11 && d.charAt(0) === '1' ? d.slice(1) : d; }
+  // Indoor test 4 (2026-11-19; Lauren's phone showed raw, 2508600188): a 10-digit number reads 250-860-0188 (11 digits
+  // starting with 1: 1-800-555-0100). Anything else, as written.
+  function phoneShow(v){ var t = String(v == null ? '' : v).trim(), d = t.replace(/\D/g, ''); if (!/^[\d\s().+-]+$/.test(t)) return t; if (d.length === 10) return d.slice(0, 3) + '-' + d.slice(3, 6) + '-' + d.slice(6); if (d.length === 11 && d.charAt(0) === '1') return '1-' + d.slice(1, 4) + '-' + d.slice(4, 7) + '-' + d.slice(7); return t; }
   function phoneChanged(v){ return digitsOf(v) !== digitsOf(CUR.phone) || (!String(v || '').trim()) !== !CUR.phone; }
   // Pub test 3 follow-up (2026-11-10): a new phone goes live straight away, but with a new address or website on the
   // same screen the step still says "Sent". Say which part is already on the page.
@@ -1740,7 +1754,7 @@
     // Tours (2026-11-16): the kinds, the town and the price as the card shows it ("From $129").
     // Indoor places (2026-11-19): the kinds, the town and the price as the card shows it ("Adults $25", "Free").
     if (C.indoor) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
-      + h([indoorKindsShort(TI.kinds) || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' && TI.per && T.tpriceCardPer ? fill(T.tpriceCardPer, { x: tourMoney(S.savedTourPrice), u: (T.iperWords || {})[TI.per] || TI.per }) : typeof S.savedTourPrice === 'number' ? fill(indoorShow() && T.tpriceCardShow ? T.tpriceCardShow : T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([indoorKindsShort(TI.kinds) || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' && TI.per && T.tpriceCardPer ? fill(T.tpriceCardPer, { x: tourMoney(S.savedTourPrice), u: (T.iperWords || {})[TI.per] || TI.per }) : typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     if (C.tour) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([S.tourWords || C.tourWords || (TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? (T.tfreeCard || 'Free') : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     // Breweries (2026-11-12): the kind, the town and the flight price as the card shows it ("From $12").
@@ -2138,12 +2152,12 @@
       x = q(T.moreQ, T.moreLead) + msgs() + '<div class="su-tiles">' + top4.map(tile2).join('') + '</div>' + (rest2.length ? '<details class="su-fold" id="suFold"' + (restOpen ? ' open' : '') + '><summary>' + h(T.fewMore) + '</summary><div class="su-tiles">' + rest2.map(tile2).join('') + '</div></details>' : '')
         + '<div class="su-stack">' + big('➜', allDone() ? T.seeFinish : T.doneNow, '', !allDone(), allDone() ? 'go:finish' : 'doneNow2') + '</div>';
     } else if (s === 'basics') {
-      x = doneLine('basics') + q(T.basicsQ) + msgs() + '<div class="su-box"><div><span>' + h(T.address) + '</span><span>' + h(CUR.address || '—') + '</span></div><div><span>' + h(T.phone) + '</span><span>' + h(CUR.phone || '—') + '</span></div><div><span>' + h(T.website) + '</span><span>' + h(siteShown()) + '</span></div></div>'
+      x = doneLine('basics') + q(T.basicsQ) + msgs() + '<div class="su-box"><div><span>' + h(T.address) + '</span><span>' + h(CUR.address || '—') + '</span></div><div><span>' + h(T.phone) + '</span><span>' + h(phoneShow(CUR.phone) || '—') + '</span></div><div><span>' + h(T.website) + '</span><span>' + h(siteShown()) + '</span></div></div>'
         // Tour test 11 (Whistler, 2026-11-18; Min-jun picks guests up at their hotels): the pickup option of this question.
         + (TOUR && T.pickupBtn && TI.pickup ? '<p class="su-sent" id="suPickupOn">' + h(T.pickupOn) + '</p>' : '')
         + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'basicsOk') + (TOUR && T.pickupBtn ? (TI.pickup ? big('✕', T.pickupOff, '', true, 'pickupOff:basics') : big('🚐', T.pickupBtn, T.pickupSub, true, 'pickupOn:basics')) : '') + big('✎', T.changeThem, '', true, 'go:basics:edit') + '</div>' + skip('basics');
     } else if (s === 'basics:edit') {
-      x = q(T.basicsEditQ) + msgs() + field('suAddr', T.streetLabel, S.addr != null ? S.addr : CUR.address || '', { max: 200 }) + field('suPhone', T.phoneLabel, S.phone != null ? S.phone : CUR.phone || '', { type: 'tel', max: 40 })
+      x = q(T.basicsEditQ) + msgs() + field('suAddr', T.streetLabel, S.addr != null ? S.addr : CUR.address || '', { max: 200 }) + field('suPhone', T.phoneLabel, S.phone != null ? S.phone : phoneShow(CUR.phone) || '', { type: 'tel', max: 40 })
         + field('suSite', T.websiteLabel, S.site != null ? S.site : siteDomain(CUR.website), { mode: 'url', max: 300 }) + '<p class="su-example">' + h(T.websiteEx) + '</p>'
         + '<div class="su-stack">' + big('✓', T.saveThese, '', false, 'basicsSave') + big('✕', T.noWebsiteBtn, '', true, 'basicsNoSite') + '</div>';
     } else if (s === 'hours') {
@@ -2406,10 +2420,15 @@
       // kinds", in her tap order) and "How long do people usually stay?" on one screen. Starting picks from her page are said.
       var ik = C.indoorKinds || [], iTop = ik.slice(0, C.indoorKindsTop || 12), iRest = ik.slice(C.indoorKindsTop || 12);
       var ichip = function(o){ var on = S.tour.kinds.indexOf(o.k) >= 0; return '<button type="button" class="su-chip' + (o.t.length > 8 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-tkind="' + h(o.k) + '">' + h(o.t) + '</button>'; };
-      x = doneLine('indoor') + q(T.tkindQ, T.tkindLead) + (S.tour.kindsGuessed && T.kindsGuess ? '<p class="su-sent su-research" id="suKindsGuess">' + h(T.kindsGuess) + '</p>' : '') + msgs()
-        + '<div class="su-chips su-kinds" role="group" aria-labelledby="suQ" id="suIndoorKinds">' + iTop.map(ichip).join('') + '</div>'
+      // Indoor test 4 (2026-11-19; Lauren: the list was 2.6 phone screens tall with Spa already picked): a kind already
+      // picked (or pre-picked from her page) shows as one line, "Spa, sauna or wellness ✓ · Change", so Save is on the first
+      // screen. Change opens the whole list (it stays open on this visit).
+      var iFold = S.tour.kinds.length > 0 && !S.kindsOpen && !S.nudge;
+      x = doneLine('indoor') + q(T.tkindQ, T.tkindLead) + (S.tour.kindsGuessed && T.kindsGuess ? '<p class="su-sent su-research" id="suKindsGuess">' + h(iFold && S.tour.kinds.length === 1 && T.kindsGuessFold ? T.kindsGuessFold : T.kindsGuess) + '</p>' : '') + msgs()
+        + (iFold ? '<p class="su-sent su-kinds-picked" id="suKindsPicked"><strong>' + h(S.tour.kinds.map(tourKindName).join(', ')) + ' ✓</strong> · <button type="button" class="su-link" data-act="kindsChange" aria-controls="suKindsAll" aria-expanded="false">' + h(T.kindsChange || 'Change') + '</button></p>' : '')
+        + '<div id="suKindsAll"' + (iFold ? ' hidden' : '') + '><div class="su-chips su-kinds" role="group" aria-labelledby="suQ" id="suIndoorKinds">' + iTop.map(ichip).join('') + '</div>'
         + (iRest.length ? '<details class="su-kinds" id="suKindsMore"' + (S.tourMoreOpen || iRest.some(function(o){ return S.tour.kinds.indexOf(o.k) >= 0; }) ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + iRest.map(ichip).join('') + '</div></details>' : '')
-        + (S.tour.kinds.length ? '<p class="su-sent" id="suTourPicked">' + h(fill(T.picked, { list: S.tour.kinds.map(tourKindName).join(', ') })) + '</p>' : '')
+        + (S.tour.kinds.length ? '<p class="su-sent" id="suTourPicked">' + h(fill(T.picked, { list: S.tour.kinds.map(tourKindName).join(', ') })) + '</p>' : '') + '</div>'
         + '<h2 class="su-h2" id="suLenQ">' + h(T.tlengthQ) + '</h2>' + (S.tour.lengthGuessed && S.tour.length && T.guessCheck ? '<p class="su-sent su-research" id="suLengthGuess">' + h(T.guessCheck) + '</p>' : '')
         + tchips('length', ['1h', '1-2h', '2-3h', 'half'], T.tlengths, T.tlengthQ, 'suLenQ')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'indoorSave') + '</div>' + skip('indoor');
@@ -2422,7 +2441,7 @@
         + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suFreeChips">' + ['free', 'donation'].map(function(f){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ip.free === f ? 'true' : 'false') + '" data-ifree="' + f + '">' + h(tourFreeWord(f)) + '</button>'; }).join('') + '</div>'
         // Indoor test 1: By donation keeps the box, as "Suggested amount (optional)".
         + (ip.free === 'donation' && T.tsuggLabel ? field('suTsugg', T.tsuggLabel, ip.suggText != null ? ip.suggText : ip.sugg != null ? String(ip.sugg) : '', { max: 12, mode: 'decimal' }) + '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>'
-          : ip.free ? '' : field('suTprice', ip.per && T.iperOne ? T.iperOne[ip.per] : indoorShow() ? T.tpriceLabelShow : T.tpriceLabel, ip.ptext != null ? ip.ptext : ip.per && indoorPerBox() ? indoorPerBox() : boxVal('suTprice', ip.price), { max: 60, ph: indoorShow() ? T.tpricePhShow : '' })
+          : ip.free ? '' : field('suTprice', ip.per && T.iperOne ? T.iperOne[ip.per] : T.tpriceLabel, ip.ptext != null ? ip.ptext : ip.per && indoorPerBox() ? indoorPerBox() : boxVal('suTprice', ip.price), { max: 60, ph: T.tpricePh || '' })
             // Indoor test 2: Per person (the default) / Per room or group, right under the box.
             + (T.iperChips ? '<div class="su-chips" role="group" aria-label="' + h(T.iperChips.person + ' / ' + T.iperChips.group) + '" id="suPerChips">' + ['person', 'group'].map(function(u){ var on = u === 'group' ? !!ip.per : !ip.per; return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (on ? 'true' : 'false') + '" data-iper="' + u + '">' + h(T.iperChips[u]) + '</button>'; }).join('') + '</div>'
               + '<p class="su-sent su-research" id="suPerRead"' + (ip.per && ip.perAuto ? '' : ' hidden') + '>' + h(ip.per ? fill(T.iperRead, { u: (T.iperWords || {})[ip.per] || ip.per }) : '') + '</p>' : '')
@@ -3853,6 +3872,8 @@
     if (k === 'noSetKeep') return seasonOnlySave();
     if (k === 'yearClosed') { S.openFrom = noSetYear() ? 'appt' : 'hours'; S.openDraft = null; return go('hours:open'); }
     if (k === 'openEdit') { S.openFrom = 'closures'; S.openDraft = null; return go('hours:open'); }
+    // Indoor test 4: "Change" under a picked kind opens the whole list of kinds.
+    if (k === 'kindsChange') { S.kindsOpen = true; render(); var ka = el('suIndoorKinds'); if (ka) { var kb = ka.querySelector('[aria-pressed="true"]') || ka.querySelector('button'); if (kb) try { kb.focus({ preventScroll: false }); } catch (e) { kb.focus(); } } return; }
     if (k === 'openMonths') {
       S.splitSaved = '';
       var odm = { from: mdRead('suOf'), to: mdRead('suOt') }; S.openDraft = odm.from || odm.to ? odm : S.openDraft;
@@ -4779,7 +4800,7 @@
       redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tkind]'), function(b){ b.onclick = function(){
       var kk = b.getAttribute('data-tkind'), i = S.tour.kinds.indexOf(kk);
-      S.tour.kindsGuessed = false;
+      S.tour.kindsGuessed = false; S.kindsOpen = true;
       if (i >= 0) S.tour.kinds.splice(i, 1);
       else if (S.tour.kinds.length >= 3) { S.nudge = T.tkindMax; S.keepNudgeFocus = true; mark(); var y0 = window.scrollY; render(); window.scrollTo(0, y0); srSay(T.tkindMax); return; }
       else S.tour.kinds.push(kk);
@@ -4805,7 +4826,7 @@
       // Indoor test 2: per room words pick Per room or group as she types (the box keeps her focus).
       if (INDOOR && el('suPerChips')) { Array.prototype.forEach.call(screen.querySelectorAll('[data-iper]'), function(b){ var u = b.getAttribute('data-iper'); b.setAttribute('aria-pressed', (u === 'group' ? !!S.tour.per : !S.tour.per) ? 'true' : 'false'); });
         var pq = el('suPerRead'); if (pq) { pq.hidden = !(S.tour.per && S.tour.perAuto); pq.textContent = S.tour.per ? fill(T.iperRead, { u: (T.iperWords || {})[S.tour.per] || S.tour.per }) : ''; }
-        var pl = screen.querySelector('label[for="suTprice"]'); if (pl) pl.textContent = S.tour.per && T.iperOne ? T.iperOne[S.tour.per] : indoorShow() ? T.tpriceLabelShow : T.tpriceLabel; } var fg = el('suFeeGuess'); if (fg && !S.tour.priceGuessed) fg.hidden = true; var fh = el('suFreeHint'); if (fh) fh.hidden = !!S.tour.free; });
+        var pl = screen.querySelector('label[for="suTprice"]'); if (pl) pl.textContent = S.tour.per && T.iperOne ? T.iperOne[S.tour.per] : T.tpriceLabel; } var fg = el('suFeeGuess'); if (fg && !S.tour.priceGuessed) fg.hidden = true; var fh = el('suFreeHint'); if (fh) fh.hidden = !!S.tour.free; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-wpick]'), function(b){ b.onclick = function(){
       readWine(); var q8 = b.getAttribute('data-wpick').split(':'), key8 = q8[0], val8 = key8 === 'groups' ? +q8[1] : q8[1];
       S.wine[key8] = String(S.wine[key8]) === String(val8) ? (key8 === 'groups' ? 0 : '') : val8; redraw(); }; });

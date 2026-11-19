@@ -2338,12 +2338,12 @@ en.indoor = {
   tkindNeed: 'Please tap what kind of place you are (up to 3).', tkindMax: 'Up to 3. Tap one you picked to take it off first.',
   tlengthQ: 'How long do people usually stay?', tlengths: { '1h': 'Up to 1 hour', '1-2h': '1 to 2 hours', '2-3h': '2 to 3 hours', half: 'Half a day or more' },
   tlengthNeed: 'Please tap how long most people stay.',
-  kindsGuess: 'We picked these from your page. Check them: tap to change.',
+  kindsGuess: 'We picked these from your page. Check them: tap to change.', kindsGuessFold: 'We picked this from your page. Not right? Tap Change.', kindsChange: 'Change',
   guessCheck: 'We picked the usual for your kind of place. Tap another if it’s different.',
   guessKind: 'We picked the usual for your kind of place. Tap another if it’s different.',
   // Price
   tpriceQ: 'What does it cost?', tpriceLead: 'The price for one adult. It shows on your card.', tpriceLeadPick: 'Your card will say “Adults {x}”.', tpriceLeadFree: 'Your card will say “Free”.',
-  tpriceLabel: 'Adult price, in dollars', tpriceMore: 'Kids’, seniors’ and family prices, passes and parties go in “Your prices”, the first of the extra details.',
+  tpriceLabel: 'Adult price, in dollars', tpriceMore: 'Your other prices (kids, seniors, passes, packages) go in “Your prices”, the first of the extra details.',
   tpriceGuess: 'We picked this from your page. Check it, and change it if it’s not right.',
   tpriceWaiting: 'You sent {x}. We’re checking it; it will show within a day.', tpriceNeed: 'Just the number, like 25. Free? Tap Free entry.',
   tpriceSavedLive: 'Your price is on your page and your card now.', tpriceSavedDay: 'We’re checking {x}. A price over {n} is checked first; it shows within a day.',
@@ -2366,7 +2366,7 @@ en.indoor = {
   bringGuess: 'We found this online. Check it. Answers you tap below are added after it.',
   // Your story and Known for
   storyQ: 'Tell visitors about your place', storyLabel: 'About your place', storyEx: 'A family-run escape room since 2016, with six themed rooms for 2 to 8 players.',
-  knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows at the top of “Plan your visit” and on your card.', knownEx: 'Six themed rooms, great for birthdays',
+  knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows under “Your visit” on your page.', knownEx: 'Six themed rooms, great for birthdays',
   knownGuess: 'We found this online. Check it, and change any words that aren’t right.',
   storyKnownSaved: 'Your Known for line is on your page now. Your story will show within a day.',
   // Groups and parties
@@ -2421,11 +2421,11 @@ fr.indoor = {
   tkindNeed: 'Touchez le genre d’endroit que vous êtes (jusqu’à 3).', tkindMax: 'Jusqu’à 3. Touchez d’abord un choix pour le retirer.',
   tlengthQ: 'Combien de temps les gens restent-ils d’habitude?', tlengths: { '1h': 'Jusqu’à 1 heure', '1-2h': '1 à 2 heures', '2-3h': '2 à 3 heures', half: 'Une demi-journée ou plus' },
   tlengthNeed: 'Touchez combien de temps la plupart des gens restent.',
-  kindsGuess: 'Nous les avons choisis d’après votre page. Vérifiez-les : touchez pour changer.',
+  kindsGuess: 'Nous les avons choisis d’après votre page. Vérifiez-les : touchez pour changer.', kindsGuessFold: 'Nous l’avons choisi d’après votre page. Ce n’est pas ça? Touchez Modifier.', kindsChange: 'Modifier',
   guessCheck: 'Nous avons choisi l’habituel pour votre genre d’endroit. Touchez-en un autre si c’est différent.',
   guessKind: 'Nous avons choisi l’habituel pour votre genre d’endroit. Touchez-en un autre si c’est différent.',
   tpriceQ: 'Combien ça coûte?', tpriceLead: 'Le prix pour un adulte. Il paraît sur votre fiche.', tpriceLeadPick: 'Votre fiche indiquera « Adultes : {x} ».', tpriceLeadFree: 'Votre fiche indiquera « Gratuit ».',
-  tpriceLabel: 'Prix adulte, en dollars', tpriceMore: 'Les prix pour enfants, aînés et familles, les laissez-passer et les fêtes vont dans « Vos tarifs », le premier des détails facultatifs.',
+  tpriceLabel: 'Prix adulte, en dollars', tpriceMore: 'Vos autres prix (enfants, aînés, laissez-passer, forfaits) vont dans « Vos tarifs », le premier des détails facultatifs.',
   tpriceGuess: 'Nous l’avons choisi d’après votre page. Vérifiez-le, et changez-le s’il n’est pas exact.',
   tpriceWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.', tpriceNeed: 'Seulement le chiffre, par exemple 25. Gratuit? Touchez Entrée gratuite.',
   tpriceSavedLive: 'Votre prix est sur votre page et votre fiche maintenant.', tpriceSavedDay: 'Nous vérifions {x}. Un prix de plus de {n} est vérifié d’abord; il s’affiche d’ici un jour.',
@@ -2444,7 +2444,7 @@ fr.indoor = {
   bringNeed: 'Écrivez une ligne, ou touchez une des réponses ci-dessous.', bringNoLink: 'Gardez les liens hors de cette ligne. Votre lien de réservation a sa propre case dans Sans réservation ou réserver.',
   bringGuess: 'Nous avons trouvé ceci en ligne. Vérifiez-le. Les réponses touchées ci-dessous s’ajoutent après.',
   storyQ: 'Parlez de votre endroit aux visiteurs', storyLabel: 'À propos de votre endroit', storyEx: 'Un jeu d’évasion familial depuis 2016, avec six salles thématiques pour 2 à 8 joueurs.',
-  knownQ: 'Pour quoi êtes-vous connus?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite » et sur votre fiche.', knownEx: 'Six salles thématiques, idéal pour les anniversaires',
+  knownQ: 'Pour quoi êtes-vous connus?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite » sur votre page en français.', knownEx: 'Six salles thématiques, idéal pour les anniversaires',
   knownGuess: 'Nous avons trouvé ceci en ligne. Vérifiez-le et changez les mots qui ne conviennent pas.',
   storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
   groupsQ: 'Groupes et fêtes : à partir de combien de personnes doivent-ils réserver?', groupsLead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes scolaires ou les réservations privées dans vos mots.',
@@ -2558,6 +2558,33 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
   },
   groups: ['Fêtes d’anniversaire avec salle privée', 'Groupes scolaires bienvenus', 'Réservations privées sur demande'],
 });
+// Indoor test 4 (2026-11-19; Lauren, a day spa: "Adult price" with no placeholder, "The price for one adult", birthday and
+// school chips, a theatre's box office hint). The setup's words by the main kind, from indoor-kinds.js: the Price screen's
+// label, placeholder, lead and preview, Your prices' lead and the tickets/booking page line, the Groups lead, example and
+// its three chips (the same number as before), and the box office hint only for theatres and classes. The setup lays
+// these over the indoor words for the kind picked (owner-setup-client.js kindWords). The old three Groups chips stay in
+// quick.groups so lines saved with them still show in French.
+(function indoorKindWords() {
+  const IK = require('./indoor-kinds');
+  const noPeriod = (x) => String(x).replace(/\.$/, '');
+  for (const [lang, T] of [['en', en.indoor], ['fr', fr.indoor]]) {
+    const fr2 = lang === 'fr';
+    T.kindText = {}; T.quick.groups_kinds = {};
+    for (const k of IK.INDOOR_KIND_TEXT_KINDS) {
+      const w = IK.indoorKindText([k], lang), line = noPeriod(w.price.page);
+      T.kindText[k] = {
+        tpriceLabel: w.price.label, tpricePh: w.price.ph, tpriceLead: w.price.lead,
+        tpriceLeadPick: fr2 ? `Votre page indiquera « ${line} ».` : `Your page will say “${line}”.`,
+        tpriceCard: line, tpriceRangeLead: fr2 ? `Nous indiquerons « ${line} », votre prix le plus bas.` : `We’ll show “${line}”, your lowest price.`,
+        menuLead: w.prices.lead, pricesNoun: w.prices.noun, pricesPage: w.prices.page,
+        webLeadTickets: fr2 ? `Nous avons inscrit votre ${w.prices.noun}. Si vos prix sont sur une autre page, changez-la.` : `We filled in your ${w.prices.noun}. If your prices are on another page, change it.`,
+        groupsLead: w.groups.lead, groupsEx: w.groups.ex, quick: { groups: w.groups.chips },
+        noSetHoursHint: w.boxOffice ? T.noSetHoursHint : '',
+      };
+      T.quick.groups_kinds[k] = w.groups.chips;
+    }
+  }
+})();
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

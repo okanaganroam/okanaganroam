@@ -522,6 +522,14 @@ for (const [base, key] of [[TYPE_ALIASES, 'types'], [FEATURE_ALIASES, 'features'
   }
 }
 
+// Indoor test 4 (2026-11-19; Lauren: "facial in Kelowna" found nothing): each indoor kind's own words (indoor-kinds.js:
+// "facial", "couples massage", "bouldering", "lane swim", "tenpin", "learn to curl", "slots") mean an indoor place, the
+// same in search and Build My Trip. A phrase another table already gives a meaning keeps it.
+{
+  const own = new Set(Object.values(TYPE_ALIASES).flat());
+  TYPE_ALIASES.indoor = Array.from(new Set([...(TYPE_ALIASES.indoor || []), ...require('./indoor-kinds').INDOOR_TYPE_WORDS.filter((p) => !own.has(p))]));
+}
+
 // Event nouns switch the request to mode 'events'. Category words are only
 // honoured once the request is about events.
 const EVENT_PHRASES = ['event', 'events', 'whats on', 'what is on', 'happening', 'happenings', 'going on', 'things happening', 'festival', 'festivals', 'concert', 'concerts', 'gig', 'gigs', 'live show', 'live shows',

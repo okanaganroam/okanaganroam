@@ -134,7 +134,11 @@ function requestKidAges(text) {
   const out = [];
   const add = (x) => { const n = Number(x); if (Number.isInteger(n) && n >= 0 && n < 19) out.push(n); };
   let m;
-  const re1 = /\b(\d{1,2}) ?(?:years? old|year olds?|yrs? old|yo)\b/g; while ((m = re1.exec(t))) add(m[1]);
+  // Indoor test 4 (2026-11-19): "14-year-old" with its hyphens too (the server reads them as spaces; this reads both).
+  const re1 = /\b(\d{1,2})[ -]?(?:years?[ -]old|year[ -]olds?|yrs?[ -]old|yo)\b/g; while ((m = re1.exec(t))) add(m[1]);
+  // Indoor test 4 (Lauren: « spa avec mon ado de 14 ans »): French ages, « mon fils de 14 ans », « nos enfants de 8 et 11 ans »,
+  // « un enfant de 6 ans » (never « 19 ans et plus », a place's own minimum).
+  const re3 = /\b(?:de|d['’]|ont|a)\s*(\d{1,2})(?:\s*(?:et|ou|à|a)\s*(\d{1,2}))?\s*ans\b(?!\s*(?:et plus|\+|minimum|et moins))/g; while ((m = re3.exec(t))) { add(m[1]); if (m[2]) add(m[2]); }
   const re2 = /\b(?:aged?|ages|kids?|children|boys?|girls?|sons?|daughters?) (\d{1,2})(?: (?:and|or|to|through) (\d{1,2}))?\b(?! ?(?:am|pm|h|people|guests|adults|of us))/g; while ((m = re2.exec(t))) { add(m[1]); if (m[2]) add(m[2]); }
   return [...new Set(out)].sort((a, b) => a - b);
 }
@@ -142,6 +146,22 @@ function requestKidAges(text) {
 function kidsYoungest(ctx) { if (!ctx) return null; const a = Array.isArray(ctx.kidAges) && ctx.kidAges.length ? ctx.kidAges.slice().sort((x, y) => x - y) : requestKidAges(ctx.queryText || ''); return a.length ? a[0] : null; }
 // Whistler #190 (2026-11-17): an active party place for a kids' birthday, read from the listing's own name and category.
 const KIDS_PARTY_ACTIVE_RE = /\b(?:adventure parks?|aerial (?:adventure )?(?:parks?|courses?)|tree ?top|ropes? courses?|obstacle courses?|zip ?lines?|mini ?golf|climbing (?:gyms?|walls?)|trampoline\w*)\b/;
+// Indoor test 4 (2026-11-19; Lauren's 16+ spa and a "19+ only" Nordic spa were planned for "spa with my 14 year old"): an
+// indoor place's own minimum age (the owner's Who can come answer; else its page saying "19+", "16 and over" or "adults
+// only") above the youngest child named. Same rule as tours.
+const INDOOR_ADULTS_RE = /\b(19|18|16|14|13|12)\s*\+|\b(19|18|16|14|13|12) (?:and|&) (?:over|older|up)\b|\b(adults?[ -]only|no one under 19|19 ans et plus)\b/i;
+function indoorMinAgeOf(v) {
+  if (!v || v.type !== 'indoor') return null;
+  if (/^\d+$/.test(String(v.indoorMinAge || ''))) return Number(v.indoorMinAge);
+  if (v.indoorMinAge === 'all') return null;
+  const m = INDOOR_ADULTS_RE.exec(`${v.description || ''} ${v.plannerDescription || ''}`);
+  return m ? Number(m[1] || m[2]) || 19 : null;
+}
+function indoorTooYoung(v, ctx) {
+  if (!v || v.type !== 'indoor' || namedInRequest(v, ctx)) return false;
+  const young = kidsYoungest(ctx), min = indoorMinAgeOf(v);
+  return young != null && min != null && young < min;
+}
 function tourTooYoung(v, ctx) {
   if (!v || v.type !== 'tour' || namedInRequest(v, ctx)) return false;
   const young = kidsYoungest(ctx);
@@ -1053,7 +1073,18 @@ function plannerExcludedPlace(v) {
 // candidates ("retired couple, no hiking" left three mornings empty).
 const GENERAL_STOP_RE = /\b(?:museums?|galler(?:y|ies)|art centre|cultural centre|heritage|nordic spa|spa|viewpoints?|lookouts?|waterfalls?|falls|gondola|provincial park|lake park|town park)\b/;
 const GENERAL_STOP_CAVEAT = 'Nothing matching that part of your request fits this time, so this is one of the area’s general things to do.';
-function spaPlace(v) { return !!v && (!v.type || v.type === 'indoor') && /\b(?:spa|spas|sauna|scandinave|massage|thermal)\b/.test(`${v.textName || normWords(v.name || '')} ${normWords(v.cuisine || '')}`); }
+function spaPlace(v) { return !!v && (!v.type || v.type === 'indoor') && ((Array.isArray(v.indoorKinds) && v.indoorKinds.includes('spa')) || /\b(?:spa|spas|sauna|scandinave|massage|thermal)\b/.test(`${v.textName || normWords(v.name || '')} ${normWords(v.cuisine || '')}`)); }
+// Indoor test 4 (2026-11-19; Lauren: "couples massage Kelowna Saturday" planned another spa): what a spa request names, and
+// how many of those its own words say (its name, story, Known for and Groups lines, its kind). "couples massage" -> 2 for a
+// spa whose Known for says massage and whose Groups line offers couples' packages.
+const SPA_FOCUS = [/\bmassages?\b/, /\bcouples?\b|\ben couple\b|\bduo\b/, /\bfacials?\b|\bsoins? du visage\b/, /\bhydro ?therap\w*|\bhydroth[eé]rapie\b|\bnordic\b|\bnordique\b|\bhot and cold\b/];
+function spaFocusHits(v, ctx) {
+  const q = normWords(ctx && ctx.queryText || '');
+  const asked = SPA_FOCUS.filter((re) => re.test(q));
+  if (!asked.length || !spaPlace(v)) return 0;
+  const own = `${v.textName || normWords(v.name || '')} ${v.textDesc || normWords(v.plannerDescription || v.description || '')} ${normWords(v.knownFor || '')} ${normWords(v.groupsText || '')} ${normWords(v.cuisine || '')}`;
+  return asked.filter((re) => re.test(own)).length;
+}
 // Tour test 2 (2026-11-16): the owner's own season wins over the snow words in a name or kind. A tour named "Coast Range
 // Heli-Skiing" whose owner set "We only run part of the year" (open_months, e.g. Dec 1 to Sep 30) runs summer tours too:
 // on a date inside that season, and not in one of their closures, the winter-only rules below do not drop it. Outside
@@ -1355,6 +1386,8 @@ function eligible(v, ctx, strict) {
   // Tour test 7 (Whistler, 2026-11-17): a child's age named without "kids" ("with our 15-year-old") still leaves out a tour
   // whose own minimum age is above it (a 16+ mountaineering guide was planned with "Ages 16 and up"); tooYoungNotes says why.
   else if (tourTooYoung(v, ctx)) return false;
+  // Indoor test 4: and an indoor place whose own minimum age is above it ("spa with my 14 year old" and a 16+ spa).
+  else if (indoorTooYoung(v, ctx)) return false;
   // Teenagers can't go to bars (2026-10-14).
   if (['pub', 'cocktail', 'distillery'].includes(v.type) && /\b(?:teens?|teenagers?|tweens?|adolescents)\b/.test(ctx.queryText || '') && !ctx.types.has(v.type)) return false;
   // A dog trip (2026-10-25): every place to go is dog-friendly; a meal may be at a place that isn't (in winter few
@@ -1437,6 +1470,8 @@ function scoreVenue(v, ctx) {
     if (BIG_HIKE_ASKED_RE.test(ctx.queryText || '')) add('long_hike_asked', 15, 'A full-day hike, as asked');
     else if (!namedInRequest(v, ctx)) add('long_hike', -18, null);
   }
+  // Indoor test 4 (2026-11-19): a spa whose own words say the massage, facial, couples or hydrotherapy asked for comes first.
+  { const sf = spaFocusHits(v, ctx); if (sf) add('spa_focus', 30 + sf * 25, null); }
   // 2026-10-28: "a spa" puts a destination spa (Scandinave's hot pools and saunas) ahead of a hotel treatment room or a
   // massage studio.
   if (SPA_ASKED_RE.test(ctx.queryText || '') && spaPlace(v)) {
@@ -1936,6 +1971,9 @@ function publicVenue(v, ctx) {
     // Indoor test 2 (2026-11-19; Jordan): a price per room, lane, game or group reads as the page says it ("From $120 per
     // room (2–6 players)"), never "per person", and stays out of the per-person estimate.
     : indoorFrom && Array.isArray(v.indoorPerLine) ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null, perGroup: v.indoorPer, unit: v.indoorPerLine[0], unitFr: v.indoorPerLine[1] }
+    // Indoor test 4 (2026-11-19; Lauren's spa read "$65 per person · Admission"): the kind's own words ("From $65",
+    // "Tickets from $25", "Day pass from $22"), as the page says it.
+    : indoorFrom && Array.isArray(v.indoorPriceLine) ? { cents: Math.round(indoorFrom * 100), label: 'Indoor', labelFr: 'Intérieur', source: null, line: v.indoorPriceLine[0], lineFr: v.indoorPriceLine[1] }
     : indoorFrom ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null }
     : cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
     : fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
@@ -6996,8 +7034,15 @@ function tooYoungNotes(result, input) {
   if (!kinds.length) return;
   const used = new Set(planStopsOf(result).concat(result.recommendations || []).filter((s) => s && s.venue).map((s) => s.venue.id));
   const regions = (input.intent && input.intent.regions) || [];
-  const out = (input.facts || []).filter((v) => v.type === 'tour' && !used.has(v.id) && tourTooYoung(v, ctx) && (!regions.length || regions.includes(v.region)) && kinds.some((k) => (v.plannerKinds || []).includes(k))).slice(0, 2);
+  const out = (input.facts || []).filter((v) => ((v.type === 'tour' && tourTooYoung(v, ctx)) || (v.type === 'indoor' && indoorTooYoung(v, ctx))) && !used.has(v.id) && (!regions.length || regions.includes(v.region)) && kinds.some((k) => (v.plannerKinds || []).includes(k))).slice(0, 2);
   for (const v of out) {
+    // Indoor test 4: "Room and Pillar Spa is for ages 16 and up, so it isn’t in this plan for your 14-year-old."
+    if (v.type === 'indoor') {
+      const ti = `${v.name} is for ages ${indoorMinAgeOf(v)} and up, so it isn’t in this plan for your ${young}-year-old.`;
+      if (!(result.notes || []).includes(ti)) result.notes = [ti].concat(result.notes || []);
+      if (!(result.contextNotes || []).includes(ti)) result.contextNotes = [ti].concat(result.contextNotes || []);
+      continue;
+    }
     // Tour test 10: the trip the request names is the one for older riders ("Trail rides are for ages 8 and up").
     const fit = /^\d+$/.test(String(v.tourMinAge || '')) && young < Number(v.tourMinAge) ? null : tourAgeFit(v, ctx);
     const text = fit && fit.out ? (fit.item ? `${v.name}’s “${fit.item}” is for ages ${fit.age} and up, so it isn’t in this plan for your ${young}-year-old.` : `${v.name} is for ages ${fit.age} and up, so it isn’t in this plan for your ${young}-year-old.`)

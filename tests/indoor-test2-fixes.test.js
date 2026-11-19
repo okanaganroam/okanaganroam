@@ -108,14 +108,14 @@ test('1b. per room: Per person tapped with "per room" words asks instead of savi
   await sb.click('priceSave');
   assert.equal(app.venueIndoorInfo(b.id).per, 'lane');
   assert.ok(plain(page(b)).includes('From $45 per lane.'));
-  // Back to per person: the unit goes, the page says Adults again.
+  // Back to per person: the unit goes, the page says the bowling words (indoor test 4: "From $8 per game.").
   const sb2 = await openSetup(base, tb, { hash: 'price' });
   await sb2.click('[data-iper="person"]');
   await sb2.type('suTprice', '8');
   await sb2.click('priceSave');
   assert.equal(app.venueIndoorInfo(b.id).per, undefined);
   assert.equal(app.indoorPrice(b.id), 8);
-  assert.ok(plain(page(b)).includes('Adults $8.'));
+  assert.ok(plain(page(b)).includes('From $8 per game.'));
   // French words: « 90 $ par équipe, jusqu'à 8 joueurs ».
   const f = escape();
   const tf = tokenFor(f.id);

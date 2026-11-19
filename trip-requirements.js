@@ -11,11 +11,12 @@ const KINDS = {
   museum: /\bmuseums?\b/,
   gallery: /\b(?:galler(?:y|ies)|art warehouse|arts? centre|arts? center)\b/,
   escape: /\bescape rooms?\b/,
-  bowling: /\b(?:bowling|bowling alley|lanes)\b/,
-  climbing: /\b(?:climbing gyms?|bouldering)\b/,
+  // Indoor test 4 (2026-11-19): the bowling words of indoor-kinds.js too (tenpin, 5-pin, « quilles »).
+  bowling: /\b(?:bowling|bowling alley|lanes|ten ?pin|5 pin|five pin|10 pin|quilles)\b/,
+  climbing: /\b(?:climbing gyms?|bouldering|indoor climbing|trampoline parks?|escalade de bloc|centre d escalade)\b/,
   arcade: /\b(?:arcades?|laser tag)\b/,
   theatre: /\b(?:theatres?|theaters?|cinema|performing arts)\b/,
-  spa: /\b(?:spas?|thermal spa|sauna experience|saunas?|floating sauna|massages?|wellness)\b/, // 2026-10-25: saunas and wellness studios
+  spa: /\b(?:spas?|thermal spa|sauna experience|saunas?|floating sauna|massages?|wellness|facials?|hydrotherapy|hydrotherapie|soins? du visage|steam rooms?|nordic spa|spa nordique)\b/, // 2026-10-25: saunas and wellness studios; indoor test 4: facials and hydrotherapy
   wine_tour: /\b(?:wine tours?|winery tours?|vineyard tours?)\b/,
   // Tour test 5 (Whistler, 2026-11-17): jet boats and boat charters are boat tours too ("boat charter", "yacht charter"; a
   // bare "charter" in a request is REQUEST_KINDS.boat_tour).

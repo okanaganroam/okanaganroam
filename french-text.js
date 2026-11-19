@@ -101,6 +101,8 @@ const FR_TEXT = {
   'Per room': 'Par salle', 'Per lane': 'Par allée', 'Per game': 'Par partie', 'Per group': 'Par groupe',
   // Indoor test 3 (2026-11-19): a theatre's card price is its lowest ticket (« À partir de 25 $ · Billets »).
   'Tickets': 'Billets',
+  // Indoor test 4 (2026-11-19; Lauren's spa card said "Admission"): every indoor kind's card line (« Soins et forfaits »).
+  ...require('./indoor-kinds').INDOOR_BASIS_FR,
   'Arts & culture': 'Arts et culture',
   'Kid Friendly': 'Adapté aux enfants',
   'Kid-Friendly': 'Adapté aux enfants',

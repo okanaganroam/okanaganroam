@@ -135,17 +135,18 @@ test('4 + 5. Price for a theatre: "Tickets from $25" on the page, card and previ
   // The setup's preview card and lead, back on the screen.
   const sim2 = await openSetup(base, t, { hash: 'price' });
   assert.equal(sim2.doc.getElementById('suTpriceLead').textContent, 'Your page will say “Tickets from $25”.');
-  // "25 to 55" for a museum: From $25, and the page keeps Adults.
+  // "25 to 55" for a museum: "Admission from $25" (indoor test 4: the museum's own words).
   const m = mk('indoor', { name: 'Penticton Museum T3', description: 'Local history museum.' });
   const tm = tokenFor(m.id);
   await ok(change(tm, { indoor_info: { kinds: ['museum'], length: '1-2h' } }));
   const sm = await openSetup(base, tm, { hash: 'price' });
-  assert.equal(sm.doc.getElementById('suTprice').getAttribute('placeholder'), null);
+  // Indoor test 4: every kind has its own placeholder and words ("Admission from $25" for a museum).
+  assert.equal(sm.doc.getElementById('suTprice').getAttribute('placeholder'), 'Your regular adult admission');
   await sm.type('suTprice', '25 to 55');
-  assert.equal(sm.doc.getElementById('suTpriceLead').textContent, 'We’ll show From $25, your lowest price.');
+  assert.equal(sm.doc.getElementById('suTpriceLead').textContent, 'We’ll show “Admission from $25”, your lowest price.');
   await sm.click('priceSave');
   assert.equal(app.indoorPrice(m.id), 25);
-  assert.ok(plain(page(m)).includes('Adults $25.'));
+  assert.ok(plain(page(m)).includes('Admission from $25.'));
   // The server reads a range the same way; one price and per-person words as before.
   assert.equal(app.cleanIndoorPrice('$25 - $55').value, 25);
   assert.equal(app.cleanIndoorPrice('25 à 55 $').value, 25);
@@ -365,12 +366,11 @@ test('10c. The French planner says Théâtre; a show stop starts at the show tim
   await ok(change(t, { indoor_info: { visit: null } }));
 });
 
-test('10d. The Penticton indoor page shows a Theatre chip when a theatre is listed there', async () => {
+test('10d. (Indoor test 4: SEO, one change at a time) A town’s indoor page has no row of experience chips; the all-valley Indoor hub keeps its Theatre chip', async () => {
   const { v } = await penticton();
   const h = await getText('/penticton/indoor');
-  assert.match(h, /<nav class="indoor-experience-filters"[^>]*>[\s\S]*?href="\/indoor\?regions=penticton&amp;types=theatre">Theatre <span>\(\d+\)<\/span><\/a>/);
+  assert.doesNotMatch(h, /<nav class="indoor-experience-filters"/);
+  assert.doesNotMatch(h, /href="\/indoor\?regions=penticton&amp;types=/);
   assert.ok(v);
-  // A town with no theatre has no Theatre chip.
-  mk('indoor', { name: 'Oliver Museum T3', region: 'oliver', description: 'A museum.' });
-  assert.doesNotMatch(await getText('/oliver/indoor'), /types=theatre/);
+  assert.match(await getText('/indoor'), /href="\/indoor\/theatre"/);
 });

@@ -75,7 +75,7 @@ test('2. Part 1 with real taps (an escape room): the starting picks, the answers
   await sim.click('yearAll');
   // What kind of place: Escape room picked from the name, 1 to 2 hours the usual (both said, both saved only with the screen).
   assert.match(sim.text(), /What kind of place are you\?/);
-  assert.match(sim.text(), /We picked these from your page/);
+  assert.match(sim.text(), /We picked (?:these|this) from your page/);
   assert.equal(sim.doc.getElementById('suIndoorKinds').querySelectorAll('[data-tkind]').length, 12, 'the 12 most common kinds open');
   assert.ok(sim.has('[data-tkind="escape"][aria-pressed="true"]'));
   assert.ok(sim.has('[data-tpick="length:1-2h"][aria-pressed="true"]'));
@@ -104,14 +104,14 @@ test('2. Part 1 with real taps (an escape room): the starting picks, the answers
   assert.match(sim.text(), /Add photos of your place/);
   // The page: the five answer lines in the Plan your visit rows (English), the booking card has Prices and Booking.
   const en = plain(page(v));
-  for (const l of ['All year.', '1 to 2 hours.', 'Adults $32.', 'Ages 8 and up. Under 18s come with an adult.', 'Please book ahead.']) assert.ok(en.includes(l), l);
+  for (const l of ['All year.', '1 to 2 hours.', 'From $32 per player.', 'Ages 8 and up. Under 18s come with an adult.', 'Please book ahead.']) assert.ok(en.includes(l), l);
   // French page: the same lines in French, and the kinds in French.
   const fr = plain(page(v, 'fr'));
-  for (const l of ['Toute l’année.', '1 à 2 heures.', 'Adultes : 32 $.', 'À partir de 8 ans. Les moins de 18 ans viennent avec un adulte.', 'Réservez à l’avance.']) assert.ok(fr.includes(l), l);
+  for (const l of ['Toute l’année.', '1 à 2 heures.', 'À partir de 32 $ par joueur.', 'À partir de 8 ans. Les moins de 18 ans viennent avec un adulte.', 'Réservez à l’avance.']) assert.ok(fr.includes(l), l);
   assert.match(fr, /Jeu d’évasion/);
   // The card price is the owner's.
   const card = db.prepare('SELECT from_price, basis, reviewer FROM price_overrides WHERE venue_id = ?').get(v.id);
-  assert.equal(card.from_price, 32); assert.equal(card.basis, 'Adult admission');
+  assert.equal(card.from_price, 32); assert.equal(card.basis, 'Per player');
 });
 
 test('3. a free museum: one tap on Free entry; the card says Free, the Free to Visit badge and Arts & Culture go on; the hub chips follow the kinds', async () => {
@@ -159,7 +159,7 @@ test('4. French: the screens in French, a French price, and Part 2 lists the six
   await sim.type('suTprice', '22,50 $');
   await sim.click('priceSave');
   assert.equal(app.indoorPriceValue(v.id), 22.5);
-  assert.ok(plain(page(v, 'fr')).includes('Adultes : 22,50 $.'));
+  assert.ok(plain(page(v, 'fr')).includes('Laissez-passer d’un jour à partir de 22,50 $.'));
   const more = await openSetup(base, t, { hash: 'more' });
   for (const l of ['Your prices', 'Your story and Known for', 'Good to know', 'Groups and parties', 'Instagram and Facebook', 'Closures and holidays']) assert.ok(more.text().includes(l), l);
 });
