@@ -1795,7 +1795,10 @@ function scoreVenue(v, ctx) {
     if (v.type === 'distillery') add('dog_distillery', -10, null);
   }
   // Kids are not taken to a meadery, cidery or casino on a rainy day, nor to indoor golf unless golf was asked for.
-  if (ctx.kids && v.type === 'indoor' && KIDS_ADULT_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textDesc, w))) add('kids_adult_setting', -40, null);
+  // Indoor test 8 (2026-11-19; Gary's bowling centre: "a licensed lounge" in his story dropped him from every kids' rainy-day
+  // plan): never for a place whose owner said All ages or that has the Kid-Friendly badge, or whose owner-picked kind is a
+  // family kind; otherwise only the name or category says it (a story can mention a lounge or a bar).
+  if (ctx.kids && v.type === 'indoor' && !kidsAdultSettingExempt(v) && KIDS_ADULT_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textCuisine || normWords(v.cuisine || ''), w))) add('kids_adult_setting', -40, null);
   if (ctx.kids && v.type === 'golf' && !ctx.types.has('golf')) add('kids_golf', -15, null);
   // Round 14 (2026-10-20): an indoor playground for small children is not an afternoon out for adults (Play Area Whistler
   // was day 2 of a plain Whistler weekend).
@@ -1822,6 +1825,12 @@ const THINGS_TO_DO_RE = /\b(?:things? to do|something (?:fun )?to do|stuff to do
 const TEEN_FUN_WORDS = ['escape', 'arcade', 'laser tag', 'go kart', 'go karts', 'karting', 'climbing', 'bouldering', 'trampoline', 'mini golf', 'bowling', 'zipline', 'zip line', 'axe throwing', 'paintball', 'virtual reality', 'vr', 'waterslide', 'water park', 'bike park', 'skate park'];
 const SOFT_FEATURES = ['patio', 'lake_view', 'happy_hour', 'live_music', 'great_groups', 'sports_tv', 'open_late', 'open_early'];
 const KIDS_ADULT_WORDS = ['meadery', 'cidery', 'winery', 'brewery', 'distillery', 'casino', 'lounge', 'nightclub', 'cannabis', 'tasting room'];
+// Indoor test 8: a family kind (FAMILY_INDOOR_KINDS, below) picked by the owner is never an adult setting for kids.
+function kidsAdultSettingExempt(v) {
+  if (!v) return false;
+  if (v.indoorMinAge === 'all' || (v.features && v.features.kid_friendly)) return true;
+  return Array.isArray(v.indoorKinds) && v.indoorKinds.length > 0 && FAMILY_INDOOR_KINDS.includes(v.indoorKinds[0]);
+}
 const ALCOHOL_SETTING_WORDS = ['winery', 'vineyard', 'vineyards', 'brewery', 'brewpub', 'taproom', 'wine bar', 'tasting room', 'estate winery'];
 const INDOOR_VISITOR_KINDS = ['museum', 'gallery', 'theatre', 'bowling', 'arcade', 'climbing', 'escape'];
 const INDOOR_NICHE_WORDS = ['casino', 'gaming', 'fitness', 'gym', 'yoga', 'pilates', 'dance studio', 'martial arts', 'parkour', 'recording studio', 'studios', 'crossfit'];

@@ -184,3 +184,23 @@ test('Search: "kids birthday party <town>" finds every family kind in site searc
   if (!one('A wheel class for adults', 'wheel classes')) fails.push('hub search: classes finds class');
   assert.deepEqual(fails, []);
 });
+
+// Indoor test 8 (2026-11-19; Gary's 5-pin bowling centre: "a licensed lounge" in his story cost −40 and dropped him from
+// every kids' rainy-day plan). A family place whose story mentions a licensed lounge or a bar is still offered for kids:
+// with the owner's All ages, with a family kind and no age answer, and with no owner answers at all (the story is not read
+// for adult words; only the name or category is).
+test('A family place whose story mentions a licensed lounge or a bar is still offered for kids', async () => {
+  const story = 'Five-pin bowling since 1962, with cosmic bowling on weekends, an arcade corner and a licensed lounge and bar for the grown-ups.';
+  const allAges = mk({ region: 'armstrong', name: 'Armstrong Lanes MX', cuisine: 'Bowling alley', description: story, rating: 4.9, reviews: 500 });
+  await ok(change(tokenFor(allAges.id), { indoor_info: { kinds: ['bowling'], length: '1-2h', age: 'all', year: 'all' } }));
+  const kindOnly = mk({ region: 'enderby', name: 'Enderby Lanes MX', cuisine: 'Bowling alley', description: story, rating: 4.9, reviews: 500 });
+  await ok(change(tokenFor(kindOnly.id), { indoor_info: { kinds: ['bowling'], length: '1-2h', year: 'all' } }));
+  const noAnswers = mk({ region: 'lumby', name: 'Lumby Bowl MX', cuisine: 'Bowling alley', description: story, rating: 4.9, reviews: 500 });
+  // Gary had 596 competitors: a few strong family places in each town, so −40 would leave him out.
+  for (const [r, town] of [['armstrong', 'Armstrong'], ['enderby', 'Enderby'], ['lumby', 'Lumby']]) {
+    for (const nm of ['Kids Gym', 'Play Barn', 'Science Hub', 'Trampoline Zone']) mk({ region: r, name: `${town} ${nm} MX8`, cuisine: 'Family fun centre', description: 'Family fun.', rating: 4.8, reviews: 400, kid_friendly: 1 });
+  }
+  for (const [v, town] of [[allAges, 'Armstrong'], [kindOnly, 'Enderby'], [noAnswers, 'Lumby']]) {
+    assert.ok(idsOf(app.runTripPlan({ text: `rainy day with kids in ${town}` }, NOW)).includes(v.id), `${v.name}: rainy day with kids`);
+  }
+});
