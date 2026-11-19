@@ -150,3 +150,19 @@ test('4. Good to know: a chip is added after the research line ("Bring binocular
   assert.match(en, /Bring binoculars\. Dress for the weather\. Hotel pickup available\. Tours sell out in summer, book early\./);
   assert.doesNotMatch(app.venueVisitInfo(v.id).rows.find((r) => r.label === 'Good to know').text, / {2}/);
 });
+
+test('5. French page: the chip-built Groups line is in French, and his price line converts all the way (« 149 $ adulte, 99 $ enfants de 5 à 12 ans »)', async () => {
+  const { v, t } = await tom();
+  ok(await change(t, { visit_rows: { groups: 'Groups of 6 or more: please book ahead. Private tours available.' } }));
+  approveAll(v.id);
+  const fr = plain(page(v, 'fr')), en = plain(page(v));
+  assert.match(fr, /Groupes de 6 (?:personnes )?ou plus/);
+  assert.doesNotMatch(fr, /Groups of 6 or more/);
+  assert.match(en, /Groups of 6 or more: please book ahead\. Private tours available\./);
+  assert.match(fr, /149 \$ adulte, 99 \$ enfants de 5 à 12 ans/);
+  assert.doesNotMatch(fr, /\$99|kids 5 to 12/);
+  assert.match(en, /\$149 adult, \$99 kids 5 to 12/);
+  // Words we don't know stay as typed (no half-French line).
+  assert.equal(app.menuPriceWithWords('349 per sled (2 adults, or 1 adult + 2 kids)', 'fr').replace(/ /g, ' '), '349 $ par traîneau (2 adults, or 1 adult + 2 kids)');
+  assert.equal(app.menuPriceWithWords('$75 adults, $45 children', 'fr').replace(/ /g, ' '), '75 $ adultes, 45 $ enfants');
+});

@@ -10798,6 +10798,9 @@ function presetAnswerMap() {
     for (const k of Object.keys(e)) {
       const isPre = pre || /^quick/.test(k) || k === 'holidays';
       const ev = e[k], fv = f[k];
+      // Tour test 16 (Whistler, 2026-11-18; Tom): the line a group-size chip writes ("Groups of 6 or more: please book
+      // ahead", "Groups of up to 12") stayed English on the French page. Every size a chip can write.
+      if (/^groupsLine(?!Label)/.test(k) && typeof ev === 'string' && typeof fv === 'string') { if (/\{n\}/.test(ev)) for (let n = 2; n <= 40; n++) add(ev.replace('{n}', n), fv.replace('{n}', n)); else add(ev, fv); continue; }
       if (isPre && typeof ev === 'string') add(ev, fv);
       else if (isPre && Array.isArray(ev) && Array.isArray(fv) && ev.length === fv.length) ev.forEach((x, i) => add(x, fv[i]));
       else if (ev && typeof ev === 'object' && !Array.isArray(ev)) walk(ev, fv, isPre);
@@ -53940,6 +53943,20 @@ const MENU_PRICE_WORDS_FR = [[/\bper person\b/i, 'par personne'], [/\bper (?:tan
   [/\bper kid\b/i, 'par enfant'], [/\bper (?:student|skier|learner)\b/i, 'par élève'], [/\bper participant\b/i, 'par participant'], [/\bper (?:private )?lesson\b/i, 'par cours'], [/\bper class\b/i, 'par cours'],
   [/\bfor the week\b/i, 'pour la semaine'], [/\bper week\b/i, 'par semaine'], [/\bfor the day\b/i, 'pour la journée'], [/\bfor (\d) days\b/i, 'pour $1 jours'],
   [/\b(\d{1,2})\s*(?:-|–|to)\s*(\d{1,2}) (?:people|persons|guests)\b/i, '$1 à $2 personnes'], [/^on request$/i, 'Sur demande'], ...MENU_UNIT_WORDS_FR];
+// Tour test 16 (Whistler, 2026-11-18; Tom): « 149 $ adult, $99 kids 5 to 12 » was half converted. Who a price is for, in the
+// words we know: « 149 $ adulte, 99 $ enfants de 5 à 12 ans ». Used only when it leaves no English word in the line ("(2
+// adults, or 1 adult + 2 kids)" stays as typed rather than « (2 adultes, or 1 adulte + 2 enfants) »).
+const MENU_WHO_WORDS_FR = [
+  [/\b(?:kids|children)\s+(?:ages?\s+)?(\d{1,2})\s*(?:-|–|to)\s*(\d{1,2})\b/i, 'enfants de $1 à $2 ans'], [/\b(?:kids|children)\s+(?:ages?\s+)?(\d{1,2})\s*(?:\+|and up|and over)/i, 'enfants de $1 ans et plus'],
+  [/\b(?:kids|children)\s+under\s+(\d{1,2})\b/i, 'enfants de moins de $1 ans'], [/\b(?:kids|children)\b/i, 'enfants'], [/\b(?:kid|child)\b/i, 'enfant'], [/\badults\b/i, 'adultes'], [/\badult\b/i, 'adulte'],
+  [/\bseniors\b/i, 'aînés'], [/\bsenior\b/i, 'aîné'], [/\bfamily\b/i, 'famille']];
+const MENU_FR_WORDS = new Set([...MENU_PRICE_WORDS_FR, ...MENU_WHO_WORDS_FR].flatMap(([, w]) => w.toLowerCase().split(/[^a-zà-ÿ’']+/)).filter(Boolean));
+function menuWhoWordsFr(q) {
+  let out = q; for (const [re, word] of MENU_WHO_WORDS_FR) out = out.replace(new RegExp(re.source, 'gi'), word);
+  if (out === q) return q;
+  const words = out.toLowerCase().match(/[a-zà-ÿ’']+/g) || [];
+  return words.every((w) => MENU_FR_WORDS.has(w)) ? out : q;
+}
 // A typed-up trip length in French (« 2.5 hours » -> « 2,5 heures », "half day" -> « demi-journée »): known words only.
 function menuDurationFr(d) {
   const t = String(d || '').trim();
@@ -53958,13 +53975,17 @@ function menuPriceWithWords(p, lang = 'en') {
   // kids)"), read as a second number and left the price without its "$". The brackets are kept as typed.
   const par = /^(.*\S)(\s*\([^()]*\d[^()]*\))$/.exec(String(p));
   // Tour test 14: on the French page, known words in the brackets too (« (1 à 4 personnes) »).
-  if (par && /^\D*\d/.test(par[1])) { const head = menuPriceWithWords(par[1], lang); let tail = par[2]; if (lang === 'fr') for (const [re, word] of MENU_PRICE_WORDS_FR) if (!/\^/.test(re.source)) tail = tail.replace(re, word); return `${head}${tail}`; }
+  if (par && /^\D*\d/.test(par[1])) { const head = menuPriceWithWords(par[1], lang); let tail = par[2]; if (lang === 'fr') for (const [re, word] of MENU_PRICE_WORDS_FR) if (!/\^/.test(re.source)) tail = tail.replace(re, word); return lang === 'fr' ? menuWhoWordsFr(`${head}${tail}`) : `${head}${tail}`; }
   if (/[$€£]|\b(?:cad|usd)\b/i.test(p)) {
     let q = p;
     // Tour test 8: "$349 per sled" typed in English, on the French page « 349 $ par traîneau ».
     // Tour test 13 (Whistler, 2026-11-18; Matthias): an add-on's "+ $49 per flight" read « + $49 per flight » beside
     // « 189 $ per flight »: one format on the French page (« + 49 $ par vol »).
-    if (lang === 'fr') { q = q.replace(/^((?:from|à partir de|dès)\s+|\+\s?)?\$\s?(\d{1,3}(?:,\d{3})+|\d{1,5})(?:\.(\d{1,2}))?(?=\s|$|\/)/i, (w, f, n, c) => `${f ? (f.trim() === '+' ? '+ ' : f) : ''}${n.replace(/,/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')}${c ? `,${c}` : ''} $`); for (const [re, word] of MENU_PRICE_WORDS_FR) q = q.replace(re, word); }
+    if (lang === 'fr') { q = q.replace(/^((?:from|à partir de|dès)\s+|\+\s?)?\$\s?(\d{1,3}(?:,\d{3})+|\d{1,5})(?:\.(\d{1,2}))?(?=\s|$|\/)/i, (w, f, n, c) => `${f ? (f.trim() === '+' ? '+ ' : f) : ''}${n.replace(/,/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')}${c ? `,${c}` : ''} $`);
+      // Tour test 16: every other amount in the line the same way (« 149 $ adulte, 99 $ enfants », not « …, $99 kids »).
+      q = q.replace(/(^|[\s,;(\/+])\$\s?(\d{1,3}(?:,\d{3})+|\d{1,5})(?:\.(\d{1,2}))?(?=[\s,;)\/.]|$)/g, (w, pre, n, c) => `${pre}${n.replace(/,/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0')}${c ? `,${c}` : ''} $`);
+      for (const [re, word] of MENU_PRICE_WORDS_FR) q = q.replace(re, word);
+      q = menuWhoWordsFr(q); }
     return q;
   }
   // Tour test 7: a group size after the words is fine ("750 per day, up to 4 people" -> "$750 per day, up to 4 people").
