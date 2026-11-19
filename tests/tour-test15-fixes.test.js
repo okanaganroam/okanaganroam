@@ -45,6 +45,7 @@ const postJson = (p, body) => fetch(base + p, { method: 'POST', headers: { 'Cont
   .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})) }));
 const change = (t, changes) => postJson(`/owner/${t}/changes?from=setup`, { changes, from_setup: true, setup_frequency: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 })
   .then((r) => ({ ...r, status: r.status === 201 ? 200 : r.status }));
+const getText = (p) => fetch(base + p, { headers: { 'User-Agent': 'whistlerroam-check/1.0' } }).then(async (r) => ({ status: r.status, text: await r.text() }));
 const ok = (r) => { assert.equal(r.status, 200, JSON.stringify(r.body)); return r; };
 const page = (v, lang = 'en', now) => app.renderVenuePage(app.getVenue(v.id), [], [], [], { lang, ...(now ? { now } : {}) });
 const plain = (h) => h.replace(/<svg[\s\S]*?<\/svg>/g, '').replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&#39;|&rsquo;/g, '’').replace(/\s+/g, ' ');
@@ -93,5 +94,5 @@ function world() {
 }
 const plan = (q, lang) => app.runTripPlan({ text: q, ...(lang ? { lang } : {}) }, NOW);
 
-module.exports = { start, stop, app, db, dave, world, plan, namesOf, itemsOf, textOf, page, plain, change, ok, approveAll, tokenFor, mk, postJson, WK, TOURS, STORY, text, CLIENT, sent, NOW };
+module.exports = { getText, start, stop, app, db, dave, world, plan, namesOf, itemsOf, textOf, page, plain, change, ok, approveAll, tokenFor, mk, postJson, WK, TOURS, STORY, text, CLIENT, sent, NOW };
 if (process.env.T15_DEBUG) return;

@@ -4508,7 +4508,10 @@ function buildDiscoverySearchVenues() {
       textName: normalize(row.name || ''), textCuisine: normalize(venueCuisineList(row).join(' ') || row.cuisine || ''), textDesc: [row.description || '', ...(row.type === 'tour' ? [...tourListText(row.id).split(' ; '), ...tourVisitSearchText(row.id).split(' ; ')] : [])].filter(Boolean).map((x) => normalize(x)).join(' '), textDescFr: normalize(row.description_fr || ''),
       // Tour test 12 (Whistler, 2026-11-18; "bungee gift cards" listed only a gift shop): a tour is in the activities its
       // tours filter puts it under (Adventure, Winter…), so a search that names one finds it (and its typed list).
-      features, collections: m.collections, activities: row.type === 'tour' ? [...new Set([...m.activities, ...OUTDOOR_ACTIVITIES.filter((a) => TOUR_ACTIVITIES.some((x) => x.slug === a.slug) && tourInActivity(row, a.slug)).map((a) => a.slug)])] : m.activities, fdTypes: m.fdTypes,
+      features, collections: m.collections, activities: row.type === 'tour' ? [...new Set([...m.activities, ...OUTDOOR_ACTIVITIES.filter((a) => TOUR_ACTIVITIES.some((x) => x.slug === a.slug) && tourInActivity(row, a.slug)).map((a) => a.slug),
+        // Tour test 15 (Whistler, 2026-11-18; "SUP", "paddleboard" and "kayak" missed Dave's canoe, kayak and SUP rentals): a
+        // paddling or river tour is under the outdoor Water Activities a search for one names.
+        ...(tourInActivity(row, 'lake') || tourInActivity(row, 'river') ? ['water'] : [])])] : m.activities, fdTypes: m.fdTypes,
       rating: row.rating, reviews: row.reviews, price: row.price, row,
     });
   }
@@ -5786,6 +5789,27 @@ function searchTextEvents(intent, now = new Date()) {
 // 19 Bistro @ Fitz). Only for words the structured reading ignores (a number like "19", or free-text words), so
 // "wineries in Oliver" never turns into a name search. Best first: the same name, then names starting with it, then
 // names holding it.
+// Tour test 15: the listed places whose own name or category (kind words) hold every topic word of the request, a word's
+// plural, -ing form or the same thing said another way (SUP / paddleboard / stand up paddle; canoe / canot).
+const SEARCH_KIND_SAME = [['sup', 'sups', 'paddleboard', 'paddleboards', 'paddleboarding', 'paddle board', 'paddle boards', 'paddle boarding', 'stand up paddle', 'stand up paddleboard', 'planche a pagaie'],
+  ['canoe', 'canoes', 'canoeing', 'canot', 'canots', 'canoe'], ['kayak', 'kayaks', 'kayaking'], ['snowshoe', 'snowshoes', 'snowshoeing', 'raquette', 'raquettes'], ['rental', 'rentals', 'location', 'locations', 'rent']];
+const SEARCH_KIND_GENERIC = new Set(['tour', 'tours', 'trip', 'trips', 'guided', 'experience', 'experiences', 'in', 'the', 'a', 'and', 'de', 'la', 'le', 'les', 'des', 'en', 'au', 'with', 'for', 'sortie', 'sorties', 'visite', 'visites']);
+function searchKindMatchIds(text, intent, venues) {
+  let raw = ` ${smartTopicWords(smartFold(text), intent || {}).join(' ')} `;
+  const groups = [];
+  for (const g of SEARCH_KIND_SAME) { const hit = g.slice().sort((a, b) => b.length - a.length).find((w) => raw.includes(` ${w} `)); if (hit) { groups.push(g); raw = raw.replace(` ${hit} `, ' '); } }
+  const rest = raw.trim().split(' ').filter((w) => w && !SEARCH_KIND_GENERIC.has(w));
+  if (!groups.length || rest.length > 1) return [];
+  const out = [];
+  for (const v of venues) {
+    if (v.type !== 'tour') continue;
+    // His picked kinds' own chip words too ("Kayak, canoe or SUP", "Rentals").
+    const kinds = (venueTourInfo(v.id).kinds || []).map((k) => (TOUR_KIND_LABELS_OWNER[k] || [])[0] || '').join(' ');
+    const own = ` ${smartFold(`${v.name || ''} ${v.cuisine || ''} ${kinds}`)} `;
+    if (groups.every((g) => g.some((w) => own.includes(` ${w} `))) && rest.every((w) => own.includes(` ${w} `) || own.includes(` ${w.replace(/s$/, '')} `))) out.push(v.id);
+  }
+  return out.length < venues.length ? out : [];
+}
 function smartNameMatches(text, intent) {
   if (!intent || intent.mode === 'events') return [];
   const raw = smartFold(text);
@@ -6556,6 +6580,17 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
       venues = [...named.map((x) => x.row), ...(nameOnly ? [] : venues.filter((v) => !ids.has(v.id)))];
       for (const x of named) why.set(x.row.id, 'Name matches');
       pinnedIds = named.map((x) => x.row.id);
+    }
+  }
+  // Tour test 15 (Whistler, 2026-11-18; "SUP", "paddleboard" and "snowshoe tours" put Dave's paddle-and-snowshoe company
+  // low or under a snowmobile company): a tour whose own name or kind words name what was typed (SUP, stand up paddle and
+  // paddleboard as one thing) comes right after the name matches, even when it's closed for the season (the card says so).
+  if (!(plan && plan.list) && run.results.kind !== 'events' && venues.length > 1) {
+    const kindIds = searchKindMatchIds(sq, run.intent, venues);
+    if (kindIds.length) {
+      const set = new Set(kindIds), pinned0 = new Set(pinnedIds);
+      venues = [...venues.filter((v) => pinned0.has(v.id)), ...venues.filter((v) => set.has(v.id) && !pinned0.has(v.id)), ...venues.filter((v) => !set.has(v.id) && !pinned0.has(v.id))];
+      pinnedIds = [...pinnedIds, ...kindIds.filter((id) => !pinned0.has(id))];
     }
   }
   // What's On events for the words ("cider fest") or the plan's own (free events), soonest best match first.
