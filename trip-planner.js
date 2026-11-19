@@ -1383,7 +1383,7 @@ function eligible(v, ctx, strict) {
   if (ctx.kids) {
     if (!kidsAllowed(v, ctx)) return false;
     // Indoor test 5: a casino (its kind or its own words) or a place whose own words say 19+ is never a kids' stop.
-    if (v.type === 'indoor' && !namedInRequest(v, ctx) && ((Array.isArray(v.indoorKinds) && v.indoorKinds.includes('casino')) || /\bcasinos?\b/.test(`${v.textName || normWords(v.name || '')} ${normWords(v.cuisine || '')}`) || (!v.indoorMinAge && indoorMinAgeOf(v) >= 18))) return false;
+    if (v.type === 'indoor' && !namedInRequest(v, ctx) && ((Array.isArray(v.indoorKinds) && v.indoorKinds.includes('casino')) || /\bcasinos?\b/.test(`${v.textName || normWords(v.name || '')} ${normWords(v.cuisine || '')}`) || (!v.indoorMinAge && (indoorMinAgeOf(v) >= 18 || /\b(?:19|18) (?:only|and over|and older|and up|plus|ans et plus)\b|\badults? only\b|\bno one under (?:18|19)\b/.test(v.textDesc || ''))))) return false;
   }
   // Tour test 7 (Whistler, 2026-11-17): a child's age named without "kids" ("with our 15-year-old") still leaves out a tour
   // whose own minimum age is above it (a 16+ mountaineering guide was planned with "Ages 16 and up"); tooYoungNotes says why.

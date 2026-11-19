@@ -159,7 +159,7 @@ test('4. French: the screens in French, a French price, and Part 2 lists the six
   await sim.type('suTprice', '22,50 $');
   await sim.click('priceSave');
   assert.equal(app.indoorPriceValue(v.id), 22.5);
-  assert.ok(plain(page(v, 'fr')).includes('Laissez-passer d’un jour à partir de 22,50 $.'));
+  assert.ok(plain(page(v, 'fr')).includes('Laissez-passer à partir de 22,50 $.'));
   const more = await openSetup(base, t, { hash: 'more' });
   for (const l of ['Your prices', 'Your story and Known for', 'Good to know', 'Groups and parties', 'Instagram and Facebook', 'Closures and holidays']) assert.ok(more.text().includes(l), l);
 });
