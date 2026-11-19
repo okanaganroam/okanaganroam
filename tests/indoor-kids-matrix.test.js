@@ -204,3 +204,25 @@ test('A family place whose story mentions a licensed lounge or a bar is still of
     assert.ok(idsOf(app.runTripPlan({ text: `rainy day with kids in ${town}` }, NOW)).includes(v.id), `${v.name}: rainy day with kids`);
   }
 });
+
+// Indoor test 9 (2026-11-19; Melissa's play centre for kids 0 to 10 was the first pick for "something for my 12 year old"):
+// a 12-year-old's request offers every family kind with no age range of its own, and never a play centre whose own words
+// say kids 0 to 10 (it says why, in a note).
+test('A 12-year-old: every family kind is offered; a play centre for kids 0 to 10 never is, with a note', async () => {
+  const fails = [];
+  for (const [kind, k] of Object.entries(KINDS)) {
+    if (k.expect !== 'yes') continue;
+    const { v, town } = placed[kind];
+    const ids = idsOf(app.runTripPlan({ text: `something for my 12 year old in ${town}` }, NOW));
+    if (!ids.includes(v.id)) fails.push(`${kind}: "something for my 12 year old in ${town}" leaves it out`);
+  }
+  assert.deepEqual(fails, []);
+  const play = mk({ region: 'peachland', name: 'Peachland Tiny Tots Play MX', cuisine: 'Indoor playground', description: 'Indoor play centre for kids 0 to 10, with a toddler zone.', rating: 4.9, reviews: 300 });
+  await ok(change(tokenFor(play.id), { indoor_info: { kinds: ['kids'], length: '1-2h', age: 'all', year: 'all' } }));
+  for (const q of ['something for my 12 year old in Peachland', 'rainy day with our 12 year old in Peachland', 'things to do with a 12 year old in Peachland']) {
+    const p = app.runTripPlan({ text: q }, NOW);
+    assert.ok(!idsOf(p).includes(play.id), q);
+    assert.ok((p.notes || []).some((x) => x.includes('Peachland Tiny Tots Play MX is for kids 0 to 10')), `${q}: ${(p.notes || []).join(' | ')}`);
+  }
+  assert.ok(idsOf(app.runTripPlan({ text: 'rainy day with a 4 year old in Peachland' }, NOW)).includes(play.id), 'a 4-year-old');
+});

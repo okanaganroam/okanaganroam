@@ -188,6 +188,15 @@ const MATRIX = {
     ['fr', 'temps des tout-petits mardi et jeudi matin', [TH, P]],
     ['fr', 'forfaits de fête avec salle', [G]],
     ['fr', 'camps pendant la relâche', [G]],
+    // Indoor test 9 (Melissa's play centre): her Help log, EN + FR.
+    ['en', 'socks required, $3 if you forget', [GTK]],
+    ['en', 'kids under 1 are cheaper how do i show that', [P]],
+    ['fr', 'chaussettes obligatoires, 3 $ si vous oubliez', [GTK]],
+    ['fr', 'les bébés de moins d’un an paient moins cher', [P]],
+    ['fr', 'nous vendons des cartes de 10 entrées', [P]],
+    ['fr', 'le bouton devrait dire réserver une fête', [BK]],
+    ['fr', 'nous sommes pour les enfants de 0 à 10 ans', [A]],
+    ['fr', 'heure adaptée aux besoins sensoriels chaque mardi', [GTK]],
   ],
   classes: [
     ['en', 'drop in is 25 plus the piece', [P]],
@@ -355,7 +364,7 @@ test('indoor test 8: leagues are Good to know, cosmic bowling is Known for plus 
 });
 
 // Every question in the 8 indoor help logs lands on an answer, on the page where it was asked, for the kind of place it was.
-const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling' };
+const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids' };
 // The misrouted ones, with where they belong.
 const LOG_WANT = {
   'we price per room not per person': [R], 'how do I change the price, it says adults but we charge per room': [R],
@@ -365,6 +374,12 @@ const LOG_WANT = {
   'we have a new exhibition every month': [E], 'opening night is outside my hours, do I change my hours?': [O], 'date night is per couple': ['indoor-price-two'],
   'leagues use most lanes weeknights': [BZ], 'open bowling is limited after 6 mon to thu because of leagues': [BZ], 'cosmic bowling friday and saturday nights': [TH],
   'price is per game but lanes can be booked by the hour': [X], 'shoe rental extra': [X], 'we have a licensed lounge': [B], 'how do i add cosmic bowling as a weekly event': [TH, 'event-repeat'],
+  // Indoor test 9 (Melissa): socks and sensory hours are Good to know (with the weekly event in its answer), cheaper little
+  // ones and passes are Your prices, the Book button's words are Booking, her 0 to 10 is the ages answer.
+  'socks required, $3 if you forget': [GTK], 'we have a sensory friendly hour tuesdays': [GTK], 'how do i add our sensory hour as a weekly thing': [GTK],
+  'kids under 1 are cheaper how do i show that': [P], 'we sell 10 visit passes': [P], 'the book button should say book a party': [BK],
+  'the age thing only goes up to all ages but we are 0 to 10': [A], 'price is per kid, parents are free': [P], 'party rooms book online but play is drop in': [BK],
+  'grip socks are mandatory where does that go': [GTK],
 };
 test('every question in the 8 indoor help logs lands on an answer (the misrouted ones on the right one)', async () => {
   const wrong = [];
@@ -379,4 +394,26 @@ test('every question in the 8 indoor help logs lands on an answer (the misrouted
     }
   }
   assert.deepEqual(wrong, []);
+});
+
+// Indoor test 9 (Melissa): what the answers say for a kids' place.
+test('indoor test 9: a kids place is told to pick All ages and say its range, the Book a party wording, and a weekly sensory hour in Good to know plus an event (EN + FR)', async () => {
+  const b = await botsFor('kids');
+  for (const q of ['punch pass', 'we sell memberships', 'kids under 1 are cheaper how do i show that']) assert.equal(b.en.best(q).id, P, q);
+  const age = plain(b.en.topic(A).a), ageFr = plain(b.fr.topic(A).aFr);
+  assert.match(age, /Pick All ages , and say your age range in your story or Good to know/);
+  assert.match(ageFr, /Choisissez Tous les âges , et indiquez votre tranche d’âge/);
+  const bk = plain(b.en.topic(BK).a), bkFr = plain(b.fr.topic(BK).aFr);
+  assert.match(bk, /Party or group booking link/);
+  assert.match(bk, /Book a party/);
+  assert.match(bkFr, /Réserver une fête/);
+  const gtk = plain(b.en.topic(GTK).a), gtkFr = plain(b.fr.topic(GTK).aFr);
+  assert.match(gtk, /Sensory-friendly hour Tuesdays 9–10 AM/);
+  assert.match(gtk, /Add an event/);
+  assert.match(gtk, /every Tuesday/);
+  assert.match(gtkFr, /chaque mardi/);
+  assert.match(gtk, /Coffee for parents|Grip socks required/);
+  // Another kind's ages answer has no kids' range line.
+  const spa = await botsFor('spa');
+  assert.doesNotMatch(plain(spa.en.topic(A).a), /age range/);
 });
