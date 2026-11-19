@@ -65596,7 +65596,9 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       const box = venueVisitInfo(venue.id) || {};
       const rows = (box.rows || []).concat((Array.isArray(box.owner_dropped) ? box.owner_dropped : []).filter((r) => r && r.owned));
       const mine = new Set(box.winery_labels || []);
-      return TOUR_MANAGED_LABELS.filter((l) => mine.has(l)).map((l) => { const r = rows.find((x) => x && x.label === l && x.text); return { label: fr ? visitLabelFr(l) : l, text: r ? ((fr && ownerFrLineText(box, r)) || r.text) : '' }; });
+      // Tour test 15 (Dave; Dayton approved): the season of each kind, as the page says it (change it on What you offer).
+      const ksw = tourKindSeasonWords(venue.id, fr);
+      return TOUR_MANAGED_LABELS.filter((l) => mine.has(l)).map((l) => { const r = rows.find((x) => x && x.label === l && x.text); return { label: fr ? visitLabelFr(l) : l, text: r ? ((fr && ownerFrLineText(box, r)) || r.text) : '' }; }).concat(ksw ? [{ label: L('Season of each kind', 'Saison de chaque genre'), text: ksw }] : []);
     })() : brew ? (() => {
       const box = venueVisitInfo(venue.id) || {};
       const rows = (box.rows || []).concat((Array.isArray(box.owner_dropped) ? box.owner_dropped : []).filter((r) => r && r.owned));

@@ -94,5 +94,217 @@ function world() {
 }
 const plan = (q, lang) => app.runTripPlan({ text: q, ...(lang ? { lang } : {}) }, NOW);
 
+const fnBody = (src, name) => { const i = src.indexOf(`function ${name}(`); let d = 0, j = src.indexOf('{', i); for (let k = j; k < src.length; k++) { if (src[k] === '{') d++; else if (src[k] === '}' && !--d) return src.slice(i, k + 1); } return ''; };
+const SERVER = fs.readFileSync(path.join(ROOT, 'server.js'), 'utf8');
+// Each test adds a copy of his listing (the same answers): any copy counts.
+const inPlan = (p) => namesOf(p).some((x) => /^Alta Lake Paddle & Snowshoe/.test(x));
+const hisStop = (p) => itemsOf(p).find((x) => /^Alta Lake Paddle & Snowshoe/.test(x.venue.name));
 module.exports = { getText, start, stop, app, db, dave, world, plan, namesOf, itemsOf, textOf, page, plain, change, ok, approveAll, tokenFor, mk, postJson, WK, TOURS, STORY, text, CLIENT, sent, NOW };
 if (process.env.T15_DEBUG) return;
+
+test('1. Build My Trip: his headline tours plan him (sunset paddle, guided paddle, SUP/kayak/canoe tour, fondue snowshoe dinner with his own "Dinner included")', async () => {
+  world();
+  const { v } = await dave();
+  const r = require('../trip-requirements.js');
+  for (const q of ['paddle tour', 'sunset paddle', 'guided paddle', 'SUP tour', 'kayak tour', 'canoe tour', 'SUP/kayak tour', 'evening paddle']) {
+    const items = r.extractTripRequirements({ text: r.tripRequestSynonyms(q.toLowerCase()), referenceDate: '2026-11-18' }).items;
+    assert.ok(items.some((i) => i.kind === 'venue_kind' && i.value === 'paddle_tour'), `${q}: ${JSON.stringify(items.map((i) => [i.kind, i.value]))}`);
+    assert.ok(!items.some((i) => i.value === 'sunset' || i.value === 'viewpoints'), q);
+  }
+  for (const q of ['fondue snowshoe dinner', 'dinner snowshoe tour', 'snowshoe with fondue', 'fondue snowshoe']) {
+    const items = r.extractTripRequirements({ text: r.tripRequestSynonyms(q), referenceDate: '2026-11-18' }).items;
+    assert.ok(items.some((i) => i.kind === 'venue_kind' && i.value === 'snowshoe_tour'), q);
+    assert.ok(!items.some((i) => i.kind === 'type' && i.value === 'restaurant'), q);
+  }
+  // A plain fondue is still a restaurant.
+  assert.match(r.tripRequestSynonyms('fondue in whistler'), /fondue restaurant/);
+  for (const q of ['sunset paddle tour in August', 'guided paddle in July', 'SUP tour in August', 'fondue snowshoe dinner in February', 'snowshoe tour Whistler in January']) assert.ok(inPlan(plan(q), v), `${q}: ${JSON.stringify(namesOf(plan(q)))}`);
+  const fondue = hisStop(plan('fondue snowshoe dinner in February'));
+  assert.ok(fondue.caveats.includes('Dinner included on the Fondue snowshoe evening (the operator’s own words).'), JSON.stringify(fondue.caveats));
+  assert.ok(!namesOf(plan('fondue snowshoe dinner in February')).includes('Fondue House T15'));
+  assert.match(fs.readFileSync(path.join(ROOT, 'trip-french-copy.js'), 'utf8'), /inclus avec « /);
+});
+
+test('2. the season each kind runs (A): stored on tour_info.kind_seasons, read from his sections without an answer; snowshoe in July and kayak in January leave him out', async () => {
+  world();
+  const { v, t } = await dave();
+  // No answer: his typed sections ("Summer rentals and tours", "Winter snowshoe tours") and the defaults.
+  assert.deepEqual(app.tourKindSeasons(v.id), { snowshoe: 'winter', paddle: 'summer', rentals: 'summer' });
+  for (const q of ['kayak in January', 'snowshoe in July', 'canoe rental in January', 'snowshoe tour in August']) assert.ok(!inPlan(plan(q), v), `${q}: ${JSON.stringify(namesOf(plan(q)))}`);
+  for (const q of ['kayak in July', 'snowshoe in January', 'canoe rental Whistler in July', 'things to do in January']) assert.ok(inPlan(plan(q), v), `${q}: ${JSON.stringify(namesOf(plan(q)))}`);
+  // His own answer wins, and is checked.
+  ok(await change(t, { tour_info: { kind_seasons: { paddle: 'summer', rentals: 'both', snowshoe: 'winter' } } }));
+  assert.deepEqual(app.venueTourInfo(v.id).kind_seasons, { paddle: 'summer', rentals: 'both', snowshoe: 'winter' });
+  assert.equal(app.tourKindSeasons(v.id).rentals, 'both');
+  assert.equal((await change(t, { tour_info: { kind_seasons: { paddle: 'spring' } } })).status, 400);
+  // Taking a kind off takes its season off.
+  ok(await change(t, { tour_info: { kinds: ['paddle', 'snowshoe'] } }));
+  assert.deepEqual(app.venueTourInfo(v.id).kind_seasons, { paddle: 'summer', snowshoe: 'winter' });
+  // A kind he didn't pick is never kept.
+  assert.equal((await change(t, { tour_info: { kind_seasons: { zipline: 'summer' } } })).status, 200);
+  assert.equal(app.venueTourInfo(v.id).kind_seasons, undefined);
+  // One kind, or one season: nothing to say.
+  const one = mk('tour', { cuisine: 'Snowshoe tours' }); const t1 = tokenFor(one.id);
+  ok(await change(t1, { tour_info: { kinds: ['snowshoe'], year: 'seasonal' } }));
+  assert.equal(app.tourKindSeasons(one.id), null);
+  assert.equal(app.tourKindSeasonsAsked(one.id, ['snowshoe']), false);
+});
+
+test('2b. the setup asks only when needed: 2+ kinds, two seasons, and a kind whose season isn’t plain; pre-filled; one short question on the kinds screen', async () => {
+  const { v, t } = await dave();
+  assert.equal(app.tourTwoSeasons(v.id), true);
+  assert.equal(app.tourKindSeasonsAsked(v.id, ['paddle', 'snowshoe']), false, 'plain from the kinds: not asked');
+  const html = await getText(`/owner/${t}/setup`);
+  assert.match(html.text, /"tourTwoSeasons":true/);
+  assert.match(html.text, /"kindSeasonGuess":\{[^}]*"snowshoe":"winter"/);
+  assert.match(CLIENT, /function ksShown\(\)\{ var ks = ksKinds\(\); return ks\.length >= 2 && ksTwoSeasons\(\) && \(ks\.some/);
+  assert.match(CLIENT, /data-tks="/);
+  assert.match(CLIENT, /if \(ksShown\(\)\) \{ var ks0 = \{\}; ksKinds\(\)\.forEach/);
+  assert.equal(text.en.tour.ksQ, 'Which season does each run?');
+  assert.deepEqual(text.fr.tour.ksOpts, { summer: 'Été', winter: 'Hiver', both: 'Les deux' });
+  // The client's rule, run.
+  const ks = new Function('S', 'C', 'CUR', 'TI', `${fnBody(CLIENT, 'ksKinds')}\n${fnBody(CLIENT, 'ksVal')}\n${fnBody(CLIENT, 'ksTwoSeasons')}\n${fnBody(CLIENT, 'ksShown')}\nreturn { ksShown, ksVal };`);
+  const C = { tourTwoSeasons: true, kindSeasonGuess: { paddle: 'summer', rentals: 'both', snowshoe: 'winter' } };
+  const S = { tour: { kinds: ['paddle', 'rentals', 'snowshoe'], ks: {} } };
+  const k1 = ks(S, C, {}, {});
+  assert.equal(k1.ksShown(), true); assert.equal(k1.ksVal('rentals'), 'both'); assert.equal(k1.ksVal('snowshoe'), 'winter');
+  assert.equal(ks({ tour: { kinds: ['paddle', 'snowshoe'], ks: {} } }, C, {}, {}).ksShown(), false);
+  assert.equal(ks(S, { ...C, tourTwoSeasons: false }, {}, {}).ksShown(), false);
+  assert.equal(ks({ tour: { kinds: ['rentals'], ks: {} } }, C, {}, {}).ksShown(), false);
+});
+
+test('3. the page and the edit page say which kind runs when (EN and FR); no "rentals" twice', async () => {
+  const { v, t } = await dave();
+  assert.equal(app.getVenue(v.id).cuisine, 'Snowshoeing, canoe & kayak rentals');
+  assert.equal(app.tourKindsText(['paddle', 'rentals', 'snowshoe'], false, 'Canoe & kayak rentals', STORY, ''), 'Snowshoeing, canoe & kayak rentals');
+  const en = plain(page(v, 'en', NOW)), fr = plain(page(v, 'fr', NOW));
+  assert.match(en, /Category Summer: canoe & kayak rentals · Winter: snowshoeing/);
+  assert.match(fr, /Catégorie Été : kayak, canot et location · Hiver : raquette/);
+  const edit = await getText(`/owner/${t}`);
+  assert.match(plain(edit.text), /Season of each kind: Summer: canoe & kayak rentals · Winter: snowshoeing/);
+});
+
+test('4. the price screen: a per-boat, per-board or hourly rental goes to Your tours and prices (no Private-tours button); a whole-boat charter stays Private tours', async () => {
+  const why = app.tourPriceWhy;
+  assert.equal(why('30/hr per boat', false, ['paddle', 'rentals', 'snowshoe']), 'unit');
+  assert.equal(why('45 per canoe per hour', false, ['paddle']), 'unit');
+  assert.equal(why('30 per board', false, ['rentals']), 'unit');
+  assert.equal(why('30/hr per boat', false, []), 'unit', 'hourly words say rental');
+  assert.equal(why('650 per boat', false, ['boat']), 'group');
+  assert.equal(why('1200 whole boat charter', false, ['paddle', 'boat']), 'group');
+  const { t } = await dave();
+  const r = await change(t, { tour_price: '30/hr per boat' });
+  assert.equal(r.status, 400); assert.doesNotMatch(JSON.stringify(r.body), /Private tours/);
+  // The client rule and its hint.
+  assert.match(CLIENT, /if \(!priv && tourRentalPriceWords\(rest\)\) return 'unit';/);
+  assert.match(CLIENT, /tourRentalKinds\(\) && T\.tpriceMoreRentals \? T\.tpriceMoreRentals : T\.tpriceMore/);
+  assert.match(text.en.tour.tpriceMoreRentals, /Rentals priced per boat, board or hour go in “Your tours and prices”/);
+  assert.match(text.fr.tour.tpriceMoreRentals, /par planche/);
+  const rw = new Function('S', 'TI', 'TOUR', `${fnBody(CLIENT, 'tourRentalKinds')}\n${fnBody(CLIENT, 'tourRentalPriceWords')}\nreturn tourRentalPriceWords;`);
+  assert.equal(rw({ tour: { kinds: ['paddle', 'rentals'] } }, {}, true)('/hr per boat'), true);
+  assert.equal(rw({ tour: { kinds: ['boat'] } }, {}, true)('per boat'), false);
+  assert.equal(rw({ tour: { kinds: ['paddle'] } }, {}, true)('whole boat charter'), false);
+});
+
+test('5. a rental request’s trip card shows his own rental price; French planner words for canoe, kayak, SUP, raquettes and fondue', async () => {
+  world();
+  const { v } = await dave();
+  const c = hisStop(plan('canoe rental Whistler in July'));
+  assert.deepEqual([c.venue.cost.label, c.venue.cost.item, c.venue.cost.unit, c.venue.cost.unitFr], ['Rental', 'Canoe rental', '$45 per boat per hour', '45 $ par bateau de l’heure']);
+  const sup = hisStop(plan('SUP rental in July'));
+  assert.equal(sup.venue.cost.unitFr, '30 $ par planche de l’heure');
+  assert.equal(hisStop(plan('sunset paddle in July')).venue.cost.label, 'Tour');
+  assert.match(fs.readFileSync(path.join(ROOT, 'trip-planner-v3-page.js'), 'utf8'), /cost\.label === 'Rental' && cost\.unit/);
+  const frw = require('../trip-planner-fr.js');
+  assert.equal(frw.tripPlannerText('location de canot à Whistler en juillet'), 'canoe rental at whistler in july');
+  assert.equal(frw.tripPlannerText('raquettes et fondue en février'), 'fondue snowshoe in february');
+  assert.equal(frw.tripPlannerText('pagaie au coucher du soleil en août'), 'sunset paddle in august');
+  for (const [q, inIt] of [['location de canot à Whistler en juillet', true], ['location de canoë à Whistler en juillet', true], ['raquettes et fondue en février', true], ['planche à pagaie en juillet', true], ['kayak en janvier', false]]) assert.equal(inPlan(plan(q, 'fr'), v), inIt, q);
+  for (const q of ['stand up paddle in July', 'SUP rental in July', 'paddleboard rental in July', 'paddle board in August']) assert.ok(inPlan(plan(q), v), q);
+});
+
+test('6. search: SUP, stand up paddle and paddleboard are one thing; a tour whose own kind matches comes right after the name matches, closed for the season or not', async () => {
+  process.env.DISCOVERY_SEARCH = 'on';
+  try {
+    world();
+    const { v } = await dave();
+    const names = async (q) => { const r = await getText(`/search?q=${encodeURIComponent(q)}`); return [...plain(r.text).matchAll(/([A-Z][A-Za-z&' ]+? (?:T15|\d+)) View details/g)].map((m) => m[1].replace(/^Favorite Add to trip /, '')); };
+    for (const q of ['SUP', 'stand up paddle', 'paddleboard', 'kayak', 'canoe rental']) assert.ok((await names(q)).some((n) => n.endsWith(v.name)), q);
+    const sn = await names('snowshoe tours');
+    assert.ok(sn.findIndex((n) => n.endsWith(v.name)) >= 0 && sn.findIndex((n) => n.endsWith(v.name)) < sn.findIndex((n) => /Blackcomb Snowmobile/.test(n)), JSON.stringify(sn));
+    assert.match(SERVER, /function searchKindMatchIds\(/);
+  } finally { delete process.env.DISCOVERY_SEARCH; }
+});
+
+test('8. the finish screen: a story saved on this visit sets storySentNow, and the French-description line is held back there (run, not read)', () => {
+  const fn = new Function('S', 'C', 'T', 'h', 'location', `${fnBody(CLIENT, 'storyWaiting')}\n${fnBody(CLIENT, 'frDescOld')}\nreturn { storyWaiting, frDescOld };`);
+  const S = { storySent: 'Summer on Alta Lake…', done: {} }, C = { lang: 'en', frDesc: 'research', frStoryQueues: true }, T = { frDescOld: 'Your French description is the old one:', frDescGo: 'update it?' };
+  const f = fn(S, C, T, (x) => String(x), { pathname: '/owner/abc/setup' });
+  assert.match(f.frDescOld(false), /^$/, 'nothing before the story is saved');
+  f.storyWaiting();
+  assert.equal(S.storySentNow, true); assert.equal(C.storyPending, 'Summer on Alta Lake…');
+  assert.equal(f.frDescOld(true), '', 'held back on the finish screen');
+  assert.match(f.frDescOld(false), /suFrDescOld/, 'the story screen keeps it');
+  const S2 = { storySent: '', done: {} }; fn(S2, {}, T, String, {}).storyWaiting(); assert.ok(!S2.storySentNow);
+});
+
+test('9. the snow-opening note: only in the break before the snow opening; the notice says "(snow permitting)" too', async () => {
+  const { v } = await dave();
+  const at = (d, lang = 'en') => plain(page(v, lang, new Date(`${d}T12:00:00-08:00`)));
+  assert.match(at('2026-11-18'), /Closed for the season\. Reopens mid-December \(snow permitting\)\./);
+  assert.match(at('2026-11-18'), /Hours Reopens mid-December \(snow permitting\)\./);
+  assert.match(at('2026-11-18', 'fr'), /Fermé pour la saison\. Rouvre mi-décembre \(selon l’enneigement\)\./);
+  assert.match(at('2027-09-20'), /Hours Reopens mid-December \(snow permitting\)\./);
+  for (const d of ['2027-07-15', '2027-05-01', '2027-01-15']) assert.doesNotMatch(at(d), /snow permitting|Opening day depends on snow/, d);
+});
+
+test('11. a family with a 4-year-old in July: his all-ages paddling and rentals are eligible', async () => {
+  world();
+  const { v } = await dave();
+  // (Each test adds another copy of his listing; any of them counts.)
+  const his = (p) => namesOf(p).some((x) => /^Alta Lake Paddle & Snowshoe/.test(x));
+  assert.ok(his(plan('family activity with a 4 year old in July')), JSON.stringify(namesOf(plan('family activity with a 4 year old in July'))));
+  assert.ok(his(plan('canoe with our 4 year old in July')));
+  assert.ok(!his(plan('family activity with a 4 year old in April')), 'closed in spring');
+});
+
+test('13. the short tours list keeps a per-person tour from each section; rentals are counted as rentals', async () => {
+  const { v } = await dave();
+  const en = plain(page(v, 'en', NOW));
+  const k = en.indexOf('🎟️ Tours & prices'); const box = en.slice(k, k + 900);
+  assert.match(box, /Sunset guided paddle \$89 per person/);
+  assert.match(box, /Guided snowshoe tour/);
+  assert.match(box, /See all tours & prices \(3 tours and 3 rentals\)/);
+  assert.match(plain(page(v, 'fr', NOW)), /\(3 activités et 3 locations\)/);
+});
+
+test('14. tours have no meeting-spot step (Dayton): no door step or tile, Basics asks for the address, the page says Address, Maps uses the business pin, a new tour spot is refused', async () => {
+  const { v, t } = await dave();
+  assert.ok(!app.setupParts('tour').part2.includes('door') && !app.setupParts('tour').part1.includes('door'));
+  assert.ok(app.setupParts('restaurant').part2.includes('door') || app.setupParts('restaurant').part1.includes('door'), 'restaurants keep theirs');
+  assert.equal(app.portalFields('tour').arrivalTile, false); assert.equal(app.portalFields('restaurant').arrivalTile, true);
+  assert.equal(text.en.tour.basicsQ, 'Is this your address, phone and website?');
+  assert.ok(text.en.tour.pickupBtn, 'the pickup option stays');
+  const completeness = require('../portal-completeness.js');
+  assert.ok(!completeness.itemsFor('tour').some((i) => i.key === 'arrival'));
+  assert.equal(completeness.itemsFor('tour').reduce((a, i) => a + i.w, 0), 100);
+  // A spot sent earlier stays stored, unused.
+  db.prepare("INSERT INTO venue_arrival_points (venue_id, file, preview_key, lat, lng, distance_m, status) VALUES (?, 'x.jpg', ?, 50.1301, -122.9501, 2000, 'approved')").run(v.id, `k15-${v.id}`);
+  const html = page(v, 'en', NOW);
+  assert.match(plain(html), /Address Lakeside Park, 4320 Alta Lake Rd, Whistler/);
+  assert.doesNotMatch(plain(html), /Meeting point/);
+  assert.doesNotMatch(html, /50\.1301/);
+  const r = await postJson(`/owner/${t}/arrival`, { image: 'data:image/jpeg;base64,AAAA', lat: 50.11, lng: -122.97, rights: true });
+  assert.equal(r.status, 400);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM venue_arrival_points WHERE venue_id = ?').get(v.id).n, 1);
+  // The Address box nudge.
+  assert.match(CLIENT, /if \(TOUR && T\.addrTwoSpots && /);
+  assert.equal(text.en.tour.addrTwoSpots, 'Put your main spot or office here. Guests get the exact meeting spot when they book.');
+});
+
+test('15. polish: unknown change key is a 400; "per board" is « par planche »; "their photo"; Groups ends with a period', async () => {
+  const { t } = await dave();
+  for (const k of ['foo', 'meeting_spot_2']) { const r = await change(t, { [k]: 'x' }); assert.equal(r.status, 400, k); }
+  assert.match(fs.readFileSync(path.join(ROOT, 'arrival-points.js'), 'utf8'), /Place it from their photo and new address\./);
+  assert.match(CLIENT, /if \(TOUR && gline && \/\[\.!\?\]\\s\/\.test\(gline\)/);
+});

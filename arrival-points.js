@@ -88,6 +88,8 @@ function createArrivalPoints(deps) {
     const signedIn = typeof token === 'function';
     const found = signedIn ? token() : deps.venueForToken(token);
     if (!found) return deps.respond(res, 404, { ok: false, error: E.gone });
+    // Tour test 15 (Dayton, 2026-11-18): a type that sends no spot (tours: guests get the meeting spot when they book).
+    if (typeof deps.allowed === 'function' && !deps.allowed(found.venue)) return deps.respond(res, 400, { ok: false, error: E.generic });
     let body;
     try { body = await deps.readJson(req, LIMITS.max_body); } catch (e) { return deps.respond(res, e.status === 413 ? 413 : 400, { ok: false, error: E.photo }); }
     if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !KEYS.has(k))) return deps.respond(res, 400, { ok: false, error: E.generic });
@@ -106,7 +108,6 @@ function createArrivalPoints(deps) {
     if (edge < LIMITS.min_edge) return deps.respond(res, 400, { ok: false, error: E.small });
     if (edge > LIMITS.max_edge) return deps.respond(res, 400, { ok: false, error: E.photo });
     const { venue } = found;
-    if (typeof deps.allowed === 'function' && !deps.allowed(venue)) return deps.respond(res, 400, { ok: false, error: E.generic });
     const pin = venue.latitude != null && validPoint(Number(venue.latitude), Number(venue.longitude)) ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null;
     const d = decide({ point, device, accuracy, pin, signedIn, addrOnly: body.addr_only === true, picked: typeof body.picked === 'boolean' ? body.picked : null });
     if (d.distance !== null && d.distance > LIMITS.too_far_m) return deps.respond(res, 400, { ok: false, error: E.far });
