@@ -1554,10 +1554,13 @@
     return '<p class="su-hint su-enhint" id="' + id + '">' + h((noQuick && T.lineEnglishHintNoQuick ? T.lineEnglishHintNoQuick : T.lineEnglishHint) + dropsEn) + '</p>';
   }
   // Indoor test 1 (2026-11-19): an indoor place's Good to know chips by its main kind (owner-setup-text.js good_to_know_kinds).
-  var INDOOR_CHIP_GROUP = { museum: 'arts', gallery: 'arts', library: 'arts', climbing: 'active', kids: 'active', pool: 'active', spa: 'spa', yoga: 'spa' };
+  // Indoor test 4 (2026-11-19): which chips and examples each kind gets comes from indoor-kinds.js (kindText chipGroup /
+  // exGroup), so a pool is never offered grip socks and a yoga studio never a swimsuit.
+  function indoorGroupOf(k, key){ var o = (T0.kindText || {})[k]; return (o && o[key]) || 'general'; }
+  var INDOOR_CHIP_GROUP = { get: function(k){ return indoorGroupOf(k, 'chipGroup'); } };
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
-    if (key === 'good_to_know' && C.indoor && (T.quick || {}).good_to_know_kinds) { var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; var lk = k0 ? T.quick.good_to_know_kinds[INDOOR_CHIP_GROUP[k0] || 'general'] : null; if (lk && lk.length) l = lk; }
+    if (key === 'good_to_know' && C.indoor && (T.quick || {}).good_to_know_kinds) { var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; var lk = k0 ? T.quick.good_to_know_kinds[INDOOR_CHIP_GROUP.get(k0)] : null; if (lk && lk.length) l = lk; }
     // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
     // isn't offered "Patio only".
     if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;
@@ -1617,18 +1620,17 @@
   // them. The kinds picked (or pre-picked) on What kind of place; none yet: shown as before.
   // Indoor test 2 (2026-11-19; Jordan's escape room was shown "Grip socks required"): the Good to know example follows the
   // main kind, as its chips do (owner-setup-text.js bringExKinds).
-  function indoorBringEx(){ if (!C.indoor || !T.bringExKinds) return T.bringEx; var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; return T.bringExKinds[INDOOR_CHIP_GROUP[k0] || 'general'] || T.bringEx; }
+  function indoorBringEx(){ if (!C.indoor || !T.bringExKinds) return T.bringEx; var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; return T.bringExKinds[INDOOR_CHIP_GROUP.get(k0)] || T.bringEx; }
   // Indoor test 3 (2026-11-19; Diane, a community theatre): the main kind (the first picked, or pre-picked), and whether it
   // is a show place (live theatre, music or comedy): it is asked about tickets, and its price is its lowest regular ticket.
   function indoorMainKind(){ if (!C.indoor) return ''; return ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0] || ''; }
   function indoorShow(){ return indoorMainKind() === 'theatre' && !!T.ibookQShow; }
   // The story and Known for examples by the main kind (owner-setup-text.js storyExKinds / knownExKinds).
-  var INDOOR_EX_GROUP = { theatre: 'theatre', cinema: 'theatre', museum: 'museum', gallery: 'museum', library: 'museum', escape: 'escape', games: 'escape', bowling: 'escape', spa: 'spa', yoga: 'spa', climbing: 'climbing', kids: 'climbing', pool: 'climbing' };
-  function indoorExFor(key, dflt){ var m = T[key]; if (!C.indoor || !m) return dflt; return m[INDOOR_EX_GROUP[indoorMainKind()] || 'general'] || dflt; }
+  function indoorExFor(key, dflt){ var m = T[key]; if (!C.indoor || !m) return dflt; return m[indoorGroupOf(indoorMainKind(), 'exGroup')] || dflt; }
   // "$25 - $55", "25 to 55", « 25 à 55 $ »: a range of prices -> its low number (the card shows "From $25"), else null.
   function indoorRangeLow(x){ var m = /^\s*(?:from\s+|[àa] partir de\s+)?(?:CA)?\$?\s*(\d{1,4}(?:[.,]\d{1,2})?)\s*\$?\s*(?:-|–|—|to|à|a|au)\s*\$?\s*(\d{1,4}(?:[.,]\d{1,2})?)\s*\$?\s*(?:(?:per |par |a |an |\/)?(?:tickets?|billets?|adults?|adultes?|person|personne|pp)\b.*)?$/i.exec(String(x == null ? '' : x)); if (!m) return null; var a = +m[1].replace(',', '.'), b = +m[2].replace(',', '.'); return a > 0 && b > a ? a : null; }
-  var INDOOR_QUIET = ['museum', 'gallery', 'library', 'classes'];
-  function indoorQuietKinds(){ if (!C.indoor) return false; var st = typeof S !== 'undefined' && S.tour, ks = (st && st.kinds && st.kinds.length ? st.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || []; return ks.length > 0 && ks.every(function(k){ return INDOOR_QUIET.indexOf(k) >= 0; }); }
+  // Indoor test 4: the quiet kinds come from indoor-kinds.js (kindText quiet): museums, galleries, libraries, classes.
+  function indoorQuietKinds(){ if (!C.indoor) return false; var st = typeof S !== 'undefined' && S.tour, ks = (st && st.kinds && st.kinds.length ? st.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || []; return ks.length > 0 && ks.every(function(k){ return !!((T0.kindText || {})[k] || {}).quiet; }); }
   function lateBtns(d, j, y){
     // Café test 1 (Whistler, 2026-11-15): no "Open after midnight?" row on a café's day card.
     if (C.cafe) return '';

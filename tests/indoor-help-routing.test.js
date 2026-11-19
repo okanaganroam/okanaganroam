@@ -192,7 +192,73 @@ const ASKED = [
   ['fr', 'nous avons un bar dans le hall, puis-je ajouter un 5 à 7', ['indoor-bar']],
   ['fr', 'je suis la gérante, pas la propriétaire, puis-je faire ceci?', ['not-owner', 'staff']],
   ['fr', 'pouvez-vous ajouter toute notre saison de spectacles', ['indoor-season-list']],
+  // Indoor test 3's dead end, found in test 4: "our tickets are $25 to $55".
+  ['en', 'our tickets are $25 to $55', ['indoor-ticket-prices']],
+  ['fr', 'nos billets coûtent de 25 $ à 55 $', ['indoor-ticket-prices']],
 ];
+// Indoor test 4 (2026-11-19; Lauren, a day spa): every question in her help log (help-log.json), and its French twin,
+// asked on a spa's setup. Treatment and service prices go to Your prices; "why does my card say Adults" to the price
+// answer; never the restaurant "Price range".
+const SPA_ASKED = [
+  ['en', 'every service has a different price', ['menu-add']],
+  ['en', 'treatments are by appointment but the circuit is walk in', ['indoor-booking']],
+  ['en', '16+ for massage, 19+ for the hydrotherapy', ['indoor-age']],
+  ['en', 'how do I add our spa menu', ['menu-add']],
+  ['en', 'is this free, what\'s the catch', ['indoor-cost']],
+  ['en', 'ticket prices change every show', ['indoor-ticket-prices']],
+  ['en', 'we are closed july and august', ['indoor-closed-months']],
+  ['en', 'our tickets are $25 to $55', ['indoor-ticket-prices']],
+  ['en', 'we only have shows, no regular hours', ['indoor-no-hours']],
+  ['en', '60 min massage is $130 and 90 min is $175, where do those go', ['menu-add']],
+  ['en', 'where do I put gift cards', ['indoor-gift']],
+  ['en', 'why does my card say Adults $65', ['indoor-price']],
+  ['en', 'where do our treatment prices go', ['menu-add']],
+  ['en', 'how much is a treatment', ['indoor-price', 'menu-add']],
+  ['en', 'massage prices', ['menu-add']],
+  ['en', 'it says adults but it’s a spa pass', ['indoor-price']],
+  ['fr', 'chaque service a un prix différent', ['menu-add']],
+  ['fr', 'les soins sont sur rendez-vous mais le circuit est sans réservation', ['indoor-booking']],
+  ['fr', '16 ans et plus pour les massages, 19 ans et plus pour l’hydrothérapie', ['indoor-age']],
+  ['fr', 'comment ajouter notre carte des soins', ['menu-add']],
+  ['fr', 'est-ce gratuit, où est l’attrape', ['indoor-cost']],
+  ['fr', 'le prix des billets change à chaque spectacle', ['indoor-ticket-prices']],
+  ['fr', 'nous sommes fermés en juillet et en août', ['indoor-closed-months']],
+  ['fr', 'nos billets coûtent de 25 $ à 55 $', ['indoor-ticket-prices']],
+  ['fr', 'nous n’avons que des spectacles, pas d’heures régulières', ['indoor-no-hours']],
+  ['fr', 'le massage de 60 min est à 130 $ et celui de 90 min à 175 $, où vont-ils', ['menu-add']],
+  ['fr', 'où mettre les cartes-cadeaux', ['indoor-gift']],
+  ['fr', 'pourquoi ma fiche indique Adultes 65 $', ['indoor-price']],
+];
+
+test('indoor test 4: a spa’s questions (Lauren’s help log, EN + FR) land on the indoor answers, never the restaurant Price range', async () => {
+  const { en, fr } = await setupFor('indoor', { name: 'Room and Pillar Spa Help', description: 'A day spa with massage and facials.' });
+  const wrong = [];
+  for (const [lang, q, want] of SPA_ASKED) {
+    const r = (lang === 'fr' ? fr : en).best(q);
+    if (!r || !want.includes(r.id)) wrong.push(`[${lang}] "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+    if (r && ['price-range', 'avg-spend'].includes(r.id)) wrong.push(`[${lang}] "${q}" -> restaurant ${r.id}`);
+  }
+  assert.deepEqual(wrong, []);
+  // Every question in her real log lands somewhere useful, and the restaurant price topics aren't on the page at all.
+  const log = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'drafts', 'fresh-eyes-indoor4-2026-11-19', 'help-log.json'), 'utf8'));
+  for (const x of log) { const r = en.best(x.q); assert.ok(r && r.id && !['price-range', 'avg-spend'].includes(r.id), `${x.q} -> ${r && r.id}`); }
+  assert.equal(en.topic('price-range'), undefined);
+  assert.equal(en.topic('avg-spend'), undefined);
+  // The answers are a spa's: its own price words and examples, no arcade, escape room or museum gift shop.
+  const plain = (h) => String(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  assert.match(plain(en.topic('indoor-price').a), /put your lowest price \(a pass or your shortest treatment\)\. Your card and your page say “From \$25”/);
+  assert.match(plain(en.topic('indoor-price').a), /Massage: 60 min \$130, 90 min \$175/);
+  assert.match(plain(fr.topic('indoor-price').aFr), /« À partir de 25 \$ »/);
+  assert.match(plain(en.topic('menu-add').a), /shows on your page as “Spa menu”/);
+  assert.match(plain(fr.topic('menu-add').aFr), /« Carte des soins »/);
+  assert.match(plain(en.topic('indoor-gift').a), /Gift cards for treatments and spa days/);
+  assert.match(plain(en.topic('indoor-groups').a), /Couples’ packages/);
+  assert.match(plain(en.topic('indoor-good-to-know').a), /Bring a swimsuit/);
+  for (const id of ['indoor-price', 'indoor-booking', 'indoor-age', 'indoor-gift', 'indoor-groups', 'indoor-good-to-know', 'menu-add']) {
+    const a = plain(en.topic(id).a) + plain(fr.topic(id).aFr);
+    assert.doesNotMatch(a, /arcade|escape room|jeu d’évasion|gift shop|boutique|grip socks|chaussettes|Adults \$|Adultes :/i, id);
+  }
+});
 
 test('every indoor owner question lands on the right indoor topic (EN + FR)', async () => {
   const { en, fr } = await setupFor('indoor', { cuisine: '' });

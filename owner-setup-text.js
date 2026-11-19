@@ -2580,6 +2580,7 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
         webLeadTickets: fr2 ? `Nous avons inscrit votre ${w.prices.noun}. Si vos prix sont sur une autre page, changez-la.` : `We filled in your ${w.prices.noun}. If your prices are on another page, change it.`,
         groupsLead: w.groups.lead, groupsEx: w.groups.ex, quick: { groups: w.groups.chips },
         noSetHoursHint: w.boxOffice ? T.noSetHoursHint : '',
+        chipGroup: w.gtk, exGroup: w.ex, quiet: w.quiet,
       };
       T.quick.groups_kinds[k] = w.groups.chips;
     }

@@ -40731,7 +40731,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // Brewery test 1 (Whistler, 2026-11-15): a brewery with no kitchen of its own has a tap list, not a food menu.
     // Indoor test 4 (2026-11-19; Lauren: "MENU · See the menu" on her page, "Prices & rates" in Help): an indoor place's prices
     // link is named as Help names it, in its kind's words ("Prices & rates", a spa's "Spa menu").
-    venueLinkRow.menu_url && !menuInVisitBox && venue.type === 'indoor' ? (() => { const kw = indoorKindsModule.indoorKindText(venueIndoorInfo(venue.id).kinds, fr ? 'fr' : 'en').prices; return [escapeHtml(kw.page), `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${escapeHtml(kw.see)} \u2197</a>`]; })()
+    venueLinkRow.menu_url && !menuInVisitBox && venue.type === 'indoor' ? (() => { const kw = indoorKindsModule.indoorKindText(venueIndoorInfo(venue.id).kinds, fr ? 'fr' : 'en').prices; return [kw.page, `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${escapeHtml(kw.see)} \u2197</a>`]; })()
     : venueLinkRow.menu_url && !menuInVisitBox ? [tapWords ? tapWords.label : L('Menu', 'Menu'), `<a href="${escapeHtml(venueLinkRow.menu_url)}" rel="nofollow noopener" target="_blank">${tapWords ? tapWords.see : L('See the menu', 'Voir le menu')} \u2197</a>`] : null,
     (venueLinkRow.instagram_url || venueLinkRow.facebook_url || venueLinkRow.tiktok_url) ? [L('Social', 'R\u00e9seaux'), [
       venueLinkRow.instagram_url ? `<a href="${escapeHtml(venueLinkRow.instagram_url)}" rel="nofollow noopener" target="_blank">Instagram</a>` : '',
@@ -59302,7 +59302,7 @@ const INDOOR_SETUP_HELP_TOPICS = [
     keys: ['ticket prices change', 'ticket prices change every show', 'prices change every show', 'price changes every show', 'prices vary', 'price varies', 'prices change', 'varies by show', 'depends on the show', 'depending on the show', 'different for every show', 'every show is different', 'each show is different', 'change every show', 'different prices for each show', 'prices are different for each show', 'range of prices', 'ticket price range', 'sliding scale',
       // Indoor test 4 (2026-11-19): Diane's "our tickets are $25 to $55" dead-ended.
       'our tickets are', 'tickets are', 'tickets range', 'tickets go from', 'tickets cost', 'tickets from', 'tickets run'],
-    keysFr: ['le prix change', 'les prix changent', 'prix des billets change', 'les prix varient', 'le prix varie', 'selon le spectacle', 'chaque spectacle', 'different pour chaque spectacle', 'ca depend du spectacle', 'fourchette de prix', 'nos billets sont', 'les billets coutent', 'billets de'],
+    keysFr: ['le prix change', 'les prix changent', 'prix des billets change', 'les prix varient', 'le prix varie', 'selon le spectacle', 'chaque spectacle', 'different pour chaque spectacle', 'ca depend du spectacle', 'fourchette de prix', 'nos billets sont', 'les billets coutent', 'billets coutent', 'nos billets coutent', 'billets de'],
     a: '<p>Put your lowest regular adult ticket, like <em>25</em>. Your card says <strong>From $25</strong>. Link your tickets page in <strong>Your prices</strong> (in More about your place), so people see each show’s price.</p>',
     aFr: '<p>Indiquez votre billet adulte régulier le moins cher, comme <em>25</em>. Votre fiche indique <strong>À partir de 25 $</strong>. Mettez le lien de votre page de billets dans <strong>Vos tarifs</strong> (dans Plus sur votre endroit), pour que les gens voient le prix de chaque spectacle.</p>' },
   { id: 'indoor-closed-months', pages: ['setup', 'edit'], over: ['indoor-seasonal', 'setup-season', 'seasonal-hours', 'closures', 'hours', 'season', 'indoor-yearly-break'],
@@ -59413,7 +59413,6 @@ const INDOOR_SETUP_HELP_TOPICS = [
 // Indoor test 4: the restaurant price topics ("Price range", "average spend") are never an indoor place's answer.
 const INDOOR_HELP_DROP_TOPICS = ['price-range', 'avg-spend'];
 const INDOOR_HELP_PLAYER_KINDS = ['escape', 'games', 'bowling', 'curling', 'other'];
-const INDOOR_HELP_CHIP_GROUP = { museum: 'arts', gallery: 'arts', library: 'arts', climbing: 'active', kids: 'active', pool: 'active', spa: 'spa', yoga: 'spa' };
 // "Says adults" is the per-room answer only where a whole room or lane is priced; elsewhere it's the price answer.
 const INDOOR_HELP_ADULT_KEYS = ['it says adults', 'says adults', 'says adult', 'adult price is wrong', 'not an adult price'];
 const INDOOR_HELP_ADULT_KEYS_FR = ['ca dit adultes', 'indique adultes', 'prix adulte est faux'];
@@ -59427,7 +59426,7 @@ function indoorKindHelpTopics(topics, kinds) {
   const label = (k) => k.price.label.replace(/, (?:in dollars|en dollars)$/, '');
   const say = (k, lang) => k.price.page.replace('{x}', lang === 'fr' ? '25 $' : '$25').replace(/\.$/, '');
   const players = INDOOR_HELP_PLAYER_KINDS.includes(en.kind);
-  const chips = (lang) => ((OWNER_SETUP_STRINGS[lang].indoor.quick || {}).good_to_know_kinds || {})[INDOOR_HELP_CHIP_GROUP[en.kind] || 'general'] || [];
+  const chips = (lang) => ((OWNER_SETUP_STRINGS[lang].indoor.quick || {}).good_to_know_kinds || {})[en.gtk] || [];
   const em = (l) => l.map((x) => `<em>${E(x)}</em>`);
   const orList = (l, w) => (l.length > 1 ? `${l.slice(0, -1).join(', ')} ${w} ${l[l.length - 1]}` : l.join(''));
   return topics.map((t) => {
@@ -59454,7 +59453,7 @@ function indoorKindHelpTopics(topics, kinds) {
       aFr: t.aFr.replace(/\(« Chaussettes antidérapantes obligatoires », « Casiers offerts », « Décharge à signer avant de jouer »\)/, `(${chips('fr').slice(0, 3).map((x) => `« ${E(x)} »`).join(', ')})`) };
     if (t.id === 'menu-add') return { ...t,
       keys: t.keys.concat(['treatment prices', 'each treatment', 'every treatment', 'all our treatments', 'our treatments', 'treatments', 'massage prices', 'min massage', 'minute massage', '60 min', '90 min', '60 minute', '90 minute', 'where do those go', 'where do they go', 'service price', 'service prices', 'each service', 'every service', 'services', 'spa menu', 'class schedule', 'class prices', 'tickets page', 'rates page']),
-      keysFr: t.keysFr.concat(['prix des soins', 'chaque soin', 'nos soins', 'soins', 'prix des massages', 'massage de 60', 'massage de 90', '60 min', '90 min', 'ou vont ils', 'carte des soins', 'horaire des cours', 'prix des services']),
+      keysFr: t.keysFr.concat(['prix des soins', 'chaque soin', 'nos soins', 'soins', 'prix des massages', 'nos massages', 'massage de 60', 'massage de 90', '60 min', '90 min', 'ou vont ils', 'carte des soins', 'horaire des cours', 'prix des services', 'chaque service', 'chaque service a un prix', 'services']),
       a: `<p>Open <strong>Your prices</strong> (the first of the extra details). Take a photo of your ${E(en.prices.noun)}, upload it, or give us the link to it; we type it up and it shows on your page as “${E(en.prices.page)}” within a day.</p><p>No ${E(en.prices.noun)} to send? Tap <strong>Type them in myself</strong>: add each one with its price, like <em>${E(en.help.prices)}</em>, then tap Publish.</p>`,
       aFr: `<p>Ouvrez <strong>Vos tarifs</strong> (le premier des détails facultatifs). Photographiez votre ${E(fr.prices.noun)}, téléversez-la, ou donnez-nous son lien; nous la retranscrivons et elle paraît sur votre page sous « ${E(fr.prices.page)} » d’ici un jour.</p><p>Rien à envoyer? Touchez <strong>Je les tape moi-même</strong> : ajoutez chacun avec son prix, comme <em>${E(fr.help.prices)}</em>, puis touchez Publier.</p>` };
     return t;
