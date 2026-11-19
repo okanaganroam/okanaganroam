@@ -1357,6 +1357,11 @@ function eligible(v, ctx, strict) {
 const VIBE_TERM_RE = /^(?:cozy|cosy|intimate|quiet|romantic|candlelit|candle lit)$/;
 const VIBE_MEAL_RE = /\b(?:cozy|cosy|intimate|quiet|romantic|candlelit)(?: [a-z]+)? (?:dinners?|lunch(?:es)?|meals?|restaurants?|brunch|breakfast|supper|dining)\b/;
 function vibeMealAsked(ctx) { return VIBE_MEAL_RE.test(normWords(ctx.queryText || '')); }
+// Tour test 16 (Whistler, 2026-11-18; Tom picks guests up at their hotels; "bear tour without a car" never used it): a request
+// with no car, or one that asks to be picked up, puts the tours with hotel pickup (the owner's own answer) first, and their
+// card says "Hotel pickup".
+const PICKUP_ASK_RE = /\b(?:no car|no cars|without (?:a |our |my |any )?car|car free|carfree|(?:do not|don t|dont) (?:have|own|drive)(?: a car)?|no vehicle|no rental car|hotel pick ?ups?|pick ?ups? (?:from|at) (?:the |our |my )?hotels?|pick (?:us|me|them) up|picks? (?:you|people|guests) up|picked up|pick up|pickup|sans (?:voiture|auto|vehicule)|pas de (?:voiture|vehicule|char)|prise en charge|venir nous chercher|nous chercher|cueillette)\b/;
+function pickupAsked(ctx) { return PICKUP_ASK_RE.test(normWords((ctx && (ctx.queryText || ctx.requirements?.text)) || '')); }
 function scoreVenue(v, ctx) {
   const reasons = [];
   let score = 0;
@@ -1371,6 +1376,8 @@ function scoreVenue(v, ctx) {
   if (Array.isArray(ctx.plannerKinds) && ctx.plannerKinds.includes('ski_lessons')) { const lf = lessonFit(v, ctx); if (lf) add('lesson_fit', lf, null); }
   // Tour test 15: an operator whose own trip includes the meal asked for ("fondue snowshoe dinner") comes first.
   if (tourMealItem(v, ctx)) add('tour_meal', 25, null);
+  // Tour test 16: hotel pickup for a request with no car or one that asks to be picked up.
+  if (v.type === 'tour' && v.tourPickup && pickupAsked(ctx)) add('pickup', 40, 'Hotel pickup');
   // Tour test 13: out of his season by request only: after the operators running then.
   if (seasonOffRequest(v, ctx) && !namedInRequest(v, ctx)) add('off_request', -30, null);
   // An indoor kind named in the request (2026-10-25: "yoga and wine" got an art gallery): places of that kind first.
@@ -4976,7 +4983,16 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         // Round 11 (2026-10-20): the swapped stop before a show is timed by the show, not by the old stop's start (a second
         // dinner Swap before a 7:30 PM show left no dinner: the new place was a little further and could not start at 5:15).
         const fillStart=Math.max(stop.gapFill&&Number.isFinite(stop.fillStart)?stop.fillStart:0,Number.isFinite(stop.keepStart)&&!(beforeEvent&&stop.swapSlot)?stop.keepStart:0,nightStop&&(stop===nightStop||stop.listedNight)&&askedNightStart(stop)!=null?askedNightStart(stop):0);
-        let range=ranges.find(([a,b])=>Math.max(a,earliest,partStart,fillStart)+duration<=Math.min(b,1440,beforeEvent?eventStart-30-(eventTravel?.maxMinutes||0):1440));
+        // Tour test 16 (Whistler, 2026-11-18; Tom's tours leave at 7 AM and 5:30 PM; the plan put him at 1–3:30 PM): a tour
+        // with its own departure times starts at the one nearest the part of the day it was put in that fits its hours.
+        let dep=null,depRange=null;
+        if(candidate.type==='tour'&&Array.isArray(candidate.tourDepartures)&&candidate.tourDepartures.length&&!stop.gapFill&&!beforeEvent&&!Number.isFinite(askedMeal)){
+          // The time asked for ("evening bear tour"), else the part of the day the stop is in.
+          const anchor=Math.max(partStart,fillStart)||(Number.isFinite(requirements.startMinutes)?requirements.startMinutes:0)||({morning:540,midday:720,afternoon:780,late:930,evening:1080,night:1080}[stop.daypart]||earliest);
+          // The day's first stop may start with an early departure (a 7 AM bear tour on a day planned from 9 AM).
+          for(const t of candidate.tourDepartures){if(t<earliest&&!(!previous&&t>=360))continue;const r=ranges.find(([a,b])=>a<=t&&t+duration<=Math.min(b,1440));if(!r)continue;if(dep==null||Math.abs(t-anchor)<Math.abs(dep-anchor))dep=t,depRange=r;}
+        }
+        let range=depRange||ranges.find(([a,b])=>Math.max(a,earliest,partStart,fillStart)+duration<=Math.min(b,1440,beforeEvent?eventStart-30-(eventTravel?.maxMinutes||0):1440));
         // Round 9: before a fixed-time event (a 2 PM escape room), lunch or a walk is shortened to fit -- an hour for a
         // meal, 45 minutes for a visit -- rather than a "Timing conflict".
         let squeezed=null;
@@ -4995,7 +5011,7 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
           if(squeezed!=null&&squeezed<least)range=null;
         }
         if(!range)return {bad:true};
-        let start=Math.max(range[0],earliest,partStart,fillStart);
+        let start=dep!=null?dep:Math.max(range[0],earliest,partStart,fillStart);
         // Round 9 (2026-10-19): an outdoor filler (one swapped in too) starts early enough to end 30 minutes before sunset.
         if(stop.gapFill&&['outdoor','beach'].includes(candidate.type)&&!candidate.indoorGolf){const light=tripRequirements.estimateDaylight(date,candidate);if(light&&start+duration>light.sunsetMinutes-30)start=Math.max(range[0],earliest,Math.floor((light.sunsetMinutes-30-duration)/5)*5);}
         // Lunch is lunch (2026-10-19): it starts by about 13:30 unless the morning itself runs later; a place that only
@@ -5022,7 +5038,7 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
             if(start>t-10&&start-t<=60&&early<start&&early+Math.max(visit,TOUR_ALLOWANCE+15)<=limit){start=early;visit=Math.max(visit,t+TOUR_ALLOWANCE-start);break;}
           }
         }
-        return {start,end:start+visit,wait:start-earliest,transfer,unknownHours, textHours:!!textHours,provisional:unknownHours||hiking||!!textHours||!one?.complete||guessed||guessedTransfer,listingTiming:!!textHours||one?.visits?.[0]?.durationSource==='listing'};
+        return {start,end:start+visit,wait:start-earliest,transfer,unknownHours,departure:dep!=null, textHours:!!textHours,provisional:unknownHours||hiking||!!textHours||!one?.complete||guessed||guessedTransfer,listingTiming:!!textHours||one?.visits?.[0]?.durationSource==='listing'};
       };
       let timed=fit(v);
       // Round 8 (2026-10-19): a ski day is on the hill from about 9 AM to 3:30 PM; lunch is a break on the hill inside
@@ -5074,6 +5090,9 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         }
       }
       const item={day:group.day,date,venueId:v?.id,status:timed?.bad?'unmet':timed?(timed.provisional||provisional?'provisional':'estimated'):'unverified',assumedStart:assumed};
+      // Tour test 16: a tour's time on the card is its own departure ("departure": true), or "Book a departure time" when the
+      // operator listed none (bookDeparture), never a made-up afternoon slot. Rentals-only operators keep their hours.
+      if(v&&v.type==='tour'&&timed&&!timed.bad){if(timed.departure)item.departure=true;else if(requirements.startMinutes==null&&!(Array.isArray(v.tourKinds)&&v.tourKinds.length&&v.tourKinds.every(k=>k==='rentals')))item.bookDeparture=true;}
       let note;
       if(timed&&!timed.bad){
         Object.assign(item,{startMinutes:timed.start,endMinutes:timed.end,waitMinutes:timed.wait,transferMinutes:timed.transfer});
@@ -7038,6 +7057,9 @@ function planTripUnchecked(input) {
   if (requirements.startDate && /^next week$/i.test(String(requirements.dateSource || '').trim())) intent.unsupported = (intent.unsupported || []).filter((u) => String(u).toLowerCase() !== 'next week');
   const consumed = tripRequirements.consumedTerms(requirements);
   if (requirements.items.some(i=>i.kind==='transport')) intent.unsupported = (intent.unsupported || []).filter(u=>!['no car','car free','without a car','on foot','walkable'].includes(String(u).toLowerCase()));
+  // Tour test 16: "can you pick us up" / "hotel pickup" is read (tours with hotel pickup first), not an unknown word.
+  if (PICKUP_ASK_RE.test(normWords(requirements.text || input.text || ''))) intent.unsupported = (intent.unsupported || []).filter(u=>!/^(?:pick|picks|picked|pickup|pickups|pick up|hotel pickup|hotel pick up|prise|charge|prise en charge|cueillette)$/.test(String(u).toLowerCase()));
+  if (PICKUP_ASK_RE.test(normWords(requirements.text || input.text || ''))) intent.foodTerms = (intent.foodTerms || []).filter((f)=>!(f && !f.cuisine && /^(?:pick|picks|picked|pickup|pickups|pick up|hotel|hotels|prise|charge|cueillette)$/.test(String(f.term || '').toLowerCase())));
   // "No driving after 6pm" is an evening rule the plan applies (2026-10-18), not something it ignores; a request with
   // it is a day plan even without a length ("wine tour in Brackendale, no driving after 6pm").
   const eveningWalk = requirements.items.find(i=>i.kind==='evening_walk');

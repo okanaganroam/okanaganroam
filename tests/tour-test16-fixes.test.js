@@ -32,10 +32,11 @@ let n = 0;
 const mk = (type, o = {}) => app.createVenue({ name: `Tour T16 ${++n}`, slug: `tour-t16-${n}`, region: 'whistler', type, latitude: 50.116 + n / 3000, longitude: -122.957,
   rating: 4.6, reviews: 120, address: `${500 + n} Main St, Whistler`, phone: '604-555-0144', website: 'https://example.com', hours: JSON.stringify(WK('09:00', '17:00')),
   description: 'A fixture used only by the tour test 16 tests.', ...o });
-const tokenFor = (id) => app.createOwnerLink(id, {}).url.split('/owner/')[1];
+const tokenFor = (id) => app.createOwnerLink(id, { reset: true }).url.split('/owner/')[1];
 let ipN = 0, srv, base;
-test.before(async () => { srv = http.createServer(app.server.listeners('request')[0]); await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`; });
-test.after(() => srv && srv.close());
+const start = async () => { if (srv) return; srv = http.createServer(app.server.listeners('request')[0]); await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`; };
+const stop = () => srv && srv.close();
+if (!process.env.T16_LIB) { test.before(start); test.after(stop); }
 const postJson = (p, body) => fetch(base + p, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.76.${Math.floor(++ipN / 250)}.${ipN % 250 + 1}` }, body: JSON.stringify(body) })
   .then(async (r) => ({ status: r.status, body: await r.json().catch(() => ({})) }));
 const change = (t, changes) => postJson(`/owner/${t}/changes?from=setup`, { changes, from_setup: true, setup_frequency: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 })
@@ -65,6 +66,9 @@ async function tom(o = {}, info = {}, { tours = true, months = '5-10' } = {}) {
   approveAll(v.id);
   return { v, t };
 }
+
+module.exports = { start, stop, app, db, tom, mk, plan, namesOf, itemsOf, page, plain, change, ok, approveAll, tokenFor, WK, TOURS, NOW };
+if (process.env.T16_LIB) return;
 
 test('1. BLOCKER: "We pick you up" on Basics really saves (the button the screen drew, pressed), the page shows Pickup, and "No pickup" takes it off', async () => {
   const { v, t } = await tom();
@@ -212,4 +216,64 @@ test('7. Search (/browse): "bear", "bear viewing", « ours » and « observation
   // The order rule itself (the page script runs the same function): name, then kind, then the rest.
   assert.ok(app.browseStrong('Coast Mountain Bear Tours', 'Wildlife and bear viewing', 'bear') > app.browseStrong('Riverside Rec Site', 'Recreation site', 'bear'));
   assert.equal(app.browseStrong('Coast Mountain Bear Tours', 'Wildlife and bear viewing', 'bear viewing'), 1);
+});
+
+test('8. Build My Trip: "without a car", "no car", "hotel pickup" and "pick us up" put the tours with hotel pickup first ("Hotel pickup" in Why it fits); undated out of season plans the coming season with a note', async () => {
+  const plain0 = await tom({ name: 'Plain Bear Co T16' }, {});
+  const pk = await tom({ name: 'Pickup Bear Co T16', rating: 4.2, reviews: 20 }, { pickup: true });
+  const first = (p) => itemsOf(p).find((x) => x.venue && x.venue.type === 'tour');
+  for (const q of ['bear tour without a car in July', 'bear tour no car in July', 'bear viewing with hotel pickup in July', 'bear tour, can you pick us up? July', 'bear tour in July, we don’t have a car']) {
+    const p = plan(q), f = first(p);
+    assert.ok(f, q);
+    assert.equal(f.venue.id, pk.v.id, `${q}: ${JSON.stringify(namesOf(p))}`);
+    assert.ok(f.why.includes('Hotel pickup'), `${q}: ${JSON.stringify(f.why)}`);
+    assert.doesNotMatch(JSON.stringify(p.notes || []), /doesn’t list “pick/, q);
+  }
+  // Without the words, the plain order (no "Hotel pickup" line).
+  const plainP = plan('bear viewing tour in July');
+  assert.ok(!itemsOf(plainP).some((x) => (x.why || []).includes('Hotel pickup')));
+  // Undated in November: the coming season (May), with the note; dated out of season stays out. (The other tours this file
+  // made run May to October too, so only the coming season has one.)
+  for (const o of db.prepare("SELECT id FROM venues WHERE type = 'tour'").all()) { ok(await change(tokenFor(o.id), { tour_info: { year: 'seasonal' }, open_months: '5-10' })); approveAll(o.id); }
+  for (const q of ['bear tour without a car', 'bear viewing tour', 'bear tour, can you pick us up']) {
+    const p = plan(q);
+    assert.ok(itemsOf(p).some((x) => x.venue.type === 'tour'), `${q}: ${JSON.stringify(namesOf(p))}`);
+    assert.match((p.notes || [])[0] + JSON.stringify(namesOf(p)), /^This tour isn’t running in November, so this plan is for May 1, when the season starts\./, q);
+    assert.equal(p.comingSeason.date, '2026-05-01'.replace('2026', '2027'));
+  }
+  assert.ok(!itemsOf(plan('bear viewing in January')).some((x) => x.venue.type === 'tour'));
+  const fr = require('../trip-french-copy.js');
+  assert.match(fr.t3FrenchText('This tour isn’t running in November, so this plan is for May 1, when the season starts. Pick your own dates any time.'), /^Cette sortie n’a pas lieu en novembre; ce plan est donc pour le 1er mai/);
+  assert.equal(fr.t3FrenchText('Hotel pickup'), 'Prise en charge à l’hôtel');
+  assert.equal(fr.t3FrenchText('Book ahead (the operator’s own answer).'), 'Réservez à l’avance (réponse de l’entreprise).');
+  void plain0;
+});
+
+test('9. Build My Trip times: his own departures ("Leaves 7 AM and 5:30 PM") place the tour at the nearest one; a tour with none says "Book a departure time", never a made-up 1–3:30 PM', async () => {
+  const { v } = await tom({ name: 'Departure Bears T16' }, { pickup: true });
+  const row = (p, id) => (p.schedule || []).find((r) => r.venueId === id);
+  const cases = [['morning bear tour in July, no car', 420], ['evening bear tour in July, no car', 1050], ['bear tour in July without a car', null]];
+  for (const [q, want] of cases) {
+    const r = row(plan(q), v.id);
+    assert.ok(r, `${q}: planned`);
+    assert.ok([420, 1050].includes(r.startMinutes), `${q}: ${r.startMinutes}`);
+    if (want != null) assert.equal(r.startMinutes, want, q);
+    assert.equal(r.departure, true); assert.ok(!r.bookDeparture);
+  }
+  // The parser: only times in a sentence about leaving; no lengths, prices or ages.
+  const hm = (t) => app.tourDepartureTimesIn(t);
+  assert.deepEqual(hm('By 4x4. Leaves 7 AM and 5:30 PM daily. Pickup from village hotels.'), [420, 1050]);
+  assert.deepEqual(hm('5:30 PM departure'), [1050]);
+  assert.deepEqual(hm('Departures 7:00 and 17:30'), [420, 1050]);
+  assert.deepEqual(hm('Départ à 9 h et 13 h 30'), [540, 810]);
+  assert.deepEqual(hm('Kids 5 to 12, 3 hours, $149. Open 9 AM to 5 PM.'), []);
+  // No departures listed: "Book a departure time" (the page script shows the flag in place of times).
+  const none = await tom({ name: 'No Times Bears T16', description: 'Bear viewing by 4x4.' }, { pickup: true }, { tours: false });
+  const only = (id, q) => app.runTripPlan({ text: q, excludeVenueIds: db.prepare("SELECT id FROM venues WHERE type = 'tour' AND id != ?").all(id).map((x) => x.id) }, NOW);
+  const r2 = row(only(none.v.id, 'bear tour in July without a car'), none.v.id);
+  const r3 = row(only(v.id, 'bear tour in July without a car'), v.id);
+  assert.ok(r3 && r3.departure && [420, 1050].includes(r3.startMinutes), JSON.stringify(r3));
+  assert.ok(r2, "the tour with no times is planned"); assert.equal(r2.bookDeparture, true); assert.ok(!r2.departure);
+  const page3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
+  assert.ok(page3.includes("'Book a departure time'") && page3.includes("'Réservez une heure de départ'"));
 });

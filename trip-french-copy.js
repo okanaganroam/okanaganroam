@@ -193,6 +193,10 @@ function t3FrenchTextCore(value){
  text=text.replace(/^Nothing in (.+?) fits an evening out, so this is in (.+?), a short drive away\.$/,(_,a,b)=>`Rien à ${a} ne convient pour une soirée; ce plan est donc à ${b.replace(/ and /g,' et ')}, à quelques minutes de route.`);
  text=text.replace(/^Including places a short drive from (.+)\.$/,(_,a)=>`Inclut des endroits à quelques minutes de route de ${a.replace(/ and /g,' et ')}.`);
  text=text.replace(/^Its listing mentions (.+)$/,(_,a)=>`Sa fiche mentionne : ${a}`);
+ // Tour test 16 (Whistler, 2026-11-18): hotel pickup on a tour's card, and an undated tour planned for its coming season.
+ text=text.replace(/^Hotel pickup$/,'Prise en charge à l’hôtel');
+ { const M={January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'};
+   text=text.replace(/^This tour isn’t running in (\w+), so this plan is for (\w+) 1, when the season starts\. Pick your own dates any time\.$/,(_,a,b)=>`Cette sortie n’a pas lieu en ${M[a]||a}; ce plan est donc pour le 1er ${M[b]||b}, au début de la saison. Choisissez vos dates quand vous voulez.`); }
  text=text.replace(/^A quick stop on the drive$/,'Un arrêt rapide sur la route');
  const accessPrefix='Access / schedule from the listing: “',accessSuffix='” Confirm access and scheduling with the operator before visiting.';
  if(text.startsWith(accessPrefix)&&text.endsWith(accessSuffix))return 'Accès / horaires selon la fiche (texte original) : « '+text.slice(accessPrefix.length,-accessSuffix.length)+' » Confirmez l’accès et les horaires auprès de l’exploitant avant de partir.';

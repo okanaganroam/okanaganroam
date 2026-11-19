@@ -7445,6 +7445,36 @@ function runTripPlan(args, now = new Date()) {
   try { plan = tripListedEventTidy(plan, args, now); } catch (e) { /* keep the plan */ }
   try { plan = tripDestinationTourPlan(plan, args, now); } catch (e) { console.error(`[trip] destination tours: ${e.message}`); }
   try { plan = tripTransportOnly(plan, args); } catch (e) { /* keep the plan */ }
+  try { plan = tripTourComingSeason(plan, args, now); } catch (e) { console.error(`[trip] coming season: ${e.message}`); }
+  return plan;
+}
+// Tour test 16 (Whistler, 2026-11-18; Tom runs bear tours May to October; "bear tour without a car" in November was an empty
+// plan): an undated request for a tour that only runs in another season plans the coming season, the way an undated ski
+// day plans the coming winter, and says so ("Bear tours aren't running in November, so this plan is for May 1, when they
+// start again."). A dated request ("bear viewing in January") is left as it is.
+const TRIP_DATED_RE = /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\b|\b(?:janv|f[ée]vr?|mars|avr|mai|juin|juil|ao[uû]t|sept|oct|nov|d[ée]c)[a-z]*\b|\b(?:spring|summer|fall|autumn|winter|printemps|[ée]t[ée]|automne|hiver|today|tonight|tomorrow|weekend|week|month|aujourd|ce soir|demain|fin de semaine|semaine|mois|monday|tuesday|wednesday|thursday|friday|saturday|sunday|lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche|christmas|no[eë]l|easter|p[aâ]ques|holiday|f[ée]ri[ée]|long weekend)\b|\d{1,2}\s*[\/-]\s*\d{1,2}/i;
+const TRIP_TOUR_ASK_RE = /\b(?:tours?|viewing|watching|safaris?|excursions?|sorties?|visites?|observation|guided|guid[ée]e?s?)\b/i;
+function tripTourComingSeason(plan, args, now = new Date()) {
+  const text = String(args.text || '');
+  if (!plan || args.swap || args.pinned || args.overrides?.startDate || TRIP_DATED_RE.test(text) || !TRIP_TOUR_ASK_RE.test(text)) return plan;
+  const tourIn = (p) => [...((p.outing && p.outing.stops) || []), ...((p.itinerary && p.itinerary.stops) || []), ...(p.days || []).flatMap((d) => d.stops || []), ...(p.recommendations || [])].some((x) => x && x.venue && x.venue.type === 'tour');
+  if (tourIn(plan)) return plan;
+  const fr = /[àâçéèêëîïôûù]/i.test(text) || /\b(?:sortie|visite|ours|sans voiture)\b/i.test(text);
+  for (let k = 1; k <= 8; k++) {
+    const d = new Date(now.getTime()); d.setDate(1); d.setMonth(d.getMonth() + k); d.setHours(12, 0, 0, 0);
+    const later = runTripPlanCore(args, d);
+    if (!later || !tourIn(later)) continue;
+    const EN_M = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const day = todayLocal(d), mon = EN_M[d.getMonth()], monFr = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'][d.getMonth()];
+    const nowMon = EN_M[now.getMonth()];
+    const note = `This tour isn’t running in ${nowMon}, so this plan is for ${mon} 1, when the season starts. Pick your own dates any time.`;
+    const noteFr = `Cette sortie n’a pas lieu en ${['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'][now.getMonth()]}; ce plan est donc pour le 1er ${monFr}, au début de la saison. Choisissez vos dates quand vous voulez.`;
+    later.notes = [note].concat(later.notes || []);
+    later.contextNotes = [note].concat(later.contextNotes || []);
+    later.comingSeason = { date: day, note, noteFr };
+    later.query = plan.query;
+    return later;
+  }
   return plan;
 }
 // ---------- Tour test 11 (Whistler, 2026-11-18; Min-jun, private sightseeing vans with hotel pickup) ----------
@@ -23493,9 +23523,49 @@ function tourFitNote(venueId) {
     return out.length > 4 && out.length <= 220 ? out : '';
   } catch (e) { return ''; }
 }
+// Tour test 16 (Whistler, 2026-11-18; Tom typed "Leaves 7 AM and 5:30 PM daily" on his tour; Build My Trip put him at 1–3:30
+// PM): the departure times an operator wrote in his typed tours or his story, as minutes from midnight. Only in a sentence
+// that is about leaving ("Leaves 7 AM and 5:30 PM", "5:30 PM departure", "Departures 7:00 and 17:30", « départ à 9 h »);
+// a time with no AM/PM reads as a day tour would (7 is 7 AM, 5:30 is 5:30 PM). Never a length, a price or an age.
+const TOUR_DEPART_WORDS_RE = /\b(?:leaves?|leaving|depart(?:s|ing|ures?)?|pick-?ups? (?:at|from \d)|start times?|starts? at|tours? (?:at|leave)|go(?:es)? out at|daily at|every day at|times?:)|d[ée]parts?\b|parte?n?t? [àa]\b/i;
+function tourDepartureTimesIn(text) {
+  const out = new Set();
+  for (const sen of String(text || '').split(/(?<=[.!?;])\s+|\n+/)) {
+    if (!TOUR_DEPART_WORDS_RE.test(sen)) continue;
+    const re = /(?<![\d$:.,\/-])(\d{1,2})(?:(?::|\s?h\s?)([0-5]\d))?\s*(a\.?m\.?|p\.?m\.?|h(?![a-z]))?(?![\d%$]|\s*(?:\$|hours?|hrs?\b|min|minutes?|years?|yrs?|ans|people|persons|guests|kids|adults?|to \d|and up|\+|km|x\b|per\b|days?|nights?))/gi;
+    const toks = [];
+    let m;
+    while ((m = re.exec(sen))) {
+      const h = +m[1], mi = m[2] ? +m[2] : 0, suf = (m[3] || '').toLowerCase().replace(/\./g, '');
+      if (!m[2] && !suf && !/\b(?:leaves?|at|depart\w*|and|&|or|et|à|a)\s*$/i.test(sen.slice(Math.max(0, m.index - 12), m.index))) continue;
+      toks.push({ h, mi, suf, f24: !!m[2] && h >= 13 });
+    }
+    for (const t of toks) {
+      let h = t.h;
+      if (t.suf === 'pm' && h < 12) h += 12; else if (t.suf === 'am' && h === 12) h = 0;
+      else if (!t.suf && !t.f24 && h >= 1 && h <= 5) h += 12; // a bare 1–5 is the afternoon on a day tour
+      const min = h * 60 + t.mi;
+      if (min >= 300 && min <= 1380) out.add(min);
+    }
+  }
+  return [...out].sort((a, b) => a - b);
+}
+function tourDepartureTimes(venueId) {
+  try {
+    let items = [];
+    const m = publishedMenu(venueId);
+    if (m && !menuIsUnconfirmedResearch(m)) items = (m.data.sections || []).flatMap((x) => x.items || []);
+    const v = db.prepare('SELECT description FROM venues WHERE id = ?').get(venueId) || {};
+    return tourDepartureTimesIn([...items.map((it) => `${it.name || ''}. ${it.description || ''}`), v.description || ''].join('\n'));
+  } catch (e) { return []; }
+}
 function tourPlannerFacts(venueId) {
   const t = venueTourInfo(venueId);
   return {
+    // Tour test 16: hotel pickup (the owner's own answer), for "without a car" / "hotel pickup" requests, and his own
+    // departure times (from his typed tours), for when the plan puts him.
+    ...(t.pickup === true ? { tourPickup: true } : {}),
+    ...(() => { const d = tourDepartureTimes(venueId); return d.length ? { tourDepartures: d.slice(0, 8) } : {}; })(),
     ...(() => { const f = tourFitNote(venueId); return f ? { tourFitNote: f } : {}; })(),
     // Tour test 13: every trip weather permitting; off-season trips by request.
     ...(t.weather_all === true ? { tourWeatherAll: true } : {}),
