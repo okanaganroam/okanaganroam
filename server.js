@@ -22576,6 +22576,18 @@ function tourKindSeasons(venueId) {
   for (const k of ks) out[k] = own && TOUR_KIND_SEASON_VALUES.includes(own[k]) ? own[k] : tourKindSeasonGuess(venueId, k);
   return Object.values(out).some((x) => x !== 'both') ? out : null;
 }
+// Build My Trip (2026-11-19): the season of each picked kind for every company with 2+ kinds, his answer or the guess,
+// even when tourKindSeasons has nothing to say (open all year, or one season). The planner judges the kind a request asks
+// for by it: a paddle request in July plans a Paddle + Snowshoe company, a snowshoe request in July leaves it out.
+function tourKindSeasonsEach(venueId) {
+  const t = venueTourInfo(venueId);
+  const ks = (Array.isArray(t.kinds) ? t.kinds : []).filter((k) => k !== 'other');
+  if (ks.length < 2) return null;
+  const own = t.kind_seasons && typeof t.kind_seasons === 'object' ? t.kind_seasons : null;
+  const out = {};
+  for (const k of ks) out[k] = own && TOUR_KIND_SEASON_VALUES.includes(own[k]) ? own[k] : tourKindSeasonGuess(venueId, k);
+  return Object.values(out).some((x) => x !== 'both') ? out : null;
+}
 function tourItemMonths(venueId, ITEM_RE, NOT_RE) {
   try {
     const m = publishedMenu(venueId);
@@ -23802,6 +23814,8 @@ function tourPlannerFacts(venueId) {
     ...(Array.isArray(t.kinds) && t.kinds.length ? { tourKinds: t.kinds.slice() } : {}),
     // Tour test 15: the season each of his kinds runs (his answer, or his typed tours' section names, or the defaults).
     ...(() => { const ks = tourKindSeasons(venueId); return ks ? { tourKindSeasons: ks } : {}; })(),
+    // 2026-11-19: and for every company with 2+ kinds (open all year too), so a request is judged by the kind it asks for.
+    ...(() => { const ks = tourKindSeasonsEach(venueId); return ks ? { tourKindSeasonsEach: ks } : {}; })(),
     // Tour test 9: the months her list's water trips run (a summer-only canoe is never planned in January).
     ...(() => { const w = tourWaterMonths(venueId); return w ? { tourWaterMonths: w } : {}; })(),
     // Tour test 10 (Whistler, 2026-11-18; Gord): each trip's own age, and his "Riders 8+" line (trip-planner.js tourAgeFit);
@@ -73254,7 +73268,7 @@ module.exports = {
   // Cafés (2026-11-10).
   COCKTAIL_SETUP_PART1, COCKTAIL_SETUP_PART2, COCKTAIL_SETUP_HELP_TOPICS, COCKTAIL_OWNER_BADGES, COCKTAIL_PRICE_LIVE_MAX, cocktailKidsWelcome, cocktailPriceOf, cocktailPriceGuess, pubSetupType, visitSlotsFor,
   websiteIsInstagramLink, BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, plannerKidsUntil, breweryListTile, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, dogsOutsideOnly, dogsPatioOnly, dogsFrLineEnglish, tripMonthWeekdayDate, kitchenSeasonsClean, setupHereHelpTopics, breweryFoodRowOn, breweryVisitLines, pubKitchenOn, ownerFrLineText, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
-  descriptionShrank, tourInActivity, TOUR_KIND_ACTIVITY, ownerTextFlagsHtml, ownerTextClean, ownerFrDescState, tourTripItems, tourTextMonths, tourWaterMonths, tourKindSeasons, tourKindSeasonWords, tourKindSeasonGuess, tourTwoSeasons, tourKindSeasonsAsked, tourPriceWhy, tourYearlyBreaksText, tourStoryWords, tourLengthRange, dogsSomeTrips, tourPriceWhy, TOUR_ADDON_LINE_RE, TOUR_KIND_ORDER, dogsChipSentences,
+  descriptionShrank, tourInActivity, TOUR_KIND_ACTIVITY, ownerTextFlagsHtml, ownerTextClean, ownerFrDescState, tourTripItems, tourTextMonths, tourWaterMonths, tourKindSeasons, tourKindSeasonsEach, tourKindSeasonWords, tourKindSeasonGuess, tourTwoSeasons, tourKindSeasonsAsked, tourPriceWhy, tourYearlyBreaksText, tourStoryWords, tourLengthRange, dogsSomeTrips, tourPriceWhy, TOUR_ADDON_LINE_RE, TOUR_KIND_ORDER, dogsChipSentences,
   TOUR_SETUP_PART1, TOUR_SETUP_PART2, TOUR_SETUP_HELP_TOPICS, TOUR_OWNER_BADGES, TOUR_PRICE_LIVE_MAX, TOUR_KIND_LABELS_OWNER, TOUR_KIND_PUBLIC, TOUR_KINDS_SHOWN, tourKindsText, tourCuisineFr, tourCardKind, openSeasonStretches, openStretchesText, venueTapListWords, ownerVisitResearchKeys, cardSeasonOnce, statusSaysClosureToday, venueMenuPreviewHtml, venueTourInfo, tourInfoAnswers, tourPrice, writeTourVisitRows, tourVisitLines, ownerTourPriceWaiting, tourResearchPrice, tourResearchLength, tourKindSuggestion, tourPlannerFacts, cleanTourPrice, apptLineFor,
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS, cafeHelpTopics, cafePlannerWords, cafeVisitTicks, cafeSpendGuessInfo,
