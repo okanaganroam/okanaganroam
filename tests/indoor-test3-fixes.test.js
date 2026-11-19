@@ -281,7 +281,9 @@ test('10b. Examples follow the kind; "Take a photo of your price sheet" is hidde
   assert.match(await exOf(['escape']), /family-run escape room since 2016/);
   assert.match(await exOf(['spa']), /day spa/);
   assert.match(await exOf(['climbing']), /bouldering gym/);
-  assert.match(await exOf(['casino']), /family-run place since 2010/);
+  // Indoor test 8: every kind has its own examples (a casino's, not the general one).
+  assert.match(await exOf(['casino']), /live poker room/);
+  assert.match(await exOf(['other']), /family-run place since 2010/);
   assert.doesNotMatch(await exOf(['theatre']), /escape room/);
   const v = theatre();
   const t = tokenFor(v.id);

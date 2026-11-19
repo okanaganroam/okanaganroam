@@ -84,7 +84,8 @@ test('2. Part 1 with real taps (an escape room): the starting picks, the answers
   await sim.click('[data-tkind="games"]');
   await sim.click('indoorSave');
   assert.deepEqual(app.venueIndoorInfo(v.id).kinds, ['escape', 'games']);
-  assert.equal(app.getVenue(v.id).cuisine, 'Escape room · arcade, VR & laser tag');
+  // Indoor test 8: games after the main kind says "arcade" unless the place's own words say VR, laser tag or karting.
+  assert.equal(app.getVenue(v.id).cuisine, 'Escape room & arcade');
   // Price: "$32 per person" reads as 32.
   assert.match(sim.text(), /What does it cost\?/);
   await sim.type('suTprice', '$32 per person');

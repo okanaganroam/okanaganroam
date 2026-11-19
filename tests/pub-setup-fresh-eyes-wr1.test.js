@@ -106,7 +106,7 @@ test('finish: two open items on one step share one button that names both ("Diet
   const src = CLIENT();
   assert.match(src, /function addName\(out, st, lab\)/);
   assert.match(src, /if \(seen\[st\]\) return addName\(out, st, lab\); if \(chk\.indexOf/);
-  assert.match(src, /if \(seen\[st\]\) return addName\(out, st, lab\); seen\[st\] = true; out\.push\(\{ step: st, label: lab, items: true \}\); \}\);\n {4}return out;\n {2}\}\n {2}\/\/ One "To reach 100%"/);
+  assert.match(src, /if \(seen\[st\]\) return addName\(out, st, lab\); seen\[st\] = true; out\.push\(\{ step: st, label: lab, items: true \}\); \}\);\n(?: {4}\/\/[^\n]*\n| {4}if \(!out\.length && INDOOR\)[^\n]*\n)* {4}return out;\n {2}\}\n {2}\/\/ One "To reach 100%"/);
   // Run the helper itself.
   const fn = /function addName\(out, st, lab\)\{[\s\S]*?\n {2}\}\n/.exec(src)[0];
   const out = vm.runInNewContext(`${fn}; var out = [{ step: 'offer', label: 'Dietary options', items: true }]; addName(out, 'offer', 'Games'); addName(out, 'offer', 'Games'); out;`);

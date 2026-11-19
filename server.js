@@ -23834,7 +23834,7 @@ function indoorSearchExtraText(venueId, fr = false) {
   try {
     const kinds = venueIndoorInfo(venueId).kinds || [];
     const full = kinds.indexOf('games') > 0 ? INDOOR_GAMES_FULL_RE.test(indoorOwnWords(venueId)) : true;
-    kinds.forEach((k, i) => { const e = indoorKindsModule.INDOOR_KIND_TEXT[k]; if (!e) return; out.push((k === 'games' && i > 0 && !full ? (fr ? ['arcade', 'arcades', 'salle d’arcade'] : ['arcade', 'arcades']) : e[fr ? 'fr' : 'en'].search).join(' ; ')); });
+    kinds.forEach((k, i) => { const e = indoorKindsModule.INDOOR_KIND_TEXT[k]; if (!e) return; out.push((k === 'games' && i > 0 && !full ? (fr ? ['arcade', 'arcades', 'salle d’arcade'] : ['arcade', 'arcades']) : e[fr ? 'fr' : 'en'].search.slice(0, 2)).join(' ; ')); });
   } catch (e) { /* no kinds */ }
   return out.filter(Boolean).join(' ; ');
 }
@@ -52366,7 +52366,9 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
         // Groups on the checklist, so "We can't take big groups" was refused. Only a real groups line (a Groups row, or a
         // Good to know row that is about groups) contradicts that answer.
         const realGroups = () => ownerHasRealGroupsLine(venue.id, current.visit_rows);
-        if (added.some((k) => (k === 'pyv_groups' ? realGroups() : done[k]) || (k === 'happy_hour' && inp.happyHourBadge))) errors.not_offered = OWNER_NOT_OFFERED_ERRORS.has;
+        // Indoor test 8: a walk-in place's booking link counts as done with no link; "We don't take bookings online" is
+        // still its to say (only a real link contradicts it).
+        if (added.some((k) => (k === 'pyv_groups' ? realGroups() : k === 'booking_link' ? !!(current.booking_url || inp.bookingUrl) : done[k]) || (k === 'happy_hour' && inp.happyHourBadge))) errors.not_offered = OWNER_NOT_OFFERED_ERRORS.has;
       }
       if (!errors.not_offered && JSON.stringify(next) !== JSON.stringify(current.not_offered || [])) changes.not_offered = next;
     }

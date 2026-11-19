@@ -239,10 +239,11 @@ test('8. polish: short kind words in the setup preview, the Good to know example
   const v = escape({ website: 'https://e-exit.example' });
   const t = tokenFor(v.id);
   await ok(change(t, { indoor_info: { kinds: ['escape', 'games'], length: '1-2h' } }));
-  // The preview card (the finish screen): "Escape room · arcade, VR & laser tag", not the chip's long label.
+  // The preview card (the finish screen): its short words, not the chip's long label. Indoor test 8: games after the main
+  // kind says "arcade" unless the place's own words say VR, laser tag or karting.
   const fin = await openSetup(base, t, { hash: 'more' });
   await fin.click(fin.acts().find((a) => /^doneNow2?$|^go:finish$/.test(a)) || 'doneNow2');
-  assert.match(fin.text(), /Escape room · arcade, VR &amp; laser tag|Escape room · arcade, VR & laser tag/);
+  assert.match(fin.text(), /Escape room &amp; arcade|Escape room & arcade/);
   assert.doesNotMatch(fin.text(), /Arcade, VR, laser tag or karting/);
   // Good to know: no grip socks example for an escape room; a climbing gym keeps it.
   const gk = await openSetup(base, t, { hash: 'bring' });
