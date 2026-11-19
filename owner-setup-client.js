@@ -3534,8 +3534,10 @@
     // Café test 1 (2026-11-11): "Yes, that's right" with no website on file is the "We don't have a website" answer too,
     // so the checklist's Website item counts it (it stopped at 97%). Never while a website is on file or waiting.
     // Tour test 11: "We pick you up (from hotels in the village)" (Basics, or Where do people meet you?): saved with the step.
-    if (/^pickup(?:On|Off):/.test(k) && TOUR) {
-      var pon = /^pickupOn/.test(k), pst = k.split(':')[1];
+    // Tour test 16 (Whistler, 2026-11-18): act() has already split 'pickupOn:basics' at the colon (k = 'pickupOn', v =
+    // 'basics'); the old test looked for the colon in k, so the button did nothing on both screens since test 11.
+    if ((k === 'pickupOn' || k === 'pickupOff') && TOUR) {
+      var pon = k === 'pickupOn', pst = v;
       var pls = [{ tour_info: { pickup: pon ? true : null } }];
       if (pst === 'basics' && pon && !CUR.website && !C.website && S.notOffered.indexOf('website') < 0) pls.push({ not_offered: addNot('website') });
       return saveAll(pst, pls, pon ? 'live' : null, pon ? null : pst, function(){ if (pon) TI.pickup = true; else delete TI.pickup; });
