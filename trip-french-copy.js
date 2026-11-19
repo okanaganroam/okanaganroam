@@ -195,6 +195,8 @@ function t3FrenchTextCore(value){
  text=text.replace(/^Its listing mentions (.+)$/,(_,a)=>`Sa fiche mentionne : ${a}`);
  // Tour test 16 (Whistler, 2026-11-18): hotel pickup on a tour's card, and an undated tour planned for its coming season.
  text=text.replace(/^Hotel pickup$/,'Prise en charge à l’hôtel');
+ // Tour test 17: tours within about an hour of the town asked for.
+ text=text.replace(/^This includes tours within about an hour of (.+?), in (.+)\.$/,(_,a,b)=>`Inclut des sorties à environ une heure de route de ${a}, à ${b.replace(/ and /g,' et ')}.`);
  { const M={January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'};
    text=text.replace(/^This tour isn’t running in (\w+), so this plan is for (\w+) 1, when the season starts\. Pick your own dates any time\.$/,(_,a,b)=>`Cette sortie n’a pas lieu en ${M[a]||a}; ce plan est donc pour le 1er ${M[b]||b}, au début de la saison. Choisissez vos dates quand vous voulez.`); }
  text=text.replace(/^A quick stop on the drive$/,'Un arrêt rapide sur la route');

@@ -767,7 +767,7 @@ test("tour test 11 answers: sightseeing kind, pickup option, airport shuttles ar
   const { en, fr } = await setupFor("tour");
   const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
   assert.match(plain(en.topic("tour-kinds-sightseeing").a), /Sightseeing and day trips/); assert.match(plain(fr.topic("tour-kinds-sightseeing").aFr), /Visites touristiques et excursions d’une journée/);
-  assert.match(plain(en.topic("tour-pickup").a), /We pick you up \(from hotels in the village\)/); assert.match(plain(en.topic("tour-pickup").a), /Pickup: hotels in Whistler Village/);
+  assert.match(plain(en.topic("tour-pickup").a), /We pick you up \(from hotels in Whistler Village\)/); assert.match(plain(en.topic("tour-pickup").a), /Pickup: hotels in Whistler Village/);
   assert.match(plain(en.topic("tour-airport-shuttle").a), /Airport shuttles and transfers aren’t tours/); assert.match(plain(en.topic("tour-airport-shuttle").a), /story or under Good to know/);
   assert.match(plain(en.topic("tour-private-hourly").a), /from \$150\/hour \(3-hour minimum\)/); assert.match(plain(fr.topic("tour-private-hourly").aFr), /150 \$ l’heure \(minimum de 3 heures\)/);
   assert.match(plain(en.topic("tour-one-trip-season").a), /Only in the evening\? Put the times/);
@@ -1021,4 +1021,51 @@ test("tour test 16 answers: Private tours box, Yes book ahead + Good to know, on
   assert.match(plain(fr.topic("tour-fill-all").aFr), /Seuls les 7 essentiels comptent/);
   assert.match(plain(en.topic("tour-season").a), /We only run part of the year/);
   assert.doesNotMatch(plain(en.topic("tour-season").a), /Open some months only/);
+});
+
+// Tour test 17 (Whistler, 2026-11-18; Sarah, Sea to Sky Whitewater, rafting in Squamish, winter eagle floats, a paid
+// shuttle from Whistler). Her 13 questions as typed (help-log.json), each with a French twin.
+const ASKED17 = [
+  ["17-007", "en", "shuttle from whistler costs extra", ["tour-shuttle"], "la navette depuis Whistler coûte en plus"],
+  ["17-010", "en", "eagle floats only in winter, rafting may to sept", ["tour-season", "setup-season", "tour-kind-seasons"], "les descentes des aigles seulement l'hiver, le rafting de mai à sept"],
+  ["17-012", "en", "trips sometimes cancel for high water", ["tour-weather"], "les sorties sont parfois annulées à cause des hautes eaux"],
+  ["17-020", "en", "our trips are different lengths, full day and 2 hours", ["tour-lengths"], "nos sorties ont des durées différentes, une journée et 2 heures"],
+  ["17-021", "en", "eagle float is winter only, rafting is summer", ["tour-kind-seasons"], "la descente des aigles c'est seulement l'hiver, le rafting c'est l'été"],
+  ["17-023", "en", "which price do i put, elaho is 219 and family float is 129", ["tour-price", "tour-two-prices", "tour-several-prices"], "quel prix je mets, l'Elaho est 219 et la descente familiale 129"],
+  ["17-026", "en", "different ages for different trips", ["tour-ages-per-trip"], "des âges différents pour différentes sorties"],
+  ["17-057", "en", "do i have to fill all of this out", ["tour-fill-all"], "est-ce que je dois tout remplir"],
+  ["17-058", "en", "we are closed all winter except eagle floats", ["tour-season", "setup-season"], "nous sommes fermés tout l'hiver sauf les descentes des aigles"],
+  ["17-059", "en", "private raft for our group of 8", ["tour-groups", "tour-private-price"], "raft privé pour notre groupe de 8"],
+  ["17-060", "en", "our summer trips sell out, book early", ["tour-sell-out"], "nos sorties d'été affichent complet, réservez tôt"],
+  ["17-061", "en", "rafting in summer, eagle floats in winter", ["tour-kind-seasons"], "le rafting l'été, les descentes des aigles l'hiver"],
+  ["17-062", "en", "the pickup is only from whistler and costs extra, is that ok", ["tour-shuttle"], "la prise en charge est seulement depuis Whistler et coûte en plus, c'est correct?"],
+  // Both seasons named without a kind of trip stay where they were.
+  ["17-v1", "en", "different summer and winter hours", ["seasonal-hours"], "des heures différentes l'été et l'hiver"],
+  ["17-v2", "en", "winter is $189 and summer $149, which one do i put", ["tour-two-prices"], "l'hiver c'est 189 $ et l'été 149 $, lequel je mets"],
+];
+test("tour test 17: every Help question (EN and its French twin) lands on the right topic", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Whitewater rafting", region: "squamish" });
+  assert.equal(ASKED17.filter((x) => !/v/.test(x[0])).length, 13);
+  const wrong = [];
+  for (const [k, lang, q, want, qFr] of ASKED17) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r && r.id)) wrong.push(`${k} ${lang.toUpperCase()} "${q}" -> ${r && r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf && rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf && rf.id} (want ${want.join(" or ")})`);
+  }
+  assert.deepEqual(wrong, []);
+});
+test("tour test 17 answers: pickup and shuttle name her town and say when to tap the button; the weather answer names the tick", async () => {
+  const { en, fr } = await setupFor("tour", { region: "squamish" });
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/[  ]/g, " ").replace(/\s+/g, " ");
+  const pk = plain(en.topic("tour-pickup").a);
+  assert.match(pk, /Free pickup from hotels in Squamish\? Tap We pick you up \(from hotels in Squamish\)/);
+  assert.match(pk, /Leave the button off/);
+  assert.match(plain(fr.topic("tour-pickup").aFr), /aux hôtels de Squamish/);
+  const sh = plain(en.topic("tour-shuttle").a);
+  assert.match(sh, /Leave We pick you up off/); assert.match(sh, /Shuttle from Whistler: \$25/);
+  assert.doesNotMatch(sh, /can also go in Your tours and prices/);
+  assert.doesNotMatch(plain(fr.topic("tour-shuttle").aFr), /peut aussi aller dans/);
+  assert.match(plain(en.topic("tour-weather").a), /Anything else about your season\? and tick Every trip is weather permitting/);
+  assert.match(plain(fr.topic("tour-weather").aFr), /Chaque sortie dépend de la météo/);
+  for (const t of en.topics) assert.doesNotMatch(String(t.a || ""), /hotels in the village/, t.id);
 });

@@ -4639,7 +4639,12 @@
     var st = el('suStory'); if (st) st.onblur = function(){ var fx = storyJoinFix(st.value); if (fx !== st.value) { st.value = fx; S.story = fx; } };
     var kmo = el('suKindsMore'); if (kmo) { if (kmo.open) S.tourMoreOpen = true; kmo.addEventListener('toggle', function(){ S.tourMoreOpen = kmo.open; }); }
     var srp = el('suStoryReplace');
-    if (srp && st) srp.onclick = function(){ st.value = ''; S.story = ''; try { st.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {} var row = el('suStoryReplaceRow'); if (row) row.hidden = true; var hn = el('suStoryEdit'); if (hn) hn.hidden = true; try { st.focus({ preventScroll: true }); } catch (e) { st.focus(); } };
+    // Tour test 17 (Whistler, 2026-11-18; Sarah): the year-round nudge goes once the box no longer says year-round (typing,
+    // or "Clear it and write my own").
+    var yrn = el('suStoryYearRound'), YR_RE = /\byear[- ]round\b|\ball year\b|toute l[’']ann[ée]e|(?:^|\s)à l[’']ann[ée]e/i;
+    var yrCheck = function(){ if (yrn && st) yrn.hidden = !YR_RE.test(st.value); };
+    if (yrn && st) { st.addEventListener('input', yrCheck); st.addEventListener('change', yrCheck); }
+    if (srp && st) srp.onclick = function(){ st.value = ''; S.story = ''; yrCheck(); try { st.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {} var row = el('suStoryReplaceRow'); if (row) row.hidden = true; var hn = el('suStoryEdit'); if (hn) hn.hidden = true; try { st.focus({ preventScroll: true }); } catch (e) { st.focus(); } };
     if (st) st.oninput = function(){ S.story = st.value; var n = st.value.length, c = el('suCount'); c.textContent = n >= STORY_OK ? T.storyGood : T.storyCount; c.className = 'su-count' + (n >= STORY_OK ? ' su-ok' : ''); };
     // A ✕ inside every filled text box (pub test 3, 2026-11-10: clearing the old phone number was a long backspace). It
     // empties the box and keeps the cursor (and the phone's keyboard) in it.

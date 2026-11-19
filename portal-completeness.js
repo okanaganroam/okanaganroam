@@ -660,6 +660,9 @@ function scoreCompleteness(input, opts) {
   // "Not sure / someone else runs it" (pub test 6, 2026-11-10): Instagram and Facebook count as answered (no nagging),
   // but are not a "we don't have one" (never in `declared`).
   const unsure = new Set(((input && input.unsureKeys) || []).filter((k) => k === 'instagram' || k === 'facebook'));
+  // Tour test 17 (Whistler, 2026-11-18; Sarah: Instagram set, Facebook blank, held at 97%): for tours, Instagram or Facebook
+  // is done; the other one isn't asked for. Tours only (the other types keep both items as they were).
+  if (input && input.type === 'tour' && (done.instagram || done.facebook)) { unsure.add('instagram'); unsure.add('facebook'); }
   const pending = o.pending || new Set();
   const photosWaiting = Math.max(0, Number(input && input.pendingPhotos) || 0);
   const na = {};
