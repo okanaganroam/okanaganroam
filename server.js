@@ -4624,11 +4624,17 @@ function indoorKindNarrow(text, intent, found) {
   const memo = new Map();
   const own = (v) => { if (!memo.has(v.id)) memo.set(v.id, ` ${v.textName || ''} ${v.textCuisine || ''} ${v.textDesc || ''} ${v.type === 'indoor' ? norm(tourVisitSearchText(v.id)) : ''} `); return memo.get(v.id); };
   const isKind = (v) => (v.type === 'indoor' && (venueIndoorInfo(v.id).kinds || []).some((k) => kinds.includes(k))) || words.some((w) => own(v).includes(` ${w} `));
-  const kept = found.items.filter((x) => isKind(x.venue));
+  // Indoor test 10 (2026-11-19): "swim" also means the beaches (every beach is a swim spot): they all stay, after the pools
+  // from November to April and before them in the lake season. Another type's places ("swimming pool": Sports &
+  // Recreation) stay only when their own words say it (an outdoor pool, never disc golf).
+  const beachToo = (intent.types || []).includes('beach') && kinds.includes('pool');
+  const kept = found.items.filter((x) => isKind(x.venue) || (beachToo && x.venue.type === 'beach'));
   if (!kept.length) return found;
   const says = (v, w) => own(v).includes(` ${w} `) || own(v).includes(` ${w}s `) || (/s$/.test(w) && own(v).includes(` ${w.slice(0, -1)} `));
   const hits = new Map(kept.map((x) => [x.venue.id, asked.filter((w) => says(x.venue, w)).length]));
-  const items = kept.map((x, i) => [x, i]).sort((a, b) => hits.get(b[0].venue.id) - hits.get(a[0].venue.id) || a[1] - b[1]).map((x) => x[0]);
+  const lakeSeason = beachToo && !TRIP_SWIM_OFF_MONTHS.includes(Number(todayLocal(new Date()).slice(5, 7)));
+  const beachFirst = (x) => (beachToo ? (x.venue.type === 'beach') === lakeSeason ? 0 : 1 : 0);
+  const items = kept.map((x, i) => [x, i]).sort((a, b) => beachFirst(a[0]) - beachFirst(b[0]) || (beachToo ? 0 : hits.get(b[0].venue.id) - hits.get(a[0].venue.id)) || a[1] - b[1]).map((x) => x[0]);
   return { ...found, total: items.length, items };
 }
 function discoveryAskRank(text, intent, found0) {
@@ -5358,8 +5364,18 @@ const INDOOR_FR_SEARCH_REWRITES = [
   ['aire de jeux interieure', 'indoor playground'], ['aires de jeux interieures', 'indoor playground'], ['centre de jeux', 'indoor playground'], ['centres de jeux', 'indoor playground'],
   ['atelier de poterie', 'pottery'], ['ateliers de poterie', 'pottery'],
   ['machines a sous', 'casino'], ['machine a sous', 'casino'], ['poker', 'casino'], ['heure du conte', 'library'], ['bibliotheque publique', 'library'],
+  // Indoor test 10 (2026-11-19, the synonym matrix): more French ways of naming each indoor kind.
+  ['salle de theatre', 'theatre'], ['salles de theatre', 'theatre'], ['piece de theatre', 'theatre'], ['pieces de theatre', 'theatre'], ['theatre communautaire', 'theatre'],
+  ['musee d art', 'art gallery'], ['musees d art', 'art gallery'], ['mur d escalade', 'climbing gym'], ['escalade interieure', 'climbing gym'], ['centre de jeux pour enfants', 'indoor playground'],
+  ['aire de jeux interieure pour enfants', 'indoor playground'], ['atelier de ceramique', 'pottery'], ['ateliers de ceramique', 'pottery'], ['soiree peinture', 'paint night'], ['soirees peinture', 'paint night'],
+  ['jouer au curling', 'curling'], ['faire du curling', 'curling'], ['essayer le curling', 'curling'],
+  ['cours de mise en forme', 'fitness class'], ['bibliotheque municipale', 'library'], ['aquaforme', 'aquafit'], ['bain a remous', 'hot tub'], ['bains a remous', 'hot tub'], ['centre aquatique', 'aquatic centre'],
 ];
 const SEARCH_PHRASE_REWRITES = [
+  // Indoor test 10 (2026-11-19, the synonym matrix): other ways of naming an indoor kind, read as its own words.
+  ['art museum', 'art gallery'], ['art museums', 'art galleries'], ['watch a film', 'cinema'], ['see a film', 'cinema'], ['watch a movie', 'cinema'], ['see a movie', 'cinema'], ['catch a movie', 'cinema'],
+  ['ceramics class', 'pottery class'], ['ceramics classes', 'pottery classes'], ['ceramic class', 'pottery class'], ['indoor rock climbing', 'indoor climbing'], ['kids play place', 'indoor playground'],
+  ['kids play places', 'indoor playground'], ['play place', 'indoor playground'], ['barre class', 'fitness class'], ['barre classes', 'fitness classes'], ['community theater', 'theatre'], ['community theatre', 'theatre'],
   // Indoor test 7 (2026-11-19; Robert's gallery): sculpture, paintings and a bare "art" mean the galleries ("sculpture" found
   // nothing, « art gratuit » listed pubs). Phrases that already say what they are keep their own words.
   ['sculpture', 'art gallery'], ['sculptures', 'art gallery'], ['sculptor', 'art gallery'], ['sculptors', 'art gallery'], ['paintings', 'art gallery'], ['art', 'art gallery'],
@@ -5368,7 +5384,7 @@ const SEARCH_PHRASE_REWRITES = [
   ['art gratuit', 'free art gallery'], ['galerie gratuite', 'free art gallery'], ['galeries gratuites', 'free art galleries'], ['galerie d art gratuite', 'free art gallery'],
   ['museum gratuit', 'free museum'], ['musee gratuit', 'free museum'], ['musees gratuits', 'free museums'],
   ...['art gallery', 'art galleries', 'art show', 'art shows', 'art exhibition', 'art exhibitions', 'art exhibit', 'art exhibits', 'art sale', 'art sales', 'art walk', 'art walks', 'art crawl',
-    'art opening', 'art openings', 'art class', 'art classes', 'art camp', 'art camps', 'art studio', 'art studios', 'art centre', 'art center', 'art museum', 'art museums', 'art supplies',
+    'art opening', 'art openings', 'art class', 'art classes', 'art camp', 'art camps', 'art studio', 'art studios', 'art centre', 'art center', 'art supplies',
     'art deco', 'street art', 'martial art', 'martial arts', 'art d', 'arts and culture', 'art and culture', 'body art', 'nail art', 'kids art', 'art party', 'art parties', 'art lesson', 'art lessons',
     'art workshop', 'art workshops', 'pop art', 'digital art', 'indigenous art', 'first nations art'].map((x) => [x, x]),
   // Indoor test 9 (2026-11-19; the EN + FR planner and search matrix, tests/indoor-planner-matrix.test.js): what visitors
@@ -5793,8 +5809,12 @@ const SMART_ACTIVITIES = [
     re: /\b(?:ice )?skating\b|\b(?:ice|skating|skate|outdoor) rinks?\b|\bshinny\b/i, types: SMART_WINTER_ACTIVITY_TYPES, guide: '/guides/okanagan-skating', events: true },
   { key: 'sledding', label: 'Sledding & tube parks', labelFr: 'Luge et glissades sur tube', words: ['sledding', 'sledding hill', 'sledding hills', 'tube park', 'tube parks', 'snow tubing', 'tubing park', 'sledding and tubing', 'luge'],
     re: /\bsledd?ing\b|\btobogg\w*|\btube parks?\b|\bsnow tubing\b|\btubing (?:park|lanes?|hill)s?\b|\btube town\b/i, notName: /snowmobil/i, types: SMART_WINTER_ACTIVITY_TYPES, guide: '/guides/okanagan-winter-beyond-skiing', events: true },
-  { key: 'spa', label: 'Spas & warm soaks', labelFr: 'Spas et bains chauds', words: ['hot springs', 'hot spring', 'spa', 'spas', 'nordic spa', 'nordic spas', 'thermal spa', 'thermal spas', 'sauna', 'saunas', 'hot pool', 'hot pools',
-    'day spa', 'warm soak', 'steam room', 'salt cave'],
+  // Indoor test 10 (2026-11-19; Sandra's pool has a hot tub, sauna and steam room: "sauna Vernon" went to the spa guide):
+  // a hot tub, sauna or steam room is any place whose own words say one, a public pool's too; "spa" stays the spas.
+  { key: 'sauna', label: 'Hot tubs & saunas', labelFr: 'Bains à remous et saunas', words: ['sauna', 'saunas', 'hot tub', 'hot tubs', 'steam room', 'steam rooms', 'whirlpool', 'bain a remous', 'bains a remous'],
+    re: /\bsaunas?\b|\bhot ?tubs?\b|\bsteam (?:rooms?|cave)\b|\bwhirlpools?\b/i, types: SMART_WINTER_ACTIVITY_TYPES, guide: '/guides/okanagan-saunas-spas' },
+  { key: 'spa', label: 'Spas & warm soaks', labelFr: 'Spas et bains chauds', words: ['hot springs', 'hot spring', 'spa', 'spas', 'nordic spa', 'nordic spas', 'thermal spa', 'thermal spas', 'hot pool', 'hot pools',
+    'day spa', 'warm soak', 'salt cave'],
     // Round 12 (2026-10-20): "spa" listed the YMCA and the aquatic and recreation centres (a sauna or steam room in
     // their blurb); a public pool or gym is not a spa.
     re: /\bspas?\b|\bsaunas?\b|\bthermal (?:spa|pools?|baths?)\b|\bhot springs?\b|\bhot pools?\b|\bnordic (?:spa|baths?)\b|\bsteam (?:room|cave)\b|\bsalt cave\b/i,
@@ -7629,7 +7649,7 @@ function tripPlannerFrModule() {
 const TRIP_PLANNER_DROPPED_TYPES = new Set(['sport', 'shop']);
 function buildTripPlannerTaxonomy() {
   const taxonomy = buildDiscoveryTaxonomy();
-  return { ...taxonomy, types: [...new Set([...taxonomy.types, ...Object.keys(CATEGORY_SLUGS)])].filter((t) => !TRIP_PLANNER_DROPPED_TYPES.has(t)), venues: taxonomy.venues.filter((v) => !TRIP_PLANNER_DROPPED_TYPES.has(v.type)) };
+  return { ...taxonomy, planner: true, types: [...new Set([...taxonomy.types, ...Object.keys(CATEGORY_SLUGS)])].filter((t) => !TRIP_PLANNER_DROPPED_TYPES.has(t)), venues: taxonomy.venues.filter((v) => !TRIP_PLANNER_DROPPED_TYPES.has(v.type)) };
 }
 // 2026-10-25: "a day in Baldy" in late October came back with every slot empty ("No suitable morning stop..."), and
 // Apex, SilverStar and Big White with one or two stops: between seasons almost everything on a ski hill is closed. When
@@ -7696,7 +7716,7 @@ function runTripPlan(args, now = new Date()) {
 // itself has none): a request that names an indoor kind (trip-requirements.js KINDS, the planner kinds of indoor-kinds.js)
 // in one town with fewer than two places of that kind there takes in the towns right around it (TRIP_SITE nearTowns:
 // Kelowna -> West Kelowna and Lake Country), with the same note as "near Kelowna". French requests too (« à Kelowna »).
-const TRIP_INDOOR_PLANNER_KINDS = [...new Set(Object.values(require('./trip-requirements').INDOOR_KIND_PLANNER).flat())];
+const TRIP_INDOOR_PLANNER_KINDS = [...new Set(Object.values(require('./trip-requirements').INDOOR_KIND_PLANNER).flat().concat(['sauna']))]; // indoor test 10: a hot tub or sauna too
 function tripIndoorKindsAsked(text) {
   const TR = require('./trip-requirements');
   let en = String(text || '');
@@ -7747,7 +7767,18 @@ function tripIndoorKindNearTowns(first, args, now) {
     const own = (x) => x && x.venue && x.venue.region === town && firstKind.some((y) => y.venue.id === x.venue.id);
     wider.recommendations = wider.recommendations.filter(own).concat(wider.recommendations.filter((x) => !own(x)));
   }
-  const near = towns.slice(1), nearText = near.length > 1 ? `${near.slice(0, -1).join(', ')} and ${near[near.length - 1]}` : near[0];
+  // Indoor test 10 (2026-11-19): the places of the asked kind from next door come nearest town first (trip-site.js lists
+  // each town's neighbours nearest first), and the note names only the towns they come from.
+  const order = [town, ...TRIP_NEAR_TOWNS[town]];
+  const rankOf = (x) => { const k = order.indexOf(x && x.venue && x.venue.region); return k < 0 ? order.length : k; };
+  const kindIds = new Set(widerKind.map((x) => x.venue.id));
+  if (Array.isArray(wider.recommendations)) {
+    const recs = wider.recommendations, kindRecs = recs.filter((x) => x && x.venue && kindIds.has(x.venue.id));
+    const sorted = kindRecs.map((x, i) => [x, i]).sort((a, b) => (a[0].venue.region === town ? -1 : 0) - (b[0].venue.region === town ? -1 : 0) || rankOf(a[0]) - rankOf(b[0]) || a[1] - b[1]).map((x) => x[0]);
+    wider.recommendations = sorted.concat(recs.filter((x) => !(x && x.venue && kindIds.has(x.venue.id))));
+  }
+  const fromTowns = order.slice(1).filter((r) => widerKind.some((x) => x.venue.region === r)).map((r) => REGION_LABELS[r]);
+  const near = fromTowns.length ? fromTowns : towns.slice(1), nearText = near.length > 1 ? `${near.slice(0, -1).join(', ')} and ${near[near.length - 1]}` : near[0];
   const note = !firstKind.length ? `Nothing in ${label} itself matched, so this includes ${nearText} nearby.` : `This includes ${nearText}, right next to ${label}.`;
   wider.notes = [note].concat(wider.notes || []);
   wider.contextNotes = [note].concat(wider.contextNotes || []);
@@ -8855,6 +8886,7 @@ function lateAfterMinutes(text) {
   return m ? (Number(m[1]) + 12) * 60 + Number(m[2] || 0) : null;
 }
 const TEAM_BUILDING_WORDS_RE = /\bteam[\s-]?building(?:\s+(?:activit(?:y|ies)|events?|ideas?|outings?|days?|nights?|games?|exercises?|experiences?|venues?|places?|spots?|fun|things to do))+\b|\bteambuilding\b/gi;
+const TRIP_SWIM_OFF_MONTHS = [11, 12, 1, 2, 3, 4];
 function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   // 2026-11-05: trip-length, clock-time, holiday-weekend and tour wording made plain; a beer, cider or distillery "tour" is a run of
@@ -8887,6 +8919,12 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     let cal = null; try { cal = require('./trip-requirements').tripCalendar(planTextPlain, todayLocal(now)); } catch (e) { cal = null; }
     const month = named ? ['january','february','march','april','may','june','july','august','september','october','november','december'].indexOf(named[1].toLowerCase()) + 1 : Number(String((cal && cal.startDate) || todayLocal(now)).slice(5, 7));
     planTextPlain = tripPlannerModule().mountainDayText(planTextPlain, month);
+    // Indoor test 10 (2026-11-19; "swim on Christmas Day in Vernon" planned three beaches): outside the lake season
+    // (November to April, trip-planner.js WATER_SEASON_OFF) a plain swim is an indoor pool, unless the request is about
+    // the beach or the lake itself.
+    if (TRIP_SWIM_OFF_MONTHS.includes(month) && !/\b(?:beach\w*|lakes?|lakeside|outdoors?|outside|cold plunge|polar bear|dog)\b/i.test(planTextPlain)) {
+      planTextPlain = planTextPlain.replace(/\b(?<!(?:lane|public|family|leisure|adult|parent|tot|aqua) )(?:go (?:for )?a |a )?swim(?:ming)?\b(?! (?:lessons?|pools?|times?|club))/gi, 'indoor pool');
+    }
   }
   // Holidays become dates and visitor shorthand becomes the planner's words (2026-10-25).
   // No wineries in the Sea to Sky (2026-10-25: "yoga and wine in Squamish" found nothing): wine means the wine bars and

@@ -67,7 +67,7 @@ const placed = {};
 test.before(async () => {
   srv = http.createServer(app.server.listeners('request')[0]); await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`;
   for (const [kind, k] of Object.entries(KINDS)) {
-    const v = mk({ name: k.name, cuisine: k.cuisine, description: `${k.name}, ${k.cuisine.toLowerCase()} in ${TOWN}.` });
+    const v = mk({ name: k.name, cuisine: k.cuisine, description: `${k.name}, ${k.cuisine.toLowerCase()} in ${TOWN}.${kind === 'pool' ? ' A 25 m lap pool, a hot tub and a sauna.' : ''}` });
     await ok(change(tokenFor(v.id), { indoor_info: { kinds: [kind], length: '1-2h', age: kind === 'casino' ? '19' : 'all', year: 'all' } }));
     placed[kind] = v;
   }
@@ -75,6 +75,12 @@ test.before(async () => {
   for (const [nm, c, d] of [['Summerland Family Fun Centre', 'Family fun centre', 'Bowling, an arcade and laser tag for the whole family.'], ['Summerland Heritage Museum & Archives', 'Museum', 'Local history.'],
     ['Summerland Leisure Pool', 'Pool', 'A leisure pool with a waterslide.'], ['Summerland Public Art Gallery', 'Art gallery', 'Rotating exhibitions.'], ['Summerland Playhouse', 'Live theatre', 'A community theatre.']]) {
     mk({ name: nm, cuisine: c, description: d, rating: 4.8, reviews: 500, kid_friendly: 1 });
+  }
+  // Indoor test 10 (2026-11-19): Sports & Recreation and beaches in the same town, so the phrases they own ("swimming
+  // pool", "rec centre", "climbing wall" -> Sports & Recreation; "swim" -> beaches) are read the way a real town reads them.
+  for (const [nm, type, d] of [['Summerland Disc Golf Course', 'sport', 'An 18-hole disc golf course.'], ['Summerland BMX Track', 'sport', 'A BMX track.'], ['Summerland Arena', 'sport', 'An ice arena.'],
+    ['Peach Orchard Beach', 'beach', 'A sandy swimming beach.'], ['Sun-Oka Beach', 'beach', 'A long sandy beach.']]) {
+    mk({ name: nm, type, cuisine: null, description: d, rating: 4.7, reviews: 300 });
   }
 });
 test.after(() => srv && srv.close());
@@ -124,4 +130,97 @@ test('A named kind with nothing in the town itself takes in the towns right arou
     const r = await fetch(`${base}${lang === 'fr' ? '/fr' : ''}/search?q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } });
     assert.ok(plain(await r.text()).includes('Westside Kidz Play Centre'), `search ${lang} "${q}" -> ${r.url.replace(base, '')}`);
   }
+});
+
+// Indoor test 10 (2026-11-19; Sandra's Vernon Aquatic Centre: "swimming pool Vernon", "aquatic centre" and "rec centre"
+// listed disc golf and BMX in search and beaches in Build My Trip; "hot tub / sauna Vernon" planned Kelowna spas): the
+// common other ways of naming each kind, English and French, with Sports & Recreation and beaches in the same town.
+const SYN = {
+  gallery: { en: ['art museum in {T}', 'art exhibit in {T}', 'art galleries near {T}'], fr: ['musée d’art à {T}', 'exposition d’art à {T}', 'galeries à {T}'] },
+  museum: { en: ['science center {T}', 'museums near {T}', 'a museum to visit in {T}'], fr: ['un musée à {T}', 'centre des sciences à {T}', 'musées près de {T}'] },
+  theatre: { en: ['playhouse in {T}', 'theater in {T}', 'watch a play in {T}'], fr: ['aller au théâtre à {T}', 'voir une pièce de théâtre à {T}', 'salle de théâtre à {T}'] },
+  cinema: { en: ['movies in {T}', 'movie theater {T}', 'watch a film in {T}', 'see a film {T}'], fr: ['cinémas à {T}', 'aller au cinéma à {T}', 'cinéma ce soir à {T}'] },
+  spa: { en: ['massage in {T}', 'nordic spa {T}', 'facial {T}'], fr: ['massage à {T}', 'spa nordique à {T}', 'soins du visage à {T}'] },
+  pool: { en: ['swimming pool {T}', 'aquatic centre {T}', 'rec centre {T}', 'public swim {T}', 'aquafit {T}'], fr: ['piscine à {T}', 'centre aquatique à {T}', 'bain libre à {T}', 'aquaforme à {T}'] },
+  climbing: { en: ['bouldering gym {T}', 'climbing wall {T}', 'indoor rock climbing {T}'], fr: ['escalade intérieure à {T}', 'mur d’escalade à {T}', 'centre d’escalade à {T}'] },
+  games: { en: ['laser tag arena {T}', 'vr arcade {T}', 'arcade games {T}'], fr: ['jeux d’arcade à {T}', 'réalité virtuelle à {T}', 'arcade à {T}'] },
+  escape: { en: ['escape game {T}', 'puzzle rooms {T}', 'escape room for 4 in {T}'], fr: ['jeu d’évasion à {T}', 'salle d’évasion à {T}', 'escape room à {T}'] },
+  bowling: { en: ['bowling alley in {T}', 'ten pin bowling {T}', 'go bowling in {T}'], fr: ['salle de quilles à {T}', 'aller aux quilles à {T}', 'quilles ce soir à {T}'] },
+  kids: { en: ['kids play place {T}', 'indoor play area {T}', 'toddler play {T}'], fr: ['centre de jeux pour enfants à {T}', 'jeux intérieurs à {T}', 'aire de jeux intérieure pour enfants à {T}'] },
+  classes: { en: ['pottery studio {T}', 'paint night {T}', 'ceramics class {T}'], fr: ['atelier de céramique à {T}', 'soirée peinture à {T}', 'cours de poterie pour adultes à {T}'] },
+  curling: { en: ['curling rink {T}', 'try curling in {T}', 'curling lessons {T}'], fr: ['jouer au curling à {T}', 'club de curling à {T}', 'curling ce samedi à {T}'] },
+  yoga: { en: ['fitness class {T}', 'yoga studio {T}', 'spin class {T}', 'barre class {T}'], fr: ['cours de mise en forme à {T}', 'studio de yoga à {T}', 'pilates à {T}'] },
+  casino: { en: ['slot machines {T}', 'casino night {T}', 'table games {T}'], fr: ['machines à sous à {T}', 'soirée au casino à {T}', 'tables de jeu à {T}'] },
+  library: { en: ['public library {T}', 'storytime {T}', 'libraries in {T}'], fr: ['bibliothèque municipale à {T}', 'heure du conte à {T}', 'bibliothèques à {T}'] },
+};
+const synAsks = () => Object.entries(SYN).flatMap(([kind, k]) => ['en', 'fr'].flatMap((lang) => k[lang].map((q) => ({ kind, lang, q: q.replace('{T}', TOWN) }))));
+
+test('Indoor test 10: every kind has 3 to 5 common synonyms in English and French', () => {
+  assert.deepEqual(Object.keys(SYN).sort(), IK.INDOOR_KIND_TEXT_KINDS.filter((k) => k !== 'other').sort());
+  for (const k of Object.values(SYN)) for (const l of ['en', 'fr']) assert.ok(k[l].length >= 3 && k[l].length <= 5);
+});
+
+test('Indoor test 10: Build My Trip offers each kind\'s place for its synonyms (EN + FR), first among the indoor stops, with Sports & Recreation and beaches in town', () => {
+  const fails = [];
+  for (const { kind, lang, q } of synAsks()) {
+    const p = app.runTripPlan({ text: q }, NOW);
+    const items = itemsOf(p);
+    const names = items.map((x) => `${x.venue.name} [${x.venue.type}]`).slice(0, 6).join(' | ');
+    if (!items.some((x) => x.venue.id === placed[kind].id)) { fails.push(`${lang} ${kind}: "${q}" leaves it out (${p.kind}: ${names || (p.notes || []).join(' ').slice(0, 120)})`); continue; }
+    const first = items.find((x) => x.venue.type === 'indoor');
+    if (first && !fitsKind(first.venue, kind)) fails.push(`${lang} ${kind}: "${q}" leads with ${first.venue.name}`);
+    if (kind === 'pool' && items.some((x) => ['sport', 'beach'].includes(x.venue.type))) fails.push(`${lang} pool: "${q}" also lists ${names}`);
+  }
+  assert.deepEqual(fails, []);
+});
+
+test('Indoor test 10: site search offers each kind\'s place for its synonyms (EN + FR); "swimming pool", "aquatic centre" and "rec centre" never list disc golf or BMX', async () => {
+  const fails = [];
+  for (const { kind, lang, q } of synAsks()) {
+    const r = await fetch(`${base}${lang === 'fr' ? '/fr' : ''}/search?q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } });
+    const h = plain(await r.text());
+    if (!h.includes(placed[kind].name)) fails.push(`${lang} ${kind}: "${q}" -> ${r.url.replace(base, '')} misses it`);
+    if (kind === 'pool' && /Disc Golf Course|BMX Track/.test(h)) fails.push(`${lang} pool: "${q}" lists disc golf or BMX`);
+  }
+  assert.deepEqual(fails, []);
+});
+
+test('Indoor test 10: a hot tub or sauna request offers the pool whose own words say it (Build My Trip and search, EN + FR), not only spas', async () => {
+  for (const q of [`hot tub ${TOWN}`, `sauna in ${TOWN}`, `hot tub and sauna ${TOWN}`, `steam room ${TOWN}`, `sauna à ${TOWN}`, `bain à remous à ${TOWN}`]) {
+    const p = app.runTripPlan({ text: q }, NOW);
+    assert.ok(itemsOf(p).some((x) => x.venue.id === placed.pool.id), `${q}: ${itemsOf(p).map((x) => x.venue.name).join(' | ')}`);
+  }
+  for (const [lang, q] of [['en', `hot tub ${TOWN}`], ['en', `sauna ${TOWN}`], ['fr', `sauna à ${TOWN}`]]) {
+    const r = await fetch(`${base}${lang === 'fr' ? '/fr' : ''}/search?q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } });
+    assert.ok(plain(await r.text()).includes(placed.pool.name), `search ${lang} "${q}"`);
+  }
+  // "Spa day" is still a spa (a pool's sauna is not a spa day).
+  const spaDay = itemsOf(app.runTripPlan({ text: `spa day in ${TOWN}` }, NOW));
+  assert.ok(spaDay.some((x) => x.venue.id === placed.spa.id));
+  assert.ok(!spaDay.some((x) => x.venue.id === placed.pool.id));
+});
+
+test('Indoor test 10: "swim" in winter is the pool, never a beach; in the lake season the beaches stay and come first (Build My Trip)', () => {
+  for (const q of [`swim in ${TOWN}`, `swim on Christmas Day in ${TOWN}`, `go for a swim in ${TOWN} in January`, `nager à ${TOWN} en décembre`]) {
+    const items = itemsOf(app.runTripPlan({ text: q }, NOW));
+    assert.ok(items.some((x) => x.venue.id === placed.pool.id), `${q}: ${items.map((x) => x.venue.name).join(' | ')}`);
+    assert.ok(!items.some((x) => x.venue.type === 'beach'), `${q}: ${items.map((x) => x.venue.name).join(' | ')}`);
+  }
+  const july = itemsOf(app.runTripPlan({ text: `swim in ${TOWN} in July` }, NOW));
+  assert.equal(july[0] && july[0].venue.type, 'beach', july.map((x) => x.venue.name).join(' | '));
+  assert.ok(!july.some((x) => x.venue.type === 'indoor' && x.venue.id !== placed.pool.id), july.map((x) => x.venue.name).join(' | '));
+});
+
+test('Indoor test 10: Sports & Recreation and beach searches still list what they did (disc golf, BMX, arena, beaches), and lawn bowling is never a bowling alley', async () => {
+  const get = async (q) => plain(await (await fetch(`${base}/search?q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } })).text());
+  assert.match(await get(`disc golf ${TOWN}`), /Summerland Disc Golf Course/);
+  assert.match(await get(`bmx ${TOWN}`), /Summerland BMX Track/);
+  const sports = await get(`sports in ${TOWN}`);
+  for (const n of ['Summerland Disc Golf Course', 'Summerland BMX Track', 'Summerland Arena']) assert.ok(sports.includes(n), n);
+  const beaches = await get(`beaches ${TOWN}`);
+  for (const n of ['Peach Orchard Beach', 'Sun-Oka Beach']) assert.ok(beaches.includes(n), n);
+  assert.ok(!beaches.includes(placed.pool.name));
+  assert.deepEqual(IK.indoorKindsNamedIn(`lawn bowling ${TOWN}`), []);
+  assert.deepEqual(IK.indoorKindsNamedIn(`bowling green in ${TOWN}`), []);
+  assert.deepEqual(IK.indoorKindsNamedIn('pool table bar'), []);
 });

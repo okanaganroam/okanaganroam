@@ -847,6 +847,14 @@ function uniq(list) { return Array.from(new Set(list)); }
 // taxonomy, every phrase normalized the same way as the input.
 // Types whose aliases, when the taxonomy has the type, belong to it alone.
 const CLAIMING_TYPES = ['tour', 'sport', 'shop'];
+// Indoor test 10 (2026-11-19, the vocabulary audit): phrases that Sports & Recreation, beaches or golf own which also name
+// an indoor kind (indoor-kinds.js: a pool, a climbing gym, a karting or mini golf place, a spa's hot tub). They mean
+// both: the other type keeps its places and the indoor places of that kind are added. (Build My Trip leaves out the
+// beaches for "swim" outside the lake season: trip-planner.js.)
+const ALSO_INDOOR_PHRASES = ['swimming pool', 'swimming pools', 'aquatic centre', 'aquatic center', 'aquatic centres', 'aquatic centers', 'rec centre', 'rec center', 'rec centres', 'rec centers',
+  'recreation centre', 'recreation center', 'swim', 'swimming', 'go karts', 'go karting', 'karting', 'mini putt', 'mini golf', 'climbing wall', 'climbing walls',
+  'hot tub', 'hot tubs', 'sauna', 'saunas', 'steam room', 'wave pool', 'leisure pool', 'indoor pool', 'indoor pools'];
+const ALSO_INDOOR_SEARCH_ONLY = new Set(['swim', 'swimming', 'go karts', 'go karting', 'karting', 'mini putt', 'mini golf', 'climbing wall', 'climbing walls']);
 function buildPhraseTable(taxonomy) {
   const t = normalizeTaxonomy(taxonomy);
   const entries = new Map();
@@ -877,6 +885,12 @@ function buildPhraseTable(taxonomy) {
     if (owner && owner !== type) continue;
     add(p, 'type', type);
   }
+  // Indoor test 10 (2026-11-19; Sandra's Vernon Aquatic Centre: "swimming pool Vernon" listed disc golf and BMX, and
+  // Build My Trip sent it to beaches): a phrase another type owns that also names an indoor kind means that type AND
+  // indoor places (an outdoor pool on Sports & Recreation, the indoor pool too).
+  // Build My Trip (taxonomy.planner) reads only the pool, hot tub and sauna ones this way: its own kinds read the others
+  // ("climbing wall", "go karting" find the places that say so), and a summer "swim" stays the beaches.
+  if (t.types.includes('indoor')) for (const p of ALSO_INDOOR_PHRASES) if (!(taxonomy && taxonomy.planner) || !ALSO_INDOOR_SEARCH_ONLY.has(p)) add(p, 'type', 'indoor');
   for (const [feature, phrases] of Object.entries(FEATURE_ALIASES)) if (t.features.includes(feature)) for (const p of phrases) add(p, 'feature', feature);
   for (const [kind, phrases] of Object.entries(COLLECTION_ALIASES)) if (t.collections.includes(kind)) for (const p of phrases) add(p, 'collection', kind);
   for (const [slug, phrases] of Object.entries(ACTIVITY_ALIASES)) if (t.activities.includes(slug)) for (const p of phrases) add(p, 'activity', slug);
@@ -1221,7 +1235,7 @@ const validVenue = (v) => v && Number.isInteger(v.id) && typeof v.name === 'stri
 // direct comparison, no copy of the venue list). Region, type and slug are
 // always read from the current taxonomy, never from the cache.
 function discoveryIndex(taxonomy, t) {
-  const vocabKey = JSON.stringify([t.regions, t.regionLabels, t.types, t.features, t.collections, t.activities, t.cuisines, t.budgets, t.paces, t.datePresets, t.eventCategories]);
+  const vocabKey = JSON.stringify([!!(taxonomy && taxonomy.planner), t.regions, t.regionLabels, t.types, t.features, t.collections, t.activities, t.cuisines, t.budgets, t.paces, t.datePresets, t.eventCategories]);
   for (let k = 0; k < DISCOVERY_INDEX_CACHE.length; k++) {
     const e = DISCOVERY_INDEX_CACHE[k];
     if (e.vocabKey !== vocabKey) continue;

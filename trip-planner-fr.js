@@ -103,6 +103,12 @@ const PHRASES = [
   ['cours de yoga', 'yoga class'], ['yoga chaud', 'hot yoga'], ['cours de mise en forme', 'fitness class'],
   ['machines a sous', 'slot machines'], ['machine a sous', 'slot machines'], ['tables de jeu', 'table games'],
   ['bibliotheque publique', 'public library'], ['bibliotheque', 'library'], ['bibliotheques', 'libraries'], ['heure du conte', 'story time'],
+  // Indoor test 10 (2026-11-19, the synonym matrix): more French ways of naming each indoor kind.
+  ['musee d art', 'art gallery'], ['musees d art', 'art galleries'], ['mur d escalade', 'climbing wall'], ['murs d escalade', 'climbing walls'], ['soiree peinture', 'paint night'], ['soirees peinture', 'paint night'],
+  ['aquaforme', 'aquafit'], ['aqua forme', 'aquafit'], ['bain a remous', 'hot tub'], ['bains a remous', 'hot tubs'], ['bain tourbillon', 'hot tub'], ['salle de theatre', 'theatre'], ['salles de theatre', 'theatres'],
+  ['theatre communautaire', 'community theatre'], ['bibliotheque municipale', 'public library'], ['centre de jeux pour enfants', 'indoor playground for kids'], ['studio de yoga', 'yoga studio'],
+  ['jouer au curling', 'curling'], ['faire du curling', 'curling'], ['essayer le curling', 'learn to curl'],
+  ['soiree au casino', 'casino night'], ['bain de vapeur', 'steam room'], ['cinemas', 'cinemas'],
   ['centre des sciences', 'science centre'], ['centre de sciences', 'science centre'], ['centre scientifique', 'science centre'],
   ['activites interieures', 'indoor activities'], ['activite interieure', 'indoor activity'], ['quand il pleut', 'when it rains'], ['jour de pluie', 'rainy day'],
   ['obligatoirement', 'must'], ['obligatoire', 'must'], ['seulement', 'only'], ['idealement', 'ideally'],

@@ -84,31 +84,33 @@ K.spa = { day: true, gtk: 'spa', ex: 'spa',
     prices: { noun: 'spa menu', page: 'Spa menu', lead: 'Every treatment, pass and package and what it costs, like a 60-minute massage. A photo of your spa menu or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Hydrotherapy circuit: walk-ins welcome. Treatments by appointment', ages: '16+ for treatments, 19+ for the circuit', gift: 'Gift cards for treatments and spa days, at the front desk or online', prices: 'Massage: 60 min $130, 90 min $175' },
     groups: { chips: ['Couples’ packages', 'Bridal and private parties', 'Private spa bookings on request'], lead: 'Tap a size, then add couples’ packages, bridal parties or private bookings in your own words.', ex: 'Couples’ packages. Bridal parties for up to 8' },
-    search: ['spa', 'spas', 'day spa', 'massage', 'massages', 'couples massage', 'facial', 'facials', 'hydrotherapy', 'sauna', 'saunas', 'nordic spa', 'steam room', 'wellness'] },
+    search: ['spa', 'spas', 'day spa', 'massage', 'massages', 'couples massage', 'facial', 'facials', 'hydrotherapy', 'sauna', 'saunas', 'nordic spa', 'steam room', 'wellness', 'hot tub', 'hot tubs', 'whirlpool'] },
   fr: { price: { page: 'À partir de {x}.', basis: 'Soins et forfaits', label: 'Votre prix le plus bas (un forfait ou votre soin le plus court)', ph: 'Comme un forfait d’un jour ou un soin de 30 minutes', lead: 'Votre prix le plus bas : un forfait ou votre soin le plus court. Il paraît sur votre fiche.' },
     prices: { noun: 'carte des soins', page: 'Carte des soins', lead: 'Chaque soin, forfait et laissez-passer et son prix, comme un massage de 60 minutes. Une photo de votre carte des soins ou un lien vers celle-ci, c’est parfait. C’est facultatif.' },
     help: { walkin: 'Circuit d’hydrothérapie : sans réservation. Soins sur rendez-vous', ages: '16+ pour les soins, 19+ pour le circuit', gift: 'Cartes-cadeaux pour les soins et les journées au spa, à l’accueil ou en ligne', prices: 'Massage : 60 min 130 $, 90 min 175 $' },
     groups: { chips: ['Forfaits pour couples', 'Fêtes de mariage et fêtes privées', 'Réservation privée du spa sur demande'], lead: 'Touchez une taille, puis ajoutez les forfaits pour couples, les fêtes de mariage ou les réservations privées dans vos mots.', ex: 'Forfaits pour couples. Fêtes de mariage jusqu’à 8 personnes' },
-    search: ['spa', 'spas', 'spa de jour', 'massage', 'massages', 'massage en couple', 'soin du visage', 'soins du visage', 'hydrothérapie', 'sauna', 'spa nordique', 'bien-être'] } };
+    search: ['spa', 'spas', 'spa de jour', 'massage', 'massages', 'massage en couple', 'soin du visage', 'soins du visage', 'hydrothérapie', 'sauna', 'spa nordique', 'bien-être', 'bain à remous', 'bain tourbillon'] } };
 
 K.pool = { day: true, gtk: 'pool', ex: 'pool',
   en: { price: { page: 'Drop-in from {x}.', basis: 'Drop-in', label: 'Adult drop-in, in dollars', ph: 'Your adult drop-in price', lead: 'Your adult drop-in price. It shows on your card.' },
     prices: { noun: 'rates page', page: PRICES_PAGE[0], lead: 'Drop-in, passes and lessons for adults, kids and families, with their prices. A photo of your rates or a link to your rates page is perfect. It’s optional.' },
     help: { walkin: 'Drop in during public swims; lessons need booking', ages: 'All ages; under 8 with an adult in the water', gift: 'Gift cards and passes at the front desk', prices: 'Kids $4, 10-visit pass $60' },
     groups: { chips: ['Birthday parties with a party room', 'School groups welcome', 'Pool or room rentals on request'], lead: 'Tap a size, then add birthday parties, school groups or rentals in your own words.', ex: 'Birthday parties with a party room. Pool rentals on request' },
-    search: ['pool', 'pools', 'swim', 'swimming', 'lane swim', 'public swim', 'rec centre', 'recreation centre', 'aquatic centre', 'waterslide'] },
+    search: ['pool', 'pools', 'swim', 'swimming', 'lane swim', 'public swim', 'rec centre', 'recreation centre', 'aquatic centre', 'waterslide',
+      // Indoor test 10 (2026-11-19): the words visitors use for a city pool (the vocabulary audit).
+      'swimming pool', 'swimming pools', 'indoor pool', 'indoor pools', 'aquatic center', 'rec center', 'recreation center', 'leisure pool', 'wave pool', 'aquafit', 'aqua fit', 'water aerobics'] },
   fr: { price: { page: 'Entrée à la séance à partir de {x}.', basis: 'Entrée à la séance', label: 'Prix adulte à la séance, en dollars', ph: 'Votre prix adulte à la séance', lead: 'Votre prix adulte à la séance. Il paraît sur votre fiche.' },
     prices: { noun: 'page des tarifs', page: PRICES_PAGE[1], lead: 'L’entrée à la séance, les laissez-passer et les cours pour adultes, enfants et familles, avec leurs prix. Une photo de vos tarifs ou un lien vers votre page des tarifs, c’est parfait. C’est facultatif.' },
     help: { walkin: 'Sans réservation pendant les bains libres; les cours se réservent', ages: 'Tous les âges; moins de 8 ans avec un adulte dans l’eau', gift: 'Cartes-cadeaux et laissez-passer à l’accueil', prices: 'Enfants 4 $, carte de 10 entrées 60 $' },
     groups: { chips: ['Fêtes d’anniversaire avec salle de fête', 'Groupes scolaires bienvenus', 'Location de la piscine ou d’une salle sur demande'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes scolaires ou les locations dans vos mots.', ex: 'Fêtes d’anniversaire avec salle de fête. Location de la piscine sur demande' },
-    search: ['piscine', 'piscines', 'baignade', 'bain libre', 'nage en couloir', 'centre récréatif', 'centre aquatique', 'glissade d’eau'] } };
+    search: ['piscine', 'piscines', 'baignade', 'bain libre', 'nage en couloir', 'centre récréatif', 'centre aquatique', 'glissade d’eau', 'piscine intérieure', 'piscine publique', 'aquaforme', 'natation'] } };
 
 K.climbing = { day: true, gtk: 'active', ex: 'climbing',
   en: { price: { page: 'Passes from {x}.', basis: 'Passes', label: 'Your lowest adult pass (day or timed)', ph: 'Like a day pass or a 60-minute jump', lead: 'Your lowest adult pass: a day pass or a timed jump. It shows on your card.' },
     prices: { noun: 'rates page', page: PRICES_PAGE[0], lead: 'Day passes, punch cards, memberships, lessons and gear rental, with their prices. A photo of your rates or a link to your rates page is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; intro lessons by booking', ages: 'All ages; under 14 with an adult', gift: 'Gift cards and punch cards at the front desk', prices: 'Gear rental $8, 10-visit punch card $180' },
     groups: { chips: ['Birthday parties', 'School and camp groups', 'Team building and private bookings'], lead: 'Tap a size, then add birthday parties, school groups or team building in your own words.', ex: 'Birthday parties for up to 12 climbers. School and camp groups welcome' },
-    search: ['climbing', 'climbing gym', 'bouldering', 'rock climbing', 'indoor climbing', 'trampoline', 'trampoline park', 'parkour', 'ninja'] },
+    search: ['climbing', 'climbing gym', 'bouldering', 'rock climbing', 'indoor climbing', 'trampoline', 'trampoline park', 'parkour', 'ninja', 'climbing wall', 'climbing walls'] },
   fr: { price: { page: 'Laissez-passer à partir de {x}.', basis: 'Laissez-passer', label: 'Votre laissez-passer adulte le moins cher (journée ou durée)', ph: 'Comme un laissez-passer d’un jour ou 60 minutes de saut', lead: 'Votre laissez-passer adulte le moins cher : à la journée ou à durée. Il paraît sur votre fiche.' },
     prices: { noun: 'page des tarifs', page: PRICES_PAGE[1], lead: 'Laissez-passer d’un jour, cartes, abonnements, cours et location d’équipement, avec leurs prix. Une photo de vos tarifs ou un lien vers votre page des tarifs, c’est parfait. C’est facultatif.' },
     help: { walkin: 'Sans réservation; cours d’initiation sur réservation', ages: 'Tous les âges; moins de 14 ans avec un adulte', gift: 'Cartes-cadeaux et cartes de 10 entrées à l’accueil', prices: 'Location d’équipement 8 $, carte de 10 entrées 180 $' },
@@ -120,7 +122,7 @@ K.games = { gtk: 'general', ex: 'games',
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Each game, pass and party package and what it costs. A photo of your price list or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Arcade: walk-ins welcome. VR and laser tag best booked', ages: 'All ages; 19+ after 8 PM', gift: 'Gift cards and game cards at the counter', prices: 'Laser tag $15 a round, VR $25 for 30 min' },
     groups: { chips: ['Birthday parties', 'Corporate events and team building', 'Private bookings on request'], lead: 'Tap a size, then add birthday parties, team building or private bookings in your own words.', ex: 'Birthday parties with a private room for up to 20. Corporate team building for up to 40' },
-    search: ['arcade', 'arcades', 'vr', 'virtual reality', 'laser tag', 'go karts', 'go-karts', 'karting', 'axe throwing', 'mini golf'] },
+    search: ['arcade', 'arcades', 'vr', 'virtual reality', 'laser tag', 'go karts', 'go-karts', 'karting', 'axe throwing', 'mini golf', 'mini putt'] },
   fr: { price: { page: 'À partir de {x}.', basis: 'Jeux et forfaits', label: 'Votre prix le plus bas pour une personne (une partie ou un forfait), en dollars', ph: 'Comme une partie de réalité virtuelle ou de laser tag', lead: 'Votre prix le plus bas pour une personne : une partie ou un forfait. Il paraît sur votre fiche.' },
     prices: { noun: 'liste de prix', page: PRICES_PAGE[1], lead: 'Chaque jeu, forfait et forfait de fête et son prix. Une photo de votre liste de prix ou un lien vers celle-ci, c’est parfait. C’est facultatif.' },
     help: { walkin: 'Arcade : sans réservation. Réalité virtuelle et laser tag : mieux vaut réserver', ages: 'Tous les âges; 19+ après 20 h', gift: 'Cartes-cadeaux et cartes de jeu au comptoir', prices: 'Laser tag 15 $ la partie, réalité virtuelle 25 $ pour 30 min' },
@@ -312,8 +314,11 @@ function indoorPriceLine(kinds, money, lang) { return indoorKindText(kinds, lang
 // The card's small lines in both languages (English -> French), for french-text.js.
 const INDOOR_BASIS_FR = Object.fromEntries(Object.values(K).map((e) => [e.en.price.basis, e.fr.price.basis]).concat(Object.values(K).map((e) => [e.en.prices.page, e.fr.prices.page])));
 // The kinds whose words name what the request asks ("massage" -> spa), from the search words.
+// Indoor test 10 (2026-11-19, the vocabulary audit): phrases that hold a kind's word but name something else: lawn bowling
+// and bowling greens (Sports & Recreation), an outdoor pool, a pool table or pool hall.
+const NOT_INDOOR_KIND_RE = / (?:lawn bowl(?:ing|s)?|bowling greens?|outdoor (?:swimming )?pools?|pool (?:tables?|halls?|cues?)|billiards?) /g;
 function indoorKindsNamedIn(text) {
-  const t = ` ${String(text || '').toLowerCase().replace(/[’']/g, '’').replace(/[^a-z0-9À-ɏ’]+/g, ' ')} `;
+  const t = ` ${String(text || '').toLowerCase().replace(/[’']/g, '’').replace(/[^a-z0-9À-ɏ’]+/g, ' ')} `.replace(NOT_INDOOR_KIND_RE, ' ').replace(NOT_INDOOR_KIND_RE, ' ');
   const out = [];
   for (const k of INDOOR_KIND_TEXT_KINDS) {
     if (k === 'other') continue;
@@ -332,7 +337,7 @@ const INDOOR_TYPE_WORD_SKIP = new Set(['history', 'heritage', 'heritage site', '
   'live show', 'a play', 'live theatre', 'pièce de théâtre', 'comédie musicale', 'pool', 'pools', 'swim', 'swimming', 'piscine', 'piscines', 'baignade', 'waterslide', 'glissade d’eau', 'mini golf', 'mini-golf', 'go karts', 'go-karts', 'karting',
   'workshop', 'workshops', 'atelier', 'ateliers', 'wellness', 'bien-être', 'rainy day', 'indoor activity', 'indoor activities', 'things to do when it rains', 'activité intérieure',
   'activités intérieures', 'jour de pluie', 'film', 'films', 'spectacle', 'spectacles', 'humour', 'art', 'theatre', 'theater', 'théâtre',
-  'cours', 'barre', 'bingo', 'poker', 'gym', 'histoire', 'patrimoine', 'site patrimonial', 'pièces', 'climbing', 'rock climbing', 'escalade', 'pottery', 'poterie', 'céramique', 'ceramics', 'axe throwing', 'lancer de hache', 'trampoline', 'parkour', 'ninja', 'vr', 'bowl', 'play area', 'aire de jeux', 'kids play']);
+  'cours', 'barre', 'bingo', 'poker', 'gym', 'histoire', 'patrimoine', 'site patrimonial', 'pièces', 'climbing', 'rock climbing', 'escalade', 'pottery', 'poterie', 'céramique', 'ceramics', 'axe throwing', 'lancer de hache', 'trampoline', 'parkour', 'ninja', 'vr', 'bowl', 'mini putt', 'natation', 'play area', 'aire de jeux', 'kids play']);
 // The words that mean "an indoor place" in search and Build My Trip ("facial", "bouldering", "lane swim", "tenpin",
 // "learn to curl", "slots", « soin du visage »).
 const INDOOR_TYPE_WORDS = [...new Set(Object.values(K).flatMap((e) => e.en.search.concat(e.fr.search)).filter((w) => !INDOOR_TYPE_WORD_SKIP.has(w)))];

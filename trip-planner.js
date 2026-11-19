@@ -4848,9 +4848,18 @@ function indoorAskedWords(text) {
   for (const k of kinds) for (const ph of IK.INDOOR_KIND_TEXT[k].en.search.concat(IK.INDOOR_KIND_TEXT[k].fr.search)) for (const w of normWords(ph).split(' ')) if (w) out.add(w);
   return out;
 }
+// Indoor test 10 (2026-11-19; "indoor pool Vernon" read "Indoor & rainy day spots in Vernon", « piscine » « Lieux pour les
+// jours de pluie … pour un jour de pluie »): a request for indoor kinds names them ("Pools in Vernon.").
+const INDOOR_KIND_PLURALS = { pool: 'pools', sauna: 'hot tubs and saunas', gallery: 'art galleries', museum: 'museums', theatre: 'theatres', cinema: 'cinemas', spa: 'spas', climbing: 'climbing gyms',
+  arcade: 'arcades', escape: 'escape rooms', bowling: 'bowling alleys', playground: 'indoor playgrounds', pottery: 'classes & workshops', curling: 'curling clubs', yoga: 'yoga classes', casino: 'casinos', library: 'libraries' };
+function indoorKindPlurals(ctx) {
+  if (!ctx || !ctx.types || !ctx.types.has('indoor') || indoorAskedLabel(ctx.queryText, 'plural')) return [];
+  return [...new Set((ctx.plannerKinds || []).filter((k) => INDOOR_KIND_PLURALS[k]).map((k) => INDOOR_KIND_PLURALS[k]))];
+}
 function interestsText(ctx) {
   const items = [];
-  for (const t of ctx.types) items.push(typeLabel(ctx, t).toLowerCase());
+  const kindNames = indoorKindPlurals(ctx);
+  for (const t of ctx.types) { if (t === 'indoor' && kindNames.length) { items.push(...kindNames); continue; } items.push(typeLabel(ctx, t).toLowerCase()); }
   for (const a of ctx.activities) items.push(activityLabel(ctx, a));
   for (const c of ctx.collections) items.push(collectionLabel(ctx, c));
   // Indoor test 6 (2026-11-19; "paint your own pottery" read "Indoor & rainy day spots, “paint” and “own”"): with an
@@ -4897,6 +4906,8 @@ function buildSummary(kind, ctx, days) {
   const at = when ? ` ${when}` : '';
   const focus = interests.length ? `, focused on ${listText(interests)}` : '';
   const occ = ctx.occasion ? OCCASION_LABELS[ctx.occasion] : null;
+  // Indoor test 10: indoor places for a rainy day say it once ("Indoor & rainy day spots in Vernon.", never "… for a rainy day").
+  const occ2 = occ && ctx.occasion === 'rainy_day' && ctx.types && ctx.types.has('indoor') ? null : occ;
   let text;
   if (kind === 'multi_day' || kind === 'day_plan') {
     const n = days === 1 ? 'A one-day plan' : `${days} ${ctx.pace === 'standard' ? '' : `${ctx.pace} `}days`;
@@ -4905,7 +4916,7 @@ function buildSummary(kind, ctx, days) {
     text = `${occ ? article(occ, true) : 'An outing'} in ${whereText(ctx)}${at}${focus}.`;
   } else if (kind === 'recommendations' || kind === 'discover') {
     if (ctx.foodTerms.length && !ctx.types.size) text = `Places that mention ${listText(ctx.foodTerms.map((f) => `“${f.term}”`))} in ${whereText(ctx)}${at}${ctx.superlative ? ', ranked by how closely they match and by their ratings' : ''}.`;
-    else text = `${interests.length ? `${listText(interests).replace(/^./, (c) => c.toUpperCase())} in ${whereText(ctx)}` : `Ideas for ${whereText(ctx)}`}${at}${occ ? ` for ${article(occ)}` : ''}.`;
+    else text = `${interests.length ? `${listText(interests).replace(/^./, (c) => c.toUpperCase())} in ${whereText(ctx)}` : `Ideas for ${whereText(ctx)}`}${at}${occ2 ? ` for ${article(occ2)}` : ''}.`;
   } else if (kind === 'events') {
     text = `What’s on in ${whereText(ctx)}.`;
   } else {
