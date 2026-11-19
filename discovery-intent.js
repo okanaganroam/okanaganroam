@@ -2365,6 +2365,15 @@ function interpretTripComponents(text, taxonomy, baseIntent) {
     walkPart.lake = true;
     out.leftoverTerms = out.leftoverTerms.filter((w) => !lakeWords.includes(w));
   }
+  // Build My Trip fixes (2026-11-18): on a site whose places list "Lake" as their kind (Whistler: "Lake", "Lake trail"), the
+  // lake in "a lake walk" was read as a kind of food, so the walk was planned as "Lake restaurants" (Cheakamus Lake under
+  // a restaurant label). A walk part whose only food word is a lake word is that walk by the lake.
+  else if (walkPart && !walkPart.meal && (walkPart.cuisines || []).length && walkPart.cuisines.every((q) => lakeWords.includes(String(q).toLowerCase()))) {
+    walkPart.lake = true;
+    walkPart.cuisines = [];
+    if (walkPart.types.includes('outdoor') || (walkPart.activities || []).includes('hiking')) walkPart.types = walkPart.types.filter((t) => t !== 'restaurant');
+    if (!walkPart.types.length) walkPart.types = ['outdoor'];
+  }
   // 2026-10-14: a "brewery crawl", "pub crawl" or "wine hop" is three stops of that kind in a row, not a list.
   // Round 14 (2026-10-20): "cafe hopping" too (a dated "cafe hopping in Whistler" gave an Ideas list, not a plan).
   const CRAWL_TYPES = ['brewery', 'pub', 'winery', 'cocktail', 'distillery', 'cafe'];

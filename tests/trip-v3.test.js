@@ -258,7 +258,7 @@ test('V3 recommended searches are short and in season, in English and French', (
   assert.deepEqual(v3.T3_EXAMPLES, [
     '3 days in Kelowna: wineries, easy walks and great food',
     '2 days in Penticton with the kids',
-    'A romantic weekend in Naramata',
+    'A romantic weekend in Kelowna',
     'What can we do around Penticton if it rains?',
   ]);
   const app = fs.readFileSync(path.join(__dirname, '..', 'public', 'scripts', 'app.js'), 'utf8');
@@ -268,6 +268,10 @@ test('V3 recommended searches are short and in season, in English and French', (
   assert.match(app, /'tripv3\.example4': 'Que peut-on faire autour de Penticton s’il pleut\s*\?'/);
   assert.doesNotMatch(app, /'tripv3\.example[56]'/);
   assert.doesNotMatch(app, /tripv3\.(?:placeholder|example[1-6]|how1Text).*?(?:September|septembre|golf|beaches|plages)/);
+  // Build My Trip fixes (2026-11-18): no season named in the placeholder, and no Naramata wine chip (closed for the winter).
+  assert.doesNotMatch(app, /tripv3\.(?:placeholder|example[1-6])': '[^']*(?:autumn|automne|summer|été|winter|hiver|spring|printemps|Naramata)/);
+  const site = require('../trip-site.js').page;
+  assert.doesNotMatch(site.placeholder + JSON.stringify(site.townExamples) + site.examples.join(' '), /autumn|automne|Naramata/);
 });
 
 test('V3 page: every example chip is a request the planner turns into real stops', () => {
@@ -636,7 +640,9 @@ test('V3 /trip?region=<town> names that town in the placeholder and the four exa
   };
   const v = run('?region=vernon');
   assert.deepEqual(v.chips, ['3 days in Vernon: wineries, easy walks and great food', '2 days in Vernon with the kids', 'A romantic weekend in Vernon', 'What can we do around Vernon if it rains?']);
-  assert.match(v.placeholder, /^Plan 3 days in Vernon this autumn/);
+  // Build My Trip fixes (2026-11-18): the placeholder names no season (it said "this autumn" all winter).
+  assert.match(v.placeholder, /^Plan 3 days in Vernon with some wineries/);
+  assert.doesNotMatch(v.placeholder + run('?region=vernon', 'fr').placeholder, /autumn|automne/);
   assert.match(run('?region=vernon', 'fr').chips[0], /^3 jours à Vernon/);
   assert.deepEqual(run('?region=nowhere').chips, ['x', 'x', 'x', 'x']);
   assert.deepEqual(run('').chips, ['x', 'x', 'x', 'x']);

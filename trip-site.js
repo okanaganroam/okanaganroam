@@ -157,13 +157,15 @@ module.exports = {
     mapCredit: { en: 'Powered by Geoapify', fr: 'Fourni par Geoapify', url: 'https://www.geoapify.com/' },
     // The H1 (2026-11-18, trip SEO): the words people search for; the "Build My Trip" name stays as the eyebrow above it.
     title: 'Okanagan trip planner', titleFr: 'Planificateur de voyage dans l’Okanagan',
-    examples: ['3 days in Kelowna: wineries, easy walks and great food', '2 days in Penticton with the kids', 'A romantic weekend in Naramata', 'What can we do around Penticton if it rains?'],
-    placeholder: 'Plan 3 days in Kelowna this autumn with some vineyards, some easy walks and some great food.',
+    // Build My Trip fixes (2026-11-18): examples and placeholder that read right in any season (the placeholder named the
+    // autumn, and the Naramata chip planned a wine weekend while most Naramata Bench tasting rooms are closed for the winter).
+    examples: ['3 days in Kelowna: wineries, easy walks and great food', '2 days in Penticton with the kids', 'A romantic weekend in Kelowna', 'What can we do around Penticton if it rains?'],
+    placeholder: 'Plan 3 days in Kelowna with some wineries, some easy walks and some great food.',
     townExamples: {
       en: ['3 days in {n}: wineries, easy walks and great food', '2 days in {n} with the kids', 'A romantic weekend in {n}', 'What can we do around {n} if it rains?'],
       fr: ['3 jours \u00e0 {n}\u00a0: vignobles, promenades faciles et bonne bouffe', '2 jours \u00e0 {n} avec les enfants', 'Une fin de semaine romantique \u00e0 {n}', 'Que peut-on faire autour de {n} s\u2019il pleut\u202f?'],
-      placeholderEn: 'Plan 3 days in {n} this autumn with some vineyards, some easy walks and some great food.',
-      placeholderFr: 'Planifiez 3 jours \u00e0 {n} cet automne avec des vignobles, des promenades faciles et de la bonne bouffe.',
+      placeholderEn: 'Plan 3 days in {n} with some wineries, some easy walks and some great food.',
+      placeholderFr: 'Planifiez 3 jours \u00e0 {n} avec des vignobles, des promenades faciles et de la bonne bouffe.',
     },
     sampleTown: 'penticton',
     sampleText: 'ask for &ldquo;a happy hour crawl in Penticton&rdquo; and you get stops like Yellow Dog Brewing and BNA Brewing, each one timed inside its happy hour, with the deals.',

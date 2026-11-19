@@ -257,8 +257,8 @@ function t3KmText(km) {
 function t3StateToQuery(s) {
   const p = [];
   const add = (k, v) => p.push(k + '=' + encodeURIComponent(v));
-  const KEY = /^[1-7]-(morning|midday|afternoon|late|evening|night)$/;
-  const PARTS = ['morning', 'midday', 'afternoon', 'late', 'evening', 'night'];
+  const KEY = /^[1-7]-(early|morning|midday|afternoon|late|evening|night)$/;
+  const PARTS = ['early', 'morning', 'midday', 'afternoon', 'late', 'evening', 'night']; // early: coffee before a ski day (2026-11-18)
   const byKey = (a, b) => (Number(a[0]) - Number(b[0])) || (PARTS.indexOf(a.slice(2)) - PARTS.indexOf(b.slice(2)));
   const id = (x) => Number.isInteger(x) && x > 0 && x < 1e9;
   const slots = (m) => Object.keys(m || {}).filter((k) => KEY.test(k) && id(m[k])).sort(byKey).map((k) => k + ':' + m[k]);
@@ -304,7 +304,7 @@ function t3QueryToState(search, regions) {
   if (!text) return null;
   let invalid = !!q.__bad;
   const ID = '[1-9]\\d{0,8}';
-  const SLOT = new RegExp('^([1-7]-(?:morning|midday|afternoon|late|evening|night)):(' + ID + ')$');
+  const SLOT = new RegExp('^([1-7]-(?:early|morning|midday|afternoon|late|evening|night)):(' + ID + ')$');
   const seedOk = /^\d{1,7}$/.test(q.seed || '') && Number(q.seed) <= 1000000;
   const seed = seedOk ? Number(q.seed) : 0;
   if (q.seed !== undefined && !seedOk) invalid = true;
@@ -341,7 +341,7 @@ function t3QueryToState(search, regions) {
   const pinned = slotMap(q.pin, 28);
   const avoid = idList(q.avoid, 200);
   const removed = [];
-  if (q.rm !== undefined) String(q.rm).split(',').forEach((k) => { if (/^[1-7]-(morning|midday|afternoon|late|evening|night)$/.test(k)) { if (removed.indexOf(k) === -1) removed.push(k); } else invalid = true; });
+  if (q.rm !== undefined) String(q.rm).split(',').forEach((k) => { if (/^[1-7]-(early|morning|midday|afternoon|late|evening|night)$/.test(k)) { if (removed.indexOf(k) === -1) removed.push(k); } else invalid = true; });
   return { text, seed, overrides, locks, exclude, pinned: pinned && Object.keys(pinned).length ? pinned : null, avoid, removed, invalid };
 }
 // A Google Maps directions link through the given stops, in order, using
