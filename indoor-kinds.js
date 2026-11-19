@@ -272,6 +272,30 @@ const TYPE_SUB = {
   other: ['Each ticket or pass', 'Chaque billet ou laissez-passer'],
 };
 for (const [k, t] of Object.entries(TYPE_SUB)) if (K[k]) { K[k].en.prices.typeSub = `${t[0]} and its price, one line at a time`; K[k].fr.prices.typeSub = `${t[1]} et son prix, une ligne à la fois`; }
+// Indoor test 8 (2026-11-19; Gary's bowling centre: "leagues use most lanes weeknights" and "cosmic bowling friday and
+// saturday nights" got "I'm not sure"): the Help examples for busy or limited times (a Good to know line) and for a theme
+// night or repeating event (a Known for line, plus the pattern for "Repeats or other dates?"), by kind:
+// [en busy, en theme, en repeat, fr busy, fr theme, fr repeat].
+const BUSY_THEME = {
+  gallery: ['Busiest on First Fridays; quiet weekday mornings', 'First Friday openings 6–8 PM', 'first Friday of each month', 'Plus achalandé les premiers vendredis; calme en semaine le matin', 'Vernissages le premier vendredi de 18 h à 20 h', 'le premier vendredi de chaque mois'],
+  museum: ['School groups most weekday mornings; quieter after 1 PM', 'Family Sundays with crafts, 1–3 PM', 'every Sunday', 'Groupes scolaires la plupart des matins de semaine; plus calme après 13 h', 'Dimanches en famille avec bricolage, de 13 h à 15 h', 'chaque dimanche'],
+  theatre: ['Box office busiest an hour before shows; buy ahead for Saturdays', 'Improv night every Thursday at 8 PM', 'every Thursday', 'Billetterie plus achalandée une heure avant les spectacles; achetez d’avance pour le samedi', 'Soirée d’impro chaque jeudi à 20 h', 'chaque jeudi'],
+  cinema: ['Opening weekends sell out; buy ahead', 'Cheap Tuesdays: every ticket $8', 'every Tuesday', 'Les fins de semaine de première affichent complet; achetez d’avance', 'Mardis à prix réduit : tous les billets à 8 $', 'chaque mardi'],
+  spa: ['Weekends book up 2 weeks ahead', 'Ladies’ night Thursdays 5–9 PM', 'every Thursday', 'Les fins de semaine se réservent 2 semaines d’avance', 'Soirée des dames le jeudi de 17 h à 21 h', 'chaque jeudi'],
+  pool: ['Lane swim only 6–8 AM; lessons after school on weekdays', 'Family swim with the inflatable Saturdays 1–3 PM', 'every Saturday', 'Nage en couloir seulement de 6 h à 8 h; cours après l’école en semaine', 'Bain familial avec la structure gonflable le samedi de 13 h à 15 h', 'chaque samedi'],
+  climbing: ['Busiest weeknights 5–8 PM; quiet mornings', 'Ladies’ climb night Wednesdays 6–9 PM', 'every Wednesday', 'Plus achalandé en semaine de 17 h à 20 h; calme le matin', 'Soirée d’escalade pour femmes le mercredi de 18 h à 21 h', 'chaque mercredi'],
+  games: ['Busy Friday and Saturday nights; book VR ahead', 'Retro arcade night Thursdays 6–10 PM', 'every Thursday', 'Achalandé les vendredis et samedis soir; réservez la réalité virtuelle', 'Soirée arcade rétro le jeudi de 18 h à 22 h', 'chaque jeudi'],
+  escape: ['Weekends book up a week ahead', 'Late-night rooms Fridays at 10 PM', 'every Friday', 'Les fins de semaine se réservent une semaine d’avance', 'Salles de fin de soirée le vendredi à 22 h', 'chaque vendredi'],
+  bowling: ['Leagues use most lanes Mon–Thu after 6, call ahead', 'Cosmic bowling Fri & Sat 9 PM–midnight', 'every Friday and Saturday', 'Les ligues occupent la plupart des allées du lun. au jeu. après 18 h, appelez avant', 'Quilles cosmiques ven. et sam. de 21 h à minuit', 'chaque vendredi et samedi'],
+  kids: ['Busiest on rainy weekends; quiet weekday afternoons', 'Toddler time Tue & Thu 9–11 AM', 'every Tuesday and Thursday', 'Plus achalandé les fins de semaine pluvieuses; calme en semaine l’après-midi', 'Temps des tout-petits mar. et jeu. de 9 h à 11 h', 'chaque mardi et jeudi'],
+  classes: ['Saturday classes fill a week ahead', 'Paint night every Friday at 7 PM', 'every Friday', 'Les cours du samedi sont pleins une semaine d’avance', 'Soirée peinture chaque vendredi à 19 h', 'chaque vendredi'],
+  curling: ['Leagues use the ice weeknights; drop-in Sunday afternoons', 'Learn-to-curl night Fridays at 7 PM', 'every Friday', 'Les ligues occupent la glace en semaine; jeu libre le dimanche après-midi', 'Soirée d’initiation au curling le vendredi à 19 h', 'chaque vendredi'],
+  yoga: ['Evening classes fill up; book a spot online', 'Candlelight yoga Fridays at 7 PM', 'every Friday', 'Les cours du soir sont pleins; réservez une place en ligne', 'Yoga aux chandelles le vendredi à 19 h', 'chaque vendredi'],
+  casino: ['Busiest Friday and Saturday nights', 'Live music in the lounge Saturdays 8 PM', 'every Saturday', 'Plus achalandé les vendredis et samedis soir', 'Musique live au salon le samedi à 20 h', 'chaque samedi'],
+  library: ['Quiet study hours weekday mornings', 'Story time Saturdays at 10:30 AM', 'every Saturday', 'Heures d’étude calmes en semaine le matin', 'L’heure du conte le samedi à 10 h 30', 'chaque samedi'],
+  other: ['Busiest on weekends and school holidays', 'Family night Fridays 5–8 PM', 'every Friday', 'Plus achalandé les fins de semaine et pendant les congés scolaires', 'Soirée familiale le vendredi de 17 h à 20 h', 'chaque vendredi'],
+};
+for (const [k, t] of Object.entries(BUSY_THEME)) if (K[k]) { Object.assign(K[k].en.help, { busy: t[0], theme: t[1], repeat: t[2] }); Object.assign(K[k].fr.help, { busy: t[3], theme: t[4], repeat: t[5] }); }
 const INDOOR_KIND_TEXT = K;
 const INDOOR_KIND_TEXT_KINDS = Object.keys(K);
 // The kind a place reads in: its main kind (the first the owner picked), else 'other'.
