@@ -187,6 +187,24 @@ function tourAgeFit(v, ctx) {
 // Tours & prices) whose name shares an activity word with the request ("mushing" / "Mush your own team") and whose own
 // age is above the youngest child named. Returns { name, age, young, word } or null.
 const ITEM_AGE_SKIP = new Set(['tour', 'tours', 'trip', 'trips', 'ride', 'rides', 'visit', 'visits', 'with', 'your', 'our', 'own', 'the', 'and', 'for', 'kid', 'kids', 'child', 'children', 'adult', 'adults', 'year', 'years', 'old', 'family', 'day', 'days', 'hour', 'hours', 'half', 'full', 'guided', 'private', 'group', 'from', 'per', 'person', 'people']);
+// Tour test 17 (Whistler, 2026-11-18; Sarah): the trip on the operator's list a plan times (v.tourItems with their own
+// length `mins` and departures `departs`): the one the request names ("family float", "family rafting" -> the family
+// trip), never one too old for the youngest child or out of its own months; else the first with departure times; else
+// the first. Null when no trip has a length or departures of its own (the operator's answers are used then).
+const TOUR_TRIP_SKIP = new Set(['tour', 'tours', 'trip', 'trips', 'with', 'year', 'years', 'old', 'without', 'near', 'from', 'around', 'want', 'like', 'some', 'this', 'that', 'july', 'june', 'august', 'september', 'october', 'may', 'january', 'february', 'march', 'april', 'november', 'december', 'whistler', 'squamish', 'pemberton']);
+function tourTripFor(v, text, month) {
+  const all = Array.isArray(v && v.tourItems) ? v.tourItems.filter((x) => x && x.name) : [];
+  if (!all.some((x) => x.mins || (x.departs && x.departs.length))) return null;
+  const q = normWords(text || '');
+  const ages = requestKidAges(q), young = ages.length ? Math.min(...ages) : null;
+  const words = new Set(q.split(' ').filter((w) => w.length >= 4 && !TOUR_TRIP_SKIP.has(w)).map(itemAgeStem));
+  const family = young != null || /\b(?:famil\w*|kids?|children|child|enfants?)\b/.test(q);
+  const fits = (it) => !(young != null && Number(it.age) > young) && !(month && Array.isArray(it.months) && it.months.length && !it.months.includes(month));
+  const pool = all.filter(fits).length ? all.filter(fits) : all;
+  const score = (it) => { const own = normWords(it.name).split(' ').filter((w) => w.length >= 4).map(itemAgeStem); let n = own.filter((w) => words.has(w)).length * 2; if (family && (it.kids || own.some((w) => /^famil/.test(w)))) n += 3; return n; };
+  const ranked = pool.map((it, i) => ({ it, i, s: score(it), d: it.departs && it.departs.length ? 1 : 0 })).sort((a, b) => b.s - a.s || b.d - a.d || a.i - b.i);
+  return ranked[0] ? ranked[0].it : null;
+}
 function itemAgeStem(w) { return String(w || '').replace(/(?:ing|ers?|es|s|ed)$/, ''); }
 function tourItemTooYoung(v, ctx) {
   const young = kidsYoungest(ctx);
@@ -1797,7 +1815,10 @@ function occasionScore(v, ctx, add) {
 }
 
 function why(reasons) {
-  const sorted = reasons.filter((r) => r.text).slice().sort((a, b) => b.weight - a.weight);
+  // Tour test 17 (Whistler, 2026-11-18; Sarah): "Hotel pickup" was the 4th reason of a rafting tour ("Matches your request
+  // for rafting", "Rentals or guided trips…", "…tours & experiences" weigh more) and never reached the card's two lines.
+  // When it is there, it is the first line.
+  const sorted = reasons.filter((r) => r.text).slice().sort((a, b) => (b.code === 'pickup') - (a.code === 'pickup') || b.weight - a.weight);
   return sorted.slice(0, 3).map((r) => r.text);
 }
 
@@ -4910,7 +4931,11 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         const longHike=!trailTime&&one?.visits?.[0]?.durationSource!=='listing'?longDayHikeMinutes(candidate):null;
         // Tour test 5 (Whistler, 2026-11-17): a tour's own trip length (the operator's answer: half a day) sets its slot (a named
         // fishing charter was planned for 2 hours).
-        const ownTourMin=candidate.type==='tour'?TOUR_LENGTH_MINUTES[candidate.tourLength]||null:null;
+        // Tour test 17 (Whistler, 2026-11-18; Sarah: the Elaho leaves at 8 AM for a full day, the family float is 2.5 hours and
+        // was planned 8–10:30 AM): the trip of his list the request is for, with its own length and its own departures.
+        const ownTrip=candidate.type==='tour'?tourTripFor(candidate,requirements.text||input.text||'',date?Number(String(date).slice(5,7)):0):null;
+        const ownTourMin=candidate.type==='tour'?(ownTrip&&ownTrip.mins)||TOUR_LENGTH_MINUTES[candidate.tourLength]||null:null;
+        const tourDeps=ownTrip?(ownTrip.departs||[]):candidate.tourDepartures;
         let duration=Math.min(candidate.indoorGolf?120:1440,stop.gapFill||stop.afterSki?gapFillMinutes(candidate):trailTime||longHike||ownTourMin||(one?.complete?one.maxMinutes:hiking?180:(VISIT_ALLOWANCE[candidate.type]||60)));
         // Setting up camp (2026-10-25) is about 45 minutes, not a three-hour outdoor visit.
         if(stop.campBase)duration=45;
@@ -4986,11 +5011,11 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         // Tour test 16 (Whistler, 2026-11-18; Tom's tours leave at 7 AM and 5:30 PM; the plan put him at 1–3:30 PM): a tour
         // with its own departure times starts at the one nearest the part of the day it was put in that fits its hours.
         let dep=null,depRange=null;
-        if(candidate.type==='tour'&&Array.isArray(candidate.tourDepartures)&&candidate.tourDepartures.length&&!stop.gapFill&&!beforeEvent&&!Number.isFinite(askedMeal)){
+        if(candidate.type==='tour'&&Array.isArray(tourDeps)&&tourDeps.length&&!stop.gapFill&&!beforeEvent&&!Number.isFinite(askedMeal)){
           // The time asked for ("evening bear tour"), else the part of the day the stop is in.
           const anchor=Math.max(partStart,fillStart)||(Number.isFinite(requirements.startMinutes)?requirements.startMinutes:0)||({morning:540,midday:720,afternoon:780,late:930,evening:1080,night:1080}[stop.daypart]||earliest);
           // The day's first stop may start with an early departure (a 7 AM bear tour on a day planned from 9 AM).
-          for(const t of candidate.tourDepartures){if(t<earliest&&!(!previous&&t>=360))continue;const r=ranges.find(([a,b])=>a<=t&&t+duration<=Math.min(b,1440));if(!r)continue;if(dep==null||Math.abs(t-anchor)<Math.abs(dep-anchor))dep=t,depRange=r;}
+          for(const t of tourDeps){if(t<earliest&&!(!previous&&t>=360))continue;const r=ranges.find(([a,b])=>a<=t&&t+duration<=Math.min(b,1440));if(!r)continue;if(dep==null||Math.abs(t-anchor)<Math.abs(dep-anchor))dep=t,depRange=r;}
         }
         let range=depRange||ranges.find(([a,b])=>Math.max(a,earliest,partStart,fillStart)+duration<=Math.min(b,1440,beforeEvent?eventStart-30-(eventTravel?.maxMinutes||0):1440));
         // Round 9: before a fixed-time event (a 2 PM escape room), lunch or a walk is shortened to fit -- an hour for a
@@ -9327,6 +9352,8 @@ function scheduleNotes(result, ctx) {
 }
 
 module.exports = {
+  // Tour test 17 (Whistler, 2026-11-18)
+  regionMinutes, PICKUP_ASK_RE, KIND_SEASON_ASK_WORDS, kindSeasonOff, tourTripFor, normWords,
   dropNameOnlyTypes,
   skiWordsAsked,
   // Site audit (2026-10-27)

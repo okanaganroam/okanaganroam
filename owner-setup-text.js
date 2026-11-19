@@ -2284,6 +2284,9 @@ Object.assign(fr.tour, {
 // "More options", and holidays and closures are an optional tile of their own (the last of the extra details).
 Object.assign(en.tour.labels, { closures: 'Closures and holidays' });
 Object.assign(fr.tour.labels, { closures: 'Fermetures et jours fériés' });
+// Tour test 17 (Whistler, 2026-11-18; Sarah, closed Feb–Apr and Oct–Nov): two closed stretches on the months screen.
+Object.assign(en.tour, { monthsSplitSaved: 'Saved: closed {a} to {b} every year, under Closures and holidays. Your season is below.', monthsClosedOneHere: 'Pick one stretch here, then add the other under Closures and holidays.' });
+Object.assign(fr.tour, { monthsSplitSaved: 'Enregistré : fermé de {a} à {b} chaque année, sous Fermetures et jours fériés. Votre saison est ci-dessous.', monthsClosedOneHere: 'Choisissez une période ici, puis ajoutez l’autre sous Fermetures et jours fériés.' });
 Object.assign(en.tour, {
   tFold: 'Anything else about your season?', seaMore: 'More options',
   openTwice: 'Closed twice a year, like a spring and a fall shoulder season? Add each one under “Closures and holidays” (in More about your tours) and tick “Every year”.',

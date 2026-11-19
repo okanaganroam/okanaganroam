@@ -944,6 +944,11 @@
     return wk && !(wk[wd] && wk[wd].length) ? wd : '';
   }
   function yearlyOn(key){ var o = HOL.filter(function(x){ return x.key === key; })[0]; return !!(o && o.yearly && S.everyYear[key] !== false); }
+  // The closures list the Closures screen sends: the holidays tapped (and next year's, when yearly) and her own dates.
+  function closuresOut(){
+    var out = HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && !holCovered(o, true); }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; });
+    return out.concat(HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key) && !holCovered(o, true) && !coveredBy(o.next) && !offSeason(o.next, true); }).map(function(o){ var nd = o.next; return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; })).concat(S.extra);
+  }
   function closuresKey(){ return JSON.stringify([S.closures.slice().sort(), S.closures.filter(yearlyOn).sort(), S.extra, monthRun(S.months)]); }
   // Happy hours. The rows exactly as they were typed here last time (kept by the server while the page still shows
   // what they made); otherwise rebuilt from the page: days with the same times are one happy hour, a deal that starts
@@ -1350,7 +1355,7 @@
     if (answered(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
     return '<div class="su-skip"><button type="button" class="su-link" data-act="skip:' + step + '">' + h(T.skip) + '</button></div>';
   }
-  function msgs(){ return (S.seaStaleDone ? '<p class="su-sent" id="suSeaStaleDone">' + h(S.seaStaleDone) + '</p>' : '') + (typeof seaStaleHtml === 'function' && !seaIsStep(S.step) ? seaStaleHtml() : '') + (S.nudge ? '<p class="su-error" role="alert">' + h(S.nudge) + '</p>' + (S.seaClosedNudge && S.nudge === S.seaClosedNudge && seaIsStep(S.step) ? '<div class="su-stack su-seaskip">' + big('➜', T.seasonAllClosedBtn, '', true, 'seaSkipClosed') + '</div>' : '') : '') + (S.error ? '<p class="su-error" role="alert">' + h(S.error) + '</p>' : ''); }
+  function msgs(){ return (S.seaStaleDone ? '<p class="su-sent" id="suSeaStaleDone">' + h(S.seaStaleDone) + '</p>' : '') + (typeof seaStaleHtml === 'function' && !seaIsStep(S.step) ? seaStaleHtml() : '') + (S.nudge ? '<p class="su-error" role="alert">' + h(S.nudge) + '</p>' + (S.nudgeLink && S.nudge === T.monthsClosedOneHere ? '<p class="su-hint"><button type="button" class="su-link" data-act="go:' + S.nudgeLink + '">' + h(T.labels.closures || T.monthsClosedOneLink || '') + ' →</button></p>' : '') + (S.seaClosedNudge && S.nudge === S.seaClosedNudge && seaIsStep(S.step) ? '<div class="su-stack su-seaskip">' + big('➜', T.seasonAllClosedBtn, '', true, 'seaSkipClosed') + '</div>' : '') : '') + (S.error ? '<p class="su-error" role="alert">' + h(S.error) + '</p>' : ''); }
   // Back on a question already answered: say so, and which answer we have.
   function doneLine(step){
     var d = S.done[step]; if (!d || d === 'skip' || d === 'later') return '';
@@ -2062,7 +2067,7 @@
     } else if (s === 'hours:open') {
       // Café test 2: "Open from [Apr 25] to [Oct 12] every year". Whole months stay a quick path (the months screen).
       var os0 = S.openDraft || S.openSea || { from: '', to: '' }, fromHours = S.openFrom === 'hours';
-      x = q(T.openQ, T.openLead) + msgs() + '<div class="su-seadates su-openseason"><p class="su-q">' + h(T.openFrom) + '</p>' + mdPick('suOf', os0.from, T.openFrom) + '<p class="su-q">' + h(T.openTo) + '</p>' + mdPick('suOt', os0.to, T.openTo) + '</div>'
+      x = q(T.openQ, T.openLead) + msgs() + (S.splitSaved ? '<p class="su-sent" id="suSplitSaved">' + h(S.splitSaved) + '</p>' : '') + '<div class="su-seadates su-openseason"><p class="su-q">' + h(T.openFrom) + '</p>' + mdPick('suOf', os0.from, T.openFrom) + '<p class="su-q">' + h(T.openTo) + '</p>' + mdPick('suOt', os0.to, T.openTo) + '</div>'
         + '<p class="su-hint su-repeats">' + h(T.repeatsYearly) + '</p><p class="su-hint"><button type="button" class="su-link" data-act="openMonths">' + h(T.openMonthsLink) + '</button></p>'
         // Restaurant test 1 (Whistler, 2026-11-14): closed twice a year is two yearly closures ("Every year"), and the ones
         // already saved are named.
@@ -2999,6 +3004,30 @@
       CUR.open_months = ov; S.savedWYear = y; S.wine.year = y; AI.year = y; if (C.distillery) S.savedYear = y; delete AI.season; S.wine.season = null; S.openTouched = false; S.wYearPick = '';
     });
   }
+  // The closed months' stretches (Dec–Jan is one), longest first: [{ a, b, n }].
+  function closedRuns(obj){
+    var runs = [];
+    for (var m = 1; m <= 12; m++) { if (!obj[m] || obj[m === 1 ? 12 : m - 1]) continue; var b = m, n = 1; while (obj[b % 12 + 1] && (b % 12 + 1) !== m) { b = b % 12 + 1; n++; } runs.push({ a: m, b: b, n: n }); }
+    return runs.sort(function(x, y){ return y.n - x.n; });
+  }
+  function monthsSplit(runs){
+    var off = runs[0], brk = runs[1], from = off.b % 12 + 1, to = off.a === 1 ? 12 : off.a - 1;
+    // A yearly closure never ends on Feb 29 (a rule for every year).
+    var yr = { from: pad2(brk.a) + '-01', to: pad2(brk.b) + '-' + (brk.b === 2 ? 28 : MLAST[brk.b - 1]), note: '', yearly: true };
+    var had = S.extra.some(function(c){ return c.yearly && c.from === yr.from && c.to === yr.to; });
+    if (!had) S.extra.push(yr);
+    S.busy = true; render();
+    return change({ closures: closuresOut() }).then(function(st){
+      S.busy = false;
+      if (!st) { if (!had) S.extra.pop(); return render(); }
+      S.closuresWas = closuresKey(); S.closuresSaved = S.closures.slice(); S.savedExtra = S.extra.length;
+      S.months = {}; for (var i = from; ; i = i % 12 + 1) { S.months[i] = true; if (i === to) break; }
+      S.closedM = null; S.openMonthsBack = false;
+      S.openDraft = { from: pad2(from) + '-01', to: pad2(to) + '-' + MLAST[to - 1] };
+      S.splitSaved = fill(T.monthsSplitSaved, { a: monthName(brk.a - 1), b: monthName(brk.b - 1) });
+      S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render();
+    });
+  }
   function monthRun(obj){
     var on = []; for (var i = 1; i <= 12; i++) if (obj[i]) on.push(i);
     if (!on.length) return { none: true }; if (on.length === 12) return { all: true };
@@ -3641,13 +3670,14 @@
     if (k === 'yearClosed') { S.openFrom = noSetYear() ? 'appt' : 'hours'; S.openDraft = null; return go('hours:open'); }
     if (k === 'openEdit') { S.openFrom = 'closures'; S.openDraft = null; return go('hours:open'); }
     if (k === 'openMonths') {
+      S.splitSaved = '';
       var odm = { from: mdRead('suOf'), to: mdRead('suOt') }; S.openDraft = odm.from || odm.to ? odm : S.openDraft;
       S.closedM = {}; var o0 = S.openDraft && S.openDraft.from && S.openDraft.to ? S.openDraft : S.openSea;
       if (o0) { var om0 = seaMonths({ on: true, months: {}, exact: o0 }); for (var mi0 = 1; mi0 <= 12; mi0++) if (!om0[mi0]) S.closedM[mi0] = true; }
       S.openMonthsBack = true; return go('closures:months');
     }
     if (k === 'openNone' || k === 'openSave') {
-      var oNew = null;
+      var oNew = null; S.splitSaved = '';
       if (k === 'openSave') {
         var of = mdRead('suOf'), ot = mdRead('suOt'); S.openDraft = { from: of, to: ot };
         if (!of || !ot) { S.nudge = T.openNeed; return render(); }
@@ -3742,7 +3772,12 @@
       var cm = S.closedM || {}, nClosed = 0, openM = {}; for (var mj = 1; mj <= 12; mj++) { if (cm[mj]) nClosed++; else openM[mj] = true; }
       if (!nClosed) { S.months = {}; S.closedM = null; if (S.openMonthsBack) { S.openMonthsBack = false; S.openDraft = null; } S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
       if (nClosed === 12) { S.nudge = T.monthsAllClosed; return render(); }
-      var r = monthRun(openM); if (r.bad) { S.nudge = T.monthsClosedInRow; return render(); }
+      var r = monthRun(openM);
+      // Tour test 17 (Whistler, 2026-11-18; Sarah: closed Feb–Apr and Oct–Nov): two closed stretches from "We only run part
+      // of the year". The longer one is the off-season, so the season runs over the other, and the other is saved as a
+      // yearly closure (the Closures and holidays rows), said in one line. More than two: one stretch here, the rest there.
+      if (r.bad && S.openMonthsBack && T.monthsSplitSaved) { var two = closedRuns(cm); if (two.length === 2) return monthsSplit(two); }
+      if (r.bad) { S.nudge = T.monthsClosedOneHere || T.monthsClosedInRow; S.nudgeLink = T.monthsClosedOneHere ? 'closures' : ''; return render(); }
       S.months = openM; S.closedM = null;
       // Café test 2: the quick path from "When are you open each year?" fills its dates with the whole months.
       if (S.openMonthsBack) { S.openMonthsBack = false; S.openDraft = { from: pad2(r.a) + '-01', to: pad2(r.b) + '-' + MLAST[r.b - 1] }; }
@@ -3750,8 +3785,7 @@
     }
     if (k === 'monthsClear') { S.months = {}; S.closedM = null; if (S.step !== 'closures') S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render(); }
     if (k === 'closuresNone' || k === 'closuresSave') {
-      var out = k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && !holCovered(o, true); }).map(function(o){ return { from: o.date, to: o.date, note: S.holNotes[o.key] != null ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; });
-      out = out.concat(k === 'closuresNone' ? [] : HOL.filter(function(o){ return S.closures.indexOf(o.key) >= 0 && yearlyOn(o.key) && !holCovered(o, true) && !coveredBy(o.next) && !offSeason(o.next, true); }).map(function(o){ var nd = o.next; return { from: nd, to: nd, note: S.holNotes[o.key] != null && S.holNotes[o.key] !== '' ? holKeep(o.key, S.holNotes[o.key]) : holEn(o.key) }; })).concat(S.extra);
+      var out = k === 'closuresNone' ? S.extra.slice() : closuresOut();
       // Café test 2 (2026-11-11): the open season is the Hours answer ("We're closed part of the year"); this screen
       // shows it and links to it, and never writes it (two places could disagree).
       var om = CUR.open_months || '';
