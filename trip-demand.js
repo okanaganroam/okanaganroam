@@ -7,7 +7,11 @@
 // different visitors wanted each business (see /api/admin/trip-demand).
 const crypto = require('crypto');
 
-const KINDS = new Set(['shown', 'add', 'remove']);
+// book_click (2026-11-18): a visitor tapped a stop's Book or Call to book button in a plan.
+const KINDS = new Set(['shown', 'add', 'remove', 'book_click']);
+// The kinds of plan a book_click can name (planFacts().plan_kind on the page); anything else is stored as 'other'.
+const PLAN_TYPES = new Set(['outing', 'day_plan', 'multi_day', 'itinerary', 'recommendations', 'discover', 'events', 'navigate', 'unknown']);
+function planType(v) { if (v == null || v === '') return null; const t = String(v); return PLAN_TYPES.has(t) ? t : 'other'; }
 const DAILY_CAP = 300; // rows per visitor per day, a runaway-bot guard
 const BOT_RE = /bot|crawl|spider|slurp|preview|fetch|monitor|headless|curl|wget|python|axios|node-fetch|go-http|lighthouse|facebookexternalhit|audit|domain-watch|^node$|^mozilla\/5\.0$/i;
 
@@ -68,10 +72,15 @@ function collectVenueIds(node, out = new Set(), depth = 0) {
 }
 
 function createLogger(db) {
-  const insert = db.prepare('INSERT OR IGNORE INTO trip_demand_events (day, visitor, venue_id, kind) VALUES (?, ?, ?, ?)');
+  // plan_type arrived with book_click (db.js adds it); an older table without it still logs, just without the plan type.
+  const hasPlanType = db.prepare('PRAGMA table_info(trip_demand_events)').all().some((c) => c.name === 'plan_type');
+  const insertRow = hasPlanType
+    ? db.prepare('INSERT OR IGNORE INTO trip_demand_events (day, visitor, venue_id, kind, plan_type) VALUES (?, ?, ?, ?, ?)')
+    : db.prepare('INSERT OR IGNORE INTO trip_demand_events (day, visitor, venue_id, kind) VALUES (?, ?, ?, ?)');
+  const insert = { run: (day, visitor, id, kind, planTypeValue) => (hasPlanType ? insertRow.run(day, visitor, id, kind, planTypeValue) : insertRow.run(day, visitor, id, kind)) };
   const exists = db.prepare('SELECT 1 FROM venues WHERE id = ?');
   const countToday = db.prepare('SELECT COUNT(*) AS n FROM trip_demand_events WHERE day = ? AND visitor = ?');
-  function record(req, kind, venueIds, now = new Date()) {
+  function record(req, kind, venueIds, now = new Date(), opts = {}) {
     if (!enabled() || !KINDS.has(kind) || isBot(req) || isInternal(req)) return 0;
     const day = dayOf(now);
     const visitor = visitorKey(req.__ip, String(req.headers['user-agent'] || ''), day);
@@ -80,7 +89,7 @@ function createLogger(db) {
     for (const id of venueIds) {
       if (room <= 0) break;
       if (!Number.isInteger(id) || id < 1 || !exists.get(id)) continue;
-      wrote += insert.run(day, visitor, id, kind).changes;
+      wrote += insert.run(day, visitor, id, kind, kind === 'book_click' ? planType(opts.planType) : null).changes;
       room -= 1;
     }
     return wrote;
@@ -90,12 +99,20 @@ function createLogger(db) {
     const since = dayOf(new Date(now.getTime() - days * 86400000));
     const rows = db.prepare(`
       SELECT v.id, v.name, v.region, v.type,
-        SUM(e.kind = 'shown') AS shown, SUM(e.kind = 'add') AS added, SUM(e.kind = 'remove') AS removed
+        SUM(e.kind = 'shown') AS shown, SUM(e.kind = 'add') AS added, SUM(e.kind = 'remove') AS removed,
+        SUM(e.kind = 'book_click') AS book_clicks
       FROM trip_demand_events e JOIN venues v ON v.id = e.venue_id
-      WHERE e.day >= ? GROUP BY v.id ORDER BY added DESC, shown DESC`).all(since);
+      WHERE e.day >= ? GROUP BY v.id ORDER BY added DESC, book_clicks DESC, shown DESC`).all(since);
     return rows.map((r) => ({ ...r, ready_to_contact: (r.added || 0) >= threshold }));
   }
-  return { record, report };
+  // Book button taps (2026-11-18) over the last `days` days: the total and by kind of plan.
+  function bookSummary(days = 30, now = new Date()) {
+    const since = dayOf(new Date(now.getTime() - days * 86400000));
+    const rows = db.prepare(`SELECT ${hasPlanType ? "COALESCE(plan_type, 'unknown')" : "'unknown'"} AS plan_type, COUNT(*) AS n FROM trip_demand_events
+      WHERE kind = 'book_click' AND day >= ? GROUP BY 1 ORDER BY n DESC`).all(since);
+    return { total: rows.reduce((t, r) => t + r.n, 0), by_plan_type: Object.fromEntries(rows.map((r) => [r.plan_type, r.n])) };
+  }
+  return { record, report, bookSummary };
 }
 
-module.exports = { enabled, dayOf, visitorKey, isBot, fromCloudCrawlerNetwork, isInternal, collectVenueIds, createLogger, DAILY_CAP, KINDS };
+module.exports = { enabled, dayOf, visitorKey, isBot, fromCloudCrawlerNetwork, isInternal, collectVenueIds, createLogger, planType, DAILY_CAP, KINDS, PLAN_TYPES };

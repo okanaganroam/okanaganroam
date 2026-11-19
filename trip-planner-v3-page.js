@@ -49,7 +49,7 @@ function t3LocalTimes(value,language){
   .replace(/\b(0\d|1\d|2[0-3]):([0-5]\d)\b(?!\s*(?:AM|PM|h\b))/g,(_,h,m)=>fmt(h,m))
   .replace(/\b0(\d) h\b/g,'$1 h')
   .replace(fr?/(\d h(?: \d\d)?) ?[–-] ?(\d)/g:/((?:AM|PM)) ?[–-] ?(\d|midnight\b)/g,fr?'$1–$2':'$1 – $2');
- const skip={url:1,photo:1,name:1,address:1,slug:1,query:1,id:1,date:1,startDate:1,endDate:1,startTime:1,endTime:1,region:1,regionLabel:1,venueName:1};
+ const skip={url:1,bookPhone:1,photo:1,name:1,address:1,slug:1,query:1,id:1,date:1,startDate:1,endDate:1,startTime:1,endTime:1,region:1,regionLabel:1,venueName:1};
  const walk=(x,key)=>{if(typeof x==='string')return skip[key]?x:text(x);if(Array.isArray(x))return x.map(y=>walk(y,key));if(x&&typeof x==='object'){const o={};for(const k of Object.keys(x))o[k]=walk(x[k],k);return o;}return x;};
  return typeof value==='string'?text(value):walk(value,'');
 }
@@ -698,6 +698,28 @@ function renderStyles() {
   .t3-caveats li + li { margin-top: 4px; }
   .t3-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(27,43,58,0.08); }
   .t3-actions .trip-btn, .t3-actions .fav-btn { min-height: 44px; }
+  /* Book buttons (2026-11-18): the place's own booking page, in the site's navy; "Call to book" is a small link. */
+  .t3-act.t3-book { background: var(--ref-navy); border-color: var(--ref-navy); color: #fff; justify-content: center; gap: 4px; white-space: normal; text-align: center; }
+  .t3-act.t3-book:hover { background: var(--ref-navy-deep); }
+  .t3-callbook-line { margin: 8px 0 0; }
+  .t3-callbook { font-weight: 800; color: var(--ref-navy); font-size: .88rem; display: inline-flex; align-items: center; min-height: 32px; }
+  .t3-bookp { margin: 18px 0; padding: 16px; border: 1px solid rgba(27,43,58,0.12); border-radius: 14px; background: #fff; }
+  .t3-bookp .t3-section-title { margin-top: 0; }
+  .t3-bookp-progress { margin: 4px 0 10px; font-weight: 800; color: #28594d; }
+  .t3-bookp-list { list-style: none; margin: 0; padding: 0; }
+  .t3-bookp-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; padding: 10px 0; border-top: 1px solid rgba(27,43,58,0.08); }
+  .t3-bookp-what { display: flex; flex-direction: column; min-width: 0; flex: 1 1 180px; }
+  .t3-bookp-when { font-size: .8rem; color: #5a6672; }
+  .t3-bookp-name { font-weight: 800; overflow-wrap: anywhere; }
+  .t3-bookp-row.is-booked .t3-bookp-name { color: #28594d; }
+  .t3-bookp-do { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .t3-bookp-tick { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-weight: 700; cursor: pointer; }
+  .t3-bookp-tick input { width: 20px; height: 20px; margin: 0; accent-color: #28594d; }
+  .t3-bookp-row.is-booked .t3-bookp-tick span::after { content: ' ✓'; }
+  .t3-bookp-none { margin-top: 8px; }
+  .t3-bookp-none summary { cursor: pointer; font-weight: 700; min-height: 32px; }
+  .t3-bookp-none ul { margin: 6px 0 0; padding-left: 18px; }
+  .t3-bookp-note { margin: 12px 0 0; font-size: .85rem; color: #5a6672; }
   .t3-estimate { padding: 14px 16px; border-radius: 12px; background: #e9f1ec; font-weight: 800; }
   .t3-stop-price { margin: 6px 0; font-size: .88rem; font-weight: 800; color: #28594d; }
   .t3-how .t3-sample { color: inherit; }
@@ -810,10 +832,12 @@ function renderStyles() {
     .t3-plan .t3-actions { display: grid; grid-template-columns: 1.35fr 1fr 1fr 1fr; gap: 6px; }
     .t3-plan .t3-actions > button, .t3-plan .t3-actions > a, .t3-plan .t3-actions .t3-more > summary { justify-content: center; text-align: center; padding: 6px 4px; font-size: 0.8125rem; line-height: 1.15; width: 100%; box-sizing: border-box; }
     .t3-plan .t3-actions .t3-more { display: block; }
+    .t3-plan .t3-actions > .t3-book { grid-column: 1 / -1; }
+    .t3-bookp { padding: 14px 12px; }
     .t3-plan .t3-actions .t3-more > summary { display: flex; align-items: center; min-height: 44px; }
     .t3-plan .t3-actions .t3-more > summary::after { margin-left: 2px; }
     /* Round 12 (2026-10-20, phone-a11y): « Ajouter au voyage » wrapped to 3 lines in a quarter of the row; in French it takes the first row. */
-    html[lang="fr"] .t3-plan .t3-actions { display: flex; flex-wrap: wrap; } html[lang="fr"] .t3-plan .t3-actions > * { flex: 1 1 0; min-width: 0; } html[lang="fr"] .t3-plan .t3-actions > .trip-btn { flex-basis: 100%; }
+    html[lang="fr"] .t3-plan .t3-actions { display: flex; flex-wrap: wrap; } html[lang="fr"] .t3-plan .t3-actions > * { flex: 1 1 0; min-width: 0; } html[lang="fr"] .t3-plan .t3-actions > .trip-btn { flex-basis: 100%; } html[lang="fr"] .t3-plan .t3-actions > .t3-book { flex-basis: 100%; }
     .t3-dh-frame { height: 100px; }
     .t3 .t3-wrap { padding: 0 16px; }
     .t3-hero-inner { padding-top: 20px; padding-bottom: 30px; }
@@ -1523,6 +1547,78 @@ function renderScript(d) {
       + (missing ? (french ? ' · Prix à vérifier pour ' + missing + ' arrêt(s)' : ' · ' + missing + ' unpriced ' + (missing === 1 ? 'stop' : 'stops') + ' excluded') : '')
       + (known ? (french ? ' · Hors taxes, pourboires et suppléments' : ' · Before tax, tips and extras') : '');
   }
+  // ---- Book buttons (2026-11-18) ----
+  // A stop with a booking link (the same one its venue page's Book button uses) gets a Book button that opens the place's
+  // own booking page in a new tab; with none, a place you would phone ("Call to book") gets a small tel: link; anything
+  // else gets nothing. We never take bookings or payment ourselves.
+  function bookUrl(u){ return typeof u === 'string' && /^https?:[/][/][^\\s"'<>]+$/i.test(u) ? u : null; }
+  function bookLabel(v){ var b = v && v.booking; if (!b) return ''; return lang() === 'fr' ? (b.labelFr || 'Réserver') : (b.label || 'Book'); }
+  function bookTel(v){ var d = v && v.bookPhone ? String(v.bookPhone).replace(/[^0-9+]/g, '') : ''; return d.length >= 7 ? d : ''; }
+  function bookLinkHtml(v, surface){
+    var u = v && v.booking ? bookUrl(v.booking.url) : null;
+    if (!u) return '';
+    var fr = lang() === 'fr', label = bookLabel(v);
+    return '<a class="t3-act t3-book" ' + hrefAttr(u) + ' target="_blank" rel="nofollow noopener' + (v.booking.affiliate ? ' sponsored' : '') + '" data-t3-book="' + esc(v.id) + '" data-t3-book-kind="booking" data-t3-book-surface="' + esc(surface) + '" aria-label="' + esc(label + ' – ' + v.name + (fr ? ' (site de l’endroit, nouvel onglet)' : ' (their own site, new tab)')) + '">' + esc(label) + ' <span aria-hidden="true">↗</span></a>';
+  }
+  function callToBookHtml(v, surface){
+    if (v && v.booking && bookUrl(v.booking.url)) return '';
+    var tel = bookTel(v);
+    if (!tel) return '';
+    var fr = lang() === 'fr';
+    return '<a class="t3-callbook" ' + hrefAttr('tel:' + tel) + ' data-t3-book="' + esc(v.id) + '" data-t3-book-kind="phone" data-t3-book-surface="' + esc(surface) + '" aria-label="' + esc((fr ? 'Appeler pour réserver – ' : 'Call to book – ') + v.name) + '">' + esc(fr ? 'Appeler pour réserver' : 'Call to book') + '</a>';
+  }
+  // Booked ticks, kept in this browser only, per plan (the request's words): { "<plan>": [venue ids] }, newest 20 plans.
+  var BOOKED_KEY = '${SITE_PAGE.storagePrefix}TripBooked';
+  function bookedPlanKey(){ return String(state.text || '').trim().toLowerCase().slice(0, 200); }
+  function bookedAll(){ try { var m = JSON.parse(localStorage.getItem(BOOKED_KEY) || '{}'); return m && typeof m === 'object' && !Array.isArray(m) ? m : {}; } catch (e) { return {}; } }
+  function bookedIds(){ var l = bookedAll()[bookedPlanKey()]; return Array.isArray(l) ? l : []; }
+  function setBooked(id, on){
+    try {
+      var all = bookedAll(), k = bookedPlanKey(), l = (Array.isArray(all[k]) ? all[k] : []).filter(function(x){ return x !== id; });
+      if (on) l.push(id);
+      delete all[k];
+      if (l.length) all[k] = l;
+      var keys = Object.keys(all);
+      while (keys.length > 20) { delete all[keys.shift()]; }
+      localStorage.setItem(BOOKED_KEY, JSON.stringify(all));
+    } catch (e) { /* private window or storage off: the tick just isn't remembered */ }
+  }
+  // The plan's venue stops in order (removed stops left out), each place once.
+  function bookableStops(p){
+    var out = [], seen = {}, multi = (p.days || []).length > 1;
+    var add = function(s, key, day){
+      if (!s || !s.venue || s.venue.id == null || seen[s.venue.id]) return;
+      if (key && state.removed[key]) return;
+      seen[s.venue.id] = true;
+      out.push({ stop: s, key: key, when: (multi ? tx('tripv3.day', { n: day }) + ' · ' : '') + whenLabel(s, key) });
+    };
+    if ((p.kind === 'multi_day' || p.kind === 'day_plan') && (p.days || []).length) (p.days || []).forEach(function(d){ (d.stops || []).forEach(function(s){ add(s, d.day + '-' + s.daypart, d.day); }); });
+    else if (p.kind === 'outing' && p.outing) (p.outing.stops || []).forEach(function(s){ add(s, null, 1); });
+    else if (p.kind === 'itinerary' && p.itinerary) (p.itinerary.stops || []).forEach(function(s){ add(s, null, 1); });
+    return out;
+  }
+  function bookProgressText(done, total){ return lang() === 'fr' ? done + ' sur ' + total + (done > 1 ? ' réservés' : ' réservé') : done + ' of ' + total + ' booked'; }
+  // "Book your trip" (2026-11-18): under the itinerary, every stop that can be booked, with its Book button and a
+  // "Booked" tick; the stops with nothing to book fold away. Only when at least one stop can be booked.
+  function bookPanelHtml(p){
+    var fr = lang() === 'fr', rows = bookableStops(p);
+    var can = rows.filter(function(r){ var v = r.stop.venue; return (v.booking && bookUrl(v.booking.url)) || bookTel(v); });
+    if (!can.length) return '';
+    var rest = rows.filter(function(r){ return can.indexOf(r) === -1; });
+    var booked = bookedIds(), done = 0;
+    var items = can.map(function(r){
+      var v = r.stop.venue, on = booked.indexOf(v.id) !== -1;
+      if (on) done++;
+      return '<li class="t3-bookp-row' + (on ? ' is-booked' : '') + '"><div class="t3-bookp-what"><span class="t3-bookp-when">' + esc(r.when) + '</span><span class="t3-bookp-name">' + esc(v.name) + '</span></div>'
+        + '<div class="t3-bookp-do">' + (bookLinkHtml(v, 'panel') || callToBookHtml(v, 'panel'))
+        + '<label class="t3-bookp-tick"><input type="checkbox" data-t3-booked="' + esc(v.id) + '"' + (on ? ' checked' : '') + '> <span>' + esc(fr ? 'Réservé' : 'Booked') + '</span></label></div></li>';
+    }).join('');
+    return '<section class="t3-bookp" aria-labelledby="t3-bookp-h"><h3 id="t3-bookp-h" class="t3-section-title">' + esc(fr ? 'Réservez votre voyage' : 'Book your trip') + '</h3>'
+      + '<p class="t3-bookp-progress" data-t3-book-progress data-t3-book-total="' + can.length + '" aria-live="polite">' + esc(bookProgressText(done, can.length)) + '</p>'
+      + '<ul class="t3-bookp-list">' + items + '</ul>'
+      + (rest.length ? '<details class="t3-bookp-none"><summary>' + esc((fr ? 'Pas de réservation nécessaire' : 'No booking needed') + ' (' + rest.length + ')') + '</summary><ul>' + rest.map(function(r){ return '<li><span class="t3-bookp-when">' + esc(r.when) + '</span> ' + esc(r.stop.venue.name) + '</li>'; }).join('') + '</ul></details>' : '')
+      + '<p class="t3-bookp-note">' + esc(fr ? 'Les réservations se font sur le site de chaque endroit. Nous ne prenons aucun paiement.' : 'Bookings are made on each place’s own site. We don’t take payment.') + '</p></section>';
+  }
   function cardHtml(stop, key, opts){
     opts = opts || {};
     var v = stop.venue, url = placeUrl(v), counts = opts.counts || {};
@@ -1561,8 +1657,10 @@ function renderScript(d) {
       + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : lang() === 'fr' && stop.nightLineFr ? esc(stop.nightLineFr) : esc(stop.nightLine)) + '</p>' : '')
       + (why ? '<details class="t3-fit"><summary>' + esc(tx('tripv3.whyFits')) + '</summary><ul class="t3-why">' + why + '</ul></details>' : '')
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
+      + (callToBookHtml(v, 'card') ? '<p class="t3-callbook-line">' + callToBookHtml(v, 'card') + '</p>' : '')
       + '</div>'
-      + '<div class="t3-actions">'
+      + '<div class="t3-actions' + (bookLinkHtml(v, 'card') ? ' has-book' : '') + '">'
+      + bookLinkHtml(v, 'card')
       + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') : '') + (opts.planStop && key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot="' + esc(key.split('-')[0]) + '"' : '') + ' aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + v.name + ' au voyage' : 'Add ' + v.name + ' to trip') + '">' + esc(lang() === 'fr' ? 'Ajouter au voyage' : 'Add to trip') + '</button>'
     // The list cards' Favorite button (2026-10-19): named for the place, with its pressed state.
     var favHtml = '<button type="button" class="card-action fav-btn" data-fav-name="' + esc(v.name) + '" aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + v.name + ' aux favoris' : 'Favorite ' + v.name) + '">Favorite</button>';
@@ -2041,6 +2139,7 @@ function renderScript(d) {
       html += '<p class="t3-empty">' + esc(tx('tripv3.tryTelling')) + '</p>';
     }
     if (hasStops) html += '<p class="t3-estimate" data-t3-estimate hidden aria-live="polite"></p>';
+    if (hasStops) html += bookPanelHtml(p);
     html += tripDetails;
     if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" ' + hrefAttr(p.seeAll.url) + '>' + esc(tx('tripv3.seeAll')) + '</a>';
     html += '</div>';
@@ -2286,6 +2385,18 @@ function renderScript(d) {
     var t = e.target.closest ? e.target : null;
     if (!t) return;
     var b;
+    // Book / Call to book (2026-11-18): the link opens as usual; we count the tap (outbound clicks and the trip demand log,
+    // both anonymous, never for our own visits) and nothing else.
+    if ((b = t.closest('[data-t3-book]'))) {
+      var bookId = Number(b.getAttribute('data-t3-book')), bookKind = b.getAttribute('data-t3-book-kind') === 'phone' ? 'phone' : 'booking';
+      var bookStop = null;
+      bookableStops(state.last || {}).forEach(function(r){ if (r.stop.venue.id === bookId) bookStop = r.stop.venue; });
+      track('outbound_click', { link_type: bookKind === 'phone' ? 'call_button' : 'booking', venue_id: bookId, venue_name: bookStop ? bookStop.name : undefined, surface: 'trip_planner', placement: b.getAttribute('data-t3-book-surface') || 'card' });
+      try {
+        if (bookId > 0 && navigator.sendBeacon && !/(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) navigator.sendBeacon('/api/trip/signal', new Blob([JSON.stringify({ kind: 'book_click', ref: 'venue:' + bookId, plan_type: planFacts(state.last).plan_kind })], { type: 'application/json' }));
+      } catch (err) { /* counting must never get in the way of booking */ }
+      return;
+    }
     if ((b=t.closest('[data-t3-badges-more]'))) {
       var list=b.closest('.t3-badges');
       var shown=list.querySelectorAll('[data-t3-badge-extra]');
@@ -2460,6 +2571,15 @@ function renderScript(d) {
       if (Object.keys(locks).length) extra.pinned = locks;
       request(extra, { requestType: 'regenerate', trigger: b });
     }
+  });
+  // "Booked" ticks in the Book your trip panel (2026-11-18): remembered in this browser for this plan, with the count.
+  resultEl.addEventListener('change', function(e){
+    var box = e.target.closest ? e.target.closest('[data-t3-booked]') : null;
+    if (!box) return;
+    setBooked(Number(box.getAttribute('data-t3-booked')), !!box.checked);
+    var row = box.closest('.t3-bookp-row'); if (row) row.classList.toggle('is-booked', !!box.checked);
+    var panel = box.closest('.t3-bookp'), prog = panel && panel.querySelector('[data-t3-book-progress]');
+    if (prog) prog.textContent = bookProgressText(panel.querySelectorAll('[data-t3-booked]:checked').length, Number(prog.getAttribute('data-t3-book-total')) || 0);
   });
   resultEl.addEventListener('change', function(e){
     var sel = e.target.closest ? e.target.closest('[data-t3-override]') : null;
