@@ -7,7 +7,11 @@
 const crypto = require('node:crypto');
 
 const LIMITS = { near_pin_m: 150, accuracy_m: 40, nudge_m: 50, choose_m: 500, too_far_m: 3000, min_edge: 800, max_edge: 2400, max_bytes: 3 * 1024 * 1024, max_body: 5 * 1024 * 1024 };
-const KEYS = new Set(['image', 'lat', 'lng', 'device_lat', 'device_lng', 'accuracy', 'rights', 'company_website']);
+// Tour test 14 (Whistler, 2026-11-18; Lucía): addr_only, the owner tapped "Send it with my address" (her photo had no
+// location and she couldn't pin it); picked, whether she moved the pin herself (sent by the setup; older pages don't).
+const KEYS = new Set(['image', 'lat', 'lng', 'device_lat', 'device_lng', 'accuracy', 'rights', 'company_website', 'addr_only', 'picked']);
+const ADDR_ONLY_REASON = 'The owner couldn’t pin it. Place it from her photo and new address.';
+const NOT_PICKED_REASON = 'No spot was picked on the map: the spot sent is the listing’s own pin.';
 
 // Metres between two points.
 function distanceMeters(a, b) {
@@ -19,12 +23,15 @@ function distanceMeters(a, b) {
 const validPoint = (lat, lng) => Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180 && !(lat === 0 && lng === 0);
 
 // Live or review, with the plain reasons Dayton sees. point = the final spot; device = the phone's own reading, if any.
-function decide({ point, device, accuracy, pin, signedIn }) {
+function decide({ point, device, accuracy, pin, signedIn, addrOnly = false, picked = null }) {
   const reasons = [];
   const distance = pin ? Math.round(distanceMeters(pin, point)) : null;
   const nudged = device ? Math.round(distanceMeters(device, point)) : null;
   if (!signedIn) reasons.push('Sent from an edit link, not a login');
-  if (!device) reasons.push('The phone gave no location, so the spot was picked on the map');
+  // Tour test 14: "0 m from the map pin… picked on the map" when nothing was picked. Say what happened.
+  if (addrOnly) reasons.push(ADDR_ONLY_REASON);
+  else if (!device && picked === false) reasons.push(NOT_PICKED_REASON);
+  else if (!device) reasons.push('The phone gave no location, so the spot was picked on the map');
   else if (!Number.isFinite(accuracy) || accuracy > LIMITS.accuracy_m) reasons.push(`Rough phone reading (${Number.isFinite(accuracy) ? `about ${Math.round(accuracy)} m` : 'unknown'})`);
   if (nudged !== null && nudged > LIMITS.nudge_m) reasons.push(`Pin moved ${nudged} m from the phone’s reading`);
   if (distance === null) reasons.push('The listing has no map pin to compare with');
@@ -100,7 +107,7 @@ function createArrivalPoints(deps) {
     if (edge > LIMITS.max_edge) return deps.respond(res, 400, { ok: false, error: E.photo });
     const { venue } = found;
     const pin = venue.latitude != null && validPoint(Number(venue.latitude), Number(venue.longitude)) ? { lat: Number(venue.latitude), lng: Number(venue.longitude) } : null;
-    const d = decide({ point, device, accuracy, pin, signedIn });
+    const d = decide({ point, device, accuracy, pin, signedIn, addrOnly: body.addr_only === true, picked: typeof body.picked === 'boolean' ? body.picked : null });
     if (d.distance !== null && d.distance > LIMITS.too_far_m) return deps.respond(res, 400, { ok: false, error: E.far });
     let file;
     try { file = deps.write(deps.strip(raw) || raw); } catch (e) { return deps.respond(res, 500, { ok: false, error: E.generic }); }
@@ -167,7 +174,10 @@ function createArrivalPoints(deps) {
     </details>`;
   }
 
-  const pending = () => db.prepare(`SELECT a.*, v.name AS venue_name, v.latitude AS pin_lat, v.longitude AS pin_lng FROM venue_arrival_points a JOIN venues v ON v.id = a.venue_id WHERE a.status = 'pending' ORDER BY a.id`).all();
+  const pending = () => db.prepare(`SELECT a.*, v.name AS venue_name, v.latitude AS pin_lat, v.longitude AS pin_lng, v.address AS venue_address FROM venue_arrival_points a JOIN venues v ON v.id = a.venue_id WHERE a.status = 'pending' ORDER BY a.id`).all();
+  // Tour test 14: a spot sent with her address (no pin picked), or whose address changed since: never a one-tap "Looks
+  // right" (the spot is still the old pin). a.new_address: an address change waiting for review (server.js).
+  const needsPlacing = (a) => !!a && (String(a.review_reasons || '').includes(ADDR_ONLY_REASON) || String(a.review_reasons || '').includes(NOT_PICKED_REASON) || (!!a.new_address && a.new_address !== a.venue_address));
 
   // Tour test 5 (Whistler, 2026-11-17): "Send with my address" (no map) after an address change sent the old pin (his
   // house) while the phone stood at the dock, 2.7 km away; a quick "Looks right" kept the house. When the phone's reading
@@ -184,8 +194,10 @@ function createArrivalPoints(deps) {
       <p class="rv-meta">Storefront spot #${a.id}${a.distance_m != null ? ` · ${a.distance_m} m from the map pin` : ''}${a.accuracy_m != null ? ` · phone accurate to about ${Math.round(a.accuracy_m)} m` : ''}</p>
       ${a.review_reasons ? `<p class="rv-meta">Why it’s here: ${esc(a.review_reasons)}</p>` : ''}
       <p><img src="/owner-photos/arrival/${esc(a.preview_key)}.jpg" alt="" loading="lazy" style="max-width:320px;width:100%;border-radius:10px"></p>
+      ${needsPlacing(a) ? `<p class="rv-warn rv-place"><strong>The owner couldn’t pin it. Place it from her photo and new address.</strong> The spot sent is the listing’s old pin, so it isn’t offered as Looks right.</p>
+      <p class="rv-meta rv-newaddr">${a.new_address && a.new_address !== a.venue_address ? `New address (waiting for review): <strong>${esc(a.new_address)}</strong> · <a href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(a.new_address)}" target="_blank" rel="noopener">map it</a> · was ${esc(a.venue_address || 'none')}` : `Address: <strong>${esc(a.venue_address || 'none')}</strong>${a.venue_address ? ` · <a href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(a.venue_address)}" target="_blank" rel="noopener">map it</a>` : ''}`}</p>` : ''}
       ${far ? choose : `<p><a class="rv-btn" href="https://www.google.com/maps?q=${a.lat},${a.lng}" target="_blank" rel="noopener">See this spot on a map</a></p>`}
-      ${actions}
+      ${needsPlacing(a) ? String(actions).replace(/<button type="button" class="rv-btn rv-approve" data-act="approve">[^<]*<\/button>/, '') : actions}
     </article>`;
   }
 

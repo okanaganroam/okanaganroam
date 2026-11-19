@@ -63736,7 +63736,17 @@ function renderAdminReviewPage() {
   const photos = listOwnerPhotos('pending');
   const videos = ownerVideoEnabled() ? listOwnerVideos('pending') : [];
   const videosOk = ownerVideoEnabled() ? listOwnerVideos('approved') : [];
-  const arrivals = arrivalPoints.pending();
+  // Tour test 14 (Whistler, 2026-11-18; Lucía): an address change waiting for review, shown next to the spot's map.
+  const arrivals = arrivalPoints.pending().map((a) => {
+    try {
+      for (const r of db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' ORDER BY id DESC").all(a.venue_id)) {
+        const c = JSON.parse(r.changes || '{}'), list = Array.isArray(c) ? c : [c];
+        const hit = list.find((x) => x && typeof x.address === 'string' && x.address.trim());
+        if (hit) return { ...a, new_address: hit.address.trim() };
+      }
+    } catch (e) { /* no change */ }
+    return a;
+  });
   const live = recentLiveOwnerPhotos();
   const events = listEventSubmissions('pending');
   const eventChanges = listOwnerEventChanges('pending');

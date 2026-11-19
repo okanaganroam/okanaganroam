@@ -2878,7 +2878,8 @@
     if (!S.door.rights) { S.nudge = T.doorRightsNeed; return render(); }
     if (!S.door.spot) { S.nudge = T.needPin; return render(); }
     stopGps(); S.busy = true; S.error = ''; S.nudge = ''; render();
-    var b = { image: S.door.photo, lat: S.door.spot.lat, lng: S.door.spot.lng, rights: true }; if (S.door.best) { b.device_lat = S.door.best.lat; b.device_lng = S.door.best.lng; b.accuracy = S.door.best.accuracy; }
+    // Tour test 14 (Lucía): say whether she placed the pin herself, or sent her photo with her address (no pin picked).
+    var b = { image: S.door.photo, lat: S.door.spot.lat, lng: S.door.spot.lng, rights: true, picked: !!S.door.moved }; if (S.door.addrOnly) b.addr_only = true; if (S.door.best) { b.device_lat = S.door.best.lat; b.device_lng = S.door.best.lng; b.accuracy = S.door.best.accuracy; }
     post(C.base + '/arrival', b).then(function(j){ if (j && j.ok) return progress('door', j.live ? 'live' : 'day').then(function(ok){ S.busy = false; if (ok) go('saved:door'); else render(); }); S.busy = false; S.error = why(j); render(); });
   }
 
