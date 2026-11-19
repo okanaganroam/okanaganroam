@@ -22303,7 +22303,10 @@ function tourLengthWords(mins, hiMins = []) {
   return { en: `${a.charAt(0).toUpperCase()}${a.slice(1)} to ${b}.`, fr: `De ${af} à ${bf}.` };
 }
 // Tour test 13: does a typed tour say its own booking rule ("book 48 hours ahead", "by request", « sur réservation »)?
-const TOUR_ITEM_BOOK_RE = /\b(?:book\w*|reserv\w*|ahead|in advance|advance notice|notice|on request|by request|by appointment|walk[- ]?ins?|same[- ]day|r[ée]serv\w*|sur demande|[àa] l.avance)\b/i;
+// Tour test 14 (Whistler, 2026-11-18; Lucía): a booking RULE, not any booking word: "We can meet at Black comb base on
+// request" and "Tell us what you need when you book" put "Varies by tour" on her Booking line. A typed tour that says how
+// far ahead, that booking is required, by appointment, walk-ins or same-day does.
+const TOUR_ITEM_BOOK_RE = /\b(?:book(?:ing)?s? (?:(?:at least|up to|min(?:imum)?) )?(?:ahead|in advance|required|essential|recommended|only|\d+|one|two|three|a (?:day|week))|reserv\w* (?:ahead|in advance|required|essential|recommended|only)|(?:reservations?|booking|bookings) (?:are |is )?(?:required|essential|recommended|needed|only)|(?:\d+|one|two|three|a) ?(?:h|hrs?|hours?|days?|weeks?)(?:['’])? (?:ahead|in advance|notice)|in advance|advance notice|by appointment|walk[- ]?ins?|same[- ]day (?:bookings?|booking ok|ok|available|spots?)|r[ée]serv\w* (?:obligatoire|requise|[àa] l.avance)|sur r[ée]servation|[àa] l.avance)\b/i;
 function tourListBookWords(venueId) {
   try {
     const m = publishedMenu(venueId);
@@ -23163,9 +23166,12 @@ function tourPrivateLine(venue, t, priv, fr) {
   const hourly = t && t.private_per === 'hour', min = hourly && Number.isInteger(t.private_min) ? t.private_min : 0;
   let van = false;
   if (hourly) { try { van = /\bvans?\b/i.test(`${venue && venue.description || ''} ${tourListText(venue && venue.id)}`); } catch (e) { van = false; } }
-  if (!hourly) return fr ? `Sorties privées à partir de ${tourMoney(priv, true)}.` : `Private tours from ${tourMoney(priv, false)}.`;
-  return fr ? `${van ? 'Van privé' : 'Sorties privées'} à partir de ${tourMoney(priv, true)} l’heure${min ? ` (minimum de ${min} heures)` : ''}.`
-    : `${van ? 'Private van' : 'Private tours'} from ${tourMoney(priv, false)}/hour${min ? ` (${min}-hour minimum)` : ''}.`;
+  // Tour test 14 (Whistler, 2026-11-18; Lucía): a lesson company's line says "Private lessons from $599." (« Cours privés »).
+  const lessons = !!(t && Array.isArray(t.kinds) && t.kinds.includes('lessons'));
+  const what = fr ? (van ? 'Van privé' : lessons ? 'Cours privés' : 'Sorties privées') : (van ? 'Private van' : lessons ? 'Private lessons' : 'Private tours');
+  if (!hourly) return fr ? `${what} à partir de ${tourMoney(priv, true)}.` : `${what} from ${tourMoney(priv, false)}.`;
+  return fr ? `${what} à partir de ${tourMoney(priv, true)} l’heure${min ? ` (minimum de ${min} heures)` : ''}.`
+    : `${what} from ${tourMoney(priv, false)}/hour${min ? ` (${min}-hour minimum)` : ''}.`;
 }
 // The operator's own published list as one text (names, lengths, descriptions); '' for research's unconfirmed list.
 function tourListText(venueId) {
@@ -50458,6 +50464,8 @@ function ownerDescriptionWasHers(venue, field = 'description') {
 function ownerFrDescState(venue) {
   try {
     if (!venue || !String(venue.description_fr || '').trim() || ownerDescriptionWasHers(venue, 'description_fr') || ownerLinkPending(venue.id, 'description_fr')) return '';
+    // Tour test 14 (Whistler, 2026-11-18; Lucía): her French translation is already queued (fr_story): nothing to ask her.
+    if (db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND help_kind = ? AND status IN ('help', 'draft') LIMIT 1").get(venue.id, SETUP_FR_STORY_KIND)) return '';
     return ownerDescriptionWasHers(venue) || ownerLinkPending(venue.id, 'description') ? 'old' : 'research';
   } catch (e) { return ''; }
 }
@@ -54153,7 +54161,9 @@ function rejectMenu(menuId, reviewer, reason) {
 // kind: 'help' ("Can you do it for me?"), 'pending' (sent from a private link) or 'published' (a signed-in owner).
 function buildMenuEmail(venue, menu, kind, extra = {}) {
   const pages = menuFiles(menu.id).map((f, i) => `Page ${i + 1}: https://okanaganroam.com${f.preview}`).join('\n') || 'No pages were added.';
-  const items = menuItemCount(parseMenuData(menu.data));
+  // Tour test 14 (Whistler, 2026-11-18; Lucía): a tour's count says its tours as the page does (extras and gift cards
+  // aren't tours: "(5 tours)" for 4 tours and 2 extras).
+  const items = (venue && venue.type === 'tour' ? tourTripItems(parseMenuData(menu.data)).length : 0) || menuItemCount(parseMenuData(menu.data));
   const fields = {
     _subject: kind === 'help' && menu.help_kind === SETUP_FR_STORY_KIND ? `[TRANSLATE] ${venue.name} asked us to write their French description from their English story`
       : kind === 'help' ? (SETUP_NOTE_KINDS.includes(menu.help_kind) ? `[FIND LINK] ${venue.name} told us their ${SETUP_SHEET_WORDS[menu.help_kind]}: please find the link` : menu.help_kind ? `[TYPE IT UP] ${venue.name} sent their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind} to type up` : `[MENU HELP] ${venue.name} asked us to type up their ${isPriceList(venue) ? PRICE_LIST_WORDS[menuKind(venue)].en.list : 'menu'}`)
@@ -56954,7 +56964,7 @@ function renderOwnerSetupPage(found, opts) {
     // Cocktail test 2 (2026-11-13): the French setup's story is the French description (description_fr).
     storyPending: ownerLinkPending(venue.id, fr ? 'description_fr' : 'description') || '',
     // Tour test 8: the French description is still research's ('old' once her English story is hers), every type.
-    frDesc: fr ? '' : ownerFrDescState(venue), frDescFr: fr ? ownerFrDescState(venue) : '', storyResearch: fr && venue.description_fr ? !ownerDescriptionWasHers(venue, 'description_fr') : !ownerDescriptionWasHers(venue),
+    frStoryQueues: COMPLETENESS_TYPES.has(venue.type), frDesc: fr ? '' : ownerFrDescState(venue), frDescFr: fr ? ownerFrDescState(venue) : '', storyResearch: fr && venue.description_fr ? !ownerDescriptionWasHers(venue, 'description_fr') : !ownerDescriptionWasHers(venue),
     // Restaurant test 1 (2026-11-14): "Alpine / European" stored from research starts the food list with those picks.
     suggestCuisines: (cur.cuisines || []).some((c) => OWNER_CUISINES.includes(c)) ? [] : ownerCuisineSuggestions(cur.cuisines),
     // Restaurant test 3 (Whistler, 2026-11-15): research's "Free parking" pre-ticks the Free parking tile too, as for pubs

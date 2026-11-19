@@ -1156,6 +1156,7 @@
   // (owner-text-clean.js localWordSplits, the same words; the admin card flags it too.)
   // Tour test 14: where two sentences ran together in a line ("moreMore", "welcome.: please"), or ''.
   function runOnText(t){ var m = /[a-zà-ÿ]{2,}[A-ZÀ-Þ][a-zà-ÿ]{2,}/.exec(String(t || '')) || /\S*[.!?]\s*[:;]\s*\S*|\S*[:;]\s*\.\S*/.exec(String(t || '')); return m ? m[0] : ''; }
+  function tourLessonsKind(){ return TOUR && ((S.tour && S.tour.kinds) || TI.kinds || []).indexOf('lessons') >= 0; }
   function splitWords(text){
     var out = [], t = String(text || '');
     (C.localJoins || []).forEach(function(w){
@@ -1711,7 +1712,9 @@
   // Tour test 8 (Whistler, 2026-11-17): her English story is new and the French description is still our research's. One
   // line with a link to the French story box (the French setup's story screen); nothing is translated.
   function frDescOld(){
-    if (C.lang === 'fr' || !T.frDescOld || !(C.frDesc === 'old' || (C.frDesc === 'research' && (S.done.story || S.storySentNow)))) return '';
+    // Tour test 14 (Lucía): a story saved on this visit over research's French queues its translation (server.js
+    // queueFrStoryTranslation), so the finish screen doesn't ask her to update the French description too.
+    if (C.lang === 'fr' || !T.frDescOld || !(C.frDesc === 'old' || (C.frDesc === 'research' && S.done.story && !S.storySentNow)) || (S.storySentNow && C.frStoryQueues)) return '';
     var href = location.pathname.replace(/^\/(?:fr\/)?owner\//, '/fr/owner/') + '#story';
     // Tour test 9 (Whistler, 2026-11-18; Tanis): the link no longer saves French as her language (her English link and the
     // home page then went to /fr). It only opens the French story box.
@@ -2269,7 +2272,8 @@
         + (S.nudge && (S.nudge === T.tpriceUnit || S.nudge === T.tpriceUnitRentals || S.nudge === T.tpriceHourly || (T.tpriceVehicle && S.nudge === T.tpriceVehicle)) && T.tpriceUnitGo && STEPS.indexOf('menu') >= 0 ? '<div class="su-stack su-seaskip" id="suTpriceUnitGo">' + big('➜', T.tpriceUnitGo, '', true, 'tpriceToMenu') + '</div>' : '')
         // The per-person box takes words too ("free", "by donation"), so it opens the letters keyboard (no number pad).
         + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { max: 40 }) + (T.tpriceFreeTip ? '<p class="su-hint" id="suFreeTip">' + h(T.tpriceFreeTip) + '</p>' : '') + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>' : '')
-        + '<h2 class="su-h2">' + h(T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 40 })
+        // Tour test 14 (Lucía): a lesson company's box says "Private lessons" (her page says "Private lessons from $599").
+        + '<h2 class="su-h2">' + h(tourLessonsKind() && T.tprivQLessons ? T.tprivQLessons : T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', tourLessonsKind() && T.tprivLabelLessons ? T.tprivLabelLessons : T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 40 })
         // Tour test 11: whole trip or per hour, and the minimum hours of an hourly price.
         + (T.tprivPers ? '<p class="su-q" id="suPrivPerQ">' + h(T.tprivPerQ) + '</p>' + tchips('privPer', ['trip', 'hour'], T.tprivPers, T.tprivPerQ, 'suPrivPerQ')
           + (tp.privPer === 'hour' ? '<p class="su-q" id="suPrivMinQ">' + h(T.tprivMinQ) + '</p>' + tchips('privMin', ['2', '3', '4', '5', '6', '8'], T.tprivMins, T.tprivMinQ, 'suPrivMinQ') : '') : '')
@@ -2371,7 +2375,9 @@
         + '<div class="su-stack">' + big('✓', T.saveFood, '', false, 'cuisineSave') + '</div>';
     } else if (s === 'photos') {
       x = (S.photosSent || S.done.photos === 'day' ? '<p class="su-sent">' + h(fill(T.photosSent, { n: S.photosSent || '' }).replace('  ', ' ').replace(/^✓ (\S)/, function(m, c){ return '✓ ' + c.toUpperCase(); })) + '</p>' + q(T.photosMore) : q(T.photosQ, photosHint())) + msgs()
-        + '<div class="su-stack">' + big('📷', T.take, T.takeSub, false, 'take') + big('🖼️', T.choose, '', true, 'pick') + (S.photosSent || S.done.photos === 'day' ? big('➜', T.photosNoMore, '', true, 'after:photos') : '') + '</div>' + (S.photosSent || S.done.photos ? '' : skip('photos'));
+        // Tour test 14 (desktop): "Choose a photo" and "Choose from my photos" were the same button twice with a mouse (no
+        // camera to open): one "Choose a photo" there.
+        + '<div class="su-stack">' + (FINE && T.choosePhoto ? big('🖼️', T.choosePhoto, '', false, 'pick') : big('📷', T.take, T.takeSub, false, 'take') + big('🖼️', T.choose, '', true, 'pick')) + (S.photosSent || S.done.photos === 'day' ? big('➜', T.photosNoMore, '', true, 'after:photos') : '') + '</div>' + (S.photosSent || S.done.photos ? '' : skip('photos'));
     } else if (s === 'photos:review') {
       var g = goodPhotos();
       // With a main photo already on the page, it stays unless the owner picks a new one (pub fresh-eyes 2, 2026-11-10: a new
