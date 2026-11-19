@@ -39416,7 +39416,29 @@ function foodDrinkPageApplies(venue) {
 }
 // Complete & Verified (2026-11-09): the page is built as before; with the badge it carries the chip and the other
 // "verified" lines are left out (stripVerifiedRepeats), so it says it once.
+// Tour test 16 (Whistler, 2026-11-18; Tom set May to October and his page still said research's "Open year-round."): while
+// a tour's story is still ours (not one the owner sent) and the owner has said they run part of the year, a sentence of the
+// story that says year-round is left off the page (EN and FR). The story itself is never changed, and nothing is dropped
+// when it is the only sentence or the owner wrote it.
+const STORY_YEAR_ROUND_RE = /\byear[- ]round\b|\ball year(?: long| round)?\b|\b365 days\b|toute l[’']ann[ée]e|(?:^|\s)à l[’']ann[ée]e|à longueur d[’']ann[ée]e/i;
+function storySentences(t) { return String(t || '').match(/[^.!?]+(?:[.!?]+|$)\s*/g) || []; }
+function storyWithoutYearRound(text) {
+  const parts = storySentences(text);
+  const kept = parts.filter((x) => !STORY_YEAR_ROUND_RE.test(x));
+  return kept.length && kept.length < parts.length ? kept.join('').trim() : text;
+}
+function storySaysYearRound(text) { return STORY_YEAR_ROUND_RE.test(String(text || '')); }
+function venueSeasonStory(venue) {
+  if (!venue || venue.type !== 'tour' || venue.redirect_to) return venue;
+  let t; try { t = venueTourInfo(venue.id); } catch (e) { return venue; }
+  if (!t || t.year !== 'seasonal') return venue;
+  const out = { ...venue };
+  if (storySaysYearRound(venue.description) && !ownerDescriptionWasHers(venue)) out.description = storyWithoutYearRound(venue.description);
+  if (storySaysYearRound(venue.description_fr) && !ownerDescriptionWasHers(venue, 'description_fr')) out.description_fr = storyWithoutYearRound(venue.description_fr);
+  return out;
+}
 function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, opts = {}) {
+  venue = venueSeasonStory(venue);
   const cv = !!venue && venueBadgeState(venue, opts.now || new Date()) === 'earned';
   const html = renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages, cv ? { ...opts, completeVerified: true } : opts);
   return cv && typeof html === 'string' ? stripVerifiedRepeats(html) : html;

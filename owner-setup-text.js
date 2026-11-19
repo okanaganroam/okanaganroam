@@ -2297,11 +2297,13 @@ Object.assign(fr.tour, {
 // line under the box says the adult price; the rest (free tours, the checked-first limit, per-boat prices) is in Help. The
 // per-boat and rental nudges after Save (tour test 15) are unchanged.
 Object.assign(en.tour, {
+  storyYearRound: 'You run part of the year, but this says year-round. Change or take out that sentence.',
   tpriceMore: 'The adult price. Kids’ prices and other trips go in “Your tours and prices”.',
   tpriceMoreRentals: 'The adult price. Kids’ prices, other trips and per-boat rentals go in “Your tours and prices”.',
   tprivLead: 'One price for the whole group, like a private vehicle or a day rate.',
 });
 Object.assign(fr.tour, {
+  storyYearRound: 'Vous partez une partie de l’année, mais ce texte dit toute l’année. Changez ou retirez cette phrase.',
   tpriceMore: 'Le prix adulte. Les prix enfants et les autres sorties vont dans « Vos sorties et tarifs ».',
   tpriceMoreRentals: 'Le prix adulte. Les prix enfants, les autres sorties et les locations par bateau vont dans « Vos sorties et tarifs ».',
   tprivLead: 'Un seul prix pour tout le groupe, comme un véhicule privé ou un tarif à la journée.',

@@ -166,3 +166,25 @@ test('5. French page: the chip-built Groups line is in French, and his price lin
   assert.equal(app.menuPriceWithWords('349 per sled (2 adults, or 1 adult + 2 kids)', 'fr').replace(/ /g, ' '), '349 $ par traîneau (2 adults, or 1 adult + 2 kids)');
   assert.equal(app.menuPriceWithWords('$75 adults, $45 children', 'fr').replace(/ /g, ' '), '75 $ adultes, 45 $ enfants');
 });
+
+test('6. Story: research says "Open year-round." after he set May to October: the story screen nudges him, and the page leaves that sentence off until he sends his own', async () => {
+  const RES = 'Guided black bear viewing tours in the Whistler valley. Open year-round.';
+  const RES_FR = 'Visites guidées d’observation de l’ours noir dans la vallée de Whistler. Ouvert toute l’année.';
+  const { v, t } = await tom({ description: RES, description_fr: RES_FR });
+  const en = plain(page(v)), fr = plain(page(v, 'fr'));
+  assert.match(en, /Guided black bear viewing tours in the Whistler valley\./); assert.doesNotMatch(en, /year-round/i);
+  assert.match(fr, /Visites guidées d’observation/); assert.doesNotMatch(fr, /toute l’année/);
+  assert.equal(app.getVenue(v.id).description, RES, 'the stored story is unchanged');
+  const sim = await openSetup(base, t, { hash: 'story' });
+  assert.match(sim.text(), /You run part of the year, but this says year-round\. Change or take out that sentence\./);
+  const simFr = await openSetup(base, t, { hash: 'story', lang: 'fr' });
+  assert.match(simFr.text().replace(/[  ]/g, ' '), /mais ce texte dit toute l’année/);
+  // Running all year: the sentence is right, so it stays and there is no nudge.
+  const all = await tom({ description: RES }, { year: 'all' }, { months: null });
+  assert.match(plain(page(all.v)), /Open year-round\./);
+  assert.doesNotMatch((await openSetup(base, all.t, { hash: 'story' })).text(), /this says year-round/);
+  // His own story is his: it shows as he wrote it.
+  ok(await change(t, { description: 'Bear viewing by 4x4, May to October. Office open year-round for bookings.' }));
+  approveAll(v.id);
+  assert.match(plain(page(v)), /Office open year-round for bookings\./);
+});
