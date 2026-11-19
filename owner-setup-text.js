@@ -2565,6 +2565,10 @@ Object.assign(fr.indoor, { webLeadTickets: 'Nous avons inscrit votre page de bil
 // Indoor test 7 (2026-11-19): the booking link folds behind this for a walk-in place.
 Object.assign(en.indoor, { haveBookPage: 'Have a booking page?' });
 Object.assign(fr.indoor, { haveBookPage: 'Vous avez une page de réservation?' });
+// Indoor test 9 (2026-11-19; Melissa's walk-in play centre: the Book button was for party rooms): with Walk-ins welcome, the
+// link box is for parties or groups, and the page's button says "Book a party" when the link or Groups line is about parties.
+Object.assign(en.indoor, { tbookQParty: 'Party or group booking link (optional)', tbookLeadParty: 'It puts a Book button on your page (“Book a party” when it’s for parties).' });
+Object.assign(fr.indoor, { tbookQParty: 'Lien de réservation de fête ou de groupe (facultatif)', tbookLeadParty: 'Il ajoute un bouton Réserver à votre page (« Réserver une fête » si c’est pour les fêtes).' });
 Object.assign(en.indoor, { frDescOld: 'Optional: we translate your story into French for you. Speak French?', frDescGo: 'Check the French yourself' });
 Object.assign(fr.indoor, { frDescOld: 'Facultatif : nous traduisons votre histoire en français pour vous. Vous parlez français?', frDescGo: 'Vérifiez le français vous-même' });
 // Good to know quick answers for indoor places, and the Groups line's. Presets: the page shows each in its own language.

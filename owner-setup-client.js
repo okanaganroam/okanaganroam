@@ -2536,7 +2536,7 @@
         // Indoor test 7 (2026-11-19; Robert's walk-in gallery): with walk-ins welcome and no link yet, the booking link
         // folds behind "Have a booking page?" (it still saves the same way when opened).
         + (walkInFold(ibNow) ? '<details class="su-fold" id="suBookFold"><summary>' + h(T.haveBookPage) + '</summary>' : '')
-        + '<h2 class="su-h2" id="suLinkQ">' + h(T.tbookQ) + '</h2><p class="su-hint">' + h(T.tbookLead) + '</p>'
+        + '<h2 class="su-h2" id="suLinkQ">' + h(ib.book === 'no' && T.tbookQParty ? T.tbookQParty : T.tbookQ) + '</h2><p class="su-hint">' + h(ib.book === 'no' && T.tbookLeadParty ? T.tbookLeadParty : T.tbookLead) + '</p>'
         + (ib.noBook ? '' : field('suBookUrl', T.bookLinkLabel, ibNow, { mode: 'url', max: 300 }) + ex(T.bookLinkEx))
         + (CUR.booking_url || C.bookingKnown ? '' : '<div class="su-chips" role="group" aria-labelledby="suLinkQ"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ib.noBook ? 'true' : 'false') + '" data-tnobook="1">' + h(T.noBookLink) + '</button></div>')
         + (walkInFold(ibNow) ? '</details>' : '')
