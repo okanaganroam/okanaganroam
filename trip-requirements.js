@@ -160,7 +160,8 @@ const REQUEST_KINDS = {
   pottery: /\b(?:something creative|get creative|creative|crafty|arts and crafts|hands on|make something|make (?:our|your|my) own|diy|paint your own(?: pottery)?|pottery painting|paint and sip|paint nights?|painting class(?:es)?|art class(?:es)?|art camps?|summer camps?|day camps?|kids? camps?|spring break camps?|pd day camps?|poterie|ateliers? creatifs?|quelque chose de creatif|bricolage|camps? de jour|camps? d ete)\b/,
   // Indoor test 9 (2026-11-19): "see a play" and "a musical" ask for live theatre; "see a movie" and "films" for a cinema
   // (a listing still needs theatre or cinema words of its own, or the owner's kind).
-  theatre: /\b(?:(?:see|watch|catch) a (?:play|show|musical)|a play(?! (?:centres?|centers?|places?|areas?|ground|cafes?|structures?|zones?))|stage plays?|musicals?|live shows?)\b/,
+  // ("catch a show" and "a live show" stay What's On and dinner-and-a-show requests.)
+  theatre: /\b(?:(?:see|watch|catch) a (?:play|musical)|a play(?! (?:centres?|centers?|places?|areas?|ground|cafes?|structures?|zones?|dates?|groups?))|stage plays?|musicals?)\b/,
   cinema: /\b(?:(?:see|watch|catch) a (?:movie|film|flick)|films?|voir un film)\b/,
   scenic_flight: /\b(?:float ?planes?|seaplanes?|scenic (?:(?:helicopter|heli|plane|air) (?:flights?|tours?)|flights?)|scenic (?:or|and) helicopter flights?|helicopter (?:tours?|flights?|rides?|sightseeing|trips?)|heli (?:tours?|flights?|rides?)|helicopters?|flightseeing|glacier landings?)\b/,
 };
