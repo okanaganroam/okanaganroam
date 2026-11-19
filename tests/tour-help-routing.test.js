@@ -467,7 +467,8 @@ test("tour test 7 answers: group words for a day rate (no boat), private-only sa
   assert.match(plain(en.topic("tour-hide-price").a), /^ ?Yes, if you have a private price/);
   assert.match(plain(en.topic("tour-course-dates").a), /Your tours and prices/); assert.match(plain(en.topic("tour-course-dates").a), /Don’t add course days under Holidays/);
   assert.match(plain(en.topic("tour-certs").a), /story/); assert.match(plain(en.topic("tour-fitness").a), /Good to know/); assert.match(plain(en.topic("tour-gear").a), /Good to know/);
-  assert.match(plain(en.topic("tour-meeting-varies").a), /Keep your office/);
+  // Tour test 15 (Dayton): no meeting-spot step for tours; the office or main spot is the address.
+  assert.match(plain(en.topic("tour-meeting-varies").a), /put your main spot or office in Basics/);
   assert.match(plain(en.topic("tour-kinds-guide").a), /Mountain guiding, mountaineering or avalanche courses/);
 });
 
@@ -652,7 +653,8 @@ test("tour test 9 answers: the cultural kind, one side of a kind, Indigenous-own
   assert.match(plain(en.topic("tour-yearly-break").a), /Every year/); assert.doesNotMatch(en.topic("tour-yearly-break").a, /__/); assert.doesNotMatch(fr.topic("tour-yearly-break").aFr, /__/);
   assert.match(plain(en.topic("tour-groups").a), /21\+ or whole classes/); assert.match(plain(fr.topic("tour-groups").aFr), /21\+ ou classes entières/);
   assert.match(plain(en.topic("tour-culture-story").a), /Your story and Known for/);
-  assert.match(plain(en.topic("tour-meeting-varies").a), /Where do people meet you\?/);
+  // Tour test 15 (Dayton): no "Where do people meet you?" step for tours any more.
+  assert.match(plain(en.topic("tour-meeting-varies").a), /Guests get the exact meeting spot when they book/);
   assert.match(plain(en.topic("fr-desc-old").a), /Leave it to us/); assert.match(plain(en.topic("menu-add").a), /Type them in myself/); assert.match(plain(fr.topic("menu-add").aFr), /Je les tape moi-même/);
 });
 
@@ -840,7 +842,8 @@ test("tour test 13 answers: confirm and pay in Good to know, the no-location pho
   const { en, fr } = await setupFor("tour");
   const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
   assert.match(plain(en.topic("tour-confirm-pay").a), /Good to know/);
-  assert.match(plain(en.topic("tour-photo-no-location").a), /Send it with my address and you place the pin/);
+  // Tour test 15 (Dayton): tours send no meeting-spot photo.
+  assert.match(plain(en.topic("tour-photo-no-location").a), /Tours don’t send a meeting-spot photo/);
   assert.match(plain(en.topic("tour-too-long").a), /320/); assert.match(plain(en.topic("tour-too-long").a), /Your tours and prices/);
   assert.match(plain(en.topic("tour-price-refused").a), /189 per person/);
   assert.match(plain(en.topic("tour-off-request").a), /Off-season trips by request/); assert.match(plain(fr.topic("tour-off-request").aFr), /Hors saison, sorties sur demande/);
@@ -905,4 +908,58 @@ test("tour test 14 answers: the lessons kind, packages and Private tours, not in
   assert.doesNotMatch(plain(en.topic("tour-confirm-pay").a), /landing|flight/i); assert.doesNotMatch(plain(fr.topic("tour-confirm-pay").aFr), /atterrissage|vol\b/i);
   assert.match(plain(en.topic("tour-kinds-other").a), /Ski and snowboard lessons/);
   assert.match(plain(en.topic("tour-price-refused").a), /Per student/);
+});
+// Tour test 15 (Whistler, 2026-11-18; Dave, summer canoe, kayak and SUP rentals and a sunset paddle, winter snowshoe tours and
+// a fondue night; an iPad). Help got 2 of 13 right. His questions (help-log.json, exact wording), with a French twin; his
+// Spanish one answered in English. Tours have no meeting-spot step (Dayton, 2026-11-18): meeting-spot questions get "guests
+// get the exact meeting spot when they book".
+const ASKED15 = [
+  ["15-1", "en", "different meeting spot summer vs winter", ["tour-meeting"], "point de rencontre différent l'été et l'hiver"],
+  ["15-2", "en", "we meet at the dock in summer and the olympic plaza ticket booth in winter, how do I put two meeting spots", ["tour-meeting"], "on se rejoint au quai l'été et à la billetterie de l'Olympic Plaza l'hiver, comment mettre deux points de rencontre"],
+  ["15-3", "en", "open mid june to early sept and mid dec to end of march, closed in between. how?", ["tour-season"], "ouvert de mi-juin à début septembre et de mi-décembre à fin mars, fermé entre les deux. comment?"],
+  ["15-4", "en", "rentals priced per boat per hour", ["tour-per-unit"], "location à l'heure par bateau"],
+  ["15-5", "en", "canoe rental is $45 an hour for the boat, not per person. sunset paddle is $89 per person", ["tour-per-unit"], "la location de canot est 45 $ de l'heure par bateau, pas par personne"],
+  ["15-6", "en", "book online, same day is fine if theres space. rentals can walk up", ["tour-same-day", "tour-lead-time"], "réservation en ligne, le jour même ça va s'il reste de la place"],
+  ["15-7", "en", "kids in canoe any age but tours 6+", ["tour-age", "tour-ages-per-trip"], "les enfants de tout âge en canot mais les sorties 6 ans et plus"],
+  ["15-8", "en", "fondue tour includes dinner", ["tour-includes-meal"], "la sortie fondue comprend le souper"],
+  ["15-9", "en", "how do i show which tours are summer and which are winter", ["tour-kind-seasons"], "comment montrer quelles sorties sont l'été et lesquelles l'hiver"],
+  ["15-10", "en", "different meeting spot summer vs winter", ["tour-meeting"], "deux points de rencontre selon la saison"],
+  ["15-11", "es", "¿Cómo pongo dos lugares de encuentro, uno en verano y otro en invierno?", ["tour-meeting"], "comment mettre deux lieux de rencontre, un l'été et un l'hiver?"],
+  ["15-12", "en", "summer vs winter tours", ["tour-kind-seasons"], "sorties d'été et sorties d'hiver"],
+  ["15-13", "en", "includes dinner", ["tour-includes-meal"], "souper inclus"],
+];
+test("tour test 15: every Help question (EN or ES, and its French twin) lands on the right topic; no tour meeting-spot step in the answers", async () => {
+  const { en, fr } = await setupFor("tour", { cuisine: "Canoe & kayak rentals" });
+  assert.equal(ASKED15.length, 13);
+  const wrong = [];
+  for (const [k, lang, q, want, qFr] of ASKED15) {
+    const r = en.best(q), rf = fr.best(qFr);
+    if (!want.includes(r && r.id)) wrong.push(`${k} ${lang.toUpperCase()} "${q}" -> ${r && r.id} (want ${want.join(" or ")})`);
+    if (!want.includes(rf && rf.id)) wrong.push(`${k} FR "${qFr}" -> ${rf && rf.id} (want ${want.join(" or ")})`);
+    if (r.lang !== "en") wrong.push(`${k} "${q}" answered in ${r.lang}`);
+    if (rf.lang !== "fr") wrong.push(`${k} FR "${qFr}" answered in ${rf.lang}`);
+  }
+  assert.deepEqual(wrong, []);
+  const plain = (h) => String(h).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+  assert.match(plain(en.topic("tour-meeting").a), /Guests get the exact meeting spot when they book/);
+  assert.match(plain(fr.topic("tour-meeting").aFr), /point de rencontre exact à la réservation/);
+  for (const t of en.topics) assert.doesNotMatch(plain(t.a || ""), /Where do people meet you\?|Send it with my address/, t.id);
+  assert.match(plain(en.topic("tour-per-unit").a), /Canoe rental: \$45 per boat per hour/);
+  assert.match(plain(en.topic("tour-includes-meal").a), /Dinner included/);
+  assert.match(plain(en.topic("tour-kind-seasons").a), /Which season does each run\?/);
+  // The day-hours answer has no restaurant words on a tour's setup.
+  assert.doesNotMatch(plain(en.topic("hours").a), /lunch|dinner|brunch/i);
+  assert.ok(!en.topics.some((t) => t.id === "setup-split-hours" || t.id === "setup-third-time"));
+});
+test("tour test 15: Help on a tour's tours-and-prices page starts with tour chips and answers tour questions", async () => {
+  const v = app.createVenue({ name: "Help Routing Menu 15", slug: "help-routing-menu-15", region: "whistler", type: "tour", latitude: 50.116, longitude: -122.957, address: "1 Main St, Whistler", description: "A fixture." });
+  const t = app.createOwnerLink(v.id, {}).url.split("/owner/")[1];
+  const html = await get(`/owner/${t}/menu`);
+  const m = /<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(html);
+  const cfg = JSON.parse(m[1]);
+  assert.deepEqual(cfg.start, ["menu-add", "tour-includes-meal", "tour-kind-seasons", "tour-per-unit"]);
+  const bot = helpBot(html);
+  assert.equal(bot.best("fondue tour includes dinner").id, "tour-includes-meal");
+  assert.equal(bot.best("how do i show which tours are summer and which are winter").id, "tour-kind-seasons");
+  assert.match(bot.topic("menu-add").q, /tours and prices/);
 });
