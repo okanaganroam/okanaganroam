@@ -50304,7 +50304,8 @@ function ownerFrDescEnglishShown(venue) {
 // makes (a fr_story help row in /admin/review, and its email), once. Never when she wrote her own French.
 async function queueFrStoryTranslation(venue, contactEmail) {
   try {
-    if (!venue || !COMPLETENESS_TYPES.has(venue.type)) return false;
+    // The caller (the owner save) checks the type has the easy setup.
+    if (!venue) return false;
     const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(venue.id);
     if (!v || !String(v.description_fr || '').trim() || ownerDescriptionWasHers(v, 'description_fr') || ownerLinkPending(v.id, 'description_fr') != null) return false;
     if (db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND help_kind = ? AND status IN ('help', 'draft') LIMIT 1").get(v.id, SETUP_FR_STORY_KIND)) return false;
@@ -51591,7 +51592,7 @@ async function handleOwnerChangeSubmission(req, res, token) {
   ownerMarkFrench(res, 'owner_change_requests', liveId);
   if (id && Object.keys(review).length) notifyInBackground(`owner update #${id}`, () => notifyOwnerChange(id));
   // Tour test 12: a new English story with research's French still up queues its translation (as "Leave it to us").
-  if (typeof changes.description === 'string' && changes.description.trim()) await queueFrStoryTranslation(venue, contact.email);
+  if (COMPLETENESS_TYPES.has(venue.type) && typeof changes.description === 'string' && changes.description.trim()) await queueFrStoryTranslation(venue, contact.email);
   // Tour test 3 (Whistler, 2026-11-17): the category words the kinds just wrote, so the setup's finish preview shows what
   // the page and the cards show (it listed the chips' names).
   let tourWords = null;
