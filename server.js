@@ -53072,6 +53072,8 @@ async function handleOwnerPhotoUpload(req, res, token) {
 const arrivalPoints = require('./arrival-points').createArrivalPoints({
   db, respond: sendSubmissionResponse, sameOrigin: isSameOriginSubmission, readJson: readLimitedJsonBody, clientIp: requestClientIp, rateLimited: (ip) => ownerPhotoRateLimited(ip),
   venueForToken: (t) => venueForOwnerToken(t), strip: (b) => stripJpegMetadata(b), dimensions: (b) => jpegDimensions(b),
+  // Dayton (2026-11-18, tour test 15): tours send no meeting spot (guests get it when they book).
+  allowed: (venue) => !(venue && venue.type === 'tour'),
   write: (buf) => { const file = `${crypto.randomBytes(12).toString('hex')}.jpg`; fs.mkdirSync(OWNER_PHOTO_DIR, { recursive: true }); fs.writeFileSync(ownerPhotoPath(file), buf, { flag: 'wx' }); return file; },
   remove: (file) => { try { fs.unlinkSync(ownerPhotoPath(file)); } catch (e) { /* already gone */ } },
 });
@@ -73640,7 +73642,7 @@ module.exports = {
   seasonTagHtml,
   seasonTagShortText,
   seasonClosedLast,
-  browseRecommendedOrder, browseStrong,
+  browseRecommendedOrder, browseStrong, tourDepartureTimesIn, tourEveryMinutesIn,
   advisoryNotOperating,
   advisoryNotOperatingIds,
   legacyTripAdvisoryUnavailable,
