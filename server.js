@@ -4968,6 +4968,14 @@ function discoveryPresentation(run) {
 // (lower case, no accents, apostrophes as spaces); the longest phrase wins at each word, a plural "s" is optional on
 // one-word entries, and a place's own name is never rewritten. Meals are Canadian: déjeuner, dîner, souper.
 const FR_SEARCH_SYNONYMS = [
+  // Tour test 14 (Whistler, 2026-11-18; Lucía, private ski lessons): « cours de ski », « leçons de ski » and « école de ski »
+  // found nothing (the planner's French words for its ski_lessons kind, trip-planner-fr.js, are the same).
+  ['cours de ski et de planche a neige', 'ski and snowboard lessons'], ['cours de ski et de planche', 'ski and snowboard lessons'], ['cours de ski de fond', 'nordic ski school'],
+  ['cours prives de ski', 'ski lessons'], ['cours de ski prives', 'ski lessons'], ['cours de ski', 'ski lessons'], ['lecons de ski', 'ski lessons'], ['lecon de ski', 'ski lessons'],
+  ['cours de planche a neige', 'snowboard lessons'], ['cours de planche', 'snowboard lessons'], ['cours de snowboard', 'snowboard lessons'], ['ecole de ski', 'ski school'], ['ecoles de ski', 'ski school'],
+  ['moniteur de ski', 'ski instructor'], ['monitrice de ski', 'ski instructor'], ['moniteurs de ski', 'ski instructor'], ['camp de ski', 'kids ski camp'], ['ski adapte', 'adaptive ski'],
+  ['cours de kitesurf', 'kiteboarding lessons'], ['cours de kite', 'kiteboarding lessons'], ['cours de wing foil', 'wing foil lessons'], ['tir a la cible', 'target shooting'], ['champ de tir', 'target shooting'],
+  ['cours d escalade', 'rock climbing lessons'], ['ecole d escalade', 'rock climbing lessons'], ['cours de velo de montagne', 'mountain bike lessons'], ['cours de voile', 'sailing'],
   // Tour test 11 (Whistler, 2026-11-18; Min-jun's guides speak Korean and Japanese): « visite en coréen » found nothing.
   // The language words, French to English (an English story says "Korean"; a French one « coréen » is matched as well).
   ['coreen', 'korean'], ['coreenne', 'korean'], ['en coreen', 'korean'], ['japonais', 'japanese'], ['japonaise', 'japanese'], ['en japonais', 'japanese'], ['mandarin', 'mandarin'], ['chinois', 'chinese'],
@@ -22679,6 +22687,12 @@ const TOUR_KIND_LABELS_OWNER = {
   // TOUR_KIND_PUBLIC.paraglide, its filters Air & Heli plus Adventure (TOUR_KIND_ACTIVITY, TOUR_ACTIVITY_ALSO), its
   // planner kind paragliding (trip-requirements.js).
   paraglide: ['Paragliding, skydiving or hang gliding', 'Parapente, parachutisme ou deltaplane'],
+  // Tour test 14 (Whistler, 2026-11-18; Lucía, private ski and snowboard lessons; the loop brief): no chip fitted a ski or
+  // snowboard school (Help said "Something else", and she was under no tours filter). A list entry, not a new field; its
+  // page words are TOUR_KIND_PUBLIC.lessons, its filter Winter & Snow (TOUR_KIND_ACTIVITY), its planner kind ski_lessons
+  // (trip-requirements.js). Whistler's real lesson listings: Whistler Adaptive Sports Program, Extremely Canadian (ski
+  // clinics), Cross Country Connection (Nordic ski school).
+  lessons: ['Ski and snowboard lessons', 'Cours de ski et de planche'],
   wine: ['Wine tours', 'Tournées des vignobles'], farm: ['Farm, ranch or kennel visits', 'Visites de ferme, de ranch ou de chenil'], rentals: ['Rentals', 'Location'], other: ['Something else', 'Autre chose'],
 };
 // Tour test 3 (Whistler, 2026-11-17): the first length is "Up to 1 hour" (a 20-minute flight read "About 1 hour").
@@ -22782,6 +22796,12 @@ const TOUR_KIND_PUBLIC = {
   // Tour test 13: the air sports the listing's own words name ("Tandem paragliding" -> "Paragliding"), else all three.
   paraglide: { words: ['Paragliding, skydiving & hang gliding', 'Parapente, parachutisme et deltaplane'], eachSide: true, sides: [[TOUR_PARAGLIDE_SIDE_RE, 'Paragliding', 'Parapente'],
     [/skydiv|sky ?dive|parachut/, 'Skydiving', 'Parachutisme'], [/hang[- ]?glid|deltaplane|delta-plane/, 'Hang gliding', 'Deltaplane'], [/speed[- ]?fl(?:y|ying)|speed[- ]?riding/, 'Speed flying', 'Speed riding']] },
+  // Tour test 14: the lessons the listing's own words name ("Private ski and snow board lessons" -> "Ski lessons · Snowboard
+  // lessons"; "Adaptive ski & snowboard lessons" keeps adaptive), else the whole words. Gboard's "snow board" counts.
+  lessons: { words: ['Ski & snowboard lessons', 'Cours de ski et de planche'], eachSide: true, sides: [[/adaptive|sit[- ]?ski|adapt[ée]/, 'Adaptive lessons', 'Cours adaptés'],
+    [/(?<!snow ?board (?:and |& |or )?)(?<!cross[- ]country |nordic )\bski(?:ing)? (?:(?:and|&|or) snow ?board )?(?:lessons?|schools?|clinics?|camps?|instruct\w*|coaching)|\bski(?:ing)? (?:and|&|or) snow ?board|cours (?:priv[ée]s )?de ski(?! de fond)|[ée]cole de ski/, 'Ski lessons', 'Cours de ski'],
+    [/snow ?board(?:ing)? (?:lessons?|schools?|camps?|clinics?|coaching)|(?:and|&|or) snow ?board|cours de (?:planche|snowboard)/, 'Snowboard lessons', 'Cours de planche'],
+    [/nordic|cross[- ]country|ski de fond/, 'Nordic ski lessons', 'Cours de ski de fond']] },
   bike: { sides: [[/e-?bike (?:rentals?|hire)|location de v[ée]los? [ée]lectriques?/, 'E-bike rentals', 'Location de vélos électriques'], [/(?<!e-)(?<!e)\bbikes? (?:rentals?|hire)|location de v[ée]los?(?! [ée]lec)/, 'Bike rentals', 'Location de vélos'],
     [/\b(?:tours?|rides?|guided|sorties?)\b/, 'Bike tours', 'Sorties à vélo']] },
 };
@@ -29709,7 +29729,7 @@ const TOUR_ACTIVITIES = [
   { slug: 'bike', label: 'Bike & E-Bike', pattern: /e-bike|ebike|bike|bicycle|cycl/i, banner: { src: '/images/tours/activity-bike.jpg', alt: 'A couple cycling together along a paved trail', pos: 50 }, heading: 'Bike & E-Bike Tours in the Okanagan', intro: 'Bike rentals and guided e-bike rides on rail trails, lakeshore paths and through wine country.' },
   { slug: 'farm', label: 'Farms & Food', pattern: /farm|u-pick|orchard|food tour|petting|goat|fruit|mushroom|flower/i, banner: { src: '/images/tours/activity-farm.jpg', alt: 'A woman and a girl picking apples in an orchard', pos: 35 }, heading: 'Farms & Food Experiences in the Okanagan', intro: 'U-pick orchards, farm visits, food tours and foraging — a taste of the valley straight from where it grows.' },
   { slug: 'adventure', label: 'Adventure', pattern: /canyon|helicopter|heli|zipline|zip tour|atv|utv|4x4|skydiv|paraglid|balloon|climb|kart|riding|stables|horse|adventure park/i, banner: { src: '/images/tours/activity-adventure.jpg', alt: 'A woman flying along a zipline through the forest', pos: 40 }, heading: 'Adventure Experiences in the Okanagan', intro: 'Ziplines, heli flights, canyoning, paragliding, ATV tours, horseback rides and more — for when you want your heart racing.' },
-  { slug: 'winter', label: 'Winter', pattern: /snowshoe|sleigh|catski|snowcat|snowmobile|dog sled|ice[- ]fishing|winter ebike|winter e-bike/i, banner: { src: '/images/tours/activity-winter.jpg', alt: 'A team of huskies racing through the snow', pos: 45 }, heading: 'Winter Experiences in the Okanagan', intro: 'Dog sledding, sleigh rides, snowmobile and snowcat tours, snowshoeing and ice fishing — the best of the valley’s snowy season.' },
+  { slug: 'winter', label: 'Winter', pattern: /snowshoe|sleigh|catski|snowcat|snowmobile|dog sled|ice[- ]fishing|winter ebike|winter e-bike|ski (?:(?:&|and|or) snow ?board )?(?:lessons?|schools?|instruct\w*|camps?|coaching)|snow ?board(?:ing)? (?:lessons?|schools?|camps?|coaching)|adaptive (?:ski|snow ?board|sports)|sit[- ]?ski|cours (?:priv[ée]s )?de (?:ski|planche|snowboard)|[ée]coles? de ski|le[çc]ons? de ski/i, banner: { src: '/images/tours/activity-winter.jpg', alt: 'A team of huskies racing through the snow', pos: 45 }, heading: 'Winter Experiences in the Okanagan', intro: 'Dog sledding, sleigh rides, snowmobile and snowcat tours, snowshoeing and ice fishing — the best of the valley’s snowy season.' },
   { slug: 'culture', label: 'History & Culture', pattern: /walking|ghost|railway|theatre|folk school|workshop|history|storytelling|indigenous|first nations|cultural tour/i, banner: { src: '/images/tours/activity-culture.jpg', alt: 'The Kettle Valley Steam Railway rounding a bend through golden grass', pos: 50 }, heading: 'History & Culture Experiences in the Okanagan', intro: 'Steam train rides, ghost and walking tours and hands-on workshops — the stories and crafts of the Okanagan.' },
 ];
 // Rule order matters: winter first (a winter e-bike tour is a winter tour).
@@ -29730,7 +29750,9 @@ const TOUR_KIND_ACTIVITY = { wine: 'wine', boat: 'lake', jetboat: 'lake', paddle
   // existing filter (no new chip: Okanagan maps it to its own nearest filter when ported).
   sightseeing: 'wildlife',
   // Tour test 13 (Matthias): paragliding is under Air & Heli, and ALSO under Adventure (TOUR_ACTIVITY_ALSO).
-  paraglide: 'air' };
+  paraglide: 'air',
+  // Tour test 14 (Lucía): ski and snowboard lessons are under Winter & Snow.
+  lessons: 'winter' };
 // Tour test 7 (Whistler, 2026-11-17; Erik, an ACMG guide, was only under Winter): a tour whose own name, category or
 // story names mountain guiding, mountaineering, avalanche courses, ACMG / IFMGA, glacier trips or alpine climbing is ALSO
 // under this filter (a tour can be under several). Whistler maps them to its Climbing & Mountain Guides filter; Okanagan,
@@ -58487,7 +58509,9 @@ const TOUR_KIND_HINTS = [['heli', /heli[- ]?ski/], ['snowmobile', /snowmobil|(?<
   ['sightseeing', /(?<!heli[- ]?)sightsee|day[- ]trips?|day tours?|van tours?|scenic drives?|visites? touristiques?|excursions? d.une journ[ée]e/],
   // Tour test 13 (Matthias): paragliding, skydiving and hang gliding are their own kind (research's "Tandem paragliding"
   // pre-picked the ATV, bungee… chip).
-  ['paraglide', TOUR_AIR_SPORT_RE]];
+  ['paraglide', TOUR_AIR_SPORT_RE],
+  // Tour test 14 (Lucía): ski and snowboard lessons, schools, clinics, kids' camps, adaptive (research's "Ski lessons").
+  ['lessons', /ski (?:(?:&|and|or) snow ?board )?(?:lessons?|schools?|instruct\w*|clinics?|camps?|coaching)|snow ?board(?:ing)? (?:lessons?|schools?|camps?|coaching)|adaptive (?:ski|snow ?board)|nordic ski school|cours (?:priv[ée]s )?de (?:ski|planche)|[ée]cole de ski/]];
 function tourKindSuggestion(venue) {
   const t = `${venue.cuisine || ''} ${venue.name || ''}`.toLowerCase();
   const out = [];

@@ -22,7 +22,7 @@ const di = require('./discovery-intent.js');
 
 // Unmistakably French words: one is enough. (Words English visitors also
 // type -- pour, propose, organise, distilleries, belvedere -- are left out.)
-const STRONG = new Set(('parapente parapentes parachutisme deltaplane helicoptere helicopteres motoneige motoneiges pres chutes grimpeurs grimpeuses ours aigles saumons tyrolienne tyroliennes nocturne arrets musee musees evasion guidee guidees visites atelier ateliers obligatoire obligatoirement seulement vegetarien vegetariens vegetarienne vegetariennes avec jours journee journees enfants enfant chien chiens chienne vignoble vignobles vin vins souper soupers '
+const STRONG = new Set(('moniteur moniteurs monitrice monitrices lecons hispanophone hispanophones lusophone parapente parapentes parachutisme deltaplane helicoptere helicopteres motoneige motoneiges pres chutes grimpeurs grimpeuses ours aigles saumons tyrolienne tyroliennes nocturne arrets musee musees evasion guidee guidees visites atelier ateliers obligatoire obligatoirement seulement vegetarien vegetariens vegetarienne vegetariennes avec jours journee journees enfants enfant chien chiens chienne vignoble vignobles vin vins souper soupers '
   + 'nouvel reveillon valentin paques magasinage magasiner boutiques librairie equitation promenade skateparc planchodrome randonnee randonnees rando plage plages pluie pleut pluvieux pluvieuse semaine nous je quoi faire voudrais voudrions '
   + 'aimerais aimerions cherche cherchons sejour itineraire activites demain aujourdhui lundi mardi mercredi jeudi '
   + 'vendredi samedi dimanche janvier fevrier avril juin juillet aout septembre octobre novembre decembre hiver printemps '
@@ -287,6 +287,22 @@ const PHRASES = [
   ['visite du chenil', 'kennel visit'], ['visite de chenil', 'kennel visit'], ['visite au chenil', 'kennel visit'], ['visiter le chenil', 'kennel visit'], ['visites du chenil', 'kennel visits'], ['chenil', 'kennel'], ['chenils', 'kennels'],
   ['visite des chiots', 'puppy visit'], ['visite aux chiots', 'puppy visit'], ['rencontrer les chiots', 'puppy visit'], ['rencontrer les huskys', 'meet the huskies'],
   ['avec notre chiot', 'with my dog'], ['avec mon chiot', 'with my dog'],
+  // Tour test 14 (Whistler, 2026-11-18; Lucía, private ski lessons): « cours de ski », « leçons de ski », « moniteur »,
+  // « école de ski » and « cours de planche » found nothing in the planner. Kiteboarding and target shooting too (the broader
+  // pass over Whistler's real tours).
+  ['cours prives de ski', 'private ski lessons'], ['cours prive de ski', 'private ski lesson'], ['cours de ski prives', 'private ski lessons'], ['cours de ski prive', 'private ski lesson'],
+  ['cours de ski et de planche a neige', 'ski and snowboard lessons'], ['cours de ski et de planche', 'ski and snowboard lessons'], ['cours de ski et de snowboard', 'ski and snowboard lessons'],
+  ['cours de planche a neige', 'snowboard lessons'], ['cours de planche', 'snowboard lessons'], ['cours de snowboard', 'snowboard lessons'], ['cours de surf des neiges', 'snowboard lessons'],
+  ['cours de ski adapte', 'adaptive ski lessons'], ['cours de ski adaptes', 'adaptive ski lessons'], ['ski adapte', 'adaptive ski'], ['cours de ski de fond', 'cross country ski lessons'],
+  ['cours de ski', 'ski lessons'], ['lecons de ski', 'ski lessons'], ['lecon de ski', 'ski lesson'], ['lecons de planche a neige', 'snowboard lessons'], ['lecons de snowboard', 'snowboard lessons'],
+  ['ecoles de ski', 'ski schools'], ['ecole de ski', 'ski school'], ['ecole de planche a neige', 'snowboard school'], ['camp de ski', 'ski camp'], ['camps de ski', 'ski camps'], ['camp de jour', 'day camp'],
+  ['monitrices de ski', 'ski instructors'], ['moniteurs de ski', 'ski instructors'], ['monitrice de ski', 'ski instructor'], ['moniteur de ski', 'ski instructor'], ['moniteurs', 'instructors'], ['monitrices', 'instructors'], ['moniteur', 'instructor'], ['monitrice', 'instructor'],
+  ['qui parle espagnol', 'spanish speaking'], ['parlant espagnol', 'spanish speaking'], ['hispanophone', 'spanish speaking'], ['en espagnol', 'in spanish'], ['qui parle portugais', 'portuguese speaking'], ['en portugais', 'in portuguese'],
+  ['cours de kitesurf', 'kitesurf lessons'], ['cours de kite', 'kite lessons'], ['cours de wing foil', 'wing foil lessons'], ['cours de wingfoil', 'wing foil lessons'], ['cours de planche a voile', 'windsurf lessons'],
+  ['tir a la cible', 'target shooting'], ['champ de tir', 'shooting range'], ['stand de tir', 'shooting range'],
+  ['cours de voile', 'sailing lessons'], ['sortie en voilier', 'sailing trip'], ['sorties en voilier', 'sailing trips'], ['croisiere en voilier', 'sailing cruise'], ['balade en voilier', 'sailing trip'],
+  ['cours d escalade', 'rock climbing lessons'], ['ecole d escalade', 'climbing school'], ['guide d escalade', 'rock climbing guide'], ['guides d escalade', 'rock climbing guides'], ['camp d escalade', 'climbing camp'],
+  ['cours de velo de montagne', 'mountain bike lessons'], ['camp de velo', 'bike camp'], ['cours de vtt', 'mountain bike lessons'],
   // Tour test 13 (Whistler, 2026-11-18; Matthias, tandem paragliding): « parapente », « parachutisme », « deltaplane »
   // found nothing in the planner (only search read them).
   ['vol en parapente biplace', 'tandem paragliding'], ['parapente biplace', 'tandem paragliding'], ['vol en parapente', 'paragliding'], ['vols en parapente', 'paragliding'], ['parapentes', 'paragliding'], ['parapente', 'paragliding'],
