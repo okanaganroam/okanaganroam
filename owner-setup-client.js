@@ -637,6 +637,13 @@
   if (TOUR && S.tour.price == null && typeof C.researchFee === 'number') { S.tour.price = C.researchFee; S.tour.priceGuessed = true; }
   if (TOUR && !S.tour.length && C.researchLength) { S.tour.length = C.researchLength; S.tour.lengthGuessed = true; }
   if (TOUR && !S.tour.kinds.length && (C.suggestKinds || []).length) { S.tour.kinds = C.suggestKinds.slice(0, 3); S.tour.kindsGuessed = true; }
+  // Tour test 15 (Whistler, 2026-11-18; Dave; Dayton approved): the season each kind runs, asked on the kinds screen only
+  // when it's needed (2+ kinds, two seasons, and a kind whose season isn't plain from the kind), pre-filled.
+  S.tour.ks = TI.kind_seasons && typeof TI.kind_seasons === 'object' ? JSON.parse(JSON.stringify(TI.kind_seasons)) : {};
+  function ksKinds(){ return ((S.tour && S.tour.kinds) || []).filter(function(k){ return k !== 'other'; }); }
+  function ksVal(k){ return S.tour.ks[k] || (C.kindSeasonGuess || {})[k] || 'both'; }
+  function ksTwoSeasons(){ return !!C.tourTwoSeasons || (CUR.hours_seasons || []).length > 0; }
+  function ksShown(){ var ks = ksKinds(); return ks.length >= 2 && ksTwoSeasons() && (ks.some(function(k){ return ((C.kindSeasonGuess || {})[k] || 'both') === 'both'; }) || Object.keys(TI.kind_seasons || {}).length > 0); }
   // "$129" / "129 $", "$1,500" / "1 500 $".
   function tourMoney(n){ var t = Math.round(n) === n ? String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, C.lang === 'fr' ? '\u00a0' : ',') : n.toFixed(2); return C.lang === 'fr' ? t.replace('.', ',') + '\u00a0$' : '$' + t; }
   // A typed price: "129", "$129", "129 $", "1,500", "1 500", "12.50" / "12,50". -> number, null (empty) or NaN.
@@ -656,6 +663,11 @@
   // Tour test 13 (Matthias): the Swiss "189.-" / "189.–" and "CHF 189" read as 189 (server.js tourPriceSwiss, the same rule).
   function priceSwiss(x){ return String(x == null ? '' : x).trim().replace(/^(?:CHF|SFr\.?|Fr\.)\s*/i, '').replace(/(\d)\s*CHF\b\.?/i, '$1').replace(/(\d)[.,][-\u2013\u2014]+/, '$1'); }
   function priceTrim(x){ return priceSwiss(x).replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
+  function tourRentalKinds(){ return TOUR && ((S.tour && S.tour.kinds) || TI.kinds || []).some(function(k){ return k === 'rentals' || k === 'paddle'; }); }
+  function tourRentalPriceWords(rest){
+    return (tourRentalKinds() || /(?:^|[\s\/])(?:hours?|hrs?|hr|h|heures?)\b|\bhourly\b|\brentals?\b|\blocations?\b/.test(rest))
+      && /\b(?:boats?|boards?|canoes?|kayaks?|sups?|paddle ?boards?|bateaux?|planches?|canots?|embarcations?)\b/.test(rest) && !/\b(?:whole|entire|charters?|nolis\w*|private|priv[ée]e?s?)\b/.test(rest);
+  }
   function tourPriceWhy(x, priv){
     var TOUR_UNIT_RE = /\b(?:e-?bikes?|bikes?|bicycles?|cycles?|v[ée]los?|rentals?|locations?|kayaks?|canoes?|canots?|rafts?|radeaux?|boards?|paddle ?boards?|planches?|sups?|skis?|snowshoes?|raquettes?|helmets?|casques?|gear|[ée]quipements?|rooms?|chambres?|vehicles?|v[ée]hicules?|cars?|voitures?|sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|horses?|chevaux|cheval|units?|unit[ée]s?|pairs?|paires?|sets?)\b/;
     // Tour test 7 (Whistler, 2026-11-17): days, nights and hours are not units: "$750/day" is a day rate for the group
@@ -684,6 +696,10 @@
     rest = rest.replace(/\bsame[\s-]+day\b/g, ' ').replace(/\s+/g, ' ').trim();
     if (!priv && PER_ONE_RE.test(rest) && /\$\s*\d|\d\s*\$/.test(rest.replace(PER_ONE_RE, ''))) return 'first';
     if (LEN_RE.test(rest)) return 'length';
+    // Tour test 15 (Whistler, 2026-11-18; Dave: "30/hr per boat", canoe and kayak rentals): with Rentals or Paddle picked, or
+    // words that say rental or per hour, a price per boat, board, canoe or kayak is a rental ('unit': Your tours and prices),
+    // never a private tour. A whole-boat charter or a private trip stays 'group' (server.js tourPriceWhy, the same rule).
+    if (!priv && tourRentalPriceWords(rest)) return 'unit';
     if (!TOUR_UNIT_RE.test(rest) && (DAY_RE.test(rest) || HOUR_RE.test(rest))) {
       if (priv) rest = rest.replace(RATE_STRIP, ' ').replace(/\s+/g, ' ').trim();
       else if (!TOUR_GROUP_RE.test(rest)) return DAY_RE.test(rest) ? 'day' : 'hourly';
@@ -2258,6 +2274,8 @@
         // couldn't find Boat to tick it again).
         + (tRest.length ? '<details class="su-kinds" id="suKindsMore"' + (S.tourMoreOpen || tRest.some(function(o){ return S.tour.kinds.indexOf(o.k) >= 0; }) ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + tRest.map(kchip).join('') + '</div></details>' : '')
         + (S.tour.kinds.length ? '<p class="su-sent" id="suTourPicked">' + h(fill(T.picked, { list: S.tour.kinds.map(tourKindName).join(', ') })) + '</p>' : '')
+        // Tour test 15: one short question, pre-filled; a row of Summer / Winter / Both per kind.
+        + (ksShown() && T.ksQ ? '<h2 class="su-h2" id="suKsQ">' + h(T.ksQ) + '</h2><p class="su-hint">' + h(T.ksLead) + '</p>' + ksKinds().map(function(k){ return '<p class="su-q" id="suKs_' + h(k) + '">' + h(tourKindName(k)) + '</p><div class="su-chips" role="group" aria-labelledby="suKsQ suKs_' + h(k) + '">' + ['summer', 'winter', 'both'].map(function(v){ return '<button type="button" class="su-chip" aria-pressed="' + (ksVal(k) === v ? 'true' : 'false') + '" data-tks="' + h(k) + ':' + v + '">' + h(T.ksOpts[v]) + '</button>'; }).join('') + '</div>'; }).join('') : '')
         + '<h2 class="su-h2" id="suLenQ">' + h(T.tlengthQ) + '</h2>' + (S.tour.lengthGuessed && S.tour.length === C.researchLength && T.guessCheck ? '<p class="su-sent su-research" id="suLengthGuess">' + h(T.guessCheck) + '</p>' : '')
         + tchips('length', ['1h', '1-2h', '2-3h', 'half', 'full', 'multi'], T.tlengths, T.tlengthQ, 'suLenQ')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'tourSave') + '</div>' + skip('tour');
@@ -2272,7 +2290,7 @@
         + (S.nudge && (S.nudge === T.tpriceGroup || S.nudge === T.tpriceDay) && S.groupMove != null && T.tpriceGroupMove ? '<div class="su-stack su-seaskip" id="suTpriceMove">' + big('➜', fill(T.tpriceGroupMove, { x: tourMoney(S.groupMove) }), '', true, 'tpriceToPriv') + '</div>' : '')
         + (S.nudge && (S.nudge === T.tpriceUnit || S.nudge === T.tpriceUnitRentals || S.nudge === T.tpriceHourly || (T.tpriceVehicle && S.nudge === T.tpriceVehicle)) && T.tpriceUnitGo && STEPS.indexOf('menu') >= 0 ? '<div class="su-stack su-seaskip" id="suTpriceUnitGo">' + big('➜', T.tpriceUnitGo, '', true, 'tpriceToMenu') + '</div>' : '')
         // The per-person box takes words too ("free", "by donation"), so it opens the letters keyboard (no number pad).
-        + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { max: 40 }) + (T.tpriceFreeTip ? '<p class="su-hint" id="suFreeTip">' + h(T.tpriceFreeTip) + '</p>' : '') + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>' : '')
+        + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { max: 40 }) + (T.tpriceFreeTip ? '<p class="su-hint" id="suFreeTip">' + h(T.tpriceFreeTip) + '</p>' : '') + '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>' + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(tourRentalKinds() && T.tpriceMoreRentals ? T.tpriceMoreRentals : T.tpriceMore) + '</p>' : '')
         // Tour test 14 (Lucía): a lesson company's box says "Private lessons" (her page says "Private lessons from $599").
         + '<h2 class="su-h2">' + h(tourLessonsKind() && T.tprivQLessons ? T.tprivQLessons : T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', tourLessonsKind() && T.tprivLabelLessons ? T.tprivLabelLessons : T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 40 })
         // Tour test 11: whole trip or per hour, and the minimum hours of an hourly price.
@@ -4066,6 +4084,8 @@
       var ti0 = {};
       if (JSON.stringify(tk0) !== JSON.stringify(TI.kinds || [])) ti0.kinds = tk0;
       if (tl0 !== (TI.length || '')) ti0.length = tl0;
+      // Tour test 15: the season of each kind, saved only when the question showed (the pre-filled answers count).
+      if (ksShown()) { var ks0 = {}; ksKinds().forEach(function(kk){ ks0[kk] = ksVal(kk); }); if (JSON.stringify(ks0) !== JSON.stringify(TI.kind_seasons || {})) ti0.kind_seasons = ks0; }
       return saveAll('tour', Object.keys(ti0).length ? [{ tour_info: ti0 }] : [], null, null, function(){ Object.keys(ti0).forEach(function(kk){ TI[kk] = ti0[kk]; }); S.tour.lengthGuessed = false; S.tour.kindsGuessed = false; });
     }
     if (k === 'priceSave') {
@@ -4445,6 +4465,7 @@
       else if (S.tour.kinds.length >= 3) { S.nudge = T.tkindMax; S.keepNudgeFocus = true; mark(); var y0 = window.scrollY; render(); window.scrollTo(0, y0); srSay(T.tkindMax); return; }
       else S.tour.kinds.push(kk);
       redraw(); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-tks]'), function(b){ b.onclick = function(){ var q15 = b.getAttribute('data-tks').split(':'); S.tour.ks[q15[0]] = q15[1]; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tadult]'), function(b){ b.onclick = function(){ S.tour.adult = !S.tour.adult; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tnobook]'), function(b){ b.onclick = function(){ readTour(); var bu2 = el('suBookUrl'); if (bu2) S.bookUrl = bu2.value; S.tour.noBook = !S.tour.noBook; redraw(); }; });
     var tpi = el('suTprice'); if (tpi && TOUR) tpi.addEventListener('input', function(){ readTour(); var ld = el('suTpriceLead'); if (ld) ld.textContent = tourPriceLead(); var fg = el('suFeeGuess'); if (fg && !S.tour.priceGuessed) fg.hidden = true; var fh = el('suFreeHint'); if (fh) fh.hidden = !!S.tour.free; });

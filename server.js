@@ -629,10 +629,10 @@ function tourPickupText(venue, fr) {
   const office = venue.address ? (fr ? frTextOr(venue.address) : venue.address) : '';
   return fr ? `hôtels ${area[1]}${office ? ` (bureau : ${office})` : ''}` : `hotels in ${area[0]}${office ? ` (office: ${office})` : ''}`;
 }
-function tourAddressIsMeetingPoint(venue) {
-  if (!venue || venue.type !== 'tour' || venue.id == null) return false;
-  try { return ['live', 'day'].includes(setupProgress(venue.id).done.basics); } catch (e) { return false; }
-}
+// Dayton (2026-11-18, tour test 15): "we dont need to have meeting location". Tours have no meeting-spot step; guests get
+// the exact meeting spot when they book, and a tour's page shows its business address as "Address" (a pickup keeps its own
+// row). Kept as a function (always false) so the old callers read plainly.
+function tourAddressIsMeetingPoint(venue) { return false; }
 function tourOwnPriceSaid(venueId) { try { return !!tourPriceValue(venueId); } catch (e) { return false; } }
 
 function normalizePrice(price) {
@@ -22324,6 +22324,26 @@ function tourKindSeasonFromList(venueId, kind) {
     return got.size === 1 ? [...got][0] : got.size === 2 ? 'both' : null;
   } catch (e) { return null; }
 }
+// "Summer: canoe & kayak rentals · Winter: snowshoeing" / « Été : canot, kayak et location · Hiver : raquette », from the
+// season of each kind (tourKindSeasons) and the kinds' own public words (tourKindsText). Null when every kind runs in
+// the same season, or there's nothing to say.
+function tourKindSeasonWords(venueId, fr = false) {
+  const ks = tourKindSeasons(venueId);
+  if (!ks) return null;
+  const t = venueTourInfo(venueId);
+  let v = null; try { v = db.prepare('SELECT cuisine, description FROM venues WHERE id = ?').get(venueId); } catch (e) { v = null; }
+  const was = 'cuisine_was' in t ? t.cuisine_was : (v && v.cuisine) || '';
+  const out = [];
+  for (const [season, en, frw] of [['summer', 'Summer', 'Été'], ['winter', 'Winter', 'Hiver'], ['both', 'All year', 'Toute l’année']]) {
+    const kinds = Object.keys(ks).filter((k) => ks[k] === season);
+    if (!kinds.length) continue;
+    const words = tourKindsText(kinds, fr, was, tourStoryWords(venueId, v && v.description), tourOwnWords(venueId));
+    if (!words) continue;
+    const low = /^[A-ZÀ-Þ][a-zà-ÿ’' -]/.test(words) && !/^(?:Indigenous|First Nations?)\b/.test(words) ? words.charAt(0).toLowerCase() + words.slice(1) : words;
+    out.push(`${fr ? frw : en}${fr ? '\u00a0: ' : ': '}${low}`);
+  }
+  return out.length >= 2 ? out.join(' · ') : null;
+}
 function tourKindSeasonGuess(venueId, kind) { return tourKindSeasonFromList(venueId, kind) || TOUR_KIND_SEASON_DEFAULT[kind] || 'both'; }
 // Two seasons: his hours have a second season, or his open stretches are two (a closed break between), or one stretch
 // takes in both January and July.
@@ -22965,7 +22985,10 @@ function tourKindsText(kinds, fr = false, was = '', story = '', ownWords = '') {
   // company's "summer heli-biking" with Bike tours picked keeps the kind's own words, so "bike tour" still finds it.
   const namesKind = (k, p) => { const words = TOUR_KIND_LABELS_OWNER[k][0].toLowerCase().split(/[^a-z-]+/).filter((w) => w && !/^(?:and|or)$/.test(w) && !TOUR_WORDS_GENERIC.test(w)); return p.toLowerCase().split(/\s+/).some((w) => words.includes(w) || words.includes(w.replace(/s$/, ''))); };
   const l = [];
-  const push = (x) => { if (x && !l.some((y) => y.toLowerCase() === x.toLowerCase())) l.push(x); };
+  // Tour test 15 (Whistler, 2026-11-18; Dave: "Snowshoeing, canoe, kayak rentals & rentals"): a one-word kind ("Rentals",
+  // « Location ») that another entry already says ("kayak rentals") isn't said twice.
+  const stem = (w) => w.toLowerCase().replace(/s$/, '');
+  const push = (x) => { if (!x || l.some((y) => y.toLowerCase() === x.toLowerCase())) return; if (!/\s/.test(x.trim()) && l.some((y) => y.split(/[\s,&]+/).some((w) => w && stem(w) === stem(x.trim())))) return; l.push(x); };
   // Tour test 5: a part two picked kinds cover goes to the kind its first own word names ("Fishing charters" is Fishing,
   // not "Boat tours and charters"); then the earlier kind in the list.
   const namePos = (k, p) => { const words = TOUR_KIND_LABELS_OWNER[k][0].toLowerCase().split(/[^a-z-]+/).filter((w) => w && !/^(?:and|or)$/.test(w) && !TOUR_WORDS_GENERIC.test(w)); const i = p.toLowerCase().split(/\s+/).findIndex((w) => words.includes(w) || words.includes(w.replace(/s$/, ''))); return i < 0 ? 99 : i; };
@@ -23124,7 +23147,7 @@ const TOUR_PER_ONE_ADJ = '(?:(?:tandem|classic|standard|solo|single|basic|regula
 const TOUR_PER_ONE_NOUNS = '(?:persons?|personnes?|pers|pp|p\\.p\\.?|ppl|pax|adults?|adultes?|guests?|head|t[êe]te|each|chacun|ea|seats?|places?|riders?|cavali[eè]re?s?|child|children|kids?|enfants?|participants?|passengers?|passagers?|flights?|vols?|rides?|jumps?|sauts?|trips?|tours?|sorties?|excursions?|tickets?|billets?|students?|[ée]tudiants?|skiers?|skieu(?:r|rs|se|ses)|snowboarders?|learners?|[ée]l[èe]ves?)';
 function tourPriceLabelDrop(rest) { return rest.replace(/\(([^()\d]*)\)/g, (all, inner) => (TOUR_GROUP_PRICE_RE.test(inner.toLowerCase()) || TOUR_UNIT_RE.test(inner.toLowerCase()) || TOUR_DAY_RATE_RE.test(inner.toLowerCase()) || TOUR_HOUR_RATE_RE.test(inner.toLowerCase()) ? all : ' ')); }
 function tourPriceTrim(x) { return tourPriceSwiss(x).replace(/^(?:from|starting (?:at|from)|starts at|[àa] partir de|d[èe]s|min(?:imum)?)\s*:?\s*/i, '').replace(/\s*(?:and up|& up|or more|and more|et plus|ou plus|minimum|min\.?|\+)\s*\.?$/i, '').trim(); }
-function tourPriceWhy(x, priv = false) {
+function tourPriceWhy(x, priv = false, kinds = []) {
   const raw = tourPriceTrim(x);
   if (!raw || !/\d/.test(raw)) return '';
   if (/^\s*(?:\$|CA\$|C\$)?\s*\d+(?:[.,]\d+)?\s*(?:(?:-|to|à|a)\s*\d+(?:[.,]\d+)?\s*)?(?:h|hrs?|hours?|heures?|mins?|minutes?)\b/i.test(raw)) return 'hours';
@@ -23139,6 +23162,9 @@ function tourPriceWhy(x, priv = false) {
   rest = rest.replace(/\bsame[\s-]+day\b/g, ' ').replace(/\s+/g, ' ').trim();
   if (!priv && TOUR_PER_ONE_RE.test(rest) && /\$\s*\d|\d\s*\$/.test(rest.replace(TOUR_PER_ONE_RE, ''))) return 'first';
   if (TOUR_LENGTH_PRICE_RE.test(rest)) return 'length';
+  // Tour test 15 (Dave: "30/hr per boat"): a rental per boat, board, canoe or kayak (Rentals or Paddle picked, or rental or
+  // per-hour words) is 'unit' (Your tours and prices), never a private tour; a whole-boat charter stays 'group'.
+  if (!priv && (kinds.some((k) => k === 'rentals' || k === 'paddle') || /(?:^|[\s/])(?:hours?|hrs?|hr|h|heures?)\b|\bhourly\b|\brentals?\b|\blocations?\b/.test(rest)) && /\b(?:boats?|boards?|canoes?|kayaks?|sups?|paddle ?boards?|bateaux?|planches?|canots?|embarcations?)\b/.test(rest) && !/\b(?:whole|entire|charters?|nolis\w*|private|priv[ée]e?s?)\b/.test(rest)) return 'unit';
   if (!TOUR_UNIT_RE.test(rest) && (TOUR_DAY_RATE_RE.test(rest) || TOUR_HOUR_RATE_RE.test(rest))) {
     if (priv) rest = rest.replace(TOUR_RATE_STRIP_RE, ' ').replace(/\s+/g, ' ').trim();
     else if (!TOUR_GROUP_PRICE_RE.test(rest)) return TOUR_DAY_RATE_RE.test(rest) ? 'day' : 'hourly';
@@ -23167,9 +23193,9 @@ const TOUR_PRICE_WHY_ERRORS = { group: 'Priced per boat or per group? Put it in 
 // Tour test 8: a per-sled or per-vehicle price says so (it said "per bike").
 const TOUR_VEHICLE_WORDS_RE = /\b(?:sleds?|snowmobiles?|motoneiges?|tra[iî]neaux?|vehicles?|v[ée]hicules?|cars?|voitures?|atvs?|utvs?|quads?|carts?|buggy|buggies|side[- ]by[- ]sides?|machines?|voiturettes?|kayaks?|canoes?|canots?|rafts?|radeaux?)\b/i;
 TOUR_PRICE_WHY_ERRORS.vehicle = 'Priced per sled, boat or vehicle? List it in Your tours and prices, like “Sled ride: $349 per sled (2 adults)”. Here, put your lowest price for one person.';
-function cleanTourPrice(x, allowFree = false, priv = !allowFree) {
+function cleanTourPrice(x, allowFree = false, priv = !allowFree, kinds = []) {
   if (x === null) return { value: null };
-  if (typeof x === 'string') { const why = tourPriceWhy(x, priv); if (why && why !== 'first') return { error: priv && why !== 'hours' ? TOUR_PRICE_ERROR : TOUR_PRICE_WHY_ERRORS[why === 'unit' && TOUR_VEHICLE_WORDS_RE.test(x) ? 'vehicle' : why], why }; }
+  if (typeof x === 'string') { const why = tourPriceWhy(x, priv, kinds); if (why && why !== 'first') return { error: priv && why !== 'hours' ? TOUR_PRICE_ERROR : TOUR_PRICE_WHY_ERRORS[why === 'unit' && TOUR_VEHICLE_WORDS_RE.test(x) ? 'vehicle' : why], why }; }
   // Tour test 4: "free", "0", "by donation"… in the per-person box (never the private price).
   if (allowFree) { const f = tourFreeRead(x); if (f) return { value: f }; }
   // Tour test 6: "from 1500" / « 1500 $ et plus » -> 1500.
@@ -39773,6 +39799,9 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   })();
   const detailRows = [
     // Distillery test 2: on French pages, a cuisine with no French is left out (the row goes when nothing is left).
+    // Tour test 15 (Whistler, 2026-11-18; Dave): a tour whose kinds run in different seasons says which ("Summer: canoe &
+    // kayak rentals · Winter: snowshoeing").
+    venue.type === 'tour' && tourKindSeasonWords(venue.id, fr) ? [L('Category', 'Cat\u00e9gorie'), escapeHtml(tourKindSeasonWords(venue.id, fr))] :
     venue.cuisine && (!fr || venueCuisineList(venue).some((c) => frCuisineShown(c)) || placeTypeBesideCuisines(venue, fr)) ? [venue.type === 'tour' ? L('Category', 'Cat\u00e9gorie') : 'Cuisine', venueCuisineList(venue).map((c) => (fr ? frCuisineShown(c) : c)).filter(Boolean).map((c) => escapeHtml(c)).concat(placeTypeBesideCuisines(venue, fr) ? [escapeHtml(placeTypeBesideCuisines(venue, fr))] : []).join(' \u00b7 ')] : null,
     // The French page shows the address's French when listed (directions like "Trailhead at the end of ..."); the map
     // link and the schema keep the stored English.
@@ -51476,7 +51505,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
   if ('tour_price' in input) {
     if (venue.type !== 'tour') errors.form = TOUR_INFO_ERROR;
     else {
-      const c = cleanTourPrice(input.tour_price, true);
+      const c = cleanTourPrice(input.tour_price, true, false, ((current.tour_info || {}).kinds) || []);
       if (c.error) errors.tour_price = c.error;
       else if (c.value !== (current.tour_price == null ? null : current.tour_price)) changes.tour_price = c.value;
     }
@@ -57028,6 +57057,9 @@ function renderOwnerSetupPage(found, opts) {
       // takes off any a wrong scrape left on (on that save only).
       tourFoodBadges: TOUR_FOOD_BADGES_CLEARED,
       tourKinds: TOUR_KINDS.map((k) => ({ k, t: TOUR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), tourKindsTop: 12,
+      // Tour test 15 (Dave; Dayton approved): the season of each kind, asked on the kinds screen only with 2+ kinds and two
+      // seasons (tourKindSeasonsAsked); pre-filled from his typed tours or the defaults.
+      tourTwoSeasons: tourTwoSeasons(venue.id), kindSeasonGuess: Object.fromEntries(TOUR_KINDS.filter((k) => k !== 'other').map((k) => [k, tourKindSeasonGuess(venue.id, k)])),
       tourWords: (() => { const t = venueTourInfo(venue.id); const c = String(venue.cuisine || ''); return Array.isArray(t.kinds) && t.kinds.some((k) => k !== 'other') && c ? (fr ? tourCuisineFr(c) || c : c) : ''; })(),
       // Tour test 4 (Whistler, 2026-11-17): research that says "by donation", "pay what you want" or "free" pre-picks no
       // price (the box had 129 from "Food tour $129; history walk by donation"); a note says what to type instead.
@@ -72627,7 +72659,7 @@ module.exports = {
   // Cafés (2026-11-10).
   COCKTAIL_SETUP_PART1, COCKTAIL_SETUP_PART2, COCKTAIL_SETUP_HELP_TOPICS, COCKTAIL_OWNER_BADGES, COCKTAIL_PRICE_LIVE_MAX, cocktailKidsWelcome, cocktailPriceOf, cocktailPriceGuess, pubSetupType, visitSlotsFor,
   websiteIsInstagramLink, BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, plannerKidsUntil, breweryListTile, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, dogsOutsideOnly, dogsPatioOnly, dogsFrLineEnglish, tripMonthWeekdayDate, kitchenSeasonsClean, setupHereHelpTopics, breweryFoodRowOn, breweryVisitLines, pubKitchenOn, ownerFrLineText, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
-  descriptionShrank, tourInActivity, TOUR_KIND_ACTIVITY, ownerTextFlagsHtml, ownerTextClean, ownerFrDescState, tourTripItems, tourTextMonths, tourWaterMonths, tourYearlyBreaksText, tourStoryWords, tourLengthRange, dogsSomeTrips, tourPriceWhy, TOUR_ADDON_LINE_RE, TOUR_KIND_ORDER, dogsChipSentences,
+  descriptionShrank, tourInActivity, TOUR_KIND_ACTIVITY, ownerTextFlagsHtml, ownerTextClean, ownerFrDescState, tourTripItems, tourTextMonths, tourWaterMonths, tourKindSeasons, tourKindSeasonWords, tourKindSeasonGuess, tourTwoSeasons, tourKindSeasonsAsked, tourPriceWhy, tourYearlyBreaksText, tourStoryWords, tourLengthRange, dogsSomeTrips, tourPriceWhy, TOUR_ADDON_LINE_RE, TOUR_KIND_ORDER, dogsChipSentences,
   TOUR_SETUP_PART1, TOUR_SETUP_PART2, TOUR_SETUP_HELP_TOPICS, TOUR_OWNER_BADGES, TOUR_PRICE_LIVE_MAX, TOUR_KIND_LABELS_OWNER, TOUR_KIND_PUBLIC, TOUR_KINDS_SHOWN, tourKindsText, tourCuisineFr, tourCardKind, openSeasonStretches, openStretchesText, venueTapListWords, ownerVisitResearchKeys, cardSeasonOnce, statusSaysClosureToday, venueMenuPreviewHtml, venueTourInfo, tourInfoAnswers, tourPrice, writeTourVisitRows, tourVisitLines, ownerTourPriceWaiting, tourResearchPrice, tourResearchLength, tourKindSuggestion, tourPlannerFacts, cleanTourPrice, apptLineFor,
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
   cafeInfoLinesHtml, cafePriceText, cafeLaptopFriendly, cafeOwnerHighlights, happyHourAllowed, CAFE_SETUP_HELP_TOPICS, cafeHelpTopics, cafePlannerWords, cafeVisitTicks, cafeSpendGuessInfo,

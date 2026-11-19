@@ -2264,6 +2264,19 @@ Object.assign(fr.tour, {
   tprivPerQ: 'Ce prix est-il pour toute la sortie ou à l’heure?', tprivPers: { trip: 'Pour toute la sortie', hour: 'À l’heure' },
   tprivMinQ: 'Nombre d’heures minimum?', tprivMins: { 2: '2 heures', 3: '3 heures', 4: '4 heures', 5: '5 heures', 6: '6 heures', 8: '8 heures' },
 });
+// Tour test 15 (Whistler, 2026-11-18; Dave, summer canoe and kayak rentals, winter snowshoe tours; Dayton approved the season
+// of each kind): the season question on the kinds screen (only with 2+ kinds and two seasons), the rentals hint on the
+// price screen, and the Address box's two-spots nudge (tours have no meeting-spot step: Dayton, 2026-11-18).
+Object.assign(en.tour, {
+  ksQ: 'Which season does each run?', ksLead: 'We filled in the usual. Change any that’s wrong.', ksOpts: { summer: 'Summer', winter: 'Winter', both: 'Both' },
+  tpriceMoreRentals: 'Several trips, or a winter and a summer price? Put your lowest price for one person here. Rentals priced per boat, board or hour go in “Your tours and prices”, the first of the extra details. A whole-boat charter or a trip just for one group goes in Private tours below.',
+  addrTwoSpots: 'Put your main spot or office here. Guests get the exact meeting spot when they book.',
+});
+Object.assign(fr.tour, {
+  ksQ: 'Quelle saison pour chacune?', ksLead: 'Nous avons rempli l’habituel. Changez ce qui ne va pas.', ksOpts: { summer: 'Été', winter: 'Hiver', both: 'Les deux' },
+  tpriceMoreRentals: 'Plusieurs sorties, ou un prix d’hiver et un prix d’été? Inscrivez ici votre prix le plus bas pour une personne. Les locations à prix par bateau, par planche ou à l’heure vont dans « Vos sorties et tarifs », le premier des détails facultatifs. Un bateau nolisé au complet ou une sortie pour un seul groupe va dans Sorties privées, plus bas.',
+  addrTwoSpots: 'Inscrivez ici votre point principal ou votre bureau. Les clients reçoivent le point de rencontre exact à la réservation.',
+});
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);
