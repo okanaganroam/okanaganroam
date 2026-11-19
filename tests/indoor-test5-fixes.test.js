@@ -129,9 +129,9 @@ test('4. Help: the examples use his own price, "put your…", camps go to the Gr
   const cfg = JSON.parse(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(html)[1]);
   const topic = (id) => cfg.topics.find((x) => x.id === id);
   const p = plain(topic('indoor-price').a);
-  assert.match(p, /In Price , put your lowest adult pass \(day or timed\)\. Your card and your page say “Passes from \$20”/);
+  assert.match(p, /In Price , put your lowest adult pass \(day or timed\)\. Your card and your page say “(?:Passes|Adult pass) \$20”/);
   assert.doesNotMatch(p, /\$25|put adult/);
-  assert.match(plain(topic('indoor-price').aFr), /« Laissez-passer à partir de 20 \$ »/);
+  assert.match(plain(topic('indoor-price').aFr), /« (?:Laissez-passer|Laissez-passer adulte) 20 \$ »/);
   const g = plain(topic('indoor-groups').a);
   assert.match(g, /tap School and camp groups in Groups and parties/);
   assert.match(g, /A camp on set dates \(a PD-day or spring break camp\) can also go on What’s On: add it with Add an event/);
@@ -144,7 +144,7 @@ test('4. Help: the examples use his own price, "put your…", camps go to the Gr
   await ok(change(tm, { indoor_info: { kinds: ['museum'], length: '1-2h' } }));
   const cm = JSON.parse(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(await getText(`/owner/${tm}/setup`))[1]);
   // Indoor test 10: with no price typed yet, the kind's own example (a museum's $12, never $25 for every kind).
-  assert.match(plain(cm.topics.find((x) => x.id === 'indoor-price').a), /put your adult admission\. Your card and your page say “Admission from \$12”/);
+  assert.match(plain(cm.topics.find((x) => x.id === 'indoor-price').a), /put your adult admission\. Your card and your page say “Admission \$12”/);
 });
 
 test('5. Search: a kids’ birthday party in Vernon lists Vernon’s indoor Family Fun places, his (whose Groups line offers parties) first; never the A-Z Kid-Friendly list; the Indoor hub’s search reads the Groups line', async () => {

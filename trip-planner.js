@@ -1115,19 +1115,26 @@ const OWN_WORDS_SKIP = new Set(('a an the and or of in on at to for with near by
   + 'kids kid children child family families toddler toddlers teens adults adult people group groups friends couple '
   + 'day days today tonight tomorrow weekend week morning afternoon evening night early late am pm noon time hour hours '
   + 'monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december '
-  + 'things thing stuff something somewhere place places spot spots fun do go see visit trip plan ideas idea activity activities indoor indoors inside rainy rain open best good great nice '
+  + 'things thing stuff something somewhere place places spot spots fun do go see visit trip plan ideas idea activity activities indoor indoors inside rainy rain open best good great nice free cheap price prices downtown walk '
   + 'year old years olds age ages christmas boxing holiday holidays long what where can could should would want like le la les des du de un une et en pour avec au aux').split(/\s+/));
+const OWN_WORDS_KIND = { gallery: ['art', 'gallery', 'galleries', 'exhibit', 'exhibition'], museum: ['museum', 'history', 'heritage'], theatre: ['theatre', 'theater', 'live', 'show', 'play', 'stage', 'playhouse'],
+  cinema: ['cinema', 'movie', 'film', 'theatre', 'theater'], spa: ['spa', 'day', 'massage'], climbing: ['climbing', 'gym', 'trampoline', 'park', 'bouldering'], arcade: ['arcade', 'game', 'laser', 'tag', 'virtual', 'reality'],
+  escape: ['escape', 'room', 'game', 'puzzle'], bowling: ['bowling', 'alley', 'lane', 'pin'], pottery: ['class', 'workshop', 'pottery', 'studio', 'art', 'paint', 'painting'], playground: ['indoor', 'playground', 'play', 'centre', 'center', 'place'],
+  pool: ['pool', 'swim', 'swimming', 'aquatic', 'rec', 'centre', 'center', 'lane'], curling: ['curling', 'club', 'rink', 'curl'], yoga: ['yoga', 'class', 'studio', 'fitness', 'pilates'], casino: ['casino', 'slot'], library: ['library', 'public', 'branch'] };
 function ownWordsFit(v, ctx) {
   if (!v || v.type !== 'indoor') return 0;
+  // Within a kind: only with a kind asked, and only places of that kind.
+  if (!(ctx.plannerKinds || []).length) return 0;
+  { let pk = []; try { pk = v._pk || (v._pk = tripRequirements.inferPlannerKinds(v)); } catch (e) { pk = []; } if (!pk.some((k) => ctx.plannerKinds.includes(k))) return 0; }
   const regionWords = new Set((ctx.regions || []).flatMap((r) => String(r).split('-')));
   const words = [...new Set(normWords(ctx.queryText || '').split(' ').filter((w) => w.length > 2 && !OWN_WORDS_SKIP.has(w) && !regionWords.has(w) && !/^\d/.test(w)))];
   if (!words.length) return 0;
   const name = ` ${v.textName || normWords(v.name || '')} `, own = ` ${v.textDesc || normWords(v.plannerDescription || v.description || '')} ${normWords(v.knownFor || '')} ${normWords(v.groupsText || '')} `;
   const has = (t, w) => t.includes(` ${w} `) || t.includes(` ${w}s `) || (w.endsWith('s') && t.includes(` ${w.slice(0, -1)} `));
-  // The kind's own words ("climbing gym", "museum") are the kind, already ranked; only the other words count.
-  const kindText = ` ${normWords(v.cuisine || '')} `;
+  // The asked kind's own words ("climbing gym", "art gallery") are the kind, already ranked; only the other words count.
+  const kindWords = new Set((ctx.plannerKinds || []).flatMap((k) => OWN_WORDS_KIND[k] || []));
   let n = 0;
-  for (const w of words) if (!has(kindText, w)) n += has(name, w) ? 25 : has(own, w) ? 18 : 0;
+  for (const w of words) if (!kindWords.has(w) && !kindWords.has(w.replace(/s$/, ''))) n += has(name, w) ? 25 : has(own, w) ? 18 : 0;
   return Math.min(50, n);
 }
 // Indoor test 4 (2026-11-19; Lauren: "couples massage Kelowna Saturday" planned another spa): what a spa request names, and

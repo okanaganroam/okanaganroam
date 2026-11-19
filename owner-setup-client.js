@@ -2615,7 +2615,7 @@
       // research found (C.gtkFound: its Good to know line, and the exceptions her walk-in answer replaced), as found online.
       // Only the sentences that contradict her answers are flagged and kept out (the rest are pre-filled).
       var gOwn = (CUR.visit_rows || {}).good_to_know || '', gIsRes = (C.visitResearch || []).indexOf('good_to_know') >= 0 || (!gOwn && !!C.gtkFound);
-      var gRes = gIsRes ? (gOwn || C.gtkFound || '') : '', gParts = sentencesOf(gRes), gBad = gParts.filter(bringClash), gClash = gBad.length ? gBad.join('. ') + '.' : '';
+      var gRes = gIsRes ? (gOwn || C.gtkFound || '') : '', gParts = String(gRes).split(/(?<=[.!?])\s+/).map(function(x){ return x.replace(/[\s.]+$/, '').trim(); }).filter(Boolean), gBad = gParts.filter(bringClash), gClash = gBad.length ? gBad.join('. ') + '.' : '';
       var gFill = gClash ? gParts.filter(function(p0){ return !bringClash(p0); }).map(function(p0){ return p0 + '.'; }).join(' ') : gRes;
       var bv = S.tour.bring != null ? S.tour.bring : gIsRes ? gFill : gOwn;
       // Tour test 1 (Whistler, 2026-11-16): research's line, untouched, says it came from online (a tap on an answer replaces it) (tour test 16: a tap adds to it).

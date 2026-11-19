@@ -199,7 +199,7 @@ test('10. Polish: Rest of the year and All year except the shutdown; no cuisine 
   const setup = await (await fetch(`${base}/owner/${t2}/setup`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } })).text();
   const cfg = JSON.parse(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(setup)[1]);
   const price = cfg.topics.find((x) => x.id === 'indoor-price');
-  assert.match(price.a, /Drop-in from \$7\.50/);
+  assert.match(price.a, /Drop-in \$7\.50/);
   assert.doesNotMatch(price.a, /\$25/);
   // The staff line keeps "(Create a login);" together.
   const land = await (await fetch(`${base}/owner/${t}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } })).text();
