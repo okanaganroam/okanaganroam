@@ -2517,12 +2517,14 @@ Object.assign(en.indoor, { bringExKinds: { gallery: 'Most art is for sale, and w
   spa: 'Bring a swimsuit. Robes and towels provided.', general: 'Arrive 15 minutes early. Free parking behind the building.',
   shows: 'Doors open 30 minutes before the show. Free parking behind the building.', pool: 'Bring a swimsuit and a towel. Lockers by the change rooms.',
   classes: 'Wear clothes that can get messy. Painted pieces are fired and ready in about a week.',
-  bowling: 'Leagues use most lanes on weeknights: call ahead. Licensed lounge. Bumpers for kids.' } });
+  bowling: 'Leagues use most lanes on weeknights: call ahead. Licensed lounge. Bumpers for kids.',
+  kids: 'Grip socks required (we sell them for $3). An adult stays with their kids. Coffee for parents.' } });
 Object.assign(fr.indoor, { bringExKinds: { gallery: 'La plupart des œuvres sont à vendre, et nous pouvons les expédier. Stationnement gratuit derrière la galerie.', arts: 'Boutique à l’entrée. Photos sans flash.', active: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Casiers offerts.',
   spa: 'Apportez votre maillot. Peignoirs et serviettes fournis.', general: 'Arrivez 15 minutes d’avance. Stationnement gratuit derrière le bâtiment.',
   shows: 'Portes ouvertes 30 minutes avant le spectacle. Stationnement gratuit derrière le bâtiment.', pool: 'Apportez votre maillot et une serviette. Casiers près des vestiaires.',
   classes: 'Portez des vêtements qui peuvent se salir. Les pièces peintes sont cuites et prêtes en une semaine environ.',
-  bowling: 'Les ligues occupent la plupart des allées en semaine : appelez avant. Salon avec permis d’alcool. Bandes pour les enfants.' } });
+  bowling: 'Les ligues occupent la plupart des allées en semaine : appelez avant. Salon avec permis d’alcool. Bandes pour les enfants.',
+  kids: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Un adulte reste avec ses enfants. Café pour les parents.' } });
 // Indoor test 3 (2026-11-19; Diane, a community theatre in Penticton, shows only). Wording only: no new fields or chips.
 // - The hint under "We don't have set hours": box office hours go in Good to know, never as the hours (they turned into
 //   "Closed Saturdays" for a Saturday-night theatre).
@@ -2582,6 +2584,8 @@ en.indoor.quick = Object.assign({}, en.quick, {
     // Indoor test 7 (2026-11-19; Robert, a commercial gallery, was offered a museum's chips): a gallery's own set.
     gallery: ['Most art is for sale', 'We can ship your purchase', 'New exhibition every month', 'Gift shop', 'Guided tours on request', 'No flash photography', 'Free parking on site'],
     active: ['Grip socks required', 'Waiver to sign before you play', 'Lockers available', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site', 'Arrive 15 minutes early'],
+    // Indoor test 9 (2026-11-19; Melissa's play centre): a kids' place's own café chip (the same chips otherwise).
+    kids: ['Grip socks required', 'Waiver to sign before you play', 'Lockers available', 'Book ahead on weekends', 'Free parking on site', 'Coffee for parents', 'Arrive 15 minutes early'],
     spa: ['Arrive 15 minutes early', 'Bring a swimsuit', 'Robes and towels provided', 'Lockers available', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site'],
     general: ['Arrive 15 minutes early', 'Book ahead on weekends', 'Lockers available', 'Free parking on site', 'Café or snack bar on site'],
     // Indoor test 6 (2026-11-19): theatres and cinemas (no lockers), pools (no grip socks or waiver), and class studios.
@@ -2599,6 +2603,7 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
     arts: ['Gratuit le premier dimanche', 'Boutique sur place', 'Sacs à laisser à l’accueil', 'Visites guidées sur demande', 'Photos sans flash', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
     gallery: ['La plupart des œuvres sont à vendre', 'Nous pouvons expédier votre achat', 'Nouvelle exposition chaque mois', 'Boutique sur place', 'Visites guidées sur demande', 'Photos sans flash', 'Stationnement gratuit sur place'],
     active: ['Chaussettes antidérapantes obligatoires', 'Décharge à signer avant de jouer', 'Casiers offerts', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place', 'Arrivez 15 minutes d’avance'],
+    kids: ['Chaussettes antidérapantes obligatoires', 'Décharge à signer avant de jouer', 'Casiers offerts', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café pour les parents', 'Arrivez 15 minutes d’avance'],
     spa: ['Arrivez 15 minutes d’avance', 'Apportez votre maillot', 'Peignoirs et serviettes fournis', 'Casiers offerts', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
     general: ['Arrivez 15 minutes d’avance', 'Réservez pour les fins de semaine', 'Casiers offerts', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
     shows: ['Arrivez 15 minutes d’avance', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
@@ -2635,6 +2640,11 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
         noSetHoursHint: w.boxOffice ? T.noSetHoursHint : '',
         // Indoor test 6 (2026-11-19; Priya stretched her pottery studio's hours to 9 PM for her evening classes): one line
         // on a classes place's hours screens.
+        // Indoor test 9 (2026-11-19; Melissa: "Your other prices (kids, seniors…)" under a price that is already per child):
+        // a kids' place lists its other prices in its own words, and its Groups screen leads with the party chips, the size
+        // row after them, optional, for school or daycare groups.
+        ...(k === 'kids' ? fr2 ? { tpriceMore: 'Vos autres prix (tout-petits, bébés, adultes, cartes de 10 entrées, fêtes) vont dans « Vos tarifs », le premier des détails facultatifs.', groupsSizeQ: 'Groupes scolaires ou de garderie : à partir de combien? (facultatif)', groupsLead: 'Touchez ce que vous offrez, comme les fêtes d’anniversaire, ou écrivez-le dans vos mots.' }
+          : { tpriceMore: 'Your other prices (toddlers, babies, adults, 10-visit passes, parties) go in “Your prices”, the first of the extra details.', groupsSizeQ: 'School or daycare groups: from what size? (optional)', groupsLead: 'Tap what you offer, like birthday parties, or say it in your own words.' } : {}),
         classNightsHint: k === 'classes' ? (fr2 ? 'Des cours le soir en dehors de ces heures? Gardez ici vos heures d’atelier libre, et ajoutez les soirs de cours dans Bon à savoir.' : 'Evening classes outside these hours? Keep your open studio hours here, and add class nights in Good to know.') : '',
       };
       T.quick.groups_kinds[k] = w.groups.chips;

@@ -454,6 +454,7 @@ function t3FrenchTextCore(value){
  text=text.replace(/^No need to book \(the operator’s own answer\)\.$/,'Pas besoin de réserver (réponse de l’entreprise).');
  // Indoor places (2026-11-19): the owner's own walk-ins answer.
  text=text.replace(/^Walk-ins welcome; book ahead for weekends and busy times \(the owner’s own answer\)\.$/,'Sans réservation; réservez pour les fins de semaine et les périodes achalandées (réponse de l’établissement).');
+ text=text.replace(/^For kids (\d{1,2}) to (\d{1,2}) \(the owner’s own words\)(\.?)$/,(_,a,b,d)=>`Pour les enfants de ${a} à ${b} ans (selon l’établissement)${d}`); // indoor test 9
  text=text.replace(/^Book ahead \(the owner’s own answer\)\.$/,'Réservez à l’avance (réponse de l’établissement).');
  text=text.replace(/^Book ahead \(the operator’s own answer\)\.$/,'Réservez à l’avance (réponse de l’entreprise).');
  // Tour test 4 (2026-11-17): several unlike trips behind one answer.
@@ -490,6 +491,7 @@ function t3FrenchTextCore(value){
  text=text.replace(/^(.+)’s “(.+)” runs (in summer|in winter|from \w+ to \w+) only, so it isn’t in this (\w+) plan\.$/,(_,n,t,r,m)=>`La sortie « ${t} » de ${n} n’a lieu que ${frRuns(r)} : elle n’est pas dans ce plan pour ${frMonth11(m)}.`);
  text=text.replace(/^(.+?) doesn’t list airport shuttles or transfers: they aren’t tours\. Check your hotel or the airport’s ground transportation page\.$/,(_,b)=>`${b} ne répertorie pas les navettes ni les transferts vers l’aéroport : ce ne sont pas des sorties. Renseignez-vous auprès de votre hôtel ou sur la page du transport terrestre de l’aéroport.`);
  // Tour test 7 (2026-11-17): a tour left out for a child under its minimum age.
+ text=text.replace(/^(.+) is for kids (\d{1,2}) to (\d{1,2}), so it isn’t in this plan for your (\d{1,2})-year-old\.$/,(_,n,a,b,y)=>`${n} est pour les enfants de ${a} à ${b} ans : nous l’avons laissé de côté pour votre enfant de ${y} ans.`); // indoor test 9
  text=text.replace(/^(.+) is for ages (\d{1,2}) and up, so it isn’t in this plan for your (\d{1,2})-year-old\.$/,(_,n,a,y)=>`${n} est pour les ${a} ans et plus : nous l’avons laissé de côté pour votre enfant de ${y} ans.`);
  text=text.replace(/^Some activities are (\d{1,2})\+: check Tours & prices\.$/,(_,n)=>'Certaines activités sont pour les '+n+' ans et plus : voyez Sorties et tarifs.');
  // Brewery test 1 (2026-11-12): a brewery's or pub's own time for minors on a kids trip.

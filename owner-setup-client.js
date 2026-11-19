@@ -2967,12 +2967,17 @@
       // Tour test 8 (Whistler, 2026-11-17; Linda, sleds of 2): every tour starts at 4 ("4+" when it has set hours; it showed
       // only for a tour by booking).
       // Brewery test 2 (2026-11-13): "We can't take big groups" comes first, so a "no" is one tap without scrolling.
-      x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
-        + '<div class="su-stack" id="suGroupsNone" style="margin-bottom:14px">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>'
+      // Indoor test 9 (2026-11-19; Melissa, a play centre: Groups opened with a size question and she tapped 10+ at random): a
+      // kids' place (T.groupsSizeQ) leads with its party chips and line; the sizes follow, optional, for school or daycare groups.
+      var gKids = INDOOR && !!T.groupsSizeQ;
+      var gNone = '<div class="su-stack" id="suGroupsNone" style="' + (gKids ? 'margin-top:18px' : 'margin-bottom:14px') + '">' + big('✕', T.groupsNone, '', true, 'no:groups') + '</div>';
+      var gSizes = (gKids ? '<h2 class="su-h2" id="suGroupSizesQ">' + h(T.groupsSizeQ) + '</h2>' : '')
         // Tour test 9 (Whistler, 2026-11-18; Tanis, school programs of about 30): a last size, "21+ or whole classes", in
         // the same question (an option, not a new field).
-        + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suGroupSizes">' + (TOUR ? [4].concat(GROUP_SIZES, T.groupsChipBig ? [21] : []) : GROUP_SIZES).map(function(n){ var on = sentencesOf(gl).indexOf(groupsSizeLine(n)) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip' + (n === 21 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (n === 21 && T.groupsChipBig ? h(T.groupsChipBig) : S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>'
-        + enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TL) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TL ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 780, area: true, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + trimNoteHtml('suGroupsLine') + ex(T.groupsEx)
+        + '<div class="su-chips" role="group" aria-labelledby="' + (gKids ? 'suGroupSizesQ' : 'suQ') + '" id="suGroupSizes">' + (TOUR ? [4].concat(GROUP_SIZES, T.groupsChipBig ? [21] : []) : GROUP_SIZES).map(function(n){ var on = sentencesOf(gl).indexOf(groupsSizeLine(n)) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip' + (n === 21 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (n === 21 && T.groupsChipBig ? h(T.groupsChipBig) : S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>';
+      var gLine = enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TL) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TL ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 780, area: true, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + trimNoteHtml('suGroupsLine') + ex(T.groupsEx);
+      x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs()
+        + (gKids ? gLine + gSizes + gNone : gNone + gSizes + gLine)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180, area: true }) : '')
         // Tour test 1 (Whistler, 2026-11-16): a tour is asked for its booking link once, on Booking; here only when not given.
         + (TL && (CUR.booking_url || C.bookingKnown || String(S.bookUrl || '').trim() || S.tour.noBook) ? ''
@@ -4584,6 +4589,9 @@
       readTour(); var br = String(S.tour.bring != null ? S.tour.bring : '').replace(/([^\s])[ \u00a0]{2,}(?=\S)/g, '$1 ').trim();
       if (!br) { S.nudge = T.bringNeed; return render(); }
       if (linkIn(br)) { S.nudge = T.bringNoLink; return render(); }
+      // Indoor test 9 (2026-11-19; Melissa's "… Sensory-friendly hour Tuesdays 9-10am" had no final period): a line of
+      // sentences ends with a period, as Groups does.
+      if (TL && /[.!?]\s/.test(br) && /[A-Za-z0-9\u00c0-\u024f)]$/.test(br)) { br += '.'; S.tour.bring = br; }
       var brSame = br === ((CUR.visit_rows || {}).good_to_know || '') && (C.visitResearch || []).indexOf('good_to_know') < 0;
       return saveAll('bring', brSame ? [] : [{ visit_rows: { good_to_know: br } }], null, null, function(){ CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.good_to_know = br; S.visit.good_to_know = br; C.visitResearch = (C.visitResearch || []).filter(function(kk){ return kk !== 'good_to_know'; }); });
     }

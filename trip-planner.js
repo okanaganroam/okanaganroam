@@ -157,6 +157,14 @@ function indoorMinAgeOf(v) {
   const m = INDOOR_ADULTS_RE.exec(`${v.description || ''} ${v.plannerDescription || ''}`);
   return m ? Number(m[1] || m[2]) || 19 : null;
 }
+// Indoor test 9 (2026-11-19; Melissa's play centre for kids 0 to 10 was the first pick for "something for my 12 year old"):
+// a kids' age range in the owner's own words (server.js indoorKidsRange) leaves the place out when the youngest child named
+// is older than its top age.
+function indoorTooOld(v, ctx) {
+  if (!v || v.type !== 'indoor' || !Array.isArray(v.indoorKidsRange) || namedInRequest(v, ctx)) return false;
+  const young = kidsYoungest(ctx);
+  return young != null && young > v.indoorKidsRange[1];
+}
 function indoorTooYoung(v, ctx) {
   if (!v || v.type !== 'indoor' || namedInRequest(v, ctx)) return false;
   const young = kidsYoungest(ctx), min = indoorMinAgeOf(v);
@@ -257,6 +265,7 @@ function kidsAllowed(v) {
   // Tour test 10: a trip the request names that is for older riders than the youngest child (tourAgeFit).
   // Indoor places (2026-11-19): the owner's own minimum age. All ages or 5+ is fine for a family; 8+ when the kids' ages
   // say so; 12+, 16+ or 19+ never is (a kids trip doesn't say how old the kids are). Unanswered: as before.
+  if (v.type === 'indoor' && indoorTooOld(v, ctx)) return false;
   if (v.type === 'indoor' && v.indoorMinAge) {
     if (v.indoorMinAge === 'all') return true;
     const youngI = kidsYoungest(ctx);
@@ -1416,6 +1425,8 @@ function eligible(v, ctx, strict) {
   else if (tourTooYoung(v, ctx)) return false;
   // Indoor test 4: and an indoor place whose own minimum age is above it ("spa with my 14 year old" and a 16+ spa).
   else if (indoorTooYoung(v, ctx)) return false;
+  // Indoor test 9: or whose own kids' age range tops out below the child named.
+  if (indoorTooOld(v, ctx)) return false;
   // Teenagers can't go to bars (2026-10-14).
   if (['pub', 'cocktail', 'distillery'].includes(v.type) && /\b(?:teens?|teenagers?|tweens?|adolescents)\b/.test(ctx.queryText || '') && !ctx.types.has(v.type)) return false;
   // A dog trip (2026-10-25): every place to go is dog-friendly; a meal may be at a place that isn't (in winter few
@@ -1903,7 +1914,7 @@ function indoorAppeal(v, ctx, add) {
     else if (ctx.kids && !(own.length && ownerKidsAges(v)) && (own.length ? own.every((k) => KIDS_QUIET_INDOOR_KINDS.includes(k)) : kinds.some((k) => ['gallery', 'theatre'].includes(k)))) add('kids_quiet_kind', -10, null);
     // Indoor test 6: the owner's own answer puts a family place ahead of unanswered ones of the same standing (a classes
     // place no longer loses every slot to a fun centre and a museum nobody answered for).
-    if (ctx.kids && ownerKidsAges(v)) add('kids_owner_ages', familyIndoorPlace(v) ? 20 : 8, v.indoorMinAge === 'all' ? 'All ages welcome (the owner’s own answer)' : 'Kids 5 and up welcome (the owner’s own answer)');
+    if (ctx.kids && ownerKidsAges(v)) add('kids_owner_ages', familyIndoorPlace(v) ? 20 : 8, Array.isArray(v.indoorKidsRange) ? `For kids ${v.indoorKidsRange[0]} to ${v.indoorKidsRange[1]} (the owner’s own words)` : v.indoorMinAge === 'all' ? 'All ages welcome (the owner’s own answer)' : 'Kids 5 and up welcome (the owner’s own answer)');
   }
   const asked = (ctx.foodTerms || []).map((f) => f.term);
   const niche = INDOOR_NICHE_WORDS.find((w) => (textHas(v.textName, w) || textHas(v.textDesc, w)) && !asked.some((a) => w.includes(a) || a.includes(w)));
@@ -2524,9 +2535,33 @@ function indoorOwnTimeLine(v, ctx) {
     || (evening && !WEEKDAYS.includes(wd) && lines.find((l) => l.eve && !l.busy));
   return pick ? { text: `“${pick.text}” (the owner’s own words)`, busy: pick.busy } : null;
 }
+// Indoor test 9 (2026-11-19; "sensory friendly activity for my son" and "kids birthday party" listed Melissa's play centre
+// with only the day and time reasons): with no line for the day or time asked, the owner's own line that holds a word of
+// the request ("Sensory-friendly hour Tuesdays 9–10 AM"), or for a party request her own Groups line about parties
+// ("Birthday parties with a party room"). The kind's own words and the plain trip words are not matched.
+const OWN_WORD_SKIP = new Set(('indoor indoors inside rainy raining family families friendly activity activities things thing something somewhere places place kids child children '
+  + 'with where there about today tonight tomorrow weekend weekends morning afternoon evening night visit spots great best good really would could should please looking '
+  + 'enfants famille activite activites interieur interieure pluie endroit endroits').split(' '));
+const OWN_PARTY_RE = /\b(?:birthdays?|bday|part(?:y|ies)|f[eê]tes?|anniversaires?)\b/i;
+function indoorOwnWordLine(v, ctx) {
+  if (!v || v.type !== 'indoor' || !ctx) return null;
+  const own = Array.isArray(v.indoorOwnLines) ? v.indoorOwnLines : [], groups = Array.isArray(v.indoorOwnGroups) ? v.indoorOwnGroups : [];
+  if (!own.length && !groups.length) return null;
+  const q = normWords(ctx.queryText || '');
+  if (OWN_PARTY_RE.test(q)) { const l = groups.concat(own).find((t) => OWN_PARTY_RE.test(t)); if (l) return l; }
+  const kindWords = indoorAskedWords(ctx.queryText) || new Set();
+  const regions = new Set(Object.values((ctx.labels && ctx.labels.regions) || {}).flatMap((r) => normWords(r).split(' ')));
+  const words = q.split(' ').filter((w) => w.length >= 5 && !OWN_WORD_SKIP.has(w) && !kindWords.has(w) && !regions.has(w) && !/^\d/.test(w));
+  for (const w of words) {
+    const l = own.concat(groups).find((t) => normWords(t).split(' ').some((x) => x === w || (w.length >= 6 && x.startsWith(w))));
+    if (l) return l;
+  }
+  return null;
+}
 function stopFrom(v, scored, extra, ctx) {
   let reasons = scored.reasons.concat(extra || []);
-  const ownLine = indoorOwnTimeLine(v, ctx);
+  let ownLine = indoorOwnTimeLine(v, ctx);
+  if (!ownLine) { const w = indoorOwnWordLine(v, ctx); if (w) ownLine = { text: `“${w}” (the owner’s own words)`, busy: false }; }
   if (ownLine && !reasons.some((r) => r.text === ownLine.text)) reasons = [{ code: 'owner_line', text: ownLine.text, weight: 60 }].concat(reasons);
   const own = placeReasons(v, ctx || {});
   if (own.length) {
@@ -7197,6 +7232,16 @@ function tooYoungNotes(result, input) {
   const ctx = buildContext(input.intent || {}, input.labels || {}, input);
   const young = kidsYoungest(ctx);
   if (young == null) return;
+  // Indoor test 9: a kids' place in the asked town left out because the child is older than its own range says so.
+  {
+    const used0 = new Set(planStopsOf(result).concat(result.recommendations || []).filter((s) => s && s.venue).map((s) => s.venue.id));
+    const regions0 = (input.intent && input.intent.regions) || [];
+    for (const v of (input.facts || []).filter((x) => indoorTooOld(x, ctx) && !used0.has(x.id) && (!regions0.length || regions0.includes(x.region))).slice(0, 2)) {
+      const text = `${v.name} is for kids ${v.indoorKidsRange[0]} to ${v.indoorKidsRange[1]}, so it isn’t in this plan for your ${young}-year-old.`;
+      if (!(result.notes || []).includes(text)) result.notes = [text].concat(result.notes || []);
+      if (!(result.contextNotes || []).includes(text)) result.contextNotes = [text].concat(result.contextNotes || []);
+    }
+  }
   const kinds = ((input.requirements && input.requirements.items) || []).filter((i) => i.kind === 'venue_kind' && i.strength === 'must').map((i) => i.value);
   if (!kinds.length) return;
   const used = new Set(planStopsOf(result).concat(result.recommendations || []).filter((s) => s && s.venue).map((s) => s.venue.id));
@@ -8248,7 +8293,10 @@ function planTripCore(input) {
   }
   // Indoor test 8 (2026-11-19; "bowling on Christmas Day" left Gary out with no word): with no town asked, the places of the
   // kind asked that are closed that day by their owner's own closure are named, as weekly closures are ("Closed Dec 25: …").
-  if (rec.items.length && /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) && (ctx.plannerKinds || []).length && !ctx.regions.length) {
+  // Indoor test 9 (2026-11-19; "rainy day with kids in West Kelowna on Canada Day" left Melissa's play centre out, closed
+  // Jul 1 by her own closure, with no word): a rainy-day or indoor list on a holiday names them too, with or without a town.
+  const indoorish = (ctx.types && ctx.types.has && ctx.types.has('indoor')) || !!ctx.rainy;
+  if (rec.items.length && /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) && ((ctx.plannerKinds || []).length ? !ctx.regions.length : indoorish)) {
     const d = String(ctx.tripDate);
     const shown = new Set(rec.items.map((i) => i.venue && i.venue.id));
     const closedAll = buildRecommendations(facts, { ...ctx, ignoreSeason: true }).items.map((x) => x.venue && facts.find((f) => f.id === x.venue.id)).filter((f) => f && !shown.has(f.id) && ownerClosureOn(f, d));

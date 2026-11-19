@@ -12,7 +12,7 @@
 //   quiet      a quiet daytime kind: no "Open after midnight?" row or second time on its day cards (indoor test 1)
 //   day        a daytime kind (indoor test 5: play centres, climbing and trampolines, pools, spas; every quiet kind too): no
 //              "Open after midnight?" row (theatres, bowling, arcades, casinos and cinemas keep it)
-//   gtk        which Good to know chips and example it gets (owner-setup-text.js good_to_know_kinds: arts, active, spa, shows,
+//   gtk        which Good to know chips and example it gets (owner-setup-text.js good_to_know_kinds: arts, active, kids, spa, shows,
 //              pool, classes, general; indoor test 6: no lockers for a cinema, messy clothes and firing time for a studio)
 //   ex         which story and Known for example it gets (storyExKinds / knownExKinds: theatre, museum, escape, spa,
 //              climbing, classes, general), so a bowling alley never sees an escape room's example or a pool a climbing gym's
@@ -151,7 +151,7 @@ K.bowling = { gtk: 'bowling', ex: 'bowling',
     groups: { chips: ['Fêtes d’anniversaire', 'Événements d’entreprise et consolidation d’équipe', 'Ligues et réservations privées'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, la consolidation d’équipe ou les ligues dans vos mots.', ex: 'Forfaits pour fêtes d’anniversaire jusqu’à 20 personnes. Soirées de quilles pour les entreprises' },
     search: ['quilles', 'salle de quilles', 'petites quilles', 'grosses quilles'] } };
 
-K.kids = { day: true, gtk: 'active', ex: 'kids',
+K.kids = { day: true, gtk: 'kids', ex: 'kids',
   en: { price: { page: 'Kids from {x}.', basis: 'Per child', label: 'Price for one child, in dollars', ph: 'Your regular price for one child', lead: 'The price for one child. It shows on your card.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Kids’ and toddlers’ prices, passes and party packages, with their prices. A photo of your price list or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; parties booked ahead', ages: 'Kids 0 to 12 with an adult', gift: 'Gift cards and 10-visit passes at the front desk', prices: 'Toddlers $9, adults free' },

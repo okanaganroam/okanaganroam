@@ -11480,7 +11480,10 @@ function visitInfoHtml(info, fr = false, opts = {}) {
     const mineFr = new Set([...(Array.isArray(info.owner_labels) ? info.owner_labels : []), ...parkedSet]);
     // Tour test 11 (Whistler, 2026-11-18): her quick-answer phrases inside it are shown in their French ("Hotel pickup
     // available. …" -> « Cueillette à l’hôtel offerte. … »); what she typed in her own words stays as typed.
-    const ownLine = (r) => (mineFr.has(r.label) && typeof r.text === 'string' && r.text.trim() ? presetAnswer(r.text, 'fr') : null);
+    // Indoor test 9 (2026-11-19; Melissa: « Private party rooms on weekends, Réservez en ligne. »): on an indoor page a line
+    // with words of her own stays whole as she typed it until its French is written (queueFrLinesTranslation); only a line
+    // made wholly of quick answers is shown in French. A chip phrase is never translated in the middle of her English.
+    const ownLine = (r) => (mineFr.has(r.label) && typeof r.text === 'string' && r.text.trim() ? (opts.type === 'indoor' && !isPresetAnswer(r.text) ? r.text : presetAnswer(r.text, 'fr')) : null);
     const rowsFr = info.rows.map((r) => ({ ...r, text: r.__frOwn ? r.text : ownFr[r.label] && ownFr[r.label].en === r.text && ownFr[r.label].fr ? ownFr[r.label].fr : (typeof r.text === 'string' ? presetOrFr(r.text, visitTextFr) : visitTextFr(r.text)) ?? ownLine(r), label: visitLabelFr(r.label), __en: r.label })).filter((r) => r.text != null);
     if (!rowsFr.length) return '';
     info = { ...info, rows: rowsFr };
@@ -24453,8 +24456,13 @@ function indoorVisitLines(venue, info) {
   // comedy) says "Tickets from $25." (« Billets à partir de 25 $. »): its lowest regular ticket.
   // Indoor test 4 (2026-11-19; Lauren's day spa said "Adults $65"): every kind words its price its own way (indoor-kinds.js):
   // "From $65." for a spa, "Admission from $12." for a museum, "Day pass from $22." for a climbing gym.
+  else if (price != null && indoorKidsPriceExact(venue.id, t)) out.Prices = { en: `Kids ${tourMoney(price, false)}.`, fr: `Enfants ${tourMoney(price, true)}.` };
   else if (price != null) out.Prices = { en: indoorKindsModule.indoorPriceLine(t.kinds, tourMoney(price, false), 'en'), fr: indoorKindsModule.indoorPriceLine(t.kinds, tourMoney(price, true), 'fr') };
-  if (INDOOR_AGES.includes(String(t.age || ''))) {
+  const range = indoorKidsRange(venue, t);
+  if (range) {
+    const adult = t.adult === true ? [' Under 18s come with an adult.', ' Les moins de 18 ans viennent avec un adulte.'] : ['', ''];
+    out.Ages = { en: `Kids ${range.min} to ${range.max}.${adult[0]}`, fr: `Enfants de ${range.min} à ${range.max} ans.${adult[1]}` };
+  } else if (INDOOR_AGES.includes(String(t.age || ''))) {
     const a = INDOOR_AGE_LINES[String(t.age)];
     const adult = t.adult === true && !['all', '19'].includes(String(t.age)) ? [' Under 18s come with an adult.', ' Les moins de 18 ans viennent avec un adulte.'] : ['', ''];
     out.Ages = { en: a[0] + adult[0], fr: a[1] + adult[1] };
@@ -24463,12 +24471,61 @@ function indoorVisitLines(venue, info) {
   return out;
 }
 const INDOOR_MANAGED_LABELS = ['Season', 'Time needed', 'Prices', 'Ages', 'Booking'];
+// Indoor test 9 (2026-11-19; Melissa's play centre for kids 0 to 10: the page said "All ages" and a 12-year-old got her as the
+// first pick). A kids' age range in the owner's own words ("kids 0 to 10", "ages 2–12", « enfants de 0 à 10 ans »), when
+// her Who can come answer is All ages: the place's main kind is an indoor playground, or the words say "for kids …".
+// Her story (the listing's description), and her own Known for and Good to know lines. -> { min, max } or null.
+const INDOOR_KIDS_RANGE_RE = /\b(for\s+)?(?:kids|children|child|little ones|ages?|aged|enfants?|[aâ]ges?)\s*(?:aged\s+|ages?\s+|from\s+|de\s+)?(\d{1,2})\s*(?:to|-|–|—|through|thru|à|a)\s*(\d{1,2})(?:\s*(?:years?(?:\s+old)?|yrs?|ans))?(?![\d$%:])/i;
+function indoorKidsRange(venue, info) {
+  try {
+    const t = info || venueIndoorInfo(venue.id);
+    if (String(t.age || '') !== 'all') return null;
+    const kidsKind = indoorKindsModule.indoorKindKey(t.kinds) === 'kids';
+    const vi = venueVisitInfo(venue.id) || {}, mine = new Set(Array.isArray(vi.owner_labels) ? vi.owner_labels : []);
+    const own = (vi.rows || []).filter((r) => r && /^(?:known for|good to know)$/i.test(r.label || '') && mine.has(r.label)).map((r) => String(r.text || ''));
+    for (const text of [venue.description || '', ...own]) {
+      for (const part of String(text).split(/(?<=[.;!?])\s+/)) {
+        const m = INDOOR_KIDS_RANGE_RE.exec(part);
+        if (!m || /\$|\bprice|\bcost/i.test(part.slice(0, m.index + m[0].length + 6))) continue;
+        const min = Number(m[2]), max = Number(m[3]);
+        if (!(max > min && max <= 17)) continue;
+        if (kidsKind || m[1]) return { min, max };
+      }
+    }
+  } catch (e) { /* none */ }
+  return null;
+}
+// Indoor test 9 (2026-11-19; "Kids from $14" while crawlers pay $8): a kids' place whose main price is per child says
+// "Kids $14." when a lower price is in its own typed prices.
+function indoorKidsPriceExact(venueId, info) {
+  try {
+    const t = info || venueIndoorInfo(venueId);
+    if (indoorKindsModule.indoorKindKey(t.kinds) !== 'kids' || !(typeof t.price === 'number' && t.price > 0) || t.per) return false;
+    const menu = publishedMenu(venueId);
+    if (!menu) return false;
+    for (const sec of menu.data.sections || []) for (const it of sec.items || []) {
+      const m = /(\d+(?:[.,]\d{1,2})?)/.exec(String(it && it.price || '').replace(/,(?=\d{3}\b)/g, ''));
+      const n = m ? Number(m[1].replace(',', '.')) : NaN;
+      if (Number.isFinite(n) && n > 0 && n < t.price) return true;
+    }
+  } catch (e) { /* none */ }
+  return false;
+}
 const INDOOR_REPEAT_LABELS = { Season: /^(?:seasons?|open|opening season)$/i, 'Time needed': /^(?:duration|length|how long|visit length|time)$/i, Prices: /^(?:price|prices|rates?|cost|admission|tickets?|pricing)$/i,
   Ages: /^(?:ages?|kids|min(?:imum)? age)$/i, Booking: /^(?:book(?:ing)?|reservations?|walk-?ins?)$/i };
 function writeIndoorVisitRows(venueId, now = new Date()) {
   const venue = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
   if (!venue || venue.type !== 'indoor') return { before: null, after: null };
   return writeAnswerVisitRows(venueId, indoorVisitLines(rowToVenue(venue), venueIndoorInfo(venueId)), INDOOR_MANAGED_LABELS, INDOOR_REPEAT_LABELS, 'tour', now);
+}
+// Indoor test 9 (2026-11-19; Melissa's French page said « Activité intérieure » at the top and « Aire de jeux intérieure » as
+// its category): an indoor place with its owner's kinds says its category's French at the top too.
+function indoorFrTopLabel(venue) {
+  try {
+    if (!venue || venue.type !== 'indoor' || !(venueIndoorInfo(venue.id).kinds || []).length) return '';
+    const c = venueCuisineList(venue)[0];
+    return (c && frCuisineShown(c)) || '';
+  } catch (e) { return ''; }
 }
 // Indoor test 9 (2026-11-19; Melissa's play centre: "Walk-ins welcome" beside a Book button that was for party rooms): a
 // walk-in place (Booking: Walk-ins welcome) whose booking link or Groups line is about parties labels its button "Book a
@@ -24490,10 +24547,10 @@ function indoorCardPrice(venueId) {
   try { if (free) priceCheck.setOwnerPrice(venueId, 0, free === 'donation' ? INDOOR_DONATION_CARD_LABEL : TOUR_FREE_CARD_LABEL); else if (p != null && per) priceCheck.setOwnerPrice(venueId, p, `Per ${INDOOR_PER_WORDS[per][0]}`, INDOOR_PER_WORDS[per][0]); else priceCheck.setOwnerPrice(venueId, p, p == null ? null : indoorKindsModule.indoorKindText(venueIndoorInfo(venueId).kinds, 'en').price.basis); } catch (e) { console.error(`[owner-portal] card price for indoor #${venueId} failed: ${e.message}`); }
 }
 // Build My Trip's facts from the owner's own answers (nothing when not answered).
-function indoorOwnLines(venueId) {
+function indoorOwnLines(venueId, labelRe = /^(?:known for|good to know)$/i) {
   try {
     const info = venueVisitInfo(venueId) || {}, mine = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
-    return (info.rows || []).filter((r) => r && typeof r.text === 'string' && /^(?:known for|good to know)$/i.test(r.label || '') && mine.has(r.label))
+    return (info.rows || []).filter((r) => r && typeof r.text === 'string' && labelRe.test(r.label || '') && mine.has(r.label))
       .flatMap((r) => String(r.text).split(/(?<=[.;!?])\s+|;\s*/)).map((x) => x.replace(/[\s.;]+$/, '').trim()).filter((x) => x.length >= 4).slice(0, 8);
   } catch (e) { return []; }
 }
@@ -24502,6 +24559,8 @@ function indoorPlannerFacts(venueId) {
   return {
     ...(Array.isArray(t.kinds) && t.kinds.length ? { indoorKinds: t.kinds.slice() } : {}),
     ...(INDOOR_AGES.includes(String(t.age || '')) ? { indoorMinAge: String(t.age) } : {}),
+    // Indoor test 9: a kids' age range in the owner's own words ("kids 0 to 10").
+    ...(() => { const v = db.prepare('SELECT id, description FROM venues WHERE id = ?').get(venueId); const r = v && indoorKidsRange(v, t); return r ? { indoorKidsRange: [r.min, r.max] } : {}; })(),
     ...(INDOOR_BOOK.includes(t.book) ? { indoorBook: t.book } : {}),
     ...(INDOOR_LENGTHS.includes(t.length) ? { indoorLength: t.length } : {}),
     ...(typeof t.price === 'number' && Number.isFinite(t.price) && t.price > 0 ? { indoorPrice: t.price } : {}),
@@ -24513,9 +24572,11 @@ function indoorPlannerFacts(venueId) {
     // Trip's "Why it fits" can quote the one that names the day or time asked ("Cosmic bowling Fri & Sat 9 PM–midnight"
     // for Saturday night, "Leagues use most lanes Mon–Thu after 6" for Tuesday at 7). Owner lines only, never research.
     ...(() => { const l = indoorOwnLines(venueId); return l.length ? { indoorOwnLines: l } : {}; })(),
+    // Indoor test 9: and her own Groups line, so a party request quotes it ("Birthday parties with a party room").
+    ...(() => { const l = indoorOwnLines(venueId, /^groups?$/i); return l.length ? { indoorOwnGroups: l } : {}; })(),
     // Indoor test 4 (2026-11-19; Lauren's spa read "$65 per person · Admission"): the kind's own price line ("From {x}",
     // "Tickets from {x}", « À partir de {x} »), as the page says it.
-    ...(typeof t.price === 'number' && t.price > 0 && !tourFreeOf(t) ? { indoorPriceLine: ['en', 'fr'].map((l) => indoorKindsModule.indoorKindText(t.kinds, l).price.page.replace(/\.$/, '')) } : {}),
+    ...(typeof t.price === 'number' && t.price > 0 && !tourFreeOf(t) ? { indoorPriceLine: indoorKidsPriceExact(venueId, t) ? ['Kids {x}', 'Enfants {x}'] : ['en', 'fr'].map((l) => indoorKindsModule.indoorKindText(t.kinds, l).price.page.replace(/\.$/, '')) } : {}),
   };
 }
 // Indoor test 3 (2026-11-19; Diane's community theatre: box office Tue–Fri 11–4 as its hours, shows Thursday to Saturday at
@@ -30953,7 +31014,10 @@ function indoorExperienceMatches(venue, slug) {
   const choice = INDOOR_EXPERIENCES.find((c) => c.slug === slug);
   if (!choice) return true;
   if (venue.type === 'indoor' && venue.id != null && (venueIndoorInfo(venue.id).kinds || []).some((k) => (INDOOR_KIND_EXPERIENCE[k] || []).includes(slug)) && slug !== 'family') return true;
-  return slug === 'family' ? !!venue.kid_friendly : choice.pattern.test(venue.name || '');
+  // Indoor test 9 (2026-11-19; the Family Fun chip said 30 and /indoor/family listed 76, every Kid-Friendly listing): one
+  // list for both, the hub's Family Fun (indoorExperiencesOf).
+  if (slug === 'family') { try { return indoorExperiencesOf(venue, getIndoorAlsoNotes().get(venue.id)).includes('family'); } catch (e) { return !!venue.kid_friendly; } }
+  return choice.pattern.test(venue.name || '');
 }
 function renderIndoorDiscoveryHtml(venues, selected) {
   const choices = [{ slug: '', label: 'All' }, ...INDOOR_EXPERIENCES];
@@ -31243,6 +31307,8 @@ function renderCategoryAllRegionsPage(type, venues, filter = null, opts = {}) {
   const activitySlug = activityContent ? activityContent.slug : '';
   if (type === 'indoor') {
     venues = venues.filter((v) => indoorExperienceMatches(v, indoorActivity));
+    // Indoor test 9: under Family Fun the active family places first (the rest keep their order).
+    if (indoorActivity === 'family') venues = venues.map((v, i) => [v, i]).sort((a, b) => familyActivePlace(b[0]) - familyActivePlace(a[0]) || a[1] - b[1]).map((x) => x[0]);
     opts = { ...opts,
       indoorGolf: (opts.indoorGolf || []).filter((v) => indoorExperienceMatches(v, indoorActivity)),
       indoorAlso: (opts.indoorAlso || []).filter((v) => indoorExperienceMatches(v, indoorActivity)),
@@ -33821,8 +33887,18 @@ const INDOOR_SORT_KEYS = new Set(INDOOR_SORTS.map((x) => x.key));
 // breweries and pubs listed for their bowling or games), so ratings are not
 // used: places that are indoor attractions first, then the ones a visitor
 // can plan around (stored hours, a fuller description).
+// Indoor test 9 (2026-11-19; Melissa's play centre was 20th of 30 under Family Fun): play centres, climbing and trampoline
+// parks, bowling and arcades (the owner's main kind, else the name) come first among the family places.
+const FAMILY_ACTIVE_KINDS = ['kids', 'climbing', 'bowling', 'games'];
+const FAMILY_ACTIVE_NAME_RE = /play ?(?:ground|centre|center|place|zone|land|house|space)|indoor play|kidz|trampolin|bounce|climb|boulder|ninja|parkour|bowl|\blanes\b|arcade|laser/i;
+function familyActivePlace(v) {
+  if (!v || !['indoor', 'sport'].includes(v.type)) return false;
+  const k = v.type === 'indoor' && v.id != null ? (venueIndoorInfo(v.id).kinds || [])[0] : null;
+  return k ? FAMILY_ACTIVE_KINDS.includes(k) : FAMILY_ACTIVE_NAME_RE.test(`${v.name || ''} ${v.cuisine || ''}`);
+}
 function indoorRecommendedScore(v) {
   let score = v.type === 'indoor' || v.type === 'golf' ? 1 : 0;
+  if (familyActivePlace(v)) score += 1.5;
   if (v.hours) score += 1;
   score += Math.min(String(v.description || '').split(/\s+/).length, 80) / 80;
   if (v.kid_friendly) score += 0.2;
@@ -39079,6 +39155,9 @@ function frenchTwinHtml(html, enPath, search = '') {
   // Round 8 (2026-10-19): the dog-friendly chip's tooltip (the place's dog rule) in French too, from the French list;
   // Peach Orchard Dog Beach's said "Fenced off-leash dog beach; ..." on /fr.
   html = html.replace(/(<span class="chip dog-friendly-badge" title=")([^"]*)(")/g, (m, a, t, b) => `${a}${escapeHtml((() => { const d = frDecode(t); const x = presetOrFr(d, frText); return x == null ? d : x; })())}${b}`);
+  // Indoor test 9 (2026-11-19): a hub card's folded badges ("3 more features" / "Fewer features") in French too.
+  html = html.replace(/<span class="fd-more-label">(\d+) more features?<\/span><span class="fd-less-label">Fewer features<\/span>/g, (m, n) => `<span class="fd-more-label">${n} autre${Number(n) === 1 ? '' : 's'} caractéristique${Number(n) === 1 ? '' : 's'}</span><span class="fd-less-label">Moins de caractéristiques</span>`);
+  html = html.replace(/(<span class="fd-extra-feature">)([^<]*)(<\/span>)/g, (m, a, t, b) => { const f = frText(frDecode(t)); return f == null ? m : `${a}${escapeHtml(f)}${b}`; });
   // Brewery test 3 (2026-11-13): a card's "+6" chip names the folded badges in French too (title and aria-label).
   html = html.replace(/<span class="chip chip-more" title="([^"]*)" aria-label="(\d+) more: [^"]*">/g, (m, t, n) => {
     const names = frDecode(t).split(', ').map((x) => { const f = frText(x); return f == null ? x : f; }).join(', ');
@@ -41048,7 +41127,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // facts that were previously only available further down the page.
   const atAGlanceParts = [
     // Café test 2 (2026-11-11): a café says its kind ("Ice cream & gelato shop · Penticton"), not "Cafe". Text only.
-    venue.type === 'golf' ? golfKindLabel : (venue.type === 'cafe' || venue.type === 'brewery') && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular,
+    venue.type === 'golf' ? golfKindLabel : (venue.type === 'cafe' || venue.type === 'brewery') && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : fr && indoorFrTopLabel(venue) ? escapeHtml(indoorFrTopLabel(venue)) : label.singular,
     `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`,
     venueShowsPrice(venue) ? '$'.repeat(venue.price) : null,
     venue.rating ? `${num(venue.rating)}\u2605${venue.reviews ? ` (${venue.reviews})` : ''}` : null,
@@ -41400,7 +41479,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const atAGlance = [
       // Café test 2 (2026-11-11): a café says its kind ("Ice cream & gelato shop · Penticton"), not "Cafe". Text only.
       // Brewery test 3 (2026-11-13): a brewery says the kind it picked too (Cidery, Taphouse, Distillery); the URL stays.
-      (venue.type === 'cafe' || venue.type === 'brewery') && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : label.singular, `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`, priceLevel ? escapeHtml(priceLevel) : null,
+      (venue.type === 'cafe' || venue.type === 'brewery') && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : fr && indoorFrTopLabel(venue) ? escapeHtml(indoorFrTopLabel(venue)) : label.singular, `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`, priceLevel ? escapeHtml(priceLevel) : null,
       venue.rating ? `${num(venue.rating)}★${venue.reviews ? ` (${venue.reviews})` : ''}` : null, priceHint ? escapeHtml(priceHint) : null,
     ].filter(Boolean).join(' &middot; ');
     const directionsHtml = ctaEntries.find((action) => action.includes('data-track="directions"')) || '';
@@ -51849,6 +51928,22 @@ async function queueFrStoryTranslation(venue, contactEmail) {
     return true;
   } catch (e) { console.error(`[owner-portal] French description request for venue #${venue && venue.id} failed: ${e.message}`); return false; }
 }
+const FR_LINE_KEYS = [['good_to_know', 'Good to know'], ['groups', 'Groups'], ['known_for', 'Known for']];
+async function queueFrLinesTranslation(venue, rows, contactEmail) {
+  try {
+    if (!venue || venue.type !== 'indoor' || !rows || typeof rows !== 'object') return false;
+    const fr = rows._fr && typeof rows._fr === 'object' ? rows._fr : {};
+    const lines = FR_LINE_KEYS.filter(([k]) => typeof rows[k] === 'string' && rows[k].trim() && !(typeof fr[k] === 'string' && fr[k].trim()) && !isPresetAnswer(rows[k]))
+      .map(([k, label]) => `${label}: ${String(rows[k]).trim()}`);
+    if (!lines.length) return false;
+    const note = `Their own English lines changed: please write the French for them on their listing (queued automatically). ${lines.join(' | ')}`.slice(0, 1500);
+    const id = Number(db.prepare("INSERT INTO venue_menus (venue_id, status, submitted_by, help_kind, help_note, contact_email, submitted_at) VALUES (?, 'help', 'owner:auto', ?, ?, ?, datetime('now'))").run(venue.id, SETUP_FR_LINES_KIND, note, contactEmail || null).lastInsertRowid);
+    const m = db.prepare('SELECT * FROM venue_menus WHERE id = ?').get(id);
+    const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(venue.id);
+    notifyInBackground(`French lines for venue #${venue.id}`, () => sendMenuHelpEmail(v, m, { note, contactEmail: contactEmail || null, contactPhone: '' }));
+    return true;
+  } catch (e) { console.error(`[owner-portal] French lines request for venue #${venue && venue.id} failed: ${e.message}`); return false; }
+}
 function ownerLinkPending(venueId, field) {
   try {
     for (const w of db.prepare("SELECT changes FROM owner_change_requests WHERE venue_id = ? AND status = 'pending' AND instant = 0 ORDER BY id DESC LIMIT 20").all(venueId)) {
@@ -53197,6 +53292,8 @@ async function handleOwnerChangeSubmission(req, res, token) {
   if (id && Object.keys(review).length) notifyInBackground(`owner update #${id}`, () => notifyOwnerChange(id));
   // Tour test 12: a new English story with research's French still up queues its translation (as "Leave it to us").
   if (COMPLETENESS_TYPES.has(venue.type) && typeof changes.description === 'string' && changes.description.trim()) await queueFrStoryTranslation(venue, contact.email);
+  // Indoor test 9: her own English Good to know, Groups or Known for lines queue their French too (not from the French setup).
+  if (venue.type === 'indoor' && res.twinLang !== 'fr' && changes.visit_rows && typeof changes.visit_rows === 'object') await queueFrLinesTranslation(venue, changes.visit_rows, contact.email);
   // Tour test 3 (Whistler, 2026-11-17): the category words the kinds just wrote, so the setup's finish preview shows what
   // the page and the cards show (it listed the chips' names).
   let tourWords = null;
@@ -55475,6 +55572,11 @@ const SETUP_NOTE_KINDS = ['facebook', 'instagram', 'menu_social'];
 // English story. No pages; never published by itself.
 const SETUP_FR_STORY_KIND = 'fr_story';
 SETUP_SHEET_WORDS[SETUP_FR_STORY_KIND] = 'French description';
+// Indoor test 9 (2026-11-19; Melissa's French page: her Good to know and Groups lines stayed English, with chip phrases
+// translated in the middle of her sentences): an indoor owner's own Good to know, Groups or Known for lines in English are
+// queued for their French the same way as the story (one admin item per change, in the same Menus list, with its email).
+const SETUP_FR_LINES_KIND = 'fr_lines';
+SETUP_SHEET_WORDS[SETUP_FR_LINES_KIND] = 'French lines (Good to know, Groups, Known for)';
 // -> { facebook: true, instagram: true } for names sent and still waiting for us.
 function setupSocialNotes(venueId) {
   const out = {};
@@ -55623,6 +55725,8 @@ function publishMenu(menuId, reviewer) {
   db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(menu.venue_id);
   // Tour test 15: his typed tours may name which side of a kind he runs (the category words are worked out again).
   try { if ((db.prepare('SELECT type FROM venues WHERE id = ?').get(menu.venue_id) || {}).type === 'tour') refreshTourKindWords(menu.venue_id); } catch (e) { /* keep the words */ }
+  // Indoor test 9: a kids' place's Prices line reads its typed prices ("Kids $14." when a lower one is listed).
+  try { if ((db.prepare('SELECT type FROM venues WHERE id = ?').get(menu.venue_id) || {}).type === 'indoor') writeIndoorVisitRows(menu.venue_id); } catch (e) { /* keep the lines */ }
   return { ok: true, venue_id: menu.venue_id };
 }
 function rejectMenu(menuId, reviewer, reason) {
@@ -55639,12 +55743,14 @@ function buildMenuEmail(venue, menu, kind, extra = {}) {
   // aren't tours: "(5 tours)" for 4 tours and 2 extras).
   const items = (venue && venue.type === 'tour' ? tourTripItems(parseMenuData(menu.data)).length : 0) || menuItemCount(parseMenuData(menu.data));
   const fields = {
-    _subject: kind === 'help' && menu.help_kind === SETUP_FR_STORY_KIND ? `[TRANSLATE] ${venue.name} asked us to write their French description from their English story`
+    _subject: kind === 'help' && menu.help_kind === SETUP_FR_LINES_KIND ? `[TRANSLATE] ${venue.name}: write the French for their own Good to know, Groups or Known for lines`
+      : kind === 'help' && menu.help_kind === SETUP_FR_STORY_KIND ? `[TRANSLATE] ${venue.name} asked us to write their French description from their English story`
       : kind === 'help' ? (SETUP_NOTE_KINDS.includes(menu.help_kind) ? `[FIND LINK] ${venue.name} told us their ${SETUP_SHEET_WORDS[menu.help_kind]}: please find the link` : menu.help_kind ? `[TYPE IT UP] ${venue.name} sent their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind} to type up` : `[MENU HELP] ${venue.name} asked us to type up their ${isPriceList(venue) ? PRICE_LIST_WORDS[menuKind(venue)].en.list : 'menu'}`)
       : `${kind === 'pending' ? '[PENDING REVIEW]' : '[LIVE]'} ${menuNoun(venue)} from ${venue.name} (${venue && venue.type === 'tour' ? menuTripCountText(venue, parseMenuData(menu.data), 'en') : menuDishCountText(items, 'en', menuKind(venue))})`,
     _template: 'table',
     _captcha: 'false',
-    'Status': kind === 'help' && menu.help_kind === SETUP_FR_STORY_KIND ? 'Sent from the French easy setup ("Leave it to us"). Nothing is on the site yet: write their French description from their English story, save it on their listing, then press Done in /admin/review.'
+    'Status': kind === 'help' && menu.help_kind === SETUP_FR_LINES_KIND ? 'Queued from their English lines. The French page shows those lines in English until then: write the French for each line (in the note), save it on their listing, then press Done in /admin/review.'
+      : kind === 'help' && menu.help_kind === SETUP_FR_STORY_KIND ? 'Sent from the French easy setup ("Leave it to us"). Nothing is on the site yet: write their French description from their English story, save it on their listing, then press Done in /admin/review.'
       : kind === 'help' && menu.help_kind ? `Sent from the easy setup: their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind}. Nothing is on the site yet: read the pages (or their website) and add it to their listing from /admin/review.`
       : kind === 'help' ? 'They pressed "Can you do it for me?". Nothing is on the site yet: open the menu editor, read the pages, then publish.'
       : kind === 'pending' ? 'PENDING REVIEW. Sent from their private link, so it is not on the site until you publish it.'
@@ -64909,6 +65015,11 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
     }
     // Tour test 9 (Whistler, 2026-11-18): a tour's story or Known for going live may say which side of a picked chip it does.
     if (venue.type === 'tour' && (chosen.includes('description') || chosen.includes('visit_rows')) && !chosen.includes('tour_info')) refreshTourKindWords(venue.id);
+    // Indoor test 9 (2026-11-19; Melissa's play centre for kids 0 to 10): a kids' age range in the owner's own story, Known
+    // for or Good to know is the Ages line, so a new story or line rewrites the answers' lines.
+    if (venue.type === 'indoor' && (chosen.includes('description') || chosen.includes('visit_rows')) && !chosen.includes('indoor_info')) {
+      try { const w = writeIndoorVisitRows(venue.id, now); if (w.before !== w.after) log.run(venue.id, 'visit_info', w.before, w.after, meta.reason, meta.batch_id, reviewer); } catch (e) { console.error(`[owner-portal] indoor lines for #${venue.id} failed: ${e.message}`); }
+    }
     db.exec('RELEASE owner_approve');
   } catch (err) {
     try { db.exec('ROLLBACK TO owner_approve'); db.exec('RELEASE owner_approve'); } catch (_) { /* already gone */ }
@@ -65842,13 +65953,13 @@ function renderAdminMenuCard(m) {
   const pages = menuFiles(m.id);
   // Tour test 12: a tour's card counts its trips only (no Extras, add-ons or gift cards).
   const items = v && v.type === 'tour' ? (tourTripItems(parseMenuData(m.data)).length || menuItemCount(parseMenuData(m.data))) : menuItemCount(parseMenuData(m.data));
-  const what = m.status === 'help' && m.help_kind === MENU_EMAIL_KIND ? '<strong>Menu expected by email</strong> (they chose “I’ll email it” in the easy setup). When it arrives, add it and press Done; if it never comes, follow up' : m.status === 'help' && m.help_kind === SETUP_FR_STORY_KIND ? '<strong>Write their French description</strong> from their English story (they tapped “Leave it to us” in the French setup)' : m.status === 'help' && SETUP_NOTE_KINDS.includes(m.help_kind) ? `<strong>Find their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind])} link and add it</strong> (they typed the name in the easy setup)` : m.status === 'help' && m.help_kind ? `<strong>Type up their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind] || m.help_kind)}</strong> (from the easy setup)` : m.status === 'help' ? '<strong>Asked us to do it</strong>' : m.status === 'published' ? '<strong>live</strong>' : 'sent from their private link';
+  const what = m.status === 'help' && m.help_kind === MENU_EMAIL_KIND ? '<strong>Menu expected by email</strong> (they chose “I’ll email it” in the easy setup). When it arrives, add it and press Done; if it never comes, follow up' : m.status === 'help' && m.help_kind === SETUP_FR_STORY_KIND ? '<strong>Write their French description</strong> from their English story (they tapped “Leave it to us” in the French setup)' : m.status === 'help' && m.help_kind === SETUP_FR_LINES_KIND ? '<strong>Write the French for their own lines</strong> (Good to know, Groups or Known for, in the note)' : m.status === 'help' && SETUP_NOTE_KINDS.includes(m.help_kind) ? `<strong>Find their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind])} link and add it</strong> (they typed the name in the easy setup)` : m.status === 'help' && m.help_kind ? `<strong>Type up their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind] || m.help_kind)}</strong> (from the easy setup)` : m.status === 'help' ? '<strong>Asked us to do it</strong>' : m.status === 'published' ? '<strong>live</strong>' : 'sent from their private link';
   const thumbs = pages.map((f, i) => (f.kind === 'pdf'
     ? `<a class="rv-btn rv-reject" href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener">PDF page ${i + 1}</a>`
     : `<a href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener"><img src="${adminReviewEsc(f.preview)}" alt="Page ${i + 1}" loading="lazy" style="height:120px;border-radius:8px;margin:0 6px 6px 0"></a>`)).join('');
   return `<article class="rv-card" data-kind="menu" data-id="${m.id}">
       <h3>${adminReviewEsc(m.venue_name)}</h3>
-      <p class="rv-meta">${m.help_kind ? ({ happy_hour: 'Happy hour', specials: 'Weekly specials', facebook: 'Facebook', instagram: 'Instagram', menu_social: 'Menu on Facebook / Instagram', [MENU_EMAIL_KIND]: 'Menu by email', [SETUP_FR_STORY_KIND]: 'French description' }[m.help_kind] || m.help_kind) : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${v && v.type === 'tour' ? menuTripCountText(v, parseMenuData(m.data), 'en') : menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
+      <p class="rv-meta">${m.help_kind ? ({ happy_hour: 'Happy hour', specials: 'Weekly specials', facebook: 'Facebook', instagram: 'Instagram', menu_social: 'Menu on Facebook / Instagram', [MENU_EMAIL_KIND]: 'Menu by email', [SETUP_FR_STORY_KIND]: 'French description', [SETUP_FR_LINES_KIND]: 'French lines' }[m.help_kind] || m.help_kind) : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${v && v.type === 'tour' ? menuTripCountText(v, parseMenuData(m.data), 'en') : menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
       ${m.help_note ? `<p class="rv-text"><strong>Their note:</strong> ${adminReviewEsc(m.help_note)}</p>` : ''}
       ${thumbs ? `<div>${thumbs}</div>` : ''}
       ${typedTourFlagsHtml(v, m.data)}
@@ -66313,9 +66424,9 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   // Menus, happy hour or specials sent for us to type up, and a Facebook or Instagram name for us to find (2026-11-09).
   try {
     for (const m of db.prepare("SELECT id, help_kind, submitted_at, updated_at FROM venue_menus WHERE venue_id = ? AND status = 'help' ORDER BY id DESC LIMIT 6").all(venueId)) {
-      const t = { [MENU_EMAIL_KIND]: fr ? 'Vous enverrez votre menu par courriel' : 'You’ll email us your menu', menu_social: fr ? 'Votre menu sur Facebook ou Instagram' : 'Your menu on Facebook or Instagram', happy_hour: fr ? '5 à 7 envoyé' : 'Happy hour sent to us', specials: fr ? 'Spéciaux envoyés' : 'Weekly specials sent to us', facebook: fr ? 'Nom de votre page Facebook' : 'Your Facebook page name', instagram: fr ? 'Votre nom Instagram' : 'Your Instagram name', [SETUP_FR_STORY_KIND]: fr ? 'Votre description en français : nous l’écrivons' : 'Your French description: we’ll write it' }[m.help_kind] || (fr ? 'Menu envoyé' : 'Menu sent to us');
+      const t = { [MENU_EMAIL_KIND]: fr ? 'Vous enverrez votre menu par courriel' : 'You’ll email us your menu', menu_social: fr ? 'Votre menu sur Facebook ou Instagram' : 'Your menu on Facebook or Instagram', happy_hour: fr ? '5 à 7 envoyé' : 'Happy hour sent to us', specials: fr ? 'Spéciaux envoyés' : 'Weekly specials sent to us', facebook: fr ? 'Nom de votre page Facebook' : 'Your Facebook page name', instagram: fr ? 'Votre nom Instagram' : 'Your Instagram name', [SETUP_FR_STORY_KIND]: fr ? 'Votre description en français : nous l’écrivons' : 'Your French description: we’ll write it', [SETUP_FR_LINES_KIND]: fr ? 'Vos lignes en français : nous les écrivons' : 'Your lines in French: we’ll write them' }[m.help_kind] || (fr ? 'Menu envoyé' : 'Menu sent to us');
       // Tour test 2 (Whistler, 2026-11-16): a tour sent its tours and prices, not a menu.
-      const tt = vrow && vrow.type === 'tour' ? ({ [MENU_EMAIL_KIND]: fr ? 'Vous enverrez vos sorties et tarifs par courriel' : 'You’ll email us your tours and prices', menu_social: fr ? 'Vos sorties et tarifs sur Facebook ou Instagram' : 'Your tours and prices on Facebook or Instagram' }[m.help_kind] || (!['happy_hour', 'specials', 'facebook', 'instagram', SETUP_FR_STORY_KIND].includes(m.help_kind) ? (fr ? 'Sorties et tarifs envoyés' : 'Tours and prices sent to us') : t)) : t;
+      const tt = vrow && vrow.type === 'tour' ? ({ [MENU_EMAIL_KIND]: fr ? 'Vous enverrez vos sorties et tarifs par courriel' : 'You’ll email us your tours and prices', menu_social: fr ? 'Vos sorties et tarifs sur Facebook ou Instagram' : 'Your tours and prices on Facebook or Instagram' }[m.help_kind] || (!['happy_hour', 'specials', 'facebook', 'instagram', SETUP_FR_STORY_KIND, SETUP_FR_LINES_KIND].includes(m.help_kind) ? (fr ? 'Sorties et tarifs envoyés' : 'Tours and prices sent to us') : t)) : t;
       items.push({ kind: 'menu', at: m.submitted_at || m.updated_at, sent: m.submitted_at || m.updated_at, status: 'pending', reason: null, title: tt });
     }
   } catch (e) { /* no menus table */ }
@@ -67925,6 +68036,10 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     onlyYou: ownerAccessCountText(1, lang), nLogins: ownerAccessCountText(99, lang).replace('99', '{n}'),
     account: P('/owner/account'),
     evUpdated: L('Updated. Your event is still waiting for review, usually within a day.', 'Mis à jour. Votre événement attend toujours notre vérification, en général d’ici un jour.'),
+    // Indoor test 9 (2026-11-19; Melissa left the email blank and was told "We'll email you"): no email, no promise.
+    evDoneNoMail: L('Thanks! Your event is in for review, usually within a day. It shows on What\u2019s On once it\u2019s approved.', 'Merci! Votre événement est en cours de vérification, en général d’ici un jour. Il paraîtra dans À l’affiche une fois approuvé.'),
+    evDoneMail: L('Thanks! Your event is in for review, usually within a day. We\u2019ll email you when it\u2019s on What\u2019s On.', 'Merci! Votre événement est en cours de vérification, en général d’ici un jour. Nous vous écrirons quand il sera dans À l’affiche.'),
+    evAccount: !!found.account,
     evChange: L('Thanks! Your change is in for review, usually within a day. The event stays as it is until then, and we\u2019ll email you when it\u2019s updated.', 'Merci! Votre modification est en cours de vérification, en général d’ici un jour. L’événement reste tel quel d’ici là, et nous vous écrirons quand il sera mis à jour.'),
     pickOne: L('Choose at least one photo.', 'Choisissez au moins une photo.'), max5: L('Please choose up to 5 photos at a time.', 'Choisissez jusqu’à 5 photos à la fois.'),
     rights: L('Please confirm you took these photos or have permission to share them.', 'Confirmez que vous avez pris ces photos ou que vous avez la permission de les partager.'),
@@ -69191,6 +69306,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
         if (j && j.ok) {
           sentAs = { name: v('oeContactName').trim(), email: v('oeContactEmail').trim() };
           rememberName(v('oeContactName')); rememberEmail(v('oeContactEmail')); shareEmail(v('oeContactEmail')); ev.style.display = 'none';
+          document.getElementById('oeDoneText').textContent = !T.evAccount && !sentAs.email ? T.evDoneNoMail : T.evDoneMail;
           if (j.updated) document.getElementById('oeDoneText').textContent = T.evUpdated;
           if (j.change) document.getElementById('oeDoneText').textContent = T.evChange;
           document.getElementById('oeDone').classList.add('show');
