@@ -164,6 +164,8 @@ test('6. French: the "Times vary" line is French all through, on the page and th
   const at = hub.indexOf(v.name);
   assert.ok(at >= 0);
   assert.doesNotMatch(hub.slice(at, at + 600), /check before you go/);
+  // Her card's price line: « À partir de 25 $ · Billets » (not "Tickets").
+  assert.match(hub.slice(at, at + 600), /À partir de 25 \$ Billets/);
   assert.equal(app.frStatusText ? app.frStatusText('Times vary · check before you go') : 'Horaires variables · vérifiez avant d’y aller', 'Horaires variables · vérifiez avant d’y aller');
 });
 

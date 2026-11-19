@@ -99,6 +99,8 @@ const FR_TEXT = {
   'By donation': 'Contribution volontaire',
   // Indoor test 2 (2026-11-19): a price for a whole room, lane, game or group (the card's small line under the price).
   'Per room': 'Par salle', 'Per lane': 'Par allée', 'Per game': 'Par partie', 'Per group': 'Par groupe',
+  // Indoor test 3 (2026-11-19): a theatre's card price is its lowest ticket (« À partir de 25 $ · Billets »).
+  'Tickets': 'Billets',
   'Arts & culture': 'Arts et culture',
   'Kid Friendly': 'Adapté aux enfants',
   'Kid-Friendly': 'Adapté aux enfants',
