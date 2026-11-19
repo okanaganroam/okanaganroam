@@ -5365,7 +5365,7 @@ const INDOOR_FR_SEARCH_REWRITES = [
   ['atelier de poterie', 'pottery'], ['ateliers de poterie', 'pottery'],
   ['machines a sous', 'casino'], ['machine a sous', 'casino'], ['poker', 'casino'], ['heure du conte', 'library'], ['bibliotheque publique', 'library'],
   // Indoor test 10 (2026-11-19, the synonym matrix): more French ways of naming each indoor kind.
-  ['salle de theatre', 'theatre'], ['salles de theatre', 'theatre'], ['piece de theatre', 'theatre'], ['pieces de theatre', 'theatre'], ['theatre communautaire', 'theatre'],
+  ['salle de theatre', 'theatre'], ['salles de theatre', 'theatre'], ['theatre communautaire', 'theatre'],
   ['musee d art', 'art gallery'], ['musees d art', 'art gallery'], ['mur d escalade', 'climbing gym'], ['escalade interieure', 'climbing gym'], ['centre de jeux pour enfants', 'indoor playground'],
   ['aire de jeux interieure pour enfants', 'indoor playground'], ['atelier de ceramique', 'pottery'], ['ateliers de ceramique', 'pottery'], ['soiree peinture', 'paint night'], ['soirees peinture', 'paint night'],
   ['jouer au curling', 'curling'], ['faire du curling', 'curling'], ['essayer le curling', 'curling'],
@@ -52104,7 +52104,8 @@ async function queueFrStoryTranslation(venue, contactEmail) {
     // Indoor test 10 (2026-11-19; Sandra's new listing had no French description, so no French page): a listing with no
     // French description at all is queued too. Until it is written the French address goes to the English page, as for
     // every place without French text (venueHasFrench): no new French page or sitemap entry before the French exists.
-    const noFr = !!v && !String(v.description_fr || '').trim();
+    const noFr = !!v && v.type === 'indoor' && !String(v.description_fr || '').trim(); // indoor places only, for now
+    if (v && v.type !== 'indoor' && !String(v.description_fr || '').trim()) return false;
     if (!v || (noFr && !String(v.description || '').trim()) || (!noFr && ownerDescriptionWasHers(v, 'description_fr')) || ownerLinkPending(v.id, 'description_fr') != null) return false;
     if (db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND help_kind = ? AND status IN ('help', 'draft') LIMIT 1").get(v.id, SETUP_FR_STORY_KIND)) return false;
     const note = noFr ? 'Their listing has no French description yet (so no French page): please write their French description from their English story (queued automatically).'

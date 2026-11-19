@@ -143,7 +143,8 @@ test('4. Help: the examples use his own price, "put your…", camps go to the Gr
   const tm = tokenFor(m.id);
   await ok(change(tm, { indoor_info: { kinds: ['museum'], length: '1-2h' } }));
   const cm = JSON.parse(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(await getText(`/owner/${tm}/setup`))[1]);
-  assert.match(plain(cm.topics.find((x) => x.id === 'indoor-price').a), /put your adult admission\. Your card and your page say “Admission from \$25”/);
+  // Indoor test 10: with no price typed yet, the kind's own example (a museum's $12, never $25 for every kind).
+  assert.match(plain(cm.topics.find((x) => x.id === 'indoor-price').a), /put your adult admission\. Your card and your page say “Admission from \$12”/);
 });
 
 test('5. Search: a kids’ birthday party in Vernon lists Vernon’s indoor Family Fun places, his (whose Groups line offers parties) first; never the A-Z Kid-Friendly list; the Indoor hub’s search reads the Groups line', async () => {

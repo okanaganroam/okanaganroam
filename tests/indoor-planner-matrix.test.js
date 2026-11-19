@@ -138,7 +138,7 @@ test('A named kind with nothing in the town itself takes in the towns right arou
 const SYN = {
   gallery: { en: ['art museum in {T}', 'art exhibit in {T}', 'art galleries near {T}'], fr: ['musée d’art à {T}', 'exposition d’art à {T}', 'galeries à {T}'] },
   museum: { en: ['science center {T}', 'museums near {T}', 'a museum to visit in {T}'], fr: ['un musée à {T}', 'centre des sciences à {T}', 'musées près de {T}'] },
-  theatre: { en: ['playhouse in {T}', 'theater in {T}', 'watch a play in {T}'], fr: ['aller au théâtre à {T}', 'voir une pièce de théâtre à {T}', 'salle de théâtre à {T}'] },
+  theatre: { en: ['playhouse in {T}', 'theater in {T}', 'watch a play in {T}'], fr: ['aller au théâtre à {T}', 'un théâtre à {T}', 'salle de théâtre à {T}'] },
   cinema: { en: ['movies in {T}', 'movie theater {T}', 'watch a film in {T}', 'see a film {T}'], fr: ['cinémas à {T}', 'aller au cinéma à {T}', 'cinéma ce soir à {T}'] },
   spa: { en: ['massage in {T}', 'nordic spa {T}', 'facial {T}'], fr: ['massage à {T}', 'spa nordique à {T}', 'soins du visage à {T}'] },
   pool: { en: ['swimming pool {T}', 'aquatic centre {T}', 'rec centre {T}', 'public swim {T}', 'aquafit {T}'], fr: ['piscine à {T}', 'centre aquatique à {T}', 'bain libre à {T}', 'aquaforme à {T}'] },

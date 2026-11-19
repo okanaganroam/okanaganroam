@@ -531,7 +531,7 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   let morningStart=null;
   // Indoor test 10 (2026-11-19): "early morning", "first thing", "when it opens": the day starts at the first place's opening
   // time when that is before 9 AM (trip-planner.js).
-  const earlyMorning=/\b(?:early (?:in the )?mornings?|early morning|first thing(?: in the morning)?|(?:right )?(?:at|when (?:it|they) opens?)(?: opening)?|at opening|before work|tot matin|t[oô]t le matin)\b/.test(normalizedText);
+  const earlyMorning=/\b(?:early (?:in the )?mornings?|early morning|first thing(?: in the morning)?|(?:right )?when (?:it|they) opens?|(?:right )?at opening(?: time)?|before work|tot matin|t[oô]t le matin)\b/.test(normalizedText);
   if(startMinutes==null){
     const tail='(?::([0-5]\\d))?\\s*(?:a\\.?m\\.?|o.?clock)?(?![\\d:]|\\s*(?:p\\.?m\\b|tonight|at night|in the (?:evening|afternoon)))';
     const early=new RegExp(`\\b(?:coffee|coffees|breakfast|brunch|cafe|caf\u00e9|latte|espresso)\\b[^.;!?]{0,40}?\\b(?:at|around|from|by)\\s+(1[01]|[6-9])${tail}`,'i').exec(original)

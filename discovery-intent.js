@@ -848,13 +848,13 @@ function uniq(list) { return Array.from(new Set(list)); }
 // Types whose aliases, when the taxonomy has the type, belong to it alone.
 const CLAIMING_TYPES = ['tour', 'sport', 'shop'];
 // Indoor test 10 (2026-11-19, the vocabulary audit): phrases that Sports & Recreation, beaches or golf own which also name
-// an indoor kind (indoor-kinds.js: a pool, a climbing gym, a karting or mini golf place, a spa's hot tub). They mean
+// an indoor kind (indoor-kinds.js: a pool, a climbing gym, a karting place, a spa's hot tub; mini golf stays golf). They mean
 // both: the other type keeps its places and the indoor places of that kind are added. (Build My Trip leaves out the
 // beaches for "swim" outside the lake season: trip-planner.js.)
 const ALSO_INDOOR_PHRASES = ['swimming pool', 'swimming pools', 'aquatic centre', 'aquatic center', 'aquatic centres', 'aquatic centers', 'rec centre', 'rec center', 'rec centres', 'rec centers',
-  'recreation centre', 'recreation center', 'swim', 'swimming', 'go karts', 'go karting', 'karting', 'mini putt', 'mini golf', 'climbing wall', 'climbing walls',
+  'recreation centre', 'recreation center', 'swim', 'swimming', 'go karts', 'go karting', 'karting', 'climbing wall', 'climbing walls',
   'hot tub', 'hot tubs', 'sauna', 'saunas', 'steam room', 'wave pool', 'leisure pool', 'indoor pool', 'indoor pools'];
-const ALSO_INDOOR_SEARCH_ONLY = new Set(['swim', 'swimming', 'go karts', 'go karting', 'karting', 'mini putt', 'mini golf', 'climbing wall', 'climbing walls']);
+const ALSO_INDOOR_SEARCH_ONLY = new Set(['swim', 'swimming', 'go karts', 'go karting', 'karting', 'climbing wall', 'climbing walls']);
 function buildPhraseTable(taxonomy) {
   const t = normalizeTaxonomy(taxonomy);
   const entries = new Map();
