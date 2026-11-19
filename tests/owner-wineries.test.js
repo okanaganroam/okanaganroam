@@ -1171,8 +1171,9 @@ test('winery test 5: a quick chip replaces research’s untouched line, adds to 
   assert.deepEqual(cfg.visitResearch, ['dogs'], 'research’s Dogs line is still research’s');
   assert.equal(cfg.cur.visit_rows.dogs, 'Dogs welcome on the patio.');
   // The rule in the client: has it -> take it out; untouched research line -> replaced; already says it -> left; else added.
+  // (Tour test 16: a tour's Good to know adds to research's line instead; tour-test16-fixes.test.js 4 runs it.)
   // Cocktail test 3 (2026-11-14): a Groups line keeps its facts (a room, a capacity); other lines are replaced as before.
-  assert.match(CLIENT5, /else if \(v && pre && v === pre && \(C\.visitResearch \|\| \[\]\)\.indexOf\(qk\) >= 0\) v = \(qk === 'groups' \? groupsKeep\(v, t, sibs\) : \[\]\)\.concat\(\[t\]\)\.join\(sep\);\n\s*else if \(saysIt\(v, t, sibs\)\) return;\n\s*else v = v \? v\.replace/);
+  assert.match(CLIENT5, /else if \(v && pre && v === pre && \(C\.visitResearch \|\| \[\]\)\.indexOf\(qk\) >= 0(?: && !\(TOUR && qk === 'good_to_know'\))?\) v = \(qk === 'groups' \? groupsKeep\(v, t, sibs\) : \[\]\)\.concat\(\[t\]\)\.join\(sep\);\n\s*else if \(saysIt\(v, t, sibs\)\) return;\n\s*else v = v \? v\.replace/);
   // saysIt, run as the client runs it.
   // Cocktail test 3 (2026-11-14): saysIt spans several lines now (chips that share their words are told apart).
   const fn = (() => { const ctx = { T: {} }; require('node:vm').runInNewContext(CLIENT5.slice(CLIENT5.indexOf('  function has(v, t)'), CLIENT5.indexOf('  // Cocktail test 2 (2026-11-13): in the French setup, a line filled')) + 'this.f = saysIt;', ctx); return ctx.f; })();
