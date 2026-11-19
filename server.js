@@ -49729,7 +49729,10 @@ function validateEventSubmission(body, now = new Date(), opts = {}) {
     else data.image_link = img;
   }
 
-  if (!present('contact_email')) {
+  // Indoor test 8 (2026-11-19; Gary's event from his private link asked for an email only after he tapped Send): an
+  // owner's event needs none (the link proves who it is); one typed must still be a real address.
+  if (!present('contact_email') && opts.emailOptional) data.contact_email = '';
+  else if (!present('contact_email')) {
     errors.contact_email = 'Please enter your email address.';
   } else if (typeof body.contact_email !== 'string' || body.contact_email.trim().length > 254
       || !SUBMISSION_EMAIL_PATTERN.test(body.contact_email.trim())) {
@@ -53409,7 +53412,7 @@ async function handleOwnerEventSubmission(req, res, token) {
   delete full.partner_venue_ids;
   delete full.image;
   delete full.image_rights;
-  const { data, errors } = validateEventSubmission(full, new Date(), { timeOptional: true });
+  const { data, errors } = validateEventSubmission(full, new Date(), { timeOptional: true, emailOptional: true });
   const partners = cleanPartnerIds(body.partner_venue_ids, venue.id);
   if (partners === null) errors.partner_venue_ids = `Choose up to ${EVENT_PARTNER_MAX} businesses listed on Okanagan Roam.`;
   else data.partner_venue_ids = partners;
@@ -68362,7 +68365,7 @@ ${priceFieldHtml}      </details>` : ''}
       <p class="op-hint" id="oeSendingAs" hidden></p>
       <div class="form-row" id="oeContactRow">
         <div class="form-field"><label for="oeContactName">${L('Your name', 'Votre nom')}</label><input type="text" id="oeContactName" maxlength="100" autocomplete="name" value="${escapeHtml(accountName)}"><p class="lyv-error" id="oeContactNameError" hidden></p></div>
-        <div class="form-field"><label for="oeContactEmail">${L('Your email', 'Votre courriel')} *</label><input type="email" id="oeContactEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}"><p class="lyv-error" id="oeContactEmailError" hidden></p></div>
+        <div class="form-field"><label for="oeContactEmail">${L('Your email (optional)', 'Votre courriel (facultatif)')}</label><input type="email" id="oeContactEmail" maxlength="254" autocomplete="email" value="${escapeHtml(found.contactEmail || '')}" aria-describedby="oeContactEmailHint"><p class="op-hint" id="oeContactEmailHint" style="margin:4px 0 0">${L('Add it and we&rsquo;ll tell you when your event is on What&rsquo;s On.', 'Ajoutez-le et nous vous dirons quand votre événement sera dans À l’affiche.')}</p><p class="lyv-error" id="oeContactEmailError" hidden></p></div>
       </div>
       <div class="lyv-hp" aria-hidden="true"><label>${L('Company website', 'Site de l’entreprise')} <input type="text" id="oeHp" tabindex="-1" autocomplete="off"></label></div>
       <p class="lyv-error" id="oeFormError" hidden></p>
@@ -69041,6 +69044,8 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
       .then(function(j){ if (j && j.ok && j.href) { location.href = j.href; return; } addBtn.disabled = false; show('olsAddError', (j && j.error) || T.again); })
       .catch(function(){ addBtn.disabled = false; show('olsAddError', T.connect); });
   });
+  // Indoor test 8: a mistyped email says so as soon as she leaves the box, not only after Send.
+  (function(){ var em0 = document.getElementById('oeContactEmail'); if (em0) em0.addEventListener('blur', function(){ var x0 = em0.value.trim(); show('oeContactEmailError', x0 && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(x0) ? ${JSON.stringify(L('Please enter a valid email address, like name@example.com.', 'Entrez une adresse courriel valide, comme nom@exemple.com.'))} : ''); }); })();
   ev.addEventListener('submit', function(e){
     e.preventDefault();
     var ids = { name:'oeNameError', categories:'oeCategoriesError', description:'oeDescriptionError', start_date:'oeStartDateError', end_date:'oeEndDateError',

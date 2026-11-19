@@ -234,3 +234,24 @@ test('6. Every kind: free and walk-in, "Have a booking page?" left closed, reach
     assert.match(portal, /Your page is complete/, `${k}: portal`);
   }
 });
+
+test('7. Add an event from his private link: no email needed (optional, pre-filled when known); a bad one is caught before Send', async () => {
+  const { v, t } = await gary();
+  const page = await fetch(`${base}/owner/${t}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text());
+  assert.match(page, /<label for="oeContactEmail">Your email \(optional\)<\/label>/);
+  assert.doesNotMatch(page, /<label for="oeContactEmail">Your email \*/);
+  // The email box is checked as soon as she leaves it (a blur check in the page's own script).
+  assert.match(page, /oeContactEmail'\); if \(em0\) em0\.addEventListener\('blur'/);
+  // Every inline script on the page still parses.
+  for (const m of page.matchAll(/<script(?![^>]*(?:application\/json|src=))[^>]*>([\s\S]*?)<\/script>/g)) new (require('node:vm').Script)(m[1]);
+  assert.match(page, /test\(x0\)|\.test\(x0\)/);
+  assert.match(page, /\[\^\\s@\]\+@\[\^\\s@\]\+\\\.\[\^\\s@\]\+\$\/\.test\(x0\)/);
+  const ev = { name: 'Cosmic Bowling', categories: ['sports-recreation'], description: 'Unlimited glow bowling with music and lights, 9 PM to midnight.', start_date: '2026-11-27', start_time: '21:00', end_time: '23:59', schedule_notes: 'every Friday and Saturday' };
+  const r = await postJson(`/owner/${t}/events`, { ...ev, contact_email: '' });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const bad = await postJson(`/owner/${t}/events`, { ...ev, name: 'Cosmic Bowling 2', contact_email: 'gary@' });
+  assert.equal(bad.status, 400);
+  assert.ok(bad.body.errors && bad.body.errors.contact_email);
+  // The public form still needs one.
+  assert.ok(v);
+});
