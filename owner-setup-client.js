@@ -54,7 +54,8 @@
   function tinfo(o){ var x = {}; x[INFO_F] = o; return x; }
   function tprice(v){ var x = {}; x[PRICE_F] = v; return x; }
   // A day newly opened in the hours editor: 11 AM – 9 PM; a tour's is 9 AM – 5 PM (tour test 2, Whistler, 2026-11-16).
-  var DAY_NEW = TOUR ? ['09:00', '17:00'] : INDOOR ? ['10:00', '17:00'] : ['11:00', '21:00'];
+  var DAY_NEW = TOUR ? ['09:00', '17:00'] : ['11:00', '21:00'];
+  if (INDOOR) DAY_NEW = ['10:00', '17:00'];
   var CK = !!C.cocktail, FOLD = !!(C.brewery || C.cocktail || TL);
   var COCKTAIL_ITEM_STEP = { cocktail_price: 'spend', kitchen: 'hours:kitchen', minors: 'offer:minors', entertainment: 'music', pyv_groups: 'groups', pyv_known: 'story', arrival: 'door', menu: 'menu', happy_hour: 'happy' };
   // The checklist item -> the screen that answers it, for this type.
@@ -643,7 +644,8 @@
   // Tour test 4 (Whistler, 2026-11-17): a free or by-donation tour. The stored answer is the word ('free' / 'donation');
   // here the price is 0 and S.tour.free holds the word. S.savedTourPrice is the stored answer as it is (number or word).
   S.tour.free = '';
-  if (CUR[PRICE_F] === 'free' || CUR[PRICE_F] === 'donation') { S.tour.free = CUR[PRICE_F]; S.tour.price = 0; }
+  if (CUR.tour_price === 'free' || CUR.tour_price === 'donation') { S.tour.free = CUR.tour_price; S.tour.price = 0; }
+  if (INDOOR && (CUR.indoor_price === 'free' || CUR.indoor_price === 'donation')) { S.tour.free = CUR.indoor_price; S.tour.price = 0; }
   S.savedTourPrice = CUR[PRICE_F] == null ? null : CUR[PRICE_F];
   // Indoor places (2026-11-19): research's price, or its Free badge, pre-picked as a suggestion (saved only with the screen);
   // the kinds research's words name pre-picked the same way; and each kind's usual visit, walk-ins answer and age.
@@ -1653,7 +1655,7 @@
   function preview(){
     // Tours (2026-11-16): the kinds, the town and the price as the card shows it ("From $129").
     // Indoor places (2026-11-19): the kinds, the town and the price as the card shows it ("Adults $25", "Free").
-    if (INDOOR) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
+    if (C.indoor) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([(TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     if (C.tour) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([S.tourWords || C.tourWords || (TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? (T.tfreeCard || 'Free') : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
@@ -2085,17 +2087,22 @@
         // ("Yes, all year" then "No, keep them" was the only way through, and it scared her).
         + '<div class="su-stack">' + (stS.length && T.yearKeep ? big('✓', T.yearKeep, '', false, 'yearKeep') : '') + big(stS.length && T.yearKeep ? '✕' : '✓', stS.length && T.yearKeep && T.allYearSame ? T.allYearSame : T.allYearYes, '', !!(stS.length && T.yearKeep), 'yearAll') + (TL && !stS.length ? big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed') : '') + (stS.length ? stS.map(function(st){ return big('✎', fill(T.seaChange, st), T.seaChangeSub, true, 'yearSeasonEdit:' + st.i); }).join('')
           // Brewery test 1 (Whistler, 2026-11-15): a second stretch (a spring and a fall shoulder season), then a third.
-          + seaMoreWrap(stS.length > 1, (stS.length < SEA_MAX && S.seaList.length < SEA_MAX && T.seaAdd ? big('🍂', stS.length > 1 ? T.seaAdd3 : T.seaAdd, stS.length > 1 ? T.seaAdd3Sub : T.seaAddSub, true, 'yearSeasonAdd') : '')) : (function(seaBtns){ return INDOOR && T.seaMore ? seaMoreHtml(seaBtns) : seaBtns; })(big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
+          + seaMoreWrap(stS.length > 1, (stS.length < SEA_MAX && S.seaList.length < SEA_MAX && T.seaAdd ? big('🍂', stS.length > 1 ? T.seaAdd3 : T.seaAdd, stS.length > 1 ? T.seaAdd3Sub : T.seaAddSub, true, 'yearSeasonAdd') : '')) : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
           // Restaurant test 3 (Whistler, 2026-11-15): a shoulder season is neither summer nor winter: the season screen with no
           // months set, the date boxes open, and she picks the dates.
-          // Indoor places (2026-11-19): these three fold under one link ("Different hours in summer or winter?").
-          + (T.allYearPart ? big('🍂', T.allYearPart, T.allYearPartSub, true, 'yearSeason:part') : '')))
+          + (T.allYearPart ? big('🍂', T.allYearPart, T.allYearPartSub, true, 'yearSeason:part') : ''))
         // Café test 2 (2026-11-11): a seasonal place says its open dates here, once, for every type.
         // Tour test 2 (Whistler, 2026-11-16): a summer-only operator tapped « Non, elles changent en été »; for a tour
         // "We only run part of the year" comes right after "Yes, all year" (above), not last.
         + (TL && !stS.length ? '' : big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed'))
         // Wineries (2026-11-12): the one new choice, "In the off-season we're open by appointment".
         + (APPT && T.allYearAppt ? big('📞', T.allYearAppt, T.allYearApptSub, true, 'yearAppt') : '') + '</div>';
+      // Indoor places (2026-11-19): the summer, winter and part-of-the-year hours buttons fold under one link
+      // ("Different hours in summer or winter?"); "Yes, all year" and "closed part of the year" stay up front.
+      if (INDOOR && T.seaMore && !noSetYear() && !storedSeas().length) {
+        var seaRe = /<button[^>]*data-act="yearSeason:(?:summer|winter|part)"[^>]*>[\s\S]*?<\/button>/g, seaBtns = x.match(seaRe) || [];
+        if (seaBtns.length) { var seaAt = x.indexOf(seaBtns[0]); x = x.replace(seaRe, ''); x = x.slice(0, seaAt) + seaMoreHtml(seaBtns.join('')) + x.slice(seaAt); }
+      }
     } else if (s === 'hours:yeardrop') {
       // Pub test 2: "Yes, all year" with other hours stored: the dates that would be removed, and a choice.
       // Brewery test 1 (Whistler, 2026-11-15): with two periods it names both; "Remove these hours" on a period's own

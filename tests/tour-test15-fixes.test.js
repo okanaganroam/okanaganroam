@@ -313,5 +313,5 @@ test('15. polish: unknown change key is a 400; "per board" is « par planche »;
   const { t } = await dave();
   for (const k of ['foo', 'meeting_spot_2']) { const r = await change(t, { [k]: 'x' }); assert.equal(r.status, 400, k); }
   assert.match(fs.readFileSync(path.join(ROOT, 'arrival-points.js'), 'utf8'), /Place it from their photo and new address\./);
-  assert.match(CLIENT, /if \(TOUR && gline && \/\[\.!\?\]\\s\/\.test\(gline\)/);
+  assert.match(CLIENT, /if \((?:TOUR|TL) && gline && \/\[\.!\?\]\\s\/\.test\(gline\)/);
 });

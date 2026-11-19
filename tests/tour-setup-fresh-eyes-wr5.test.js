@@ -264,7 +264,7 @@ test('11 + Minor + wording: header at 360, "add it", "On some trips: …", Group
   assert.match(css, /@media \(max-width: 400px\) \{ body\.owner-setup \.su-head \{ gap: 6px; \} body\.owner-setup \.su-logo \{ font-size: 15px;/);
   // "Address sent. We’ll add it within a day." ("address" ends in s; it read "them").
   const pc = fs.readFileSync(path.join(ROOT, 'portal-completeness.js'), 'utf8');
-  assert.match(pc, /const EN_PLURAL = new Set\(\['photos', 'tours and prices', 'features'\]\);/);
+  assert.match(pc, /const EN_PLURAL = new Set\(\['photos', 'tours and prices', (?:'prices', )?'features'\]\);/);
   // The dogs line joins chip and words with ": ".
   assert.equal(app.dogsChipSentences('On some trips private charters only'), 'On some trips: private charters only');
   assert.equal(app.dogsChipSentences('À certaines sorties sorties privées seulement'), 'À certaines sorties: sorties privées seulement');
