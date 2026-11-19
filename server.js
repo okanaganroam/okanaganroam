@@ -10607,6 +10607,70 @@ function visitBookLabelFr(info, type) {
   const en = (info && info.booking_label) || VISIT_BOOK_LABELS[type] || '';
   return (en && frLookup(en)) || 'Réserver';
 }
+// Book buttons (2026-11-18): where a place's Book button goes and what it says, shared by the venue page and Build My
+// Trip so both always agree. The owner's own booking link comes first ("Book" / « Réserver »; left out when it is just
+// the place's website), then the booking page of its Plan your visit box ("Book a tasting", "Reserve a table" ...).
+// opts.links / opts.visitInfo: what the caller already read (the venue page passes the box it shows, so a box that
+// does not show gives no Book button there either). -> { url, label, label_fr, source, affiliate, rel } or null.
+// affiliate: the link is marked as an affiliate link (venue_links.booking_affiliate, or the box's booking_affiliate);
+// then rel also says "sponsored". No link is marked yet.
+function bookingRel(affiliate) { return affiliate ? 'nofollow noopener sponsored' : 'nofollow noopener'; }
+function venueBookingAffiliate(venueId) {
+  try { const r = db.prepare('SELECT booking_affiliate FROM venue_links WHERE venue_id = ?').get(venueId); return !!(r && r.booking_affiliate); } catch (e) { return false; }
+}
+function venueBookingLink(venue, opts = {}) {
+  if (!venue || venue.redirect_to || !Number.isInteger(venue.id)) return null;
+  const key = (u) => String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#]+$/, '');
+  const links = opts.links || venueLinks(venue.id) || {};
+  const own = typeof links.booking_url === 'string' && /^https?:\/\//i.test(links.booking_url.trim()) ? links.booking_url.trim() : null;
+  if (own && !(venue.website && key(own) === key(venue.website))) {
+    const affiliate = venueBookingAffiliate(venue.id);
+    return { url: own, label: 'Book', label_fr: 'Réserver', source: 'owner', affiliate, rel: bookingRel(affiliate) };
+  }
+  const info = 'visitInfo' in opts ? opts.visitInfo : venueVisitInfo(venue.id);
+  const boxUrl = info && typeof info.booking_url === 'string' && /^https?:\/\//i.test(info.booking_url.trim()) ? info.booking_url.trim() : null;
+  if (boxUrl && ('visitInfo' in opts || (Array.isArray(info.rows) && info.rows.length))) {
+    const affiliate = info.booking_affiliate === true;
+    return { url: boxUrl, label: info.booking_label || VISIT_BOOK_LABELS[venue.type] || 'Book', label_fr: visitBookLabelFr(info, venue.type), source: 'visit_info', affiliate, rel: bookingRel(affiliate) };
+  }
+  return null;
+}
+// Build My Trip (2026-11-18): the kinds of place where "Call to book" makes sense when there is no booking link. Beaches,
+// parks, trails, cafes and free places never show it (nothing to book, so nothing to nag about).
+const TRIP_CALL_TO_BOOK_TYPES = new Set(['restaurant', 'winery', 'brewery', 'distillery', 'pub', 'cocktail', 'tour', 'golf', 'indoor', 'sport']);
+// Each venue stop in a plan gets `booking` { url, label, labelFr, affiliate } when it has a booking link, or else
+// `bookPhone` when a call books it. A venue without either gets neither field (no URL is ever sent for it).
+function withTripBooking(plan) {
+  const seen = new Set();
+  const byId = db.prepare('SELECT id, name, type, website, phone, redirect_to, free_entry FROM venues WHERE id = ?');
+  const cache = new Map();
+  const lookup = (id) => {
+    if (!cache.has(id)) {
+      let row = null;
+      try { row = byId.get(id) || null; } catch (e) { row = null; }
+      let out = null;
+      if (row) {
+        const b = venueBookingLink(row);
+        if (b) out = { booking: { url: b.url, label: b.label, labelFr: b.label_fr, affiliate: !!b.affiliate } };
+        else if (row.phone && String(row.phone).trim() && TRIP_CALL_TO_BOOK_TYPES.has(row.type) && !row.free_entry) out = { bookPhone: String(row.phone).trim() };
+      }
+      cache.set(id, row ? { row, out } : null);
+    }
+    return cache.get(id);
+  };
+  const walk = (o, depth) => {
+    if (!o || typeof o !== 'object' || depth > 8 || seen.has(o)) return;
+    seen.add(o);
+    if (Array.isArray(o)) { for (const x of o) walk(x, depth + 1); return; }
+    if (Number.isInteger(o.id) && typeof o.name === 'string' && typeof o.type === 'string' && typeof o.url === 'string' && o.booking === undefined && o.bookPhone === undefined) {
+      const hit = lookup(o.id);
+      if (hit && hit.row.name === o.name && hit.row.type === o.type && hit.out) Object.assign(o, hit.out);
+    }
+    for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object') walk(o[k], depth + 1);
+  };
+  walk(plan, 0);
+  return plan;
+}
 // Cleanup (2026-11-01): a Canadian number reads 250-491-2695, not +1 250-491-2695 (the tel: link keeps the stored number).
 function displayPhone(p) {
   const m = /^\s*(?:\+?1[\s.-]?)?\(?(\d{3})\)?[\s.-]*(\d{3})[\s.-]*(\d{4})\s*$/.exec(String(p || ''));
@@ -39242,9 +39306,12 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     mapsUrl ? `<a class="cta" href="${builtInDirections || mapsUrl}" ${builtInDirections ? 'data-roam-directions' : 'rel="nofollow noopener" target="_blank"'}${trackAttr('directions')}>${builtInDirections ? L('Get Directions', 'Itin\u00e9raire') : L('Open in Google Maps','Ouvrir dans Google Maps')}</a>` : null,
     // Brewery test 2 (2026-11-13): a website that is the same Facebook page as the Facebook link shows once, as Facebook.
     venue.website && !websiteIsFacebookLink(venue.website, venueLinkRow.facebook_url) && !websiteIsInstagramLink(venue.website, venueLinkRow.instagram_url) ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${mapsUrl ? L('Website \u2197', 'Site Web \u2197') : L('Visit Website', 'Visiter le site Web')}</a>` : null,
-    venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${L('Book', 'R\u00e9server')}</a>`
-      // A winery's tasting booking page from its Plan your visit box (2026-10-29), when it has no booking link of its own.
-      : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(fr ? visitBookLabelFr(visitInfo, venue.type) : (visitInfo.booking_label || VISIT_BOOK_LABELS[venue.type] || 'Book'))}</a>` : null,
+    // The owner's booking link, else a winery's tasting booking page from its Plan your visit box (2026-10-29). One helper
+    // (venueBookingLink, 2026-11-18) decides, so Build My Trip's Book button always matches this one.
+    (() => {
+      const book = venue.redirect_to ? null : venueBookingLink(venue, { links: venueLinkRow, visitInfo });
+      return book ? `<a class="cta secondary" href="${escapeHtml(book.url)}" rel="${book.rel}" target="_blank"${trackAttr('booking')}>${escapeHtml(fr ? book.label_fr : book.label)}</a>` : null;
+    })(),
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).
@@ -69412,7 +69479,7 @@ const server = http.createServer(async (req, res) => {
       if (parsed.error) return sendJSON(res, 400, { error: parsed.error });
       // Weekly specials (2026-10-27): a stop on its special's day says so, added after planning like the deals.
       try {
-        const planResult = withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value)))));
+        const planResult = withTripBooking(withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value))))));
         // Stage 1 demand log: which businesses this plan showed (anonymous, never blocks the reply).
         try { req.__ip = requestClientIp(req); tripDemandLog.record(req, 'shown', tripDemand.collectVenueIds(planResult)); } catch (e) { /* logging must never break the planner */ }
         return sendJSON(res, 200, planResult);
@@ -69752,7 +69819,8 @@ const server = http.createServer(async (req, res) => {
       if (!tripDemand.enabled() || !isSameOriginSubmission(req)) { res.writeHead(204); return res.end(); }
       try {
         const b = await readLimitedJsonBody(req, 2048);
-        const kind = b && b.kind === 'add' ? 'add' : b && b.kind === 'remove' ? 'remove' : null;
+        // book_click (2026-11-18): a Book / Call to book tap in a plan, with the kind of plan it came from.
+        const kind = b && (b.kind === 'add' || b.kind === 'remove' || b.kind === 'book_click') ? b.kind : null;
         let id = null;
         const m = b && typeof b.ref === 'string' ? /^venue:([1-9][0-9]*)$/.exec(b.ref) : null;
         if (m) id = Number(m[1]);
@@ -69760,7 +69828,7 @@ const server = http.createServer(async (req, res) => {
           const rows = db.prepare('SELECT id FROM venues WHERE name = ? AND (? IS NULL OR region = ?)').all(b.name, b.region || null, b.region || null);
           if (rows.length === 1) id = rows[0].id;
         }
-        if (kind && id) { req.__ip = requestClientIp(req); tripDemandLog.record(req, kind, [id]); }
+        if (kind && id) { req.__ip = requestClientIp(req); tripDemandLog.record(req, kind, [id], new Date(), { planType: kind === 'book_click' && typeof b.plan_type === 'string' ? b.plan_type.slice(0, 24) : null }); }
       } catch (e) { /* ignore: logging only */ }
       res.writeHead(204);
       return res.end();
@@ -69774,12 +69842,13 @@ const server = http.createServer(async (req, res) => {
       const threshold = Math.max(1, parseInt(query.threshold, 10) || 10);
       const rows = tripDemandLog.report(days, threshold);
       if (query.format === 'csv') {
-        const csv = ['id,name,region,type,shown,added,removed,ready_to_contact']
-          .concat(rows.map((r) => [r.id, JSON.stringify(r.name), r.region, r.type, r.shown, r.added, r.removed, r.ready_to_contact].join(','))).join('\n');
+        const csv = ['id,name,region,type,shown,added,removed,book_clicks,ready_to_contact']
+          .concat(rows.map((r) => [r.id, JSON.stringify(r.name), r.region, r.type, r.shown, r.added, r.removed, r.book_clicks || 0, r.ready_to_contact].join(','))).join('\n');
         res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store' });
         return res.end(csv + '\n');
       }
-      return sendJSON(res, 200, { days, threshold, count: rows.length, rows });
+      const book = tripDemandLog.bookSummary(days);
+      return sendJSON(res, 200, { days, threshold, count: rows.length, book_clicks: book.total, book_clicks_by_plan_type: book.by_plan_type, rows });
     }
 
     if (pathname === '/api/venue-submissions' && method === 'POST') {
@@ -71299,6 +71368,8 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Book buttons (2026-11-18), for tests/trip-book-buttons.test.js.
+  venueBookingLink, withTripBooking, TRIP_CALL_TO_BOOK_TYPES,
   // Tour test 10 (2026-11-18), for tests/tour-test10-fixes.test.js.
   sentenceCaps, typedAllLowercase, tourRiderAge, renderAdminMenuCard, planStopRegions, ownerFrDescState,
   weekendEmailPlace,

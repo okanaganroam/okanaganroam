@@ -1178,6 +1178,11 @@ if (!db.prepare('PRAGMA table_info(venue_seasons)').all().some((c) => c.name ===
 if (!db.prepare('PRAGMA table_info(venue_links)').all().some((c) => c.name === 'tiktok_url')) {
   db.exec('ALTER TABLE venue_links ADD COLUMN tiktok_url TEXT');
 }
+// Book buttons (2026-11-18): 1 marks booking_url as an affiliate link, so every Book button for it carries
+// rel="sponsored". Nothing sets it yet (no affiliate links); additive, older rows read as 0.
+if (!db.prepare('PRAGMA table_info(venue_links)').all().some((c) => c.name === 'booking_affiliate')) {
+  db.exec('ALTER TABLE venue_links ADD COLUMN booking_affiliate INTEGER NOT NULL DEFAULT 0');
+}
 
 // Visitor photos & tips (2026-10-17, drafts/visitor-photos-tips-plan.md): a
 // visitor sends a short tip and/or up to 3 photos for a listing. It stays
@@ -1417,6 +1422,11 @@ CREATE TABLE IF NOT EXISTS trip_demand_events (
 );
 CREATE INDEX IF NOT EXISTS idx_trip_demand_venue ON trip_demand_events (venue_id, kind, day);
 `);
+// Book buttons (2026-11-18): a 'book_click' row says which kind of plan the click came from (outing, day_plan,
+// multi_day, itinerary ...). NULL on every other row.
+if (!db.prepare('PRAGMA table_info(trip_demand_events)').all().some((c) => c.name === 'plan_type')) {
+  db.exec('ALTER TABLE trip_demand_events ADD COLUMN plan_type TEXT');
+}
 
 // Site event counts (2026-11-05): per day, how often each fixed-list feature event happened. Counts only, no visitor id.
 db.exec(`
