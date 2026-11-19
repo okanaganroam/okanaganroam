@@ -177,7 +177,7 @@ test('4. the admin card for a spot sent with her address: says so plainly, shows
   const ap = require('../arrival-points.js');
   const pin = { lat: 50.1167, lng: -122.9548 };
   const d = ap.decide({ point: pin, device: null, accuracy: NaN, pin, signedIn: false, addrOnly: true, picked: false });
-  assert.ok(d.reasons.includes('The owner couldn’t pin it. Place it from her photo and new address.'), JSON.stringify(d.reasons));
+  assert.ok(d.reasons.includes('The owner couldn’t pin it. Place it from their photo and new address.'), JSON.stringify(d.reasons));
   assert.ok(!d.reasons.some((r) => /picked on the map/.test(r)));
   const notPicked = ap.decide({ point: pin, device: null, accuracy: NaN, pin, signedIn: true, picked: false });
   assert.ok(notPicked.reasons.some((r) => /No spot was picked on the map/.test(r)));
@@ -191,7 +191,7 @@ test('4. the admin card for a spot sent with her address: says so plainly, shows
   const row = { ...kit.pending()[0], new_address: 'Base of Whistler Village Gondola, by the ski school sign' };
   const actions = '<div class="rv-actions"><button type="button" class="rv-btn rv-approve" data-act="approve">Looks right</button><input type="text" name="reason"><button type="button" class="rv-btn rv-reject" data-act="reject">Reject</button></div>';
   const html = kit.cardHtml(row, (x) => String(x), actions);
-  assert.match(html, /The owner couldn’t pin it\. Place it from her photo and new address\./);
+  assert.match(html, /The owner couldn’t pin it\. Place it from their photo and new address\./);
   assert.match(html, /New address \(waiting for review\): <strong>Base of Whistler Village Gondola, by the ski school sign<\/strong>/);
   assert.doesNotMatch(html, /Looks right<\/button>/); assert.match(html, /data-act="reject"/);
   // The setup says what happened.

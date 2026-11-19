@@ -40310,7 +40310,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       regionLabel, directionsHtml, contactActions, saveActions, ctaRowAttrs, hasWebsite: !!venue.website, hasPhone: !!venue.phone,
       menuPicks: picks, formatPrice: menuPriceLabel,
       menuHtml: venueMenu ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
-      menuLink: menuPagePath(venue, 'en'), menuCountText: venueMenu ? menuDishCountText(menuTripCount(venue, venueMenu), 'en', menuKind(venue)) : '',
+      menuLink: menuPagePath(venue, 'en'), menuCountText: venueMenu ? menuTripCountText(venue, venueMenu, 'en') : '',
       menuOwnUrl: venueLinkRow.menu_url && /^https?:\/\//i.test(venueLinkRow.menu_url) ? venueLinkRow.menu_url : '',
       menuWords: venueTapListWords(venue, false), menuIcon: venueTapListIcon(venue),
       happyDealsHtml: happyHour && happyHour.deals ? venueHappyHourBlockHtml(happyHour, false) : '',
@@ -54336,7 +54336,7 @@ function buildMenuEmail(venue, menu, kind, extra = {}) {
   const fields = {
     _subject: kind === 'help' && menu.help_kind === SETUP_FR_STORY_KIND ? `[TRANSLATE] ${venue.name} asked us to write their French description from their English story`
       : kind === 'help' ? (SETUP_NOTE_KINDS.includes(menu.help_kind) ? `[FIND LINK] ${venue.name} told us their ${SETUP_SHEET_WORDS[menu.help_kind]}: please find the link` : menu.help_kind ? `[TYPE IT UP] ${venue.name} sent their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind} to type up` : `[MENU HELP] ${venue.name} asked us to type up their ${isPriceList(venue) ? PRICE_LIST_WORDS[menuKind(venue)].en.list : 'menu'}`)
-      : `${kind === 'pending' ? '[PENDING REVIEW]' : '[LIVE]'} ${menuNoun(venue)} from ${venue.name} (${menuDishCountText(items, 'en', menuKind(venue))})`,
+      : `${kind === 'pending' ? '[PENDING REVIEW]' : '[LIVE]'} ${menuNoun(venue)} from ${venue.name} (${venue && venue.type === 'tour' ? menuTripCountText(venue, parseMenuData(menu.data), 'en') : menuDishCountText(items, 'en', menuKind(venue))})`,
     _template: 'table',
     _captcha: 'false',
     'Status': kind === 'help' && menu.help_kind === SETUP_FR_STORY_KIND ? 'Sent from the French easy setup ("Leave it to us"). Nothing is on the site yet: write their French description from their English story, save it on their listing, then press Done in /admin/review.'
@@ -59452,6 +59452,21 @@ function tourTripItems(data) {
   return ((data || {}).sections || []).flatMap((x) => (x && tourExtrasSection(x.name) ? [] : (x && x.items) || []))
     .filter((it) => it && !TOUR_ADDON_LINE_RE.test(String(it.name || '').replace(/^[^\p{L}\p{N}]+/u, '').trim()) && !TOUR_EXTRA_ITEM_RE.test(String(it.price || '')) && !TOUR_EXTRA_ITEM_RE.test(String(it.name || '').replace(/^[^\p{L}\p{N}+$]+/u, '')));
 }
+// Tour test 15 (Whistler, 2026-11-18; Dave: 3 rentals and 3 tours read "6 tours"): a tour's list counted as tours and
+// rentals ("3 tours and 3 rentals" / « 3 sorties et 3 locations »), the same on the page, the admin card and the email.
+// `menu` is a published menu ({ data, items }) or its data. Other places: the dish count as before.
+const TOUR_RENTAL_ITEM_RE = /\b(?:rentals?|hire|locations?)\b/i;
+function menuTripCountText(venue, menu, lang = 'en') {
+  const data = menu && menu.data ? menu.data : menu;
+  const fallback = menu && typeof menu.items === 'number' ? menu.items : menuItemCount(data);
+  if (!venue || venue.type !== 'tour') return menuDishCountText(fallback, lang, menuKind(venue));
+  const trips = tourTripItems(data);
+  if (!trips.length) return menuDishCountText(fallback, lang, menuKind(venue));
+  const rentals = trips.filter((it) => TOUR_RENTAL_ITEM_RE.test(String(it.name || ''))).length, tours = trips.length - rentals;
+  if (!rentals) return menuDishCountText(tours, lang, menuKind(venue));
+  const r = lang === 'fr' ? `${rentals} location${rentals === 1 ? '' : 's'}` : `${rentals} rental${rentals === 1 ? '' : 's'}`;
+  return tours ? `${menuDishCountText(tours, lang, menuKind(venue))}${lang === 'fr' ? ' et ' : ' and '}${r}` : r;
+}
 function menuTripCount(venue, menu) {
   if (!menu) return 0;
   if (!venue || venue.type !== 'tour') return menu.items;
@@ -59473,7 +59488,11 @@ function venueMenuPreviewHtml(venue, menu, lang) {
   const multi = venue.type === 'tour' && secs.filter((x) => (x.items || []).length).length > 1;
   const share = multi ? Math.max(1, Math.floor(5 / secs.filter((x) => (x.items || []).length).length)) : 5;
   const taken = new Map(secs.map((x) => [x, []]));
-  if (multi) { for (const x of secs) for (const it of (x.items || []).slice(0, share)) if ([...taken.values()].reduce((n, l) => n + l.length, 0) < 5) taken.get(x).push(it); }
+  // Tour test 15 (Whistler, 2026-11-18; Dave: three rentals per boat filled his summer share and hid the sunset paddle):
+  // each section's share keeps its first per-person tour (shown in the list's own order).
+  const perPerson = (it) => /\b(?:per|a|par)\s+(?:person|personne|adult|adulte|guest|rider|seat)\b|\bpp\b|\/\s*(?:person|pp)\b/i.test(String(it && it.price || ''));
+  const shareOf = (x) => { const items = x.items || [], first = items.find(perPerson); const head = items.slice(0, share); return first && !head.includes(first) ? head.slice(0, Math.max(0, share - 1)).concat([first]) : head; };
+  if (multi) { for (const x of secs) for (const it of shareOf(x)) if ([...taken.values()].reduce((n, l) => n + l.length, 0) < 5) taken.get(x).push(it); }
   for (const x of secs) for (const it of x.items || []) { if ([...taken.values()].reduce((n, l) => n + l.length, 0) >= 5) break; if (!taken.get(x).includes(it)) taken.get(x).push(it); }
   const unseen = [];
   for (const x of secs) {
@@ -59485,7 +59504,7 @@ function venueMenuPreviewHtml(venue, menu, lang) {
   const w = PRICE_LIST_WORDS[menuKind(venue)];
   // Tour test 5 (Whistler, 2026-11-17): "See all tours & prices (4 tours)" counted "Extra person $75" as a tour. Add-on
   // lines (an extra person, rentals, a licence, add-ons) are not trips.
-  const count = menuDishCountText(menuTripCount(venue, menu), lang, menuKind(venue));
+  const count = menuTripCountText(venue, menu, lang);
   const see = tours ? (fr ? (venue.type === 'tour' ? `Voir toutes les sorties et tarifs (${count})` : `Voir tous les tarifs (${count})`) : `See all ${w.en.list} (${count})`) : (fr ? `Voir tout le menu (${count})` : `See the full menu (${count})`);
   // Golf pages also carry the researched green-fee table, so the course's own list says where it came from.
   const heading = menuKind(venue) === 'golf' ? (fr ? 'Tarifs de golf, selon le terrain' : 'Green fees & rates from the course') : menuNoun(venue, lang);
@@ -59513,7 +59532,7 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
   const kindWords = PRICE_LIST_WORDS[menuKind(venue)];
   const noun = menuNoun(venue, lang);
   // Tour test 6: the full list's count leaves out add-on and private-group lines too, like the short list's.
-  const count = menuDishCountText(menuTripCount(venue, menu), lang, menuKind(venue));
+  const count = menuTripCountText(venue, menu, lang);
   const updatedText = tours ? L('Prices updated', 'Tarifs mis à jour') : L('Menu updated', 'Menu mis à jour');
   const title = tours ? (fr
     ? fitTitle([venue.name, shortTitleName(venue.name, 36)].flatMap((n) => [`${kindWords.fr.noun} ${frDe(n)} — ${regionLabel}, C.-B. | Okanagan Roam`, `${kindWords.fr.noun} ${frDe(n)} — ${regionLabel}`, `Tarifs ${frDe(n)} — ${regionLabel}`, `Tarifs ${frDe(n)}`]))
@@ -63856,7 +63875,7 @@ function renderAdminMenuCard(m) {
     : `<a href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener"><img src="${adminReviewEsc(f.preview)}" alt="Page ${i + 1}" loading="lazy" style="height:120px;border-radius:8px;margin:0 6px 6px 0"></a>`)).join('');
   return `<article class="rv-card" data-kind="menu" data-id="${m.id}">
       <h3>${adminReviewEsc(m.venue_name)}</h3>
-      <p class="rv-meta">${m.help_kind ? ({ happy_hour: 'Happy hour', specials: 'Weekly specials', facebook: 'Facebook', instagram: 'Instagram', menu_social: 'Menu on Facebook / Instagram', [MENU_EMAIL_KIND]: 'Menu by email', [SETUP_FR_STORY_KIND]: 'French description' }[m.help_kind] || m.help_kind) : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
+      <p class="rv-meta">${m.help_kind ? ({ happy_hour: 'Happy hour', specials: 'Weekly specials', facebook: 'Facebook', instagram: 'Instagram', menu_social: 'Menu on Facebook / Instagram', [MENU_EMAIL_KIND]: 'Menu by email', [SETUP_FR_STORY_KIND]: 'French description' }[m.help_kind] || m.help_kind) : v ? menuNoun(v) : 'Menu'} #${m.id} · ${what} · ${v && v.type === 'tour' ? menuTripCountText(v, parseMenuData(m.data), 'en') : menuDishCountText(items, 'en', menuKind(v))} · ${pages.length} page${pages.length === 1 ? '' : 's'} · sent ${adminReviewEsc(adminReviewTime(m.submitted_at || m.created_at))}${m.contact_email ? ` · ${adminReviewEsc(m.contact_email)}` : ''}${v ? ` · <a href="${adminReviewEsc(venueListingUrl(v))}" target="_blank" rel="noopener">listing</a>` : ''}</p>
       ${m.help_note ? `<p class="rv-text"><strong>Their note:</strong> ${adminReviewEsc(m.help_note)}</p>` : ''}
       ${thumbs ? `<div>${thumbs}</div>` : ''}
       ${typedTourFlagsHtml(v, m.data)}
@@ -64652,7 +64671,7 @@ function ownerMenuCardHtml(venue, href, lang = 'en') {
     // French (2026-10-18): a price list uses its own French words (PRICE_LIST_WORDS).
     const list = w ? frDecode(w.fr.listHtml) : 'votre menu';
     const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
-    const sub = pub ? `${cap(list)} ${w ? 'sont' : 'est'} en ligne (${menuDishCountText(menuTripCount(venue, pub), 'fr', menuKind(venue))}). Touchez pour ${w ? 'les' : 'le'} modifier ou ${w ? 'les' : 'le'} remplacer.`
+    const sub = pub ? `${cap(list)} ${w ? 'sont' : 'est'} en ligne (${menuTripCountText(venue, pub, 'fr')}). Touchez pour ${w ? 'les' : 'le'} modifier ou ${w ? 'les' : 'le'} remplacer.`
       : draft && ['pending', 'help'].includes(draft.status) ? `Merci! Nous avons ${list} et ${w ? 'les' : 'le'} mettrons en ligne bientôt.`
         : draft ? `Vous avez commencé à ajouter ${list}. Touchez pour reprendre là où vous étiez.`
           : w ? `Prenez votre liste de prix en photo ou donnez-nous le lien de votre site Web. Nous en faisons ${frDecode(w.fr.blurb)} sur votre page en environ 2 minutes.`
@@ -64661,7 +64680,7 @@ function ownerMenuCardHtml(venue, href, lang = 'en') {
     return `<a class="op-menu-card" href="${escapeHtml(href)}"><span class="op-menu-big">${big}</span><span class="op-menu-sub">${escapeHtml(sub)}</span></a>`;
   }
   const what = w ? w.en.list : 'menu';
-  const sub = pub ? `Your ${what} ${w ? 'are' : 'is'} live (${menuDishCountText(menuTripCount(venue, pub), 'en', menuKind(venue))}). Tap to change or replace ${w ? 'them' : 'it'}.`
+  const sub = pub ? `Your ${what} ${w ? 'are' : 'is'} live (${menuTripCountText(venue, pub, 'en')}). Tap to change or replace ${w ? 'them' : 'it'}.`
     : draft && ['pending', 'help'].includes(draft.status) ? `Thanks! We have your ${what} and will put ${w ? 'them' : 'it'} up soon.`
       : draft ? `You started adding your ${what}. Tap to pick up where you left off.`
         : w ? `Snap a photo of your price list, or share the link from your website. We turn it into ${w.en.blurb} on your page in about 2 minutes.`

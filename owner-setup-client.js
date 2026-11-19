@@ -4059,6 +4059,8 @@
       var bline = CK ? String(S.brew.book || '').trim() : '';
       if (bline && linkIn(bline)) { S.nudge = T.groupsNoLink; return render(); }
       if (!gline && !glinkCh && !bline) { S.nudge = T.groupsNeed; return render(); }
+      // Tour test 15 (Dave: "… Private fondue nights for up to 20"): a line of sentences ends with a period.
+      if (TOUR && gline && /[.!?]\s/.test(gline) && /[A-Za-z0-9\u00c0-\u024f)]$/.test(gline)) { gline += '.'; S.brew.groups = gline; }
       var gl2 = [];
       if (bline && S.notOffered.indexOf('pyv_reservations') >= 0) gl2.push({ not_offered: { remove: ['pyv_reservations'] } });
       if (gline && S.notOffered.indexOf('pyv_groups') >= 0) gl2.push({ not_offered: { remove: ['pyv_groups'] } });

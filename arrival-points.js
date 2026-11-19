@@ -10,7 +10,7 @@ const LIMITS = { near_pin_m: 150, accuracy_m: 40, nudge_m: 50, choose_m: 500, to
 // Tour test 14 (Whistler, 2026-11-18; Lucía): addr_only, the owner tapped "Send it with my address" (her photo had no
 // location and she couldn't pin it); picked, whether she moved the pin herself (sent by the setup; older pages don't).
 const KEYS = new Set(['image', 'lat', 'lng', 'device_lat', 'device_lng', 'accuracy', 'rights', 'company_website', 'addr_only', 'picked']);
-const ADDR_ONLY_REASON = 'The owner couldn’t pin it. Place it from her photo and new address.';
+const ADDR_ONLY_REASON = 'The owner couldn’t pin it. Place it from their photo and new address.';
 const NOT_PICKED_REASON = 'No spot was picked on the map: the spot sent is the listing’s own pin.';
 
 // Metres between two points.
@@ -196,7 +196,7 @@ function createArrivalPoints(deps) {
       <p class="rv-meta">Storefront spot #${a.id}${a.distance_m != null ? ` · ${a.distance_m} m from the map pin` : ''}${a.accuracy_m != null ? ` · phone accurate to about ${Math.round(a.accuracy_m)} m` : ''}</p>
       ${a.review_reasons ? `<p class="rv-meta">Why it’s here: ${esc(a.review_reasons)}</p>` : ''}
       <p><img src="/owner-photos/arrival/${esc(a.preview_key)}.jpg" alt="" loading="lazy" style="max-width:320px;width:100%;border-radius:10px"></p>
-      ${needsPlacing(a) ? `<p class="rv-warn rv-place"><strong>The owner couldn’t pin it. Place it from her photo and new address.</strong> The spot sent is the listing’s old pin, so it isn’t offered as Looks right.</p>
+      ${needsPlacing(a) ? `<p class="rv-warn rv-place"><strong>The owner couldn’t pin it. Place it from their photo and new address.</strong> The spot sent is the listing’s old pin, so it isn’t offered as Looks right.</p>
       <p class="rv-meta rv-newaddr">${a.new_address && a.new_address !== a.venue_address ? `New address (waiting for review): <strong>${esc(a.new_address)}</strong> · <a href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(a.new_address)}" target="_blank" rel="noopener">map it</a> · was ${esc(a.venue_address || 'none')}` : `Address: <strong>${esc(a.venue_address || 'none')}</strong>${a.venue_address ? ` · <a href="https://www.google.com/maps/search/?api=1&amp;query=${encodeURIComponent(a.venue_address)}" target="_blank" rel="noopener">map it</a>` : ''}`}</p>` : ''}
       ${far ? choose : `<p><a class="rv-btn" href="https://www.google.com/maps?q=${a.lat},${a.lng}" target="_blank" rel="noopener">See this spot on a map</a></p>`}
       ${needsPlacing(a) ? String(actions).replace(/<button type="button" class="rv-btn rv-approve" data-act="approve">[^<]*<\/button>/, '') : actions}
