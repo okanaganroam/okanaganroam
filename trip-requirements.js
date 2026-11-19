@@ -143,6 +143,10 @@ const REQUEST_KINDS = {
   // Tour test 14: a bare "instructor", "private lesson" or "kids camp" asks for ski lessons (only when the clause names no
   // other sport to learn: extractTripRequirements).
   ski_lessons: /\b(?:instructors?|private lessons?|semi private lessons?|kids? camps?|day camps?|lessons? for (?:my|our) (?:kids?|son|daughter|children))\b/,
+  // Indoor test 6 (2026-11-19; Priya's paint-your-own pottery studio): "something creative", hands-on, make-your-own and
+  // art-class words, and kids' camps ask for a class or workshop place (a listing still needs pottery/class words of its
+  // own, or the owner's Classes & workshops kind). "summer camp" was read as Camping.
+  pottery: /\b(?:something creative|get creative|creative|crafty|arts and crafts|hands on|make something|make (?:our|your|my) own|diy|paint your own(?: pottery)?|pottery painting|paint and sip|paint nights?|painting class(?:es)?|art class(?:es)?|art camps?|summer camps?|day camps?|kids? camps?|spring break camps?|pd day camps?|poterie|ateliers? creatifs?|quelque chose de creatif|bricolage|camps? de jour|camps? d ete)\b/,
   scenic_flight: /\b(?:float ?planes?|seaplanes?|scenic (?:(?:helicopter|heli|plane|air) (?:flights?|tours?)|flights?)|scenic (?:or|and) helicopter flights?|helicopter (?:tours?|flights?|rides?|sightseeing|trips?)|heli (?:tours?|flights?|rides?)|helicopters?|flightseeing|glacier landings?)\b/,
 };
 const HELI_SKI_LISTING_RE=/\b(?:heli ?ski(?:ing|s)?|heliski\w*|heli ?board\w*|cat ?ski(?:ing|s)?|catski\w*|snowcat skiing)\b/;

@@ -1135,7 +1135,18 @@
   // Café test 4 (2026-11-11): days the owner marked Closed on this screen. "Every open day" never fills them, even on a
   // new page with no hours yet (where it fills every other day).
   function tapClosed(d, on){ S.closedTap = S.closedTap || {}; if (on) S.closedTap[S.step + d] = true; else delete S.closedTap[S.step + d]; }
-  function copyGets(d, x){ var w = W(); return x !== d && (!!w[x] || (othersClosed(d) && !(S.closedTap || {})[S.step + x])); }
+  // Indoor test 6 (2026-11-19; Priya, closed Mondays, new page with no hours): "Mon–Fri" from Tuesday opened her Monday,
+  // whose card she had open, showing Closed. A closed day whose card is open (she sees it Closed) counts as marked Closed.
+  var TUE_SAT = ['tue', 'wed', 'thu', 'fri', 'sat'];
+  // Indoor test 6: a researched Good to know line that says the opposite of the owner's own Booking or Who can come answer.
+  var CLASH_BOOK_RE = /\bby appointment\b|\bappointment only\b|\bno drop[- ]?ins?\b|\bno drop[- ]?in\b|\bno walk[- ]?ins?\b|\bbooking (?:is )?required\b|\bmust (?:be )?book|\breservations? (?:are |is )?required\b|\bsur rendez-vous\b|\bsur réservation seulement\b/i;
+  var CLASH_AGE_RE = /\badults?[- ]only\b|\b(?:19|18)\s*\+|\b(?:19|18) (?:and|&) (?:over|older|up)\b|\bno (?:kids|children|minors)\b|\badultes seulement\b|\b(?:19|18) ans et plus\b/i;
+  function bringClash(line){
+    if (!INDOOR || !line) return false;
+    var book = S.tour.book || TI.book || '', age = S.tour.age || TI.age || '';
+    return ((book === 'no' || book === 'busy') && CLASH_BOOK_RE.test(line)) || ((age === 'all' || age === '5') && CLASH_AGE_RE.test(line));
+  }
+  function copyGets(d, x){ var w = W(); return x !== d && (!!w[x] || (othersClosed(d) && !(S.closedTap || {})[S.step + x] && !HO()[x])); }
   function nthMonday(y, mo, nth){ var d = new Date(y, mo, 1); var n = 0; while (true) { if (d.getDay() === 1 && ++n === nth) return d; d.setDate(d.getDate() + 1); } }
   // Pub test 5 (2026-11-10): every BC stat holiday, not only Dec 24 to Easter Monday (Thanksgiving couldn't be entered).
   // Each one's next date from today, in date order; "This year and next" saves next year's own date (fn(year + 1): the
@@ -1632,6 +1643,9 @@
   // Indoor test 4: the quiet kinds come from indoor-kinds.js (kindText quiet): museums, galleries, libraries, classes.
   function indoorQuietKinds(){ if (!C.indoor) return false; var st = typeof S !== 'undefined' && S.tour, ks = (st && st.kinds && st.kinds.length ? st.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || []; return ks.length > 0 && ks.every(function(k){ return !!((T0.kindGroups || {})[k] || [])[2]; }); }
   function indoorDayKinds(){ if (!C.indoor) return false; var st = typeof S !== 'undefined' && S.tour, ks = (st && st.kinds && st.kinds.length ? st.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || []; return ks.length > 0 && ks.every(function(k){ return !!((T0.kindGroups || {})[k] || [])[3]; }); }
+  // Indoor test 6 (2026-11-19; Priya): a classes place's hours screens say, in one line, that evening classes go in Good to
+  // know (she stretched her open hours to 9 PM for them).
+  function classNightsHint(){ return C.indoor && T.classNightsHint ? '<p class="su-hint" id="suClassNightsHint">' + h(T.classNightsHint) + '</p>' : ''; }
   function lateBtns(d, j, y){
     // Café test 1 (Whistler, 2026-11-15): no "Open after midnight?" row on a café's day card.
     if (C.cafe) return '';
@@ -2170,7 +2184,7 @@
       // Winery test 4 (2026-11-12): a winery says "We don't have set hours. Visits are by appointment" here (and on the
       // day list); once it has, the screen says so and "Yes, that's right" keeps it.
       var anyOpen = S.week && DAYS.some(function(d){ return S.week[d]; }), noneNow = APPT && AI.visit === 'appointment' && !anyOpen && !!CUR.hours;
-      x = doneLine('hours') + q(T.hoursQ) + msgs() + (anyOpen ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit')
+      x = doneLine('hours') + q(T.hoursQ) + (anyOpen ? classNightsHint() : '') + msgs() + (anyOpen ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit')
         // Distillery test 2 (Whistler, 2026-11-16): a stretch of other hours is changed from here in one tap (« Modifier mes
         // heures du 15 juin au 7 sept. »); it took four screens (the week, Next, the year question, then this button).
         + storedSeas().map(function(st){ return big('✎', fill(T.seaChange, st), '', true, 'yearSeasonEdit:' + st.i); }).join('') + noSetBtn() + '</div>'
@@ -2251,7 +2265,7 @@
           + (seaOtherAB && T.seaCopy ? '<div class="su-samerow" style="margin:0 0 10px"><button type="button" class="su-toggle" id="suSeaCopy" data-act="seaCopy">' + h(fill(T.seaCopy, seaOtherAB)) + '</button></div>' : '')
           // Café test 4 (2026-11-11): "Open after midnight?" is said once, beside each day's Midnight / 1 AM / 2 AM buttons
           // (it was also a paragraph at the top).
-          : q(T.hoursEditQ, T.hoursEditLead)) + (TOUR && T.departHint ? '<p class="su-hint" id="suDepartHint">' + h(T.departHint) + '</p>' : '') + (!seas && S.weekBack && T.hoursBack ? '<p class="su-sent" id="suHoursBack">' + h(T.hoursBack) + '</p>' : '') + msgs() + '<div class="su-hdays">' + DAYS.map(function(d, i){
+          : q(T.hoursEditQ, T.hoursEditLead)) + (TOUR && T.departHint ? '<p class="su-hint" id="suDepartHint">' + h(T.departHint) + '</p>' : '') + (!seas ? classNightsHint() : '') + (!seas && S.weekBack && T.hoursBack ? '<p class="su-sent" id="suHoursBack">' + h(T.hoursBack) + '</p>' : '') + msgs() + '<div class="su-hdays">' + DAYS.map(function(d, i){
         var w = wk[d], prev = i > 0 ? wk[DAYS[i - 1]] : null, mon = i > 1 ? wk.mon : null;
         var sameH = function(a, b){ return JSON.stringify(a || null) === JSON.stringify(b || null); }, sameP = !!prev && !sameH(w, prev), sameM = !!mon && !sameH(w, mon) && !(prev && sameH(prev, mon));
         if (!hop[d]) return '<div class="su-day su-hrow" id="suRow' + d + '"><div class="su-hsum"><b>' + h(dayName(d)) + '</b><span>' + (w ? h(w.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ')) : h(T.closed)) + '</span>'
@@ -2289,6 +2303,8 @@
             // Brewery test 2 (Whistler, 2026-11-16): from Friday, "Saturday" alone too (Fri and Sat close late, Sunday
             // doesn't: Sat–Sun made Sunday close at midnight as well).
             + (d === 'fri' && T.copySat && copyGets('fri', 'sat') ? '<button type="button" class="su-toggle" data-copysat="fri">' + h(T.copySat) + '</button>' : '')
+            // Indoor test 6 (Priya): closed Mondays, open Tuesday to Saturday: "Tue–Sat" beside Mon–Fri, only when Monday is closed.
+            + (T.copyTueSat && !W().mon && TUE_SAT.indexOf(d) >= 0 ? '<button type="button" class="su-toggle" data-copytuesat="' + d + '">' + h(T.copyTueSat) + '</button>' : '')
             + '<button type="button" class="su-toggle" data-copywe="' + d + '">' + h(T.copyWeekend) + '</button>' + hDone(d) + '</div>'
             // Said once, under the first open card (café test 5: it repeated under every open day).
             + (!seas && d === firstOpenCard && DAYS.some(function(x){ return x !== d && !copyGets(d, x); }) ? '<p class="su-hint su-copynote">' + h(T.copyClosedNote) + '</p>' : '') : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
@@ -2516,10 +2532,15 @@
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'bookingSave') + '</div>' + skip('booking');
     } else if (s === 'bring') {
       // Tours (2026-11-16): what to bring or wear and the weather calls, in the "Good to know" line (no new field).
-      var bv = S.tour.bring != null ? S.tour.bring : ((CUR.visit_rows || {}).good_to_know || '');
+      // Indoor test 6 (2026-11-19; Priya said Walk-ins welcome and All ages; research's line said "Studio is by appointment
+      // only"): a researched line that contradicts her own answers is shown as found online, flagged, and never put in her box
+      // as hers. Skipping leaves it as it is (never silently dropped); her own line replaces it.
+      var gRes = (C.visitResearch || []).indexOf('good_to_know') >= 0 ? ((CUR.visit_rows || {}).good_to_know || '') : '', gClash = bringClash(gRes);
+      var bv = S.tour.bring != null ? S.tour.bring : gClash ? '' : ((CUR.visit_rows || {}).good_to_know || '');
       // Tour test 1 (Whistler, 2026-11-16): research's line, untouched, says it came from online (a tap on an answer replaces it) (tour test 16: a tap adds to it).
       var bRes = !!bv && bv === ((CUR.visit_rows || {}).good_to_know || '') && (C.visitResearch || []).indexOf('good_to_know') >= 0;
-      x = doneLine('bring') + q(T.bringQ, T.bringLead) + (bRes && T.bringGuess ? '<p class="su-sent su-research" id="suBringGuess">' + h(T.bringGuess) + '</p>' : '') + msgs() + enLineHint(bv === ((CUR.visit_rows || {}).good_to_know || '') ? bv : '', 'suBringEn', false, 'good_to_know') + quick('good_to_know', 'suBring', bv)
+      x = doneLine('bring') + q(T.bringQ, T.bringLead) + (bRes && T.bringGuess ? '<p class="su-sent su-research" id="suBringGuess">' + h(T.bringGuess) + '</p>' : '')
+        + (gClash && T.bringClash ? '<p class="su-sent su-research su-clash" id="suBringClash">' + h(T.bringClash) + '</p><p class="su-example" id="suBringFound">“' + h(gRes) + '”</p>' : '') + msgs() + enLineHint(bv === ((CUR.visit_rows || {}).good_to_know || '') ? bv : '', 'suBringEn', false, 'good_to_know') + quick('good_to_know', 'suBring', bv)
         + '<label class="su-sr" for="suBring">' + h(T.bringQ) + '</label><textarea class="su-field su-line" id="suBring" maxlength="' + (BRING_MAX + 600) + '" rows="4" aria-describedby="suBringCount">' + h(bv) + '</textarea>' + countLine('suBring', bv, BRING_MAX) + ex(indoorBringEx())
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'bringSave') + '</div>' + skip('bring');
     } else if (s === 'winery') {
@@ -4380,7 +4401,9 @@
       var il = Object.keys(ii0).length ? [tinfo(ii0)] : [];
       // A gallery, museum or live theatre is Arts & Culture (the badge goes on with the kind; never taken off here).
       var artsNow = ik0.some(function(kk){ return (C.artsKinds || []).indexOf(kk) >= 0; }), artsAdd = artsNow && !S.savedBadges.arts_culture && !(CUR.badges || {}).arts_culture;
-      if (artsAdd && il.length) il.push({ badges: { arts_culture: true } });
+      // Indoor test 6 (2026-11-19; Priya: classes -> gallery -> classes left the badge on): the badge goes in the same request
+      // as the kind, so the server knows the kind put it on (arts_auto) and takes it off with the kind.
+      if (artsAdd && il.length) il[0].badges = { arts_culture: true };
       // Indoor test 5: the server takes the kind's own badge off when no arts kind is left (C.artsAuto); the screens follow.
       var artsOff = !artsNow && C.artsAuto && il.length;
       return saveAll('indoor', il, null, null, function(){ Object.keys(ii0).forEach(function(kk){ TI[kk] = ii0[kk]; }); S.tour.lengthGuessed = false; S.tour.kindsGuessed = false;
@@ -4697,6 +4720,11 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-copyevery]'), function(b){ b.onclick = function(){
       readTimes(); var wk = W(), d = b.getAttribute('data-copyevery'), src = wk[d]; if (!src) return;
       DAYS.forEach(function(x){ if (x !== d) wk[x] = clone(src); }); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-copytuesat]'), function(b){ b.onclick = function(){
+      readTimes(); var wk = W(), d = b.getAttribute('data-copytuesat'), src = wk[d]; if (!src || wk.mon) return;
+      // Tuesday to Saturday, open days or (a new page) every one of them that isn't marked Closed; Monday and Sunday as they are.
+      var gets = TUE_SAT.filter(function(x){ return x !== d && (wk[x] || copyGets(d, x)); });
+      gets.forEach(function(x){ wk[x] = clone(src); }); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-copysat]'), function(b){ b.onclick = function(){
       readTimes(); var wk = W(), src = wk.fri; if (!src || !copyGets('fri', 'sat')) return;
       wk.sat = clone(src); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });

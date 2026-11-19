@@ -370,6 +370,7 @@ const FR_TEXT = {
   'outdoor destinations': 'sites de plein air', 'outdoor destination': 'site de plein air',
   'indoor & rainy day spots': 'lieux pour les jours de pluie', 'indoor & rainy day spot': 'lieu pour les jours de pluie',
   'art galleries': 'galeries d’art', 'art gallery': 'galerie d’art', 'museums & galleries': 'musées et galeries', 'museum or gallery': 'musée ou galerie',
+  'classes & workshops': 'cours et ateliers', 'class or workshop': 'cours ou atelier', 'kids’ camps': 'camps pour enfants', 'kids’ camp': 'camp pour enfants',
   'indoor attractions': 'attraits intérieurs', 'indoor attraction': 'attrait intérieur',
   'tours & experiences': 'visites et expériences', 'tour & experience': 'visite ou expérience',
   'sports & recreation spots': 'lieux de sports et loisirs', 'sports & recreation spot': 'lieu de sports et loisirs',

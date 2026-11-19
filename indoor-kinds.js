@@ -12,9 +12,11 @@
 //   quiet      a quiet daytime kind: no "Open after midnight?" row or second time on its day cards (indoor test 1)
 //   day        a daytime kind (indoor test 5: play centres, climbing and trampolines, pools, spas; every quiet kind too): no
 //              "Open after midnight?" row (theatres, bowling, arcades, casinos and cinemas keep it)
-//   gtk        which Good to know chips and example it gets (owner-setup-text.js good_to_know_kinds: arts, active, spa, general)
+//   gtk        which Good to know chips and example it gets (owner-setup-text.js good_to_know_kinds: arts, active, spa, shows,
+//              pool, classes, general; indoor test 6: no lockers for a cinema, messy clothes and firing time for a studio)
 //   ex         which story and Known for example it gets (storyExKinds / knownExKinds: theatre, museum, escape, spa,
-//              climbing, general), so a bowling alley never sees an escape room's example or a pool a climbing gym's
+//              climbing, classes, general), so a bowling alley never sees an escape room's example or a pool a climbing gym's
+//   typeSub    (indoor test 6) the setup's "Type them in myself" line, in the kind's words ("Each class and its price")
 //   en / fr:
 //     price    page   the page's Prices line ({x} is the price: "From $65.", "Tickets from $25.")
 //              basis  the card's small line under "From $65" ("Treatments and passes")
@@ -52,7 +54,7 @@ K.museum = { quiet: true, gtk: 'arts', ex: 'museum', arts: true,
     groups: { chips: ['Groupes scolaires bienvenus', 'Visites guidées de groupe sur demande', 'Événements privés et location'], lead: 'Touchez une taille, puis ajoutez les groupes scolaires, les visites guidées ou les événements privés dans vos mots.', ex: 'Groupes scolaires et visites guidées sur rendez-vous' },
     search: ['musée', 'musées', 'histoire', 'patrimoine', 'site patrimonial', 'centre des sciences'] } };
 
-K.theatre = { gtk: 'general', ex: 'theatre', boxOffice: true,
+K.theatre = { gtk: 'shows', ex: 'theatre', boxOffice: true,
   en: { price: { page: 'Tickets from {x}.', basis: 'Tickets', label: 'Lowest regular adult ticket, in dollars', ph: 'Varies by show? Your lowest regular ticket.', lead: 'Your lowest regular adult ticket. It shows on your card.' },
     prices: { noun: 'tickets page', page: PRICES_PAGE[0], lead: 'Your ticket prices, season passes and group rates. A link to your tickets page is perfect. It’s optional.' },
     help: { walkin: 'Tickets at the door; buy ahead for busy shows', ages: 'All ages; some comedy nights 19+', gift: 'Gift certificates at the box office', prices: 'Season pass $180, groups of 10 or more save 10%' },
@@ -64,7 +66,7 @@ K.theatre = { gtk: 'general', ex: 'theatre', boxOffice: true,
     groups: { chips: ['Tarifs de groupe pour 10 personnes ou plus', 'Location de la salle pour événements privés', 'Matinées scolaires sur demande'], lead: 'Touchez une taille, puis ajoutez les tarifs de groupe, la location de la salle ou les spectacles scolaires dans vos mots.', ex: 'Tarifs de groupe pour 10 personnes ou plus. La salle se loue pour des événements privés' },
     search: ['théâtre', 'pièce de théâtre', 'pièces', 'spectacle', 'spectacles', 'concert', 'concerts', 'humour', 'comédie musicale'] } };
 
-K.cinema = { gtk: 'general', ex: 'general',
+K.cinema = { gtk: 'shows', ex: 'general',
   en: { price: { page: 'Tickets from {x}.', basis: 'Tickets', label: 'Regular adult ticket, in dollars', ph: 'Your regular adult ticket', lead: 'Your regular adult ticket. It shows on your card.' },
     prices: { noun: 'tickets page', page: PRICES_PAGE[0], lead: 'Your ticket prices for adults, kids and seniors, and cheap nights. A link to your tickets page is perfect. It’s optional.' },
     help: { walkin: 'Tickets at the door or online', ages: 'All ages; check each film’s rating', gift: 'Gift cards at the box office', prices: 'Kids and seniors $10, Tuesdays $8' },
@@ -88,7 +90,7 @@ K.spa = { day: true, gtk: 'spa', ex: 'spa',
     groups: { chips: ['Forfaits pour couples', 'Fêtes de mariage et fêtes privées', 'Réservation privée du spa sur demande'], lead: 'Touchez une taille, puis ajoutez les forfaits pour couples, les fêtes de mariage ou les réservations privées dans vos mots.', ex: 'Forfaits pour couples. Fêtes de mariage jusqu’à 8 personnes' },
     search: ['spa', 'spas', 'spa de jour', 'massage', 'massages', 'massage en couple', 'soin du visage', 'soins du visage', 'hydrothérapie', 'sauna', 'spa nordique', 'bien-être'] } };
 
-K.pool = { day: true, gtk: 'general', ex: 'general',
+K.pool = { day: true, gtk: 'pool', ex: 'general',
   en: { price: { page: 'Drop-in from {x}.', basis: 'Drop-in', label: 'Adult drop-in, in dollars', ph: 'Your adult drop-in price', lead: 'Your adult drop-in price. It shows on your card.' },
     prices: { noun: 'rates page', page: PRICES_PAGE[0], lead: 'Drop-in, passes and lessons for adults, kids and families, with their prices. A photo of your rates or a link to your rates page is perfect. It’s optional.' },
     help: { walkin: 'Drop in during public swims; lessons need booking', ages: 'All ages; under 8 with an adult in the water', gift: 'Gift cards and passes at the front desk', prices: 'Kids $4, 10-visit pass $60' },
@@ -153,24 +155,28 @@ K.kids = { day: true, gtk: 'active', ex: 'general',
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Kids’ and toddlers’ prices, passes and party packages, with their prices. A photo of your price list or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; parties booked ahead', ages: 'Kids 0 to 12 with an adult', gift: 'Gift cards and 10-visit passes at the front desk', prices: 'Toddlers $9, adults free' },
     groups: { chips: ['Birthday parties with a party room', 'School and daycare groups', 'Private bookings on request'], lead: 'Tap a size, then add birthday parties, school or daycare groups or private bookings in your own words.', ex: 'Birthday parties with a party room for up to 20 kids. Daycare groups welcome' },
-    search: ['indoor playground', 'indoor play', 'play centre', 'play center', 'toddler play', 'soft play', 'kids play', 'play area'] },
+    search: ['indoor playground', 'indoor play', 'play centre', 'play center', 'toddler play', 'soft play', 'kids play', 'play area', 'summer camp', 'summer camps', 'day camp', 'day camps', 'kids camp', 'kids camps', 'kid camp'] },
   fr: { price: { page: 'Enfants à partir de {x}.', basis: 'Par enfant', label: 'Prix pour un enfant, en dollars', ph: 'Votre prix régulier pour un enfant', lead: 'Le prix pour un enfant. Il paraît sur votre fiche.' },
     prices: { noun: 'liste de prix', page: PRICES_PAGE[1], lead: 'Les prix pour enfants et tout-petits, les laissez-passer et les forfaits de fête, avec leurs prix. Une photo de votre liste de prix ou un lien vers celle-ci, c’est parfait. C’est facultatif.' },
     help: { walkin: 'Sans réservation; les fêtes se réservent', ages: 'Enfants de 0 à 12 ans avec un adulte', gift: 'Cartes-cadeaux et cartes de 10 entrées à l’accueil', prices: 'Tout-petits 9 $, adultes gratuit' },
     groups: { chips: ['Fêtes d’anniversaire avec salle de fête', 'Groupes scolaires et de garderie', 'Réservations privées sur demande'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes scolaires ou de garderie ou les réservations privées dans vos mots.', ex: 'Fêtes d’anniversaire avec salle de fête jusqu’à 20 enfants. Groupes de garderie bienvenus' },
-    search: ['aire de jeux intérieure', 'jeux intérieurs', 'centre de jeux', 'jeux pour tout-petits', 'aire de jeux'] } };
+    search: ['aire de jeux intérieure', 'jeux intérieurs', 'centre de jeux', 'jeux pour tout-petits', 'aire de jeux', 'camp de jour', 'camps de jour', 'camp pour enfants'] } };
 
-K.classes = { quiet: true, gtk: 'general', ex: 'general', boxOffice: true,
+K.classes = { quiet: true, gtk: 'classes', ex: 'classes', boxOffice: true,
   en: { price: { page: 'Classes from {x}.', basis: 'Classes', label: 'Your lowest class or workshop price, in dollars', ph: 'Like a drop-in class or your shortest workshop', lead: 'Your lowest price for one class or workshop. It shows on your card.' },
     prices: { noun: 'class schedule', page: PRICES_PAGE[0], lead: 'Each class and workshop and what it costs. A photo of your class schedule or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Please book ahead; drop-in on open studio nights', ages: 'Adults; kids’ classes for ages 6 and up on Saturdays', gift: 'Gift cards for any class, online or at the studio', prices: 'Wheel class $65, kids’ class $35' },
     groups: { chips: ['Private parties and workshops', 'Team building workshops', 'Kids’ birthday classes'], lead: 'Tap a size, then add private parties, team building or kids’ birthday classes in your own words.', ex: 'Private workshops for up to 12. Team building classes' },
-    search: ['workshop', 'workshops', 'pottery', 'pottery class', 'painting class', 'paint night', 'cooking class', 'art class', 'ceramics'] },
+    // Indoor test 6 (2026-11-19; Priya's paint-your-own pottery studio: "something creative to do" listed a winery and a
+    // chicken place, "summer camp" read as Camping): creative, hands-on and make-your-own words, and kids' camps.
+    search: ['workshop', 'workshops', 'pottery', 'pottery class', 'pottery classes', 'painting class', 'painting classes', 'paint night', 'cooking class', 'art class', 'art classes', 'ceramics',
+      'creative', 'something creative', 'get creative', 'crafty', 'arts and crafts', 'hands on', 'make something', 'make our own', 'make your own', 'diy', 'paint your own', 'paint your own pottery', 'pottery painting', 'paint and sip',
+      'summer camp', 'summer camps', 'day camp', 'day camps', 'kids camp', 'kids camps', 'kid camp', 'art camp', 'art camps', 'spring break camp', 'pd day camp'] },
   fr: { price: { page: 'Cours à partir de {x}.', basis: 'Cours', label: 'Votre prix le plus bas pour un cours ou un atelier, en dollars', ph: 'Comme un cours à la séance ou votre atelier le plus court', lead: 'Votre prix le plus bas pour un cours ou un atelier. Il paraît sur votre fiche.' },
     prices: { noun: 'horaire des cours', page: PRICES_PAGE[1], lead: 'Chaque cours et atelier et son prix. Une photo de votre horaire des cours ou un lien vers celui-ci, c’est parfait. C’est facultatif.' },
     help: { walkin: 'Réservez à l’avance; sans réservation les soirs d’atelier libre', ages: 'Adultes; cours pour enfants de 6 ans et plus le samedi', gift: 'Cartes-cadeaux pour tous les cours, en ligne ou à l’atelier', prices: 'Cours de tour 65 $, cours pour enfants 35 $' },
     groups: { chips: ['Fêtes et ateliers privés', 'Ateliers de consolidation d’équipe', 'Cours d’anniversaire pour enfants'], lead: 'Touchez une taille, puis ajoutez les fêtes privées, la consolidation d’équipe ou les cours d’anniversaire dans vos mots.', ex: 'Ateliers privés jusqu’à 12 personnes. Cours de consolidation d’équipe' },
-    search: ['atelier', 'ateliers', 'poterie', 'cours de poterie', 'cours de peinture', 'cours de cuisine', 'céramique'] } };
+    search: ['atelier', 'ateliers', 'poterie', 'cours de poterie', 'cours de peinture', 'cours de cuisine', 'céramique', 'créatif', 'créative', 'quelque chose de créatif', 'bricolage', 'peinture sur poterie', 'camp de jour', 'camps de jour', 'camp d’été', 'camps d’été', 'camp pour enfants'] } };
 
 K.curling = { gtk: 'general', ex: 'general',
   en: { price: { page: 'From {x} per person.', basis: 'Per person', label: 'Price for one person (like learn to curl), in dollars', ph: 'Like a learn-to-curl session', lead: 'The price for one person, like a learn-to-curl session. It shows on your card.' },
@@ -253,6 +259,18 @@ const TYPER = {
   other: ['Adult admission', 'Prices', 'Entrée adulte', 'Tarifs'],
 };
 for (const [k, t] of Object.entries(TYPER)) if (K[k]) { K[k].en.prices.typer = { item: t[0], section: t[1] }; K[k].fr.prices.typer = { item: t[2], section: t[3] }; }
+// Indoor test 6 (2026-11-19; Priya's pottery studio was offered "Each ticket or pass and its price"): the "Type them in
+// myself" line by kind: [en, fr], each followed by ", one line at a time".
+const TYPE_SUB = {
+  gallery: ['Each admission or tour', 'Chaque entrée ou visite'], museum: ['Each admission or pass', 'Chaque entrée ou laissez-passer'],
+  theatre: ['Each ticket', 'Chaque billet'], cinema: ['Each ticket', 'Chaque billet'], spa: ['Each treatment or pass', 'Chaque soin ou forfait'],
+  pool: ['Each drop-in, pass or lesson', 'Chaque entrée, laissez-passer ou cours'], climbing: ['Each pass', 'Chaque laissez-passer'],
+  games: ['Each game or pass', 'Chaque partie ou forfait'], escape: ['Each room', 'Chaque salle'], bowling: ['Each game or lane', 'Chaque partie ou allée'],
+  kids: ['Each play pass or party', 'Chaque laissez-passer ou fête'], classes: ['Each class', 'Chaque cours'], curling: ['Each session or rental', 'Chaque séance ou location'],
+  yoga: ['Each class or pass', 'Chaque cours ou carte'], casino: ['Each show or entry', 'Chaque spectacle ou entrée'], library: ['Each program', 'Chaque programme'],
+  other: ['Each ticket or pass', 'Chaque billet ou laissez-passer'],
+};
+for (const [k, t] of Object.entries(TYPE_SUB)) if (K[k]) { K[k].en.prices.typeSub = `${t[0]} and its price, one line at a time`; K[k].fr.prices.typeSub = `${t[1]} et son prix, une ligne à la fois`; }
 const INDOOR_KIND_TEXT = K;
 const INDOOR_KIND_TEXT_KINDS = Object.keys(K);
 // The kind a place reads in: its main kind (the first the owner picked), else 'other'.

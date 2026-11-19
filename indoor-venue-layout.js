@@ -125,7 +125,9 @@ const JUMP_SCRIPT = `<script>
 
 function indoorIntro(description) {
   const text = String(description || '').replace(/\s+/g, ' ').trim();
-  if (text.length <= 320) return { intro: text, rest: false };
+  // Indoor test 6 (2026-11-19; Priya's four-sentence story, 338 letters, lost its last line "Kids’ summer camps and private
+  // parties too."): a story of up to 400 letters (a few sentences, what the setup asks for) shows whole.
+  if (text.length <= 400) return { intro: text, rest: false };
   const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z0-9"“])/);
   let intro = sentences[0];
   for (let i = 1; i < sentences.length && (intro + ' ' + sentences[i]).length <= 300; i++) intro += ' ' + sentences[i];

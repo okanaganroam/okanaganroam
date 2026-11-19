@@ -4605,9 +4605,17 @@ function discoveryGroupsLines() {
 // that kind (the owner's own kind, or their own words saying it), the ones whose words say what was asked first ("couples
 // massage": a spa whose Known for says massage and whose Groups line offers couples' packages). Nothing of that kind: as before.
 function indoorKindNarrow(text, intent, found) {
-  if (!found || !Array.isArray(found.items) || !(intent && (intent.types || []).includes('indoor'))) return found;
+  if (!found || !Array.isArray(found.items)) return found;
   const kinds = indoorKindsModule.indoorKindsNamedIn(text);
   if (!kinds.length) return found;
+  // Indoor test 6 (2026-11-19; Priya: "pottery" listed two cafés that mention it above her pottery studio): a kind word
+  // that doesn't make the search "indoor places only" (pottery, climbing, swim) still puts the places of that kind (the
+  // owner's own kind first, then indoor places whose own words say it) ahead of the rest, which stay.
+  if (!(intent && (intent.types || []).includes('indoor'))) {
+    const rank = (v) => (v.type === 'indoor' && (venueIndoorInfo(v.id).kinds || []).some((k) => kinds.includes(k)) ? 2 : v.type === 'indoor' ? 1 : 0);
+    const items = found.items.map((x, i) => [x, i, rank(x.venue)]).sort((a, b) => b[2] - a[2] || a[1] - b[1]).map((x) => x[0]);
+    return { ...found, items };
+  }
   const norm = discoveryIntentModule().normalizeDiscoveryText, q = ` ${norm(String(text || ''))} `;
   const words = [...new Set(kinds.flatMap((k) => indoorKindsModule.INDOOR_KIND_TEXT[k].en.search.concat(indoorKindsModule.INDOOR_KIND_TEXT[k].fr.search)).map((w) => norm(w)).filter(Boolean))];
   const asked = [...new Set(words.concat(words.flatMap((w) => w.split(' ')).filter((w) => w.length >= 5)))].filter((w) => q.includes(` ${w} `));
@@ -7012,6 +7020,24 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       if (row) knownForById.set(r.venue_id, String(row.text).slice(0, 200));
     }
   } catch (e) { /* none */ }
+  // Indoor test 6 (2026-11-19; Priya's Friday date night on the wheel, $95 for two, was in no date-night plan): an indoor
+  // place's own date-night line (Known for, Groups, Good to know) or price item ("Date night wheel class, Fridays 7 PM",
+  // "95 for two"), so a date night can offer it as another good option. Owner-published price lists only.
+  const dateNightById = new Map();
+  try {
+    const DN = /\bdate[- ]nights?\b|\bsoir[ée]es? en amoureux\b/i;
+    for (const r of db.prepare("SELECT v.id AS venue_id, i.info FROM venue_visit_info i JOIN venues v ON v.id = i.venue_id WHERE v.type = 'indoor' AND (i.info LIKE '%ate night%' OR i.info LIKE '%amoureux%')").all()) {
+      let o = null; try { o = JSON.parse(r.info); } catch (e) { o = null; }
+      const line = o ? visitLinesText(o, ['Known for', 'Groups', 'Good to know']).split(' ; ').find((x) => DN.test(x)) : null;
+      if (line) dateNightById.set(r.venue_id, String(line).slice(0, 140));
+    }
+    for (const r of db.prepare("SELECT m.venue_id, m.data FROM venue_menus m JOIN venues v ON v.id = m.venue_id WHERE v.type = 'indoor' AND m.status = 'published' AND m.source = 'owner' AND (m.data LIKE '%ate night%' OR m.data LIKE '%amoureux%') ORDER BY m.id DESC").all()) {
+      if (dateNightById.has(r.venue_id)) continue;
+      let o = null; try { o = JSON.parse(r.data); } catch (e) { o = null; }
+      const it = o && Array.isArray(o.sections) ? o.sections.flatMap((x) => (x && Array.isArray(x.items) ? x.items : [])).find((x) => x && DN.test(String(x.name || ''))) : null;
+      if (it) dateNightById.set(r.venue_id, `${String(it.name).slice(0, 100)}${it.price ? ` (${/^\d/.test(String(it.price)) ? '$' : ''}${String(it.price).slice(0, 30)})` : ''}`);
+    }
+  } catch (e) { /* none */ }
   // Indoor test 2 (2026-11-19; Jordan): each place's Groups and Good to know lines ("Corporate team building and birthday
   // parties"), so team building and birthday party requests put the places that offer them first.
   const groupsById = new Map();
@@ -7068,6 +7094,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       textName: normalize(v.name || ''), textCuisine: normalize(venueCuisineList(v).join(' ') || v.cuisine || ''), textDesc: normalize(`${v.description || ''}${knownForById.has(v.id) ? ` ${knownForById.get(v.id)}` : ''}${v.type === 'shop' ? ' shop shops shopping store stores' : ''}${v.type === 'cafe' ? cafePlannerWords(v) : ''}`),
       ...(v.type === 'shop' ? { isShop: true } : {}),
       ...(groupsById.has(v.id) ? { groupsText: groupsById.get(v.id) } : {}),
+      ...(dateNightById.has(v.id) ? { dateNightLine: dateNightById.get(v.id) } : {}),
       // Indoor test 2: an indoor place open past 11 PM (on the trip's day, when there is one) is a late-night stop.
       ...(v.type === 'indoor' && !features.open_late && indoorLateClose(weekJsonOn(v, hoursDate), parseLocalDate(onDate) ? onDate : null) != null ? (features.open_late = true, { lateClose: lateCloseText(indoorLateClose(weekJsonOn(v, hoursDate), parseLocalDate(onDate) ? onDate : null)) }) : {}),
       features, collections: m.collections, activities: [...new Set([...(preparePlannerKinds ? [...m.activities, ...requirementModule.inferPlannerActivities(v)] : m.activities), ...(preparePlannerKinds && requirementModule.inferPlannerKinds(v).includes('skating') ? ['winter'] : []), ...(v.type === 'sport' && /\b(?:bike|pump track|dirt jumps|bmx)\b/i.test(v.cuisine || '') ? ['cycling'] : []), ...(v.type === 'tour' && /\b(?:adventure|adventures|aventure|tree ?top|ropes? course\w*|zip ?lin\w*|bungee|bungy|raft\w*|atv|rzr|via ferrata|snowmobil\w*|heli\w*|flight\w*|floatplane|kayak\w*|canoe\w*|climb\w*|canyoning|paraglid\w*|jet ?boat)/i.test(v.cuisine || '') ? ['adventure'] : []), ...(v.type === 'sport' && /\b(?:adventure parks?|aerial parks?|tree ?top|ropes? courses?|obstacle courses?)\b/i.test(v.cuisine || '') ? ['adventure'] : []), ...(v.type === 'tour' && /\b(?:bear|wildlife|eagle|whale|birding|nature walk|salmon)/i.test(v.cuisine || '') ? ['nature'] : []), ...(/\bski resort\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(/\b(?:skating rink|arena|curling)\b/i.test(v.cuisine || '') ? ['winter'] : []), ...(/\bnordic\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(v.type === 'tour' && /\b(?:kayak\w*|canoe\w*|sup|paddle\w*|rafting|sailing|boat tours?|wing foil|kite\w*|river floats?)/i.test(v.cuisine || '') ? ['water'] : [])])], fdTypes: m.fdTypes,
