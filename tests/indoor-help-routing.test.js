@@ -321,6 +321,90 @@ test('indoor test 5: a climbing and trampoline park’s questions (Chris’s hel
   assert.match(plain(fr.topic('indoor-groups').aFr), /Groupes scolaires et camps/);
 });
 
+// Indoor test 6 (2026-11-19; Priya, a pottery and paint studio in Penticton: drop-in painting all ages $25, 6-week wheel
+// courses 14+, a Friday date night $95 for two, kids' camps): every question in her help log, with its French twin, on
+// the setup and, for the two she asked on her prices page, on that page too. A question with no key of a topic never gets
+// that topic ("date night is per couple" got the photo-position answer from « coupée »).
+const CLAY_ASKED = [
+  ['en', 'we have evening classes outside our normal hours, do I put those in?', ['indoor-class-nights']],
+  ['en', 'evening classes outside normal hours', ['indoor-class-nights']],
+  ['en', 'How do I set my hours?', ['hours']],
+  ['en', 'we close over christmas for two weeks', ['setup-short-closure', 'indoor-yearly-break', 'closures']],
+  ['en', 'we have drop in painting and booked classes', ['indoor-booking']],
+  ['en', 'drop in is $25 plus the piece, what do I put', ['indoor-price']],
+  ['en', 'all ages for painting but 14+ for the wheel', ['indoor-age']],
+  ['en', 'courses run 6 weeks', ['indoor-courses']],
+  ['en', 'date night is per couple', ['indoor-price-two']],
+  ['en', 'how do people see our class schedule', ['menu-add']],
+  ['en', 'where do I put our kids summer camps', ['indoor-groups']],
+  ['en', 'what price do I put', ['indoor-price']],
+  ['en', 'where do the rest of my prices go', ['menu-add']],
+  ['en', 'can people just walk in', ['indoor-booking']],
+  ['fr', 'nous avons des cours le soir en dehors de nos heures, est-ce que je les mets?', ['indoor-class-nights']],
+  ['fr', 'cours du soir en dehors des heures', ['indoor-class-nights']],
+  ['fr', 'comment changer mes heures d’ouverture?', ['hours']],
+  ['fr', 'nous fermons deux semaines à Noël', ['setup-short-closure', 'indoor-yearly-break', 'closures']],
+  ['fr', 'nous avons de la peinture sans réservation et des cours à réserver', ['indoor-booking']],
+  ['fr', 'tous les âges pour la peinture mais 14 ans et plus pour le tour', ['indoor-age']],
+  ['fr', 'les cours durent 6 semaines', ['indoor-courses']],
+  ['fr', 'la soirée en amoureux est par couple', ['indoor-price-two']],
+  ['fr', 'où mettre nos camps d’été pour enfants', ['indoor-groups']],
+  ['fr', 'quel prix mettre', ['indoor-price']],
+  ['fr', 'où vont mes autres prix', ['menu-add']],
+  ['fr', 'est-ce qu’on peut venir sans réserver', ['indoor-booking']],
+];
+test('indoor test 6: a pottery and paint studio’s questions (Priya’s help log, EN + FR) land on the right answers; the hours answers fit a classes place; the prices answer names her real button', async () => {
+  const v = app.createVenue({ name: `Clay Studio Help ${++n}`, slug: `indoor-help-${n}`, region: 'penticton', type: 'indoor', latitude: 49.48, longitude: -119.59, address: `${n} Fairview Rd, Penticton`, description: 'A pottery and paint studio.' });
+  const t = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const ch = (changes) => fetch(`${base}/owner/${t}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify({ changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) }).then((r) => r.status);
+  assert.ok([200, 201].includes(await ch({ indoor_info: { kinds: ['classes'], length: '2-3h', book: 'no', age: 'all' } })));
+  assert.ok([200, 201].includes(await ch({ indoor_price: 25 })));
+  const en = helpBot(await get(`/owner/${t}/setup`)), fr = helpBot(await get(`/fr/owner/${t}/setup`));
+  const wrong = [];
+  for (const [lang, q, want] of CLAY_ASKED) {
+    const r = (lang === 'fr' ? fr : en).best(q);
+    if (!r || !want.includes(r.id)) wrong.push(`[${lang}] "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+  }
+  // Her prices page (where she asked about the date night and the courses).
+  const men = helpBot(await get(`/owner/${t}/menu`)), mfr = helpBot(await get(`/fr/owner/${t}/menu`));
+  for (const [b, q, want] of [[men, 'date night is per couple', 'indoor-price-two'], [men, 'courses run 6 weeks', 'indoor-courses'], [mfr, 'la soirée en amoureux est par couple', 'indoor-price-two'], [mfr, 'les cours durent 6 semaines', 'indoor-courses']]) {
+    const r = b.best(q); if (!r || r.id !== want) wrong.push(`[menu] "${q}" -> ${r && r.id} (want ${want})`);
+  }
+  assert.deepEqual(wrong, []);
+  // Never photo-position from a word that only looks like « coupée »; "not sure" is fine.
+  assert.notEqual(men.best('date night is per couple').id, 'photo-position');
+  for (const q of ['per couple', 'the couple who own it']) assert.notEqual(men.best(q).id, 'photo-position', q);
+  // Every question in her real log lands somewhere.
+  const log = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', '..', 'drafts', 'fresh-eyes-indoor6-2026-11-19', 'help-log.json'), 'utf8'));
+  for (const x of log.filter((y) => !/^\[/.test(y.q))) { const r = (/\/menu/.test(x.hash) ? men : en).best(x.q); assert.ok(r && r.id, `${x.q} -> nothing`); }
+  const plain = (h) => String(h).replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ');
+  // Class nights: open studio hours, class nights in Good to know, the wheel example (EN + FR).
+  assert.match(plain(en.topic('indoor-class-nights').a), /Keep your hours as your open studio hours/);
+  assert.match(plain(en.topic('indoor-class-nights').a), /Evening wheel classes Wed & Fri 6:30–9 \(book online\)/);
+  assert.match(plain(fr.topic('indoor-class-nights').aFr), /heures d’atelier libre/);
+  // The hours answers never name "+ Add a second time" (a classes place's day cards don't have it), nor past midnight; the
+  // lunch-and-dinner answer is not offered; the hours answer says where evening classes go.
+  const hours = plain(en.topic('hours').a), hoursFr = plain(fr.topic('hours').aFr);
+  assert.doesNotMatch(hours, /Add a second time|past midnight/);
+  assert.doesNotMatch(hoursFr, /deuxième plage|après minuit/);
+  assert.match(hours, /Evening classes outside these hours\? Keep your hours as your open studio hours/);
+  assert.equal(en.topic('setup-split-hours'), undefined);
+  // Her prices: her button's words ("Looks good, send it!" on her link), and the Book button opens her schedule.
+  assert.match(plain(en.topic('menu-add').a), /then tap Looks good, send it!/);
+  assert.doesNotMatch(plain(en.topic('menu-add').a), /tap Publish/);
+  assert.match(plain(en.topic('menu-add').a), /your page’s Book button opens it/);
+  assert.match(plain(fr.topic('menu-add').aFr), /C’est bon, envoyer/);
+  // The ages answer: the youngest age for anything she offers.
+  assert.match(plain(en.topic('indoor-age').a), /youngest age anyone can come, for anything you offer/);
+  // A bowling alley (second times on its day cards) keeps "+ Add a second time" in its hours answer.
+  const b = app.createVenue({ name: `Lanes Help ${++n}`, slug: `indoor-help-${n}`, region: 'penticton', type: 'indoor', latitude: 49.48, longitude: -119.59, address: `${n} Main St, Penticton`, description: 'Bowling.' });
+  const tb = app.createOwnerLink(b.id, {}).url.split('/owner/')[1];
+  await fetch(`${base}/owner/${tb}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify({ changes: { indoor_info: { kinds: ['bowling'], length: '1-2h' } }, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) });
+  const be = helpBot(await get(`/owner/${tb}/setup`));
+  assert.match(plain(be.topic('hours').a), /Add a second time/);
+  assert.doesNotMatch(plain(be.topic('hours').a), /open studio hours/);
+});
+
 test('every indoor owner question lands on the right indoor topic (EN + FR)', async () => {
   const { en, fr } = await setupFor('indoor', { cuisine: '' });
   const wrong = [];
