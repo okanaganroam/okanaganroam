@@ -7002,7 +7002,7 @@ function tripPlannerLabels() {
 }
 
 const TRIP_PLAN_MAX_IDS = 200;
-const TRIP_PLAN_PIN_RE = /^[1-7]-(morning|midday|afternoon|late|evening|night)$/; // late: a wine day's late-afternoon tasting; night: an event on an evening with dinner (2026-10-18)
+const TRIP_PLAN_PIN_RE = /^[1-7]-(early|morning|midday|afternoon|late|evening|night)$/; // late: a wine day's late-afternoon tasting; night: an event on an evening with dinner (2026-10-18); early: coffee before a ski day (2026-11-18)
 // Validates the POST /api/trip/plan body; returns { error } or { value }.
 // The first day of an undated Halloween trip: Oct 31 itself, or the weekend around it for a longer trip (never a
 // day already past).
@@ -8118,7 +8118,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   // 2026-11-05: trip-length, clock-time, holiday-weekend and tour wording made plain; a beer, cider or distillery "tour" is a run of
   // breweries, cideries or distilleries. (planText is the French layer's own text; planTextPlain is what the planner reads.)
   const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);
-  const planTextPlain = (discoveryIntentModule().fixedHolidayDates || ((x) => x))((discoveryIntentModule().plainClockTimes || ((x) => x))((discoveryIntentModule().plainRelativeDates || ((x) => x))(discoveryIntentModule().mergeSegmentStays(planText)).replace(new RegExp(TRIP_SITE.sunsetDinner.re.source, 'gi'), TRIP_SITE.sunsetDinner.reading)))
+  let planTextPlain = (discoveryIntentModule().fixedHolidayDates || ((x) => x))((discoveryIntentModule().plainClockTimes || ((x) => x))((discoveryIntentModule().plainRelativeDates || ((x) => x))(discoveryIntentModule().mergeSegmentStays(planText)).replace(new RegExp(TRIP_SITE.sunsetDinner.re.source, 'gi'), TRIP_SITE.sunsetDinner.reading)))
     .replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/gi, 'morning $1')
     .replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/gi, (m, h) => (discoveryIntentModule().holidayWeekendDates || (() => null))(h.toLowerCase().replace('labor', 'labour'), now) || m)
     .replace(/\b(?:craft )?(?:beer|brewery|brewpub|brew) (?:tours?|tastings?)\b/gi, 'brewery crawl').replace(/\b(?:cider|cidery) tours?\b/gi, 'cidery crawl').replace(/\b(?:distillery|spirits|gin|whisky|whiskey) tours?\b/gi, 'distillery crawl')
@@ -8133,6 +8133,14 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     .replace(OWN_CLASS_WORDS_RE, 'masterclass').replace(OWN_CLASS_BARE_RE, (m, lead) => (tripAnyClassListed() ? `${lead || ''}masterclass` : m))
     // "Happy hour cocktails" is a happy hour anywhere that has one then (a distillery, a pub), not only cocktail lounges.
     .replace(/\b(?:happy hour cocktails?|cocktails? (?:at|during|for) (?:a |the )?happy hour|cocktail happy hours?)\b/gi, 'happy hour');
+  // Build My Trip fixes (2026-11-18): "a day on the mountain / on the slopes" in the ski months is a ski day (trip-planner.js
+  // mountainDayText); the month is the one the request names, else its date, else today's.
+  {
+    const named = /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/i.exec(planTextPlain);
+    let cal = null; try { cal = require('./trip-requirements').tripCalendar(planTextPlain, todayLocal(now)); } catch (e) { cal = null; }
+    const month = named ? ['january','february','march','april','may','june','july','august','september','october','november','december'].indexOf(named[1].toLowerCase()) + 1 : Number(String((cal && cal.startDate) || todayLocal(now)).slice(5, 7));
+    planTextPlain = tripPlannerModule().mountainDayText(planTextPlain, month);
+  }
   // Holidays become dates and visitor shorthand becomes the planner's words (2026-10-25).
   // No wineries in the Sea to Sky (2026-10-25: "yoga and wine in Squamish" found nothing): wine means the wine bars and
   // lounges, unless wineries are listed or the wine is ruled out.
@@ -8358,7 +8366,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   { const late = extracted.windowClock && !extracted.windowClock.rolled ? extracted.windowClock.start : null; if (late && !overrides?.startDate && Number.isFinite(extracted.startMinutes) && extracted.startMinutes < late) extracted.startMinutes = late; }
   if(overrides?.dayStartMinutes)extracted.dayStartMinutes=overrides.dayStartMinutes;
   if(overrides?.shortWalkVenueIds)extracted.shortWalkVenueIds=overrides.shortWalkVenueIds;
-  let requirements = overrides?.shortWalkVenueIds || overrides?.dayStartMinutes || overrides?.startDate || overrides?.startMinutes!==undefined || extracted.startDate || extracted.daypart || extracted.onlyRequested || Number.isInteger(extracted.explicitMealCount) || extracted.conflicts.length || extracted.items.some(i => !['days', 'base', 'type'].includes(i.kind)) ? extracted : null;
+  let requirements = overrides?.shortWalkVenueIds || overrides?.dayStartMinutes || overrides?.startDate || overrides?.startMinutes!==undefined || extracted.startDate || extracted.daypart || extracted.morningStart != null || extracted.onlyRequested || Number.isInteger(extracted.explicitMealCount) || extracted.conflicts.length || extracted.items.some(i => !['days', 'base', 'type'].includes(i.kind)) ? extracted : null;
   if (requirements) {
     trip = requirementModule.expandTripComponents(trip.multi ? trip : {...trip, regions:intent.regions || [], party:intent.party || trip.party, when:intent.when || trip.when}, requirements);
     if (requirements.items.some(i=>i.kind==='rainy'&&i.activityOnly)) intent.occasion=null;

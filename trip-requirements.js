@@ -393,6 +393,14 @@ function tripCalendar(text, referenceDate=null) {
 // request outright.
 const RAIN_BACKUP_CONTEXT=/\b(?:beach|beaches|hike|hikes|hiking|walk|walks|park|parks|lake|outdoors?|outside|golf|swim|swimming|sunny|nice weather|if it s nice|weekend|nights?|[2-7] days?|two days|three days|four days|five days)\b/;
 const CONDITIONAL_RAIN=/\b(?:if|in case|incase|should|when) (?:it|the weather) (?:rains?|is (?:raining|rainy|bad|wet|crappy|lousy)|turns(?: bad| wet)?|gets (?:bad|wet|rainy))\b|\bin case of (?:rain|bad weather)\b|\b(?:back ?up|plan b|fallback|rain option)\b/;
+// Build My Trip fixes (2026-11-18): "Morning coffee and a ski day", "morning coffee, a walk, lunch and dinner": the word
+// "morning" describes the first stop, not a morning-only plan, when later parts of the day are asked for too.
+function morningOfOneStop(t){
+  const x=String(t||'');
+  if(!/\bmorning (?:coffee|coffees|breakfast|latte|espresso|cafe|walk|stroll|hike|run|swim|paddle|yoga|ski|skiing|tasting)\b/.test(x))return false;
+  if(/\bmorning\b(?! (?:coffee|coffees|breakfast|latte|espresso|cafe|walk|stroll|hike|run|swim|paddle|yoga|ski|skiing|tasting)\b)/.test(x))return false;
+  return /\b(?:lunch|dinner|supper|apres|après|afternoon|evening|tonight|night|day|days|weekend|ski day|drinks|happy hour|winer(?:y|ies)|tasting)\b/.test(x.replace(/\bmorning [a-z]+\b/g,' '));
+}
 function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDate=null}) {
   const items=[],conflicts=[];let explicitMealCount=null;
   // "at noon" / "starting at midday" is a 12 pm start, like "at 2 pm" (not after a meal such as "lunch at noon", which the bare-start rule skips).
@@ -416,6 +424,19 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   })();
   const startClock=/\b(?:starting|start|begin|leave|depart)(?:ing)?\s+(?:at\s+)?(1[0-2]|[1-9])(?::([0-5]\d))?\s*(am|pm)\b/i.exec(original)||bareStart;
   let startMinutes=startClock?(Number(startClock[1])%12)*60+Number(startClock[2]||0)+(startClock[3].toLowerCase()==='pm'?720:0):null;
+  // Build My Trip fixes (2026-11-18): the request's own morning start. "Start with coffee at 10" / "breakfast at 9am" (a
+  // morning hour after coffee, breakfast or a start word, with or without "am") is the start time; a request that opens
+  // with coffee or breakfast, or asks for "morning coffee" / "start with breakfast", starts in the morning (morningStart,
+  // 9 AM; brunch 10 AM), each stop still inside its listed hours. It had started around noon or 1 PM to lead up to dinner.
+  let morningStart=null;
+  if(startMinutes==null){
+    const tail='(?::([0-5]\\d))?\\s*(?:a\\.?m\\.?|o.?clock)?(?![\\d:]|\\s*(?:p\\.?m\\b|tonight|at night|in the (?:evening|afternoon)))';
+    const early=new RegExp(`\\b(?:coffee|coffees|breakfast|brunch|cafe|caf\u00e9|latte|espresso)\\b[^.;!?]{0,40}?\\b(?:at|around|from|by)\\s+(1[01]|[6-9])${tail}`,'i').exec(original)
+      ||new RegExp(`\\b(?:start|starting|begin|beginning|kick off)\\b[^.;!?]{0,40}?\\b(?:at|around|from)\\s+(1[01]|[89])${tail}`,'i').exec(original);
+    if(early)startMinutes=Number(early[1])*60+Number(early[2]||0);
+    else if(/\bmorning (?:coffee|coffees|breakfast|latte|espresso|cafe)\b|\b(?:start|starting|begin|beginning|kick off|kicking off)(?: the day| our day| my day| things)? (?:with|at)(?: an?| some| our| my)? (?:coffee|coffees|breakfast|brunch|cafe|latte)\b|^\W*(?:(?:an?|some|early|morning|quick|good|great)\s+)*(?:coffee|coffees|breakfast|latte|lattes|espresso|cafe|cafes|brunch)\b/i.test(original.normalize('NFD').replace(/[\u0300-\u036f]/g,'')))
+      morningStart=/^\W*(?:(?:an?|some|early|morning|quick|good|great)\s+)*brunch\b/i.test(original)?600:540;
+  }
   // Pub test 3 (Whistler, 2026-11-14): "Dinner at 7 PM at <place>" put dinner at 6 PM (the meal's own time was skipped as a
   // start time and read nowhere else). A meal's own time is that meal's time: dinner or supper from 4 to 10 PM, lunch
   // from 11 AM to 2 PM. -> mealMinutes { dinner, lunch } (absent when not said).
@@ -626,7 +647,7 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   // 2026-10-14: "pizza one night", "sushi once" -- that food is wanted on one meal, not every day (a 3-day family trip
   // planned pizza for all three dinners). The word just before the frequency phrase is kept; the planner uses it once.
   const {onceTerms,onceEvening}=onceFoods(normalizedText);
-  return bareTimeWindow({onceTerms,onceEvening,occasion:intent.occasion||null,items:items.filter(i=>i.kind!=='event'||i.value!=='any'||['show','comedy'].includes(i.eventKind)||!items.some(j=>j.kind==='event'&&j.value!=='any'&&j.sourceText===i.sourceText)),conflicts,startMinutes,...(Object.keys(mealMinutes).length?{mealMinutes}:{}),...(dinnerClock?{dinnerAtClock:true}:{}),startDate,endDate:calendar.endDate,dateSource:calendar.source,text:normalizedText,planDays:intent.days||null,explicitMealCount,outingScope:durationMinutes>0&&durationMinutes<=1440?'short':null,onlyRequested:/\b(?:only|just)\s+(?:a |an |one )?(?:coffee|cafes?|museums?|galler(?:y|ies)|dinner|lunch|winery|wineries|walk)\b|\b(?:coffee|cafes?|museums?|dinner|lunch|winery|wineries|walk)\s+only\b/.test(normalizedText),daypart:deadlineMinutes!=null?(deadlineMinutes<=720?'morning':deadlineMinutes<=1020?'afternoon':'evening'):/\b(?<!no )(?<!without )(?<!skip )morning\b/.test(normalizedText)?'morning':/\b(?<!no )(?<!without )(?<!skip )afternoon\b/.test(normalizedText)?'afternoon':/\b(?:evening|date night|night out|a night|tonight)\b/.test(normalizedText)?'evening':null},intent,trip,referenceDate);
+  return bareTimeWindow({onceTerms,onceEvening,occasion:intent.occasion||null,items:items.filter(i=>i.kind!=='event'||i.value!=='any'||['show','comedy'].includes(i.eventKind)||!items.some(j=>j.kind==='event'&&j.value!=='any'&&j.sourceText===i.sourceText)),conflicts,startMinutes,...(morningStart!=null?{morningStart}:{}),...(Object.keys(mealMinutes).length?{mealMinutes}:{}),...(dinnerClock?{dinnerAtClock:true}:{}),startDate,endDate:calendar.endDate,dateSource:calendar.source,text:normalizedText,planDays:intent.days||null,explicitMealCount,outingScope:durationMinutes>0&&durationMinutes<=1440?'short':null,onlyRequested:/\b(?:only|just)\s+(?:a |an |one )?(?:coffee|cafes?|museums?|galler(?:y|ies)|dinner|lunch|winery|wineries|walk)\b|\b(?:coffee|cafes?|museums?|dinner|lunch|winery|wineries|walk)\s+only\b/.test(normalizedText),daypart:deadlineMinutes!=null?(deadlineMinutes<=720?'morning':deadlineMinutes<=1020?'afternoon':'evening'):/\b(?<!no )(?<!without )(?<!skip )morning\b/.test(normalizedText)&&!morningOfOneStop(normalizedText)?'morning':/\b(?<!no )(?<!without )(?<!skip )afternoon\b/.test(normalizedText)?'afternoon':/\b(?:evening|date night|night out|a night|tonight)\b/.test(normalizedText)?'evening':null},intent,trip,referenceDate);
 }
 // Time windows (2026-10-20, round 11): a request that names only a town and a time -- "this weekend in Squamish",
 // "Saturday evening in Squamish", "an afternoon in Whistler", "morning in Pemberton" -- is a plan for that time, not
@@ -1347,4 +1368,4 @@ function tripRequestSynonyms(text){let out=String(text||'');const walksNegated=W
  if(/\b(?:ski|skiing|snowboard\w*)\b/i.test(out)&&!/\b(?:cross.country|nordic)\b/i.test(out)&&!/\b(?:don.?t|do not|won.?t|not|no|never|without)\s+(?:\w+\s+){0,2}(?:ski|skiing|snowboard\w*)\b/i.test(out))out=out.replace(/\b(?:a )?night out\b|\bgoing out(?: at night)?\b/gi,'nightlife').replace(/\s*\b(?:in the morning|in the afternoon|in the evening)\b/gi,'').replace(/\b(?:morning|afternoon|evening)\s+(?=(?:ski|skiing|snowboard\w*|spa|apres|après|dinner|lunch|drinks)\b)/gi,'').replace(/\s{2,}/g,' ');
  return out;}
 
-module.exports={KINDS,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
+module.exports={morningOfOneStop,KINDS,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
