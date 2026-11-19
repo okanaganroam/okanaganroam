@@ -18433,7 +18433,10 @@ test('Indoor discovery: banner and experience choices stay on the indoor hub', a
   });
 });
 
-test('Indoor discovery: URL filters select real venues and family uses the stored badge', async () => {
+// Indoor test 9 (2026-11-19): Family Fun is one list on the hub chip and on /indoor/family (the hub's Family Fun: places
+// built for family time, read from their names, like a "Discovery" centre), no longer the Kid-Friendly badge alone. Every
+// fixture here is named "Discovery …", so each is on it (as on the hub's own Family Fun chip).
+test('Indoor discovery: URL filters select real venues and family is the hub\'s Family Fun', async () => {
   const fixtures = [
     { name: 'Discovery Museum', slug: 'discovery-museum' },
     { name: 'Discovery Escape Room', slug: 'discovery-escape', kid_friendly: true },
@@ -18442,12 +18445,12 @@ test('Indoor discovery: URL filters select real venues and family uses the store
   ].map((v) => app.createVenue({ region: 'kelowna', type: 'indoor', description: 'Test fixture.', ...v }));
   try {
     await withWinterServer(async (base) => {
-      for (const [activity, selected] of [['arts', 0], ['games', 1], ['family', 1], ['spas', 2], ['theatre', 3]]) {
+      for (const [activity, selected] of [['arts', 0], ['games', 1], ['family', [0, 1, 2, 3]], ['spas', 2], ['theatre', 3]]) {
         const page = await WINTER_GET(base, `/indoor/${activity}`);
         assert.equal(page.status, 200);
         // Inspect cards, excluding JSON-LD and navigation.
         const cards = page.text.match(/<ul class="card-grid">[\s\S]*?<\/ul>/g)?.join('') || '';
-        fixtures.forEach((v, i) => assert.equal(cards.includes(`href="/kelowna/indoor/${v.slug}"`), i === selected, `${activity}: ${v.name}`));
+        fixtures.forEach((v, i) => assert.equal(cards.includes(`href="/kelowna/indoor/${v.slug}"`), Array.isArray(selected) ? selected.includes(i) : i === selected, `${activity}: ${v.name}`));
         assert.match(page.text, /aria-current="page"/);
         assert.match(page.text, /[1-9]\d* matching spots?/);
       }

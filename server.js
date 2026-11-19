@@ -5349,6 +5349,16 @@ function searchShortWord(w, targets, isKnown) {
 // above): a phrase whose words mean something else one by one, read as the word the listings use. "haunted house"
 // listed every coffee house, "sleigh ride" and "dog sled" every tour (dog read as the dog-friendly badge), "toboggan
 // hill" every winery on a hill, "u pick" Pick Thai. A place's own name is never rewritten.
+// Indoor test 9: the indoor kinds' French phrases the French word list misread (« piscine intérieure » as "pool interieure",
+// « atelier de poterie » as "workshop of poterie"), read before it (discoverySearchText) and with the rest below.
+const INDOOR_FR_SEARCH_REWRITES = [
+  ['salle de spectacle', 'theatre'], ['salle de spectacles', 'theatre'], ['salles de spectacle', 'theatre'],
+  ['piscine interieure', 'pool'], ['piscines interieures', 'pool'], ['piscine publique', 'pool'],
+  ['jouer aux quilles', 'bowling'], ['salle de quilles', 'bowling'], ['parc interieur pour enfants', 'indoor playground'], ['parc interieur', 'indoor playground'], ['parcs interieurs', 'indoor playground'],
+  ['aire de jeux interieure', 'indoor playground'], ['aires de jeux interieures', 'indoor playground'], ['centre de jeux', 'indoor playground'], ['centres de jeux', 'indoor playground'],
+  ['atelier de poterie', 'pottery'], ['ateliers de poterie', 'pottery'],
+  ['machines a sous', 'casino'], ['machine a sous', 'casino'], ['poker', 'casino'], ['heure du conte', 'library'], ['bibliotheque publique', 'library'],
+];
 const SEARCH_PHRASE_REWRITES = [
   // Indoor test 7 (2026-11-19; Robert's gallery): sculpture, paintings and a bare "art" mean the galleries ("sculpture" found
   // nothing, « art gratuit » listed pubs). Phrases that already say what they are keep their own words.
@@ -5366,13 +5376,9 @@ const SEARCH_PHRASE_REWRITES = [
   // the casino, « jouer aux quilles » bowling); "to visit" adds nothing to a gallery or museum.
   ['gallery to visit', 'gallery'], ['galleries to visit', 'galleries'], ['museum to visit', 'museum'], ['museums to visit', 'museums'],
   ['live theatre', 'theatre'], ['live theater', 'theatre'], ['see a play', 'theatre'], ['watch a play', 'theatre'], ['see a show', 'theatre'],
-  ['salle de spectacle', 'theatre'], ['salle de spectacles', 'theatre'], ['salles de spectacle', 'theatre'], ['piece de theatre', 'theatre'], ['pieces de theatre', 'theatre'],
-  ['indoor pool', 'pool'], ['indoor pools', 'pool'], ['indoor swimming pool', 'pool'], ['piscine interieure', 'pool'], ['piscines interieures', 'pool'], ['piscine publique', 'pool'],
-  ['jouer aux quilles', 'bowling'], ['salle de quilles', 'bowling'], ['parc interieur pour enfants', 'indoor playground'], ['parc interieur', 'indoor playground'], ['parcs interieurs', 'indoor playground'],
-  ['aire de jeux interieure', 'indoor playground'], ['aires de jeux interieures', 'indoor playground'], ['centre de jeux', 'indoor playground'], ['centres de jeux', 'indoor playground'],
-  ['atelier de poterie', 'pottery'], ['ateliers de poterie', 'pottery'], ['cours de poterie', 'pottery'],
-  ['poker', 'casino'], ['slots', 'casino'], ['slot machines', 'casino'], ['machines a sous', 'casino'], ['machine a sous', 'casino'],
-  ['story time', 'library'], ['storytime', 'library'], ['heure du conte', 'library'], ['public library', 'library'], ['bibliotheque publique', 'library'],
+  ['indoor pool', 'pool'], ['indoor pools', 'pool'], ['indoor swimming pool', 'pool'], ['poker', 'casino'], ['slots', 'casino'], ['slot machines', 'casino'],
+  ['story time', 'library'], ['storytime', 'library'], ['public library', 'library'],
+  ...INDOOR_FR_SEARCH_REWRITES,
   ['haunted house', 'haunted'], ['haunted houses', 'haunted'], ['haunted attraction', 'haunted'], ['haunted attractions', 'haunted'],
   ['toboggan', 'sledding'], ['toboggans', 'sledding'], ['tobogganing', 'sledding'], ['toboggan hill', 'sledding'], ['toboggan hills', 'sledding'],
   ['sledding hill', 'sledding'], ['sledding hills', 'sledding'], ['sled hill', 'sledding'], ['sleds', 'sledding'],
@@ -5399,7 +5405,8 @@ const SEARCH_PHRASE_REWRITES = [
 ];
 const SEARCH_PHRASE_REWRITE_MAP = new Map(SEARCH_PHRASE_REWRITES);
 const SEARCH_PHRASE_REWRITE_MAX = Math.max(...SEARCH_PHRASE_REWRITES.map(([k]) => k.split(' ').length));
-function searchPhraseRewrites(text) {
+const INDOOR_FR_SEARCH_MAP = new Map(INDOOR_FR_SEARCH_REWRITES);
+function searchPhraseRewrites(text, only = null) {
   const raw = String(text || '');
   const parts = raw.split(/\s+/).filter(Boolean);
   // "u-pick" is two words once folded ("u pick"): fold each typed word, then spread it over its folded words.
@@ -5418,7 +5425,7 @@ function searchPhraseRewrites(text) {
       // A phrase starts and ends on whole typed words, and never inside a place's name.
       if ((i > 0 && owner[i - 1] === owner[i]) || (i + len < folded.length && owner[i + len] === owner[i + len - 1])) continue;
       if ([...Array(len).keys()].some((k) => keep.has(i + k))) continue;
-      const en = SEARCH_PHRASE_REWRITE_MAP.get(folded.slice(i, i + len).join(' '));
+      const en = (only || SEARCH_PHRASE_REWRITE_MAP).get(folded.slice(i, i + len).join(' '));
       if (en != null) { out.push(en); hit = len; }
     }
     if (hit) { changed = true; lastOwner = owner[i + hit - 1]; i += hit; continue; }
@@ -5436,7 +5443,7 @@ function discoverySearchText(text, lang) {
   }
   let t = text;
   // Indoor test 9: the indoor kinds' French phrases (« piscine intérieure », « jouer aux quilles ») before the word list.
-  try { t = searchPhraseRewrites(t); } catch (e) { t = text; }
+  try { t = searchPhraseRewrites(t, INDOOR_FR_SEARCH_MAP); } catch (e) { t = text; }
   try { t = frSearchSynonyms(t); } catch (e) { /* as read so far */ }
   try { t = searchPhraseRewrites(t); } catch (e) { /* as read so far */ }
   try { return tripPlannerFrModule().tripPlannerText(t, buildDiscoveryTaxonomy(), { frenchPage: true }); } catch (e) { return t; }
@@ -7730,6 +7737,16 @@ function tripIndoorKindNearTowns(first, args, now) {
   const wider = runTripPlanCore({ ...args, text: `${before}${lead}${listed}${text.slice(at + label.length)}` }, now);
   const widerKind = ofKind(wider);
   if (tripPlanEmpty(wider) || widerKind.length <= firstKind.length) return first;
+  // The town's own place of that kind stays, first: a list puts it back at the top; any other plan that lost it is not used.
+  const widerIds = new Set(widerKind.map((x) => x.venue.id));
+  const lost = firstKind.filter((x) => !widerIds.has(x.venue.id));
+  if (lost.length) {
+    if (!Array.isArray(wider.recommendations) || !wider.recommendations.length || !Array.isArray(first.recommendations)) return first;
+    wider.recommendations = lost.concat(wider.recommendations).slice(0, Math.max(wider.recommendations.length, lost.length));
+  } else if (Array.isArray(wider.recommendations)) {
+    const own = (x) => x && x.venue && x.venue.region === town && firstKind.some((y) => y.venue.id === x.venue.id);
+    wider.recommendations = wider.recommendations.filter(own).concat(wider.recommendations.filter((x) => !own(x)));
+  }
   const near = towns.slice(1), nearText = near.length > 1 ? `${near.slice(0, -1).join(', ')} and ${near[near.length - 1]}` : near[0];
   const note = !firstKind.length ? `Nothing in ${label} itself matched, so this includes ${nearText} nearby.` : `This includes ${nearText}, right next to ${label}.`;
   wider.notes = [note].concat(wider.notes || []);
