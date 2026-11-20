@@ -25,6 +25,11 @@ const ctxOf = (p, input, today = '2026-07-01') => ts.tripStayContext(p, input, t
 test('parseTripStayInput: dates, party size and every refusal', () => {
   assert.deepEqual(ts.parseTripStayInput(undefined), { value: null });
   assert.deepEqual(ts.parseTripStayInput({}), { value: null });
+  assert.deepEqual(ts.parseTripStayInput({ dog: true }), { value: { dog: true } });
+  assert.deepEqual(ts.parseTripStayInput({ dog: false }), { value: null });
+  assert.ok(ts.parseTripStayInput({ dog: 1 }).error);
+  assert.equal(ctxOf(plan({}), { dog: true }).dog, true);
+  assert.equal(ctxOf(plan({ party: ['with a dog'] }), {}).dog, true);
   assert.deepEqual(ts.parseTripStayInput({ arrive: '', leave: '', adults: null }), { value: null });
   assert.deepEqual(ts.parseTripStayInput({ arrive: '2026-12-18', leave: '2026-12-21', adults: 2, kids: 0 }), { value: { arrive: '2026-12-18', leave: '2026-12-21', adults: 2, kids: 0 } });
   assert.deepEqual(ts.parseTripStayInput({ arrive: '2026-12-18' }), { value: { arrive: '2026-12-18' } });
@@ -183,7 +188,7 @@ test('the card: sleeps, price band, links, reasons in English and French; whereT
   const s = stay({ id: 7, km: 2.14, photo: '/images/venues/a.jpg', info: { max_guests: 6, price_level: 3, kid_friendly: true } });
   const w = ts.whereToStay(plan(), { arrive: '2026-07-10', leave: '2026-07-13', adults: 2, kids: 2 }, [s], '2026-07-01');
   assert.equal(w.stayId, 7);
-  assert.deepEqual(w.trip, { arrive: '2026-07-10', leave: '2026-07-13', nights: 3, adults: 2, kids: 2, datesGiven: true });
+  assert.deepEqual(w.trip, { arrive: '2026-07-10', leave: '2026-07-13', nights: 3, adults: 2, kids: 2, dog: false, datesGiven: true });
   assert.equal(w.pick.sleeps, 6);
   assert.equal(w.pick.priceBand, '$$$');
   assert.equal(w.pick.photo, '/images/venues/a.jpg');

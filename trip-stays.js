@@ -36,13 +36,14 @@ function addDays(iso, n) {
 }
 function daysBetween(a, b) { return Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000); }
 
-// The optional trip inputs of POST /api/trip/plan: { arrive, leave, adults, kids }, every key optional.
+// The optional trip inputs of POST /api/trip/plan: { arrive, leave, adults, kids, dog }, every key optional (dog: true
+// when the visitor ticked "Bringing a dog", false when they left it unticked; absent = the request's own words decide).
 // -> { value } (null when nothing was given) or { error }.
 function parseTripStayInput(raw) {
   if (raw === undefined || raw === null) return { value: null };
-  if (!isObj(raw)) return { error: 'stay must be an object with arrive, leave, adults and kids.' };
-  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids'].includes(k));
-  if (extra.length) return { error: `stay may only contain arrive, leave, adults and kids (not ${extra.join(', ')}).` };
+  if (!isObj(raw)) return { error: 'stay must be an object with arrive, leave, adults, kids and dog.' };
+  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog'].includes(k));
+  if (extra.length) return { error: `stay may only contain arrive, leave, adults, kids and dog (not ${extra.join(', ')}).` };
   const out = {};
   for (const k of ['arrive', 'leave']) {
     if (raw[k] === undefined || raw[k] === null || raw[k] === '') continue;
@@ -62,6 +63,10 @@ function parseTripStayInput(raw) {
   if (raw.kids !== undefined && raw.kids !== null) {
     if (!intIn(raw.kids, 0, MAX_KIDS)) return { error: `stay.kids must be a whole number from 0 to ${MAX_KIDS}.` };
     out.kids = raw.kids;
+  }
+  if (raw.dog !== undefined && raw.dog !== null) {
+    if (typeof raw.dog !== 'boolean') return { error: 'stay.dog must be true or false.' };
+    if (raw.dog) out.dog = true;
   }
   return { value: Object.keys(out).length ? out : null };
 }
@@ -138,7 +143,7 @@ function tripStayContext(plan, input, today) {
   const withKids = kids !== null ? kids > 0 : !!party.kids;
   const guests = adults !== null ? adults + (kids || 0) : null;
   return {
-    arrive, leave, nights, months, adults, kids, guests, withKids, dog: !!party.dog, budget: budgetOf(plan.intent),
+    arrive, leave, nights, months, adults, kids, guests, withKids, dog: i.dog === true || !!party.dog, budget: budgetOf(plan.intent),
     centre, primaryRegion: regions[0], regions, datesGiven: !!(i.arrive && i.leave),
   };
 }
@@ -230,7 +235,7 @@ function whereToStay(plan, input, stays, today) {
   if (!picked) return null;
   return {
     stayId: picked.pick.id,
-    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, kids: ctx.kids, datesGiven: ctx.datesGiven },
+    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, kids: ctx.kids, dog: !!ctx.dog, datesGiven: ctx.datesGiven },
     pick: picked.pick,
     alternatives: picked.alternatives,
   };

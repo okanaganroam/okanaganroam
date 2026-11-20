@@ -72,7 +72,7 @@ test('flag on: whereToStay with the trip dates, party and chosen stay; the dates
     const p = JSON.parse(r.text);
     const w = p.whereToStay;
     assert.ok(w, 'a base for a 3-night family trip');
-    assert.deepEqual(w.trip, { arrive: '2027-07-09', leave: '2027-07-12', nights: 3, adults: 2, kids: 2, datesGiven: true });
+    assert.deepEqual(w.trip, { arrive: '2027-07-09', leave: '2027-07-12', nights: 3, adults: 2, kids: 2, dog: false, datesGiven: true });
     assert.equal(w.stayId, w.pick.id);
     assert.ok(made.includes(w.pick.id));
     const shown = [w.pick, ...w.alternatives].map((s) => s.name);
@@ -140,4 +140,25 @@ test('parseTripPlanBody: the stay field is validated only when stays are on', ()
   assert.deepEqual(off({ adults: 2 }).value, app.parseTripPlanBody({ text: 'x' }).value);
   // Other fields are checked exactly as before.
   assert.match(app.parseTripPlanBody({ text: 'x', stays: 1 }, { stays: true }).error, /Unexpected field/);
+});
+
+test('"Bringing a dog" ticked: the stay must allow pets and the plan is a dog trip, without the words in the request', async () => {
+  delete process.env.TRIP_STAYS;
+  const r = await post({ text: '2 days in Kelowna', stay: { adults: 2, dog: true } }, '?stays=1');
+  assert.equal(r.status, 200);
+  const p = JSON.parse(r.text);
+  assert.equal(p.whereToStay.pick.name, 'Trip Stays Test Pet Motel');
+  assert.equal(p.whereToStay.trip.dog, true);
+  assert.ok((p.intent.features || []).includes('dog_friendly') || (p.intent.party && p.intent.party.dog), 'the plan itself is a dog trip');
+  // Same as typing it.
+  const typed = JSON.parse((await post({ text: '2 days in Kelowna with our dog', stay: { adults: 2 } }, '?stays=1')).text);
+  assert.deepEqual(stopIds(p), stopIds(typed));
+  // Unticked (dog: false) changes nothing; a dog already in the request is not added twice.
+  const plain = JSON.parse((await post({ text: '2 days in Kelowna', stay: { adults: 2 } }, '?stays=1')).text);
+  assert.deepEqual(JSON.parse((await post({ text: '2 days in Kelowna', stay: { adults: 2, dog: false } }, '?stays=1')).text), plain);
+  assert.equal(plain.whereToStay.trip.dog, false);
+  assert.equal((await post({ text: '2 days in Kelowna', stay: { dog: 'yes' } }, '?stays=1')).status, 400);
+  const page = await (await fetch(`${base}/trip?stays=1`)).text();
+  assert.match(page, /id="t3Dog"/);
+  assert.match(page, /Bringing a dog/);
 });
