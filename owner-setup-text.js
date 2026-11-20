@@ -2519,12 +2519,15 @@ Object.assign(en.indoor, { iperChips: { person: 'Per person', group: 'Per room o
   iperOne: { room: 'Price for one room, in dollars', lane: 'Price for one lane, in dollars', game: 'Price for one game, in dollars', group: 'Price for one group, in dollars' },
   tpriceLeadPer: 'Your page will say “{page}”. Your card: “From {x} / {u}”.', ipageLine: 'From {x} per {u}{size}', isizeRange: ' ({a}–{b} {who})', isizeUpTo: ' (up to {b} {who})', iwho: { players: 'players', people: 'people' },
   iperRead: 'You typed a price per {u}, so we picked Per room or group. Tap Per person if it’s for one person.',
-  iperNeed: 'Is that price for a whole {u}? Tap Per room or group. Or type the price for one person, like 25.', tpriceCardPer: 'From {x} / {u}' });
+  iperNeed: 'Is that price for a whole {u}? Tap Per room or group. Or type the price for one person, like 25.', tpriceCardPer: 'From {x} / {u}',
+  // Indoor test 16: a minimum typed after a price per person ("35 per person, min 2 players").
+  iminSize: ' ({n}-{one} minimum)', iwhoOne: { players: 'player', people: 'person' } });
 Object.assign(fr.indoor, { iperChips: { person: 'Par personne', group: 'Par salle ou groupe' }, iperWords: { room: 'salle', lane: 'allée', game: 'partie', group: 'groupe' },
   iperOne: { room: 'Prix pour une salle, en dollars', lane: 'Prix pour une allée, en dollars', game: 'Prix pour une partie, en dollars', group: 'Prix pour un groupe, en dollars' },
   tpriceLeadPer: 'Votre page indiquera « {page} ». Votre fiche : « À partir de {x} / {u} ».', ipageLine: 'À partir de {x} par {u}{size}', isizeRange: ' ({a} à {b} {who})', isizeUpTo: ' (jusqu’à {b} {who})', iwho: { players: 'joueurs', people: 'personnes' },
   iperRead: 'Vous avez écrit un prix par {u}, alors nous avons choisi Par salle ou groupe. Touchez Par personne si c’est pour une personne.',
-  iperNeed: 'Ce prix est-il pour {one}? Touchez Par salle ou groupe. Ou écrivez le prix pour une personne, par exemple 25.', iperOneFr: { room: 'toute une salle', lane: 'toute une allée', game: 'toute une partie', group: 'tout un groupe' }, tpriceCardPer: 'À partir de {x} / {u}' });
+  iperNeed: 'Ce prix est-il pour {one}? Touchez Par salle ou groupe. Ou écrivez le prix pour une personne, par exemple 25.', iperOneFr: { room: 'toute une salle', lane: 'toute une allée', game: 'toute une partie', group: 'tout un groupe' }, tpriceCardPer: 'À partir de {x} / {u}',
+  iminSize: ' (minimum {n} {who})', iwhoOne: { players: 'joueur', people: 'personne' } });
 // Indoor test 2 (2026-11-19): the Good to know example by the main kind (like its chips): no grip socks for an escape room.
 Object.assign(en.indoor, { bringExKinds: { gallery: 'Most art is for sale, and we can ship it. Free parking behind the gallery.', arts: 'Gift shop by the entrance. No flash photography.', active: 'Grip socks required (we sell them for $3). Lockers available.',
   spa: 'Bring a swimsuit. Robes and towels provided.', general: 'Arrive 15 minutes early. Free parking behind the building.',

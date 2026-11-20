@@ -267,7 +267,16 @@ const TYPER = {
   library: ['Workshop', 'Programs', 'Atelier', 'Programmes'],
   other: ['Adult admission', 'Prices', 'Entrée adulte', 'Tarifs'],
 };
-for (const [k, t] of Object.entries(TYPER)) if (K[k]) { K[k].en.prices.typer = { item: t[0], section: t[1] }; K[k].fr.prices.typer = { item: t[2], section: t[3] }; }
+// Indoor test 16 (2026-11-19; Tyler's escape room, $35 per player: the typer's first line came pre-filled "Private room for 2
+// to 6 — $35"): the first line's name for a main price per person, by kind ([en, fr]); a kind whose example is per person
+// already keeps it. A room or group name is only ever paired with a price per room or group (server.js indoorFirstItemName).
+const TYPER_PERSON = { escape: ['One player', 'Un joueur'] };
+// The first line's name for a main price per room, lane, game or group ([en, fr]).
+const TYPER_PER = { room: ['One room', 'Une salle'], lane: ['One lane', 'Une allée'], game: ['One game', 'Une partie'], group: ['One group', 'Un groupe'] };
+for (const [k, t] of Object.entries(TYPER)) if (K[k]) {
+  const pp = TYPER_PERSON[k] || [t[0], t[2]];
+  K[k].en.prices.typer = { item: t[0], section: t[1], person: pp[0] }; K[k].fr.prices.typer = { item: t[2], section: t[3], person: pp[1] };
+}
 // Indoor test 6 (2026-11-19; Priya's pottery studio was offered "Each ticket or pass and its price"): the "Type them in
 // myself" line by kind: [en, fr], each followed by ", one line at a time".
 const TYPE_SUB = {
@@ -446,4 +455,4 @@ const INDOOR_TYPE_WORD_SKIP = new Set(['history', 'heritage', 'heritage site', '
 // "learn to curl", "slots", « soin du visage »).
 const INDOOR_TYPE_WORDS = [...new Set(Object.values(K).flatMap((e) => e.en.search.concat(e.fr.search)).filter((w) => !INDOOR_TYPE_WORD_SKIP.has(w)))];
 
-module.exports = { indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };
+module.exports = { TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };

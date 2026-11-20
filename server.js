@@ -5959,6 +5959,27 @@ function smartActivityPick(activity, region, features) {
   }, (v) => (inName(v) ? 100 : 0) + (SMART_ACTIVITY_TYPES.has(v.type) ? 10 : 0) + foodDrinkRecommendedScore(v.row));
 }
 
+// Indoor test 16 (2026-11-19; "escape room monday kelowna" said "Open now" for Tyler's room, closed Mondays): a weekday named
+// in an activity search. -> { key: 'mon', idx, en: 'Monday', fr: 'lundi' } or null (none, or more than one day).
+function smartSearchDay(folded) {
+  const hits = SMART_WEEKDAYS.map((w, i) => (w.some((x) => new RegExp(`(?:^| )${x}s?(?: |$)`).test(folded)) ? i : -1)).filter((i) => i >= 0);
+  if (hits.length !== 1) return null;
+  const i = hits[0];
+  return { key: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][i], idx: i, en: SMART_WEEKDAYS[i][0].charAt(0).toUpperCase() + SMART_WEEKDAYS[i][0].slice(1), fr: SMART_WEEKDAYS[i][1] };
+}
+// A place on that day, from its listed hours: { open: true, text: 'Open Mondays · 12 PM–10 PM' } | { open: false, text:
+// 'Closed Mondays' } | null (hours not known for that day).
+function smartDayStatus(row, day, lang = 'en') {
+  try {
+    const ph = row && row.hours ? hoursModule.parseHours(row.hours) : null;
+    const d = ph && ph.known ? ph.days[day.key] : null;
+    if (!d || d.status === 'unknown') return null;
+    const fr = lang === 'fr';
+    if (d.status === 'closed') return { open: false, state: 'closed', text: fr ? `Fermé le ${day.fr}` : `Closed ${day.en}s` };
+    const r = (d.ranges || []).map(([a, b]) => `${hoursModule.formatClockMinutes(a)}–${hoursModule.formatClockMinutes(b)}`).join(', ');
+    return { open: true, state: 'open', text: fr ? `Ouvert le ${day.fr}${r ? ` · ${r}` : ''}` : `Open ${day.en}s${r ? ` · ${r}` : ''}` };
+  } catch (e) { return null; }
+}
 // Search ranking (2026-10-18): date night, romantic and special dinners rank by the planner's own romance scoring
 // (trip-planner.js occasionScore: lake views, $$$ and up, "romantic" or "intimate" in the description, the kinds of
 // place that suit a date) and its special-dinner rule (specialDinner: $$$ and up, fine dining, tasting menus, winery
@@ -6382,14 +6403,18 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
   const activity = smartActivityFor(folded);
   if (activity && T.every((t) => SMART_ACTIVITY_TYPES.has(t)) && !intent.cuisines.length && !intent.collections.length
     && !smartTopicWords(folded, intent, [...activity.words, ...SMART_ACTIVITY_GENERIC]).length) {
-    const pick = () => smartActivityPick(activity, region, F);
+    // Indoor test 16: a weekday named ("escape room monday kelowna"): the places open that day first, and each card says
+    // the day ("Closed Mondays", "Open Mondays · 12 PM–10 PM") instead of "Open now".
+    const day = smartSearchDay(folded);
+    const pick = () => { const l = smartActivityPick(activity, region, F); if (!day) return l; const st = (x) => smartDayStatus(x.row, day); return l.map((x, i) => ({ x, i, s: st(x) })).sort((a, b) => ((b.s && b.s.open ? 1 : 0) - (a.s && a.s.open ? 1 : 0)) || ((a.s && !a.s.open ? 1 : 0) - (b.s && !b.s.open ? 1 : 0)) || a.i - b.i).map((o) => o.x); };
     // Round 8 (2026-10-19): the activity's guide beside its places, and its events; with no place, the guide itself.
     const guide = activity.guide ? liveGuides().find((g) => g.path === activity.guide) : null;
     if (pick().length) {
       return {
         key: activity.key,
-        heading: `${activity.label}${town ? ` in ${town}` : ''}`,
-        headingFr: `${activity.labelFr}${town ? ` à ${town}` : ''}`,
+        ...(day ? { day } : {}),
+        heading: `${activity.label}${town ? ` in ${town}` : ''}${day ? ` on ${day.en}` : ''}`,
+        headingFr: `${activity.labelFr}${town ? ` à ${town}` : ''}${day ? ` le ${day.fr}` : ''}`,
         guides: guide ? [{ path: guide.path, heading: guide.heading }] : [],
         list: pick,
         ...(activity.events ? { events: () => searchEventsFor({ regions: R, test: activity.eventTest || ((e) => activity.re.test(`${e.name || ''} ${e.description || ''}`)), rank: activity.eventRank || null, now }) } : {}),
@@ -7054,6 +7079,8 @@ function renderSearchResultsHubPage(model, lang) {
     photoKeyFor: (v) => curatedPhotoKey(v),
     features: ['patio', 'dog_friendly', 'kid_friendly', 'lake_view', 'great_groups', 'live_music', 'happy_hour', 'vegetarian', 'open_early', 'open_late'],
     openNow: true,
+    // Indoor test 16: a weekday named: each card says that day ("Closed Mondays"), never "Open now".
+    ...(model.plan && model.plan.day ? { statusOverrides: new Map(venues.map((v) => [v.id, smartDayStatus(v, model.plan.day, lang)]).filter(([, st]) => st).map(([id, st]) => [id, { state: st.state, text: st.text, day: true }])) } : {}),
     // French: each note piece the word list knows, in French; the rest left off.
     cardNotes: lang === 'fr' ? new Map([...why].map(([id, t]) => [id, t.split(' · ').map((x) => frText(x)).filter(Boolean).join(' · ')]).filter(([, t]) => t)) : why,
     cardNoteLabel: L.matched,
@@ -24821,6 +24848,11 @@ function indoorVisitLines(venue, info) {
   // "From $65." for a spa, "Admission from $12." for a museum, "Day pass from $22." for a climbing gym.
   else if (price != null && indoorPriceExact(venue.id, t)) out.Prices = { en: `${indoorKindsModule.indoorKindText(t.kinds, 'en').price.exact} ${tourMoney(price, false)}.`, fr: `${indoorKindsModule.indoorKindText(t.kinds, 'fr').price.exact} ${tourMoney(price, true)}.` };
   else if (price != null) out.Prices = { en: indoorKindsModule.indoorPriceLine(t.kinds, tourMoney(price, false), 'en'), fr: indoorKindsModule.indoorPriceLine(t.kinds, tourMoney(price, true), 'fr') };
+  // Indoor test 16 (2026-11-19; Tyler typed "35 per person, min 2 players"): a minimum kept with a price per person.
+  if (out.Prices && price != null && !free && !INDOOR_PER_UNITS.includes(t.per) && Number.isInteger(t.per_min) && t.per_min > 1) {
+    const players = (Array.isArray(t.kinds) ? t.kinds : []).some((k) => INDOOR_PLAYER_KINDS.includes(k));
+    out.Prices = { en: out.Prices.en.replace(/\.$/, '') + ` (${t.per_min}-${players ? 'player' : 'person'} minimum).`, fr: out.Prices.fr.replace(/\.$/, '') + ` (minimum ${t.per_min} ${players ? 'joueurs' : 'personnes'}).` };
+  }
   const range = indoorKidsRange(venue, t);
   if (range) {
     const adult = t.adult === true ? [' Under 18s come with an adult.', ' Les moins de 18 ans viennent avec un adulte.'] : ['', ''];
@@ -33318,7 +33350,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
       var nx = openNextOf(status, label, clock);
       if (nx) NEXT_OPEN[id] = nx;
       var el = card.querySelector('.fd-open-status');
-      if (el) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
+      if (el && !el.hasAttribute('data-fd-day')) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
     });
   }
   function paintOpenCount(types, features, regions){
@@ -33837,7 +33869,7 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
     cardChunks = cardChunks.map((chunk) => {
       const cid = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
       const line = (extra.statusOverrides && extra.statusOverrides.get(cid)) || cardStatusFor(openStatusById.get(cid), venueById.get(cid));
-      return cardSeasonOnce(chunk, line).replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}">${escapeHtml(line.text)}</p>`);
+      return cardSeasonOnce(chunk, line).replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}"${line.day ? ' data-fd-day="1"' : ''}>${escapeHtml(line.text)}</p>`);
     });
   }
   if (extra.welcoming) {
@@ -36583,6 +36615,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   }
   const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, (cfg.openNow || cfg.cardStatus) ? openInfo.byId : null, {
     cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {}, cardExtraHtml: cfg.cardExtraHtml || null, cardNameMarkHtml: cfg.cardNameMarkHtml || null,
+    ...(cfg.statusOverrides ? { statusOverrides: cfg.statusOverrides } : {}),
     // cfg.activityPhotos: 'swap' (follows the type chips) or one fixed activity ('winter' on Ski & Snow).
     altPhotos: cfg.activityPhotos ? (cfg.activityPhotos === 'swap' ? 'swap' : 'fixed') : null,
     photoType: cfg.activityPhotos && cfg.activityPhotos !== 'swap' ? cfg.activityPhotos : (f.types.length === 1 ? f.types[0] : null),
@@ -46086,7 +46119,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
     cardChunks = cardChunks.map((chunk) => {
       const cid = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
       const line = cardStatusFor(openStatusById.get(cid), venueById.get(cid));
-      return cardSeasonOnce(chunk, line).replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}">${escapeHtml(line.text)}</p>`);
+      return cardSeasonOnce(chunk, line).replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}"${line.day ? ' data-fd-day="1"' : ''}>${escapeHtml(line.text)}</p>`);
     });
   }
   const firstBatch = [], deferred = [];
@@ -46230,7 +46263,7 @@ function bhStart(){
       var nx = openNextOf(status, label, clock);
       if (nx) NEXT_OPEN[id] = nx;
       var el = card.querySelector('.fd-open-status');
-      if (el) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
+      if (el && !el.hasAttribute('data-fd-day')) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
     });
   }
   // Favourites: the saved-items rule itself (window.__roamFav), read once per
@@ -57285,6 +57318,20 @@ const MENU_APP_STRINGS = {
 // Price lists (tours, golf, other prices, 2026-10-17): the same screens, worded for a price list. No diet tags.
 // Indoor test 5 (2026-11-19; Chris's price typer said "What it is (like Adult admission)" and "Section name, like
 // Admission" for jump passes): an indoor place's typer in its kind's words (indoor-kinds.js typer).
+// Indoor test 16 (2026-11-19; Tyler's $35 per player came pre-filled as "Private room for 2 to 6"): the typer's first line
+// names the main price's own unit: per person, the kind's per-person name ("One player", "Adult admission"); per room, lane,
+// game or group, that unit ("One room"). Never a room name beside a price per person.
+const INDOOR_UNIT_NAME_RE = /\b(?:rooms?|salles?|groups?|groupes?|lanes?|allées?|private|privée?s?|party|parties|fêtes?)\b/i;
+function indoorFirstItemName(venue, lang) {
+  try {
+    const t = venueIndoorInfo(venue.id);
+    const w = indoorKindsModule.indoorKindText(t.kinds || indoorKindSuggestion(venue), lang).prices.typer || {};
+    const per = indoorKindsModule.TYPER_PER[t.per];
+    if (per) return per[lang === 'fr' ? 1 : 0];
+    const name = w.person || w.item || '';
+    return INDOOR_UNIT_NAME_RE.test(name) ? '' : name;
+  } catch (e) { return ''; }
+}
 function indoorMenuAppStrings(venue, lang) {
   const w = indoorKindsModule.indoorKindText(venueIndoorInfo(venue.id).kinds || indoorKindSuggestion(venue), lang).prices.typer;
   if (!w) return {};
@@ -58665,7 +58712,7 @@ function renderMenuAppPage(found, opts) {
   const cfg = {
     base: opts.base, mode: opts.mode, lang, back: opts.back || null, website: normalizeWebsiteUrl(venue.website) || '', email: found.contactEmail || '', venueName: venue.name, adminNote: opts.adminNote || null,
     kind: menuKind(venue),
-    ...(venue.type === 'indoor' && opts.mode !== 'admin' && indoorPrice(venue.id) != null && !venueIndoorInfo(venue.id).per ? { firstItem: { name: (indoorKindsModule.indoorKindText(venueIndoorInfo(venue.id).kinds || indoorKindSuggestion(venue), lang).prices.typer || {}).item || '', price: lang === 'fr' ? String(indoorPrice(venue.id)).replace('.', ',') : String(Number.isInteger(indoorPrice(venue.id)) ? indoorPrice(venue.id) : indoorPrice(venue.id).toFixed(2)) } } : {}),
+    ...(venue.type === 'indoor' && opts.mode !== 'admin' && indoorPrice(venue.id) != null ? { firstItem: { name: indoorFirstItemName(venue, lang), price: lang === 'fr' ? String(indoorPrice(venue.id)).replace('.', ',') : String(Number.isInteger(indoorPrice(venue.id)) ? indoorPrice(venue.id) : indoorPrice(venue.id).toFixed(2)) } } : {}),
     linkOk: MENU_LINK_TYPES.has(venue.type) && opts.mode !== 'admin' && !!opts.back,
     t: { ...t, networkText: t.network, newDishText: plain(t.newDish), newSectionText: plain(t.newSection), takeDownConfirmText: plain(t.takeDownConfirm), firstSectionText: plain(t.firstSection) },
     state,

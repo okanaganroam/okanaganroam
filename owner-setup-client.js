@@ -688,6 +688,8 @@
   // Indoor test 2 (2026-11-19; Jordan): the price is per person ('') or for a whole room, lane, game or group (TI.per), with
   // who it's for (2–6 players). The box then holds her words ("120 per room (2–6 players)"), which say all of it.
   S.tour.per = INDOOR && INDOOR_PER.indexOf(TI.per) >= 0 && !S.tour.free ? TI.per : ''; S.tour.perMin = S.tour.per && TI.per_min ? TI.per_min : null; S.tour.perMax = S.tour.per && TI.per_max ? TI.per_max : null; S.tour.perTapped = ''; S.tour.perAuto = false;
+  // Indoor test 16 (2026-11-19; Tyler: "35 per person, min 2 players"): a price per person keeps its minimum (TI.per_min).
+  S.tour.minPeople = INDOOR && !S.tour.per && !S.tour.free && TI.per_min > 1 ? TI.per_min : null;
   if (INDOOR && S.tour.price == null && C.researchFree) { S.tour.free = C.researchDonation ? 'donation' : 'free'; S.tour.price = 0; S.tour.priceGuessed = true; if (C.researchDonation && S.tour.sugg == null && typeof C.researchSuggested === 'number') S.tour.sugg = C.researchSuggested; }
   else if (INDOOR && S.tour.price == null && typeof C.researchFee === 'number') { S.tour.price = C.researchFee; S.tour.priceGuessed = true; }
   if (INDOOR && !S.tour.kinds.length && (C.suggestKinds || []).length) { S.tour.kinds = C.suggestKinds.slice(0, 3); S.tour.kindsGuessed = true; }
@@ -804,15 +806,19 @@
   function tourFreeWord(f){ return (T.tfreeWords || {})[f] || (f === 'donation' ? 'By donation' : 'Free'); }
   function readTour(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
-    if ((x = v('suTprice')) !== null) { var fw = tourFreeRead(x), np = fw ? 0 : tourPriceRead(x); S.tour.priceFirst = !fw && tourPriceWhy(x) === 'first'; if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; S.tour.free = fw;
+    if ((x = v('suTprice')) !== null) { var xTyped = x, mr0 = INDOOR ? indoorMinRead(x) : null; if (mr0 && mr0.n) x = mr0.rest;
+      var fw = tourFreeRead(x), np = fw ? 0 : tourPriceRead(x); S.tour.priceFirst = !fw && tourPriceWhy(x) === 'first'; if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; S.tour.free = fw;
       // Indoor test 2: per room / lane / game / group words pick Per room or group (unless she tapped Per person), and say
       // who it's for; with Per room or group on, the number at the start is the price.
       if (INDOOR && !fw) {
-        var pr = indoorPerRead(x); S.tour.ptext = x;
+        var pr = indoorPerRead(x); S.tour.ptext = xTyped;
         if (pr.per && S.tour.perTapped !== 'person') { S.tour.perAuto = S.tour.per !== pr.per || S.tour.perAuto; S.tour.per = pr.per; }
         else if (!pr.per && S.tour.perAuto) { S.tour.per = ''; S.tour.perAuto = false; }
         if (S.tour.per) { S.tour.perMin = pr.min; S.tour.perMax = pr.max; var nn = tourPriceNumber(x); S.tour.price = nn == null ? (String(x).trim() ? NaN : null) : nn; S.tour.priceFirst = false; }
         S.tour.perWords = pr.per;
+        // Indoor test 16: "min 2 players" (per person) is who the price is for: "From $35 per player (2-player minimum)".
+        S.tour.minPeople = mr0 && mr0.n && !S.tour.per ? mr0.n : null;
+        if (mr0 && mr0.n && S.tour.per && !S.tour.perMin) S.tour.perMin = mr0.n;
         // Indoor test 3 (Diane: "$25 - $55" was refused): a range is its low number.
         var rl = S.tour.per ? null : indoorRangeLow(x); S.tour.range = rl != null; if (rl != null) { S.tour.price = rl; S.tour.priceFirst = false; }
       }
@@ -841,7 +847,7 @@
   function boxVal(id, n){ if (id === 'suTprice' && S.tour && S.tour.free) return tourFreeRead(S.rawBox[id]) === S.tour.free ? S.rawBox[id] : tourFreeWord(S.tour.free); return n == null ? '' : isNaN(n) ? (S.rawBox[id] || '') : String(n); }
   // Tour test 4: is what a price box holds readable now? (The red nudge goes as soon as it is.)
   function priceBoxOk(id, x){
-    if (id === 'suTprice') { var a = tourPriceRead(x); return !!tourFreeRead(x) || (a != null && !isNaN(a)); }
+    if (id === 'suTprice') { if (INDOOR) x = indoorMinRead(x).rest; var a = tourPriceRead(x); return !!tourFreeRead(x) || (a != null && !isNaN(a)); }
     if (id === 'suTpriv') { var b = tourPriceRead(x, true); return b == null || !isNaN(b); }
     if (feeHours(x)) return false;
     var f = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-zÀ-ɏ].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.');
@@ -873,6 +879,18 @@
     return out;
   }
   // Per room or group with nothing typed to say which: an escape room's is a room, bowling's a lane, the rest a group.
+  // Indoor test 16 (2026-11-19; Tyler: "35 per person, min 2 players" lost its minimum and the preview line): a minimum
+  // number of players or people in the box ("min 2 players", "2-player minimum", « minimum 2 joueurs »). -> { n, rest }.
+  function indoorMinRead(x){
+    var t = String(x == null ? '' : x), who = '(?:players?|people|persons?|ppl|pax|guests?|joueurs?|personnes?|pers)';
+    var m = new RegExp('\\s*[,;(]?\\s*(?:(?:with )?(?:a )?min(?:imum)?\\.?\\s*(?:of\\s*|de\\s*)?(\\d{1,2})(?:\\s*-?\\s*' + who + ')?(?:\\s*(?:to book|per (?:room|booking|game)|par (?:salle|réservation)))?|(\\d{1,2})\\s*-?\\s*' + who + '\\s*min(?:imum)?)\\s*\\)?', 'i').exec(t);
+    if (!m) return { n: null, rest: t };
+    var n = +(m[1] || m[2]);
+    if (!(n > 1 && n < 100)) return { n: null, rest: t };
+    return { n: n, rest: (t.slice(0, m.index) + ' ' + t.slice(m.index + m[0].length)).replace(/\s+/g, ' ').replace(/[\s,;]+$/, '').trim() };
+  }
+  // " (2-player minimum)" / " (minimum 2 joueurs)": what her page adds after a price per person.
+  function indoorMinSize(){ var n = S.tour.minPeople; if (!INDOOR || !(n > 1) || S.tour.per || S.tour.free || !T.iminSize) return ''; return fill(T.iminSize, { n: n, who: (T.iwho || {})[indoorPlayers() ? 'players' : 'people'] || '', one: (T.iwhoOne || {})[indoorPlayers() ? 'players' : 'people'] || '' }); }
   function indoorPerDefault(){ var k0 = ((S.tour && S.tour.kinds) || [])[0]; return k0 === 'escape' ? 'room' : k0 === 'bowling' ? 'lane' : 'group'; }
   function indoorPlayers(){ return ((S.tour && S.tour.kinds) || []).some(function(k){ return ['escape', 'games', 'bowling', 'curling'].indexOf(k) >= 0; }); }
   // "From $120 per room (2–6 players)" (what her page will say; server.js indoorPerLine, the same words).
@@ -887,7 +905,7 @@
   // Tour test 6: a rentals-only company (its only kind is Rentals): the card says "From $69" without "a person".
   function tourRentalsOnly(){ var ks = (S.tour && S.tour.kinds) || []; return ks.length > 0 && ks.every(function(k){ return k === 'rentals'; }); }
   // Tour test 12: a second price after the first ("2nd jump same day $69"): the nudge to Your tours and prices.
-  function tourPriceLead(){ var l0 = tourPriceLead0(); return S.tour.priceFirst && T.tpriceFirst ? l0 + ' ' + T.tpriceFirst : l0; }
+  function tourPriceLead(){ var l0 = tourPriceLead0(), ms = indoorMinSize(); if (ms && typeof S.tour.price === 'number' && S.tour.price > 0) l0 = l0.replace(/(”|\s?»)(\.?)$/, ms + '$1$2'); return S.tour.priceFirst && T.tpriceFirst ? l0 + ' ' + T.tpriceFirst : l0; }
   // Indoor test 14 (2026-11-19; Helen typed 5 under By donation; the lead kept "By donation"): the lead says the
   // suggested amount as she types it, as her page will ("By donation (suggested $5)").
   function suggNow(){ var t0 = S.tour.suggText, n0 = t0 != null ? (String(t0).trim() ? tourPriceNumber(t0) : null) : S.tour.sugg; return typeof n0 === 'number' && !isNaN(n0) && n0 > 0 && n0 <= (C.feeLiveMax || 300) ? n0 : null; }
@@ -2564,7 +2582,7 @@
         + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suFreeChips">' + ['free', 'donation'].map(function(f){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ip.free === f ? 'true' : 'false') + '" data-ifree="' + f + '">' + h(tourFreeWord(f)) + '</button>'; }).join('') + '</div>'
         // Indoor test 1: By donation keeps the box, as "Suggested amount (optional)".
         + (ip.free === 'donation' && T.tsuggLabel ? field('suTsugg', T.tsuggLabel, ip.suggText != null ? ip.suggText : ip.sugg != null ? String(ip.sugg) : '', { max: 12, mode: 'decimal' }) + '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>'
-          : ip.free ? '' : field('suTprice', ip.per && T.iperOne ? T.iperOne[ip.per] : T.tpriceLabel, ip.ptext != null ? ip.ptext : ip.per && indoorPerBox() ? indoorPerBox() : boxVal('suTprice', ip.price), { max: 60, ph: T.tpricePh || '' })
+          : ip.free ? '' : field('suTprice', ip.per && T.iperOne ? T.iperOne[ip.per] : T.tpriceLabel, ip.ptext != null ? ip.ptext : ip.per && indoorPerBox() ? indoorPerBox() : indoorMinSize() && typeof ip.price === 'number' ? boxVal('suTprice', ip.price) + indoorMinSize() : boxVal('suTprice', ip.price), { max: 60, ph: T.tpricePh || '' })
             // Indoor test 2: Per person (the default) / Per room or group, right under the box.
             + (T.iperChips ? '<div class="su-chips" role="group" aria-label="' + h(T.iperChips.person + ' / ' + T.iperChips.group) + '" id="suPerChips">' + ['person', 'group'].map(function(u){ var on = u === 'group' ? !!ip.per : !ip.per; return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (on ? 'true' : 'false') + '" data-iper="' + u + '">' + h(T.iperChips[u]) + '</button>'; }).join('') + '</div>'
               + '<p class="su-sent su-research" id="suPerRead"' + (ip.per && ip.perAuto ? '' : ' hidden') + '>' + h(ip.per ? fill(T.iperRead, { u: (T.iperWords || {})[ip.per] || ip.per }) : '') + '</p>' : '')
@@ -4550,7 +4568,7 @@
       // with words that say otherwise ("per room", "per boat", "for 4 people"): ask, and offer Per room or group.
       var iper = ipf ? '' : S.tour.per || '';
       if (!ipf && !iper && T.iperNeed) { var iw = S.tour.perWords || (['unit', 'group', 'lesson', 'day', 'hourly'].indexOf(tourPriceWhy(ipb)) >= 0 ? indoorPerDefault() : ''); if (iw) { var iu = (T.iperWords || {})[iw] || iw; S.nudge = fill(T.iperNeed, { u: iu, one: (T.iperOneFr || {})[iw] || iu }); S.badField = 'suTprice'; return render(); } }
-      var ipmin = iper && S.tour.perMin ? S.tour.perMin : null, ipmax = iper && S.tour.perMax ? S.tour.perMax : null;
+      var ipmin = iper ? (S.tour.perMin || null) : ipf ? null : (S.tour.minPeople || null), ipmax = iper && S.tour.perMax ? S.tour.perMax : null;
       // Indoor test 1: the suggested donation (optional; empty takes it off).
       var isg = null;
       if (ipf === 'donation' && S.tour.suggText != null && String(S.tour.suggText).trim()) { isg = tourPriceNumber(S.tour.suggText); if (isg == null || isNaN(isg) || isg > (C.feeLiveMax || 300)) { S.nudge = T.tsuggNeed; S.badField = 'suTsugg'; return render(); } }
