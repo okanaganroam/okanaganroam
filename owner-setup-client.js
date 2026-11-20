@@ -806,7 +806,7 @@
   function tourFreeWord(f){ return (T.tfreeWords || {})[f] || (f === 'donation' ? 'By donation' : 'Free'); }
   function readTour(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
-    if ((x = v('suTprice')) !== null) { var xTyped = x, mr0 = INDOOR ? indoorMinRead(x) : null; if (mr0 && mr0.n) x = mr0.rest;
+    if ((x = v('suTprice')) !== null) { var xTyped = x, mr0 = INDOOR ? indoorMinRead(x) : null; if (mr0) x = mr0.rest;
       var fw = tourFreeRead(x), np = fw ? 0 : tourPriceRead(x); S.tour.priceFirst = !fw && tourPriceWhy(x) === 'first'; if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; S.tour.free = fw;
       // Indoor test 2: per room / lane / game / group words pick Per room or group (unless she tapped Per person), and say
       // who it's for; with Per room or group on, the number at the start is the price.
@@ -884,10 +884,13 @@
   function indoorMinRead(x){
     var t = String(x == null ? '' : x), who = '(?:players?|people|persons?|ppl|pax|guests?|joueurs?|personnes?|pers)';
     var m = new RegExp('\\s*[,;(]?\\s*(?:(?:with )?(?:a )?min(?:imum)?\\.?\\s*(?:of\\s*|de\\s*)?(\\d{1,2})(?:\\s*-?\\s*' + who + ')?(?:\\s*(?:to book|per (?:room|booking|game)|par (?:salle|réservation)))?|(\\d{1,2})\\s*-?\\s*' + who + '\\s*min(?:imum)?)\\s*\\)?', 'i').exec(t);
+    // "per player" is per person (one player is one person).
+    t = t.replace(/(\b(?:per|a|an|par|each)\s+|\/\s*)(?:players?|joueurs?|joueuses?)\b/gi, '$1person');
     if (!m) return { n: null, rest: t };
     var n = +(m[1] || m[2]);
     if (!(n > 1 && n < 100)) return { n: null, rest: t };
-    return { n: n, rest: (t.slice(0, m.index) + ' ' + t.slice(m.index + m[0].length)).replace(/\s+/g, ' ').replace(/[\s,;]+$/, '').trim() };
+    var t0 = String(x == null ? '' : x);
+    return { n: n, rest: (t0.slice(0, m.index) + ' ' + t0.slice(m.index + m[0].length)).replace(/(\b(?:per|a|an|par|each)\s+|\/\s*)(?:players?|joueurs?|joueuses?)\b/gi, '$1person').replace(/\s+/g, ' ').replace(/[\s,;]+$/, '').trim() };
   }
   // " (2-player minimum)" / " (minimum 2 joueurs)": what her page adds after a price per person.
   function indoorMinSize(){ var n = S.tour.minPeople; if (!INDOOR || !(n > 1) || S.tour.per || S.tour.free || !T.iminSize) return ''; return fill(T.iminSize, { n: n, who: (T.iwho || {})[indoorPlayers() ? 'players' : 'people'] || '', one: (T.iwhoOne || {})[indoorPlayers() ? 'players' : 'people'] || '' }); }
@@ -4567,7 +4570,7 @@
       // Indoor test 2 (Jordan): a price per room, lane, game or group is never saved as a price for one person. Per person
       // with words that say otherwise ("per room", "per boat", "for 4 people"): ask, and offer Per room or group.
       var iper = ipf ? '' : S.tour.per || '';
-      if (!ipf && !iper && T.iperNeed) { var iw = S.tour.perWords || (['unit', 'group', 'lesson', 'day', 'hourly'].indexOf(tourPriceWhy(ipb)) >= 0 ? indoorPerDefault() : ''); if (iw) { var iu = (T.iperWords || {})[iw] || iw; S.nudge = fill(T.iperNeed, { u: iu, one: (T.iperOneFr || {})[iw] || iu }); S.badField = 'suTprice'; return render(); } }
+      if (!ipf && !iper && T.iperNeed) { var iw = S.tour.perWords || (['unit', 'group', 'lesson', 'day', 'hourly'].indexOf(tourPriceWhy(indoorMinRead(ipb).rest)) >= 0 ? indoorPerDefault() : ''); if (iw) { var iu = (T.iperWords || {})[iw] || iw; S.nudge = fill(T.iperNeed, { u: iu, one: (T.iperOneFr || {})[iw] || iu }); S.badField = 'suTprice'; return render(); } }
       var ipmin = iper ? (S.tour.perMin || null) : ipf ? null : (S.tour.minPeople || null), ipmax = iper && S.tour.perMax ? S.tour.perMax : null;
       // Indoor test 1: the suggested donation (optional; empty takes it off).
       var isg = null;
