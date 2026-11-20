@@ -177,6 +177,8 @@ test('4. "free family saturday kelowna" with nothing on What\'s On that Saturday
 
 test('5. Build My Trip: a by-donation museum is a cheap stop ("cheap rainy day in Kelowna on Saturday"), and the trip total says "By donation (suggested $5)", not $0', async () => {
   const { v } = await helen();
+  // Indoor test 17: a day plan has one museum, so the other tests' copies of Helen's museum move out of town.
+  for (const r of db.prepare("SELECT id FROM venues WHERE name LIKE 'Heritage T14%' AND id != ?").all(v.id)) app.updateVenue(r.id, { region: 'baldy' });
   for (let i = 0; i < 4; i++) mk({ name: `Cheap Arcade T14 ${i}`, cuisine: 'Arcade', price: 1, description: 'An arcade.', hours: JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['10:00', '22:00']]]))) });
   const items = (p) => [...((p.outing && p.outing.stops) || []), ...((p.itinerary && p.itinerary.stops) || []), ...(p.days || []).flatMap((d) => d.stops || []), ...(p.recommendations || [])].filter((x) => x && x.venue);
   const p = app.runTripPlan({ text: 'cheap rainy day in Kelowna on Saturday' }, NOW);

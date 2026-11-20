@@ -246,7 +246,8 @@ test('9. Good to know chips follow the kind: a museum gets museum chips (no grip
   const g = mk('indoor', { name: 'Gneiss Climbing T1', description: 'Bouldering.' });
   await ok(change(tokenFor(g.id), { indoor_info: { kinds: ['climbing'] } }));
   const gc = await chipsOf(g);
-  assert.ok(gc.includes('Grip socks required') && gc.includes('Waiver to sign before you play'), gc.join(' | '));
+  // Indoor test 17: the waiver chip says the kind's verb.
+  assert.ok(gc.includes('Grip socks required') && gc.includes('Waiver to sign before you climb'), gc.join(' | '));
   const s = mk('indoor', { name: 'Nordic Spa T1', description: 'Hot and cold pools.' });
   await ok(change(tokenFor(s.id), { indoor_info: { kinds: ['spa'] } }));
   const sc = await chipsOf(s);

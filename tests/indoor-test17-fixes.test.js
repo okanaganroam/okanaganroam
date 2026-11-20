@@ -271,3 +271,32 @@ test('4. Polish: the waiver chip says the kind\'s verb (climb, jump, play); a wa
   const kindsOfDay = gyms.map((x) => x.venue.typeLabel);
   assert.equal(new Set(kindsOfDay).size, kindsOfDay.length, kindsOfDay.join(' | '));
 });
+
+// Her real listing: six research rows, so her answers fill the box and research's Groups and Good to know lines are set
+// aside (owner_dropped) and offered back in her boxes (groupsFound, gtkFound).
+test('G2 + G3 with a full box (her real listing): research\'s Groups line offered back in her box is trimmed first when she adds her words; its "Wednesday … opens at 2:30 PM" line is asked about and flagged, never pre-filled as hers', async () => {
+  const v = mk({ name: 'Gneiss Full Box T17', description: 'A bouldering-focused climbing gym with regularly reset problems and training areas.', great_groups: 1, kid_friendly: 1 });
+  db.prepare('INSERT INTO venue_visit_info (venue_id, info) VALUES (?, ?)').run(v.id, JSON.stringify({ rows: [
+    { label: 'Known for', text: 'Bouldering gym with walls up to 15 ft, a kids zone with auto belays and speed tracks, and a training area.' },
+    { label: 'Prices', text: 'Adult day pass $20, youth (11 to 17) $16, kids (3 to 10) $11.50. Shoes $5. Plus tax.' },
+    { label: 'Booking', text: 'Drop in for climbing; sign the online waiver first.' },
+    { label: 'Ages', text: 'Kids area with auto belays for ages 3 and up.' },
+    { label: 'Groups', text: RES_GROUPS },
+    { label: 'Good to know', text: 'Wednesday is route-setting day at OG Banks: opens at 2:30 PM.' }], source_url: 'https://example.com', checked_at: '2026-10-31' }));
+  const t = tokenFor(v.id);
+  await ok(change(t, { indoor_info: { kinds: ['climbing'], length: '1-2h', book: 'no', age: 'all', year: 'all' }, indoor_price: 22 }));
+  await ok(change(t, { hours: MEGAN }));
+  const stale = app.indoorStaleResearch(app.getVenue(v.id), NOW).map((x) => x.text);
+  assert.ok(stale.includes('Wednesday is route-setting day at OG Banks: opens at 2:30 PM.'), stale.join(' | '));
+  const m = await openSetup(base, t, { hash: 'more' });
+  assert.match(m.text(), /We also had: “Wednesday is route-setting day at OG Banks: opens at 2:30 PM\.” Still right\?/);
+  const b = await openSetup(base, t, { hash: 'bring' });
+  assert.doesNotMatch(b.doc.getElementById('suBring').value, /route-setting/);
+  assert.ok(b.has('#suBringClash'), 'flagged as found online');
+  const g = await openSetup(base, t, { hash: 'groups' });
+  const box = g.doc.getElementById('suGroupsLine');
+  assert.equal(box.value.trim(), RES_GROUPS);
+  await g.type('suGroupsLine', `${box.value.trim()} ${HER_GROUPS}`);
+  await g.click('brewGroupsSave');
+  assert.equal(lineOf(v.id, 'Groups'), HER_GROUPS);
+});

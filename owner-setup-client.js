@@ -1695,11 +1695,20 @@
   // or after chips), research's sentences go first, never the owner's words; only her own words over the limit alone are
   // kept to the whole sentences that fit, and the message says so. -> false (fits), { text, go: true } (research trimmed:
   // save as it is now), or { text, go: false } (her own words cut: shown, saved on the next Save).
+  // Research's own line for a box: the box's line while it is still research's, or (indoor) the Groups or Good to know line
+  // research found when her box holds none of her own (C.groupsFound, C.gtkFound: her other saved lines made the box hers).
+  function researchOf(key){
+    var cur = String(((CUR.visit_rows || {})[key]) || '').trim();
+    if (cur && (C.visitResearch || []).indexOf(key) >= 0) return cur;
+    if (!cur && key === 'groups' && C.groupsFound) return String(C.groupsFound).trim();
+    if (!cur && key === 'good_to_know' && C.gtkFound) return String(C.gtkFound).trim();
+    return '';
+  }
   function overMaxOwn(boxId, max, key){
     var b = el(boxId); if (!b) return false;
     var v = String(b.value || '').trim(); if (v.length <= max) return false;
-    var pre = String(((CUR.visit_rows || {})[key]) || '').trim();
-    if (pre && (C.visitResearch || []).indexOf(key) >= 0) {
+    var pre = researchOf(key);
+    if (pre) {
       var tr = trimResearch(v, pre, max, null);
       if (tr) { b.value = tr.v; trimNoteSet(boxId, tr.rest); if (tr.v.length <= max) return { text: tr.v, go: true }; }
     }
@@ -5016,7 +5025,7 @@
       // Tour test 9 (Whistler, 2026-11-18; Tanis): "Groups of up to 20School and group programs…" went live: the size line
       // ends with ". " so what she types next starts its own sentence (as the Good to know answers do).
       readBrew(); S.brew.groups = addPiece(keepPieces(S.brew.groups, groupsKeep(S.brew.groups)), groupsSizeLine(+b.getAttribute('data-bgroup')) + '.') + ' ';
-      var gpre = String(((CUR.visit_rows || {}).groups) || '').trim(), gtr = gpre && (C.visitResearch || []).indexOf('groups') >= 0 ? trimResearch(S.brew.groups, gpre, 180, groupsSizeLine(+b.getAttribute('data-bgroup'))) : null;
+      var gpre = researchOf('groups'), gtr = gpre ? trimResearch(S.brew.groups, gpre, 180, groupsSizeLine(+b.getAttribute('data-bgroup'))) : null;
       if (gtr) { S.brew.groups = gtr.v + ' '; S.trimNote = { box: 'suGroupsLine', step: S.step, text: fill(T.trimResearch || '{rest}', { rest: gtr.rest.length > 90 ? gtr.rest.slice(0, 88) + '…' : gtr.rest }) }; } (S.chipFilled = S.chipFilled || {}).suGroupsLine = S.brew.groups; S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y);
       // Tour test 14 (Lucía, Pixel): her tap on the box after a size chip put the cursor mid-line, so her words went inside
       // "Groups of 6 or more: please book ahead." The box takes the focus with the cursor at the end (as the quick chips do).
@@ -5137,7 +5146,7 @@
       if (sep === '. ' && v && qk !== 'takeout') v = v.replace(/[\s]+$/, '').replace(/([^.!?])$/, '$1.') + ' ';
       // Tour test 14 (Lucía): no double space inside the line (a space she typed after an earlier chip's ". ").
       v = v.replace(/([^\s])[ \u00a0]{2,}(?=\S)/g, '$1 ');
-      var lim0 = qk === 'groups' ? 180 : qk === 'good_to_know' ? BRING_MAX : 0, tr0 = lim0 && pre && (C.visitResearch || []).indexOf(qk) >= 0 ? trimResearch(v, pre, lim0, t) : null;
+      var lim0 = qk === 'groups' ? 180 : qk === 'good_to_know' ? BRING_MAX : 0, rpre = lim0 ? researchOf(qk) : '', tr0 = lim0 && rpre ? trimResearch(v, rpre, lim0, t) : null;
       if (tr0) { v = tr0.v + (sep === '. ' && !/[.!?]$/.test(tr0.v) ? '.' : '') + ' '; trimNoteSet(box.id, tr0.rest); } else if (lim0 && S.trimNote && S.trimNote.box === box.id && v.trim().length <= lim0) trimNoteSet(box.id, '');
       box.value = v.slice(0, box.maxLength > 0 ? box.maxLength : 180); box._qPrev = box.value; countUpdate(box); mark();
       // Tour test 11 (Whistler, 2026-11-18; Min-jun dictates): a Good to know chip puts the cursor in the box, at the end.

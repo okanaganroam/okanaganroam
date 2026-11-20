@@ -99,7 +99,7 @@ function renderIndoorLayout(p) {
         <p class="gb-eyebrow">${eyebrow} · <a href="/${e(v.region)}">${e(p.regionLabel)}</a></p>${v.image_url ? `<h1 class="gb-desktop-title">${e(v.name)}</h1>` : ''}
         ${intro ? `<p class="gb-intro">${e(intro)}</p>` : ''}
         ${p.verifiedHtml || ''}${p.advisoryHtml || ''}${p.openStatusHtml || ''}${p.chipsHtml ? `<p class="chips">${p.chipsHtml}</p>` : ''}
-        ${book ? `<div class="gb-mobile-book">${book}<p class="gb-help">Opens the booking page in a new tab ↗</p></div>` : mainButton ? `<div class="gb-direct">${mainButton}</div>` : ''}
+        ${book ? `<div class="gb-mobile-book">${book}<p class="gb-help">${walkIn ? 'Opens in a new tab ↗' : 'Opens the booking page in a new tab ↗'}</p></div>` : mainButton ? `<div class="gb-direct">${mainButton}</div>` : ''}
         ${tiles.length >= 2 ? `<div class="gb-quick">${tiles.join('')}</div>` : ''}
         ${save.length ? `<div class="gb-save"${p.ctaRowAttrs}>${save.join('')}</div><p class="gb-help">♡ Favorite saves this place for later. Add to trip puts it on your trip list.</p>` : ''}
       </section>
