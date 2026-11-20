@@ -22279,7 +22279,10 @@ function cafeInfoAnswers(venueId) { const o = { ...venueCafeInfo(venueId) }; del
 function cafeInfoLinks(venueId) { const l = venueCafeInfo(venueId).links || {}; return { order_url: l.order_url || '', preorder_url: l.preorder_url || '' }; }
 function cafeServesBeerWine(venueId) { const s = venueCafeInfo(venueId).serves; return Array.isArray(s) && s.includes('beer_wine'); }
 // Happy hour is asked of a café only when it ticked Beer & wine (outreach rule); every other type as before.
-function happyHourAllowed(venue) { return !!venue && (!!portalFields(venue.type).happyHour || (venue.type === 'cafe' && cafeServesBeerWine(venue.id))); }
+// Sport setup (2026-11-20; Dayton: happy hour never appears for sports places, a clubhouse bar included): golf listings
+// lose the happy hour box and tile on their portal while the sport setup is on. Their public happy hour lines are left as
+// they are (no data change).
+function happyHourAllowed(venue) { return !!venue && !sportSetupType(venue.type) && (!!portalFields(venue.type).happyHour || (venue.type === 'cafe' && cafeServesBeerWine(venue.id))); }
 // Laptops "all day" is the public Laptop friendly chip (Decided 3); "not at busy times" is a line; "no laptops" shows nothing.
 function cafeLaptopFriendly(venue) { return !!venue && venue.type === 'cafe' && (venueCafeInfo(venue.id).stay || {}).laptops === 'all_day'; }
 // The kind of café a name suggests (Decided 6), for the setup only: pre-selected, saved only when the owner confirms it.

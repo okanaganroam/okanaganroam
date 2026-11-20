@@ -211,3 +211,35 @@ test('8. search finds a sports place by the kind its owner picked', async () => 
     assert.ok(plain(r.text).includes('Westside Racquet Fixture'), 'found by the courts kind');
   } finally { delete process.env.DISCOVERY_SEARCH; }
 });
+
+test('9. the edit page (golf with a happy hour badge): the checklist and the answer lines; no happy hour box or tile; Help without happy hour', async () => {
+  const v = mk('golf', { name: 'Edit Page Golf Club', happy_hour: 1, description: 'An 18-hole course.' });
+  const t = tokenFor(v.id);
+  ok(await change(t, { indoor_info: { kinds: ['golf'], length: 'half', book: 'ahead', age: 'all', year: 'all' }, indoor_price: 70 }));
+  const html = (await getText(`/owner/${t}`)).text;
+  assert.match(html, /id="opComplete"/, 'the checklist');
+  const text = plain(html);
+  assert.match(text, /Green fees from \$70\./);
+  assert.match(text, /Please book ahead\./);
+  assert.doesNotMatch(text, /Your times and what’s on special/, 'no happy hour tile');
+  assert.ok(!/id="happy"/.test(html), 'no happy hour box');
+  assert.match(text, /Tournaments, clinics, leagues and more/, 'the events tile in sport words');
+  const fr = plain((await getText(`/fr/owner/${t}`)).text);
+  assert.match(fr, /Droits de jeu à partir de 70 \$\./);
+  // The public page keeps what research found (no data change).
+  assert.ok(app.getVenue(v.id).happy_hour);
+});
+
+test('10. research lines her answers make wrong come off her page (a skate park research said "Closed Mondays" and "$5 entry"; she says open daily and free)', async () => {
+  const v = mk('sport', { name: 'Research Skate Park', description: 'A skate park with a bowl. Closed Mondays.' });
+  db.prepare('INSERT INTO venue_visit_info (venue_id, info) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET info = excluded.info').run(v.id, JSON.stringify({ rows: [{ label: 'Good to know', text: 'Closed Mondays. Helmets recommended.' }, { label: 'Prices', text: 'Entry $5 per person.' }], source_url: 'https://research.example', checked_at: '2026-10-01' }));
+  const t = tokenFor(v.id);
+  ok(await change(t, { indoor_info: { kinds: ['skatepark'], book: 'no', age: 'all', year: 'all' }, indoor_price: 'free' }));
+  // Her hours (every day, Mondays included) from the hours screen.
+  ok(await change(t, { hours: WK('08:00', '22:00') }));
+  const en = plain(app.renderVenuePage(app.getVenue(v.id), [], [], [], { lang: 'en', now: new Date('2026-11-20T12:00:00-08:00') }));
+  assert.ok(en.includes('Free entry.'));
+  assert.ok(!en.includes('Entry $5 per person.'), 'research\'s price is replaced by her answer');
+  assert.ok(en.includes('Helmets recommended.'), 'the rest of research\'s line stays');
+  assert.ok(!/Closed Mondays\. Helmets/.test(en), 'the closed day her hours contradict is off her page');
+});
