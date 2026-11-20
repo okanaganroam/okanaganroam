@@ -47562,6 +47562,27 @@ function browseRestJson(venues, now = new Date(), fresh = false) {
   const hash = crypto.createHash('md5').update(json).digest('hex').slice(0, 12);
   return (browseRestMemo = { version, json, jsonEn, hash, at: Date.now() });
 }
+// Browse in the hub layout (2026-11-20): the Food & Drink layout's own stylesheet with its card rules pointed at Browse's
+// list (#bhResults), then Browse's own rules. Browse keeps its own controls, cards and script.
+const BROWSE_REFRESH_CSS = `<style id="browse-refresh">
+${fs.readFileSync(path.join(__dirname, 'public', 'food-drink-layout.css'), 'utf8').split('#fdResults').join('#bhResults').replace(/`|\$\{/g, '')}
+  /* Browse in the hub layout (2026-11-20): its own controls and cards, laid out like the other list pages. */
+  /* The filter bar sits inside the toolbar (no longer its own sticky strip), so a phone's panels are placed against the screen. */
+  body.browse-page.fd-refresh .fd-toolbar .rp-filterbar { position: static; margin: 12px 0 0; padding: 0; background: none; border: 0; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  body.browse-page.fd-refresh .fd-toolbar .fd-controls { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-start; }
+  body.browse-page.fd-refresh .fd-toolbar .fd-controls > *, body.browse-page.fd-refresh .fd-toolbar .fd-controls > .fd-pop:first-child { flex: 0 0 auto !important; margin: 0; width: auto !important; max-width: none !important; }
+  body.browse-page.fd-refresh .fd-toolbar .fd-pop-btn { width: auto !important; max-width: none !important; white-space: nowrap; }
+  body.browse-page.fd-refresh .fd-toolbar .fd-pop-btn, body.browse-page.fd-refresh .fd-toolbar .fd-open-toggle, body.browse-page.fd-refresh .fd-toolbar .fd-controls > a, body.browse-page.fd-refresh .fd-toolbar .fd-controls > button { min-height: 44px; border-radius: 999px; background: #fffdf8; border: 1px solid #ddd6c9; }
+  body.browse-page.fd-refresh .fd-toolbar .fd-search { margin: 0; }
+  body.browse-page.fd-refresh .fd-type-row { margin-top: 14px; }
+  @media (max-width: 640px) {
+    body.browse-page.fd-refresh #bhResults > .venue-card { padding: 12px 16px !important; }
+    body.browse-page.fd-refresh #bhResults > .venue-card::before { height: clamp(128px, 40vw, 190px) !important; min-height: 0 !important; padding-bottom: 0 !important; width: calc(100% + 32px); margin: 0 -16px 10px; }
+    body.browse-page.fd-refresh #bhResults > .venue-card > h2 { font-size: 20px; line-height: 1.25; margin-bottom: 8px; }
+    body.browse-page.fd-refresh #bhResults > .venue-card > .card-slot-notice:has(> .season-tag) { position: relative !important; order: -2 !important; top: auto !important; right: auto !important; left: auto !important; align-self: flex-start; max-width: calc(100% - 20px); margin: -48px 10px 18px !important; }
+  }
+</style>`;
+
 function renderBrowseHubPage(venues, filter = null, now = new Date()) {
   const cuisines = browseCuisines(venues);
   const f = filter || parseBrowseHubQuery({}, cuisines);
@@ -47638,9 +47659,10 @@ ${renderFoodDrinkHubStyles()}
 ${renderFoodDrinkOpenNowStyles()}
 ${renderBrowseHubStyles()}
 ${BROWSE_HEAD_EXTRAS}
+${BROWSE_REFRESH_CSS}
 ${golfEngagementHeadHtml('fd', true, 'browse')}
 </head>
-<body class="golf-page outdoor-page fd-page browse-page">
+<body class="golf-page outdoor-page fd-page fd-refresh browse-page">
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
 ${withoutFavoritesNavLink(renderGolfHeaderHtml())}
@@ -47648,9 +47670,11 @@ ${withoutFavoritesNavLink(renderGolfHeaderHtml())}
   ${breadcrumbNavHtml([{ name: 'Home', href: '/' }, { name: 'Browse & Search' }])}
   <h1>${escapeHtml(heading)}</h1>
   <p class="outdoor-intro fd-intro">Every place in the valley, filterable by region, category, and what matters to you.</p>
+  <div class="fd-toolbar">
   ${browseSearchHtml(f.q)}
-  ${browseTypeChipsHtml(state)}
   ${browseFilterBarHtml(venues, cuisines, state, openCount)}
+  </div>
+  ${browseTypeChipsHtml(state)}
   ${BROWSE_EARLY_TAP_SCRIPT}
   <p class="fd-open-note">${escapeHtml(BROWSE_OPEN_NOTE)}</p>
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="bhResultsTop">
