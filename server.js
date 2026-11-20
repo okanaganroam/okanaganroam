@@ -53092,6 +53092,20 @@ function indoorGroupsFound(venueId) {
 }
 // Writes the owner's lines into the stored box (an Undo writes the old ones back). Rows the owner left alone (Menu,
 // Patio...) and the booking button stay. A changed line loses its old "More" link. -> the new info JSON (or null).
+// Sport test 3: the % checklist's words for a sport or golf listing's main kind (portal-completeness.js input.kindWhy).
+function sportKindWhyOf(k) {
+  const SK = indoorKindsModule.SPORT, e = SK.K[k], w = SK.KIND_SETUP_WORDS[k];
+  if (!e || !w) return null;
+  const strip = (x) => String(x).replace(/ It’s optional\.$| C’est facultatif\.$/, '');
+  return {
+    photo_main: { whyEn: `Real photos only, taken by you. ${w.photosLead[0].replace(/ Three photos is perfect\.$/, '')}`, whyFr: `De vraies photos seulement, prises par vous. ${w.photosLead[1].replace(/ Trois photos, c’est parfait\.$/, '')}` },
+    indoor_price: { whyEn: e.en.price.lead, whyFr: e.fr.price.lead },
+    menu: { whyEn: strip(e.en.prices.lead), whyFr: strip(e.fr.prices.lead) },
+    ...(k === 'golf' ? {} : { booking_link: { en: 'Booking link', fr: 'Lien de réservation', whyEn: 'The page where people book with you, if you have one.', whyFr: 'La page où l’on réserve chez vous, si vous en avez une.' },
+      indoor_booking: { whyEn: 'Walk-ins welcome, or book ahead (or both).', whyFr: 'Sans réservation, ou réserver à l’avance (ou les deux).' },
+      pyv_known: { whyEn: 'One line: what people love most about your place.', whyFr: 'Une ligne : ce que les gens aiment le plus chez vous.' } }),
+  };
+}
 function capTypeOf(venueId) { try { return (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || ''; } catch (e) { return ''; } }
 function writeOwnerVisitRows(venueId, value, now = new Date()) {
   const cur = venueVisitInfo(venueId);
@@ -60064,7 +60078,7 @@ function researchedMenuOwnerCard(venue, pub, base, lang = 'en') {
 function renderMenuAppPage(found, opts) {
   const { venue } = found;
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
-  const t0 = { ...MENU_APP_STRINGS[lang], ...(isPriceList(venue) ? priceListAppStrings(menuKind(venue), lang, priceListWordsFor(venue)) : {}), ...(brewSetupType(venue.type) ? breweryMenuAppStrings(venue, lang) : {}), ...(kindSetupType(venue.type) ? indoorMenuAppStrings(venue, lang) : {}) };
+  const t0 = { ...MENU_APP_STRINGS[lang], ...(isPriceList(venue) ? priceListAppStrings(menuKind(venue), lang, priceListWordsFor(venue)) : {}), ...(brewSetupType(venue.type) ? breweryMenuAppStrings(venue, lang) : {}), ...(kindSetupType(venue.type) && menuKind(venue) !== 'golf' ? indoorMenuAppStrings(venue, lang) : {}) };
   // Indoor test 1 (2026-11-19; Margaret): "Type them in myself" from the setup's Your prices felt like leaving the setup for
   // the full editor. Opened from the setup (its way back is the setup's #more list), an indoor place's screen says it is
   // part of the setup, and its way back says so too.
@@ -62689,7 +62703,7 @@ const SPORT_TEST3_HELP_TOPICS = [
     keysFr: ['comptant seulement', 'argent comptant', 'comptant et debit', 'pas de carte de credit', 'pas de cartes de credit', 'paiement'],
     a: '<p>Say it in one line in <strong>Good to know</strong>, like <em>Cash or debit only</em>. It shows under “Your visit” on your page.</p>',
     aFr: '<p>Dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>Comptant ou débit seulement</em>. C’est affiché sous « Votre visite » sur votre page.</p>' },
-  { id: 'sport-no-bar', pages: ['setup', 'edit'], keepHappy: true, over: ['indoor-bar', 'hh-deals', 'hh-times', 'sport-food-menu', 'sport-restaurant', 'indoor-good-to-know', 'features', 'setup-happy', 'happy-hour', 'hh-add', 'dont-have'],
+  { id: 'sport-no-bar', kinds: ['golf', 'simgolf', 'range'], pages: ['setup', 'edit'], keepHappy: true, over: ['indoor-bar', 'hh-deals', 'hh-times', 'sport-food-menu', 'sport-restaurant', 'indoor-good-to-know', 'features', 'setup-happy', 'happy-hour', 'hh-add', 'dont-have'],
     q: 'We don’t serve alcohol (a snack bar)', qFr: 'Nous ne servons pas d’alcool (un casse-croûte)',
     allOf: [['dont', 'never', 'without', 'pas', 'aucun', 'sans'], ['beer', 'alcohol', 'liquor', 'licensed', 'licence', 'license', 'wine', 'alcool', 'biere', 'permis']],
     keys: ['we dont serve beer', 'dont serve beer', 'dont serve alcohol', 'no alcohol', 'not licensed', 'no liquor', 'no liquor licence', 'its a snack bar', 'snack bar not a bar', 'why does it say happy hour', 'happy hour not done', 'we dont have a happy hour', 'no happy hour', 'dry'],
@@ -70515,7 +70529,8 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
       offerAnswered: (() => { try { return ['live', 'day'].includes(setupProgress(venue.id).done.offer); } catch (e) { return false; } })() } : {}),
     // Indoor places (2026-11-19): the same, with their indoor answers and adult price.
     ...(kindSetupType(venue.type) ? { openMonths: venueLinks(venue.id).open_months || '', hasSeasons: ((venueHoursExtras(venue.id) || {}).seasons || []).length > 0,
-      indoorInfo: live.indoor_info || indoorInfoAnswers(venue.id), indoorPrice: 'indoor_price' in live ? live.indoor_price : indoorPriceValue(venue.id),
+      indoorInfo: live.indoor_info || indoorInfoAnswers(venue.id),
+      ...(sportSetupType(venue.type) && ((live.indoor_info || indoorInfoAnswers(venue.id) || {}).kinds || [])[0] ? { kindWhy: sportKindWhyOf(((live.indoor_info || indoorInfoAnswers(venue.id)).kinds)[0]) } : {}), indoorPrice: 'indoor_price' in live ? live.indoor_price : indoorPriceValue(venue.id),
       offerAnswered: (() => { try { return ['live', 'day'].includes(setupProgress(venue.id).done.offer); } catch (e) { return false; } })() } : {}),
     ownerFeatures: Object.entries(venueOwnerFeaturesFor(venue)).filter(([, on]) => on).map(([k]) => k),
   };

@@ -105,12 +105,9 @@ test('1. Gord\'s range: the price list editor, his page, the prices page and the
   assert.match(ppf, /Champ de pratique et mini-golf à Kelowna/);
   // The checklist's words are his kind's.
   assert.equal(app.priceListWordsFor(app.getVenue(v.id)).en.noun, 'Prices & rates');
-  const PC = require('../portal-completeness.js');
-  for (const lang of ['en', 'fr']) {
-    const sc = PC.scoreCompleteness({ type: 'golf', indoorInfo: { kinds: ['range', 'simgolf'] } }, {});
-    noHit(NO_GOLF_COURSE, JSON.stringify([...(sc.missing || []), ...(sc.coming || [])].map((x) => lang === 'fr' ? [x.fr, x.whyFr] : [x.en, x.whyEn])), `${lang} checklist`);
-  }
   noHit(NO_GOLF_COURSE, plain(await getText(`/owner/${t}`)), 'portal home');
+  noHit(NO_GOLF_COURSE, plain(await getText(`/fr/owner/${t}`)), 'fr portal home');
+  assert.match(plain(await getText(`/owner/${t}`)), /Your range or mini golf, and people playing/);
   // A golf course keeps its green fees.
   const course = mk('golf', { name: 'Green Fee Course Fixture', description: 'An 18-hole public course.' });
   assert.equal(app.priceListWordsFor(app.getVenue(course.id)).en.noun, 'Green fees & rates');
