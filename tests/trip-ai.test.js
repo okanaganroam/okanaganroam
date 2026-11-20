@@ -60,11 +60,7 @@ test('valid output: the structure comes back checked; the request sent is Haiku 
   assert.deepEqual(sch.properties.t.items.enum, TAXONOMY.regions);
   assert.ok(sch.properties.i.items.properties.k.enum.includes('winery'));
   assert.ok(!sch.properties.i.items.properties.k.enum.includes('shop'));
-  assert.deepEqual(sch.required, ['t', 'i']);
-  // Inside the documented structured-output limits: at most 24 optional parameters, no union types.
-  const optional = Object.keys(sch.properties).length - sch.required.length + Object.keys(sch.properties.i.items.properties).length - sch.properties.i.items.required.length;
-  assert.ok(optional <= 24, `${optional} optional parameters`);
-  assert.doesNotMatch(JSON.stringify(sch), /anyOf|"type":\[/);
+  assert.deepEqual(sch.required, ai.WIRE_KEYS, 'every key is required (round 3)');
   // Speed (round 2): short answer cap, thinking off, the stable system prompt sent as one cached block.
   assert.equal(b.max_tokens, 400);
   assert.deepEqual(b.thinking, { type: 'disabled' });
@@ -252,16 +248,55 @@ test('one stop asked once: après + drinks, winery + winery and a sunset + dinne
 test('wire format: short keys round-trip to the long intent', () => {
   const long = intent({ towns: ['kelowna'], weekday: 'saturday', driver: true, party: { adults: 2, kid_ages: [4] }, interests: [it('coffee', { time_of_day: 'morning', start_time: '09:30' })], must_have: ['vegan'] });
   const w = ai.toWire(long);
-  assert.deepEqual(Object.keys(w), ['t', 'i', 'w', 'a', 'ka', 'dd', 'mh'], 'empty keys are left out');
+  assert.deepEqual(Object.keys(w), ai.WIRE_KEYS, 'every key, always');
+  assert.deepEqual(w.f, ['driver']);
+  assert.equal(w.sd, '');
+  assert.equal(w.d, 0);
   assert.equal(w.w, 'saturday');
   const back = ai.expandWire(w);
   assert.equal(back.ok, true);
   assert.equal(back.intent.weekday, 'saturday');
   assert.equal(back.intent.month, null);
   assert.equal(ai.validateIntent(back.intent, ALLOWED).ok, true);
-  assert.equal(ai.expandWire({ ...w, i: [{ k: 'coffee', t: 'any', s: null, p: null, venue: 1 }] }).reason, 'invalid:interest');
-  // The wire answer for a typical request is a small fraction of the first version's.
-  assert.ok(JSON.stringify(w).length < JSON.stringify(long).length * 0.4, `${JSON.stringify(w).length} vs ${JSON.stringify(long).length}`);
-  // The smallest answer is just towns and interests.
-  assert.deepEqual(ai.expandWire({ t: [], i: [] }).intent.party, { adults: null, kids: null, kid_ages: [], dog: false });
+  assert.equal(back.intent.driver, true);
+  assert.equal(back.intent.start_date, null, '"" is not said');
+  assert.equal(back.intent.days, null, '0 is not said');
+  assert.equal(back.intent.interests[0].place, null);
+  assert.equal(ai.expandWire({ ...w, i: [{ k: 'coffee', t: 'any', s: '', p: '', venue: 1 }] }).reason, 'invalid:interest');
+  assert.equal(ai.expandWire({ ...w, i: [{ k: 'coffee', t: 'any', s: null, p: '' }] }).reason, 'invalid:interest', 'no nulls in the wire format');
+  assert.equal(ai.expandWire({ ...w, f: ['vip'] }).reason, 'invalid:flags');
+  assert.equal(ai.expandWire({ ...w, d: -1 }).reason, 'invalid:d');
+  const { sd, ...noSd } = w;
+  assert.equal(ai.expandWire(noSd).reason, 'invalid:missing_sd');
+  // Still smaller than the first version's answer (long names, nested party, nulls everywhere).
+  assert.ok(JSON.stringify(w).length < JSON.stringify(long).length * 0.6, `${JSON.stringify(w).length} vs ${JSON.stringify(long).length}`);
+});
+
+// Round 3 (2026-11-20): round 2's schema (20 optional parameters) made the live API compile for 14-30 s and then answer
+// 400 "Schema is too complex". This holds the schema to the documented structured-output limits, with the real taxonomy
+// size, so it can't drift back silently.
+test('schema complexity: no optional parameters, no unions, no formats, enums no bigger than round 1 (which compiled)', () => {
+  // A taxonomy as big as the live one: every type, activity and badge the reader knows, 20 towns.
+  const towns = ['kelowna', 'west-kelowna', 'peachland', 'summerland', 'penticton', 'naramata', 'lake-country', 'okanagan-falls', 'oliver', 'osoyoos',
+    'vernon', 'armstrong', 'coldstream', 'lumby', 'enderby', 'kaleden', 'apex', 'big-white', 'silverstar', 'baldy'];
+  const full = ai.buildAllowed({
+    regions: towns, regionLabels: Object.fromEntries(towns.map((t) => [t, t])),
+    types: Object.keys(ai.TYPE_PHRASES), activities: Object.keys(ai.ACTIVITY_PHRASES),
+    features: Object.keys(ai.FEATURE_PHRASES).filter((f) => f !== 'accessible'), paces: ['relaxed', 'standard', 'packed'], budgets: ['budget', 'moderate', 'upscale'],
+  });
+  const c = ai.schemaComplexity(ai.wireSchema(full));
+  assert.ok(c.optional <= ai.SCHEMA_LIMITS.optional && c.unions <= ai.SCHEMA_LIMITS.unions, 'inside the documented limits');
+  // Stricter than the limits, on purpose: these are what made round 2 fail.
+  assert.equal(c.optional, 0, 'optional parameters');
+  assert.equal(c.unions, 0, 'union types (anyOf / type arrays)');
+  assert.equal(c.formats, 0, 'string formats');
+  assert.ok(c.depth <= 3, `nesting depth ${c.depth}`);
+  // Round 1 (all required, 13 unions, 171 enum values, largest 47) compiled and answered in ~1.3 s; stay at or under its
+  // enum budget plus the handful of "" sentinels and flags.
+  assert.ok(c.largestEnum <= 50, `largest enum ${c.largestEnum}`);
+  assert.ok(c.enumValues <= 200, `enum values ${c.enumValues}`);
+  assert.ok(c.properties <= 25, `properties ${c.properties}`);
+  // The counter itself sees optional parameters and unions.
+  assert.deepEqual(ai.schemaComplexity({ type: 'object', required: ['a'], properties: { a: { type: 'string' }, b: { anyOf: [{ type: 'string' }, { type: 'null' }] }, c: { type: ['string', 'null'] } } }).optional, 2);
+  assert.equal(ai.schemaComplexity({ type: 'object', required: [], properties: { b: { anyOf: [{ type: 'string' }, { type: 'null' }] }, c: { type: ['string', 'null'] } } }).unions, 2);
 });

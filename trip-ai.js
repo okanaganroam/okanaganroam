@@ -83,125 +83,146 @@ const enumOf = (values) => ({ type: 'string', enum: values.slice() });
 const DRINK_KINDS = new Set(['winery', 'wine_tasting', 'brewery', 'cidery', 'distillery', 'pub', 'cocktail', 'drinks', 'apres', 'happy_hour']);
 const WHEN_VALUES = [...WEEKDAYS, ...MONTHS, ...SEASONS];
 
-// The wire format (round 2, 2026-11-20): what the model writes. Haiku's read time is mostly the tokens it writes, and the
-// first version wrote every key every time (~250-300 tokens, mostly nulls and falses). Now only towns ("t") and
-// interests ("i") are required and every other key is optional: the model leaves out what the request doesn't say, so a
-// typical answer is ~30-80 tokens. Optional keys instead of nullable ones also take the schema from 11 union-typed
-// parameters to none (unions are the expensive part of grammar compilation) and stay inside the documented limit of 24
-// optional parameters (we use 20). Expanded to the long, readable intent by expandWire() before anything else sees it.
-//   u unsure, t towns, v valley-wide, sd start date, d days, n nights, w weekday/month/season, a adults, k kids,
-//   ka kids' ages, dog, o occasion, rain, dd designated driver, i interests [{k kind, t time of day, s start "HH:MM",
-//   p typed place}], pc pace, b budget, mh must-haves, ma must-avoids.
-const WIRE_KEYS = ['t', 'i', 'u', 'v', 'sd', 'd', 'n', 'w', 'a', 'k', 'ka', 'dog', 'o', 'rain', 'dd', 'pc', 'b', 'mh', 'ma'];
-const WIRE_REQUIRED = ['t', 'i'];
+// The wire format: what the model writes.
+// Round 2 made every key but two optional (20 optional parameters) so the model could leave empty keys out. The live
+// API spent 14-30 s compiling that grammar and then answered 400 "Schema is too complex": each optional parameter
+// roughly doubles part of the grammar's state space, and they compound. Round 3 (2026-11-20): EVERY key is required and
+// there are NO union types (no nullable anyOf, no type arrays) and NO formats. "Not said" is a fixed empty value instead:
+// "" for text, 0 for numbers, [] for lists, and the yes/no facts are one list of flags (only the ones that apply).
+// Short keys keep the answer small (a typical answer is ~150-200 characters, ~50-70 tokens; round 1 wrote ~420
+// characters with long names and nested nulls). The value lists (towns, kinds, badges) stay as enums: round 1 had the
+// same enums and compiled fine (p50 1.3 s), so they are not the problem, and they stop invented values at the source.
+// schemaComplexity() below counts all of this, and a unit test holds it to the documented limits.
+//   t towns, i interests [{k kind, t time of day, s start "HH:MM" or "", p typed place or ""}], f flags, sd start date
+//   or "", d days, n nights, a adults, k kids (0 = not said), ka kids' ages, w weekday/month/season or "", o occasion
+//   or "", pc pace or "", b budget or "", mh must-haves, ma must-avoids.
+const WIRE_KEYS = ['t', 'i', 'f', 'sd', 'd', 'n', 'a', 'k', 'ka', 'w', 'o', 'pc', 'b', 'mh', 'ma'];
+const WIRE_REQUIRED = WIRE_KEYS.slice();
+const FLAGS = ['unsure', 'valley', 'dog', 'rain', 'driver'];
+// Structured-outputs limits (platform.claude.com/docs/en/build-with-claude/structured-outputs, "Schema complexity
+// limits"): at most 24 optional parameters and 16 union-typed parameters per request, plus internal grammar-size limits.
+// We stay at 0 and 0.
+const SCHEMA_LIMITS = { optional: 24, unions: 16 };
 function wireSchema(allowed) {
-  return {
-    type: 'object',
-    additionalProperties: false,
-    required: WIRE_REQUIRED.slice(),
-    properties: {
-      t: { type: 'array', items: enumOf(allowed.regions) },
-      i: {
-        type: 'array',
-        items: {
-          type: 'object', additionalProperties: false, required: ['k'],
-          properties: { k: enumOf(allowed.kinds), t: enumOf(TIMES), s: { type: 'string' }, p: { type: 'string' } },
-        },
-      },
-      u: { type: 'boolean' },
-      v: { type: 'boolean' },
-      sd: { type: 'string', format: 'date' },
-      d: { type: 'integer' },
-      n: { type: 'integer' },
-      w: enumOf(WHEN_VALUES),
-      a: { type: 'integer' },
-      k: { type: 'integer' },
-      ka: { type: 'array', items: { type: 'integer' } },
-      dog: { type: 'boolean' },
-      o: enumOf(OCCASIONS),
-      rain: { type: 'boolean' },
-      dd: { type: 'boolean' },
-      pc: enumOf(allowed.paces),
-      b: enumOf(allowed.budgets),
-      mh: { type: 'array', items: enumOf(allowed.features) },
-      ma: { type: 'array', items: enumOf(allowed.avoid) },
-    },
-  };
+  const str = { type: 'string' };
+  const int = { type: 'integer' };
+  const obj = (properties) => ({ type: 'object', additionalProperties: false, required: Object.keys(properties), properties });
+  return obj({
+    t: { type: 'array', items: enumOf(allowed.regions) },
+    i: { type: 'array', items: obj({ k: enumOf(allowed.kinds), t: enumOf(TIMES), s: str, p: str }) },
+    f: { type: 'array', items: enumOf(FLAGS) },
+    sd: str,
+    d: int,
+    n: int,
+    a: int,
+    k: int,
+    ka: { type: 'array', items: int },
+    w: enumOf(['', ...WHEN_VALUES]),
+    o: enumOf(['', ...OCCASIONS]),
+    pc: enumOf(['', ...allowed.paces]),
+    b: enumOf(['', ...allowed.budgets]),
+    mh: { type: 'array', items: enumOf(allowed.features) },
+    ma: { type: 'array', items: enumOf(allowed.avoid) },
+  });
 }
 // Kept for callers of the first version: the schema the model answers in.
 const intentSchema = wireSchema;
+// Counts what drives grammar size: optional parameters (properties not in "required"), union-typed parameters (anyOf /
+// oneOf / type arrays), format strings, enum values, nesting depth.
+function schemaComplexity(schema) {
+  const out = { optional: 0, unions: 0, formats: 0, enums: 0, enumValues: 0, largestEnum: 0, properties: 0, depth: 0 };
+  const walk = (node, depth) => {
+    if (!node || typeof node !== 'object') return;
+    out.depth = Math.max(out.depth, depth);
+    if (node.anyOf || node.oneOf || Array.isArray(node.type)) out.unions += 1;
+    if (node.format) out.formats += 1;
+    if (Array.isArray(node.enum)) { out.enums += 1; out.enumValues += node.enum.length; out.largestEnum = Math.max(out.largestEnum, node.enum.length); }
+    if (node.properties) {
+      const req = new Set(node.required || []);
+      for (const [k, v] of Object.entries(node.properties)) { out.properties += 1; if (!req.has(k)) out.optional += 1; walk(v, depth + 1); }
+    }
+    if (node.items) walk(node.items, depth + 1);
+    for (const u of [...(node.anyOf || []), ...(node.oneOf || [])]) walk(u, depth + 1);
+  };
+  walk(schema, 0);
+  return out;
+}
 const LONG_KEYS = ['unsure', 'towns', 'valley_wide', 'start_date', 'days', 'nights', 'weekday', 'month', 'season', 'party', 'occasion',
   'rainy_day', 'interests', 'pace', 'budget', 'must_have', 'must_avoid'];
 
-// Wire answer -> the long intent, filling what was left out (shape only; validateIntent checks every value).
+// Wire answer -> the long intent ("" / 0 / missing flag -> not said). Shape only; validateIntent checks every value.
 // -> { ok, intent } | { ok: false, reason }
 function expandWire(w) {
   if (!w || typeof w !== 'object' || Array.isArray(w)) return { ok: false, reason: 'invalid:not_object' };
   const extra = Object.keys(w).filter((k) => !WIRE_KEYS.includes(k));
   if (extra.length) return { ok: false, reason: `invalid:extra_${extra[0]}` };
   for (const k of WIRE_REQUIRED) if (!(k in w)) return { ok: false, reason: `invalid:missing_${k}` };
-  const opt = (k, dflt) => (w[k] === undefined ? dflt : w[k]);
-  const when = opt('w', null);
-  if (when !== null && !inEnum(when, WHEN_VALUES)) return { ok: false, reason: 'invalid:when' };
+  if (!Array.isArray(w.f) || !w.f.every((x) => FLAGS.includes(x))) return { ok: false, reason: 'invalid:flags' };
+  for (const k of ['sd', 'w', 'o', 'pc', 'b']) if (typeof w[k] !== 'string') return { ok: false, reason: `invalid:${k}` };
+  for (const k of ['d', 'n', 'a', 'k']) if (!Number.isInteger(w[k]) || w[k] < 0) return { ok: false, reason: `invalid:${k}` };
+  if (w.w !== '' && !inEnum(w.w, WHEN_VALUES)) return { ok: false, reason: 'invalid:when' };
   if (!Array.isArray(w.i)) return { ok: false, reason: 'invalid:interests' };
   for (const it of w.i) {
-    if (!it || typeof it !== 'object' || Array.isArray(it) || !('k' in it) || Object.keys(it).some((k) => !['k', 't', 's', 'p'].includes(k))) return { ok: false, reason: 'invalid:interest' };
+    if (!it || typeof it !== 'object' || Array.isArray(it) || ['k', 't', 's', 'p'].some((k) => !(k in it)) || Object.keys(it).some((k) => !['k', 't', 's', 'p'].includes(k))
+      || typeof it.s !== 'string' || typeof it.p !== 'string') return { ok: false, reason: 'invalid:interest' };
   }
+  const flag = (x) => w.f.includes(x);
+  const text = (x) => (x === '' ? null : x);
+  const num = (x) => (x === 0 ? null : x);
   return {
     ok: true,
     intent: {
-      unsure: opt('u', false), towns: w.t, valley_wide: opt('v', false), start_date: opt('sd', null), days: opt('d', null), nights: opt('n', null),
-      weekday: WEEKDAYS.includes(when) ? when : null, month: MONTHS.includes(when) ? when : null, season: SEASONS.includes(when) ? when : null,
-      party: { adults: opt('a', null), kids: opt('k', null), kid_ages: opt('ka', []), dog: opt('dog', false) }, occasion: opt('o', null),
-      rainy_day: opt('rain', false), driver: opt('dd', false),
-      interests: w.i.map((it) => ({ kind: it.k, time_of_day: it.t === undefined ? 'any' : it.t, start_time: it.s === undefined ? null : it.s, place: it.p === undefined ? null : it.p })),
-      pace: opt('pc', null), budget: opt('b', null), must_have: opt('mh', []), must_avoid: opt('ma', []),
+      unsure: flag('unsure'), towns: w.t, valley_wide: flag('valley'), start_date: text(w.sd), days: num(w.d), nights: num(w.n),
+      weekday: WEEKDAYS.includes(w.w) ? w.w : null, month: MONTHS.includes(w.w) ? w.w : null, season: SEASONS.includes(w.w) ? w.w : null,
+      party: { adults: num(w.a), kids: num(w.k), kid_ages: w.ka, dog: flag('dog') }, occasion: text(w.o),
+      rainy_day: flag('rain'), driver: flag('driver'),
+      interests: w.i.map((it) => ({ kind: it.k, time_of_day: it.t, start_time: text(it.s), place: text(it.p) })),
+      pace: text(w.pc), budget: text(w.b), must_have: w.mh, must_avoid: w.ma,
     },
   };
 }
-// The long intent -> the wire format, leaving out what is empty, as the model is told to (for fixtures and tests).
+// The long intent -> the wire format (for fixtures and tests).
 function toWire(x) {
   const p = x.party || {};
-  const w = { t: x.towns || [], i: (x.interests || []).map((it) => {
-    const o = { k: it.kind };
-    if (it.time_of_day && it.time_of_day !== 'any') o.t = it.time_of_day;
-    if (it.start_time) o.s = it.start_time;
-    if (it.place) o.p = it.place;
-    return o;
-  }) };
-  const put = (k, v) => { if (v !== null && v !== undefined && v !== false && !(Array.isArray(v) && !v.length)) w[k] = v; };
-  put('u', !!x.unsure); put('v', !!x.valley_wide); put('sd', x.start_date); put('d', x.days); put('n', x.nights);
-  put('w', x.weekday || x.month || x.season || null); put('a', p.adults); put('k', p.kids); put('ka', p.kid_ages); put('dog', !!p.dog);
-  put('o', x.occasion); put('rain', !!x.rainy_day); put('dd', !!x.driver); put('pc', x.pace); put('b', x.budget);
-  put('mh', x.must_have); put('ma', x.must_avoid);
-  return w;
+  const f = [];
+  if (x.unsure) f.push('unsure');
+  if (x.valley_wide) f.push('valley');
+  if (p.dog) f.push('dog');
+  if (x.rainy_day) f.push('rain');
+  if (x.driver) f.push('driver');
+  return {
+    t: x.towns || [],
+    i: (x.interests || []).map((it) => ({ k: it.kind, t: it.time_of_day || 'any', s: it.start_time || '', p: it.place || '' })),
+    f, sd: x.start_date || '', d: x.days || 0, n: x.nights || 0, a: p.adults || 0, k: p.kids || 0, ka: p.kid_ages || [],
+    w: x.weekday || x.month || x.season || '', o: x.occasion || '', pc: x.pace || '', b: x.budget || '', mh: x.must_have || [], ma: x.must_avoid || [],
+  };
 }
 
 // The system prompt is the same for every request (towns, rules), so it is sent as one cached block; the date and the
 // request go in the user message after it. Claude Haiku 5.5 caches prefixes from 512 tokens; this prompt plus the
-// schema is ~2K tokens, so it qualifies. The kind/feature enums live in the schema (also stable, compiled once and cached
-// by the API for 24 h).
+// schema is ~2K tokens, so it qualifies. The value lists live in the schema (also stable; the API compiles it once and
+// keeps it for 24 h from last use).
 function systemPrompt(allowed) {
   const towns = allowed.regions.map((r) => `${r} (${allowed.regionLabels[r] || r})`).join(', ');
   return [
     'You read one visitor request for an Okanagan Valley (BC) trip planner into the JSON schema. You do not plan anything.',
-    'Only read what the request says. Never add a place, business, price, opening hour or booking. Leave fields empty/null when not said. Do not infer needs or avoidances (kids do not mean "no alcohol").',
-    'Leave out every key that the request does not give (only t and i are always there; t may be []).',
-    'Keys: u unsure, t towns, v whole valley, sd start date, d days, n nights, w weekday/month/season, a adults, k kids, ka kids\' ages, dog, o occasion, rain rainy day, dd designated driver, i interests, pc pace, b budget, mh must-haves, ma must-avoids.',
-    `t: only these slugs: ${towns}. "Okanagan", "the valley" or towns across the valley -> v true. A ski hill (Big White, SilverStar, Apex, Baldy) is its slug. "Naramata Bench" is naramata.`,
+    'Only read what the request says. Never add a place, business, price, opening hour or booking. Do not infer needs or avoidances (kids do not mean "no alcohol").',
+    'Every key is always present. When the request does not say it: "" for text, 0 for numbers, [] for lists.',
+    'Keys: t towns, i interests, f flags, sd start date, d days, n nights, a adults, k kids, ka kids\' ages, w weekday/month/season, o occasion, pc pace, b budget, mh must-haves, ma must-avoids.',
+    'f: only the flags that apply: unsure (not a trip request or too vague to read; still fill what you can), valley (the whole valley: "Okanagan", "the valley", towns across it), dog (a dog comes), rain (rain or a rainy day), driver (a designated driver, "someone is driving", "no driving").',
+    `t: only these slugs: ${towns}. A ski hill (Big White, SilverStar, Apex, Baldy) is its slug. "Naramata Bench" is naramata.`,
     'sd: only for a calendar date ("this Saturday", "tomorrow", "Dec 5"), resolved from today\'s date below as YYYY-MM-DD, never past. Otherwise w = weekday, month or season.',
     'd: days asked ("a weekend" = 2, "a day" = 1). n: only when nights are counted. a, k: only when counted; ka only when ages are given ("toddlers" = [2], "teens" = [15]).',
     'i: one entry per stop they want, IN THE ORDER THEY WILL HAPPEN, which is not always the order of the words:',
     '  "a brewery after dinner" -> dinner, brewery. "before dinner, a winery" -> winery, dinner. "X then Y", "X followed by Y", "start with X", "end with Y" -> X, Y.',
     '  One entry per stop: "a sunset dinner" = dinner; "lunch with a view" = lunch plus mh lake_view; "a winery tour" = winery; "après after skiing" = ski, apres (no extra drinks).',
     '  "a day on the mountain/slopes" in winter = ski. "cheap eats" = cheap_eats. "wine tasting" = wine_tasting.',
-    '  Each interest: k kind; t time of day only when said or obvious ("morning coffee" = morning); s "HH:MM" 24h only for a clock time ("coffee at 10" = "10:00"); p only a business name the visitor typed for that stop, copied exactly. Never suggest one.',
+    '  Each interest: k kind; t time of day only when said or obvious ("morning coffee" = morning), else "any"; s "HH:MM" 24h only for a clock time ("coffee at 10" = "10:00"); p only a business name the visitor typed for that stop, copied exactly. Never suggest one.',
     'o: romantic (anniversary, date, couples, honeymoon), family, friends (girls, bachelor), parents (seniors, grandparents), solo, birthday.',
     'pc: relaxed for chill/slow/easy; packed for busy/as much as possible. b: budget for cheap; upscale for fancy/luxury.',
     'mh: needs such as vegan, gluten_free, kid_friendly, dog_friendly, accessible (wheelchair, mobility).',
-    'ma: only what they say to avoid or exclude, scoped to exactly what the "no"/"not"/"without" applies to. "we don\'t drink" / "sober" / "alcohol-free" -> alcohol. A designated driver, "someone is driving" or "no driving" means they DO drink: dd true, never alcohol. Never put a kind in ma that is also in i.',
+    'ma: only what they say to avoid or exclude, scoped to exactly what the "no"/"not"/"without" applies to. "we don\'t drink" / "sober" / "alcohol-free" -> alcohol. A designated driver means they DO drink: flag driver, never alcohol. Never put a kind in ma that is also in i.',
     'The request may be in French; read it the same way.',
-    'u: true only when the text is not a trip request or is too vague to read; still fill what you can.',
   ].join('\n');
 }
 
@@ -386,7 +407,7 @@ async function readTripRequest(text, opts = {}) {
   } : null;
   const costUsd = costOf(j && j.usage);
   if (costUsd) addSpend(costUsd, now);
-  if (!res || !res.ok || !j) return { ok: false, reason: `api_${res ? res.status : 0}`, usage, costUsd, ms: ms() };
+  if (!res || !res.ok || !j) return { ok: false, reason: `api_${res ? res.status : 0}`, error: (j && j.error && String(j.error.message || j.error.type || '').slice(0, 300)) || null, usage, costUsd, ms: ms() };
   if (j.stop_reason === 'refusal') return { ok: false, reason: 'refused', usage, costUsd, ms: ms() };
   if (j.stop_reason === 'max_tokens') return { ok: false, reason: 'too_long', usage, costUsd, ms: ms() };
   const out = (j.content || []).filter((b) => b && b.type === 'text').map((b) => b.text).join('');
@@ -508,6 +529,6 @@ function renderTripRequest(intent, ctx = {}) {
 module.exports = {
   MODEL, PRICE_PER_TOKEN, DEFAULT_TIMEOUT_MS, DEFAULT_DAILY_USD, TIMES, MONTHS, SEASONS, OCCASIONS,
   TYPE_PHRASES, ACTIVITY_PHRASES, MOMENT_PHRASES, FEATURE_PHRASES,
-  enabled, apiKey, buildAllowed, intentSchema, wireSchema, expandWire, toWire, WIRE_KEYS, WIRE_REQUIRED, DRINK_KINDS, systemPrompt, stripPII, validateIntent, readTripRequest, renderTripRequest,
+  enabled, apiKey, buildAllowed, intentSchema, wireSchema, expandWire, toWire, WIRE_KEYS, WIRE_REQUIRED, FLAGS, SCHEMA_LIMITS, schemaComplexity, DRINK_KINDS, systemPrompt, stripPII, validateIntent, readTripRequest, renderTripRequest,
   costOf, dailyCapUsd, spentToday, addSpend, resetSpend, pacificDay,
 };

@@ -183,7 +183,16 @@ async function main() {
   if (!MOCK) {
     const allowed = tripAi.buildAllowed(taxonomy);
     const w = await tripAi.readTripRequest('a day in Kelowna', { allowed, today: DATE, env, timeoutMs: 30000, now: NOW });
-    console.log(`warm-up: ${w.ok ? 'ok' : w.reason} in ${w.ms} ms`);
+    console.log(`warm-up: ${w.ok ? 'ok' : w.reason} in ${w.ms} ms${w.usage ? ` (in ${w.usage.input_tokens}, out ${w.usage.output_tokens}, cache read ${w.usage.cache_read_input_tokens}, write ${w.usage.cache_creation_input_tokens})` : ''}`);
+    // Round 3: a warm-up that fails means every request would fail the same way (round 2's schema: 30 s time-outs, then
+    // 400 "Schema is too complex"). Stop here and say why, instead of running every request into the same wall.
+    if (!w.ok) {
+      console.error(`\nStopped: the warm-up read failed (${w.reason}${w.error ? `: ${w.error}` : ''}).`);
+      if (/^api_4/.test(w.reason)) console.error('The API refused the request itself (a 4xx), so no request would work. Nothing was written.');
+      else if (w.reason === 'timeout') console.error('It took over 30 s. That usually means the answer format is being compiled and is too complex. Nothing was written.');
+      restoreDb();
+      process.exit(3);
+    }
   }
   const rows = [];
   for (const c of cases) {

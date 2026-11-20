@@ -10,7 +10,7 @@
 // first call (cold: schema compile + cache write) and for the rest. The first round warms the prompt cache, so the
 // second round shows the steady state. A generous timeout here, so slow calls are measured instead of cut off.
 // With --mock it also compares the size of the model's answer in the first version's format (every key, long names)
-// with the round-2 wire format, for the hard cases' fixture answers: output tokens are most of Haiku's read time.
+// with the current wire format, for the fixture answers: output tokens are most of Haiku's read time.
 
 const fs = require('fs');
 const path = require('path');
@@ -51,6 +51,12 @@ async function main() {
       const r = await tripAi.readTripRequest(c.text, { allowed, today, env, timeoutMs: TIMEOUT_MS, lang: c.lang, ...(MOCK ? { fetchImpl, apiKey: 'mock' } : {}) });
       const u = r.usage || {};
       console.log(`r${round} ${c.id} ${String(r.ms).padStart(5)} ms  ${r.ok ? 'ok    ' : r.reason.padEnd(6)} in ${u.input_tokens ?? '-'} out ${u.output_tokens ?? '-'} cache read ${u.cache_read_input_tokens ?? '-'} write ${u.cache_creation_input_tokens ?? '-'}  ${c.text.slice(0, 60)}`);
+      if (!r.ok && r.error) console.log(`      error: ${r.error}`);
+      // A refused request (4xx) on the first call means every call will be refused: stop and show why.
+      if (first === null && !r.ok && /^api_4/.test(r.reason)) {
+        console.error(`\nStopped: the first call was refused (${r.reason}${r.error ? `: ${r.error}` : ''}). Every call would fail the same way.`);
+        process.exit(3);
+      }
       if (first === null) first = r.ms; else times.push(r.ms);
     }
   }
@@ -63,7 +69,8 @@ async function main() {
     const ids = Object.keys(mocks);
     const a = ids.reduce((t, id) => t + longForm(mocks[id]).length, 0) / ids.length;
     const b = ids.reduce((t, id) => t + JSON.stringify(tripAi.toWire(mocks[id])).length, 0) / ids.length;
-    console.log(`answer size over ${ids.length} fixture answers: first version ${Math.round(a)} characters (~${Math.round(a / 3)} tokens), round 2 ${Math.round(b)} characters (~${Math.round(b / 3)} tokens), ${Math.round((100 * (a - b)) / a)}% smaller`);
+    console.log(`answer size over ${ids.length} fixture answers: first version ${Math.round(a)} characters (~${Math.round(a / 3)} tokens), now ${Math.round(b)} characters (~${Math.round(b / 3)} tokens), ${Math.round((100 * (a - b)) / a)}% smaller`);
+    console.log(`schema: ${JSON.stringify(tripAi.schemaComplexity(tripAi.wireSchema(allowed)))} (documented limits: ${tripAi.SCHEMA_LIMITS.optional} optional, ${tripAi.SCHEMA_LIMITS.unions} union-typed parameters)`);
     console.log(`system prompt ${tripAi.systemPrompt(allowed).length} characters + schema ${JSON.stringify(tripAi.wireSchema(allowed)).length} characters (~${Math.round((tripAi.systemPrompt(allowed).length + JSON.stringify(tripAi.wireSchema(allowed)).length) / 3.5)} tokens; Haiku 5.5 caches from 512)`);
   }
 }
