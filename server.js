@@ -41955,7 +41955,9 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const parkLayout = !fr && !venue.redirect_to && venue.region === 'coldstream' && venue.slug === 'kalamalka-lake-provincial-park-trails-rattlesnake-point';
   // Outdoors and Sports & Recreation pages (2026-11-08): the layout first built for the Kalamalka park page, on every English
   // page of those two categories (outdoor-venue-layout.js). Kalamalka keeps its mapped route and parking entrances.
-  const outdoorLayout = !fr && !venue.redirect_to && (venue.type === 'outdoor' || venue.type === 'sport');
+  // Batch 2 (2026-11-20): beaches, golf courses, tours and shops use the Outdoors layout too, with their own content kept.
+  const placeLayout = !fr && !venue.redirect_to && !golfboxLayout && !indoorLayout && ['beach', 'golf', 'tour', 'shop'].includes(venue.type);
+  const outdoorLayout = !fr && !venue.redirect_to && (venue.type === 'outdoor' || venue.type === 'sport' || placeLayout);
   const wineryPage = !fr && !venue.redirect_to && venue.type === 'winery';
   const fdLayout = !fr && !venue.redirect_to && (foodDrinkPageApplies(venue) || wineryPage);
   const nichePrices = wineryPage && venue.region === 'west-kelowna' && venue.slug === 'niche-wine-company' ? require('./data/niche-tasting-prices.json') : null;
@@ -42919,10 +42921,20 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     actions:ctaEntries, ctaRowAttrs, guideLinks, nearbyCards:fdNearbyCards,
     visitorHtml:visitorSectionHtml(venue, 'en'), gallery:galleryHtml ? galleryHtml.phone(creditHtml) : '',
     park:parkLayout, regionLabel, categorySlug:catSlug, openStatusHtml, glanceHtml:hikeGlanceHtml,
-    chipsHtml:`${cvChipHtml}${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}`, descriptionHtml:'<p class="venue-description">' + escapeHtml(trimVenueTagline(venue.description) || '') + '</p>',
+    chipsHtml:`${cvChipHtml}${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}`, descriptionHtml:'<p class="venue-description">' + escapeHtml((placeLayout && editorial ? editorial.intro : trimVenueTagline(venue.description)) || '') + '</p>',
     locationHtml, detailRows, hoursHtml:showDatesHtml || hoursHtml, visitHtml, eventsHtml:venueEventsHtml, ownerCtaHtml,
     // Indoor test 5 (2026-11-19): an outdoor or sport place's own typed prices too (the French page already shows them).
-    menuHtml: venueMenu ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
+    // A place on the shared place layout (golf, beaches, tours, shops) shows its list in moreHtml instead.
+    menuHtml: venueMenu && !placeLayout ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
+    ...(placeLayout ? {
+      whyHtml: venueWhyHtml, verifiedHtml,
+      // The line under the name says what kind of place it is, its town and its rating, as the older page did.
+      eyebrowHtml: atAGlanceParts, glanceHtml: '', nearbyLimit: 12,
+      aboutExtraHtml: `${editorialHtml || ''}${golfMapHtml || ''}${golfGlanceHtml || ''}${golfFeesHtml || ''}${golfValueHtml || ''}`,
+      relatedHtml, nearbyHtml,
+      // What the business itself posts: its deals, weekly nights and its price list or "Tours & prices".
+      moreHtml: `${venueDealsCardHtml || ''}${venueWeeklyNightsHtml(weeklyNights, fr, { events: false, brew: false, tours: false, lounge: false }) || ''}${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, 'en') : ''}`,
+    } : {}),
   }) : '';
   const page = `<!DOCTYPE html>
 <html lang="${fr ? 'fr' : 'en'}"${hasFrench ? ` data-page-lang="${fr ? 'fr' : 'en'}"` : ''}>
@@ -44097,6 +44109,29 @@ ${renderAnalyticsHeadHtml('event')}
     .event-related-list li > a, .event-related-all a { display: inline-block; padding: 11px 0; }
     .event-related-all { margin-top: 0; }
   }
+</style>
+<style id="event-refresh">
+  /* Event pages in the place-page look (2026-11-20, batch 2): styling only; the page's content and markup are unchanged. */
+  body.event-page .event-hero { border-radius: 24px; overflow: hidden; box-shadow: 0 10px 28px rgba(27,43,58,0.10); }
+  body.event-page .event-main .subtitle { font: 800 12px/1.4 Nunito, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #286962; }
+  body.event-page .event-main .chips .chip { background: #edf3e9; color: #1f5450; border: 1px solid rgba(40,105,98,0.18); border-radius: 999px; font-weight: 700; }
+  body.event-page .event-cta-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  body.event-page .event-cta-row .cta { margin: 0; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; box-sizing: border-box; text-align: center; }
+  body.event-page .event-cta-row .cta.event-cta-primary { grid-column: 1 / -1; background: #1b2b3a; border-color: #1b2b3a; color: #fff; }
+  body.event-page .event-cta-row .cta.event-cta-primary:hover { background: #24384b; }
+  body.event-page .event-cta-row .cta.secondary { background: #fffdf7; border: 1px solid rgba(27,43,58,0.22); color: #1b2b3a; }
+  body.event-page .event-cta-row .cta.secondary:last-child:nth-child(even) { grid-column: 1 / -1; }
+  body.event-page .event-actions { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: flex-start; gap: 10px; }
+  body.event-page .event-actions .card-action { flex: 0 1 auto; width: auto; min-height: 44px; padding: 0 18px; border-radius: 999px; }
+  body.event-page .venue-section.event-details { background: #fffdf7; border: 1px solid rgba(27,43,58,0.08); border-radius: 22px; padding: 18px 20px; box-shadow: 0 6px 18px rgba(27,43,58,0.06); }
+  body.event-page .event-related h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; }
+  body.event-page .event-related-list { list-style: none; padding: 0; margin: 12px 0; display: grid; gap: 10px; }
+  body.event-page .event-related-list li { background: #fffdf7; border: 1px solid rgba(27,43,58,0.08); border-radius: 16px; padding: 12px 16px; }
+  body.event-page .event-related-list li a { font-weight: 800; color: #1b2b3a; text-decoration: none; display: block; }
+  body.event-page .event-related-list li a:hover { text-decoration: underline; }
+  body.event-page .event-related-meta { display: block; font-size: 0.86rem; color: #615b53; }
+  body.event-page .event-related-all + .cta, body.event-page .event-related .cta { border-radius: 999px; }
+  @media (min-width: 760px) { body.event-page .event-related-list { grid-template-columns: 1fr 1fr; } }
 </style>
 </head>
 <body class="golf-page event-page">

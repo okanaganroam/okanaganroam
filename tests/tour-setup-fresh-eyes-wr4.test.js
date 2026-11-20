@@ -526,7 +526,7 @@ test('10. wording and small items: "end of February", "tap Next", "Address or me
   ok(await change(t, { tour_info: { kinds: ['walking', 'food'], length: '1h' } }));
   assert.equal(app.getVenue(v.id).cuisine, 'Walking tours & food tours');
   // The page: "Category" (not Cuisine) for a tour, and "Meeting point" once the Basics question is confirmed.
-  assert.match(plain(page(v, 'en')), /Good to Know Category Walking tours & food tours Address Gyro Park/);
+  assert.match(plain(page(v, 'en')), /Getting there 📍 Category Walking tours & food tours Address Gyro Park/);
   // Tour test 15 (Dayton, 2026-11-18): a tour's address stays "Address" (no meeting-point label).
   await progress(t, 'basics');
   assert.equal(app.tourAddressIsMeetingPoint(app.getVenue(v.id)), false);
