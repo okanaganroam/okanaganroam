@@ -28,6 +28,11 @@ function sourceLine(p, e, external) {
 }
 function renderIndoorLayout(p) {
   const e = p.escapeHtml, v = p.venue;
+  // p.t (2026-11-20): the French page hands in a map of this file's own labels (place-layouts-fr.js). It also hands in
+  // its own description (summaryDescriptionHtml), kind line (eyebrowHtml) and visit box (visitBoxHtml) ready-made, and
+  // no visit rows, so the English-worded row logic below is not used on a French page.
+  const dict = p.t || null;
+  const T = (label, vars) => { let out = dict && Object.prototype.hasOwnProperty.call(dict, label) ? dict[label] : label; if (vars) for (const k of Object.keys(vars)) out = out.split('{' + k + '}').join(vars[k]); return out; };
   const visitRows = (p.visitInfo && p.visitInfo.rows) || [];
   const glance = p.glanceRows || []; // [[label, text]] from the editorial at-a-glance facts (indoor golf only)
   const external = (url, label, cls = '') => `<a class="${cls}" href="${e(url)}" target="_blank" rel="noopener">${label} ↗</a>`;
@@ -57,7 +62,7 @@ function renderIndoorLayout(p) {
   const otherRows = visitRows.filter((r) => !BOOKING_LABELS.test(r.label));
   const rowHtml = (r) => `<div class="gb-row"><strong>${e(r.label)}</strong><p>${r.url ? external(r.url, e(r.text)) : e(r.text)}</p></div>`;
   // The price level is shown once: in Getting here when the details already carry a Price row, otherwise here.
-  const price = v.price && !/class="label">Price</.test(p.detailRows || '') ? '$'.repeat(Math.min(4, Math.max(1, Number(v.price) || 1))) : '';
+  const price = v.price && !/class="label">(?:Price|Prix)</.test(p.detailRows || '') ? '$'.repeat(Math.min(4, Math.max(1, Number(v.price) || 1))) : '';
 
   // Indoor test 5 (2026-11-19; Chris typed 7 prices; the French page listed them, the English page never did): the owner's
   // typed price list shows here as on the French page ("See all prices & rates (7)").
@@ -66,50 +71,51 @@ function renderIndoorLayout(p) {
   // Indoor test 17 (2026-11-19; Megan's walk-in gym: "Plan a time / Book your visit" sat above "Walk-ins welcome", her button
   // being the waiver): a walk-in place's card is "Before you go".
   const walkIn = visitRows.some((r) => /^Booking$/i.test(r.label) && /^Walk-ins welcome: no need to book\.?$/i.test(String(r.text || '').trim()));
-  const bookHead = />Showtimes (?:&amp;|&) tickets\b/.test(book) ? 'Showtimes &amp; tickets' : />Class schedule\b/.test(book) ? 'Class schedule' : walkIn ? 'Before you go' : 'Book your visit';
+  const bookHead = />Showtimes (?:&amp;|&) tickets\b/.test(book) ? 'Showtimes &amp; tickets' : />Class schedule\b/.test(book) ? 'Class schedule' : walkIn ? 'Before you go' : T('Book your visit');
   const bookingCard = book || costRows.length
-    ? `<aside class="gb-card gb-booking" id="gbBooking"><p class="gb-eyebrow">${book && !walkIn ? 'Plan a time' : walkIn ? 'Walk-ins welcome' : 'Good to know'}</p><h2>${book ? bookHead : 'Prices &amp; booking'}</h2>
-        ${book ? `<div class="gb-desktop-book">${book}<p class="gb-help">${walkIn ? 'Opens in a new tab.' : 'Opens the booking page in a new tab.'}</p></div>` : ''}
-        ${price ? `<p class="gb-price-line"><strong>${price}</strong> <span>price level</span></p>` : ''}
+    ? `<aside class="gb-card gb-booking" id="gbBooking"><p class="gb-eyebrow">${book && !walkIn ? T('Plan a time') : walkIn ? 'Walk-ins welcome' : T('Good to know')}</p><h2>${book ? bookHead : T('Prices &amp; booking')}</h2>
+        ${book ? `<div class="gb-desktop-book">${book}<p class="gb-help">${walkIn ? 'Opens in a new tab.' : T('Opens the booking page in a new tab.')}</p></div>` : ''}
+        ${price ? `<p class="gb-price-line"><strong>${price}</strong> <span>${T('price level')}</span></p>` : ''}
         ${costRows.map(rowHtml).join('')}
         ${sourceLine(p, e, external)}
       </aside>` : '';
 
   const visitBody = [...glance.map(([label, text]) => rowHtml({ label, text })), ...otherRows.map(rowHtml)].join('');
   const visitCard = visitBody
-    ? `<section class="gb-card gb-visit" id="gbVisit"><p class="gb-eyebrow">Before you go</p><h2>Your visit ✨</h2>${visitBody}</section>` : '';
+    ? `<section class="gb-card gb-visit" id="gbVisit"><p class="gb-eyebrow">${T('Before you go')}</p><h2>${T('Your visit ✨')}</h2>${visitBody}</section>`
+    : p.visitBoxHtml ? `<section class="gb-card gb-visit" id="gbVisit">${p.visitBoxHtml}</section>` : '';
 
   const contactCard = (p.detailRows || p.locationHtml || contactActions.length || directions)
-    ? `<section class="gb-card gb-contact" id="gbContact"><p class="gb-eyebrow">Meet you there</p><h2>Getting here 📍</h2>${p.detailRows ? `<div class="venue-key-info">${p.detailRows}</div>` : ''}${p.locationHtml || ''}<div class="gb-contact-actions">${directions}${contactActions.join('')}</div></section>` : '';
+    ? `<section class="gb-card gb-contact" id="gbContact"><p class="gb-eyebrow">${T('Meet you there')}</p><h2>${T('Getting here 📍')}</h2>${p.detailRows ? `<div class="venue-key-info">${p.detailRows}</div>` : ''}${p.locationHtml || ''}<div class="gb-contact-actions">${directions}${contactActions.join('')}</div></section>` : '';
   const hoursCard = p.hoursHtml ? `<section class="gb-card gb-hours" id="gbHours"><div class="venue-section venue-hours" id="venueHours">${p.hoursHtml}</div></section>` : '';
 
-  const nav = [['gbOverview', 'Overview'], bookingCard ? ['gbBooking', book && !walkIn ? 'Book' : walkIn ? 'Before you go' : 'Prices'] : pricesCard && ['gbPrices', 'Prices'], visitCard && ['gbVisit', 'Your visit'], contactCard && ['gbContact', 'Getting here'], hoursCard && ['gbHours', 'Hours']]
+  const nav = [['gbOverview', T('Overview')], bookingCard ? ['gbBooking', book && !walkIn ? T('Book') : walkIn ? 'Before you go' : T('Prices')] : pricesCard && ['gbPrices', T('Prices')], visitCard && ['gbVisit', T('Your visit')], contactCard && ['gbContact', T('Getting here')], hoursCard && ['gbHours', T('Hours')]]
     .filter(Boolean).map(([id, label]) => `<a href="#${id}">${label}</a>`).join('');
 
   // Indoor test 7 (2026-11-19; Robert): with the whole story already the intro, "The space" repeated it word for word. It
   // shows only when it has more to say; the guide links stay on their own.
-  const more = rest
-    ? `<section class="gb-card gb-more"><h2>A little more about ${e(v.name)}</h2><details class="gb-fold"><summary>The space</summary><p>${e(v.description || '')}</p>${p.guideLinks || ''}</details></section>`
+  const more = rest && !p.summaryDescriptionHtml
+    ? `<section class="gb-card gb-more"><h2>${T('A little more about {x}', { x: e(v.name) })}</h2><details class="gb-fold"><summary>${T('The space')}</summary><p>${e(v.description || '')}</p>${p.guideLinks || ''}</details></section>`
     : p.guideLinks ? `<section class="gb-card gb-more">${p.guideLinks}</section>` : '';
 
   return `<div id="gbLayout" class="gb-generic">
-    <nav class="gb-nav" aria-label="Page sections">${nav}</nav>
+    <nav class="gb-nav" aria-label="${T('Page sections')}">${nav}</nav>
     <div class="gb-grid">
       <section id="gbOverview" class="gb-overview">
-        <p class="gb-eyebrow">${eyebrow} · <a href="/${e(v.region)}">${e(p.regionLabel)}</a></p>${v.image_url ? `<h1 class="gb-desktop-title">${e(v.name)}</h1>` : ''}
-        ${intro ? `<p class="gb-intro">${e(intro)}</p>` : ''}
+        <p class="gb-eyebrow">${p.eyebrowHtml ? `${isGolf ? '⛳' : '🌧️'} ${p.eyebrowHtml}` : `${eyebrow} · <a href="/${e(v.region)}">${e(p.regionLabel)}</a>`}</p>${v.image_url ? `<h1 class="gb-desktop-title">${e(v.name)}</h1>` : ''}
+        ${p.summaryDescriptionHtml || (intro ? `<p class="gb-intro">${e(intro)}</p>` : '')}${p.whyHtml || ''}
         ${p.verifiedHtml || ''}${p.advisoryHtml || ''}${p.openStatusHtml || ''}${p.chipsHtml ? `<p class="chips">${p.chipsHtml}</p>` : ''}
-        ${book ? `<div class="gb-mobile-book">${book}<p class="gb-help">${walkIn ? 'Opens in a new tab ↗' : 'Opens the booking page in a new tab ↗'}</p></div>` : mainButton ? `<div class="gb-direct">${mainButton}</div>` : ''}
+        ${book ? `<div class="gb-mobile-book">${book}<p class="gb-help">${walkIn ? 'Opens in a new tab ↗' : T('Opens the booking page in a new tab ↗')}</p></div>` : mainButton ? `<div class="gb-direct">${mainButton}</div>` : ''}
         ${tiles.length >= 2 ? `<div class="gb-quick">${tiles.join('')}</div>` : ''}
-        ${save.length ? `<div class="gb-save"${p.ctaRowAttrs}>${save.join('')}</div><p class="gb-help">♡ Favorite saves this place for later. Add to trip puts it on your trip list.</p>` : ''}
+        ${save.length ? `<div class="gb-save"${p.ctaRowAttrs}>${save.join('')}</div><p class="gb-help">${T('♡ Favorite saves this place for later. Add to trip puts it on your trip list.')}</p>` : ''}
       </section>
-      ${bookingCard}${pricesCard}${visitCard}${contactCard}${hoursCard}
+      ${bookingCard}${pricesCard}${p.moreHtml || ''}${visitCard}${contactCard}${hoursCard}
     </div>
     ${p.gallery || ''}${more}
     ${p.eventsHtml || ''}${p.visitorHtml || ''}
-    ${p.nearbyCards.length ? `<section class="gb-nearby"><p class="gb-eyebrow">Keep the good day going</p><h2>Around the neighbourhood 🌿</h2><ul class="nearby-list">${p.nearbyCards.slice(0, 3).join('')}</ul></section>` : ''}
-    ${p.ownerCtaHtml || ''}
-    <p class="gb-source">Know something we should update? <a href="/contact" data-contact-open>Let us know →</a></p>
+    ${p.nearbyCards.length ? `<section class="gb-nearby"><p class="gb-eyebrow">${T('Keep the good day going')}</p><h2>${T('Around the neighbourhood 🌿')}</h2><ul class="nearby-list">${p.nearbyCards.slice(0, p.nearbyLimit || 3).join('')}</ul></section>` : ''}
+    ${p.relatedHtml || ''}${p.nearbyHtml || ''}${p.ownerCtaHtml || ''}
+    <p class="gb-source">${T('Know something we should update?')} <a href="${p.contactHref || '/contact'}" data-contact-open>${T('Let us know →')}</a></p>
   </div>${JUMP_SCRIPT}`;
 }
 
