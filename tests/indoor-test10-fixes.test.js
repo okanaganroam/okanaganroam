@@ -94,25 +94,26 @@ test('3. A link in Good to know names the setup\'s own Address, phone and websit
   assert.doesNotMatch(g.text(), /booking link/);
 });
 
-test('4. "Adult drop-in $7.50" (not "from") when her typed prices list a lower one: page, card, Build My Trip, EN + FR; every kind has its words', async () => {
+test('4. "Adult drop-in $7.50", and "From $3.50 (adult drop-in $7.50)" when her typed prices list a lower one: page, card, Build My Trip, EN + FR; only exact kinds have exact words', async () => {
   const { v } = await sandra();
   assert.match(plain(pageHtml(v)), /Adult drop-in \$7\.50\./); // indoor test 12: never "from" for one drop-in
   publishPrices(v.id, [['Adult drop-in', '7.50'], ['Youth drop-in', '4.75'], ['Child drop-in', '3.50'], ['Locker', '1'], ['10-visit pass', '67.50']]);
   app.writeIndoorVisitRows(v.id);
   app.indoorCardPrice && app.indoorCardPrice(v.id);
   const en = plain(pageHtml(v)), fr = plain(pageHtml(v, 'fr'));
-  assert.match(en, /Prices Adult drop-in \$7\.50\./);
+  // Indoor test 18 (THE PRICE RULE): the card and Build My Trip show the lowest real price, the page says what $7.50 buys.
+  assert.match(en, /Prices From \$3\.50 \(adult drop-in \$7\.50\)\./);
   assert.doesNotMatch(en, /Drop-in from/);
-  assert.match(fr, /Entrée adulte à la séance 7,50 \$\./);
-  assert.deepEqual(app.indoorPlannerFacts(v.id).indoorPriceLine, ['Adult drop-in {x}', 'Entrée adulte à la séance {x}']);
-  assert.equal(app.cardPriceFor(v.id), '$7.50');
+  assert.match(fr, /À partir de 3,50\s\$ \(entrée adulte à la séance 7,50\s\$\)\./);
+  assert.deepEqual(app.indoorPlannerFacts(v.id).indoorPriceLine.map((x) => x.replace(/\s/g, ' ')), ['From {x} (adult drop-in $7.50)', 'À partir de {x} (entrée adulte à la séance 7,50 $)']);
+  assert.equal(app.cardPriceFor(v.id), 'From $3.50');
   // A lower add-on alone (a locker) never makes it exact.
   const { v: v2 } = await sandra();
   publishPrices(v2.id, [['Adult drop-in', '7.50'], ['Locker', '1'], ['Towel rental', '2']]);
   app.writeIndoorVisitRows(v2.id);
   assert.match(plain(pageHtml(v2)), /Adult drop-in \$7\.50\./);
-  // Every kind has its exact words, English and French.
-  for (const k of IK.INDOOR_KIND_TEXT_KINDS) for (const l of ['en', 'fr']) assert.ok(IK.INDOOR_KIND_TEXT[k][l].price.exact, `${k} ${l}`);
+  // Indoor test 18: only the exact kinds have exact words (a spa never says "Adult price"), English and French.
+  for (const k of IK.INDOOR_KIND_TEXT_KINDS) for (const l of ['en', 'fr']) assert.equal(!!IK.INDOOR_KIND_TEXT[k][l].price.exact, ['gallery', 'museum', 'cinema', 'pool', 'yoga', 'bowling', 'kids'].includes(k), `${k} ${l}`);
   // Her typed price names show as typed on the French page (never half translated).
   assert.match(fr, /Adult drop-in 7,50 \$ Youth drop-in 4,75 \$/);
 });

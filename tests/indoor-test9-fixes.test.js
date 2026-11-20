@@ -101,19 +101,22 @@ test('2. A walk-in place whose link or Groups line is about parties: "Book a par
   assert.ok(!g.text().includes(T.en.indoor.tbookQParty), 'book ahead: the plain title');
 });
 
-test('3. Price: "Kids $14" when a lower price is in her typed prices (page, card line), "Kids from $14" otherwise; the price hint names her own other prices', async () => {
+// Indoor test 18 (THE PRICE RULE, indoor-kinds.js): a play centre's price is one child admission (an exact kind): "Child
+// admission $14."; with a lower typed price, "From $8 (child admission $14)."
+test('3. Price: "Child admission $14", and "From $8 (child admission $14)" when a lower price is in her typed prices (page, card line); the price hint names her own other prices', async () => {
   const { v } = await melissa();
-  assert.match(plain(pageHtml(v)), /Kids from \$14\./);
+  assert.match(plain(pageHtml(v)), /Child admission \$14\./);
   publishPrices(v.id, [['Drop-in play, per child', '14'], ['Crawlers under 1', '8'], ['Adults with a child', 'Free'], ['10-visit punch pass', '126']]);
   const { t } = await melissa();
   // The line is written again when her prices are published (publishMenu does this; here the prices went in directly).
   app.writeIndoorVisitRows(v.id);
   const en = plain(pageHtml(v)), fr = plain(pageHtml(v, 'fr'));
-  assert.match(en, /Prices Kids \$14\./);
+  assert.match(en, /Prices From \$8 \(child admission \$14\)\./);
   assert.doesNotMatch(en, /Kids from \$14/);
-  assert.match(fr, /Enfants 14 \$\./);
+  assert.match(fr, /À partir de 8\s\$ \(entrée enfant 14\s\$\)\./);
   const facts = app.indoorPlannerFacts(v.id);
-  assert.deepEqual(facts.indoorPriceLine, ['Kids {x}', 'Enfants {x}']);
+  assert.deepEqual(facts.indoorPriceLine.map((x) => x.replace(/\s/g, ' ')), ['From {x} (child admission $14)', 'À partir de {x} (entrée enfant 14 $)']);
+  assert.equal(facts.indoorPriceAt, 8);
   // The hint under the price box.
   const g = await openSetup(base, t, { hash: 'price' });
   const hint = g.doc.getElementById('suTpriceMore');

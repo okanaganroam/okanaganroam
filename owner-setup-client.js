@@ -806,12 +806,12 @@
   function tourFreeWord(f){ return (T.tfreeWords || {})[f] || (f === 'donation' ? 'By donation' : 'Free'); }
   function readTour(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
-    if ((x = v('suTprice')) !== null) { var xTyped = x, mr0 = INDOOR ? indoorMinRead(x) : null; if (mr0) x = mr0.rest;
+    if ((x = v('suTprice')) !== null) { var xTyped = x, lw0 = INDOOR && !tourFreeRead(x) ? indoorLeadWords(x) : null; if (lw0) x = lw0.rest; var mr0 = INDOOR ? indoorMinRead(x) : null; if (mr0) x = mr0.rest;
       var fw = tourFreeRead(x), np = fw ? 0 : tourPriceRead(x); S.tour.priceFirst = !fw && tourPriceWhy(x) === 'first'; if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; S.tour.free = fw;
       // Indoor test 2: per room / lane / game / group words pick Per room or group (unless she tapped Per person), and say
       // who it's for; with Per room or group on, the number at the start is the price.
       if (INDOOR && !fw) {
-        var pr = indoorPerRead(x); S.tour.ptext = xTyped;
+        var pr = indoorPerRead(lw0 ? lw0.words + ' ' + x : x); S.tour.ptext = xTyped;
         if (pr.per && S.tour.perTapped !== 'person') { S.tour.perAuto = S.tour.per !== pr.per || S.tour.perAuto; S.tour.per = pr.per; }
         else if (!pr.per && S.tour.perAuto) { S.tour.per = ''; S.tour.perAuto = false; }
         if (S.tour.per) { S.tour.perMin = pr.min; S.tour.perMax = pr.max; var nn = tourPriceNumber(x); S.tour.price = nn == null ? (String(x).trim() ? NaN : null) : nn; S.tour.priceFirst = false; }
@@ -881,6 +881,14 @@
   // Per room or group with nothing typed to say which: an escape room's is a room, bowling's a lane, the rest a group.
   // Indoor test 16 (2026-11-19; Tyler: "35 per person, min 2 players" lost its minimum and the preview line): a minimum
   // number of players or people in the box ("min 2 players", "2-player minimum", « minimum 2 joueurs »). -> { n, rest }.
+  // Indoor test 18 (2026-11-19; Natalie typed "Facials from $95" and was told "Just the number"): words before the number
+  // say what the price is ("Facials from $95", "Day pass: 25", "Pedicure 70"): the number is read, the words are left.
+  function indoorLeadWords(x){
+    var t = String(x == null ? '' : x).trim(), m = /^([A-Za-z\u00c0-\u024f\u2019'][A-Za-z\u00c0-\u024f\u2019'\s&\-\/]*?)\s*(?:\b(?:from|starting at|starts at|at|is|are|only|[\u00e0a] partir de|d[\u00e8e]s|de)\b)?\s*[:\-\u2013\u2014=]?\s*((?:CA|C)?\$\s*\d.*|\d.*)$/i.exec(t);
+    if (!m) return null; var w = m[1].replace(/[\s:\-\u2013\u2014]+$/, '').trim();
+    if (!w || /^(?:from|starting|starts|start|min|minimum|max|maximum|ca|c|cad|usd|about|around|environ|[\u00e0a] partir|d[\u00e8e]s|per|par|up to|jusqu)$/i.test(w)) return null;
+    return { words: w, rest: m[2] };
+  }
   function indoorMinRead(x){
     var t = String(x == null ? '' : x), who = '(?:players?|people|persons?|ppl|pax|guests?|joueurs?|personnes?|pers)';
     var m = new RegExp('\\s*[,;(]?\\s*(?:(?:with )?(?:a )?min(?:imum)?\\.?\\s*(?:of\\s*|de\\s*)?(\\d{1,2})(?:\\s*-?\\s*' + who + ')?(?:\\s*(?:to book|per (?:room|booking|game)|par (?:salle|réservation)))?|(\\d{1,2})\\s*-?\\s*' + who + '\\s*min(?:imum)?)\\s*\\)?', 'i').exec(t);
@@ -914,8 +922,11 @@
   function suggNow(){ var t0 = S.tour.suggText, n0 = t0 != null ? (String(t0).trim() ? tourPriceNumber(t0) : null) : S.tour.sugg; return typeof n0 === 'number' && !isNaN(n0) && n0 > 0 && n0 <= (C.feeLiveMax || 300) ? n0 : null; }
   function tourPriceLead0(){ var n = S.tour.price; if (S.tour.free === 'donation' && T.tpriceLeadDonation) return INDOOR && T.tpriceLeadDonationSugg && suggNow() != null ? fill(T.tpriceLeadDonationSugg, { x: tourMoney(suggNow()) }) : T.tpriceLeadDonation;
     // Indoor test 3: a range typed ("$25 - $55") says what we'll show. Indoor test 4: every kind's lead is its own (kindWords).
-    if (INDOOR && !S.tour.free && !S.tour.per && S.tour.range && n > 0 && T.tpriceRangeLead) return fill(T.tpriceRangeLead, { x: tourMoney(n) });
-    if (INDOOR && S.tour.per && !S.tour.free && T.tpriceLeadPer) return n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPer, { page: indoorPerPage(n), x: tourMoney(n), u: (T.iperWords || {})[S.tour.per] || S.tour.per }); return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : INDOOR && C.indoorExact && T.tpriceLeadPickExact ? T.tpriceLeadPickExact : T.tpriceLeadPick, { x: tourMoney(n) }); }
+    if (INDOOR && !S.tour.free && !S.tour.per && S.tour.range && n > 0 && T.tpriceRangeLead) return fill(T.tpriceRangeLead, { x: tourMoney(n), line: indoorShowLine(n) });
+    if (INDOOR && S.tour.per && !S.tour.free && T.tpriceLeadPer) return n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPer, { page: indoorPerPage(n), x: tourMoney(n), u: (T.iperWords || {})[S.tour.per] || S.tour.per }); return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : T.tpriceLeadPick, { x: tourMoney(n), line: INDOOR ? indoorShowLine(n) : '' }); }
+  // Indoor test 18: THE PRICE RULE (indoor-kinds.js, top), as her page will say it: her price in her kind's words, or, when
+  // her own typed prices list a lower one (C.indoorLow), from that one ("From $70"; a museum "From $8 (adult admission $12)").
+  function indoorShowLine(n){ var lo = typeof C.indoorLow === 'number' && C.indoorLow > 0 && C.indoorLow < n ? C.indoorLow : null; return lo != null && T.tpriceCardLow ? fill(T.tpriceCardLow, { x: tourMoney(lo), main: tourMoney(n) }) : fill(T.tpriceCard, { x: tourMoney(n) }); }
   // "$16" / "16 $".
   function cpText(n){ return C.lang === 'fr' ? money(n) + '\u00a0$' : '$' + money(n); }
   function cpLeadText(){ var n = S.cp.fee; if (S.cp.none || n == null || isNaN(n) || n <= 0 || n > (C.feeLiveMax || 40)) return T.cpriceLead; return fill(T.cpriceLeadPick, { x: fill(T.feeCard, { x: cpText(n) }) }); }
@@ -1080,8 +1091,10 @@
   // Distillery test 1 (Whistler, 2026-11-16): Family Day (always a Monday) was offered to a place closed every Monday. A
   // holiday that falls on the same weekday every year (never Christmas or Canada Day, which move) on a day the week has
   // closed (the stretch's week inside a stored stretch) isn't offered: its tile says "You're closed Mondays".
-  function holWeekClosed(o){
-    if (!o || ['family', 'goodFri', 'easterMon', 'victoria', 'bcDay', 'labour', 'thanks'].indexOf(o.key) < 0 || !S.week || !DAYS.some(function(d){ return S.week[d] && S.week[d].length; })) return '';
+  // Indoor test 18 (2026-11-19; Natalie, closed Mondays: Jun 21 falls on a Monday next year and said nothing): any fixed-date
+  // holiday on a closed weekday this time says so too (any = true); its tile stays tappable, for the years it moves.
+  function holWeekClosed(o, any){
+    if (!o || (!any && ['family', 'goodFri', 'easterMon', 'victoria', 'bcDay', 'labour', 'thanks'].indexOf(o.key) < 0) || !S.week || !DAYS.some(function(d){ return S.week[d] && S.week[d].length; })) return '';
     var dt = new Date(o.date + 'T12:00:00'); if (isNaN(dt)) return '';
     var wd = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][dt.getDay()], md = String(o.date).slice(5), wk = S.week;
     (S.seaList || []).forEach(function(s){ if (s && s.on && s.src && s.week && mdInRange(md, s.src.from, s.src.to)) wk = s.week; });
@@ -1907,7 +1920,7 @@
     // Tours (2026-11-16): the kinds, the town and the price as the card shows it ("From $129").
     // Indoor places (2026-11-19): the kinds, the town and the price as the card shows it ("Adults $25", "Free").
     if (C.indoor) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
-      + h([indoorKindsShort(TI.kinds) || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' && TI.per && T.tpriceCardPer ? fill(T.tpriceCardPer, { x: tourMoney(S.savedTourPrice), u: (T.iperWords || {})[TI.per] || TI.per }) : typeof S.savedTourPrice === 'number' ? fill(C.indoorExact && T.tpriceCardExact ? T.tpriceCardExact : T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([indoorKindsShort(TI.kinds) || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' && TI.per && T.tpriceCardPer ? fill(T.tpriceCardPer, { x: tourMoney(S.savedTourPrice), u: (T.iperWords || {})[TI.per] || TI.per }) : typeof S.savedTourPrice === 'number' ? indoorShowLine(S.savedTourPrice) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     if (C.tour) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([S.tourWords || C.tourWords || (TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? (T.tfreeCard || 'Free') : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     // Breweries (2026-11-12): the kind, the town and the flight price as the card shows it ("From $12").
@@ -2513,7 +2526,7 @@
         // year?"). This screen only shows a saved open season, with Change.
         // Indoor test 11 (2026-11-19; Kim): a holiday on a day she's usually closed is tappable: "Open this holiday" turns on Open
         // on holidays (stored hours_holidays: every such holiday, as the hours screen's chip; there's no per-holiday store).
-        + '<h2 class="su-h2" id="suHolQ">' + h(T.holidaysH) + '</h2><div class="su-tiles" role="group" aria-labelledby="suHolQ">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ var cov = holCovered(o); var wkc = !cov && S.closures.indexOf(o.key) < 0 && T.holClosedDay ? holWeekClosed(o) : ''; var hop2 = wkc && INDOOR && T.holOpenThis; if (hop2) return '<button type="button" class="su-tile' + (S.mainHol ? '' : ' su-covered') + '" aria-pressed="' + (S.mainHol ? 'true' : 'false') + '" data-holopen="' + o.key + '"><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + '<span class="su-tile-sub su-covered-note">' + h(S.mainHol ? T.holOpenOn : fill(T.holClosedDay, { day: longDay(wkc) }) + ' · ' + T.holOpenThis) + '</span></button>'; return '<button type="button" class="su-tile' + (cov || wkc ? ' su-covered' : '') + '" aria-pressed="' + (cov || S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"' + (cov ? ' disabled' : '') + (wkc ? ' disabled data-wkc="' + wkc + '"' : '') + '><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + (cov ? '<span class="su-tile-sub su-covered-note">' + h(!coveredBy(o.date) && T.holSeason ? T.holSeason : T.holCovered) + '</span>' : wkc ? '<span class="su-tile-sub su-covered-note">' + h(fill(T.holClosedDay, { day: longDay(wkc) })) + '</span>' : '') + '</button>'; }).join('') + '</div>'
+        + '<h2 class="su-h2" id="suHolQ">' + h(T.holidaysH) + '</h2><div class="su-tiles" role="group" aria-labelledby="suHolQ">' + HOL.filter(function(o, i){ return S.holAll || i < HOL_FEW || S.closures.indexOf(o.key) >= 0; }).map(function(o){ var cov = holCovered(o); var wkc = !cov && S.closures.indexOf(o.key) < 0 && T.holClosedDay ? holWeekClosed(o) : ''; var wkf = !cov && !wkc && S.closures.indexOf(o.key) < 0 && T.holClosedDay ? holWeekClosed(o, true) : ''; var hop2 = wkc && INDOOR && T.holOpenThis; if (hop2) return '<button type="button" class="su-tile' + (S.mainHol ? '' : ' su-covered') + '" aria-pressed="' + (S.mainHol ? 'true' : 'false') + '" data-holopen="' + o.key + '"><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + '<span class="su-tile-sub su-covered-note">' + h(S.mainHol ? T.holOpenOn : fill(T.holClosedDay, { day: longDay(wkc) }) + ' · ' + T.holOpenThis) + '</span></button>'; return '<button type="button" class="su-tile' + (cov || wkc ? ' su-covered' : '') + '" aria-pressed="' + (cov || S.closures.indexOf(o.key) >= 0 ? 'true' : 'false') + '" data-hol="' + o.key + '"' + (cov ? ' disabled' : '') + (wkc ? ' disabled data-wkc="' + wkc + '"' : '') + '><span class="su-tile-sub">' + h(dateLabel(o.date)) + '</span>' + h(T.holidays[o.key]) + (cov ? '<span class="su-tile-sub su-covered-note">' + h(!coveredBy(o.date) && T.holSeason ? T.holSeason : T.holCovered) + '</span>' : wkc || wkf ? '<span class="su-tile-sub su-covered-note">' + h(fill(T.holClosedDay, { day: longDay(wkc || wkf) })) + '</span>' : '') + '</button>'; }).join('') + '</div>'
         + (INDOOR && S.mainHol && T.holOpenNote ? '<p class="su-hint" id="suHolOpenNote">' + h(T.holOpenNote) + '</p>' : '')
         + (HOL.length > HOL_FEW ? '<button type="button" class="su-more" data-act="holAll">' + h(S.holAll ? T.holFewer : fill(T.holAll, { n: HOL.length })) + '</button>' : '')
         // Café test 1 (Whistler, 2026-11-15): a holiday tile is closed all day; an early close is a message to us.

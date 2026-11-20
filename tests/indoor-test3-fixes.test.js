@@ -119,7 +119,7 @@ test('4 + 5. Price for a theatre: "Tickets from $25" on the page, card and previ
   await ok(change(t, { indoor_info: { kinds: ['theatre'], length: '2-3h' } }));
   const sim = await openSetup(base, t, { hash: 'price' });
   const box = sim.doc.getElementById('suTprice');
-  assert.equal(box.getAttribute('placeholder'), 'Varies by show? Your lowest regular ticket.');
+  assert.equal(box.getAttribute('placeholder'), 'Your lowest regular ticket, like 25');
   assert.match(sim.screen(), /Lowest regular adult ticket, in dollars/);
   await sim.type('suTprice', '$25 - $55');
   assert.equal(sim.doc.getElementById('suTpriceLead').textContent, 'We’ll show “Tickets from $25”, your lowest price.');
@@ -135,18 +135,18 @@ test('4 + 5. Price for a theatre: "Tickets from $25" on the page, card and previ
   // The setup's preview card and lead, back on the screen.
   const sim2 = await openSetup(base, t, { hash: 'price' });
   assert.equal(sim2.doc.getElementById('suTpriceLead').textContent, 'Your page will say “Tickets from $25”.');
-  // "25 to 55" for a museum: "Admission from $25" (indoor test 4: the museum's own words).
+  // "25 to 55" for a museum: its lowest, in the museum's own words (indoor test 18, THE PRICE RULE: "Adult admission $25").
   const m = mk('indoor', { name: 'Penticton Museum T3', description: 'Local history museum.' });
   const tm = tokenFor(m.id);
   await ok(change(tm, { indoor_info: { kinds: ['museum'], length: '1-2h' } }));
   const sm = await openSetup(base, tm, { hash: 'price' });
   // Indoor test 4: every kind has its own placeholder and words ("Admission from $25" for a museum).
-  assert.equal(sm.doc.getElementById('suTprice').getAttribute('placeholder'), 'Your regular adult admission');
+  assert.equal(sm.doc.getElementById('suTprice').getAttribute('placeholder'), 'Your regular adult admission, like 12');
   await sm.type('suTprice', '25 to 55');
-  assert.equal(sm.doc.getElementById('suTpriceLead').textContent, 'We’ll show “Admission from $25”, your lowest price.');
+  assert.equal(sm.doc.getElementById('suTpriceLead').textContent, 'We’ll show “Adult admission $25”, your lowest price.');
   await sm.click('priceSave');
   assert.equal(app.indoorPrice(m.id), 25);
-  assert.ok(plain(page(m)).includes('Admission from $25.'));
+  assert.ok(plain(page(m)).includes('Adult admission $25.'));
   // The server reads a range the same way; one price and per-person words as before.
   assert.equal(app.cleanIndoorPrice('$25 - $55').value, 25);
   assert.equal(app.cleanIndoorPrice('25 à 55 $').value, 25);

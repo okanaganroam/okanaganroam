@@ -738,7 +738,12 @@ function slotFit(v, ctx, windowKey, dayIndex, daypart) {
     score += weekday ? 2 : n >= 5 ? 2 : n >= 3 ? -4 : -14;
     const text = listedHoursText(v, null, fit.days);
     if (text) reasons.push({ code: 'hours', text, weight: 2 });
-    caveats.push(`Its listed hours only fit the ${label} on ${dayListText(fit.days)} \u2014 check the day you go`);
+    // Indoor test 18 (2026-11-19; Natalie's spa, open Tue–Sat: a girls' weekend said "only fit the morning on Tue–Sat"):
+    // when the slot fits every day the place is open, the days it's open are the whole story ("Open Tue–Sat").
+    const parsedH = v._hours || (v._hours = parseVenueHours(v.hours));
+    const openDays = parsedH && parsedH.days ? WEEKDAYS.filter((d) => parsedH.days[d] && parsedH.days[d].status === 'open') : [];
+    const fitsAllOpen = openDays.length && openDays.length < 7 && openDays.every((d) => (fit.days || []).includes(d));
+    caveats.push(fitsAllOpen ? `Open ${dayListText(fit.days)} \u2014 check the day you go` : `Its listed hours only fit the ${label} on ${dayListText(fit.days)} \u2014 check the day you go`);
     // 2026-10-25: a plan with no date is timed from a Saturday, so a place closed that day (a winery open Mon-Fri on
     // day 1, a Tue-Sat sushi lunch on day 2, a Sunday) comes after places that are open.
     // Day 1 of an undated plan is a Saturday, day 2 a Sunday, and so on.
@@ -1151,7 +1156,15 @@ const HIGHLIGHTS_ASKED_RE = /\b(?:first time|first visit|never been|must see|mus
 // Town centres (2026-10-25), for "far from town": the listings' average is pulled out by outlying parks.
 const TOWN_CENTRES = SITE.townCentres;
 const INDOOR_KIND_RE = /\b(yoga|pilates|pottery|ceramics|curling|bowling|escape room|arcade|axe throwing|climbing gym|bouldering|trampoline|board game|cooking class|makerspace|cinema|theatre|museum|gallery|sauna|disc golf|skate ?park|pump track|dirt jumps|toboggan|playground|dog park|splash park|spray park|hot springs|suspension bridge)s?\b/;
-const SPA_ASKED_RE = /\b(?:spa|spas|sauna|saunas|massage|massages|wellness|pamper\w*|relax\w*|hot tubs?|soak\w*|thermal|nordic spa)\b/;
+const SPA_ASKED_RE = /\b(?:spa|spas|sauna|saunas|massage|massages|wellness|pamper\w*|relax\w*|hot tubs?|soak\w*|thermal|nordic spa|detente|unwind\w*)\b/;
+// Indoor test 18 (2026-11-19; Natalie's day spa was left out of "relaxing day in Penticton" and « journée détente »): the
+// relaxing occasion's words (on normWords text) favour the spa kind, an owner-confirmed spa most.
+const RELAX_ASKED_RE = /\b(?:relax\w*|unwind\w*|pamper\w*|detente|se detendre|self care|me time|treat (?:ourselves|myself|yourself))\b/;
+function relaxSpaBonus(v, ctx) {
+  if (!RELAX_ASKED_RE.test(normWords(ctx && ctx.queryText || '')) || !spaPlace(v)) return 0;
+  if (v.type === 'indoor' && Array.isArray(v.indoorKinds) && v.indoorKinds.includes('spa')) return 25 + (v.completeVerified ? 5 : 0);
+  return 6;
+}
 // 2026-10-25 (tools audit): listings with no public access (Ivey Lake, Pemberton: private shoreline) are never planned
 // unless the request names them; the list is data/planner-excluded-places.json (region + slug).
 const PLANNER_EXCLUDED_PLACES = (() => {
@@ -1207,6 +1220,10 @@ function ownerKindFit(v, ctx) {
 // how many of those its own words say (its name, story, Known for and Groups lines, its kind). "couples massage" -> 2 for a
 // spa whose Known for says massage and whose Groups line offers couples' packages.
 const SPA_FOCUS = [/\bmassages?\b/, /\bcouples?\b|\ben couple\b|\bduo\b/, /\bfacials?\b|\bsoins? du visage\b/, /\bhydro ?therap\w*|\bhydroth[eé]rapie\b|\bnordic\b|\bnordique\b|\bhot and cold\b/];
+// The spa words in the order a quote is looked for: the most specific first.
+const SPA_FOCUS_ORDER = [SPA_FOCUS[1], SPA_FOCUS[2], SPA_FOCUS[3], SPA_FOCUS[0]];
+// What a spa request names, for a place whose own words say none of it ("Its listing doesn’t mention massages").
+const SPA_FOCUS_NAMES = ['massages', 'couples’ treatments', 'facials', 'hydrotherapy'];
 function spaFocusHits(v, ctx) {
   const q = normWords(ctx && ctx.queryText || '');
   const asked = SPA_FOCUS.filter((re) => re.test(q));
@@ -1627,6 +1644,7 @@ function scoreVenue(v, ctx) {
   { const sf = spaFocusHits(v, ctx); if (sf) add('spa_focus', v.type === 'indoor' && !(Array.isArray(v.indoorKinds) && v.indoorKinds.length) && (ctx.plannerKinds || []).length ? Math.min(11, 30 + sf * 25) : 30 + sf * 25, null); }
   // 2026-10-28: "a spa" puts a destination spa (Scandinave's hot pools and saunas) ahead of a hotel treatment room or a
   // massage studio.
+  { const rb = relaxSpaBonus(v, ctx); if (rb) add('relax_spa', rb, null); }
   if (SPA_ASKED_RE.test(ctx.queryText || '') && spaPlace(v)) {
     if (SPA_DESTINATION_RE.test(`${v.textName || ''} ${v.textDesc || normWords(v.plannerDescription || v.description || '')}`)) add('spa_destination', 12, 'A spa with hot pools, saunas and cold plunges');
     else if (/\bmassage\b/.test(v.textName || normWords(v.name || ''))) add('spa_massage', -6, null);
@@ -1857,6 +1875,7 @@ function scoreVenue(v, ctx) {
   }
   // 2026-10-28: "a spa" puts a destination spa (hot pools, saunas, thermal baths) ahead of a treatment room or a massage
   // studio.
+  { const rb = relaxSpaBonus(v, ctx); if (rb) add('relax_spa', rb, null); }
   if (SPA_ASKED_RE.test(ctx.queryText || '') && spaPlace(v)) {
     if (SPA_DESTINATION_RE.test(`${v.textName || ''} ${v.textDesc || normWords(v.plannerDescription || v.description || '')}`)) add('spa_destination', 12, 'A spa with hot pools, saunas and cold plunges');
     else if (/\bmassage\b/.test(v.textName || normWords(v.name || ''))) add('spa_massage', -6, null);
@@ -2075,10 +2094,14 @@ const PARTY_KINDS = ['escape', 'arcade', 'bowling', 'climbing'];
 // Indoor test 16 (2026-11-19; "rainy day for a group of 6"): a group asked for (Great for Groups, read from "a group", "group
 // of N", "for N people", "big group", "team", or a group occasion) puts the places that say they take groups first: the
 // Great for Groups badge (its own +8 as a feature), the place's own Groups line, a price per room or group.
+const COUPLES_ONLY_LINE_RE = /\b(?:couples?|for two|pour deux|duo|en couple|date night)\b/;
+const GROUP_SIZE_LINE_RE = /\b(?:groups?|groupes?|parties|party|bridal|bachelorette|girls|friends|team|corporate|private|up to \d|jusqu a \d|\d+ (?:or more|people|guests|personnes))\b/;
 function groupAsked(ctx) { return !!ctx && ((ctx.features || []).includes('great_groups') || ctx.occasion === 'group_getaway' || ctx.scoringOccasion === 'group_getaway'); }
 function groupFitScore(v, ctx, add) {
   if (!groupAsked(ctx) || DINING_TYPES.includes(v.type)) return;
-  const lines = Array.isArray(v.indoorOwnGroups) ? v.indoorOwnGroups : [];
+  // Indoor test 18 (2026-11-19; Natalie's spa: "Couples’ packages" read "Takes groups" on a girls' weekend): a Groups line
+  // that is only about couples (two people) is not a group line.
+  const lines = (Array.isArray(v.indoorOwnGroups) ? v.indoorOwnGroups : []).filter((l) => !COUPLES_ONLY_LINE_RE.test(normWords(l)) || GROUP_SIZE_LINE_RE.test(normWords(l)));
   // Its reason never quotes "please book ahead" as a reason it fits (that is the stop's Book ahead line).
   if (lines.length) add('group_line', 20, 'Takes groups (the owner’s own Groups line)');
   else if (v.groupsText) add('group_line', 8, null);
@@ -2243,7 +2266,8 @@ function publicVenue(v, ctx) {
     // "Tickets from $25", "Day pass from $22"), as the page says it.
     // Indoor test 13: the owner's own price line for the day or cheap night asked ("Cheap Tuesdays $8").
     : indoorFrom && !Array.isArray(v.indoorPerLine) && indoorAskedPriceLine(v, ctx) ? { ...indoorAskedPriceLine(v, ctx), label: 'Indoor', labelFr: 'Intérieur', source: null, lineFr: indoorAskedPriceLine(v, ctx).line, asked: true }
-    : indoorFrom && Array.isArray(v.indoorPriceLine) ? { cents: Math.round(indoorFrom * 100), label: 'Indoor', labelFr: 'Intérieur', source: null, line: v.indoorPriceLine[0], lineFr: v.indoorPriceLine[1] }
+    // Indoor test 18: THE PRICE RULE (indoor-kinds.js): its amount is the lowest real price ("From $70" with a $70 pedicure).
+    : indoorFrom && Array.isArray(v.indoorPriceLine) ? { cents: Math.round((typeof v.indoorPriceAt === 'number' && v.indoorPriceAt > 0 ? v.indoorPriceAt : indoorFrom) * 100), label: 'Indoor', labelFr: 'Intérieur', source: null, line: v.indoorPriceLine[0], lineFr: v.indoorPriceLine[1] }
     : indoorFrom ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null }
     : cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
     : fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
@@ -2734,6 +2758,9 @@ function indoorOwnWordLine(v, ctx) {
   if (!own.length && !groups.length) return null;
   const q = normWords(ctx.queryText || '');
   if (OWN_PARTY_RE.test(q)) { const l = groups.concat(own).find((t) => OWN_PARTY_RE.test(t)); if (l) return l; }
+  // Indoor test 18 (2026-11-19; "couples massage" said only "Matches your request for a spa" for Natalie's spa, whose Groups
+  // line is "Couples’ packages"): a spa request's own words (couples, facial, hydrotherapy, massage) quote her line.
+  if (spaPlace(v)) for (const re of SPA_FOCUS_ORDER) if (re.test(q)) { const l = groups.concat(own).find((t) => re.test(normWords(t))); if (l) return l; }
   const kindWords = indoorAskedWords(ctx.queryText) || new Set();
   const regions = new Set(Object.values((ctx.labels && ctx.labels.regions) || {}).flatMap((r) => normWords(r).split(' ')));
   const words = q.split(' ').filter((w) => w.length >= 5 && !OWN_WORD_SKIP.has(w) && !kindWords.has(w) && !regions.has(w) && !/^\d/.test(w));
@@ -2751,7 +2778,8 @@ function stopFrom(v, scored, extra, ctx) {
   const own = placeReasons(v, ctx || {});
   if (own.length) {
     // "Matches your request for a museum" and "... for museums" are one reason; the existing line stays.
-    const root = (t) => normWords(String(t).replace(/^Matches your request for (?:an? )?/, '')).slice(0, 4);
+    // Indoor test 18: "a spa" and "spas" too (the plural's s).
+    const root = (t) => normWords(String(t).replace(/^Matches your request for (?:an? )?/, '')).replace(/e?s$/, '').slice(0, 4);
     const asked = reasons.filter((r) => /^Matches your request for /.test(r.text || '')).map((r) => root(r.text));
     const mine = own.filter((o) => o.code !== 'request' || !asked.includes(root(o.text)));
     reasons = reasons.filter((r) => !mine.some((o) => o.text === r.text));
@@ -2760,6 +2788,15 @@ function stopFrom(v, scored, extra, ctx) {
     if (reasons.filter((r) => r.text && !['daypart', 'region'].includes(r.code)).length >= 2) reasons = reasons.filter((r) => !['daypart', 'region'].includes(r.code));
   }
   let caveats = [...new Set([...(scored.caveats || []), ...tripRequirements.listedAccessNotes(v)])];
+  // Indoor test 18 (2026-11-19; a floating sauna got the same "Why it fits" as Natalie's spa for "couples massage"): a spa
+  // or sauna whose own words say none of what was asked (massage, couples, facial) doesn't say it matches; it says so.
+  if (v && ctx && spaPlace(v)) {
+    const q = normWords(ctx.queryText || ''), askedI = SPA_FOCUS.findIndex((re) => re.test(q));
+    if (askedI >= 0 && askedI < 3 && !spaFocusHits(v, ctx)) {
+      reasons = reasons.filter((r) => !/^Matches your request for (?:an? )?(?:spas?|massages?|facials?|couples?\b.*)$/i.test(r.text || ''));
+      caveats.push(`Its listing doesn’t mention ${SPA_FOCUS_NAMES[askedI]} \u2014 check before you book`);
+    }
+  }
   // Winery test 4 (2026-11-12): a winery that said it is by appointment has no hours to go by: no "Listed hours" reason
   // and no hours caveat next to "By appointment only".
   if (v && (v.ownerAppointment === true || v.tourByBooking === true)) {

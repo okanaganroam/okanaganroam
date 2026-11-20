@@ -599,6 +599,8 @@ function t3FrenchTextCore(value){
   const whenFr={today:'aujourd’hui',tomorrow:'demain',tonight:'ce soir','this weekend':'cette fin de semaine','this morning':'ce matin','this afternoon':'cet après-midi','this evening':'ce soir'};
   const whenText=w=>{if(whenFr[w])return whenFr[w];const m=/^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)(?: (morning|afternoon|evening))?$/.exec(w);return m?dayFr[m[1]]+(m[2]?' '+({morning:'matin',afternoon:'après-midi',evening:'soir'}[m[2]]):''):null;};
   text=text.replace(/^Checked against each venue’s listed hours on @BRAND@(?: for (.+?))?: places whose listed hours show them closed then are left out, and places without usable hours are marked\. Hours can change, so check before you go\.$/,(raw,w)=>{const fw=w?whenText(w):'';return fw===null?raw:'Vérifié selon les horaires indiqués sur @BRAND@'+(fw?' pour '+fw:'')+' : les lieux fermés à ce moment-là selon leurs horaires sont exclus, et ceux sans horaires utilisables sont signalés. Les horaires peuvent changer, alors vérifiez avant de partir.';});
+  // Indoor test 18: a spa or sauna whose listing doesn't say what was asked.
+  text=text.replace(/^Its listing doesn’t mention (massages|couples’ treatments|facials|hydrotherapy) — check before you book$/,(_,w)=>'Sa fiche ne mentionne pas '+({massages:'de massages','couples’ treatments':'de soins pour couples',facials:'de soins du visage',hydrotherapy:'d’hydrothérapie'}[w])+' — vérifiez avant de réserver');
   text=text.replace(/^Its listed hours end at (\d{1,2}:\d{2}) — check before you go$/,(_,c)=>'Ses horaires indiqués se terminent à '+clockFr(c)+' — vérifiez avant de partir');
   text=text.replace(/^Price level (\$+)$/,'Niveau de prix $1');
   text=text.replace(/^A sit-down dinner to end the day$/,'Un souper assis pour finir la journée');
@@ -702,6 +704,8 @@ function t3FrenchTextCore(value){
  text=text.replace(/^Add a lesson$/,'Ajoutez un cours');
  text=text.replace(/^No ski or snowboard lesson company open on these dates is listed near the hill\.$/,'Aucune école de ski ou de planche ouverte à ces dates n’est répertoriée près de la montagne.');
  text=text.replace(/^About (<?\d+) km \(straight line\) from (.+)$/,(_,k,w)=>'Environ '+k+' km (à vol d’oiseau) '+({'the previous stop':'de l’arrêt précédent','the wineries':'des vignobles','the morning and afternoon stops':'des arrêts du matin et de l’après-midi'}[w]||(/^[AEIOUYÉÈÊaeiouyéèê]/.test(w)?'d’':'de ')+w));
+ // Indoor test 18: "Open Tue–Sat — check the day you go".
+ text=text.replace(/^Open ((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[A-Za-z–, ]*) — check the day you go$/,(_,list)=>'Ouvert '+list.replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>({Mon:'lun.',Tue:'mar.',Wed:'mer.',Thu:'jeu.',Fri:'ven.',Sat:'sam.',Sun:'dim.'}[d])).replace(/–/g,' au ')+' — vérifiez le jour de votre visite');
  // "Its listed hours only fit the midday on Mon–Fri, Sun — check the day you go" (2026-10-18).
  text=text.replace(/^Its listed hours only fit the (morning|midday|afternoon|late afternoon|early evening|evening) on (.+) — check the day you go$/,(_,part,list)=>{
   const when={morning:'le matin',midday:'le midi',afternoon:'l’après-midi','late afternoon':'en fin d’après-midi','early evening':'en début de soirée',evening:'le soir'}[part];

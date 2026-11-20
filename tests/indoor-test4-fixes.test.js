@@ -73,7 +73,7 @@ test('1. A spa’s price is "From $65" with "Treatments and passes" on the page,
   await ok(change(t, { indoor_info: { kinds: ['spa'], length: '2-3h' } }));
   const sim = await openSetup(base, t, { hash: 'price' });
   assert.equal(sim.doc.getElementById('suScreen').querySelector('label[for="suTprice"]').textContent, 'Your lowest price (a pass or your shortest treatment)');
-  assert.equal(sim.doc.getElementById('suTprice').getAttribute('placeholder'), 'Like a day pass or a 30-minute treatment');
+  assert.equal(sim.doc.getElementById('suTprice').getAttribute('placeholder'), 'Your lowest price, like 65 (your shortest treatment)');
   assert.doesNotMatch(sim.text(), /The price for one adult|Adult price|Adults/);
   await sim.type('suTprice', '65');
   assert.equal(sim.doc.getElementById('suTpriceLead').textContent, 'Your page will say “From $65”.');

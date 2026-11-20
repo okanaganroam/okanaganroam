@@ -188,7 +188,7 @@ test('4. Help: doors open before the first show (no set hours, plus a Good to kn
   assert.match(hp(bb.topic('indoor-theme-nights').a), /Add an event.*open-door hours/);
 });
 
-test('5. A request that names a day or a cheap night shows his matching price line ("Cheap Tuesdays $8"), EN + FR; other requests keep "Adult ticket $14"; research prices never count', async () => {
+test('5. A request that names a day or a cheap night shows his matching price line ("Cheap Tuesdays $8"), EN + FR; other requests show the everyday lowest "From $10 (adult ticket $14)"; research prices never count', async () => {
   const ARM = { region: 'armstrong', latitude: 50.45, longitude: -119.2 };
   const { v } = await dan(ARM);
   publishPrices(v.id, [['Adult ticket', '14'], ['Seniors and kids', '10'], ['Cheap Tuesdays', '8', 'Every ticket, all day Tuesday']]);
@@ -199,11 +199,13 @@ test('5. A request that names a day or a cheap night shows his matching price li
     assert.equal(c.cents, 800, `${q}: ${JSON.stringify(c)}`);
     assert.equal(c.line, 'Cheap Tuesdays {x}', q);
   }
+  // Indoor test 18 (THE PRICE RULE): other requests show the everyday lowest (seniors and kids $10; a Tuesday deal is not
+  // an everyday price), with what $14 buys.
   for (const q of ['movie in Armstrong tonight', 'movie in Armstrong Saturday', 'cinéma à Armstrong samedi soir']) {
     const c = costOf(q);
-    assert.equal(c.cents, 1400, q);
-    assert.equal(c.line, 'Adult ticket {x}', q);
-    assert.equal(c.lineFr, 'Billet adulte {x}', q);
+    assert.equal(c.cents, 1000, q);
+    assert.equal(c.line, 'From {x} (adult ticket $14)', q);
+    assert.equal(c.lineFr.replace(/\s/g, ' '), 'À partir de {x} (billet adulte 14 $)', q);
   }
   // Research's prices are never his.
   const { v: r } = await dan({ region: 'enderby', latitude: 50.55, longitude: -119.14 });

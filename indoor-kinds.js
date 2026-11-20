@@ -1,4 +1,32 @@
 'use strict';
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+// THE PRICE RULE (indoor test 18, 2026-11-19; Natalie's day spa read "Adult price $95" once she typed a $70 pedicure). One
+// rule for every surface that shows an indoor place's own price: the page's Prices row, the card, Build My Trip's card,
+// the setup's Price screen preview, the finish preview, the Help examples and the price typer's first line. It replaces
+// the per-case rules of tests 4, 10, 11, 12, 16 and 17 ("from" here, an "exact" label there). indoorPriceShow() below is
+// the only place it is written; server.js indoorPriceView() and owner-setup-client.js indoorShowLine() only feed it.
+//
+// Inputs: the kind (its basis below), the main price, its unit (per person, or per room / lane / game / group), Free or
+// By donation, the owner's own typed prices (the lowest one that is a real visit price: not an add-on, rental, gift card,
+// percentage, one-weekday deal like "Cheap Tuesdays", intro offer or membership) and the minimum players.
+//   (a) Free / By donation        "Free entry" / "By donation (suggested $5)". Nothing else.
+//   (b) An EXACT kind: its main price is one single admission and the kind's label truly names what it buys
+//       (gallery and museum adult admission, cinema adult ticket, pool adult drop-in, yoga drop-in class, bowling one
+//       game, play centre child admission: EXACT below):
+//         no lower typed price    "Adult admission $12."            card "$12 · Adult admission"
+//         a lower typed price     "From $8 (adult admission $12)."  card "From $8 · Adult admission $12"
+//   (c) A RANGE kind: the main price is the lowest of several services (spa, theatre, classes, climbing passes, arcade,
+//       escape room, curling, casino, library, other): "From $<lowest of the main and typed prices>" in the kind's words
+//       ("From $70.", "Tickets from $25.", "From $30 per player."), card "From $70 · Treatments and passes". A range kind
+//       never says "Adult price", "Adult admission" or any one-service label.
+//   (d) Per room / lane / game / group: "From $120 per room (2–6 players)." as before (server.js indoorPerLine); a
+//       minimum per person adds "(2-player minimum)".
+// The card always shows the lowest real price a visitor can pay. Build My Trip and the setup previews say the page's
+// words (without the full stop). The price typer's first line is the main price under a neutral name for a range kind
+// ("Shortest treatment", "One class", "One player"); a specific word ("Massage") only when the place's own words name
+// exactly one service.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+//
 // Indoor test 4 (2026-11-19; Lauren, a Kelowna day spa: her $65 hydrotherapy circuit was "Adults / Adult admission /
 // Admission" on every surface, the setup offered her birthday and school-group chips, a theatre's box office hint and a
 // museum's gift-shop example). One table of words for every indoor kind, in English and French, so each kind reads in its
@@ -32,24 +60,24 @@ const PRICES_PAGE = ['Prices & rates', 'Tarifs'];
 
 // Indoor test 7 (2026-11-19; Robert): a gallery's own Good to know chips and story / Known for examples (museums keep theirs).
 K.gallery = { quiet: true, gtk: 'gallery', ex: 'gallery', arts: true,
-  en: { price: { page: 'Admission from {x}.', basis: 'Adult admission', label: 'Adult admission, in dollars', ph: 'Your regular adult admission', lead: 'Your regular adult admission. It shows on your card.' },
+  en: { price: { page: 'Adult admission {x}.', basis: 'Adult admission', label: 'Adult admission, in dollars', ph: 'Your regular adult admission', lead: 'Your regular adult admission. It shows on your card.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Admission for adults, seniors, students and kids, memberships and tours, with their prices. A photo of your price list or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; guided tours by appointment', ages: 'Kids under 12 with an adult', gift: 'Gift shop by the entrance; memberships at the front desk', prices: 'Seniors $8, kids under 12 free' },
     groups: { chips: ['School groups welcome', 'Guided group tours on request', 'Private events and rentals'], lead: 'Tap a size, then add school groups, guided tours or private events in your own words.', ex: 'School groups and guided tours by appointment' },
     search: ['art gallery', 'art galleries', 'gallery', 'galleries', 'exhibition', 'exhibitions'] },
-  fr: { price: { page: 'Entrée à partir de {x}.', basis: 'Entrée adulte', label: 'Entrée adulte, en dollars', ph: 'Votre entrée adulte régulière', lead: 'Votre entrée adulte régulière. Elle paraît sur votre fiche.' },
+  fr: { price: { page: 'Entrée adulte {x}.', basis: 'Entrée adulte', label: 'Entrée adulte, en dollars', ph: 'Votre entrée adulte régulière', lead: 'Votre entrée adulte régulière. Elle paraît sur votre fiche.' },
     prices: { noun: 'liste de prix', page: PRICES_PAGE[1], lead: 'L’entrée pour les adultes, les aînés, les étudiants et les enfants, les abonnements et les visites, avec leurs prix. Une photo de votre liste de prix ou un lien vers celle-ci, c’est parfait. C’est facultatif.' },
     help: { walkin: 'Sans réservation; visites guidées sur rendez-vous', ages: 'Moins de 12 ans avec un adulte', gift: 'Boutique à l’entrée; abonnements à l’accueil', prices: 'Aînés 8 $, gratuit pour les moins de 12 ans' },
     groups: { chips: ['Groupes scolaires bienvenus', 'Visites guidées de groupe sur demande', 'Événements privés et location'], lead: 'Touchez une taille, puis ajoutez les groupes scolaires, les visites guidées ou les événements privés dans vos mots.', ex: 'Groupes scolaires et visites guidées sur rendez-vous' },
     search: ['galerie d’art', 'galeries d’art', 'galerie', 'galeries', 'exposition', 'expositions'] } };
 
 K.museum = { quiet: true, gtk: 'arts', ex: 'museum', arts: true,
-  en: { price: { page: 'Admission from {x}.', basis: 'Adult admission', label: 'Adult admission, in dollars', ph: 'Your regular adult admission', lead: 'Your regular adult admission. It shows on your card.' },
+  en: { price: { page: 'Adult admission {x}.', basis: 'Adult admission', label: 'Adult admission, in dollars', ph: 'Your regular adult admission', lead: 'Your regular adult admission. It shows on your card.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Admission for adults, seniors, students and kids, family passes and memberships, with their prices. A photo of your price list or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; school groups by appointment', ages: 'All ages; kids under 12 with an adult', gift: 'Gift shop by the entrance; memberships at the front desk', prices: 'Seniors $10, kids 6–12 $5, family pass $40' },
     groups: { chips: ['School groups welcome', 'Guided group tours on request', 'Private events and rentals'], lead: 'Tap a size, then add school groups, guided tours or private events in your own words.', ex: 'School groups and guided tours by appointment' },
     search: ['museum', 'museums', 'history', 'heritage', 'heritage site', 'science centre', 'science center', 'hands on science', 'science for kids', 'planetarium'] },
-  fr: { price: { page: 'Entrée à partir de {x}.', basis: 'Entrée adulte', label: 'Entrée adulte, en dollars', ph: 'Votre entrée adulte régulière', lead: 'Votre entrée adulte régulière. Elle paraît sur votre fiche.' },
+  fr: { price: { page: 'Entrée adulte {x}.', basis: 'Entrée adulte', label: 'Entrée adulte, en dollars', ph: 'Votre entrée adulte régulière', lead: 'Votre entrée adulte régulière. Elle paraît sur votre fiche.' },
     prices: { noun: 'liste de prix', page: PRICES_PAGE[1], lead: 'L’entrée pour les adultes, les aînés, les étudiants et les enfants, les laissez-passer familiaux et les abonnements, avec leurs prix. Une photo de votre liste de prix ou un lien vers celle-ci, c’est parfait. C’est facultatif.' },
     help: { walkin: 'Sans réservation; groupes scolaires sur rendez-vous', ages: 'Tous les âges; moins de 12 ans avec un adulte', gift: 'Boutique à l’entrée; abonnements à l’accueil', prices: 'Aînés 10 $, enfants de 6 à 12 ans 5 $, laissez-passer familial 40 $' },
     groups: { chips: ['Groupes scolaires bienvenus', 'Visites guidées de groupe sur demande', 'Événements privés et location'], lead: 'Touchez une taille, puis ajoutez les groupes scolaires, les visites guidées ou les événements privés dans vos mots.', ex: 'Groupes scolaires et visites guidées sur rendez-vous' },
@@ -146,24 +174,24 @@ K.escape = { gtk: 'general', ex: 'escape',
     search: ['jeu d’évasion', 'jeux d’évasion', 'salle d’évasion', 'escape game'] } };
 
 K.bowling = { gtk: 'bowling', ex: 'bowling',
-  en: { price: { page: 'From {x} per game.', basis: 'Per game', label: 'Price for one game, one person, in dollars', ph: 'Priced per lane? Tap Per room or group below', lead: 'The price for one game for one person. Priced per lane? Tap Per room or group. It shows on your card.' },
+  en: { price: { page: 'One game {x}.', basis: 'One game', label: 'Price for one game, one person, in dollars', ph: 'Priced per lane? Tap Per room or group below', lead: 'The price for one game for one person. Priced per lane? Tap Per room or group. It shows on your card.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Games, lanes by the hour, shoe rental and party packages, with their prices. A photo of your price list or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; book lanes for weekends', ages: 'All ages; bumpers for kids', gift: 'Gift cards at the front counter', prices: 'Shoes $3, lane $45 an hour' },
     groups: { chips: ['Birthday parties', 'Corporate events and team building', 'Leagues and private bookings'], lead: 'Tap a size, then add birthday parties, team building or leagues in your own words.', ex: 'Birthday party packages for up to 20. Corporate bowling nights' },
     search: ['bowling', 'bowling alley', 'tenpin', 'ten pin', '10 pin', '5 pin', '5-pin', 'five pin'] },
-  fr: { price: { page: 'À partir de {x} par partie.', basis: 'Par partie', label: 'Prix d’une partie pour une personne, en dollars', ph: 'Un prix par allée? Touchez Par salle ou groupe ci-dessous', lead: 'Le prix d’une partie pour une personne. Un prix par allée? Touchez Par salle ou groupe. Il paraît sur votre fiche.' },
+  fr: { price: { page: 'Une partie {x}.', basis: 'Une partie', label: 'Prix d’une partie pour une personne, en dollars', ph: 'Un prix par allée? Touchez Par salle ou groupe ci-dessous', lead: 'Le prix d’une partie pour une personne. Un prix par allée? Touchez Par salle ou groupe. Il paraît sur votre fiche.' },
     prices: { noun: 'liste de prix', page: PRICES_PAGE[1], lead: 'Les parties, les allées à l’heure, la location de souliers et les forfaits de fête, avec leurs prix. Une photo de votre liste de prix ou un lien vers celle-ci, c’est parfait. C’est facultatif.' },
     help: { walkin: 'Sans réservation; réservez une allée la fin de semaine', ages: 'Tous les âges; bandes pour les enfants', gift: 'Cartes-cadeaux au comptoir', prices: 'Souliers 3 $, allée 45 $ l’heure' },
     groups: { chips: ['Fêtes d’anniversaire', 'Événements d’entreprise et consolidation d’équipe', 'Ligues et réservations privées'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, la consolidation d’équipe ou les ligues dans vos mots.', ex: 'Forfaits pour fêtes d’anniversaire jusqu’à 20 personnes. Soirées de quilles pour les entreprises' },
     search: ['quilles', 'salle de quilles', 'petites quilles', 'grosses quilles'] } };
 
 K.kids = { day: true, gtk: 'kids', ex: 'kids',
-  en: { price: { page: 'Kids from {x}.', basis: 'Per child', label: 'Price for one child, in dollars', ph: 'Your regular price for one child', lead: 'The price for one child. It shows on your card.' },
+  en: { price: { page: 'Child admission {x}.', basis: 'Child admission', label: 'Price for one child, in dollars', ph: 'Your regular price for one child', lead: 'The price for one child. It shows on your card.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Kids’ and toddlers’ prices, passes and party packages, with their prices. A photo of your price list or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; parties booked ahead', ages: 'Kids 0 to 12 with an adult', gift: 'Gift cards and 10-visit passes at the front desk', prices: 'Toddlers $9, adults free' },
     groups: { chips: ['Birthday parties with a party room', 'School and daycare groups', 'Private bookings on request'], lead: 'Tap what you offer, like birthday parties, or say it in your own words.', ex: 'Birthday parties with a party room for up to 20 kids. Daycare groups welcome' },
     search: ['indoor playground', 'indoor play', 'play centre', 'play center', 'toddler play', 'soft play', 'kids play', 'play area', 'summer camp', 'summer camps', 'day camp', 'day camps', 'kids camp', 'kids camps', 'kid camp'] },
-  fr: { price: { page: 'Enfants à partir de {x}.', basis: 'Par enfant', label: 'Prix pour un enfant, en dollars', ph: 'Votre prix régulier pour un enfant', lead: 'Le prix pour un enfant. Il paraît sur votre fiche.' },
+  fr: { price: { page: 'Entrée enfant {x}.', basis: 'Entrée enfant', label: 'Prix pour un enfant, en dollars', ph: 'Votre prix régulier pour un enfant', lead: 'Le prix pour un enfant. Il paraît sur votre fiche.' },
     prices: { noun: 'liste de prix', page: PRICES_PAGE[1], lead: 'Les prix pour enfants et tout-petits, les laissez-passer et les forfaits de fête, avec leurs prix. Une photo de votre liste de prix ou un lien vers celle-ci, c’est parfait. C’est facultatif.' },
     help: { walkin: 'Sans réservation; les fêtes se réservent', ages: 'Enfants de 0 à 12 ans avec un adulte', gift: 'Cartes-cadeaux et cartes de 10 entrées à l’accueil', prices: 'Tout-petits 9 $, adultes gratuit' },
     groups: { chips: ['Fêtes d’anniversaire avec salle de fête', 'Groupes scolaires et de garderie', 'Réservations privées sur demande'], lead: 'Touchez ce que vous offrez, comme les fêtes d’anniversaire, ou écrivez-le dans vos mots.', ex: 'Fêtes d’anniversaire avec salle de fête jusqu’à 20 enfants. Groupes de garderie bienvenus' },
@@ -247,6 +275,29 @@ K.other = { gtk: 'general', ex: 'general',
     groups: { chips: ['Fêtes d’anniversaire avec salle privée', 'Groupes scolaires bienvenus', 'Réservations privées sur demande'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes scolaires ou les réservations privées dans vos mots.', ex: 'Fêtes d’anniversaire avec salle privée jusqu’à 20 personnes. Groupes scolaires bienvenus' },
     search: ['activité intérieure', 'activités intérieures', 'jour de pluie'] } };
 
+// Indoor test 18 (2026-11-19; Natalie typed "Facials from $95" as the old hint invited and was told "Just the number"): the
+// Price box's placeholder says the number it wants and what it is, by kind ([en, fr]). Words around the number are read
+// now too (owner-setup-client.js indoorLeadWords).
+const PRICE_PH = {
+  gallery: ['Your regular adult admission, like 10', 'Votre entrée adulte régulière, par exemple 10'],
+  museum: ['Your regular adult admission, like 12', 'Votre entrée adulte régulière, par exemple 12'],
+  theatre: ['Your lowest regular ticket, like 25', 'Votre billet régulier le moins cher, par exemple 25'],
+  cinema: ['Your regular adult ticket, like 14', 'Votre billet adulte régulier, par exemple 14'],
+  spa: ['Your lowest price, like 65 (your shortest treatment)', 'Votre prix le plus bas, par exemple 65 (votre soin le plus court)'],
+  pool: ['Your adult drop-in price, like 7.50', 'Votre prix adulte à la séance, par exemple 7,50'],
+  climbing: ['Your lowest adult pass, like 22 (a day pass or a timed jump)', 'Votre laissez-passer adulte le moins cher, par exemple 22 (journée ou durée)'],
+  games: ['Your lowest price for one person, like 15 (one game)', 'Votre prix le plus bas pour une personne, par exemple 15 (une partie)'],
+  escape: ['One player, like 30. Priced per room? Tap Per room or group below', 'Un joueur, par exemple 30. Un prix par salle? Touchez Par salle ou groupe ci-dessous'],
+  bowling: ['One game for one person, like 6.50. Priced per lane? Tap Per room or group below', 'Une partie pour une personne, par exemple 6,50. Un prix par allée? Touchez Par salle ou groupe ci-dessous'],
+  kids: ['Your price for one child, like 14', 'Votre prix pour un enfant, par exemple 14'],
+  classes: ['Your lowest price, like 40 (one class or your shortest workshop)', 'Votre prix le plus bas, par exemple 40 (un cours ou votre atelier le plus court)'],
+  curling: ['One person, like 30 (learn to curl)', 'Une personne, par exemple 30 (initiation au curling)'],
+  yoga: ['Your drop-in class price, like 20', 'Votre prix pour un cours à la carte, par exemple 20'],
+  casino: ['Your entry price, like 40. Free to get in? Tap Free entry', 'Votre prix d’entrée, par exemple 40. L’entrée est gratuite? Touchez Entrée gratuite'],
+  library: ['Your lowest price, like 10. Free to visit? Tap Free entry', 'Votre prix le plus bas, par exemple 10. La visite est gratuite? Touchez Entrée gratuite'],
+  other: ['Your lowest price for one person, like 15', 'Votre prix le plus bas pour une personne, par exemple 15'],
+};
+for (const [k, x] of Object.entries(PRICE_PH)) if (K[k]) { K[k].en.price.ph = x[0]; K[k].fr.price.ph = x[1]; }
 // Indoor test 5 (2026-11-19; Chris): the price typer's example line and section, per kind: [en item, en section, fr item, fr section].
 const TYPER = {
   gallery: ['Adult admission', 'Admission', 'Entrée adulte', 'Entrée'],
@@ -279,24 +330,31 @@ const TYPER_PERSON = { escape: ['One player', 'Un joueur'] };
 const TYPER_TRUE = {
   gallery: { name: ['Adult admission', 'Entrée adulte'] }, museum: { name: ['Adult admission', 'Entrée adulte'] },
   theatre: { name: ['Adult ticket', 'Billet adulte'] }, cinema: { name: ['Adult ticket', 'Billet adulte'] },
-  spa: { name: ['Shortest treatment', 'Soin le plus court'], own: [[/\b(?:day pass|circuit|hydrotherap\w*|thermal|nordic|bath ?house)\b/i, 'Day pass', 'Forfait d’un jour'], [/\bmassages?\b/i, 'Massage', 'Massage'], [/\bfacials?\b/i, 'Facial', 'Soin du visage']] },
+  // Indoor test 18: a spa's services; a specific name only when its own words name exactly one of them (null: counted, never
+  // used as the name).
+  spa: { name: ['Shortest treatment', 'Soin le plus court'], own: [[/\b(?:day pass|circuit|hydrotherap\w*|thermal|nordic|bath ?house)\b/i, 'Day pass', 'Forfait d’un jour'], [/\bmassages?\b|\bmassoth[ée]rap\w*/i, 'Massage', 'Massage'], [/\bfacials?\b|\bsoins? du visage\b/i, 'Facial', 'Soin du visage'],
+    [/\bsaunas?\b/i, 'Sauna session', 'Séance de sauna'], [/\bfloat(?:s|ing|ation)?\b(?! sauna)/i, 'Float', 'Flottaison'], [/\b(?:pedicures?|manicures?|nails?|p[ée]dicures?|manucures?|ongles)\b/i, null, null],
+    [/\b(?:wax\w*|lash\w*|brows?|body (?:wraps?|scrubs?)|reflexolog\w*|epilation|[ée]pilation|cils|sourcils)\b/i, null, null]] },
   pool: { name: ['Adult drop-in', 'Entrée adulte à la séance'] },
   climbing: { name: ['Day pass', 'Laissez-passer d’un jour'], own: [[/\b(?:climb\w*|boulder\w*|escalade|belay\w*)\b/i, 'Day pass', 'Laissez-passer d’un jour'], [/\btrampolin\w*|\bjump(?:s|ing)?\b/i, '60-min jump pass', 'Saut de 60 min']] },
   games: { name: ['One game', 'Une partie'], own: [[/\blaser ?tag\b/i, 'Laser tag game', 'Partie de laser tag'], [/\b(?:vr|virtual reality)\b/i, 'VR game, 30 min', 'Partie de réalité virtuelle, 30 min']] },
   escape: { name: ['One player', 'Un joueur'] },
   bowling: { name: ['One game', 'Une partie'] },
-  kids: { name: ['One child', 'Un enfant'], own: [[/\btoddlers?\b/i, 'Toddler play pass', 'Laissez-passer tout-petits']] },
+  kids: { name: ['Child admission', 'Entrée enfant'], own: [[/\btoddlers?\b/i, 'Toddler play pass', 'Laissez-passer tout-petits']] },
   classes: { name: ['One class', 'Un cours'], own: [[/\bwheel\b/i, 'Wheel class, 2 hours', 'Cours de tour, 2 heures'], [/\bpaint your own\b/i, 'Studio fee, one person', 'Frais d’atelier, une personne']] },
   curling: { name: ['One person', 'Une personne'], own: [[/\blearn to curl\b/i, 'Learn to curl, 2 hours', 'Initiation au curling, 2 heures']] },
   yoga: { name: ['Drop-in class', 'Cours à la carte'] },
   casino: { name: ['Entry', 'Entrée'] }, library: { name: ['One program', 'Un programme'] },
-  other: { name: ['Adult admission', 'Entrée adulte'] },
+  other: { name: ['One person', 'Une personne'] },
 };
 // The first line's name, and the "like …" example, for a place: kinds, language, the price's unit (per: room, lane, game,
 // group; none: per person) and its own words. -> { first, item, section }
 function indoorTyperWords(kinds, lang, { per = null, own = '' } = {}) {
   const k = indoorKindKey(kinds), fr = lang === 'fr' ? 1 : 0, tt = TYPER_TRUE[k] || TYPER_TRUE.other, t = TYPER[k] || TYPER.other;
-  const hit = (tt.own || []).find((x) => x[0].test(String(own || '')));
+  // Indoor test 18 (Natalie's spa: "Massage $95" pre-filled when $95 was her facial): a specific name only when the place's
+  // own words name exactly one service; several (massages, facials and pedicures): the kind's neutral name.
+  const hits = (tt.own || []).filter((x) => x[0].test(String(own || '')));
+  const hit = hits.length === 1 && hits[0][1] ? hits[0] : null;
   const name = hit ? [hit[1], hit[2]] : tt.name;
   const unit = per && TYPER_PER[per] ? TYPER_PER[per][fr] : null;
   return { first: unit || name[fr], item: unit || name[fr], section: t[fr ? 3 : 1] };
@@ -352,13 +410,39 @@ for (const [k, t] of Object.entries(BUSY_THEME)) if (K[k]) { Object.assign(K[k].
 // each kind before the owner has typed one (a pool's drop-in is never $25).
 const EX_PRICE = { gallery: 10, museum: 12, theatre: 25, cinema: 14, spa: 65, pool: 7.5, climbing: 22, games: 15, escape: 30, bowling: 6.5, kids: 14, classes: 40, curling: 30, yoga: 20, casino: 40, library: 10, other: 15 };
 for (const [k, x] of Object.entries(EX_PRICE)) if (K[k]) K[k].exPrice = x;
-// Indoor test 10 (2026-11-19; Sandra's pool: "Drop-in from $7.50" while kids pay $3.50): when the owner's typed prices list a
-// lower price than her main one, the main one says what it is instead of "from": [en, fr] ("Adult drop-in $7.50.").
-const EXACT = { gallery: ['Adult admission', 'Entrée adulte'], museum: ['Adult admission', 'Entrée adulte'], theatre: ['Adult ticket', 'Billet adulte'], cinema: ['Adult ticket', 'Billet adulte'],
-  spa: ['Adult price', 'Prix adulte'], pool: ['Adult drop-in', 'Entrée adulte à la séance'], climbing: ['Adult pass', 'Laissez-passer adulte'], games: ['Per person', 'Par personne'],
-  escape: ['Per person', 'Par personne'], bowling: ['One game', 'Une partie'], kids: ['Kids', 'Enfants'], classes: ['Per class', 'Par cours'], curling: ['Adults', 'Adultes'],
-  yoga: ['Drop-in class', 'Cours à la carte'], casino: ['Adults', 'Adultes'], library: ['Adults', 'Adultes'], other: ['Adult admission', 'Entrée adulte'] };
-for (const [k, x] of Object.entries(EXACT)) if (K[k]) { K[k].en.price.exact = x[0]; K[k].fr.price.exact = x[1]; }
+// THE PRICE RULE's EXACT kinds (indoor test 18; see the top of this file): the label that truly names what the main price
+// buys ([en, fr]). Every other kind is a RANGE kind and has no exact label (a spa is never "Adult price").
+const EXACT = { gallery: ['Adult admission', 'Entrée adulte'], museum: ['Adult admission', 'Entrée adulte'], cinema: ['Adult ticket', 'Billet adulte'],
+  pool: ['Adult drop-in', 'Entrée adulte à la séance'], yoga: ['Drop-in class', 'Cours à la carte'], bowling: ['One game', 'Une partie'], kids: ['Child admission', 'Entrée enfant'] };
+for (const [k, x] of Object.entries(EXACT)) if (K[k]) {
+  K[k].single = true; K[k].en.price.exact = x[0]; K[k].fr.price.exact = x[1];
+  K[k].en.price.page = `${x[0]} {x}.`; K[k].fr.price.page = `${x[1]} {x}.`; K[k].en.price.basis = x[0]; K[k].fr.price.basis = x[1];
+}
+const FROM_WORDS = ['From {x}', 'À partir de {x}'];
+const lc1 = (t) => String(t).charAt(0).toLowerCase() + String(t).slice(1);
+// THE PRICE RULE (b) and (c), for a price per person (server.js indoorPriceView handles free, donation and per-unit first).
+//   price  the owner's main price (> 0)
+//   low    the lowest of the owner's own typed prices that is a real visit price, or null
+//   money  (n, fr) -> "$12" / "12 $"
+// -> { kind, exact, lowered, amount, line, page, card: { from, basis } }:
+//   amount  the price the card, Build My Trip and the estimate use: always the lowest real price
+//   line    the words with {x} for amount ("From {x}", "Adult admission {x}", "From {x} (adult admission $12)")
+//   page    the page's Prices row ("From $70.")
+//   card    from: the card says "From $70" (else "$12"); basis: the card's small line, in English (french-text.js)
+function indoorPriceShow(kinds, lang, price, { low = null, money } = {}) {
+  const k = indoorKindKey(kinds), fr = lang === 'fr', w = K[k][fr ? 'fr' : 'en'], m = money || ((n, f) => (f ? `${String(n).replace('.', ',')} $` : `$${n}`));
+  const lo = typeof low === 'number' && Number.isFinite(low) && low > 0 && low < price ? low : null;
+  const ex = EXACT[k];
+  if (ex && lo == null) return { kind: k, exact: true, lowered: false, amount: price, line: `${ex[fr ? 1 : 0]} {x}`, page: `${ex[fr ? 1 : 0]} ${m(price, fr)}.`, card: { from: false, basis: ex[0] } };
+  if (ex) {
+    const line = `${FROM_WORDS[fr ? 1 : 0]} (${lc1(ex[fr ? 1 : 0])} ${m(price, fr)})`;
+    return { kind: k, exact: true, lowered: true, amount: lo, line, page: `${line.replace('{x}', m(lo, fr))}.`, card: { from: true, basis: `${ex[0]} ${m(price, false)}` } };
+  }
+  const amount = lo != null ? lo : price, line = String(w.price.page).replace(/\.$/, '');
+  return { kind: k, exact: false, lowered: lo != null, amount, line, page: `${line.replace('{x}', m(amount, fr))}.`, card: { from: true, basis: K[k].en.price.basis } };
+}
+// The exact labels [en, fr], for the card's small line with a lower price ("Adult admission $12") in French (french-text.js).
+const INDOOR_EXACT_FR = Object.values(EXACT).map((x) => x.slice());
 // Indoor test 12 (2026-11-19; Jess's price box was pre-filled with $80, research's "1 month unlimited intro pass $80"): the
 // words a research price line must name for its amount to pre-fill the kind's Price box (the kind's own basis: a drop-in,
 // a single class, an adult admission, a day pass…), and the words that make a line something else (an intro offer, a pass
@@ -492,7 +576,7 @@ function indoorKindText(kinds, lang) {
 function indoorPriceLine(kinds, money, lang) { return indoorKindText(kinds, lang).price.page.replace('{x}', money); }
 // The card's small lines in both languages (English -> French), for french-text.js.
 const INDOOR_BASIS_FR = Object.fromEntries(Object.values(K).map((e) => [e.en.price.basis, e.fr.price.basis]).concat(Object.values(K).map((e) => [e.en.prices.page, e.fr.prices.page]))
-  .concat(Object.values(K).map((e) => [e.en.price.exact, e.fr.price.exact])));
+  .concat(Object.values(K).filter((e) => e.en.price.exact).map((e) => [e.en.price.exact, e.fr.price.exact])));
 // The kinds whose words name what the request asks ("massage" -> spa), from the search words.
 // Indoor test 10 (2026-11-19, the vocabulary audit): phrases that hold a kind's word but name something else: lawn bowling
 // and bowling greens (Sports & Recreation), an outdoor pool, a pool table or pool hall.
@@ -522,4 +606,4 @@ const INDOOR_TYPE_WORD_SKIP = new Set(['history', 'heritage', 'heritage site', '
 // "learn to curl", "slots", « soin du visage »).
 const INDOOR_TYPE_WORDS = [...new Set(Object.values(K).flatMap((e) => e.en.search.concat(e.fr.search)).filter((w) => !INDOOR_TYPE_WORD_SKIP.has(w)))];
 
-module.exports = { indoorWaiverVerb, indoorTyperWords, TYPER_TRUE, indoorKindLabel, indoorKindLabels, BOOK_AHEAD_UNIT, TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };
+module.exports = { indoorPriceShow, INDOOR_EXACT_FR, EXACT_PRICE_LABELS: EXACT, indoorWaiverVerb, indoorTyperWords, TYPER_TRUE, indoorKindLabel, indoorKindLabels, BOOK_AHEAD_UNIT, TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };

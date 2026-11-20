@@ -5906,10 +5906,13 @@ const SMART_ACTIVITIES = [
   { key: 'sauna', label: 'Hot tubs & saunas', labelFr: 'Bains à remous et saunas', words: ['sauna', 'saunas', 'hot tub', 'hot tubs', 'steam room', 'steam rooms', 'whirlpool', 'bain a remous', 'bains a remous'],
     re: /\bsaunas?\b|\bhot ?tubs?\b|\bsteam (?:rooms?|cave)\b|\bwhirlpools?\b/i, types: SMART_WINTER_ACTIVITY_TYPES, guide: '/guides/okanagan-saunas-spas' },
   { key: 'spa', label: 'Spas & warm soaks', labelFr: 'Spas et bains chauds', words: ['hot springs', 'hot spring', 'spa', 'spas', 'nordic spa', 'nordic spas', 'thermal spa', 'thermal spas', 'hot pool', 'hot pools',
-    'day spa', 'warm soak', 'salt cave'],
+    'day spa', 'warm soak', 'salt cave',
+    // Indoor test 18 (2026-11-19; "massage penticton" read "Indoor & rainy day spots" and "massage christmas day" lost
+    // its date): massages and facials are a spa's.
+    'massage', 'massages', 'couples massage', 'massage therapy', 'facial', 'facials', 'massage en couple', 'soin du visage', 'soins du visage'],
     // Round 12 (2026-10-20): "spa" listed the YMCA and the aquatic and recreation centres (a sauna or steam room in
     // their blurb); a public pool or gym is not a spa.
-    re: /\bspas?\b|\bsaunas?\b|\bthermal (?:spa|pools?|baths?)\b|\bhot springs?\b|\bhot pools?\b|\bnordic (?:spa|baths?)\b|\bsteam (?:room|cave)\b|\bsalt cave\b/i,
+    re: /\bspas?\b|\bsaunas?\b|\bthermal (?:spa|pools?|baths?)\b|\bhot springs?\b|\bhot pools?\b|\bnordic (?:spa|baths?)\b|\bsteam (?:room|cave)\b|\bsalt cave\b|\bmassages?\b|\bfacials?\b/i,
     notName: /\b(?:ymca|ywca|aquatics?|recreation (?:cent(?:re|er)|complex)|community cent(?:re|er)|fitness|leisure cent(?:re|er)|sportsplex|arena|pools?)\b/i,
     types: SMART_WINTER_ACTIVITY_TYPES, guide: '/guides/okanagan-saunas-spas' },
   { key: 'pumpkin_patch', label: 'Pumpkin patches', labelFr: 'Champs de citrouilles', words: ['pumpkin patch', 'pumpkin patches', 'pumpkin', 'pumpkins', 'pumpkin farm', 'pumpkin farms', 'pumpkin picking', 'pick a pumpkin',
@@ -5989,6 +5992,10 @@ const SMART_HOLIDAYS = [
   [/(?:^| )(?:new years day|new year s day|new years|jour de l an|jan 1|january 1|1er janvier)(?: |$)/, 1, 1],
   [/(?:^| )(?:canada day|fete du canada|july 1|1er juillet)(?: |$)/, 7, 1],
 ];
+// Indoor test 18: the date words a plan's day stands for (a month, a holiday, a day number).
+const SEARCH_DATE_WORD_RE = /^(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre|christmas|xmas|noel|boxing|new years?|nye|day|jour|\d{1,2}(?:st|nd|rd|th)?)(?: (?:day|eve|\d{1,2}))?$/;
+// The search activity that lists a kind's places ("climbing" -> Climbing gyms), for searchKindNearest's note.
+const SEARCH_KIND_ACTIVITY = { climbing: 'climbing_gym', spa: 'spa', bowling: 'bowling', escape: 'escape_room', arcade: 'arcade', museum: 'museum', theatre: 'theatre' };
 const SMART_HOLIDAY_WORDS = ['christmas day', 'xmas day', 'christmas eve', 'xmas eve', 'christmas', 'xmas', 'jour de noel', 'veille de noel', 'lendemain de noel', 'noel', 'boxing day', 'new years eve', 'new year s eve', 'nye', 'new years day',
   'new year s day', 'new years', 'jour de l an', 'veille du jour de l an', 'canada day', 'fete du canada', 'dec 24', 'dec 25', 'dec 26', 'dec 31', 'december 24', 'december 25', 'december 26', 'december 31', '24 dec', '25 dec', '26 dec', '31 dec',
   '24 decembre', '25 decembre', '26 decembre', '31 decembre', 'jan 1', 'january 1', '1er janvier', 'july 1', '1er juillet', 'on', 'le', 'day', 'jour'];
@@ -7084,6 +7091,11 @@ function searchSummaryHtml(model, lang) {
   const notes = p.notes.filter((n) => !(plan && plan.list && (['occasion', 'when'].includes(n.field) || (plan.key === 'budget' && n.field === 'budget'))))
     // Round 8 (2026-10-19): a plan's own list ("hot springs" -> spas) is not an any-word match either.
     .filter((n) => !((model.nameOnly || (plan && plan.list)) && n.code === 'any_words'))
+    // Indoor test 18 (2026-11-19; Natalie: "climbing christmas day kelowna" said "“december” isn’t something search can
+    // apply" over places showing Dec 25, and "No climbing gyms in Kelowna" over 5 Kelowna gyms): a plan's list that applied
+    // a day leaves off the notes about its date words, and a list of places of that kind leaves off "No … in <town>".
+    .filter((n) => !(plan && plan.list && plan.day && n.field === 'phrase' && SEARCH_DATE_WORD_RE.test(smartFold(String(n.value || '')))))
+    .filter((n) => !(plan && plan.list && n.code === 'kind_nearest' && model.venues && model.venues.length && SEARCH_KIND_ACTIVITY[n.value] === plan.key))
     .map((n) => (lang === 'fr' ? discoveryNoteTextFr(n, labels) : discoveryNoteText(n, labels))).filter((t, i, all) => t && all.indexOf(t) === i);
   const noteHtml = notes.length ? `<ul class="search-notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
   const quote = lang === 'fr' ? `« ${esc(q)} »` : `“${esc(q)}”`;
@@ -24894,8 +24906,9 @@ function indoorVisitLines(venue, info) {
   // comedy) says "Tickets from $25." (« Billets à partir de 25 $. »): its lowest regular ticket.
   // Indoor test 4 (2026-11-19; Lauren's day spa said "Adults $65"): every kind words its price its own way (indoor-kinds.js):
   // "From $65." for a spa, "Admission from $12." for a museum, "Day pass from $22." for a climbing gym.
-  else if (price != null && indoorPriceExact(venue.id, t)) out.Prices = { en: `${indoorKindsModule.indoorKindText(t.kinds, 'en').price.exact} ${tourMoney(price, false)}.`, fr: `${indoorKindsModule.indoorKindText(t.kinds, 'fr').price.exact} ${tourMoney(price, true)}.` };
-  else if (price != null) out.Prices = { en: indoorKindsModule.indoorPriceLine(t.kinds, tourMoney(price, false), 'en'), fr: indoorKindsModule.indoorPriceLine(t.kinds, tourMoney(price, true), 'fr') };
+  // Indoor test 18: THE PRICE RULE (indoor-kinds.js, top): "From $70." for a spa whose typed pedicure is $70, "Adult
+  // admission $12." for a museum, "From $8 (adult admission $12)." when her typed prices list a lower one.
+  else if (price != null) out.Prices = { en: indoorPriceView(venue.id, t, 'en').page, fr: indoorPriceView(venue.id, t, 'fr').page };
   // Indoor test 16 (2026-11-19; Tyler typed "35 per person, min 2 players"): a minimum kept with a price per person.
   if (out.Prices && price != null && !free && !INDOOR_PER_UNITS.includes(t.per) && Number.isInteger(t.per_min) && t.per_min > 1) {
     const players = (Array.isArray(t.kinds) ? t.kinds : []).some((k) => INDOOR_PLAYER_KINDS.includes(k));
@@ -24916,8 +24929,32 @@ function indoorVisitLines(venue, info) {
     const adult = t.adult === true && !['all', '19'].includes(String(t.age)) ? [' Under 18s come with an adult.', ' Les moins de 18 ans viennent avec un adulte.'] : ['', ''];
     out.Ages = { en: a[0] + adult[0], fr: a[1] + adult[1] };
   }
-  if (INDOOR_BOOK.includes(t.book)) out.Booking = { en: INDOOR_BOOK_LINES[t.book][0], fr: INDOOR_BOOK_LINES[t.book][1] };
+  if (INDOOR_BOOK.includes(t.book)) {
+    // Indoor test 18 (2026-11-19; Natalie's "Please book ahead." replaced research's "Book online or by phone."): research's
+    // booking detail stays after her line when it doesn't contradict it (the round-14 stale check) and says something more.
+    const tail = indoorBookingResearchTail(venue, t);
+    out.Booking = { en: INDOOR_BOOK_LINES[t.book][0] + (tail ? ` ${tail}` : ''), fr: INDOOR_BOOK_LINES[t.book][1] };
+  }
   return out;
+}
+// Research's Booking sentences that still hold beside the owner's booking answer: about booking (how, where, when), not
+// contradicted by her answer (indoorStaleWhy), not removed by her, and not just her answer again ("Booking required" after
+// "Please book ahead."). Read from research's own line (owner_was once her answer replaced it). -> 'Book online or by phone.' or ''.
+const INDOOR_BOOK_DETAIL_RE = /\b(?:book\w*|reserv\w*|call|phone|online|website|app|appointments?|walk[- ]?ins?|drop[- ]?ins?|in advance|ahead|deposit|cancel\w*)\b/i;
+function indoorBookingResearchTail(venue, t) {
+  try {
+    const info = venueVisitInfo(venue.id) || {};
+    const managed = Array.isArray(info.winery_labels) && info.winery_labels.includes('Booking');
+    const raw = managed ? (info.owner_was && info.owner_was.Booking && !info.owner_was.Booking.owned ? info.owner_was.Booking.text : '')
+      : ((info.rows || []).find((r) => r && r.label === 'Booking' && !(info.owner_labels || []).includes('Booking')) || {}).text;
+    if (!raw) return '';
+    const ctx = indoorStaleCtx(venue);
+    const gone = ctx.gone || new Set();
+    const keep = indoorStalePieces(raw).filter((x) => INDOOR_BOOK_DETAIL_RE.test(x) && !/\bgift\b/i.test(x) && !gone.has(indoorStaleKey(x)) && !indoorStaleWhy(x, ctx)
+      && !(t.book === 'ahead' && INDOOR_STALE_BOOK_RE.test(x) && !/\b(?:online|phone|call|website|app)\b/i.test(x))
+      && !(t.book !== 'ahead' && INDOOR_STALE_WALKIN_RE.test(x) && !/\b(?:online|phone|call|website|app)\b/i.test(x)));
+    return keep.map((x) => (/[.!?]$/.test(x) ? x : `${x}.`)).join(' ').slice(0, 200);
+  } catch (e) { return ''; }
 }
 const INDOOR_MANAGED_LABELS = ['Season', 'Time needed', 'Prices', 'Ages', 'Booking'];
 // ---------- Indoor test 14 (2026-11-19): research lines the owner's answers have made wrong ----------
@@ -25283,29 +25320,40 @@ function indoorAdultAges(venue, info) {
     return { alone, withAdult };
   } catch (e) { return null; }
 }
-// Indoor test 9 (2026-11-19; "Kids from $14" while crawlers pay $8): a kids' place whose main price is per child says
-// "Kids $14." when a lower price is in its own typed prices.
-// Indoor test 10 (2026-11-19; Sandra's pool: "Drop-in from $7.50" while kids pay $3.50): every kind does, in its own words
-// ("Adult drop-in $7.50.", indoor-kinds.js price.exact). An add-on (a locker, shoe or gear rental) is not a lower price.
-const INDOOR_NOT_A_PRICE_RE = /\b(?:lockers?|rentals?|rent|shoes?|socks?|towels?|gear|equipment|add[- ]?ons?|extras?|parking|deposit|tax|taxes|tips?|fees?|diapers?|locks?|snacks?|drinks?|coffee)\b/i;
-function indoorPriceExact(venueId, info) {
+// Indoor test 9/10 (an add-on is not a lower price) and indoor test 18 (THE PRICE RULE, indoor-kinds.js top): the lowest
+// of the owner's own typed prices that is a real visit price (not a locker, rental, gift card, upgrade or a percentage),
+// or null. Research prices never count.
+const INDOOR_NOT_A_PRICE_RE = /\b(?:lockers?|rentals?|rent|shoes?|socks?|towels?|gear|equipment|add[- ]?ons?|extras?|upgrades?|enhancements?|parking|deposit|tax|taxes|tips?|fees?|diapers?|locks?|snacks?|drinks?|coffee|gift (?:cards?|certificates?|vouchers?)|cartes?[- ]cadeaux?|certificats?[- ]cadeaux?|suppl[ée]ments?)\b/i;
+// A deal for one day of the week ("Cheap Tuesdays $8", « Mardis à 8 $ ») is not a price every visitor can pay: Build My
+// Trip shows it for that day (trip-planner.js indoorAskedPriceLine), the card keeps the everyday lowest. Nor is an offer
+// for first-timers or members ("First massage, new clients $79", "Monthly membership $49").
+const INDOOR_ONE_DAY_DEAL_RE = /\b(?:mon|tues?|wed(?:nes)?|thu(?:rs)?|fri|sat(?:ur)?|sun)days?\b|\b(?:lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)s?\b|\b(?:intro(?:ductory)?|first[- ](?:visit|time|class|massage|treatment|facial|week|month|session|climb)|new (?:clients?|students?|customers?|members?)|trial|promo\w*|memberships?|members?|monthly|per month|a month|annual|yearly|nouveaux? (?:clients?|élèves?)|abonnements?|essai)\b/i;
+function indoorLowestTyped(venueId) {
+  try {
+    const menu = publishedMenu(venueId);
+    if (!menu || menu.source !== 'owner') return null;
+    let lo = null;
+    for (const sec of menu.data.sections || []) for (const it of sec.items || []) {
+      const raw = String(it && it.price || '');
+      if (!it || !it.name || INDOOR_NOT_A_PRICE_RE.test(String(it.name)) || /%/.test(raw) || INDOOR_ONE_DAY_DEAL_RE.test(`${it.name} ${it.description || ''}`)) continue;
+      const m = /(\d+(?:[.,]\d{1,2})?)/.exec(raw.replace(/,(?=\d{3}\b)/g, ''));
+      const n = m ? Number(m[1].replace(',', '.')) : NaN;
+      if (Number.isFinite(n) && n > 0 && (lo == null || n < lo)) lo = n;
+    }
+    return lo;
+  } catch (e) { return null; }
+}
+// THE PRICE RULE for a place's price per person (not free, not per room): indoor-kinds.js indoorPriceShow with her own
+// lowest typed price. -> { amount, line, page, card: { from, basis }, exact, lowered }, or null.
+function indoorPriceView(venueId, info, lang = 'en') {
   try {
     const t = info || venueIndoorInfo(venueId);
-    if (!(typeof t.price === 'number' && t.price > 0) || t.per) return false;
-    // Indoor test 12 (2026-11-19; Jess's yoga studio): a kind whose price is one drop-in (indoor-kinds.js single) is always
-    // that price, never "from" ("Drop-in class $22").
-    if (indoorKindsModule.indoorKindText(t.kinds, 'en').single) return true;
-    const menu = publishedMenu(venueId);
-    if (!menu) return false;
-    for (const sec of menu.data.sections || []) for (const it of sec.items || []) {
-      if (INDOOR_NOT_A_PRICE_RE.test(String(it && it.name || ''))) continue;
-      const m = /(\d+(?:[.,]\d{1,2})?)/.exec(String(it && it.price || '').replace(/,(?=\d{3}\b)/g, ''));
-      const n = m ? Number(m[1].replace(',', '.')) : NaN;
-      if (Number.isFinite(n) && n > 0 && n < t.price) return true;
-    }
-  } catch (e) { /* none */ }
-  return false;
+    if (!(typeof t.price === 'number' && t.price > 0) || tourFreeOf(t) || INDOOR_PER_UNITS.includes(t.per)) return null;
+    return indoorKindsModule.indoorPriceShow(t.kinds, lang, t.price, { low: indoorLowestTyped(venueId), money: tourMoney });
+  } catch (e) { return null; }
 }
+// The card says the price without "From" ("$12 · Adult admission"): an exact kind with no lower typed price.
+function indoorPriceExact(venueId, info) { const v = indoorPriceView(venueId, info); return !!(v && !v.card.from); }
 const INDOOR_REPEAT_LABELS = { Season: /^(?:seasons?|open|opening season)$/i, 'Time needed': /^(?:duration|length|how long|visit length|time)$/i, Prices: /^(?:price|prices|rates?|cost|admission|tickets?|pricing)$/i,
   Ages: /^(?:ages?|kids|min(?:imum)? age)$/i, Booking: /^(?:book(?:ing)?|reservations?|walk-?ins?)$/i };
 function writeIndoorVisitRows(venueId, now = new Date()) {
@@ -25372,7 +25420,7 @@ function indoorCardPrice(venueId) {
   const p = indoorPrice(venueId), free = indoorFree(venueId);
   // Indoor test 2: a price per room, lane, game or group says so ("From $120 / room").
   const per = INDOOR_PER_UNITS.includes(venueIndoorInfo(venueId).per) ? venueIndoorInfo(venueId).per : null;
-  try { if (free) priceCheck.setOwnerPrice(venueId, 0, free === 'donation' ? INDOOR_DONATION_CARD_LABEL : TOUR_FREE_CARD_LABEL); else if (p != null && per) priceCheck.setOwnerPrice(venueId, p, `Per ${INDOOR_PER_WORDS[per][0]}`, INDOOR_PER_WORDS[per][0]); else priceCheck.setOwnerPrice(venueId, p, p == null ? null : indoorKindsModule.indoorKindText(venueIndoorInfo(venueId).kinds, 'en').price[indoorPriceExact(venueId) ? 'exact' : 'basis']); } catch (e) { console.error(`[owner-portal] card price for indoor #${venueId} failed: ${e.message}`); }
+  try { if (free) priceCheck.setOwnerPrice(venueId, 0, free === 'donation' ? INDOOR_DONATION_CARD_LABEL : TOUR_FREE_CARD_LABEL); else if (p != null && per) priceCheck.setOwnerPrice(venueId, p, `Per ${INDOOR_PER_WORDS[per][0]}`, INDOOR_PER_WORDS[per][0]); else if (p == null) priceCheck.setOwnerPrice(venueId, null); else { const view = indoorPriceView(venueId); priceCheck.setOwnerPrice(venueId, view ? view.amount : p, view ? view.card.basis : null); } } catch (e) { console.error(`[owner-portal] card price for indoor #${venueId} failed: ${e.message}`); }
 }
 // Indoor test 13: the owner's own typed prices (never research): [[name, description, price]], up to 12, priced lines only.
 function indoorOwnPriceItems(venueId) {
@@ -25430,7 +25478,8 @@ function indoorPlannerFacts(venueId) {
     ...(() => { const l = indoorOwnLines(venueId, /^groups?$/i); return l.length ? { indoorOwnGroups: l } : {}; })(),
     // Indoor test 4 (2026-11-19; Lauren's spa read "$65 per person · Admission"): the kind's own price line ("From {x}",
     // "Tickets from {x}", « À partir de {x} »), as the page says it.
-    ...(typeof t.price === 'number' && t.price > 0 && !tourFreeOf(t) ? { indoorPriceLine: indoorPriceExact(venueId, t) ? ['en', 'fr'].map((l) => `${indoorKindsModule.indoorKindText(t.kinds, l).price.exact} {x}`) : ['en', 'fr'].map((l) => indoorKindsModule.indoorKindText(t.kinds, l).price.page.replace(/\.$/, '')) } : {}),
+    // Indoor test 18: THE PRICE RULE's words and its amount (the lowest real price: "From $70" for a spa with a $70 pedicure).
+    ...(indoorPriceView(venueId, t) ? { indoorPriceLine: ['en', 'fr'].map((l) => indoorPriceView(venueId, t, l).line), indoorPriceAt: indoorPriceView(venueId, t).amount } : {}),
   };
 }
 // Indoor test 3 (2026-11-19; Diane's community theatre: box office Tue–Fri 11–4 as its hours, shows Thursday to Saturday at
@@ -58936,7 +58985,7 @@ ${lang === 'fr' ? frenchHeaderFragment(renderGolfHeaderHtml()) : renderGolfHeade
   </div></main>
 <script>window.MENU_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${MENU_APP_SCRIPT}</script>
-${opts.mode === 'admin' ? '' : ownerHelpWidgetHtml('menu', { signedIn: opts.mode === 'account', lang, ...(venue.type === 'indoor' && INDOOR_SETUP_ON ? { dropHappyHour: true, noHappyHour: true, dropTopics: INDOOR_HELP_DROP_TOPICS, extraTopics: indoorKindHelpTopics(INDOOR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('menu') && x.id !== 'menu-add'), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpExact(venue), indoorHelpFree(venue), indoorHelpNoHours(venue)) } : venue.type === 'tour' ? { dropHappyHour: true, noHappyHour: true, start: TOUR_MENU_HELP_START, extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x && x.id) } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('menu')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('menu')) } : {}) })}
+${opts.mode === 'admin' ? '' : ownerHelpWidgetHtml('menu', { signedIn: opts.mode === 'account', lang, ...(venue.type === 'indoor' && INDOOR_SETUP_ON ? { dropHappyHour: true, noHappyHour: true, dropTopics: INDOOR_HELP_DROP_TOPICS, extraTopics: indoorKindHelpTopics(INDOOR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('menu') && x.id !== 'menu-add'), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpLow(venue), indoorHelpFree(venue), indoorHelpNoHours(venue)) } : venue.type === 'tour' ? { dropHappyHour: true, noHappyHour: true, start: TOUR_MENU_HELP_START, extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x && x.id) } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('menu')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('menu')) } : {}) })}
 </body>
 </html>`;
 }
@@ -59672,7 +59721,7 @@ function renderOwnerSetupPage(found, opts) {
     visitResearch: ownerVisitResearchKeys(venue.id),
     // Indoor test 11 (2026-11-19; Kim: Good to know opened empty, research's line set aside and "Planetarium shows need
     // pre-registration" gone with her walk-in answer): research's lines for her Good to know box, pre-filled as found online.
-    ...(venue.type === 'indoor' ? { gtkFound: indoorGtkFound(venue.id), groupsFound: indoorGroupsFound(venue.id), indoorExact: indoorHelpExact(venue), ...setupStaleOut(venue) } : {}),
+    ...(venue.type === 'indoor' ? { gtkFound: indoorGtkFound(venue.id), groupsFound: indoorGroupsFound(venue.id), indoorLow: indoorHelpLow(venue), ...setupStaleOut(venue) } : {}),
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
     credit: String(venue.name || '').replace(/[<>]/g, '').trim().slice(0, 80),
     minEdge: OWNER_PHOTO_MIN_EDGE, menuMinEdge: MENU_MIN_EDGE, pdfMax: MENU_PDF_MAX_BYTES, maxPages: MENU_MAX_PAGES, maxPhotos: OWNER_PHOTO_PENDING_LIMIT,
@@ -59779,7 +59828,7 @@ ${pageHead(`${t.title}: ${venue.name} | Okanagan Roam`, t.title, null, [], { gol
 <input type="file" id="suDoorCam" accept="image/*" capture="environment" class="su-file" tabindex="-1" aria-hidden="true"><input type="file" id="suDoorPick" accept="image/jpeg,image/*" class="su-file" tabindex="-1" aria-hidden="true">
 <script>window.SETUP_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${OWNER_SETUP_SCRIPT}</script>
-${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), dropHappyHour: tour || indoor, ...(indoor ? { dropTopics: INDOOR_HELP_DROP_TOPICS } : {}), extraTopics: setupHereHelpTopics(venue, steps, withSetupNightsTopic(venue.type, (tour ? [statusTopic, ...TOUR_SETUP_HELP_TOPICS.map(tourYearlyBreakWords), TOUR_SETUP_SEASON_HELP_TOPIC] : indoor ? [statusTopic, ...indoorKindHelpTopics(INDOOR_SETUP_HELP_TOPICS.map(indoorClosureWords), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpExact(venue), indoorHelpFree(venue), indoorHelpNoHours(venue))] : cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type).map(helpHereInSetup)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_CHANGE_LATER_HELP_TOPIC, SETUP_WHO_SEES_HELP_TOPIC, tour ? TOUR_THIRD_STRETCH_HELP_TOPIC : SETUP_THIRD_STRETCH_HELP_TOPIC, SETUP_OPEN_HOLIDAYS_HELP_TOPIC], /* Tour test 15: a tour's day hours are departures, never lunch and dinner or brunch: its own 'hours' answer only. */ (tour ? [] : [SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC]).map((x) => (cafe ? cafeSecondTimeWords(x) : indoor ? indoorHoursHelpWords(betweenSecondTimeWords(x), venue) : pub || brewery ? betweenSecondTimeWords(x) : x)).filter(Boolean), [setupClosuresHelpTopic(venue.type), setupClosureFixHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : []))) })}
+${ownerHelpWidgetHtml('setup', { signedIn: opts.mode === 'account', lang, completeness: true, editHref: opts.back, venueId: venue.id, noHappyHour: !happyHourAllowed(venue), dropHappyHour: tour || indoor, ...(indoor ? { dropTopics: INDOOR_HELP_DROP_TOPICS } : {}), extraTopics: setupHereHelpTopics(venue, steps, withSetupNightsTopic(venue.type, (tour ? [statusTopic, ...TOUR_SETUP_HELP_TOPICS.map(tourYearlyBreakWords), TOUR_SETUP_SEASON_HELP_TOPIC] : indoor ? [statusTopic, ...indoorKindHelpTopics(INDOOR_SETUP_HELP_TOPICS.map(indoorClosureWords), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpLow(venue), indoorHelpFree(venue), indoorHelpNoHours(venue))] : cocktail ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...COCKTAIL_SETUP_HELP_TOPICS] : pub ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...PUB_SETUP_HELP_TOPICS] : cafe ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...cafeHelpTopics('setup')] : winery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...WINERY_SETUP_HELP_TOPICS] : brewery ? [statusTopic, SETUP_SEASON_HELP_TOPIC, ...brewHelpTopics(venue.type).map(helpHereInSetup)] : [statusTopic, SETUP_SEASON_HELP_TOPIC, RESTAURANT_KITCHEN_HELP_TOPIC]).concat([SETUP_CHANGE_LATER_HELP_TOPIC, SETUP_WHO_SEES_HELP_TOPIC, tour ? TOUR_THIRD_STRETCH_HELP_TOPIC : SETUP_THIRD_STRETCH_HELP_TOPIC, SETUP_OPEN_HOLIDAYS_HELP_TOPIC], /* Tour test 15: a tour's day hours are departures, never lunch and dinner or brunch: its own 'hours' answer only. */ (tour ? [] : [SETUP_SPLIT_HOURS_HELP_TOPIC, SETUP_THIRD_TIME_HELP_TOPIC, SETUP_HOURS_HELP_TOPIC]).map((x) => (cafe ? cafeSecondTimeWords(x) : indoor ? indoorHoursHelpWords(betweenSecondTimeWords(x), venue) : pub || brewery ? betweenSecondTimeWords(x) : x)).filter(Boolean), [setupClosuresHelpTopic(venue.type), setupClosureFixHelpTopic(venue.type)].filter(Boolean), steps.includes('specials') ? [SETUP_SPECIALS_HELP_TOPIC] : [], steps.includes('music') ? setupEventTopics() : [], happyHourAllowed(venue) ? [SETUP_HAPPY_SPLIT_HELP_TOPIC] : [], steps.includes('takeout') ? [SETUP_DELIVERY_HELP_TOPIC] : []))) })}
 <script>/* Pub test 8 (2026-11-10): the "?" Help button lives in the Back row, so it never sits over the heading (with big text the header wraps and a fixed spot met the title). */(function(){var b=document.getElementById('ohbBtn'),t=document.querySelector('.su-top');if(b&&t){t.appendChild(b);document.body.classList.add('su-help-inrow');}})();</script>
 </body>
 </html>`;
@@ -60753,8 +60802,10 @@ const INDOOR_SETUP_HELP_TOPICS = [
   // now"), and an intro class's price ("intro class price" got the Add an event steps).
   { id: 'indoor-typer-first', pages: ['setup', 'edit', 'menu'], over: ['menu-add', 'indoor-price', 'edit-review', 'menu-type'],
     q: 'What goes in the first line of my prices?', qFr: 'Que mettre dans la première ligne de mes tarifs?',
-    keys: ['first line', 'the first line', 'what goes in the first line', 'what goes first', 'first row', 'first item', 'first price', 'top line', 'what do i put first', 'already filled in', 'already filled', 'prefilled', 'pre filled', 'filled in for me', 'why is there a price already', 'first one'],
-    keysFr: ['premiere ligne', 'la premiere ligne', 'quoi mettre en premier', 'premier element', 'premier prix', 'deja rempli', 'deja remplie', 'pre rempli'],
+    keys: ['first line', 'the first line', 'what goes in the first line', 'what goes first', 'first row', 'first item', 'first price', 'top line', 'what do i put first', 'already filled in', 'already filled', 'prefilled', 'pre filled', 'filled in for me', 'why is there a price already', 'first one',
+      // Indoor test 18 (Natalie: "the price list said massage $95 but that was my facial price").
+      'the list said', 'price list said', 'list says', 'the price list said', 'but that was my', 'that was my', 'that is my', 'wrong name', 'the name is wrong', 'it said massage', 'called it', 'wrong treatment', 'not my massage price'],
+    keysFr: ['premiere ligne', 'la premiere ligne', 'quoi mettre en premier', 'premier element', 'premier prix', 'deja rempli', 'deja remplie', 'pre rempli', 'la liste disait', 'la liste dit', 'c etait mon prix', 'mauvais nom', 'le nom est faux'],
     a: '<p>The first line is your main price from <strong>Price</strong>, already filled in with a name for it. Change the name if you call it something else, then add each other price on its own line.</p>',
     aFr: '<p>La première ligne est votre prix principal, tiré de <strong>Prix</strong>, déjà rempli avec un nom. Changez le nom si vous l’appelez autrement, puis ajoutez chacun de vos autres prix sur sa propre ligne.</p>' },
   { id: 'indoor-old-line', pages: ['setup', 'edit'], over: ['indoor-good-to-know', 'hours', 'indoor-age', 'plan-visit', 'setup-hours'],
@@ -60766,8 +60817,10 @@ const INDOOR_SETUP_HELP_TOPICS = [
     aFr: '<p>Vos réponses ont priorité : une ligne trouvée en ligne qui ne correspond pas est retirée de votre page, et nous demandons « Nous avions aussi : … Est-ce toujours vrai? ». Touchez <strong>Retirer</strong> et elle ne revient plus. Elle est encore dans la case <strong>Bon à savoir</strong>? Videz la case avec <strong>✕</strong> (ou effacez seulement cette ligne) et écrivez la vôtre, puis touchez <strong>Enregistrer</strong>.</p><p>De nouvelles heures? Changez-les dans <strong>Heures</strong> : les lignes qui donnent d’autres heures sont retirées.</p>' },
   { id: 'indoor-intro-class', pages: ['setup', 'edit', 'menu'], over: ['event-add', 'indoor-courses', 'indoor-class-nights', 'menu-add', 'indoor-price', 'event-repeat', 'indoor-theme-nights'],
     q: 'An intro class or lesson: where do its price and times go?', qFr: 'Un cours d’initiation : où vont son prix et ses heures?',
-    keys: ['intro class price', 'intro class', 'intro classes', 'intro lesson', 'intro lessons', 'intro to', 'intro course', 'beginner class', 'beginner classes', 'class price', 'lesson price', 'price of a class', 'price for a class', 'price of the class', 'how much is a class', 'learn to climb', 'learn to boulder', 'belay class', 'belay course'],
-    keysFr: ['prix du cours', 'prix d un cours', 'cours d initiation', 'cours pour debutants', 'initiation', 'prix de la lecon', 'cours d escalade'],
+    // Indoor test 18 (Natalie: "intro offer price for first massage" got the general Price answer): a first-visit offer.
+    allOf: [['first', 'premier', 'premiere'], ['massage', 'massages', 'treatment', 'facial', 'visit', 'appointment', 'soin', 'visite']],
+    keys: ['intro offer price', 'intro offer for first', 'first massage', 'first visit', 'first treatment', 'first facial', 'first time clients', 'new client offer', 'new client special', 'intro class price', 'intro class', 'intro classes', 'intro lesson', 'intro lessons', 'intro to', 'intro course', 'beginner class', 'beginner classes', 'class price', 'lesson price', 'price of a class', 'price for a class', 'price of the class', 'how much is a class', 'learn to climb', 'learn to boulder', 'belay class', 'belay course'],
+    keysFr: ['prix du cours', 'prix d un cours', 'cours d initiation', 'cours pour debutants', 'initiation', 'prix de la lecon', 'cours d escalade', 'offre d introduction', 'premier massage', 'premiere visite', 'premier soin', 'offre aux nouveaux clients'],
     a: '<p>Its price goes in <strong>Your prices</strong>, like <em>Intro class $35</em>. When it runs: every week? Say it in your <strong>Known for</strong> line, like <em>Intro classes Tuesdays and Thursdays at 6 PM</em> (search and Build My Trip read it). On set dates only? Also add each date with <strong>Add an event</strong> on your page.</p>',
     aFr: '<p>Son prix va dans <strong>Vos tarifs</strong>, comme <em>Cours d’initiation 35 $</em>. Quand : chaque semaine? Dites-le dans votre ligne <strong>Connu pour</strong>, comme <em>Cours d’initiation les mardis et jeudis à 18 h</em> (la recherche et Planifier mon voyage la lisent). À des dates précises seulement? Ajoutez aussi chaque date avec <strong>Ajouter un événement</strong> sur votre page.</p>' },
   // Indoor test 2 (Jordan: "we have a bar, can I add happy hour" got "I'm not sure"): happy hour isn't listed for indoor
@@ -60885,10 +60938,13 @@ const INDOOR_SETUP_HELP_TOPICS = [
     keys: ['socks', 'grip socks', 'lockers', 'locker', 'towels', 'swimsuit', 'what to bring', 'what to wear', 'wear', 'bring', 'waiver', 'waivers', 'sign a waiver', 'shoes', 'bowling shoes', 'rentals included', 'quiet', 'cell phones', 'photos allowed', 'no photos', 'food and drink', 'cafe on site', 'snack bar', 'good to know', 'rules', 'dress code', 'arrive early',
       // Indoor test 7 (Robert: "we ship art anywhere in canada" got "I'm not sure").
       'ship', 'ships', 'we ship', 'shipping', 'ship art', 'ship anywhere', 'ship your purchase', 'we can ship', 'most art is for sale', 'waiver required', 'waiver is required', 'robe', 'robes', 'robe and towel', 'towel included', 'bring a swimsuit', 'flash', 'no flash', 'flash photos', 'lockers need', 'quarter',
-      'socks required', 'socks are required', 'grip socks required', 'socks mandatory', 'if you forget', 'if they forget', 'forget your socks', 'forget their socks', 'socks for sale', 'we sell socks', 'socks are', 'sensory', 'sensory friendly', 'sensory hour', 'sensory friendly hour', 'quiet hour'],
-    keysFr: ['chaussettes', 'casiers', 'casier', 'serviettes', 'maillot', 'quoi apporter', 'quoi porter', 'decharge', 'signer une decharge', 'souliers', 'chaussures', 'photos permises', 'pas de photos', 'nourriture', 'casse croute', 'bon a savoir', 'regles', 'code vestimentaire', 'arriver tot', 'expedier', 'expedition', 'nous expedions', 'livraison des oeuvres', 'peignoir', 'apportez un maillot', 'fournis', 'decharge obligatoire', 'flash', 'pas de photos avec flash', 'chaussettes obligatoires', 'si vous oubliez', 'si on oublie', 'sensoriel', 'sensorielle', 'heure sensorielle', 'besoins sensoriels', 'heure calme'],
-    a: '<p>Open <strong>Good to know</strong> in More about your place. Tap the answers that fit (“Grip socks required”, “Lockers available”, “Waiver to sign before you play”) or type a line in your own words. It shows in “Plan your visit” on your page.</p><p>A weekly hour, like a sensory-friendly hour? Put it here in one line, like <em>Sensory-friendly hour Tuesdays 9–10 AM</em>. To list it on What’s On too, tap <strong>Add an event</strong> on your page (after the setup) and write “every Tuesday” in <strong>Repeats or other dates?</strong></p>',
-    aFr: '<p>Ouvrez <strong>Bon à savoir</strong> dans Plus sur votre endroit. Touchez les réponses qui conviennent (« Chaussettes antidérapantes obligatoires », « Casiers offerts », « Décharge à signer avant de jouer ») ou écrivez une ligne dans vos mots. Elle paraît dans « Planifiez votre visite » sur votre page.</p><p>Une heure chaque semaine, comme une heure adaptée aux besoins sensoriels? Mettez-la ici en une ligne, comme <em>Heure adaptée aux besoins sensoriels le mardi de 9 h à 10 h</em>. Pour l’ajouter aussi à À l’affiche, touchez <strong>Ajouter un événement</strong> sur votre page (après la configuration) et écrivez « chaque mardi » dans <strong>Récurrent ou autres dates?</strong></p>' },
+      'socks required', 'socks are required', 'grip socks required', 'socks mandatory', 'if you forget', 'if they forget', 'forget your socks', 'forget their socks', 'socks for sale', 'we sell socks', 'socks are', 'sensory', 'sensory friendly', 'sensory hour', 'sensory friendly hour', 'quiet hour',
+      // Indoor test 18 (Natalie asked "cancellation policy" 3 times and got "I'm not sure").
+      'cancellation policy', 'cancellation', 'cancellations', '24 hour cancellation', '24 hour cancellation policy', '48 hour cancellation', 'cancel', 'cancelling', 'canceling', 'late cancellation', 'no show', 'no shows', 'no show fee', 'no show policy', 'missed appointment', 'missed appointments', 'deposit to book', 'reschedule'],
+    keysFr: ['chaussettes', 'casiers', 'casier', 'serviettes', 'maillot', 'quoi apporter', 'quoi porter', 'decharge', 'signer une decharge', 'souliers', 'chaussures', 'photos permises', 'pas de photos', 'nourriture', 'casse croute', 'bon a savoir', 'regles', 'code vestimentaire', 'arriver tot', 'expedier', 'expedition', 'nous expedions', 'livraison des oeuvres', 'peignoir', 'apportez un maillot', 'fournis', 'decharge obligatoire', 'flash', 'pas de photos avec flash', 'chaussettes obligatoires', 'si vous oubliez', 'si on oublie', 'sensoriel', 'sensorielle', 'heure sensorielle', 'besoins sensoriels', 'heure calme',
+      'politique d annulation', 'annulation', 'annulations', 'annulation 24 heures', 'annuler', 'frais d absence', 'absence', 'rendez vous manque', 'reporter un rendez vous'],
+    a: '<p>Open <strong>Good to know</strong> in More about your place. Tap the answers that fit (“Grip socks required”, “Lockers available”, “Waiver to sign before you play”) or type a line in your own words. It shows in “Plan your visit” on your page.</p><p>A weekly hour, like a sensory-friendly hour? Put it here in one line, like <em>Sensory-friendly hour Tuesdays 9–10 AM</em>. To list it on What’s On too, tap <strong>Add an event</strong> on your page (after the setup) and write “every Tuesday” in <strong>Repeats or other dates?</strong></p><p>A cancellation policy goes here too, in one line, like <em>24-hour cancellation policy; missed appointments are charged</em>.</p>',
+    aFr: '<p>Ouvrez <strong>Bon à savoir</strong> dans Plus sur votre endroit. Touchez les réponses qui conviennent (« Chaussettes antidérapantes obligatoires », « Casiers offerts », « Décharge à signer avant de jouer ») ou écrivez une ligne dans vos mots. Elle paraît dans « Planifiez votre visite » sur votre page.</p><p>Une heure chaque semaine, comme une heure adaptée aux besoins sensoriels? Mettez-la ici en une ligne, comme <em>Heure adaptée aux besoins sensoriels le mardi de 9 h à 10 h</em>. Pour l’ajouter aussi à À l’affiche, touchez <strong>Ajouter un événement</strong> sur votre page (après la configuration) et écrivez « chaque mardi » dans <strong>Récurrent ou autres dates?</strong></p><p>Une politique d’annulation va ici aussi, en une ligne, comme <em>Annulation 24 heures à l’avance; les rendez-vous manqués sont facturés</em>.</p>' },
   { id: 'indoor-visit-length', pages: ['setup', 'edit'], over: ['tour-lengths'],
     q: 'How long does a visit take? It depends', qFr: 'Combien de temps dure une visite? Ça dépend',
     keys: ['how long', 'how long is a visit', 'how long does a visit take', 'does a visit take', 'a visit take', 'visit take', 'visit length', 'it depends', 'depends', 'how long do people stay', 'an hour', 'all day', 'a game is', 'session length', 'show length', 'runtime', 'time needed'],
@@ -60902,8 +60958,9 @@ const INDOOR_SETUP_HELP_TOPICS = [
     // Indoor test 1 (2026-11-19): the buttons as the screen shows them (the summer and winter ones folded under a link).
     a: '<p>In your hours, after the days, tap <strong>We’re closed part of the year</strong> and pick your first and last day. The dates repeat every year; outside them your page says “Closed for the season” and Build My Trip doesn’t plan you. Shorter hours in winter? Tap <strong>Different hours in summer or winter?</strong>, then <strong>No, different in winter</strong>, and set them. Closed for a few weeks, like over Christmas? That’s a closure: <strong>Closures and holidays</strong>, in More about your place.</p>',
     aFr: '<p>Dans vos heures, après les jours, touchez <strong>Nous fermons une partie de l’année</strong> et choisissez votre premier et votre dernier jour. Les dates reviennent chaque année; en dehors, votre page indique « Fermé pour la saison » et Planifier mon voyage ne vous propose pas. Des heures plus courtes l’hiver? Touchez <strong>Des heures différentes l’été ou l’hiver?</strong>, puis <strong>Non, elles changent en hiver</strong>, et indiquez-les. Fermé quelques semaines, comme pendant les Fêtes? C’est une fermeture : <strong>Fermetures et jours fériés</strong>, dans Plus sur votre endroit.</p>' },
-  { id: 'indoor-gift', pages: ['setup', 'edit'], q: 'Gift cards, memberships or a gift shop', qFr: 'Cartes-cadeaux, abonnements ou boutique',
-    keys: ['gift card', 'gift cards', 'gift certificate', 'gift certificates', 'voucher', 'vouchers', 'gift shop', 'shop', 'store', 'merch', 'members', 'membership'],
+  // Indoor test 18 (Natalie asked "gift certificates" on the price list page and got "I'm not sure"): on Your prices too.
+  { id: 'indoor-gift', pages: ['setup', 'edit', 'menu'], q: 'Gift cards, memberships or a gift shop', qFr: 'Cartes-cadeaux, abonnements ou boutique',
+    keys: ['gift card', 'gift cards', 'gift certificate', 'gift certificates', 'how do i add gift certificates', 'gift certificates to my prices', 'voucher', 'vouchers', 'gift shop', 'shop', 'store', 'merch', 'members', 'membership'],
     keysFr: ['carte cadeau', 'cartes cadeaux', 'certificat cadeau', 'bon cadeau', 'boutique', 'magasin', 'membres', 'abonnement', 'la boutique', 'boutique vaut la peine', 'mentionner la boutique', 'boutique mentionnee'],
     a: '<p>A gift shop: tap <strong>Gift shop</strong> in <strong>Good to know</strong> (museums and galleries), or say it in one line there. Gift cards and memberships go in your story, in <strong>Your story and Known for</strong>, like <em>Gift cards and memberships at the front desk or online.</em> Membership prices can go in <strong>Your prices</strong>. There’s no separate box, to keep it short.</p>',
     aFr: '<p>Une boutique : touchez <strong>Boutique sur place</strong> dans <strong>Bon à savoir</strong> (musées et galeries), ou dites-le en une ligne. Les cartes-cadeaux et les abonnements vont dans votre histoire, dans <strong>Votre histoire et ce pour quoi vous êtes connus</strong>, comme <em>Cartes-cadeaux et abonnements à l’accueil ou en ligne.</em> Les prix des abonnements peuvent aller dans <strong>Vos tarifs</strong>. Il n’y a pas de case à part, pour rester court.</p>' },
@@ -60996,10 +61053,20 @@ const INDOOR_SETUP_HELP_TOPICS = [
   // Indoor test 6 (Priya: "date night is per couple", "courses run 6 weeks", on her prices page).
   { id: 'indoor-price-two', pages: ['setup', 'edit', 'menu'], over: ['indoor-price', 'menu-add', 'cost'], noRelated: ['cost', 'price-range', 'avg-spend'],
     q: 'A price for two or per couple', qFr: 'Un prix pour deux ou par couple',
-    keys: ['per couple', 'for two people', 'for the two of us', 'the two of you', 'price for two', 'prices for two', 'priced for two', 'priced per couple', 'couples price', 'couple price', 'date night', 'date nights', 'date night price', 'per pair', '95 for two'],
-    keysFr: ['par couple', 'pour deux personnes', 'prix pour deux', 'en couple', 'soiree en amoureux', 'soirees en amoureux', 'tete a tete'],
-    a: '<p>In <strong>Your prices</strong>, add it as one line, just as you sell it, with the price for the two of you, like <em>Date night for two</em> and <em>95</em>. Your card keeps your lowest price for one person.</p>',
-    aFr: '<p>Dans <strong>Vos tarifs</strong>, ajoutez-le en une ligne, comme vous le vendez, avec le prix pour les deux, comme <em>Soirée en amoureux pour deux</em> et <em>95</em>. Votre fiche garde votre prix le plus bas pour une personne.</p>' },
+    keys: ['per couple', 'for two people', 'for the two of us', 'the two of you', 'price for two', 'prices for two', 'priced for two', 'priced per couple', 'couples price', 'couple price', 'date night', 'date nights', 'date night price', 'per pair', '95 for two',
+      // Indoor test 18 (Natalie, a day spa: "couples massage package" on Your prices got "I'm not sure").
+      'couples package', 'couples packages', 'couples massage package', 'couples massage', 'couple package', 'package for two', 'spa package for two', 'price for the couples package', 'a price for the couples package', 'need a price for the couples package', 'spa package for couples'],
+    keysFr: ['par couple', 'pour deux personnes', 'prix pour deux', 'en couple', 'soiree en amoureux', 'soirees en amoureux', 'tete a tete', 'forfait pour couples', 'forfait couple', 'forfait pour deux', 'massage en couple'],
+    a: '<p>In <strong>Your prices</strong>, add it as one line, just as you sell it, with the price for the two of you, like <em>Date night for two</em> and <em>95</em>. A package (a couples’ massage, a spa day) is the same: one line with its name and price, like <em>Couples’ massage package</em> and <em>260</em>. Your card keeps your lowest price for one person.</p><p>Want couples or groups to find it? Say it in <strong>Groups and parties</strong> too, like <em>Couples’ packages</em>.</p>',
+    aFr: '<p>Dans <strong>Vos tarifs</strong>, ajoutez-le en une ligne, comme vous le vendez, avec le prix pour les deux, comme <em>Soirée en amoureux pour deux</em> et <em>95</em>. Un forfait (un massage en couple, une journée au spa) c’est pareil : une ligne avec son nom et son prix, comme <em>Forfait massage en couple</em> et <em>260</em>. Votre fiche garde votre prix le plus bas pour une personne.</p><p>Pour que les couples ou les groupes le trouvent, dites-le aussi dans <strong>Groupes et fêtes</strong>, comme <em>Forfaits pour couples</em>.</p>' },
+  // Indoor test 18 (Natalie: "pedicures are different prices for each kind" on Your prices got "I'm not sure"): prices that
+  // vary by item, length or option.
+  { id: 'indoor-price-varies', pages: ['setup', 'edit', 'menu'], over: ['menu-add', 'indoor-price', 'cost', 'indoor-extras'], noRelated: ['cost', 'price-range', 'avg-spend'],
+    q: 'Each kind or length has its own price', qFr: 'Chaque sorte ou durée a son prix',
+    keys: ['different prices for each', 'different price for each', 'different prices for each kind', 'each kind is a different price', 'each one is a different price', 'prices vary', 'price varies', 'prices depend', 'depends on the length', 'depends on the treatment', 'each treatment is a different price', 'every treatment is a different price', 'different lengths', 'by length', 'per item', 'each item'],
+    keysFr: ['prix differents', 'chaque sorte a son prix', 'les prix varient', 'le prix varie', 'selon la duree', 'selon le soin', 'chaque soin a son prix'],
+    a: '<p>In <strong>Your prices</strong>, type each one on its own line with its own price, like <em>Classic pedicure</em> <em>55</em>, <em>Spa pedicure</em> <em>70</em>. Many of them? Put them under a heading (a section), like <em>Pedicures</em>. A price that depends on the day or the person? Write the lowest with “from”, like <em>Pedicures from $55</em>. Your card shows your lowest price.</p>',
+    aFr: '<p>Dans <strong>Vos tarifs</strong>, tapez chacun sur sa ligne avec son prix, comme <em>Pédicure classique</em> <em>55</em>, <em>Pédicure spa</em> <em>70</em>. Il y en a beaucoup? Mettez-les sous un titre (une section), comme <em>Pédicures</em>. Un prix qui dépend du jour ou de la personne? Écrivez le plus bas avec « à partir de », comme <em>Pédicures à partir de 55 $</em>. Votre fiche montre votre prix le plus bas.</p>' },
   { id: 'indoor-courses', pages: ['setup', 'edit', 'menu'], over: ['indoor-price', 'menu-add', 'event-add', 'indoor-exhibits'], noRelated: ['cost', 'price-range', 'avg-spend'],
     q: 'Courses that run several weeks', qFr: 'Des cours sur plusieurs semaines',
     keys: ['courses run', 'course runs', 'multi week', 'multiweek', 'week course', 'week courses', 'weekly course', 'weekly courses', 'six week course', 'course dates', 'courses start', 'next course', 'new course', 'session dates', 'fall session', 'register for', 'swim lessons', 'lessons'],
@@ -61106,22 +61173,24 @@ function indoorHelpPrice(venue) { return (venue && indoorPrice(venue.id)) || ind
 // "Admission $12" (the kind's words without "from").
 // Indoor test 12 (2026-11-19): the owner side and the page agree everywhere: a kind priced from its lowest price keeps
 // "from" here too ("Admission from $12"), and an exact price (one drop-in, or a lower typed price) says its words.
-function indoorOwnerPriceWords(k, exact) { return exact || k.single ? `${k.price.exact} {x}` : String(k.price.page).replace(/\.$/, ''); }
-function indoorHelpExact(venue) { try { return !!(venue && indoorPriceExact(venue.id)); } catch (e) { return false; } }
+// Indoor test 18: THE PRICE RULE's words (indoor-kinds.js) for the price Help uses and her lowest typed price.
+function indoorOwnerPriceWords(kinds, lang, price, low) { const v = indoorKindsModule.indoorPriceShow(kinds, lang, price, { low, money: tourMoney }); return v.line.replace('{x}', tourMoney(v.amount, lang === 'fr')); }
+// Her own lowest typed price per person (null for a price per room or group): Help, the setup preview (C.indoorLow).
+function indoorHelpLow(venue) { try { return venue && !INDOOR_PER_UNITS.includes(venueIndoorInfo(venue.id).per) ? indoorLowestTyped(venue.id) : null; } catch (e) { return null; } }
 // Indoor test 12 (2026-11-19; Jess's paid studio was told "Free entry? You can skip this."): only a place that ticked Free
 // entry or By donation is told it can skip Your prices.
 function indoorHelpFree(venue) { try { return !!(venue && indoorFree(venue.id)); } catch (e) { return false; } }
 // Indoor test 13 (2026-11-19; Dan's cinema, shows only): a place with no set hours (or a cinema or theatre, whose times are
 // its shows) is never told to keep its "open-door hours" or to add a weekly event for a cheap night.
 function indoorHelpNoHours(venue) { try { const t = venueIndoorInfo(venue.id); return t.visit === 'appointment' || indoorKindsModule.indoorKindText(indoorHelpKinds(venue), 'en').ticketed; } catch (e) { return false; } }
-function indoorKindHelpTopics(topics, kinds, price = null, exact = false, free = null, noHours = false) {
+function indoorKindHelpTopics(topics, kinds, price = null, low = null, free = null, noHours = false) {
   const E = escapeHtml;
   const en = indoorKindsModule.indoorKindText(kinds, 'en'), fr = indoorKindsModule.indoorKindText(kinds, 'fr');
   if (!(Number(price) > 0)) price = en.exPrice;
   // Indoor test 5: "put your adult admission", never "put adult day pass".
   const label = (k) => { const l = k.price.label.replace(/, (?:in dollars|en dollars)$/, ''); return /^(?:your|votre)\b/i.test(l) ? l : `${k === fr ? 'votre' : 'your'} ${l.charAt(0).toLowerCase()}${l.slice(1)}`; };
   const money = (lang) => { const n = Number(price) > 0 ? Number(price) : en.exPrice; const t = Number.isInteger(n) ? String(n) : n.toFixed(2); return lang === 'fr' ? `${t.replace('.', ',')} $` : `$${t}`; };
-  const say = (k, lang) => indoorOwnerPriceWords(k, exact).replace('{x}', money(lang));
+  const say = (k, lang) => indoorOwnerPriceWords(kinds, lang, Number(price) > 0 ? Number(price) : en.exPrice, typeof low === 'number' ? low : null);
   // Indoor test 5: a camp (a PD-day or school camp) is a Groups line (the kind's school or camp chip) and, on set dates, an event.
   const campChip = (k) => k.groups.chips.find((c) => /camp|school|scolaire/i.test(c)) || k.groups.chips[0];
   const hasCamp = (k) => k.groups.chips.some((c) => /camp|school|scolaire/i.test(c));
@@ -61155,14 +61224,17 @@ function indoorKindHelpTopics(topics, kinds, price = null, exact = false, free =
     if (t.id === 'indoor-price') return { ...t,
       keys: t.keys.concat(players ? [] : INDOOR_HELP_ADULT_KEYS).concat(['why does my card say', 'my card says', 'card says', 'card say', 'does my card say', 'card says adults', 'card say adults', 'why adults', 'admission is wrong', 'says admission', 'our lowest price', 'lowest price', 'cheapest', 'shortest treatment', 'a pass',
         // Indoor test 5 (Chris): what goes in the box, for timed passes and a cheaper toddler time.
+        // Indoor test 18 (Natalie: "it said just the number for my price"): words with the number are read now.
+        'just the number', 'it said just the number', 'said just the number', 'only the number', 'only a number', 'just a number', 'wont take my price', 'won t take my price', 'price wont save', 'refused my price',
         'what do i put', 'what do i put in the box', 'not a day pass', 'its not a day pass', 'jump pass', 'jump passes', 'timed pass', 'timed passes', 'toddler time', 'toddler price', 'toddlers price', 'is cheaper', 'cheaper', 'kid price', 'kids prices',
         // Indoor test 12 (Jess: "intro offer 2 weeks for $49" got "I'm not sure"): an intro offer is one of Your prices.
         'intro offer', 'intro offers', 'introductory offer', 'intro special', 'intro pass', 'intro price', 'new student', 'new students', 'new student special', 'new client special', 'first week', 'first class free', 'first class', 'trial class', '2 weeks for', 'two weeks for', '2 weeks unlimited', 'weeks unlimited', 'unlimited for', 'month unlimited']),
       keysFr: t.keysFr.concat(players ? [] : INDOOR_HELP_ADULT_KEYS_FR).concat(['ma fiche indique', 'pourquoi ma fiche', 'fiche dit', 'prix le plus bas', 'le moins cher',
+        'juste le chiffre', 'seulement le chiffre', 'seulement un chiffre', 'il a dit juste le chiffre', 'refuse mon prix',
         'abonnements', 'les abonnements', 'quoi mettre', 'qu est ce que je mets', 'pas un laissez passer d un jour', 'laissez passer de saut', 'temps des tout petits', 'prix tout petits', 'moins cher', 'prix des enfants',
         'offre d introduction', 'offre de bienvenue', 'nouveaux eleves', 'nouvel eleve', 'nouveaux clients', 'premiere semaine', 'premier cours gratuit', 'cours d essai', '2 semaines pour', 'deux semaines pour', 'illimite']),
-      a: `<p>In <strong>Price</strong>, put ${E(label(en).charAt(0).toLowerCase() + label(en).slice(1))}. Your card and your page say “${E(say(en, 'en'))}”, in words for your kind of place (what you picked on <strong>What kind of place</strong>).${players ? ' Priced per room, lane or group? Tap <strong>Per room or group</strong> under the box.' : ''} Your other prices go in <strong>Your prices</strong> (in More about your place): type each one with its price, like <em>${E(en.help.prices)}</em>.</p><p>A cheap night or a deal, like <em>${E(deal('en'))}</em>? Type it as one of <strong>Your prices</strong>, and say it in your <strong>Known for</strong> line too: search and Build My Trip read it.</p>`,
-      aFr: `<p>Dans <strong>Prix</strong>, indiquez ${E(label(fr).charAt(0).toLowerCase() + label(fr).slice(1))}. Votre fiche et votre page indiquent « ${E(say(fr, 'fr'))} », dans les mots de votre genre d’endroit (ce que vous avez choisi dans <strong>Quel genre d’endroit</strong>).${players ? ' Un prix par salle, par allée ou par groupe? Touchez <strong>Par salle ou groupe</strong> sous la case.' : ''} Vos autres prix vont dans <strong>Vos tarifs</strong> (dans Plus sur votre endroit) : tapez chacun avec son prix, comme <em>${E(fr.help.prices)}</em>.</p><p>Une soirée à prix réduit ou une aubaine, comme <em>${E(deal('fr'))}</em>? Tapez-la parmi <strong>Vos tarifs</strong>, et dites-la aussi dans votre ligne <strong>Connu pour</strong> : la recherche et Planifier mon voyage la lisent.</p>` };
+      a: `<p>In <strong>Price</strong>, put ${E(label(en).charAt(0).toLowerCase() + label(en).slice(1))}. Your card and your page say “${E(say(en, 'en'))}”, in words for your kind of place (what you picked on <strong>What kind of place</strong>).${players ? ' Priced per room, lane or group? Tap <strong>Per room or group</strong> under the box.' : ''} Your other prices go in <strong>Your prices</strong> (in More about your place): type each one with its price, like <em>${E(en.help.prices)}</em>. When one of them is lower, your card shows that one, from your lowest.</p><p>Just a number is enough, with or without words: “${E(money('en').replace('$', ''))}”, “${E(money('en'))}” or “${E(en.kind === 'spa' ? 'Facials' : indoorKindsModule.indoorTyperWords(kinds, 'en').first)} from ${E(money('en'))}” all work.</p><p>A cheap night or a deal, like <em>${E(deal('en'))}</em>? Type it as one of <strong>Your prices</strong>, and say it in your <strong>Known for</strong> line too: search and Build My Trip read it.</p>`,
+      aFr: `<p>Dans <strong>Prix</strong>, indiquez ${E(label(fr).charAt(0).toLowerCase() + label(fr).slice(1))}. Votre fiche et votre page indiquent « ${E(say(fr, 'fr'))} », dans les mots de votre genre d’endroit (ce que vous avez choisi dans <strong>Quel genre d’endroit</strong>).${players ? ' Un prix par salle, par allée ou par groupe? Touchez <strong>Par salle ou groupe</strong> sous la case.' : ''} Vos autres prix vont dans <strong>Vos tarifs</strong> (dans Plus sur votre endroit) : tapez chacun avec son prix, comme <em>${E(fr.help.prices)}</em>. Si l’un d’eux est plus bas, votre fiche montre celui-là, à partir de votre prix le plus bas.</p><p>Un chiffre suffit, avec ou sans mots : « ${E(money('fr').replace(/\s?\$$/, ''))} », « ${E(money('fr'))} » ou « ${E(en.kind === 'spa' ? 'Soins du visage' : indoorKindsModule.indoorTyperWords(kinds, 'fr').first)} à partir de ${E(money('fr'))} », tout fonctionne.</p><p>Une soirée à prix réduit ou une aubaine, comme <em>${E(deal('fr'))}</em>? Tapez-la parmi <strong>Vos tarifs</strong>, et dites-la aussi dans votre ligne <strong>Connu pour</strong> : la recherche et Planifier mon voyage la lisent.</p>` };
     if (t.id === 'indoor-per-room' && !players) return { ...t, keys: t.keys.filter((x) => !INDOOR_HELP_ADULT_KEYS.includes(x)), keysFr: t.keysFr.filter((x) => !INDOOR_HELP_ADULT_KEYS_FR.includes(x)) };
     // Indoor test 8: the kind's own busy line, theme night (with its repeat pattern) and extras.
     if (t.id === 'indoor-busy-times') return { ...t,
@@ -61178,6 +61250,11 @@ function indoorKindHelpTopics(topics, kinds, price = null, exact = false, free =
     if (t.id === 'indoor-extras') return { ...t,
       a: `<p>Keep ${E(label(en).charAt(0).toLowerCase() + label(en).slice(1))} in <strong>Price</strong>: it stays your main price (“${E(say(en, 'en'))}”). Add each extra as its own line in <strong>Your prices</strong>, like <em>${E(en.help.prices)}</em>. Included in the price? Say so in one line under <strong>Good to know</strong>.</p><p>Prices before tax? Write “plus tax” after the price in <strong>Your prices</strong>, like <em>${E(indoorKindsModule.indoorTyperWords(kinds, 'en').first)} ${E(money('en'))} plus tax</em>.</p>`,
       aFr: `<p>Gardez ${E(label(fr).charAt(0).toLowerCase() + label(fr).slice(1))} dans <strong>Prix</strong> : il reste votre prix principal (« ${E(say(fr, 'fr'))} »). Ajoutez chaque extra en une ligne dans <strong>Vos tarifs</strong>, comme <em>${E(fr.help.prices)}</em>. C’est inclus dans le prix? Dites-le en une ligne sous <strong>Bon à savoir</strong>.</p><p>Des prix avant taxes? Écrivez « plus taxes » après le prix dans <strong>Vos tarifs</strong>, comme <em>${E(indoorKindsModule.indoorTyperWords(kinds, 'fr').first)} ${E(money('fr'))} plus taxes</em>.</p>` };
+    // Indoor test 18 (Natalie, a day spa: "intro offer price for first massage"): a spa's example is a first-visit offer, and
+    // an offer never becomes the card's price.
+    if (t.id === 'indoor-intro-class') return { ...t,
+      a: (en.kind === 'spa' ? t.a.replace('<em>Intro class $35</em>', '<em>First massage, new clients $79</em>') : t.a).replace(/<\/p>$/, ' An intro offer never becomes your card’s price: your card keeps your everyday lowest price.</p>'),
+      aFr: (en.kind === 'spa' ? t.aFr.replace('<em>Cours d’initiation 35 $</em>', '<em>Premier massage, nouveaux clients 79 $</em>') : t.aFr).replace(/<\/p>$/, ' Une offre d’introduction ne devient jamais le prix de votre fiche : elle garde votre prix habituel le plus bas.</p>') };
     // Indoor test 17 (2026-11-19; Megan: "what goes in the first line" got the edit-link answer): the price typer's first
     // line is her main price, named for her kind.
     if (t.id === 'indoor-typer-first') return { ...t,
@@ -68662,7 +68739,7 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
   try { week = live.hours ? (typeof live.hours === 'string' ? JSON.parse(live.hours) : live.hours) : null; } catch (e) { week = null; }
   return portalCompleteness.renderCompleteness(portalCompleteness.scoreCompleteness(input, { today: todayLocal(), pending, liveFields: ownerCompletenessLiveFields(signedIn) }), {
     // Café test 4 (2026-11-11): the checklist without the percent and badge talk at the top of the edit page.
-    fr, canDecline: true, noScore: true, winery: venue.type === 'winery', brewery: brewSetupType(venue.type), distillery: venue.type === 'distillery', tour: venue.type === 'tour', indoor: venue.type === 'indoor', indoorExact: venue.type === 'indoor' && indoorHelpExact(venue), apptOnly: apptType(venue.type) && apptAnswers(venue.id, venue.type).visit === 'appointment',
+    fr, canDecline: true, noScore: true, winery: venue.type === 'winery', brewery: brewSetupType(venue.type), distillery: venue.type === 'distillery', tour: venue.type === 'tour', indoor: venue.type === 'indoor', indoorLow: venue.type === 'indoor' ? indoorHelpLow(venue) : null, apptOnly: apptType(venue.type) && apptAnswers(venue.id, venue.type).visit === 'appointment',
     menuHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/menu`, lang) : ownerPath(`/owner/account/venue/${venue.id}/menu`, lang),
     setupHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang),
     hoursText: input.hasHours && week && !pending.has('hours') ? portalCompleteness.hoursLine(week, fr) : '',
@@ -70883,7 +70960,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
   });
 })();
 </script>
-${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: completeOn ? venue.id : null, noHappyHour: !happyHourAllowed(venue), dropHappyHour: venue.type === 'tour' || venue.type === 'indoor', ...(venue.type === 'indoor' && INDOOR_SETUP_ON ? { extraTopics: indoorKindHelpTopics(INDOOR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')).map(indoorClosureWords), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpExact(venue), indoorHelpFree(venue), indoorHelpNoHours(venue)), dropTopics: INDOOR_HELP_DROP_TOPICS } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: cafeHelpTopics('edit').filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'tour' ? { extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')).map(tourYearlyBreakWords).concat([TOUR_THIRD_STRETCH_HELP_TOPIC, SETUP_OPEN_HOLIDAYS_HELP_TOPIC]) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
+${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: completeOn ? venue.id : null, noHappyHour: !happyHourAllowed(venue), dropHappyHour: venue.type === 'tour' || venue.type === 'indoor', ...(venue.type === 'indoor' && INDOOR_SETUP_ON ? { extraTopics: indoorKindHelpTopics(INDOOR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')).map(indoorClosureWords), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpLow(venue), indoorHelpFree(venue), indoorHelpNoHours(venue)), dropTopics: INDOOR_HELP_DROP_TOPICS } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: cafeHelpTopics('edit').filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'tour' ? { extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')).map(tourYearlyBreakWords).concat([TOUR_THIRD_STRETCH_HELP_TOPIC, SETUP_OPEN_HOLIDAYS_HELP_TOPIC]) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
 </body>
 </html>`;
 }

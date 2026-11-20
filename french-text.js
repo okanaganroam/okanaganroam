@@ -1094,7 +1094,11 @@ for (let n = 1; n <= 20; n++) {
 const MONTHS_LONG = { January: 'janvier', February: 'février', March: 'mars', April: 'avril', May: 'mai', June: 'juin', July: 'juillet', August: 'août', September: 'septembre', October: 'octobre', November: 'novembre', December: 'décembre' };
 const SEASON_DATE = '(January|February|March|April|May|June|July|August|September|October|November|December) (\\d{1,2})(?:, (\\d{4}))?';
 const seasonDate = (m, i) => `${m[i + 1] === '1' ? '1er' : m[i + 1]} ${MONTHS_LONG[m[i]]}${m[i + 2] ? ` ${m[i + 2]}` : ''}`;
+const INDOOR_EXACT_FR_MAP = new Map(require('./indoor-kinds').INDOOR_EXACT_FR);
 const FR_PATTERNS = [
+  // Indoor test 18 (THE PRICE RULE, indoor-kinds.js): an exact kind's card line under its lower price ("Adult admission
+  // $12" -> « Entrée adulte 12 $ »).
+  [new RegExp(`^(${[...INDOOR_EXACT_FR_MAP.keys()].join('|')}) \\$(\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})?)$`), (m) => `${INDOOR_EXACT_FR_MAP.get(m[1])} ${m[2].replace(/,/g, ' ').replace('.', ',')} $`],
   // Indoor test 2 (2026-11-19): a card price per room, lane, game or group ("From $120 / room" -> « À partir de 120 $ / salle »).
   [/^From \$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?) \/ (room|lane|game|group)$/, (m) => `À partir de ${m[1].replace(/,/g, '\u00a0').replace('.', ',')}\u00a0$ / ${{ room: 'salle', lane: 'allée', game: 'partie', group: 'groupe' }[m[2]]}`],
   // What's On (2026-10-19): the month headings past next week, a one-day "Showing Sun Oct 18" under the dates, and

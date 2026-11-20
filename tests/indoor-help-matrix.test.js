@@ -477,8 +477,9 @@ test('indoor test 11: Kim\'s Help questions (a science centre) land on the right
   assert.match(th, /Add an event/);
   // The price answers say the page's own words: "Admission $12" (no "from") before any lower typed price.
   // Indoor test 12: the page's own words, "from" included, so the owner side and the page agree.
-  assert.match(plain(b.en.topic(P).a), /“Admission from \$12”/);
-  assert.match(plain(pageOf(b.v)), /Admission from \$12\./);
+  // Indoor test 18 (THE PRICE RULE): a museum's adult admission is exact: "Adult admission $12".
+  assert.match(plain(b.en.topic(P).a), /“Adult admission \$12”/);
+  assert.match(plain(pageOf(b.v)), /Adult admission \$12\./);
 });
 
 // Indoor test 12 (2026-11-19; Jess, a hot yoga and Pilates studio open only around its classes): every question in her Help

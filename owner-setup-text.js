@@ -2665,14 +2665,13 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
       const w = IK.indoorKindText([k], lang), line = noPeriod(w.price.page);
       T.kindText[k] = {
         tpriceLabel: w.price.label, tpricePh: w.price.ph, tpriceLead: w.price.lead,
-        tpriceLeadPick: fr2 ? `Votre page indiquera « ${line} ».` : `Your page will say “${line}”.`,
-        // Indoor test 11 (2026-11-19; Kim: "Admission from $12" on the price screen and the finish preview while her page said
-        // "Adult admission $12"): the page's own words, "Adult admission $12" once her typed prices list a lower one
-        // (C.indoorExact), else the page's line. Indoor test 12 (2026-11-19): with its "from" ("Admission from $12"), so the
-        // finish preview and the page agree.
-        tpriceCard: line, tpriceCardExact: `${w.price.exact} {x}`,
-        tpriceLeadPickExact: fr2 ? `Votre page indiquera « ${w.price.exact} {x} ».` : `Your page will say “${w.price.exact} {x}”.`,
-        tpriceRangeLead: fr2 ? `Nous indiquerons « ${line} », votre prix le plus bas.` : `We’ll show “${line}”, your lowest price.`,
+        // Indoor test 18: THE PRICE RULE (indoor-kinds.js, top). The preview fills {line}: tpriceCard with her price, or
+        // tpriceCardLow when her own typed prices list a lower one (C.indoorLow): "From $70" for a spa, "From $8 (adult
+        // admission $12)" for a museum. owner-setup-client.js indoorShowLine.
+        tpriceLeadPick: fr2 ? 'Votre page indiquera « {line} ».' : 'Your page will say “{line}”.',
+        tpriceCard: line,
+        tpriceCardLow: IK.indoorPriceShow([k], lang, 1000000, { low: 1, money: (n, f) => (n === 1 ? '{x}' : '{main}') }).line,
+        tpriceRangeLead: fr2 ? 'Nous indiquerons « {line} », votre prix le plus bas.' : 'We’ll show “{line}”, your lowest price.',
         menuLead: w.prices.lead, menuTypeSub: w.prices.typeSub, pricesNoun: w.prices.noun, pricesPage: w.prices.page,
         webLeadTickets: fr2 ? `Nous avons inscrit votre ${w.prices.noun}. Si vos prix sont sur une autre page, changez-la.` : `We filled in your ${w.prices.noun}. If your prices are on another page, change it.`,
         groupsLead: w.groups.lead, groupsEx: w.groups.ex, quick: { groups: w.groups.chips },
