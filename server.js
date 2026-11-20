@@ -28700,7 +28700,10 @@ const MAP_PAGE_SCRIPT = `  if (!window.L) return;
     if (openOnly && !includeUnlistedHours && places.some(function(p){
       return !p.st && matchesPlace(p, true) && (!me || !radiusFixed || !radiusKm || town || p.d <= radiusKm);
     })) {
+      // 2026-11-20: late at night "patio" found nothing and only offered unlisted hours; offer closed places too.
       return esc(FR ? 'Aucun résultat ouvert maintenant.' : 'No matching places are listed as open now.') +
+        ' <button type="button" class="pm-relax" data-relax="open">' +
+        esc(FR ? 'Afficher aussi les lieux fermés actuellement' : 'Show places that are closed now too') + '</button>' +
         ' <button type="button" class="pm-relax" data-relax="unlisted">' +
         esc(FR ? 'Afficher les lieux sans horaires' : 'Show places with unlisted hours') + '</button>';
     }
