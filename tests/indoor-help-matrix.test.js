@@ -710,8 +710,49 @@ test('indoor test 16: Tyler\'s Help questions (an escape room) land on the right
   // The ages answer shows the with-an-adult wording Tyler's Ages line now reads.
   assert.match(plain(b.en.topic(A).a), /Ages 12 and up \(8\+ with an adult\)/);
 });
+// Indoor test 17 (2026-11-19; Megan, a bouldering gym: a day pass, walk-ins, All ages with kids under 14 with an adult, a
+// waiver link): her Help log, EN and FR twins, with where each belongs ([page, question, topics, French twin]). "plus tax"
+// is Your prices' extras answer ("plus tax" after the price); "corporate team events" the Groups answer that names the
+// Team building chip; "the wednesday line is old" the old-line answer (Remove, or delete it from Good to know); "what goes
+// in the first line" the price typer's first line; "intro class price" Your prices, with Add an event only for set dates.
+const TL17 = 'indoor-typer-first', OL = 'indoor-old-line', IC = 'indoor-intro-class';
+const MEGAN = [
+  ['setup', 'shoe rental extra', [X], 'location de souliers en extra'],
+  ['setup', 'plus tax', [X], 'plus taxes'],
+  ['setup', 'waiver online before you climb', [GTK], 'décharge en ligne avant de grimper'],
+  ['setup', 'is the waiver link my booking link', [BK], 'le lien de la décharge est-il mon lien de réservation'],
+  ['setup', 'kids under 14 need an adult', [A], 'les moins de 14 ans doivent être avec un adulte'],
+  ['menu', 'what goes in the first line', [TL17], 'que mettre dans la première ligne'],
+  ['menu', 'intro class price', [IC], 'prix du cours d’initiation'],
+  ['setup', 'intro classes tuesdays and thursdays at 6', [IC, TH], 'cours d’initiation mardi et jeudi à 18 h'],
+  ['setup', 'the wednesday line is old, we open at 10 now', [OL], 'la ligne du mercredi est vieille, on ouvre à 10 h maintenant'],
+  ['setup', 'birthday parties weekends only', [G], 'fêtes d’anniversaire la fin de semaine seulement'],
+  ['setup', 'corporate team events', [G], 'événements d’entreprise'],
+  ['setup', 'that line is wrong', [OL], 'cette ligne est fausse'],
+];
+const MEGAN_WANT = Object.fromEntries(MEGAN.map(([, q, want]) => [q, want]));
+test('indoor test 17: Megan\'s Help questions (a bouldering gym) land on the right answer, in English and in French; the answers say "plus tax", name the Team building chip, Remove for an old line, the first line\'s Day pass, and Add an event only for set dates', async () => {
+  const b = await botsFor('climbing');
+  const wrong = [];
+  for (const [pg, q, want, qFr] of MEGAN) {
+    const r = (pg === 'menu' ? b.men : b.en).best(q), f = (pg === 'menu' ? b.mfr : b.fr).best(qFr);
+    if (!r || !want.includes(r.id)) wrong.push(`en ${pg} "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+    if (!f || !want.includes(f.id)) wrong.push(`fr ${pg} "${qFr}" -> ${f && f.id} (want ${want.join(' or ')})`);
+  }
+  assert.deepEqual(wrong, []);
+  assert.match(plain(b.en.topic(X).a), /Write “plus tax” after the price in Your prices , like Day pass \$22 plus tax/);
+  assert.match(plain(b.fr.topic(X).aFr), /plus taxes/);
+  assert.match(plain(b.en.topic(G).a), /Team building and private bookings/);
+  assert.match(plain(b.en.topic(G).a), /Corporate or team events/);
+  assert.match(plain(b.en.topic(OL).a), /Tap Remove/);
+  assert.match(plain(b.en.topic(OL).a), /Good to know/);
+  assert.match(plain(b.men.topic(TL17).a), /Day pass \$22/);
+  assert.match(plain(b.mfr.topic(TL17).aFr), /Laissez-passer d’un jour 22 \$/);
+  assert.match(plain(b.men.topic(IC).a), /Your prices/);
+  assert.match(plain(b.men.topic(IC).a), /On set dates only\? Also add each date with Add an event/);
+});
 // Every question in the 8 indoor help logs lands on an answer, on the page where it was asked, for the kind of place it was.
-const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga', 13: 'cinema', 14: 'museum', 15: 'gallery', 16: 'escape' };
+const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga', 13: 'cinema', 14: 'museum', 15: 'gallery', 16: 'escape', 17: 'climbing' };
 // The misrouted ones, with where they belong.
 const LOG_WANT = {
   'we price per room not per person': [R], 'how do I change the price, it says adults but we charge per room': [R],
@@ -741,6 +782,8 @@ const LOG_WANT = {
   ...AARON_WANT,
   // Indoor test 16 (Tyler, an escape room).
   ...TYLER_WANT,
+  // Indoor test 17 (Megan, a bouldering gym).
+  ...MEGAN_WANT,
 };
 test('every question in the 8 indoor help logs lands on an answer (the misrouted ones on the right one)', async () => {
   const wrong = [];
