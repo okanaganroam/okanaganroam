@@ -1,0 +1,558 @@
+{
+ "reason": "Venue photos stays-ok-1",
+ "batch_id": "photos-stays-ok-1-2026-11-19",
+ "venues": [
+  {
+   "id": 1936,
+   "name": "Tim's By The River Campsite",
+   "region": "armstrong",
+   "slug": "tim-s-by-the-river-campsite",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/tim-s-by-the-river-campsite-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1937,
+   "name": "Tinhorn Lodge",
+   "region": "baldy",
+   "slug": "tinhorn-lodge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/tinhorn-lodge-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1938,
+   "name": "Bullet Creek Cabins",
+   "region": "big-white",
+   "slug": "bullet-creek-cabins",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/bullet-creek-cabins-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1941,
+   "name": "Chateau Big White",
+   "region": "big-white",
+   "slug": "chateau-big-white",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/chateau-big-white-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1945,
+   "name": "Copper Kettle Lodge",
+   "region": "big-white",
+   "slug": "copper-kettle-lodge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/copper-kettle-lodge-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1946,
+   "name": "Grizzly Lodge",
+   "region": "big-white",
+   "slug": "grizzly-lodge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/grizzly-lodge-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1942,
+   "name": "Inn at Big White",
+   "region": "big-white",
+   "slug": "inn-at-big-white",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/inn-at-big-white-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1944,
+   "name": "Ptarmigan Inn",
+   "region": "big-white",
+   "slug": "ptarmigan-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ptarmigan-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1947,
+   "name": "Stonebridge Lodge",
+   "region": "big-white",
+   "slug": "stonebridge-lodge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/stonebridge-lodge-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1948,
+   "name": "Sundance Resort",
+   "region": "big-white",
+   "slug": "sundance-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sundance-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1940,
+   "name": "Urban Retreat Hostel",
+   "region": "big-white",
+   "slug": "urban-retreat-hostel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/urban-retreat-hostel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1943,
+   "name": "White Crystal Inn",
+   "region": "big-white",
+   "slug": "white-crystal-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/white-crystal-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1939,
+   "name": "Woodcutter Cabins",
+   "region": "big-white",
+   "slug": "woodcutter-cabins",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/woodcutter-cabins-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1949,
+   "name": "Mara Cottage Campground",
+   "region": "enderby",
+   "slug": "mara-cottage-campground",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mara-cottage-campground-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1950,
+   "name": "Quilakwa RV Park & Campground",
+   "region": "enderby",
+   "slug": "quilakwa-rv-park-and-campground",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/quilakwa-rv-park-and-campground-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1953,
+   "name": "Camp-Along Resort",
+   "region": "kaleden",
+   "slug": "camp-along-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/camp-along-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1951,
+   "name": "Mountain Springs Nature Retreat & B&B",
+   "region": "kaleden",
+   "slug": "mountain-springs-nature-retreat-and-b-and-b",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mountain-springs-nature-retreat-and-b-and-b-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1952,
+   "name": "Ponderosa Point Resort",
+   "region": "kaleden",
+   "slug": "ponderosa-point-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ponderosa-point-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1954,
+   "name": "A Vista Villa Couples Retreat",
+   "region": "kelowna",
+   "slug": "a-vista-villa-couples-retreat",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/a-vista-villa-couples-retreat-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1967,
+   "name": "Accent Inns Kelowna",
+   "region": "kelowna",
+   "slug": "accent-inns-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/accent-inns-kelowna-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1959,
+   "name": "Apple Valley Orchard & RV Park",
+   "region": "kelowna",
+   "slug": "apple-valley-orchard-and-rv-park",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/apple-valley-orchard-and-rv-park-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1955,
+   "name": "Beds by the Bridge",
+   "region": "kelowna",
+   "slug": "beds-by-the-bridge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/beds-by-the-bridge-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1968,
+   "name": "Best Western Plus Kelowna Hotel & Suites",
+   "region": "kelowna",
+   "slug": "best-western-plus-kelowna-hotel-and-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/best-western-plus-kelowna-hotel-and-suites-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1960,
+   "name": "Big Sky RV Park",
+   "region": "kelowna",
+   "slug": "big-sky-rv-park",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/big-sky-rv-park-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1993,
+   "name": "Borgata Lodge at Quail Ridge",
+   "region": "kelowna",
+   "slug": "borgata-lodge-at-quail-ridge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/borgata-lodge-at-quail-ridge-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1987,
+   "name": "Canadas Best Value Inn Kelowna",
+   "region": "kelowna",
+   "slug": "canadas-best-value-inn-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/canadas-best-value-inn-kelowna-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1956,
+   "name": "Chateau Okanagan",
+   "region": "kelowna",
+   "slug": "chateau-okanagan",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/chateau-okanagan-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1969,
+   "name": "Coast Capri Hotel",
+   "region": "kelowna",
+   "slug": "coast-capri-hotel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/coast-capri-hotel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1970,
+   "name": "Comfort Suites Kelowna",
+   "region": "kelowna",
+   "slug": "comfort-suites-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/comfort-suites-kelowna-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1988,
+   "name": "Days Inn by Wyndham Kelowna",
+   "region": "kelowna",
+   "slug": "days-inn-by-wyndham-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/days-inn-by-wyndham-kelowna-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1994,
+   "name": "Delta Hotels by Marriott Grand Okanagan Resort",
+   "region": "kelowna",
+   "slug": "delta-hotels-by-marriott-grand-okanagan-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/delta-hotels-by-marriott-grand-okanagan-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1989,
+   "name": "Dilworth Inn",
+   "region": "kelowna",
+   "slug": "dilworth-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/dilworth-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1971,
+   "name": "Econo Lodge Inn & Suites Kelowna",
+   "region": "kelowna",
+   "slug": "econo-lodge-inn-and-suites-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/econo-lodge-inn-and-suites-kelowna-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1972,
+   "name": "Fairfield by Marriott Kelowna",
+   "region": "kelowna",
+   "slug": "fairfield-by-marriott-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/fairfield-by-marriott-kelowna-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1961,
+   "name": "Farming Karma RV Park",
+   "region": "kelowna",
+   "slug": "farming-karma-rv-park",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/farming-karma-rv-park-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1973,
+   "name": "Four Points by Sheraton Kelowna Airport",
+   "region": "kelowna",
+   "slug": "four-points-by-sheraton-kelowna-airport",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/four-points-by-sheraton-kelowna-airport-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1974,
+   "name": "Hampton Inn & Suites by Hilton Kelowna Airport",
+   "region": "kelowna",
+   "slug": "hampton-inn-and-suites-by-hilton-kelowna-airport",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/hampton-inn-and-suites-by-hilton-kelowna-airport-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1957,
+   "name": "Hillcrest Farm Market B&B",
+   "region": "kelowna",
+   "slug": "hillcrest-farm-market-b-and-b",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/hillcrest-farm-market-b-and-b-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1975,
+   "name": "Holiday Inn Express & Suites Kelowna East",
+   "region": "kelowna",
+   "slug": "holiday-inn-express-and-suites-kelowna-east",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/holiday-inn-express-and-suites-kelowna-east-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1976,
+   "name": "Hotel Eldorado at Eldorado Resort",
+   "region": "kelowna",
+   "slug": "hotel-eldorado-at-eldorado-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/hotel-eldorado-at-eldorado-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1977,
+   "name": "Hotel Zed Kelowna",
+   "region": "kelowna",
+   "slug": "hotel-zed-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/hotel-zed-kelowna-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1978,
+   "name": "Hyatt Place Kelowna",
+   "region": "kelowna",
+   "slug": "hyatt-place-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/hyatt-place-kelowna-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1979,
+   "name": "La Quinta Inn & Suites by Wyndham Kelowna BC",
+   "region": "kelowna",
+   "slug": "la-quinta-inn-and-suites-by-wyndham-kelowna-bc",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/la-quinta-inn-and-suites-by-wyndham-kelowna-bc-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1963,
+   "name": "MacDonald Acres RV Park",
+   "region": "kelowna",
+   "slug": "macdonald-acres-rv-park",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/macdonald-acres-rv-park-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1958,
+   "name": "Magnolia Bed and Breakfast",
+   "region": "kelowna",
+   "slug": "magnolia-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/magnolia-bed-and-breakfast-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1995,
+   "name": "Manteo at Eldorado Resort",
+   "region": "kelowna",
+   "slug": "manteo-at-eldorado-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/manteo-at-eldorado-resort-2610.jpg?v=20261119"
+   }
+  }
+ ]
+}

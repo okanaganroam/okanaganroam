@@ -1,0 +1,47 @@
+[
+ {
+  "id": 2003,
+  "name": "Naramata Courtyard Suites",
+  "reason": "Own site and Google Maps only have photos up to 1024px wide (all under the 1200px minimum); no tourism board photo found"
+ },
+ {
+  "id": 2030,
+  "name": "Pine Bluff Motel",
+  "reason": "No website; Google Maps has only 3 visitor photos (one dim, blurry dusk shot of the building, an interior, a hillside), none usable"
+ },
+ {
+  "id": 2014,
+  "name": "River Stone Cottage",
+  "reason": "Own site's cottage photos are all 630px wide (banner 1261x350, too short for a 2:1 crop); Google Maps place is the winery and has no cottage photos"
+ },
+ {
+  "id": 2013,
+  "name": "Vintage Merlot Bed & Breakfast",
+  "reason": "Own site's photos are all 400px wide; Google Maps place has no photos"
+ },
+ {
+  "id": 2011,
+  "name": "Global Village Permaculture Bed & Breakfast",
+  "reason": "Own site has only garden, food and people photos (no house or suite shot); Google Maps place has no photos"
+ },
+ {
+  "id": 2024,
+  "name": "The Villa at Hester Creek",
+  "reason": "Own site's villa photos are 1111px or smaller, and its aerial banner gives only a 1194px-wide 2:1 crop; Google Maps exteriors show only the parking court and fountain"
+ },
+ {
+  "id": 2028,
+  "name": "Mount View Motel",
+  "reason": "Own website did not respond; the only Google exterior is mostly hill and sky with the units at the very bottom, even at the lowest crop"
+ },
+ {
+  "id": 2018,
+  "name": "Black Hills Vineyard Lodge",
+  "reason": "Own site blocks plain requests (Cloudflare-style challenge), so its photos were not used; Google Maps place is the winery with no lodge photos"
+ },
+ {
+  "id": 2023,
+  "name": "Pipe Dreams Winery Suites",
+  "reason": "Own site blocks plain requests, so its photos were not used; Google Maps place is the winery with no suite photos"
+ }
+]

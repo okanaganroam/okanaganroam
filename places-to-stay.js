@@ -175,6 +175,7 @@ const STAY_STYLES = `<style>
   body.stays-page .st-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
   body.stays-page .st-actions a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; font-weight: 800; text-decoration: none; border: 1px solid var(--ref-navy, #1B2B3A); color: var(--ref-navy, #1B2B3A); }
   body.stays-page .st-actions a.st-rates { background: var(--ref-navy, #1B2B3A); color: #fff; margin-top: 0; }
+  body.stays-page .st-credit { margin: -8px 0 14px; font-size: 12px; color: var(--ink-soft, #666); }
   body.stays-page .st-hero { width: 100%; max-height: 360px; object-fit: cover; border-radius: 14px; display: block; margin: 0 0 14px; }
   body.stays-page .st-disclosure { margin: 18px 0 0; font-size: 0.82rem; opacity: 0.75; max-width: 640px; }
   @media (max-width: 860px) { body.stays-page .st-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -298,7 +299,8 @@ ${deps.headerHtml()}
   <main class="wrap-wide golf-main" id="main">
   <div class="st-wrap">
   <nav class="breadcrumb" aria-label="${fr ? 'Fil d’Ariane' : 'Breadcrumb'}"><a href="${fr ? '/fr' : '/'}">${fr ? 'Accueil' : 'Home'}</a> &rsaquo; <a href="${fr ? '/fr' : ''}/${esc(venue.region)}">${esc(town)}</a> &rsaquo; <a href="${staysListPath(venue.region, lang)}">${esc(label)}</a> &rsaquo; ${esc(venue.name)}</nav>
-  ${photo ? `<img class="st-hero" src="${esc(photo)}" alt="" width="980" height="360">` : ''}
+  ${photo ? `<img class="st-hero" src="${esc(photo)}" alt="${esc(venue.name)}" width="980" height="360">` : ''}
+  ${photo && photoCreditFor(photo) ? `<p class="st-credit">${fr ? 'Photo :' : 'Photo:'} ${esc(photoCreditFor(photo))}</p>` : ''}
   <p class="st-kicker">${esc([kind, town].filter(Boolean).join(' · '))}</p>
   <h1>${esc(venue.name)}</h1>
   ${desc ? `<p class="st-intro"${fr && !descFr ? ' lang="en"' : ''}>${esc(desc)}</p>` : ''}
@@ -315,6 +317,16 @@ ${deps.headerHtml()}
 ${deps.engagementScript(venue)}
 </body>
 </html>`;
+}
+
+
+// Photo credit for a stay's photo (2026-11-19), from the same credits file every listing uses. "Photo:" is added on the page.
+let _stayCredits = null;
+function photoCreditFor(url) {
+  try {
+    if (!_stayCredits) _stayCredits = require('./data/venue-photo-credits.json');
+    return String(_stayCredits[String(url).split('?')[0]] || '').replace(/^\s*photos?\s*:\s*/i, '').trim();
+  } catch (e) { return ''; }
 }
 
 module.exports = {
