@@ -904,6 +904,121 @@ function t3AboutHtml(d) {
   </section>`;
 }
 
+// ---- Where to stay (step 2, 2026-11-20; TRIP_STAYS or /trip?stays=1, see server.js) ----
+// The optional Dates and Guests row under the request box (folded until opened), and its styles. Nothing here is on
+// the page while the flag is off.
+const T3_STAY_STYLES = `<style>
+  .t3-stay-in { margin: 6px 0 2px; border-top: 1px solid rgba(27,43,58,0.12); padding-top: 8px; }
+  .t3-stay-in summary { cursor: pointer; font-weight: 800; font-size: 0.88rem; color: var(--ref-navy); min-height: 32px; display: flex; align-items: center; gap: 6px; }
+  .t3-stay-in summary small { font-weight: 600; color: rgba(27,43,58,0.6); }
+  .t3-stay-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 10px; padding: 6px 0 4px; }
+  .t3-stay-row label { display: flex; flex-direction: column; gap: 2px; font-size: 0.78rem; font-weight: 800; color: rgba(27,43,58,0.75); }
+  .t3-stay-row input, .t3-stay-row select { min-height: 40px; border: 1px solid rgba(27,43,58,0.25); border-radius: 10px; padding: 6px 8px; font: 600 0.92rem 'Nunito', 'Nunito Fallback', sans-serif; color: var(--ref-navy); background: #fff; min-width: 0; width: 100%; box-sizing: border-box; }
+  @media (max-width: 640px) { .t3-stay-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .t3-stay { background: #fff; border-radius: 18px; padding: 16px; margin: 0 0 18px; box-shadow: 0 10px 26px -20px rgba(0,0,0,0.5); }
+  .t3-stay h3 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.2rem; margin: 0 0 2px; color: var(--ref-navy); }
+  .t3-stay-sub { margin: 0 0 12px; font-size: 0.86rem; color: rgba(27,43,58,0.7); }
+  .t3-stay-pick { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .t3-stay-pick img, .t3-stay-pick .t3-stay-nophoto { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; background: rgba(27,43,58,0.08); display: block; }
+  @media (max-width: 640px) { .t3-stay-pick { grid-template-columns: 1fr; } .t3-stay-pick img, .t3-stay-pick .t3-stay-nophoto { aspect-ratio: 16 / 9; } }
+  .t3-stay-kicker { margin: 0; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ref-gold); }
+  .t3-stay-name { margin: 2px 0 4px; font-size: 1.1rem; font-weight: 800; }
+  .t3-stay-name a, .t3-stay-alt a { color: var(--ref-navy); }
+  .t3-stay-facts { margin: 0 0 6px; font-weight: 700; font-size: 0.9rem; }
+  .t3-stay-why { margin: 0; padding-left: 18px; font-size: 0.88rem; }
+  .t3-stay-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .t3-stay-alts { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+  .t3-stay-alts[hidden] { display: none; }
+  .t3-stay-alt { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid rgba(27,43,58,0.15); border-radius: 12px; padding: 10px 12px; }
+  .t3-stay-alt p { margin: 0; font-size: 0.84rem; }
+  .t3-stay-alt .t3-btn { min-height: 40px; padding: 8px 16px; flex: none; }
+</style>`;
+function t3StayInputsHtml() {
+  const opts = (from, to) => '<option value="">–</option>' + Array.from({ length: to - from + 1 }, (_, i) => `<option value="${from + i}">${from + i}</option>`).join('');
+  return `${T3_STAY_STYLES}
+        <details class="t3-stay-in" id="t3StayIn">
+          <summary><span class="t3-en">Dates and guests</span><span class="t3-fr" lang="fr">Dates et voyageurs</span> <small><span class="t3-en">(optional)</span><span class="t3-fr" lang="fr">(facultatif)</span></small></summary>
+          <div class="t3-stay-row">
+            <label><span><span class="t3-en">Arrive</span><span class="t3-fr" lang="fr">Arrivée</span></span><input type="date" id="t3Arrive"></label>
+            <label><span><span class="t3-en">Leave</span><span class="t3-fr" lang="fr">Départ</span></span><input type="date" id="t3Leave"></label>
+            <label><span><span class="t3-en">Adults</span><span class="t3-fr" lang="fr">Adultes</span></span><select id="t3Adults">${opts(1, 16)}</select></label>
+            <label><span><span class="t3-en">Kids</span><span class="t3-fr" lang="fr">Enfants</span></span><select id="t3Kids">${opts(0, 12)}</select></label>
+          </div>
+        </details>
+`;
+}
+// Browser code for the row and the "Where to stay" card (shipped only while the flag is on). The card reads the raw
+// plan (state.last.whereToStay), never the copy with times and dates rewritten for display.
+const T3_STAY_CLIENT_SRC = String.raw`
+  var stayChoice = null;
+  function t3StayInput(){
+    var g = function(id){ var el = document.getElementById(id); return el ? el.value : ''; };
+    var o = {}, a = g('t3Arrive'), l = g('t3Leave'), ad = g('t3Adults'), k = g('t3Kids');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(a)) o.arrive = a;
+    if (o.arrive && /^\d{4}-\d{2}-\d{2}$/.test(l)) o.leave = l;
+    if (/^\d+$/.test(ad)) o.adults = Number(ad);
+    if (/^\d+$/.test(k)) o.kids = Number(k);
+    return Object.keys(o).length ? o : null;
+  }
+  (function(){
+    var a = document.getElementById('t3Arrive'), l = document.getElementById('t3Leave');
+    if (!a || !l) return;
+    var today = new Date(); today = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+    a.min = today; l.min = today;
+    a.addEventListener('change', function(){
+      if (!a.value) return;
+      var next = new Date(a.value + 'T12:00:00Z'); next.setUTCDate(next.getUTCDate() + 1);
+      l.min = next.toISOString().slice(0, 10);
+      if (l.value && l.value < l.min) l.value = '';
+    });
+  })();
+  function t3StayData(){
+    var w = state.last && state.last.whereToStay;
+    if (!w || !w.pick) return null;
+    var all = [w.pick].concat(w.alternatives || []);
+    var chosen = all.filter(function(s){ return s.id === stayChoice; })[0] || w.pick;
+    w.stayId = chosen.id;
+    return { w: w, chosen: chosen, others: all.filter(function(s){ return s !== chosen; }) };
+  }
+  function t3StayFacts(s, fr){
+    return [s.sleeps ? (fr ? 'Jusqu’à ' + s.sleeps + ' pers.' : 'Sleeps ' + s.sleeps) : '', s.priceBand || ''].filter(Boolean).join(' · ');
+  }
+  function t3StayCardHtml(){
+    var d = t3StayData();
+    if (!d) return '';
+    var fr = lang() === 'fr', s = d.chosen, t = d.w.trip || {};
+    var url = function(x){ return safeUrl((fr && x.urlFr) || x.url); };
+    var u = url(s), facts = t3StayFacts(s, fr);
+    var kicker = [fr ? (s.kindFr || s.kind) : s.kind, s.regionLabel].filter(Boolean).join(' · ');
+    var nights = t.nights ? (fr ? t.nights + (t.nights > 1 ? ' nuits' : ' nuit') : t.nights + (t.nights > 1 ? ' nights' : ' night')) : '';
+    var html = '<section class="t3-stay" data-t3-stay aria-labelledby="t3StayHead"><h3 id="t3StayHead">' + esc(fr ? 'Où dormir' : 'Where to stay') + '</h3>'
+      + '<p class="t3-stay-sub">' + esc(fr ? 'Un point de chute près de vos arrêts' + (nights ? ', pour ' + nights : '') + '.' : 'A base close to your stops' + (nights ? ', for ' + nights : '') + '.') + '</p>'
+      + '<article class="t3-stay-pick">' + (s.photo ? '<img src="' + esc(s.photo) + '" alt="" loading="lazy" width="360" height="270">' : '<span class="t3-stay-nophoto" aria-hidden="true"></span>')
+      + '<div>' + (kicker ? '<p class="t3-stay-kicker">' + esc(kicker) + '</p>' : '')
+      + '<p class="t3-stay-name">' + (u ? '<a ' + hrefAttr(u) + '>' + esc(s.name) + '</a>' : esc(s.name)) + '</p>'
+      + (facts ? '<p class="t3-stay-facts">' + esc(facts) + '</p>' : '')
+      + '<ul class="t3-stay-why">' + (s.reasons || []).slice(0, 2).map(function(r){ return '<li>' + esc(fr ? r.textFr : r.text) + '</li>'; }).join('') + '</ul></div></article>';
+    if (d.others.length) {
+      html += '<div class="t3-stay-bar"><button type="button" class="t3-btn t3-btn-ghost" data-t3-stay-change aria-expanded="false" aria-controls="t3StayAlts">' + esc(fr ? 'Changer' : 'Change') + '</button></div>'
+        + '<ul class="t3-stay-alts" id="t3StayAlts" hidden>' + d.others.map(function(o){
+          var ou = url(o), of = t3StayFacts(o, fr), why = (o.reasons || [])[0];
+          return '<li class="t3-stay-alt"><div><p><strong>' + (ou ? '<a ' + hrefAttr(ou) + '>' + esc(o.name) + '</a>' : esc(o.name)) + '</strong></p><p>' + esc([o.regionLabel, of, why ? (fr ? why.textFr : why.text) : ''].filter(Boolean).join(' · ')) + '</p></div>'
+            + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-stay-choose="' + esc(o.id) + '">' + esc(fr ? 'Choisir' : 'Choose') + '</button></li>';
+        }).join('') + '</ul>';
+    }
+    return html + '</section>';
+  }
+  resultEl.addEventListener('click', function(e){
+    var ch = e.target.closest && e.target.closest('[data-t3-stay-change]');
+    if (ch) { var list = document.getElementById('t3StayAlts'); if (list) { list.hidden = !list.hidden; ch.setAttribute('aria-expanded', list.hidden ? 'false' : 'true'); } return; }
+    var pick = e.target.closest && e.target.closest('[data-t3-stay-choose]');
+    if (!pick) return;
+    stayChoice = Number(pick.getAttribute('data-t3-stay-choose'));
+    var card = resultEl.querySelector('[data-t3-stay]');
+    if (card) { card.outerHTML = t3StayCardHtml(); var head = document.getElementById('t3StayHead'); if (head) { head.setAttribute('tabindex', '-1'); head.focus(); } }
+  });
+`;
+
 function renderBody(d) {
   const esc = d.esc;
   // data-i18n: /scripts/app.js shows these in the visitor's language (the
@@ -923,7 +1038,7 @@ function renderBody(d) {
       <form class="t3-composer" id="t3Form" novalidate>
         <label class="t3-sr" for="t3Input" data-i18n="tripv3.inputLabel">Describe the trip you want</label>
         <textarea id="t3Input" rows="3" maxlength="500" placeholder="${SITE_PAGE.placeholder}" data-i18n-placeholder="tripv3.placeholder"></textarea>
-        <div class="t3-composer-foot">
+${d.stays ? t3StayInputsHtml() : ''}        <div class="t3-composer-foot">
           <span class="t3-hint"><span class="t3-en">Get a day-by-day plan you can edit, save, and share.</span><span class="t3-fr" lang="fr">Obtenez un plan jour par jour à modifier, à enregistrer et à partager.</span></span>
           <button type="submit" class="t3-submit" id="t3Submit"><span data-i18n="tripv3.submit">Plan my trip</span> <span aria-hidden="true">&rarr;</span></button>
         </div>
@@ -1005,7 +1120,7 @@ function renderScript(d) {
   ${t3FrenchPlan.toString()}
   var state = { text: '', seed: 0, overrides: {}, locks: {}, exclude: [], removed: {}, last: null, lastReq: null };
   var renderedVenueCardAnchors = {};
-
+${d.stays ? T3_STAY_CLIENT_SRC : ''}
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   // Crawlable links (2026-10-19, round 8): link markup glued together in this script as a quoted href attribute
   // around esc(url) read to crawlers that scan the page's HTML as links to the code itself (fake 404s). The
@@ -1078,7 +1193,7 @@ function renderScript(d) {
     var o = state.overrides, ov = {};
     ['days', 'pace', 'baseRegion', 'budgetMode', 'durationMinutes', 'startDate', 'startMinutes', 'dayStartMinutes', 'shortWalkVenueIds', 'eventId'].forEach(function(k){ if (o[k] !== undefined) ov[k] = o[k]; });
     if (Object.keys(ov).length) body.overrides = ov;
-    for (var k in extra) body[k] = extra[k];
+    for (var k in extra) body[k] = extra[k];${d.stays ? "\n    var stayIn = t3StayInput(); if (stayIn) body.stay = stayIn;" : ''}
     var requestType = opts.requestType || 'initial';
     var trigger = opts.trigger || null;
     setStatus(tx('tripv3.planning'), 'loading');
@@ -1087,7 +1202,7 @@ function renderScript(d) {
     if (trigger) { trigger.disabled = true; trigger.setAttribute('aria-busy', 'true'); }
     clearEditError();
     function done(){ submitBtn.disabled = false; resultEl.removeAttribute('aria-busy'); if (trigger) { trigger.disabled = false; trigger.removeAttribute('aria-busy'); } }
-    return fetch('/api/trip/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    return fetch('/api/trip/plan${d.stays === 'preview' ? '?stays=1' : ''}', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, status: r.status, j: j }; }); })
       .then(function(res){
         done();
@@ -1169,7 +1284,7 @@ function renderScript(d) {
       : { text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude };
     // French (2026-10-18): a plan made on /fr/trip keeps its French address, so a reload or a shared link stays French.
     var base = (location.pathname + '/').indexOf('/fr/') === 0 ? '/fr/trip' : '/trip';
-    try { history.replaceState(null, '', base + t3StateToQuery(s)); } catch (e) {}
+    try { history.replaceState(null, '', base + t3StateToQuery(s)${d.stays === 'preview' ? " + (t3StateToQuery(s) ? '&' : '?') + 'stays=1'" : ''}); } catch (e) {}
   }
 
   // ---- plan helpers ----
@@ -2050,7 +2165,7 @@ function renderScript(d) {
     html += warningSummaryHtml(p);
     var tripDetails = html.slice(aboveStopsLength);
     html = html.slice(0, aboveStopsLength);
-    // Dates and the trip map share one tidy row of tools above the days (2026-10-14).
+${d.stays ? "    html += t3StayCardHtml();\n" : ''}    // Dates and the trip map share one tidy row of tools above the days (2026-10-14).
     if (planKinds && days().length) {
       html += '<div class="t3-tools">' + schedHtml + '<div class="t3-map-slot" data-t3-map-slot></div></div>';
       // Round 12 (2026-10-20): French day tabs say « Squamish et Whistler » (the plan's own days are not translated).
