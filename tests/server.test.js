@@ -33116,3 +33116,17 @@ test('Kalamalka parking: named entrances resolve to distinct sourced parking poi
   assert.equal(app.mapDestination(path, new Date(), 'invented'), null);
   assert.equal(app.mapDestination('/kelowna/outdoors/another-place', new Date(), 'twin-bays'), null);
 });
+
+test('Roam Now (2026-11-20): when Open now hides every match, the empty list offers closed places as well as unlisted hours', async () => {
+  await withDiscoveryServer(async (base) => {
+    const en = await (await fetch(`${base}/map`)).text();
+    const fr = await (await fetch(`${base}/fr/map`)).text();
+    const i = en.indexOf("'No matching places are listed as open now.'");
+    assert.ok(i > 0);
+    const msg = en.slice(i, i + 600);
+    assert.ok(msg.includes('data-relax="open">') && msg.includes("'Show places that are closed now too'"), 'closed-too button');
+    assert.ok(msg.includes('data-relax="unlisted">'), 'unlisted-hours button kept');
+    assert.ok(msg.indexOf('data-relax="open"') < msg.indexOf('data-relax="unlisted"'), 'closed-too first');
+    assert.ok(fr.includes('Afficher aussi les lieux fermés actuellement'));
+  });
+});
