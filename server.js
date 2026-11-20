@@ -42214,9 +42214,11 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const placeLayout = !fr && !venue.redirect_to && !golfboxLayout && !indoorLayout && ['beach', 'golf', 'tour', 'shop'].includes(venue.type);
   const outdoorLayout = !fr && !venue.redirect_to && (venue.type === 'outdoor' || venue.type === 'sport' || placeLayout);
   const wineryPage = !fr && !venue.redirect_to && venue.type === 'winery';
-  const fdLayout = !fr && !venue.redirect_to && (foodDrinkPageApplies(venue) || wineryPage);
+  // French Food & Drink pages (2026-11-20) use the layout too, with its labels in French (food-drink-venue-layout-fr.js).
+  // French winery pages keep the older page for now: the tastings card is written in English.
+  const fdLayout = !venue.redirect_to && (foodDrinkPageApplies(venue) || wineryPage);
   const nichePrices = wineryPage && venue.region === 'west-kelowna' && venue.slug === 'niche-wine-company' ? require('./data/niche-tasting-prices.json') : null;
-  const copperProfile = fdLayout && venue.region === 'kelowna' && venue.type === 'brewery' && venue.slug === 'copper-brewing-co'
+  const copperProfile = fdLayout && !fr && venue.region === 'kelowna' && venue.type === 'brewery' && venue.slug === 'copper-brewing-co'
     ? require('./data/copper-layout-profile.json') : null;
   // Round 12 (2026-10-20): « du Okanagan Golf Club » in a French description reads « de l’Okanagan Golf Club ».
   if (fr && venue.description_fr) venue = { ...venue, description_fr: frElideOkanagan(venue.description_fr) };
@@ -43080,13 +43082,15 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const winery = wineryPage;
     const profile = cafePageProfile(venue, copperProfile || (nichePrices ? { shortName: 'Niche' } : {}), { hasHappyDeals: !!(happyHour && happyHour.deals), hasSpecials: !!weeklySpecials, hasNights: !!weeklyNights });
     const picks = venueMenu ? fdLib.pickMenuExamples(venueMenu.data.sections, profile.menuPickNames) : [];
-    const priceHint = fdLib.menuPriceHint(picks, menuPriceLabel);
-    const priceLevel = venueShowsPrice(venue) ? fdLib.priceLegend(venue.price) : '';
+    const pageLang = fr ? 'fr' : 'en';
+    const priceHint = fr ? fdLib.menuPriceHint(picks, (p) => menuPriceLabel(p, 'fr')).replace(/^Menu examples /, 'Exemples au menu ') : fdLib.menuPriceHint(picks, menuPriceLabel);
+    const FR_PRICE_WORDS = { 1: 'abordable', 2: 'modéré', 3: 'cher', 4: 'très cher' };
+    const priceLevel = !venueShowsPrice(venue) ? '' : fr ? (FR_PRICE_WORDS[Number(venue.price)] ? '$'.repeat(Number(venue.price)) + ' (' + FR_PRICE_WORDS[Number(venue.price)] + ')' : '') : fdLib.priceLegend(venue.price);
     const atAGlance = [
       // Café test 2 (2026-11-11): a café says its kind ("Ice cream & gelato shop · Penticton"), not "Cafe". Text only.
       // Brewery test 3 (2026-11-13): a brewery says the kind it picked too (Cidery, Taphouse, Distillery); the URL stays.
       (venue.type === 'cafe' || venue.type === 'brewery') && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : fr && indoorFrTopLabel(venue) ? escapeHtml(indoorFrTopLabel(venue)) : label.singular, `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`, priceLevel ? escapeHtml(priceLevel) : null,
-      venue.rating ? `${num(venue.rating)}★${venue.reviews ? ` (${venue.reviews})` : ''}` : null, priceHint ? escapeHtml(priceHint) : null,
+      venue.rating ? `${fr ? String(num(venue.rating)).replace('.', ',') : num(venue.rating)}★${venue.reviews ? ` (${venue.reviews})` : ''}` : null, priceHint ? escapeHtml(priceHint) : null,
     ].filter(Boolean).join(' &middot; ');
     const directionsHtml = ctaEntries.find((action) => action.includes('data-track="directions"')) || '';
     const saveActions = ctaEntries.find((action) => action.includes('fav-btn')) || '';
@@ -43095,7 +43099,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // same record (the Book button, or the Plan your visit box's own label such as "Book a tasting").
     const bookingText = (/>([^<]+)<\/a>$/.exec(bookingAction) || [])[1] || '';
     const primaryActionHtml = bookingAction
-      .replace('<a ', `<a aria-label="${escapeHtml(bookingText)} on ${escapeHtml(venue.name)}’s website (opens in a new tab)" `)
+      .replace('<a ', fr ? `<a aria-label="${escapeHtml(bookingText)} sur le site Web de ${escapeHtml(venue.name)} (s’ouvre dans un nouvel onglet)" ` : `<a aria-label="${escapeHtml(bookingText)} on ${escapeHtml(venue.name)}’s website (opens in a new tab)" `)
       .replace('</a>', ' <span class="fd-external-arrow" aria-hidden="true">↗</span></a>');
     const contactActions = ctaEntries.filter((action) => action !== directionsHtml && action !== saveActions && action !== bookingAction);
     const descText = editorial ? editorial.intro : trimVenueTagline(venue.description);
@@ -43115,38 +43119,42 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       }
     }
     const dogNote = dogFriendlyNote !== undefined && dogFriendlyNote !== null ? String(dogFriendlyNote).trim() : '';
+    // The French page's own description paragraph and chip row, exactly as its older page wrote them.
+    const frSummaryDescHtml = fr ? `${frDescEnglish && !editorial ? '<p class="venue-desc-lang" id="venueDescLang">Description en anglais</p>' : ''}<p class="venue-description"${!(frDescEnglish && !editorial) ? ' lang="fr"' : ' lang="en"'}>${editorial ? escapeHtml(editorial.intro) : frDescEnglish ? escapeHtml(venue.description || '') : escapeHtml(venue.description_fr || venue.description || '')}</p>` : '';
+    const frSummaryChipsHtml = fr ? `<p class="chips">${cvChipHtml}${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}</p>` : '';
     return fdLib.renderFoodDrinkVenueLayout({
       venue, escapeHtml, atAGlance, openStatusHtml, happyHourHtml, verifiedHtml, venueAdvisoryHtml, profile,
+      t: fr ? require('./food-drink-venue-layout-fr') : null, summaryDescriptionHtml: frSummaryDescHtml, summaryChipsHtml: frSummaryChipsHtml,
       primaryActionHtml, experienceHtml: winery ? require('./niche-tastings').wineryTastingsHtml(visitInfoRaw, escapeHtml, nichePrices) : '',
       regionLabel, directionsHtml, contactActions, saveActions, ctaRowAttrs, hasWebsite: !!venue.website, hasPhone: !!venue.phone,
-      menuPicks: picks, formatPrice: menuPriceLabel,
-      menuHtml: venueMenu ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
-      menuLink: menuPagePath(venue, 'en'), menuCountText: venueMenu ? menuTripCountText(venue, venueMenu, 'en') : '',
+      menuPicks: picks, formatPrice: fr ? (p) => menuPriceLabel(p, 'fr') : menuPriceLabel,
+      menuHtml: venueMenu ? venueMenuPreviewHtml(venue, venueMenu, pageLang) : '',
+      menuLink: menuPagePath(venue, pageLang), menuCountText: venueMenu ? menuTripCountText(venue, venueMenu, pageLang) : '',
       menuOwnUrl: venueLinkRow.menu_url && /^https?:\/\//i.test(venueLinkRow.menu_url) ? venueLinkRow.menu_url : '',
-      menuWords: venueTapListWords(venue, false), menuIcon: venueTapListIcon(venue),
-      happyDealsHtml: happyHour && happyHour.deals ? venueHappyHourBlockHtml(happyHour, false) : '',
-      weeklySpecialsHtml: weeklySpecials ? venueSpecialsHtml(weeklySpecials, false) : '',
-      weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, false, { events: venue.type === 'cafe', brew: venue.type === 'brewery' || venue.type === 'restaurant', tours: venue.type === 'distillery', lounge: venue.type === 'cocktail' }), extraDealsHtml,
+      menuWords: venueTapListWords(venue, fr), menuIcon: venueTapListIcon(venue),
+      happyDealsHtml: happyHour && happyHour.deals ? venueHappyHourBlockHtml(happyHour, fr) : '',
+      weeklySpecialsHtml: weeklySpecials ? venueSpecialsHtml(weeklySpecials, fr) : '',
+      weeklyNightsHtml: venueWeeklyNightsHtml(weeklyNightsForPage, fr, { events: venue.type === 'cafe', brew: venue.type === 'brewery' || venue.type === 'restaurant', tours: venue.type === 'distillery', lounge: venue.type === 'cocktail' }), extraDealsHtml,
       nightKinds: weeklyNightsForPage ? weeklyNightsForPage.rows.map((row) => row.s.kind) : [],
       // A pub says who's welcome in its own line by the hours, not as a Kid-friendly highlight (2026-11-10).
       // Its Sports TV highlight names the sports and TVs when the business has said, and (Dayton, Nov 10) Local beer on
       // tap and the games show in the visible highlights too, not only in the folded features list.
       // A café's own tiles (Wi-Fi, Laptop friendly, Drive-thru...) follow its usual highlights (2026-11-10).
-      highlights: venue.type === 'pub' ? pubHighlights(venue, dogFriendlyNote, profile) : venue.type === 'cafe' ? foodDrinkHighlights(venue, dogFriendlyNote, profile).concat(cafeOwnerHighlights(venue)) : foodDrinkHighlights(venue, dogFriendlyNote, profile),
-      intro: winery ? desc.intro.split(/(?<=[.!?])\s+/)[0] : desc.intro,
+      highlights: fr ? [] : venue.type === 'pub' ? pubHighlights(venue, dogFriendlyNote, profile) : venue.type === 'cafe' ? foodDrinkHighlights(venue, dogFriendlyNote, profile).concat(cafeOwnerHighlights(venue)) : foodDrinkHighlights(venue, dogFriendlyNote, profile),
+      intro: fr ? '' : winery ? desc.intro.split(/(?<=[.!?])\s+/)[0] : desc.intro,
       dealsCardHtml: copperProfile ? undefined : venueDealsCardHtml,
       editorialHtml, whyHtml: venueWhyHtml,
-      recognitionHtml: cvChipHtml + (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() : ''),
+      recognitionHtml: fr ? '' : cvChipHtml + (isHiddenGem ? hiddenGemBadgeHtml() + ' ' : '') + (isLocalFavourite ? localFavouriteBadgeHtml() : ''),
       // Winery: the box leaves out the rows the Tastings card above already shows (no tasting listed twice, 2026-11-08).
       visitHtml: winery ? visitInfoHtml(require('./niche-tastings').withoutTastingCardRows(nichePrices ? require('./niche-tastings').nicheVisitInfoWithPrices(visitInfoRaw, nichePrices) : visitInfoRaw, escapeHtml, nichePrices), false)
-        : nichePrices ? visitInfoHtml(require('./niche-tastings').nicheVisitInfoWithPrices(visitInfoRaw, nichePrices), false, { type: venue.type }) : visitHtml, descriptionHtml: (copperProfile || winery || desc.rest) ? '<p class="venue-description">' + escapeHtml(descText || '') + '</p>' : '',
-      badgesHtml: '<p class="chips">' + hiddenGemChip + attributeChipsFor(!!happyHourHtml) + '</p>',
-      dogNoteHtml: !copperProfile && dogNote ? '<p class="fd-dog-note"><strong>Dogs:</strong> ' + escapeHtml(dogNote) + '</p>' : '',
+        : nichePrices ? visitInfoHtml(require('./niche-tastings').nicheVisitInfoWithPrices(visitInfoRaw, nichePrices), false, { type: venue.type }) : visitHtml, descriptionHtml: !fr && (copperProfile || winery || desc.rest) ? '<p class="venue-description">' + escapeHtml(descText || '') + '</p>' : '',
+      badgesHtml: fr ? '' : '<p class="chips">' + hiddenGemChip + attributeChipsFor(!!happyHourHtml) + '</p>',
+      dogNoteHtml: !fr && !copperProfile && dogNote ? '<p class="fd-dog-note"><strong>Dogs:</strong> ' + escapeHtml(dogNote) + '</p>' : '',
       // Copper's deals card carries its happy hour times and its price is in the line under the name, so those two rows go;
       // every other venue keeps its rows (the price row, the happy hour row with its jump to the deals).
       detailRows: copperProfile ? detailRows.replace(/<div class="detail-row"><span class="label">(?:Price|Happy hour)<\/span>[\s\S]*?<\/div>/g, '') : detailRows,
       // Roam design system (2026-11-11): the town map with this place pinned, above the Location link.
-      locationHtml: venueMapCardHtml(venue, mapsUrl, fr) + locationHtml, hoursHtml, visitorHtml: visitorSectionHtml(venue, 'en'), guideLinks, ownerCtaHtml,
+      locationHtml: venueMapCardHtml(venue, mapsUrl, fr) + locationHtml, hoursHtml, visitorHtml: visitorSectionHtml(venue, pageLang), guideLinks, ownerCtaHtml,
       eventsHtml: venueEventsHtml, nearbyCards: fdNearbyCards, relatedHtml, nearbyHtml,
     });
   })() : '';

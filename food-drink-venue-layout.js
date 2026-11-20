@@ -111,6 +111,10 @@ function dealsWording(hasDeals, hasNights, nightKinds, type) {
 
 function renderFoodDrinkVenueLayout(parts) {
   const esc = parts.escapeHtml;
+  // parts.t (2026-11-20): the French page hands in a map of this file's own labels (food-drink-venue-layout-fr.js).
+  // T(label, { x: ... }) gives the label in the page's language, with its {x} parts filled in.
+  const dict = parts.t || null;
+  const T = (label, vars) => { let out = dict && Object.prototype.hasOwnProperty.call(dict, label) ? dict[label] : label; if (vars) for (const k of Object.keys(vars)) out = out.split('{' + k + '}').join(vars[k]); return out; };
   const profile = parts.profile || {};
   const venue = parts.venue;
   const name = esc(venue.name);
@@ -121,8 +125,8 @@ function renderFoodDrinkVenueLayout(parts) {
   // Menu
   const menuExamples = parts.menuPicks.map((item) => {
     const options = [];
-    if (/gluten[- ]free.*option/i.test(item.description || '')) options.push('Gluten-free option');
-    if (/vegan.*option/i.test(item.description || '')) options.push('Vegan option');
+    if (/gluten[- ]free.*option/i.test(item.description || '')) options.push(T('Gluten-free option'));
+    if (/vegan.*option/i.test(item.description || '')) options.push(T('Vegan option'));
     if (!options.length) options.push(...(item.dietary || []));
     const price = String(item.price || '').trim() ? '<span>' + esc(parts.formatPrice(item.price)) + '</span>' : '';
     return '<div><strong>' + esc(item.name) + '</strong>' + price
@@ -131,20 +135,20 @@ function renderFoodDrinkVenueLayout(parts) {
   // A brewery with no kitchen of its own (parts.menuWords): "Tap list" / "See the tap list" instead of the menu words.
   const mw = parts.menuWords || null;
   const ownMenuLink = parts.menuOwnUrl
-    ? '<a class="fd-own-menu" href="' + esc(parts.menuOwnUrl) + '" target="_blank" rel="nofollow noopener">' + (parts.menuHtml ? 'See ' + (short || name) + '’s own ' + (mw ? esc(mw.lower) : 'menu') : mw ? esc(mw.see) : 'See the menu') + ' ↗</a>' : '';
+    ? '<a class="fd-own-menu" href="' + esc(parts.menuOwnUrl) + '" target="_blank" rel="nofollow noopener">' + (parts.menuHtml ? T('See {x}’s own {m}', { x: short || name, m: mw ? esc(mw.lower) : T('menu') }) : mw ? esc(mw.see) : T('See the menu')) + ' ↗</a>' : '';
   let menu = '';
   if (parts.menuHtml) {
     menu = '<section class="fd-card" id="fdMenu"><div class="fd-section-title"><div>'
-      + '<div class="fd-eyebrow">' + esc(profile.menuEyebrow || 'A look at the menu') + '</div><h2>On the menu 🍽️</h2></div>'
-      + (menuExamples ? '<span class="fd-note">A few menu examples</span>' : '') + '</div>'
+      + '<div class="fd-eyebrow">' + esc(T(profile.menuEyebrow || 'A look at the menu')) + '</div><h2>' + T('On the menu 🍽️') + '</h2></div>'
+      + (menuExamples ? '<span class="fd-note">' + T('A few menu examples') + '</span>' : '') + '</div>'
       + (menuExamples ? '<div class="fd-menu-picks">' + menuExamples + '</div>' : '')
-      + '<a class="fd-full-menu" href="' + esc(parts.menuLink) + '">See the full menu (' + esc(parts.menuCountText) + ') →</a>' + ownMenuLink
-      + fold('More menu details &amp; dietary options', parts.menuHtml) + '</section>';
+      + '<a class="fd-full-menu" href="' + esc(parts.menuLink) + '">' + T('See the full menu ({n}) →', { n: esc(parts.menuCountText) }) + '</a>' + ownMenuLink
+      + fold(T('More menu details &amp; dietary options'), parts.menuHtml) + '</section>';
   } else if (parts.menuOwnUrl) {
-    menu = mw ? '<section class="fd-card" id="fdMenu"><h2>' + esc(mw.label) + ' ' + (parts.menuIcon || '🍺') + '</h2><p>The latest ' + esc(mw.lower) + ' is on ' + (short || name) + '’s own page.</p>'
+    menu = mw ? '<section class="fd-card" id="fdMenu"><h2>' + esc(mw.label) + ' ' + (parts.menuIcon || '🍺') + '</h2><p>' + T('The latest {m} is on {x}’s own page.', { m: esc(mw.lower), x: short || name }) + '</p>'
       + '<a class="fd-full-menu" href="' + esc(parts.menuOwnUrl) + '" target="_blank" rel="nofollow noopener">' + esc(mw.see) + ' ↗</a></section>'
-      : '<section class="fd-card" id="fdMenu"><h2>Menu &amp; prices 🍽️</h2><p>The latest menu and prices are on ' + (short || name) + '’s own website.</p>'
-      + '<a class="fd-full-menu" href="' + esc(parts.menuOwnUrl) + '" target="_blank" rel="nofollow noopener">See the menu ↗</a></section>';
+      : '<section class="fd-card" id="fdMenu"><h2>' + T('Menu &amp; prices 🍽️') + '</h2><p>' + T('The latest menu and prices are on {x}’s own website.', { x: short || name }) + '</p>'
+      + '<a class="fd-full-menu" href="' + esc(parts.menuOwnUrl) + '" target="_blank" rel="nofollow noopener">' + T('See the menu') + ' ↗</a></section>';
   }
 
   // Deals, specials and weekly nights
@@ -154,38 +158,38 @@ function renderFoodDrinkVenueLayout(parts) {
   const hasDeals = useCard ? !!parts.dealsCardHtml : !!(parts.happyDealsHtml || parts.weeklySpecialsHtml);
   const hasNights = !!parts.weeklyNightsHtml;
   const dealsText = dealsWording(hasDeals, hasNights, parts.nightKinds || [], venue && venue.type);
-  const dealsLabel = profile.dealsLabel || dealsText.tab;
+  const dealsLabel = T(profile.dealsLabel || dealsText.tab);
   let deals = '';
   if ((hasDeals || hasNights) && useCard) {
     deals = '<section class="fd-card fd-deals" id="fdDeals">' + parts.dealsCardHtml + parts.weeklyNightsHtml + '</section>';
   } else if (hasDeals || hasNights) {
     deals = '<section class="fd-card" id="fdDeals">'
-      + (dealsText.heading ? '<div class="fd-eyebrow">' + esc(profile.dealsEyebrow || (parts.happyDealsHtml ? 'Make a little time for happy hour' : 'This week')) + '</div><h2>' + esc(profile.dealsHeading || dealsText.heading) + '</h2>' : '')
+      + (dealsText.heading ? '<div class="fd-eyebrow">' + esc(T(profile.dealsEyebrow || (parts.happyDealsHtml ? 'Make a little time for happy hour' : 'This week'))) + '</div><h2>' + esc(T(profile.dealsHeading || dealsText.heading)) + '</h2>' : '')
       + (parts.happyDealsHtml ? '<div id="venueDeals">' + parts.happyDealsHtml + '</div>' : '')
-      + fold('Weekly food &amp; drink specials', parts.weeklySpecialsHtml) + parts.weeklyNightsHtml + (parts.extraDealsHtml || '') + '</section>';
+      + fold(T('Weekly food &amp; drink specials'), parts.weeklySpecialsHtml) + parts.weeklyNightsHtml + (parts.extraDealsHtml || '') + '</section>';
   }
 
   const hours = parts.hoursHtml ? '<div class="venue-section venue-hours" id="venueHours">' + parts.hoursHtml + '</div>' : '';
 
   // The tabs: only for sections this page really has, and only when there are at least two to move between.
   const tabs = [];
-  if (parts.experienceHtml) tabs.push(['fdTastings', 'Tastings']);
+  if (parts.experienceHtml) tabs.push(['fdTastings', T('Tastings')]);
   // Brewery test 1 port (2026-11-16): the section tab says "Tap list" too for a brewery with no kitchen (the button and
   // the card already did).
-  if (menu) tabs.push(['fdMenu', mw && !parts.menuHtml ? mw.label : 'Menu']);
+  if (menu) tabs.push(['fdMenu', mw && !parts.menuHtml ? mw.label : T('Menu')]);
   if (deals) tabs.push(['fdDeals', dealsLabel]);
-  if (hours) tabs.push(['venueHours', 'Hours']);
+  if (hours) tabs.push(['venueHours', T('Hours')]);
   const nav = tabs.length >= 2
-    ? '<nav class="fd-section-nav" aria-label="' + name + ' sections"><a href="#fdOverview" aria-current="location">Overview</a>'
+    ? '<nav class="fd-section-nav" aria-label="' + T('{x} sections', { x: name }) + '"><a href="#fdOverview" aria-current="location">' + T('Overview') + '</a>'
       + tabs.map(([id, label]) => '<a href="#' + id + '">' + esc(label) + '</a>').join('') + '</nav>' : '';
 
   // Main buttons
   const buttons = [];
   if (parts.primaryActionHtml) buttons.push(parts.primaryActionHtml.replace('class="cta secondary"', 'class="cta fd-menu-button"'));
-  if (menu) buttons.push(mw && !parts.menuHtml ? '<a class="cta fd-menu-button" href="#fdMenu">' + (parts.menuIcon || '🍺') + ' ' + esc(mw.label) + '</a>' : '<a class="cta fd-menu-button" href="#fdMenu">🍽️ Menu &amp; prices</a>');
+  if (menu) buttons.push(mw && !parts.menuHtml ? '<a class="cta fd-menu-button" href="#fdMenu">' + (parts.menuIcon || '🍺') + ' ' + esc(mw.label) + '</a>' : '<a class="cta fd-menu-button" href="#fdMenu">' + T('🍽️ Menu &amp; prices') + '</a>');
   // Directions is the main button unless there is a menu button, which leads.
   if (parts.directionsHtml) buttons.push(menu || parts.primaryActionHtml ? parts.directionsHtml.replace('class="cta"', 'class="cta secondary"') : parts.directionsHtml);
-  if (hours) buttons.push('<a class="cta secondary" href="#venueHours">🕒 Hours</a>');
+  if (hours) buttons.push('<a class="cta secondary" href="#venueHours">' + T('🕒 Hours') + '</a>');
   const ctaRow = buttons.length ? '<div class="venue-cta-row"' + parts.ctaRowAttrs + '>' + buttons.join('') + '</div>' : '';
 
   const highlights = parts.highlights.length
@@ -198,32 +202,32 @@ function renderFoodDrinkVenueLayout(parts) {
   // Nearby
   const nearbyList = (cards) => cards.length ? '<ul class="nearby-list">' + cards.join('') + '</ul>' : '';
   const nearby = parts.nearbyCards.length || parts.relatedHtml || parts.nearbyHtml
-    ? '<section class="fd-nearby" data-from-venue="' + Number(venue.id) + '"><div class="fd-section-title"><div><div class="fd-eyebrow">While you’re in the neighbourhood</div><h2>A little more to explore 🌿</h2></div>'
-      + '<a href="/' + esc(venue.region) + '">Explore ' + esc(parts.regionLabel) + ' →</a></div>'
+    ? '<section class="fd-nearby" data-from-venue="' + Number(venue.id) + '"><div class="fd-section-title"><div><div class="fd-eyebrow">' + T('While you’re in the neighbourhood') + '</div><h2>' + T('A little more to explore 🌿') + '</h2></div>'
+      + '<a href="/' + esc(venue.region) + '">' + T('Explore {r} →', { r: esc(parts.regionLabel) }) + '</a></div>'
       + nearbyList(parts.nearbyCards.slice(0, 3))
-      + fold('More nearby places', nearbyList(parts.nearbyCards.slice(3)) + parts.relatedHtml + parts.nearbyHtml) + '</section>' : '';
+      + fold(T('More nearby places'), nearbyList(parts.nearbyCards.slice(3)) + parts.relatedHtml + parts.nearbyHtml) + '</section>' : '';
 
   // Plan your visit (2026-11-08): its own open card after the menu and deals, not inside "More about" where most
   // visitors never saw it. Same box, same rows: its own "More: ..." line still folds the extra rows in place.
   const visit = parts.visitHtml ? '<div class="fd-card fd-visit">' + parts.visitHtml + '</div>' : '';
 
   // More about the venue: the full description and everything that is not shown above
-  const more = fold('More about ' + (short || name) + ' &amp; all venue features',
+  const more = fold(T('More about {x} &amp; all venue features', { x: short || name }),
     parts.descriptionHtml + parts.badgesHtml + parts.dogNoteHtml + (profile.stripVerifiedDate ? parts.verifiedHtml : '') + parts.guideLinks + parts.ownerCtaHtml, 'fd-card');
 
   // Save and contact
   const contactRow = parts.contactActions.length ? '<div class="fd-actions fd-contact-actions"' + parts.ctaRowAttrs + '>' + parts.contactActions.join('') + '</div>' : '';
-  const who = short || 'this place';
-  const saveClauses = [parts.hasWebsite ? 'visit their website' : '', parts.hasPhone ? 'give them a call' : ''].filter(Boolean);
+  const who = short || T('this place');
+  const saveClauses = [parts.hasWebsite ? T('visit their website') : '', parts.hasPhone ? T('give them a call') : ''].filter(Boolean);
   const saveText = saveClauses.length
-    ? saveClauses[0].charAt(0).toUpperCase() + saveClauses[0].slice(1) + (saveClauses[1] ? ', ' + saveClauses[1] : '') + ', or save ' + who + ' for your next outing.'
-    : 'Save ' + who + ' for your next outing.';
-  const saveCard = '<section class="fd-card fd-save-card"><h2>Keep this one handy 💛</h2><p>' + saveText + '</p>'
+    ? T('{a}, or save {w} for your next outing.', { a: saveClauses[0].charAt(0).toUpperCase() + saveClauses[0].slice(1) + (saveClauses[1] ? ', ' + saveClauses[1] : ''), w: who })
+    : T('Save {w} for your next outing.', { w: who });
+  const saveCard = '<section class="fd-card fd-save-card"><h2>' + T('Keep this one handy 💛') + '</h2><p>' + saveText + '</p>'
     + contactRow + (parts.saveActions ? '<div class="fd-actions fd-save-actions"' + parts.ctaRowAttrs + '>' + parts.saveActions + '</div>' : '')
-    + (parts.saveActions ? '<p class="fd-save-help"><span id="fdFavoriteHelp"><strong>Favorite</strong> saves ' + who + ' for later.</span><span id="fdTripHelp"><strong>Add to trip</strong> puts ' + who + ' on your trip list.</span></p>' : '')
+    + (parts.saveActions ? '<p class="fd-save-help"><span id="fdFavoriteHelp">' + T('<strong>Favorite</strong> saves {w} for later.', { w: who }) + '</span><span id="fdTripHelp">' + T('<strong>Add to trip</strong> puts {w} on your trip list.', { w: who }) + '</span></p>' : '')
     + '</section>';
 
-  const keyInfo = parts.detailRows ? '<div class="venue-section venue-key-info"><h2>Your visit, made easy</h2>' + parts.detailRows + '\n</div>' : '';
+  const keyInfo = parts.detailRows ? '<div class="venue-section venue-key-info"><h2>' + T('Your visit, made easy') + '</h2>' + parts.detailRows + '\n</div>' : '';
   const intro = profile.intro || parts.intro;
   const editorial = parts.editorialHtml ? '<div class="fd-card fd-editorial">' + parts.editorialHtml + '</div>' : '';
   const recognition = parts.recognitionHtml ? '<p class="chips fd-recognition">' + parts.recognitionHtml + '</p>' : '';
@@ -232,10 +236,10 @@ function renderFoodDrinkVenueLayout(parts) {
     '<div class="fd-layout"><div class="fd-content"><section class="fd-summary" id="fdOverview">',
     '<div class="venue-header"><h1 class="venue-desktop-title">' + name + '</h1><p class="venue-at-a-glance">' + parts.atAGlance + '</p>' + parts.openStatusHtml + (profile.happyHourLink ? '' : parts.happyHourHtml) + '</div>',
     recognition, parts.venueAdvisoryHtml || '',
-    intro ? '<p class="venue-description">' + esc(intro) + '</p>' : '', parts.whyHtml || '',
-    ctaRow, highlights, profile.happyHourLink ? happyLink : '', verifiedInSummary, '</section>',
+    parts.summaryDescriptionHtml || (intro ? '<p class="venue-description">' + esc(intro) + '</p>' : ''), parts.whyHtml || '',
+    ctaRow, parts.summaryChipsHtml || highlights, profile.happyHourLink ? happyLink : '', verifiedInSummary, '</section>',
     nav, parts.experienceHtml || '', menu, deals, ...(visit ? [visit] : []), editorial, more,
-    fold('Upcoming events at ' + (short || name), parts.eventsHtml, 'fd-card'), profile.visitorFirst ? parts.visitorHtml : '',
+    fold(T('Upcoming events at {x}', { x: short || name }), parts.eventsHtml, 'fd-card'), profile.visitorFirst ? parts.visitorHtml : '',
     // The facts (map, phone, hours, save buttons) come before the visitor photos and tips in the page itself, for keyboard
     // and screen reader order (round 9 accessibility rule); Copper keeps its approved order.
     '</div><aside class="fd-aside">', keyInfo, parts.locationHtml, hours, saveCard, '</aside>',
