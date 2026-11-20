@@ -65,7 +65,11 @@ const fitsKind = (pv, kind) => plannerKindsOf(pv).some((k) => (TR.INDOOR_KIND_PL
 
 const placed = {};
 test.before(async () => {
-  srv = http.createServer(app.server.listeners('request')[0]); await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`;
+  srv = http.createServer(app.server.listeners('request')[0]);
+  // The Build My Trip sweeps run for seconds without yielding; the server's 5 s keep-alive timer then closed the idle
+  // socket just as the next search reused it (ECONNRESET on the first fetch). A long keep-alive keeps the test about search.
+  srv.keepAliveTimeout = 120000;
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`;
   for (const [kind, k] of Object.entries(KINDS)) {
     const v = mk({ name: k.name, cuisine: k.cuisine, description: `${k.name}, ${k.cuisine.toLowerCase()} in ${TOWN}.${kind === 'pool' ? ' A 25 m lap pool, a hot tub and a sauna.' : ''}` });
     await ok(change(tokenFor(v.id), { indoor_info: { kinds: [kind], length: '1-2h', age: kind === 'casino' ? '19' : 'all', year: 'all' } }));
