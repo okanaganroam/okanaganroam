@@ -403,6 +403,21 @@ const SPORT_WORDS = {
   pyv_groups: { en: 'Groups and events', fr: 'Groupes et événements', whyEn: 'Tournaments, parties, school groups, leagues: from what size should groups book?', whyFr: 'Tournois, fêtes, groupes scolaires, ligues : à partir de quelle taille réserver?' },
 };
 const SPORT_ITEMS = INDOOR_ITEMS.map((i) => (SPORT_WORDS[i.key] ? { ...i, ...SPORT_WORDS[i.key] } : i));
+// Sport test 3 (2026-11-20; Gord's driving range: "Your main price (like a green fee…)", "Green fees, passes…"): once the
+// owner has picked his kinds, the checklist's words are his main kind's (sport-kinds.js), never a golf course's for a range.
+const SK = require('./sport-kinds.js');
+const sportKindWhy = (k) => {
+  const e = SK.K[k], w = SK.KIND_SETUP_WORDS[k];
+  if (!e || !w) return null;
+  const strip = (x) => String(x).replace(/ It’s optional\.$| C’est facultatif\.$/, '');
+  return {
+    photo_main: { whyEn: `Real photos only, taken by you. ${w.photosLead[0].replace(/ Three photos is perfect\.$/, '')}`, whyFr: `De vraies photos seulement, prises par vous. ${w.photosLead[1].replace(/ Trois photos, c’est parfait\.$/, '')}` },
+    indoor_price: { whyEn: e.en.price.lead, whyFr: e.fr.price.lead },
+    menu: { whyEn: strip(e.en.prices.lead), whyFr: strip(e.fr.prices.lead) },
+    ...(k === 'golf' ? {} : { booking_link: { en: 'Booking link', fr: 'Lien de réservation', whyEn: 'The page where people book with you, if you have one.', whyFr: 'La page où l’on réserve chez vous, si vous en avez une.' } }),
+  };
+};
+const SPORT_KIND_WHY = Object.fromEntries(SK.SPORT_KINDS.map((k) => [k, sportKindWhy(k)]));
 // Distilleries (Dayton, 2026-11-13; SPEC-distilleries.md "Decided"): the brewery items and 100 points, with spirits words
 // (each item's `distillery` words, laid over for a distillery only). "What kind of place" counts as done (Decided 1).
 const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS, winery: WINERY_ITEMS, brewery: BREWERY_ITEMS, distillery: BREWERY_ITEMS, cocktail: COCKTAIL_ITEMS, tour: TOUR_ITEMS, indoor: INDOOR_ITEMS, sport: SPORT_ITEMS, golf: SPORT_ITEMS };
@@ -418,7 +433,10 @@ const EXTRA_NONE_KEYS = ['dogs'];
 // any other (remembered, research doesn't add them back), never scored and never in that type's checklist. Pubs are
 // asked about booking and takeout in the setup without scoring them.
 // Café test 2 (2026-11-11): "No washroom" is an explicit answer too (never shown on the page).
-const OPTIONAL_NONE_KEYS = { cafe: ['happy_hour', 'specials', 'entertainment', 'pyv_groups', 'washroom', 'ordering'], pub: ['pyv_reservations', 'pyv_takeout'], cocktail: ['pyv_reservations', 'pyv_takeout', 'specials'] };
+// Sport test 3 (2026-11-20; Gord tapped "No" on the golf Happy hour tile and got "could not be read"): golf and sport
+// listings that get the optional Happy hour tile (server.js golfHappyHourKind) can answer No.
+const OPTIONAL_NONE_KEYS = { cafe: ['happy_hour', 'specials', 'entertainment', 'pyv_groups', 'washroom', 'ordering'], pub: ['pyv_reservations', 'pyv_takeout'], cocktail: ['pyv_reservations', 'pyv_takeout', 'specials'],
+  golf: ['happy_hour'], sport: ['happy_hour'] };
 const noneKeysFor = (type) => [...new Set(itemsFor(type).filter((i) => i.noneEn).map((i) => i.key).concat(OPTIONAL_NONE_KEYS[type] || [], EXTRA_NONE_KEYS))];
 const NONE_KEYS = itemsFor('restaurant').filter((i) => i.noneEn).map((i) => i.key);
 // Café test 2 (2026-11-11): with every type's optional answers too ("No washroom" is a café's only one of its own).
@@ -780,6 +798,12 @@ function scoreCompleteness(input, opts) {
     if (kc) it = { ...it, ...kc };
     // Distilleries (2026-11-13): spirits words over the brewery ones.
     if (base.distillery && input && input.type === 'distillery') it = { ...it, ...base.distillery };
+    // Sport test 3: the owner's main sport kind's words.
+    if (input && (input.type === 'golf' || input.type === 'sport')) {
+      const mk = input.indoorInfo && Array.isArray(input.indoorInfo.kinds) ? input.indoorInfo.kinds[0] : '';
+      const kw = mk && SPORT_KIND_WHY[mk] && SPORT_KIND_WHY[mk][base.key];
+      if (kw) it = { ...it, ...kw };
+    }
     const ok = done[it.key] || none.has(it.key) || unsure.has(it.key);
     // No hours at all (live check 2026-11-08, 42 restaurants): "Are your hours still right?" has nothing to confirm.
     // It is part of "Add your hours" until there are hours (saving hours from the portal marks them checked too).

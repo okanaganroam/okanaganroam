@@ -354,7 +354,12 @@ const KIND_SETUP_WORDS = {
   simgolf: { tpriceMore: MORE('peak and off-peak, rentals, punch passes, leagues', 'pointe et hors pointe, location, cartes prépayées, ligues'), photosLead: PHOTOS('Your bays and lounge, and people playing.', 'Vos baies et votre salon, et des gens qui jouent.'),
     allYearShutHint: SHUT('upgrades or maintenance', 'des travaux ou l’entretien'), ...LINK('bay ', 'des baies') },
   range: { tpriceMore: MORE('large buckets, mini golf, lessons, passes', 'grands seaux, mini-golf, cours, cartes'), photosLead: PHOTOS('Your range or mini golf, and people playing.', 'Votre champ de pratique ou votre mini-golf, et des gens qui jouent.'),
-    allYearShutHint: SHUT('maintenance', 'l’entretien'), ...LINK('', '') },
+    allYearShutHint: SHUT('maintenance', 'l’entretien'), ...LINK('', ''),
+    // Sport test 3 (2026-11-20; Gord: range and Trackman all year, mini golf April to mid-October; "Most places like yours close
+    // for winter" was wrong for him; Dayton: no new field): one part seasonal is a Good to know line.
+    seasonHintKind: ['Range open all year? Tap Yes. Only the mini golf closes for winter? Keep Yes, and add one line in Good to know, like Mini golf April to mid-October.', 'Champ de pratique ouvert toute l’année? Touchez Oui. Seul le mini-golf ferme l’hiver? Gardez Oui, et ajoutez une ligne dans Bon à savoir, comme Mini-golf d’avril à la mi-octobre.'],
+    tbookQParty: ['Booking link (lessons, bays or parties, optional)', 'Lien de réservation (cours, baies ou fêtes, facultatif)'],
+    tbookLeadParty: ['It puts a Book button on your page, in its own words (like Book a bay for a simulator bay, or Book a party).', 'Il ajoute un bouton Réserver sur votre page, dans ses mots (comme Réserver une baie pour une baie de simulateur, ou Réserver une fête).'] },
   skischool: { tpriceMore: MORE('private lessons, kids’ programs, rentals, lift tickets', 'cours privés, programmes pour enfants, location, billets de remontée'), photosLead: PHOTOS('Your lessons on the snow, and people skiing or riding.', 'Vos cours sur la neige, et des gens qui skient ou glissent.'),
     allYearShutHint: SHUT('a holiday break', 'une pause des Fêtes'), ...LINK('lesson ', 'des cours') },
   rink: { tpriceMore: MORE('kids, seniors, skate rentals, passes', 'enfants, aînés, location de patins, cartes'), photosLead: PHOTOS('Your rink, and people skating.', 'Votre patinoire, et des gens qui patinent.'),

@@ -1331,6 +1331,29 @@ function kindSeasonAsked(v, ctx) {
   const words = normWords(`${(ctx && ctx.askText) || ''} ${(ctx && ctx.queryText) || ''}`);
   return Object.keys(seasons).filter((k) => ((tripRequirements.TOUR_KIND_PLANNER || {})[k] || []).some((x) => pk.includes(x)) || (KIND_SEASON_ASK_WORDS[k] && KIND_SEASON_ASK_WORDS[k].test(words)));
 }
+// Sport test 3 (2026-11-20; Gord's driving range and mini golf): a mini golf or driving range asked for that this place is
+// (trip-requirements.js golfPartKind), and a part of the place closed for its own season on the trip's day ("Mini golf:
+// April to mid-October", server.js sportPartSeasons).
+const GOLF_PART_KINDS = ['mini_golf', 'driving_range'];
+function askedGolfPart(v, ctx) { return !!v && !!ctx && (ctx.plannerKinds || []).some((k) => GOLF_PART_KINDS.includes(k) && (v.plannerKinds || []).includes(k)); }
+function golfPartShut(v, ctx) {
+  if (!v || !Array.isArray(v.partSeasons) || !v.partSeasons.length || !ctx) return false;
+  const asked = (ctx.plannerKinds || []).filter((k) => GOLF_PART_KINDS.includes(k));
+  if (!asked.length) return false;
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) ? String(ctx.tripDate) : null;
+  const m = tripMonthOf(ctx);
+  if (!iso && !m) return false;
+  const md = iso && !(ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month)) ? iso.slice(5, 10) : `${String(m).padStart(2, '0')}-15`;
+  const shut = (p) => (p.from <= p.to ? (md < p.from || md > p.to) : (md < p.from && md > p.to));
+  // Closed when every part asked for that this place has is out of its own season.
+  const mine = asked.filter((k) => (v.plannerKinds || []).includes(k));
+  return mine.length > 0 && mine.every((k) => { const p = v.partSeasons.find((x) => x.kind === k); return p && shut(p); });
+}
+function golfPartLabel(v) {
+  const k = v.plannerKinds || [];
+  const mini = k.includes('mini_golf'), range = k.includes('driving_range');
+  return mini && range ? ['Driving range & mini golf', 'Champ de pratique et mini-golf'] : mini ? ['Mini golf', 'Mini-golf'] : range ? ['Driving range', 'Champ de pratique'] : null;
+}
 function kindSeasonBlocked(v, ctx) {
   if (!v || v.type !== 'tour' || !kindSeasonsOf(v) || !ctx || namedInRequest(v, ctx)) return false;
   const m = tripMonthOf(ctx);
@@ -1379,7 +1402,9 @@ function offSeasonBlocked(v, ctx) {
   if (v.type === 'tour' && /\b(?:mountain bike|e bike|bike tours?|biking|rafting|sailing|kayak\w*|canoe\w*|sup|paddle\w*|wing foil|kite\w*|horseback|trail rides?|float ?planes?|seaplane)\b/.test(sub) && !/\b(?:winter|year round|eagle|snow\w*|ski\w*|heli\w*)\b/.test(sub) && [11, 12, 1, 2, 3].includes(m) && !(ownerSeasonOpenOn(v, ctx) && (!((ctx.plannerKinds || []).some((k) => ['bike_tour', 'rentals', 'paddle_tour', 'rafting', 'horseback'].includes(k))) || ownerRidesThen(v, m, ctx)))) return true;
   if (!['beach', 'outdoor', 'golf', 'sport', 'tour'].includes(v.type)) return false;
   // Outdoor golf in winter only when golf was asked for (it then gets the course's own season caveat).
-  if (v.type === 'golf') return !v.indoorGolf && [11, 12, 1, 2, 3].includes(m) && !/\bgolf/.test(text) && !(ctx.types && ctx.types.has('golf'));
+  // Sport test 3: a range open all year by its owner's answer is judged by its own part seasons (golfPartShut), never the
+  // courses' winter.
+  if (v.type === 'golf') return !v.indoorGolf && !v.sportYearAll && [11, 12, 1, 2, 3].includes(m) && !/\bgolf/.test(text) && !(ctx.types && ctx.types.has('golf'));
   // A lift-access bike park, an aerial course, mini golf or paintball is a summer place; pump tracks, skills parks,
   // skate parks and disc golf are under snow in winter.
   if (v.type === 'outdoor' && /\blift access bike park\b/.test(sub)) return [10, 11, 12, 1, 2, 3, 4].includes(m);
@@ -1491,7 +1516,8 @@ function eligible(v, ctx, strict) {
   // Young kids (2026-10-25: "something to do with a 5 year old" got an ice-cave heli tour): no heli, backcountry or
   // big-thrill outfitters unless the request names one.
   if (ctx.kids && v.type === 'tour' && !['all', '5', '6', '8', '10'].includes(v.tourMinAge) && !(v.tourMinAge && kidsYoungest(ctx) != null && kidsAllowed(v, ctx)) && /\b(?:heli\w*|helicopter|backcountry|bungee|bungy|skydiv\w*|paraglid\w*|via ferrata|cat ski\w*|snowcat|ice cave|avalanche|mountaineering|ski touring|kiteboard\w*|kitesurf\w*|wing foil\w*|rock climbing guides?|climbing guides?|whitewater)\b/.test(normWords(v.cuisine || '')) && !namedInRequest(v, ctx)) return false;
-  if (v.type === 'golf' && /\bdriving range\b/.test(normWords(v.cuisine || '')) && !/\b(?:range|practice|lesson|lessons)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
+  if (v.type === 'golf' && /\bdriving range\b/.test(normWords(v.cuisine || '')) && !askedGolfPart(v, ctx) && !/\b(?:range|practice|lesson|lessons|mini ?golf|mini ?putt|minigolf|buckets?|balls)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
+  if (golfPartShut(v, ctx) && !namedInRequest(v, ctx)) return false;
   if (specialistOutdoorBlocked(v, ctx)) return false;
   if (!ctx.ignoreSeason && offSeasonBlocked(v, ctx)) return false;
   if (horseOffBlocked(v, ctx)) return false;
@@ -1757,9 +1783,9 @@ function scoreVenue(v, ctx) {
   // A golf trip plays the full courses first; a par-3 or academy course when asked or with kids (2026-10-25).
   if (v.type === 'golf' && /\b(?:par 3|par three|academy|pitch and putt|short course|9 hole|nine hole)\b/.test(normWords(`${v.cuisine || ''} ${v.name || ''}`)) && !ctx.kids && !/\b(?:par 3|par three|short|beginners?|easy|9 holes?|nine holes?|learn|lessons?|kids)\b/.test(ctx.queryText || '')) add('short_course', -18, null);
   // An 18-hole round takes half a day: on a general trip it is only planned when golf is asked for (2026-10-25).
-  if (v.type === 'golf' && !v.indoorGolf && !ctx.types.has('golf') && !/\bgolf\w*\b/.test(ctx.queryText || '')) add('golf_unasked', -20, null);
+  if (v.type === 'golf' && !v.indoorGolf && !ctx.types.has('golf') && !askedGolfPart(v, ctx) && !/\bgolf\w*\b/.test(ctx.queryText || '')) add('golf_unasked', -20, null);
   // A driving range is practice, not the round a golf trip came for (2026-10-25).
-  if (v.type === 'golf' && /\b(?:driving range|range|practice)\b/.test(normWords(v.cuisine || '')) && !/\b(?:range|practice|lesson|lessons)\b/.test(ctx.queryText || '')) add('range', -35, null);
+  if (v.type === 'golf' && /\b(?:driving range|range|practice)\b/.test(normWords(v.cuisine || '')) && !askedGolfPart(v, ctx) && !/\b(?:range|practice|lesson|lessons|mini ?golf|mini ?putt|minigolf|buckets?|balls)\b/.test(ctx.queryText || '')) add('range', -35, null);
   for (const c of v.collections) {
     if (ctx.collections.has(c)) add('collection', 22, c === 'hidden_gem' ? `One of ${SITE.brand}’s Hidden Gems` : `On ${SITE.brand}’s ${collectionLabel(ctx, c)} list`);
   }
@@ -1977,7 +2003,7 @@ function scoreVenue(v, ctx) {
   // plan): never for a place whose owner said All ages or that has the Kid-Friendly badge, or whose owner-picked kind is a
   // family kind; otherwise only the name or category says it (a story can mention a lounge or a bar).
   if (ctx.kids && v.type === 'indoor' && !kidsAdultSettingExempt(v) && KIDS_ADULT_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textCuisine || normWords(v.cuisine || ''), w))) add('kids_adult_setting', -40, null);
-  if (ctx.kids && v.type === 'golf' && !ctx.types.has('golf')) add('kids_golf', -15, null);
+  if (ctx.kids && v.type === 'golf' && !ctx.types.has('golf') && !askedGolfPart(v, ctx) && !(v.plannerKinds || []).includes('mini_golf')) add('kids_golf', -15, null);
   // Round 14 (2026-10-20): an indoor playground for small children is not an afternoon out for adults (Play Area Whistler
   // was day 2 of a plain Whistler weekend).
   if (!ctx.kids && v.type === 'indoor' && KIDS_ONLY_RE.test(`${v.textName || ''} ${v.textDesc || normWords(v.plannerDescription || v.description || '')}`)) add('kids_only', -30, null);
@@ -2305,6 +2331,8 @@ function publicVenue(v, ctx) {
     // Indoor test 7 (2026-11-19; Robert's card read "Indoor attraction" in one plan and "Art gallery" in another): an indoor
     // place's card always says its own kind (the owner's main kind, else its listed kind), in French too.
     ...(v.type === 'indoor' && indoorCardKind(v) ? { typeLabel: indoorCardKind(v)[0], typeLabelFr: indoorCardKind(v)[1] } : {}),
+    // Sport test 3 (2026-11-20; Gord's range read "INDOOR GOLF" / "GOLF COURSE"): a range or mini golf says what it is.
+    ...(v.type === 'golf' && !v.indoorGolf && golfPartLabel(v) ? { typeLabel: golfPartLabel(v)[0], typeLabelFr: golfPartLabel(v)[1] } : {}),
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
     // Tour test 4: no $-$$$$ tier beside a tour's own price ("Free · $$", "From $35 · $$").
     rating: v.rating, reviews: v.reviews, price: tourIsFree || tourFrom || indoorFrom || ((v.type === 'indoor' || v.kindOwn) && v.indoorFree) ? null : v.price, freeEntry: !!v.features?.free_entry || ((v.type === 'indoor' || v.kindOwn) && !!v.indoorFree), address: v.address || null,
@@ -3490,8 +3518,9 @@ function offSeasonSkip(v, ctx) {
   // its "golf season runs from early April to mid-October". An outdoor course whose description or advisory gives its
   // season is not planned outside it (to the half month: "mid-October" ends on the 15th), nor after an advisory that
   // says the season has ended, unless the request names the course.
-  if (month && v.type === 'golf' && !v.indoorGolf) {
-    const text = `${v.textDesc || ''} ${normWords((v.advisory && v.advisory.note) || '')}`;
+  if (month && v.type === 'golf' && !v.indoorGolf && !v.sportYearAll) {
+    // Sport test 3: a sentence about one part ("Mini golf is open April to mid-October") is that part's season, not the place's.
+    const text = `${v.textDesc || ''} ${normWords((v.advisory && v.advisory.note) || '')}`.replace(/\b(?:mini ?golf|mini ?putt|minigolf)\b[^.;]*/g, ' ');
     const named = normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || '').includes((v.textName || '').split(' ').slice(0, 2).join(' '));
     if (!named && [10, 11, 12, 1, 2, 3].includes(month) && /\b(?:season (?:has )?(?:ended|is over|is done|wrapped up)|closed for the (?:season|year|winter)|end of (?:the )?season)\b/.test(text)) return true;
     const g = new RegExp(`\\b(?:(early|mid|late) )?(${DESC_MONTHS.join('|')}) (?:to|through|until|thru) (?:(early|mid|late) )?(${DESC_MONTHS.join('|')})\\b`).exec(text);
@@ -3514,8 +3543,8 @@ function offSeasonSkip(v, ctx) {
       if (!inside && !named && a !== b) return true;
     }
   }
-  if (month && COLD_MONTHS.includes(month) && !v.indoorGolf && (v.indoorEvidence !== 'explicit' || ['cafe', 'restaurant'].includes(v.type)) && summerOnly(v, ctx)) return true;
-  if (!month || ctx.types.has(v.type) || (v.type === 'beach' && ctx.lake) || (v.type === 'golf' && v.indoorGolf)) return false;
+  if (month && COLD_MONTHS.includes(month) && !v.indoorGolf && !v.sportYearAll && (v.indoorEvidence !== 'explicit' || ['cafe', 'restaurant'].includes(v.type)) && summerOnly(v, ctx)) return true;
+  if (!month || ctx.types.has(v.type) || (v.type === 'beach' && ctx.lake) || (v.type === 'golf' && (v.indoorGolf || v.sportYearAll))) return false;
   return (OFF_SEASON_MONTHS[v.type] || []).includes(month);
 }
 
@@ -5117,10 +5146,14 @@ function indoorKindPlurals(ctx) {
   if (!ctx || !ctx.types || !ctx.types.has('indoor') || indoorAskedLabel(ctx.queryText, 'plural')) return [];
   return [...new Set((ctx.plannerKinds || []).filter((k) => INDOOR_KIND_PLURALS[k]).map((k) => INDOOR_KIND_PLURALS[k]))];
 }
+// Sport test 3: "Mini golf in Kelowna", "Driving ranges in Kelowna" (never "Indoor & rainy day spots" or "Golf courses").
+const GOLF_PART_PLURALS = { mini_golf: 'mini golf', driving_range: 'driving ranges' };
 function interestsText(ctx) {
   const items = [];
   const kindNames = indoorKindPlurals(ctx);
-  for (const t of ctx.types) { if (t === 'indoor' && kindNames.length) { items.push(...kindNames); continue; } items.push(typeLabel(ctx, t).toLowerCase()); }
+  const golfParts = [...new Set((ctx.plannerKinds || []).filter((k) => GOLF_PART_PLURALS[k]).map((k) => GOLF_PART_PLURALS[k]))];
+  if (golfParts.length) items.push(...golfParts);
+  for (const t of ctx.types) { if (golfParts.length && (t === 'indoor' || t === 'golf' || t === 'outdoor' || t === 'sport')) continue; if (t === 'indoor' && kindNames.length) { items.push(...kindNames); continue; } items.push(typeLabel(ctx, t).toLowerCase()); }
   for (const a of ctx.activities) items.push(activityLabel(ctx, a));
   for (const c of ctx.collections) items.push(collectionLabel(ctx, c));
   // Indoor test 6 (2026-11-19; "paint your own pottery" read "Indoor & rainy day spots, “paint” and “own”"): with an
@@ -7789,6 +7822,17 @@ function planTripUnchecked(input) {
       intent.types = (intent.types || []).filter(t => !(t === 'outdoor' && dropActs.includes('skiing')));
     }
     if (kindMust('fishing_tour') || kindMust('heli_ski') || kindMust('rentals') || kindMust('snowshoe_tour') || kindMust('boat_tour') || kindMust('ski_touring') || kindMust('avalanche_course') || kindMust('multi_day_tour') || kindMust('mountain_guide')) intent.foodTerms = intent.foodTerms.filter(f => !(f.cuisine && /^(?:fishing|salmon|sturgeon|trout|salmon fishing|fishing (?:charters?|trips?|tours?|guides?)|charters?|boat charters?|heli ?skiing|cat ?skiing|snowshoe tours?|snowshoeing|(?:equipment |gear )?rentals?|ski touring|backcountry skiing|avalanche courses?|hut trips?|mountaineering|mountain guid\w*)$/.test(normWords(f.term))));
+  }
+  // Sport test 3 (2026-11-20; "mini golf with kids" planned 8 golf courses, "driving range then dinner" a round at a
+  // course): a mini golf or driving range request is that kind, not golf courses, unless it names a course or a round too.
+  if (requirements.items.some(i => i.kind === 'venue_kind' && ['mini_golf', 'driving_range'].includes(i.value) && i.strength === 'must')) {
+    const rest = normWords(requirements.text || input.text || '').replace(/\b(?:mini ?golf\w*|minigolf|mini ?putt\w*|disc golf|crazy golf|glow golf|adventure golf|(?:golf )?driving ranges?|golf ranges?|golf balls?|golf lessons?)\b/g, ' ');
+    if (!/\bgolf\w*\b/.test(rest)) {
+      intent.types = (intent.types || []).filter(t => t !== 'golf');
+      requirements = { ...requirements, items: requirements.items.filter(i => !(i.kind === 'type' && i.value === 'golf')) };
+      input = { ...input, requirements };
+    }
+    intent.foodTerms = (intent.foodTerms || []).filter(f => !/^(?:mini ?golf|minigolf|mini ?putt|driving range|bucket of balls)$/.test(normWords(f.term)));
   }
   // Tour test 4: the same for a food tour or a walking tour (real listings have the category "Food tour").
   if (requirements.items.some(i => i.kind === 'venue_kind' && i.value === 'food_tour' && i.strength === 'must')) intent.foodTerms = intent.foodTerms.filter(f => !(f.cuisine && /^(?:food|foodie|culinary|tasting|food tasting)(?: and drink)? tours?$/.test(normWords(f.term))));

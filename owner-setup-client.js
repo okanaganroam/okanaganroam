@@ -1765,6 +1765,9 @@
     if (B.kind === 'shows') return W.shows; if (B.kind === 'classes') return W.classes;
     // Sport (2026-11-20): a golf course's, simulator's, lesson's or court's own button when people book ahead.
     var kb = (B.kindBtn || {})[indoorMainKind()]; if (kb && book !== 'no') return kb;
+    // Sport test 3: a bay booking link at a place with simulators among its kinds (server.js indoorBookButton).
+    var allK = (S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [];
+    if (B.bay && allK.indexOf('simgolf') >= 0 && new RegExp(B.bay.re, 'i').test(u)) return B.bay.word;
     return book === 'no' ? W.visit : W.book;
   }
   function bookShowsLine(url, book){ var w = bookShowsWord(url, book); return C.bookShows && T.bookShows ? '<p class="su-hint" id="suBookShows" aria-live="polite"' + (w ? '' : ' hidden') + '>' + h(w ? fill(T.bookShows, { x: w }) : '') + '</p>' : ''; }
@@ -1805,7 +1808,7 @@
   // Indoor test 3 (2026-11-19; Diane, a community theatre): the main kind (the first picked, or pre-picked), and whether it
   // is a show place (live theatre, music or comedy): it is asked about tickets, and its price is its lowest regular ticket.
   // Sport and golf (2026-11-20): the main kind's usual season's hint on the Hours step ('' for none).
-  function sportSeasonHint(){ if (!C.sport) return ''; var se = (C.kindSeasons || {})[indoorMainKind()] || ''; return se === 'summer' ? (T.seasonHintSummer || '') : se === 'winter' ? (T.seasonHintWinter || '') : ''; }
+  function sportSeasonHint(){ if (!C.sport) return ''; if (T.seasonHintKind) return T.seasonHintKind; var se = (C.kindSeasons || {})[indoorMainKind()] || ''; return se === 'summer' ? (T.seasonHintSummer || '') : se === 'winter' ? (T.seasonHintWinter || '') : ''; }
   function indoorMainKind(){ if (!C.indoor) return ''; return ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0] || ''; }
   function indoorShow(){ return indoorMainKind() === 'theatre' && !!T.ibookQShow; }
   // The story and Known for examples by the main kind (owner-setup-text.js storyExKinds / knownExKinds).
@@ -5402,6 +5405,16 @@
   // typing anywhere else, deleting, or a box that holds her own words is left exactly as it is.
   var quickJoin = function(box, prev, sibs, sep){
     var v = box.value, p0 = String(prev || '');
+    // Sport test 3 (2026-11-20; Gord tapped "Birthday parties", then typed "with mini golf for up to 20 kids": it saved as
+    // "Birthday parties. With mini golf…"): a chip's ". " (tour test 10) is a space again when the words typed right after
+    // it carry the chip on in lower case, as the distillery fix below does for a box without the ". ".
+    if (sep === '. ' && /[^.!?\s]\. $/.test(p0) && v.length > p0.length && v.slice(0, p0.length) === p0) {
+      var add0 = v.slice(p0.length);
+      if (!/^[a-zà-ÿ]/.test(add0)) return false;
+      var at0 = box.selectionStart, nv0 = (p0.replace(/\. $/, ' ') + add0).slice(0, box.maxLength > 0 ? box.maxLength : 180);
+      box.value = nv0; try { if (at0 != null) box.setSelectionRange(Math.min(nv0.length, at0 - 1), Math.min(nv0.length, at0 - 1)); } catch (e1) {}
+      return true;
+    }
     if (!p0.trim() || v.length <= p0.length || v.slice(0, p0.length) !== p0 || /[\s.,;:!?]$/.test(p0)) return false;
     var added = v.slice(p0.length);
     // A space typed first: wait for the next letter (the box still holds only the chips).

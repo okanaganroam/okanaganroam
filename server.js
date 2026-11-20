@@ -5930,6 +5930,10 @@ const SMART_ACTIVITIES = [
     re: /\baxe[- ]?throw\w*|\bhatchet[- ]?throw\w*/i },
   { key: 'mini_golf', label: 'Mini golf', labelFr: 'Minigolf', words: ['mini golf', 'minigolf', 'mini putt', 'miniature golf', 'putt putt', 'crazy golf', 'mini golfs'],
     re: /\bmini[- ]?golf\b|\bminiature golf\b|\bputt[- ]?putt\b|\bmini[- ]?putt\b|\bcrazy golf\b/i },
+  // Sport test 3 (2026-11-20; "driving range kelowna" listed the 21 golf courses): a driving range is the ranges (their
+  // owner's kind, else a golf listing named a range or whose story names one and no course), never a course's practice area.
+  { key: 'driving_range', label: 'Driving ranges', labelFr: 'Champs de pratique', words: ['driving range', 'driving ranges', 'golf range', 'golf ranges', 'practice range', 'bucket of balls', 'buckets of balls', 'hit balls', 'hit some balls', 'champ de pratique', 'champs de pratique', 'practice de golf', 'seau de balles', 'seaux de balles'],
+    types: ['golf', 'sport'], re: /\bdriving ranges?\b|\bgolf ranges?\b|\bpractice range\b/i, test: (v) => golfPartOf(v.row, 'driving_range') },
   { key: 'go_karts', label: 'Go-karts', labelFr: 'Karting', words: ['go kart', 'go karts', 'go karting', 'gokart', 'gokarts', 'go cart', 'go carts', 'karting', 'kart', 'karts'],
     re: /\bgo[- ]?karts?\b|\bgo[- ]?karting\b|\bkarting\b|\bkartplex\b/i },
   { key: 'trampoline', label: 'Trampoline parks', labelFr: 'Parcs de trampolines', words: ['trampoline', 'trampolines', 'trampoline park', 'trampoline parks', 'parc de trampolines', 'trampoline centre'],
@@ -6010,12 +6014,29 @@ function smartActivityFor(folded) {
   return best;
 }
 // The places for one activity: name matches first, then description matches; best first within each.
+// Sport test 3: a golf or sport listing's mini golf or driving range (trip-requirements.js golfPartKind: its owner's kind and
+// own words first), for search.
+function golfPartOf(row, kind) {
+  try {
+    if (!row || !['golf', 'sport', 'indoor', 'outdoor'].includes(row.type)) return false;
+    const kinds = sportSetupType(row.type) ? venueIndoorInfo(row.id).kinds : null;
+    const kf = ((venueVisitInfo(row.id) || {}).rows || []).filter((r) => r && /^known for$/i.test(r.label || '')).map((r) => r.text).join(' ');
+    const TR = require('./trip-requirements');
+    const v = { ...row, ...(Array.isArray(kinds) && kinds.length ? { sportKinds: kinds } : {}), knownFor: kf };
+    const norm = (x) => String(x || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+    return TR.golfPartKind(v, kind, norm(`${row.name || ''} ${row.description || ''}`), norm(row.name));
+  } catch (e) { return false; }
+}
 function smartActivityPick(activity, region, features) {
   const inName = (v) => activity.re.test(String(v.row.name || ''));
   return smartPickVenues((v) => {
     if ((region && v.region !== region) || !features.every((f) => v.features[f])) return false;
     if (activity.notName && activity.notName.test(String(v.row.name || ''))) return false;
     if (activity.types && !activity.types.includes(v.type)) return false;
+    // Sport test 3: the activity's own test (a driving range by its kind), else its words.
+    if (activity.test) return activity.test(v) ? (inName(v) ? `Name says ${activity.label.toLowerCase()}` : true) : false;
+    // A golf listing whose owner said what it is: mini golf only when it is one (a course's story may mention a putting area).
+    if (activity.key === 'mini_golf' && sportSetupType(v.type) && (venueIndoorInfo(v.id).kinds || []).length && !golfPartOf(v.row, 'mini_golf')) return false;
     if (inName(v)) return `Name says ${activity.label.toLowerCase()}`;
     if (activity.nameOnly) return false;
     return activity.re.test(String(v.row.description || '')) || activity.re.test(String(v.row.cuisine || '')) ? `Mentions ${activity.label.toLowerCase()}` : false;
@@ -6057,7 +6078,9 @@ const SEARCH_DATE_WORD_RE = /^(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)
 const SEARCH_KIND_ACTIVITY = { climbing: 'climbing_gym', spa: 'spa', bowling: 'bowling', escape: 'escape_room', arcade: 'arcade', museum: 'museum', theatre: 'theatre' };
 const SMART_HOLIDAY_WORDS = ['christmas day', 'xmas day', 'christmas eve', 'xmas eve', 'christmas', 'xmas', 'jour de noel', 'veille de noel', 'lendemain de noel', 'noel', 'boxing day', 'new years eve', 'new year s eve', 'nye', 'new years day',
   'new year s day', 'new years', 'jour de l an', 'veille du jour de l an', 'canada day', 'fete du canada', 'dec 24', 'dec 25', 'dec 26', 'dec 31', 'december 24', 'december 25', 'december 26', 'december 31', '24 dec', '25 dec', '26 dec', '31 dec',
-  '24 decembre', '25 decembre', '26 decembre', '31 decembre', 'jan 1', 'january 1', '1er janvier', 'july 1', '1er juillet', 'on', 'le', 'day', 'jour'];
+  '24 decembre', '25 decembre', '26 decembre', '31 decembre', 'jan 1', 'january 1', '1er janvier', 'july 1', '1er juillet', 'on', 'le', 'day', 'jour',
+  // Sport test 3 (2026-11-20): « le jour de Noël » arrives as "the day of christmas".
+  'the day of christmas', 'day of christmas', 'of', 'the'];
 const SMART_MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const SMART_MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 // Indoor test 19 (2026-11-19; Priyanka: "indoor playground kelowna december 25" said "“december” isn’t something search
@@ -6569,20 +6592,31 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
   const activity = smartActivityFor(folded);
   // Indoor test 17: a holiday named ("climbing christmas day kelowna") is that date (smartSearchHoliday).
   const hday = activity ? smartSearchHoliday(folded, now) : null;
-  if (activity && (hday || T.every((t) => SMART_ACTIVITY_TYPES.has(t))) && !intent.cuisines.length && !intent.collections.length
-    && !smartTopicWords(folded, intent, [...activity.words, ...SMART_ACTIVITY_GENERIC, ...(hday ? SMART_HOLIDAY_WORDS : [])]).length) {
+  // Sport test 3 (2026-11-20; "mini golf in july kelowna" and « mini-golf en janvier kelowna » listed the 21 golf courses):
+  // a month named keeps the activity (its words are a month for the heading, never words to search for).
+  const amonth = activity && !hday ? smartSearchMonth(folded) : null;
+  const afolded = amonth ? smartStripMonth(folded, amonth) : folded;
+  if (activity && (hday || amonth || T.every((t) => SMART_ACTIVITY_TYPES.has(t))) && !intent.cuisines.length && !intent.collections.length
+    && !smartTopicWords(afolded, intent, [...activity.words, ...SMART_ACTIVITY_GENERIC, ...(hday ? SMART_HOLIDAY_WORDS : [])]).length) {
     // Indoor test 16: a weekday named ("escape room monday kelowna"): the places open that day first, and each card says
     // the day ("Closed Mondays", "Open Mondays · 12 PM–10 PM") instead of "Open now".
     const day = hday || smartSearchDay(folded);
-    const pick = () => { const l = smartActivityPick(activity, region, F); if (!day) return l; const st = (x) => smartDayStatus(x.row, day); return l.map((x, i) => ({ x, i, s: st(x) })).sort((a, b) => ((b.s && b.s.open ? 1 : 0) - (a.s && a.s.open ? 1 : 0)) || ((a.s && !a.s.open ? 1 : 0) - (b.s && !b.s.open ? 1 : 0)) || a.i - b.i).map((o) => o.x); };
+    // Sport test 3: a place whose mini golf (or range) is closed for its own season on the day or in the month asked (or
+    // today) goes last, and its card says so ("Mini golf: April to mid-October · closed then").
+    const partKind = activity.key === 'mini_golf' || activity.key === 'driving_range' ? activity.key : null;
+    const partDate = day && day.date ? day.date : amonth ? `2027-${String(amonth.month).padStart(2, '0')}-15` : null;
+    const partShut = (x) => { if (!partKind) return null; const p = sportPartSeasons(x.row).find((q) => q.kind === partKind); return p && sportPartClosedOn(p, partDate || todayLocal(now)) ? p : null; };
+    const pick0 = () => { const l = smartActivityPick(activity, region, F); if (!partKind) return l;
+      return l.map((x) => { const p = partShut(x); return p ? { ...x, why: [x.why, `${p.en} · ${partDate ? 'closed then' : 'closed now'}`].filter(Boolean).join(' · '), rank: x.rank - 200, partShut: true } : x; }).sort((a, b) => (a.partShut ? 1 : 0) - (b.partShut ? 1 : 0) || b.rank - a.rank || String(a.row.name).localeCompare(String(b.row.name))); };
+    const pick = () => { const l = pick0(); if (!day) return l; const st = (x) => smartDayStatus(x.row, day); return l.map((x, i) => ({ x, i, s: st(x) })).sort((a, b) => ((b.s && b.s.open ? 1 : 0) - (a.s && a.s.open ? 1 : 0)) || ((a.s && !a.s.open ? 1 : 0) - (b.s && !b.s.open ? 1 : 0)) || a.i - b.i).map((o) => o.x); };
     // Round 8 (2026-10-19): the activity's guide beside its places, and its events; with no place, the guide itself.
     const guide = activity.guide ? liveGuides().find((g) => g.path === activity.guide) : null;
     if (pick().length) {
       return {
         key: activity.key,
         ...(day ? { day } : {}),
-        heading: `${activity.label}${town ? ` in ${town}` : ''}${day ? ` on ${day.en}` : ''}`,
-        headingFr: `${activity.labelFr}${town ? ` à ${town}` : ''}${day ? ` le ${day.fr}` : ''}`,
+        heading: `${activity.label}${town ? ` in ${town}` : ''}${day ? ` on ${day.en}` : amonth ? ` in ${amonth.en}` : ''}`,
+        headingFr: `${activity.labelFr}${town ? ` à ${town}` : ''}${day ? ` le ${day.fr}` : amonth ? ` en ${amonth.fr}` : ''}`,
         guides: guide ? [{ path: guide.path, heading: guide.heading }] : [],
         list: pick,
         ...(activity.events ? { events: () => searchEventsFor({ regions: R, test: activity.eventTest || ((e) => activity.re.test(`${e.name || ''} ${e.description || ''}`)), rank: activity.eventRank || null, now }) } : {}),
@@ -7551,7 +7585,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // Hours checked after the place's closure was recorded are its season's hours (2026-10-25: on-mountain dining).
       ...(v.hours_checked_at && seasons.has(v.id) && seasons.get(v.id).checked_at && String(v.hours_checked_at).slice(0, 10) >= String(seasons.get(v.id).checked_at).slice(0, 10) ? { seasonHours: true } : {}),
       indoorGolf: v.type === 'golf' && golfSimVenue(v),
-      plannerKinds: preparePlannerKinds ? [...requirementModule.inferPlannerKinds({ ...v, activities: m.activities, ...(v.type === 'sport' && sportSetupType('sport') && (venueIndoorInfo(v.id).kinds || []).length ? { sportKinds: venueIndoorInfo(v.id).kinds } : {}), ...(knownForById.has(v.id) ? { knownFor: knownForById.get(v.id) } : {}), ...(v.type === 'tour' && tourPlannerFacts(v.id).tourItems ? { tourItems: tourPlannerFacts(v.id).tourItems } : {}), ...(v.type === 'tour' && Array.isArray(venueTourInfo(v.id).kinds) ? { tourKinds: venueTourInfo(v.id).kinds } : {}), ...(v.type === 'indoor' && Array.isArray(venueIndoorInfo(v.id).kinds) ? { indoorKinds: venueIndoorInfo(v.id).kinds } : {}), ...(v.type === 'tour' ? (({ tourLength, tourMultiDay }) => ({ tourLength, tourMultiDay }))(tourPlannerFacts(v.id)) : {}) }), ...(v.type === 'shop' ? ['shopping'] : []), ...(/\b(?:farm|farms|u-?pick|orchard)\b/i.test(`${v.name || ''} ${v.cuisine || ''}`) ? ['farm'] : []), ...(/\bhorse\w*|trail rides?\b/i.test(v.cuisine || '') ? ['horseback'] : [])] : [],
+      plannerKinds: preparePlannerKinds ? [...requirementModule.inferPlannerKinds({ ...v, activities: m.activities, ...(sportSetupType(v.type) && (venueIndoorInfo(v.id).kinds || []).length ? { sportKinds: venueIndoorInfo(v.id).kinds } : {}), ...(knownForById.has(v.id) ? { knownFor: knownForById.get(v.id) } : {}), ...(v.type === 'tour' && tourPlannerFacts(v.id).tourItems ? { tourItems: tourPlannerFacts(v.id).tourItems } : {}), ...(v.type === 'tour' && Array.isArray(venueTourInfo(v.id).kinds) ? { tourKinds: venueTourInfo(v.id).kinds } : {}), ...(v.type === 'indoor' && Array.isArray(venueIndoorInfo(v.id).kinds) ? { indoorKinds: venueIndoorInfo(v.id).kinds } : {}), ...(v.type === 'tour' ? (({ tourLength, tourMultiDay }) => ({ tourLength, tourMultiDay }))(tourPlannerFacts(v.id)) : {}) }), ...(v.type === 'shop' ? ['shopping'] : []), ...(/\b(?:farm|farms|u-?pick|orchard)\b/i.test(`${v.name || ''} ${v.cuisine || ''}`) ? ['farm'] : []), ...(/\bhorse\w*|trail rides?\b/i.test(v.cuisine || '') ? ['horseback'] : [])] : [],
       nights: nightsFact(v),
       specials: specialsFact(v),
       plannerDescription: preparePlannerKinds ? v.description || '' : null,
@@ -7568,7 +7602,11 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // Sport and golf (2026-11-20): the same owner answers once the owner has given any (kindOwn: the planner reads them as
       // it reads an indoor place's: the price in its kind's words, Free, the minimum age, walk-ins or book ahead).
       // Their kinds are not indoor kinds: they never decide an indoor request (sportKinds carries them).
-      ...(sportSetupType(v.type) && Object.keys(venueIndoorInfo(v.id)).length ? (() => { const f = indoorPlannerFacts(v.id); delete f.indoorKinds; const bw = indoorKindsModule.SPORT.BOOK_WORDS[(venueIndoorInfo(v.id).kinds || [])[0]]; const note = bw && bw.notes && bw.notes[venueIndoorInfo(v.id).book]; return { ...f, ...(Array.isArray(venueIndoorInfo(v.id).kinds) ? { sportKinds: venueIndoorInfo(v.id).kinds.slice() } : {}), ...(note ? { indoorBookNote: note[0] } : {}), kindOwn: true }; })() : {}),
+      ...(sportSetupType(v.type) && Object.keys(venueIndoorInfo(v.id)).length ? (() => { const f = indoorPlannerFacts(v.id); delete f.indoorKinds; const bw = indoorKindsModule.SPORT.BOOK_WORDS[(venueIndoorInfo(v.id).kinds || [])[0]]; const note = bw && bw.notes && bw.notes[venueIndoorInfo(v.id).book]; return { ...f, ...(Array.isArray(venueIndoorInfo(v.id).kinds) ? { sportKinds: venueIndoorInfo(v.id).kinds.slice() } : {}), ...(note ? { indoorBookNote: note[0] } : {}), ...(venueIndoorInfo(v.id).year === 'all' ? { sportYearAll: true } : {}), kindOwn: true }; })() : {}),
+      // Sport test 3 (2026-11-20; Gord: "Mini golf April to mid-October", the range all year): the season of one part of the
+      // place, read from the owner's own words (sportPartSeasons), so a mini golf request outside it leaves the place out
+      // while a driving range request keeps it.
+      ...(sportSetupType(v.type) && sportPartSeasons(v).length ? { partSeasons: sportPartSeasons(v).map((x) => ({ kind: x.kind, from: x.from, to: x.to })) } : {}),
       // Indoor test 3 (2026-11-19): a show place's own show days and time (its Known for, then its story) and its dated
       // shows on What's On, so Build My Trip never calls it "Closed" on a night its own words or a listed show say it plays.
       ...(v.type === 'indoor' && indoorShowPlace(venueIndoorInfo(v.id)) ? (() => {
@@ -8083,6 +8121,36 @@ function runTripPlan(args, now = new Date()) {
   try { plan = tripShowPlacesFallback(plan, args); } catch (e) { console.error(`[trip] show places: ${e.message}`); }
   try { plan = tripKindClosureNotes(plan, args, now); } catch (e) { console.error(`[trip] kind closures: ${e.message}`); }
   try { plan = tripIndoorGolfWords(plan, args); } catch (e) { console.error(`[trip] indoor golf words: ${e.message}`); }
+  try { plan = tripGolfPartSeasonNotes(plan, args, now); } catch (e) { console.error(`[trip] part seasons: ${e.message}`); }
+  return plan;
+}
+// Sport test 3 (2026-11-20; "mini golf with kids on Saturday" in November left Gord's range out with no word): a mini golf
+// (or driving range) request on a day that part of a place is closed by its owner's own words says so by name, with the
+// day it reopens: "Mini golf is closed for the season at Kelowna Driving Range & Mini Golf (reopens Apr 1)."
+function tripGolfPartSeasonNotes(plan, args, now) {
+  if (!plan || args.swap || args.pinned) return plan;
+  let en = String(args.text || '');
+  try { en = tripPlannerFrModule().tripPlannerText(en, buildTripPlannerTaxonomy()); } catch (e) { /* as typed */ }
+  const TR = require('./trip-requirements');
+  const asked = ['mini_golf', 'driving_range'].filter((k) => TR.KINDS[k].test(normalizeTripParserText(en)));
+  if (!asked.length) return plan;
+  const di = discoveryIntentModule();
+  try { en = (di.fixedHolidayDates || ((x) => x))((di.plainRelativeDates || ((x) => x))(en, now), now); } catch (e) { /* as typed */ }
+  let cal = null; try { cal = TR.tripCalendar(en, todayLocal(now)); } catch (e) { cal = null; }
+  const date = (plan.schedule || []).map((r) => r && r.date).find(Boolean) || plan.listDate || (cal && cal.startDate ? cal.startDate : null);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return plan;
+  const own = ((plan.overview && plan.overview.regions) || []).map((r) => r && r.slug).filter(Boolean);
+  const M = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const said = [...(plan.warnings || []), ...(plan.notes || [])].join(' \n ');
+  const add = [];
+  for (const v of db.prepare(`SELECT * FROM venues WHERE type IN ('golf', 'sport') AND redirect_to IS NULL${own.length ? ` AND region IN (${own.map(() => '?').join(',')})` : ''} ORDER BY name`).all(...own)) {
+    for (const p of sportPartSeasons(v)) {
+      if (!asked.includes(p.kind) || !sportPartClosedOn(p, date) || said.includes(v.name)) continue;
+      const [mo, d] = p.from.split('-').map(Number);
+      add.push(`${p.kind === 'mini_golf' ? 'Mini golf' : 'The driving range'} is closed for the season at ${v.name} (reopens ${M[mo - 1]} ${d}).`);
+    }
+  }
+  if (add.length) plan.warnings = add.slice(0, 3).concat(plan.warnings || []);
   return plan;
 }
 // Sport test 2 (2026-11-20; "golf simulator saturday night then drinks": "Golf courses" over a simulator stop): when every
@@ -11896,6 +11964,8 @@ const VISIT_LABELS_FR = {
   'Winter': 'Hiver', 'Tours': 'Visites', 'Games': 'Jeux', 'To go': 'À emporter', 'Kids & dogs': 'Enfants et chiens',
   'Reservations': 'Réservations', 'Menu': 'Menu', 'Dietary': 'Régimes alimentaires', 'Patio': 'Terrasse', 'Takeout': 'À emporter',
   'The hike': 'La randonnée', 'Dogs': 'Chiens', 'Parking': 'Stationnement', 'Best season': 'Meilleure saison', 'Before you go': 'Avant de partir', 'Trail map': 'Carte du sentier',
+  // Sport test 3 (2026-11-20): research's golf and sport lines.
+  'Practice': 'Pratique', 'Lessons': 'Cours', 'Also': 'Aussi', 'Rentals': 'Location', 'Passes': 'Cartes', 'Leagues': 'Ligues', 'Memberships': 'Abonnements',
 };
 function visitLabelFr(label) { return VISIT_LABELS_FR[label] || frLookup(label) || label; }
 // ---------- Preset answers in the page's language (café test 6, 2026-11-12) ----------
@@ -12154,7 +12224,9 @@ function visitInfoHtml(info, fr = false, opts = {}) {
     // Sport test 2 (2026-11-20; Trevor's French page lost research's "Food: Full bar with beer on tap… Pizza is available in
     // store", which the English page keeps): on an indoor or sport page research's Food line shows as written (English)
     // until its French is written, as her own lines do.
-    const keepEn = (r) => kindSetupType(opts.type) && VISIT_KEEP_RESEARCH_RE.test(String(r.label || '')) && typeof r.text === 'string' && r.text.trim() ? r.text : null;
+    // Sport test 3 (2026-11-20; Gord's French page lost research's "Practice: 300-yard range… winter bucket $16", sport test 2
+    // #15 again): its practice, rentals, lessons and passes lines too (the price lines PENDING_PRICE_ROW_RE names).
+    const keepEn = (r) => kindSetupType(opts.type) && (VISIT_KEEP_RESEARCH_RE.test(String(r.label || '')) || PENDING_PRICE_ROW_RE.test(String(r.label || ''))) && typeof r.text === 'string' && r.text.trim() ? r.text : null;
     const ownLine = (r) => (mineFr.has(r.label) && typeof r.text === 'string' && r.text.trim() ? (kindSetupType(opts.type) && !isPresetAnswer(r.text) ? r.text : presetAnswer(r.text, 'fr')) : keepEn(r));
     const rowsFr = info.rows.map((r) => ({ ...r, text: r.__frOwn ? r.text : ownFr[r.label] && ownFr[r.label].en === r.text && ownFr[r.label].fr ? ownFr[r.label].fr : (typeof r.text === 'string' ? presetOrFr(r.text, visitTextFr) : visitTextFr(r.text)) ?? ownLine(r), label: visitLabelFr(r.label), __en: r.label })).filter((r) => r.text != null);
     if (!rowsFr.length) return '';
@@ -22532,7 +22604,11 @@ function cafeServesBeerWine(venueId) { const s = venueCafeInfo(venueId).serves; 
 // mini golf gets it when its own words or badges say it has a bar. Never any other sport kind. It is the same happy hour
 // storage and editor as every other type, so the researched golf happy hours stay editable.
 const GOLF_HAPPY_KINDS = ['golf', 'simgolf'];
-const GOLF_BAR_WORDS_RE = /\b(?:bar|bars|licensed|lounge|pub|bistro|beer|beers|wine|cocktails?|taps?|happy hour|clubhouse restaurant|restaurant|grill|patio)\b/i;
+// Sport test 3 (2026-11-20; Gord's "Snack bar with pop, coffee and ice cream" turned the tile on for a no-alcohol family
+// range): real bar or lounge words only. A bare "bar" counts unless it is a snack, juice, coffee, salad, candy or similar
+// bar; "grill", "patio" and "restaurant" alone are not a bar. Words saying no alcohol win.
+const GOLF_BAR_WORDS_RE = /\b(?:licensed|lounge|pub|bistro|(?<!root |ginger |no )beers?|(?<!no )wine|cocktails?|on tap|taps|happy hour|full bar|sports bar|patio bar|bar (?:&|and) grill|(?<!(?:snack|juice|coffee|espresso|salad|granola|candy|chocolate|smoothie|protein|cereal|oxygen|ice cream|yogurt|yoghurt|breakfast|taco|nacho|popcorn|treat|slushie?|dessert|cookie|sundae|tea|kids|kid’s|kids’|kid's|kids')\s)bars?)\b/i;
+const GOLF_NO_ALCOHOL_RE = /\b(?:no alcohol|alcohol[- ]free|not licensed|unlicensed|no liquor|dry (?:facility|venue)|no beer)\b|\bsans alcool\b/i;
 function golfHappyHourKind(venue) {
   try {
     if (!venue || !sportSetupType(venue.type)) return false;
@@ -22544,7 +22620,8 @@ function golfHappyHourKind(venue) {
     if (k !== 'range') return false;
     if (Number(v.happy_hour) === 1) return true;
     const rows = ((venueVisitInfo(v.id) || {}).rows || []).map((r) => `${r.label} ${r.text}`).join(' ');
-    return GOLF_BAR_WORDS_RE.test(`${v.name || ''} ${v.description || ''} ${rows}`);
+    const words = `${v.name || ''} ${v.description || ''} ${rows}`;
+    return GOLF_BAR_WORDS_RE.test(words) && !GOLF_NO_ALCOHOL_RE.test(words);
   } catch (e) { return false; }
 }
 function happyHourAllowed(venue) { if (venue && sportSetupType(venue.type)) return golfHappyHourKind(venue); return !!venue && (!!portalFields(venue.type).happyHour || (venue.type === 'cafe' && cafeServesBeerWine(venue.id))); }
@@ -25825,6 +25902,7 @@ function indoorPartyBooking(venue, bookingUrl) {
 // Indoor test 13 (2026-11-19): the page's link button by kind and booking answer: "Showtimes & tickets" (cinemas and
 // theatres), "Class schedule" (class kinds), "Book a party" (a walk-in place's party page), "Book a visit" (a walk-in
 // place's booking page), else "Book". -> [en, fr].
+const SPORT_BAY_URL_RE = /alleytrak|trackman|toptracer|golfsim|sim-?golf|\bbays?\b|simulator/i;
 function indoorBookButton(venue, bookingUrl) {
   const B = indoorKindsModule.INDOOR_BOOK_BUTTONS;
   try {
@@ -25832,6 +25910,9 @@ function indoorBookButton(venue, bookingUrl) {
     const t = venueIndoorInfo(venue.id), k = indoorKindsModule.indoorKindText(t.kinds, 'en');
     // Sport (2026-11-20): a tee-time, bay, lesson or court booking page says so ("Book a tee time").
     if (k.bookBtn && t.book !== 'no' && !INDOOR_WAIVER_URL_RE.test(String(bookingUrl || ''))) return k.bookBtn;
+    // Sport test 3 (2026-11-20; Gord's range: his Trackman bay booking said "Book a visit"): a place with simulators among
+    // its kinds whose link is a bay booking (its address says Trackman, bays or a bay booking system) says "Book a bay".
+    if (sportSetupType(venue.type) && (t.kinds || []).includes('simgolf') && SPORT_BAY_URL_RE.test(String(bookingUrl || ''))) return indoorKindsModule.SPORT.K.simgolf.bookBtn;
     // Indoor test 17 (2026-11-19; Megan pasted her waiver link): a waiver link says so.
     if (INDOOR_WAIVER_URL_RE.test(String(bookingUrl || ''))) return B.waiver;
     if (indoorPartyBooking(venue, bookingUrl)) return B.party;
@@ -31472,11 +31553,29 @@ function isIndoorGolfVenue(venue) {
 // winter rule and the card's price words. isIndoorGolfVenue (above) still decides which listings the /indoor pages list
 // (no listing moves on a town or category page): Okanagan Virtual Golf Penticton ("virtual golf", "three bays… launch
 // monitor") is a simulator here.
+// Sport test 3 (2026-11-20; Gord's driving range and mini golf, with one indoor Trackman bay as his second kind, planned as
+// "INDOOR GOLF" and ranked behind the courses): only the owner's MAIN kind (the first he picked) decides. A second kind
+// never makes a range a simulator.
 function golfSimVenue(v) {
   if (!v || v.type !== 'golf') return false;
-  if (isIndoorGolfVenue(v)) return true;
-  try { const k = venueIndoorInfo(v.id).kinds || []; if (k.length) return k.includes('simgolf'); } catch (e) { /* by its words */ }
-  return /\b(?:virtual golf|golf lounge|sim lounge|sim golf|launch monitors?|trackman|golfbox)\b/i.test(`${v.name || ''} ${v.cuisine || ''} ${v.description || ''}`);
+  return sportMainKind(v) === 'simgolf';
+}
+const GOLF_SIM_WORDS_RE = /\b(?:virtual golf|golf lounge|sim lounge|sim golf|launch monitors?|trackman|golfbox)\b/i;
+// Sport test 3 (2026-11-20; the audit after three tests found words and behaviour keyed on the listing TYPE golf, not the
+// owner's kind: "Green fees" on a range's price list, a range planned as a golf course or a simulator): a sport or golf
+// listing's MAIN kind, the one every kind-keyed word and rule reads (sport-kinds.js). The owner's first pick, else (a golf
+// listing nobody has set up) what its name says, then its words: a simulator, a range or mini golf, else a golf course.
+// '' for a sport listing with no owner kind (its words are too broad to guess).
+function sportMainKind(v) {
+  if (!v || !sportSetupType(v.type)) return '';
+  try { const k = (venueIndoorInfo(v.id).kinds || [])[0]; if (k && indoorKindsModule.SPORT.K[k]) return k; } catch (e) { /* by its words */ }
+  if (v.type !== 'golf') return '';
+  const name = String(v.name || '').toLowerCase();
+  for (const [k, re] of indoorKindsModule.SPORT.SPORT_KIND_HINTS) if (['simgolf', 'range', 'golf'].includes(k) && re.test(name)) return k;
+  // A range or mini golf whose story also names a simulator bay further on is still a range.
+  const rangeFirst = /\b(?:driving range|mini[- ]?golf|mini[- ]?putt)\b/i.test(String(v.description || '').slice(0, 200));
+  if (!rangeFirst && (isIndoorGolfVenue(v) || GOLF_SIM_WORDS_RE.test(`${v.cuisine || ''} ${v.description || ''}`))) return 'simgolf';
+  return indoorKindsModule.sportKindSuggestion(v).find((k) => ['golf', 'simgolf', 'range'].includes(k)) || 'golf';
 }
 // Indoor & Rainy Day hub (2026-10-11): the golf venues that are indoor
 // simulators, listed on /indoor in their own section (they keep type golf
@@ -31533,7 +31632,7 @@ function golfOwnerFee(v) {
 // French hub translates it (INDOOR_BASIS_FR).
 function golfCardBasis(v, hubKind) {
   let k = '';
-  try { const kinds = sportSetupType(v.type) ? venueIndoorInfo(v.id).kinds : []; k = (kinds || []).find((x) => indoorKindsModule.SPORT.K[x]) || ''; } catch (e) { k = ''; }
+  try { const kinds = sportSetupType(v.type) ? venueIndoorInfo(v.id).kinds : []; k = (kinds || []).length && indoorKindsModule.SPORT.K[kinds[0]] ? kinds[0] : ''; } catch (e) { k = ''; }
   if (!k) k = hubKind === 'simulators' || golfSimVenue(v) ? 'simgolf' : hubKind === 'practice' ? 'range' : 'golf';
   const e = indoorKindsModule.SPORT.K[k] || indoorKindsModule.SPORT.K.golf;
   return e.en.price.basis;
@@ -42778,6 +42877,15 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   }
   // Tour test 13 (Whistler, 2026-11-18; Matthias): "Every trip is weather permitting" under the hours, and "Closed for the
   // season (trips by request)" when he ticked off-season trips by request.
+  // Sport test 3 (2026-11-20; Gord: mini golf April to mid-October, the range all year; Dayton: no new field): the season
+  // of one part of the place, from the owner's own words, goes with the hours ("Mini golf: April to mid-October").
+  if (sportSetupType(venue.type) && !venue.redirect_to) {
+    const parts = sportPartSeasons(venue);
+    if (parts.length) {
+      const pl = parts.map((x) => `<p class="venue-season venue-season-part" style="margin:0 0 10px;font-weight:700">${escapeHtml(fr ? x.fr : x.en)}</p>`).join('');
+      hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${pl}`) : `<h2>${L('Season', 'Saison')}</h2>${pl}`;
+    }
+  }
   if (venue.type === 'tour' && tourWeatherAll(venue.id)) {
     const wl = `<p class="venue-hours-weather">${L('Every trip is weather permitting.', 'Chaque sortie dépend de la météo.')}</p>`;
     hoursHtml = hoursHtml ? hoursHtml.replace('</h2>', `</h2>${wl}`) : `<h2>${L('Hours', 'Heures')}</h2>${wl}`;
@@ -43271,7 +43379,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
 
   const relatedHtml = relatedVenues.length
     ? `<div class="related-section">
-        <h2>${fr ? `Autres ${escapeHtml(label.plural.toLowerCase())} \u00e0 ${escapeHtml(regionLabel)}` : `Other ${escapeHtml(label.plural.toLowerCase())} in ${escapeHtml(regionLabel)}`}</h2>
+        <h2>${fr ? `Autres ${escapeHtml(label.plural.toLowerCase())} \u00e0 ${escapeHtml(regionLabel)}` : `Other ${escapeHtml((sportHubPlural(venue) || label.plural).toLowerCase())} in ${escapeHtml(regionLabel)}`}</h2>
         <div class="related-grid">${relatedVenues.map(relatedCard).join('')}</div>
       </div>`
     : '';
@@ -43464,6 +43572,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     actions:ctaEntries, ctaRowAttrs, guideLinks, nearbyCards:fdNearbyCards,
     visitorHtml:visitorSectionHtml(venue, 'en'), gallery:galleryHtml ? galleryHtml.phone(creditHtml) : '',
     park:parkLayout, regionLabel, categorySlug:catSlug, openStatusHtml: `${openStatusHtml}${happyHourHtml}`, glanceHtml:hikeGlanceHtml,
+    // Sport test 3: "Near the course" only on a golf course's page.
+    ...(venue.type === 'golf' && sportHubPlural(venue) ? { nearbyHeading: 'More to do nearby ✨' } : {}),
     chipsHtml:`${cvChipHtml}${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}`, descriptionHtml:'<p class="venue-description">' + escapeHtml((placeLayout && editorial ? editorial.intro : trimVenueTagline(venue.description)) || '') + '</p>',
     locationHtml, detailRows, hoursHtml:showDatesHtml || hoursHtml, visitHtml, eventsHtml:venueEventsHtml, ownerCtaHtml,
     // Indoor test 5 (2026-11-19): an outdoor or sport place's own typed prices too (the French page already shows them).
@@ -43551,7 +43661,7 @@ ${fdLayout ? '<link rel="stylesheet" href="/food-drink-venue.css?v=' + crypto.cr
   ${venueEventsHtml ? `${venueEventsHtml}\n  ` : ''}${nearbyStripHtml ? `${nearbyStripHtml}\n  ` : ''}${relatedHtml}
   ${nearbyHtml}
 `}
-  <a class="cta secondary" href="/${venue.region}/${catSlug}">${fr ? `Retour aux ${escapeHtml(label.plural.toLowerCase())} \u00e0 ${escapeHtml(regionLabel)}` : `Back to ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}`}</a>
+  <a class="cta secondary" href="/${venue.region}/${catSlug}">${fr ? `Retour aux ${escapeHtml(label.plural.toLowerCase())} \u00e0 ${escapeHtml(regionLabel)}` : `Back to ${escapeHtml(sportHubPlural(venue) || label.plural)} in ${escapeHtml(regionLabel)}`}</a>
   <a class="cta secondary" href="/${venue.region}">${fr ? `Tout d\u00e9couvrir \u00e0 ${escapeHtml(regionLabel)}` : `Explore all of ${escapeHtml(regionLabel)}`}</a>
   ${themedShell ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
@@ -52979,6 +53089,7 @@ function indoorGroupsFound(venueId) {
 }
 // Writes the owner's lines into the stored box (an Undo writes the old ones back). Rows the owner left alone (Menu,
 // Patio...) and the booking button stay. A changed line loses its old "More" link. -> the new info JSON (or null).
+function capTypeOf(venueId) { try { return (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || ''; } catch (e) { return ''; } }
 function writeOwnerVisitRows(venueId, value, now = new Date()) {
   const cur = venueVisitInfo(venueId);
   const before = currentVisitInfoJson(venueId);
@@ -52987,6 +53098,7 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   const slotLabels = new Set(OWNER_VISIT_SLOTS.filter((x) => x.key !== 'menu').flatMap((x) => x.labels));
   const confirmed = new Set(Array.isArray((value || {})._confirm) ? value._confirm : []);
   const SLOTS = visitSlotsFor(venueId);
+  const keptResearch = [];
   // Winery test 4 (2026-11-12): research's line that an owner's line replaces or clears is kept (owner_was), so an Undo
   // puts research's line back as research's (the "No dogs allowed" answer clears research's Dogs line). A winery's
   // answer lines (Groups...) keep theirs in writeWineryVisitRows.
@@ -53015,6 +53127,21 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
       continue;
     }
     if (i >= 0 && !owned.has(label) && !WINERY_MANAGED_LABELS.includes(label) && !was[label]) was[label] = { text: old, ...(rows[i].url ? { url: rows[i].url } : {}) };
+    // Sport test 3 (2026-11-20; Gord's Groups line: a size tap, two chips and his words passed 240, the setup took
+    // research's "Lessons with golf pro Steve Lawrence, plus a pro shop…" out to fit, and it was gone from his page; sport
+    // test 2's longer box only helped when the sentence fit): on an indoor or sport page, research's sentences that his
+    // Groups line leaves out are kept on the page as their own line ("Lessons"), never lost. Every path (the chips' trim,
+    // his own edit, the edit page) saves through here.
+    // (Research's Groups line may sit set aside by a full box: owner_dropped, not hers. That was the path left out.)
+    const resGroups = slot.key === 'groups' && next ? (i >= 0 && !owned.has(rows[i].label) ? old : ((cur && Array.isArray(cur.owner_dropped) ? cur.owner_dropped : []).find((r) => r && !r.owned && !r.kept && r.label === 'Groups') || {}).text || '') : '';
+    if (resGroups && kindSetupType(capTypeOf(venueId))) {
+      const core = (x) => String(x || '').toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, ' ').trim();
+      // A sentence of research's he kept or reworded (any three words of it in a row are in his line) is his now.
+      const said = ` ${core(next)} `;
+      const reworded = (x) => { const w = core(x).split(' '); for (let j = 0; j + 2 < w.length; j++) if (said.includes(` ${w[j]} ${w[j + 1]} ${w[j + 2]} `)) return true; return false; };
+      const left = String(resGroups).split(/(?<=[.;!?])\s+/).map((x) => x.trim()).filter((x) => x && core(x).length > 12 && !reworded(x));
+      if (left.length) keptResearch.push({ label: /\b(?:lessons?|pros?|coach\w*|clinics?|instruct\w*|academy)\b/i.test(left.join(' ')) ? 'Lessons' : /\brent\w*\b/i.test(left.join(' ')) ? 'Rentals' : 'Also', text: left.join(' '), kept: true });
+    }
     if (next) {
       if (i >= 0) rows[i] = { label, text: next }; else rows.push({ label, text: next });
     } else if (i >= 0) rows.splice(i, 1);
@@ -53030,9 +53157,14 @@ function writeOwnerVisitRows(venueId, value, now = new Date()) {
   // Tour test 5 (Whistler, 2026-11-17): a research row is not hers just because its label is one of the answer slots
   // (research's "Good to know: Free parking at the marina…" kept the box while Rob's own Dogs line was set aside, until he
   // typed his own Good to know). Her lines (owned) come first; research fills what is left (all types).
-  const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash, (r) => badgeOk.has(r.label), capType);
+  for (const k of keptResearch) if (!rows.some((r) => r.label === k.label) && !stash.some((r) => r && r.label === k.label)) stash.push(k);
+  const keptLabels = new Set([...keptResearch.map((k) => k.label), ...stash.filter((r) => r && r.kept).map((r) => r.label), ...((cur && Array.isArray(cur.kept_labels)) ? cur.kept_labels : [])]);
+  const dropped = visitCapRows(rows, (r) => owned.has(r.label), owned, new Set((cur && cur.winery_labels) || []), stash, (r) => badgeOk.has(r.label) || keptLabels.has(r.label), capType);
   const info = { ...(cur || { booking_url: null, source_url: null }), rows, checked_at: todayLocal(now), owner_labels: [...owned].sort() };
   if (dropped.length) info.owner_dropped = dropped; else delete info.owner_dropped;
+  // Sport test 3: research's sentences kept from her Groups line stay kept on every later save.
+  const keptNow = [...keptLabels].filter((l) => rows.some((r) => r.label === l) || dropped.some((r) => r.label === l));
+  if (keptNow.length) info.kept_labels = keptNow; else delete info.kept_labels;
   if (Object.keys(was).length) info.owner_was = was; else delete info.owner_was;
   // Restaurant test 2 (2026-11-14): her French lines (`_fr`), exactly as sent; a value without `_fr` leaves them as they are.
   if (value && value._fr && typeof value._fr === 'object' && !Array.isArray(value._fr)) {
@@ -57247,7 +57379,11 @@ const MENU_VENUE_TYPES = portalTypesWith('menu');
 function menuKind(venue) {
   if (!venue) return 'menu';
   if (venue.type === 'tour') return 'tours';
-  if (venue.type === 'golf') return isIndoorGolfVenue(venue) ? 'prices' : 'golf';
+  // Sport test 3 (2026-11-20; Gord's driving range read "Green fees" on his price list, page and prices page): a golf
+  // course's words only when the owner's main kind is a golf course (sportMainKind); a range, simulator or any other kind
+  // has a price list in its own words (priceListWordsFor).
+  if (sportSetupType(venue.type) && sportMainKind(venue) === 'golf') return 'golf';
+  if (venue.type === 'golf') return isIndoorGolfVenue(venue) || sportMainKind(venue) ? 'prices' : 'golf';
   return venue.type === 'indoor' || venue.type === 'sport' || sportSetupType(venue.type) ? 'prices' : 'menu';
 }
 function isPriceList(venue) { return menuKind(venue) !== 'menu'; }
@@ -57270,6 +57406,16 @@ const PRICE_LIST_WORDS = {
     schema: 'Service',
   },
 };
+// Sport test 3 (2026-11-20): a sport or golf listing's price list in its main kind's words (sport-kinds.js prices.page):
+// a golf course "Green fees & rates", ski lessons "Lessons & rates", every other kind "Prices & rates" / « Tarifs ».
+function priceListWordsFor(venue) {
+  const w = PRICE_LIST_WORDS[menuKind(venue)];
+  const k = w && venue && sportSetupType(venue.type) ? sportMainKind(venue) : '';
+  const e = k && k !== 'golf' ? indoorKindsModule.SPORT.K[k] : null;
+  if (!e || e.en.prices.page === PRICE_LIST_WORDS.prices.en.noun) return w;
+  const en = e.en.prices.page, fr = e.fr.prices.page;
+  return { ...w, en: { ...w.en, noun: en, title: en.replace(/\b\w/g, (c) => c.toUpperCase()), list: en.toLowerCase() }, fr: { ...w.fr, noun: fr, listHtml: `vos ${fr.toLowerCase()}` } };
+}
 const MENU_MAX_PAGES = 10;
 const MENU_JPEG_MAX_BYTES = 4 * 1024 * 1024;
 const MENU_PDF_MAX_BYTES = 10 * 1024 * 1024;
@@ -57848,7 +57994,7 @@ function buildMenuEmail(venue, menu, kind, extra = {}) {
   const fields = {
     _subject: kind === 'help' && menu.help_kind === SETUP_FR_LINES_KIND ? `[TRANSLATE] ${venue.name}: write the French for their own Good to know, Groups or Known for lines`
       : kind === 'help' && menu.help_kind === SETUP_FR_STORY_KIND ? `[TRANSLATE] ${venue.name} asked us to write their French description from their English story`
-      : kind === 'help' ? (SETUP_NOTE_KINDS.includes(menu.help_kind) ? `[FIND LINK] ${venue.name} told us their ${SETUP_SHEET_WORDS[menu.help_kind]}: please find the link` : menu.help_kind ? `[TYPE IT UP] ${venue.name} sent their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind} to type up` : `[MENU HELP] ${venue.name} asked us to type up their ${isPriceList(venue) ? PRICE_LIST_WORDS[menuKind(venue)].en.list : 'menu'}`)
+      : kind === 'help' ? (SETUP_NOTE_KINDS.includes(menu.help_kind) ? `[FIND LINK] ${venue.name} told us their ${SETUP_SHEET_WORDS[menu.help_kind]}: please find the link` : menu.help_kind ? `[TYPE IT UP] ${venue.name} sent their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind} to type up` : `[MENU HELP] ${venue.name} asked us to type up their ${isPriceList(venue) ? priceListWordsFor(venue).en.list : 'menu'}`)
       : `${kind === 'pending' ? '[PENDING REVIEW]' : '[LIVE]'} ${menuNoun(venue)} from ${venue.name} (${venue && venue.type === 'tour' ? menuTripCountText(venue, parseMenuData(menu.data), 'en') : menuDishCountText(items, 'en', menuKind(venue))})`,
     _template: 'table',
     _captcha: 'false',
@@ -58541,15 +58687,24 @@ function indoorFirstItemName(venue, lang) {
 }
 function indoorMenuAppStrings(venue, lang) {
   const t = venueIndoorInfo(venue.id);
-  const w = indoorKindsModule.indoorTyperWords(t.kinds || indoorKindSuggestion(venue), lang, { per: t.per, own: indoorOwnWords(venue.id) });
+  const kinds = (t.kinds || []).length ? t.kinds : sportSetupType(venue.type) ? [sportMainKind(venue) || 'sportother'] : indoorKindSuggestion(venue);
+  const own = indoorOwnWords(venue.id);
+  const w = indoorKindsModule.indoorTyperWords(kinds, lang, { per: t.per, own });
   if (!w) return {};
   const E = escapeHtml;
+  // Sport test 3 (2026-11-20; Gord's range: "like 18 holes, weekday", "like 75"): a sport kind's own example line and price,
+  // and a range whose own words say mini golf too names both ("like Small bucket, or Mini golf, adults").
+  const sk = sportSetupType(venue.type) ? indoorKindsModule.sportKindKey(kinds) : '';
+  const both = sk === 'range' && (indoorKindsModule.indoorKindLabel('range', own) || [])[0] === indoorKindsModule.SPORT.LABEL_PARTS.range.both[0];
+  const item = both ? (lang === 'fr' ? 'Petit seau, ou Mini-golf, adulte' : 'Small bucket, or Mini golf, adults') : w.item;
+  const px = sk ? indoorKindsModule.SPORT.EX_PRICE[sk] : null;
+  const section = both ? (lang === 'fr' ? 'Tarifs' : 'Prices') : w.section;
   return lang === 'fr'
-    ? { dishName: `Ce que c&rsquo;est (ex. ${E(w.item)})`, namePh: `ex. ${w.item}`, sectionPh: `Nom de la section, ex. ${w.section}`, firstSection: w.section }
-    : { dishName: `What it is (like ${E(w.item)})`, namePh: `like ${w.item}`, sectionPh: `Section name, like ${w.section}`, firstSection: w.section };
+    ? { dishName: `Ce que c&rsquo;est (ex. ${E(item)})`, namePh: `ex. ${item}`, sectionPh: `Nom de la section, ex. ${both ? 'Mini-golf' : w.section}`, firstSection: section, ...(px ? { pricePh: `ex. ${px}` } : {}) }
+    : { dishName: `What it is (like ${E(item)})`, namePh: `like ${item}`, sectionPh: `Section name, like ${both ? 'Mini golf' : w.section}`, firstSection: section, ...(px ? { pricePh: `like ${px}` } : {}) };
 }
-function priceListAppStrings(kind, lang) {
-  const w = PRICE_LIST_WORDS[kind];
+function priceListAppStrings(kind, lang, words = null) {
+  const w = words || PRICE_LIST_WORDS[kind];
   const e = w.en, f = w.fr;
   const L = escapeHtml(e.list);
   if (lang === 'fr') {
@@ -59906,7 +60061,7 @@ function researchedMenuOwnerCard(venue, pub, base, lang = 'en') {
 function renderMenuAppPage(found, opts) {
   const { venue } = found;
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
-  const t0 = { ...MENU_APP_STRINGS[lang], ...(isPriceList(venue) ? priceListAppStrings(menuKind(venue), lang) : {}), ...(brewSetupType(venue.type) ? breweryMenuAppStrings(venue, lang) : {}), ...(venue.type === 'indoor' ? indoorMenuAppStrings(venue, lang) : {}) };
+  const t0 = { ...MENU_APP_STRINGS[lang], ...(isPriceList(venue) ? priceListAppStrings(menuKind(venue), lang, priceListWordsFor(venue)) : {}), ...(brewSetupType(venue.type) ? breweryMenuAppStrings(venue, lang) : {}), ...(kindSetupType(venue.type) ? indoorMenuAppStrings(venue, lang) : {}) };
   // Indoor test 1 (2026-11-19; Margaret): "Type them in myself" from the setup's Your prices felt like leaving the setup for
   // the full editor. Opened from the setup (its way back is the setup's #more list), an indoor place's screen says it is
   // part of the setup, and its way back says so too.
@@ -60752,6 +60907,8 @@ function renderOwnerSetupPage(found, opts) {
         words: Object.fromEntries(Object.entries(indoorKindsModule.INDOOR_BOOK_BUTTONS).map(([k, w]) => [k, w[fr ? 1 : 0]])),
         // Sport (2026-11-20): each kind's own button ("Book a tee time") when people book ahead.
         kindBtn: sport ? Object.fromEntries(SPORT_KINDS.map((k) => [k, (indoorKindsModule.indoorKindText([k], 'en').bookBtn || [])[fr ? 1 : 0] || ''])) : {},
+        // Sport test 3: a bay booking link (Trackman, an AlleyTrak page) of a place with simulators among its kinds says "Book a bay".
+        bay: sport ? { re: SPORT_BAY_URL_RE.source, word: indoorKindsModule.SPORT.K.simgolf.bookBtn[fr ? 1 : 0] } : null,
         kind: (() => { const k = indoorKindsModule.indoorKindText(venueIndoorInfo(venue.id).kinds || indoorKindSuggestion(venue), 'en'); return k.ticketed ? 'shows' : k.classKind ? 'classes' : k.kind === 'kids' ? 'kids' : ''; })(),
         research: (() => { const vi = venueVisitInfo(venue.id) || {}; return vi.booking_url && vi.booking_label ? { url: vi.booking_url, label: vi.booking_label } : null; })() },
     } : {}),
@@ -64131,7 +64288,7 @@ function menuDishCountText(n, lang, kind = 'menu') {
 }
 // What the uploaded list is called, by kind and language.
 function menuNoun(venue, lang = 'en') {
-  const w = PRICE_LIST_WORDS[menuKind(venue)];
+  const w = priceListWordsFor(venue);
   return w ? (lang === 'fr' ? w.fr.noun : w.en.noun) : 'Menu';
 }
 function menuMenuUrl(venue, lang = 'en') { return `https://okanaganroam.com${menuPagePath(venue, lang)}`; }
@@ -64204,7 +64361,7 @@ const VENUE_MENU_CSS = `<style>
 // schema.org for a price list: an OfferCatalog per section, each line offered at a CAD price (a tour is a
 // TouristTrip, a green fee, admission or rental a Service).
 function priceListOfferCatalog(venue, menu, lang) {
-  const w = PRICE_LIST_WORDS[menuKind(venue)];
+  const w = priceListWordsFor(venue);
   return {
     '@type': 'OfferCatalog',
     name: lang === 'fr' ? `${w.fr.noun} ${frDe(venue.name)}` : `${venue.name} ${w.en.list}`,
@@ -64300,7 +64457,7 @@ function venueMenuPreviewHtml(venue, menu, lang) {
     mine.forEach((it, i) => { picks.push(it); if (!i && venue.type === 'tour' && x.name && secs.length > 1) secOf.set(it, String(x.name)); });
   }
   const tours = isPriceList(venue);
-  const w = PRICE_LIST_WORDS[menuKind(venue)];
+  const w = priceListWordsFor(venue);
   // Tour test 5 (Whistler, 2026-11-17): "See all tours & prices (4 tours)" counted "Extra person $75" as a tour. Add-on
   // lines (an extra person, rentals, a licence, add-ons) are not trips.
   const count = menuTripCountText(venue, menu, lang);
@@ -64316,6 +64473,78 @@ function venueMenuPreviewHtml(venue, menu, lang) {
   </section>`;
 }
 
+// Sport test 3 (2026-11-20; Gord's range's prices page said "Golf Course in Kelowna, BC" under "Golf Courses"): a sport or
+// golf listing whose main kind isn't a golf course is named by its kind ("Driving range & mini golf"), and its hub is
+// "Golf" (the hub lists every kind of golf). null: the category's own words.
+// Sport test 3 (2026-11-20; Gord: "Mini golf is open April to mid-October; the range and the indoor Trackman are open all
+// year"; Dayton: no per-kind season field): the season of one part of a place, read from the owner's own words (his Good
+// to know and Known for lines, his price list's sections and lines, and his own story), EN or FR: "Mini golf April to
+// mid-October", "Mini golf (April to October)", « minigolf d’avril à octobre ». -> [{ kind: 'mini_golf' | 'driving_range',
+// from: 'MM-DD', to: 'MM-DD', en, fr }]. Never research's words, and never written anywhere.
+const PART_SEASON_MONTHS_EN = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+const PART_SEASON_MONTHS_FR = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre'];
+const PART_SEASON_PARTS = [['mini_golf', '(?:mini ?golf|mini ?putt|minigolf)', ['Mini golf', 'Mini-golf']], ['driving_range', '(?:driving range|the range|range|champ de pratique)', ['Driving range', 'Champ de pratique']]];
+const PART_MON = `(${PART_SEASON_MONTHS_EN.map((m) => m.slice(0, 3) + '[a-z]*').join('|')}|${PART_SEASON_MONTHS_FR.join('|')})`;
+const PART_WHEN = `(?:(early|mid|late|debut|mi|fin)[- ](?:de |d )?)?`;
+function sportPartSeasons(venue) {
+  try {
+    if (!venue || !sportSetupType(venue.type)) return [];
+    const info = venueVisitInfo(venue.id) || {}, mine = new Set(info.owner_labels || []);
+    const texts = (info.rows || []).filter((r) => r && mine.has(r.label) && /^(?:good to know|known for|prices|season)$/i.test(String(r.label || ''))).map((r) => String(r.text || ''));
+    const fr = info.owner_fr || {};
+    for (const k of Object.keys(fr)) if (fr[k] && fr[k].fr) texts.push(String(fr[k].fr));
+    const pub = publishedMenu(venue.id);
+    if (pub && pub.source !== 'research' && pub.data) for (const sct of pub.data.sections || []) { texts.push(`${sct.name || ''} ${sct.note || ''}`); for (const it of sct.items || []) texts.push(`${sct.name || ''} ${it.name || ''} ${it.description || ''}`); }
+    const full = db.prepare('SELECT description, description_fr FROM venues WHERE id = ?').get(venue.id) || {};
+    if (ownerDescriptionWasHers({ ...venue, description: full.description })) texts.push(String(full.description || ''));
+    if (full.description_fr && ownerDescriptionWasHers({ ...venue, description_fr: full.description_fr }, 'description_fr')) texts.push(String(full.description_fr));
+    const fold = (t) => String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’'`]/g, ' ').replace(/[-–—]/g, (c) => (c === '-' ? '-' : ' to ')).replace(/\s+/g, ' ');
+    const out = [];
+    for (const [kind, partRe, names] of PART_SEASON_PARTS) {
+      const re = new RegExp(`\\b${partRe}\\b[^.;!?\\n]{0,40}?\\b(?:from |d |de |du |open |ouvert )?${PART_WHEN}${PART_MON}\\b\\s*(\\d{1,2})?(?:st|nd|rd|th|er)?\\s*(?:to|through|until|till|thru|a|au|jusqu a|jusqu au)\\s+(?:la |le )?${PART_WHEN}${PART_MON}\\b\\s*(\\d{1,2})?`, 'i');
+      for (const t of texts) {
+        const m = re.exec(fold(t));
+        if (!m) continue;
+        const mo = (x) => { const a = PART_SEASON_MONTHS_EN.findIndex((n) => n.startsWith(x.slice(0, 3))); return a >= 0 ? a : PART_SEASON_MONTHS_FR.indexOf(x); };
+        const a = mo(m[2]), b = mo(m[5]);
+        if (a < 0 || b < 0 || a === b) continue;
+        const LAST = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        const w1 = { early: 1, debut: 1, mid: 15, mi: 15, late: 20, fin: 20 }[m[1]] || 1, w2 = { early: 10, debut: 10, mid: 15, mi: 15, late: LAST[b], fin: LAST[b] }[m[4]] || LAST[b];
+        const da = m[3] ? Math.min(Number(m[3]), LAST[a]) : w1, dbb = m[6] ? Math.min(Number(m[6]), LAST[b]) : w2;
+        const md = (x, d) => `${String(x + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+        const wEn = (x, d, mm, day) => `${{ mid: 'mid-', mi: 'mid-', early: 'early ', debut: 'early ', late: 'late ', fin: 'late ' }[mm] || ''}${cap(PART_SEASON_MONTHS_EN[x])}${day ? ` ${d}` : ''}`;
+        const frMonth = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+        const wFr = (x, mm) => `${{ mid: 'la mi-', mi: 'la mi-', early: 'début ', debut: 'début ', late: 'fin ', fin: 'fin ' }[mm] || ''}${frMonth[x]}`;
+        const fromFr = wFr(a, m[1]), toFr = wFr(b, m[4]);
+        const de = /^[aeiouyàâéèêëîïôûü]/i.test(fromFr) ? 'd’' : 'de ';
+        const item = { kind, from: md(a, da), to: md(b, dbb), en: `${names[0]}: ${wEn(a, da, m[1], m[3])} to ${wEn(b, dbb, m[4], m[6])}`.replace(/\s+/g, ' '), fr: `${names[1]} : ${de}${fromFr} à ${toFr}` };
+        out.push(item);
+        // The French card note for the same line (search's "Mini golf: April to mid-October · closed now").
+        try { FR_FROM_APP.set(item.en, item.fr); } catch (e) { /* French pages say the English line */ }
+        break;
+      }
+    }
+    return out;
+  } catch (e) { return []; }
+}
+// A part's season on a date (YYYY-MM-DD): true when that part is closed then.
+function sportPartClosedOn(part, date) {
+  const md = String(date || '').slice(5, 10);
+  if (!/^\d{2}-\d{2}$/.test(md) || !part) return false;
+  return part.from <= part.to ? (md < part.from || md > part.to) : (md < part.from && md > part.to);
+}
+function sportKindSingular(venue, fr = false) {
+  const k = venue && sportSetupType(venue.type) ? sportMainKind(venue) : '';
+  if (!k || k === 'golf') return null;
+  const w = indoorKindsModule.indoorKindLabel(k, indoorOwnWords(venue.id)) || indoorKindsModule.SPORT.SPORT_KIND_WORDS[k];
+  return w ? w[fr ? 1 : 0] : null;
+}
+function sportHubPlural(venue, fr = false) {
+  const k = venue && venue.type === 'golf' ? sportMainKind(venue) : '';
+  // French keeps « Terrains de golf », the hub's own name (« Retour aux terrains de golf à Kelowna »).
+  return k && k !== 'golf' && !fr ? 'Golf' : null;
+}
 function renderVenueMenuPage(venue, menu, opts = {}) {
   const fr = opts.lang === 'fr';
   const lang = fr ? 'fr' : 'en';
@@ -64323,12 +64552,14 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
   const hasFrench = venueHasFrench(venue);
   const regionLabel = REGION_LABELS[venue.region];
   const catSlug = CATEGORY_SLUGS[venue.type];
-  const label = (fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[venue.type];
+  const label0 = (fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[venue.type];
+  const label = { ...label0, singular: sportKindSingular(venue, fr) || label0.singular };
+  const hubPlural = sportHubPlural(venue, fr) || label0.plural;
   const canonical = menuMenuUrl(venue, lang);
   const venueUrl = `https://okanaganroam.com${venuePagePath(venue, lang)}`;
   const updated = menuUpdatedLabel(menu.publishedAt, lang);
   const tours = isPriceList(venue);
-  const kindWords = PRICE_LIST_WORDS[menuKind(venue)];
+  const kindWords = priceListWordsFor(venue);
   const noun = menuNoun(venue, lang);
   // Tour test 6: the full list's count leaves out add-on and private-group lines too, like the short list's.
   const count = menuTripCountText(venue, menu, lang);
@@ -64409,7 +64640,7 @@ ${VENUE_MENU_CSS}
     ${website ? `<a class="cta secondary" href="${escapeHtml(website)}" rel="nofollow noopener" target="_blank" data-track="website">${L('Website', 'Site Web')} ↗</a>` : ''}
   </p>
   <p class="vm-meta">${L('Own this business?', 'C’est votre entreprise?')} <a href="/owner/login" rel="nofollow">${tours ? L('Sign in to update your prices', 'Connectez-vous pour modifier vos tarifs') : L('Sign in to update your menu', 'Connectez-vous pour modifier votre menu')}</a></p>
-  <a class="cta secondary" href="/${venue.region}/${catSlug}">${fr ? `Retour aux ${escapeHtml(label.plural.toLowerCase())} à ${escapeHtml(regionLabel)}` : `More ${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}`}</a>
+  <a class="cta secondary" href="/${venue.region}/${catSlug}">${fr ? `Retour aux ${escapeHtml(label.plural.toLowerCase())} à ${escapeHtml(regionLabel)}` : `More ${escapeHtml(hubPlural)} in ${escapeHtml(regionLabel)}`}</a>
   </div>
   ${themedShell ? '</main>' : ''}
   ${renderHomeFooterHTML(true)}
@@ -68327,10 +68558,10 @@ function ownerExtrasFor(venue, lang = 'en') {
   const kind = menuKind(venue);
   if (lang === 'fr') {
     if (!portalFields(venue.type).menu) return 'vos liens de réservation et de réseaux sociaux';
-    return kind === 'menu' ? 'votre menu' : frDecode(PRICE_LIST_WORDS[kind].fr.listHtml);
+    return kind === 'menu' ? 'votre menu' : frDecode(priceListWordsFor(venue).fr.listHtml);
   }
   if (!portalFields(venue.type).menu) return 'booking and social links';
-  return kind === 'menu' ? 'your menu' : PRICE_LIST_WORDS[kind].en.list;
+  return kind === 'menu' ? 'your menu' : priceListWordsFor(venue).en.list;
 }
 
 function ownerDecisionEmail({ venueName, what, outcome, reason, link, owner, edited, lang }) {
@@ -68497,10 +68728,10 @@ async function notifyReviewDecision(kind, id, action, extra = {}) {
     if (m.lang === 'fr') {
       const row = db.prepare('SELECT * FROM venues WHERE id = ?').get(v.id);
       const frLink = outcome === 'approved' ? `https://okanaganroam.com${venueHasFrench(row) ? menuPagePath(row, 'fr') : menuPagePath(v)}` : ownerListingUrlFr(v);
-      return sendOwnerDecision(ownerDecisionRecipients(v.id, m.contact_email), ownerDecisionEmail({ venueName: v.name, what: isPriceList(v) ? frDecode(PRICE_LIST_WORDS[menuKind(v)].fr.listHtml) : 'votre menu', outcome, reason, link: frLink, owner: true, lang: 'fr' }));
+      return sendOwnerDecision(ownerDecisionRecipients(v.id, m.contact_email), ownerDecisionEmail({ venueName: v.name, what: isPriceList(v) ? frDecode(priceListWordsFor(v).fr.listHtml) : 'votre menu', outcome, reason, link: frLink, owner: true, lang: 'fr' }));
     }
     const link = outcome === 'approved' ? `https://okanaganroam.com${menuPagePath(v)}` : venueListingUrl(v);
-    return sendOwnerDecision(ownerDecisionRecipients(v.id, m.contact_email), ownerDecisionEmail({ venueName: v.name, what: isPriceList(v) ? `your ${PRICE_LIST_WORDS[menuKind(v)].en.list}` : 'your menu', outcome, reason, link, owner: true }));
+    return sendOwnerDecision(ownerDecisionRecipients(v.id, m.contact_email), ownerDecisionEmail({ venueName: v.name, what: isPriceList(v) ? `your ${priceListWordsFor(v).en.list}` : 'your menu', outcome, reason, link, owner: true }));
   }
   return 'no_address';
 }
@@ -69492,7 +69723,7 @@ function ownerVenueSummary(venueId, lang = 'en') {
   if (live) parts.push(`<span class="op-status op-status-live">${L(`${live} photo${live === 1 ? '' : 's'} live`, `${live} photo${live === 1 ? '' : 's'} en ligne`)}</span>`);
   if (n("SELECT COUNT(*) AS n FROM venue_menus WHERE venue_id = ? AND status = 'published'")) {
     const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
-    parts.push(`<span class="op-status op-status-live">${v && PRICE_LIST_WORDS[menuKind(v)] ? L('Prices live', 'Prix en ligne') : L('Menu live', 'Menu en ligne')}</span>`);
+    parts.push(`<span class="op-status op-status-live">${v && priceListWordsFor(v) ? L('Prices live', 'Prix en ligne') : L('Menu live', 'Menu en ligne')}</span>`);
   }
   const last = ownerLastUpdatedAt(venueId);
   const lastHtml = last ? `<br><span class="op-last">${L('Last updated', 'Dernière mise à jour :')} ${ownerUpdatedDate(last, fr)}</span>` : '';
@@ -69675,7 +69906,7 @@ function ownerMenuCardHtml(venue, href, lang = 'en') {
   if (!portalFields(venue.type).menu) return '';
   const pub = publishedMenu(venue.id);
   const draft = activeMenuDraft(venue.id);
-  const w = PRICE_LIST_WORDS[menuKind(venue)];
+  const w = priceListWordsFor(venue);
   // Brewery test 3 (Whistler, 2026-11-16): a taproom with no kitchen of its own reads "Add your tap list" (cider list,
   // drinks list), and the banner goes once a link to it is on the page or waiting for our check (it still read "Add
   // your menu. Snap a photo of your menu…" after she had sent the link). A published or started menu keeps the banner.
@@ -78528,7 +78759,7 @@ module.exports = {
   parseTripPlanBody,
   runTripPlan, runTripPlanCore, ownerClosureCount,
   // Sport test 2 (2026-11-20): the golf winter rule.
-  golfWinterSeasonMap, GOLF_WINTER_RULE_ON, golfCardBasis,
+  golfWinterSeasonMap, GOLF_WINTER_RULE_ON, golfCardBasis, sportMainKind, sportPartSeasons, priceListWordsFor,
   // Planner (2026-10-27): the happy hour crawl.
   tripHappyHourAsk,
   tripHappyHourChain,

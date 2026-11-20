@@ -146,7 +146,14 @@ const KINDS = {
   // Audit 2026-10-27: "ice skating and hot chocolate" planned Brandywine Falls (a winter-tagged trail); skating is the
   // rinks and arenas themselves, indoors or out. Skate parks are SPORT_KINDS.skatepark.
   skating: /\b(?:ice skating|skating rinks?|ice rinks?|ice arenas?|public skating|skating)\b/,
+  // Sport test 3 (2026-11-20; Gord's driving range and mini golf: "mini golf with kids" planned 8 golf courses, "driving
+  // range then dinner" a round at a course): mini golf and a driving range are their own kinds, never a golf course.
+  // (French « mini-golf », « minigolf » and « champ de pratique » arrive in English: trip-planner-fr.js.)
+  mini_golf: /\b(?:mini ?golf(?:ing)?|mini ?putt(?:ing)?|minigolf|putt ?putt|crazy golf|glow golf|adventure golf|putting course)\b/,
+  driving_range: /\b(?:driving ranges?|golf ranges?|practice ranges?|buckets? of (?:golf )?balls|hit (?:some |a few )?(?:golf )?balls|range balls|toptracer)\b/,
 };
+// The golf words that are mini golf, disc golf or a driving range, never a golf course (blanked before "golf" is read).
+const NOT_GOLF_COURSE_RE = /\b(?:mini ?golf(?:ing)?|minigolf|mini ?putt\w*|disc golf|frisbee golf|crazy golf|glow golf|adventure golf|(?:golf )?driving ranges?|golf ranges?|golf balls?)\b/g;
 // Tour test 3 (Whistler, 2026-11-17): what a visitor types for a kind can be wider than what a listing must say. "Helicopter",
 // "scenic helicopter flight", "helicopter ride" and "heli flight" ask for a scenic flight ("helicopter" was "not something
 // we can plan around yet"); a listing still needs flight or tour words of its own (a heli-ski company named "… Helicopters"
@@ -218,7 +225,7 @@ const INDOOR_ONLY_PLANNER_KINDS = new Set(['playground', 'pool', 'curling', 'yog
 // Every planner kind that is a tour listing (one list: the request reader, the plan's types and the excluded kinds all
 // use it, so a new tour kind is added once).
 const TOUR_PLANNER_KINDS = ['wine_tour','boat_tour','guided_hike','cooking','snow_tour','sleigh_ride','atv','adventure_park','snowmobile_tour','wildlife_tour','scenic_flight','heli_hike','food_tour','walking_tour','fishing_tour','heli_ski','rentals','snowshoe_tour','bike_tour','paddle_tour','ski_touring','avalanche_course','multi_day_tour','mountain_guide','kennel_visit','cultural_tour','sightseeing_tour','paragliding','ski_lessons','kite_lessons','shooting'];
-const LABELS = {ski_lessons:'ski or snowboard lesson',kite_lessons:'kiteboarding or wing foil lesson',shooting:'target shooting',sightseeing_tour:'sightseeing tour',sleigh_ride:'sleigh ride',cultural_tour:'cultural tour',kennel_visit:'kennel visit',ski_touring:'ski touring',avalanche_course:'avalanche course',multi_day_tour:'multi-day trip',mountain_guide:'mountain guide',adventure_park:'adventure park',skating:'skating',farm:'farm',shopping:'shopping',zipline:'ziplining',bungee:'bungee jumping',paragliding:'paragliding',rafting:'rafting',scenic_flight:'scenic flight',heli_hike:'heli-hiking',fishing_tour:'fishing trip',snowshoe_tour:'snowshoe tour',heli_ski:'heli-skiing',rentals:'rentals',bike_tour:'bike tour',paddle_tour:'paddle tour',food_tour:'food tour',walking_tour:'walking tour',atv:'ATV tour',snowmobile_tour:'snowmobile tour',wildlife_tour:'wildlife tour',via_ferrata:'via ferrata',bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',sauna:'hot tub or sauna',cinema:'cinema',playground:'indoor playground',pool:'pool',curling:'curling',yoga:'yoga class',casino:'casino',library:'library',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',pottery:'pottery class',snow_tour:'snow experience',hiking:'hiking'};
+const LABELS = {mini_golf:'mini golf',driving_range:'driving range',ski_lessons:'ski or snowboard lesson',kite_lessons:'kiteboarding or wing foil lesson',shooting:'target shooting',sightseeing_tour:'sightseeing tour',sleigh_ride:'sleigh ride',cultural_tour:'cultural tour',kennel_visit:'kennel visit',ski_touring:'ski touring',avalanche_course:'avalanche course',multi_day_tour:'multi-day trip',mountain_guide:'mountain guide',adventure_park:'adventure park',skating:'skating',farm:'farm',shopping:'shopping',zipline:'ziplining',bungee:'bungee jumping',paragliding:'paragliding',rafting:'rafting',scenic_flight:'scenic flight',heli_hike:'heli-hiking',fishing_tour:'fishing trip',snowshoe_tour:'snowshoe tour',heli_ski:'heli-skiing',rentals:'rentals',bike_tour:'bike tour',paddle_tour:'paddle tour',food_tour:'food tour',walking_tour:'walking tour',atv:'ATV tour',snowmobile_tour:'snowmobile tour',wildlife_tour:'wildlife tour',via_ferrata:'via ferrata',bmx:'BMX',skatepark:'skate park',disc_golf:'disc golf',tennis:'tennis',pickleball:'pickleball',challenging_hike:'challenging hike',walk:'walk',easy_walk:'easy walk',park:'park',horseback:'horseback riding',sunset:'sunset viewpoint',museum:'museum',gallery:'gallery',escape:'escape room',bowling:'bowling',climbing:'climbing gym',arcade:'arcade',theatre:'theatre',spa:'spa',sauna:'hot tub or sauna',cinema:'cinema',playground:'indoor playground',pool:'pool',curling:'curling',yoga:'yoga class',casino:'casino',library:'library',wine_tour:'wine tour',boat_tour:'boat tour',guided_hike:'guided hike',cooking:'cooking class',pottery:'pottery class',snow_tour:'snow experience',hiking:'hiking'};
 const WALKING_TRANSPORT = /\b(?:no car|(?:we |i )?(?:do not|don t|dont) drive|(?:rely|relying) on (?:public )?(?:transit|buses|the bus)|public transit|no vehicle|without (?:a |our |my )?car|do not have (?:a |our |my )?car|don t have (?:a |our |my )?car|no driving|car free|on foot|walkable|(?:walk|walking) between (?:the )?(?:stops|places|venues))\b/g;
 // "No driving after 6pm", "no driving at night" (2026-10-18): only the evening is on foot, so it is an evening rule,
 // not a car-free trip (it used to plan one winery a day inside a 1.5 km walking radius).
@@ -315,6 +322,31 @@ function hikingPlace(v){
   if(/\b(?:garden|gardens|promenade|seawall|beach|boardwalk|lakeshore walk|waterfront walk)\b/.test(norm(v.name)))return false;
   return true;
 }
+// Sport test 3 (2026-11-20): a listing is mini golf or a driving range by its owner's kind (Driving range or mini golf,
+// the main kind or not; a range's own words say which of the two it has, both when they name neither), else by its own
+// words: a golf listing named a range or mini golf, or whose story names one and no golf course; an indoor or outdoor
+// place (a family fun centre, an amusement park) whose words say mini golf. A golf course with a practice range is not
+// a driving range for a visitor.
+const MINI_GOLF_WORDS=/\b(?:mini ?golf|mini ?putt\w*|minigolf|putt ?putt|crazy golf|glow golf|adventure golf|putting course)\b/;
+const RANGE_WORDS=/\b(?:driving ranges?|golf ranges?|practice ranges?|buckets? of balls|toptracer|range)\b/;
+const GOLF_COURSE_WORDS=/\bgolf (?:club|course|resort|and country|country club)\b|\bcountry club\b|\b(?:9|18|nine|eighteen|27) holes?\b|\bpar \d/;
+function golfPartKind(v,kind,text,name){
+  const own=norm([v.name,v.textName,v.knownFor,v.description||v.textDesc].filter(Boolean).join(' '));
+  const says=kind==='mini_golf'?MINI_GOLF_WORDS:RANGE_WORDS;
+  if(['golf','sport'].includes(v.type)&&Array.isArray(v.sportKinds)&&v.sportKinds.length){
+    if(!v.sportKinds.includes('range'))return false;
+    const mini=MINI_GOLF_WORDS.test(own),range=RANGE_WORDS.test(own.replace(MINI_GOLF_WORDS,' '));
+    return (!mini&&!range)||(kind==='mini_golf'?mini:range);
+  }
+  if(v.type==='golf'){
+    if(says.test(name))return true;
+    const story=own.replace(kind==='mini_golf'?/$^/:MINI_GOLF_WORDS,' ');
+    if(!says.test(story))return false;
+    return !GOLF_COURSE_WORDS.test(own.replace(/\b(?:\d+ hole )?(?:championship )?(?:mini ?golf|minigolf|mini ?putt)(?: course)?\b/g,' '));
+  }
+  if(kind==='mini_golf'&&['indoor','outdoor','sport'].includes(v.type))return MINI_GOLF_WORDS.test(norm([v.name,v.textName,v.cuisine,v.knownFor,v.description||v.textDesc].filter(Boolean).join(' ')));
+  return false;
+}
 function inferPlannerKinds(v) {
   // Tour test 1 (Whistler, 2026-11-16): a tour's own kind words too ("Snowmobile & ATV tours", kept when the operator's kinds
   // are saved), so an ATV request finds it.
@@ -396,6 +428,7 @@ function inferPlannerKinds(v) {
     if (kind === 'sunset' && v.type === 'outdoor' && (v.activities || []).includes('viewpoints') && (Number(v.lake_view) === 1 || !!(v.features && v.features.lake_view))) return true;
     // Indoor test 10: a hot tub or sauna in its own words or its Known for line (a pool's hot tub counts).
     if (kind === 'sauna') return v.type === 'indoor' && re.test(norm(`${text} ${v.knownFor || ''}`));
+    if (kind==='mini_golf'||kind==='driving_range') return golfPartKind(v,kind,text,name);
     if (!re.test(text)) return false;
     if (SPORT_KINDS[kind]) return v.type==='sport' && re.test(name);
     if (kind === 'park') {
@@ -654,7 +687,7 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
       for(let k=items.length-1;k>=0;k--)if(items[k].kind==='venue_kind'&&items[k].value==='spa'&&items[k].sourceText===scopeText)items.splice(k,1);
     }
     for(const [value,re] of Object.entries({restaurant:/\b(?:dinner|lunch|restaurants?|meals?)\b/,cafe:/\b(?:cafes?|coffee)\b/,breakfast:/\b(?:breakfast|brunch)\b/,winery:/\b(?:wineries|winery|vineyards?|wine tasting)\b/,golf:/\bgolf\b/,beach:SITE.beachWordRe,outdoor:/\b(?:hiking|skiing|ski|snowshoeing|outdoor)\b/,tour:/\b(?:tours?|cruise|guided)\b/,brewery:/\b(?:brewery|breweries|brewpubs?|taprooms?|craft beer)\b/,distillery:/\b(?:distillery|distilleries|craft spirits|spirits|gin|whisk(?:e)?y|vodka|rum|liqueurs?)\b/,cocktail:/\b(?:cocktails?|cocktail (?:bars?|lounges?))\b/})) {
-      const m=re.exec(value==='golf'&&taxonomy?.types?.includes('sport')?c.replace(/\bdisc golf\b/g,x=>' '.repeat(x.length)):c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index)))add('type',value,scopeText,value==='cafe'&&/\bcoffee\b/.test(c)?{servesCoffee:true}:value==='restaurant'&&WINERY_LUNCH.test(c)?{wineryLunch:true}:{});
+      const m=re.exec(value==='golf'?c.replace(NOT_GOLF_COURSE_RE,x=>' '.repeat(x.length)):c);if(m&&!/\b(?:no|not|without|avoid|skip|exclude)\b(?:(?!\b(?:but|include|with)\b).)*$/.test(c.slice(0,m.index)))add('type',value,scopeText,value==='cafe'&&/\bcoffee\b/.test(c)?{servesCoffee:true}:value==='restaurant'&&WINERY_LUNCH.test(c)?{wineryLunch:true}:{});
     }
     // "3 wineries a day" / "two breweries per day" is a count for every day (2026-10-18), capped at
     // PER_DAY_MAX (more tastings than that do not fit a day); "3 wineries" alone is a count for the trip.
@@ -930,6 +963,23 @@ function consumedTerms(requirements) {
 // filling unrelated breakfast/lunch/dinner slots. Multi-day plans stay intact.
 // Skating asked for (audit 2026-10-27): the plan's generic outdoor ("winter") part is the rink, indoors or out
 // ("ice skating and hot chocolate in Whistler" planned the Train Wreck trail).
+// Sport test 3: mini golf is played at a range (golf), a family fun centre (indoor), an amusement park (outdoor) or a
+// sports listing; a driving range is a golf or sports listing.
+const GOLF_PART_TYPES={mini_golf:['golf','indoor','outdoor','sport'],driving_range:['golf','sport']};
+// Sport test 3: an unscoped mini golf or driving range request ("mini golf in Kelowna") is that kind's stop, as skating is,
+// never a golf course.
+function golfPartComponents(trip,requirements){
+  const asked=(requirements.items||[]).filter(i=>i.kind==='venue_kind'&&i.strength==='must'&&GOLF_PART_TYPES[i.value]).map(i=>i.value);
+  if(!asked.length||!Array.isArray(trip?.components))return trip;
+  let comps=trip.components.slice();
+  for(const k of asked){
+    if(comps.some(c=>(c.plannerKinds||[]).includes(k)))continue;
+    const part={kind:'venue',types:GOLF_PART_TYPES[k],phrase:LABELS[k],plannerKinds:[k],activities:[],features:[],collections:[],cuisines:[],dog:!!trip?.party?.dog,kids:!!trip?.party?.kids,meal:null,daypart:requirements.daypart,generic:false};
+    const at=comps.findIndex(c=>c.kind==='venue'&&(c.types||[]).length===1&&['golf','outdoor','indoor'].includes(c.types[0])&&!(c.plannerKinds||[]).length&&!c.meal);
+    comps=at>=0?comps.map((c,n)=>n===at?{...part,daypart:c.daypart||part.daypart}:c):[...comps,part];
+  }
+  return {...trip,components:comps};
+}
 function skatingComponents(trip,requirements){
   if(!(requirements.items||[]).some(i=>i.kind==='venue_kind'&&i.strength==='must'&&i.value==='skating')||!Array.isArray(trip?.components))return trip;
   if(trip.components.some(c=>(c.plannerKinds||[]).includes('skating')))return trip;
@@ -964,13 +1014,13 @@ function explicitOutingComponents(trip,requirements) {
   // Indoor test 13 (2026-11-19; "dinner and a movie" was a generic indoor stop): every indoor kind asked with a meal too.
   // 2026-10-25: "spa day and dinner in Penticton" found nothing (the spa and the dinner were one request); an activity
   // asked for with a meal is two stops, as a game and dinner already were.
-  const scoped=kinds.some(i=>SPORT_KINDS[i.value]||['spa','museum','gallery','escape','bowling','climbing','arcade','theatre','pottery','cooking','horseback','sunset','cinema','playground','pool','curling','yoga','casino','library'].includes(i.value))&&items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper|lunch)\b/.test(i.sourceText))||!!(kinds.length&&requirements.startDate)||items.some(i=>i.kind==='transport')||requirements.onlyRequested||requirements.outingScope==='short'||days===1&&(kinds.length||items.some(i=>i.kind==='activity'||i.kind==='rainy'&&i.activityOnly))||items.some(i=>i.kind==='price_limit')||requirements.daypart&&(kinds.length||items.some(i=>i.kind==='activity')||items.filter(i=>i.kind==='type'&&i.strength==='must').length>=1);
-  if(!scoped)trip=skatingComponents(trip,requirements);
+  const scoped=kinds.some(i=>SPORT_KINDS[i.value]||GOLF_PART_TYPES[i.value]||['spa','museum','gallery','escape','bowling','climbing','arcade','theatre','pottery','cooking','horseback','sunset','cinema','playground','pool','curling','yoga','casino','library'].includes(i.value))&&items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper|lunch)\b/.test(i.sourceText))||!!(kinds.length&&requirements.startDate)||items.some(i=>i.kind==='transport')||requirements.onlyRequested||requirements.outingScope==='short'||days===1&&(kinds.length||items.some(i=>i.kind==='activity'||i.kind==='rainy'&&i.activityOnly))||items.some(i=>i.kind==='price_limit')||requirements.daypart&&(kinds.length||items.some(i=>i.kind==='activity')||items.filter(i=>i.kind==='type'&&i.strength==='must').length>=1);
+  if(!scoped)trip=golfPartComponents(skatingComponents(trip,requirements),requirements);
   if(!scoped)return bindNamedVenues(requirements.timeWindow&&!trip?.multi?timeWindowComponents(trip,requirements):trip,requirements);
   const text=requirements.text||'',parts=[];
   const typeFor=k=>SPORT_KINDS[k]?'sport':['walk','easy_walk','challenging_hike','park','sunset','horseback'].includes(k)?'outdoor':TOUR_PLANNER_KINDS.includes(k)?'tour':'indoor';
   const make=(types,phrase,extra={})=>({kind:'venue',types,phrase,activities:[],features:[],collections:[],cuisines:[],dog:!!trip?.party?.dog,kids:!!trip?.party?.kids,meal:null,daypart:requirements.daypart,generic:false,...extra});
-  for(const i of kinds)parts.push(make(i.value==='skating'?['indoor','sport','outdoor']:[typeFor(i.value)],LABELS[i.value],{plannerKinds:[i.value]}));
+  for(const i of kinds)parts.push(make(i.value==='skating'?['indoor','sport','outdoor']:GOLF_PART_TYPES[i.value]||[typeFor(i.value)],LABELS[i.value],{plannerKinds:[i.value]}));
   for(const i of items.filter(i=>i.kind==='activity'&&i.strength==='must')) {
     if(i.value==='winter'&&(items.some(j=>j.kind==='activity'&&['skiing','snowshoeing'].includes(j.value))||kinds.some(k=>k.value==='skating')))continue;
     const existing=parts.find(c=>i.value==='viewpoints'&&(c.plannerKinds||[]).includes('sunset')||i.value==='hiking'&&(c.plannerKinds||[]).some(k=>['guided_hike','challenging_hike','easy_walk'].includes(k)));
@@ -1014,7 +1064,7 @@ function expandTripComponentsInner(trip,requirements) {
   // the afternoon's explicit-outing rebuild merged the crawl's copies into its one item).
   if (!(trip?.multi && trip.crawl) && (!trip?.multi || requirements.daypart || requirements.onlyRequested || requirements.items.some(i=>i.kind==='transport'))) trip=explicitOutingComponents(trip,requirements);
   if (!trip?.multi) return trip;
-  trip=skatingComponents(trip,requirements);
+  trip=golfPartComponents(skatingComponents(trip,requirements),requirements);
   const singleDay=!(requirements.planDays>1||(requirements.items||[]).some(i=>i.kind==='days'&&i.value>1||i.dayIndex>1));
   const components=trip.components.map(c=>singleDay&&requirements.daypart&&!c.meal?{...c,daypart:requirements.daypart}:c);
   for(const item of requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must'&&['easy_walk','challenging_hike'].includes(i.value))){
@@ -1559,4 +1609,4 @@ function tripRequestSynonyms(text){let out=String(text||'');const walksNegated=W
  if(/\b(?:ski|skiing|snowboard\w*)\b/i.test(out)&&!/\b(?:cross.country|nordic)\b/i.test(out)&&!/\b(?:don.?t|do not|won.?t|not|no|never|without)\s+(?:\w+\s+){0,2}(?:ski|skiing|snowboard\w*)\b/i.test(out))out=out.replace(/\b(?:a )?night out\b|\bgoing out(?: at night)?\b/gi,'nightlife').replace(/\s*\b(?:in the morning|in the afternoon|in the evening)\b/gi,'').replace(/\b(?:morning|afternoon|evening)\s+(?=(?:ski|skiing|snowboard\w*|spa|apres|après|dinner|lunch|drinks)\b)/gi,'').replace(/\s{2,}/g,' ');
  return out;}
 
-module.exports={SPORT_KIND_PLANNER,indoorSlotOf,morningOfOneStop,KINDS,REQUEST_KINDS,TOUR_PLANNER_KINDS,TOUR_KIND_PLANNER,INDOOR_KIND_PLANNER,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
+module.exports={golfPartKind,SPORT_KIND_PLANNER,indoorSlotOf,morningOfOneStop,KINDS,REQUEST_KINDS,TOUR_PLANNER_KINDS,TOUR_KIND_PLANNER,INDOOR_KIND_PLANNER,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};

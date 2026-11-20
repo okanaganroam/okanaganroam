@@ -1086,6 +1086,8 @@ const FR_TEXT = {
   // List pages in the Sports & Recreation layout (2026-11-20): the layout's own labels.
   'Choose a town': 'Choisir une ville',
   'Green fees': 'Droits de jeu',
+  'closed now': 'fermé en ce moment',
+  'closed then': 'fermé à cette date',
   '✨ All golf': '✨ Tout le golf',
   'How sorting works': 'Comment fonctionne le tri',
   'Recommended puts the best-rated courses with the most reviews first, then driving ranges and indoor golf; places closed for the season move lower down. Price sorting uses each course’s standard adult green fee for its standard round, at prime time in peak season, as published by the course. Places with no published fee come last.': '« Recommandés » place d’abord les terrains les mieux notés et les plus évalués, puis les champs de pratique et le golf intérieur; les lieux fermés pour la saison descendent plus bas. Le tri par prix utilise le droit de jeu adulte régulier de chaque terrain pour sa ronde habituelle, aux heures de pointe en haute saison, tel que publié par le terrain. Les lieux sans tarif publié viennent en dernier.',

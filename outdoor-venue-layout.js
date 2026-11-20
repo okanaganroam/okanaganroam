@@ -80,7 +80,7 @@ function renderOutdoorLayout(p) {
       ${where}
     </div>
     ${p.visitorHtml || ''}${p.eventsHtml || ''}
-    ${p.nearbyCards.length ? `<section class="kl-nearby"><div class="kl-nearby-head"><div><p class="kl-eyebrow">Make a day of it</p><h2>${NEARBY_HEADING[v.type] || 'Nearby adventures ✨'}</h2></div><a href="/${e(v.region)}/${e(p.categorySlug)}">See more ${e(category.toLowerCase())} →</a></div><ul class="nearby-list">${p.nearbyCards.slice(0, p.nearbyLimit || 3).join('')}</ul></section>` : ''}
+    ${p.nearbyCards.length ? `<section class="kl-nearby"><div class="kl-nearby-head"><div><p class="kl-eyebrow">Make a day of it</p><h2>${p.nearbyHeading || NEARBY_HEADING[v.type] || 'Nearby adventures ✨'}</h2></div><a href="/${e(v.region)}/${e(p.categorySlug)}">See more ${e(category.toLowerCase())} →</a></div><ul class="nearby-list">${p.nearbyCards.slice(0, p.nearbyLimit || 3).join('')}</ul></section>` : ''}
     ${p.relatedHtml || ''}${p.nearbyHtml || ''}${p.ownerCtaHtml || ''}
     <p class="kl-update">Spotted something that needs updating? <a href="/contact" data-contact-open>Suggest an update →</a></p>
   </div>`;
