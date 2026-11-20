@@ -152,7 +152,8 @@ function createCounter(db) {
   }
   // Outbound clicks (2026-11-06): what each business got from visitors leaving for it -- website, booking, phone,
   // directions, menu, social -- over the last 7/30/90 days, busiest first. Counts only.
-  const OUT = { website: ['website'], booking: ['booking'], phone: ['call_button', 'phone_number'], directions: ['directions'], menu: ['full_menu'], social: ['social_link'] };
+  // stays (2026-11-19): Check rates taps on places to stay (places-to-stay.js).
+  const OUT = { website: ['website'], booking: ['booking'], phone: ['call_button', 'phone_number'], directions: ['directions'], menu: ['full_menu'], social: ['social_link'], stays: ['stay_click'] };
   function outbound(days = 30, limit = 100, now = new Date()) {
     days = [7, 30, 90].includes(Number(days)) ? Number(days) : 30;
     const since = dayList(days, now)[0];
@@ -162,20 +163,20 @@ function createCounter(db) {
       WHERE c.day >= ? AND (c.name = 'venue_view' OR c.name IN (${Object.keys(keyToOut).map(() => '?').join(',')})) GROUP BY c.venue_id, c.name`).all(since, ...Object.keys(keyToOut));
     const by = new Map();
     for (const r of rows) {
-      const e = by.get(r.id) || { id: r.id, views: 0, website: 0, booking: 0, phone: 0, directions: 0, menu: 0, social: 0 };
+      const e = by.get(r.id) || { id: r.id, views: 0, website: 0, booking: 0, phone: 0, directions: 0, menu: 0, social: 0, stays: 0 };
       if (r.name === 'venue_view') e.views += r.n; else e[keyToOut[r.name]] += r.n;
       by.set(r.id, e);
     }
     const info = db.prepare('SELECT id, name, region, type FROM venues WHERE id = ? AND redirect_to IS NULL');
     const list = [];
     for (const e of by.values()) {
-      e.total = e.website + e.booking + e.phone + e.directions + e.menu + e.social;
+      e.total = e.website + e.booking + e.phone + e.directions + e.menu + e.social + e.stays;
       if (!e.total) continue;
       const v = info.get(e.id); if (!v) continue;
       list.push({ ...e, name: v.name, region: v.region, type: v.type, rate: e.views ? Math.round((e.total / e.views) * 1000) / 10 : null });
     }
     list.sort((a, b) => b.total - a.total || b.views - a.views || a.name.localeCompare(b.name));
-    const totals = { views: 0, website: 0, booking: 0, phone: 0, directions: 0, menu: 0, social: 0, total: 0 };
+    const totals = { views: 0, website: 0, booking: 0, phone: 0, directions: 0, menu: 0, social: 0, stays: 0, total: 0 };
     for (const e of list) for (const k of Object.keys(totals)) totals[k] += e[k] || 0;
     const first = db.prepare('SELECT MIN(day) AS d FROM venue_event_counts').get().d;
     return { days, since, counting_since: first || null, totals, businesses: list.slice(0, limit), with_clicks: list.length };
