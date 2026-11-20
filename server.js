@@ -45,6 +45,7 @@ const { renderSearchTermsPage } = require('./search-terms-page');
 const { renderOutboundPage } = require('./outbound-page');
 const placesToStay = require('./places-to-stay');
 const tripStays = require('./trip-stays');
+const stayBookingLinks = require('./stay-booking-links');
 const gscReport = require('./gsc-report');
 // What is clickable on one business or event page (2026-11-05): read from the page itself, so each sheet shows that page's
 // own buttons and links. The server asks its own public page (no scripts run, so nothing is counted); kept 10 minutes.
@@ -7703,6 +7704,9 @@ function parseTripPlanBody(body, opts = {}) {
 function tripStayCandidates() {
   let rows = [];
   try { rows = db.prepare("SELECT * FROM venues WHERE type = 'stay' AND redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL ORDER BY id").all().map(rowToVenue); } catch (e) { rows = []; }
+  // The owner's / admin's own booking link (never an affiliate link; stay-booking-links.js).
+  const ownerBooking = new Map();
+  try { for (const r of db.prepare("SELECT l.venue_id, l.booking_url FROM venue_links l JOIN venues v ON v.id = l.venue_id WHERE v.type = 'stay' AND l.booking_url IS NOT NULL").all()) ownerBooking.set(r.venue_id, r.booking_url); } catch (e) { /* no venue_links table */ }
   const infoById = new Map();
   try {
     for (const r of db.prepare('SELECT venue_id, info_json FROM stay_info').all()) {
@@ -7717,6 +7721,8 @@ function tripStayCandidates() {
       latitude: v.latitude, longitude: v.longitude, photo,
       url: placesToStay.stayPath(v, 'en'), urlFr: placesToStay.stayPath(v, 'fr'),
       info: infoById.get(v.id) || null,
+      // For the booking buttons only (not on the card): address and website for the "Check rates" fallback.
+      address: v.address || null, website: v.website || null, ownerBookingUrl: ownerBooking.get(v.id) || null,
     };
   });
 }
@@ -7745,10 +7751,46 @@ function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
 function withTripStays(plan, stay, now = new Date()) {
   if (!plan || typeof plan !== 'object') return plan;
   try {
-    const block = tripStays.whereToStay(plan, stay, tripStayCandidates(), todayLocal(now));
-    if (block) plan.whereToStay = block;
+    const candidates = tripStayCandidates();
+    let block = tripStays.whereToStay(plan, stay, candidates, todayLocal(now));
+    if (block) {
+      // Step 3 (2026-11-20, stay-booking-links.js): each stay's booking buttons, pre-filled with the trip's dates and
+      // party (affiliate links only when STAY_AFFILIATE_PROVIDER and STAY_AFFILIATE_ID are set), and the plan's stops
+      // that already have a booking link, for the card's "Your trip checklist".
+      block = stayBookingLinks.withBookingLinks(block, new Map(candidates.map((c) => [c.id, c])));
+      block.checklist = tripBookingChecklist(plan);
+      plan.whereToStay = block;
+    }
   } catch (e) { console.error(`[trip] where to stay: ${e.message}`); }
   return plan;
+}
+// The plan's stops that already have a booking link, in plan order, once each (at most 6): the venue page's own Book
+// button (venue_links.booking_url, else the Plan your visit box's booking link) with the same words.
+// -> [{ venueId, name, url, label, labelFr }]
+const TRIP_CHECKLIST_MAX = 6;
+function tripBookingChecklist(plan) {
+  const stops = Array.isArray(plan.days) && plan.days.length ? plan.days.flatMap((d) => (d && d.stops) || [])
+    : ((plan.itinerary && plan.itinerary.stops) || (plan.outing && plan.outing.stops) || []);
+  const out = [], seen = new Set();
+  const key = (u) => String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#]+$/, '');
+  for (const s of stops) {
+    const id = s && s.venue && s.venue.id;
+    if (!Number.isInteger(id) || seen.has(id) || out.length >= TRIP_CHECKLIST_MAX) continue;
+    seen.add(id);
+    try {
+      const v = db.prepare('SELECT id, name, type, website, redirect_to FROM venues WHERE id = ?').get(id);
+      if (!v || v.redirect_to || v.type === placesToStay.STAY_TYPE) continue;
+      const own = String((venueLinks(id) || {}).booking_url || '').trim();
+      const visit = venueVisitInfo(id) || {};
+      // The same rule as the venue page: a booking link that is just the website is not a booking page.
+      const url = /^https:\/\/[^\s"'<>]+$/i.test(own) && !(v.website && key(own) === key(v.website)) ? own
+        : /^https:\/\/[^\s"'<>]+$/i.test(String(visit.booking_url || '').trim()) ? String(visit.booking_url).trim() : null;
+      if (!url) continue;
+      const [en, fr] = url === own ? indoorBookButton(v, own) : [visit.booking_label || VISIT_BOOK_LABELS[v.type] || 'Book', visitBookLabelFr(visit, v.type)];
+      out.push({ venueId: id, name: v.name, url, label: en, labelFr: fr });
+    } catch (e) { /* skip this stop */ }
+  }
+  return out;
 }
 
 // The weekday of day 1, only when the request names a date ("tonight",

@@ -693,5 +693,6 @@ module.exports = {
   CLOSE_BY_KM, CLOSE_BY_LIMIT, CLOSE_BY_FOOD_DRINK, CLOSE_BY_THINGS_TO_DO, CLOSE_BY_TYPES, CLOSE_BY_LABEL,
   pickStayCloseBy, formatStayDistance, closeByHtml,
   TOWN_NOTES_FILE, loadTownNotes, setTownNotes, townNoteFor,
+  hasTrackingParams,
   STAY_INFO_KEYS, STAY_UNIT_TYPES, validateStayInfo, normalizeStayInfo, stayInfoLines, stayInfoHtml, staySleepsChip, formatStayTime, openMonthsText,
 };
