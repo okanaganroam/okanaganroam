@@ -31448,8 +31448,8 @@ function foodDrinkFilterBarHtml(venues, state = {}, scopeFeatures = null, welcom
     if (!scopeFeatures.length) return '';
     return `<div class="fd-controls">
     <div class="fd-pop">
-      <button type="button" class="fd-pop-btn" id="fdFeaturesBtn" aria-expanded="false" aria-controls="fdFeaturesPanel"><span class="fd-pop-icon" aria-hidden="true">${uiIcon('sparkle')}</span> <span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span><span class="fd-pop-count" id="fdFeaturesCount"${nF ? '' : ' hidden'}>${nF ? ` · ${escapeHtml(String(nF))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="fdFeaturesPanel" hidden>${foodDrinkFeatureChipsHtml(state, scopeFeatures)}
+      <button type="button" class="fd-pop-btn" id="fdFeaturesBtn" aria-expanded="false" aria-controls="fdFeaturesPanel"><span class="fd-pop-icon" aria-hidden="true">${welcoming ? '' : uiIcon('sparkle')}</span> ${welcoming ? '✨ Filters' : '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>'}<span class="fd-pop-count" id="fdFeaturesCount"${nF ? '' : ' hidden'}>${nF ? ` · ${escapeHtml(String(nF))}` : ''}</span></button>
+      <div class="fd-pop-panel" id="fdFeaturesPanel" hidden>${welcoming ? '<p class="fd-panel-heading">✨ Make it your kind of outing</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button>' : ''}${foodDrinkFeatureChipsHtml(state, scopeFeatures)}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>
@@ -31779,6 +31779,8 @@ function renderFoodDrinkHubScriptHtml(opts = {}) {
       if (key === 'az') return name(a).localeCompare(name(b));
       if (key === 'town') return String(LABELS.regions[d(a).r] || '').localeCompare(String(LABELS.regions[d(b).r] || '')) || name(a).localeCompare(name(b));
       if (key === 'rating') return ((d(b).g || 0) - (d(a).g || 0)) || ((d(b).n || 0) - (d(a).n || 0)) || name(a).localeCompare(name(b));
+      // Golf (2026-11-20): priced places by price, then the rest by name.
+      if (key === 'price-asc' || key === 'price-desc') { var pa = d(a).p, pb = d(b).p; if ((pa == null) !== (pb == null)) return pa == null ? 1 : -1; if (pa == null) return name(a).localeCompare(name(b)); return ((key === 'price-asc' ? pa - pb : pb - pa)) || name(a).localeCompare(name(b)); }
       return ((d(a).o === undefined ? 1e9 : d(a).o) - (d(b).o === undefined ? 1e9 : d(b).o));
     });
   }
@@ -32170,7 +32172,10 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
       // Fix (2026-10-18): honour the page's older single-choice parameter
       // (?activities= on Outdoors, ?activity= on Tours) like the server does,
       // so a pre-filtered first paint is not cleared on boot.
-      var pre = { t: (params.get('types') || ${opts.legacyTypesParam ? `params.get(${JSON.stringify(opts.legacyTypesParam)}) || ` : ''}'').split(',').filter(Boolean), f: (params.get('features') || '').split(',').filter(Boolean), r: (params.get('regions') || '').split(',').filter(Boolean) };
+      // Fix (2026-11-20): an activity page (/outdoors/hiking, /tours/wine, /sports/skate) names its activity on the chip row, so a
+      // first paint with that activity chosen is not cleared on boot when the address carries no ?types=.
+      var typeRow = document.querySelector('.fd-type-row[data-default-types]');
+      var pre = { t: (params.get('types') || ${opts.legacyTypesParam ? `params.get(${JSON.stringify(opts.legacyTypesParam)}) || ` : ''}(typeRow && !params.has('types') ? typeRow.getAttribute('data-default-types') : '') || '').split(',').filter(Boolean), f: (params.get('features') || '').split(',').filter(Boolean), r: (params.get('regions') || '').split(',').filter(Boolean) };
       typeChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.t.indexOf(c.getAttribute('data-fd-type')) !== -1 ? 'true' : 'false'); });
       featureChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.f.indexOf(c.getAttribute('data-fd-feature')) !== -1 ? 'true' : 'false'); });
       regionChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.r.indexOf(c.getAttribute('data-region')) !== -1 ? 'true' : 'false'); });
@@ -32664,7 +32669,7 @@ function renderFoodDrinkScopedPage(venues, filter, scope, now = new Date()) {
     if (st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
   }
 
-  const cardsHtml = venues.length ? foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, false, openInfo.byId) : '';
+  const cardsHtml = venues.length ? foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, false, openInfo.byId, { welcoming: true }) : '';
   const emptyHtml = venues.length === 0
     ? `<p class="fd-no-results" id="fdNoResults">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel || 'the Okanagan')} right now.</p>`
     : `<p class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}>No ${escapeHtml(label.plural.toLowerCase())} here match that combination yet. <a href="${path}" id="fdNoResultsClear">Clear the filters</a> to see all of them.</p>`;
@@ -32686,9 +32691,11 @@ ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderDestinationCategoryStyles()}
 ${renderFoodDrinkOpenNowStyles()}
+<link rel="stylesheet" href="/food-drink-layout.css?v=${crypto.createHash('md5').update(fs.readFileSync(require('node:path').join(__dirname, 'public', 'food-drink-layout.css'))).digest('hex').slice(0, 12)}">
+<style id="fd-scoped-refresh">@media(max-width:640px){body.fd-scoped-page.fd-refresh .fd-pop-panel{bottom:auto!important;max-height:calc(100dvh - 92px)!important;}}</style>
 ${golfEngagementHeadHtml('fd', true, 'category')}
 </head>
-<body class="golf-page outdoor-page fd-page fd-scoped-page">
+<body class="golf-page outdoor-page fd-page fd-refresh fd-scoped-page">
 ${CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE : ''}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -32703,8 +32710,10 @@ ${renderGolfHeaderHtml()}
     ? categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(valleyText.heading)}</h1>\n  <p class="outdoor-intro fd-intro">${escapeHtml(valleyText.intro)}</p>`)
     : categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>${region === 'kelowna' && (type === 'restaurant' || type === 'cafe') ? `\n  <p class="subtitle"><a href="${BRUNCH_GUIDE_PATH}">Guide: the best brunch in Kelowna &rarr;</a></p>` : ''}${type === 'winery' ? `\n  <p class="subtitle"><a href="${WINE_GUIDE_PATH}">New to wine country? Start with our first-timer\u2019s guide &rarr;</a> &middot; <a href="/wineries">All Okanagan wineries</a></p>` : ''}`)}
   ${valleyWide ? renderCategoryRegionSelector(catSlug, venues) : regionCategoryTabsHtml(region, categoryCounts, type)}
-  ${venues.length ? foodDrinkSearchHtml() : ''}
-  ${venues.length ? (foodDrinkFilterBarHtml(venues, state, scopeFeatures) || '<div class="fd-controls">\n  </div>').replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`) : ''}
+  ${venues.length ? `<div class="fd-toolbar">
+  ${foodDrinkSearchHtml(true)}
+  ${(foodDrinkFilterBarHtml(venues, state, scopeFeatures, true) || '<div class="fd-controls">\n  </div>').replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`)}
+  </div>` : ''}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
   ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered), state, venues.length > 1 ? sort : null)}
@@ -34189,6 +34198,110 @@ function dogCardPhotoKey(v, isBeach) {
   if (FD_CARD_DOG_PHOTOS[t] && id % 2 === 0) return `${t}-dog`;
   return foodDrinkCardPhotoKey({ ...v, dog_friendly: 0 });
 }
+// Sports and Indoor sub-pages in the hub layout (2026-11-20, batch 1). /sports/<activity>, /<town>/sports,
+// /indoor/<experience> and /<town>/indoor used an older page. They now show the /sports or /indoor page itself -- with the
+// activity already chosen, or with only that town's places -- and keep their own title, description, canonical, share
+// tags, schema, breadcrumb and heading, taken unchanged from the older page (oldHtml), so nothing a search engine reads moves.
+function subPageInHubLayout(hubHtml, oldHtml, pagePath, hubPath, opts = {}) {
+  const headOf = (h) => h.slice(0, h.indexOf('</head>'));
+  const oldHead = headOf(oldHtml);
+  let head = headOf(hubHtml), body = hubHtml.slice(head.length);
+  const swap = (re) => { const m = oldHead.match(re); if (m) head = head.replace(re, () => m[0]); };
+  swap(/<title>[\s\S]*?<\/title>/);
+  swap(/<meta name="description"[^>]*>/);
+  swap(/<link rel="canonical"[^>]*>/);
+  for (const k of ['og:type', 'og:title', 'og:description', 'og:image', 'og:url']) swap(new RegExp(`<meta property="${k}"[^>]*>`));
+  for (const k of ['twitter:card', 'twitter:title', 'twitter:description', 'twitter:image']) swap(new RegExp(`<meta name="${k}"[^>]*>`));
+  // Whether search engines may index the page stays exactly as the older page said.
+  const robotsRe = /<meta name="robots"[^>]*>\n?/;
+  const oldRobots = oldHead.match(robotsRe);
+  head = head.replace(robotsRe, '');
+  if (oldRobots) head = head.replace(/<title>/, () => oldRobots[0].trim() + '\n<title>');
+  const ldRe = /<script type="application\/ld\+json">[\s\S]*?<\/script>/g;
+  const oldLd = oldHead.match(ldRe) || [];
+  if (oldLd.length) { let first = true; head = head.replace(ldRe, () => { if (first) { first = false; return oldLd.join('\n'); } return ''; }); }
+  const oldMain = oldHtml.slice(oldHtml.indexOf('<main'));
+  const nav = oldMain.match(/<nav class="breadcrumb"[\s\S]*?<\/nav>/), h1 = oldMain.match(/<h1[^>]*>([\s\S]*?)<\/h1>/);
+  if (nav) body = body.replace(/<nav class="breadcrumb"[\s\S]*?<\/nav>/, () => nav[0]);
+  if (h1) body = body.replace(/(<h1[^>]*>)[\s\S]*?(<\/h1>)/, (m, a, b) => a + h1[1] + b);
+  if (opts.intro) body = body.replace(/(<p class="outdoor-intro fd-intro"[^>]*>)[\s\S]*?(<\/p>)/, (m, a, b) => a + escapeHtml(opts.intro) + b);
+  // Links back to the page itself, not to the hub.
+  body = body.replace(new RegExp(`href="${hubPath}" id="fdNoResultsClear"`), `href="${pagePath}" id="fdNoResultsClear"`);
+  if (opts.activity) body = body.replace('data-filter="fd-type"', `data-filter="fd-type" data-default-types="${opts.activity}"`);
+  if (opts.town) {
+    // One town: no town picker and no By town links.
+    body = body.replace(/<section class="hub-links" aria-labelledby="(?:sports|indoor)TownsHeading">[\s\S]*?<\/section>/, '');
+    head += '<style id="sub-page-town">.fd-pop:has(> #fdRegionsBtn){display:none!important}</style>\n';
+  }
+  return head + body;
+}
+function renderSportsSubPage(oldHtml, pagePath, query, scope) {
+  const inTown = (v) => !scope.region || v.region === scope.region;
+  const types = String(query.types || '').split(',').filter((t) => SPORT_ACTIVITIES.some((a) => a.slug === t));
+  const filter = { ...parseFoodDrinkFilterQuery(query), types: types.length || !scope.activity ? types : [scope.activity], sort: SPORTS_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' };
+  if (scope.region) filter.regions = [];
+  const hub = renderSportsHubPage(getVenuesByCategory('sport').filter(inTown), getSportsAlsoVenues().filter(inTown), getSportsAlsoNotes(), filter);
+  return subPageInHubLayout(hub, oldHtml, pagePath, '/sports', { town: !!scope.region, intro: scope.intro, activity: scope.activity });
+}
+function renderIndoorSubPage(oldHtml, pagePath, query, scope) {
+  const inTown = (v) => !scope.region || v.region === scope.region;
+  const types = String(query.types || '').split(',').filter((t) => INDOOR_HUB_EXPERIENCES.some((a) => a.slug === t));
+  const filter = { ...parseFoodDrinkFilterQuery(query), types: types.length || !scope.activity ? types : [scope.activity], openNow: query.open === 'now', sort: INDOOR_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' };
+  if (scope.region) filter.regions = [];
+  // A town page lists that town's indoor listings only, as it always has (no simulators or tagged places from other categories).
+  const hub = scope.region ? renderIndoorHubPage(getVenuesByCategory('indoor').filter(inTown), [], [], getIndoorAlsoNotes(), filter)
+    : renderIndoorHubPage(getVenuesByCategory('indoor'), getIndoorGolfVenues(), getIndoorAlsoVenues(), getIndoorAlsoNotes(), filter);
+  return subPageInHubLayout(hub, oldHtml, pagePath, '/indoor', { town: !!scope.region, intro: scope.intro, activity: scope.activity });
+}
+
+// Golf in the hub layout (2026-11-20, batch 1). /golf and /<town>/golf keep their three groups (as chips), their green
+// fees (a box on each card) and their price sorts, and keep their own title, schema, breadcrumb and heading (oldHtml).
+const GOLF_HUB_KINDS = [{ type: 'courses', label: 'Golf Courses' }, { type: 'practice', label: 'Driving Ranges & Practice' }, { type: 'simulators', label: 'Indoor Golf & Simulators' }];
+const GOLF_HUB_SORTS = [{ key: 'recommended', label: 'Recommended' }, { key: 'price-asc', label: 'Price: low to high' }, { key: 'price-desc', label: 'Price: high to low' }, { key: 'az', label: 'A–Z' }];
+function renderGolfHubLayoutPage(oldHtml, venues, query, scope = {}) {
+  const pagePath = scope.region ? `/${scope.region}/golf` : '/golf';
+  const details = golfDetailsFor(venues);
+  const today = scope.today;
+  const keyOf = (v) => `${v.region}/${v.slug}`;
+  const isPractice = (v) => !!(golfData && golfData.isPracticeFacility(details.get(keyOf(v))));
+  const kindOf = (v) => (isIndoorGolfVenue(v) ? 'simulators' : isPractice(v) ? 'practice' : 'courses');
+  const byName = (a, b) => String(a.name).localeCompare(String(b.name));
+  const group = (k) => venues.filter((v) => kindOf(v) === k);
+  const courses = seasonClosedLast(group('courses').sort((a, b) => foodDrinkRecommendedScore(b) - foodDrinkRecommendedScore(a) || byName(a, b)));
+  const ordered = [...courses, ...seasonClosedLast(group('practice')), ...group('simulators')];
+  const cents = (v) => (golfData ? golfData.comparisonCents(details.get(keyOf(v)), today) : null);
+  const kinds = GOLF_HUB_KINDS.filter((k) => ordered.some((v) => kindOf(v) === k.type));
+  const plainText = (h) => String(h || '').replace(/<\/p>\s*<p[^>]*>/g, ' · ').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+  const info = new Map(ordered.map((v) => {
+    let fee = golfData ? golfData.golfCardFeeHtml(details.get(keyOf(v)), today) : '';
+    if ((!fee || fee.includes('golf-fee-none')) && GOLF_CARD_PRICES[keyOf(v)]) fee = escapeHtml(GOLF_CARD_PRICES[keyOf(v)]);
+    const text = plainText(fee);
+    return [v.id, text ? `<div class="hub-card-info"><strong>Green fees</strong><p>${escapeHtml(text)}</p></div>` : ''];
+  }));
+  const sortKey = query.sort === 'name' ? 'az' : query.sort;
+  const types = String(query.types || '').split(',').filter((t) => kinds.some((k) => k.type === t));
+  const filter = { ...parseFoodDrinkFilterQuery(query), types, sort: GOLF_HUB_SORTS.some((x) => x.key === sortKey) ? sortKey : 'recommended' };
+  if (scope.region) filter.regions = [];
+  const m = oldHtml.slice(oldHtml.indexOf('<main')).match(/<p class="(?:outdoor-intro|hub-intro)[^"]*"[^>]*>([\s\S]*?)<\/p>/) || oldHtml.slice(oldHtml.indexOf('<main')).match(/<p class="(subtitle)">([^<]*)<\/p>/);
+  const intro = m ? plainText(m[m.length - 1]) : '';
+  const h1 = oldHtml.slice(oldHtml.indexOf('<main')).match(/<h1[^>]*>([\s\S]*?)<\/h1>/);
+  const content = { all: { banner: CATEGORY_BANNER_IMAGES.golf, heading: h1 ? plainText(h1[1]) : 'Golf Courses', intro: intro || 'Golf courses, driving ranges and indoor golf.' } };
+  const hub = renderCuratedHubPage({
+    path: pagePath, name: 'Golf Courses', title: 'Golf Courses | Okanagan Roam', description: 'Golf courses.', bodyClass: 'golf-hub-page', surface: 'golf',
+    region: scope.region || null,
+    types: kinds, catsFor: (v) => [kindOf(v)], categoryContent: content,
+    keepOrder: true, sorts: GOLF_HUB_SORTS, priceOf: cents,
+    listFor: (sort, mixed) => (sort === 'price-asc' || sort === 'price-desc') ? (() => { const priced = mixed.filter((v) => cents(v) != null).sort((a, b) => (cents(a) - cents(b)) * (sort === 'price-desc' ? -1 : 1) || byName(a, b)); return [...priced, ...mixed.filter((v) => cents(v) == null).sort(byName)]; })() : null,
+    photoKeyFor: (v) => curatedPhotoKey(v, 'golf'), cardExtraHtml: info, cardStatus: true,
+    features: ['kid_friendly', 'dog_friendly', 'lake_view', 'great_groups', 'patio'],
+    search: { label: 'Search golf courses', placeholder: 'Search by course name or town...' },
+    allLabel: '✨ All golf',
+    cardOptsExtra: { priceAllowed: () => false },
+    sortHelp: { summary: 'How sorting works', text: 'Recommended puts the best-rated courses with the most reviews first, then driving ranges and indoor golf; places closed for the season move lower down. Price sorting uses each course’s standard adult green fee for its standard round, at prime time in peak season, as published by the course. Places with no published fee come last.' },
+  }, ordered, filter);
+  return subPageInHubLayout(hub, oldHtml, pagePath, pagePath, {});
+}
+
 function renderDogHubPage(venues, filter = null, now = new Date()) {
   const f = { types: [], features: [], regions: [], ...(filter || {}) };
   const sort = DOG_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
@@ -34269,20 +34382,20 @@ function renderDogHubPage(venues, filter = null, now = new Date()) {
   const cardNotes = new Map([...policyNotes].filter(([id]) => !beachIds.has(id)));
   const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, openInfo.byId, {
     cardNotes, cardNoteLabel: 'Dogs:', photoKeyFor: (v) => dogCardPhotoKey(v, beachIds.has(v.id)),
-    cardOpts: { dogNoteInline: true, hideDogBadges: true },
+    cardOpts: { dogNoteInline: true, hideDogBadges: true }, welcoming: true,
   });
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${DOG_HUB_TYPES.map((t) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)} <span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">✨ All places</button>${DOG_HUB_TYPES.map((t) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)} <span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+      <div class="fd-pop-panel" id="${id}Panel" hidden><p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to go?' : '✨ Make it your kind of outing'}</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button><p class="hub-filter-help">Numbers show how many places match each filter.</p>${panel}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>`;
   const controlsHtml = `<div class="fd-controls">
-    ${pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
-    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+    ${pop('fdRegions', '<span class="fd-town-label">' + escapeHtml(nR ? REGION_LABELS[f.regions[0]] + (nR > 1 ? ' +' + (nR - 1) : '') : 'Choose a town') + '</span>', uiIcon('pin'), '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts, hideEmpty: true }))}
+    ${featureKeys.length ? pop('fdFeatures', '✨ Filters', '', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
     ${foodDrinkOpenNowToggleHtml(openNow, openCount)}
   </div>`;
   const typeLabels = Object.fromEntries(DOG_HUB_TYPES.map((t) => [t.type, t.label]));
@@ -34294,6 +34407,8 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: 
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderFoodDrinkOpenNowStyles()}
+<link rel="stylesheet" href="/food-drink-layout.css?v=${crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-layout.css'))).digest('hex').slice(0, 12)}">
+${CURATED_REFRESH_CSS.split('body.curated-hub-page.fd-refresh').join('body.dog-hub-page.fd-refresh')}
 ${golfEngagementHeadHtml('dog', true, 'hub')}
 <style id="dog-hub">
   body.dog-hub-page .dog-note, body.dog-hub-page .card-note { margin: 2px 0 10px; font-size: 0.9rem; line-height: 1.45; color: var(--teal-deep, #1F5450); }
@@ -34303,7 +34418,7 @@ ${golfEngagementHeadHtml('dog', true, 'hub')}
   body.dog-hub-page .dog-guides h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
 </style>
 </head>
-<body class="golf-page outdoor-page fd-page dog-page dog-hub-page">
+<body class="golf-page outdoor-page fd-page fd-refresh dog-page dog-hub-page">
 ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -34330,9 +34445,11 @@ ${renderGolfHeaderHtml()}
   </script>`, `<h1>${escapeHtml(dogContent.heading)}</h1>
   <p class="outdoor-intro fd-intro">${escapeHtml(dogContent.intro)}</p>
   <p class="subtitle"><a href="${DOG_GUIDE_PATH}">Guide: dog-friendly Kelowna, with the dog rules for each place &rarr;</a></p>`)}
+  <div class="fd-toolbar">
   ${foodDrinkSearchHtml().replace('Search food and drink', 'Search dog friendly places').replace('Search by name, place or dish...', 'Search by name, town, beach or trail...')}
-  ${chips}
   ${controlsHtml}
+  </div>
+  ${chips}
   <p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
@@ -35015,7 +35132,12 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   // cfg.layout === 'activities' (2026-11-20, Outdoors): the layout of /sports -- search, town and Filters in one bar,
   // activity chips with icons, welcoming cards with a "Things to do here" box, a note on the sort, and By activity /
   // By town links under the results. Every other curated page keeps the layout below.
-  const actLayout = cfg.layout === 'activities';
+  // Every curated page (2026-11-20, batch 1): the same layout, unless a page asks for cfg.layout 'classic'. Each page keeps
+  // its own chips, filters, notes and descriptions; only Outdoors swaps the description for its "Things to do here" box.
+  const actLayout = cfg.layout !== 'classic';
+  const allLabel = cfg.allLabel || (cfg.layout === 'activities' ? '✨ All activities' : '✨ All places');
+  const plainMixed = !cfg.sorts && !cfg.keepOrder && !cfg.openFirst && !cfg.reorder && !cfg.pinFirst;
+  const sortHelp = cfg.sortHelp || (plainMixed ? { summary: 'How “Mixed” works', text: 'Mixed spreads each kind of place through the list, so every kind gets a turn near the top, and the order changes each day. Places closed for the season move lower down. It is not a ranking.' } : null);
   const typeKeys = new Set(allTypes.map((t) => t.type));
   const f = { types: [], features: [], regions: [], ...(filter || {}) };
   f.types = f.types.filter((t) => typeKeys.has(t));
@@ -35040,7 +35162,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   const mixedRank = new Map(mixed.map((v, i) => [v.id, i]));
   const list = sort === 'az' ? venues.slice().sort(byName)
     : sort === 'town' ? venues.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
-      : mixed;
+      : (cfg.listFor && cfg.listFor(sort, mixed)) || mixed;
   const featsById = foodDrinkFeaturesByVenue(list);
   const featureTally = {};
   for (const fs of featsById.values()) for (const k of fs) featureTally[k] = (featureTally[k] || 0) + 1;
@@ -35085,20 +35207,23 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     const st = openInfo.byId.get(v.id);
     if (cfg.openNow && st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
     if (sorts.some((x) => x.key === 'rating')) { payload[String(v.id)].g = Number(v.rating) || 0; payload[String(v.id)].n = Number(v.reviews) || 0; }
+    // cfg.priceOf (2026-11-20, Golf): the comparison price behind the page's price sorts.
+    if (cfg.priceOf) { const pr = cfg.priceOf(v); if (pr != null) payload[String(v.id)].p = pr; }
   }
   const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, (cfg.openNow || cfg.cardStatus) ? openInfo.byId : null, {
     cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {}, cardExtraHtml: cfg.cardExtraHtml || null, cardNameMarkHtml: cfg.cardNameMarkHtml || null,
     // cfg.activityPhotos: 'swap' (follows the type chips) or one fixed activity ('winter' on Ski & Snow).
     altPhotos: cfg.activityPhotos ? (cfg.activityPhotos === 'swap' ? 'swap' : 'fixed') : null,
     photoType: cfg.activityPhotos && cfg.activityPhotos !== 'swap' ? cfg.activityPhotos : (f.types.length === 1 ? f.types[0] : null),
+    ...(actLayout ? { welcoming: true } : {}),
     ...(cfg.cardOptsExtra || {}),
   });
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">${actLayout ? '✨ All activities' : 'All'}</button>${allTypes.map((t, i) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}"${i >= cfg.types.length || (cfg.region && !(counts.types[t.type] || 0) && !selected.has(t.type)) ? ' hidden' : ''}>${actLayout && cfg.typeIcons && cfg.typeIcons[t.type] ? cfg.typeIcons[t.type] + ' ' : ''}${escapeHtml(t.label)} <span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>${actLayout ? '<p class="hub-filter-help">Numbers show how many places match each activity.</p>' : ''}`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"${cfg.defaultTypes && cfg.defaultTypes.length ? ` data-default-types="${cfg.defaultTypes.join(',')}"` : ''}><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">${actLayout ? allLabel : 'All'}</button>${allTypes.map((t, i) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}"${i >= cfg.types.length || (cfg.region && !(counts.types[t.type] || 0) && !selected.has(t.type)) ? ' hidden' : ''}>${actLayout && cfg.typeIcons && cfg.typeIcons[t.type] ? cfg.typeIcons[t.type] + ' ' : ''}${escapeHtml(t.label)} <span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>${actLayout ? '<p class="hub-filter-help">Numbers show how many places match each activity.</p>' : ''}`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="${id}Panel" hidden>${actLayout ? `<p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to go?' : '✨ Make it your kind of outing'}</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button><p class="hub-filter-help">Numbers show how many places match each filter.</p>` : ''}${panel}
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${actLayout ? `<p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to go?' : escapeHtml(cfg.filtersHeading || '✨ Make it your kind of outing')}</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button><p class="hub-filter-help">Numbers show how many places match each filter.</p>` : ''}${panel}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>`;
@@ -35122,6 +35247,7 @@ ${renderFoodDrinkHubStyles()}
 ${cfg.openNow ? renderFoodDrinkOpenNowStyles() : ''}
 ${actLayout ? `<link rel="stylesheet" href="/food-drink-layout.css?v=${crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-layout.css'))).digest('hex').slice(0, 12)}">` : ''}
 ${golfEngagementHeadHtml(cfg.surface, true, cfg.pageType || 'hub')}
+${actLayout ? CURATED_REFRESH_CSS : ''}
 ${cfg.extraHead || ''}
 <style id="curated-hub">
   body.curated-hub-page .card-note { margin: 2px 0 10px; font-size: 0.9rem; line-height: 1.45; color: var(--teal-deep, #1F5450); }
@@ -35171,7 +35297,7 @@ ${renderGolfHeaderHtml()}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
   ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, list.length, filtered), state, sort, sorts)}
-  ${actLayout && cfg.sortHelp ? `<details class="hub-sort-help" id="hubSortHelp"${sort === 'recommended' ? '' : ' hidden'}><summary>${escapeHtml(cfg.sortHelp.summary)}</summary><p>${escapeHtml(cfg.sortHelp.text)}</p></details>` : ''}
+  ${actLayout && sortHelp ? `<details class="hub-sort-help" id="hubSortHelp"${sort === 'recommended' ? '' : ' hidden'}><summary>${escapeHtml(sortHelp.summary)}</summary><p>${escapeHtml(sortHelp.text)}</p></details>` : ''}
   <p class="fd-search-note" id="fdSearchNote" hidden></p>
   <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">Nothing matches that combination yet.</span> <a href="${cfg.path}" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
   ${tryHtml ? `<p class="fd-no-results-try">Try one word, like ${tryHtml}.</p>` : ''}</div>
@@ -35187,7 +35313,7 @@ ${renderGolfHeaderHtml()}
   ${renderFoodDrinkHubScriptHtml({ openNow: !!cfg.openNow, surface: cfg.surface, typeLabels, searchLabels: cfg.searchLabels || {}, legacyTypesParam: cfg.legacyTypesParam || null })}
   ${cfg.activityPhotos === 'swap' ? ACTIVITY_PHOTO_SWAP_SCRIPT : ''}
   ${cfg.bodyClass === 'outdoors-hub-page' ? hubCardFitScriptHtml() : ''}
-  ${actLayout && cfg.sortHelp ? `<script>(function(){var sort=document.getElementById('fdSort'),help=document.getElementById('hubSortHelp');if(!sort||!help)return;function sync(){help.hidden=sort.value!=='recommended';}sort.addEventListener('change',sync);window.addEventListener('pageshow',sync);})();</script>` : ''}
+  ${actLayout && sortHelp ? `<script>(function(){var sort=document.getElementById('fdSort'),help=document.getElementById('hubSortHelp');if(!sort||!help)return;function sync(){help.hidden=sort.value!=='recommended';}sort.addEventListener('change',sync);window.addEventListener('pageshow',sync);})();</script>` : ''}
 </body>
 </html>`;
 }
@@ -35340,6 +35466,7 @@ function renderOutdoorsHubPage(venues, filter = null, opts = {}, now = new Date(
   for (const a of live) if (OUTDOOR_ACTIVITY_BANNERS[a.slug]) content[a.slug] = { banner: OUTDOOR_ACTIVITY_BANNERS[a.slug], heading: `${a.label} in ${town.region ? REGION_LABELS[town.region] : 'the Okanagan'}`, intro: a.blurb };
   return renderCuratedHubPage({
     path: activity ? `/outdoors/${activity.slug}` : '/outdoors',
+    defaultTypes: activity ? [activity.slug] : null,
     name: activity ? activity.label : 'Outdoors',
     crumbs: activity ? [{ name: 'Outdoors', href: '/outdoors' }] : [],
     title: activity ? `${activity.label} in the Okanagan | Okanagan Roam` : 'Outdoor Adventures in the Okanagan | Okanagan Roam',
@@ -35410,6 +35537,37 @@ function outdoorsActivityLayout(venues, live, acts, town, now = new Date()) {
     extraHead: OUTDOORS_ACTIVITY_LAYOUT_CSS,
   };
 }
+// The layout rules every curated page shares (2026-11-20); Outdoors adds its own card rules below.
+const CURATED_REFRESH_CSS = `<style id="curated-refresh">
+  body.curated-hub-page.fd-refresh .hub-card-info {padding:10px 12px;margin:0 0 10px;background:#edf3e9;border-radius:14px;line-height:1.45;}
+  body.curated-hub-page.fd-refresh .hub-card-info strong {display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#286962;margin-bottom:4px;}
+  body.curated-hub-page.fd-refresh .hub-card-info p {font-size:14px;margin:0;color:#1b2b3a;}
+  body.curated-hub-page.fd-refresh .category-banner {height:170px;min-height:0;}
+  body.curated-hub-page.fd-refresh .fd-intro {display:block!important;-webkit-line-clamp:unset;}
+  body.curated-hub-page.fd-refresh .hub-filter-help {font:400 13px/1.45 Nunito,sans-serif;color:#615b53;margin:8px 0 12px;}
+  body.curated-hub-page.fd-refresh .fd-pop-panel .hub-filter-help {margin-top:22px;}
+  body.curated-hub-page.fd-refresh .hub-sort-help {margin:0 0 12px;color:#286962;font:700 13px/1.5 Nunito,sans-serif;}
+  body.curated-hub-page.fd-refresh .hub-sort-help summary {cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px;}
+  body.curated-hub-page.fd-refresh .hub-sort-help summary::before {content:'▸';}
+  body.curated-hub-page.fd-refresh .hub-sort-help[open] summary::before {content:'▾';}
+  body.curated-hub-page.fd-refresh .hub-sort-help p {max-width:70ch;margin:0;padding:12px 16px;background:#edf3e9;border-radius:16px;color:#514b43;font-weight:400;}
+  @media(max-width:640px){
+    body.curated-hub-page.fd-refresh .fd-type-row + .hub-filter-help {display:none;}
+    body.curated-hub-page.fd-refresh.fd-refresh .fd-pop-panel {bottom:auto!important;max-height:calc(100dvh - 92px)!important;}
+    body.curated-hub-page.fd-refresh.fd-refresh .category-banner,body.curated-hub-page.fd-refresh.fd-refresh .category-banner img {height:110px!important;}
+    body.curated-hub-page.fd-refresh.fd-refresh #fdResults > .venue-card {padding:12px 16px!important;}
+    body.curated-hub-page.fd-refresh.fd-refresh #fdResults > .venue-card::before {height:clamp(128px,40vw,190px)!important;min-height:0!important;padding-bottom:0!important;width:calc(100% + 32px);margin:0 -16px 10px;}
+    body.curated-hub-page.fd-refresh.fd-refresh #fdResults > .venue-card > h2 {font-size:20px;line-height:1.25;margin-bottom:8px;}
+    body.curated-hub-page.fd-refresh.fd-refresh #fdResults > .venue-card > .card-slot-notice:has(> .season-tag) {position:relative!important;order:-2!important;top:auto!important;right:auto!important;left:auto!important;align-self:flex-start;max-width:calc(100% - 20px);margin:-48px 10px 18px!important;}
+  }
+  body.curated-hub-page.fd-refresh .hub-links { margin: 26px 0 8px; }
+  body.curated-hub-page.fd-refresh .hub-links h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+  body.curated-hub-page.fd-refresh .hub-links nav { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.curated-hub-page.fd-refresh .hub-links a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 700; font-size: 0.86rem; color: var(--ink, #2A2019); text-decoration: none; }
+  body.curated-hub-page.fd-refresh .hub-links a:hover { background: rgba(27,43,58,0.06); }
+  body.curated-hub-page.fd-refresh .hub-links a span { font-size: 0.74rem; opacity: 0.6; }
+
+</style>`;
 const OUTDOORS_ACTIVITY_LAYOUT_CSS = `<style id="outdoors-hub">
   body.outdoors-hub-page .category-banner {height:170px;min-height:0;}
   body.outdoors-hub-page .fd-intro {display:block!important;-webkit-line-clamp:unset;}
@@ -35499,6 +35657,7 @@ function renderToursSectionPage(venues, alsoVenues, filter = null, opts = {}, no
   for (const a of TOUR_ACTIVITIES) content[a.slug] = { banner: a.banner, heading: a.heading || `${a.label} in the Okanagan`, intro: a.intro || a.blurb || content.all.intro };
   return renderCuratedHubPage({
     path: activity ? `/tours/${activity.slug}` : '/tours',
+    defaultTypes: activity ? [activity.slug] : null,
     name: activity ? activity.label : 'Tours & Experiences',
     crumbs: activity ? [{ name: 'Tours & Experiences', href: '/tours' }] : [],
     schemaFilter: activity ? (v) => tourInActivity(v, activity.slug) : null,
@@ -72763,8 +72922,14 @@ const server = http.createServer(async (req, res) => {
           sportActivity: type === 'sport' ? slug : undefined,
           sportsAlso: type === 'sport' ? getSportsAlsoVenues() : undefined,
         });
+        // Batch 1 (2026-11-20): the activity page in the /sports or /indoor layout, with its own title, schema and heading.
+        const introOf = (h) => { const m = h.slice(h.indexOf('<main')).match(/<p class="(?:outdoor-intro|hub-intro)[^"]*"[^>]*>([\s\S]*?)<\/p>/); return m ? m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim() : ''; };
+        const laidOut = type === 'sport' && SPORT_ACTIVITIES.some((a) => a.slug === slug) ? renderSportsSubPage(html, `/sports/${slug}`, query, { activity: slug, intro: introOf(html) })
+          // /indoor/family stays on its older page: it lists every kid-friendly indoor place, a wider set than the /indoor page's Family Fun chip.
+          : type === 'indoor' && slug !== 'family' && INDOOR_HUB_EXPERIENCES.some((a) => a.slug === slug) ? renderIndoorSubPage(html, `/indoor/${slug}`, query, { activity: slug, intro: introOf(html) })
+            : html;
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end(html);
+        return res.end(laidOut);
       }
     }
 
@@ -72806,8 +72971,15 @@ const server = http.createServer(async (req, res) => {
           const html = FD_CATEGORY_KIND_BY_TYPE[type] || type === 'winery'
             ? renderFoodDrinkHubPage(venues, { ...parseFoodDrinkFilterQuery(query), openNow: query.open === 'now', sort: FD_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' }, { region, type, categoryCounts: getRegionCategoryCounts(region), categoryGuidePages })
             : renderCategoryPage(region, type, venues, categoryGuidePages, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', sportsAlso });
+          // Batch 1 (2026-11-20): town Sports and Indoor pages in the /sports or /indoor layout, with only that town's places.
+          const sub = html.slice(html.indexOf('<main')).match(/<p class="subtitle">([^<]*)<\/p>/);
+          const townIntro = sub ? sub[1].replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim() : `Places in ${REGION_LABELS[region]}, BC, listed by Okanagan Roam.`;
+          const laidOut = type === 'golf' && venues.length ? renderGolfHubLayoutPage(html, venues, query, { region })
+            : type === 'sport' && (venues.length || sportsAlso.length) ? renderSportsSubPage(html, `/${region}/sports`, query, { region, intro: townIntro })
+            : type === 'indoor' && venues.length ? renderIndoorSubPage(html, `/${region}/indoor`, query, { region, intro: townIntro })
+              : html;
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-          return res.end(html);
+          return res.end(laidOut);
         }
       }
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -72883,7 +73055,7 @@ const server = http.createServer(async (req, res) => {
         // parseOutdoorFilterQuery); /indoor also accepts an activity choice.
         const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', indoorActivity: type === 'indoor' ? query.activity : undefined, indoorGolf: type === 'indoor' ? getIndoorGolfVenues() : undefined, indoorAlso: type === 'indoor' ? getIndoorAlsoVenues() : undefined, toursAlso: type === 'tour' ? getToursAlsoVenues() : undefined, tourActivity: type === 'tour' ? query.activity : undefined, sportActivity: type === 'sport' ? query.activity : undefined, sportsAlso: type === 'sport' ? getSportsAlsoVenues() : undefined });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end(html);
+        return res.end(type === 'golf' && venues.length ? renderGolfHubLayoutPage(html, venues, query) : html);
       }
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(render404Page(pathname));
