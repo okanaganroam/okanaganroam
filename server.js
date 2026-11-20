@@ -28447,7 +28447,58 @@ function staysPageDeps() {
     // Close by: the type names and venue page links every other venue page uses (French page only when the place has one).
     typeLabel: (type, lang) => (((lang === 'fr' ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[type] || {}).singular || type),
     venueHref: (v, lang) => (lang === 'fr' && venueHasFrench(v) ? venuePagePath(v, 'fr') : venuePagePath(v)),
+    // Stay info (2026-11-20): the stored facts ("Good to know" on the page, "Sleeps N" on the list), or null.
+    stayInfo: (id) => { const r = getStayInfo(id); return r ? r.info : null; },
   };
+}
+// ---- Stay info (2026-11-20) ----
+// One validated JSON object per stay (stay_info table, placesToStay.validateStayInfo). -> { info, updated_at, batch_id }
+// or null (none stored, or unreadable).
+function getStayInfo(venueId) {
+  try {
+    const row = db.prepare('SELECT info_json, updated_at, batch_id FROM stay_info WHERE venue_id = ?').get(venueId);
+    if (!row) return null;
+    const info = JSON.parse(row.info_json);
+    return info && typeof info === 'object' && !Array.isArray(info) ? { info, updated_at: row.updated_at, batch_id: row.batch_id } : null;
+  } catch (e) { return null; }
+}
+// Upsert a stay's info (already validated) with one venue_enrichment_log row (field 'stay_info', old and new JSON) in
+// the same transaction. expect_updated_at (optional): the updated_at the caller last read (null = "none stored yet");
+// a different one means someone else wrote in between, and nothing is written.
+//   { found: false } | { found: true, notStay: true } | { found: true, conflict: true, live }
+//   | { found: true, changed: false, live } | { found: true, changed: true, created, live }
+function guardedStayInfoUpsert(venueId, info, meta) {
+  const venue = db.prepare('SELECT id, type FROM venues WHERE id = ?').get(venueId);
+  if (!venue) return { found: false };
+  if (venue.type !== placesToStay.STAY_TYPE) return { found: true, notStay: true };
+  const json = JSON.stringify(placesToStay.normalizeStayInfo(info));
+  let txOpen = false;
+  try {
+    db.exec('BEGIN IMMEDIATE');
+    txOpen = true;
+    const existing = db.prepare('SELECT info_json, updated_at, batch_id FROM stay_info WHERE venue_id = ?').get(venueId) || null;
+    if (meta.hasExpect && (existing ? existing.updated_at : null) !== meta.expect_updated_at) {
+      db.exec('ROLLBACK'); txOpen = false;
+      return { found: true, conflict: true, live: getStayInfo(venueId) };
+    }
+    if (existing && existing.info_json === json) {
+      db.exec('ROLLBACK'); txOpen = false;
+      return { found: true, changed: false, live: getStayInfo(venueId) };
+    }
+    const now = new Date().toISOString();
+    db.prepare(`INSERT INTO stay_info (venue_id, info_json, updated_at, batch_id) VALUES (?, ?, ?, ?)
+      ON CONFLICT(venue_id) DO UPDATE SET info_json = excluded.info_json, updated_at = excluded.updated_at, batch_id = excluded.batch_id`)
+      .run(venueId, json, now, meta.batch_id);
+    db.prepare(`INSERT INTO venue_enrichment_log
+        (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+      VALUES (?, 'stay_info', ?, ?, 'manual_research', ?, ?, ?, 0, NULL)`)
+      .run(venueId, existing ? existing.info_json : null, json, meta.reason, info.confidence || 'low', meta.batch_id);
+    db.exec('COMMIT'); txOpen = false;
+    return { found: true, changed: true, created: !existing, live: getStayInfo(venueId) };
+  } catch (err) {
+    if (txOpen) { try { db.exec('ROLLBACK'); } catch (_) { /* the original error is what matters */ } }
+    throw err;
+  }
 }
 // Close by on a stay's page (2026-11-19): our own listings within 2 km of it (placesToStay.pickStayCloseBy ranks
 // them), by the venue pages' distance helper. Not stays, not redirected, only types with a page, and not places closed
@@ -70129,6 +70180,46 @@ const server = http.createServer(async (req, res) => {
     // strict key allowlist as every admin route; reason and batch_id are
     // required for the audit row. 200 { changed: true } on a write,
     // 409 when the venue already has a website (nothing written).
+    // POST /admin/stay-info (2026-11-20): store the extra facts about one place to stay (places-to-stay.js,
+    // drafts/stays-2026-11/stay-info-schema.md). Body { venue_id, info, reason, batch_id, expect_updated_at? }; only
+    // venues of type 'stay'; info is validated (validateStayInfo) and upserted with one venue_enrichment_log row.
+    // GET /admin/stay-info?venue_id= reads it back. Bearer ENRICHMENT_ADMIN_TOKEN, like every /admin write route.
+    if (pathname === '/admin/stay-info' && (method === 'POST' || method === 'GET')) {
+      if (!requireAdminToken(req, res)) return;
+      if (method === 'GET') {
+        const id = /^\d{1,10}$/.test(String(query.venue_id || '')) ? Number(query.venue_id) : NaN;
+        if (!Number.isInteger(id) || id <= 0) return sendJSON(res, 400, { error: 'venue_id must be a positive integer.' });
+        const v = db.prepare('SELECT id, name, region, slug, type FROM venues WHERE id = ?').get(id);
+        if (!v) return sendJSON(res, 404, { error: 'Venue not found.' });
+        if (v.type !== placesToStay.STAY_TYPE) return sendJSON(res, 400, { error: 'That venue is not a place to stay.' });
+        const r = getStayInfo(id);
+        return sendJSON(res, 200, { venue_id: id, name: v.name, region: v.region, slug: v.slug, info: r ? r.info : null, updated_at: r ? r.updated_at : null, batch_id: r ? r.batch_id : null });
+      }
+      let body;
+      try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+      const allowed = ['venue_id', 'info', 'reason', 'batch_id', 'expect_updated_at'];
+      const unexpected = Object.keys(body).filter((k) => !allowed.includes(k));
+      if (unexpected.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpected.join(', ')}` });
+      if (!Number.isInteger(body.venue_id) || body.venue_id <= 0) return sendJSON(res, 400, { error: 'venue_id must be a positive integer.' });
+      if (typeof body.reason !== 'string' || !body.reason.trim()) return sendJSON(res, 400, { error: 'reason is required and must be a non-empty string.' });
+      if (typeof body.batch_id !== 'string' || !body.batch_id.trim()) return sendJSON(res, 400, { error: 'batch_id is required and must be a non-empty string.' });
+      const hasExpect = Object.prototype.hasOwnProperty.call(body, 'expect_updated_at');
+      if (hasExpect && body.expect_updated_at !== null && typeof body.expect_updated_at !== 'string') return sendJSON(res, 400, { error: 'expect_updated_at must be a string or null.' });
+      const checked = placesToStay.validateStayInfo(body.info);
+      if (!checked.ok) return sendJSON(res, 400, { error: 'info is not valid.', errors: checked.errors });
+      let result;
+      try {
+        result = guardedStayInfoUpsert(body.venue_id, body.info, { reason: body.reason.trim(), batch_id: body.batch_id.trim(), hasExpect, expect_updated_at: hasExpect ? body.expect_updated_at : undefined });
+      } catch (err) {
+        return sendJSON(res, 500, { error: 'Saving the stay info failed and was rolled back.', detail: String(err.message || err) });
+      }
+      if (!result.found) return sendJSON(res, 404, { error: 'Venue not found.' });
+      if (result.notStay) return sendJSON(res, 400, { error: 'That venue is not a place to stay; stay info is only for type stay.' });
+      if (result.conflict) return sendJSON(res, 409, { error: 'The stay info changed since expect_updated_at; nothing was written.', live: result.live });
+      return sendJSON(res, 200, { venue_id: body.venue_id, changed: result.changed, created: !!result.created, info: result.live && result.live.info, updated_at: result.live && result.live.updated_at, batch_id: result.live && result.live.batch_id });
+    }
+
     if (pathname === '/admin/enrich-website' && method === 'POST') {
       if (!ENRICHMENT_ADMIN_TOKEN) {
         return sendJSON(res, 503, { error: 'Enrich-website endpoint is not configured.' });
@@ -73454,7 +73545,7 @@ if (require.main === module) {
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
   // Places to stay (2026-11-19), for tests/stays.test.js.
-  getStaysByRegion, findStayBySlug, handleStaysRoute, getStayCloseBy, withStaysNavLink, venueActivityCounter,
+  getStaysByRegion, findStayBySlug, handleStaysRoute, getStayCloseBy, withStaysNavLink, getStayInfo, guardedStayInfoUpsert, venueActivityCounter,
   // Tour test 12 (Whistler, 2026-11-18).
   // Tour test 13.
   fitToLimit, tourExtrasSection, tourListBookWords, tourListInfo, tourOwnWords, tourWeatherAll, tourOffRequest, ownerVisitText, tourFitNote,

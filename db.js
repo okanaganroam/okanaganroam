@@ -1670,4 +1670,16 @@ CREATE TABLE IF NOT EXISTS weekend_email_sends (
 );
 `);
 
+// Stay info (2026-11-20, places-to-stay.js): one JSON object of extra facts per place to stay (type 'stay'), in the
+// shape of drafts/stays-2026-11/stay-info-schema.md. Written only through POST /admin/stay-info (validated there, one
+// venue_enrichment_log row per change); batch_id is the research batch that last wrote it.
+db.exec(`
+CREATE TABLE IF NOT EXISTS stay_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info_json TEXT NOT NULL,
+  updated_at TEXT,
+  batch_id TEXT
+);
+`);
+
 module.exports = db;
