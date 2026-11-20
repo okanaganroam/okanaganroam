@@ -1,0 +1,209 @@
+{
+  "armstrong": {
+    "en": "Our only place to stay for Armstrong is a riverside campground on the Salmon River, out toward Falkland rather than in town. For more choice, look at Vernon, a short drive south.",
+    "fr": "Pour Armstrong, notre seul hébergement est un terrain de camping au bord de la rivière Salmon, en direction de Falkland plutôt qu'en ville. Pour plus de choix, regardez du côté de Vernon, à quelques minutes de route au sud.",
+    "tips": [
+      {
+        "en": "Many campgrounds in the area close for winter, so check the season before you go.",
+        "fr": "Plusieurs campings de la région ferment l'hiver : vérifiez les dates d'ouverture avant de partir."
+      }
+    ]
+  },
+  "baldy": {
+    "en": "Our one stay here is a lodge on the ski hill, rented as whole self-contained units, so it suits families and groups. Baldy's season can change from year to year, so check that the resort is running before you book.",
+    "fr": "Notre seul hébergement ici est un chalet sur la montagne, loué en unités complètes et autonomes, idéal pour les familles et les groupes. La saison de Baldy peut changer d'une année à l'autre : assurez-vous que la station est ouverte avant de réserver.",
+    "tips": [
+      {
+        "en": "Oliver and Osoyoos are the nearest towns for groceries and more places to stay.",
+        "fr": "Oliver et Osoyoos sont les villes les plus proches pour l'épicerie et d'autres hébergements."
+      }
+    ]
+  },
+  "big-white": {
+    "en": "Most places to stay are in or next to the village, and many are ski-in/ski-out. The Village Centre keeps you closest to shops and restaurants. Areas a little away from the centre are quieter, with condos and log cabins. Lodging here is busiest in ski season.",
+    "fr": "La plupart des hébergements sont dans le village ou tout près, et plusieurs sont skis aux pieds. Le centre du village vous garde près des boutiques et des restaurants. Les secteurs un peu à l'écart du centre sont plus calmes, avec des condos et des chalets en bois rond. C'est en saison de ski que tout se remplit.",
+    "tips": [
+      {
+        "en": "Drive up with winter tires or chains: BC requires them on most highways from October 1.",
+        "fr": "Montez avec des pneus d'hiver ou des chaînes : la C.-B. les exige sur la plupart des routes à partir du 1er octobre."
+      },
+      {
+        "en": "Ask how your unit connects to the runs. Some are true ski-in/ski-out; others are a short walk away.",
+        "fr": "Demandez comment votre logement rejoint les pistes. Certains sont vraiment skis aux pieds, d'autres à quelques pas de marche."
+      }
+    ]
+  },
+  "enderby": {
+    "en": "Our two stays here are campgrounds: one on the Shuswap River in Enderby, and one north of town in Mara along Highway 97A. Both suit RV and tent campers who want time on the river.",
+    "fr": "Nos deux hébergements ici sont des terrains de camping : l'un au bord de la rivière Shuswap à Enderby, l'autre au nord, à Mara, le long de la route 97A. Ils conviennent aux campeurs en VR ou en tente qui veulent profiter de la rivière.",
+    "tips": [
+      {
+        "en": "Check opening dates before you go, especially outside summer.",
+        "fr": "Vérifiez les dates d'ouverture avant de partir, surtout hors de l'été."
+      }
+    ]
+  },
+  "kaleden": {
+    "en": "Kaleden sits on the west side of Skaha Lake, between Penticton and Okanagan Falls. Stays here are a lakeside cabin resort and a campground near the water, plus a rural B&B out in the Marron Valley. It's a quiet lake base with Penticton close by.",
+    "fr": "Kaleden se trouve sur la rive ouest du lac Skaha, entre Penticton et Okanagan Falls. On y trouve des chalets au bord du lac, un camping près de l'eau et un gîte à la campagne dans la vallée de Marron. Un coin tranquille au bord du lac, à deux pas de Penticton.",
+    "tips": [
+      {
+        "en": "Some places here only open in the warmer months, so check dates first.",
+        "fr": "Certains endroits n'ouvrent que pendant la belle saison : vérifiez les dates d'abord."
+      }
+    ]
+  },
+  "kelowna": {
+    "en": "Downtown, near the lake, you can walk to City Park, the beach and the bars. Harvey Avenue and Highway 97 North are lined with chain hotels and budget motels, handy if you're driving, and newer hotels cluster near the airport. The Lower Mission has beach stays near Pandosy Village, and RV parks sit east of the city off Highway 33.",
+    "fr": "Au centre-ville, près du lac, vous pouvez vous rendre à pied au parc City Park, à la plage et dans les bars. L'avenue Harvey et la route 97 Nord regroupent hôtels de chaîne et motels abordables, pratiques en voiture, et des hôtels récents entourent l'aéroport. Le Lower Mission offre des séjours près des plages et du village Pandosy, et les terrains de VR sont à l'est, près de la route 33.",
+    "tips": [
+      {
+        "en": "Harvey Avenue is Highway 97, the main road through town. If traffic noise bothers you, ask for a room away from the road.",
+        "fr": "L'avenue Harvey, c'est la route 97, l'axe principal de la ville. Si le bruit vous dérange, demandez une chambre loin de la route."
+      },
+      {
+        "en": "Airport hotels suit early flights, but downtown and the beaches are a drive away.",
+        "fr": "Les hôtels de l'aéroport sont pratiques pour un vol matinal, mais il faut prendre la voiture pour le centre-ville et les plages."
+      }
+    ]
+  },
+  "lake-country": {
+    "en": "Lake Country is spread out north of Kelowna, with no single town centre. Stays include orchard RV parks in Oyama between Wood and Kalamalka lakes, a highway motel in Winfield, an RV resort on Ellison Lake and log cabins up at Beaver Lake for fishing.",
+    "fr": "Lake Country est un secteur étendu au nord de Kelowna, sans vrai centre-ville. On y trouve des terrains de VR dans les vergers d'Oyama, entre les lacs Wood et Kalamalka, un motel sur la route à Winfield, un complexe de VR au lac Ellison et des chalets en bois rond au lac Beaver, pour la pêche.",
+    "tips": [
+      {
+        "en": "Winfield is just north of Kelowna's airport, which helps with early flights.",
+        "fr": "Winfield est juste au nord de l'aéroport de Kelowna, pratique pour un vol matinal."
+      },
+      {
+        "en": "Some RV parks here are seasonal, so check dates before you book.",
+        "fr": "Certains terrains de VR sont saisonniers : vérifiez les dates avant de réserver."
+      }
+    ]
+  },
+  "naramata": {
+    "en": "Naramata village is small and walkable, with cafés, a beach and the KVR Trail close by. Out on the Naramata Bench, guest houses sit among the vineyards, good for winery days. There are no big hotels, so choice is limited; Penticton is a short drive south.",
+    "fr": "Le village de Naramata est petit et se fait à pied, avec des cafés, une plage et le sentier KVR tout près. Sur le Naramata Bench, des maisons d'hôtes se trouvent au milieu des vignes, parfaites pour visiter les vignobles. Il n'y a pas de grands hôtels, donc le choix est limité; Penticton est à quelques minutes de route au sud.",
+    "tips": [
+      {
+        "en": "Rooms are few, so book early for summer and harvest weekends.",
+        "fr": "Les chambres sont rares : réservez tôt pour les fins de semaine d'été et des vendanges."
+      },
+      {
+        "en": "The KVR Trail runs along the bench, an easy way to bike between wineries.",
+        "fr": "Le sentier KVR longe le Bench, une façon facile d'aller d'un vignoble à l'autre à vélo."
+      },
+      {
+        "en": "Some suites are adults-only or have minimum stays, so check before you book.",
+        "fr": "Certaines suites sont réservées aux adultes ou exigent un séjour minimum : vérifiez avant de réserver."
+      }
+    ]
+  },
+  "okanagan-falls": {
+    "en": "Okanagan Falls sits at the south end of Skaha Lake. Our stays here are small: a lakefront inn, an RV park on the water and a motel near the beach, with wineries close by.",
+    "fr": "Okanagan Falls se trouve au bout sud du lac Skaha. Nos hébergements y sont petits : une auberge au bord du lac, un terrain de VR sur l'eau et un motel près de la plage, avec des vignobles tout près.",
+    "tips": []
+  },
+  "oliver": {
+    "en": "Downtown motels and hotels line Main Street, within walking distance of places to eat. West and east of town, the Golden Mile and Black Sage benches have winery suites and guest houses. For lake time, look at the resorts and RV parks on Tuc-el-Nuit Lake, or north at Gallagher and Vaseux lakes.",
+    "fr": "Au centre-ville, motels et hôtels bordent la rue Main, à distance de marche des restaurants. À l'ouest et à l'est, les secteurs Golden Mile et Black Sage offrent des suites et des maisons d'hôtes dans les vignobles. Pour profiter du lac, regardez les complexes et terrains de VR du lac Tuc-el-Nuit, ou plus au nord, aux lacs Gallagher et Vaseux.",
+    "tips": [
+      {
+        "en": "Many winery stays are whole houses or suites with minimum nights, so read the booking rules.",
+        "fr": "Plusieurs séjours en vignoble sont des maisons entières ou des suites avec un minimum de nuits : lisez bien les conditions."
+      },
+      {
+        "en": "Harvest season in September and October is busy, so book early.",
+        "fr": "Les vendanges, en septembre et octobre, attirent beaucoup de monde : réservez tôt."
+      },
+      {
+        "en": "Some RV parks stay open all year and take winter snowbirds.",
+        "fr": "Certains terrains de VR restent ouverts toute l'année et accueillent les hivernants."
+      }
+    ]
+  },
+  "osoyoos": {
+    "en": "Many places to stay line Main Street, including lakefront hotels and motels with their own beaches near the centre of town. The east side of the lake is quieter, with beach resorts, campgrounds and a hillside resort on Nk'Mip land. Budget motels are spread along Main Street and the highways into town.",
+    "fr": "Plusieurs hébergements bordent la rue Main, dont des hôtels et motels avec plage privée près du centre. La rive est du lac est plus calme, avec des complexes de plage, des campings et un complexe à flanc de colline sur les terres nk'mip. Les motels abordables sont répartis le long de la rue Main et des routes qui mènent en ville.",
+    "tips": [
+      {
+        "en": "Summers here are hot, so check that your room has air conditioning.",
+        "fr": "Les étés sont chauds ici : vérifiez que votre chambre est climatisée."
+      },
+      {
+        "en": "Some lakefront suites offer longer winter stays for snowbirds.",
+        "fr": "Certaines suites au bord du lac offrent des séjours prolongés l'hiver pour les hivernants."
+      },
+      {
+        "en": "The U.S. border crossing is just south of town.",
+        "fr": "Le poste frontalier avec les États-Unis est juste au sud de la ville."
+      }
+    ]
+  },
+  "peachland": {
+    "en": "Our one stay in Peachland is a cabin resort on Beach Avenue, set above its own sandy beach on Okanagan Lake.",
+    "fr": "Notre seul hébergement à Peachland est un ensemble de chalets sur l'avenue Beach, au-dessus de sa propre plage de sable sur le lac Okanagan.",
+    "tips": []
+  },
+  "penticton": {
+    "en": "Lakeshore Drive, across from Okanagan Beach, is the busiest strip, with motels and hotels a walk from downtown and the convention centre. Skaha Lake Road runs south to Skaha Beach, with family motels along the way. Riverside Drive sits by the river channel, and B&Bs dot the Naramata Bench for winery visits.",
+    "fr": "La promenade Lakeshore, face à la plage Okanagan, est le secteur le plus animé, avec motels et hôtels à distance de marche du centre-ville et du centre des congrès. La route Skaha Lake descend jusqu'à la plage Skaha, bordée de motels familiaux. La promenade Riverside longe le canal, et des gîtes parsèment le Naramata Bench, près des vignobles.",
+    "tips": [
+      {
+        "en": "Riverside Drive is close to where the summer river-channel float begins.",
+        "fr": "La promenade Riverside est près du départ de la descente du canal en bouée, l'été."
+      },
+      {
+        "en": "Several motels offer weekly or monthly rates in winter.",
+        "fr": "Plusieurs motels offrent des tarifs à la semaine ou au mois l'hiver."
+      }
+    ]
+  },
+  "silverstar": {
+    "en": "All our stays are in or right beside the village, with its colourful main street of hotels, lodges and condos. Many are ski-in/ski-out, and the village is busiest in ski season. In summer, it's a base for mountain biking and hiking.",
+    "fr": "Tous nos hébergements sont dans le village ou juste à côté, avec sa rue principale colorée bordée d'hôtels, de chalets et de condos. Plusieurs sont skis aux pieds, et le village est le plus achalandé en saison de ski. L'été, c'est un point de départ pour le vélo de montagne et la randonnée.",
+    "tips": [
+      {
+        "en": "Several lodges share one central front desk in the village, so confirm where to pick up your keys.",
+        "fr": "Plusieurs chalets partagent une même réception au village : confirmez où récupérer vos clés."
+      },
+      {
+        "en": "Drive up with winter tires or chains: BC requires them on most highways from October 1.",
+        "fr": "Montez avec des pneus d'hiver ou des chaînes : la C.-B. les exige sur la plupart des routes à partir du 1er octobre."
+      },
+      {
+        "en": "Vernon, down the hill, is the nearest town for groceries and more places to stay.",
+        "fr": "Vernon, au pied de la montagne, est la ville la plus proche pour l'épicerie et d'autres hébergements."
+      }
+    ]
+  },
+  "summerland": {
+    "en": "Summerland's two stays are motels just off Highway 97: one downtown, and one a short walk from Sunoka and Powell beaches. The second is near the start of Bottleneck Drive, the local wine route.",
+    "fr": "Les deux hébergements de Summerland sont des motels tout près de la route 97 : l'un au centre-ville, l'autre à quelques minutes à pied des plages Sunoka et Powell. Ce dernier est près du début de Bottleneck Drive, la route des vins locale.",
+    "tips": []
+  },
+  "vernon": {
+    "en": "Most hotels and motels line 32nd Street, the Highway 97 strip through the centre, with newer chain hotels in north Vernon by Anderson Way. Swan Lake, just north, has RV parks and a suite hotel. South of town, look for lakeside vacation homes on Okanagan Lake and a golf resort.",
+    "fr": "La plupart des hôtels et motels bordent la 32e Rue, le tronçon de la route 97 qui traverse le centre, et des hôtels de chaîne récents se trouvent dans le nord de Vernon, près d'Anderson Way. Au lac Swan, juste au nord, il y a des terrains de VR et un hôtel de suites. Au sud, on trouve des maisons de vacances au bord du lac Okanagan et un complexe de golf.",
+    "tips": [
+      {
+        "en": "Vernon works as a base for SilverStar day trips; the ski hill is up Silver Star Road.",
+        "fr": "Vernon est une bonne base pour skier à SilverStar à la journée; la station est au bout de la route Silver Star."
+      }
+    ]
+  },
+  "west-kelowna": {
+    "en": "Chain hotels and a motel sit by Highway 97 in Westbank, handy if you're driving. B&Bs are spread across the hills and Lakeview Heights, close to the Westside Wine Trail. Lakefront cottage resorts line the shore, from near the bridge south.",
+    "fr": "Les hôtels de chaîne et un motel sont le long de la route 97 à Westbank, pratiques en voiture. Les gîtes sont dispersés dans les collines et à Lakeview Heights, près de la route des vins Westside Wine Trail. Des chalets au bord de l'eau longent la rive, du pont vers le sud.",
+    "tips": [
+      {
+        "en": "The Westside Wine Trail follows Boucherie Road, so nearby B&Bs keep winery drives short.",
+        "fr": "La Westside Wine Trail suit le chemin Boucherie : les gîtes à proximité évitent les longs trajets entre vignobles."
+      },
+      {
+        "en": "The bridge to Kelowna gets busy at rush hour, so leave extra time.",
+        "fr": "Le pont vers Kelowna est souvent congestionné aux heures de pointe : prévoyez du temps."
+      }
+    ]
+  }
+}
