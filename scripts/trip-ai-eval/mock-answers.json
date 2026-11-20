@@ -1,5 +1,5 @@
 {
- "note": "Hand-written stand-ins for what Claude Haiku 5.5 is expected to return for the 20 hard cases, used by --mock when no ANTHROPIC_API_KEY is available. They run through the real trip-ai.js code (a fake fetch returns them), so validation, rendering and the planner are exercised; latency and cost are not real.",
+ "note": "Hand-written stand-ins for what Claude Haiku 5.5 is expected to return for the hard cases and the two regressions from the first real run (R52 order, R55 designated driver), used by --mock when no ANTHROPIC_API_KEY is available. They run through the real trip-ai.js code (a fake fetch returns them), so validation, rendering and the planner are exercised; latency and cost are not real.",
  "answers": {
   "H01": {
    "unsure": false,
@@ -722,6 +722,232 @@
    "budget": null,
    "must_have": [],
    "must_avoid": []
+  },
+  "H21": {
+   "unsure": false,
+   "towns": [
+    "oliver"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": 1,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "winery",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": [],
+   "driver": true
+  },
+  "H22": {
+   "unsure": false,
+   "towns": [
+    "vernon"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "dinner",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "cocktail",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H23": {
+   "unsure": false,
+   "towns": [
+    "summerland"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "winery",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "dinner",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H24": {
+   "unsure": false,
+   "towns": [
+    "kelowna"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "lunch",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "brewery",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": [
+    "winery"
+   ]
+  },
+  "R52": {
+   "unsure": false,
+   "towns": [
+    "penticton"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "dinner",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "brewery",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "R55": {
+   "unsure": false,
+   "towns": [
+    "naramata"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "wine_tasting",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": [],
+   "driver": true
   }
  }
 }

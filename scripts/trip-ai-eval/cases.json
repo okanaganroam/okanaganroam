@@ -1,5 +1,5 @@
 {
- "note": "20 hard cases (the Nov 18 plan's list plus 10 more, hand-labelled) and 60 realistic requests. The 60 are NOT from the trip-demand log: Stage 1 stores only which businesses were shown/added/removed, never the request text, and no export exists locally. They are the owner's own Build My Trip QA prompts (drafts/trip-qa-2026-10-25), labelled automatically by the harness's keyword labeller. Replace them with real visitor requests when a log of request text exists.",
+ "note": "24 hard cases (the Nov 18 plan's list, 10 more, and 4 order/negation regressions added after the first real run, hand-labelled) and 60 realistic requests. The 60 are NOT from the trip-demand log: Stage 1 stores only which businesses were shown/added/removed, never the request text, and no export exists locally. They are the owner's own Build My Trip QA prompts (drafts/trip-qa-2026-10-25), labelled automatically by the harness's keyword labeller. Replace them with real visitor requests when a log of request text exists.",
  "cases": [
   {
    "id": "H01",
@@ -283,6 +283,68 @@
    "lang": "en",
    "expect": {
     "expectFallback": true
+   }
+  },
+  {
+   "id": "H21",
+   "set": "hard",
+   "text": "a winery day in Oliver, my sister is our designated driver",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "oliver"
+    ],
+    "kinds": [
+     "winery"
+    ]
+   }
+  },
+  {
+   "id": "H22",
+   "set": "hard",
+   "text": "cocktails after dinner in Vernon",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "vernon"
+    ],
+    "kinds": [
+     "restaurant",
+     "drinks"
+    ]
+   }
+  },
+  {
+   "id": "H23",
+   "set": "hard",
+   "text": "before dinner, a winery in Summerland",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "summerland"
+    ],
+    "kinds": [
+     "winery",
+     "restaurant"
+    ]
+   }
+  },
+  {
+   "id": "H24",
+   "set": "hard",
+   "text": "lunch followed by a brewery in Kelowna, no wineries please",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "kelowna"
+    ],
+    "kinds": [
+     "restaurant",
+     "brewery"
+    ],
+    "noKinds": [
+     "winery"
+    ]
    }
   },
   {

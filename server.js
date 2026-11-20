@@ -7785,7 +7785,7 @@ async function tripAiPlanArgs(args, { staysOn = false, now = new Date(), lang = 
   const allowed = tripAi.buildAllowed(taxonomy);
   let r;
   try { r = await (reader || tripAiReader)(args.text, { today: todayLocal(now), lang, allowed, now }); } catch (e) { r = { ok: false, reason: 'error' }; }
-  const info = { used: false, reason: (r && r.reason) || 'error', ms: r && Number.isFinite(r.ms) ? r.ms : null, model: tripAi.MODEL, costUsd: r && r.costUsd ? Number(r.costUsd.toFixed(6)) : 0, intent: (r && r.intent) || null };
+  const info = { used: false, reason: (r && r.reason) || 'error', ms: r && Number.isFinite(r.ms) ? r.ms : null, model: tripAi.MODEL, costUsd: r && r.costUsd ? Number(r.costUsd.toFixed(6)) : 0, usage: (r && r.usage) || null, intent: (r && r.intent) || null };
   if (!r || !r.ok || !r.intent) return { args, ai: info };
   // The reader's answer is checked again here, whatever reader produced it.
   const v = tripAi.validateIntent(r.intent, allowed, { originalText: args.text, today: todayLocal(now) });

@@ -79,62 +79,129 @@ function buildAllowed(taxonomy = {}) {
 
 const nullable = (schema) => ({ anyOf: [schema, { type: 'null' }] });
 const enumOf = (values) => ({ type: 'string', enum: values.slice() });
-// Strict JSON schema for structured output (no numeric or length limits: those are checked in validateIntent).
-function intentSchema(allowed) {
+// Kinds served with alcohol, for the negation-scope check ("designated driver" is not "no alcohol").
+const DRINK_KINDS = new Set(['winery', 'wine_tasting', 'brewery', 'cidery', 'distillery', 'pub', 'cocktail', 'drinks', 'apres', 'happy_hour']);
+const WHEN_VALUES = [...WEEKDAYS, ...MONTHS, ...SEASONS];
+
+// The wire format (round 2, 2026-11-20): what the model writes. Haiku's read time is mostly the tokens it writes, and the
+// first version wrote every key every time (~250-300 tokens, mostly nulls and falses). Now only towns ("t") and
+// interests ("i") are required and every other key is optional: the model leaves out what the request doesn't say, so a
+// typical answer is ~30-80 tokens. Optional keys instead of nullable ones also take the schema from 11 union-typed
+// parameters to none (unions are the expensive part of grammar compilation) and stay inside the documented limit of 24
+// optional parameters (we use 20). Expanded to the long, readable intent by expandWire() before anything else sees it.
+//   u unsure, t towns, v valley-wide, sd start date, d days, n nights, w weekday/month/season, a adults, k kids,
+//   ka kids' ages, dog, o occasion, rain, dd designated driver, i interests [{k kind, t time of day, s start "HH:MM",
+//   p typed place}], pc pace, b budget, mh must-haves, ma must-avoids.
+const WIRE_KEYS = ['t', 'i', 'u', 'v', 'sd', 'd', 'n', 'w', 'a', 'k', 'ka', 'dog', 'o', 'rain', 'dd', 'pc', 'b', 'mh', 'ma'];
+const WIRE_REQUIRED = ['t', 'i'];
+function wireSchema(allowed) {
   return {
     type: 'object',
     additionalProperties: false,
-    required: ['unsure', 'towns', 'valley_wide', 'start_date', 'days', 'nights', 'weekday', 'month', 'season', 'party', 'occasion',
-      'rainy_day', 'interests', 'pace', 'budget', 'must_have', 'must_avoid'],
+    required: WIRE_REQUIRED.slice(),
     properties: {
-      unsure: { type: 'boolean' },
-      towns: { type: 'array', items: enumOf(allowed.regions) },
-      valley_wide: { type: 'boolean' },
-      start_date: nullable({ type: 'string', format: 'date' }),
-      days: nullable({ type: 'integer' }),
-      nights: nullable({ type: 'integer' }),
-      weekday: nullable(enumOf(WEEKDAYS)),
-      month: nullable(enumOf(MONTHS)),
-      season: nullable(enumOf(SEASONS)),
-      party: {
-        type: 'object', additionalProperties: false, required: ['adults', 'kids', 'kid_ages', 'dog'],
-        properties: { adults: nullable({ type: 'integer' }), kids: nullable({ type: 'integer' }), kid_ages: { type: 'array', items: { type: 'integer' } }, dog: { type: 'boolean' } },
-      },
-      occasion: nullable(enumOf(OCCASIONS)),
-      rainy_day: { type: 'boolean' },
-      interests: {
+      t: { type: 'array', items: enumOf(allowed.regions) },
+      i: {
         type: 'array',
         items: {
-          type: 'object', additionalProperties: false, required: ['kind', 'time_of_day', 'start_time', 'place'],
-          properties: { kind: enumOf(allowed.kinds), time_of_day: enumOf(TIMES), start_time: nullable({ type: 'string' }), place: nullable({ type: 'string' }) },
+          type: 'object', additionalProperties: false, required: ['k'],
+          properties: { k: enumOf(allowed.kinds), t: enumOf(TIMES), s: { type: 'string' }, p: { type: 'string' } },
         },
       },
-      pace: nullable(enumOf(allowed.paces)),
-      budget: nullable(enumOf(allowed.budgets)),
-      must_have: { type: 'array', items: enumOf(allowed.features) },
-      must_avoid: { type: 'array', items: enumOf(allowed.avoid) },
+      u: { type: 'boolean' },
+      v: { type: 'boolean' },
+      sd: { type: 'string', format: 'date' },
+      d: { type: 'integer' },
+      n: { type: 'integer' },
+      w: enumOf(WHEN_VALUES),
+      a: { type: 'integer' },
+      k: { type: 'integer' },
+      ka: { type: 'array', items: { type: 'integer' } },
+      dog: { type: 'boolean' },
+      o: enumOf(OCCASIONS),
+      rain: { type: 'boolean' },
+      dd: { type: 'boolean' },
+      pc: enumOf(allowed.paces),
+      b: enumOf(allowed.budgets),
+      mh: { type: 'array', items: enumOf(allowed.features) },
+      ma: { type: 'array', items: enumOf(allowed.avoid) },
     },
   };
 }
+// Kept for callers of the first version: the schema the model answers in.
+const intentSchema = wireSchema;
+const LONG_KEYS = ['unsure', 'towns', 'valley_wide', 'start_date', 'days', 'nights', 'weekday', 'month', 'season', 'party', 'occasion',
+  'rainy_day', 'interests', 'pace', 'budget', 'must_have', 'must_avoid'];
 
+// Wire answer -> the long intent, filling what was left out (shape only; validateIntent checks every value).
+// -> { ok, intent } | { ok: false, reason }
+function expandWire(w) {
+  if (!w || typeof w !== 'object' || Array.isArray(w)) return { ok: false, reason: 'invalid:not_object' };
+  const extra = Object.keys(w).filter((k) => !WIRE_KEYS.includes(k));
+  if (extra.length) return { ok: false, reason: `invalid:extra_${extra[0]}` };
+  for (const k of WIRE_REQUIRED) if (!(k in w)) return { ok: false, reason: `invalid:missing_${k}` };
+  const opt = (k, dflt) => (w[k] === undefined ? dflt : w[k]);
+  const when = opt('w', null);
+  if (when !== null && !inEnum(when, WHEN_VALUES)) return { ok: false, reason: 'invalid:when' };
+  if (!Array.isArray(w.i)) return { ok: false, reason: 'invalid:interests' };
+  for (const it of w.i) {
+    if (!it || typeof it !== 'object' || Array.isArray(it) || !('k' in it) || Object.keys(it).some((k) => !['k', 't', 's', 'p'].includes(k))) return { ok: false, reason: 'invalid:interest' };
+  }
+  return {
+    ok: true,
+    intent: {
+      unsure: opt('u', false), towns: w.t, valley_wide: opt('v', false), start_date: opt('sd', null), days: opt('d', null), nights: opt('n', null),
+      weekday: WEEKDAYS.includes(when) ? when : null, month: MONTHS.includes(when) ? when : null, season: SEASONS.includes(when) ? when : null,
+      party: { adults: opt('a', null), kids: opt('k', null), kid_ages: opt('ka', []), dog: opt('dog', false) }, occasion: opt('o', null),
+      rainy_day: opt('rain', false), driver: opt('dd', false),
+      interests: w.i.map((it) => ({ kind: it.k, time_of_day: it.t === undefined ? 'any' : it.t, start_time: it.s === undefined ? null : it.s, place: it.p === undefined ? null : it.p })),
+      pace: opt('pc', null), budget: opt('b', null), must_have: opt('mh', []), must_avoid: opt('ma', []),
+    },
+  };
+}
+// The long intent -> the wire format, leaving out what is empty, as the model is told to (for fixtures and tests).
+function toWire(x) {
+  const p = x.party || {};
+  const w = { t: x.towns || [], i: (x.interests || []).map((it) => {
+    const o = { k: it.kind };
+    if (it.time_of_day && it.time_of_day !== 'any') o.t = it.time_of_day;
+    if (it.start_time) o.s = it.start_time;
+    if (it.place) o.p = it.place;
+    return o;
+  }) };
+  const put = (k, v) => { if (v !== null && v !== undefined && v !== false && !(Array.isArray(v) && !v.length)) w[k] = v; };
+  put('u', !!x.unsure); put('v', !!x.valley_wide); put('sd', x.start_date); put('d', x.days); put('n', x.nights);
+  put('w', x.weekday || x.month || x.season || null); put('a', p.adults); put('k', p.kids); put('ka', p.kid_ages); put('dog', !!p.dog);
+  put('o', x.occasion); put('rain', !!x.rainy_day); put('dd', !!x.driver); put('pc', x.pace); put('b', x.budget);
+  put('mh', x.must_have); put('ma', x.must_avoid);
+  return w;
+}
+
+// The system prompt is the same for every request (towns, rules), so it is sent as one cached block; the date and the
+// request go in the user message after it. Claude Haiku 5.5 caches prefixes from 512 tokens; this prompt plus the
+// schema is ~2K tokens, so it qualifies. The kind/feature enums live in the schema (also stable, compiled once and cached
+// by the API for 24 h).
 function systemPrompt(allowed) {
   const towns = allowed.regions.map((r) => `${r} (${allowed.regionLabels[r] || r})`).join(', ');
   return [
-    'You read one visitor request for a trip planner in the Okanagan Valley, BC, and return it as JSON in the given schema. You do not plan anything.',
-    'Rules:',
-    '- Only read what the request says. Never add a place, business, price, opening hour or booking. Leave a field empty/null when the request does not say it.',
-    `- towns: only these slugs: ${towns}. "Okanagan", "the valley" or several towns across the valley -> valley_wide true. A ski hill named by its resort (Big White, SilverStar, Apex, Baldy) is that town slug.`,
-    '- start_date: only when the request gives a calendar date (resolve "this Saturday", "tomorrow", "Dec 5" from today\'s date given below, YYYY-MM-DD, never in the past). Otherwise use weekday, month or season.',
-    '- days: the number of days asked ("a weekend" = 2, "a day" = 1). nights: only when the request counts nights.',
-    '- party: adults and kids only when counted; kid_ages only when ages are given ("toddlers" = [2], "teens" = [15]); dog true when a dog comes.',
-    '- interests: what they want to do, in the order asked, each mapped to the closest kind in the enum. "a day on the mountain/slopes" in winter = ski; "après" = apres; "hot tub" = hot_tub; "wine tasting" = wine_tasting or winery; "cheap eats" = cheap_eats.',
-    '  time_of_day only when said or obvious ("morning coffee" = morning); start_time "HH:MM" 24h only when a clock time is given ("coffee at 10" = "10:00").',
-    '  place: only a business name the visitor typed for that stop, copied exactly as typed; otherwise null. Never suggest one.',
-    '- occasion: romantic (anniversary, date, honeymoon), family, friends, parents ("for my parents", seniors), solo, birthday. rainy_day when rain or a rainy day is mentioned.',
-    '- pace: relaxed for "chill", "slow", "easy", "relaxing"; packed for "busy", "as much as possible". budget: budget for "cheap", "on a budget"; upscale for "fancy", "luxury".',
-    '- must_have: needs such as vegan, gluten_free, kid_friendly, dog_friendly, accessible (wheelchair, mobility). must_avoid: kinds of places or alcohol they do not want.',
-    '- The request may be in French; read it the same way.',
-    '- unsure: true when the text is not a trip request, is too vague to read, or you are guessing. When unsure, still fill what you can.',
+    'You read one visitor request for an Okanagan Valley (BC) trip planner into the JSON schema. You do not plan anything.',
+    'Only read what the request says. Never add a place, business, price, opening hour or booking. Leave fields empty/null when not said. Do not infer needs or avoidances (kids do not mean "no alcohol").',
+    'Leave out every key that the request does not give (only t and i are always there; t may be []).',
+    'Keys: u unsure, t towns, v whole valley, sd start date, d days, n nights, w weekday/month/season, a adults, k kids, ka kids\' ages, dog, o occasion, rain rainy day, dd designated driver, i interests, pc pace, b budget, mh must-haves, ma must-avoids.',
+    `t: only these slugs: ${towns}. "Okanagan", "the valley" or towns across the valley -> v true. A ski hill (Big White, SilverStar, Apex, Baldy) is its slug. "Naramata Bench" is naramata.`,
+    'sd: only for a calendar date ("this Saturday", "tomorrow", "Dec 5"), resolved from today\'s date below as YYYY-MM-DD, never past. Otherwise w = weekday, month or season.',
+    'd: days asked ("a weekend" = 2, "a day" = 1). n: only when nights are counted. a, k: only when counted; ka only when ages are given ("toddlers" = [2], "teens" = [15]).',
+    'i: one entry per stop they want, IN THE ORDER THEY WILL HAPPEN, which is not always the order of the words:',
+    '  "a brewery after dinner" -> dinner, brewery. "before dinner, a winery" -> winery, dinner. "X then Y", "X followed by Y", "start with X", "end with Y" -> X, Y.',
+    '  One entry per stop: "a sunset dinner" = dinner; "lunch with a view" = lunch plus mh lake_view; "a winery tour" = winery; "après after skiing" = ski, apres (no extra drinks).',
+    '  "a day on the mountain/slopes" in winter = ski. "cheap eats" = cheap_eats. "wine tasting" = wine_tasting.',
+    '  Each interest: k kind; t time of day only when said or obvious ("morning coffee" = morning); s "HH:MM" 24h only for a clock time ("coffee at 10" = "10:00"); p only a business name the visitor typed for that stop, copied exactly. Never suggest one.',
+    'o: romantic (anniversary, date, couples, honeymoon), family, friends (girls, bachelor), parents (seniors, grandparents), solo, birthday.',
+    'pc: relaxed for chill/slow/easy; packed for busy/as much as possible. b: budget for cheap; upscale for fancy/luxury.',
+    'mh: needs such as vegan, gluten_free, kid_friendly, dog_friendly, accessible (wheelchair, mobility).',
+    'ma: only what they say to avoid or exclude, scoped to exactly what the "no"/"not"/"without" applies to. "we don\'t drink" / "sober" / "alcohol-free" -> alcohol. A designated driver, "someone is driving" or "no driving" means they DO drink: dd true, never alcohol. Never put a kind in ma that is also in i.',
+    'The request may be in French; read it the same way.',
+    'u: true only when the text is not a trip request or is too vague to read; still fill what you can.',
   ].join('\n');
 }
 
@@ -170,7 +237,7 @@ function resetSpend() { spend.day = null; spend.usd = 0; spend.calls = 0; }
 function costOf(usage) {
   if (!usage) return 0;
   return (Number(usage.input_tokens) || 0) * PRICE_PER_TOKEN.input + (Number(usage.output_tokens) || 0) * PRICE_PER_TOKEN.output
-    + (Number(usage.cache_creation_input_tokens) || 0) * PRICE_PER_TOKEN.input * 1.25 + (Number(usage.cache_read_input_tokens) || 0) * PRICE_PER_TOKEN.input * 0.1;
+    + (Number(usage.cache_creation_input_tokens) || 0) * PRICE_PER_TOKEN.input * 2 + (Number(usage.cache_read_input_tokens) || 0) * PRICE_PER_TOKEN.input * 0.1;
 }
 
 function enabled(env = process.env) { return /^(1|on|true|yes)$/i.test(String(env.TRIP_AI || '').trim()); }
@@ -192,11 +259,12 @@ function addDays(iso, n) { const d = new Date(`${iso}T12:00:00Z`); d.setUTCDate(
 function validateIntent(raw, allowed, { originalText = '', today = null } = {}) {
   const bad = (reason) => ({ ok: false, reason: `invalid:${reason}` });
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return bad('not_object');
-  const keys = Object.keys(intentSchema(allowed).properties);
-  const extra = Object.keys(raw).filter((k) => !keys.includes(k));
+  const extra = Object.keys(raw).filter((k) => !LONG_KEYS.includes(k) && k !== 'driver');
   if (extra.length) return bad(`extra_${extra[0]}`);
-  for (const k of keys) if (!(k in raw)) return bad(`missing_${k}`);
+  for (const k of LONG_KEYS) if (!(k in raw)) return bad(`missing_${k}`);
   if (typeof raw.unsure !== 'boolean' || typeof raw.valley_wide !== 'boolean' || typeof raw.rainy_day !== 'boolean') return bad('boolean');
+  // driver (round 2): optional, false when absent.
+  if (raw.driver !== undefined && typeof raw.driver !== 'boolean') return bad('driver');
   if (!Array.isArray(raw.towns) || raw.towns.length > 8 || !raw.towns.every((t) => inEnum(t, allowed.regions))) return bad('towns');
   if (raw.start_date !== null && !validDate(raw.start_date)) return bad('start_date');
   if (raw.start_date && today && (raw.start_date < today || raw.start_date > addDays(today, 400))) return bad('start_date_range');
@@ -217,7 +285,8 @@ function validateIntent(raw, allowed, { originalText = '', today = null } = {}) 
   const dropped = [];
   const interests = [];
   for (const it of raw.interests) {
-    if (!it || typeof it !== 'object' || Array.isArray(it) || Object.keys(it).some((k) => !['kind', 'time_of_day', 'start_time', 'place'].includes(k))) return bad('interest');
+    if (!it || typeof it !== 'object' || Array.isArray(it) || Object.keys(it).some((k) => !['kind', 'time_of_day', 'start_time', 'place', 'sunset'].includes(k))) return bad('interest');
+    if (it.sunset !== undefined && it.sunset !== true) return bad('interest_sunset');
     if (!inEnum(it.kind, allowed.kinds)) return bad('interest_kind');
     if (!inEnum(it.time_of_day, TIMES)) return bad('interest_time');
     if (it.start_time !== null && !(typeof it.start_time === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(it.start_time))) return bad('interest_start_time');
@@ -225,18 +294,35 @@ function validateIntent(raw, allowed, { originalText = '', today = null } = {}) 
     let place = it.place === null ? null : String(it.place).replace(/\s+/g, ' ').trim().slice(0, 80);
     // The visitor's own words only: a name the request does not contain is dropped (never a suggestion from the model).
     if (place && (place.length < 3 || !folded.includes(fold(place)))) { dropped.push(`place:${place}`); place = null; }
-    interests.push({ kind: it.kind, time_of_day: it.time_of_day, start_time: it.start_time, place: place || null });
+    const prev = interests[interests.length - 1];
+    // One stop asked once: the same kind twice in a row, or après followed by "drinks", is one stop (the first answer
+    // read "après drinks after skiing" as après then drinks; "2 days of golf" as golf, golf).
+    if (prev && !place && !prev.place && (prev.kind === it.kind || (prev.kind === 'apres' && it.kind === 'drinks'))) { dropped.push(`repeat:${it.kind}`); continue; }
+    // "a sunset dinner" is one dinner at sunset, not a sunset stop plus a dinner.
+    if (prev && prev.kind === 'sunset' && it.kind === 'dinner' && !prev.place) { interests.pop(); dropped.push('repeat:sunset'); }
+    const sunset = it.sunset === true || !!(prev && prev.kind === 'sunset' && it.kind === 'dinner' && !prev.place);
+    interests.push({ kind: it.kind, time_of_day: it.time_of_day, start_time: it.start_time, place: place || null, ...(sunset ? { sunset: true } : {}) });
   }
   if (raw.pace !== null && !inEnum(raw.pace, allowed.paces)) return bad('pace');
   if (raw.budget !== null && !inEnum(raw.budget, allowed.budgets)) return bad('budget');
   if (!Array.isArray(raw.must_have) || raw.must_have.length > 10 || !raw.must_have.every((f) => inEnum(f, allowed.features))) return bad('must_have');
   if (!Array.isArray(raw.must_avoid) || raw.must_avoid.length > 10 || !raw.must_avoid.every((f) => inEnum(f, allowed.avoid))) return bad('must_avoid');
+  // Negation scope (round 2): an avoidance can't cancel what was asked for. A kind that is also an interest is not
+  // avoided, and "no alcohol" can't stand next to a winery, brewery or drinks stop, or a designated driver ("wine tasting
+  // with a designated driver" means they drink and someone else drives; the first answer read it as "no alcohol").
+  const asked = new Set(interests.map((x) => x.kind));
+  const drinksAsked = interests.some((x) => DRINK_KINDS.has(x.kind));
+  const avoid = [...new Set(raw.must_avoid)].filter((k) => {
+    const conflict = asked.has(k) || (k === 'alcohol' && (drinksAsked || raw.driver === true));
+    if (conflict) dropped.push(`avoid:${k}`);
+    return !conflict;
+  });
   const intent = {
     unsure: raw.unsure, towns: [...new Set(raw.towns)], valley_wide: raw.valley_wide, start_date: raw.start_date, days: raw.days, nights: raw.nights,
     weekday: raw.weekday, month: raw.month, season: raw.season,
     party: { adults: p.adults, kids: p.kids, kid_ages: p.kid_ages.slice(), dog: p.dog },
-    occasion: raw.occasion, rainy_day: raw.rainy_day, interests, pace: raw.pace, budget: raw.budget,
-    must_have: [...new Set(raw.must_have)], must_avoid: [...new Set(raw.must_avoid)],
+    occasion: raw.occasion, rainy_day: raw.rainy_day, driver: raw.driver === true, interests, pace: raw.pace, budget: raw.budget,
+    must_have: [...new Set(raw.must_have)], must_avoid: avoid,
   };
   return { ok: true, intent, dropped };
 }
@@ -262,12 +348,16 @@ async function readTripRequest(text, opts = {}) {
   const fetchImpl = opts.fetchImpl || fetch;
   const body = {
     model: MODEL,
-    max_tokens: 1024,
+    // The wire answer is ~60-120 tokens; 400 leaves room without letting a runaway answer eat the time budget.
+    max_tokens: 400,
     // A short extraction: thinking off at low effort keeps it fast and cheap (Claude Haiku 5.5 accepts "disabled" at
     // effort high or below).
     thinking: { type: 'disabled' },
-    output_config: { effort: 'low', format: { type: 'json_schema', schema: intentSchema(allowed) } },
-    system: systemPrompt(allowed),
+    output_config: { effort: 'low', format: { type: 'json_schema', schema: wireSchema(allowed) } },
+    // Identical on every request, so it is cached. A one-hour cache, because test reads on the live site are minutes
+    // apart (a 5-minute cache would mostly miss); a hit skips re-reading ~1.7K tokens and bills them at 0.1x, a write
+    // costs 2x on those tokens (well under a cent a day).
+    system: [{ type: 'text', text: systemPrompt(allowed), cache_control: { type: 'ephemeral', ttl: '1h' } }],
     messages: [{ role: 'user', content: `Today is ${cap1(weekday)} ${today}.${opts.lang === 'fr' ? ' The visitor is on the French page.' : ''}\nRequest: ${clean}` }],
   };
   const controller = new AbortController();
@@ -290,16 +380,21 @@ async function readTripRequest(text, opts = {}) {
   } catch (err) {
     return { ok: false, reason: err && (err.code === 'TIMEOUT' || err.name === 'AbortError' || err.name === 'TimeoutError') ? 'timeout' : 'network', ms: ms() };
   } finally { clearTimeout(timer); }
-  const usage = j && j.usage ? { input_tokens: j.usage.input_tokens || 0, output_tokens: j.usage.output_tokens || 0 } : null;
+  const usage = j && j.usage ? {
+    input_tokens: j.usage.input_tokens || 0, output_tokens: j.usage.output_tokens || 0,
+    cache_read_input_tokens: j.usage.cache_read_input_tokens || 0, cache_creation_input_tokens: j.usage.cache_creation_input_tokens || 0,
+  } : null;
   const costUsd = costOf(j && j.usage);
   if (costUsd) addSpend(costUsd, now);
   if (!res || !res.ok || !j) return { ok: false, reason: `api_${res ? res.status : 0}`, usage, costUsd, ms: ms() };
   if (j.stop_reason === 'refusal') return { ok: false, reason: 'refused', usage, costUsd, ms: ms() };
   if (j.stop_reason === 'max_tokens') return { ok: false, reason: 'too_long', usage, costUsd, ms: ms() };
   const out = (j.content || []).filter((b) => b && b.type === 'text').map((b) => b.text).join('');
-  let raw;
-  try { raw = JSON.parse(out); } catch (e) { return { ok: false, reason: 'bad_json', usage, costUsd, ms: ms() }; }
-  const v = validateIntent(raw, allowed, { originalText: text, today });
+  let wire;
+  try { wire = JSON.parse(out); } catch (e) { return { ok: false, reason: 'bad_json', usage, costUsd, ms: ms() }; }
+  const x = expandWire(wire);
+  if (!x.ok) return { ok: false, reason: x.reason, usage, costUsd, ms: ms() };
+  const v = validateIntent(x.intent, allowed, { originalText: text, today });
   if (!v.ok) return { ok: false, reason: v.reason, usage, costUsd, ms: ms() };
   if (v.intent.unsure) return { ok: false, reason: 'unsure', intent: v.intent, usage, costUsd, ms: ms() };
   return { ok: true, intent: v.intent, dropped: v.dropped, usage, costUsd, ms: ms(), model: j.model || MODEL };
@@ -317,8 +412,10 @@ function interestPhrase(it, kinds) {
   let phrase = TYPE_PHRASES[it.kind] && kinds.types.has(it.kind) ? TYPE_PHRASES[it.kind]
     : ACTIVITY_PHRASES[it.kind] && kinds.activities.has(it.kind) ? ACTIVITY_PHRASES[it.kind] : MOMENT_PHRASES[it.kind];
   if (!phrase) return null;
+  if (it.kind === 'dinner' && it.sunset) phrase = 'a sunset dinner';
   const tod = it.time_of_day;
-  if (tod && tod !== 'any' && !TIMED_MOMENTS.has(it.kind)) {
+  // Drinks are an evening thing anyway: "night breweries" read worse than "breweries" after the dinner they follow.
+  if (tod && tod !== 'any' && !TIMED_MOMENTS.has(it.kind) && !(DRINK_KINDS.has(it.kind) && (tod === 'evening' || tod === 'night'))) {
     // "a hike" in the afternoon -> "an afternoon hike"; "coffee" in the morning -> "morning coffee".
     const bare = phrase.replace(/^(?:a|an) /, '');
     phrase = bare === phrase ? `${tod} ${phrase}` : `${/^[aeiou]/.test(tod) ? 'an' : 'a'} ${tod} ${bare}`;
@@ -356,12 +453,13 @@ function renderTripRequest(intent, ctx = {}) {
   if (intent.occasion === 'solo') lead.push('solo');
   if (intent.budget === 'upscale') lead.push('upscale');
   let head;
-  const list = ints.map((x) => x.phrase);
+  const list = multi ? [...new Set(ints.map((x) => x.phrase))] : ints.map((x) => x.phrase);
   if (multi) head = `${lead.length ? `a ${lead.join(' ')} ` : ''}${days} days${where ? ` ${where}` : ''}${list.length ? ` with ${joinAnd(list)}` : ''}`;
   else if (list.length) head = `${lead.length ? `${lead.join(' ')} ` : ''}${list.join(' then ')}${where ? ` ${where}` : ''}`;
   else head = `a ${lead.length ? `${lead.join(' ')} ` : ''}day${where ? ` ${where}` : ''}`;
   const tail = [];
   if (party.length) tail.push(`with ${joinAnd(party)}`);
+  if (intent.driver) tail.push('with a designated driver');
   if (intent.rainy_day) tail.push('on a rainy day');
   if (!intent.start_date) {
     if (intent.weekday && !multi) tail.push(`on ${cap1(intent.weekday)}`);
@@ -371,7 +469,9 @@ function renderTripRequest(intent, ctx = {}) {
   if (intent.budget === 'budget' && !intent.interests.some((i) => i.kind === 'cheap_eats')) tail.push('on a budget');
   const needs = intent.must_have.map((f) => FEATURE_PHRASES[f]).filter(Boolean);
   if (needs.length) tail.push(joinAnd(needs));
-  const avoid = intent.must_avoid.map((k) => AVOID_EXTRA[k] || `no ${TYPE_PHRASES[k] || ACTIVITY_PHRASES[k] || MOMENT_PHRASES[k] || k}`.replace(/^no (a|an) /, 'no '));
+  // "No alcohol" already covers every drinks kind: one clear phrase, not a list of ten.
+  const avoidKinds = intent.must_avoid.includes('alcohol') ? intent.must_avoid.filter((k) => k === 'alcohol' || !DRINK_KINDS.has(k)) : intent.must_avoid;
+  const avoid = avoidKinds.map((k) => AVOID_EXTRA[k] || `no ${TYPE_PHRASES[k] || ACTIVITY_PHRASES[k] || MOMENT_PHRASES[k] || k}`.replace(/^no (a|an) /, 'no '));
   if (avoid.length) tail.push(joinAnd(avoid));
   const text = [head, ...tail].join(', ').replace(/\s+/g, ' ').trim().slice(0, MAX_TEXT);
   // Overrides: only what the visitor did not set themselves; all are the planner's existing, validated chips.
@@ -408,6 +508,6 @@ function renderTripRequest(intent, ctx = {}) {
 module.exports = {
   MODEL, PRICE_PER_TOKEN, DEFAULT_TIMEOUT_MS, DEFAULT_DAILY_USD, TIMES, MONTHS, SEASONS, OCCASIONS,
   TYPE_PHRASES, ACTIVITY_PHRASES, MOMENT_PHRASES, FEATURE_PHRASES,
-  enabled, apiKey, buildAllowed, intentSchema, systemPrompt, stripPII, validateIntent, readTripRequest, renderTripRequest,
+  enabled, apiKey, buildAllowed, intentSchema, wireSchema, expandWire, toWire, WIRE_KEYS, WIRE_REQUIRED, DRINK_KINDS, systemPrompt, stripPII, validateIntent, readTripRequest, renderTripRequest,
   costOf, dailyCapUsd, spentToday, addSpend, resetSpend, pacificDay,
 };

@@ -4,16 +4,19 @@
 //
 // Runs each request in scripts/trip-ai-eval/cases.json both ways on the same date -- today's rules, and the AI reader
 // (trip-ai.js) feeding the same planner -- straight through the planner functions in server.js (no server, no live
-// site, no live database: the repo's okanagan.db, copied back unchanged at the end). Writes into drafts/trip-ai/:
+// site, no live database). The code runs from a temporary staged copy of this folder with a COPY of the database
+// (the repo's okanagan.db, or --db <file>), so neither the repo's tracked database nor the --db file is ever changed.
+// Writes into drafts/trip-ai/:
 //   trip-ai-eval-<date>.csv          one row per request and path, with every automatic check
 //   trip-ai-eval-<date>.md           success rate, fallback rate, p50/p95 latency, cost per plan, monthly estimate
 //   blind-ab-<date>.md               20 requests as plan A / plan B for the owner to judge (no labels)
 //   blind-ab-key-<date>.json         which of A/B was the AI (open only after judging)
 //
 // Usage (from the repo folder):
-//   ANTHROPIC_API_KEY=... node scripts/trip-ai-eval.js              # real model, all 80 requests
-//   node scripts/trip-ai-eval.js --mock                             # no key: the 20 hard cases with fixture answers
-// Options: --date YYYY-MM-DD (default today), --only hard|real, --limit N, --timeout-ms 2000,
+//   ANTHROPIC_API_KEY=... node scripts/trip-ai-eval.js              # real model, all 84 requests
+//   node scripts/trip-ai-eval.js --mock                             # no key: the cases with fixture answers
+//   ... --db drafts/trip-ai/okanagan-real-copy.db                   # plan against a fuller local copy of the data
+// Options: --db <file>, --tag <word> (added to the file names), --date YYYY-MM-DD (default today), --only hard|real, --limit N, --timeout-ms 2000,
 //          --monthly-plans 341 (plans a month, for the cost estimate), --out <dir> (default drafts/trip-ai), --seed 20261120
 //
 // Automatic checks (each only when it applies): right towns (every stop in a town asked for), every interest asked for
@@ -42,16 +45,30 @@ if (!MOCK && !String(process.env.ANTHROPIC_API_KEY || '').trim()) {
   process.exit(2);
 }
 
-// The repo database is copied aside first and put back at the end (loading server.js runs its migrations on it).
-const DB_FILE = fs.existsSync('/data') ? '/data/okanagan.db' : path.join(ROOT, 'okanagan.db');
-const DB_BACKUP = path.join(os.tmpdir(), `trip-ai-eval-${process.pid}.db`);
-fs.copyFileSync(DB_FILE, DB_BACKUP);
+// Stage the code in a temporary folder with a copy of the database (db.js opens <its folder>/okanagan.db; loading
+// server.js runs migrations on it). Top-level files are copied, data/ is copied, public/ is linked (read-only), the same
+// way tests/server.test.js stages isolated servers. Nothing in the repo or in --db is written.
+if (fs.existsSync('/data')) { console.error('This looks like the live server (/data exists). Run the eval on a laptop.'); process.exit(2); }
+const DB_SOURCE = path.resolve(opt('db', path.join(ROOT, 'okanagan.db')));
+if (!fs.existsSync(DB_SOURCE)) { console.error(`No database at ${DB_SOURCE}`); process.exit(2); }
+const STAGE = fs.mkdtempSync(path.join(os.tmpdir(), 'trip-ai-eval-'));
+for (const entry of fs.readdirSync(ROOT, { withFileTypes: true })) {
+  const n = entry.name;
+  if (n.startsWith('.') || /\.db(-wal|-shm)?$/.test(n) || n.endsWith('.zip') || n === 'node_modules' || entry.isSymbolicLink()) continue;
+  if (entry.isDirectory()) {
+    if (n === 'data') fs.cpSync(path.join(ROOT, n), path.join(STAGE, n), { recursive: true });
+    else if (n === 'public') fs.symlinkSync(path.join(ROOT, n), path.join(STAGE, n), 'dir');
+  } else fs.copyFileSync(path.join(ROOT, n), path.join(STAGE, n));
+}
+fs.copyFileSync(DB_SOURCE, path.join(STAGE, 'okanagan.db'));
 
 process.env.TRIP_PLANNER_V3 = process.env.TRIP_PLANNER_V3 || 'on';
-const app = require(path.join(ROOT, 'server.js'));
-const db = require(path.join(ROOT, 'db.js'));
-const tripAi = require(path.join(ROOT, 'trip-ai.js'));
+const app = require(path.join(STAGE, 'server.js'));
+const db = require(path.join(STAGE, 'db.js'));
+const tripAi = require(path.join(STAGE, 'trip-ai.js'));
 
+let DB_STATS = '';
+try { DB_STATS = db.prepare("SELECT type, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL GROUP BY type ORDER BY n DESC").all().map((r) => `${r.type} ${r.n}`).join(', '); } catch (e) { DB_STATS = 'unknown'; }
 const todayPacific = () => new Date(Date.now() - 8 * 3600000).toISOString().slice(0, 10);
 const DATE = opt('date', todayPacific());
 const NOW = new Date(`${DATE}T19:00:00Z`); // 11 AM Pacific on that date, for both paths
@@ -84,7 +101,13 @@ const MATCH = {
 function autoLabel(text) {
   const t = fold(text);
   const towns = Object.keys(labels).filter((r) => new RegExp(`\\b${fold(labels[r]).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(t));
-  const kinds = KIND_WORDS.map(([k, re]) => [k, t.search(re)]).filter(([, i]) => i >= 0).sort((a, b) => a[1] - b[1]).map(([k]) => k);
+  const kindsIn = (x) => KIND_WORDS.map(([k, re]) => [k, x.search(re)]).filter(([, i]) => i >= 0).sort((a, b) => a[1] - b[1]).map(([k]) => k);
+  // Order of happening (round 2): "A after B" is B then A; "before B, A" / "A before B" keep A first.
+  const after = /^(.*?)\bafter\b(.*)$/.exec(t);
+  let kinds = kindsIn(t);
+  if (after && kindsIn(after[1]).length && kindsIn(after[2]).length) kinds = [...new Set([...kindsIn(after[2]), ...kindsIn(after[1])])];
+  const before = /^\s*before\b([^,]*),(.*)$/.exec(t);
+  if (before && kindsIn(before[1]).length && kindsIn(before[2]).length) kinds = [...new Set([...kindsIn(before[2]), ...kindsIn(before[1])])];
   const m = /\b(\d) days?\b/.exec(t) || /\bdeux jours\b/.exec(t);
   const days = m ? (m[1] ? Number(m[1]) : 2) : /\b(?:weekend|fin de semaine|week-end)\b/.test(t) ? 2 : null;
   return { towns, kinds, days, dog: /\bdog\b/.test(t) || null, kids: /\b(?:kids|toddlers?|enfants|children)\b/.test(t) || null };
@@ -146,7 +169,7 @@ const fullPlan = (args, now) => app.runTripPlan(args, now);
 function mockFetchFor(id) {
   return async () => ({
     ok: true, status: 200,
-    json: async () => ({ model: tripAi.MODEL, stop_reason: 'end_turn', usage: { input_tokens: 0, output_tokens: 0 }, content: [{ type: 'text', text: JSON.stringify(mockDoc.answers[id]) }] }),
+    json: async () => ({ model: tripAi.MODEL, stop_reason: 'end_turn', usage: { input_tokens: 0, output_tokens: 0 }, content: [{ type: 'text', text: JSON.stringify(tripAi.toWire(mockDoc.answers[id])) }] }),
   });
 }
 function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -183,15 +206,16 @@ async function main() {
   // ---------- CSV ----------
   const q = (v) => `"${String(v === undefined || v === null ? '' : v).replace(/"/g, '""')}"`;
   const stopText = (p) => planStops(p).map((s) => `D${s.day} ${s.venue.name} [${s.venue.type}/${s.venue.region}]`).join(' | ');
-  const head = ['id', 'set', 'lang', 'request', 'path', 'pass', 'failed_checks', 'ai_used', 'ai_reason', 'ai_text', 'ai_ms', 'cost_usd', 'plan_ms', 'kind', 'days', 'first_start', 'stops', 'unlisted_kinds'];
+  const head = ['id', 'set', 'lang', 'request', 'path', 'pass', 'failed_checks', 'ai_used', 'ai_reason', 'ai_text', 'ai_ms', 'cost_usd', 'in_tokens', 'out_tokens', 'cache_read_tokens', 'cache_write_tokens', 'plan_ms', 'kind', 'days', 'first_start', 'stops', 'unlisted_kinds'];
   const lines = [head.join(',')];
   for (const r of rows) {
     for (const [pathName, p, ck, ms] of [['rules', r.rulesPlan, r.rc, r.rulesMs], ['ai', r.aiPlan, r.ac, r.aiMs]]) {
       lines.push([r.c.id, r.c.set, r.c.lang, r.c.text, pathName, ck.pass, ck.failed.join('+'), pathName === 'ai' ? r.ai.used : '', pathName === 'ai' ? r.ai.reason : '', pathName === 'ai' ? (r.ai.text || '') : '',
-        pathName === 'ai' ? (r.ai.ms ?? '') : '', pathName === 'ai' ? (r.ai.costUsd || 0) : '', ms, p && p.kind, (p && p.days ? p.days.length : ''), hm(firstStart(p)), stopText(p), (ck.unlistedKinds || []).join('+')].map(q).join(','));
+        pathName === 'ai' ? (r.ai.ms ?? '') : '', pathName === 'ai' ? (r.ai.costUsd || 0) : '', ...['input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens'].map((k) => (pathName === 'ai' && r.ai.usage ? r.ai.usage[k] : '')), ms, p && p.kind, (p && p.days ? p.days.length : ''), hm(firstStart(p)), stopText(p), (ck.unlistedKinds || []).join('+')].map(q).join(','));
     }
   }
-  const tag = `${DATE}${MOCK ? '-mock' : ''}`;
+  // Files are named by date (+ -mock, + the --db file's name, + --tag), so a second run doesn't overwrite the first.
+  const tag = [DATE, MOCK ? 'mock' : '', opt('db', null) ? path.basename(DB_SOURCE).replace(/\.db$/, '') : '', opt('tag', '')].filter(Boolean).join('-');
   fs.writeFileSync(path.join(OUT, `trip-ai-eval-${tag}.csv`), lines.join('\n') + '\n');
 
   // ---------- Summary ----------
@@ -201,6 +225,9 @@ async function main() {
   const lat = rows.map((r) => r.ai.ms).filter(Number.isFinite);
   const cost = rows.reduce((s, r) => s + (r.ai.costUsd || 0), 0);
   const perPlan = n ? cost / n : 0;
+  const withUsage = rows.filter((r) => r.ai.usage);
+  const avg = (k) => (withUsage.length ? Math.round(withUsage.reduce((t, r) => t + (r.ai.usage[k] || 0), 0) / withUsage.length) : null);
+  const cacheHits = withUsage.filter((r) => r.ai.usage.cache_read_input_tokens > 0).length;
   const reasons = {};
   for (const r of rows.filter((x) => !x.ai.used)) reasons[r.ai.reason] = (reasons[r.ai.reason] || 0) + 1;
   const checkNames = ['towns', 'interests', 'order', 'startTime', 'noClosed', 'listed', 'days', 'dog', 'kids', 'avoided', 'named', 'nonEmpty'];
@@ -213,9 +240,9 @@ async function main() {
   const md = [
     `# Build My Trip AI reader: test results ${DATE}${MOCK ? ' (MOCKED model answers)' : ''}`,
     '',
-    MOCK ? '**Mocked run.** No ANTHROPIC_API_KEY was available, so the 20 hard cases used hand-written fixture answers (scripts/trip-ai-eval/mock-answers.json) through the real trip-ai.js code. Latency and cost below are not real; rerun with a key for real numbers.' : `Model: ${tripAi.MODEL}, timeout ${TIMEOUT_MS} ms, same date (${DATE}) for both paths.`,
+    MOCK ? '**Mocked run.** No ANTHROPIC_API_KEY was available, so only the cases with hand-written fixture answers ran (scripts/trip-ai-eval/mock-answers.json) through the real trip-ai.js code. Latency and cost below are not real; rerun with a key for real numbers.' : `Model: ${tripAi.MODEL}, timeout ${TIMEOUT_MS} ms, same date (${DATE}) for both paths.`,
     '',
-    `Requests: ${n} (${rows.filter((r) => r.c.set === 'hard').length} hard, ${rows.filter((r) => r.c.set === 'real').length} realistic). Local repo database (food and drink listings only: no outdoor, ski, beach, golf, indoor or tour stops exist locally, so those interests are skipped by the checks and noted as "unlisted_kinds" in the CSV).`,
+    `Requests: ${n} (${rows.filter((r) => r.c.set === 'hard').length} hard, ${rows.filter((r) => r.c.set === 'real').length} realistic). Database: a copy of ${path.basename(DB_SOURCE)} (${DB_STATS}). Interests with no listing of that kind in the asked towns are skipped by the checks and noted as "unlisted_kinds" in the CSV.`,
     '',
     '| | Rules (today) | AI reader |',
     '|---|---|---|',
@@ -223,6 +250,7 @@ async function main() {
     `| AI reading used (not fallen back) | | ${rate((r) => r.ai.used)}% |`,
     `| Fell back to rules | | ${rate((r) => !r.ai.used)}% ${Object.keys(reasons).length ? `(${Object.entries(reasons).map(([k, v]) => `${k}: ${v}`).join(', ')})` : ''} |`,
     `| AI read time p50 / p95 | | ${pct(lat, 50) ?? '-'} / ${pct(lat, 95) ?? '-'} ms |`,
+    `| Tokens per read (average): input / output / read from cache | | ${avg('input_tokens') ?? '-'} / ${avg('output_tokens') ?? '-'} / ${avg('cache_read_input_tokens') ?? '-'} (cache hit on ${cacheHits} of ${withUsage.length}) |`,
     `| Cost per plan | $0 | $${perPlan.toFixed(6)} |`,
     `| Estimated monthly cost at ${MONTHLY_PLANS} plans/month | $0 | $${(perPlan * MONTHLY_PLANS).toFixed(2)} |`,
     '',
@@ -247,7 +275,16 @@ async function main() {
 
   // ---------- Blind A/B for 20 requests ----------
   const rand = rng(SEED);
-  const pool = rows.filter((r) => r.c.set === 'hard').concat(rows.filter((r) => r.c.set !== 'hard')).slice(0, 20);
+  // Which 20 (round 2): pairs where both plans have stops and the two plans differ come first (hard cases, then the rest,
+  // in file order); then pairs that differ with one side empty; then identical pairs with stops; empty-vs-empty last.
+  const ids = (p) => JSON.stringify(planStops(p).map((s) => s.venue.id));
+  const tier = (r) => {
+    const a = planStops(r.aiPlan).length > 0, b = planStops(r.rulesPlan).length > 0, same = ids(r.aiPlan) === ids(r.rulesPlan);
+    return a && b && !same ? 0 : (a || b) && !same ? 1 : a && b ? 2 : 3;
+  };
+  const ordered = rows.map((r, i) => ({ r, i, t: tier(r), h: r.c.set === 'hard' ? 0 : 1 })).sort((x, y) => x.t - y.t || x.h - y.h || x.i - y.i);
+  const pool = ordered.slice(0, 20).map((x) => x.r);
+  const tiers = [0, 1, 2, 3].map((t) => ordered.slice(0, 20).filter((x) => x.t === t).length);
   const render = (p) => {
     const stops = planStops(p);
     if (!stops.length) return '_(no stops: the planner could not build a plan)_';
@@ -255,7 +292,7 @@ async function main() {
     return stops.map((s) => `- ${p.days && p.days.length > 1 ? `Day ${s.day}, ` : ''}${hm(sched.get(`${s.day}-${s.venue.id}`)) || s.label || s.daypart || ''} ${s.venue.name} (${s.venue.typeLabel || s.venue.type}, ${s.venue.regionLabel || s.venue.region})`).join('\n');
   };
   const sheet = [`# Build My Trip: which plan is better? (${DATE})`, '', 'For each request, read plan A and plan B and mark the better one (or "same"; some pairs are the same plan). Do not open the answer key until you are done.', ''];
-  const key = { date: DATE, seed: SEED, mock: MOCK, answers: [] };
+  const key = { date: DATE, seed: SEED, mock: MOCK, db: path.basename(DB_SOURCE), chosen: `${tiers[0]} pairs that differ with stops on both sides, ${tiers[1]} that differ with one side empty, ${tiers[2]} identical, ${tiers[3]} empty on both sides`, answers: [] };
   pool.forEach((r, i) => {
     const aiIsA = rand() < 0.5;
     const [A, B] = aiIsA ? [r.aiPlan, r.rulesPlan] : [r.rulesPlan, r.aiPlan];
@@ -270,6 +307,6 @@ async function main() {
 
 function restoreDb() {
   try { db.close(); } catch (e) { /* already closed */ }
-  try { fs.copyFileSync(DB_BACKUP, DB_FILE); fs.unlinkSync(DB_BACKUP); } catch (e) { console.error(`Could not restore ${DB_FILE}: ${e.message} (backup at ${DB_BACKUP})`); }
+  try { fs.rmSync(STAGE, { recursive: true, force: true }); } catch (e) { /* temp folder */ }
 }
 main().then(() => { restoreDb(); process.exit(0); }, (e) => { console.error(e); restoreDb(); process.exit(1); });
