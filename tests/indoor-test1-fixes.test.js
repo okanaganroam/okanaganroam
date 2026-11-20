@@ -106,12 +106,14 @@ test('2. by donation (real taps): research\'s "suggested $5" is offered under By
   assert.ok(plain(page(v)).includes('Free entry.'));
 });
 
-test('3. a price typed before tapping By donation becomes the suggested amount; words in the box get a plain nudge', async () => {
+// Indoor test 14 (2026-11-19; Dayton: never carry over an adult price): a price typed before tapping By donation no longer
+// becomes the suggested amount; the box starts empty and she types it.
+test('3. a price typed before tapping By donation is not carried into the suggested amount; words in the box get a plain nudge', async () => {
   const v = mk('indoor', { name: 'Penticton Gallery T1', description: 'A public art gallery.' });
   const sim = await openSetup(base, tokenFor(v.id), { hash: 'price' });
   await sim.type('suTprice', '4');
   await sim.click('[data-ifree="donation"]');
-  assert.equal(sim.doc.getElementById('suTsugg').value, '4');
+  assert.equal(sim.doc.getElementById('suTsugg').value, '');
   await sim.type('suTsugg', 'whatever you like');
   await sim.click('priceSave');
   assert.match(sim.text(), /Just the number, like 5/);

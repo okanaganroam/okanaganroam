@@ -24804,7 +24804,7 @@ const INDOOR_MANAGED_LABELS = ['Season', 'Time needed', 'Prices', 'Ages', 'Booki
 const INDOOR_STALE_LABELS = ['Good to know', 'Known for', 'Groups', 'Prices'];
 const INDOOR_STALE_KEY_RE = /^[a-f0-9]{10}$/;
 const INDOOR_STALE_MAX = 40;
-const INDOOR_DAY_WORDS = [['sun', /\bsun(?:day)?s?\b/], ['mon', /\bmon(?:day)?s?\b/], ['tue', /\btues?(?:day)?s?\b/], ['wed', /\bwed(?:nesday)?s?\b/], ['thu', /\bthu(?:rs?)?(?:day)?s?\b/], ['fri', /\bfri(?:day)?s?\b/], ['sat', /\bsat(?:urday)?s?\b/]];
+const INDOOR_DAY_WORDS = [['sun', /\bsun(?:day)?s?\b/i], ['mon', /\bmon(?:day)?s?\b/i], ['tue', /\btues?(?:day)?s?\b/i], ['wed', /\bwed(?:nesday)?s?\b/i], ['thu', /\bthu(?:rs?)?(?:day)?s?\b/i], ['fri', /\bfri(?:day)?s?\b/i], ['sat', /\bsat(?:urday)?s?\b/i]];
 const INDOOR_DAY_ORDER = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 const INDOOR_SEASON_WORDS_RE = /\b(?:winter|summer|spring|fall|autumn|season|seasonal|holidays?|stat(?:utory)?|christmas|easter|thanksgiving|long weekends?|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b/i;
 const INDOOR_STALE_BOOK_RE = /\bby appointment only\b|\bappointment only\b|\bno drop[- ]?ins?\b|\bno walk[- ]?ins?\b|\bbooking (?:is )?required\b|\bmust (?:be )?book|\breservations? (?:are |is )?required\b|\bmust be booked\b|\bbook(?:ing)? ahead (?:is )?required\b/i;
@@ -24864,7 +24864,9 @@ function indoorStaleWhy(sentence, ctx) {
   return '';
 }
 // The owner's saved answers the check reads, or null when she has answered nothing yet (research stays as found).
-function indoorStaleCtx(venue, now = new Date()) {
+function indoorStaleCtx(venue0, now = new Date()) {
+  // The stored row (a page's venue object may not carry hours_source).
+  const venue = db.prepare('SELECT id, hours, hours_source FROM venues WHERE id = ?').get(venue0.id) || venue0;
   const t = venueIndoorInfo(venue.id);
   const ownHours = venue.hours_source === 'venue_owner' && t.visit !== 'appointment';
   let days = null;
@@ -63597,13 +63599,13 @@ const OWNER_HELP_SCRIPT = String.raw`
   var DAYS_EN = { mon: 'Monday', tues: 'Tuesday', tue: 'Tuesday', wednes: 'Wednesday', wed: 'Wednesday', thurs: 'Thursday', thu: 'Thursday', fri: 'Friday', satur: 'Saturday', sat: 'Saturday', sun: 'Sunday' };
   function patOf(q){
     var x = String(q || '').toLowerCase(), m;
-    if ((m = /(first|second|third|fourth|last|1st|2nd|3rd|4th)\s+(mon|tues|wednes|thurs|fri|satur|sun)days?/.exec(x))) {
+    if ((m = /\b(first|second|third|fourth|last|1st|2nd|3rd|4th)\s+(mon|tues|wednes|thurs|fri|satur|sun)days?\b/.exec(x))) {
       var nth = { '1st': 'first', '2nd': 'second', '3rd': 'third', '4th': 'fourth' }[m[1]] || m[1];
       return nth + ' ' + DAYS_EN[m[2]] + ' of the month';
     }
-    if ((m = /(premier|première|deuxième|troisième|quatrième|dernier)\s+(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)/.exec(x))) return m[1].replace('première', 'premier') + ' ' + m[2] + ' du mois';
-    if ((m = /every\s+(other\s+)?(mon|tues|wednes|thurs|fri|satur|sun)day/.exec(x))) return 'every ' + (m[1] ? 'other ' : '') + DAYS_EN[m[2]];
-    if ((m = /chaque\s+(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)/.exec(x))) return 'chaque ' + m[1];
+    if ((m = /\b(premier|première|deuxième|troisième|quatrième|dernier)\s+(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\b/.exec(x))) return m[1].replace('première', 'premier') + ' ' + m[2] + ' du mois';
+    if ((m = /\bevery\s+(other\s+)?(mon|tues|wednes|thurs|fri|satur|sun)day\b/.exec(x))) return 'every ' + (m[1] ? 'other ' : '') + DAYS_EN[m[2]];
+    if ((m = /\bchaque\s+(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)\b/.exec(x))) return 'chaque ' + m[1];
     return '';
   }
   function patFill(html, asked){ var p0 = patOf(asked); return String(html == null ? '' : html).replace(/\[\[pat:([^\]]*)\]\]/g, function(m0, d){ return p0 ? p0.replace(/[<>&]/g, '') : d; }); }
@@ -76447,7 +76449,7 @@ module.exports = {
   resolveDiscoveryDestination,
   selectDiscoveryVenues,
   heroSearchTarget,
-  smartSearchPlan,
+  smartSearchPlan, indoorStaleResearch, indoorStaleKey, indoorStaleRows,
   // Search ranking (2026-10-18)
   SMART_ACTIVITIES,
   smartRomanceScore,
