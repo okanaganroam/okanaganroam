@@ -1,0 +1,102 @@
+{
+ "reason": "Venue photos stays2-ok",
+ "batch_id": "photos-stays2-ok-2026-11-20",
+ "venues": [
+  {
+   "id": 2013,
+   "name": "Vintage Merlot Bed & Breakfast",
+   "region": "oliver",
+   "slug": "vintage-merlot-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/vintage-merlot-bed-and-breakfast-2610.jpg?v=20261120"
+   }
+  },
+  {
+   "id": 2011,
+   "name": "Global Village Permaculture Bed & Breakfast",
+   "region": "oliver",
+   "slug": "global-village-permaculture-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/global-village-permaculture-bed-and-breakfast-2610.jpg?v=20261120"
+   }
+  },
+  {
+   "id": 2023,
+   "name": "Pipe Dreams Winery Suites",
+   "region": "oliver",
+   "slug": "pipe-dreams-winery-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/pipe-dreams-winery-suites-2610.jpg?v=20261120"
+   }
+  },
+  {
+   "id": 2085,
+   "name": "Sunny Beach Motel",
+   "region": "penticton",
+   "slug": "sunny-beach-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sunny-beach-motel-2610.jpg?v=20261120"
+   }
+  },
+  {
+   "id": 2089,
+   "name": "Waterfront Inn",
+   "region": "penticton",
+   "slug": "waterfront-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/waterfront-inn-2610.jpg?v=20261120"
+   }
+  },
+  {
+   "id": 2095,
+   "name": "Vance Creek Hotel & Conference Centre",
+   "region": "silverstar",
+   "slug": "vance-creek-hotel-and-conference-centre",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/vance-creek-hotel-and-conference-centre-2610.jpg?v=20261120"
+   }
+  },
+  {
+   "id": 2093,
+   "name": "Lord Aberdeen Hotel",
+   "region": "silverstar",
+   "slug": "lord-aberdeen-hotel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/lord-aberdeen-hotel-2610.jpg?v=20261120"
+   }
+  },
+  {
+   "id": 2096,
+   "name": "Snowbird Lodge (SilverStar Central Reservations front desk)",
+   "region": "silverstar",
+   "slug": "snowbird-lodge-silverstar-central-reservations-front-desk",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/snowbird-lodge-silverstar-central-reservations-front-desk-2610.jpg?v=20261120"
+   }
+  }
+ ]
+}

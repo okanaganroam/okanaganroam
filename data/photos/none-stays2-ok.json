@@ -1,0 +1,92 @@
+[
+ {
+  "id": 1964,
+  "name": "Kelowna Okanagan Lake Hostel",
+  "reason": "Own site no longer responds; Tourism Kelowna blocks plain requests (403); Google Maps re-check blocked (rate limit) so not redone"
+ },
+ {
+  "id": 2003,
+  "name": "Naramata Courtyard Suites",
+  "reason": "Discover Naramata listing photos are all 1024px wide (same as own site); Google Maps re-check blocked"
+ },
+ {
+  "id": 2018,
+  "name": "Black Hills Vineyard Lodge",
+  "reason": "Own site still blocks plain requests (403); Visit Oliver lists only the winery (tasting room, wine), no lodge photos; Google Maps re-check blocked"
+ },
+ {
+  "id": 2028,
+  "name": "Mount View Motel",
+  "reason": "Own site does not respond; Visit Oliver photos are 1066px or smaller (gazebo, kitchenettes, beds); Google Maps re-check blocked"
+ },
+ {
+  "id": 2030,
+  "name": "Pine Bluff Motel",
+  "reason": "Visit Oliver listing (exterior, pool, rooms) is all 1024-1080px wide; Google Maps re-check blocked"
+ },
+ {
+  "id": 2014,
+  "name": "River Stone Cottage",
+  "reason": "Own site and Visit Oliver cottage photos are all 630px; the large Visit Oliver photos show the winery house, not the yellow cottage"
+ },
+ {
+  "id": 2024,
+  "name": "The Villa at Hester Creek",
+  "reason": "Best shot is the own-site aerial banner (2083x597 original), whose 2:1 crop is 1194px, just under 1200; other villa photos are 1111px or smaller"
+ },
+ {
+  "id": 2034,
+  "name": "Brookvale Holiday Resort (Brookvale Campground & RV)",
+  "reason": "Own site gallery is empty (logo and a 1020px banner only); Destination Osoyoos blocks plain requests (429); Google Maps re-check blocked"
+ },
+ {
+  "id": 2077,
+  "name": "Holiday House Motel",
+  "reason": "Visit Penticton listing photos are all 1024px or smaller; no own site; Google Maps re-check blocked"
+ },
+ {
+  "id": 2080,
+  "name": "Plaza Motel",
+  "reason": "Visit Penticton photos are 1024px except one 1999px kitchen shot (no exterior over 1024px); Google Maps re-check blocked"
+ },
+ {
+  "id": 2098,
+  "name": "Rosedale Motel",
+  "reason": "Own gallery (32 photos) is all 799px or smaller, banners 999px; no Summerland board listing reachable; Google Maps re-check blocked"
+ },
+ {
+  "id": 2104,
+  "name": "Best Western Premier Route 97 Vernon",
+  "reason": "bestwestern.com still blocks (403); Tourism Vernon has one 1280px suite shot with two people filling the frame; Google Maps re-check blocked"
+ },
+ {
+  "id": 2107,
+  "name": "Fairfield Inn & Suites Vernon",
+  "reason": "marriott.com still blocks (403); not listed on Tourism Vernon; Google Maps re-check blocked"
+ },
+ {
+  "id": 2119,
+  "name": "A Lakeview Heights Bed & Breakfast",
+  "reason": "Visit Westside house exterior is 1000px; only a 1200px dining room shot with chair backs in front and a deck view without the house; Google Maps re-check blocked"
+ },
+ {
+  "id": 2127,
+  "name": "TownePlace Suites by Marriott West Kelowna",
+  "reason": "marriott.com blocks (403); Visit Westside has only a 600px aerial; Google Maps blocked again, so still not checked"
+ },
+ {
+  "id": 2120,
+  "name": "A View of the Lake Bed & Breakfast",
+  "reason": "Visit Westside photos for this B&B are 570px or smaller (its large pool photo is a different B&B, Chateau du Lac); own site photos 500-600px; Google Maps re-check blocked"
+ },
+ {
+  "id": 1962,
+  "name": "Heartland Family Campground",
+  "reason": "second pass photo rejected on review (no campsites/buildings in the strip)"
+ },
+ {
+  "id": 2101,
+  "name": "Swan Lake RV Park & Campground",
+  "reason": "second pass photo rejected on review (no campsites/buildings in the strip)"
+ }
+]
