@@ -75,13 +75,14 @@ test('2. a golf course, Part 1 with real taps: Golf course picked, the season hi
   await sim.type('suTprice', '$59');
   await sim.click('priceSave');
   assert.equal(app.indoorPriceValue(v.id), 59);
-  assert.ok(sim.has('[data-tpick="book:ahead"][aria-pressed="true"]'));
+  // Sport test 1: a golf course starts on "walk-ons when there's room; book tee times for busy times".
+  assert.ok(sim.has('[data-tpick="book:busy"][aria-pressed="true"]'));
   await sim.type('suBookUrl', 'https://example.com/tee-times');
   await sim.click('bookingSave');
   assert.ok(sim.has('[data-tpick="age:all"][aria-pressed="true"]'), 'All ages is a golf course\'s usual answer');
   await sim.click('offerSave');
   const en = plain(page(v));
-  for (const l of ['Half a day or more.', 'Green fees from $59.', 'All ages.', 'Please book ahead.']) assert.ok(en.includes(l), l);
+  for (const l of ['Half a day or more.', 'Green fees from $59.', 'All ages.', 'Walk-ons when there’s room. Book tee times for weekends and busy times.']) assert.ok(en.includes(l), l);
   const fr = plain(page(v, 'fr'));
   assert.ok(fr.includes('Droits de jeu à partir de 59 $.'), 'French price');
   const card = db.prepare('SELECT from_price, basis FROM price_overrides WHERE venue_id = ?').get(v.id);
@@ -104,7 +105,7 @@ test('3. a city skate park: Skate park picked, one tap on Free entry; the card a
   assert.ok(sim.has('[data-tpick="book:no"][aria-pressed="true"]'), 'walk-ins are a skate park\'s usual answer');
   await sim.click('bookingSave');
   const en = plain(page(v));
-  for (const l of ['Free entry.', 'Walk-ins welcome: no need to book.']) assert.ok(en.includes(l), l);
+  for (const l of ['Free entry.', 'Open to everyone: no need to book.']) assert.ok(en.includes(l), l);
   assert.ok(plain(page(v, 'fr')).includes('Entrée gratuite.'));
   const card = db.prepare('SELECT from_price, basis FROM price_overrides WHERE venue_id = ?').get(v.id);
   assert.equal(card.from_price, 0); assert.equal(card.basis, 'Free');
@@ -153,17 +154,25 @@ test('5. a golf simulator (type golf): Indoor golf picked from its words, the ba
   assert.match(hub2.slice(cardAt, cardAt + 4000), /From \$72/, 'the owner\'s green fee on the golf card');
 });
 
-test('6. the % checklist and Part 2: sport words, owner-only answers, no happy hour anywhere in the setup (even for a club with a happy hour badge)', async () => {
+test('6. the % checklist and Part 2: sport words, owner-only answers; the optional Happy hour tile for a golf course only (Dayton, sport test 1), never for other sport kinds', async () => {
   const v = mk('golf', { name: 'Clubhouse Lake Golf Club', happy_hour: 1, description: 'An 18-hole course with a lounge.' });
   const t = tokenFor(v.id);
   assert.deepEqual(app.venueIndoorInfo(v.id), {}, 'research never fills the owner answers');
   const html = (await getText(`/owner/${t}/setup`)).text;
   const cfg = JSON.parse(/window\.SETUP_CFG = (\{[\s\S]*?\});<\/script>/.exec(html)[1].replace(/\\u003c/g, '<'));
-  assert.ok(!cfg.steps.some((k) => /^(?:happy|specials|music|spend|cuisine|door)$/.test(k)), cfg.steps.join());
+  assert.ok(!cfg.steps.some((k) => /^(?:specials|music|spend|cuisine|door)$/.test(k)), cfg.steps.join());
+  assert.ok(cfg.steps.includes('happy') && cfg.part2.includes('happy') && cfg.happyHour === true, 'a golf course has the optional happy hour tile');
   assert.equal(cfg.sport, true); assert.equal(cfg.indoor, true);
   assert.deepEqual(cfg.indoorKinds.map((x) => x.k), app.SPORT_KINDS_SHOWN);
   const topics = JSON.parse(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(html)[1]).topics;
-  assert.ok(!topics.some((x) => /happy hour/i.test(`${x.q} ${x.a}`) && x.id !== 'indoor-bar'), 'no happy hour topic');
+  assert.doesNotMatch(topics.find((x) => x.id === 'indoor-bar').a, /isn’t listed/, 'golf: Help says where happy hour goes');
+  // A skate park: never a happy hour tile or topic.
+  const sk = mk('sport', { name: 'No Happy Skate Park', happy_hour: 1, description: 'A skate park by the beach bar.' });
+  const skHtml = (await getText(`/owner/${tokenFor(sk.id)}/setup`)).text;
+  const skCfg = JSON.parse(/window\.SETUP_CFG = (\{[\s\S]*?\});<\/script>/.exec(skHtml)[1].replace(/\\u003c/g, '<'));
+  assert.ok(!skCfg.steps.includes('happy') && !skCfg.happyHour, skCfg.steps.join());
+  const skTopics = JSON.parse(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(skHtml)[1]).topics;
+  assert.ok(!skTopics.some((x) => /happy hour/i.test(`${x.q} ${x.a}`) && x.id !== 'indoor-bar'), 'no happy hour topic for a skate park');
   for (const id of ['sport-kinds-other', 'sport-opening-day', 'sport-weather', 'sport-tee-times', 'sport-golf-details', 'indoor-price', 'indoor-free', 'indoor-fill-all']) assert.ok(topics.some((x) => x.id === id), id);
   for (const id of ['indoor-exhibits', 'indoor-artists', 'indoor-kinds-other', 'indoor-ticket-prices']) assert.ok(!topics.some((x) => x.id === id), `no ${id}`);
   const more = await openSetup(base, t, { hash: 'more' });
@@ -212,7 +221,7 @@ test('8. search finds a sports place by the kind its owner picked', async () => 
   } finally { delete process.env.DISCOVERY_SEARCH; }
 });
 
-test('9. the edit page (golf with a happy hour badge): the checklist and the answer lines; no happy hour box or tile; Help without happy hour', async () => {
+test('9. the edit page (golf with a happy hour badge): the checklist and the answer lines; the happy hour box and tile are back for golf (Dayton, sport test 1)', async () => {
   const v = mk('golf', { name: 'Edit Page Golf Club', happy_hour: 1, description: 'An 18-hole course.' });
   const t = tokenFor(v.id);
   ok(await change(t, { indoor_info: { kinds: ['golf'], length: 'half', book: 'ahead', age: 'all', year: 'all' }, indoor_price: 70 }));
@@ -220,9 +229,8 @@ test('9. the edit page (golf with a happy hour badge): the checklist and the ans
   assert.match(html, /id="opComplete"/, 'the checklist');
   const text = plain(html);
   assert.match(text, /Green fees from \$70\./);
-  assert.match(text, /Please book ahead\./);
-  assert.doesNotMatch(text, /Your times and what’s on special/, 'no happy hour tile');
-  assert.ok(!/id="happy"/.test(html), 'no happy hour box');
+  assert.match(text, /Please book a tee time ahead\./);
+  assert.match(text, /Your times and what’s on special/, 'the happy hour tile');
   assert.match(text, /Tournaments, clinics, leagues and more/, 'the events tile in sport words');
   const fr = plain((await getText(`/fr/owner/${t}`)).text);
   assert.match(fr, /Droits de jeu à partir de 70 \$\./);

@@ -217,7 +217,8 @@ const TYPE_SUB = {
 };
 // Help's busy-times, theme-night and repeat examples: [en busy, en theme, en repeat, fr busy, fr theme, fr repeat].
 const BUSY_THEME = {
-  golf: ['Weekend mornings book up a week ahead', 'Twilight 9 holes after 4 PM', 'every day after 4 PM', 'Les matins de fin de semaine se réservent une semaine d’avance', 'Neuf trous au crépuscule après 16 h', 'chaque jour après 16 h'],
+  // Sport test 1: a golf course's weekly event is a men's or ladies' night (its twilight rate is a price line).
+  golf: ['Weekend mornings book up a week ahead', 'Men’s night Wednesdays from 5 PM', 'every Wednesday', 'Les matins de fin de semaine se réservent une semaine d’avance', 'Soirée des hommes le mercredi dès 17 h', 'chaque mercredi'],
   simgolf: ['Evenings book up; daytime bays are easier', 'League night Tuesdays at 6 PM', 'every Tuesday', 'Les soirées sont pleines; plus facile le jour', 'Soirée de ligue le mardi à 18 h', 'chaque mardi'],
   range: ['Busiest on sunny weekend afternoons', 'Glow mini golf Fridays after dark', 'every Friday', 'Plus achalandé les après-midi ensoleillés de fin de semaine', 'Mini-golf fluo le vendredi à la noirceur', 'chaque vendredi'],
   skischool: ['Christmas week and spring break book up first', 'Night skiing Tue–Sat 3:30–8 PM', 'every Tuesday to Saturday', 'La semaine de Noël et la relâche se réservent en premier', 'Ski de soirée du mar. au sam. de 15 h 30 à 20 h', 'du mardi au samedi'],
@@ -303,7 +304,9 @@ const LABEL_PARTS = {
 };
 // Starting answers a kind suggests (pre-picked "We picked the usual for your kind of place", saved only with the screen).
 const SPORT_KIND_LENGTH = { golf: 'half', simgolf: '1-2h', range: '1h', rink: '1-2h', skatepark: '1-2h', discgolf: '1-2h', bike: '1-2h', swim: '1-2h', courts: '1-2h', skischool: 'half', sportsctr: '1-2h' };
-const SPORT_KIND_BOOK = { golf: 'ahead', simgolf: 'ahead', range: 'no', rink: 'no', skatepark: 'no', discgolf: 'no', bike: 'no', swim: 'no', courts: 'no', skischool: 'ahead', sportsctr: 'no' };
+// Sport test 1 (2026-11-20): a golf course starts on "walk-ons when there's room; book tee times for busy times" (its own
+// Good to know words: "Tee times recommended; walk-ons when there's room").
+const SPORT_KIND_BOOK = { golf: 'busy', simgolf: 'ahead', range: 'no', rink: 'no', skatepark: 'no', discgolf: 'no', bike: 'no', swim: 'no', courts: 'no', skischool: 'ahead', sportsctr: 'no' };
 // Public, open-to-all kinds start on All ages (a suggestion, saved only with the screen).
 const SPORT_ALL_AGES_KINDS = ['golf', 'range', 'rink', 'skatepark', 'discgolf', 'bike', 'swim', 'courts', 'sportsctr'];
 // The kinds research's words name (the name first, then the story), up to 3, as the starting picks.
@@ -312,6 +315,34 @@ const SPORT_KIND_HINTS = [['simgolf', /simulator|indoor golf|sim golf|golf loung
   ['bike', /bmx|bike park|pump track|mountain bike|dirt jump|bike trails/], ['swim', /\bpool\b|spray park|splash|aquatic/], ['courts', /tennis|pickleball|\bcourts?\b/],
   ['skischool', /ski (?:&|and) board school|ski school|snow school|lessons|night skiing/], ['sportsctr', /sports cent|sports complex|recreation complex|rec cent/]];
 
+// Sport test 1 (2026-11-20; Debbie's golf course: she picked "book ahead for busy times" and her page said "Walk-ins
+// welcome", « Sans réservation »): each kind's booking words where the indoor ones don't fit, for the setup's three choices
+// (chips), the page's Booking line (lines) and Build My Trip's note (notes; 'no' needs none). [en, fr] each.
+const own = (en, fr) => [`${en} (the owner’s own answer).`, `${fr} (réponse de l’établissement).`];
+const BOOK_WORDS = {
+  golf: { chips: { no: ['Yes, walk-ons welcome', 'Oui, départs sans réservation'], busy: ['Walk-ons when there’s room; book tee times for busy times', 'Départs sans réservation s’il y a de la place; réservez pour les périodes achalandées'], ahead: ['No, please book a tee time', 'Non, réservez un départ'] },
+    lines: { no: ['Walk-ons welcome: no tee time needed.', 'Départs sans réservation : pas besoin de réserver.'], busy: ['Walk-ons when there’s room. Book tee times for weekends and busy times.', 'Départs sans réservation s’il y a de la place. Réservez vos départs pour les fins de semaine et les périodes achalandées.'], ahead: ['Please book a tee time ahead.', 'Réservez votre départ à l’avance.'] },
+    notes: { busy: own('Walk-ons when there’s room; book tee times for weekends and busy times', 'Départs sans réservation s’il y a de la place; réservez vos départs pour les fins de semaine et les périodes achalandées'), ahead: own('Book a tee time ahead', 'Réservez votre départ à l’avance') } },
+  simgolf: { chips: { busy: ['Yes, but book a bay for busy times', 'Oui, mais réservez une baie pour les périodes achalandées'], ahead: ['No, please book a bay', 'Non, réservez une baie'] },
+    lines: { no: ['Walk-ins welcome when a bay is free.', 'Sans réservation si une baie est libre.'], busy: ['Walk-ins when a bay is free. Book a bay for evenings, weekends and busy times.', 'Sans réservation si une baie est libre. Réservez une baie pour les soirées, les fins de semaine et les périodes achalandées.'], ahead: ['Please book a bay ahead.', 'Réservez une baie à l’avance.'] },
+    notes: { busy: own('Walk-ins when a bay is free; book a bay for evenings, weekends and busy times', 'Sans réservation si une baie est libre; réservez une baie pour les soirées, les fins de semaine et les périodes achalandées'), ahead: own('Book a bay ahead', 'Réservez une baie à l’avance') } },
+  courts: { chips: { no: ['Yes, first come, first served', 'Oui, premier arrivé, premier servi'], busy: ['Yes, but book a court for busy times', 'Oui, mais réservez un terrain pour les périodes achalandées'], ahead: ['No, please book a court', 'Non, réservez un terrain'] },
+    lines: { no: ['First come, first served: no need to book.', 'Premier arrivé, premier servi : pas besoin de réserver.'], busy: ['First come, first served. Book a court for evenings, weekends and busy times.', 'Premier arrivé, premier servi. Réservez un terrain pour les soirées, les fins de semaine et les périodes achalandées.'], ahead: ['Please book a court ahead.', 'Réservez un terrain à l’avance.'] },
+    notes: { busy: own('First come, first served; book a court for evenings, weekends and busy times', 'Premier arrivé, premier servi; réservez un terrain pour les soirées, les fins de semaine et les périodes achalandées'), ahead: own('Book a court ahead', 'Réservez un terrain à l’avance') } },
+  skischool: { chips: { no: ['Yes, drop-in lessons', 'Oui, cours sans réservation'], busy: ['Yes, but book ahead for weekends and holidays', 'Oui, mais réservez pour les fins de semaine et les congés'], ahead: ['No, please book lessons ahead', 'Non, réservez les cours à l’avance'] },
+    lines: { no: ['Drop-in lessons: no need to book.', 'Cours sans réservation : pas besoin de réserver.'], busy: ['Drop-in lessons when there’s room. Book ahead for weekends and holidays.', 'Cours sans réservation s’il y a de la place. Réservez pour les fins de semaine et les congés.'], ahead: ['Please book lessons ahead.', 'Réservez vos cours à l’avance.'] },
+    notes: { busy: own('Drop-in lessons when there’s room; book ahead for weekends and holidays', 'Cours sans réservation s’il y a de la place; réservez pour les fins de semaine et les congés'), ahead: own('Book lessons ahead', 'Réservez vos cours à l’avance') } },
+  // Open-to-all outdoor places: nobody "walks in" to a skate park, a disc golf course or a pump track.
+  skatepark: { chips: { no: ['Yes, open to everyone', 'Oui, ouvert à tous'] }, lines: { no: ['Open to everyone: no need to book.', 'Ouvert à tous : pas besoin de réserver.'] } },
+  discgolf: { chips: { no: ['Yes, open to everyone', 'Oui, ouvert à tous'] }, lines: { no: ['Open to everyone: no need to book.', 'Ouvert à tous : pas besoin de réserver.'] } },
+  bike: { chips: { no: ['Yes, open to everyone', 'Oui, ouvert à tous'] }, lines: { no: ['Open to riders: no need to book.', 'Ouvert aux cyclistes : pas besoin de réserver.'] } },
+  rink: { lines: { no: ['Drop in during public skating: no need to book.', 'Sans réservation pendant le patinage libre.'] } },
+  swim: { lines: { no: ['Drop in during public swims: no need to book.', 'Sans réservation pendant les bains libres.'] } },
+  sportsctr: { lines: { no: ['Drop in during public times: no need to book.', 'Sans réservation pendant les périodes publiques.'] } },
+};
+// Kinds played outdoors: the dog tile says "Dogs welcome", never "inside" (sport test 1).
+const OUTDOOR_KINDS = ['golf', 'range', 'skatepark', 'discgolf', 'bike', 'swim', 'courts', 'skischool', 'sportother'];
+
 const SPORT_KINDS = SPORT_KIND_ORDER.slice();
-module.exports = { K, PRICE_PH, TYPER, TYPER_TRUE, TYPE_SUB, BUSY_THEME, EX_PRICE, EXACT, PREFILL, SLOT, EVENTS, BOOK_AHEAD_UNIT, LABEL_PARTS,
+module.exports = { K, PRICE_PH, BOOK_WORDS, OUTDOOR_KINDS, TYPER, TYPER_TRUE, TYPE_SUB, BUSY_THEME, EX_PRICE, EXACT, PREFILL, SLOT, EVENTS, BOOK_AHEAD_UNIT, LABEL_PARTS,
   SPORT_KINDS, SPORT_KIND_ORDER, SPORT_KIND_LABELS_OWNER, SPORT_KIND_WORDS, SPORT_KIND_LENGTH, SPORT_KIND_BOOK, SPORT_ALL_AGES_KINDS, SPORT_KIND_HINTS };

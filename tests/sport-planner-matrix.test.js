@@ -35,7 +35,7 @@ const JULY = new Date('2026-07-15T12:00:00-07:00'), JAN = new Date('2027-01-15T1
 // [kind, type, region, listing, owner answers, price, open_months, [request, when, in?, words on the stop]]
 const CASES = [
   ['golf', 'golf', 'penticton', { name: 'Sagebrush Links Golf Club' }, { kinds: ['golf'], age: 'all', book: 'ahead', length: 'half', year: 'seasonal' }, 59, '04-01:10-31', [
-    ['golf in Penticton', JULY, true, ['Green fees from', 'Book ahead (the owner’s own answer).']],
+    ['golf in Penticton', JULY, true, ['Green fees from', 'Book a tee time ahead (the owner’s own answer).']],
     ['golf with kids in Penticton', JULY, true],
     ['golf in Penticton', JAN, false],
     ['golf à Penticton', JULY, true, ['Droits de jeu à partir de']]]],

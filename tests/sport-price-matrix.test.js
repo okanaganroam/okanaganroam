@@ -62,6 +62,9 @@ const SCENARIOS = {
   main: { price: MAIN },
   lower: { price: MAIN, typed: [['Main', String(MAIN)], ['Lower one', String(LOWER)], ['Locker', '1']] },
   higher: { price: MAIN, typed: [['Main', String(MAIN)], ['Bigger one', String(HIGHER)]] },
+  // Sport test 1 (2026-11-20; Debbie's card said her $23 power cart): extras and discounted people's lines lower than the
+  // main price never become the headline, for every sport kind (they read as the main price only).
+  extras: { price: MAIN, typed: [['Main', String(MAIN)], ['Power cart', '10'], ['Club rental', '9'], ['Junior rate', '8'], ['Seniors', '7'], ['Kids under 12', '6'], ['Season membership', '5']], extras: true },
   free: { price: 'free' },
   minimum: { price: PERSON, info: { per_min: 2 } },
 };
@@ -80,11 +83,12 @@ test('THE PRICE RULE for sport: every sport kind × every price scenario: the pa
       const v = mk(GOLF_KINDS.includes(k) ? { type: 'golf' } : {});
       const t = tokenFor(v.id);
       await ok(change(t, { indoor_info: { kinds: [k], length: '1-2h', book: 'no', age: 'all', year: 'all', ...(cfg.info || {}) }, indoor_price: cfg.price }));
-      if (cfg.typed) publishPrices(v.id, cfg.typed);
+      // Sport test 1 (2026-11-20): only an adult green-fee line may lower a golf course's card, so its lower line is one.
+      if (cfg.typed) publishPrices(v.id, cfg.typed.map(([nm, pr]) => [k === 'golf' && nm === 'Lower one' ? '9 holes, weekdays' : nm, pr]));
       app.writeIndoorVisitRows(v.id);
       app.indoorCardPrice(v.id);
       const perPerson = typeof cfg.price === 'number' && !(cfg.info && cfg.info.per);
-      const lowest = cfg.typed ? Math.min(cfg.price, ...cfg.typed.filter((x) => x[0] !== 'Locker').map((x) => Number(x[1]))) : cfg.price;
+      const lowest = cfg.extras ? cfg.price : cfg.typed ? Math.min(cfg.price, ...cfg.typed.filter((x) => x[0] !== 'Locker').map((x) => Number(x[1]))) : cfg.price;
       const exact = !!EXACT[k];
       // 1. The page's Prices row (EN + FR).
       const en = page(v), fr = page(v, 'fr');
@@ -96,7 +100,7 @@ test('THE PRICE RULE for sport: every sport kind × every price scenario: the pa
       for (const lang of ['en', 'fr']) want(!BAD_WORDS_RE.test(L[lang]), `${id}: ${lang} "${L[lang]}" says Adult price`);
       if (!exact) for (const lang of ['en', 'fr']) want(!EXACT_RE.test(L[lang]), `${id}: a range kind's ${lang} line names an exact label: "${L[lang]}"`);
       // What each scenario must say.
-      if (sc === 'main' || sc === 'higher') want(L.en === (exact ? `${EXACT[k][0]} ${money(MAIN, 'en')}.` : IK.indoorKindText([k], 'en').price.page.replace('{x}', money(MAIN, 'en'))), `${id}: EN "${L.en}"`);
+      if (sc === 'main' || sc === 'higher' || sc === 'extras') want(L.en === (exact ? `${EXACT[k][0]} ${money(MAIN, 'en')}.` : IK.indoorKindText([k], 'en').price.page.replace('{x}', money(MAIN, 'en'))), `${id}: EN "${L.en}"`);
       if (sc === 'lower') {
         want(L.en.includes(money(LOWER, 'en')), `${id}: EN "${L.en}" leads with the lowest`);
         want(exact ? L.en === `From ${money(LOWER, 'en')} (${EXACT[k][0].charAt(0).toLowerCase()}${EXACT[k][0].slice(1)} ${money(MAIN, 'en')}).` : !L.en.includes(money(MAIN, 'en')), `${id}: EN "${L.en}"`);

@@ -2818,7 +2818,11 @@ function stopFrom(v, scored, extra, ctx) {
     caveats = caveats.filter((c) => !c.startsWith(UNKNOWN_HOURS_CAVEAT.replace(/ — .*$/, '')) && !/listed hours/i.test(c));
     const tn = INDOOR_TIMES_NOTES[v.indoorTimes] || INDOOR_CLASS_TIME_NOTE;
     if (!caveats.includes(tn)) caveats.push(tn);
-  } else if (v && (v.type === 'indoor' || v.kindOwn) && INDOOR_BOOK_NOTES[v.indoorBook] && !caveats.includes(INDOOR_BOOK_NOTES[v.indoorBook]) && !(ownLine && ownLine.busy && v.indoorBook !== 'ahead')) caveats.push(INDOOR_BOOK_NOTES[v.indoorBook]);
+  } else if (v && (v.type === 'indoor' || v.kindOwn) && INDOOR_BOOK_NOTES[v.indoorBook] && !(ownLine && ownLine.busy && v.indoorBook !== 'ahead')) {
+    // Sport test 1 (2026-11-20): a sport kind's own booking words (a golf course's "Walk-ons when there's room…").
+    const bn = (typeof v.indoorBookNote === 'string' && v.indoorBookNote) || INDOOR_BOOK_NOTES[v.indoorBook];
+    if (!caveats.includes(bn)) caveats.push(bn);
+  }
   if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = tourBookAheadNote(v); if (!caveats.includes(bn)) caveats.push(bn); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
   // Tour test 4 (Whistler, 2026-11-17), bug 12: the operator's one booking and age answer stands for several unlike trips
@@ -8569,6 +8573,18 @@ function planTripCore(input) {
     const shown = new Set(rec.items.map((i) => i.venue && i.venue.id));
     const closedAll = buildRecommendations(facts, { ...ctx, ignoreSeason: true }).items.map((x) => x.venue && facts.find((f) => f.id === x.venue.id)).filter((f) => f && !shown.has(f.id) && ownerClosureOn(f, d));
     if (closedAll.length) result.warnings.push(`Closed ${CLOSURE_MONTHS_EN[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}: ${closedAll.slice(0, 6).map((f) => f.name).join(', ')}.`);
+  }
+  // Sport test 1 (2026-11-20; "golf in Kelowna on January 16" left Debbie's course out, closed for the season by her own
+  // dates, with no word): a dated list for a kind or type of place names the places of that kind, in the town asked, that
+  // their own season closes that day, with the day they reopen ("Closed for the season: Shadow Ridge (reopens Mar 15).").
+  if (rec.items.length && /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) && ((ctx.plannerKinds || []).length || (ctx.types && ctx.types.size && ctx.types.size <= 2))) {
+    const d = String(ctx.tripDate);
+    const shown = new Set(rec.items.map((i) => i.venue && i.venue.id));
+    const seasonShut = buildRecommendations(facts, { ...ctx, ignoreSeason: true }).items.map((x) => x.venue && facts.find((f) => f.id === x.venue.id))
+      .filter((f) => f && !shown.has(f.id) && f.openMonths && !ownerClosureOn(f, d) && seasonClosedOnTripRaw({ ...f, ownerClosures: undefined }, { date: d }));
+    const reopen = (f) => { const m = /^(\d{2})-(\d{2}):/.exec(String(f.openMonths || '')); return m ? `${CLOSURE_MONTHS_EN[Number(m[1]) - 1]} ${Number(m[2])}` : ''; };
+    const named = seasonShut.slice(0, 4).map((f) => (reopen(f) ? `${f.name} (reopens ${reopen(f)})` : f.name));
+    if (named.length) result.warnings.push(`Closed for the season: ${named.join(', ')}.`);
   }
   // Audit fix (2026-10-27): the list's own day, when the request named one, so the trip API can add that day's weekly
   // nights and happy hour to each place ("Tonight: Trivia 7:30–9 PM").

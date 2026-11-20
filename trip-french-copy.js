@@ -1,6 +1,8 @@
 'use strict';
 // Display-only French copy. Stored venue names, URLs, facts and API output stay intact.
 const FR_MONTHS_BY_EN={January:'janvier',February:'février',March:'mars',April:'avril',May:'mai',June:'juin',July:'juillet',August:'août',September:'septembre',October:'octobre',November:'novembre',December:'décembre'};
+// Sport test 1 (2026-11-20): each sport kind's own Build My Trip booking note, English -> French (sport-kinds.js BOOK_WORDS).
+const SPORT_BOOK_NOTES_FR=new Map(Object.values(require('./sport-kinds').BOOK_WORDS).flatMap((w)=>Object.values(w.notes||{})));
 const FR_SEASON_WORDS={winter:'hiver',spring:'printemps',summer:'été',fall:'automne',autumn:'automne','off-season':'hors saison'};
 // Round 15c (2026-10-20): the English heading of an Ideas list ("Breweries in Squamish on Sunday.", "Art galleries and
 // dog-friendly spots in Whistler this weekend.", "Ideas for Pemberton.", "What’s on in Squamish.") in French. Built only when
@@ -227,6 +229,8 @@ function t3FrenchTextCore(value){
    text=text.replace(/^(.+) is closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?: \((.+)\))?\.$/,(_,n,m,d,h)=>n+' est fermé le '+frDom(d)+' '+FR_SHORT[m]+(h?' ('+(FR_HOLIDAYS[h.replace(/'/g,'’')]||h)+')':'')+'.');
    // Indoor test 8 (2026-11-19): the places of the kind asked closed that day by their owner ("Closed Dec 25: A, B.").
    // Indoor test 11: with the holiday's name on the generic day plan ("Closed Dec 26 (Boxing Day): A.").
+   // Sport test 1 (2026-11-20): the places of the kind asked closed for the season that day, with the day they reopen.
+   text=text.replace(/^Closed for the season: (.+)\.$/,(_,n)=>'Fermés pour la saison : '+n.replace(/ \(reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})\)/g,(w,m,dd)=>' (réouverture le '+frDom(dd)+' '+FR_SHORT[m]+')')+'.');
    text=text.replace(/^Closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?: \((.+?)\))?: (.+)\.$/,(_,m,d,h,n)=>'Fermés le '+frDom(d)+' '+FR_SHORT[m]+(h?' ('+(FR_HOLIDAYS[h.replace(/'/g,'’')]||h)+')':'')+' : '+n+'.'); }
  // Indoor test 8: the owner's own line quoted on a stop.
  text=text.replace(/^(“.+”) \(the owner’s own words\)$/,'$1 (les mots de l’établissement)');
@@ -458,6 +462,8 @@ function t3FrenchTextCore(value){
  text=text.replace(/^Book at least 48 hours ahead \(the operator’s own answer\)\.$/,'Réservez au moins 48 heures à l’avance (réponse de l’entreprise).');
  text=text.replace(/^Book at least a week ahead \(the operator’s own answer\)\.$/,'Réservez au moins une semaine à l’avance (réponse de l’entreprise).');
  text=text.replace(/^No need to book \(the operator’s own answer\)\.$/,'Pas besoin de réserver (réponse de l’entreprise).');
+ // Sport test 1 (2026-11-20): a sport kind's own booking note (sport-kinds.js BOOK_WORDS: a golf course's walk-ons).
+ if(typeof SPORT_BOOK_NOTES_FR!=='undefined'&&SPORT_BOOK_NOTES_FR.has(text))return SPORT_BOOK_NOTES_FR.get(text);
  // Indoor places (2026-11-19): the owner's own walk-ins answer.
  text=text.replace(/^Walk-ins welcome; book ahead for weekends and busy times \(the owner’s own answer\)\.$/,'Sans réservation; réservez pour les fins de semaine et les périodes achalandées (réponse de l’établissement).');
  // Indoor test 16: the owner's own ages on a kids' stop, and an age rule with an adult.
@@ -842,4 +848,4 @@ function t3FrenchPlan(plan){
  }else {p.headline=t3FrenchText(p.headline||p.summary);if(p.experience?.text)p.experience.text=t3FrenchText(p.experience.text);}
  return p;
 }
-module.exports={t3FrenchHeadingCore,t3FrenchSummary,frSummaryItems,frSummaryList,frSummaryAround,frOccasionNoun,FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN};
+module.exports={t3FrenchHeadingCore,t3FrenchSummary,frSummaryItems,frSummaryList,frSummaryAround,frOccasionNoun,FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,SPORT_BOOK_NOTES_FR};

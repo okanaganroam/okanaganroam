@@ -1,5 +1,5 @@
 'use strict';
-const {FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE,t3FrenchHeadingCore,t3FrenchSummary,frSummaryItems,frSummaryList,frSummaryAround,frOccasionNoun}=require('./trip-french-copy');
+const {FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,SPORT_BOOK_NOTES_FR,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE,t3FrenchHeadingCore,t3FrenchSummary,frSummaryItems,frSummaryList,frSummaryAround,frOccasionNoun}=require('./trip-french-copy');
 const SITE_PAGE=require('./trip-site.js').page;
 
 // ---------- Build My Trip V3 page (Step 2, 2026-09-29) ----------
@@ -976,6 +976,8 @@ function renderScript(d) {
   // Fix (2026-10-19): the French helpers below read these lookups, so ship them with the functions (a season or month crashed /fr/trip).
   var FR_MONTHS_BY_EN = ${JSON.stringify(FR_MONTHS_BY_EN)};
   var FR_SEASON_WORDS = ${JSON.stringify(FR_SEASON_WORDS)};
+  // Sport test 1 (2026-11-20): each sport kind's own booking note in French.
+  var SPORT_BOOK_NOTES_FR = new Map(${JSON.stringify([...SPORT_BOOK_NOTES_FR])});
   // Round 15c: the French Ideas heading (t3FrenchText calls it) and its lookups.
   var FR_HEADING_NAMES = ${JSON.stringify(FR_HEADING_NAMES)};
   var FR_HEADING_DAYS = ${JSON.stringify(FR_HEADING_DAYS)};

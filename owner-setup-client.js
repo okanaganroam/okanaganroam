@@ -1683,6 +1683,9 @@
       // Indoor test 17: the waiver chip says her kind's verb ("Waiver to sign before you climb").
       if (C.waiverVerb) l = l.map(function(c){ return c.replace(/before you play$/, 'before you ' + C.waiverVerb).replace(/avant de jouer$/, 'avant de ' + C.waiverVerb); });
       if (freeIndoor()) l = l.filter(function(c){ return !/first Sunday|premier dimanche/i.test(c); });
+      // Sport test 1 (2026-11-20): never a chip research's own words already say, or contradict ("Dress code: collared
+      // shirts" beside "collars not needed"), unless her line already says it.
+      if (C.gtkHide && C.gtkHide.length) l = l.filter(function(c){ return C.gtkHide.indexOf(c) < 0 || saysIt(value, c, l); });
       // Indoor test 11 (2026-11-19; Kim was asked about free parking twice): free parking is the Free parking tile in What you
       // offer, so its Good to know chip isn't offered (unless her line already says it, so she can take it out).
       l = l.filter(function(c){ return !/^(?:Free parking on site|Stationnement gratuit sur place)$/i.test(c) || saysIt(value, c, l); });
@@ -2415,12 +2418,14 @@
         : q(T.yearAllDropQ, fill(T.yearAllDropLead, { span: dAll.join(andWord()) || seaSpan(S.sea) })) + msgs() + '<div class="su-stack">' + big('✓', T.yearAllDropKeep, T.yearAllDropKeepSub, false, 'yearDropKeep') + big('✕', T.yearAllDropYes, T.yearAllDropYesSub, true, 'yearDropYes') + '</div>';
     } else if (s === 'hours:open') {
       // Café test 2: "Open from [Apr 25] to [Oct 12] every year". Whole months stay a quick path (the months screen).
-      var os0 = S.openDraft || S.openSea || { from: '', to: '' }, fromHours = S.openFrom === 'hours';
+      // Sport test 1 (2026-11-20): research's own season dates start the boxes when there's nothing yet (saved only with the screen).
+      var os0 = S.openDraft || S.openSea || (C.researchOpen && C.researchOpen.from ? { from: C.researchOpen.from, to: C.researchOpen.to } : { from: '', to: '' }), fromHours = S.openFrom === 'hours';
       x = q(T.openQ, T.openLead) + msgs() + (S.splitSaved ? '<p class="su-sent" id="suSplitSaved">' + h(S.splitSaved) + '</p>' : '') + '<div class="su-seadates su-openseason"><p class="su-q">' + h(T.openFrom) + '</p>' + mdPick('suOf', os0.from, T.openFrom) + '<p class="su-q">' + h(T.openTo) + '</p>' + mdPick('suOt', os0.to, T.openTo) + '</div>'
         + '<p class="su-hint su-repeats">' + h(T.repeatsYearly) + '</p><p class="su-hint"><button type="button" class="su-link" data-act="openMonths">' + h(T.openMonthsLink) + '</button></p>'
         // Restaurant test 1 (Whistler, 2026-11-14): closed twice a year is two yearly closures ("Every year"), and the ones
         // already saved are named.
-        + (T.openTwice ? '<p class="su-hint su-twice">' + h(T.openTwice) + (yearlyClosed().length ? ' ' + h(fill(T.openTwiceHave, { list: andList(yearlyClosed()) }).replace(/\.\.$/, '.')) : '') + '</p>' : '')
+        // Sport test 1: a one-season kind (a golf course, an arena) is never asked about spring and fall shoulder seasons.
+        + (C.sport && (C.kindSeasons || {})[indoorMainKind()] ? '' : (T.openTwice ? '<p class="su-hint su-twice">' + h(T.openTwice) + (yearlyClosed().length ? ' ' + h(fill(T.openTwiceHave, { list: andList(yearlyClosed()) }).replace(/\.\.$/, '.')) : '') + '</p>' : ''))
         + tticksHtml(true)
         + '<div class="su-stack">' + (fromHours ? big('✓', T.openSame, T.openSameSub, false, 'openSave:same') + big('☀️', T.openSummer, T.openSummerSub, true, 'openSave:summer') : big('✓', T.openSaveOnly, '', false, 'openSave:only'))
         + big('✕', T.allYearBtn, '', true, 'openNone') + '</div>';
@@ -4657,13 +4662,15 @@
       var iio = {};
       if (ipf === 'donation' && isg !== (typeof TI.suggested === 'number' ? TI.suggested : null)) iio.suggested = isg;
       if (iper !== (TI.per || '') || ipmin !== (TI.per_min || null) || ipmax !== (TI.per_max || null)) { iio.per = iper || null; iio.per_min = ipmin; iio.per_max = ipmax; }
+      // Sport test 1 (2026-11-20): a golf course's "$45 for 9 holes" keeps its holes for the first line of her price list.
+      if (C.sport && indoorMainKind() === 'golf' && !ipf) { var ihr = el('suTprice') ? el('suTprice').value : '', ihm = /\b(9|18|nine|eighteen)[- ]?(?:holes?|trous)\b/i.exec(ihr), ih = ihm ? (/^(?:18|eighteen)$/i.test(ihm[1]) ? 18 : 9) : null; if (ih !== (TI.holes || null)) iio.holes = ih; }
       if (Object.keys(iio).length) ipl.push(tinfo(iio));
       if (ival !== S.savedTourPrice || (CUR.indoor_price_waiting != null && ival !== CUR.indoor_price_waiting)) ipl.push(tprice(ival));
       // Free entry is the Free to Visit badge too (on with free, off with a price), so the Free filters agree with the card.
       var ifreeB = !!ipf; if (ifreeB !== !!(S.savedBadges.free_entry || (CUR.badges || {}).free_entry) && ipl.length) ipl.push({ badges: { free_entry: ifreeB } });
       var ilive = ipf || ipp <= (C.feeLiveMax || 300);
       S.savedLine.price = ipf === 'donation' && T.tpriceSavedDonation ? T.tpriceSavedDonation : ipf ? T.tpriceSavedFree : ilive ? T.tpriceSavedLive : fill(T.tpriceSavedDay, { x: tourMoney(ipp), n: tourMoney(C.feeLiveMax || 300) });
-      return saveAll('price', ipl, null, null, function(){ if (ilive) { S.savedTourPrice = ival; CUR.indoor_price = ival; CUR.indoor_price_waiting = null; } else CUR.indoor_price_waiting = ipp; S.tour.priceGuessed = false; S.savedBadges.free_entry = ifreeB; if (iper) { TI.per = iper; S.tour.per = iper; } else { delete TI.per; S.tour.per = ''; } if (ipmin) TI.per_min = ipmin; else delete TI.per_min; if (ipmax) TI.per_max = ipmax; else delete TI.per_max; S.tour.ptext = null; S.tour.perAuto = false; S.tour.perTapped = ''; if (ipf === 'donation') { TI.suggested = isg; if (isg == null) delete TI.suggested; S.tour.sugg = isg; S.tour.suggText = null; } });
+      return saveAll('price', ipl, null, null, function(){ if (ilive) { S.savedTourPrice = ival; CUR.indoor_price = ival; CUR.indoor_price_waiting = null; } else CUR.indoor_price_waiting = ipp; S.tour.priceGuessed = false; S.savedBadges.free_entry = ifreeB; if ('holes' in iio) { if (iio.holes) TI.holes = iio.holes; else delete TI.holes; } if (iper) { TI.per = iper; S.tour.per = iper; } else { delete TI.per; S.tour.per = ''; } if (ipmin) TI.per_min = ipmin; else delete TI.per_min; if (ipmax) TI.per_max = ipmax; else delete TI.per_max; S.tour.ptext = null; S.tour.perAuto = false; S.tour.perTapped = ''; if (ipf === 'donation') { TI.suggested = isg; if (isg == null) delete TI.suggested; S.tour.sugg = isg; S.tour.suggText = null; } });
     }
     if (k === 'bookingSave' && INDOOR) {
       readTour(); var ib0 = S.tour, ibu = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null; if (ibu !== null) S.bookUrl = ibu;

@@ -147,8 +147,10 @@ test('3. Search: "christmas day" / "december 25" applies the date (Closed Dec 25
   assert.equal(app.smartStripHoliday('indoor playground kelowna on boxing day'), 'indoor playground kelowna');
   assert.equal(app.smartStripHoliday('escape room christmas eve penticton'), 'escape room penticton');
   assert.equal(app.smartStripHoliday('boxing gym kelowna'), 'boxing gym kelowna');
-  // A month alone (no date) still says so.
-  assert.match(plain(await getText(`/search?q=${encodeURIComponent('indoor playground kelowna december')}`)), /“december” isn’t something search can apply/);
+  // Sport test 1 (2026-11-20): a month alone (no date) is applied too ("in December"), never "can't apply".
+  const dec = plain(await getText(`/search?q=${encodeURIComponent('indoor playground kelowna december')}`));
+  assert.doesNotMatch(dec, /isn’t something search can apply/);
+  assert.match(dec, /in December/);
 });
 
 test('4. The visit box: "Season: All year." is left off, and the automatic Time needed row goes before her researched Food line or her own Groups line when the box is full', async () => {

@@ -2662,7 +2662,7 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
 // never repeat an indoor one), so Help's chip lists read them the same way.
 (function sportWords() {
   Object.assign(en.indoor.quick.good_to_know_kinds, {
-    golf: ['Tee times recommended', 'Cart and club rentals', 'Pro shop', 'Restaurant or patio on site', 'Dress code: collared shirts', 'Driving range on site', 'Free parking on site'],
+    golf: ['Tee times recommended', 'Cart and club rentals', 'Pro shop', 'Restaurant and patio on site', 'Dress code: collared shirts', 'Driving range on site', 'Free parking on site'],
     simgolf: ['Book a bay ahead', 'Clubs to borrow', 'Food and drinks on site', 'Lessons available', 'Free parking on site'],
     range: ['Balls and clubs to rent', 'Covered stalls', 'Lessons available', 'Lit for evening play', 'Free parking on site'],
     snow: ['Book lessons ahead', 'Rentals available', 'Lift ticket not included', 'Meet at the ski school sign', 'Dress for the weather'],
@@ -2676,7 +2676,7 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
     sportgen: ['Book ahead on weekends', 'Rentals available', 'Arrive 15 minutes early', 'Free parking on site', 'Washrooms on site'],
   });
   Object.assign(fr.indoor.quick.good_to_know_kinds, {
-    golf: ['Heures de départ conseillées', 'Location de voiturettes et de bâtons', 'Boutique du pro', 'Restaurant ou terrasse sur place', 'Code vestimentaire : chemise à col', 'Champ de pratique sur place', 'Stationnement gratuit sur place'],
+    golf: ['Heures de départ conseillées', 'Location de voiturettes et de bâtons', 'Boutique du pro', 'Restaurant et terrasse sur place', 'Code vestimentaire : chemise à col', 'Champ de pratique sur place', 'Stationnement gratuit sur place'],
     simgolf: ['Réservez une baie à l’avance', 'Bâtons à emprunter', 'Nourriture et boissons sur place', 'Cours offerts', 'Stationnement gratuit sur place'],
     range: ['Balles et bâtons à louer', 'Postes couverts', 'Cours offerts', 'Éclairé le soir', 'Stationnement gratuit sur place'],
     snow: ['Réservez les cours à l’avance', 'Location sur place', 'Billet de remontée non compris', 'Rendez-vous au panneau de l’école de ski', 'Habillez-vous selon la météo'],
@@ -2751,6 +2751,9 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
         // row after them, optional, for school or daycare groups.
         ...(k === 'kids' ? fr2 ? { tpriceMore: 'Vos autres prix (tout-petits, bébés, adultes, cartes de 10 entrées, fêtes) vont dans « Vos tarifs », le premier des détails facultatifs.', groupsQ: 'Fêtes d’anniversaire et groupes', groupsSizeQ: 'Groupes scolaires ou de garderie : à partir de combien? (facultatif)' }
           : { tpriceMore: 'Your other prices (toddlers, babies, adults, 10-visit passes, parties) go in “Your prices”, the first of the extra details.', groupsQ: 'Birthday parties and groups', groupsSizeQ: 'School or daycare groups: from what size? (optional)' } : {}),
+        // Sport test 1 (2026-11-20): a sport kind's own words for the three booking choices ("Walk-ons when there's room; book
+        // tee times for busy times" on a golf course).
+        ...(IK.SPORT.BOOK_WORDS[k] && IK.SPORT.BOOK_WORDS[k].chips ? { ibooks: Object.fromEntries(Object.entries(IK.SPORT.BOOK_WORDS[k].chips).map(([b, w]) => [b, w[fr2 ? 1 : 0]])) } : {}),
         classNightsHint: k === 'classes' ? (fr2 ? 'Des cours le soir en dehors de ces heures? Gardez ici vos heures d’atelier libre, et ajoutez les soirs de cours dans Bon à savoir.' : 'Evening classes outside these hours? Keep your open studio hours here, and add class nights in Good to know.') : '',
       };
       T.quick.groups_kinds[k] = w.groups.chips;
