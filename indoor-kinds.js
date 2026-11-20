@@ -416,6 +416,7 @@ for (const [k, x] of Object.entries(EX_PRICE)) if (K[k]) K[k].exPrice = x;
 const EXACT = { gallery: ['Adult admission', 'Entrée adulte'], museum: ['Adult admission', 'Entrée adulte'], cinema: ['Adult ticket', 'Billet adulte'],
   pool: ['Adult drop-in', 'Entrée adulte à la séance'], yoga: ['Drop-in class', 'Cours à la carte'], bowling: ['One game', 'Une partie'], kids: ['Child admission', 'Entrée enfant'] };
 for (const [k, x] of Object.entries(EXACT)) if (K[k]) {
+  // single: an exact kind (no "from" before its own price; indoorKindText().single).
   K[k].single = true; K[k].en.price.exact = x[0]; K[k].fr.price.exact = x[1];
   K[k].en.price.page = `${x[0]} {x}.`; K[k].fr.price.page = `${x[1]} {x}.`; K[k].en.price.basis = x[0]; K[k].fr.price.basis = x[1];
 }
@@ -573,8 +574,6 @@ function indoorKindText(kinds, lang) {
   const see = w.prices.page === PRICES_PAGE[lang === 'fr' ? 1 : 0] ? (lang === 'fr' ? 'Voir les tarifs' : 'See prices & rates') : lang === 'fr' ? `Voir la ${w.prices.page.toLowerCase()}` : `See the ${w.prices.page.toLowerCase()}`;
   return { kind: k, exPrice: e.exPrice || 15, single: !!e.single, slot: e.slot || null, ticketed: !!e.ticketed, classKind: !!e.classKind, boxOffice: !!e.boxOffice, arts: !!e.arts, quiet: !!e.quiet, day: !!(e.day || e.quiet), gtk: e.gtk || 'general', ex: e.ex || 'general', ...w, prices: { ...w.prices, see } };
 }
-// "Tickets from $25." with the price written in.
-function indoorPriceLine(kinds, money, lang) { return indoorKindText(kinds, lang).price.page.replace('{x}', money); }
 // The card's small lines in both languages (English -> French), for french-text.js.
 const INDOOR_BASIS_FR = Object.fromEntries(Object.values(K).map((e) => [e.en.price.basis, e.fr.price.basis]).concat(Object.values(K).map((e) => [e.en.prices.page, e.fr.prices.page]))
   .concat(Object.values(K).filter((e) => e.en.price.exact).map((e) => [e.en.price.exact, e.fr.price.exact])));
@@ -607,4 +606,4 @@ const INDOOR_TYPE_WORD_SKIP = new Set(['history', 'heritage', 'heritage site', '
 // "learn to curl", "slots", « soin du visage »).
 const INDOOR_TYPE_WORDS = [...new Set(Object.values(K).flatMap((e) => e.en.search.concat(e.fr.search)).filter((w) => !INDOOR_TYPE_WORD_SKIP.has(w)))];
 
-module.exports = { indoorPriceShow, INDOOR_EXACT_FR, EXACT_PRICE_LABELS: EXACT, indoorWaiverVerb, indoorTyperWords, TYPER_TRUE, indoorKindLabel, indoorKindLabels, BOOK_AHEAD_UNIT, TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };
+module.exports = { indoorPriceShow, INDOOR_EXACT_FR, EXACT_PRICE_LABELS: EXACT, indoorWaiverVerb, indoorTyperWords, TYPER_TRUE, indoorKindLabel, indoorKindLabels, BOOK_AHEAD_UNIT, TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, INDOOR_BASIS_FR, indoorKindsNamedIn };

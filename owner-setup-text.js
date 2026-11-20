@@ -2669,6 +2669,8 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
         // tpriceCardLow when her own typed prices list a lower one (C.indoorLow): "From $70" for a spa, "From $8 (adult
         // admission $12)" for a museum. owner-setup-client.js indoorShowLine.
         tpriceLeadPick: fr2 ? 'Votre page indiquera « {line} ».' : 'Your page will say “{line}”.',
+        // When one of Your prices is lower than the box's, the line comes from it: the lead says so.
+        tpriceLeadPickLow: fr2 ? 'Votre page indiquera « {line} » : votre prix le plus bas, tiré de Vos tarifs.' : 'Your page will say “{line}”: your lowest price, from Your prices.',
         tpriceCard: line,
         tpriceCardLow: IK.indoorPriceShow([k], lang, 1000000, { low: 1, money: (n, f) => (n === 1 ? '{x}' : '{main}') }).line,
         tpriceRangeLead: fr2 ? 'Nous indiquerons « {line} », votre prix le plus bas.' : 'We’ll show “{line}”, your lowest price.',

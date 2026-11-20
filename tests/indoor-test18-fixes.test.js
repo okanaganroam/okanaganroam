@@ -78,7 +78,7 @@ test('1. THE PRICE RULE for her spa: $95 main and a $70 pedicure: the page, the 
   assert.equal(stop.venue.cost.line, 'From {x}');
   // The setup's Price screen, as she comes back: "Your page will say “From $70”".
   const g = await openSetup(base, t, { hash: 'price' });
-  assert.equal(g.doc.getElementById('suTpriceLead').textContent, 'Your page will say “From $70”.');
+  assert.equal(g.doc.getElementById('suTpriceLead').textContent, 'Your page will say “From $70”: your lowest price, from Your prices.');
   assert.doesNotMatch(g.text(), /Adult price/);
   const gf = await openSetup(base, t, { hash: 'price', lang: 'fr' });
   assert.match(gf.doc.getElementById('suTpriceLead').textContent, /« À partir de 70\s\$ »/);
