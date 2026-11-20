@@ -812,7 +812,8 @@
       // who it's for; with Per room or group on, the number at the start is the price.
       if (INDOOR && !fw) {
         var pr = indoorPerRead(lw0 ? lw0.words + ' ' + x : x); S.tour.ptext = xTyped;
-        if (pr.per && S.tour.perTapped !== 'person') { S.tour.perAuto = S.tour.per !== pr.per || S.tour.perAuto; S.tour.per = pr.per; }
+        // Sport (2026-11-20): no Per room or group choice (a golf fee is per person; a bay's hour is in the kind's words).
+        if (pr.per && S.tour.perTapped !== 'person' && !C.sport) { S.tour.perAuto = S.tour.per !== pr.per || S.tour.perAuto; S.tour.per = pr.per; }
         else if (!pr.per && S.tour.perAuto) { S.tour.per = ''; S.tour.perAuto = false; }
         if (S.tour.per) { S.tour.perMin = pr.min; S.tour.perMax = pr.max; var nn = tourPriceNumber(x); S.tour.price = nn == null ? (String(x).trim() ? NaN : null) : nn; S.tour.priceFirst = false; }
         S.tour.perWords = pr.per;

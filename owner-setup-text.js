@@ -2768,6 +2768,9 @@ function sportStrings(base, o) {
   return x;
 }
 en.sport = sportStrings(en.indoor, {
+  // No Per room or group choice under the price box (Dayton: few screens, no extra choices): a golf fee is per person, a
+  // simulator's hour per bay is in its kind's words.
+  iperChips: null, iperNeed: '', iperRead: '',
   labels: { groups: 'Groups and events' },
   photosLead: 'Your course, rink or park, and people playing. Three photos is perfect.',
   allYearClosedSub: 'Like open April to October, or December to March. You pick the dates.',
@@ -2788,6 +2791,9 @@ en.sport = sportStrings(en.indoor, {
   seasonHintWinter: 'Most places like yours are open in winter only. Tap “We’re closed part of the year” and pick your first and last day.',
 });
 fr.sport = sportStrings(fr.indoor, {
+  // No Per room or group choice under the price box (Dayton: few screens, no extra choices): a golf fee is per person, a
+  // simulator's hour per bay is in its kind's words.
+  iperChips: null, iperNeed: '', iperRead: '',
   labels: { groups: 'Groupes et événements' },
   photosLead: 'Votre parcours, votre patinoire ou votre parc, et des gens qui jouent. Trois photos, c’est parfait.',
   allYearClosedSub: 'Par exemple ouvert d’avril à octobre, ou de décembre à mars. Vous choisissez les dates.',

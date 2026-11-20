@@ -193,7 +193,7 @@ const TYPER = {
   bike: ['Practice night', 'Riding', 'Soirée d’entraînement', 'Vélo'],
   courts: ['Drop-in', 'Court time', 'Jeu libre', 'Terrains'],
   discgolf: ['Disc rental', 'Discs', 'Location de disques', 'Disques'],
-  sportsctr: ['Adult drop-in', 'Drop-in', 'Adulte à la séance', 'À la séance'],
+  sportsctr: ['Drop-in', 'Drop-in', 'À la séance', 'À la séance'],
   sportother: ['Adult admission', 'Prices', 'Entrée adulte', 'Tarifs'],
 };
 // The first typed line's true name for the main price ([en, fr]); own: a specific word only when the place's own words
@@ -209,7 +209,7 @@ const TYPER_TRUE = {
   bike: { name: ['One rider', 'Un cycliste'] },
   courts: { name: ['Court time', 'Temps de terrain'] },
   discgolf: { name: ['One round', 'Une partie'] },
-  sportsctr: { name: ['Adult drop-in', 'Adulte à la séance'] },
+  sportsctr: { name: ['Drop-in', 'À la séance'] },
   sportother: { name: ['One person', 'Une personne'] },
 };
 // The "Type them in myself" line: [en, fr], each followed by ", one line at a time".
