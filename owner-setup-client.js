@@ -433,7 +433,11 @@
   var SPORTS_RE = /\b(?:sports?|tvs?|televisions?|big[- ]screens?|the game|game day|game night|hockey night|playoffs?|nhl|nfl|cfl|ufc|pay[- ]per[- ]view)\b/i;
   function sportsAt(){ var t = String(S.story || ''), m = SPORTS_RE.exec(t); return m ? [m.index, m.index + m[0].length] : null; }
   // A short quote around it ("…and the game on"), for the gentle prompt.
+  // Sport test 2 (2026-11-20; Trevor's golf simulator: "Your description still mentions sports… Fix my description", with no
+  // Sports TV tile to answer it): the nudge is only for a place whose setup offers the Sports TV tile (pubs, restaurants…).
+  function sportsTileHere(){ return (C.offerGroups || []).some(function(g){ return (g.keys || []).indexOf('sports_tv') >= 0; }); }
   function sportsBit(){
+    if (!sportsTileHere()) return '';
     var at = sportsAt(); if (!at) return ''; var t = String(S.story), a = Math.max(0, at[0] - 24), b = Math.min(t.length, at[1] + 24);
     while (a > 0 && /\S/.test(t.charAt(a - 1))) a--; while (b < t.length && /\S/.test(t.charAt(b))) b++;
     return (a > 0 ? '…' : '') + t.slice(a, b).trim().replace(/[.,;:!]+$/, '') + (b < t.length ? '…' : '');
@@ -698,7 +702,8 @@
     var k0 = (S.tour.kinds || [])[0];
     if (!k0) return;
     if ((!S.tour.length || S.tour.lengthGuessed) && !TI.length && (C.kindLength || {})[k0]) { S.tour.length = C.kindLength[k0]; S.tour.lengthGuessed = true; }
-    if ((!S.tour.book || S.tour.bookGuessed) && !TI.book && (C.kindBook || {})[k0]) { S.tour.book = C.kindBook[k0]; S.tour.bookGuessed = true; }
+    // Sport test 2: research's own walk-in words first ("Walk-ins welcome; booking ahead recommended" -> busy), every kind.
+    if ((!S.tour.book || S.tour.bookGuessed) && !TI.book && (C.researchBook || (C.kindBook || {})[k0])) { S.tour.book = C.researchBook || C.kindBook[k0]; S.tour.bookGuessed = true; }
     // Indoor test 12 (2026-11-19): research's price pre-fills only for the kind it names (a yoga drop-in, a museum's adult
     // admission); another main kind picked takes its own, or an empty box.
     if (C.researchFeeKinds && !S.tour.free && (S.tour.price == null || S.tour.priceGuessed) && CUR.indoor_price == null) { var rf = C.researchFeeKinds[k0]; if (typeof rf === 'number') { S.tour.price = rf; S.tour.priceGuessed = true; } else if (S.tour.priceGuessed) { S.tour.price = null; S.tour.priceGuessed = false; } }
@@ -1228,7 +1233,9 @@
     if (staleIn(C.staleKept, line)) return false;
     if (staleIn(C.stale, line)) return true;
     var book = S.tour.book || TI.book || '', age = S.tour.age || TI.age || '';
-    return ((book === 'no' || book === 'busy') && CLASH_BOOK_RE.test(line)) || ((age === 'all' || age === '5') && CLASH_AGE_RE.test(line));
+    // Sport test 2: "19+ after 8 PM" (« 19 ans et plus après 20 h ») is all ages before then, never a clash with All ages.
+    var timedAge = /\b(?:19|18)\s*\+?\s*(?:and (?:over|older|up)\s*)?(?:ans et plus\s*)?(?:after|from|apr[èe]s|d[èe]s|à partir de)\s+\d|\b(?:adults?[- ]only|adultes seulement)\s+(?:after|apr[èe]s|d[èe]s)\s+\d/i.test(line);
+    return ((book === 'no' || book === 'busy') && CLASH_BOOK_RE.test(line)) || ((age === 'all' || age === '5') && CLASH_AGE_RE.test(line) && !timedAge);
   }
   function copyGets(d, x){ var w = W(), open = typeof HO === 'function' ? HO() : {}; return x !== d && (!!w[x] || (othersClosed(d) && !(S.closedTap || {})[S.step + x] && !open[x])); }
   function nthMonday(y, mo, nth){ var d = new Date(y, mo, 1); var n = 0; while (true) { if (d.getDay() === 1 && ++n === nth) return d; d.setDate(d.getDate() + 1); } }
@@ -1706,6 +1713,8 @@
   // Tour test 2 (Whistler, 2026-11-16): Good to know stopped mid-sentence at the limit with no word. A visible counter
   // ("212 / 240") that says so at the limit; a tour's Good to know holds 240 (C.bringMax, the server's own limit).
   var BRING_MAX = C.bringMax || 180;
+  // Sport test 2: an indoor or sport place's Groups line holds 240 (C.groupsMax).
+  var GROUPS_MAX = C.groupsMax || 180;
   // Tour test 13 (Whistler, 2026-11-18; Matthias pasted a long line: the box cut it at the limit, "If we cancel b", and it
   // was saved): the boxes no longer cut a paste (their maxlength has room past the limit); at Save, text over the limit is
   // kept to its last full sentence (or word), the box shows it, and the message says where the rest goes. Nothing is saved
@@ -2961,7 +2970,7 @@
             + (C.offerLabels.service_dogs ? '<button type="button" class="su-tile su-tile-wide su-subtile" id="suServiceDogs" aria-pressed="' + (S.badges.service_dogs ? 'true' : 'false') + '" data-off="service_dogs"' + (S.noDogs ? '' : ' hidden') + '><span class="su-e" aria-hidden="true">' + C.offerIcons.service_dogs + '</span>' + h(C.offerLabels.service_dogs) + '<span class="su-tile-sub">' + h(T.serviceDogsSub) + '</span></button>'
               // Restaurant test 1 (Whistler, 2026-11-14): it was ticked for her, so say so (a tap meant to tick it unticked it).
               + (T.serviceDogsTicked ? '<p class="su-hint" id="suSdogTicked" role="status"' + (S.sdogAuto && S.noDogs && S.badges.service_dogs ? '' : ' hidden') + '>' + h(T.serviceDogsTicked) + '</p>' : '') : '') : '') + '</div>'; }).join('')
-        + '<p class="su-hint su-sportsnote" id="suSportsNote" role="status"' + (sportsBit() && !S.badges.sports_tv ? '' : ' hidden') + '>' + h(fill(T.storySportsLead, { bit: sportsBit() })) + '</p>'
+        + (sportsTileHere() ? '<p class="su-hint su-sportsnote" id="suSportsNote" role="status"' + (sportsBit() && !S.badges.sports_tv ? '' : ' hidden') + '>' + h(fill(T.storySportsLead, { bit: sportsBit() })) + '</p>' : '')
         + '<div class="su-stack su-offer-save">' + big('✓', T.saveOffer, '', false, 'offerSave') + '</div>' + skip('offer');
     } else if (s === 'offer:laptops') {
       x = q(T.laptopQ, T.laptopLead) + msgs() + radios('stay.laptops', ['all_day', 'not_busy', 'none'], T.laptops, T.laptopSub)
@@ -3125,7 +3134,7 @@
         // Tour test 9 (Whistler, 2026-11-18; Tanis, school programs of about 30): a last size, "21+ or whole classes", in
         // the same question (an option, not a new field).
         + '<div class="su-chips" role="group" aria-labelledby="' + (gKids ? 'suGroupSizesQ' : 'suQ') + '" id="suGroupSizes">' + (TOUR ? [4].concat(GROUP_SIZES, T.groupsChipBig ? [21] : []) : GROUP_SIZES).map(function(n){ var on = sentencesOf(gl).indexOf(groupsSizeLine(n)) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip' + (n === 21 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (n === 21 && T.groupsChipBig ? h(T.groupsChipBig) : S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>';
-      var gLine = enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TL) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TL ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 780, area: true, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + trimNoteHtml('suGroupsLine') + ex(T.groupsEx);
+      var gLine = enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TL) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TL ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 780, area: true, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, GROUPS_MAX) + trimNoteHtml('suGroupsLine') + ex(T.groupsEx);
       // Indoor test 11 (Kim): research's Groups line, untouched, says it came from online, as Known for and Good to know do.
       var gGuess = INDOOR && T.groupsGuess && !!gl && ((gl === ((CUR.visit_rows || {}).groups || '') && (C.visitResearch || []).indexOf('groups') >= 0) || (!(CUR.visit_rows || {}).groups && gl === C.groupsFound)) ? '<p class="su-sent su-research" id="suGroupsGuess">' + h(T.groupsGuess) + '</p>' : '';
       x = doneLine('groups') + q(INDOOR && T.groupsQAhead && ((S.tour && S.tour.book) || TI.book) === 'ahead' ? T.groupsQAhead : T.groupsQ, T.groupsLead) + msgs() + gGuess
@@ -4589,7 +4598,7 @@
       return saveAll('flights', fl, null, null, function(){ Object.keys(bi2).forEach(function(kk){ if (bi2[kk] == null) delete BI[kk]; else BI[kk] = bi2[kk]; }); if (fb2.noFlights) { S.savedFlight = null; CUR.flight_fee = null; } else if (ff <= C.feeLiveMax) { S.savedFlight = ff; CUR.flight_fee = ff; CUR.flight_fee_waiting = null; } else if (ff !== S.savedFlight) CUR.flight_fee_waiting = ff; fb2.feeGuessed = false; S.togoGuessed = false; });
     }
     if (k === 'brewGroupsSave') {
-      var gFit = overMaxOwn('suGroupsLine', 180, 'groups'); if (gFit) { S.brew.groups = gFit.text; if (!gFit.go) return render(); }
+      var gFit = overMaxOwn('suGroupsLine', GROUPS_MAX, 'groups'); if (gFit) { S.brew.groups = gFit.text; if (!gFit.go) return render(); }
       readBrew(); var gline = String(S.brew.groups || '').trim(), gbu = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null;
       // Tour test 14 (Lucía): "Groups of 6 or moreMore than 4 people?… welcome.: please book ahead." went live. Two sentences
       // run together (a lowercase letter then a capital, or ".:") are asked about once; Save again keeps the line.
@@ -5073,7 +5082,7 @@
       // Tour test 9 (Whistler, 2026-11-18; Tanis): "Groups of up to 20School and group programs…" went live: the size line
       // ends with ". " so what she types next starts its own sentence (as the Good to know answers do).
       readBrew(); S.brew.groups = addPiece(keepPieces(S.brew.groups, groupsKeep(S.brew.groups)), groupsSizeLine(+b.getAttribute('data-bgroup')) + '.') + ' ';
-      var gpre = researchOf('groups'), gtr = gpre ? trimResearch(S.brew.groups, gpre, 180, groupsSizeLine(+b.getAttribute('data-bgroup'))) : null;
+      var gpre = researchOf('groups'), gtr = gpre ? trimResearch(S.brew.groups, gpre, GROUPS_MAX, groupsSizeLine(+b.getAttribute('data-bgroup'))) : null;
       if (gtr) { S.brew.groups = gtr.v + ' '; S.trimNote = { box: 'suGroupsLine', step: S.step, text: fill(T.trimResearch || '{rest}', { rest: gtr.rest.length > 90 ? gtr.rest.slice(0, 88) + '…' : gtr.rest }) }; } (S.chipFilled = S.chipFilled || {}).suGroupsLine = S.brew.groups; S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y);
       // Tour test 14 (Lucía, Pixel): her tap on the box after a size chip put the cursor mid-line, so her words went inside
       // "Groups of 6 or more: please book ahead." The box takes the focus with the cursor at the end (as the quick chips do).
@@ -5194,7 +5203,7 @@
       if (sep === '. ' && v && qk !== 'takeout') v = v.replace(/[\s]+$/, '').replace(/([^.!?])$/, '$1.') + ' ';
       // Tour test 14 (Lucía): no double space inside the line (a space she typed after an earlier chip's ". ").
       v = v.replace(/([^\s])[ \u00a0]{2,}(?=\S)/g, '$1 ');
-      var lim0 = qk === 'groups' ? 180 : qk === 'good_to_know' ? BRING_MAX : 0, rpre = lim0 ? researchOf(qk) : '', tr0 = lim0 && rpre ? trimResearch(v, rpre, lim0, t) : null;
+      var lim0 = qk === 'groups' ? GROUPS_MAX : qk === 'good_to_know' ? BRING_MAX : 0, rpre = lim0 ? researchOf(qk) : '', tr0 = lim0 && rpre ? trimResearch(v, rpre, lim0, t) : null;
       if (tr0) { v = tr0.v + (sep === '. ' && !/[.!?]$/.test(tr0.v) ? '.' : '') + ' '; trimNoteSet(box.id, tr0.rest); } else if (lim0 && S.trimNote && S.trimNote.box === box.id && v.trim().length <= lim0) trimNoteSet(box.id, '');
       box.value = v.slice(0, box.maxLength > 0 ? box.maxLength : 180); box._qPrev = box.value; countUpdate(box); mark();
       // Tour test 11 (Whistler, 2026-11-18; Min-jun dictates): a Good to know chip puts the cursor in the box, at the end.

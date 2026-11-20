@@ -2689,11 +2689,11 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
     sportsctr: ['Casiers offerts', 'Apportez des souliers d’intérieur', 'Les heures libres changent : voyez l’horaire', 'Stationnement gratuit sur place', 'Comptoir de friandises'],
     sportgen: ['Réservez pour les fins de semaine', 'Location sur place', 'Arrivez 15 minutes d’avance', 'Stationnement gratuit sur place', 'Toilettes sur place'],
   });
-  Object.assign(en.indoor.bringExKinds, { golf: 'Tee times recommended on weekends. Cart and club rentals in the pro shop.', simgolf: 'Book a bay ahead for evenings. Clubs to borrow at no charge.', range: 'Balls and clubs to rent. Covered stalls when it rains.',
+  Object.assign(en.indoor.bringExKinds, { golf: 'Tee times recommended on weekends. Cart and club rentals in the pro shop.', simgolf: 'Book a bay ahead for evenings. Bring your own clubs or rent ours.', range: 'Balls and clubs to rent. Covered stalls when it rains.',
     snow: 'Book lessons ahead at Christmas and spring break. Meet at the ski school sign 15 minutes early.', rink: 'Skate rentals at the front desk. Public skate times change with hockey games: check the schedule.', swim: 'Bring a swimsuit and a towel. Lifeguards on duty during public swims.',
     skate: 'Helmets recommended. Lit until 10 PM.', bike: 'Helmets required. The track is closed to the public during race nights.', courts: 'First come, first served. Bring your own racquet or paddle.', discgolf: 'Free to play. Course map at the first tee.',
     sportsctr: 'Bring indoor shoes. Drop-in times change: check the schedule.', sportgen: 'Arrive 15 minutes early. Free parking on site.' });
-  Object.assign(fr.indoor.bringExKinds, { golf: 'Heures de départ conseillées la fin de semaine. Location de voiturettes et de bâtons à la boutique du pro.', simgolf: 'Réservez une baie à l’avance le soir. Bâtons à emprunter sans frais.', range: 'Balles et bâtons à louer. Postes couverts quand il pleut.',
+  Object.assign(fr.indoor.bringExKinds, { golf: 'Heures de départ conseillées la fin de semaine. Location de voiturettes et de bâtons à la boutique du pro.', simgolf: 'Réservez une baie à l’avance le soir. Apportez vos bâtons ou louez les nôtres.', range: 'Balles et bâtons à louer. Postes couverts quand il pleut.',
     snow: 'Réservez les cours à l’avance à Noël et à la relâche. Rendez-vous au panneau de l’école de ski 15 minutes d’avance.', rink: 'Location de patins à l’accueil. Les heures de patinage libre changent selon les matchs : voyez l’horaire.', swim: 'Apportez votre maillot et une serviette. Sauveteurs en service pendant les bains libres.',
     skate: 'Casque conseillé. Éclairé jusqu’à 22 h.', bike: 'Casque obligatoire. La piste est fermée au public pendant les soirées de course.', courts: 'Premier arrivé, premier servi. Apportez votre raquette.', discgolf: 'Gratuit. Carte du parcours au premier départ.',
     sportsctr: 'Apportez des souliers d’intérieur. Les heures libres changent : voyez l’horaire.', sportgen: 'Arrivez 15 minutes d’avance. Stationnement gratuit sur place.' });
@@ -2756,6 +2756,9 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
         ...(IK.SPORT.BOOK_WORDS[k] && IK.SPORT.BOOK_WORDS[k].chips ? { ibooks: Object.fromEntries(Object.entries(IK.SPORT.BOOK_WORDS[k].chips).map(([b, w]) => [b, w[fr2 ? 1 : 0]])) } : {}),
         classNightsHint: k === 'classes' ? (fr2 ? 'Des cours le soir en dehors de ces heures? Gardez ici vos heures d’atelier libre, et ajoutez les soirs de cours dans Bon à savoir.' : 'Evening classes outside these hours? Keep your open studio hours here, and add class nights in Good to know.') : '',
       };
+      // Sport test 2 (2026-11-20): the kind's own words where the sport screens had a golf course's (sport-kinds.js).
+      const sw = (IK.SPORT.KIND_SETUP_WORDS || {})[k];
+      if (sw) for (const [key, pair] of Object.entries(sw)) T.kindText[k][key] = pair[fr2 ? 1 : 0];
       T.quick.groups_kinds[k] = w.groups.chips;
       // Indoor test 13: [4] what its link is ('shows' for cinemas and theatres, 'classes' for class kinds, '' the rest).
       T.kindGroups[k] = [w.gtk, w.ex, w.quiet ? 1 : 0, w.day ? 1 : 0, w.ticketed ? 'shows' : w.classKind ? 'classes' : ''];
@@ -2771,49 +2774,49 @@ function sportStrings(base, o) {
   return x;
 }
 en.sport = sportStrings(en.indoor, {
-  tpriceMore: 'Your other prices (twilight, juniors, carts, rentals, passes) go in “Your prices”, the first of the extra details.',
+  tpriceMore: 'Your other prices (kids, passes, lessons, rentals) go in “Your prices”, the first of the extra details.',
   // No Per room or group choice under the price box (Dayton: few screens, no extra choices): a golf fee is per person, a
   // simulator's hour per bay is in its kind's words.
   iperChips: null, iperNeed: '', iperRead: '',
   labels: { groups: 'Groups and events' },
-  photosLead: 'Your course, rink or park, and people playing. Three photos is perfect.',
+  photosLead: 'Your place, and people playing. Three photos is perfect.',
   allYearClosedSub: 'Like open April to October, or December to March. You pick the dates.',
-  allYearShutHint: 'Closed a week or two each year, like for maintenance or aeration? Add it under Closures and holidays.',
+  allYearShutHint: 'Closed a week or two each year, like for maintenance? Add it under Closures and holidays.',
   seaClosuresHint: 'Closed over Christmas, or for a tournament week? Add it under Closures in More about your place.',
   noDogsSub: 'Not allowed', noDogsSubInside: 'Not allowed',
   noSetHours: 'We don’t have set hours (lessons or bookings only)', noSetHoursNow: 'No set hours: lessons or bookings only ✓',
-  bookLinkLabel: 'Booking or tee times link', bookLinkEx: 'your tee-time, bay, lesson or court booking page', tbookQ: 'Your booking or tee times link (optional)',
-  storyEx: 'A family-run 18-hole course since 1990, with lake views from the back nine.', knownEx: 'Lake views from every hole on the back nine',
-  bringEx: 'Tee times recommended on weekends. Cart and club rentals in the pro shop.',
-  groupsQ: 'Groups and events: from what size should they book ahead?', groupsLead: 'Tap a size, then add tournaments, parties, school groups or leagues in your own words.', groupsEx: 'Tournaments for up to 144 golfers. Birthday parties on weekends',
-  menuLead: 'Every green fee, pass, lesson or rental and what it costs. A photo of your rate sheet or a link to your rates page is perfect. It’s optional.',
+  bookLinkLabel: 'Booking link', bookLinkEx: 'your booking page', tbookQ: 'Your booking link (optional)',
+  storyEx: 'A local, family-run place since 2010. Friendly staff and something for every age.', knownEx: 'Friendly, local and fun for the whole family',
+  bringEx: 'Arrive 15 minutes early. Free parking on site.',
+  groupsQ: 'Groups and events: from what size should they book ahead?', groupsLead: 'Tap a size, then add tournaments, parties, school groups or leagues in your own words.', groupsEx: 'Birthday parties on weekends. School groups welcome',
+  menuLead: 'Every pass, lesson or rental and what it costs. A photo of your price list or a link to your prices page is perfect. It’s optional.',
   menuFreeSub: 'Anything that costs extra, like lessons or rentals? Optional',
   menuLeadFree: 'It’s free, so you can skip this. Anything that costs extra, like lessons or rentals? A photo of the price list or a link is perfect.',
-  menuTypeSub: 'Each green fee, pass or lesson and its price, one line at a time',
+  menuTypeSub: 'Each pass, lesson or rental and its price, one line at a time',
   // Seasons matter here: the Hours screen's line under "We're closed part of the year" names the kind's usual season.
   seasonHintSummer: 'Most places like yours close for winter. Tap “We’re closed part of the year” and pick your first and last day.',
   seasonHintWinter: 'Most places like yours are open in winter only. Tap “We’re closed part of the year” and pick your first and last day.',
 });
 fr.sport = sportStrings(fr.indoor, {
-  tpriceMore: 'Vos autres prix (crépuscule, juniors, voiturettes, location, abonnements) vont dans « Vos tarifs », le premier des détails facultatifs.',
+  tpriceMore: 'Vos autres prix (enfants, cartes, cours, locations) vont dans « Vos tarifs », le premier des détails facultatifs.',
   // No Per room or group choice under the price box (Dayton: few screens, no extra choices): a golf fee is per person, a
   // simulator's hour per bay is in its kind's words.
   iperChips: null, iperNeed: '', iperRead: '',
   labels: { groups: 'Groupes et événements' },
-  photosLead: 'Votre parcours, votre patinoire ou votre parc, et des gens qui jouent. Trois photos, c’est parfait.',
+  photosLead: 'Votre endroit, et des gens qui jouent. Trois photos, c’est parfait.',
   allYearClosedSub: 'Par exemple ouvert d’avril à octobre, ou de décembre à mars. Vous choisissez les dates.',
-  allYearShutHint: 'Fermé une semaine ou deux chaque année, comme pour l’entretien ou l’aération? Ajoutez-le dans Fermetures et jours fériés.',
+  allYearShutHint: 'Fermé une semaine ou deux chaque année, comme pour l’entretien? Ajoutez-le dans Fermetures et jours fériés.',
   seaClosuresHint: 'Fermé pendant les Fêtes, ou pour une semaine de tournoi? Ajoutez-le sous Fermetures dans Plus sur votre endroit.',
   noDogsSub: 'Pas admis', noDogsSubInside: 'Pas admis',
   noSetHours: 'Nous n’avons pas d’heures fixes (cours ou réservations seulement)', noSetHoursNow: 'Pas d’heures fixes : cours ou réservations seulement ✓',
-  bookLinkLabel: 'Lien de réservation ou de départs', bookLinkEx: 'votre page de réservation de départs, de baies, de cours ou de terrains', tbookQ: 'Votre lien de réservation ou de départs (facultatif)',
-  storyEx: 'Un parcours familial de 18 trous depuis 1990, avec vue sur le lac au retour.', knownEx: 'Vue sur le lac de chaque trou au retour',
-  bringEx: 'Heures de départ conseillées la fin de semaine. Location de voiturettes et de bâtons à la boutique du pro.',
-  groupsQ: 'Groupes et événements : à partir de combien de personnes doivent-ils réserver?', groupsLead: 'Touchez une taille, puis ajoutez les tournois, les fêtes, les groupes scolaires ou les ligues dans vos mots.', groupsEx: 'Tournois jusqu’à 144 golfeurs. Fêtes d’anniversaire la fin de semaine',
-  menuLead: 'Chaque droit de jeu, abonnement, cours ou location et son prix. Une photo de votre grille tarifaire ou un lien vers votre page des tarifs, c’est parfait. C’est facultatif.',
+  bookLinkLabel: 'Lien de réservation', bookLinkEx: 'votre page de réservation', tbookQ: 'Votre lien de réservation (facultatif)',
+  storyEx: 'Un endroit local et familial depuis 2010. Une équipe accueillante et quelque chose pour tous les âges.', knownEx: 'Accueillant, local et amusant pour toute la famille',
+  bringEx: 'Arrivez 15 minutes d’avance. Stationnement gratuit sur place.',
+  groupsQ: 'Groupes et événements : à partir de combien de personnes doivent-ils réserver?', groupsLead: 'Touchez une taille, puis ajoutez les tournois, les fêtes, les groupes scolaires ou les ligues dans vos mots.', groupsEx: 'Fêtes d’anniversaire la fin de semaine. Groupes scolaires bienvenus',
+  menuLead: 'Chaque carte, cours ou location et son prix. Une photo de votre liste de prix ou un lien vers votre page de prix, c’est parfait. C’est facultatif.',
   menuFreeSub: 'Quelque chose de payant, comme des cours ou des locations? Facultatif',
   menuLeadFree: 'C’est gratuit, vous pouvez donc passer cette étape. Quelque chose de payant, comme des cours ou des locations? Une photo de la liste de prix ou un lien, c’est parfait.',
-  menuTypeSub: 'Chaque droit de jeu, abonnement ou cours et son prix, une ligne à la fois',
+  menuTypeSub: 'Chaque carte, cours ou location et son prix, une ligne à la fois',
   seasonHintSummer: 'La plupart des endroits comme le vôtre ferment l’hiver. Touchez « Nous fermons une partie de l’année » et choisissez votre premier et votre dernier jour.',
   seasonHintWinter: 'La plupart des endroits comme le vôtre sont ouverts l’hiver seulement. Touchez « Nous fermons une partie de l’année » et choisissez votre premier et votre dernier jour.',
 });

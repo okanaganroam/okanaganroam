@@ -103,7 +103,7 @@ function renderIndoorLayout(p) {
         ${tiles.length >= 2 ? `<div class="gb-quick">${tiles.join('')}</div>` : ''}
         ${save.length ? `<div class="gb-save"${p.ctaRowAttrs}>${save.join('')}</div><p class="gb-help">♡ Favorite saves this place for later. Add to trip puts it on your trip list.</p>` : ''}
       </section>
-      ${bookingCard}${pricesCard}${visitCard}${contactCard}${hoursCard}
+      ${bookingCard}${pricesCard}${p.dealsHtml ? `<section class="gb-card gb-deals">${p.dealsHtml}</section>` : ''}${visitCard}${contactCard}${hoursCard}
     </div>
     ${p.gallery || ''}${more}
     ${p.eventsHtml || ''}${p.visitorHtml || ''}

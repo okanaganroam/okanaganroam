@@ -1293,7 +1293,8 @@ const FR_SCRIPT = [
   ["function hoursStatusLabel(status, clock) {", "function hoursStatusLabel(status, clock) { var __l = hoursStatusLabelEn(status, clock); __l.text = __frStatusText(__l.text); return __l; }\n" +
     "function __frStatusText(text) { var D = { Mon: 'lun.', Tue: 'mar.', Wed: 'mer.', Thu: 'jeu.', Fri: 'ven.', Sat: 'sam.', Sun: 'dim.' };\n" +
     "  var t = String(text).replace('Open now \\u00b7 Closes ', 'Ouvert \\u00b7 ferme \\u00e0 ').replace('Open 24 hours', 'Ouvert 24 h sur 24').replace('Closed today \\u00b7 Opens ', 'Ferm\\u00e9 aujourd\\u2019hui \\u00b7 ouvre ').replace('Closed \\u00b7 Opens ', 'Ferm\\u00e9 \\u00b7 ouvre ').replace('Closed today', 'Ferm\\u00e9 aujourd\\u2019hui').replace(' (holiday)', ' (jour f\\u00e9ri\\u00e9)').replace(' (temporary closure)', ' (fermeture temporaire)').replace(') \\u00b7 Opens ', ') \\u00b7 ouvre ').replace('Closed now', 'Ferm\\u00e9 en ce moment').replace('Hours not listed for today', 'Heures non indiqu\\u00e9es pour aujourd\\u2019hui').replace(/\\btomorrow /, 'demain \\u00e0 ').replace(/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun), (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\\d{1,2}), /, function(m, d, mo, n){ var M = { Jan: 'janv.', Feb: 'f\\u00e9vr.', Mar: 'mars', Apr: 'avr.', May: 'mai', Jun: 'juin', Jul: 'juil.', Aug: 'ao\\u00fbt', Sep: 'sept.', Oct: 'oct.', Nov: 'nov.', Dec: 'd\\u00e9c.' }; return D[d] + ' ' + (n === '1' ? '1er' : n) + ' ' + M[mo] + ' \\u00e0 '; }).replace(/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /, function(m, d){ return D[d] + ' \\u00e0 '; }).replace(/ouvre (\\d)/, 'ouvre \\u00e0 $1').replace(/ferme \\u00e0 (demain|lun\\.|mar\\.|mer\\.|jeu\\.|ven\\.|sam\\.|dim\\.) /, 'ferme $1 ');\n" +
-    "  return t.replace(/\\b(\\d{1,2})(?::(\\d{2}))? (AM|PM)\\b/g, function(m, h, mm, ap){ var H = Number(h) % 12; if (ap === 'PM') H += 12; return H === 0 && !mm ? 'minuit' : H + ' h' + (mm ? ' ' + mm : ''); }); }\n" +
+    // Sport test 2 (2026-11-20; the French search card said « Ouvert · ferme à midnight »): "midnight" is « minuit » here too.
+    "  return t.replace(/\\b(\\d{1,2})(?::(\\d{2}))? (AM|PM)\\b/g, function(m, h, mm, ap){ var H = Number(h) % 12; if (ap === 'PM') H += 12; return H === 0 && !mm ? 'minuit' : H + ' h' + (mm ? ' ' + mm : ''); }).replace(/\\bmidnight\\b/g, 'minuit'); }\n" +
     "function hoursStatusLabelEn(status, clock) {"],
 ];
 
@@ -1491,6 +1492,11 @@ FR_PATTERNS.unshift([/^Tours and experiences in and from (.+), booked with local
 
 // Round 10 (2026-10-19): the Free to Visit guide (#405) showed "Free Things to Do" as a chip and in the breadcrumb, and
 // its search label ("Search free things to do in kelowna") and the Arts & Culture one stayed in English.
+// Sport test 2 (2026-11-20): a sport kind's category word as search reads it (« golf simulator » -> « simulateur de golf »).
+for (const [en, fr] of Object.values(require('./sport-kinds').SPORT_KIND_WORDS)) { const k = en.toLowerCase(); if (!Object.prototype.hasOwnProperty.call(FR_TEXT, k)) FR_TEXT[k] = fr.toLowerCase(); }
+// The golf winter rule (sport test 2, 2026-11-20).
+FR_TEXT['Usually closed for the season (check before you go).'] = 'Habituellement fermé pour la saison (vérifiez avant d’y aller).';
+FR_TEXT['Usually closed for the season (check before you go)'] = 'Habituellement fermé pour la saison (vérifiez avant d’y aller)';
 FR_TEXT['Free Things to Do'] = 'Activités gratuites';
 FR_TEXT['› Free Things to Do'] = '› Activités gratuites';
 FR_TEXT['› Arts & Culture'] = '› Arts et culture';

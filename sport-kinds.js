@@ -340,9 +340,40 @@ const BOOK_WORDS = {
   swim: { lines: { no: ['Drop in during public swims: no need to book.', 'Sans réservation pendant les bains libres.'] } },
   sportsctr: { lines: { no: ['Drop in during public times: no need to book.', 'Sans réservation pendant les périodes publiques.'] } },
 };
+// Sport test 2 (2026-11-20; Trevor's golf simulator was told "twilight, juniors, carts", "Your course, rink or park" and
+// "maintenance or aeration"): each kind's own words on the setup screens that had golf-course words for every kind.
+// [en, fr] each: tpriceMore (under the price box), photosLead, allYearShutHint (the Hours year screen), and the booking
+// link's label, its example and its question.
+const SHUT = (en, fr) => [`Closed a week or two each year, like for ${en}? Add it under Closures and holidays.`, `Fermé une semaine ou deux chaque année, comme pour ${fr}? Ajoutez-le dans Fermetures et jours fériés.`];
+const MORE = (en, fr) => [`Your other prices (${en}) go in “Your prices”, the first of the extra details.`, `Vos autres prix (${fr}) vont dans « Vos tarifs », le premier des détails facultatifs.`];
+const PHOTOS = (en, fr) => [`${en} Three photos is perfect.`, `${fr} Trois photos, c’est parfait.`];
+const LINK = (unitEn, unitFr) => ({ bookLinkLabel: unitEn ? ['Booking link', 'Lien de réservation'] : ['Booking link', 'Lien de réservation'], bookLinkEx: [`your ${unitEn || ''}booking page`.replace('  ', ' '), `votre page de réservation${unitFr ? ` ${unitFr}` : ''}`], tbookQ: ['Your booking link (optional)', 'Votre lien de réservation (facultatif)'] });
+const KIND_SETUP_WORDS = {
+  golf: { tpriceMore: MORE('twilight, juniors, carts, rentals, passes', 'crépuscule, juniors, voiturettes, location, abonnements'), photosLead: PHOTOS('Your course, the clubhouse, and people playing.', 'Votre parcours, le club-house et des gens qui jouent.'),
+    allYearShutHint: SHUT('maintenance or aeration', 'l’entretien ou l’aération'), bookLinkLabel: ['Tee times link', 'Lien de réservation des départs'], bookLinkEx: ['your tee-time booking page', 'votre page de réservation des départs'], tbookQ: ['Your tee times link (optional)', 'Votre lien de réservation des départs (facultatif)'] },
+  simgolf: { tpriceMore: MORE('peak and off-peak, rentals, punch passes, leagues', 'pointe et hors pointe, location, cartes prépayées, ligues'), photosLead: PHOTOS('Your bays and lounge, and people playing.', 'Vos baies et votre salon, et des gens qui jouent.'),
+    allYearShutHint: SHUT('upgrades or maintenance', 'des travaux ou l’entretien'), ...LINK('bay ', 'des baies') },
+  range: { tpriceMore: MORE('large buckets, mini golf, lessons, passes', 'grands seaux, mini-golf, cours, cartes'), photosLead: PHOTOS('Your range or mini golf, and people playing.', 'Votre champ de pratique ou votre mini-golf, et des gens qui jouent.'),
+    allYearShutHint: SHUT('maintenance', 'l’entretien'), ...LINK('', '') },
+  skischool: { tpriceMore: MORE('private lessons, kids’ programs, rentals, lift tickets', 'cours privés, programmes pour enfants, location, billets de remontée'), photosLead: PHOTOS('Your lessons on the snow, and people skiing or riding.', 'Vos cours sur la neige, et des gens qui skient ou glissent.'),
+    allYearShutHint: SHUT('a holiday break', 'une pause des Fêtes'), ...LINK('lesson ', 'des cours') },
+  rink: { tpriceMore: MORE('kids, seniors, skate rentals, passes', 'enfants, aînés, location de patins, cartes'), photosLead: PHOTOS('Your rink, and people skating.', 'Votre patinoire, et des gens qui patinent.'),
+    allYearShutHint: SHUT('ice maintenance', 'l’entretien de la glace'), ...LINK('', '') },
+  swim: { tpriceMore: MORE('kids, family swims, passes, lessons', 'enfants, bains familiaux, cartes, cours'), photosLead: PHOTOS('Your pool or spray park, and people swimming.', 'Votre piscine ou vos jeux d’eau, et des gens qui se baignent.'),
+    allYearShutHint: SHUT('pool maintenance', 'l’entretien de la piscine'), ...LINK('', '') },
+  skatepark: { tpriceMore: MORE('lessons, camps, programs', 'cours, camps, programmes'), photosLead: PHOTOS('Your park, and people riding.', 'Votre parc, et des gens qui roulent.'), allYearShutHint: SHUT('repairs', 'des réparations'), ...LINK('', '') },
+  bike: { tpriceMore: MORE('race nights, memberships, rentals', 'soirées de course, abonnements, location'), photosLead: PHOTOS('Your track or trails, and people riding.', 'Votre piste ou vos sentiers, et des gens qui roulent.'), allYearShutHint: SHUT('track work', 'des travaux sur la piste'), ...LINK('', '') },
+  courts: { tpriceMore: MORE('court bookings, lessons, memberships', 'réservations de terrain, cours, abonnements'), photosLead: PHOTOS('Your courts, and people playing.', 'Vos terrains, et des gens qui jouent.'), allYearShutHint: SHUT('resurfacing', 'refaire la surface'), ...LINK('court ', 'des terrains') },
+  discgolf: { tpriceMore: MORE('disc rentals, leagues', 'location de disques, ligues'), photosLead: PHOTOS('Your course, and people playing.', 'Votre parcours, et des gens qui jouent.'), allYearShutHint: SHUT('trail work', 'des travaux sur le parcours'), ...LINK('', '') },
+  sportsctr: { tpriceMore: MORE('kids, passes, programs, rentals', 'enfants, cartes, programmes, locations'), photosLead: PHOTOS('Your gym or arena, and people playing.', 'Votre gymnase ou votre aréna, et des gens qui jouent.'), allYearShutHint: SHUT('maintenance', 'l’entretien'), ...LINK('', '') },
+  sportother: { tpriceMore: MORE('kids, passes, lessons, rentals', 'enfants, cartes, cours, locations'), photosLead: PHOTOS('Your place, and people playing.', 'Votre endroit, et des gens qui jouent.'), allYearShutHint: SHUT('maintenance', 'l’entretien'), ...LINK('', '') },
+};
+// The words that belong to a golf course only: never on another kind's setup screens, chips, examples or Help (the
+// sweep test in tests/sport-test2-fixes.test.js). Disc golf has its own course and tees.
+const GOLF_COURSE_ONLY_RE = /(?<![\p{L}\p{N}])(?:twilight|carts?|aeration|green fees?|tee[- ]?times?|pro shop|collared|your course|crépuscule|voiturettes?|aération|droits? de jeu|heures? de départ|boutique du pro|votre parcours)(?![\p{L}\p{N}])/iu;
 // Kinds played outdoors: the dog tile says "Dogs welcome", never "inside" (sport test 1).
 const OUTDOOR_KINDS = ['golf', 'range', 'skatepark', 'discgolf', 'bike', 'swim', 'courts', 'skischool', 'sportother'];
 
 const SPORT_KINDS = SPORT_KIND_ORDER.slice();
-module.exports = { K, PRICE_PH, BOOK_WORDS, OUTDOOR_KINDS, TYPER, TYPER_TRUE, TYPE_SUB, BUSY_THEME, EX_PRICE, EXACT, PREFILL, SLOT, EVENTS, BOOK_AHEAD_UNIT, LABEL_PARTS,
+module.exports = { K, KIND_SETUP_WORDS, GOLF_COURSE_ONLY_RE, PRICE_PH, BOOK_WORDS, OUTDOOR_KINDS, TYPER, TYPER_TRUE, TYPE_SUB, BUSY_THEME, EX_PRICE, EXACT, PREFILL, SLOT, EVENTS, BOOK_AHEAD_UNIT, LABEL_PARTS,
   SPORT_KINDS, SPORT_KIND_ORDER, SPORT_KIND_LABELS_OWNER, SPORT_KIND_WORDS, SPORT_KIND_LENGTH, SPORT_KIND_BOOK, SPORT_ALL_AGES_KINDS, SPORT_KIND_HINTS };

@@ -266,6 +266,12 @@ function kidsAllowed(v) {
   // Indoor places (2026-11-19): the owner's own minimum age. All ages or 5+ is fine for a family; 8+ when the kids' ages
   // say so; 12+, 16+ or 19+ never is (a kids trip doesn't say how old the kids are). Unanswered: as before.
   if (v.type === 'indoor' && indoorTooOld(v, ctx)) return false;
+  // Sport test 2 (2026-11-20; Trevor's simulator is 19+ after 8 PM): a request for a time at or after the owner's "kids
+  // until" time never plans kids there ("golf simulator with my 10 year old at 9 PM").
+  if ((v.type === 'indoor' || v.kindOwn) && ctx && kidsUntilMinutes(v) != null) {
+    const at = /\b(?:at|around|by|for|from|after)\s+(\d{1,2})(?:[: ](\d{2}))?\s*(am|pm|a\.?m\.?|p\.?m\.?)(?![a-z])/i.exec(ctx.queryText || '');
+    if (at) { const min = ((Number(at[1]) % 12) + (/^p/i.test(at[3]) ? 12 : 0)) * 60 + Number(at[2] || 0); if (min >= kidsUntilMinutes(v)) return false; }
+  }
   if ((v.type === 'indoor' || v.kindOwn) && v.indoorMinAge) {
     if (v.indoorMinAge === 'all') return true;
     const youngI = kidsYoungest(ctx);
@@ -1523,6 +1529,8 @@ function eligible(v, ctx, strict) {
   if (ctx.rainy) {
     if (v.type === 'beach' || v.type === 'outdoor') return false;
     if (v.type === 'golf' && !v.indoorGolf) return false;
+    // Sport test 2 (2026-11-20): an arena or a sports centre is a rainy-day place; a skate park or a pump track isn't.
+    if (v.type === 'sport' && v.indoorEvidence !== 'explicit' && !namedInRequest(v, ctx)) return false;
   }
   // Spas and saunas are adults' places (2026-10-25: a family day in Brackendale ended at a sauna).
   // Indoor test 12 (2026-11-19): "yoga with my 12 year old" asks for yoga: a yoga studio whose owner said All ages (or an age
@@ -1562,13 +1570,19 @@ function eligible(v, ctx, strict) {
     // Indoor test 16: a group asked for ("rainy day for a group of 6") is the Great for Groups badge for food and drink; a
     // place to go is ranked by it (groupFitScore), never left out for not having it.
     if (f === 'great_groups' && !BADGE_TYPES.includes(v.type)) continue;
+    // Sport test 2 (2026-11-20; "golf and happy hour on Wednesday": "No place here is listed with happy hour"): a golf
+    // simulator, course or any other place whose owner set a happy hour has it, like a pub's badge.
+    if (f === 'happy_hour' && !BADGE_TYPES.includes(v.type) && v.features.happy_hour) continue;
     if (BADGE_TYPES.includes(v.type)) { if (!v.features[f]) return false; } else if (strict) return false;
   }
   if (ctx.plannerKinds.length && ['indoor', 'tour', 'sport'].includes(v.type) && !ctx.plannerKinds.some(k => (v.plannerKinds || tripRequirements.inferPlannerKinds(v)).includes(k))) return false;
   if (strict) {
     const kindMatch = ctx.plannerKinds.some(k => (v.plannerKinds || []).includes(k));
     if (ctx.plannerKinds.length && (!ctx.types.size || ['indoor','tour','outdoor','sport'].some(t=>ctx.types.has(t))) && !kindMatch) return false;
-    if (ctx.types.size && !ctx.types.has(v.type) && !(v.fdTypes || []).some((t) => ctx.types.has(t)) && !(ctx.requirements && kindMatch && [...ctx.types].every(t=>['tour','indoor','outdoor','sport'].includes(t))) && !kidsKitchenMeal(v, ctx)) return false;
+    // Sport test 2 (2026-11-20; "rainy day in Kelowna" never offered a golf simulator): a rainy-day list of indoor places takes
+    // in golf simulators and indoor sport places (an arena, a sports centre) too.
+    const rainyIndoorSport = ctx.rainy && ctx.types.has('indoor') && v.indoorEvidence === 'explicit' && ((v.type === 'golf' && v.indoorGolf) || v.type === 'sport');
+    if (ctx.types.size && !ctx.types.has(v.type) && !rainyIndoorSport && !(v.fdTypes || []).some((t) => ctx.types.has(t)) && !(ctx.requirements && kindMatch && [...ctx.types].every(t=>['tour','indoor','outdoor','sport'].includes(t))) && !kidsKitchenMeal(v, ctx)) return false;
     // An asked-for kind of place to eat or drink ("hiking, craft beer and good food") does not need the activity's tag
     // (2026-10-25: no brewery met "hiking", so none was planned).
     if (ctx.activities.size && !v.activities.some((a) => ctx.activities.has(a)) && !(ctx.types.has(v.type) && !['outdoor', 'beach', 'tour', 'sport'].includes(v.type))) return false;
@@ -1925,6 +1939,8 @@ function scoreVenue(v, ctx) {
     if (['brewery', 'winery'].includes(v.type)) add('teen_bar', -25, null);
   }
   // On a rainy day the places people actually visit indoors come first; clubs, companies and studios last.
+  // Sport test 2: a golf simulator or an indoor sport place (an arena's public skate) is a real rainy-day outing.
+  if (ctx.rainy && (v.indoorGolf || (v.type === 'sport' && v.indoorEvidence === 'explicit'))) add('rainy_attraction', 5, 'A good rainy-day pick');
   if (ctx.rainy && v.type === 'indoor') {
     if (RAIN_BACKUP_GOOD_WORDS.some((w) => textHas(v.textName, w))) add('rainy_attraction', 5, 'A good rainy-day pick');
     if (RAIN_BACKUP_NICHE_WORDS.some((w) => textHas(v.textName, w)) && !ownVisitorKind(v)) add('rainy_niche', -10, null);
@@ -8577,6 +8593,7 @@ function planTripCore(input) {
   // Sport test 1 (2026-11-20; "golf in Kelowna on January 16" left Debbie's course out, closed for the season by her own
   // dates, with no word): a dated list for a kind or type of place names the places of that kind, in the town asked, that
   // their own season closes that day, with the day they reopen ("Closed for the season: Shadow Ridge (reopens Mar 15).").
+  let golfIndoorOnly = false;
   if (rec.items.length && /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) && ((ctx.plannerKinds || []).length || (ctx.types && ctx.types.size && ctx.types.size <= 2))) {
     const d = String(ctx.tripDate);
     const shown = new Set(rec.items.map((i) => i.venue && i.venue.id));
@@ -8585,6 +8602,10 @@ function planTripCore(input) {
     const reopen = (f) => { const m = /^(\d{2})-(\d{2}):/.exec(String(f.openMonths || '')); return m ? `${CLOSURE_MONTHS_EN[Number(m[1]) - 1]} ${Number(m[2])}` : ''; };
     const named = seasonShut.slice(0, 4).map((f) => (reopen(f) ? `${f.name} (reopens ${reopen(f)})` : f.name));
     if (named.length) result.warnings.push(`Closed for the season: ${named.join(', ')}.`);
+    // Sport test 2 (2026-11-20; "golf in January" listed 8 closed outdoor courses and no simulator): when the courses are
+    // closed for the season that day and the list is indoor golf, it says so.
+    const golfItems = rec.items.filter((i) => i.venue && i.venue.type === 'golf');
+    if (ctx.types && ctx.types.has('golf') && golfItems.length && golfItems.every((i) => { const f = facts.find((x) => x.id === i.venue.id); return f && f.indoorGolf; }) && seasonShut.some((f) => f.type === 'golf' && !f.indoorGolf)) golfIndoorOnly = true;
   }
   // Audit fix (2026-10-27): the list's own day, when the request named one, so the trip API can add that day's weekly
   // nights and happy hour to each place ("Tonight: Trivia 7:30–9 PM").
@@ -8592,6 +8613,11 @@ function planTripCore(input) {
   // Whistler #190 (2026-11-17): when the whole list comes from the nearest town that has it, the header names that town
   // (the note above says why).
   result.summary = buildSummary(kind, borrowedTown ? { ...ctx, regions: [borrowedTown] } : ctx, null);
+  if (golfIndoorOnly) {
+    result.summary = String(result.summary || '').replace(/^Golf courses\b/, 'Indoor golf').replace(/\bgolf courses\b/, 'indoor golf');
+    const mon = /^\d{4}-(\d{2})/.exec(String(ctx.tripDate || ''));
+    result.warnings.push(`Most golf courses are closed ${mon ? `in ${MONTH_NAMES[Number(mon[1]) - 1]}` : 'then'}, so these are indoor golf simulators.`);
+  }
   result.overview = buildOverview(kind, ctx, null);
   // 2026-10-25: when the only matches are closed for the season ("boat rental in Penticton" in October), say so and
   // name them, rather than "no listings match".
