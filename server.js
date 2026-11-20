@@ -5815,6 +5815,29 @@ function smartWeekdayFallback(folded, intent, whenParams, region, town, categori
     const dayEn = SMART_WEEKDAYS[dayIdx][0].charAt(0).toUpperCase() + SMART_WEEKDAYS[dayIdx][0].slice(1), dayFr = SMART_WEEKDAYS[dayIdx][1];
     const date = new Date(`${whenParams.from}T12:00:00`);
     const md = `${MONTH_SHORT[date.getMonth()]} ${date.getDate()}`;
+    // Indoor test 15 (2026-11-19; "free family saturday vernon" listed one restaurant that says Saturday): free and family
+    // asked together lists the free, kid-friendly places open that day (their listed hours, or a park or beach), indoor first.
+    const freeAsked = /(?:^| )(?:free|gratuit|gratuite|gratuits|gratuites)(?: |$)/.test(folded);
+    if (freeAsked && family) {
+      const dk = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][dayIdx];
+      const freeList = () => smartPickVenues((v) => {
+        const r = v.row;
+        if ((region && r.region !== region) || FOOD_DRINK_TYPES.includes(r.type)) return false;
+        let freeWord = '';
+        try { freeWord = r.type === 'indoor' ? indoorFree(r.id) : r.type === 'tour' ? tourFree(r.id) : ''; } catch (e) { freeWord = ''; }
+        if (!(freeWord || r.free_entry || ['outdoor', 'beach'].includes(r.type))) return false;
+        let age = ''; try { age = r.type === 'indoor' ? String(venueIndoorInfo(r.id).age || '') : ''; } catch (e) { age = ''; }
+        if (!(r.kid_friendly || age === 'all' || age === '5')) return false;
+        let open = null;
+        try { const ph = r.hours ? hoursModule.parseHours(r.hours) : null; if (ph && ph.known) open = !!(ph.days[dk] && ph.days[dk].status === 'open'); } catch (e) { open = null; }
+        if (open === false || (open === null && !['outdoor', 'beach'].includes(r.type))) return false;
+        return freeWord === 'donation' ? `By donation · open ${dayEn}` : `Free · open ${dayEn}`;
+      }, (v) => (v.row.type === 'indoor' ? 5 : 0) + (v.row.hours_source === 'venue_owner' ? 2 : 0) + foodDrinkRecommendedScore(v.row) / 10);
+      return { key: 'events_weekday', guides: [],
+        heading: `Nothing on What’s On for ${dayEn}, ${md}${town ? ` in ${town}` : ''}. Free places for families open ${dayEn}, and events on the next ${dayEn}s`,
+        headingFr: `Rien à l’affiche le ${dayFr} ${date.getDate()}${town ? ` à ${town}` : ''}. Les endroits gratuits pour les familles ouverts le ${dayFr}, et les événements des prochains ${dayFr}s`,
+        list: freeList, events: () => ({ total: evs.length, items: evs }) };
+    }
     return { key: 'events_weekday', guides: [],
       heading: `Nothing on What’s On for ${dayEn}, ${md}${town ? ` in ${town}` : ''}. Places that say ${dayEn}, and events on the next ${dayEn}s`,
       headingFr: `Rien à l’affiche le ${dayFr} ${date.getDate()}${town ? ` à ${town}` : ''}. Les endroits qui parlent du ${dayFr}, et les événements des prochains ${dayFr}s`,
@@ -24562,6 +24585,18 @@ const INDOOR_ARTS_KINDS = ['gallery', 'museum', 'theatre'];
 const INDOOR_KIND_LENGTH = { gallery: '1h', museum: '1-2h', theatre: '2-3h', cinema: '2-3h', spa: '2-3h', pool: '1-2h', climbing: '1-2h', games: '1-2h', escape: '1-2h', bowling: '1-2h', kids: '1-2h', classes: '2-3h', curling: '2-3h', yoga: '1h', casino: '2-3h', library: '1h' };
 const INDOOR_KIND_BOOK = { gallery: 'no', museum: 'no', theatre: 'ahead', cinema: 'busy', spa: 'ahead', pool: 'no', climbing: 'no', games: 'busy', escape: 'ahead', bowling: 'busy', kids: 'no', classes: 'ahead', curling: 'ahead', yoga: 'busy', casino: 'no', library: 'no' };
 const INDOOR_KIND_AGE = { casino: '19' };
+// Indoor test 15 (2026-11-19; Aaron's gallery had no age picked): a gallery, museum or library starts on All ages (shown as
+// "We picked the usual for your kind of place", saved only with the screen) unless research's own words give an age.
+const INDOOR_ALL_AGES_KINDS = ['gallery', 'museum', 'library'];
+function indoorKindAgeFor(venue) {
+  try {
+    const info = venueVisitInfo(venue.id) || {};
+    const text = [venue.description || '', ...(info.rows || []).map((r) => (r && typeof r.text === 'string' ? r.text : ''))].join(' ');
+    const m = INDOOR_STALE_MINAGE_RE.exec(text), n = m ? Number(m[1] || m[2] || m[3] || m[4]) : NaN;
+    if (INDOOR_STALE_ADULT_RE.test(text) || (Number.isFinite(n) && n >= 3 && n <= 21)) return INDOOR_KIND_AGE;
+    return { ...INDOOR_KIND_AGE, ...Object.fromEntries(INDOOR_ALL_AGES_KINDS.map((k) => [k, 'all'])) };
+  } catch (e) { return INDOOR_KIND_AGE; }
+}
 const INDOOR_LENGTH_LINES = { '1h': ['Up to 1 hour.', 'Jusqu’à 1 heure.'], '1-2h': ['1 to 2 hours.', '1 à 2 heures.'], '2-3h': ['2 to 3 hours.', '2 à 3 heures.'], half: ['Half a day or more.', 'Une demi-journée ou plus.'] };
 const INDOOR_BOOK_LINES = { no: ['Walk-ins welcome: no need to book.', 'Sans réservation : passez nous voir.'],
   busy: ['Walk-ins welcome. Book ahead for weekends and busy times.', 'Sans réservation. Réservez pour les fins de semaine et les périodes achalandées.'],
@@ -24903,6 +24938,108 @@ function indoorStaleResearch(venue, now = new Date()) {
   } catch (e) { return []; }
 }
 // The keys hidden on the public page (stale and not kept, or removed).
+// Indoor test 15 (2026-11-19; Aaron set his gallery Free, but the research event "Fall Exhibitions" still said "Admission is
+// by donation" and named a past opening reception): when an owner's price (Free or By donation) or hours go live, each of
+// the place's research events still running whose own words now contradict them is put on the review page, once, under
+// "Changes to live events". Nothing on the event changes until the reviewer saves it; the owner's fields stay as they are.
+const EVENT_CHECK_DATED_RE = /\b(?:opening|reception|vernissage|artist talk|talk|launch|premiere)\b[^.]*?\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?|sept?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(20\d\d))?\b/i;
+function indoorEventCheckWhy(sentence, ctx) {
+  const s = String(sentence || '');
+  if (ctx.free === 'free' && /\bby donation\b|\bpay what you\b|\bsuggested donation\b|\bdonations? (?:welcome|appreciated)\b/i.test(s)) return 'price';
+  if (ctx.free === 'donation' && /\b(?:free (?:admission|entry)|admission (?:is )?free|entry (?:is )?free)\b/i.test(s)) return 'price';
+  const why = indoorStaleWhy(s, ctx);
+  if (why === 'price' || why === 'hours' || why === 'date') return why;
+  const d = EVENT_CHECK_DATED_RE.exec(s);
+  if (d) {
+    const mo = INDOOR_MONTHS.findIndex((x) => x.startsWith(d[1].toLowerCase().slice(0, 3))), day = Number(d[2]);
+    let year = d[3] ? Number(d[3]) : Number(String(ctx.checked || ctx.today).slice(0, 4));
+    if (!d[3]) { const c = /^(\d{4})-(\d\d)-(\d\d)/.exec(ctx.checked || ''); if (c && Date.UTC(year, mo, day) < Date.UTC(year, Number(c[2]) - 1, Number(c[3])) - 30 * 86400000) year += 1; }
+    if (mo >= 0 && day >= 1 && day <= 31 && `${year}-${String(mo + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` < ctx.today) return 'date';
+  }
+  return '';
+}
+const EVENT_CHECK_WHY = { price: 'its price', hours: 'the days it’s open', date: 'a date that has passed' };
+// -> [{ event, why, text }] for the place's research events (not sent by the owner) that still run.
+function indoorEventChecksFor(venue, now = new Date()) {
+  try {
+    if (!venue || venue.type !== 'indoor') return [];
+    const ctx0 = indoorStaleCtx(venue, now);
+    if (!ctx0) return [];
+    const today = todayLocal(now);
+    const rows = db.prepare(`SELECT e.* FROM events e WHERE e.venue_id = ? AND COALESCE(e.status, 'scheduled') != 'cancelled'
+        AND NOT EXISTS (SELECT 1 FROM event_submissions s WHERE s.event_id = e.id AND s.owner_venue_id IS NOT NULL)
+        AND EXISTS (SELECT 1 FROM event_occurrences o WHERE o.event_id = e.id AND o.status = 'scheduled' AND o.end_date >= ?)`).all(venue.id, today);
+    const out = [];
+    for (const e of rows) {
+      const ctx = { ...ctx0, checked: String(e.source_checked_at || e.created_at || '').slice(0, 10) || ctx0.checked };
+      let hit = null;
+      for (const p of indoorStalePieces(e.description)) { if (hit) break; const why = indoorEventCheckWhy(p, ctx); if (why) hit = { why, text: p }; }
+      if (!hit && ctx.free === 'free' && e.price_kind === 'donation') hit = { why: 'price', text: 'Price: by donation' };
+      if (hit) out.push({ event: e, ...hit });
+    }
+    return out;
+  } catch (e) { return []; }
+}
+function eventCheckPending(eventId) {
+  return db.prepare(`SELECT l.id FROM event_enrichment_log l WHERE l.event_id = ? AND l.field_name = 'owner_check'
+    AND NOT EXISTS (SELECT 1 FROM event_enrichment_log d WHERE d.event_id = l.event_id AND d.field_name = 'owner_check_done' AND d.id > l.id)`).get(eventId) || null;
+}
+// Called when an owner's price or hours go live. One waiting item per event at most.
+function queueIndoorEventChecks(venue, now = new Date()) {
+  let n = 0;
+  for (const c of indoorEventChecksFor(venue, now)) {
+    if (eventCheckPending(c.event.id)) continue;
+    const t = venueIndoorInfo(venue.id), free = tourFreeOf(t);
+    const owner = free === 'free' ? 'Free entry' : free === 'donation' ? 'By donation' : 'its hours';
+    logEventChange(c.event.id, null, 'owner_check', c.text, JSON.stringify({ why: c.why, owner, venue_id: venue.id }),
+      { source: 'venue_owner', reason: `owner change at ${venue.name} (#${venue.id})`, batch_id: `owner-check-${todayLocal(now)}`, confidence: 'high' });
+    n++;
+  }
+  return n;
+}
+function listEventChecks() {
+  return db.prepare(`SELECT l.* FROM event_enrichment_log l WHERE l.field_name = 'owner_check'
+      AND NOT EXISTS (SELECT 1 FROM event_enrichment_log d WHERE d.event_id = l.event_id AND d.field_name = 'owner_check_done' AND d.id > l.id)
+      ORDER BY l.id DESC LIMIT 100`).all().map((l) => {
+    let info = {}; try { info = JSON.parse(l.new_value || '{}') || {}; } catch (e) { info = {}; }
+    const ev = db.prepare('SELECT id, name, region, slug, description, price_kind, price_text, status, venue_id FROM events WHERE id = ?').get(l.event_id) || {};
+    const v = db.prepare('SELECT name FROM venues WHERE id = ?').get(info.venue_id || ev.venue_id) || {};
+    return { kind: 'eventcheck', id: l.id, event: ev, venue_name: v.name || '', text: l.old_value || '', why: info.why || '', owner: info.owner || '' };
+  }).filter((c) => c.event.id && c.event.status !== 'cancelled');
+}
+// The reviewer's decision: 'approve' saves the edited description (and, for a price, the owner's free word as the event's
+// price when it was by donation or free), 'dismiss' keeps the event as it is. Either way the item leaves the list; nobody
+// is emailed.
+function decideEventCheck(id, action, edits, reviewer) {
+  const l = db.prepare("SELECT * FROM event_enrichment_log WHERE id = ? AND field_name = 'owner_check'").get(id);
+  if (!l) return { ok: false, reason: 'not_found' };
+  if (!eventCheckPending(l.event_id) || eventCheckPending(l.event_id).id !== l.id) return { ok: false, reason: 'not_pending' };
+  const ev = db.prepare('SELECT * FROM events WHERE id = ?').get(l.event_id);
+  if (!ev) return { ok: false, reason: 'not_found' };
+  let info = {}; try { info = JSON.parse(l.new_value || '{}') || {}; } catch (e) { info = {}; }
+  const meta = { reason: `research event check #${id}`, batch_id: `owner-check-${id}`, reviewed_by: reviewer };
+  if (action === 'approve') {
+    const fields = {};
+    const d = edits && typeof edits.description === 'string' ? cleanSubmissionText(edits.description, { multiline: true }) : null;
+    if (d && d !== ev.description) fields.description = d;
+    const word = info.owner === 'Free entry' ? 'free' : info.owner === 'By donation' ? 'donation' : null;
+    if (info.why === 'price' && word && ['free', 'donation'].includes(ev.price_kind || '') && ev.price_kind !== word) { fields.price_kind = word; fields.price_text = null; }
+    if (Object.keys(fields).length) { const r = updateEvent(ev.id, fields, meta); if (!r.ok) return { ok: false, reason: 'write_failed', detail: r.reason }; }
+  }
+  logEventChange(ev.id, null, 'owner_check_done', null, action === 'approve' ? 'saved' : 'kept', { ...meta, source: 'admin_review', confidence: 'high' });
+  return { ok: true, edited: action === 'approve' };
+}
+function renderAdminEventCheckCard(c) {
+  const ev = c.event;
+  return `<article class="rv-card" data-kind="eventcheck" data-id="${c.id}">
+      <h3>${adminReviewEsc(ev.name)} <span class="rv-meta">(${adminReviewEsc(c.venue_name)})</span></h3>
+      <p class="rv-meta">Research event · the owner now says <strong>${adminReviewEsc(c.owner)}</strong>${ev.slug ? ` · <a href="/${adminReviewEsc(ev.region)}/events/${adminReviewEsc(ev.slug)}" target="_blank" rel="noopener">live event</a>` : ''}</p>
+      <div class="rv-warn">This event’s text may now be wrong about ${adminReviewEsc(EVENT_CHECK_WHY[c.why] || 'it')}: “${adminReviewEsc(c.text)}”. Fix the text below and save, or keep it as it is.</div>
+      <label class="rv-field">Description ${adminEditBox('description', ev.description || '', { multiline: true, rows: 5, max: 2000 })}</label>
+      <div class="rv-actions"><button type="button" class="rv-btn rv-approve" data-act="approve">Save and mark checked</button><button type="button" class="rv-btn rv-reject" data-act="dismiss">Keep as it is</button></div>
+      <p class="rv-result" hidden></p>
+    </article>`;
+}
 function indoorStaleHiddenKeys(venue, now = new Date()) { return new Set(indoorStaleResearch(venue, now).map((x) => x.key)); }
 // One line with its hidden sentences taken out ('' when nothing is left).
 function indoorStaleStrip(text, hidden) { return indoorStalePieces(text).filter((p) => !hidden.has(indoorStaleKey(p))).join(' ').trim(); }
@@ -50574,7 +50711,7 @@ function describeEventSubmissionWhen(sub) {
 // Indoor test 15: what the reviewer must check before approving an event, in words: a run longer than the owner limit
 // (it went in with its full dates), and a single-day event whose Repeats box describes a run ("Jul 5 – Aug 27", "until
 // December 19", "all summer"), so a run is never published as one day without someone looking.
-const EVENT_RUN_NOTE_RE = /\b(?:until|till|til|through|thru|runs?|running|on (?:view|display)|all (?:summer|winter|fall|autumn|spring|season|month)|every (?:day|week)|daily|weekdays|(?:mon|tues|wednes|thurs|fri|satur|sun)days)\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*\d{0,2}(?:st|nd|rd|th)?\s*(?:-|–|—|to)\s*(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*)?\d{0,2}\b|\b\d{1,2}\s*(?:-|–|—|to)\s*\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i;
+const EVENT_RUN_NOTE_RE = /\b(?:until|till|til|through|thru|runs?|running|on (?:view|display)|all (?:summer|winter|fall|autumn|spring|season|month)|every|each|weekly|monthly|daily|weekdays|(?:mon|tues|wednes|thurs|fri|satur|sun)days)\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*\d{0,2}(?:st|nd|rd|th)?\s*(?:-|–|—|to)\s*(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*)?\d{0,2}\b|\b\d{1,2}\s*(?:-|–|—|to)\s*\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i;
 function eventSubmissionReviewFlags(sub) {
   const out = [];
   if (!sub || !sub.start_date) return out;
@@ -59285,7 +59422,7 @@ function renderOwnerSetupPage(found, opts) {
       indoorGamesShort: INDOOR_GAMES_FULL_RE.test(indoorOwnWords(venue.id)) ? '' : INDOOR_GAMES_SHORT[fr ? 1 : 0],
       // Indoor test 12 (2026-11-19; the finish preview said "Museum" where the page says "Science centre"): the page's own word.
       indoorScienceCentre: INDOOR_SCIENCE_CENTRE_RE.test(indoorOwnWords(venue.id)) ? (fr ? 'Centre des sciences' : 'Science centre') : '',
-      kindLength: INDOOR_KIND_LENGTH, kindBook: INDOOR_KIND_BOOK, kindAge: INDOOR_KIND_AGE, artsKinds: INDOOR_ARTS_KINDS, artsAuto: !!venueIndoorInfo(venue.id).arts_auto,
+      kindLength: INDOOR_KIND_LENGTH, kindBook: INDOOR_KIND_BOOK, kindAge: indoorKindAgeFor(venue), artsKinds: INDOOR_ARTS_KINDS, artsAuto: !!venueIndoorInfo(venue.id).arts_auto,
       suggestKinds: (snap.indoor_info || {}).kinds ? [] : indoorKindSuggestion(venue),
       researchFee: indoorResearchPrice(venue), researchFeeKinds: indoorResearchPriceKinds(venue), researchFree: (!!venue.free_entry || indoorResearchDonation(venue)) && snap.indoor_price == null, researchDonation: indoorResearchDonation(venue),
       // Indoor test 2: the suggested donation box starts from research's own "suggested $5", never its adult price.
@@ -66081,6 +66218,10 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
         VALUES (?, 'visit_info', ?, ?, 'venue_owner', ?, 'high', ?, 0, ?)`).run(venue.id, w.before, w.after, meta.reason, meta.batch_id, reviewer);
     } catch (e) { console.error(`[owner-portal] indoor lines for #${venue.id} failed: ${e.message}`); }
   }
+  // Indoor test 15: research events this price or these hours now contradict go on the review page (never on an Undo).
+  if (venue.type === 'indoor' && !opts.undo && (chosen.includes('hours') || (chosen.includes('indoor_price') && ['free', 'donation'].includes(values.indoor_price)))) {
+    try { queueIndoorEventChecks(venue, now); } catch (e) { console.error(`[owner-portal] event checks for #${venue.id} failed: ${e.message}`); }
+  }
   return { ok: true, applied, listing };
 }
 
@@ -66577,6 +66718,12 @@ const ADMIN_REVIEW_ERRORS = {
 
 // One decision from the review page -> { status, body }.
 async function adminReviewAction(kind, id, action, body) {
+  if (kind === 'eventcheck') {
+    if (action !== 'approve' && action !== 'dismiss') return { status: 400, body: { error: 'Unknown action.' } };
+    const r = decideEventCheck(id, action, body.edits, ADMIN_REVIEWER);
+    if (!r.ok) return { status: r.reason === 'not_found' ? 404 : 409, body: { error: ADMIN_REVIEW_ERRORS[r.reason] || r.reason, detail: r.detail } };
+    return { status: 200, body: { ok: true, emailed: false } };
+  }
   if (action === 'dismiss' && kind !== 'photo') return { status: 400, body: { error: 'Unknown action.' } };
   if (kind === 'video') return adminVideoAction(id, action, body);
   if (kind === 'arrival') return arrivalPoints.action(id, action, body, ADMIN_REVIEWER);
@@ -67064,7 +67211,8 @@ function renderAdminReviewPage() {
   });
   const live = recentLiveOwnerPhotos();
   const events = listEventSubmissions('pending');
-  const eventChanges = listOwnerEventChanges('pending');
+  // Indoor test 15: research events an owner's new price or hours contradict ride in the same list.
+  const eventChanges = [...listOwnerEventChanges('pending'), ...listEventChecks()];
   const venues = listVenueSubmissions('pending');
   const menus = listMenusForReview();
   const liveMenus = recentLiveMenus();
@@ -67098,7 +67246,7 @@ function renderAdminReviewPage() {
     ${ownerVideoEnabled() ? section('videos', 'Videos to review', videos, (v) => renderAdminVideoCard(v, false), 'No videos waiting.') : ''}
     ${videosOk.length ? section('videosok', 'Videos approved for reels (delete once posted)', videosOk, (v) => renderAdminVideoCard(v, true), '') : ''}
     ${section('events', 'Events', events, renderAdminEventCard, 'No events waiting.')}
-    ${eventChanges.length ? section('eventchanges', 'Changes to live events', eventChanges, renderAdminEventChangeCard, '') : ''}
+    ${eventChanges.length ? section('eventchanges', 'Changes to live events', eventChanges, (c) => (c.kind === 'eventcheck' ? renderAdminEventCheckCard(c) : renderAdminEventChangeCard(c)), '') : ''}
     ${section('venues', 'New venues', venues, renderAdminVenueCard, 'No new venues waiting.')}
     ${section('claims', 'Listing claims', claims, renderAdminClaimCard, 'No claims waiting.')}
     ${section('menus', 'Menus', menus, renderAdminMenuCard, 'No menus waiting.')}
@@ -69491,7 +69639,7 @@ ${priceFieldHtml}      </details>` : ''}
     </details>` : ''}
     <details class="op-fold op-sec" id="events" data-task="events">
     <summary><h2 class="lyv-section-label" id="oeHead">${L('Add an event', 'Ajouter un événement')}</h2> <span class="op-fold-hint">${indoorEventsWords(venue) ? L(`${indoorEventsWords(venue).en} on What&rsquo;s On`, `${indoorEventsWords(venue).fr} dans À l’affiche`) : venue.type === 'tour' ? L('Special trips, workshops or classes on What&rsquo;s On', 'Sorties spéciales, ateliers ou cours dans À l’affiche') : L('Live music, tastings, markets, classes or specials on What&rsquo;s On', 'Musique en direct, dégustations, marchés, cours ou spéciaux dans À l’affiche')}</span></summary>
-    <p class="op-hint">${indoorEventsWords(venue) ? L(`${indoorEventsWords(venue).en}. Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time.`, `${indoorEventsWords(venue).fr}. Les événements s’affichent dans À l’affiche et sur votre page une fois vérifiés. Envoyez un événement à la fois.`) : venue.type === 'tour' ? L('Special trips, workshops, classes. Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time.', 'Sorties spéciales, ateliers, cours. Les événements s’affichent dans À l’affiche et sur votre page une fois vérifiés. Envoyez un événement à la fois.') : L('Live music, tastings, markets, classes, specials. Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time.', 'Musique en direct, dégustations, marchés, cours, spéciaux. Les événements s’affichent dans À l’affiche et sur votre page une fois vérifiés. Envoyez un événement à la fois.')}</p>
+    <p class="op-hint">${indoorEventsWords(venue) /* Indoor test 15: the heading line already names the kind's events; this line doesn't repeat them. */ ? L('Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time. An exhibition or camp can run up to 120 days as one event.', 'Les événements s’affichent dans À l’affiche et sur votre page une fois vérifiés. Envoyez un événement à la fois. Une exposition ou un camp peut durer jusqu’à 120 jours en un seul événement.') : venue.type === 'tour' ? L('Special trips, workshops, classes. Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time.', 'Sorties spéciales, ateliers, cours. Les événements s’affichent dans À l’affiche et sur votre page une fois vérifiés. Envoyez un événement à la fois.') : L('Live music, tastings, markets, classes, specials. Events show on What&rsquo;s On and on your page once we&rsquo;ve reviewed them. Send one event at a time.', 'Musique en direct, dégustations, marchés, cours, spéciaux. Les événements s’affichent dans À l’affiche et sur votre page une fois vérifiés. Envoyez un événement à la fois.')}</p>
     <form class="venue-form" id="oeForm" novalidate>
       <p class="op-changing" id="oeChanging" hidden>${L('Changing', 'Modification de')} <strong id="oeChangingName"></strong>. ${L('Edit anything below and press <strong>Send change</strong>.', 'Modifiez ce que vous voulez ci-dessous, puis touchez <strong>Envoyer la modification</strong>.')} <button type="button" class="op-linkbtn" id="oeChangeStop">${L('Add a new event instead', 'Ajouter plutôt un nouvel événement')}</button></p>
       <div class="form-row full"><div class="form-field"><label for="oeName">${L('Event name', 'Nom de l’événement')} *</label><input type="text" id="oeName" maxlength="120"><p class="lyv-error" id="oeNameError" hidden></p></div></div>
@@ -74766,7 +74914,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(302, { Location: r2.url('GET', v.object_key, { expires: 3600, query: query3 }), 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
         return res.end();
       }
-      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|menu|claim|video|arrival)\/(\d+)\/(approve|reject|remove|undo|dismiss)$/.exec(pathname);
+      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|eventcheck|menu|claim|video|arrival)\/(\d+)\/(approve|reject|remove|undo|dismiss)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
         if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
@@ -75825,7 +75973,7 @@ module.exports = {
   // Verified mark (2026-10-27)
   guardedVenueLinkUpdate, RESEARCH_LINK_FIELDS, venueLinks, ownerLastUpdatedAt,
   venueIsClaimed, claimedVenueIds, venueConfirmedHtml, ownerUpdatedDate,
-  venueBadgeState, completeVerifiedIds, resetCompleteVerifiedCache, setCompleteVerifiedIdsForTest, stripVerifiedRepeats, badgeRemindersDue, badgeReminderTick, badgeReminderByToken, confirmHoursFromReminder, BADGE_REMINDER_PATH,
+  venueBadgeState, completeVerifiedIds, resetCompleteVerifiedCache, setCompleteVerifiedIdsForTest, listEventChecks, decideEventCheck, queueIndoorEventChecks, indoorEventChecksFor, eventSubmissionReviewFlags, stripVerifiedRepeats, badgeRemindersDue, badgeReminderTick, badgeReminderByToken, confirmHoursFromReminder, BADGE_REMINDER_PATH,
   guardedCuisineUpdate, guardedCuisinesUpdate, venueCuisineList, venuePlaceType, venueCuisinesState, writeVenueCuisines, clearVenueCuisinesCache,
   placeTypeDisplay, placeTypeBesideCuisines, PLACE_TYPE_DISPLAY, PLACE_TYPE_DISPLAY_FR, MAP_OWNER_FEATURES, mapDataVersion, MAP_DATA_FORMAT, MAP_MUST_HAVES, writeVenueOwnerFeatures, badgeReminderOptedOut,
   OWNER_CUISINES_POPULAR, OWNER_CUISINES_MAX, RESTAURANT_PLACE_TYPES, frPlaceType,

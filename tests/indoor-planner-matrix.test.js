@@ -319,3 +319,30 @@ test('Indoor test 13 sweep (S1): every kind\'s stop length is its Time needed an
   }
   assert.deepEqual(fails, []);
 });
+
+// Indoor test 15 (2026-11-19; "free things to do in Vernon" left out Aaron's free gallery for a café and a diner): the kinds
+// that are often free to visit (a gallery, a library, a by-donation museum), marked so by their owners, are offered for free
+// requests in English and French, ahead of any café or restaurant, and a paid kind never leads.
+test('Indoor test 15: free requests offer the owner-free gallery and library and the by-donation museum, before any café or restaurant (EN + FR)', async () => {
+  for (const [kind, price] of [['gallery', 'free'], ['library', 'free'], ['museum', 'donation']]) await ok(change(tokenFor(placed[kind].id), { indoor_price: price }));
+  for (let i = 0; i < 4; i++) mk({ name: `Summerland Diner ${i}`, type: i % 2 ? 'restaurant' : 'cafe', cuisine: 'Diner', description: 'Breakfast all day.', rating: 4.9, reviews: 900, price: 1 });
+  const FREE = {
+    gallery: [`free art gallery in ${TOWN}`, `free things to do in ${TOWN}`, `galerie d’art gratuite à ${TOWN}`],
+    library: [`free things to do in ${TOWN} on a rainy day`, `free library ${TOWN}`, `bibliothèque gratuite à ${TOWN}`],
+    museum: [`free museum in ${TOWN}`, `free things to do in ${TOWN}`, `musée gratuit à ${TOWN}`],
+  };
+  const fails = [];
+  for (const [kind, qs] of Object.entries(FREE)) {
+    for (const q of qs) {
+      const items = itemsOf(app.runTripPlan({ text: q }, NOW));
+      const names = items.map((x) => `${x.venue.name} [${x.venue.type}]`).slice(0, 8).join(' | ');
+      const at = items.findIndex((x) => x.venue.id === placed[kind].id);
+      if (at < 0) { fails.push(`${kind}: "${q}" leaves it out (${names})`); continue; }
+      const food = items.findIndex((x) => ['cafe', 'restaurant'].includes(x.venue.type));
+      if (food >= 0 && food < at) fails.push(`${kind}: "${q}" puts ${items[food].venue.name} first (${names})`);
+      const firstIndoor = items.find((x) => x.venue.type === 'indoor');
+      if (firstIndoor && ['escape', 'spa', 'bowling', 'casino'].some((k) => firstIndoor.venue.id === placed[k].id)) fails.push(`${kind}: "${q}" leads with paid ${firstIndoor.venue.name}`);
+    }
+  }
+  assert.deepEqual(fails, []);
+});

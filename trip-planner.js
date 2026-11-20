@@ -832,11 +832,17 @@ function indoorCardKind(v) {
   const named = (t) => IK.indoorKindsNamedIn(t).filter((k) => INDOOR_CARD_WORDS[k]);
   const fromCat = c ? named(c) : [];
   const k = fromCat.length === 1 ? fromCat[0] : !c ? (named(v.name || '').length === 1 ? named(v.name || '')[0] : null) : null;
-  return k ? INDOOR_CARD_WORDS[k] : null;
+  if (k) return INDOOR_CARD_WORDS[k];
+  // Indoor test 15 (2026-11-19; the Vernon & District Performing Arts Centre read "ART GALLERY" in an art gallery plan): a
+  // performing arts centre, playhouse or concert hall is a theatre.
+  if (/\bperforming arts\b|\bplayhouse\b|\bconcert hall\b|\bopera house\b/i.test(`${v.name || ''} ${c}`)) return INDOOR_CARD_WORDS.theatre;
+  return null;
 }
 function indoorVenueLabel(ctx, v, form = 'singular') {
   const asked = indoorAskedLabel(ctx.queryText, form);
-  if (!asked || indoorAskedFits(asked, v)) return typeLabel(ctx, 'indoor', form);
+  // Indoor test 15: the asked kind labels a place only when its own name or category says it (not only the kinds read
+  // from its description); otherwise its own category, or "Indoor attraction".
+  if (!asked || indoorAskedFits(asked, { ...v, plannerKinds: [] })) return typeLabel(ctx, 'indoor', form);
   const own = String(v.cuisine || '').trim();
   if (own && own.length <= 32 && form === 'singular') return own.replace(/^./, (c) => c.toUpperCase());
   const l = ctx.labels.types && ctx.labels.types.indoor;
@@ -1483,6 +1489,8 @@ function eligible(v, ctx, strict) {
     }
     // Indoor test 2 (2026-11-19): an indoor place open past 11 PM by its hours (server.js indoorLateClose) is a late-night stop.
     if (f === 'open_late' && v.type === 'indoor') { if (!v.features.open_late) return false; continue; }
+    // Indoor test 15: the owner's Free or By donation answer is free to visit, like the Free Entry badge.
+    if (f === 'free_entry' && budgetFreeStop(v)) continue;
     if (BADGE_TYPES.includes(v.type)) { if (!v.features[f]) return false; } else if (strict) return false;
   }
   if (ctx.plannerKinds.length && ['indoor', 'tour', 'sport'].includes(v.type) && !ctx.plannerKinds.some(k => (v.plannerKinds || tripRequirements.inferPlannerKinds(v)).includes(k))) return false;
@@ -2920,9 +2928,9 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
     if (out.length >= count) break;
     // An activity asked for on its own ("mountain biking") is all one kind of place, so the per-type cap does not apply.
     // Indoor test 15: "free things to do" fills with free and by-donation places before any café or diner: a free place
-    // may take two more of its kind than the usual cap.
+    // is not held back by the cap on one kind of place.
     const freeHere = freeAsked && (s.v.features?.free_entry || budgetFreeStop(s.v));
-    if ((perType[s.v.type] || 0) >= RECOMMENDATION_PER_TYPE + (freeHere ? 2 : 0) && !(ctx.types.size === 1 && ctx.types.has(s.v.type)) && !(ctx.activities.size && !ctx.types.size)) continue;
+    if (!freeHere && (perType[s.v.type] || 0) >= RECOMMENDATION_PER_TYPE && !(ctx.types.size === 1 && ctx.types.has(s.v.type)) && !(ctx.activities.size && !ctx.types.size)) continue;
     perType[s.v.type] = (perType[s.v.type] || 0) + 1;
     out.push(stopFrom(s.v, s, regionReason(s.v, ctx), ctx));
   }

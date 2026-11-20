@@ -338,4 +338,4 @@ function searchVenuesAnyWord(intent, venues) {
   return { total: scored.length, items: scored.map(({ venue, matchedOn, hits }) => ({ venue, matchedOn, hits })), exclusions: plan };
 }
 
-module.exports = { textHas, termMatch, foodMatch, searchVenues, searchVenuesAnyWord, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES, CONCEPT_STRAY_WORDS, withoutConceptStrays, CONCEPT_EVENT_RULES, isEventExcluded, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };
+module.exports = { textHas, termMatch, numberVariants, foodMatch, searchVenues, searchVenuesAnyWord, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES, CONCEPT_STRAY_WORDS, withoutConceptStrays, CONCEPT_EVENT_RULES, isEventExcluded, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };

@@ -1550,9 +1550,10 @@ function renderScript(d) {
     var giftText = gifts ? (french ? 'Contribution volontaire' : 'By donation') + (giftCents > 0 ? (french ? ' (suggérée\u00a0: ' + cad(giftCents) + ')' : ' (suggested ' + cad(giftCents) + ')') : '') : '';
     el.hidden = false;
     el.textContent = (french ? 'Estimation par personne : ' : 'Estimated total per person: ')
-      + (known ? (gifts && !cents ? giftText : cad(cents) + ' CAD' + (gifts ? ' + ' + giftText.charAt(0).toLowerCase() + giftText.slice(1) : '')) : (french ? 'à vérifier' : 'check prices'))
+      // Indoor test 15 (2026-11-19; Aaron's free gallery made the total "$0 CAD"): free stops only say "Free".
+      + (known ? (!cents && !gifts ? (french ? 'Gratuit' : 'Free') : gifts && !cents ? giftText : cad(cents) + ' CAD' + (gifts ? ' + ' + giftText.charAt(0).toLowerCase() + giftText.slice(1) : '')) : (french ? 'à vérifier' : 'check prices'))
       + (missing ? (french ? ' · Prix à vérifier pour ' + missing + ' arrêt(s)' : ' · ' + missing + ' unpriced ' + (missing === 1 ? 'stop' : 'stops') + ' excluded') : '')
-      + (known ? (french ? ' · Hors taxes, pourboires et suppléments' : ' · Before tax, tips and extras') : '');
+      + (known && (cents || gifts) ? (french ? ' · Hors taxes, pourboires et suppléments' : ' · Before tax, tips and extras') : '');
   }
   function cardHtml(stop, key, opts){
     opts = opts || {};
