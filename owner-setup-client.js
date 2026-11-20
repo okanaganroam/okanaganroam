@@ -72,7 +72,13 @@
     return ks.some(function(k){ return INDOOR_NOT_FAMILY.indexOf(k) < 0 || (k === 'theatre' && /\b(?:kids?|children)[’']?s?\s+(?:shows?|theatre|theater|plays?)|family (?:shows?|theatre|theater)|pour enfants/i.test(story)); });
   }
   // Indoor test 7: an indoor place where people just walk in, with no booking link yet: its booking boxes fold away.
-  function walkInFold(link){ return INDOOR && !!T.haveBookPage && !String(link || '').trim() && ((S.tour && S.tour.book) || (TI && TI.book)) === 'no'; }
+  // Indoor test 13 (2026-11-19; Dan's cinema): a cinema's or theatre's showtimes link and a class place's schedule link never
+  // fold away under "Walk-ins welcome".
+  function walkInFold(link){ return INDOOR && !!T.haveBookPage && !String(link || '').trim() && ((S.tour && S.tour.book) || (TI && TI.book)) === 'no' && !indoorLinkKind(); }
+  // What the main kind's link is: 'shows', 'classes' or ''.
+  function indoorLinkKind(){ if (!C.indoor) return ''; var o = (T0.kindGroups || {})[indoorMainKind()]; return (o && o[4]) || ''; }
+  // The link box's title and line by kind and booking answer.
+  function indoorLinkQ(book){ var lk = indoorLinkKind(); if (lk === 'shows' && T.tbookQShows) return [T.tbookQShows, T.tbookLeadShows]; if (lk === 'classes' && T.tbookQClass) return [T.tbookQClass, T.tbookLeadClass]; if (book === 'no' && T.tbookQParty) return [T.tbookQParty, T.tbookLeadVisit || T.tbookLeadParty]; return [T.tbookQ, T.tbookLead]; }
   function freeIndoor(){ return INDOOR && (CUR.indoor_price === 'free' || CUR.indoor_price === 'donation' || S.savedTourPrice === 'free' || S.savedTourPrice === 'donation'); }
   function itemStep(k){ return (INDOOR && INDOOR_ITEM_STEP[k]) || (TOUR && TOUR_ITEM_STEP[k]) || (C.winery && WINERY_ITEM_STEP[k]) || (C.brewery && BREWERY_ITEM_STEP[k]) || (CK && COCKTAIL_ITEM_STEP[k]) || ''; }
   var DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -1620,7 +1626,8 @@
       l = l.filter(function(c){ return !/^(?:Free parking on site|Stationnement gratuit sur place)$/i.test(c) || saysIt(value, c, l); });
       // Indoor test 12 (2026-11-19; Jess answered "No, please book ahead" and was offered "Book ahead on weekends"): no
       // weekend booking chip when every visit is booked ahead.
-      if (((S.tour && S.tour.book) || (TI && TI.book)) === 'ahead') l = l.filter(function(c){ return !/^(?:Book ahead on weekends|Réservez pour les fins de semaine)$/i.test(c) || saysIt(value, c, l); }); }
+      // Indoor test 13 (2026-11-19; Dan's cinema, walk-ins welcome, was offered it too): nor under walk-ins welcome.
+      if (['ahead', 'no'].indexOf((S.tour && S.tour.book) || (TI && TI.book)) >= 0) l = l.filter(function(c){ return !/^(?:Book ahead on weekends|Réservez pour les fins de semaine)$/i.test(c) || saysIt(value, c, l); }); }
     // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
     // isn't offered "Patio only".
     if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;
@@ -2556,7 +2563,7 @@
         // Indoor test 7 (2026-11-19; Robert's walk-in gallery): with walk-ins welcome and no link yet, the booking link
         // folds behind "Have a booking page?" (it still saves the same way when opened).
         + (walkInFold(ibNow) ? '<details class="su-fold" id="suBookFold"><summary>' + h(T.haveBookPage) + '</summary>' : '')
-        + '<h2 class="su-h2" id="suLinkQ">' + h(ib.book === 'no' && T.tbookQParty ? T.tbookQParty : T.tbookQ) + '</h2><p class="su-hint">' + h(ib.book === 'no' && T.tbookLeadParty ? T.tbookLeadParty : T.tbookLead) + '</p>'
+        + '<h2 class="su-h2" id="suLinkQ">' + h(indoorLinkQ(ib.book)[0]) + '</h2><p class="su-hint">' + h(indoorLinkQ(ib.book)[1]) + '</p>'
         + (ib.noBook ? '' : field('suBookUrl', T.bookLinkLabel, ibNow, { mode: 'url', max: 300 }) + ex(T.bookLinkEx))
         + (CUR.booking_url || C.bookingKnown ? '' : '<div class="su-chips" role="group" aria-labelledby="suLinkQ"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ib.noBook ? 'true' : 'false') + '" data-tnobook="1">' + h(T.noBookLink) + '</button></div>')
         + (walkInFold(ibNow) ? '</details>' : '')

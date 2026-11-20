@@ -2081,6 +2081,28 @@ function yearlyClosureNote(v, ctx) {
   const from = String(hit.from), to = String(hit.to || hit.from);
   return { en: `Closed ${md(from, false)}${to !== from ? ` \u2013 ${md(to, false)}` : ''} every year`, fr: `Fermé ${to !== from ? `du ${md(from, true)} au ${md(to, true)}` : `le ${md(from, true)}`} chaque année` };
 }
+// Indoor test 13 (2026-11-19; Dan's cinema: "cheap movie night Tuesday" showed his $14 adult ticket): when the request names
+// a day ("Tuesday", « mardi ») or a cheap night ("cheap", "discount", « pas cher »), the owner's own typed price line that
+// matches it ("Cheap Tuesdays $8"), else null. -> { cents, line } with {x} for the money.
+const PRICE_DAY_WORDS = [['monday', 'mon', 'mondays', 'lundi', 'lundis'], ['tuesday', 'tue', 'tues', 'tuesdays', 'mardi', 'mardis'], ['wednesday', 'wed', 'wednesdays', 'mercredi', 'mercredis'], ['thursday', 'thu', 'thurs', 'thursdays', 'jeudi', 'jeudis'], ['friday', 'fri', 'fridays', 'vendredi', 'vendredis'], ['saturday', 'sat', 'saturdays', 'samedi', 'samedis'], ['sunday', 'sun', 'sundays', 'dimanche', 'dimanches']];
+const PRICE_DEAL_RE = /\b(?:cheap|cheaper|cheapest|discount|discounted|deal|deals|bargain|budget|toonie|half price|special|specials|rabais|reduit|pas cher|bon marche|aubaine)\b/;
+function indoorAskedPriceLine(v, ctx) {
+  const items = v && v.type === 'indoor' && Array.isArray(v.indoorPriceItems) ? v.indoorPriceItems : null;
+  if (!items || !items.length || !ctx) return null;
+  const q = ` ${normWords(`${ctx.askText || ''} ${ctx.queryText || ''}`)} `;
+  const days = PRICE_DAY_WORDS.filter((ws) => ws.some((w) => q.includes(` ${w} `)));
+  const deal = PRICE_DEAL_RE.test(q);
+  if (!days.length && !deal) return null;
+  const has = (t, ws) => ws.some((w) => ` ${normWords(t)} `.includes(` ${w} `));
+  let hit = null;
+  for (const [name, desc, price] of items) {
+    const t = `${name} ${desc}`;
+    const dayOk = days.length ? days.some((ws) => has(t, ws)) : false;
+    const dealOk = deal && PRICE_DEAL_RE.test(` ${normWords(t)} `);
+    if ((dayOk || (!days.length && dealOk)) && (!hit || price < hit[2])) hit = [name, desc, price];
+  }
+  return hit ? { cents: Math.round(hit[2] * 100), line: `${hit[0]} {x}` } : null;
+}
 function publicVenue(v, ctx) {
   // Winery test 5 (2026-11-12): a winery's own tasting fee comes before a published price ("Check price per person" showed
   // with a $10 owner fee); a free tasting says so.
@@ -2105,6 +2127,8 @@ function publicVenue(v, ctx) {
     : indoorFrom && Array.isArray(v.indoorPerLine) ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null, perGroup: v.indoorPer, unit: v.indoorPerLine[0], unitFr: v.indoorPerLine[1] }
     // Indoor test 4 (2026-11-19; Lauren's spa read "$65 per person · Admission"): the kind's own words ("From $65",
     // "Tickets from $25", "Day pass from $22"), as the page says it.
+    // Indoor test 13: the owner's own price line for the day or cheap night asked ("Cheap Tuesdays $8").
+    : indoorFrom && !Array.isArray(v.indoorPerLine) && indoorAskedPriceLine(v, ctx) ? { ...indoorAskedPriceLine(v, ctx), label: 'Indoor', labelFr: 'Intérieur', source: null, lineFr: indoorAskedPriceLine(v, ctx).line, asked: true }
     : indoorFrom && Array.isArray(v.indoorPriceLine) ? { cents: Math.round(indoorFrom * 100), label: 'Indoor', labelFr: 'Intérieur', source: null, line: v.indoorPriceLine[0], lineFr: v.indoorPriceLine[1] }
     : indoorFrom ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null }
     : cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
@@ -2234,7 +2258,10 @@ const INDOOR_BOOK_NOTES = {
   busy: 'Walk-ins welcome; book ahead for weekends and busy times (the owner’s own answer).',
   ahead: 'Book ahead (the owner’s own answer).',
 };
-const INDOOR_CLASS_TIME_NOTE = 'Book a class time: see the schedule on their Book button (the owner’s own answer).';
+const INDOOR_CLASS_TIME_NOTE = 'Book a class time: see the schedule on their Class schedule button (the owner’s own answer).';
+// Indoor test 13 (2026-11-19; Dan's cinema, shows only, with a showtimes link: "Hours not listed"): every kind with no set
+// hours and a link says where its times are, by what the link is.
+const INDOOR_TIMES_NOTES = { classes: INDOOR_CLASS_TIME_NOTE, shows: 'Showtimes: see the schedule on their Showtimes & tickets button (the owner’s own answer).', web: 'Times: see their website before you go (the owner’s own answer).' };
 const TOUR_BOOK_AHEAD_NOTES = {
   same_day: 'Same-day bookings are often fine (the operator’s own answer). Call ahead for the times.',
   day: 'Book at least a day ahead (the operator’s own answer).',
@@ -2633,10 +2660,11 @@ function stopFrom(v, scored, extra, ctx) {
   // Indoor test 8: his own busy line for the evening asked stands in for the general walk-ins answer.
   // Indoor test 12 (2026-11-19; Jess's yoga studio, classes only with a schedule link): no "Hours not listed" for it; its
   // stop says to book a class time instead of the general book-ahead answer.
-  if (v && v.type === 'indoor' && v.indoorClassTimes === true) {
+  if (v && v.type === 'indoor' && (v.indoorClassTimes === true || INDOOR_TIMES_NOTES[v.indoorTimes])) {
     reasons = reasons.filter((r) => r.code !== 'hours' && !/^Listed hours/.test(r.text || ''));
     caveats = caveats.filter((c) => !c.startsWith(UNKNOWN_HOURS_CAVEAT.replace(/ — .*$/, '')) && !/listed hours/i.test(c));
-    if (!caveats.includes(INDOOR_CLASS_TIME_NOTE)) caveats.push(INDOOR_CLASS_TIME_NOTE);
+    const tn = INDOOR_TIMES_NOTES[v.indoorTimes] || INDOOR_CLASS_TIME_NOTE;
+    if (!caveats.includes(tn)) caveats.push(tn);
   } else if (v && v.type === 'indoor' && INDOOR_BOOK_NOTES[v.indoorBook] && !caveats.includes(INDOOR_BOOK_NOTES[v.indoorBook]) && !(ownLine && ownLine.busy && v.indoorBook !== 'ahead')) caveats.push(INDOOR_BOOK_NOTES[v.indoorBook]);
   if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = tourBookAheadNote(v); if (!caveats.includes(bn)) caveats.push(bn); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);

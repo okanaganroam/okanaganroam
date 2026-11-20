@@ -67,13 +67,16 @@ K.theatre = { gtk: 'shows', ex: 'theatre', boxOffice: true,
     groups: { chips: ['Tarifs de groupe pour 10 personnes ou plus', 'Location de la salle pour événements privés', 'Matinées scolaires sur demande'], lead: 'Touchez une taille, puis ajoutez les tarifs de groupe, la location de la salle ou les spectacles scolaires dans vos mots.', ex: 'Tarifs de groupe pour 10 personnes ou plus. La salle se loue pour des événements privés' },
     search: ['théâtre', 'pièce de théâtre', 'pièces', 'spectacle', 'spectacles', 'concert', 'concerts', 'humour', 'comédie musicale'] } };
 
-K.cinema = { gtk: 'shows', ex: 'cinema',
-  en: { price: { page: 'Tickets from {x}.', basis: 'Tickets', label: 'Regular adult ticket, in dollars', ph: 'Your regular adult ticket', lead: 'Your regular adult ticket. It shows on your card.' },
+// Indoor test 13 (2026-11-19; Dan's cinema: the price screen previewed "Tickets from $14" for his regular adult ticket): a
+// cinema's price is its regular adult ticket (single), "Adult ticket $14" everywhere, never "from". Its own Good to know
+// chips (a concession stand, not a café).
+K.cinema = { gtk: 'cinema', ex: 'cinema', single: true,
+  en: { price: { page: 'Adult ticket {x}.', basis: 'Adult ticket', label: 'Regular adult ticket, in dollars', ph: 'Your regular adult ticket', lead: 'Your regular adult ticket. It shows on your card.' },
     prices: { noun: 'tickets page', page: PRICES_PAGE[0], lead: 'Your ticket prices for adults, kids and seniors, and cheap nights. A link to your tickets page is perfect. It’s optional.' },
     help: { walkin: 'Tickets at the door or online', ages: 'All ages; check each film’s rating', gift: 'Gift cards at the box office', prices: 'Kids and seniors $10, Tuesdays $8' },
     groups: { chips: ['Private screenings', 'Group tickets for 10 or more', 'Birthday parties with a movie'], lead: 'Tap a size, then add private screenings, group tickets or parties in your own words.', ex: 'Private screenings for up to 120. Birthday party packages' },
     search: ['cinema', 'cinemas', 'movie', 'movies', 'movie theatre', 'movie theater', 'film', 'films'] },
-  fr: { price: { page: 'Billets à partir de {x}.', basis: 'Billets', label: 'Billet adulte régulier, en dollars', ph: 'Votre billet adulte régulier', lead: 'Votre billet adulte régulier. Il paraît sur votre fiche.' },
+  fr: { price: { page: 'Billet adulte {x}.', basis: 'Billet adulte', label: 'Billet adulte régulier, en dollars', ph: 'Votre billet adulte régulier', lead: 'Votre billet adulte régulier. Il paraît sur votre fiche.' },
     prices: { noun: 'page de billets', page: PRICES_PAGE[1], lead: 'Le prix de vos billets pour adultes, enfants et aînés, et vos soirées à prix réduit. Un lien vers votre page de billets, c’est parfait. C’est facultatif.' },
     help: { walkin: 'Billets à la porte ou en ligne', ages: 'Tous les âges; vérifiez le classement de chaque film', gift: 'Cartes-cadeaux à la billetterie', prices: 'Enfants et aînés 10 $, le mardi 8 $' },
     groups: { chips: ['Projections privées', 'Billets de groupe pour 10 personnes ou plus', 'Fêtes d’anniversaire avec un film'], lead: 'Touchez une taille, puis ajoutez les projections privées, les billets de groupe ou les fêtes dans vos mots.', ex: 'Projections privées jusqu’à 120 personnes. Forfaits pour fêtes d’anniversaire' },
@@ -351,6 +354,31 @@ function indoorPrefillPrice(kinds, text, amount = null) {
   }
   return null;
 }
+// Indoor test 13 (2026-11-19; Dan's cinema got a 1-hour slot in "dinner and a movie"): how long Build My Trip plans a visit
+// of each kind when the owner hasn't said (his Time needed answer always wins), in minutes. Null: the general indoor
+// allowance.
+const SLOT = { gallery: 60, museum: 90, theatre: 150, cinema: 150, spa: 150, pool: 90, climbing: 120, games: 90, escape: 60, bowling: 90, kids: 120, classes: 120, curling: 120, yoga: 75, casino: 120, library: 60, other: null };
+for (const [k, x] of Object.entries(SLOT)) if (K[k]) K[k].slot = x;
+// The owner's Time needed answer (server.js INDOOR_LENGTHS) in minutes.
+const INDOOR_LENGTH_MINUTES = { '1h': 60, '1-2h': 90, '2-3h': 150, half: 240 };
+// Indoor test 13: the kinds people buy tickets for a showtime at (their link is "Showtimes & tickets"), and the class kinds
+// (their link is the class schedule). Every other kind with a booking page: "Book a visit" / "Book".
+const TICKETED_KINDS = ['cinema', 'theatre'];
+const CLASS_KINDS = ['yoga', 'classes'];
+for (const k of TICKETED_KINDS) K[k].ticketed = true;
+for (const k of CLASS_KINDS) K[k].classKind = true;
+// The slot length in minutes for a place: its Time needed answer, else its main kind's default, else null.
+function indoorSlotMinutes(kinds, length) {
+  if (INDOOR_LENGTH_MINUTES[length]) return INDOOR_LENGTH_MINUTES[length];
+  const k = Array.isArray(kinds) ? kinds.find((x) => K[x]) : K[kinds] ? kinds : null;
+  return k && K[k].slot ? K[k].slot : null;
+}
+// What a place's link is, for a place with no set hours: 'shows' (showtimes), 'classes' (class times) or 'web' (times on
+// their website): "Showtimes: see the schedule", "Class times: see the schedule", "Times: see their website".
+function indoorTimesKind(kinds) { const k = indoorKindKey(kinds); return K[k].ticketed ? 'shows' : K[k].classKind ? 'classes' : 'web'; }
+const INDOOR_TIMES_LINES = { shows: ['Showtimes: see the schedule', 'Séances : voir l’horaire'], classes: ['Class times: see the schedule', 'Horaires des cours : voir l’horaire'], web: ['Times: see their website', 'Horaires : voir leur site Web'] };
+// The page's link button by kind and booking answer: [en, fr].
+const INDOOR_BOOK_BUTTONS = { shows: ['Showtimes & tickets', 'Horaires et billets'], classes: ['Class schedule', 'Horaire des cours'], visit: ['Book a visit', 'Réserver une visite'], book: ['Book', 'Réserver'], party: ['Book a party', 'Réserver une fête'] };
 const INDOOR_KIND_TEXT = K;
 const INDOOR_KIND_TEXT_KINDS = Object.keys(K);
 // The kind a place reads in: its main kind (the first the owner picked), else 'other'.
@@ -360,7 +388,7 @@ function indoorKindText(kinds, lang) {
   const k = indoorKindKey(kinds), e = K[k], w = e[lang === 'fr' ? 'fr' : 'en'];
   // The prices link's words on the page: "See prices & rates" / « Voir les tarifs », a spa's "See the spa menu".
   const see = w.prices.page === PRICES_PAGE[lang === 'fr' ? 1 : 0] ? (lang === 'fr' ? 'Voir les tarifs' : 'See prices & rates') : lang === 'fr' ? `Voir la ${w.prices.page.toLowerCase()}` : `See the ${w.prices.page.toLowerCase()}`;
-  return { kind: k, exPrice: e.exPrice || 15, single: !!e.single, boxOffice: !!e.boxOffice, arts: !!e.arts, quiet: !!e.quiet, day: !!(e.day || e.quiet), gtk: e.gtk || 'general', ex: e.ex || 'general', ...w, prices: { ...w.prices, see } };
+  return { kind: k, exPrice: e.exPrice || 15, single: !!e.single, slot: e.slot || null, ticketed: !!e.ticketed, classKind: !!e.classKind, boxOffice: !!e.boxOffice, arts: !!e.arts, quiet: !!e.quiet, day: !!(e.day || e.quiet), gtk: e.gtk || 'general', ex: e.ex || 'general', ...w, prices: { ...w.prices, see } };
 }
 // "Tickets from $25." with the price written in.
 function indoorPriceLine(kinds, money, lang) { return indoorKindText(kinds, lang).price.page.replace('{x}', money); }
@@ -396,4 +424,4 @@ const INDOOR_TYPE_WORD_SKIP = new Set(['history', 'heritage', 'heritage site', '
 // "learn to curl", "slots", « soin du visage »).
 const INDOOR_TYPE_WORDS = [...new Set(Object.values(K).flatMap((e) => e.en.search.concat(e.fr.search)).filter((w) => !INDOOR_TYPE_WORD_SKIP.has(w)))];
 
-module.exports = { indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };
+module.exports = { indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };

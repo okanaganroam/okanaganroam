@@ -1346,6 +1346,9 @@ Object.assign(FR_TEXT, Object.fromEntries(Object.entries({
   'Times vary · check before you go': 'Horaires variables · vérifiez avant d’y aller',
   // Indoor test 12 (2026-11-19): a class place's status line with no set hours and a schedule link.
   'Class times: see the schedule': 'Horaires des cours : voir l’horaire',
+  // Indoor test 13 (2026-11-19): a show place's and any other place's link line, with no set hours.
+  'Showtimes: see the schedule': 'Séances : voir l’horaire',
+  'Times: see their website': 'Horaires : voir leur site Web',
   'Hosts comedy': 'Présente de l’humour', 'Hosts live music': 'Présente de la musique en direct', 'Hosts plays': 'Présente des pièces de théâtre',
   'check show dates': 'vérifiez les dates des spectacles', 'Check show dates': 'Vérifiez les dates des spectacles',
   'From': 'Du',

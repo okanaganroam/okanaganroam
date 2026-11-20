@@ -129,7 +129,9 @@ test('3. Every indoor kind: an owner with honest answers (free, walk-in, no onli
     // Booking: walk-ins welcome, no online bookings (the link folds away for a walk-in place).
     const sb = await openSetup(base, t, { hash: 'booking' });
     await sb.click('[data-tpick="book:no"]');
-    assert.ok(sb.has('#suBookFold'), `${k}: the booking link folds behind "Have a booking page?"`);
+    // Indoor test 13: a cinema's or theatre's showtimes link and a class place's schedule link stay open under walk-ins.
+    const linkKind = IK.indoorKindText([k], 'en').ticketed || IK.indoorKindText([k], 'en').classKind;
+    assert.equal(sb.has('#suBookFold'), !linkKind, `${k}: the booking link folds behind "Have a booking page?" (not for a showtimes or class schedule link)`);
     await sb.click('[data-tnobook="1"]');
     await sb.click('bookingSave');
     // Groups: none (real tap).

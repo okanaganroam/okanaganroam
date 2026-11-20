@@ -938,9 +938,10 @@ function explicitOutingComponents(trip,requirements) {
   const items=requirements.items||[],days=items.find(i=>i.kind==='days')?.value||requirements.planDays;
   if(days>1 || items.some(i=>i.dayIndex>1))return trip;
   const kinds=items.filter(i=>i.kind==='venue_kind'&&i.strength==='must');
+  // Indoor test 13 (2026-11-19; "dinner and a movie" was a generic indoor stop): every indoor kind asked with a meal too.
   // 2026-10-25: "spa day and dinner in Penticton" found nothing (the spa and the dinner were one request); an activity
   // asked for with a meal is two stops, as a game and dinner already were.
-  const scoped=kinds.some(i=>SPORT_KINDS[i.value]||['spa','museum','gallery','escape','bowling','climbing','arcade','theatre','pottery','cooking','horseback','sunset'].includes(i.value))&&items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper|lunch)\b/.test(i.sourceText))||!!(kinds.length&&requirements.startDate)||items.some(i=>i.kind==='transport')||requirements.onlyRequested||requirements.outingScope==='short'||days===1&&(kinds.length||items.some(i=>i.kind==='activity'||i.kind==='rainy'&&i.activityOnly))||items.some(i=>i.kind==='price_limit')||requirements.daypart&&(kinds.length||items.some(i=>i.kind==='activity')||items.filter(i=>i.kind==='type'&&i.strength==='must').length>=1);
+  const scoped=kinds.some(i=>SPORT_KINDS[i.value]||['spa','museum','gallery','escape','bowling','climbing','arcade','theatre','pottery','cooking','horseback','sunset','cinema','playground','pool','curling','yoga','casino','library'].includes(i.value))&&items.some(i=>i.kind==='type'&&i.value==='restaurant'&&/\b(?:dinner|supper|lunch)\b/.test(i.sourceText))||!!(kinds.length&&requirements.startDate)||items.some(i=>i.kind==='transport')||requirements.onlyRequested||requirements.outingScope==='short'||days===1&&(kinds.length||items.some(i=>i.kind==='activity'||i.kind==='rainy'&&i.activityOnly))||items.some(i=>i.kind==='price_limit')||requirements.daypart&&(kinds.length||items.some(i=>i.kind==='activity')||items.filter(i=>i.kind==='type'&&i.strength==='must').length>=1);
   if(!scoped)trip=skatingComponents(trip,requirements);
   if(!scoped)return bindNamedVenues(requirements.timeWindow&&!trip?.multi?timeWindowComponents(trip,requirements):trip,requirements);
   const text=requirements.text||'',parts=[];
@@ -995,6 +996,14 @@ function expandTripComponentsInner(trip,requirements) {
   const components=trip.components.map(c=>singleDay&&requirements.daypart&&!c.meal?{...c,daypart:requirements.daypart}:c);
   for(const item of requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must'&&['easy_walk','challenging_hike'].includes(i.value))){
     for(let n=0;n<components.length;n++)if(components[n].kind==='venue'&&(components[n].activities||[]).includes('hiking'))components[n]={...components[n],plannerKinds:[...new Set([...(components[n].plannerKinds||[]),item.value])]};
+  }
+  // Indoor test 13 (2026-11-19; "dinner and a movie" planned the cinema as "Indoor & rainy day spots"): the indoor part of a
+  // two-part request is the indoor kind asked for (its label, its kind's places and its kind's visit length).
+  const INDOOR_PKS=new Set(Object.values(INDOOR_KIND_PLANNER).flat());
+  for(const item of requirements.items.filter(i=>i.kind==='venue_kind'&&i.strength==='must'&&INDOOR_PKS.has(i.value))){
+    if(components.some(c=>(c.plannerKinds||[]).includes(item.value)))continue;
+    const n=components.findIndex(c=>c.kind==='venue'&&(c.types||[]).length===1&&c.types[0]==='indoor'&&!(c.plannerKinds||[]).length&&!c.rainyOption&&!c.venueId);
+    if(n>=0)components[n]={...components[n],plannerKinds:[item.value],phrase:LABELS[item.value]||components[n].phrase,generic:false};
   }
   for (const item of (requirements.items||[]).filter(i=>i.kind==='venue_kind'&&i.strength==='must'&&['sunset','horseback'].includes(i.value))) {
     const existing=components.findIndex(c=>c.kind==='venue'&&((c.plannerKinds||[]).includes(item.value)||item.value==='sunset'&&(c.activities||[]).includes('viewpoints')));
@@ -1279,6 +1288,15 @@ function isOutdoorSport(v){
  if(/\b(?:indoor|covered|enclosed)\b/i.test(text))return false;
  return /\b(?:outdoor|open-air|disc golf course|skate ?park|bmx (?:race )?track|dawn to dusk)\b/i.test(text);
 }
+// Indoor test 13: an indoor place's planned visit in minutes: the owner's Time needed answer (indoorLength), else the
+// usual length of its own kind (its owner's kinds, else the indoor kind its planner kinds are), else null.
+const PLANNER_INDOOR_KIND=Object.fromEntries(Object.entries(INDOOR_KIND_PLANNER).flatMap(([k,pks])=>pks.map(pk=>[pk,k])));
+function indoorSlotOf(v,kinds){
+  const IK=require('./indoor-kinds');
+  const own=Array.isArray(v.indoorKinds)&&v.indoorKinds.length?v.indoorKinds:null;
+  const k=own||(kinds||[]).map(x=>PLANNER_INDOOR_KIND[x]).filter(Boolean);
+  return IK.indoorSlotMinutes(k,v.indoorLength);
+}
 // Planning allowances, not venue-supplied durations or verified routes.
 function estimateTripTiming({plan,facts,requirements,tripDate=null}){
   if(['recommendations','discover'].includes(plan.kind))return [];
@@ -1305,8 +1323,11 @@ function estimateTripTiming({plan,facts,requirements,tripDate=null}){
       const requestedChallenge=(requirements?.items||[]).some(i=>i.value==='challenging_hike'&&i.strength!=='exclude');
       const listed = hike && !requestedWalk && !requestedChallenge ? listedOutdoorTiming(v).durationRange : null;
       const sportAllowance=sportVisitAllowance(v,kinds);
-      range=selectedShortWalk?[30,60]:listed || sportAllowance || (hike&&!requestedWalk?(requestedChallenge?[180,300]:[90,180]):v.type==='cafe'?[20,40]:v.type==='restaurant'?[60,90]:v.type==='winery'?[45,75]:kinds.includes('museum')?[60,90]:kinds.includes('gallery')?[30,60]:kinds.some(k=>['easy_walk','walk'].includes(k))?[30,60]:kinds.includes('escape')?[60,90]:null);
-      if(range){g.minMinutes+=range[0];g.maxMinutes+=range[1]+(stop.waitMinutes||0);g.visits.push({venueId:v.id,minMinutes:range[0],maxMinutes:range[1],...(listed?{durationSource:'listing'}:sportAllowance?{durationSource:'planning allowance'}:{})});}
+      // Indoor test 13 (2026-11-19; Dan's cinema got a 1-hour slot): an indoor place's visit is its owner's Time needed
+      // answer, else its kind's usual length (indoor-kinds.js slot: a film 2.5 hours, an escape room an hour).
+      const indoorSlot=v.type==='indoor'?indoorSlotOf(v,kinds):null;
+      range=selectedShortWalk?[30,60]:listed || sportAllowance || (indoorSlot?[Math.max(30,indoorSlot-30),indoorSlot]:null) || (hike&&!requestedWalk?(requestedChallenge?[180,300]:[90,180]):v.type==='cafe'?[20,40]:v.type==='restaurant'?[60,90]:v.type==='winery'?[45,75]:kinds.includes('museum')?[60,90]:kinds.includes('gallery')?[30,60]:kinds.some(k=>['easy_walk','walk'].includes(k))?[30,60]:kinds.includes('escape')?[60,90]:null);
+      if(range){g.minMinutes+=range[0];g.maxMinutes+=range[1]+(stop.waitMinutes||0);g.visits.push({venueId:v.id,minMinutes:range[0],maxMinutes:range[1],...(listed||indoorSlot&&v.indoorLength?{durationSource:'listing'}:sportAllowance||indoorSlot?{durationSource:'planning allowance'}:{})});}
       else{g.complete=false;g.unknown.push('visit duration');}
     }else{g.complete=false;g.unknown.push(stop.event?'event duration':'visit duration');}
     g.previous=v||{};
@@ -1503,4 +1524,4 @@ function tripRequestSynonyms(text){let out=String(text||'');const walksNegated=W
  if(/\b(?:ski|skiing|snowboard\w*)\b/i.test(out)&&!/\b(?:cross.country|nordic)\b/i.test(out)&&!/\b(?:don.?t|do not|won.?t|not|no|never|without)\s+(?:\w+\s+){0,2}(?:ski|skiing|snowboard\w*)\b/i.test(out))out=out.replace(/\b(?:a )?night out\b|\bgoing out(?: at night)?\b/gi,'nightlife').replace(/\s*\b(?:in the morning|in the afternoon|in the evening)\b/gi,'').replace(/\b(?:morning|afternoon|evening)\s+(?=(?:ski|skiing|snowboard\w*|spa|apres|après|dinner|lunch|drinks)\b)/gi,'').replace(/\s{2,}/g,' ');
  return out;}
 
-module.exports={morningOfOneStop,KINDS,REQUEST_KINDS,TOUR_PLANNER_KINDS,TOUR_KIND_PLANNER,INDOOR_KIND_PLANNER,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
+module.exports={indoorSlotOf,morningOfOneStop,KINDS,REQUEST_KINDS,TOUR_PLANNER_KINDS,TOUR_KIND_PLANNER,INDOOR_KIND_PLANNER,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};

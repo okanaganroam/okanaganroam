@@ -211,7 +211,9 @@ test('6. Every kind: free and walk-in, "Have a booking page?" left closed, reach
     // Booking: walk-ins welcome; the folded "Have a booking page?" is left closed (no link, no "we don't" tap).
     const sb = await openSetup(base, t, { hash: 'booking' });
     await sb.click('[data-tpick="book:no"]');
-    assert.ok(sb.has('#suBookFold'), `${k}: the booking link folds behind "Have a booking page?"`);
+    // Indoor test 13: a cinema's or theatre's showtimes link and a class place's schedule link stay open under walk-ins.
+    const linkKind = IK.indoorKindText([k], 'en').ticketed || IK.indoorKindText([k], 'en').classKind;
+    assert.equal(sb.has('#suBookFold'), !linkKind, `${k}: the booking link folds behind "Have a booking page?" (not for a showtimes or class schedule link)`);
     await sb.click('bookingSave');
     const sg = await openSetup(base, t, { hash: 'groups' });
     await sg.click('no:groups');

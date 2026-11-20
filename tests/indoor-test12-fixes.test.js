@@ -204,9 +204,10 @@ test('6. A class place with no set hours and a schedule link says "Class times: 
   const p = app.runTripPlan({ text: 'hot yoga Kelowna' }, NOW);
   const stop = itemsOf(p).find((x) => x.venue.id === v.id);
   assert.ok(stop);
-  assert.ok(stop.caveats.includes('Book a class time: see the schedule on their Book button (the owner’s own answer).'), JSON.stringify(stop.caveats));
+  // Indoor test 13: the button is "Class schedule" now, and the note names it.
+  assert.ok(stop.caveats.includes('Book a class time: see the schedule on their Class schedule button (the owner’s own answer).'), JSON.stringify(stop.caveats));
   assert.ok(!stop.caveats.some((c) => /No usable hours listed/.test(c)), JSON.stringify(stop.caveats));
-  assert.equal(frCopy.t3FrenchText('Book a class time: see the schedule on their Book button (the owner’s own answer).'), 'Réservez une heure de cours : voyez l’horaire avec leur bouton Réserver (réponse de l’établissement).');
+  assert.equal(frCopy.t3FrenchText('Book a class time: see the schedule on their Class schedule button (the owner’s own answer).'), 'Réservez une heure de cours : voyez l’horaire avec leur bouton Horaire des cours (réponse de l’établissement).');
   // No link: the general line.
   const { v: noLink } = await jess({ name: 'Pranify Yoga T12 No Link' }, {}, null);
   assert.match(plain(pageHtml(noLink)), /Times vary · check before you go/);

@@ -2526,7 +2526,7 @@ Object.assign(fr.indoor, { iperChips: { person: 'Par personne', group: 'Par sall
 // Indoor test 2 (2026-11-19): the Good to know example by the main kind (like its chips): no grip socks for an escape room.
 Object.assign(en.indoor, { bringExKinds: { gallery: 'Most art is for sale, and we can ship it. Free parking behind the gallery.', arts: 'Gift shop by the entrance. No flash photography.', active: 'Grip socks required (we sell them for $3). Lockers available.',
   spa: 'Bring a swimsuit. Robes and towels provided.', general: 'Arrive 15 minutes early. Free parking behind the building.',
-  shows: 'Doors open 30 minutes before the show. Free parking behind the building.', pool: 'Bring a swimsuit and a towel. Lockers by the change rooms.',
+  shows: 'Doors open 30 minutes before the show. Free parking behind the building.', cinema: 'Doors open 30 minutes before the first show. Concession stand with popcorn.', pool: 'Bring a swimsuit and a towel. Lockers by the change rooms.',
   classes: 'Wear clothes that can get messy. Painted pieces are fired and ready in about a week.',
   bowling: 'Leagues use most lanes on weeknights: call ahead. Licensed lounge. Bumpers for kids.',
   kids: 'Grip socks required (we sell them for $3). An adult stays with their kids. Coffee for parents.',
@@ -2534,7 +2534,7 @@ Object.assign(en.indoor, { bringExKinds: { gallery: 'Most art is for sale, and w
   yoga: 'Hot room classes: bring water and a towel. Mats to rent for $3. Arrive 15 minutes early.' } });
 Object.assign(fr.indoor, { bringExKinds: { gallery: 'La plupart des œuvres sont à vendre, et nous pouvons les expédier. Stationnement gratuit derrière la galerie.', arts: 'Boutique à l’entrée. Photos sans flash.', active: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Casiers offerts.',
   spa: 'Apportez votre maillot. Peignoirs et serviettes fournis.', general: 'Arrivez 15 minutes d’avance. Stationnement gratuit derrière le bâtiment.',
-  shows: 'Portes ouvertes 30 minutes avant le spectacle. Stationnement gratuit derrière le bâtiment.', pool: 'Apportez votre maillot et une serviette. Casiers près des vestiaires.',
+  shows: 'Portes ouvertes 30 minutes avant le spectacle. Stationnement gratuit derrière le bâtiment.', cinema: 'Portes ouvertes 30 minutes avant la première séance. Comptoir de friandises avec maïs soufflé.', pool: 'Apportez votre maillot et une serviette. Casiers près des vestiaires.',
   classes: 'Portez des vêtements qui peuvent se salir. Les pièces peintes sont cuites et prêtes en une semaine environ.',
   bowling: 'Les ligues occupent la plupart des allées en semaine : appelez avant. Salon avec permis d’alcool. Bandes pour les enfants.',
   kids: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Un adulte reste avec ses enfants. Café pour les parents.',
@@ -2585,6 +2585,10 @@ Object.assign(fr.indoor, { haveBookPage: 'Vous avez une page de réservation?' }
 // link box is for parties or groups, and the page's button says "Book a party" when the link or Groups line is about parties.
 Object.assign(en.indoor, { tbookQParty: 'Party or group booking link (optional)', tbookLeadParty: 'It puts a Book button on your page (“Book a party” when it’s for parties).' });
 Object.assign(fr.indoor, { tbookQParty: 'Lien de réservation de fête ou de groupe (facultatif)', tbookLeadParty: 'Il ajoute un bouton Réserver à votre page (« Réserver une fête » si c’est pour les fêtes).' });
+// Indoor test 13 (2026-11-19; Dan's cinema: "Walk-ins welcome" folded his showtimes link away, then titled it a party link):
+// a ticketed kind's and a class kind's link box keeps its own title under any booking answer, and says which button it makes.
+Object.assign(en.indoor, { tbookQShows: 'Your showtimes or tickets link', tbookLeadShows: 'It puts a Showtimes & tickets button on your page.', tbookQClass: 'Your class schedule link', tbookLeadClass: 'It puts a Class schedule button on your page.', tbookLeadVisit: 'It puts a Book a visit button on your page (“Book a party” when the link is your party page).' });
+Object.assign(fr.indoor, { tbookQShows: 'Votre lien d’horaires ou de billets', tbookLeadShows: 'Il ajoute un bouton Horaires et billets à votre page.', tbookQClass: 'Votre lien d’horaire des cours', tbookLeadClass: 'Il ajoute un bouton Horaire des cours à votre page.', tbookLeadVisit: 'Il ajoute un bouton Réserver une visite à votre page (« Réserver une fête » si le lien est votre page de fêtes).' });
 Object.assign(en.indoor, { frDescOld: 'Optional: we translate your story into French for you. Speak French?', frDescGo: 'Check the French yourself' });
 Object.assign(fr.indoor, { frDescOld: 'Facultatif : nous traduisons votre histoire en français pour vous. Vous parlez français?', frDescGo: 'Vérifiez le français vous-même' });
 // Good to know quick answers for indoor places, and the Groups line's. Presets: the page shows each in its own language.
@@ -2604,6 +2608,8 @@ en.indoor.quick = Object.assign({}, en.quick, {
     general: ['Arrive 15 minutes early', 'Book ahead on weekends', 'Lockers available', 'Free parking on site', 'Café or snack bar on site'],
     // Indoor test 6 (2026-11-19): theatres and cinemas (no lockers), pools (no grip socks or waiver), and class studios.
     shows: ['Arrive 15 minutes early', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site'],
+    // Indoor test 13 (2026-11-19; Dan's cinema): a concession stand, not a café.
+    cinema: ['Arrive 15 minutes early', 'Book ahead on weekends', 'Free parking on site', 'Concession stand'],
     pool: ['Bring a swimsuit', 'Lockers available', 'Arrive 15 minutes early', 'Free parking on site', 'Café or snack bar on site'],
     classes: ['Wear clothes that can get messy', 'Pieces ready in about a week', 'Book ahead on weekends', 'Free parking on site', 'Arrive 15 minutes early'],
     // Indoor test 8 (2026-11-19; Gary's bowling centre had the generic chips): leagues, the lounge and bumpers.
@@ -2624,6 +2630,7 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
     spa: ['Arrivez 15 minutes d’avance', 'Apportez votre maillot', 'Peignoirs et serviettes fournis', 'Casiers offerts', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
     general: ['Arrivez 15 minutes d’avance', 'Réservez pour les fins de semaine', 'Casiers offerts', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
     shows: ['Arrivez 15 minutes d’avance', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
+    cinema: ['Arrivez 15 minutes d’avance', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Comptoir de friandises'],
     pool: ['Apportez votre maillot', 'Casiers offerts', 'Arrivez 15 minutes d’avance', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
     classes: ['Portez des vêtements qui peuvent se salir', 'Pièces prêtes en une semaine environ', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Arrivez 15 minutes d’avance'],
     bowling: ['Ligues en semaine : appelez avant', 'Salon avec permis d’alcool', 'Bandes pour les enfants', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
@@ -2672,7 +2679,8 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
         classNightsHint: k === 'classes' ? (fr2 ? 'Des cours le soir en dehors de ces heures? Gardez ici vos heures d’atelier libre, et ajoutez les soirs de cours dans Bon à savoir.' : 'Evening classes outside these hours? Keep your open studio hours here, and add class nights in Good to know.') : '',
       };
       T.quick.groups_kinds[k] = w.groups.chips;
-      T.kindGroups[k] = [w.gtk, w.ex, w.quiet ? 1 : 0, w.day ? 1 : 0];
+      // Indoor test 13: [4] what its link is ('shows' for cinemas and theatres, 'classes' for class kinds, '' the rest).
+      T.kindGroups[k] = [w.gtk, w.ex, w.quiet ? 1 : 0, w.day ? 1 : 0, w.ticketed ? 'shows' : w.classKind ? 'classes' : ''];
     }
   }
 })();
