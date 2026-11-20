@@ -1528,7 +1528,7 @@ function renderScript(d) {
     // Winery test 5 (2026-11-12): a winery whose owner says tastings are free.
     if (v.freeTasting) return '<p class="t3-stop-price" data-cost-cents="0">' + esc(french ? 'Dégustation gratuite' : 'Free tasting') + '</p>';
     // Indoor test 1 (2026-11-19): a place its owner marked by donation, with the suggested amount when she gave one.
-    if (v.byDonation) return '<p class="t3-stop-price" data-cost-cents="0"><strong>' + esc(french ? 'Contribution volontaire' : 'By donation') + '</strong>' + esc(typeof v.byDonation === 'number' ? (french ? ' (suggérée\u00a0: ' + cad(Math.round(v.byDonation * 100)) + ')' : ' (suggested ' + cad(Math.round(v.byDonation * 100)) + ')') : '') + '</p>';
+    if (v.byDonation) return '<p class="t3-stop-price" data-cost-cents="0" data-donation="' + (typeof v.byDonation === 'number' ? Math.round(v.byDonation * 100) : 0) + '"><strong>' + esc(french ? 'Contribution volontaire' : 'By donation') + '</strong>' + esc(typeof v.byDonation === 'number' ? (french ? ' (suggérée\u00a0: ' + cad(Math.round(v.byDonation * 100)) + ')' : ' (suggested ' + cad(Math.round(v.byDonation * 100)) + ')') : '') + '</p>';
     // Tour test 4 (Whistler, 2026-11-17): a tour its operator marked free, or by donation.
     if (v.freeTour) return '<p class="t3-stop-price" data-cost-cents="0"><strong>' + esc(french ? 'Gratuit' : 'Free') + '</strong>' + esc(v.freeTour === 'donation' ? (french ? ' (contribution volontaire)' : ' (pay what you want)') : '') + '</p>';
     return '<p class="t3-stop-price"' + (v.freeEntry ? ' data-cost-cents="0"' : '') + '>'
@@ -1538,16 +1538,19 @@ function renderScript(d) {
     var el = resultEl.querySelector('[data-t3-estimate]');
     if (!el) return;
     var cards = Array.from(resultEl.querySelectorAll('.t3-stops .t3-card'));
-    var known = 0, cents = 0, french = lang() === 'fr';
+    var known = 0, cents = 0, french = lang() === 'fr', gifts = 0, giftCents = 0;
     cards.forEach(function(card){
       var price = card.querySelector('[data-cost-cents]');
       if (price) { known++; cents += Number(price.dataset.costCents); }
+      // Indoor test 14 (2026-11-19; Helen's by-donation museum made the total "$0 CAD"): a by-donation stop is said as one.
+      if (price && price.hasAttribute('data-donation')) { gifts++; giftCents += Number(price.getAttribute('data-donation')) || 0; }
     });
     if (!cards.length) return;
     var missing = cards.length - known;
+    var giftText = gifts ? (french ? 'Contribution volontaire' : 'By donation') + (giftCents > 0 ? (french ? ' (suggérée\u00a0: ' + cad(giftCents) + ')' : ' (suggested ' + cad(giftCents) + ')') : '') : '';
     el.hidden = false;
     el.textContent = (french ? 'Estimation par personne : ' : 'Estimated total per person: ')
-      + (known ? cad(cents) + ' CAD' : (french ? 'à vérifier' : 'check prices'))
+      + (known ? (gifts && !cents ? giftText : cad(cents) + ' CAD' + (gifts ? ' + ' + giftText.charAt(0).toLowerCase() + giftText.slice(1) : '')) : (french ? 'à vérifier' : 'check prices'))
       + (missing ? (french ? ' · Prix à vérifier pour ' + missing + ' arrêt(s)' : ' · ' + missing + ' unpriced ' + (missing === 1 ? 'stop' : 'stops') + ' excluded') : '')
       + (known ? (french ? ' · Hors taxes, pourboires et suppléments' : ' · Before tax, tips and extras') : '');
   }

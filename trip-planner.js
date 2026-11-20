@@ -864,6 +864,13 @@ const BUDGET_SKIPPED_TYPES = ['winery', 'distillery'];
 // adventure outfitters, golf -- and leans on free parks, walks, beaches and markets.
 const BUDGET_PAID_RE = /\b(?:spa|spas|wellness|massage|massages|facials?|float(?:ing)? (?:spa|tank|centre|center)|sauna|esthetics?|day spa|adventure company|adventures? (?:co|inc|ltd)|rentals?|zip ?lines?|ziplining|charters?|guided|resort|yurts?|campground|rv park)\b/;
 const FREE_PLACE_RE = /\b(?:park|parks|trail|trails|walkway|boardwalk|greenway|beach|beaches|lookout|viewpoint|market|markets|promenade|waterfront|nature reserve|free)\b/;
+// Indoor test 14 (2026-11-19; Helen's by-donation museum was left out of "cheap rainy day in Kelowna on Saturday", where
+// $ places won): a place its owner marked Free entry or By donation (indoor or tour) fits a cheap or budget request as well
+// as a $ place does. -> true or false.
+function budgetFreeStop(v) {
+  return !!v && ((v.type === 'indoor' && (v.indoorFree === 'free' || v.indoorFree === 'donation')) || (v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation')));
+}
+function budgetFreeBonus(ctx, v) { return ctx.budget === 'budget' && budgetFreeStop(v); }
 function budgetPaid(v) {
   // Tour test 4 (Whistler, 2026-11-17): a tour its operator marked free (or by donation) is not a paid stop.
   if (v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation')) return false;
@@ -1788,7 +1795,8 @@ function scoreVenue(v, ctx) {
   // that says skating puts the rinks first.
   if (/\b(?:skating|skate|rink|rinks)\b/.test(normWords(ctx.queryText || '')) && /\b(?:rink|rinks|skating|skate)\b/.test(`${v.textName || ''}`)) add('skating', 20, 'A skating rink');
   // "Cheap eats" (2026-10-18): $ places first, $$ after, pricier ones last (it once led with $$ sushi).
-  if (ctx.budget === 'budget' && v.price != null) {
+  if (budgetFreeBonus(ctx, v)) add('budget', 16, v.indoorFree === 'donation' || v.tourFree === 'donation' ? 'By donation: fits your budget' : 'Free entry: fits your budget');
+  else if (ctx.budget === 'budget' && v.price != null) {
     if (v.price === 1) add('budget', 14, `Price level ${priceText(v.price)} fits your budget preference`);
     else if (v.price === 2) add('budget', 3, `Price level ${priceText(v.price)} fits your budget preference`);
     else add('budget_miss', -14, null);
@@ -2893,7 +2901,7 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
     if (t && t.skip) continue; // listed hours prove it is closed at the time asked for
     scored.push(t ? { v, score: s.score + t.score, reasons: s.reasons.concat(t.reasons), caveats: t.caveats } : { v, ...s });
   }
-  const priceRank = (v) => (v.price === 1 ? 0 : v.price == null || v.price === 2 ? 1 : 2);
+  const priceRank = (v) => (v.price === 1 || budgetFreeStop(v) ? 0 : v.price == null || v.price === 2 ? 1 : 2);
   scored.sort(ctx.budget === 'budget' && !freeAsked ? (a, b) => priceRank(a.v) - priceRank(b.v) || compareScored(a, b) : compareScored);
   const out = [];
   const perType = {};
@@ -2982,7 +2990,7 @@ function buildOuting(facts, ctx) {
       const s = scoreVenue(v, ctx);
       const dist = distanceTerm(prev, v, kmCost, maxHop);
       // A cheap date night (2026-10-25: it got Rimrock Café, $$$$): listed prices of $$$ and up rank well down.
-      const budgetCost = ctx.budget === 'budget' && v.price != null ? (v.price >= 3 ? -40 : v.price === 1 ? 6 : 0) : 0;
+      const budgetCost = budgetFreeBonus(ctx, v) ? 8 : ctx.budget === 'budget' && v.price != null ? (v.price >= 3 ? -40 : v.price === 1 ? 6 : 0) : 0;
       // Restaurant test 1 (Whistler, 2026-11-14): a dish the visitor asked for ("we love cheese fondue") that the place
       // serves (its cuisine, description or Known for line) puts it ahead for dinner, over a romantic place without it.
       const dish = step.types.includes('restaurant') && ctx.foodTerms.some((ft) => DISH_WORDS_RE.test(ft.term) && foodMatch(v, ft)) ? 15 : 0;
@@ -3372,7 +3380,7 @@ function pickLunchNear(pool, ctx, d, info, near, used, reserved, base, focuses, 
       const km = kmOrNull(near, v);
       let score = base.get(v.id).score + fit.score + (v.type === 'restaurant' ? 4 : 0) - (km == null ? 6 : km * 1.2 + (km > 15 ? 25 : 0));
       if (v.type === 'restaurant' && v.textCuisine && tripCuisines.has(v.textCuisine)) score -= 4;
-      if (ctx.budget === 'budget' && v.price != null) score += v.price === 1 ? 6 : v.price >= 3 ? -8 : 0;
+      if (budgetFreeBonus(ctx, v)) score += 8; else if (ctx.budget === 'budget' && v.price != null) score += v.price === 1 ? 6 : v.price >= 3 ? -8 : 0;
       const extra = [{ code: 'meal', text: 'A lunch stop between the morning and afternoon', weight: 3 }];
       if (km != null) extra.push({ code: 'nearby', text: `About ${km < 1 ? '<1' : Math.round(km)} km (straight line) from the morning and afternoon stops`, weight: 5 });
       cands.push({ v, score, reasons: base.get(v.id).reasons.concat(fit.reasons, extra), caveats: fit.caveats.concat(far ? [nearbyTownCaveat(ctx, centroids, info.regionList, v.region, 'lunch')] : []) });
@@ -4283,7 +4291,7 @@ function pickMeal(pool, ctx, d, daypart, near, used, opts) {
     // On a wine day, lunch at a winery's own restaurant is a third winery visit.
     if (opts.wine && /\b(?:winery|vineyards?|estate|wines)\b/.test(`${v.textName || ''}`)) score += isLunch ? 9 : 4;
     if (opts.apres && /\b(?:apres|après|slopeside|ski in|village)\b/.test(`${v.textName || ''} ${v.textDesc || ''}`)) score += 4;
-    if (ctx.budget === 'budget' && v.price != null) score += v.price === 1 ? 10 : v.price === 2 ? 2 : -10;
+    if (budgetFreeBonus(ctx, v)) score += 12; else if (ctx.budget === 'budget' && v.price != null) score += v.price === 1 ? 10 : v.price === 2 ? 2 : -10;
     const reasons = [];
     if (km != null) reasons.push({ code: 'nearby', text: `About ${km < 1 ? '<1' : Math.round(km)} km (straight line) from ${opts.nearName || 'the previous stop'}`, weight: 5 });
     if (kFit && kFit.ok) reasons.push({ code: 'meal', text: kitchenMealText(v, isLunch ? 'lunch' : 'dinner', kFit.closes), weight: 20 });

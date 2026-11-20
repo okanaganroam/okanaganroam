@@ -379,6 +379,28 @@ function indoorTimesKind(kinds) { const k = indoorKindKey(kinds); return K[k].ti
 const INDOOR_TIMES_LINES = { shows: ['Showtimes: see the schedule', 'Séances : voir l’horaire'], classes: ['Class times: see the schedule', 'Horaires des cours : voir l’horaire'], web: ['Times: see their website', 'Horaires : voir leur site Web'] };
 // The page's link button by kind and booking answer: [en, fr].
 const INDOOR_BOOK_BUTTONS = { shows: ['Showtimes & tickets', 'Horaires et billets'], classes: ['Class schedule', 'Horaire des cours'], visit: ['Book a visit', 'Réserver une visite'], book: ['Book', 'Réserver'], party: ['Book a party', 'Réserver une fête'] };
+// Indoor test 14 (2026-11-19; Helen's museum: the edit page's Add an event said "Live music, tastings, markets, classes or
+// specials"): the kind's own events, for the Add an event heading line and its intro: [en, fr].
+const EVENTS = {
+  gallery: ['Openings, artist talks, workshops', 'Vernissages, rencontres avec les artistes, ateliers'],
+  museum: ['Talks, exhibitions, family days', 'Conférences, expositions, journées familiales'],
+  theatre: ['Shows, concerts, comedy nights', 'Spectacles, concerts, soirées d’humour'],
+  cinema: ['Special screenings, film festivals, premieres', 'Projections spéciales, festivals de films, premières'],
+  spa: ['Wellness nights, workshops, open houses', 'Soirées bien-être, ateliers, portes ouvertes'],
+  pool: ['Family swims, swim lessons, special sessions', 'Bains familiaux, cours de natation, séances spéciales'],
+  climbing: ['Competitions, clinics, theme nights', 'Compétitions, ateliers d’initiation, soirées à thème'],
+  games: ['Tournaments, theme nights, retro nights', 'Tournois, soirées à thème, soirées rétro'],
+  escape: ['Theme nights, new room launches, special events', 'Soirées à thème, nouvelles salles, événements spéciaux'],
+  bowling: ['Cosmic bowling, tournaments, theme nights', 'Quilles cosmiques, tournois, soirées à thème'],
+  kids: ['Toddler times, theme days, camps', 'Temps des tout-petits, journées à thème, camps'],
+  classes: ['Workshops, paint nights, open studios', 'Ateliers, soirées peinture, ateliers ouverts'],
+  curling: ['Bonspiels, learn-to-curl nights, open houses', 'Bonspiels, soirées d’initiation, portes ouvertes'],
+  yoga: ['Workshops, special classes, retreats', 'Ateliers, cours spéciaux, retraites'],
+  casino: ['Live music, tournaments, special events', 'Musique live, tournois, événements spéciaux'],
+  library: ['Story times, author talks, workshops', 'Heures du conte, rencontres d’auteurs, ateliers'],
+  other: ['Special events, theme nights, workshops', 'Événements spéciaux, soirées à thème, ateliers'],
+};
+for (const [k, x] of Object.entries(EVENTS)) if (K[k]) { K[k].en.events = x[0]; K[k].fr.events = x[1]; }
 const INDOOR_KIND_TEXT = K;
 const INDOOR_KIND_TEXT_KINDS = Object.keys(K);
 // The kind a place reads in: its main kind (the first the owner picked), else 'other'.

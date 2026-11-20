@@ -554,8 +554,49 @@ test('indoor test 13: Dan\'s Help questions (a cinema) land on the right answer,
   assert.match(plain((await botsFor('bowling')).en.topic(TH).a), /Add an event.*open-door hours/);
 });
 
+// Indoor test 14 (2026-11-19; Helen, executive director of a history museum): her Help log, EN and FR twins, with where
+// each belongs. Doors open before a talk is an event (she has set hours); late summer Thursdays are summer hours; her family
+// Saturday is Good to know plus an event, said in her own pattern.
+const DO = 'indoor-doors-open', SL = 'indoor-summer-late', FD = 'indoor-family-day', LOC = 'indoor-local-owned';
+const HELEN = [
+  ['I am the executive director, not the owner. can I still do this', ['not-owner', 'staff'], 'je suis la directrice générale, pas la propriétaire. puis-je quand même le faire?'],
+  ['we are open late thursdays in summer, till 8', [SL], 'nous sommes ouverts tard le jeudi l’été, jusqu’à 20 h'],
+  ['we close from christmas to new years', ['closures', 'setup-closures', 'setup-short-closure', YB], 'nous fermons de noël au jour de l’an'],
+  ['admission is by donation, suggested $5', [F], 'l’entrée est à contribution volontaire, 5 $ suggérés'],
+  ['school groups need to book ahead but everyone else can walk in', [BK, G], 'les groupes scolaires doivent réserver mais les autres peuvent venir sans réserver'],
+  ['we are a non-profit society, do I tick locally owned', [LOC], 'nous sommes une société sans but lucratif, est-ce que je coche propriété locale?'],
+  ['monthly lecture series', ['event-repeat', FD], 'série de conférences mensuelle'],
+  ['free family saturdays first saturday of the month', [FD], 'samedis en famille gratuits le premier samedi du mois'],
+  ['doors open half an hour before the lecture starts', [DO], 'les portes ouvrent une demi-heure avant la conférence'],
+  ['can people rent the museum for weddings or events', [G], 'peut-on louer le musée pour des mariages ou des événements?'],
+  ['is the gift shop worth mentioning', [GF, GTK], 'est-ce que la boutique vaut la peine d’être mentionnée?'],
+  ['how do I add our monthly lecture series to my page', ['event-repeat', 'event-add', FD], 'comment ajouter notre série de conférences mensuelle à ma page?'],
+  ['we are closed sundays and mondays', ['hours', 'setup-hours-here'], 'nous sommes fermés le dimanche et le lundi'],
+  // Her other words for the same things.
+  ['open late in july', [SL], 'ouvert plus tard en juillet'],
+  ['summer evenings we stay open later', [SL], 'les soirs d’été nous restons ouverts plus tard'],
+  ['first sunday of each month is free', [FD], 'le premier dimanche de chaque mois est gratuit'],
+];
+const HELEN_WANT = Object.fromEntries(HELEN.map(([q, want]) => [q, want]));
+test('indoor test 14: Helen\'s Help questions (a museum) land on the right answer, in English and in French; doors open is an event for a museum and the no-set-hours answer for a cinema; her pattern is echoed; locally owned names Who can come?', async () => {
+  const b = await botsFor('museum');
+  const wrong = [];
+  for (const [q, want, qFr] of HELEN) {
+    const r = b.en.best(q), f = b.fr.best(qFr);
+    if (!r || !want.includes(r.id)) wrong.push(`en "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+    if (!f || !want.includes(f.id)) wrong.push(`fr "${qFr}" -> ${f && f.id} (want ${want.join(' or ')})`);
+  }
+  assert.deepEqual(wrong, []);
+  assert.match(plain(b.en.topic(DO).a), /^ ?Add the talk or show as an event with its start time; say doors open 30 minutes early in its description\./);
+  assert.match(plain(b.en.topic(LOC).a), /Who can come\?/);
+  assert.doesNotMatch(plain(b.en.topic(LOC).a), /What you offer/);
+  assert.match(plain(b.fr.topic(LOC).aFr), /Qui peut venir ?\?/);
+  // Show and class kinds keep the no-set-hours answer for doors open (no doors-open topic for them).
+  for (const k of ['cinema', 'theatre', 'yoga', 'classes']) { const c = await botsFor(k); assert.equal(c.en.topic(DO), undefined, k); assert.equal(c.en.best('doors open half an hour before the show').id, NH, k); }
+  for (const k of ['museum', 'gallery', 'bowling', 'pool', 'library']) assert.equal((await botsFor(k)).en.best('doors open half an hour before the talk').id, DO, k);
+});
 // Every question in the 8 indoor help logs lands on an answer, on the page where it was asked, for the kind of place it was.
-const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga', 13: 'cinema' };
+const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga', 13: 'cinema', 14: 'museum' };
 // The misrouted ones, with where they belong.
 const LOG_WANT = {
   'we price per room not per person': [R], 'how do I change the price, it says adults but we charge per room': [R],
@@ -579,6 +620,8 @@ const LOG_WANT = {
   ...JESS_WANT,
   // Indoor test 13 (Dan, a cinema).
   ...DAN_WANT,
+  // Indoor test 14 (Helen, a museum).
+  ...HELEN_WANT,
 };
 test('every question in the 8 indoor help logs lands on an answer (the misrouted ones on the right one)', async () => {
   const wrong = [];

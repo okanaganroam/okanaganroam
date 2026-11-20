@@ -271,7 +271,7 @@ Object.assign(en, {
   textLong: 'Number {n} is a bit long. Please keep it to {max} letters.',
   soFarQ: 'Your answers so far', optional: 'Optional', sentTitle: 'Sent', storySentAs: 'What we’ll put on your page:',
   essReady: 'Your page is ready', essCount: '{n} of {total} essentials done.', essSkipped: 'Skipped for now. Tap one to do it:',
-  pctAbout: 'About {n}% complete', pctAboutSub: 'once we add what you sent (usually within a day).', pctRaise: 'Add more about your place to raise it.',
+  pctAbout: 'About {n}% complete', pctAboutSub: 'once we add what you sent (usually within a day).', pctRaise: 'Add more about your place to raise it.', pctMoreOpt: 'Add more to help visitors (optional).',
   saveClosures1: 'Save these closures ({n} new)', saveClosuresN: 'Save these closures ({n} new)',
   menuSentQ: 'Your menu is sent ✓', menuNewer: 'Want to send a newer menu?',
   quickLead: 'Tap what fits:', quickOr: 'Or type it in your own words:',
@@ -293,7 +293,7 @@ Object.assign(fr, {
   textLong: 'Le numéro {n} est un peu long. Gardez-le à {max} caractères.',
   soFarQ: 'Vos réponses jusqu’ici', optional: 'Facultatif', sentTitle: 'Envoyé', storySentAs: 'Ce que nous mettrons sur votre page :',
   essReady: 'Votre page est prête', essCount: '{n} éléments essentiels sur {total} sont faits.', essSkipped: 'Passés pour l’instant. Touchez-en un pour le faire :',
-  pctAbout: 'Complète à environ {n}\u00a0%', pctAboutSub: 'dès que nous aurons ajouté ce que vous avez envoyé (habituellement d’ici un jour).', pctRaise: 'Ajoutez plus de détails pour l’augmenter.',
+  pctAbout: 'Complète à environ {n}\u00a0%', pctAboutSub: 'dès que nous aurons ajouté ce que vous avez envoyé (habituellement d’ici un jour).', pctRaise: 'Ajoutez plus de détails pour l’augmenter.', pctMoreOpt: 'Ajoutez plus de détails pour aider les visiteurs (facultatif).',
   saveClosures1: 'Enregistrer ces fermetures ({n} nouvelle)', saveClosuresN: 'Enregistrer ces fermetures ({n} nouvelles)',
   menuSentQ: 'Votre menu est envoyé ✓', menuNewer: 'Voulez-vous envoyer un menu plus récent?',
   quickLead: 'Touchez ce qui convient :', quickOr: 'Ou écrivez-le dans vos mots :',
@@ -2395,6 +2395,7 @@ en.indoor = {
   menuFreeSub: 'Anything that costs extra, like classes or tours? Optional',
   stMenuFree: 'optional: free entry already counts',
   menuLeadFree: 'Entry is free, so you can skip this. Anything that costs extra, like classes or tours? A photo of the price list or a link is perfect.',
+  menuLeadDonation: 'Entry is by donation, so you can skip this. Anything that costs extra, like classes or tours? A photo of the price list or a link is perfect.',
   snap: 'Take a photo of your price sheet', snapSub: 'Or your brochure, one page at a time', upload: 'Upload your price list', uploadSub: 'A file or photos from your phone or computer',
   web: 'My prices are on my website', menuSocial: 'My prices are on Facebook or Instagram',
   emailQ: 'Email your prices to us', emailLead: 'Send a photo or a file of your price list. Put “{name}” in the subject.', mailSubject: 'Prices for {name}',
@@ -2476,6 +2477,7 @@ fr.indoor = {
   menuFreeSub: 'Quelque chose de payant, comme des cours ou des visites? Facultatif',
   stMenuFree: 'facultatif : l’entrée gratuite compte déjà',
   menuLeadFree: 'L’entrée est gratuite, vous pouvez donc passer cette étape. Quelque chose de payant, comme des cours ou des visites? Une photo de la liste de prix ou un lien, c’est parfait.',
+  menuLeadDonation: 'L’entrée est à contribution volontaire, vous pouvez donc passer cette étape. Quelque chose de payant, comme des cours ou des visites? Une photo de la liste de prix ou un lien, c’est parfait.',
   snap: 'Photographier votre grille tarifaire', snapSub: 'Ou votre brochure, une page à la fois', upload: 'Téléverser votre liste de prix', uploadSub: 'Un fichier ou des photos de votre téléphone ou ordinateur',
   web: 'Mes tarifs sont sur mon site Web', menuSocial: 'Mes tarifs sont sur Facebook ou Instagram',
   emailQ: 'Envoyez-nous vos tarifs par courriel', emailLead: 'Envoyez une photo ou un fichier de votre liste de prix. Indiquez « {name} » dans l’objet.', mailSubject: 'Tarifs de {name}',
@@ -2506,10 +2508,10 @@ Object.assign(en.indoor, { reopenDay: 'Open this day' }); Object.assign(fr.indoo
 Object.assign(fr.indoor, { addSecond: '+ Ajouter une deuxième plage (si vous fermez entre les deux)', twoTimesMax: 'Jusqu’à deux plages par jour.' });
 Object.assign(en.indoor, { tsuggLabel: 'Suggested amount (optional)', tdonationCard: 'By donation', tsuggNeed: 'Just the number, like 5. No suggested amount? Leave the box empty.',
   seaClosuresHint: 'Closed over Christmas or for a winter break? Add it under Closures in More about your place.',
-  tpriceLeadDonation: 'Your card will say “By donation”.', tpriceSavedDonation: 'Your page and your card say “By donation” now.' });
+  tpriceLeadDonation: 'Your card will say “By donation”.', tpriceLeadDonationSugg: 'Your page will say “By donation (suggested {x})”.', tpriceSavedDonation: 'Your page and your card say “By donation” now.' });
 Object.assign(fr.indoor, { tsuggLabel: 'Montant suggéré (facultatif)', tdonationCard: 'Contribution volontaire', tsuggNeed: 'Seulement le chiffre, par exemple 5. Pas de montant suggéré? Laissez la case vide.',
   seaClosuresHint: 'Fermé pendant les Fêtes ou pour une pause d’hiver? Ajoutez-le sous Fermetures dans Plus sur votre endroit.',
-  tpriceLeadDonation: 'Votre fiche indiquera « Contribution volontaire ».', tpriceSavedDonation: 'Votre page et votre fiche indiquent « Contribution volontaire » maintenant.' });
+  tpriceLeadDonation: 'Votre fiche indiquera « Contribution volontaire ».', tpriceLeadDonationSugg: 'Votre page indiquera « Contribution volontaire (suggérée : {x}) ».', tpriceSavedDonation: 'Votre page et votre fiche indiquent « Contribution volontaire » maintenant.' });
 // Indoor test 2 (2026-11-19; Jordan, escape rooms: "120 per room" was saved as $120 a person): a price for a whole room, lane,
 // game or group. One small choice under the price box (Per person, the default / Per room or group); "per room", "per lane",
 // "per game", "per group" or "per party" in the box picks it for her, and "2-6 players" or "up to 8" says who it's for.
@@ -2580,6 +2582,9 @@ Object.assign(fr.indoor, { webLeadTickets: 'Nous avons inscrit votre page de bil
 // finish screen's French line says it's optional and we translate it.
 // Indoor test 7 (2026-11-19): the booking link folds behind this for a walk-in place.
 Object.assign(en.indoor, { haveBookPage: 'Have a booking page?' });
+// Indoor test 14 (2026-11-19): research lines her answers made wrong, asked about on the next screen.
+Object.assign(en.indoor, { staleHead: 'We also had this from online', staleLead: 'It doesn’t match your answers, so it’s off your page for now.', staleQ: 'We also had: “{x}” Still right?', staleKeep: 'Keep', staleRemove: 'Remove', staleKept: 'Kept. It’s back on your page.', staleGone: 'Removed from your page.' });
+Object.assign(fr.indoor, { staleHead: 'Nous avions aussi ceci, trouvé en ligne', staleLead: 'Ça ne correspond pas à vos réponses, donc c’est retiré de votre page pour l’instant.', staleQ: 'Nous avions aussi : « {x} » Est-ce toujours vrai?', staleKeep: 'Garder', staleRemove: 'Retirer', staleKept: 'Gardé. C’est de retour sur votre page.', staleGone: 'Retiré de votre page.' });
 Object.assign(fr.indoor, { haveBookPage: 'Vous avez une page de réservation?' });
 // Indoor test 9 (2026-11-19; Melissa's walk-in play centre: the Book button was for party rooms): with Walk-ins welcome, the
 // link box is for parties or groups, and the page's button says "Book a party" when the link or Groups line is about parties.

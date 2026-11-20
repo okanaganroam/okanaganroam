@@ -32,7 +32,9 @@ function renderIndoorLayout(p) {
   const glance = p.glanceRows || []; // [[label, text]] from the editorial at-a-glance facts (indoor golf only)
   const external = (url, label, cls = '') => `<a class="${cls}" href="${e(url)}" target="_blank" rel="noopener">${label} ↗</a>`;
   const isGolf = v.type === 'golf';
-  const eyebrow = isGolf ? '⛳ Indoor golf' : '🌧️ Indoor &amp; rainy day';
+  // Indoor test 14 (2026-11-19; Helen: the label above her museum's name said "Indoor & rainy day"): it says the place's
+  // kind ("Museum", "Cinema"), as the French page does; only a place with no kind words keeps "Indoor & rainy day".
+  const eyebrow = isGolf ? '⛳ Indoor golf' : p.kindLabel ? `🌧️ ${e(p.kindLabel)}` : '🌧️ Indoor &amp; rainy day';
 
   // The booking button: the place's own booking link when it has one.
   const bookingAnchor = p.actions.find((a) => /data-track="booking"/.test(a));
@@ -44,7 +46,7 @@ function renderIndoorLayout(p) {
 
   // Indoor test 5 (2026-11-19; Chris): the intro showed only the first two sentences of his three-sentence story (the
   // trampoline park was folded away). A short story shows whole; a longer one up to about 300 characters.
-  const { intro, rest } = indoorIntro(p.venue.description);
+  const { intro, rest } = indoorIntro(p.venue.description, !!p.ownStory);
 
   // Quick facts: short recorded values only (the editorial glance rows).
   const tiles = glance.filter(([, text]) => String(text).length <= 30).slice(0, 4)
@@ -128,11 +130,13 @@ const JUMP_SCRIPT = `<script>
   })();
   </script>`;
 
-function indoorIntro(description) {
+function indoorIntro(description, own = false) {
   const text = String(description || '').replace(/\s+/g, ' ').trim();
   // Indoor test 6 (2026-11-19; Priya's four-sentence story, 338 letters, lost its last line "Kids’ summer camps and private
   // parties too."): a story of up to 400 letters (a few sentences, what the setup asks for) shows whole.
-  if (text.length <= 400) return { intro: text, rest: false };
+  // Indoor test 14 (2026-11-19; Helen kept research's two sentences and added three of her own, 530 letters: the intro
+  // stopped after research's two): the owner's own story (sent and checked) shows whole up to 700 letters.
+  if (text.length <= (own ? 700 : 400)) return { intro: text, rest: false };
   const sentences = text.split(/(?<=[.!?])\s+(?=[A-Z0-9"“])/);
   let intro = sentences[0];
   for (let i = 1; i < sentences.length && (intro + ' ' + sentences[i]).length <= 300; i++) intro += ' ' + sentences[i];

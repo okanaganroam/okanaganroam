@@ -80,6 +80,8 @@
   // The link box's title and line by kind and booking answer.
   function indoorLinkQ(book){ var lk = indoorLinkKind(); if (lk === 'shows' && T.tbookQShows) return [T.tbookQShows, T.tbookLeadShows]; if (lk === 'classes' && T.tbookQClass) return [T.tbookQClass, T.tbookLeadClass]; if (book === 'no' && T.tbookQParty) return [T.tbookQParty, T.tbookLeadVisit || T.tbookLeadParty]; return [T.tbookQ, T.tbookLead]; }
   function freeIndoor(){ return INDOOR && (CUR.indoor_price === 'free' || CUR.indoor_price === 'donation' || S.savedTourPrice === 'free' || S.savedTourPrice === 'donation'); }
+  // Indoor test 14 (2026-11-19; Helen's museum is by donation; Your prices said "Entry is free"): which one it is.
+  function donationIndoor(){ return INDOOR && (S.savedTourPrice != null ? S.savedTourPrice === 'donation' : CUR.indoor_price === 'donation'); }
   function itemStep(k){ return (INDOOR && INDOOR_ITEM_STEP[k]) || (TOUR && TOUR_ITEM_STEP[k]) || (C.winery && WINERY_ITEM_STEP[k]) || (C.brewery && BREWERY_ITEM_STEP[k]) || (CK && COCKTAIL_ITEM_STEP[k]) || ''; }
   var DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
   var el = function(id){ return document.getElementById(id); };
@@ -886,7 +888,10 @@
   function tourRentalsOnly(){ var ks = (S.tour && S.tour.kinds) || []; return ks.length > 0 && ks.every(function(k){ return k === 'rentals'; }); }
   // Tour test 12: a second price after the first ("2nd jump same day $69"): the nudge to Your tours and prices.
   function tourPriceLead(){ var l0 = tourPriceLead0(); return S.tour.priceFirst && T.tpriceFirst ? l0 + ' ' + T.tpriceFirst : l0; }
-  function tourPriceLead0(){ var n = S.tour.price; if (S.tour.free === 'donation' && T.tpriceLeadDonation) return T.tpriceLeadDonation;
+  // Indoor test 14 (2026-11-19; Helen typed 5 under By donation; the lead kept "By donation"): the lead says the
+  // suggested amount as she types it, as her page will ("By donation (suggested $5)").
+  function suggNow(){ var t0 = S.tour.suggText, n0 = t0 != null ? (String(t0).trim() ? tourPriceNumber(t0) : null) : S.tour.sugg; return typeof n0 === 'number' && !isNaN(n0) && n0 > 0 && n0 <= (C.feeLiveMax || 300) ? n0 : null; }
+  function tourPriceLead0(){ var n = S.tour.price; if (S.tour.free === 'donation' && T.tpriceLeadDonation) return INDOOR && T.tpriceLeadDonationSugg && suggNow() != null ? fill(T.tpriceLeadDonationSugg, { x: tourMoney(suggNow()) }) : T.tpriceLeadDonation;
     // Indoor test 3: a range typed ("$25 - $55") says what we'll show. Indoor test 4: every kind's lead is its own (kindWords).
     if (INDOOR && !S.tour.free && !S.tour.per && S.tour.range && n > 0 && T.tpriceRangeLead) return fill(T.tpriceRangeLead, { x: tourMoney(n) });
     if (INDOOR && S.tour.per && !S.tour.free && T.tpriceLeadPer) return n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPer, { page: indoorPerPage(n), x: tourMoney(n), u: (T.iperWords || {})[S.tour.per] || S.tour.per }); return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : INDOOR && C.indoorExact && T.tpriceLeadPickExact ? T.tpriceLeadPickExact : T.tpriceLeadPick, { x: tourMoney(n) }); }
@@ -1165,8 +1170,14 @@
   // Indoor test 6: a researched Good to know line that says the opposite of the owner's own Booking or Who can come answer.
   var CLASH_BOOK_RE = /\bby appointment\b|\bappointment only\b|\bno drop[- ]?ins?\b|\bno drop[- ]?in\b|\bno walk[- ]?ins?\b|\bbooking (?:is )?required\b|\bmust (?:be )?book|\breservations? (?:are |is )?required\b|\bsur rendez-vous\b|\bsur réservation seulement\b/i;
   var CLASH_AGE_RE = /\badults?[- ]only\b|\b(?:19|18)\s*\+|\b(?:19|18) (?:and|&) (?:over|older|up)\b|\bno (?:kids|children|minors)\b|\badultes seulement\b|\b(?:19|18) ans et plus\b/i;
+  // Indoor test 14: a research sentence the server found her answers made wrong (or out of date) is flagged too, one she
+  // kept never is (the same list as the page and "We also had").
+  function staleNorm(x){ return String(x || '').toLowerCase().replace(/[^a-z0-9$]+/g, ' ').trim(); }
+  function staleIn(list, line){ var n = staleNorm(line); return !!n && (list || []).some(function(o){ return staleNorm(typeof o === 'string' ? o : o.text) === n; }); }
   function bringClash(line){
     if (!INDOOR || !line) return false;
+    if (staleIn(C.staleKept, line)) return false;
+    if (staleIn(C.stale, line)) return true;
     var book = S.tour.book || TI.book || '', age = S.tour.age || TI.age || '';
     return ((book === 'no' || book === 'busy') && CLASH_BOOK_RE.test(line)) || ((age === 'all' || age === '5') && CLASH_AGE_RE.test(line));
   }
@@ -1268,7 +1279,7 @@
   // Records one answer. -> true, or false with the reason shown (never "Saved" on a save that didn't happen).
   function happyBlocks(){ return S.happy.map(function(e){ var b = { days: DAYS.filter(function(d){ return e.days[d]; }), from: e.from, to: e.to, what: (e.what || '').trim() }; if (e.close) b.close = true; return b; }); }
   function progress(step, status){ var body = { step: step, status: status }; if (step === 'happy' && status === 'live' && S.happyTyped) { body.blocks = happyBlocks(); if (C.lang === 'fr') body.lang = 'fr'; }
-    return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (j.waiting) C.waiting = j.waiting; if (S.dirty === step) S.dirty = ''; drSaved(step); return true; } S.error = why(j); return false; }); }
+    return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (j.waiting) C.waiting = j.waiting; if (j.stale) { C.stale = j.stale; C.staleGone = j.staleGone || []; C.staleKept = j.staleKept || []; } if (S.dirty === step) S.dirty = ''; drSaved(step); return true; } S.error = why(j); return false; }); }
   function record(step, status, then){ if (S.busy) return; S.busy = true; S.error = ''; render(); return progress(step, status).then(function(ok){ S.busy = false; if (!ok) return render(); if (then) then(); else go('saved:' + step); }); }
   // Help's "did it go through?": what we have right now, read from the server each time it is asked.
   // Brewery test 4 (2026-11-13): a status on its own line starts with a capital ("On your page").
@@ -1825,7 +1836,9 @@
     // Never "done" beside a bare low number: when things are on their way, the ring shows where the page will be.
     // One number only (two read as a grade): where the page will be once we add what was sent.
     if (sc.soon > sc.pct) return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #C9A34A 0 ' + sc.soon + '%, #E5DED2 0)"><b>' + pct(sc.soon) + '</b></div><div><strong>' + h(fill(T.pctAbout, { n: sc.soon })) + '</strong><span>'
-      + h(T.pctAboutSub) + '</span>' + (raise ? '<small>' + h(T.pctRaise) + '</small>' : '') + '</div></div>';
+      // Indoor test 14 (2026-11-19; Helen at an honest 100%: "Add more about your place to raise it"): at 100% there is
+      // nothing to raise; more is only to help visitors, and optional (every type).
+      + h(T.pctAboutSub) + '</span>' + (raise ? '<small id="suPctMore">' + h(sc.soon >= 100 && T.pctMoreOpt ? T.pctMoreOpt : T.pctRaise) + '</small>' : '') + '</div></div>';
     return '<div class="su-score"><div class="su-ring" style="background:conic-gradient(#1E4F4C ' + sc.pct + '%, #E5DED2 0)"><b>' + pct(sc.pct) + '</b></div><div><strong>' + h(fill(T.pctNow, { n: sc.pct })) + '</strong><span>'
       + h(sc.pct >= 100 ? T.pctDone : raise ? T.pctRaise : T.niceWork) + '</span></div></div>';
   }
@@ -2625,8 +2638,9 @@
       // research found (C.gtkFound: its Good to know line, and the exceptions her walk-in answer replaced), as found online.
       // Only the sentences that contradict her answers are flagged and kept out (the rest are pre-filled).
       var gOwn = (CUR.visit_rows || {}).good_to_know || '', gIsRes = (C.visitResearch || []).indexOf('good_to_know') >= 0 || (!gOwn && !!C.gtkFound);
-      var gRes = gIsRes ? (gOwn || C.gtkFound || '') : '', gParts = String(gRes).split(/(?<=[.!?])\s+/).map(function(x){ return x.replace(/[\s.]+$/, '').trim(); }).filter(Boolean), gBad = gParts.filter(bringClash), gClash = gBad.length ? gBad.join('. ') + '.' : '';
-      var gFill = gClash ? gParts.filter(function(p0){ return !bringClash(p0); }).map(function(p0){ return p0 + '.'; }).join(' ') : gRes;
+      var gRes = gIsRes ? (gOwn || C.gtkFound || '') : '', gParts = String(gRes).split(/(?<=[.!?])\s+/).map(function(x){ return x.replace(/[\s.]+$/, '').trim(); }).filter(function(x){ return x && !staleIn(C.staleGone, x); }), gBad = gParts.filter(bringClash), gClash = gBad.length ? gBad.join('. ') + '.' : '';
+      var gGone = (C.staleGone || []).length && String(gRes).split(/(?<=[.!?])\s+/).filter(function(x){ return x.trim(); }).length !== gParts.length;
+      var gFill = gClash || gGone ? gParts.filter(function(p0){ return !bringClash(p0); }).map(function(p0){ return p0 + '.'; }).join(' ') : gRes;
       var bv = S.tour.bring != null ? S.tour.bring : gIsRes ? gFill : gOwn;
       // Tour test 1 (Whistler, 2026-11-16): research's line, untouched, says it came from online (a tap on an answer replaces it) (tour test 16: a tap adds to it).
       var bRes = !!bv && gIsRes && bv === gFill;
@@ -2746,7 +2760,7 @@
       // Sent already: say so in the heading, Next is the main button, and a newer menu is the smaller choice (as photos).
       // Indoor test 8 (2026-11-19; Gary): "Your prices are sent ✓" stayed after we had put them live.
       x = (sentM ? q(nowSt('menu', 'day') === 'live' && T.menuLiveQ ? T.menuLiveQ : T.menuSentQ) + msgs() + '<div class="su-stack" style="margin-bottom:22px">' + big('➜', nextLabel('menu'), '', false, 'after:menu') + '</div><h2 class="su-h2">' + h(T.menuNewer) + '</h2>'
-          : (S.done.menu === 'email' ? '<p class="su-sent">' + h(T.menuSentEmail) + '</p>' : '') + q(T.menuQ, freeIndoor() && T.menuLeadFree ? T.menuLeadFree : T.menuLead) + msgs())
+          : (S.done.menu === 'email' ? '<p class="su-sent">' + h(T.menuSentEmail) + '</p>' : '') + q(T.menuQ, freeIndoor() && T.menuLeadFree ? (donationIndoor() && T.menuLeadDonation ? T.menuLeadDonation : T.menuLeadFree) : T.menuLead) + msgs())
         + '<div class="su-stack">' + (INDOOR && FINE ? '' : big('📷', T.snap, T.snapSub, sentM, 'go:menu:cam')) + big('📄', T.upload, T.uploadSub, true, 'go:menu:upload') + (C.website ? big('🌐', T.web, '', true, 'go:menu:web') : '') + big('📘', T.menuSocial, fbKnown() ? fill(T.menuFbKnown, { x: siteDomain(fbKnown()) }) : '', true, 'go:menu:social')
         // Café test 2 (2026-11-11): flavours that change every day ("see Instagram / Facebook / the board").
         + (C.cafe ? big('🔄', iceKind() ? T.menuDailyIce : T.menuDaily, T.menuDailySub, true, 'go:menu:daily') : '')
@@ -3081,6 +3095,15 @@
         + (C.statsHtml || '')
         + '<div class="su-stack"><a class="su-big" href="' + h(C.pageHref) + '" target="_blank" rel="noopener"><span class="su-ico" aria-hidden="true">↗</span><span>' + h(T.seePage) + '</span></a>'
         + '<a class="su-big su-alt" href="' + h(C.back) + '"><span class="su-ico" aria-hidden="true">←</span><span>' + h(T.backSettings) + '</span></a></div>' + changeLink;
+    }
+    // Indoor test 14 (2026-11-19; Helen saved Tue–Sat and research's "Closed Tuesdays and Wednesdays" stayed on her page):
+    // research lines her answers made wrong (or out of date) are off her page; the next screen asks about each one, "We
+    // also had: '…' Still right?", with Keep (back on her page, remembered) and Remove (remembered). Up to three at a time.
+    if (INDOOR && (p[0] === 'saved' || s === 'ess' || s === 'more' || s === 'finish') && (C.stale || []).length && T.staleQ) {
+      var stH = '<div class="su-day su-stale" id="suStale" role="group" aria-labelledby="suStaleH"><p class="su-q" id="suStaleH" style="margin-top:0">' + h(T.staleHead) + '</p><p class="su-hint">' + h(T.staleLead) + '</p>'
+        + C.stale.slice(0, 3).map(function(o){ return '<div class="su-stale-one"><p class="su-example">' + h(fill(T.staleQ, { x: o.text })) + '</p><div class="su-chips"><button type="button" class="su-chip" data-stale="keep:' + h(o.key) + '">' + h(T.staleKeep) + '</button><button type="button" class="su-chip" data-stale="gone:' + h(o.key) + '">' + h(T.staleRemove) + '</button></div></div>'; }).join('') + '</div>';
+      var stAt = x.indexOf('<div class="su-stack');
+      x = stAt >= 0 ? x.slice(0, stAt) + stH + x.slice(stAt) : x + stH;
     }
     if (S.error || S.nudge) { S.exitAfter = false; S.langGo = false; }
     // A failed save always says so, whatever the screen.
@@ -4974,12 +4997,29 @@
       else S.tour.kinds.push(kk);
       indoorGuess();
       redraw(); }; });
+    // Indoor test 14: Keep or Remove on "We also had" (indoor_info kept / gone, the whole list each time).
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-stale]'), function(b){ b.onclick = function(){
+      if (S.busy) return; var q14 = b.getAttribute('data-stale').split(':'), how = q14[0], key = q14[1];
+      var item = (C.stale || []).filter(function(o){ return o.key === key; })[0]; if (!item) return;
+      var kept = (TI.kept || []).filter(function(k){ return k !== key; }), gone = (TI.gone || []).filter(function(k){ return k !== key; });
+      if (how === 'keep') kept.push(key); else gone.push(key);
+      S.busy = true; S.error = ''; render();
+      change({ indoor_info: { kept: kept.length ? kept : null, gone: gone.length ? gone : null } }).then(function(r){
+        S.busy = false;
+        if (r) { TI.kept = kept; TI.gone = gone; if (CUR.indoor_info) { CUR.indoor_info.kept = kept; CUR.indoor_info.gone = gone; }
+          C.stale = C.stale.filter(function(o){ return o.key !== key; });
+          if (how === 'keep') { C.staleKept = (C.staleKept || []).concat([item.text]); } else { C.staleGone = (C.staleGone || []).concat([item.text]); }
+          srSay(how === 'keep' ? T.staleKept : T.staleGone); }
+        render(); });
+    }; });
     // Indoor places (2026-11-19): Free entry / By donation (a tap again takes it back; the price box comes back empty).
     Array.prototype.forEach.call(screen.querySelectorAll('[data-ifree]'), function(b){ b.onclick = function(){
       var f = b.getAttribute('data-ifree'); S.tour.priceGuessed = false;
-      // Indoor test 1: a price she typed before tapping By donation becomes the suggested amount.
-      readTour(); var typed0 = S.tour.price;
-      if (S.tour.free === f) { S.tour.free = ''; S.tour.price = null; S.rawBox.suTprice = ''; } else { if (f === 'donation' && S.tour.sugg == null && S.tour.suggText == null && typeof typed0 === 'number' && typed0 > 0) S.tour.sugg = typed0; S.tour.free = f; S.tour.price = 0; S.rawBox.suTprice = tourFreeWord(f); }
+      // Indoor test 14 (2026-11-19; Helen: the box said $10, research's adult price pre-filled in the price box): the
+      // Suggested amount box starts empty unless research's own price line was a suggested donation (C.researchSuggested,
+      // or her saved one). An adult price is never carried over (indoor test 1 carried a typed price; Dayton: never).
+      readTour();
+      if (S.tour.free === f) { S.tour.free = ''; S.tour.price = null; S.rawBox.suTprice = ''; } else { if (f === 'donation' && S.tour.sugg == null && S.tour.suggText == null && C.researchDonation && typeof C.researchSuggested === 'number') S.tour.sugg = C.researchSuggested; S.tour.free = f; S.tour.price = 0; S.rawBox.suTprice = tourFreeWord(f); }
       S.nudge = ''; redraw(); }; });
     // Indoor test 2: Per person / Per room or group (a tap; her words in the box stay).
     Array.prototype.forEach.call(screen.querySelectorAll('[data-iper]'), function(b){ b.onclick = function(){
@@ -4990,6 +5030,7 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tks]'), function(b){ b.onclick = function(){ var q15 = b.getAttribute('data-tks').split(':'); S.tour.ks[q15[0]] = q15[1]; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tadult]'), function(b){ b.onclick = function(){ S.tour.adult = !S.tour.adult; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tnobook]'), function(b){ b.onclick = function(){ readTour(); var bu2 = el('suBookUrl'); if (bu2) S.bookUrl = bu2.value; S.tour.noBook = !S.tour.noBook; redraw(); }; });
+    var tsg = el('suTsugg'); if (tsg && INDOOR) tsg.addEventListener('input', function(){ S.tour.suggText = tsg.value; var ld = el('suTpriceLead'); if (ld) ld.textContent = tourPriceLead(); });
     var tpi = el('suTprice'); if (tpi && TL) tpi.addEventListener('input', function(){ readTour(); var ld = el('suTpriceLead'); if (ld) ld.textContent = tourPriceLead();
       // Indoor test 2: per room words pick Per room or group as she types (the box keeps her focus).
       if (INDOOR && el('suPerChips')) { Array.prototype.forEach.call(screen.querySelectorAll('[data-iper]'), function(b){ var u = b.getAttribute('data-iper'); b.setAttribute('aria-pressed', (u === 'group' ? !!S.tour.per : !S.tour.per) ? 'true' : 'false'); });
