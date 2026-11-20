@@ -36296,6 +36296,7 @@ function renderGolfHubLayoutPage(oldHtml, venues, query, scope = {}) {
   const group = (k) => venues.filter((v) => kindOf(v) === k);
   const courses = seasonClosedLast(group('courses').sort((a, b) => foodDrinkRecommendedScore(b) - foodDrinkRecommendedScore(a) || byName(a, b)));
   const ordered = [...courses, ...seasonClosedLast(group('practice')), ...group('simulators')];
+  const rankOf = new Map(ordered.map((v, i) => [v.id, i + 1]));
   const cents = (v) => (golfData ? golfData.comparisonCents(details.get(keyOf(v)), today) : null);
   const kinds = GOLF_HUB_KINDS.filter((k) => ordered.some((v) => kindOf(v) === k.type));
   const plainText = (h) => String(h || '').replace(/<\/p>\s*<p[^>]*>/g, ' · ').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
@@ -36317,14 +36318,16 @@ function renderGolfHubLayoutPage(oldHtml, venues, query, scope = {}) {
     path: pagePath, name: 'Golf Courses', title: 'Golf Courses | Okanagan Roam', description: 'Golf courses.', bodyClass: 'golf-hub-page', surface: 'golf',
     region: scope.region || null,
     types: kinds, catsFor: (v) => [kindOf(v)], categoryContent: content,
-    keepOrder: true, sorts: GOLF_HUB_SORTS, priceOf: cents,
+    // Golf courses always come first under Recommended, then driving ranges, then indoor golf. Every place is pinned in
+    // that order, so the engine's "closed for the season last" pass cannot lift an open simulator above a closed course.
+    keepOrder: true, pinFirst: (v) => rankOf.get(v.id), sorts: GOLF_HUB_SORTS, priceOf: cents,
     listFor: (sort, mixed) => (sort === 'price-asc' || sort === 'price-desc') ? (() => { const priced = mixed.filter((v) => cents(v) != null).sort((a, b) => (cents(a) - cents(b)) * (sort === 'price-desc' ? -1 : 1) || byName(a, b)); return [...priced, ...mixed.filter((v) => cents(v) == null).sort(byName)]; })() : null,
     photoKeyFor: (v) => curatedPhotoKey(v, 'golf'), cardExtraHtml: info, cardStatus: true,
     features: ['kid_friendly', 'dog_friendly', 'lake_view', 'great_groups', 'patio'],
     search: { label: 'Search golf courses', placeholder: 'Search by course name or town...' },
     allLabel: '✨ All golf',
     cardOptsExtra: { priceAllowed: () => false },
-    sortHelp: { summary: 'How sorting works', text: 'Recommended puts the best-rated courses with the most reviews first, then driving ranges and indoor golf; places closed for the season move lower down. Price sorting uses each course’s standard adult green fee for its standard round, at prime time in peak season, as published by the course. Places with no published fee come last.' },
+    sortHelp: { summary: 'How sorting works', text: 'Recommended lists golf courses first, best-rated with the most reviews at the top and courses closed for the season after the open ones, then driving ranges, then indoor golf. Price sorting uses each course’s standard adult green fee for its standard round, at prime time in peak season, as published by the course. Places with no published fee come last.' },
   }, ordered, filter);
   return subPageInHubLayout(hub, oldHtml, pagePath, pagePath, {});
 }
