@@ -1182,12 +1182,12 @@ function ownWordsFit(v, ctx) {
   for (const w of words) if (!kindWords.has(w) && !kindWords.has(w.replace(/s$/, ''))) n += has(name, w) ? 25 : has(own, w) ? 18 : 0;
   return Math.min(50, n);
 }
-// Indoor test 17: the owner's own kind is the asked one (+12), and the place is Complete & Verified (+4 more).
+// Indoor test 17: the owner’s own kind is the asked one (+25, more than a rating or a description word weighs), and the place is Complete & Verified (+5 more).
 function ownerKindFit(v, ctx) {
   if (!v || v.type !== 'indoor' || !(ctx.plannerKinds || []).length || !Array.isArray(v.indoorKinds) || !v.indoorKinds.length) return 0;
   const own = v.indoorKinds.flatMap((k) => tripRequirements.INDOOR_KIND_PLANNER[k] || []);
   if (!ctx.plannerKinds.some((k) => own.includes(k))) return 0;
-  return 12 + (v.completeVerified ? 4 : 0);
+  return 25 + (v.completeVerified ? 5 : 0);
 }
 // Indoor test 4 (2026-11-19; Lauren: "couples massage Kelowna Saturday" planned another spa): what a spa request names, and
 // how many of those its own words say (its name, story, Known for and Groups lines, its kind). "couples massage" -> 2 for a
@@ -1608,7 +1608,9 @@ function scoreVenue(v, ctx) {
   // ... and one open on the planned day beats one its own week lists closed all that day.
   if (v.type === 'indoor' && (ctx.tripDate || ctx.startWeekday) && dayClosedAllDay(v, /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) ? ctx.tripDate : null, ctx.startWeekday)) add('closed_that_day', -35, null);
   // Indoor test 4 (2026-11-19): a spa whose own words say the massage, facial, couples or hydrotherapy asked for comes first.
-  { const sf = spaFocusHits(v, ctx); if (sf) add('spa_focus', 30 + sf * 25, null); }
+  // Indoor test 17: for a place that is a spa only by its own description (no owner kind), less than the owner's kind
+  // weighs, so an owner-confirmed spa stays first ("a massage in Summerland").
+  { const sf = spaFocusHits(v, ctx); if (sf) add('spa_focus', v.type === 'indoor' && !(Array.isArray(v.indoorKinds) && v.indoorKinds.length) && (ctx.plannerKinds || []).length ? Math.min(11, 30 + sf * 25) : 30 + sf * 25, null); }
   // 2026-10-28: "a spa" puts a destination spa (Scandinave's hot pools and saunas) ahead of a hotel treatment room or a
   // massage studio.
   if (SPA_ASKED_RE.test(ctx.queryText || '') && spaPlace(v)) {

@@ -417,3 +417,41 @@ test('Indoor test 16: "<activity> in <town> <day> 7pm then dinner" starts that k
   }
   assert.deepEqual(fails, []);
 });
+
+// Indoor test 17 (2026-11-19; Megan's bouldering gym: "climbing Kelowna Saturday" read "climbing" as a word and listed trails
+// and another gym first, « escalade » read as outdoor rock climbing and found nothing, and her owner-confirmed gym came
+// last alphabetically): the plain activity words and their French forms are read as the kind, for every indoor kind that
+// has one. In a town with that kind, its places come first; the owner-confirmed one before a better-rated place that is
+// the kind only by its description (and before trails that mention a climb); "then dinner" and "with my 7 year old" keep it.
+const PLAIN = {
+  climbing: { en: ['climb in {T}', 'climbing {T} saturday', 'my 7 year old wants to climb in {T}'], fr: ['escalade à {T} samedi', 'escalade intérieure à {T}', 'faire de l’escalade à {T}'], kids: true },
+  bowling: { en: ['bowl in {T}', 'go bowl in {T} tonight', 'bowling {T} saturday'], fr: ['quilles à {T}', 'jouer aux quilles à {T} samedi', 'quilles à {T} ce soir'], kids: true },
+  pool: { en: ['swim in {T}', 'swimming {T} saturday', 'somewhere to swim with my 7 year old in {T}'], fr: ['nager à {T}', 'natation à {T}', 'baignade intérieure à {T}'], kids: true },
+  classes: { en: ['paint in {T}', 'pottery {T}', 'painting in {T} saturday'], fr: ['peindre à {T}', 'poterie à {T}', 'peinture à {T} samedi'], kids: true },
+  spa: { en: ['spa {T}', 'massage {T} saturday', 'a massage in {T}'], fr: ['spa à {T}', 'massage à {T}', 'un massage à {T} samedi'] },
+  cinema: { en: ['movie {T}', 'film in {T} tonight', 'a movie with my 7 year old in {T}'], fr: ['film à {T}', 'cinéma à {T} ce soir', 'voir un film à {T}'], kids: true },
+  museum: { en: ['museum {T}', 'a museum in {T} saturday', 'museum with my 7 year old in {T}'], fr: ['musée à {T}', 'un musée à {T} samedi', 'musées à {T}'], kids: true },
+  gallery: { en: ['gallery {T}', 'a gallery in {T} saturday', 'galleries in {T}'], fr: ['galerie à {T}', 'une galerie à {T} samedi', 'galeries à {T}'] },
+};
+test('Indoor test 17 sweep (G5): plain activity words (climb, bowl, swim, paint, spa, massage, movie, film, museum, gallery) and their French forms are the kind; the owner-confirmed place comes first, before a better-rated description match and any trail; "then dinner" and "with my 7 year old" keep the kind', () => {
+  const fails = [];
+  // Better-rated places that are each kind only by their description, and trails that mention a climb.
+  const desc = { climbing: 'An indoor climbing wall and bouldering cave.', bowling: 'Ten-pin bowling lanes and an arcade.', pool: 'An indoor swimming pool with lane swim.', classes: 'Pottery classes and paint nights.',
+    spa: 'Massage, facials and a day spa.', cinema: 'A movie theatre with two screens.', museum: 'A small museum of local history.', gallery: 'An art gallery with local painters.' };
+  for (const [kind, d] of Object.entries(desc)) mk({ name: `Summerland ${kind} Hall G5`, cuisine: null, description: d, rating: 4.95, reviews: 2000 });
+  mk({ name: 'Giants Head Climb Trail G5', type: 'outdoor', cuisine: null, description: 'A steep climb to the summit with views; climbing the switchbacks takes an hour.', rating: 4.9, reviews: 900 });
+  for (const [kind, k] of Object.entries(PLAIN)) {
+    for (const [lang, q0] of ['en', 'fr'].flatMap((l) => k[l].map((q) => [l, q])).concat(k.kids ? [['en', `${k.en[0]} then dinner`]] : [])) {
+      const q = q0.replace('{T}', TOWN);
+      const p = app.runTripPlan({ text: q }, NOW);
+      const items = itemsOf(p);
+      const names = items.map((x) => `${x.venue.name}[${x.venue.type}]`).slice(0, 6).join(' | ');
+      const mine = items.findIndex((x) => x.venue.id === placed[kind].id);
+      if (mine < 0) { fails.push(`${lang} ${kind}: "${q}" leaves it out (${names})`); continue; }
+      const firstPlace = items.findIndex((x) => !['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'winery'].includes(x.venue.type));
+      if (firstPlace !== mine) fails.push(`${lang} ${kind}: "${q}" leads with ${items[firstPlace] && items[firstPlace].venue.name} (${names})`);
+      if (/dinner/.test(q) && !items.some((x) => x.venue.type === 'restaurant')) fails.push(`${kind}: "${q}" has no dinner (${names})`);
+    }
+  }
+  assert.deepEqual(fails, []);
+});
