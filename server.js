@@ -44,6 +44,7 @@ const { renderPagesPage, renderRoamNowPage, renderEventsPage, renderEmailPage, r
 const { renderSearchTermsPage } = require('./search-terms-page');
 const { renderOutboundPage } = require('./outbound-page');
 const placesToStay = require('./places-to-stay');
+const tripStays = require('./trip-stays');
 const gscReport = require('./gsc-report');
 // What is clickable on one business or event page (2026-11-05): read from the page itself, so each sheet shows that page's
 // own buttons and links. The server asks its own public page (no scripts run, so nothing is counted); kept 10 minutes.
@@ -7316,6 +7317,16 @@ function tripPlannerV3ActiveFor(req) {
 function tripPlanApiEnabled() {
   return isTripPlannerV2Enabled() || tripPlannerV3Mode() !== 'off';
 }
+// Build My Trip "Where to stay" (step 2, 2026-11-20, trip-stays.js): trip dates, party size and a base stay, behind
+// TRIP_STAYS (off by default: the planner, its API and /trip are exactly as before and the new inputs are ignored).
+// /trip?stays=1 (and POST /api/trip/plan?stays=1, which that page sends) turns it on for that request only, so the owner
+// can try it on the live site first. /trip?stays=1 is noindex like every /trip URL with a query.
+function isTripStaysEnabled() {
+  return /^(1|on|true|yes)$/i.test(String(process.env.TRIP_STAYS || '').trim());
+}
+function tripStaysEnabledFor(query) {
+  return isTripStaysEnabled() || String((query && query.stays) || '') === '1';
+}
 // Loaded lazily for the same reason as the interpreter (see
 // discoveryIntentModule): server.js still starts without the file.
 function tripPlannerModule() {
@@ -7605,7 +7616,19 @@ function halloweenTripStart(days, now) {
   return from < today ? today : from;
 }
 
-function parseTripPlanBody(body) {
+// opts.stays (TRIP_STAYS or the ?stays=1 preview): the optional trip dates and party size ({ stay: { arrive, leave,
+// adults, kids } }) are read; otherwise a "stay" field is ignored, so the plan is the same as without it.
+function parseTripPlanBody(body, opts = {}) {
+  let stay = null;
+  if (body && typeof body === 'object' && !Array.isArray(body) && Object.prototype.hasOwnProperty.call(body, 'stay')) {
+    if (opts.stays) {
+      const st = tripStays.parseTripStayInput(body.stay);
+      if (st.error) return { error: st.error };
+      stay = st.value;
+    }
+    body = { ...body };
+    delete body.stay;
+  }
   const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned', 'overrides', 'swap'];
   const unexpected = Object.keys(body || {}).filter((k) => !allowed.includes(k));
   if (unexpected.length) return { error: `Unexpected field(s): ${unexpected.join(', ')}` };
@@ -7673,7 +7696,55 @@ function parseTripPlanBody(body) {
       || (w.times !== undefined && (!w.times || typeof w.times !== 'object' || Array.isArray(w.times) || Object.keys(w.times).length > 28 || !Object.entries(w.times).every(([k, m]) => swapKey(k) && Number.isInteger(m) && m >= 0 && m < 1440)))) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>", id: <venue id>, locked: ["<day>-<daypart>"], times: { "<day>-<daypart>": <minutes> } }.' };
     swap = { key: w.key, type: w.type, ...(w.id !== undefined ? { id: w.id } : {}), ...(w.locked !== undefined ? { locked: w.locked.slice() } : {}), ...(w.times !== undefined ? { times: { ...w.times } } : {}), ...(w.stops !== undefined ? { stops: w.stops.map((x) => ({ ...x })) } : {}) };
   }
-  return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap } };
+  return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap, ...(stay ? { stay } : {}) } };
+}
+
+// Every place to stay with a map location, its stay_info facts and what the "Where to stay" card shows.
+function tripStayCandidates() {
+  let rows = [];
+  try { rows = db.prepare("SELECT * FROM venues WHERE type = 'stay' AND redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL ORDER BY id").all().map(rowToVenue); } catch (e) { rows = []; }
+  const infoById = new Map();
+  try {
+    for (const r of db.prepare('SELECT venue_id, info_json FROM stay_info').all()) {
+      try { const o = JSON.parse(r.info_json); if (o && typeof o === 'object' && !Array.isArray(o)) infoById.set(r.venue_id, o); } catch (e) { /* skip */ }
+    }
+  } catch (e) { /* no stay_info table */ }
+  return rows.filter((v) => REGION_LABELS[v.region]).map((v) => {
+    const photo = v.image_url && /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(v.image_url).trim()) ? String(v.image_url).trim() : null;
+    return {
+      id: v.id, name: v.name, region: v.region, regionLabel: REGION_LABELS[v.region],
+      kind: placesToStay.stayKindLabel(v.cuisine, 'en') || null, kindFr: placesToStay.stayKindLabel(v.cuisine, 'fr') || null,
+      latitude: v.latitude, longitude: v.longitude, photo,
+      url: placesToStay.stayPath(v, 'en'), urlFr: placesToStay.stayPath(v, 'fr'),
+      info: infoById.get(v.id) || null,
+    };
+  });
+}
+// The planner with the trip inputs: the arrival date is the plan's start date (unless the Dates control set one), and
+// a day plan or multi-day plan covers the stay (one day per night, plus the last day; at most 7) unless the visitor
+// set the number of days. Then the plan gets its "whereToStay" block when a stay fits. Without inputs, the plan is
+// the same as runTripPlan's plus that block.
+function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
+  const stay = args.stay || null;
+  const base = { ...args };
+  delete base.stay;
+  if (stay && stay.arrive && !(base.overrides && base.overrides.startDate)) base.overrides = { ...(base.overrides || {}), startDate: stay.arrive };
+  let plan = run(base, now);
+  if (stay && stay.arrive && stay.leave && plan && ['multi_day', 'day_plan'].includes(plan.kind) && !(base.overrides && base.overrides.days !== undefined)) {
+    const want = Math.min(7, tripStays.daysBetween(stay.arrive, stay.leave) + 1);
+    if (want !== ((plan.days || []).length || 1)) {
+      try { const longer = run({ ...base, overrides: { ...(base.overrides || {}), days: want } }, now); if (longer && ['multi_day', 'day_plan'].includes(longer.kind)) plan = longer; } catch (e) { /* keep the plan as asked */ }
+    }
+  }
+  return withTripStays(plan, stay, now);
+}
+function withTripStays(plan, stay, now = new Date()) {
+  if (!plan || typeof plan !== 'object') return plan;
+  try {
+    const block = tripStays.whereToStay(plan, stay, tripStayCandidates(), todayLocal(now));
+    if (block) plan.whereToStay = block;
+  } catch (e) { console.error(`[trip] where to stay: ${e.message}`); }
+  return plan;
 }
 
 // The weekday of day 1, only when the request names a date ("tonight",
@@ -45641,7 +45712,7 @@ function tripSamplePlan(now = Date.now()) {
 // ?region= from the town pages, campaign tags) is noindex, follow and canonical to /trip, so no new indexable page.
 const TRIP_PAGE_TITLE = 'Okanagan Trip Planner: Free Day-by-Day Itinerary | Okanagan Roam';
 const TRIP_PAGE_DESCRIPTION = 'Plan an Okanagan trip in one sentence: a free day-by-day itinerary for Kelowna, Penticton, Vernon and wine country, built from places open on your dates.';
-function renderTripPlannerV3Page({ preview = false, noindex = false } = {}) {
+function renderTripPlannerV3Page({ preview = false, noindex = false, stays = null } = {}) {
   if (!tripPlannerV3PageModule) return renderTripPlannerPage(isTripPlannerV2Enabled());
   const canonical = 'https://okanaganroam.com/trip';
   let tripTrayHtml = '';
@@ -45676,6 +45747,8 @@ function renderTripPlannerV3Page({ preview = false, noindex = false } = {}) {
     appScriptSrc: APP_JS_SRC,
     preview,
     noindex,
+    // Where to stay (2026-11-20): the Dates and Guests row, only with TRIP_STAYS or /trip?stays=1 ('preview').
+    ...(stays ? { stays } : {}),
   }));
 }
 
@@ -74882,11 +74955,15 @@ const server = http.createServer(async (req, res) => {
       } catch (err) {
         return sendJSON(res, 400, { error: 'Malformed JSON body.' });
       }
-      const parsed = parseTripPlanBody(body);
+      const staysOn = tripStaysEnabledFor(query);
+      const parsed = parseTripPlanBody(body, { stays: staysOn });
       if (parsed.error) return sendJSON(res, 400, { error: parsed.error });
       // Weekly specials (2026-10-27): a stop on its special's day says so, added after planning like the deals.
       try {
-        const planResult = withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value)))));
+        // Where to stay (2026-11-20): only with TRIP_STAYS or ?stays=1; otherwise exactly the plan as before.
+        const planResult = staysOn
+          ? runTripPlanWithStay(parsed.value, (a, n) => withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(a, n))))))
+          : withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value)))));
         // Stage 1 demand log: which businesses this plan showed (anonymous, never blocks the reply).
         try { req.__ip = requestClientIp(req); tripDemandLog.record(req, 'shown', tripDemand.collectVenueIds(planResult)); } catch (e) { /* logging must never break the planner */ }
         return sendJSON(res, 200, planResult);
@@ -74913,7 +74990,7 @@ const server = http.createServer(async (req, res) => {
       // Any query (?q= examples and shared plans, ?region=, campaign tags): noindex, follow, canonical /trip (trip SEO).
       const tripHasQuery = Object.keys(query || {}).length > 0;
       if (tripPlannerV3ActiveFor(req)) {
-        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview', noindex: tripHasQuery });
+        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview', noindex: tripHasQuery, stays: isTripStaysEnabled() ? 'on' : tripStaysEnabledFor(query) ? 'preview' : null });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
         return res.end(html);
       }
@@ -77691,6 +77768,7 @@ module.exports = {
   tripPlannerLabels,
   parseTripPlanBody,
   runTripPlan, runTripPlanCore, ownerClosureCount,
+  runTripPlanWithStay, withTripStays, tripStayCandidates, isTripStaysEnabled, tripStaysEnabledFor,
   // Planner (2026-10-27): the happy hour crawl.
   tripHappyHourAsk,
   tripHappyHourChain,
