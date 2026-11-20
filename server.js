@@ -36207,6 +36207,36 @@ function renderGolfHubLayoutPage(oldHtml, venues, query, scope = {}) {
   return subPageInHubLayout(hub, oldHtml, pagePath, pagePath, {});
 }
 
+// Guides in the site's card look (2026-11-20, batch 3): one stylesheet for the Guides index and every guide article.
+const GUIDES_REFRESH_CSS = `<style id="guides-refresh">
+  /* Guides in the site's card look (2026-11-20, batch 3): styling only; the content and markup are unchanged. */
+  body.guides-index-page .guides-group > h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; }
+  body.guides-index-page .guide-card a { border-radius: 20px; background: #fffdf7; border: 1px solid rgba(27,43,58,0.08); box-shadow: 0 6px 18px rgba(27,43,58,0.06); transition: transform .18s ease, box-shadow .18s ease; }
+  body.guides-index-page .guide-card a:hover { transform: translateY(-2px); box-shadow: 0 14px 28px -18px rgba(27,43,58,0.45); }
+  body.guides-index-page .guide-card-title { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.08rem; color: #1b2b3a; }
+  body.guides-index-page .guides-town { background: #fffdf7; border: 1px solid rgba(27,43,58,0.08); border-radius: 16px; padding: 2px 16px; margin: 0 0 10px; }
+  body.guides-index-page .guides-town-links a { background: #fffdf7; }
+  @media (max-width: 559px) {
+    /* On a phone each guide is a compact row (photo left, words right), like the Destinations and Categories cards. */
+    body.guides-index-page .guide-grid { grid-template-columns: 1fr; gap: 12px; }
+    body.guides-index-page .guide-card a { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: stretch; }
+    body.guides-index-page .guide-card-img { aspect-ratio: auto; min-height: 112px; height: 100%; }
+    body.guides-index-page .guide-card-body { padding: 12px 14px; gap: 4px; }
+    body.guides-index-page .guide-card-title { font-size: 1rem; }
+    body.guides-index-page .guide-card-desc { font-size: .84rem; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  }
+  body.ski-guide-page .ski-guide-jump a { background: #fffdf7; border: 1px solid rgba(27,43,58,0.18); color: #1b2b3a; min-height: 40px; display: inline-flex; align-items: center; box-sizing: border-box; }
+  body.ski-guide-page .ski-guide-jump a:hover { background: rgba(27,43,58,0.06); }
+  body.ski-guide-page .ski-guide-resort { background: #fffdf7; border: 1px solid rgba(27,43,58,0.08); border-radius: 22px; padding: 20px 22px; box-shadow: 0 6px 18px rgba(27,43,58,0.06); margin-top: 22px; }
+  body.ski-guide-page .ski-guide-resort > h2 { margin-top: 0; }
+  body.ski-guide-page .ski-guide-list { list-style: none; padding-left: 0; }
+  body.ski-guide-page .ski-guide-list li { padding: 12px 0; margin: 0; border-top: 1px solid rgba(27,43,58,0.08); }
+  body.ski-guide-page .ski-guide-list li:first-child { border-top: 0; padding-top: 4px; }
+  body.ski-guide-page .ski-guide-list li > a:first-child, body.ski-guide-page .ski-guide-list li > strong:first-child a { font-weight: 800; color: #1b2b3a; }
+  body.ski-guide-page table.patio-picks { border-radius: 16px; overflow: hidden; }
+  @media (max-width: 640px) { body.ski-guide-page .ski-guide-resort { padding: 16px 16px; border-radius: 18px; } }
+</style>`;
+
 function renderDogHubPage(venues, filter = null, now = new Date()) {
   const f = { types: [], features: [], regions: [], ...(filter || {}) };
   const sort = DOG_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
@@ -48372,6 +48402,7 @@ ${renderAnalyticsHeadHtml('guide')}
   body.ski-guide-page .ski-guide-list { padding-left: 1.2em; margin: 0; }
   body.ski-guide-page .ski-guide-list li { margin: 0 0 10px; line-height: 1.55; }
 </style>
+${GUIDES_REFRESH_CSS}
 </head>
 <body class="golf-page ski-guide-page">
   ${renderGolfTripTrayHtml()}
@@ -48517,6 +48548,7 @@ ${CATEGORY_BANNER_STYLE}
   body.ski-guide-page .patio-picks th, body.ski-guide-page .patio-picks td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid rgba(27,43,58,.12); line-height: 1.5; }
   body.ski-guide-page .patio-picks th { width: 38%; font-weight: 700; }
 </style>
+${GUIDES_REFRESH_CSS}
 </head>
 <body class="golf-page ski-guide-page">
   ${renderGolfTripTrayHtml()}
@@ -48772,6 +48804,7 @@ ${CATEGORY_BANNER_STYLE}
   body.ski-guide-page .patio-picks thead th { font-size: .85rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-muted, #6B5D54); }
   body.ski-guide-page .patio-picks tbody th { width: 38%; font-weight: 700; }
 </style>
+${GUIDES_REFRESH_CSS}
 </head>
 <body class="golf-page ski-guide-page">
   ${renderGolfTripTrayHtml()}
@@ -49725,6 +49758,7 @@ ${renderAnalyticsHeadHtml('hub')}
   body.guides-index-page .guides-town-links a:hover { background: rgba(27,43,58,0.06); }
   body.guides-index-page .guides-town-links span { font-weight: 600; opacity: .8; }
 </style>
+${GUIDES_REFRESH_CSS}
 </head>
 <body class="golf-page guides-index-page">
   ${renderGolfTripTrayHtml()}
