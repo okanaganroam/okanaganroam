@@ -25570,6 +25570,34 @@ test('Smarter search: guide topics go to the guide; typos in a place name find t
   assert.equal(go('xqzvbn plorf'), '/search?q=xqzvbn%20plorf');
 })));
 
+test('Search: a one-word typo of a name\'s distinctive first word offers the place; town and shared first words do not (2026-11-19)', () => withDiscoveryFlag('on', () => withSmartSearchFixtures(() => {
+  const add = (name, region, type, slug) => {
+    db.prepare('INSERT INTO venues (name, region, type, slug, description, rating, reviews) VALUES (?, ?, ?, ?, ?, ?, ?)').run(name, region, type, slug, 'One-word typo fixture.', 4.3, 40);
+    return db.prepare('SELECT * FROM venues WHERE slug = ? AND region = ?').get(slug, region);
+  };
+  const made = [
+    add('Barriquetta & Java', 'vernon', 'cafe', 'barriquetta-java'),
+    add('Kelowna Typo Taproom', 'kelowna', 'brewery', 'kelowna-typo-taproom'),
+    add('Quorvex Pizza', 'kelowna', 'restaurant', 'quorvex-pizza'),
+    add('Quorvex Sushi', 'penticton', 'restaurant', 'quorvex-sushi'),
+  ];
+  try {
+    const names = (q) => app.smartFuzzyVenues(q, app.interpretDiscoveryText(q)).map((m) => m.venue.name);
+    // "barriqure" for Barrique & Java: the distinctive first word, one letter off.
+    assert.deepEqual(names('barriquetra'), ['Barriquetta & Java']);
+    assert.equal(app.heroSearchTarget('barriquetra').url, '/vernon/cafes/barriquetta-java');
+    assert.ok(app.renderSearchPage(app.runDiscovery('barriquetra', { limit: 480 })).includes('Did you mean'));
+    // A misspelled town never jumps to a place that starts with the town's name.
+    assert.ok(!names('kelowan').includes('Kelowna Typo Taproom'));
+    // A first word two places share is not distinctive.
+    assert.deepEqual(names('quorvx'), []);
+    // Short words are left alone.
+    assert.deepEqual(names('javva'), []);
+  } finally {
+    for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
+})));
+
 test('Smarter search: /search uses the standard cards, name matches first, Show more past 48, helpful empty pages and a French page', () => withDiscoveryFlag('on', () => withSmartSearchFixtures(() => withDiscoveryServer(async (base) => {
   const page = async (q, prefix = '') => { const r = await fetch(`${base}${prefix}/search?q=${encodeURIComponent(q)}`, { redirect: 'manual' }); return { r, html: await r.text() }; };
   // Standard listing cards: photo, Favorite / Add to trip, the sort and noindex.

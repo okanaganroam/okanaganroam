@@ -5583,13 +5583,30 @@ function smartEditDistance(a, b, max) {
 const SMART_NAME_GENERIC = new Set(['the', 'a', 'winery', 'wineries', 'estate', 'estates', 'family', 'vineyard', 'vineyards', 'cellars', 'cellar', 'wines', 'wine',
   'restaurant', 'cafe', 'coffee', 'brewing', 'brewery', 'company', 'co', 'inc', 'ltd', 'bistro', 'bar', 'grill', 'kitchen', 'house', 'and', 'at', 'of', 'distillery', 'distilling']);
 const smartCore = (folded) => { const w = folded.split(' ').filter((x) => !SMART_NAME_GENERIC.has(x)); return w.length ? w.join(' ') : folded; };
+// A name's distinctive first word (2026-11-19, "barriqure" found nothing): 6+ letters, not a town's name, and the first
+// word of only one place's name, so a one-word typo of it can offer that place ("Barrique & Java") without a misspelled
+// town ("kelowan") jumping to "Kelowna Beer Institute".
+let smartLeadWordIndex = null;
+function smartDistinctLeadWords(venues) {
+  if (smartLeadWordIndex && smartLeadWordIndex.venues === venues) return smartLeadWordIndex.words;
+  const towns = new Set();
+  for (const label of Object.values(REGION_LABELS)) smartFold(label).split(' ').forEach((w) => towns.add(w));
+  const count = new Map();
+  for (const v of venues) { const w = smartCore(smartFold(v.row.name)).split(' ')[0]; if (w) count.set(w, (count.get(w) || 0) + 1); }
+  const words = new Set([...count].filter(([w, n]) => n === 1 && w.length >= 6 && !towns.has(w)).map(([w]) => w));
+  smartLeadWordIndex = { venues, words };
+  return words;
+}
 function smartFuzzyVenues(text, intent) {
   const raw = smartFold(text);
   const variants = uniqueList([smartCore(raw), smartCore(smartTopicWords(raw, intent).join(' '))]).filter((q) => q.replace(/ /g, '').length >= 4 && q.split(' ').length <= 5);
   if (!variants.length) return [];
   const found = [];
-  for (const v of discoverySearchVenues()) {
+  const searchVenues = discoverySearchVenues();
+  const leadWords = smartDistinctLeadWords(searchVenues);
+  for (const v of searchVenues) {
     const name = smartFold(v.row.name), core = smartCore(name);
+    const lead = core.split(' ')[0];
     let best = 99;
     for (const q of variants) {
       const k = q.split(' ').length;
@@ -5597,6 +5614,8 @@ function smartFuzzyVenues(text, intent) {
       const cands = [name, core];
       // A name's first words only for a request of two or more words ("mision hill").
       if (k >= 2) cands.push(name.split(' ').slice(0, k).join(' '), core.split(' ').slice(0, k).join(' '));
+      // A one-word request of 6+ letters: a name's distinctive first word too ("barriqure" -> Barrique & Java).
+      else if (q.length >= 6 && leadWords.has(lead)) cands.push(lead);
       for (const c of cands) { const d = smartEditDistance(q, c, max); if (d <= max && d < best) best = d; }
     }
     if (best < 99) found.push({ venue: v.row, distance: best });
