@@ -244,13 +244,14 @@ test('9. The price typer is worded by kind ("What it is (like 60-min jump pass)"
     const html = await getText(`${lang === 'fr' ? '/fr' : ''}/owner/${t}/menu`);
     const cfg = JSON.parse(/window\.MENU_CFG = (\{[\s\S]*?\});\s*<\/script>/.exec(html)[1]);
     if (lang === 'en') {
-      assert.equal(cfg.t.dishName, 'What it is (like 60-min jump pass)');
-      assert.equal(cfg.t.namePh, 'like 60-min jump pass');
+      // Indoor test 17: a gym that climbs and jumps is named by its day pass (his $20 is the bouldering day pass).
+      assert.equal(cfg.t.dishName, 'What it is (like Day pass)');
+      assert.equal(cfg.t.namePh, 'like Day pass');
       assert.equal(cfg.t.sectionPh, 'Section name, like Passes');
       assert.doesNotMatch(cfg.t.typeIntro, /each price with its price/);
       assert.match(cfg.t.typeIntro, /Add each one with its price/);
     } else {
-      assert.match(cfg.t.dishName, /ex\. Saut de 60 min/);
+      assert.match(cfg.t.dishName, /ex\. Laissez-passer d’un jour/);
       assert.equal(cfg.t.sectionPh, 'Nom de la section, ex. Laissez-passer');
       assert.doesNotMatch(cfg.t.typeIntro, /chaque tarif avec son prix/);
     }
