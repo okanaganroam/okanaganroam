@@ -1688,6 +1688,21 @@
     return { text: t.slice(0, cut).trim().replace(/[,;:\u2013\u2014-]+$/, '').trim(), rest: t.slice(cut).trim() };
   }
   function overMax(boxId, max){ var b = el(boxId); if (!b) return false; var f = fitLine(b.value, max); if (!f.rest) return false; b.value = f.text; S.nudge = fill(TOUR && T.fitRestTour ? T.fitRestTour : T.fitRest || '{max}', { max: max, rest: f.rest.length > 90 ? f.rest.slice(0, 88) + '…' : f.rest }); return f.text; }
+  // Indoor test 17 (2026-11-19; Megan added her words after research's Groups line and Save cut HER words; the test-8 and
+  // test-16 rule held only for a chip or size tap): over the limit at Save, on every path (chip, size, typing after research
+  // or after chips), research's sentences go first, never the owner's words; only her own words over the limit alone are
+  // kept to the whole sentences that fit, and the message says so. -> false (fits), { text, go: true } (research trimmed:
+  // save as it is now), or { text, go: false } (her own words cut: shown, saved on the next Save).
+  function overMaxOwn(boxId, max, key){
+    var b = el(boxId); if (!b) return false;
+    var v = String(b.value || '').trim(); if (v.length <= max) return false;
+    var pre = String(((CUR.visit_rows || {})[key]) || '').trim();
+    if (pre && (C.visitResearch || []).indexOf(key) >= 0) {
+      var tr = trimResearch(v, pre, max, null);
+      if (tr) { b.value = tr.v; trimNoteSet(boxId, tr.rest); if (tr.v.length <= max) return { text: tr.v, go: true }; }
+    }
+    var r = overMax(boxId, max); return r === false ? false : { text: r, go: false };
+  }
   function countText(n, max){ return n > max && T.countOver ? fill(T.countOver, { n: n, max: max, d: n - max }) : n >= max && T.countFull ? fill(T.countFull, { max: max }) : fill(T.countOf || '{n} / {max}', { n: n, max: max }); }
   function countLine(boxId, value, max){ var n = String(value || '').length; return '<p class="su-hint su-count' + (n >= max ? ' su-count-full' : '') + '" id="' + boxId + 'Count" data-count="' + boxId + '" data-max="' + max + '" aria-live="polite">' + h(countText(n, max)) + '</p>'; }
   function countUpdate(box){ if (!box || !box.id) return; var c = el(box.id + 'Count'); if (!c) return; var max = +c.getAttribute('data-max'), n = box.value.length; c.textContent = countText(n, max); c.className = 'su-hint su-count' + (n >= max ? ' su-count-full' : ''); }
@@ -4508,7 +4523,7 @@
       return saveAll('flights', fl, null, null, function(){ Object.keys(bi2).forEach(function(kk){ if (bi2[kk] == null) delete BI[kk]; else BI[kk] = bi2[kk]; }); if (fb2.noFlights) { S.savedFlight = null; CUR.flight_fee = null; } else if (ff <= C.feeLiveMax) { S.savedFlight = ff; CUR.flight_fee = ff; CUR.flight_fee_waiting = null; } else if (ff !== S.savedFlight) CUR.flight_fee_waiting = ff; fb2.feeGuessed = false; S.togoGuessed = false; });
     }
     if (k === 'brewGroupsSave') {
-      var gFit = overMax('suGroupsLine', 180); if (gFit !== false) { S.brew.groups = gFit; return render(); }
+      var gFit = overMaxOwn('suGroupsLine', 180, 'groups'); if (gFit) { S.brew.groups = gFit.text; if (!gFit.go) return render(); }
       readBrew(); var gline = String(S.brew.groups || '').trim(), gbu = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null;
       // Tour test 14 (Lucía): "Groups of 6 or moreMore than 4 people?… welcome.: please book ahead." went live. Two sentences
       // run together (a lowercase letter then a capital, or ".:") are asked about once; Save again keeps the line.
@@ -4668,7 +4683,7 @@
       return saveAll('booking', bl, null, null, function(){ if (bk0) TI.book = bk0; if (blinkCh) CUR.booking_url = bu1; });
     }
     if (k === 'bringSave') {
-      var brFit = overMax('suBring', BRING_MAX); if (brFit !== false) { S.tour.bring = brFit; return render(); }
+      var brFit = overMaxOwn('suBring', BRING_MAX, 'good_to_know'); if (brFit) { S.tour.bring = brFit.text; if (!brFit.go) return render(); }
       // Tour test 16: no double spaces in the saved line (a space typed after a chip's ". ").
       readTour(); var br = String(S.tour.bring != null ? S.tour.bring : '').replace(/([^\s])[ \u00a0]{2,}(?=\S)/g, '$1 ').trim();
       if (!br) { S.nudge = T.bringNeed; return render(); }
@@ -4763,7 +4778,7 @@
       S.storySent = S.story; return saveAll('story', [storyOut(S.story)], null, null, storyWaiting); }
     if (k === 'moveLink') { var ln = el('suLine'), bu = el('suBookUrl'), got = linkIn(ln ? ln.value : ''); if (!got || !bu) return; bu.value = got.url; S.bookUrl = got.url; ln.value = got.rest; S.visit.reservations = got.rest; S.linkOffer = ''; S.nudge = ''; render(); var b2 = el('suBookUrl'); if (b2) b2.scrollIntoView({ block: 'center' }); return; }
     if (k === 'lineSave') {
-      var lnFit = overMax('suLine', 180); if (lnFit !== false) { S.visit[p[2]] = lnFit; return render(); }
+      var lnFit = overMaxOwn('suLine', 180, p[2]); if (lnFit) { S.visit[p[2]] = lnFit.text; if (!lnFit.go) return render(); }
       var step = p[1], key = p[2], line = el('suLine').value.trim();
       // The booking link (pub test 9): its own box on this screen; a link in the line is offered a move, never refused.
       var bkUrl = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null; if (bkUrl !== null) S.bookUrl = bkUrl;

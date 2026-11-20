@@ -96,3 +96,77 @@ test('G1. The price typer: for EVERY kind and EVERY price unit (per person, per 
   await ok(change(tj, { indoor_info: { kinds: ['climbing'], length: '1-2h', age: 'all', year: 'all' }, indoor_price: 22 }));
   assert.equal((await menuCfg(tj)).first, '60-min jump pass');
 });
+
+// G2. Research's Groups and Good to know lines, as research left them on Megan's real listing.
+const RES_GROUPS = 'Kids birthday parties: 1.5 hours, up to 16 kids, private mezzanine room and a staff climbing coach.';
+const RES_GTK = 'Wednesday is route-setting day at OG Banks: opens at 2:30 PM. Chalk and shoes for rent at the front desk; bring water.';
+const HER_GROUPS = 'Weekend kids birthday parties (1.5 hrs, up to 16 kids). Team building events. Youth climbing teams.';
+const HER_GTK = 'Waiver to sign before you climb: sign it online first. Kids under 14 need an adult on the mats. Free lockers by the front desk. Grip socks for the kids zone. Bring a water bottle. Chalk bags for sale. Youth team practice Tuesday and Thursday evenings.';
+const withResearch = (o = {}) => {
+  const v = mk({ name: `Gneiss T17 Research ${n + 1}`, description: 'A bouldering-focused climbing gym with regularly reset problems and training areas.', great_groups: 1, kid_friendly: 1, ...o });
+  db.prepare('INSERT INTO venue_visit_info (venue_id, info) VALUES (?, ?)').run(v.id, JSON.stringify({ rows: [{ label: 'Known for', text: 'Bouldering gym with walls up to 15 ft.' }, { label: 'Groups', text: RES_GROUPS }, { label: 'Good to know', text: RES_GTK }], source_url: 'https://example.com', checked_at: '2026-10-31' }));
+  return v;
+};
+const lineOf = (id, label) => { const i = rowsOf(id); const r = (i.rows || []).concat(i.owner_dropped || []).find((x) => x.label === label); return r ? r.text : ''; };
+const sentences = (x) => String(x).split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+test('G2. Groups and Good to know: over the limit, research\'s words are trimmed first and the owner\'s typed words and taps are never cut, on every path (typing after research, a chip tap, a size tap, typing after chips); her own words alone over the limit keep the whole sentences that fit and say so', async () => {
+  for (const [hash, box, save, key, label, her, max] of [['groups', 'suGroupsLine', 'brewGroupsSave', 'groups', 'Groups', HER_GROUPS, 180], ['bring', 'suBring', 'bringSave', 'good_to_know', 'Good to know', HER_GTK, 320]]) {
+    // Path 1: typing after research's line (her words added at the end of the box).
+    {
+      const v = withResearch(); const t = tokenFor(v.id);
+      await ok(change(t, { indoor_info: { kinds: ['climbing'], length: '1-2h', book: 'no', age: 'all', year: 'all' } }));
+      const s = await openSetup(base, t, { hash });
+      const b = s.doc.getElementById(box);
+      assert.ok(b, `${hash}: ${s.acts().join(' | ')}`);
+      assert.ok(String(b.value).includes(sentences(label === 'Groups' ? RES_GROUPS : RES_GTK)[0].replace(/\.$/, '')), `${hash}: the box starts with research: ${b.value}`);
+      await s.type(box, `${b.value.trim()} ${her}`);
+      await s.click(save);
+      const got = lineOf(v.id, label);
+      for (const x of sentences(her)) assert.ok(got.includes(x.replace(/\.$/, '')), `${hash} typed: her "${x}" kept in "${got}"`);
+      assert.ok(got.length <= max, got);
+    }
+    // Path 2: a chip tap after research, then her words.
+    {
+      const v = withResearch(); const t = tokenFor(v.id);
+      await ok(change(t, { indoor_info: { kinds: ['climbing'], length: '1-2h', book: 'no', age: 'all', year: 'all' } }));
+      const s = await openSetup(base, t, { hash });
+      const chip = s.doc.getElementById('suScreen').querySelectorAll('[data-quick]').find((c) => c.getAttribute('data-box') === box && c.getAttribute('aria-pressed') !== 'true');
+      assert.ok(chip, `${hash}: a chip`);
+      await s.click(`[data-quick="${chip.getAttribute('data-quick')}"]`);
+      const tapped = chip.getAttribute('data-quick');
+      await s.type(box, `${s.doc.getElementById(box).value.trim()} ${her}`);
+      await s.click(save);
+      const got = lineOf(v.id, label);
+      assert.ok(got.includes(tapped.replace(/\.$/, '')), `${hash} chip: her tap "${tapped}" kept in "${got}"`);
+      for (const x of sentences(her)) assert.ok(got.includes(x.replace(/\.$/, '')), `${hash} chip: her "${x}" kept in "${got}"`);
+    }
+    // Path 3 (Groups): a size tap after research, then her words.
+    if (hash === 'groups') {
+      const v = withResearch(); const t = tokenFor(v.id);
+      await ok(change(t, { indoor_info: { kinds: ['climbing'], length: '1-2h', book: 'no', age: 'all', year: 'all' } }));
+      const s = await openSetup(base, t, { hash });
+      await s.click('[data-bgroup="10"]');
+      await s.type(box, `${s.doc.getElementById(box).value.trim()} ${her}`);
+      await s.click(save);
+      const got = lineOf(v.id, label);
+      assert.match(got, /Groups of 10 or more: please book ahead/);
+      for (const x of sentences(her)) assert.ok(got.includes(x.replace(/\.$/, '')), `size: her "${x}" kept in "${got}"`);
+    }
+    // Path 4: no research, her chips then her words, over the limit on her own: the whole sentences that fit, and a message.
+    {
+      const v = mk({ name: `Gneiss T17 Own ${n + 1}`, great_groups: 1 }); const t = tokenFor(v.id);
+      await ok(change(t, { indoor_info: { kinds: ['climbing'], length: '1-2h', book: 'no', age: 'all', year: 'all' } }));
+      const s = await openSetup(base, t, { hash });
+      const long = `${her} ${her.replace(/\.$/, '')} again on Sundays.`;
+      await s.type(box, long);
+      await s.click(save);
+      const shown = s.doc.getElementById(box) ? s.doc.getElementById(box).value : '';
+      assert.ok(shown.length <= max && shown.length > 0, shown);
+      assert.ok(/[.!?]$/.test(shown.trim()), `whole sentences: ${shown}`);
+      assert.ok(long.startsWith(shown.trim().replace(/[.!?]$/, '')), shown);
+      assert.match(s.text(), /\d+|characters|caract/, 'it says so');
+      await s.click(save);
+      assert.equal(lineOf(v.id, label), shown.trim());
+    }
+  }
+});
