@@ -36237,6 +36237,28 @@ const GUIDES_REFRESH_CSS = `<style id="guides-refresh">
   @media (max-width: 640px) { body.ski-guide-page .ski-guide-resort { padding: 16px 16px; border-radius: 18px; } }
 </style>`;
 
+// Info, legal and form pages in the site's card look (2026-11-20, batch 4): typography and spacing only.
+const INFO_FORM_REFRESH_CSS = `<style id="info-form-refresh">
+  /* Info, legal and form pages in the site's card look (2026-11-20, batch 4): typography and spacing only. No field,
+     label or form behaviour is changed. */
+  body.info-page .info-body { max-width: 760px; background: #fffdf7; border: 1px solid rgba(27,43,58,0.08); border-radius: 22px; padding: 24px 28px 28px; margin: 18px 0 48px; box-shadow: 0 6px 18px rgba(27,43,58,0.06); box-sizing: border-box; }
+  body.info-page .info-lead { font-size: 1.1rem; line-height: 1.6; color: #1b2b3a; }
+  body.info-page .info-body h2 { font-size: 1.28rem; margin: 30px 0 10px; padding-top: 22px; border-top: 1px solid rgba(27,43,58,0.08); color: #1b2b3a; }
+  body.info-page .info-body > h2:first-child, body.info-page .info-lead + h2 { border-top: 0; padding-top: 0; margin-top: 18px; }
+  body.info-page .info-body p, body.info-page .info-body li { line-height: 1.7; color: #3a332c; }
+  body.info-page .info-body li { margin: 0 0 8px; }
+  body.info-page .info-body a:not(.secondary):not([class*="cta"]) { color: #1f5450; text-underline-offset: 3px; }
+  body.info-page .info-cta a, body.info-page .info-cta button { min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center; }
+  body.info-page .info-cta a.secondary { background: #fffdf7; border: 1px solid rgba(27,43,58,0.22); color: #1b2b3a; }
+  body.info-page .info-updated { border-top: 1px solid rgba(27,43,58,0.08); padding-top: 14px; }
+  @media (max-width: 640px) { body.info-page .info-body { padding: 18px 18px 22px; border-radius: 18px; margin-top: 12px; } }
+  /* Forms: the same field look everywhere (cream field, soft border, 14px corners), and a clear focus ring. */
+  body.list-venue-page .venue-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), body.list-venue-page .venue-form select, body.list-venue-page .venue-form textarea,
+  body.list-event-page .venue-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), body.list-event-page .venue-form select, body.list-event-page .venue-form textarea,
+  body.owner-page .venue-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), body.owner-page .venue-form select, body.owner-page .venue-form textarea { background: #fffdf7; border: 1px solid rgba(27,43,58,0.22); border-radius: 14px; }
+  body.list-venue-page .venue-form :is(input, select, textarea):focus-visible, body.list-event-page .venue-form :is(input, select, textarea):focus-visible, body.owner-page .venue-form :is(input, select, textarea):focus-visible { outline: 3px solid rgba(40,105,98,0.45); outline-offset: 2px; border-color: #286962; }
+</style>`;
+
 function renderDogHubPage(venues, filter = null, now = new Date()) {
   const f = { types: [], features: [], regions: [], ...(filter || {}) };
   const sort = DOG_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
@@ -49818,6 +49840,7 @@ ${banner ? CATEGORY_BANNER_STYLE : ''}
   body.info-page .info-link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--teal-deep); text-decoration: underline; cursor: pointer; }
 </style>
 </head>
+${INFO_FORM_REFRESH_CSS}
 <body class="golf-page info-page">
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -51009,6 +51032,7 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   body.list-venue-page .lyv-correct { font: inherit; font-size: 0.85rem; font-weight: 700; padding: 6px 12px; border-radius: 999px; border: 0; cursor: pointer; background: var(--sand-deep, #ece3d3); color: var(--ink); }
   body.list-venue-page .lyv-photos-note { margin: -4px 0 18px; }
 </style>
+${INFO_FORM_REFRESH_CSS}
 <body class="golf-page list-venue-page">
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -65292,6 +65316,7 @@ ${extraHead}
   ${OWNER_STATUS_CSS}
 </style>
 </head>
+${INFO_FORM_REFRESH_CSS}
 <body class="golf-page owner-page">
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main"><div class="op-wrap">
@@ -71659,6 +71684,7 @@ ${golfEngagementHeadHtml('fd', true, 'listing_form')}
   }
 </style>
 </head>
+${INFO_FORM_REFRESH_CSS}
 <body class="golf-page list-event-page">
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
