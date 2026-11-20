@@ -33,3 +33,5 @@ body.indoor-venue-page .venue-hero-photo>img{width:100%;height:100%!important;ob
 #gbLayout.gb-generic .gb-direct{margin:16px 0;max-width:340px}
 @media(max-width:899px){#gbLayout.gb-generic .gb-quick{grid-template-columns:1fr 1fr}}
 #gbLayout.gb-generic .gb-hours .venue-section{border:0;padding:0;margin:0;background:none;box-shadow:none}
+/* Sport test 2 (2026-11-20): the happy hour deals card inside the layout's own card is one card, not a card in a card. */
+#gbLayout .gb-deals .venue-deals-card{border:0;box-shadow:none;background:none;padding:0;margin:0}
