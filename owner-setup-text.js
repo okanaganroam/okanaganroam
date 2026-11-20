@@ -2583,8 +2583,8 @@ Object.assign(fr.indoor, { webLeadTickets: 'Nous avons inscrit votre page de bil
 // Indoor test 7 (2026-11-19): the booking link folds behind this for a walk-in place.
 Object.assign(en.indoor, { haveBookPage: 'Have a booking page?' });
 // Indoor test 14 (2026-11-19): research lines her answers made wrong, asked about on the next screen.
-Object.assign(en.indoor, { staleHead: 'We also had this from online', staleLead: 'It doesn’t match your answers, so it’s off your page for now.', staleQ: 'We also had: “{x}” Still right?', staleKeep: 'Keep', staleRemove: 'Remove', staleKept: 'Kept. It’s back on your page.', staleGone: 'Removed from your page.' });
-Object.assign(fr.indoor, { staleHead: 'Nous avions aussi ceci, trouvé en ligne', staleLead: 'Ça ne correspond pas à vos réponses, donc c’est retiré de votre page pour l’instant.', staleQ: 'Nous avions aussi : « {x} » Est-ce toujours vrai?', staleKeep: 'Garder', staleRemove: 'Retirer', staleKept: 'Gardé. C’est de retour sur votre page.', staleGone: 'Retiré de votre page.' });
+Object.assign(en.indoor, { staleHead: 'We also had this from online', staleLead: 'It doesn’t match your answers or may be out of date, so it’s off your page until you say.', staleQ: 'We also had: “{x}” Still right?', staleKeep: 'Keep', staleRemove: 'Remove', staleKept: 'Kept. It’s back on your page.', staleGone: 'Removed from your page.' });
+Object.assign(fr.indoor, { staleHead: 'Nous avions aussi ceci, trouvé en ligne', staleLead: 'Ça ne correspond pas à vos réponses ou ce n’est peut-être plus à jour, donc c’est retiré de votre page jusqu’à ce que vous le disiez.', staleQ: 'Nous avions aussi : « {x} » Est-ce toujours vrai?', staleKeep: 'Garder', staleRemove: 'Retirer', staleKept: 'Gardé. C’est de retour sur votre page.', staleGone: 'Retiré de votre page.' });
 Object.assign(fr.indoor, { haveBookPage: 'Vous avez une page de réservation?' });
 // Indoor test 9 (2026-11-19; Melissa's walk-in play centre: the Book button was for party rooms): with Walk-ins welcome, the
 // link box is for parties or groups, and the page's button says "Book a party" when the link or Groups line is about parties.
