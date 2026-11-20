@@ -2034,7 +2034,7 @@ function groupFitScore(v, ctx, add) {
   if (!groupAsked(ctx) || DINING_TYPES.includes(v.type)) return;
   const lines = Array.isArray(v.indoorOwnGroups) ? v.indoorOwnGroups : [];
   // Its reason never quotes "please book ahead" as a reason it fits (that is the stop's Book ahead line).
-  if (lines.length) add('group_line', 14, 'Takes groups (the owner’s own Groups line)');
+  if (lines.length) add('group_line', 20, 'Takes groups (the owner’s own Groups line)');
   else if (v.groupsText) add('group_line', 8, null);
   if (['room', 'group'].includes(v.indoorPer)) add('group_price', 8, `Priced per ${v.indoorPer}`);
 }

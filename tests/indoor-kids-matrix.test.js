@@ -263,3 +263,42 @@ test('Indoor test 12: a 16+ yoga studio is never offered with a 12-year-old; an 
   }
   assert.ok(idsOf(app.runTripPlan({ text: `hot yoga in ${town}` }, NOW)).includes(sixteen.id));
 });
+
+// Indoor test 16 sweep S1 (2026-11-19; Tyler's 8+ escape room, 8 to 11 with a paying adult, was left out of "something to do
+// with my 10 year old"): for EVERY kind, three places whose owner's minimum age is 5+, 8+ (with "Ages 12+ on their own; ages 8
+// to 11 with an adult" in Good to know) and 12+, in one town (SilverStar) among the usual competitors, one kind at a time.
+// "my 10 year old": 5+ and 8+ in (the 8+ one notes "Under 12s come with an adult"), 12+ out; "my 7 year old": 5+ in, 8+ and
+// 12+ out. A spa or a casino never; a quiet kind (a gallery, a library) may be outranked but is never wrongly in.
+test('Indoor test 16 sweep (S1): every kind with a minimum age of 5+, 8+ (8 to 11 with an adult) or 12+ is in or out for "my 10 year old" and "my 7 year old", with the adult note', async () => {
+  const fails = [];
+  const region = 'silverstar', town = 'SilverStar';
+  for (const [nm, c, d, kf] of [['Fun Centre', 'Family fun centre', 'Bowling, an arcade and laser tag.', 1], ['Museum & Archives', 'Museum', 'Local history museum.', 1],
+    ['Public Art Gallery', 'Art gallery', 'A public art gallery.', 0], ['Lake City Casino', 'Casino', 'Slots and table games. 19+.', 0], ['Nordic Spa', 'Spa', 'A day spa with massage.', 0]]) {
+    mk({ region, name: `${town} ${nm} S1`, cuisine: c, description: d, rating: 4.7, reviews: 300, kid_friendly: kf });
+  }
+  for (const [kind, k] of Object.entries(KINDS)) {
+    const made = {};
+    for (const age of ['5', '8', '12']) {
+      const v = mk({ region, name: `${town} ${k.name} ${age}+ S1`, cuisine: k.cuisine, description: `${k.name} in ${town}.`, rating: 4.2, reviews: 40 });
+      const t = tokenFor(v.id);
+      await ok(change(t, { indoor_info: { kinds: [kind], length: '1-2h', book: 'busy', age, year: 'all' } }));
+      if (age === '8') await ok(change(t, { visit_rows: { good_to_know: 'Ages 12+ on their own; ages 8 to 11 with an adult.' } }));
+      made[age] = v;
+    }
+    for (const [young, want] of [[10, { 5: true, 8: true, 12: false }], [7, { 5: true, 8: false, 12: false }]]) {
+      const q = `something to do with my ${young} year old in ${town}`;
+      const items = itemsOf(app.runTripPlan({ text: q }, NOW));
+      for (const age of ['5', '8', '12']) {
+        const stop = items.find((x) => x.venue.id === made[age].id);
+        const expectIn = k.expect === 'no' ? false : want[age];
+        if (!expectIn && stop) fails.push(`${kind} ${age}+: "${q}" offers it`);
+        if (expectIn && !stop && k.expect === 'yes') fails.push(`${kind} ${age}+: "${q}" leaves it out (${items.map((x) => x.venue.name).slice(0, 8).join(' | ')})`);
+        if (stop && age === '8' && !(stop.caveats || []).includes('Under 12s come with an adult (the owner’s own words).')) fails.push(`${kind} 8+: "${q}" has no adult note (${(stop.caveats || []).join(' / ')})`);
+        if (stop && age !== '8' && (stop.caveats || []).some((c) => /come with an adult/.test(c))) fails.push(`${kind} ${age}+: "${q}" has an adult note`);
+      }
+    }
+    // Out of the way for the next kind (moved to Baldy, where nothing is asked).
+    for (const v of Object.values(made)) app.updateVenue(v.id, { region: 'baldy' });
+  }
+  assert.deepEqual(fails, []);
+});

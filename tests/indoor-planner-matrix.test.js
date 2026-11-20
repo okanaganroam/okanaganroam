@@ -346,3 +346,72 @@ test('Indoor test 15: free requests offer the owner-free gallery and library and
   }
   assert.deepEqual(fails, []);
 });
+
+// Indoor test 16 sweep S2 (2026-11-19; "rainy day for a group of 6" searched for the word "group": a YMCA and a spa whose
+// stories say "group" came first and Tyler's escape room, Great for Groups with a Groups line, was left out). For EVERY kind,
+// one place with the Great for Groups badge, its owner's Groups line and (where it is the kind's way) a price per room or
+// lane, in one town (SilverStar) among better-rated places whose stories say "group" or "groups", one kind at a time: both
+// "rainy day for a group of 6 in <town>" and "indoor group activity <town>" put it first, read the group as Great for Groups
+// (never the word "group"), and the header never says “group”.
+test('Indoor test 16 sweep (S2): every kind with Great for Groups and a Groups line comes first for "a group of 6" and "indoor group activity"; group is never a word to find', async () => {
+  const fails = [];
+  const region = 'silverstar', town = 'SilverStar', at = { latitude: 50.36, longitude: -119.06 };
+  for (const [nm, c, d] of [['Downtown Y', 'Gym', 'Group fitness classes, a pool and a gym.'], ['Wellness Spa', 'Spa', 'Group spa days, massage and facials.'],
+    ['Family Fun Centre', 'Family fun centre', 'Bowling, an arcade and laser tag for groups of all sizes.'], ['Museum & Archives', 'Museum', 'Local history; group tours.']]) {
+    mk({ region, ...at, name: `${town} ${nm} S2`, cuisine: c, description: d, rating: 4.9, reviews: 800, kid_friendly: 1 });
+  }
+  for (const [kind, k] of Object.entries(KINDS)) {
+    const v = mk({ region, ...at, name: `${town} ${k.name} S2`, cuisine: k.cuisine, description: `${k.name} in ${town}.`, rating: 4.1, reviews: 30, great_groups: 1 });
+    const t = tokenFor(v.id);
+    const per = kind === 'escape' ? { per: 'room', per_min: 2, per_max: 6 } : kind === 'bowling' ? { per: 'lane' } : {};
+    await ok(change(t, { indoor_info: { kinds: [kind], length: '1-2h', book: 'busy', age: kind === 'casino' ? '19' : 'all', year: 'all', ...per }, indoor_price: kind === 'escape' ? 180 : 20 }));
+    await ok(change(t, { visit_rows: { groups: 'Groups of 10 or more: please book ahead. Private bookings on request.' } }));
+    for (const q of [`rainy day for a group of 6 in ${town}`, `indoor group activity ${town}`]) {
+      const p = app.runTripPlan({ text: q }, NOW);
+      const items = itemsOf(p);
+      const first = items.find((x) => x.venue.type === 'indoor');
+      // A spa, a casino or a yoga studio (adults' or booked-class places, never a rainy-day attraction first) is offered, ahead
+      // of the gym whose story only says "group fitness"; every other kind comes first.
+      if (['spa', 'casino', 'yoga'].includes(kind)) {
+        const mine = items.findIndex((x) => x.venue.id === v.id), word = items.findIndex((x) => /Downtown Y S2/.test(x.venue.name));
+        if (mine < 0 || (word >= 0 && word < mine)) fails.push(`${kind}: "${q}" puts a "group" story first (${items.map((x) => x.venue.name).slice(0, 6).join(' | ')})`);
+      } else if (!first || first.venue.id !== v.id) fails.push(`${kind}: "${q}" leads with ${first ? first.venue.name : 'nothing'} (${items.map((x) => x.venue.name).slice(0, 5).join(' | ')})`);
+      if (!(p.intent.features || []).includes('great_groups')) fails.push(`${kind}: "${q}" is not Great for Groups`);
+      if ((p.intent.foodTerms || []).some((f) => /^(?:group|groups|team)$/.test(f.term))) fails.push(`${kind}: "${q}" looks for the word`);
+      if (/“group”|“groups”/.test(JSON.stringify(p.understood) + JSON.stringify(p.summary || ''))) fails.push(`${kind}: "${q}" header says “group”`);
+    }
+    app.updateVenue(v.id, { region: 'baldy' });
+  }
+  // The other ways to say it read as Great for Groups (or the group occasion), never the word.
+  for (const q of [`big group fun in ${town}`, `escape room for 8 people in ${town}`, `team activity ${town}`, `bowling for a group ${town}`, `rainy day for 8 people in ${town}`]) {
+    const p = app.runTripPlan({ text: q }, NOW);
+    if (!(p.intent.features || []).includes('great_groups')) fails.push(`"${q}" is not Great for Groups`);
+    if ((p.intent.foodTerms || []).some((f) => /^(?:group|groups|team|people)$/.test(f.term))) fails.push(`"${q}" looks for the word`);
+  }
+  // "group of friends" and "team building" keep their own meaning; "dinner for 2 people" is not a group.
+  assert.equal(app.runTripPlan({ text: `group of friends ${town}` }, NOW).intent.occasion, 'group_getaway');
+  assert.ok(!(app.runTripPlan({ text: `dinner for 2 people in Kelowna` }, NOW).intent.features || []).includes('great_groups'));
+  assert.deepEqual(fails, []);
+});
+
+// Indoor test 16 (2026-11-19; "Saturday 7pm then dinner" planned the escape room at 4 PM): an explicit clock after the day
+// starts the asked kind's stop at that time, with dinner after it, for several kinds; a clock after "then" is that part's.
+// (The matrix's places are open 10 AM to 8 PM.)
+const CLOCK = [['escape', 'escape room in {T} Saturday 6pm then dinner', 18 * 60], ['bowling', 'bowling in {T} Friday 5pm then dinner', 17 * 60],
+  ['cinema', 'movie theatre in {T} Saturday 4pm then dinner', 16 * 60], ['museum', 'museum in {T} Sunday at 1pm then dinner', 13 * 60], ['climbing', 'climbing gym in {T} Saturday 2pm then dinner', 14 * 60],
+  ['games', 'arcade in {T} tonight 6pm then dinner', 18 * 60]];
+test('Indoor test 16: "<activity> in <town> <day> 7pm then dinner" starts that kind\'s place at the time asked, with dinner after it', () => {
+  const fails = [];
+  for (const [kind, q0, start] of CLOCK) {
+    const q = q0.replace('{T}', TOWN);
+    const p = app.runTripPlan({ text: q }, NOW);
+    const hit = itemsOf(p).find((x) => x.venue.type === 'indoor' && fitsKind(x.venue, kind));
+    const s = hit && (p.schedule || []).find((x) => x.venueId === hit.venue.id);
+    if (!s) { fails.push(`${kind}: "${q}" has no ${kind} stop`); continue; }
+    if (s.startMinutes !== start) fails.push(`${kind}: "${q}" starts it at ${s.startMinutes / 60}`);
+    const meal = itemsOf(p).find((x) => x.venue.type === 'restaurant');
+    const ms = meal && (p.schedule || []).find((x) => x.venueId === meal.venue.id);
+    if (ms && ms.startMinutes < s.endMinutes && ms.endMinutes > s.startMinutes) fails.push(`${kind}: "${q}" overlaps dinner`);
+  }
+  assert.deepEqual(fails, []);
+});
