@@ -705,7 +705,7 @@ function t3FrenchTextCore(value){
  text=text.replace(/^No ski or snowboard lesson company open on these dates is listed near the hill\.$/,'Aucune école de ski ou de planche ouverte à ces dates n’est répertoriée près de la montagne.');
  text=text.replace(/^About (<?\d+) km \(straight line\) from (.+)$/,(_,k,w)=>'Environ '+k+' km (à vol d’oiseau) '+({'the previous stop':'de l’arrêt précédent','the wineries':'des vignobles','the morning and afternoon stops':'des arrêts du matin et de l’après-midi'}[w]||(/^[AEIOUYÉÈÊaeiouyéèê]/.test(w)?'d’':'de ')+w));
  // Indoor test 18: "Open Tue–Sat — check the day you go".
- text=text.replace(/^Open ((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[A-Za-z–, ]*) — check the day you go$/,(_,list)=>'Ouvert '+list.replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>({Mon:'lun.',Tue:'mar.',Wed:'mer.',Thu:'jeu.',Fri:'ven.',Sat:'sam.',Sun:'dim.'}[d])).replace(/–/g,' au ')+' — vérifiez le jour de votre visite');
+ text=text.replace(/^Open ((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)[A-Za-z–, ]*?)( — check the day you go)?$/,(_,list,chk)=>'Ouvert '+list.replace(/\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b/g,d=>({Mon:'lun.',Tue:'mar.',Wed:'mer.',Thu:'jeu.',Fri:'ven.',Sat:'sam.',Sun:'dim.'}[d])).replace(/–/g,' au ')+(chk?' — vérifiez le jour de votre visite':''));
  // "Its listed hours only fit the midday on Mon–Fri, Sun — check the day you go" (2026-10-18).
  text=text.replace(/^Its listed hours only fit the (morning|midday|afternoon|late afternoon|early evening|evening) on (.+) — check the day you go$/,(_,part,list)=>{
   const when={morning:'le matin',midday:'le midi',afternoon:'l’après-midi','late afternoon':'en fin d’après-midi','early evening':'en début de soirée',evening:'le soir'}[part];

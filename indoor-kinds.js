@@ -329,7 +329,8 @@ const TYPER_PERSON = { escape: ['One player', 'Un joueur'] };
 // match wins. TYPER keeps the examples (the "like …" hints) for a place whose words say nothing more.
 const TYPER_TRUE = {
   gallery: { name: ['Adult admission', 'Entrée adulte'] }, museum: { name: ['Adult admission', 'Entrée adulte'] },
-  theatre: { name: ['Adult ticket', 'Billet adulte'] }, cinema: { name: ['Adult ticket', 'Billet adulte'] },
+  // Indoor test 18: a theatre is a range kind (its lowest regular ticket): a neutral name, never the cinema's exact one.
+  theatre: { name: ['Regular ticket', 'Billet régulier'] }, cinema: { name: ['Adult ticket', 'Billet adulte'] },
   // Indoor test 18: a spa's services; a specific name only when its own words name exactly one of them (null: counted, never
   // used as the name).
   spa: { name: ['Shortest treatment', 'Soin le plus court'], own: [[/\b(?:day pass|circuit|hydrotherap\w*|thermal|nordic|bath ?house)\b/i, 'Day pass', 'Forfait d’un jour'], [/\bmassages?\b|\bmassoth[ée]rap\w*/i, 'Massage', 'Massage'], [/\bfacials?\b|\bsoins? du visage\b/i, 'Facial', 'Soin du visage'],

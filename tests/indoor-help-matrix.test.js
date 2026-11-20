@@ -752,8 +752,62 @@ test('indoor test 17: Megan\'s Help questions (a bouldering gym) land on the rig
   assert.match(plain(b.men.topic(IC).a), /Your prices/);
   assert.match(plain(b.men.topic(IC).a), /On set dates only\? Also add each date with Add an event/);
 });
+// Indoor test 18 (2026-11-19; Natalie, a day spa: a $95 facial as her main price, a $70 pedicure, couples' packages,
+// please book ahead, 16+): her Help log, EN and FR twins, with where each belongs ([page, question, topics, French twin]).
+// A cancellation policy is a Good to know line; on Your prices (the menu page), a couples' package is a price for two,
+// prices that vary per item are one line each, gift certificates are the gift answer, "the list said massage $95 but that
+// was my facial price" is the first line's answer, and an intro offer for a first massage is Your prices (indoor-intro-class).
+const PT = 'indoor-price-two', PV = 'indoor-price-varies';
+const NATALIE = [
+  ['setup', 'each treatment is a different price', [P, PV], 'chaque soin a un prix différent'],
+  ['setup', 'by appointment only', [BK], 'sur rendez-vous seulement'],
+  ['menu', 'couples massage package', [PT], 'forfait massage en couple'],
+  ['menu', 'pedicures are different prices for each kind', [PV], 'les pédicures : chaque sorte a son prix'],
+  ['menu', 'gift certificates', [GF], 'certificats cadeaux'],
+  ['setup', '24 hour cancellation policy', [GTK], 'politique d’annulation de 24 heures'],
+  ['setup', 'gift certificates', [GF], 'certificats cadeaux'],
+  ['setup', 'couples massage package', [G, PT], 'forfait massage en couple'],
+  ['setup', 'cancellation policy', [GTK], 'politique d’annulation'],
+  ['setup', 'we are by appointment only, no walk ins', [BK], 'sur rendez-vous seulement, sans réservation non'],
+  ['setup', 'prices plus tax', [X], 'prix plus taxes'],
+  ['setup', 'it said just the number for my price', [P], 'il a dit juste le chiffre pour mon prix'],
+  ['setup', 'clients must be 16 or older', [A], 'les clients doivent avoir 16 ans ou plus'],
+  ['setup', 'how do I add gift certificates to my prices', [GF], 'comment ajouter des certificats cadeaux à mes tarifs'],
+  ['setup', 'what goes in the first line of my prices', ['indoor-typer-first'], 'que mettre dans la première ligne de mes tarifs'],
+  ['setup', 'the price list said massage $95 but that was my facial price', ['indoor-typer-first'], 'la liste disait massage 95 $ mais c’était mon prix de soin du visage'],
+  ['menu', 'the price list said massage $95 but that was my facial price', ['indoor-typer-first'], 'la liste disait massage 95 $ mais c’était mon prix de soin du visage'],
+  ['setup', 'corporate team events', [G], 'événements d’entreprise'],
+  ['setup', 'there is an old line on my page that is wrong', [OL], 'une vieille ligne sur ma page est fausse'],
+  ['setup', 'intro offer price for first massage', [IC], 'offre d’introduction pour un premier massage'],
+  ['menu', 'intro offer price for first massage', [IC], 'offre d’introduction pour un premier massage'],
+  ['setup', 'can I say walk-ins for pedicures but massages by appointment', [BK], 'sans réservation pour les pédicures mais les massages sur rendez-vous'],
+  ['setup', 'do you need a price for the couples package', [PT], 'faut-il un prix pour le forfait pour couples'],
+  ['setup', 'no show fee', [GTK], 'frais d’absence'],
+];
+const NATALIE_WANT = Object.fromEntries(NATALIE.filter(([pg]) => pg === 'setup').map(([, q, want]) => [q, want]));
+test('indoor test 18: Natalie\'s Help questions (a day spa) land on the right answer, in English and in French, on the setup and price list pages; the answers name the cancellation line, packages, one line per price, words with the number and a first massage offer', async () => {
+  const b = await botsFor('spa');
+  const wrong = [];
+  for (const [pg, q, want, qFr] of NATALIE) {
+    const r = (pg === 'menu' ? b.men : b.en).best(q), f = (pg === 'menu' ? b.mfr : b.fr).best(qFr);
+    if (!r || !want.includes(r.id)) wrong.push(`en ${pg} "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+    if (!f || !want.includes(f.id)) wrong.push(`fr ${pg} "${qFr}" -> ${f && f.id} (want ${want.join(' or ')})`);
+  }
+  assert.deepEqual(wrong, []);
+  assert.match(plain(b.en.topic(GTK).a), /cancellation policy goes here too/);
+  assert.match(plain(b.fr.topic(GTK).aFr), /politique d’annulation va ici aussi/);
+  assert.match(plain(b.men.topic(PT).a), /Couples’ massage package/);
+  assert.match(plain(b.men.topic(PV).a), /each one on its own line/);
+  assert.match(plain(b.men.topic(GF).a), /Gift cards/);
+  assert.match(plain(b.en.topic(IC).a), /First massage, new clients \$79/);
+  assert.match(plain(b.en.topic(IC).a), /never becomes your card’s price/);
+  assert.match(plain(b.en.topic(P).a), /Just a number is enough/);
+  assert.match(plain(b.men.topic('indoor-typer-first').a), /Shortest treatment \$89/);
+  // Happy hour is never offered for an indoor place, on either page.
+  for (const bot of [b.en, b.men]) assert.ok(!bot.topics.some((x) => /happy/i.test(x.id)), bot.topics.map((x) => x.id).filter((x) => /happy/i.test(x)).join(','));
+});
 // Every question in the 8 indoor help logs lands on an answer, on the page where it was asked, for the kind of place it was.
-const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga', 13: 'cinema', 14: 'museum', 15: 'gallery', 16: 'escape', 17: 'climbing' };
+const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga', 13: 'cinema', 14: 'museum', 15: 'gallery', 16: 'escape', 17: 'climbing', 18: 'spa' };
 // The misrouted ones, with where they belong.
 const LOG_WANT = {
   'we price per room not per person': [R], 'how do I change the price, it says adults but we charge per room': [R],
@@ -785,6 +839,8 @@ const LOG_WANT = {
   ...TYLER_WANT,
   // Indoor test 17 (Megan, a bouldering gym).
   ...MEGAN_WANT,
+  // Indoor test 18 (Natalie, a day spa).
+  ...NATALIE_WANT,
 };
 test('every question in the 8 indoor help logs lands on an answer (the misrouted ones on the right one)', async () => {
   const wrong = [];
