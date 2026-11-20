@@ -7617,7 +7617,7 @@ function halloweenTripStart(days, now) {
 }
 
 // opts.stays (TRIP_STAYS or the ?stays=1 preview): the optional trip dates and party size ({ stay: { arrive, leave,
-// adults, kids } }) are read; otherwise a "stay" field is ignored, so the plan is the same as without it.
+// adults, kids, dog } }) are read; otherwise a "stay" field is ignored, so the plan is the same as without it.
 function parseTripPlanBody(body, opts = {}) {
   let stay = null;
   if (body && typeof body === 'object' && !Array.isArray(body) && Object.prototype.hasOwnProperty.call(body, 'stay')) {
@@ -7724,10 +7724,14 @@ function tripStayCandidates() {
 // a day plan or multi-day plan covers the stay (one day per night, plus the last day; at most 7) unless the visitor
 // set the number of days. Then the plan gets its "whereToStay" block when a stay fits. Without inputs, the plan is
 // the same as runTripPlan's plus that block.
+const TRIP_DOG_WORDS_RE = /\b(?:dogs?|pups?|puppy|puppies|pooch|chiens?|chienne|toutous?)\b/i;
 function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
   const stay = args.stay || null;
   const base = { ...args };
   delete base.stay;
+  // "Bringing a dog" ticked: the plan is a dog trip as if the request said so (dog-friendly stops, "with a dog" shown),
+  // unless the request already names a dog.
+  if (stay && stay.dog && typeof base.text === 'string' && !TRIP_DOG_WORDS_RE.test(base.text) && base.text.trim().length + 13 <= discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) base.text = `${base.text.trim()} with our dog`;
   if (stay && stay.arrive && !(base.overrides && base.overrides.startDate)) base.overrides = { ...(base.overrides || {}), startDate: stay.arrive };
   let plan = run(base, now);
   if (stay && stay.arrive && stay.leave && plan && ['multi_day', 'day_plan'].includes(plan.kind) && !(base.overrides && base.overrides.days !== undefined)) {

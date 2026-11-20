@@ -914,6 +914,8 @@ const T3_STAY_STYLES = `<style>
   .t3-stay-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 10px; padding: 6px 0 4px; }
   .t3-stay-row label { display: flex; flex-direction: column; gap: 2px; font-size: 0.78rem; font-weight: 800; color: rgba(27,43,58,0.75); }
   .t3-stay-row input, .t3-stay-row select { min-height: 40px; border: 1px solid rgba(27,43,58,0.25); border-radius: 10px; padding: 6px 8px; font: 600 0.92rem 'Nunito', 'Nunito Fallback', sans-serif; color: var(--ref-navy); background: #fff; min-width: 0; width: 100%; box-sizing: border-box; }
+  .t3-stay-row label.t3-stay-dog { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 8px; min-height: 40px; font-size: 0.88rem; cursor: pointer; }
+  .t3-stay-row label.t3-stay-dog input { width: 20px; height: 20px; min-height: 0; margin: 0; accent-color: var(--ref-navy); flex: none; }
   @media (max-width: 640px) { .t3-stay-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   .t3-stay { background: #fff; border-radius: 18px; padding: 16px; margin: 0 0 18px; box-shadow: 0 10px 26px -20px rgba(0,0,0,0.5); }
   .t3-stay h3 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.2rem; margin: 0 0 2px; color: var(--ref-navy); }
@@ -943,6 +945,7 @@ function t3StayInputsHtml() {
             <label><span><span class="t3-en">Leave</span><span class="t3-fr" lang="fr">Départ</span></span><input type="date" id="t3Leave"></label>
             <label><span><span class="t3-en">Adults</span><span class="t3-fr" lang="fr">Adultes</span></span><select id="t3Adults">${opts(1, 16)}</select></label>
             <label><span><span class="t3-en">Kids</span><span class="t3-fr" lang="fr">Enfants</span></span><select id="t3Kids">${opts(0, 12)}</select></label>
+            <label class="t3-stay-dog"><input type="checkbox" id="t3Dog"><span><span class="t3-en">Bringing a dog</span><span class="t3-fr" lang="fr">Avec un chien</span></span></label>
           </div>
         </details>
 `;
@@ -958,6 +961,7 @@ const T3_STAY_CLIENT_SRC = String.raw`
     if (o.arrive && /^\d{4}-\d{2}-\d{2}$/.test(l)) o.leave = l;
     if (/^\d+$/.test(ad)) o.adults = Number(ad);
     if (/^\d+$/.test(k)) o.kids = Number(k);
+    var dg = document.getElementById('t3Dog'); if (dg && dg.checked) o.dog = true;
     return Object.keys(o).length ? o : null;
   }
   (function(){
