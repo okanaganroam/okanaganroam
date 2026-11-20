@@ -299,7 +299,8 @@ test('9. Polish: long URLs wrap at 360; "Your prices are live ✓" once approved
   assert.equal(T.fr.indoor.menuLiveQ, 'Vos tarifs sont en ligne ✓');
   // Card labels: no owner kind, a clear category.
   const mcc = mk('indoor', { name: 'McCurdy Bowl T8', cuisine: 'Bowling alley', description: 'Ten-pin bowling.', rating: 4.9, reviews: 900 });
-  const card = itemsOf(app.runTripPlan({ text: 'bowling in Kelowna' }, NOW)).find((x) => x.venue.id === mcc.id);
+  // (Indoor test 17: owner-confirmed bowling places now come first in "bowling in Kelowna", so the card is read by its name.)
+  const card = itemsOf(app.runTripPlan({ text: 'bowling at McCurdy Bowl T8 in Kelowna' }, NOW)).find((x) => x.venue.id === mcc.id);
   assert.ok(card, 'McCurdy is in the plan');
   assert.equal(card.venue.typeLabel, 'Bowling');
   assert.equal(card.venue.typeLabelFr, 'Quilles');

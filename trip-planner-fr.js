@@ -278,7 +278,11 @@ const PHRASES = [
   ['vie nocturne', 'nightlife'], ['sortie nocturne', 'night out'], ['boite de nuit', 'nightclub'], ['boites de nuit', 'nightclubs'],
   ['observer les ours', 'bear viewing'], ['ours', 'bears'], ['aigles', 'eagles'], ['aigle', 'eagle'], ['saumons', 'salmon'], ['saumon', 'salmon'],
   ['cascades', 'waterfalls'], ['cascade', 'waterfall'], ['chutes', 'falls'],
-  ['grimpeurs', 'rock climbing'], ['grimpeur', 'rock climbing'], ['grimpeuses', 'rock climbing'], ['escalade', 'rock climbing'],
+  ['grimpeurs', 'rock climbing'], ['grimpeur', 'rock climbing'], ['grimpeuses', 'rock climbing'], 
+  // Indoor test 17 (2026-11-19; Megan's bouldering gym: « escalade à Kelowna samedi » found nothing, a bare « escalade » read
+  // as outdoor rock climbing): « escalade » is climbing (a climbing gym in winter); outdoor words keep rock climbing.
+  ['escalade', 'climbing'], ['escalade interieure', 'indoor climbing'], ['escalade en salle', 'indoor climbing'], ['escalade exterieure', 'rock climbing'],
+  ['escalade de rocher', 'rock climbing'], ['escalade sur roche', 'rock climbing'], ['grimper', 'climb'], ['faire de l escalade', 'climbing'],
   ['coucher de soleil', 'sunset spots'], ['couchers de soleil', 'sunset spots'], ['belles vues', 'views'], ['vue sur les montagnes', 'mountain views'],
   ['avec des arrets', 'with stops along the way'], ['arrets en route', 'stops along the way'], ['arrets', 'stops'],
   ['tyrolienne', 'zipline'], ['tyroliennes', 'ziplines'], ['saut a l elastique', 'bungee'], ['rafting', 'rafting'], ['velo de montagne', 'mountain biking'],

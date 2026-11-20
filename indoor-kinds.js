@@ -415,6 +415,28 @@ const EVENTS = {
   other: ['Special events, theme nights, workshops', 'Événements spéciaux, soirées à thème, ateliers'],
 };
 for (const [k, x] of Object.entries(EVENTS)) if (K[k]) { K[k].en.events = x[0]; K[k].fr.events = x[1]; }
+// Indoor test 17 (2026-11-19; Megan's bouldering-only gym read "Climbing & trampoline" on her card, page and every plan,
+// and the trampoline word cost her a place in "climbing gym" plans): a kind label that names several things shows only
+// the parts the place's own words (its name, story and Known for) say: "Climbing gym" (« Salle d’escalade ») unless they
+// mention trampolines. Each part: [words, en, fr]; both: the label when several parts are said; none: the label when no
+// part is said (the first part's, or the full label when nothing can be told).
+const LABEL_PARTS = {
+  climbing: { parts: [[/\b(?:climb\w*|boulder\w*|escalade|grimp\w*|belay\w*|top ?rope|auto ?belays?)\b/i, 'Climbing gym', 'Salle d’escalade'], [/\btrampolin\w*\b/i, 'Trampoline park', 'Parc de trampolines']],
+    both: ['Climbing & trampoline', 'Escalade et trampoline'], none: ['Climbing gym', 'Salle d’escalade'] },
+  spa: { parts: [[/\b(?:spas?|massages?|facials?|treatments?|hydrotherap\w*|soins?|wellness|bien-être)\b/i, 'Spa', 'Spa'], [/\b(?:saunas?|steam|bains? de vapeur)\b/i, 'Sauna', 'Sauna']],
+    both: ['Spa & sauna', 'Spa et sauna'], none: ['Spa', 'Spa'] },
+  pool: { parts: [[/\b(?:pools?|swim\w*|aquatic\w*|waterslides?|piscines?|natation|baignade)\b/i, 'Swimming pool', 'Piscine'], [/\b(?:rec(?:reation)? (?:centres?|centers?)|gym|fitness|arenas?|centre récréatif)\b/i, 'Rec centre', 'Centre récréatif']],
+    both: ['Pool & rec centre', 'Piscine et centre récréatif'], none: ['Pool & rec centre', 'Piscine et centre récréatif'] },
+};
+// [en, fr] for a kind and the place's own words, or null (the kind's usual words). own null: nothing is known (the usual words).
+function indoorKindLabel(kind, own) {
+  const L = LABEL_PARTS[kind];
+  if (!L || own == null) return null;
+  const said = L.parts.filter((p) => p[0].test(String(own)));
+  return said.length > 1 ? L.both.slice() : said.length === 1 ? [said[0][1], said[0][2]] : L.none.slice();
+}
+// Every label a kind may show ([en, fr] pairs), its usual words first.
+function indoorKindLabels(kind, usual) { const L = LABEL_PARTS[kind]; return [usual].concat(L ? [L.both, L.none, ...L.parts.map((p) => [p[1], p[2]])] : []).filter(Boolean); }
 const INDOOR_KIND_TEXT = K;
 const INDOOR_KIND_TEXT_KINDS = Object.keys(K);
 // The kind a place reads in: its main kind (the first the owner picked), else 'other'.
@@ -460,4 +482,4 @@ const INDOOR_TYPE_WORD_SKIP = new Set(['history', 'heritage', 'heritage site', '
 // "learn to curl", "slots", « soin du visage »).
 const INDOOR_TYPE_WORDS = [...new Set(Object.values(K).flatMap((e) => e.en.search.concat(e.fr.search)).filter((w) => !INDOOR_TYPE_WORD_SKIP.has(w)))];
 
-module.exports = { BOOK_AHEAD_UNIT, TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };
+module.exports = { indoorKindLabel, indoorKindLabels, BOOK_AHEAD_UNIT, TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };

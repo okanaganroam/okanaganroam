@@ -24713,7 +24713,8 @@ function indoorOwnWords(venueId) {
 // is called that.
 const INDOOR_SCIENCE_CENTRE_RE = /\b(?:science|discovery) (?:centres?|centers?)\b/i;
 function indoorKindsText(kinds, fr = false, own = null) {
-  const l = (kinds || []).filter((k, i, a) => INDOOR_KIND_WORDS[k] && a.indexOf(k) === i).map((k, i) => (k === 'games' && i > 0 && own != null && !INDOOR_GAMES_FULL_RE.test(own) ? INDOOR_GAMES_SHORT : k === 'museum' && own != null && INDOOR_SCIENCE_CENTRE_RE.test(own) ? ['Science centre', 'Centre des sciences'] : INDOOR_KIND_WORDS[k])[fr ? 1 : 0]);
+  // Indoor test 17: a label naming several things shows only the parts the place's own words say ("Climbing gym").
+  const l = (kinds || []).filter((k, i, a) => INDOOR_KIND_WORDS[k] && a.indexOf(k) === i).map((k, i) => (k === 'games' && i > 0 && own != null && !INDOOR_GAMES_FULL_RE.test(own) ? INDOOR_GAMES_SHORT : k === 'museum' && own != null && INDOOR_SCIENCE_CENTRE_RE.test(own) ? ['Science centre', 'Centre des sciences'] : indoorKindsModule.indoorKindLabel(k, own) || INDOOR_KIND_WORDS[k])[fr ? 1 : 0]);
   if (!l.length) return '';
   const lower = (x, i) => (i && !/^(?:VR|SUP)\b/.test(x) ? x.charAt(0).toLowerCase() + x.slice(1) : x);
   const ll = l.map(lower);
@@ -24729,8 +24730,8 @@ function indoorCuisineFr(text) {
         let o = null; try { o = JSON.parse(r.info); } catch (e) { o = null; }
         const en = o && Array.isArray(o.kinds) ? indoorKindsText(o.kinds) : '';
         if (en && en === r.c) indoorCuisineFrMap.set(String(r.c), indoorKindsText(o.kinds, true));
-        // Indoor test 8: "Bowling & arcade" (games second, no VR words of its own).
-        else if (o && Array.isArray(o.kinds) && (o.kinds.indexOf('games') > 0 || o.kinds.includes('museum'))) { const own = indoorOwnWords(r.id); if (indoorKindsText(o.kinds, false, own) === r.c) indoorCuisineFrMap.set(String(r.c), indoorKindsText(o.kinds, true, own)); }
+        // Indoor test 8: "Bowling & arcade" (games second, no VR words of its own); indoor test 17: "Climbing gym".
+        else if (o && Array.isArray(o.kinds) && o.kinds.length) { const own = indoorOwnWords(r.id); if (indoorKindsText(o.kinds, false, own) === r.c) indoorCuisineFrMap.set(String(r.c), indoorKindsText(o.kinds, true, own)); }
       }
     } catch (e) { /* no table yet */ }
   }
@@ -59507,7 +59508,7 @@ function renderOwnerSetupPage(found, opts) {
       allSteps: INDOOR_SETUP_PART1.concat(INDOOR_SETUP_PART2), feeLiveMax: INDOOR_PRICE_LIVE_MAX, bringMax: TOUR_GOOD_TO_KNOW_MAX,
       indoorKinds: INDOOR_KINDS_SHOWN.map((k) => ({ k, t: INDOOR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), indoorKindsTop: INDOOR_KINDS_TOP,
       // Indoor test 2: the card's short words for each kind, for the preview ("Escape room · arcade, VR & laser tag").
-      indoorKindWords: Object.fromEntries(Object.entries(INDOOR_KIND_WORDS).map(([k, w]) => [k, w[fr ? 1 : 0]])),
+      indoorKindWords: Object.fromEntries(Object.entries(INDOOR_KIND_WORDS).map(([k, w]) => [k, (indoorKindsModule.indoorKindLabel(k, indoorOwnWords(venue.id)) || w)[fr ? 1 : 0]])),
       // Indoor test 8: games after the main kind reads "arcade" unless his own words say VR, laser tag or karting.
       indoorGamesShort: INDOOR_GAMES_FULL_RE.test(indoorOwnWords(venue.id)) ? '' : INDOOR_GAMES_SHORT[fr ? 1 : 0],
       // Indoor test 12 (2026-11-19; the finish preview said "Museum" where the page says "Science centre"): the page's own word.
