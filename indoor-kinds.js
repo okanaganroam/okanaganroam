@@ -422,7 +422,8 @@ function indoorSlotMinutes(kinds, length) {
 function indoorTimesKind(kinds) { const k = indoorKindKey(kinds); return K[k].ticketed ? 'shows' : K[k].classKind ? 'classes' : 'web'; }
 const INDOOR_TIMES_LINES = { shows: ['Showtimes: see the schedule', 'Séances : voir l’horaire'], classes: ['Class times: see the schedule', 'Horaires des cours : voir l’horaire'], web: ['Times: see their website', 'Horaires : voir leur site Web'] };
 // The page's link button by kind and booking answer: [en, fr].
-const INDOOR_BOOK_BUTTONS = { shows: ['Showtimes & tickets', 'Horaires et billets'], classes: ['Class schedule', 'Horaire des cours'], visit: ['Book a visit', 'Réserver une visite'], book: ['Book', 'Réserver'], party: ['Book a party', 'Réserver une fête'] };
+// Indoor test 17: a waiver link (Smartwaiver, WaiverSign…) is "Sign the waiver" whatever the booking answer.
+const INDOOR_BOOK_BUTTONS = { waiver: ['Sign the waiver', 'Signer la décharge'], shows: ['Showtimes & tickets', 'Horaires et billets'], classes: ['Class schedule', 'Horaire des cours'], visit: ['Book a visit', 'Réserver une visite'], book: ['Book', 'Réserver'], party: ['Book a party', 'Réserver une fête'] };
 // Indoor test 14 (2026-11-19; Helen's museum: the edit page's Add an event said "Live music, tastings, markets, classes or
 // specials"): the kind's own events, for the Add an event heading line and its intro: [en, fr].
 const EVENTS = {
@@ -467,6 +468,15 @@ function indoorKindLabel(kind, own) {
 }
 // Every label a kind may show ([en, fr] pairs), its usual words first.
 function indoorKindLabels(kind, usual) { const L = LABEL_PARTS[kind]; return [usual].concat(L ? [L.both, L.none, ...L.parts.map((p) => [p[1], p[2]])] : []).filter(Boolean); }
+// Indoor test 17 (2026-11-19; Megan's bouldering gym was offered "Waiver to sign before you play"): the waiver chip's verb
+// follows the kind ([en, fr]): climb for a climbing gym (jump when its own words say trampolines and not climbing), play
+// for a play centre or an arcade.
+const WAIVER_VERB = { climbing: ['climb', 'grimper'], kids: ['play', 'jouer'], games: ['play', 'jouer'] };
+function indoorWaiverVerb(kinds, own = '') {
+  const k = indoorKindKey(kinds);
+  if (k === 'climbing' && /\btrampolin\w*|\bjump/i.test(own) && !/\b(?:climb\w*|boulder\w*|escalade)\b/i.test(own)) return ['jump', 'sauter'];
+  return WAIVER_VERB[k] || ['play', 'jouer'];
+}
 const INDOOR_KIND_TEXT = K;
 const INDOOR_KIND_TEXT_KINDS = Object.keys(K);
 // The kind a place reads in: its main kind (the first the owner picked), else 'other'.
@@ -512,4 +522,4 @@ const INDOOR_TYPE_WORD_SKIP = new Set(['history', 'heritage', 'heritage site', '
 // "learn to curl", "slots", « soin du visage »).
 const INDOOR_TYPE_WORDS = [...new Set(Object.values(K).flatMap((e) => e.en.search.concat(e.fr.search)).filter((w) => !INDOOR_TYPE_WORD_SKIP.has(w)))];
 
-module.exports = { indoorTyperWords, TYPER_TRUE, indoorKindLabel, indoorKindLabels, BOOK_AHEAD_UNIT, TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };
+module.exports = { indoorWaiverVerb, indoorTyperWords, TYPER_TRUE, indoorKindLabel, indoorKindLabels, BOOK_AHEAD_UNIT, TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };

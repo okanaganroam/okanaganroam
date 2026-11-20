@@ -1654,6 +1654,8 @@
     var l = (T.quick || {})[key]; if (!l) return '';
     if (key === 'good_to_know' && C.indoor && (T.quick || {}).good_to_know_kinds) { var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; var lk = k0 ? T.quick.good_to_know_kinds[INDOOR_CHIP_GROUP.get(k0)] : null; if (lk && lk.length) l = lk;
       // Indoor test 7 (2026-11-19): "Free on the first Sunday" makes no sense when entry is always free.
+      // Indoor test 17: the waiver chip says her kind's verb ("Waiver to sign before you climb").
+      if (C.waiverVerb) l = l.map(function(c){ return c.replace(/before you play$/, 'before you ' + C.waiverVerb).replace(/avant de jouer$/, 'avant de ' + C.waiverVerb); });
       if (freeIndoor()) l = l.filter(function(c){ return !/first Sunday|premier dimanche/i.test(c); });
       // Indoor test 11 (2026-11-19; Kim was asked about free parking twice): free parking is the Free parking tile in What you
       // offer, so its Good to know chip isn't offered (unless her line already says it, so she can take it out).
@@ -1703,6 +1705,18 @@
     }
     var r = overMax(boxId, max); return r === false ? false : { text: r, go: false };
   }
+  // Indoor test 17 (2026-11-19; Megan): what her page's button will say for the link in the box, as the page decides it
+  // (server.js indoorBookButton): a waiver link "Sign the waiver", a party page "Book a party", walk-ins "Book a visit".
+  function bookShowsWord(url, book){
+    var B = C.bookShows; if (!B || !String(url || '').trim()) return '';
+    var u = String(url).trim(), W = B.words || {};
+    if (B.research && u === B.research.url) return B.research.label;
+    if (new RegExp(B.waiver, 'i').test(u)) return W.waiver;
+    if (book === 'no' && new RegExp(B.party, 'i').test(u.replace(/[-_/.?=&]+/g, ' '))) return W.party;
+    if (B.kind === 'shows') return W.shows; if (B.kind === 'classes') return W.classes;
+    return book === 'no' ? W.visit : W.book;
+  }
+  function bookShowsLine(url, book){ var w = bookShowsWord(url, book); return C.bookShows && T.bookShows ? '<p class="su-hint" id="suBookShows" aria-live="polite"' + (w ? '' : ' hidden') + '>' + h(w ? fill(T.bookShows, { x: w }) : '') + '</p>' : ''; }
   function countText(n, max){ return n > max && T.countOver ? fill(T.countOver, { n: n, max: max, d: n - max }) : n >= max && T.countFull ? fill(T.countFull, { max: max }) : fill(T.countOf || '{n} / {max}', { n: n, max: max }); }
   function countLine(boxId, value, max){ var n = String(value || '').length; return '<p class="su-hint su-count' + (n >= max ? ' su-count-full' : '') + '" id="' + boxId + 'Count" data-count="' + boxId + '" data-max="' + max + '" aria-live="polite">' + h(countText(n, max)) + '</p>'; }
   function countUpdate(box){ if (!box || !box.id) return; var c = el(box.id + 'Count'); if (!c) return; var max = +c.getAttribute('data-max'), n = box.value.length; c.textContent = countText(n, max); c.className = 'su-hint su-count' + (n >= max ? ' su-count-full' : ''); }
@@ -2615,7 +2629,7 @@
         // folds behind "Have a booking page?" (it still saves the same way when opened).
         + (walkInFold(ibNow) ? '<details class="su-fold" id="suBookFold"><summary>' + h(T.haveBookPage) + '</summary>' : '')
         + '<h2 class="su-h2" id="suLinkQ">' + h(indoorLinkQ(ib.book)[0]) + '</h2><p class="su-hint">' + h(indoorLinkQ(ib.book)[1]) + '</p>'
-        + (ib.noBook ? '' : field('suBookUrl', T.bookLinkLabel, ibNow, { mode: 'url', max: 300 }) + ex(T.bookLinkEx))
+        + (ib.noBook ? '' : field('suBookUrl', T.bookLinkLabel, ibNow, { mode: 'url', max: 300 }) + ex(T.bookLinkEx) + bookShowsLine(ibNow, ib.book))
         + (CUR.booking_url || C.bookingKnown ? '' : '<div class="su-chips" role="group" aria-labelledby="suLinkQ"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ib.noBook ? 'true' : 'false') + '" data-tnobook="1">' + h(T.noBookLink) + '</button></div>')
         + (walkInFold(ibNow) ? '</details>' : '')
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'bookingSave') + '</div>' + skip('booking');
@@ -5068,6 +5082,8 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tks]'), function(b){ b.onclick = function(){ var q15 = b.getAttribute('data-tks').split(':'); S.tour.ks[q15[0]] = q15[1]; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tadult]'), function(b){ b.onclick = function(){ S.tour.adult = !S.tour.adult; redraw(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tnobook]'), function(b){ b.onclick = function(){ readTour(); var bu2 = el('suBookUrl'); if (bu2) S.bookUrl = bu2.value; S.tour.noBook = !S.tour.noBook; redraw(); }; });
+    // Indoor test 17: the button's words follow the link as it is typed or pasted.
+    var bsx = el('suBookUrl'), bsl = el('suBookShows'); if (bsx && bsl && INDOOR) bsx.addEventListener('input', function(){ var w = bookShowsWord(bsx.value, S.tour && S.tour.book); bsl.textContent = w ? fill(T.bookShows, { x: w }) : ''; bsl.hidden = !w; });
     var tsg = el('suTsugg'); if (tsg && INDOOR) tsg.addEventListener('input', function(){ S.tour.suggText = tsg.value; var ld = el('suTpriceLead'); if (ld) ld.textContent = tourPriceLead(); });
     var tpi = el('suTprice'); if (tpi && TL) tpi.addEventListener('input', function(){ readTour(); var ld = el('suTpriceLead'); if (ld) ld.textContent = tourPriceLead();
       // Indoor test 2: per room words pick Per room or group as she types (the box keeps her focus).

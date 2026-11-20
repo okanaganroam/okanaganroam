@@ -63,10 +63,13 @@ function renderIndoorLayout(p) {
   // typed price list shows here as on the French page ("See all prices & rates (7)").
   const pricesCard = p.menuHtml ? `<section class="gb-card gb-prices" id="gbPrices">${p.menuHtml}</section>` : '';
   // Indoor test 13 (2026-11-19): the card is titled by what the button opens (a cinema's showtimes, a studio's schedule).
-  const bookHead = />Showtimes (?:&amp;|&) tickets\b/.test(book) ? 'Showtimes &amp; tickets' : />Class schedule\b/.test(book) ? 'Class schedule' : 'Book your visit';
+  // Indoor test 17 (2026-11-19; Megan's walk-in gym: "Plan a time / Book your visit" sat above "Walk-ins welcome", her button
+  // being the waiver): a walk-in place's card is "Before you go".
+  const walkIn = visitRows.some((r) => /^Booking$/i.test(r.label) && /^Walk-ins welcome: no need to book\.?$/i.test(String(r.text || '').trim()));
+  const bookHead = />Showtimes (?:&amp;|&) tickets\b/.test(book) ? 'Showtimes &amp; tickets' : />Class schedule\b/.test(book) ? 'Class schedule' : walkIn ? 'Before you go' : 'Book your visit';
   const bookingCard = book || costRows.length
-    ? `<aside class="gb-card gb-booking" id="gbBooking"><p class="gb-eyebrow">${book ? 'Plan a time' : 'Good to know'}</p><h2>${book ? bookHead : 'Prices &amp; booking'}</h2>
-        ${book ? `<div class="gb-desktop-book">${book}<p class="gb-help">Opens the booking page in a new tab.</p></div>` : ''}
+    ? `<aside class="gb-card gb-booking" id="gbBooking"><p class="gb-eyebrow">${book && !walkIn ? 'Plan a time' : walkIn ? 'Walk-ins welcome' : 'Good to know'}</p><h2>${book ? bookHead : 'Prices &amp; booking'}</h2>
+        ${book ? `<div class="gb-desktop-book">${book}<p class="gb-help">${walkIn ? 'Opens in a new tab.' : 'Opens the booking page in a new tab.'}</p></div>` : ''}
         ${price ? `<p class="gb-price-line"><strong>${price}</strong> <span>price level</span></p>` : ''}
         ${costRows.map(rowHtml).join('')}
         ${sourceLine(p, e, external)}
@@ -80,7 +83,7 @@ function renderIndoorLayout(p) {
     ? `<section class="gb-card gb-contact" id="gbContact"><p class="gb-eyebrow">Meet you there</p><h2>Getting here 📍</h2>${p.detailRows ? `<div class="venue-key-info">${p.detailRows}</div>` : ''}${p.locationHtml || ''}<div class="gb-contact-actions">${directions}${contactActions.join('')}</div></section>` : '';
   const hoursCard = p.hoursHtml ? `<section class="gb-card gb-hours" id="gbHours"><div class="venue-section venue-hours" id="venueHours">${p.hoursHtml}</div></section>` : '';
 
-  const nav = [['gbOverview', 'Overview'], bookingCard ? ['gbBooking', book ? 'Book' : 'Prices'] : pricesCard && ['gbPrices', 'Prices'], visitCard && ['gbVisit', 'Your visit'], contactCard && ['gbContact', 'Getting here'], hoursCard && ['gbHours', 'Hours']]
+  const nav = [['gbOverview', 'Overview'], bookingCard ? ['gbBooking', book && !walkIn ? 'Book' : walkIn ? 'Before you go' : 'Prices'] : pricesCard && ['gbPrices', 'Prices'], visitCard && ['gbVisit', 'Your visit'], contactCard && ['gbContact', 'Getting here'], hoursCard && ['gbHours', 'Hours']]
     .filter(Boolean).map(([id, label]) => `<a href="#${id}">${label}</a>`).join('');
 
   // Indoor test 7 (2026-11-19; Robert): with the whole story already the intro, "The space" repeated it word for word. It

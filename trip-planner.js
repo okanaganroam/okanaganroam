@@ -838,6 +838,12 @@ function indoorMainKind(v) {
   const IK = require('./indoor-kinds');
   return Object.keys(INDOOR_CARD_WORDS).find((k) => IK.indoorKindLabels(k, INDOOR_CARD_WORDS[k]).some((w) => w[0] === pair[0])) || null;
 }
+// Indoor test 17: an indoor place of a kind the day already has (its other stops), unless the request asks for several.
+function sameIndoorKindToday(v, stops, facts, ctx) {
+  const k = indoorMainKind(v); if (!k || SEVERAL_ASKED_RE.test((ctx && ctx.queryText) || '')) return false;
+  const ids = new Set((stops || []).filter((x) => x && x.venue && x.venue.type === 'indoor' && x.venue.id !== v.id).map((x) => x.venue.id));
+  return (facts || []).some((f) => ids.has(f.id) && indoorMainKind(f) === k);
+}
 function indoorCardKind(v) {
   const own = Array.isArray(v.indoorKinds) ? v.indoorKinds.find((k) => INDOOR_CARD_WORDS[k]) : null;
   if (own) return indoorKindPair(own, v);
@@ -4055,6 +4061,7 @@ function buildDays(facts, ctx, days, pinned) {
       if (offSeasonSkip(v, ctx) || (placeKey(v) && taken.has(placeKey(v))) || (ctx.kids && familyAvoid(v))) continue;
       if (ctx.pace === 'relaxed' && v.type === 'golf') continue;
       if (spaPlace(v) && first && spaPlace(first)) continue; // one spa a day (2026-10-25)
+      if (v.type === 'indoor' && sameIndoorKindToday(v, day.stops, facts, ctx)) continue; // indoor test 17: one place of each kind a day
       if (spaPlace(v) && (!SPA_ASKED_RE.test(ctx.queryText || '') || oneSpa) && out.some((dd) => (dd.stops || []).some((x) => x.venue && spaPlace(byId.get(x.venue.id) || x.venue)))) continue;
       if (v.type === 'beach' && types.has('beach') && coolBeachMonth(actualDate || ctx.tripDate)) continue; // one beach a day off season
       const fit = slotFit(v, ctx, 'afternoon', d - 1, 'afternoon');
@@ -5927,6 +5934,7 @@ function fillDinnerGaps(result, input, requirements) {
         // 2026-10-25 (tools audit): a rainy day is all indoors, so a third indoor stop may fill a long late afternoon
         // ("rainy day in Whistler" had a spa and a museum, then 3 h 15 min free before dinner).
         if (capped(v.type) || (dayTypes[v.type] || 0) >= (v.type === 'indoor' && (ctx.rainy || dayCtx.rainy) ? 3 : 2) || (v.type === 'golf' && !v.indoorGolf) || eveningOnlyVenue(v)) continue;
+        if (v.type === 'indoor' && sameIndoorKindToday(v, day.stops, facts, ctx)) continue; // indoor test 17: one place of each kind a day
         if (v.type === 'outdoor' && (/\b(?:steep|summit|summits|ladder|ladders|chains)\b/.test(normWords(v.trailText || '')) || (trailMinutes(v) || 0) >= 150)) continue; // a summit trail is not a pre-dinner filler
         if (spaPlace(v) && (day.stops || []).some((x) => x.venue && spaPlace(x.venue))) continue; // one spa a day (2026-10-25)
         if (spaPlace(v) && (!SPA_ASKED_RE.test(normWords(input.text || '')) || oneSpaAsked(input.text, (result.days || []).length)) && (result.days || []).some((dd) => (dd.stops || []).some((x) => x.venue && spaPlace(x.venue)))) continue; // and one a trip unless asked
@@ -6301,6 +6309,7 @@ function idleGapCandidates(result, input, requirements, g) {
     if (!kinds.includes(v.type) || spaPlace(v) || longDayHike(v) || used.has(v.id) || estateUsed.has(v.id) || ctx.exclude.has(v.id) || ctx.avoid.has(v.id) || !hasCoords(v)) continue;
     if ((placeKey(v) && usedPlaces.has(placeKey(v))) || (ctx.kids && familyAvoid(v)) || (regions.length && !regions.includes(v.region))) continue;
     if (capped(v.type) || (dayTypes[v.type] || 0) >= (crawl ? 4 : 2) || (eveningOnlyVenue(v) && end0 < 1020)) continue;
+    if (v.type === 'indoor' && sameIndoorKindToday(v, g.stops, facts, ctx)) continue; // indoor test 17
     if (bookedOutfitter(v) || appointmentOnly(v) || rotateBooked(v) || (!ctx.kids && KIDS_ONLY_RE.test(`${v.textName || ''} ${v.textDesc || ''}`))) continue;
     if (!crawl && GAP_ALCOHOL_TYPES.includes(v.type) && !ctx.types.has(v.type) && result.theme !== 'wine' && !['group_getaway', 'celebration'].includes(ctx.occasion)) continue;
     if (v.type === 'cafe' && cafeRole(v) !== 'treat' && !ctx.kids) continue;

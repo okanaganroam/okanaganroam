@@ -50,6 +50,7 @@ const NOW = new Date('2026-11-19T12:00:00-08:00');
 const page = (v, lang = 'en') => app.renderVenuePage(app.getVenue(v.id), [], [], [], { lang, now: NOW });
 const plain = (h) => String(h).replace(/<svg[\s\S]*?<\/svg>/g, '').replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&middot;/g, '·').replace(/&amp;/g, '&').replace(/&#39;|&rsquo;/g, '’').replace(/[  ]/g, ' ').replace(/\s+/g, ' ');
 const itemsOf = (p) => [...((p.outing && p.outing.stops) || []), ...((p.itinerary && p.itinerary.stops) || []), ...(p.days || []).flatMap((d) => d.stops || []), ...(p.recommendations || [])].filter((x) => x && x.venue);
+const approveAll = (id) => { for (const r of db.prepare("SELECT id FROM owner_change_requests WHERE venue_id = ? AND status = 'pending'").all(id)) app.approveOwnerChange(r.id, 'admin:test'); };
 const rowsOf = (id) => JSON.parse(db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(id).info);
 const menuCfg = async (t, lang = 'en') => { const h = await getText(`${lang === 'fr' ? '/fr' : ''}/owner/${t}/menu`); const m = /"firstItem":\{"name":"([^"]*)","price":"([^"]*)"\}/.exec(h); return { first: m ? m[1] : null, price: m ? m[2] : null, html: h }; };
 
@@ -169,4 +170,104 @@ test('G2. Groups and Good to know: over the limit, research\'s words are trimmed
       assert.equal(lineOf(v.id, label), shown.trim());
     }
   }
+});
+
+// Megan's gym as she left it: climbing, walk-ins, All ages, a day pass, her Good to know with the under-14 rule, her waiver
+// link and her hours; closed on Christmas Day.
+const meganGym = async (o = {}) => {
+  const v = withResearch({ name: `Gneiss Climbing T17 ${n + 1}`, ...o });
+  const t = tokenFor(v.id);
+  await ok(change(t, { indoor_info: { kinds: ['climbing'], length: '1-2h', book: 'no', age: 'all', year: 'all' }, indoor_price: 22 }));
+  await ok(change(t, { hours: MEGAN }));
+  await ok(change(t, { visit_rows: { good_to_know: 'Waiver to sign before you climb. Kids under 14 need an adult on the mats.' } }));
+  await ok(change(t, { closures: [{ from: '2026-12-25', to: '2026-12-25', note: 'Christmas Day' }] }));
+  return { v, t };
+};
+
+test('1. Kind label: a bouldering-only gym is "Climbing gym" (« Salle d’escalade ») on its card, page, setup and every plan; a trampoline park is "Trampoline park"; both say both; spa and pool labels show only the parts their words say', async () => {
+  const { v, t } = await meganGym();
+  assert.equal(app.getVenue(v.id).cuisine, 'Climbing gym');
+  assert.match(plain(page(v, 'fr')), /Salle d’escalade/);
+  assert.doesNotMatch(plain(page(v)), /Climbing & trampoline/);
+  const s = await openSetup(base, t, { hash: 'more' });
+  assert.equal(s.cfg.indoorKindWords.climbing, 'Climbing gym');
+  const sf = await openSetup(base, t, { hash: 'more', lang: 'fr' });
+  assert.equal(sf.cfg.indoorKindWords.climbing, 'Salle d’escalade');
+  for (const q of ['climbing gym in Kelowna', 'rainy day with a 10 year old in Kelowna', 'kids birthday party Kelowna Saturday', 'team building Kelowna']) {
+    const stop = itemsOf(app.runTripPlan({ text: q }, NOW)).find((x) => x.venue.id === v.id);
+    if (stop) { assert.equal(stop.venue.typeLabel, 'Climbing gym', q); assert.equal(stop.venue.typeLabelFr, 'Salle d’escalade', q); }
+  }
+  const tr = mk({ name: 'Bounce Park T17', description: 'An indoor trampoline park with a dodgeball court.' });
+  await ok(change(tokenFor(tr.id), { indoor_info: { kinds: ['climbing'], length: '1-2h', age: 'all', year: 'all' } }));
+  assert.equal(app.getVenue(tr.id).cuisine, 'Trampoline park');
+  const both = mk({ name: 'Rock & Bounce T17', description: 'A climbing gym with bouldering and a trampoline park.' });
+  await ok(change(tokenFor(both.id), { indoor_info: { kinds: ['climbing'], length: '1-2h', age: 'all', year: 'all' } }));
+  assert.equal(app.getVenue(both.id).cuisine, 'Climbing & trampoline');
+  // Every multi-part label: only the parts its words say.
+  for (const [kind, desc, want] of [['spa', 'A day spa with massage and facials.', 'Spa'], ['spa', 'A floating sauna on the lake.', 'Sauna'], ['spa', 'A spa with massage and a sauna.', 'Spa & sauna'],
+    ['pool', 'An indoor swimming pool with lane swim.', 'Swimming pool'], ['pool', 'A rec centre with a pool and a gym.', 'Pool & rec centre']]) {
+    const x = mk({ name: `Label T17 ${n + 1}`, description: desc });
+    await ok(change(tokenFor(x.id), { indoor_info: { kinds: [kind], length: '1-2h', age: 'all', year: 'all' } }));
+    assert.equal(app.getVenue(x.id).cuisine, want, desc);
+  }
+});
+
+test('3. Search with a holiday ("climbing christmas day kelowna", « escalade noël kelowna »): the places are listed, hers saying "Closed Dec 25", never "No places match"', async () => {
+  const { v } = await meganGym({ name: 'Gneiss T17 Holiday' });
+  const other = mk({ name: 'Crux Climbing Gym T17', description: 'Full-service indoor climbing gym with bouldering.', hours: JSON.stringify(DAY('12:00', '22:00')) });
+  const h = await getText(`/search?q=${encodeURIComponent('climbing christmas day kelowna')}`);
+  assert.doesNotMatch(plain(h), /No places match/);
+  const cardOf = (html, name) => { const i = html.indexOf(`data-venue-name="${name}"`); assert.ok(i > 0, name); return html.slice(i, html.indexOf('</li>', i)); };
+  assert.match(cardOf(h, v.name), /data-fd-day="1">Closed Dec 25</);
+  assert.match(cardOf(h, other.name), /data-fd-day="1">Dec 25 · 12 PM–10 PM \(usual Friday hours\)</);
+  assert.ok(h.indexOf(`data-venue-name="${other.name}"`) < h.indexOf(`data-venue-name="${v.name}"`), 'open that day first');
+  const fr = await getText(`/fr/search?q=${encodeURIComponent('escalade noël kelowna')}`);
+  assert.match(cardOf(fr, v.name), /Fermé le 25 déc\./);
+  // A weekday still reads as before; no holiday: no day line.
+  assert.match(await getText(`/search?q=${encodeURIComponent('climbing monday kelowna')}`), /Open Mondays/);
+  assert.doesNotMatch(await getText(`/search?q=${encodeURIComponent('climbing kelowna')}`), /data-fd-day="1"/);
+});
+
+test('4. Polish: the waiver chip says the kind\'s verb (climb, jump, play); a walk-in place\'s card is "Before you go"; a day plan has one place of each kind unless asked; the booking screen says what the page\'s button will say for the link in the box', async () => {
+  const { v, t } = await meganGym({ name: 'Gneiss T17 Polish' });
+  const g = await openSetup(base, t, { hash: 'bring' });
+  const chips = g.doc.getElementById('suScreen').querySelectorAll('[data-quick]').map((c) => c.getAttribute('data-quick'));
+  assert.ok(chips.includes('Waiver to sign before you climb'), chips.join(' | '));
+  assert.ok(!chips.some((c) => /before you play/.test(c)));
+  const gf = await openSetup(base, t, { hash: 'bring', lang: 'fr' });
+  assert.ok(gf.doc.getElementById('suScreen').querySelectorAll('[data-quick]').some((c) => c.getAttribute('data-quick') === 'Décharge à signer avant de grimper'));
+  const IKw = IK.indoorWaiverVerb;
+  assert.deepEqual(IKw(['climbing'], 'An indoor trampoline park.'), ['jump', 'sauter']);
+  assert.deepEqual(IKw(['kids'], ''), ['play', 'jouer']);
+  // Before you go: walk-ins welcome, with a waiver link as her button.
+  await ok(change(t, { booking_url: 'https://smartwaiver.example.com/portal/sw/gneiss' }));
+  approveAll(v.id);
+  const en = page(v);
+  assert.match(en, /<p class="gb-eyebrow">Walk-ins welcome<\/p><h2>Before you go<\/h2>/);
+  assert.doesNotMatch(en, /Book your visit/);
+  assert.match(plain(en), /Sign the waiver/);
+  // A place that books ahead keeps "Book your visit".
+  const e2 = mk({ name: 'Escape T17 Ahead', description: 'Three escape rooms.' });
+  const te = tokenFor(e2.id);
+  await ok(change(te, { indoor_info: { kinds: ['escape'], length: '1-2h', book: 'ahead', age: 'all', year: 'all' } }));
+  await ok(change(te, { booking_url: 'https://example.com/book' }));
+  approveAll(e2.id);
+  assert.match(page(e2), /<h2>Book your visit<\/h2>/);
+  // The booking screen: what the button says for the link (her waiver link stays "Sign the waiver").
+  const b = await openSetup(base, t, { hash: 'booking' });
+  assert.match(b.doc.getElementById('suBookShows').textContent, /Your page’s button: Sign the waiver/);
+  await b.type('suBookUrl', 'https://gneiss.example.com/birthday-parties');
+  assert.match(b.doc.getElementById('suBookShows').textContent, /Your page’s button: Book a party/);
+  await b.type('suBookUrl', 'https://gneiss.example.com/visit');
+  assert.match(b.doc.getElementById('suBookShows').textContent, /Your page’s button: Book a visit/);
+  // One climbing gym a day (her kids' birthday day planned two); "two escape rooms" keeps two.
+  for (const nm of ['Crux Gym T17 A', 'Boulder Barn T17 B']) {
+    const c = mk({ name: nm, region: 'peachland', latitude: 49.77, longitude: -119.74, description: 'An indoor climbing gym with bouldering.', kid_friendly: 1, great_groups: 1 });
+    await ok(change(tokenFor(c.id), { indoor_info: { kinds: ['climbing'], length: '1-2h', book: 'no', age: 'all', year: 'all' } }));
+  }
+  for (const nm of ['Peach Burgers T17', 'Lakeside Pizza T17']) mk({ name: nm, region: 'peachland', type: 'restaurant', cuisine: 'Pizza', latitude: 49.771, longitude: -119.74, description: 'Pizza and burgers for families.', kid_friendly: 1 });
+  const day = app.runTripPlan({ text: 'kids birthday party in Peachland Saturday' }, NOW);
+  const gyms = (day.days || []).flatMap((d) => d.stops || []).filter((x) => x.venue && x.venue.type === 'indoor');
+  const kindsOfDay = gyms.map((x) => x.venue.typeLabel);
+  assert.equal(new Set(kindsOfDay).size, kindsOfDay.length, kindsOfDay.join(' | '));
 });

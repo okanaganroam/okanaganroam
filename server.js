@@ -5876,8 +5876,10 @@ const SMART_ACTIVITIES = [
     re: /\bgo[- ]?karts?\b|\bgo[- ]?karting\b|\bkarting\b|\bkartplex\b/i },
   { key: 'trampoline', label: 'Trampoline parks', labelFr: 'Parcs de trampolines', words: ['trampoline', 'trampolines', 'trampoline park', 'trampoline parks', 'parc de trampolines', 'trampoline centre'],
     re: /\btrampolines?\b/i },
-  { key: 'climbing_gym', label: 'Climbing gyms', labelFr: 'Centres d’escalade', words: ['climbing gym', 'climbing gyms', 'bouldering', 'bouldering gym', 'bouldering gyms', 'indoor climbing', 'climbing wall', 'climbing walls', 'escalade', 'escalade interieure'],
-    re: /\bclimbing (?:gyms?|walls?|centres?|centers?)\b|\bboulder(?:ing)?\b|\bindoor climbing\b/i },
+  // Indoor test 17 (2026-11-19; Megan: "climbing christmas day kelowna" found nothing): plain "climbing" / "climb" too; the
+  // places are indoors or Sports & Recreation (never a "Boulder Trail").
+  { key: 'climbing_gym', label: 'Climbing gyms', labelFr: 'Centres d’escalade', words: ['climbing gym', 'climbing gyms', 'bouldering', 'bouldering gym', 'bouldering gyms', 'indoor climbing', 'climbing wall', 'climbing walls', 'escalade', 'escalade interieure', 'salle d escalade', 'climbing', 'climb'],
+    types: ['indoor', 'sport'], re: /\bclimbing (?:gyms?|walls?|centres?|centers?)\b|\bboulder(?:ing)?\b|\bindoor climbing\b|\bauto[- ]?belays?\b|\btop[- ]rop(?:e|ing)\b/i },
   { key: 'arcade', label: 'Arcades', labelFr: 'Arcades', words: ['arcade', 'arcades', 'video arcade', 'arcade games', 'salle d arcade', 'salles d arcade'],
     re: /\b(?:arcades?|rcades)\b/i },
   { key: 'laser_tag', label: 'Laser tag', labelFr: 'Laser tag', words: ['laser tag', 'lazer tag', 'lasertag'],
@@ -5956,7 +5958,16 @@ function smartActivityPick(activity, region, features) {
     if (inName(v)) return `Name says ${activity.label.toLowerCase()}`;
     if (activity.nameOnly) return false;
     return activity.re.test(String(v.row.description || '')) || activity.re.test(String(v.row.cuisine || '')) ? `Mentions ${activity.label.toLowerCase()}` : false;
-  }, (v) => (inName(v) ? 100 : 0) + (SMART_ACTIVITY_TYPES.has(v.type) ? 10 : 0) + foodDrinkRecommendedScore(v.row));
+  }, (v) => (inName(v) ? 100 : 0) + (smartOwnerKind(v, activity) ? 150 : 0) + (SMART_ACTIVITY_TYPES.has(v.type) ? 10 : 0) + foodDrinkRecommendedScore(v.row));
+}
+// Indoor test 17: a place whose owner picked the activity's kind comes first (before a name or description match).
+function smartOwnerKind(v, activity) {
+  try {
+    if (!v || v.type !== 'indoor') return false;
+    const own = venueIndoorInfo(v.id).kinds; if (!Array.isArray(own) || !own.length) return false;
+    const asked = indoorKindsModule.indoorKindsNamedIn(`${activity.label} ${activity.words.join(' ')}`);
+    return own.some((k) => asked.includes(k));
+  } catch (e) { return false; }
 }
 
 // Indoor test 16 (2026-11-19; "escape room monday kelowna" said "Open now" for Tyler's room, closed Mondays): a weekday named
@@ -5967,16 +5978,50 @@ function smartSearchDay(folded) {
   const i = hits[0];
   return { key: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][i], idx: i, en: SMART_WEEKDAYS[i][0].charAt(0).toUpperCase() + SMART_WEEKDAYS[i][0].slice(1), fr: SMART_WEEKDAYS[i][1] };
 }
+// Indoor test 17 (2026-11-19; "climbing christmas day kelowna" said "No places match"): a holiday named in an activity
+// search is that date (the next one): the places are listed, each card saying "Closed Dec 25" (the owner's closure) or
+// its usual hours that weekday. -> { key, idx, en: 'Dec 25', fr: '25 déc.', date: 'YYYY-MM-DD', words } or null.
+const SMART_HOLIDAYS = [
+  [/(?:^| )(?:christmas day|xmas day|christmas|xmas|jour de noel|noel|dec 25|december 25|25 dec|25 decembre)(?: |$)/, 12, 25],
+  [/(?:^| )(?:christmas eve|xmas eve|veille de noel|dec 24|december 24|24 dec|24 decembre)(?: |$)/, 12, 24],
+  [/(?:^| )(?:boxing day|lendemain de noel|dec 26|december 26|26 dec|26 decembre)(?: |$)/, 12, 26],
+  [/(?:^| )(?:new years eve|new year s eve|nye|veille du jour de l an|dec 31|december 31|31 dec|31 decembre)(?: |$)/, 12, 31],
+  [/(?:^| )(?:new years day|new year s day|new years|jour de l an|jan 1|january 1|1er janvier)(?: |$)/, 1, 1],
+  [/(?:^| )(?:canada day|fete du canada|july 1|1er juillet)(?: |$)/, 7, 1],
+];
+const SMART_HOLIDAY_WORDS = ['christmas day', 'xmas day', 'christmas eve', 'xmas eve', 'christmas', 'xmas', 'jour de noel', 'veille de noel', 'lendemain de noel', 'noel', 'boxing day', 'new years eve', 'new year s eve', 'nye', 'new years day',
+  'new year s day', 'new years', 'jour de l an', 'veille du jour de l an', 'canada day', 'fete du canada', 'dec 24', 'dec 25', 'dec 26', 'dec 31', 'december 24', 'december 25', 'december 26', 'december 31', '24 dec', '25 dec', '26 dec', '31 dec',
+  '24 decembre', '25 decembre', '26 decembre', '31 decembre', 'jan 1', 'january 1', '1er janvier', 'july 1', '1er juillet', 'on', 'le', 'day', 'jour'];
+const SMART_MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const SMART_MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+function smartSearchHoliday(folded, now = new Date()) {
+  const h = SMART_HOLIDAYS.find(([re]) => re.test(folded));
+  if (!h) return null;
+  const today = todayLocal(now), y0 = Number(today.slice(0, 4));
+  let date = `${y0}-${String(h[1]).padStart(2, '0')}-${String(h[2]).padStart(2, '0')}`;
+  if (date < today) date = `${y0 + 1}${date.slice(4)}`;
+  const idx = new Date(`${date}T12:00:00Z`).getUTCDay();
+  return { key: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][idx], idx, date, en: `${SMART_MONTHS_SHORT[h[1] - 1]} ${h[2]}`, fr: `${h[2] === 1 ? '1er' : h[2]} ${SMART_MONTHS_FR[h[1] - 1]}`, holiday: true };
+}
 // A place on that day, from its listed hours: { open: true, text: 'Open Mondays · 12 PM–10 PM' } | { open: false, text:
-// 'Closed Mondays' } | null (hours not known for that day).
+// 'Closed Mondays' } | null (hours not known for that day). A holiday date (day.date): the owner's closure that day first
+// ("Closed Dec 25"), else that weekday's listed hours ("Dec 25 · 10 AM–10 PM (usual Friday hours)").
 function smartDayStatus(row, day, lang = 'en') {
   try {
+    const fr0 = lang === 'fr';
+    if (day && day.date && row && row.id) {
+      const cl = (venueHoursExtras(row.id).closures || []).find((c) => c && day.date >= c.from && day.date <= (c.to || c.from));
+      if (cl) return { open: false, state: 'closed', text: fr0 ? `Fermé le ${day.fr}` : `Closed ${day.en}` };
+    }
     const ph = row && row.hours ? hoursModule.parseHours(row.hours) : null;
     const d = ph && ph.known ? ph.days[day.key] : null;
     if (!d || d.status === 'unknown') return null;
     const fr = lang === 'fr';
+    const wd = SMART_WEEKDAYS[day.idx];
+    if (day.date && d.status === 'closed') return { open: false, state: 'closed', text: fr ? `Fermé le ${wd[1]}` : `Closed ${wd[0].charAt(0).toUpperCase() + wd[0].slice(1)}s` };
     if (d.status === 'closed') return { open: false, state: 'closed', text: fr ? `Fermé le ${day.fr}` : `Closed ${day.en}s` };
     const r = (d.ranges || []).map(([a, b]) => `${hoursModule.formatClockMinutes(a)}–${hoursModule.formatClockMinutes(b)}`).join(', ');
+    if (day.date) return { open: true, state: 'open', text: fr ? `${day.fr}${r ? ` · ${r}` : ''} (heures habituelles du ${wd[1]})` : `${day.en}${r ? ` · ${r}` : ''} (usual ${wd[0].charAt(0).toUpperCase() + wd[0].slice(1)} hours)` };
     return { open: true, state: 'open', text: fr ? `Ouvert le ${day.fr}${r ? ` · ${r}` : ''}` : `Open ${day.en}s${r ? ` · ${r}` : ''}` };
   } catch (e) { return null; }
 }
@@ -6401,11 +6446,13 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
   // Search ranking (2026-10-18): an activity ("escape room", "go karts in kelowna") -> the places that have it,
   // name matches first. Only when nothing else is asked for, and only when a place in that town has it.
   const activity = smartActivityFor(folded);
-  if (activity && T.every((t) => SMART_ACTIVITY_TYPES.has(t)) && !intent.cuisines.length && !intent.collections.length
-    && !smartTopicWords(folded, intent, [...activity.words, ...SMART_ACTIVITY_GENERIC]).length) {
+  // Indoor test 17: a holiday named ("climbing christmas day kelowna") is that date (smartSearchHoliday).
+  const hday = activity ? smartSearchHoliday(folded, now) : null;
+  if (activity && (hday || T.every((t) => SMART_ACTIVITY_TYPES.has(t))) && !intent.cuisines.length && !intent.collections.length
+    && !smartTopicWords(folded, intent, [...activity.words, ...SMART_ACTIVITY_GENERIC, ...(hday ? SMART_HOLIDAY_WORDS : [])]).length) {
     // Indoor test 16: a weekday named ("escape room monday kelowna"): the places open that day first, and each card says
     // the day ("Closed Mondays", "Open Mondays · 12 PM–10 PM") instead of "Open now".
-    const day = smartSearchDay(folded);
+    const day = hday || smartSearchDay(folded);
     const pick = () => { const l = smartActivityPick(activity, region, F); if (!day) return l; const st = (x) => smartDayStatus(x.row, day); return l.map((x, i) => ({ x, i, s: st(x) })).sort((a, b) => ((b.s && b.s.open ? 1 : 0) - (a.s && a.s.open ? 1 : 0)) || ((a.s && !a.s.open ? 1 : 0) - (b.s && !b.s.open ? 1 : 0)) || a.i - b.i).map((o) => o.x); };
     // Round 8 (2026-10-19): the activity's guide beside its places, and its events; with no place, the guide itself.
     const guide = activity.guide ? liveGuides().find((g) => g.path === activity.guide) : null;
@@ -25285,6 +25332,7 @@ function indoorFrTopLabel(venue) {
 // walk-in place (Booking: Walk-ins welcome) whose booking link or Groups line is about parties labels its button "Book a
 // party" (« Réserver une fête »).
 const INDOOR_PARTY_WORDS_RE = /\b(?:part(?:y|ies)|birthdays?|bday|f[eê]tes?|anniversaires?)\b/i;
+const INDOOR_WAIVER_URL_RE = /waiver|smartwaiver|waiversign|waiverforever|rollerwaiver|waivers?\.|wavier|decharge/i;
 // Indoor test 13 (2026-11-19; Dan's cinema: his showtimes link was a "Book a party" button because his Groups line named
 // birthday parties): the Groups line counts only for a kids' place; any other kind says "Book a party" only when the link
 // itself is a party page.
@@ -25307,6 +25355,8 @@ function indoorBookButton(venue, bookingUrl) {
   try {
     if (!venue || venue.type !== 'indoor') return B.book;
     const t = venueIndoorInfo(venue.id), k = indoorKindsModule.indoorKindText(t.kinds, 'en');
+    // Indoor test 17 (2026-11-19; Megan pasted her waiver link): a waiver link says so.
+    if (INDOOR_WAIVER_URL_RE.test(String(bookingUrl || ''))) return B.waiver;
     if (indoorPartyBooking(venue, bookingUrl)) return B.party;
     if (k.ticketed) return B.shows;
     if (k.classKind) return B.classes;
@@ -59574,6 +59624,8 @@ function renderOwnerSetupPage(found, opts) {
       indoorKinds: INDOOR_KINDS_SHOWN.map((k) => ({ k, t: INDOOR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), indoorKindsTop: INDOOR_KINDS_TOP,
       // Indoor test 2: the card's short words for each kind, for the preview ("Escape room · arcade, VR & laser tag").
       indoorKindWords: Object.fromEntries(Object.entries(INDOOR_KIND_WORDS).map(([k, w]) => [k, (indoorKindsModule.indoorKindLabel(k, indoorOwnWords(venue.id)) || w)[fr ? 1 : 0]])),
+      // Indoor test 17: the waiver chip's verb for her kind ("before you climb").
+      waiverVerb: indoorKindsModule.indoorWaiverVerb(venueIndoorInfo(venue.id).kinds || indoorKindSuggestion(venue), indoorOwnWords(venue.id))[fr ? 1 : 0],
       // Indoor test 8: games after the main kind reads "arcade" unless his own words say VR, laser tag or karting.
       indoorGamesShort: INDOOR_GAMES_FULL_RE.test(indoorOwnWords(venue.id)) ? '' : INDOOR_GAMES_SHORT[fr ? 1 : 0],
       // Indoor test 12 (2026-11-19; the finish preview said "Museum" where the page says "Science centre"): the page's own word.
@@ -59585,6 +59637,12 @@ function renderOwnerSetupPage(found, opts) {
       researchSuggested: indoorResearchSuggested(venue),
       visitTicks: indoorVisitTicks(venue, snap.badges),
       bookingKnown: (!snap.booking_url && (venueVisitInfo(venue.id) || {}).booking_url) || '',
+      // Indoor test 17 (2026-11-19; Megan: the booking screen didn't say her waiver link stays "Sign the waiver"): what the
+      // page's button will say for the link in the box ("Your page shows: Sign the waiver").
+      bookShows: { waiver: INDOOR_WAIVER_URL_RE.source, party: INDOOR_PARTY_WORDS_RE.source,
+        words: Object.fromEntries(Object.entries(indoorKindsModule.INDOOR_BOOK_BUTTONS).map(([k, w]) => [k, w[fr ? 1 : 0]])),
+        kind: (() => { const k = indoorKindsModule.indoorKindText(venueIndoorInfo(venue.id).kinds || indoorKindSuggestion(venue), 'en'); return k.ticketed ? 'shows' : k.classKind ? 'classes' : k.kind === 'kids' ? 'kids' : ''; })(),
+        research: (() => { const vi = venueVisitInfo(venue.id) || {}; return vi.booking_url && vi.booking_label ? { url: vi.booking_url, label: vi.booking_label } : null; })() },
     } : {}),
     // Pub test (Whistler, 2026-11-14): research's "Minors until 9 PM" pre-picks that answer on a pub's Who's welcome
     // too (a suggestion, saved only with the screen), as it does for breweries.
@@ -61169,8 +61227,8 @@ function indoorKindHelpTopics(topics, kinds, price = null, exact = false, free =
         + (rentChip(fr) ? `<p>${teamChip(fr) === rentChip(fr) ? 'Des événements d’entreprise ou d’équipe, ou des réservations privées?' : 'Vous louez votre espace pour des événements privés?'} Touchez <strong>${E(rentChip(fr))}</strong> dans <strong>Groupes et fêtes</strong>; votre page l’indique et la recherche vous trouve pour cela.</p>` : '')
         + (teamChip(fr) && teamChip(fr) !== rentChip(fr) ? `<p>Des événements d’entreprise ou d’équipe? Touchez <strong>${E(teamChip(fr))}</strong> dans <strong>Groupes et fêtes</strong> : la recherche et Planifier mon voyage vous trouvent pour la consolidation d’équipe grâce à elle.</p>` : '') };
     if (t.id === 'indoor-good-to-know' && chips('en').length >= 3) return { ...t,
-      a: t.a.replace(/\(“Grip socks required”, “Lockers available”, “Waiver to sign before you play”\)/, `(${chips('en').slice(0, 3).map((x) => `“${E(x)}”`).join(', ')})`),
-      aFr: t.aFr.replace(/\(« Chaussettes antidérapantes obligatoires », « Casiers offerts », « Décharge à signer avant de jouer »\)/, `(${chips('fr').slice(0, 3).map((x) => `« ${E(x)} »`).join(', ')})`) };
+      a: t.a.replace(/\(“Grip socks required”, “Lockers available”, “Waiver to sign before you play”\)/, `(${chips('en').slice(0, 3).map((x) => `“${E(x.replace(/before you play$/, `before you ${indoorKindsModule.indoorWaiverVerb(kinds)[0]}`))}”`).join(', ')})`),
+      aFr: t.aFr.replace(/\(« Chaussettes antidérapantes obligatoires », « Casiers offerts », « Décharge à signer avant de jouer »\)/, `(${chips('fr').slice(0, 3).map((x) => `« ${E(x.replace(/avant de jouer$/, `avant de ${indoorKindsModule.indoorWaiverVerb(kinds)[1]}`))} »`).join(', ')})`) };
     // Indoor test 6 (Priya): no "+ Add a second time" for a kind whose day cards don't have it.
     if (t.id === 'indoor-swim-times' && en.quiet) return { ...t,
       a: t.a.replace(/ \(tap <strong>\+ Add a second time<\/strong> on a day with a break\)/, ''),

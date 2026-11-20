@@ -2359,7 +2359,7 @@ en.indoor = {
   tpriceSavedLive: 'Your price is on your page and your card now.', tpriceSavedDay: 'We’re checking {x}. A price over {n} is checked first; it shows within a day.',
   tpriceSavedFree: 'Your page and your card say “Free” now.', tpriceCard: 'Adults {x}', tfreeCard: 'Free', tfreeWords: { free: 'Free entry', donation: 'By donation' },
   // Walk-ins or booking
-  ibookQ: 'Can people just walk in?', ibooks: { no: 'Yes, walk-ins welcome', busy: 'Yes, but book ahead for weekends and busy times', ahead: 'No, please book ahead' },
+  bookShows: 'Your page’s button: {x}', ibookQ: 'Can people just walk in?', ibooks: { no: 'Yes, walk-ins welcome', busy: 'Yes, but book ahead for weekends and busy times', ahead: 'No, please book ahead' },
   ibookNeed: 'Please tap one: walk-ins welcome, or book ahead.',
   tbookQ: 'Your booking or tickets link (optional)', tbookLead: 'It puts a Book button on your page.',
   bookLinkLabel: 'Booking or tickets link', bookLinkEx: 'your website’s booking page, or your FareHarbor, Eventbrite or tickets page', noBookLink: 'We don’t take bookings online',
@@ -2448,7 +2448,7 @@ fr.indoor = {
   tpriceWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.', tpriceNeed: 'Seulement le chiffre, par exemple 25. Gratuit? Touchez Entrée gratuite.',
   tpriceSavedLive: 'Votre prix est sur votre page et votre fiche maintenant.', tpriceSavedDay: 'Nous vérifions {x}. Un prix de plus de {n} est vérifié d’abord; il s’affiche d’ici un jour.',
   tpriceSavedFree: 'Votre page et votre fiche indiquent « Gratuit » maintenant.', tpriceCard: 'Adultes : {x}', tfreeCard: 'Gratuit', tfreeWords: { free: 'Entrée gratuite', donation: 'Contribution volontaire' },
-  ibookQ: 'Peut-on venir sans réservation?', ibooks: { no: 'Oui, sans réservation', busy: 'Oui, mais réservez pour les fins de semaine et les périodes achalandées', ahead: 'Non, réservez à l’avance' },
+  bookShows: 'Le bouton de votre page : {x}', ibookQ: 'Peut-on venir sans réservation?', ibooks: { no: 'Oui, sans réservation', busy: 'Oui, mais réservez pour les fins de semaine et les périodes achalandées', ahead: 'Non, réservez à l’avance' },
   ibookNeed: 'Touchez une réponse : sans réservation, ou réserver à l’avance.',
   tbookQ: 'Votre lien de réservation ou de billets (facultatif)', tbookLead: 'Il ajoute un bouton Réserver à votre page.',
   bookLinkLabel: 'Lien de réservation ou de billets', bookLinkEx: 'la page de réservation de votre site, ou votre page FareHarbor, Eventbrite ou de billets', noBookLink: 'Nous ne prenons pas de réservations en ligne',
