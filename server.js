@@ -5836,7 +5836,10 @@ function smartWeekdayFallback(folded, intent, whenParams, region, town, categori
       return { key: 'events_weekday', guides: [],
         heading: `Nothing on What’s On for ${dayEn}, ${md}${town ? ` in ${town}` : ''}. Free places for families open ${dayEn}, and events on the next ${dayEn}s`,
         headingFr: `Rien à l’affiche le ${dayFr} ${date.getDate()}${town ? ` à ${town}` : ''}. Les endroits gratuits pour les familles ouverts le ${dayFr}, et les événements des prochains ${dayFr}s`,
-        list: freeList, events: () => ({ total: evs.length, items: evs }) };
+        // The places whose own words say a free family day on that weekday come first ("Free family Saturdays"); a
+        // restaurant's "family dinners on Saturdays" is not a free thing to do.
+        list: () => { const said = list().filter((x) => !FOOD_DRINK_TYPES.includes(x.row.type) && /\bfree\b|\bgratuit|\bdonation\b/i.test(x.why || '')); const seen = new Set(said.map((x) => x.row.id)); return said.concat(freeList().filter((x) => !seen.has(x.row.id))); },
+        events: () => ({ total: evs.length, items: evs }) };
     }
     return { key: 'events_weekday', guides: [],
       heading: `Nothing on What’s On for ${dayEn}, ${md}${town ? ` in ${town}` : ''}. Places that say ${dayEn}, and events on the next ${dayEn}s`,
@@ -60681,9 +60684,8 @@ const INDOOR_SETUP_HELP_TOPICS = [
   // Groups line. The kind's camp or school chip is named by indoorKindHelpTopics.
   { id: 'indoor-camps', pages: ['setup', 'edit'], over: ['indoor-groups', 'indoor-exhibits', 'event-add', 'events', 'event-repeat', 'indoor-seasonal', 'indoor-age'],
     q: 'Summer, spring break or PD-day camps', qFr: 'Camps d’été, de la relâche ou des journées pédagogiques',
-    allOf: [['camp']],
-    keys: ['camp', 'camps', 'day camp', 'day camps', 'summer camp', 'summer camps', 'spring break camp', 'spring break camps', 'pd day camp', 'pd day camps', 'art camp', 'art camps', 'kids camps'],
-    keysFr: ['camp', 'camps', 'camp de jour', 'camps de jour', 'camps d ete', 'camp de la relache', 'camps pendant la relache'],
+    keys: ['camp', 'camps', 'day camp', 'day camps', 'summer camp', 'summer camps', 'spring break camp', 'spring break camps', 'pd day camp', 'pd day camps', 'school pd day camps', 'school camps', 'art camp', 'art camps', 'kids camps', 'kids summer camps', 'camps in summer'],
+    keysFr: ['camp', 'camps', 'camp de jour', 'camps de jour', 'camps d ete', 'camp de la relache', 'camps pendant la relache', 'camps pour enfants', 'camp pour enfants', 'camps d art', 'camps de journee pedagogique', 'camps l ete'],
     a: '<p>A camp on set dates (summer, spring break or a PD day) goes on What’s On: on your page (after the setup), tap <strong>Add an event</strong> and give its first and last day, like July 5 to August 27 (a camp can run up to 120 days as one event). Weeks with breaks? Add the first week and write the others in <strong>Repeats or other dates?</strong>.</p><p>Then say you run camps in <strong>Groups and parties</strong> (in More about your place), in a line of your own, like <em>Summer art camps for ages 6–12</em>.</p>',
     aFr: '<p>Un camp à dates fixes (l’été, la relâche ou une journée pédagogique) va dans À l’affiche : sur votre page (après la configuration), touchez <strong>Ajouter un événement</strong> et indiquez son premier et son dernier jour, comme du 5 juillet au 27 août (un camp peut durer jusqu’à 120 jours en un seul événement). Des semaines avec des pauses? Ajoutez la première semaine et écrivez les autres dans <strong>Récurrent ou autres dates?</strong>.</p><p>Dites ensuite que vous offrez des camps dans <strong>Groupes et fêtes</strong> (dans Plus sur votre endroit), en une ligne à vous, comme <em>Camps d’art d’été pour les 6 à 12 ans</em>.</p>' },
   // Indoor test 7: "we have a new exhibition every month" is this topic, not the generic repeating-event answer.
@@ -60958,8 +60960,9 @@ function indoorKindHelpTopics(topics, kinds, price = null, exact = false, free =
       a: hasCamp(en) ? t.a.replace('(in More about your place), in a line of your own, like', `(in More about your place): tap <strong>${E(campChip(en))}</strong> and add a line of your own, like`) : t.a,
       aFr: hasCamp(en) ? t.aFr.replace('(dans Plus sur votre endroit), en une ligne à vous, comme', `(dans Plus sur votre endroit) : touchez <strong>${E(campChip(fr))}</strong> et ajoutez une ligne à vous, comme`) : t.aFr };
     if (t.id === 'indoor-groups') return { ...t,
-      keys: t.keys.concat(['camp', 'camps', 'day camp', 'day camps', 'pd day', 'pd days', 'pd day camp', 'pd day camps', 'school camps', 'school pd day camps', 'summer camp', 'summer camps', 'spring break camp', 'spring break camps', 'pro d day']),
-      keysFr: t.keysFr.concat(['camp', 'camps', 'camp de jour', 'camps de jour', 'journee pedagogique', 'journees pedagogiques', 'camp de la relache', 'camps d ete']),
+      // Indoor test 15: camps themselves are the camps answer (Add an event first); PD days stay here as school groups.
+      keys: t.keys.concat(['pd day', 'pd days', 'pro d day']),
+      keysFr: t.keysFr.concat(['journee pedagogique', 'journees pedagogiques']),
       a: t.a.replace(/like <em>School groups and guided tours by appointment<\/em>, <em>Birthday parties with a private room for up to 20<\/em> or <em>Corporate team building for up to 40<\/em>/, `like ${orList(em(en.groups.chips), 'or')}`)
         // Indoor test 13 (2026-11-19; Dan's cinema was told "Camps and school groups: tap Private screenings"): only a kind
         // with a school or camp chip; and a place with no set hours has no open hours to keep.

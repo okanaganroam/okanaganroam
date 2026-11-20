@@ -264,7 +264,7 @@ test('indoor test 4: a spa’s questions (Lauren’s help log, EN + FR) land on 
 // Indoor test 5 (2026-11-19; Chris, a climbing and trampoline park, $20, All ages): every question in his help log
 // (help-log.json) and its French twin. Timed passes, toddler time, memberships and "the rest of my prices" are the price
 // answers (the box, then Your prices with his kind's examples); PD-day camps are the Groups answer (its school and camp chip,
-// and events for dated camps).
+// and events for dated camps). Indoor test 15: a camp now leads with Add an event (indoor-camps), then the Groups chip.
 const CLIMB_ASKED = [
   ['en', 'closed christmas day only', ['closures']],
   ['en', 'jump passes are 60 min $22 or 90 min $28, not a day pass. what do i put', ['indoor-price']],
@@ -273,7 +273,7 @@ const CLIMB_ASKED = [
   ['en', 'kids under 7 need an adult inside with them', ['indoor-age']],
   ['en', 'how do I show our birthday party packages', ['indoor-groups']],
   ['en', 'memberships?', ['indoor-price', 'menu-add']],
-  ['en', 'school PD day camps', ['indoor-groups']],
+  ['en', 'school PD day camps', ['indoor-camps']],
   ['en', 'what price do I put', ['indoor-price']],
   ['en', 'can people just walk in', ['indoor-booking']],
   ['en', 'where do i put the gift shop', ['indoor-gift']],
@@ -289,7 +289,7 @@ const CLIMB_ASKED = [
   ['fr', 'la décharge se signe en ligne avant de venir', ['indoor-good-to-know']],
   ['fr', 'comment montrer nos forfaits de fête d’anniversaire', ['indoor-groups']],
   ['fr', 'abonnements?', ['indoor-price', 'menu-add']],
-  ['fr', 'camps de journée pédagogique', ['indoor-groups']],
+  ['fr', 'camps de journée pédagogique', ['indoor-camps']],
   ['fr', 'où va le reste de mes prix', ['menu-add', 'indoor-price']],
   ['fr', 'prix des enfants', ['indoor-price', 'menu-add']],
   ['fr', 'est-ce que les gens peuvent venir sans réserver', ['indoor-booking']],
@@ -337,7 +337,7 @@ const CLAY_ASKED = [
   ['en', 'courses run 6 weeks', ['indoor-courses']],
   ['en', 'date night is per couple', ['indoor-price-two']],
   ['en', 'how do people see our class schedule', ['menu-add']],
-  ['en', 'where do I put our kids summer camps', ['indoor-groups']],
+  ['en', 'where do I put our kids summer camps', ['indoor-camps']],
   ['en', 'what price do I put', ['indoor-price']],
   ['en', 'where do the rest of my prices go', ['menu-add']],
   ['en', 'can people just walk in', ['indoor-booking']],
@@ -349,7 +349,7 @@ const CLAY_ASKED = [
   ['fr', 'tous les âges pour la peinture mais 14 ans et plus pour le tour', ['indoor-age']],
   ['fr', 'les cours durent 6 semaines', ['indoor-courses']],
   ['fr', 'la soirée en amoureux est par couple', ['indoor-price-two']],
-  ['fr', 'où mettre nos camps d’été pour enfants', ['indoor-groups']],
+  ['fr', 'où mettre nos camps d’été pour enfants', ['indoor-camps']],
   ['fr', 'quel prix mettre', ['indoor-price']],
   ['fr', 'où vont mes autres prix', ['menu-add']],
   ['fr', 'est-ce qu’on peut venir sans réserver', ['indoor-booking']],
