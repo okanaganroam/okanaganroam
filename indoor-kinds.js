@@ -271,6 +271,36 @@ const TYPER = {
 // to 6 — $35"): the first line's name for a main price per person, by kind ([en, fr]); a kind whose example is per person
 // already keeps it. A room or group name is only ever paired with a price per room or group (server.js indoorFirstItemName).
 const TYPER_PERSON = { escape: ['One player', 'Un joueur'] };
+// Indoor test 17 (2026-11-19; Megan's bouldering gym: the typer's first line came pre-filled "60-min jump pass — $22"; the
+// test-16 fix covered escape rooms only): every kind's first line is a true name for its main price's own unit ([en, fr]):
+// "Day pass" for climbing, "Adult admission" for a museum, "One game" for bowling. A kind-specific example word (a jump
+// pass, a massage, a wheel class, a toddler pass) is used only when the place's own words say it: [words, en, fr], first
+// match wins. TYPER keeps the examples (the "like …" hints) for a place whose words say nothing more.
+const TYPER_TRUE = {
+  gallery: { name: ['Adult admission', 'Entrée adulte'] }, museum: { name: ['Adult admission', 'Entrée adulte'] },
+  theatre: { name: ['Adult ticket', 'Billet adulte'] }, cinema: { name: ['Adult ticket', 'Billet adulte'] },
+  spa: { name: ['Shortest treatment', 'Soin le plus court'], own: [[/\b(?:day pass|circuit|hydrotherap\w*|thermal|nordic|bath ?house)\b/i, 'Day pass', 'Forfait d’un jour'], [/\bmassages?\b/i, 'Massage', 'Massage'], [/\bfacials?\b/i, 'Facial', 'Soin du visage']] },
+  pool: { name: ['Adult drop-in', 'Entrée adulte à la séance'] },
+  climbing: { name: ['Day pass', 'Laissez-passer d’un jour'], own: [[/\b(?:climb\w*|boulder\w*|escalade|belay\w*)\b/i, 'Day pass', 'Laissez-passer d’un jour'], [/\btrampolin\w*|\bjump(?:s|ing)?\b/i, '60-min jump pass', 'Saut de 60 min']] },
+  games: { name: ['One game', 'Une partie'], own: [[/\blaser ?tag\b/i, 'Laser tag game', 'Partie de laser tag'], [/\b(?:vr|virtual reality)\b/i, 'VR game, 30 min', 'Partie de réalité virtuelle, 30 min']] },
+  escape: { name: ['One player', 'Un joueur'] },
+  bowling: { name: ['One game', 'Une partie'] },
+  kids: { name: ['One child', 'Un enfant'], own: [[/\btoddlers?\b/i, 'Toddler play pass', 'Laissez-passer tout-petits']] },
+  classes: { name: ['One class', 'Un cours'], own: [[/\bwheel\b/i, 'Wheel class, 2 hours', 'Cours de tour, 2 heures'], [/\bpaint your own\b/i, 'Studio fee, one person', 'Frais d’atelier, une personne']] },
+  curling: { name: ['One person', 'Une personne'], own: [[/\blearn to curl\b/i, 'Learn to curl, 2 hours', 'Initiation au curling, 2 heures']] },
+  yoga: { name: ['Drop-in class', 'Cours à la carte'] },
+  casino: { name: ['Entry', 'Entrée'] }, library: { name: ['One program', 'Un programme'] },
+  other: { name: ['Adult admission', 'Entrée adulte'] },
+};
+// The first line's name, and the "like …" example, for a place: kinds, language, the price's unit (per: room, lane, game,
+// group; none: per person) and its own words. -> { first, item, section }
+function indoorTyperWords(kinds, lang, { per = null, own = '' } = {}) {
+  const k = indoorKindKey(kinds), fr = lang === 'fr' ? 1 : 0, tt = TYPER_TRUE[k] || TYPER_TRUE.other, t = TYPER[k] || TYPER.other;
+  const hit = (tt.own || []).find((x) => x[0].test(String(own || '')));
+  const name = hit ? [hit[1], hit[2]] : tt.name;
+  const unit = per && TYPER_PER[per] ? TYPER_PER[per][fr] : null;
+  return { first: unit || name[fr], item: unit || name[fr], section: t[fr ? 3 : 1] };
+}
 // The first line's name for a main price per room, lane, game or group ([en, fr]).
 // Indoor test 16 (2026-11-19; Tyler: everyone books his escape rooms ahead, so "Groups: from what size should they book
 // ahead?" read oddly): for a place whose owner said Please book ahead, the Groups size question asks when a big group
@@ -279,7 +309,7 @@ const BOOK_AHEAD_UNIT = { escape: ['room', 'salle'], bowling: ['lane', 'allée']
   classes: ['class', 'cours'], yoga: ['class', 'cours'], spa: ['appointment', 'rendez-vous'], kids: ['session', 'séance'], pool: ['session', 'séance'] };
 const TYPER_PER = { room: ['One room', 'Une salle'], lane: ['One lane', 'Une allée'], game: ['One game', 'Une partie'], group: ['One group', 'Un groupe'] };
 for (const [k, t] of Object.entries(TYPER)) if (K[k]) {
-  const pp = TYPER_PERSON[k] || [t[0], t[2]];
+  const pp = TYPER_PERSON[k] || (TYPER_TRUE[k] || TYPER_TRUE.other).name;
   K[k].en.prices.typer = { item: t[0], section: t[1], person: pp[0] }; K[k].fr.prices.typer = { item: t[2], section: t[3], person: pp[1] };
 }
 // Indoor test 6 (2026-11-19; Priya's pottery studio was offered "Each ticket or pass and its price"): the "Type them in
@@ -482,4 +512,4 @@ const INDOOR_TYPE_WORD_SKIP = new Set(['history', 'heritage', 'heritage site', '
 // "learn to curl", "slots", « soin du visage »).
 const INDOOR_TYPE_WORDS = [...new Set(Object.values(K).flatMap((e) => e.en.search.concat(e.fr.search)).filter((w) => !INDOOR_TYPE_WORD_SKIP.has(w)))];
 
-module.exports = { indoorKindLabel, indoorKindLabels, BOOK_AHEAD_UNIT, TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };
+module.exports = { indoorTyperWords, TYPER_TRUE, indoorKindLabel, indoorKindLabels, BOOK_AHEAD_UNIT, TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };

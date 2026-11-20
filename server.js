@@ -57323,18 +57323,19 @@ const MENU_APP_STRINGS = {
 // names the main price's own unit: per person, the kind's per-person name ("One player", "Adult admission"); per room, lane,
 // game or group, that unit ("One room"). Never a room name beside a price per person.
 const INDOOR_UNIT_NAME_RE = /\b(?:rooms?|salles?|groups?|groupes?|lanes?|allées?|private|privée?s?|party|parties|fêtes?)\b/i;
+// Indoor test 17: the first line is a true name for the main price's own unit, for every kind (indoor-kinds.js
+// indoorTyperWords): "Day pass" for a climbing gym, "60-min jump pass" only when the place's own words say trampolines.
 function indoorFirstItemName(venue, lang) {
   try {
     const t = venueIndoorInfo(venue.id);
-    const w = indoorKindsModule.indoorKindText(t.kinds || indoorKindSuggestion(venue), lang).prices.typer || {};
-    const per = indoorKindsModule.TYPER_PER[t.per];
-    if (per) return per[lang === 'fr' ? 1 : 0];
-    const name = w.person || w.item || '';
-    return INDOOR_UNIT_NAME_RE.test(name) ? '' : name;
+    const w = indoorKindsModule.indoorTyperWords(t.kinds || indoorKindSuggestion(venue), lang, { per: t.per, own: indoorOwnWords(venue.id) });
+    if (t.per && indoorKindsModule.TYPER_PER[t.per]) return w.first;
+    return INDOOR_UNIT_NAME_RE.test(w.first) ? '' : w.first;
   } catch (e) { return ''; }
 }
 function indoorMenuAppStrings(venue, lang) {
-  const w = indoorKindsModule.indoorKindText(venueIndoorInfo(venue.id).kinds || indoorKindSuggestion(venue), lang).prices.typer;
+  const t = venueIndoorInfo(venue.id);
+  const w = indoorKindsModule.indoorTyperWords(t.kinds || indoorKindSuggestion(venue), lang, { per: t.per, own: indoorOwnWords(venue.id) });
   if (!w) return {};
   const E = escapeHtml;
   return lang === 'fr'
