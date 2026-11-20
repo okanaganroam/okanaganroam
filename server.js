@@ -63537,6 +63537,17 @@ const VENUE_MENU_CSS = `<style>
   .vm-meta { font-size: 0.88rem; opacity: 0.75; margin: 4px 0 0; }
   .vm-note-box { background: var(--paper, #F7F1E6); border-radius: 12px; padding: 12px 16px; font-size: 0.9rem; margin: 26px 0 12px; }
   .vm-page { max-width: 760px; }
+  /* Menu and price-list pages in the site's card look (2026-11-20): styling only; the dishes, prices and notes are unchanged. */
+  .vm-page .vm-meta { color: #615b53; }
+  .vm-page .vm-section { background: #fffdf7; border: 1px solid rgba(27,43,58,0.08); border-radius: 22px; padding: 20px 22px 10px; margin: 18px 0; box-shadow: 0 6px 18px rgba(27,43,58,0.06); }
+  .vm-page .vm-section > h2 { margin-top: 0; color: #1b2b3a; }
+  .vm-page .vm-item:last-child { border-bottom: 0; }
+  .vm-page .vm-name { color: #1b2b3a; }
+  .vm-page .vm-price { color: #1f5450; font-weight: 800; white-space: nowrap; }
+  .vm-page .vm-tag { background: #edf3e9; color: #1f5450; border: 1px solid rgba(40,105,98,0.18); border-radius: 999px; }
+  .vm-page .vm-note-box { background: #fffdf7; border: 1px solid rgba(27,43,58,0.08); border-radius: 22px; box-shadow: 0 6px 18px rgba(27,43,58,0.06); }
+  .vm-page .vm-btn, .vm-page a.cta.secondary { border-radius: 999px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; }
+  @media (max-width: 640px) { .vm-page .vm-section { padding: 16px 16px 6px; border-radius: 18px; } }
   a.vm-btn { display: inline-block; background: #1B2B3A; padding: 12px 22px; border-radius: 16px; text-align: center; font-weight: 800; text-decoration: none; margin: 4px 8px 6px 0; }
   a.vm-btn, a.vm-btn:visited, a.vm-btn:hover, a.vm-btn:focus { color: #fff !important; }
   a.vm-btn:hover, a.vm-btn:focus { background: #2C4257; }
