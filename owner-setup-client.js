@@ -1172,6 +1172,8 @@
   var CLASH_AGE_RE = /\badults?[- ]only\b|\b(?:19|18)\s*\+|\b(?:19|18) (?:and|&) (?:over|older|up)\b|\bno (?:kids|children|minors)\b|\badultes seulement\b|\b(?:19|18) ans et plus\b/i;
   // Indoor test 14: a research sentence the server found her answers made wrong (or out of date) is flagged too, one she
   // kept never is (the same list as the page and "We also had").
+  // The server's list after each save (her answers just changed).
+  function staleTake(j){ C.stale = j.stale; C.staleGone = j.staleGone || []; C.staleKept = j.staleKept || []; }
   function staleNorm(x){ return String(x || '').toLowerCase().replace(/[^a-z0-9$]+/g, ' ').trim(); }
   function staleIn(list, line){ var n = staleNorm(line); return !!n && (list || []).some(function(o){ return staleNorm(typeof o === 'string' ? o : o.text) === n; }); }
   function bringClash(line){
@@ -1279,7 +1281,7 @@
   // Records one answer. -> true, or false with the reason shown (never "Saved" on a save that didn't happen).
   function happyBlocks(){ return S.happy.map(function(e){ var b = { days: DAYS.filter(function(d){ return e.days[d]; }), from: e.from, to: e.to, what: (e.what || '').trim() }; if (e.close) b.close = true; return b; }); }
   function progress(step, status){ var body = { step: step, status: status }; if (step === 'happy' && status === 'live' && S.happyTyped) { body.blocks = happyBlocks(); if (C.lang === 'fr') body.lang = 'fr'; }
-    return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (j.waiting) C.waiting = j.waiting; if (j.stale) { C.stale = j.stale; C.staleGone = j.staleGone || []; C.staleKept = j.staleKept || []; } if (S.dirty === step) S.dirty = ''; drSaved(step); return true; } S.error = why(j); return false; }); }
+    return post(C.base + '/setup/progress', body).then(function(j){ if (j && j.ok) { S.done[step] = (j.progress && j.progress.done && j.progress.done[step]) || status; if (j.score) S.score = j.score; if (j.waiting) C.waiting = j.waiting; if (j.stale) staleTake(j); if (S.dirty === step) S.dirty = ''; drSaved(step); return true; } S.error = why(j); return false; }); }
   function record(step, status, then){ if (S.busy) return; S.busy = true; S.error = ''; render(); return progress(step, status).then(function(ok){ S.busy = false; if (!ok) return render(); if (then) then(); else go('saved:' + step); }); }
   // Help's "did it go through?": what we have right now, read from the server each time it is asked.
   // Brewery test 4 (2026-11-13): a status on its own line starts with a capital ("On your page").
