@@ -2768,6 +2768,7 @@ function sportStrings(base, o) {
   return x;
 }
 en.sport = sportStrings(en.indoor, {
+  tpriceMore: 'Your other prices (twilight, juniors, carts, rentals, passes) go in “Your prices”, the first of the extra details.',
   // No Per room or group choice under the price box (Dayton: few screens, no extra choices): a golf fee is per person, a
   // simulator's hour per bay is in its kind's words.
   iperChips: null, iperNeed: '', iperRead: '',
@@ -2791,6 +2792,7 @@ en.sport = sportStrings(en.indoor, {
   seasonHintWinter: 'Most places like yours are open in winter only. Tap “We’re closed part of the year” and pick your first and last day.',
 });
 fr.sport = sportStrings(fr.indoor, {
+  tpriceMore: 'Vos autres prix (crépuscule, juniors, voiturettes, location, abonnements) vont dans « Vos tarifs », le premier des détails facultatifs.',
   // No Per room or group choice under the price box (Dayton: few screens, no extra choices): a golf fee is per person, a
   // simulator's hour per bay is in its kind's words.
   iperChips: null, iperNeed: '', iperRead: '',

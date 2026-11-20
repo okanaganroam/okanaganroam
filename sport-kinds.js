@@ -170,18 +170,12 @@ K.sportother = kind({ day: true, gtk: 'sportgen', ex: 'sportgen', season: '', pl
 
 // The Price box's placeholder ([en, fr]): the number it wants and what it is.
 const PRICE_PH = {
-  golf: ['Your lowest adult green fee, like 55', 'Votre droit de jeu adulte le moins cher, par exemple 55'],
-  simgolf: ['One bay for an hour, like 45', 'Une baie pendant une heure, par exemple 45'],
-  range: ['Your lowest price, like 12 (a small bucket)', 'Votre prix le plus bas, par exemple 12 (un petit seau)'],
-  skischool: ['Your lowest lesson, like 89', 'Votre cours le moins cher, par exemple 89'],
-  rink: ['Your adult public skate, like 5', 'Votre patinage libre adulte, par exemple 5'],
-  swim: ['Your adult swim, like 5', 'Votre baignade adulte, par exemple 5'],
-  skatepark: ['Like 10. Free to use? Tap Free entry', 'Par exemple 10. C’est gratuit? Touchez Entrée gratuite'],
-  bike: ['Like 10 (a practice night). Free? Tap Free entry', 'Par exemple 10 (une soirée d’entraînement). Gratuit? Touchez Entrée gratuite'],
-  courts: ['Like 5 (a drop-in). Free? Tap Free entry', 'Par exemple 5 (le jeu libre). Gratuit? Touchez Entrée gratuite'],
-  discgolf: ['Like 5. Free to play? Tap Free entry', 'Par exemple 5. C’est gratuit? Touchez Entrée gratuite'],
-  sportsctr: ['Your adult drop-in, like 6', 'Votre prix adulte à la séance, par exemple 6'],
-  sportother: ['Your lowest price for one person, like 15', 'Votre prix le plus bas pour une personne, par exemple 15'],
+  // Short, so they fit a 390px phone box (the label above says what the number is).
+  golf: ['Like 55', 'Par exemple 55'], simgolf: ['Like 45 (one bay, one hour)', 'Par exemple 45 (une baie, une heure)'], range: ['Like 12 (a small bucket)', 'Par exemple 12 (un petit seau)'],
+  skischool: ['Like 89', 'Par exemple 89'], rink: ['Like 5', 'Par exemple 5'], swim: ['Like 5', 'Par exemple 5'],
+  skatepark: ['Like 10, or tap Free entry', 'Par exemple 10, ou touchez Entrée gratuite'], bike: ['Like 10, or tap Free entry', 'Par exemple 10, ou touchez Entrée gratuite'],
+  courts: ['Like 5, or tap Free entry', 'Par exemple 5, ou touchez Entrée gratuite'], discgolf: ['Like 5, or tap Free entry', 'Par exemple 5, ou touchez Entrée gratuite'],
+  sportsctr: ['Like 6', 'Par exemple 6'], sportother: ['Like 15', 'Par exemple 15'],
 };
 // The price typer's example line and section: [en item, en section, fr item, fr section].
 const TYPER = {

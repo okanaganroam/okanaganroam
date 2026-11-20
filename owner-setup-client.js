@@ -2383,7 +2383,8 @@
         // ("Yes, all year" then "No, keep them" was the only way through, and it scared her).
         // Indoor test 10 (2026-11-19; Sandra's August maintenance shutdown had no place here): a short yearly shutdown is a
         // closure, said in one line (indoor places only).
-        + (T.allYearShutHint ? '<p class="su-hint" id="suShutHint">' + h(T.allYearShutHint) + '</p>' : '')
+        // Sport (2026-11-20): one hint at a time: the season hint takes the shutdown hint's place.
+        + (T.allYearShutHint && !(sportSeasonHint() && !stS.length && !S.openSea) ? '<p class="su-hint" id="suShutHint">' + h(T.allYearShutHint) + '</p>' : '')
         // Sport and golf (2026-11-20): a kind with a usual season (golf and pools in summer, rinks and ski lessons in
         // winter) says so once, while no season is stored. A hint only: nothing is picked for her.
         + (sportSeasonHint() && !stS.length && !S.openSea ? '<p class="su-hint" id="suSportSeason">' + h(sportSeasonHint()) + '</p>' : '')
@@ -2655,7 +2656,7 @@
       x = doneLine('price') + '<h1 id="suQ">' + h(T.tpriceQ) + '</h1><p class="su-lead" id="suTpriceLead">' + h(tourPriceLead()) + '</p>'
         + (ip.priceGuessed && (ip.free || (ip.price != null && !isNaN(ip.price))) && T.tpriceGuess ? '<p class="su-sent su-research" id="suFeeGuess">' + h(T.tpriceGuess) + '</p>' : '')
         + (CUR.indoor_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.indoor_price_waiting) })) + '</p>' : '') + msgs()
-        + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suFreeChips">' + ['free', 'donation'].map(function(f){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ip.free === f ? 'true' : 'false') + '" data-ifree="' + f + '">' + h(tourFreeWord(f)) + '</button>'; }).join('') + '</div>'
+        + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suFreeChips">' + (C.sport && ip.free !== 'donation' ? ['free'] : ['free', 'donation']).map(function(f){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ip.free === f ? 'true' : 'false') + '" data-ifree="' + f + '">' + h(tourFreeWord(f)) + '</button>'; }).join('') + '</div>'
         // Indoor test 1: By donation keeps the box, as "Suggested amount (optional)".
         + (ip.free === 'donation' && T.tsuggLabel ? field('suTsugg', T.tsuggLabel, ip.suggText != null ? ip.suggText : ip.sugg != null ? String(ip.sugg) : '', { max: 12, mode: 'decimal' }) + '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>'
           : ip.free ? '' : field('suTprice', ip.per && T.iperOne ? T.iperOne[ip.per] : T.tpriceLabel, ip.ptext != null ? ip.ptext : ip.per && indoorPerBox() ? indoorPerBox() : indoorMinSize() && typeof ip.price === 'number' ? boxVal('suTprice', ip.price) + indoorMinSize() : boxVal('suTprice', ip.price), { max: 60, ph: T.tpricePh || '' })
