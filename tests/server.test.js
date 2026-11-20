@@ -16026,7 +16026,7 @@ test('Browse hub: /browse lists every venue in the hub shape -- server-rendered 
   assert.match(html, /<a class="fd-pop-btn bh-map-link" id="bhMapLink" href="\/map">/);
   // None of the wizard.
   assert.doesNotMatch(html, /id="wizardStep1"|id="searchInput"|id="venueGrid"|<body class="wizard-active page-browse">|browse-directory-styles|__roamPrefill/);
-  assert.match(html, /<body class="golf-page outdoor-page fd-page browse-page">/);
+  assert.match(html, /<body class="golf-page outdoor-page fd-page fd-refresh browse-page">/);
   // One GA4 tag with its own page type; one capture script; app.js once, versioned.
   assert.equal((html.match(/page_type: '[a-z_]+'/g) || []).length, 1);
   assert.ok(html.includes("var cfg = { page_type: 'browse' };"));
