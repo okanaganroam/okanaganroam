@@ -1522,9 +1522,12 @@ const REQUEST_SYNONYMS=[...SHORTHAND,[/\bh[eé]li[- ]?(?:hik(?:ing|es?)|randonn[
   // Great for Groups with a Groups line): a group, a group of N, N people (4 or more), a big group or a team is the
   // Great for Groups badge ("big group"), never a word to find. "Group of friends", "team building" and "team trip" keep
   // their own meaning (the group occasion), as before.
-  [/\b(?:a |our |my )?(?:big |large )?group of (?:\d{1,3}|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty)(?: (?:people|adults|guests|players|of us|coworkers|colleagues|teens|teenagers|kids|students))?\b/gi,'a big group'],
-  [/\bfor (?:a )?(?:party of |team of )?(\d{1,3}|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty)(?: (?:people|adults|guests|players|of us|persons))\b/gi,(m,n)=>{const k={four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,twelve:12,fifteen:15,twenty:20}[String(n).toLowerCase()]||Number(n);return k>=4?'for a big group':m;}],
-  [/(?<!\b(?:big|large|good for|great for|for big|for large) )\b(?:groups?|teams?)\b(?! (?:of friends|getaway|building|dinner|dinners|trip|trips|of \d))/gi,'big group']];
+  // With food or drink asked for ("craft beer tour for 6 people", "brewery for a group of 8"), the head count is not a filter
+  // on the places (a brewery without the badge still takes 6): it is left out instead.
+  [/\b(?:a |our |my )?(?:big |large )?group of (?:\d{1,3}|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty)(?: (?:people|adults|guests|players|of us|coworkers|colleagues|teens|teenagers|kids|students))?\b/gi,(m,...a)=>(GROUP_FOOD_RE.test(a[a.length-1])?'':'a big group')],
+  [/\bfor (?:a )?(?:party of |team of )?(\d{1,3}|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty)(?: (?:people|adults|guests|players|of us|persons))\b/gi,(m,n,off,str)=>{const k={four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,twelve:12,fifteen:15,twenty:20}[String(n).toLowerCase()]||Number(n);return k>=4?(GROUP_FOOD_RE.test(str)?'':'for a big group'):m;}],
+  [/(?<!\b(?:big|large|good for|great for|for big|for large) )\b(?:groups?|teams?)\b(?! (?:of friends|getaway|building|dinner|dinners|trip|trips|of \d))/gi,(m,off,str)=>(GROUP_FOOD_RE.test(str)?m:'big group')]];
+const GROUP_FOOD_RE=/\b(?:dinners?|lunch(?:es)?|brunch|breakfast|suppers?|meals?|eat|food|restaurants?|cafes?|cafés?|coffee|beers?|brewer(?:y|ies)|breweries|wines?|winer(?:y|ies)|tastings?|pubs?|bars?|drinks?|cocktails?|distiller(?:y|ies)|cider(?:y|ies)?)\b/i;
 // 2026-10-25 (tools audit): "retired couple, no hiking" became "relaxed easy walks, no hiking", a walks part that "no
 // hiking" emptied (three mornings left free). With hiking or walking ruled out, those words mean "relaxed" only.
 const WALKS_NEGATED_RE=/\b(?:no|without|skip|avoid|not into|no more|don.?t (?:want|like|do|need)(?: to)?|do not (?:want|like|do|need)(?: to)?)\s+(?:\w+\s+)?(?:hik\w*|walks?|walking|trails?)\b/i;

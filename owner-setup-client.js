@@ -847,7 +847,7 @@
   function boxVal(id, n){ if (id === 'suTprice' && S.tour && S.tour.free) return tourFreeRead(S.rawBox[id]) === S.tour.free ? S.rawBox[id] : tourFreeWord(S.tour.free); return n == null ? '' : isNaN(n) ? (S.rawBox[id] || '') : String(n); }
   // Tour test 4: is what a price box holds readable now? (The red nudge goes as soon as it is.)
   function priceBoxOk(id, x){
-    if (id === 'suTprice') { if (INDOOR) x = indoorMinRead(x).rest; var a = tourPriceRead(x); return !!tourFreeRead(x) || (a != null && !isNaN(a)); }
+    if (id === 'suTprice') { if (typeof INDOOR !== 'undefined' && INDOOR && typeof indoorMinRead === 'function') x = indoorMinRead(x).rest; var a = tourPriceRead(x); return !!tourFreeRead(x) || (a != null && !isNaN(a)); }
     if (id === 'suTpriv') { var b = tourPriceRead(x, true); return b == null || !isNaN(b); }
     if (feeHours(x)) return false;
     var f = String(x).trim().replace(/^(\$?\s*\d[\d.,]*\s*\$?)\s*[\/+(A-Za-zÀ-ɏ].*$/, '$1').trim().replace(/^\$\s*/, '').replace(/\s*\$$/, '').replace(',', '.');

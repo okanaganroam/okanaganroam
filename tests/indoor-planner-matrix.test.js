@@ -391,6 +391,8 @@ test('Indoor test 16 sweep (S2): every kind with Great for Groups and a Groups l
   // "group of friends" and "team building" keep their own meaning; "dinner for 2 people" is not a group.
   assert.equal(app.runTripPlan({ text: `group of friends ${town}` }, NOW).intent.occasion, 'group_getaway');
   assert.ok(!(app.runTripPlan({ text: `dinner for 2 people in Kelowna` }, NOW).intent.features || []).includes('great_groups'));
+  // With food or drink asked for, a head count never filters the places (a brewery without the badge still takes 6).
+  for (const q of ['craft beer tour in Kelowna for 6 people', 'brewery for a group of 8 in Kelowna', 'dinner for 8 people in Kelowna']) assert.ok(!(app.runTripPlan({ text: q }, NOW).intent.features || []).includes('great_groups'), q);
   assert.deepEqual(fails, []);
 });
 
