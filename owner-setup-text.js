@@ -2655,6 +2655,67 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
 // its three chips (the same number as before), and the box office hint only for theatres and classes. The setup lays
 // these over the indoor words for the kind picked (owner-setup-client.js kindWords). The old three Groups chips stay in
 // quick.groups so lines saved with them still show in French.
+// Sports & recreation and golf (2026-11-20, the sport easy setup; Dayton: "keep this nice and easy for businesses to do
+// and not overwhelming for them"). The indoor screens in sport words: golf courses, simulators, ranges and mini golf,
+// arenas, skate parks, disc golf, BMX tracks, outdoor pools, courts, ski lessons and sports centres. The same 7 essentials
+// and 6 optional tiles; no new fields. Each sport kind's own chips and examples sit in the indoor tables too (their keys
+// never repeat an indoor one), so Help's chip lists read them the same way.
+(function sportWords() {
+  Object.assign(en.indoor.quick.good_to_know_kinds, {
+    golf: ['Tee times recommended', 'Cart and club rentals', 'Pro shop', 'Restaurant or patio on site', 'Dress code: collared shirts', 'Driving range on site', 'Free parking on site'],
+    simgolf: ['Book a bay ahead', 'Clubs to borrow', 'Food and drinks on site', 'Lessons available', 'Free parking on site'],
+    range: ['Balls and clubs to rent', 'Covered stalls', 'Lessons available', 'Lit for evening play', 'Free parking on site'],
+    snow: ['Book lessons ahead', 'Rentals available', 'Lift ticket not included', 'Meet at the ski school sign', 'Dress for the weather'],
+    rink: ['Skate rentals', 'Helmets for kids', 'Public skate times change: check the schedule', 'Skate aids for beginners', 'Free parking on site', 'Concession stand'],
+    swim: ['Bring a swimsuit and a towel', 'Lifeguards on duty', 'Kids under 8 with an adult in the water', 'Change rooms', 'Shade and picnic area', 'Free parking on site'],
+    skate: ['Helmets recommended', 'Bikes and scooters welcome', 'Lit in the evening', 'Washrooms nearby', 'Free parking on site'],
+    bike: ['Helmets required', 'Closed during race nights', 'Bike rentals nearby', 'Washrooms nearby', 'Free parking on site'],
+    courts: ['First come, first served', 'Book a court for evenings', 'Bring your own racquet or paddle', 'Lit in the evening', 'Free parking on site'],
+    discgolf: ['Free to play', 'Bring your own discs', 'Course map at the first tee', 'Washrooms nearby', 'Free parking on site'],
+    sportsctr: ['Lockers available', 'Bring indoor shoes', 'Drop-in times change: check the schedule', 'Free parking on site', 'Concession stand'],
+    sportgen: ['Book ahead on weekends', 'Rentals available', 'Arrive 15 minutes early', 'Free parking on site', 'Washrooms on site'],
+  });
+  Object.assign(fr.indoor.quick.good_to_know_kinds, {
+    golf: ['Heures de départ conseillées', 'Location de voiturettes et de bâtons', 'Boutique du pro', 'Restaurant ou terrasse sur place', 'Code vestimentaire : chemise à col', 'Champ de pratique sur place', 'Stationnement gratuit sur place'],
+    simgolf: ['Réservez une baie à l’avance', 'Bâtons à emprunter', 'Nourriture et boissons sur place', 'Cours offerts', 'Stationnement gratuit sur place'],
+    range: ['Balles et bâtons à louer', 'Postes couverts', 'Cours offerts', 'Éclairé le soir', 'Stationnement gratuit sur place'],
+    snow: ['Réservez les cours à l’avance', 'Location sur place', 'Billet de remontée non compris', 'Rendez-vous au panneau de l’école de ski', 'Habillez-vous selon la météo'],
+    rink: ['Location de patins', 'Casque pour les enfants', 'Les heures de patinage libre changent : voyez l’horaire', 'Aides au patinage pour débutants', 'Stationnement gratuit sur place', 'Comptoir de friandises'],
+    swim: ['Apportez votre maillot et une serviette', 'Sauveteurs en service', 'Moins de 8 ans avec un adulte dans l’eau', 'Vestiaires', 'Ombre et aire de pique-nique', 'Stationnement gratuit sur place'],
+    skate: ['Casque conseillé', 'Vélos et trottinettes bienvenus', 'Éclairé le soir', 'Toilettes à proximité', 'Stationnement gratuit sur place'],
+    bike: ['Casque obligatoire', 'Fermé pendant les soirées de course', 'Location de vélos à proximité', 'Toilettes à proximité', 'Stationnement gratuit sur place'],
+    courts: ['Premier arrivé, premier servi', 'Réservez un terrain le soir', 'Apportez votre raquette', 'Éclairé le soir', 'Stationnement gratuit sur place'],
+    discgolf: ['Gratuit', 'Apportez vos disques', 'Carte du parcours au premier départ', 'Toilettes à proximité', 'Stationnement gratuit sur place'],
+    sportsctr: ['Casiers offerts', 'Apportez des souliers d’intérieur', 'Les heures libres changent : voyez l’horaire', 'Stationnement gratuit sur place', 'Comptoir de friandises'],
+    sportgen: ['Réservez pour les fins de semaine', 'Location sur place', 'Arrivez 15 minutes d’avance', 'Stationnement gratuit sur place', 'Toilettes sur place'],
+  });
+  Object.assign(en.indoor.bringExKinds, { golf: 'Tee times recommended on weekends. Cart and club rentals in the pro shop.', simgolf: 'Book a bay ahead for evenings. Clubs to borrow at no charge.', range: 'Balls and clubs to rent. Covered stalls when it rains.',
+    snow: 'Book lessons ahead at Christmas and spring break. Meet at the ski school sign 15 minutes early.', rink: 'Skate rentals at the front desk. Public skate times change with hockey games: check the schedule.', swim: 'Bring a swimsuit and a towel. Lifeguards on duty during public swims.',
+    skate: 'Helmets recommended. Lit until 10 PM.', bike: 'Helmets required. The track is closed to the public during race nights.', courts: 'First come, first served. Bring your own racquet or paddle.', discgolf: 'Free to play. Course map at the first tee.',
+    sportsctr: 'Bring indoor shoes. Drop-in times change: check the schedule.', sportgen: 'Arrive 15 minutes early. Free parking on site.' });
+  Object.assign(fr.indoor.bringExKinds, { golf: 'Heures de départ conseillées la fin de semaine. Location de voiturettes et de bâtons à la boutique du pro.', simgolf: 'Réservez une baie à l’avance le soir. Bâtons à emprunter sans frais.', range: 'Balles et bâtons à louer. Postes couverts quand il pleut.',
+    snow: 'Réservez les cours à l’avance à Noël et à la relâche. Rendez-vous au panneau de l’école de ski 15 minutes d’avance.', rink: 'Location de patins à l’accueil. Les heures de patinage libre changent selon les matchs : voyez l’horaire.', swim: 'Apportez votre maillot et une serviette. Sauveteurs en service pendant les bains libres.',
+    skate: 'Casque conseillé. Éclairé jusqu’à 22 h.', bike: 'Casque obligatoire. La piste est fermée au public pendant les soirées de course.', courts: 'Premier arrivé, premier servi. Apportez votre raquette.', discgolf: 'Gratuit. Carte du parcours au premier départ.',
+    sportsctr: 'Apportez des souliers d’intérieur. Les heures libres changent : voyez l’horaire.', sportgen: 'Arrivez 15 minutes d’avance. Stationnement gratuit sur place.' });
+  Object.assign(en.indoor.storyExKinds, { golf: 'A family-run 18-hole course since 1990, with lake views from the back nine and a patio for after your round.', simgolf: 'Four TrackMan bays, 300 courses to play, lessons with a PGA pro and food and drinks while you play.',
+    range: 'A grass driving range with covered stalls, a putting green and an 18-hole mini golf course for the kids.', skischool: 'Ski and snowboard lessons for every age, from first-timers to experts, with kids’ day camps all winter.',
+    rink: 'Our community arena: public skating, drop-in hockey and skate rentals from October to March.', swim: 'An outdoor pool with a waterslide and a spray park, open daily in summer with lifeguards on duty.',
+    skatepark: 'A concrete skate park with a bowl and a street section, lit in the evening, free and open to everyone.', bike: 'A club-run BMX track with race nights in summer and learn-to-ride clinics for kids.',
+    courts: 'Six lit courts for tennis and pickleball, free to play, with drop-in nights all summer.', discgolf: 'An 18-hole disc golf course through the trees, free to play, with a map at the first tee.',
+    sportsctr: 'Our community sports centre: a gym, an arena and drop-in sports for every age.', sportgen: 'A local, family-run place since 2010. Friendly staff and something for every age.' });
+  Object.assign(fr.indoor.storyExKinds, { golf: 'Un parcours familial de 18 trous depuis 1990, avec vue sur le lac au retour et une terrasse pour après la partie.', simgolf: 'Quatre baies TrackMan, 300 parcours à jouer, des cours avec un pro de la PGA, et à manger et à boire pendant que vous jouez.',
+    range: 'Un champ de pratique sur gazon avec des postes couverts, un vert d’exercice et un mini-golf de 18 trous pour les enfants.', skischool: 'Des cours de ski et de planche pour tous les âges, des débutants aux experts, avec des camps de jour pour enfants tout l’hiver.',
+    rink: 'Notre aréna communautaire : patinage libre, hockey libre et location de patins d’octobre à mars.', swim: 'Une piscine extérieure avec glissade d’eau et jeux d’eau, ouverte tous les jours l’été avec des sauveteurs en service.',
+    skatepark: 'Un planchodrome en béton avec un bol et une section de rue, éclairé le soir, gratuit et ouvert à tous.', bike: 'Une piste de BMX gérée par un club, avec des soirées de course l’été et des cliniques d’initiation pour les enfants.',
+    courts: 'Six terrains éclairés pour le tennis et le pickleball, gratuits, avec du jeu libre tout l’été.', discgolf: 'Un parcours de disque-golf de 18 trous dans les arbres, gratuit, avec une carte au premier départ.',
+    sportsctr: 'Notre centre sportif communautaire : un gymnase, un aréna et des sports libres pour tous les âges.', sportgen: 'Un endroit local et familial depuis 2010. Une équipe accueillante et quelque chose pour tous les âges.' });
+  Object.assign(en.indoor.knownExKinds, { golf: 'Lake views from every hole on the back nine', simgolf: 'TrackMan bays and lessons with a PGA pro', range: 'Covered stalls and 18 holes of mini golf', skischool: 'Kids’ day camps and first-timer lessons',
+    rink: 'Family skates on Sunday afternoons', swim: 'The waterslide and the spray park', skatepark: 'The bowl and the street section', bike: 'Thursday race nights in summer', courts: 'Drop-in pickleball every weekday morning',
+    discgolf: '18 holes through the pines', sportsctr: 'Drop-in sports for every age', sportgen: 'Friendly, local and fun for the whole family' });
+  Object.assign(fr.indoor.knownExKinds, { golf: 'Vue sur le lac de chaque trou au retour', simgolf: 'Les baies TrackMan et les cours avec un pro de la PGA', range: 'Les postes couverts et les 18 trous de mini-golf', skischool: 'Les camps de jour pour enfants et les cours pour débutants',
+    rink: 'Le patinage familial le dimanche après-midi', swim: 'La glissade d’eau et les jeux d’eau', skatepark: 'Le bol et la section de rue', bike: 'Les soirées de course du jeudi l’été', courts: 'Le pickleball libre chaque matin de semaine',
+    discgolf: '18 trous dans les pins', sportsctr: 'Des sports libres pour tous les âges', sportgen: 'Accueillant, local et amusant pour toute la famille' });
+})();
 (function indoorKindWords() {
   const IK = require('./indoor-kinds');
   const noPeriod = (x) => String(x).replace(/\.$/, '');
@@ -2664,7 +2725,7 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
     // Codes, not words: [Good to know chip group, story example group, quiet kind, daytime kind] (an array, so the French
     // check skips it). Daytime (indoor test 5): no "Open after midnight?" row.
     T.kindGroups = {};
-    for (const k of IK.INDOOR_KIND_TEXT_KINDS) {
+    for (const k of IK.INDOOR_KIND_TEXT_KINDS.concat(IK.SPORT_KIND_TEXT_KINDS)) {
       const w = IK.indoorKindText([k], lang), line = noPeriod(w.price.page);
       T.kindText[k] = {
         tpriceLabel: w.price.label, tpricePh: w.price.ph, tpriceLead: w.price.lead,
@@ -2698,6 +2759,53 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
     }
   }
 })();
+// The sport strings: the indoor ones (with the kind tables above) and these words over them.
+function sportStrings(base, o) {
+  const x = JSON.parse(JSON.stringify(base));
+  for (const [k, v] of Object.entries(o)) x[k] = v && typeof v === 'object' && !Array.isArray(v) && x[k] && typeof x[k] === 'object' && !Array.isArray(x[k]) ? { ...x[k], ...v } : v;
+  // A sport listing with no kind yet reads in the "Something else" words.
+  if (x.kindText && x.kindText.sportother) x.kindText.other = x.kindText.sportother;
+  return x;
+}
+en.sport = sportStrings(en.indoor, {
+  labels: { groups: 'Groups and events' },
+  photosLead: 'Your course, rink or park, and people playing. Three photos is perfect.',
+  allYearClosedSub: 'Like open April to October, or December to March. You pick the dates.',
+  allYearShutHint: 'Closed a week or two each year, like for maintenance or aeration? Add it under Closures and holidays.',
+  seaClosuresHint: 'Closed over Christmas, or for a tournament week? Add it under Closures in More about your place.',
+  noDogsSub: 'Not allowed', noDogsSubInside: 'Not allowed',
+  noSetHours: 'We don’t have set hours (lessons or bookings only)', noSetHoursNow: 'No set hours: lessons or bookings only ✓',
+  bookLinkLabel: 'Booking or tee times link', bookLinkEx: 'your tee-time, bay, lesson or court booking page', tbookQ: 'Your booking or tee times link (optional)',
+  storyEx: 'A family-run 18-hole course since 1990, with lake views from the back nine.', knownEx: 'Lake views from every hole on the back nine',
+  bringEx: 'Tee times recommended on weekends. Cart and club rentals in the pro shop.',
+  groupsQ: 'Groups and events: from what size should they book ahead?', groupsLead: 'Tap a size, then add tournaments, parties, school groups or leagues in your own words.', groupsEx: 'Tournaments for up to 144 golfers. Birthday parties on weekends',
+  menuLead: 'Every green fee, pass, lesson or rental and what it costs. A photo of your rate sheet or a link to your rates page is perfect. It’s optional.',
+  menuFreeSub: 'Anything that costs extra, like lessons or rentals? Optional',
+  menuLeadFree: 'It’s free, so you can skip this. Anything that costs extra, like lessons or rentals? A photo of the price list or a link is perfect.',
+  menuTypeSub: 'Each green fee, pass or lesson and its price, one line at a time',
+  // Seasons matter here: the Hours screen's line under "We're closed part of the year" names the kind's usual season.
+  seasonHintSummer: 'Most places like yours close for winter. Tap “We’re closed part of the year” and pick your first and last day.',
+  seasonHintWinter: 'Most places like yours are open in winter only. Tap “We’re closed part of the year” and pick your first and last day.',
+});
+fr.sport = sportStrings(fr.indoor, {
+  labels: { groups: 'Groupes et événements' },
+  photosLead: 'Votre parcours, votre patinoire ou votre parc, et des gens qui jouent. Trois photos, c’est parfait.',
+  allYearClosedSub: 'Par exemple ouvert d’avril à octobre, ou de décembre à mars. Vous choisissez les dates.',
+  allYearShutHint: 'Fermé une semaine ou deux chaque année, comme pour l’entretien ou l’aération? Ajoutez-le dans Fermetures et jours fériés.',
+  seaClosuresHint: 'Fermé pendant les Fêtes, ou pour une semaine de tournoi? Ajoutez-le sous Fermetures dans Plus sur votre endroit.',
+  noDogsSub: 'Pas admis', noDogsSubInside: 'Pas admis',
+  noSetHours: 'Nous n’avons pas d’heures fixes (cours ou réservations seulement)', noSetHoursNow: 'Pas d’heures fixes : cours ou réservations seulement ✓',
+  bookLinkLabel: 'Lien de réservation ou de départs', bookLinkEx: 'votre page de réservation de départs, de baies, de cours ou de terrains', tbookQ: 'Votre lien de réservation ou de départs (facultatif)',
+  storyEx: 'Un parcours familial de 18 trous depuis 1990, avec vue sur le lac au retour.', knownEx: 'Vue sur le lac de chaque trou au retour',
+  bringEx: 'Heures de départ conseillées la fin de semaine. Location de voiturettes et de bâtons à la boutique du pro.',
+  groupsQ: 'Groupes et événements : à partir de combien de personnes doivent-ils réserver?', groupsLead: 'Touchez une taille, puis ajoutez les tournois, les fêtes, les groupes scolaires ou les ligues dans vos mots.', groupsEx: 'Tournois jusqu’à 144 golfeurs. Fêtes d’anniversaire la fin de semaine',
+  menuLead: 'Chaque droit de jeu, abonnement, cours ou location et son prix. Une photo de votre grille tarifaire ou un lien vers votre page des tarifs, c’est parfait. C’est facultatif.',
+  menuFreeSub: 'Quelque chose de payant, comme des cours ou des locations? Facultatif',
+  menuLeadFree: 'C’est gratuit, vous pouvez donc passer cette étape. Quelque chose de payant, comme des cours ou des locations? Une photo de la liste de prix ou un lien, c’est parfait.',
+  menuTypeSub: 'Chaque droit de jeu, abonnement ou cours et son prix, une ligne à la fois',
+  seasonHintSummer: 'La plupart des endroits comme le vôtre ferment l’hiver. Touchez « Nous fermons une partie de l’année » et choisissez votre premier et votre dernier jour.',
+  seasonHintWinter: 'La plupart des endroits comme le vôtre sont ouverts l’hiver seulement. Touchez « Nous fermons une partie de l’année » et choisissez votre premier et votre dernier jour.',
+});
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

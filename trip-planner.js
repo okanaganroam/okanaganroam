@@ -266,7 +266,7 @@ function kidsAllowed(v) {
   // Indoor places (2026-11-19): the owner's own minimum age. All ages or 5+ is fine for a family; 8+ when the kids' ages
   // say so; 12+, 16+ or 19+ never is (a kids trip doesn't say how old the kids are). Unanswered: as before.
   if (v.type === 'indoor' && indoorTooOld(v, ctx)) return false;
-  if (v.type === 'indoor' && v.indoorMinAge) {
+  if ((v.type === 'indoor' || v.kindOwn) && v.indoorMinAge) {
     if (v.indoorMinAge === 'all') return true;
     const youngI = kidsYoungest(ctx);
     if (youngI != null && /^\d+$/.test(v.indoorMinAge)) return youngI >= Number(v.indoorMinAge);
@@ -923,7 +923,7 @@ const FREE_PLACE_RE = /\b(?:park|parks|trail|trails|walkway|boardwalk|greenway|b
 // $ places won): a place its owner marked Free entry or By donation (indoor or tour) fits a cheap or budget request as well
 // as a $ place does. -> true or false.
 function budgetFreeStop(v) {
-  return !!v && ((v.type === 'indoor' && (v.indoorFree === 'free' || v.indoorFree === 'donation')) || (v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation')));
+  return !!v && (((v.type === 'indoor' || v.kindOwn) && (v.indoorFree === 'free' || v.indoorFree === 'donation')) || (v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation')));
 }
 // A request that asks for free places already keeps to them (no extra lift among them).
 function budgetFreeBonus(ctx, v) { return ctx.budget === 'budget' && budgetFreeStop(v) && !/\b(?:free|gratuit\w*|gratis)\b/.test(String(ctx.queryText || '').toLowerCase()); }
@@ -2051,7 +2051,7 @@ function ownerKidsAges(v, ctx) {
 }
 // The Kid-Friendly badge, or (indoor) the owner's own minimum age the kids named meet (indoor test 16).
 function indoorAdultNote(v, ctx) {
-  const a = v && v.type === 'indoor' && v.indoorAdultAges;
+  const a = v && (v.type === 'indoor' || v.kindOwn) && v.indoorAdultAges;
   if (!a || !ctx || !(ctx.kids || kidsYoungest(ctx) != null)) return null;
   const young = kidsYoungest(ctx);
   if (young != null && a.alone != null && young >= a.alone) return null;
@@ -2257,8 +2257,8 @@ function publicVenue(v, ctx) {
   // boat per hour"), not the tours' "From $89".
   const rental = v.type === 'tour' && !tourIsFree ? tourRentalPrice(v, ctx) : null;
   // Indoor places (2026-11-19): the owner's own adult price ("$25 · Admission"); free entry says Free (freeEntry).
-  const indoorFrom = v.type === 'indoor' && !v.indoorFree && typeof v.indoorPrice === 'number' && Number.isFinite(v.indoorPrice) && v.indoorPrice > 0 ? v.indoorPrice : null;
-  const cost = tourIsFree || (v.type === 'indoor' && v.indoorFree) ? null : rental ? rental : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
+  const indoorFrom = (v.type === 'indoor' || v.kindOwn) && !v.indoorFree && typeof v.indoorPrice === 'number' && Number.isFinite(v.indoorPrice) && v.indoorPrice > 0 ? v.indoorPrice : null;
+  const cost = tourIsFree || ((v.type === 'indoor' || v.kindOwn) && v.indoorFree) ? null : rental ? rental : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
     // Indoor test 2 (2026-11-19; Jordan): a price per room, lane, game or group reads as the page says it ("From $120 per
     // room (2–6 players)"), never "per person", and stays out of the per-person estimate.
     : indoorFrom && Array.isArray(v.indoorPerLine) ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null, perGroup: v.indoorPer, unit: v.indoorPerLine[0], unitFr: v.indoorPerLine[1] }
@@ -2267,7 +2267,7 @@ function publicVenue(v, ctx) {
     // Indoor test 13: the owner's own price line for the day or cheap night asked ("Cheap Tuesdays $8").
     : indoorFrom && !Array.isArray(v.indoorPerLine) && indoorAskedPriceLine(v, ctx) ? { ...indoorAskedPriceLine(v, ctx), label: 'Indoor', labelFr: 'Intérieur', source: null, lineFr: indoorAskedPriceLine(v, ctx).line, asked: true }
     // Indoor test 18: THE PRICE RULE (indoor-kinds.js): its amount is the lowest real price ("From $70" with a $70 pedicure).
-    : indoorFrom && Array.isArray(v.indoorPriceLine) ? { cents: Math.round((typeof v.indoorPriceAt === 'number' && v.indoorPriceAt > 0 ? v.indoorPriceAt : indoorFrom) * 100), label: 'Indoor', labelFr: 'Intérieur', source: null, line: v.indoorPriceLine[0], lineFr: v.indoorPriceLine[1] }
+    : indoorFrom && Array.isArray(v.indoorPriceLine) ? { cents: Math.round((typeof v.indoorPriceAt === 'number' && v.indoorPriceAt > 0 ? v.indoorPriceAt : indoorFrom) * 100), label: v.kindOwn ? (v.type === 'golf' ? 'Golf' : 'Activity') : 'Indoor', labelFr: v.kindOwn ? (v.type === 'golf' ? 'Golf' : 'Activité') : 'Intérieur', source: null, line: v.indoorPriceLine[0], lineFr: v.indoorPriceLine[1] }
     : indoorFrom ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null }
     : cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
     : fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
@@ -2279,7 +2279,7 @@ function publicVenue(v, ctx) {
     ...(tourIsFree ? { freeTour: v.tourFree } : {}),
     ...(yearlyClosureNote(v, ctx) ? { yearlyClosure: yearlyClosureNote(v, ctx) } : {}),
     // Indoor test 1 (2026-11-19; Margaret): a by-donation museum says "By donation (suggested $5)", never "Free entry".
-    ...(v.type === 'indoor' && v.indoorFree === 'donation' ? { byDonation: typeof v.indoorSuggested === 'number' && v.indoorSuggested > 0 ? v.indoorSuggested : true } : {}),
+    ...((v.type === 'indoor' || v.kindOwn) && v.indoorFree === 'donation' ? { byDonation: typeof v.indoorSuggested === 'number' && v.indoorSuggested > 0 ? v.indoorSuggested : true } : {}),
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     ...(cost ? { cost } : {}),
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.type === 'cocktail' ? 'Cocktail lounge' : v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : BREWERY_KIND_LABEL[v.type === 'brewery' && v.breweryKind] ? BREWERY_KIND_LABEL[v.breweryKind][0] : ctx ? (v.type === 'indoor' ? indoorVenueLabel(ctx, v, 'singular') : typeLabel(ctx, v.type, 'singular')) : v.type,
@@ -2291,7 +2291,7 @@ function publicVenue(v, ctx) {
     ...(v.type === 'indoor' && indoorCardKind(v) ? { typeLabel: indoorCardKind(v)[0], typeLabelFr: indoorCardKind(v)[1] } : {}),
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
     // Tour test 4: no $-$$$$ tier beside a tour's own price ("Free · $$", "From $35 · $$").
-    rating: v.rating, reviews: v.reviews, price: tourIsFree || tourFrom || indoorFrom || (v.type === 'indoor' && v.indoorFree) ? null : v.price, freeEntry: !!v.features?.free_entry || (v.type === 'indoor' && !!v.indoorFree), address: v.address || null,
+    rating: v.rating, reviews: v.reviews, price: tourIsFree || tourFrom || indoorFrom || ((v.type === 'indoor' || v.kindOwn) && v.indoorFree) ? null : v.price, freeEntry: !!v.features?.free_entry || ((v.type === 'indoor' || v.kindOwn) && !!v.indoorFree), address: v.address || null,
     // The venue's own photo when it has one (2026-10-17); otherwise a photo of
     // the kind of place (the site's category photos), labelled as an example.
     photo: ownStopPhoto(v), // real photos only (2026-10-28): no example photo for a place without its own
@@ -2818,7 +2818,7 @@ function stopFrom(v, scored, extra, ctx) {
     caveats = caveats.filter((c) => !c.startsWith(UNKNOWN_HOURS_CAVEAT.replace(/ — .*$/, '')) && !/listed hours/i.test(c));
     const tn = INDOOR_TIMES_NOTES[v.indoorTimes] || INDOOR_CLASS_TIME_NOTE;
     if (!caveats.includes(tn)) caveats.push(tn);
-  } else if (v && v.type === 'indoor' && INDOOR_BOOK_NOTES[v.indoorBook] && !caveats.includes(INDOOR_BOOK_NOTES[v.indoorBook]) && !(ownLine && ownLine.busy && v.indoorBook !== 'ahead')) caveats.push(INDOOR_BOOK_NOTES[v.indoorBook]);
+  } else if (v && (v.type === 'indoor' || v.kindOwn) && INDOOR_BOOK_NOTES[v.indoorBook] && !caveats.includes(INDOOR_BOOK_NOTES[v.indoorBook]) && !(ownLine && ownLine.busy && v.indoorBook !== 'ahead')) caveats.push(INDOOR_BOOK_NOTES[v.indoorBook]);
   if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = tourBookAheadNote(v); if (!caveats.includes(bn)) caveats.push(bn); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
   // Tour test 4 (Whistler, 2026-11-17), bug 12: the operator's one booking and age answer stands for several unlike trips

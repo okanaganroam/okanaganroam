@@ -1750,6 +1750,8 @@
     if (new RegExp(B.waiver, 'i').test(u)) return W.waiver;
     if (book === 'no' && new RegExp(B.party, 'i').test(u.replace(/[-_/.?=&]+/g, ' '))) return W.party;
     if (B.kind === 'shows') return W.shows; if (B.kind === 'classes') return W.classes;
+    // Sport (2026-11-20): a golf course's, simulator's, lesson's or court's own button when people book ahead.
+    var kb = (B.kindBtn || {})[indoorMainKind()]; if (kb && book !== 'no') return kb;
     return book === 'no' ? W.visit : W.book;
   }
   function bookShowsLine(url, book){ var w = bookShowsWord(url, book); return C.bookShows && T.bookShows ? '<p class="su-hint" id="suBookShows" aria-live="polite"' + (w ? '' : ' hidden') + '>' + h(w ? fill(T.bookShows, { x: w }) : '') + '</p>' : ''; }
@@ -1789,6 +1791,8 @@
   function indoorBringEx(){ if (!C.indoor || !T.bringExKinds) return T.bringEx; var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; return T.bringExKinds[INDOOR_CHIP_GROUP.get(k0)] || T.bringEx; }
   // Indoor test 3 (2026-11-19; Diane, a community theatre): the main kind (the first picked, or pre-picked), and whether it
   // is a show place (live theatre, music or comedy): it is asked about tickets, and its price is its lowest regular ticket.
+  // Sport and golf (2026-11-20): the main kind's usual season's hint on the Hours step ('' for none).
+  function sportSeasonHint(){ if (!C.sport) return ''; var se = (C.kindSeasons || {})[indoorMainKind()] || ''; return se === 'summer' ? (T.seasonHintSummer || '') : se === 'winter' ? (T.seasonHintWinter || '') : ''; }
   function indoorMainKind(){ if (!C.indoor) return ''; return ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0] || ''; }
   function indoorShow(){ return indoorMainKind() === 'theatre' && !!T.ibookQShow; }
   // The story and Known for examples by the main kind (owner-setup-text.js storyExKinds / knownExKinds).
@@ -2379,6 +2383,9 @@
         // Indoor test 10 (2026-11-19; Sandra's August maintenance shutdown had no place here): a short yearly shutdown is a
         // closure, said in one line (indoor places only).
         + (T.allYearShutHint ? '<p class="su-hint" id="suShutHint">' + h(T.allYearShutHint) + '</p>' : '')
+        // Sport and golf (2026-11-20): a kind with a usual season (golf and pools in summer, rinks and ski lessons in
+        // winter) says so once, while no season is stored. A hint only: nothing is picked for her.
+        + (sportSeasonHint() && !stS.length && !S.openSea ? '<p class="su-hint" id="suSportSeason">' + h(sportSeasonHint()) + '</p>' : '')
         + '<div class="su-stack">' + (stS.length && T.yearKeep ? big('✓', T.yearKeep, '', false, 'yearKeep') : '') + big(stS.length && T.yearKeep ? '✕' : '✓', stS.length && T.yearKeep && T.allYearSame ? T.allYearSame : T.allYearYes, '', !!(stS.length && T.yearKeep), 'yearAll') + (TL && !stS.length ? big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed') : '') + (stS.length ? stS.map(function(st){ return big('✎', fill(T.seaChange, st), T.seaChangeSub, true, 'yearSeasonEdit:' + st.i); }).join('')
           // Brewery test 1 (Whistler, 2026-11-15): a second stretch (a spring and a fall shoulder season), then a third.
           + seaMoreWrap(stS.length > 1, (stS.length < SEA_MAX && S.seaList.length < SEA_MAX && T.seaAdd ? big('🍂', stS.length > 1 ? T.seaAdd3 : T.seaAdd, stS.length > 1 ? T.seaAdd3Sub : T.seaAddSub, true, 'yearSeasonAdd') : '')) : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')

@@ -200,6 +200,8 @@ const TOUR_KIND_PLANNER = { fishing: ['fishing_tour'], boat: ['boat_tour'], jetb
 // test 9 every indoor kind has a planner kind of its own (a cinema is no longer a theatre).
 const INDOOR_KIND_PLANNER = { gallery: ['gallery'], museum: ['museum'], theatre: ['theatre'], cinema: ['cinema'], spa: ['spa'], climbing: ['climbing'], games: ['arcade'], escape: ['escape'],
   bowling: ['bowling'], classes: ['pottery'], kids: ['playground'], pool: ['pool'], curling: ['curling'], yoga: ['yoga'], casino: ['casino'], library: ['library'] };
+// Sport setup (2026-11-20): a sports listing's owner kinds -> the planner kinds they are (golf courses plan as type golf).
+const SPORT_KIND_PLANNER = { skatepark: ['skatepark'], discgolf: ['disc_golf'], bike: ['bmx'], courts: ['tennis', 'pickleball'], rink: ['skating'], skischool: ['ski_lessons'] };
 // Indoor test 9: each indoor planner kind's request words (indoor-kinds.js search words, English and French, plus the
 // words of its own request phrases), read as the kind and not as words a listing must hold.
 const INDOOR_KIND_REQUEST_WORDS = (() => {
@@ -334,6 +336,8 @@ function inferPlannerKinds(v) {
     if (kind==='atv'&&v.type==='tour'&&Array.isArray(v.tourKinds)&&v.tourKinds.includes('adventure')&&!re.test(text)&&/\b(?:tree ?top|ropes?|adventure parks?|bungee|bungy|climb\w*|canyon\w*|via ferrata|paraglid\w*|skydiv\w*|zip ?lines?)\b/.test(text)) return false;
     if (v.type==='tour'&&Array.isArray(v.tourKinds)&&v.tourKinds.some(k=>(TOUR_KIND_PLANNER[k]||[]).includes(kind))) return true;
     if (v.type==='indoor'&&Array.isArray(v.indoorKinds)&&v.indoorKinds.some(k=>(INDOOR_KIND_PLANNER[k]||[]).includes(kind))) return true;
+    // Sport setup (2026-11-20): a sports listing is the kind its owner picked (an arena is skating, a skate park a skatepark).
+    if (v.type==='sport'&&Array.isArray(v.sportKinds)&&v.sportKinds.some(k=>(SPORT_KIND_PLANNER[k]||[]).includes(kind))) return true;
     // Tour test 17 (Whistler, 2026-11-18): a tour's own "Wildlife viewing" (the chip's page words) or "eagle viewing" is a
     // wildlife tour; a viewing area or a boardwalk (not a tour) isn't.
     if (kind==='wildlife_tour'&&v.type==='tour'&&/\bwildlife viewing\b|\beagle (?:viewing|watching)\b/.test(text)) return true;
@@ -1553,4 +1557,4 @@ function tripRequestSynonyms(text){let out=String(text||'');const walksNegated=W
  if(/\b(?:ski|skiing|snowboard\w*)\b/i.test(out)&&!/\b(?:cross.country|nordic)\b/i.test(out)&&!/\b(?:don.?t|do not|won.?t|not|no|never|without)\s+(?:\w+\s+){0,2}(?:ski|skiing|snowboard\w*)\b/i.test(out))out=out.replace(/\b(?:a )?night out\b|\bgoing out(?: at night)?\b/gi,'nightlife').replace(/\s*\b(?:in the morning|in the afternoon|in the evening)\b/gi,'').replace(/\b(?:morning|afternoon|evening)\s+(?=(?:ski|skiing|snowboard\w*|spa|apres|après|dinner|lunch|drinks)\b)/gi,'').replace(/\s{2,}/g,' ');
  return out;}
 
-module.exports={indoorSlotOf,morningOfOneStop,KINDS,REQUEST_KINDS,TOUR_PLANNER_KINDS,TOUR_KIND_PLANNER,INDOOR_KIND_PLANNER,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
+module.exports={SPORT_KIND_PLANNER,indoorSlotOf,morningOfOneStop,KINDS,REQUEST_KINDS,TOUR_PLANNER_KINDS,TOUR_KIND_PLANNER,INDOOR_KIND_PLANNER,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
