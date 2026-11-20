@@ -1,0 +1,727 @@
+{
+ "note": "Hand-written stand-ins for what Claude Haiku 5.5 is expected to return for the 20 hard cases, used by --mock when no ANTHROPIC_API_KEY is available. They run through the real trip-ai.js code (a fake fetch returns them), so validation, rendering and the planner are exercised; latency and cost are not real.",
+ "answers": {
+  "H01": {
+   "unsure": false,
+   "towns": [
+    "big-white"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": 1,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "ski",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H02": {
+   "unsure": false,
+   "towns": [
+    "silverstar"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "ski",
+     "time_of_day": "morning",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "apres",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H03": {
+   "unsure": false,
+   "towns": [
+    "kelowna"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "coffee",
+     "time_of_day": "morning",
+     "start_time": "10:00",
+     "place": null
+    },
+    {
+     "kind": "winery",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "dinner",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H04": {
+   "unsure": false,
+   "towns": [
+    "penticton"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [
+     2
+    ],
+    "dog": false
+   },
+   "occasion": "family",
+   "rainy_day": true,
+   "interests": [
+    {
+     "kind": "indoor",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H05": {
+   "unsure": false,
+   "towns": [
+    "naramata"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": "parents",
+   "rainy_day": false,
+   "interests": [],
+   "pace": "relaxed",
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H06": {
+   "unsure": false,
+   "towns": [
+    "kelowna"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": 2,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": "romantic",
+   "rainy_day": false,
+   "interests": [],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H07": {
+   "unsure": false,
+   "towns": [
+    "big-white"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "ski",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "hot_tub",
+     "time_of_day": "afternoon",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H08": {
+   "unsure": false,
+   "towns": [
+    "vernon"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "cheap_eats",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": "budget",
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H09": {
+   "unsure": false,
+   "towns": [
+    "penticton"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": 2,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": true
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [],
+   "pace": null,
+   "budget": null,
+   "must_have": [
+    "dog_friendly"
+   ],
+   "must_avoid": []
+  },
+  "H10": {
+   "unsure": false,
+   "towns": [
+    "kelowna"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": 1,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "lunch",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "winery",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [
+    "accessible"
+   ],
+   "must_avoid": []
+  },
+  "H11": {
+   "unsure": false,
+   "towns": [
+    "penticton"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": 3,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": 2,
+    "kid_ages": [],
+    "dog": true
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H12": {
+   "unsure": false,
+   "towns": [],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "coffee",
+     "time_of_day": "morning",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "ski",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "apres",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "dinner",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H13": {
+   "unsure": false,
+   "towns": [
+    "naramata"
+   ],
+   "valley_wide": false,
+   "start_date": "2026-11-21",
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "brunch",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "wine_tasting",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "dinner",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H14": {
+   "unsure": false,
+   "towns": [
+    "kelowna"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "lunch",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "brewery",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [
+    "vegan",
+    "gluten_free"
+   ],
+   "must_avoid": []
+  },
+  "H15": {
+   "unsure": false,
+   "towns": [
+    "osoyoos"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": 2,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": "romantic",
+   "rainy_day": false,
+   "interests": [],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": [
+    "winery",
+    "alcohol"
+   ]
+  },
+  "H16": {
+   "unsure": false,
+   "towns": [
+    "kelowna"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": 2,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": "romantic",
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "winery",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H17": {
+   "unsure": false,
+   "towns": [
+    "penticton"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": 1,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": "family",
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "coffee",
+     "time_of_day": "morning",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "beach",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "dinner",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H18": {
+   "unsure": false,
+   "towns": [
+    "vernon"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "golf",
+     "time_of_day": "morning",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "lunch",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
+     "kind": "brewery",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H19": {
+   "unsure": false,
+   "towns": [
+    "kelowna"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "dinner",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": "Waterfront Wines"
+    },
+    {
+     "kind": "drinks",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "H20": {
+   "unsure": true,
+   "towns": [],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  }
+ }
+}

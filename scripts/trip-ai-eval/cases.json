@@ -1,0 +1,709 @@
+{
+ "note": "20 hard cases (the Nov 18 plan's list plus 10 more, hand-labelled) and 60 realistic requests. The 60 are NOT from the trip-demand log: Stage 1 stores only which businesses were shown/added/removed, never the request text, and no export exists locally. They are the owner's own Build My Trip QA prompts (drafts/trip-qa-2026-10-25), labelled automatically by the harness's keyword labeller. Replace them with real visitor requests when a log of request text exists.",
+ "cases": [
+  {
+   "id": "H01",
+   "set": "hard",
+   "text": "a day on the mountain at Big White",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "big-white"
+    ],
+    "kinds": [
+     "outdoor"
+    ]
+   }
+  },
+  {
+   "id": "H02",
+   "set": "hard",
+   "text": "après drinks after a day of skiing at SilverStar",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "silverstar"
+    ],
+    "kinds": [
+     "outdoor",
+     "drinks"
+    ]
+   }
+  },
+  {
+   "id": "H03",
+   "set": "hard",
+   "text": "morning coffee at 10 then a winery and dinner in Kelowna",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "kelowna"
+    ],
+    "kinds": [
+     "cafe",
+     "winery",
+     "restaurant"
+    ],
+    "startMinutes": 600
+   }
+  },
+  {
+   "id": "H04",
+   "set": "hard",
+   "text": "rainy day with toddlers in Penticton",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "penticton"
+    ],
+    "kids": true
+   }
+  },
+  {
+   "id": "H05",
+   "set": "hard",
+   "text": "something chill for my parents in Naramata",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "naramata"
+    ]
+   }
+  },
+  {
+   "id": "H06",
+   "set": "hard",
+   "text": "romantic weekend in Kelowna",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "kelowna"
+    ],
+    "days": 2
+   }
+  },
+  {
+   "id": "H07",
+   "set": "hard",
+   "text": "ski day then hot tub at Big White",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "big-white"
+    ],
+    "kinds": [
+     "outdoor"
+    ]
+   }
+  },
+  {
+   "id": "H08",
+   "set": "hard",
+   "text": "cheap eats only in Vernon",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "vernon"
+    ],
+    "kinds": [
+     "food"
+    ]
+   }
+  },
+  {
+   "id": "H09",
+   "set": "hard",
+   "text": "2 days in Penticton, dog with us",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "penticton"
+    ],
+    "days": 2,
+    "dog": true
+   }
+  },
+  {
+   "id": "H10",
+   "set": "hard",
+   "text": "wheelchair friendly day in Kelowna with lunch and a winery",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "kelowna"
+    ],
+    "kinds": [
+     "restaurant",
+     "winery"
+    ]
+   }
+  },
+  {
+   "id": "H11",
+   "set": "hard",
+   "text": "3 nights in Penticton with 2 kids and our dog",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "penticton"
+    ],
+    "days": 4,
+    "dog": true,
+    "kids": true
+   }
+  },
+  {
+   "id": "H12",
+   "set": "hard",
+   "text": "coffee, a day on the mountain, après and dinner",
+   "lang": "en",
+   "expect": {
+    "kinds": [
+     "cafe",
+     "outdoor",
+     "drinks",
+     "restaurant"
+    ]
+   }
+  },
+  {
+   "id": "H13",
+   "set": "hard",
+   "text": "brunch then wine tasting then a sunset dinner in Naramata this Saturday",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "naramata"
+    ],
+    "kinds": [
+     "food",
+     "winery",
+     "restaurant"
+    ]
+   }
+  },
+  {
+   "id": "H14",
+   "set": "hard",
+   "text": "we're vegan and gluten free - lunch then breweries in Kelowna",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "kelowna"
+    ],
+    "kinds": [
+     "restaurant",
+     "brewery"
+    ]
+   }
+  },
+  {
+   "id": "H15",
+   "set": "hard",
+   "text": "anniversary weekend in Osoyoos, we don't drink so no wineries",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "osoyoos"
+    ],
+    "days": 2,
+    "noKinds": [
+     "winery",
+     "brewery"
+    ]
+   }
+  },
+  {
+   "id": "H16",
+   "set": "hard",
+   "text": "un week-end romantique à Kelowna avec des vignobles",
+   "lang": "fr",
+   "expect": {
+    "towns": [
+     "kelowna"
+    ],
+    "days": 2,
+    "kinds": [
+     "winery"
+    ]
+   }
+  },
+  {
+   "id": "H17",
+   "set": "hard",
+   "text": "une journée à Penticton avec les enfants : un café le matin, puis la plage et une pizza pour souper",
+   "lang": "fr",
+   "expect": {
+    "towns": [
+     "penticton"
+    ],
+    "kinds": [
+     "cafe",
+     "beach",
+     "restaurant"
+    ],
+    "kids": true
+   }
+  },
+  {
+   "id": "H18",
+   "set": "hard",
+   "text": "golf in the morning then lunch and a brewery in Vernon - text me at 250-555-0199",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "vernon"
+    ],
+    "kinds": [
+     "golf",
+     "restaurant",
+     "brewery"
+    ]
+   }
+  },
+  {
+   "id": "H19",
+   "set": "hard",
+   "text": "dinner at Waterfront Wines then cocktails in Kelowna",
+   "lang": "en",
+   "expect": {
+    "towns": [
+     "kelowna"
+    ],
+    "kinds": [
+     "drinks"
+    ],
+    "namedVenue": "Waterfront Wines Restaurant"
+   }
+  },
+  {
+   "id": "H20",
+   "set": "hard",
+   "text": "help me plan something fun",
+   "lang": "en",
+   "expect": {
+    "expectFallback": true
+   }
+  },
+  {
+   "id": "R01",
+   "set": "real",
+   "text": "2 days in Naramata wineries and hiking",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R02",
+   "set": "real",
+   "text": "3 days in Penticton with kids",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R03",
+   "set": "real",
+   "text": "weekend in Kelowna with the dog",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R04",
+   "set": "real",
+   "text": "a foodie weekend in Kelowna",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R05",
+   "set": "real",
+   "text": "5 days in the Okanagan with kids",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R06",
+   "set": "real",
+   "text": "a day of wineries in Summerland",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R07",
+   "set": "real",
+   "text": "a day in Oliver on Sunday",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R08",
+   "set": "real",
+   "text": "a relaxed weekend in Naramata",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R09",
+   "set": "real",
+   "text": "a beach and lunch in Kelowna",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R10",
+   "set": "real",
+   "text": "2 days in Lake Country",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R11",
+   "set": "real",
+   "text": "art galleries and cafes in Vernon",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R12",
+   "set": "real",
+   "text": "museums in Kelowna",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R13",
+   "set": "real",
+   "text": "a craft beer day in Vernon",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R14",
+   "set": "real",
+   "text": "lunch and a winery in Osoyoos",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R15",
+   "set": "real",
+   "text": "a waterfall hike in Peachland",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R16",
+   "set": "real",
+   "text": "a bike ride and lunch in Penticton",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R17",
+   "set": "real",
+   "text": "a winery tour in Lake Country",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R18",
+   "set": "real",
+   "text": "3 days in Vernon and Kelowna",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R19",
+   "set": "real",
+   "text": "une fin de semaine à Penticton",
+   "lang": "fr",
+   "expect": null
+  },
+  {
+   "id": "R20",
+   "set": "real",
+   "text": "deux jours à Kelowna avec des enfants",
+   "lang": "fr",
+   "expect": null
+  },
+  {
+   "id": "R21",
+   "set": "real",
+   "text": "a day in Penticton for seniors",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R22",
+   "set": "real",
+   "text": "a day in Kelowna for a bachelor party",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R23",
+   "set": "real",
+   "text": "2 days of golf in Osoyoos",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R24",
+   "set": "real",
+   "text": "cafes in Summerland",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R25",
+   "set": "real",
+   "text": "a weekend in Peachland and Summerland",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R26",
+   "set": "real",
+   "text": "a day in Oliver with kids",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R27",
+   "set": "real",
+   "text": "tacos and beer in Penticton",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R28",
+   "set": "real",
+   "text": "pizza in Vernon tonight",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R29",
+   "set": "real",
+   "text": "a vegetarian day in Kelowna",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R30",
+   "set": "real",
+   "text": "dog friendly wineries in Naramata",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R31",
+   "set": "real",
+   "text": "weekend getaway Osoyoos for couples",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R32",
+   "set": "real",
+   "text": "a day in Kelowna with a toddler",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R33",
+   "set": "real",
+   "text": "things to do in Peachland in winter",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R34",
+   "set": "real",
+   "text": "2 days in Kelowna in March",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R35",
+   "set": "real",
+   "text": "a weekend in Vernon in December",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R36",
+   "set": "real",
+   "text": "a girls weekend in Penticton",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R37",
+   "set": "real",
+   "text": "a day in Enderby",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R38",
+   "set": "real",
+   "text": "brunch and a hike in Kelowna",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R39",
+   "set": "real",
+   "text": "coffee, a winery and dinner in Penticton",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R40",
+   "set": "real",
+   "text": "a day trip from Kelowna to Vernon",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R41",
+   "set": "real",
+   "text": "4 days in the Okanagan",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R42",
+   "set": "real",
+   "text": "a cheap day in Penticton",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R43",
+   "set": "real",
+   "text": "date night in Vernon",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R44",
+   "set": "real",
+   "text": "winery lunch in West Kelowna",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R45",
+   "set": "real",
+   "text": "a beach day in Osoyoos in July",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R46",
+   "set": "real",
+   "text": "a day at SilverStar in February",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R47",
+   "set": "real",
+   "text": "a day at Big White in January",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R48",
+   "set": "real",
+   "text": "New Year's Eve in Kelowna",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R49",
+   "set": "real",
+   "text": "spa day and dinner in Penticton",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R50",
+   "set": "real",
+   "text": "lunch with a view in Kelowna",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R51",
+   "set": "real",
+   "text": "dinner then a brewery in Kelowna",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R52",
+   "set": "real",
+   "text": "a brewery after dinner in Penticton",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R53",
+   "set": "real",
+   "text": "hike then dinner in Vernon",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R54",
+   "set": "real",
+   "text": "cheap eats and a hike in West Kelowna",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R55",
+   "set": "real",
+   "text": "wine tasting on the Naramata Bench with a designated driver",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R56",
+   "set": "real",
+   "text": "golf weekend in Vernon",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R57",
+   "set": "real",
+   "text": "2 days in Vernon in December",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R58",
+   "set": "real",
+   "text": "Christmas in Kelowna",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R59",
+   "set": "real",
+   "text": "ice cream and a beach in Penticton",
+   "lang": "en",
+   "expect": null
+  },
+  {
+   "id": "R60",
+   "set": "real",
+   "text": "a packed day in Kelowna",
+   "lang": "en",
+   "expect": null
+  }
+ ]
+}
