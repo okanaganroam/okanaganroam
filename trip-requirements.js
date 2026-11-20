@@ -1550,6 +1550,8 @@ const GROUP_FOOD_RE=/\b(?:dinners?|lunch(?:es)?|brunch|breakfast|suppers?|meals?
 // 2026-10-25 (tools audit): "retired couple, no hiking" became "relaxed easy walks, no hiking", a walks part that "no
 // hiking" emptied (three mornings left free). With hiking or walking ruled out, those words mean "relaxed" only.
 const WALKS_NEGATED_RE=/\b(?:no|without|skip|avoid|not into|no more|don.?t (?:want|like|do|need)(?: to)?|do not (?:want|like|do|need)(?: to)?)\s+(?:\w+\s+)?(?:hik\w*|walks?|walking|trails?)\b/i;
+// Sport setup (2026-11-20): « disque-golf » (French) asks for disc golf.
+REQUEST_SYNONYMS.push([/\bdisques?[- ]golf\b/gi, 'disc golf']);
 function tripRequestSynonyms(text){let out=String(text||'');const walksNegated=WALKS_NEGATED_RE.test(out);for(const [re,w] of REQUEST_SYNONYMS)out=out.replace(re,walksNegated&&w==='relaxed easy walks'?'relaxed':w);
  // "Best brunch then a walk" (2026-10-25): "best" ranks a list; in a request with several parts it emptied the plan.
  if(/\b(?:then|followed by|after that|afterwards)\b/i.test(out))out=out.replace(/\b(?:the )?(?:best|top|top rated|highest rated)\s+(?=\w)/gi,'');

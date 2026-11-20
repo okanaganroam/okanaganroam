@@ -7469,7 +7469,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       ...(v.type === 'indoor' ? indoorPlannerFacts(v.id) : {}),
       // Sport and golf (2026-11-20): the same owner answers once the owner has given any (kindOwn: the planner reads them as
       // it reads an indoor place's: the price in its kind's words, Free, the minimum age, walk-ins or book ahead).
-      ...(sportSetupType(v.type) && Object.keys(venueIndoorInfo(v.id)).length ? { ...indoorPlannerFacts(v.id), kindOwn: true } : {}),
+      // Their kinds are not indoor kinds: they never decide an indoor request (sportKinds carries them).
+      ...(sportSetupType(v.type) && Object.keys(venueIndoorInfo(v.id)).length ? (() => { const f = indoorPlannerFacts(v.id); delete f.indoorKinds; return { ...f, ...(Array.isArray(venueIndoorInfo(v.id).kinds) ? { sportKinds: venueIndoorInfo(v.id).kinds.slice() } : {}), kindOwn: true }; })() : {}),
       // Indoor test 3 (2026-11-19): a show place's own show days and time (its Known for, then its story) and its dated
       // shows on What's On, so Build My Trip never calls it "Closed" on a night its own words or a listed show say it plays.
       ...(v.type === 'indoor' && indoorShowPlace(venueIndoorInfo(v.id)) ? (() => {
@@ -8593,7 +8594,7 @@ function tripSportPlannerType(v) {
   // for courts and "Something else", which are local facilities rather than a visitor's stop).
   try {
     const k = sportSetupType('sport') && v && v.id != null ? (venueIndoorInfo(v.id).kinds || [])[0] : null;
-    if (k && indoorKindsModule.SPORT.K[k]) { const p = indoorKindsModule.SPORT.K[k].planner; return p === 'indoor' || p === 'outdoor' ? p : null; }
+    if (k && indoorKindsModule.SPORT.K[k]) { const p = indoorKindsModule.SPORT.K[k].planner; return p === 'indoor' || p === 'outdoor' || p === 'tour' ? p : null; }
   } catch (e) { /* the words below */ }
   const c = v.cuisine ? String(v.cuisine) : '';
   if (TRIP_SPORT_INDOOR_RE.test(c)) return 'indoor';

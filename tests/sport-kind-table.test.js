@@ -90,7 +90,7 @@ test('the table: every sport kind has its price, Your prices, Help, Groups, sear
     assert.ok(app.INDOOR_KIND_LABELS_OWNER[k], `${k} owner label`);
     // Its usual season is one of three; its planner type is a known one.
     assert.ok(['summer', 'winter', ''].includes(e.season), k);
-    assert.ok(['golf', 'indoor', 'outdoor', null].includes(SK.K[k].planner), k);
+    assert.ok(['golf', 'indoor', 'outdoor', 'tour', null].includes(SK.K[k].planner), k);
   }
   // Happy hour is never a sport chip or example.
   assert.doesNotMatch(JSON.stringify(T.en.sport.quick.good_to_know_kinds) + JSON.stringify(T.en.sport.bringExKinds), /happy hour/i);

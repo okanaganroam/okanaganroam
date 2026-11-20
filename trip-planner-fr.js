@@ -387,6 +387,11 @@ const PHRASES = [
   ['location d equipement', 'equipment rentals'], ['location de materiel', 'equipment rentals'],
   ['jouer au golf', 'golf'], ['terrain de golf', 'golf course'], ['terrains de golf', 'golf courses'],
   ['parcours de golf', 'golf course'], ['golfer', 'golf'],
+  // Sport setup (2026-11-20): the sport kinds' French words.
+  ['disque golf', 'disc golf'], ['disques golf', 'disc golf'], ['parcours de disque golf', 'disc golf course'], ['golf frisbee', 'disc golf'],
+  ['piste de bmx', 'bmx track'], ['pistes de bmx', 'bmx tracks'],
+  ['champ de pratique', 'driving range'], ['simulateur de golf', 'golf simulator'], ['simulateurs de golf', 'golf simulators'], ['golf interieur', 'indoor golf'],
+  ['piscine exterieure', 'outdoor pool'], ['piscines exterieures', 'outdoor pools'],
   ['vue sur le lac', 'lake view'], ['vue sur lac', 'lake view'], ['vue sur la lac', 'lake view'],
   ['au bord du lac', 'by the lake'], ['bord du lac', 'by the lake'], ['pres du lac', 'by the lake'], ['sur le lac', 'on the lake'],
   ['au bord de l eau', 'waterfront'], ['bord de l eau', 'waterfront'], ...SITE_FRENCH_LAKES, ['lac', 'lake'], ['lacs', 'lakes'],

@@ -16,7 +16,8 @@
 //   season   'summer' | 'winter' | ''   the usual season, for the Hours step's hint and Help ("Closed in winter? Tap We're
 //            closed part of the year"); never written anywhere by itself (owner-only answers are never filled in)
 //   planner  the Build My Trip type the kind plans as when a sport listing's owner picked it (server.js
-//            tripSportPlannerType): 'indoor', 'outdoor', or null (courts: a local facility, not a visitor's stop)
+//            tripSportPlannerType): 'indoor', 'outdoor', 'tour' (ski lessons), 'golf' (golf listings stay golf), or
+//            null (courts and Something else: a local facility, not a visitor's stop)
 // ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 const K = {};
 const PRICES_PAGE = ['Prices & rates', 'Tarifs'];
@@ -58,7 +59,8 @@ K.range = kind({ day: true, gtk: 'range', ex: 'range', season: 'summer', planner
     groups: { chips: ['Fêtes d’anniversaire', 'Cours et cliniques de groupe', 'Sorties d’entreprise et d’équipe'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les cours de groupe ou les sorties d’équipe dans vos mots.', ex: 'Fêtes d’anniversaire avec mini-golf jusqu’à 20 personnes. Cours de groupe la fin de semaine' },
     search: ['champ de pratique', 'practice de golf', 'seau de balles', 'mini-golf', 'minigolf'] } });
 
-K.skischool = kind({ bookBtn: ['Book a lesson', 'Réserver un cours'], day: true, gtk: 'snow', ex: 'skischool', season: 'winter', planner: 'outdoor',
+// Ski lessons plan as a tour stop (Build My Trip's ski lessons are a tour kind: 'ski_lessons').
+K.skischool = kind({ bookBtn: ['Book a lesson', 'Réserver un cours'], day: true, gtk: 'snow', ex: 'skischool', season: 'winter', planner: 'tour',
   en: { price: { page: 'Lessons from {x}.', basis: 'Lessons', label: 'Your lowest lesson price (like a group lesson), in dollars', ph: '', lead: 'Your lowest lesson price, like one group lesson. It shows on your card.' },
     prices: { noun: 'lessons page', page: 'Lessons & rates', lead: 'Group and private lessons, kids’ programs, rentals and lift tickets, with their prices. A link to your lessons page is perfect. It’s optional.' },
     help: { walkin: 'Book lessons ahead, especially at Christmas and spring break', ages: 'Kids’ programs from age 3; adults welcome', gift: 'Gift cards for lessons online', prices: 'Private lesson $219, kids’ day camp $179' },
@@ -287,7 +289,9 @@ const SPORT_KIND_LABELS_OWNER = {
 };
 // The page words of each kind (venues.cuisine, the card's category line).
 const SPORT_KIND_WORDS = {
-  golf: ['Golf course', 'Terrain de golf'], simgolf: ['Indoor golf', 'Golf intérieur'], range: ['Driving range & mini golf', 'Champ de pratique et mini-golf'],
+  golf: ['Golf course', 'Terrain de golf'],
+  // "Golf simulator", never "Indoor golf": as a category word, "indoor golf" in a request read as a cuisine and lost the place.
+  simgolf: ['Golf simulator', 'Simulateur de golf'], range: ['Driving range & mini golf', 'Champ de pratique et mini-golf'],
   rink: ['Arena & skating', 'Aréna et patinage'], skatepark: ['Skate park', 'Planchodrome'], discgolf: ['Disc golf', 'Disque-golf'],
   bike: ['BMX track & bike park', 'Piste de BMX et parc de vélo'], swim: ['Outdoor pool', 'Piscine extérieure'], courts: ['Tennis & pickleball', 'Tennis et pickleball'],
   skischool: ['Ski & snowboard lessons', 'Cours de ski et de planche'], sportsctr: ['Sports centre', 'Centre sportif'],
