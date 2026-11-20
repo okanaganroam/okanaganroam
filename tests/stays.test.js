@@ -417,19 +417,20 @@ test('town notes: intro and tips under the heading, escaped, in the meta descrip
   } finally { stays.setTownNotes(null); }
 });
 
-test('town notes file: the shipped shape, with one placeholder entry', () => {
+test('town notes file: every town has the shipped shape', () => {
   const data = JSON.parse(fs.readFileSync(stays.TOWN_NOTES_FILE, 'utf8'));
   const towns = Object.keys(data);
-  assert.deepEqual(towns, ['kelowna']);
+  assert.ok(towns.length >= 1 && towns.includes('kelowna'));
   for (const t of towns) {
     assert.equal(typeof data[t].en, 'string');
     assert.equal(typeof data[t].fr, 'string');
     assert.ok(data[t].en.length > 40 && data[t].fr.length > 40);
+    assert.ok(data[t].tips.length <= 3);
     assert.ok(Array.isArray(data[t].tips));
     for (const tip of data[t].tips) { assert.equal(typeof tip.en, 'string'); assert.equal(typeof tip.fr, 'string'); }
   }
   const note = stays.townNoteFor('kelowna', 'en');
   assert.equal(note.text, data.kelowna.en.replace(/\s+/g, ' ').trim());
-  assert.equal(stays.townNoteFor('penticton', 'en'), null);
+  assert.equal(stays.townNoteFor('no-such-town', 'en'), null);
   assert.equal(stays.townNoteFor('__proto__', 'en'), null);
 });
