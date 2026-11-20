@@ -1,0 +1,372 @@
+[
+ {
+  "id": 2065,
+  "name": "Sandman Hotel Penticton",
+  "file": "/images/venues/sandman-hotel-penticton-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.sandmanhotels.com/penticton",
+  "image_url": "https://image-tc.galaxy.tf/wijpeg-3mlise0cgi3y4vzjg5r5ik86s/pen-exterior.jpg?width=1920",
+  "source_kind": "website",
+  "note": "Hotel entrance and covered porte-cochere under blue sky"
+ },
+ {
+  "id": 2082,
+  "name": "Shoreline Resort",
+  "file": "/images/venues/shoreline-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://shorelineresort.ca/gallery/",
+  "image_url": "https://shorelineresort.ca/wp-content/uploads/2023/08/Slider-Hero-Image-1-scaled.jpg",
+  "source_kind": "website",
+  "note": "Resort building and sign facing Okanagan Lake across Lakeshore Drive"
+ },
+ {
+  "id": 2083,
+  "name": "Slumber Lodge",
+  "file": "/images/venues/slumber-lodge-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482626f89f27d33:0xb065325fbc2c6e70",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdt4eLuAs5Y46J0Kanq_iNriK0gJhP7VMbTQn4HOnMTnBBMWPelk6kbquvH1ZMHejEKq9Pd7BH6I3MJeeV3N0W10mcqVLC-xGUzrUq5QLuqaXOJl4XauOO30zvmYtp6DDJiSMpw=w2400",
+  "source_kind": "google_maps",
+  "note": "Indoor pool with lake view windows (owner photo)"
+ },
+ {
+  "id": 2084,
+  "name": "Spanish Villa Resort",
+  "file": "/images/venues/spanish-villa-resort-2610.jpg",
+  "dimensions": "1584x792",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482626c28d8605f:0x1f0f7b6765151593",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLf0nWXdUD72ZLp7g4wH7JtjN1cNZ3gKUp3ZJtpMv0qXQhEJ1GHLzq1sRA5NhXtvUSxmfZiu91GSkPvoeskn7sYqgmhLyixiZNW6DvwtJWuZP1993J9P36noNnkV_hNwDt9EhvNGuQ=w2400",
+  "source_kind": "google_maps",
+  "note": "Arched two-storey motel front and balconies (right two-thirds of the photo, cropped to leave out the Canada Day sign; summer bunting still on the railings)"
+ },
+ {
+  "id": 2086,
+  "name": "Swiss Sunset Inn",
+  "file": "/images/venues/swiss-sunset-inn-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x548289947c242097:0xe9732855055f7561",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcfNGPGb-LHRL_ATCCwDzi5cT8q_GMFIBXCJI2qizBvoM9Ta810H8tytCMEr6IQDrfucq5uIIAVRU15Fi_ZOnoABvKVMYwdh3FaqJrn2E0zZTy2chadHB3ZnCSE5Q3bDSw1PGKiQJhEeHk=w2400",
+  "source_kind": "google_maps",
+  "note": "Outdoor pool with the motel's units and red Muskoka chairs behind"
+ },
+ {
+  "id": 2066,
+  "name": "The Balcomo - A Ramada by Wyndham Penticton",
+  "file": "/images/venues/the-balcomo-a-ramada-by-wyndham-penticton-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.balcomo.com/",
+  "image_url": "https://cdn.prod.website-files.com/64358a3c311c5ccb1203c94c/6939e25997763f4a01e26d0d_Birds-Eye---Pool-%2B-Wellness-Centre-1_Small.png",
+  "source_kind": "website",
+  "note": "Aerial view of the hotel grounds, pool and wellness centre"
+ },
+ {
+  "id": 2087,
+  "name": "The Traveler's Motel",
+  "file": "/images/venues/the-traveler-s-motel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482898451b9d3c1:0x4f6cf54a17aaa6c7",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLd6uFx7y4BnkjJvQ1X1N0bZh5dJf8sNVVo-hb2I-Iu-iIZ3kzM2PENqi8vikKAcMSCdviPTkbRsh7WYH3k1Xasuz1TMkmBiGiEuLlTGZgd7uINaGKPnGwp9zKSYU_SwrOJqotrF=w2400",
+  "source_kind": "google_maps",
+  "note": "Bright guest room with king bed, dining table and sofa"
+ },
+ {
+  "id": 2092,
+  "name": "Tiki Shores Inn & Suites",
+  "file": "/images/venues/tiki-shores-inn-and-suites-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482626c3b11773b:0x8244de9294a33b75",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeS4DPO7cFXR0yUTbJ7ea1AsENP69wugFoFam1HRybqsxcwpGP0BnEgOAALNd9JxZkU7FWEJri34PRr-LPdokmRqF2N3RyB5IPLEJ5DlmUgRU43VyNg3tHpcKVAo0yg50EmiF4yEoNQmVc=w2400",
+  "source_kind": "google_maps",
+  "note": "Bright suite with king bed and kitchenette (owner photo; the only front shots are a stitched composite or 1024px)"
+ },
+ {
+  "id": 2088,
+  "name": "Valleystar Motel",
+  "file": "/images/venues/valleystar-motel-2610.jpg",
+  "dimensions": "1400x700",
+  "source_page": "https://www.valleystarmotel.com/",
+  "image_url": "https://www.valleystarmotel.com/wp-content/uploads/2019/03/header_default.jpg",
+  "source_kind": "website",
+  "note": "Motel sign, gardens and buildings on Skaha Lake Road with hills behind"
+ },
+ {
+  "id": 2094,
+  "name": "The Bulldog Hotel Silver Star",
+  "file": "/images/venues/the-bulldog-hotel-silver-star-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://thebulldog.com/locations/hotels/the-bulldog-hotel-silver-star-canada/",
+  "image_url": "https://thebulldog.com/wp-content/uploads/2022/03/607A8158-Edit-2220x1536.jpg",
+  "source_kind": "website",
+  "note": "The hotel building and deck in snow at Silver Star village"
+ },
+ {
+  "id": 2097,
+  "name": "The Pinnacles Suites",
+  "file": "/images/venues/the-pinnacles-suites-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537e7f648c286029:0xa97ed5a4f22a66c1",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfS8D1LE862PO_ln7s0z-enyP-SS5pfQugdr8p4wLqFY5Q1GzL8OPF3bX1sRswUyDalcdYdr0jUg1eLSvl69fxVg3S-KZsVF4rGchA0tUR0OGD9k_lGDsgmy5LuJGFk__4Vt3e7CA=w2400",
+  "source_kind": "google_maps",
+  "note": "Pinnacles Suites building with red and grey A-frame roofs in summer (owner photo)"
+ },
+ {
+  "id": 2099,
+  "name": "Summerland Motel",
+  "file": "/images/venues/summerland-motel-2610.jpg",
+  "dimensions": "1200x600",
+  "source_page": "https://summerlandmotel.com/",
+  "image_url": "https://summerlandmotel.com/wp-content/uploads/2025/02/courtyard.webp",
+  "source_kind": "website",
+  "note": "Two-storey motel wing and lawn courtyard with patio tables (source only 1200px wide)"
+ },
+ {
+  "id": 2103,
+  "name": "Best Western Pacific Inn",
+  "file": "/images/venues/best-western-pacific-inn-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd891ad55171b:0xddba6ee139e64af4",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdvKsZSA9Zr-VLQwMG3KH7FmVHsgS9GuxHF3I1xBLszbRS6ipODhlffTVwO5UHcBt_W0PMP7cAflEjmuA9T3cbxG-DIQ1YT5yqP6bE6QMgGmLjMIre66bj57UTKj_Qgap84UPxv=w2400",
+  "source_kind": "google_maps",
+  "note": "Guest room with two queen beds (owner photo; no usable exterior; chain site blocks scripts)"
+ },
+ {
+  "id": 2114,
+  "name": "Canada's Best Value Inn & Suites Vernon",
+  "file": "/images/venues/canada-s-best-value-inn-and-suites-vernon-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd8eb3f908c0f:0x33538c55551a76a4",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdTJuApcoBWD5mtI2Wk4vCE1Ang43M3oj6S6z2AlqYWj6CM5lq5sUxgzC16iFR12rbhe6z5nqH7ywpRzlcfsYySdzz97BIdhYvSJzUvFiV6PbNPqeXYXLqa5He01NtoIbYhowcc=w2400",
+  "source_kind": "google_maps",
+  "note": "Two-storey motel building with Canada's Best Value Inn sign (owner photo)"
+ },
+ {
+  "id": 2115,
+  "name": "Courtyard Inn Vernon",
+  "file": "/images/venues/courtyard-inn-vernon-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd8eb3f426eb3:0xb706d05a376a23c5",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLc_tu3cWlkomNQdFLjMHwMUNuyjtl72QUzO0f6pif7u-LZTuiyzhEy5rI6-MRjI8SNt4tqzXMDoqi0nsRFVoaFOn71B90IUE-sFju-ZHzC9QrCZgZEsZUJvyH6hfVLw01g44jjhZWe_wH7z=w2400",
+  "source_kind": "google_maps",
+  "note": "Motel front with arched facade and entrance on 32nd Street (owner photo)"
+ },
+ {
+  "id": 2105,
+  "name": "Days Inn by Wyndham Vernon",
+  "file": "/images/venues/days-inn-by-wyndham-vernon-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.wyndhamhotels.com/days-inn/vernon-british-columbia/daysinn-vernon/overview",
+  "image_url": "https://www.wyndhamhotels.com/adobe/dynamicmedia/deliver/dm-aid--8a57b6a3-7d24-48e2-b36f-189858049dab/48181-exterior-view-4.jpg?width=1600&preferwebp=true",
+  "source_kind": "website",
+  "note": "Hotel front entrance with Days Inn sign under blue sky"
+ },
+ {
+  "id": 2106,
+  "name": "Divya Sutra Plaza & Conference Centre",
+  "file": "/images/venues/divya-sutra-plaza-and-conference-centre-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd88e9b29e6f1:0x90ecc29b90e6867b",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfGOcFMsy81zENnX37jsFfS2JNZq_-xqQj86eys0_WAse3Guunm9zqJXAM4BRGxNZ_YzeS67Fi6K4drhZ95sNWRMZtsQ4NWs4hXJuMFVB6iFM9Ng89B3ltWibS2xt8-BV7bbwLtLA=w2400",
+  "source_kind": "google_maps",
+  "note": "Bright king guest room with sitting area and window (owner photo; no usable exterior found)"
+ },
+ {
+  "id": 2108,
+  "name": "Holiday Inn Express & Suites Vernon",
+  "file": "/images/venues/holiday-inn-express-and-suites-vernon-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd8904ef4d0cf:0xe91bf4dd23dd9fca",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdIYHFP1VS_jW762UCIu2wqh_N6VTJ5KoCWPdcl3yn4kXR27xVhWXijMcVqUTVh1GnHmfiCHpNI_4JpcIiFd1fN3uk01hKb2LH9FGE6Ba1X5F6nlg3lV8SqL-cpq83bus1iz-Un=w2400",
+  "source_kind": "google_maps",
+  "note": "Hotel front entrance and porte-cochere with Holiday Inn Express tower (owner photo)"
+ },
+ {
+  "id": 2117,
+  "name": "Outback Lakeside Vacation Homes",
+  "file": "/images/venues/outback-lakeside-vacation-homes-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.outbacklakeside.com/",
+  "image_url": "https://image-tc.galaxy.tf/wijpeg-995d3qmxakllc2792rszo3r20/home_og-image.jpg",
+  "source_kind": "website",
+  "note": "Glass-walled lakeside vacation home among the trees at dusk"
+ },
+ {
+  "id": 2118,
+  "name": "Predator Ridge Resort",
+  "file": "/images/venues/predator-ridge-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.predatorridge.com/resort/",
+  "image_url": "https://www.predatorridge.com/wp-content/uploads/Blog-Content-Predator-Course-Resort-1920x1080-1.jpg",
+  "source_kind": "website",
+  "note": "The Lodge buildings above a Predator Course green with hills behind"
+ },
+ {
+  "id": 2109,
+  "name": "Prestige Hotel Vernon",
+  "file": "/images/venues/prestige-hotel-vernon-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.prestigehotelsandresorts.com/location/prestige-vernon-hotel/",
+  "image_url": "https://www.prestigehotelsandresorts.com/wp-content/uploads/2024/11/Vernon-front-entrance-from-road-med-resolution.jpg",
+  "source_kind": "website",
+  "note": "White gabled front entrance with landscaped garden bed"
+ },
+ {
+  "id": 2110,
+  "name": "Prestige Vernon Lodge & Conference Centre",
+  "file": "/images/venues/prestige-vernon-lodge-and-conference-centre-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.prestigehotelsandresorts.com/location/prestige-vernon-lodge/",
+  "image_url": "https://www.prestigehotelsandresorts.com/wp-content/uploads/2024/11/PVL-Exterior_Main-scaled.jpg",
+  "source_kind": "website",
+  "note": "Front entrance with Vernon Lodge name over the porte-cochere"
+ },
+ {
+  "id": 2111,
+  "name": "Quality Inn & Suites Vernon",
+  "file": "/images/venues/quality-inn-and-suites-vernon-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.qualityinnvernon.ca/",
+  "image_url": "https://static.wixstatic.com/media/6ea886_5f14eb1a853843ae8db324e080a7245e~mv2.jpg",
+  "source_kind": "website",
+  "note": "Aerial view of the hotel and entrance on 32nd Street with hills behind"
+ },
+ {
+  "id": 2112,
+  "name": "Sandman Hotel & Suites Vernon",
+  "file": "/images/venues/sandman-hotel-and-suites-vernon-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.sandmanhotels.com/vernon",
+  "image_url": "https://image-tc.galaxy.tf/wijpeg-4k10adbiz8h3bl71s1fxwnl9l/sandman-hotel-suites-vernon-exterior-02.jpg",
+  "source_kind": "website",
+  "note": "Hotel and Sandman Suites buildings lit up at dusk on 32nd Street"
+ },
+ {
+  "id": 2116,
+  "name": "Silver Star Motel",
+  "file": "/images/venues/silver-star-motel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537dd8ea3c85928f:0xe1f5572302483d12",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeMq6iCkNXK4PHF12Py3I6DDVrgfMkr2tCvkDZLlLASoBR8cv8l1EkI97LuywLQ8ThuwwcE3h3Rx7kFZUAi8mO2nwD9VvroajD6x9LzlhHAKqsldhrhxIV5_jVgdEaklQJszqE=w2400",
+  "source_kind": "google_maps",
+  "note": "Motel units and Silver Star Motel sign on 32nd Street (owner photo)"
+ },
+ {
+  "id": 2100,
+  "name": "Spirit Lodge at Silver Star (B&B)",
+  "file": "/images/venues/spirit-lodge-at-silver-star-b-and-b-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://spiritlodgesilverstar.com/",
+  "image_url": "https://spiritlodgesilverstar.com/wp-content/uploads/2019/09/house-front-sep-2019.jpg",
+  "source_kind": "website",
+  "note": "Log lodge front with green roof, big windows and deck"
+ },
+ {
+  "id": 2102,
+  "name": "Swan Lake RV Resort",
+  "file": "/images/venues/swan-lake-rv-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.swanlakervresort.com/photo-gallery",
+  "image_url": "https://images.squarespace-cdn.com/content/v1/6a32ff160f02b758ce85fc3e/92c4aee6-a3dc-4e2e-8ff6-d7ac971f39c1/20260621_171858.jpg?format=2500w",
+  "source_kind": "website",
+  "note": "Resort lawns and gardens on the shore of Swan Lake with hills behind"
+ },
+ {
+  "id": 2113,
+  "name": "The Castle at Swan Lake",
+  "file": "/images/venues/the-castle-at-swan-lake-2610.jpg",
+  "dimensions": "1200x600",
+  "source_page": "https://www.swanlakecastle.com/",
+  "image_url": "https://www.swanlakecastle.com/wp-content/uploads/The-Castle-At-Swan-Lake-Hotel-Bistro-by-Intermezzo-sign.jpg",
+  "source_kind": "website",
+  "note": "Castle-style hotel front with stone turret and restaurant entrance (source 1200px wide)"
+ },
+ {
+  "id": 2121,
+  "name": "A View to Remember B&B",
+  "file": "/images/venues/a-view-to-remember-b-and-b-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8acb6ade63d3:0xc6ac639318f707a1",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLepM5WUockRSMkIPIFyOkIXue9V5UhMDZ7CVZkhxmyLEekI1ykFYix0LT81OdDn4ihPfUuXjfTCaWLx_r5-dm9dQQ-Qyv0GfB5RRjlJ097ILfTfvXjU5wEp6WW-ISwu-lHCe-Cbe9i605lZ=w2400",
+  "source_kind": "google_maps",
+  "note": "The B&B house with balcony and rock garden under the hillside (owner photo)"
+ },
+ {
+  "id": 2129,
+  "name": "Casa Loma Lakeshore Resort",
+  "file": "/images/venues/casa-loma-lakeshore-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8ad681386a6f:0x1bff4ca7825ecee0",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdCE6IZBEkQ4SuId9Yr0jfrDq-xwhM0UzgjAGFxvgFhLgGfuQ7Y3H-KzJCHoThUla6NiwOLQM4mu-d6tcvyfoBfiwo61Bcyew7lGhyyfUbpdaqaCN0rUw5IfNdAU128mwEDjgA=w2400",
+  "source_kind": "google_maps",
+  "note": "Resort pool and docks on Okanagan Lake seen from a balcony"
+ },
+ {
+  "id": 2126,
+  "name": "DoubleTree by Hilton West Kelowna",
+  "file": "/images/venues/doubletree-by-hilton-west-kelowna-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x5482752efe3fffff:0x9e9ded1a94997af0",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLe8j2jmgkrJkmIN_m6AmKdBrEsE1AJve_Pk5b5KgY_EufmlCOaejJoeNNTTsZP_DG6FHupODaSIxRDAhMDJZebd6wOhdTxA8r_fz7G_X4aPH653NQrUnMAWOVRBIiOrV6MeJdCM11rVid1M=w2400",
+  "source_kind": "google_maps",
+  "note": "Hotel entrance with DoubleTree by Hilton sign at dusk (owner photo)"
+ },
+ {
+  "id": 2122,
+  "name": "Salish Bed & Breakfast and Spa",
+  "file": "/images/venues/salish-bed-and-breakfast-and-spa-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x54820bed9901ffc3:0x1d84cd01ff86da8",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLc_2FVOjaskABGL229CrK2DlSD7TJk6G1QSwy8Rl28lAizU9Lhfuc8y0XMN2YPXxBgrGwkqf7LaAnH-4tbtw2LBiWYbITXBIqxX6XTmn1H-SS0KIzCch7abvWlray4DHTs-9egh=w2400",
+  "source_kind": "google_maps",
+  "note": "Pool deck with loungers and red umbrellas looking over the valley (owner photo)"
+ },
+ {
+  "id": 2123,
+  "name": "Seclusion Bay Resort",
+  "file": "/images/venues/seclusion-bay-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://staylocations.com/west-kelowna-vacation-rentals/seclusion-bay-resort/",
+  "image_url": "https://www.staylocations.com/video/tours/seclusion-bay-resort.jpg",
+  "source_kind": "website",
+  "note": "Lakeshore cabins and beach of the resort under pine-covered hills"
+ },
+ {
+  "id": 2128,
+  "name": "Super 8 by Wyndham West Kelowna BC",
+  "file": "/images/venues/super-8-by-wyndham-west-kelowna-bc-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.wyndhamhotels.com/super-8/west-kelowna-british-columbia/super-8-west-kelowna-bc/overview",
+  "image_url": "https://www.wyndhamhotels.com/adobe/dynamicmedia/deliver/dm-aid--4a4ccf6d-a4c6-44af-86ba-d1f1eaee7212/46318-exterior-view-2.jpg?width=1600&preferwebp=true",
+  "source_kind": "website",
+  "note": "Motel entrance with Super 8 sign and hills behind"
+ },
+ {
+  "id": 2130,
+  "name": "The Cove Lakeside Resort",
+  "file": "/images/venues/the-cove-lakeside-resort-2610.jpg",
+  "dimensions": "1440x720",
+  "source_page": "https://www.covelakeside.com/",
+  "image_url": "https://image-tc.galaxy.tf/wijpeg-6vx6zcg2rdu9lp7gma6cm65ej/cove-website-short-hero-1920x720px-100kb-1.jpg?width=1920",
+  "source_kind": "website",
+  "note": "Resort buildings, pools and lawn above Okanagan Lake"
+ },
+ {
+  "id": 2125,
+  "name": "The Lake House at Quails' Gate",
+  "file": "/images/venues/the-lake-house-at-quails-gate-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537d8abb548fdafb:0x2a633e65cde2f24e",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcgyLaS-m0B9LcMVQMM-8hwle7haFkoTt01jrxEYiT_iyEVZ3OlX_M5L0M6140yzp1rHKyolCHOM5qNkpxHtKL-b19WUlX_qgVC9OSGpwmFDU_jPvkUfcCE5KL15nxALdLYm60V=w2400",
+  "source_kind": "google_maps",
+  "note": "The Lake House's A-frame front lit at dusk (top half of the photo only, cropped above the guests at the fire pit)"
+ },
+ {
+  "id": 2124,
+  "name": "The Outside Inn at Niche Wine Co.",
+  "file": "/images/venues/the-outside-inn-at-niche-wine-co-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://nichewinecompany.com/stay/",
+  "image_url": "https://nichewinecompany.com/wp-content/uploads/2026/03/ITBC-Niche-Winery_Web-3.jpg",
+  "source_kind": "website",
+  "note": "Glass-fronted Outside Inn cabins lit up on the hillside under a night sky"
+ }
+]

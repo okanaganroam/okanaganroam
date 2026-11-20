@@ -1,0 +1,450 @@
+{
+ "reason": "Venue photos stays-ok-4",
+ "batch_id": "photos-stays-ok-4-2026-11-19",
+ "venues": [
+  {
+   "id": 2065,
+   "name": "Sandman Hotel Penticton",
+   "region": "penticton",
+   "slug": "sandman-hotel-penticton",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sandman-hotel-penticton-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2082,
+   "name": "Shoreline Resort",
+   "region": "penticton",
+   "slug": "shoreline-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/shoreline-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2083,
+   "name": "Slumber Lodge",
+   "region": "penticton",
+   "slug": "slumber-lodge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/slumber-lodge-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2084,
+   "name": "Spanish Villa Resort",
+   "region": "penticton",
+   "slug": "spanish-villa-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/spanish-villa-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2086,
+   "name": "Swiss Sunset Inn",
+   "region": "penticton",
+   "slug": "swiss-sunset-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/swiss-sunset-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2066,
+   "name": "The Balcomo - A Ramada by Wyndham Penticton",
+   "region": "penticton",
+   "slug": "the-balcomo-a-ramada-by-wyndham-penticton",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-balcomo-a-ramada-by-wyndham-penticton-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2087,
+   "name": "The Traveler's Motel",
+   "region": "penticton",
+   "slug": "the-traveler-s-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-traveler-s-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2092,
+   "name": "Tiki Shores Inn & Suites",
+   "region": "penticton",
+   "slug": "tiki-shores-inn-and-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/tiki-shores-inn-and-suites-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2088,
+   "name": "Valleystar Motel",
+   "region": "penticton",
+   "slug": "valleystar-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/valleystar-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2094,
+   "name": "The Bulldog Hotel Silver Star",
+   "region": "silverstar",
+   "slug": "the-bulldog-hotel-silver-star",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-bulldog-hotel-silver-star-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2097,
+   "name": "The Pinnacles Suites",
+   "region": "silverstar",
+   "slug": "the-pinnacles-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-pinnacles-suites-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2099,
+   "name": "Summerland Motel",
+   "region": "summerland",
+   "slug": "summerland-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/summerland-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2103,
+   "name": "Best Western Pacific Inn",
+   "region": "vernon",
+   "slug": "best-western-pacific-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/best-western-pacific-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2114,
+   "name": "Canada's Best Value Inn & Suites Vernon",
+   "region": "vernon",
+   "slug": "canada-s-best-value-inn-and-suites-vernon",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/canada-s-best-value-inn-and-suites-vernon-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2115,
+   "name": "Courtyard Inn Vernon",
+   "region": "vernon",
+   "slug": "courtyard-inn-vernon",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/courtyard-inn-vernon-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2105,
+   "name": "Days Inn by Wyndham Vernon",
+   "region": "vernon",
+   "slug": "days-inn-by-wyndham-vernon",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/days-inn-by-wyndham-vernon-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2106,
+   "name": "Divya Sutra Plaza & Conference Centre",
+   "region": "vernon",
+   "slug": "divya-sutra-plaza-and-conference-centre",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/divya-sutra-plaza-and-conference-centre-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2108,
+   "name": "Holiday Inn Express & Suites Vernon",
+   "region": "vernon",
+   "slug": "holiday-inn-express-and-suites-vernon",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/holiday-inn-express-and-suites-vernon-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2117,
+   "name": "Outback Lakeside Vacation Homes",
+   "region": "vernon",
+   "slug": "outback-lakeside-vacation-homes",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/outback-lakeside-vacation-homes-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2118,
+   "name": "Predator Ridge Resort",
+   "region": "vernon",
+   "slug": "predator-ridge-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/predator-ridge-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2109,
+   "name": "Prestige Hotel Vernon",
+   "region": "vernon",
+   "slug": "prestige-hotel-vernon",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/prestige-hotel-vernon-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2110,
+   "name": "Prestige Vernon Lodge & Conference Centre",
+   "region": "vernon",
+   "slug": "prestige-vernon-lodge-and-conference-centre",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/prestige-vernon-lodge-and-conference-centre-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2111,
+   "name": "Quality Inn & Suites Vernon",
+   "region": "vernon",
+   "slug": "quality-inn-and-suites-vernon",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/quality-inn-and-suites-vernon-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2112,
+   "name": "Sandman Hotel & Suites Vernon",
+   "region": "vernon",
+   "slug": "sandman-hotel-and-suites-vernon",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sandman-hotel-and-suites-vernon-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2116,
+   "name": "Silver Star Motel",
+   "region": "vernon",
+   "slug": "silver-star-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/silver-star-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2100,
+   "name": "Spirit Lodge at Silver Star (B&B)",
+   "region": "vernon",
+   "slug": "spirit-lodge-at-silver-star-b-and-b",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/spirit-lodge-at-silver-star-b-and-b-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2102,
+   "name": "Swan Lake RV Resort",
+   "region": "vernon",
+   "slug": "swan-lake-rv-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/swan-lake-rv-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2113,
+   "name": "The Castle at Swan Lake",
+   "region": "vernon",
+   "slug": "the-castle-at-swan-lake",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-castle-at-swan-lake-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2121,
+   "name": "A View to Remember B&B",
+   "region": "west-kelowna",
+   "slug": "a-view-to-remember-b-and-b",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/a-view-to-remember-b-and-b-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2129,
+   "name": "Casa Loma Lakeshore Resort",
+   "region": "west-kelowna",
+   "slug": "casa-loma-lakeshore-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/casa-loma-lakeshore-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2126,
+   "name": "DoubleTree by Hilton West Kelowna",
+   "region": "west-kelowna",
+   "slug": "doubletree-by-hilton-west-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/doubletree-by-hilton-west-kelowna-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2122,
+   "name": "Salish Bed & Breakfast and Spa",
+   "region": "west-kelowna",
+   "slug": "salish-bed-and-breakfast-and-spa",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/salish-bed-and-breakfast-and-spa-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2123,
+   "name": "Seclusion Bay Resort",
+   "region": "west-kelowna",
+   "slug": "seclusion-bay-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/seclusion-bay-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2128,
+   "name": "Super 8 by Wyndham West Kelowna BC",
+   "region": "west-kelowna",
+   "slug": "super-8-by-wyndham-west-kelowna-bc",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/super-8-by-wyndham-west-kelowna-bc-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2130,
+   "name": "The Cove Lakeside Resort",
+   "region": "west-kelowna",
+   "slug": "the-cove-lakeside-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-cove-lakeside-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2125,
+   "name": "The Lake House at Quails' Gate",
+   "region": "west-kelowna",
+   "slug": "the-lake-house-at-quails-gate",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-lake-house-at-quails-gate-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2124,
+   "name": "The Outside Inn at Niche Wine Co.",
+   "region": "west-kelowna",
+   "slug": "the-outside-inn-at-niche-wine-co",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-outside-inn-at-niche-wine-co-2610.jpg?v=20261119"
+   }
+  }
+ ]
+}

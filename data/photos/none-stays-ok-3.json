@@ -1,0 +1,17 @@
+[
+ {
+  "id": 2034,
+  "name": "Brookvale Holiday Resort (Brookvale Campground & RV)",
+  "reason": "Own site photos are all under 1100px (homepage.png 1020x360); the only Google place (Brookvale Holiday Resort Inc) has 3 photos: two of just the lake and a cabin door; destinationosoyoos.com shows a Vercel bot checkpoint (429) so the board listing could not be checked."
+ },
+ {
+  "id": 2077,
+  "name": "Holiday House Motel",
+  "reason": "No own website; Google place has 0 photos; Visit Penticton listing exterior is only 1024px wide, other listing photos are rooms/kitchens at 1024px."
+ },
+ {
+  "id": 2080,
+  "name": "Plaza Motel",
+  "reason": "No own website; Google has only a dated bed close-up and a ceiling shot; Visit Penticton listing photos are 1024px except one kitchen shot."
+ }
+]

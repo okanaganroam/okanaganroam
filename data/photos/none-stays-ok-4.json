@@ -1,0 +1,62 @@
+[
+ {
+  "id": 2085,
+  "name": "Sunny Beach Motel",
+  "reason": "Own site (skahalakemotels.com) has only the roadside sign, room shots under 1200px and tiles with text overlays; Google Maps has one photo (a carpet)"
+ },
+ {
+  "id": 2089,
+  "name": "Waterfront Inn",
+  "reason": "Own site (skahalakemotels.com) has only an empty patio shot, small room photos and banners with text overlays; Google Maps has room, damage close-ups and patio furniture"
+ },
+ {
+  "id": 2093,
+  "name": "Lord Aberdeen Hotel",
+  "reason": "Resort page loads photos by script only; Google Maps has two 360 spheres and a night shot of the village, nothing of the hotel"
+ },
+ {
+  "id": 2096,
+  "name": "Snowbird Lodge (SilverStar Central Reservations front desk)",
+  "reason": "Resort page loads photos by script only; Google Maps has two 360 spheres, a dim bedroom and a covered hot-tub deck (no usable shot of the lodge)"
+ },
+ {
+  "id": 2095,
+  "name": "Vance Creek Hotel & Conference Centre",
+  "reason": "Own (skisilverstar.com) page loads photos by script only; Google Maps has two 360 spheres, a bed close-up and a photo of the resort admin building, nothing of the hotel itself"
+ },
+ {
+  "id": 2098,
+  "name": "Rosedale Motel",
+  "reason": "Own site photos are all under 1200px (largest 999x391); Google Maps has no photos 1200px or wider"
+ },
+ {
+  "id": 2104,
+  "name": "Best Western Premier Route 97 Vernon",
+  "reason": "bestwestern.com blocks scripts (403); Google Maps has two 360 spheres and two photos with children filling the frame"
+ },
+ {
+  "id": 2107,
+  "name": "Fairfield Inn & Suites Vernon",
+  "reason": "marriott.com blocks scripts (403); Google Maps has only one 360 sphere"
+ },
+ {
+  "id": 2101,
+  "name": "Swan Lake RV Park & Campground",
+  "reason": "Own site shows only the office front; Google Maps has one photo (a guest's feet at a fire pit facing the lake)"
+ },
+ {
+  "id": 2119,
+  "name": "A Lakeview Heights Bed & Breakfast",
+  "reason": "Own site's house, patio and deck photos are only 1000px wide (largest originals); Google Maps has only sunset/night views and breakfast close-ups, no shot of the house"
+ },
+ {
+  "id": 2120,
+  "name": "A View of the Lake Bed & Breakfast",
+  "reason": "Own site photos of the house are 500-600px; Google Maps has only 360 spheres, breakfast/food, a tub and sunset views (no shot of the house)"
+ },
+ {
+  "id": 2127,
+  "name": "TownePlace Suites by Marriott West Kelowna",
+  "reason": "marriott.com blocks scripts (403); Google Maps blocked the lookup twice (rate limit), so not checked"
+ }
+]
