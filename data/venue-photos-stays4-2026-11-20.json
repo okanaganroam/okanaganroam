@@ -1,0 +1,78 @@
+{
+ "reason": "Places-to-stay photos, fourth pass (booking sites, Dayton approved Nov 20)",
+ "batch_id": "photos-stays4-ok-2026-11-20",
+ "venues": [
+  {
+   "id": 2107,
+   "name": "Fairfield Inn & Suites Vernon",
+   "region": "vernon",
+   "slug": "fairfield-inn-and-suites-vernon",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/fairfield-inn-and-suites-vernon-2610.jpg?v=20261120c"
+   }
+  },
+  {
+   "id": 2127,
+   "name": "TownePlace Suites by Marriott West Kelowna",
+   "region": "west-kelowna",
+   "slug": "towneplace-suites-by-marriott-west-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/towneplace-suites-by-marriott-west-kelowna-2610.jpg?v=20261120c"
+   }
+  },
+  {
+   "id": 2098,
+   "name": "Rosedale Motel",
+   "region": "summerland",
+   "slug": "rosedale-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/rosedale-motel-2610.jpg?v=20261120c"
+   }
+  },
+  {
+   "id": 2080,
+   "name": "Plaza Motel",
+   "region": "penticton",
+   "slug": "plaza-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/plaza-motel-2610.jpg?v=20261120c"
+   }
+  },
+  {
+   "id": 2028,
+   "name": "Mount View Motel",
+   "region": "oliver",
+   "slug": "mount-view-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mount-view-motel-2610.jpg?v=20261120c"
+   }
+  },
+  {
+   "id": 1964,
+   "name": "Kelowna Okanagan Lake Hostel",
+   "region": "kelowna",
+   "slug": "kelowna-okanagan-lake-hostel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kelowna-okanagan-lake-hostel-2610.jpg?v=20261120c"
+   }
+  }
+ ]
+}

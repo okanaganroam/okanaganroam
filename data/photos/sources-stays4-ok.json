@@ -1,0 +1,62 @@
+[
+ {
+  "id": 2107,
+  "name": "Fairfield Inn & Suites Vernon",
+  "file": "/images/venues/fairfield-inn-and-suites-vernon-2610.jpg",
+  "dimensions": "1280x640",
+  "source_page": "https://www.booking.com/hotel/ca/fairfield-inn-amp-suites-vernon.html",
+  "image_url": "https://cf.bstatic.com/xdata/images/hotel/max1280x900/628053330.jpg?k=8f97982ec8de71a0ca2ed3c81f9b95b113a1078b94432709c1a5503b9df51d03&o=&hp=1",
+  "source_kind": "booking_site",
+  "note": "hotel front with Fairfield by Marriott sign"
+ },
+ {
+  "id": 2127,
+  "name": "TownePlace Suites by Marriott West Kelowna",
+  "file": "/images/venues/towneplace-suites-by-marriott-west-kelowna-2610.jpg",
+  "dimensions": "1280x640",
+  "source_page": "https://www.booking.com/hotel/ca/towneplace-suites-by-marriott-west-kelowna.html",
+  "image_url": "https://cf.bstatic.com/xdata/images/hotel/max1280x900/434740283.jpg?k=9ea4f5207f4aa438e36c32a4fd91e2aa024aacaa1d106832a5f618cf297b357c&o=&hp=1",
+  "source_kind": "booking_site",
+  "note": "aerial of the hotel with Okanagan Lake behind"
+ },
+ {
+  "id": 2098,
+  "name": "Rosedale Motel",
+  "file": "/images/venues/rosedale-motel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.expedia.ca/Summerland-Hotels-Rosedale-Motel.h9997446.Hotel-Information",
+  "image_url": "https://images.trvl-media.com/lodging/10000000/10000000/9997500/9997446/13659abb.jpg",
+  "source_kind": "booking_site",
+  "note": "motel office front with flowers"
+ },
+ {
+  "id": 2080,
+  "name": "Plaza Motel",
+  "file": "/images/venues/plaza-motel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.expedia.ca/Penticton-Hotels-Plaza-Motel.h8309107.Hotel-Information",
+  "image_url": "https://images.trvl-media.com/lodging/9000000/8310000/8309200/8309107/f5fe6bf5.jpg",
+  "source_kind": "booking_site",
+  "note": "indoor pool"
+ },
+ {
+  "id": 2028,
+  "name": "Mount View Motel",
+  "file": "/images/venues/mount-view-motel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.expedia.ca/Oliver-Hotels-Mount-View-Motel.h10088547.Hotel-Information",
+  "image_url": "https://images.trvl-media.com/lodging/11000000/10090000/10088600/10088547/22cad420.jpg",
+  "source_kind": "booking_site",
+  "note": "garden gazebo and patio with hills behind"
+ },
+ {
+  "id": 1964,
+  "name": "Kelowna Okanagan Lake Hostel",
+  "file": "/images/venues/kelowna-okanagan-lake-hostel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.expedia.ca/Kelowna-Hotels-Kelowna-Okanagan-Lake-Hostel.h9794908.Hotel-Information",
+  "image_url": "https://images.trvl-media.com/lodging/10000000/9800000/9795000/9794908/5f9ac980.jpg",
+  "source_kind": "booking_site",
+  "note": "hostel house with its sign and garden"
+ }
+]
