@@ -45,6 +45,7 @@ const { renderSearchTermsPage } = require('./search-terms-page');
 const { renderOutboundPage } = require('./outbound-page');
 const placesToStay = require('./places-to-stay');
 const tripStays = require('./trip-stays');
+const tripAi = require('./trip-ai');
 const stayBookingLinks = require('./stay-booking-links');
 const gscReport = require('./gsc-report');
 // What is clickable on one business or event page (2026-11-05): read from the page itself, so each sheet shows that page's
@@ -7763,6 +7764,50 @@ function withTripStays(plan, stay, now = new Date()) {
     }
   } catch (e) { console.error(`[trip] where to stay: ${e.message}`); }
   return plan;
+}
+// Build My Trip step 4 (2026-11-20, trip-ai.js): an AI request reader, admin-only test switch. Used only when TRIP_AI
+// is on AND the request has ?ai=1 AND the admin bearer token (ENRICHMENT_ADMIN_TOKEN). Without all three the route runs
+// exactly as before (no 401 either: a public request with ?ai=1 is just a public request). The AI only reads the request
+// into a checked structure; trip-ai.js turns that back into the planner's own request words and its existing overrides,
+// and the same planner picks every place. Any failure plans from the visitor's own text, as today.
+function tripAiRequested(req, query) {
+  if (!tripAi.enabled() || String((query && query.ai) || '') !== '1' || !ENRICHMENT_ADMIN_TOKEN) return false;
+  const match = /^Bearer (.+)$/.exec((req && req.headers && req.headers.authorization) || '');
+  return !!(match && safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN));
+}
+// Swapped out by the tests so they never call the API.
+const tripAiDefaultReader = (text, opts) => tripAi.readTripRequest(text, opts);
+let tripAiReader = tripAiDefaultReader;
+function setTripAiReader(fn) { tripAiReader = fn || tripAiDefaultReader; }
+// args: the parsed POST body. -> { args (what the planner runs), ai (the debug block for the admin response) }.
+async function tripAiPlanArgs(args, { staysOn = false, now = new Date(), lang = 'en', reader = null } = {}) {
+  // Round 4 gate: only step-by-step requests (a clock time or time of day, order words, 3+ kinds of stops) are read by
+  // the model; a broad request plans with the rules at once, with no API call (trip-ai.js tripGate).
+  const gate = tripAi.tripGate(args.text);
+  if (gate.gated !== 'step_by_step') return { args, ai: { used: false, reason: 'gated_broad', gated: gate.gated, why: gate.why, ms: 0, model: tripAi.MODEL, costUsd: 0, usage: null, intent: null } };
+  const taxonomy = buildTripPlannerTaxonomy();
+  const allowed = tripAi.buildAllowed(taxonomy);
+  let r;
+  try { r = await (reader || tripAiReader)(args.text, { today: todayLocal(now), lang, allowed, now }); } catch (e) { r = { ok: false, reason: 'error' }; }
+  const info = { used: false, reason: (r && r.reason) || 'error', gated: gate.gated, why: gate.why, ms: r && Number.isFinite(r.ms) ? r.ms : null, model: tripAi.MODEL, costUsd: r && r.costUsd ? Number(r.costUsd.toFixed(6)) : 0, usage: (r && r.usage) || null, intent: (r && r.intent) || null };
+  if (!r || !r.ok || !r.intent) return { args, ai: info };
+  // The reader's answer is checked again here, whatever reader produced it.
+  const v = tripAi.validateIntent(r.intent, allowed, { originalText: args.text, today: todayLocal(now) });
+  if (!v.ok) return { args, ai: { ...info, reason: v.reason, intent: null } };
+  if (v.intent.unsure) return { args, ai: { ...info, reason: 'unsure', intent: v.intent } };
+  const out = tripAi.renderTripRequest(v.intent, { allowed, taxonomy, args, staysOn });
+  // The rendered input goes through the same body validator as a visitor's (nothing new can be steered).
+  const body = { text: out.text, seed: args.seed, excludeVenueIds: args.excludeVenueIds, avoidVenueIds: args.avoidVenueIds };
+  if (args.pinned) body.pinned = args.pinned;
+  if (out.overrides) body.overrides = out.overrides;
+  if (args.swap) body.swap = args.swap;
+  if (staysOn && out.stay) body.stay = out.stay;
+  const parsed = parseTripPlanBody(body, { stays: staysOn });
+  if (parsed.error) return { args, ai: { ...info, reason: `render:${parsed.error}`.slice(0, 160), intent: v.intent } };
+  return {
+    args: parsed.value,
+    ai: { ...info, used: true, reason: 'ok', intent: v.intent, text: out.text, overrides: out.overrides, ...(staysOn ? { stay: out.stay || null } : {}), dropped: [...new Set([...(r.dropped || []), ...v.dropped, ...out.dropped])] },
+  };
 }
 // The plan's stops that already have a booking link, in plan order, once each (at most 6): the venue page's own Book
 // button (venue_links.booking_url, else the Plan your visit box's booking link) with the same words.
@@ -75063,12 +75108,18 @@ const server = http.createServer(async (req, res) => {
       const staysOn = tripStaysEnabledFor(query);
       const parsed = parseTripPlanBody(body, { stays: staysOn });
       if (parsed.error) return sendJSON(res, 400, { error: parsed.error });
+      // AI request reader (step 4, 2026-11-20): admin test requests only (TRIP_AI on + ?ai=1 + admin token).
+      let planArgs = parsed.value, aiInfo = null;
+      if (tripAiRequested(req, query)) {
+        try { const r = await tripAiPlanArgs(parsed.value, { staysOn, lang: query.lang === 'fr' ? 'fr' : 'en' }); planArgs = r.args; aiInfo = r.ai; } catch (e) { aiInfo = { used: false, reason: 'error' }; }
+      }
       // Weekly specials (2026-10-27): a stop on its special's day says so, added after planning like the deals.
       try {
         // Where to stay (2026-11-20): only with TRIP_STAYS or ?stays=1; otherwise exactly the plan as before.
         const planResult = staysOn
-          ? runTripPlanWithStay(parsed.value, (a, n) => withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(a, n))))))
-          : withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value)))));
+          ? runTripPlanWithStay(planArgs, (a, n) => withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(a, n))))))
+          : withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(planArgs)))));
+        if (aiInfo && planResult && typeof planResult === 'object') planResult.ai = aiInfo;
         // Stage 1 demand log: which businesses this plan showed (anonymous, never blocks the reply).
         try { req.__ip = requestClientIp(req); tripDemandLog.record(req, 'shown', tripDemand.collectVenueIds(planResult)); } catch (e) { /* logging must never break the planner */ }
         return sendJSON(res, 200, planResult);
@@ -77874,6 +77925,8 @@ module.exports = {
   parseTripPlanBody,
   runTripPlan, runTripPlanCore, ownerClosureCount,
   runTripPlanWithStay, withTripStays, tripStayCandidates, isTripStaysEnabled, tripStaysEnabledFor,
+  // Build My Trip step 4 (2026-11-20), for tests/trip-ai*.test.js and scripts/trip-ai-eval.js.
+  tripAiRequested, tripAiPlanArgs, setTripAiReader,
   // Planner (2026-10-27): the happy hour crawl.
   tripHappyHourAsk,
   tripHappyHourChain,
