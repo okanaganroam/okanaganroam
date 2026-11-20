@@ -35012,6 +35012,10 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   // cfg.hiddenTypes: types a link may ask for (?types=restaurant) that have
   // no visible chip; each is a hidden chip, so the page script keeps the filter.
   const allTypes = [...cfg.types, ...(cfg.hiddenTypes || [])];
+  // cfg.layout === 'activities' (2026-11-20, Outdoors): the layout of /sports -- search, town and Filters in one bar,
+  // activity chips with icons, welcoming cards with a "Things to do here" box, a note on the sort, and By activity /
+  // By town links under the results. Every other curated page keeps the layout below.
+  const actLayout = cfg.layout === 'activities';
   const typeKeys = new Set(allTypes.map((t) => t.type));
   const f = { types: [], features: [], regions: [], ...(filter || {}) };
   f.types = f.types.filter((t) => typeKeys.has(t));
@@ -35087,20 +35091,23 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     // cfg.activityPhotos: 'swap' (follows the type chips) or one fixed activity ('winter' on Ski & Snow).
     altPhotos: cfg.activityPhotos ? (cfg.activityPhotos === 'swap' ? 'swap' : 'fixed') : null,
     photoType: cfg.activityPhotos && cfg.activityPhotos !== 'swap' ? cfg.activityPhotos : (f.types.length === 1 ? f.types[0] : null),
+    ...(cfg.cardOptsExtra || {}),
   });
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${allTypes.map((t, i) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}"${i >= cfg.types.length || (cfg.region && !(counts.types[t.type] || 0) && !selected.has(t.type)) ? ' hidden' : ''}>${escapeHtml(t.label)} <span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">${actLayout ? '✨ All activities' : 'All'}</button>${allTypes.map((t, i) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}"${i >= cfg.types.length || (cfg.region && !(counts.types[t.type] || 0) && !selected.has(t.type)) ? ' hidden' : ''}>${actLayout && cfg.typeIcons && cfg.typeIcons[t.type] ? cfg.typeIcons[t.type] + ' ' : ''}${escapeHtml(t.label)} <span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>${actLayout ? '<p class="hub-filter-help">Numbers show how many places match each activity.</p>' : ''}`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${actLayout ? `<p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to go?' : '✨ Make it your kind of outing'}</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button><p class="hub-filter-help">Numbers show how many places match each filter.</p>` : ''}${panel}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>`;
   // A one-town page (cfg.region) has no Regions control.
   const controlsHtml = `<div class="fd-controls">
-    ${cfg.region ? '' : pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
-    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+    ${cfg.region ? '' : actLayout
+    ? pop('fdRegions', '<span class="fd-town-label">' + escapeHtml(nR ? REGION_LABELS[f.regions[0]] + (nR > 1 ? ' +' + (nR - 1) : '') : 'Choose a town') + '</span>', uiIcon('pin'), '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts, hideEmpty: true }))
+    : pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
+    ${featureKeys.length ? pop('fdFeatures', actLayout ? '✨ Filters' : '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
     ${cfg.openNow ? foodDrinkOpenNowToggleHtml(openNowOn, openCount) : ''}
   </div>`;
   const typeLabels = Object.fromEntries(allTypes.map((t) => [t.type, t.label]));
@@ -35113,6 +35120,7 @@ ${pageHead(cfg.title, cfg.description, cfg.noindex ? null : canonical, cfg.noind
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${cfg.openNow ? renderFoodDrinkOpenNowStyles() : ''}
+${actLayout ? `<link rel="stylesheet" href="/food-drink-layout.css?v=${crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-layout.css'))).digest('hex').slice(0, 12)}">` : ''}
 ${golfEngagementHeadHtml(cfg.surface, true, cfg.pageType || 'hub')}
 ${cfg.extraHead || ''}
 <style id="curated-hub">
@@ -35124,7 +35132,7 @@ ${cfg.extraHead || ''}
   body.curated-hub-page .how-we-pick p { margin: 0; font-size: 0.92rem; line-height: 1.5; color: rgba(42,32,25,0.85); }
 </style>
 </head>
-<body class="golf-page outdoor-page fd-page curated-hub-page ${cfg.bodyClass}">
+<body class="golf-page outdoor-page fd-page${actLayout ? ' fd-refresh' : ''} curated-hub-page ${cfg.bodyClass}">
 ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -35152,17 +35160,23 @@ ${renderGolfHeaderHtml()}
   ${content.intro ? `<p class="outdoor-intro fd-intro">${content === cfg.categoryContent.all && cfg.introHtml ? cfg.introHtml : escapeHtml(content.intro)}</p>` : ''}${cfg.heroExtraHtml || ''}`)}
   ${cfg.leadHtml || ''}${cfg.howWePick ? `
   <section class="how-we-pick" aria-labelledby="howWePickHead"><h2 id="howWePickHead">${escapeHtml(cfg.howWePick.heading)}</h2><p>${escapeHtml(cfg.howWePick.text)}</p></section>` : ''}
+  ${actLayout ? `<div class="fd-toolbar">
   ${foodDrinkSearchHtml().replace('Search food and drink', escapeHtml(cfg.search.label)).replace('Search by name, place or dish...', escapeHtml(cfg.search.placeholder))}
-  ${chips}
   ${controlsHtml}
+  </div>
+  ${chips}` : `${foodDrinkSearchHtml().replace('Search food and drink', escapeHtml(cfg.search.label)).replace('Search by name, place or dish...', escapeHtml(cfg.search.placeholder))}
+  ${chips}
+  ${controlsHtml}`}
   ${cfg.openNow ? `<p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>` : ''}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
   ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, list.length, filtered), state, sort, sorts)}
+  ${actLayout && cfg.sortHelp ? `<details class="hub-sort-help" id="hubSortHelp"${sort === 'recommended' ? '' : ' hidden'}><summary>${escapeHtml(cfg.sortHelp.summary)}</summary><p>${escapeHtml(cfg.sortHelp.text)}</p></details>` : ''}
   <p class="fd-search-note" id="fdSearchNote" hidden></p>
   <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">Nothing matches that combination yet.</span> <a href="${cfg.path}" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
   ${tryHtml ? `<p class="fd-no-results-try">Try one word, like ${tryHtml}.</p>` : ''}</div>
   ${cardsHtml}
+  ${actLayout ? cfg.linksHtml || '' : ''}
   <script type="application/json" id="fdVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
   </section>
   ${cfg.afterHtml || ''}
@@ -35173,6 +35187,7 @@ ${renderGolfHeaderHtml()}
   ${renderFoodDrinkHubScriptHtml({ openNow: !!cfg.openNow, surface: cfg.surface, typeLabels, searchLabels: cfg.searchLabels || {}, legacyTypesParam: cfg.legacyTypesParam || null })}
   ${cfg.activityPhotos === 'swap' ? ACTIVITY_PHOTO_SWAP_SCRIPT : ''}
   ${cfg.bodyClass === 'outdoors-hub-page' ? hubCardFitScriptHtml() : ''}
+  ${actLayout && cfg.sortHelp ? `<script>(function(){var sort=document.getElementById('fdSort'),help=document.getElementById('hubSortHelp');if(!sort||!help)return;function sync(){help.hidden=sort.value!=='recommended';}sort.addEventListener('change',sync);window.addEventListener('pageshow',sync);})();</script>` : ''}
 </body>
 </html>`;
 }
@@ -35350,8 +35365,84 @@ function renderOutdoorsHubPage(venues, filter = null, opts = {}, now = new Date(
     categoryContent: content,
     ...town,
     ...(activity ? {} : {}),
+    ...outdoorsActivityLayout(venues, live, acts, town, now),
   }, venues, f, now);
 }
+// Outdoors in the layout of /sports (2026-11-20, Dayton): the same search bar, town and Filters buttons, activity chips
+// with icons, welcoming cards and By activity / By town links. Everything here comes from the listings already on the
+// page: the "Things to do here" box lists each place's own outdoor activities.
+const OUTDOOR_ACTIVITY_EMOJI = Object.freeze({ hiking: '🥾', viewpoints: '🏞️', nature: '🦉', cycling: '🚵', winter: '❄️', adventure: '🧗', fishing: '🎣', camping: '⛺', water: '🛶' });
+function outdoorsActivityLayout(venues, live, acts, town, now = new Date()) {
+  const label = Object.fromEntries(live.map((a) => [a.slug, a.label]));
+  const info = new Map(venues.map((v) => {
+    const names = (acts.get(v.id) || []).map((s) => label[s]).filter(Boolean);
+    return [v.id, names.length ? `<div class="hub-card-info"><strong>Things to do here</strong><p>${escapeHtml(names.join(' \u00b7 '))}</p></div>` : ''];
+  }));
+  const openById = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false }).byId;
+  const statusOverrides = new Map(venues.flatMap((v) => {
+    const st = cardStatusFor(openById.get(v.id), v);
+    return st && st.text === 'Open year-round' ? [[v.id, { ...st, text: 'Year-round access' }]] : [];
+  }));
+  const count = {};
+  for (const list of acts.values()) for (const sl of list) count[sl] = (count[sl] || 0) + 1;
+  const activityLinks = live.filter((a) => (count[a.slug] || 0) >= MIN_ACTIVITY_VENUES)
+    .map((a) => `<a href="/outdoors/${a.slug}">${escapeHtml(a.label)} <span>${count[a.slug]}</span></a>`).join('\n      ');
+  // A town page exists for every town with at least one outdoor-type listing (beach members alone do not make one).
+  const townCount = {};
+  for (const v of venues) if (v.type === 'outdoor' && REGION_LABELS[v.region]) townCount[v.region] = (townCount[v.region] || 0) + 1;
+  const townLinks = town.region ? '' : Object.entries(townCount).filter(([, n]) => n >= MIN_CATEGORY_VENUES)
+    .sort((x, y) => y[1] - x[1] || REGION_LABELS[x[0]].localeCompare(REGION_LABELS[y[0]]))
+    .map(([r, n]) => `<a href="/${r}/outdoors">${escapeHtml(REGION_LABELS[r])} <span>${n}</span></a>`).join('\n      ');
+  const section = (id, heading, aria, links) => links ? `<section class="hub-links" aria-labelledby="${id}">
+    <h2 id="${id}">${heading}</h2>
+    <nav aria-label="${aria}">
+      ${links}
+    </nav>
+  </section>` : '';
+  return {
+    layout: 'activities',
+    typeIcons: OUTDOOR_ACTIVITY_EMOJI,
+    cardExtraHtml: info,
+    cardOpts: { allBadges: true },
+    cardOptsExtra: { welcoming: true, statusOverrides },
+    sortHelp: { summary: 'How \u201cMixed\u201d works', text: 'Mixed spreads each kind of outdoor place through the list, so hikes, viewpoints, nature spots and the rest all get a turn near the top, and the order changes each day. Places closed for the season move lower down. It is not a ranking.' },
+    linksHtml: section('outdoorsActivitiesHeading', 'By activity', 'Outdoor places by activity', activityLinks) + section('outdoorsTownsHeading', 'By town', 'Outdoor places by town', townLinks),
+    extraHead: OUTDOORS_ACTIVITY_LAYOUT_CSS,
+  };
+}
+const OUTDOORS_ACTIVITY_LAYOUT_CSS = `<style id="outdoors-hub">
+  body.outdoors-hub-page .category-banner {height:170px;min-height:0;}
+  body.outdoors-hub-page .fd-intro {display:block!important;-webkit-line-clamp:unset;}
+  html body.outdoors-hub-page.fd-refresh #fdResults > li.venue-card > .card-slot-desc {display:none!important;}
+  html body.outdoors-hub-page.fd-refresh #fdResults > li.venue-card > .card-slot-fee {display:block!important;}
+  body.outdoors-hub-page .hub-card-info {padding:10px 12px;margin:0 0 10px;background:#edf3e9;border-radius:14px;line-height:1.45;}
+  body.outdoors-hub-page .hub-card-info strong {display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#286962;margin-bottom:4px;}
+  body.outdoors-hub-page .hub-card-info p {font-size:14px;margin:0;color:#1b2b3a;}
+  body.outdoors-hub-page .hub-filter-help {font:400 13px/1.45 Nunito,sans-serif;color:#615b53;margin:8px 0 12px;}
+  body.outdoors-hub-page .fd-pop-panel .hub-filter-help {margin-top:22px;}
+  body.outdoors-hub-page .hub-sort-help {margin:0 0 12px;color:#286962;font:700 13px/1.5 Nunito,sans-serif;}
+  body.outdoors-hub-page .hub-sort-help summary {cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px;}
+  body.outdoors-hub-page .hub-sort-help summary::before {content:'▸';}
+  body.outdoors-hub-page .hub-sort-help[open] summary::before {content:'▾';}
+  body.outdoors-hub-page .hub-sort-help p {max-width:70ch;margin:0;padding:12px 16px;background:#edf3e9;border-radius:16px;color:#514b43;font-weight:400;}
+  @media(max-width:640px){
+    body.outdoors-hub-page .fd-type-row + .hub-filter-help {display:none;}
+    body.outdoors-hub-page.fd-refresh .fd-pop-panel {bottom:auto!important;max-height:calc(100dvh - 92px)!important;}
+    body.outdoors-hub-page.fd-refresh .category-banner,body.outdoors-hub-page.fd-refresh .category-banner img {height:110px!important;}
+    body.outdoors-hub-page.fd-refresh #fdResults > .venue-card {padding:12px 16px!important;}
+    body.outdoors-hub-page.fd-refresh #fdResults > .venue-card::before {height:clamp(128px,40vw,190px)!important;min-height:0!important;padding-bottom:0!important;width:calc(100% + 32px);margin:0 -16px 10px;}
+    body.outdoors-hub-page.fd-refresh #fdResults > .venue-card > h2 {font-size:20px;line-height:1.25;margin-bottom:8px;}
+    body.outdoors-hub-page.fd-refresh #fdResults > .venue-card > .card-slot-notice:has(> .season-tag) {position:relative!important;order:-2!important;top:auto!important;right:auto!important;left:auto!important;align-self:flex-start;max-width:calc(100% - 20px);margin:-48px 10px 18px!important;}
+  }
+  body.outdoors-hub-page .hub-links { margin: 26px 0 8px; }
+  body.outdoors-hub-page .hub-links h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+  body.outdoors-hub-page .hub-links nav { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.outdoors-hub-page .hub-links a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 700; font-size: 0.86rem; color: var(--ink, #2A2019); text-decoration: none; }
+  body.outdoors-hub-page .hub-links a:hover { background: rgba(27,43,58,0.06); }
+  body.outdoors-hub-page .hub-links a span { font-size: 0.74rem; opacity: 0.6; }
+  body.outdoors-hub-page .card-grid > .venue-card > .card-slot-desc, body.outdoors-hub-page .card-grid > .venue-card > .card-slot-notes { display: none !important; }
+  html body.outdoors-hub-page.golf-page .card-grid > li.venue-card:is([data-ph], [data-card-ph]):not(.whatson-event-card) > .chips:not(:empty) { display: flex !important; }
+</style>`;
 // ?types=, ?regions=, ?features=, ?sort= for these sections, plus each
 // page's older single-choice parameter (?activities= on Outdoors,
 // ?activity= on Tours), so existing links keep their filter.

@@ -8058,7 +8058,8 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.match(wideBody, /Fixture Canyon Park/); assert.match(wideBody, /Fixture Nordic Centre/);
     assert.match(wideBody, /data-region="kelowna" aria-pressed="false">Kelowna <span class="outdoor-activity-count">1<\/span>/);
     assert.match(wideBody, /data-region="vernon" aria-pressed="false">Vernon/);
-    assert.match(wideBody, /data-region="osoyoos" aria-pressed="false">Osoyoos <span class="outdoor-activity-count">0<\/span>/, 'a canonical region with no outdoor venues still gets a chip, showing 0');
+    // Like /sports (2026-11-20), the town list leaves out towns with no outdoor places.
+    assert.doesNotMatch(wideBody, /data-region="osoyoos"/, 'a town with no outdoor places is not offered');
     assert.equal((wideBody.match(/<h1[\s>]/g) || []).length, 1);
     assert.equal(footerOf(wideBody), footerOf(withFooterOutdoors(beachesBefore)), 'the shared footer on /outdoors is byte-identical to the /beaches footer (with its Outdoors link now /outdoors)');
     const outdoorGrid = (wideBody.match(/<ul class="card-grid" id="fdResults"[^>]*>([\s\S]*?)<\/ul>/) || [])[1] || '';
@@ -8348,15 +8349,16 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a li
     assert.equal((await fetch(`${base}/outdoors/hiking/`)).status, 200, 'trailing slash tolerated like other routes');
     const landing = await (await fetch(`${base}/outdoors`)).text();
     assert.equal((landing.match(/<h1[\s>]/g) || []).length, 1);
-    const lm = landing.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
-    assert.ok(lm.indexOf('id="fdSearch"') < lm.indexOf('fd-type-row') && lm.indexOf('fd-type-row') < lm.indexOf('id="fdRegionsBtn"') && lm.indexOf('id="fdRegionsBtn"') < lm.indexOf('id="fdResults"'), 'search -> activity chips -> Regions -> results');
+    const lm = landing.replace(/<style\b[\s\S]*?<\/style>/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
+    // Laid out like /sports (2026-11-20): search and Choose a town share one toolbar, then the activity chips, then the results.
+    assert.ok(lm.indexOf('id="fdSearch"') < lm.indexOf('id="fdRegionsBtn"') && lm.indexOf('id="fdRegionsBtn"') < lm.indexOf('fd-type-row') && lm.indexOf('fd-type-row') < lm.indexOf('id="fdResults"'), 'search -> Regions -> activity chips -> results');
     assert.doesNotMatch(lm, /Explore by Activity/);
     for (const r of ['kelowna', 'penticton', 'vernon']) {
       assert.match(lm, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">`), `region chip for ${r}`);
       assert.equal((await fetch(`${base}/${r}/outdoors`)).status, 200, `/${r}/outdoors is valid`);
     }
     assert.equal((await fetch(`${base}/outdoors/camping`)).status, 404); assert.equal((await fetch(`${base}/outdoors/water`)).status, 404);
-    assert.match(landing, /data-fd-type="hiking" aria-pressed="false">Hiking &amp; Trails <span class="outdoor-activity-count">3<\/span><\/button>/);
+    assert.match(landing, /data-fd-type="hiking" aria-pressed="false">🥾 Hiking &amp; Trails <span class="outdoor-activity-count">3<\/span><\/button>/);
     assert.doesNotMatch(landing, /outdoors-guide-link/);
     assert.equal((lm.match(/<li class="venue-card" /g) || []).length, 3, 'results list has each venue once');
     assert.match(landing, /id="fdResults"/);
