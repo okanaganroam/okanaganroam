@@ -302,3 +302,52 @@ test('Indoor test 16 sweep (S1): every kind with a minimum age of 5+, 8+ (8 to 1
   }
   assert.deepEqual(fails, []);
 });
+
+// Indoor test 17 (2026-11-19; Megan's All ages gym with "Kids under 14 need an adult on the mats" in Good to know: the Ages
+// row and kids' trip cards read only the 5+/8+ answer): an adult rule in the owner's OWN words ("under N … adult", "N and
+// under with an adult", « moins de N ans … adulte »), in Good to know, Groups or Ages, with ANY age answer (All ages too),
+// shows in the Ages row and on kids' trip cards, for every kind; research's words never do.
+test('Indoor test 17 sweep (G4): every kind, any age answer: the owner\'s own "under 14 … adult" rule shows in the Ages row ("All ages (under 14 with an adult).") and as the kids\' card note; research\'s rule never does', async () => {
+  const fails = [];
+  const db = require('../db.js');
+  const region = 'apex', town = 'Apex';
+  const rowsAges = (id) => ((JSON.parse(db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(id).info).rows) || []).find((r) => r.label === 'Ages');
+  const RULES = [
+    ['good_to_know', 'Kids under 14 need an adult on the mats.', 14],
+    ['groups', 'Birthday parties. 13 and under with an adult.', 14],
+    ['good_to_know', 'Les moins de 14 ans doivent être accompagnés d’un adulte.', 14],
+    ['good_to_know', 'Children under the age of 12 must be supervised by an adult.', 12],
+  ];
+  for (const [kind, k] of Object.entries(KINDS)) {
+    if (k.expect === 'no') continue;
+    for (const [i, [field, rule, under]] of RULES.entries()) {
+      for (const age of i === 0 ? ['all', '5'] : ['all']) {
+        const v = mk({ region, name: `${town} ${k.name} ${age} G4 ${i}`, cuisine: k.cuisine, description: `${k.name} in ${town}.`, rating: 4.2, reviews: 40 });
+        const t = tokenFor(v.id);
+        await ok(change(t, { indoor_info: { kinds: [kind], length: '1-2h', book: 'busy', age, year: 'all' } }));
+        await ok(change(t, { visit_rows: { [field]: rule } }));
+        const row = rowsAges(v.id);
+        const want = age === 'all' ? `All ages (under ${under} with an adult).` : `Ages ${under} and up (5+ with an adult).`;
+        if (!row || row.text !== want) fails.push(`${kind} ${age} "${rule}": Ages row ${row && row.text}`);
+        if (age === 'all' && i === 0) {
+          const html = app.renderVenuePage(app.getVenue(v.id), [], [], [], { lang: 'fr', now: NOW });
+          if (!plain(html).includes(`Tous les âges (moins de ${under} ans avec un adulte).`)) fails.push(`${kind}: no French Ages row`);
+          if (k.expect === 'yes') {
+            const stop = itemsOf(app.runTripPlan({ text: `something to do with my 7 year old in ${town}` }, NOW)).find((x) => x.venue.id === v.id);
+            if (!stop) fails.push(`${kind}: "my 7 year old" leaves it out`);
+            else if (!(stop.caveats || []).includes(`Under ${under}s come with an adult (the owner’s own words).`)) fails.push(`${kind}: no adult note (${(stop.caveats || []).join(' / ')})`);
+          }
+        }
+        app.updateVenue(v.id, { region: 'baldy' });
+      }
+    }
+    // Research's rule (no owner line) is never read.
+    const r = mk({ region, name: `${town} ${k.name} research G4`, cuisine: k.cuisine, description: `${k.name} in ${town}.`, rating: 4.2, reviews: 40 });
+    db.prepare('INSERT INTO venue_visit_info (venue_id, info) VALUES (?, ?)').run(r.id, JSON.stringify({ rows: [{ label: 'Good to know', text: 'Kids under 14 need an adult.' }], source_url: 'https://example.com', checked_at: '2026-10-31' }));
+    await ok(change(tokenFor(r.id), { indoor_info: { kinds: [kind], length: '1-2h', book: 'busy', age: 'all', year: 'all' } }));
+    const rr = rowsAges(r.id);
+    if (!rr || rr.text !== 'All ages.') fails.push(`${kind}: research rule read (${rr && rr.text})`);
+    app.updateVenue(r.id, { region: 'baldy' });
+  }
+  assert.deepEqual(fails, []);
+});

@@ -24861,7 +24861,8 @@ function indoorVisitLines(venue, info) {
   } else if (INDOOR_AGES.includes(String(t.age || '')) && indoorAdultAges(venue, t)) {
     // Indoor test 16: "Ages 12 and up (8+ with an adult)." from the owner's own words.
     const r = indoorAdultAges(venue, t);
-    out.Ages = r.alone != null ? { en: `Ages ${r.alone} and up (${r.withAdult}+ with an adult).`, fr: `À partir de ${r.alone} ans (dès ${r.withAdult} ans avec un adulte).` }
+    out.Ages = r.alone != null && r.withAdult === 0 ? { en: `All ages (under ${r.alone} with an adult).`, fr: `Tous les âges (moins de ${r.alone} ans avec un adulte).` }
+      : r.alone != null ? { en: `Ages ${r.alone} and up (${r.withAdult}+ with an adult).`, fr: `À partir de ${r.alone} ans (dès ${r.withAdult} ans avec un adulte).` }
       : { en: `Ages ${r.withAdult} and up, with an adult.`, fr: `À partir de ${r.withAdult} ans, avec un adulte.` };
   } else if (INDOOR_AGES.includes(String(t.age || ''))) {
     const a = INDOOR_AGE_LINES[String(t.age)];
@@ -25198,23 +25199,28 @@ function indoorKidsRange(venue, info) {
 // 8 to 11 with a paying adult"): an age rule with an adult in the owner's own Good to know or Groups words (never
 // research), read the way round 9 reads age ranges. -> { alone: 12, withAdult: 8 } (alone null when only "8+ with an adult"
 // is said), or null. Every kind with a minimum age.
-const INDOOR_ADULT_WORDS_RE = /\b(?:with|accompanied by|alongside) (?:a |an |one )?(?:paying |participating |playing )?(?:adults?|parents?|guardians?|grown[- ]?ups?)\b|\bavec (?:un )?(?:adulte|parent)s?\b|\baccompagn[ée]s?\b/i;
+// Indoor test 17 (2026-11-19; Megan's "Kids under 14 need an adult on the mats"): "need an adult", "must be with a
+// parent", "adult supervision" and « doivent être avec un adulte » are an adult rule too.
+const INDOOR_ADULT_WORDS_RE = /\b(?:with|accompanied by|alongside|supervised by) (?:a |an |one )?(?:paying |participating |playing )?(?:adults?|parents?|guardians?|grown[- ]?ups?)\b|\b(?:needs?|need to have|must have|must be with|must bring|requires?|required to have) (?:a |an |one )?(?:paying |participating )?(?:adults?|parents?|guardians?|grown[- ]?ups?)\b|\b(?:adult|parent(?:al)?) supervision\b|\bavec (?:un )?(?:adulte|parent)s?\b|\baccompagn[ée]s?\b|\bsurveillance d.un adulte\b/i;
 const INDOOR_ALONE_WORDS_RE = /\b(?:on their own|by themselves|alone|unaccompanied|without (?:an? )?(?:adult|parent|guardian)|solo|seuls?)\b/i;
 function indoorAdultAges(venue, info) {
   try {
     const t = info || venueIndoorInfo(venue.id);
-    const min = /^\d+$/.test(String(t.age || '')) ? Number(t.age) : null;
+    // Indoor test 17: with any age answer, All ages too ("All ages (under 14 with an adult)"); the owner's own Good to know,
+    // Groups or Ages words only, never research's.
+    const min = /^\d+$/.test(String(t.age || '')) ? Number(t.age) : String(t.age || '') === 'all' ? 0 : null;
     if (min == null || min >= 19) return null;
     let alone = null, withAdult = null;
-    for (const part of indoorOwnLines(venue.id, /^(?:good to know|groups?)$/i)) {
-      for (const c of String(part).split(/[;,]\s*|\s+(?:and|but|or)\s+(?=(?:ages?\s*)?\d|under\b|kids\b|children\b)/i)) {
+    for (const part of indoorOwnLines(venue.id, /^(?:good to know|groups?|ages)$/i)) {
+      for (const c of String(part).split(/[;,]\s*|(?<!\b\d{1,2})\s+(?:and|but|or)\s+(?=(?:ages?\s*)?\d|under\b|kids\b|children\b)/i)) {
         const range = /\b(?:ages?\s*|aged\s*|kids\s*|children\s*)?(\d{1,2})\s*(?:to|-|–|—|through|thru|à)\s*(\d{1,2})\b/i.exec(c);
         const plus = /\b(\d{1,2})\s*(?:\+|and (?:up|over|older)|years? and (?:up|over|older)|ans et plus)/i.exec(c);
-        const under = /\bunder\s*(\d{1,2})s?\b|\bmoins de (\d{1,2}) ans\b/i.exec(c);
+        const under = /\bunder\s*(?:the age of\s*|age\s*)?(\d{1,2})s?\b|\bmoins de (\d{1,2}) ans\b|\b(?:ages?\s*)?(\d{1,2}) (?:and|&|or) (?:under|younger)\b|\b(\d{1,2}) ans et moins\b/i.exec(c);
+        const underN = under ? (under[1] || under[2] ? Number(under[1] || under[2]) : Number(under[3] || under[4]) + 1) : null;
         if (INDOOR_ADULT_WORDS_RE.test(c)) {
           if (range && Number(range[2]) > Number(range[1]) && Number(range[2]) < 19) { withAdult = Number(range[1]); alone = alone || Number(range[2]) + 1; }
           else if (plus && Number(plus[1]) < 19) withAdult = Number(plus[1]);
-          else if (under && Number(under[1] || under[2]) < 19) alone = alone || Number(under[1] || under[2]);
+          else if (under && underN <= 19) alone = alone || underN;
         } else if (INDOOR_ALONE_WORDS_RE.test(c) && plus && Number(plus[1]) < 19) alone = Number(plus[1]);
       }
     }
