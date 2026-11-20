@@ -3792,7 +3792,7 @@ test('S4 #5: public event reads need no auth and ignore a wrong bearer', async (
   const id = list.json.events[0].id;
   const one = await s4request('GET', `/api/events/${id}`);
   assert.equal(one.status, 200);
-  assert.deepEqual(Object.keys(one.json).sort(), ['attribution', 'categories', 'dateLabel', 'description', 'id', 'image', 'name', 'occurrences', 'priceKind', 'priceLabel', 'recurrence', 'region', 'slug', 'status', 'time', 'valleyWide', 'venueName', 'website'].sort());
+  assert.deepEqual(Object.keys(one.json).sort(), ['attribution', 'categories', 'dateLabel', 'description', 'id', 'image', 'images', 'name', 'occurrences', 'priceKind', 'priceLabel', 'recurrence', 'region', 'slug', 'status', 'time', 'valleyWide', 'venueName', 'website'].sort());
   assert.equal(one.json.occurrences.length, 2, 'cancelled occurrence not exposed publicly');
   assert.deepEqual(Object.keys(one.json.occurrences[0]).sort(), ['allDay', 'endDate', 'endsNextDay', 'endTime', 'id', 'label', 'startDate', 'startTime'].sort());
   const occs = await s4request('GET', `/api/events/${id}/occurrences`);

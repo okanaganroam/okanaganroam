@@ -260,6 +260,9 @@ const newEventColumns = [
   ['type', 'TEXT'],
   ['price_kind', 'TEXT'],
   ['price_text', 'TEXT'],
+  // Several photos per event (2026-11-20): the photos after the main one (image_url), in order, as a JSON array of
+  // site paths ("/images/events/foo-800.jpg"). Null = just the main photo.
+  ['images_json', 'TEXT'],
 ];
 for (const [col, colType] of newEventColumns) {
   if (!existingEventCols.includes(col)) {
