@@ -200,6 +200,12 @@ const STAY_STYLES = `<style>
   body.stays-page .st-near-name { font-weight: 800; overflow-wrap: anywhere; }
   body.stays-page .st-near-list a:hover .st-near-name { text-decoration: underline; }
   body.stays-page .st-near-meta { font-size: 0.8rem; font-weight: 700; opacity: 0.7; }
+  /* Stay info (2026-11-20): the facts list under the address on a stay's page (.st-know), and the guests chip on the list. */
+  body.stays-page .st-know { margin: 10px 0 4px; max-width: 640px; }
+  body.stays-page .st-know h2 { font-size: 1.05rem; margin: 0 0 4px; }
+  body.stays-page .st-know ul { margin: 0; padding-left: 1.2em; }
+  body.stays-page .st-know li { margin: 0 0 3px; }
+  body.stays-page .st-chip { align-self: flex-start; display: inline-block; margin: 0 0 4px; padding: 2px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; background: #EEE8DC; color: var(--ref-navy, #1B2B3A); }
   @media (max-width: 860px) { body.stays-page .st-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 560px) { body.stays-page .st-list, body.stays-page .st-near-list { grid-template-columns: 1fr; } }
 </style>`;
@@ -230,7 +236,7 @@ document.addEventListener('click', function(e){
 });
 </script>`;
 
-// deps: { origin, siteName, pageHead, analyticsHead, headerHtml, footerHtml, appScript, escapeHtml, breadcrumbSchema, links(venueId), indexable(region), engagementScript(venue) }
+// deps: { origin, siteName, pageHead, analyticsHead, headerHtml, footerHtml, appScript, escapeHtml, breadcrumbSchema, links(venueId), indexable(region), engagementScript(venue), stayInfo(venueId) (optional) }
 function renderStaysListPage({ region, regionLabel, stays, lang = 'en' }, deps) {
   const origin = deps.origin || 'https://okanaganroam.com';
   const siteName = deps.siteName || 'Okanagan Roam';
@@ -257,6 +263,7 @@ function renderStaysListPage({ region, regionLabel, stays, lang = 'en' }, deps) 
       <span class="st-meta">${esc([kind, town].filter(Boolean).join(' · '))}</span>
       <a class="st-name" href="${stayPath(v, lang)}">${esc(v.name)}</a>
       ${v.address ? `<p class="st-addr">${esc(v.address)}</p>` : ''}
+      ${staySleepsChip(deps.stayInfo ? deps.stayInfo(v.id) : null, lang)}
       ${ratesButtonHtml(link, v, esc)}
     </div></li>`;
   }).join('\n    ');
@@ -333,6 +340,7 @@ ${deps.headerHtml()}
   </div>`}
   ${desc ? `<p class="st-intro"${fr && !descFr ? ' lang="en"' : ''}>${esc(desc)}</p>` : ''}
   ${venue.address ? `<p class="st-addr">${esc(venue.address)}</p>` : ''}
+  ${stayInfoHtml(deps.stayInfo ? deps.stayInfo(venue.id) : null, lang, esc)}
   ${actions ? `<div class="st-actions">
     ${actions}
   </div>` : ''}
@@ -462,6 +470,221 @@ function photoCreditFor(url) {
   } catch (e) { return ''; }
 }
 
+// ---- Stay info (2026-11-20) ----
+// Extra facts about each place to stay (drafts/stays-2026-11/stay-info-schema.md), one JSON object per stay in the
+// stay_info table (db.js), written only through POST /admin/stay-info (scripts/apply-stay-info.js). Build My Trip will
+// use it later to choose a base and pre-fill booking links; for now the stay's own page shows a short "Good to know"
+// list and the town list a "Sleeps N" chip. sources, confidence and the booking links are stored but never shown yet.
+// Every field is optional and may be null ("not known"; never guessed).
+const STAY_INFO_KEYS = ['max_guests', 'unit_types', 'bedrooms_max', 'price_level', 'pets', 'kitchen', 'pool', 'hot_tub', 'parking',
+  'accessible', 'adults_only', 'kid_friendly', 'check_in', 'check_out', 'min_nights', 'min_nights_note', 'open_months',
+  'booking', 'sources', 'confidence', 'checked_at'];
+const STAY_UNIT_TYPES = ['room', 'suite', 'studio', 'apartment', 'cabin', 'cottage', 'house', 'condo', 'rv_site', 'tent_site', 'dorm_bed', 'glamping'];
+const STAY_INFO_ENUMS = { pets: ['yes', 'no', 'some'], kitchen: ['all', 'some', 'none'], parking: ['free', 'paid', 'none'], confidence: ['high', 'medium', 'low'] };
+const STAY_INFO_BOOLEANS = ['pool', 'hot_tub', 'accessible', 'adults_only', 'kid_friendly'];
+const STAY_BOOKING_KEYS = ['own', 'booking_com', 'expedia'];
+const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
+// A URL in the query string of which an affiliate or tracking tag appears (aid=, label=, affiliate, utm_).
+function hasTrackingParams(u) {
+  const q = String(u.search || '').toLowerCase();
+  return /(?:^\?|[?&;])(?:aid|label)=/.test(q) || q.includes('affiliate') || q.includes('utm_');
+}
+// -> error text or null. https only, no user:password, no tracking tags.
+function stayUrlError(value, field) {
+  if (typeof value !== 'string' || !value.trim() || value.length > 600) return `${field} must be a URL (at most 600 characters).`;
+  let u;
+  try { u = new URL(value.trim()); } catch (e) { return `${field} must be an absolute URL.`; }
+  if (u.protocol !== 'https:') return `${field} must use https.`;
+  if (u.username || u.password) return `${field} must not contain credentials.`;
+  if (!u.hostname.includes('.')) return `${field} must have a real domain.`;
+  if (hasTrackingParams(u)) return `${field} has an affiliate or tracking parameter (aid=, label=, affiliate, utm_); use the plain listing URL.`;
+  return null;
+}
+const intIn = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
+function validDate(s) {
+  if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s;
+}
+
+// -> { ok, errors: [text] }. Only the schema's keys; every value null or the right type / enum value.
+function validateStayInfo(obj) {
+  const errors = [];
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return { ok: false, errors: ['info must be a JSON object.'] };
+  for (const k of Object.keys(obj)) if (!STAY_INFO_KEYS.includes(k)) errors.push(`Unknown field: ${k}.`);
+  const has = (k) => Object.prototype.hasOwnProperty.call(obj, k) && obj[k] !== null;
+  if (has('max_guests') && !intIn(obj.max_guests, 1, 500)) errors.push('max_guests must be a whole number from 1 to 500, or null.');
+  if (has('bedrooms_max') && !intIn(obj.bedrooms_max, 0, 50)) errors.push('bedrooms_max must be a whole number from 0 to 50, or null.');
+  if (has('min_nights') && !intIn(obj.min_nights, 1, 365)) errors.push('min_nights must be a whole number from 1 to 365, or null.');
+  if (has('price_level') && !intIn(obj.price_level, 1, 4)) errors.push('price_level must be 1, 2, 3 or 4, or null.');
+  if (has('unit_types')) {
+    if (!Array.isArray(obj.unit_types)) errors.push('unit_types must be a list.');
+    else {
+      for (const t of obj.unit_types) if (!STAY_UNIT_TYPES.includes(t)) errors.push(`unit_types: "${String(t)}" is not one of ${STAY_UNIT_TYPES.join(', ')}.`);
+      if (new Set(obj.unit_types).size !== obj.unit_types.length) errors.push('unit_types lists a type twice.');
+    }
+  }
+  for (const [k, allowed] of Object.entries(STAY_INFO_ENUMS)) {
+    if (has(k) && !allowed.includes(obj[k])) errors.push(`${k} must be one of ${allowed.join(', ')}, or null.`);
+  }
+  for (const k of STAY_INFO_BOOLEANS) if (has(k) && typeof obj[k] !== 'boolean') errors.push(`${k} must be true, false or null.`);
+  for (const k of ['check_in', 'check_out']) if (has(k) && (typeof obj[k] !== 'string' || !TIME_RE.test(obj[k]))) errors.push(`${k} must be a 24-hour time like 15:00, or null.`);
+  if (has('min_nights_note') && (typeof obj.min_nights_note !== 'string' || !obj.min_nights_note.trim() || obj.min_nights_note.length > 160 || /[<>]/.test(obj.min_nights_note))) {
+    errors.push('min_nights_note must be short plain text (at most 160 characters), or null.');
+  }
+  if (has('open_months')) {
+    const m = obj.open_months;
+    if (!Array.isArray(m) || !m.every((x) => intIn(x, 1, 12))) errors.push('open_months must be a list of month numbers 1 to 12.');
+    else if (new Set(m).size !== m.length) errors.push('open_months lists a month twice.');
+  }
+  if (has('checked_at') && !validDate(obj.checked_at)) errors.push('checked_at must be a date like 2026-11-20, or null.');
+  if (has('sources')) {
+    if (!Array.isArray(obj.sources) || obj.sources.length > 30) errors.push('sources must be a list of at most 30 URLs.');
+    else obj.sources.forEach((s, i) => { const e = stayUrlError(s, `sources[${i}]`); if (e) errors.push(e); });
+  }
+  if (has('booking')) {
+    const b = obj.booking;
+    if (typeof b !== 'object' || Array.isArray(b)) errors.push('booking must be an object with own, booking_com and expedia.');
+    else {
+      for (const k of Object.keys(b)) if (!STAY_BOOKING_KEYS.includes(k)) errors.push(`Unknown field: booking.${k}.`);
+      for (const k of STAY_BOOKING_KEYS) {
+        if (b[k] === null || b[k] === undefined) continue;
+        const e = stayUrlError(b[k], `booking.${k}`);
+        if (e) { errors.push(e); continue; }
+        const u = new URL(b[k].trim());
+        const host = u.hostname.toLowerCase();
+        if (k === 'booking_com' && !((host === 'booking.com' || host.endsWith('.booking.com')) && /^\/hotel\/[a-z]{2}\/[^/]+\.html$/i.test(u.pathname))) {
+          errors.push('booking.booking_com must be a Booking.com hotel page (https://www.booking.com/hotel/ca/<name>.html).');
+        }
+        if (k === 'expedia' && !(/(?:^|\.)expedia\.[a-z.]{2,6}$/.test(host) && /Hotel-Information/i.test(u.pathname))) {
+          errors.push('booking.expedia must be an Expedia hotel page (https://www.expedia.ca/...Hotel-Information).');
+        }
+      }
+    }
+  }
+  return { ok: errors.length === 0, errors };
+}
+// The stored form: the schema's keys in the schema's order (a valid object only), so the same facts are the same text.
+function normalizeStayInfo(obj) {
+  const out = {};
+  for (const k of STAY_INFO_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+    let v = obj[k];
+    if (typeof v === 'string') v = v.trim();
+    if (k === 'booking' && v) { const b = {}; for (const bk of STAY_BOOKING_KEYS) if (Object.prototype.hasOwnProperty.call(v, bk)) b[bk] = typeof v[bk] === 'string' ? v[bk].trim() : v[bk]; v = b; }
+    if (k === 'sources' && Array.isArray(v)) v = v.map((s) => s.trim());
+    out[k] = v;
+  }
+  return out;
+}
+
+// ---- Showing it ----
+const UNIT_TYPE_LABELS = {
+  room: { en: 'rooms', fr: 'chambres' }, suite: { en: 'suites', fr: 'suites' }, studio: { en: 'studios', fr: 'studios' },
+  apartment: { en: 'apartments', fr: 'appartements' }, cabin: { en: 'cabins', fr: 'chalets' }, cottage: { en: 'cottages', fr: 'cottages' },
+  house: { en: 'houses', fr: 'maisons' }, condo: { en: 'condos', fr: 'condos' }, rv_site: { en: 'RV sites', fr: 'emplacements pour VR' },
+  tent_site: { en: 'tent sites', fr: 'emplacements de tente' }, dorm_bed: { en: 'dorm beds', fr: 'lits en dortoir' }, glamping: { en: 'glamping', fr: 'prêt-à-camper' },
+};
+const MONTHS = {
+  en: ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+  fr: ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
+};
+const upperFirst = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);
+// "15:00" -> "3 pm" / "15 h"; "10:30" -> "10:30 am" / "10 h 30".
+function formatStayTime(hhmm, lang = 'en') {
+  if (typeof hhmm !== 'string' || !TIME_RE.test(hhmm)) return '';
+  const [h, m] = hhmm.split(':').map(Number);
+  if (lang === 'fr') return `${h} h${m ? ` ${String(m).padStart(2, '0')}` : ''}`;
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}${m ? `:${String(m).padStart(2, '0')}` : ''} ${h < 12 ? 'am' : 'pm'}`;
+}
+// Month numbers -> runs of months in calendar order, a run may wrap past December ([11,12,1,2] -> one run Nov-Feb).
+function monthRuns(months) {
+  const set = new Set(months);
+  const runs = [];
+  // Start each run at a month whose previous month is closed; walk forward.
+  for (let m = 1; m <= 12; m++) {
+    const prev = m === 1 ? 12 : m - 1;
+    if (!set.has(m) || set.has(prev)) continue;
+    let end = m; let len = 1;
+    while (len < 12 && set.has(end === 12 ? 1 : end + 1)) { end = end === 12 ? 1 : end + 1; len++; }
+    runs.push([m, end]);
+  }
+  return runs;
+}
+function openMonthsText(months, lang = 'en') {
+  if (!Array.isArray(months) || !months.length) return '';
+  const valid = [...new Set(months.filter((x) => intIn(x, 1, 12)))];
+  if (!valid.length || valid.length === 12) return '';
+  const fr = lang === 'fr';
+  const names = MONTHS[fr ? 'fr' : 'en'];
+  const runs = monthRuns(valid);
+  if (runs.length === 1) {
+    const [a, b] = runs[0];
+    if (a === b) return fr ? `Ouvert en ${names[a - 1]}` : `Open in ${names[a - 1]}`;
+    return fr ? `Ouvert de ${names[a - 1]} à ${names[b - 1]}` : `Open ${names[a - 1]}–${names[b - 1]}`;
+  }
+  const parts = runs.map(([a, b]) => (a === b ? names[a - 1] : `${names[a - 1]}–${names[b - 1]}`));
+  return fr ? `Ouvert : ${parts.join(', ')}` : `Open ${parts.join(', ')}`;
+}
+
+// The "Good to know" lines for a stay's page: [{ key, text, lang? }]. A null (or missing) value hides its line.
+// Never sources, confidence or booking links. price_level shows only as $ symbols.
+function stayInfoLines(info, lang = 'en') {
+  if (!info || typeof info !== 'object') return [];
+  const fr = lang === 'fr';
+  const out = [];
+  if (intIn(info.max_guests, 1, 500)) out.push({ key: 'max_guests', text: fr ? `Jusqu’à ${info.max_guests} personne${info.max_guests > 1 ? 's' : ''}` : `Sleeps up to ${info.max_guests}` });
+  const units = Array.isArray(info.unit_types) ? info.unit_types.filter((t) => UNIT_TYPE_LABELS[t]).map((t) => UNIT_TYPE_LABELS[t][fr ? 'fr' : 'en']) : [];
+  if (units.length) out.push({ key: 'unit_types', text: upperFirst(units.join(', ')) });
+  if (intIn(info.price_level, 1, 4)) out.push({ key: 'price_level', text: `${fr ? 'Prix habituel :' : 'Typical price:'} ${'$'.repeat(info.price_level)}` });
+  const ci = formatStayTime(info.check_in, lang); const co = formatStayTime(info.check_out, lang);
+  const times = [ci ? (fr ? `Arrivée dès ${ci}` : `Check-in from ${ci}`) : '', co ? (fr ? `Départ ${co}` : `Check-out ${co}`) : ''].filter(Boolean);
+  if (times.length) out.push({ key: 'times', text: times.join(' · ') });
+  const note = typeof info.min_nights_note === 'string' ? clean(info.min_nights_note) : '';
+  if (intIn(info.min_nights, 2, 365)) {
+    const n = info.min_nights;
+    out.push({ key: 'min_nights', text: fr ? `Minimum ${n} nuits` : `Minimum ${n} nights`, note: note || null });
+  } else if (note) {
+    out.push({ key: 'min_nights', text: '', note });
+  }
+  const pets = { yes: { en: 'Pets welcome', fr: 'Animaux acceptés' }, no: { en: 'No pets', fr: 'Animaux non acceptés' }, some: { en: 'Pets welcome in some units', fr: 'Animaux acceptés dans certaines unités' } }[info.pets];
+  if (pets) out.push({ key: 'pets', text: pets[fr ? 'fr' : 'en'] });
+  const kitchen = { all: { en: 'Kitchen in every unit', fr: 'Cuisine dans chaque unité' }, some: { en: 'Kitchen in some units', fr: 'Cuisine dans certaines unités' } }[info.kitchen];
+  if (kitchen) out.push({ key: 'kitchen', text: kitchen[fr ? 'fr' : 'en'] });
+  const extras = [
+    info.pool === true ? (fr ? 'Piscine' : 'Pool') : '',
+    info.hot_tub === true ? (fr ? 'Bain à remous' : 'Hot tub') : '',
+    info.parking === 'free' ? (fr ? 'Stationnement gratuit' : 'Free parking') : info.parking === 'paid' ? (fr ? 'Stationnement payant' : 'Paid parking') : '',
+  ].filter(Boolean);
+  if (extras.length) out.push({ key: 'amenities', text: extras.join(' · ') });
+  if (info.adults_only === true) out.push({ key: 'adults_only', text: fr ? 'Adultes seulement' : 'Adults only' });
+  const open = openMonthsText(info.open_months, lang);
+  if (open) out.push({ key: 'open_months', text: open });
+  return out;
+}
+// "Good to know" under the address; '' when there is nothing to say. The minimum-stay note is written in English, so
+// on a French page it is marked lang="en".
+function stayInfoHtml(info, lang, esc) {
+  const lines = stayInfoLines(info, lang);
+  if (!lines.length) return '';
+  const fr = lang === 'fr';
+  const li = lines.map((l) => {
+    const note = l.note ? (l.text ? ` <span${fr ? ' lang="en"' : ''}>(${esc(l.note)})</span>` : `<span${fr ? ' lang="en"' : ''}>${esc(upperFirst(l.note))}</span>`) : '';
+    return `<li data-stay-info-line="${l.key}">${esc(l.text)}${note}</li>`;
+  }).join('');
+  return `<section class="st-know" aria-labelledby="stKnowHead" data-stay-info>
+    <h2 id="stKnowHead">${fr ? 'Bon à savoir' : 'Good to know'}</h2>
+    <ul>${li}</ul>
+  </section>`;
+}
+// The list card's chip: "Sleeps 6" / "Jusqu’à 6 pers." when max_guests is known.
+function staySleepsChip(info, lang = 'en') {
+  if (!info || !intIn(info.max_guests, 1, 500)) return '';
+  return `<span class="st-chip" data-stay-sleeps>${lang === 'fr' ? `Jusqu’à ${info.max_guests} pers.` : `Sleeps ${info.max_guests}`}</span>`;
+}
+
 module.exports = {
   STAY_TYPE, STAY_SEGMENT, STAY_LABEL, STAY_KINDS, DISCLOSURE, CHECK_RATES,
   STAY22_ALLEZ_BASE, BOOKING_SEARCH_BASE, EXPEDIA_SEARCH_BASE,
@@ -470,4 +693,5 @@ module.exports = {
   CLOSE_BY_KM, CLOSE_BY_LIMIT, CLOSE_BY_FOOD_DRINK, CLOSE_BY_THINGS_TO_DO, CLOSE_BY_TYPES, CLOSE_BY_LABEL,
   pickStayCloseBy, formatStayDistance, closeByHtml,
   TOWN_NOTES_FILE, loadTownNotes, setTownNotes, townNoteFor,
+  STAY_INFO_KEYS, STAY_UNIT_TYPES, validateStayInfo, normalizeStayInfo, stayInfoLines, stayInfoHtml, staySleepsChip, formatStayTime, openMonthsText,
 };
