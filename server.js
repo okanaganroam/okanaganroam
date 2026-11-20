@@ -17998,16 +17998,17 @@ ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
     } catch (e) { /* analytics must never break the site */ }
   };
   // Measurement Phase C: open_my_trip, once per visitor click that OPENS the
-  // My Trip tray. Capture phase, so the tray's state is read before app.js
+  // My Trip tray (header My Trip button since Oct 13, or the old tray button). Capture phase, so the tray's state is read before app.js
   // toggles it; clicks made by page code (isTrusted false) are not counted.
   document.addEventListener('click', function(e){
     try {
-      if (!e.isTrusted || !e.target.closest || !e.target.closest('#tripTrayToggle')) return;
+      var btn = e.isTrusted && e.target.closest ? e.target.closest('.nav-mytrip-btn, #tripTrayToggle') : null;
+      if (!btn) return;
       var panel = document.getElementById('tripTrayPanel');
       if (!panel || panel.classList.contains('open')) return;
       var count = document.getElementById('tripTrayCount');
       var size = count ? parseInt(count.textContent, 10) || 0 : 0;
-      window.trackEvent('open_my_trip', { trip_size: size, open_source: 'tray_button' });
+      window.trackEvent('open_my_trip', { trip_size: size, open_source: btn.id === 'tripTrayToggle' ? 'tray_button' : 'header_button' });
     } catch (err) { /* analytics must never break the site */ }
   }, true);
   // Business portal (2026-11-05): a click on a Business login or Claim this listing link anywhere outside the portal,

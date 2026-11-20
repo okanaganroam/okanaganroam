@@ -13469,19 +13469,22 @@ test('Measurement Phase C: add_to_trip carries trip_source (individual by defaul
 
 test('Measurement Phase C: open_my_trip fires once per visitor click that opens the tray -- not on close, not for code-triggered clicks', () => {
   const h = ga4Harness();
-  const cap = h.listeners.filter((l) => l.type === 'click' && l.capture === true);
-  assert.equal(cap.length, 1, 'one capture-phase listener');
+  const cap = h.listeners.filter((l) => l.type === 'click' && l.capture === true && String(l.fn).includes('open_my_trip'));
+  assert.equal(cap.length, 1, 'one capture-phase My Trip listener');
   const open = { v: false };
   h.els.tripTrayPanel = { classList: { contains: (c) => c === 'open' && open.v } };
   h.els.tripTrayCount = { textContent: '3' };
-  const toggle = { closest: (sel) => (sel === '#tripTrayToggle' ? toggle : null) };
+  const toggle = { id: 'tripTrayToggle', closest: (sel) => (sel.split(', ').includes('#tripTrayToggle') ? toggle : null) };
+  const header = { id: '', closest: (sel) => (sel.split(', ').includes('.nav-mytrip-btn') ? header : null) };
   const other = { closest: () => null };
   const click = (target, isTrusted = true) => cap[0].fn({ target, isTrusted });
   click(toggle);                 // opens -> counted
   open.v = true; click(toggle);  // closes -> not counted
   open.v = false; click(toggle, false); // page code (e.g. "View My Trip") -> not counted here
   click(other);                  // unrelated click
-  assert.deepEqual(h.events(), [['open_my_trip', { trip_size: 3, open_source: 'tray_button' }]]);
+  click(header);                 // header My Trip button (live since 2026-10-13) opens -> counted
+  open.v = true; click(header);  // closes -> not counted
+  assert.deepEqual(h.events(), [['open_my_trip', { trip_size: 3, open_source: 'tray_button' }], ['open_my_trip', { trip_size: 3, open_source: 'header_button' }]]);
 });
 
 test('Measurement Phase C: venue pages -- every type tags its outbound links; Food & Drink gets venue_view + outbound_click and (since 2026-10-14) the Favorite module', () => {
