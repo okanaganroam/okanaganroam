@@ -2676,6 +2676,8 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
         menuLead: w.prices.lead, menuTypeSub: w.prices.typeSub, pricesNoun: w.prices.noun, pricesPage: w.prices.page,
         webLeadTickets: fr2 ? `Nous avons inscrit votre ${w.prices.noun}. Si vos prix sont sur une autre page, changez-la.` : `We filled in your ${w.prices.noun}. If your prices are on another page, change it.`,
         groupsLead: w.groups.lead, groupsEx: w.groups.ex, quick: { groups: w.groups.chips },
+        // Indoor test 16: the Groups size question when everyone books ahead (owner-setup-client.js, Booking: Please book ahead).
+        groupsQAhead: (() => { const u = IK.BOOK_AHEAD_UNIT[k]; if (fr2) return u ? `Grands groupes : à partir de combien doivent-ils appeler ou réserver plus d’${['cours', 'rendez-vous'].includes(u[1]) ? 'un' : 'une'} ${u[1]}?` : 'Grands groupes : à partir de combien doivent-ils appeler à l’avance?'; return u ? `Big groups: from what size should they call or book more than one ${u[0]}?` : 'Big groups: from what size should they call ahead?'; })(),
         noSetHoursHint: w.boxOffice ? T.noSetHoursHint : '',
         // Indoor test 6 (2026-11-19; Priya stretched her pottery studio's hours to 9 PM for her evening classes): one line
         // on a classes place's hours screens.

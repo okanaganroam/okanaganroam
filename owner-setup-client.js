@@ -3044,7 +3044,7 @@
       var gLine = enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TL) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TL ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 780, area: true, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + trimNoteHtml('suGroupsLine') + ex(T.groupsEx);
       // Indoor test 11 (Kim): research's Groups line, untouched, says it came from online, as Known for and Good to know do.
       var gGuess = INDOOR && T.groupsGuess && !!gl && ((gl === ((CUR.visit_rows || {}).groups || '') && (C.visitResearch || []).indexOf('groups') >= 0) || (!(CUR.visit_rows || {}).groups && gl === C.groupsFound)) ? '<p class="su-sent su-research" id="suGroupsGuess">' + h(T.groupsGuess) + '</p>' : '';
-      x = doneLine('groups') + q(T.groupsQ, T.groupsLead) + msgs() + gGuess
+      x = doneLine('groups') + q(INDOOR && T.groupsQAhead && ((S.tour && S.tour.book) || TI.book) === 'ahead' ? T.groupsQAhead : T.groupsQ, T.groupsLead) + msgs() + gGuess
         + (gKids ? gLine + gSizes + gNone : gNone + gSizes + gLine)
         + (CK ? '<h2 class="su-h2" id="suBookQ">' + h(T.bookQ2) + '</h2>' + enLineHint(S.brew.book === ((CUR.visit_rows || {}).reservations || '') ? S.brew.book : '', 'suBookEn', false, 'reservations') + quick('reservations', 'suBookLine', S.brew.book) + field('suBookLine', T.bookLineLabel, S.brew.book, { max: 180, area: true }) : '')
         // Tour test 1 (Whistler, 2026-11-16): a tour is asked for its booking link once, on Booking; here only when not given.

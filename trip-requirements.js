@@ -514,11 +514,15 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
   // Penticton on October 30 at 4 pm") is the start too; it was ignored and the plan began at 11 AM. Not when it is a
   // meal's or an event's own time ("dinner at 7 pm", "a show at 8 pm") or part of "no driving after 7 pm".
   const bareStart=(()=>{
-    const re=/\b(?:at|from|around)\s+(1[0-2]|[1-9])(?::([0-5]\d))?\s*(am|pm)\b/gi;let m;
+    // Indoor test 16 (2026-11-19; "Saturday 7pm then dinner" planned the escape room at 4 PM): a clock right after the
+    // day ("Saturday 7pm", "tonight 8 pm") is the start too.
+    const re=/\b(?:at|from|around|(?:mon|tues|wednes|thurs|fri|satur|sun)day|today|tonight|tomorrow)\s+(1[0-2]|[1-9])(?::([0-5]\d))?\s*(am|pm)\b/gi;let m;
     while((m=re.exec(original))){
       const before=original.slice(Math.max(0,m.index-40),m.index).toLowerCase();
       if(/\b(?:dinners?|lunch(?:es)?|breakfasts?|brunch(?:es)?|suppers?|shows?|concerts?|games?|events?|performances?|movies?|films?|tickets?|reservations?|table|booking|tee times?|sunset|happy hours?|trivia|karaoke|bingo|tour)\s*$/.test(before))continue;
       if(/\b(?:no|not|don'?t|avoid|without)\b[^.,;]*\b(?:driv\w*|car)\b[^.,;]*$/.test(before)||/\b(?:by|before|until|till|after|no later than)\s*$/.test(before))continue;
+      // A day's clock after a later part ("dinner then escape room Saturday 7pm") is that part's time, not the start.
+      if(!/^(?:at|from|around)\b/i.test(m[0])&&/\b(?:then|after|afterwards?|followed by)\b/i.test(original.slice(0,m.index)))continue;
       return m;
     }
     return null;

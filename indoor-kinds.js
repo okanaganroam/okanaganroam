@@ -272,6 +272,11 @@ const TYPER = {
 // already keeps it. A room or group name is only ever paired with a price per room or group (server.js indoorFirstItemName).
 const TYPER_PERSON = { escape: ['One player', 'Un joueur'] };
 // The first line's name for a main price per room, lane, game or group ([en, fr]).
+// Indoor test 16 (2026-11-19; Tyler: everyone books his escape rooms ahead, so "Groups: from what size should they book
+// ahead?" read oddly): for a place whose owner said Please book ahead, the Groups size question asks when a big group
+// should call or book more than one of its own unit ([en, fr]); a kind with none asks when to call ahead.
+const BOOK_AHEAD_UNIT = { escape: ['room', 'salle'], bowling: ['lane', 'allée'], curling: ['sheet', 'piste'], games: ['session', 'séance'], climbing: ['session', 'séance'],
+  classes: ['class', 'cours'], yoga: ['class', 'cours'], spa: ['appointment', 'rendez-vous'], kids: ['session', 'séance'], pool: ['session', 'séance'] };
 const TYPER_PER = { room: ['One room', 'Une salle'], lane: ['One lane', 'Une allée'], game: ['One game', 'Une partie'], group: ['One group', 'Un groupe'] };
 for (const [k, t] of Object.entries(TYPER)) if (K[k]) {
   const pp = TYPER_PERSON[k] || [t[0], t[2]];
@@ -455,4 +460,4 @@ const INDOOR_TYPE_WORD_SKIP = new Set(['history', 'heritage', 'heritage site', '
 // "learn to curl", "slots", « soin du visage »).
 const INDOOR_TYPE_WORDS = [...new Set(Object.values(K).flatMap((e) => e.en.search.concat(e.fr.search)).filter((w) => !INDOOR_TYPE_WORD_SKIP.has(w)))];
 
-module.exports = { TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };
+module.exports = { BOOK_AHEAD_UNIT, TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, indoorPriceLine, INDOOR_BASIS_FR, indoorKindsNamedIn };

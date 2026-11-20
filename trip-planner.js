@@ -836,6 +836,17 @@ function indoorCardKind(v) {
   // Indoor test 15 (2026-11-19; the Vernon & District Performing Arts Centre read "ART GALLERY" in an art gallery plan): a
   // performing arts centre, playhouse or concert hall is a theatre.
   if (/\bperforming arts\b|\bplayhouse\b|\bconcert hall\b|\bopera house\b/i.test(`${v.name || ''} ${c}`)) return INDOOR_CARD_WORDS.theatre;
+  // Indoor test 16 (2026-11-19; "INDOOR ATTRACTION · Xperience Games Kelowna", tech-based escape rooms): with nothing in its
+  // name or category, the one kind its own story names (in its first sentence, else in all of it).
+  if (!c && !named(v.name || '').length) {
+    const story = String(v.plannerDescription || v.description || '');
+    // The kind named first ("tech-based escape rooms … alongside VR escape games" is an escape room).
+    const words = String(story.split(/(?<=[.!?])\s+/)[0] || '').split(/\s+/).slice(0, 40);
+    let first = [];
+    for (let i = 1; i <= words.length && !first.length; i++) first = named(words.slice(0, i).join(' '));
+    const d = first.length === 1 ? first : named(story || v.textDesc || '');
+    if (d.length === 1) return INDOOR_CARD_WORDS[d[0]];
+  }
   return null;
 }
 function indoorVenueLabel(ctx, v, form = 'singular') {
@@ -2021,8 +2032,9 @@ const PARTY_KINDS = ['escape', 'arcade', 'bowling', 'climbing'];
 function groupAsked(ctx) { return !!ctx && ((ctx.features || []).includes('great_groups') || ctx.occasion === 'group_getaway' || ctx.scoringOccasion === 'group_getaway'); }
 function groupFitScore(v, ctx, add) {
   if (!groupAsked(ctx) || DINING_TYPES.includes(v.type)) return;
-  const own = Array.isArray(v.indoorOwnGroups) && v.indoorOwnGroups.length ? v.indoorOwnGroups[0] : '';
-  if (own) add('group_line', 14, own.length <= 90 ? `“${own}” (the owner’s own words)` : 'Takes groups (the owner’s own Groups line)');
+  const lines = Array.isArray(v.indoorOwnGroups) ? v.indoorOwnGroups : [];
+  // Its reason never quotes "please book ahead" as a reason it fits (that is the stop's Book ahead line).
+  if (lines.length) add('group_line', 14, 'Takes groups (the owner’s own Groups line)');
   else if (v.groupsText) add('group_line', 8, null);
   if (['room', 'group'].includes(v.indoorPer)) add('group_price', 8, `Priced per ${v.indoorPer}`);
 }

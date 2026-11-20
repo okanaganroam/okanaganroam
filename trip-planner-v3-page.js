@@ -1594,8 +1594,10 @@ function renderScript(d) {
       // Weekly nights (2026-10-27): an evening stop on one of the venue's nights ("Tonight: Trivia at 7 PM").
       + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : lang() === 'fr' && stop.nightLineFr ? esc(stop.nightLineFr) : esc(stop.nightLine)) + '</p>' : '')
       + (t3PickupLine(stop) ? '<p class="t3-pickup">\u2713 ' + esc(t3PickupLine(stop)) + '</p>' : '')
-      + (why ? '<details class="t3-fit"><summary>' + esc(tx('tripv3.whyFits')) + '</summary><ul class="t3-why">' + why + '</ul></details>' : '')
+      // Indoor test 16 (2026-11-19; "Why it fits / Book ahead" read as a reason it fits): the good-to-know lines come before
+      // the folded "Why it fits", never under it.
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
+      + (why ? '<details class="t3-fit"><summary>' + esc(tx('tripv3.whyFits')) + '</summary><ul class="t3-why">' + why + '</ul></details>' : '')
       + '</div>'
       + '<div class="t3-actions">'
       + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') : '') + (opts.planStop && key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot="' + esc(key.split('-')[0]) + '"' : '') + ' aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + v.name + ' au voyage' : 'Add ' + v.name + ' to trip') + '">' + esc(lang() === 'fr' ? 'Ajouter au voyage' : 'Add to trip') + '</button>'
