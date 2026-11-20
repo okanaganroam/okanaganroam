@@ -300,3 +300,67 @@ test('schema complexity: no optional parameters, no unions, no formats, enums no
   assert.deepEqual(ai.schemaComplexity({ type: 'object', required: ['a'], properties: { a: { type: 'string' }, b: { anyOf: [{ type: 'string' }, { type: 'null' }] }, c: { type: ['string', 'null'] } } }).optional, 2);
   assert.equal(ai.schemaComplexity({ type: 'object', required: [], properties: { b: { anyOf: [{ type: 'string' }, { type: 'null' }] }, c: { type: ['string', 'null'] } } }).unions, 2);
 });
+
+// Round 4 (2026-11-20): only step-by-step requests go to the model. The blind test picked the AI 10 times, the rules 4,
+// with 6 ties; the AI's wins were step-by-step days and its losses broad asks.
+const EVAL_CASES = require('../scripts/trip-ai-eval/cases.json').cases;
+// The gate's decision for every eval request, written out so a change to it shows up here.
+const GATED_IN = ['H02', 'H03', 'H07', 'H10', 'H12', 'H13', 'H14', 'H17', 'H18', 'H19', 'H22', 'H23', 'H24',
+  'R09', 'R14', 'R16', 'R28', 'R38', 'R39', 'R44', 'R49', 'R50', 'R51', 'R52', 'R53'];
+test('gate: the step-by-step requests among the eval cases go to the model, all others stay on the rules', () => {
+  const inn = EVAL_CASES.filter((c) => ai.tripGate(c.text).gated === 'step_by_step').map((c) => c.id);
+  assert.deepEqual(inn, GATED_IN);
+  assert.equal(EVAL_CASES.length - inn.length, 59);
+  // The AI's wins in the Nov 20 run stay in.
+  for (const id of ['H03', 'H14', 'H18', 'H23', 'H24', 'R09', 'R44', 'R52']) assert.ok(inn.includes(id), id);
+  // Broad asks, including the two blind losses, stay on the rules.
+  for (const id of ['R02', 'R04', 'H09', 'H21', 'H06', 'R41']) assert.ok(!inn.includes(id), id);
+});
+
+test('gate: the rule itself, in English and French', () => {
+  const g = (t) => ai.tripGate(t).gated;
+  // Clock times and times of day tied to a stop.
+  assert.equal(g('coffee at 10 in Kelowna'), 'step_by_step');
+  assert.equal(g('golf at 7:30am in Vernon'), 'step_by_step');
+  assert.equal(g('un café à 9h à Penticton'), 'step_by_step');
+  assert.equal(g('a winery for dinner in Naramata'), 'step_by_step');
+  assert.equal(g('une plage le matin à Osoyoos'), 'step_by_step');
+  // Order words.
+  for (const t of ['a hike then a brewery in Vernon', 'a winery after the beach', 'before the beach, a cafe', 'golf followed by a pub', 'first a hike, a brewery',
+    'la plage puis une microbrasserie', 'un vignoble après la plage', 'avant la plage, un café', 'ensuite une brasserie', "d'abord la plage"]) assert.equal(g(t), 'step_by_step', t);
+  // Three kinds of stops in one ask.
+  assert.equal(g('a beach, a winery and a brewery in Penticton'), 'step_by_step');
+  // Broad asks.
+  for (const t of ['3 days in Penticton with kids', 'a foodie weekend in Kelowna', '2 days in Penticton, dog with us', 'date night in Vernon',
+    'a beach and a winery in Osoyoos', '2 nights in Kelowna', 'une fin de semaine à Penticton', 'trois jours à Kelowna avec des enfants',
+    'first time in the Okanagan, 3 days in Kelowna', "New Year's Eve in Kelowna", 'a 2-day trip for 4 people in Vernon']) assert.equal(g(t), 'broad', t);
+  // « après-midi » is a time of day, not the order word « après ».
+  assert.deepEqual(ai.tripGate('des cafés l\'après-midi').why, ['time of day']);
+  assert.deepEqual(ai.tripGate('morning coffee at 10 then a winery').why, ['clock time', 'time of day', 'order words']);
+});
+
+test('H17 (French, step by step): a café stop is the planner\'s "coffee" step, so the order holds', () => {
+  // The real answer read "un café" as the type cafe; "morning cafes then a beach" let the planner move the cafe after the beach.
+  const v = ai.validateIntent(intent({ towns: ['penticton'], days: 1, occasion: 'family', interests: [it('cafe', { time_of_day: 'morning' }), it('beach', { time_of_day: 'afternoon' }), it('dinner')], must_have: ['kid_friendly'] }),
+    ai.buildAllowed({ ...TAXONOMY, types: [...TAXONOMY.types, 'beach'] }));
+  const r = ai.renderTripRequest(v.intent, { allowed: ai.buildAllowed({ ...TAXONOMY, types: [...TAXONOMY.types, 'beach'] }), taxonomy: { ...TAXONOMY, types: [...TAXONOMY.types, 'beach'] }, args: {} });
+  assert.equal(r.text, 'family morning coffee then an afternoon beach then dinner in Penticton, kid-friendly');
+  // A cafe as the only ask stays "cafes" (a list of cafes, as before).
+  assert.equal(ai.renderTripRequest(intent({ towns: ['penticton'], interests: [it('cafe')] }), { allowed: ALLOWED, taxonomy: TAXONOMY, args: {} }).text, 'cafes in Penticton');
+  assert.match(ai.systemPrompt(ALLOWED), /un café le matin"\) = coffee/);
+});
+
+test('H21: a one-day trip to one kind of place is "a day of …" (a timed day with meals), not a list', () => {
+  const r = ai.renderTripRequest(intent({ towns: ['kelowna'], days: 1, driver: true, interests: [it('winery')] }), { allowed: ALLOWED, taxonomy: TAXONOMY, args: {} });
+  assert.equal(r.text, 'a day of wineries in Kelowna, with a designated driver');
+  // Not when a meal or a clock time is part of it, or when no day was asked.
+  assert.equal(ai.renderTripRequest(intent({ towns: ['kelowna'], days: 1, interests: [it('winery', { start_time: '11:00' })] }), { allowed: ALLOWED, taxonomy: TAXONOMY, args: {} }).text, 'wineries in Kelowna');
+  assert.equal(ai.renderTripRequest(intent({ towns: ['kelowna'], interests: [it('winery')] }), { allowed: ALLOWED, taxonomy: TAXONOMY, args: {} }).text, 'wineries in Kelowna');
+});
+
+test('R04: "foodie" is the planner\'s foodie trip, not plain restaurants', () => {
+  assert.ok(ALLOWED.kinds.includes('foodie'));
+  const r = ai.renderTripRequest(intent({ towns: ['kelowna'], days: 2, interests: [it('foodie')] }), { allowed: ALLOWED, taxonomy: TAXONOMY, args: {} });
+  assert.equal(r.text, 'a foodie 2 days in Kelowna');
+  assert.match(ai.systemPrompt(ALLOWED), /"foodie" = foodie/);
+});

@@ -159,16 +159,42 @@ test('stays: AI dates, party and dog fill the "Where to stay" inputs only with s
   const reading = { ok: true, intent: intent({ towns: ['penticton'], nights: 3, start_date: '2027-07-09', party: { adults: 2, kids: 2, dog: true } }) };
   try {
     answer = reading;
-    const off = JSON.parse((await post({ text: '3 nights in Penticton with 2 kids and our dog' }, '?ai=1', TOKEN)).text);
+    const off = JSON.parse((await post({ text: '3 nights in Penticton with 2 kids and our dog: breakfast, then the beach, then dinner' }, '?ai=1', TOKEN)).text);
     assert.equal(off.ai.used, true);
     assert.equal(off.ai.stay, undefined);
     assert.equal(off.whereToStay, undefined);
-    const on = JSON.parse((await post({ text: '3 nights in Penticton with 2 kids and our dog' }, '?ai=1&stays=1', TOKEN)).text);
+    const on = JSON.parse((await post({ text: '3 nights in Penticton with 2 kids and our dog: breakfast, then the beach, then dinner' }, '?ai=1&stays=1', TOKEN)).text);
     assert.deepEqual(on.ai.stay, { arrive: '2027-07-09', leave: '2027-07-12', adults: 2, kids: 2, dog: true });
     assert.equal(on.kind, 'multi_day');
     assert.equal(on.days.length, 4);
-    const mine = JSON.parse((await post({ text: '3 nights in Penticton with 2 kids and our dog', stay: { adults: 4 } }, '?ai=1&stays=1', TOKEN)).text);
+    const mine = JSON.parse((await post({ text: '3 nights in Penticton with 2 kids and our dog: breakfast, then the beach, then dinner', stay: { adults: 4 } }, '?ai=1&stays=1', TOKEN)).text);
     assert.equal(mine.ai.stay.adults, 4, 'the visitor\'s own number is kept');
+  } finally { delete process.env.TRIP_AI; }
+});
+
+test('gate (round 4): a broad request plans with the rules at once, without calling the model; the reason is in the ai block', async () => {
+  process.env.TRIP_AI = 'on';
+  try {
+    for (const text of ['3 days in Penticton with kids', 'a foodie weekend in Kelowna', '2 days in Penticton, dog with us']) {
+      reads = [];
+      answer = { ok: true, intent: intent({ towns: ['kelowna'], interests: [it('bowling')] }) };
+      const plain = JSON.parse((await post({ text })).text);
+      const p = JSON.parse((await post({ text }, '?ai=1', TOKEN)).text);
+      assert.equal(reads.length, 0, `no model call for "${text}"`);
+      assert.equal(p.ai.used, false);
+      assert.equal(p.ai.reason, 'gated_broad');
+      assert.equal(p.ai.gated, 'broad');
+      assert.equal(p.ai.costUsd, 0);
+      const { ai, ...rest } = p;
+      assert.deepEqual(rest, plain, 'exactly the rules plan');
+    }
+    // A step-by-step request is read, and says why.
+    reads = [];
+    answer = { ok: true, intent: intent({ towns: ['kelowna'], interests: [it('lunch'), it('brewery')] }) };
+    const s = JSON.parse((await post({ text: 'lunch then breweries in Kelowna' }, '?ai=1', TOKEN)).text);
+    assert.equal(reads.length, 1);
+    assert.equal(s.ai.gated, 'step_by_step');
+    assert.ok(s.ai.why.includes('order words'));
   } finally { delete process.env.TRIP_AI; }
 });
 

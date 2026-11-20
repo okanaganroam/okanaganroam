@@ -7781,11 +7781,15 @@ let tripAiReader = tripAiDefaultReader;
 function setTripAiReader(fn) { tripAiReader = fn || tripAiDefaultReader; }
 // args: the parsed POST body. -> { args (what the planner runs), ai (the debug block for the admin response) }.
 async function tripAiPlanArgs(args, { staysOn = false, now = new Date(), lang = 'en', reader = null } = {}) {
+  // Round 4 gate: only step-by-step requests (a clock time or time of day, order words, 3+ kinds of stops) are read by
+  // the model; a broad request plans with the rules at once, with no API call (trip-ai.js tripGate).
+  const gate = tripAi.tripGate(args.text);
+  if (gate.gated !== 'step_by_step') return { args, ai: { used: false, reason: 'gated_broad', gated: gate.gated, why: gate.why, ms: 0, model: tripAi.MODEL, costUsd: 0, usage: null, intent: null } };
   const taxonomy = buildTripPlannerTaxonomy();
   const allowed = tripAi.buildAllowed(taxonomy);
   let r;
   try { r = await (reader || tripAiReader)(args.text, { today: todayLocal(now), lang, allowed, now }); } catch (e) { r = { ok: false, reason: 'error' }; }
-  const info = { used: false, reason: (r && r.reason) || 'error', ms: r && Number.isFinite(r.ms) ? r.ms : null, model: tripAi.MODEL, costUsd: r && r.costUsd ? Number(r.costUsd.toFixed(6)) : 0, usage: (r && r.usage) || null, intent: (r && r.intent) || null };
+  const info = { used: false, reason: (r && r.reason) || 'error', gated: gate.gated, why: gate.why, ms: r && Number.isFinite(r.ms) ? r.ms : null, model: tripAi.MODEL, costUsd: r && r.costUsd ? Number(r.costUsd.toFixed(6)) : 0, usage: (r && r.usage) || null, intent: (r && r.intent) || null };
   if (!r || !r.ok || !r.intent) return { args, ai: info };
   // The reader's answer is checked again here, whatever reader produced it.
   const v = tripAi.validateIntent(r.intent, allowed, { originalText: args.text, today: todayLocal(now) });

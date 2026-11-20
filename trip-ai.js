@@ -49,6 +49,9 @@ const MOMENT_PHRASES = {
   sunset: 'sunset', swim: 'a swim', wine_tasting: 'wine tasting', cidery: 'cideries', live_music: 'live music', museum: 'a museum',
   gallery: 'an art gallery', bowling: 'bowling', escape_room: 'an escape room', climbing_gym: 'a climbing gym',
   playground: 'a playground', farmers_market: 'farmers market', cheap_eats: 'cheap eats',
+  // Round 4: "a foodie weekend" (R04) was read as plain "restaurants" and lost the foodie mix (cafes, sweets, markets).
+  // Rendered as the planner's own word "foodie" in front of the trip (renderTripRequest).
+  foodie: 'foodie',
 };
 // Moments whose time of day is already in the word: no "evening dinner".
 const TIMED_MOMENTS = new Set(['breakfast', 'brunch', 'lunch', 'dinner', 'apres', 'happy_hour', 'sunset']);
@@ -216,7 +219,7 @@ function systemPrompt(allowed) {
     'i: one entry per stop they want, IN THE ORDER THEY WILL HAPPEN, which is not always the order of the words:',
     '  "a brewery after dinner" -> dinner, brewery. "before dinner, a winery" -> winery, dinner. "X then Y", "X followed by Y", "start with X", "end with Y" -> X, Y.',
     '  One entry per stop: "a sunset dinner" = dinner; "lunch with a view" = lunch plus mh lake_view; "a winery tour" = winery; "après after skiing" = ski, apres (no extra drinks).',
-    '  "a day on the mountain/slopes" in winter = ski. "cheap eats" = cheap_eats. "wine tasting" = wine_tasting.',
+    '  "a day on the mountain/slopes" in winter = ski. "cheap eats" = cheap_eats. "wine tasting" = wine_tasting. A coffee or café stop ("un café le matin") = coffee. "foodie" = foodie.',
     '  Each interest: k kind; t time of day only when said or obvious ("morning coffee" = morning), else "any"; s "HH:MM" 24h only for a clock time ("coffee at 10" = "10:00"); p only a business name the visitor typed for that stop, copied exactly. Never suggest one.',
     'o: romantic (anniversary, date, couples, honeymoon), family, friends (girls, bachelor), parents (seniors, grandparents), solo, birthday.',
     'pc: relaxed for chill/slow/easy; packed for busy/as much as possible. b: budget for cheap; upscale for fancy/luxury.',
@@ -421,6 +424,40 @@ async function readTripRequest(text, opts = {}) {
   return { ok: true, intent: v.intent, dropped: v.dropped, usage, costUsd, ms: ms(), model: j.model || MODEL };
 }
 
+// ---------- The gate (round 4, 2026-11-20) ----------
+// The blind test (Nov 20, 3 testers) picked the AI plan 10 times, the rules 4, ties 6: the AI helps on step-by-step days
+// (a clock time, a time of day, "then / after / before", several stops in a row) and adds nothing, or worse, on broad asks
+// ("3 days in Penticton with kids", "a foodie weekend"). So only step-by-step requests are sent to the model; everything
+// else plans with today's rules straight away (no API call, no wait). Decided here, in code, before any call, from the
+// request's own words in English or French (accents ignored).
+const GATE_CLOCK_RE = /\b(?:at|a|vers|around|by|from|starting|start|des)\s+\d{1,2}(?:[:h]\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|h)?(?![\w-])(?!\s*(?:days?|nights?|jours?|nuits?|people|personnes|adults?|kids?|enfants|hours?|heures?|minutes?|km|years?|ans))|\b\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?)(?![\w])|\b\d{1,2}h\d{0,2}\b|\b(?:noon|midi)\b/;
+const GATE_TIME_RE = /\b(?:morning|afternoon|evening|night|tonight|midday|sunrise|sunset|breakfast|brunch|lunch|dinner|supper|matin|matinee|apres-midi|soir|soiree|ce soir|nuit|dejeuner|diner|souper|petit-dejeuner)\b/;
+const GATE_ORDER_RE = /\b(?:then|after|afterwards|before|followed by|first(?!\s+time)|later|finish(?:ing)? (?:with|at)|end(?:ing)? (?:with|at)|start(?:ing)? (?:with|at)|puis|apres|avant|ensuite|d'abord|suivi(?:e|s|es)? d[eu]|pour finir|enfin)\b/;
+// Kinds of stops, to count "3 or more" (each pattern counts once).
+const GATE_KIND_RES = [
+  /\b(?:coffee|cafes?|latte|espresso)\b/, /\b(?:winery|wineries|wine|wines|vignobles?|vins?|degustation)\b/, /\b(?:brewery|breweries|beers?|bieres?|microbrasseries?|cideries?|ciders?)\b/,
+  /\b(?:breakfast|petit-dejeuner)\b/, /\bbrunch\b/, /\b(?:lunch|dejeuner)\b/, /\b(?:dinner|supper|souper|diner)\b/, /\b(?:pizza|tacos|burgers?|sushi|eats|restaurants?)\b/,
+  /\b(?:pubs?|cocktails?|drinks|bars?|apres(?![-\s]midi))\b/, /\b(?:beach|beaches|plages?)\b/, /\b(?:hike|hikes|hiking|trails?|randonnees?|sentiers?|waterfall)\b/,
+  /\b(?:bike|biking|cycling|velo)\b/, /\b(?:ski|skiing|slopes|snowboard\w*)\b/, /\b(?:museums?|musees?)\b/, /\b(?:galler(?:y|ies)|galeries?)\b/, /\bspa\b/, /\bgolf\b/,
+  /\b(?:ice cream|gelato|glaces?)\b/, /\bhot tubs?\b/, /\bbowling\b/, /\bescape rooms?\b/, /\b(?:markets?|marches?)\b/, /\b(?:viewpoints?|lookouts?|belvederes?)\b/,
+  /\b(?:swim|swimming|baignade)\b/, /\b(?:paddle\w*|kayak\w*|canoe\w*)\b/, /\b(?:playgrounds?|parcs? (?:a|pour) jeux)\b/,
+];
+const gateFold = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’]/g, "'");
+// -> { gated: 'step_by_step' | 'broad', why: [...] }
+function tripGate(text) {
+  // Phrases that use a time word without timing a stop.
+  const t = gateFold(text).replace(/\b(?:date|girls'?|guys'?|game|ladies'?|movie) night\b/g, ' ').replace(/\bnew year'?s eve\b/g, ' ').replace(/\b(?:one|two|\d+)[\s-]night(?:s)?\b/g, ' ')
+    // « après-midi » is the afternoon: neither the order word « après » nor « midi » (noon).
+    .replace(/\bapres[-\s]midi\b/g, 'afternoon');
+  const why = [];
+  if (GATE_CLOCK_RE.test(t)) why.push('clock time');
+  if (GATE_TIME_RE.test(t)) why.push('time of day');
+  if (GATE_ORDER_RE.test(t)) why.push('order words');
+  const kinds = GATE_KIND_RES.filter((re) => re.test(t)).length;
+  if (kinds >= 3) why.push(`${kinds} kinds of stops`);
+  return { gated: why.length ? 'step_by_step' : 'broad', why };
+}
+
 // ---------- Back into the planner's own input ----------
 const cap1 = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 function joinAnd(list, word = 'and') { return list.length <= 1 ? (list[0] || '') : `${list.slice(0, -1).join(', ')} ${word} ${list[list.length - 1]}`; }
@@ -454,9 +491,13 @@ function renderTripRequest(intent, ctx = {}) {
   const kinds = { types: new Set((ctx.taxonomy && ctx.taxonomy.types) || Object.keys(TYPE_PHRASES)), activities: new Set((ctx.taxonomy && ctx.taxonomy.activities) || Object.keys(ACTIVITY_PHRASES)) };
   const args = ctx.args || {};
   const dropped = [];
-  const ints = intent.interests.map((it) => ({ it, phrase: interestPhrase(it, kinds) })).filter((x) => x.phrase || (dropped.push(`kind:${x.it.kind}`), false));
   const days = intent.days || (intent.nights ? Math.min(7, intent.nights + 1) : null);
   const multi = days && days > 1;
+  const foodie = intent.interests.some((it) => it.kind === 'foodie');
+  // Round 4 (H17): in a one-day list of steps, a cafe stop is the planner's "coffee" step. The plural type word "cafes"
+  // reads as a kind of place to mix in, and the planner moved it after the beach ("un café le matin, puis la plage...").
+  const stepKind = (it) => (!multi && it.kind === 'cafe' && intent.interests.length > 1 ? { ...it, kind: 'coffee' } : it);
+  const ints = intent.interests.filter((it) => it.kind !== 'foodie').map((it) => ({ it, phrase: interestPhrase(stepKind(it), kinds) })).filter((x) => x.phrase || (dropped.push(`kind:${x.it.kind}`), false));
   const towns = intent.towns.filter((t) => labels[t]).map((t) => labels[t]);
   const where = intent.valley_wide && towns.length !== 1 ? 'in the Okanagan' : towns.length ? `in ${joinAnd(towns)}` : '';
   const party = [];
@@ -473,9 +514,14 @@ function renderTripRequest(intent, ctx = {}) {
   if (intent.occasion === 'birthday') lead.push('birthday');
   if (intent.occasion === 'solo') lead.push('solo');
   if (intent.budget === 'upscale') lead.push('upscale');
+  if (foodie) lead.push('foodie');
   let head;
   const list = multi ? [...new Set(ints.map((x) => x.phrase))] : ints.map((x) => x.phrase);
   if (multi) head = `${lead.length ? `a ${lead.join(' ')} ` : ''}${days} days${where ? ` ${where}` : ''}${list.length ? ` with ${joinAnd(list)}` : ''}`;
+  // Round 4 (H21): "a winery day" read as one kind of place and no day ("wineries in Oliver") came back as an untimed list
+  // of 8 wineries. A one-day trip with a single kind of place and no meal or clock time is "a day of <places>", which the
+  // planner turns into a timed day with meals around them.
+  else if (days === 1 && ints.length === 1 && TYPE_PHRASES[ints[0].it.kind] === ints[0].phrase && !ints[0].it.start_time) head = `a ${lead.length ? `${lead.join(' ')} ` : ''}day of ${ints[0].phrase}${where ? ` ${where}` : ''}`;
   else if (list.length) head = `${lead.length ? `${lead.join(' ')} ` : ''}${list.join(' then ')}${where ? ` ${where}` : ''}`;
   else head = `a ${lead.length ? `${lead.join(' ')} ` : ''}day${where ? ` ${where}` : ''}`;
   const tail = [];
@@ -529,6 +575,6 @@ function renderTripRequest(intent, ctx = {}) {
 module.exports = {
   MODEL, PRICE_PER_TOKEN, DEFAULT_TIMEOUT_MS, DEFAULT_DAILY_USD, TIMES, MONTHS, SEASONS, OCCASIONS,
   TYPE_PHRASES, ACTIVITY_PHRASES, MOMENT_PHRASES, FEATURE_PHRASES,
-  enabled, apiKey, buildAllowed, intentSchema, wireSchema, expandWire, toWire, WIRE_KEYS, WIRE_REQUIRED, FLAGS, SCHEMA_LIMITS, schemaComplexity, DRINK_KINDS, systemPrompt, stripPII, validateIntent, readTripRequest, renderTripRequest,
+  enabled, apiKey, buildAllowed, intentSchema, wireSchema, expandWire, toWire, tripGate, WIRE_KEYS, WIRE_REQUIRED, FLAGS, SCHEMA_LIMITS, schemaComplexity, DRINK_KINDS, systemPrompt, stripPII, validateIntent, readTripRequest, renderTripRequest,
   costOf, dailyCapUsd, spentToday, addSpend, resetSpend, pacificDay,
 };

@@ -9,7 +9,7 @@
 // Writes into drafts/trip-ai/:
 //   trip-ai-eval-<date>.csv          one row per request and path, with every automatic check
 //   trip-ai-eval-<date>.md           success rate, fallback rate, p50/p95 latency, cost per plan, monthly estimate
-//   blind-ab-<date>.md               20 requests as plan A / plan B for the owner to judge (no labels)
+//   blind-ab-<date>.md               up to 20 step-by-step requests whose plans differ, as plan A / plan B (no labels)
 //   blind-ab-key-<date>.json         which of A/B was the AI (open only after judging)
 //
 // Usage (from the repo folder):
@@ -76,7 +76,8 @@ const NOW = new Date(`${DATE}T19:00:00Z`); // 11 AM Pacific on that date, for bo
 const casesDoc = JSON.parse(fs.readFileSync(path.join(__dirname, 'trip-ai-eval', 'cases.json'), 'utf8'));
 const mockDoc = JSON.parse(fs.readFileSync(path.join(__dirname, 'trip-ai-eval', 'mock-answers.json'), 'utf8'));
 let cases = casesDoc.cases.filter((c) => !ONLY || c.set === ONLY);
-if (MOCK) cases = cases.filter((c) => mockDoc.answers[c.id]);
+// Round 4: broad requests never reach the model (the gate), so with --mock they run without a fixture answer.
+if (MOCK) cases = cases.filter((c) => mockDoc.answers[c.id] || tripAi.tripGate(c.text).gated !== 'step_by_step');
 if (LIMIT) cases = cases.slice(0, LIMIT);
 
 // ---------- Labeller (the same expectations for both paths) ----------
@@ -209,17 +210,17 @@ async function main() {
     const rc = check(rulesPlan, expect, 'rules');
     const ac = check(aiPlan, expect, 'ai');
     rows.push({ c, expect, rulesPlan, aiPlan, ai, rc, ac, rulesMs, aiMs });
-    console.log(`${c.id} rules:${rc.pass ? 'pass' : 'FAIL ' + rc.failed.join('+')} ai:${ac.pass ? 'pass' : 'FAIL ' + ac.failed.join('+')} ${ai.used ? '' : `(fallback: ${ai.reason})`} ${ai.ms !== null ? ai.ms + ' ms' : ''}  ${ai.text ? '-> ' + ai.text : ''}`);
+    console.log(`${c.id} [${ai.gated === 'step_by_step' ? 'AI ' : 'rules'}] rules:${rc.pass ? 'pass' : 'FAIL ' + rc.failed.join('+')} ai:${ac.pass ? 'pass' : 'FAIL ' + ac.failed.join('+')} ${ai.used ? '' : `(fallback: ${ai.reason})`} ${ai.ms !== null ? ai.ms + ' ms' : ''}  ${ai.text ? '-> ' + ai.text : ''}`);
   }
 
   // ---------- CSV ----------
   const q = (v) => `"${String(v === undefined || v === null ? '' : v).replace(/"/g, '""')}"`;
   const stopText = (p) => planStops(p).map((s) => `D${s.day} ${s.venue.name} [${s.venue.type}/${s.venue.region}]`).join(' | ');
-  const head = ['id', 'set', 'lang', 'request', 'path', 'pass', 'failed_checks', 'ai_used', 'ai_reason', 'ai_text', 'ai_ms', 'cost_usd', 'in_tokens', 'out_tokens', 'cache_read_tokens', 'cache_write_tokens', 'plan_ms', 'kind', 'days', 'first_start', 'stops', 'unlisted_kinds'];
+  const head = ['id', 'set', 'lang', 'request', 'path', 'pass', 'failed_checks', 'gate', 'gate_why', 'ai_used', 'ai_reason', 'ai_text', 'ai_ms', 'cost_usd', 'in_tokens', 'out_tokens', 'cache_read_tokens', 'cache_write_tokens', 'plan_ms', 'kind', 'days', 'first_start', 'stops', 'unlisted_kinds'];
   const lines = [head.join(',')];
   for (const r of rows) {
     for (const [pathName, p, ck, ms] of [['rules', r.rulesPlan, r.rc, r.rulesMs], ['ai', r.aiPlan, r.ac, r.aiMs]]) {
-      lines.push([r.c.id, r.c.set, r.c.lang, r.c.text, pathName, ck.pass, ck.failed.join('+'), pathName === 'ai' ? r.ai.used : '', pathName === 'ai' ? r.ai.reason : '', pathName === 'ai' ? (r.ai.text || '') : '',
+      lines.push([r.c.id, r.c.set, r.c.lang, r.c.text, pathName, ck.pass, ck.failed.join('+'), r.ai.gated || '', (r.ai.why || []).join('+'), pathName === 'ai' ? r.ai.used : '', pathName === 'ai' ? r.ai.reason : '', pathName === 'ai' ? (r.ai.text || '') : '',
         pathName === 'ai' ? (r.ai.ms ?? '') : '', pathName === 'ai' ? (r.ai.costUsd || 0) : '', ...['input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens'].map((k) => (pathName === 'ai' && r.ai.usage ? r.ai.usage[k] : '')), ms, p && p.kind, (p && p.days ? p.days.length : ''), hm(firstStart(p)), stopText(p), (ck.unlistedKinds || []).join('+')].map(q).join(','));
     }
   }
@@ -246,6 +247,12 @@ async function main() {
     return `| ${k} | ${app_.length} | ${app_.filter((r) => r.rc[k]).length} | ${app_.filter((r) => r.ac[k]).length} |`;
   };
   const better = rows.filter((r) => r.ac.pass && !r.rc.pass), worse = rows.filter((r) => !r.ac.pass && r.rc.pass);
+  // Round 4 gate: the step-by-step requests (read by the model) and the broad ones (rules only, identical by design).
+  const gIn = rows.filter((r) => r.ai.gated === 'step_by_step');
+  const rateOf = (list, f) => (list.length ? Math.round((100 * list.filter(f).length) / list.length) : 0);
+  const gInBetter = gIn.filter((r) => r.ac.pass && !r.rc.pass).length, gInWorse = gIn.filter((r) => !r.ac.pass && r.rc.pass).length;
+  const gInFallback = gIn.filter((r) => !r.ai.used);
+  const gInLat = gIn.map((r) => r.ai.ms).filter(Number.isFinite);
   const md = [
     `# Build My Trip AI reader: test results ${DATE}${MOCK ? ' (MOCKED model answers)' : ''}`,
     '',
@@ -255,7 +262,11 @@ async function main() {
     '',
     '| | Rules (today) | AI reader |',
     '|---|---|---|',
-    `| All automatic checks pass | ${rate((r) => r.rc.pass)}% | ${rate((r) => r.ac.pass)}% |`,
+    `| All automatic checks pass (all ${n}) | ${rate((r) => r.rc.pass)}% | ${rate((r) => r.ac.pass)}% |`,
+    `| **Step-by-step requests sent to the AI (gate)** | | **${gIn.length} of ${n}** (the other ${n - gIn.length} plan with the rules, no AI call) |`,
+    `| All automatic checks pass, step-by-step only | ${rateOf(gIn, (r) => r.rc.pass)}% | ${rateOf(gIn, (r) => r.ac.pass)}% (better on ${gInBetter}, worse on ${gInWorse}) |`,
+    `| Step-by-step: fell back to rules | | ${gInFallback.length} of ${gIn.length}${gInFallback.length ? ` (${[...new Set(gInFallback.map((r) => r.ai.reason))].join(', ')})` : ''} |`,
+    `| Step-by-step: AI read time p50 / p95 | | ${pct(gInLat, 50) ?? '-'} / ${pct(gInLat, 95) ?? '-'} ms |`,
     `| AI reading used (not fallen back) | | ${rate((r) => r.ai.used)}% |`,
     `| Fell back to rules | | ${rate((r) => !r.ai.used)}% ${Object.keys(reasons).length ? `(${Object.entries(reasons).map(([k, v]) => `${k}: ${v}`).join(', ')})` : ''} |`,
     `| AI read time p50 / p95 | | ${pct(lat, 50) ?? '-'} / ${pct(lat, 95) ?? '-'} ms |`,
@@ -273,9 +284,9 @@ async function main() {
     '',
     '## Each request',
     '',
-    '| id | request | rules | AI | AI read as |',
-    '|---|---|---|---|---|',
-    ...rows.map((r) => `| ${r.c.id} | ${r.c.text.replace(/\|/g, '/')} | ${r.rc.pass ? 'pass' : 'fail: ' + r.rc.failed.join(', ')} | ${r.ac.pass ? 'pass' : 'fail: ' + r.ac.failed.join(', ')} | ${r.ai.used ? r.ai.text.replace(/\|/g, '/') : `(rules: ${r.ai.reason})`} |`),
+    '| id | gate | request | rules | AI | AI read as |',
+    '|---|---|---|---|---|---|',
+    ...rows.map((r) => `| ${r.c.id} | ${r.ai.gated === 'step_by_step' ? 'AI' : 'rules'} | ${r.c.text.replace(/\|/g, '/')} | ${r.rc.pass ? 'pass' : 'fail: ' + r.rc.failed.join(', ')} | ${r.ac.pass ? 'pass' : 'fail: ' + r.ac.failed.join(', ')} | ${r.ai.used ? r.ai.text.replace(/\|/g, '/') : `(rules: ${r.ai.reason})`} |`),
     '',
     'Go / no-go (plan): AI wins at least 15 of the 20 blind picks, adds under 1 second (p95), costs under about $5 a month, and adds no new wrong-place errors (the "towns", "listed" and "noClosed" rows).',
     '',
@@ -284,24 +295,21 @@ async function main() {
 
   // ---------- Blind A/B for 20 requests ----------
   const rand = rng(SEED);
-  // Which 20 (round 2): pairs where both plans have stops and the two plans differ come first (hard cases, then the rest,
-  // in file order); then pairs that differ with one side empty; then identical pairs with stops; empty-vs-empty last.
+  // Which ones (round 4): ONLY step-by-step requests (the ones the gate sends to the AI) whose two plans differ, up to 20,
+  // hard cases first, then the rest, in file order. Broad requests are the rules plan both ways, so there is nothing to pick.
   const ids = (p) => JSON.stringify(planStops(p).map((s) => s.venue.id));
-  const tier = (r) => {
-    const a = planStops(r.aiPlan).length > 0, b = planStops(r.rulesPlan).length > 0, same = ids(r.aiPlan) === ids(r.rulesPlan);
-    return a && b && !same ? 0 : (a || b) && !same ? 1 : a && b ? 2 : 3;
-  };
-  const ordered = rows.map((r, i) => ({ r, i, t: tier(r), h: r.c.set === 'hard' ? 0 : 1 })).sort((x, y) => x.t - y.t || x.h - y.h || x.i - y.i);
-  const pool = ordered.slice(0, 20).map((x) => x.r);
-  const tiers = [0, 1, 2, 3].map((t) => ordered.slice(0, 20).filter((x) => x.t === t).length);
+  const eligible = rows.map((r, i) => ({ r, i, h: r.c.set === 'hard' ? 0 : 1 }))
+    .filter((x) => x.r.ai.gated === 'step_by_step' && ids(x.r.aiPlan) !== ids(x.r.rulesPlan))
+    .sort((x, y) => x.h - y.h || x.i - y.i);
+  const pool = eligible.slice(0, 20).map((x) => x.r);
   const render = (p) => {
     const stops = planStops(p);
     if (!stops.length) return '_(no stops: the planner could not build a plan)_';
     const sched = new Map(((p && p.schedule) || []).map((x) => [`${x.day || 1}-${x.venueId}`, x.startMinutes]));
     return stops.map((s) => `- ${p.days && p.days.length > 1 ? `Day ${s.day}, ` : ''}${hm(sched.get(`${s.day}-${s.venue.id}`)) || s.label || s.daypart || ''} ${s.venue.name} (${s.venue.typeLabel || s.venue.type}, ${s.venue.regionLabel || s.venue.region})`).join('\n');
   };
-  const sheet = [`# Build My Trip: which plan is better? (${DATE})`, '', 'For each request, read plan A and plan B and mark the better one (or "same"; some pairs are the same plan). Do not open the answer key until you are done.', ''];
-  const key = { date: DATE, seed: SEED, mock: MOCK, db: path.basename(DB_SOURCE), chosen: `${tiers[0]} pairs that differ with stops on both sides, ${tiers[1]} that differ with one side empty, ${tiers[2]} identical, ${tiers[3]} empty on both sides`, answers: [] };
+  const sheet = [`# Build My Trip: which plan is better? (${DATE})`, '', `For each request, read plan A and plan B and mark the better one (or "same"). These are the ${pool.length} step-by-step requests where the two plans differ. Do not open the answer key until you are done.`, ''];
+  const key = { date: DATE, seed: SEED, mock: MOCK, db: path.basename(DB_SOURCE), chosen: `${pool.length} of the ${eligible.length} step-by-step requests whose AI and rules plans differ (of ${gIn.length} step-by-step, ${n} in all)`, answers: [] };
   pool.forEach((r, i) => {
     const aiIsA = rand() < 0.5;
     const [A, B] = aiIsA ? [r.aiPlan, r.rulesPlan] : [r.rulesPlan, r.aiPlan];
@@ -311,7 +319,8 @@ async function main() {
   fs.writeFileSync(path.join(OUT, `blind-ab-${tag}.md`), sheet.join('\n'));
   fs.writeFileSync(path.join(OUT, `blind-ab-key-${tag}.json`), JSON.stringify(key, null, 1) + '\n');
   console.log(`\nWrote ${path.join(OUT, `trip-ai-eval-${tag}.md`)} (+ .csv, blind-ab-${tag}.md, blind-ab-key-${tag}.json)`);
-  console.log(`Rules pass ${rate((r) => r.rc.pass)}%, AI pass ${rate((r) => r.ac.pass)}%, fallback ${rate((r) => !r.ai.used)}%, p95 ${pct(lat, 95) ?? '-'} ms, $${perPlan.toFixed(6)}/plan, ~$${(perPlan * MONTHLY_PLANS).toFixed(2)}/month`);
+  console.log(`Gate: ${gIn.length} of ${n} requests are step-by-step (sent to the AI); on those, rules pass ${rateOf(gIn, (r) => r.rc.pass)}%, AI pass ${rateOf(gIn, (r) => r.ac.pass)}% (better ${gInBetter}, worse ${gInWorse}). Blind sheet: ${pool.length} pairs.`);
+  console.log(`All: rules pass ${rate((r) => r.rc.pass)}%, AI pass ${rate((r) => r.ac.pass)}%, fallback ${rate((r) => !r.ai.used)}%, p95 ${pct(lat, 95) ?? '-'} ms, $${perPlan.toFixed(6)}/plan, ~$${(perPlan * MONTHLY_PLANS).toFixed(2)}/month`);
 }
 
 function restoreDb() {
