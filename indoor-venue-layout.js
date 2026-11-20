@@ -61,7 +61,7 @@ function renderIndoorLayout(p) {
   // typed price list shows here as on the French page ("See all prices & rates (7)").
   const pricesCard = p.menuHtml ? `<section class="gb-card gb-prices" id="gbPrices">${p.menuHtml}</section>` : '';
   // Indoor test 13 (2026-11-19): the card is titled by what the button opens (a cinema's showtimes, a studio's schedule).
-  const bookHead = />Showtimes &amp; tickets<|>Showtimes & tickets</.test(book) ? 'Showtimes &amp; tickets' : />Class schedule</.test(book) ? 'Class schedule' : 'Book your visit';
+  const bookHead = />Showtimes (?:&amp;|&) tickets\b/.test(book) ? 'Showtimes &amp; tickets' : />Class schedule\b/.test(book) ? 'Class schedule' : 'Book your visit';
   const bookingCard = book || costRows.length
     ? `<aside class="gb-card gb-booking" id="gbBooking"><p class="gb-eyebrow">${book ? 'Plan a time' : 'Good to know'}</p><h2>${book ? bookHead : 'Prices &amp; booking'}</h2>
         ${book ? `<div class="gb-desktop-book">${book}<p class="gb-help">Opens the booking page in a new tab.</p></div>` : ''}
