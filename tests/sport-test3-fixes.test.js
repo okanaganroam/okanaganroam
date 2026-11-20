@@ -105,6 +105,12 @@ test('1. Gord\'s range: the price list editor, his page, the prices page and the
   assert.match(ppf, /Champ de pratique et mini-golf à Kelowna/);
   // The checklist's words are his kind's.
   assert.equal(app.priceListWordsFor(app.getVenue(v.id)).en.noun, 'Prices & rates');
+  const PC = require('../portal-completeness.js');
+  for (const lang of ['en', 'fr']) {
+    const sc = PC.scoreCompleteness({ type: 'golf', indoorInfo: { kinds: ['range', 'simgolf'] } }, {});
+    noHit(NO_GOLF_COURSE, JSON.stringify([...(sc.missing || []), ...(sc.coming || [])].map((x) => lang === 'fr' ? [x.fr, x.whyFr] : [x.en, x.whyEn])), `${lang} checklist`);
+  }
+  noHit(NO_GOLF_COURSE, plain(await getText(`/owner/${t}`)), 'portal home');
   // A golf course keeps its green fees.
   const course = mk('golf', { name: 'Green Fee Course Fixture', description: 'An 18-hole public course.' });
   assert.equal(app.priceListWordsFor(app.getVenue(course.id)).en.noun, 'Green fees & rates');
@@ -153,10 +159,16 @@ test('2. Build My Trip plans the range for mini golf and the driving range (EN +
 
 test('3. happy hour: a snack bar is not a bar; a licensed lounge is; "No" works for every golf and sport kind that shows the tile', async () => {
   const snack = await gord({ region: 'summerland', latitude: 49.6, longitude: -119.67 });
-  const cfg = cfgOf(await getText(`/owner/${snack.t}/setup`));
-  assert.ok(!JSON.stringify(cfg.offerGroups || []).includes('"happy_hour"') && !/"happy_hour"/.test(JSON.stringify(cfg.moreTiles || cfg.more || '')), 'no happy hour tile for a snack bar');
+  assert.equal(app.happyHourAllowed(app.getVenue(snack.v.id)), false, 'no happy hour tile for a snack bar');
+  const sim = await openSetup(base, snack.t, { hash: 'more' });
+  assert.doesNotMatch(sim.text(), /Happy hour/);
+  for (const words of ['A driving range with a salad bar and granola bars.', 'Range with a juice bar. No alcohol.', 'Snack bar. Root beer floats.']) {
+    const x = mk('golf', { description: words }); ok(await change(tokenFor(x.id), { indoor_info: { kinds: ['range'] } }));
+    assert.equal(app.happyHourAllowed(app.getVenue(x.id)), false, words);
+  }
   const lic = mk('golf', { name: 'Licensed Range Fixture', description: 'A driving range with a licensed patio lounge and beer on tap.' });
   const tl = tokenFor(lic.id); ok(await change(tl, { indoor_info: { kinds: ['range'] } }));
+  assert.equal(app.happyHourAllowed(app.getVenue(lic.id)), true);
   const bad = [];
   const cases = [['golf', 'golf', 'An 18-hole course.'], ['golf', 'simgolf', 'A golf simulator lounge.'], ['golf', 'range', 'A driving range with a licensed lounge.']];
   for (const k of SK.SPORT_KINDS) if (!['golf', 'simgolf', 'range'].includes(k)) cases.push(['sport', k, 'A place with a licensed lounge.']);
@@ -236,9 +248,131 @@ test('6. the French page keeps research\'s Practice row; the booking button says
   const r = await gord({ region: 'naramata', latitude: 49.59, longitude: -119.59 }, { kinds: ['range'], gtk: null, prices: false });
   assert.doesNotMatch(html(r.v), /Book a bay/);
 });
-test('dbg', async () => {
-  const { v, t } = await gord({}, { gtk: null, prices: false });
-  ok(await change(t, { visit_rows: { groups: 'Groups of 10 or more: please book ahead. Birthday parties with mini golf for up to 20 kids, picnic tables included.' } }));
-  const i = app.venueVisitInfo(v.id);
-  console.log('INFO', JSON.stringify(i).slice(0, 2500));
+// Help (the widget's own matcher on the real page config).
+const helpBot = (h) => {
+  const m = /<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>\s*<script>([\s\S]*?)<\/script>/.exec(h);
+  const stub = () => ({ addEventListener() {}, appendChild() {}, querySelector() { return null; } });
+  const ctx = { window: {}, document: { getElementById: (id) => (id === 'ohbCfg' ? { textContent: m[1] } : stub()), createElement: stub, querySelectorAll: () => [] }, setTimeout };
+  vm.createContext(ctx); vm.runInContext(m[2], ctx);
+  const cfg = JSON.parse(m[1]);
+  return { best: (q) => ctx.window.__ohbBest(q), topics: cfg.topics, byId: Object.fromEntries(cfg.topics.map((t) => [t.id, t])) };
+};
+const { GORD_LOG } = require('./sport3-help-log.js');
+const bot = (b, lang, pg) => b[(lang === 'fr' ? 'fr' : '') + pg];
+
+test('7. Help: Gord\'s log, French twins and more range and mini golf questions land (EN + FR); no "Pints $6" without a bar; the price answer keeps the card rule', async () => {
+  const { t } = await gord({ region: 'penticton', latitude: 49.49, longitude: -119.59 });
+  const b = { setup: helpBot(await getText(`/owner/${t}/setup`)), frsetup: helpBot(await getText(`/fr/owner/${t}/setup`)), menu: helpBot(await getText(`/owner/${t}/menu`)), frmenu: helpBot(await getText(`/fr/owner/${t}/menu`)) };
+  const wrong = [];
+  for (const [lang, pg, q, want] of GORD_LOG) { const r = bot(b, lang, pg).best(q); if (!r || !want.includes(r.id)) wrong.push(`[${lang} ${pg}] "${q}" -> ${r && r.id} (${r && r.hits.slice(0, 3).join(',')})`); }
+  assert.deepEqual(wrong, []);
+  for (const bb of Object.values(b)) for (const tp of bb.topics) assert.doesNotMatch(`${JSON.stringify(tp.a)} ${JSON.stringify(tp.aFr)}`, /Pints \$6|Pintes 6/, tp.id);
+  const price = b.setup.byId['indoor-price'];
+  assert.doesNotMatch(price.a, /When one of them is lower, your card shows that one/);
+  assert.match(price.a, /never become your card’s price/);
+  // The season answer never tells him to close the whole place.
+  assert.match(b.setup.byId['sport-season'].a, /Only part of your place closes/);
+});
+
+// The audit's sweep (2026-11-20): every surface a sport or golf listing shows, for every sport kind, in English and French,
+// says that kind's words and never another kind's: the setup screens, the price list editor, the prices page, the public
+// page, the hub card, the search card, the Build My Trip stop and Help.
+const KIND_DESC = { golf: 'An 18-hole public course.', simgolf: 'Four golf simulator bays and a lounge.', range: 'A driving range with covered stalls.', rink: 'An ice rink with public skating.',
+  skatepark: 'A concrete skate park with a bowl.', discgolf: 'An 18-hole disc golf course.', bike: 'A BMX track for all ages.', swim: 'An outdoor pool with a slide.', courts: 'Six pickleball courts.',
+  skischool: 'Ski and snowboard lessons for kids and adults.', sportsctr: 'A sports centre with a gym.', sportother: 'A family sports place.' };
+const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// What only one kind says: its price line, its card's price words (when no other kind shares them) and its button.
+const OWN_WORDS = (() => {
+  const out = {};
+  const basisCount = {};
+  for (const k of SK.SPORT_KINDS) for (const l of ['en', 'fr']) { const b = SK.K[k][l].price.basis; basisCount[b] = (basisCount[b] || 0) + 1; }
+  for (const k of SK.SPORT_KINDS) {
+    const w = [];
+    for (const l of ['en', 'fr']) {
+      const e = SK.K[k][l];
+      if (!/^(?:From|À partir de) \{x\}\.$/.test(e.price.page)) w.push(esc(e.price.page.replace(/ ?\{x\}.*$/, '').trim()));
+      if (basisCount[e.price.basis] === 1 && e.price.basis.split(' ').length > 1) w.push(esc(e.price.basis));
+    }
+    if (SK.K[k].bookBtn) w.push(...SK.K[k].bookBtn.map(esc));
+    out[k] = w.filter((x) => x.length > 5);
+  }
+  return out;
+})();
+const SWEEP_SKIP_HELP = /^(?:sport-tee-times|sport-kinds-other|menu-import|sport-bay-link|sport-green-fees-word)$/;
+test('8. the sweep: every sport kind, every surface, EN + FR, says its own kind\'s words and never another kind\'s', async () => {
+  process.env.DISCOVERY_SEARCH = 'on';
+  const bad = [], tripMissing = [];
+  try {
+    let j = 0;
+    for (const k of SK.SPORT_KINDS) {
+      const type = ['golf', 'simgolf', 'range'].includes(k) ? 'golf' : 'sport';
+      const reg = ['vernon', 'penticton', 'osoyoos', 'oliver', 'summerland', 'peachland', 'west-kelowna', 'lake-country', 'naramata', 'enderby', 'armstrong', 'coldstream'][j++];
+      const v = mk(type, { name: `Sweep ${k} Fixture`, region: reg, latitude: 49.5 + j / 40, longitude: -119.5, description: KIND_DESC[k], description_fr: `Un endroit pour l’essai ${k}.` });
+      const t = tokenFor(v.id);
+      ok(await change(t, { indoor_info: { kinds: [k], length: '1-2h', book: 'ahead', age: 'all', year: 'all' }, indoor_price: 12 }));
+      db.prepare("INSERT INTO venue_links (venue_id, booking_url) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET booking_url = excluded.booking_url").run(v.id, 'https://example.com/book');
+      publish(v.id, [['Prices', [['First line', 12], ['Second line', 15], ['Third line', 20]]]]);
+      const forbid = [...Object.entries(OWN_WORDS).filter(([kk]) => kk !== k).flatMap(([, w]) => w)];
+      const words = new RegExp(`(?:${forbid.join('|')})`, 'i');
+      const check = (where, text) => {
+        const tt = String(text);
+        const m = words.exec(tt) || (k !== 'golf' && NO_GOLF_COURSE.exec(tt)) || (!['golf', 'simgolf', 'range'].includes(k) && /\bmini[- ]?golf\b|\bbuckets?\b|\bseaux? de balles\b/i.exec(tt));
+        if (m) bad.push(`${k} ${where}: "${m[0]}" …${tt.slice(Math.max(0, m.index - 70), m.index + 50)}…`);
+      };
+      const near = (p, name, where) => { const i = p.indexOf(name); if (i < 0) { bad.push(`${k} ${where}: not listed`); return ''; } return p.slice(Math.max(0, i - 40), i + 260); };
+      for (const lang of ['en', 'fr']) {
+        const pre = lang === 'fr' ? '/fr' : '';
+        const h = html(v, lang);
+        // (The <title> is the page's search title: unchanged while the SEO freeze rules hold.)
+        check(`[${lang}] page`, plain(h.replace(/<title>[\s\S]*?<\/title>/, '')).replace(/Things to Do[\s\S]*?Business login/, ''));
+        const href = /href="([^"]+\/prices)"/.exec(h);
+        if (href) check(`[${lang}] prices page`, plain((await getText(`${pre}${href[1].replace(/^\/fr/, '')}`)).replace(/<title>[\s\S]*?<\/title>/, '')).replace(/Things to Do[\s\S]*?Business login/, ''));
+        else bad.push(`${k} [${lang}]: no prices link`);
+        const ed = await getText(`${pre}/owner/${t}/menu`);
+        const cfg = JSON.parse(/window\.MENU_CFG = (\{[\s\S]*?\});<\/script>/.exec(ed)[1].replace(/\\u003c/g, '<'));
+        check(`[${lang}] editor`, JSON.stringify(cfg.t));
+        const cat = type === 'golf' ? 'golf' : 'sports';
+        check(`[${lang}] hub card`, near(plain(await getText(`${pre}/${reg}/${cat}`)), `Sweep ${k} Fixture`, `[${lang}] hub`));
+        const q = `${k === 'skischool' ? (lang === 'fr' ? 'cours de ski' : 'ski lessons') : SK.K[k][lang].search[0]} ${reg.replace(/-/g, ' ')}`;
+        check(`[${lang}] search card "${q}"`, near(plain(await getText(`${pre}/search?q=${encodeURIComponent(q)}`)), `Sweep ${k} Fixture`, `[${lang}] search "${q}"`));
+        for (const pg of ['setup', 'menu']) {
+          for (const tp of helpBot(await getText(`${pre}/owner/${t}/${pg}`)).topics) {
+            if (SWEEP_SKIP_HELP.test(tp.id)) continue;
+            check(`[${lang}] help ${pg} ${tp.id}`, [tp.a, tp.aFr].map((x) => (typeof x === 'object' ? Object.values(x || {}).join(' ') : String(x || ''))).join(' ').replace(/<[^>]+>/g, ''));
+          }
+        }
+      }
+      for (const hash of ['price', 'booking', 'photos', 'hours:year', 'groups', 'more']) {
+        try { const sim = await openSetup(base, t, { hash }); check(`setup #${hash}`, sim.text()); } catch (e) { bad.push(`${k} setup #${hash}: ${e.message}`); }
+      }
+      const p = app.runTripPlan({ text: `${SK.K[k].en.search[0]} in ${reg.replace(/-/g, ' ')} on Saturday July 17, 2027` }, NOV);
+      const stops = JSON.stringify([p.recommendations, p.itinerary, p.days, p.outing]);
+      const at = stops.indexOf(`Sweep ${k} Fixture`);
+      if (at >= 0) check('trip stop', stops.slice(Math.max(0, at - 600), at + 900)); else tripMissing.push(k);
+    }
+  } finally { delete process.env.DISCOVERY_SEARCH; }
+  assert.deepEqual(bad, []);
+  // Every kind a visitor plans for is in its Build My Trip request (courts and Something else aren't visitor stops).
+  assert.deepEqual(tripMissing.filter((k) => !['courts', 'sportother', 'sportsctr', 'skischool'].includes(k)), []); // (ski lessons in July: out of season)
+});
+
+test('9. search keeps mini golf and the driving range with a month or a holiday (EN + FR); a part closed then goes last and says so', async () => {
+  process.env.DISCOVERY_SEARCH = 'on';
+  try {
+    const { v } = await gord({ region: 'armstrong', latitude: 50.45, longitude: -119.2 });
+    const name = app.getVenue(v.id).name;
+    mk('golf', { name: 'Search Course Fixture', region: 'armstrong', latitude: 50.44, longitude: -119.2, description: 'An 18-hole public course.' });
+    const H = async (lang, q) => { const h = await getText(`${lang === 'fr' ? '/fr' : ''}/search?q=${encodeURIComponent(q)}`); return plain(h); };
+    for (const [lang, q, head] of [['en', 'mini golf in july armstrong', /Mini golf in Armstrong in July/], ['en', 'mini golf christmas day armstrong', /Mini golf in Armstrong on Dec 25/],
+      ['fr', 'mini-golf en janvier armstrong', /Minigolf à Armstrong en janvier/], ['fr', 'mini-golf le jour de noël armstrong', /Minigolf à Armstrong le 25 déc/],
+      ['en', 'driving range in july armstrong', /Driving ranges in Armstrong in July/], ['en', 'driving range armstrong', /Driving ranges in Armstrong/], ['fr', 'champ de pratique armstrong', /Champs de pratique à Armstrong/]]) {
+      const r = await H(lang, q);
+      assert.match(r, head, q);
+      assert.ok(r.includes(name), `${q}: his place`);
+      assert.ok(!r.includes('Search Course Fixture'), `${q}: no golf course`);
+    }
+    // January: his mini golf is closed for its season, so his card says so (and the range search doesn't).
+    assert.match(await H('en', 'mini golf in january armstrong'), /Mini golf: April to mid-October · closed then/);
+    assert.doesNotMatch(await H('en', 'driving range in january armstrong'), /closed then/);
+  } finally { delete process.env.DISCOVERY_SEARCH; }
 });

@@ -42929,7 +42929,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // split the /golf directory already uses; the JSON-LD @type stays
   // GolfCourse and every other category keeps label.singular.
   const golfDetail = venue.type === 'golf' ? golfDetailsFor([venue]).get(`${venue.region}/${venue.slug}`) : undefined;
-  const golfKindLabel = (venue.type === 'golf' && isIndoorGolfVenue(venue)) ? L('Indoor Golf', 'Golf int\u00e9rieur')
+  // Sport test 3 (2026-11-20; Gord's page read "Driving Range & Practice" / « Champ de pratique »: no mini golf, and EN and
+  // FR different): a listing whose owner picked a kind that isn't a golf course says that kind, as its card does.
+  const golfKindLabel = venue.type === 'golf' && sportKindSingular(venue, fr) && (venueIndoorInfo(venue.id).kinds || []).length ? sportKindSingular(venue, fr)
+    : (venue.type === 'golf' && isIndoorGolfVenue(venue)) ? L('Indoor Golf', 'Golf int\u00e9rieur')
     : (golfData && golfData.isPracticeFacility(golfDetail)) ? L('Driving Range & Practice', 'Champ de pratique')
     // Indoor test 9: a French indoor page's hero says its category (« Aire de jeux intérieure »), as its top line does.
     : fr && indoorFrTopLabel(venue) ? indoorFrTopLabel(venue) : label.singular;
@@ -43118,7 +43121,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // facts that were previously only available further down the page.
   const atAGlanceParts = [
     // Café test 2 (2026-11-11): a café says its kind ("Ice cream & gelato shop · Penticton"), not "Cafe". Text only.
-    venue.type === 'golf' ? golfKindLabel : (venue.type === 'cafe' || venue.type === 'brewery') && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : fr && indoorFrTopLabel(venue) ? escapeHtml(indoorFrTopLabel(venue)) : label.singular,
+    venue.type === 'golf' ? escapeHtml(golfKindLabel) : (venue.type === 'cafe' || venue.type === 'brewery') && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : fr && indoorFrTopLabel(venue) ? escapeHtml(indoorFrTopLabel(venue)) : label.singular,
     `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`,
     venueShowsPrice(venue) ? '$'.repeat(venue.price) : null,
     venue.rating ? `${num(venue.rating)}\u2605${venue.reviews ? ` (${venue.reviews})` : ''}` : null,
@@ -62645,6 +62648,76 @@ function sportTest2Tokens(kind, venue) {
       MAIN_LINE_FR: String(typerFr.first || 'prix principal').toLowerCase(), TECH_EX: (w.tech || [])[1] || 'Ce qui rend votre endroit unique', EXTRAS_FR: 'La location, les cours, les abonnements, la nourriture et les prix pour enfants ou aînés' } };
 }
 // The kind's own words for SPORT_TEST1_HELP_TOPICS: { en: {TOKEN: text}, fr: {…} }.
+// Sport test 3 (2026-11-20; Gord, a family driving range and mini golf: Help answered 10 of his 27 questions well): the
+// answers his questions needed, EN + FR. Only part of the place seasonal (no new field: a Good to know line), kids free
+// (a price line, not Free entry), mini golf and family rates, free clubs, cash only, no alcohol, the bay booking link, a
+// chip that's only for summer, and "it says green fees". Never "Pints $6" to a place with no bar.
+const SPORT_TEST3_HELP_TOPICS = [
+  { id: 'sport-part-season', kinds: ['range', 'golf', 'simgolf'], pages: ['setup', 'edit'], over: ['sport-season', 'seasonal-hours', 'indoor-kinds-many', 'setup-season', 'season', 'indoor-seasonal', 'hours', 'sport-opening-day', 'indoor-closed-months', 'indoor-summer-daily', 'closures', 'setup-closures', 'edit-season', 'sport-kinds-other', 'cuisine'],
+    q: 'Only part of my place is seasonal (like the mini golf)', qFr: 'Seule une partie de mon endroit est saisonnière (comme le mini-golf)',
+    allOf: [['mini', 'putt'], ['winter', 'october', 'april', 'hiver', 'octobre', 'avril', 'seasonal', 'saisonn', 'close', 'closed', 'ferm']],
+    allOf2: [['range', 'champ', 'pratique', 'trackman', 'simulator'], ['all', 'year', 'toute', 'annee'], ['mini', 'putt', 'close', 'ferm']],
+    keys: ['only part of my place', 'part of my place is seasonal', 'part of our place is seasonal', 'part of our place', 'the rest is open all year', 'part of it is seasonal', 'mini golf closes', 'mini golf is closed in winter', 'mini golf closed in winter', 'mini golf is seasonal', 'mini golf only in summer', 'mini golf april to october', 'how will people know the mini golf is closed', 'mini golf closes in october', 'the range is open all year', 'range is open all year but', 'open all year but the mini golf', 'outdoor part closes', 'patio closes in winter'],
+    keysFr: ['seule une partie', 'une partie est saisonniere', 'le mini golf est ferme l hiver', 'le mini golf ferme', 'minigolf ferme', 'mini golf d avril a octobre', 'le champ de pratique est ouvert toute l annee', 'ouvert toute l annee mais le mini golf'],
+    a: '<p>Keep <strong>Yes, all year</strong> on your hours for the part that’s open all year (like your range). Then add one line in <strong>Good to know</strong>, like <em>Mini golf April to mid-October</em>. Your page shows it next to your hours, and Build My Trip and search leave the mini golf out in winter while the rest of your place stays in. Don’t mark the whole place closed part of the year: that closes all of it.</p><p>A section on Your prices works too, like <em>Mini golf (April to October)</em>.</p>',
+    aFr: '<p>Gardez <strong>Oui, toute l’année</strong> pour vos heures, pour la partie ouverte toute l’année (comme votre champ de pratique). Puis ajoutez une ligne dans <strong>Bon à savoir</strong>, comme <em>Mini-golf d’avril à la mi-octobre</em>. Votre page l’affiche à côté de vos heures, et Planifier mon voyage et la recherche laissent le mini-golf de côté l’hiver, alors que le reste de votre endroit reste proposé. Ne marquez pas tout l’endroit fermé une partie de l’année : cela le ferme en entier.</p><p>Une section dans Vos tarifs fonctionne aussi, comme <em>Mini-golf (avril à octobre)</em>.</p>' },
+  { id: 'sport-kids-free', pages: ['setup', 'edit', 'menu'], over: ['indoor-free', 'indoor-price', 'indoor-age', 'sport-rate-lines', 'indoor-line-age', 'sport-card-price', 'indoor-price-varies', 'cost', 'indoor-typer-first'],
+    q: 'Kids under 5 are free: do I tap Free entry?', qFr: 'Les moins de 5 ans sont gratuits : est-ce que je touche Entrée gratuite?',
+    allOf: [['kid', 'child', 'under', 'toddler', 'baby', 'babies', 'little', 'enfant', 'moins', 'bebe', 'tout'], ['free', 'gratuit', 'no charge']],
+    keys: ['kids under 5 free', 'kids under 5 are free', 'under 5 free', 'under 5s free', 'under fives free', 'kids are free', 'kids free', 'children free', 'free for kids', 'toddlers free', 'little ones free', 'play free', 'do i tap free entry', 'tap free entry'],
+    keysFr: ['moins de 5 ans gratuit', 'les moins de 5 ans sont gratuits', 'enfants gratuits', 'gratuit pour les enfants', 'est ce que je touche entree gratuite', 'les tout petits sont gratuits'],
+    a: '<p>Don’t tap <strong>Free entry</strong>: that’s for a place where nobody pays. Add a line in <strong>Your prices</strong>, like <em>Kids under 5 — Free</em> (type <em>Free</em> as its price). Your card keeps your main price.</p>',
+    aFr: '<p>Ne touchez pas <strong>Entrée gratuite</strong> : c’est pour un endroit où personne ne paie. Ajoutez une ligne dans <strong>Vos tarifs</strong>, comme <em>Moins de 5 ans — Gratuit</em> (tapez <em>Gratuit</em> comme prix). Votre fiche garde votre prix principal.</p>' },
+  { id: 'sport-minigolf-rates', kinds: ['range'], pages: ['setup', 'edit', 'menu'], over: ['indoor-price', 'menu-add', 'sport-rate-lines', 'indoor-age', 'indoor-line-age', 'indoor-price-varies', 'indoor-typer-first', 'indoor-groups', 'cost', 'sport-card-price'],
+    q: 'Mini golf rates: adults, kids and a family rate', qFr: 'Tarifs du mini-golf : adultes, enfants et tarif familial',
+    allOf: [['mini', 'putt', 'famil'], ['rate', 'price', 'cost', 'charge', 'tarif', 'prix']],
+    keys: ['family rate', 'family rates', 'family price', 'family pass', 'family of 4', 'family of four', '2 adults 2 kids', 'two adults two kids', 'mini golf adults', 'mini golf kids', 'mini golf prices', 'mini golf rates', 'where do those go', 'adults and kids'],
+    keysFr: ['tarif familial', 'prix familial', 'famille de 4', '2 adultes 2 enfants', 'tarifs du mini golf', 'prix du mini golf'],
+    a: '<p>In <strong>Your prices</strong>, add a section called <em>Mini golf</em> (tap a section name to change it), then one line each: <em>Adults $11</em>, <em>Kids 12 and under $8</em>, <em>Family (2 adults, 2 kids) $34</em>. Your card keeps your main price from <strong>Price</strong> (a small bucket or one round); kids’ and family rates never replace it.</p>',
+    aFr: '<p>Dans <strong>Vos tarifs</strong>, ajoutez une section <em>Mini-golf</em> (touchez le nom d’une section pour le changer), puis une ligne chacun : <em>Adultes 11 $</em>, <em>Enfants de 12 ans et moins 8 $</em>, <em>Famille (2 adultes, 2 enfants) 34 $</em>. Votre fiche garde votre prix principal de <strong>Prix</strong> (un petit seau ou une partie); les tarifs enfants et familiaux ne le remplacent jamais.</p>' },
+  { id: 'sport-free-clubs', kinds: ['range', 'golf', 'simgolf'], pages: ['setup', 'edit', 'menu'], over: ['sport-minigolf-rates', 'sport-rentals', 'indoor-extras', 'indoor-free', 'indoor-good-to-know', 'sport-card-price', 'indoor-price', 'cost', 'menu-add'],
+    q: 'Clubs or putters are free to borrow', qFr: 'Les bâtons ou les fers droits sont prêtés gratuitement',
+    allOf: [['club', 'putter', 'baton', 'equipment', 'racquet', 'disc'], ['free', 'borrow', 'included', 'loan', 'gratuit', 'prete', 'inclus']],
+    keys: ['clubs are free', 'free clubs', 'free to borrow', 'clubs to borrow', 'borrow clubs', 'putters too', 'putters are free', 'loaner clubs', 'do clubs come with', 'clubs come with the bucket', 'club rental is free', 'free club rental'],
+    keysFr: ['batons gratuits', 'batons pretes', 'pret de batons', 'les batons sont gratuits', 'batons inclus'],
+    a: '<p>Add a line in <strong>Your prices</strong> with <em>Free</em> as its price, like <em>Range clubs to borrow — Free</em>, or say it once in <strong>Good to know</strong>: <em>Clubs and putters free to borrow</em>. A free line never becomes your card’s price.</p>',
+    aFr: '<p>Ajoutez une ligne dans <strong>Vos tarifs</strong> avec <em>Gratuit</em> comme prix, comme <em>Bâtons prêtés au champ de pratique — Gratuit</em>, ou dites-le une fois dans <strong>Bon à savoir</strong> : <em>Bâtons et fers droits prêtés gratuitement</em>. Une ligne gratuite ne devient jamais le prix de votre fiche.</p>' },
+  { id: 'sport-payment', pages: ['setup', 'edit', 'menu'], over: ['indoor-good-to-know', 'sport-card-price', 'features', 'indoor-extras', 'cost', 'menu-add'],
+    q: 'Cash only, or no credit cards', qFr: 'Comptant seulement, ou pas de cartes de crédit',
+    allOf: [['cash', 'debit', 'credit', 'visa', 'mastercard', 'interac', 'amex', 'comptant', 'paiement', 'payment'], ['only', 'no', 'take', 'accept', 'seulement', 'pas', 'prenons', 'acceptons', 'prend']],
+    keys: ['cash only', 'cash and debit', 'cash or debit', 'debit only', 'no credit cards', 'no credit card', 'we only take cash', 'take credit cards', 'accept credit cards', 'payment', 'how people pay', 'interac'],
+    keysFr: ['comptant seulement', 'argent comptant', 'comptant et debit', 'pas de carte de credit', 'pas de cartes de credit', 'paiement'],
+    a: '<p>Say it in one line in <strong>Good to know</strong>, like <em>Cash or debit only</em>. It shows under “Your visit” on your page.</p>',
+    aFr: '<p>Dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>Comptant ou débit seulement</em>. C’est affiché sous « Votre visite » sur votre page.</p>' },
+  { id: 'sport-no-bar', pages: ['setup', 'edit'], keepHappy: true, over: ['indoor-bar', 'hh-deals', 'hh-times', 'sport-food-menu', 'sport-restaurant', 'indoor-good-to-know', 'features', 'setup-happy', 'happy-hour', 'hh-add', 'dont-have'],
+    q: 'We don’t serve alcohol (a snack bar)', qFr: 'Nous ne servons pas d’alcool (un casse-croûte)',
+    allOf: [['dont', 'never', 'without', 'pas', 'aucun', 'sans'], ['beer', 'alcohol', 'liquor', 'licensed', 'licence', 'license', 'wine', 'alcool', 'biere', 'permis']],
+    keys: ['we dont serve beer', 'dont serve beer', 'dont serve alcohol', 'no alcohol', 'not licensed', 'no liquor', 'no liquor licence', 'its a snack bar', 'snack bar not a bar', 'why does it say happy hour', 'happy hour not done', 'we dont have a happy hour', 'no happy hour', 'dry'],
+    keysFr: ['pas d alcool', 'nous ne servons pas d alcool', 'pas de permis d alcool', 'pas de biere', 'casse croute', 'pas de 5 a 7', 'pourquoi 5 a 7'],
+    a: '<p>Nothing to add for drinks. Happy hour is only for a place with a bar or lounge; if a <strong>Happy hour</strong> tile shows in More about your place, tap it and choose <strong>No</strong>. Say what your snack bar has in <strong>Good to know</strong>, like <em>Snack bar with pop, coffee and ice cream</em>.</p>',
+    aFr: '<p>Rien à ajouter pour les boissons. Le 5 à 7 est seulement pour un endroit avec un bar ou un salon; si une tuile <strong>5 à 7</strong> paraît dans Plus sur votre endroit, touchez-la et choisissez <strong>Non</strong>. Dites ce que votre casse-croûte offre dans <strong>Bon à savoir</strong>, comme <em>Casse-croûte avec boissons gazeuses, café et crème glacée</em>.</p>' },
+  { id: 'sport-bay-link', kinds: ['range', 'simgolf', 'golf'], pages: ['setup', 'edit'], over: ['indoor-booking', 'sport-tee-times', 'indoor-book-party', 'booking', 'reservations', 'indoor-party-button'],
+    q: 'My link is for booking our simulator bay', qFr: 'Mon lien sert à réserver notre baie de simulateur',
+    allOf: [['link', 'lien'], ['trackman', 'simulator', 'bay', 'bays', 'baie', 'simulateur', 'toptracer']],
+    keys: ['link is for booking', 'that link is for', 'booking our indoor trackman', 'trackman booking', 'simulator booking', 'book the simulator', 'not parties', 'is that ok here'],
+    keysFr: ['lien pour reserver le simulateur', 'reservation du simulateur', 'pas pour les fetes'],
+    a: '<p>Yes. Paste it in the booking link box. When the link is your simulator’s booking page (Trackman, a bay booking system), your page’s button says <strong>Book a bay</strong>. Lessons by phone? Say so in <strong>Good to know</strong>, like <em>Lessons with our pro: call to book</em>.</p>',
+    aFr: '<p>Oui. Collez-le dans la case du lien de réservation. Quand le lien est la page de réservation de votre simulateur (Trackman, un système de réservation de baies), le bouton de votre page dit <strong>Réserver une baie</strong>. Des cours par téléphone? Dites-le dans <strong>Bon à savoir</strong>, comme <em>Cours avec notre pro : appelez pour réserver</em>.</p>' },
+  { id: 'sport-chip-season', pages: ['setup', 'edit'], over: ['sport-season', 'indoor-summer-late', 'seasonal-hours', 'indoor-good-to-know', 'indoor-summer-daily', 'setup-season', 'season', 'sport-part-season'],
+    q: 'A Good to know tap that’s only true in summer', qFr: 'Un choix de Bon à savoir qui n’est vrai que l’été',
+    allOf: [['lit', 'light', 'lights', 'chip', 'tap', 'eclair', 'choix'], ['summer', 'winter', 'ete', 'hiver']],
+    keys: ['lit for evening play', 'is the lit', 'lights only in summer', 'only summer', 'if its only summer', 'only in the summer', 'ok if its only'],
+    keysFr: ['eclaire le soir', 'seulement l ete', 'eclaire seulement l ete'],
+    a: '<p>Yes. Tap it, then add <em>in summer</em> after it in the box, like <em>Lit in the evening, in summer</em>. Your later summer hours go on <strong>Are these your hours all year?</strong>: tap <strong>Different hours in summer or winter?</strong>.</p>',
+    aFr: '<p>Oui. Touchez-le, puis ajoutez <em>l’été</em> après dans la case, comme <em>Éclairé le soir, l’été</em>. Vos heures d’été plus tardives vont dans <strong>Ces heures sont-elles les mêmes toute l’année?</strong> : touchez <strong>Des heures différentes l’été ou l’hiver?</strong>.</p>' },
+  { id: 'sport-green-fees-word', kinds: ['simgolf', 'range', 'rink', 'skatepark', 'discgolf', 'bike', 'swim', 'courts', 'skischool', 'sportsctr', 'sportother'], pages: ['setup', 'edit', 'menu'], over: ['sport-card-price', 'sport-rate-change', 'menu-change', 'menu-add', 'indoor-typer-first'],
+    q: 'It says green fees, but we’re not a golf course', qFr: 'Ça dit droits de jeu, mais nous ne sommes pas un terrain de golf',
+    allOf: [['green', 'droits'], ['range', 'mini', 'change', 'rename', 'section', 'champ', 'renomm', 'changer', 'not', 'pas', 'sim', 'bay']],
+    keys: ['it says green fees', 'says green fees but', 'green fees but we are', 'not green fees', 'change green fees', 'rename green fees', 'we are a driving range'],
+    keysFr: ['ca dit droits de jeu', 'droits de jeu mais', 'changer droits de jeu'],
+    a: '<p>Your price list, page and card use your kind’s words (for a range or mini golf: <em>Prices &amp; rates</em>). A section on your list still named for a golf course? Tap its name and type the new one, like <em>Driving range</em> or <em>Mini golf</em>. Words that don’t fit? Check <strong>What kind of place</strong>: your main kind goes first.</p>',
+    aFr: '<p>Votre liste de prix, votre page et votre fiche utilisent les mots de votre genre (pour un champ de pratique ou un mini-golf : <em>Tarifs</em>). Une section porte encore un nom de terrain de golf? Touchez son nom et tapez le nouveau, comme <em>Champ de pratique</em> ou <em>Mini-golf</em>. Des mots qui ne conviennent pas? Vérifiez <strong>Quel genre d’endroit</strong> : votre genre principal va en premier.</p>' },
+];
 const SPORT_HELP_TOKENS = {
   golf: { en: { RATE_EX: 'Twilight 18 holes $59 – after 2 PM', MEMBER_EX: 'Season memberships: call the pro shop', EXTRAS_EN: 'Carts, rentals, lessons, memberships and junior or senior rates', CHANGE_EX: '18 holes $72 (from May 1: $78)', DOGS_EX: 'Dogs welcome on the patio, not on the course', PUBLIC_EX: 'Restaurant and patio open to everyone, golfers or not', TOURN_EX: 'Charity tournaments for up to 144 golfers' },
     fr: { RATE_EX: 'Crépuscule 18 trous 59 $ – après 14 h', MEMBER_EX: 'Abonnements de saison : appelez la boutique du pro', EXTRAS_FR: 'Les voiturettes, la location, les cours, les abonnements et les tarifs juniors ou aînés', CHANGE_EX: '18 trous 72 $ (dès le 1er mai : 78 $)', DOGS_EX: 'Chiens bienvenus sur la terrasse, pas sur le parcours', PUBLIC_EX: 'Restaurant et terrasse ouverts à tous, golfeurs ou non', TOURN_EX: 'Tournois de bienfaisance jusqu’à 144 golfeurs' } },
@@ -62674,7 +62747,7 @@ function sportHelpFill(t, tok) {
   const fill = (x, m) => (typeof x === 'string' ? x.replace(/\{([A-Z_]+)\}/g, (all, k) => (k in m ? (/_(?:EN|FR)$/.test(k) ? m[k] : escapeHtml(m[k])) : all)) : x);
   return { ...t, a: fill(t.a, tok.en), aFr: fill(t.aFr, tok.fr) };
 }
-const SPORT_SETUP_HELP_TOPICS = SPORT_TEST2_HELP_TOPICS.concat(SPORT_TEST1_HELP_TOPICS).concat(SPORT_OWN_HELP_TOPICS).concat(INDOOR_SETUP_HELP_TOPICS.filter((t) => t && !SPORT_HELP_SKIP.has(t.id)).map((t) => ({ ...t, q: sportHelpWords(t.q), qFr: sportHelpWords(t.qFr), a: sportHelpWords(t.a), aFr: sportHelpWords(t.aFr),
+const SPORT_SETUP_HELP_TOPICS = SPORT_TEST3_HELP_TOPICS.concat(SPORT_TEST2_HELP_TOPICS).concat(SPORT_TEST1_HELP_TOPICS).concat(SPORT_OWN_HELP_TOPICS).concat(INDOOR_SETUP_HELP_TOPICS.filter((t) => t && !SPORT_HELP_SKIP.has(t.id)).map((t) => ({ ...t, q: sportHelpWords(t.q), qFr: sportHelpWords(t.qFr), a: sportHelpWords(t.a), aFr: sportHelpWords(t.aFr),
   // The kinds topic's "several things" examples in sport words.
   ...(t.id === 'indoor-kinds-many' ? { keys: t.keys.concat(['golf and mini golf', 'range and mini golf', 'arena and pool', 'skate park and courts', 'course and range', 'simulators and lessons']) } : {}),
   // What sports and golf owners say for the shared answers (the price, Good to know, ages, groups, weekly programs, free).
@@ -62765,8 +62838,15 @@ function kindSetupHelpBase(venue) {
   // Sport test 1: the topics for the main kind only (kinds), in the kind's own words.
   const kind = indoorKindsModule.sportKindKey((venueIndoorInfo(venue.id).kinds || []).length ? venueIndoorInfo(venue.id).kinds : indoorKindSuggestion(venue));
   const tok = sportHelpTokens(kind, happy);
-  const daylight = kind === 'golf' ? ['change every day to your summer first and last tee time, like 6:30 AM to 8 PM', 'changez chaque jour pour vos premier et dernier départs d’été, comme de 6 h 30 à 20 h'] : null;
-  return SPORT_SETUP_HELP_TOPICS.filter((t) => !Array.isArray(t.kinds) || t.kinds.includes(kind)).map((t0) => {
+  const daylight = kind === 'golf' ? ['change every day to your summer first and last tee time, like 6:30 AM to 8 PM', 'changez chaque jour pour vos premier et dernier départs d’été, comme de 6 h 30 à 20 h']
+    // Sport test 3 (Gord's lit range: "Thursday 10 AM to 8 PM" read oddly): a range's summer evenings under the lights.
+    : kind === 'range' ? ['change every day to your summer hours, like 8 AM to 9 PM with the lights on', 'changez chaque jour pour vos heures d’été, comme de 8 h à 21 h avec l’éclairage'] : null;
+  // Sport test 3 (the sweep): the summer extra in the second-kind answer is mini golf only for a golf place.
+  const golfish = ['golf', 'simgolf', 'range'].includes(kind);
+  const plainExtra = (t) => (golfish || t.id !== 'sport-second-kind' ? t : { ...t,
+    a: String(t.a).replace('like an outdoor mini putt in summer', 'like an outdoor area open only in summer').replace('<em>Outdoor mini putt in summer</em>', '<em>Outdoor area open in summer</em>'),
+    aFr: String(t.aFr).replace('comme un mini-golf extérieur l’été', 'comme un espace extérieur ouvert seulement l’été').replace('<em>Mini-golf extérieur l’été</em>', '<em>Espace extérieur ouvert l’été</em>') });
+  return SPORT_SETUP_HELP_TOPICS.filter((t) => !Array.isArray(t.kinds) || t.kinds.includes(kind)).map(plainExtra).map((t0) => {
     // Sport test 2: no golf-course words in another kind's answers (a simulator was told about power carts and collared shirts).
     const t = kind !== 'golf' && ['sport-rentals', 'sport-dress-code'].includes(t0.id) ? sportKindHelpWords(t0, kind) : t0;
     if (/^sport-/.test(t.id) && SPORT_TEST1_HELP_TOPICS.includes(t0)) return sportHelpFill(t, tok);
@@ -62778,6 +62858,13 @@ function kindSetupHelpBase(venue) {
     if (t.id === 'indoor-summer-late' && !daylight) return { ...t, over: (t.over || []).filter((x) => x !== 'indoor-theme-nights') };
     if (t.id === 'indoor-summer-late' && daylight) return { ...t, over: (t.over || []).filter((x) => x !== 'indoor-theme-nights'), keys: t.keys.concat(['daylight', 'hours change with daylight', 'first tee time', 'last tee time', 'first tee', 'tee times earlier in summer']), keysFr: (t.keysFr || []).concat(['lumiere du jour', 'premier depart', 'dernier depart']),
       a: t.a.replace('change that day only (Thursday 10 AM to 8 PM)', daylight[0]), aFr: t.aFr.replace('changez seulement ce jour (jeudi de 10 h à 20 h)', daylight[1]) };
+    // Sport test 3: gift cards are their own answer (never the card-price one: "do you show gift cards?").
+    if (t.id === 'indoor-gift') { const g = indoorKindsModule.indoorKindText([kind], 'en').help.gift, gf = indoorKindsModule.indoorKindText([kind], 'fr').help.gift;
+      return { ...t, over: (t.over || []).concat(['sport-card-price', 'indoor-good-to-know', 'indoor-extras']), allOf: [['gift', 'cadeau'], ['card', 'carte', 'certif', 'voucher', 'bon']], keys: t.keys.concat(['do you show gift cards', 'we sell gift cards', 'gift cards at the counter']),
+        a: `<p>Say it in one line in <strong>Good to know</strong>, like <em>${escapeHtml(g)}</em>. Gift cards don’t go in Your prices, and they never change your card’s price.</p>`,
+        aFr: `<p>Dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>${escapeHtml(gf)}</em>. Les cartes-cadeaux ne vont pas dans Vos tarifs et ne changent jamais le prix de votre fiche.</p>` }; }
+    // Sport test 3: the season answer never closes a whole place whose part is seasonal.
+    if (t.id === 'sport-season' && ['range', 'golf', 'simgolf'].includes(kind)) return { ...t, a: t.a.replace(/<\/p>$/, ' Only part of your place closes, like the mini golf? Keep your hours all year and add one line in <strong>Good to know</strong>, like <em>Mini golf April to mid-October</em>.</p>'), aFr: t.aFr.replace(/<\/p>$/, ' Seule une partie ferme, comme le mini-golf? Gardez vos heures toute l’année et ajoutez une ligne dans <strong>Bon à savoir</strong>, comme <em>Mini-golf d’avril à la mi-octobre</em>.</p>') };
     // Weekly nights in sport words: men's and ladies' nights, leagues (Known for, then an event that repeats).
     if (t.id === 'indoor-theme-nights') return { ...t, over: (t.over || []).concat(['indoor-summer-daily', 'indoor-summer-late', 'indoor-price', 'sport-golf-details', 'indoor-extras', 'sport-members']),
       allOf: (t.allOf || []).map((g, i) => (i === 0 ? g.filter((w) => w !== 'tournament' && w !== 'tournoi').concat(['men', 'mens', 'ladies', 'couple', 'senior', 'junior', 'league', 'homme', 'hommes', 'ligue']) : g)),
@@ -62979,7 +63066,13 @@ function indoorKindHelpTopics(topics, kinds, price = null, low = null, free = nu
       aFr: Object.fromEntries(['in', 'link', 'out'].map((m) => [m, `${free ? '<p>Entrée gratuite? Vous pouvez passer cette étape.</p>' : ''}<p>Ouvrez <strong>Vos tarifs</strong> (le premier des détails facultatifs). Photographiez votre ${E(fr.prices.noun)}, téléversez-la, ou donnez-nous son lien; nous la retranscrivons et elle paraît sur votre page sous « ${E(fr.prices.page)} » d’ici un jour.</p><p>Rien à envoyer? Touchez <strong>Je les tape moi-même</strong> : ajoutez chacun avec son prix, comme <em>${E(fr.help.prices)}</em>, puis touchez <strong>${m === 'in' ? 'C’est bon, publier !' : 'C’est bon, envoyer !'}</strong>.</p>${/horaire/.test(fr.prices.noun) ? '<p>Votre horaire est en ligne? Collez son lien dans <strong>Réservation</strong> : le bouton <strong>Réserver</strong> de votre page l’ouvre, pour que l’on voie chaque cours et ses dates.</p>' : ''}`])) };
     return t;
   // Indoor test 5: the English indoor page's box is “Your visit” (indoor-venue-layout.js), not “Plan your visit”.
-  }).filter(Boolean).map((t) => (t && typeof t.a === 'string' && /“Plan your visit”/.test(t.a) ? { ...t, a: t.a.replace(/“Plan your visit”/g, '“Your visit”') } : t));
+  }).filter(Boolean).map((t) => (t && typeof t.a === 'string' && /“Plan your visit”/.test(t.a) ? { ...t, a: t.a.replace(/“Plan your visit”/g, '“Your visit”') } : t))
+    // Sport test 3 (2026-11-20; Gord: the price screen said "When one of them is lower, your card shows that one" while the
+    // price list's Help said kids' prices never become the card's price, which is what the card does): a sport kind's
+    // price answer says the rule its card keeps.
+    .map((t) => (t && t.id === 'indoor-price' && indoorKindsModule.SPORT.SPORT_KINDS.includes(en.kind) && typeof t.a === 'string' ? { ...t,
+      a: t.a.replace('When one of them is lower, your card shows that one, from your lowest.', 'Kids’, seniors’, family, rental and lesson prices never become your card’s price.'),
+      aFr: String(t.aFr).replace('Si l’un d’eux est plus bas, votre fiche montre celui-là, à partir de votre prix le plus bas.', 'Les prix pour enfants, aînés, familles, la location et les cours ne deviennent jamais le prix de votre fiche.') } : t));
 }
 const WINERY_SETUP_HELP_TOPICS = [
   HH_TIMES_EDIT_ONLY_HELP_TOPIC,

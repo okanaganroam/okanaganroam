@@ -414,7 +414,9 @@ const sportKindWhy = (k) => {
     photo_main: { whyEn: `Real photos only, taken by you. ${w.photosLead[0].replace(/ Three photos is perfect\.$/, '')}`, whyFr: `De vraies photos seulement, prises par vous. ${w.photosLead[1].replace(/ Trois photos, c’est parfait\.$/, '')}` },
     indoor_price: { whyEn: e.en.price.lead, whyFr: e.fr.price.lead },
     menu: { whyEn: strip(e.en.prices.lead), whyFr: strip(e.fr.prices.lead) },
-    ...(k === 'golf' ? {} : { booking_link: { en: 'Booking link', fr: 'Lien de réservation', whyEn: 'The page where people book with you, if you have one.', whyFr: 'La page où l’on réserve chez vous, si vous en avez une.' } }),
+    ...(k === 'golf' ? {} : { booking_link: { en: 'Booking link', fr: 'Lien de réservation', whyEn: 'The page where people book with you, if you have one.', whyFr: 'La page où l’on réserve chez vous, si vous en avez une.' },
+      indoor_booking: { whyEn: 'Walk-ins welcome, or book ahead (or both).', whyFr: 'Sans réservation, ou réserver à l’avance (ou les deux).' },
+      pyv_known: { whyEn: 'One line: what people love most about your place.', whyFr: 'Une ligne : ce que les gens aiment le plus chez vous.' } }),
   };
 };
 const SPORT_KIND_WHY = Object.fromEntries(SK.SPORT_KINDS.map((k) => [k, sportKindWhy(k)]));

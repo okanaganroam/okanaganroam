@@ -107,7 +107,7 @@ const MATRIX = {
     ['en', 'we are run by the city', [PUB]],
     ['en', 'birthday parties on the ice', [G]],
     ['en', 'the ice goes in every october, the date changes', [OD]],
-    ['en', 'kids skate free', [P]],
+    ['en', 'kids skate free', [P, 'sport-kids-free']], // sport test 3: kids free is a price line
     ['fr', 'location de patins', [RN, X]],
     ['fr', 'nous sommes gérés par la ville', [PUB]],
     ['fr', 'fêtes d’anniversaire sur la glace', [G]],
@@ -269,7 +269,7 @@ const DEBBIE_LOG = [
   ['en', 'setup', 'the course is closed to the public for a tournament on june 12', CL.concat([TOUR])],
   ['en', 'setup', 'frost delays in spring, what do I do', [W]],
   ['en', 'setup', 'if it rains do we show as closed', [W]],
-  ['en', 'setup', 'kids under 12 golf free with a paying adult', [P]],
+  ['en', 'setup', 'kids under 12 golf free with a paying adult', [P, 'sport-kids-free']], // sport test 3: kids free is a price line
   ['en', 'setup', "what's our junior rate shown as", [RL]],
   ['en', 'setup', 'can my page be in French too', ['indoor-french']],
   ['en', 'setup', 'how do people book a lesson with our pro', [TT, LS]],
@@ -378,4 +378,13 @@ test('the sport answers: no Per room or group, no indoor-only answers; the bar a
   assert.doesNotMatch(price, /Per room or group|admission|museum/i);
   assert.match(price, /Green fees from \$65/);
   assert.ok(!(await botsFor('courts')).en.topics.some((x) => x.id === 'setup-happy-split'), 'no happy hour split topic for courts');
+});
+
+test('sport test 3: Gord\'s Help log (a driving range and mini golf) lands, with French twins and more range and mini golf questions (EN + FR, on the page he asked from)', async () => {
+  const { GORD_LOG } = require('./sport3-help-log.js');
+  const b = await botsFor('range');
+  const page = (lang, pg) => (pg === 'menu' ? (lang === 'fr' ? b.frMenu : b.menu) : (lang === 'fr' ? b.fr : b.en));
+  const wrong = [];
+  for (const [lang, pg, q, want] of GORD_LOG) { const r = page(lang, pg).best(q); if (!r || !want.includes(r.id)) wrong.push(`[${lang} ${pg}] "${q}" -> ${r && r.id}`); }
+  assert.deepEqual(wrong, []);
 });
