@@ -57357,6 +57357,15 @@ function publishMenu(menuId, reviewer) {
   try { if (/^owner/.test(String(menu.submitted_by || '')) || /^owner/.test(String(reviewer || ''))) queueFrPriceNames(menu.venue_id, parseMenuData(menu.data)); } catch (e) { /* not queued */ }
   return { ok: true, venue_id: menu.venue_id };
 }
+// A typed-up request we finished by hand (help row with a help_kind): off the review list, nobody emailed. Stored as
+// 'superseded' (the status list has no 'done'); reviewed_by says it was done here.
+function doneMenuHelp(menuId, reviewer) {
+  const m = db.prepare('SELECT status, help_kind FROM venue_menus WHERE id = ?').get(menuId);
+  if (!m) return { ok: false, reason: 'not_found' };
+  if (m.status !== 'help' || !m.help_kind) return { ok: false, reason: m.status === 'help' ? 'not_help' : 'not_pending' };
+  db.prepare("UPDATE venue_menus SET status = 'superseded', reviewed_at = datetime('now'), reviewed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'help'").run(`${reviewer}:done`, menuId);
+  return { ok: true };
+}
 function rejectMenu(menuId, reviewer, reason) {
   const r = db.prepare("UPDATE venue_menus SET status = 'rejected', rejection_reason = ?, reviewed_at = datetime('now'), reviewed_by = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND status IN ('pending', 'help', 'ready', 'draft')")
     .run(typeof reason === 'string' ? reason.trim().slice(0, 300) || null : null, reviewer, menuId);
@@ -67684,6 +67693,14 @@ async function adminReviewAction(kind, id, action, body) {
     if (!r.ok) return { status: r.reason === 'not_found' ? 404 : 409, body: { error: ADMIN_REVIEW_ERRORS[r.reason] || r.reason, detail: r.detail } };
     return { status: 200, body: { ok: true, emailed: false } };
   }
+  // Done (2026-11-20, Dayton): a typed-up request (happy hour, specials, a French description) we finished by hand
+  // leaves the list quietly; only Reject emailed them, which told the owner no after we had done it.
+  if (action === 'done') {
+    if (kind !== 'menu') return { status: 400, body: { error: 'Unknown action.' } };
+    const d = doneMenuHelp(id, ADMIN_REVIEWER);
+    if (!d.ok) return { status: d.reason === 'not_found' ? 404 : 409, body: { error: d.reason === 'not_help' ? 'Only a request we type up can be marked done.' : ADMIN_REVIEW_ERRORS[d.reason] || d.reason } };
+    return { status: 200, body: { ok: true, emailed: 'not_told' } };
+  }
   if (action === 'dismiss' && kind !== 'photo') return { status: 400, body: { error: 'Unknown action.' } };
   if (kind === 'video') return adminVideoAction(id, action, body);
   if (kind === 'arrival') return arrivalPoints.action(id, action, body, ADMIN_REVIEWER);
@@ -67850,9 +67867,11 @@ function adminReviewActions(kind, id, opts = {}) {
   const approve = opts.remove ? '' : `<button type="button" class="rv-btn rv-approve" data-act="approve">${opts.approveLabel || 'Approve'}</button>`;
   const reject = `<button type="button" class="rv-btn rv-reject" data-act="${opts.remove ? 'remove' : 'reject'}">${opts.remove ? 'Remove from site' : 'Reject'}</button>`;
   const dismiss = opts.dismiss ? '<button type="button" class="rv-btn rv-reject" data-act="dismiss" title="Takes it off this list without emailing them">Dismiss quietly</button>' : '';
+  const done = opts.done ? '<button type="button" class="rv-btn rv-approve" data-act="done" title="We did it: takes it off this list without emailing them">Done</button>' : '';
   return `<div class="rv-actions">${opts.options || ''}</div>
-      <div class="rv-actions">${approve}<input type="text" name="reason" maxlength="300" placeholder="${opts.reasonPlaceholder || (opts.remove ? 'Reason (sent to the owner)' : 'Reason if rejecting (sent to them)')}">${reject}${dismiss}</div>
+      <div class="rv-actions">${approve}<input type="text" name="reason" maxlength="300" placeholder="${opts.reasonPlaceholder || (opts.remove ? 'Reason (sent to the owner)' : 'Reason if rejecting (sent to them)')}">${reject}${dismiss}${done}</div>
       ${opts.dismiss ? '<p class="rv-meta">Dismiss quietly: not published and nothing is sent to them (for photos used another way, like menu pages).</p>' : ''}
+      ${opts.done ? '<p class="rv-meta">Done: you typed it up (or wrote their French) and saved it on their listing. It leaves this list and nothing is sent to them.</p>' : ''}
       <p class="rv-result" hidden></p>`;
 }
 
@@ -68015,7 +68034,7 @@ function renderAdminMenuCard(m) {
       ${thumbs ? `<div>${thumbs}</div>` : ''}
       ${typedTourFlagsHtml(v, m.data)}
       ${m.status === 'published' || m.help_kind ? '' : `<p><a class="rv-btn rv-approve" style="display:inline-block;text-decoration:none" href="/admin/review/menu/${m.id}">Open the menu editor</a></p>`}
-      ${adminReviewActions('menu', m.id, { remove: m.status === 'published', approveLabel: '' }).replace(/<button type="button" class="rv-btn rv-approve"[^>]*>[^<]*<\/button>/, '')}
+      ${adminReviewActions('menu', m.id, { remove: m.status === 'published', approveLabel: '', done: m.status === 'help' && !!m.help_kind }).replace(/<button type="button" class="rv-btn rv-approve"[^>]*>[^<]*<\/button>/, '')}
     </article>`;
 }
 
@@ -68289,7 +68308,7 @@ function renderAdminReviewPage() {
       .then(function(x){
         out.hidden = false;
         if (x.ok && kind === 'price') { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = { approve: 'The new price is live.', keep: 'Kept as it is. It comes back only if the page\u2019s prices change.', dismiss: 'The price is off the card.' }[act]; card.classList.add('rv-done'); return; }
-        if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' && kind === 'claim' ? 'Approved: an edit link was made for them.' : act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') + (body.photo_id ? ' It is now the main photo.' : '') : act === 'remove' ? 'Removed from the site.' : act === 'undo' ? 'Undone: the old values are back.' + (x.j.skipped && x.j.skipped.length ? ' Left alone (changed again since): ' + x.j.skipped.join(', ') + '.' : '') : act === 'make-main' ? 'Now the main photo.' : act === 'keep' ? 'Kept on the site; reports cleared.' : act === 'dismiss' ? 'Dismissed.' : 'Rejected.') + (EMAIL[x.j.emailed] || '') + (x.j.link ? ' Their link: ' + x.j.link : ''); card.classList.add('rv-done'); return; }
+        if (x.ok) { Array.prototype.forEach.call(card.querySelectorAll('.rv-edit'), function(el){ el.disabled = true; }); out.textContent = (act === 'approve' && kind === 'claim' ? 'Approved: an edit link was made for them.' : act === 'approve' ? (body.edits ? 'Approved with your edits and live.' : 'Approved and live.') + (body.photo_id ? ' It is now the main photo.' : '') : act === 'remove' ? 'Removed from the site.' : act === 'undo' ? 'Undone: the old values are back.' + (x.j.skipped && x.j.skipped.length ? ' Left alone (changed again since): ' + x.j.skipped.join(', ') + '.' : '') : act === 'make-main' ? 'Now the main photo.' : act === 'keep' ? 'Kept on the site; reports cleared.' : act === 'dismiss' ? 'Dismissed.' : act === 'done' ? 'Done: off the list, nothing sent to them.' : 'Rejected.') + (EMAIL[x.j.emailed] || '') + (x.j.link ? ' Their link: ' + x.j.link : ''); card.classList.add('rv-done'); return; }
         out.textContent = (x.j && x.j.error) || 'Something went wrong.';
         Array.prototype.forEach.call(buttons, function(b){ b.disabled = false; });
       })
@@ -75927,7 +75946,7 @@ const server = http.createServer(async (req, res) => {
         res.writeHead(302, { Location: r2.url('GET', v.object_key, { expires: 3600, query: query3 }), 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' });
         return res.end();
       }
-      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|eventcheck|menu|claim|video|arrival)\/(\d+)\/(approve|reject|remove|undo|dismiss)$/.exec(pathname);
+      const m = /^\/admin\/review\/(change|photo|event|venue|eventchange|eventcheck|menu|claim|video|arrival)\/(\d+)\/(approve|reject|remove|undo|dismiss|done)$/.exec(pathname);
       if (m && method === 'POST') {
         if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
         if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
