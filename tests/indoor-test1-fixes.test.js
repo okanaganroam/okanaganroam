@@ -66,7 +66,8 @@ test('2. by donation (real taps): research\'s "suggested $5" is offered under By
   assert.ok(sim.has('[data-ifree="donation"][aria-pressed="true"]'), sim.text().slice(0, 400));
   assert.match(sim.text(), /Suggested amount \(optional\)/);
   assert.equal(sim.doc.getElementById('suTsugg').value, '5');
-  assert.match(sim.text(), /Your card will say “By donation”/);
+  // Indoor test 14: the lead says the suggested amount the box holds, as the page will.
+  assert.match(sim.text(), /Your page will say “By donation \(suggested \$5\)”/);
   await sim.click('priceSave');
   assert.equal(app.indoorPriceValue(v.id), 'donation');
   assert.equal(app.indoorSuggested(v.id), 5);
@@ -89,7 +90,7 @@ test('2. by donation (real taps): research\'s "suggested $5" is offered under By
   assert.ok(stop, JSON.stringify(itemsOf(p).map((x) => x.venue.name)));
   assert.equal(stop.venue.byDonation, 5);
   const v3 = fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8');
-  assert.match(v3, /if \(v\.byDonation\) return '<p class="t3-stop-price" data-cost-cents="0"><strong>' \+ esc\(french \? 'Contribution volontaire' : 'By donation'\)/);
+  assert.match(v3, /if \(v\.byDonation\) return '<p class="t3-stop-price" data-cost-cents="0" data-donation="' \+ [^\n]*?'"><strong>' \+ esc\(french \? 'Contribution volontaire' : 'By donation'\)/);
   // An empty box takes the amount off: "By donation." on its own.
   const sim2 = await openSetup(base, t, { hash: 'price' });
   assert.equal(sim2.doc.getElementById('suTsugg').value, '5');

@@ -60609,7 +60609,7 @@ const INDOOR_SETUP_HELP_TOPICS = [
   // in Good to know, and goes on What's On with Add an event.
   { id: 'indoor-family-day', pages: ['setup', 'edit'], over: ['indoor-theme-nights', 'event-repeat', 'event-add', 'events', 'indoor-free', 'indoor-age', 'indoor-good-to-know', 'hours'],
     q: 'A family day or a monthly day (like first Saturdays)', qFr: 'Une journée familiale ou un jour par mois (comme le premier samedi)',
-    allOf: [['first', 'second', 'third', 'fourth', 'last', '1st', '2nd', '3rd', '4th', 'premier', 'premiere', 'deuxieme', 'troisieme', 'dernier', 'monthly', 'mensuel', 'mensuelle'], ['month', 'mois']],
+    allOf: [['famil', 'free', 'gratuit'], ['first', 'second', 'third', 'fourth', 'last', '1st', '2nd', '3rd', '4th', 'premier', 'premiere', 'deuxieme', 'troisieme', 'dernier', 'monthly', 'mensuel', 'mensuelle'], ['month', 'mois']],
     allOf2: [['famil'], ['day', 'days', 'journee', 'journees', 'jour']],
     keys: ['family day', 'family days', 'free family saturday', 'free family saturdays', 'free family sunday', 'free family', 'first saturday', 'first sunday', 'of the month', 'each month', 'every month', 'once a month'],
     keysFr: ['journee familiale', 'journees familiales', 'samedis en famille gratuits', 'premier samedi', 'premier dimanche', 'du mois', 'chaque mois', 'une fois par mois'],

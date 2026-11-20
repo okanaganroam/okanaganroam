@@ -870,7 +870,8 @@ const FREE_PLACE_RE = /\b(?:park|parks|trail|trails|walkway|boardwalk|greenway|b
 function budgetFreeStop(v) {
   return !!v && ((v.type === 'indoor' && (v.indoorFree === 'free' || v.indoorFree === 'donation')) || (v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation')));
 }
-function budgetFreeBonus(ctx, v) { return ctx.budget === 'budget' && budgetFreeStop(v); }
+// A request that asks for free places already keeps to them (no extra lift among them).
+function budgetFreeBonus(ctx, v) { return ctx.budget === 'budget' && budgetFreeStop(v) && !/\b(?:free|gratuit\w*|gratis)\b/.test(String(ctx.queryText || '').toLowerCase()); }
 function budgetPaid(v) {
   // Tour test 4 (Whistler, 2026-11-17): a tour its operator marked free (or by donation) is not a paid stop.
   if (v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation')) return false;
@@ -2901,7 +2902,7 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
     if (t && t.skip) continue; // listed hours prove it is closed at the time asked for
     scored.push(t ? { v, score: s.score + t.score, reasons: s.reasons.concat(t.reasons), caveats: t.caveats } : { v, ...s });
   }
-  const priceRank = (v) => (v.price === 1 || budgetFreeStop(v) ? 0 : v.price == null || v.price === 2 ? 1 : 2);
+  const priceRank = (v) => (v.price === 1 ? 0 : v.price == null || v.price === 2 ? 1 : 2);
   scored.sort(ctx.budget === 'budget' && !freeAsked ? (a, b) => priceRank(a.v) - priceRank(b.v) || compareScored(a, b) : compareScored);
   const out = [];
   const perType = {};
