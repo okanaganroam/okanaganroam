@@ -28425,7 +28425,29 @@ function staysPageDeps() {
     indexable: (region) => placesToStay.staysIndexable(region),
     engagementScript: (venue) => golfVenueEngagementScriptHtml(venue),
     env: process.env,
+    // Close by: the type names and venue page links every other venue page uses (French page only when the place has one).
+    typeLabel: (type, lang) => (((lang === 'fr' ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[type] || {}).singular || type),
+    venueHref: (v, lang) => (lang === 'fr' && venueHasFrench(v) ? venuePagePath(v, 'fr') : venuePagePath(v)),
   };
+}
+// Close by on a stay's page (2026-11-19): our own listings within 2 km of it (placesToStay.pickStayCloseBy ranks
+// them), by the venue pages' distance helper. Not stays, not redirected, only types with a page, and not places closed
+// right now (a written "not operating" advisory, or closed for the season: the same tests as the hotel QR pages).
+function getStayCloseBy(stay, now = new Date()) {
+  const lat = Number(stay && stay.latitude), lng = Number(stay && stay.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || (!lat && !lng)) return [];
+  try {
+    const types = placesToStay.CLOSE_BY_TYPES.filter((t) => CATEGORY_SLUGS[t]);
+    // A box a little over 2 km each way (1 degree of longitude is about 71 km here), then the exact distance.
+    const dLat = 0.025, dLng = 0.04;
+    const rows = db.prepare(`SELECT * FROM venues WHERE type != 'stay' AND type IN (${types.map(() => '?').join(',')}) AND redirect_to IS NULL AND slug IS NOT NULL
+      AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? AND id != ?`)
+      .all(...types, lat - dLat, lat + dLat, lng - dLng, lng + dLng, stay.id).map(rowToVenue)
+      .filter((v) => REGION_LABELS[v.region]);
+    const closedIds = new Set(advisoryNotOperatingIds());
+    for (const [id, st] of getSeasonStates(now)) if (seasonStateBlocksOffers(st)) closedIds.add(id);
+    return placesToStay.pickStayCloseBy(stay, rows, { distanceKm: venueDistanceKm, closedIds });
+  } catch (e) { return []; }
 }
 // Sitemap entries for the towns STAYS_INDEXABLE has opened (none by default). English only, like the rest of the sitemap.
 function staysSitemapEntries(toLastmod) {
@@ -28476,7 +28498,7 @@ function handleStaysRoute(req, res, pathname, method, search) {
     return false;
   }
   res.writeHead(200, headers(indexable));
-  res.end(placesToStay.renderStayVenuePage({ venue, regionLabel: REGION_LABELS[region], lang }, staysPageDeps()));
+  res.end(placesToStay.renderStayVenuePage({ venue, regionLabel: REGION_LABELS[region], lang, closeBy: getStayCloseBy(venue) }, staysPageDeps()));
   return true;
 }
 function renderHotelPage(hotel, now = new Date()) {
@@ -73207,7 +73229,7 @@ if (require.main === module) {
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
   // Places to stay (2026-11-19), for tests/stays.test.js.
-  getStaysByRegion, findStayBySlug, handleStaysRoute, withStaysNavLink, venueActivityCounter,
+  getStaysByRegion, findStayBySlug, handleStaysRoute, getStayCloseBy, withStaysNavLink, venueActivityCounter,
   // Tour test 12 (Whistler, 2026-11-18).
   // Tour test 13.
   fitToLimit, tourExtrasSection, tourListBookWords, tourListInfo, tourOwnWords, tourWeatherAll, tourOffRequest, ownerVisitText, tourFitNote,

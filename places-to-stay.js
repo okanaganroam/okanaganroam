@@ -178,8 +178,30 @@ const STAY_STYLES = `<style>
   body.stays-page .st-credit { margin: -8px 0 14px; font-size: 12px; color: var(--ink-soft, #666); }
   body.stays-page .st-hero { width: 100%; max-height: 360px; object-fit: cover; border-radius: 14px; display: block; margin: 0 0 14px; }
   body.stays-page .st-disclosure { margin: 18px 0 0; font-size: 0.82rem; opacity: 0.75; max-width: 640px; }
+  /* No photo (2026-11-19): the same plain sand panel with the mountain mark the venue cards use (CARD_V2_CSS), the
+     same height as a photo, so a row of mixed cards still lines up. */
+  body.stays-page .st-nophoto { display: block; width: 100%; height: 150px; background: #EEE8DC url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 24'%3E%3Cpath d='M3 20 14 7l7 8 10-12 12 14 7-7 10 10' fill='none' stroke='%23B7AB96' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 72px auto no-repeat; }
+  body.stays-page .st-body > .st-rates { margin-top: auto; }
+  body.stays-page .st-body > .st-addr { margin-bottom: 6px; }
+  /* No photo on the place page: the plain dark title hero of the venue pages (.venue-hero-fallback in SEO_PAGE_CSS). */
+  body.stays-page .st-titlehero { margin: 0 0 14px; border-radius: 14px; min-height: 170px; }
+  body.stays-page .st-titlehero .venue-hero-type { color: rgba(255,255,255,0.85); }
+  body.stays-page .st-titlehero h1 { margin: 0; color: #fff; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; line-height: 1.15; font-size: clamp(1.7rem, 3.4vw, 2.4rem); overflow-wrap: anywhere; }
+  body.stays-page .st-notes { margin: 0 0 18px; max-width: 640px; }
+  body.stays-page .st-notes .st-intro { margin: 0 0 8px; }
+  body.stays-page .st-tips { margin: 0; padding-left: 1.2em; opacity: 0.85; }
+  body.stays-page .st-tips li { margin: 0 0 4px; }
+  /* Close by (2026-11-19): up to four of our listings within 2 km, with type and straight-line distance. */
+  body.stays-page .st-near { margin: 22px 0 8px; }
+  body.stays-page .st-near h2 { font-size: 1.05rem; margin: 0 0 4px; }
+  body.stays-page .st-near-note { margin: 0 0 10px; font-size: 0.82rem; opacity: 0.7; }
+  body.stays-page .st-near-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  body.stays-page .st-near-list a { display: flex; flex-direction: column; gap: 2px; min-height: 44px; padding: 10px 12px; border: 1px solid rgba(27,43,58,0.14); border-radius: 12px; background: #fff; text-decoration: none; color: var(--ref-navy, #1B2B3A); }
+  body.stays-page .st-near-name { font-weight: 800; overflow-wrap: anywhere; }
+  body.stays-page .st-near-list a:hover .st-near-name { text-decoration: underline; }
+  body.stays-page .st-near-meta { font-size: 0.8rem; font-weight: 700; opacity: 0.7; }
   @media (max-width: 860px) { body.stays-page .st-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 560px) { body.stays-page .st-list { grid-template-columns: 1fr; } }
+  @media (max-width: 560px) { body.stays-page .st-list, body.stays-page .st-near-list { grid-template-columns: 1fr; } }
 </style>`;
 
 function stayPath(venue, lang = 'en') { return `${lang === 'fr' ? '/fr' : ''}/${venue.region}/${STAY_SEGMENT}/${venue.slug}`; }
@@ -217,7 +239,10 @@ function renderStaysListPage({ region, regionLabel, stays, lang = 'en' }, deps) 
   const town = regionLabel;
   const label = STAY_LABEL[fr ? 'fr' : 'en'];
   const title = fr ? `${label} à ${town}, C.-B. | ${siteName}` : `${label} in ${town}, BC | ${siteName}`;
-  const description = fr
+  // Town notes (2026-11-19, data/stays-town-notes.json): "Where to stay in <town>" intro + tips; a town without one
+  // keeps the generic line. The note also becomes the meta description.
+  const note = townNoteFor(region, lang, deps.townNotes);
+  const description = note ? metaFromNote(note.text) : fr
     ? `Hôtels, motels, gîtes et autres lieux où dormir à ${town}, C.-B.`
     : `Hotels, motels, B&Bs and other places to stay in ${town}, BC.`;
   const canonical = `${origin}${staysListPath(region, lang)}`;
@@ -228,7 +253,7 @@ function renderStaysListPage({ region, regionLabel, stays, lang = 'en' }, deps) 
     if (link && link.affiliate) anyAffiliate = true;
     const kind = stayKindLabel(v.cuisine, lang);
     const photo = v.image_url && /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(v.image_url).trim()) ? String(v.image_url).trim() : '';
-    return `<li class="st-card" data-venue-id="${v.id}">${photo ? `<img src="${esc(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<div class="st-body">
+    return `<li class="st-card" data-venue-id="${v.id}"${photo ? '' : ' data-ph="none"'}>${photo ? `<img src="${esc(photo)}" alt="" loading="lazy" width="480" height="270">` : '<span class="st-nophoto" aria-hidden="true"></span>'}<div class="st-body">
       <span class="st-meta">${esc([kind, town].filter(Boolean).join(' · '))}</span>
       <a class="st-name" href="${stayPath(v, lang)}">${esc(v.name)}</a>
       ${v.address ? `<p class="st-addr">${esc(v.address)}</p>` : ''}
@@ -250,7 +275,7 @@ ${deps.headerHtml()}
   <nav class="breadcrumb" aria-label="${fr ? 'Fil d’Ariane' : 'Breadcrumb'}"><a href="${fr ? '/fr' : '/'}">${fr ? 'Accueil' : 'Home'}</a> &rsaquo; <a href="${fr ? '/fr' : ''}/${esc(region)}">${esc(town)}</a> &rsaquo; ${esc(label)}</nav>
   <p class="st-kicker">${esc(town)}</p>
   <h1>${fr ? `${esc(label)} à ${esc(town)}` : `${esc(label)} in ${esc(town)}`}</h1>
-  <p class="st-intro">${fr ? 'Hôtels, motels, gîtes, auberges et autres lieux où dormir, par ordre alphabétique.' : 'Hotels, motels, B&amp;Bs, inns and other places to stay, in alphabetical order.'}</p>
+  ${note ? townNoteHtml(note, esc) : `<p class="st-intro">${fr ? 'Hôtels, motels, gîtes, auberges et autres lieux où dormir, par ordre alphabétique.' : 'Hotels, motels, B&amp;Bs, inns and other places to stay, in alphabetical order.'}</p>`}
   <ul class="st-list">
     ${cards}
   </ul>
@@ -264,7 +289,7 @@ ${LIST_CLICK_SCRIPT}
 </html>`;
 }
 
-function renderStayVenuePage({ venue, regionLabel, lang = 'en' }, deps) {
+function renderStayVenuePage({ venue, regionLabel, lang = 'en', closeBy = [] }, deps) {
   const origin = deps.origin || 'https://okanaganroam.com';
   const siteName = deps.siteName || 'Okanagan Roam';
   const fr = lang === 'fr';
@@ -299,16 +324,20 @@ ${deps.headerHtml()}
   <main class="wrap-wide golf-main" id="main">
   <div class="st-wrap">
   <nav class="breadcrumb" aria-label="${fr ? 'Fil d’Ariane' : 'Breadcrumb'}"><a href="${fr ? '/fr' : '/'}">${fr ? 'Accueil' : 'Home'}</a> &rsaquo; <a href="${fr ? '/fr' : ''}/${esc(venue.region)}">${esc(town)}</a> &rsaquo; <a href="${staysListPath(venue.region, lang)}">${esc(label)}</a> &rsaquo; ${esc(venue.name)}</nav>
-  ${photo ? `<img class="st-hero" src="${esc(photo)}" alt="${esc(venue.name)}" width="980" height="360">` : ''}
-  ${photo && photoCreditFor(photo) ? `<p class="st-credit">${fr ? 'Photo :' : 'Photo:'} ${esc(photoCreditFor(photo))}</p>` : ''}
+  ${photo ? `<img class="st-hero" src="${esc(photo)}" alt="${esc(venue.name)}" width="980" height="360">
+  ${photoCreditFor(photo) ? `<p class="st-credit">${fr ? 'Photo :' : 'Photo:'} ${esc(photoCreditFor(photo))}</p>` : ''}
   <p class="st-kicker">${esc([kind, town].filter(Boolean).join(' · '))}</p>
-  <h1>${esc(venue.name)}</h1>
+  <h1>${esc(venue.name)}</h1>` : `<div class="venue-hero venue-hero-fallback st-titlehero" data-ph="none">
+    <span class="venue-hero-type">${esc([kind, town].filter(Boolean).join(' · '))}</span>
+    <h1>${esc(venue.name)}</h1>
+  </div>`}
   ${desc ? `<p class="st-intro"${fr && !descFr ? ' lang="en"' : ''}>${esc(desc)}</p>` : ''}
   ${venue.address ? `<p class="st-addr">${esc(venue.address)}</p>` : ''}
   ${actions ? `<div class="st-actions">
     ${actions}
   </div>` : ''}
   ${link && link.affiliate ? disclosureHtml(lang) : ''}
+  ${closeByHtml(closeBy, lang, deps)}
   <p><a href="${staysListPath(venue.region, lang)}">${fr ? `← ${esc(label)} à ${esc(town)}` : `← ${esc(label)} in ${esc(town)}`}</a></p>
   </div>
   </main>
@@ -319,6 +348,110 @@ ${deps.engagementScript(venue)}
 </html>`;
 }
 
+
+// ---- Close by (2026-11-19) ----
+// Up to four of our own listings within 2 km (straight line) of a stay: food & drink first, then things to do, nearest
+// first within each, and a mix when both are near (two of each, the spare places going to whichever is nearer). Skips
+// other stays, hidden or redirected listings, places with no page, and places closed now (closedIds: a written
+// "not operating" advisory or closed for the season). Pure: the server passes the candidates and its distance helper
+// (venueDistanceKm, the one the venue pages' Close by uses).
+const CLOSE_BY_KM = 2;
+const CLOSE_BY_LIMIT = 4;
+const CLOSE_BY_FOOD_DRINK = ['restaurant', 'cafe', 'winery', 'brewery', 'pub'];
+const CLOSE_BY_THINGS_TO_DO = ['outdoor', 'beach', 'indoor', 'tour'];
+const CLOSE_BY_TYPES = [...CLOSE_BY_FOOD_DRINK, ...CLOSE_BY_THINGS_TO_DO];
+const CLOSE_BY_LABEL = { en: 'Close by', fr: 'À proximité' };
+const CLOSE_BY_NOTE = { en: 'Straight-line distances from this place.', fr: 'Distances à vol d’oiseau depuis ce lieu.' };
+function pickStayCloseBy(stay, candidates, opts = {}) {
+  const distanceKm = opts.distanceKm;
+  const closed = opts.closedIds || new Set();
+  const maxKm = opts.maxKm || CLOSE_BY_KM;
+  const limit = opts.limit || CLOSE_BY_LIMIT;
+  if (!stay || typeof distanceKm !== 'function') return [];
+  const seen = new Set([stay.id]);
+  const rows = (candidates || []).filter((v) => v && !seen.has(v.id) && seen.add(v.id) && v.type !== STAY_TYPE && CLOSE_BY_TYPES.includes(v.type)
+    && v.slug && !v.redirect_to && !closed.has(v.id))
+    .map((v) => ({ v, km: distanceKm(stay, v) }))
+    .filter((x) => typeof x.km === 'number' && Number.isFinite(x.km) && x.km <= maxKm)
+    .sort((a, b) => a.km - b.km || String(a.v.name).localeCompare(String(b.v.name)));
+  const food = rows.filter((x) => CLOSE_BY_FOOD_DRINK.includes(x.v.type));
+  const todo = rows.filter((x) => CLOSE_BY_THINGS_TO_DO.includes(x.v.type));
+  const half = Math.ceil(limit / 2);
+  const picked = new Set([...food.slice(0, half), ...todo.slice(0, limit - half)]);
+  for (const x of rows) { if (picked.size >= limit) break; picked.add(x); }
+  const inOrder = (list) => list.filter((x) => picked.has(x));
+  return [...inOrder(food), ...inOrder(todo)].slice(0, limit).map((x) => ({ ...x, group: CLOSE_BY_FOOD_DRINK.includes(x.v.type) ? 'food_drink' : 'things_to_do' }));
+}
+// "350 m" under 1 km (to the nearest 10 m), "1.2 km" from 1 km ("1,2 km" in French).
+function formatStayDistance(km, lang = 'en') {
+  const m = Math.max(10, Math.round((Number(km) * 1000) / 10) * 10);
+  if (m < 1000) return `${m} m`;
+  const k = (Math.round(Number(km) * 10) / 10).toFixed(1);
+  return `${lang === 'fr' ? k.replace('.', ',') : k} km`;
+}
+// deps: escapeHtml, typeLabel(type, lang), venueHref(venue, lang). Nothing near -> no section.
+function closeByHtml(items, lang, deps) {
+  if (!items || !items.length) return '';
+  const fr = lang === 'fr';
+  const esc = deps.escapeHtml;
+  const li = items.map(({ v, km }) => {
+    const type = (deps.typeLabel && deps.typeLabel(v.type, lang)) || v.type;
+    return `<li data-venue-id="${Number(v.id)}"><a href="${esc(deps.venueHref(v, lang))}"><span class="st-near-name">${esc(v.name)}</span><span class="st-near-meta">${esc(type)} · ${esc(formatStayDistance(km, lang))}</span></a></li>`;
+  }).join('\n      ');
+  return `<section class="st-near" aria-labelledby="stNearHead" data-stay-close-by>
+    <h2 id="stNearHead">${CLOSE_BY_LABEL[fr ? 'fr' : 'en']}</h2>
+    <p class="st-near-note">${CLOSE_BY_NOTE[fr ? 'fr' : 'en']}</p>
+    <ul class="st-near-list">
+      ${li}
+    </ul>
+  </section>`;
+}
+
+// ---- Town notes (2026-11-19) ----
+// data/stays-town-notes.json: { "<region-slug>": { "en": "...", "fr": "...", "tips": [{ "en": "...", "fr": "..." }] } }.
+// Read when it changes (a content update is a file drop-in). setTownNotes() replaces it (tests).
+const TOWN_NOTES_FILE = require('path').join(__dirname, 'data', 'stays-town-notes.json');
+let _townNotes = { mtime: -1, data: {} };
+let _townNotesOverride = null;
+function loadTownNotes(file = TOWN_NOTES_FILE) {
+  if (_townNotesOverride) return _townNotesOverride;
+  try {
+    const fs = require('fs');
+    const mtime = fs.statSync(file).mtimeMs;
+    if (mtime !== _townNotes.mtime) {
+      const data = JSON.parse(fs.readFileSync(file, 'utf8'));
+      _townNotes = { mtime, data: data && typeof data === 'object' && !Array.isArray(data) ? data : {} };
+    }
+    return _townNotes.data;
+  } catch (e) { return {}; }
+}
+function setTownNotes(data) { _townNotesOverride = data || null; }
+const clean = (x) => (typeof x === 'string' ? x.replace(/\s+/g, ' ').trim() : '');
+// -> { text, textLang, tips: [{ text, lang }] } or null. French falls back to the English text (marked lang="en").
+function townNoteFor(region, lang = 'en', notes) {
+  const all = notes || loadTownNotes();
+  const entry = all && Object.prototype.hasOwnProperty.call(all, region) ? all[region] : null;
+  if (!entry || typeof entry !== 'object') return null;
+  const fr = lang === 'fr';
+  const pick = (o) => { const f = fr ? clean(o && o.fr) : ''; return f ? { text: f, lang: 'fr' } : { text: clean(o && o.en), lang: 'en' }; };
+  const main = pick(entry);
+  if (!main.text) return null;
+  const tips = (Array.isArray(entry.tips) ? entry.tips : []).map(pick).filter((t) => t.text).map((t) => ({ text: t.text, lang: t.lang }));
+  return { text: main.text, textLang: main.lang, tips, lang: fr ? 'fr' : 'en' };
+}
+function metaFromNote(text) {
+  const t = clean(text);
+  if (t.length <= 300) return t;
+  const cut = t.slice(0, 297);
+  return `${cut.slice(0, cut.lastIndexOf(' ') > 200 ? cut.lastIndexOf(' ') : 297)}…`;
+}
+function townNoteHtml(note, esc) {
+  const langAttr = (l) => (l !== note.lang ? ` lang="${l}"` : '');
+  const tips = note.tips.length ? `\n    <ul class="st-tips">${note.tips.map((t) => `<li${langAttr(t.lang)}>${esc(t.text)}</li>`).join('')}</ul>` : '';
+  return `<div class="st-notes" data-stay-town-note>
+    <p class="st-intro"${langAttr(note.textLang)}>${esc(note.text)}</p>${tips}
+  </div>`;
+}
 
 // Photo credit for a stay's photo (2026-11-19), from the same credits file every listing uses. "Photo:" is added on the page.
 let _stayCredits = null;
@@ -334,4 +467,7 @@ module.exports = {
   STAY22_ALLEZ_BASE, BOOKING_SEARCH_BASE, EXPEDIA_SEARCH_BASE,
   stayKind, stayKindLabel, affiliateConfig, staysIndexable, staysNavOn, buildAffiliateUrl, stayRatesLink,
   stayPath, staysListPath, renderStaysListPage, renderStayVenuePage,
+  CLOSE_BY_KM, CLOSE_BY_LIMIT, CLOSE_BY_FOOD_DRINK, CLOSE_BY_THINGS_TO_DO, CLOSE_BY_TYPES, CLOSE_BY_LABEL,
+  pickStayCloseBy, formatStayDistance, closeByHtml,
+  TOWN_NOTES_FILE, loadTownNotes, setTownNotes, townNoteFor,
 };

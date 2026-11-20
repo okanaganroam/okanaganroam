@@ -1,0 +1,11 @@
+{
+  "kelowna": {
+    "en": "We list more than 40 places to stay in Kelowna: mostly hotels, plus motels, B&Bs, guest houses, resorts and campgrounds. Many are downtown on or near Water Street, Abbott Street and Bernard Avenue, and others line Harvey Avenue and Highway 97 North, Lakeshore Road and the streets near the airport.",
+    "fr": "Nous présentons plus de 40 lieux où dormir à Kelowna : surtout des hôtels, mais aussi des motels, des gîtes, des maisons d’hôtes, des complexes hôteliers et des campings. Beaucoup se trouvent au centre-ville, sur ou près de Water Street, Abbott Street et Bernard Avenue; d’autres bordent Harvey Avenue et l’autoroute 97 Nord, Lakeshore Road et les rues près de l’aéroport.",
+    "tips": [
+      { "en": "Downtown addresses (Water Street, Abbott Street, Bernard Avenue) are a short walk from the waterfront.", "fr": "Les adresses du centre-ville (Water Street, Abbott Street, Bernard Avenue) sont à quelques pas du bord du lac." },
+      { "en": "Harvey Avenue and Highway 97 North are the main highway strip, handy if you are driving.", "fr": "Harvey Avenue et l’autoroute 97 Nord forment le grand axe routier, pratique si vous êtes en voiture." },
+      { "en": "Places on Airport Way and Innovation Drive are the closest to Kelowna International Airport (YLW).", "fr": "Les lieux sur Airport Way et Innovation Drive sont les plus proches de l’aéroport international de Kelowna (YLW)." }
+    ]
+  }
+}

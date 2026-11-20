@@ -287,3 +287,149 @@ test('import script: dry-run parsing, street address rule, kinds and regions', (
   assert.match(importer.rowToVenue(rows[2], regions).skip, /unknown subtype/);
   assert.match(importer.rowToVenue(rows[3], regions).skip, /unknown region/);
 });
+
+// ---- Close by, no-photo cards and pages, town notes (2026-11-19) ----
+// A stay far from every other fixture, with our own listings set out around it at known distances (due north).
+const FAR = { lat: 50.9, lng: -118.2 };
+const north = (km) => FAR.lat + km / 111.195;
+const S = mkStay({ name: 'Remote Close By Lodge', cuisine: 'lodge', latitude: FAR.lat, longitude: FAR.lng, website: null });
+let nb = 0;
+const mkNear = (type, km, o = {}) => app.createVenue({ slug: `close-by-${type}-${++nb}`, region: 'kelowna', type, name: `Near ${type} ${nb}`,
+  latitude: north(km), longitude: FAR.lng, ...o });
+const R1 = mkNear('restaurant', 0.3);
+const C1 = mkNear('cafe', 0.6, { description_fr: 'Un café de test.' });
+const W1 = mkNear('winery', 1.5);
+const O1 = mkNear('outdoor', 0.2);
+const B1 = mkNear('beach', 1.0);
+const I1 = mkNear('indoor', 1.9);
+const FAR_R = mkNear('restaurant', 2.3);
+const GOLF = mkNear('golf', 0.1);
+const COCKTAIL = mkNear('cocktail', 0.1);
+const OTHER_STAY = mkStay({ name: 'Next Door Stay', latitude: north(0.05), longitude: FAR.lng });
+const MOVED = mkNear('restaurant', 0.1);
+db.prepare('UPDATE venues SET redirect_to = ? WHERE id = ?').run(R1.id, MOVED.id);
+const SEASONAL = mkNear('outdoor', 0.15);
+db.prepare('INSERT INTO venue_seasons (venue_id, status, until_date, reopens_date, source_url, checked_at) VALUES (?, ?, ?, ?, ?, ?)')
+  .run(SEASONAL.id, 'closed', null, '2099-05-01', 'https://example.com/season', '2026-01-01');
+const LONELY = mkStay({ name: 'Lonely Cabin', cuisine: 'cabin', latitude: 51.7, longitude: -117.1, website: null });
+const PHOTO = mkStay({ name: 'Photo Hotel', image_url: '/images/venues/test-photo-hotel.jpg' });
+
+const nearIds = (html) => [...(html.match(/<section class="st-near"[\s\S]*?<\/section>/) || [''])[0].matchAll(/<li data-venue-id="(\d+)"/g)].map((m) => Number(m[1]));
+
+test('Close by: within 2 km, food & drink first then things to do, nearest first, a mix, four at most', async () => {
+  const items = app.getStayCloseBy(app.getVenue(S.id));
+  assert.deepEqual(items.map((x) => x.v.id), [R1.id, C1.id, O1.id, B1.id]);
+  assert.deepEqual(items.map((x) => x.group), ['food_drink', 'food_drink', 'things_to_do', 'things_to_do']);
+  const page = await get(`/kelowna/stays/${S.slug}`);
+  assert.equal(page.status, 200);
+  assert.deepEqual(nearIds(page.text), [R1.id, C1.id, O1.id, B1.id]);
+  assert.match(page.text, /<h2 id="stNearHead">Close by<\/h2>/);
+  assert.match(page.text, new RegExp(`<a href="/kelowna/restaurants/${R1.slug}"><span class="st-near-name">Near restaurant \\d+</span><span class="st-near-meta">Restaurant · 300 m</span></a>`));
+  assert.match(page.text, /<span class="st-near-meta">Beach · 1\.0 km<\/span>/);
+  assert.ok(!/st-near[\s\S]*nofollow[\s\S]*<\/section>/.test(page.text.match(/<section class="st-near"[\s\S]*?<\/section>/)[0]), 'plain internal links');
+});
+
+test('Close by: skips other stays, other types, redirected, closed for the season and anything past 2 km', () => {
+  const ids = app.getStayCloseBy(app.getVenue(S.id)).map((x) => x.v.id);
+  for (const v of [FAR_R, GOLF, COCKTAIL, OTHER_STAY, MOVED, SEASONAL, W1, I1]) assert.ok(!ids.includes(v.id), v.name);
+  // The pure ranking: cutoff, cap, mix and the spare places going to the nearer group.
+  const dist = (a, b) => b.km;
+  const v = (id, type, km, o = {}) => ({ id, type, km, slug: `s${id}`, name: `V${id}`, ...o });
+  const stay = { id: 0, type: 'stay' };
+  const food = [v(1, 'restaurant', 0.5), v(2, 'cafe', 0.4), v(3, 'pub', 1.2), v(4, 'brewery', 1.9), v(5, 'winery', 2.01)];
+  assert.deepEqual(stays.pickStayCloseBy(stay, food, { distanceKm: dist }).map((x) => x.v.id), [2, 1, 3, 4], 'only food: the four nearest, cutoff at 2 km');
+  const mixed = [...food, v(6, 'tour', 0.1), v(7, 'outdoor', 1.95)];
+  assert.deepEqual(stays.pickStayCloseBy(stay, mixed, { distanceKm: dist }).map((x) => x.v.id), [2, 1, 6, 7]);
+  const one = [...food, v(6, 'tour', 0.1)];
+  assert.deepEqual(stays.pickStayCloseBy(stay, one, { distanceKm: dist }).map((x) => x.v.id), [2, 1, 3, 6], 'a spare place goes to the nearer remaining one');
+  const skip = [v(8, 'stay', 0.1), v(9, 'golf', 0.1), v(10, 'restaurant', 0.1, { redirect_to: 1 }), v(11, 'restaurant', 0.1, { slug: null }), v(12, 'cafe', 0.1)];
+  assert.deepEqual(stays.pickStayCloseBy(stay, skip, { distanceKm: dist, closedIds: new Set([12]) }), []);
+  assert.equal(stays.formatStayDistance(0.351), '350 m');
+  assert.equal(stays.formatStayDistance(0.004), '10 m');
+  assert.equal(stays.formatStayDistance(0.998), '1.0 km');
+  assert.equal(stays.formatStayDistance(1.24), '1.2 km');
+  assert.equal(stays.formatStayDistance(1.24, 'fr'), '1,2 km');
+});
+
+test('Close by: hidden when nothing is within 2 km', async () => {
+  assert.deepEqual(app.getStayCloseBy(app.getVenue(LONELY.id)), []);
+  for (const p of [`/kelowna/stays/${LONELY.slug}`, `/fr/kelowna/stays/${LONELY.slug}`]) {
+    const r = await get(p);
+    assert.equal(r.status, 200);
+    assert.ok(!r.text.includes('data-stay-close-by'), p);
+    assert.ok(!r.text.includes('stNearHead'), p);
+  }
+});
+
+test('Close by: French labels on /fr pages, French venue pages only where the place has one', async () => {
+  const fr = await get(`/fr/kelowna/stays/${S.slug}`);
+  assert.equal(fr.status, 200);
+  assert.match(fr.text, /<h2 id="stNearHead">À proximité<\/h2>/);
+  assert.match(fr.text, /Distances à vol d’oiseau/);
+  assert.match(fr.text, new RegExp(`<a href="/fr/kelowna/cafes/${C1.slug}"><span class="st-near-name">[^<]+</span><span class="st-near-meta">Café · 600 m</span>`));
+  assert.match(fr.text, new RegExp(`<a href="/kelowna/restaurants/${R1.slug}">`), 'no French page: the English one');
+  assert.match(fr.text, /<span class="st-near-meta">Plage · 1,0 km<\/span>/);
+  assert.equal(fr.headers.get('x-robots-tag'), 'noindex');
+});
+
+test('no photo: the card gets the sand no-photo panel and the page the plain title hero, never an empty image box', async () => {
+  const list = await get('/kelowna/stays');
+  const card = (id) => (list.text.match(new RegExp(`<li class="st-card" data-venue-id="${id}"[\\s\\S]*?</li>`)) || [''])[0];
+  assert.match(card(A.id), /^<li class="st-card" data-venue-id="\d+" data-ph="none"><span class="st-nophoto" aria-hidden="true"><\/span>/);
+  assert.ok(!/<img/.test(card(A.id)));
+  assert.match(card(PHOTO.id), /<img src="\/images\/venues\/test-photo-hotel\.jpg"/);
+  assert.ok(!card(PHOTO.id).includes('st-nophoto'));
+  assert.ok(!/<img[^>]*src=""/.test(list.text));
+  assert.match(list.text, /\.st-nophoto \{ display: block; width: 100%; height: 150px; background: #EEE8DC/);
+  const page = await get(`/kelowna/stays/${A.slug}`);
+  assert.match(page.text, /<div class="venue-hero venue-hero-fallback st-titlehero" data-ph="none">\s*<span class="venue-hero-type">Inn · Kelowna<\/span>\s*<h1>Aardvark Lakeside Inn<\/h1>/);
+  assert.ok(!page.text.includes('class="st-hero"'));
+  assert.ok(!/<img[^>]*src=""/.test(page.text));
+  assert.ok(!page.text.includes('class="st-kicker"'), 'the kind line moves into the hero');
+  const photoPage = await get(`/kelowna/stays/${PHOTO.slug}`);
+  assert.match(photoPage.text, /<img class="st-hero" src="\/images\/venues\/test-photo-hotel\.jpg"/);
+  assert.ok(!photoPage.text.includes('class="venue-hero venue-hero-fallback st-titlehero"'));
+  assert.match(photoPage.text, /<h1>Photo Hotel<\/h1>/);
+});
+
+test('town notes: intro and tips under the heading, escaped, in the meta description; a town without one keeps the generic line', async () => {
+  stays.setTownNotes({
+    kelowna: { en: 'Stay <b>near</b> the "lake" & the bridge.', fr: 'Dormez <i>près</i> du lac.', tips: [{ en: 'Tip <script>alert(1)</script>', fr: 'Astuce & conseil' }, { en: 'English only tip' }, { fr: '' }] },
+  });
+  try {
+    const en = await get('/kelowna/stays');
+    assert.match(en.text, /<h1>Places to stay in Kelowna<\/h1>\s*<div class="st-notes" data-stay-town-note>\s*<p class="st-intro">Stay &lt;b&gt;near&lt;\/b&gt; the &quot;lake&quot; &amp; the bridge\.<\/p>/);
+    assert.match(en.text, /<ul class="st-tips"><li>Tip &lt;script&gt;alert\(1\)&lt;\/script&gt;<\/li><li>English only tip<\/li><\/ul>/);
+    assert.ok(!en.text.includes('<script>alert(1)'));
+    assert.ok(!en.text.includes('in alphabetical order'), 'the note replaces the generic line');
+    assert.match(en.text, /<meta name="description" content="Stay &lt;b&gt;near&lt;\/b&gt; the &quot;lake&quot; &amp; the bridge\.">/);
+    const fr = await get('/fr/kelowna/stays');
+    assert.match(fr.text, /<p class="st-intro">Dormez &lt;i&gt;près&lt;\/i&gt; du lac\.<\/p>/);
+    assert.match(fr.text, /<li>Astuce &amp; conseil<\/li><li lang="en">English only tip<\/li>/);
+    assert.match(fr.text, /<meta name="description" content="Dormez &lt;i&gt;près&lt;\/i&gt; du lac\.">/);
+    const pen = await get('/penticton/stays');
+    assert.ok(!pen.text.includes('data-stay-town-note'));
+    assert.match(pen.text, /Hotels, motels, B&amp;Bs, inns and other places to stay, in alphabetical order\./);
+    assert.match(pen.text, /<meta name="description" content="Hotels, motels, B&amp;Bs and other places to stay in Penticton, BC\.">/);
+    assert.equal(en.headers.get('x-robots-tag'), 'noindex', 'still noindex');
+    assert.match(en.text, /<meta name="robots" content="noindex">/);
+    assert.ok(!(await get('/sitemap.xml')).text.includes('/stays'));
+  } finally { stays.setTownNotes(null); }
+});
+
+test('town notes file: the shipped shape, with one placeholder entry', () => {
+  const data = JSON.parse(fs.readFileSync(stays.TOWN_NOTES_FILE, 'utf8'));
+  const towns = Object.keys(data);
+  assert.deepEqual(towns, ['kelowna']);
+  for (const t of towns) {
+    assert.equal(typeof data[t].en, 'string');
+    assert.equal(typeof data[t].fr, 'string');
+    assert.ok(data[t].en.length > 40 && data[t].fr.length > 40);
+    assert.ok(Array.isArray(data[t].tips));
+    for (const tip of data[t].tips) { assert.equal(typeof tip.en, 'string'); assert.equal(typeof tip.fr, 'string'); }
+  }
+  const note = stays.townNoteFor('kelowna', 'en');
+  assert.equal(note.text, data.kelowna.en.replace(/\s+/g, ' ').trim());
+  assert.equal(stays.townNoteFor('penticton', 'en'), null);
+  assert.equal(stays.townNoteFor('__proto__', 'en'), null);
+});
