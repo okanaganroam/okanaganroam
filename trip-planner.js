@@ -1686,7 +1686,14 @@ function scoreVenue(v, ctx) {
     const kmTown = kmBetween(v, TOWN_CENTRES[v.region]);
     if (kmTown > 25 && kmTown < 150 && !namedInRequest(v, ctx)) add('far', -Math.min(25, (kmTown - 25) * 0.5 + 8), null);
   }
-  if (/\bfree\b/.test(ctx.queryText || '') && !/\b(?:gluten|alcohol|dairy|nut|sugar) free\b/.test(ctx.queryText || '')) { if (v.features.free_entry || (v.type === 'tour' && v.tourFree)) add('free', 25, null); else if (DINING_TYPES.includes(v.type) && !ctx.types.size) add('free', -20, null); else if (['indoor', 'tour', 'golf'].includes(v.type)) add('free', -45, null); }
+  // Indoor test 15 (2026-11-19; "free things to do in Vernon" left out the free, Complete & Verified gallery for a café and
+  // a diner): the owner's own Free or By donation answer counts as free to visit, like the Free Entry badge; a place the
+  // owner confirmed in full (Complete & Verified) gets a little more, so it leads among near-equal free places.
+  if (/\bfree\b/.test(ctx.queryText || '') && !/\b(?:gluten|alcohol|dairy|nut|sugar) free\b/.test(ctx.queryText || '')) {
+    if (v.features.free_entry || budgetFreeStop(v)) { add('free', 25, null); if (v.completeVerified) add('verified', 4, null); }
+    else if (DINING_TYPES.includes(v.type) && !ctx.types.size) add('free', -20, null);
+    else if (['indoor', 'tour', 'golf'].includes(v.type)) add('free', -45, null);
+  }
   // A nightclub only for nightlife or a group night out (2026-10-25: a couple in their 60s asking for wine bars got Moe Joe's).
   if (/\bnightclub\b/.test(normWords(v.cuisine || '')) && ctx.occasion !== 'group_getaway' && !NIGHT_OUT_RE.test(ctx.queryText || '')) add('nightclub', -35, null);
   // Winter months (2026-10-25): outdoor places listed for winter come first when nothing more specific was asked.
@@ -2533,6 +2540,8 @@ function rotateWithinType(cands, ctx, score = (c) => c.score, opts = {}) {
     }
     if (rotateBooked(c.v) && !rotateBooked(best.v)) continue;
     if (appointmentOnly(c.v) && !appointmentOnly(best.v)) continue;
+    // Indoor test 15: a Complete & Verified best place never rotates to one its owner hasn't confirmed.
+    if (best.v.completeVerified && !c.v.completeVerified) continue;
     const km = kmOrNull(best.v, c.v);
     if (km != null && km > ROTATE_MAX_KM) continue;
     pool.push(c);
@@ -2737,7 +2746,8 @@ function stopFrom(v, scored, extra, ctx) {
   };
 }
 function compareScored(a, b) {
-  return b.score - a.score || (b.v.rating || 0) - (a.v.rating || 0) || (b.v.reviews || 0) - (a.v.reviews || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id;
+  // Indoor test 15: a Complete & Verified place (all confirmed by its owner) breaks a tie before rating and reviews.
+  return b.score - a.score || (b.v.completeVerified ? 1 : 0) - (a.v.completeVerified ? 1 : 0) || (b.v.rating || 0) - (a.v.rating || 0) || (b.v.reviews || 0) - (a.v.reviews || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id;
 }
 
 // ---------- classification ----------
@@ -2909,7 +2919,10 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
   for (const s of scored) {
     if (out.length >= count) break;
     // An activity asked for on its own ("mountain biking") is all one kind of place, so the per-type cap does not apply.
-    if ((perType[s.v.type] || 0) >= RECOMMENDATION_PER_TYPE && !(ctx.types.size === 1 && ctx.types.has(s.v.type)) && !(ctx.activities.size && !ctx.types.size)) continue;
+    // Indoor test 15: "free things to do" fills with free and by-donation places before any café or diner: a free place
+    // may take two more of its kind than the usual cap.
+    const freeHere = freeAsked && (s.v.features?.free_entry || budgetFreeStop(s.v));
+    if ((perType[s.v.type] || 0) >= RECOMMENDATION_PER_TYPE + (freeHere ? 2 : 0) && !(ctx.types.size === 1 && ctx.types.has(s.v.type)) && !(ctx.activities.size && !ctx.types.size)) continue;
     perType[s.v.type] = (perType[s.v.type] || 0) + 1;
     out.push(stopFrom(s.v, s, regionReason(s.v, ctx), ctx));
   }

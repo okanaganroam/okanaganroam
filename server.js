@@ -7260,6 +7260,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
   const facts = [];
   const indoorIds = new Set(getCollectionVenueIds('indoor_also'));
   const requirementModule = require('./trip-requirements');
+  // Indoor test 15: Complete & Verified (the owner confirmed everything) breaks ties between near-equal places.
+  let cvIds = new Set(); try { cvIds = completeVerifiedIds(); } catch (e) { cvIds = new Set(); }
   for (const v of rows) {
     if (!REGION_LABELS[v.region] || !CATEGORY_SLUGS[v.type]) continue;
     // Whistler Roam (2026-10-25): sports places a visitor would go to (the bike park, climbing gyms, the Adventure Zone,
@@ -7275,6 +7277,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       id: v.id, name: v.name, region: v.region, type: plannerType, url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
       rating: v.rating == null ? null : Number(v.rating), reviews: v.reviews == null ? 0 : Number(v.reviews),
       price: v.price == null ? null : Number(v.price), address: v.address || null,
+      ...(cvIds.has(v.id) ? { completeVerified: true } : {}),
       lat: v.latitude == null ? null : Number(v.latitude), lng: v.longitude == null ? null : Number(v.longitude),
       cuisine: v.cuisine ? String(v.cuisine).toLowerCase().trim() : null, cuisineLabel: v.cuisine || null,
       cuisines: venueCuisineList(v).map((c) => String(c).toLowerCase().trim()),
@@ -68300,6 +68303,8 @@ function completeVerifiedIds(now = new Date()) {
   return ids;
 }
 function resetCompleteVerifiedCache() { completeVerifiedCache = { key: '', at: 0, ids: new Set() }; }
+// Tests only: stand in for the badge (Complete & Verified needs a whole finished setup to earn).
+function setCompleteVerifiedIdsForTest(ids, now = new Date()) { completeVerifiedCache = { key: todayLocal(now), at: Date.now() + 365 * 86400000, ids: new Set(ids) }; }
 
 // ---------- Complete & Verified reminders (2026-11-09) ----------
 // Five days before a badge would pause (hours checked 25-29 days ago), the business gets one short email with a private
@@ -75820,7 +75825,7 @@ module.exports = {
   // Verified mark (2026-10-27)
   guardedVenueLinkUpdate, RESEARCH_LINK_FIELDS, venueLinks, ownerLastUpdatedAt,
   venueIsClaimed, claimedVenueIds, venueConfirmedHtml, ownerUpdatedDate,
-  venueBadgeState, completeVerifiedIds, resetCompleteVerifiedCache, stripVerifiedRepeats, badgeRemindersDue, badgeReminderTick, badgeReminderByToken, confirmHoursFromReminder, BADGE_REMINDER_PATH,
+  venueBadgeState, completeVerifiedIds, resetCompleteVerifiedCache, setCompleteVerifiedIdsForTest, stripVerifiedRepeats, badgeRemindersDue, badgeReminderTick, badgeReminderByToken, confirmHoursFromReminder, BADGE_REMINDER_PATH,
   guardedCuisineUpdate, guardedCuisinesUpdate, venueCuisineList, venuePlaceType, venueCuisinesState, writeVenueCuisines, clearVenueCuisinesCache,
   placeTypeDisplay, placeTypeBesideCuisines, PLACE_TYPE_DISPLAY, PLACE_TYPE_DISPLAY_FR, MAP_OWNER_FEATURES, mapDataVersion, MAP_DATA_FORMAT, MAP_MUST_HAVES, writeVenueOwnerFeatures, badgeReminderOptedOut,
   OWNER_CUISINES_POPULAR, OWNER_CUISINES_MAX, RESTAURANT_PLACE_TYPES, frPlaceType,

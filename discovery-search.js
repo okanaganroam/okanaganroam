@@ -29,9 +29,38 @@ function textHas(normalized, term) {
 function termMatch(v, term, fr = false, alt = true) {
   // 2026-10-25: the visitor's word or the listing's word for the same thing ("waterfall" / "falls"); used by Build My
   // Trip's food/text matching as well as site search.
-  if (alt) { const own = termMatch(v, term, fr, false); if (own) return own; for (const w of TERM_SYNONYMS[term] || []) { const m = termMatch(v, w, fr, false); if (m) return m; } return null; }
+  if (alt) {
+    const own = termMatch(v, term, fr, false); if (own) return own;
+    for (const w of TERM_SYNONYMS[term] || []) { const m = termMatch(v, w, fr, false); if (m) return m; }
+    // Indoor test 15 (2026-11-19; "art class vernon" missed the gallery whose page says "adult art classes"): the other
+    // number of the word, for any word ("class" / "classes", "gallery" / "galleries", "tour" / "tours").
+    for (const w of numberVariants(term)) { const m = termMatch(v, w, fr, false); if (m) return m; }
+    return null;
+  }
   const inName = textHas(v.textName, term), inCui = textHas(v.textCuisine, term), inDesc = textHas(v.textDesc, term) || (fr && textHas(v.textDescFr, term));
   return inName || inCui || inDesc ? { inName, inCui, inDesc } : null;
+}
+// The same word in the other number: the last word of a term, singular <-> plural, by the regular English rules
+// (class/classes, gallery/galleries, tour/tours, beach/beaches). Short words, numbers and words that only look plural
+// (news, tennis, bus, canvas) are left alone.
+const NUMBER_KEEP = new Set(['news', 'series', 'species', 'lens', 'yes', 'always', 'perhaps', 'plus', 'class', 'glass', 'grass', 'pass', 'less', 'chess', 'dress', 'press', 'fitness', 'wellness', 'business', 'access']);
+function numberVariants(term) {
+  const words = String(term || '').split(' ');
+  const last = words[words.length - 1];
+  if (!last || last.length < 4 || /[^a-z]/.test(last)) return [];
+  const pre = words.slice(0, -1).join(' ');
+  const out = [];
+  if (!NUMBER_KEEP.has(last)) {
+    if (/[^aeiou]ies$/.test(last)) out.push(`${last.slice(0, -3)}y`);
+    else if (/(?:ss|x|z|ch|sh)es$/.test(last)) out.push(last.slice(0, -2));
+    else if (/[^siua]s$/.test(last)) out.push(last.slice(0, -1));
+  }
+  if (!/s$/.test(last) || /ss$/.test(last)) {
+    if (/[^aeiou]y$/.test(last)) out.push(`${last.slice(0, -1)}ies`);
+    else if (/(?:ss|x|z|ch|sh)$/.test(last)) out.push(`${last}es`);
+    else out.push(`${last}s`);
+  }
+  return out.filter((w) => w !== last).map((w) => (pre ? `${pre} ${w}` : w));
 }
 const termWeight = (m) => (m.inName ? 3 : 0) + (m.inCui ? 2 : 0) + (m.inDesc ? 1 : 0);
 const termWhere = (m) => [m.inName && 'name', m.inCui && 'cuisine', m.inDesc && 'description'].filter(Boolean).join('+');
