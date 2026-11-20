@@ -94,7 +94,7 @@ const MATRIX = {
   ],
   escape: [
     ['en', 'we charge per room 2-6 players', [R]],
-    ['en', 'price is per person but min 2 players', [P, R]],
+    ['en', 'price is per person but min 2 players', [P, R, 'indoor-min-players']],
     ['en', 'weekends book up fast', [BZ, BK]],
     ['en', 'kids under 12 need an adult', [A]],
     ['en', 'halloween horror room in october only', [E, TH, S]],
@@ -666,8 +666,52 @@ test('indoor test 15: Aaron\'s Help questions (a free gallery) land on the right
   const cl = b.en.best('we close on stat holidays');
   assert.doesNotMatch(plain(b.en.topic(cl.id).a).slice(0, 80), /Open on holidays/);
 });
+// Indoor test 16 (2026-11-19; Tyler, an escape room: $35 per player, 2 players minimum, everyone books ahead, 8+ with an adult):
+// his Help log, EN and FR twins, with where each belongs. "can I say 2 player minimum" (it was "I'm not sure") is the
+// minimum-players answer; closed Monday and Tuesday is the hours answer, which names the screen's real button (Next).
+const MP = 'indoor-min-players';
+const TYLER = [
+  ['price per person but you can book the whole room', [R, X, P], 'prix par personne mais on peut réserver toute la salle'],
+  ['booking only online by time slot', [BK], 'réservation seulement en ligne par plage horaire'],
+  ['12+ or 8+ with an adult', [A], '12 ans et plus ou 8 ans et plus avec un adulte'],
+  ['team building packages', [G], 'forfaits de consolidation d’équipe'],
+  ['closed christmas day', CLOSED_HOL.concat(['setup-short-closure']), 'fermé le jour de Noël'],
+  ['closed mon and tue', ['hours'], 'fermé lundi et mardi'],
+  ['we close on stat holidays', CLOSED_HOL, 'nous fermons les jours fériés'],
+  ['can people rent a room for a private party', [G], 'peut-on louer une salle pour une fête privée'],
+  ['kids camps in summer', [CAMP], 'camps pour enfants l’été'],
+  ['no dogs, service dogs are allowed', [AC], 'pas de chiens, les chiens d’assistance sont acceptés'],
+  ['how do I add a team building package', [G, M], 'comment ajouter un forfait de consolidation d’équipe'],
+  ['birthday party packages', [G], 'forfaits de fête d’anniversaire'],
+  ['can I say 2 player minimum', [MP], 'puis-je dire minimum 2 joueurs'],
+  // His other words for the same things.
+  ['minimum 2 players', [MP], 'minimum de 2 joueurs'],
+  ['minimum players per booking', [MP], 'nombre minimum de joueurs'],
+  ['minimum age to book', [A], 'âge minimum pour réserver'],
+];
+const TYLER_WANT = Object.fromEntries(TYLER.map(([q, want]) => [q, want]));
+test('indoor test 16: Tyler\'s Help questions (an escape room) land on the right answer, in English and in French; a minimum number of players is typed after the price; the hours answer names Next', async () => {
+  const b = await botsFor('escape');
+  const wrong = [];
+  for (const [q, want, qFr] of TYLER) {
+    const r = b.en.best(q), f = b.fr.best(qFr);
+    if (!r || !want.includes(r.id)) wrong.push(`en "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+    if (!f || !want.includes(f.id)) wrong.push(`fr "${qFr}" -> ${f && f.id} (want ${want.join(' or ')})`);
+  }
+  assert.deepEqual(wrong, []);
+  const mp = plain(b.en.topic(MP).a), mpFr = plain(b.fr.topic(MP).aFr);
+  assert.match(mp, /In Price , type it after your price, like 35 per person, min 2 players : your page says “From \$35 per player \(2-player minimum\)”/);
+  assert.match(mpFr, /minimum 2 joueurs/);
+  const hours = plain(b.en.topic('hours').a), hoursFr = plain(b.fr.topic('hours').aFr);
+  assert.match(hours, /Tap Next :/);
+  assert.doesNotMatch(hours, /Save my hours/);
+  assert.match(hoursFr, /Suivant/);
+  assert.doesNotMatch(hoursFr, /Enregistrer mes heures/);
+  // The ages answer shows the with-an-adult wording Tyler's Ages line now reads.
+  assert.match(plain(b.en.topic(A).a), /Ages 12 and up \(8\+ with an adult\)/);
+});
 // Every question in the 8 indoor help logs lands on an answer, on the page where it was asked, for the kind of place it was.
-const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga', 13: 'cinema', 14: 'museum', 15: 'gallery' };
+const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga', 13: 'cinema', 14: 'museum', 15: 'gallery', 16: 'escape' };
 // The misrouted ones, with where they belong.
 const LOG_WANT = {
   'we price per room not per person': [R], 'how do I change the price, it says adults but we charge per room': [R],
@@ -695,6 +739,8 @@ const LOG_WANT = {
   ...HELEN_WANT,
   // Indoor test 15 (Aaron, a gallery).
   ...AARON_WANT,
+  // Indoor test 16 (Tyler, an escape room).
+  ...TYLER_WANT,
 };
 test('every question in the 8 indoor help logs lands on an answer (the misrouted ones on the right one)', async () => {
   const wrong = [];
