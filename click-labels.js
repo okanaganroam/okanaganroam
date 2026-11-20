@@ -18,6 +18,8 @@ const RULES = [
   ['town_link', 'Town name under the title', 'Top of page', '.venue-at-a-glance a', V],
   ['see_hours', 'See hours', 'Top buttons', 'a[href="#venueHours"]', V],
   ['directions', 'Get directions', 'Top buttons', 'a[data-roam-directions]', B],
+  // Places to stay (2026-11-19): the Check rates button (affiliate partner, own booking link or website).
+  ['stay_click', 'Check rates (place to stay)', 'Top buttons', 'a[data-track~="stay_click"]', V],
   ['website', 'Website', 'Top buttons', 'a[data-track~="website"]', V],
   ['booking', 'Book online / buy tickets', 'Top buttons', 'a[data-track~="booking"]', V],
   ['call_button', 'Call button', 'Top buttons', '.venue-cta-row a[data-track~="phone"]', V],

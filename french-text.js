@@ -308,6 +308,9 @@ const FR_TEXT = {
   'Indoor & Rainy Day': 'Intérieur et jours de pluie',
   'Sports & Recreation': 'Sports et loisirs',
   'Shops & Outfitters': 'Boutiques et équipement',
+  // Places to stay (2026-11-19): the town page's "Places to stay" link (STAYS_NAV).
+  'Places to stay': 'Hébergement',
+  'Places to stay →': 'Hébergement →',
   'Shop': 'Boutique',
   'Dog Friendly Finds': 'Trouvailles pour chiens',
   'Dog-Friendly Finds': 'Trouvailles pour chiens',

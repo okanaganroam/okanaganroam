@@ -10,12 +10,12 @@ function siteCard(g, days) {
   const rows = d.businesses.map((b) => [
     `<a href="/admin/dashboard/business?site=${site}&id=${b.id}&days=${days}">${esc(b.name)}</a> <small>${esc(b.region || '')}</small>`,
     num(b.views), `<b>${num(b.total)}</b>`, b.rate === null ? '' : `${b.rate}%`,
-    num(b.website), num(b.booking), num(b.phone), num(b.directions), num(b.menu), num(b.social),
+    num(b.website), num(b.booking), num(b.phone), num(b.directions), num(b.menu), num(b.social), num(b.stays || 0),
   ]);
   return `<section class="col"><h2>${esc(g.name)} <small>last ${days} days</small></h2><div class="card">
-    <div class="stats">${stat(t.total, 'outbound clicks')}${stat(t.website, 'website')}${stat(t.booking, 'book / tickets')}${stat(t.phone, 'calls')}${stat(t.directions, 'directions')}</div>
+    <div class="stats">${stat(t.total, 'outbound clicks')}${stat(t.website, 'website')}${stat(t.booking, 'book / tickets')}${stat(t.phone, 'calls')}${stat(t.directions, 'directions')}${t.stays ? stat(t.stays, 'stay rate checks') : ''}</div>
     <h4>Businesses visitors went on to contact <small>${num(d.with_clicks)} had at least one click; top ${d.businesses.length} shown</small></h4>
-    ${table(['Business', 'Views', 'Clicks out', 'Clicks per view', 'Website', 'Book', 'Call', 'Directions', 'Menu', 'Social'], rows)}
+    ${table(['Business', 'Views', 'Clicks out', 'Clicks per view', 'Website', 'Book', 'Call', 'Directions', 'Menu', 'Social', 'Check rates'], rows)}
     <p class="empty">Counting started ${d.counting_since ? esc(d.counting_since) : 'today'}. A click is a visitor pressing the button on the business page; it shows interest, not that they went in or bought. “Clicks per view” is clicks out divided by page views. Click a name for its full click sheet. Your own visits are left out.</p></div></section>`;
 }
 
