@@ -806,7 +806,7 @@
   function tourFreeWord(f){ return (T.tfreeWords || {})[f] || (f === 'donation' ? 'By donation' : 'Free'); }
   function readTour(){
     var v = function(id){ var n = el(id); return n ? n.value : null; }, x;
-    if ((x = v('suTprice')) !== null) { var xTyped = x, lw0 = INDOOR && !tourFreeRead(x) ? indoorLeadWords(x) : null; if (lw0) x = lw0.rest; var mr0 = INDOOR ? indoorMinRead(x) : null; if (mr0) x = mr0.rest;
+    if ((x = v('suTprice')) !== null) { var xTyped = x, pp0 = INDOOR ? indoorPaidPart(x) : null; if (pp0) x = pp0; var lw0 = INDOOR && !tourFreeRead(x) ? indoorLeadWords(x) : null; if (lw0) x = lw0.rest; var mr0 = INDOOR ? indoorMinRead(x) : null; if (mr0) x = mr0.rest;
       var fw = tourFreeRead(x), np = fw ? 0 : tourPriceRead(x); S.tour.priceFirst = !fw && tourPriceWhy(x) === 'first'; if (S.tour.priceGuessed && np !== C.researchFee) S.tour.priceGuessed = false; S.tour.price = np; S.tour.free = fw;
       // Indoor test 2: per room / lane / game / group words pick Per room or group (unless she tapped Per person), and say
       // who it's for; with Per room or group on, the number at the start is the price.
@@ -883,6 +883,17 @@
   // number of players or people in the box ("min 2 players", "2-player minimum", « minimum 2 joueurs »). -> { n, rest }.
   // Indoor test 18 (2026-11-19; Natalie typed "Facials from $95" and was told "Just the number"): words before the number
   // say what the price is ("Facials from $95", "Day pass: 25", "Pedicure 70"): the number is read, the words are left.
+  // Indoor test 19 (2026-11-19; Priyanka typed "adults free, kids 15" and was refused): with a free word and a number, the
+  // number tied to a paid part is the price ("kids 15"), a kid's part first; the free part goes in Your prices. -> the part
+  // to read, or null.
+  function indoorPaidPart(x){
+    var t = String(x == null ? '' : x), FREE = /\b(?:free|gratuit\w*|gratis)\b/i;
+    if (!FREE.test(t) || !/\d/.test(t)) return null;
+    var parts = t.split(/\s*(?:[,;\/]|\band\b|\bbut\b|\bet\b|\bmais\b)\s*/i).filter(function(p){ return /\d/.test(p) && !FREE.test(p); });
+    if (!parts.length) return null;
+    var kid = parts.filter(function(p){ return /\b(?:kids?|child(?:ren)?|toddlers?|babies|enfants?|tout-petits?|jump(?:ers?)?|play(?:ers?)?|paid|paying)\b/i.test(p); });
+    return (kid[0] || parts[0]).trim();
+  }
   function indoorLeadWords(x){
     var t = String(x == null ? '' : x).trim(), m = /^([A-Za-z\u00c0-\u024f\u2019'][A-Za-z\u00c0-\u024f\u2019'\s&\-\/]*?)\s*(?:\b(?:from|starting at|starts at|at|is|are|only|[\u00e0a] partir de|d[\u00e8e]s|de)\b)?\s*[:\-\u2013\u2014=]?\s*((?:CA|C)?\$\s*\d.*|\d.*)$/i.exec(t);
     if (!m) return null; var w = m[1].replace(/[\s:\-\u2013\u2014]+$/, '').trim();
@@ -1713,6 +1724,8 @@
   // research found when her box holds none of her own (C.groupsFound, C.gtkFound: her other saved lines made the box hers).
   function researchOf(key){
     var cur = String(((CUR.visit_rows || {})[key]) || '').trim();
+    // Indoor test 19: research's Good to know now stays in the box more often; C.gtkFound adds the booking exceptions her answer replaced.
+    if (cur && key === 'good_to_know' && C.gtkFound && String(C.gtkFound).indexOf(cur) === 0 && (C.visitResearch || []).indexOf(key) >= 0) return String(C.gtkFound).trim();
     if (cur && (C.visitResearch || []).indexOf(key) >= 0) return cur;
     if (!cur && key === 'groups' && C.groupsFound) return String(C.groupsFound).trim();
     if (!cur && key === 'good_to_know' && C.gtkFound) return String(C.gtkFound).trim();
@@ -2713,7 +2726,7 @@
       // research found (C.gtkFound: its Good to know line, and the exceptions her walk-in answer replaced), as found online.
       // Only the sentences that contradict her answers are flagged and kept out (the rest are pre-filled).
       var gOwn = (CUR.visit_rows || {}).good_to_know || '', gIsRes = (C.visitResearch || []).indexOf('good_to_know') >= 0 || (!gOwn && !!C.gtkFound);
-      var gRes = gIsRes ? (gOwn || C.gtkFound || '') : '', gParts = String(gRes).split(/(?<=[.!?])\s+/).map(function(x){ return x.replace(/[\s.]+$/, '').trim(); }).filter(function(x){ return x && !staleIn(C.staleGone, x); }), gBad = gParts.filter(bringClash), gClash = gBad.length ? gBad.join('. ') + '.' : '';
+      var gRes = gIsRes ? (gOwn && C.gtkFound && String(C.gtkFound).indexOf(String(gOwn).trim()) === 0 ? C.gtkFound : (gOwn || C.gtkFound || '')) : '', gParts = String(gRes).split(/(?<=[.!?])\s+/).map(function(x){ return x.replace(/[\s.]+$/, '').trim(); }).filter(function(x){ return x && !staleIn(C.staleGone, x); }), gBad = gParts.filter(bringClash), gClash = gBad.length ? gBad.join('. ') + '.' : '';
       var gGone = (C.staleGone || []).length && String(gRes).split(/(?<=[.!?])\s+/).filter(function(x){ return x.trim(); }).length !== gParts.length;
       var gFill = gClash || gGone ? gParts.filter(function(p0){ return !bringClash(p0); }).map(function(p0){ return p0 + '.'; }).join(' ') : gRes;
       var bv = S.tour.bring != null ? S.tour.bring : gIsRes ? gFill : gOwn;
@@ -2911,6 +2924,8 @@
       // Tours (2026-11-16): "Who can come" asks the minimum age first, then dogs and access.
       // Indoor places (2026-11-19): the youngest age first (All ages, 5+, 8+, 12+, 16+, 19+), "Under 18s come with an adult".
       var tourAges = INDOOR ? '<h2 class="su-h2" style="margin-top:6px" id="suAgeQ">' + h(T.tageQ) + '</h2>' + (S.tour.ageGuessed && S.tour.age && T.guessKind ? '<p class="su-sent su-research" id="suAgeGuess">' + h(T.guessKind) + '</p>' : '') + tchips('age', ['all', '5', '8', '12', '16', '19'], T.tages, T.tageQ, 'suAgeQ')
+          // Indoor test 19: a kids' place's one hint line (its range is said in its story, not picked here).
+          + ((S.tour.kinds || []).indexOf('kids') >= 0 && T.tageKidsHint ? '<p class="su-sent" id="suAgeKidsHint">' + h(T.tageKidsHint) + '</p>' : '')
         + (S.tour.age && S.tour.age !== '19' && S.tour.age !== 'all' ? '<div class="su-chips" role="group" style="margin-top:8px"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (S.tour.adult ? 'true' : 'false') + '" data-tadult="1" id="suAdultRule">' + h(T.tadult) + '</button></div>' : '')
         : TOUR ? '<h2 class="su-h2" style="margin-top:6px" id="suAgeQ">' + h(T.tageQ) + '</h2>' + tchips('age', ['all', '5', '6', '8', '10', '12', '14', '16', '19'], T.tages, T.tageQ, 'suAgeQ')
         // Tour test 8: "Under 18s come with an adult" beside "All ages" only when it was picked (it read like a rule for babies).
@@ -4618,7 +4633,7 @@
     }
     if (k === 'priceSave' && INDOOR) {
       // Indoor test 18: words before the number ("Facials from $95") say what it is; the number is the price.
-      readTour(); var ipf = S.tour.free, ipb = el('suTprice') ? el('suTprice').value : '', ipbL = !ipf ? indoorLeadWords(ipb) : null; if (ipbL) ipb = ipbL.rest; var ipp = ipf ? 0 : !S.tour.per && indoorRangeLow(ipb) != null ? indoorRangeLow(ipb) : tourPriceNumber(ipb);
+      readTour(); var ipf = S.tour.free, ipb = el('suTprice') ? el('suTprice').value : '', ipbP = !ipf ? indoorPaidPart(ipb) : null; if (ipbP) ipb = ipbP; var ipbL = !ipf ? indoorLeadWords(ipb) : null; if (ipbL) ipb = ipbL.rest; var ipp = ipf ? 0 : !S.tour.per && indoorRangeLow(ipb) != null ? indoorRangeLow(ipb) : tourPriceNumber(ipb);
       if (!ipf && (ipp == null || isNaN(ipp))) { S.nudge = T.tpriceNeed; S.badField = 'suTprice'; return render(); }
       // Indoor test 2 (Jordan): a price per room, lane, game or group is never saved as a price for one person. Per person
       // with words that say otherwise ("per room", "per boat", "for 4 people"): ask, and offer Per room or group.
@@ -4931,7 +4946,8 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-hclose]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-hclose'); delete HO()[d]; var y = window.scrollY; render(); window.scrollTo(0, y); var r = el('suRow' + d); if (r && r.getBoundingClientRect().top < 60) { r.scrollIntoView({ block: 'start' }); window.scrollBy(0, -80); } }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-copyevery]'), function(b){ b.onclick = function(){
       readTimes(); var wk = W(), d = b.getAttribute('data-copyevery'), src = wk[d]; if (!src) return;
-      DAYS.forEach(function(x){ if (x !== d) wk[x] = clone(src); }); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+      // Indoor test 19 (2026-11-19; Priyanka: Monday stayed open after "Every day"): the day's editor closes; every day shows its hours.
+      DAYS.forEach(function(x){ if (x !== d) wk[x] = clone(src); }); delete HO()[d]; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-copytuesat]'), function(b){ b.onclick = function(){
       readTimes(); var wk = W(), d = b.getAttribute('data-copytuesat'), src = wk[d]; if (!src || wk.mon) return;
       // Tuesday to Saturday, open days or (a new page) every one of them that isn't marked Closed; Monday and Sunday as they are.
@@ -4948,6 +4964,7 @@
       // other day is closed (a new page with no hours yet) does it fill them all.
       var gets = DAYS.filter(function(x){ return copyGets(d, x); });
       gets.forEach(function(x){ if (all || (we ? ['sat', 'sun'] : ['mon', 'tue', 'wed', 'thu', 'fri']).indexOf(x) >= 0) wk[x] = clone(src); });
+      if (all) delete HO()[d];
       mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-same]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-same'), i = DAYS.indexOf(d), wk = W(); wk[d] = clone(wk[DAYS[i - 1]]); render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-yearly]'), function(b){ b.onchange = function(){ var k = b.getAttribute('data-yearly'); S.everyYear[k] = !yearlyOn(k); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });

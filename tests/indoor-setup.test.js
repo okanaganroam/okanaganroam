@@ -105,10 +105,13 @@ test('2. Part 1 with real taps (an escape room): the starting picks, the answers
   assert.match(sim.text(), /Add photos of your place/);
   // The page: the five answer lines in the Plan your visit rows (English), the booking card has Prices and Booking.
   const en = plain(page(v));
-  for (const l of ['All year.', '1 to 2 hours.', 'From $32 per player.', 'Ages 8 and up. Under 18s come with an adult.', 'Please book ahead.']) assert.ok(en.includes(l), l);
+  // Indoor test 19: "All year." says nothing a visitor needs and is left off.
+  assert.ok(!en.includes('All year.'));
+  for (const l of ['1 to 2 hours.', 'From $32 per player.', 'Ages 8 and up. Under 18s come with an adult.', 'Please book ahead.']) assert.ok(en.includes(l), l);
   // French page: the same lines in French, and the kinds in French.
   const fr = plain(page(v, 'fr'));
-  for (const l of ['Toute l’année.', '1 à 2 heures.', 'À partir de 32 $ par joueur.', 'À partir de 8 ans. Les moins de 18 ans viennent avec un adulte.', 'Réservez à l’avance.']) assert.ok(fr.includes(l), l);
+  assert.ok(!fr.includes('Toute l’année.'));
+  for (const l of ['1 à 2 heures.', 'À partir de 32 $ par joueur.', 'À partir de 8 ans. Les moins de 18 ans viennent avec un adulte.', 'Réservez à l’avance.']) assert.ok(fr.includes(l), l);
   assert.match(fr, /Jeu d’évasion/);
   // The card price is the owner's.
   const card = db.prepare('SELECT from_price, basis, reviewer FROM price_overrides WHERE venue_id = ?').get(v.id);

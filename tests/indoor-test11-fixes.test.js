@@ -162,8 +162,9 @@ test('5. Good to know and Groups pre-fill research as found online; her walk-in 
   RESEARCH(v.id);
   const t = tokenFor(v.id);
   await ok(change(t, { indoor_info: { kinds: ['museum'], length: '1-2h', book: 'no', age: 'all', year: 'all' }, indoor_price: 12 }));
-  // Her walk-in answer replaced research's Booking line; research's Good to know was set aside (the box was full).
-  assert.ok(!rowsOf(v.id).rows.some((r) => r.label === 'Good to know'));
+  // Her walk-in answer replaced research's Booking line. Indoor test 19: research's Good to know stays in the box now (the
+  // automatic Season and Time needed rows go first when it is full); it is still research's, not hers.
+  assert.ok(!rowsOf(v.id).owner_labels.includes('Good to know'));
   const g = await openSetup(base, t, { hash: 'bring' });
   assert.match(g.text(), /We found this online\. Check it\./);
   assert.equal(g.doc.getElementById('suBring').value, 'Wear socks for the dino dig pit. No elevator to level 2 or the planetarium. Sensory backpacks and earmuffs to borrow. Planetarium shows need pre-registration.');

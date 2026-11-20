@@ -197,7 +197,7 @@ const MATRIX = {
     ['fr', 'chaussettes obligatoires, 3 $ si vous oubliez', [GTK]],
     ['fr', 'les bébés de moins d’un an paient moins cher', [P]],
     ['fr', 'nous vendons des cartes de 10 entrées', [P]],
-    ['fr', 'le bouton devrait dire réserver une fête', [BK]],
+    ['fr', 'le bouton devrait dire réserver une fête', [BK, 'indoor-book-party']],
     ['fr', 'nous sommes pour les enfants de 0 à 10 ans', [A]],
     ['fr', 'heure adaptée aux besoins sensoriels chaque mardi', [GTK]],
   ],
@@ -806,8 +806,54 @@ test('indoor test 18: Natalie\'s Help questions (a day spa) land on the right an
   // Happy hour is never offered for an indoor place, on either page.
   for (const bot of [b.en, b.men]) assert.ok(!bot.topics.some((x) => /happy/i.test(x.id)), bot.topics.map((x) => x.id).filter((x) => /happy/i.test(x)).join(','));
 });
+// Indoor test 19 (2026-11-19; Priyanka, a kids' play centre: $15 a child, parents free, a café inside, toddler-only
+// mornings): her whole Help log, EN and FR twins, with where each belongs ([page, question, topics, French twin]). Parents
+// free at a place that charges is Your prices (never Free entry); on the price list page a membership with no set price,
+// socks required $3 and "should child admission say 2 and up" have their own answers; café inside is Good to know; toddler
+// time on What's On is the weekly event answer (never the price answer); the Book a party button "already does it".
+const NSP = 'indoor-no-set-price', RB = 'indoor-required-buy', LA = 'indoor-line-age', BP = 'indoor-book-party';
+const PRIYANKA = [
+  ['setup', 'under 2 is cheaper', [P], 'moins de 2 ans c’est moins cher'],
+  ['setup', 'parents free', [P], 'parents gratuits'],
+  ['setup', 'birthday parties weekends book online', [G, BK], 'fêtes d’anniversaire la fin de semaine, réservation en ligne'],
+  ['setup', 'its for kids 0 to 10, a parent must stay', [A], 'c’est pour les enfants de 0 à 10 ans, un parent doit rester'],
+  ['menu', 'monthly membership no set price', [NSP], 'abonnement mensuel sans prix fixe'],
+  ['menu', 'socks required $3', [RB], 'chaussettes obligatoires 3 $'],
+  ['menu', 'should child admission say 2 and up', [LA], 'l’entrée enfant doit-elle dire 2 ans et plus'],
+  ['setup', 'socks required', [GTK], 'chaussettes obligatoires'],
+  ['setup', 'toddler only mornings tuesday thursday', [TH], 'tout-petits seulement le matin mardi et jeudi'],
+  ['setup', 'gift cards', [GF], 'cartes-cadeaux'],
+  ['setup', 'first visit free for new families', [IC], 'première visite gratuite pour les nouvelles familles'],
+  ['setup', 'party cancellation policy', [GTK], 'politique d’annulation des fêtes'],
+  ['setup', 'we have a cafe inside', [GTK], 'nous avons un café sur place'],
+  ['setup', 'monthly membership', [P], 'abonnement mensuel'],
+  ['setup', 'how do i add toddler time to whats on', [TH], 'comment ajouter le temps des tout-petits à l’affiche'],
+  ['setup', 'we sell 10 visit passes', [P], 'nous vendons des cartes de 10 entrées'],
+  ['setup', 'the book button should say book a party', [BP], 'le bouton devrait dire réserver une fête'],
+];
+const PRIYANKA_WANT = Object.fromEntries(PRIYANKA.filter(([pg]) => pg === 'setup').map(([, q, want]) => [q, want]));
+test('indoor test 19: Priyanka\'s Help questions (a kids\' play centre) land on the right answer, in English and in French, on the setup and price list pages; parents free says Adults free in Your prices, never Free entry', async () => {
+  const b = await botsFor('kids');
+  const wrong = [];
+  for (const [pg, q, want, qFr] of PRIYANKA) {
+    const r = (pg === 'menu' ? b.men : b.en).best(q), f = (pg === 'menu' ? b.mfr : b.fr).best(qFr);
+    if (!r || !want.includes(r.id)) wrong.push(`en ${pg} "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+    if (!f || !want.includes(f.id)) wrong.push(`fr ${pg} "${qFr}" -> ${f && f.id} (want ${want.join(' or ')})`);
+  }
+  assert.deepEqual(wrong, []);
+  assert.match(plain(b.en.topic(P).a), /Parents or adults get in free\? Add a line in Your prices , like Adults free/);
+  assert.match(plain(b.fr.topic(P).aFr), /Adultes : gratuit/);
+  assert.match(plain(b.men.topic(NSP).a), /leave the price blank/);
+  assert.match(plain(b.men.topic(RB).a), /Grip socks \(required\) \$3/);
+  assert.match(plain(b.men.topic(LA).a), /2 and up/);
+  assert.match(plain(b.en.topic(BP).a), /already does/);
+  assert.match(plain(b.en.topic(GTK).a), /café or snack bar inside/);
+  // A free place: "parents free" is not turned into a price line there.
+  const g = await botsFor('gallery');
+  assert.doesNotMatch(plain(g.en.topic(P).a), /Adults free/);
+});
 // Every question in the 8 indoor help logs lands on an answer, on the page where it was asked, for the kind of place it was.
-const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga', 13: 'cinema', 14: 'museum', 15: 'gallery', 16: 'escape', 17: 'climbing', 18: 'spa' };
+const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga', 13: 'cinema', 14: 'museum', 15: 'gallery', 16: 'escape', 17: 'climbing', 18: 'spa', 19: 'kids' };
 // The misrouted ones, with where they belong.
 const LOG_WANT = {
   'we price per room not per person': [R], 'how do I change the price, it says adults but we charge per room': [R],
@@ -820,7 +866,7 @@ const LOG_WANT = {
   // Indoor test 9 (Melissa): socks and sensory hours are Good to know (with the weekly event in its answer), cheaper little
   // ones and passes are Your prices, the Book button's words are Booking, her 0 to 10 is the ages answer.
   'socks required, $3 if you forget': [GTK], 'we have a sensory friendly hour tuesdays': [GTK], 'how do i add our sensory hour as a weekly thing': [GTK],
-  'kids under 1 are cheaper how do i show that': [P], 'we sell 10 visit passes': [P], 'the book button should say book a party': [BK],
+  'kids under 1 are cheaper how do i show that': [P], 'we sell 10 visit passes': [P], 'the book button should say book a party': [BP, BK],
   'the age thing only goes up to all ages but we are 0 to 10': [A], 'price is per kid, parents are free': [P], 'party rooms book online but play is drop in': [BK],
   'grip socks are mandatory where does that go': [GTK],
   // Indoor test 10 (Sandra, a city pool): her five "I'm not sure"s and the ones that need a better answer.
@@ -841,6 +887,8 @@ const LOG_WANT = {
   ...MEGAN_WANT,
   // Indoor test 18 (Natalie, a day spa).
   ...NATALIE_WANT,
+  // Indoor test 19 (Priyanka, a kids' play centre).
+  ...PRIYANKA_WANT,
 };
 test('every question in the 8 indoor help logs lands on an answer (the misrouted ones on the right one)', async () => {
   const wrong = [];

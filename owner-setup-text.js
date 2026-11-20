@@ -2355,7 +2355,7 @@ en.indoor = {
   tpriceQ: 'What does it cost?', tpriceLead: 'The price for one adult. It shows on your card.', tpriceLeadPick: 'Your card will say “Adults {x}”.', tpriceLeadFree: 'Your card will say “Free”.',
   tpriceLabel: 'Adult price, in dollars', tpriceMore: 'Your other prices (kids, seniors, passes, packages) go in “Your prices”, the first of the extra details.',
   tpriceGuess: 'We picked this from your page. Check it, and change it if it’s not right.',
-  tpriceWaiting: 'You sent {x}. We’re checking it; it will show within a day.', tpriceNeed: 'Just the number, like 25. Free? Tap Free entry.',
+  tpriceWaiting: 'You sent {x}. We’re checking it; it will show within a day.', tpriceNeed: 'We couldn’t find a price in that. Type your main price with its number, like 25. Some people get in free (like adults)? Add that line in Your prices. Nobody pays? Tap Free entry.',
   tpriceSavedLive: 'Your price is on your page and your card now.', tpriceSavedDay: 'We’re checking {x}. A price over {n} is checked first; it shows within a day.',
   tpriceSavedFree: 'Your page and your card say “Free” now.', tpriceCard: 'Adults {x}', tfreeCard: 'Free', tfreeWords: { free: 'Free entry', donation: 'By donation' },
   // Walk-ins or booking
@@ -2445,7 +2445,7 @@ fr.indoor = {
   tpriceQ: 'Combien ça coûte?', tpriceLead: 'Le prix pour un adulte. Il paraît sur votre fiche.', tpriceLeadPick: 'Votre fiche indiquera « Adultes : {x} ».', tpriceLeadFree: 'Votre fiche indiquera « Gratuit ».',
   tpriceLabel: 'Prix adulte, en dollars', tpriceMore: 'Vos autres prix (enfants, aînés, laissez-passer, forfaits) vont dans « Vos tarifs », le premier des détails facultatifs.',
   tpriceGuess: 'Nous l’avons choisi d’après votre page. Vérifiez-le, et changez-le s’il n’est pas exact.',
-  tpriceWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.', tpriceNeed: 'Seulement le chiffre, par exemple 25. Gratuit? Touchez Entrée gratuite.',
+  tpriceWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.', tpriceNeed: 'Nous n’avons pas trouvé de prix. Écrivez votre prix principal avec son chiffre, par exemple 25. Certains entrent gratuitement (comme les adultes)? Ajoutez cette ligne dans Vos tarifs. Personne ne paie? Touchez Entrée gratuite.',
   tpriceSavedLive: 'Votre prix est sur votre page et votre fiche maintenant.', tpriceSavedDay: 'Nous vérifions {x}. Un prix de plus de {n} est vérifié d’abord; il s’affiche d’ici un jour.',
   tpriceSavedFree: 'Votre page et votre fiche indiquent « Gratuit » maintenant.', tpriceCard: 'Adultes : {x}', tfreeCard: 'Gratuit', tfreeWords: { free: 'Entrée gratuite', donation: 'Contribution volontaire' },
   bookShows: 'Le bouton de votre page : {x}', ibookQ: 'Peut-on venir sans réservation?', ibooks: { no: 'Oui, sans réservation', busy: 'Oui, mais réservez pour les fins de semaine et les périodes achalandées', ahead: 'Non, réservez à l’avance' },
@@ -2591,6 +2591,9 @@ Object.assign(fr.indoor, { staleHead: 'Nous avions aussi ceci, trouvé en ligne'
 Object.assign(fr.indoor, { haveBookPage: 'Vous avez une page de réservation?' });
 // Indoor test 9 (2026-11-19; Melissa's walk-in play centre: the Book button was for party rooms): with Walk-ins welcome, the
 // link box is for parties or groups, and the page's button says "Book a party" when the link or Groups line is about parties.
+// Indoor test 19 (2026-11-19; Priyanka, kids 0 to 10): a kids' place's hint under From what age? (All ages is pre-picked).
+Object.assign(en.indoor, { tageKidsHint: 'For kids up to an age, like 0 to 10? Say it in your story.' });
+Object.assign(fr.indoor, { tageKidsHint: 'Pour les enfants jusqu’à un certain âge, comme de 0 à 10 ans? Dites-le dans votre histoire.' });
 Object.assign(en.indoor, { tbookQParty: 'Party or group booking link (optional)', tbookLeadParty: 'It puts a Book button on your page (“Book a party” when it’s for parties).' });
 Object.assign(fr.indoor, { tbookQParty: 'Lien de réservation de fête ou de groupe (facultatif)', tbookLeadParty: 'Il ajoute un bouton Réserver à votre page (« Réserver une fête » si c’est pour les fêtes).' });
 // Indoor test 13 (2026-11-19; Dan's cinema: "Walk-ins welcome" folded his showtimes link away, then titled it a party link):
