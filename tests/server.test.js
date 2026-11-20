@@ -19377,7 +19377,7 @@ test('French place pages (2026-10-13): /fr/... renders the place in French, pair
   assert.match(page.text, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/share\/fr\/kelowna\/restaurants\/test-trattoria\.png\?v=/);
   assert.match(page.text, /<a href="\/kelowna\/restaurants\/test-trattoria" hreflang="en" lang="en">English<\/a>/);
   assert.doesNotMatch(page.text, /class="desc-en"/, 'only the French description');
-  assert.match(page.text, /Bon à savoir/);
+  assert.match(page.text, /Gardez cette adresse sous la main/);
   const ld = s5jsonLd(page.text);
   assert.deepEqual(ld.find((b) => b['@type'] === 'BreadcrumbList').itemListElement[0].name, 'Accueil');
   assert.equal(ld.find((b) => b['@type'] !== 'BreadcrumbList').description, app.getVenue(venue.id).description_fr);
@@ -31463,8 +31463,9 @@ test('Round 9 accessibility: on a venue page the facts (map, phone, website) com
     db.prepare("UPDATE venues SET phone = '250-555-0199', website = 'https://example.com/', address = '1 Test St, Kelowna' WHERE id = ?").run(v.id);
     for (const lang of ['en', 'fr']) {
       const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'r9-order-cafe'), [], [], [], { lang });
-      // English Food & Drink pages (2026-11-07): the sidebar closes the facts, and the visitor photos and tips come after it.
-      const fdPage = lang === 'en';
+      // Food & Drink pages (2026-11-07; French too since 2026-11-20): the sidebar closes the facts, and the visitor photos
+      // and tips come after it.
+      const fdPage = true;
       const aside = html.indexOf(fdPage ? '<aside class="fd-aside">' : '<aside class="venue-aside">'), asideEnd = html.indexOf('</aside>'), extra = fdPage ? asideEnd : html.indexOf('<div class="venue-extra">');
       assert.ok(aside > 0 && extra >= asideEnd, 'the extras follow the sidebar');
       // (#572: one map link, the Directions button; a place with no coordinates for the built-in directions gets the Google Maps button.)
@@ -31930,28 +31931,16 @@ test('Round 10 phone: venue pages put Call / Directions / Favorite / Add to trip
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   for (const opts of [{}, { lang: 'fr' }]) {
     const html = app.renderVenuePage({ ...venue, description_fr: 'Une trattoria fictive pour les tests.' }, [], [], [], opts);
-    if (!opts.lang) {
-      // English Food & Drink pages (2026-11-07) follow Copper's approved order: a short introduction, then the main buttons
+    {
+      // Food & Drink pages (2026-11-07; French too since 2026-11-20) follow Copper's approved order: a short introduction, then the main buttons
       // (Directions, Menu, Hours); Call and the save buttons sit in the "Keep this one handy" card with the facts.
       const top = html.slice(html.indexOf('<div class="fd-content">'), html.indexOf('<aside class="fd-aside">'));
-      assert.ok(top.indexOf('<div class="venue-header">') >= 0 && top.indexOf('<p class="venue-description">') > top.indexOf('<div class="venue-header">'));
-      assert.ok(top.indexOf('<div class="venue-cta-row"') > top.indexOf('<p class="venue-description">'), 'the introduction, then the main buttons');
+      assert.ok(top.indexOf('<div class="venue-header">') >= 0 && top.indexOf('<p class="venue-description"') > top.indexOf('<div class="venue-header">'));
+      assert.ok(top.indexOf('<div class="venue-cta-row"') > top.indexOf('<p class="venue-description"'), 'the introduction, then the main buttons');
       assert.match(html, /<div class="fd-actions fd-contact-actions"[^>]*><a class="cta secondary" href="tel:/, 'the Call button is in the contact card');
       assert.match(html, /<div class="fd-actions fd-save-actions"[^>]*>\s*<button type="button" class="card-action fav-btn"/);
       assert.ok(html.indexOf('<aside class="fd-aside">') < html.indexOf('id="vcOpen"') || !html.includes('id="vcOpen"'), 'the facts come before the visitor photos and tips');
-      continue;
     }
-    const main = html.slice(html.indexOf('<div class="venue-main">'), html.indexOf('<aside class="venue-aside">'));
-    const at = (s) => main.indexOf(s);
-    assert.ok(at('<div class="venue-header">') >= 0 && at('<div class="venue-cta-row"') > 0 && at('<p class="venue-description"') > 0);
-    assert.ok(at('<div class="venue-header">') < at('<div class="venue-cta-row"'), 'header first');
-    assert.ok(at('<div class="venue-cta-row"') < at('<p class="venue-description"'), 'the buttons come before the description in the page (tab order)');
-    assert.match(main, /<a class="cta secondary" href="tel:/, 'the Call button is in that row');
-    // #402: the contact block (sidebar) still comes before the visitor photos and tips.
-    assert.ok(html.indexOf('<aside class="venue-aside">') < html.indexOf('<div class="venue-extra">'));
-    // Wider screens show the description first again through CSS order, and phones keep the page order.
-    assert.match(html, /@media \(min-width: 641px\) \{\n    body\.golf-page \.venue-main > \.venue-header \{ order: -4; \}\n    body\.golf-page \.venue-main > \.venue-description \{ order: -3; \}\n    body\.golf-page \.venue-main > aside \{ order: -2; \}\n    body\.golf-page \.venue-main > \.venue-editorial \{ order: -1; \}/);
-    assert.match(html, /@media \(min-width: 960px\) \{[\s\S]*?body\.golf-page \.venue-main \{ display: flex; flex-direction: column; \}/);
   }
   // Editorial story sections (Elora) follow the description in the page and are marked for the wide-screen order.
   const elora = app.renderVenuePage(eloraPageFixture(), [], [], []);

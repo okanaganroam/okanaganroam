@@ -178,9 +178,11 @@ test('no winery page repeats a link address under the wrong words', () => {
   }
 });
 
-test('French winery pages keep their current layout', () => {
+test('French winery pages use the Food & Drink layout, without the English tastings card (2026-11-20)', () => {
   const fr = app.renderVenuePage(app.getVenue(rich.id), [], [], [], { now: NOW, lang: 'fr' });
-  assert.doesNotMatch(fr, /<body[^>]*winery-venue-page|<div class="fd-layout">/);
+  assert.match(fr, /<body[^>]*fd-venue-page/);
+  assert.match(fr, /<div class="fd-layout">/);
+  assert.doesNotMatch(fr, /<body[^>]*winery-venue-page|id="fdTastings"/);
 });
 
 test('a tasting is never listed twice: the Plan your visit box leaves out the rows the Tastings card shows', () => {

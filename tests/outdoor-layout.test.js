@@ -107,8 +107,11 @@ test('only the Kalamalka page has the mapped route and the two parking entrances
   }
 });
 
-test('French pages, and a redirected listing, keep their own layout', () => {
-  assert.doesNotMatch(page(trail, 'fr'), /id="klLayout"/);
+test('French pages use the layout with its labels in French (2026-11-20); a redirected listing keeps its own', () => {
+  const fr = page(trail, 'fr');
+  assert.match(fr, /id="klLayout"/);
+  assert.match(fr, /À propos de cet endroit/);
+  assert.doesNotMatch(fr, /About this place|Spotted something that needs updating/);
   const redirected = { ...app.getVenue(trail.id), redirect_to: bare.id };
   assert.doesNotMatch(app.renderVenuePage(redirected, [], [], [], { now: NOW }), /id="klLayout"/);
 });

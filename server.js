@@ -42206,17 +42206,20 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const golfboxLayout = !fr && !venue.redirect_to && venue.region === 'west-kelowna' && venue.slug === 'golfbox';
   // Indoor & Rainy Day pages (2026-11-08): the venues and indoor golf simulators the hub lists use the layout first built for
   // GOLFBOX (indoor-venue-layout.js); GOLFBOX keeps its own page.
-  const indoorLayout = !fr && !venue.redirect_to && !golfboxLayout && (venue.type === 'indoor' || (venue.type === 'golf' && isIndoorGolfVenue(venue)));
+  // French place pages (2026-11-20) use these layouts too, with the labels in French (place-layouts-fr.js). The two
+  // one-off pages (GOLFBOX, the Kalamalka park) are written in English, so in French they use the shared layouts.
+  const indoorLayout = !venue.redirect_to && !golfboxLayout && (venue.type === 'indoor' || (venue.type === 'golf' && isIndoorGolfVenue(venue)));
   const parkLayout = !fr && !venue.redirect_to && venue.region === 'coldstream' && venue.slug === 'kalamalka-lake-provincial-park-trails-rattlesnake-point';
   // Outdoors and Sports & Recreation pages (2026-11-08): the layout first built for the Kalamalka park page, on every English
   // page of those two categories (outdoor-venue-layout.js). Kalamalka keeps its mapped route and parking entrances.
   // Batch 2 (2026-11-20): beaches, golf courses, tours and shops use the Outdoors layout too, with their own content kept.
-  const placeLayout = !fr && !venue.redirect_to && !golfboxLayout && !indoorLayout && ['beach', 'golf', 'tour', 'shop'].includes(venue.type);
-  const outdoorLayout = !fr && !venue.redirect_to && (venue.type === 'outdoor' || venue.type === 'sport' || placeLayout);
+  const placeLayout = !venue.redirect_to && !golfboxLayout && !indoorLayout && ['beach', 'golf', 'tour', 'shop'].includes(venue.type);
+  const outdoorLayout = !venue.redirect_to && (venue.type === 'outdoor' || venue.type === 'sport' || placeLayout);
   const wineryPage = !fr && !venue.redirect_to && venue.type === 'winery';
   // French Food & Drink pages (2026-11-20) use the layout too, with its labels in French (food-drink-venue-layout-fr.js).
-  // French winery pages keep the older page for now: the tastings card is written in English.
-  const fdLayout = !venue.redirect_to && (foodDrinkPageApplies(venue) || wineryPage);
+  // French winery pages use it as well, without the tastings card (written in English): their tastings stay in the
+  // French visit box.
+  const fdLayout = !venue.redirect_to && (foodDrinkPageApplies(venue) || wineryPage || (fr && venue.type === 'winery'));
   const nichePrices = wineryPage && venue.region === 'west-kelowna' && venue.slug === 'niche-wine-company' ? require('./data/niche-tasting-prices.json') : null;
   const copperProfile = fdLayout && !fr && venue.region === 'kelowna' && venue.type === 'brewery' && venue.slug === 'copper-brewing-co'
     ? require('./data/copper-layout-profile.json') : null;
@@ -43077,6 +43080,9 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     var edit = box.querySelector('a.venue-claim-btn'); if (edit) edit.href = '${fr ? '/fr' : ''}/owner/account/venue/' + box.getAttribute('data-venue-id');
   })();
   </script>`;
+  // The French page's own description paragraph, exactly as its older page wrote it (every French layout shows it).
+  const frDescBlockHtml = fr ? `${frDescEnglish && !editorial ? '<p class="venue-desc-lang" id="venueDescLang">Description en anglais</p>' : ''}<p class="venue-description"${!(frDescEnglish && !editorial) ? ' lang="fr"' : ' lang="en"'}>${editorial ? escapeHtml(editorial.intro) : frDescEnglish ? escapeHtml(venue.description || '') : escapeHtml(venue.description_fr || venue.description || '')}</p>` : '';
+  const frLayoutText = fr ? require('./place-layouts-fr') : null;
   const fdBody = fdLayout ? (() => {
     const fdLib = require('./food-drink-venue-layout');
     const winery = wineryPage;
@@ -43120,7 +43126,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     }
     const dogNote = dogFriendlyNote !== undefined && dogFriendlyNote !== null ? String(dogFriendlyNote).trim() : '';
     // The French page's own description paragraph and chip row, exactly as its older page wrote them.
-    const frSummaryDescHtml = fr ? `${frDescEnglish && !editorial ? '<p class="venue-desc-lang" id="venueDescLang">Description en anglais</p>' : ''}<p class="venue-description"${!(frDescEnglish && !editorial) ? ' lang="fr"' : ' lang="en"'}>${editorial ? escapeHtml(editorial.intro) : frDescEnglish ? escapeHtml(venue.description || '') : escapeHtml(venue.description_fr || venue.description || '')}</p>` : '';
+    const frSummaryDescHtml = frDescBlockHtml;
     const frSummaryChipsHtml = fr ? `<p class="chips">${cvChipHtml}${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}</p>` : '';
     return fdLib.renderFoodDrinkVenueLayout({
       venue, escapeHtml, atAGlance, openStatusHtml, happyHourHtml, verifiedHtml, venueAdvisoryHtml, profile,
@@ -43171,32 +43177,39 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     ? { ...indoorVisitBase, rows: indoorVisitBase.rows.concat(indoorVisitBase.owner_dropped.filter((r) => r && r.owned && r.label && typeof r.text === 'string' && r.text.trim() && !indoorVisitBase.rows.some((x) => x.label === r.label)).map((r) => ({ label: r.label, text: r.text }))) }
     : indoorVisitBase;
   const indoorBody = indoorLayout ? require('./indoor-venue-layout').renderIndoorLayout({
-    venue: venue.type === 'indoor' ? { ...venue, description: indoorStaleDescription(venue) } : venue, escapeHtml, visitInfo:indoorVisitInfo, actions:ctaEntries, ctaRowAttrs, verifiedHtml, advisoryHtml:venueAdvisoryHtml, kindLabel:indoorEnTopLabel(venue), ownStory:venue.type === 'indoor' && ownerDescriptionWasHers(venue),
-    glanceRows:venue.type === 'golf' ? GOLF_AT_A_GLANCE_FACTS[`${venue.region}/${venue.slug}`] : null,
+    venue: venue.type === 'indoor' ? { ...venue, description: indoorStaleDescription(venue) } : venue, escapeHtml, visitInfo:fr ? null : indoorVisitInfo, actions:ctaEntries, ctaRowAttrs, verifiedHtml, advisoryHtml:venueAdvisoryHtml, kindLabel:indoorEnTopLabel(venue), ownStory:venue.type === 'indoor' && ownerDescriptionWasHers(venue),
+    glanceRows:!fr && venue.type === 'golf' ? GOLF_AT_A_GLANCE_FACTS[`${venue.region}/${venue.slug}`] : null,
     detailRows, locationHtml, hoursHtml:showDatesHtml || hoursHtml, guideLinks, nearbyCards:fdNearbyCards, eventsHtml:venueEventsHtml,
-    visitorHtml:visitorSectionHtml(venue, 'en'), gallery:galleryHtml ? galleryHtml.phone(creditHtml) : '', ownerCtaHtml,
+    visitorHtml:visitorSectionHtml(venue, fr ? 'fr' : 'en'), gallery:galleryHtml ? galleryHtml.phone(creditHtml) : '', ownerCtaHtml,
     regionLabel, openStatusHtml, chipsHtml:`${cvChipHtml}${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}`,
     // Indoor test 5 (2026-11-19): the owner's typed prices, as the French page shows them.
-    menuHtml: venueMenu ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
+    menuHtml: venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : '',
+    // French: the page's own kind line, description, visit box and the business's own posts, as its older page had them.
+    ...(fr ? {
+      t: frLayoutText, eyebrowHtml: atAGlanceParts, summaryDescriptionHtml: frDescBlockHtml + (editorialHtml || ''), whyHtml: venueWhyHtml,
+      visitBoxHtml: `${golfGlanceHtml || ''}${visitHtml || ''}${golfEnglishNote || ''}`, nearbyLimit: 12, relatedHtml, nearbyHtml,
+      moreHtml: `${happyHourHtml || ''}${venueDealsCardHtml || ''}${venueWeeklyNightsHtml(weeklyNights, fr, { events: false, brew: false, tours: false, lounge: false }) || ''}`,
+    } : {}),
   }) : '';
   const outdoorBody = outdoorLayout ? require('./outdoor-venue-layout').renderOutdoorLayout({
-    venue, escapeHtml, facts:OUTDOOR_FACTS[String(venue.id)], factRows:outdoorFactRows(venue), visitInfo:visitInfoRaw, advisoryHtml:venueAdvisoryHtml,
+    venue, escapeHtml, facts:fr ? null : OUTDOOR_FACTS[String(venue.id)], factRows:fr ? [] : outdoorFactRows(venue), visitInfo:visitInfoRaw, advisoryHtml:venueAdvisoryHtml,
     actions:ctaEntries, ctaRowAttrs, guideLinks, nearbyCards:fdNearbyCards,
-    visitorHtml:visitorSectionHtml(venue, 'en'), gallery:galleryHtml ? galleryHtml.phone(creditHtml) : '',
+    visitorHtml:visitorSectionHtml(venue, fr ? 'fr' : 'en'), gallery:galleryHtml ? galleryHtml.phone(creditHtml) : '',
     park:parkLayout, regionLabel, categorySlug:catSlug, openStatusHtml, glanceHtml:hikeGlanceHtml,
-    chipsHtml:`${cvChipHtml}${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}`, descriptionHtml:'<p class="venue-description">' + escapeHtml((placeLayout && editorial ? editorial.intro : trimVenueTagline(venue.description)) || '') + '</p>',
+    chipsHtml:`${cvChipHtml}${hiddenGemChip}${attributeChipsFor(!!happyHourHtml)}`, descriptionHtml:fr ? frDescBlockHtml : '<p class="venue-description">' + escapeHtml((placeLayout && editorial ? editorial.intro : trimVenueTagline(venue.description)) || '') + '</p>',
     locationHtml, detailRows, hoursHtml:showDatesHtml || hoursHtml, visitHtml, eventsHtml:venueEventsHtml, ownerCtaHtml,
     // Indoor test 5 (2026-11-19): an outdoor or sport place's own typed prices too (the French page already shows them).
     // A place on the shared place layout (golf, beaches, tours, shops) shows its list in moreHtml instead.
-    menuHtml: venueMenu && !placeLayout ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
-    ...(placeLayout ? {
+    menuHtml: venueMenu && !placeLayout && !fr ? venueMenuPreviewHtml(venue, venueMenu, 'en') : '',
+    ...(fr ? { t: frLayoutText, categoryPlural: label.plural.toLowerCase() } : {}),
+    ...(placeLayout || fr ? {
       whyHtml: venueWhyHtml, verifiedHtml,
       // The line under the name says what kind of place it is, its town and its rating, as the older page did.
-      eyebrowHtml: atAGlanceParts, glanceHtml: '', nearbyLimit: 12,
-      aboutExtraHtml: `${editorialHtml || ''}${golfMapHtml || ''}${golfGlanceHtml || ''}${golfFeesHtml || ''}${golfValueHtml || ''}`,
+      eyebrowHtml: atAGlanceParts, glanceHtml: fr ? hikeGlanceHtml : '', nearbyLimit: 12,
+      aboutExtraHtml: `${editorialHtml || ''}${golfMapHtml || ''}${golfGlanceHtml || ''}${golfFeesHtml || ''}${golfValueHtml || ''}${golfEnglishNote || ''}`,
       relatedHtml, nearbyHtml,
       // What the business itself posts: its deals, weekly nights and its price list or "Tours & prices".
-      moreHtml: `${venueDealsCardHtml || ''}${venueWeeklyNightsHtml(weeklyNights, fr, { events: false, brew: false, tours: false, lounge: false }) || ''}${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, 'en') : ''}`,
+      moreHtml: `${venueDealsCardHtml || ''}${venueWeeklyNightsHtml(weeklyNights, fr, { events: false, brew: false, tours: false, lounge: false }) || ''}${venueMenu ? venueMenuPreviewHtml(venue, venueMenu, fr ? 'fr' : 'en') : ''}`,
     } : {}),
   }) : '';
   const page = `<!DOCTYPE html>
