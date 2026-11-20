@@ -460,6 +460,13 @@ function t3FrenchTextCore(value){
  text=text.replace(/^No need to book \(the operator’s own answer\)\.$/,'Pas besoin de réserver (réponse de l’entreprise).');
  // Indoor places (2026-11-19): the owner's own walk-ins answer.
  text=text.replace(/^Walk-ins welcome; book ahead for weekends and busy times \(the owner’s own answer\)\.$/,'Sans réservation; réservez pour les fins de semaine et les périodes achalandées (réponse de l’établissement).');
+ // Indoor test 16: the owner's own ages on a kids' stop, and an age rule with an adult.
+ text=text.replace(/^Priced per (room|group)$/,(_,u)=>u==='room'?'Prix par salle':'Prix par groupe');
+ if(text==='Takes groups (the owner’s own Groups line)')return 'Accueille les groupes (selon l’établissement)';
+ text=text.replace(/^All ages welcome \(the owner’s own answer\)$/,'Tous les âges sont bienvenus (réponse de l’établissement)');
+ text=text.replace(/^Kids (\d{1,2}) and up welcome \(the owner’s own answer\)$/,(_,a)=>`Enfants de ${a} ans et plus bienvenus (réponse de l’établissement)`);
+ text=text.replace(/^Under (\d{1,2})s come with an adult \(the owner’s own (?:words|answer)\)\.$/,(_,a)=>`Les moins de ${a} ans viennent avec un adulte (selon l’établissement).`);
+ text=text.replace(/^Kids (\d{1,2}) and up come with an adult \(the owner’s own words\)\.$/,(_,a)=>`Dès ${a} ans, avec un adulte (selon l’établissement).`);
  text=text.replace(/^For kids (\d{1,2}) to (\d{1,2}) \(the owner’s own words\)(\.?)$/,(_,a,b,d)=>`Pour les enfants de ${a} à ${b} ans (selon l’établissement)${d}`); // indoor test 9
  text=text.replace(/^Book ahead \(the owner’s own answer\)\.$/,'Réservez à l’avance (réponse de l’établissement).');
  text=text.replace(/^Book a class time: see the schedule on their (?:Book|Class schedule) button \(the owner’s own answer\)\.$/,'Réservez une heure de cours : voyez l’horaire avec leur bouton Horaire des cours (réponse de l’établissement).'); // indoor test 12

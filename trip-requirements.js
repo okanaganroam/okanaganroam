@@ -1513,7 +1513,14 @@ const REQUEST_SYNONYMS=[...SHORTHAND,[/\bh[eé]li[- ]?(?:hik(?:ing|es?)|randonn[
   // Indoor test 7 (2026-11-19; Robert's gallery): "art walk", "first Friday", sculpture and paintings, and a bare "art"
   // mean galleries ("art walk downtown Kelowna" planned hiking parks; "art in Kelowna on Friday" a trail and laser tag).
   [/\bart (?:walks?|crawls?|tours?)\b/gi,'art galleries'],[/\bfirst fridays?(?: art\b| art walks?\b| openings?\b)?/gi,'art galleries'],[/\b(?:sculptures?|sculptors?|paintings|painters)\b/gi,'art galleries'],
-  [/(?<!\b(?:martial|street|body|nail|latte|pop|digital|kids?|children'?s?) )\bart\b(?! (?:galler|museum|class|classes|camps?|studios?|workshops?|lessons?|centre|center|deco|supplies|supply|party|parties))/gi,'art galleries']];
+  [/(?<!\b(?:martial|street|body|nail|latte|pop|digital|kids?|children'?s?) )\bart\b(?! (?:galler|museum|class|classes|camps?|studios?|workshops?|lessons?|centre|center|deco|supplies|supply|party|parties))/gi,'art galleries'],
+  // Indoor test 16 (2026-11-19; "rainy day for a group of 6" searched for the word "group" and left out Tyler's escape room,
+  // Great for Groups with a Groups line): a group, a group of N, N people (4 or more), a big group or a team is the
+  // Great for Groups badge ("big group"), never a word to find. "Group of friends", "team building" and "team trip" keep
+  // their own meaning (the group occasion), as before.
+  [/\b(?:a |our |my )?(?:big |large )?group of (?:\d{1,3}|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty)(?: (?:people|adults|guests|players|of us|coworkers|colleagues|teens|teenagers|kids|students))?\b/gi,'a big group'],
+  [/\bfor (?:a )?(?:party of |team of )?(\d{1,3}|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty)(?: (?:people|adults|guests|players|of us|persons))\b/gi,(m,n)=>{const k={four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,twelve:12,fifteen:15,twenty:20}[String(n).toLowerCase()]||Number(n);return k>=4?'for a big group':m;}],
+  [/(?<!\b(?:big|large|good for|great for|for big|for large) )\b(?:groups?|teams?)\b(?! (?:of friends|getaway|building|dinner|dinners|trip|trips|of \d))/gi,'big group']];
 // 2026-10-25 (tools audit): "retired couple, no hiking" became "relaxed easy walks, no hiking", a walks part that "no
 // hiking" emptied (three mornings left free). With hiking or walking ruled out, those words mean "relaxed" only.
 const WALKS_NEGATED_RE=/\b(?:no|without|skip|avoid|not into|no more|don.?t (?:want|like|do|need)(?: to)?|do not (?:want|like|do|need)(?: to)?)\s+(?:\w+\s+)?(?:hik\w*|walks?|walking|trails?)\b/i;

@@ -24825,6 +24825,11 @@ function indoorVisitLines(venue, info) {
   if (range) {
     const adult = t.adult === true ? [' Under 18s come with an adult.', ' Les moins de 18 ans viennent avec un adulte.'] : ['', ''];
     out.Ages = { en: `Kids ${range.min} to ${range.max}.${adult[0]}`, fr: `Enfants de ${range.min} à ${range.max} ans.${adult[1]}` };
+  } else if (INDOOR_AGES.includes(String(t.age || '')) && indoorAdultAges(venue, t)) {
+    // Indoor test 16: "Ages 12 and up (8+ with an adult)." from the owner's own words.
+    const r = indoorAdultAges(venue, t);
+    out.Ages = r.alone != null ? { en: `Ages ${r.alone} and up (${r.withAdult}+ with an adult).`, fr: `À partir de ${r.alone} ans (dès ${r.withAdult} ans avec un adulte).` }
+      : { en: `Ages ${r.withAdult} and up, with an adult.`, fr: `À partir de ${r.withAdult} ans, avec un adulte.` };
   } else if (INDOOR_AGES.includes(String(t.age || ''))) {
     const a = INDOOR_AGE_LINES[String(t.age)];
     const adult = t.adult === true && !['all', '19'].includes(String(t.age)) ? [' Under 18s come with an adult.', ' Les moins de 18 ans viennent avec un adulte.'] : ['', ''];
@@ -25098,6 +25103,39 @@ function indoorKidsRange(venue, info) {
   } catch (e) { /* none */ }
   return null;
 }
+// Indoor test 16 (2026-11-19; Tyler's escape room: 8+ in Who can come, and his own Good to know "Ages 12+ on their own; ages
+// 8 to 11 with a paying adult"): an age rule with an adult in the owner's own Good to know or Groups words (never
+// research), read the way round 9 reads age ranges. -> { alone: 12, withAdult: 8 } (alone null when only "8+ with an adult"
+// is said), or null. Every kind with a minimum age.
+const INDOOR_ADULT_WORDS_RE = /\b(?:with|accompanied by|alongside) (?:a |an |one )?(?:paying |participating |playing )?(?:adults?|parents?|guardians?|grown[- ]?ups?)\b|\bavec (?:un )?(?:adulte|parent)s?\b|\baccompagn[ée]s?\b/i;
+const INDOOR_ALONE_WORDS_RE = /\b(?:on their own|by themselves|alone|unaccompanied|without (?:an? )?(?:adult|parent|guardian)|solo|seuls?)\b/i;
+function indoorAdultAges(venue, info) {
+  try {
+    const t = info || venueIndoorInfo(venue.id);
+    const min = /^\d+$/.test(String(t.age || '')) ? Number(t.age) : null;
+    if (min == null || min >= 19) return null;
+    let alone = null, withAdult = null;
+    for (const part of indoorOwnLines(venue.id, /^(?:good to know|groups?)$/i)) {
+      for (const c of String(part).split(/[;,]\s*|\s+(?:and|but|or)\s+(?=(?:ages?\s*)?\d|under\b|kids\b|children\b)/i)) {
+        const range = /\b(?:ages?\s*|aged\s*|kids\s*|children\s*)?(\d{1,2})\s*(?:to|-|–|—|through|thru|à)\s*(\d{1,2})\b/i.exec(c);
+        const plus = /\b(\d{1,2})\s*(?:\+|and (?:up|over|older)|years? and (?:up|over|older)|ans et plus)/i.exec(c);
+        const under = /\bunder\s*(\d{1,2})s?\b|\bmoins de (\d{1,2}) ans\b/i.exec(c);
+        if (INDOOR_ADULT_WORDS_RE.test(c)) {
+          if (range && Number(range[2]) > Number(range[1]) && Number(range[2]) < 19) { withAdult = Number(range[1]); alone = alone || Number(range[2]) + 1; }
+          else if (plus && Number(plus[1]) < 19) withAdult = Number(plus[1]);
+          else if (under && Number(under[1] || under[2]) < 19) alone = alone || Number(under[1] || under[2]);
+        } else if (INDOOR_ALONE_WORDS_RE.test(c) && plus && Number(plus[1]) < 19) alone = Number(plus[1]);
+      }
+    }
+    if (withAdult == null && alone == null) return null;
+    if (withAdult == null) withAdult = min;
+    if (withAdult < min) withAdult = min;
+    if (alone != null && alone <= withAdult) alone = null;
+    // A rule for one activity that starts above the owner's own minimum ("Escape rooms: 10+ with an adult") is left to Good to know.
+    if (withAdult !== min) return null;
+    return { alone, withAdult };
+  } catch (e) { return null; }
+}
 // Indoor test 9 (2026-11-19; "Kids from $14" while crawlers pay $8): a kids' place whose main price is per child says
 // "Kids $14." when a lower price is in its own typed prices.
 // Indoor test 10 (2026-11-19; Sandra's pool: "Drop-in from $7.50" while kids pay $3.50): every kind does, in its own words
@@ -25216,6 +25254,8 @@ function indoorPlannerFacts(venueId) {
   return {
     ...(Array.isArray(t.kinds) && t.kinds.length ? { indoorKinds: t.kinds.slice() } : {}),
     ...(INDOOR_AGES.includes(String(t.age || '')) ? { indoorMinAge: String(t.age) } : {}),
+    // Indoor test 16: an age rule with an adult (the owner's own words), or the Under 18s come with an adult answer.
+    ...(() => { const v = db.prepare('SELECT id FROM venues WHERE id = ?').get(venueId); const r = v && indoorAdultAges(v, t); return r ? { indoorAdultAges: r } : t.adult === true && /^(?:5|8|12|16)$/.test(String(t.age || '')) ? { indoorAdultAges: { alone: 18, withAdult: Number(t.age) } } : {}; })(),
     // Indoor test 9: a kids' age range in the owner's own words ("kids 0 to 10").
     ...(() => { const v = db.prepare('SELECT id, description FROM venues WHERE id = ?').get(venueId); const r = v && indoorKidsRange(v, t); return r ? { indoorKidsRange: [r.min, r.max] } : {}; })(),
     ...(INDOOR_BOOK.includes(t.book) ? { indoorBook: t.book } : {}),
