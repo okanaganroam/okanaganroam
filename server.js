@@ -56791,7 +56791,7 @@ const MENU_PRICE_WORDS_FR = [[/\bper person\b/i, 'par personne'], [/\bper (?:tan
   // (known words only; the rest stays as typed).
   [/\bper kid\b/i, 'par enfant'], [/\bper (?:student|skier|learner)\b/i, 'par élève'], [/\bper participant\b/i, 'par participant'], [/\bper (?:private )?lesson\b/i, 'par cours'], [/\bper class\b/i, 'par cours'],
   [/\bfor the week\b/i, 'pour la semaine'], [/\bper week\b/i, 'par semaine'], [/\bfor the day\b/i, 'pour la journée'], [/\bfor (\d) days\b/i, 'pour $1 jours'],
-  [/\b(\d{1,2})\s*(?:-|–|to)\s*(\d{1,2}) (?:people|persons|guests)\b/i, '$1 à $2 personnes'], [/^on request$/i, 'Sur demande'], [/\bfree\b/, 'gratuit'], [/\bFree\b/, 'Gratuit'], ...MENU_UNIT_WORDS_FR];
+  [/\b(\d{1,2})\s*(?:-|–|to)\s*(\d{1,2}) (?:people|persons|guests)\b/i, '$1 à $2 personnes'], [/^on request$/i, 'Sur demande'], ...MENU_UNIT_WORDS_FR];
 // Tour test 16 (Whistler, 2026-11-18; Tom): « 149 $ adult, $99 kids 5 to 12 » was half converted. Who a price is for, in the
 // words we know: « 149 $ adulte, 99 $ enfants de 5 à 12 ans ». Used only when it leaves no English word in the line ("(2
 // adults, or 1 adult + 2 kids)" stays as typed rather than « (2 adultes, or 1 adulte + 2 enfants) »).
@@ -56800,7 +56800,9 @@ const MENU_WHO_WORDS_FR = [
   [/\b(?:(?:kids|children)\s+)?under\s+(\d{1,2})s?\s+(?:(?:are|go|come|ride|is)\s+)?free\b/i, 'gratuit pour les moins de $1 ans'], [/\bfree\s+(?:for\s+)?(?:(?:kids|children)\s+)?under\s+(\d{1,2})\b/i, 'gratuit pour les moins de $1 ans'],
   [/\b(?:kids|children)\s+(?:ages?\s+)?(\d{1,2})\s*(?:-|–|to)\s*(\d{1,2})\b/i, 'enfants de $1 à $2 ans'], [/\b(?:kids|children)\s+(?:ages?\s+)?(\d{1,2})\s*(?:\+|and up|and over)/i, 'enfants de $1 ans et plus'],
   [/\b(?:kids|children)\s+under\s+(\d{1,2})\b/i, 'enfants de moins de $1 ans'], [/\b(?:kids|children)\b/i, 'enfants'], [/\b(?:kid|child)\b/i, 'enfant'], [/\badults\b/i, 'adultes'], [/\badult\b/i, 'adulte'],
-  [/\bseniors\b/i, 'aînés'], [/\bsenior\b/i, 'aîné'], [/\bfamily\b/i, 'famille']];
+  [/\bseniors\b/i, 'aînés'], [/\bsenior\b/i, 'aîné'], [/\bfamily\b/i, 'famille'],
+  // Indoor test 19: a free word left after the phrases above ("under 6 free" is theirs) is « gratuit ».
+  [/\bfree\b/, 'gratuit'], [/\bFree\b/, 'Gratuit']];
 const MENU_FR_WORDS = new Set([...MENU_PRICE_WORDS_FR, ...MENU_WHO_WORDS_FR].flatMap(([, w]) => w.toLowerCase().split(/[^a-zà-ÿ’']+/)).filter(Boolean));
 function menuWhoWordsFr(q) {
   const one = (seg) => {
