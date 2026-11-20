@@ -3813,7 +3813,8 @@ test('sports listings show a matched local photo on the valley hub, region categ
 
     const region = await s4request('GET', '/kelowna/sports');
     assert.equal(region.status, 200);
-    assert.match(region.text, /data-card-ph style="--card-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park-w480\.jpg\?v=[0-9a-f]{10}'\)/);
+    // The town page is the /sports page with only that town's places (2026-11-20), so its cards are the hub's cards.
+    assert.match(region.text, /data-ph="own" style="--fd-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park-w480\.jpg\?v=[0-9a-f]{10}'\)/);
   } finally {
     db.prepare('DELETE FROM venues WHERE id = ?').run(Number(result.lastInsertRowid));
   }
@@ -4945,7 +4946,7 @@ test('Guide pages (2026-10-14): the shared directory engine, a friendly heading,
   const venues = batch4bGuideVenues();
   const html = app.renderGuidePage('kelowna', 'patio', venues);
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/);
-  assert.match(html, /<body class="golf-page outdoor-page fd-page curated-hub-page guide-page">/);
+  assert.match(html, /<body class="golf-page outdoor-page fd-page fd-refresh curated-hub-page guide-page">/);
   assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
   assert.match(html, /<h1>Patios in Kelowna<\/h1>/);
@@ -9888,7 +9889,7 @@ test('Dog Friendly Finds: card contract, photos, engagement wiring and internal 
   }
 
   // Trip tray, header and footer are the shared ones.
-  assert.match(markup, /class="golf-page outdoor-page fd-page dog-page dog-hub-page"/);
+  assert.match(markup, /class="golf-page outdoor-page fd-page fd-refresh dog-page dog-hub-page"/);
   assert.match(markup, /id="floatingTooltip"/);
 });
 
@@ -10166,7 +10167,7 @@ test('Destination pages: every linked category tab has an active venue, and food
     assert.doesNotMatch(markup, new RegExp(`data-venue-id="${other.id}"`), 'another region never appears');
     assert.doesNotMatch(markup, /id="fdRegionsBtn"/, 'no global Regions popover');
     assert.doesNotMatch(markup, /data-fd-type=/, 'no global type chips');
-    assert.match(markup, /What are you looking for\?/);
+    assert.match(markup, /id="fdFeaturesBtn"[^>]*>[\s\S]{0,120}Filters/);
     assert.match(markup, /data-fd-feature="patio"/);
     assert.match(markup, /id="fdSearch"/);
     assert.match(markup, /class="category-region-selector-active" aria-current="page">Cafes/, 'current tab');
@@ -17703,7 +17704,9 @@ test('Indoor & Rainy Day: /indoor renders with zero indoor venues (simulators + 
       const region = await WINTER_GET(base, '/kelowna/indoor');
       assert.equal(region.status, 200);
       assert.match(region.text, /Indoor &amp; Rainy Day Spots in Kelowna, BC/);
-      assert.match(region.text, /class="category-back-link" href="\/indoor">← All Indoor &amp; Rainy Day</);
+      // The town page is the /indoor page with only that town's places (2026-11-20).
+      assert.match(region.text, /<body class="[^"]*indoor-hub-page/);
+      assert.match(region.text, /href="\/kelowna\/indoor\/winter-test-gallery"/);
       const venue = await WINTER_GET(base, '/kelowna/indoor/winter-test-gallery');
       assert.equal(venue.status, 200);
       assert.match(venue.text, /<title>Winter Test Gallery — Indoor Attraction in Kelowna, BC<\/title>/);
@@ -17901,7 +17904,7 @@ test('Tours & Experiences: /tours renders with zero tour venues (coming soon), r
       assert.match(empty.text, /<h1>Tours &amp; Experiences in the Okanagan<\/h1>/);
       assert.match(empty.text, /class="tour-coming-soon">More tours and experiences are coming soon/);
       assert.match(empty.text, /<p class="outdoor-intro fd-intro">Wine tours, lake cruises, guided hikes, cooking classes, sleigh rides and more/);
-      assert.match(empty.text, /<body class="golf-page outdoor-page fd-page curated-hub-page tours-hub-page">/);
+      assert.match(empty.text, /<body class="golf-page outdoor-page fd-page fd-refresh curated-hub-page tours-hub-page">/);
       assert.doesNotMatch(empty.text, /class="subtitle">0 verified/);
       assert.doesNotMatch(empty.text, /toursAlsoHeading/, 'no also-section without members');
       assert.equal((await WINTER_GET(base, '/vernon/tours')).status, 404, 'an empty region/tours pair 404s like any other');
@@ -18173,9 +18176,10 @@ test('Sports & Recreation: other-type venues tagged sports_also get a "More plac
       // notes, and the sitemap lists it; the hub's region selector offers it.
       const kel = await WINTER_GET(base, '/kelowna/sports');
       assert.equal(kel.status, 200);
-      assert.match(kel.text, /<h2 class="category-subsection-heading" id="sportsAlsoHeading">More places to play<\/h2>/);
+      // The town page is the /sports page with only that town's places (2026-11-20); tagged places are cards like the rest.
+      assert.match(kel.text, /<body class="[^"]*sports-hub-page/);
       assert.match(kel.text, /href="\/kelowna\/outdoors\/sports-also-city-park"/);
-      assert.match(kel.text, /<span class="card-note-label">Play:<\/span> Skate park and four tennis courts/);
+      assert.match(kel.text, /Skate park and four tennis courts/);
       assert.doesNotMatch(kel.text, /No sports &amp; recreation are listed/);
       // SEO r13: a town page with fewer than 3 places is noindex and out of the sitemap (both tagged venues here are single).
       assert.match(kel.text, /noindex/);
@@ -18189,8 +18193,10 @@ test('Sports & Recreation: other-type venues tagged sports_also get a "More plac
       const own = app.createVenue({ name: 'Sports Also Test Skate Park', region: 'kelowna', type: 'sport', description: 'A fixture skate park.', slug: 'sports-also-test-skate-park' });
       try {
         const kel2 = await WINTER_GET(base, '/kelowna/sports');
-        assert.match(kel2.text, /<p class="subtitle">1 verified sports &amp; recreation spot in Kelowna\.<\/p>/);
-        assert.match(kel2.text, /href="\/kelowna\/sports\/sports-also-test-skate-park"[\s\S]*id="sportsAlsoHeading"/, 'its own venues first, then More places to play');
+        assert.match(kel2.text, /1 verified sports &amp; recreation spot in Kelowna\./);
+        // One list, as on /sports (2026-11-20): its own venue and the town's tagged place are both cards.
+        assert.match(kel2.text, /href="\/kelowna\/sports\/sports-also-test-skate-park"/);
+        assert.match(kel2.text, /href="\/kelowna\/outdoors\/sports-also-city-park"/);
         const hub2 = await WINTER_GET(base, '/sports');
         // One list since 2026-10-14: its own venue and the two tagged places.
         assert.match(hub2.text, /id="fdResultsSummary" aria-live="polite">3 places to play</);
@@ -18448,10 +18454,12 @@ test('Indoor discovery: URL filters select real venues and family uses the store
         const page = await WINTER_GET(base, `/indoor/${activity}`);
         assert.equal(page.status, 200);
         // Inspect cards, excluding JSON-LD and navigation.
-        const cards = page.text.match(/<ul class="card-grid">[\s\S]*?<\/ul>/g)?.join('') || '';
+        const cards = page.text.match(/<ul class="card-grid"[^>]*>[\s\S]*?<\/ul>/g)?.join('') || '';
         fixtures.forEach((v, i) => assert.equal(cards.includes(`href="/kelowna/indoor/${v.slug}"`), i === selected, `${activity}: ${v.name}`));
-        assert.match(page.text, /aria-current="page"/);
-        assert.match(page.text, /[1-9]\d* matching spots?/);
+        // The activity page is the /indoor page with that activity chosen (2026-11-20).
+        // /indoor/family keeps its older page (every kid-friendly indoor place).
+        if (activity === 'family') { assert.match(page.text, /aria-current="page"/); assert.match(page.text, /[1-9]\d* matching spots?/); }
+        else assert.match(page.text, new RegExp(`data-fd-type="${activity}" aria-pressed="true"`));
       }
       const unknown = await WINTER_GET(base, '/indoor?activity=unknown');
       fixtures.forEach((v) => assert.ok(unknown.text.includes(`href="/kelowna/indoor/${v.slug}"`)));
@@ -24653,7 +24661,7 @@ test('Town winery pages use the food & drink page: site header, photo cards, sea
     const res = await fetch(`http://localhost:${srv.address().port}/kelowna/wineries`);
     assert.equal(res.status, 200);
     const html = await res.text();
-    assert.match(html, /<body class="golf-page outdoor-page fd-page fd-scoped-page">/);
+    assert.match(html, /<body class="golf-page outdoor-page fd-page fd-refresh fd-scoped-page">/);
     assert.match(html, /<h1>Wineries in Kelowna, BC<\/h1>/);
     for (const needle of ['id="fdOpenNow"', '<select id="fdSort"', 'id="fdResults"', 'data-ph="', 'first-timer', 'href="/wineries"']) assert.ok(html.includes(needle), needle);
     for (const v of made) assert.ok(html.includes(`data-venue-id="${v.id}"`), v.name);
