@@ -1092,10 +1092,10 @@
   // Distillery test 1 (Whistler, 2026-11-16): Family Day (always a Monday) was offered to a place closed every Monday. A
   // holiday that falls on the same weekday every year (never Christmas or Canada Day, which move) on a day the week has
   // closed (the stretch's week inside a stored stretch) isn't offered: its tile says "You're closed Mondays".
-  // Indoor test 18 (2026-11-19; Natalie, closed Mondays: Jun 21 falls on a Monday next year and said nothing): any fixed-date
-  // holiday on a closed weekday this time says so too (any = true); its tile stays tappable, for the years it moves.
-  function holWeekClosed(o, any){
-    if (!o || (!any && ['family', 'goodFri', 'easterMon', 'victoria', 'bcDay', 'labour', 'thanks'].indexOf(o.key) < 0) || !S.week || !DAYS.some(function(d){ return S.week[d] && S.week[d].length; })) return '';
+  // Indoor test 18 (2026-11-19; Natalie, closed Mondays: Jun 21 is a Monday next year and said nothing): with a second
+  // argument (true), any fixed-date holiday on a closed weekday this time says so too; its tile stays tappable.
+  function holWeekClosed(o){
+    if (!o || (!arguments[1] && ['family', 'goodFri', 'easterMon', 'victoria', 'bcDay', 'labour', 'thanks'].indexOf(o.key) < 0) || !S.week || !DAYS.some(function(d){ return S.week[d] && S.week[d].length; })) return '';
     var dt = new Date(o.date + 'T12:00:00'); if (isNaN(dt)) return '';
     var wd = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][dt.getDay()], md = String(o.date).slice(5), wk = S.week;
     (S.seaList || []).forEach(function(s){ if (s && s.on && s.src && s.week && mdInRange(md, s.src.from, s.src.to)) wk = s.week; });
