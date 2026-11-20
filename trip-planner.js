@@ -839,8 +839,16 @@ function indoorMainKind(v) {
   return Object.keys(INDOOR_CARD_WORDS).find((k) => IK.indoorKindLabels(k, INDOOR_CARD_WORDS[k]).some((w) => w[0] === pair[0])) || null;
 }
 // Indoor test 17: an indoor place of a kind the day already has (its other stops), unless the request asks for several.
+// ... asked for: "two escape rooms", or the kind named in the plural ("kids, museums and easy food").
+function severalOfKindAsked(k, ctx) {
+  const q = ` ${normWords((ctx && ctx.queryText) || '')} `;
+  // No request text (a plan built from an intent alone): nothing to tell, so as before.
+  if (!q.trim() || SEVERAL_ASKED_RE.test(q)) return true;
+  const IK = require('./indoor-kinds'), K = IK.INDOOR_KIND_TEXT[k];
+  return !!K && K.en.search.concat(K.fr.search).map((w) => normWords(w)).some((w) => /s$/.test(w) && w.length > 3 && q.includes(` ${w} `) && !/(?:ss|ics|ous)$/.test(w));
+}
 function sameIndoorKindToday(v, stops, facts, ctx) {
-  const k = indoorMainKind(v); if (!k || SEVERAL_ASKED_RE.test((ctx && ctx.queryText) || '')) return false;
+  const k = indoorMainKind(v); if (!k || severalOfKindAsked(k, ctx)) return false;
   const ids = new Set((stops || []).filter((x) => x && x.venue && x.venue.type === 'indoor' && x.venue.id !== v.id).map((x) => x.venue.id));
   return (facts || []).some((f) => ids.has(f.id) && indoorMainKind(f) === k);
 }
@@ -3816,7 +3824,7 @@ function buildDays(facts, ctx, days, pinned) {
           if (dayTypes[v.type] && !['restaurant', 'indoor', 'tour'].includes(v.type) && !(v.type === 'winery' && days === 1 && ctx.types.has('winery') && dayTypes.winery < 2) && !(v.type === 'outdoor' && dayTypes.outdoor < 2 && WELL_KNOWN_SIGHTS.has(v.name))) continue;
           // Indoor test 17 (2026-11-19; a kids' birthday day planned two climbing gyms): one indoor place of each kind a day,
           // unless the request asks for more than one ("two escape rooms").
-          if (v.type === 'indoor' && indoorMainKind(v) && dayIndoorKinds.has(indoorMainKind(v)) && !SEVERAL_ASKED_RE.test(ctx.queryText || '')) continue;
+          if (v.type === 'indoor' && indoorMainKind(v) && dayIndoorKinds.has(indoorMainKind(v)) && !severalOfKindAsked(indoorMainKind(v), ctx)) continue;
           const fit = slotFit(v, ctx, daypart, d - 1, daypart);
           if (!fit.ok) continue; // listed hours prove it is closed then
           const s = base.get(v.id);
