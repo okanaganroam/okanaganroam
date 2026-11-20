@@ -1,0 +1,82 @@
+[
+ {
+  "id": 2013,
+  "name": "Vintage Merlot Bed & Breakfast",
+  "file": "/images/venues/vintage-merlot-bed-and-breakfast-2610.jpg",
+  "dimensions": "1440x720",
+  "source_page": "https://visitoliver.com/local-business/vintage-merlot-bed-breakfast/",
+  "image_url": "https://visitoliver.com/wp-content/uploads/2025/01/VMbnb-Exterior.jpeg",
+  "source_kind": "tourism_board",
+  "note": "The house and front garden with patio seating, over the front fence; source only 1440px (source 1440x1080)"
+ },
+ {
+  "id": 2011,
+  "name": "Global Village Permaculture Bed & Breakfast",
+  "file": "/images/venues/global-village-permaculture-bed-and-breakfast-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://visitoliver.com/local-business/global-village-permaculture-bed-breakfast/",
+  "image_url": "https://visitoliver.com/wp-content/uploads/2025/01/GVPBNB-Suite.webp",
+  "source_kind": "tourism_board",
+  "note": "The red guest suite cottage with its garden (source 2320x2320)"
+ },
+ {
+  "id": 2023,
+  "name": "Pipe Dreams Winery Suites",
+  "file": "/images/venues/pipe-dreams-winery-suites-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://visitoliver.com/local-business/pipe-dreams-winery-suites/",
+  "image_url": "https://visitoliver.com/wp-content/uploads/2025/01/PDS-property2.jpeg",
+  "source_kind": "tourism_board",
+  "note": "The property across its vineyard rows, Pipe Dreams sign at left and the buildings behind (source 2048x1266)"
+ },
+ {
+  "id": 2085,
+  "name": "Sunny Beach Motel",
+  "file": "/images/venues/sunny-beach-motel-2610.jpg",
+  "dimensions": "1470x736",
+  "source_page": "https://visitpenticton.com/listing/sunny-beach-motel/",
+  "image_url": "https://visitpenticton.com/wp-content/uploads/2016/03/20180919-sunny-beach-motel-034.jpg",
+  "source_kind": "tourism_board",
+  "note": "Motel front with its Sunny Beach Motel sign and office; source 1470px wide (source 1470x1800)"
+ },
+ {
+  "id": 2089,
+  "name": "Waterfront Inn",
+  "file": "/images/venues/waterfront-inn-2610.jpg",
+  "dimensions": "1610x806",
+  "source_page": "https://visitpenticton.com/listing/waterfront-inn/",
+  "image_url": "https://visitpenticton.com/wp-content/uploads/2016/03/20221031-waterfront-resort-002-Pano-low-res.jpg",
+  "source_kind": "tourism_board",
+  "note": "Wide guest room with two queen beds (no exterior over 1000px anywhere) (source 1800x805)"
+ },
+ {
+  "id": 2095,
+  "name": "Vance Creek Hotel & Conference Centre",
+  "file": "/images/venues/vance-creek-hotel-and-conference-centre-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.skisilverstar.com/lodging-amenities/places-to-stay/vance-creek-hotel/",
+  "image_url": "https://cms.skisilverstar.com/sites/default/files/2022-10/DSC_7014.jpg",
+  "source_kind": "website",
+  "note": "Hotel entrance with the Vance Creek sign, in winter snow (source 3600x2395)"
+ },
+ {
+  "id": 2093,
+  "name": "Lord Aberdeen Hotel",
+  "file": "/images/venues/lord-aberdeen-hotel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.skisilverstar.com/lodging-amenities/places-to-stay/lord-aberdeen-hotel/",
+  "image_url": "https://cms.skisilverstar.com/sites/default/files/2022-10/DSC_7009.jpg",
+  "source_kind": "website",
+  "note": "The Lord Aberdeen building with its sign, in winter snow (source 3600x2395)"
+ },
+ {
+  "id": 2096,
+  "name": "Snowbird Lodge (SilverStar Central Reservations front desk)",
+  "file": "/images/venues/snowbird-lodge-silverstar-central-reservations-front-desk-2610.jpg",
+  "dimensions": "1500x750",
+  "source_page": "https://www.skisilverstar.com/lodging-amenities/places-to-stay/snowbird-lodge/",
+  "image_url": "https://cms.skisilverstar.com/sites/default/files/2025-09/DSC_6811-web.jpg",
+  "source_kind": "website",
+  "note": "Snowbird Lodge's turret front in winter snow; source 1500px (source 1500x998)"
+ }
+]
