@@ -1,0 +1,57 @@
+[
+ {
+  "id": 2098,
+  "name": "Rosedale Motel",
+  "reason": "Own site (Joomla) gallery and all room/cottage pages top out at 799px (banners 999x391); reservations page is a form only, no booking engine; Google Maps has no photos 1200px or wider"
+ },
+ {
+  "id": 2107,
+  "name": "Fairfield Inn & Suites Vernon",
+  "reason": "marriott.com page opens in the browser and lists the hotel's photos, but cache.marriott.com refuses plain curl (403) for the image files; Google Maps has only one 360 sphere"
+ },
+ {
+  "id": 2127,
+  "name": "TownePlace Suites by Marriott West Kelowna",
+  "reason": "marriott.com images refused to plain curl (403); Google Maps (first successful check) has 4 visitor photos: an event sign, a closet, a kitchenette corridor and a cat"
+ },
+ {
+  "id": 2077,
+  "name": "Holiday House Motel",
+  "reason": "No own website (searched); Google place has no photos 1200px or wider"
+ },
+ {
+  "id": 2080,
+  "name": "Plaza Motel",
+  "reason": "No own website (searched); Google has only a dated room shot and a door close-up"
+ },
+ {
+  "id": 2003,
+  "name": "Naramata Courtyard Suites",
+  "reason": "Own site media library checked: suites photos are 1024px or smaller; the large images are stock/tourism shots (coffee window, Naramata Store, food, lake); Google has nothing 1200px or wider"
+ },
+ {
+  "id": 2018,
+  "name": "Black Hills Vineyard Lodge",
+  "reason": "Lodge page opens in the browser (4 photos up to full size), but blackhillswinery.com refuses plain curl for the image files; Google place is the winery only (tasting room, wine, sign)"
+ },
+ {
+  "id": 2028,
+  "name": "Mount View Motel",
+  "reason": "Own Weebly site now returns 404 (unpublished); Google still has only the hill-and-sky exterior, a guest's room shot and a bathroom"
+ },
+ {
+  "id": 2030,
+  "name": "Pine Bluff Motel",
+  "reason": "No own website (searched); Google has the same 3 photos (dim dusk building shot, an interior, a hillside)"
+ },
+ {
+  "id": 2014,
+  "name": "River Stone Cottage",
+  "reason": "Own site (now WordPress) cottage photos are all 630px, banner 1261x350; 95 large media-library photos checked, all winery/events; Google place is the winery (vineyard, wine, people)"
+ },
+ {
+  "id": 1964,
+  "name": "Kelowna Okanagan Lake Hostel",
+  "reason": "Own site photos max 640px; Google has only guest-complaint close-ups (window, TV, chair, duvet, hallway)"
+ }
+]
