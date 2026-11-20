@@ -50360,7 +50360,14 @@ const EVENT_SUBMISSION_RATE_LIMIT = 10; // POST attempts per IP ...
 const EVENT_SUBMISSION_RATE_WINDOW_MS = 60 * 60 * 1000; // ... per hour (own counter, separate from venues)
 const EVENT_SUBMISSION_DUPLICATE_WINDOW_DAYS = 7;
 const EVENT_SUBMISSION_MAX_FUTURE_DAYS = 366; // latest allowed start date, from today
-const EVENT_SUBMISSION_MAX_SPAN_DAYS = 31; // a date range covers at most 31 calendar days
+const EVENT_SUBMISSION_MAX_SPAN_DAYS = 31; // a date range covers at most 31 calendar days (the public form)
+// Indoor test 15 (2026-11-19; Aaron's gallery: a summer camp Jul 5 – Aug 27 was turned back at 31 days, and exhibitions run
+// 2–3 months): an owner's event (from the private link or a login) runs up to 120 days as it is. Longer still goes in with
+// its full dates, flagged for the reviewer; only a run over a year is turned back, and that message names the owner form's
+// own box. The public form keeps 31 days: it is anonymous and not tied to a listing, and its limit is passed in the same
+// shared validator, so raising the owner's limit cannot widen it.
+const OWNER_EVENT_MAX_SPAN_DAYS = 120;
+const OWNER_EVENT_HARD_SPAN_DAYS = 366;
 const EVENT_SUBMISSION_CONSENT_VERSION = '2026-09-25';
 const EVENT_SUBMISSION_CONSENT_TEXT = 'I am authorized to submit this event, the details are accurate, and Okanagan Roam may review, edit and publish them. My contact details are only used to follow up about this event and are not published.';
 const EVENT_SUBMISSION_REGIONS = VENUE_SUBMISSION_REGIONS;
@@ -50398,6 +50405,8 @@ function eventSubmissionRateLimited(ip, now = Date.now()) {
 // through the existing validateEventOccurrence() as a final gate.
 // opts.timeOptional (2026-11-11): owner forms may leave the start time blank; a single-day event then reads
 // "Time to be confirmed". The public form keeps the start time required.
+const EVENT_SUBMISSION_SPAN_ERROR = `An event can span at most ${EVENT_SUBMISSION_MAX_SPAN_DAYS} days. Put the first day here and write the full run in “Other dates or schedule notes” below.`;
+const OWNER_EVENT_SPAN_ERROR = 'An event can run up to a year. Longer, or a series? Put the first day here and write the full run in “Repeats or other dates?” below.';
 function validateEventSubmission(body, now = new Date(), opts = {}) {
   const errors = {};
   const data = {};
@@ -50475,7 +50484,8 @@ function validateEventSubmission(body, now = new Date(), opts = {}) {
     endDate = parseLocalDate(body.end_date);
     if (!endDate) errors.end_date = 'Please enter a real end date.';
     else if (startDate && endDate < startDate) errors.end_date = 'The end date is before the start date.';
-    else if (startDate && localDaysBetween(startDate, endDate) >= EVENT_SUBMISSION_MAX_SPAN_DAYS) errors.end_date = `An event can span at most ${EVENT_SUBMISSION_MAX_SPAN_DAYS} days. Please list longer runs in the schedule notes.`;
+    else if (opts.owner && startDate && localDaysBetween(startDate, endDate) >= OWNER_EVENT_HARD_SPAN_DAYS) errors.end_date = OWNER_EVENT_SPAN_ERROR;
+    else if (!opts.owner && startDate && localDaysBetween(startDate, endDate) >= EVENT_SUBMISSION_MAX_SPAN_DAYS) errors.end_date = EVENT_SUBMISSION_SPAN_ERROR;
   }
 
   const timeOk = (v) => typeof v === 'string' && LOCAL_TIME_PATTERN.test(v);
@@ -50558,6 +50568,20 @@ function describeEventSubmissionWhen(sub) {
   return `${dates}, ${times} (Okanagan time)`;
 }
 
+// Indoor test 15: what the reviewer must check before approving an event, in words: a run longer than the owner limit
+// (it went in with its full dates), and a single-day event whose Repeats box describes a run ("Jul 5 – Aug 27", "until
+// December 19", "all summer"), so a run is never published as one day without someone looking.
+const EVENT_RUN_NOTE_RE = /\b(?:until|till|til|through|thru|runs?|running|on (?:view|display)|all (?:summer|winter|fall|autumn|spring|season|month)|every (?:day|week)|daily|weekdays|(?:mon|tues|wednes|thurs|fri|satur|sun)days)\b|\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*\d{0,2}(?:st|nd|rd|th)?\s*(?:-|–|—|to)\s*(?:(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s*)?\d{0,2}\b|\b\d{1,2}\s*(?:-|–|—|to)\s*\d{1,2}\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i;
+function eventSubmissionReviewFlags(sub) {
+  const out = [];
+  if (!sub || !sub.start_date) return out;
+  const span = sub.end_date && sub.end_date !== sub.start_date ? localDaysBetween(sub.start_date, sub.end_date) + 1 : 1;
+  if (span > OWNER_EVENT_MAX_SPAN_DAYS) out.push(`Runs ${span} days (${formatSubmissionLocalDate(sub.start_date)} to ${formatSubmissionLocalDate(sub.end_date)}), longer than ${OWNER_EVENT_MAX_SPAN_DAYS}. Check the end date before approving.`);
+  const notes = String(sub.schedule_notes || '').trim();
+  if (span === 1 && notes && EVENT_RUN_NOTE_RE.test(notes)) out.push(`One day only, but “Repeats or other dates?” says: “${notes.slice(0, 160)}”. Set the end date or add the dates before approving, or it shows as a single day.`);
+  return out;
+}
+
 function buildEventSubmissionEmail(sub) {
   const payload = {
     _subject: `[PENDING REVIEW] Event submission #${sub.id}: ${sub.name}`,
@@ -50581,6 +50605,8 @@ function buildEventSubmissionEmail(sub) {
     'Contact email': sub.contact_email,
   };
   if (sub.schedule_notes) payload['Other dates / schedule notes (not published)'] = sub.schedule_notes;
+  const flags = eventSubmissionReviewFlags(sub);
+  if (flags.length) payload['Check before approving'] = flags.join(' ');
   if (sub.price_text) payload['Price (as given)'] = sub.price_text;
   if (sub.image_link) payload['Poster / photo link (not published automatically)'] = sub.image_link;
   // Pub test 9: the owner's uploaded picture, private until the event is approved (then it is the event's image).
@@ -54246,7 +54272,7 @@ async function handleOwnerEventSubmission(req, res, token) {
   delete full.partner_venue_ids;
   delete full.image;
   delete full.image_rights;
-  const { data, errors } = validateEventSubmission(full, new Date(), { timeOptional: true, emailOptional: true });
+  const { data, errors } = validateEventSubmission(full, new Date(), { timeOptional: true, emailOptional: true, owner: true });
   const partners = cleanPartnerIds(body.partner_venue_ids, venue.id);
   if (partners === null) errors.partner_venue_ids = `Choose up to ${EVENT_PARTNER_MAX} businesses listed on Okanagan Roam.`;
   else data.partner_venue_ids = partners;
@@ -54271,7 +54297,7 @@ async function handleOwnerEventSubmission(req, res, token) {
   }
   ownerMarkFrench(res, 'event_submissions', id);
   notifyInBackground(`owner event #${id}`, () => notifyEventSubmission(id));
-  return sendSubmissionResponse(res, 201, { ok: true, id });
+  return sendSubmissionResponse(res, 201, { ok: true, id, ...(localDaysBetween(data.start_date, data.end_date || data.start_date) + 1 > OWNER_EVENT_MAX_SPAN_DAYS ? { long: true } : {}) });
 }
 
 // An owner event's picture (pub test 9, 2026-11-10): the same checks as an owner photo (a JPEG the browser made, at least
@@ -60378,7 +60404,7 @@ const INDOOR_SETUP_HELP_TOPICS = [
       'book a party', 'say book a party', 'should say book', 'button should say', 'party booking', 'party booking link', 'party link', 'party rooms book online', 'parties book online',
       // Indoor test 12 (Jess): classes that fill up are booked ahead.
       'classes fill up', 'class fills up', 'classes fill', 'classes sell out', 'booking required', 'booking is required', 'must book', 'always book', 'book every time'],
-    keysFr: ['se reservent', 'se reserve', 'sur inscription', 'preinscription', 'inscription prealable', 'sans reservation', 'sans reserver', 'venir sans reserver', 'reserver', 'reservation', 'reservations', 'faut il reserver', 'reserver en ligne', 'billets en ligne', 'acheter des billets', 'lien de reservation', 'rendez vous', 'fins de semaine', 'reservees en ligne', 'doivent etre reservees', 'sans reservation pour', 'les deux', 'inscription', 'inscriptions', 'reserver une fete', 'lien de reservation de fete', 'reservation de fete', 'fetes en ligne', 'cours sont pleins', 'reservation obligatoire', 'doit reserver', 'toujours reserver'],
+    keysFr: ['inscrit en ligne', 's inscrit en ligne', 'inscription en ligne', 'inscriptions en ligne', 'on s inscrit', 'se reservent', 'se reserve', 'sur inscription', 'preinscription', 'inscription prealable', 'sans reservation', 'sans reserver', 'venir sans reserver', 'reserver', 'reservation', 'reservations', 'faut il reserver', 'reserver en ligne', 'billets en ligne', 'acheter des billets', 'lien de reservation', 'rendez vous', 'fins de semaine', 'reservees en ligne', 'doivent etre reservees', 'sans reservation pour', 'les deux', 'inscription', 'inscriptions', 'reserver une fete', 'lien de reservation de fete', 'reservation de fete', 'fetes en ligne', 'cours sont pleins', 'reservation obligatoire', 'doit reserver', 'toujours reserver'],
     // Indoor test 2 (2026-11-19; Jordan): a place where some things book ahead and others are walk-in picks its main one.
     a: '<p>In <strong>Booking</strong>, tap one: <strong>Yes, walk-ins welcome</strong>, <strong>Yes, but book ahead for weekends and busy times</strong>, or <strong>No, please book ahead</strong>. Then paste your booking or tickets link (FareHarbor, Eventbrite, your own website): your page gets a Book button.</p><p>Booking always required (classes fill up)? Tap <strong>No, please book ahead</strong> and paste your booking link: your page says “Please book ahead” and its <strong>Book</strong> button opens your booking page.</p><p>Some things book ahead and some are walk-in (like rooms online and the arcade walk-in)? Pick what’s true for your main activity, and add the exception under <strong>Good to know</strong>, like <em>Arcade: walk-ins welcome</em>.</p>',
     aFr: '<p>Dans <strong>Réservations</strong>, touchez une réponse : <strong>Oui, sans réservation</strong>, <strong>Oui, mais réservez pour les fins de semaine et les périodes achalandées</strong>, ou <strong>Non, réservez à l’avance</strong>. Collez ensuite votre lien de réservation ou de billets (FareHarbor, Eventbrite, votre site) : votre page a un bouton Réserver.</p><p>La réservation est toujours obligatoire (les cours sont pleins)? Touchez <strong>Non, réservez à l’avance</strong> et collez votre lien de réservation : votre page indique « Réservez à l’avance » et son bouton <strong>Réserver</strong> ouvre votre page de réservation.</p><p>Certaines activités se réservent et d’autres non (les salles en ligne, l’arcade sans réservation)? Choisissez ce qui vaut pour votre activité principale, et ajoutez l’exception sous <strong>Bon à savoir</strong>, comme <em>Arcade : sans réservation</em>.</p>' },
@@ -60453,6 +60479,8 @@ const INDOOR_SETUP_HELP_TOPICS = [
   { id: 'indoor-groups', pages: ['setup', 'edit'], over: ['booking-link', 'tour-groups', 'indoor-booking', 'indoor-no-hours'],
     q: 'Birthday parties, school groups and private bookings', qFr: 'Fêtes d’anniversaire, groupes scolaires et réservations privées',
     allOf: [['group', 'school', 'scolair', 'field'], ['appointment', 'rendez', 'arrangement', 'request', 'demande']],
+    // Indoor test 15 (Aaron: "the gallery can be rented for events" got the exhibitions answer): renting out the place.
+    allOf2: [['rent', 'louer', 'loue', 'louon', 'location', 'hire'], ['gallery', 'galerie', 'museum', 'musee', 'space', 'espace', 'venue', 'lieu', 'hall', 'salle', 'room', 'place', 'theatre', 'theater', 'cinema', 'building', 'studio', 'event', 'evenement', 'wedding', 'mariage', 'part', 'fete', 'private', 'prive', 'whole', 'out']],
     keys: ['school groups by appointment', 'groups by appointment', 'group tours', 'group tours by appointment', 'school tours', 'school and group tours', 'tours by appointment', 'guided tours', 'school visits', 'class visits', 'birthday', 'birthdays', 'birthday party', 'birthday parties', 'parties', 'party', 'party room', 'party packages', 'school groups', 'field trips', 'groups', 'group', 'big groups', 'corporate', 'team building', 'private booking', 'private event', 'private events', 'rent the space', 'rentals', 'venue rental', 'buyout', 'stag', 'bachelorette', 'corporate team building', 'team building is', 'party packages', 'birthday party packages', 'company party', 'office party', 'christmas party', 'bday', 'bday party', 'bday parties', 'birthday packages', 'weddings', 'wedding', 'rent the hall', 'hall rental', 'bridal', 'bridal parties', 'couples packages', 'matinee', 'matinees', 'school matinees', 'bus tour', 'bus tours', 'bus tour groups', 'meeting room', 'meeting rooms', 'private events after hours', 'private screenings', 'screenings',
       // Indoor test 13 (2026-11-19; Dan's cinema: "can people rent the theatre" got "I'm not sure").
       'rent the theatre', 'rent the theater', 'rent the cinema', 'rent a theatre', 'rent a theater', 'rent a cinema', 'rent the place', 'rent the venue', 'rent the room', 'rent out', 'rent it out', 'rent the whole', 'people rent', 'can people rent', 'rental', 'theatre rental', 'theater rental', 'cinema rental', 'private screening', 'private showing', 'private movie', 'buy out', 'buyouts', 'book the whole', 'whole theatre', 'whole theater', 'whole cinema', 'exclusive use'],
@@ -60496,9 +60524,28 @@ const INDOOR_SETUP_HELP_TOPICS = [
     keys: ['wheelchair', 'wheelchair accessible', 'accessible', 'accessibility', 'elevator', 'elevators', 'ramp', 'stairs', 'step free', 'accessible washroom', 'mobility', 'stroller', 'strollers', 'service dog', 'service dogs',
       // Indoor test 10 (Sandra's pool): accessible change rooms and a pool lift.
       'pool lift', 'pool lifts', 'change room', 'change rooms', 'accessible change room', 'aquatic wheelchair'],
-    keysFr: ['fauteuil roulant', 'accessible', 'accessibles', 'accessibilite', 'ascenseur', 'rampe', 'escaliers', 'sans marche', 'toilettes accessibles', 'mobilite', 'poussette', 'poussettes', 'chien d assistance', 'vestiaires accessibles', 'leve personne', 'vestiaire accessible'],
-    a: '<p>In <strong>Who can come</strong>, tick <strong>Wheelchair accessible</strong> if people can get in and around without steps, and <strong>Service dogs welcome</strong>. Anything more (an elevator to the second floor, stroller parking, sensory-friendly hours) goes in one line under <strong>Good to know</strong>.</p>',
-    aFr: '<p>Dans <strong>Qui peut venir</strong>, cochez <strong>Accessible en fauteuil roulant</strong> si l’on peut entrer et circuler sans marches, et <strong>Chiens d’assistance bienvenus</strong>. Le reste (un ascenseur vers l’étage, un espace pour les poussettes, des heures adaptées sensoriellement) va en une ligne sous <strong>Bon à savoir</strong>.</p>' },
+    keysFr: ['fauteuil roulant', 'accessible', 'accessibles', 'accessibilite', 'ascenseur', 'rampe', 'escaliers', 'sans marche', 'toilettes accessibles', 'mobilite', 'poussette', 'poussettes', 'chien d assistance', 'chiens d assistance', 'chiens d assistance acceptes', 'chiens d assistance bienvenus', 'pas de chiens mais', 'vestiaires accessibles', 'leve personne', 'vestiaire accessible'],
+    a: '<p>In <strong>Who can come</strong>, tick <strong>Wheelchair accessible</strong> if people can get in and around without steps. No dogs, but service dogs are welcome? Tap <strong>No dogs allowed</strong>: your page shows “No dogs (service dogs welcome)”. Anything more (an elevator to the second floor, stroller parking, sensory-friendly hours) goes in one line under <strong>Good to know</strong>.</p>',
+    aFr: '<p>Dans <strong>Qui peut venir</strong>, cochez <strong>Accessible en fauteuil roulant</strong> si l’on peut entrer et circuler sans marches. Pas de chiens, mais les chiens d’assistance sont bienvenus? Touchez <strong>Chiens non admis</strong> : votre page indique « Pas de chiens (chiens d’assistance bienvenus) ». Le reste (un ascenseur vers l’étage, un espace pour les poussettes, des heures adaptées sensoriellement) va en une ligne sous <strong>Bon à savoir</strong>.</p>' },
+  // Indoor test 15 (2026-11-19; Aaron's gallery: "our exhibition runs 3 months, it says an event can span at most 31 days"
+  // got the general exhibitions answer): a run of weeks or months is one event with its first and last day.
+  { id: 'indoor-long-event', pages: ['setup', 'edit'], over: ['indoor-exhibits', 'indoor-camps', 'event-add', 'events', 'event-repeat', 'indoor-seasonal', 'indoor-groups'],
+    q: 'An exhibition or camp that runs for weeks or months', qFr: 'Une exposition ou un camp qui dure des semaines ou des mois',
+    allOf: [['runs', 'running', 'lasts', 'span', 'longer'], ['month', 'mois', 'week', 'summer', '31', 'day']],
+    allOf2: [['31', 'thirty'], ['day', 'jour']],
+    keys: ['longer than a month', 'more than a month', 'over a month', 'at most 31 days', 'span at most', '31 days', '31 day limit', 'runs 3 months', 'runs for months', 'runs all summer', 'all summer long', 'two months', 'three months', '2 months', '3 months', 'long run', 'longer run', 'exhibition runs', 'end date', 'last day of the exhibition'],
+    keysFr: ['plus d un mois', 'plus long qu un mois', 'au plus 31 jours', '31 jours', 'dure 3 mois', 'dure trois mois', 'tout l ete', 'deux mois', 'trois mois', 'date de fin'],
+    a: '<p>Add it once with <strong>Add an event</strong> on your page (after the setup): its first day in <strong>Date</strong> and its last day in <strong>End date (multi-day)</strong>, like July 5 to August 27. An event can run up to 120 days as it is; a longer one goes in too, and we check its dates with it. What’s On shows it the whole time it runs, like “On now · until Dec 19”.</p><p>Only some days in that stretch (weekdays only, or weeks with breaks)? Write them in <strong>Repeats or other dates?</strong> and we add the dates.</p>',
+    aFr: '<p>Ajoutez-le une seule fois avec <strong>Ajouter un événement</strong> sur votre page (après la configuration) : son premier jour dans <strong>Date</strong> et son dernier jour dans <strong>Date de fin (plusieurs jours)</strong>, comme du 5 juillet au 27 août. Un événement peut durer jusqu’à 120 jours tel quel; un plus long est accepté aussi, et nous vérifions ses dates en même temps. À l’affiche le montre pendant toute sa durée, comme « En cours · jusqu’au 19 déc. ».</p><p>Seulement certains jours de cette période (en semaine, ou des semaines avec des pauses)? Écrivez-les dans <strong>Récurrent ou autres dates?</strong> et nous ajouterons les dates.</p>' },
+  // Indoor test 15 (Aaron: "kids art camps in summer" led with group sizes): a camp on set dates is an event first, then a
+  // Groups line. The kind's camp or school chip is named by indoorKindHelpTopics.
+  { id: 'indoor-camps', pages: ['setup', 'edit'], over: ['indoor-groups', 'indoor-exhibits', 'event-add', 'events', 'event-repeat', 'indoor-seasonal', 'indoor-age'],
+    q: 'Summer, spring break or PD-day camps', qFr: 'Camps d’été, de la relâche ou des journées pédagogiques',
+    allOf: [['camp']],
+    keys: ['camp', 'camps', 'day camp', 'day camps', 'summer camp', 'summer camps', 'spring break camp', 'spring break camps', 'pd day camp', 'pd day camps', 'art camp', 'art camps', 'kids camps'],
+    keysFr: ['camp', 'camps', 'camp de jour', 'camps de jour', 'camps d ete', 'camp de la relache', 'camps pendant la relache'],
+    a: '<p>A camp on set dates (summer, spring break or a PD day) goes on What’s On: on your page (after the setup), tap <strong>Add an event</strong> and give its first and last day, like July 5 to August 27 (a camp can run up to 120 days as one event). Weeks with breaks? Add the first week and write the others in <strong>Repeats or other dates?</strong>.</p><p>Then say you run camps in <strong>Groups and parties</strong> (in More about your place), in a line of your own, like <em>Summer art camps for ages 6–12</em>.</p>',
+    aFr: '<p>Un camp à dates fixes (l’été, la relâche ou une journée pédagogique) va dans À l’affiche : sur votre page (après la configuration), touchez <strong>Ajouter un événement</strong> et indiquez son premier et son dernier jour, comme du 5 juillet au 27 août (un camp peut durer jusqu’à 120 jours en un seul événement). Des semaines avec des pauses? Ajoutez la première semaine et écrivez les autres dans <strong>Récurrent ou autres dates?</strong>.</p><p>Dites ensuite que vous offrez des camps dans <strong>Groupes et fêtes</strong> (dans Plus sur votre endroit), en une ligne à vous, comme <em>Camps d’art d’été pour les 6 à 12 ans</em>.</p>' },
   // Indoor test 7: "we have a new exhibition every month" is this topic, not the generic repeating-event answer.
   { id: 'indoor-exhibits', pages: ['setup', 'edit'], over: ['event-add', 'events', 'event-repeat'],
     q: 'Our exhibitions or shows change', qFr: 'Nos expositions ou spectacles changent',
@@ -60690,6 +60737,7 @@ function indoorKindHelpTopics(topics, kinds, price = null, exact = false, free =
   // Indoor test 5: a camp (a PD-day or school camp) is a Groups line (the kind's school or camp chip) and, on set dates, an event.
   const campChip = (k) => k.groups.chips.find((c) => /camp|school|scolaire/i.test(c)) || k.groups.chips[0];
   const hasCamp = (k) => k.groups.chips.some((c) => /camp|school|scolaire/i.test(c));
+  const rentChip = (k) => k.groups.chips.find((c) => /rent|locat|privat|priv[ée]/i.test(c)) || '';
   const players = INDOOR_HELP_PLAYER_KINDS.includes(en.kind);
   const chips = (lang) => ((OWNER_SETUP_STRINGS[lang].indoor.quick || {}).good_to_know_kinds || {})[en.gtk] || [];
   const em = (l) => l.map((x) => `<em>${E(x)}</em>`);
@@ -60765,6 +60813,10 @@ function indoorKindHelpTopics(topics, kinds, price = null, exact = false, free =
     if (t.id === 'indoor-gift') return { ...t,
       a: `<p>${en.arts ? 'A gift shop: tap <strong>Gift shop</strong> in <strong>Good to know</strong>, or say it in one line there. ' : ''}Gift cards${en.arts ? ' and memberships' : ''} go in your story, in <strong>Your story and Known for</strong>, like <em>${E(en.help.gift)}.</em> Their prices can go in <strong>Your prices</strong>. There’s no separate box, to keep it short.</p>`,
       aFr: `<p>${fr.arts ? 'Une boutique : touchez <strong>Boutique sur place</strong> dans <strong>Bon à savoir</strong>, ou dites-le en une ligne. ' : ''}Les cartes-cadeaux${fr.arts ? ' et les abonnements' : ''} vont dans votre histoire, dans <strong>Votre histoire et ce pour quoi vous êtes connus</strong>, comme <em>${E(fr.help.gift)}.</em> Leurs prix peuvent aller dans <strong>Vos tarifs</strong>. Il n’y a pas de case à part, pour rester court.</p>` };
+    // Indoor test 15: a camp names the kind's camp or school chip after the event.
+    if (t.id === 'indoor-camps') return { ...t,
+      a: hasCamp(en) ? t.a.replace('(in More about your place), in a line of your own, like', `(in More about your place): tap <strong>${E(campChip(en))}</strong> and add a line of your own, like`) : t.a,
+      aFr: hasCamp(en) ? t.aFr.replace('(dans Plus sur votre endroit), en une ligne à vous, comme', `(dans Plus sur votre endroit) : touchez <strong>${E(campChip(fr))}</strong> et ajoutez une ligne à vous, comme`) : t.aFr };
     if (t.id === 'indoor-groups') return { ...t,
       keys: t.keys.concat(['camp', 'camps', 'day camp', 'day camps', 'pd day', 'pd days', 'pd day camp', 'pd day camps', 'school camps', 'school pd day camps', 'summer camp', 'summer camps', 'spring break camp', 'spring break camps', 'pro d day']),
       keysFr: t.keysFr.concat(['camp', 'camps', 'camp de jour', 'camps de jour', 'journee pedagogique', 'journees pedagogiques', 'camp de la relache', 'camps d ete']),
@@ -60772,10 +60824,13 @@ function indoorKindHelpTopics(topics, kinds, price = null, exact = false, free =
         // Indoor test 13 (2026-11-19; Dan's cinema was told "Camps and school groups: tap Private screenings"): only a kind
         // with a school or camp chip; and a place with no set hours has no open hours to keep.
         .replace(noHours ? ' Your open hours stay as they are.' : '\u0000', '')
-        + (hasCamp(en) ? `<p>Camps and school groups: tap <strong>${E(campChip(en))}</strong> in <strong>Groups and parties</strong>. A camp on set dates (a PD-day or spring break camp) can also go on What’s On: add it with <strong>Add an event</strong> on your page.</p>` : ''),
+        + (hasCamp(en) ? `<p>Camps and school groups: tap <strong>${E(campChip(en))}</strong> in <strong>Groups and parties</strong>. A camp on set dates (a PD-day or spring break camp) can also go on What’s On: add it with <strong>Add an event</strong> on your page.</p>` : '')
+        // Indoor test 15 (Aaron: "the gallery can be rented for events"): the kind's rental chip, by name.
+        + (rentChip(en) ? `<p>Rent out your space for private events? Tap <strong>${E(rentChip(en))}</strong> in <strong>Groups and parties</strong>; your page says so and search finds you for it.</p>` : ''),
       aFr: t.aFr.replace(/comme <em>Groupes scolaires et visites guidées sur rendez-vous<\/em>, <em>Fêtes d’anniversaire avec salle privée jusqu’à 20 personnes<\/em> ou <em>Consolidation d’équipe pour les entreprises, jusqu’à 40 personnes<\/em>/, `comme ${orList(em(fr.groups.chips), 'ou')}`)
         .replace(noHours ? ' Vos heures d’ouverture restent comme elles sont.' : '\u0000', '')
-        + (hasCamp(en) ? `<p>Camps et groupes scolaires : touchez <strong>${E(campChip(fr))}</strong> dans <strong>Groupes et fêtes</strong>. Un camp à dates fixes (journée pédagogique ou relâche) peut aussi aller dans À l’affiche : ajoutez-le avec <strong>Ajouter un événement</strong> sur votre page.</p>` : '') };
+        + (hasCamp(en) ? `<p>Camps et groupes scolaires : touchez <strong>${E(campChip(fr))}</strong> dans <strong>Groupes et fêtes</strong>. Un camp à dates fixes (journée pédagogique ou relâche) peut aussi aller dans À l’affiche : ajoutez-le avec <strong>Ajouter un événement</strong> sur votre page.</p>` : '')
+        + (rentChip(fr) ? `<p>Vous louez votre espace pour des événements privés? Touchez <strong>${E(rentChip(fr))}</strong> dans <strong>Groupes et fêtes</strong>; votre page l’indique et la recherche vous trouve pour cela.</p>` : '') };
     if (t.id === 'indoor-good-to-know' && chips('en').length >= 3) return { ...t,
       a: t.a.replace(/\(“Grip socks required”, “Lockers available”, “Waiver to sign before you play”\)/, `(${chips('en').slice(0, 3).map((x) => `“${E(x)}”`).join(', ')})`),
       aFr: t.aFr.replace(/\(« Chaussettes antidérapantes obligatoires », « Casiers offerts », « Décharge à signer avant de jouer »\)/, `(${chips('fr').slice(0, 3).map((x) => `« ${E(x)} »`).join(', ')})`) };
@@ -61461,7 +61516,7 @@ function setupHereHelpTopics(venue, steps, list) {
   // year" and where different hours go instead.
   const shortClosure = !has('setup-short-closure') ? setupClosuresHelpTopic(venue.type) : null;
   if (shortClosure && typeof shortClosure.a === 'string') {
-    out.push({ ...shortClosure, id: 'setup-short-closure', pages: ['setup'], over: ['closures', 'seasonal-hours', 'setup-season', 'season', 'hours', 'distillery-hours', 'brewery-seasonal-hours', 'winery-appointment', 'setup-split-hours', 'restaurant-kitchen', 'brewery-kitchen', 'weekly-nights'], noRelated: ['seasonal-hours'],
+    out.push({ ...shortClosure, allOf: undefined, allOf2: undefined, id: 'setup-short-closure', pages: ['setup'], over: ['closures', 'seasonal-hours', 'setup-season', 'season', 'hours', 'distillery-hours', 'brewery-seasonal-hours', 'winery-appointment', 'setup-split-hours', 'restaurant-kitchen', 'brewery-kitchen', 'weekly-nights'], noRelated: ['seasonal-hours'],
       q: 'We close for a week or two each year', qFr: 'Nous fermons une semaine ou deux chaque année',
       keys: ['close for two weeks', 'closed for two weeks', 'close two weeks', 'closed two weeks', 'closes for two weeks', 'close for a week', 'closed for a week', 'close for a couple of weeks', 'closed for a couple of weeks', 'close for a few weeks', 'closed for a few weeks', 'close for three weeks', 'closed for three weeks', 'closed three weeks', 'week or two', 'spring break', 'fall break', 'close for renovations', 'closed for renovations', 'close for vacation', 'closed for vacation', 'close for holidays', 'staff holiday'],
       keysFr: ['fermons deux semaines', 'ferme deux semaines', 'fermes deux semaines', 'fermons une semaine', 'ferme une semaine', 'fermons quelques semaines', 'ferme quelques semaines', 'fermons trois semaines', 'semaine ou deux', 'pause du printemps', 'relache', 'fermons pour des renovations', 'ferme pour renovations', 'fermons pour les vacances', 'ferme pour les vacances'],
@@ -63035,6 +63090,9 @@ const OWNER_HELP_TOPICS = [
     a: '<ol><li>{ON}, open <strong>Seasonal hours</strong> (with your opening hours) and tick <strong>We have different hours part of the year</strong>.</li><li>Give it a name if you like (“Winter hours”), pick the first and last day (for example November 1 to April 30), and fill in that season’s hours for each day.</li><li>Tap {SEND}.</li></ol><p>Every year between those days your page shows these hours instead of your usual ones, then switches back by itself. {LIVE}</p><p>Closed for the whole off-season instead? Choose <strong>Open some months only</strong>. Closed for a day or two? Use <strong>Special closures</strong>. Different hours on just one holiday? <strong>Message us</strong> with the date and times.</p>',
     aFr: '<ol><li>{ON}, ouvrez <strong>Heures saisonnières</strong> (sous vos heures d’ouverture) et cochez <strong>Nous avons d’autres heures pendant une partie de l’année</strong>.</li><li>Donnez-leur un nom si vous voulez (« Heures d’hiver »), choisissez le premier et le dernier jour (par exemple du 1er novembre au 30 avril) et entrez les heures de cette saison pour chaque jour.</li><li>Touchez {SEND}.</li></ol><p>Chaque année entre ces dates, votre page affiche ces heures au lieu de vos heures habituelles, puis revient d’elle-même aux heures habituelles. {LIVE}</p><p>Fermé toute la basse saison? Choisissez plutôt <strong>Ouvert certains mois seulement</strong>. Fermé un jour ou deux? Utilisez <strong>Fermetures spéciales</strong>. Des heures différentes un seul jour férié? <strong>Écrivez-nous</strong> avec la date et les heures.</p>' },
   { id: 'closures', over: ['hours'], q: 'Closed on a holiday or a special day', qFr: 'Fermé un jour férié ou un jour spécial', pages: ['edit'],
+    // Indoor test 15 (Aaron: "we close on stat holidays" led with Open on holidays, the opposite): closed + a holiday word is
+    // this answer first, in every kind of place.
+    allOf: [['close', 'shut', 'ferm'], ['stat', 'holiday', 'ferie', 'conge']],
     keys: ['holiday', 'holidays', 'stat', 'stat holiday', 'statutory holiday', 'christmas', 'christmas day', 'christmas eve', 'xmas', 'boxing day', 'new years', 'new years day', 'new years eve', 'thanksgiving', 'easter', 'good friday', 'victoria day', 'canada day', 'bc day', 'labour day', 'labor day', 'remembrance day', 'family day',
       'special closure', 'special closures', 'closed on', 'closed one day', 'closed for a day', 'closed for a week', 'closed next week', 'closed this weekend', 'closed tomorrow', 'closed today', 'closed for two weeks', 'closed for a few weeks', 'closure', 'closing early', 'vacation', 'renovation', 'renovations', 'private event', 'private party', 'temporarily closed', 'closed temporarily', 'day off', 'a few days',
       // Round 10 (2026-10-19): "holiday hours" got Seasonal hours and "change my hours for christmas" the weekly hours.
@@ -64265,7 +64323,8 @@ const OWNER_PORTAL_MESSAGES_FR = {
   [`Events can be submitted up to ${EVENT_SUBMISSION_MAX_FUTURE_DAYS} days ahead.`]: `Vous pouvez envoyer un événement jusqu’à ${EVENT_SUBMISSION_MAX_FUTURE_DAYS} jours à l’avance.`,
   'Please enter a real end date.': 'Entrez une date de fin valide.',
   'The end date is before the start date.': 'La date de fin est avant la date de début.',
-  [`An event can span at most ${EVENT_SUBMISSION_MAX_SPAN_DAYS} days. Please list longer runs in the schedule notes.`]: `Un événement peut durer au plus ${EVENT_SUBMISSION_MAX_SPAN_DAYS} jours. Indiquez les périodes plus longues sous « Autres dates ».`,
+  [EVENT_SUBMISSION_SPAN_ERROR]: `Un événement peut durer au plus ${EVENT_SUBMISSION_MAX_SPAN_DAYS} jours. Indiquez le premier jour ici et écrivez toute la période sous « Autres dates » plus bas.`,
+  [OWNER_EVENT_SPAN_ERROR]: 'Un événement peut durer jusqu’à un an. Plus long, ou une série? Indiquez le premier jour ici et écrivez toute la période sous « Récurrent ou autres dates? » plus bas.',
   'An all-day event has no start or end time.': 'Un événement d’une journée entière n’a pas d’heure de début ni de fin.',
   'Please enter the start time, or tick All day.': 'Entrez l’heure de début ou cochez « Toute la journée ».',
   'Please add the start time too, or clear the end time.': 'Ajoutez aussi l’heure de début, ou effacez l’heure de fin.',
@@ -66894,6 +66953,8 @@ function renderAdminEventCard(s) {
       ${s.partner_venue_ids && s.partner_venue_ids.length ? `<p class="rv-meta">Partner venues (the event also shows on their pages): ${adminReviewEsc(partnerVenueNamesText(s.partner_venue_ids))}</p>` : ''}
       <label class="rv-field">Name ${adminEditBox('name', s.name, { max: 120 })}</label>
       <label class="rv-field">Description ${adminEditBox('description', s.description, { multiline: true, rows: 5, max: 2000 })}</label>
+      ${s.schedule_notes ? `<p class="rv-text"><strong>Repeats or other dates (not published):</strong> ${adminReviewEsc(s.schedule_notes)}</p>` : ''}
+      ${eventSubmissionReviewFlags(s).map((f) => `<div class="rv-warn rv-run">${adminReviewEsc(f)}</div>`).join('')}
       ${dupHtml}
       ${adminReviewActions('event', s.id, { options: dupOpt })}
     </article>`;
@@ -68920,6 +68981,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
     evUpdated: L('Updated. Your event is still waiting for review, usually within a day.', 'Mis à jour. Votre événement attend toujours notre vérification, en général d’ici un jour.'),
     // Indoor test 9 (2026-11-19; Melissa left the email blank and was told "We'll email you"): no email, no promise.
     evDoneNoMail: L('Thanks! Your event is in for review, usually within a day. It shows on What\u2019s On once it\u2019s approved.', 'Merci! Votre événement est en cours de vérification, en général d’ici un jour. Il paraîtra dans À l’affiche une fois approuvé.'),
+    evLong: L(' It runs more than 120 days, so we’ll check its dates with it.', ' Il dure plus de 120 jours : nous vérifierons ses dates en même temps.'),
     evDoneMail: L('Thanks! Your event is in for review, usually within a day. We\u2019ll email you when it\u2019s on What\u2019s On.', 'Merci! Votre événement est en cours de vérification, en général d’ici un jour. Nous vous écrirons quand il sera dans À l’affiche.'),
     evAccount: !!found.account,
     evChange: L('Thanks! Your change is in for review, usually within a day. The event stays as it is until then, and we\u2019ll email you when it\u2019s updated.', 'Merci! Votre modification est en cours de vérification, en général d’ici un jour. L’événement reste tel quel d’ici là, et nous vous écrirons quand il sera mis à jour.'),
@@ -70190,7 +70252,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
         if (j && j.ok) {
           sentAs = { name: v('oeContactName').trim(), email: v('oeContactEmail').trim() };
           rememberName(v('oeContactName')); rememberEmail(v('oeContactEmail')); shareEmail(v('oeContactEmail')); ev.style.display = 'none';
-          document.getElementById('oeDoneText').textContent = !T.evAccount && !sentAs.email ? T.evDoneNoMail : T.evDoneMail;
+          document.getElementById('oeDoneText').textContent = (!T.evAccount && !sentAs.email ? T.evDoneNoMail : T.evDoneMail) + (j.long ? T.evLong : '');
           if (j.updated) document.getElementById('oeDoneText').textContent = T.evUpdated;
           if (j.change) document.getElementById('oeDoneText').textContent = T.evChange;
           document.getElementById('oeDone').classList.add('show');

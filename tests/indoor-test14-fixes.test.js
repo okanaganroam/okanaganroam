@@ -228,6 +228,6 @@ test('7. polish: the Your prices screen says "Entry is by donation"; the English
   assert.doesNotMatch(h2, /Indoor &amp; rainy day · <a/);
   // Add an event in a museum's words.
   const edit = await (await fetch(`${base}/owner/${t}`)).text();
-  assert.match(edit, /Talks, exhibitions, family days on What&rsquo;s On/);
+  assert.match(edit, /Exhibitions, talks, family days on What&rsquo;s On/);
   assert.doesNotMatch(edit, /Live music, tastings, markets, classes or specials on What/);
 });

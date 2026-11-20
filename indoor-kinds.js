@@ -382,8 +382,8 @@ const INDOOR_BOOK_BUTTONS = { shows: ['Showtimes & tickets', 'Horaires et billet
 // Indoor test 14 (2026-11-19; Helen's museum: the edit page's Add an event said "Live music, tastings, markets, classes or
 // specials"): the kind's own events, for the Add an event heading line and its intro: [en, fr].
 const EVENTS = {
-  gallery: ['Openings, artist talks, workshops', 'Vernissages, rencontres avec les artistes, ateliers'],
-  museum: ['Talks, exhibitions, family days', 'Conférences, expositions, journées familiales'],
+  gallery: ['Exhibitions, openings, artist talks, workshops', 'Expositions, vernissages, rencontres avec les artistes, ateliers'],
+  museum: ['Exhibitions, talks, family days', 'Expositions, conférences, journées familiales'],
   theatre: ['Shows, concerts, comedy nights', 'Spectacles, concerts, soirées d’humour'],
   cinema: ['Special screenings, film festivals, premieres', 'Projections spéciales, festivals de films, premières'],
   spa: ['Wellness nights, workshops, open houses', 'Soirées bien-être, ateliers, portes ouvertes'],

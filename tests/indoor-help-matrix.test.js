@@ -56,6 +56,8 @@ const P = 'indoor-price', F = 'indoor-free', R = 'indoor-per-room', X = 'indoor-
   E = 'indoor-exhibits', O = 'indoor-openings', CN = 'indoor-class-nights', C = 'indoor-courses', NH = 'indoor-no-hours', TP = 'indoor-ticket-prices', SW = 'indoor-swim-times',
   GF = 'indoor-gift', CM = 'indoor-closed-months', YB = 'indoor-yearly-break', AR = 'indoor-artists';
 const CLOSE = [YB, 'setup-short-closure', 'closures'];
+// Indoor test 15: a camp on set dates leads with Add an event (indoor-camps), then the Groups chip.
+const CAMP = 'indoor-camps';
 
 // kind -> [language, question, topics it may land on]
 const MATRIX = {
@@ -169,12 +171,12 @@ const MATRIX = {
     ['en', 'ladies climb night wednesdays', [TH]],
     ['en', 'everyone signs a waiver online', [GTK]],
     ['en', 'under 14 with an adult', [A]],
-    ['en', 'kids climbing camps in summer', [G]],
+    ['en', 'kids climbing camps in summer', [CAMP]],
     ['en', 'punch cards and memberships', [P, GF]],
     ['fr', 'location d’équipement en extra', [X]],
     ['fr', 'tout le monde signe une décharge', [GTK]],
     ['fr', 'soirée d’escalade pour femmes le mercredi', [TH]],
-    ['fr', 'camps d’escalade l’été', [G]],
+    ['fr', 'camps d’escalade l’été', [CAMP]],
   ],
   kids: [
     ['en', 'kids 12, adults free', [P]],
@@ -184,11 +186,11 @@ const MATRIX = {
     ['en', 'toddler mornings tue and thu', [TH, P]],
     ['en', 'kids 0 to 12 only, parents stay', [A]],
     ['en', 'party packages with a party room', [G]],
-    ['en', 'pd day camps', [G]],
+    ['en', 'pd day camps', [CAMP]],
     ['fr', 'les chaussettes antidérapantes sont obligatoires', [GTK]],
     ['fr', 'temps des tout-petits mardi et jeudi matin', [TH, P]],
     ['fr', 'forfaits de fête avec salle', [G]],
-    ['fr', 'camps pendant la relâche', [G]],
+    ['fr', 'camps pendant la relâche', [CAMP]],
     // Indoor test 9 (Melissa's play centre): her Help log, EN + FR.
     ['en', 'socks required, $3 if you forget', [GTK]],
     ['en', 'kids under 1 are cheaper how do i show that', [P]],
@@ -207,11 +209,11 @@ const MATRIX = {
     ['en', 'all ages painting but 14+ wheel', [A]],
     ['en', 'byob for paint and sip', [B]],
     ['en', 'team building workshops', [G]],
-    ['en', 'kids summer art camps', [G]],
+    ['en', 'kids summer art camps', [CAMP]],
     ['fr', 'les cours durent 6 semaines', [C]],
     ['fr', 'soirée peinture chaque vendredi', [TH]],
     ['fr', 'apportez votre vin', [B]],
-    ['fr', 'camps d’art pour enfants l’été', [G]],
+    ['fr', 'camps d’art pour enfants l’été', [CAMP]],
   ],
   curling: [
     ['en', 'learn to curl is 30 a person, ice rental 150 a sheet', [P, X, M]],
@@ -415,7 +417,7 @@ const KIM = [
   ['we\'re a non-profit, does locally owned apply', [LO], 'nous sommes un organisme sans but lucratif, la propriété locale s’applique-t-elle?'],
   ['the photos belong to the science centre not me, can I tick this', [PR], 'les photos appartiennent au centre des sciences, pas à moi, puis-je cocher la case?'],
   ['science saturdays demos at 11 and 2', [TH], 'démonstrations scientifiques chaque samedi à 11 h et 14 h'],
-  ['summer and spring break camps', [G], 'camps d’été et de la relâche'],
+  ['summer and spring break camps', [CAMP], 'camps d’été et de la relâche'],
   ['we do a free demo every saturday at 11am and 2pm, where does that go', [TH], 'nous faisons une démonstration gratuite chaque samedi à 11 h et 14 h, où la mettre?'],
   ['we open extra on long weekend mondays', [HO], 'nous ouvrons aussi les lundis des longues fins de semaine'],
   ['open daily in july and august', [SD], 'ouvert tous les jours en juillet et août'],
@@ -430,7 +432,7 @@ const KIM = [
   ['our schedule is a pdf on our website', [SW, GTK], 'notre horaire est un PDF sur notre site'],
   ['will my page be in french', [FRN], 'ma page sera-t-elle en anglais aussi?'],
   ['is it ok to say wheelchair accessible if the planetarium is upstairs', [AC], 'puis-je dire accessible en fauteuil roulant si le planétarium est à l’étage?'],
-  ['summer camps and spring break camps', [G], 'camps d’été et camps de la relâche'],
+  ['summer camps and spring break camps', [CAMP], 'camps d’été et camps de la relâche'],
   // Her other words for the same things.
   ['open stat holidays', [HO], 'ouvert les jours fériés'],
   ['long weekend mondays', [HO], 'les lundis des longues fins de semaine'],
@@ -595,14 +597,83 @@ test('indoor test 14: Helen\'s Help questions (a museum) land on the right answe
   for (const k of ['cinema', 'theatre', 'yoga', 'classes']) { const c = await botsFor(k); assert.equal(c.en.topic(DO), undefined, k); assert.equal(c.en.best('doors open half an hour before the show').id, NH, k); }
   for (const k of ['museum', 'gallery', 'bowling', 'pool', 'library']) assert.equal((await botsFor(k)).en.best('doors open half an hour before the talk').id, DO, k);
 });
+// Indoor test 15 (2026-11-19; Aaron, staff at a free public art gallery): his Help log, EN and FR twins, with where each
+// belongs. Closed on stat holidays is the closures answer (never "Open on holidays"); renting the gallery is Groups and
+// parties; a summer camp leads with Add an event; a run of months is one event with its first and last day.
+const LE = 'indoor-long-event', CLOSED_HOL = ['closures', 'setup-closures'];
+const AARON = [
+  ["I'm staff not the owner", ['not-owner', 'staff'], 'je suis employé, pas le propriétaire'],
+  ['we close on stat holidays', CLOSED_HOL, 'nous fermons les jours fériés'],
+  ['admission is free but classes cost', [F], 'l’entrée est gratuite mais les cours sont payants'],
+  ['our adult art classes you register online, where do I put that', [BK], 'on s’inscrit en ligne à nos cours d’art pour adultes, où le mettre?'],
+  ['exhibitions change every few months', [E], 'nos expositions changent tous les quelques mois'],
+  ['the gallery can be rented for events', [G], 'on peut louer la galerie pour des événements'],
+  ['our exhibition runs 3 months, it says an event can span at most 31 days', [LE], 'notre exposition dure 3 mois, on dit qu’un événement peut durer au plus 31 jours'],
+  ['kids art camps in summer', [CAMP], 'camps d’art pour enfants l’été'],
+  ['we have a gift shop selling local art', [GF, GTK], 'nous avons une boutique qui vend de l’art local'],
+  ['first friday opening reception every month', [O], 'vernissage le premier vendredi de chaque mois'],
+  ['open late thursdays in summer', [SL], 'ouvert tard le jeudi l’été'],
+  ['doors open at 10 for the opening', [DO, O], 'les portes ouvrent à 10 h pour le vernissage'],
+  ['how do I get to 100%', ['page-complete'], 'comment arriver à 100 %'],
+  ['where do our class prices go', [M, X, P, F], 'où vont les prix de nos cours'],
+  ['is it ok to say no dogs, service dogs are allowed', [AC], 'puis-je dire pas de chiens, mais les chiens d’assistance sont acceptés'],
+  ['we are closed on all stat holidays, is there one button', CLOSED_HOL, 'nous sommes fermés tous les jours fériés, y a-t-il un seul bouton?'],
+  // His other words for the same things.
+  ['event longer than a month', [LE], 'un événement de plus d’un mois'],
+  ['exhibition runs 3 months', [LE], 'l’exposition dure trois mois'],
+  ['it says at most 31 days', [LE], 'on dit au plus 31 jours'],
+  ['we rent the gallery for events', [G], 'nous louons la galerie pour des événements'],
+  ['venue rental', [G], 'location de salle'],
+  ['rented for weddings and parties', [G], 'louée pour des mariages et des fêtes'],
+  ['kids camps in summer', [CAMP], 'camps pour enfants l’été'],
+  ['closed on stat holidays', CLOSED_HOL, 'fermé les jours fériés'],
+];
+const AARON_WANT = Object.fromEntries(AARON.map(([q, want]) => [q, want]));
+test('indoor test 15: Aaron\'s Help questions (a free gallery) land on the right answer, in English and in French; closed on holidays is never "Open on holidays"; rentals name Private events and rentals; camps lead with Add an event; no dogs names a real button', async () => {
+  const b = await botsFor('gallery');
+  const wrong = [];
+  for (const [q, want, qFr] of AARON) {
+    const r = b.en.best(q), f = b.fr.best(qFr);
+    if (!r || !want.includes(r.id)) wrong.push(`en "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+    if (!f || !want.includes(f.id)) wrong.push(`fr "${qFr}" -> ${f && f.id} (want ${want.join(' or ')})`);
+  }
+  assert.deepEqual(wrong, []);
+  // Closed on stat holidays, for every kind and in French: never the open-on-holidays answers.
+  for (const kind of ['gallery', 'museum', 'pool', 'bowling', 'library']) {
+    const bk = await botsFor(kind);
+    for (const q of ['we close on stat holidays', 'closed all stat holidays', 'we are closed on holidays']) { const r = bk.en.best(q); assert.ok(r && CLOSED_HOL.includes(r.id), `${kind} "${q}" -> ${r && r.id}`); }
+    const f = bk.fr.best('nous sommes fermés les jours fériés'); assert.ok(f && CLOSED_HOL.includes(f.id), `${kind} fr -> ${f && f.id}`);
+    assert.equal(bk.en.best('open on stat holidays').id, HO, kind);
+  }
+  const groups = plain(b.en.topic(G).a), groupsFr = plain(b.fr.topic(G).aFr);
+  assert.match(groups, /Rent out your space for private events\? Tap Private events and rentals in Groups and parties/);
+  assert.match(groupsFr, /Touchez Événements privés et location dans Groupes et fêtes/);
+  const camp = plain(b.en.topic(CAMP).a), campFr = plain(b.fr.topic(CAMP).aFr);
+  assert.match(camp, /^ ?A camp on set dates .* tap Add an event and give its first and last day/);
+  assert.ok(camp.indexOf('Add an event') < camp.indexOf('Groups and parties'), 'Add an event first');
+  assert.match(camp, /tap School groups welcome and add a line of your own/);
+  assert.match(campFr, /touchez Ajouter un événement/);
+  const acc = plain(b.en.topic(AC).a), accFr = plain(b.fr.topic(AC).aFr);
+  assert.match(acc, /Tap No dogs allowed : your page shows “No dogs \(service dogs welcome\)”/);
+  assert.doesNotMatch(acc, /tick Wheelchair accessible[^.]*and Service dogs welcome/);
+  assert.match(accFr, /Touchez Chiens non admis : votre page indique « Pas de chiens \(chiens d’assistance bienvenus\) »/);
+  const le = plain(b.en.topic(LE).a);
+  assert.match(le, /End date \(multi-day\)/);
+  assert.match(le, /up to 120 days/);
+  assert.match(le, /Repeats or other dates\?/);
+  assert.match(plain(b.fr.topic(LE).aFr), /jusqu’à 120 jours/);
+  // The closures answer (not "Open on holidays") is what "we close on stat holidays" opens.
+  const cl = b.en.best('we close on stat holidays');
+  assert.doesNotMatch(plain(b.en.topic(cl.id).a).slice(0, 80), /Open on holidays/);
+});
 // Every question in the 8 indoor help logs lands on an answer, on the page where it was asked, for the kind of place it was.
-const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga', 13: 'cinema', 14: 'museum' };
+const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga', 13: 'cinema', 14: 'museum', 15: 'gallery' };
 // The misrouted ones, with where they belong.
 const LOG_WANT = {
   'we price per room not per person': [R], 'how do I change the price, it says adults but we charge per room': [R],
   'school groups by appointment only': [G], 'kids get in free': [P], 'I dont speak French, do I have to update the French description': ['indoor-french'],
   'we have a small gift shop, where does that go': [GF, GTK], '60 min massage is $130 and 90 min is $175, where do those go': [M],
-  'why does my card say Adults $65': [P], 'school PD day camps': [G], 'what is the catch, are you going to sell me advertising': ['indoor-cost'],
+  'why does my card say Adults $65': [P], 'school PD day camps': [CAMP], 'what is the catch, are you going to sell me advertising': ['indoor-cost'],
   'we have a new exhibition every month': [E], 'opening night is outside my hours, do I change my hours?': [O], 'date night is per couple': ['indoor-price-two'],
   'leagues use most lanes weeknights': [BZ], 'open bowling is limited after 6 mon to thu because of leagues': [BZ], 'cosmic bowling friday and saturday nights': [TH],
   'price is per game but lanes can be booked by the hour': [X], 'shoe rental extra': [X], 'we have a licensed lounge': [B], 'how do i add cosmic bowling as a weekly event': [TH, 'event-repeat'],
@@ -622,6 +693,8 @@ const LOG_WANT = {
   ...DAN_WANT,
   // Indoor test 14 (Helen, a museum).
   ...HELEN_WANT,
+  // Indoor test 15 (Aaron, a gallery).
+  ...AARON_WANT,
 };
 test('every question in the 8 indoor help logs lands on an answer (the misrouted ones on the right one)', async () => {
   const wrong = [];
