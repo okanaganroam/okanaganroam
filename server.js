@@ -30598,6 +30598,7 @@ ${renderAnalyticsHeadHtml('favorites')}
   @media (min-width: 900px) { body.favorites-page .fav-list { grid-template-columns: 1fr 1fr; } }
 </style>
 </head>
+${FAVORITES_REFRESH_CSS}
 <body class="golf-page favorites-page">
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -36253,10 +36254,34 @@ const INFO_FORM_REFRESH_CSS = `<style id="info-form-refresh">
   body.info-page .info-updated { border-top: 1px solid rgba(27,43,58,0.08); padding-top: 14px; }
   @media (max-width: 640px) { body.info-page .info-body { padding: 18px 18px 22px; border-radius: 18px; margin-top: 12px; } }
   /* Forms: the same field look everywhere (cream field, soft border, 14px corners), and a clear focus ring. */
-  body.list-venue-page .venue-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), body.list-venue-page .venue-form select, body.list-venue-page .venue-form textarea,
-  body.list-event-page .venue-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), body.list-event-page .venue-form select, body.list-event-page .venue-form textarea,
-  body.owner-page .venue-form input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), body.owner-page .venue-form select, body.owner-page .venue-form textarea { background: #fffdf7; border: 1px solid rgba(27,43,58,0.22); border-radius: 14px; }
+  body.list-venue-page .venue-form input:not([type="checkbox"]):not([type="radio"]):not([type=file]), body.list-venue-page .venue-form select, body.list-venue-page .venue-form textarea,
+  body.list-event-page .venue-form input:not([type="checkbox"]):not([type="radio"]):not([type=file]), body.list-event-page .venue-form select, body.list-event-page .venue-form textarea,
+  body.owner-page .venue-form input:not([type="checkbox"]):not([type="radio"]):not([type=file]), body.owner-page .venue-form select, body.owner-page .venue-form textarea { background: #fffdf7; border: 1px solid rgba(27,43,58,0.22); border-radius: 14px; }
   body.list-venue-page .venue-form :is(input, select, textarea):focus-visible, body.list-event-page .venue-form :is(input, select, textarea):focus-visible, body.owner-page .venue-form :is(input, select, textarea):focus-visible { outline: 3px solid rgba(40,105,98,0.45); outline-offset: 2px; border-color: #286962; }
+</style>`;
+
+// Favorites in the site's card look (2026-11-20): styling only; favorites-page.js and saved-items.js are untouched.
+const FAVORITES_REFRESH_CSS = `<style id="favorites-refresh">
+  /* Favorites in the site's card look (2026-11-20): styling only. The list, its buttons and how they work are unchanged. */
+  body.favorites-page .fav-intro { font-size: 1rem; line-height: 1.6; max-width: 62ch; opacity: 1; color: #615b53; }
+  body.favorites-page .fav-section h2 { color: #1b2b3a; }
+  body.favorites-page .fav-section h3 { font: 800 12px/1.4 Nunito, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: #286962; }
+  body.favorites-page .fav-item { background: #fffdf7; border: 1px solid rgba(27,43,58,0.08); border-radius: 20px; box-shadow: 0 6px 18px rgba(27,43,58,0.06); }
+  body.favorites-page .fav-item.has-photo { grid-template-columns: 104px 1fr; padding: 12px; gap: 6px 16px; }
+  body.favorites-page .fav-item.has-photo .fav-photo { width: 104px; height: 104px; border-radius: 14px; }
+  body.favorites-page .fav-name, body.favorites-page .fav-name a { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.1rem; line-height: 1.25; color: #1b2b3a; text-decoration: none; }
+  body.favorites-page .fav-name a:hover, body.favorites-page a.fav-name:hover { text-decoration: underline; }
+  body.favorites-page .fav-meta { color: #615b53; opacity: 1; margin-top: 4px; }
+  body.favorites-page .fav-actions { margin-top: 6px; }
+  body.favorites-page .fav-actions .trip-btn, body.favorites-page .fav-actions .fav-save { background: #fffdf7; color: #1b2b3a; border: 1px solid rgba(27,43,58,0.35); min-height: 44px; }
+  body.favorites-page .fav-actions .trip-btn:hover, body.favorites-page .fav-actions .fav-save:hover { background: rgba(27,43,58,0.06); }
+  body.favorites-page .fav-actions .trip-btn.in-trip { background: #edf3e9; border-color: rgba(40,105,98,0.35); color: #1f5450; }
+  body.favorites-page .fav-actions .fav-remove { min-height: 44px; border-color: transparent; color: #615b53; text-decoration: underline; text-underline-offset: 3px; padding: 8px 10px; }
+  body.favorites-page .fav-actions .fav-remove:hover { color: #1b2b3a; }
+  body.favorites-page .fav-toolbar button { background: #fffdf7; border: 1px solid rgba(27,43,58,0.22); min-height: 44px; }
+  body.favorites-page .fav-toolbar button:hover { background: rgba(27,43,58,0.06); }
+  body.favorites-page .fav-choice { border-radius: 20px; background: #fffdf7; }
+  @media (min-width: 760px) { body.favorites-page .fav-list { grid-template-columns: 1fr 1fr; gap: 14px; } }
 </style>`;
 
 function renderDogHubPage(venues, filter = null, now = new Date()) {
