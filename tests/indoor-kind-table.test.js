@@ -161,3 +161,71 @@ test('every kind: its Groups chips (same number), Your prices words, the box off
     if (!en.arts) assert.doesNotMatch(p(bot.topic('indoor-gift').a), /Gift shop/, k);
   }
 });
+
+// Indoor test 13 (2026-11-19; Dan's cinema: his showtimes link was a "Book a party" button and folded away under walk-ins;
+// his page said "Times vary" with a showtimes link). The sweeps over every kind.
+const NONE_HOURS = { mon: null, tue: null, wed: null, thu: null, fri: null, sat: null, sun: null };
+const approveAll = (id) => { for (const r of db.prepare("SELECT id FROM owner_change_requests WHERE venue_id = ? AND status = 'pending'").all(id)) app.approveOwnerChange(r.id, 'admin:test'); app.clearHoursExtraCache(); };
+const setLink = (id, url) => db.prepare('INSERT INTO venue_links (venue_id, booking_url) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET booking_url = excluded.booking_url').run(id, url);
+const bookButton = (v, lang) => ((/<a [^>]*data-track="booking"[^>]*>([^<]*)<\/a>/.exec(app.renderVenuePage(app.getVenue(v.id), [], [], [], { lang, now: NOW })) || [])[1] || '').replace(/&amp;/g, '&').replace(/ ↗$/, '');
+
+test('Indoor test 13 sweep (S2): every kind and booking answer: the page\'s link button (EN + FR) and the setup\'s link box say what the link is; "Book a party" only for a party link (or a kids\' place\'s party Groups line)', async () => {
+  const B = IK.INDOOR_BOOK_BUTTONS, fails = [];
+  for (const k of INDOOR_KINDS) {
+    const v = mk(); const t = tokenFor(v.id);
+    await ok(change(t, { indoor_info: { kinds: [k], length: '1-2h', book: 'no', age: 'all', year: 'all' }, visit_rows: { groups: 'Birthday parties with a private room' } }));
+    approveAll(v.id);
+    setLink(v.id, 'https://kinds.example/book');
+    const w = IK.indoorKindText([k], 'en');
+    for (const book of ['no', 'busy', 'ahead']) {
+      await ok(change(t, { indoor_info: { kinds: [k], length: '1-2h', book, age: 'all', year: 'all' } }));
+      const want = w.ticketed ? B.shows : w.classKind ? B.classes : book === 'no' ? (k === 'kids' ? B.party : B.visit) : B.book;
+      for (const [i, lang] of [[0, 'en'], [1, 'fr']]) if (bookButton(v, lang) !== want[i]) fails.push(`${k} ${book} ${lang}: "${bookButton(v, lang)}" (want "${want[i]}")`);
+      // The setup's link box title, as the owner sees it with that answer saved (tapping it again would take it back).
+      const g = await openSetup(base, t, { hash: 'booking' });
+      if (!g.has(`[data-tpick="book:${book}"][aria-pressed="true"]`) && !/aria-pressed="true"[^>]*data-tpick="book:/.test(g.screen()) ) await g.click(`[data-tpick="book:${book}"]`);
+      const q = (g.doc.getElementById('suLinkQ') || { textContent: '(no box)' }).textContent;
+      const wantQ = w.ticketed ? 'Your showtimes or tickets link' : w.classKind ? 'Your class schedule link' : book === 'no' ? T.en.indoor.tbookQParty : T.en.indoor.tbookQ;
+      if (q !== wantQ) fails.push(`${k} ${book} setup: "${q}" (want "${wantQ}")`);
+    }
+    // A party page link: "Book a party" for a walk-in place of any kind but a ticketed or class one... and for those too, the link is the party page.
+    setLink(v.id, 'https://kinds.example/birthday-parties');
+    await ok(change(t, { indoor_info: { kinds: [k], length: '1-2h', book: 'no', age: 'all', year: 'all' } }));
+    if (bookButton(v, 'en') !== B.party[0]) fails.push(`${k} party link: "${bookButton(v, 'en')}"`);
+  }
+  assert.deepEqual(fails, []);
+});
+
+test('Indoor test 13 sweep (S3): every kind with no set hours and a link says what the link is, linked (page EN + FR, Build My Trip\'s fact); with no link "Times vary · check before you go"', async () => {
+  const fails = [];
+  for (const k of INDOOR_KINDS) {
+    const v = mk(); const t = tokenFor(v.id);
+    await ok(change(t, { indoor_info: { kinds: [k], length: '1-2h', book: 'busy', age: 'all', year: 'all', visit: 'appointment' } }));
+    await ok(change(t, { hours: NONE_HOURS }));
+    approveAll(v.id);
+    if (!/Times vary · check before you go/.test(page(v))) fails.push(`${k} no link: ${(/Hours[^.]{0,80}/.exec(page(v)) || [''])[0]}`);
+    setLink(v.id, `https://kinds.example/${k}/times`);
+    const kind = IK.indoorTimesKind([k]), [en, fr] = IK.INDOOR_TIMES_LINES[kind];
+    const h = app.renderVenuePage(app.getVenue(v.id), [], [], [], { lang: 'en', now: NOW });
+    if (!h.includes(`<a href="https://kinds.example/${k}/times" rel="nofollow noopener" target="_blank">${en}</a>`)) fails.push(`${k} en: no linked "${en}"`);
+    if (/Times vary/.test(page(v))) fails.push(`${k} en: still "Times vary"`);
+    if (!page(v, 'fr').includes(fr.replace(/’/g, '’'))) fails.push(`${k} fr: no "${fr}"`);
+    if (app.indoorPlannerFacts(v.id).indoorTimes !== kind) fails.push(`${k} planner fact: ${app.indoorPlannerFacts(v.id).indoorTimes}`);
+    if (k === 'cinema' || k === 'theatre') { if (kind !== 'shows') fails.push(`${k}: ${kind}`); } else if (k === 'yoga' || k === 'classes') { if (kind !== 'classes') fails.push(`${k}: ${kind}`); } else if (kind !== 'web') fails.push(`${k}: ${kind}`);
+  }
+  assert.deepEqual(fails, []);
+});
+
+test('Indoor test 13 sweep (S1): every kind has a slot length (its Time needed answer wins) and the planner reads it', () => {
+  const TR = require('../trip-requirements.js');
+  for (const k of INDOOR_KINDS) {
+    const slot = IK.indoorKindText([k], 'en').slot;
+    if (k === 'other') { assert.equal(slot, null); continue; }
+    assert.ok(slot >= 60 && slot <= 150, `${k}: ${slot}`);
+    assert.equal(TR.indoorSlotOf({ type: 'indoor', indoorKinds: [k] }, []), slot, k);
+    for (const [len, m] of Object.entries(IK.INDOOR_LENGTH_MINUTES)) assert.equal(TR.indoorSlotOf({ type: 'indoor', indoorKinds: [k], indoorLength: len }, []), m, `${k} ${len}`);
+  }
+  // The examples Dayton gave.
+  const S = (k) => IK.indoorKindText([k], 'en').slot;
+  assert.deepEqual([S('cinema'), S('theatre'), S('museum'), S('bowling'), S('escape'), S('spa'), S('climbing')], [150, 150, 90, 90, 60, 150, 120]);
+});

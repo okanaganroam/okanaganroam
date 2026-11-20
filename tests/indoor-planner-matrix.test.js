@@ -284,3 +284,38 @@ test('Indoor test 12: "<activity> in <town> <day> morning/afternoon/evening" put
   }
   assert.deepEqual(fails, []);
 });
+
+// Indoor test 13 (2026-11-19; Dan's cinema got a 1-hour slot, and the French slot read « CINEMA »): every kind's stop is as
+// long as its owner's Time needed answer (1 to 2 hours here: 90 minutes), or, with no answer, its kind's usual length
+// (indoor-kinds.js slot); and every kind's slot label reads in French.
+const frCopy = require('../trip-french-copy.js');
+const SAME_FR = new Set(['Spa', 'Casino', 'Curling', 'Arcade']);
+const scheduled = (p, id) => { const r = (p.schedule || []).find((x) => x.venueId === id); return r ? r.endMinutes - r.startMinutes : null; };
+// What a stop should last: its owner's Time needed answer, else its kind's own length.
+// A listing with no owner kinds reads as the kind its own words are (a "Museum & Archives" is a museum's 90 minutes).
+const wantMinutes = (v) => { const f = app.indoorPlannerFacts(v.id); return f.indoorKinds ? IK.indoorSlotMinutes(f.indoorKinds, f.indoorLength) : TR.indoorSlotOf({ type: 'indoor' }, plannerKindsOf(v)); };
+test('Indoor test 13 sweep (S1): every kind\'s stop length is its Time needed answer (90 minutes for 1 to 2 hours), or its kind\'s own length with no answer; and its French slot label', async () => {
+  const fails = [];
+  const OTHER_TOWN = { region: 'enderby', latitude: 50.55, longitude: -119.14 };
+  for (const [kind, k] of Object.entries(KINDS)) {
+    if (kind === 'other') continue;
+    const q = `${k.en[0].replace('{T}', TOWN)} saturday afternoon`;
+    const p = app.runTripPlan({ text: q }, NOW);
+    const stop = itemsOf(p).find((x) => x.venue.type === 'indoor' && fitsKind(x.venue, kind));
+    if (!stop) { fails.push(`${kind}: "${q}" has no ${kind}`); continue; }
+    const m = scheduled(p, stop.venue.id), want = wantMinutes(stop.venue);
+    if (stop.venue.id === placed[kind].id && want !== 90) fails.push(`${kind}: its 1 to 2 hours reads ${want}`);
+    if (m !== want) fails.push(`${kind}: "${q}" plans ${stop.venue.name} for ${m} minutes (want ${want})`);
+    const fr = frCopy.t3FrenchText(stop.label);
+    if (fr === stop.label && !SAME_FR.has(stop.label)) fails.push(`${kind}: slot label "${stop.label}" stays English in French`);
+    // No Time needed answer (in a town of its own): the kind’s own length.
+    const v = app.createVenue({ slug: `indoor-pm-slot-${kind}`, type: 'indoor', name: `${k.name} Enderby`, cuisine: k.cuisine, description: `${k.name} Enderby, ${k.cuisine.toLowerCase()}.`, address: '700 George St, Enderby, BC',
+      phone: '250-555-0188', website: 'https://example.com', hours: DAY('09:00', '21:00'), rating: 4.3, reviews: 60, ...OTHER_TOWN });
+    await ok(change(tokenFor(v.id), { indoor_info: { kinds: [kind], age: kind === 'casino' ? '19' : 'all', year: 'all' } }));
+    const q2 = `${k.en[0].replace('{T}', 'Enderby')} saturday afternoon`;
+    const p2 = app.runTripPlan({ text: q2 }, NOW);
+    const m2 = scheduled(p2, v.id), want2 = IK.indoorKindText([kind], 'en').slot;
+    if (m2 !== want2) fails.push(`${kind}: "${q2}" plans ${m2} minutes (want ${want2}, the kind's own; ${p2.kind}: ${itemsOf(p2).map((x) => x.venue.name).join(' | ')})`);
+  }
+  assert.deepEqual(fails, []);
+});

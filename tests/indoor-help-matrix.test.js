@@ -522,8 +522,40 @@ test('indoor test 12: Jess\'s Help questions (a hot yoga studio) land on the rig
   for (const k of ['museum', 'pool', 'bowling', 'theatre']) assert.equal((await botsFor(k)).en.topic(CH), undefined, k);
 });
 
+// Indoor test 13 (2026-11-19; Dan, a 2-screen cinema with shows only): his Help log, EN and FR twins, with where each belongs.
+const DAN = [
+  ['doors open half an hour before first show', [NH], 'les portes ouvrent une demi-heure avant la première séance'],
+  ['showtimes change every week', [NH], 'les horaires des films changent chaque semaine'],
+  ['cheap tuesdays $8', [P], 'mardis à prix réduit 8 $'],
+  ['popcorn is extra', [X], 'le maïs soufflé est en extra'],
+  ['we have beer and wine, is that happy hour', [B], 'nous avons de la bière et du vin, est-ce un 5 à 7?'],
+  ['can people rent the theatre', [G], 'peut-on louer la salle?'],
+  // His other words for the same things.
+  ['doors open before the show', [NH], 'les portes ouvrent avant le spectacle'],
+  ['private screening', [G], 'projection privée'],
+  ['can we do a buyout', [G], 'peut-on privatiser la salle?'],
+];
+const DAN_WANT = Object.fromEntries(DAN.map(([q, want]) => [q, want]));
+test('indoor test 13: Dan\'s Help questions (a cinema) land on the right answer, in English and in French; the answers say what his page says and drop the open-door hours', async () => {
+  const b = await botsFor('cinema');
+  const wrong = [];
+  for (const [q, want, qFr] of DAN) {
+    const r = b.en.best(q), f = b.fr.best(qFr);
+    if (!r || !want.includes(r.id)) wrong.push(`en "${q}" -> ${r && r.id} (want ${want.join(' or ')})`);
+    if (!f || !want.includes(f.id)) wrong.push(`fr "${qFr}" -> ${f && f.id} (want ${want.join(' or ')})`);
+  }
+  assert.deepEqual(wrong, []);
+  assert.match(plain(b.en.topic(NH).a), /Doors open 30 minutes before the first show/);
+  assert.match(plain(b.en.topic(P).a), /like Cheap Tuesdays \$8 \? Type it as one of Your prices , and say it in your Known for line too/);
+  assert.doesNotMatch(plain(b.en.topic(TH).a), /open-door hours|Add an event/);
+  assert.match(plain(b.en.topic(BK).a), /Showtimes & tickets/);
+  assert.doesNotMatch(plain(b.en.topic(BK).a), /Book a party/);
+  // A kind with set hours (bowling) keeps the weekly event and its open-door hours.
+  assert.match(plain((await botsFor('bowling')).en.topic(TH).a), /Add an event.*open-door hours/);
+});
+
 // Every question in the 8 indoor help logs lands on an answer, on the page where it was asked, for the kind of place it was.
-const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga' };
+const LOG_KINDS = { 1: 'museum', 2: 'escape', 3: 'theatre', 4: 'spa', 5: 'climbing', 6: 'classes', 7: 'gallery', 8: 'bowling', 9: 'kids', 10: 'pool', 11: 'museum', 12: 'yoga', 13: 'cinema' };
 // The misrouted ones, with where they belong.
 const LOG_WANT = {
   'we price per room not per person': [R], 'how do I change the price, it says adults but we charge per room': [R],
@@ -545,14 +577,17 @@ const LOG_WANT = {
   ...KIM_WANT,
   // Indoor test 12 (Jess, a hot yoga studio).
   ...JESS_WANT,
+  // Indoor test 13 (Dan, a cinema).
+  ...DAN_WANT,
 };
 test('every question in the 8 indoor help logs lands on an answer (the misrouted ones on the right one)', async () => {
   const wrong = [];
   for (const [i, kind] of Object.entries(LOG_KINDS)) {
     const f = path.join(__dirname, '..', '..', '..', 'drafts', `fresh-eyes-indoor${i}-2026-11-19`, 'help-log.json');
     if (!fs.existsSync(f)) continue;
-    const b = await botsFor(kind);
     for (const x of JSON.parse(fs.readFileSync(f, 'utf8')).filter((y) => y.q && !/^\[/.test(y.q))) {
+      // Indoor test 13's log also rechecks Jess's yoga studio (its "reg-yoga" shots): those are asked of a yoga studio.
+      const b = await botsFor(/reg-yoga/.test(x.shot || '') ? 'yoga' : kind);
       const r = (/\/menu/.test(x.hash) ? b.men : b.en).best(x.q);
       if (!r || !r.id) wrong.push(`log ${i} (${kind}) "${x.q}" -> nothing`);
       else if (LOG_WANT[x.q] && !LOG_WANT[x.q].includes(r.id)) wrong.push(`log ${i} (${kind}) "${x.q}" -> ${r.id} (want ${LOG_WANT[x.q].join(' or ')})`);
