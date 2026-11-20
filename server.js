@@ -31177,8 +31177,11 @@ const ALL_REGIONS_BACK_LABEL = { golf: 'Golf', beach: 'Beaches', outdoor: 'Outdo
 // golf" (that's how each one was written at insertion time), and no
 // outdoor course description does, so the existing data already supports
 // the distinction without inventing a new schema field.
+// 2026-11-20: a "virtual golf" venue is indoor golf too, by its name or its description. (Okanagan Virtual Golf's
+// Penticton listing describes its bays and launch monitor without either of the other words, so it was grouped with
+// the outdoor courses.)
 function isIndoorGolfVenue(venue) {
-  return /simulator|indoor golf/i.test(venue.description || '');
+  return /simulator|indoor golf|virtual golf/i.test(`${venue.name || ''} ${venue.description || ''}`);
 }
 // Indoor & Rainy Day hub (2026-10-11): the golf venues that are indoor
 // simulators, listed on /indoor in their own section (they keep type golf
