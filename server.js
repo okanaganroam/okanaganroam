@@ -5408,7 +5408,7 @@ const INDOOR_FR_SEARCH_REWRITES = [
   const fold = (w) => String(w).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’'-]/g, ' ').replace(/\s+/g, ' ').trim();
   const have = new Set(INDOOR_FR_SEARCH_REWRITES.map(([k]) => k));
   const SKIP = new Set(['golf', 'sports', 'loisirs', 'sports et loisirs', 'hockey', 'tennis', 'pickleball', 'bmx', 'pump track', 'skatepark', 'minigolf', 'mini golf', 'patin', 'baignade']);
-  const target = { golf: 'golf course', simgolf: 'golf simulator', range: 'driving range', skischool: 'ski lesson', rink: 'skating rink', swim: 'outdoor pool', skatepark: 'skate park', bike: 'bmx track', courts: 'tennis courts', discgolf: 'disc golf', sportsctr: 'sports centre' };
+  const target = { golf: 'golf course', simgolf: 'golf simulator', range: 'driving range', skischool: 'ski lesson', rink: 'skating', swim: 'outdoor pool', skatepark: 'skate park', bike: 'bmx track', courts: 'tennis courts', discgolf: 'disc golf', sportsctr: 'sports centre' };
   const own = { 'heure de depart': 'tee time', 'droits de jeu': 'green fees', '18 trous': '18 holes', '9 trous': '9 holes', 'seau de balles': 'bucket of balls', 'patinage libre': 'public skating', 'hockey libre': 'drop in hockey', 'bain libre': 'public swim', 'ski de soiree': 'night skiing', 'ski en soiree': 'night skiing', 'apprendre a skier': 'learn to ski', 'jeux d eau': 'splash park', 'parc aquatique': 'water park', 'sports libres': 'drop in sports', 'gymnase': 'gymnasium', 'aréna': 'arena', 'arena': 'arena', 'arenas': 'arenas' };
   for (const [k, e] of Object.entries(require('./sport-kinds').K)) {
     if (!target[k]) continue;
@@ -10598,7 +10598,8 @@ function ownerSeasonSupersedes(venueId, openMonths, undo) {
 //   dates:   each course's rate-season notes in data/golf-course-data.json where they name the opening month ("Low season
 //            (March-April & October)" -> open from March 1); otherwise March 15 to October 31.
 // One switch turns it off everywhere.
-const GOLF_WINTER_RULE_ON = true;
+// GOLF_WINTER_RULE=off turns it off too (tests/server.test.js: its golf fixtures predate the rule and run on today's date).
+const GOLF_WINTER_RULE_ON = process.env.GOLF_WINTER_RULE !== 'off';
 const GOLF_WINTER_DEFAULT = { from: '03-15', to: '10-31' };
 const GOLF_WINTER_OPEN_RE = /\b(?:year[- ]round|all[- ]year(?: round)?|open (?:all|every) (?:year|winter)|12 months|(?:open|play(?:able)?|golf(?:ing)?) (?:in|through|during|all) (?:the )?winter|winter (?:hours|golf|play|greens|rates?|season pass)|toute l.année)\b/i;
 const GOLF_COVERED_RE = /\b(?:indoor|covered|heated|enclosed|simulators?|sim golf|virtual golf|golf lounge|trackman)\b/i;
@@ -10626,9 +10627,18 @@ function golfCourseSeasonNotes() {
   return GOLF_SEASON_NOTES;
 }
 // venue id -> 'MM-DD:MM-DD' (its usual open season) for every listing the rule covers.
+let golfWinterCache = null;
 function golfWinterSeasonMap() {
+  if (!GOLF_WINTER_RULE_ON) return new Map();
+  // Read once until the database changes (any write), as the search records are.
+  let version = null; try { version = db.prepare('SELECT total_changes() AS n').get().n; } catch (e) { version = null; }
+  if (golfWinterCache && version != null && golfWinterCache.version === version && Date.now() - golfWinterCache.at < 60000) return new Map(golfWinterCache.map);
+  const out = golfWinterSeasonMapRead();
+  golfWinterCache = { version, at: Date.now(), map: [...out] };
+  return out;
+}
+function golfWinterSeasonMapRead() {
   const out = new Map();
-  if (!GOLF_WINTER_RULE_ON) return out;
   let rows = [];
   try { rows = db.prepare("SELECT id, type, name, cuisine, description, region, slug FROM venues WHERE type IN ('golf', 'sport') AND redirect_to IS NULL").all(); } catch (e) { rows = []; }
   if (!rows.length) return out;
@@ -25872,7 +25882,8 @@ const AGE_AFTER_RES = [
   new RegExp(String.raw`\b(?:19|18)\s*(?:\+|and (?:over|older|up)|years? and (?:over|older|up)|ans et plus|only)?\s*(?:after|from|past|apr[èe]s|d[èe]s|[àa] partir de)\s+` + AGE_AFTER_TIME, 'i'),
   new RegExp(String.raw`\b(?:adults?[- ]only|adultes? seulement|adultes? uniquement|no (?:kids|children|minors))\s+(?:after|from|past|apr[èe]s|d[èe]s|[àa] partir de)\s+` + AGE_AFTER_TIME, 'i'),
 ];
-const AGE_UNTIL_RE = new RegExp(String.raw`\b(?:kids|children|minors|all ages|under[- ]?(?:19|18)s?|families|enfants|mineurs|tous les [âa]ges|familles)\b[^.;]{0,60}?\b(?:until|till|til|before|up to|jusqu[’']?[àa]|avant)\s+` + AGE_AFTER_TIME, 'i');
+// "Kids' parties until 8 PM" is not an age rule: the kids must be welcome, allowed or with an adult until then.
+const AGE_UNTIL_RE = new RegExp(String.raw`\b(?:kids|children|minors|all ages|under[- ]?(?:19|18)s?|families|enfants|mineurs|tous les [âa]ges|familles)\b[^.;]{0,30}?\b(?:welcome|allowed|ok|okay|are fine|with (?:an? )?(?:adult|parent|guardian)s?|accompanied|supervised|bienvenu(?:e|s|es)?|admis|accept[ée]s?|avec (?:un )?(?:adulte|parent))\b[^.;]{0,24}?\b(?:until|till|til|before|up to|jusqu[’']?[àa]|avant)\s+` + AGE_AFTER_TIME, 'i');
 function ageAfterMinutes(m, i) {
   let h = Number(m[i]), mm = Number(m[i + 1] || 0); const ap = String(m[i + 2] || '').toLowerCase().replace(/[^apmh]/g, '');
   if (!(h >= 0 && h <= 24) || mm > 59) return null;
@@ -52733,7 +52744,7 @@ function visitSlotsFor(venueId) { let t = ''; try { t = (db.prepare('SELECT type
 // The classic edit page keeps its five boxes (the dogs line is only asked in the setup).
 const OWNER_VISIT_EDIT_KEYS = ['known_for', 'reservations', 'takeout', 'dietary', 'groups'];
 // Sport test 2 (2026-11-20; Trevor's two Groups taps pushed research's "Winter scramble leagues run 5 weeks" off at 180): an
-// indoor or sport place's Groups line holds 240, so research's facts and the owner's taps both fit.
+// sport or golf place's Groups line holds 240, so research's facts and the owner's taps both fit (indoor keeps 180).
 const KIND_GROUPS_MAX = 240;
 const OWNER_VISIT_ERRORS = {
   long: `Please keep each line to ${VISIT_TEXT_MAX} characters or less.`,
@@ -52744,7 +52755,7 @@ const OWNER_VISIT_ERRORS = {
   link: 'Please leave links out of these lines. Your booking link has its own box under “Name, address & links”.',
   unreadable: 'Some of the information could not be read. Please reload the page and try again.',
 };
-function visitTextMaxFor(type, key) { return (type === 'tour' || kindSetupType(type)) && key === 'good_to_know' ? TOUR_GOOD_TO_KNOW_MAX : kindSetupType(type) && key === 'groups' ? KIND_GROUPS_MAX : VISIT_TEXT_MAX; }
+function visitTextMaxFor(type, key) { return (type === 'tour' || kindSetupType(type)) && key === 'good_to_know' ? TOUR_GOOD_TO_KNOW_MAX : sportSetupType(type) && key === 'groups' ? KIND_GROUPS_MAX : VISIT_TEXT_MAX; }
 // Tour test 10 (Whistler, 2026-11-18; Gord typed everything in lower case: "family ranch in pemberton meadows since 1979.
 // trail rides 1 or 2 hrs…"): the first letter of each sentence an owner types (story, Known for, Good to know, a typed
 // tour's name) gets its capital when saved. No other letter or word changes (names like "pemberton" stay as typed: the
@@ -60716,7 +60727,7 @@ function renderOwnerSetupPage(found, opts) {
     // typical visit, walk-ins or book ahead, 19+ for a casino), research's price or its Free badge, all pre-picked as
     // suggestions ("We picked this for you: check it") and saved only with the screen.
     ...(indoor ? {
-      allSteps: INDOOR_SETUP_PART1.concat(INDOOR_SETUP_PART2), feeLiveMax: INDOOR_PRICE_LIVE_MAX, bringMax: TOUR_GOOD_TO_KNOW_MAX, groupsMax: KIND_GROUPS_MAX,
+      allSteps: INDOOR_SETUP_PART1.concat(INDOOR_SETUP_PART2), feeLiveMax: INDOOR_PRICE_LIVE_MAX, bringMax: TOUR_GOOD_TO_KNOW_MAX, groupsMax: sportSetupType(venue.type) ? KIND_GROUPS_MAX : 180,
       indoorKinds: (sport ? SPORT_KINDS_SHOWN : INDOOR_KINDS_SHOWN).map((k) => ({ k, t: INDOOR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), indoorKindsTop: sport ? SPORT_KINDS_SHOWN.length : INDOOR_KINDS_TOP,
       // Sport and golf (2026-11-20): the sport words, each kind's usual season (the Hours step's hint) and its fallback kind.
       sport, kindSeasons: sport ? Object.fromEntries(SPORT_KINDS.map((k) => [k, indoorKindsModule.indoorKindText([k], 'en').season || ''])) : {}, otherKind: sport ? 'sportother' : 'other',

@@ -48,6 +48,9 @@ if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
 // value only, never a real credential, and only exists in this test
 // process's environment.
 process.env.ENRICHMENT_ADMIN_TOKEN = 'test-fixture-admin-token';
+// Sport test 2 (2026-11-20): the golf winter rule is off here (these golf fixtures have no season and run on today's date);
+// tests/sport-test2-fixes.test.js covers it.
+process.env.GOLF_WINTER_RULE = 'off';
 
 // Seasonal homepage tiles (2026-10-11): "/" swaps Beaches/Golf for Ski &
 // Snow/Indoor from November to March. Every existing homepage and mood-card

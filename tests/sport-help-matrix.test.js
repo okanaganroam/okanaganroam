@@ -292,7 +292,7 @@ const MORE = {
     ['en', 'is the clubhouse restaurant open to non golfers', [REST]], ['en', 'no denim on the course', [DC]], ['en', 'we only have a practice green', [NR]], ['en', 'charity scramble in june', [TOUR]], ['en', 'ladies league thursday evenings', [TH, MEM]],
     ['fr', 'tarifs aînés en semaine', [RL]]],
   simgolf: [['en', 'junior rate for kids', [RL, P]], ['en', 'monthly memberships', [RL, P]], ['en', 'prices go up in january', [RC]], ['en', 'we have a bar and happy hour', [B, HH]], ['en', 'is there a dress code', [DC]],
-    ['en', 'tournament on saturday', [TOUR]], ['en', 'mens league on mondays', [TH, MEM]], ['en', 'can dogs come in', [DOG]], ['en', 'our kitchen serves food all day', [REST, B]], ['en', 'off peak rate before 4pm', [P, PV, RL]],
+    ['en', 'tournament on saturday', [TOUR]], ['en', 'mens league on mondays', [TH, MEM]], ['en', 'can dogs come in', [DOG]], ['en', 'our kitchen serves food all day', [REST, B, 'sport-food-menu']], ['en', 'off peak rate before 4pm', [P, PV, RL]],
     ['fr', 'tarif junior pour les enfants', [RL, P]]],
   range: [['en', 'junior bucket price', [RL, P]], ['en', 'season pass for the range', [RL]], ['en', 'new prices next season', [RC]], ['en', 'dogs allowed on the range', [DOG]], ['en', 'snack bar on site', [REST]],
     ['en', 'glow mini golf friday nights', [TH]], ['en', 'mini golf tournament', [TOUR]], ['en', 'no collars needed', [DC]], ['en', 'small bucket is our cheapest', [P, PV]], ['en', 'senior rates', [RL]],
