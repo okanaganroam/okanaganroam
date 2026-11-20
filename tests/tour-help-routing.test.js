@@ -730,7 +730,7 @@ test("tour test 10 answers: three stretches with the spring-and-fall tip, Open o
   assert.match(plain(en.topic("tour-age").a), /8\+, 10\+/); assert.match(plain(fr.topic("tour-age").aFr), /8\+, 10\+/);
   assert.match(plain(en.topic("tour-ages-per-trip").a), /Riders 8\+ \(pony rides under 8\)/);
   assert.match(plain(en.topic("tour-price-rules").a), /Your tours and prices/); assert.match(plain(en.topic("tour-price-rules").a), /2 person minimum/);
-  assert.match(plain(en.topic("not-owner").a), /Managers, marketing and staff can update the page too/);
+  assert.match(plain(en.topic("not-owner").a), /managers, staff and volunteers can use this link too/);
   assert.match(plain(en.topic("tour-one-trip-season").a), /Stay “all year”/);
 });
 

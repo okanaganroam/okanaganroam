@@ -204,7 +204,7 @@ test('the page script: answered steps offer Next (never Skip), Exit asks to save
   assert.match(s, /function skip\(step\)\{[\s\S]*?if \(answered\(step\)\) return '<div class="su-stack" style="margin-top:14px">' \+ big\('➜', nextLabel\(step\), '', true, 'after:' \+ step\)/);
   assert.match(s, /if \(k === 'skip'\) \{ if \(answered\(v\)\) return after\(v\);/);
   // The menu step says what was sent.
-  assert.match(s, /sentM \? q\(T\.menuSentQ\)/);
+  assert.match(s, /sentM \? q\(nowSt\('menu', 'day'\) === 'live' && T\.menuLiveQ \? T\.menuLiveQ : T\.menuSentQ\)/);
   // Exit setup: "Save these first?" with Save and exit first; saving goes through the step's own save.
   assert.match(html, /<a class="su-exit" id="suExit" href="/);
   assert.match(s, /el\('suExit'\)\.onclick = function\(e\)\{ if \(S\.busy\) \{ e\.preventDefault\(\); return; \}[\s\S]{0,400}?if \(unsaved\(\)\) \{ e\.preventDefault\(\); askExit\(\); \} \};/); // café test 5: photos with the box ticked are sent first

@@ -35,7 +35,9 @@ const STRONG = new Set(('moniteur moniteurs monitrice monitrices lecons hispanop
   // 2026-10-18: "un week-end vinicole", "où les chiens sont acceptés" (ouu is the tokenizer's où).
   + 'vinicole vinicoles viticole viticoles oenologique acceptes admis bienvenus ouu '
   // Search gaps (2026-10-18): "végétalien whistler" and "abordable squamish" were read as unknown words.
-  + 'vegetalien vegetalienne vegetaliens vegetaliennes vegane veganes abordable abordables').split(' '));
+  + 'vegetalien vegetalienne vegetaliens vegetaliennes vegane veganes abordable abordables '
+  // Indoor test 9 (2026-11-19): the indoor kinds' own French words.
+  + 'interieure interieures interieurs quilles piscine piscines bibliotheque bibliotheques galerie galeries escalade evasion conte').split(' '));
 // Common French function words: two different ones are needed.
 const WEAK = new Set(('le la les l des du de d un une et ou au aux en dans sur chez pour mon ma mes nos notre votre vos est sont '
   + 'que qui ce cette ces il y').split(' '));
@@ -79,8 +81,36 @@ const PHRASES = [
   ['atelier de poterie', 'pottery class'], ['cours de poterie', 'pottery class'],
   ['atelier de ceramique', 'pottery class'], ['cours de ceramique', 'pottery class'],
   ['galerie d art', 'art gallery'], ['galeries d art', 'art galleries'],
-  ['musee', 'museum'], ['musees', 'museums'], ['galerie', 'gallery'], ['galeries', 'galleries'],
+  ['musee', 'museum'], ['musees', 'museums'], ['galerie', 'art gallery'], ['galeries', 'art galleries'],
   ['salle d escalade', 'climbing gym'], ['quilles', 'bowling'], ['cinema', 'cinema'],
+  // Indoor test 9 (2026-11-19; Melissa's play centre: « aire de jeux intérieure à West Kelowna » read « aire of jeux
+  // interieure » and found nothing): every indoor kind's French words (indoor-kinds.js), read without accents, as the
+  // English words the planner's indoor kinds already know (trip-requirements.js KINDS).
+  ['aire de jeux interieure', 'indoor playground'], ['aires de jeux interieures', 'indoor playgrounds'], ['aire de jeu interieure', 'indoor playground'],
+  ['aire de jeux interieure pour enfants', 'indoor playground for kids'], ['parc interieur pour enfants', 'indoor playground for kids'], ['parc interieur', 'indoor playground'], ['parcs interieurs', 'indoor playgrounds'],
+  ['centre de jeux interieur', 'indoor playground'], ['centre de jeux', 'play centre'], ['centres de jeux', 'play centres'], ['jeux interieurs', 'indoor play'], ['jeux pour tout petits', 'toddler play'],
+  ['centre d escalade', 'climbing gym'], ['salles d escalade', 'climbing gyms'], ['escalade de bloc', 'bouldering'], ['escalade interieure', 'indoor climbing'],
+  ['parc de trampolines', 'trampoline park'], ['parc de trampoline', 'trampoline park'], ['parcs de trampolines', 'trampoline parks'], ['centre de trampolines', 'trampoline park'],
+  ['salle d arcade', 'arcade'], ['salles d arcade', 'arcades'], ['salle de jeux d arcade', 'arcade'], ['jeux d arcade', 'arcade games'], ['realite virtuelle', 'virtual reality'], ['lancer de hache', 'axe throwing'],
+  ['salle de quilles', 'bowling alley'], ['salles de quilles', 'bowling alleys'], ['jouer aux quilles', 'bowling'], ['petites quilles', '5 pin bowling'], ['grosses quilles', 'ten pin bowling'],
+  ['salle de cinema', 'movie theatre'], ['salles de cinema', 'movie theatres'], ['voir un film', 'see a movie'], ['aller au cinema', 'cinema'],
+  ['piece de theatre', 'a play'], ['pieces de theatre', 'plays'], ['salle de spectacle', 'theatre'], ['salles de spectacle', 'theatres'], ['salle de spectacles', 'theatre'], ['theatre', 'theatre'], ['theatres', 'theatres'],
+  ['piscine interieure', 'indoor pool'], ['piscines interieures', 'indoor pools'], ['piscine publique', 'public pool'], ['piscine', 'pool'], ['piscines', 'pools'],
+  ['bain libre', 'public swim'], ['bains libres', 'public swim'], ['nage en couloir', 'lane swim'], ['centre aquatique', 'aquatic centre'], ['centres aquatiques', 'aquatic centres'], ['centre recreatif', 'rec centre'],
+  ['spa de jour', 'day spa'], ['spa nordique', 'nordic spa'], ['massage en couple', 'couples massage'], ['massages en couple', 'couples massage'], ['soin du visage', 'facial'], ['soins du visage', 'facials'],
+  ['cours de peinture', 'painting class'], ['peinture sur poterie', 'paint your own pottery'], ['atelier de peinture', 'painting class'],
+  ['initiation au curling', 'learn to curl'], ['club de curling', 'curling club'],
+  ['cours de yoga', 'yoga class'], ['yoga chaud', 'hot yoga'], ['cours de mise en forme', 'fitness class'],
+  ['machines a sous', 'slot machines'], ['machine a sous', 'slot machines'], ['tables de jeu', 'table games'],
+  ['bibliotheque publique', 'public library'], ['bibliotheque', 'library'], ['bibliotheques', 'libraries'], ['heure du conte', 'story time'],
+  // Indoor test 10 (2026-11-19, the synonym matrix): more French ways of naming each indoor kind.
+  ['musee d art', 'art gallery'], ['musees d art', 'art galleries'], ['mur d escalade', 'climbing wall'], ['murs d escalade', 'climbing walls'], ['soiree peinture', 'paint night'], ['soirees peinture', 'paint night'],
+  ['aquaforme', 'aquafit'], ['aqua forme', 'aquafit'], ['bain a remous', 'hot tub'], ['bains a remous', 'hot tubs'], ['bain tourbillon', 'hot tub'], ['salle de theatre', 'theatre'], ['salles de theatre', 'theatres'],
+  ['theatre communautaire', 'community theatre'], ['bibliotheque municipale', 'public library'], ['centre de jeux pour enfants', 'indoor playground for kids'], ['studio de yoga', 'yoga studio'],
+  ['jouer au curling', 'curling'], ['faire du curling', 'curling'], ['essayer le curling', 'learn to curl'],
+  ['soiree au casino', 'casino night'], ['bain de vapeur', 'steam room'], ['cinemas', 'cinemas'],
+  ['centre des sciences', 'science centre'], ['centre de sciences', 'science centre'], ['centre scientifique', 'science centre'],
+  ['activites interieures', 'indoor activities'], ['activite interieure', 'indoor activity'], ['quand il pleut', 'when it rains'], ['jour de pluie', 'rainy day'],
   ['obligatoirement', 'must'], ['obligatoire', 'must'], ['seulement', 'only'], ['idealement', 'ideally'],
   ['repas vegetariens', 'vegetarian meals'], ['repas vegetariens seulement', 'only vegetarian meals'],
   ['jour 1', 'day 1'], ['jour 2', 'day 2'], ['jour 3', 'day 3'], ['jour 4', 'day 4'],
@@ -248,7 +278,11 @@ const PHRASES = [
   ['vie nocturne', 'nightlife'], ['sortie nocturne', 'night out'], ['boite de nuit', 'nightclub'], ['boites de nuit', 'nightclubs'],
   ['observer les ours', 'bear viewing'], ['ours', 'bears'], ['aigles', 'eagles'], ['aigle', 'eagle'], ['saumons', 'salmon'], ['saumon', 'salmon'],
   ['cascades', 'waterfalls'], ['cascade', 'waterfall'], ['chutes', 'falls'],
-  ['grimpeurs', 'rock climbing'], ['grimpeur', 'rock climbing'], ['grimpeuses', 'rock climbing'], ['escalade', 'rock climbing'],
+  ['grimpeurs', 'rock climbing'], ['grimpeur', 'rock climbing'], ['grimpeuses', 'rock climbing'], 
+  // Indoor test 17 (2026-11-19; Megan's bouldering gym: « escalade à Kelowna samedi » found nothing, a bare « escalade » read
+  // as outdoor rock climbing): « escalade » is climbing (a climbing gym in winter); outdoor words keep rock climbing.
+  ['escalade', 'climbing'], ['escalade interieure', 'indoor climbing'], ['escalade en salle', 'indoor climbing'], ['escalade exterieure', 'rock climbing'],
+  ['escalade de rocher', 'rock climbing'], ['escalade sur roche', 'rock climbing'], ['grimper', 'climb'], ['faire de l escalade', 'climbing'],
   ['coucher de soleil', 'sunset spots'], ['couchers de soleil', 'sunset spots'], ['belles vues', 'views'], ['vue sur les montagnes', 'mountain views'],
   ['avec des arrets', 'with stops along the way'], ['arrets en route', 'stops along the way'], ['arrets', 'stops'],
   ['tyrolienne', 'zipline'], ['tyroliennes', 'ziplines'], ['saut a l elastique', 'bungee'], ['rafting', 'rafting'], ['velo de montagne', 'mountain biking'],
@@ -370,7 +404,7 @@ const PHRASES = [
   ['marches', 'markets'],
   ['marche fermier', 'farmers market'], ['marche des fermiers', 'farmers market'], ['marche public', 'farmers market'],
   ['marches publics', 'farmers markets'], ['marche de producteurs', 'farmers market'], ['marches fermiers', 'farmers markets'],
-  ['partie de hockey', 'hockey game'], ['match de hockey', 'hockey game'], ['galerie', 'gallery'], ['galeries', 'galleries'],
+  ['partie de hockey', 'hockey game'], ['match de hockey', 'hockey game'], ['galerie', 'art gallery'], ['galeries', 'art galleries'],
   ['quoi de neuf', 'whats on'], ['ce qui se passe', 'whats on'],
   // who is coming
   ['avec mon chien', 'with my dog'], ['avec ma chienne', 'with my dog'], ['avec le chien', 'with the dog'],

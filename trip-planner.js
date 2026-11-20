@@ -134,7 +134,11 @@ function requestKidAges(text) {
   const out = [];
   const add = (x) => { const n = Number(x); if (Number.isInteger(n) && n >= 0 && n < 19) out.push(n); };
   let m;
-  const re1 = /\b(\d{1,2}) ?(?:years? old|year olds?|yrs? old|yo)\b/g; while ((m = re1.exec(t))) add(m[1]);
+  // Indoor test 4 (2026-11-19): "14-year-old" with its hyphens too (the server reads them as spaces; this reads both).
+  const re1 = /\b(\d{1,2})[ -]?(?:years?[ -]old|year[ -]olds?|yrs?[ -]old|yo)\b/g; while ((m = re1.exec(t))) add(m[1]);
+  // Indoor test 4 (Lauren: « spa avec mon ado de 14 ans »): French ages, « mon fils de 14 ans », « nos enfants de 8 et 11 ans »,
+  // « un enfant de 6 ans » (never « 19 ans et plus », a place's own minimum).
+  const re3 = /\b(?:de|d['’]|ont|a)\s*(\d{1,2})(?:\s*(?:et|ou|à|a)\s*(\d{1,2}))?\s*ans\b(?!\s*(?:et plus|\+|minimum|et moins))/g; while ((m = re3.exec(t))) { add(m[1]); if (m[2]) add(m[2]); }
   const re2 = /\b(?:aged?|ages|kids?|children|boys?|girls?|sons?|daughters?) (\d{1,2})(?: (?:and|or|to|through) (\d{1,2}))?\b(?! ?(?:am|pm|h|people|guests|adults|of us))/g; while ((m = re2.exec(t))) { add(m[1]); if (m[2]) add(m[2]); }
   return [...new Set(out)].sort((a, b) => a - b);
 }
@@ -142,6 +146,30 @@ function requestKidAges(text) {
 function kidsYoungest(ctx) { if (!ctx) return null; const a = Array.isArray(ctx.kidAges) && ctx.kidAges.length ? ctx.kidAges.slice().sort((x, y) => x - y) : requestKidAges(ctx.queryText || ''); return a.length ? a[0] : null; }
 // Whistler #190 (2026-11-17): an active party place for a kids' birthday, read from the listing's own name and category.
 const KIDS_PARTY_ACTIVE_RE = /\b(?:adventure parks?|aerial (?:adventure )?(?:parks?|courses?)|tree ?top|ropes? courses?|obstacle courses?|zip ?lines?|mini ?golf|climbing (?:gyms?|walls?)|trampoline\w*)\b/;
+// Indoor test 4 (2026-11-19; Lauren's 16+ spa and a "19+ only" Nordic spa were planned for "spa with my 14 year old"): an
+// indoor place's own minimum age (the owner's Who can come answer; else its page saying "19+", "16 and over" or "adults
+// only") above the youngest child named. Same rule as tours.
+const INDOOR_ADULTS_RE = /\b(19|18|16|14|13|12)\s*\+|\b(19|18|16|14|13|12) (?:and|&) (?:over|older|up)\b|\b(adults?[ -]only|no one under 19|19 ans et plus)\b/i;
+function indoorMinAgeOf(v) {
+  if (!v || v.type !== 'indoor') return null;
+  if (/^\d+$/.test(String(v.indoorMinAge || ''))) return Number(v.indoorMinAge);
+  if (v.indoorMinAge === 'all') return null;
+  const m = INDOOR_ADULTS_RE.exec(`${v.description || ''} ${v.plannerDescription || ''}`);
+  return m ? Number(m[1] || m[2]) || 19 : null;
+}
+// Indoor test 9 (2026-11-19; Melissa's play centre for kids 0 to 10 was the first pick for "something for my 12 year old"):
+// a kids' age range in the owner's own words (server.js indoorKidsRange) leaves the place out when the youngest child named
+// is older than its top age.
+function indoorTooOld(v, ctx) {
+  if (!v || v.type !== 'indoor' || !Array.isArray(v.indoorKidsRange) || namedInRequest(v, ctx)) return false;
+  const young = kidsYoungest(ctx);
+  return young != null && young > v.indoorKidsRange[1];
+}
+function indoorTooYoung(v, ctx) {
+  if (!v || v.type !== 'indoor' || namedInRequest(v, ctx)) return false;
+  const young = kidsYoungest(ctx), min = indoorMinAgeOf(v);
+  return young != null && min != null && young < min;
+}
 function tourTooYoung(v, ctx) {
   if (!v || v.type !== 'tour' || namedInRequest(v, ctx)) return false;
   const young = kidsYoungest(ctx);
@@ -235,6 +263,15 @@ function kidsAllowed(v) {
   // Tour test 1: with the kids' ages named, a tour whose minimum is at or below the youngest is fine ("our 14-year-old" and
   // a 12+ tour); one above it is not.
   // Tour test 10: a trip the request names that is for older riders than the youngest child (tourAgeFit).
+  // Indoor places (2026-11-19): the owner's own minimum age. All ages or 5+ is fine for a family; 8+ when the kids' ages
+  // say so; 12+, 16+ or 19+ never is (a kids trip doesn't say how old the kids are). Unanswered: as before.
+  if (v.type === 'indoor' && indoorTooOld(v, ctx)) return false;
+  if (v.type === 'indoor' && v.indoorMinAge) {
+    if (v.indoorMinAge === 'all') return true;
+    const youngI = kidsYoungest(ctx);
+    if (youngI != null && /^\d+$/.test(v.indoorMinAge)) return youngI >= Number(v.indoorMinAge);
+    return v.indoorMinAge === '5';
+  }
   if (v.type === 'tour' && tourAgeFit(v, ctx).out) return false;
   if (v.type === 'tour' && v.tourMinAge) {
     if (v.tourMinAge === 'all') return true;
@@ -552,6 +589,9 @@ function buildContext(intent, labels, options) {
     lake: intent.lake === true,
     plannerKinds: opts.requirements ? opts.requirements.items.filter(i => i.kind === 'venue_kind' && i.strength === 'must').map(i => i.value) : intent.plannerKinds || [],
     requirements: opts.requirements || null,
+    // Indoor test 2 (2026-11-19): the clock time the request names (server.js askedMinutes), kept for a list of places
+    // even when no other requirement was (requestedTimeFit).
+    askedMinutes: Number.isFinite(opts.askedMinutes) ? opts.askedMinutes : null,
     queryText: normWords(opts.text || ''),
     // Tour test 10: the request's own words before the shorthand ("trail ride", "pony ride" both read "horseback riding"),
     // for the trips it names (tourAgeFit).
@@ -698,7 +738,12 @@ function slotFit(v, ctx, windowKey, dayIndex, daypart) {
     score += weekday ? 2 : n >= 5 ? 2 : n >= 3 ? -4 : -14;
     const text = listedHoursText(v, null, fit.days);
     if (text) reasons.push({ code: 'hours', text, weight: 2 });
-    caveats.push(`Its listed hours only fit the ${label} on ${dayListText(fit.days)} \u2014 check the day you go`);
+    // Indoor test 18 (2026-11-19; Natalie's spa, open Tue–Sat: a girls' weekend said "only fit the morning on Tue–Sat"):
+    // when the slot fits every day the place is open, the days it's open are the whole story ("Open Tue–Sat").
+    const parsedH = v._hours || (v._hours = parseVenueHours(v.hours));
+    const openDays = parsedH && parsedH.days ? WEEKDAYS.filter((d) => parsedH.days[d] && parsedH.days[d].status === 'open') : [];
+    const fitsAllOpen = openDays.length && openDays.length < 7 && openDays.every((d) => (fit.days || []).includes(d));
+    caveats.push(fitsAllOpen ? `Open ${dayListText(fit.days)} \u2014 check the day you go` : `Its listed hours only fit the ${label} on ${dayListText(fit.days)} \u2014 check the day you go`);
     // 2026-10-25: a plan with no date is timed from a Saturday, so a place closed that day (a winery open Mon-Fri on
     // day 1, a Tue-Sat sushi lunch on day 2, a Sunday) comes after places that are open.
     // Day 1 of an undated plan is a Saturday, day 2 a Sunday, and so on.
@@ -723,6 +768,10 @@ function slotFit(v, ctx, windowKey, dayIndex, daypart) {
 function indoorAskedLabel(text, form) {
   const q = String(text || '');
   if (!q || /\b(?:rain|rainy|raining|wet|indoor|indoors|inside)\b/.test(q)) return null;
+  // Indoor test 6 (2026-11-19; Priya: "paint your own pottery" read "Indoor & rainy day spots, “paint” and “own”", "art
+  // class" read "Art galleries"): a class, workshop, make-your-own or kids' camp request says so.
+  if (/\b(?:summer|day|kids?|art|spring break|pd day) camps?\b/.test(q)) return form === 'singular' ? 'Kids’ camp' : 'Kids’ camps';
+  if (/\b(?:class|classes|workshops?|pottery|ceramics|paint your own|creative|crafty|arts and crafts|hands on(?! science)|make something|make (?:our|your|my) own|diy|paint nights?|paint and sip)\b/.test(q)) return form === 'singular' ? 'Class or workshop' : 'Classes & Workshops';
   const gallery = /\b(?:galleries|gallery|art)\b/.test(q), museum = /\bmuseums?\b/.test(q);
   if (gallery && museum) return form === 'singular' ? 'Museum or Gallery' : 'Museums & Galleries';
   if (gallery) return form === 'singular' ? 'Art Gallery' : 'Art Galleries';
@@ -768,9 +817,81 @@ function indoorAskedFits(asked, v) {
   if (/[Rr]ental/.test(asked)) return !!v.isShop || /\b(?:rentals?|rent|hire)\b/.test(t);
   return true;
 }
+// The page words of each indoor kind (server.js INDOOR_KIND_WORDS), English and French.
+const INDOOR_CARD_WORDS = {
+  gallery: ['Art gallery', 'Galerie d’art'], museum: ['Museum', 'Musée'], theatre: ['Live theatre & shows', 'Théâtre et spectacles'], cinema: ['Cinema', 'Cinéma'],
+  spa: ['Spa & sauna', 'Spa et sauna'], pool: ['Pool & rec centre', 'Piscine et centre récréatif'], climbing: ['Climbing & trampoline', 'Escalade et trampoline'],
+  games: ['Arcade, VR & laser tag', 'Arcade, réalité virtuelle et laser tag'], escape: ['Escape room', 'Jeu d’évasion'], bowling: ['Bowling', 'Quilles'],
+  kids: ['Indoor playground', 'Aire de jeux intérieure'], classes: ['Classes & workshops', 'Cours et ateliers'], curling: ['Curling', 'Curling'],
+  yoga: ['Yoga & fitness classes', 'Yoga et cours de mise en forme'], casino: ['Casino', 'Casino'], library: ['Library', 'Bibliothèque'],
+};
+// Indoor test 17 (2026-11-19; "Climbing & trampoline" for a bouldering-only gym; Energyplex read one kind in one plan and
+// another in the next): a place's label is the same in every plan: its own kind's words, showing only the parts its own
+// words say (indoor-kinds.js indoorKindLabel: "Climbing gym"), as its card and page say them.
+function indoorOwnText(v) { return `${v.name || ''} ${v.plannerDescription || v.description || v.textDesc || ''} ${v.knownFor || ''}`; }
+function indoorKindPair(k, v) {
+  const IK = require('./indoor-kinds');
+  const c = String(v.cuisine || '').trim().toLowerCase();
+  const stored = c && IK.indoorKindLabels(k, INDOOR_CARD_WORDS[k]).find((w) => w[0].toLowerCase() === c);
+  return stored || IK.indoorKindLabel(k, indoorOwnText(v)) || INDOOR_CARD_WORDS[k];
+}
+// Indoor test 17: an indoor place's main kind (its owner's first, else the kind its label names), or null.
+const SEVERAL_ASKED_RE = /\b(?:two|2|three|3|four|4|both|several|multiple|a couple of|a few|deux|trois|plusieurs)\b/;
+function indoorMainKind(v) {
+  if (Array.isArray(v.indoorKinds) && v.indoorKinds.length) return v.indoorKinds[0];
+  const pair = indoorCardKind(v); if (!pair) return null;
+  const IK = require('./indoor-kinds');
+  return Object.keys(INDOOR_CARD_WORDS).find((k) => IK.indoorKindLabels(k, INDOOR_CARD_WORDS[k]).some((w) => w[0] === pair[0])) || null;
+}
+// Indoor test 17: an indoor place of a kind the day already has (its other stops), unless the request asks for several.
+// ... asked for: "two escape rooms", or the kind named in the plural ("kids, museums and easy food").
+function severalOfKindAsked(k, ctx) {
+  const q = ` ${normWords((ctx && ctx.queryText) || '')} `;
+  // No request text (a plan built from an intent alone): nothing to tell, so as before.
+  if (!q.trim() || SEVERAL_ASKED_RE.test(q)) return true;
+  const IK = require('./indoor-kinds'), K = IK.INDOOR_KIND_TEXT[k];
+  return !!K && K.en.search.concat(K.fr.search).map((w) => normWords(w)).some((w) => /s$/.test(w) && w.length > 3 && q.includes(` ${w} `) && !/(?:ss|ics|ous)$/.test(w));
+}
+function sameIndoorKindToday(v, stops, facts, ctx) {
+  const k = indoorMainKind(v); if (!k || severalOfKindAsked(k, ctx)) return false;
+  const ids = new Set((stops || []).filter((x) => x && x.venue && x.venue.type === 'indoor' && x.venue.id !== v.id).map((x) => x.venue.id));
+  return (facts || []).some((f) => ids.has(f.id) && indoorMainKind(f) === k);
+}
+function indoorCardKind(v) {
+  const own = Array.isArray(v.indoorKinds) ? v.indoorKinds.find((k) => INDOOR_CARD_WORDS[k]) : null;
+  if (own) return indoorKindPair(own, v);
+  const c = String(v.cuisine || '').trim().toLowerCase();
+  const hit = c && Object.keys(INDOOR_CARD_WORDS).flatMap((k) => require('./indoor-kinds').indoorKindLabels(k, INDOOR_CARD_WORDS[k])).find((w) => w[0].toLowerCase() === c);
+  if (hit) return hit;
+  // Indoor test 8 (2026-11-19; "BOWLING" beside "INDOOR ATTRACTION" for McCurdy Bowling Centre): with no owner kind, the
+  // kind its category names ("Bowling alley" -> Bowling), else its name ("Planet Lazer" stays an indoor attraction).
+  const IK = require('./indoor-kinds');
+  const named = (t) => IK.indoorKindsNamedIn(t).filter((k) => INDOOR_CARD_WORDS[k]);
+  const fromCat = c ? named(c) : [];
+  const k = fromCat.length === 1 ? fromCat[0] : !c ? (named(v.name || '').length === 1 ? named(v.name || '')[0] : null) : null;
+  if (k) return indoorKindPair(k, v);
+  // Indoor test 15 (2026-11-19; the Vernon & District Performing Arts Centre read "ART GALLERY" in an art gallery plan): a
+  // performing arts centre, playhouse or concert hall is a theatre.
+  if (/\bperforming arts\b|\bplayhouse\b|\bconcert hall\b|\bopera house\b/i.test(`${v.name || ''} ${c}`)) return INDOOR_CARD_WORDS.theatre;
+  // Indoor test 16 (2026-11-19; "INDOOR ATTRACTION · Xperience Games Kelowna", tech-based escape rooms): with nothing in its
+  // name or category, the one kind its own story names (in its first sentence, else in all of it).
+  if (!c && !named(v.name || '').length) {
+    // Indoor test 17: a stop built without its description (only its words) reads the same story, so its label never changes.
+    const story = String(v.plannerDescription || v.description || v.textDesc || '');
+    // The kind named first ("tech-based escape rooms … alongside VR escape games" is an escape room).
+    const words = String(story.split(/(?<=[.!?])\s+/)[0] || '').split(/\s+/).slice(0, 40);
+    let first = [];
+    for (let i = 1; i <= words.length && !first.length; i++) first = named(words.slice(0, i).join(' '));
+    const d = first.length === 1 ? first : named(story || v.textDesc || '');
+    if (d.length === 1) return indoorKindPair(d[0], v);
+  }
+  return null;
+}
 function indoorVenueLabel(ctx, v, form = 'singular') {
   const asked = indoorAskedLabel(ctx.queryText, form);
-  if (!asked || indoorAskedFits(asked, v)) return typeLabel(ctx, 'indoor', form);
+  // Indoor test 15: the asked kind labels a place only when its own name or category says it (not only the kinds read
+  // from its description); otherwise its own category, or "Indoor attraction".
+  if (!asked || indoorAskedFits(asked, { ...v, plannerKinds: [] })) return typeLabel(ctx, 'indoor', form);
   const own = String(v.cuisine || '').trim();
   if (own && own.length <= 32 && form === 'singular') return own.replace(/^./, (c) => c.toUpperCase());
   const l = ctx.labels.types && ctx.labels.types.indoor;
@@ -798,6 +919,14 @@ const BUDGET_SKIPPED_TYPES = ['winery', 'distillery'];
 // adventure outfitters, golf -- and leans on free parks, walks, beaches and markets.
 const BUDGET_PAID_RE = /\b(?:spa|spas|wellness|massage|massages|facials?|float(?:ing)? (?:spa|tank|centre|center)|sauna|esthetics?|day spa|adventure company|adventures? (?:co|inc|ltd)|rentals?|zip ?lines?|ziplining|charters?|guided|resort|yurts?|campground|rv park)\b/;
 const FREE_PLACE_RE = /\b(?:park|parks|trail|trails|walkway|boardwalk|greenway|beach|beaches|lookout|viewpoint|market|markets|promenade|waterfront|nature reserve|free)\b/;
+// Indoor test 14 (2026-11-19; Helen's by-donation museum was left out of "cheap rainy day in Kelowna on Saturday", where
+// $ places won): a place its owner marked Free entry or By donation (indoor or tour) fits a cheap or budget request as well
+// as a $ place does. -> true or false.
+function budgetFreeStop(v) {
+  return !!v && ((v.type === 'indoor' && (v.indoorFree === 'free' || v.indoorFree === 'donation')) || (v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation')));
+}
+// A request that asks for free places already keeps to them (no extra lift among them).
+function budgetFreeBonus(ctx, v) { return ctx.budget === 'budget' && budgetFreeStop(v) && !/\b(?:free|gratuit\w*|gratis)\b/.test(String(ctx.queryText || '').toLowerCase()); }
 function budgetPaid(v) {
   // Tour test 4 (Whistler, 2026-11-17): a tour its operator marked free (or by donation) is not a paid stop.
   if (v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation')) return false;
@@ -1027,7 +1156,15 @@ const HIGHLIGHTS_ASKED_RE = /\b(?:first time|first visit|never been|must see|mus
 // Town centres (2026-10-25), for "far from town": the listings' average is pulled out by outlying parks.
 const TOWN_CENTRES = SITE.townCentres;
 const INDOOR_KIND_RE = /\b(yoga|pilates|pottery|ceramics|curling|bowling|escape room|arcade|axe throwing|climbing gym|bouldering|trampoline|board game|cooking class|makerspace|cinema|theatre|museum|gallery|sauna|disc golf|skate ?park|pump track|dirt jumps|toboggan|playground|dog park|splash park|spray park|hot springs|suspension bridge)s?\b/;
-const SPA_ASKED_RE = /\b(?:spa|spas|sauna|saunas|massage|massages|wellness|pamper\w*|relax\w*|hot tubs?|soak\w*|thermal|nordic spa)\b/;
+const SPA_ASKED_RE = /\b(?:spa|spas|sauna|saunas|massage|massages|wellness|pamper\w*|relax\w*|hot tubs?|soak\w*|thermal|nordic spa|detente|unwind\w*)\b/;
+// Indoor test 18 (2026-11-19; Natalie's day spa was left out of "relaxing day in Penticton" and « journée détente »): the
+// relaxing occasion's words (on normWords text) favour the spa kind, an owner-confirmed spa most.
+const RELAX_ASKED_RE = /\b(?:relax\w*|unwind\w*|pamper\w*|detente|se detendre|self care|me time|treat (?:ourselves|myself|yourself))\b/;
+function relaxSpaBonus(v, ctx) {
+  if (!RELAX_ASKED_RE.test(normWords(ctx && ctx.queryText || '')) || !spaPlace(v)) return 0;
+  if (v.type === 'indoor' && Array.isArray(v.indoorKinds) && v.indoorKinds.includes('spa')) return 25 + (v.completeVerified ? 5 : 0);
+  return 6;
+}
 // 2026-10-25 (tools audit): listings with no public access (Ivey Lake, Pemberton: private shoreline) are never planned
 // unless the request names them; the list is data/planner-excluded-places.json (region + slug).
 const PLANNER_EXCLUDED_PLACES = (() => {
@@ -1042,7 +1179,58 @@ function plannerExcludedPlace(v) {
 // candidates ("retired couple, no hiking" left three mornings empty).
 const GENERAL_STOP_RE = /\b(?:museums?|galler(?:y|ies)|art centre|cultural centre|heritage|nordic spa|spa|viewpoints?|lookouts?|waterfalls?|falls|gondola|provincial park|lake park|town park)\b/;
 const GENERAL_STOP_CAVEAT = 'Nothing matching that part of your request fits this time, so this is one of the area’s general things to do.';
-function spaPlace(v) { return !!v && (!v.type || v.type === 'indoor') && /\b(?:spa|spas|sauna|scandinave|massage|thermal)\b/.test(`${v.textName || normWords(v.name || '')} ${normWords(v.cuisine || '')}`); }
+function spaPlace(v) { return !!v && (!v.type || v.type === 'indoor') && ((Array.isArray(v.indoorKinds) && v.indoorKinds.includes('spa')) || /\b(?:spa|spas|sauna|scandinave|massage|thermal)\b/.test(`${v.textName || normWords(v.name || '')} ${normWords(v.cuisine || '')}`)); }
+// Indoor test 11: the request's own words (not the town, the day, the time or the party) that an indoor place's name or own
+// lines say (not its kind's own words). 25 a word in its name, 18 in its own lines, at most 50.
+const OWN_WORDS_SKIP = new Set(('a an the and or of in on at to for with near by from my our your we us me i is are be this that these those it its some any '
+  + 'kids kid children child family families toddler toddlers teens adults adult people group groups friends couple '
+  + 'day days today tonight tomorrow weekend week morning afternoon evening night early late am pm noon time hour hours '
+  + 'monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december '
+  + 'things thing stuff something somewhere place places spot spots fun do go see visit trip plan ideas idea activity activities indoor indoors inside rainy rain open best good great nice free cheap price prices downtown walk '
+  + 'year old years olds age ages christmas boxing holiday holidays long what where can could should would want like le la les des du de un une et en pour avec au aux').split(/\s+/));
+const OWN_WORDS_KIND = { gallery: ['art', 'gallery', 'galleries', 'exhibit', 'exhibition'], museum: ['museum', 'history', 'heritage'], theatre: ['theatre', 'theater', 'live', 'show', 'play', 'stage', 'playhouse'],
+  cinema: ['cinema', 'movie', 'film', 'theatre', 'theater'], spa: ['spa', 'day', 'massage'], climbing: ['climbing', 'gym', 'trampoline', 'park', 'bouldering'], arcade: ['arcade', 'game', 'laser', 'tag', 'virtual', 'reality'],
+  escape: ['escape', 'room', 'game', 'puzzle'], bowling: ['bowling', 'alley', 'lane', 'pin'], pottery: ['class', 'workshop', 'pottery', 'studio', 'art', 'paint', 'painting'], playground: ['indoor', 'playground', 'play', 'centre', 'center', 'place'],
+  pool: ['pool', 'swim', 'swimming', 'aquatic', 'rec', 'centre', 'center', 'lane'], curling: ['curling', 'club', 'rink', 'curl'], yoga: ['yoga', 'class', 'studio', 'fitness', 'pilates'], casino: ['casino', 'slot'], library: ['library', 'public', 'branch'] };
+function ownWordsFit(v, ctx) {
+  if (!v || v.type !== 'indoor') return 0;
+  // Within a kind: only with a kind asked, and only places of that kind.
+  // Only an indoor kind asked (a bike rental request is never re-ranked by an indoor place's words).
+  if (!(ctx.plannerKinds || []).length || !ctx.plannerKinds.every((k) => OWN_WORDS_KIND[k])) return 0;
+  { let pk = []; try { pk = Array.isArray(v.plannerKinds) && v.plannerKinds.length ? v.plannerKinds : tripRequirements.inferPlannerKinds(v); } catch (e) { pk = []; } if (!pk.some((k) => ctx.plannerKinds.includes(k))) return 0; }
+  const regionWords = new Set((ctx.regions || []).flatMap((r) => String(r).split('-')));
+  const words = [...new Set(normWords(ctx.queryText || '').split(' ').filter((w) => w.length > 2 && !OWN_WORDS_SKIP.has(w) && !regionWords.has(w) && !/^\d/.test(w)))];
+  if (!words.length) return 0;
+  const name = ` ${v.textName || normWords(v.name || '')} `, own = ` ${v.textDesc || normWords(v.plannerDescription || v.description || '')} ${normWords(v.knownFor || '')} ${normWords(v.groupsText || '')} `;
+  const has = (t, w) => t.includes(` ${w} `) || t.includes(` ${w}s `) || (w.endsWith('s') && t.includes(` ${w.slice(0, -1)} `));
+  // The asked kind's own words ("climbing gym", "art gallery") are the kind, already ranked; only the other words count.
+  const kindWords = new Set((ctx.plannerKinds || []).flatMap((k) => OWN_WORDS_KIND[k] || []));
+  let n = 0;
+  for (const w of words) if (!kindWords.has(w) && !kindWords.has(w.replace(/s$/, ''))) n += has(name, w) ? 25 : has(own, w) ? 18 : 0;
+  return Math.min(50, n);
+}
+// Indoor test 17: the owner’s own kind is the asked one (+25, more than a rating or a description word weighs), and the place is Complete & Verified (+5 more).
+function ownerKindFit(v, ctx) {
+  if (!v || v.type !== 'indoor' || !(ctx.plannerKinds || []).length || !Array.isArray(v.indoorKinds) || !v.indoorKinds.length) return 0;
+  const own = v.indoorKinds.flatMap((k) => tripRequirements.INDOOR_KIND_PLANNER[k] || []);
+  if (!ctx.plannerKinds.some((k) => own.includes(k))) return 0;
+  return 25 + (v.completeVerified ? 5 : 0);
+}
+// Indoor test 4 (2026-11-19; Lauren: "couples massage Kelowna Saturday" planned another spa): what a spa request names, and
+// how many of those its own words say (its name, story, Known for and Groups lines, its kind). "couples massage" -> 2 for a
+// spa whose Known for says massage and whose Groups line offers couples' packages.
+const SPA_FOCUS = [/\bmassages?\b/, /\bcouples?\b|\ben couple\b|\bduo\b/, /\bfacials?\b|\bsoins? du visage\b/, /\bhydro ?therap\w*|\bhydroth[eé]rapie\b|\bnordic\b|\bnordique\b|\bhot and cold\b/];
+// The spa words in the order a quote is looked for: the most specific first.
+const SPA_FOCUS_ORDER = [SPA_FOCUS[1], SPA_FOCUS[2], SPA_FOCUS[3], SPA_FOCUS[0]];
+// What a spa request names, for a place whose own words say none of it ("Its listing doesn’t mention massages").
+const SPA_FOCUS_NAMES = ['massages', 'couples’ treatments', 'facials', 'hydrotherapy'];
+function spaFocusHits(v, ctx) {
+  const q = normWords(ctx && ctx.queryText || '');
+  const asked = SPA_FOCUS.filter((re) => re.test(q));
+  if (!asked.length || !spaPlace(v)) return 0;
+  const own = `${v.textName || normWords(v.name || '')} ${v.textDesc || normWords(v.plannerDescription || v.description || '')} ${normWords(v.knownFor || '')} ${normWords(v.groupsText || '')} ${normWords(v.cuisine || '')}`;
+  return asked.filter((re) => re.test(own)).length;
+}
 // Tour test 2 (2026-11-16): the owner's own season wins over the snow words in a name or kind. A tour named "Coast Range
 // Heli-Skiing" whose owner set "We only run part of the year" (open_months, e.g. Dec 1 to Sep 30) runs summer tours too:
 // on a date inside that season, and not in one of their closures, the winter-only rules below do not drop it. Outside
@@ -1337,13 +1525,22 @@ function eligible(v, ctx, strict) {
     if (v.type === 'golf' && !v.indoorGolf) return false;
   }
   // Spas and saunas are adults' places (2026-10-25: a family day in Brackendale ended at a sauna).
-  if ((ctx.kids || ctx.occasion === 'family' || /\b(?:teens?|teenagers?|tweens?|adolescents)\b/.test(ctx.queryText || '')) && !/\b(?:spa|spas|sauna|massage)\b/.test(ctx.queryText || '') && (spaPlace(v) || /\b(?:pilates|yoga|breathwork|wellness studio|massage)\b/.test(normWords(v.cuisine || '')))) return false;
+  // Indoor test 12 (2026-11-19): "yoga with my 12 year old" asks for yoga: a yoga studio whose owner said All ages (or an age
+  // the kids named meet) is offered; a 16+ one still never is (kidsAllowed).
+  const yogaAsked = /\b(?:yoga|pilates)\b/.test(ctx.queryText || '') && v.type === 'indoor' && !!v.indoorMinAge && ctx.kids && kidsAllowed(v, ctx);
+  if ((ctx.kids || ctx.occasion === 'family' || /\b(?:teens?|teenagers?|tweens?|adolescents)\b/.test(ctx.queryText || '')) && !/\b(?:spa|spas|sauna|massage)\b/.test(ctx.queryText || '') && (spaPlace(v) || (!yogaAsked && /\b(?:pilates|yoga|breathwork|wellness studio|massage)\b/.test(normWords(v.cuisine || ''))))) return false;
   if (ctx.kids) {
     if (!kidsAllowed(v, ctx)) return false;
+    // Indoor test 5: a casino (its kind or its own words) or a place whose own words say 19+ is never a kids' stop.
+    if (v.type === 'indoor' && !namedInRequest(v, ctx) && ((Array.isArray(v.indoorKinds) && v.indoorKinds.includes('casino')) || /\bcasinos?\b/.test(`${v.textName || normWords(v.name || '')} ${normWords(v.cuisine || '')}`) || (!v.indoorMinAge && (indoorMinAgeOf(v) >= 18 || /\b(?:19|18) (?:only|and over|and older|and up|plus|ans et plus)\b|\badults? only\b|\bno one under (?:18|19)\b/.test(v.textDesc || ''))))) return false;
   }
   // Tour test 7 (Whistler, 2026-11-17): a child's age named without "kids" ("with our 15-year-old") still leaves out a tour
   // whose own minimum age is above it (a 16+ mountaineering guide was planned with "Ages 16 and up"); tooYoungNotes says why.
   else if (tourTooYoung(v, ctx)) return false;
+  // Indoor test 4: and an indoor place whose own minimum age is above it ("spa with my 14 year old" and a 16+ spa).
+  else if (indoorTooYoung(v, ctx)) return false;
+  // Indoor test 9: or whose own kids' age range tops out below the child named.
+  if (indoorTooOld(v, ctx)) return false;
   // Teenagers can't go to bars (2026-10-14).
   if (['pub', 'cocktail', 'distillery'].includes(v.type) && /\b(?:teens?|teenagers?|tweens?|adolescents)\b/.test(ctx.queryText || '') && !ctx.types.has(v.type)) return false;
   // A dog trip (2026-10-25): every place to go is dog-friendly; a meal may be at a place that isn't (in winter few
@@ -1358,6 +1555,13 @@ function eligible(v, ctx, strict) {
       if (BADGE_TYPES.includes(v.type) && !v.features.kid_friendly && !kidsKitchenMeal(v, ctx)) return false;
       continue; // outdoor/beach/golf: family heuristic, never claimed as a badge
     }
+    // Indoor test 2 (2026-11-19): an indoor place open past 11 PM by its hours (server.js indoorLateClose) is a late-night stop.
+    if (f === 'open_late' && v.type === 'indoor') { if (!v.features.open_late) return false; continue; }
+    // Indoor test 15: the owner's Free or By donation answer is free to visit, like the Free Entry badge.
+    if (f === 'free_entry' && budgetFreeStop(v)) continue;
+    // Indoor test 16: a group asked for ("rainy day for a group of 6") is the Great for Groups badge for food and drink; a
+    // place to go is ranked by it (groupFitScore), never left out for not having it.
+    if (f === 'great_groups' && !BADGE_TYPES.includes(v.type)) continue;
     if (BADGE_TYPES.includes(v.type)) { if (!v.features[f]) return false; } else if (strict) return false;
   }
   if (ctx.plannerKinds.length && ['indoor', 'tour', 'sport'].includes(v.type) && !ctx.plannerKinds.some(k => (v.plannerKinds || tripRequirements.inferPlannerKinds(v)).includes(k))) return false;
@@ -1424,8 +1628,23 @@ function scoreVenue(v, ctx) {
     if (BIG_HIKE_ASKED_RE.test(ctx.queryText || '')) add('long_hike_asked', 15, 'A full-day hike, as asked');
     else if (!namedInRequest(v, ctx)) add('long_hike', -18, null);
   }
+  // Indoor test 11 (2026-11-19; Kim: "science centre Vernon" listed a weekends-only museum and the archives first, and a
+  // morning itinerary picked that museum): within a kind, an indoor place whose name or own lines (story, Known for, Groups)
+  // say the request's own words comes first.
+  { const ow = ownWordsFit(v, ctx); if (ow) add('own_words', ow, null); }
+  // Indoor test 17 (2026-11-19; Megan's bouldering gym came last, alphabetically, for "climbing gym Kelowna"): with an indoor
+  // kind asked for, a place whose owner picked that kind comes before places that are it only by their description, and a
+  // Complete & Verified one (all confirmed by its owner) before the rest.
+  { const ok = ownerKindFit(v, ctx); if (ok) add('owner_kind', ok, null); }
+  // ... and one open on the planned day beats one its own week lists closed all that day.
+  if (v.type === 'indoor' && (ctx.tripDate || ctx.startWeekday) && dayClosedAllDay(v, /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) ? ctx.tripDate : null, ctx.startWeekday)) add('closed_that_day', -35, null);
+  // Indoor test 4 (2026-11-19): a spa whose own words say the massage, facial, couples or hydrotherapy asked for comes first.
+  // Indoor test 17: for a place that is a spa only by its own description (no owner kind), less than the owner's kind
+  // weighs, so an owner-confirmed spa stays first ("a massage in Summerland").
+  { const sf = spaFocusHits(v, ctx); if (sf) add('spa_focus', v.type === 'indoor' && !(Array.isArray(v.indoorKinds) && v.indoorKinds.length) && (ctx.plannerKinds || []).length ? Math.min(11, 30 + sf * 25) : 30 + sf * 25, null); }
   // 2026-10-28: "a spa" puts a destination spa (Scandinave's hot pools and saunas) ahead of a hotel treatment room or a
   // massage studio.
+  { const rb = relaxSpaBonus(v, ctx); if (rb) add('relax_spa', rb, null); }
   if (SPA_ASKED_RE.test(ctx.queryText || '') && spaPlace(v)) {
     if (SPA_DESTINATION_RE.test(`${v.textName || ''} ${v.textDesc || normWords(v.plannerDescription || v.description || '')}`)) add('spa_destination', 12, 'A spa with hot pools, saunas and cold plunges');
     else if (/\bmassage\b/.test(v.textName || normWords(v.name || ''))) add('spa_massage', -6, null);
@@ -1511,7 +1730,7 @@ function scoreVenue(v, ctx) {
   if (/\bsnowshoe\w*\b/.test(ctx.queryText || '') && /\bsnowshoe\b/.test(normWords(v.cuisine || ''))) add('snowshoe', 15, 'Snowshoe trails');
   // A town library or recreation centre is for a rainy day or the kids, not a stop on an ordinary trip (2026-10-25).
   if (v.type === 'indoor' && /\b(?:library|community centre|recreation centre|rec centre)\b/.test(`${normWords(v.cuisine || '')} ${v.textName || ''}`) && !ctx.rainy && !ctx.kids && ctx.occasion !== 'family' && !/\b(?:library|libraries|rec centre|recreation centre|pool|swimming pool|arena|skating|skate|hockey)\b/.test(ctx.queryText || '')) add('local_facility', -45, null);
-  if (v.type === 'indoor' && /\b(?:board game|game room|games room|ninja gym|indoor playground|trampoline)\b/.test(normWords(v.cuisine || '')) && !ctx.rainy && !ctx.kids && !/\b(?:rain|rainy|games?|board games?|ninja|trampoline|indoor|teens?|teenagers?)\b/.test(ctx.queryText || '')) add('rainy_only', -30, null);
+  if (v.type === 'indoor' && /\b(?:board game|game room|games room|ninja gym|indoor playground|trampoline)\b/.test(normWords(v.cuisine || '')) && !ctx.rainy && !ctx.kids && !/\b(?:rain|rainy|games?|board games?|ninja|trampoline|indoor|teens?|teenagers?)\b/.test(ctx.queryText || '') && !ownerKindFit(v, ctx)) add('rainy_only', -30, null);
   // A class or members' studio (pottery, yoga, a makerspace, an art school) is booked ahead, not "a walk or a sight"
   // (2026-10-25: "an afternoon in Squamish" opened at a pottery studio). Asked for by name, it ranks first (kind_asked).
   if (v.type === 'indoor' && /\b(?:pottery studio|makerspace|art school|yoga studio|pilates|breathwork|fitness|gym)\b/.test(normWords(v.cuisine || '')) && !/\b(?:climbing|bouldering)\b/.test(normWords(v.cuisine || '')) && !INDOOR_KIND_RE.test(ctx.queryText || '') && !/\b(?:class|classes|workshop|studio|fitness|workout)\b/.test(ctx.queryText || '')) add('booked_class', -30, null);
@@ -1553,7 +1772,14 @@ function scoreVenue(v, ctx) {
     const kmTown = kmBetween(v, TOWN_CENTRES[v.region]);
     if (kmTown > 25 && kmTown < 150 && !namedInRequest(v, ctx)) add('far', -Math.min(25, (kmTown - 25) * 0.5 + 8), null);
   }
-  if (/\bfree\b/.test(ctx.queryText || '') && !/\b(?:gluten|alcohol|dairy|nut|sugar) free\b/.test(ctx.queryText || '')) { if (v.features.free_entry || (v.type === 'tour' && v.tourFree)) add('free', 25, null); else if (DINING_TYPES.includes(v.type) && !ctx.types.size) add('free', -20, null); else if (['indoor', 'tour', 'golf'].includes(v.type)) add('free', -45, null); }
+  // Indoor test 15 (2026-11-19; "free things to do in Vernon" left out the free, Complete & Verified gallery for a café and
+  // a diner): the owner's own Free or By donation answer counts as free to visit, like the Free Entry badge; a place the
+  // owner confirmed in full (Complete & Verified) gets a little more, so it leads among near-equal free places.
+  if (/\bfree\b/.test(ctx.queryText || '') && !/\b(?:gluten|alcohol|dairy|nut|sugar) free\b/.test(ctx.queryText || '')) {
+    if (v.features.free_entry || budgetFreeStop(v)) { add('free', 25, null); if (v.completeVerified) add('verified', 4, null); }
+    else if (DINING_TYPES.includes(v.type) && !ctx.types.size) add('free', -20, null);
+    else if (['indoor', 'tour', 'golf'].includes(v.type)) add('free', -45, null);
+  }
   // A nightclub only for nightlife or a group night out (2026-10-25: a couple in their 60s asking for wine bars got Moe Joe's).
   if (/\bnightclub\b/.test(normWords(v.cuisine || '')) && ctx.occasion !== 'group_getaway' && !NIGHT_OUT_RE.test(ctx.queryText || '')) add('nightclub', -35, null);
   // Winter months (2026-10-25): outdoor places listed for winter come first when nothing more specific was asked.
@@ -1579,7 +1805,13 @@ function scoreVenue(v, ctx) {
       // offered for "Has the Live Music badge" (her second Friday read that way; her music is the first Friday).
       const nmOther = f === 'live_music' && ctxPlanDate(ctx) ? venueNight(v, 'live_music', ctxPlanDate(ctx)) : null;
       if (nmOther && !nmOther.on) add('night_other_day', -20, null);
+      // Indoor test 2: an indoor place matched on its hours says how late it's open ("Open until 1 AM"), not a badge.
+      else if (f === 'open_late' && v.lateClose) add('feature', 8, `Open until ${v.lateClose}`);
       else add('feature', 8, `Has the ${featureLabel(ctx, f)} badge`);
+    } else if (f === 'kid_friendly' && v.type === 'indoor' && ownerKidsAges(v, ctx)) {
+      // Indoor test 6: an indoor owner's own All ages or 5+ counts as much as the Kid-Friendly badge (its reason is
+      // kids_owner_ages' "All ages welcome (the owner's own answer)").
+      add('feature', 8, null);
     }
     if (f === 'live_music') {
       const nm = venueNight(v, 'live_music', ctxPlanDate(ctx));
@@ -1610,13 +1842,16 @@ function scoreVenue(v, ctx) {
     if (nt) { const t = nightClock(nt.n.start), dn = planDate ? WEEKDAY_NAMES[WEEKDAYS[(new Date(`${planDate}T12:00:00Z`).getUTCDay() + 6) % 7]] : null; add('night', 30, dn && t && nt.title.length <= 40 ? `${nt.title} on ${dn} at ${t}, from its listing` : null); continue; }
     const m = foodMatch(v, ft);
     if (!m) continue;
-    if (m.cuisine) add('food', 18, `Listed cuisine: ${v.cuisineLabel || ft.cuisine} — matches “${ft.term}”`);
+    // Indoor test 10: a place that isn't food or drink has a category, not a cuisine ("Listed as Pool — matches “pool”").
+    if (m.cuisine) add('food', 18, DINING_TYPES.includes(v.type) || ['winery', 'brewery', 'distillery'].includes(v.type) ? `Listed cuisine: ${v.cuisineLabel || ft.cuisine} — matches “${ft.term}”` : `Listed as ${v.cuisineLabel || ft.cuisine} — matches “${ft.term}”`);
     // Restaurant test 3 (Whistler, 2026-11-15): "family Saturday brunch at 9am" picked a café that only mentions brunch over
     // the family restaurant listed as Breakfast & Brunch (open at 8). A brunch or breakfast place by its listed cuisine is
     // what was asked for, like a cuisine match, and ahead of a word in a name.
     else if (m.inCui && /^(?:brunch|breakfast)$/.test(ft.term)) add('food', 26 + (m.inName ? 4 : 0) + (m.inDesc ? 4 : 0), `Listed cuisine: ${v.cuisineLabel || v.cuisine} — matches “${ft.term}”`);
     else {
-      const where = [m.inName && 'name', m.inCui && 'cuisine', m.inDesc && 'description'].filter(Boolean);
+      // Indoor test 10 (2026-11-19; "Mentions “pool” in its cuisine and description" for a pool): only food places have a
+      // cuisine; anywhere else it is the place's category.
+      const where = [m.inName && 'name', m.inCui && (DINING_TYPES.includes(v.type) || ['winery', 'brewery', 'distillery'].includes(v.type) ? 'cuisine' : 'category'), m.inDesc && 'description'].filter(Boolean);
       // A loose word in a restaurant's description ("desert", "quiet") counts for less than a dish it serves.
       // 2026-10-28: "a cozy dinner" is about the meal, so a cozy restaurant counts in full, not as a loose word.
       const loose = DINING_TYPES.includes(v.type) && !m.inName && !m.inCui && !DISH_WORDS_RE.test(ft.term) && !/^(?:brunch|breakfast)$/.test(ft.term) && !(VIBE_TERM_RE.test(ft.term) && vibeMealAsked(ctx));
@@ -1640,6 +1875,7 @@ function scoreVenue(v, ctx) {
   }
   // 2026-10-28: "a spa" puts a destination spa (hot pools, saunas, thermal baths) ahead of a treatment room or a massage
   // studio.
+  { const rb = relaxSpaBonus(v, ctx); if (rb) add('relax_spa', rb, null); }
   if (SPA_ASKED_RE.test(ctx.queryText || '') && spaPlace(v)) {
     if (SPA_DESTINATION_RE.test(`${v.textName || ''} ${v.textDesc || normWords(v.plannerDescription || v.description || '')}`)) add('spa_destination', 12, 'A spa with hot pools, saunas and cold plunges');
     else if (/\bmassage\b/.test(v.textName || normWords(v.name || ''))) add('spa_massage', -6, null);
@@ -1654,7 +1890,8 @@ function scoreVenue(v, ctx) {
   // that says skating puts the rinks first.
   if (/\b(?:skating|skate|rink|rinks)\b/.test(normWords(ctx.queryText || '')) && /\b(?:rink|rinks|skating|skate)\b/.test(`${v.textName || ''}`)) add('skating', 20, 'A skating rink');
   // "Cheap eats" (2026-10-18): $ places first, $$ after, pricier ones last (it once led with $$ sushi).
-  if (ctx.budget === 'budget' && v.price != null) {
+  if (budgetFreeBonus(ctx, v)) add('budget', 16, v.indoorFree === 'donation' || v.tourFree === 'donation' ? 'By donation: fits your budget' : 'Free entry: fits your budget');
+  else if (ctx.budget === 'budget' && v.price != null) {
     if (v.price === 1) add('budget', 14, `Price level ${priceText(v.price)} fits your budget preference`);
     else if (v.price === 2) add('budget', 3, `Price level ${priceText(v.price)} fits your budget preference`);
     else add('budget_miss', -14, null);
@@ -1672,6 +1909,7 @@ function scoreVenue(v, ctx) {
   }
   if (v.indoorGolf && !ctx.rainy) add('indoor_golf', -8, null); // a real course first, unless it rains
   indoorAppeal(v, ctx, add);
+  groupsAskScore(v, ctx, add);
   // "Things to do" / "something fun" without a kind of place: activities before food and drink (2026-10-14: "something
   // fun to do in Whistler" listed cafes and restaurants first).
   const q = ctx.queryText || '';
@@ -1689,7 +1927,7 @@ function scoreVenue(v, ctx) {
   // On a rainy day the places people actually visit indoors come first; clubs, companies and studios last.
   if (ctx.rainy && v.type === 'indoor') {
     if (RAIN_BACKUP_GOOD_WORDS.some((w) => textHas(v.textName, w))) add('rainy_attraction', 5, 'A good rainy-day pick');
-    if (RAIN_BACKUP_NICHE_WORDS.some((w) => textHas(v.textName, w))) add('rainy_niche', -10, null);
+    if (RAIN_BACKUP_NICHE_WORDS.some((w) => textHas(v.textName, w)) && !ownVisitorKind(v)) add('rainy_niche', -10, null);
   }
   // "A hike with a view": a trail with the Lake View badge before one without.
   if (ctx.lake && ctx.activities.has('hiking') && v.type === 'outdoor' && v.features.lake_view && (v.activities || []).includes('hiking')) add('hike_view', 15, 'A trail with a lake view');
@@ -1719,13 +1957,17 @@ function scoreVenue(v, ctx) {
     if (v.type === 'distillery') add('dog_distillery', -10, null);
   }
   // Kids are not taken to a meadery, cidery or casino on a rainy day, nor to indoor golf unless golf was asked for.
-  if (ctx.kids && v.type === 'indoor' && KIDS_ADULT_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textDesc, w))) add('kids_adult_setting', -40, null);
+  // Indoor test 8 (2026-11-19; Gary's bowling centre: "a licensed lounge" in his story dropped him from every kids' rainy-day
+  // plan): never for a place whose owner said All ages or that has the Kid-Friendly badge, or whose owner-picked kind is a
+  // family kind; otherwise only the name or category says it (a story can mention a lounge or a bar).
+  if (ctx.kids && v.type === 'indoor' && !kidsAdultSettingExempt(v) && KIDS_ADULT_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textCuisine || normWords(v.cuisine || ''), w))) add('kids_adult_setting', -40, null);
   if (ctx.kids && v.type === 'golf' && !ctx.types.has('golf')) add('kids_golf', -15, null);
   // Round 14 (2026-10-20): an indoor playground for small children is not an afternoon out for adults (Play Area Whistler
   // was day 2 of a plain Whistler weekend).
   if (!ctx.kids && v.type === 'indoor' && KIDS_ONLY_RE.test(`${v.textName || ''} ${v.textDesc || normWords(v.plannerDescription || v.description || '')}`)) add('kids_only', -30, null);
   if (ctx.kids && v.type === 'indoor' && RAIN_BACKUP_KIDS_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textDesc, w))) add('kids_indoor_fun', 8, 'Indoor fun for kids');
-  if (ctx.rainy && v.type === 'indoor' && /\b(?:ranch|farm|garden|gardens|orchard)\b/.test(v.textName || '')) add('rainy_mostly_outdoors', -8, null);
+  // Indoor test 5: not for a place whose owner picked its indoor kind ("The Rock Garden" is a climbing gym).
+  if (ctx.rainy && v.type === 'indoor' && !(Array.isArray(v.indoorKinds) && v.indoorKinds.length) && /\b(?:ranch|farm|garden|gardens|orchard)\b/.test(v.textName || '')) add('rainy_mostly_outdoors', -8, null);
   // A party that doesn't drink is not sent to a winery or brewery restaurant for dinner (2026-10-14).
   if (ctx.alcoholFree && DINING_TYPES.includes(v.type) && ALCOHOL_SETTING_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textDesc, w))) add('alcohol_setting', -12, null);
   if (ctx.avoid.has(v.id)) add('avoid', -20, null);
@@ -1745,6 +1987,12 @@ const THINGS_TO_DO_RE = /\b(?:things? to do|something (?:fun )?to do|stuff to do
 const TEEN_FUN_WORDS = ['escape', 'arcade', 'laser tag', 'go kart', 'go karts', 'karting', 'climbing', 'bouldering', 'trampoline', 'mini golf', 'bowling', 'zipline', 'zip line', 'axe throwing', 'paintball', 'virtual reality', 'vr', 'waterslide', 'water park', 'bike park', 'skate park'];
 const SOFT_FEATURES = ['patio', 'lake_view', 'happy_hour', 'live_music', 'great_groups', 'sports_tv', 'open_late', 'open_early'];
 const KIDS_ADULT_WORDS = ['meadery', 'cidery', 'winery', 'brewery', 'distillery', 'casino', 'lounge', 'nightclub', 'cannabis', 'tasting room'];
+// Indoor test 8: a family kind (FAMILY_INDOOR_KINDS, below) picked by the owner is never an adult setting for kids.
+function kidsAdultSettingExempt(v) {
+  if (!v) return false;
+  if (v.indoorMinAge === 'all' || (v.features && v.features.kid_friendly)) return true;
+  return Array.isArray(v.indoorKinds) && v.indoorKinds.length > 0 && FAMILY_INDOOR_KINDS.includes(v.indoorKinds[0]);
+}
 const ALCOHOL_SETTING_WORDS = ['winery', 'vineyard', 'vineyards', 'brewery', 'brewpub', 'taproom', 'wine bar', 'tasting room', 'estate winery'];
 const INDOOR_VISITOR_KINDS = ['museum', 'gallery', 'theatre', 'bowling', 'arcade', 'climbing', 'escape'];
 const INDOOR_NICHE_WORDS = ['casino', 'gaming', 'fitness', 'gym', 'yoga', 'pilates', 'dance studio', 'martial arts', 'parkour', 'recording studio', 'studios', 'crossfit'];
@@ -1774,15 +2022,104 @@ function ownStopPhoto(v) {
 }
 const STOP_PHOTO_KEYS = new Set(['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery', 'winery', 'beach', 'golf', 'outdoor', 'hiking', 'viewpoints', 'water', 'cycling', 'adventure', 'winter', 'indoor', 'arts', 'family', 'games', 'spa', 'theatre', 'tour', 'tour-wine', 'tour-lake', 'tour-farm', 'tour-bike', 'sport', 'ski', 'restaurant-noodle']);
 function isDogTrip(ctx) { return !!(ctx.dog || ctx.features.includes('dog_friendly') || (ctx.requirements?.items || []).some((i) => i.kind === 'feature' && i.value === 'dog_friendly')); }
+// Indoor test 5 (2026-11-19; Chris's climbing and trampoline park, owner-confirmed All ages, was left out of every "rainy day
+// with kids" / "family fun" plan in Vernon while galleries and a theatre were offered). The cause: a request that names no
+// indoor kind builds its facts without planner kinds (buildTripPlannerFacts(false) gives plannerKinds: []), and an empty list
+// was read as "no kinds", so his climbing kind never counted (no +10 for kids), "climbing gym" read as a member gym (-9) and
+// "The Rock Garden" as a garden (-8). Now the kinds are worked out when the list is empty, and for kids and rainy days the
+// family kinds (climbing and trampolines, indoor play, bowling, arcades, cinemas, pools, museums and science centres) come
+// first, an owner's own All ages or 5+ ahead of unanswered places, and galleries and theatres after them.
+const FAMILY_INDOOR_KINDS = ['climbing', 'kids', 'bowling', 'games', 'cinema', 'pool', 'museum'];
+const FAMILY_PLANNER_KINDS = ['climbing', 'bowling', 'arcade', 'museum'];
+const KIDS_QUIET_INDOOR_KINDS = ['gallery', 'theatre', 'classes', 'library', 'curling', 'yoga'];
+function indoorKindsOf(v) { return v.plannerKinds && v.plannerKinds.length ? v.plannerKinds : tripRequirements.inferPlannerKinds(v); }
+// Indoor test 6 (2026-11-19; Priya's All ages pottery and paint studio): an owner's own All ages or 5+ outweighs a kind's
+// "quiet" read. A classes place (paint-your-own pottery, kids' art classes) or an escape room the owner says is for all
+// ages is a family kind;
+// a gallery, theatre or library whose owner says All ages is no longer pushed down for kids. An owner who picked a kind of
+// place people visit is never read as a member gym or a recording studio from its name ("Donut House Studios").
+const FAMILY_IF_ALL_AGES_KINDS = ['classes', 'escape'];
+const NICHE_OWN_KINDS = ['casino', 'yoga', 'other'];
+// Indoor test 16 (2026-11-19; Tyler's 8+ escape room, 8 to 11 with an adult, was left out of "something to do with my 10
+// year old"): with the kids' ages named, an owner's own minimum age at or below the youngest child counts like All ages.
+function ownerKidsAges(v, ctx) {
+  if (!v) return false;
+  const a = String(v.indoorMinAge || '');
+  if (['all', '5'].includes(a)) return true;
+  const young = ctx ? kidsYoungest(ctx) : null;
+  return /^\d+$/.test(a) && young != null && young >= Number(a);
+}
+// The Kid-Friendly badge, or (indoor) the owner's own minimum age the kids named meet (indoor test 16).
+function indoorAdultNote(v, ctx) {
+  const a = v && v.type === 'indoor' && v.indoorAdultAges;
+  if (!a || !ctx || !(ctx.kids || kidsYoungest(ctx) != null)) return null;
+  const young = kidsYoungest(ctx);
+  if (young != null && a.alone != null && young >= a.alone) return null;
+  return a.alone != null ? `Under ${a.alone}s come with an adult (the owner’s own ${a.alone === 18 ? 'answer' : 'words'}).` : `Kids ${a.withAdult} and up come with an adult (the owner’s own words).`;
+}
+function kidsFitOwn(v, ctx) { return !!(v && ((v.features && v.features.kid_friendly) || (v.type === 'indoor' && ownerKidsAges(v, ctx)))); }
+function ownVisitorKind(v) { const own = v && v.type === 'indoor' && Array.isArray(v.indoorKinds) ? v.indoorKinds : []; return own.length > 0 && own.some((k) => !NICHE_OWN_KINDS.includes(k)); }
+function familyIndoorPlace(v, ctx) {
+  if (!v || v.type !== 'indoor') return false;
+  const own = Array.isArray(v.indoorKinds) ? v.indoorKinds : [];
+  if (own.length) return own.some((k) => FAMILY_INDOOR_KINDS.includes(k)) || (ownerKidsAges(v, ctx) && own.some((k) => FAMILY_IF_ALL_AGES_KINDS.includes(k)));
+  return indoorKindsOf(v).some((k) => FAMILY_PLANNER_KINDS.includes(k)) || /\b(?:science (?:centre|center)|trampoline|indoor playground|play centre|play center|cinemas?|movie theatre|aquatic centre|leisure pool)\b/.test(`${v.textName || ''} ${normWords(v.cuisine || '')}`);
+}
 function indoorAppeal(v, ctx, add) {
   if (v.type !== 'indoor') return;
-  const kinds = v.plannerKinds || tripRequirements.inferPlannerKinds(v);
+  const kinds = indoorKindsOf(v);
   if (kinds.some((k) => INDOOR_VISITOR_KINDS.includes(k))) add('indoor_attraction', ctx.kids && kinds.some((k) => ['bowling', 'arcade', 'climbing', 'museum'].includes(k)) ? 10 : 7, null);
+  if (ctx.kids || ctx.rainy) {
+    const own = Array.isArray(v.indoorKinds) ? v.indoorKinds : [];
+    if (familyIndoorPlace(v, ctx)) add('family_kind', ctx.kids ? 12 : 6, ctx.kids ? 'Indoor fun for the whole family' : null);
+    else if (ctx.kids && !(own.length && ownerKidsAges(v, ctx)) && (own.length ? own.every((k) => KIDS_QUIET_INDOOR_KINDS.includes(k)) : kinds.some((k) => ['gallery', 'theatre'].includes(k)))) add('kids_quiet_kind', -10, null);
+    // Indoor test 6: the owner's own answer puts a family place ahead of unanswered ones of the same standing (a classes
+    // place no longer loses every slot to a fun centre and a museum nobody answered for).
+    if (ctx.kids && ownerKidsAges(v, ctx)) add('kids_owner_ages', familyIndoorPlace(v, ctx) ? 20 : 8, Array.isArray(v.indoorKidsRange) ? `For kids ${v.indoorKidsRange[0]} to ${v.indoorKidsRange[1]} (the owner’s own words)` : v.indoorMinAge === 'all' ? 'All ages welcome (the owner’s own answer)' : `Kids ${v.indoorMinAge} and up welcome (the owner’s own answer)`);
+  }
   const asked = (ctx.foodTerms || []).map((f) => f.term);
   const niche = INDOOR_NICHE_WORDS.find((w) => (textHas(v.textName, w) || textHas(v.textDesc, w)) && !asked.some((a) => w.includes(a) || a.includes(w)));
-  if (niche && !kinds.some((k) => INDOOR_VISITOR_KINDS.includes(k))) add('indoor_niche', -9, null);
+  if (niche && !kinds.some((k) => INDOOR_VISITOR_KINDS.includes(k)) && !ownVisitorKind(v)) add('indoor_niche', -9, null);
 }
 
+// Indoor test 2 (2026-11-19; Jordan: "team building activity in Kelowna" and "birthday party kelowna" left out his escape
+// rooms, whose Groups line says "Corporate team building and birthday parties"): a team building or birthday party request
+// puts the places whose own Groups or Good to know line offers it first, then the kinds of place people book for it.
+const TEAM_ASK_RE = /\b(?:team building|teambuilding|corporate (?:events?|outings?|party|parties|groups?)|company (?:outings?|party|parties|events?)|office (?:party|parties)|staff (?:party|parties))\b/;
+const BIRTHDAY_ASK_RE = /\b(?:birthday (?:party|parties|packages?)|kids? birthday|bday party)\b/;
+// Indoor test 6: a kids' camp request puts the places whose own Groups or Good to know line offers camps first.
+const CAMP_ASK_RE = /\b(?:summer|day|kids?|art|spring break|pd day) camps?\b|\bcamps? (?:de jour|d ete|pour enfants)\b/;
+const TEAM_LINE_RE = /\b(?:team building|teambuilding|corporate|company (?:events?|outings?|party|parties)|office (?:party|parties)|staff (?:party|parties))\b/;
+const PARTY_KINDS = ['escape', 'arcade', 'bowling', 'climbing'];
+// Indoor test 16 (2026-11-19; "rainy day for a group of 6"): a group asked for (Great for Groups, read from "a group", "group
+// of N", "for N people", "big group", "team", or a group occasion) puts the places that say they take groups first: the
+// Great for Groups badge (its own +8 as a feature), the place's own Groups line, a price per room or group.
+const COUPLES_ONLY_LINE_RE = /\b(?:couples?|for two|pour deux|duo|en couple|date night)\b/;
+const GROUP_SIZE_LINE_RE = /\b(?:groups?|groupes?|parties|party|bridal|bachelorette|girls|friends|team|corporate|private|up to \d|jusqu a \d|\d+ (?:or more|people|guests|personnes))\b/;
+function groupAsked(ctx) { return !!ctx && ((ctx.features || []).includes('great_groups') || ctx.occasion === 'group_getaway' || ctx.scoringOccasion === 'group_getaway'); }
+function groupFitScore(v, ctx, add) {
+  if (!groupAsked(ctx) || DINING_TYPES.includes(v.type)) return;
+  // Indoor test 18 (2026-11-19; Natalie's spa: "Couples’ packages" read "Takes groups" on a girls' weekend): a Groups line
+  // that is only about couples (two people) is not a group line.
+  const lines = (Array.isArray(v.indoorOwnGroups) ? v.indoorOwnGroups : []).filter((l) => !COUPLES_ONLY_LINE_RE.test(normWords(l)) || GROUP_SIZE_LINE_RE.test(normWords(l)));
+  // Its reason never quotes "please book ahead" as a reason it fits (that is the stop's Book ahead line).
+  if (lines.length) add('group_line', 20, 'Takes groups (the owner’s own Groups line)');
+  else if (v.groupsText) add('group_line', 8, null);
+  if (['room', 'group'].includes(v.indoorPer)) add('group_price', 8, `Priced per ${v.indoorPer}`);
+}
+function groupsAskScore(v, ctx, add) {
+  groupFitScore(v, ctx, add);
+  const q = normWords(`${ctx.askText || ''} ${ctx.queryText || ''}`);
+  const team = TEAM_ASK_RE.test(q), bday = BIRTHDAY_ASK_RE.test(q), camp = CAMP_ASK_RE.test(q);
+  if (!team && !bday && !camp) return;
+  const g = v.groupsText || '';
+  if (camp && /\bcamps?\b/.test(g)) { add('groups_line', 24, 'Runs kids’ camps, from its listing'); return; }
+  if (!team && !bday) return;
+  const kinds = v.type === 'indoor' ? (v.plannerKinds || tripRequirements.inferPlannerKinds(v)) : [];
+  if (team && TEAM_LINE_RE.test(g)) add('groups_line', 24, 'Offers team building, from its listing');
+  else if (bday && /\bbirthday/.test(g)) add('groups_line', 24, 'Hosts birthday parties, from its listing');
+  else if (kinds.some((k) => PARTY_KINDS.includes(k))) add('groups_kind', 8, null);
+}
 function occasionScore(v, ctx, add) {
   const o = ctx.scoringOccasion;
   if (!o) return;
@@ -1831,7 +2168,7 @@ function why(reasons) {
   // Tour test 17 (Whistler, 2026-11-18; Sarah): "Hotel pickup" was the 4th reason of a rafting tour ("Matches your request
   // for rafting", "Rentals or guided trips…", "…tours & experiences" weigh more) and never reached the card's two lines.
   // When it is there, it is the first line.
-  const sorted = reasons.filter((r) => r.text).slice().sort((a, b) => (b.code === 'pickup') - (a.code === 'pickup') || b.weight - a.weight);
+  const sorted = reasons.filter((r) => r.text).slice().sort((a, b) => (b.code === 'pickup') - (a.code === 'pickup') || (b.code === 'owner_line') - (a.code === 'owner_line') || b.weight - a.weight);
   return sorted.slice(0, 3).map((r) => r.text);
 }
 
@@ -1859,6 +2196,50 @@ function tourRentalPrice(v, ctx) {
   const it = pool[0];
   return { cents: Math.round(num(it.price) * 100), label: 'Rental', labelFr: 'Location', source: null, item: it.name, unit: it.price, unitFr: it.priceFr || it.price };
 }
+// Indoor test 1 (2026-11-19; Margaret's museum closes Dec 24 – Jan 14 every year): a request with no exact date ("a museum
+// in Summerland in January", or no date at all) that overlaps one of the owner's yearly closures says so on the card
+// ("Closed Dec 24 – Jan 14 every year"). Dated plans already leave the place out on its closed days.
+const CLOSURE_MONTHS_EN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const CLOSURE_MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
+function yearlyClosureNote(v, ctx) {
+  if (!v || !Array.isArray(v.ownerClosures) || !v.ownerClosures.length || (ctx && ctx.requirements && ctx.requirements.startDate)) return null;
+  const month = ctx && ctx.seasonInfo && ctx.seasonInfo.named === 'month' && Number.isInteger(ctx.seasonInfo.month) ? ctx.seasonInfo.month : null;
+  const inside = (x, a, b) => (a <= b ? x >= a && x <= b : x >= a || x <= b);
+  const today = ctx && /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) ? String(ctx.tripDate) : ownerClosureToday();
+  const soon = (() => { const d = new Date(`${today}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + 30); return d.toISOString().slice(0, 10); })();
+  const hit = v.ownerClosures.find((c) => {
+    if (!c || !c.yearly || !/^\d{4}-\d{2}-\d{2}$/.test(String(c.from)) || !/^\d{4}-\d{2}-\d{2}$/.test(String(c.to || c.from))) return false;
+    const a = String(c.from).slice(5), b = String(c.to || c.from).slice(5);
+    if (month) { for (let d = 1; d <= 31; d++) if (inside(`${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`, a, b)) return true; return false; }
+    return String(c.from) <= soon && String(c.to || c.from) >= today;
+  });
+  if (!hit) return null;
+  const md = (iso, fr) => { const m = Number(iso.slice(5, 7)) - 1, d = Number(iso.slice(8, 10)); return fr ? `${d === 1 ? '1er' : d} ${CLOSURE_MONTHS_FR[m]}` : `${CLOSURE_MONTHS_EN[m]} ${d}`; };
+  const from = String(hit.from), to = String(hit.to || hit.from);
+  return { en: `Closed ${md(from, false)}${to !== from ? ` \u2013 ${md(to, false)}` : ''} every year`, fr: `Fermé ${to !== from ? `du ${md(from, true)} au ${md(to, true)}` : `le ${md(from, true)}`} chaque année` };
+}
+// Indoor test 13 (2026-11-19; Dan's cinema: "cheap movie night Tuesday" showed his $14 adult ticket): when the request names
+// a day ("Tuesday", « mardi ») or a cheap night ("cheap", "discount", « pas cher »), the owner's own typed price line that
+// matches it ("Cheap Tuesdays $8"), else null. -> { cents, line } with {x} for the money.
+const PRICE_DAY_WORDS = [['monday', 'mon', 'mondays', 'lundi', 'lundis'], ['tuesday', 'tue', 'tues', 'tuesdays', 'mardi', 'mardis'], ['wednesday', 'wed', 'wednesdays', 'mercredi', 'mercredis'], ['thursday', 'thu', 'thurs', 'thursdays', 'jeudi', 'jeudis'], ['friday', 'fri', 'fridays', 'vendredi', 'vendredis'], ['saturday', 'sat', 'saturdays', 'samedi', 'samedis'], ['sunday', 'sun', 'sundays', 'dimanche', 'dimanches']];
+const PRICE_DEAL_RE = /\b(?:cheap|cheaper|cheapest|discount|discounted|deal|deals|bargain|budget|toonie|half price|special|specials|rabais|reduit|pas cher|bon marche|aubaine)\b/;
+function indoorAskedPriceLine(v, ctx) {
+  const items = v && v.type === 'indoor' && Array.isArray(v.indoorPriceItems) ? v.indoorPriceItems : null;
+  if (!items || !items.length || !ctx) return null;
+  const q = ` ${normWords(`${ctx.askText || ''} ${ctx.queryText || ''}`)} `;
+  const days = PRICE_DAY_WORDS.filter((ws) => ws.some((w) => q.includes(` ${w} `)));
+  const deal = PRICE_DEAL_RE.test(q);
+  if (!days.length && !deal) return null;
+  const has = (t, ws) => ws.some((w) => ` ${normWords(t)} `.includes(` ${w} `));
+  let hit = null;
+  for (const [name, desc, price] of items) {
+    const t = `${name} ${desc}`;
+    const dayOk = days.length ? days.some((ws) => has(t, ws)) : false;
+    const dealOk = deal && PRICE_DEAL_RE.test(` ${normWords(t)} `);
+    if ((dayOk || (!days.length && dealOk)) && (!hit || price < hit[2])) hit = [name, desc, price];
+  }
+  return hit ? { cents: Math.round(hit[2] * 100), line: `${hit[0]} {x}` } : null;
+}
 function publicVenue(v, ctx) {
   // Winery test 5 (2026-11-12): a winery's own tasting fee comes before a published price ("Check price per person" showed
   // with a $10 owner fee); a free tasting says so.
@@ -1875,7 +2256,19 @@ function publicVenue(v, ctx) {
   // Tour test 15 (Whistler, 2026-11-18; Dave): a rental asked for shows his own rental price as typed ("Canoe rental: $45 per
   // boat per hour"), not the tours' "From $89".
   const rental = v.type === 'tour' && !tourIsFree ? tourRentalPrice(v, ctx) : null;
-  const cost = tourIsFree ? null : rental ? rental : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
+  // Indoor places (2026-11-19): the owner's own adult price ("$25 · Admission"); free entry says Free (freeEntry).
+  const indoorFrom = v.type === 'indoor' && !v.indoorFree && typeof v.indoorPrice === 'number' && Number.isFinite(v.indoorPrice) && v.indoorPrice > 0 ? v.indoorPrice : null;
+  const cost = tourIsFree || (v.type === 'indoor' && v.indoorFree) ? null : rental ? rental : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
+    // Indoor test 2 (2026-11-19; Jordan): a price per room, lane, game or group reads as the page says it ("From $120 per
+    // room (2–6 players)"), never "per person", and stays out of the per-person estimate.
+    : indoorFrom && Array.isArray(v.indoorPerLine) ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null, perGroup: v.indoorPer, unit: v.indoorPerLine[0], unitFr: v.indoorPerLine[1] }
+    // Indoor test 4 (2026-11-19; Lauren's spa read "$65 per person · Admission"): the kind's own words ("From $65",
+    // "Tickets from $25", "Day pass from $22"), as the page says it.
+    // Indoor test 13: the owner's own price line for the day or cheap night asked ("Cheap Tuesdays $8").
+    : indoorFrom && !Array.isArray(v.indoorPerLine) && indoorAskedPriceLine(v, ctx) ? { ...indoorAskedPriceLine(v, ctx), label: 'Indoor', labelFr: 'Intérieur', source: null, lineFr: indoorAskedPriceLine(v, ctx).line, asked: true }
+    // Indoor test 18: THE PRICE RULE (indoor-kinds.js): its amount is the lowest real price ("From $70" with a $70 pedicure).
+    : indoorFrom && Array.isArray(v.indoorPriceLine) ? { cents: Math.round((typeof v.indoorPriceAt === 'number' && v.indoorPriceAt > 0 ? v.indoorPriceAt : indoorFrom) * 100), label: 'Indoor', labelFr: 'Intérieur', source: null, line: v.indoorPriceLine[0], lineFr: v.indoorPriceLine[1] }
+    : indoorFrom ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null }
     : cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
     : fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
     : flight ? (v.type === 'distillery' ? { cents: Math.round(flight * 100), label: 'Tasting', labelFr: 'Dégustation', source: null } : { cents: Math.round(flight * 100), label: 'Flight', labelFr: 'Palette de dégustation', source: null }) : tripStopPrice(v.url, v.id);
@@ -1884,15 +2277,21 @@ function publicVenue(v, ctx) {
     // too; it read « Prix par personne à vérifier ».
     ...(fee === 0 || ((v.type === 'brewery' || v.type === 'distillery') && v.flightFee === 0) ? { freeTasting: true } : {}),
     ...(tourIsFree ? { freeTour: v.tourFree } : {}),
+    ...(yearlyClosureNote(v, ctx) ? { yearlyClosure: yearlyClosureNote(v, ctx) } : {}),
+    // Indoor test 1 (2026-11-19; Margaret): a by-donation museum says "By donation (suggested $5)", never "Free entry".
+    ...(v.type === 'indoor' && v.indoorFree === 'donation' ? { byDonation: typeof v.indoorSuggested === 'number' && v.indoorSuggested > 0 ? v.indoorSuggested : true } : {}),
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     ...(cost ? { cost } : {}),
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.type === 'cocktail' ? 'Cocktail lounge' : v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : BREWERY_KIND_LABEL[v.type === 'brewery' && v.breweryKind] ? BREWERY_KIND_LABEL[v.breweryKind][0] : ctx ? (v.type === 'indoor' ? indoorVenueLabel(ctx, v, 'singular') : typeLabel(ctx, v.type, 'singular')) : v.type,
     // Brewery test 3 (2026-11-13): the kind the owner picked (« Cidrerie »), in French too.
     ...(v.type === 'brewery' && BREWERY_KIND_LABEL[v.breweryKind] ? { typeLabelFr: BREWERY_KIND_LABEL[v.breweryKind][1] } : {}),
     ...(v.type === 'cocktail' ? { typeLabelFr: 'Bar à cocktails' } : {}),
+    // Indoor test 7 (2026-11-19; Robert's card read "Indoor attraction" in one plan and "Art gallery" in another): an indoor
+    // place's card always says its own kind (the owner's main kind, else its listed kind), in French too.
+    ...(v.type === 'indoor' && indoorCardKind(v) ? { typeLabel: indoorCardKind(v)[0], typeLabelFr: indoorCardKind(v)[1] } : {}),
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
     // Tour test 4: no $-$$$$ tier beside a tour's own price ("Free · $$", "From $35 · $$").
-    rating: v.rating, reviews: v.reviews, price: tourIsFree || tourFrom ? null : v.price, freeEntry: !!v.features?.free_entry, address: v.address || null,
+    rating: v.rating, reviews: v.reviews, price: tourIsFree || tourFrom || indoorFrom || (v.type === 'indoor' && v.indoorFree) ? null : v.price, freeEntry: !!v.features?.free_entry || (v.type === 'indoor' && !!v.indoorFree), address: v.address || null,
     // The venue's own photo when it has one (2026-10-17); otherwise a photo of
     // the kind of place (the site's category photos), labelled as an example.
     photo: ownStopPhoto(v), // real photos only (2026-10-28): no example photo for a place without its own
@@ -1992,6 +2391,15 @@ function coldMonthIceCream(v, date) {
 const TOUR_BOOKING_NOTE = 'Tours run at set times: book ahead with the operator and plan the day around the time you get.';
 // Tours (2026-11-16): the operator's own "book ahead" answer replaces the general note.
 const TOUR_VARIES_NOTE = 'Length, ages and booking can differ by tour: see this operator’s Tours & prices.';
+// Indoor places (2026-11-19): the owner's own walk-ins answer on the stop ("Walk-ins welcome" needs no note).
+const INDOOR_BOOK_NOTES = {
+  busy: 'Walk-ins welcome; book ahead for weekends and busy times (the owner’s own answer).',
+  ahead: 'Book ahead (the owner’s own answer).',
+};
+const INDOOR_CLASS_TIME_NOTE = 'Book a class time: see the schedule on their Class schedule button (the owner’s own answer).';
+// Indoor test 13 (2026-11-19; Dan's cinema, shows only, with a showtimes link: "Hours not listed"): every kind with no set
+// hours and a link says where its times are, by what the link is.
+const INDOOR_TIMES_NOTES = { classes: INDOOR_CLASS_TIME_NOTE, shows: 'Showtimes: see the schedule on their Showtimes & tickets button (the owner’s own answer).', web: 'Times: see their website before you go (the owner’s own answer).' };
 const TOUR_BOOK_AHEAD_NOTES = {
   same_day: 'Same-day bookings are often fine (the operator’s own answer). Call ahead for the times.',
   day: 'Book at least a day ahead (the operator’s own answer).',
@@ -2254,6 +2662,8 @@ function rotateWithinType(cands, ctx, score = (c) => c.score, opts = {}) {
     }
     if (rotateBooked(c.v) && !rotateBooked(best.v)) continue;
     if (appointmentOnly(c.v) && !appointmentOnly(best.v)) continue;
+    // Indoor test 15: a Complete & Verified best place never rotates to one its owner hasn't confirmed.
+    if (best.v.completeVerified && !c.v.completeVerified) continue;
     const km = kmOrNull(best.v, c.v);
     if (km != null && km > ROTATE_MAX_KM) continue;
     pool.push(c);
@@ -2295,12 +2705,81 @@ function placeReasons(v, ctx) {
   if (ctx && ctx.kids && v.features && v.features.kid_friendly) out.push({ code: 'place', text: 'Has the Kid-Friendly badge', weight: 5 });
   return out;
 }
+// Indoor test 8 (2026-11-19; Gary's bowling centre: "bowling Kelowna Tuesday 7 PM" said walk-ins are welcome while his own
+// line says leagues fill the lanes then; "cosmic bowling … Saturday night" never quoted his cosmic bowling line): the
+// owner's own Known for or Good to know sentence that names the day (or a range or "weeknights" that covers it) asked, the
+// evening one first for an evening; for a weekday evening, his line about leagues or busy times. -> { text, busy } or null.
+const OWN_DAY_RE = { mon: /\bmon(?:day)?s?\b|\blun(?:di)?s?\b/, tue: /\btue(?:s|sday)?s?\b|\bmar(?:di)?s?\b/, wed: /\bwed(?:nesday)?s?\b|\bmer(?:credi)?s?\b/, thu: /\bthu(?:r|rs|rsday)?s?\b|\bjeu(?:di)?s?\b/,
+  fri: /\bfri(?:day)?s?\b|\bven(?:dredi)?s?\b/, sat: /\bsat(?:urday)?s?\b|\bsam(?:edi)?s?\b/, sun: /\bsun(?:day)?s?\b|\bdim(?:anche)?s?\b/ };
+const OWN_BUSY_RE = /\b(?:leagues?|ligues?|busy|busiest|limited|full|fill|fills|sold out|sell out|reserved|call ahead|book ahead|achaland\w*|pleins?|pleines?|r[ée]serv\w*|appelez)\b/i;
+const OWN_EVENING_RE = /\b(?:nights?|evenings?|tonight|soirs?|soir[ée]es?|pm|after [5-9]|apr[èe]s (?:1[7-9]|2[0-3]) ?h)\b|\b(?:[5-9]|1[01])(?::\d\d)? ?pm\b|\b(?:1[7-9]|2[0-3]) ?h\b|midnight|minuit/i;
+function ownLineDays(text) {
+  const t = String(text || '').toLowerCase().replace(/[’']/g, "'");
+  const days = new Set();
+  for (const d of WEEKDAYS) if (OWN_DAY_RE[d].test(t)) days.add(d);
+  // Ranges: "Mon–Thu", "Mon to Thu", « lun. au jeu. ».
+  const dw = '(mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun|lun|mar|mer|jeu|ven|sam|dim)[a-z]*\\.?';
+  const r = new RegExp(`\\b${dw}\\s*(?:-|–|—|to|through|thru|au|à)\\s*${dw}`).exec(t);
+  if (r) {
+    const key = (x) => ({ mon: 'mon', tue: 'tue', tues: 'tue', wed: 'wed', thu: 'thu', thur: 'thu', thurs: 'thu', fri: 'fri', sat: 'sat', sun: 'sun', lun: 'mon', mar: 'tue', mer: 'wed', jeu: 'thu', ven: 'fri', sam: 'sat', dim: 'sun' })[x];
+    let i = WEEKDAYS.indexOf(key(r[1])); const j = WEEKDAYS.indexOf(key(r[2]));
+    if (i >= 0 && j >= 0) for (let n = 0; n < 7; n++) { days.add(WEEKDAYS[i]); if (i === j) break; i = (i + 1) % 7; }
+  }
+  if (/\bweeknights?\b|\bweekdays?\b|\ben semaine\b/.test(t)) ['mon', 'tue', 'wed', 'thu'].forEach((d) => days.add(d));
+  if (/\bweekends?\b|\bfins? de semaine\b/.test(t)) ['sat', 'sun'].forEach((d) => days.add(d));
+  return days;
+}
+function indoorOwnTimeLine(v, ctx) {
+  if (!v || v.type !== 'indoor' || !Array.isArray(v.indoorOwnLines) || !v.indoorOwnLines.length || !ctx) return null;
+  const wd = String(ctx.startWeekday || '').toLowerCase().slice(0, 3);
+  const at = askedClockOf(ctx);
+  const evening = ctx.whenDaypart === 'evening' || (at != null && at >= 17 * 60) || /\b(?:night|tonight|evening|soir|soiree)\b/.test(normWords(ctx.queryText || ''));
+  if (!WEEKDAYS.includes(wd) && !evening) return null;
+  const lines = v.indoorOwnLines.map((text) => ({ text, days: ownLineDays(text), eve: OWN_EVENING_RE.test(text), busy: OWN_BUSY_RE.test(text) }));
+  const onDay = (l) => !WEEKDAYS.includes(wd) || l.days.has(wd);
+  const weekdayEve = evening && ['mon', 'tue', 'wed', 'thu'].includes(wd);
+  const pick = (weekdayEve && lines.find((l) => l.busy && l.days.size && onDay(l)))
+    || (evening && lines.find((l) => l.days.size && onDay(l) && l.eve))
+    || (WEEKDAYS.includes(wd) && lines.find((l) => l.days.size && onDay(l)))
+    || (evening && !WEEKDAYS.includes(wd) && lines.find((l) => l.eve && !l.busy));
+  return pick ? { text: `“${pick.text}” (the owner’s own words)`, busy: pick.busy } : null;
+}
+// Indoor test 9 (2026-11-19; "sensory friendly activity for my son" and "kids birthday party" listed Melissa's play centre
+// with only the day and time reasons): with no line for the day or time asked, the owner's own line that holds a word of
+// the request ("Sensory-friendly hour Tuesdays 9–10 AM"), or for a party request her own Groups line about parties
+// ("Birthday parties with a party room"). The kind's own words and the plain trip words are not matched.
+const OWN_WORD_SKIP = new Set(('indoor indoors inside rainy raining family families friendly activity activities things thing something somewhere places place kids child children '
+  + 'with where there about today tonight tomorrow weekend weekends morning afternoon evening night visit spots great best good really would could should please looking '
+  + 'enfants famille activite activites interieur interieure pluie endroit endroits').split(' '));
+const OWN_PARTY_RE = /\b(?:birthdays?|bday|part(?:y|ies)|f[eê]tes?|anniversaires?)\b/i;
+function indoorOwnWordLine(v, ctx) {
+  if (!v || v.type !== 'indoor' || !ctx) return null;
+  const own = Array.isArray(v.indoorOwnLines) ? v.indoorOwnLines : [], groups = Array.isArray(v.indoorOwnGroups) ? v.indoorOwnGroups : [];
+  if (!own.length && !groups.length) return null;
+  const q = normWords(ctx.queryText || '');
+  if (OWN_PARTY_RE.test(q)) { const l = groups.concat(own).find((t) => OWN_PARTY_RE.test(t)); if (l) return l; }
+  // Indoor test 18 (2026-11-19; "couples massage" said only "Matches your request for a spa" for Natalie's spa, whose Groups
+  // line is "Couples’ packages"): a spa request's own words (couples, facial, hydrotherapy, massage) quote her line.
+  if (spaPlace(v)) for (const re of SPA_FOCUS_ORDER) if (re.test(q)) { const l = groups.concat(own).find((t) => re.test(normWords(t))); if (l) return l; }
+  const kindWords = indoorAskedWords(ctx.queryText) || new Set();
+  const regions = new Set(Object.values((ctx.labels && ctx.labels.regions) || {}).flatMap((r) => normWords(r).split(' ')));
+  const words = q.split(' ').filter((w) => w.length >= 5 && !OWN_WORD_SKIP.has(w) && !kindWords.has(w) && !regions.has(w) && !/^\d/.test(w));
+  for (const w of words) {
+    const l = own.concat(groups).find((t) => normWords(t).split(' ').some((x) => x === w || (w.length >= 6 && x.startsWith(w))));
+    if (l) return l;
+  }
+  return null;
+}
 function stopFrom(v, scored, extra, ctx) {
   let reasons = scored.reasons.concat(extra || []);
+  let ownLine = indoorOwnTimeLine(v, ctx);
+  if (!ownLine) { const w = indoorOwnWordLine(v, ctx); if (w) ownLine = { text: `“${w}” (the owner’s own words)`, busy: false }; }
+  if (ownLine && !reasons.some((r) => r.text === ownLine.text)) reasons = [{ code: 'owner_line', text: ownLine.text, weight: 60 }].concat(reasons);
   const own = placeReasons(v, ctx || {});
   if (own.length) {
     // "Matches your request for a museum" and "... for museums" are one reason; the existing line stays.
-    const root = (t) => normWords(String(t).replace(/^Matches your request for (?:an? )?/, '')).slice(0, 4);
+    // Indoor test 18: "a spa" and "spas" too (the plural's s).
+    const root = (t) => normWords(String(t).replace(/^Matches your request for (?:an? )?/, '')).replace(/e?s$/, '').slice(0, 4);
     const asked = reasons.filter((r) => /^Matches your request for /.test(r.text || '')).map((r) => root(r.text));
     const mine = own.filter((o) => o.code !== 'request' || !asked.includes(root(o.text)));
     reasons = reasons.filter((r) => !mine.some((o) => o.text === r.text));
@@ -2309,6 +2788,15 @@ function stopFrom(v, scored, extra, ctx) {
     if (reasons.filter((r) => r.text && !['daypart', 'region'].includes(r.code)).length >= 2) reasons = reasons.filter((r) => !['daypart', 'region'].includes(r.code));
   }
   let caveats = [...new Set([...(scored.caveats || []), ...tripRequirements.listedAccessNotes(v)])];
+  // Indoor test 18 (2026-11-19; a floating sauna got the same "Why it fits" as Natalie's spa for "couples massage"): a spa
+  // or sauna whose own words say none of what was asked (massage, couples, facial) doesn't say it matches; it says so.
+  if (v && ctx && spaPlace(v)) {
+    const q = normWords(ctx.queryText || ''), askedI = SPA_FOCUS.findIndex((re) => re.test(q));
+    if (askedI >= 0 && askedI < 3 && !spaFocusHits(v, ctx)) {
+      reasons = reasons.filter((r) => !/^Matches your request for (?:an? )?(?:spas?|massages?|facials?|couples?\b.*)$/i.test(r.text || ''));
+      caveats.push(`Its listing doesn’t mention ${SPA_FOCUS_NAMES[askedI]} \u2014 check before you book`);
+    }
+  }
   // Winery test 4 (2026-11-12): a winery that said it is by appointment has no hours to go by: no "Listed hours" reason
   // and no hours caveat next to "By appointment only".
   if (v && (v.ownerAppointment === true || v.tourByBooking === true)) {
@@ -2322,11 +2810,22 @@ function stopFrom(v, scored, extra, ctx) {
   if (v && v.ownerHours) caveats = caveats.map((c) => c.replace(/ \u2014 check (?:before|the day) you go$/, ''));
   if (ctx && ctx.features && isDogTrip(ctx) && DINING_TYPES.includes(v.type) && !(v.features.dog_friendly || v.collections.includes('dog_friendly'))) caveats.push(`Not listed as dog-friendly on ${SITE.brand}, so plan this one without your dog or check with them first`);
   // Round 10 (2026-10-19): a tour company runs at set times; it is booked, not dropped in on.
+  // Indoor test 8: his own busy line for the evening asked stands in for the general walk-ins answer.
+  // Indoor test 12 (2026-11-19; Jess's yoga studio, classes only with a schedule link): no "Hours not listed" for it; its
+  // stop says to book a class time instead of the general book-ahead answer.
+  if (v && v.type === 'indoor' && (v.indoorClassTimes === true || INDOOR_TIMES_NOTES[v.indoorTimes])) {
+    reasons = reasons.filter((r) => r.code !== 'hours' && !/^Listed hours/.test(r.text || ''));
+    caveats = caveats.filter((c) => !c.startsWith(UNKNOWN_HOURS_CAVEAT.replace(/ — .*$/, '')) && !/listed hours/i.test(c));
+    const tn = INDOOR_TIMES_NOTES[v.indoorTimes] || INDOOR_CLASS_TIME_NOTE;
+    if (!caveats.includes(tn)) caveats.push(tn);
+  } else if (v && v.type === 'indoor' && INDOOR_BOOK_NOTES[v.indoorBook] && !caveats.includes(INDOOR_BOOK_NOTES[v.indoorBook]) && !(ownLine && ownLine.busy && v.indoorBook !== 'ahead')) caveats.push(INDOOR_BOOK_NOTES[v.indoorBook]);
   if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = tourBookAheadNote(v); if (!caveats.includes(bn)) caveats.push(bn); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
   // Tour test 4 (Whistler, 2026-11-17), bug 12: the operator's one booking and age answer stands for several unlike trips
   // (its own Tours & prices list names different lengths or ages): say so, once.
   if (v && v.type === 'tour' && v.tourVaries && (TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead] || v.tourMinAge) && !caveats.includes(TOUR_VARIES_NOTE)) caveats.push(TOUR_VARIES_NOTE);
+  // Indoor test 16 (2026-11-19; Tyler: 12+ on their own, 8 to 11 with a paying adult): with kids, the owner's adult rule.
+  { const an = indoorAdultNote(v, ctx); if (an && !caveats.includes(an)) caveats.push(an); }
   if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|8|10|12|14|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
   // Tour test 13: a paragliding operator on a "scenic flight" plan is labelled paragliding, and an air-sport operator's
   // own "who can fly" line (weight, run a few steps) is on its stop.
@@ -2384,7 +2883,8 @@ function stopFrom(v, scored, extra, ctx) {
   };
 }
 function compareScored(a, b) {
-  return b.score - a.score || (b.v.rating || 0) - (a.v.rating || 0) || (b.v.reviews || 0) - (a.v.reviews || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id;
+  // Indoor test 15: a Complete & Verified place (all confirmed by its owner) breaks a tie before rating and reviews.
+  return b.score - a.score || (b.v.completeVerified ? 1 : 0) - (a.v.completeVerified ? 1 : 0) || (b.v.rating || 0) - (a.v.rating || 0) || (b.v.reviews || 0) - (a.v.reviews || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id;
 }
 
 // ---------- classification ----------
@@ -2428,7 +2928,10 @@ function requestedTimeFit(v, ctx, opts = {}) {
   // the time. A place whose listed hours prove it closed then is left out (it closed at 4, or is closed that day); one
   // that opens within the next 90 minutes stays, below the places already open ("at 7am": open at 7 before opens at 8).
   // Only for a list of places (buildRecommendations): a plan of several stops starts at that time and runs on from it.
-  const at = opts.list && !live && weekday && ctx.requirements && Number.isFinite(ctx.requirements.startMinutes) && !ctx.requirements.dinnerAtClock ? ctx.requirements.startMinutes : null;
+  // Indoor test 2 (2026-11-19): or the time alone (ctx.askedMinutes) when nothing else kept the requirements ("Friday at
+  // 11 PM" listed an art centre and wineries that close at 6).
+  const askedAt = ctx.requirements && Number.isFinite(ctx.requirements.startMinutes) ? (ctx.requirements.dinnerAtClock ? null : ctx.requirements.startMinutes) : Number.isFinite(ctx.askedMinutes) ? ctx.askedMinutes : null;
+  const at = opts.list && !live && weekday && askedAt != null ? askedAt : null;
   if (at != null && parsed.known) {
     const open = openAtMinute(parsed, weekday, at);
     if (open === false) {
@@ -2553,7 +3056,10 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
   for (const s of scored) {
     if (out.length >= count) break;
     // An activity asked for on its own ("mountain biking") is all one kind of place, so the per-type cap does not apply.
-    if ((perType[s.v.type] || 0) >= RECOMMENDATION_PER_TYPE && !(ctx.types.size === 1 && ctx.types.has(s.v.type)) && !(ctx.activities.size && !ctx.types.size)) continue;
+    // Indoor test 15: "free things to do" fills with free and by-donation places before any café or diner: a free place
+    // is not held back by the cap on one kind of place.
+    const freeHere = freeAsked && (s.v.features?.free_entry || budgetFreeStop(s.v));
+    if (!freeHere && (perType[s.v.type] || 0) >= RECOMMENDATION_PER_TYPE && !(ctx.types.size === 1 && ctx.types.has(s.v.type)) && !(ctx.activities.size && !ctx.types.size)) continue;
     perType[s.v.type] = (perType[s.v.type] || 0) + 1;
     out.push(stopFrom(s.v, s, regionReason(s.v, ctx), ctx));
   }
@@ -2562,6 +3068,13 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
   // tour made the list, so families see one. Never ahead of the places that ranked higher.
   if (ctx.kids && !ctx.types.size && !ctx.activities.size && !(ctx.plannerKinds || []).length && out.length && !out.some((x) => x.venue && x.venue.type === 'tour')) {
     const t = scored.find((x) => x.v.type === 'tour' && x.v.tourMinAge === 'all' && x.v.features && x.v.features.kid_friendly);
+    if (t) { const st = stopFrom(t.v, t, regionReason(t.v, ctx), ctx); if (out.length >= count) out[out.length - 1] = st; else out.push(st); }
+  }
+  // Indoor test 2 (2026-11-19; Jordan's escape rooms and arcade, open to 1 AM): a late-night list of only food and drink
+  // keeps its last place for the best indoor place open late by its hours (an arcade, bowling, a show), so a late-night
+  // request shows something to do as well. Never ahead of the places that ranked higher.
+  if ((ctx.features || []).includes('open_late') && !ctx.types.size && !ctx.kids && out.length >= 4 && !out.some((x) => x.venue && x.venue.type === 'indoor')) {
+    const t = scored.find((x) => x.v.type === 'indoor' && x.v.lateClose);
     if (t) { const st = stopFrom(t.v, t, regionReason(t.v, ctx), ctx); if (out.length >= count) out[out.length - 1] = st; else out.push(st); }
   }
   return { items: out, total: scored.length };
@@ -2628,7 +3141,7 @@ function buildOuting(facts, ctx) {
       const s = scoreVenue(v, ctx);
       const dist = distanceTerm(prev, v, kmCost, maxHop);
       // A cheap date night (2026-10-25: it got Rimrock Café, $$$$): listed prices of $$$ and up rank well down.
-      const budgetCost = ctx.budget === 'budget' && v.price != null ? (v.price >= 3 ? -40 : v.price === 1 ? 6 : 0) : 0;
+      const budgetCost = budgetFreeBonus(ctx, v) ? 8 : ctx.budget === 'budget' && v.price != null ? (v.price >= 3 ? -40 : v.price === 1 ? 6 : 0) : 0;
       // Restaurant test 1 (Whistler, 2026-11-14): a dish the visitor asked for ("we love cheese fondue") that the place
       // serves (its cuisine, description or Known for line) puts it ahead for dinner, over a romantic place without it.
       const dish = step.types.includes('restaurant') && ctx.foodTerms.some((ft) => DISH_WORDS_RE.test(ft.term) && foodMatch(v, ft)) ? 15 : 0;
@@ -2688,7 +3201,26 @@ function buildOuting(facts, ctx) {
     alternates.push({ v, score: s.score + (step.prefer[v.type] || 0) + fit.score, reasons: s.reasons.concat(fit.reasons), caveats: fit.caveats });
   }
   alternates.sort(compareScored);
-  return { stops, alternates: alternates.slice(0, 6).map((a) => stopFrom(a.v, a, regionReason(a.v, ctx), ctx)) };
+  // Indoor test 6 (2026-11-19; Priya's Friday date night on the wheel): a date night also offers, first among the other
+  // good options, an indoor place in town whose owner offers a date night of its own (its Known for, Groups or Good to
+  // know line, or a price item), when its hours fit the evening.
+  const own = [];
+  if (ROMANTIC_EVENING_OCCASIONS.includes(ctx.occasion)) {
+    const first = stops.find((st) => st.venue), town = first ? first.venue.region : null;
+    for (const v of base) {
+      if (used.has(v.id) || v.type !== 'indoor' || !v.dateNightLine || (town && v.region !== town)) continue;
+      // Its date night on named days ("Friday date nights") and the plan on another day: not offered.
+      const days = WEEKDAYS.filter((d) => new RegExp(`\\b${WEEKDAY_NAMES[d].toLowerCase().slice(0, 3)}(?:${WEEKDAY_NAMES[d].toLowerCase().slice(3)})?s?\\b`).test(String(v.dateNightLine).toLowerCase()));
+      const wd = String(ctx.startWeekday || '').toLowerCase().slice(0, 3);
+      if (days.length && WEEKDAYS.includes(wd) && !days.includes(wd)) continue;
+      const fit = slotFit(v, altCtx, 'evening', 0, null);
+      if (!fit.ok) continue;
+      const s = scoreVenue(v, altCtx);
+      own.push({ v, score: s.score, reasons: [{ code: 'date_night_own', text: `Its own date night: “${v.dateNightLine}”`, weight: 20 }].concat(s.reasons, fit.reasons), caveats: fit.caveats });
+    }
+    own.sort(compareScored);
+  }
+  return { stops, alternates: own.slice(0, 2).concat(alternates).slice(0, 6).map((a) => stopFrom(a.v, a, regionReason(a.v, ctx), ctx)) };
 }
 
 // ---------- multi-day plans ----------
@@ -2999,7 +3531,7 @@ function pickLunchNear(pool, ctx, d, info, near, used, reserved, base, focuses, 
       const km = kmOrNull(near, v);
       let score = base.get(v.id).score + fit.score + (v.type === 'restaurant' ? 4 : 0) - (km == null ? 6 : km * 1.2 + (km > 15 ? 25 : 0));
       if (v.type === 'restaurant' && v.textCuisine && tripCuisines.has(v.textCuisine)) score -= 4;
-      if (ctx.budget === 'budget' && v.price != null) score += v.price === 1 ? 6 : v.price >= 3 ? -8 : 0;
+      if (budgetFreeBonus(ctx, v)) score += 8; else if (ctx.budget === 'budget' && v.price != null) score += v.price === 1 ? 6 : v.price >= 3 ? -8 : 0;
       const extra = [{ code: 'meal', text: 'A lunch stop between the morning and afternoon', weight: 3 }];
       if (km != null) extra.push({ code: 'nearby', text: `About ${km < 1 ? '<1' : Math.round(km)} km (straight line) from the morning and afternoon stops`, weight: 5 });
       cands.push({ v, score, reasons: base.get(v.id).reasons.concat(fit.reasons, extra), caveats: fit.caveats.concat(far ? [nearbyTownCaveat(ctx, centroids, info.regionList, v.region, 'lunch')] : []) });
@@ -3141,6 +3673,7 @@ function buildDays(facts, ctx, days, pinned) {
     const dailyCovered = new Set();
     const activityMorning = (ctx.requirements?.items || []).some(i => i.strength === 'must' && ['venue_kind','rainy'].includes(i.kind) && !(i.kind === 'rainy' && i.activityOnly) && (!tripRequirements.requirementDay(i,ctx.tripDate) || tripRequirements.requirementDay(i,ctx.tripDate) === d)) && !(ctx.requirements?.items || []).some(i=>i.kind==='type'&&['breakfast','cafe'].includes(i.value));
     const dayTypes = {};
+    const dayIndoorKinds = new Set();
     const capped = v => (v.type === 'beach' && coolBeachMonth(actualDate || ctx.tripDate) && (dayTypes.beach || 0) >= 1) || (ctx.requirements?.items || []).some(i => i.kind === 'type_count' && i.strength === 'must' && i.value === v.type && (!tripRequirements.requirementDay(i, ctx.tripDate) || tripRequirements.requirementDay(i, ctx.tripDate) === d) && (tripRequirements.requirementDay(i, ctx.tripDate) ? dayTypes[v.type] || 0 : tripTypeCount[v.type] || 0) >= i.count) || (v.type === 'restaurant' && Number.isInteger(ctx.requirements?.explicitMealCount) && (tripTypeCount.restaurant || 0) >= ctx.requirements.explicitMealCount);
     const stops = [];
     let prev = null;
@@ -3326,6 +3859,9 @@ function buildDays(facts, ctx, days, pinned) {
           // Sea to Sky (2026-10-25): the outdoors is the point, so a second outdoor stop is fine when it is one of the
           // best-known sights (the Chief in the morning, the Sea to Sky Gondola later).
           if (dayTypes[v.type] && !['restaurant', 'indoor', 'tour'].includes(v.type) && !(v.type === 'winery' && days === 1 && ctx.types.has('winery') && dayTypes.winery < 2) && !(v.type === 'outdoor' && dayTypes.outdoor < 2 && WELL_KNOWN_SIGHTS.has(v.name))) continue;
+          // Indoor test 17 (2026-11-19; a kids' birthday day planned two climbing gyms): one indoor place of each kind a day,
+          // unless the request asks for more than one ("two escape rooms").
+          if (v.type === 'indoor' && indoorMainKind(v) && dayIndoorKinds.has(indoorMainKind(v)) && !severalOfKindAsked(indoorMainKind(v), ctx)) continue;
           const fit = slotFit(v, ctx, daypart, d - 1, daypart);
           if (!fit.ok) continue; // listed hours prove it is closed then
           const s = base.get(v.id);
@@ -3444,7 +3980,7 @@ function buildDays(facts, ctx, days, pinned) {
           // snack stop; budget trips: free parks, walks, beaches and markets over cafés.
           if ((ctx.kids || ctx.budget === 'budget') && ['morning', 'afternoon'].includes(daypart) && DINING_TYPES.includes(v.type) && !vFocus.some((f) => f.key.startsWith('food:')) && !ctx.types.has(v.type)) score -= ctx.kids ? 22 : 12;
           if (ctx.budget === 'budget' && ['outdoor', 'beach'].includes(v.type) && FREE_PLACE_RE.test(`${v.textName || ''} ${v.textDesc || ''}`)) score += 10;
-          if (ctx.kids && ['morning', 'afternoon'].includes(daypart) && (v.type === 'indoor' || v.type === 'outdoor') && (v.features.kid_friendly || RAIN_BACKUP_KIDS_WORDS.some((w) => textHas(v.textName, w)))) score += 6;
+          if (ctx.kids && ['morning', 'afternoon'].includes(daypart) && (v.type === 'indoor' || v.type === 'outdoor') && (kidsFitOwn(v, ctx) || RAIN_BACKUP_KIDS_WORDS.some((w) => textHas(v.textName, w)))) score += 6;
           const dinnerJourney = daypart === 'evening' && v.type === 'restaurant' && mealRequests.length;
           // Round 8: the drive to the next town asked for ("dinner in Brackendale") is part of the plan, not a hop to avoid.
           const townChange = !!(partsFor(ctx, d) && prev && prev.region !== v.region);
@@ -3525,6 +4061,7 @@ function buildDays(facts, ctx, days, pinned) {
       used.add(v.id);
       for (const i of ctx.requirements?.items || []) if (tripRequirements.matches(v, i) && (!tripRequirements.requirementDay(i, ctx.tripDate) || tripRequirements.requirementDay(i, ctx.tripDate) === d)) { covered.add(i.id); if(i.kind!=='rainy'||!DINING_TYPES.includes(v.type))dailyCovered.add(i.id); }
       dayTypes[v.type] = (dayTypes[v.type] || 0) + 1;
+      if (v.type === 'indoor' && indoorMainKind(v)) dayIndoorKinds.add(indoorMainKind(v));
       tripTypeCount[v.type] = (tripTypeCount[v.type] || 0) + 1;
       for (const f of focuses) if (f.test(v) && f.key.startsWith('food:') && !met.has(f.key)) tripFoodCount[f.key] = (tripFoodCount[f.key] || 0) + 1;
       if (v.type === 'restaurant' && v.textCuisine) tripCuisines.add(v.textCuisine);
@@ -3569,6 +4106,7 @@ function buildDays(facts, ctx, days, pinned) {
       if (offSeasonSkip(v, ctx) || (placeKey(v) && taken.has(placeKey(v))) || (ctx.kids && familyAvoid(v))) continue;
       if (ctx.pace === 'relaxed' && v.type === 'golf') continue;
       if (spaPlace(v) && first && spaPlace(first)) continue; // one spa a day (2026-10-25)
+      if (v.type === 'indoor' && sameIndoorKindToday(v, day.stops, facts, ctx)) continue; // indoor test 17: one place of each kind a day
       if (spaPlace(v) && (!SPA_ASKED_RE.test(ctx.queryText || '') || oneSpa) && out.some((dd) => (dd.stops || []).some((x) => x.venue && spaPlace(byId.get(x.venue.id) || x.venue)))) continue;
       if (v.type === 'beach' && types.has('beach') && coolBeachMonth(actualDate || ctx.tripDate)) continue; // one beach a day off season
       const fit = slotFit(v, ctx, 'afternoon', d - 1, 'afternoon');
@@ -3910,7 +4448,7 @@ function pickMeal(pool, ctx, d, daypart, near, used, opts) {
     // On a wine day, lunch at a winery's own restaurant is a third winery visit.
     if (opts.wine && /\b(?:winery|vineyards?|estate|wines)\b/.test(`${v.textName || ''}`)) score += isLunch ? 9 : 4;
     if (opts.apres && /\b(?:apres|après|slopeside|ski in|village)\b/.test(`${v.textName || ''} ${v.textDesc || ''}`)) score += 4;
-    if (ctx.budget === 'budget' && v.price != null) score += v.price === 1 ? 10 : v.price === 2 ? 2 : -10;
+    if (budgetFreeBonus(ctx, v)) score += 12; else if (ctx.budget === 'budget' && v.price != null) score += v.price === 1 ? 10 : v.price === 2 ? 2 : -10;
     const reasons = [];
     if (km != null) reasons.push({ code: 'nearby', text: `About ${km < 1 ? '<1' : Math.round(km)} km (straight line) from ${opts.nearName || 'the previous stop'}`, weight: 5 });
     if (kFit && kFit.ok) reasons.push({ code: 'meal', text: kitchenMealText(v, isLunch ? 'lunch' : 'dinner', kFit.closes), weight: 20 });
@@ -4543,12 +5081,32 @@ function focusText(ctx, key) {
 
 // ---------- summary ----------
 
+function indoorAskedWords(text) {
+  const IK = require('./indoor-kinds');
+  const kinds = IK.indoorKindsNamedIn(text || '');
+  if (!kinds.length) return null;
+  const out = new Set(['own', 'your', 'our', 'my']);
+  for (const k of kinds) for (const ph of IK.INDOOR_KIND_TEXT[k].en.search.concat(IK.INDOOR_KIND_TEXT[k].fr.search)) for (const w of normWords(ph).split(' ')) if (w) out.add(w);
+  return out;
+}
+// Indoor test 10 (2026-11-19; "indoor pool Vernon" read "Indoor & rainy day spots in Vernon", « piscine » « Lieux pour les
+// jours de pluie … pour un jour de pluie »): a request for indoor kinds names them ("Pools in Vernon.").
+const INDOOR_KIND_PLURALS = { pool: 'pools', sauna: 'hot tubs and saunas', gallery: 'art galleries', museum: 'museums', theatre: 'theatres', cinema: 'cinemas', spa: 'spas', climbing: 'climbing gyms',
+  arcade: 'arcades', escape: 'escape rooms', bowling: 'bowling alleys', playground: 'indoor playgrounds', pottery: 'classes & workshops', curling: 'curling clubs', yoga: 'yoga classes', casino: 'casinos', library: 'libraries' };
+function indoorKindPlurals(ctx) {
+  if (!ctx || !ctx.types || !ctx.types.has('indoor') || indoorAskedLabel(ctx.queryText, 'plural')) return [];
+  return [...new Set((ctx.plannerKinds || []).filter((k) => INDOOR_KIND_PLURALS[k]).map((k) => INDOOR_KIND_PLURALS[k]))];
+}
 function interestsText(ctx) {
   const items = [];
-  for (const t of ctx.types) items.push(typeLabel(ctx, t).toLowerCase());
+  const kindNames = indoorKindPlurals(ctx);
+  for (const t of ctx.types) { if (t === 'indoor' && kindNames.length) { items.push(...kindNames); continue; } items.push(typeLabel(ctx, t).toLowerCase()); }
   for (const a of ctx.activities) items.push(activityLabel(ctx, a));
   for (const c of ctx.collections) items.push(collectionLabel(ctx, c));
-  for (const ft of ctx.foodTerms) { const t = termText(ft.term); if (t) items.push(t); }
+  // Indoor test 6 (2026-11-19; "paint your own pottery" read "Indoor & rainy day spots, “paint” and “own”"): with an
+  // indoor kind asked for, the words of its own phrases (and "own", "your") aren't listed again: the kind's label says it.
+  const kindWords = ctx.types.has('indoor') ? indoorAskedWords(ctx.queryText) : null;
+  for (const ft of ctx.foodTerms) { if (kindWords && kindWords.has(normWords(ft.term))) continue; const t = termText(ft.term); if (t) items.push(t); }
   for (const f of ctx.features) items.push((ctx.labels.featureNouns && ctx.labels.featureNouns[f]) || featureLabel(ctx, f).toLowerCase());
   return items;
 }
@@ -4558,9 +5116,21 @@ function whereText(ctx) {
 
 // The time the visitor asked about, in their terms: "tonight",
 // "tomorrow morning", "on Saturday afternoon".
+// Indoor test 8: the clock time a request names ("Tuesday 7 PM", "at 7:30 pm"), or null.
+function askedClockOf(ctx) {
+  if (!ctx) return null;
+  if (ctx.requirements && Number.isFinite(ctx.requirements.startMinutes)) return ctx.requirements.dinnerAtClock ? null : ctx.requirements.startMinutes;
+  if (Number.isFinite(ctx.askedMinutes)) return ctx.askedMinutes;
+  const m = /\b(1[0-2]|[1-9])(?::([0-5]\d))?\s*([ap])\.?\s?m\b/i.exec(String(ctx.queryText || ''));
+  return m ? (Number(m[1]) % 12) * 60 + Number(m[2] || 0) + (/p/i.test(m[3]) ? 720 : 0) : null;
+}
 function whenText(ctx) {
   const w = ctx.when;
   if (!w) return '';
+  // Indoor test 8 (2026-11-19; "bowling Kelowna Tuesday 7 PM" read "on Tuesday"): an indoor request keeps its clock time.
+  const asked0 = askedClockOf(ctx);
+  const at = asked0 != null && ctx.types && ctx.types.has && ctx.types.has('indoor') && w.weekday && !w.now && w.preset !== 'today' ? asked0 : null;
+  if (at != null) return `on ${w.weekday[0].toUpperCase()}${w.weekday.slice(1)} at ${kidsClock(at)}`;
   const part = ctx.whenDaypart;
   if (w.preset === 'today' && w.now) return 'right now';
   if (w.preset === 'today') return part === 'evening' ? 'tonight' : part ? `this ${part}` : 'today';
@@ -4577,6 +5147,8 @@ function buildSummary(kind, ctx, days) {
   const at = when ? ` ${when}` : '';
   const focus = interests.length ? `, focused on ${listText(interests)}` : '';
   const occ = ctx.occasion ? OCCASION_LABELS[ctx.occasion] : null;
+  // Indoor test 10: indoor places for a rainy day say it once ("Indoor & rainy day spots in Vernon.", never "… for a rainy day").
+  const occ2 = occ && ctx.occasion === 'rainy_day' && ctx.types && ctx.types.has('indoor') ? null : occ;
   let text;
   if (kind === 'multi_day' || kind === 'day_plan') {
     const n = days === 1 ? 'A one-day plan' : `${days} ${ctx.pace === 'standard' ? '' : `${ctx.pace} `}days`;
@@ -4585,7 +5157,7 @@ function buildSummary(kind, ctx, days) {
     text = `${occ ? article(occ, true) : 'An outing'} in ${whereText(ctx)}${at}${focus}.`;
   } else if (kind === 'recommendations' || kind === 'discover') {
     if (ctx.foodTerms.length && !ctx.types.size) text = `Places that mention ${listText(ctx.foodTerms.map((f) => `“${f.term}”`))} in ${whereText(ctx)}${at}${ctx.superlative ? ', ranked by how closely they match and by their ratings' : ''}.`;
-    else text = `${interests.length ? `${listText(interests).replace(/^./, (c) => c.toUpperCase())} in ${whereText(ctx)}` : `Ideas for ${whereText(ctx)}`}${at}${occ ? ` for ${article(occ)}` : ''}.`;
+    else text = `${interests.length ? `${listText(interests).replace(/^./, (c) => c.toUpperCase())} in ${whereText(ctx)}` : `Ideas for ${whereText(ctx)}`}${at}${occ2 ? ` for ${article(occ2)}` : ''}.`;
   } else if (kind === 'events') {
     text = `What’s on in ${whereText(ctx)}.`;
   } else {
@@ -4868,6 +5440,15 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
     let cursor=dayStart??options.startMinutes??requirements.startMinutes??tourStart??nightLead??(first?.preSki?480:null)??morningStart??({morning:540,midday:720,afternoon:780,evening:1080}[first?.daypart]||({morning:540,afternoon:780,evening:1080}[requirements.daypart])||540),previous=null,provisional=false;
     // Round 7 (2026-10-19): a road trip's day that opens with a long drive leaves around 9 AM and starts its first stop
     // after the drive ("leave about 6:33 AM" for a 9 AM hike in Mount Currie after Pemberton).
+    // Indoor test 10 (2026-11-19; "lane swim Vernon early morning" was planned at 9 AM; the pool opens at 6:30): an early
+    // morning request starts at the first place's own opening time when that is earlier than the usual 9 AM (never
+    // before 5 AM).
+    if(assumed&&requirements.earlyMorning&&group.day===1&&first?.venue&&cursor>=540){
+      const fv=byId.get(first.venue.id);
+      const h=fv&&fv.hours?(fv._hours||(fv._hours=parseVenueHours(fv.hours))).days[weekday]:null;
+      const opens=h&&h.status==='open'&&h.ranges.length?h.ranges[0][0]:null;
+      if(Number.isFinite(opens)&&opens>=300&&opens<cursor)cursor=opens;
+    }
     const driveIn=plan.days.find(d=>d.day===group.day)?.driveIn;
     if(driveIn&&driveIn.maxMinutes>=30&&dayStart==null&&cursor<=600)cursor=Math.ceil((Math.max(cursor,540)+driveIn.maxMinutes)/15)*15;
     if(assumed&&first?.venue&&/\b(?:dinner|supper)\b/i.test(first.label||'')){
@@ -5094,7 +5675,15 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
             if(start>t-10&&start-t<=60&&early<start&&early+Math.max(visit,TOUR_ALLOWANCE+15)<=limit){start=early;visit=Math.max(visit,t+TOUR_ALLOWANCE-start);break;}
           }
         }
-        return {start,end:start+visit,wait:start-earliest,transfer,unknownHours,departure:dep!=null, textHours:!!textHours,provisional:unknownHours||hiking||!!textHours||!one?.complete||guessed||guessedTransfer,listingTiming:!!textHours||one?.visits?.[0]?.durationSource==='listing'};
+        // Indoor test 3 (2026-11-19; Diane's theatre was planned 7:38–9:08 PM, the end of dinner plus the walk): an evening
+        // stop at a show place starts at its show time ("7:30 PM" in its own words) when that is within 20 minutes, else on
+        // the nearest half hour, never at an odd minute. Within its hours (when it has any) and the next fixed time.
+        if(candidate.showPlace&&['evening','night'].includes(stop.daypart)&&dep==null&&!stop.gapFill&&!beforeEvent){
+          const top=Math.min(range[1],1440);
+          const want=Number.isFinite(candidate.showStart)&&Math.abs(candidate.showStart-start)<=20?candidate.showStart:Math.round(start/30)*30;
+          if(want>=range[0]&&want+visit<=top)start=want;else{const up=Math.ceil(start/30)*30;if(up+visit<=top)start=up;}
+        }
+        return {start,end:start+visit,wait:Math.max(0,start-earliest),transfer,unknownHours,departure:dep!=null, textHours:!!textHours,provisional:unknownHours||hiking||!!textHours||!one?.complete||guessed||guessedTransfer,listingTiming:!!textHours||one?.visits?.[0]?.durationSource==='listing'};
       };
       let timed=fit(v);
       // Round 8 (2026-10-19): a ski day is on the hill from about 9 AM to 3:30 PM; lunch is a break on the hill inside
@@ -5390,6 +5979,7 @@ function fillDinnerGaps(result, input, requirements) {
         // 2026-10-25 (tools audit): a rainy day is all indoors, so a third indoor stop may fill a long late afternoon
         // ("rainy day in Whistler" had a spa and a museum, then 3 h 15 min free before dinner).
         if (capped(v.type) || (dayTypes[v.type] || 0) >= (v.type === 'indoor' && (ctx.rainy || dayCtx.rainy) ? 3 : 2) || (v.type === 'golf' && !v.indoorGolf) || eveningOnlyVenue(v)) continue;
+        if (v.type === 'indoor' && sameIndoorKindToday(v, day.stops, facts, ctx)) continue; // indoor test 17: one place of each kind a day
         if (v.type === 'outdoor' && (/\b(?:steep|summit|summits|ladder|ladders|chains)\b/.test(normWords(v.trailText || '')) || (trailMinutes(v) || 0) >= 150)) continue; // a summit trail is not a pre-dinner filler
         if (spaPlace(v) && (day.stops || []).some((x) => x.venue && spaPlace(x.venue))) continue; // one spa a day (2026-10-25)
         if (spaPlace(v) && (!SPA_ASKED_RE.test(normWords(input.text || '')) || oneSpaAsked(input.text, (result.days || []).length)) && (result.days || []).some((dd) => (dd.stops || []).some((x) => x.venue && spaPlace(x.venue)))) continue; // and one a trip unless asked
@@ -5406,13 +5996,13 @@ function fillDinnerGaps(result, input, requirements) {
         if (coldMonthIceCream(v, date || ctx.tripDate)) continue; // round 10: no gelato filler in November
         if (!eligible(v, dayCtx, false) || offSeasonSkip(v, dayCtx) || (date && seasonClosedOnTrip(v, { date })) || advisoryUnavailable(v.advisory && v.advisory.note)) continue;
         if (!tripRequirements.venueAllowed(v, requirements, day.day, input.tripDate) || !fits(v)) continue;
-        if (ctx.kids && !(v.features && v.features.kid_friendly) && !GAP_KIDS_RE.test(`${v.textName || ''} ${v.textDesc || ''}`)) continue;
+        if (ctx.kids && !kidsFitOwn(v, ctx) && !GAP_KIDS_RE.test(`${v.textName || ''} ${v.textDesc || ''}`)) continue;
         const km = from ? kmBetween(from, v) : 3;
         const sv = scoreVenue(v, ctx);
         let score = sv.score - (km || 0) * 1.5;
         if (ctx.types.has(v.type)) score += 8;
         if (result.theme === 'wine' && v.type === 'winery') score += 10;
-        if (ctx.kids && v.features && v.features.kid_friendly) score += 6;
+        if (ctx.kids && kidsFitOwn(v, ctx)) score += 6;
         cands.push({ v, score, bonus: (sv.reasons || []).filter((r) => r.code === 'collection_bonus').reduce((n, r) => n + (r.weight || 0), 0) });
       }
       pick = rotateFillerPick(cands, dayCtx, `late|${day.day}`);
@@ -5764,6 +6354,7 @@ function idleGapCandidates(result, input, requirements, g) {
     if (!kinds.includes(v.type) || spaPlace(v) || longDayHike(v) || used.has(v.id) || estateUsed.has(v.id) || ctx.exclude.has(v.id) || ctx.avoid.has(v.id) || !hasCoords(v)) continue;
     if ((placeKey(v) && usedPlaces.has(placeKey(v))) || (ctx.kids && familyAvoid(v)) || (regions.length && !regions.includes(v.region))) continue;
     if (capped(v.type) || (dayTypes[v.type] || 0) >= (crawl ? 4 : 2) || (eveningOnlyVenue(v) && end0 < 1020)) continue;
+    if (v.type === 'indoor' && sameIndoorKindToday(v, g.stops, facts, ctx)) continue; // indoor test 17
     if (bookedOutfitter(v) || appointmentOnly(v) || rotateBooked(v) || (!ctx.kids && KIDS_ONLY_RE.test(`${v.textName || ''} ${v.textDesc || ''}`))) continue;
     if (!crawl && GAP_ALCOHOL_TYPES.includes(v.type) && !ctx.types.has(v.type) && result.theme !== 'wine' && !['group_getaway', 'celebration'].includes(ctx.occasion)) continue;
     if (v.type === 'cafe' && cafeRole(v) !== 'treat' && !ctx.kids) continue;
@@ -5772,7 +6363,7 @@ function idleGapCandidates(result, input, requirements, g) {
     // Out of its season (a paddling place in January, a ski run in July) it is not a filler.
     if (season && seasonFit(v, { kind: 'venue', types: [v.type], activities: [] }, season, dayCtx).score < 0) continue;
     if (!tripRequirements.venueAllowed(v, requirements, g.day, input.tripDate)) continue;
-    if (ctx.kids && !(v.features && v.features.kid_friendly) && !GAP_KIDS_RE.test(`${v.textName || ''} ${v.textDesc || ''}`)) continue;
+    if (ctx.kids && !kidsFitOwn(v, ctx) && !GAP_KIDS_RE.test(`${v.textName || ''} ${v.textDesc || ''}`)) continue;
     const t1 = from ? tripRequirements.estimateTransfer(from, v) : null, t2 = to ? tripRequirements.estimateTransfer(v, to) : null;
     if ((from && !t1) || (t1 && t1.maxMinutes > 20) || (t2 && t2.maxMinutes > 20)) continue;
     const duration = gapFillMinutes(v);
@@ -5800,7 +6391,7 @@ function idleGapCandidates(result, input, requirements, g) {
     let score = sv.score - (km || 0) * 1.5;
     if (ctx.types.has(v.type)) score += 8;
     if (result.theme === 'wine' && v.type === 'winery') score += 10;
-    if (ctx.kids && v.features && v.features.kid_friendly) score += 6;
+    if (ctx.kids && kidsFitOwn(v, ctx)) score += 6;
     out.push({ v, score, startAt });
   }
   return { cands: out.sort((a, b) => b.score - a.score || a.v.id - b.v.id), ctx: dayCtx };
@@ -6521,6 +7112,11 @@ function addSuggestedTimes(result, input) {
   const first = stops.find((x) => x.venue || x.event);
   const tries = ['evening', 'night'].includes(first && first.daypart) ? [1020, 960, 900, 1110] : ['afternoon', 'late'].includes(first && first.daypart) ? [720, 840, 900] : [600, 660, 720, 480];
   for (const m of tries) { if (!best || !best.untimed) break; if (fixedStart != null && m < fixedStart) continue; const t = run(m); if (t && t.untimed < best.untimed) best = t; }
+  // Indoor test 10 (2026-11-19; "lane swim Vernon early morning": the pool opens at 6 AM on weekdays, 9 on Saturdays):
+  // an early-morning request with no day named is timed on the typical day whose first stop opens earliest.
+  if (best && req.earlyMorning && !fixedDate && !WEEKDAYS.includes(input.startWeekday) && best.rows[0] && Number.isFinite(best.rows[0].startMinutes)) {
+    for (const wd of [5, 4, 1]) { const t = run(null, typicalDate(input, result, wd)); if (t && t.untimed <= best.untimed && t.rows[0] && Number.isFinite(t.rows[0].startMinutes) && t.rows[0].startMinutes < best.rows[0].startMinutes) best = t; }
+  }
   // With no weekday named, a Friday or Thursday is tried when a stop is closed on the Saturday (or the Sunday after).
   if (best && best.untimed && !fixedDate && !WEEKDAYS.includes(input.startWeekday)) for (const wd of [5, 4]) { const t = run(null, typicalDate(input, result, wd)); if (t && t.untimed < best.untimed) best = t; if (!best.untimed) break; }
   // A crawl's lunch that falls after the first tasting (a brewery that opens at 4 PM) is its dinner.
@@ -6904,12 +7500,29 @@ function tooYoungNotes(result, input) {
   const ctx = buildContext(input.intent || {}, input.labels || {}, input);
   const young = kidsYoungest(ctx);
   if (young == null) return;
+  // Indoor test 9: a kids' place in the asked town left out because the child is older than its own range says so.
+  {
+    const used0 = new Set(planStopsOf(result).concat(result.recommendations || []).filter((s) => s && s.venue).map((s) => s.venue.id));
+    const regions0 = (input.intent && input.intent.regions) || [];
+    for (const v of (input.facts || []).filter((x) => indoorTooOld(x, ctx) && !used0.has(x.id) && (!regions0.length || regions0.includes(x.region))).slice(0, 2)) {
+      const text = `${v.name} is for kids ${v.indoorKidsRange[0]} to ${v.indoorKidsRange[1]}, so it isn’t in this plan for your ${young}-year-old.`;
+      if (!(result.notes || []).includes(text)) result.notes = [text].concat(result.notes || []);
+      if (!(result.contextNotes || []).includes(text)) result.contextNotes = [text].concat(result.contextNotes || []);
+    }
+  }
   const kinds = ((input.requirements && input.requirements.items) || []).filter((i) => i.kind === 'venue_kind' && i.strength === 'must').map((i) => i.value);
   if (!kinds.length) return;
   const used = new Set(planStopsOf(result).concat(result.recommendations || []).filter((s) => s && s.venue).map((s) => s.venue.id));
   const regions = (input.intent && input.intent.regions) || [];
-  const out = (input.facts || []).filter((v) => v.type === 'tour' && !used.has(v.id) && tourTooYoung(v, ctx) && (!regions.length || regions.includes(v.region)) && kinds.some((k) => (v.plannerKinds || []).includes(k))).slice(0, 2);
+  const out = (input.facts || []).filter((v) => ((v.type === 'tour' && tourTooYoung(v, ctx)) || (v.type === 'indoor' && indoorTooYoung(v, ctx))) && !used.has(v.id) && (!regions.length || regions.includes(v.region)) && kinds.some((k) => (v.plannerKinds || []).includes(k))).slice(0, 2);
   for (const v of out) {
+    // Indoor test 4: "Room and Pillar Spa is for ages 16 and up, so it isn’t in this plan for your 14-year-old."
+    if (v.type === 'indoor') {
+      const ti = `${v.name} is for ages ${indoorMinAgeOf(v)} and up, so it isn’t in this plan for your ${young}-year-old.`;
+      if (!(result.notes || []).includes(ti)) result.notes = [ti].concat(result.notes || []);
+      if (!(result.contextNotes || []).includes(ti)) result.contextNotes = [ti].concat(result.contextNotes || []);
+      continue;
+    }
     // Tour test 10: the trip the request names is the one for older riders ("Trail rides are for ages 8 and up").
     const fit = /^\d+$/.test(String(v.tourMinAge || '')) && young < Number(v.tourMinAge) ? null : tourAgeFit(v, ctx);
     const text = fit && fit.out ? (fit.item ? `${v.name}’s “${fit.item}” is for ages ${fit.age} and up, so it isn’t in this plan for your ${young}-year-old.` : `${v.name} is for ages ${fit.age} and up, so it isn’t in this plan for your ${young}-year-old.`)
@@ -7400,7 +8013,7 @@ function rainBackups(result, input, intent) {
     .map((v) => {
       let score = (v.rating || 4) * 2;
       if (RAIN_BACKUP_GOOD_WORDS.some((w) => textHas(v.textName, w))) score += 12; else if (RAIN_BACKUP_GOOD_WORDS.some((w) => textHas(v.textDesc, w))) score += 6;
-      if (RAIN_BACKUP_NICHE_WORDS.some((w) => textHas(v.textName, w))) score -= 15;
+      if (RAIN_BACKUP_NICHE_WORDS.some((w) => textHas(v.textName, w)) && !ownVisitorKind(v)) score -= 15;
       if (party.kids && v.features.kid_friendly) score += 5;
       if (party.kids && RAIN_BACKUP_KIDS_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textDesc, w))) score += 10;
       if (v.collections.includes('indoor_also') || v.collections.includes('local_favorite') || v.collections.includes('hidden_gem')) score += 3;
@@ -7419,7 +8032,7 @@ const REQUIREMENT_FEATURE_WORDS = { dog_friendly: 'dog friendly', kid_friendly: 
 // An unmet request whose offered places are all closed that day (the page's "Not included: … is closed Mondays").
 function requirementClosedOnly(i) {
   const alts = (i && Array.isArray(i.optionalAlternatives) ? i.optionalAlternatives : i && Array.isArray(i.alternatives) ? i.alternatives : []).filter((a) => a && typeof a.name === 'string');
-  return alts.some((a) => a.closedDay) && !alts.some((a) => !a.closedDay && ['another_listing', 'confirm_hours', 'different_time'].includes(a.reasonCode));
+  return alts.some((a) => a.closedDay) && !alts.some((a) => !a.closedDay && ['another_listing', 'confirm_hours', 'different_time', 'show_dates'].includes(a.reasonCode));
 }
 function requirementWarning(i) {
   if (i.kind === 'event') {
@@ -7443,6 +8056,18 @@ function requirementWarning(i) {
   return i.reason || null;
 }
 
+// Indoor test 3 (2026-11-19; Diane's theatre: box office Tue–Fri 11–4 as its hours, shows Thursday to Saturday at 7:30 PM):
+// a show place (server.js indoorShowPlace) plays on a night when it has a show on What's On that date, when its own words
+// name that day with its shows, or when its own words talk of shows without naming days. Its listed hours (often the box
+// office's) then never make it "Closed" that night: it is offered with "Check show dates" instead. It is never planned
+// into the itinerary on this alone (nothing says it is open), so the safety net only changes the reason shown.
+function showPlaceOn(v, date, weekday) {
+  if (!v || !v.showPlace) return false;
+  if (date && Array.isArray(v.showDates) && v.showDates.includes(date)) return true;
+  const wd = weekday ? String(weekday).toLowerCase().slice(0, 3) : null;
+  if (Array.isArray(v.showDays) && v.showDays.length) return !!wd && v.showDays.includes(wd);
+  return !!v.showWords;
+}
 // Closed all day on the trip's date (from its date, or the asked weekday): listed as closed that day in its own week.
 function dayClosedAllDay(v, date, weekday) {
   const wd = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? WEEKDAYS[(new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7] : weekday ? String(weekday).toLowerCase().slice(0, 3) : null;
@@ -7521,9 +8146,14 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       // closed Wednesdays in winter) was still offered as "Another listing" (hoursFit is only checked with a daypart).
       // Brewery test 4 follow-up (2026-11-13): it's offered only with the day it's closed ("Closed Mondays (Oct–Apr) · try
       // Tue–Sun"), never as "Another listing"; without that fact it's still left out.
+      // Indoor test 3: a show place on a show night is never "Closed" by its (box office) hours.
+      const showDate = /^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? visitDate : null;
+      const showWd = showDate ? WEEKDAYS[(new Date(`${showDate}T12:00:00Z`).getUTCDay() + 6) % 7] : weekday ? String(weekday).toLowerCase().slice(0, 3) : null;
+      const showNight = daypart !== 'morning' && showPlaceOn(venue, showDate, showWd);
       const closedWd = !daypart && dayClosedAllDay(venue, visitDate, weekday) ? (/^\d{4}-\d{2}-\d{2}$/.test(visitDate || '') ? WEEKDAYS[(new Date(`${visitDate}T12:00:00Z`).getUTCDay() + 6) % 7] : String(weekday || '').toLowerCase().slice(0, 3)) : null;
-      const closedAll = closedWd ? closedDayInfo(venue, closedWd) : null;
+      let closedAll = closedWd ? closedDayInfo(venue, closedWd) : null;
       if (closedWd && !closedAll) continue;
+      if (showNight) closedAll = null;
       const exact = tripRequirements.matches(venue, item);
       const kinds = venue.plannerKinds || tripRequirements.inferPlannerKinds(venue);
       const related = !exact && adjacent.some(k => kinds.includes(k) || (venue.activities || []).includes(k));
@@ -7544,7 +8174,8 @@ function addOptionalRequirementAlternatives(results, plan, requirements, input) 
       // not "Another listing".
       if (!closedAll && input.intent?.party?.kids && venue.ownerAdultsOnly && !kidsAllowed(venue)) reasonCode = 'adults_only';
       if (closedAll && reasonCode !== 'different_time') continue;
-      const closedDay = closedAll || (reasonCode === 'different_time' && weekday ? closedDayInfo(venue, weekday) : null);
+      if (showNight && !related && local && ['different_time', 'confirm_hours', 'another_listing'].includes(reasonCode)) reasonCode = 'show_dates';
+      const closedDay = showNight ? null : closedAll || (reasonCode === 'different_time' && weekday ? closedDayInfo(venue, weekday) : null);
       candidates.push({
         id: venue.id, name: venue.name, url: venue.url, region: venue.region, type: venue.type,
         reasonCode, ...(byAppointment ? { appointment: true } : {}), ...(closedDay ? { closedDay } : {}), _exact: exact, _local: local, _rating: Number(venue.rating) || 0,
@@ -7841,6 +8472,21 @@ function planTripCore(input) {
     const wintry = buildRecommendations(facts, { ...ctx, activities: new Set([...ctx.activities].filter((a) => a !== 'adventure').concat(['winter'])) });
     if (wintry.items.length) { rec = wintry; result.notes.push('In the cold months the big hikes are under snow, so these are winter adventures instead.'); }
   }
+  // Indoor test 6 (2026-11-19; "pottery class in Penticton on Monday" quietly listed a Kelowna studio): the places in the
+  // town asked for that match but are closed all that weekday say so ("Donut House Studios is closed Mondays") when the
+  // list moves to another town.
+  const homeClosedLines = (() => {
+    const wd = String(ctx.startWeekday || '').toLowerCase().slice(0, 3);
+    if (rec.items.length || !ctx.regions.length || !WEEKDAYS.includes(wd)) return [];
+    return buildRecommendations(facts, { ...ctx, startWeekday: null, whenDaypart: null }, 3).items.filter((st) => st.venue)
+      .map((st) => {
+        const f = facts.find((x) => x.id === st.venue.id); if (!f) return null;
+        // Closed for the owner's own break that day too: the break says it ("closed Dec 28 (Christmas break)").
+        const cl = ownerClosureOn(f, ctx.tripDate), d = String(ctx.tripDate || ''), note = cl ? String(cl.note || '').trim() : '';
+        if (cl) return `${f.name} is closed ${CLOSURE_MONTHS_EN[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}${note ? ` (${note.replace(/[.!]\s*$/, '')})` : ''}`;
+        const c = !showPlaceOn(f, null, wd) && closedDayInfo(f, wd); return c ? `${f.name} is ${closedDayEnglish(c)}` : null;
+      }).filter(Boolean);
+  })();
   // A small town with nothing that fits: the nearest towns, said plainly (2026-10-25: "outdoor adventures in Britannia
   // Beach" was an empty list).
   if (!rec.items.length && ctx.regions.length && !ctx.foodTerms.some((f) => f.cuisine || DISH_WORDS_RE.test(f.term)) && ![...ctx.types].some((t) => DINING_TYPES.includes(t))) {
@@ -7885,6 +8531,45 @@ function planTripCore(input) {
   }
   result.recommendations = rec.items;
   result.totalMatches = rec.total;
+  if (rec.items.length && homeClosedLines.length) result.warnings.unshift(`${homeClosedLines.join('; ')}.`);
+  // Indoor test 7 (2026-11-19; "art gallery Kelowna Monday" quietly left out Robert's gallery and the Kelowna Art Gallery,
+  // both closed Mondays, because another gallery was open): a list for a named weekday and a kind of place names the ones
+  // that match but are closed all that day ("Closed Mondays: Hambleton Galleries, Kelowna Art Gallery."), in the same town too.
+  if (rec.items.length && !homeClosedLines.length && (ctx.plannerKinds || []).length && !borrowedTown) {
+    const wd = String(ctx.startWeekday || '').toLowerCase().slice(0, 3);
+    if (WEEKDAYS.includes(wd)) {
+      const shown = new Set(rec.items.map((i) => i.venue && i.venue.id));
+      const shut = buildRecommendations(facts, { ...ctx, startWeekday: null, whenDaypart: null }).items.map((x) => x.venue && facts.find((f) => f.id === x.venue.id))
+        .filter((f) => f && !shown.has(f.id) && !showPlaceOn(f, null, wd) && closedDayInfo(f, wd)).map((f) => f.name);
+      const ENL = { mon: 'Mondays', tue: 'Tuesdays', wed: 'Wednesdays', thu: 'Thursdays', fri: 'Fridays', sat: 'Saturdays', sun: 'Sundays' };
+      if (shut.length) result.warnings.push(`Closed ${ENL[wd]}: ${shut.slice(0, 5).join(', ')}.`);
+    }
+  }
+  // Indoor test 5 (2026-11-19; "bouldering in Vernon on Christmas Day" listed Kelowna's gyms and never said why Chris's
+  // park wasn't there): a place of the kind asked for, in the town asked for, closed that day by its owner's own closure
+  // says so ("The Rock Garden is closed Dec 25 (Christmas Day).").
+  if (rec.items.length && /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) && (ctx.plannerKinds || []).length && ctx.regions.length) {
+    const d = String(ctx.tripDate);
+    const shut = (f) => ownerClosureOn(f, d);
+    const shown = new Set(rec.items.map((i) => i.venue && i.venue.id));
+    const closedHere = buildRecommendations(facts, { ...ctx, ignoreSeason: true }, 3).items.map((x) => x.venue && facts.find((f) => f.id === x.venue.id)).filter((f) => f && !shown.has(f.id) && shut(f));
+    for (const f of closedHere.slice(0, 2)) {
+      const c = shut(f), note = String(c.note || '').trim();
+      result.warnings.unshift(`${f.name} is closed ${CLOSURE_MONTHS_EN[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}${note ? ` (${note})` : ''}.`);
+    }
+    if (closedHere.length > 2) result.warnings.push(`Closed ${CLOSURE_MONTHS_EN[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}: ${closedHere.slice(0, 6).map((f) => f.name).join(', ')}.`);
+  }
+  // Indoor test 8 (2026-11-19; "bowling on Christmas Day" left Gary out with no word): with no town asked, the places of the
+  // kind asked that are closed that day by their owner's own closure are named, as weekly closures are ("Closed Dec 25: …").
+  // Indoor test 9 (2026-11-19; "rainy day with kids in West Kelowna on Canada Day" left Melissa's play centre out, closed
+  // Jul 1 by her own closure, with no word): a rainy-day or indoor list on a holiday names them too, with or without a town.
+  const indoorish = (ctx.types && ctx.types.has && ctx.types.has('indoor')) || !!ctx.rainy;
+  if (rec.items.length && /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) && ((ctx.plannerKinds || []).length ? !ctx.regions.length : indoorish)) {
+    const d = String(ctx.tripDate);
+    const shown = new Set(rec.items.map((i) => i.venue && i.venue.id));
+    const closedAll = buildRecommendations(facts, { ...ctx, ignoreSeason: true }).items.map((x) => x.venue && facts.find((f) => f.id === x.venue.id)).filter((f) => f && !shown.has(f.id) && ownerClosureOn(f, d));
+    if (closedAll.length) result.warnings.push(`Closed ${CLOSURE_MONTHS_EN[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}: ${closedAll.slice(0, 6).map((f) => f.name).join(', ')}.`);
+  }
   // Audit fix (2026-10-27): the list's own day, when the request named one, so the trip API can add that day's weekly
   // nights and happy hour to each place ("Tonight: Trivia 7:30–9 PM").
   { const listDate = ctxPlanDate(ctx); if (listDate) result.listDate = listDate; }
@@ -7923,7 +8608,7 @@ function planTripCore(input) {
     // match are closed all that day says why, like the day plans do: "The Velvet Door is closed Mondays · try Wed–Sun."
     const wd = String(ctx.startWeekday || '').toLowerCase().slice(0, 3);
     const anyDay = WEEKDAYS.includes(wd) ? buildRecommendations(facts, { ...ctx, startWeekday: null, whenDaypart: null }, 3).items.filter((s) => s.venue) : [];
-    const closedLines = anyDay.map((st) => { const f = facts.find((x) => x.id === st.venue.id); const c = f && closedDayInfo(f, wd); return c ? `${f.name} is ${closedDayEnglish(c)}` : null; }).filter(Boolean);
+    const closedLines = anyDay.map((st) => { const f = facts.find((x) => x.id === st.venue.id); const c = f && !showPlaceOn(f, null, wd) && closedDayInfo(f, wd); return c ? `${f.name} is ${closedDayEnglish(c)}` : null; }).filter(Boolean);
     if (closedLines.length && closedLines.length === anyDay.length) result.warnings.push(`${closedLines.join('; ')}.`);
     else result.warnings.push(`No ${SITE.brand} listings match every part of that request.`);
   }
@@ -9369,6 +10054,8 @@ function liveNote(live) {
   const when = live.win.from >= 1440 ? `${day} night, from ${clockText(live.win.from)}` : `${day} from ${clockText(live.win.from)}`;
   return `Hours were checked for ${when} ${SITE.timeName} time; places whose listed hours have already ended (or do not start again) are left out.`;
 }
+// The owner's own closure covering a date ('YYYY-MM-DD'), yearly ones by month and day (indoor test 5), or undefined.
+function ownerClosureOn(f, d) { return f && /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')) && Array.isArray(f.ownerClosures) && f.ownerClosures.find((c) => c && (c.yearly ? (String(c.from).slice(5) <= String(c.to || c.from).slice(5) ? d.slice(5) >= String(c.from).slice(5) && d.slice(5) <= String(c.to || c.from).slice(5) : d.slice(5) >= String(c.from).slice(5) || d.slice(5) <= String(c.to || c.from).slice(5)) : d >= String(c.from) && d <= String(c.to || c.from))); }
 // Plan-level honesty notes, added once for any scheduled plan or outing.
 function scheduleNotes(result, ctx) {
   const stops = [...result.days.flatMap((d) => d.stops), ...(result.outing ? result.outing.stops : [])].filter((s) => s.venue);

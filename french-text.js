@@ -95,6 +95,14 @@ const FR_TEXT = {
   'Groups': 'Groupes',
   'Happy hour': '5 à 7',
   'Free': 'Gratuit',
+  // Indoor test 1 (2026-11-19): a by-donation place's card price.
+  'By donation': 'Contribution volontaire',
+  // Indoor test 2 (2026-11-19): a price for a whole room, lane, game or group (the card's small line under the price).
+  'Per room': 'Par salle', 'Per lane': 'Par allée', 'Per game': 'Par partie', 'Per group': 'Par groupe',
+  // Indoor test 3 (2026-11-19): a theatre's card price is its lowest ticket (« À partir de 25 $ · Billets »).
+  'Tickets': 'Billets',
+  // Indoor test 4 (2026-11-19; Lauren's spa card said "Admission"): every indoor kind's card line (« Soins et forfaits »).
+  ...require('./indoor-kinds').INDOOR_BASIS_FR,
   'Arts & culture': 'Arts et culture',
   'Kid Friendly': 'Adapté aux enfants',
   'Kid-Friendly': 'Adapté aux enfants',
@@ -365,6 +373,7 @@ const FR_TEXT = {
   'outdoor destinations': 'sites de plein air', 'outdoor destination': 'site de plein air',
   'indoor & rainy day spots': 'lieux pour les jours de pluie', 'indoor & rainy day spot': 'lieu pour les jours de pluie',
   'art galleries': 'galeries d’art', 'art gallery': 'galerie d’art', 'museums & galleries': 'musées et galeries', 'museum or gallery': 'musée ou galerie',
+  'classes & workshops': 'cours et ateliers', 'class or workshop': 'cours ou atelier', 'kids’ camps': 'camps pour enfants', 'kids’ camp': 'camp pour enfants',
   'indoor attractions': 'attraits intérieurs', 'indoor attraction': 'attrait intérieur',
   'tours & experiences': 'visites et expériences', 'tour & experience': 'visite ou expérience',
   'sports & recreation spots': 'lieux de sports et loisirs', 'sports & recreation spot': 'lieu de sports et loisirs',
@@ -1119,7 +1128,13 @@ for (let n = 1; n <= 20; n++) {
 const MONTHS_LONG = { January: 'janvier', February: 'février', March: 'mars', April: 'avril', May: 'mai', June: 'juin', July: 'juillet', August: 'août', September: 'septembre', October: 'octobre', November: 'novembre', December: 'décembre' };
 const SEASON_DATE = '(January|February|March|April|May|June|July|August|September|October|November|December) (\\d{1,2})(?:, (\\d{4}))?';
 const seasonDate = (m, i) => `${m[i + 1] === '1' ? '1er' : m[i + 1]} ${MONTHS_LONG[m[i]]}${m[i + 2] ? ` ${m[i + 2]}` : ''}`;
+const INDOOR_EXACT_FR_MAP = new Map(require('./indoor-kinds').INDOOR_EXACT_FR);
 const FR_PATTERNS = [
+  // Indoor test 18 (THE PRICE RULE, indoor-kinds.js): an exact kind's card line under its lower price ("Adult admission
+  // $12" -> « Entrée adulte 12 $ »).
+  [new RegExp(`^(${[...INDOOR_EXACT_FR_MAP.keys()].join('|')}) \\$(\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})?)$`), (m) => `${INDOOR_EXACT_FR_MAP.get(m[1])} ${m[2].replace(/,/g, ' ').replace('.', ',')} $`],
+  // Indoor test 2 (2026-11-19): a card price per room, lane, game or group ("From $120 / room" -> « À partir de 120 $ / salle »).
+  [/^From \$(\d{1,3}(?:,\d{3})*(?:\.\d{2})?) \/ (room|lane|game|group)$/, (m) => `À partir de ${m[1].replace(/,/g, '\u00a0').replace('.', ',')}\u00a0$ / ${{ room: 'salle', lane: 'allée', game: 'partie', group: 'groupe' }[m[2]]}`],
   // What's On (2026-10-19): the month headings past next week, a one-day "Showing Sun Oct 18" under the dates, and
   // "No more live music tonight. Next:" above the next three events of that kind.
   [/^Later in (January|February|March|April|May|June|July|August|September|October|November|December)$/, (m) => `Plus tard en ${MONTHS_LONG[m[1]]}`],
@@ -1369,6 +1384,15 @@ Object.assign(FR_TEXT, Object.fromEntries(Object.entries({
   'today': 'aujourd’hui',
   'tomorrow': 'demain',
   'Times vary': 'Horaires variables',
+  // Indoor test 3 (2026-11-19): a show place's status line, whole (it read « Horaires variables · check before you go »).
+  'Times vary · check before you go': 'Horaires variables · vérifiez avant d’y aller',
+  // Indoor test 12 (2026-11-19): a class place's status line with no set hours and a schedule link.
+  'Class times: see the schedule': 'Horaires des cours : voir l’horaire',
+  // Indoor test 13 (2026-11-19): a show place's and any other place's link line, with no set hours.
+  'Showtimes: see the schedule': 'Séances : voir l’horaire',
+  'Times: see their website': 'Horaires : voir leur site Web',
+  'Hosts comedy': 'Présente de l’humour', 'Hosts live music': 'Présente de la musique en direct', 'Hosts plays': 'Présente des pièces de théâtre',
+  'check show dates': 'vérifiez les dates des spectacles', 'Check show dates': 'Vérifiez les dates des spectacles',
   'From': 'Du',
   'From:': 'Du :',
   'Example photo': 'Photo d’exemple',

@@ -103,7 +103,8 @@ module.exports = {
   // Server-side tables for the planner's runner.
   defaultRegion: 'kelowna',
   nearTowns: {
-  vernon: ['coldstream', 'silverstar', 'armstrong'], kelowna: ['west-kelowna', 'lake-country'], 'west-kelowna': ['kelowna', 'peachland'],
+  // Indoor test 10 (2026-11-19): nearest first (Coldstream, Armstrong and Lake Country before SilverStar; Kelowna is not next door).
+  vernon: ['coldstream', 'armstrong', 'lake-country', 'silverstar'], kelowna: ['west-kelowna', 'lake-country'], 'west-kelowna': ['kelowna', 'peachland'],
   'lake-country': ['kelowna', 'vernon'], peachland: ['summerland', 'west-kelowna'], summerland: ['penticton', 'peachland'],
   penticton: ['naramata', 'summerland', 'kaleden'], naramata: ['penticton'], kaleden: ['penticton', 'okanagan-falls'],
   'okanagan-falls': ['kaleden', 'oliver'], oliver: ['osoyoos', 'okanagan-falls'], osoyoos: ['oliver'], coldstream: ['vernon', 'lumby'],

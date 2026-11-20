@@ -181,16 +181,25 @@ function t3ClosedDayText(c,fr){
 function t3MissingClosedText(step,fr){
   var alts=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string';});
   var closed=alts.filter(function(a){return t3ClosedDayText(a.closedDay,fr);});
-  if(!closed.length||alts.some(function(a){return !t3ClosedDayText(a.closedDay,fr)&&['another_listing','confirm_hours','different_time'].indexOf(a.reasonCode)>=0;}))return null;
+  if(!closed.length||alts.some(function(a){return !t3ClosedDayText(a.closedDay,fr)&&['another_listing','confirm_hours','different_time','show_dates'].indexOf(a.reasonCode)>=0;}))return null;
   return closed.map(function(a){var t=t3ClosedDayText(a.closedDay,fr);return a.name+(fr?' — '+t:' is '+(/ only/.test(t)?'open '+t:t.charAt(0).toLowerCase()+t.slice(1)));}).join(fr?' ; ':'; ')+'.';
 }
 
+// Indoor test 3 (2026-11-19; "comedy show in Penticton" found nothing): "Places that host comedy: Cleland Community Theatre
+// — check show dates" (« Lieux qui présentent de l’humour : … — vérifiez les dates des spectacles »).
+function t3ShowPlacesHtml(p,fr,esc,hrefAttr){
+ var sp=p&&p.showPlaces;if(!sp||!Array.isArray(sp.places))return '';
+ var places=sp.places.filter(function(x){return x&&typeof x.name==='string'&&typeof x.url==='string'&&/^\/(?!\/)/.test(x.url);});
+ if(!places.length)return '';
+ var head=fr?'Lieux qui présentent '+String(sp.whatFr||'des spectacles')+'\u00a0: ':'Places that host '+String(sp.what||'shows')+': ';
+ return '<p class="t3-empty t3-showplaces">'+esc(head)+places.map(function(x){return '<a '+hrefAttr(x.url)+'>'+esc(x.name)+'</a>';}).join(', ')+esc(fr?' — vérifiez les dates des spectacles':' — check show dates')+'</p>';
+}
 function t3OptionalAlternativesHtml(step,fr,esc){
  const hrefAttr=u=>['href','"'+esc(u)+'"'].join('='); // see hrefAttr in the page script
  const alternatives=(step&&Array.isArray(step.alternatives)?step.alternatives:[]).filter(function(a){return a&&typeof a.name==='string'&&typeof a.url==='string'&&/^\/(?!\/)/.test(a.url);});
  if(!alternatives.length)return '';
- const labels=fr?{intro:'Options facultatives à considérer. Choisissez-en une si vous le souhaitez ; elle ne sera pas ajoutée automatiquement.',similar:'Activité similaire',region:'Autre région',time:'À un autre moment',hours:'Horaires à confirmer',listing:'Autre fiche',adults:'Adultes seulement (19 ans et plus)',appt:'Sur rendez-vous · appelez avant'}:{intro:'Optional ideas to consider. Choose one if you like; it will not be added automatically.',similar:'Similar activity',region:'Another region',time:'Try another time',hours:'Confirm hours',listing:'Another listing',adults:'Adults only (19+)',appt:'By appointment · call ahead'};
- const reason={similar_activity:labels.similar,different_region:labels.region,different_time:labels.time,confirm_hours:labels.hours,another_listing:labels.listing,adults_only:labels.adults};
+ const labels=fr?{intro:'Options facultatives à considérer. Choisissez-en une si vous le souhaitez ; elle ne sera pas ajoutée automatiquement.',similar:'Activité similaire',region:'Autre région',time:'À un autre moment',hours:'Horaires à confirmer',listing:'Autre fiche',adults:'Adultes seulement (19 ans et plus)',shows:'Vérifiez les dates des spectacles',appt:'Sur rendez-vous · appelez avant'}:{intro:'Optional ideas to consider. Choose one if you like; it will not be added automatically.',similar:'Similar activity',region:'Another region',time:'Try another time',hours:'Confirm hours',listing:'Another listing',adults:'Adults only (19+)',shows:'Check show dates',appt:'By appointment · call ahead'};
+ const reason={similar_activity:labels.similar,different_region:labels.region,different_time:labels.time,confirm_hours:labels.hours,another_listing:labels.listing,adults_only:labels.adults,show_dates:labels.shows};
  return '<div class="t3-optional-alternatives"><p>'+esc(labels.intro)+'</p><ul>'+alternatives.map(function(a){return '<li><a '+hrefAttr(a.url)+'>'+esc(a.name)+'</a>'+(function(){var r=a.appointment&&a.reasonCode==='another_listing'?'':(t3ClosedDayText(a.closedDay,fr)||reason[a.reasonCode]||'');var parts=[r,a.appointment?labels.appt:''].filter(Boolean);return parts.length?' — '+esc(parts.join(' · ')):'';})()+'</li>';}).join('')+'</ul></div>';
 }
 
@@ -413,7 +422,7 @@ function t3WhyLines(stop) {
   const v = (stop && stop.venue) || {};
   return ((stop && stop.why) || []).filter((w) => !/^(?:Hotel pickup|Prise en charge à l\u2019hôtel)$/.test(w) && !(v.listedHours && (/^(Listed hours|Horaires indiqu\u00e9s|Les horaires varient)/.test(w) || w === v.listedHours)) && !/\(straight line\)/.test(w)).slice(0, 2);
 }
-const CLIENT_HELPERS_SRC = [t3PickupLine, t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
+const CLIENT_HELPERS_SRC = [t3ShowPlacesHtml, t3PickupLine, t3WhyLines, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, t3EventPlaceHtml, t3VenueCardId, t3ListingGapGroups, t3ListingGapSummaryHtml, t3ClosedDayText, t3MissingClosedText, t3OptionalAlternativesHtml].map((fn) => fn.toString()).join('\n');
 
 const T3_EXAMPLES = [
   ...SITE_PAGE.examples,
@@ -1507,12 +1516,19 @@ function renderScript(d) {
       // Tour test 15 (Whistler, 2026-11-18): a rental asked for shows the operator's own rental price as typed ("Canoe rental:
       // $45 per boat per hour"), not a price per person.
       if (cost.label === 'Rental' && cost.unit) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc((cost.item ? cost.item + ': ' : '') + (french ? cost.unitFr || cost.unit : cost.unit)) + '</strong></p>';
+      // Indoor test 2 (2026-11-19): a price for a whole room, lane or group ("From $120 per room (2–6 players)"): never "per
+      // person", and not added to the per-person estimate.
+      if (cost.perGroup && cost.unit) return '<p class="t3-stop-price"><strong>' + esc(french ? cost.unitFr || cost.unit : cost.unit) + '</strong></p>';
       if (fromWord) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(fromWord + cad(cost.cents)) + '</strong></p>';
+      // Indoor test 4 (2026-11-19): an indoor place's price in its kind's own words ("From $65", "Tickets from $25").
+      if (typeof cost.line === 'string' && cost.line.indexOf('{x}') >= 0) return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc((french && typeof cost.lineFr === 'string' ? cost.lineFr : cost.line).replace('{x}', cad(cost.cents))) + '</strong></p>';
       return '<p class="t3-stop-price" data-cost-cents="' + cost.cents + '"><strong>' + esc(cad(cost.cents) + (french ? ' / personne' : ' per person')) + '</strong> · '
         + esc(french ? cost.labelFr : cost.label) + (typeof cost.source === 'string' && cost.source.startsWith('https://') ? ' · <a ' + hrefAttr(cost.source) + '>' + esc(french ? 'Source' : 'Price source') + '</a>' : '') + '</p>';
     }
     // Winery test 5 (2026-11-12): a winery whose owner says tastings are free.
     if (v.freeTasting) return '<p class="t3-stop-price" data-cost-cents="0">' + esc(french ? 'Dégustation gratuite' : 'Free tasting') + '</p>';
+    // Indoor test 1 (2026-11-19): a place its owner marked by donation, with the suggested amount when she gave one.
+    if (v.byDonation) return '<p class="t3-stop-price" data-cost-cents="0" data-donation="' + (typeof v.byDonation === 'number' ? Math.round(v.byDonation * 100) : 0) + '"><strong>' + esc(french ? 'Contribution volontaire' : 'By donation') + '</strong>' + esc(typeof v.byDonation === 'number' ? (french ? ' (suggérée\u00a0: ' + cad(Math.round(v.byDonation * 100)) + ')' : ' (suggested ' + cad(Math.round(v.byDonation * 100)) + ')') : '') + '</p>';
     // Tour test 4 (Whistler, 2026-11-17): a tour its operator marked free, or by donation.
     if (v.freeTour) return '<p class="t3-stop-price" data-cost-cents="0"><strong>' + esc(french ? 'Gratuit' : 'Free') + '</strong>' + esc(v.freeTour === 'donation' ? (french ? ' (contribution volontaire)' : ' (pay what you want)') : '') + '</p>';
     return '<p class="t3-stop-price"' + (v.freeEntry ? ' data-cost-cents="0"' : '') + '>'
@@ -1522,18 +1538,22 @@ function renderScript(d) {
     var el = resultEl.querySelector('[data-t3-estimate]');
     if (!el) return;
     var cards = Array.from(resultEl.querySelectorAll('.t3-stops .t3-card'));
-    var known = 0, cents = 0, french = lang() === 'fr';
+    var known = 0, cents = 0, french = lang() === 'fr', gifts = 0, giftCents = 0;
     cards.forEach(function(card){
       var price = card.querySelector('[data-cost-cents]');
       if (price) { known++; cents += Number(price.dataset.costCents); }
+      // Indoor test 14 (2026-11-19; Helen's by-donation museum made the total "$0 CAD"): a by-donation stop is said as one.
+      if (price && price.hasAttribute('data-donation')) { gifts++; giftCents += Number(price.getAttribute('data-donation')) || 0; }
     });
     if (!cards.length) return;
     var missing = cards.length - known;
+    var giftText = gifts ? (french ? 'Contribution volontaire' : 'By donation') + (giftCents > 0 ? (french ? ' (suggérée\u00a0: ' + cad(giftCents) + ')' : ' (suggested ' + cad(giftCents) + ')') : '') : '';
     el.hidden = false;
     el.textContent = (french ? 'Estimation par personne : ' : 'Estimated total per person: ')
-      + (known ? cad(cents) + ' CAD' : (french ? 'à vérifier' : 'check prices'))
+      // Indoor test 15 (2026-11-19; Aaron's free gallery made the total "$0 CAD"): free stops only say "Free".
+      + (known ? (!cents && !gifts ? (french ? 'Gratuit' : 'Free') : gifts && !cents ? giftText : cad(cents) + ' CAD' + (gifts ? ' + ' + giftText.charAt(0).toLowerCase() + giftText.slice(1) : '')) : (french ? 'à vérifier' : 'check prices'))
       + (missing ? (french ? ' · Prix à vérifier pour ' + missing + ' arrêt(s)' : ' · ' + missing + ' unpriced ' + (missing === 1 ? 'stop' : 'stops') + ' excluded') : '')
-      + (known ? (french ? ' · Hors taxes, pourboires et suppléments' : ' · Before tax, tips and extras') : '');
+      + (known && (cents || gifts) ? (french ? ' · Hors taxes, pourboires et suppléments' : ' · Before tax, tips and extras') : '');
   }
   function cardHtml(stop, key, opts){
     opts = opts || {};
@@ -1565,6 +1585,8 @@ function renderScript(d) {
       + '<div class="t3-card-tags">' + badgesHtml(v) + '</div>'
       + '<div class="t3-card-body">'
       + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + (v.hoursByOwner ? ' <span class="t3-nowrap">' + esc(lang() === 'fr' ? '(confirmés par l’entreprise)' : '(confirmed by the business)') + '</span>' : /venue page|page du lieu/i.test(v.listedHours) ? '' : ' <span class="t3-nowrap"><span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></span>') + '</p>' : '')
+      // Indoor test 1 (2026-11-19): a yearly closure in the month asked for (or the next weeks, with no date).
+      + (v.yearlyClosure ? '<p class="t3-hours t3-closure">' + esc(lang() === 'fr' ? v.yearlyClosure.fr : v.yearlyClosure.en) + '</p>' : '')
       // Happy hour deals (2026-10-26): a stop timed inside the venue's happy hour says what is on.
       + (stop.happyHourLine ? '<p class="t3-hh">' + (lang() === 'fr' && stop.happyHourDealsFr ? '5 à 7' + (stop.happyHourWhenFr ? ' (' + esc(stop.happyHourWhenFr) + ')' : '') + '\u00a0: <span' + (stop.happyHourLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.happyHourDealsFr) + '</span>' : esc(stop.happyHourLine)) + '</p>' : '')
       // Weekly specials (2026-10-27): a stop on its special's day ("Tonight: Taco Tuesday · $3 tacos").
@@ -1572,8 +1594,10 @@ function renderScript(d) {
       // Weekly nights (2026-10-27): an evening stop on one of the venue's nights ("Tonight: Trivia at 7 PM").
       + (stop.nightLine ? '<p class="t3-wn">' + (lang() === 'fr' && stop.nightsFr ? esc(stop.nightLineLabelFr || 'Ce soir') + ' : <span' + (stop.nightLineFrLang ? ' lang="en"' : '') + '>' + esc(stop.nightsFr) + '</span>' : lang() === 'fr' && stop.nightLineFr ? esc(stop.nightLineFr) : esc(stop.nightLine)) + '</p>' : '')
       + (t3PickupLine(stop) ? '<p class="t3-pickup">\u2713 ' + esc(t3PickupLine(stop)) + '</p>' : '')
-      + (why ? '<details class="t3-fit"><summary>' + esc(tx('tripv3.whyFits')) + '</summary><ul class="t3-why">' + why + '</ul></details>' : '')
+      // Indoor test 16 (2026-11-19; "Why it fits / Book ahead" read as a reason it fits): the good-to-know lines come before
+      // the folded "Why it fits", never under it.
       + (cav ? '<ul class="t3-caveats" aria-label="' + esc(tx('tripv3.goodToKnow')) + '">' + cav + '</ul>' : '')
+      + (why ? '<details class="t3-fit"><summary>' + esc(tx('tripv3.whyFits')) + '</summary><ul class="t3-why">' + why + '</ul></details>' : '')
       + '</div>'
       + '<div class="t3-actions">'
       + '<button type="button" class="trip-btn" data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region) + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + (opts.planStop ? ' data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') : '') + (opts.planStop && key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot="' + esc(key.split('-')[0]) + '"' : '') + ' aria-pressed="false" aria-label="' + esc(lang() === 'fr' ? 'Ajouter ' + v.name + ' au voyage' : 'Add ' + v.name + ' to trip') + '">' + esc(lang() === 'fr' ? 'Ajouter au voyage' : 'Add to trip') + '</button>'
@@ -2053,6 +2077,8 @@ function renderScript(d) {
     } else {
       html += '<p class="t3-empty">' + esc(tx('tripv3.tryTelling')) + '</p>';
     }
+    // Indoor test 3 (2026-11-19): no dated show fits a show request: the theatres in town whose own words say they host it.
+    html += t3ShowPlacesHtml(p, lang() === 'fr', esc, hrefAttr);
     if (hasStops) html += '<p class="t3-estimate" data-t3-estimate hidden aria-live="polite"></p>';
     html += tripDetails;
     if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" ' + hrefAttr(p.seeAll.url) + '>' + esc(tx('tripv3.seeAll')) + '</a>';
@@ -2649,4 +2675,4 @@ ${renderScript(d)}
 </html>`;
 }
 
-module.exports = { t3PickupLine, t3WhyLines, t3ClosedDayText, t3MissingClosedText, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };
+module.exports = { t3ShowPlacesHtml, t3PickupLine, t3WhyLines, t3ClosedDayText, t3MissingClosedText, t3FrenchHref, t3LocalTimes, t3DayPinLayout, t3DroppedRequests, t3DriveText, t3TimingChecklist, t3TimelineRows, t3EventPlaceHtml, t3ListingGapGroups, t3ListingGapSummaryHtml, t3VenueCardId, t3PlanNextSteps, t3OptionalAlternativesHtml, t3EditLosesMatch, renderTripPlannerV3Page, t3Km, t3KmText, t3StateToQuery, t3QueryToState, t3MapsUrl, t3MapPoints, T3_EXAMPLES };

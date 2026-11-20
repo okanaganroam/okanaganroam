@@ -225,7 +225,7 @@ test('8. setup: group size "21+ or whole classes" and ". " after a size; Type th
   assert.equal(text.en.tour.groupsChipBig, '21+ or whole classes'); assert.equal(text.fr.tour.groupsChipBig, '21+ ou classes entières');
   assert.match(text.en.tour.groupsLineBig, /^Groups of 21 or more, like whole classes/); assert.match(text.en.tour.groupsLineBigBooked, /^Groups of 21 or more/);
   assert.match(CLIENT, /\[4\]\.concat\(GROUP_SIZES, T\.groupsChipBig \? \[21\] : \[\]\)/);
-  assert.match(CLIENT, /concat\(\[groupsSizeLine\(\+b\.getAttribute\('data-bgroup'\)\)\]\)\.join\('\. '\) \+ '\. '/);
+  assert.match(CLIENT, /groupsSizeLine\(\+b\.getAttribute\('data-bgroup'\)\) \+ '\.'\) \+ ' '/ /* indoor test 8: punctuation kept (keepPieces) */);
   // Typed tours on the setup's screen: the edit page's own editor, opened on typing.
   assert.equal(text.en.tour.menuType, 'Type them in myself'); assert.equal(text.fr.tour.menuType, 'Je les tape moi-même');
   assert.match(CLIENT, /id="suMenuType" href="' \+ h\(location\.pathname\.replace\(\/\\\/setup\\\/\?\$\/, '\/menu'\) \+ '\?from=setup#type'\)/);

@@ -363,7 +363,7 @@ test('B9: the closed line once on a card (every type), and the Season line and h
 
 test('B10 + B11: the booking link is asked once, and the French wording table', async () => {
   const { t } = await jess();
-  assert.match(CLIENT, /\(TOUR && \(CUR\.booking_url \|\| C\.bookingKnown \|\| String\(S\.bookUrl \|\| ''\)\.trim\(\) \|\| S\.tour\.noBook\) \? ''/);
+  assert.match(CLIENT, /\((?:TOUR|TL) && \(CUR\.booking_url \|\| C\.bookingKnown \|\| String\(S\.bookUrl \|\| ''\)\.trim\(\) \|\| S\.tour\.noBook\) \? ''/);
   const f = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
   assert.equal(f.t.labels.hours, 'Vos heures et votre saison');
   assert.match(f.t.allYearClosed, /^Nous offrons des sorties une partie de l’année seulement$/);

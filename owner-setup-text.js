@@ -24,7 +24,7 @@ const en = {
   hoursQ: 'Are these still your hours?', closed: 'Closed', open: 'Open', hoursEditQ: 'Change your hours', hoursEditLead: 'Tap a time to change it.',
   sameAs: 'Same as {day}', opens: '{day} opens', closes: '{day} closes', to: 'to', saveHours: 'Save my hours', needOpenDay: 'Please set at least one day you’re open.',
   winterQ: 'Different hours part of the year?', winterHint: 'For example, shorter winter hours from November to April.', whichMonths: 'Which months?', hoursThen: 'Hours in those months',
-  winterNeedMonths: 'Please tap the months for your other hours.', noHours: 'We don’t have your hours yet. Tap “Change them” to add them.', addHours: 'Add my hours',
+  winterNeedMonths: 'Please tap the months for your other hours.', noHours: 'We don’t have your hours yet. Tap “Add my hours” to add them.', addHours: 'Add my hours',
   seasonQ: 'Do you close for part of the year?', seasonLead: 'For example, open May to October, or closed in January.', allYear: 'No, we’re open all year', partYear: 'Yes, we close for part of the year',
   monthsQ: 'Which months are you open?', monthsLead: 'Tap every month you’re open. When you’re closed, your page says “Closed for the season” and when you reopen.', saveSeason: 'Save my season',
   monthsInRow: 'Please pick months in a row, like May to October.', monthsNeed: 'Please tap the months you’re open.',
@@ -112,7 +112,7 @@ const fr = {
   hoursQ: 'Est-ce que ce sont toujours vos heures?', closed: 'Fermé', open: 'Ouvert', hoursEditQ: 'Modifier vos heures', hoursEditLead: 'Touchez une heure pour la changer.',
   sameAs: 'Comme {day}', opens: '{day} ouverture', closes: '{day} fermeture', to: 'à', saveHours: 'Enregistrer mes heures', needOpenDay: 'Indiquez au moins un jour d’ouverture.',
   winterQ: 'D’autres heures une partie de l’année?', winterHint: 'Par exemple, des heures d’hiver plus courtes de novembre à avril.', whichMonths: 'Quels mois?', hoursThen: 'Heures pendant ces mois',
-  winterNeedMonths: 'Touchez les mois de vos autres heures.', noHours: 'Nous n’avons pas encore vos heures. Touchez « Les modifier » pour les ajouter.', addHours: 'Ajouter mes heures',
+  winterNeedMonths: 'Touchez les mois de vos autres heures.', noHours: 'Nous n’avons pas encore vos heures. Touchez « Ajouter mes heures » pour les ajouter.', addHours: 'Ajouter mes heures',
   seasonQ: 'Fermez-vous une partie de l’année?', seasonLead: 'Par exemple, ouvert de mai à octobre, ou fermé en janvier.', allYear: 'Non, nous sommes ouverts toute l’année', partYear: 'Oui, nous fermons une partie de l’année',
   monthsQ: 'Quels mois êtes-vous ouvert?', monthsLead: 'Touchez chaque mois où vous êtes ouvert. Quand vous êtes fermé, votre page indique « Fermé pour la saison » et la date de réouverture.', saveSeason: 'Enregistrer ma saison',
   monthsInRow: 'Choisissez des mois qui se suivent, comme de mai à octobre.', monthsNeed: 'Touchez les mois où vous êtes ouvert.',
@@ -271,7 +271,7 @@ Object.assign(en, {
   textLong: 'Number {n} is a bit long. Please keep it to {max} letters.',
   soFarQ: 'Your answers so far', optional: 'Optional', sentTitle: 'Sent', storySentAs: 'What we’ll put on your page:',
   essReady: 'Your page is ready', essCount: '{n} of {total} essentials done.', essSkipped: 'Skipped for now. Tap one to do it:',
-  pctAbout: 'About {n}% complete', pctAboutSub: 'once we add what you sent (usually within a day).', pctRaise: 'Add more about your place to raise it.',
+  pctAbout: 'About {n}% complete', pctAboutSub: 'once we add what you sent (usually within a day).', pctRaise: 'Add more about your place to raise it.', pctMoreOpt: 'Add more to help visitors (optional).',
   saveClosures1: 'Save these closures ({n} new)', saveClosuresN: 'Save these closures ({n} new)',
   menuSentQ: 'Your menu is sent ✓', menuNewer: 'Want to send a newer menu?',
   quickLead: 'Tap what fits:', quickOr: 'Or type it in your own words:',
@@ -293,7 +293,7 @@ Object.assign(fr, {
   textLong: 'Le numéro {n} est un peu long. Gardez-le à {max} caractères.',
   soFarQ: 'Vos réponses jusqu’ici', optional: 'Facultatif', sentTitle: 'Envoyé', storySentAs: 'Ce que nous mettrons sur votre page :',
   essReady: 'Votre page est prête', essCount: '{n} éléments essentiels sur {total} sont faits.', essSkipped: 'Passés pour l’instant. Touchez-en un pour le faire :',
-  pctAbout: 'Complète à environ {n}\u00a0%', pctAboutSub: 'dès que nous aurons ajouté ce que vous avez envoyé (habituellement d’ici un jour).', pctRaise: 'Ajoutez plus de détails pour l’augmenter.',
+  pctAbout: 'Complète à environ {n}\u00a0%', pctAboutSub: 'dès que nous aurons ajouté ce que vous avez envoyé (habituellement d’ici un jour).', pctRaise: 'Ajoutez plus de détails pour l’augmenter.', pctMoreOpt: 'Ajoutez plus de détails pour aider les visiteurs (facultatif).',
   saveClosures1: 'Enregistrer ces fermetures ({n} nouvelle)', saveClosuresN: 'Enregistrer ces fermetures ({n} nouvelles)',
   menuSentQ: 'Votre menu est envoyé ✓', menuNewer: 'Voulez-vous envoyer un menu plus récent?',
   quickLead: 'Touchez ce qui convient :', quickOr: 'Ou écrivez-le dans vos mots :',
@@ -454,7 +454,7 @@ Object.assign(fr, {
 Object.assign(en, {
   // Hours: a short list of the 7 days with a Change button each; only the days tapped open up.
   hoursEditLead: 'Tap Change beside any day that’s different. The other days stay as they are.',
-  hoursChange: 'Change', hoursChangeDay: 'Change {day}', hoursDoneDay: 'Done ✓', copyTo: 'Copy these hours to:', copyAll: 'Every day', copyWeek: 'Mon–Fri',
+  hoursChange: 'Change', hoursChangeDay: 'Change {day}', hoursDoneDay: 'Done ✓', copyTo: 'Copy these hours to:', copyAll: 'Every day', copyWeek: 'Mon–Fri', copyTueSat: 'Tue–Sat',
   // Menu photos: "Add another page" comes first.
   camLeadSome: 'Got another page? Add it first. When every page is here, tap Send. Tap ✕ to retake one.',
   // No dogs: its own answer on "What you offer".
@@ -466,7 +466,7 @@ Object.assign(en, {
 });
 Object.assign(fr, {
   hoursEditLead: 'Touchez Modifier à côté d’une journée différente. Les autres journées restent telles quelles.',
-  hoursChange: 'Modifier', hoursChangeDay: 'Modifier {day}', hoursDoneDay: 'Terminé ✓', copyTo: 'Copier ces heures à :', copyAll: 'Tous les jours', copyWeek: 'Lun–ven',
+  hoursChange: 'Modifier', hoursChangeDay: 'Modifier {day}', hoursDoneDay: 'Terminé ✓', copyTo: 'Copier ces heures à :', copyAll: 'Tous les jours', copyWeek: 'Lun–ven', copyTueSat: 'Mar–sam',
   camLeadSome: 'Une autre page? Ajoutez-la d’abord. Quand toutes les pages sont là, touchez Envoyer. Touchez ✕ pour en reprendre une.',
   noDogs: 'Chiens non admis', noDogsSub: 'Ni à l’intérieur ni sur la terrasse', noDogsSubInside: 'Ni à l’intérieur ni à l’extérieur',
   spendSkip: 'Je ne sais pas, passer',
@@ -1734,6 +1734,12 @@ en.brewery.kindDistillery.tapWords = tapWordsEn('cocktail list'); fr.brewery.kin
 en.stillAdd = 'You can still add'; fr.stillAdd = 'Vous pouvez encore ajouter';
 // A holiday that is always on a weekday the place is closed (Family Day for a place closed Mondays).
 en.holClosedDay = 'You’re closed {day}s'; fr.holClosedDay = 'Vous êtes fermé le {day}';
+// Indoor test 11 (2026-11-19; Kim, open on long-weekend Mondays): a holiday on a day she's usually closed can be opened.
+en.groupsGuess = 'We found this online. Check it, and change any words that aren’t right.'; fr.groupsGuess = 'Nous avons trouvé ceci en ligne. Vérifiez-le et changez les mots qui ne conviennent pas.';
+en.holOpenThis = 'Open this holiday'; fr.holOpenThis = 'Ouvrir ce jour férié';
+en.holOpenOn = 'Open (Open on holidays is on)'; fr.holOpenOn = 'Ouvert (Ouvert les jours fériés est activé)';
+en.holOpenNote = 'Open on holidays is on: stat holidays and Christmas week days you’re usually closed show open, with your weekend hours. Closed on one, like Christmas Day? Tap it above. Tap an open holiday to turn this off.';
+fr.holOpenNote = 'Ouvert les jours fériés est activé : les jours fériés et les jours de la semaine de Noël où vous êtes habituellement fermé s’affichent ouverts, avec vos heures de fin de semaine. Fermé l’un d’eux, comme Noël? Touchez-le ci-dessus. Touchez un jour férié ouvert pour désactiver.';
 // Tour test 5 (Whistler, 2026-11-17): the box is no longer selected on its first tap (one tap and typing wiped Rob's
 // description): typing adds to the end, and replacing it is the link under the hint (or the ✕).
 en.storyResearchHint = 'This is what your page says now. Typing adds to the end of it.';
@@ -1984,6 +1990,7 @@ Object.assign(en.tour, {
   // Tour test 13: text past the limit, kept to its last full sentence (Save again to keep it).
   countOver: '{n} / {max}: {d} over. When you save, we keep it to the last full sentence.',
   fitRest: 'That was over {max} characters, so we kept it to the last full sentence. Left out: “{rest}”. Tap Save again to keep it as it is now.',
+  trimResearch: 'To fit your answers in, we took out part of the line we found online: “{rest}”. Your own taps and words stay.',
   fitRestTour: 'That was over {max} characters, so we kept it to the last full sentence. Left out: “{rest}”. Put the rest in a tour’s description (in Your tours and prices) or under Groups. Tap Save again to keep it as it is now.',
   quickOld: { good_to_know: ['Hotel pickup available'], groups: ['Private tours available'] },
   doorRights: 'I took this photo or have permission to share it, and Okanagan Roam may show it to help visitors find your meeting spot.',
@@ -1996,6 +2003,7 @@ Object.assign(fr.tour, {
   countOf: '{n} / {max}', countFull: 'C’est la limite ({max} caractères). Raccourcissez une ligne pour en ajouter.',
   countOver: '{n} / {max} : {d} de trop. À l’enregistrement, nous gardons jusqu’à la dernière phrase complète.',
   fitRest: 'Ça dépassait {max} caractères, alors nous avons gardé jusqu’à la dernière phrase complète. Laissé de côté : « {rest} ». Touchez Enregistrer de nouveau pour le garder ainsi.',
+  trimResearch: 'Pour faire place à vos réponses, nous avons retiré une partie de la ligne trouvée en ligne : « {rest} ». Vos réponses et vos mots restent.',
   fitRestTour: 'Ça dépassait {max} caractères, alors nous avons gardé jusqu’à la dernière phrase complète. Laissé de côté : « {rest} ». Mettez le reste dans la description d’une sortie (dans Vos sorties et tarifs) ou sous Groupes. Touchez Enregistrer de nouveau pour le garder ainsi.',
   quickOld: { good_to_know: ['Cueillette à l’hôtel offerte'], groups: ['Visites privées offertes'] },
   photosQ: 'Ajoutez des photos de vos sorties', moreQ: 'Plus de détails sur votre entreprise',
@@ -2311,6 +2319,385 @@ Object.assign(fr.tour, {
   tpriceMoreRentals: 'Le prix adulte. Les prix enfants, les autres sorties et les locations par bateau vont dans « Vos sorties et tarifs ».',
   tprivLead: 'Un seul prix pour tout le groupe, comme un véhicule privé ou un tarif à la journée.',
 });
+// Indoor places (2026-11-19, the indoor easy setup; Dayton: "keep this nice and easy for businesses to do and not
+// overwhelming for them"): museums, galleries, theatres, cinemas, spas, pools, climbing gyms, arcades, escape rooms,
+// bowling, play centres and classes. The tour's screens in indoor words: 7 essentials, 6 optional tiles. The kinds screen
+// is 'indoor'; Price, Booking, Who can come, Good to know and Groups are the tour's screens with these words.
+en.indoor = {
+  hiLead: 'Let’s get your page ready, one question at a time. The 7 essentials take about 5 minutes. You can stop any time and carry on later.',
+  timeLine: 'About 5 minutes for the essentials. You can stop any time and carry on later.',
+  labels: { basics: 'Address, phone and website', hours: 'Your hours', indoor: 'What kind of place', price: 'Price', booking: 'Walk-ins or booking', offer: 'Who can come', photos: 'Photos',
+    menu: 'Your prices', story: 'Your story and Known for', bring: 'Good to know', groups: 'Groups and parties', social: 'Instagram and Facebook', closures: 'Closures and holidays' },
+  noLabels: { social: 'not on Instagram or Facebook', groups: 'no big groups', booking: 'no online bookings' },
+  stStoryKnown: 'Known for on your page, story within a day', stGroupsLink: 'on your page, new booking link within a day',
+  basicsQ: 'Is this your address, phone and website?',
+  photosQ: 'Add photos of your place', photosLead: 'Your space, what people do here, your guests having fun. Three photos is perfect.', photosNoMore: 'No, I’m done with photos',
+  // Your hours
+  allYearClosed: 'We’re closed part of the year', allYearClosedSub: 'Like open May to September only. You pick the dates.',
+  seaMore: 'Different hours in summer or winter?', allYearLead: 'Closed, or on different hours, for part of the year? Say so here.',
+  // Indoor test 10 (2026-11-19): a maintenance shutdown is a closure.
+  allYearShutHint: 'Closed a week or two each year, like a maintenance shutdown? Add it under Closures and holidays.',
+  noDogsSub: 'Not inside', noDogsSubInside: 'Not inside',
+  hoursQ: 'Are these still your hours?', needOpenDayAppt: 'Please set at least one open day. No set hours? Tap “We don’t have set hours” below.',
+  noSetHours: 'We don’t have set hours (shows or classes only)', noSetHoursNow: 'No set hours: shows or classes only ✓',
+  noSetHoursSaved: 'Your old weekly hours are off your page. It says “Times vary · check before you go”.',
+  yearNoSetQ: 'Are you open all year?', yearNoSetLead: 'If you’re only open for a season, like May to September, tap it and pick your dates.',
+  yearNoSetYes: 'Yes, all year', yearNoSetKeep: 'Yes, those are my dates', yearNoSetChange: 'Change my dates',
+  // What kind of place
+  tkindQ: 'What kind of place are you?', tkindLead: 'Pick up to 3, the main one first. They show on your card and help search and Build My Trip find you.',
+  tkindNeed: 'Please tap what kind of place you are (up to 3).', tkindMax: 'Up to 3. Tap one you picked to take it off first.',
+  tlengthQ: 'How long do people usually stay?', tlengths: { '1h': 'Up to 1 hour', '1-2h': '1 to 2 hours', '2-3h': '2 to 3 hours', half: 'Half a day or more' },
+  tlengthNeed: 'Please tap how long most people stay.',
+  kindsGuess: 'We picked these from your page. Check them: tap to change.', kindsGuessFold: 'We picked this from your page. Not right? Tap Change.', kindsChange: 'Change',
+  guessCheck: 'We picked the usual for your kind of place. Tap another if it’s different.',
+  guessKind: 'We picked the usual for your kind of place. Tap another if it’s different.',
+  // Price
+  tpriceQ: 'What does it cost?', tpriceLead: 'The price for one adult. It shows on your card.', tpriceLeadPick: 'Your card will say “Adults {x}”.', tpriceLeadFree: 'Your card will say “Free”.',
+  tpriceLabel: 'Adult price, in dollars', tpriceMore: 'Your other prices (kids, seniors, passes, packages) go in “Your prices”, the first of the extra details.',
+  tpriceGuess: 'We picked this from your page. Check it, and change it if it’s not right.',
+  tpriceWaiting: 'You sent {x}. We’re checking it; it will show within a day.', tpriceNeed: 'We couldn’t find a price in that. Type your main price with its number, like 25. Some people get in free (like adults)? Add that line in Your prices. Nobody pays? Tap Free entry.',
+  tpriceSavedLive: 'Your price is on your page and your card now.', tpriceSavedDay: 'We’re checking {x}. A price over {n} is checked first; it shows within a day.',
+  tpriceSavedFree: 'Your page and your card say “Free” now.', tpriceCard: 'Adults {x}', tfreeCard: 'Free', tfreeWords: { free: 'Free entry', donation: 'By donation' },
+  // Walk-ins or booking
+  bookShows: 'Your page’s button: {x}', ibookQ: 'Can people just walk in?', ibooks: { no: 'Yes, walk-ins welcome', busy: 'Yes, but book ahead for weekends and busy times', ahead: 'No, please book ahead' },
+  ibookNeed: 'Please tap one: walk-ins welcome, or book ahead.',
+  tbookQ: 'Your booking or tickets link (optional)', tbookLead: 'It puts a Book button on your page.',
+  bookLinkLabel: 'Booking or tickets link', bookLinkEx: 'your website’s booking page, or your FareHarbor, Eventbrite or tickets page', noBookLink: 'We don’t take bookings online',
+  bookLinkBad: 'Please check the link, for example yourplace.com/book.',
+  tbookSavedLink: 'Your answer is on your page now. We check a new booking link first, usually within a day.',
+  // Who can come
+  offerQ: 'Who can come?', offerLead: 'Families check this before they visit.',
+  tageQ: 'From what age?', tages: { all: 'All ages', 5: '5+', 8: '8+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Under 18s come with an adult',
+  tageNeed: 'Please tap the youngest age you take (or All ages).',
+  // Good to know
+  bringQ: 'Good to know', bringLead: 'Anything people should know before they come? Two or three short lines.',
+  bringEx: 'Grip socks required (we sell them for $3). Lockers available.',
+  bringNeed: 'Please type a line, or tap one of the answers below.', bringNoLink: 'Please leave links out of this line. Your website goes in Address, phone and website, and your Website button links to it. Write “see our website” instead.',
+  bringGuess: 'We found this online. Check it. Answers you tap below are added after it.',
+  bringClash: 'Found online, may not match your answers: check it. Type your own line below, or skip to leave it as it is.',
+  // Your story and Known for
+  storyQ: 'Tell visitors about your place', storyLabel: 'About your place', storyEx: 'A family-run escape room since 2016, with six themed rooms for 2 to 8 players.',
+  knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows under “Your visit” on your page.', knownEx: 'Six themed rooms, great for birthdays',
+  knownGuess: 'We found this online. Check it, and change any words that aren’t right.',
+  storyKnownSaved: 'Your Known for line is on your page now. Your story will show within a day.',
+  // Groups and parties
+  groupsQ: 'Groups and parties: from what size should they book ahead?', groupsLead: 'Tap a size, then add birthday parties, school groups or private bookings in your own words.',
+  groupsEx: 'Birthday parties with a private room for up to 20. School groups welcome', groupsLine: 'Groups of {n} or more: please book ahead',
+  quickGroups: ['Groups of 8 or more: please book ahead', 'Groups of 10 or more: please book ahead', 'Groups of 12 or more: please book ahead', 'Groups of 15 or more: please book ahead', 'Groups of 20 or more: please book ahead'],
+  groupsLineLabel: 'Your Groups line', groupsNone: 'We can’t take big groups', groupsNeed: 'Please tap a size or type a line, or tap “We can’t take big groups”.',
+  groupsNoLink: 'Please leave links out of the Groups line.', groupsSavedLink: 'Your Groups line is on your page now. We check a new booking link first, usually within a day.',
+  // Instagram and Facebook on one screen
+  socialQ: 'Instagram and Facebook', socialLead: 'Fill in the ones you have. Your page links to them.', socialNeed: 'Please type your Instagram or Facebook, or tap an answer under each one.',
+  hoursSavedNow: '✓ Your hours are saved.', hoursSentNow: '✓ Your hours are sent.', igLead: 'Type your Instagram name, like @yourplace.',
+  // Your prices (the menu feature in price words)
+  menuQ: 'How should we add your prices?', menuLead: 'Every ticket, pass, class or party package and what it costs. A photo of your price sheet or a link to your prices page is perfect. It’s optional.',
+  // Indoor test 7 (2026-11-19): a free or by-donation place has nothing it must list here.
+  menuFreeSub: 'Anything that costs extra, like classes or tours? Optional',
+  stMenuFree: 'optional: free entry already counts',
+  menuLeadFree: 'Entry is free, so you can skip this. Anything that costs extra, like classes or tours? A photo of the price list or a link is perfect.',
+  menuLeadDonation: 'Entry is by donation, so you can skip this. Anything that costs extra, like classes or tours? A photo of the price list or a link is perfect.',
+  snap: 'Take a photo of your price sheet', snapSub: 'Or your brochure, one page at a time', upload: 'Upload your price list', uploadSub: 'A file or photos from your phone or computer',
+  web: 'My prices are on my website', menuSocial: 'My prices are on Facebook or Instagram',
+  emailQ: 'Email your prices to us', emailLead: 'Send a photo or a file of your price list. Put “{name}” in the subject.', mailSubject: 'Prices for {name}',
+  menuSentEmail: '✓ You said you’ll email your prices.', menuNote: 'Sent from the easy setup. Please add our prices to our page.',
+  menuSentQ: 'Your prices are sent ✓', menuNewer: 'Want to send a newer list?', menuSent: '✓ Your prices are sent.', menuLiveQ: 'Your prices are live ✓',
+  webQ: 'Is this where your prices are?', webLead: 'We filled in your website’s address. If your prices have their own page, type its name after the last /, like /prices.',
+  webQEmpty: 'Where are your prices online?', webLeadEmpty: 'Type the address of the page your prices are on.', webLabel: 'Prices page web address',
+  webEmpty: 'Please type the address of your prices page, like www.yourplace.com/prices.',
+  upQ: 'Upload your price list', upQSome: 'Your price list', upLead: 'Pick the file your prices are in. A file or photos both work.', upPick: 'Choose my price list file', sendMenu: 'Send my prices',
+  camQ: 'Snap your price sheet', camLead: 'Hold your phone over the price sheet so the whole page fits.', page: 'Price list page {n}',
+  menuSocialQ: 'Where are your prices?', menuSocialLead: 'Paste the link to your Facebook or Instagram page or post with your prices. Or type the page name and we’ll find it.',
+  menuSocialNote: 'Our prices are on our Facebook or Instagram page: “{name}”. Please find them and add them as our prices link.',
+  savedMenuSocialName: 'We’ll find your prices on that page and add them within a day.',
+  menuType: 'Type them in myself', menuTypeSub: 'Each ticket or pass and its price, one line at a time',
+  menuSentToast: '✓ Your prices are sent. We check them first, then add them to your page within a day.',
+  helpTail: 'Photos, your prices and your description show on your page within a day. So does a new address or website, if you changed it. A new phone number and everything else is on your page right away.',
+  countOf: '{n} / {max}', countFull: 'That’s the limit ({max} characters). Shorten a line to add more.',
+  countOver: '{n} / {max}: {d} over. When you save, we keep it to the last full sentence.',
+  fitRest: 'That was over {max} characters, so we kept it to the last full sentence. Left out: “{rest}”. Tap Save again to keep it as it is now.',
+  trimResearch: 'To fit your answers in, we took out part of the line we found online: “{rest}”. Your own taps and words stay.',
+};
+fr.indoor = {
+  hiLead: 'Préparons votre page, une question à la fois. Les 7 essentiels prennent environ 5 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  timeLine: 'Environ 5 minutes pour l’essentiel. Vous pouvez arrêter à tout moment et continuer plus tard.',
+  labels: { basics: 'Adresse, téléphone et site Web', hours: 'Vos heures', indoor: 'Quel genre d’endroit', price: 'Prix', booking: 'Sans réservation ou réserver', offer: 'Qui peut venir', photos: 'Photos',
+    menu: 'Vos tarifs', story: 'Votre histoire et ce pour quoi vous êtes connus', bring: 'Bon à savoir', groups: 'Groupes et fêtes', social: 'Instagram et Facebook', closures: 'Fermetures et jours fériés' },
+  noLabels: { social: 'pas sur Instagram ni Facebook', groups: 'pas de grands groupes', booking: 'pas de réservations en ligne' },
+  stStoryKnown: 'Votre spécialité est en ligne; votre histoire le sera d’ici un jour', stGroupsLink: 'sur votre page, nouveau lien de réservation d’ici un jour',
+  basicsQ: 'Est-ce bien votre adresse, votre téléphone et votre site Web?',
+  photosQ: 'Ajoutez des photos de votre endroit', photosLead: 'Votre espace, ce qu’on y fait, vos clients qui s’amusent. Trois photos, c’est parfait.', photosNoMore: 'Non, j’ai fini les photos',
+  allYearClosed: 'Nous fermons une partie de l’année', allYearClosedSub: 'Par exemple ouvert de mai à septembre seulement. Vous choisissez les dates.',
+  seaMore: 'Des heures différentes l’été ou l’hiver?', allYearLead: 'Fermé, ou des heures différentes, une partie de l’année? Dites-le ici.',
+  allYearShutHint: 'Fermé une semaine ou deux chaque année, comme pour un arrêt d’entretien? Ajoutez-le dans Fermetures et jours fériés.',
+  noDogsSub: 'Pas à l’intérieur', noDogsSubInside: 'Pas à l’intérieur',
+  hoursQ: 'Est-ce que ce sont toujours vos heures?', needOpenDayAppt: 'Indiquez au moins un jour d’ouverture. Pas d’heures fixes? Touchez « Nous n’avons pas d’heures fixes » plus bas.',
+  noSetHours: 'Nous n’avons pas d’heures fixes (spectacles ou cours seulement)', noSetHoursNow: 'Pas d’heures fixes : spectacles ou cours seulement ✓',
+  noSetHoursSaved: 'Vos anciennes heures de la semaine sont retirées de votre page. Elle indique « Horaires variables · vérifiez avant d’y aller ».',
+  yearNoSetQ: 'Êtes-vous ouvert toute l’année?', yearNoSetLead: 'Si vous êtes ouvert seulement une saison, par exemple de mai à septembre, touchez ce choix et indiquez vos dates.',
+  yearNoSetYes: 'Oui, toute l’année', yearNoSetKeep: 'Oui, ce sont mes dates', yearNoSetChange: 'Modifier mes dates',
+  tkindQ: 'Quel genre d’endroit êtes-vous?', tkindLead: 'Choisissez-en jusqu’à 3, le principal d’abord. Ils paraissent sur votre fiche et aident la recherche et Planifier mon voyage à vous trouver.',
+  tkindNeed: 'Touchez le genre d’endroit que vous êtes (jusqu’à 3).', tkindMax: 'Jusqu’à 3. Touchez d’abord un choix pour le retirer.',
+  tlengthQ: 'Combien de temps les gens restent-ils d’habitude?', tlengths: { '1h': 'Jusqu’à 1 heure', '1-2h': '1 à 2 heures', '2-3h': '2 à 3 heures', half: 'Une demi-journée ou plus' },
+  tlengthNeed: 'Touchez combien de temps la plupart des gens restent.',
+  kindsGuess: 'Nous les avons choisis d’après votre page. Vérifiez-les : touchez pour changer.', kindsGuessFold: 'Nous l’avons choisi d’après votre page. Ce n’est pas ça? Touchez Modifier.', kindsChange: 'Modifier',
+  guessCheck: 'Nous avons choisi l’habituel pour votre genre d’endroit. Touchez-en un autre si c’est différent.',
+  guessKind: 'Nous avons choisi l’habituel pour votre genre d’endroit. Touchez-en un autre si c’est différent.',
+  tpriceQ: 'Combien ça coûte?', tpriceLead: 'Le prix pour un adulte. Il paraît sur votre fiche.', tpriceLeadPick: 'Votre fiche indiquera « Adultes : {x} ».', tpriceLeadFree: 'Votre fiche indiquera « Gratuit ».',
+  tpriceLabel: 'Prix adulte, en dollars', tpriceMore: 'Vos autres prix (enfants, aînés, laissez-passer, forfaits) vont dans « Vos tarifs », le premier des détails facultatifs.',
+  tpriceGuess: 'Nous l’avons choisi d’après votre page. Vérifiez-le, et changez-le s’il n’est pas exact.',
+  tpriceWaiting: 'Vous avez envoyé {x}. Nous le vérifions; il s’affichera d’ici un jour.', tpriceNeed: 'Nous n’avons pas trouvé de prix. Écrivez votre prix principal avec son chiffre, par exemple 25. Certains entrent gratuitement (comme les adultes)? Ajoutez cette ligne dans Vos tarifs. Personne ne paie? Touchez Entrée gratuite.',
+  tpriceSavedLive: 'Votre prix est sur votre page et votre fiche maintenant.', tpriceSavedDay: 'Nous vérifions {x}. Un prix de plus de {n} est vérifié d’abord; il s’affiche d’ici un jour.',
+  tpriceSavedFree: 'Votre page et votre fiche indiquent « Gratuit » maintenant.', tpriceCard: 'Adultes : {x}', tfreeCard: 'Gratuit', tfreeWords: { free: 'Entrée gratuite', donation: 'Contribution volontaire' },
+  bookShows: 'Le bouton de votre page : {x}', ibookQ: 'Peut-on venir sans réservation?', ibooks: { no: 'Oui, sans réservation', busy: 'Oui, mais réservez pour les fins de semaine et les périodes achalandées', ahead: 'Non, réservez à l’avance' },
+  ibookNeed: 'Touchez une réponse : sans réservation, ou réserver à l’avance.',
+  tbookQ: 'Votre lien de réservation ou de billets (facultatif)', tbookLead: 'Il ajoute un bouton Réserver à votre page.',
+  bookLinkLabel: 'Lien de réservation ou de billets', bookLinkEx: 'la page de réservation de votre site, ou votre page FareHarbor, Eventbrite ou de billets', noBookLink: 'Nous ne prenons pas de réservations en ligne',
+  bookLinkBad: 'Vérifiez le lien, par exemple votreendroit.com/reserver.',
+  tbookSavedLink: 'Votre réponse est sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
+  offerQ: 'Qui peut venir?', offerLead: 'Les familles le vérifient avant de venir.',
+  tageQ: 'À partir de quel âge?', tages: { all: 'Tous les âges', 5: '5+', 8: '8+', 12: '12+', 16: '16+', 19: '19+' }, tadult: 'Les moins de 18 ans viennent avec un adulte',
+  tageNeed: 'Touchez l’âge minimum que vous acceptez (ou Tous les âges).',
+  bringQ: 'Bon à savoir', bringLead: 'Quelque chose à savoir avant de venir? Deux ou trois courtes lignes.',
+  bringEx: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Casiers offerts.',
+  bringNeed: 'Écrivez une ligne, ou touchez une des réponses ci-dessous.', bringNoLink: 'Gardez les liens hors de cette ligne. Votre site Web va dans Adresse, téléphone et site Web, et votre bouton Site Web y mène. Écrivez plutôt « voyez notre site Web ».',
+  bringGuess: 'Nous avons trouvé ceci en ligne. Vérifiez-le. Les réponses touchées ci-dessous s’ajoutent après.',
+  bringClash: 'Trouvé en ligne, peut ne pas correspondre à vos réponses : vérifiez-le. Tapez votre propre ligne ci-dessous, ou passez pour le laisser tel quel.',
+  storyQ: 'Parlez de votre endroit aux visiteurs', storyLabel: 'À propos de votre endroit', storyEx: 'Un jeu d’évasion familial depuis 2016, avec six salles thématiques pour 2 à 8 joueurs.',
+  knownQ: 'Pour quoi êtes-vous connus?', knownLead: 'Une ligne, c’est parfait. Elle paraît en haut de « Planifiez votre visite » sur votre page en français.', knownEx: 'Six salles thématiques, idéal pour les anniversaires',
+  knownGuess: 'Nous avons trouvé ceci en ligne. Vérifiez-le et changez les mots qui ne conviennent pas.',
+  storyKnownSaved: 'Votre spécialité est sur votre page maintenant. Votre histoire s’affichera d’ici un jour.',
+  groupsQ: 'Groupes et fêtes : à partir de combien de personnes doivent-ils réserver?', groupsLead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes scolaires ou les réservations privées dans vos mots.',
+  groupsEx: 'Fêtes d’anniversaire avec salle privée jusqu’à 20 personnes. Groupes scolaires bienvenus', groupsLine: 'Groupes de {n} personnes ou plus : réservez à l’avance',
+  quickGroups: ['Groupes de 8 personnes ou plus : réservez à l’avance', 'Groupes de 10 personnes ou plus : réservez à l’avance', 'Groupes de 12 personnes ou plus : réservez à l’avance', 'Groupes de 15 personnes ou plus : réservez à l’avance', 'Groupes de 20 personnes ou plus : réservez à l’avance'],
+  groupsLineLabel: 'Votre ligne Groupes', groupsNone: 'Nous ne pouvons pas accueillir de grands groupes', groupsNeed: 'Touchez une taille ou écrivez une ligne, ou touchez « Nous ne pouvons pas accueillir de grands groupes ».',
+  groupsNoLink: 'Gardez les liens hors de la ligne Groupes.', groupsSavedLink: 'Votre ligne Groupes est sur votre page maintenant. Nous vérifions d’abord un nouveau lien de réservation, en général d’ici un jour.',
+  socialQ: 'Instagram et Facebook', socialLead: 'Remplissez ceux que vous avez. Votre page y mène.', socialNeed: 'Écrivez votre Instagram ou votre Facebook, ou touchez une réponse sous chacun.',
+  hoursSavedNow: '✓ Vos heures sont enregistrées.', hoursSentNow: '✓ Vos heures sont envoyées.', igLead: 'Écrivez votre nom Instagram, comme @votreendroit.',
+  menuQ: 'Comment ajouter vos tarifs?', menuLead: 'Chaque billet, laissez-passer, cours ou forfait de fête et son prix. Une photo de votre grille tarifaire ou un lien vers votre page de prix, c’est parfait. C’est facultatif.',
+  menuFreeSub: 'Quelque chose de payant, comme des cours ou des visites? Facultatif',
+  stMenuFree: 'facultatif : l’entrée gratuite compte déjà',
+  menuLeadFree: 'L’entrée est gratuite, vous pouvez donc passer cette étape. Quelque chose de payant, comme des cours ou des visites? Une photo de la liste de prix ou un lien, c’est parfait.',
+  menuLeadDonation: 'L’entrée est à contribution volontaire, vous pouvez donc passer cette étape. Quelque chose de payant, comme des cours ou des visites? Une photo de la liste de prix ou un lien, c’est parfait.',
+  snap: 'Photographier votre grille tarifaire', snapSub: 'Ou votre brochure, une page à la fois', upload: 'Téléverser votre liste de prix', uploadSub: 'Un fichier ou des photos de votre téléphone ou ordinateur',
+  web: 'Mes tarifs sont sur mon site Web', menuSocial: 'Mes tarifs sont sur Facebook ou Instagram',
+  emailQ: 'Envoyez-nous vos tarifs par courriel', emailLead: 'Envoyez une photo ou un fichier de votre liste de prix. Indiquez « {name} » dans l’objet.', mailSubject: 'Tarifs de {name}',
+  menuSentEmail: '✓ Vous avez dit que vous enverrez vos tarifs par courriel.', menuNote: 'Envoyé depuis la configuration simple. Merci d’ajouter nos tarifs à notre page.',
+  menuSentQ: 'Vos tarifs sont envoyés ✓', menuNewer: 'Voulez-vous envoyer une liste plus récente?', menuSent: '✓ Vos tarifs sont envoyés.', menuLiveQ: 'Vos tarifs sont en ligne ✓',
+  webQ: 'Vos tarifs sont-ils à cette adresse?', webLead: 'Nous avons inscrit l’adresse de votre site Web. Si vos prix ont leur propre page, tapez son nom après le dernier /, comme /tarifs.',
+  webQEmpty: 'Où sont vos tarifs en ligne?', webLeadEmpty: 'Tapez l’adresse de la page où se trouvent vos prix.', webLabel: 'Adresse Web de la page des prix',
+  webEmpty: 'Écrivez l’adresse de votre page de prix, comme www.votreendroit.com/tarifs.',
+  upQ: 'Téléversez votre liste de prix', upQSome: 'Votre liste de prix', upLead: 'Choisissez le fichier de vos tarifs. Un fichier ou des photos, les deux fonctionnent.', upPick: 'Choisir le fichier de ma liste de prix', sendMenu: 'Envoyer mes tarifs',
+  camQ: 'Photographiez votre grille tarifaire', camLead: 'Tenez votre téléphone au-dessus de la grille tarifaire pour que toute la page soit visible.', page: 'Page {n} de la liste de prix',
+  menuSocialQ: 'Où sont vos tarifs?', menuSocialLead: 'Collez le lien de votre page ou publication Facebook ou Instagram avec vos prix. Ou tapez le nom de la page et nous la trouverons.',
+  menuSocialNote: 'Nos tarifs sont sur notre page Facebook ou Instagram : « {name} ». Merci de les trouver et de les ajouter comme lien de nos prix.',
+  savedMenuSocialName: 'Nous trouverons vos tarifs sur cette page et les ajouterons d’ici un jour.',
+  menuType: 'Je les tape moi-même', menuTypeSub: 'Chaque billet ou laissez-passer et son prix, une ligne à la fois',
+  menuSentToast: '✓ Vos tarifs sont envoyés. Nous les vérifions d’abord, puis les ajoutons à votre page d’ici un jour.',
+  helpTail: 'Les photos, vos tarifs et votre description s’affichent d’ici un jour, tout comme une nouvelle adresse ou un nouveau site Web si vous les avez modifiés. Un nouveau numéro de téléphone et tout le reste sont en ligne tout de suite.',
+  countOf: '{n} / {max}', countFull: 'C’est la limite ({max} caractères). Raccourcissez une ligne pour en ajouter.',
+  countOver: '{n} / {max} : {d} de trop. À l’enregistrement, nous gardons jusqu’à la dernière phrase complète.',
+  fitRest: 'Ça dépassait {max} caractères, alors nous avons gardé jusqu’à la dernière phrase complète. Laissé de côté : « {rest} ». Touchez Enregistrer de nouveau pour le garder ainsi.',
+  trimResearch: 'Pour faire place à vos réponses, nous avons retiré une partie de la ligne trouvée en ligne : « {rest} ». Vos réponses et vos mots restent.',
+  moreQ: 'Plus sur votre endroit',
+};
+// Indoor test 1 (2026-11-19; Margaret, a by-donation museum): By donation keeps the adult price box, as the suggested amount.
+// Indoor test 1: no "lunch & dinner" on an indoor place's day card (a pool or a theatre that closes in between).
+Object.assign(en.indoor, { addSecond: '+ Add a second time (if you close in between)', twoTimesMax: 'Up to two times a day.' });
+// Indoor test 11 (2026-11-19; Kim: a closed day said "Open this day" on one row and "Reopen" on another): one wording.
+Object.assign(en.indoor, { reopenDay: 'Open this day' }); Object.assign(fr.indoor, { reopenDay: 'Ouvrir ce jour' });
+Object.assign(fr.indoor, { addSecond: '+ Ajouter une deuxième plage (si vous fermez entre les deux)', twoTimesMax: 'Jusqu’à deux plages par jour.' });
+Object.assign(en.indoor, { tsuggLabel: 'Suggested amount (optional)', tdonationCard: 'By donation', tsuggNeed: 'Just the number, like 5. No suggested amount? Leave the box empty.',
+  seaClosuresHint: 'Closed over Christmas or for a winter break? Add it under Closures in More about your place.',
+  tpriceLeadDonation: 'Your card will say “By donation”.', tpriceLeadDonationSugg: 'Your page will say “By donation (suggested {x})”.', tpriceSavedDonation: 'Your page and your card say “By donation” now.' });
+Object.assign(fr.indoor, { tsuggLabel: 'Montant suggéré (facultatif)', tdonationCard: 'Contribution volontaire', tsuggNeed: 'Seulement le chiffre, par exemple 5. Pas de montant suggéré? Laissez la case vide.',
+  seaClosuresHint: 'Fermé pendant les Fêtes ou pour une pause d’hiver? Ajoutez-le sous Fermetures dans Plus sur votre endroit.',
+  tpriceLeadDonation: 'Votre fiche indiquera « Contribution volontaire ».', tpriceLeadDonationSugg: 'Votre page indiquera « Contribution volontaire (suggérée : {x}) ».', tpriceSavedDonation: 'Votre page et votre fiche indiquent « Contribution volontaire » maintenant.' });
+// Indoor test 2 (2026-11-19; Jordan, escape rooms: "120 per room" was saved as $120 a person): a price for a whole room, lane,
+// game or group. One small choice under the price box (Per person, the default / Per room or group); "per room", "per lane",
+// "per game", "per group" or "per party" in the box picks it for her, and "2-6 players" or "up to 8" says who it's for.
+Object.assign(en.indoor, { iperChips: { person: 'Per person', group: 'Per room or group' }, iperWords: { room: 'room', lane: 'lane', game: 'game', group: 'group' },
+  iperOne: { room: 'Price for one room, in dollars', lane: 'Price for one lane, in dollars', game: 'Price for one game, in dollars', group: 'Price for one group, in dollars' },
+  tpriceLeadPer: 'Your page will say “{page}”. Your card: “From {x} / {u}”.', ipageLine: 'From {x} per {u}{size}', isizeRange: ' ({a}–{b} {who})', isizeUpTo: ' (up to {b} {who})', iwho: { players: 'players', people: 'people' },
+  iperRead: 'You typed a price per {u}, so we picked Per room or group. Tap Per person if it’s for one person.',
+  iperNeed: 'Is that price for a whole {u}? Tap Per room or group. Or type the price for one person, like 25.', tpriceCardPer: 'From {x} / {u}',
+  // Indoor test 16: a minimum typed after a price per person ("35 per person, min 2 players").
+  iminSize: ' ({n}-{one} minimum)', iwhoOne: { players: 'player', people: 'person' } });
+Object.assign(fr.indoor, { iperChips: { person: 'Par personne', group: 'Par salle ou groupe' }, iperWords: { room: 'salle', lane: 'allée', game: 'partie', group: 'groupe' },
+  iperOne: { room: 'Prix pour une salle, en dollars', lane: 'Prix pour une allée, en dollars', game: 'Prix pour une partie, en dollars', group: 'Prix pour un groupe, en dollars' },
+  tpriceLeadPer: 'Votre page indiquera « {page} ». Votre fiche : « À partir de {x} / {u} ».', ipageLine: 'À partir de {x} par {u}{size}', isizeRange: ' ({a} à {b} {who})', isizeUpTo: ' (jusqu’à {b} {who})', iwho: { players: 'joueurs', people: 'personnes' },
+  iperRead: 'Vous avez écrit un prix par {u}, alors nous avons choisi Par salle ou groupe. Touchez Par personne si c’est pour une personne.',
+  iperNeed: 'Ce prix est-il pour {one}? Touchez Par salle ou groupe. Ou écrivez le prix pour une personne, par exemple 25.', iperOneFr: { room: 'toute une salle', lane: 'toute une allée', game: 'toute une partie', group: 'tout un groupe' }, tpriceCardPer: 'À partir de {x} / {u}',
+  iminSize: ' (minimum {n} {who})', iwhoOne: { players: 'joueur', people: 'personne' } });
+// Indoor test 2 (2026-11-19): the Good to know example by the main kind (like its chips): no grip socks for an escape room.
+Object.assign(en.indoor, { bringExKinds: { gallery: 'Most art is for sale, and we can ship it. Free parking behind the gallery.', arts: 'Gift shop by the entrance. No flash photography.', active: 'Grip socks required (we sell them for $3). Lockers available.',
+  spa: 'Bring a swimsuit. Robes and towels provided.', general: 'Arrive 15 minutes early. Free parking behind the building.',
+  shows: 'Doors open 30 minutes before the show. Free parking behind the building.', cinema: 'Doors open 30 minutes before the first show. Concession stand with popcorn.', pool: 'Bring a swimsuit and a towel. Lockers by the change rooms.',
+  classes: 'Wear clothes that can get messy. Painted pieces are fired and ready in about a week.',
+  bowling: 'Leagues use most lanes on weeknights: call ahead. Licensed lounge. Bumpers for kids.',
+  kids: 'Grip socks required (we sell them for $3). An adult stays with their kids. Coffee for parents.',
+  // Indoor test 12 (2026-11-19): a yoga studio's own example.
+  yoga: 'Hot room classes: bring water and a towel. Mats to rent for $3. Arrive 15 minutes early.' } });
+Object.assign(fr.indoor, { bringExKinds: { gallery: 'La plupart des œuvres sont à vendre, et nous pouvons les expédier. Stationnement gratuit derrière la galerie.', arts: 'Boutique à l’entrée. Photos sans flash.', active: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Casiers offerts.',
+  spa: 'Apportez votre maillot. Peignoirs et serviettes fournis.', general: 'Arrivez 15 minutes d’avance. Stationnement gratuit derrière le bâtiment.',
+  shows: 'Portes ouvertes 30 minutes avant le spectacle. Stationnement gratuit derrière le bâtiment.', cinema: 'Portes ouvertes 30 minutes avant la première séance. Comptoir de friandises avec maïs soufflé.', pool: 'Apportez votre maillot et une serviette. Casiers près des vestiaires.',
+  classes: 'Portez des vêtements qui peuvent se salir. Les pièces peintes sont cuites et prêtes en une semaine environ.',
+  bowling: 'Les ligues occupent la plupart des allées en semaine : appelez avant. Salon avec permis d’alcool. Bandes pour les enfants.',
+  kids: 'Chaussettes antidérapantes obligatoires (en vente à 3 $). Un adulte reste avec ses enfants. Café pour les parents.',
+  yoga: 'Cours en salle chaude : apportez de l’eau et une serviette. Tapis à louer pour 3 $. Arrivez 15 minutes d’avance.' } });
+// Indoor test 3 (2026-11-19; Diane, a community theatre in Penticton, shows only). Wording only: no new fields or chips.
+// - The hint under "We don't have set hours": box office hours go in Good to know, never as the hours (they turned into
+//   "Closed Saturdays" for a Saturday-night theatre).
+// - A theatre (its main kind) is asked about tickets, and its price is its lowest regular ticket ("Tickets from $25").
+// - A range ("$25 - $55", "25 to 55") is read as its low number.
+// - The story and Known for examples follow the main kind (like the Good to know example).
+Object.assign(en.indoor, { webLeadTickets: 'We filled in your tickets page. If your prices are on another page, change it.', researchLine: 'We picked these from what we found online. Untick anything that’s wrong.', noSetHoursHint: 'Shows or classes only? Tap this. Put box office hours in Good to know, like “Box office: Tue–Fri 11–4 and an hour before shows.”',
+  ibookQShow: 'Do people need tickets ahead?', ibooksShow: { no: 'Tickets at the door are fine', busy: 'Tickets at the door, but buy ahead for busy shows', ahead: 'Please buy tickets ahead' },
+  ibookNeedShow: 'Please tap one: tickets at the door, or buy ahead.',
+  tpriceLeadShow: 'Your lowest regular adult ticket. It shows on your card.', tpriceLeadPickShow: 'Your page will say “Tickets from {x}”.', tpriceLabelShow: 'Lowest regular adult ticket, in dollars',
+  tpricePhShow: 'Varies by show? Your lowest regular ticket.', tpriceCardShow: 'Tickets from {x}', tpriceRangeLead: 'We’ll show From {x}, your lowest price.', tpriceRangeLeadShow: 'We’ll show “Tickets from {x}”, your lowest price.',
+  storyExKinds: { theatre: 'A 443-seat community theatre since 1979, with plays, concerts and comedy nights from September to June.', museum: 'A volunteer-run museum of local history, with a pioneer cabin and hands-on displays for kids.',
+    escape: 'A family-run escape room since 2016, with six themed rooms for 2 to 8 players.', spa: 'A small day spa with a eucalyptus steam room, a cedar sauna and massage by appointment.',
+    climbing: 'A bouldering gym with new problems every week, a kids’ wall and gear to rent.', general: 'A local, family-run place since 2010. Friendly staff and something for every age.',
+    classes: 'A sunny pottery studio: drop in to paint a mug, or sign up for a wheel class. We glaze and fire your pieces for you.',
+    gallery: 'A downtown gallery showing Okanagan painters and sculptors, with a new exhibition every month. Most of the art is for sale.',
+    // Indoor test 8 (2026-11-19): every kind has its own story and Known for examples.
+    cinema: 'An independent two-screen cinema since 1948, showing new releases, classics and kids’ matinees, with real butter on the popcorn.', pool: 'A community aquatic centre with a lap pool, a leisure pool with a lazy river and a waterslide, and swim lessons for every age.', games: 'An arcade with 60 games, two VR stations and a laser tag arena. Great for birthdays and rainy days.', bowling: 'Five-pin bowling since 1962: 24 lanes, cosmic bowling on weekends, an arcade corner and a licensed lounge.', kids: 'An indoor playground for kids 0 to 12, with a three-level play structure, a toddler zone and a café for parents.', curling: 'A friendly curling club with four sheets of ice, learn-to-curl nights for beginners and a lounge over the ice.', yoga: 'A bright yoga studio with hot and gentle classes, beginner series and a drop-in rate for visitors.', casino: 'A casino with slots, table games and a live poker room, plus a restaurant and shows on weekends. 19+.', library: 'A public library branch with free Wi-Fi, story time for kids and quiet study space. Visitors welcome.' },
+  knownExKinds: { gallery: 'Local painters and sculptors, with a new show every month', theatre: 'Plays, concerts and comedy nights, Thursday to Saturday at 7:30 PM', museum: 'Local history and a hands-on kids’ corner', escape: 'Six themed rooms, great for birthdays',
+    spa: 'Steam room, sauna and massage', climbing: 'Bouldering for all levels, with a kids’ wall', general: 'Friendly, local and great on a rainy day',
+    classes: 'Paint-your-own pottery and beginner wheel classes',
+    cinema: 'New releases, classic film nights and cheap Tuesdays', pool: 'The lazy river, the waterslide and family swims', games: 'Retro arcade games, VR and laser tag', bowling: 'Cosmic bowling Fri & Sat 9 PM–midnight', kids: 'A three-level play structure and toddler time', curling: 'Learn-to-curl nights and a lounge over the ice', yoga: 'Hot yoga and beginner-friendly classes', casino: 'Live poker and weekend shows', library: 'Story time and a cozy reading room' } });
+Object.assign(fr.indoor, { webLeadTickets: 'Nous avons inscrit votre page de billets. Si vos prix sont sur une autre page, changez-la.', researchLine: 'Nous avons choisi ceux-ci d’après ce que nous avons trouvé en ligne. Décochez tout ce qui est faux.', noSetHoursHint: 'Spectacles ou cours seulement? Touchez ceci. Mettez les heures de billetterie dans Bon à savoir, comme « Billetterie : mar.–ven. 11 h–16 h et une heure avant les spectacles. »',
+  ibookQShow: 'Faut-il acheter les billets à l’avance?', ibooksShow: { no: 'Billets à la porte, c’est parfait', busy: 'Billets à la porte, mais achetez d’avance pour les spectacles populaires', ahead: 'Achetez vos billets à l’avance' },
+  ibookNeedShow: 'Touchez une réponse : billets à la porte, ou d’avance.',
+  tpriceLeadShow: 'Votre billet adulte régulier le moins cher. Il paraît sur votre fiche.', tpriceLeadPickShow: 'Votre page indiquera « Billets à partir de {x} ».', tpriceLabelShow: 'Billet adulte régulier le moins cher, en dollars',
+  tpricePhShow: 'Ça varie selon le spectacle? Votre billet régulier le moins cher.', tpriceCardShow: 'Billets à partir de {x}', tpriceRangeLead: 'Nous indiquerons À partir de {x}, votre prix le plus bas.', tpriceRangeLeadShow: 'Nous indiquerons « Billets à partir de {x} », votre prix le plus bas.',
+  storyExKinds: { theatre: 'Un théâtre communautaire de 443 places depuis 1979 : pièces, concerts et soirées d’humour de septembre à juin.', museum: 'Un musée d’histoire locale tenu par des bénévoles, avec une cabane de pionniers et des activités pour les enfants.',
+    escape: 'Un jeu d’évasion familial depuis 2016, avec six salles thématiques pour 2 à 8 joueurs.', spa: 'Un petit spa de jour avec bain de vapeur à l’eucalyptus, sauna de cèdre et massages sur rendez-vous.',
+    climbing: 'Un centre de bloc avec de nouveaux problèmes chaque semaine, un mur pour enfants et de l’équipement à louer.', general: 'Un endroit local et familial depuis 2010. Une équipe accueillante et quelque chose pour tous les âges.',
+    classes: 'Un atelier de poterie ensoleillé : passez peindre une tasse, ou inscrivez-vous à un cours de tour. Nous émaillons et cuisons vos pièces.',
+    gallery: 'Une galerie du centre-ville qui expose des peintres et sculpteurs de l’Okanagan, avec une nouvelle exposition chaque mois. La plupart des œuvres sont à vendre.',
+    cinema: 'Un cinéma indépendant de deux salles depuis 1948 : nouveautés, classiques et matinées pour enfants, avec du vrai beurre sur le maïs soufflé.', pool: 'Un centre aquatique communautaire avec un bassin de longueurs, une piscine récréative avec rivière paresseuse et glissade d’eau, et des cours de natation pour tous les âges.', games: 'Une arcade de 60 jeux, deux postes de réalité virtuelle et une arène de laser tag. Parfait pour les anniversaires et les jours de pluie.', bowling: 'Des petites quilles depuis 1962 : 24 allées, des quilles cosmiques la fin de semaine, un coin arcade et un salon avec permis d’alcool.', kids: 'Une aire de jeux intérieure pour les 0 à 12 ans, avec une structure sur trois niveaux, un coin pour les tout-petits et un café pour les parents.', curling: 'Un club de curling sympathique avec quatre pistes, des soirées d’initiation pour débutants et un salon qui donne sur la glace.', yoga: 'Un studio de yoga lumineux avec des cours chauds et doux, des séries pour débutants et un tarif à la séance pour les visiteurs.', casino: 'Un casino avec machines à sous, tables de jeu et salle de poker, un restaurant et des spectacles la fin de semaine. 19 ans et plus.', library: 'Une succursale de bibliothèque publique avec Wi-Fi gratuit, l’heure du conte pour les enfants et des espaces d’étude calmes. Visiteurs bienvenus.' },
+  knownExKinds: { gallery: 'Des peintres et sculpteurs d’ici, avec une nouvelle exposition chaque mois', theatre: 'Pièces, concerts et soirées d’humour, du jeudi au samedi à 19 h 30', museum: 'L’histoire locale et un coin pour les enfants', escape: 'Six salles thématiques, idéal pour les anniversaires',
+    spa: 'Bain de vapeur, sauna et massages', climbing: 'Du bloc pour tous les niveaux, avec un mur pour enfants', general: 'Accueillant, local et parfait un jour de pluie',
+    classes: 'La poterie à peindre soi-même et des cours de tour pour débutants',
+    cinema: 'Nouveautés, soirées de classiques et mardis à prix réduit', pool: 'La rivière paresseuse, la glissade d’eau et les bains familiaux', games: 'Jeux d’arcade rétro, réalité virtuelle et laser tag', bowling: 'Quilles cosmiques ven. et sam. de 21 h à minuit', kids: 'Une structure de jeux sur trois niveaux et le temps des tout-petits', curling: 'Les soirées d’initiation et un salon qui donne sur la glace', yoga: 'Le yoga chaud et des cours pour débutants', casino: 'Le poker et les spectacles de fin de semaine', library: 'L’heure du conte et une salle de lecture chaleureuse' } });
+// Indoor test 1 (2026-11-19; Margaret: "I don't speak French, do I have to update the French description"): the
+// finish screen's French line says it's optional and we translate it.
+// Indoor test 7 (2026-11-19): the booking link folds behind this for a walk-in place.
+Object.assign(en.indoor, { haveBookPage: 'Have a booking page?' });
+// Indoor test 14 (2026-11-19): research lines her answers made wrong, asked about on the next screen.
+Object.assign(en.indoor, { staleHead: 'We also had this from online', staleLead: 'It doesn’t match your answers or may be out of date, so it’s off your page until you say.', staleQ: 'We also had: “{x}” Still right?', staleKeep: 'Keep', staleRemove: 'Remove', staleKept: 'Kept. It’s back on your page.', staleGone: 'Removed from your page.' });
+Object.assign(fr.indoor, { staleHead: 'Nous avions aussi ceci, trouvé en ligne', staleLead: 'Ça ne correspond pas à vos réponses ou ce n’est peut-être plus à jour, donc c’est retiré de votre page jusqu’à ce que vous le disiez.', staleQ: 'Nous avions aussi : « {x} » Est-ce toujours vrai?', staleKeep: 'Garder', staleRemove: 'Retirer', staleKept: 'Gardé. C’est de retour sur votre page.', staleGone: 'Retiré de votre page.' });
+Object.assign(fr.indoor, { haveBookPage: 'Vous avez une page de réservation?' });
+// Indoor test 9 (2026-11-19; Melissa's walk-in play centre: the Book button was for party rooms): with Walk-ins welcome, the
+// link box is for parties or groups, and the page's button says "Book a party" when the link or Groups line is about parties.
+// Indoor test 19 (2026-11-19; Priyanka, kids 0 to 10): a kids' place's hint under From what age? (All ages is pre-picked).
+Object.assign(en.indoor, { tageKidsHint: 'For kids up to an age, like 0 to 10? Say it in your story.' });
+Object.assign(fr.indoor, { tageKidsHint: 'Pour les enfants jusqu’à un certain âge, comme de 0 à 10 ans? Dites-le dans votre histoire.' });
+Object.assign(en.indoor, { tbookQParty: 'Party or group booking link (optional)', tbookLeadParty: 'It puts a Book button on your page (“Book a party” when it’s for parties).' });
+Object.assign(fr.indoor, { tbookQParty: 'Lien de réservation de fête ou de groupe (facultatif)', tbookLeadParty: 'Il ajoute un bouton Réserver à votre page (« Réserver une fête » si c’est pour les fêtes).' });
+// Indoor test 13 (2026-11-19; Dan's cinema: "Walk-ins welcome" folded his showtimes link away, then titled it a party link):
+// a ticketed kind's and a class kind's link box keeps its own title under any booking answer, and says which button it makes.
+Object.assign(en.indoor, { tbookQShows: 'Your showtimes or tickets link', tbookLeadShows: 'It puts a Showtimes & tickets button on your page.', tbookQClass: 'Your class schedule link', tbookLeadClass: 'It puts a Class schedule button on your page.', tbookLeadVisit: 'It puts a Book a visit button on your page (“Book a party” when the link is your party page).' });
+Object.assign(fr.indoor, { tbookQShows: 'Votre lien d’horaires ou de billets', tbookLeadShows: 'Il ajoute un bouton Horaires et billets à votre page.', tbookQClass: 'Votre lien d’horaire des cours', tbookLeadClass: 'Il ajoute un bouton Horaire des cours à votre page.', tbookLeadVisit: 'Il ajoute un bouton Réserver une visite à votre page (« Réserver une fête » si le lien est votre page de fêtes).' });
+Object.assign(en.indoor, { frDescOld: 'Optional: we translate your story into French for you. Speak French?', frDescGo: 'Check the French yourself' });
+Object.assign(fr.indoor, { frDescOld: 'Facultatif : nous traduisons votre histoire en français pour vous. Vous parlez français?', frDescGo: 'Vérifiez le français vous-même' });
+// Good to know quick answers for indoor places, and the Groups line's. Presets: the page shows each in its own language.
+// Indoor test 1 (2026-11-19; Margaret's museum was offered grip socks and a waiver): the Good to know chips follow the main
+// kind (good_to_know_kinds: arts = museums, galleries, libraries; active = climbing, trampolines, play centres, pools;
+// spa = spas and yoga; general = the rest). No more chips than before on any screen (7 at most).
+en.indoor.quick = Object.assign({}, en.quick, {
+  good_to_know: ['Grip socks required', 'Lockers available', 'Waiver to sign before you play', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site', 'Arrive 15 minutes early'],
+  good_to_know_kinds: {
+    arts: ['Free on the first Sunday', 'Gift shop', 'Bags can be left at the desk', 'Guided tours on request', 'No flash photography', 'Free parking on site', 'Café or snack bar on site'],
+    // Indoor test 7 (2026-11-19; Robert, a commercial gallery, was offered a museum's chips): a gallery's own set.
+    gallery: ['Most art is for sale', 'We can ship your purchase', 'New exhibition every month', 'Gift shop', 'Guided tours on request', 'No flash photography', 'Free parking on site'],
+    active: ['Grip socks required', 'Waiver to sign before you play', 'Lockers available', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site', 'Arrive 15 minutes early'],
+    // Indoor test 9 (2026-11-19; Melissa's play centre): a kids' place's own café chip (the same chips otherwise).
+    kids: ['Grip socks required', 'Waiver to sign before you play', 'Lockers available', 'Book ahead on weekends', 'Free parking on site', 'Coffee for parents', 'Arrive 15 minutes early'],
+    spa: ['Arrive 15 minutes early', 'Bring a swimsuit', 'Robes and towels provided', 'Lockers available', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site'],
+    general: ['Arrive 15 minutes early', 'Book ahead on weekends', 'Lockers available', 'Free parking on site', 'Café or snack bar on site'],
+    // Indoor test 6 (2026-11-19): theatres and cinemas (no lockers), pools (no grip socks or waiver), and class studios.
+    shows: ['Arrive 15 minutes early', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site'],
+    // Indoor test 13 (2026-11-19; Dan's cinema): a concession stand, not a café.
+    cinema: ['Arrive 15 minutes early', 'Book ahead on weekends', 'Free parking on site', 'Concession stand'],
+    pool: ['Bring a swimsuit', 'Lockers available', 'Arrive 15 minutes early', 'Free parking on site', 'Café or snack bar on site'],
+    classes: ['Wear clothes that can get messy', 'Pieces ready in about a week', 'Book ahead on weekends', 'Free parking on site', 'Arrive 15 minutes early'],
+    // Indoor test 8 (2026-11-19; Gary's bowling centre had the generic chips): leagues, the lounge and bumpers.
+    bowling: ['Leagues on weeknights: call ahead', 'Licensed lounge', 'Bumpers for kids', 'Book ahead on weekends', 'Free parking on site', 'Café or snack bar on site'],
+    // Indoor test 12 (2026-11-19; Jess's hot yoga studio was offered a café, lockers and "Book ahead on weekends"): yoga and
+    // fitness studios' own set.
+    yoga: ['Bring water and a towel', 'Mats to rent', 'Arrive 15 minutes early', 'Free parking on site'],
+  },
+  groups: ['Birthday parties with a private room', 'School groups welcome', 'Private bookings on request'],
+});
+fr.indoor.quick = Object.assign({}, fr.quick, {
+  good_to_know: ['Chaussettes antidérapantes obligatoires', 'Casiers offerts', 'Décharge à signer avant de jouer', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place', 'Arrivez 15 minutes d’avance'],
+  good_to_know_kinds: {
+    arts: ['Gratuit le premier dimanche', 'Boutique sur place', 'Sacs à laisser à l’accueil', 'Visites guidées sur demande', 'Photos sans flash', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
+    gallery: ['La plupart des œuvres sont à vendre', 'Nous pouvons expédier votre achat', 'Nouvelle exposition chaque mois', 'Boutique sur place', 'Visites guidées sur demande', 'Photos sans flash', 'Stationnement gratuit sur place'],
+    active: ['Chaussettes antidérapantes obligatoires', 'Décharge à signer avant de jouer', 'Casiers offerts', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place', 'Arrivez 15 minutes d’avance'],
+    kids: ['Chaussettes antidérapantes obligatoires', 'Décharge à signer avant de jouer', 'Casiers offerts', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café pour les parents', 'Arrivez 15 minutes d’avance'],
+    spa: ['Arrivez 15 minutes d’avance', 'Apportez votre maillot', 'Peignoirs et serviettes fournis', 'Casiers offerts', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
+    general: ['Arrivez 15 minutes d’avance', 'Réservez pour les fins de semaine', 'Casiers offerts', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
+    shows: ['Arrivez 15 minutes d’avance', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
+    cinema: ['Arrivez 15 minutes d’avance', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Comptoir de friandises'],
+    pool: ['Apportez votre maillot', 'Casiers offerts', 'Arrivez 15 minutes d’avance', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
+    classes: ['Portez des vêtements qui peuvent se salir', 'Pièces prêtes en une semaine environ', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Arrivez 15 minutes d’avance'],
+    bowling: ['Ligues en semaine : appelez avant', 'Salon avec permis d’alcool', 'Bandes pour les enfants', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Café ou casse-croûte sur place'],
+    yoga: ['Apportez de l’eau et une serviette', 'Tapis à louer', 'Arrivez 15 minutes d’avance', 'Stationnement gratuit sur place'],
+  },
+  groups: ['Fêtes d’anniversaire avec salle privée', 'Groupes scolaires bienvenus', 'Réservations privées sur demande'],
+});
+// Indoor test 4 (2026-11-19; Lauren, a day spa: "Adult price" with no placeholder, "The price for one adult", birthday and
+// school chips, a theatre's box office hint). The setup's words by the main kind, from indoor-kinds.js: the Price screen's
+// label, placeholder, lead and preview, Your prices' lead and the tickets/booking page line, the Groups lead, example and
+// its three chips (the same number as before), and the box office hint only for theatres and classes. The setup lays
+// these over the indoor words for the kind picked (owner-setup-client.js kindWords). The old three Groups chips stay in
+// quick.groups so lines saved with them still show in French.
+(function indoorKindWords() {
+  const IK = require('./indoor-kinds');
+  const noPeriod = (x) => String(x).replace(/\.$/, '');
+  for (const [lang, T] of [['en', en.indoor], ['fr', fr.indoor]]) {
+    const fr2 = lang === 'fr';
+    T.kindText = {}; T.quick.groups_kinds = {};
+    // Codes, not words: [Good to know chip group, story example group, quiet kind, daytime kind] (an array, so the French
+    // check skips it). Daytime (indoor test 5): no "Open after midnight?" row.
+    T.kindGroups = {};
+    for (const k of IK.INDOOR_KIND_TEXT_KINDS) {
+      const w = IK.indoorKindText([k], lang), line = noPeriod(w.price.page);
+      T.kindText[k] = {
+        tpriceLabel: w.price.label, tpricePh: w.price.ph, tpriceLead: w.price.lead,
+        // Indoor test 18: THE PRICE RULE (indoor-kinds.js, top). The preview fills {line}: tpriceCard with her price, or
+        // tpriceCardLow when her own typed prices list a lower one (C.indoorLow): "From $70" for a spa, "From $8 (adult
+        // admission $12)" for a museum. owner-setup-client.js indoorShowLine.
+        tpriceLeadPick: fr2 ? 'Votre page indiquera « {line} ».' : 'Your page will say “{line}”.',
+        // When one of Your prices is lower than the box's, the line comes from it: the lead says so.
+        tpriceLeadPickLow: fr2 ? 'Votre page indiquera « {line} » : votre prix le plus bas, tiré de Vos tarifs.' : 'Your page will say “{line}”: your lowest price, from Your prices.',
+        tpriceCard: line,
+        tpriceCardLow: IK.indoorPriceShow([k], lang, 1000000, { low: 1, money: (n, f) => (n === 1 ? '{x}' : '{main}') }).line,
+        tpriceRangeLead: fr2 ? 'Nous indiquerons « {line} », votre prix le plus bas.' : 'We’ll show “{line}”, your lowest price.',
+        menuLead: w.prices.lead, menuTypeSub: w.prices.typeSub, pricesNoun: w.prices.noun, pricesPage: w.prices.page,
+        webLeadTickets: fr2 ? `Nous avons inscrit votre ${w.prices.noun}. Si vos prix sont sur une autre page, changez-la.` : `We filled in your ${w.prices.noun}. If your prices are on another page, change it.`,
+        groupsLead: w.groups.lead, groupsEx: w.groups.ex, quick: { groups: w.groups.chips },
+        // Indoor test 16: the Groups size question when everyone books ahead (owner-setup-client.js, Booking: Please book ahead).
+        groupsQAhead: (() => { const u = IK.BOOK_AHEAD_UNIT[k]; if (fr2) return u ? `Grands groupes : à partir de combien doivent-ils appeler ou réserver plus d’${['cours', 'rendez-vous'].includes(u[1]) ? 'un' : 'une'} ${u[1]}?` : 'Grands groupes : à partir de combien doivent-ils appeler à l’avance?'; return u ? `Big groups: from what size should they call or book more than one ${u[0]}?` : 'Big groups: from what size should they call ahead?'; })(),
+        noSetHoursHint: w.boxOffice ? T.noSetHoursHint : '',
+        // Indoor test 6 (2026-11-19; Priya stretched her pottery studio's hours to 9 PM for her evening classes): one line
+        // on a classes place's hours screens.
+        // Indoor test 9 (2026-11-19; Melissa: "Your other prices (kids, seniors…)" under a price that is already per child):
+        // a kids' place lists its other prices in its own words, and its Groups screen leads with the party chips, the size
+        // row after them, optional, for school or daycare groups.
+        ...(k === 'kids' ? fr2 ? { tpriceMore: 'Vos autres prix (tout-petits, bébés, adultes, cartes de 10 entrées, fêtes) vont dans « Vos tarifs », le premier des détails facultatifs.', groupsQ: 'Fêtes d’anniversaire et groupes', groupsSizeQ: 'Groupes scolaires ou de garderie : à partir de combien? (facultatif)' }
+          : { tpriceMore: 'Your other prices (toddlers, babies, adults, 10-visit passes, parties) go in “Your prices”, the first of the extra details.', groupsQ: 'Birthday parties and groups', groupsSizeQ: 'School or daycare groups: from what size? (optional)' } : {}),
+        classNightsHint: k === 'classes' ? (fr2 ? 'Des cours le soir en dehors de ces heures? Gardez ici vos heures d’atelier libre, et ajoutez les soirs de cours dans Bon à savoir.' : 'Evening classes outside these hours? Keep your open studio hours here, and add class nights in Good to know.') : '',
+      };
+      T.quick.groups_kinds[k] = w.groups.chips;
+      // Indoor test 13: [4] what its link is ('shows' for cinemas and theatres, 'classes' for class kinds, '' the rest).
+      T.kindGroups[k] = [w.gtk, w.ex, w.quiet ? 1 : 0, w.day ? 1 : 0, w.ticketed ? 'shows' : w.classKind ? 'classes' : ''];
+    }
+  }
+})();
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

@@ -343,9 +343,52 @@ const TOUR_ITEMS = [
   R('owner_confirmed', { w: 2 }),
 ];
 if (TOUR_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: tour weights must sum to 100');
+// Indoor places (2026-11-19, the indoor easy setup: museums, galleries, theatres, spas, escape rooms, climbing gyms,
+// bowling, arcades…). The tour engine with their own 100 points, the essentials first. New items: the kind of place (up
+// to 3), a typical visit, the adult price or "Free", walk-ins or book ahead, and who can come. Every answer is the
+// owner's own (venue_indoor_info, never researched). No meeting spot or door step (the tour lesson): no 'arrival' item.
+// The stored kinds. The order they show in (most common first) is the server's INDOOR_KINDS_SHOWN.
+const INDOOR_KINDS = ['gallery', 'museum', 'theatre', 'cinema', 'spa', 'pool', 'climbing', 'games', 'escape', 'bowling', 'kids', 'classes', 'curling', 'yoga', 'casino', 'library', 'other'];
+const INDOOR_LENGTHS = ['1h', '1-2h', '2-3h', 'half'];
+// 'no': walk-ins welcome; 'busy': walk-ins welcome, book ahead for weekends and busy times; 'ahead': please book ahead.
+const INDOOR_BOOK = ['no', 'busy', 'ahead'];
+const INDOOR_AGES = ['all', '5', '8', '12', '16', '19'];
+const INDOOR_ITEMS = [
+  R('address_pin', { w: 5 }),
+  R('phone', { w: 4 }),
+  R('website', { w: 3 }),
+  { key: 'indoor_kind', group: 'indoor', w: 4, fix: true, target: { setup: 'indoor' }, fields: ['indoor_info'],
+    en: 'What kind of place', fr: 'Quel genre d’endroit', whyEn: 'Museum, gallery, spa, escape room, climbing gym and so on. Pick up to 3.', whyFr: 'Musée, galerie, spa, jeu d’évasion, salle d’escalade, etc. Choisissez-en jusqu’à 3.', btnEn: 'Pick them', btnFr: 'Choisir', icon: '🧭' },
+  R('hours', { w: 9 }),
+  R('hours_fresh', { w: 4 }),
+  { key: 'season', group: 'hours', w: 5, fix: true, target: { setup: 'hours:year' }, fields: ['open_months', 'hours_seasons', 'indoor_info'],
+    en: 'Open all year?', fr: 'Ouvert toute l’année?', whyEn: 'All year, or only part of the year? Say so, so nobody comes when you’re closed.', whyFr: 'Toute l’année, ou une partie de l’année seulement? Dites-le, pour que personne ne vienne quand c’est fermé.', btnEn: 'Answer', btnFr: 'Répondre', icon: '📆' },
+  R('photo_main', { w: 10, whyEn: 'Real photos only, taken by you. Your space, what people do here, your guests having fun.', whyFr: 'De vraies photos seulement, prises par vous. Votre espace, ce qu’on y fait, vos clients qui s’amusent.' }),
+  R('photo_extra', { w: 7 }),
+  { key: 'visit_length', group: 'indoor', w: 3, fix: true, target: { setup: 'indoor' }, fields: ['indoor_info'],
+    en: 'How long a visit takes', fr: 'La durée d’une visite', whyEn: 'Up to an hour, 1 to 2 hours, 2 to 3 hours or half a day.', whyFr: 'Jusqu’à une heure, 1 à 2 heures, 2 à 3 heures ou une demi-journée.', btnEn: 'Answer', btnFr: 'Répondre', icon: '⏱️' },
+  { key: 'indoor_price', group: 'indoor', w: 8, fix: true, target: { setup: 'price' }, fields: ['indoor_price'],
+    en: 'Price', fr: 'Prix', whyEn: 'The adult price, or Free entry. It shows on your card.', whyFr: 'Le prix pour un adulte, ou Entrée gratuite. Il paraît sur votre fiche.', btnEn: 'Answer', btnFr: 'Répondre', icon: '💵' },
+  { key: 'indoor_booking', group: 'indoor', w: 4, fix: true, target: { setup: 'booking' }, fields: ['indoor_info'],
+    en: 'Walk in or book ahead', fr: 'Sans réservation ou réserver', whyEn: 'Walk-ins welcome, or book ahead (or both).', whyFr: 'Sans réservation, ou réserver à l’avance (ou les deux).', btnEn: 'Answer', btnFr: 'Répondre', icon: '🗓️' },
+  { key: 'booking_link', noneEn: 'We don’t take bookings online', noneFr: 'Nous ne prenons pas de réservations en ligne', group: 'indoor', w: 3, fix: true, target: { setup: 'booking' }, fields: ['booking_url'],
+    en: 'Booking or tickets link', fr: 'Lien de réservation ou de billets', whyEn: 'The page where people book or buy tickets.', whyFr: 'La page où l’on réserve ou achète des billets.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '📅' },
+  { key: 'indoor_ages', group: 'yourvisit', w: 5, fix: true, target: { setup: 'offer' }, fields: ['indoor_info'],
+    en: 'Who can come', fr: 'Qui peut venir', whyEn: 'All ages, or from what age (5+, 8+, 12+, 16+, 19+).', whyFr: 'Tous les âges, ou à partir de quel âge (5+, 8+, 12+, 16+, 19+).', btnEn: 'Answer', btnFr: 'Répondre', icon: '👪' },
+  { key: 'access', group: 'yourvisit', w: 3, fix: true, target: { setup: 'offer' }, fields: ['owner_features'],
+    en: 'Wheelchair access and parking', fr: 'Accès en fauteuil roulant et stationnement', whyEn: 'Tick Wheelchair accessible or Free parking on “Who can come”.', whyFr: 'Cochez Accessible en fauteuil roulant ou Stationnement gratuit dans « Qui peut venir ».', btnEn: 'Tick them', btnFr: 'Cocher', icon: '♿' },
+  R('menu', { group: 'indoor', w: 4, target: { setup: 'menu' }, en: 'Your prices', fr: 'Vos tarifs', whyEn: 'Every ticket, pass or class and what it costs. A photo of your price sheet or a link to your prices page is fine.', whyFr: 'Chaque billet, laissez-passer ou cours et son prix. Une photo de votre grille tarifaire ou un lien vers votre page de prix suffit.', btnEn: 'Add them', btnFr: 'Ajouter', icon: '🎟️' }),
+  R('description', { w: 5 }),
+  R('pyv_known', { group: 'about', w: 3, target: { setup: 'story' }, whyEn: 'One line, e.g. Six themed rooms, great for birthdays.', whyFr: 'Une ligne, p. ex. Six salles thématiques, idéal pour les anniversaires.' }),
+  R('pyv_groups', { group: 'yourvisit', w: 3, en: 'Groups and parties', fr: 'Groupes et fêtes', whyEn: 'Birthday parties, school groups, team outings: from what size should groups book?', whyFr: 'Fêtes d’anniversaire, groupes scolaires, sorties d’équipe : à partir de quelle taille réserver?', target: { setup: 'groups' } }),
+  R('instagram', { w: 3 }),
+  R('facebook', { w: 3 }),
+  R('owner_confirmed', { w: 2 }),
+];
+if (INDOOR_ITEMS.reduce((a, i) => a + i.w, 0) !== 100) throw new Error('portal-completeness: indoor weights must sum to 100');
 // Distilleries (Dayton, 2026-11-13; SPEC-distilleries.md "Decided"): the brewery items and 100 points, with spirits words
 // (each item's `distillery` words, laid over for a distillery only). "What kind of place" counts as done (Decided 1).
-const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS, winery: WINERY_ITEMS, brewery: BREWERY_ITEMS, distillery: BREWERY_ITEMS, cocktail: COCKTAIL_ITEMS, tour: TOUR_ITEMS };
+const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS, winery: WINERY_ITEMS, brewery: BREWERY_ITEMS, distillery: BREWERY_ITEMS, cocktail: COCKTAIL_ITEMS, tour: TOUR_ITEMS, indoor: INDOOR_ITEMS };
 const itemsFor = (type) => ITEMS_BY_TYPE[type] || ITEMS;
 // "We don't have one" (2026-11-08): the items a restaurant may genuinely not offer. Never the core of a page (address,
 // phone, hours, photos, menu, average spend, description, storefront spot): those are always worth adding.
@@ -362,7 +405,7 @@ const OPTIONAL_NONE_KEYS = { cafe: ['happy_hour', 'specials', 'entertainment', '
 const noneKeysFor = (type) => [...new Set(itemsFor(type).filter((i) => i.noneEn).map((i) => i.key).concat(OPTIONAL_NONE_KEYS[type] || [], EXTRA_NONE_KEYS))];
 const NONE_KEYS = itemsFor('restaurant').filter((i) => i.noneEn).map((i) => i.key);
 // Café test 2 (2026-11-11): with every type's optional answers too ("No washroom" is a café's only one of its own).
-const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS, ...BREWERY_ITEMS, ...COCKTAIL_ITEMS, ...TOUR_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS, ...Object.values(OPTIONAL_NONE_KEYS)))];
+const ALL_NONE_KEYS = [...new Set([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS, ...BREWERY_ITEMS, ...COCKTAIL_ITEMS, ...TOUR_ITEMS, ...INDOOR_ITEMS].filter((i) => i.noneEn).map((i) => i.key).concat(EXTRA_NONE_KEYS, ...Object.values(OPTIONAL_NONE_KEYS)))];
 // In-place confirmation (final fresh-eyes 2026-11-09): the "We don't have…" button turns into "Got it: … ✓ · Undo"
 // where it was tapped, so the owner sees it worked without scrolling to "You told us you don't have these".
 const GOT_TEXT = {
@@ -411,8 +454,9 @@ const SECONDS = {
   brewery_kind: 10, flight_price: 15, to_go: 10,
   cocktail_price: 10,
   tour_kind: 10, tour_length: 5, tour_price: 15, book_ahead: 10, tour_ages: 10,
+  indoor_kind: 10, visit_length: 5, indoor_price: 15, indoor_booking: 10, indoor_ages: 10,
 };
-if ([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS, ...BREWERY_ITEMS, ...COCKTAIL_ITEMS, ...TOUR_ITEMS].some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
+if ([...ITEMS, ...PUB_ITEMS, ...CAFE_ITEMS, ...WINERY_ITEMS, ...BREWERY_ITEMS, ...COCKTAIL_ITEMS, ...TOUR_ITEMS, ...INDOOR_ITEMS].some((i) => !(i.key in SECONDS))) throw new Error('portal-completeness: every item needs a time estimate');
 // Whole minutes for the items an owner can still do (not the ones waiting for review). Saving hours also makes them
 // fresh, so "hours checked" adds nothing when the hours themselves are missing. Never less than 1 while anything is left.
 // Quick ones (2026-11-08, Dayton: "people are busy"): items that take half a minute or less lead the bar and the panel,
@@ -433,6 +477,7 @@ const QUICK_FIELD_BY_TYPE = { brewery: { brewery_kind: 'place_type', flight_pric
 QUICK_FIELD_BY_TYPE.distillery = { ...QUICK_FIELD_BY_TYPE.brewery };
 QUICK_FIELD_BY_TYPE.cocktail = { cocktail_price: 'cocktail_price' };
 QUICK_FIELD_BY_TYPE.tour = { tour_kind: 'tour_info', tour_length: 'tour_info', tour_price: 'tour_price', book_ahead: 'tour_info', tour_ages: 'tour_info', season: 'tour_info' };
+QUICK_FIELD_BY_TYPE.indoor = { indoor_kind: 'indoor_info', visit_length: 'indoor_info', indoor_price: 'indoor_price', indoor_booking: 'indoor_info', indoor_ages: 'indoor_info', season: 'indoor_info' };
 const quickFieldFor = (type, key) => ((QUICK_FIELD_BY_TYPE[type] || {})[key]) || QUICK_FIELD[key];
 function minutesLeft(missing) {
   const keys = new Set(missing.filter((it) => !it.waiting).map((it) => it.key));
@@ -465,6 +510,8 @@ const GROUPS = [
   { key: 'taproom', en: 'Taproom', fr: 'Salle de dégustation' },
   // Tours (2026-11-16).
   { key: 'tour', en: 'Your tours', fr: 'Vos activités' },
+  // Indoor places (2026-11-19).
+  { key: 'indoor', en: 'Your place', fr: 'Votre endroit' },
 ];
 
 const nonBlank = (s) => typeof s === 'string' && s.trim() !== '';
@@ -600,6 +647,28 @@ function doneMap(input, today) {
         access: ['wheelchair_accessible', 'free_parking'].some((k) => feats.has(k)) || !!i.offerAnswered,
       };
     })() : {}),
+    // Indoor places (2026-11-19): venue_indoor_info (owner-only, never researched) and the owner's price ('free' and
+    // 'donation' are answers). No set hours (shows, classes or by appointment) answers the hours, their check and the season.
+    ...(i.type === 'indoor' ? (() => {
+      const t = i.indoorInfo && typeof i.indoorInfo === 'object' ? i.indoorInfo : {};
+      const apptOnly = t.visit === 'appointment';
+      return {
+        ...(apptOnly ? { hours: true, hours_fresh: true } : {}),
+        indoor_kind: Array.isArray(t.kinds) && t.kinds.some((k) => INDOOR_KINDS.includes(k)),
+        visit_length: INDOOR_LENGTHS.includes(t.length),
+        season: nonBlank(i.openMonths) || !!i.hasSeasons || t.year === 'all' || apptOnly,
+        indoor_price: (typeof i.indoorPrice === 'number' && Number.isFinite(i.indoorPrice) && i.indoorPrice > 0) || i.indoorPrice === 'free' || i.indoorPrice === 'donation',
+        // Indoor test 7 (2026-11-19; Robert's free gallery, stuck at 93%): Free entry or By donation answers Your prices too
+        // (nothing to list; anything that costs extra is optional).
+        ...(i.indoorPrice === 'free' || i.indoorPrice === 'donation' ? { menu: true } : {}),
+        // Indoor test 8 (2026-11-19; a free walk-in gallery stuck at 97%: the checklist wanted the booking link the setup folds
+        // away for walk-ins): Walk-ins welcome with no link answers it.
+        booking_link: nonBlank(i.bookingUrl) || t.book === 'no',
+        indoor_booking: INDOOR_BOOK.includes(t.book),
+        indoor_ages: INDOOR_AGES.includes(String(t.age || '')),
+        access: ['wheelchair_accessible', 'free_parking'].some((k) => feats.has(k)) || !!i.offerAnswered,
+      };
+    })() : {}),
     ...(i.type === 'pub' || i.type === 'cocktail' ? {
       // "We don't serve food" in the kitchen question also answers the food type.
       cuisine: nonBlank(i.cuisine) || !!(pub.kitchen && pub.kitchen.mode === 'none'),
@@ -662,7 +731,7 @@ function scoreCompleteness(input, opts) {
   const unsure = new Set(((input && input.unsureKeys) || []).filter((k) => k === 'instagram' || k === 'facebook'));
   // Tour test 17 (Whistler, 2026-11-18; Sarah: Instagram set, Facebook blank, held at 97%): for tours, Instagram or Facebook
   // is done; the other one isn't asked for. Tours only (the other types keep both items as they were).
-  if (input && input.type === 'tour' && (done.instagram || done.facebook)) { unsure.add('instagram'); unsure.add('facebook'); }
+  if (input && (input.type === 'tour' || input.type === 'indoor') && (done.instagram || done.facebook)) { unsure.add('instagram'); unsure.add('facebook'); }
   const pending = o.pending || new Set();
   const photosWaiting = Math.max(0, Number(input && input.pendingPhotos) || 0);
   const na = {};
@@ -837,7 +906,7 @@ function renderCompleteness(result, opts) {
   const photosSent = Math.max(0, Number(o.pendingPhotos) || 0);
   if (o.plainWaiting && (nw || extraFields.length || photosSent)) {
     // Tour test 2 (Whistler, 2026-11-16): a tour's are its tours and prices and its meeting spot photo (o.tour).
-    const short = { photo_main: ['photos', 'photos'], photo_extra: ['photos', 'photos'], menu: o.tour ? ['tours and prices', 'sorties et tarifs'] : ['menu', 'menu'], description: ['your story', 'votre histoire'], address_pin: ['address', 'adresse'], phone: ['phone', 'téléphone'],
+    const short = { photo_main: ['photos', 'photos'], photo_extra: ['photos', 'photos'], menu: o.tour ? ['tours and prices', 'sorties et tarifs'] : o.indoor ? ['prices', 'tarifs'] : ['menu', 'menu'], description: ['your story', 'votre histoire'], address_pin: ['address', 'adresse'], phone: ['phone', 'téléphone'],
       website: ['website', 'site Web'], arrival: o.tour ? ['meeting spot photo', 'photo du point de rencontre'] : o.winery || o.distillery ? ['tasting room door photo', 'photo de la porte de la salle de dégustation'] : o.brewery ? ['taproom door photo', 'photo de la porte de la salle'] : ['front door photo', 'photo de la devanture'], happy_hour: ['happy hour', 'happy hour'], specials: ['specials', 'spéciaux'], facebook: ['Facebook', 'Facebook'], instagram: ['Instagram', 'Instagram'] };
     for (const it of waitingList) { const n = (short[it.key] || [it.en, it.fr])[fr ? 1 : 0]; if (!sentNames.includes(n)) sentNames.push(n); }
     for (const k of extraFields) { const n = fieldNames[k][fr ? 1 : 0]; if (!sentNames.includes(n)) sentNames.push(n); }
@@ -852,7 +921,7 @@ function renderCompleteness(result, opts) {
   const FR_FEM = new Set(['photos', 'votre histoire', 'adresse', 'photo de la porte de la salle de dégustation', 'photo de la porte de la salle', 'photo de la devanture', 'photo du point de rencontre', 'caractéristiques']);
   const FR_PLURAL = new Set(['photos', 'spéciaux', 'caractéristiques', 'sorties et tarifs']);
   // Tour test 5 (Whistler, 2026-11-17): "Address sent. We’ll add them within a day." ("address" ends in s): the plural names.
-  const EN_PLURAL = new Set(['photos', 'tours and prices', 'features']);
+  const EN_PLURAL = new Set(['photos', 'tours and prices', 'prices', 'features']);
   const frMany = sentNames.length > 1 || FR_PLURAL.has(sentNames[0]), frFem = sentNames.length > 0 && sentNames.every((x) => FR_FEM.has(x));
   const frSent = `envoy${frFem ? 'ée' : 'é'}${frMany ? 's' : ''}`;
   const sentSentence = sentNames.length ? L(` ${cap(sentList)} sent. We’ll add ${sentNames.length === 1 && !EN_PLURAL.has(sentNames[0]) ? 'it' : 'them'} within a day.`, ` ${cap(sentList)} : ${frSent}. Nous ${frMany ? 'les ajouterons' : 'l’ajouterons'} d’ici un jour.`) : '';
@@ -975,9 +1044,9 @@ function renderCompleteness(result, opts) {
   const bState = o.claimed === undefined ? null : badgeState(r, !!o.claimed);
   const chip = badgeChipHtml(fr);
   const badgeBlock = bState === 'earned'
-    ? `<div class="op-cb-badge op-cb-badge-earned" id="opCbBadge"><p><span aria-hidden="true">🎉</span> ${L('You earned the', 'Vous avez obtenu le badge')} ${chip}${L(' badge.', '.')}</p><p class="op-cb-badge-note">${o.tour && o.apptOnly ? L('It shows on your page, in search and on the Roam Now map. Keep it by confirming your season and booking details at least every 30 days. We’ll send a reminder.', 'Il s’affiche sur votre fiche, dans la recherche et sur la carte Roam Now. Gardez-le en confirmant votre saison et vos réservations au moins tous les 30 jours. Nous vous enverrons un rappel.') : L('It shows on your page, in search and on the Roam Now map. Keep it by checking your hours at least every 30 days. We’ll send a reminder.', 'Il s’affiche sur votre fiche, dans la recherche et sur la carte Roam Now. Gardez-le en vérifiant vos heures au moins tous les 30 jours. Nous vous enverrons un rappel.')}</p></div>`
+    ? `<div class="op-cb-badge op-cb-badge-earned" id="opCbBadge"><p><span aria-hidden="true">🎉</span> ${L('You earned the', 'Vous avez obtenu le badge')} ${chip}${L(' badge.', '.')}</p><p class="op-cb-badge-note">${o.apptOnly && o.indoor ? L('It shows on your page, in search and on the Roam Now map. Keep it by checking your details at least every 30 days. We’ll send a reminder.', 'Il s’affiche sur votre fiche, dans la recherche et sur la carte Roam Now. Gardez-le en vérifiant vos renseignements au moins tous les 30 jours. Nous vous enverrons un rappel.') : o.tour && o.apptOnly ? L('It shows on your page, in search and on the Roam Now map. Keep it by confirming your season and booking details at least every 30 days. We’ll send a reminder.', 'Il s’affiche sur votre fiche, dans la recherche et sur la carte Roam Now. Gardez-le en confirmant votre saison et vos réservations au moins tous les 30 jours. Nous vous enverrons un rappel.') : L('It shows on your page, in search and on the Roam Now map. Keep it by checking your hours at least every 30 days. We’ll send a reminder.', 'Il s’affiche sur votre fiche, dans la recherche et sur la carte Roam Now. Gardez-le en vérifiant vos heures au moins tous les 30 jours. Nous vous enverrons un rappel.')}</p></div>`
     : bState === 'paused'
-    ? `<div class="op-cb-badge op-cb-badge-paused" id="opCbBadge"><p><span aria-hidden="true">⏰</span> ${L('Your', 'Votre badge')} ${chip} ${L('badge is paused. Are your hours still right?', 'est en pause. Vos heures sont-elles toujours exactes?')}</p><button type="button" class="op-cb-btn" data-cb-save="${esc(JSON.stringify({ hours_checked: true }))}" data-cb-done="${esc(L('Thanks! Your badge is back.', 'Merci! Votre badge est de retour.'))}">${L('Yes, these are right', 'Oui, elles sont exactes')}</button></div>`
+    ? `<div class="op-cb-badge op-cb-badge-paused" id="opCbBadge"><p><span aria-hidden="true">⏰</span> ${L('Your', 'Votre badge')} ${chip} ${o.apptOnly && o.indoor ? L('badge is paused. Are your details still right?', 'est en pause. Vos renseignements sont-ils toujours exacts?') : L('badge is paused. Are your hours still right?', 'est en pause. Vos heures sont-elles toujours exactes?')}</p><button type="button" class="op-cb-btn" data-cb-save="${esc(JSON.stringify({ hours_checked: true }))}" data-cb-done="${esc(L('Thanks! Your badge is back.', 'Merci! Votre badge est de retour.'))}">${L('Yes, these are right', 'Oui, elles sont exactes')}</button></div>`
     : bState === 'none' && !noScore
     ? `<div class="op-cb-badge" id="opCbBadge"><p>${chip}</p><p class="op-cb-badge-note">${L('Reach 100% to earn the Complete &amp; Verified badge for your page.', 'Atteignez 100 % pour obtenir le badge Complète et vérifiée pour votre fiche.')}</p></div>`
     : '';
@@ -1329,4 +1398,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { TOUR_ITEMS, TOUR_KINDS, TOUR_LENGTHS, TOUR_BOOK, TOUR_AGES, COCKTAIL_ITEMS, BREWERY_ITEMS, BREWERY_KINDS, BREWERY_FOOD, BREWERY_TO_GO, BREWERY_YEAR, QUICK_FIELD_BY_TYPE, quickFieldFor, WINERY_ITEMS, WINERY_KINDS, WINERY_FOOD, WINERY_VISIT, WINERY_YEAR, OPTIONAL_NONE_KEYS, CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { INDOOR_ITEMS, INDOOR_KINDS, INDOOR_LENGTHS, INDOOR_BOOK, INDOOR_AGES, TOUR_ITEMS, TOUR_KINDS, TOUR_LENGTHS, TOUR_BOOK, TOUR_AGES, COCKTAIL_ITEMS, BREWERY_ITEMS, BREWERY_KINDS, BREWERY_FOOD, BREWERY_TO_GO, BREWERY_YEAR, QUICK_FIELD_BY_TYPE, quickFieldFor, WINERY_ITEMS, WINERY_KINDS, WINERY_FOOD, WINERY_VISIT, WINERY_YEAR, OPTIONAL_NONE_KEYS, CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

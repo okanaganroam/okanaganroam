@@ -832,8 +832,9 @@ test('groups (test 3): a size chip keeps a room or capacity from research; a qui
   // Quick answers on research's untouched line: Buyouts keeps the room for 20; Private room itself is already said.
   assert.deepEqual([...ctx.groupsKeep('Private room for 20', 'Buyouts', G)], ['Private room for 20']);
   assert.deepEqual([...ctx.groupsKeep('Groups welcome, call ahead', 'Private room', G)], [], 'a line with nothing the chip lacks is replaced');
-  assert.match(s, /S\.brew\.groups = groupsKeep\(S\.brew\.groups\)\.concat\(\[groupsSizeLine\(\+b\.getAttribute\('data-bgroup'\)\)\]\)\.join\('\. '\) \+ '\. ';/ /* tour test 9: ". " after the size */);
-  assert.match(s, /v = \(qk === 'groups' \? groupsKeep\(v, t, sibs\) : \[\]\)\.concat\(\[t\]\)\.join\(sep\);/);
+  // Indoor test 8: the sentences kept keep their own punctuation (keepPieces), then the size line and ". ".
+  assert.match(s, /S\.brew\.groups = addPiece\(keepPieces\(S\.brew\.groups, groupsKeep\(S\.brew\.groups\)\), groupsSizeLine\(\+b\.getAttribute\('data-bgroup'\)\) \+ '\.'\) \+ ' ';/ /* tour test 9: ". " after the size */);
+  assert.match(s, /v = (?:qk === 'groups' && sep === '\. ' \? addPiece\(keepPieces\(v, groupsKeep\(v, t, sibs\)\), t\) : )?\(qk === 'groups' \? groupsKeep\(v, t, sibs\) : \[\]\)\.concat\(\[t\]\)\.join\(sep\);/);
   // Un-pressing Private room inside "Private room for 20" takes the sentence, never leaving "for 20".
   assert.match(s, /if \(inLonger\) v = sentencesOf\(v\)\.filter\(function\(x\)\{ return !has\(x, t\); \}\)\.join\(sep\);/);
   // The pressed size is the "book ahead" sentence's, not the room's 20.

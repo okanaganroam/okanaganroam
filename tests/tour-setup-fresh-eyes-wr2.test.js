@@ -464,7 +464,7 @@ test('9 + 10 + Minor: the edit page and the wording table for a tour (EN/FR); «
   assert.doesNotMatch(pe, /When you open and close/);
   // "… sent" line and the update names.
   const PC = fs.readFileSync(path.join(__dirname, '..', 'portal-completeness.js'), 'utf8');
-  assert.match(PC, /menu: o\.tour \? \['tours and prices', 'sorties et tarifs'\] : \['menu', 'menu'\]/);
+  assert.match(PC, /menu: o\.tour \? \['tours and prices', 'sorties et tarifs'\] : (?:o\.indoor \? \['prices', 'tarifs'\] : )?\['menu', 'menu'\]/);
   assert.match(PC, /arrival: o\.tour \? \['meeting spot photo', 'photo du point de rencontre'\]/);
   assert.doesNotMatch(pf, /menu et photo de la devanture/);
   assert.match(pf, /à partir de quel âge \(5\+, 6\+, 12\+, 16\+, 19\+\)|Qui peut venir/);
@@ -492,9 +492,10 @@ test('10 + 11. closures: Next saves an added closure; the booking and hours defa
   assert.match(CLIENT, /var DAY_NEW = TOUR \? \['09:00', '17:00'\] : \['11:00', '21:00'\];/);
   assert.doesNotMatch(CLIENT, /\[\['11:00', '21:00'\]\]/);
   // The year screen: a tour's "We only run part of the year" comes before the summer and winter hours choices.
-  const a = CLIENT.indexOf("'yearAll') + (TOUR && !stS.length ? big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed') : '') + (stS.length ? stS.map(");
+  // Indoor places (2026-11-19) share it (TL: tours and indoor places).
+  const a = CLIENT.indexOf("'yearAll') + (TL && !stS.length ? big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed') : '') + (stS.length ? stS.map(");
   assert.ok(a > 0 && a < CLIENT.indexOf("big('☀️', T.allYearSummer"));
-  assert.match(CLIENT, /\+ \(TOUR && !stS\.length \? '' : big\('🗓️', T\.allYearClosed, T\.allYearClosedSub, true, 'yearClosed'\)\)/);
+  assert.match(CLIENT, /\+ \((?:TOUR|TL) && !stS\.length \? '' : big\('🗓️', T\.allYearClosed, T\.allYearClosedSub, true, 'yearClosed'\)\)/);
 });
 
 test('Minor: the admin editor’s refusal has no "dish" for a tour', () => {

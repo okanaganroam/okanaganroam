@@ -317,7 +317,8 @@ test('kitchen: a saved answer offers "Keep 9:30 PM" (« Garder 21 h 30 ») as th
 
 test('French spacing: « (Créer un compte) ; vous », « d’ici un jour) ; elle », « Retirer cette plage : », « votre voyage ? », « Vous y êtes allé ? »', () => {
   const s = SERVER();
-  assert.match(s, /Créer un compte<\/a>\)\\u202f; vous vous verrez/);
+  // Indoor test 10: the link and its brackets stay together in a no-wrap span.
+  assert.match(s, /Créer un compte<\/a>\)\\u202f;(?:<\/span>)? vous vous verrez/);
   assert.match(text.fr.oftenWaiting, /d’ici un jour\) ; elle reste/);
   assert.match(CLIENT(), /h\(T\.removeSecond \+ \(C\.lang === 'fr' \? '\\u00a0: ' : ': '\) \+ t12\(y\[0\]\)/);
   assert.match(fs.readFileSync(path.join(__dirname, '..', 'trip-planner-v3-page.js'), 'utf8'), /Combien de temps dure votre voyage\\u202f\? Choisissez/);

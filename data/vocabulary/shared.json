@@ -1,5 +1,5 @@
 {
- "_about": "Phrases that mean the same thing on any Roam site (2026-10-28). Copied as is to a new site; added to the code's base tables. types/features/collections/activities/occasions/budget/pace/cuisineSynonyms: more ways to say each value. descriptionSynonyms: a word the visitor uses -> words a listing's description uses for the same thing (searched when the word is not a category). termLabels: how a searched word reads in a plan summary instead of in quotes. Keys must match the site's own values; an unknown key is ignored. Tour test 13 (2026-11-18): paragliding, skydiving and hang gliding are their own group (descriptionSynonyms + termLabels here; the planner's paragliding kind in trip-requirements.js). Tour test 14 (2026-11-18): ski and snowboard lessons, ski schools, instructors, kids' ski camps and adaptive skiing (the planner's ski_lessons kind), and the broader pass over Whistler's real tours: kiteboarding and wing foil lessons, target shooting, rock climbing lessons, mountain bike lessons, sailing.",
+ "_about": "Phrases that mean the same thing on any Roam site (2026-10-28). Copied as is to a new site; added to the code's base tables. types/features/collections/activities/occasions/budget/pace/cuisineSynonyms: more ways to say each value. descriptionSynonyms: a word the visitor uses -> words a listing's description uses for the same thing (searched when the word is not a category). termLabels: how a searched word reads in a plan summary instead of in quotes. Keys must match the site's own values; an unknown key is ignored. Tour test 13 (2026-11-18): paragliding, skydiving and hang gliding are their own group (descriptionSynonyms + termLabels here; the planner's paragliding kind in trip-requirements.js). Tour test 14 (2026-11-18): ski and snowboard lessons, ski schools, instructors, kids' ski camps and adaptive skiing (the planner's ski_lessons kind), and the broader pass over Whistler's real tours: kiteboarding and wing foil lessons, target shooting, rock climbing lessons, mountain bike lessons, sailing. Indoor test 10 (2026-11-19, the vocabulary audit): swimming pool, aquatic centre, rec centre, swim, hot tub, sauna, karting, mini putt and climbing wall also mean indoor places (discovery-intent.js ALSO_INDOOR_PHRASES); lawn bowling and bowling greens are never a bowling alley (indoor-kinds.js); gym, weight room and fitness centre find the listings that say them.",
  "types": {
   "restaurant": [
    "a bite",
@@ -204,7 +204,14 @@
    "things to do when it rains",
    "indoor fun",
    "paint night",
-   "day spa"
+   "day spa",
+   "free museum",
+   "free museums",
+   "free gallery",
+   "free galleries",
+   "free art gallery",
+   "free art galleries",
+   "free admission museum"
   ],
   "tour": [
    "guided tours",
@@ -422,6 +429,21 @@
    "late night food",
    "late night eats",
    "night owl"
+  ],
+  "free_entry": [
+   "free museum",
+   "free museums",
+   "free gallery",
+   "free galleries",
+   "free art gallery",
+   "free art galleries",
+   "by donation",
+   "admission by donation",
+   "entry by donation",
+   "pay what you can",
+   "pay what you wish",
+   "free to visit",
+   "free admission museum"
   ]
  },
  "collections": {
@@ -889,6 +911,24 @@
   ]
  },
  "descriptionSynonyms": {
+  "dinosaur": [
+   "dinosaurs",
+   "dino",
+   "dinos",
+   "ankylosaurus",
+   "fossil",
+   "fossils",
+   "paleontology"
+  ],
+  "dinosaurs": [
+   "dinosaur",
+   "dino",
+   "dinos",
+   "ankylosaurus",
+   "fossil",
+   "fossils",
+   "paleontology"
+  ],
   "cozy": [
    "cosy",
    "fireplace",
@@ -1421,6 +1461,30 @@
    "sails",
    "sailing courses",
    "yachts"
+  ],
+  "gym": [
+   "fitness centre",
+   "fitness center",
+   "weight room",
+   "fitness"
+  ],
+  "weight room": [
+   "fitness centre",
+   "fitness center",
+   "gym"
+  ],
+  "fitness centre": [
+   "fitness center",
+   "weight room",
+   "gym"
+  ],
+  "heritage": [
+   "museum",
+   "history",
+   "historic",
+   "historical",
+   "archives",
+   "heritage site"
   ]
  },
  "termLabels": {
