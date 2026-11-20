@@ -1,0 +1,462 @@
+[
+ {
+  "id": 1936,
+  "name": "Tim's By The River Campsite",
+  "file": "/images/venues/tim-s-by-the-river-campsite-2610.jpg",
+  "dimensions": "1200x600",
+  "source_page": "http://timscampsite.ca",
+  "image_url": "https://static.wixstatic.com/media/820cd4_15639655a901496aa1db240169f3c290~mv2.jpg",
+  "source_kind": "website",
+  "note": "Shuswap River running past the campground under summer trees (source 1200px wide, best available)"
+ },
+ {
+  "id": 1937,
+  "name": "Tinhorn Lodge",
+  "file": "/images/venues/tinhorn-lodge-2610.jpg",
+  "dimensions": "1200x600",
+  "source_page": "https://www.tinhornlodge.ca/",
+  "image_url": "https://www.tinhornlodge.ca/og-image.jpg",
+  "source_kind": "website",
+  "note": "Log lodge exterior with wraparound deck in winter snow (source 1200px wide)"
+ },
+ {
+  "id": 1938,
+  "name": "Bullet Creek Cabins",
+  "file": "/images/venues/bullet-creek-cabins-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/plan-your-trip/accommodation/bullet-creek-cabins",
+  "image_url": "http://www.bigwhite.com/sites/default/files/2016-09/Winter-Accom-BulletCreek-Exterior-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Bullet Creek cabin exterior with snowy deck and trees (Big White's own accommodation page)"
+ },
+ {
+  "id": 1941,
+  "name": "Chateau Big White",
+  "file": "/images/venues/chateau-big-white-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/plan-your-trip/accommodation/chateau-big-white",
+  "image_url": "http://www.bigwhite.com/sites/default/files/2024-05/NEW-CBW-Exterior-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Chateau Big White exterior in snow on the village ski-through"
+ },
+ {
+  "id": 1945,
+  "name": "Copper Kettle Lodge",
+  "file": "/images/venues/copper-kettle-lodge-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/plan-your-trip/accommodation/copper-kettle-lodge",
+  "image_url": "http://www.bigwhite.com/sites/default/files/2023-03/Winter-Accomm-Copper-Kettle-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Copper Kettle Lodge building in snow with Big White village behind"
+ },
+ {
+  "id": 1946,
+  "name": "Grizzly Lodge",
+  "file": "/images/venues/grizzly-lodge-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/plan-your-trip/accommodation/grizzly-lodge",
+  "image_url": "http://www.bigwhite.com/sites/default/files/2016-09/Winter-Accom-Grizzly-Exterior-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Grizzly Lodge stone-and-timber facade with balconies under snow"
+ },
+ {
+  "id": 1942,
+  "name": "Inn at Big White",
+  "file": "/images/venues/inn-at-big-white-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Inn At Big White, 5340 Big White Rd",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcLYAMUSLXXA-jXnaLri17MuVtjL5ybeGItUt-ErzyEEqtaAsHsFF95hWb7dyO1fs_ohpfUpDJWRsOMqtoNEn78bzJY3CiFanjt175bQFQTpeAq-rnnGWHGe7kSUEDudKezesSN=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: Inn at Big White facade with chairlift passing in front and snowy run behind (Big White's banner was a wide village aerial)"
+ },
+ {
+  "id": 1944,
+  "name": "Ptarmigan Inn",
+  "file": "/images/venues/ptarmigan-inn-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/plan-your-trip/accommodation/ptarmigan-inn",
+  "image_url": "http://www.bigwhite.com/sites/default/files/2025-01/Winter-Accom-Ptarmigan-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Ptarmigan Inn exterior in winter with snowy forest"
+ },
+ {
+  "id": 1947,
+  "name": "Stonebridge Lodge",
+  "file": "/images/venues/stonebridge-lodge-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/plan-your-trip/accommodation/stonebridge",
+  "image_url": "http://www.bigwhite.com/sites/default/files/2022-12/Winter-Accom-Stonebridge-Exterior-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Stonebridge Lodge facade on the ski-in run with skiers passing"
+ },
+ {
+  "id": 1948,
+  "name": "Sundance Resort",
+  "file": "/images/venues/sundance-resort-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/plan-your-trip/accommodation/sundance-resort",
+  "image_url": "http://www.bigwhite.com/sites/default/files/2023-03/Winter-Accom-Sundance-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Sundance Resort buildings in snow with the village and forest above"
+ },
+ {
+  "id": 1940,
+  "name": "Urban Retreat Hostel",
+  "file": "/images/venues/urban-retreat-hostel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.urbanretreathostel.ca/",
+  "image_url": "https://www.urbanretreathostel.ca/wp-content/uploads/2024/11/Exterior-2-scaled.jpg",
+  "source_kind": "website",
+  "note": "Hostel entrance with timber gable and Urban Retreat Hostel sign in snow"
+ },
+ {
+  "id": 1943,
+  "name": "White Crystal Inn",
+  "file": "/images/venues/white-crystal-inn-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/plan-your-trip/accommodation/white-crystal-inn",
+  "image_url": "http://www.bigwhite.com/sites/default/files/2022-12/Winter-Accom-WC-Exterior-2000x800px_0.jpg",
+  "source_kind": "website",
+  "note": "White Crystal Inn on the ski-through with skiers in front"
+ },
+ {
+  "id": 1939,
+  "name": "Woodcutter Cabins",
+  "file": "/images/venues/woodcutter-cabins-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.bigwhite.com/plan-your-trip/accommodation/woodcutter-cabins",
+  "image_url": "http://www.bigwhite.com/sites/default/files/2016-10/Winter-Accom-Woodcutter-Exterior-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Woodcutter cabin with timber balcony among snow-laden trees"
+ },
+ {
+  "id": 1949,
+  "name": "Mara Cottage Campground",
+  "file": "/images/venues/mara-cottage-campground-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://maracottagecampground.com/",
+  "image_url": "https://img1.wsimg.com/isteam/ip/2af2a508-c4d9-46c1-89fe-4da635e8db0e/20220712_080312.jpg",
+  "source_kind": "website",
+  "note": "Treed campsite with a motorhome and picnic table on grass"
+ },
+ {
+  "id": 1950,
+  "name": "Quilakwa RV Park & Campground",
+  "file": "/images/venues/quilakwa-rv-park-and-campground-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.quilakwarvpark.com/rv-campground",
+  "image_url": "https://images.squarespace-cdn.com/content/v1/6424cb2f78caa9713df5855f/1787075036576-FKW3AUYZA4U8LE2IQ22W/1000008946.jpg?format=2500w",
+  "source_kind": "website",
+  "note": "Campground loop with flower beds, RV sites and tall trees"
+ },
+ {
+  "id": 1953,
+  "name": "Camp-Along Resort",
+  "file": "/images/venues/camp-along-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Camp-Along Resort, 100 Ash Ave, Kaleden",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLc8dT8VHskK_6owIIi1llaSQqQtWjhmS_zZihAVAhAwT6HJ2RfKVOVAdd0eRwOFgNR3fUuPahA3iYcGa_0p2QsfVOIgHtyo2fQOaGOw1Y1yFar1d-od75e73Y2NKUpiHT_npvC1bEgOSQXD=w2400",
+  "source_kind": "google_maps",
+  "note": "Grassy campground terraces with picnic tables above Skaha Lake (listed website is campendium.com, not the resort's own)"
+ },
+ {
+  "id": 1951,
+  "name": "Mountain Springs Nature Retreat & B&B",
+  "file": "/images/venues/mountain-springs-nature-retreat-and-b-and-b-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://mountainspringscentre.ca/",
+  "image_url": "https://cdn.soloist.ai/3416fea8-70d9-4644-bb30-8b8917b78e22/f29dbf8d-26a0-4861-bd68-f53a7f4e9080_2048x2048.webp",
+  "source_kind": "website",
+  "note": "Aerial of the retreat house with patio and lawn among pines"
+ },
+ {
+  "id": 1952,
+  "name": "Ponderosa Point Resort",
+  "file": "/images/venues/ponderosa-point-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.ponderosapoint.com/",
+  "image_url": "https://www.ponderosapoint.com/wp-content/uploads/2016/05/Home-banner-2025.jpg",
+  "source_kind": "website",
+  "note": "Aerial of the treed point with beach and cabins on Skaha Lake"
+ },
+ {
+  "id": 1954,
+  "name": "A Vista Villa Couples Retreat",
+  "file": "/images/venues/a-vista-villa-couples-retreat-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: A Vista Villa Bed & Breakfast, 962 Ryder Dr, Kelowna",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfOrI4d8NkUe2YYRub1v69u62g8oECb6w_yw8Dx6olQXcv59YdHxqgU6__2Iig8xjal2mublmkAtV_9jniG7O3e-uAXGn3VWCb09vuvrHOVy7yT8Go8BsLMxGYIPYCCHxR2Ndo=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: pool and patio with the villa behind on a sunny day"
+ },
+ {
+  "id": 1967,
+  "name": "Accent Inns Kelowna",
+  "file": "/images/venues/accent-inns-kelowna-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Accent Inns Kelowna, 1140 Harvey Ave, Kelowna",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfSYcu51Vam5q-SLoNdD8h6zCsUVuZB9fgbEFGvmlBMZQziPKBJc5ZkKknliK45lHLpEPD_Tar3XZgpTEjlXAy9R8Y3UrhAulwOeZziREDGMspo1W9zrQmHy_CbhwLk61uiUkMT=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: hotel exterior with Accent Inns sign at dusk (chain site photos not clearly tied to Kelowna)"
+ },
+ {
+  "id": 1959,
+  "name": "Apple Valley Orchard & RV Park",
+  "file": "/images/venues/apple-valley-orchard-and-rv-park-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Apple Valley Orchard & RV Park, 1980 Union Rd, Kelowna",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfJ9z0F43NnlhByhR_eJG_TYoVPwmJ7Wicq6CNU2Hq-Dl9yW8fZN3JnSQfgJGewW4fYhAY35d7QCERuGgVJUvzgDbwha7lYZol-Guj1ZWUOnid-VtAoJ6U5G6_w242T2zSjYghkyeMsKjre=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: the park's farmhouse office building with patio and picnic table (site photos 800px or blossoms only)"
+ },
+ {
+  "id": 1955,
+  "name": "Beds by the Bridge",
+  "file": "/images/venues/beds-by-the-bridge-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://bythebridge.ca/",
+  "image_url": "https://img1.wsimg.com/isteam/ip/5f598500-0218-494c-90f9-26e089ea55b3/6E3A1133_4_5Enhancer.jpg",
+  "source_kind": "website",
+  "note": "Pink B&B house front with garden bridge and sign"
+ },
+ {
+  "id": 1968,
+  "name": "Best Western Plus Kelowna Hotel & Suites",
+  "file": "/images/venues/best-western-plus-kelowna-hotel-and-suites-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.bestwesternkelownahotel.com/",
+  "image_url": "https://static.wixstatic.com/media/ce5942_bf06754ccd664ddc9e0eeba091c75d8b~mv2.jpg",
+  "source_kind": "website",
+  "note": "Hotel tower and low wing with Best Western Plus signs at dusk"
+ },
+ {
+  "id": 1960,
+  "name": "Big Sky RV Park",
+  "file": "/images/venues/big-sky-rv-park-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "Google Maps: Big Sky RV Park, 4390 Wallace Hill Rd, Kelowna",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcCuDJy1yVw1Xozjqx-oBwZ2-zQKrc2i6F_aJH6qvUblCDulNTzdbNwEB1SeH_qApJsbDzHslsVWklYGv9oihBX2seaEWqRqUKtL1spoaoyD_3xxMoJgaqxWPdgBwnUSir2lJVIAnpRLYcD=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner aerial photo of the RV sites among farmland at dusk (website has no large photos)"
+ },
+ {
+  "id": 1993,
+  "name": "Borgata Lodge at Quail Ridge",
+  "file": "/images/venues/borgata-lodge-at-quail-ridge-2610.jpg",
+  "dimensions": "1500x750",
+  "source_page": "Google Maps: Borgata Lodge, 3185 Via Centrale, Kelowna",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeQd2UN6wmJk7mFSq73zFk1mSJfPiobpvEtX24xklsQ2127Tf8Mwu2Hd2dhHEx8gRqIpM83mnBPUFZ5ATdhp3KCVq4zUx3Vi4P9z_sJRPJcc5HCaEo-bX7Fd9rZcnbi8C3_9yuyWAwPwgu1=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: Borgata Lodge building and courtyard with flowers (website returns 403 to scripts; source 1500px)"
+ },
+ {
+  "id": 1987,
+  "name": "Canadas Best Value Inn Kelowna",
+  "file": "/images/venues/canadas-best-value-inn-kelowna-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.sonesta.com/hotels/bc0002-canadas-best-value-inn-kelowna",
+  "image_url": "https://sonesta.bynder.com/transform/037fe77e-960f-4c8d-b3aa-ba686e2335d0/CBVI_Kelowna_BC0002_ExteriorFront3?io=transform:fit,width:2560,height:2560&format=jpg&quality=90",
+  "source_kind": "website",
+  "note": "Motel entrance and sign on Highway 97 (Sonesta's own Kelowna property photo)"
+ },
+ {
+  "id": 1956,
+  "name": "Chateau Okanagan",
+  "file": "/images/venues/chateau-okanagan-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Chateau Okanagan, 380 Lochview Rd, Kelowna",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfn694xvLb_df1yP9zPZJM_iGCgnKBk-r92T7ut8zOwEhMVuI5dW_IE4wV1TYZ0LuQ74x1AIwJB2z6XkU3M-vqUNK6U-oFlE_EVKfagShZLaBHzi3HLdTCFB9aBPbNohZ_S1ohL=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner aerial of the stone chateau on the hillside (own site refuses non-browser requests)"
+ },
+ {
+  "id": 1969,
+  "name": "Coast Capri Hotel",
+  "file": "/images/venues/coast-capri-hotel-2610.jpg",
+  "dimensions": "1666x834",
+  "source_page": "https://www.coasthotels.com/coast-capri-hotel",
+  "image_url": "https://image-tc.galaxy.tf/wijpeg-63yn0kb8jnkpe7d7q6oghv2mj/coast-capri-hotel-2024.jpg",
+  "source_kind": "website",
+  "note": "Hotel wings with balconies around the courtyard pool"
+ },
+ {
+  "id": 1970,
+  "name": "Comfort Suites Kelowna",
+  "file": "/images/venues/comfort-suites-kelowna-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Comfort Suites Kelowna, 2656 Hwy 97 N, Kelowna",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLf8p1-PcA1TT7Htipt1vcHDdwOLqL-OY11rg2XMgG9ZrWOBiUzt0HCtz6VEXnnwKn6EKCRGHngKZnJ4RKprom_jB7peaHNVzM2OenLo010edkyKFSnyE0WI_Gipc96QITbgHQNx07TxMN6e=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner aerial of the lit hotel with Comfort Suites and Waterslide signs at dusk (site's exterior photo only 1024px)"
+ },
+ {
+  "id": 1988,
+  "name": "Days Inn by Wyndham Kelowna",
+  "file": "/images/venues/days-inn-by-wyndham-kelowna-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.wyndhamhotels.com/days-inn/kelowna-british-columbia/days-inn-kelowna/overview",
+  "image_url": "https://www.wyndhamhotels.com/content/dam/property-images/en-us/di/ca/bc/kelowna/07185/07185_exterior_view_2.jpg",
+  "source_kind": "website",
+  "note": "Motel buildings with Days Inn signs, pool fence and garden"
+ },
+ {
+  "id": 1994,
+  "name": "Delta Hotels by Marriott Grand Okanagan Resort",
+  "file": "/images/venues/delta-hotels-by-marriott-grand-okanagan-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Delta Hotels Grand Okanagan Resort, 1310 Water St, Kelowna",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfZH-3suw5K74khTvnLh6V9yD-s_tvhd2J6DhYbSzlJtTRI6C69srNowOXzqml6tlg_AWaD2fSfVElxNC45TJbmh5Vf1ZnlNdD_uT1J1WN13PXeVgE856g9mdH8fbqliTrfmkelM_tzIFSx=w2400",
+  "source_kind": "google_maps",
+  "note": "Resort lagoon and towers with Okanagan Lake behind in fall light (marriott.com returns 403)"
+ },
+ {
+  "id": 1989,
+  "name": "Dilworth Inn",
+  "file": "/images/venues/dilworth-inn-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "https://www.dilworthinn.com/",
+  "image_url": "https://www.dilworthinn.com/files/233A5711.jpg",
+  "source_kind": "website",
+  "note": "Two-storey motel wing with balcony behind flower gardens"
+ },
+ {
+  "id": 1971,
+  "name": "Econo Lodge Inn & Suites Kelowna",
+  "file": "/images/venues/econo-lodge-inn-and-suites-kelowna-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.econolodgekelowna.com/",
+  "image_url": "https://www.econolodgekelowna.com/image/w1800/files/60afd0e0-c194-4caf-b9c4-6b5dd8b0b5a5.jpg",
+  "source_kind": "website",
+  "note": "Motel entrance canopy and two-storey wing on a sunny day"
+ },
+ {
+  "id": 1972,
+  "name": "Fairfield by Marriott Kelowna",
+  "file": "/images/venues/fairfield-by-marriott-kelowna-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Fairfield by Marriott Inn & Suites Kelowna, 1655 Powick Rd",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdveQcUToWprzqW6mkMa2S6OIJZtTupdqS34T8imS7QSc1B-erVDLyAQ-nUrBm1an_ok5t3yPWoHxhosY-RVEkjwpDsdgNiH6Wjszn29OXEC5PbUm6N4zAOO3DMbnpTe2Vba3hX2KONdHg1=w2400",
+  "source_kind": "google_maps",
+  "note": "Hotel exterior with Fairfield sign and entrance canopy on an overcast day (marriott.com returns 403; only 7 Google photos, best of them)"
+ },
+ {
+  "id": 1961,
+  "name": "Farming Karma RV Park",
+  "file": "/images/venues/farming-karma-rv-park-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Farming Karma RV Park, 1160 McKenzie Rd, Kelowna",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLd7PdQoUlzj0C9PuuBaRHTqLZRLwfMFitfADzSBafTshq4C6Pz_jRQfveJwpmK7ooDB3__E6fSDZ93s0Xb68RzZJQH68Q4lpdbJ17mo9TgkY_PBbogzml5Jy43LFLC2_RTh7mAW=w2400",
+  "source_kind": "google_maps",
+  "note": "RV sites with trailers, umbrellas and picnic tables by the orchard (website photos 800px max)"
+ },
+ {
+  "id": 1973,
+  "name": "Four Points by Sheraton Kelowna Airport",
+  "file": "/images/venues/four-points-by-sheraton-kelowna-airport-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Four Points by Sheraton Kelowna Airport, 5505 Airport Way",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfe3dw-taz_lUmXjqadQvUrxZhWD8Ybdq93RXUB-QQDhvXibZd0rs_jmlzS6MZQIbsHycvY-I8Cs2_ZHmAgEE5H0EWxo49vK2oCc8QRxnxXbq3_sXWRiP8I2pMBv5Xh6TmFVQhi=w2400",
+  "source_kind": "google_maps",
+  "note": "Indoor pool with waterslide (marriott.com 403; Google has only 3 photos, 2 are 360s, no usable exterior)"
+ },
+ {
+  "id": 1974,
+  "name": "Hampton Inn & Suites by Hilton Kelowna Airport",
+  "file": "/images/venues/hampton-inn-and-suites-by-hilton-kelowna-airport-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Hampton Inn & Suites by Hilton Kelowna Airport, 1665 Innovation Dr",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcocDCJnyJQ4mZzM7BXl1vTBgsxav71MVLjoFK6bLqLIcmT0GWm2RoJDp5-CIR15ewKKNUxUQdJa6tsRuQPuqOZVfrUiGk-cUUDzrDFhZhyPQ470t7tJ1tDJi5tJo6q0kVUTx6Qyw=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: hotel facade with Hampton Inn sign and timber entrance canopy at dusk (hilton.com timed out)"
+ },
+ {
+  "id": 1957,
+  "name": "Hillcrest Farm Market B&B",
+  "file": "/images/venues/hillcrest-farm-market-b-and-b-2610.jpg",
+  "dimensions": "1500x750",
+  "source_page": "https://www.hillcrestfarmmarket.com/b-b/",
+  "image_url": "https://www.hillcrestfarmmarket.com/wp-content/uploads/2020/07/131025_hillcrest_cafe_026.jpg",
+  "source_kind": "website",
+  "note": "King guest room with stone fireplace and valley window (no exterior photo of the B&B on site or Google)"
+ },
+ {
+  "id": 1975,
+  "name": "Holiday Inn Express & Suites Kelowna East",
+  "file": "/images/venues/holiday-inn-express-and-suites-kelowna-east-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Holiday Inn Express & Suites Kelowna - East, 1620 Powick Rd",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfnwHkEXK5HIZWsNpgTnhHRtxIlSTAS8MRsULRLC5mhVqyoDzjIJlrlaz4rULxGgsyaCVeFGBiy8CmumyOGkOtjGOgx0isO0QcCyfOaM3vLipjR78uPHntLI3DwMbljx2HHniA=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: hotel exterior with Holiday Inn Express sign at dusk (ihg site returns 403)"
+ },
+ {
+  "id": 1976,
+  "name": "Hotel Eldorado at Eldorado Resort",
+  "file": "/images/venues/hotel-eldorado-at-eldorado-resort-2610.jpg",
+  "dimensions": "1420x710",
+  "source_page": "Google Maps: Hotel Eldorado at Eldorado Resort, 500 Cook Rd, Kelowna",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeXzx4Ckoo4Ux6fiXElndTjw9VdFkx6FaxN2Ndyu8B4JFR1r85LItbmeMWrnBLiXFnsLo-GCq_XcmyhePpZu0sNdXs-0KA0qMbpJeGehmki193Ko2t_lAwKbC_kWevrv-9cJJ0a=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: lakefront hotel and boardwalk patio (site's own exterior shots under 1100px; source 1420px)"
+ },
+ {
+  "id": 1977,
+  "name": "Hotel Zed Kelowna",
+  "file": "/images/venues/hotel-zed-kelowna-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.hotelzed.com/kelowna/gallery/",
+  "image_url": "https://www.hotelzed.com/wp-content/uploads/2023/06/The-funkiest-hotel-in-Kelowna.jpg",
+  "source_kind": "website",
+  "note": "Retro motel facade with rainbow doors and Hotel Zed sign"
+ },
+ {
+  "id": 1978,
+  "name": "Hyatt Place Kelowna",
+  "file": "/images/venues/hyatt-place-kelowna-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Hyatt Place Kelowna, 1915 Enterprise Way",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLck-NYxAyFQcfpYqZDWJW2Pbr7LvYLS7JjfR_2guGIHVkOzRpduYxOtXSHaxd6DcRs_dTBlFBXE7TMPeyJN23_11t_JjJJCgaXQiiDjitXDSSeljD0ppD9SQrPhMzfAZgAx5uWvTwa9uE4V=w2400",
+  "source_kind": "google_maps",
+  "note": "Hotel facade and glass entrance canopy (hyatt.com 403; Hyatt Place sign sits above the strip)"
+ },
+ {
+  "id": 1979,
+  "name": "La Quinta Inn & Suites by Wyndham Kelowna BC",
+  "file": "/images/venues/la-quinta-inn-and-suites-by-wyndham-kelowna-bc-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: La Quinta Inn & Suites By Wyndham Kelowna BC, 1670 Commerce Ave",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdiASXY8t901cld4qYa3k87PrwsAIrc1dDWTTsZmAd0OOiar_CrHbxIyK8ht5H0H0xiW7pETWeZzkk1x_v9pyIWNDE6-d9EEza9Ot0PoH3DfHA4aL083AuFHdQ9YM3ZbReVoVdaudd-pWm4=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: new five-storey hotel with La Quinta sunburst facade (wyndhamhotels.com page had no property images in its HTML)"
+ },
+ {
+  "id": 1963,
+  "name": "MacDonald Acres RV Park",
+  "file": "/images/venues/macdonald-acres-rv-park-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: MacDonald Acres RV Park, 4631 Hwy 33, Kelowna",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdtlMqzSIC7bK6SxVKTAjkgh9E6DZG5MemfMbZ2sg1igFzRGFvqN2PkFZBJeMU4nUeSu9fniQ2u40r944199svh1QZsYT6THnD9j2oV7uKL2ddScfL29b8H-RuQkC3R1btaxvFIBfPbDw8=w2400",
+  "source_kind": "google_maps",
+  "note": "Tent site under a tree on a grassy bench with valley view (website returns 404)"
+ },
+ {
+  "id": 1958,
+  "name": "Magnolia Bed and Breakfast",
+  "file": "/images/venues/magnolia-bed-and-breakfast-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://themagnoliabandb.com/",
+  "image_url": "https://themagnoliabandb.com/wp-content/uploads/2024/11/Home-page-banner-image-2-scaled.jpg",
+  "source_kind": "website",
+  "note": "Overhead view of the pool deck with loungers and the B&B house"
+ },
+ {
+  "id": 1995,
+  "name": "Manteo at Eldorado Resort",
+  "file": "/images/venues/manteo-at-eldorado-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.manteo.com/",
+  "image_url": "https://image-tc.galaxy.tf/wijpeg-3e5zeqgwsel0olsnwuohd92n0/dji-0164.jpg?width=1920",
+  "source_kind": "website",
+  "note": "Aerial of Manteo's roofs, pool and marina on Okanagan Lake"
+ }
+]

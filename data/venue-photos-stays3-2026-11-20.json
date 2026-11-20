@@ -1,0 +1,90 @@
+{
+ "reason": "Places-to-stay photos, third pass (own websites)",
+ "batch_id": "photos-stays3-ok-2026-11-20",
+ "venues": [
+  {
+   "id": 2101,
+   "name": "Swan Lake RV Park & Campground",
+   "region": "vernon",
+   "slug": "swan-lake-rv-park-and-campground",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/swan-lake-rv-park-and-campground-2610.jpg?v=20261120b"
+   }
+  },
+  {
+   "id": 2119,
+   "name": "A Lakeview Heights Bed & Breakfast",
+   "region": "west-kelowna",
+   "slug": "a-lakeview-heights-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/a-lakeview-heights-bed-and-breakfast-2610.jpg?v=20261120b"
+   }
+  },
+  {
+   "id": 2120,
+   "name": "A View of the Lake Bed & Breakfast",
+   "region": "west-kelowna",
+   "slug": "a-view-of-the-lake-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/a-view-of-the-lake-bed-and-breakfast-2610.jpg?v=20261120b"
+   }
+  },
+  {
+   "id": 2104,
+   "name": "Best Western Premier Route 97 Vernon",
+   "region": "vernon",
+   "slug": "best-western-premier-route-97-vernon",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/best-western-premier-route-97-vernon-2610.jpg?v=20261120b"
+   }
+  },
+  {
+   "id": 2034,
+   "name": "Brookvale Holiday Resort (Brookvale Campground & RV)",
+   "region": "osoyoos",
+   "slug": "brookvale-holiday-resort-brookvale-campground-and-rv",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/brookvale-holiday-resort-brookvale-campground-and-rv-2610.jpg?v=20261120b"
+   }
+  },
+  {
+   "id": 2024,
+   "name": "The Villa at Hester Creek",
+   "region": "oliver",
+   "slug": "the-villa-at-hester-creek",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-villa-at-hester-creek-2610.jpg?v=20261120b"
+   }
+  },
+  {
+   "id": 1962,
+   "name": "Heartland Family Campground",
+   "region": "kelowna",
+   "slug": "heartland-family-campground",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/heartland-family-campground-2610.jpg?v=20261120b"
+   }
+  }
+ ]
+}

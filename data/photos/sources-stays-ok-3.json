@@ -1,0 +1,462 @@
+[
+ {
+  "id": 2040,
+  "name": "Avalon Inn",
+  "file": "/images/venues/avalon-inn-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "http://www.avaloninnosoyoos.com/",
+  "image_url": "https://avaloninnosoyoos.com/s/cdn/v1.0/i/m?url=https%3A%2F%2Fstorage.googleapis.com%2Fproduction-websitebuilder-v1-0-0%2F280%2F174280%2FOQl3uzdL%2F9ec6389426614a57a6732b2685c37a2a&methods=resize%2C2400%2C5000",
+  "source_kind": "website",
+  "note": "Front of the inn with its Avalon Inn sign and lawn, mountains behind"
+ },
+ {
+  "id": 2036,
+  "name": "Best Western Plus Osoyoos Hotel & Suites",
+  "file": "/images/venues/best-western-plus-osoyoos-hotel-and-suites-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Best Western Plus Osoyoos Hotel & Suites, 5506 Main Street, Osoyoos",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfj_LeI0bUhq6BtzZCyHg--8ZeI2AeXsCcI2T-xCRi0LuKeVfGK2QB2N3V87bW64YhpJdepH1alYxEfKiF-xh8eIXemQSx4W0MNjG7gx0txVtsGXMkTqGMvrAlswNREPaK_AWytBg=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: front of the hotel from Main Street with its roadside sign (bestwestern.com blocks scripts)"
+ },
+ {
+  "id": 2041,
+  "name": "Boundary Motel",
+  "file": "/images/venues/boundary-motel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "http://www.boundarymotel.com/",
+  "image_url": "https://static.wixstatic.com/media/06035a_45d1f494f9d643de9849813534720de9~mv2_d_5184_3456_s_4_2.jpg",
+  "source_kind": "website",
+  "note": "Motel units with hanging flower baskets and Adirondack chairs (2:1 crop of 5184px source)"
+ },
+ {
+  "id": 2037,
+  "name": "Coast Osoyoos Beach Hotel",
+  "file": "/images/venues/coast-osoyoos-beach-hotel-2610.jpg",
+  "dimensions": "1666x834",
+  "source_page": "https://www.coasthotels.com/coast-osoyoos-beach-hotel",
+  "image_url": "https://image-tc.galaxy.tf/wijpeg-bmidzgqt2ppxkvkbw7xw4r24b/coast-osoyoos-beach-hotel-2025.jpg?width=2400",
+  "source_kind": "website",
+  "note": "Hotel building on its beach, reflected in Osoyoos Lake (source 1667px wide)"
+ },
+ {
+  "id": 2038,
+  "name": "Holiday Inn & Suites Osoyoos",
+  "file": "/images/venues/holiday-inn-and-suites-osoyoos-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Holiday Inn & Suites Osoyoos, 7906 Main Street, Osoyoos",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLclfCsnj8YMK3P9_Sq47IAWdt4vtJr4f4HgvzONPrQ61wsM8BHjIkJDPKM9E_wYnWzp-ckNaeVBlhmtxYre1xLTA1yuNwNYWKeTU_wsCiV73LVeD6dqghMeK-gLdMOFhFzRHMk7=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: the lakefront hotel reflected in Osoyoos Lake, hills behind (ihg.com blocks scripts)"
+ },
+ {
+  "id": 2033,
+  "name": "Inkaneep Point Resort",
+  "file": "/images/venues/inkaneep-point-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://inkaneep.com/",
+  "image_url": "https://img1.wsimg.com/isteam/ip/47440b09-1b06-420d-b813-09422eb71a16/WP_000856.jpg",
+  "source_kind": "website",
+  "note": "Resort beach on Osoyoos Lake with Adirondack chairs, dock and paddle boats"
+ },
+ {
+  "id": 2042,
+  "name": "Osoyoos Lakeview Inn & Suites",
+  "file": "/images/venues/osoyoos-lakeview-inn-and-suites-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://osoyooslakeview.ca/",
+  "image_url": "https://img1.wsimg.com/isteam/ip/0cd9d6ec-18e1-4b50-b52f-944af488d578/20200619_114321.jpg",
+  "source_kind": "website",
+  "note": "Outdoor pool with the two-storey motel building and hills behind"
+ },
+ {
+  "id": 2039,
+  "name": "Park Inn by Radisson Osoyoos",
+  "file": "/images/venues/park-inn-by-radisson-osoyoos-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Park Inn by Radisson Osoyoos, 9130 Main Street, Osoyoos",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcx9hlx-BEGi7XjAeR16MhHJNSYbt4WhOd8l3f5yD-iXkGzbo1_Kt7P-sFZ0Cc93PrB5xYdhtYgCPTI4W-eHZuGNn4n0_NR1DZI7_t6z-FaGBbDtanXSNm-SeVrIwqhY03dtRxzwcDvXyjV=w2400",
+  "source_kind": "google_maps",
+  "note": "Courtyard pool surrounded by the hotel's arched balconies (choicehotels.com blocks scripts)"
+ },
+ {
+  "id": 2046,
+  "name": "Richter Pass Beach Resort",
+  "file": "/images/venues/richter-pass-beach-resort-2610.jpg",
+  "dimensions": "1344x672",
+  "source_page": "https://richterpass.com/",
+  "image_url": "https://richterpass.com/wp-content/uploads/revslider/slider-richter/slider-image1.jpg",
+  "source_kind": "website",
+  "note": "Beachfront motel building with lawn and Osoyoos Lake beach (source 1920x672, crop 1344px wide)"
+ },
+ {
+  "id": 2043,
+  "name": "Sahara Courtyard Inn & Suites",
+  "file": "/images/venues/sahara-courtyard-inn-and-suites-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Sahara Courtyard Inn & Suites, 6205 Cottonwood Drive, Osoyoos",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeFPu9xGC2gBiHmcjqbh4JU-VCnhgo84myf13tCdDdVYhehscx9_9HNyTaPkwNXz84rDQAyB8uFlYXDC75JxTEeu-8t0uBY6a-ilS-8xBRkfZBrnSGwf4y5kELx8frhPJh0QJ07E6iGb5Q=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: motel units around the fenced pool at sunset, hills behind (no website listed)"
+ },
+ {
+  "id": 2047,
+  "name": "Sandy Beach Suites",
+  "file": "/images/venues/sandy-beach-suites-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://sandybeachsuites.ca/",
+  "image_url": "https://sandybeachsuites.ca/wp-content/uploads/2019/06/Sandy-Beach-100-of-229.jpg",
+  "source_kind": "website",
+  "note": "Sandy beach with red Adirondack chairs in front of the Mediterranean-style suite buildings"
+ },
+ {
+  "id": 2048,
+  "name": "Spirit Ridge, in The Unbound Collection by Hyatt",
+  "file": "/images/venues/spirit-ridge-in-the-unbound-collection-by-hyatt-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Spirit Ridge, in The Unbound Collection by Hyatt, 1200 Rancher Creek Road, Osoyoos",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdbV1YPwwkZILSvy4isHvzb0qrqvRi95GEA2VxYebDodMNNoiMRVRczHS8nOQ90kajJVVj8BY4YtlfKT2ErzVL5pFZ7oVti0pkM-VtLf3FNjvB4zrgMSDT0E59c36s-JPch5eJBcA=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: the resort's pool and gardens below its vineyard (hyatt.com blocks scripts)"
+ },
+ {
+  "id": 2044,
+  "name": "Sun Beach Motel",
+  "file": "/images/venues/sun-beach-motel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Sun Beach Motel, 7303 Main Street, Osoyoos",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLe-rxrEflPbw6NImtP2m3tZq405drQUgVyGhuqO8bQt2L9G4VFFp9F9YrwOSYAK5W0GTdfHxr8AXpdA0UBiIgiO4zGYVal6rD3F8eOQgssT0CAWX-cocaKAAbACR6JWgrgFT4vD=w2400",
+  "source_kind": "google_maps",
+  "note": "Motel building and willow trees seen from the lake, with its beach and dock (own site blocks scripts: 403)"
+ },
+ {
+  "id": 2035,
+  "name": "Sunterra Campground",
+  "file": "/images/venues/sunterra-campground-2610.jpg",
+  "dimensions": "1600x800",
+  "source_page": "Google Maps: Sunterra Campground, 5003 Lakeshore Drive, Osoyoos",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcWf-19eDJaKnzwXp7OHQfoMpHAslRY-cjSw9oL3SftX1ugY78ueHJoIfFyrWKVmpzIMgGHRs4fbRl4nJOmb1R7agAbg5Dqw35TuW5SV6LUa4kJdz_nUnGWWkh9FvLt6cNdUm4b7upJj3mb=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: the campground beach with a picnic table and dock on Osoyoos Lake at dusk (source 1600px wide)"
+ },
+ {
+  "id": 2049,
+  "name": "Walnut Beach Resort",
+  "file": "/images/venues/walnut-beach-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.walnutbeachresort.com/",
+  "image_url": "https://www.walnutbeachresort.com/img/hero/WalnutBeach-Resort-Osoyoos-Drone_1007.webp",
+  "source_kind": "website",
+  "note": "Aerial of the resort on Osoyoos Lake: buildings, pool, beach and dock"
+ },
+ {
+  "id": 2050,
+  "name": "Watermark Beach Resort",
+  "file": "/images/venues/watermark-beach-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.watermarkbeachresort.com/",
+  "image_url": "https://www.watermarkbeachresort.com/wp-content/uploads/2023/05/Hotel_Amenities_Hero.jpg",
+  "source_kind": "website",
+  "note": "Outdoor pool and loungers with the resort building and hills behind"
+ },
+ {
+  "id": 2045,
+  "name": "Westridge Motor Inn",
+  "file": "/images/venues/westridge-motor-inn-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "http://westridgeinn.ca/",
+  "image_url": "https://images.squarespace-cdn.com/content/v1/5b4e4f889f8770378d9f8c4d/1562546998765-IHS212RVTYXUTXLN3VDY/POOL1.jpg?format=2500w",
+  "source_kind": "website",
+  "note": "Outdoor pool and patio with the Westridge Motor Inn sign"
+ },
+ {
+  "id": 2051,
+  "name": "Peachland Beach Resort",
+  "file": "/images/venues/peachland-beach-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.peachlandbeachresort.com/",
+  "image_url": "https://images.squarespace-cdn.com/content/v1/67be3506c64e5f6422db8ab1/1740518688331-TZ9KN3R7UQY9KG8MZ0N3/Davis+Cove+Aerials+%283+of+5%29.jpg?format=2500w",
+  "source_kind": "website",
+  "note": "Aerial of the lakefront cabins above the resort's beach (site file names say Davis Cove)"
+ },
+ {
+  "id": 2069,
+  "name": "5000 Motel",
+  "file": "/images/venues/5000-motel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: 5000 Motel, 1742 Main Street, Penticton",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLf1JzpcsZFnZ6YFEVbYTJZEUVf2RWp0I1ZOr7aYHGonZetzDqZx8cKKhgcdoKsyc5i8BZj3QKPLwib5kUEusTYoP8EPOBqu2hSUmGmq0H-TlPC1EZuKePZXSzxfXZ1dXfTQ9M_SIQ=w2400",
+  "source_kind": "google_maps",
+  "note": "Aerial of the motel units around the fenced outdoor pool (own site unreachable)"
+ },
+ {
+  "id": 2052,
+  "name": "Above the Beach Guest Suites",
+  "file": "/images/venues/above-the-beach-guest-suites-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Above the Beach Guest Suites, 102 Spruce Place, Penticton",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcdTP9kMrmAPUFtrTbRVsgXlg8tBiM92jyZndLWBRl-Id86_h_xoAcUCwpuOJRnC4bKiIQYsDd0ZsFpfCTDW-mJVY6NOJCv_k8I8FBjbmVP8FWjVLXPNff_hQy6KYuA0K8d4KIuzA=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: guest-suite patio looking over Penticton and the hills (site photos under 1200px)"
+ },
+ {
+  "id": 2070,
+  "name": "Apple Tree Inn",
+  "file": "/images/venues/apple-tree-inn-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Apple Tree Inn, 2406 Skaha Lake Road, Penticton",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeXSLD9evVo_otHe77AwGqNvaWUdfJSToKSg0LOg3P2PXinUvDhJCob2uoTiq7xllYyJRPvZtyps-YZHB9JM3uqKP7c2T2zjHMqQ8xXt5dw2wPHs97HuqEog9AaaumW4_EcAURU=w2400",
+  "source_kind": "google_maps",
+  "note": "Outdoor pool with the motel building and hills behind (own site unreachable)"
+ },
+ {
+  "id": 2071,
+  "name": "Beachside Motel",
+  "file": "/images/venues/beachside-motel-2610.jpg",
+  "dimensions": "1770x886",
+  "source_page": "https://visitpenticton.com/listing/beachside-motel/",
+  "image_url": "https://visitpenticton.com/wp-content/uploads/2016/03/Beachside-motel-exterior.jpg",
+  "source_kind": "tourism_board",
+  "note": "Front of the motel with its Beachside Motel sign and flower bed (source 1920x885, crop 1770px wide; own-site photos 800px or text overlay)"
+ },
+ {
+  "id": 2059,
+  "name": "Best Western Inn at Penticton",
+  "file": "/images/venues/best-western-inn-at-penticton-2610.jpg",
+  "dimensions": "1534x766",
+  "source_page": "Google Maps: Best Western Penticton (Inn at Penticton), 3180 Skaha Lake Road, Penticton",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeddeKjbye0LsWgS3HHqV5ktrQ6Crc8wP1PEBITxplS46DoSiXEWlIgc7qeqGHUJ6A_KOSy5od-fPb4sbTFolAn-Yt1rThyZYN_JPe2BQuH9jayIyZzUPyHvjiT6_t9lLnd-1oHO7sbaJY1=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: the inn at dusk behind its Best Western Inn at Penticton sign (source 1534px wide; bestwestern.com blocks scripts)"
+ },
+ {
+  "id": 2053,
+  "name": "Bialto Bed & Breakfast",
+  "file": "/images/venues/bialto-bed-and-breakfast-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Bialto Bed & Breakfast, 1112 Syer Road, Penticton",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdX_wUY5AngpyIdIR1ScHa8myab4c3fxHE6qtry4ypg1jqmoDH1b9OqCxIEAFE2fs8uAInJdmi3lFeTq6sn95PcWgRqSQGksTRwNBlCDUI9eBqXVImRrP2Sqzx4eODx9g8DghETVXcN1OM=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: the modern B&B house on the hillside, hills behind (site photos under 1200px)"
+ },
+ {
+  "id": 2072,
+  "name": "Black Sea Motel",
+  "file": "/images/venues/black-sea-motel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Black Sea Motel, 988 Lakeshore Drive West, Penticton",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLc-G_oSoKx16BHCfygAe6BiTe4M4gUuJrC5Af_NOLv7x58Y-7G0AZxHaMDZE2_Im7d6Vbp35MJ7EwfhDDRVWEwAXEdM6bEkdE8DRpl_-V9QzA7BedJcpud_z5km56PMdWFsHWxH=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: guest room with two queen beds and armchairs, re-cropped from the right 80% of the frame to drop the TV and curtain edge (no usable exterior anywhere)"
+ },
+ {
+  "id": 2073,
+  "name": "Bowmont Motel",
+  "file": "/images/venues/bowmont-motel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.bowmontmotel.com/",
+  "image_url": "https://www.bowmontmotel.com/wp-content/uploads/revslider/slider-home2/Front-of-Motel-4-1-scaled.jpg",
+  "source_kind": "website",
+  "note": "Front of the motel at dusk with its Bowmont Motel sign"
+ },
+ {
+  "id": 2067,
+  "name": "Casa Grande Inn & Guest Suites",
+  "file": "/images/venues/casa-grande-inn-and-guest-suites-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.casagrandeinn.ca/",
+  "image_url": "https://irp.cdn-website.com/d9278c57/dms3rep/multi/opt/DJI_0428-1920w.jpg",
+  "source_kind": "website",
+  "note": "Adobe-style inn building with its patios, hills behind"
+ },
+ {
+  "id": 2060,
+  "name": "Coast Penticton Hotel",
+  "file": "/images/venues/coast-penticton-hotel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.coasthotels.com/coast-penticton-hotel",
+  "image_url": "https://image-tc.galaxy.tf/wijpeg-5oqr7yfwd4vhia3utpwnel0e2/homepage_og-image.jpg?width=2400",
+  "source_kind": "website",
+  "note": "The hotel's two-storey buildings and Coast sign at dusk, hills behind"
+ },
+ {
+  "id": 2054,
+  "name": "Cormier's Studio Guest Suites",
+  "file": "/images/venues/cormier-s-studio-guest-suites-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.cormierstudio.com/",
+  "image_url": "https://images.squarespace-cdn.com/content/v1/58f923492e69cfc19c9b37fa/1695149755127-1UZAIS6SNRCXLJ1CDR9U/cormier-penticton-accomodations.jpg?format=2500w",
+  "source_kind": "website",
+  "note": "The guest suites' garden path with Skaha Lake and hills beyond"
+ },
+ {
+  "id": 2061,
+  "name": "Days Inn & Conference Centre Penticton",
+  "file": "/images/venues/days-inn-and-conference-centre-penticton-2610.jpg",
+  "dimensions": "1366x682",
+  "source_page": "https://www.daysinnpenticton.ca/",
+  "image_url": "https://www.daysinnpenticton.ca/perch/resources/opengraph-w1500.jpg",
+  "source_kind": "website",
+  "note": "Front of the hotel with its Days Inn sign and gated garden, hills behind (source 1500x683, crop 1366px wide)"
+ },
+ {
+  "id": 2074,
+  "name": "Empire Motel",
+  "file": "/images/venues/empire-motel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://visitpenticton.com/listing/empire-motel/",
+  "image_url": "https://visitpenticton.com/wp-content/uploads/2015/08/20180917-empire-motel-035.jpg",
+  "source_kind": "tourism_board",
+  "note": "The two-storey motel behind its lawn, gardens and Empire Motel sign, hills behind (no own website; no Google photos)"
+ },
+ {
+  "id": 2062,
+  "name": "Fairfield Inn & Suites by Marriott Penticton",
+  "file": "/images/venues/fairfield-inn-and-suites-by-marriott-penticton-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://visitpenticton.com/listing/fairfield-inn-suites-penticton/",
+  "image_url": "https://visitpenticton.com/wp-content/uploads/2019/10/FIS_YLWFE_Exterior_01-1.jpg",
+  "source_kind": "tourism_board",
+  "note": "Hotel entrance canopy and front of the building (marriott.com blocks scripts; Google has no photos 1200px+)"
+ },
+ {
+  "id": 2057,
+  "name": "Farm House at D'Angelo Vineyards",
+  "file": "/images/venues/farm-house-at-d-angelo-vineyards-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: D'Angelo Estate Winery & Farm House, 979 Lochore Road, Penticton",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLezl0C4PU7eWhzX-1vZrWc0aiypqghBFfSeIdFvYFSsyLMZq5nBUQ-BRH4F0FD4yaVe8SdP8S2X-4APx2dnNhywXtGY-XDbGjU35sSYasZO_eQPIqQu9giNpXKsPBTHZ-ytAn56Aw=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: Farm House guest suite bedroom with sofa (weak: website photos under 1200px or darkened backgrounds; no good exterior)"
+ },
+ {
+  "id": 2075,
+  "name": "Flamingo Motel",
+  "file": "/images/venues/flamingo-motel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Flamingo Motel, 2387 Skaha Lake Road, Penticton",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdkSgo9EXTBN9Hr7O5NvWHL21bPo359A7PaeQSA9uvfeX7HcRtqeQlpMWBbHhDgfMgPgJNeIyJHA5lmAkxEb0XW03RfhdWetdd-eka-NP6ALTM-ocxbxqvMiwqU3D6qsHikUq8qlGnN4n8=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: the motel's sunny patio with tables, BBQ and its roadside sign (no own website)"
+ },
+ {
+  "id": 2063,
+  "name": "Four Points by Sheraton Penticton at the Convention Centre",
+  "file": "/images/venues/four-points-by-sheraton-penticton-at-the-convention-centre-2610.jpg",
+  "dimensions": "1700x850",
+  "source_page": "https://visitpenticton.com/listing/four-points-by-sheraton-penticton/",
+  "image_url": "https://visitpenticton.com/wp-content/uploads/2023/11/FP_YYFFP_Exterior_001.jpg",
+  "source_kind": "tourism_board",
+  "note": "Front of the six-storey hotel with its Four Points sign (source 1700px; marriott.com blocks scripts; Google photos are food only)"
+ },
+ {
+  "id": 2076,
+  "name": "Golden Sands Resort",
+  "file": "/images/venues/golden-sands-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://visitpenticton.com/listing/golden-sands-resort/",
+  "image_url": "https://visitpenticton.com/wp-content/uploads/2016/03/Golden-Sands-Room-4.jpg",
+  "source_kind": "tourism_board",
+  "note": "Suite with full kitchen, dining table and sofa (own site photos under 1000px; Google has only 2 unusable photos)"
+ },
+ {
+  "id": 2058,
+  "name": "HI Penticton Hostel",
+  "file": "/images/venues/hi-penticton-hostel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: HI Penticton Hostel, 464 Ellis Street, Penticton",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdFy2RP0Qdk3tzRhb0RBXQQIpKHtHWP4txrpABYRzB-SdDbK0ozR0U5exiwOyXoige_O5neEBymQpj69BcxgMUWBIpd4vfyg962spm9-QgYPRnTy6JC2beilFq-nshpL-uUoiRP61TkdoHa=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: front entrance of the hostel with its HI sign and direction signpost (hihostels.ca full-size photos return 404)"
+ },
+ {
+  "id": 2090,
+  "name": "Kettle Valley Beach Resort",
+  "file": "/images/venues/kettle-valley-beach-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Kettle Valley Beach Resort, 950 Lakeshore Drive West, Penticton",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLd1zExmbL-b-z7JIEmyfMSpXQQI46FBHNuTYa1xDISFlLin-C9mWt_XmISCfiOyC_H-mVX5GIB-rsCmvZb6Nu99ppXXfqaNFgEdkloT4XAl7gNaSD0Vn4rm0cT26T3bCADkevw3RV0oHzF_=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo: the red-roofed cottages and fire-pit courtyard, hills behind (own site behind a Cloudflare block)"
+ },
+ {
+  "id": 2078,
+  "name": "Lakecity Inn",
+  "file": "/images/venues/lakecity-inn-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: LakeCity Inn, 1473 Main Street, Penticton",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLc6nlm3tbXdL_mo3cIynwsCk7gYi2cECDJyrkU-1nQX5IJc8iIP6ecPbLLWNWEfp49rqupueZGhaUibnXETv6dwgb_JTl175F_NXUbnh0db8Xbjyf6OXO5uAydHgcD3QHgMjE167csDPw0=w2400",
+  "source_kind": "google_maps",
+  "note": "Arched two-storey motel buildings around the parking court, hills behind (no own website)"
+ },
+ {
+  "id": 2079,
+  "name": "Lakeside Villa & Nordic Spa",
+  "file": "/images/venues/lakeside-villa-and-nordic-spa-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.lakesidevilla.ca/",
+  "image_url": "https://irp.cdn-website.com/1a7b9d6f/dms3rep/multi/opt/Exterior+7-1920w.jpg",
+  "source_kind": "website",
+  "note": "The two-storey motel building with pink doors and balcony"
+ },
+ {
+  "id": 2055,
+  "name": "Munson Mountain Estates",
+  "file": "/images/venues/munson-mountain-estates-2610.jpg",
+  "dimensions": "1500x750",
+  "source_page": "https://www.mmestates.ca/",
+  "image_url": "https://static.wixstatic.com/media/d0f4c5_130ac5496bda4704a60997d96f3606e5~mv2.jpg",
+  "source_kind": "website",
+  "note": "Lawn with Adirondack chairs overlooking Okanagan Lake (source 1500px wide)"
+ },
+ {
+  "id": 2056,
+  "name": "O.K. Whistlestop B&B",
+  "file": "/images/venues/o-k-whistlestop-b-and-b-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.okwhistlestop.com/",
+  "image_url": "https://www.okwhistlestop.com/wp-content/uploads/2018/06/okwhistlestop_web-51.jpg",
+  "source_kind": "website",
+  "note": "Pergola patio with pizza oven and BBQ, vineyard and Okanagan Lake behind"
+ },
+ {
+  "id": 2091,
+  "name": "Okanagan Lakefront Resort",
+  "file": "/images/venues/okanagan-lakefront-resort-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.okanaganlakefrontresort.com/",
+  "image_url": "https://cdn.prod.website-files.com/6653f6feba64b2e2e20c889c/683a033ae91dfc6e955502ef_Okanagan%20Lake%20Motel%20-%202QS%20-%2000001.webp",
+  "source_kind": "website",
+  "note": "Bright suite living room with balcony door looking out to Okanagan Lake (no good exterior on site or Google)"
+ },
+ {
+  "id": 2064,
+  "name": "Penticton Lakeside Resort & Conference Centre",
+  "file": "/images/venues/penticton-lakeside-resort-and-conference-centre-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.pentictonlakesideresort.com/",
+  "image_url": "https://www.pentictonlakesideresort.com/wp-content/uploads/2020/11/Website-Footer-scaled.jpg",
+  "source_kind": "website",
+  "note": "The resort on Okanagan Lake's shore seen from the water, hills behind"
+ },
+ {
+  "id": 2081,
+  "name": "Riverside Motel",
+  "file": "/images/venues/riverside-motel-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Riverside Motel, 110 Riverside Drive, Penticton",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdCQRel_u-FZOrCTn7lsns89_p7Wz5v_mnrvInW_qa4PHWJx7Da_vOlXdTYwAclzxl-A5ctngTHpvIQkYVZt-NpP7pY95uw8on0KmrXvPBq0x0N0Tseqq7zKstsz7ssqf6EKvPO=w2400",
+  "source_kind": "google_maps",
+  "note": "Outdoor pool with loungers in front of the motel units (no own website)"
+ },
+ {
+  "id": 2068,
+  "name": "Sahara Courtyard Inn",
+  "file": "/images/venues/sahara-courtyard-inn-2610.jpg",
+  "dimensions": "1500x750",
+  "source_page": "https://saharacourtyardinn.com/",
+  "image_url": "https://saharacourtyardinn.com/wp-content/uploads/2023/06/IMG_3877-1.jpg",
+  "source_kind": "website",
+  "note": "Courtyard pool with the two-storey inn and hanging flower baskets (source 1500px wide)"
+ }
+]

@@ -1,0 +1,558 @@
+{
+ "reason": "Venue photos stays-ok-3",
+ "batch_id": "photos-stays-ok-3-2026-11-19",
+ "venues": [
+  {
+   "id": 2040,
+   "name": "Avalon Inn",
+   "region": "osoyoos",
+   "slug": "avalon-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/avalon-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2036,
+   "name": "Best Western Plus Osoyoos Hotel & Suites",
+   "region": "osoyoos",
+   "slug": "best-western-plus-osoyoos-hotel-and-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/best-western-plus-osoyoos-hotel-and-suites-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2041,
+   "name": "Boundary Motel",
+   "region": "osoyoos",
+   "slug": "boundary-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/boundary-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2037,
+   "name": "Coast Osoyoos Beach Hotel",
+   "region": "osoyoos",
+   "slug": "coast-osoyoos-beach-hotel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/coast-osoyoos-beach-hotel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2038,
+   "name": "Holiday Inn & Suites Osoyoos",
+   "region": "osoyoos",
+   "slug": "holiday-inn-and-suites-osoyoos",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/holiday-inn-and-suites-osoyoos-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2033,
+   "name": "Inkaneep Point Resort",
+   "region": "osoyoos",
+   "slug": "inkaneep-point-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/inkaneep-point-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2042,
+   "name": "Osoyoos Lakeview Inn & Suites",
+   "region": "osoyoos",
+   "slug": "osoyoos-lakeview-inn-and-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/osoyoos-lakeview-inn-and-suites-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2039,
+   "name": "Park Inn by Radisson Osoyoos",
+   "region": "osoyoos",
+   "slug": "park-inn-by-radisson-osoyoos",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/park-inn-by-radisson-osoyoos-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2046,
+   "name": "Richter Pass Beach Resort",
+   "region": "osoyoos",
+   "slug": "richter-pass-beach-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/richter-pass-beach-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2043,
+   "name": "Sahara Courtyard Inn & Suites",
+   "region": "osoyoos",
+   "slug": "sahara-courtyard-inn-and-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sahara-courtyard-inn-and-suites-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2047,
+   "name": "Sandy Beach Suites",
+   "region": "osoyoos",
+   "slug": "sandy-beach-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sandy-beach-suites-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2048,
+   "name": "Spirit Ridge, in The Unbound Collection by Hyatt",
+   "region": "osoyoos",
+   "slug": "spirit-ridge-in-the-unbound-collection-by-hyatt",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/spirit-ridge-in-the-unbound-collection-by-hyatt-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2044,
+   "name": "Sun Beach Motel",
+   "region": "osoyoos",
+   "slug": "sun-beach-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sun-beach-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2035,
+   "name": "Sunterra Campground",
+   "region": "osoyoos",
+   "slug": "sunterra-campground",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sunterra-campground-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2049,
+   "name": "Walnut Beach Resort",
+   "region": "osoyoos",
+   "slug": "walnut-beach-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/walnut-beach-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2050,
+   "name": "Watermark Beach Resort",
+   "region": "osoyoos",
+   "slug": "watermark-beach-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/watermark-beach-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2045,
+   "name": "Westridge Motor Inn",
+   "region": "osoyoos",
+   "slug": "westridge-motor-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/westridge-motor-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2051,
+   "name": "Peachland Beach Resort",
+   "region": "peachland",
+   "slug": "peachland-beach-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/peachland-beach-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2069,
+   "name": "5000 Motel",
+   "region": "penticton",
+   "slug": "5000-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/5000-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2052,
+   "name": "Above the Beach Guest Suites",
+   "region": "penticton",
+   "slug": "above-the-beach-guest-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/above-the-beach-guest-suites-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2070,
+   "name": "Apple Tree Inn",
+   "region": "penticton",
+   "slug": "apple-tree-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/apple-tree-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2071,
+   "name": "Beachside Motel",
+   "region": "penticton",
+   "slug": "beachside-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/beachside-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2059,
+   "name": "Best Western Inn at Penticton",
+   "region": "penticton",
+   "slug": "best-western-inn-at-penticton",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/best-western-inn-at-penticton-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2053,
+   "name": "Bialto Bed & Breakfast",
+   "region": "penticton",
+   "slug": "bialto-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/bialto-bed-and-breakfast-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2072,
+   "name": "Black Sea Motel",
+   "region": "penticton",
+   "slug": "black-sea-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/black-sea-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2073,
+   "name": "Bowmont Motel",
+   "region": "penticton",
+   "slug": "bowmont-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/bowmont-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2067,
+   "name": "Casa Grande Inn & Guest Suites",
+   "region": "penticton",
+   "slug": "casa-grande-inn-and-guest-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/casa-grande-inn-and-guest-suites-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2060,
+   "name": "Coast Penticton Hotel",
+   "region": "penticton",
+   "slug": "coast-penticton-hotel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/coast-penticton-hotel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2054,
+   "name": "Cormier's Studio Guest Suites",
+   "region": "penticton",
+   "slug": "cormier-s-studio-guest-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/cormier-s-studio-guest-suites-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2061,
+   "name": "Days Inn & Conference Centre Penticton",
+   "region": "penticton",
+   "slug": "days-inn-and-conference-centre-penticton",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/days-inn-and-conference-centre-penticton-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2074,
+   "name": "Empire Motel",
+   "region": "penticton",
+   "slug": "empire-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/empire-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2062,
+   "name": "Fairfield Inn & Suites by Marriott Penticton",
+   "region": "penticton",
+   "slug": "fairfield-inn-and-suites-by-marriott-penticton",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/fairfield-inn-and-suites-by-marriott-penticton-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2057,
+   "name": "Farm House at D'Angelo Vineyards",
+   "region": "penticton",
+   "slug": "farm-house-at-d-angelo-vineyards",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/farm-house-at-d-angelo-vineyards-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2075,
+   "name": "Flamingo Motel",
+   "region": "penticton",
+   "slug": "flamingo-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/flamingo-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2063,
+   "name": "Four Points by Sheraton Penticton at the Convention Centre",
+   "region": "penticton",
+   "slug": "four-points-by-sheraton-penticton-at-the-convention-centre",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/four-points-by-sheraton-penticton-at-the-convention-centre-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2076,
+   "name": "Golden Sands Resort",
+   "region": "penticton",
+   "slug": "golden-sands-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/golden-sands-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2058,
+   "name": "HI Penticton Hostel",
+   "region": "penticton",
+   "slug": "hi-penticton-hostel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/hi-penticton-hostel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2090,
+   "name": "Kettle Valley Beach Resort",
+   "region": "penticton",
+   "slug": "kettle-valley-beach-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kettle-valley-beach-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2078,
+   "name": "Lakecity Inn",
+   "region": "penticton",
+   "slug": "lakecity-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/lakecity-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2079,
+   "name": "Lakeside Villa & Nordic Spa",
+   "region": "penticton",
+   "slug": "lakeside-villa-and-nordic-spa",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/lakeside-villa-and-nordic-spa-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2055,
+   "name": "Munson Mountain Estates",
+   "region": "penticton",
+   "slug": "munson-mountain-estates",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/munson-mountain-estates-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2056,
+   "name": "O.K. Whistlestop B&B",
+   "region": "penticton",
+   "slug": "o-k-whistlestop-b-and-b",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/o-k-whistlestop-b-and-b-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2091,
+   "name": "Okanagan Lakefront Resort",
+   "region": "penticton",
+   "slug": "okanagan-lakefront-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/okanagan-lakefront-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2064,
+   "name": "Penticton Lakeside Resort & Conference Centre",
+   "region": "penticton",
+   "slug": "penticton-lakeside-resort-and-conference-centre",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/penticton-lakeside-resort-and-conference-centre-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2081,
+   "name": "Riverside Motel",
+   "region": "penticton",
+   "slug": "riverside-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/riverside-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2068,
+   "name": "Sahara Courtyard Inn",
+   "region": "penticton",
+   "slug": "sahara-courtyard-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sahara-courtyard-inn-2610.jpg?v=20261119"
+   }
+  }
+ ]
+}

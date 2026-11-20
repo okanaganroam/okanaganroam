@@ -1,0 +1,72 @@
+[
+ {
+  "id": 2101,
+  "name": "Swan Lake RV Park & Campground",
+  "file": "/images/venues/swan-lake-rv-park-and-campground-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://swanlakecampground.com/gallery/",
+  "image_url": "https://swanlakecampground.com/wp-content/gallery/misc/Tenting-sites.jpg",
+  "source_kind": "website",
+  "note": "Tents on lakefront sites beside the gazebo and Swan Lake (3024x4032 source)"
+ },
+ {
+  "id": 2119,
+  "name": "A Lakeview Heights Bed & Breakfast",
+  "file": "/images/venues/a-lakeview-heights-bed-and-breakfast-2610.jpg",
+  "dimensions": "1620x810",
+  "source_page": "https://mountainsideaccommodations.com/gallery/",
+  "image_url": "https://mountainsideaccommodations.com/wp-content/uploads/2016/01/Gallery.Lakeview-Hieghts-Bed-and-Breakfast.jpg",
+  "source_kind": "website",
+  "note": "The B&B house from above with Okanagan Lake behind (1620px original from the site media library)"
+ },
+ {
+  "id": 2120,
+  "name": "A View of the Lake Bed & Breakfast",
+  "file": "/images/venues/a-view-of-the-lake-bed-and-breakfast-2610.jpg",
+  "dimensions": "1400x700",
+  "source_page": "https://www.aviewofthelake.com/about.php",
+  "image_url": "https://www.aviewofthelake.com/assets/img/page-headers/about-page-header.jpg",
+  "source_kind": "website",
+  "note": "Guest lounge with leather sofas and brick fireplace (room shot; house exteriors on the site are only 500px)"
+ },
+ {
+  "id": 2104,
+  "name": "Best Western Premier Route 97 Vernon",
+  "file": "/images/venues/best-western-premier-route-97-vernon-2610.jpg",
+  "dimensions": "1498x750",
+  "source_page": "https://www.bestwestern.com/en_US/book/hotels-in-vernon/best-western-premier-route-97-vernon/propertyCode.62143.html",
+  "image_url": "https://images.bestwestern.com/bwi/brochures/62143/photos/1024/32927661.jpg",
+  "source_kind": "website",
+  "note": "Hotel front with the Premier Best Western sign at 5350 Anderson Way (1499px original)"
+ },
+ {
+  "id": 2034,
+  "name": "Brookvale Holiday Resort (Brookvale Campground & RV)",
+  "file": "/images/venues/brookvale-holiday-resort-brookvale-campground-and-rv-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.brookvalecampground.com/",
+  "image_url": "https://www.brookvalecampground.com/wp-content/uploads/2020/09/Site-17.jpg",
+  "source_kind": "website",
+  "note": "RV with awning and picnic table on campsite 17 under the shade trees (own site media library, 3264px)"
+ },
+ {
+  "id": 2024,
+  "name": "The Villa at Hester Creek",
+  "file": "/images/venues/the-villa-at-hester-creek-2610.jpg",
+  "dimensions": "1194x598",
+  "source_page": "https://www.hestercreek.com/visit/villa/",
+  "image_url": "https://www.hestercreek.com/wp-content/uploads/2026/09/Website-Villa-Photos-1500x4302-1.jpg",
+  "source_kind": "website",
+  "note": "Aerial of the Villa suites beside the vineyard (agreed exception: 2083x597 banner gives a 1194px-wide 2:1 crop)"
+ },
+ {
+  "id": 1962,
+  "name": "Heartland Family Campground",
+  "file": "/images/venues/heartland-family-campground-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "Google Maps: Heartland, 5983 Hwy 33, Kelowna",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfNXXhnkUQK8_x84bPvJaclBbj-3E-dDsjDn6I2zphjjWuMpIMHazhmzRlqGToTb5lrT8W6XdD6n4YApSUyj2HRNIwBj3ZoSAu_mwlh1OSKXaFB2JWcdWN76vIgengaxMQg-HsyMdIjCEQ=w2400",
+  "source_kind": "google_maps",
+  "note": "A travel trailer set up on a treed campsite (visitor photo, 3060px)"
+ }
+]

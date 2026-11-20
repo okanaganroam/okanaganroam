@@ -43,6 +43,7 @@ const { renderFunnelsPage } = require('./funnels-page');
 const { renderPagesPage, renderRoamNowPage, renderEventsPage, renderEmailPage, renderHelpPage } = require('./pages-page');
 const { renderSearchTermsPage } = require('./search-terms-page');
 const { renderOutboundPage } = require('./outbound-page');
+const placesToStay = require('./places-to-stay');
 const gscReport = require('./gsc-report');
 // What is clickable on one business or event page (2026-11-05): read from the page itself, so each sheet shows that page's
 // own buttons and links. The server asks its own public page (no scripts run, so nothing is counted); kept 10 minutes.
@@ -502,7 +503,7 @@ function rowToVenue(row) {
 
 // GET /api/venues  (supports ?region=&type=&dog_friendly=1&vegetarian=1&vegan=1&search=&min_rating=&page=&limit=)
 function listVenues(query) {
-  const clauses = ['redirect_to IS NULL'];
+  const clauses = ['redirect_to IS NULL AND type != \'stay\''];
   const params = [];
 
   if (query.region) {
@@ -1734,10 +1735,10 @@ function guardedMergeAndRetireUpdate(duplicateId, canonicalId, fieldValues) {
 }
 
 function getStats() {
-  const total = db.prepare('SELECT COUNT(*) AS n FROM venues WHERE redirect_to IS NULL').get().n;
-  const phoned = db.prepare("SELECT COUNT(*) AS n FROM venues WHERE phone IS NOT NULL AND phone != '' AND redirect_to IS NULL").get().n;
-  const vegetarian = db.prepare('SELECT COUNT(*) AS n FROM venues WHERE vegetarian = 1 AND redirect_to IS NULL').get().n;
-  const vegan = db.prepare('SELECT COUNT(*) AS n FROM venues WHERE vegan = 1 AND redirect_to IS NULL').get().n;
+  const total = db.prepare('SELECT COUNT(*) AS n FROM venues WHERE redirect_to IS NULL AND type != \'stay\'').get().n;
+  const phoned = db.prepare("SELECT COUNT(*) AS n FROM venues WHERE phone IS NOT NULL AND phone != '' AND redirect_to IS NULL AND type != 'stay'").get().n;
+  const vegetarian = db.prepare('SELECT COUNT(*) AS n FROM venues WHERE vegetarian = 1 AND redirect_to IS NULL AND type != \'stay\'').get().n;
+  const vegan = db.prepare('SELECT COUNT(*) AS n FROM venues WHERE vegan = 1 AND redirect_to IS NULL AND type != \'stay\'').get().n;
   const byRegion = db.prepare('SELECT region, COUNT(*) AS n FROM venues GROUP BY region ORDER BY n DESC').all();
   const byType = db.prepare('SELECT type, COUNT(*) AS n FROM venues GROUP BY type ORDER BY n DESC').all();
   return { total, phoned, vegetarian, vegan, by_region: byRegion, by_type: byType };
@@ -1979,7 +1980,8 @@ function usesThemedVenueShell(type) {
 // Sports & Recreation (2026-10-12) the same way as Tours.
 // Tours & Experiences (2026-10-11) launches the same way as Indoor.
 // Shops & Outfitters (2026-10-23) the same way as Sports.
-const TRIP_PLANNER_EXCLUDED_TYPES = new Set(['beach', 'outdoor', 'distillery', 'indoor', 'tour', 'sport', 'shop']);
+// Places to stay (2026-11-19) are never trip stops (places-to-stay.js).
+const TRIP_PLANNER_EXCLUDED_TYPES = new Set(['beach', 'outdoor', 'distillery', 'indoor', 'tour', 'sport', 'shop', 'stay']);
 const TRIP_INTEREST_TYPES = Object.keys(CATEGORY_SLUGS).filter((t) => !TRIP_PLANNER_EXCLUDED_TYPES.has(t));
 function isTripPlannerType(type) {
   return TRIP_INTEREST_TYPES.includes(type);
@@ -2624,7 +2626,7 @@ function getRegionCategoryCounts(region) {
   // ACTIVE venue -- redirected (retired) rows are not counted (2026-09-25), so
   // the destination page's numbers match the category pages they link to.
   return db
-    .prepare('SELECT type, COUNT(*) AS n FROM venues WHERE region = ? AND redirect_to IS NULL GROUP BY type')
+    .prepare('SELECT type, COUNT(*) AS n FROM venues WHERE region = ? AND redirect_to IS NULL AND type != \'stay\' GROUP BY type')
     .all(region)
     .filter((r) => CATEGORY_SLUGS[r.type]) // ignore any unexpected/unmapped type defensively
     .reduce((acc, r) => { acc[r.type] = r.n; return acc; }, {});
@@ -2632,7 +2634,7 @@ function getRegionCategoryCounts(region) {
 
 function getVenuesByRegionCategory(region, type) {
   return db
-    .prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND redirect_to IS NULL ORDER BY name ASC')
+    .prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND redirect_to IS NULL AND type != \'stay\' ORDER BY name ASC')
     .all(region, type)
     .map(rowToVenue);
 }
@@ -2644,7 +2646,7 @@ function getVenuesByRegionCategory(region, type) {
 // reads as a coherent, grouped page rather than a shuffled one.
 function getVenuesByCategory(type) {
   return db
-    .prepare('SELECT * FROM venues WHERE type = ? AND redirect_to IS NULL ORDER BY region ASC, name ASC')
+    .prepare('SELECT * FROM venues WHERE type = ? AND redirect_to IS NULL AND type != \'stay\' ORDER BY region ASC, name ASC')
     .all(type)
     .map(rowToVenue);
 }
@@ -2673,7 +2675,7 @@ function findVenueBySlug(region, type, slug) {
 // 404s, exactly as it does today.
 function findActiveVenueBySlugAcrossTypes(region, slug) {
   const rows = db
-    .prepare('SELECT * FROM venues WHERE region = ? AND slug = ? AND redirect_to IS NULL')
+    .prepare('SELECT * FROM venues WHERE region = ? AND slug = ? AND redirect_to IS NULL AND type != \'stay\'')
     .all(region, slug);
   return rows.length === 1 ? rowToVenue(rows[0]) : null;
 }
@@ -2685,7 +2687,7 @@ function findActiveVenueBySlugAcrossTypes(region, slug) {
 // category-change lookup above.
 function findActiveVenueBySlugAcrossRegions(type, slug) {
   const rows = db
-    .prepare('SELECT * FROM venues WHERE type = ? AND slug = ? AND redirect_to IS NULL')
+    .prepare('SELECT * FROM venues WHERE type = ? AND slug = ? AND redirect_to IS NULL AND type != \'stay\'')
     .all(type, slug);
   return rows.length === 1 ? rowToVenue(rows[0]) : null;
 }
@@ -3987,7 +3989,7 @@ function tripEventLocation(event, regionCandidates = new Map()) {
   const row=db.prepare('SELECT venue_id, venue_name_text, region FROM events WHERE id=?').get(event.id);
   if(!row)return null;
   if(row.venue_id==null&&!regionCandidates.has(row.region))regionCandidates.set(row.region,
-    db.prepare('SELECT id, name, region, latitude, longitude, redirect_to FROM venues WHERE region=? AND redirect_to IS NULL').all(row.region));
+    db.prepare('SELECT id, name, region, latitude, longitude, redirect_to FROM venues WHERE region=? AND redirect_to IS NULL AND type != \'stay\'').all(row.region));
   const candidates=row.venue_id!=null
     ? db.prepare('SELECT id, name, region, latitude, longitude, redirect_to FROM venues WHERE id=?').all(row.venue_id)
     : regionCandidates.get(row.region);
@@ -4069,7 +4071,7 @@ function getHiddenGemVenueIds() {
     FROM collection_items ci
     JOIN collections c ON c.id = ci.collection_id
     JOIN venues v ON v.id = ci.content_id
-    WHERE c.kind = 'hidden_gem' AND ci.content_type = 'venue' AND v.redirect_to IS NULL
+    WHERE c.kind = 'hidden_gem' AND ci.content_type = 'venue' AND v.redirect_to IS NULL AND v.type != 'stay'
   `).all();
   return new Set(rows.map((r) => r.id));
 }
@@ -4106,7 +4108,7 @@ function getCollectionVenueIds(kind) {
     FROM collection_items ci
     JOIN collections c ON c.id = ci.collection_id
     JOIN venues v ON v.id = ci.content_id
-    WHERE c.kind = ? AND ci.content_type = 'venue' AND v.redirect_to IS NULL
+    WHERE c.kind = ? AND ci.content_type = 'venue' AND v.redirect_to IS NULL AND v.type != 'stay'
   `).all(kind);
   return new Set(rows.map((r) => r.id));
 }
@@ -4140,17 +4142,17 @@ function buildDiscoveryTaxonomy() {
   const liveKinds = db.prepare('SELECT DISTINCT kind FROM collections').all().map((r) => r.kind);
   const cuisines = db.prepare(`
     SELECT DISTINCT lower(trim(cuisine)) AS c FROM venues
-    WHERE redirect_to IS NULL AND cuisine IS NOT NULL AND trim(cuisine) != ''
+    WHERE redirect_to IS NULL AND type != 'stay' AND cuisine IS NOT NULL AND trim(cuisine) != ''
   `).all().map((r) => r.c);
   // Restaurants' second and third cuisines (2026-11-09) are cuisines in use too.
   try {
     for (const r of db.prepare(`SELECT vc.cuisines FROM venue_cuisines vc JOIN venues v ON v.id = vc.venue_id
-      WHERE v.redirect_to IS NULL AND v.type = 'restaurant' AND vc.cuisines IS NOT NULL`).all()) {
+      WHERE v.redirect_to IS NULL AND v.type != 'stay' AND v.type = 'restaurant' AND vc.cuisines IS NOT NULL`).all()) {
       let list = []; try { list = JSON.parse(r.cuisines) || []; } catch (e) { list = []; }
       for (const c of list) { const k = String(c).toLowerCase().trim(); if (k && !cuisines.includes(k)) cuisines.push(k); }
     }
   } catch (e) { /* no table yet */ }
-  const venues = db.prepare('SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL')
+  const venues = db.prepare('SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL')
     .all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]);
   return {
@@ -4413,7 +4415,7 @@ function savedItemsDeps(now = new Date()) {
     getVenue: (id) => db.prepare('SELECT id, name, region, type, slug, redirect_to FROM venues WHERE id = ?').get(id) || null,
     getEvent: (id) => db.prepare('SELECT id, name, region, slug FROM events WHERE id = ?').get(id) || null,
     getOccurrence: (id) => db.prepare('SELECT id, event_id, start_date, end_date, start_time, status FROM event_occurrences WHERE id = ?').get(id) || null,
-    findVenuesByName: (name) => db.prepare('SELECT id, name, region, type, slug FROM venues WHERE name = ? AND redirect_to IS NULL AND slug IS NOT NULL ORDER BY region, id').all(name),
+    findVenuesByName: (name) => db.prepare('SELECT id, name, region, type, slug FROM venues WHERE name = ? AND redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL ORDER BY region, id').all(name),
     findEventsByName: (name) => db.prepare("SELECT id, name, region, slug FROM events WHERE name = ? AND status = 'scheduled' ORDER BY id").all(name),
     venueUrl,
     eventUrl: (e) => `/${e.region}/events/${e.slug}`,
@@ -4511,7 +4513,7 @@ function buildDiscoverySearchVenues() {
   for (const a of OUTDOOR_ACTIVITIES) for (const id of getCollectionVenueIds(a.kind)) add(id, 'activities', a.slug);
   for (const [type, kind] of Object.entries(FD_CATEGORY_KIND_BY_TYPE)) for (const id of getCollectionVenueIds(kind)) add(id, 'fdTypes', type);
   const venues = [];
-  for (const row of db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL').all()) {
+  for (const row of db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\'').all()) {
     if (!REGION_LABELS[row.region] || !CATEGORY_SLUGS[row.type]) continue;
     const features = {};
     for (const f of BOOL_FIELDS) if (badgeOnPublic(row, f)) features[f] = true;
@@ -4825,7 +4827,7 @@ function listedFarmersMarkets(regions, window, now = new Date()) {
   if (to > addLocalDays(from, 27)) to = addLocalDays(from, 27);
   const seasons = getSeasonRows(today);
   const open = [], ended = [];
-  const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL').all()
+  const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL').all()
     .filter((v) => LISTED_FARMERS_MARKET_RE.test(String(v.name || '').replace(/[’']/g, '')) && (!regions || !regions.length || regions.includes(v.region)) && discoveryVenueUrl(v));
   for (const v of rows) {
     const season = seasons.get(v.id) || null;
@@ -5747,13 +5749,30 @@ function smartEditDistance(a, b, max) {
 const SMART_NAME_GENERIC = new Set(['the', 'a', 'winery', 'wineries', 'estate', 'estates', 'family', 'vineyard', 'vineyards', 'cellars', 'cellar', 'wines', 'wine',
   'restaurant', 'cafe', 'coffee', 'brewing', 'brewery', 'company', 'co', 'inc', 'ltd', 'bistro', 'bar', 'grill', 'kitchen', 'house', 'and', 'at', 'of', 'distillery', 'distilling']);
 const smartCore = (folded) => { const w = folded.split(' ').filter((x) => !SMART_NAME_GENERIC.has(x)); return w.length ? w.join(' ') : folded; };
+// A name's distinctive first word (2026-11-19, "barriqure" found nothing): 6+ letters, not a town's name, and the first
+// word of only one place's name, so a one-word typo of it can offer that place ("Barrique & Java") without a misspelled
+// town ("kelowan") jumping to "Kelowna Beer Institute".
+let smartLeadWordIndex = null;
+function smartDistinctLeadWords(venues) {
+  if (smartLeadWordIndex && smartLeadWordIndex.venues === venues) return smartLeadWordIndex.words;
+  const towns = new Set();
+  for (const label of Object.values(REGION_LABELS)) smartFold(label).split(' ').forEach((w) => towns.add(w));
+  const count = new Map();
+  for (const v of venues) { const w = smartCore(smartFold(v.row.name)).split(' ')[0]; if (w) count.set(w, (count.get(w) || 0) + 1); }
+  const words = new Set([...count].filter(([w, n]) => n === 1 && w.length >= 6 && !towns.has(w)).map(([w]) => w));
+  smartLeadWordIndex = { venues, words };
+  return words;
+}
 function smartFuzzyVenues(text, intent) {
   const raw = smartFold(text);
   const variants = uniqueList([smartCore(raw), smartCore(smartTopicWords(raw, intent).join(' '))]).filter((q) => q.replace(/ /g, '').length >= 4 && q.split(' ').length <= 5);
   if (!variants.length) return [];
   const found = [];
-  for (const v of discoverySearchVenues()) {
+  const searchVenues = discoverySearchVenues();
+  const leadWords = smartDistinctLeadWords(searchVenues);
+  for (const v of searchVenues) {
     const name = smartFold(v.row.name), core = smartCore(name);
+    const lead = core.split(' ')[0];
     let best = 99;
     for (const q of variants) {
       const k = q.split(' ').length;
@@ -5761,6 +5780,8 @@ function smartFuzzyVenues(text, intent) {
       const cands = [name, core];
       // A name's first words only for a request of two or more words ("mision hill").
       if (k >= 2) cands.push(name.split(' ').slice(0, k).join(' '), core.split(' ').slice(0, k).join(' '));
+      // A one-word request of 6+ letters: a name's distinctive first word too ("barriqure" -> Barrique & Java).
+      else if (q.length >= 6 && leadWords.has(lead)) cands.push(lead);
       for (const c of cands) { const d = smartEditDistance(q, c, max); if (d <= max && d < best) best = d; }
     }
     if (best < 99) found.push({ venue: v.row, distance: best });
@@ -7314,7 +7335,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
   for (const kind of ['hidden_gem', 'local_favorite', 'dog_friendly']) for (const id of getCollectionVenueIds(kind)) addMember(id, { kind: 'collections', value: kind });
   for (const a of OUTDOOR_ACTIVITIES) for (const id of getCollectionVenueIds(a.kind)) addMember(id, { kind: 'activities', value: a.slug });
   for (const [type, kind] of Object.entries(FD_CATEGORY_KIND_BY_TYPE)) for (const id of getCollectionVenueIds(kind)) addMember(id, { kind: 'fdTypes', value: type });
-  const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL').all();
+  const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL').all();
   const advisories = getAdvisoryNotesWithDates();
   let advisoryFrench = new Map();
   try { advisoryFrench = getAdvisoryFrenchByEnglish(); } catch (e) { advisoryFrench = new Map(); }
@@ -7886,7 +7907,7 @@ function tripPlannerFrModule() {
 // "skate park" plan exactly as they did before the type existed.
 // Shops & Outfitters (2026-10-23) is dropped the same way: a shop is not a
 // planner stop, and "gift shop" or "hiking gear" plan as before.
-const TRIP_PLANNER_DROPPED_TYPES = new Set(['sport', 'shop']);
+const TRIP_PLANNER_DROPPED_TYPES = new Set(['sport', 'shop', 'stay']);
 function buildTripPlannerTaxonomy() {
   const taxonomy = buildDiscoveryTaxonomy();
   return { ...taxonomy, planner: true, types: [...new Set([...taxonomy.types, ...Object.keys(CATEGORY_SLUGS)])].filter((t) => !TRIP_PLANNER_DROPPED_TYPES.has(t)), venues: taxonomy.venues.filter((v) => !TRIP_PLANNER_DROPPED_TYPES.has(v.type)) };
@@ -8693,7 +8714,7 @@ function tripHappyHourApresMiss(f) {
 function tripHappyHourChain({ date, region, startFloor, dinner, excluded, now, dog = false, lateFloor = null, apres = false }) {
   const planner = tripPlannerModule();
   const weekday = localWeekdayKey(date);
-  const rows = db.prepare('SELECT id, happy_hour, happy_hour_times, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND region = ? AND happy_hour_times IS NOT NULL').all(region);
+  const rows = db.prepare('SELECT id, happy_hour, happy_hour_times, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND region = ? AND happy_hour_times IS NOT NULL').all(region);
   const hh = new Map();
   for (const row of rows) {
     const deals = happyHourDealsShown(row, now);
@@ -9029,7 +9050,7 @@ function tripNamedVenuePlan(plan, args, now = new Date()) {
   // The facts are read only when a listed name could be in the request (a cheap name pass first).
   const textWords = new Set(norm(text.replace(/['’]/g, '')).split(' '));
   const maybe = new Set(named.map((i) => i.value));
-  for (const v of db.prepare('SELECT id, name FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL').all()) {
+  for (const v of db.prepare('SELECT id, name FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL').all()) {
     const core = tripNameCore(v.name);
     if (core && core.every((w) => leftover.has(w) && textWords.has(w))) maybe.add(v.id);
   }
@@ -10148,7 +10169,7 @@ function getOutdoorActivityVenues(activity) {
     SELECT v.* FROM venues v
     JOIN collection_items ci ON ci.content_type = 'venue' AND ci.content_id = v.id
     JOIN collections c ON c.id = ci.collection_id
-    WHERE c.kind = ? AND v.type IN (${OUTDOOR_ACTIVITY_TYPE_SQL}) AND v.redirect_to IS NULL
+    WHERE c.kind = ? AND v.type IN (${OUTDOOR_ACTIVITY_TYPE_SQL}) AND v.redirect_to IS NULL AND v.type != 'stay'
     GROUP BY v.id
     ORDER BY v.name ASC
   `).all(activity.kind, ...OUTDOOR_ACTIVITY_VENUE_TYPES).map(rowToVenue);
@@ -10158,7 +10179,7 @@ function getOutdoorActivityCounts() {
   const rows = db.prepare(`
     SELECT c.kind AS kind, COUNT(DISTINCT v.id) AS n FROM collection_items ci
     JOIN collections c ON c.id = ci.collection_id
-    JOIN venues v ON v.id = ci.content_id AND v.type IN (${OUTDOOR_ACTIVITY_TYPE_SQL}) AND v.redirect_to IS NULL
+    JOIN venues v ON v.id = ci.content_id AND v.type IN (${OUTDOOR_ACTIVITY_TYPE_SQL}) AND v.redirect_to IS NULL AND v.type != 'stay'
     WHERE ci.content_type = 'venue'
     GROUP BY c.kind
   `).all(...OUTDOOR_ACTIVITY_VENUE_TYPES);
@@ -10205,7 +10226,7 @@ function getOutdoorLandingVenues() {
   if (!liveKinds.length || !others.length) return getVenuesByCategory('outdoor');
   return db.prepare(`
     SELECT v.* FROM venues v
-    WHERE v.redirect_to IS NULL AND (
+    WHERE v.redirect_to IS NULL AND v.type != 'stay' AND (
       v.type = 'outdoor'
       OR (v.type IN (${others.map(() => '?').join(', ')}) AND v.id IN (
         SELECT ci.content_id FROM collection_items ci
@@ -10225,7 +10246,7 @@ function getCollectionNotes(kind) {
     FROM collection_items ci
     JOIN collections c ON c.id = ci.collection_id
     JOIN venues v ON v.id = ci.content_id
-    WHERE c.kind = ? AND ci.content_type = 'venue' AND v.redirect_to IS NULL
+    WHERE c.kind = ? AND ci.content_type = 'venue' AND v.redirect_to IS NULL AND v.type != 'stay'
     ORDER BY ci.created_at ASC, ci.rowid ASC
   `).all(kind);
   const map = new Map();
@@ -10419,12 +10440,12 @@ function getSeasonRows(today = todayLocal()) {
   for (const r of db.prepare(`
     SELECT s.venue_id, s.status, s.until_date, s.reopens_date, s.source_url, s.checked_at
     FROM venue_seasons s JOIN venues v ON v.id = s.venue_id
-    WHERE v.redirect_to IS NULL AND s.superseded_at IS NULL
+    WHERE v.redirect_to IS NULL AND v.type != 'stay' AND s.superseded_at IS NULL
   `).all()) map.set(r.venue_id, r);
   // Owners' yearly seasons, where no dated closure has been set by hand since. Brewery test 3 (2026-11-13): the owner's
   // own save marks an older researched row superseded (ownerSeasonSupersedes), so it is no longer read above.
   for (const r of db.prepare(`SELECT l.venue_id, l.open_months FROM venue_links l JOIN venues v ON v.id = l.venue_id
-    WHERE l.open_months IS NOT NULL AND v.redirect_to IS NULL`).all()) {
+    WHERE l.open_months IS NOT NULL AND v.redirect_to IS NULL AND v.type != 'stay'`).all()) {
     if (map.has(r.venue_id)) continue;
     const row = recurringSeasonRow(r.venue_id, r.open_months, today);
     if (row) map.set(r.venue_id, row);
@@ -11162,7 +11183,7 @@ function tripSwapBadgeReason(s, from, to) {
 // /admin/review (2026-10-26): places whose deals are on file but no longer shown (checked more than
 // HH_DEALS_STALE_DAYS days ago), oldest first, so they get re-checked.
 function staleHappyHourDeals(now = new Date()) {
-  const rows = db.prepare('SELECT id, name, region, type, slug, happy_hour_deals, happy_hour_deals_source, happy_hour_deals_checked_at, happy_hour_times FROM venues WHERE redirect_to IS NULL AND happy_hour_deals IS NOT NULL ORDER BY happy_hour_deals_checked_at, name').all();
+  const rows = db.prepare('SELECT id, name, region, type, slug, happy_hour_deals, happy_hour_deals_source, happy_hour_deals_checked_at, happy_hour_times FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND happy_hour_deals IS NOT NULL ORDER BY happy_hour_deals_checked_at, name').all();
   return rows.filter((r) => happyHourDealsStale(r.happy_hour_deals_checked_at, now, seasonOfHappyHour(r.happy_hour_times))).map(({ happy_hour_times, ...r }) => r);
 }
 
@@ -13300,7 +13321,7 @@ function venueDistanceKm(a, b) {
 function getRelatedVenues(venue, limit = 6) {
   // Same region + same category, excluding itself
   const rows = db
-    .prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND id != ? AND redirect_to IS NULL')
+    .prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND id != ? AND redirect_to IS NULL AND type != \'stay\'')
     .all(venue.region, venue.type, venue.id)
     .map(rowToVenue);
   const cuisine = String(venue.cuisine || '').toLowerCase();
@@ -13331,7 +13352,7 @@ function getNearbyVenues(venue, limit = 6) {
   // Same region, any other category, excluding itself — a broader
   // "explore this region more" set distinct from same-category related venues
   const rows = db
-    .prepare('SELECT * FROM venues WHERE region = ? AND type != ? AND id != ? AND redirect_to IS NULL')
+    .prepare('SELECT * FROM venues WHERE region = ? AND type != ? AND id != ? AND redirect_to IS NULL AND type != \'stay\'')
     .all(venue.region, venue.type, venue.id)
     .map(rowToVenue);
   const origin = venueCloseByOrigin(venue);
@@ -14412,7 +14433,7 @@ function listGuideCombos(minCount) {
   // iteration order and the same { region, badge, count } output.
   const sums = BOOL_FIELDS.map((b) => `SUM(CASE WHEN ${badgeTrueSql(b)} THEN 1 ELSE 0 END) AS ${b}`).join(', ');
   const byRegion = new Map(db
-    .prepare(`SELECT region, ${sums} FROM venues WHERE redirect_to IS NULL GROUP BY region`)
+    .prepare(`SELECT region, ${sums} FROM venues WHERE redirect_to IS NULL AND type != 'stay' GROUP BY region`)
     .all()
     .map((r) => [r.region, r]));
   const combos = [];
@@ -14613,7 +14634,7 @@ function guideStandoutPlan(region, ctx) {
   if (!guideStandoutCache || guideStandoutCache.sig !== sig) guideStandoutCache = { sig, byRegion: new Map() };
   if (guideStandoutCache.byRegion.has(region)) return guideStandoutCache.byRegion.get(region);
   const pages = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region).map((c) => {
-    const list = db.prepare(`SELECT * FROM venues WHERE region = ? AND ${badgeTrueSql(c.badge)} AND redirect_to IS NULL ORDER BY reviews DESC`).all(region).map(rowToVenue);
+    const list = db.prepare(`SELECT * FROM venues WHERE region = ? AND ${badgeTrueSql(c.badge)} AND redirect_to IS NULL AND type != 'stay' ORDER BY reviews DESC`).all(region).map(rowToVenue);
     return { badge: c.badge, cand: guideIntros.standoutCandidates(c.badge, list, ctx) };
   });
   const plan = guideIntros.allocateStandouts(pages);
@@ -14747,7 +14768,7 @@ const GUIDE_COMBOS = [
 ];
 const GUIDE_COMBO_BY_SLUG = Object.fromEntries(GUIDE_COMBOS.map((c) => [c.slug, c]));
 function comboGuideWhere(combo) {
-  return [combo.type ? 'type = ?' : null, ...combo.badges.map((b) => badgeTrueSql(b)), 'redirect_to IS NULL'].filter(Boolean).join(' AND ');
+  return [combo.type ? 'type = ?' : null, ...combo.badges.map((b) => badgeTrueSql(b)), 'redirect_to IS NULL AND type != \'stay\''].filter(Boolean).join(' AND ');
 }
 function getComboGuideVenues(region, combo) {
   return db.prepare(`SELECT * FROM venues WHERE region = ? AND ${comboGuideWhere(combo)} ORDER BY reviews DESC`)
@@ -15043,7 +15064,7 @@ function renderExploreByCategoryHTML() {
   const rows = db.prepare(`
     SELECT type, region, COUNT(*) AS n
     FROM venues
-    WHERE redirect_to IS NULL
+    WHERE redirect_to IS NULL AND type != 'stay'
     GROUP BY type, region
     ORDER BY n DESC
   `).all();
@@ -15591,7 +15612,7 @@ function homeUpcomingEventCount(now = homepageNow()) {
 }
 function renderHomeStatsHTML({ now = homepageNow() } = {}) {
   let counts = {};
-  try { for (const r of db.prepare('SELECT type, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL GROUP BY type').all()) counts[r.type] = r.n; } catch (e) { counts = {}; }
+  try { for (const r of db.prepare('SELECT type, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL AND type != \'stay\' GROUP BY type').all()) counts[r.type] = r.n; } catch (e) { counts = {}; }
   let events = 0;
   try { events = homeUpcomingEventCount(now); } catch (e) { events = 0; }
   const n = (types) => types.reduce((t, k) => t + (counts[k] || 0), 0);
@@ -15678,7 +15699,7 @@ function bestRegionForCategoryType() {
   const rows = db.prepare(`
     SELECT type, region, COUNT(*) AS n
     FROM venues
-    WHERE redirect_to IS NULL
+    WHERE redirect_to IS NULL AND type != 'stay'
     GROUP BY type, region
     ORDER BY n DESC
   `).all();
@@ -18736,7 +18757,7 @@ const NAV_HAPPY_HOUR_HREF = '/guide/kelowna/happy_hour';
 // The towns with a Happy Hour page (the same MIN_GUIDE_VENUES rule as the /guide/<town>/happy_hour route).
 function navHappyHourTowns() {
   try {
-    return db.prepare('SELECT region FROM venues WHERE redirect_to IS NULL AND happy_hour = 1 GROUP BY region HAVING COUNT(*) >= ?').all(MIN_GUIDE_VENUES)
+    return db.prepare('SELECT region FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND happy_hour = 1 GROUP BY region HAVING COUNT(*) >= ?').all(MIN_GUIDE_VENUES)
       .map((r) => r.region).filter((r) => REGION_LABELS[r] && /^[a-z-]+$/.test(r)).sort();
   } catch (e) { return []; }
 }
@@ -22636,7 +22657,7 @@ function wineryRestaurantPage(venue) {
     const mine = street(venue.address);
     if (mine && /\d/.test(mine)) {
       try {
-        hit = db.prepare("SELECT id, name, region, type, slug, address FROM venues WHERE type = 'restaurant' AND redirect_to IS NULL AND region = ? AND id != ?").all(venue.region, venue.id).find((r) => street(r.address) === mine) || null;
+        hit = db.prepare("SELECT id, name, region, type, slug, address FROM venues WHERE type = 'restaurant' AND redirect_to IS NULL AND type != 'stay' AND region = ? AND id != ?").all(venue.region, venue.id).find((r) => street(r.address) === mine) || null;
       } catch (e) { hit = null; }
     }
   }
@@ -24610,7 +24631,7 @@ function tourRiderAge(venueId) {
 // name, category words and description), to tell whether a town has a food-tour or walking-tour company.
 function tripTourKindVenues() {
   try {
-    return db.prepare("SELECT id, name, region, cuisine, description FROM venues WHERE type = 'tour' AND redirect_to IS NULL").all()
+    return db.prepare("SELECT id, name, region, cuisine, description FROM venues WHERE type = 'tour' AND redirect_to IS NULL AND type != 'stay'").all()
       .map((v) => { const k = venueTourInfo(v.id).kinds; return { id: v.id, type: 'tour', region: v.region, name: v.name, cuisine: v.cuisine || '', description: v.description || '', ...(Array.isArray(k) ? { tourKinds: k } : {}), ...(tourFree(v.id) ? { tourFree: tourFree(v.id) } : {}) }; });
   } catch (e) { return []; }
 }
@@ -26025,7 +26046,7 @@ function regionStartVenues(region, max = 6) {
   if (!intro) return [];
   const html = intro.paragraphs.map((p) => p[1]).join(' ');
   const seen = new Set(), out = [];
-  const find = db.prepare('SELECT * FROM venues WHERE region = ? AND slug = ? AND redirect_to IS NULL');
+  const find = db.prepare('SELECT * FROM venues WHERE region = ? AND slug = ? AND redirect_to IS NULL AND type != \'stay\'');
   for (const m of html.matchAll(/href="\/([a-z-]+)\/([a-z-]+)\/([a-z0-9-]+)"/g)) {
     const [, r, catSlug, slug] = m;
     if (r !== region || !SLUG_TO_TYPE[catSlug] || seen.has(slug)) continue;
@@ -26072,7 +26093,7 @@ function regionCategoryImage(c) {
 // Dog-Friendly: a dog-friendly listing; Local Favourites / Hidden Gems: one of its members), else any unused listing photo
 // from the hill. -> the 480px copy, or null (the shared category art is used).
 function skiTilePhoto(region, c, used) {
-  const rows = db.prepare("SELECT id, type, name, image_url, dog_friendly FROM venues WHERE region = ? AND redirect_to IS NULL AND image_url IS NOT NULL AND image_url <> '' ORDER BY id").all(region)
+  const rows = db.prepare("SELECT id, type, name, image_url, dog_friendly FROM venues WHERE region = ? AND redirect_to IS NULL AND type != 'stay' AND image_url IS NOT NULL AND image_url <> '' ORDER BY id").all(region)
     .filter((v) => /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(v.image_url).trim()));
   const kind = { 'local-favourites': 'local_favorite', 'hidden-gems': 'hidden_gem' }[c.key];
   const members = kind ? new Set(db.prepare(`SELECT ci.content_id AS id FROM collection_items ci JOIN collections k ON k.id = ci.collection_id
@@ -26514,7 +26535,7 @@ ${upcomingEvents.map((e) => {
 
   // Kelowna follows the owner-approved compact destination layout.
   if (region === 'kelowna') {
-    const activeSlugs = db.prepare("SELECT slug FROM venues WHERE region = ? AND redirect_to IS NULL").all(region).map(v => v.slug);
+    const activeSlugs = db.prepare("SELECT slug FROM venues WHERE region = ? AND redirect_to IS NULL AND type != 'stay'").all(region).map(v => v.slug);
     return `<!DOCTYPE html><html lang="en"><head>
 ${pageHead(title, description, canonical, [breadcrumb, ...regionPageSchemas(region, regionLabel, description, canonical, categories)], { golfTheme: true, shareImage })}
 ${renderOutdoorThemeStyles()}
@@ -26528,7 +26549,7 @@ ${GOLF_APP_SCRIPT_TAG}</body></html>`;
 
   // Every other town follows the same compact layout, with its own vetted photos and places (data/towns/<town>.json).
   if (townPages.has(region)) {
-    const activeSlugs = db.prepare("SELECT slug FROM venues WHERE region = ? AND redirect_to IS NULL").all(region).map(v => v.slug);
+    const activeSlugs = db.prepare("SELECT slug FROM venues WHERE region = ? AND redirect_to IS NULL AND type != 'stay'").all(region).map(v => v.slug);
     return `<!DOCTYPE html><html lang="en"><head>
 ${pageHead(title, description, canonical, [breadcrumb, ...regionPageSchemas(region, regionLabel, description, canonical, categories)], { golfTheme: true, shareImage })}
 ${renderOutdoorThemeStyles()}
@@ -26545,7 +26566,7 @@ ${GOLF_APP_SCRIPT_TAG}</body></html>`;
     const season = SKI_RESORT_SEASON[region];
     const state = skiSeasonState(season, todayLocal());
     const status = state === 'open' ? season.statusOpen : state ? season.statusSoon : null;
-    const activeSlugs = db.prepare("SELECT slug FROM venues WHERE region = ? AND redirect_to IS NULL").all(region).map(v => v.slug);
+    const activeSlugs = db.prepare("SELECT slug FROM venues WHERE region = ? AND redirect_to IS NULL AND type != 'stay'").all(region).map(v => v.slug);
     return `<!DOCTYPE html><html lang="en"><head>
 ${pageHead(title, description, canonical, [breadcrumb, ...regionPageSchemas(region, regionLabel, description, canonical, categories)], { golfTheme: true, shareImage })}
 ${renderOutdoorThemeStyles()}
@@ -26562,7 +26583,7 @@ ${GOLF_APP_SCRIPT_TAG}</body></html>`;
     const season = SKI_RESORT_SEASON[region];
     const state = skiSeasonState(season, todayLocal());
     const status = state === 'open' ? season.statusOpen : state ? season.statusSoon : null;
-    const activeSlugs = db.prepare("SELECT slug FROM venues WHERE region = ? AND redirect_to IS NULL").all(region).map(v => v.slug);
+    const activeSlugs = db.prepare("SELECT slug FROM venues WHERE region = ? AND redirect_to IS NULL AND type != 'stay'").all(region).map(v => v.slug);
     return `<!DOCTYPE html><html lang="en"><head>
 ${pageHead(title, description, canonical, [breadcrumb, ...regionPageSchemas(region, regionLabel, description, canonical, categories)], { golfTheme: true, shareImage })}
 ${renderOutdoorThemeStyles()}
@@ -26674,7 +26695,7 @@ function countUpcomingEventsForRegion(region, now = new Date()) {
 }
 // = getDogFriendlyHubVenues()
 function countDogFriendlyHubVenues(region = null) {
-  return countVenueRows(`v.redirect_to IS NULL AND (
+  return countVenueRows(`v.redirect_to IS NULL AND v.type != 'stay' AND (
       v.dog_friendly = 1
       OR EXISTS (
         SELECT 1 FROM collection_items ci
@@ -26685,7 +26706,7 @@ function countDogFriendlyHubVenues(region = null) {
 }
 // = getLocalFavouriteVenues()
 function countLocalFavouriteVenues(region = null) {
-  return countVenueRows(`v.redirect_to IS NULL AND EXISTS (
+  return countVenueRows(`v.redirect_to IS NULL AND v.type != 'stay' AND EXISTS (
       SELECT 1 FROM collection_items ci
       JOIN collections c ON c.id = ci.collection_id
       WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = 'local_favorite'
@@ -26695,7 +26716,7 @@ function countLocalFavouriteVenues(region = null) {
 // redirected, whose region and type are known (REGION_LABELS / CATEGORY_SLUGS).
 function countHiddenGemCollectionVenues(region = null) {
   const regions = Object.keys(REGION_LABELS), types = Object.keys(CATEGORY_SLUGS);
-  return countVenueRows(`v.redirect_to IS NULL
+  return countVenueRows(`v.redirect_to IS NULL AND v.type != 'stay'
       AND v.region IN (${regions.map(() => '?').join(', ')})
       AND v.type IN (${types.map(() => '?').join(', ')})
       AND EXISTS (
@@ -26706,7 +26727,7 @@ function countHiddenGemCollectionVenues(region = null) {
 }
 // = getSecretSpotVenues()
 function countSecretSpotVenues() {
-  return countVenueRows(`v.redirect_to IS NULL AND v.type IN (${SECRET_SPOT_TYPES.map(() => '?').join(', ')}) AND EXISTS (
+  return countVenueRows(`v.redirect_to IS NULL AND v.type != 'stay' AND v.type IN (${SECRET_SPOT_TYPES.map(() => '?').join(', ')}) AND EXISTS (
       SELECT 1 FROM collection_items ci
       JOIN collections c ON c.id = ci.collection_id
       WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = 'hidden_gem'
@@ -26714,7 +26735,7 @@ function countSecretSpotVenues() {
 }
 // = getFoodDrinkHubVenues()
 function countFoodDrinkHubVenues() {
-  return countVenueRows(`v.redirect_to IS NULL AND (
+  return countVenueRows(`v.redirect_to IS NULL AND v.type != 'stay' AND (
       v.type IN (${FOOD_DRINK_TYPES.map(() => '?').join(', ')})
       OR EXISTS (
         SELECT 1 FROM collection_items ci
@@ -26725,14 +26746,14 @@ function countFoodDrinkHubVenues() {
 }
 // = getVenuesByCategory(type)
 function countVenuesByCategory(type) {
-  return countVenueRows('v.type = ? AND v.redirect_to IS NULL', [type], null);
+  return countVenueRows('v.type = ? AND v.redirect_to IS NULL AND v.type != \'stay\'', [type], null);
 }
 // = getOutdoorLandingVenues()
 function countOutdoorLandingVenues() {
   const liveKinds = listLiveOutdoorActivities().map((a) => a.kind);
   const others = OUTDOOR_ACTIVITY_VENUE_TYPES.filter((t) => t !== 'outdoor');
   if (!liveKinds.length || !others.length) return countVenuesByCategory('outdoor');
-  return countVenueRows(`v.redirect_to IS NULL AND (
+  return countVenueRows(`v.redirect_to IS NULL AND v.type != 'stay' AND (
       v.type = 'outdoor'
       OR (v.type IN (${others.map(() => '?').join(', ')}) AND v.id IN (
         SELECT ci.content_id FROM collection_items ci
@@ -26999,7 +27020,7 @@ const MAP_AREA_CENTERS = {
 };
 const MAP_POPUP_LIMIT = 12;
 function mapAreaPins() {
-  const rows = db.prepare('SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL').all()
+  const rows = db.prepare('SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]);
   return VALID_REGIONS.filter((r) => MAP_AREA_CENTERS[r]).map((region) => {
     const places = rows.filter((v) => v.region === region).sort((a, b) => String(a.name).localeCompare(String(b.name)));
@@ -27029,7 +27050,7 @@ const MAP_GROUPS = [
 ];
 const MAP_GROUP_BY_TYPE = Object.fromEntries(MAP_GROUPS.flatMap((g) => g.types.map((t) => [t, g.key])));
 function mapPlaces() {
-  return db.prepare('SELECT id, name, region, type, slug, latitude, longitude FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
+  return db.prepare('SELECT id, name, region, type, slug, latitude, longitude FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)));
 }
 const MAP_PAGE_STYLE = `<style id="near-me-map">
@@ -29492,7 +29513,7 @@ function mapFrenchNote(note) {
 }
 function mapPlacesData(now = new Date()) {
   const arrivalSpots = arrivalPoints.forMap();
-  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, free_entry, rating, cuisine, description, happy_hour_times, price, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
+  const venues = db.prepare('SELECT id, name, region, type, slug, latitude, longitude, hours, patio, dog_friendly, happy_hour, live_music, lake_view, kid_friendly, vegetarian, vegan, gluten_free, open_late, open_early, great_groups, sports_tv, nonalcoholic, free_entry, rating, cuisine, description, happy_hour_times, price, happy_hour_deals, happy_hour_deals_fr, happy_hour_deals_checked_at FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
   const open = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false });
   const seasons = getSeasonStates(now);
@@ -29598,12 +29619,12 @@ function mapEventsData(now = new Date(), { ahead = false } = {}) {
     ORDER BY o.start_date, COALESCE(o.start_time, ''), e.name, o.id`).all(today, ahead ? addLocalDays(today, MAP_AHEAD_DAYS) : weekEnd);
   const seen = new Set();
   const venueQ = db.prepare('SELECT name, latitude, longitude, image_url, redirect_to FROM venues WHERE id = ?');
-  const regionVenueQ = db.prepare('SELECT id, name, region, address, latitude, longitude, redirect_to FROM venues WHERE region = ? AND redirect_to IS NULL');
+  const regionVenueQ = db.prepare('SELECT id, name, region, address, latitude, longitude, redirect_to FROM venues WHERE region = ? AND redirect_to IS NULL AND type != \'stay\'');
   const regionVenues = new Map();
   // An event without a venue link is pinned only when its venue text names exactly one listed place in the same
   // town ("Cannery Brewing", or "Gray Monk Estate Winery, Lake Country"); anything else is listed without a pin.
   const byName = new Map();
-  for (const v of db.prepare('SELECT name, region, latitude, longitude, image_url FROM venues WHERE redirect_to IS NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all()) {
+  for (const v of db.prepare('SELECT name, region, latitude, longitude, image_url FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND latitude IS NOT NULL AND longitude IS NOT NULL').all()) {
     const k = `${v.region}|${String(v.name).trim().toLowerCase()}`;
     byName.set(k, byName.has(k) ? null : v);
   }
@@ -29696,14 +29717,14 @@ function mapLiveData(now = new Date()) {
   const version = mapDataVersion(now);
   if (mapDataCache && mapDataCache.version === version) return mapDataCache;
   const photos = {};
-  for (const v of db.prepare('SELECT name, region, type, slug, image_url FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND image_url IS NOT NULL').all()) {
+  for (const v of db.prepare('SELECT name, region, type, slug, image_url FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND image_url IS NOT NULL').all()) {
     const photo = venueThumbPhoto(v);
     if (photo && REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]) photos[`/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`] = photo;
   }
   const glutenFreeNotes = {};
   const visitRows = db.prepare(`SELECT v.region, v.type, v.slug, i.info
     FROM venue_visit_info i JOIN venues v ON v.id = i.venue_id
-    WHERE v.redirect_to IS NULL AND v.slug IS NOT NULL
+    WHERE v.redirect_to IS NULL AND v.type != 'stay' AND v.slug IS NOT NULL
       AND v.latitude IS NOT NULL AND v.longitude IS NOT NULL`).all();
   for (const v of visitRows) {
     if (!REGION_LABELS[v.region] || !CATEGORY_SLUGS[v.type]) continue;
@@ -30179,8 +30200,112 @@ function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map()) 
 function hotelAwayText(km) {
   return km <= 1.2 ? `${Math.max(1, Math.round(km * 12))} min walk` : `${Math.round(km * 1.6 + 2)} min drive`;
 }
+// ---------- Places to stay (2026-11-19, places-to-stay.js) ----------
+// Own reads, own routes: type 'stay' is not in CATEGORY_SLUGS, and every shared list query leaves it out
+// (type != 'stay'), so stays never reach another category, the map, Roam Now, Build My Trip, Editor's Picks or the
+// sitemap. Ordered by name, the same as every other town category page; commission never affects the order.
+function getStaysByRegion(region) {
+  return db.prepare("SELECT * FROM venues WHERE region = ? AND type = 'stay' AND redirect_to IS NULL AND slug IS NOT NULL ORDER BY name ASC")
+    .all(region).map(rowToVenue);
+}
+function findStayBySlug(region, slug) {
+  const row = db.prepare("SELECT * FROM venues WHERE region = ? AND type = 'stay' AND slug = ?").get(region, slug);
+  return row ? rowToVenue(row) : null;
+}
+function countStaysInRegion(region) {
+  try { return db.prepare("SELECT COUNT(*) AS n FROM venues WHERE region = ? AND type = 'stay' AND redirect_to IS NULL AND slug IS NOT NULL").get(region).n; } catch (e) { return 0; }
+}
+function staysPageDeps() {
+  return {
+    origin: 'https://okanaganroam.com', siteName: 'Okanagan Roam',
+    pageHead, escapeHtml,
+    analyticsHead: (t) => renderAnalyticsHeadHtml(t),
+    headerHtml: () => renderGolfHeaderHtml(),
+    footerHtml: () => renderHomeFooterHTML(true),
+    appScript: GOLF_APP_SCRIPT_TAG,
+    breadcrumbSchema: (items) => breadcrumbListSchema(items),
+    links: (id) => { try { return venueLinks(id); } catch (e) { return {}; } },
+    indexable: (region) => placesToStay.staysIndexable(region),
+    engagementScript: (venue) => golfVenueEngagementScriptHtml(venue),
+    env: process.env,
+    // Close by: the type names and venue page links every other venue page uses (French page only when the place has one).
+    typeLabel: (type, lang) => (((lang === 'fr' ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[type] || {}).singular || type),
+    venueHref: (v, lang) => (lang === 'fr' && venueHasFrench(v) ? venuePagePath(v, 'fr') : venuePagePath(v)),
+  };
+}
+// Close by on a stay's page (2026-11-19): our own listings within 2 km of it (placesToStay.pickStayCloseBy ranks
+// them), by the venue pages' distance helper. Not stays, not redirected, only types with a page, and not places closed
+// right now (a written "not operating" advisory, or closed for the season: the same tests as the hotel QR pages).
+function getStayCloseBy(stay, now = new Date()) {
+  const lat = Number(stay && stay.latitude), lng = Number(stay && stay.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || (!lat && !lng)) return [];
+  try {
+    const types = placesToStay.CLOSE_BY_TYPES.filter((t) => CATEGORY_SLUGS[t]);
+    // A box a little over 2 km each way (1 degree of longitude is about 71 km here), then the exact distance.
+    const dLat = 0.025, dLng = 0.04;
+    const rows = db.prepare(`SELECT * FROM venues WHERE type != 'stay' AND type IN (${types.map(() => '?').join(',')}) AND redirect_to IS NULL AND slug IS NOT NULL
+      AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? AND id != ?`)
+      .all(...types, lat - dLat, lat + dLat, lng - dLng, lng + dLng, stay.id).map(rowToVenue)
+      .filter((v) => REGION_LABELS[v.region]);
+    const closedIds = new Set(advisoryNotOperatingIds());
+    for (const [id, st] of getSeasonStates(now)) if (seasonStateBlocksOffers(st)) closedIds.add(id);
+    return placesToStay.pickStayCloseBy(stay, rows, { distanceKm: venueDistanceKm, closedIds });
+  } catch (e) { return []; }
+}
+// Sitemap entries for the towns STAYS_INDEXABLE has opened (none by default). English only, like the rest of the sitemap.
+function staysSitemapEntries(toLastmod) {
+  const out = [];
+  let regions = [];
+  try { regions = db.prepare("SELECT region, MAX(updated_at) AS lastmod FROM venues WHERE type = 'stay' AND redirect_to IS NULL AND slug IS NOT NULL GROUP BY region").all(); } catch (e) { regions = []; }
+  for (const r of regions) {
+    if (!REGION_LABELS[r.region] || !placesToStay.staysIndexable(r.region)) continue;
+    out.push(`  <url>\n    <loc>https://okanaganroam.com${placesToStay.staysListPath(r.region)}</loc>\n    <lastmod>${toLastmod(r.lastmod)}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.6</priority>\n  </url>`);
+    for (const v of getStaysByRegion(r.region)) {
+      out.push(`  <url>\n    <loc>https://okanaganroam.com${placesToStay.stayPath(v)}</loc>\n    <lastmod>${toLastmod(v.updated_at)}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.5</priority>\n  </url>`);
+    }
+  }
+  return out;
+}
+// STAYS_NAV (off by default): a "Places to stay" link on a town's page, only when the town has at least one stay.
+function withStaysNavLink(html, region, lang = 'en') {
+  if (!placesToStay.staysNavOn() || !countStaysInRegion(region) || typeof html !== 'string') return html;
+  const link = `<p class="stays-nav-link"><a href="${placesToStay.staysListPath(region)}">${placesToStay.STAY_LABEL[lang === 'fr' ? 'fr' : 'en']} &rarr;</a></p>\n`;
+  const at = html.indexOf('</main>');
+  return at === -1 ? html : html.slice(0, at) + link + html.slice(at);
+}
+// GET /<town>/stays, /<town>/stays/<slug> and their /fr twins. Returns true when it answered.
+function handleStaysRoute(req, res, pathname, method, search) {
+  if (method !== 'GET') return false;
+  const m = /^(\/fr)?\/([a-z-]+)\/stays(?:\/([a-z0-9-]+))?\/?$/.exec(pathname);
+  if (!m || !REGION_LABELS[m[2]]) return false;
+  const lang = m[1] ? 'fr' : 'en';
+  const region = m[2];
+  const headers = (indexable) => ({ 'Content-Type': 'text/html; charset=utf-8', ...(lang === 'fr' ? { 'Content-Language': 'fr-CA' } : {}), ...(indexable ? {} : { 'X-Robots-Tag': 'noindex' }) });
+  const indexable = lang === 'en' && placesToStay.staysIndexable(region);
+  if (!m[3]) {
+    const stays = getStaysByRegion(region);
+    if (!stays.length) return false;
+    res.writeHead(200, headers(indexable));
+    res.end(placesToStay.renderStaysListPage({ region, regionLabel: REGION_LABELS[region], stays, lang }, staysPageDeps()));
+    return true;
+  }
+  const venue = findStayBySlug(region, m[3]);
+  if (!venue) return false;
+  if (venue.redirect_to) {
+    const target = getVenue(venue.redirect_to);
+    if (target && !target.redirect_to && target.type === 'stay' && target.slug && REGION_LABELS[target.region]) {
+      res.writeHead(301, { Location: withCampaignParams(placesToStay.stayPath(target, lang), search) });
+      res.end();
+      return true;
+    }
+    return false;
+  }
+  res.writeHead(200, headers(indexable));
+  res.end(placesToStay.renderStayVenuePage({ venue, regionLabel: REGION_LABELS[region], lang, closeBy: getStayCloseBy(venue) }, staysPageDeps()));
+  return true;
+}
 function renderHotelPage(hotel, now = new Date()) {
-  const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all().map(rowToVenue);
+  const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all().map(rowToVenue);
   const notOperating = advisoryNotOperatingIds();
   const closedIds = new Set(notOperating);
   const today0 = todayLocal(now);
@@ -30767,7 +30892,7 @@ function categoryCountText(c) {
 }
 // Places per town, for the "Browse by town" row (busiest first).
 function regionVenueCounts() {
-  return db.prepare('SELECT region, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL GROUP BY region').all()
+  return db.prepare('SELECT region, COUNT(*) AS n FROM venues WHERE redirect_to IS NULL AND type != \'stay\' GROUP BY region').all()
     .filter((r) => REGION_LABELS[r.region])
     .sort((a, b) => b.n - a.n || REGION_LABELS[a.region].localeCompare(REGION_LABELS[b.region]));
 }
@@ -32858,7 +32983,7 @@ function getFoodDrinkHubVenues() {
   const kindPlaceholders = FD_CATEGORY_COLLECTION_KINDS.map(() => '?').join(', ');
   const rows = db.prepare(`
     SELECT v.* FROM venues v
-    WHERE v.redirect_to IS NULL AND (
+    WHERE v.redirect_to IS NULL AND v.type != 'stay' AND (
       v.type IN (${typePlaceholders})
       OR EXISTS (
         SELECT 1 FROM collection_items ci
@@ -33156,8 +33281,8 @@ function foodDrinkFilterBarHtml(venues, state = {}, scopeFeatures = null, welcom
     if (!scopeFeatures.length) return '';
     return `<div class="fd-controls">
     <div class="fd-pop">
-      <button type="button" class="fd-pop-btn" id="fdFeaturesBtn" aria-expanded="false" aria-controls="fdFeaturesPanel"><span class="fd-pop-icon" aria-hidden="true">${uiIcon('sparkle')}</span> <span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span><span class="fd-pop-count" id="fdFeaturesCount"${nF ? '' : ' hidden'}>${nF ? ` · ${escapeHtml(String(nF))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="fdFeaturesPanel" hidden>${foodDrinkFeatureChipsHtml(state, scopeFeatures)}
+      <button type="button" class="fd-pop-btn" id="fdFeaturesBtn" aria-expanded="false" aria-controls="fdFeaturesPanel"><span class="fd-pop-icon" aria-hidden="true">${welcoming ? '' : uiIcon('sparkle')}</span> ${welcoming ? '✨ Filters' : '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>'}<span class="fd-pop-count" id="fdFeaturesCount"${nF ? '' : ' hidden'}>${nF ? ` · ${escapeHtml(String(nF))}` : ''}</span></button>
+      <div class="fd-pop-panel" id="fdFeaturesPanel" hidden>${welcoming ? '<p class="fd-panel-heading">✨ Make it your kind of outing</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button>' : ''}${foodDrinkFeatureChipsHtml(state, scopeFeatures)}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>
@@ -33487,6 +33612,8 @@ function renderFoodDrinkHubScriptHtml(opts = {}) {
       if (key === 'az') return name(a).localeCompare(name(b));
       if (key === 'town') return String(LABELS.regions[d(a).r] || '').localeCompare(String(LABELS.regions[d(b).r] || '')) || name(a).localeCompare(name(b));
       if (key === 'rating') return ((d(b).g || 0) - (d(a).g || 0)) || ((d(b).n || 0) - (d(a).n || 0)) || name(a).localeCompare(name(b));
+      // Golf (2026-11-20): priced places by price, then the rest by name.
+      if (key === 'price-asc' || key === 'price-desc') { var pa = d(a).p, pb = d(b).p; if ((pa == null) !== (pb == null)) return pa == null ? 1 : -1; if (pa == null) return name(a).localeCompare(name(b)); return ((key === 'price-asc' ? pa - pb : pb - pa)) || name(a).localeCompare(name(b)); }
       return ((d(a).o === undefined ? 1e9 : d(a).o) - (d(b).o === undefined ? 1e9 : d(b).o));
     });
   }
@@ -33881,7 +34008,10 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
       // Fix (2026-10-18): honour the page's older single-choice parameter
       // (?activities= on Outdoors, ?activity= on Tours) like the server does,
       // so a pre-filtered first paint is not cleared on boot.
-      var pre = { t: (params.get('types') || ${opts.legacyTypesParam ? `params.get(${JSON.stringify(opts.legacyTypesParam)}) || ` : ''}'').split(',').filter(Boolean), f: (params.get('features') || '').split(',').filter(Boolean), r: (params.get('regions') || '').split(',').filter(Boolean) };
+      // Fix (2026-11-20): an activity page (/outdoors/hiking, /tours/wine, /sports/skate) names its activity on the chip row, so a
+      // first paint with that activity chosen is not cleared on boot when the address carries no ?types=.
+      var typeRow = document.querySelector('.fd-type-row[data-default-types]');
+      var pre = { t: (params.get('types') || ${opts.legacyTypesParam ? `params.get(${JSON.stringify(opts.legacyTypesParam)}) || ` : ''}(typeRow && !params.has('types') ? typeRow.getAttribute('data-default-types') : '') || '').split(',').filter(Boolean), f: (params.get('features') || '').split(',').filter(Boolean), r: (params.get('regions') || '').split(',').filter(Boolean) };
       typeChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.t.indexOf(c.getAttribute('data-fd-type')) !== -1 ? 'true' : 'false'); });
       featureChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.f.indexOf(c.getAttribute('data-fd-feature')) !== -1 ? 'true' : 'false'); });
       regionChips.forEach(function(c){ c.setAttribute('aria-pressed', pre.r.indexOf(c.getAttribute('data-region')) !== -1 ? 'true' : 'false'); });
@@ -34375,7 +34505,7 @@ function renderFoodDrinkScopedPage(venues, filter, scope, now = new Date()) {
     if (st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
   }
 
-  const cardsHtml = venues.length ? foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, false, openInfo.byId) : '';
+  const cardsHtml = venues.length ? foodDrinkBatchedCardsHtml(venues, matchIds, matching.length, advisoryNotes, false, openInfo.byId, { welcoming: true }) : '';
   const emptyHtml = venues.length === 0
     ? `<p class="fd-no-results" id="fdNoResults">No ${escapeHtml(label.plural.toLowerCase())} are listed in ${escapeHtml(regionLabel || 'the Okanagan')} right now.</p>`
     : `<p class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}>No ${escapeHtml(label.plural.toLowerCase())} here match that combination yet. <a href="${path}" id="fdNoResultsClear">Clear the filters</a> to see all of them.</p>`;
@@ -34397,9 +34527,11 @@ ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderDestinationCategoryStyles()}
 ${renderFoodDrinkOpenNowStyles()}
+<link rel="stylesheet" href="/food-drink-layout.css?v=${crypto.createHash('md5').update(fs.readFileSync(require('node:path').join(__dirname, 'public', 'food-drink-layout.css'))).digest('hex').slice(0, 12)}">
+<style id="fd-scoped-refresh">@media(max-width:640px){body.fd-scoped-page.fd-refresh .fd-pop-panel{bottom:auto!important;max-height:calc(100dvh - 92px)!important;}}</style>
 ${golfEngagementHeadHtml('fd', true, 'category')}
 </head>
-<body class="golf-page outdoor-page fd-page fd-scoped-page">
+<body class="golf-page outdoor-page fd-page fd-refresh fd-scoped-page">
 ${CATEGORY_BANNER_IMAGES[type] ? CATEGORY_BANNER_STYLE : ''}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -34414,8 +34546,10 @@ ${renderGolfHeaderHtml()}
     ? categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(valleyText.heading)}</h1>\n  <p class="outdoor-intro fd-intro">${escapeHtml(valleyText.intro)}</p>`)
     : categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>${region === 'kelowna' && (type === 'restaurant' || type === 'cafe') ? `\n  <p class="subtitle"><a href="${BRUNCH_GUIDE_PATH}">Guide: the best brunch in Kelowna &rarr;</a></p>` : ''}${type === 'winery' ? `\n  <p class="subtitle"><a href="${WINE_GUIDE_PATH}">New to wine country? Start with our first-timer\u2019s guide &rarr;</a> &middot; <a href="/wineries">All Okanagan wineries</a></p>` : ''}`)}
   ${valleyWide ? renderCategoryRegionSelector(catSlug, venues) : regionCategoryTabsHtml(region, categoryCounts, type)}
-  ${venues.length ? foodDrinkSearchHtml() : ''}
-  ${venues.length ? (foodDrinkFilterBarHtml(venues, state, scopeFeatures) || '<div class="fd-controls">\n  </div>').replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`) : ''}
+  ${venues.length ? `<div class="fd-toolbar">
+  ${foodDrinkSearchHtml(true)}
+  ${(foodDrinkFilterBarHtml(venues, state, scopeFeatures, true) || '<div class="fd-controls">\n  </div>').replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`)}
+  </div>` : ''}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
   ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, venues.length, filtered), state, venues.length > 1 ? sort : null)}
@@ -35429,7 +35563,7 @@ const DOG_HUB_LABEL_BY_FEATURE = Object.fromEntries(DOG_HUB_FEATURES.map((f) => 
 function getDogFriendlyHubVenues() {
   const rows = db.prepare(`
     SELECT v.* FROM venues v
-    WHERE v.redirect_to IS NULL AND (
+    WHERE v.redirect_to IS NULL AND v.type != 'stay' AND (
       v.dog_friendly = 1
       OR EXISTS (
         SELECT 1 FROM collection_items ci
@@ -35918,6 +36052,110 @@ function dogCardPhotoKey(v, isBeach) {
   if (FD_CARD_DOG_PHOTOS[t] && id % 2 === 0) return `${t}-dog`;
   return foodDrinkCardPhotoKey({ ...v, dog_friendly: 0 });
 }
+// Sports and Indoor sub-pages in the hub layout (2026-11-20, batch 1). /sports/<activity>, /<town>/sports,
+// /indoor/<experience> and /<town>/indoor used an older page. They now show the /sports or /indoor page itself -- with the
+// activity already chosen, or with only that town's places -- and keep their own title, description, canonical, share
+// tags, schema, breadcrumb and heading, taken unchanged from the older page (oldHtml), so nothing a search engine reads moves.
+function subPageInHubLayout(hubHtml, oldHtml, pagePath, hubPath, opts = {}) {
+  const headOf = (h) => h.slice(0, h.indexOf('</head>'));
+  const oldHead = headOf(oldHtml);
+  let head = headOf(hubHtml), body = hubHtml.slice(head.length);
+  const swap = (re) => { const m = oldHead.match(re); if (m) head = head.replace(re, () => m[0]); };
+  swap(/<title>[\s\S]*?<\/title>/);
+  swap(/<meta name="description"[^>]*>/);
+  swap(/<link rel="canonical"[^>]*>/);
+  for (const k of ['og:type', 'og:title', 'og:description', 'og:image', 'og:url']) swap(new RegExp(`<meta property="${k}"[^>]*>`));
+  for (const k of ['twitter:card', 'twitter:title', 'twitter:description', 'twitter:image']) swap(new RegExp(`<meta name="${k}"[^>]*>`));
+  // Whether search engines may index the page stays exactly as the older page said.
+  const robotsRe = /<meta name="robots"[^>]*>\n?/;
+  const oldRobots = oldHead.match(robotsRe);
+  head = head.replace(robotsRe, '');
+  if (oldRobots) head = head.replace(/<title>/, () => oldRobots[0].trim() + '\n<title>');
+  const ldRe = /<script type="application\/ld\+json">[\s\S]*?<\/script>/g;
+  const oldLd = oldHead.match(ldRe) || [];
+  if (oldLd.length) { let first = true; head = head.replace(ldRe, () => { if (first) { first = false; return oldLd.join('\n'); } return ''; }); }
+  const oldMain = oldHtml.slice(oldHtml.indexOf('<main'));
+  const nav = oldMain.match(/<nav class="breadcrumb"[\s\S]*?<\/nav>/), h1 = oldMain.match(/<h1[^>]*>([\s\S]*?)<\/h1>/);
+  if (nav) body = body.replace(/<nav class="breadcrumb"[\s\S]*?<\/nav>/, () => nav[0]);
+  if (h1) body = body.replace(/(<h1[^>]*>)[\s\S]*?(<\/h1>)/, (m, a, b) => a + h1[1] + b);
+  if (opts.intro) body = body.replace(/(<p class="outdoor-intro fd-intro"[^>]*>)[\s\S]*?(<\/p>)/, (m, a, b) => a + escapeHtml(opts.intro) + b);
+  // Links back to the page itself, not to the hub.
+  body = body.replace(new RegExp(`href="${hubPath}" id="fdNoResultsClear"`), `href="${pagePath}" id="fdNoResultsClear"`);
+  if (opts.activity) body = body.replace('data-filter="fd-type"', `data-filter="fd-type" data-default-types="${opts.activity}"`);
+  if (opts.town) {
+    // One town: no town picker and no By town links.
+    body = body.replace(/<section class="hub-links" aria-labelledby="(?:sports|indoor)TownsHeading">[\s\S]*?<\/section>/, '');
+    head += '<style id="sub-page-town">.fd-pop:has(> #fdRegionsBtn){display:none!important}</style>\n';
+  }
+  return head + body;
+}
+function renderSportsSubPage(oldHtml, pagePath, query, scope) {
+  const inTown = (v) => !scope.region || v.region === scope.region;
+  const types = String(query.types || '').split(',').filter((t) => SPORT_ACTIVITIES.some((a) => a.slug === t));
+  const filter = { ...parseFoodDrinkFilterQuery(query), types: types.length || !scope.activity ? types : [scope.activity], sort: SPORTS_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' };
+  if (scope.region) filter.regions = [];
+  const hub = renderSportsHubPage(getVenuesByCategory('sport').filter(inTown), getSportsAlsoVenues().filter(inTown), getSportsAlsoNotes(), filter);
+  return subPageInHubLayout(hub, oldHtml, pagePath, '/sports', { town: !!scope.region, intro: scope.intro, activity: scope.activity });
+}
+function renderIndoorSubPage(oldHtml, pagePath, query, scope) {
+  const inTown = (v) => !scope.region || v.region === scope.region;
+  const types = String(query.types || '').split(',').filter((t) => INDOOR_HUB_EXPERIENCES.some((a) => a.slug === t));
+  const filter = { ...parseFoodDrinkFilterQuery(query), types: types.length || !scope.activity ? types : [scope.activity], openNow: query.open === 'now', sort: INDOOR_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' };
+  if (scope.region) filter.regions = [];
+  // A town page lists that town's indoor listings only, as it always has (no simulators or tagged places from other categories).
+  const hub = scope.region ? renderIndoorHubPage(getVenuesByCategory('indoor').filter(inTown), [], [], getIndoorAlsoNotes(), filter)
+    : renderIndoorHubPage(getVenuesByCategory('indoor'), getIndoorGolfVenues(), getIndoorAlsoVenues(), getIndoorAlsoNotes(), filter);
+  return subPageInHubLayout(hub, oldHtml, pagePath, '/indoor', { town: !!scope.region, intro: scope.intro, activity: scope.activity });
+}
+
+// Golf in the hub layout (2026-11-20, batch 1). /golf and /<town>/golf keep their three groups (as chips), their green
+// fees (a box on each card) and their price sorts, and keep their own title, schema, breadcrumb and heading (oldHtml).
+const GOLF_HUB_KINDS = [{ type: 'courses', label: 'Golf Courses' }, { type: 'practice', label: 'Driving Ranges & Practice' }, { type: 'simulators', label: 'Indoor Golf & Simulators' }];
+const GOLF_HUB_SORTS = [{ key: 'recommended', label: 'Recommended' }, { key: 'price-asc', label: 'Price: low to high' }, { key: 'price-desc', label: 'Price: high to low' }, { key: 'az', label: 'A–Z' }];
+function renderGolfHubLayoutPage(oldHtml, venues, query, scope = {}) {
+  const pagePath = scope.region ? `/${scope.region}/golf` : '/golf';
+  const details = golfDetailsFor(venues);
+  const today = scope.today;
+  const keyOf = (v) => `${v.region}/${v.slug}`;
+  const isPractice = (v) => !!(golfData && golfData.isPracticeFacility(details.get(keyOf(v))));
+  const kindOf = (v) => (isIndoorGolfVenue(v) ? 'simulators' : isPractice(v) ? 'practice' : 'courses');
+  const byName = (a, b) => String(a.name).localeCompare(String(b.name));
+  const group = (k) => venues.filter((v) => kindOf(v) === k);
+  const courses = seasonClosedLast(group('courses').sort((a, b) => foodDrinkRecommendedScore(b) - foodDrinkRecommendedScore(a) || byName(a, b)));
+  const ordered = [...courses, ...seasonClosedLast(group('practice')), ...group('simulators')];
+  const cents = (v) => (golfData ? golfData.comparisonCents(details.get(keyOf(v)), today) : null);
+  const kinds = GOLF_HUB_KINDS.filter((k) => ordered.some((v) => kindOf(v) === k.type));
+  const plainText = (h) => String(h || '').replace(/<\/p>\s*<p[^>]*>/g, ' · ').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+  const info = new Map(ordered.map((v) => {
+    let fee = golfData ? golfData.golfCardFeeHtml(details.get(keyOf(v)), today) : '';
+    if ((!fee || fee.includes('golf-fee-none')) && GOLF_CARD_PRICES[keyOf(v)]) fee = escapeHtml(GOLF_CARD_PRICES[keyOf(v)]);
+    const text = plainText(fee);
+    return [v.id, text ? `<div class="hub-card-info"><strong>Green fees</strong><p>${escapeHtml(text)}</p></div>` : ''];
+  }));
+  const sortKey = query.sort === 'name' ? 'az' : query.sort;
+  const types = String(query.types || '').split(',').filter((t) => kinds.some((k) => k.type === t));
+  const filter = { ...parseFoodDrinkFilterQuery(query), types, sort: GOLF_HUB_SORTS.some((x) => x.key === sortKey) ? sortKey : 'recommended' };
+  if (scope.region) filter.regions = [];
+  const m = oldHtml.slice(oldHtml.indexOf('<main')).match(/<p class="(?:outdoor-intro|hub-intro)[^"]*"[^>]*>([\s\S]*?)<\/p>/) || oldHtml.slice(oldHtml.indexOf('<main')).match(/<p class="(subtitle)">([^<]*)<\/p>/);
+  const intro = m ? plainText(m[m.length - 1]) : '';
+  const h1 = oldHtml.slice(oldHtml.indexOf('<main')).match(/<h1[^>]*>([\s\S]*?)<\/h1>/);
+  const content = { all: { banner: CATEGORY_BANNER_IMAGES.golf, heading: h1 ? plainText(h1[1]) : 'Golf Courses', intro: intro || 'Golf courses, driving ranges and indoor golf.' } };
+  const hub = renderCuratedHubPage({
+    path: pagePath, name: 'Golf Courses', title: 'Golf Courses | Okanagan Roam', description: 'Golf courses.', bodyClass: 'golf-hub-page', surface: 'golf',
+    region: scope.region || null,
+    types: kinds, catsFor: (v) => [kindOf(v)], categoryContent: content,
+    keepOrder: true, sorts: GOLF_HUB_SORTS, priceOf: cents,
+    listFor: (sort, mixed) => (sort === 'price-asc' || sort === 'price-desc') ? (() => { const priced = mixed.filter((v) => cents(v) != null).sort((a, b) => (cents(a) - cents(b)) * (sort === 'price-desc' ? -1 : 1) || byName(a, b)); return [...priced, ...mixed.filter((v) => cents(v) == null).sort(byName)]; })() : null,
+    photoKeyFor: (v) => curatedPhotoKey(v, 'golf'), cardExtraHtml: info, cardStatus: true,
+    features: ['kid_friendly', 'dog_friendly', 'lake_view', 'great_groups', 'patio'],
+    search: { label: 'Search golf courses', placeholder: 'Search by course name or town...' },
+    allLabel: '✨ All golf',
+    cardOptsExtra: { priceAllowed: () => false },
+    sortHelp: { summary: 'How sorting works', text: 'Recommended puts the best-rated courses with the most reviews first, then driving ranges and indoor golf; places closed for the season move lower down. Price sorting uses each course’s standard adult green fee for its standard round, at prime time in peak season, as published by the course. Places with no published fee come last.' },
+  }, ordered, filter);
+  return subPageInHubLayout(hub, oldHtml, pagePath, pagePath, {});
+}
+
 function renderDogHubPage(venues, filter = null, now = new Date()) {
   const f = { types: [], features: [], regions: [], ...(filter || {}) };
   const sort = DOG_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
@@ -35998,20 +36236,20 @@ function renderDogHubPage(venues, filter = null, now = new Date()) {
   const cardNotes = new Map([...policyNotes].filter(([id]) => !beachIds.has(id)));
   const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, openInfo.byId, {
     cardNotes, cardNoteLabel: 'Dogs:', photoKeyFor: (v) => dogCardPhotoKey(v, beachIds.has(v.id)),
-    cardOpts: { dogNoteInline: true, hideDogBadges: true },
+    cardOpts: { dogNoteInline: true, hideDogBadges: true }, welcoming: true,
   });
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${DOG_HUB_TYPES.map((t) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)} <span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">✨ All places</button>${DOG_HUB_TYPES.map((t) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}">${escapeHtml(t.label)} <span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+      <div class="fd-pop-panel" id="${id}Panel" hidden><p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to go?' : '✨ Make it your kind of outing'}</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button><p class="hub-filter-help">Numbers show how many places match each filter.</p>${panel}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>`;
   const controlsHtml = `<div class="fd-controls">
-    ${pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
-    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+    ${pop('fdRegions', '<span class="fd-town-label">' + escapeHtml(nR ? REGION_LABELS[f.regions[0]] + (nR > 1 ? ' +' + (nR - 1) : '') : 'Choose a town') + '</span>', uiIcon('pin'), '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts, hideEmpty: true }))}
+    ${featureKeys.length ? pop('fdFeatures', '✨ Filters', '', nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
     ${foodDrinkOpenNowToggleHtml(openNow, openCount)}
   </div>`;
   const typeLabels = Object.fromEntries(DOG_HUB_TYPES.map((t) => [t.type, t.label]));
@@ -36023,6 +36261,8 @@ ${pageHead(title, description, canonical, [breadcrumb, itemList], { shareImage: 
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${renderFoodDrinkOpenNowStyles()}
+<link rel="stylesheet" href="/food-drink-layout.css?v=${crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-layout.css'))).digest('hex').slice(0, 12)}">
+${CURATED_REFRESH_CSS.split('body.curated-hub-page.fd-refresh').join('body.dog-hub-page.fd-refresh')}
 ${golfEngagementHeadHtml('dog', true, 'hub')}
 <style id="dog-hub">
   body.dog-hub-page .dog-note, body.dog-hub-page .card-note { margin: 2px 0 10px; font-size: 0.9rem; line-height: 1.45; color: var(--teal-deep, #1F5450); }
@@ -36032,7 +36272,7 @@ ${golfEngagementHeadHtml('dog', true, 'hub')}
   body.dog-hub-page .dog-guides h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
 </style>
 </head>
-<body class="golf-page outdoor-page fd-page dog-page dog-hub-page">
+<body class="golf-page outdoor-page fd-page fd-refresh dog-page dog-hub-page">
 ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -36059,9 +36299,11 @@ ${renderGolfHeaderHtml()}
   </script>`, `<h1>${escapeHtml(dogContent.heading)}</h1>
   <p class="outdoor-intro fd-intro">${escapeHtml(dogContent.intro)}</p>
   <p class="subtitle"><a href="${DOG_GUIDE_PATH}">Guide: dog-friendly Kelowna, with the dog rules for each place &rarr;</a></p>`)}
+  <div class="fd-toolbar">
   ${foodDrinkSearchHtml().replace('Search food and drink', 'Search dog friendly places').replace('Search by name, place or dish...', 'Search by name, town, beach or trail...')}
-  ${chips}
   ${controlsHtml}
+  </div>
+  ${chips}
   <p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
@@ -36130,7 +36372,7 @@ function getToursAlsoNotes() {
 function getToursAlsoVenues() {
   return db.prepare(`
     SELECT v.* FROM venues v
-    WHERE v.redirect_to IS NULL AND v.type != 'tour' AND EXISTS (
+    WHERE v.redirect_to IS NULL AND v.type != 'stay' AND v.type != 'tour' AND EXISTS (
       SELECT 1 FROM collection_items ci
       JOIN collections c ON c.id = ci.collection_id
       WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = ?
@@ -36153,7 +36395,7 @@ function getSportsAlsoNotes() {
 function getSportsAlsoVenues() {
   return db.prepare(`
     SELECT v.* FROM venues v
-    WHERE v.redirect_to IS NULL AND v.type != 'sport' AND EXISTS (
+    WHERE v.redirect_to IS NULL AND v.type != 'stay' AND v.type != 'sport' AND EXISTS (
       SELECT 1 FROM collection_items ci
       JOIN collections c ON c.id = ci.collection_id
       WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = ?
@@ -36165,7 +36407,7 @@ function getSportsAlsoVenues() {
 function getIndoorAlsoVenues() {
   return db.prepare(`
     SELECT v.* FROM venues v
-    WHERE v.redirect_to IS NULL AND v.type != 'indoor' AND EXISTS (
+    WHERE v.redirect_to IS NULL AND v.type != 'stay' AND v.type != 'indoor' AND EXISTS (
       SELECT 1 FROM collection_items ci
       JOIN collections c ON c.id = ci.collection_id
       WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = ?
@@ -36200,7 +36442,7 @@ function getPublicCollectionNotes(kind) {
 function getLocalFavouriteVenues() {
   return db.prepare(`
     SELECT v.* FROM venues v
-    WHERE v.redirect_to IS NULL AND EXISTS (
+    WHERE v.redirect_to IS NULL AND v.type != 'stay' AND EXISTS (
       SELECT 1 FROM collection_items ci
       JOIN collections c ON c.id = ci.collection_id
       WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = 'local_favorite'
@@ -36645,7 +36887,7 @@ const SECRET_SPOT_TYPES = ['outdoor', 'beach'];
 function getSecretSpotVenues() {
   return db.prepare(`
     SELECT v.* FROM venues v
-    WHERE v.redirect_to IS NULL AND v.type IN (${SECRET_SPOT_TYPES.map(() => '?').join(', ')}) AND EXISTS (
+    WHERE v.redirect_to IS NULL AND v.type != 'stay' AND v.type IN (${SECRET_SPOT_TYPES.map(() => '?').join(', ')}) AND EXISTS (
       SELECT 1 FROM collection_items ci
       JOIN collections c ON c.id = ci.collection_id
       WHERE ci.content_type = 'venue' AND ci.content_id = v.id AND c.kind = 'hidden_gem'
@@ -36661,7 +36903,7 @@ function countHiddenGemsOutsideSecretSpots(regions = []) {
     SELECT COUNT(DISTINCT v.id) AS n FROM venues v
     JOIN collection_items ci ON ci.content_type = 'venue' AND ci.content_id = v.id
     JOIN collections c ON c.id = ci.collection_id
-    WHERE c.kind = 'hidden_gem' AND v.redirect_to IS NULL
+    WHERE c.kind = 'hidden_gem' AND v.redirect_to IS NULL AND v.type != 'stay'
       AND v.type NOT IN (${SECRET_SPOT_TYPES.map(() => '?').join(', ')})${regionSql}
   `).get(...SECRET_SPOT_TYPES, ...regions);
   return row ? row.n : 0;
@@ -36741,6 +36983,15 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   // cfg.hiddenTypes: types a link may ask for (?types=restaurant) that have
   // no visible chip; each is a hidden chip, so the page script keeps the filter.
   const allTypes = [...cfg.types, ...(cfg.hiddenTypes || [])];
+  // cfg.layout === 'activities' (2026-11-20, Outdoors): the layout of /sports -- search, town and Filters in one bar,
+  // activity chips with icons, welcoming cards with a "Things to do here" box, a note on the sort, and By activity /
+  // By town links under the results. Every other curated page keeps the layout below.
+  // Every curated page (2026-11-20, batch 1): the same layout, unless a page asks for cfg.layout 'classic'. Each page keeps
+  // its own chips, filters, notes and descriptions; only Outdoors swaps the description for its "Things to do here" box.
+  const actLayout = cfg.layout !== 'classic';
+  const allLabel = cfg.allLabel || (cfg.layout === 'activities' ? '✨ All activities' : '✨ All places');
+  const plainMixed = !cfg.sorts && !cfg.keepOrder && !cfg.openFirst && !cfg.reorder && !cfg.pinFirst;
+  const sortHelp = cfg.sortHelp || (plainMixed ? { summary: 'How “Mixed” works', text: 'Mixed spreads each kind of place through the list, so every kind gets a turn near the top, and the order changes each day. Places closed for the season move lower down. It is not a ranking.' } : null);
   const typeKeys = new Set(allTypes.map((t) => t.type));
   const f = { types: [], features: [], regions: [], ...(filter || {}) };
   f.types = f.types.filter((t) => typeKeys.has(t));
@@ -36765,7 +37016,7 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   const mixedRank = new Map(mixed.map((v, i) => [v.id, i]));
   const list = sort === 'az' ? venues.slice().sort(byName)
     : sort === 'town' ? venues.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
-      : mixed;
+      : (cfg.listFor && cfg.listFor(sort, mixed)) || mixed;
   const featsById = foodDrinkFeaturesByVenue(list);
   const featureTally = {};
   for (const fs of featsById.values()) for (const k of fs) featureTally[k] = (featureTally[k] || 0) + 1;
@@ -36810,6 +37061,8 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     const st = openInfo.byId.get(v.id);
     if (cfg.openNow && st && st.eligible) payload[String(v.id)].h = compactFoodDrinkHours(st.hours);
     if (sorts.some((x) => x.key === 'rating')) { payload[String(v.id)].g = Number(v.rating) || 0; payload[String(v.id)].n = Number(v.reviews) || 0; }
+    // cfg.priceOf (2026-11-20, Golf): the comparison price behind the page's price sorts.
+    if (cfg.priceOf) { const pr = cfg.priceOf(v); if (pr != null) payload[String(v.id)].p = pr; }
   }
   const cardsHtml = foodDrinkBatchedCardsHtml(list, matchIds, matching.length, advisoryNotes, true, (cfg.openNow || cfg.cardStatus) ? openInfo.byId : null, {
     cardNotes: notes, cardNoteLabel: cfg.cardNoteLabel, photoKeyFor: cfg.photoKeyFor, cardOpts: cfg.cardOpts || {}, cardExtraHtml: cfg.cardExtraHtml || null, cardNameMarkHtml: cfg.cardNameMarkHtml || null,
@@ -36817,20 +37070,24 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
     // cfg.activityPhotos: 'swap' (follows the type chips) or one fixed activity ('winter' on Ski & Snow).
     altPhotos: cfg.activityPhotos ? (cfg.activityPhotos === 'swap' ? 'swap' : 'fixed') : null,
     photoType: cfg.activityPhotos && cfg.activityPhotos !== 'swap' ? cfg.activityPhotos : (f.types.length === 1 ? f.types[0] : null),
+    ...(actLayout ? { welcoming: true } : {}),
+    ...(cfg.cardOptsExtra || {}),
   });
   const selected = new Set(f.types);
-  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">All</button>${allTypes.map((t, i) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}"${i >= cfg.types.length || (cfg.region && !(counts.types[t.type] || 0) && !selected.has(t.type)) ? ' hidden' : ''}>${escapeHtml(t.label)} <span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>`;
+  const chips = `<div class="fd-type-row" role="group" aria-label="Choose a kind of place" data-filter="fd-type"${cfg.defaultTypes && cfg.defaultTypes.length ? ` data-default-types="${cfg.defaultTypes.join(',')}"` : ''}><button type="button" class="outdoor-filter-chip fd-type-chip fd-type-all" data-fd-type-all="1" aria-pressed="${selected.size ? 'false' : 'true'}">${actLayout ? allLabel : 'All'}</button>${allTypes.map((t, i) => `<button type="button" class="outdoor-filter-chip fd-type-chip" data-fd-type="${t.type}" aria-pressed="${selected.has(t.type) ? 'true' : 'false'}"${i >= cfg.types.length || (cfg.region && !(counts.types[t.type] || 0) && !selected.has(t.type)) ? ' hidden' : ''}>${actLayout && cfg.typeIcons && cfg.typeIcons[t.type] ? cfg.typeIcons[t.type] + ' ' : ''}${escapeHtml(t.label)} <span class="outdoor-activity-count">${counts.types[t.type] || 0}</span></button>`).join('')}</div>${actLayout ? '<p class="hub-filter-help">Numbers show how many places match each activity.</p>' : ''}`;
   const nF = f.features.length, nR = f.regions.length;
   const pop = (id, labelHtml, icon, badge, panel) => `<div class="fd-pop">
       <button type="button" class="fd-pop-btn" id="${id}Btn" aria-expanded="false" aria-controls="${id}Panel"><span class="fd-pop-icon" aria-hidden="true">${icon}</span> ${labelHtml}<span class="fd-pop-count" id="${id}Count"${badge ? '' : ' hidden'}>${badge ? ` \u00b7 ${escapeHtml(String(badge))}` : ''}</span></button>
-      <div class="fd-pop-panel" id="${id}Panel" hidden>${panel}
+      <div class="fd-pop-panel" id="${id}Panel" hidden>${actLayout ? `<p class="fd-panel-heading">${id === 'fdRegions' ? '📍 Where would you like to go?' : escapeHtml(cfg.filtersHeading || '✨ Make it your kind of outing')}</p><button type="button" class="fd-panel-close" data-fd-close>Close ×</button><p class="hub-filter-help">Numbers show how many places match each filter.</p>` : ''}${panel}
         <div class="fd-pop-actions"><button type="button" class="fd-pop-apply" data-fd-apply>Show results</button></div>
       </div>
     </div>`;
   // A one-town page (cfg.region) has no Regions control.
   const controlsHtml = `<div class="fd-controls">
-    ${cfg.region ? '' : pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
-    ${featureKeys.length ? pop('fdFeatures', '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
+    ${cfg.region ? '' : actLayout
+    ? pop('fdRegions', '<span class="fd-town-label">' + escapeHtml(nR ? REGION_LABELS[f.regions[0]] + (nR > 1 ? ' +' + (nR - 1) : '') : 'Choose a town') + '</span>', uiIcon('pin'), '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts, hideEmpty: true }))
+    : pop('fdRegions', 'Regions', uiIcon('pin'), nR || '', renderOutdoorRegionFilterChips(list, { selectedRegions: f.regions, counts }))}
+    ${featureKeys.length ? pop('fdFeatures', actLayout ? '✨ Filters' : '<span class="fd-pop-long">What are you looking for?</span><span class="fd-pop-short">Filters</span>', uiIcon('sparkle'), nF || '', foodDrinkFeatureChipsHtml(state, featureKeys)) : ''}
     ${cfg.openNow ? foodDrinkOpenNowToggleHtml(openNowOn, openCount) : ''}
   </div>`;
   const typeLabels = Object.fromEntries(allTypes.map((t) => [t.type, t.label]));
@@ -36843,7 +37100,9 @@ ${pageHead(cfg.title, cfg.description, cfg.noindex ? null : canonical, cfg.noind
 ${renderOutdoorThemeStyles()}
 ${renderFoodDrinkHubStyles()}
 ${cfg.openNow ? renderFoodDrinkOpenNowStyles() : ''}
+${actLayout ? `<link rel="stylesheet" href="/food-drink-layout.css?v=${crypto.createHash('md5').update(fs.readFileSync(path.join(__dirname, 'public', 'food-drink-layout.css'))).digest('hex').slice(0, 12)}">` : ''}
 ${golfEngagementHeadHtml(cfg.surface, true, cfg.pageType || 'hub')}
+${actLayout ? CURATED_REFRESH_CSS : ''}
 ${cfg.extraHead || ''}
 <style id="curated-hub">
   body.curated-hub-page .card-note { margin: 2px 0 10px; font-size: 0.9rem; line-height: 1.45; color: var(--teal-deep, #1F5450); }
@@ -36854,7 +37113,7 @@ ${cfg.extraHead || ''}
   body.curated-hub-page .how-we-pick p { margin: 0; font-size: 0.92rem; line-height: 1.5; color: rgba(42,32,25,0.85); }
 </style>
 </head>
-<body class="golf-page outdoor-page fd-page curated-hub-page ${cfg.bodyClass}">
+<body class="golf-page outdoor-page fd-page${actLayout ? ' fd-refresh' : ''} curated-hub-page ${cfg.bodyClass}">
 ${CATEGORY_BANNER_STYLE}
   ${renderGolfTripTrayHtml()}
 <div id="floatingTooltip"></div>
@@ -36882,17 +37141,23 @@ ${renderGolfHeaderHtml()}
   ${content.intro ? `<p class="outdoor-intro fd-intro">${content === cfg.categoryContent.all && cfg.introHtml ? cfg.introHtml : escapeHtml(content.intro)}</p>` : ''}${cfg.heroExtraHtml || ''}`)}
   ${cfg.leadHtml || ''}${cfg.howWePick ? `
   <section class="how-we-pick" aria-labelledby="howWePickHead"><h2 id="howWePickHead">${escapeHtml(cfg.howWePick.heading)}</h2><p>${escapeHtml(cfg.howWePick.text)}</p></section>` : ''}
+  ${actLayout ? `<div class="fd-toolbar">
   ${foodDrinkSearchHtml().replace('Search food and drink', escapeHtml(cfg.search.label)).replace('Search by name, place or dish...', escapeHtml(cfg.search.placeholder))}
-  ${chips}
   ${controlsHtml}
+  </div>
+  ${chips}` : `${foodDrinkSearchHtml().replace('Search food and drink', escapeHtml(cfg.search.label)).replace('Search by name, place or dish...', escapeHtml(cfg.search.placeholder))}
+  ${chips}
+  ${controlsHtml}`}
   ${cfg.openNow ? `<p class="fd-open-note">${escapeHtml(FD_OPEN_NOTE)}</p>` : ''}
   <section class="outdoor-step outdoor-step-results fd-results-step" aria-labelledby="fdResultsTop">
   <h2 class="visually-hidden" id="fdResultsTop">Results</h2>
   ${foodDrinkResultBarHtml(foodDrinkSummaryText(matching.length, list.length, filtered), state, sort, sorts)}
+  ${actLayout && sortHelp ? `<details class="hub-sort-help" id="hubSortHelp"${sort === 'recommended' ? '' : ' hidden'}><summary>${escapeHtml(sortHelp.summary)}</summary><p>${escapeHtml(sortHelp.text)}</p></details>` : ''}
   <p class="fd-search-note" id="fdSearchNote" hidden></p>
   <div class="fd-no-results" id="fdNoResults"${matching.length === 0 ? '' : ' hidden'}><p><span id="fdNoResultsText">Nothing matches that combination yet.</span> <a href="${cfg.path}" id="fdNoResultsClear">Clear the filters</a> to see everything.</p>
   ${tryHtml ? `<p class="fd-no-results-try">Try one word, like ${tryHtml}.</p>` : ''}</div>
   ${cardsHtml}
+  ${actLayout ? cfg.linksHtml || '' : ''}
   <script type="application/json" id="fdVenueData">${JSON.stringify(payload).replace(/</g, '\\u003c')}</script>
   </section>
   ${cfg.afterHtml || ''}
@@ -36903,6 +37168,7 @@ ${renderGolfHeaderHtml()}
   ${renderFoodDrinkHubScriptHtml({ openNow: !!cfg.openNow, surface: cfg.surface, typeLabels, searchLabels: cfg.searchLabels || {}, legacyTypesParam: cfg.legacyTypesParam || null })}
   ${cfg.activityPhotos === 'swap' ? ACTIVITY_PHOTO_SWAP_SCRIPT : ''}
   ${cfg.bodyClass === 'outdoors-hub-page' ? hubCardFitScriptHtml() : ''}
+  ${actLayout && sortHelp ? `<script>(function(){var sort=document.getElementById('fdSort'),help=document.getElementById('hubSortHelp');if(!sort||!help)return;function sync(){help.hidden=sort.value!=='recommended';}sort.addEventListener('change',sync);window.addEventListener('pageshow',sync);})();</script>` : ''}
 </body>
 </html>`;
 }
@@ -37055,6 +37321,7 @@ function renderOutdoorsHubPage(venues, filter = null, opts = {}, now = new Date(
   for (const a of live) if (OUTDOOR_ACTIVITY_BANNERS[a.slug]) content[a.slug] = { banner: OUTDOOR_ACTIVITY_BANNERS[a.slug], heading: `${a.label} in ${town.region ? REGION_LABELS[town.region] : 'the Okanagan'}`, intro: a.blurb };
   return renderCuratedHubPage({
     path: activity ? `/outdoors/${activity.slug}` : '/outdoors',
+    defaultTypes: activity ? [activity.slug] : null,
     name: activity ? activity.label : 'Outdoors',
     crumbs: activity ? [{ name: 'Outdoors', href: '/outdoors' }] : [],
     title: activity ? `${activity.label} in the Okanagan | Okanagan Roam` : 'Outdoor Adventures in the Okanagan | Okanagan Roam',
@@ -37080,8 +37347,115 @@ function renderOutdoorsHubPage(venues, filter = null, opts = {}, now = new Date(
     categoryContent: content,
     ...town,
     ...(activity ? {} : {}),
+    ...outdoorsActivityLayout(venues, live, acts, town, now),
   }, venues, f, now);
 }
+// Outdoors in the layout of /sports (2026-11-20, Dayton): the same search bar, town and Filters buttons, activity chips
+// with icons, welcoming cards and By activity / By town links. Everything here comes from the listings already on the
+// page: the "Things to do here" box lists each place's own outdoor activities.
+const OUTDOOR_ACTIVITY_EMOJI = Object.freeze({ hiking: '🥾', viewpoints: '🏞️', nature: '🦉', cycling: '🚵', winter: '❄️', adventure: '🧗', fishing: '🎣', camping: '⛺', water: '🛶' });
+function outdoorsActivityLayout(venues, live, acts, town, now = new Date()) {
+  const label = Object.fromEntries(live.map((a) => [a.slug, a.label]));
+  const info = new Map(venues.map((v) => {
+    const names = (acts.get(v.id) || []).map((s) => label[s]).filter(Boolean);
+    return [v.id, names.length ? `<div class="hub-card-info"><strong>Things to do here</strong><p>${escapeHtml(names.join(' \u00b7 '))}</p></div>` : ''];
+  }));
+  const openById = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now, { requireVerified: false }).byId;
+  const statusOverrides = new Map(venues.flatMap((v) => {
+    const st = cardStatusFor(openById.get(v.id), v);
+    return st && st.text === 'Open year-round' ? [[v.id, { ...st, text: 'Year-round access' }]] : [];
+  }));
+  const count = {};
+  for (const list of acts.values()) for (const sl of list) count[sl] = (count[sl] || 0) + 1;
+  const activityLinks = live.filter((a) => (count[a.slug] || 0) >= MIN_ACTIVITY_VENUES)
+    .map((a) => `<a href="/outdoors/${a.slug}">${escapeHtml(a.label)} <span>${count[a.slug]}</span></a>`).join('\n      ');
+  // A town page exists for every town with at least one outdoor-type listing (beach members alone do not make one).
+  const townCount = {};
+  for (const v of venues) if (v.type === 'outdoor' && REGION_LABELS[v.region]) townCount[v.region] = (townCount[v.region] || 0) + 1;
+  const townLinks = town.region ? '' : Object.entries(townCount).filter(([, n]) => n >= MIN_CATEGORY_VENUES)
+    .sort((x, y) => y[1] - x[1] || REGION_LABELS[x[0]].localeCompare(REGION_LABELS[y[0]]))
+    .map(([r, n]) => `<a href="/${r}/outdoors">${escapeHtml(REGION_LABELS[r])} <span>${n}</span></a>`).join('\n      ');
+  const section = (id, heading, aria, links) => links ? `<section class="hub-links" aria-labelledby="${id}">
+    <h2 id="${id}">${heading}</h2>
+    <nav aria-label="${aria}">
+      ${links}
+    </nav>
+  </section>` : '';
+  return {
+    layout: 'activities',
+    typeIcons: OUTDOOR_ACTIVITY_EMOJI,
+    cardExtraHtml: info,
+    cardOpts: { allBadges: true },
+    cardOptsExtra: { welcoming: true, statusOverrides },
+    sortHelp: { summary: 'How \u201cMixed\u201d works', text: 'Mixed spreads each kind of outdoor place through the list, so hikes, viewpoints, nature spots and the rest all get a turn near the top, and the order changes each day. Places closed for the season move lower down. It is not a ranking.' },
+    linksHtml: section('outdoorsActivitiesHeading', 'By activity', 'Outdoor places by activity', activityLinks) + section('outdoorsTownsHeading', 'By town', 'Outdoor places by town', townLinks),
+    extraHead: OUTDOORS_ACTIVITY_LAYOUT_CSS,
+  };
+}
+// The layout rules every curated page shares (2026-11-20); Outdoors adds its own card rules below.
+const CURATED_REFRESH_CSS = `<style id="curated-refresh">
+  body.curated-hub-page.fd-refresh .hub-card-info {padding:10px 12px;margin:0 0 10px;background:#edf3e9;border-radius:14px;line-height:1.45;}
+  body.curated-hub-page.fd-refresh .hub-card-info strong {display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#286962;margin-bottom:4px;}
+  body.curated-hub-page.fd-refresh .hub-card-info p {font-size:14px;margin:0;color:#1b2b3a;}
+  body.curated-hub-page.fd-refresh .category-banner {height:170px;min-height:0;}
+  body.curated-hub-page.fd-refresh .fd-intro {display:block!important;-webkit-line-clamp:unset;}
+  body.curated-hub-page.fd-refresh .hub-filter-help {font:400 13px/1.45 Nunito,sans-serif;color:#615b53;margin:8px 0 12px;}
+  body.curated-hub-page.fd-refresh .fd-pop-panel .hub-filter-help {margin-top:22px;}
+  body.curated-hub-page.fd-refresh .hub-sort-help {margin:0 0 12px;color:#286962;font:700 13px/1.5 Nunito,sans-serif;}
+  body.curated-hub-page.fd-refresh .hub-sort-help summary {cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px;}
+  body.curated-hub-page.fd-refresh .hub-sort-help summary::before {content:'▸';}
+  body.curated-hub-page.fd-refresh .hub-sort-help[open] summary::before {content:'▾';}
+  body.curated-hub-page.fd-refresh .hub-sort-help p {max-width:70ch;margin:0;padding:12px 16px;background:#edf3e9;border-radius:16px;color:#514b43;font-weight:400;}
+  @media(max-width:640px){
+    body.curated-hub-page.fd-refresh .fd-type-row + .hub-filter-help {display:none;}
+    body.curated-hub-page.fd-refresh.fd-refresh .fd-pop-panel {bottom:auto!important;max-height:calc(100dvh - 92px)!important;}
+    body.curated-hub-page.fd-refresh.fd-refresh .category-banner,body.curated-hub-page.fd-refresh.fd-refresh .category-banner img {height:110px!important;}
+    body.curated-hub-page.fd-refresh.fd-refresh #fdResults > .venue-card {padding:12px 16px!important;}
+    body.curated-hub-page.fd-refresh.fd-refresh #fdResults > .venue-card::before {height:clamp(128px,40vw,190px)!important;min-height:0!important;padding-bottom:0!important;width:calc(100% + 32px);margin:0 -16px 10px;}
+    body.curated-hub-page.fd-refresh.fd-refresh #fdResults > .venue-card > h2 {font-size:20px;line-height:1.25;margin-bottom:8px;}
+    body.curated-hub-page.fd-refresh.fd-refresh #fdResults > .venue-card > .card-slot-notice:has(> .season-tag) {position:relative!important;order:-2!important;top:auto!important;right:auto!important;left:auto!important;align-self:flex-start;max-width:calc(100% - 20px);margin:-48px 10px 18px!important;}
+  }
+  body.curated-hub-page.fd-refresh .hub-links { margin: 26px 0 8px; }
+  body.curated-hub-page.fd-refresh .hub-links h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+  body.curated-hub-page.fd-refresh .hub-links nav { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.curated-hub-page.fd-refresh .hub-links a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 700; font-size: 0.86rem; color: var(--ink, #2A2019); text-decoration: none; }
+  body.curated-hub-page.fd-refresh .hub-links a:hover { background: rgba(27,43,58,0.06); }
+  body.curated-hub-page.fd-refresh .hub-links a span { font-size: 0.74rem; opacity: 0.6; }
+
+</style>`;
+const OUTDOORS_ACTIVITY_LAYOUT_CSS = `<style id="outdoors-hub">
+  body.outdoors-hub-page .category-banner {height:170px;min-height:0;}
+  body.outdoors-hub-page .fd-intro {display:block!important;-webkit-line-clamp:unset;}
+  html body.outdoors-hub-page.fd-refresh #fdResults > li.venue-card > .card-slot-desc {display:none!important;}
+  html body.outdoors-hub-page.fd-refresh #fdResults > li.venue-card > .card-slot-fee {display:block!important;}
+  body.outdoors-hub-page .hub-card-info {padding:10px 12px;margin:0 0 10px;background:#edf3e9;border-radius:14px;line-height:1.45;}
+  body.outdoors-hub-page .hub-card-info strong {display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#286962;margin-bottom:4px;}
+  body.outdoors-hub-page .hub-card-info p {font-size:14px;margin:0;color:#1b2b3a;}
+  body.outdoors-hub-page .hub-filter-help {font:400 13px/1.45 Nunito,sans-serif;color:#615b53;margin:8px 0 12px;}
+  body.outdoors-hub-page .fd-pop-panel .hub-filter-help {margin-top:22px;}
+  body.outdoors-hub-page .hub-sort-help {margin:0 0 12px;color:#286962;font:700 13px/1.5 Nunito,sans-serif;}
+  body.outdoors-hub-page .hub-sort-help summary {cursor:pointer;min-height:44px;display:flex;align-items:center;gap:6px;}
+  body.outdoors-hub-page .hub-sort-help summary::before {content:'▸';}
+  body.outdoors-hub-page .hub-sort-help[open] summary::before {content:'▾';}
+  body.outdoors-hub-page .hub-sort-help p {max-width:70ch;margin:0;padding:12px 16px;background:#edf3e9;border-radius:16px;color:#514b43;font-weight:400;}
+  @media(max-width:640px){
+    body.outdoors-hub-page .fd-type-row + .hub-filter-help {display:none;}
+    body.outdoors-hub-page.fd-refresh .fd-pop-panel {bottom:auto!important;max-height:calc(100dvh - 92px)!important;}
+    body.outdoors-hub-page.fd-refresh .category-banner,body.outdoors-hub-page.fd-refresh .category-banner img {height:110px!important;}
+    body.outdoors-hub-page.fd-refresh #fdResults > .venue-card {padding:12px 16px!important;}
+    body.outdoors-hub-page.fd-refresh #fdResults > .venue-card::before {height:clamp(128px,40vw,190px)!important;min-height:0!important;padding-bottom:0!important;width:calc(100% + 32px);margin:0 -16px 10px;}
+    body.outdoors-hub-page.fd-refresh #fdResults > .venue-card > h2 {font-size:20px;line-height:1.25;margin-bottom:8px;}
+    body.outdoors-hub-page.fd-refresh #fdResults > .venue-card > .card-slot-notice:has(> .season-tag) {position:relative!important;order:-2!important;top:auto!important;right:auto!important;left:auto!important;align-self:flex-start;max-width:calc(100% - 20px);margin:-48px 10px 18px!important;}
+  }
+  body.outdoors-hub-page .hub-links { margin: 26px 0 8px; }
+  body.outdoors-hub-page .hub-links h2 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.15rem; margin: 0 0 10px; }
+  body.outdoors-hub-page .hub-links nav { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.outdoors-hub-page .hub-links a { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; min-height: 40px; box-sizing: border-box; border: 1px solid rgba(27,43,58,0.18); border-radius: 999px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 700; font-size: 0.86rem; color: var(--ink, #2A2019); text-decoration: none; }
+  body.outdoors-hub-page .hub-links a:hover { background: rgba(27,43,58,0.06); }
+  body.outdoors-hub-page .hub-links a span { font-size: 0.74rem; opacity: 0.6; }
+  body.outdoors-hub-page .card-grid > .venue-card > .card-slot-desc, body.outdoors-hub-page .card-grid > .venue-card > .card-slot-notes { display: none !important; }
+  html body.outdoors-hub-page.golf-page .card-grid > li.venue-card:is([data-ph], [data-card-ph]):not(.whatson-event-card) > .chips:not(:empty) { display: flex !important; }
+</style>`;
 // ?types=, ?regions=, ?features=, ?sort= for these sections, plus each
 // page's older single-choice parameter (?activities= on Outdoors,
 // ?activity= on Tours), so existing links keep their filter.
@@ -37138,6 +37512,7 @@ function renderToursSectionPage(venues, alsoVenues, filter = null, opts = {}, no
   for (const a of TOUR_ACTIVITIES) content[a.slug] = { banner: a.banner, heading: a.heading || `${a.label} in the Okanagan`, intro: a.intro || a.blurb || content.all.intro };
   return renderCuratedHubPage({
     path: activity ? `/tours/${activity.slug}` : '/tours',
+    defaultTypes: activity ? [activity.slug] : null,
     name: activity ? activity.label : 'Tours & Experiences',
     crumbs: activity ? [{ name: 'Tours & Experiences', href: '/tours' }] : [],
     schemaFilter: activity ? (v) => tourInActivity(v, activity.slug) : null,
@@ -37240,7 +37615,7 @@ function getSkiSnowVenues() {
 function getSkiSnowEatVenues() {
   return db.prepare(`
     SELECT * FROM venues
-    WHERE redirect_to IS NULL
+    WHERE redirect_to IS NULL AND type != 'stay'
       AND region IN (${SKI_SNOW_REGIONS.map(() => '?').join(', ')})
       AND type IN (${SKI_SNOW_EAT_TYPES.map(() => '?').join(', ')})
     ORDER BY name ASC
@@ -37333,7 +37708,7 @@ function getHiddenGemCollectionVenues(feature = null) {
   const memberOf = (kind) => getCollectionVenueIds(kind);
   const gems = memberOf('hidden_gem');
   const dogs = feature === 'dog_friendly' ? memberOf(DOG_FRIENDLY_COLLECTION_KIND) : null;
-  return db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL ORDER BY name ASC').all()
+  return db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' ORDER BY name ASC').all()
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && gems.has(v.id))
     .filter((v) => !feature || Number(v[feature]) === 1 || (dogs && dogs.has(v.id)))
     .map(rowToVenue);
@@ -39562,21 +39937,21 @@ function buildSitemapXml() {
     ...combo,
     lastmod: toLastmod(
       db
-        .prepare(`SELECT MAX(updated_at) AS m FROM venues WHERE region = ? AND ${badgeTrueSql(combo.badge)} AND redirect_to IS NULL`)
+        .prepare(`SELECT MAX(updated_at) AS m FROM venues WHERE region = ? AND ${badgeTrueSql(combo.badge)} AND redirect_to IS NULL AND type != 'stay'`)
         .get(combo.region).m
     ),
   }));
 
   // Region pages: one per region that has at least one venue.
   const regionCounts = db
-    .prepare('SELECT region, COUNT(*) AS n, MAX(updated_at) AS lastmod FROM venues WHERE redirect_to IS NULL GROUP BY region')
+    .prepare('SELECT region, COUNT(*) AS n, MAX(updated_at) AS lastmod FROM venues WHERE redirect_to IS NULL AND type != \'stay\' GROUP BY region')
     .all()
     .filter((r) => REGION_LABELS[r.region] && r.n > 0);
 
   // Category pages: one per region+type combo that has at least one
   // venue — computed live, same pattern as the guide-page combos above.
   const categoryCombos = db
-    .prepare('SELECT region, type, COUNT(*) AS n, MAX(updated_at) AS lastmod FROM venues WHERE redirect_to IS NULL GROUP BY region, type')
+    .prepare('SELECT region, type, COUNT(*) AS n, MAX(updated_at) AS lastmod FROM venues WHERE redirect_to IS NULL AND type != \'stay\' GROUP BY region, type')
     .all()
     .filter((r) => REGION_LABELS[r.region] && CATEGORY_SLUGS[r.type] && r.n > 0);
   // /:region/sports also renders for regions whose places to play are
@@ -39611,7 +39986,7 @@ function buildSitemapXml() {
   // all of them after the startup backfill, but this guards against any
   // edge case rather than emitting a broken sitemap entry).
   const venueRows = db
-    .prepare('SELECT id, region, type, slug, updated_at, description, description_fr, hours FROM venues WHERE slug IS NOT NULL AND redirect_to IS NULL')
+    .prepare('SELECT id, region, type, slug, updated_at, description, description_fr, hours FROM venues WHERE slug IS NOT NULL AND redirect_to IS NULL AND type != \'stay\'')
     .all()
     // SEO r13 (2026-10-20): thin place pages are noindex, so they are left out here too (venuePageIsThin).
     .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && !venuePageIsThin(v));
@@ -39719,6 +40094,8 @@ function buildSitemapXml() {
     // Phase 1 (Events architecture gate): only non-expired events —
     // listEventsForSitemap() already applies the same "don't advertise
     // dead pages" filtering the venue rows above get via redirect_to.
+    // Places to stay (2026-11-19): only the towns STAYS_INDEXABLE has opened (none by default).
+    ...staysSitemapEntries(toLastmod),
     ...listEventsForSitemap()
       .filter((e) => REGION_LABELS[e.region])
       .map(
@@ -41132,7 +41509,7 @@ function happyHourStatesFor(venues, now = new Date()) {
 function happyHourNowSummary(now = new Date()) {
   let rows = [];
   try {
-    rows = db.prepare('SELECT id, region, type, slug, latitude, longitude, hours, happy_hour_times, redirect_to FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL AND happy_hour_times IS NOT NULL').all()
+    rows = db.prepare('SELECT id, region, type, slug, latitude, longitude, hours, happy_hour_times, redirect_to FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL AND happy_hour_times IS NOT NULL').all()
       .filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type] && MAP_GROUP_BY_TYPE[v.type] && Number.isFinite(Number(v.latitude)) && Number.isFinite(Number(v.longitude)) && !(Number(v.latitude) === 0 && Number(v.longitude) === 0));
   } catch (e) { rows = []; }
   const { clock, byId } = happyHourStatesFor(rows, now);
@@ -42904,7 +43281,7 @@ function eventListingByName(text, region) {
   if (!eventListingNames || Date.now() - eventListingNamesAt > 10 * 60 * 1000) {
     eventListingNames = new Map();
     try {
-      for (const v of db.prepare("SELECT name, region, address FROM venues WHERE redirect_to IS NULL AND address IS NOT NULL AND address != ''").all()) {
+      for (const v of db.prepare("SELECT name, region, address FROM venues WHERE redirect_to IS NULL AND type != 'stay' AND address IS NOT NULL AND address != ''").all()) {
         const k = eventVenueKey(v.name);
         if (!eventListingNames.has(k)) eventListingNames.set(k, []);
         eventListingNames.get(k).push(v);
@@ -42939,7 +43316,7 @@ function eventAutoVenueIndex() {
   try {
     const venues = new Map(), venuesBare = new Map(), nameKeyById = new Map(), insideByRegion = new Map();
     const add = (map, k, id) => { if (!map.has(k)) map.set(k, []); if (!map.get(k).includes(id)) map.get(k).push(id); };
-    for (const v of db.prepare('SELECT id, name, region FROM venues WHERE redirect_to IS NULL').all()) {
+    for (const v of db.prepare('SELECT id, name, region FROM venues WHERE redirect_to IS NULL AND type != \'stay\'').all()) {
       add(venues, `${v.region}|${eventVenueKey(v.name)}`, v.id);
       nameKeyById.set(v.id, eventVenueKey(v.name));
       // SEO r13: "<Place> at <Host>" listings ("Terrafina at Hester Creek"), for eventMoreSpecificListing.
@@ -45189,7 +45566,7 @@ function notFoundSuggestions(pathname) {
   const words = [...new Set(last.split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !NOT_FOUND_STOP_WORDS.has(w)))].sort((a, b) => b.length - a.length).slice(0, 3);
   if (words.length && db) {
     try {
-      const rows = db.prepare(`SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND (${words.map(() => 'slug LIKE ?').join(' OR ')}) LIMIT 300`)
+      const rows = db.prepare(`SELECT name, region, type, slug FROM venues WHERE redirect_to IS NULL AND type != 'stay' AND slug IS NOT NULL AND (${words.map(() => 'slug LIKE ?').join(' OR ')}) LIMIT 300`)
         .all(...words.map((w) => `%${w}%`));
       const scored = rows.filter((v) => REGION_LABELS[v.region] && CATEGORY_SLUGS[v.type]).map((v) => {
         const parts = String(v.slug).split('-');
@@ -45981,7 +46358,7 @@ function browseTypeLabel(type) {
 // /api/venues?limit=5000 returned), with the Food & Drink effective
 // categories attached.
 function getBrowseHubVenues() {
-  const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL ORDER BY name ASC').all().map(rowToVenue);
+  const rows = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' ORDER BY name ASC').all().map(rowToVenue);
   return attachFoodDrinkCategories(rows);
 }
 // Other-type venues tagged into a category's "also" collection (2026-10-12):
@@ -47421,7 +47798,7 @@ function findLikelyDuplicateVenues(data) {
   const addr = duplicateAddressKey(data.address);
   const exactName = slugify(String(data.name || ''));
   const out = [];
-  const rows = db.prepare(`SELECT id, name, type, region, slug, phone, address FROM venues WHERE region IN (${towns.map(() => '?').join(',')}) AND redirect_to IS NULL`).all(...towns);
+  const rows = db.prepare(`SELECT id, name, type, region, slug, phone, address FROM venues WHERE region IN (${towns.map(() => '?').join(',')}) AND redirect_to IS NULL AND type != 'stay'`).all(...towns);
   for (const v of rows) {
     const sameTown = v.region === region, sameType = v.type === data.type;
     const exact = sameTown && slugify(v.name) === exactName;
@@ -47852,7 +48229,7 @@ const SKI_GUIDE = {
 // The live venue row behind a guide mention, or null when it no longer has
 // a public page (removed, redirected, or a type with no category URL).
 function skiGuideVenue(region, slug) {
-  const v = db.prepare('SELECT * FROM venues WHERE region = ? AND slug = ? AND redirect_to IS NULL').get(region, slug);
+  const v = db.prepare('SELECT * FROM venues WHERE region = ? AND slug = ? AND redirect_to IS NULL AND type != \'stay\'').get(region, slug);
   if (v && CATEGORY_SLUGS[v.type]) return v;
   // Round 12 (2026-10-20): a guide ref with a listing's old slug (changeVenueSlug) still finds it.
   const renamed = findSlugRedirectVenue(region, null, slug);
@@ -49342,7 +49719,7 @@ ${renderGolfHeaderHtml()}
 // people and Google can see a real, accountable local guide. Counts are read live; French is in data/french/about-*.json.
 function aboutPageStats() {
   try {
-    const places = db.prepare('SELECT region FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL').all().filter((v) => REGION_LABELS[v.region]).length;
+    const places = db.prepare('SELECT region FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL').all().filter((v) => REGION_LABELS[v.region]).length;
     const events = listEventsForSitemap().filter((e) => REGION_LABELS[e.region]).length;
     const guides = Object.keys(FILE_GUIDES).filter((p) => !guideIsThin(FILE_GUIDES[p])).length + 6;
     return { places, events, guides, towns: Object.keys(REGION_LABELS).length };
@@ -50414,7 +50791,7 @@ function venueLookup(q, region) {
   if (term.length < 2) return [];
   const r = typeof region === 'string' && REGION_LABELS[region] ? region : null;
   const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-  let rows = db.prepare(`SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND name LIKE ? ESCAPE '\\'${r ? ' AND region = ?' : ''} ORDER BY (LOWER(name) LIKE LOWER(?)) DESC, name LIMIT 8`)
+  let rows = db.prepare(`SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND type != 'stay' AND slug IS NOT NULL AND name LIKE ? ESCAPE '\\'${r ? ' AND region = ?' : ''} ORDER BY (LOWER(name) LIKE LOWER(?)) DESC, name LIMIT 8`)
     .all(...[like, ...(r ? [r] : []), `${term}%`]);
   // Forgiving lookup (2026-10-19, site review pass 4): "quails gate", "Quail's Gate", "the hatching post", "sandhill"
   // and "mission hills" find the listing too: names compared without spaces, apostrophes, accents, a leading "the"
@@ -50424,7 +50801,7 @@ function venueLookup(q, region) {
     if (keys[0].length >= 3) {
       const seen = new Set(rows.map((v) => `${v.region}/${v.slug}`));
       const more = [];
-      for (const v of db.prepare(`SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL${r ? ' AND region = ?' : ''}`).all(...(r ? [r] : []))) {
+      for (const v of db.prepare(`SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND type != 'stay' AND slug IS NOT NULL${r ? ' AND region = ?' : ''}`).all(...(r ? [r] : []))) {
         if (seen.has(`${v.region}/${v.slug}`)) continue;
         let at = -1;
         for (const nk of venueLookupKeys(v.name)) for (const k of keys) { const i = nk.indexOf(k); if (i !== -1 && (at === -1 || i < at)) at = i; }
@@ -50436,7 +50813,7 @@ function venueLookup(q, region) {
   }
   if (rows.length < 8) {
     const seen = new Set(rows.map((v) => `${v.region}/${v.slug}`));
-    const all = db.prepare(`SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL${r ? ' AND region = ?' : ''}`).all(...(r ? [r] : []));
+    const all = db.prepare(`SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND type != 'stay' AND slug IS NOT NULL${r ? ' AND region = ?' : ''}`).all(...(r ? [r] : []));
     const byWords = venueLookupByWords(term, all).filter((v) => !seen.has(`${v.region}/${v.slug}`));
     rows = [...rows, ...byWords.slice(0, 8 - rows.length)];
   }
@@ -54655,7 +55032,7 @@ function cleanPartnerIds(raw, ownVenueId) {
 function partnerVenueRows(ids) {
   const list = parsePartnerIds(ids);
   if (!list.length) return [];
-  const rows = db.prepare(`SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND slug IS NOT NULL AND id IN (${list.map(() => '?').join(',')})`).all(...list);
+  const rows = db.prepare(`SELECT id, name, region, type, slug FROM venues WHERE redirect_to IS NULL AND type != 'stay' AND slug IS NOT NULL AND id IN (${list.map(() => '?').join(',')})`).all(...list);
   const byId = new Map(rows.map((r) => [r.id, r]));
   return list.map((id) => byId.get(id)).filter((v) => v && CATEGORY_SLUGS[v.type]);
 }
@@ -63071,7 +63448,7 @@ function researchedMenuSourceHtml(venue, menu, lang = 'en') {
 
 function listIndexableMenusForSitemap() {
   const rows = db.prepare(`SELECT m.venue_id, MAX(m.published_at) AS published_at FROM venue_menus m JOIN venues v ON v.id = m.venue_id
-    WHERE m.status = 'published' AND v.redirect_to IS NULL GROUP BY m.venue_id`).all();
+    WHERE m.status = 'published' AND v.redirect_to IS NULL AND v.type != 'stay' GROUP BY m.venue_id`).all();
   const out = [];
   for (const r of rows) {
     const menu = publishedMenu(r.venue_id);
@@ -71784,6 +72161,8 @@ const server = http.createServer(async (req, res) => {
         return res.end();
       }
     }
+    // Places to stay (2026-11-19): /<town>/stays, /<town>/stays/<slug> and the /fr twins. noindex unless STAYS_INDEXABLE.
+    if (handleStaysRoute(req, res, pathname, method, parsed.search)) return;
     if ((pathname === '/links' || pathname === '/links/') && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'public, max-age=300' });
       return res.end(renderSocialLinksPage());
@@ -72060,7 +72439,7 @@ const server = http.createServer(async (req, res) => {
     if (shareCardMatch) {
       const [, scFr, scRegion, scCategory, scSlug] = shareCardMatch;
       const scType = Object.keys(CATEGORY_SLUGS).find((t) => CATEGORY_SLUGS[t] === scCategory);
-      const scVenue = shareCardModule && scType && REGION_LABELS[scRegion] ? db.prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND slug = ? AND redirect_to IS NULL').get(scRegion, scType, scSlug) : null;
+      const scVenue = shareCardModule && scType && REGION_LABELS[scRegion] ? db.prepare('SELECT * FROM venues WHERE region = ? AND type = ? AND slug = ? AND redirect_to IS NULL AND type != \'stay\'').get(scRegion, scType, scSlug) : null;
       if (!scVenue) {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         return res.end('Not found');
@@ -72314,7 +72693,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (REGION_LABELS[region] && BOOL_FIELDS.includes(badge)) {
         const rows = db
-          .prepare(`SELECT * FROM venues WHERE region = ? AND ${badgeTrueSql(badge)} AND redirect_to IS NULL ORDER BY reviews DESC`)
+          .prepare(`SELECT * FROM venues WHERE region = ? AND ${badgeTrueSql(badge)} AND redirect_to IS NULL AND type != 'stay' ORDER BY reviews DESC`)
           .all(region);
         if (rows.length >= MIN_GUIDE_VENUES) {
           const gv = rows.map(rowToVenue);
@@ -74223,7 +74602,7 @@ const server = http.createServer(async (req, res) => {
       // never goes into a plan here either.
       const advisoryNotes = getAdvisoryNotes();
       const regionVenues = db
-        .prepare('SELECT * FROM venues WHERE region = ? AND redirect_to IS NULL')
+        .prepare('SELECT * FROM venues WHERE region = ? AND redirect_to IS NULL AND type != \'stay\'')
         .all(region)
         .map(rowToVenue)
         .filter((v) => isTripPlannerType(v.type) && !legacyTripAdvisoryUnavailable(advisoryNotes.get(v.id)));
@@ -74562,7 +74941,7 @@ const server = http.createServer(async (req, res) => {
           // A listing that was removed (2026-11-14, dashboard Broken pages): no dead end. Send them to that town's list
           // of the same kind of place, or the town page when it has none (302: the listing could come back).
           if (REGION_LABELS[cm[2]]) {
-            const hasKind = type && CATEGORY_SLUGS[type] && db.prepare('SELECT 1 FROM venues WHERE region = ? AND type = ? AND redirect_to IS NULL LIMIT 1').get(cm[2], type);
+            const hasKind = type && CATEGORY_SLUGS[type] && db.prepare('SELECT 1 FROM venues WHERE region = ? AND type = ? AND redirect_to IS NULL AND type != \'stay\' LIMIT 1').get(cm[2], type);
             res.writeHead(302, { Location: `${cm[1] || ''}/${cm[2]}${hasKind ? `/${CATEGORY_SLUGS[type]}` : ''}`, 'Cache-Control': 'public, max-age=3600' });
             return res.end();
           }
@@ -75746,8 +76125,14 @@ const server = http.createServer(async (req, res) => {
           sportActivity: type === 'sport' ? slug : undefined,
           sportsAlso: type === 'sport' ? getSportsAlsoVenues() : undefined,
         });
+        // Batch 1 (2026-11-20): the activity page in the /sports or /indoor layout, with its own title, schema and heading.
+        const introOf = (h) => { const m = h.slice(h.indexOf('<main')).match(/<p class="(?:outdoor-intro|hub-intro)[^"]*"[^>]*>([\s\S]*?)<\/p>/); return m ? m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim() : ''; };
+        const laidOut = type === 'sport' && SPORT_ACTIVITIES.some((a) => a.slug === slug) ? renderSportsSubPage(html, `/sports/${slug}`, query, { activity: slug, intro: introOf(html) })
+          // /indoor/family stays on its older page: it lists every kid-friendly indoor place, a wider set than the /indoor page's Family Fun chip.
+          : type === 'indoor' && slug !== 'family' && INDOOR_HUB_EXPERIENCES.some((a) => a.slug === slug) ? renderIndoorSubPage(html, `/indoor/${slug}`, query, { activity: slug, intro: introOf(html) })
+            : html;
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end(html);
+        return res.end(laidOut);
       }
     }
 
@@ -75789,8 +76174,15 @@ const server = http.createServer(async (req, res) => {
           const html = FD_CATEGORY_KIND_BY_TYPE[type] || type === 'winery'
             ? renderFoodDrinkHubPage(venues, { ...parseFoodDrinkFilterQuery(query), openNow: query.open === 'now', sort: FD_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' }, { region, type, categoryCounts: getRegionCategoryCounts(region), categoryGuidePages })
             : renderCategoryPage(region, type, venues, categoryGuidePages, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', sportsAlso });
+          // Batch 1 (2026-11-20): town Sports and Indoor pages in the /sports or /indoor layout, with only that town's places.
+          const sub = html.slice(html.indexOf('<main')).match(/<p class="subtitle">([^<]*)<\/p>/);
+          const townIntro = sub ? sub[1].replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim() : `Places in ${REGION_LABELS[region]}, BC, listed by Okanagan Roam.`;
+          const laidOut = type === 'golf' && venues.length ? renderGolfHubLayoutPage(html, venues, query, { region })
+            : type === 'sport' && (venues.length || sportsAlso.length) ? renderSportsSubPage(html, `/${region}/sports`, query, { region, intro: townIntro })
+            : type === 'indoor' && venues.length ? renderIndoorSubPage(html, `/${region}/indoor`, query, { region, intro: townIntro })
+              : html;
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-          return res.end(html);
+          return res.end(laidOut);
         }
       }
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -75866,7 +76258,7 @@ const server = http.createServer(async (req, res) => {
         // parseOutdoorFilterQuery); /indoor also accepts an activity choice.
         const html = renderCategoryAllRegionsPage(type, venues, type === 'outdoor' ? parseOutdoorFilterQuery(query) : null, { golfSort: type === 'golf' && golfData ? golfData.parseGolfSort(query) : 'recommended', indoorActivity: type === 'indoor' ? query.activity : undefined, indoorGolf: type === 'indoor' ? getIndoorGolfVenues() : undefined, indoorAlso: type === 'indoor' ? getIndoorAlsoVenues() : undefined, toursAlso: type === 'tour' ? getToursAlsoVenues() : undefined, tourActivity: type === 'tour' ? query.activity : undefined, sportActivity: type === 'sport' ? query.activity : undefined, sportsAlso: type === 'sport' ? getSportsAlsoVenues() : undefined });
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-        return res.end(html);
+        return res.end(type === 'golf' && venues.length ? renderGolfHubLayoutPage(html, venues, query) : html);
       }
       res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(render404Page(pathname));
@@ -75880,7 +76272,7 @@ const server = http.createServer(async (req, res) => {
         const categoryCounts = getRegionCategoryCounts(region);
         if (Object.keys(categoryCounts).length > 0) {
           const regionGuidePages = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region);
-          const html = renderRegionPage(region, categoryCounts, regionGuidePages);
+          const html = withStaysNavLink(renderRegionPage(region, categoryCounts, regionGuidePages), region);
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }
@@ -76189,6 +76581,8 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Places to stay (2026-11-19), for tests/stays.test.js.
+  getStaysByRegion, findStayBySlug, handleStaysRoute, getStayCloseBy, withStaysNavLink, venueActivityCounter,
   // Tour test 12 (Whistler, 2026-11-18).
   // Tour test 13.
   fitToLimit, tourExtrasSection, tourListBookWords, tourListInfo, tourOwnWords, tourWeatherAll, tourOffRequest, ownerVisitText, tourFitNote,

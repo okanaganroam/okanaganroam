@@ -3813,7 +3813,8 @@ test('sports listings show a matched local photo on the valley hub, region categ
 
     const region = await s4request('GET', '/kelowna/sports');
     assert.equal(region.status, 200);
-    assert.match(region.text, /data-card-ph style="--card-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park-w480\.jpg\?v=[0-9a-f]{10}'\)/);
+    // The town page is the /sports page with only that town's places (2026-11-20), so its cards are the hub's cards.
+    assert.match(region.text, /data-ph="own" style="--fd-ph:url\('\/images\/sports\/venues\/kelowna-crawford-trails-myra-bellevue-provincial-park-w480\.jpg\?v=[0-9a-f]{10}'\)/);
   } finally {
     db.prepare('DELETE FROM venues WHERE id = ?').run(Number(result.lastInsertRowid));
   }
@@ -4945,7 +4946,7 @@ test('Guide pages (2026-10-14): the shared directory engine, a friendly heading,
   const venues = batch4bGuideVenues();
   const html = app.renderGuidePage('kelowna', 'patio', venues);
   assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/);
-  assert.match(html, /<body class="golf-page outdoor-page fd-page curated-hub-page guide-page">/);
+  assert.match(html, /<body class="golf-page outdoor-page fd-page fd-refresh curated-hub-page guide-page">/);
   assert.match(html, /<div id="tripTray">[\s\S]*<button id="tripTrayToggle">/);
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1);
   assert.match(html, /<h1>Patios in Kelowna<\/h1>/);
@@ -8058,7 +8059,8 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors): "/" is byte-identical before and afte
     assert.match(wideBody, /Fixture Canyon Park/); assert.match(wideBody, /Fixture Nordic Centre/);
     assert.match(wideBody, /data-region="kelowna" aria-pressed="false">Kelowna <span class="outdoor-activity-count">1<\/span>/);
     assert.match(wideBody, /data-region="vernon" aria-pressed="false">Vernon/);
-    assert.match(wideBody, /data-region="osoyoos" aria-pressed="false">Osoyoos <span class="outdoor-activity-count">0<\/span>/, 'a canonical region with no outdoor venues still gets a chip, showing 0');
+    // Like /sports (2026-11-20), the town list leaves out towns with no outdoor places.
+    assert.doesNotMatch(wideBody, /data-region="osoyoos"/, 'a town with no outdoor places is not offered');
     assert.equal((wideBody.match(/<h1[\s>]/g) || []).length, 1);
     assert.equal(footerOf(wideBody), footerOf(withFooterOutdoors(beachesBefore)), 'the shared footer on /outdoors is byte-identical to the /beaches footer (with its Outdoors link now /outdoors)');
     const outdoorGrid = (wideBody.match(/<ul class="card-grid" id="fdResults"[^>]*>([\s\S]*?)<\/ul>/) || [])[1] || '';
@@ -8348,15 +8350,16 @@ test('FROZEN HOMEPAGE + FOOTER (Outdoors Phase 2): activity memberships and a li
     assert.equal((await fetch(`${base}/outdoors/hiking/`)).status, 200, 'trailing slash tolerated like other routes');
     const landing = await (await fetch(`${base}/outdoors`)).text();
     assert.equal((landing.match(/<h1[\s>]/g) || []).length, 1);
-    const lm = landing.replace(/<style>[\s\S]*?<\/style>/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
-    assert.ok(lm.indexOf('id="fdSearch"') < lm.indexOf('fd-type-row') && lm.indexOf('fd-type-row') < lm.indexOf('id="fdRegionsBtn"') && lm.indexOf('id="fdRegionsBtn"') < lm.indexOf('id="fdResults"'), 'search -> activity chips -> Regions -> results');
+    const lm = landing.replace(/<style\b[\s\S]*?<\/style>/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
+    // Laid out like /sports (2026-11-20): search and Choose a town share one toolbar, then the activity chips, then the results.
+    assert.ok(lm.indexOf('id="fdSearch"') < lm.indexOf('id="fdRegionsBtn"') && lm.indexOf('id="fdRegionsBtn"') < lm.indexOf('fd-type-row') && lm.indexOf('fd-type-row') < lm.indexOf('id="fdResults"'), 'search -> Regions -> activity chips -> results');
     assert.doesNotMatch(lm, /Explore by Activity/);
     for (const r of ['kelowna', 'penticton', 'vernon']) {
       assert.match(lm, new RegExp(`<button type="button" class="outdoor-filter-chip" data-region="${r}" aria-pressed="false">`), `region chip for ${r}`);
       assert.equal((await fetch(`${base}/${r}/outdoors`)).status, 200, `/${r}/outdoors is valid`);
     }
     assert.equal((await fetch(`${base}/outdoors/camping`)).status, 404); assert.equal((await fetch(`${base}/outdoors/water`)).status, 404);
-    assert.match(landing, /data-fd-type="hiking" aria-pressed="false">Hiking &amp; Trails <span class="outdoor-activity-count">3<\/span><\/button>/);
+    assert.match(landing, /data-fd-type="hiking" aria-pressed="false">🥾 Hiking &amp; Trails <span class="outdoor-activity-count">3<\/span><\/button>/);
     assert.doesNotMatch(landing, /outdoors-guide-link/);
     assert.equal((lm.match(/<li class="venue-card" /g) || []).length, 3, 'results list has each venue once');
     assert.match(landing, /id="fdResults"/);
@@ -9886,7 +9889,7 @@ test('Dog Friendly Finds: card contract, photos, engagement wiring and internal 
   }
 
   // Trip tray, header and footer are the shared ones.
-  assert.match(markup, /class="golf-page outdoor-page fd-page dog-page dog-hub-page"/);
+  assert.match(markup, /class="golf-page outdoor-page fd-page fd-refresh dog-page dog-hub-page"/);
   assert.match(markup, /id="floatingTooltip"/);
 });
 
@@ -10164,7 +10167,7 @@ test('Destination pages: every linked category tab has an active venue, and food
     assert.doesNotMatch(markup, new RegExp(`data-venue-id="${other.id}"`), 'another region never appears');
     assert.doesNotMatch(markup, /id="fdRegionsBtn"/, 'no global Regions popover');
     assert.doesNotMatch(markup, /data-fd-type=/, 'no global type chips');
-    assert.match(markup, /What are you looking for\?/);
+    assert.match(markup, /id="fdFeaturesBtn"[^>]*>[\s\S]{0,120}Filters/);
     assert.match(markup, /data-fd-feature="patio"/);
     assert.match(markup, /id="fdSearch"/);
     assert.match(markup, /class="category-region-selector-active" aria-current="page">Cafes/, 'current tab');
@@ -17701,7 +17704,9 @@ test('Indoor & Rainy Day: /indoor renders with zero indoor venues (simulators + 
       const region = await WINTER_GET(base, '/kelowna/indoor');
       assert.equal(region.status, 200);
       assert.match(region.text, /Indoor &amp; Rainy Day Spots in Kelowna, BC/);
-      assert.match(region.text, /class="category-back-link" href="\/indoor">← All Indoor &amp; Rainy Day</);
+      // The town page is the /indoor page with only that town's places (2026-11-20).
+      assert.match(region.text, /<body class="[^"]*indoor-hub-page/);
+      assert.match(region.text, /href="\/kelowna\/indoor\/winter-test-gallery"/);
       const venue = await WINTER_GET(base, '/kelowna/indoor/winter-test-gallery');
       assert.equal(venue.status, 200);
       assert.match(venue.text, /<title>Winter Test Gallery — Indoor Attraction in Kelowna, BC<\/title>/);
@@ -17899,7 +17904,7 @@ test('Tours & Experiences: /tours renders with zero tour venues (coming soon), r
       assert.match(empty.text, /<h1>Tours &amp; Experiences in the Okanagan<\/h1>/);
       assert.match(empty.text, /class="tour-coming-soon">More tours and experiences are coming soon/);
       assert.match(empty.text, /<p class="outdoor-intro fd-intro">Wine tours, lake cruises, guided hikes, cooking classes, sleigh rides and more/);
-      assert.match(empty.text, /<body class="golf-page outdoor-page fd-page curated-hub-page tours-hub-page">/);
+      assert.match(empty.text, /<body class="golf-page outdoor-page fd-page fd-refresh curated-hub-page tours-hub-page">/);
       assert.doesNotMatch(empty.text, /class="subtitle">0 verified/);
       assert.doesNotMatch(empty.text, /toursAlsoHeading/, 'no also-section without members');
       assert.equal((await WINTER_GET(base, '/vernon/tours')).status, 404, 'an empty region/tours pair 404s like any other');
@@ -18171,9 +18176,10 @@ test('Sports & Recreation: other-type venues tagged sports_also get a "More plac
       // notes, and the sitemap lists it; the hub's region selector offers it.
       const kel = await WINTER_GET(base, '/kelowna/sports');
       assert.equal(kel.status, 200);
-      assert.match(kel.text, /<h2 class="category-subsection-heading" id="sportsAlsoHeading">More places to play<\/h2>/);
+      // The town page is the /sports page with only that town's places (2026-11-20); tagged places are cards like the rest.
+      assert.match(kel.text, /<body class="[^"]*sports-hub-page/);
       assert.match(kel.text, /href="\/kelowna\/outdoors\/sports-also-city-park"/);
-      assert.match(kel.text, /<span class="card-note-label">Play:<\/span> Skate park and four tennis courts/);
+      assert.match(kel.text, /Skate park and four tennis courts/);
       assert.doesNotMatch(kel.text, /No sports &amp; recreation are listed/);
       // SEO r13: a town page with fewer than 3 places is noindex and out of the sitemap (both tagged venues here are single).
       assert.match(kel.text, /noindex/);
@@ -18187,8 +18193,10 @@ test('Sports & Recreation: other-type venues tagged sports_also get a "More plac
       const own = app.createVenue({ name: 'Sports Also Test Skate Park', region: 'kelowna', type: 'sport', description: 'A fixture skate park.', slug: 'sports-also-test-skate-park' });
       try {
         const kel2 = await WINTER_GET(base, '/kelowna/sports');
-        assert.match(kel2.text, /<p class="subtitle">1 verified sports &amp; recreation spot in Kelowna\.<\/p>/);
-        assert.match(kel2.text, /href="\/kelowna\/sports\/sports-also-test-skate-park"[\s\S]*id="sportsAlsoHeading"/, 'its own venues first, then More places to play');
+        assert.match(kel2.text, /1 verified sports &amp; recreation spot in Kelowna\./);
+        // One list, as on /sports (2026-11-20): its own venue and the town's tagged place are both cards.
+        assert.match(kel2.text, /href="\/kelowna\/sports\/sports-also-test-skate-park"/);
+        assert.match(kel2.text, /href="\/kelowna\/outdoors\/sports-also-city-park"/);
         const hub2 = await WINTER_GET(base, '/sports');
         // One list since 2026-10-14: its own venue and the two tagged places.
         assert.match(hub2.text, /id="fdResultsSummary" aria-live="polite">3 places to play</);
@@ -18449,10 +18457,12 @@ test('Indoor discovery: URL filters select real venues and family is the hub\'s 
         const page = await WINTER_GET(base, `/indoor/${activity}`);
         assert.equal(page.status, 200);
         // Inspect cards, excluding JSON-LD and navigation.
-        const cards = page.text.match(/<ul class="card-grid">[\s\S]*?<\/ul>/g)?.join('') || '';
+        const cards = page.text.match(/<ul class="card-grid"[^>]*>[\s\S]*?<\/ul>/g)?.join('') || '';
         fixtures.forEach((v, i) => assert.equal(cards.includes(`href="/kelowna/indoor/${v.slug}"`), Array.isArray(selected) ? selected.includes(i) : i === selected, `${activity}: ${v.name}`));
-        assert.match(page.text, /aria-current="page"/);
-        assert.match(page.text, /[1-9]\d* matching spots?/);
+        // The activity page is the /indoor page with that activity chosen (2026-11-20).
+        // /indoor/family keeps its older page (the hub's Family Fun).
+        if (activity === 'family') { assert.match(page.text, /aria-current="page"/); assert.match(page.text, /[1-9]\d* matching spots?/); }
+        else assert.match(page.text, new RegExp(`data-fd-type="${activity}" aria-pressed="true"`));
       }
       const unknown = await WINTER_GET(base, '/indoor?activity=unknown');
       fixtures.forEach((v) => assert.ok(unknown.text.includes(`href="/kelowna/indoor/${v.slug}"`)));
@@ -24654,7 +24664,7 @@ test('Town winery pages use the food & drink page: site header, photo cards, sea
     const res = await fetch(`http://localhost:${srv.address().port}/kelowna/wineries`);
     assert.equal(res.status, 200);
     const html = await res.text();
-    assert.match(html, /<body class="golf-page outdoor-page fd-page fd-scoped-page">/);
+    assert.match(html, /<body class="golf-page outdoor-page fd-page fd-refresh fd-scoped-page">/);
     assert.match(html, /<h1>Wineries in Kelowna, BC<\/h1>/);
     for (const needle of ['id="fdOpenNow"', '<select id="fdSort"', 'id="fdResults"', 'data-ph="', 'first-timer', 'href="/wineries"']) assert.ok(html.includes(needle), needle);
     for (const v of made) assert.ok(html.includes(`data-venue-id="${v.id}"`), v.name);
@@ -25569,6 +25579,34 @@ test('Smarter search: guide topics go to the guide; typos in a place name find t
   assert.ok(html.includes('href="/vernon/restaurants/xavier-pelicandro"') && html.includes('href="/penticton/restaurants/xavier-pelicandro"'));
   // Nothing close: no guess.
   assert.equal(go('xqzvbn plorf'), '/search?q=xqzvbn%20plorf');
+})));
+
+test('Search: a one-word typo of a name\'s distinctive first word offers the place; town and shared first words do not (2026-11-19)', () => withDiscoveryFlag('on', () => withSmartSearchFixtures(() => {
+  const add = (name, region, type, slug) => {
+    db.prepare('INSERT INTO venues (name, region, type, slug, description, rating, reviews) VALUES (?, ?, ?, ?, ?, ?, ?)').run(name, region, type, slug, 'One-word typo fixture.', 4.3, 40);
+    return db.prepare('SELECT * FROM venues WHERE slug = ? AND region = ?').get(slug, region);
+  };
+  const made = [
+    add('Barriquetta & Java', 'vernon', 'cafe', 'barriquetta-java'),
+    add('Kelowna Typo Taproom', 'kelowna', 'brewery', 'kelowna-typo-taproom'),
+    add('Quorvex Pizza', 'kelowna', 'restaurant', 'quorvex-pizza'),
+    add('Quorvex Sushi', 'penticton', 'restaurant', 'quorvex-sushi'),
+  ];
+  try {
+    const names = (q) => app.smartFuzzyVenues(q, app.interpretDiscoveryText(q)).map((m) => m.venue.name);
+    // "barriqure" for Barrique & Java: the distinctive first word, one letter off.
+    assert.deepEqual(names('barriquetra'), ['Barriquetta & Java']);
+    assert.equal(app.heroSearchTarget('barriquetra').url, '/vernon/cafes/barriquetta-java');
+    assert.ok(app.renderSearchPage(app.runDiscovery('barriquetra', { limit: 480 })).includes('Did you mean'));
+    // A misspelled town never jumps to a place that starts with the town's name.
+    assert.ok(!names('kelowan').includes('Kelowna Typo Taproom'));
+    // A first word two places share is not distinctive.
+    assert.deepEqual(names('quorvx'), []);
+    // Short words are left alone.
+    assert.deepEqual(names('javva'), []);
+  } finally {
+    for (const v of made) db.prepare('DELETE FROM venues WHERE id = ?').run(v.id);
+  }
 })));
 
 test('Smarter search: /search uses the standard cards, name matches first, Show more past 48, helpful empty pages and a French page', () => withDiscoveryFlag('on', () => withSmartSearchFixtures(() => withDiscoveryServer(async (base) => {

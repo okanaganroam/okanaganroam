@@ -1,0 +1,486 @@
+{
+ "reason": "Venue photos stays-ok-2",
+ "batch_id": "photos-stays-ok-2-2026-11-19",
+ "venues": [
+  {
+   "id": 1996,
+   "name": "McCulloch Lake Resort",
+   "region": "kelowna",
+   "slug": "mcculloch-lake-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/mcculloch-lake-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1990,
+   "name": "Oasis Inn",
+   "region": "kelowna",
+   "slug": "oasis-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/oasis-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1980,
+   "name": "Park Inn by Radisson Kelowna",
+   "region": "kelowna",
+   "slug": "park-inn-by-radisson-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/park-inn-by-radisson-kelowna-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1981,
+   "name": "Prestige Beach House",
+   "region": "kelowna",
+   "slug": "prestige-beach-house",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/prestige-beach-house-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1982,
+   "name": "Ramada by Wyndham Kelowna Hotel & Conference Center",
+   "region": "kelowna",
+   "slug": "ramada-by-wyndham-kelowna-hotel-and-conference-center",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ramada-by-wyndham-kelowna-hotel-and-conference-center-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1991,
+   "name": "Recreation Inn & Suites",
+   "region": "kelowna",
+   "slug": "recreation-inn-and-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/recreation-inn-and-suites-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1965,
+   "name": "Residence & Conference Centre - Kelowna (Okanagan College)",
+   "region": "kelowna",
+   "slug": "residence-and-conference-centre-kelowna-okanagan-college",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/residence-and-conference-centre-kelowna-okanagan-college-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1983,
+   "name": "Royal Anne Hotel",
+   "region": "kelowna",
+   "slug": "royal-anne-hotel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/royal-anne-hotel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1984,
+   "name": "Sandman Hotel & Suites Kelowna",
+   "region": "kelowna",
+   "slug": "sandman-hotel-and-suites-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sandman-hotel-and-suites-kelowna-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1985,
+   "name": "Siesta Suites",
+   "region": "kelowna",
+   "slug": "siesta-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/siesta-suites-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1966,
+   "name": "Stay at UBC Okanagan",
+   "region": "kelowna",
+   "slug": "stay-at-ubc-okanagan",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/stay-at-ubc-okanagan-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1992,
+   "name": "Super 8 by Wyndham Kelowna BC",
+   "region": "kelowna",
+   "slug": "super-8-by-wyndham-kelowna-bc",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/super-8-by-wyndham-kelowna-bc-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1986,
+   "name": "The Royal Kelowna",
+   "region": "kelowna",
+   "slug": "the-royal-kelowna",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-royal-kelowna-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2000,
+   "name": "Beaver Lake Resort",
+   "region": "lake-country",
+   "slug": "beaver-lake-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/beaver-lake-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2001,
+   "name": "Holiday Park Resort",
+   "region": "lake-country",
+   "slug": "holiday-park-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/holiday-park-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1997,
+   "name": "Ley's RV Park",
+   "region": "lake-country",
+   "slug": "ley-s-rv-park",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ley-s-rv-park-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1999,
+   "name": "Super 8 by Wyndham Lake Country/Winfield Area Airport North",
+   "region": "lake-country",
+   "slug": "super-8-by-wyndham-lake-country-winfield-area-airport-north",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/super-8-by-wyndham-lake-country-winfield-area-airport-north-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 1998,
+   "name": "The Orchard RV Retreat",
+   "region": "lake-country",
+   "slug": "the-orchard-rv-retreat",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-orchard-rv-retreat-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2002,
+   "name": "Bench d'Or",
+   "region": "naramata",
+   "slug": "bench-d-or",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/bench-d-or-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2005,
+   "name": "Naramata Inn",
+   "region": "naramata",
+   "slug": "naramata-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/naramata-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2007,
+   "name": "Sandy Beach Lodge & Resort",
+   "region": "naramata",
+   "slug": "sandy-beach-lodge-and-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sandy-beach-lodge-and-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2006,
+   "name": "The Village Motel",
+   "region": "naramata",
+   "slug": "the-village-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-village-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2004,
+   "name": "Villa Magnolia Guest House",
+   "region": "naramata",
+   "slug": "villa-magnolia-guest-house",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/villa-magnolia-guest-house-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2010,
+   "name": "Ok Falls Beach Motel",
+   "region": "okanagan-falls",
+   "slug": "ok-falls-beach-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ok-falls-beach-motel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2008,
+   "name": "Skaha Lakefront Inn",
+   "region": "okanagan-falls",
+   "slug": "skaha-lakefront-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/skaha-lakefront-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2009,
+   "name": "Sun & Sand RV Park",
+   "region": "okanagan-falls",
+   "slug": "sun-and-sand-rv-park",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sun-and-sand-rv-park-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2015,
+   "name": "Apple Beach RV Park",
+   "region": "oliver",
+   "slug": "apple-beach-rv-park",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/apple-beach-rv-park-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2026,
+   "name": "Cactus Tree Inn",
+   "region": "oliver",
+   "slug": "cactus-tree-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/cactus-tree-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2021,
+   "name": "Coast Oliver Hotel",
+   "region": "oliver",
+   "slug": "coast-oliver-hotel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/coast-oliver-hotel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2016,
+   "name": "Desert Lake RV Resort",
+   "region": "oliver",
+   "slug": "desert-lake-rv-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/desert-lake-rv-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2019,
+   "name": "High Chaparral Guest House",
+   "region": "oliver",
+   "slug": "high-chaparral-guest-house",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/high-chaparral-guest-house-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2022,
+   "name": "King Hotel",
+   "region": "oliver",
+   "slug": "king-hotel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/king-hotel-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2027,
+   "name": "Maple Leaf Motel & RV Resort",
+   "region": "oliver",
+   "slug": "maple-leaf-motel-and-rv-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/maple-leaf-motel-and-rv-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2029,
+   "name": "Oliver Motel & Inn",
+   "region": "oliver",
+   "slug": "oliver-motel-and-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/oliver-motel-and-inn-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2031,
+   "name": "The Lakeside Resort",
+   "region": "oliver",
+   "slug": "the-lakeside-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-lakeside-resort-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2025,
+   "name": "The Lodge at Gallagher Lake",
+   "region": "oliver",
+   "slug": "the-lodge-at-gallagher-lake",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-lodge-at-gallagher-lake-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2017,
+   "name": "The Orchard at Oliver",
+   "region": "oliver",
+   "slug": "the-orchard-at-oliver",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-orchard-at-oliver-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2020,
+   "name": "Tokios House at Rust Wine Co.",
+   "region": "oliver",
+   "slug": "tokios-house-at-rust-wine-co",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/tokios-house-at-rust-wine-co-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2012,
+   "name": "Uncorked Bed & Breakfast",
+   "region": "oliver",
+   "slug": "uncorked-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/uncorked-bed-and-breakfast-2610.jpg?v=20261119"
+   }
+  },
+  {
+   "id": 2032,
+   "name": "Vaseux Lakeside Resort",
+   "region": "oliver",
+   "slug": "vaseux-lakeside-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/vaseux-lakeside-resort-2610.jpg?v=20261119"
+   }
+  }
+ ]
+}
