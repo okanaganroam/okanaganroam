@@ -24900,6 +24900,63 @@ const INDOOR_STALE_DATE_RE = /\b(?:runs?|running|on (?:view|display|now)|until|t
 function indoorStaleKey(text) { return crypto.createHash('sha1').update(String(text || '').toLowerCase().replace(/[^a-z0-9$]+/g, ' ').trim()).digest('hex').slice(0, 10); }
 // The sentences of one research line (Good to know splits on sentences only, indoor test 11).
 function indoorStalePieces(text) { return String(text || '').split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter(Boolean); }
+// Indoor test 17 (2026-11-19; Megan's new hours open at 10 every day, and research's "Wednesday is route-setting day at OG
+// Banks: opens at 2:30 PM." stayed on her page, unasked): a research sentence that states opening or closing TIMES for days
+// her saved hours now contradict: "opens at 2:30 PM on Wednesday", "open until 9 Fridays", "Monday 9–10:30", "closes at
+// 5 on weekends". With no day named, "daily" / "every day" means all of them and anything else is left alone (a class
+// "at 6 PM" is not an hours line). A time with no AM or PM matches either. -> true when it contradicts.
+const INDOOR_TIME_RE = '(noon|midnight|\\d{1,2}(?::[0-5]\\d|\\.[0-5]\\d| ?h ?[0-5]?\\d?)?(?:\\s?(?:a\\.?m\\.?|p\\.?m\\.?))?)';
+function indoorClockOf(x) {
+  const t = String(x || '').toLowerCase().trim();
+  if (t === 'noon') return [720]; if (t === 'midnight') return [0, 1440];
+  const m = /^(\d{1,2})(?:[:.h] ?([0-5]?\d))?\s?(a|p)?/.exec(t.replace(/\./g, (c, i) => (/\d\.\d/.test(t.slice(i - 1, i + 2)) ? ':' : '')));
+  if (!m) return [];
+  let h = Number(m[1]); const mm = Number(m[2] || 0); if (h > 24 || mm > 59) return [];
+  if (m[3]) { if (h === 12) h = 0; if (m[3] === 'p') h += 12; return [h * 60 + mm]; }
+  return h >= 13 ? [h * 60 + mm] : [h * 60 + mm, (h % 12 + 12) * 60 + mm];
+}
+function indoorStaleTimes(s, ctx) {
+  const text = String(s || '');
+  const daysIn = (t) => {
+    const out = new Set(INDOOR_DAY_WORDS.filter(([, re]) => re.test(t)).map(([d]) => d));
+    for (const r of t.matchAll(/\b(mon|tue|wed|thu|fri|sat|sun)[a-z]*\.?\s*(?:-|–|—|to|through|thru)\s*(mon|tue|wed|thu|fri|sat|sun)[a-z]*/gi)) { const a = INDOOR_DAY_ORDER.indexOf(r[1].toLowerCase()), b = INDOOR_DAY_ORDER.indexOf(r[2].toLowerCase()); for (let i = a; a >= 0 && b >= 0; i = (i + 1) % 7) { out.add(INDOOR_DAY_ORDER[i]); if (i === b) break; } }
+    if (/\bweekdays?\b/i.test(t)) ['mon', 'tue', 'wed', 'thu', 'fri'].forEach((d) => out.add(d));
+    if (/\bweekends?\b/i.test(t)) ['sat', 'sun'].forEach((d) => out.add(d));
+    if (/\b(?:daily|every day|7 days a week|all week)\b/i.test(t)) INDOOR_DAY_ORDER.forEach((d) => out.add(d));
+    return [...out];
+  };
+  const days = daysIn(text);
+  if (!days.length) return false;
+  const rangesOf = (d) => (ctx.times[d] || []);
+  const startIs = (d, mins) => rangesOf(d).some((r) => mins.includes(r[0]));
+  const endIs = (d, mins) => rangesOf(d).some((r) => mins.includes(r[1]) || mins.includes(r[1] - 1440));
+  const T = INDOOR_TIME_RE;
+  // "opens at 2:30 PM", "open from 9", "doors open at 10".
+  const NOT_CLOCK = '(?!\\s*(?:days?|weeks?|months?|years?|hours?|hrs?|minutes?|mins?|kids?|people|players)\\b)';
+  const op = new RegExp(`\\bopen(?:s|ing)?\\s+(?:at|from)?\\s*${T}${NOT_CLOCK}`, 'i').exec(text);
+  if (op && !/\b(?:until|till|til|to)\b/i.test(text.slice(op.index, op.index + op[0].length))) {
+    const mins = indoorClockOf(op[1]);
+    if (mins.length && days.some((d) => !ctx.days[d] || !startIs(d, mins))) return true;
+  }
+  // "open until 9", "closes at 5", "till 10 PM".
+  const cl = new RegExp(`\\b(?:until|till|til|closes?\\s+at|closing\\s+at|closes)\\s+${T}${NOT_CLOCK}`, 'i').exec(text);
+  if (cl && /\b(?:open|opens|close|closes|closing|hours)\b/i.test(text)) {
+    const mins = indoorClockOf(cl[1]);
+    if (mins.length && days.some((d) => !ctx.days[d] || !endIs(d, mins))) return true;
+  }
+  // "Monday 9–10:30", "Hours: Sat 9 AM to 8 PM": a range that is the whole statement (no class, lesson or event words).
+  const rg = new RegExp(`${T}\\s*(?:-|–|—|to)\\s*${T}`, 'i').exec(text);
+  if (rg) {
+    const rest = text.replace(new RegExp(`${T}\\s*(?:-|–|—|to)\\s*${T}`, 'gi'), ' ').replace(/\b(?:mon|tue|tues|wed|thu|thur|thurs|fri|sat|sun)[a-z]*\.?/gi, ' ')
+      .replace(/\b(?:hours?|open|opens|daily|every day|weekdays?|weekends?|and|to|through|thru|from|is|are|we're|we are|on|at|the|gym|building)\b/gi, ' ').replace(/[\s.,;:!–—&-]+/g, '');
+    if (!rest || /\b(?:open|opens|hours)\b/i.test(text)) {
+      const a = indoorClockOf(rg[1]), b0 = indoorClockOf(rg[2]);
+      const b = b0.concat(b0.map((x) => x + 720)).filter((x) => a.some((y) => x > y));
+      if (a.length && b.length && days.some((d) => !ctx.days[d] || !startIs(d, a) || !endIs(d, b))) return true;
+    }
+  }
+  return false;
+}
 // Why one research sentence no longer holds, or '' (hours, price, booking, ages, date).
 function indoorStaleWhy(sentence, ctx) {
   const s = String(sentence || '');
@@ -24914,6 +24971,7 @@ function indoorStaleWhy(sentence, ctx) {
       if (named.some((d) => open[d])) return 'hours';
     }
     if (/\bopen (?:daily|every day|7 days|seven days)\b|\bopen (?:all )?week long\b/i.test(s) && INDOOR_DAY_ORDER.some((d) => !open[d])) return 'hours';
+    if (ctx.times && indoorStaleTimes(s, ctx)) return 'hours';
     const openR = /\bopen\s+(mon|tue|wed|thu|fri|sat|sun)[a-z]*\s*(?:-|–|—|to|through|thru)\s*(mon|tue|wed|thu|fri|sat|sun)[a-z]*/i.exec(s);
     if (openR) {
       const a = INDOOR_DAY_ORDER.indexOf(openR[1].toLowerCase()), b = INDOOR_DAY_ORDER.indexOf(openR[2].toLowerCase()), set = [];
@@ -24948,12 +25006,12 @@ function indoorStaleCtx(venue0, now = new Date()) {
   const venue = db.prepare('SELECT id, hours, hours_source FROM venues WHERE id = ?').get(venue0.id) || venue0;
   const t = venueIndoorInfo(venue.id);
   const ownHours = venue.hours_source === 'venue_owner' && t.visit !== 'appointment';
-  let days = null;
-  if (ownHours && hoursModule) { try { const p = hoursModule.parseHours(venue.hours); if (p && p.known) days = Object.fromEntries(INDOOR_DAY_ORDER.map((d) => [d, !!(p.days[d] && p.days[d].status === 'open')])); } catch (e) { days = null; } }
+  let days = null, times = null;
+  if (ownHours && hoursModule) { try { const p = hoursModule.parseHours(venue.hours); if (p && p.known) { days = Object.fromEntries(INDOOR_DAY_ORDER.map((d) => [d, !!(p.days[d] && p.days[d].status === 'open')])); times = Object.fromEntries(INDOOR_DAY_ORDER.map((d) => [d, p.days[d] && p.days[d].status === 'open' && Array.isArray(p.days[d].ranges) ? p.days[d].ranges : []])); } } catch (e) { days = null; times = null; } }
   const free = tourFreeOf(t), price = typeof t.price === 'number' && t.price > 0 ? t.price : null;
   if (!Object.keys(t).length && !days) return null;
   const info = venueVisitInfo(venue.id) || {};
-  return { days, free, price, book: t.book || '', age: t.age ? String(t.age) : '', today: todayLocal(now), checked: String(info.checked_at || ''), kept: new Set(Array.isArray(t.kept) ? t.kept : []), gone: new Set(Array.isArray(t.gone) ? t.gone : []) };
+  return { days, times, free, price, book: t.book || '', age: t.age ? String(t.age) : '', today: todayLocal(now), checked: String(info.checked_at || ''), kept: new Set(Array.isArray(t.kept) ? t.kept : []), gone: new Set(Array.isArray(t.gone) ? t.gone : []) };
 }
 // -> [{ key, label, text, why, gone }]: every research sentence that is stale (not kept) or that she removed. The story
 // (label 'Story') counts while the listing's description is research's.
@@ -76764,7 +76822,7 @@ module.exports = {
   resolveDiscoveryDestination,
   selectDiscoveryVenues,
   heroSearchTarget,
-  smartSearchPlan, indoorStaleResearch, indoorStaleKey, indoorStaleRows,
+  smartSearchPlan, indoorStaleResearch, indoorStaleKey, indoorStaleRows, indoorStaleTimes,
   // Search ranking (2026-10-18)
   SMART_ACTIVITIES,
   smartRomanceScore,

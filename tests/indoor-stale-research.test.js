@@ -131,3 +131,33 @@ test('Keep and Remove are remembered for every kind: Keep puts the line back on 
   const r = await change(t, { indoor_info: { kept: ['not a key'] } });
   assert.equal(r.status, 400);
 });
+
+// Indoor test 17 (2026-11-19; Megan's new hours open at 10 every day and research's "Wednesday is route-setting day at OG
+// Banks: opens at 2:30 PM." stayed, unasked; the round-14 check read only closed days): research sentences that state
+// opening or closing TIMES her saved hours contradict are caught for EVERY kind; time lines that still hold, and class or
+// event times, stay.
+test('every indoor kind: research time statements her hours contradict ("opens at 2:30 PM on Wednesday", "open until 9 Fridays", "closed Tuesdays", "Monday 9–10:30") are hidden and asked about; times that hold and class times stay', async () => {
+  const STALE_T = ['Wednesday is route-setting day: opens at 2:30 PM.', 'Open until 9 Fridays.', 'Closed Tuesdays.', 'Monday 9–10:30.', 'Closes at 5 on weekends.'];
+  const HOLDS_T = ['Open until 10 PM weekdays.', 'Intro classes Tuesdays and Thursdays at 6 PM.', 'Toddler time Tue 9–11 AM.', 'Open 7 days a week.'];
+  const wrong = [];
+  for (const kind of KINDS) {
+    const v = app.createVenue({ name: `Stale times ${kind} ${++n}`, slug: `indoor-stale-t-${n}`, region: 'penticton', type: 'indoor', latitude: 49.49 + n / 3000, longitude: -119.59,
+      address: `${n} Main St, Penticton, BC`, phone: '250-555-0199', website: 'https://example.com', hours: JSON.stringify(WEEK('09:00', '22:30')), description: 'A place to visit in Penticton.' });
+    setBox(v.id, [{ label: 'Good to know', text: STALE_T.concat(HOLDS_T).join(' ') }]);
+    const t = app.createOwnerLink(v.id, { reset: true }).url.split('/owner/')[1];
+    await ok(change(t, { indoor_info: { kinds: [kind], length: '1-2h', book: 'no', age: 'all', year: 'all' } }));
+    await ok(change(t, { hours: WEEK('10:00', '22:00') }));
+    approveAll(v.id);
+    const stale = app.indoorStaleResearch(app.getVenue(v.id), NOW).map((x) => x.text);
+    for (const line of STALE_T) if (!stale.includes(line)) wrong.push(`${kind}: not caught "${line}"`);
+    for (const line of HOLDS_T) if (stale.includes(line)) wrong.push(`${kind}: caught a line that holds "${line}"`);
+    const en = page(v);
+    for (const line of STALE_T) if (en.includes(line.replace(/\.$/, ''))) wrong.push(`${kind}: page still says "${line}"`);
+    if (!en.includes('Intro classes Tuesdays and Thursdays at 6 PM')) wrong.push(`${kind}: page lost a class time`);
+    if (kind === 'climbing') {
+      const s = await openSetup(base, t, { hash: 'more' });
+      if (!/We also had: “Wednesday is route-setting day: opens at 2:30 PM\.” Still right\?/.test(s.text())) wrong.push(`${kind}: no "We also had" for the Wednesday line: ${s.text().slice(0, 300)}`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
