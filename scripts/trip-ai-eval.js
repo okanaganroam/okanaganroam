@@ -107,6 +107,9 @@ function autoLabel(text) {
   const after = /^(.*?)\bafter\b(.*)$/.exec(t);
   let kinds = kindsIn(t);
   if (after && kindsIn(after[1]).length && kindsIn(after[2]).length) kinds = [...new Set([...kindsIn(after[2]), ...kindsIn(after[1])])];
+  // A meal at a kind of place ("winery lunch", "lunch at a brewery"): the meal comes first, then that place (round 5).
+  const mealAt = /\b(winery|wineries|vineyard|brewery|breweries) (lunch|brunch|dinner)\b|\b(lunch|brunch|dinner) (?:at|in) (?:a |an |the )?(winery|vineyard|brewery)\b/.exec(t);
+  if (mealAt) { const place = /brew/.test(mealAt[1] || mealAt[4]) ? 'brewery' : 'winery'; kinds = ['food', ...kinds.filter((k) => k !== 'food' && k !== place), place]; }
   const before = /^\s*before\b([^,]*),(.*)$/.exec(t);
   if (before && kindsIn(before[1]).length && kindsIn(before[2]).length) kinds = [...new Set([...kindsIn(before[2]), ...kindsIn(before[1])])];
   const m = /\b(\d) days?\b/.exec(t) || /\bdeux jours\b/.exec(t);
@@ -136,6 +139,11 @@ function check(plan, expect, path) {
   const stops = planStops(plan);
   const res = {};
   res.nonEmpty = stops.length > 0;
+  // Every stop of a day plan has a time (round 5: "a brewery after dinner" came back with an untimed brewery).
+  if (stops.length && plan && ['itinerary', 'outing', 'day_plan', 'multi_day'].includes(plan.kind) && Array.isArray(plan.schedule) && plan.schedule.length) {
+    const timed = new Set(plan.schedule.filter((x) => Number.isFinite(x.startMinutes)).map((x) => `${x.day || 1}-${x.venueId}`));
+    res.timed = stops.every((st) => timed.has(`${st.day}-${st.venue.id}`));
+  }
   res.listed = stops.every((s) => factIds.has(s.venue.id));
   const closedRe = /\bclosed\b|out of season|not open|season(?:al)? closure/i;
   const closedIds = new Set(((plan && plan.schedule) || []).filter((x) => x.status === 'closed').map((x) => x.venueId));
@@ -240,7 +248,7 @@ async function main() {
   const cacheHits = withUsage.filter((r) => r.ai.usage.cache_read_input_tokens > 0).length;
   const reasons = {};
   for (const r of rows.filter((x) => !x.ai.used)) reasons[r.ai.reason] = (reasons[r.ai.reason] || 0) + 1;
-  const checkNames = ['towns', 'interests', 'order', 'startTime', 'noClosed', 'listed', 'days', 'dog', 'kids', 'avoided', 'named', 'nonEmpty'];
+  const checkNames = ['towns', 'interests', 'order', 'startTime', 'timed', 'noClosed', 'listed', 'days', 'dog', 'kids', 'avoided', 'named', 'nonEmpty'];
   const checkRow = (k) => {
     const app_ = rows.filter((r) => typeof r.rc[k] === 'boolean');
     if (!app_.length) return null;

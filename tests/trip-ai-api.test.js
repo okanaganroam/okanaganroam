@@ -92,7 +92,7 @@ test('on + ?ai=1 + admin token: the mocked reading feeds the same planner; ai bl
     assert.ok(reads[0].opts.allowed.regions.includes('kelowna'));
     assert.equal(p.ai.used, true);
     assert.equal(p.ai.reason, 'ok');
-    assert.equal(p.ai.text, 'morning coffee then wineries then dinner in Kelowna');
+    assert.equal(p.ai.text, 'coffee then wineries then dinner in Kelowna');
     assert.deepEqual(p.ai.overrides, { startMinutes: 600 });
     assert.equal(p.ai.model, 'claude-haiku-5-5');
     // The plan is exactly what the planner gives for that request and those overrides.

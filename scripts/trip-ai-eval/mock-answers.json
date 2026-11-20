@@ -1,5 +1,5 @@
 {
- "note": "Hand-written stand-ins for what Claude Haiku 5.5 returns, used by --mock when no ANTHROPIC_API_KEY is available. They run through the real trip-ai.js code (a fake fetch returns them in the wire format), so validation, rendering and the planner are exercised; latency and cost are not real. H17 is the real Nov 20 misread (un café read as the type cafe); R02 and R04 are broad and gated out (never read), kept so the mapping is covered if the gate changes.",
+ "note": "Hand-written stand-ins for what Claude Haiku 5.5 returns, used by --mock when no ANTHROPIC_API_KEY is available. They run through the real trip-ai.js code (a fake fetch returns them in the wire format), so validation, rendering and the planner are exercised; latency and cost are not real. H17 is the real Nov 20 misread (un café read as the type cafe); R02 and R04 are broad and gated out (never read), kept so the mapping is covered if the gate changes. Round 5: H13, H18, H23, H24, R44 and R52 carry the count (c) and meal-place (a) readings the prompt now asks for.",
  "answers": {
   "H01": {
    "unsure": false,
@@ -455,6 +455,12 @@
      "place": null
     },
     {
+     "kind": "sunset",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null
+    },
+    {
      "kind": "dinner",
      "time_of_day": "any",
      "start_time": null,
@@ -654,7 +660,8 @@
      "kind": "brewery",
      "time_of_day": "any",
      "start_time": null,
-     "place": null
+     "place": null,
+     "count": 1
     }
    ],
    "pace": null,
@@ -823,7 +830,8 @@
      "kind": "winery",
      "time_of_day": "any",
      "start_time": null,
-     "place": null
+     "place": null,
+     "count": 1
     },
     {
      "kind": "dinner",
@@ -868,7 +876,8 @@
      "kind": "brewery",
      "time_of_day": "any",
      "start_time": null,
-     "place": null
+     "place": null,
+     "count": 1
     }
    ],
    "pace": null,
@@ -909,7 +918,8 @@
      "kind": "brewery",
      "time_of_day": "any",
      "start_time": null,
-     "place": null
+     "place": null,
+     "count": 1
     }
    ],
    "pace": null,
@@ -1005,6 +1015,40 @@
      "time_of_day": "any",
      "start_time": null,
      "place": null
+    }
+   ],
+   "pace": null,
+   "budget": null,
+   "must_have": [],
+   "must_avoid": []
+  },
+  "R44": {
+   "unsure": false,
+   "towns": [
+    "west-kelowna"
+   ],
+   "valley_wide": false,
+   "start_date": null,
+   "days": null,
+   "nights": null,
+   "weekday": null,
+   "month": null,
+   "season": null,
+   "party": {
+    "adults": null,
+    "kids": null,
+    "kid_ages": [],
+    "dog": false
+   },
+   "occasion": null,
+   "rainy_day": false,
+   "interests": [
+    {
+     "kind": "lunch",
+     "time_of_day": "any",
+     "start_time": null,
+     "place": null,
+     "at": "winery"
     }
    ],
    "pace": null,

@@ -160,7 +160,7 @@ test('a place name is kept only when the visitor typed it; it is never a suggest
 
 test('render: the planner\'s own words, overrides only where the visitor set none, stay inputs only with stays on', () => {
   const r1 = ai.renderTripRequest(intent({ towns: ['kelowna'], interests: [it('coffee', { time_of_day: 'morning', start_time: '10:00' }), it('winery'), it('dinner', { start_time: '19:00' })] }), { allowed: ALLOWED, taxonomy: TAXONOMY, args: {} });
-  assert.equal(r1.text, 'morning coffee then wineries then dinner in Kelowna, dinner at 7 PM');
+  assert.equal(r1.text, 'coffee then wineries then dinner in Kelowna, dinner at 7 PM');
   assert.deepEqual(r1.overrides, { startMinutes: 600 });
   // The visitor's own start time wins.
   assert.deepEqual(ai.renderTripRequest(intent({ towns: ['kelowna'], interests: [it('coffee', { start_time: '10:00' })] }), { allowed: ALLOWED, taxonomy: TAXONOMY, args: { overrides: { startMinutes: 540 } } }).overrides, { startMinutes: 540 });
@@ -178,7 +178,8 @@ test('render: the planner\'s own words, overrides only where the visitor set non
   assert.equal(r3.text, 'a day in Penticton, with a 2-year-old and a 4-year-old, on a rainy day, vegan and wheelchair accessible, no alcohol', '"no alcohol" covers the drinks kinds');
   assert.deepEqual(r3.overrides, { pace: 'relaxed' });
   const r4 = ai.renderTripRequest(intent({ towns: ['kelowna'], interests: [it('hiking', { time_of_day: 'afternoon' }), it('gallery', { time_of_day: 'morning' }), it('dinner', { time_of_day: 'evening' })] }), { allowed: ALLOWED, taxonomy: TAXONOMY, args: {} });
-  assert.equal(r4.text, 'an afternoon hike then a morning art gallery then dinner in Kelowna');
+  assert.equal(r4.text, 'a hike then an art gallery then dinner in Kelowna', 'no time-of-day words (round 5)');
+  assert.deepEqual(r4.overrides, { startMinutes: 780 }, 'the first stop\'s afternoon is the start time');
 });
 
 test('French requests go to the model as typed (it reads French); the reading is language-free', async () => {
@@ -344,7 +345,8 @@ test('H17 (French, step by step): a café stop is the planner\'s "coffee" step, 
   const v = ai.validateIntent(intent({ towns: ['penticton'], days: 1, occasion: 'family', interests: [it('cafe', { time_of_day: 'morning' }), it('beach', { time_of_day: 'afternoon' }), it('dinner')], must_have: ['kid_friendly'] }),
     ai.buildAllowed({ ...TAXONOMY, types: [...TAXONOMY.types, 'beach'] }));
   const r = ai.renderTripRequest(v.intent, { allowed: ai.buildAllowed({ ...TAXONOMY, types: [...TAXONOMY.types, 'beach'] }), taxonomy: { ...TAXONOMY, types: [...TAXONOMY.types, 'beach'] }, args: {} });
-  assert.equal(r.text, 'family morning coffee then an afternoon beach then dinner in Penticton, kid-friendly');
+  assert.equal(r.text, 'family coffee then a beach then dinner in Penticton, kid-friendly');
+  assert.deepEqual(r.overrides, { startMinutes: 540 }, 'morning: the day starts at 9');
   // A cafe as the only ask stays "cafes" (a list of cafes, as before).
   assert.equal(ai.renderTripRequest(intent({ towns: ['penticton'], interests: [it('cafe')] }), { allowed: ALLOWED, taxonomy: TAXONOMY, args: {} }).text, 'cafes in Penticton');
   assert.match(ai.systemPrompt(ALLOWED), /un café le matin"\) = coffee/);
@@ -363,4 +365,64 @@ test('R04: "foodie" is the planner\'s foodie trip, not plain restaurants', () =>
   const r = ai.renderTripRequest(intent({ towns: ['kelowna'], days: 2, interests: [it('foodie')] }), { allowed: ALLOWED, taxonomy: TAXONOMY, args: {} });
   assert.equal(r.text, 'a foodie 2 days in Kelowna');
   assert.match(ai.systemPrompt(ALLOWED), /"foodie" = foodie/);
+});
+
+// Round 5 (2026-11-20): the 4 blind losses of the t5 run.
+const R = (x, extra = {}) => ai.renderTripRequest(x, { allowed: ALLOWED, taxonomy: TAXONOMY, args: {}, ...extra });
+test('H13: a brunch first starts the day in the brunch window; a sunset dinner stays one sunset dinner', () => {
+  const v = ai.validateIntent(intent({ towns: ['naramata'], start_date: '2026-11-21', interests: [it('brunch'), it('wine_tasting'), it('sunset'), it('dinner')] }), ALLOWED, { today: '2026-11-20' });
+  const r = R(v.intent);
+  assert.equal(r.text, 'brunch then wine tasting then a sunset dinner in Naramata');
+  // A dated plan put brunch at 12:45; 10:30 is the brunch start (breakfast 8:00).
+  assert.deepEqual(r.overrides, { startDate: '2026-11-21', startMinutes: 630 });
+  assert.equal(R(intent({ towns: ['naramata'], interests: [it('breakfast'), it('winery')] })).overrides.startMinutes, 480);
+  // A clock time the visitor gave wins.
+  assert.equal(R(intent({ towns: ['naramata'], interests: [it('brunch', { start_time: '11:15' }), it('winery')] })).overrides.startMinutes, 675);
+  assert.match(ai.systemPrompt(ALLOWED), /"a sunset dinner" -> sunset, dinner/);
+});
+
+test('H23 / R52: "a winery" is one winery; "a brewery after dinner" is one brewery after dinner (singular counts)', () => {
+  assert.equal(R(intent({ towns: ['kelowna'], interests: [it('winery', { count: 1 }), it('dinner')] })).text, 'a winery then dinner in Kelowna');
+  assert.equal(R(intent({ towns: ['kelowna'], interests: [it('wine_tasting', { count: 1 }), it('dinner')] })).text, 'a winery then dinner in Kelowna');
+  assert.equal(R(intent({ towns: ['penticton'], interests: [it('dinner'), it('brewery', { count: 1, time_of_day: 'night' })] })).text, 'dinner then a brewery in Penticton');
+  // No count, or more than one: the plural, as before.
+  assert.equal(R(intent({ towns: ['kelowna'], interests: [it('winery'), it('dinner')] })).text, 'wineries then dinner in Kelowna');
+  assert.equal(R(intent({ towns: ['kelowna'], interests: [it('winery', { count: 3 }), it('dinner')] })).text, 'wineries then dinner in Kelowna');
+  // The wire format carries it (c), and the prompt asks for it in English and French.
+  const w = ai.toWire(intent({ interests: [it('winery', { count: 1 })] }));
+  assert.equal(w.i[0].c, 1);
+  assert.equal(ai.expandWire(w).intent.interests[0].count, 1);
+  assert.equal(ai.expandWire(ai.toWire(intent({ interests: [it('winery')] }))).intent.interests[0].count, null);
+  assert.equal(ai.validateIntent(intent({ interests: [it('winery', { count: 12 })] }), ALLOWED).reason, 'invalid:interest_count');
+  assert.match(ai.systemPrompt(ALLOWED), /« une » \("a winery" = 1/);
+});
+
+test('R44: "winery lunch" is one lunch at a winery, at lunch time, never wineries then a mid-afternoon lunch', () => {
+  // The right reading: one lunch at a winery.
+  const good = ai.validateIntent(intent({ towns: ['kelowna'], interests: [it('lunch', { at: 'winery' })] }), ALLOWED);
+  assert.equal(R(good.intent).text, 'lunch at a winery in Kelowna');
+  // The t5 reading (a winery, then lunch at a winery) is the same stop twice: it collapses to the lunch.
+  const twice = ai.validateIntent(intent({ towns: ['kelowna'], interests: [it('winery'), it('lunch', { at: 'winery' })] }), ALLOWED);
+  assert.deepEqual(twice.intent.interests.map((x) => x.kind), ['lunch']);
+  assert.ok(twice.dropped.includes('repeat:winery'));
+  const after = ai.validateIntent(intent({ towns: ['kelowna'], interests: [it('lunch', { at: 'winery' }), it('winery')] }), ALLOWED);
+  assert.deepEqual(after.intent.interests.map((x) => x.kind), ['lunch']);
+  // But a counted winery after the winery lunch is a real second stop.
+  const more = ai.validateIntent(intent({ towns: ['kelowna'], interests: [it('lunch', { at: 'winery' }), it('winery', { count: 2 })] }), ALLOWED);
+  assert.deepEqual(more.intent.interests.map((x) => x.kind), ['lunch', 'winery']);
+  // "at" only goes with meals, and only a kind of place that serves them.
+  assert.equal(ai.validateIntent(intent({ interests: [it('lunch', { at: 'beach' })] }), ALLOWED).reason, 'invalid:interest_at');
+  const hike = ai.validateIntent(intent({ interests: [it('winery', { at: 'brewery' })] }), ALLOWED);
+  assert.equal(hike.intent.interests[0].at, undefined);
+  assert.equal(R(intent({ towns: ['penticton'], interests: [it('lunch', { at: 'brewery' }), it('pub')] })).text, 'lunch at a brewery then pubs in Penticton');
+  assert.match(ai.systemPrompt(ALLOWED), /« dîner au vignoble » -> \{k: lunch, a: winery\}/);
+});
+
+test('round 5 schema: still every key required, no unions, inside the limits', () => {
+  const sch = ai.wireSchema(ALLOWED);
+  assert.deepEqual(sch.properties.i.items.required, ['k', 't', 's', 'p', 'c', 'a']);
+  const c = ai.schemaComplexity(sch);
+  assert.equal(c.optional, 0);
+  assert.equal(c.unions, 0);
+  assert.equal(c.formats, 0);
 });

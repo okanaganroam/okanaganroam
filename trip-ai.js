@@ -75,6 +75,7 @@ function buildAllowed(taxonomy = {}) {
   return {
     regions, regionLabels: { ...(taxonomy.regionLabels || {}) }, kinds, features,
     avoid: [...kinds, ...Object.keys(AVOID_EXTRA)],
+    mealPlaces: MEAL_PLACE_KINDS.filter((k) => types.includes(k)),
     paces: (taxonomy.paces || PACES).filter((p) => PACES.includes(p)),
     budgets: (taxonomy.budgets || BUDGETS).filter((b) => BUDGETS.includes(b)),
   };
@@ -101,6 +102,10 @@ const WHEN_VALUES = [...WEEKDAYS, ...MONTHS, ...SEASONS];
 //   or "", pc pace or "", b budget or "", mh must-haves, ma must-avoids.
 const WIRE_KEYS = ['t', 'i', 'f', 'sd', 'd', 'n', 'a', 'k', 'ka', 'w', 'o', 'pc', 'b', 'mh', 'ma'];
 const WIRE_REQUIRED = WIRE_KEYS.slice();
+const WIRE_ITEM_KEYS = ['k', 't', 's', 'p', 'c', 'a'];
+// Meals that can be "at" a kind of place (round 5), and the kinds of place that serve them.
+const MEALS = new Set(['breakfast', 'brunch', 'lunch', 'dinner', 'drinks']);
+const MEAL_PLACE_KINDS = ['winery', 'brewery', 'distillery', 'pub', 'cafe', 'beach', 'golf'];
 const FLAGS = ['unsure', 'valley', 'dog', 'rain', 'driver'];
 // Structured-outputs limits (platform.claude.com/docs/en/build-with-claude/structured-outputs, "Schema complexity
 // limits"): at most 24 optional parameters and 16 union-typed parameters per request, plus internal grammar-size limits.
@@ -112,7 +117,9 @@ function wireSchema(allowed) {
   const obj = (properties) => ({ type: 'object', additionalProperties: false, required: Object.keys(properties), properties });
   return obj({
     t: { type: 'array', items: enumOf(allowed.regions) },
-    i: { type: 'array', items: obj({ k: enumOf(allowed.kinds), t: enumOf(TIMES), s: str, p: str }) },
+    // Round 5: c = how many stops of that kind (1 for "a winery", 0 when not said or "wineries"); a = the kind of place a
+    // meal is at ("winery lunch", "lunch at a brewery"), "" otherwise.
+    i: { type: 'array', items: obj({ k: enumOf(allowed.kinds), t: enumOf(TIMES), s: str, p: str, c: int, a: enumOf(['', ...allowed.mealPlaces]) }) },
     f: { type: 'array', items: enumOf(FLAGS) },
     sd: str,
     d: int,
@@ -166,8 +173,8 @@ function expandWire(w) {
   if (w.w !== '' && !inEnum(w.w, WHEN_VALUES)) return { ok: false, reason: 'invalid:when' };
   if (!Array.isArray(w.i)) return { ok: false, reason: 'invalid:interests' };
   for (const it of w.i) {
-    if (!it || typeof it !== 'object' || Array.isArray(it) || ['k', 't', 's', 'p'].some((k) => !(k in it)) || Object.keys(it).some((k) => !['k', 't', 's', 'p'].includes(k))
-      || typeof it.s !== 'string' || typeof it.p !== 'string') return { ok: false, reason: 'invalid:interest' };
+    if (!it || typeof it !== 'object' || Array.isArray(it) || WIRE_ITEM_KEYS.some((k) => !(k in it)) || Object.keys(it).some((k) => !WIRE_ITEM_KEYS.includes(k))
+      || typeof it.s !== 'string' || typeof it.p !== 'string' || typeof it.a !== 'string' || !Number.isInteger(it.c) || it.c < 0) return { ok: false, reason: 'invalid:interest' };
   }
   const flag = (x) => w.f.includes(x);
   const text = (x) => (x === '' ? null : x);
@@ -179,7 +186,7 @@ function expandWire(w) {
       weekday: WEEKDAYS.includes(w.w) ? w.w : null, month: MONTHS.includes(w.w) ? w.w : null, season: SEASONS.includes(w.w) ? w.w : null,
       party: { adults: num(w.a), kids: num(w.k), kid_ages: w.ka, dog: flag('dog') }, occasion: text(w.o),
       rainy_day: flag('rain'), driver: flag('driver'),
-      interests: w.i.map((it) => ({ kind: it.k, time_of_day: it.t, start_time: text(it.s), place: text(it.p) })),
+      interests: w.i.map((it) => ({ kind: it.k, time_of_day: it.t, start_time: text(it.s), place: text(it.p), count: num(it.c), at: text(it.a) })),
       pace: text(w.pc), budget: text(w.b), must_have: w.mh, must_avoid: w.ma,
     },
   };
@@ -195,7 +202,7 @@ function toWire(x) {
   if (x.driver) f.push('driver');
   return {
     t: x.towns || [],
-    i: (x.interests || []).map((it) => ({ k: it.kind, t: it.time_of_day || 'any', s: it.start_time || '', p: it.place || '' })),
+    i: (x.interests || []).map((it) => ({ k: it.kind, t: it.time_of_day || 'any', s: it.start_time || '', p: it.place || '', c: it.count || 0, a: it.at || '' })),
     f, sd: x.start_date || '', d: x.days || 0, n: x.nights || 0, a: p.adults || 0, k: p.kids || 0, ka: p.kid_ages || [],
     w: x.weekday || x.month || x.season || '', o: x.occasion || '', pc: x.pace || '', b: x.budget || '', mh: x.must_have || [], ma: x.must_avoid || [],
   };
@@ -218,7 +225,9 @@ function systemPrompt(allowed) {
     'd: days asked ("a weekend" = 2, "a day" = 1). n: only when nights are counted. a, k: only when counted; ka only when ages are given ("toddlers" = [2], "teens" = [15]).',
     'i: one entry per stop they want, IN THE ORDER THEY WILL HAPPEN, which is not always the order of the words:',
     '  "a brewery after dinner" -> dinner, brewery. "before dinner, a winery" -> winery, dinner. "X then Y", "X followed by Y", "start with X", "end with Y" -> X, Y.',
-    '  One entry per stop: "a sunset dinner" = dinner; "lunch with a view" = lunch plus mh lake_view; "a winery tour" = winery; "après after skiing" = ski, apres (no extra drinks).',
+    '  One entry per stop: "a sunset dinner" -> sunset, dinner (they become one sunset dinner); "lunch with a view" = lunch plus mh lake_view; "a winery tour" = winery; "après after skiing" = ski, apres (no extra drinks).',
+    '  A meal at a kind of place is ONE entry, the meal, with a = that kind: "winery lunch", "lunch at a winery", "brewery lunch", « dîner au vignoble » -> {k: lunch, a: winery}. Never a separate winery entry for it. In Canadian French « dîner » is lunch and « souper » is dinner.',
+    '  c: how many of that kind: 1 for "a"/"one"/« un »/« une » ("a winery" = 1, « une microbrasserie » = 1), the number when counted ("two wineries" = 2), 0 for a plural or a tour of them ("wineries", "a winery tour", "wine tasting" with no count).',
     '  "a day on the mountain/slopes" in winter = ski. "cheap eats" = cheap_eats. "wine tasting" = wine_tasting. A coffee or café stop ("un café le matin") = coffee. "foodie" = foodie.',
     '  Each interest: k kind; t time of day only when said or obvious ("morning coffee" = morning), else "any"; s "HH:MM" 24h only for a clock time ("coffee at 10" = "10:00"); p only a business name the visitor typed for that stop, copied exactly. Never suggest one.',
     'o: romantic (anniversary, date, couples, honeymoon), family, friends (girls, bachelor), parents (seniors, grandparents), solo, birthday.',
@@ -309,8 +318,11 @@ function validateIntent(raw, allowed, { originalText = '', today = null } = {}) 
   const dropped = [];
   const interests = [];
   for (const it of raw.interests) {
-    if (!it || typeof it !== 'object' || Array.isArray(it) || Object.keys(it).some((k) => !['kind', 'time_of_day', 'start_time', 'place', 'sunset'].includes(k))) return bad('interest');
+    if (!it || typeof it !== 'object' || Array.isArray(it) || Object.keys(it).some((k) => !['kind', 'time_of_day', 'start_time', 'place', 'sunset', 'count', 'at'].includes(k))) return bad('interest');
     if (it.sunset !== undefined && it.sunset !== true) return bad('interest_sunset');
+    // count / at (round 5): optional in the long form (absent = not said).
+    if (it.count !== undefined && it.count !== null && !isInt(it.count, 1, 9)) return bad('interest_count');
+    if (it.at !== undefined && it.at !== null && !inEnum(it.at, allowed.mealPlaces || MEAL_PLACE_KINDS)) return bad('interest_at');
     if (!inEnum(it.kind, allowed.kinds)) return bad('interest_kind');
     if (!inEnum(it.time_of_day, TIMES)) return bad('interest_time');
     if (it.start_time !== null && !(typeof it.start_time === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(it.start_time))) return bad('interest_start_time');
@@ -319,13 +331,20 @@ function validateIntent(raw, allowed, { originalText = '', today = null } = {}) 
     // The visitor's own words only: a name the request does not contain is dropped (never a suggestion from the model).
     if (place && (place.length < 3 || !folded.includes(fold(place)))) { dropped.push(`place:${place}`); place = null; }
     const prev = interests[interests.length - 1];
+    // A meal "at" a kind of place is that one meal stop (round 5, R44 "winery lunch"): only for meals, and a separate entry
+    // of the same kind right before or after it, without its own count or name, is the same stop asked twice.
+    const at = it.at && MEALS.has(it.kind) ? it.at : null;
+    if (it.at && !at) dropped.push(`at:${it.kind}`);
+    if (prev && prev.at && !place && prev.at === it.kind && !it.count) { dropped.push(`repeat:${it.kind}`); continue; }
+    if (prev && at && !prev.place && prev.kind === at && !prev.count) { interests.pop(); dropped.push(`repeat:${prev.kind}`); }
     // One stop asked once: the same kind twice in a row, or après followed by "drinks", is one stop (the first answer
     // read "après drinks after skiing" as après then drinks; "2 days of golf" as golf, golf).
     if (prev && !place && !prev.place && (prev.kind === it.kind || (prev.kind === 'apres' && it.kind === 'drinks'))) { dropped.push(`repeat:${it.kind}`); continue; }
     // "a sunset dinner" is one dinner at sunset, not a sunset stop plus a dinner.
     if (prev && prev.kind === 'sunset' && it.kind === 'dinner' && !prev.place) { interests.pop(); dropped.push('repeat:sunset'); }
     const sunset = it.sunset === true || !!(prev && prev.kind === 'sunset' && it.kind === 'dinner' && !prev.place);
-    interests.push({ kind: it.kind, time_of_day: it.time_of_day, start_time: it.start_time, place: place || null, ...(sunset ? { sunset: true } : {}) });
+    interests.push({ kind: it.kind, time_of_day: it.time_of_day, start_time: it.start_time, place: place || null, ...(sunset ? { sunset: true } : {}),
+      ...(it.count ? { count: it.count } : {}), ...(at ? { at } : {}) });
   }
   if (raw.pace !== null && !inEnum(raw.pace, allowed.paces)) return bad('pace');
   if (raw.budget !== null && !inEnum(raw.budget, allowed.budgets)) return bad('budget');
@@ -466,21 +485,31 @@ function clock(hhmm) {
   const h12 = h % 12 === 0 ? 12 : h % 12;
   return `${h12}${m ? `:${String(m).padStart(2, '0')}` : ''} ${h < 12 ? 'AM' : 'PM'}`;
 }
+// One stop of a kind (round 5): "a winery" asks for one winery; "wineries" lets the planner add a second (H23 "before
+// dinner, a winery" came back with two), and after dinner the plural lost its time (R52).
+const ONE_PHRASES = {
+  restaurant: 'a restaurant', winery: 'a winery', cafe: 'a cafe', brewery: 'a brewery', pub: 'a pub', cocktail: 'a cocktail lounge',
+  distillery: 'a distillery', wine_tasting: 'a winery', cidery: 'a cidery', golf: 'golf', beach: 'a beach', tour: 'a tour',
+};
 function interestPhrase(it, kinds) {
   let phrase = TYPE_PHRASES[it.kind] && kinds.types.has(it.kind) ? TYPE_PHRASES[it.kind]
     : ACTIVITY_PHRASES[it.kind] && kinds.activities.has(it.kind) ? ACTIVITY_PHRASES[it.kind] : MOMENT_PHRASES[it.kind];
   if (!phrase) return null;
+  if (it.count === 1 && ONE_PHRASES[it.kind]) phrase = ONE_PHRASES[it.kind];
   if (it.kind === 'dinner' && it.sunset) phrase = 'a sunset dinner';
-  const tod = it.time_of_day;
-  // Drinks are an evening thing anyway: "night breweries" read worse than "breweries" after the dinner they follow.
-  if (tod && tod !== 'any' && !TIMED_MOMENTS.has(it.kind) && !(DRINK_KINDS.has(it.kind) && (tod === 'evening' || tod === 'night'))) {
-    // "a hike" in the afternoon -> "an afternoon hike"; "coffee" in the morning -> "morning coffee".
-    const bare = phrase.replace(/^(?:a|an) /, '');
-    phrase = bare === phrase ? `${tod} ${phrase}` : `${/^[aeiou]/.test(tod) ? 'an' : 'a'} ${tod} ${bare}`;
-  }
+  // Round 5: no "morning"/"afternoon" words in front of stops. "morning golf then lunch then a brewery" made the planner
+  // read the lunch as a plain restaurant and put it after the brewery; the time of day of the FIRST stop becomes the
+  // planner's start-time chip instead (renderTripRequest), and the order words carry the rest.
+  // "lunch at a winery" (R44): the planner's own words for a meal at a kind of place; it plans lunch at noon, then the
+  // winery right after (its winery-lunch pick when it plans a wine day).
+  if (it.at && ONE_PHRASES[it.at]) phrase = `${phrase} at ${ONE_PHRASES[it.at]}`;
   if (it.place) phrase = `${phrase} at ${it.place}`;
   return phrase;
 }
+// Where the day starts when the first stop has a time of day but no clock time (round 5, H13: a dated brunch was planned
+// at 12:45; the brunch window opens ~10:00).
+const FIRST_STOP_START = { breakfast: 480, brunch: 630 };
+const TOD_START = { early: 480, morning: 540, midday: 720, afternoon: 780 };
 
 // intent + { allowed, taxonomy, args (the parsed POST body), staysOn } -> { text, overrides, stay, dropped }.
 // The text uses only words the rules read today; dates, pace and a clock start go into the planner's existing,
@@ -546,10 +575,14 @@ function renderTripRequest(intent, ctx = {}) {
   const overrides = { ...given };
   if (intent.start_date && given.startDate === undefined) overrides.startDate = intent.start_date;
   if (intent.pace && given.pace === undefined) overrides.pace = intent.pace;
-  const first = ints[0] && ints[0].it.start_time;
-  if (first && !multi && given.startMinutes === undefined && given.dayStartMinutes === undefined) {
-    const [h, m] = first.split(':').map(Number);
-    overrides.startMinutes = h * 60 + m;
+  const firstIt = ints[0] && ints[0].it;
+  const first = firstIt && firstIt.start_time;
+  if (!multi && given.startMinutes === undefined && given.dayStartMinutes === undefined) {
+    if (first) {
+      const [h, m] = first.split(':').map(Number);
+      overrides.startMinutes = h * 60 + m;
+    } else if (firstIt && FIRST_STOP_START[firstIt.kind] !== undefined) overrides.startMinutes = FIRST_STOP_START[firstIt.kind];
+    else if (firstIt && TOD_START[firstIt.time_of_day] !== undefined && !TIMED_MOMENTS.has(firstIt.kind)) overrides.startMinutes = TOD_START[firstIt.time_of_day];
   }
   // Later clock times stay in the text ("dinner at 7 PM"), as a visitor would type them.
   const timedText = ints.slice(1).filter((x) => x.it.start_time).map((x) => `${x.phrase.replace(/ at .*$/, '')} at ${clock(x.it.start_time)}`);
