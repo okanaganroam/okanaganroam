@@ -7,8 +7,12 @@
 // kalamalka-venue-layout.js; this file hands it that one page and builds every other one itself.
 'use strict';
 
-const CATEGORY_ICON = { outdoor: '🌿', sport: '🏅' };
-const CATEGORY_EYEBROW = { outdoor: 'Outdoors', sport: 'Sports & Recreation' };
+// Beaches, golf courses, tours and shops (2026-11-20, batch 2) use the same layout. Their own content -- a course's map, green
+// fees and value, a tour's visit details, the editorial "why it's a gem" note, the related and nearby links -- is handed in
+// as ready-made blocks (aboutExtraHtml, whyHtml, verifiedHtml, relatedHtml, nearbyHtml) and shown unchanged.
+const CATEGORY_ICON = { outdoor: '🌿', sport: '🏅', beach: '🏖️', golf: '⛳', tour: '🧭', shop: '🛍️' };
+const CATEGORY_EYEBROW = { outdoor: 'Outdoors', sport: 'Sports & Recreation', beach: 'Beaches', golf: 'Golf', tour: 'Tours & Experiences', shop: 'Shops' };
+const NEARBY_HEADING = { beach: 'More to do nearby ✨', golf: 'Near the course ✨', tour: 'Make a day of it ✨', shop: 'More to do nearby ✨' };
 
 function renderOutdoorLayout(p) {
   if (p.park) return require('./kalamalka-venue-layout').renderKalamalkaLayout(p);
@@ -31,7 +35,8 @@ function renderOutdoorLayout(p) {
 
   const heads = rows.find((r) => r[0] === 'Heads up');
   const save = p.actions.filter((a) => /fav-btn|trip-btn/.test(a));
-  const main = p.actions.filter((a) => !/fav-btn|trip-btn/.test(a));
+  // A place you book (a tee time, a tour) leads with its booking button.
+  const main = p.actions.filter((a) => !/fav-btn|trip-btn/.test(a)).sort((a, b) => /data-track="booking"/.test(b) - /data-track="booking"/.test(a));
 
   // Before you go: the researched facts except the ones shown elsewhere (the notice, the parking box, the source line).
   const shown = (label) => tiles.some((t) => t.includes(`<small>${label}</small>`));
@@ -51,7 +56,7 @@ function renderOutdoorLayout(p) {
   const where = hasWhere
     ? `<aside class="kl-card kl-parking" id="klParking"><p class="kl-eyebrow">Start on the right foot</p><h2>Getting there 📍</h2>${parking ? `<p>${parking}</p>` : ''}${p.detailRows ? `<div class="venue-key-info">${p.detailRows}</div>` : ''}${p.locationHtml || ''}</aside>` : '';
 
-  const about = `<section class="kl-card" id="klAbout"><h2>About this place</h2>${p.descriptionHtml || ''}${p.guideLinks || ''}</section>`;
+  const about = `<section class="kl-card" id="klAbout"><h2>About this place</h2>${p.descriptionHtml || ''}${p.whyHtml || ''}${p.aboutExtraHtml || ''}${p.guideLinks || ''}</section>`;
   const hours = p.hoursHtml ? `<section class="kl-card kl-hours" id="venueHours">${p.hoursHtml}</section>` : '';
 
   const nav = [['klOverview', 'Overview'], ['klAbout', 'About'], before && ['klBefore', 'Before you go'], where && ['klParking', 'Getting there'], hours && ['venueHours', 'Hours']]
@@ -60,9 +65,9 @@ function renderOutdoorLayout(p) {
   const category = CATEGORY_EYEBROW[v.type] || 'Outdoors';
   return `<div id="klLayout" class="kl-generic">
     <section class="kl-overview" id="klOverview">${p.advisoryHtml || ''}
-      <p class="kl-eyebrow">${CATEGORY_ICON[v.type] || '🌿'} ${e(category)} · <a href="/${e(v.region)}">${e(p.regionLabel)}</a></p>
+      <p class="kl-eyebrow">${CATEGORY_ICON[v.type] || '🌿'} ${p.eyebrowHtml || `${e(category)} · <a href="/${e(v.region)}">${e(p.regionLabel)}</a>`}</p>
       ${v.image_url ? `<h1 class="kl-desktop-title">${e(v.name)}</h1>` : ''}
-      ${p.glanceHtml || ''}${p.openStatusHtml || ''}
+      ${p.glanceHtml || ''}${p.openStatusHtml || ''}${p.verifiedHtml || ''}
       ${p.chipsHtml ? `<p class="chips">${p.chipsHtml}</p>` : ''}
       ${tiles.length >= 2 ? `<div class="kl-quick kl-quick-${tiles.length}" aria-label="Quick facts">${tiles.join('')}</div>` : ''}
       ${heads ? `<aside class="kl-notice"><strong>🌲 Heads up</strong><p>${heads[1]}</p></aside>` : ''}
@@ -71,12 +76,12 @@ function renderOutdoorLayout(p) {
     </section>
     <nav class="kl-nav" aria-label="Page sections">${nav}</nav>
     <div class="kl-grid">
-      <div class="kl-main">${about}${before}${hours}${p.visitHtml || ''}${p.gallery || ''}</div>
+      <div class="kl-main">${about}${p.moreHtml || ''}${before}${hours}${p.visitHtml || ''}${p.gallery || ''}</div>
       ${where}
     </div>
     ${p.visitorHtml || ''}${p.eventsHtml || ''}
-    ${p.nearbyCards.length ? `<section class="kl-nearby"><div class="kl-nearby-head"><div><p class="kl-eyebrow">Make a day of it</p><h2>Nearby adventures ✨</h2></div><a href="/${e(v.region)}/${e(p.categorySlug)}">See more ${e(category.toLowerCase())} →</a></div><ul class="nearby-list">${p.nearbyCards.slice(0, 3).join('')}</ul></section>` : ''}
-    ${p.ownerCtaHtml || ''}
+    ${p.nearbyCards.length ? `<section class="kl-nearby"><div class="kl-nearby-head"><div><p class="kl-eyebrow">Make a day of it</p><h2>${NEARBY_HEADING[v.type] || 'Nearby adventures ✨'}</h2></div><a href="/${e(v.region)}/${e(p.categorySlug)}">See more ${e(category.toLowerCase())} →</a></div><ul class="nearby-list">${p.nearbyCards.slice(0, p.nearbyLimit || 3).join('')}</ul></section>` : ''}
+    ${p.relatedHtml || ''}${p.nearbyHtml || ''}${p.ownerCtaHtml || ''}
     <p class="kl-update">Spotted something that needs updating? <a href="/contact" data-contact-open>Suggest an update →</a></p>
   </div>`;
 }

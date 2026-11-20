@@ -61,6 +61,14 @@ const SUMMER_NOW = new Date('2026-07-15T19:00:00Z');
 const noImgV = (html) => String(html).replace(/(\/images\/[\w\/.-]+\.(?:jpe?g|png|webp))\?v=[0-9a-f]{10}/gi, '$1');
 
 const app = require('../server.js');
+// Place pages in the Outdoors layout (2026-11-20, batch 2): the main buttons and the Favorite / Add to trip row are two
+// groups. Returns [whole, row attributes, every action] like the older single-row match did.
+function placeActions(html) {
+  const m = html.match(/<div class="venue-cta-row"([^>]*)>([\s\S]*?)<\/div>/);
+  if (m) return m;
+  const main = html.match(/<div class="kl-primary">([\s\S]*?)<\/div>/), save = html.match(/<div class="kl-save"([^>]*)>([\s\S]*?)<\/div>/);
+  return main || save ? [null, save ? save[1] : '', (main ? main[1] : '') + (save ? save[2] : '')] : null;
+}
 // The verified-prices file holds real venue ids; fixtures reuse small ids, so tests start with no prices on file.
 for (const k of Object.keys(app.CARD_PRICES)) delete app.CARD_PRICES[k];
 const db = require('../db.js');
@@ -6833,7 +6841,7 @@ test('Golf venue page shows all five actions: Website, Get Directions, Call, Fav
   const base = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course'); // has coords
   const venue = Object.assign({}, base, { website: 'https://example-golf.test/', phone: '+1 250-555-0100' });
   const html = app.renderVenuePage(venue, [], [], []);
-  const row = html.match(/<div class="venue-cta-row"([^>]*)>([\s\S]*?)<\/div>/);
+  const row = placeActions(html);
   assert.ok(row, 'cta row present');
   assert.match(row[1], /data-venue-category="golf" data-venue-name="Test Golf Course" data-surface="venue_page"/);
   const body = row[2];
@@ -6858,7 +6866,7 @@ test('Golf pages use the homepage visual system (app.css + reused header + golf-
     assert.match(html, /<link rel="stylesheet" href="\/styles\/app\.css">/);
     assert.ok(html.indexOf('/styles/app.css') < html.indexOf('<style>'), 'app.css loads before the inline SEO CSS so SEO rules win ties');
     assert.match(html, /body\.golf-page \{/);
-    assert.match(html, /<body class="golf-page">/);
+    assert.match(html, /<body class="golf-page[" ]/);
     assert.match(html, /<header id="top">/, 'homepage header markup reused');
     assert.match(html, /class="logo-wordmark">Okanagan<span class="logo-wordmark-accent"> Roam<\/span>/);
     assert.match(html, /<a class="app-btn" id="navTripBtn" href="\/trip">/);
@@ -6899,7 +6907,7 @@ test('Golf venue page: hero is the title treatment, header does not repeat it, i
   const course = app.renderVenuePage(app.findVenueBySlug('kelowna', 'golf', 'test-golf-course'), [], [], []);
   assert.match(course, /<div class="venue-hero venue-hero-fallback venue-hero-golf">\s*<span class="venue-hero-type">Golf Course<\/span>\s*<h1>Test Golf Course<\/h1>\s*<\/div>/);
   assert.equal((course.match(/<h1[\s>]/g) || []).length, 1, 'exactly one <h1> on the page');
-  assert.match(course, /<div class="venue-header">\s*<p class="venue-at-a-glance">Golf Course &middot; <a href="\/kelowna">Kelowna<\/a><\/p>/, 'header opens with the meta line, not a second title');
+  assert.match(course, /<p class="kl-eyebrow">⛳ Golf Course &middot; <a href="\/kelowna">Kelowna<\/a><\/p>/, 'header opens with the meta line, not a second title');
   assert.doesNotMatch(course, /<span class="venue-hero-name">/, 'hero name span replaced by the <h1> on golf pages');
   assert.match(course, /<style>\s*\/\* Hero: same per-type gradient/, 'themed polish styles present');
   assert.match(course, /body\.golf-page \.venue-hero-fallback h1 \{/);
@@ -6970,7 +6978,7 @@ test('Beach venue page: hero carries the <h1>, header opens with "Beach · Regio
   const beach = app.renderVenuePage(app.findVenueBySlug('kelowna', 'beach', 'test-beach-park'), [], [], []);
   assert.match(beach, /<div class="venue-hero venue-hero-fallback venue-hero-beach">\s*<span class="venue-hero-type">Beach<\/span>\s*<h1>Test Beach Park<\/h1>\s*<\/div>/);
   assert.equal((beach.match(/<h1[\s>]/g) || []).length, 1, 'exactly one <h1> on the page');
-  assert.match(beach, /<div class="venue-header">\s*<p class="venue-at-a-glance">Beach &middot; <a href="\/kelowna">Kelowna<\/a><\/p>/);
+  assert.match(beach, /<p class="kl-eyebrow">🏖️ Beach &middot; <a href="\/kelowna">Kelowna<\/a><\/p>/);
   assert.doesNotMatch(beach, /<span class="venue-hero-name">/);
   assert.match(beach, /<style>\s*\/\* Hero: same per-type gradient/, 'themed polish styles present on beach pages');
   assert.match(beach, /body\.golf-page \.venue-hero-fallback\.venue-hero-beach \{ box-shadow/);
@@ -7446,11 +7454,11 @@ test('Beach venue page: Beach JSON-LD, hero, five-action CTA row (no Call when p
   assert.match(html, /<title>Test Beach Park — Beach in Kelowna, BC \| Okanagan Roam<\/title>/);
   assert.match(html, /"@type":"Beach"/);
   assert.match(html, /"geo":\{"@type":"GeoCoordinates","latitude":49\.86,"longitude":-119\.49\}/);
-  assert.match(html, /<body class="golf-page beach-page">/);
+  assert.match(html, /<body class="golf-page beach-page[" ]/);
   assert.match(html, /<div id="tripTray">/);
   assert.match(html, /venue-hero venue-hero-fallback venue-hero-beach/);
   assert.match(html, /<a class="category-back-link" href="\/kelowna\/beaches">← Kelowna Beaches<\/a>/);
-  const cta = html.match(/<div class="venue-cta-row"([^>]*)>([\s\S]*?)<\/div>/);
+  const cta = placeActions(html);
   assert.ok(cta, 'CTA row must render');
   assert.match(cta[1], /data-venue-category="beach" data-venue-name="Test Beach Park" data-surface="venue_page"/);
   // Batch 3: themed venue pages render the canonical app.js labels ("Favorite", "Add to trip").
@@ -7468,7 +7476,7 @@ test('Beach venue page: Beach JSON-LD, hero, five-action CTA row (no Call when p
 test('Beach venue page with no address, coordinates, website or phone: Get Directions / Visit Website / Call are all omitted, Favorite + Add to Trip remain', () => {
   const b = bareBeachFixture();
   const html = app.renderVenuePage(b, [], [], []);
-  const cta = html.match(/<div class="venue-cta-row"[^>]*>([\s\S]*?)<\/div>/);
+  const cta = (placeActions(html) || []).slice(1);
   assert.ok(cta);
   assert.doesNotMatch(cta[1], /Get Directions|Open in Google Maps|Visit Website|>Call<|google\.com\/maps|tel:/);
   assert.match(cta[1], /Favorite/);
@@ -7516,11 +7524,11 @@ test('Advisories: the collection is bootstrapped, memberships render a "Check be
   assert.doesNotMatch(category.slice(bareIdx, category.indexOf('</li>', bareIdx)), /venue-advisory/, 'only the member venue gets the notice');
 
   const page = app.renderVenuePage(b, [], [], []);
-  // Round 10 (2026-10-19): the notice and the CTA row come after the header and before the description in the page
-  // (wide screens show the description first through CSS order).
-  assert.match(page, /-->\n  <aside class="venue-advisory" role="note" aria-label="Check before you go">/, 'notice sits right after the header');
-  assert.match(page, /<\/aside>\n  <div class="venue-cta-row"/, 'and just before the CTA row');
-  assert.ok(page.indexOf('<div class="venue-cta-row"') < page.indexOf('<p class="venue-description"'));
+  // Batch 2 (2026-11-20): on the Outdoors-layout place page the notice opens the overview, ahead of the buttons and the
+  // description.
+  assert.match(page, /<section class="kl-overview" id="klOverview">\s*<aside class="venue-advisory" role="note" aria-label="Check before you go">/, 'notice opens the overview');
+  assert.ok(page.indexOf('<aside class="venue-advisory"') < page.indexOf('<div class="kl-save"'), 'and comes before the buttons');
+  assert.ok(page.indexOf('<div class="kl-save"') < page.indexOf('<p class="venue-description"'));
   assert.match(page, /\.venue-advisory \{/);
   // Permanent facts are untouched: the description text is identical.
   assert.match(page, /<p class="venue-description">A fixture public beach with a swim area, playground and washrooms, used only by the automated test suite\.<\/p>/);
@@ -7568,7 +7576,7 @@ test('Golf regression: Golf listing and venue pages are unchanged by the Beaches
   assert.match(category, /Indoor Golf/, 'Golf-only subsection split still applies to Golf');
   const golf = app.findVenueBySlug('kelowna', 'golf', 'test-golf-course');
   const page = app.renderVenuePage(golf, [], [], []);
-  assert.match(page, /<body class="golf-page">/);
+  assert.match(page, /<body class="golf-page[" ]/);
   assert.match(page, /"@type":"GolfCourse"/);
   assert.match(page, /"venue_category":"golf","surface":"venue_page"/);
   assert.match(page, /data-venue-category="golf" data-venue-name="Test Golf Course" data-surface="venue_page"/);
@@ -7805,7 +7813,7 @@ test('Dog Friendly badge coexists with the existing Hidden Gem / Local Favourite
 
 test('Beach venue CTA rules: Get Directions from coordinates OR a verified address; Visit Website / Call only when the field is verified', () => {
   const base = { id: 999901, name: 'CTA Rule Beach', region: 'kelowna', type: 'beach', slug: 'cta-rule-beach', description: 'x', redirect_to: null };
-  const ctaOf = (v) => { const m = app.renderVenuePage(v, [], [], []).match(/<div class="venue-cta-row"[^>]*>([\s\S]*?)<\/div>/); return m ? m[1] : ''; };
+  const ctaOf = (v) => { const m = placeActions(app.renderVenuePage(v, [], [], [])); return m ? m[2] : ''; };
   const addrOnly = ctaOf({ ...base, address: '12 Sample Beach Rd, Kelowna, BC', latitude: null, longitude: null, website: null, phone: null });
   assert.match(addrOnly, /Open in Google Maps/); // the built-in "Get Directions" needs a MAPBOX_TOKEN (not set in tests)
   assert.match(addrOnly, /query=12%20Sample%20Beach%20Rd%2C%20Kelowna%2C%20BC/, 'address-only venues get directions via the address query, same pattern as every other venue');
