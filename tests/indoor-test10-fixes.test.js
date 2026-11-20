@@ -96,7 +96,7 @@ test('3. A link in Good to know names the setup\'s own Address, phone and websit
 
 test('4. "Adult drop-in $7.50" (not "from") when her typed prices list a lower one: page, card, Build My Trip, EN + FR; every kind has its words', async () => {
   const { v } = await sandra();
-  assert.match(plain(pageHtml(v)), /Drop-in from \$7\.50\./);
+  assert.match(plain(pageHtml(v)), /Adult drop-in \$7\.50\./); // indoor test 12: never "from" for one drop-in
   publishPrices(v.id, [['Adult drop-in', '7.50'], ['Youth drop-in', '4.75'], ['Child drop-in', '3.50'], ['Locker', '1'], ['10-visit pass', '67.50']]);
   app.writeIndoorVisitRows(v.id);
   app.indoorCardPrice && app.indoorCardPrice(v.id);
@@ -110,7 +110,7 @@ test('4. "Adult drop-in $7.50" (not "from") when her typed prices list a lower o
   const { v: v2 } = await sandra();
   publishPrices(v2.id, [['Adult drop-in', '7.50'], ['Locker', '1'], ['Towel rental', '2']]);
   app.writeIndoorVisitRows(v2.id);
-  assert.match(plain(pageHtml(v2)), /Drop-in from \$7\.50\./);
+  assert.match(plain(pageHtml(v2)), /Adult drop-in \$7\.50\./);
   // Every kind has its exact words, English and French.
   for (const k of IK.INDOOR_KIND_TEXT_KINDS) for (const l of ['en', 'fr']) assert.ok(IK.INDOOR_KIND_TEXT[k][l].price.exact, `${k} ${l}`);
   // Her typed price names show as typed on the French page (never half translated).
@@ -199,7 +199,7 @@ test('10. Polish: Rest of the year and All year except the shutdown; no cuisine 
   const setup = await (await fetch(`${base}/owner/${t2}/setup`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } })).text();
   const cfg = JSON.parse(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(setup)[1]);
   const price = cfg.topics.find((x) => x.id === 'indoor-price');
-  assert.match(price.a, /Drop-in \$7\.50/);
+  assert.match(price.a, /Adult drop-in \$7\.50/); // indoor test 12: the page's words
   assert.doesNotMatch(price.a, /\$25/);
   // The staff line keeps "(Create a login);" together.
   const land = await (await fetch(`${base}/owner/${t}`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } })).text();

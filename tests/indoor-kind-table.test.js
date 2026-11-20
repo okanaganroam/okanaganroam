@@ -72,7 +72,7 @@ test('the table: every kind the setup offers has its price, Your prices, Help, G
       assert.ok(w.groups.lead && w.groups.ex, `${at} groups lead and example`);
       assert.ok(Array.isArray(w.search) && w.search.length >= 2, `${at} search words`);
       // "Adult admission" only for kinds people pay admission to.
-      if (!ADMISSION_KINDS.includes(k)) for (const x of [w.price.page, w.price.basis, w.price.label, w.price.ph, w.price.lead]) assert.doesNotMatch(x, /Adult admission|Adults \{x\}|Entrée adulte|Adultes :/i, `${at}: ${x}`);
+      if (!ADMISSION_KINDS.includes(k)) for (const x of [w.price.page, w.price.basis, w.price.label, w.price.ph, w.price.lead]) assert.doesNotMatch(x, /Adult admission|Adults \{x\}|Entrée adulte(?! à la séance)|Adultes :/i, `${at}: ${x}`); // (a pool's « Entrée adulte à la séance » is its drop-in)
       // The French is French: the card's line has a French twin the French pages use.
       if (lang === 'en') assert.equal(FR_TEXT[w.price.basis], IK.indoorKindText([k], 'fr').price.basis, `${k}: French card line`);
     }

@@ -60341,7 +60341,9 @@ function indoorHelpPrice(venue) { return (venue && indoorPrice(venue.id)) || ind
 // Indoor test 11 (2026-11-19; Kim: Help said "Admission from $12" while her page said "Adult admission $12"): the owner
 // side says the page's own words, "Adult admission $12" (price.exact) when her typed prices list a lower one, else
 // "Admission $12" (the kind's words without "from").
-function indoorOwnerPriceWords(k, exact) { return exact ? `${k.price.exact} {x}` : String(k.price.page).replace(/\.$/, '').replace(/ from \{x\}$/, ' {x}').replace(/ à partir de \{x\}$/, ' {x}'); }
+// Indoor test 12 (2026-11-19): the owner side and the page agree everywhere: a kind priced from its lowest price keeps
+// "from" here too ("Admission from $12"), and an exact price (one drop-in, or a lower typed price) says its words.
+function indoorOwnerPriceWords(k, exact) { return exact || k.single ? `${k.price.exact} {x}` : String(k.price.page).replace(/\.$/, ''); }
 function indoorHelpExact(venue) { try { return !!(venue && indoorPriceExact(venue.id)); } catch (e) { return false; } }
 // Indoor test 12 (2026-11-19; Jess's paid studio was told "Free entry? You can skip this."): only a place that ticked Free
 // entry or By donation is told it can skip Your prices.

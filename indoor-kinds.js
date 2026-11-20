@@ -91,15 +91,16 @@ K.spa = { day: true, gtk: 'spa', ex: 'spa',
     groups: { chips: ['Forfaits pour couples', 'Fêtes de mariage et fêtes privées', 'Réservation privée du spa sur demande'], lead: 'Touchez une taille, puis ajoutez les forfaits pour couples, les fêtes de mariage ou les réservations privées dans vos mots.', ex: 'Forfaits pour couples. Fêtes de mariage jusqu’à 8 personnes' },
     search: ['spa', 'spas', 'spa de jour', 'massage', 'massages', 'massage en couple', 'soin du visage', 'soins du visage', 'hydrothérapie', 'sauna', 'spa nordique', 'bien-être', 'bain à remous', 'bain tourbillon'] } };
 
-K.pool = { day: true, gtk: 'pool', ex: 'pool',
-  en: { price: { page: 'Drop-in from {x}.', basis: 'Drop-in', label: 'Adult drop-in, in dollars', ph: 'Your adult drop-in price', lead: 'Your adult drop-in price. It shows on your card.' },
+// Indoor test 12: a pool's price is one adult drop-in too (single): "Adult drop-in $7.50", never "Drop-in from $7.50".
+K.pool = { day: true, gtk: 'pool', ex: 'pool', single: true,
+  en: { price: { page: 'Adult drop-in {x}.', basis: 'Adult drop-in', label: 'Adult drop-in, in dollars', ph: 'Your adult drop-in price', lead: 'Your adult drop-in price. It shows on your card.' },
     prices: { noun: 'rates page', page: PRICES_PAGE[0], lead: 'Drop-in, passes and lessons for adults, kids and families, with their prices. A photo of your rates or a link to your rates page is perfect. It’s optional.' },
     help: { walkin: 'Drop in during public swims; lessons need booking', ages: 'All ages; under 8 with an adult in the water', gift: 'Gift cards and passes at the front desk', prices: 'Kids $4, 10-visit pass $60' },
     groups: { chips: ['Birthday parties with a party room', 'School groups welcome', 'Pool or room rentals on request'], lead: 'Tap a size, then add birthday parties, school groups or rentals in your own words.', ex: 'Birthday parties with a party room. Pool rentals on request' },
     search: ['pool', 'pools', 'swim', 'swimming', 'lane swim', 'public swim', 'rec centre', 'recreation centre', 'aquatic centre', 'waterslide',
       // Indoor test 10 (2026-11-19): the words visitors use for a city pool (the vocabulary audit).
       'swimming pool', 'swimming pools', 'indoor pool', 'indoor pools', 'aquatic center', 'rec center', 'recreation center', 'leisure pool', 'wave pool', 'aquafit', 'aqua fit', 'water aerobics'] },
-  fr: { price: { page: 'Entrée à la séance à partir de {x}.', basis: 'Entrée à la séance', label: 'Prix adulte à la séance, en dollars', ph: 'Votre prix adulte à la séance', lead: 'Votre prix adulte à la séance. Il paraît sur votre fiche.' },
+  fr: { price: { page: 'Entrée adulte à la séance {x}.', basis: 'Entrée adulte à la séance', label: 'Prix adulte à la séance, en dollars', ph: 'Votre prix adulte à la séance', lead: 'Votre prix adulte à la séance. Il paraît sur votre fiche.' },
     prices: { noun: 'page des tarifs', page: PRICES_PAGE[1], lead: 'L’entrée à la séance, les laissez-passer et les cours pour adultes, enfants et familles, avec leurs prix. Une photo de vos tarifs ou un lien vers votre page des tarifs, c’est parfait. C’est facultatif.' },
     help: { walkin: 'Sans réservation pendant les bains libres; les cours se réservent', ages: 'Tous les âges; moins de 8 ans avec un adulte dans l’eau', gift: 'Cartes-cadeaux et laissez-passer à l’accueil', prices: 'Enfants 4 $, carte de 10 entrées 60 $' },
     groups: { chips: ['Fêtes d’anniversaire avec salle de fête', 'Groupes scolaires bienvenus', 'Location de la piscine ou d’une salle sur demande'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes scolaires ou les locations dans vos mots.', ex: 'Fêtes d’anniversaire avec salle de fête. Location de la piscine sur demande' },

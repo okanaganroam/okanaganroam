@@ -313,9 +313,9 @@ test('indoor test 5: a climbing and trampoline park’s questions (Chris’s hel
   for (const x of log.filter((y) => !/^\[/.test(y.q))) { const r = en.best(x.q); assert.ok(r && r.id, `${x.q} -> nothing`); }
   const plain = (h) => String(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
   // His own price, his kind's words and examples; "put your…".
-  assert.match(plain(en.topic('indoor-price').a), /put your lowest adult pass \(day or timed\)\. Your card and your page say “Passes \$20”/);
+  assert.match(plain(en.topic('indoor-price').a), /put your lowest adult pass \(day or timed\)\. Your card and your page say “Passes from \$20”/); // indoor test 12: as the page says it
   assert.match(plain(en.topic('indoor-price').a), /Gear rental \$8, 10-visit punch card \$180/);
-  assert.match(plain(fr.topic('indoor-price').aFr), /indiquez votre laissez-passer adulte le moins cher \(journée ou durée\)\. Votre fiche et votre page indiquent « Laissez-passer 20 \$ »/);
+  assert.match(plain(fr.topic('indoor-price').aFr), /indiquez votre laissez-passer adulte le moins cher \(journée ou durée\)\. Votre fiche et votre page indiquent « Laissez-passer à partir de 20 \$ »/);
   assert.doesNotMatch(plain(en.topic('indoor-price').a), /\$25/);
   assert.match(plain(en.topic('indoor-groups').a), /School and camp groups/);
   assert.match(plain(en.topic('indoor-groups').a), /Add an event/);

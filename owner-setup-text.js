@@ -2653,8 +2653,9 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
         tpriceLeadPick: fr2 ? `Votre page indiquera « ${line} ».` : `Your page will say “${line}”.`,
         // Indoor test 11 (2026-11-19; Kim: "Admission from $12" on the price screen and the finish preview while her page said
         // "Adult admission $12"): the page's own words, "Adult admission $12" once her typed prices list a lower one
-        // (C.indoorExact), else "Admission $12".
-        tpriceCard: line.replace(/ from \{x\}$/, ' {x}').replace(/ à partir de \{x\}$/, ' {x}'), tpriceCardExact: `${w.price.exact} {x}`,
+        // (C.indoorExact), else the page's line. Indoor test 12 (2026-11-19): with its "from" ("Admission from $12"), so the
+        // finish preview and the page agree.
+        tpriceCard: line, tpriceCardExact: `${w.price.exact} {x}`,
         tpriceLeadPickExact: fr2 ? `Votre page indiquera « ${w.price.exact} {x} ».` : `Your page will say “${w.price.exact} {x}”.`,
         tpriceRangeLead: fr2 ? `Nous indiquerons « ${line} », votre prix le plus bas.` : `We’ll show “${line}”, your lowest price.`,
         menuLead: w.prices.lead, menuTypeSub: w.prices.typeSub, pricesNoun: w.prices.noun, pricesPage: w.prices.page,

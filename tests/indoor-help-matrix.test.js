@@ -45,10 +45,11 @@ const botsFor = async (kind) => {
   const t = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
   const r = await fetch(`${base}/owner/${t}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base }, body: JSON.stringify({ changes: { indoor_info: { kinds: [kind], length: '1-2h', book: 'busy', age: 'all' }, indoor_price: PRICE[kind] }, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) });
   assert.ok([200, 201].includes(r.status), kind);
-  bots[kind] = { en: helpBot(await get(`/owner/${t}/setup`)), fr: helpBot(await get(`/fr/owner/${t}/setup`)), men: helpBot(await get(`/owner/${t}/menu`)), mfr: helpBot(await get(`/fr/owner/${t}/menu`)) };
+  bots[kind] = { v, en: helpBot(await get(`/owner/${t}/setup`)), fr: helpBot(await get(`/fr/owner/${t}/setup`)), men: helpBot(await get(`/owner/${t}/menu`)), mfr: helpBot(await get(`/fr/owner/${t}/menu`)) };
   return bots[kind];
 };
 
+const pageOf = (v) => app.renderVenuePage(app.getVenue(v.id), [], [], [], { lang: 'en', now: new Date('2026-11-19T12:00:00-08:00') }).replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '');
 // Topic ids, short.
 const P = 'indoor-price', F = 'indoor-free', R = 'indoor-per-room', X = 'indoor-extras', B = 'indoor-bar', BK = 'indoor-booking', BZ = 'indoor-busy-times',
   TH = 'indoor-theme-nights', A = 'indoor-age', G = 'indoor-groups', GTK = 'indoor-good-to-know', S = 'indoor-seasonal', FA = 'indoor-fill-all', M = 'menu-add',
@@ -402,7 +403,7 @@ test('indoor test 10: Sandra\'s Help questions (a city pool) land on the right a
   assert.match(plain(b.en.topic(YB).a), /dates change a bit each year/);
   assert.match(plain(b.en.topic(AO).a), /Known for/);
   assert.match(plain(b.fr.topic(PR).aFr), /Oui, si vous avez le droit de les partager/);
-  assert.match(plain(b.en.topic(P).a), /Drop-in \$6\.50/); // indoor test 11: the owner side says the page's words without "from"
+  assert.match(plain(b.en.topic(P).a), /Adult drop-in \$6\.50/); // indoor test 12: a pool's drop-in is one exact price, as the page says it
   assert.doesNotMatch(plain(b.en.topic(P).a), /\$25/);
 });
 
@@ -473,8 +474,9 @@ test('indoor test 11: Kim\'s Help questions (a science centre) land on the right
   assert.match(th, /Known for/);
   assert.match(th, /Add an event/);
   // The price answers say the page's own words: "Admission $12" (no "from") before any lower typed price.
-  assert.match(plain(b.en.topic(P).a), /“Admission \$12”/);
-  assert.doesNotMatch(plain(b.en.topic(P).a) + plain(b.en.topic(X).a), /Admission from/);
+  // Indoor test 12: the page's own words, "from" included, so the owner side and the page agree.
+  assert.match(plain(b.en.topic(P).a), /“Admission from \$12”/);
+  assert.match(plain(pageOf(b.v)), /Admission from \$12\./);
 });
 
 // Indoor test 12 (2026-11-19; Jess, a hot yoga and Pilates studio open only around its classes): every question in her Help
