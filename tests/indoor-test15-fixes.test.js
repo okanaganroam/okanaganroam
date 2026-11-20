@@ -172,7 +172,15 @@ test('4. his price set to Free puts the research event that says "by donation" (
   const b = await aaron();
   const c2 = app.listEventChecks().find((c) => c.event.id === b.eventId);
   assert.ok(c2);
-  assert.ok(app.decideEventCheck(c2.id, 'dismiss', null, 'admin:test').ok);
+  // On the review page, under Changes to live events, with its own two buttons; Keep as it is goes through the page's route.
+  const login = await fetch(`${base}/admin/review/login`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': ip() }, body: JSON.stringify({ token: 'indoor-test15-admin-token' }) });
+  const cookie = (login.headers.get('set-cookie') || '').split(';')[0];
+  const page = await (await fetch(`${base}/admin/review`, { headers: { Cookie: cookie } })).text();
+  assert.match(page, new RegExp(`data-kind="eventcheck" data-id="${c2.id}"`));
+  assert.match(plain(page), /Changes to live events[\s\S]*the owner now says Free entry[\s\S]*may now be wrong about its price: “Admission is by donation;/);
+  assert.match(page, /data-act="dismiss">Keep as it is</);
+  const kept = await fetch(`${base}/admin/review/eventcheck/${c2.id}/dismiss`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, Cookie: cookie }, body: '{}' });
+  assert.equal(kept.status, 200, await kept.text());
   assert.match(db.prepare('SELECT description FROM events WHERE id = ?').get(b.eventId).description, /by donation/);
   assert.equal(app.listEventChecks().filter((c) => c.event.id === b.eventId).length, 0);
   // An owner's own event is never put up for this check.
