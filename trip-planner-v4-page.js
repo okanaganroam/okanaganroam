@@ -54,7 +54,7 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-icon { width: 44px; height: 44px; border-radius: 999px; border: 0; background: transparent; color: var(--ref-navy); font-size: 1.15rem; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
   .t3-v4 .v4-icon:hover { background: rgba(27,43,58,0.07); }
   .t3-v4 .v4-icon[aria-busy="true"] { opacity: 0.4; }
-  .t3-v4 .v4-confirmed .v4-acts { display: none; }
+  .t3-v4 .v4-confirmed .v4-acts, .t3-v4 .v4-confirmed .t3-swap-note { display: none; }
   .t3-v4 .v4-confirmed .v4-row { grid-template-columns: 56px minmax(0, 1fr); padding-right: 12px; }
   .t3-v4 .v4-more { padding: 0 14px 12px 80px; font-size: 0.86rem; line-height: 1.45; color: var(--ref-navy); }
   .t3-v4 .v4-more p { margin: 0 0 4px; }
@@ -140,7 +140,8 @@ const V4_CLIENT_SRC = String.raw`
       sheet: 'Book your trip', next: 'Open next booking', nextOf: 'Next: {name}', allSet: 'All booked ✓', progress: '{d} of {n} booked', reserve: 'Reserve by phone or on their site', noOnline: 'No online booking listed',
       toBook: 'To book', copied: 'Trip copied. Paste it into your group chat.', copyThis: 'Copy this link: ', shareTitle: 'Our trip', estFor: 'for {n}', est: 'estimate', more: '+{n} more',
       startOver: 'Start over', stay: 'Stay', addBookings: 'Add to bookings', added: 'Added', call: 'Call', contact: 'Contact', byPhone: 'Reserve by phone',
-      savedReplaced: 'Saved ✓ Your trip is in My Trip.', notPriced: 'Not priced yet: {names}', freeLabel: 'Free' },
+      savedReplaced: 'Saved ✓ Your trip is in My Trip.', notPriced: 'Not priced yet: {names}', freeLabel: 'Free', dogsOk: 'Dogs allowed',
+      tipNoBook: 'Plan confirmed. Share it with your group or save it.' },
     fr: { yourPlan: 'Votre plan', edit: 'Modifier la demande', tip: 'Touchez un arrêt pour les détails. Remplacez ⇄ ou retirez ✕ ce que vous voulez, puis confirmez.', tipDone: 'Plan confirmé. Réservez tout d’un coup, puis partagez-le avec votre groupe.',
       confirm: 'Confirmer le plan', confirmNote: 'Vous pourrez encore remplacer ou retirer des arrêts.', book: 'Tout réserver', share: 'Partager', save: 'Enregistrer', saved: 'Enregistré ✓', editPlan: 'Modifier le plan',
       note: 'Heures suggérées. Vérifiez les horaires avant de partir.', options: 'Plus d’options et notes', day: 'Jour', stops1: '1 arrêt', stopsN: '{n} arrêts', days1: '1 jour', daysN: '{n} jours',
@@ -149,7 +150,8 @@ const V4_CLIENT_SRC = String.raw`
       sheet: 'Réserver votre voyage', next: 'Ouvrir la prochaine réservation', nextOf: 'Ensuite : {name}', allSet: 'Tout est réservé ✓', progress: '{d} sur {n} réservés', reserve: 'Réservez par téléphone ou sur leur site', noOnline: 'Pas de réservation en ligne indiquée',
       toBook: 'À réserver', copied: 'Voyage copié. Collez-le dans la discussion de votre groupe.', copyThis: 'Copiez ce lien : ', shareTitle: 'Notre voyage', estFor: 'pour {n}', est: 'estimation', more: '+{n} autres',
       startOver: 'Recommencer', stay: 'Hébergement', addBookings: 'Ajouter aux réservations', added: 'Ajouté', call: 'Appeler', contact: 'Coordonnées', byPhone: 'Réserver par téléphone',
-      savedReplaced: 'Enregistré ✓ Votre voyage est dans Mon voyage.', notPriced: 'Prix pas encore indiqué : {names}', freeLabel: 'Gratuit' }
+      savedReplaced: 'Enregistré ✓ Votre voyage est dans Mon voyage.', notPriced: 'Prix pas encore indiqué : {names}', freeLabel: 'Gratuit', dogsOk: 'Chiens admis',
+      tipNoBook: 'Plan confirmé. Partagez-le avec votre groupe ou enregistrez-le.' }
   };
   function vt(k, vars){
     var s = (V4_TEXT[lang()] || V4_TEXT.en)[k] || V4_TEXT.en[k] || k;
@@ -158,7 +160,7 @@ const V4_CLIENT_SRC = String.raw`
   }
   // Viator's "Add to trip" is "Add to bookings" here: one verb per action (My Trip is "Save").
   if (typeof T3_VT !== 'undefined') { T3_VT.add = { en: V4_TEXT.en.addBookings, fr: V4_TEXT.fr.addBookings }; T3_VT.added = { en: V4_TEXT.en.added, fr: V4_TEXT.fr.added }; }
-  var v4 = { confirmed: false, open: {}, saved: false, ask: false, restoreConfirm: false };
+  var v4 = { confirmed: false, open: {}, saved: false, ask: false, restoreConfirm: false, gone: {} };
   // EN / FR (round 1, 2026-11-21: the switch did nothing on /trip): /trip and /fr/trip are twins with no hreflang (a /trip
   // link with a plan is noindex), so app.js's setLanguage opens the other one through data-twin-path, with the address
   // bar's plan (request, edits, dates, guests, confirmed) in the query. The same plan, in the other language.
@@ -232,9 +234,12 @@ const V4_CLIENT_SRC = String.raw`
     if (/dog/.test(party)) want.dog_friendly = 1;
     if (/kid/.test(party)) want.kid_friendly = 1;
     ((p.intent && p.intent.features) || []).forEach(function(f){ want[f] = 1; });
-    return (v.badges || []).filter(function(b){ return b && want[b.key]; }).slice(0, 2).map(function(b){
+    var out = (v.badges || []).filter(function(b){ return b && want[b.key]; }).slice(0, 2).map(function(b){
       return b.key === 'dog_friendly' && v.dogsPatioOnly ? (lang() === 'fr' ? 'Chiens sur la terrasse' : 'Dogs on patio') : frLabel(BADGE_KEYS[b.key], b.label);
     });
+    // Round 2 (2026-11-21): a walk, park or beach on the official dog list says so on a dog trip, like a patio does.
+    if (want.dog_friendly && !(v.badges || []).some(function(b){ return b && b.key === 'dog_friendly'; }) && (v.collections || []).some(function(c){ return c && c.key === 'dog_friendly'; })) out.unshift(vt('dogsOk'));
+    return out.slice(0, 2);
   }
   function v4Line(s){ return [v4Kind(s), v4Price(s.venue)].concat(v4Badges(s.venue)).filter(Boolean).join(' · '); }
   function v4Thumb(v){
@@ -291,11 +296,16 @@ const V4_CLIENT_SRC = String.raw`
       return '';
     }
     var v = s.venue, id = key || ('s' + v.id), did = 'v4d-' + esc(id);
+    // Round 2 (2026-11-21: an evening out or a day of parts had Swap only): a stop with no day slot is removed here, with Undo.
+    if (!key && v4.gone[v.id]) {
+      return '<li class="v4-stop v4-gone"><div class="v4-row">' + v4Thumb(null) + '<div class="v4-main"><span class="v4-time">' + esc(vt('removed')) + '</span><span class="v4-name">' + esc(v.name) + '</span></div>'
+        + '<div class="v4-acts"><button type="button" class="v4-text" data-v4-undo-id="' + esc(v.id) + '">' + esc(vt('undo')) + '</button></div></div></li>';
+    }
     var html = '<li class="v4-stop" data-venue-id="' + esc(v.id) + '"><div class="v4-row">' + v4Thumb(v)
       + '<button type="button" class="v4-main" aria-expanded="' + (v4.open[id] ? 'true' : 'false') + '" aria-controls="' + did + '" data-v4-toggle="' + did + '" data-v4-id="' + esc(id) + '"><span class="v4-time">' + esc(v4Start(s, key)) + '</span><span class="v4-name">' + esc(v.name) + '</span><span class="v4-line">' + esc(v4Line(s)) + '</span></button>'
       + '<div class="v4-acts">'
       + (key ? (s.noSwap ? '' : '<button type="button" class="v4-icon" data-t3-swap="' + esc(key) + '" aria-label="' + esc(vt('swap', { name: v.name })) + '" title="' + esc(vt('swap', { name: v.name })) + '">⇄</button>') + '<button type="button" class="v4-icon" data-t3-remove="' + esc(key) + '" aria-label="' + esc(vt('remove', { name: v.name })) + '" title="' + esc(vt('remove', { name: v.name })) + '">✕</button>'
-        : '<button type="button" class="v4-icon" data-t3-swap-id="' + esc(v.id) + '" aria-label="' + esc(vt('swap', { name: v.name })) + '" title="' + esc(vt('swap', { name: v.name })) + '">⇄</button>')
+        : '<button type="button" class="v4-icon" data-t3-swap-id="' + esc(v.id) + '" aria-label="' + esc(vt('swap', { name: v.name })) + '" title="' + esc(vt('swap', { name: v.name })) + '">⇄</button><button type="button" class="v4-icon" data-v4-remove-id="' + esc(v.id) + '" aria-label="' + esc(vt('remove', { name: v.name })) + '" title="' + esc(vt('remove', { name: v.name })) + '">✕</button>')
       + '</div></div>'
       + '<div class="v4-more" id="' + did + '"' + (v4.open[id] ? '' : ' hidden') + '>' + v4Details(s, id) + '</div>'
       + v4TripBtn(v, key) + '</li>';
@@ -305,7 +315,11 @@ const V4_CLIENT_SRC = String.raw`
     var html = '<ol class="v4-stops">', prev = null;
     stops.forEach(function(s){
       var key = keyFor ? keyFor(s) : null;
-      if (s.venue && prev && s.driveFrom && !(key && state.removed[key])) html += '<li class="v4-leg">' + esc(t3DriveText(s.driveFrom, lang())) + '</li>';
+      // Round 2 (2026-11-21): no "Drive from Whistler Blackcomb to Whistler" after a lunch on the hill or between two places
+      // in the same village (you ski down or walk).
+      var near = prev && prev.venue && typeof t3Km === 'function' ? t3Km(prev.venue, s.venue) : null;
+      var skiLeg = !!(prev && (prev.skiDay || prev.onHill)) || !!(s.skiDay || s.onHill);
+      if (s.venue && prev && s.driveFrom && !(key && state.removed[key]) && !skiLeg && !(near !== null && near < 2.5)) html += '<li class="v4-leg">' + esc(t3DriveText(s.driveFrom, lang())) + '</li>';
       html += v4StopHtml(s, key, counts);
       if (s.venue && !(key && state.removed[key])) prev = s;
     });
@@ -320,7 +334,7 @@ const V4_CLIENT_SRC = String.raw`
   function v4Count(p){
     var n = 0;
     (p.days || []).forEach(function(d){ d.stops.forEach(function(s){ if ((s.venue || (s.kind === 'event' && s.event)) && !state.removed[d.day + '-' + s.daypart]) n++; }); });
-    ((p.outing && p.outing.stops) || (p.itinerary && p.itinerary.stops) || []).forEach(function(s){ if (s.venue || s.event) n++; });
+    ((p.outing && p.outing.stops) || (p.itinerary && p.itinerary.stops) || []).forEach(function(s){ if ((s.venue && !v4.gone[s.venue.id]) || s.event) n++; });
     return n;
   }
   // ---- booking: the same steps as the stays box ("Book my trip"), in a sheet ----
@@ -345,6 +359,12 @@ const V4_CLIENT_SRC = String.raw`
       if (['restaurant', 'pub'].indexOf(s.venue.type) === -1 || !(['evening', 'night'].indexOf(s.daypart) !== -1 || /dinner|supper/i.test(s.label || ''))) return;
       seen[s.venue.id] = 1; out.push({ s: s, day: d.day });
     }); });
+    // Round 2 (2026-11-21: a date night's dinner was not in "Book my trip"): an evening out's or a day of parts' restaurant.
+    var p = state.last || {};
+    ((p.outing && p.outing.stops) || (p.itinerary && p.itinerary.stops) || []).forEach(function(s){
+      if (!s.venue || v4.gone[s.venue.id] || ids[s.venue.id] || seen[s.venue.id] || s.venue.type !== 'restaurant') return;
+      seen[s.venue.id] = 1; out.push({ s: s, day: 0 });
+    });
     return out;
   }
   function v4BookCardHtml(){
@@ -383,7 +403,7 @@ const V4_CLIENT_SRC = String.raw`
     if (reserve.length) html += '<p class="v4-sheet-h4">' + esc(vt('reserve')) + '</p><ol class="v4-check">' + reserve.map(function(r){
       var u = placeUrl(r.s.venue), tel = v4Tel(r.s.venue.phone);
       // Round 1 (2026-11-21): a Call link straight from the sheet when the place lists a phone, else its page.
-      return '<li><span aria-hidden="true" style="text-align:center">☎</span><span class="v4-check-name">' + esc(r.s.venue.name) + '<small>' + esc(vt('day') + ' ' + r.day + ' · ' + (tel ? vt('byPhone') + ' · ' + r.s.venue.phone : vt('noOnline'))) + '</small></span>'
+      return '<li><span aria-hidden="true" style="text-align:center">☎</span><span class="v4-check-name">' + esc(r.s.venue.name) + '<small>' + esc((r.day ? vt('day') + ' ' + r.day + ' · ' : '') + (tel ? vt('byPhone') + ' · ' + r.s.venue.phone : vt('noOnline'))) + '</small></span>'
         + (tel ? '<a class="v4-call" href="' + esc(tel) + '" data-track="booking" data-venue-id="' + esc(r.s.venue.id) + '">' + esc(vt('call')) + '</a>' : u ? '<a ' + hrefAttr(u) + '>' + esc(vt('contact')) + '</a>' : '<span></span>') + '</li>';
     }).join('') + '</ol>';
     if (typeof t3ViatorBlockHtml === 'function') html += t3ViatorBlockHtml(fr, true);
@@ -499,9 +519,12 @@ const V4_CLIENT_SRC = String.raw`
     var main = v4Main(), bar = document.getElementById('v4Bar');
     if (!main || !main.classList.contains('has-plan')) return;
     if (!bar) { bar = document.createElement('div'); bar.id = 'v4Bar'; bar.className = 'v4-bar'; bar.setAttribute('role', 'region'); main.appendChild(bar); }
+    var canBookNow = v4CanBook();
+    // Round 2: Save says Saved when every stop of this plan is already in My Trip (after a reload too).
+    try { if (!v4.saved && addState().state === 'added') v4.saved = true; } catch (err) {}
     bar.setAttribute('aria-label', v4.confirmed ? vt('book') : vt('confirm'));
     bar.innerHTML = v4BarHtml();
-    var tip = resultEl.querySelector('.v4-tip'); if (tip) tip.textContent = v4.confirmed ? vt('tipDone') : vt('tip');
+    var tip = resultEl.querySelector('.v4-tip'); if (tip) tip.textContent = v4.confirmed ? (canBookNow ? vt('tipDone') : vt('tipNoBook')) : vt('tip');
     var plan = resultEl.querySelector('.v4'); if (plan) plan.classList.toggle('v4-confirmed', v4.confirmed);
     document.body.style.paddingBottom = bar.offsetHeight ? bar.offsetHeight + 'px' : '';
   }
@@ -517,7 +540,7 @@ const V4_CLIENT_SRC = String.raw`
     var html = '<div class="t3-plan v4' + (v4.confirmed ? ' v4-confirmed' : '') + '"><header class="v4-head"><h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(p.headline || p.summary || vt('yourPlan')) + '</h2>'
       + '<p class="v4-sub">' + esc(sub) + '</p><button type="button" class="v4-edit" data-v4-edit>✎ ' + esc(vt('edit')) + '</button></header>'
       + (p.eventAmbiguity ? '<section class="t3-warnings" role="alert"><p>' + esc(fr ? 'Plusieurs événements correspondent à «' + p.eventAmbiguity.phrase + '». Choisissez :' : 'More than one listed event matches “' + p.eventAmbiguity.phrase + '”. Choose one:') + '</p><div class="t3-event-choices">' + p.eventAmbiguity.candidates.map(function(name, i){ var cid = p.eventAmbiguity.candidateIds && p.eventAmbiguity.candidateIds[i]; return Number.isSafeInteger(cid) && cid > 0 ? '<button type="button" class="t3-btn t3-btn-ghost" data-t3-event-choice="' + cid + '">' + esc(name) + '</button>' : ''; }).join('') + '</div></section>' : '')
-      + '<p class="v4-tip">' + esc(v4.confirmed ? vt('tipDone') : vt('tip')) + '</p>'
+      + '<p class="v4-tip">' + esc(v4.confirmed ? (v4CanBook() ? vt('tipDone') : vt('tipNoBook')) : vt('tip')) + '</p>'
       + '<p class="t3-plan-status" id="t3PlanStatus" role="status" aria-live="polite"></p><div class="v4-days">';
     if (planKinds) {
       (p.days || []).forEach(function(d){
@@ -544,10 +567,15 @@ const V4_CLIENT_SRC = String.raw`
     if (window.__syncTripButtons) window.__syncTripButtons();
     v4UpdateBar();
     if (focus) {
-      var siteHead = document.querySelector('header#top');
-      var headH = siteHead && getComputedStyle(siteHead).position === 'sticky' ? siteHead.getBoundingClientRect().height : 0;
-      var top = resultEl.getBoundingClientRect().top + (window.pageYOffset || 0) - headH - 8;
-      try { window.scrollTo({ top: Math.max(0, top), behavior: 'auto' }); } catch (e) { window.scrollTo(0, Math.max(0, top)); }
+      var toTop = function(){
+        var siteHead = document.querySelector('header#top');
+        var headH = siteHead && getComputedStyle(siteHead).position === 'sticky' ? siteHead.getBoundingClientRect().height : 0;
+        var top = resultEl.getBoundingClientRect().top + (window.pageYOffset || 0) - headH - 8;
+        try { window.scrollTo({ top: Math.max(0, top), behavior: 'auto' }); } catch (e) { window.scrollTo(0, Math.max(0, top)); }
+      };
+      toTop();
+      // Round 2 (2026-11-21): again once the hidden hero and photos have settled, so the title is in view.
+      if (window.requestAnimationFrame) requestAnimationFrame(function(){ requestAnimationFrame(toTop); });
       var t = document.getElementById('t3Headline'); if (t) { try { t.focus({ preventScroll: true }); } catch (e) { t.focus(); } }
     }
   }
@@ -571,8 +599,11 @@ const V4_CLIENT_SRC = String.raw`
       var c = resultEl.querySelector('.v4-confirm'); if (c) c.parentNode.removeChild(c);
       v4UpdateBar(); syncUrl();
       var bk = document.querySelector('#v4Bar [data-v4-book], #v4Bar [data-v4-share]'); if (bk) { try { bk.focus({ preventScroll: true }); } catch (err) {} }
+      var hd = document.getElementById('t3Headline'); if (hd && hd.getBoundingClientRect().top < 0) { try { hd.scrollIntoView({ block: 'center' }); } catch (err) {} }
       return;
     }
+    if ((b = t.closest('[data-v4-remove-id]')) && resultEl.contains(b)) { v4.gone[b.getAttribute('data-v4-remove-id')] = 1; v4.saved = false; render(false); return; }
+    if ((b = t.closest('[data-v4-undo-id]')) && resultEl.contains(b)) { delete v4.gone[b.getAttribute('data-v4-undo-id')]; render(false); return; }
     if ((b = t.closest('[data-v4-unconfirm]'))) { v4.confirmed = false; v4.ask = false; render(false); syncUrl(); return; }
     if ((b = t.closest('[data-v4-book]'))) { v4OpenSheet(); return; }
     if ((b = t.closest('[data-v4-close]'))) { var dlg = document.getElementById('v4Sheet'); if (dlg) { if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); } return; }

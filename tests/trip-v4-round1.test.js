@@ -73,3 +73,34 @@ test('V4 page: Share lists every stop with its time (no "+2 more"), Save asks be
   assert.equal(scripts.length, 1);
   assert.doesNotThrow(() => new Function(scripts[0])); // eslint-disable-line no-new-func
 });
+
+// ---- Round 2 (2026-11-21): dog owners, older parents, date night, budget backpacker, Whistler après ----
+test('V4 round 2 server: plain words, one stop per part of the day, the typed length wins, the phone menu reaches EN / FR', () => {
+  const src = require('node:fs').readFileSync(require.resolve('../server.js'), 'utf8');
+  const body = /function v4PlainText\(text\) \{[\s\S]*?\n\}/.exec(src)[0];
+  const v4PlainText = new Function(`${body}; return v4PlainText;`)(); // eslint-disable-line no-new-func
+  assert.equal(v4PlainText('a day in Vernon, easy flat walks and a nice lunch'), 'a day in Vernon, easy walks and a nice lunch');
+  assert.equal(v4PlainText('a gentle day in Vernon'), 'a relaxed day in Vernon');
+  assert.equal(v4PlainText('cocktails, a great dinner, then dessert'), 'cocktails, a great dinner, then a dessert cafe');
+  assert.equal(v4PlainText('then a dessert spot'), 'then a dessert spot', 'already a place');
+  assert.equal(v4PlainText('3 days in Kelowna, wineries'), '3 days in Kelowna, wineries');
+  const tidyBody = /function v4TidyDays\(plan\) \{[\s\S]*?\n\}/.exec(src)[0];
+  const v4TidyDays = new Function(`${tidyBody}; return v4TidyDays;`)(); // eslint-disable-line no-new-func
+  const st = (id, part, type) => ({ daypart: part, venue: { id, type } });
+  const plan = { kind: 'multi_day', days: [{ day: 1, stops: [st(1, 'morning', 'restaurant'), st(2, 'midday', 'restaurant'), st(3, 'afternoon', 'restaurant'), st(4, 'midday', 'outdoor'), st(5, 'late', 'outdoor'), st(6, 'evening', 'restaurant')] }], schedule: [1, 2, 3, 4, 5, 6].map((id) => ({ day: 1, venueId: id })) };
+  v4TidyDays(plan);
+  assert.deepEqual(plan.days[0].stops.map((s) => s.venue.id), [1, 2, 5, 6], 'no repeated part of the day, no third sit-down meal in the afternoon');
+  assert.deepEqual(plan.schedule.map((r) => r.venueId), [1, 2, 5, 6]);
+  assert.ok(/const typedDays = !!\(args\.v4 && plan && plan\.intent && Number\.isInteger\(plan\.intent\.days\)/.test(src), '"3 days" with 3 nights of dates stays 3 days');
+  assert.ok(src.includes("(links.contains(t) || (burger && burger.contains(t)) || t.id === 'langToggle')"), 'the phone menu no longer swallows its own EN / FR press');
+});
+
+test('V4 round 2 page: Remove on an evening out, dinner in Book, dog walks say dogs allowed, no Book promise with nothing to book', () => {
+  const src = v4page.V4_CLIENT_SRC;
+  assert.ok(/data-v4-remove-id="/.test(src) && /data-v4-undo-id="/.test(src), 'Remove and Undo with no day slot');
+  assert.ok(/\(p\.outing && p\.outing\.stops\) \|\| \(p\.itinerary && p\.itinerary\.stops\)/.test(src) && /s\.venue\.type !== 'restaurant'/.test(src), 'an evening out\'s restaurant is in the sheet');
+  assert.ok(/dogsOk: 'Dogs allowed'/.test(src) && /dogsOk: 'Chiens admis'/.test(src));
+  assert.ok(/tipNoBook: 'Plan confirmed\. Share it with your group or save it\.'/.test(src) && /tipNoBook: 'Plan confirmé\./.test(src));
+  assert.ok(/skiLeg/.test(src) && /near < 2\.5/.test(src), 'no drive line inside a ski day or a village');
+  assert.ok(/addState\(\)\.state === 'added'/.test(src), 'Saved stays Saved after a reload');
+});

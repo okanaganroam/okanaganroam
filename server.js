@@ -7762,7 +7762,9 @@ function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
   if (stay && stay.dog && typeof base.text === 'string' && !TRIP_DOG_WORDS_RE.test(base.text) && base.text.trim().length + 13 <= discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) base.text = `${base.text.trim()} with our dog`;
   if (stay && stay.arrive && !(base.overrides && base.overrides.startDate)) base.overrides = { ...(base.overrides || {}), startDate: stay.arrive };
   let plan = run(base, now);
-  if (stay && stay.arrive && stay.leave && plan && ['multi_day', 'day_plan'].includes(plan.kind) && !(base.overrides && base.overrides.days !== undefined)) {
+  // V4 (round 2, 2026-11-21: "3 days" with Aug 10-13 became a 4-day plan): a length the request names wins over the dates.
+  const typedDays = !!(args.v4 && plan && plan.intent && Number.isInteger(plan.intent.days) && plan.intent.days > 0);
+  if (stay && stay.arrive && stay.leave && plan && !typedDays && ['multi_day', 'day_plan'].includes(plan.kind) && !(base.overrides && base.overrides.days !== undefined)) {
     const want = Math.min(7, tripStays.daysBetween(stay.arrive, stay.leave) + 1);
     if (want !== ((plan.days || []).length || 1)) {
       try { const longer = run({ ...base, overrides: { ...(base.overrides || {}), days: want } }, now); if (longer && ['multi_day', 'day_plan'].includes(longer.kind)) plan = longer; } catch (e) { /* keep the plan as asked */ }
@@ -8082,9 +8084,50 @@ const TRIP_SKI_HILL_BASE = TRIP_SITE.skiHillBase;
 //  - each stop carries its listed phone, for the Book sheet's Call link on a meal booked by phone.
 const V4_NOT_RUSHED_RE = /\b(?:(?:nothing|not|nothing too|not too|never|don'?t want to be|don.t want to feel)\s+(?:too\s+)?rushed|no rush(?:ing)?|unrushed|no hurry|in no hurry|at our own pace|take (?:our|my) time|pas (?:trop )?press[ée]s?|sans (?:se )?presser|sans rush|pas de rush|prendre (?:notre|mon) temps|[àa] notre rythme)\b/i;
 const V4_WHEN_DAYS = { 'this-weekend': 2, 'next-weekend': 2, weekend: 2, today: 1, tomorrow: 1 };
+// Round 2 (2026-11-21): words the planner missed. "easy flat walks" lost the walk ("flat" is not a kind of place); "then
+// dessert" after dinner had no stop (a dessert café is one).
+function v4PlainText(text) {
+  if (typeof text !== 'string') return text;
+  return text
+    .replace(/\bgentle\s+(day|days|pace|trip|outing|weekend)\b/gi, 'relaxed $1')
+    .replace(/\b(?:easy\s+)?flat\s+(?:and\s+easy\s+)?(walks?|paths?|trails?|strolls?)\b/gi, 'easy $1')
+    .replace(/\b(walks?|paths?|trails?|strolls?)\s+(?:that are|that's|on)\s+flat(?:\s+ground)?\b/gi, 'easy $1')
+    .replace(/\b((?:then|and then|and|after(?:wards)?,?)\s+)(?:a\s+|some\s+)?desserts?\b(?!\s+(?:cafe|café|spot|place|shop|bar))/gi, '$1a dessert cafe')
+    .replace(/\b(puis|et ensuite|et)\s+(?:un\s+)?dessert\b(?!\s+(?:au|dans))/gi, '$1 un café dessert');
+}
+// Round 2 (2026-11-21: "3 days, cheap food" planned four restaurants a day and two stops in one part of the day, so
+// Remove took out two stops and a Swap reshuffled every day): one stop per part of the day (a filled gap that lands on
+// a taken part is dropped, its time stays free), and no third sit-down meal in the afternoon once the day has lunch and
+// dinner. The schedule rows of a dropped stop go too.
+function v4TidyDays(plan) {
+  if (!plan || !['multi_day', 'day_plan'].includes(plan.kind)) return;
+  const meal = (s) => s && s.venue && s.venue.type === 'restaurant';
+  for (const day of plan.days || []) {
+    const stops = day.stops || [];
+    const keep = [];
+    const seen = new Map();
+    for (const st of stops) {
+      if (!st || !(st.venue || st.event)) { keep.push(st); continue; }
+      const at = seen.get(st.daypart);
+      if (at === undefined) { seen.set(st.daypart, keep.length); keep.push(st); continue; }
+      const first = keep[at];
+      if (meal(st) && !meal(first) && ['midday', 'evening'].includes(st.daypart)) { keep[at] = st; continue; }
+      // the later copy of a taken part of the day is left out
+    }
+    const has = (part) => keep.some((x) => x && meal(x) && x.daypart === part);
+    const out = has('midday') && has('evening') ? keep.filter((x) => !(x && meal(x) && ['afternoon', 'late'].includes(x.daypart) && !x.event && !x.wineryLunch)) : keep;
+    if (out.length !== stops.length) {
+      const ids = new Set(out.filter((x) => x && x.venue).map((x) => x.venue.id));
+      const gone = stops.filter((x) => x && x.venue && !ids.has(x.venue.id)).map((x) => x.venue.id);
+      day.stops = out;
+      if (Array.isArray(plan.schedule)) plan.schedule = plan.schedule.filter((r) => !(r && r.day === day.day && gone.includes(r.venueId)));
+    }
+  }
+}
 function runTripPlan(args, now = new Date()) {
   if (!args || !args.v4) return runTripPlanBase(args, now);
   let a = args;
+  if (typeof a.text === 'string') { const plain = v4PlainText(a.text); if (plain !== a.text) a = { ...a, text: plain }; }
   if (typeof a.text === 'string' && V4_NOT_RUSHED_RE.test(a.text) && !(a.overrides && a.overrides.pace)) a = { ...a, overrides: { ...(a.overrides || {}), pace: 'relaxed' } };
   let plan = runTripPlanBase(a, now);
   try {
@@ -8096,6 +8139,7 @@ function runTripPlan(args, now = new Date()) {
       if (longer && ['multi_day', 'day_plan'].includes(longer.kind) && (longer.days || []).length) plan = longer;
     }
   } catch (e) { /* keep the list */ }
+  try { v4TidyDays(plan); } catch (e) { /* keep the plan as planned */ }
   try { v4AddStopPhones(plan); } catch (e) { /* phones are a convenience */ }
   return plan;
 }
@@ -18629,7 +18673,9 @@ button.nav-link-label { background: none; border: 0; margin: 0; padding: 0; font
       document.addEventListener('click', function(e){
         if (!links.classList.contains('open') || (phoneMq && !phoneMq.matches)) return;
         var t = e.target;
-        if (t && t.nodeType === 1 && (links.contains(t) || (burger && burger.contains(t)))) return;
+        // The menu's EN / FR buttons press the header's hidden #langToggle (round 1 of the Build My Trip V4 tests, 2026-11-21:
+        // on phones that press counted as a tap outside the menu, so it was swallowed and the language never changed).
+        if (t && t.nodeType === 1 && (links.contains(t) || (burger && burger.contains(t)) || t.id === 'langToggle')) return;
         e.preventDefault(); e.stopPropagation();
         links.classList.remove('open');
         if (burger) { burger.setAttribute('aria-expanded', 'false'); focusEl(burger); }
