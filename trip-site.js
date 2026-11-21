@@ -163,6 +163,20 @@ module.exports = {
     },
   },
 
+  // Viator (2026-11-20, viator.js): the affiliate campaign tag, the Viator destinations the match script looks up (by
+  // name, under British Columbia) and which one each of our towns uses for Build My Trip suggestions (else `area`), and
+  // the activity interests Build My Trip may suggest Viator tours for (keys of viator.js INTERESTS).
+  viator: {
+    campaign: 'okanagan',
+    province: 'British Columbia',
+    // Viator has one destination for the whole valley (checked against /destinations 2026-11-20: d22366
+    // "Kelowna & Okanagan Valley", a CITY under British Columbia d261), so every town uses it.
+    area: 'Kelowna & Okanagan Valley',
+    destinationNames: ['Kelowna & Okanagan Valley'],
+    regionDestinations: {},
+    interests: ['wine_tour', 'food_tour', 'boat', 'zipline', 'paddle', 'bike_tour', 'ski_lesson', 'tour'],
+  },
+
   // French requests: place words the interpreter turns into English.
   frenchRequests: { regions: { 'kelowna ouest': 'west kelowna', 'ouest de kelowna': 'west kelowna', 'chutes okanagan': 'okanagan falls' },
     // Tour test 11 port (2026-11-18): « canyon Myra » (the day trips' Myra Canyon), like Whistler's « lacs Joffre ».

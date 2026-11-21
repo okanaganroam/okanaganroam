@@ -47,6 +47,8 @@ const placesToStay = require('./places-to-stay');
 const tripStays = require('./trip-stays');
 const stayBookingLinks = require('./stay-booking-links');
 const tripBooking = require('./trip-booking');
+// Viator tours (2026-11-20, viator.js): off unless VIATOR_API_KEY and VIATOR_PARTNER_ID are both set.
+const viator = require('./viator');
 const gscReport = require('./gsc-report');
 // What is clickable on one business or event page (2026-11-05): read from the page itself, so each sheet shows that page's
 // own buttons and links. The server asks its own public page (no scripts run, so nothing is counted); kept 10 minutes.
@@ -7751,9 +7753,9 @@ function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
       try { const longer = run({ ...base, overrides: { ...(base.overrides || {}), days: want } }, now); if (longer && ['multi_day', 'day_plan'].includes(longer.kind)) plan = longer; } catch (e) { /* keep the plan as asked */ }
     }
   }
-  return withTripStays(plan, stay, now);
+  return withTripStays(plan, stay, now, args.text);
 }
-function withTripStays(plan, stay, now = new Date()) {
+function withTripStays(plan, stay, now = new Date(), text = '') {
   if (!plan || typeof plan !== 'object') return plan;
   try {
     const candidates = tripStayCandidates();
@@ -7767,6 +7769,14 @@ function withTripStays(plan, stay, now = new Date()) {
       // "Book your trip" (2026-11-20, trip-booking.js): the estimated total and the "Book my trip" steps, per stay card.
       block = tripBooking.withTripBooking(block, plan);
       plan.whereToStay = block;
+    }
+    // Viator (2026-11-20, viator.js): which activities the visitor asked for that no planned stop can book (a wine tour,
+    // a zipline...), for up to 2 suggestion cards the page loads from /api/trip/viator. Added after planning: it never
+    // changes the stops or their order. Only with VIATOR_API_KEY and VIATOR_PARTNER_ID set.
+    if (viator.enabled()) {
+      const bookable = new Set(((block && block.checklist) || tripBookingChecklist(plan)).map((c) => c.venueId));
+      const hint = viator.tripHint(plan, text, bookable);
+      if (hint) plan.viator = hint;
     }
   } catch (e) { console.error(`[trip] where to stay: ${e.message}`); }
   return plan;
@@ -7792,9 +7802,11 @@ function tripBookingChecklist(plan) {
       // The same rule as the venue page: a booking link that is just the website is not a booking page.
       const url = /^https:\/\/[^\s"'<>]+$/i.test(own) && !(v.website && key(own) === key(v.website)) ? own
         : /^https:\/\/[^\s"'<>]+$/i.test(String(visit.booking_url || '').trim()) ? String(visit.booking_url).trim() : null;
-      if (!url) continue;
-      const [en, fr] = url === own ? indoorBookButton(v, own) : [visit.booking_label || VISIT_BOOK_LABELS[v.type] || 'Book', visitBookLabelFr(visit, v.type)];
-      out.push({ venueId: id, name: v.name, url, label: en, labelFr: fr });
+      // Viator (2026-11-20, owner decision): a venue with an approved Viator match books through Viator (its own link or
+      // not); viator.checklistItem leaves every other venue as it was.
+      if (!url && !viator.venueBooking(id)) continue;
+      const [en, fr] = !url ? ['', ''] : url === own ? indoorBookButton(v, own) : [visit.booking_label || VISIT_BOOK_LABELS[v.type] || 'Book', visitBookLabelFr(visit, v.type)];
+      out.push(viator.checklistItem({ venueId: id, name: v.name, url, label: en, labelFr: fr }));
     } catch (e) { /* skip this stop */ }
   }
   return out;
@@ -21543,6 +21555,8 @@ ${golfFavTripScriptBody(type)}
 // outbound_click reporting, but NOT the Favorite / Add to Trip module --
 // their pages have no such controls, so there is nothing else to report.
 function golfVenueEngagementScriptHtml(venue) {
+  // Viator (2026-11-20): the "viator" click key only on a page that has a Viator button (others are unchanged).
+  const viatorPage = !!(venue && !venue.redirect_to && viator.venueBooking(venue.id));
   const favTrip = venuePageUsesEngagement(venue.type);
   const pageCtx = JSON.stringify({
     venue_id: venue.id,
@@ -21564,7 +21578,7 @@ function golfVenueEngagementScriptHtml(venue) {
     params.link_type = link.getAttribute('data-track');
     track('outbound_click', params);
   });
-  ${clickLabels.clientClassifierJs()}
+  ${clickLabels.clientClassifierJs(viatorPage ? { viator: true } : {})}
   document.addEventListener('click', function(e){
     try {
       var el = e.target && e.target.closest ? e.target.closest('a,button,summary,[data-vg-open]') : null;
@@ -42237,7 +42251,22 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   venue = venueSeasonStory(venue);
   const cv = !!venue && venueBadgeState(venue, opts.now || new Date()) === 'earned';
   const html = renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages, cv ? { ...opts, completeVerified: true } : opts);
-  return cv && typeof html === 'string' ? stripVerifiedRepeats(html) : html;
+  // Viator (2026-11-20, owner decision): for a match Dayton approved (data/viator-matches.json), with VIATOR_API_KEY +
+  // VIATOR_PARTNER_ID set, the commission line and "or book direct with <name>" go under the "Book on Viator" button.
+  // Every other page is unchanged.
+  const out = cv && typeof html === 'string' ? stripVerifiedRepeats(html) : html;
+  return venue && !venue.redirect_to && viator.venueBooking(venue.id) ? viator.withVenueLink(out, venue, opts.lang, { direct: venueOwnBooking(venue) }) : out;
+}
+// The venue's own booking link, by the venue page's rule: venue_links.booking_url unless it is just the website, else the
+// Plan your visit box's booking link. -> { url, name } or null.
+function venueOwnBooking(venue) {
+  const key = (u) => String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#]+$/, '');
+  try {
+    const own = String((venueLinks(venue.id) || {}).booking_url || '').trim();
+    if (/^https?:\/\/[^\s"'<>]+$/i.test(own) && !(venue.website && key(own) === key(venue.website))) return { url: own, name: venue.name };
+    const vi = String((venueVisitInfo(venue.id) || {}).booking_url || '').trim();
+    return /^https?:\/\/[^\s"'<>]+$/i.test(vi) ? { url: vi, name: venue.name } : null;
+  } catch (e) { return null; }
 }
 function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages, opts = {}) {
   // French twin (2026-10-13): opts.lang 'fr' renders /fr/... in French; L(en, fr) picks the page's wording.
@@ -42801,6 +42830,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
 
   // CTA buttons — only ever rendered when the underlying data already
   // exists; nothing here fabricates a website, phone number, or address.
+  const viatorBook = venue.redirect_to ? null : viator.venueBooking(venue.id);
   const ctaEntries = [
     // Phone visitors (2026-10-20): Directions is the main button (what someone on the move wants, and it keeps them
     // with us afterwards), and Website is a plain button marked as opening elsewhere. With no address, Website stays
@@ -42808,7 +42838,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     mapsUrl ? `<a class="cta" href="${builtInDirections || mapsUrl}" ${builtInDirections ? 'data-roam-directions' : 'rel="nofollow noopener" target="_blank"'}${trackAttr('directions')}>${pickupOffice ? (builtInDirections ? L('Directions to the office', 'Itin\u00e9raire vers le bureau') : L('Office in Google Maps', 'Bureau dans Google Maps')) : builtInDirections ? L('Get Directions', 'Itin\u00e9raire') : L('Open in Google Maps','Ouvrir dans Google Maps')}</a>` : null,
     // Brewery test 2 (2026-11-13): a website that is the same Facebook page as the Facebook link shows once, as Facebook.
     venue.website && !websiteIsFacebookLink(venue.website, venueLinkRow.facebook_url) && !websiteIsInstagramLink(venue.website, venueLinkRow.instagram_url) ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${mapsUrl ? L('Website \u2197', 'Site Web \u2197') : L('Visit Website', 'Visiter le site Web')}</a>` : null,
-    venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(L(...indoorBookButton(venue, venueLinkRow.booking_url)))}</a>`
+    // Viator (2026-11-20, owner decision): a venue with an approved Viator match has "Book on Viator" as its Book button
+    // (its own booking link moves to a smaller "or book direct" line under it: renderVenuePage, viator.withVenueLink).
+    viatorBook ? viator.bookButtonHtml(viatorBook.url, fr ? 'fr' : 'en')
+      : venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(L(...indoorBookButton(venue, venueLinkRow.booking_url)))}</a>`
       // A winery's tasting booking page from its Plan your visit box (2026-10-29), when it has no booking link of its own.
       : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(fr ? visitBookLabelFr(visitInfo, venue.type) : (visitInfo.booking_label || VISIT_BOOK_LABELS[venue.type] || 'Book'))}</a>` : null,
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
@@ -45857,7 +45890,7 @@ function tripSamplePlan(now = Date.now()) {
 // ?region= from the town pages, campaign tags) is noindex, follow and canonical to /trip, so no new indexable page.
 const TRIP_PAGE_TITLE = 'Okanagan Trip Planner: Free Day-by-Day Itinerary | Okanagan Roam';
 const TRIP_PAGE_DESCRIPTION = 'Plan an Okanagan trip in one sentence: a free day-by-day itinerary for Kelowna, Penticton, Vernon and wine country, built from places open on your dates.';
-function renderTripPlannerV3Page({ preview = false, noindex = false, stays = null } = {}) {
+function renderTripPlannerV3Page({ preview = false, noindex = false, stays = null, viator: viatorOn = false } = {}) {
   if (!tripPlannerV3PageModule) return renderTripPlannerPage(isTripPlannerV2Enabled());
   const canonical = 'https://okanaganroam.com/trip';
   let tripTrayHtml = '';
@@ -45894,6 +45927,8 @@ function renderTripPlannerV3Page({ preview = false, noindex = false, stays = nul
     noindex,
     // Where to stay (2026-11-20): the Dates and Guests row, only with TRIP_STAYS or /trip?stays=1 ('preview').
     ...(stays ? { stays } : {}),
+    // Viator suggestions (2026-11-20): only with the stays box and Viator set up.
+    ...(stays && viatorOn ? { viator: true } : {}),
   }));
 }
 
@@ -63907,6 +63942,8 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
   </section>`).join('\n  ');
   const website = normalizeWebsiteUrl(venue.website);
   const booking = tours ? venueLinks(venue.id).booking_url || null : null; // "Book online" (tee times, tours, sessions)
+  // Viator (2026-11-20, owner decision): a matched venue's "Book online" goes to Viator, with the commission line.
+  const viatorMenuBook = tours ? viator.venueBooking(venue.id) : null;
   const page = `<!DOCTYPE html>
 <html lang="${lang}"${hasFrench ? ` data-page-lang="${lang}"` : ''}>
 <head>
@@ -63936,7 +63973,7 @@ ${VENUE_MENU_CSS}
     : `Dishes and prices can change. Check with ${escapeHtml(venue.name)} before you go, and confirm any allergies or dietary needs with them directly.`}</div>
   <p>
     <a class="vm-btn" href="${venuePagePath(venue, lang)}">${fr ? `Infos, heures et carte ${escapeHtml(frDe(venue.name))}` : `Hours, map and more for ${escapeHtml(venue.name)}`}</a>
-    ${booking ? `<a class="cta secondary" href="${escapeHtml(booking)}" rel="nofollow noopener" target="_blank" data-track="booking">${L('Book online', 'Réserver en ligne')} ↗</a>` : ''}
+    ${viatorMenuBook ? `${viator.bookButtonHtml(viatorMenuBook.url, lang)}<p class="vm-note" data-viator-disclosure>${escapeHtml(viator.DISCLOSURE[lang === 'fr' ? 'fr' : 'en'])}</p>` : booking ? `<a class="cta secondary" href="${escapeHtml(booking)}" rel="nofollow noopener" target="_blank" data-track="booking">${L('Book online', 'Réserver en ligne')} ↗</a>` : ''}
     ${venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}" data-track="phone">${L('Call', 'Appeler')} ${escapeHtml(venue.phone)}</a>` : ''}
     ${website ? `<a class="cta secondary" href="${escapeHtml(website)}" rel="nofollow noopener" target="_blank" data-track="website">${L('Website', 'Site Web')} ↗</a>` : ''}
   </p>
@@ -75266,6 +75303,21 @@ const server = http.createServer(async (req, res) => {
       } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
     }
 
+    // GET /api/trip/viator?i=wine_tour,zipline&r=kelowna&lang=fr (2026-11-20, viator.js): up to 2 Viator suggestion cards
+    // for Build My Trip, only with Viator set up (VIATOR_API_KEY + VIATOR_PARTNER_ID) and the stays box on (TRIP_STAYS or
+    // ?stays=1). Loaded by the page after the plan, so no Viator text is in any page's source (/api/ is robots-blocked).
+    // Answers are cached for 24 hours per destination, interest and language; a Viator error is just no cards.
+    if (pathname === '/api/trip/viator' && method === 'GET' && viator.enabled() && tripStaysEnabledFor(query)) {
+      const keys = String(query.i || '').split(',').map((k) => k.trim()).filter((k, n, a) => viator.siteInterests().includes(k) && a.indexOf(k) === n).slice(0, 2);
+      const region = String(query.r || '');
+      if (!keys.length || (region && !REGION_LABELS[region])) return sendJSON(res, 400, { error: 'i must name known interests and r a known town.' });
+      const lang = query.lang === 'fr' ? 'fr' : 'en';
+      const cards = await viator.tripCards(keys, region || null, lang);
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      return sendJSON(res, 200, { cards, disclosure: viator.DISCLOSURE[lang] });
+    }
+
     // GET /trip — Build My Trip, Stage 2. A fixed, exact path, registered
     // before the generic /:region catch-all below for the same reason
     // /events is (otherwise "trip" would be treated as an unrecognized
@@ -75287,7 +75339,7 @@ const server = http.createServer(async (req, res) => {
       const tripHasQuery = Object.keys(query || {}).length > 0;
       if (tripPlannerV3ActiveFor(req)) {
         const staysMode = isTripStaysEnabled() ? 'on' : tripStaysEnabledFor(query) ? 'preview' : null;
-        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview', noindex: tripHasQuery, stays: staysMode });
+        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview', noindex: tripHasQuery, stays: staysMode, ...(staysMode && viator.enabled() ? { viator: true } : {}) });
         // "See live prices" (2026-11-20): only this page, only with stays on and Stay22 set up, may frame Stay22's map.
         if (staysMode && placesToStay.affiliateConfig().provider === 'stay22') res.setHeader('Content-Security-Policy', TRIP_STAYS_CSP);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -78076,6 +78128,7 @@ module.exports = {
   parseTripPlanBody,
   runTripPlan, runTripPlanCore, ownerClosureCount,
   runTripPlanWithStay, withTripStays, tripStayCandidates, isTripStaysEnabled, tripStaysEnabledFor,
+  tripBookingChecklist,
   // Planner (2026-10-27): the happy hour crawl.
   tripHappyHourAsk,
   tripHappyHourChain,

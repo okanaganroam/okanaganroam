@@ -111,8 +111,10 @@ test('click items: keys are unique, lowercase, and each has a selector; the brow
   assert.equal(new Set(keys).size, keys.length);
   assert.ok(keys.every((k) => /^[a-z_]{1,32}$/.test(k)));
   assert.ok(labels.LABELS.every((l) => l.sel && l.pages.length));
-  const js = labels.clientClassifierJs();
+  const js = labels.clientClassifierJs({ viator: true });
   for (const k of keys) assert.ok(js.includes(`"${k}"`), k);
+  // Viator (2026-11-20): the "viator" key ships only on a page with a "Book on Viator" button.
+  assert.ok(!labels.clientClassifierJs().includes('"viator"'));
   // The fallbacks come last so a specific item always wins.
   assert.equal(keys.at(-1), 'other_button'); assert.equal(keys.at(-2), 'other_link');
 });

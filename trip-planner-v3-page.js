@@ -1317,6 +1317,136 @@ const T3_STAY_CLIENT_SRC = `
   });
 `;
 
+// Viator suggestions (2026-11-20, viator.js), only when the stays box is on AND Viator is set up (d.viator): the stays
+// script with four small hooks (Viator steps join "Book my trip" only after "Add to trip"; the commission line shows
+// with any Viator link; a Viator step counts as a booking tap), plus the cards. The cards load from /api/trip/viator
+// after the plan, so the page source never holds Viator content. Without d.viator the page is exactly as before.
+const T3_VIATOR_STYLES = `<style>
+  .t3-vt { margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid rgba(27,43,58,0.12); }
+  .t3-vt h4 { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; margin: 0 0 8px; font-size: 0.95rem; color: var(--ref-navy); }
+  .t3-vt-by { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: rgba(27,43,58,0.6); }
+  .t3-vt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .t3-vt-card { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: start; }
+  .t3-vt-ph { position: relative; margin: 0; }
+  .t3-vt-ph img { width: 96px; height: 72px; object-fit: cover; border-radius: 10px; display: block; background: rgba(27,43,58,0.08); }
+  .t3-vt-ph figcaption { margin: 2px 0 0; font-size: 0.66rem; color: rgba(27,43,58,0.6); }
+  .t3-vt-title { margin: 0; font-weight: 800; font-size: 0.92rem; line-height: 1.3; color: var(--ref-navy); }
+  .t3-vt-meta { margin: 2px 0 0; font-size: 0.8rem; font-weight: 700; color: rgba(27,43,58,0.72); }
+  .t3-vt-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 4px; }
+  .t3-vt-acts a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 800; font-size: 0.86rem; color: var(--ref-navy); }
+  .t3-vt-add[aria-pressed="true"] { text-decoration: none; }
+  .t3-vt-alone h3 { margin-bottom: 8px; }
+  .t3-vt-alone .t3-vt { margin: 0; padding: 0; border: 0; }
+</style>`;
+function t3ViatorStaySrc(staySrc) {
+  const swap = (from, to) => { if (!staySrc.includes(from)) throw new Error(`viator hook not found: ${from.slice(0, 60)}`); staySrc = staySrc.replace(from, to); };
+  swap("var steps = (s.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && t3StayExt(x.url); });",
+    "var steps = (s.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && t3StayExt(x.url); }).concat(t3ViatorSteps());");
+  swap("var key = t3BookKeyFor(s, d.w, steps);", "var key = t3BookKeyFor(s, d.w, steps.filter(function(x){ return x.kind !== 'viator'; }));");
+  swap("return d ? (d.chosen.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && t3StayExt(x.url); }) : []; }",
+    "return d ? (d.chosen.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && t3StayExt(x.url); }).concat(t3ViatorSteps()) : []; }");
+  // A Viator suggestion step, and a listed venue that books through Viator (its approved match): data-link="viator".
+  swap("var track = step.kind === 'stay' ?", "var track = step.kind === 'viator' ? ' data-track=\"booking\" data-link=\"viator\" data-viator-code=\"' + esc(step.id) + '\"' : step.link === 'viator' ? ' data-track=\"booking\" data-link=\"viator\" data-venue-id=\"' + esc(step.id) + '\"' : step.kind === 'stay' ?");
+  swap("(s.kind === 'venue' ? ' · ' + s.name : '')", "(s.kind !== 'stay' ? ' · ' + s.name : '')");
+  swap("var aff = (s.bookingLinks || [])", "var aff = t3ViatorShown() || (s.bookingLinks || [])");
+  swap("return html + t3StayDisclosureHtml(s, steps, fr) + '</section>';", "return html + t3ViatorBlockHtml(fr, true) + t3StayDisclosureHtml(s, steps, fr) + '</section>';");
+  return staySrc;
+}
+function t3ViatorClientSrc(d) {
+  return `
+  var T3_VT = ${JSON.stringify(require('./viator').TEXT)};
+  var T3_VT_QS = ${JSON.stringify(d.stays === 'preview' ? '&stays=1' : '')};` + String.raw`
+  var vtState = { key: '', cards: null, loading: false };
+  function t3ViatorHint(){ var p = state.last; return p && p.viator && p.viator.interests && p.viator.interests.length ? p.viator : null; }
+  function t3VtText(k, fr){ return (T3_VT[k] || {})[fr ? 'fr' : 'en'] || ''; }
+  // The cards for this plan and language: null while they load (nothing shows), [] when Viator has none.
+  function t3ViatorCards(){
+    var h = t3ViatorHint();
+    if (!h) return null;
+    var fr = lang() === 'fr';
+    var key = h.interests.map(function(x){ return x.key; }).join(',') + '|' + (h.region || '') + '|' + (fr ? 'fr' : 'en');
+    if (vtState.key === key) return vtState.cards;
+    vtState = { key: key, cards: null, loading: true };
+    fetch('/api/trip/viator?i=' + encodeURIComponent(key.split('|')[0]) + '&r=' + encodeURIComponent(h.region || '') + '&lang=' + (fr ? 'fr' : 'en') + T3_VT_QS, { headers: { Accept: 'application/json' } })
+      .then(function(r){ return r.ok ? r.json() : { cards: [] }; })
+      .catch(function(){ return { cards: [] }; })
+      .then(function(j){
+        if (vtState.key !== key) return;
+        vtState.loading = false;
+        vtState.cards = (j && Array.isArray(j.cards) ? j.cards : []).filter(function(c){ return c && c.code && t3StayExt(c.url); }).slice(0, 2);
+        t3ViatorRefresh();
+      });
+    return null;
+  }
+  function t3ViatorShown(){ var c = vtState.cards; return !!(c && c.length && t3ViatorHint()) || t3ViatorSteps().length > 0; }
+  // Viator steps join "Book my trip" only when the visitor taps "Add to trip" (kept with that plan's progress).
+  function t3ViatorAdded(){ return bookState && Array.isArray(bookState.vt) ? bookState.vt : []; }
+  function t3ViatorSteps(){
+    return t3ViatorAdded().filter(function(x){ return x && x.id && t3StayExt(x.url); }).map(function(x){
+      return { kind: 'viator', id: x.id, name: x.name, label: t3VtText('book', false), labelFr: t3VtText('book', true), url: x.url, affiliate: true, rel: 'sponsored nofollow noopener', link: 'viator' };
+    });
+  }
+  function t3VtDuration(d, fr){
+    if (!d || !d.from) return '';
+    var f = function(m){ var h = Math.floor(m / 60), r = m % 60; return h ? h + ' h' + (r ? ' ' + r + (fr ? '' : ' min') : '') : r + ' min'; };
+    return d.to && d.to !== d.from ? (d.from % 60 || d.to % 60 ? f(d.from) + '–' + f(d.to) : (d.from / 60) + '–' + (d.to / 60) + ' h') : f(d.from);
+  }
+  function t3VtCardHtml(c, fr, canAdd){
+    var meta = [];
+    if (c.rating) meta.push('★ ' + (fr ? String(c.rating).replace('.', ',') : c.rating) + (c.reviews ? ' (' + c.reviews + ')' : ''));
+    if (c.fromPrice && c.currency === 'CAD') meta.push(t3VtText('from', fr) + ' ' + cad(c.fromPrice * 100));
+    var dur = t3VtDuration(c.duration, fr); if (dur) meta.push(dur);
+    var added = t3ViatorAdded().some(function(x){ return x.id === c.code; });
+    var ph = c.photo && t3StayExt(c.photo.url) ? '<figure class="t3-vt-ph"><img src="' + esc(c.photo.url) + '" alt="" loading="lazy" width="96" height="72"><figcaption>' + esc(t3VtText('photo', fr)) + '</figcaption></figure>' : '<span></span>';
+    return '<li class="t3-vt-card" data-t3-vt-code="' + esc(c.code) + '">' + ph + '<div><p class="t3-vt-title">' + esc(c.title) + '</p>' + (meta.length ? '<p class="t3-vt-meta">' + esc(meta.join(' · ')) + '</p>' : '')
+      + '<div class="t3-vt-acts"><a ' + hrefAttr(c.url) + ' target="_blank" rel="sponsored nofollow noopener" data-track="booking" data-link="viator" data-viator-code="' + esc(c.code) + '">' + esc(t3VtText('seeOn', fr)) + ' <span aria-hidden="true">↗</span></a>'
+      + (canAdd ? '<button type="button" class="t3-book-link t3-vt-add" data-t3-vt-add="' + esc(c.code) + '" aria-pressed="' + (added ? 'true' : 'false') + '">' + esc(added ? '✓ ' + t3VtText('added', fr) : t3VtText('add', fr)) + '</button>' : '') + '</div></div></li>';
+  }
+  // inBox: inside "Book your trip" (with Add to trip); else on its own under the plan's summary (no box to add to).
+  function t3ViatorBlockHtml(fr, inBox){
+    var cards = t3ViatorCards();
+    if (!cards || !cards.length) return '<div data-t3-viator hidden></div>';
+    return '<div class="t3-vt" data-t3-viator><h4><span>' + esc(t3VtText('heading', fr)) + '</span><span class="t3-vt-by">' + esc(t3VtText('powered', fr)) + '</span></h4><ul class="t3-vt-list">'
+      + cards.map(function(c){ return t3VtCardHtml(c, fr, inBox); }).join('') + '</ul><p class="t3-book-note">' + esc(t3VtText('priceNote', fr)) + '</p></div>';
+  }
+  function t3ViatorAloneHtml(){
+    if (!t3ViatorHint()) return '';
+    var fr = lang() === 'fr', inner = t3ViatorBlockHtml(fr, false);
+    if (!/class="t3-vt"/.test(inner)) return '<section class="t3-stay t3-vt-alone" data-t3-vt-alone hidden>' + inner + '</section>';
+    return '<section class="t3-stay t3-vt-alone" data-t3-vt-alone aria-labelledby="t3VtHead"><h3 id="t3VtHead">' + esc(t3VtText('heading', fr)) + '</h3>' + inner.replace(/<h4>[\s\S]*?<\/h4>/, '<p class="t3-vt-by">' + esc(t3VtText('powered', fr)) + '</p>')
+      + '<p class="t3-stay-disclosure" data-stay-disclosure>' + esc(fr ? T3_STAY_DISCLOSURE.fr : T3_STAY_DISCLOSURE.en) + '</p></section>';
+  }
+  function t3ViatorRefresh(){
+    if (resultEl.querySelector('[data-t3-stay]')) { t3BookRerender(); return; }
+    var alone = resultEl.querySelector('[data-t3-vt-alone]');
+    if (alone) alone.outerHTML = t3ViatorAloneHtml();
+  }
+  resultEl.addEventListener('click', function(e){
+    var a = e.target.closest && e.target.closest('a[data-link="viator"]');
+    // A listed venue's own step (data-venue-id) is counted by the box's handler; a suggestion card here.
+    if (a) { if (!a.hasAttribute('data-venue-id')) track('outbound_click', { surface: 'trip_planner', link_type: 'booking', link: 'viator', viator_product: a.getAttribute('data-viator-code') || '' }); return; }
+    var add = e.target.closest && e.target.closest('[data-t3-vt-add]');
+    if (!add) return;
+    var code = add.getAttribute('data-t3-vt-add'), list = t3ViatorAdded().slice(), at = -1;
+    list.forEach(function(x, n){ if (x.id === code) at = n; });
+    var base = t3BookSteps().length - t3ViatorSteps().length;
+    if (at >= 0) {
+      // Taking one out: the later Viator steps move up, so their marks go with them.
+      for (var n = base + at; n < base + list.length; n++) { if (bookState.st[n + 1] !== undefined) bookState.st[n] = bookState.st[n + 1]; else delete bookState.st[n]; }
+      list.splice(at, 1);
+    } else {
+      var c = (vtState.cards || []).filter(function(x){ return x.code === code; })[0];
+      if (!c) return;
+      list.push({ id: c.code, name: c.title, url: c.url });
+      track('viator_add_to_trip', { surface: 'trip_planner', viator_product: c.code });
+    }
+    bookState.vt = list;
+    t3BookSave();
+    t3BookRerender('[data-t3-vt-add="' + code.replace(/"/g, '') + '"]');
+  });
+`;
+}
+
 function renderBody(d) {
   const esc = d.esc;
   // data-i18n: /scripts/app.js shows these in the visitor's language (the
@@ -1336,7 +1466,7 @@ function renderBody(d) {
       <form class="t3-composer" id="t3Form" novalidate>
         <label class="t3-sr" for="t3Input" data-i18n="tripv3.inputLabel">Describe the trip you want</label>
         <textarea id="t3Input" rows="3" maxlength="500" placeholder="${SITE_PAGE.placeholder}" data-i18n-placeholder="tripv3.placeholder"></textarea>
-${d.stays ? t3StayInputsHtml() : ''}        <div class="t3-composer-foot">
+${d.stays ? t3StayInputsHtml() + (d.viator ? T3_VIATOR_STYLES + '\n' : '') : ''}        <div class="t3-composer-foot">
           <span class="t3-hint"><span class="t3-en">Get a day-by-day plan you can edit, save, and share.</span><span class="t3-fr" lang="fr">Obtenez un plan jour par jour à modifier, à enregistrer et à partager.</span></span>
           <button type="submit" class="t3-submit" id="t3Submit"><span data-i18n="tripv3.submit">Plan my trip</span> <span aria-hidden="true">&rarr;</span></button>
         </div>
@@ -1418,7 +1548,7 @@ function renderScript(d) {
   ${t3FrenchPlan.toString()}
   var state = { text: '', seed: 0, overrides: {}, locks: {}, exclude: [], removed: {}, last: null, lastReq: null };
   var renderedVenueCardAnchors = {};
-${d.stays ? T3_STAY_CLIENT_SRC : ''}
+${d.stays ? (d.viator ? t3ViatorStaySrc(T3_STAY_CLIENT_SRC) + t3ViatorClientSrc(d) : T3_STAY_CLIENT_SRC) : ''}
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   // Crawlable links (2026-10-19, round 8): link markup glued together in this script as a quoted href attribute
   // around esc(url) read to crawlers that scan the page's HTML as links to the code itself (fake 404s). The
@@ -2463,7 +2593,7 @@ ${d.stays ? T3_STAY_CLIENT_SRC : ''}
     html += warningSummaryHtml(p);
     var tripDetails = html.slice(aboveStopsLength);
     html = html.slice(0, aboveStopsLength);
-${d.stays ? "    html += t3StayCardHtml();\n" : ''}    // Dates and the trip map share one tidy row of tools above the days (2026-10-14).
+${d.stays ? "    html += t3StayCardHtml();\n" + (d.viator ? "    if (!t3StayData()) html += t3ViatorAloneHtml();\n" : '') : ''}    // Dates and the trip map share one tidy row of tools above the days (2026-10-14).
     if (planKinds && days().length) {
       html += '<div class="t3-tools">' + schedHtml + '<div class="t3-map-slot" data-t3-map-slot></div></div>';
       // Round 12 (2026-10-20): French day tabs say « Squamish et Whistler » (the plan's own days are not translated).
