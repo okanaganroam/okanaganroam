@@ -2984,6 +2984,8 @@ function stopFrom(v, scored, extra, ctx) {
 }
 // Sport test 12: the weight an owner-set-up sport or golf place gets in a time-slot itinerary's stop of its kind.
 const OWNER_SET_UP_SLOT_WEIGHT = 10;
+// Sport test 13: how far a neighbouring town's place can be (Kaleden to Penticton is about 15 km).
+const NEIGHBOUR_TOWN_KM = 30;
 function compareScored(a, b) {
   // Indoor test 15: a Complete & Verified place (all confirmed by its owner) breaks a tie before rating and reviews.
   return b.score - a.score || (b.v.completeVerified ? 1 : 0) - (a.v.completeVerified ? 1 : 0) || (b.v.ownerSetUp ? 1 : 0) - (a.v.ownerSetUp ? 1 : 0) || (b.v.rating || 0) - (a.v.rating || 0) || (b.v.reviews || 0) - (a.v.reviews || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id;
@@ -3152,7 +3154,10 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
     scored.push(t ? { v, score: s.score + t.score, reasons: s.reasons.concat(t.reasons), caveats: t.caveats } : { v, ...s });
   }
   const priceRank = (v) => (v.price === 1 ? 0 : v.price == null || v.price === 2 ? 1 : 2);
-  scored.sort(ctx.budget === 'budget' && !freeAsked ? (a, b) => priceRank(a.v) - priceRank(b.v) || compareScored(a, b) : compareScored);
+  // Sport test 13 (2026-11-21; Twin Lakes, set up by its owners, was 7th of 8 in "golf with my kids near Penticton", behind
+  // courses nobody has confirmed): a sport or golf place its owner set up comes first among the places of the kind asked for.
+  const ownFirst = (v) => (v.ownerSetUp && (ctx.types.has(v.type) || (ctx.activities && ctx.activities.has(v.type))) ? 0 : 1);
+  scored.sort(ctx.budget === 'budget' && !freeAsked ? (a, b) => priceRank(a.v) - priceRank(b.v) || compareScored(a, b) : (a, b) => ownFirst(a.v) - ownFirst(b.v) || compareScored(a, b));
   const out = [];
   const perType = {};
   for (const s of scored) {
@@ -3556,6 +3561,14 @@ const ROUGH_ACCESS_NOTE = 'Rough access road — the listing says to check your 
 const DESC_MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
 const DESC_SEASON_CUE_RE = /\b(?:open|opens|opening|access|accessible|road|roads|vehicle|clearance|season|seasonal|operates|operating|run|runs|snow free|snow-free|trail is|hikeable)\b/;
 const DESC_SEASON_RE = new RegExp(`\\b(?:(?:early|mid|late) )?(${DESC_MONTHS.join('|')}) (?:to|through|until|thru) (?:(?:early|mid|late) )?(${DESC_MONTHS.join('|')})\\b`);
+// Sport test 13: the parts of a golf place that have their own season or hours. A sentence naming one is about that part.
+const PLACE_PART_RE = /\b(?:rv park|rv parks|rv sites?|rv resort|campground|campgrounds|campsites?|camping|driving range|practice range|range|patio|patios|terrace|bistro|restaurant|restaurants|grill|lounge|clubhouse (?:restaurant|bar|kitchen)|dining room|cafe|pro shop|golf shop|shop|simulators?|indoor golf|mini ?golf|mini ?putt|minigolf|pool|hot tub|marina)\b/;
+// Text sentence by sentence (split before normalizing), without the sentences whose subject is a part of the place ("RV
+// park open late April to mid September", "The patio is open May to September", "Range opens mid-April").
+function seasonSentences(text) {
+  const lead = new RegExp(`^(?:(?:the|our|its|their|a|an|and|also|plus)\\s+)*(?:${PLACE_PART_RE.source.slice(2, -2)})\\b`);
+  return String(text || '').split(/(?<=[.;!?])\s+|\n+/).map((x) => normWords(x)).filter((x) => x && !lead.test(x)).join(' . ');
+}
 function offSeasonSkip(v, ctx) {
   // A named month is judged in that month, not on the planned date ("driving range in June" asked in October).
   if (ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month) && ctx.tripDate) ctx = { ...ctx, tripDate: monthDate(ctx.seasonInfo.month, ctx.tripDate) };
@@ -3572,9 +3585,13 @@ function offSeasonSkip(v, ctx) {
   // its "golf season runs from early April to mid-October". An outdoor course whose description or advisory gives its
   // season is not planned outside it (to the half month: "mid-October" ends on the 15th), nor after an advisory that
   // says the season has ended, unless the request names the course.
-  if (month && v.type === 'golf' && !v.indoorGolf && !v.sportYearAll) {
+  // Sport test 13 (2026-11-21; Twin Lakes: their Good to know line "RV park open late April to mid September" took the
+  // course out of every plan from Sep 16 to Oct 15, inside their own season Apr 1 – Oct 15): the owner's own season always
+  // wins over words; the words read are research's description and advisory only (never the owner's lines), sentence by
+  // sentence, leaving out any sentence about another part of the place (the RV park, the range, the patio, the bistro…).
+  if (month && v.type === 'golf' && !v.indoorGolf && !v.sportYearAll && !(v.ownerSetUp && v.openMonths)) {
     // Sport test 3: a sentence about one part ("Mini golf is open April to mid-October") is that part's season, not the place's.
-    const text = `${v.textDesc || ''} ${normWords((v.advisory && v.advisory.note) || '')}`.replace(/\b(?:mini ?golf|mini ?putt|minigolf)\b[^.;]*/g, ' ');
+    const text = `${v.textSeason != null ? v.textSeason : v.textDesc || ''} ${seasonSentences((v.advisory && v.advisory.note) || '')}`.replace(/\b(?:mini ?golf|mini ?putt|minigolf)\b[^.;]*/g, ' ');
     const named = normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || '').includes((v.textName || '').split(' ').slice(0, 2).join(' '));
     if (!named && [10, 11, 12, 1, 2, 3].includes(month) && /\b(?:season (?:has )?(?:ended|is over|is done|wrapped up)|closed for the (?:season|year|winter)|end of (?:the )?season)\b/.test(text)) return true;
     const g = new RegExp(`\\b(?:(early|mid|late) )?(${DESC_MONTHS.join('|')}) (?:to|through|until|thru) (?:(early|mid|late) )?(${DESC_MONTHS.join('|')})\\b`).exec(text);
@@ -3587,8 +3604,9 @@ function offSeasonSkip(v, ctx) {
   }
   // 2026-10-25: an outdoor place or tour whose description gives its season ("high-clearance vehicle, July to
   // September" for a Monashee backcountry trail) is not planned outside it unless the request names it.
-  if (month && ['outdoor', 'tour'].includes(v.type)) {
-    const desc = v.textDesc || '';
+  // (Sport test 13: a sport place planned as an outdoor stop reads its description alone, and its owner's season wins.)
+  if (month && ['outdoor', 'tour'].includes(v.type) && !(v.ownerSetUp && v.openMonths)) {
+    const desc = v.textSeason != null ? v.textSeason : v.textDesc || '';
     const w = DESC_SEASON_RE.exec(desc);
     if (w && DESC_SEASON_CUE_RE.test(desc.slice(Math.max(0, w.index - 70), w.index + w[0].length + 25))) {
       const a = DESC_MONTHS.indexOf(w[1]) + 1, b = DESC_MONTHS.indexOf(w[2]) + 1;
@@ -10097,6 +10115,16 @@ function planItinerary(input) {
       scored.push({ v, score, base: s.score, reasons, caveats, seasonFlags: sf.flags, advisory: !!adv, ...(kFit ? { kitchenMeal: true } : {}), ...(c.liveMusicFallback && musicNightOn(v) ? { nightOn: musicNightOn(v) } : {}) });
     }
     scored.sort(compareScored);
+    // Sport test 13 (2026-11-21; "tee time then dinner in Kaleden" booked St. Andrews, unverified with no hours, over Twin
+    // Lakes, set up by its owners, because its bistro is next door): an unverified place with no hours never takes the stop
+    // from an owner-set-up place of the same kind in the same or a neighbouring town. It is kept only when nothing else is.
+    const ownSet = scored.filter((x) => x.v.ownerSetUp && (c.types || []).includes(x.v.type));
+    if (ownSet.length) {
+      const outranked = (x) => !x.v.ownerSetUp && !x.v.completeVerified && !x.v.hours && ownSet.some((o) => o.v.type === x.v.type && !!o.v.indoorGolf === !!x.v.indoorGolf
+        && (o.v.region === x.v.region || (kmOrNull(o.v, x.v) != null && kmOrNull(o.v, x.v) <= NEIGHBOUR_TOWN_KM)));
+      const kept = scored.filter((x) => !outranked(x));
+      if (kept.length) scored.splice(0, scored.length, ...kept);
+    }
     // A walk by the lake is on the shore when the town has one listed.
     if (c.lake) { const shore = scored.filter((x) => x.reasons.some((r) => r.code === 'lake' && r.text === 'By the lake')); if (shore.length) scored.splice(0, scored.length, ...shore); }
     const label = componentLabel(c, ctx);
@@ -10434,7 +10462,7 @@ module.exports = {
   withSameEstates, longDayHike, longDayHikeMinutes, oneSpaAsked,
   coolBeachMonth,
   dogOnlyPlace,
-  offSeasonSkip,
+  offSeasonSkip, seasonSentences, PLACE_PART_RE,
   tripTheme,
   // Build My Trip round 15 (2026-10-20)
   addSuggestedTimes, addStory, SUGGESTED_TIMES_NOTE,

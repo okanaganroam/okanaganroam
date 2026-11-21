@@ -847,6 +847,115 @@ const ACCESS_TOPICS = ['staff', 'login-create', 'access', 'not-owner', 'login-pr
 // Sport test 12 (2026-11-21): the answers that close the place (closures, closed months, a yearly break) and its season.
 const CLOSE_TOPICS = ['closures', 'setup-short-closure', 'sport-one-off-closure', 'indoor-closed-months', 'indoor-yearly-break', 'sport-closures-yearly', 'setup-closure-fix', 'closures-count'];
 const SEASON_TOPICS = ['sport-season', 'season', 'indoor-seasonal', 'sport-opening-day', 'year-round', 'edit-season', 'setup-season'];
+// Sport test 13 (2026-11-21; Gord and Linda, Twin Lakes Golf Course & RV Park: "Also the RV park opens April 28 to mid
+// September, does that go here too?" got Closures, which would have closed the course for weeks). A part of the place with
+// its own dates or hours (the RV park, the range, the patio, the pro shop, the bistro or restaurant, the campground) is one
+// line in Good to know: never the place's closures, season or hours.
+const PART_WORDS = 'rv park|rv parks|rv sites?|rv resort|rv|campground|campgrounds|campsites?|camping|patio|patios|terrasse|terrasses|bistro|restaurant|restaurants|resto|grill|lounge|kitchen|cafe|snack bar|dining room|salle a manger|clubhouse restaurant|clubhouse bar|mini golf|minigolf|mini putt|putt putt|hot tub|day spa|spa';
+const GOLF_PART_WORDS = 'driving range|practice range|range|champ de pratique|simulators?|simulateurs?|trackman|indoor golf|golf interieur';
+const PART_TIME = '\\b(open|opens|opening|opened|close|closes|closing|closed|own season|different season|separate season|its season|their season|seasonal|sa propre saison|une autre saison|hours|hour|heures|horaire|horaires|until|till|ouvre|ouvrent|ouvert|ouverte|ouverts|ferme|ferment|fermee|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre|specificdate)\\b';
+// A part word and a time word within a few words of each other ("the RV park opens April 28", « le champ de pratique ouvre »).
+const near = (a, b, n = 6) => `\\b(${a})\\b(?: [a-z0-9]+){0,${n}} ${b}|${b}(?: [a-z0-9]+){0,${n}} \\b(${a})\\b`;
+// The pro shop is the course's own door in season; only its off-season days are a part of its own ("Linda opens the pro
+// shop Tuesdays and Thursdays in December").
+const SHOP_WORDS = 'pro shop|golf shop|shop|boutique du pro|boutique|store|magasin';
+const OFFSEASON_WORDS = '\\b(december|decembre|january|janvier|february|fevrier|november|novembre|winter|winters|hiver|off season|offseason|hors saison|christmas|noel|holidays|course is closed|course closed|terrain est ferme|parcours est ferme)\\b';
+// The place's own opening time in the same question ("the pro shop opens at 7", « la boutique du pro ouvre de 7 h »): its
+// hours are asked about too.
+const PLACE_OPENS_AT = '\\b(boutique du pro|boutique|pro shop|golf shop|shop|course|terrain|parcours|we|nous|on) (usually |normally |generalement )?(ouvre|ouvrons|opens|open|is open|est ouverte?|is|from) (de |from |at |a |des |around |vers )?[0-9]';
+const PART_FIT = ['sport-part-season', 'sport-restaurant', 'indoor-good-to-know', 'sport-offseason-other', 'sport-sister-listing', 'sport-last-booking', 'sport-first-tee', 'sport-dawn-dusk', 'hh-some-months', 'hh-times', 'setup-happy-split', 'sport-social-hour', 'sport-hh-none-specials', 'sport-food-menu', 'sport-dogs', 'phone', 'sport-chip-season', 'sport-gtk-full', 'sport-one-listing', 'sport-second-kind', 'sport-offseason-events', 'sport-season-says', 'sport-bay-link', 'indoor-also-offer', 'indoor-busy-times', 'sport-members', 'sport-lessons', 'sport-tee-times', 'sport-dress-code'];
+// Every answer that sets the place's own hours (place-wide), as against a part's.
+const PLACE_HOURS = ['hours', 'seasonal-hours', 'hours-third-stretch', 'indoor-summer-late', 'indoor-summer-daily', 'setup-split-hours', 'setup-third-time', 'year-round', 'hours-right'];
+// "We still open to the public that weekend. Do I put it in closures?"
+const STILL_OPEN = '\\b(still open|still be open|open to the public|open as usual|open like normal|open like usual|business as usual|toujours ouverts?|toujours ouvertes?|restons ouverts?|reste ouvert|ouverts? au public|ouvert comme d habitude)\\b';
+const FIT13 = [
+  // A part of the place, named with dates, months or hours (golf courses: also the range, the simulator, the academy).
+  { id: 'part-own-time', all: [near(PART_WORDS, PART_TIME)],
+    not: ['\\b(we|nous|on|course|club|arena|rink|park is|centre|center|facility|terrain|parcours|whole place|everything|tout) (is |are |re |est |sont )?(all )?(closed|close|closes|shut|ferme|fermee|fermons) (on|for|le|pour|the) (specificdate|christmas|noel|thanksgiving|good friday|easter|paques|a day|the day|that day|ce jour)\\b', '\\b(gift|gifts|cadeau|cadeaux|certificates?|certificat|cards?|cartes?)\\b(?!.*\\b(december|decembre|hours|heures|open|opens|ouvre|ouvert)\\b)', '\\b(happy hour|5 a 7|social hour)\\b', '\\b(email|courriel|instagram|facebook|website|site web) (shop|boutique)\\b', '\\bshop (name|account|page|instagram|insta)\\b', PLACE_OPENS_AT],
+    fit: PART_FIT, bad: CLOSE_TOPICS.concat(SEASON_TOPICS, PLACE_HOURS), go: ['sport-part-season', 'sport-restaurant'] },
+  { id: 'golf-part-own-time', golfCourse: true, all: [near(GOLF_PART_WORDS, PART_TIME)],
+    not: ['\\b(no|dont have|don t have|do not have|without|pas de) (a |any )?(driving |practice )?range\\b', '\\b(price|age|date|time) range\\b', '\\brange balls?\\b', '\\b(happy hour|5 a 7)\\b', PLACE_OPENS_AT],
+    fit: PART_FIT, bad: CLOSE_TOPICS.concat(SEASON_TOPICS, PLACE_HOURS), go: ['sport-part-season', 'sport-offseason-other'] },
+  { id: 'shop-offseason', golfCourse: true, all: [`\\b(${SHOP_WORDS})\\b`, OFFSEASON_WORDS, PART_TIME], not: ['\\b(email|courriel|instagram|insta|facebook|website|site web) (shop|boutique)\\b', '\\bshop (name|account|page|instagram|insta)\\b'],
+    fit: PART_FIT, bad: CLOSE_TOPICS.concat(SEASON_TOPICS, PLACE_HOURS), go: ['sport-part-season'] },
+  // "We're still open to the public that weekend. Do I put it in closures?": open is never a closure. A draw, a
+  // tournament or an event that day is an event.
+  { id: 'still-open-event', all: [STILL_OPEN, '\\b(closures?|close|closed|closing|fermetures?|ferme|fermer|fermee)\\b', '\\b(draw|draws|tournament|tournaments|tourney|scramble|event|events|prize|prizes|party|fundraiser|tournoi|tournois|evenement|evenements|tirage|fete)\\b'],
+    fit: ['sport-tournaments', 'event-add', 'event-repeat', 'indoor-theme-nights', 'weekly-nights', 'sport-offseason-events', 'indoor-groups'], bad: CLOSE_TOPICS.concat(SEASON_TOPICS), go: ['sport-tournaments', 'event-add'] },
+  { id: 'still-open', all: [STILL_OPEN, '\\b(closures?|close|closed|closing|fermetures?|ferme|fermer|fermee)\\b'], bad: CLOSE_TOPICS.concat(SEASON_TOPICS) },
+  // "All these prices are plus tax. Do I have to write plus tax on every line": the tax answer.
+  { id: 'tax', all: ['\\b(tax|taxes|gst|pst|hst|tps|tvq|tvh|tvp|taxe)\\b'], not: ['\\b(tax receipt|tax receipts|recu d impot|charitable)\\b'],
+    fit: ['sport-tax', 'cost', 'indoor-cost', 'sport-included'], go: ['sport-tax'] },
+  // A drink named as served (draft beer, wine) is never "we don't serve alcohol".
+  { id: 'drinks-served', all: ['\\b(draft|draught|beer|beers|wine|wines|cocktails?|pints?|biere|bieres|vin|vins|licensed|liquor licence|caesars?)\\b'],
+    not: ['\\b(no|dont|don t|not|without|never|pas de|sans|aucun|aucune|n a pas|ne sert pas|ne servons pas) (?:(?:serve|sell|have|a|any|de|d) ){0,2}(alcohol|beer|beers|liquor|licen[cs]e|wine|biere|bieres|vin|alcool|bar)\\b', '\\bnot licensed\\b', '\\bpas de permis\\b'],
+    bad: ['sport-no-bar'] },
+  // "We dont have a real happy hour. Next year we're starting Thirsty Thursdays, 18 holes with a cart, a draft beer and a
+  // hotdog": a weekly special, never a happy hour, never "no alcohol".
+  { id: 'no-hh-weekly', all: ['\\b(no|dont have|doesnt have|do not have|does not have|without|not have|pas de|n a pas|aucun) (?:(?:a|an|any|real|actual|vrai) ){0,2}(happy hour|5 a 7|social hour)\\b', '\\b(mondays|tuesdays|wednesdays|thursdays|fridays|saturdays|sundays|weekly|every week|each week|package|packages|forfaits?|beer|draft|biere|hot ?dogs?|cart|18 holes|9 holes|chaque semaine|les jeudis|les vendredis)\\b'],
+    fit: ['sport-hh-none-specials', 'sport-package', 'dont-have', 'sport-restaurant', 'indoor-theme-nights', 'specials'], go: ['sport-hh-none-specials'] },
+  // "Is this a happy hour?" (a twilight discount, half-price bar food, beers after league): happy hour's own answers, the
+  // price lines, or Ask us. Never an unrelated answer.
+  { id: 'hh-asked', all: ['\\b(happy hour|happy hours|5 a 7|cinq a sept|social hour|heure sociale)\\b'],
+    fit: ['hh-some-months', 'hh-times', 'hh-deals', 'setup-happy-split', 'sport-social-hour', 'indoor-bar', 'sport-no-bar', 'sport-hh-none-specials', 'dont-have', 'sport-package', 'sport-rate-lines', 'sport-twilight-times', 'specials', 'weekly-nights', 'indoor-theme-nights', 'sport-restaurant', 'sport-sister-listing', 'sport-food-menu', 'setup-happy', 'happy-hour', 'hh-add', 'sport-part-season'] },
+  // "My wife Linda and I share this one phone. Does she need her own login or can we both use this?"
+  { id: 'share-device', all: ['\\b(share|sharing|shared|same|one) (this |the |a |our |my |one )*(phone|device|cell|cellphone|tablet|ipad|computer|login|account|email)\\b|\\bboth use\\b|\\buse it together\\b|\\bmeme (telephone|cellulaire|compte|appareil|ordinateur)\\b|\\bpartage(ons|r|z)? (le|ce|un|notre) (telephone|cellulaire|compte|appareil)\\b'],
+    fit: ['staff', 'login-create', 'resume-device', 'login-privacy', 'settings', 'access', 'own-login'], bad: ['not-owner'], go: ['staff'] },
+  // "Your value thing on our page says driving range not documented but we have a driving range. Can you fix that?": the
+  // course facts come from our checked golf data (Message us), never "Nothing to untick".
+  { id: 'golf-facts-wrong', golfCourse: true, all: ['\\b(driving range|range|holes|par|yardage|yards|slope|putting green|course map|value|index|facts|scorecard|designer|champ de pratique|trous|normale)\\b', '\\b(not documented|undocumented|says|said|shows|showing|wrong|incorrect|missing|fix|correct|corrige|corriger|faux|fausse|erreur|isnt right|not right|out of date|dit|indique)\\b', '\\b(page|listing|site|value|index|glance|top|fiche|your)\\b'],
+    not: ['\\b(no|dont have|don t have|do not have|without|pas de) (a |any )?(driving |practice )?range\\b'],
+    fit: ['sport-golf-details', 'indoor-old-line', 'google', 'sport-card-price'], bad: ['sport-no-range'], go: ['sport-golf-details'] },
+  // "The green fee table up top says 2026 rates from your research. Will it change to the prices Linda typed in?": yes,
+  // research's table comes off once their own prices are in.
+  { id: 'research-table', golfCourse: true, all: ['\\b(table|chart|research|tableau|recherche|recherches|up top|at the top|old rates|last year s|last years)\\b', '\\b(change|changes|replace|replaced|update|updated|switch|go away|come off|comes off|remplac[a-z]*|disparai[a-z]*|still show|still there|stay|reste)\\b', '\\b(price|prices|rates?|fees?|green fees?|tarifs?|prix|droits? de jeu)\\b'],
+    fit: ['sport-golf-details', 'sport-card-price', 'indoor-old-line', 'live-speed', 'changes-review'], go: ['sport-golf-details'] },
+  // A pro shop or a shop named for its hours, phone or account is not a gift shop.
+  { id: 'shop-not-gift', all: ['\\b(pro shop|golf shop|shop|boutique|store|magasin)\\b'], not: ['\\b(gift|gifts|cadeau|cadeaux|certificates?|certificats?|gift cards?|cartes? cadeaux?|souvenirs?|merch|merchandise|memberships?|abonnements?|sell|sells|vend|vendons|retail)\\b'],
+    bad: ['indoor-gift'] },
+  // "the bistro and RV park are extensions 102 and 103": the phone answer.
+  { id: 'phone-extension', all: ['\\b(extension|extensions|ext|poste [0-9]+|un poste|le poste|postes [0-9]+)\\b'], fit: ['phone', 'name-address', 'google'], go: ['phone'] },
+  // An address question is the address answer (or where people meet).
+  { id: 'address', all: ['\\b(address|addresses|adresse|adresses|civic number|numero civique|street number|no street)\\b'], not: ['\\b(email|e mail|courriel|web) (address|adresse)\\b|\\badresse (courriel|e mail|electronique|web)\\b', '\\bip address\\b'],
+    fit: ['name-address', 'sport-meeting-place', 'google', 'phone', 'not-found', 'settings', 'indoor-old-line', 'website-broken', 'map-pin'], go: ['name-address'] },
+  // "How long before my changes show on the page?": how fast changes go live, never how long a visit takes.
+  { id: 'changes-when', all: ['\\b(how long|combien de temps|when will|how soon|how fast|how quickly|des que|avant que|quand est ce que)\\b', '\\b(changes?|changements?|modifications?|updates?|edits?|photos?|show|shows|show up|appear|appears|live|online|en ligne|paraiss[a-z]*|parait|apparai[a-z]*|visible|mise a jour)\\b'],
+    not: ['\\b(visit|visits|round|rounds|game|games|lesson|lessons|class|classes|session|sessions|tour|tours|to play|takes to play|partie|parties|cours|visite|ronde|lift|chairlift|wait)\\b', '\\b(closure|closures|closed|close|closing|ferme|fermee|fermeture|smoke|fumee|weather)\\b'],
+    fit: ['live-speed', 'setup-live-when', 'changes-review', 'photos-when', 'photo-pending', 'see-page', 'nothing-changed', 'menu-change', 'event-add'], go: ['live-speed'] },
+  // "Can I add the mini-putt as a third kind?": the kinds answers.
+  { id: 'kinds-add', all: ['\\b(kind|kinds|genre|genres|category|categories|categorie|categories)\\b', '\\b(second|third|another|other|deuxieme|troisieme|autre|add|ajouter|pick|choose|tick|cocher|select|both)\\b'],
+    fit: ['indoor-kinds-many', 'sport-kinds-other', 'sport-second-kind', 'sport-one-listing', 'sport-sister-listing', 'sport-part-season', 'indoor-also-offer', 'sport-offseason-other', 'cuisine-pick', 'sport-find-me'], go: ['sport-second-kind', 'indoor-kinds-many'] },
+  // A tournament or a competition: the tournaments answer, its closure, its event, or a group or league answer.
+  { id: 'tournament', all: ['\\b(tournament|tournaments|tourney|tournoi|tournois|pdga|competition|competitions|championship|championnat|scramble|member guest|amateur)\\b'], not: ['\\b(championship|championnat) (course|layout|golf course|parcours)\\b'],
+    fit: ['sport-tournaments', 'sport-one-off-closure', 'closures', 'setup-short-closure', 'sport-closures-yearly', 'setup-closure-fix', 'closures-count', 'sport-book-ahead-hours', 'sport-peak-dates', 'indoor-groups', 'event-add', 'event-repeat', 'event-change', 'sport-members', 'sport-lessons', 'sport-package', 'sport-group-size', 'sport-offseason-events', 'sport-photo-consent', 'photo-add', 'sport-two-courses'], go: ['sport-tournaments'] },
+  // "Lane swim is booked online but leisure swim is just show up", "we book by phone only, no website": how people book
+  // (walk-ins or booking), never the session times or "no website, only Facebook".
+  { id: 'book-or-walkin', all: ['\\b(reserv[a-z]*|book|books|booking|bookings|booked|book ahead)\\b', '\\b(show up|shows up|drop in|drop ins|walk in|walk ins|walkins|walk on|walk ons|just come|just call|by phone|par telephone|au telephone|sans reservation|pas de site web|no website|dont have a website)\\b'],
+    not: ['\\b(instagram|insta|facebook|fb)\\b'],
+    fit: ['indoor-booking', 'sport-same-day', 'sport-book-ahead-hours', 'sport-walk-ons', 'sport-tee-times', 'booking-link', 'sport-booking-link', 'indoor-groups', 'indoor-book-party', 'sport-bay-link', 'links', 'phone', 'sport-members', 'indoor-busy-times', 'sport-lessons', 'sport-peak-dates', 'sport-dress-code', 'indoor-good-to-know', 'sport-offseason-other', 'sport-part-season', 'sport-what-to-bring', 'sport-refunds', 'indoor-min-players', 'indoor-per-room'], go: ['indoor-booking'] },
+  // "How do I set different hours?": an hours answer.
+  { id: 'hours-how', all: ['\\b(how do (i|we)|how can (i|we)|how to|where do (i|we)|comment (je|on)|ou est ce que (je|on)) (set|show|put|enter|change|add|do|mettre|mets|indiquer|indique|entrer|changer)\\b', '\\b(hours|heures|horaires?|opening times|open times)\\b'],
+    not: ['\\b(happy hour|5 a 7|social hour)\\b'],
+    fit: ['hours', 'seasonal-hours', 'hours-third-stretch', 'indoor-summer-late', 'indoor-summer-daily', 'setup-split-hours', 'setup-third-time', 'sport-first-tee', 'sport-dawn-dusk', 'indoor-holiday-open', 'hours-open-holidays', 'sport-holiday-short', 'season', 'indoor-seasonal', 'sport-season', 'sport-opening-day', 'indoor-closed-months', 'year-round', 'indoor-yearly-break', 'sport-last-booking', 'indoor-no-hours', 'indoor-swim-times', 'sport-extra-sessions', 'hours-right', 'google', 'sport-part-season', 'sport-offseason-other', 'sport-restaurant', 'indoor-busy-times', 'sport-members', 'sport-chip-season', 'shows-closed'],
+    go: ['seasonal-hours', 'hours'] },
+  // "Bike park open May long weekend to Thanksgiving": the season.
+  { id: 'season-range', all: ['\\b(open|opens|opening|ouvert|ouverts|ouverte|ouvre|ouvrons|season|saison|runs?|run)\\b(?: [a-z0-9]+){0,3} (from |de |du )?(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre|may long weekend|victoria day|easter|paques|specificdate)\\b(?: [a-z0-9]+){0,3} (to|until|till|through|thru|a|au|jusqu)\\b'],
+    not: ['\\b(happy hour|5 a 7|social hour)\\b'],
+    fit: SEASON_TOPICS.concat(['sport-weather', 'sport-season-says', 'indoor-closed-months', 'seasonal-hours', 'sport-part-season', 'sport-offseason-other', 'indoor-summer-daily', 'sport-chip-season', 'sport-first-tee', 'hours', 'sport-closures-yearly', 'sport-one-off-closure', 'closures', 'sport-peak-dates', 'indoor-yearly-break', 'sport-restaurant', 'sport-offseason-events', 'sport-season-says', 'indoor-summer-late', 'hours-third-stretch', 'sport-aeration', 'sport-rate-change', 'sport-rates-next-year', 'sport-twilight-times', 'indoor-camps', 'sport-lessons', 'sport-extra-sessions', 'sport-second-kind', 'indoor-kinds-many', 'sport-sister-listing', 'sport-dawn-dusk', 'sport-last-booking'], PLACE_HOURS), go: ['sport-season', 'indoor-seasonal', 'season'] },
+  // "Lequel va dans la case du prix?": the Price box answers only (never extras or rentals).
+  { id: 'price-box', all: ['\\b(price box|price field|the price box|case du prix|case prix|champ du prix|on price|in price|for price|goes in price|which one|lequel|laquelle|which number|which rate|which price|quel prix|quel tarif)\\b', '\\b(dollarsign|price|prices|rate|rates|fee|fees|tarif|tarifs|prix|[0-9]{2,4})\\b'],
+    fit: ['indoor-price', 'sport-card-price', 'sport-golf-details', 'indoor-price-varies', 'sport-twilight-times', 'sport-rate-lines', 'sport-member-rates', 'sport-no-rate', 'sport-kids-free', 'indoor-free', 'sport-package', 'sport-per-person', 'indoor-price-two', 'sport-rates-next-year', 'sport-tax', 'indoor-min-players', 'sport-lessons', 'sport-peak-dates', 'sport-rate-change', 'indoor-per-room', 'indoor-typer-first', 'menu-add', 'sport-public', 'indoor-no-set-price', 'hh-deals', 'sport-said-twice', 'sport-bay-link', 'setup-missing'], go: ['indoor-price'] },
+  // "Our story says private club; we're semi-private now. Rewrite or add a sentence?": the story answers.
+  { id: 'story-edit', all: ['\\b(story|histoire|description|our text|notre texte|blurb|about us)\\b', '\\b(rewrite|re write|reecri[a-z]*|change|changer|edit|update|corrige[a-z]*|ajoute[a-z]*|add|sentence|phrase|line|ligne|outdated|old|ancienne?|wrong|says|dit|parle|talks? about|mentions?)\\b'],
+    fit: ['description', 'indoor-old-line', 'indoor-french', 'fr-desc-old', 'french-lines', 'sport-sports-words', 'sport-find-me', 'sport-public', 'easy-setup', 'setup-change-later', 'sport-approval-first', 'sport-package', 'indoor-also-offer', 'live-speed', 'changes-review', 'plan-visit', 'indoor-good-to-know', 'sport-gtk-full', 'sport-sister-listing', 'sport-one-listing'], go: ['description'] },
+  // "Should we tick Free? We have an honesty box": Free entry and the price answers.
+  { id: 'free-tick', all: ['\\b(free|gratuit|gratuite|honesty box|by donation|donation|dons)\\b', '\\b(tick|click|check|cocher|coche)\\b'], not: ['\\b(is|are|if|when) (a |the |one )?(bay|bays|lane|lanes|court|courts|table|tee|tees|spot|spots|room|rink|sheet) (is |are )?free\\b'],
+    fit: ['indoor-free', 'sport-kids-free', 'indoor-price', 'sport-golf-details', 'indoor-cost', 'cost', 'sport-public', 'sport-kid-badge', 'indoor-age', 'sport-free-clubs', 'sport-card-price', 'features', 'sport-terms', 'scam'] },
+  // "Snow covers it Dec to March, can I say it's closed for winter?", "Arena is closed April to August, where do I say
+  // that?": how to set the season, never "Will my page say we're closed?".
+  { id: 'season-where', all: ['\\b(closed|close|ferme|fermee|fermes|shut)\\b', '\\b(winter|for the season|for winter|months?|mois|hiver|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre)\\b', '\\b(where do (i|we) (say|put|show|add|enter)|how do (i|we) (say|put|show|add|set|enter)|can (i|we) (say|put|show|mark)|where (would|should) (i|we)|ou est ce que (je|on)|ou je (le )?(dis|mets|indique)|comment (je|on) (le )?(dis|mets|indique)|where does that go|where do i say)\\b'],
+    bad: ['sport-season-says', 'shows-closed'], go: ['sport-season', 'indoor-seasonal', 'season'] },
+];
 const FIT = [
   // Sport test 12 (2026-11-21; Rob: "carringtons closes oct 17, a couple weeks before the course. does the happy hour need
   // different dates" got Closures, which would have closed his course Oct 18–31). The safety rule: the answers that close
@@ -854,7 +963,7 @@ const FIT = [
   // word (closed, close, shut…) about the place itself, a free word, a price word. A question about a part of the place
   // (its restaurant, patio, happy hour, pro shop, simulator) closing is never answered by them: it gets the topic its
   // subject points to (happy hour months here), else "I'm not sure" with Ask us.
-  { id: 'hh-dates', not: ['\\b(no|dont have|doesnt have|do not have|does not have|without|not have|pas de|n a pas|aucun) (a |an |any |real )?(happy hour|5 a 7|social hour)\\b'], all: ['\\b(happy hour|happy hours|5 a 7|cinq a sept|social hour|heure sociale)\\b', '\\b(dates?|months?|mois|ends?|ending|until|jusqu|closes?|closing|closed|ferme|fermes|fermee|season|saison|october|oct|september|sept|april|november|specificdate|mid|early|late|before the course)\\b'],
+  { id: 'hh-dates', not: ['\\b(no|dont have|doesnt have|do not have|does not have|without|not have|pas de|n a pas|aucun) (a |an |any |real )?(happy hour|5 a 7|social hour)\\b'], all: ['\\b(happy hour|happy hours|5 a 7|cinq a sept|social hour|heure sociale)\\b', '\\b(dates?|months?|mois|ends?|ending|until|jusqu|closes?|closing|closed|ferme|fermes|fermee|season|saison|october|oct|september|sept|april|november|march|may|june|july|august|mars|avril|mai|octobre|septembre|specificdate|mid|early|late|before the course|only when|seulement quand)\\b'],
     fit: ['hh-some-months', 'hh-times', 'setup-happy-split', 'sport-social-hour', 'indoor-bar', 'hh-deals'], bad: CLOSE_TOPICS.concat(SEASON_TOPICS), go: ['hh-some-months', 'hh-times'] },
   { id: 'close-needs-close', all: ['.'], not: ['\\b(close|closed|closes|closing|closure|closures|shut|shuts|shutting|off|vacation|holiday|holidays|break|not open|no public|ferme|fermee|fermes|fermons|fermer|fermeture|fermetures|conge|conges|feries?|vacances|pause|reopen|reopens|rouvre|tournament|tournoi|championship|championnat|private event|evenement prive|season|saison|winter|hiver|summer|ete|months?|mois|year|annee|snow|neige|specificdate|dates?)\\b'],
     bad: CLOSE_TOPICS },
@@ -963,5 +1072,10 @@ const FIT = [
   // "Can I see what our page looks like to a golfer?"
   { id: 'see-page', all: ['\\b(see|view|look at|preview|voir) (what )?(our|my|the) (page|listing|fiche)|what (our|my|the) (page|listing) looks like|what (the public|visitors|golfers|people|customers) see|ce que (le public|les visiteurs) voi|a quoi ressemble (notre|ma) (page|fiche)|voir (notre|ma) (page|fiche) comme|comme (un|une) (golfeur|golfeuse|visiteur|visiteuse|client|cliente) (la )?voit\\b'],
     fit: ['see-page', 'setup-live-when', 'live-speed', 'photos-when', 'photo-pending', 'changes-review', 'indoor-french', 'french', 'sport-season-says', 'shows-closed'], go: ['see-page'] },
+  // Sport test 13: the rules above, narrow (they only ever take answers away, never let one through).
+  ...FIT13.map((r) => ({ ...r, narrow: true })),
 ];
-module.exports = { WORDS, word, TOPICS, MORE_KEYS, tokens, kindHelp, fill, CONCEPTS, NOT_IF, FIT };
+// Sport test 13: the answers that change the place's own closures, season, Free entry, per-room or main price; Help gives
+// them only on a strong match (server.js best()).
+const DANGER = CLOSE_TOPICS.concat(SEASON_TOPICS, ['indoor-free', 'indoor-per-room', 'indoor-price']);
+module.exports = { WORDS, word, TOPICS, MORE_KEYS, tokens, kindHelp, fill, CONCEPTS, NOT_IF, FIT, DANGER };

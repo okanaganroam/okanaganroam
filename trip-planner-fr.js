@@ -51,6 +51,10 @@ const STRONG_ON_FRENCH_PAGE = new Set(['brasserie', 'brasseries', 'cidrerie', 'c
 // interpreter's own English phrases (discovery-intent.js), so nothing here
 // can introduce a meaning the planner does not already have. '' drops a word.
 const PHRASES = [
+  // Sport test 13 (2026-11-21): « fin de semaine de golf dans le sud de l'Okanagan » planned the whole valley around
+  // « sud » (and Kelowna on the live site): the south and north of the Okanagan are those areas' towns.
+  ['dans le sud de l okanagan', 'in the south okanagan'], ['le sud de l okanagan', 'the south okanagan'], ['sud de l okanagan', 'south okanagan'], ['dans l okanagan sud', 'in the south okanagan'], ['l okanagan sud', 'the south okanagan'], ['okanagan sud', 'south okanagan'],
+  ['dans le nord de l okanagan', 'in the north okanagan'], ['le nord de l okanagan', 'the north okanagan'], ['nord de l okanagan', 'north okanagan'], ['dans l okanagan nord', 'in the north okanagan'], ['l okanagan nord', 'the north okanagan'], ['okanagan nord', 'north okanagan'],
   // Tour test 15 (Whistler, 2026-11-18; Dave, canoe, kayak and SUP rentals, a sunset paddle, snowshoe and fondue evenings):
   // « location de canot à Whistler en juillet » read « location of canoe » and found nothing. Rentals by what is rented
   // (singular and plural, canoë too), the paddle at sunset, the snowshoe-and-fondue evening (a snowshoe tour, not a

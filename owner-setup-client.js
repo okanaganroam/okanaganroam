@@ -1665,6 +1665,12 @@
       });
     });
   }
+  // Sport test 13 (2026-11-21; Gord's own line "Pro shop open Tue and Thu 10 to 2 in December…" lit the "Pro shop" chip,
+  // and a tap on it would have cut "Pro shop" out of his sentence): on an indoor or sport place a chip shows as picked only
+  // when she tapped it on this visit, or a sentence of the box is exactly the chip.
+  var QTAP = {};
+  function chipExact(v, t){ var k = String(t || '').toLowerCase().replace(/[\s.;:!?]+$/, '').trim(); return !!k && sentencesOf(v).some(function(x){ return x.toLowerCase().replace(/[\s.;:!?]+$/, '').trim() === k; }); }
+  function chipOn(v, t, sibs, boxId){ if (!INDOOR) return saysIt(v, t, sibs); return chipExact(v, t) || (!!QTAP[(boxId || '') + '|' + t] && has(v, t)); }
   // Cocktail test 3 (2026-11-14): a Groups line in sentences. A "book ahead from N" sentence (a size), and the sentences
   // that carry a fact a size chip doesn't ("Private room for 20": a room, a capacity) and so are never dropped by a tap.
   function sentencesOf(v){ return String(v || '').split(/[.;!?]+(?:\s+|$)/).map(function(x){ return x.replace(/[\s.;]+$/, '').trim(); }).filter(Boolean); }
@@ -1786,7 +1792,7 @@
     // the owner's own words in the box say is not so, for every chip and kind (unless the chip's words are in the box).
     l = l.filter(function(c){ return saysIt(value, c, l) || !chipNegated(value, c); });
     var shown = key === 'dogs' && TOUR && T.dogChipLabels && T.dogChipLabels.length === l.length ? T.dogChipLabels : l;
-    return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t, qi){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (saysIt(value, t, l) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-key="' + key + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(shown[qi]) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
+    return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t, qi){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (chipOn(value, t, l, boxId) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-key="' + key + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(shown[qi]) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
   }
   // Tour test 2 (Whistler, 2026-11-16): Good to know stopped mid-sentence at the limit with no word. A visible counter
   // ("212 / 240") that says so at the limit; a tour's Good to know holds 240 (C.bringMax, the server's own limit).
@@ -2189,7 +2195,9 @@
     var en = location.pathname.replace(/^\/fr(?=\/)/, '');
     // Tour test 10 (Whistler, 2026-11-18; Gord): "Leave it to us" queues the French description for us (the same queue as a
     // Facebook name), then goes back to the English setup. The link still works without the script.
-    return '<p class="su-hint" id="suFrDescEnLead" lang="en">' + h(E.lead) + ' <a class="su-link" id="suFrDescLeave" data-act="frLeave" href="' + h(en) + '">' + h(E.leave) + '</a></p>';
+    // Sport test 13 (2026-11-21): the French screen says it in French first; the English follows for her, marked English.
+    var fr = T.frDescEnLead && T.frDescEnLead !== E.lead ? T.frDescEnLead : '', frLeave = T.frDescLeave && T.frDescLeave !== E.leave ? T.frDescLeave : '';
+    return '<p class="su-hint" id="suFrDescEnLead"' + (fr ? '' : ' lang="en"') + '>' + (fr ? h(fr) + ' <span lang="en">(' + h(E.lead) + ')</span>' : h(E.lead)) + ' <a class="su-link" id="suFrDescLeave" data-act="frLeave" href="' + h(en) + '">' + (frLeave ? h(frLeave) + ' <span lang="en">(' + h(E.leave) + ')</span>' : h(E.leave)) + '</a></p>';
   }
   function frOnlyFinish(){ var noFr = !CUR.description_fr && T.frOnlyFinishNoStory; return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish"' + (noFr ? ' data-nostory="1"' : '') + '>' + h(noFr ? fill(T.frOnlyFinishNoStory, { story: T.labels.story }) : T.frOnlyFinish) + '</p>' : ''; }
   // Indoor test 7 (2026-11-19; Robert's gallery): one source of truth with the checklist. A skipped step whose scored items
@@ -2556,7 +2564,9 @@
       // now starts from the current hours as a short list, one row a day with a big Change button; only the days tapped
       // open up (the full card: Open/Closed, the times, Midnight / 1 AM / 2 AM, the early-morning note, "Same as"). An
       // open day can copy its hours to every day or Mon–Fri. Days never opened keep their hours exactly as stored.
-      if (!seas && !S.hoursOpenSet) { S.hoursOpenSet = true; S.hoursOpen = {}; if (!DAYS.some(function(d){ return S.week[d]; })) S.hoursOpen.mon = true; }
+      // Sport test 13 (2026-11-21; t9–t13: a page with no hours opened the editor with Monday's card open, on "Closed" in the
+      // owner's eyes): no day's card is opened for her; every day is a row with its Change button.
+      if (!seas && !S.hoursOpenSet) { S.hoursOpenSet = true; S.hoursOpen = {}; }
       if (!seas && !S.hoursAutoMonSet) { S.hoursAutoMonSet = true; if (S.hoursOpen.mon && !DAYS.some(function(d){ return S.week[d]; })) S.hoursAutoMon = true; }
       var wk = W(), hop = HO(), firstOpenCard = DAYS.filter(function(d){ return hop[d] && wk[d]; })[0];
       // Exact days (pub test 7): "open late May to early September" without rounding to whole months.
@@ -5268,7 +5278,7 @@
       var gv = gsx.value, gs = sentencesOf(gv).filter(function(x){ return (isSizeLine(x) || /book|réserv/i.test(x)) && !sizeFact(x); })[0] || '', gn = (/\b(\d{1,2})\b/.exec(gs) || [])[1] || sizeFactChip(gv);
       Array.prototype.forEach.call(screen.querySelectorAll('[data-bgroup]'), function(c){ var n0 = +c.getAttribute('data-bgroup'); c.setAttribute('aria-pressed', sentencesOf(gv).indexOf(groupsSizeLine(n0)) >= 0 || (!!gn && +gn === n0) ? 'true' : 'false'); });
       var qs = Array.prototype.filter.call(screen.querySelectorAll('[data-quick]'), function(c){ return c.getAttribute('data-box') === 'suGroupsLine'; }), ql = qs.map(function(c){ return c.getAttribute('data-quick'); });
-      qs.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(gv, c.getAttribute('data-quick'), ql) ? 'true' : 'false'); });
+      qs.forEach(function(c){ c.setAttribute('aria-pressed', chipOn(gv, c.getAttribute('data-quick'), ql, 'suGroupsLine') ? 'true' : 'false'); });
       if (!gv.trim() && S.trimNote) trimNoteSet('suGroupsLine', ''); });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-bq]'), function(b){ b.onclick = function(){ readTimes(); var q11 = b.getAttribute('data-bq').split(':'), wk = W(), w11 = wk[q11[0]] && wk[q11[0]][+q11[1]]; if (!w11) return; w11[+q11[2]] = q11[3] + ':' + q11[4]; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     // Tours (2026-11-16): one-of-a-few answers, the kinds (up to 3), "under 18s with an adult" and "no online bookings".
@@ -5362,7 +5372,12 @@
       // Cocktail test 3 (2026-11-14): un-pressing a chip inside a longer Groups sentence ("Private room for 20") takes
       // that whole sentence away, never leaving "for 20" behind.
       var inLonger = qk === 'groups' && has(v, t) && sentencesOf(v).filter(function(x){ return has(x, t) && x.toLowerCase() !== t.toLowerCase(); }).length;
+      var bid = b.getAttribute('data-box'), onNow = chipOn(v, t, sibs, bid);
       if (inLonger) v = sentencesOf(v).filter(function(x){ return !has(x, t); }).join(sep);
+      // Sport test 13: on an indoor or sport place, a chip not shown as picked is added, never cut out of her own words.
+      else if (INDOOR && !onNow && !(v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0 && !(TL && qk === 'good_to_know'))) { QTAP[bid + '|' + t] = 1; v = v ? v.replace(/[\s.,]+$/, '') + sep + t : t; }
+      else if (INDOOR && onNow && !chipExact(v, t) && has(v, t)) { delete QTAP[bid + '|' + t]; var i9 = v.toLowerCase().lastIndexOf(t.toLowerCase()); v = (v.slice(0, i9) + v.slice(i9 + t.length)).replace(/([.,])\s*[.,]/g, '$1').replace(/^[\s.,]+|[\s.,]+$/g, '').replace(/\s{2,}/g, ' '); }
+      else if (INDOOR && onNow) { delete QTAP[bid + '|' + t]; var tk = t.toLowerCase().replace(/[\s.;:!?]+$/, '').trim(); v = keepPieces(v, sentencesOf(v).filter(function(x){ return x.toLowerCase().replace(/[\s.;:!?]+$/, '').trim() !== tk; })); }
       else if (has(v, t)) { var i = v.toLowerCase().indexOf(t.toLowerCase()); v = (v.slice(0, i) + v.slice(i + t.length)).replace(/([.,])\s*[.,]/g, '$1').replace(/^[\s.,]+|[\s.,]+$/g, '').replace(/\s{2,}/g, ' '); }
       // Distillery test 2 (Whistler, 2026-11-16): the same for the line we pre-filled from research on a taproom's dogs screen
       // (« Chiens bienvenus à l'intérieur. » + « Terrasse seulement » read as both): the tap replaces it.
@@ -5390,7 +5405,7 @@
       // had text still takes the focus at its end (tour test 12).
       // Indoor test 5 (Chris): every chip box, so what is typed next goes at the end, never mid-line.
       if (!wasEmpty || touchTap) { try { box.focus(); var bl = box.value.length; box.setSelectionRange(bl, bl); } catch (e9) { /* older phones */ } }
-      mine.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(box.value, c.getAttribute('data-quick'), sibs) ? 'true' : 'false'); });
+      mine.forEach(function(c){ c.setAttribute('aria-pressed', chipOn(box.value, c.getAttribute('data-quick'), sibs, c.getAttribute('data-box')) ? 'true' : 'false'); });
     }; });
     var fold = el('suFold'); if (fold) fold.addEventListener('toggle', function(){ S.moreOpen = fold.open; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-sport]'), function(b){ b.onclick = function(){ var k = b.getAttribute('data-sport'); S.sports.list[k] = !S.sports.list[k]; b.setAttribute('aria-pressed', S.sports.list[k] ? 'true' : 'false'); S.nudge = ''; }; });
@@ -5632,7 +5647,7 @@
     var mine = Array.prototype.filter.call(screen.querySelectorAll('[data-quick]'), function(c){ return c.getAttribute('data-box') === id; }); if (!mine.length) return;
     var sibs = mine.map(function(c){ return c.getAttribute('data-quick'); });
     if (e.target._qPrev == null || quickJoin(e.target, e.target._qPrev, sibs, mine[0].getAttribute('data-sep') || '. ') !== 'wait') e.target._qPrev = e.target.value;
-    mine.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(e.target.value, c.getAttribute('data-quick'), sibs) ? 'true' : 'false'); });
+    mine.forEach(function(c){ c.setAttribute('aria-pressed', chipOn(e.target.value, c.getAttribute('data-quick'), sibs, id) ? 'true' : 'false'); });
   };
   screen.addEventListener('input', quickTyped);
   screen.addEventListener('input', function(e){ countUpdate(e.target); });

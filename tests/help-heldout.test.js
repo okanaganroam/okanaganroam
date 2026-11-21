@@ -24,7 +24,9 @@ const S89 = require('./help-sport89-questions.js'), S10 = require('./help-sport1
 const S11 = require('./help-sport11-questions.js');
 // Sport test 12 (2026-11-21): Rob's 16.
 const S12 = require('./help-sport12-questions.js');
-const SRC = { ...H0.SRC, ...S89.SRC, ...S10.SRC, ...S11.SRC, ...S12.SRC }, Q = [...H0.Q, ...S89.Q, ...S10.Q, ...S11.Q, ...S12.Q], KNOWN_MISS = H0.KNOWN_MISS;
+// Sport test 13 (2026-11-21): Gord and Linda's 22.
+const S13 = require('./help-sport13-questions.js');
+const SRC = { ...H0.SRC, ...S89.SRC, ...S10.SRC, ...S11.SRC, ...S12.SRC, ...S13.SRC }, Q = [...H0.Q, ...S89.Q, ...S10.Q, ...S11.Q, ...S12.Q, ...S13.Q], KNOWN_MISS = H0.KNOWN_MISS;
 app.setVenueSubmissionTransport(async () => {});
 
 let srv, base;
@@ -59,16 +61,20 @@ async function botsFor(src, n) {
 test('held-out Help: real owner questions land on a good answer, never a harmful one', async () => {
   const bots = {}; let n = 0;
   for (const src of Object.keys(SRC)) bots[src] = await botsFor(src, ++n);
-  const harmful = [], newMiss = [];
+  const harmful = [], newMiss = [], askUs = [];
   let good = 0;
   for (const [src, page, lang, q, ok, harm] of Q) {
     const r = bots[src][page][lang].best(q);
     const fine = r.id ? ok.includes(r.id) : ok.includes('UNSURE');
     if (r.id && harm.includes(r.id)) harmful.push(`${src} "${q}" -> ${r.id}`);
     if (fine && !(r.id && harm.includes(r.id))) good++;
+    // Sport test 13 (Dayton: answer only when sure): on a sport or golf place a weak match may become an honest Ask us
+    // (counted below), never a wrong answer.
+    else if (!r.id && !/^indoor/.test(src)) askUs.push(`${src} "${q}"`);
     else if (!KNOWN_MISS.includes(q)) newMiss.push(`${src} "${q}" -> ${r.id || 'not sure'} (wants ${ok.join(' / ')})`);
   }
   assert.deepEqual(harmful, [], 'no real question may land on an answer that undoes the owner’s setup');
   assert.deepEqual(newMiss, [], 'a question that landed well must keep landing well');
+  assert.ok(askUs.length <= 4, `Ask us in place of an answer: ${askUs.join('; ')}`);
   assert.ok(good / Q.length >= 0.97, `held-out good ${good}/${Q.length}`);
 });

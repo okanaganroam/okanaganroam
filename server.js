@@ -88,8 +88,25 @@ const { sportsPhotoForVenue } = (() => { try { return require('./sports-photo-fa
 const golfData = (() => { try { return require('./golf-data.js'); } catch (e) { return null; } })();
 // French golf "At a glance" wording (round 12, 2026-10-20); null keeps the French card off (isolated-child tests).
 const golfGlanceFr = (() => { try { return require('./golf-glance-fr.js'); } catch (e) { return null; } })();
+// Sport test 13 (2026-11-21; before setup Twin Lakes' page said "Driving range: Yes" in At a glance and "Driving range: not
+// documented" in the Value index): the value index reads the same facility facts as At a glance. A practice facility our
+// golf data hasn't documented takes its At a glance row (a row that says "None…" or "No…" is a no).
 function golfDetailsFor(venues) {
-  return golfData ? golfData.getGolfDetails(db, venues) : new Map();
+  const out = golfData ? golfData.getGolfDetails(db, venues) : new Map();
+  try {
+    for (const [key, d] of out) {
+      const rows = (typeof GOLF_AT_A_GLANCE_FACTS !== 'undefined' && GOLF_AT_A_GLANCE_FACTS[key]) || null;
+      if (!d || !rows) continue;
+      const row = (re) => (rows.find((r) => re.test(r[0])) || [])[1];
+      const yes = (t) => (t == null || !String(t).trim() ? null : /^(?:none|no)\b/i.test(String(t).trim()) ? 0 : 1);
+      const glance = { driving_range: yes(row(/^Driving range$/i)), putting_green: yes(row(/^Putting/i)), short_game: yes(row(/^Short game/i)) };
+      const fac = { ...(d.facilities || {}) };
+      let changed = false;
+      for (const k of Object.keys(glance)) if (fac[k] !== 1 && fac[k] !== 0 && glance[k] != null) { fac[k] = glance[k]; changed = true; }
+      if (changed) out.set(key, { ...d, facilities: fac });
+    }
+  } catch (e) { /* as stored */ }
+  return out;
 }
 // Canonical opening hours (2026-09-26, Open Now Phase 1): parsing and the
 // open/closed/unknown status for venues.hours live in hours.js. Nothing uses
@@ -4521,11 +4538,17 @@ function discoveryTextHas(normalized, term) {
 // every API item is built from exactly the stored values.
 // Sport test 2 (2026-11-20; "ski lessons coldstream" and « cours de ski » read the winter activity and found no ski school):
 // a ski school (its owner's kind, or its own words) is in the winter activity, as ski hills are.
+// Sport test 13 (2026-11-21; "rv park", "golf rv" and "golf and rv park" found nothing for Twin Lakes Golf Course & RV
+// Park): a sport or golf place whose name or its owner's own lines say it has an RV park or campground is found by a
+// camping search too.
+const SPORT_CAMPING_RE = /\b(?:rv park|rv parks|rv sites?|rv resort|rv camping|campground|campgrounds|campsites?|camping)\b/i;
 function sportSearchActivities(row, acts) {
   try {
     const kinds = venueIndoorInfo(row.id).kinds || [];
     const ski = kinds.length ? kinds.includes('skischool') : /\b(?:ski|snowboard)(?: (?:and|&) snowboard)? (?:lessons?|school)\b|\bnight skiing\b/i.test(`${row.name || ''} ${row.cuisine || ''} ${row.description || ''}`);
-    return ski && !acts.includes('winter') ? acts.concat(['winter']) : acts;
+    let out = ski && !acts.includes('winter') ? acts.concat(['winter']) : acts;
+    if (!out.includes('camping') && (SPORT_CAMPING_RE.test(row.name || '') || SPORT_CAMPING_RE.test(indoorOwnLines(row.id, /^(?:good to know|known for|groups)$/i).join(' ')))) out = out.concat(['camping']);
+    return out;
   } catch (e) { return acts; }
 }
 // Sport test 8 (2026-11-21; Marg's Lumby course: disc golf, her second kind, never reached search, and "disc golf lumby"
@@ -6121,7 +6144,11 @@ function golfPartOf(row, kind) {
     const TR = require('./trip-requirements');
     const v = { ...row, ...(Array.isArray(kinds) && kinds.length ? { sportKinds: kinds } : {}), knownFor: kf };
     const norm = (x) => String(x || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-    return TR.golfPartKind(v, kind, norm(`${row.name || ''} ${row.description || ''}`), norm(row.name));
+    if (TR.golfPartKind(v, kind, norm(`${row.name || ''} ${row.description || ''}`), norm(row.name))) return true;
+    // Sport test 13 (2026-11-21; "driving range" left out Twin Lakes, whose owners tapped "Driving range on site"): a
+    // golf course whose owner's own Good to know says it has a driving range is found by a driving range search too
+    // (after the ranges themselves: smartOwnerKind).
+    return kind === 'driving_range' && row.type === 'golf' && /\bdriving range on site\b|\bchamp de pratique sur place\b/i.test(indoorOwnLines(row.id, /^good to know$/i).join(' '));
   } catch (e) { return false; }
 }
 function smartActivityPick(activity, region, features) {
@@ -7403,16 +7430,23 @@ function searchIndoorNearTowns(run, text, lang) {
 // Sport tests 8 and 9 (2026-11-21; "nine hole golf near vernon" and "golf near penticton" never listed Lumby or Summerland,
 // 25 and 10 minutes away, while Build My Trip plans them): "near <town>" (« près de <ville> ») takes in the towns around it
 // (TRIP_SITE nearTowns), the town asked first (searchSportOrder).
+// Sport test 13 (2026-11-21; Twin Lakes in Kaleden, 15 minutes south, was in no "golf penticton" search, EN or FR): a
+// sport or golf search that names one town takes in the towns around it too, without "near", the town's own places first
+// (searchSportOrder). The town's hub pages keep their own lists; this is search only. Penticton's towns for search also
+// take in Okanagan Falls (SEARCH_NEAR_EXTRA).
+const SEARCH_NEAR_EXTRA = { penticton: ['okanagan-falls'] };
 function searchNearTownsWiden(run, text, lang) {
   const regions = (run && run.intent && run.intent.regions) || [];
   if (regions.length !== 1 || !(TRIP_NEAR_TOWNS[regions[0]] || []).length) return run;
   const town = regions[0], label = REGION_LABELS[town];
   const esc = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const sporty = ((run.intent.types || []).some((t) => t === 'golf' || t === 'sport'));
   const re = new RegExp(`(^|[^A-Za-z])(?:near|nearby|around|close to|pr[eè]s de|proche de|autour de)\\s+(?:the\\s+)?${esc}(?![A-Za-z])`, 'i');
-  const m = re.exec(text);
+  const reTown = new RegExp(`(^|[^A-Za-z])(?:(?:in|at|a|à|en)\\s+)?${esc}(?![A-Za-z])`, 'i');
+  const m = re.exec(text) || (sporty ? reTown.exec(text) : null);
   if (!m) return run;
-  const towns = [town, ...TRIP_NEAR_TOWNS[town]].map((r) => REGION_LABELS[r]).filter(Boolean);
-  const wider = runDiscovery(text.replace(re, (all, pre) => `${pre}${towns.slice(0, -1).join(', ')} and ${towns[towns.length - 1]}`), { limit: SEARCH_PAGE_MAX_RESULTS, lang });
+  const towns = [town, ...TRIP_NEAR_TOWNS[town], ...(SEARCH_NEAR_EXTRA[town] || []).filter((r) => !TRIP_NEAR_TOWNS[town].includes(r))].map((r) => REGION_LABELS[r]).filter(Boolean);
+  const wider = runDiscovery(text.replace(re.exec(text) ? re : reTown, (all, pre) => `${pre}${towns.slice(0, -1).join(', ')} and ${towns[towns.length - 1]}`), { limit: SEARCH_PAGE_MAX_RESULTS, lang });
   if (((wider.results && wider.results.total) || 0) <= ((run.results && run.results.total) || 0)) return run;
   wider.query = run.query; wider.searchText = run.searchText;
   Object.defineProperty(wider, 'askedTowns', { value: [town], enumerable: false });
@@ -7889,6 +7923,9 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
         return own.length ? { cuisine: w ? w.toLowerCase() : null, cuisines: w ? [w.toLowerCase()] : [] } : { cuisine: v.cuisine ? String(v.cuisine).toLowerCase().trim() : null, cuisines: venueCuisineList(v).map((c) => String(c).toLowerCase().trim()) }; })(),
       cuisineLabel: v.cuisine || null,
       textName: normalize(v.name || ''), textCuisine: normalize(venueCuisineList(v).join(' ') || v.cuisine || ''), textDesc: normalize(`${v.description || ''}${knownForById.has(v.id) ? ` ${knownForById.get(v.id)}` : ''}${v.type === 'shop' ? ' shop shops shopping store stores' : ''}${v.type === 'cafe' ? cafePlannerWords(v) : ''}`) + (sportSetupType(v.type) ? sportPlannerWords(v).map((x) => ` ${normalize(x)}`).join('') : ''),
+      // Sport test 13: a golf place's season words are read from its description alone, sentence by sentence, without the
+      // sentences about a part of it (trip-planner.js offSeasonSkip).
+      ...(sportSetupType(v.type) ? { textSeason: require('./trip-planner').seasonSentences(v.description || '') } : {}),
       ...(v.type === 'shop' ? { isShop: true } : {}),
       ...(groupsById.has(v.id) ? { groupsText: groupsById.get(v.id) } : {}),
       ...(dateNightById.has(v.id) ? { dateNightLine: dateNightById.get(v.id) } : {}),
@@ -55733,7 +55770,7 @@ function queueHappyHourDealsFr(venue, deals, contactEmail) {
 // Sport test 6 (2026-11-20; Priya's setup left 4 French-lines items for one listing in /admin/review, beside the French
 // description): an owner's pending English lines and price names are ONE review item. A new line joins the open item
 // (the newest words of each line win); one is added only when there is none. -> the item's id, or null when nothing changed.
-const FR_LINES_LABELS_FR = ['Known for', 'Good to know', 'Groups', 'Happy hour', 'Prices', 'Closures'];
+const FR_LINES_LABELS_FR = ['Known for', 'Good to know', 'Groups', 'Happy hour', 'Prices', 'Price details', 'Closures'];
 // Sport test 11: the same item names her French lines to write in English ("Known for (write the English): …").
 const FR_LINES_LABELS = [...FR_LINES_LABELS_FR, ...['Story', ...FR_LINES_LABELS_FR].map((l) => l + FR_LINES_EN_SUFFIX)];
 const FR_LINES_PRE = { lines: 'Their own English lines changed: please write the French for them on their listing (queued automatically).', prices: 'Their price names are in English: please write the French for them on their listing (queued automatically).',
@@ -55756,7 +55793,8 @@ function frLinesParts(note) {
 function frLinesNote(parts) {
   const labels = FR_LINES_LABELS.filter((l) => parts[l]);
   const toFr = labels.filter((l) => !l.endsWith(FR_LINES_EN_SUFFIX)), toEn = labels.filter((l) => l.endsWith(FR_LINES_EN_SUFFIX));
-  const pre = toEn.length && toFr.length ? FR_LINES_PRE.mixed : toEn.length ? FR_LINES_PRE.english : toFr.every((l) => l === 'Prices') ? FR_LINES_PRE.prices : toFr.includes('Prices') ? FR_LINES_PRE.both : FR_LINES_PRE.lines;
+  const priceL = (l) => l === 'Prices' || l === 'Price details';
+  const pre = toEn.length && toFr.length ? FR_LINES_PRE.mixed : toEn.length ? FR_LINES_PRE.english : toFr.every(priceL) ? FR_LINES_PRE.prices : toFr.some(priceL) ? FR_LINES_PRE.both : FR_LINES_PRE.lines;
   return `${pre} ${labels.map((l) => `${l}: ${parts[l]}`).join(' | ')}`.slice(0, 1500);
 }
 function frLinesUpsert(venueId, parts, contactEmail) {
@@ -55802,10 +55840,15 @@ function sendFrLinesEmailNow(venueId) {
 function queueFrPriceNames(venueId, data) {
   const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
   if (!v || !kindSetupType(v.type)) return false;
-  const names = [...new Set(((data && data.sections) || []).flatMap((sec) => [sec && sec.name, ...((sec && sec.items) || []).map((it) => it && it.name)]).map((x) => String(x || '').trim()).filter(Boolean))];
+  // (Sport test 13: the editor's own first section name is ours, never queued: the French page says it in French.)
+  const names = [...new Set(((data && data.sections) || []).flatMap((sec) => [sec && !PRICE_SECTION_DEFAULT_FR[String(sec.name || '').trim().toLowerCase()] ? sec.name : '', ...((sec && sec.items) || []).map((it) => it && it.name)]).map((x) => String(x || '').trim()).filter(Boolean))];
+  // Sport test 13 (2026-11-21; Linda's "Open to 4 pm", "Mon to Thu, prime time…" stayed English on the French page): each
+  // line's details are queued with the names.
+  const details = [...new Set(((data && data.sections) || []).flatMap((sec) => ((sec && sec.items) || []).map((it) => it && it.description)).map((x) => String(x || '').trim()).filter(Boolean))];
   if (!names.length) return false;
   // Sport test 11: a list typed in French asks for its English names (it asked for "the French" of « 18 trous, matin »).
-  const id = frLinesUpsert(venueId, { [priceListIsFrench(data) ? 'Prices' + FR_LINES_EN_SUFFIX : 'Prices']: names.join(' | ') }, null);
+  const fr0 = priceListIsFrench(data);
+  const id = frLinesUpsert(venueId, { [fr0 ? 'Prices' + FR_LINES_EN_SUFFIX : 'Prices']: names.join(' | '), ...(details.length ? { [fr0 ? 'Price details' + FR_LINES_EN_SUFFIX : 'Price details']: details.join(' | ') } : {}) }, null);
   if (!id) return false;
   frLinesEmailSoon(venueId, id, null);
   return true;
@@ -61876,6 +61919,13 @@ ${pageHead(`${plain(opts.mode === 'admin' ? t.adminTitle : t.title)}${lang === '
   body.owner-page .mn-wait { background: #7A5A00; border-color: #7A5A00; color: #fff; }
   body.owner-page .mn-block { margin: 8px 0; }
   body.owner-page .mn-wrap, body.owner-page .mn-menu, body.owner-page .mn-item { min-width: 0; overflow-wrap: anywhere; }
+  /* Sport test 13 (2026-11-21; at 360 px the floating Help button sat on "Delete this rate"): on phones, while a line is
+     open, Help is the small round "?" in the corner, and Done and Delete sit side by side on the left, clear of it. */
+  @media (max-width: 699px) {
+    body.owner-page:has(.mn-open) .ohb-btn { width: 44px; height: 44px; padding: 0; justify-content: center; gap: 0; font-size: 0; }
+    body.owner-page:has(.mn-open) .ohb-btn .ohb-q { width: 32px; height: 32px; font-size: 1.1rem; }
+    body.owner-page .mn-open .mn-row { justify-content: flex-start; column-gap: 20px; padding-right: 56px; }
+  }
 </style>
 </head>
 <body class="golf-page owner-page">
@@ -64227,8 +64277,8 @@ const SPORT_OWN_HELP_TOPICS = [SPORT_SEASON_TOPIC,
     q: 'Our course details on the page (holes, par, green fees)', qFr: 'Les détails de notre parcours sur la page (trous, normale, droits de jeu)',
     keys: ['holes', '18 holes', '9 holes', 'par', 'yardage', 'yards', 'slope', 'rating', 'course rating', 'course details', 'course facts', 'scorecard', 'course map', 'designer', 'executive course', 'championship course', 'twilight', 'twilight rate', 'green fee', 'green fees', 'wrong green fee', 'old green fee', 'glance'],
     keysFr: ['trous', '18 trous', '9 trous', 'normale', 'verges', 'carte de pointage', 'details du parcours', 'crepuscule', 'droit de jeu', 'droits de jeu'],
-    a: '<p>Your main green fee goes on <strong>Price</strong>: your lowest regular adult rate, 9 or 18 holes. Your card and your page show it as “Green fees from $55”. Twilight, 9-hole, cart and pass prices go in <strong>Your prices</strong>, one line each. The course facts at the top of your page (holes, par, the course map link) come from our checked golf data: something wrong there? Tap <strong>Message us</strong> and Dayton will fix it. Last year’s green fee table from our research? It comes off your page once your own price is in.</p>',
-    aFr: '<p>Votre droit de jeu principal va dans <strong>Prix</strong> : votre tarif adulte régulier le moins cher, 9 ou 18 trous. Votre fiche et votre page l’affichent « Droits de jeu à partir de 55 $ ». Les tarifs du crépuscule, de 9 trous, de voiturette et d’abonnement vont dans <strong>Vos tarifs</strong>, une ligne chacun. Les faits du parcours en haut de votre page (trous, normale, lien vers la carte) viennent de nos données de golf vérifiées : une erreur? Touchez <strong>Nous écrire</strong> et Dayton la corrigera. Le tableau des droits de jeu de l’an dernier, tiré de nos recherches? Il quitte votre page dès que votre propre prix est entré.</p>' },
+    a: '<p>Your main green fee goes on <strong>Price</strong>: your lowest regular adult rate, 9 or 18 holes. Your card and your page show it as “Green fees from $55”. Twilight, 9-hole, cart and pass prices go in <strong>Your prices</strong>, one line each. The course facts at the top of your page (holes, par, the course map link) come from our checked golf data: something wrong there? Tap <strong>Message us</strong> and Dayton will fix it. The green fee table from our research? Yes, it changes: once your own prices are in (we check them first, usually within a day), your list shows instead and research’s table comes off.</p>',
+    aFr: '<p>Votre droit de jeu principal va dans <strong>Prix</strong> : votre tarif adulte régulier le moins cher, 9 ou 18 trous. Votre fiche et votre page l’affichent « Droits de jeu à partir de 55 $ ». Les tarifs du crépuscule, de 9 trous, de voiturette et d’abonnement vont dans <strong>Vos tarifs</strong>, une ligne chacun. Les faits du parcours en haut de votre page (trous, normale, lien vers la carte) viennent de nos données de golf vérifiées : une erreur? Touchez <strong>Nous écrire</strong> et Dayton la corrigera. Le tableau des droits de jeu tiré de nos recherches? Oui, il change : dès que vos propres tarifs sont entrés (nous les vérifions d’abord, en général d’ici un jour), votre liste paraît et le tableau des recherches disparaît.</p>' },
   { id: 'sport-members', pages: ['setup', 'edit'], over: ['indoor-busy-times', 'indoor-booking', 'indoor-age'],
     q: 'Members-only times, or a private or semi-private club', qFr: 'Heures réservées aux membres, ou club privé ou semi-privé',
     keys: ['members only', 'member only', 'members times', 'member times', 'semi private', 'semi-private', 'private club', 'members and guests', 'guests of members', 'public welcome', 'non members', 'nonmembers', 'public tee times', 'members get priority', 'league nights', 'leagues', 'league'],
@@ -64288,8 +64338,8 @@ const SPORT_TEST1_HELP_TOPICS = [
     q: 'Tournaments, competitions and charity events', qFr: 'Tournois, compétitions et événements de bienfaisance',
     keys: ['tournament', 'tournaments', 'charity tournament', 'charity tournaments', 'host tournaments', 'we host tournaments', 'we host charity tournaments', 'golf tournament', 'golf tournaments', 'corporate tournament', 'fundraiser', 'fundraisers', 'charity golf', 'charity event', 'scramble', 'charity scramble', 'add our tournaments', 'how do i add our tournaments', 'competition', 'competitions', 'contest', 'contests', 'race day', 'provincial race', 'provincial races', 'regional race', 'swim meet', 'swim meets', 'meet', 'regatta', 'jam'],
     keysFr: ['tournoi', 'tournois', 'tournoi de charite', 'tournois de bienfaisance', 'tournoi caritatif', 'collecte de fonds', 'nos tournois', 'tournois par annee', 'competition', 'competitions', 'course provinciale'],
-    a: '<p>On <strong>Groups and events</strong>, {TOURN_EN}, like <em>{TOURN_EX}</em>. A tournament on a set date that people can join or watch? Add it with <strong>Add an event</strong> on your page: it shows on What’s On. Closed to the public that day? Add the date under <strong>Closures and holidays</strong>.</p>',
-    aFr: '<p>Dans <strong>Groupes et événements</strong>, {TOURN_FR}, comme <em>{TOURN_EX}</em>. Un tournoi à une date fixe auquel on peut participer ou assister? Ajoutez-le avec <strong>Ajouter un événement</strong> sur votre page : il paraît dans À l’affiche. Fermé au public ce jour-là? Ajoutez la date sous <strong>Fermetures et jours fériés</strong>.</p>' },
+    a: '<p>On <strong>Groups and events</strong>, {TOURN_EN}, like <em>{TOURN_EX}</em>. A tournament on a set date that people can join or watch? Add it with <strong>Add an event</strong> on your page: it shows on What’s On. Closed to the public that day? Add the date under <strong>Closures and holidays</strong>. Still open to the public, like a prize draw on your last weekend? Don’t add a closure: just add it as an event.</p>',
+    aFr: '<p>Dans <strong>Groupes et événements</strong>, {TOURN_FR}, comme <em>{TOURN_EX}</em>. Un tournoi à une date fixe auquel on peut participer ou assister? Ajoutez-le avec <strong>Ajouter un événement</strong> sur votre page : il paraît dans À l’affiche. Fermé au public ce jour-là? Ajoutez la date sous <strong>Fermetures et jours fériés</strong>. Toujours ouvert au public, comme un tirage de prix la dernière fin de semaine? N’ajoutez pas de fermeture : ajoutez-le seulement comme événement.</p>' },
 ];
 // Sport test 2 (2026-11-20; Trevor, a golf simulator lounge, asked 38 questions and Help missed 13, four in a row on his
 // price list): the answers his questions needed, for every sport kind in its own words ({TOKENS}: sportTest2Tokens).
@@ -64852,6 +64902,9 @@ function sport5HelpCtx(venue, kind) {
     if (sib) out.sister = { id: sib.id, name: sib.name };
   } catch (e) { /* none */ }
   // Search: a ski school asked for from a valley town lists the nearest hills (discovery-search, sport test 5 #9).
+  // Sport test 13 (2026-11-21): a town search ("golf penticton") also shows places in the towns next to it (Kaleden,
+  // Summerland, Naramata, Okanagan Falls), after that town's own.
+  if (kind === 'golf' || kind === 'discgolf' || kind === 'range') out.near = { en: 'A search for golf in a town, like Penticton, also lists places a short drive away in the towns next to it, after that town’s own.', fr: 'Une recherche de golf dans une ville, comme Penticton, montre aussi les endroits à courte distance dans les villes voisines, après ceux de la ville.' };
   if (kind === 'skischool') out.near = { en: 'Someone searching for ski lessons in a valley town, like Kelowna, finds the nearest ski hill’s lessons, with how far they are.', fr: 'Quelqu’un qui cherche des cours de ski dans une ville de la vallée, comme Kelowna, trouve les cours de la station la plus proche, avec la distance.' };
   return out;
 }
@@ -66579,6 +66632,13 @@ function venueMenuPreviewHtml(venue, menu, lang) {
   </section>`;
 }
 
+// Sport test 13 (2026-11-21; the French prices page headed Twin Lakes' list "Green fees"): the section names the price
+// editor starts a list with are the site's own words, so the French page says them in French. A name the owner typed
+// stays as typed (its French is written by hand, with the price names).
+const PRICE_SECTION_DEFAULT_FR = { 'green fees': 'Droits de jeu', prices: 'Prix' };
+function priceSectionNameIn(name, lang) {
+  return lang === 'fr' ? PRICE_SECTION_DEFAULT_FR[String(name || '').trim().toLowerCase()] || name : name;
+}
 // Sport test 3 (2026-11-20; Gord's range's prices page said "Golf Course in Kelowna, BC" under "Golf Courses"): a sport or
 // golf listing whose main kind isn't a golf course is named by its kind ("Driving range & mini golf"), and its hub is
 // "Golf" (the hub lists every kind of golf). null: the category's own words.
@@ -66709,7 +66769,7 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
   // Sport test 11: an owner's list typed in French says so on the English page (until its English names are written).
   const frList = lang !== 'fr' && kindSetupType(venue.type) && priceListIsFrench(menu.data);
   const sections = (frList ? `<p class="vm-note vm-lang-note">${escapeHtml(PRICE_LIST_IN_FRENCH_NOTE)}</p>\n  ` : '') + menu.data.sections.map((s) => `<section class="vm-section"${frList ? ' lang="fr"' : ''}>
-    ${s.name ? `<h2>${escapeHtml(s.name)}</h2>` : ''}${s.note ? `<p class="vm-note">${escapeHtml(s.note)}</p>` : ''}
+    ${s.name ? `<h2>${escapeHtml(priceSectionNameIn(s.name, lang))}</h2>` : ''}${s.note ? `<p class="vm-note">${escapeHtml(s.note)}</p>` : ''}
     <ul class="vm-list">${s.items.map((it) => menuItemHtml(it, lang, kindSetupType(venue.type))).join('')}</ul>
   </section>`).join('\n  ');
   const website = normalizeWebsiteUrl(venue.website);
@@ -68160,19 +68220,42 @@ const OWNER_HELP_SCRIPT = String.raw`
   // topic (go) when this place has it, else it becomes "I'm not sure" with Ask us. An unsure question with a clear intent
   // gets that intent's topic.
   var FITRE = (cfg.fit || []).map(function(r){ var mk = function(a){ return (a || []).map(function(x){ return new RegExp(x); }); }; return { r: r, all: mk(r.all), not: mk(r.not) }; });
+  // Sport test 13 (2026-11-21; Dayton: answer only when sure, else an honest Ask us): on a sport or golf place (cfg.sure),
+  // an answer that would change the place's own closures, season, Free entry, per-room or main price (cfg.danger) is
+  // given only on a strong match: a key of two or more real words side by side, or every word group of the topic, and
+  // no other topic close behind it. Anything else close behind a loose match is not sure either. Answers the fit check
+  // chose (its rules) stand.
   function best(q){
+    var r = bestFit(q);
+    if (!cfg.sure || !r.id || !r.why || !r.why[0] || r.why[0].id !== r.id || r.why.some(function(w){ return w && w.fit; })) return r;
+    var w0 = r.why[0], w1 = r.why[1], rel = r.why[2] && r.why[2].rel;
+    var s0 = w0.s || 0, s1 = w1 ? w1.s || 0 : 0;
+    var strong = w0.kmax >= 2 || w0.grp >= 1 || (w1 ? s0 >= 2 * s1 : s0 >= 6);
+    var close = !!w1 && !rel && s1 >= s0 * 0.9;
+    var danger = (cfg.danger || []).indexOf(r.id) >= 0;
+    var unsure = danger ? (!strong || (close && !w0.grp) || (w0.text && !s0)) : (close && w0.kmax < 2 && !w0.grp);
+    if (!unsure) return r;
+    return { id: null, hits: r.hits, lang: r.lang, why: r.why.concat([{ sure: false, was: r.id, danger: danger }]) };
+  }
+  function bestFit(q){
     var r = best0(q);
     if (!FITRE.length) return r;
     var qs = ' ' + toks(q).join(' ') + ' ';
     var M = FITRE.filter(function(f){ return f.all.every(function(x){ return x.test(qs); }) && !f.not.some(function(x){ return x.test(qs); }); }).map(function(f){ return f.r; });
     if (!M.length) return r;
+    // Sport test 13 (2026-11-21): a narrow rule only ever takes an answer away (the answer must be one of its own), never
+    // lets one through that the other rules turned down; its own next answer comes after theirs.
     var fitRules = M.filter(function(f){ return f.fit; });
-    var fits = !!r.id && fitRules.some(function(f){ return f.fit.indexOf(r.id) >= 0; });
-    var bad = !!r.id && M.some(function(f){ return f.bad && f.bad.indexOf(r.id) >= 0; });
+    var wide = fitRules.filter(function(f){ return !f.narrow; }), narrow = fitRules.filter(function(f){ return f.narrow; });
+    var inNarrow = function(id){ return narrow.every(function(f){ return f.fit.indexOf(id) >= 0; }); };
+    var isBad = function(id){ return M.some(function(f){ return f.bad && f.bad.indexOf(id) >= 0; }); };
+    var fits = !!r.id && (!wide.length || wide.some(function(f){ return f.fit.indexOf(r.id) >= 0; })) && inNarrow(r.id);
+    var bad = !!r.id && isBad(r.id);
     if (r.id && !bad && (fits || !fitRules.length)) return r;
     if (!r.id && !fitRules.length) return r;
-    var go = null, goFrom = fitRules.length ? fitRules : M.filter(function(f){ return f.bad && f.bad.indexOf(r.id) >= 0; });
-    for (var i = 0; i < goFrom.length && !go; i++) (goFrom[i].go || []).forEach(function(g){ if (!go && byIdM[g] && g !== r.id) go = g; });
+    var go = null, goFrom = fitRules.length ? wide.concat(narrow) : M.filter(function(f){ return f.bad && f.bad.indexOf(r.id) >= 0; });
+    for (var i = 0; i < goFrom.length && !go; i++) (goFrom[i].go || []).forEach(function(g){ if (!go && byIdM[g] && g !== r.id && inNarrow(g) && !isBad(g)) go = g; });
+    for (var i2 = 0; i2 < goFrom.length && !go; i2++) (goFrom[i2].go || []).forEach(function(g){ if (!go && byIdM[g] && g !== r.id) go = g; });
     var lead = go ? [go] : [];
     if (!go) fitRules.forEach(function(f){ f.fit.forEach(function(x){ if (byIdM[x] && lead.indexOf(x) < 0 && lead.length < 2) lead.push(x); }); });
     var hits = lead.concat(r.hits.filter(function(x){ return lead.indexOf(x) < 0 && !(fitRules.length && fitRules.every(function(f){ return f.fit.indexOf(x) < 0; }) && x === r.id); }));
@@ -68524,11 +68607,14 @@ function ownerHelpWidgetHtml(page, opts = {}) {
   // Tours (2026-11-16): no happy hour at all, so its topics aren't there to be found either.
   if (opts.dropHappyHour) cfg.topics = cfg.topics.filter((t) => !HELP_HAPPY_RE.test(`${t.q} ${t.qFr}`));
   // Sport test 7: a sport or golf place's topics carry their concept groups (sport-help.js CONCEPTS; the matcher's allOfAny).
-  try { const pv0 = opts.venueId ? getVenue(opts.venueId) : null; if (pv0 && sportSetupType(pv0.type)) { const C0 = sport5HelpModule.CONCEPTS || {}; cfg.cover = true; cfg.coverAdd = 0.5; const golfCourse0 = (venueIndoorInfo(pv0.id).kinds || [])[0] === 'golf' || (pv0.type === 'golf' && !(venueIndoorInfo(pv0.id).kinds || []).length); cfg.fit = (sport5HelpModule.FIT || []).filter((r) => !r.golfCourse || golfCourse0).map(({ golfCourse, ...r }) => r);
+  try { const pv0 = opts.venueId ? getVenue(opts.venueId) : null; if (pv0 && sportSetupType(pv0.type)) { const C0 = sport5HelpModule.CONCEPTS || {}; cfg.cover = true; cfg.coverAdd = 0.5; cfg.sure = true; cfg.danger = sport5HelpModule.DANGER || []; const golfCourse0 = (venueIndoorInfo(pv0.id).kinds || [])[0] === 'golf' || (pv0.type === 'golf' && !(venueIndoorInfo(pv0.id).kinds || []).length); cfg.fit = (sport5HelpModule.FIT || []).filter((r) => !r.golfCourse || golfCourse0).map(({ golfCourse, ...r }) => r);
     // Sport test 10 (2026-11-21; Lorraine: "a toll free line… Can I list both numbers?"): one phone number fits the box;
     // the second goes in Good to know (no second phone field).
     // Sport test 11 (2026-11-21; Geneviève's second number for the simulator read the line 6th): it comes first.
     cfg.topics = cfg.topics.map((t) => (t.id === 'phone' ? { ...t, a: `<p>Two numbers, like a toll-free line, a booking line or the restaurant? One fits the phone box: put the main one there and the other in one line in <strong>Good to know</strong>, like <em>Toll-free 1-800-555-0123</em>. Postal code missing? Add it at the end of the address.</p>${t.a}`, aFr: frSpacingHtml(`<p>Deux numéros, comme une ligne sans frais, une ligne de réservation ou le restaurant? Un seul entre dans la case du téléphone : mettez-y le principal, et l’autre en une ligne dans <strong>Bon à savoir</strong>, comme <em>Réservations : 250-555-0123</em>. Le code postal manque? Ajoutez-le à la fin de l’adresse.</p>`) + t.aFr } : t));
+    // Sport test 13 (2026-11-21; Gord and Linda share one phone: "Please don't share one password" didn't fit them): two
+    // people on one phone can use it together; a login of their own is for their own device.
+    cfg.topics = cfg.topics.map((t) => (t.id === 'staff' ? { ...t, a: `<p>Two of you on one phone or one computer? That’s fine: use it together, with the same link or login. A second login is only for someone on their own phone or computer.</p>${t.a}`, aFr: frSpacingHtml('<p>Vous êtes deux sur un même téléphone ou ordinateur? Pas de problème : utilisez-le ensemble, avec le même lien ou le même compte. Un deuxième compte sert seulement à quelqu’un sur son propre téléphone ou ordinateur.</p>') + t.aFr } : t));
     // Sport test 10: a shop open in the off-season doesn't make the course open; and which rate goes on Price when a course
     // has several (high season, shoulder, residents).
     // (Golf courses only: a simulator or a range listed as golf has its own words.)
@@ -81284,7 +81370,7 @@ module.exports = {
   renderOutdoorActivityPage,
   // Golf venue page polish (2026-09-20)
   renderGolfVenuePolishStyles,
-  GOLF_AT_A_GLANCE_FACTS,
+  GOLF_AT_A_GLANCE_FACTS, golfDetailsFor,
   golfAtAGlanceHtml,
   // Build My Trip, Stage 3 (price/amenity/discovery scoring + NL parser)
   TRIP_VALID_BUDGETS,
