@@ -60251,7 +60251,7 @@ ${lang === 'fr' ? frenchHeaderFragment(renderGolfHeaderHtml()) : renderGolfHeade
   </div></main>
 <script>window.MENU_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${MENU_APP_SCRIPT}</script>
-${opts.mode === 'admin' ? '' : ownerHelpWidgetHtml('menu', { signedIn: opts.mode === 'account', lang, ...(kindSetupType(venue.type) ? { dropHappyHour: !happyHourAllowed(venue), noHappyHour: !happyHourAllowed(venue), dropTopics: INDOOR_HELP_DROP_TOPICS, extraTopics: indoorKindHelpTopics(kindSetupHelpBase(venue).filter((x) => x.pages.includes('menu') && x.id !== 'menu-add').concat(INDOOR_MENU_HELP_TOPICS), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpLow(venue), indoorHelpFree(venue), indoorHelpNoHours(venue), indoorHelpPageSay(venue)).concat(sportMenuImportTopic(venue)) } : venue.type === 'tour' ? { dropHappyHour: true, noHappyHour: true, start: TOUR_MENU_HELP_START, extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x && x.id) } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('menu')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('menu')) } : {}) })}
+${opts.mode === 'admin' ? '' : ownerHelpWidgetHtml('menu', { signedIn: opts.mode === 'account', lang, ...(kindSetupType(venue.type) ? { dropHappyHour: !happyHourAllowed(venue), noHappyHour: !happyHourAllowed(venue), dropTopics: INDOOR_HELP_DROP_TOPICS, extraTopics: indoorKindHelpTopics(kindSetupHelpBase(venue).filter((x) => x.pages.includes('menu') && x.id !== 'menu-add').concat(sportMenuHelpTopics(venue)), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpLow(venue), indoorHelpFree(venue), indoorHelpNoHours(venue), indoorHelpPageSay(venue)).concat(sportMenuImportTopic(venue)) } : venue.type === 'tour' ? { dropHappyHour: true, noHappyHour: true, start: TOUR_MENU_HELP_START, extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x && x.id) } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('menu')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('menu')) } : {}) })}
 </body>
 </html>`;
 }
@@ -62974,7 +62974,8 @@ function sport4KindHelp(t, kind, venue, happy) {
   }
   return t;
 }
-const SPORT_SETUP_HELP_TOPICS = SPORT4_HELP_TOPICS.concat(SPORT_TEST3_HELP_TOPICS).concat(SPORT_TEST2_HELP_TOPICS).concat(SPORT_TEST1_HELP_TOPICS).concat(SPORT_OWN_HELP_TOPICS).concat(INDOOR_SETUP_HELP_TOPICS.filter((t) => t && !SPORT_HELP_SKIP.has(t.id)).map((t) => ({ ...t, q: sportHelpWords(t.q), qFr: sportHelpWords(t.qFr), a: sportHelpWords(t.a), aFr: sportHelpWords(t.aFr),
+const sport5HelpModule = require('./sport-help');
+const SPORT_SETUP_HELP_TOPICS = sport5HelpModule.TOPICS.concat(SPORT4_HELP_TOPICS).concat(SPORT_TEST3_HELP_TOPICS).concat(SPORT_TEST2_HELP_TOPICS).concat(SPORT_TEST1_HELP_TOPICS).concat(SPORT_OWN_HELP_TOPICS).concat(INDOOR_SETUP_HELP_TOPICS.filter((t) => t && !SPORT_HELP_SKIP.has(t.id)).map((t) => ({ ...t, q: sportHelpWords(t.q), qFr: sportHelpWords(t.qFr), a: sportHelpWords(t.a), aFr: sportHelpWords(t.aFr),
   // The kinds topic's "several things" examples in sport words.
   ...(t.id === 'indoor-kinds-many' ? { keys: t.keys.concat(['golf and mini golf', 'range and mini golf', 'arena and pool', 'skate park and courts', 'course and range', 'simulators and lessons']) } : {}),
   // What sports and golf owners say for the shared answers (the price, Good to know, ages, groups, weekly programs, free).
@@ -63073,6 +63074,8 @@ function kindSetupHelpBase(venue) {
   // Sport test 1: the topics for the main kind only (kinds), in the kind's own words.
   const kind = indoorKindsModule.sportKindKey((venueIndoorInfo(venue.id).kinds || []).length ? venueIndoorInfo(venue.id).kinds : indoorKindSuggestion(venue));
   const tok = sportHelpTokens(kind, happy);
+  const ctx5 = sport5HelpCtx(venue, kind), tok5 = sport5HelpModule.tokens(kind, ctx5);
+  { const t2 = sportTest2Tokens(kind, venue); tok5.t2 = t2; }
   const daylight = kind === 'golf' ? ['change every day to your summer first and last tee time, like 6:30 AM to 8 PM', 'changez chaque jour pour vos premier et dernier départs d’été, comme de 6 h 30 à 20 h']
     // Sport test 3 (Gord's lit range: "Thursday 10 AM to 8 PM" read oddly): a range's summer evenings under the lights.
     : kind === 'range' ? ['change every day to your summer hours, like 8 AM to 9 PM with the lights on', 'changez chaque jour pour vos heures d’été, comme de 8 h à 21 h avec l’éclairage'] : null;
@@ -63107,7 +63110,51 @@ function kindSetupHelpBase(venue) {
       keysFr: (t.keysFr || []).concat(['soiree des hommes', 'soiree des dames', 'soiree des femmes', 'ligue des dames', 'ligue des hommes', 'chaque mercredi', 'chaque mardi']),
       a: t.a.replace(/(Keep your hours as your open-door hours\.)/, '$1 Only in summer? Say so, like <em>every Tuesday, June to August</em>.'), aFr: t.aFr.replace(/(<\/p>)$/, ' Seulement l’été? Dites-le, comme <em>chaque mardi, de juin à août</em>.$1') };
     return t;
-  }).map((t) => sport4KindHelp(t, kind, venue, happy));
+  }).map((t) => sport4KindHelp(t, kind, venue, happy)).map((t) => sport5KindHelp(t, kind, ctx5, tok5));
+}
+// Sport test 5 (2026-11-20; Jen's ski school: Help answered 11 of 42 well, in golf words): sport-help.js holds every
+// kind's own words for every answer and the answers no answer covered; this is what it needs to know about her listing.
+function sport5HelpCtx(venue, kind) {
+  const out = { esc: escapeHtml, kind, price: null, amount: null, season: null, gtk: { en: [], fr: [] }, booking: {}, event: SPORT4_EVENT_EX[kind] || SPORT4_EVENT_EX.sportother, near: null };
+  try {
+    const t = venueIndoorInfo(venue.id);
+    const lines = indoorVisitLines(rowToVenue(venue), t).Prices;
+    if (lines && lines.en) out.price = { en: String(lines.en).replace(/\.$/, ''), fr: String(lines.fr || lines.en).replace(/\.$/, '') };
+    const pv = indoorPriceView(venue.id, t, 'en'); if (pv) out.amount = pv.amount;
+  } catch (e) { /* no price yet */ }
+  try {
+    const os = tourOpenSeason(venue.id);
+    if (os && /^\d{2}-\d{2}$/.test(os.from || '') && /^\d{2}-\d{2}$/.test(os.to || '')) {
+      const [m, d] = os.from.split('-').map(Number);
+      const FRM = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+      out.season = { en: `${wineryMd(os.from, false)} – ${wineryMd(os.to, false)}`, fr: `du ${wineryMd(os.from, true)} ${frAuDay(wineryMd(os.to, true))}`, reopenEn: `${MONTH_LONG[m - 1]} ${d}`, reopenFr: `${d === 1 ? '1er' : d} ${FRM[m - 1]}` };
+    }
+  } catch (e) { /* no season */ }
+  try {
+    const g = (indoorKindsModule.SPORT.K[kind] || {}).gtk;
+    out.gtk = { en: ((OWNER_SETUP_STRINGS.en.indoor.quick.good_to_know_kinds || {})[g] || []).slice(), fr: ((OWNER_SETUP_STRINGS.fr.indoor.quick.good_to_know_kinds || {})[g] || []).slice() };
+  } catch (e) { /* no chips */ }
+  const bw = (indoorKindsModule.SPORT.BOOK_WORDS || {})[kind] || {}, ib = [OWNER_SETUP_STRINGS.en.sport.ibooks || {}, OWNER_SETUP_STRINGS.fr.sport.ibooks || {}];
+  out.booking = { ahead: (bw.chips || {}).ahead || [ib[0].ahead, ib[1].ahead], busy: (bw.chips || {}).busy || [ib[0].busy, ib[1].busy], line: (bw.lines || {}).busy || INDOOR_BOOK_LINES.busy || null };
+  // Search: a ski school asked for from a valley town lists the nearest hills (discovery-search, sport test 5 #9).
+  if (kind === 'skischool') out.near = { en: 'Someone searching for ski lessons in a valley town, like Kelowna, finds the nearest ski hill’s lessons, with how far they are.', fr: 'Quelqu’un qui cherche des cours de ski dans une ville de la vallée, comme Kelowna, trouve les cours de la station la plus proche, avec la distance.' };
+  return out;
+}
+// The price list page's own answers, in a sports or golf kind's words (sport test 5: "grip socks" on a ski school's list).
+function sportMenuHelpTopics(venue) {
+  if (!(venue && sportSetupType(venue.type))) return INDOOR_MENU_HELP_TOPICS;
+  try {
+    const kind = indoorKindsModule.sportKindKey((venueIndoorInfo(venue.id).kinds || []).length ? venueIndoorInfo(venue.id).kinds : indoorKindSuggestion(venue));
+    const ctx = sport5HelpCtx(venue, kind), tok = sport5HelpModule.tokens(kind, ctx);
+    return INDOOR_MENU_HELP_TOPICS.map((t) => sport5KindHelp(t, kind, ctx, tok));
+  } catch (e) { return INDOOR_MENU_HELP_TOPICS; }
+}
+function sport5KindHelp(t, kind, ctx, tok) {
+  let x = sport5HelpModule.kindHelp(t, kind, ctx);
+  // Every {TOKEN} left in an answer or its title is filled (the second-kind answer showed "{MAIN_EN}").
+  const all = { en: { ...tok.en, ...(tok.t2 ? tok.t2.en : {}) }, fr: { ...tok.fr, ...(tok.t2 ? tok.t2.fr : {}) } };
+  x = { ...x, a: sport5HelpModule.fill(x.a, all.en), aFr: sport5HelpModule.fill(x.aFr, all.fr), q: sport5HelpModule.fill(x.q, all.en), qFr: sport5HelpModule.fill(x.qFr, all.fr) };
+  return x;
 }
 const INDOOR_HELP_PLAYER_KINDS = ['escape', 'games', 'bowling', 'curling', 'other'];
 // "Says adults" is the per-room answer only where a whole room or lane is priced; elsewhere it's the price answer.

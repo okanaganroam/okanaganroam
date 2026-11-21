@@ -111,7 +111,7 @@ const KIND_EX_WORDS = {
   range: ['mini[- ]?golf', 'mini[- ]?putt\\w*', 'buckets?', 'seaux?', 'toptracer'],
   rink: ['rinks?', 'skates?', 'skating', 'arenas?', 'hockey', 'patin\\w*', 'arénas?', 'ice rentals?'],
   swim: ['pools?', 'swims?', 'swimming', 'lifeguards?', 'piscines?', 'baignades?', 'sauveteurs?'],
-  skatepark: ['skate ?parks?', 'skateboard\\w*', 'planchodromes?', 'jams?'],
+  skatepark: ['skate ?parks?', 'skateboard\\w*', 'planchodromes?', 'jams?', 'skates?'], // sport test 5: a skate park's own "skate camps"
   bike: ['bmx', 'pump tracks?', 'race nights?', 'riders?', 'cyclistes?'],
   courts: ['pickleball', 'tennis', 'racquets?', 'raquettes?', 'book a court'],
   discgolf: ['disc golf', 'discs?', 'disque-golf', 'disques?'],

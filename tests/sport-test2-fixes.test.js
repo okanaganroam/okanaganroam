@@ -276,7 +276,7 @@ const TREVOR_LOG = [
   ['en', 'setup', 'its $45 an hour weekdays before 5:30 and $60 nights and weekends. which one do i put', ['indoor-price', 'indoor-price-varies', 'sport-rate-lines']],
   ['en', 'setup', 'plus GST?', ['indoor-extras']],
   ['en', 'setup', 'people can book online or just call us, and walk ins are fine if a bay is free. what do i pick', ['sport-tee-times', 'indoor-booking']],
-  ['en', 'setup', 'we have a 24 hour cancellation policy where does that go', ['indoor-good-to-know']],
+  ['en', 'setup', 'we have a 24 hour cancellation policy where does that go', ['indoor-good-to-know', 'sport-refunds']], // sport test 5: its own answer
   ['en', 'setup', 'kids are welcome with an adult until 8pm, after 8 its 19+ because of the bar. what age do i pick', ['indoor-age']],
   ['en', 'setup', 'why does it say no dogs and quote our description about mocktails?', ['sport-dogs']],
   ['en', 'setup', "why does it say my description still mentions sports? we're a golf place, the big screens are real", ['sport-sports-words']],
@@ -289,12 +289,12 @@ const TREVOR_LOG = [
   ['en', 'setup', 'do i need to write this in french too?', ['indoor-french']],
   ['en', 'setup', 'we have pizza and snacks and a full bar, where do i put our food menu', ['sport-food-menu']],
   ['en', 'setup', 'kids are ok with an parent until 8 then its 19+ how do i say that', ['indoor-age']],
-  ['en', 'setup', 'can people bring their own clubs?', ['indoor-good-to-know', 'sport-rentals']],
+  ['en', 'setup', 'can people bring their own clubs?', ['indoor-good-to-know', 'sport-rentals', 'sport-what-to-bring']],
   ['en', 'setup', 'we do birthday parties and corporate buyouts of the whole place, how do people find that', ['indoor-groups']],
   ['en', 'setup', 'our tuesday night league, should that be an event?', ['indoor-theme-nights', 'sport-members']],
   ['en', 'setup', 'can i put a bay deal in here too, like $35 bays 3 to 5 weekdays, or only drinks?', ['indoor-bar']],
   ['en', 'setup', 'do i need a liquor licence to list happy hour? we are fully licensed', ['indoor-bar']],
-  ['en', 'setup', 'christmas eve we close at 4pm, and new years eve we stay open late for a party', ['closures', 'setup-closures']],
+  ['en', 'setup', 'christmas eve we close at 4pm, and new years eve we stay open late for a party', ['closures', 'setup-closures', 'sport-holiday-short']], // sport test 5: a short holiday's own answer
   ['en', 'setup', 'is this every year or do i have to do it again next year', ['sport-closures-yearly']],
   ['fr', 'setup', "c'est 45 $ par baie de l'heure, pas par personne. qu'est-ce que je mets?", ['sport-per-person', 'indoor-price']],
   ['fr', 'setup', "on a une ligue d'hiver le mardi soir, ça va où?", ['indoor-theme-nights', 'sport-members']],

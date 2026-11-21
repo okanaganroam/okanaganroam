@@ -170,7 +170,7 @@ const MATRIX = {
     ['en', 'people book a court online', [TT]],
     ['en', 'the courts are free', [F]],
     ['en', 'drop in pickleball weekday mornings', [TH, BZ]],
-    ['en', 'bring your own racquet', [RN, GTK]],
+    ['en', 'bring your own racquet', [RN, GTK, 'sport-what-to-bring']],
     ['en', 'run by the city', [PUB]],
     ['en', 'beginner clinics', [LS]],
     ['en', 'do i need to answer all of this', [FA]],
@@ -304,7 +304,7 @@ const MORE = {
     ['en', 'we close in winter', SEASON], ['en', 'kids under 10 need an adult', [A]], ['en', 'scooters allowed', [GTK]], ['en', 'skate camps in july', [CAMP, LS]], ['en', 'season pass for lessons', [RL, LS]],
     ['fr', 'chiens en laisse', [DOG]]],
   discgolf: [['en', 'dogs on leash welcome', [DOG]], ['en', 'tournaments twice a year', [TOUR, G, TH]], ['en', 'league night wednesdays at 6', [TH, MEM, BZ]], ['en', 'membership for the club', [RL]], ['en', 'disc rental is $5', [RN, X]],
-    ['en', 'no fee to play', [F]], ['en', 'junior league', [TH, MEM, RL, LS, BZ]], ['en', 'bring your own discs', [GTK, RN]], ['en', 'course closes for snow', SEASON.concat([W])], ['en', 'fees go up next year', [RC]],
+    ['en', 'no fee to play', [F]], ['en', 'junior league', [TH, MEM, RL, LS, BZ]], ['en', 'bring your own discs', [GTK, RN, 'sport-what-to-bring']], ['en', 'course closes for snow', SEASON.concat([W])], ['en', 'fees go up next year', [RC]],
     ['fr', 'tournois deux fois par année', [TOUR, G]]],
   bike: [['en', 'season membership $90', [RL]], ['en', 'junior riders price', [RL, P]], ['en', 'dogs not allowed on the track', [DOG]], ['en', 'race nights thursdays', [TH, BZ]], ['en', 'provincial race in july', [TOUR, TH]],
     ['en', 'canteen on race nights', [REST, TH]], ['en', 'new fees next year', [RC]], ['en', 'helmets and gloves required', [GTK, A]], ['en', 'bike rentals nearby', [RN]], ['en', 'open april to october', SEASON],
@@ -396,4 +396,73 @@ test('sport test 4: Ryan\'s Help log (a golf course with a range) lands, with Fr
   const wrong = [];
   for (const [lang, pg, q, want] of RYAN_LOG) { const r = page(lang, pg).best(q); if (!r || !want.includes(r.id)) wrong.push(`[${lang} ${pg}] "${q}" -> ${r && r.id} (hits ${r && r.hits.slice(0, 4).join(',')})`); }
   assert.deepEqual(wrong, []);
+});
+
+// Sport test 5 (2026-11-20; Jen's ski school: 11 good answers out of 42, and the lessons, weather and suggestion titles in
+// golf words): about 40 questions a real owner of EVERY kind asks (tests/sport-help-questions.js, a third in French), on
+// the page each is asked from, with the owner's own kind, price and season. Then every Help answer AND its title (the
+// titles are the suggestion buttons under an answer) in the main kind's own words: never golf's PGA, frost, twilight or
+// tee times, and never an indoor kind's pedicures, socks or bowling.
+const FX = require('./sport-help-questions.js');
+const owners = {};
+const ownerBots = async (kind) => {
+  if (owners[kind]) return owners[kind];
+  const o = await FX.makeOwner(app, null, base, kind, 500 + Object.keys(owners).length);
+  owners[kind] = { setup: helpBot(await get(`/owner/${o.token}/setup`)), frsetup: helpBot(await get(`/fr/owner/${o.token}/setup`)), menu: helpBot(await get(`/owner/${o.token}/menu`)), frmenu: helpBot(await get(`/fr/owner/${o.token}/menu`)) };
+  return owners[kind];
+};
+test('sport test 5: about 40 questions for every sport kind, a third in French', () => {
+  for (const k of IK.SPORT_KIND_TEXT_KINDS) {
+    const rows = FX.QUESTIONS[k] || [];
+    assert.ok(rows.length >= 40, `${k}: ${rows.length} questions`);
+    assert.ok(rows.filter((r) => r[0] === 'fr').length * 3.4 >= rows.length, `${k}: ${rows.filter((r) => r[0] === 'fr').length} in French of ${rows.length}`);
+  }
+});
+test('sport test 5: every sport kind’s questions land on a right answer, on the page they are asked from (EN + FR)', async () => {
+  const wrong = [];
+  for (const k of IK.SPORT_KIND_TEXT_KINDS) {
+    const b = await ownerBots(k);
+    for (const [lang, pg, q, want] of FX.QUESTIONS[k]) {
+      const r = b[(lang === 'fr' ? 'fr' : '') + pg].best(q);
+      if (!r || !want.includes(r.id)) wrong.push(`${k} [${lang} ${pg}] "${q}" -> ${r && r.id} (want ${want.join(' or ')}; hits ${r && r.hits.slice(0, 4).join(',')})`);
+    }
+  }
+  assert.deepEqual(wrong, []);
+});
+test('sport test 5: every Help answer and title in the main kind’s own words (setup and price pages, EN + FR); no {TOKEN} left', async () => {
+  const bad = [];
+  const strip = (x) => String(x || '').replace(/<[^>]+>/g, ' ');
+  for (const k of IK.SPORT_KIND_TEXT_KINDS) {
+    const b = await ownerBots(k);
+    for (const pg of ['setup', 'frsetup', 'menu', 'frmenu']) for (const tp of b[pg].topics) {
+      const txt = [tp.q, tp.qFr, strip(tp.a), strip(tp.aFr)].join(' | ');
+      const f = FX.foreignIn(k, txt, tp.id);
+      if (f) bad.push(`${k} ${pg} ${tp.id}: ${f}`);
+      if (/\{[A-Z_]+\}/.test(txt)) bad.push(`${k} ${pg} ${tp.id}: a {TOKEN} is left`);
+    }
+  }
+  assert.deepEqual([...new Set(bad)], []);
+});
+test('sport test 5: Jen’s answers say what is true for her (her season, no meeting-place field, staff language, never undo her season)', async () => {
+  const b = await ownerBots('skischool');
+  const say = (q, lang = 'en', pg = 'setup') => { const bot = b[(lang === 'fr' ? 'fr' : '') + pg]; const r = bot.best(q); const t = bot.topic(r.id); return { id: r.id, a: String(lang === 'fr' ? t.aFr : t.a).replace(/<[^>]+>/g, '') }; };
+  // "closed in July" with her season set: her own dates, never "tap Closed for whole months".
+  const july = say('we are closed in july obviously, will the page say that');
+  assert.match(july.a, /Nov 26 – Apr 6/); assert.match(july.a, /November 26/); assert.doesNotMatch(july.a, /Closed for whole months/);
+  assert.match(b.setup.topic('indoor-closed-months').a, /already covers it/);
+  // A meeting place is a Good to know line (Dayton: no meeting-place field).
+  assert.match(say('where do people meet for lessons? theres no box for it').a, /Good to know[\s\S]*Snow School desk/);
+  // French: instructors who speak French is staff language, never "the portal is in French".
+  const fr = say('nos moniteurs parlent français, où le dire', 'fr');
+  assert.equal(fr.id, 'sport-staff-language'); assert.match(fr.a, /Moniteurs francophones sur demande/);
+  // Lessons are her main thing, in ski words (never "local PGA pros"); weather is lessons and lifts (never frost or a tournament).
+  assert.doesNotMatch(b.setup.topic('sport-lessons').a, /PGA|Junior clinic/); assert.match(b.setup.topic('sport-lessons').a, /Private lesson, 1 hour \$189/);
+  assert.doesNotMatch(b.setup.topic('sport-weather').a + b.setup.topic('sport-weather').q, /[Ff]rost|tournament/);
+  // The suggestion titles: no twilight or tee times.
+  assert.doesNotMatch(b.setup.topic('sport-rate-lines').q + b.setup.topic('sport-tee-times').q, /Twilight|Tee times/);
+  // Christmas camp and holiday peak are an event and Good to know, never a closure.
+  assert.notEqual(say('christmas camp is dec 21 to 26, should that be an event').id, 'closures');
+  assert.match(say('holiday peak is dec 19 to jan 4, our busiest. where do i say that').a, /aren’t closures/);
+  // The chips Dayton hasn't OK'd: Help says to type them.
+  assert.match(say('can we add a chip for french speaking instructors').a, /type it in your own words/);
 });
