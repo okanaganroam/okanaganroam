@@ -1991,7 +1991,10 @@
       // Indoor test 8 (2026-11-19): with Free entry or By donation, Your prices is optional and already counts: never "not done yet".
       var optFree = s === 'menu' && (d === 'none' || d === 'skip') && freeIndoor() && T.stMenuFree;
       if (optFree) { d = 'live'; k = '✓'; }
-      return '<li class="su-li-btn"><button type="button" class="su-rowbtn" data-act="edit:' + s + '"><span class="su-k su-k-' + d + '" aria-hidden="true">' + k + '</span><span>' + h(T.labels[s]) + ' <span class="su-dim">· ' + h(optFree ? T.stMenuFree : stText(s, d)) + (s === 'music' && musicEventsLine() ? ' · ' + h(musicEventsLine()) : (s === 'music' && musicOftenLine() ? ' · ' + h(musicOftenLine()) : '')) + '</span></span><span class="su-chev" aria-hidden="true">›</span></button></li>';
+      // Sport test 12 (2026-11-21): Who can come saved with a suggested age never tapped: no ✓, "tap an age to confirm".
+      var ageOpen = s === 'offer' && INDOOR && !!S.tour.ageGuessed && !!S.tour.age && !TI.age && T.stAgeTap;
+      if (ageOpen) { d = 'none'; k = '○'; }
+      return '<li class="su-li-btn"><button type="button" class="su-rowbtn" data-act="edit:' + s + '"><span class="su-k su-k-' + d + '" aria-hidden="true">' + k + '</span><span>' + h(T.labels[s]) + ' <span class="su-dim">· ' + h(optFree ? T.stMenuFree : ageOpen ? T.stAgeTap : stText(s, d)) + (s === 'music' && musicEventsLine() ? ' · ' + h(musicEventsLine()) : (s === 'music' && musicOftenLine() ? ' · ' + h(musicOftenLine()) : '')) + '</span></span><span class="su-chev" aria-hidden="true">›</span></button></li>';
     }).join(''));
   }
   // Pub test 3 (Whistler, 2026-11-14): the spend's − and + move $2 at a time ($1 at a time was slow from $18 to $26); cafés
@@ -2211,7 +2214,7 @@
       if (k === 'menu' && tapOnly()) { if (C.menuKnown) return; seen[k] = true; out.push({ step: k, label: T.finishTap || T.labels[k] }); return; }
       seen[k] = true; out.push({ step: k, label: T.labels[k] });
     });
-    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k], chk = st, lab = C.lang === 'fr' ? it.fr : it.en; if (COMBO && (it.k === 'instagram' || it.k === 'facebook')) { if (socialGiven()) return; st = 'social'; lab = T.labels.social; } if (itemStep(it.k)) st = chk = itemStep(it.k); if (CLO_SUB && st === 'closures') st = chk = 'hours'; if (!st || (st === 'spend' && S.spendNotSure)) return; if (seen[st]) return addName(out, st, lab); if (chk.indexOf(':') < 0 && answered(chk) && !C.brewery) return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: lab, items: true }); });
+    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k], chk = st, lab = C.lang === 'fr' ? it.fr : it.en; if (COMBO && (it.k === 'instagram' || it.k === 'facebook')) { if (socialGiven()) return; st = 'social'; lab = T.labels.social; } if (itemStep(it.k)) st = chk = itemStep(it.k); if (CLO_SUB && st === 'closures') st = chk = 'hours'; if (!st || (st === 'spend' && S.spendNotSure)) return; if (seen[st]) return addName(out, st, lab); if (chk.indexOf(':') < 0 && answered(chk) && !C.brewery && it.k !== 'indoor_ages') return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: lab, items: true }); });
     return out;
   }
   // Pub test (Whistler, 2026-11-14): at 96% only "Dietary options" was offered, though Games was open too (both are

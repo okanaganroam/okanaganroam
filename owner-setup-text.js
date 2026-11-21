@@ -2356,6 +2356,7 @@ en.indoor = {
   guessCheck: 'We picked the usual for your kind of place. Tap another if it’s different.',
   guessKind: 'We picked the usual for your kind of place. Tap another if it’s different.',
   ageSuggest: 'Suggested: {age}. Tap it to confirm, or tap another age.',
+  stAgeTap: 'tap an age to confirm',
   // Price
   tpriceQ: 'What does it cost?', tpriceLead: 'The price for one adult. It shows on your card.', tpriceLeadPick: 'Your card will say “Adults {x}”.', tpriceLeadFree: 'Your card will say “Free”.',
   tpriceLabel: 'Adult price, in dollars', tpriceMore: 'Your other prices (kids, seniors, passes, packages) go in “Your prices”, the first of the extra details.',
@@ -2448,6 +2449,7 @@ fr.indoor = {
   guessCheck: 'Nous avons choisi l’habituel pour votre genre d’endroit. Touchez-en un autre si c’est différent.',
   guessKind: 'Nous avons choisi l’habituel pour votre genre d’endroit. Touchez-en un autre si c’est différent.',
   ageSuggest: 'Suggéré : {age}. Touchez-le pour confirmer, ou touchez un autre âge.',
+  stAgeTap: 'touchez un âge pour confirmer',
   tpriceQ: 'Combien ça coûte?', tpriceLead: 'Le prix pour un adulte. Il paraît sur votre fiche.', tpriceLeadPick: 'Votre fiche indiquera « Adultes : {x} ».', tpriceLeadFree: 'Votre fiche indiquera « Gratuit ».',
   tpriceLabel: 'Prix adulte, en dollars', tpriceMore: 'Vos autres prix (enfants, aînés, laissez-passer, forfaits) vont dans « Vos tarifs », le premier des détails facultatifs.',
   tpriceGuess: 'Nous l’avons choisi d’après votre page. Vérifiez-le, et changez-le s’il n’est pas exact.',
