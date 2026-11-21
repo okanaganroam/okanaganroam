@@ -13149,6 +13149,8 @@ function sportOwnRatesLink(venue) {
   try { return !!(venue && sportSetupType(venue.type) && (indoorPrice(venue.id) != null || indoorFree(venue.id)) && (venueLinks(venue.id) || {}).menu_url); } catch (e) { return false; }
 }
 function visitInfoHtml(info, fr = false, opts = {}) {
+  // Sport test 14: the parts' own times show beside the hours (venuePartTimesHtml), never in this box.
+  if (info && Array.isArray(info.rows) && info.rows.some((r) => r && r.label === PART_TIMES_LABEL)) info = { ...info, rows: info.rows.filter((r) => !(r && r.label === PART_TIMES_LABEL)) };
   if (fr && info) info = visitWithFrLines(info, opts.type);
   if (!fr && info) info = visitWithFrLinesEnPage(info, opts.type);
   if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
@@ -18928,6 +18930,11 @@ const SEO_PAGE_CSS = `
   .hours-list.venue-hours-year-list { column-count: 1 !important; }
   .venue-hours-year-list li { max-width: 620px; justify-content: flex-start; }
   .venue-hours-year-list li span:first-child { flex: 0 0 min(11em, 42%); }
+  /* Sport test 14: a golf place's parts with their own times, under its hours ("Range" · "April–October"). */
+  .venue-part-times { margin: 10px 0 8px; }
+  .hours-list.venue-part-times-list { column-count: 1 !important; }
+  .venue-part-times-list li { max-width: 620px; justify-content: flex-start; gap: 12px; }
+  .venue-part-times-list .venue-part-name { flex: 0 0 min(11em, 42%); font-weight: 700; }
   .venue-hours-year-list li span:last-child { flex: 1 1 auto; text-align: left !important; }
   .venue-hours-year-list li span:first-child { font-weight: 700; }
   .venue-hours-checked { margin: 8px 0 0; font-size: 0.8rem; color: var(--ink-muted, #6B5D54); }
@@ -24133,7 +24140,7 @@ function visitBadgeConfirmedLabels(venueId, rows) {
 // again); on a tour's page Groups first, then Dogs, so Good to know stays in the box ahead of them.
 function visitOwnRowToPark(rows, type = '') {
   if (type === 'tour') for (const l of ['Groups', 'Dogs']) { const j = rows.findIndex((r) => r.label === l); if (j >= 0) return j; }
-  for (let k = rows.length - 1; k >= 0; k--) if (rows[k].label !== 'Known for') return k;
+  for (let k = rows.length - 1; k >= 0; k--) if (rows[k].label !== 'Known for' && rows[k].label !== 'Part times') return k;
   return rows.length - 1;
 }
 function visitCapRows(rows, isOwn, owned, managed, stash, isKept = () => false, type = '') {
@@ -24143,11 +24150,13 @@ function visitCapRows(rows, isOwn, owned, managed, stash, isKept = () => false, 
   const dropped = [];
   const setAside = (j) => { const r = rows[j]; dropped.push({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}), ...(Number.isInteger(r.venue_id) ? { venue_id: r.venue_id } : {}), ...(isOwn(r) ? { owned: true } : isKept(r) ? { kept: true } : {}) }); rows.splice(j, 1); };
   const repeatsAnswer = (r) => !isOwn(r) && Object.keys(WINERY_REPEAT_LABELS).some((l) => managed.has(l) && owned.has(l) && rows.some((x) => x.label === l) && WINERY_REPEAT_LABELS[l].test(r.label));
-  while (rows.length > VISIT_ROWS_MAX) {
+  // Sport test 14: a golf place's "Part times" line shows beside the hours, not in the box: it never takes a box row's place.
+  const inBox = (r) => !(r && r.label === 'Part times');
+  while (rows.filter(inBox).length > VISIT_ROWS_MAX) {
     let j = -1;
-    for (let k = rows.length - 1; k >= 0; k--) if (repeatsAnswer(rows[k])) { j = k; break; }
-    if (j < 0) for (let k = rows.length - 1; k >= 0; k--) if (!isOwn(rows[k]) && !isKept(rows[k])) { j = k; break; }
-    if (j < 0) for (let k = rows.length - 1; k >= 0; k--) if (!isOwn(rows[k])) { j = k; break; }
+    for (let k = rows.length - 1; k >= 0; k--) if (inBox(rows[k]) && repeatsAnswer(rows[k])) { j = k; break; }
+    if (j < 0) for (let k = rows.length - 1; k >= 0; k--) if (inBox(rows[k]) && !isOwn(rows[k]) && !isKept(rows[k])) { j = k; break; }
+    if (j < 0) for (let k = rows.length - 1; k >= 0; k--) if (inBox(rows[k]) && !isOwn(rows[k])) { j = k; break; }
     setAside(j >= 0 ? j : visitOwnRowToPark(rows, type));
   }
   return dropped;
@@ -25716,7 +25725,7 @@ function visitLinesText(info, labels) {
   return rows.concat(dropped).map((r) => r.text).join(' ; ');
 }
 function indoorVisitSearchText(venueId) {
-  try { return searchWithoutNegated(visitLinesText(venueVisitInfo(venueId), ['Known for', 'Good to know', 'Groups'])); } catch (e) { return ''; }
+  try { return searchWithoutNegated(visitLinesText(venueVisitInfo(venueId), ['Known for', 'Good to know', 'Groups', PART_TIMES_LABEL])); } catch (e) { return ''; }
 }
 // Sport test 6 (2026-11-20; "skate rentals kelowna" ranked Priya's arena 1st because her own line says "No skate rentals or
 // sharpening here"): what an owner says a place does NOT have or do is never a search match. From the negation to the end
@@ -42754,6 +42763,55 @@ function venueHoursExtrasHtml(parsed, clock, fr, dayText, dayNames, shown = null
 // '' when the place has no seasonal set and isn't closed for the season (nothing to add to the usual list).
 // Tour test 10: a stretch whose week has a closed day (so "Open on holidays" changes something on its holidays).
 function stretchHasClosedDay(days) { return !!days && ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].some((d) => days[d] && days[d].status === 'closed'); }
+// Sport test 14 (2026-11-21; Dayton approved): "Range: April–October", "Fitting bay: open all winter by appointment", each
+// line as its part's times, under the hours. Her line in French on the French page once it is written (owner_fr, or the
+// French she typed); until then her English, marked (en anglais), as the box marks hers. The English page: her English,
+// or her French marked (in French) until its English is written.
+function partTimesLines(text) { return String(text || '').split(/\s*;\s*/).map((x) => x.trim().replace(/[.]$/, '')).filter(Boolean).slice(0, 3); }
+function venuePartTimesHtml(venue, fr) {
+  let info = null; try { info = venueVisitInfo(venue.id); } catch (e) { info = null; }
+  if (!info || !Array.isArray(info.rows)) return '';
+  const mine = new Set(info.owner_labels || []);
+  const row = info.rows.find((r) => r && r.label === PART_TIMES_LABEL && mine.has(r.label));
+  let frOwn = null; try { frOwn = ownerVisitFrLines(info).part_times || null; } catch (e) { frOwn = null; }
+  const ownFr = info.owner_fr && info.owner_fr[PART_TIMES_LABEL];
+  let text = row && typeof row.text === 'string' ? row.text : '', lang = '';
+  if (fr) {
+    if (ownFr && ownFr.en === text && ownFr.fr) text = ownFr.fr;
+    else if (typeof frOwn === 'string' && frOwn.trim()) text = frOwn;
+    else if (text && !ownerTextIsFrench(text)) lang = 'en';
+  } else {
+    if (!text && typeof frOwn === 'string' && frOwn.trim()) { text = frOwn; lang = 'fr'; } else if (text && ownerTextIsFrench(text)) lang = 'fr';
+  }
+  const lines = partTimesLines(text);
+  if (!lines.length) return '';
+  const note = lang === 'en' ? ' <span class="visit-lang-note">(en anglais)</span>' : lang === 'fr' ? ' <span class="visit-lang-note">(in French)</span>' : '';
+  const li = lines.map((x) => {
+    const m = /^([^:]{2,40}):\s*(.+)$/.exec(x);
+    const inner = m ? `<span class="venue-part-name">${escapeHtml(m[1])}</span> <span>${escapeHtml(m[2])}</span>` : `<span>${escapeHtml(x)}</span>`;
+    return `<li${lang ? ` lang="${lang}"` : ''}>${inner}</li>`;
+  }).join('');
+  return `<div class="venue-part-times"><p class="venue-hours-year-h"><strong>${fr ? 'Heures de certaines parties de l’endroit' : 'Parts of the place with their own times'}</strong>${note}</p><ul class="hours-list venue-part-times-list">${li}</ul></div>`;
+}
+// Research's own sentences (its lines, never the owner's) that name a part of a golf place with its own times ("The range
+// opens in March"), at most two, short. Only ever offered on the hours screen as a line to keep.
+const PART_TIMES_PART_RE = /\b(?:driving range|practice range|range|simulators?|indoor golf|fitting (?:bay|studio|centre|center)|club fitting|academy|pro shop|golf shop|restaurant|bistro|grill|patio|lounge|cafe|clubhouse|rv park|campground|mini ?golf|mini ?putt|lessons?)\b/i;
+const PART_TIMES_TIME_RE = /\b(?:january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sept?|oct|nov|dec|winter|summer|spring|fall|autumn|all year|year[- ]round|by appointment|weekends?|daily|open|opens|closes|closed)\b/i;
+function partTimesFromResearch(venueId) {
+  try {
+    const info = venueVisitInfo(venueId); if (!info || !Array.isArray(info.rows)) return [];
+    const mine = new Set(info.owner_labels || []);
+    const out = [];
+    for (const r of info.rows) {
+      if (!r || mine.has(r.label) || typeof r.text !== 'string' || r.label === PART_TIMES_LABEL) continue;
+      for (const sen of r.text.split(/(?<=[.!?])\s+/)) {
+        const t = sen.trim().replace(/[.]$/, '');
+        if (t.length >= 12 && t.length <= 90 && PART_TIMES_PART_RE.test(t) && PART_TIMES_TIME_RE.test(t) && !/\$\s?\d/.test(t) && !out.includes(t)) out.push(t);
+      }
+    }
+    return out.slice(0, 2);
+  } catch (e) { return []; }
+}
 function venueSeasonHoursHtml(venueId, parsed, openMonths, fr, shut) {
   if (!hoursModule || !parsed || !parsed.known) return '';
   const x = hoursExtrasMap().get(venueId);
@@ -44165,6 +44223,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // soft note when that was more than about six months ago.
     if (pageHours === venue.hours) hoursHtml += venueHoursCheckedHtml(venue.id, fr, opts.now || new Date());
   }
+  // Sport test 14: a golf place's parts with their own times, beside the hours (never the course's own hours).
+  if (hoursHtml && !venue.redirect_to && venue.type === 'golf') hoursHtml += venuePartTimesHtml(venue, fr);
   // Winery test 4 (2026-11-12): by appointment today, the Hours box says so first. By appointment all year: that line
   // instead of any stored week (an old 10-5 never shows next to it). In the off-season the walk-in hours stay under it
   // with the off-season line, as before.
@@ -54378,7 +54438,12 @@ const OWNER_VISIT_SLOTS = [
 // stays beside it), so the owner's groups answer replaces research's Groups line only and nothing is doubled or lost.
 // Cocktail test 1 (2026-11-13): and research's "Good to know" is its own box on the edit page (one writer, so nothing doubles).
 const COCKTAIL_VISIT_SLOTS = OWNER_VISIT_SLOTS.map((x) => (x.key === 'groups' ? { ...x, labels: ['Groups'], def: 'Groups' } : x)).concat([{ key: 'good_to_know', labels: ['Good to know'], def: 'Good to know', item: null }]);
-const OWNER_VISIT_KEYS = [...new Set([...OWNER_VISIT_SLOTS, ...COCKTAIL_VISIT_SLOTS].map((x) => x.key))];
+// Sport test 14 (2026-11-21; Dayton approved one optional line for golf): "Part of the place with its own times?" (the
+// range, the fitting bay, the restaurant), up to 3 short lines kept as one, joined by "; ". Never scored, never the
+// course's season or hours: it shows beside the hours as that part's times (venuePartTimesHtml).
+const GOLF_VISIT_SLOTS = COCKTAIL_VISIT_SLOTS.concat([{ key: 'part_times', labels: ['Part times'], def: 'Part times', item: null }]);
+const PART_TIMES_LABEL = 'Part times';
+const OWNER_VISIT_KEYS = [...new Set([...OWNER_VISIT_SLOTS, ...COCKTAIL_VISIT_SLOTS, ...GOLF_VISIT_SLOTS].map((x) => x.key))];
 // Pub test (Whistler, 2026-11-14): her Groups answer replaced research's "Good to know: Live music on weekends in
 // winter" and showed as "Good to know". A groups answer is its own "Groups" line now and research's Good to know stays
 // beside it, unless that line is itself about groups (her answer covers it, so it is replaced as before). A line that
@@ -54401,7 +54466,7 @@ function visitSlotRowIndex(slot, rows, owned) {
 // The label a new line of this slot gets: "Groups" for an answer about groups, else the slot's own.
 function visitSlotNewLabel(slot, text) { return visitGroupsSlot(slot) && VISIT_GROUPS_RE.test(String(text || '')) ? 'Groups' : slot.def; }
 // Tours (2026-11-16): Groups is its own line and "Good to know" (what to bring, weather calls) its own box, as for lounges.
-function visitSlotsForType(t) { return t === 'cocktail' || t === 'tour' || kindSetupType(t) ? COCKTAIL_VISIT_SLOTS : OWNER_VISIT_SLOTS; }
+function visitSlotsForType(t) { return t === 'golf' ? GOLF_VISIT_SLOTS : t === 'cocktail' || t === 'tour' || kindSetupType(t) ? COCKTAIL_VISIT_SLOTS : OWNER_VISIT_SLOTS; }
 function visitSlotsFor(venueId) { let t = ''; try { t = (db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId) || {}).type || ''; } catch (e) { t = ''; } return visitSlotsForType(t); }
 // The classic edit page keeps its five boxes (the dogs line is only asked in the setup).
 const OWNER_VISIT_EDIT_KEYS = ['known_for', 'reservations', 'takeout', 'dietary', 'groups'];
@@ -55729,7 +55794,7 @@ function frRateWordsEn(text) {
 }
 // The review item's labels for words to write in English (her French lines): "Known for (write the English)".
 const FR_LINES_EN_SUFFIX = ' (write the English)';
-const FR_LINE_KEYS = [['good_to_know', 'Good to know'], ['groups', 'Groups'], ['known_for', 'Known for']];
+const FR_LINE_KEYS = [['good_to_know', 'Good to know'], ['groups', 'Groups'], ['known_for', 'Known for'], ['part_times', 'Part times']];
 async function queueFrLinesTranslation(venue, rows, contactEmail) {
   try {
     if (!venue || !kindSetupType(venue.type) || !rows || typeof rows !== 'object') return false;
@@ -55795,7 +55860,7 @@ function queueHappyHourDealsFr(venue, deals, contactEmail) {
 // Sport test 6 (2026-11-20; Priya's setup left 4 French-lines items for one listing in /admin/review, beside the French
 // description): an owner's pending English lines and price names are ONE review item. A new line joins the open item
 // (the newest words of each line win); one is added only when there is none. -> the item's id, or null when nothing changed.
-const FR_LINES_LABELS_FR = ['Known for', 'Good to know', 'Groups', 'Happy hour', 'Prices', 'Price details', 'Closures'];
+const FR_LINES_LABELS_FR = ['Known for', 'Good to know', 'Groups', 'Happy hour', 'Prices', 'Price details', 'Closures', 'Part times'];
 // Sport test 11: the same item names her French lines to write in English ("Known for (write the English): …").
 const FR_LINES_LABELS = [...FR_LINES_LABELS_FR, ...['Story', ...FR_LINES_LABELS_FR].map((l) => l + FR_LINES_EN_SUFFIX)];
 const FR_LINES_PRE = { lines: 'Their own English lines changed: please write the French for them on their listing (queued automatically).', prices: 'Their price names are in English: please write the French for them on their listing (queued automatically).',
@@ -62692,6 +62757,8 @@ function renderOwnerSetupPage(found, opts) {
       researchSuggested: indoorResearchSuggested(venue),
       visitTicks: indoorVisitTicks(venue, snap.badges),
       bookingKnown: (!snap.booking_url && (venueVisitInfo(venue.id) || {}).booking_url) || '',
+      // Sport test 14: research's sentences about a part of a golf place with its own times, offered to keep (never filled in).
+      partTimesSuggest: venue.type === 'golf' ? partTimesFromResearch(venue.id) : [],
       // Indoor test 17 (2026-11-19; Megan: the booking screen didn't say her waiver link stays "Sign the waiver"): what the
       // page's button will say for the link in the box ("Your page shows: Sign the waiver").
       bookShows: { waiver: INDOOR_WAIVER_URL_RE.source, party: INDOOR_PARTY_WORDS_RE.source,
@@ -64653,10 +64720,13 @@ function sport4KindHelp(t, kind, venue, happy) {
     }
     return t;
   }
-  if (t.id === 'sport-part-season' && golfish) {
-    const what = kind === 'golf' ? ['for your course', 'celles de votre parcours'] : ['for your bays', 'celles de vos baies'];
-    return { ...t, a: `<p>Your hours and season are ${what[0]}. A part with its own season, like the patio? Keep your hours as they are and add one line in <strong>Good to know</strong>, like <em>Patio open May to September</em>. Don’t mark the whole place closed part of the year for it: that closes all of it.</p>`,
-      aFr: `<p>Vos heures et votre saison sont ${what[1]}. Une partie a sa propre saison, comme la terrasse? Gardez vos heures et ajoutez une ligne dans <strong>Bon à savoir</strong>, comme <em>Terrasse ouverte de mai à septembre</em>. Ne marquez pas tout l’endroit fermé une partie de l’année pour ça : cela le ferme en entier.</p>` };
+  // Sport test 14 (2026-11-21; Dayton approved the golf line "Part of the place with its own times?"): a part's own times
+  // (the range, the fitting bay, the pro shop in winter, the restaurant, the patio, the RV park) go on that line now.
+  if (t.id === 'sport-part-season' && (golfish || kind === 'range')) {
+    const what = kind === 'simgolf' ? ['for your bays', 'celles de vos baies'] : kind === 'range' ? ['for your range', 'celles de votre champ de pratique'] : ['for your course', 'celles de votre parcours'];
+    const ex = kind === 'simgolf' ? ['Patio: May–September', 'Terrasse : de mai à septembre'] : ['Range: April–October', 'Champ de pratique : d’avril à octobre'];
+    return { ...t, a: `<p>No: your hours and season are ${what[0]}. A part with its own times, like the range, club fitting, the pro shop in winter or the restaurant? On your hours, under <strong>Part of the place with its own times?</strong>, add one line, like <em>${ex[0]}</em> or <em>Club fitting: all winter by appointment</em>. Your page shows it beside your hours as that part’s times; your own season and hours stay as they are. Don’t mark the whole place closed, or open all year, for it.</p>`,
+      aFr: `<p>Non : vos heures et votre saison sont ${what[1]}. Une partie a ses propres heures, comme le champ de pratique, l’ajustement de bâtons, la boutique du pro l’hiver ou le restaurant? Dans vos heures, sous <strong>Une partie de l’endroit a ses propres heures?</strong>, ajoutez une ligne, comme <em>${ex[1]}</em> ou <em>Ajustement de bâtons : tout l’hiver sur rendez-vous</em>. Votre page l’affiche à côté de vos heures, comme les heures de cette partie; votre saison et vos heures restent les mêmes. Ne marquez pas tout l’endroit fermé, ni ouvert toute l’année, pour ça.</p>` };
   }
   if (t.id === 'sport-season' && golfish) return both([['like the mini golf?', 'like the patio?'], ['<em>Mini golf April to mid-October</em>', '<em>Patio open May to September</em>']], [['comme le mini-golf?', 'comme la terrasse?'], ['<em>Mini-golf d’avril à la mi-octobre</em>', '<em>Terrasse ouverte de mai à septembre</em>']]);
   if (t.id === 'sport-second-kind' && kind === 'golf') {

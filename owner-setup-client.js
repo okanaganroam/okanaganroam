@@ -1086,6 +1086,7 @@
   }
   function curOpenSea(){ return S.openTouched ? S.openSea : openSeaOf(CUR.open_months); }
   S.openSea = openSeaOf(CUR.open_months); S.openTouched = false;
+  S.partTimes = String(((CUR.visit_rows || {}).part_times) || '').split(/\s*;\s*/).filter(Boolean).join('\n');
   // Seasonal hours (pub test 6, 2026-11-10): the first stored set, as its months and its own day-by-day week (it was one
   // time for the days already open in the usual week, so "open daily in summer" kept Mon and Tue closed). Stored the same
   // way as always (hours_seasons: { from, to, label, hours: { mon: [...], ... } }); older sets read back as they are.
@@ -2552,6 +2553,8 @@
         + (APPT && T.allYearAppt ? big('📞', T.allYearAppt, T.allYearApptSub, true, 'yearAppt') : '') + '</div>';
       // Indoor places (2026-11-19): the summer, winter and part-of-the-year hours buttons fold under one link
       // ("Different hours in summer or winter?"); "Yes, all year" and "closed part of the year" stay up front.
+      // Sport test 14: the parts' own times (golf), above the year answers.
+      if (s === 'hours:year' && !noSetYear() && partTimesOn()) x = x.replace('<div class="su-stack">', partTimesHtml() + '<div class="su-stack">');
       if (INDOOR && T.seaMore && !noSetYear() && !storedSeas().length) {
         var seaRe = /<button[^>]*data-act="yearSeason:(?:summer|winter|part)"[^>]*>[\s\S]*?<\/button>/g, seaBtns = x.match(seaRe) || [];
         // Sport test 14: for sport and golf, "different for part of the year" comes first in the box.
@@ -3661,6 +3664,19 @@
   var LAST = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   // Sport test 14 (2026-11-21): a booking link kept as stored that no owner has set yet (research's) is sent with Save as the
   // owner's own answer, so a link that is also the website keeps its Book button. Every type's booking save.
+  // Sport test 14 (2026-11-21; Dayton approved, golf only): "Part of the place with its own times? (optional)" on the
+  // season question, up to 3 short lines ("Range: April–October"). Saved with the hours as the owner's own line (never
+  // filled in for her: research's sentences are offered to keep); it shows beside the hours as that part's times and never
+  // changes the course's season or hours.
+  function partTimesOn(){ return !!C.sport && !!T.partTimesQ && ['golf', 'range', 'simgolf'].indexOf(indoorMainKind()) >= 0; }
+  function partTimesOut(v){ return String(v || '').split(/\s*(?:\n|;)\s*/).map(function(x){ return x.trim(); }).filter(Boolean).slice(0, 3).join('; '); }
+  function partTimesRead(){ var b = el('suPartTimes'); if (b) S.partTimes = b.value; }
+  function partTimesHtml(){
+    var sug = (C.partTimesSuggest || []).filter(function(t){ return String(S.partTimes || '').indexOf(t) < 0; });
+    return '<div class="su-parttimes" id="suPartTimesBox" style="margin:14px 0 12px"><label class="su-q" for="suPartTimes">' + h(T.partTimesQ) + '</label><p class="su-hint" id="suPartTimesHint">' + h(T.partTimesHint) + '</p>'
+      + '<textarea class="su-field su-line" id="suPartTimes" rows="3" maxlength="180" aria-describedby="suPartTimesHint" placeholder="' + h(T.partTimesPh) + '">' + h(S.partTimes || '') + '</textarea>'
+      + sug.map(function(t, i){ return '<p class="su-hint"><button type="button" class="su-link" data-act="partTimesUse:' + i + '">' + h(fill(T.partTimesKeep, { line: t })) + '</button></p>'; }).join('') + '</div>';
+  }
   function bookKeep(u){ return !!u && !CUR.booking_owner_set && !!CUR.booking_url && u === CUR.booking_url; }
   // Sport test 14: month chips in exactly two runs (Mar–Apr and Oct) become two stretches with the same day hours, when
   // there's room for one more stretch. -> true when split.
@@ -3760,6 +3776,9 @@
     var tourApptOff = TL && AI.visit === 'appointment';
     if (tourApptOff) listH.push(tinfo({ visit: null }));
     var tkpH = tticksPart(!!openVal(S.openTouched ? S.openSea : null) || !!(CUR.open_months && !S.openTouched)); if (tkpH) listH.push(tkpH);
+    // Sport test 14: the parts' own times, when changed (their own line, never the hours).
+    partTimesRead(); var ptNew = partTimesOn() ? partTimesOut(S.partTimes) : null, ptCh = ptNew !== null && ptNew !== String((CUR.visit_rows || {}).part_times || '');
+    if (ptCh) listH.push({ visit_rows: C.lang === 'fr' ? { part_times: ptNew, _lang: 'fr' } : { part_times: ptNew } });
     // Bug 9 (brewery test 1): a usual day changed on this visit while a stored period still has that day's old time.
     var stale = seaStaleOf(ch.hours_seasons || CUR.hours_seasons || []), addNext = !!S.seaAddNext; S.seaAddNext = false;
     saveAll('hours', listH, null, addNext ? seaStepOf(Math.min(S.seaList.filter(function(o){ return o.on; }).length, SEA_MAX - 1)) : KITCHEN_Q ? 'hours:kitchen' : CLO_SUB ? 'closures' : null, function(){
@@ -3784,6 +3803,7 @@
         S.seaList = keep; S.seaI = 0; S.sea = keep[0];
       }
       if ('open_months' in ch) CUR.open_months = ch.open_months;
+      if (ptCh) { CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.part_times = ptNew; }
       S.seaTouched = false; S.openTouched = false;
       if (addNext) seaAddStart();
     });
@@ -4353,6 +4373,7 @@
     // Sport test 11: open the days of these hours too (the season is widened to cover them), or skip these hours.
     if (k === 'seaOutOpen' && S.seaOut && S.seaOut.ext) { S.openSea = { from: S.seaOut.ext.from, to: S.seaOut.ext.to }; S.openTouched = true; S.seaOut = null; S.seaOutNudge = ''; S.nudge = ''; return hoursSave(); }
     // Sport test 14: keep only the stretch's days in season (the days outside it are dropped, never the ones in it).
+    if (k === 'partTimesUse') { partTimesRead(); var pts = (C.partTimesSuggest || []).filter(function(t){ return String(S.partTimes || '').indexOf(t) < 0; })[+v]; if (pts) S.partTimes = (String(S.partTimes || '').trim() ? String(S.partTimes).trim() + '\n' : '') + pts; var my2 = window.scrollY; render(); window.scrollTo(0, my2); return; }
     if (k === 'seaOutKeep' && S.seaOut && S.seaOut.keep) {
       var kz = S.seaList[S.seaOut.i], kk = S.seaOut.keep; S.seaOut = null; S.seaOutNudge = ''; S.nudge = '';
       if (kz) { kz.exact = { from: kk.from, to: kk.to }; kz.dirty = true; S.seaTouched = true; }
@@ -5750,6 +5771,7 @@
   screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-addtime],[data-rmtime],[data-copyevery],[data-copywe],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc],[data-wpick],[data-fee],[data-wnobook],[data-xq],[data-bpick],[data-bfee],[data-btogo],[data-bgroup],[data-bq],[data-tpick],[data-tkind],[data-tadult],[data-tnobook],[data-ifree],[data-iper]') : null; if (t) mark(); }, true);
   // Kept as the owner taps and types, and once more on the way out.
   var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
+  screen.addEventListener('input', function(e){ if (e && e.target && e.target.id === 'suPartTimes') S.partTimes = e.target.value; });
   screen.addEventListener('input', drSoon); screen.addEventListener('change', drSoon); screen.addEventListener('click', function(){ setTimeout(drSave, 0); });
   window.addEventListener('pagehide', drSave);
   // ---------- Where she is, in the address (bug-check 2026-11-12) ----------

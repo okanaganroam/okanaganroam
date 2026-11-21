@@ -201,7 +201,8 @@ test('3. Help in French: her 24 questions land well; the 30 held-out French ques
   assert.match(s.answer('sport-sister-listing', true), /n’a pas de page à lui ici/, 'no simulator listing of her own: never "il a sa propre page"');
   assert.doesNotMatch(s.answer('sport-sister-listing', true), /il a sa propre page/);
   assert.equal(s.best('Le club de golf comme tel n’a pas de 5 à 7. Par contre, le restaurant 1913 fait des soupers spéciaux le vendredi soir en saison. Qu’est-ce que je réponds ici?').id, 'sport-hh-none-specials');
-  assert.match(s.answer('sport-offseason-other', true), /Bon à savoir[\s\S]*Écrivez-nous/);
+  // Sport test 14 (Dayton approved the golf line): when it runs goes on « Une partie de l’endroit a ses propres heures? ».
+  assert.match(s.answer('sport-offseason-other', true), /Une partie de l’endroit a ses propres heures[\s\S]*Écrivez-nous/);
   assert.match(e.answer('indoor-cost', true), /^<p>C’est gratuit, vraiment/);
   // An error page with no login words is never a confident unrelated answer.
   const r = e.best('J’ai une erreur quand je clique sur le bouton, ça ne marche pas.');

@@ -259,3 +259,62 @@ test('8. search: golf and wine lists the courses first; a tournament venue searc
   // A winery search alone is unchanged.
   assert.ok(!(await searchNames('winery oliver')).includes(fv.name));
 });
+
+// Dayton approved (2026-11-21), golf only: "Part of the place with its own times? (optional)" on the season question.
+test('9. the parts\' own times (golf): on the season question, beside the hours EN and FR, never the course\'s season or plans', async () => {
+  const { v, t } = await setUp(['golf', 'range'], { season: '04-01:10-15', region: 'oliver', name: 'Parts Line Golf T14' });
+  db.prepare("UPDATE venues SET hours_source = 'venue_owner' WHERE id = ?").run(v.id);
+  const g = await openSetup(base, t, { hash: 'hours' });
+  await g.click('hoursOk');
+  assert.match(g.text(), /Part of the place with its own times\? \(optional\)/);
+  assert.equal(g.doc.getElementById('suPartTimes').value, '', 'never filled in for her');
+  await g.type('suPartTimes', 'Range: March–November\nFitting bay: open all winter by appointment');
+  // Her season as it is (We're closed part of the year, the same dates), saved with the line.
+  await g.click('yearClosed');
+  await g.type('suOfM', '4'); await g.type('suOfD', '1'); await g.type('suOtM', '10'); await g.type('suOtD', '15');
+  await g.click('openSave:same');
+  const seasonNow = db.prepare('SELECT open_months FROM venue_links WHERE venue_id = ?').get(v.id).open_months;
+  assert.equal(seasonNow, '04-01:10-15', 'the course season stays in charge');
+  if (app.clearVenueCaches) app.clearVenueCaches();
+  const en = await getText(`/oliver/golf/${v.slug}`), fr = await getText(`/fr/oliver/golf/${v.slug}`);
+  assert.match(en, /Parts of the place with their own times[\s\S]*?<span class="venue-part-name">Range<\/span> <span>March–November<\/span>[\s\S]*?<span class="venue-part-name">Fitting bay<\/span> <span>open all winter by appointment<\/span>/);
+  assert.doesNotMatch(en, /visit-label">Part times/, 'never in the Plan your visit box');
+  assert.match(fr, /Heures de certaines parties de l’endroit[\s\S]*?\(en anglais\)[\s\S]*?<li lang="en"><span class="venue-part-name">Range<\/span>/);
+  // Queued for French with her other lines.
+  const items = db.prepare("SELECT help_kind, help_note FROM venue_menus WHERE venue_id = ?").all(v.id);
+  assert.ok(items.some((x) => /Part times/.test(String(x.help_note || ''))), JSON.stringify(items));
+  // Build My Trip: the course is out in January (its season), in in July, whatever the parts say.
+  const NOV = new Date('2026-11-21T12:00:00-08:00');
+  assert.ok(!NAMES(app.runTripPlan({ text: 'golf in Oliver on Saturday January 15 2028' }, NOV)).includes(v.name));
+  const jul = app.runTripPlan({ text: 'golf in Oliver on Saturday July 17 2027' }, NOV);
+  assert.ok([...NAMES(jul), ...((jul.recommendations || []).map((x) => x.venue && x.venue.name))].includes(v.name));
+  // Not part of the 100%: the checklist is the same with or without it.
+  // (Its slot has no checklist item, like the Dogs line: item null.)
+  assert.match(fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8'), /\{ key: 'part_times', labels: \['Part times'\], def: 'Part times', item: null \}/);
+  // Help: the part questions point to the line.
+  const S = helpBot(await getText(`/owner/${t}/setup`));
+  for (const q of ['the fitting bay is open all winter by appointment. should I say open all year then?', 'the range usually opens a week or two before the course in march. do I change our season?', 'the pro shop is open tue to sat 10 to 4 all winter, where does that go?', 'Also the RV park opens April 28 to mid September, does that go here too?', 'our restaurant is open in november but golf is closed. does that change our season?']) {
+    const r = S.best(q);
+    assert.ok(!r.id || /Part of the place with its own times/.test(S.answer(r.id)), `${q} -> ${r.id}`);
+  }
+  assert.match(S.answer('sport-part-season'), /Part of the place with its own times\?/);
+  // Search reads it for that part.
+  const html = await getText(`/search?q=${encodeURIComponent('fitting bay')}`);
+  assert.ok(html.includes(`>${v.name}`));
+});
+
+test('9b. no other sport kind sees the line, and the server takes it for golf only', async () => {
+  for (const [kind, type] of [['rink', 'sport'], ['skischool', 'sport'], ['swim', 'sport'], ['discgolf', 'sport']]) {
+    const { t } = await setUp([kind], { type, season: '06-10:09-05' });
+    const g = await openSetup(base, t, { hash: 'hours' });
+    await g.click('hoursOk');
+    assert.ok(!g.doc.getElementById('suPartTimes'), kind);
+    const r = await change(t, { visit_rows: { part_times: 'Lounge: winter only' } });
+    assert.equal(r.status, 400, kind);
+  }
+  // A golf simulator place does see it.
+  const { t } = await setUp(['simgolf'], { type: 'golf' });
+  const g = await openSetup(base, t, { hash: 'hours' });
+  await g.click('hoursOk');
+  assert.ok(g.doc.getElementById('suPartTimes'));
+});
