@@ -38,7 +38,7 @@ app.setVenueSubmissionTransport(async () => {});
 let srv, base;
 test.before(async () => { srv = http.createServer(app.server.listeners('request')[0]); await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`; });
 test.after(() => srv && srv.close());
-const get = (p) => fetch(base + p).then((r) => r.text());
+const get = (p) => fetch(base + p, { headers: { Connection: 'close' } }).then((r) => r.text());
 const helpBot = (html) => {
   const m = /<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>\s*<script>([\s\S]*?)<\/script>/.exec(html);
   assert.ok(m, 'the page has the Help widget');
@@ -55,7 +55,7 @@ async function botsFor(src, n) {
   const v = app.createVenue({ name: `Heldout ${src}`, slug: `heldout-${src}`, region: 'kelowna', type: c.type, latitude: 49.88 + n / 1000, longitude: -119.49, address: `${n} Water St, Kelowna`, website: `https://example-${n}.com`, hours: JSON.stringify(WK), description: 'A fixture.' });
   if (c.sister) app.createVenue({ name: `${c.sister} ${src}`, slug: `heldout-${src}-sister`, region: 'kelowna', type: c.type, latitude: 49.88 + n / 1000, longitude: -119.48, address: `${n} Water St, Kelowna`, hours: JSON.stringify(WK), description: 'Its sister listing.' });
   const t = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
-  const post = (changes) => fetch(`${base}/owner/${t}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.66.${n}.1` }, body: JSON.stringify({ changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) });
+  const post = (changes) => fetch(`${base}/owner/${t}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Connection: 'close', Origin: base, 'X-Real-IP': `10.66.${n}.1` }, body: JSON.stringify({ changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) });
   if (c.season) assert.ok([200, 201].includes((await post({ hours: WK, open_months: SEA[c.season] || c.season })).status), `${src} season`);
   const info = { kinds: c.kinds, length: c.length || '1-2h', book: c.book, age: c.age || 'all', year: c.season || c.year === 'seasonal' ? 'seasonal' : 'all' };
   const r = await post({ indoor_info: info, indoor_price: c.free || c.price });

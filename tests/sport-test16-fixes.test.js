@@ -222,7 +222,7 @@ test('4. Help: her 30 questions on the screens she asked them land well (or on c
   assert.match(S.answer('indoor-local-owned'), /management company run from a head office\? Then it doesn’t count: leave it unticked/);
   // The card rule, said as it is (#13, #28).
   assert.match(E.answer('sport-card-price'), /Green fees from \$200/);
-  assert.match(E.answer('sport-card-price'), /standby[\s\S]*On an 18-hole course, a 9-hole rate never lowers it either/);
+  assert.match(E.answer('sport-card-price'), /standby[\s\S]*Nor does twilight, or a 9-hole rate when your price is for 18 holes/);
   assert.match(S.answer('sport-rate-lines'), /Write <em>from \$85<\/em> or <em>varies<\/em>[\s\S]*not your lowest/);
   assert.doesNotMatch(`${S.answer('sport-rate-lines')} ${S.answer('sport-no-rate')}`, /lowest regular adult price/);
   // The parts line: shows as typed all year (no "No:" opener).

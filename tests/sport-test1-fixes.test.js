@@ -154,10 +154,13 @@ test('5. golf happy hour: the optional tile for a golf course and a simulator, a
   ok(await change(t, { happy_hour: hh, badges: { happy_hour: true, patio: true } }));
   assert.equal(!!app.getVenue(v.id).happy_hour, true);
   assert.match(page(v, 'en', new Date('2026-07-15T12:00:00-07:00')), /Happy hour|happy hour/i);
+  // Sport test 16 (2026-11-21): search only finds a happy hour visitors can see today, never while the course is closed for
+  // the season (a golf course is closed in winter unless it says so), so it is found or not by today's date.
+  const seen = !app.happyHourHiddenNow(app.getVenue(v.id));
   process.env.DISCOVERY_SEARCH = 'on';
   try {
     const r = plain(await getText(`/search?q=${encodeURIComponent('golf patio happy hour kelowna')}`));
-    assert.ok(r.includes(app.getVenue(v.id).name), r.slice(0, 1200));
+    assert.equal(r.includes(app.getVenue(v.id).name), seen, r.slice(0, 1200));
   } finally { delete process.env.DISCOVERY_SEARCH; }
 });
 

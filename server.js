@@ -26989,17 +26989,21 @@ function sportPriceLineCounts(kind, name, desc = '', section = '', opts = {}) {
   if (kind === 'golf' && opts && opts.eighteen && SPORT_NINE_LINE_RE.test(`${name} ${desc || ''}`) && !SPORT_EIGHTEEN_LINE_RE.test(String(name))) return false;
   return true;
 }
-// An 18-hole (or bigger) course: our checked golf data says so, or her own list has an 18-hole line.
-function sportGolfEighteen(venueId, menu) {
+// An 18-hole (or bigger) course whose typed main price is for 18 holes: our checked golf data says 18+, or her own list has
+// an 18-hole line; and her main price isn't her own plain 9-hole line's (Debbie typed her 9-hole $45: her 9-hole rates
+// are her round then).
+function sportGolfEighteen(venueId, menu, main = null) {
   try {
     const v = db.prepare('SELECT id, slug, region, type, name, description FROM venues WHERE id = ?').get(venueId);
     if (!v || v.type !== 'golf') return false;
     const d = golfDetailsFor([v]).get(`${v.region}/${v.slug}`);
     const holes = d && d.profile && d.profile.holes != null ? Number(d.profile.holes) : NaN;
-    if (holes >= 18) return true;
     if (holes === 9) return false;
-    for (const sec of (menu && menu.data && menu.data.sections) || []) for (const it of sec.items || []) if (it && SPORT_EIGHTEEN_LINE_RE.test(String(it.name || ''))) return true;
-    return false;
+    const items = [].concat(...((menu && menu.data && menu.data.sections) || []).map((sec) => sec.items || [])).filter(Boolean);
+    const num = (x) => { const m = /(\d+(?:[.,]\d{1,2})?)/.exec(String(x || '').replace(/,(?=\d{3}\b)/g, '')); return m ? Number(m[1].replace(',', '.')) : NaN; };
+    if (main > 0 && items.some((it) => SPORT_NINE_LINE_RE.test(String(it.name || '')) && !SPORT_QUALIFIED_PRICE_RE.test(`${it.name} ${it.description || ''}`) && Math.abs(num(it.price) - main) < 0.01)) return false;
+    if (holes >= 18) return true;
+    return items.some((it) => SPORT_EIGHTEEN_LINE_RE.test(String(it.name || '')));
   } catch (e) { return false; }
 }
 function indoorLowestTyped(venueId) {
@@ -27009,7 +27013,7 @@ function indoorLowestTyped(venueId) {
     let lo = null;
     const kinds = venueIndoorInfo(venueId).kinds;
     const sportKind = Array.isArray(kinds) && kinds.length && indoorKindsModule.SPORT_KIND_TEXT_KINDS.includes(kinds[0]) ? kinds[0] : null;
-    const eighteen = sportKind === 'golf' && sportGolfEighteen(venueId, menu);
+    const eighteen = sportKind === 'golf' && sportGolfEighteen(venueId, menu, Number((venueIndoorInfo(venueId) || {}).price) || null);
     for (const sec of menu.data.sections || []) for (const it of sec.items || []) {
       const raw = String(it && it.price || '');
       if (!it || !it.name || INDOOR_NOT_A_PRICE_RE.test(String(it.name)) || /%/.test(raw) || INDOOR_ONE_DAY_DEAL_RE.test(`${it.name} ${it.description || ''}`)) continue;
@@ -64581,8 +64585,8 @@ const SPORT_TEST2_HELP_TOPICS = [
     allOf: [['card', 'fiche'], ['show', 'shows', 'say', 'says', 'price', 'become', 'affich', 'prix', 'indiqu', 'devien', 'green fee', 'droits']],
     keys: ['what shows on the card', 'still what shows', 'shows on the card', 'show on the card', 'shows on my card', 'on my card', 'my card says', 'card says', 'card price', 'become my price', 'become my card price', 'become the card price', 'will it show', 'show 10 for clubs', 'my card on the golf page', 'says green fees', 'dont have green fees', 'we rent bays'],
     keysFr: ['sur ma fiche', 'ma fiche indique', 'prix de ma fiche', 'deviendra', 'affichera', 'droits de jeu sur ma fiche'],
-    a: '<p>Your card keeps your main price from <strong>Price</strong>, in your kind’s words: “{PAGE_SAY}”. {EXTRAS_EN} never become your card’s price, even when they’re cheaper. Only a lower plain adult {MAIN_LINE_EN} in Your prices can lower it: never a rate for some times or some people, like after 5 PM, twilight, standby, replay, junior or senior.{NINE_EN} Words that don’t fit your place? Check <strong>What kind of place</strong>: your card reads its words.</p>',
-    aFr: '<p>Votre fiche garde votre prix principal de <strong>Prix</strong>, dans les mots de votre genre : « {PAGE_SAY} ». {EXTRAS_FR} ne deviennent jamais le prix de votre fiche, même moins chers. Seul un {MAIN_LINE_FR} adulte ordinaire plus bas dans Vos tarifs peut le baisser : jamais un tarif pour certaines heures ou certaines personnes, comme après 17 h, crépuscule, en attente, deuxième ronde, junior ou aîné.{NINE_FR} Des mots qui ne conviennent pas? Vérifiez <strong>Quel genre d’endroit</strong> : votre fiche en lit les mots.</p>' },
+    a: '<p>Your card keeps your main price from <strong>Price</strong>, in your kind’s words: “{PAGE_SAY}”. {EXTRAS_EN} never become your card’s price, even when they’re cheaper. Only a lower plain adult {MAIN_LINE_EN} in Your prices can lower it: never a rate for some times or some people, like after 5 PM, standby, replay, junior or senior.{NINE_EN} Words that don’t fit your place? Check <strong>What kind of place</strong>: your card reads its words.</p>',
+    aFr: '<p>Votre fiche garde votre prix principal de <strong>Prix</strong>, dans les mots de votre genre : « {PAGE_SAY} ». {EXTRAS_FR} ne deviennent jamais le prix de votre fiche, même moins chers. Seul un {MAIN_LINE_FR} adulte ordinaire plus bas dans Vos tarifs peut le baisser : jamais un tarif pour certaines heures ou certaines personnes, comme après 17 h, en attente, deuxième ronde, junior ou aîné.{NINE_FR} Des mots qui ne conviennent pas? Vérifiez <strong>Quel genre d’endroit</strong> : votre fiche en lit les mots.</p>' },
   { id: 'sport-sim-tech', kinds: ['simgolf', 'range'], pages: ['setup', 'edit'], over: ['indoor-good-to-know', 'description', 'features', 'indoor-french', 'sport-kinds-other'],
     q: 'Our simulators, brand and courses: do I say it?', qFr: 'Nos simulateurs, la marque et les parcours : est-ce que je le dis?',
     keys: ['simulator brand', 'which simulator', 'brand', 'trackman', 'uneekor', 'foresight', 'gspro', 'gs pro', 'full swing', 'launch monitor', 'launch monitors', 'courses we have', 'how many courses', 'does anybody care', 'does anyone care', 'our sims', 'our simulators', 'our technology', 'toptracer'],
@@ -64628,10 +64632,10 @@ function sportTest2Tokens(kind, venue) {
   return {
     en: { LAST_UNIT_EN: (w.last || [])[0] || 'entry', LAST_EX: (w.last || [])[2] || 'Last entry 8:30 PM', MAIN_EN: label[0], UNIT_EN: (w.unit || [])[0] || 'group',
       PER_EX: `${typer.first} $${price}`, PAGE_SAY: en.price.page.replace('{x}', `$${price}`).replace(/\.$/, ''), SPLIT_EX: (w.split || [])[0] || 'Groups of 10 or more: ask about group rates',
-      MAIN_LINE_EN: String(typer.first || 'main price').toLowerCase(), NINE_EN: kind === 'golf' ? ' On an 18-hole course, a 9-hole rate never lowers it either.' : '', TECH_EX: (w.tech || [])[0] || 'What makes your place special', EXTRAS_EN: 'Rentals, lessons, memberships, food and kids’ or senior prices' },
+      MAIN_LINE_EN: String(typer.first || 'main price').toLowerCase(), NINE_EN: kind === 'golf' ? ' Nor does twilight, or a 9-hole rate when your price is for 18 holes.' : '', TECH_EX: (w.tech || [])[0] || 'What makes your place special', EXTRAS_EN: 'Rentals, lessons, memberships, food and kids’ or senior prices' },
     fr: { LAST_UNIT_FR: (w.last || [])[1] || 'entrée', LAST_EX: (w.last || [])[3] || 'Dernière entrée à 20 h 30', MAIN_FR: label[1], UNIT_FR: (w.unit || [])[1] || 'groupe',
       PER_EX: `${typerFr.first} ${price} $`, PAGE_SAY: fr.price.page.replace('{x}', `${price} $`).replace(/\.$/, ''), SPLIT_EX: (w.split || [])[1] || 'Groupes de 10 ou plus : demandez les tarifs de groupe',
-      MAIN_LINE_FR: String(typerFr.first || 'prix principal').toLowerCase(), NINE_FR: kind === 'golf' ? ' Sur un parcours de 18 trous, un tarif 9 trous ne le baisse pas non plus.' : '', TECH_EX: (w.tech || [])[1] || 'Ce qui rend votre endroit unique', EXTRAS_FR: 'La location, les cours, les abonnements, la nourriture et les prix pour enfants ou aînés' } };
+      MAIN_LINE_FR: String(typerFr.first || 'prix principal').toLowerCase(), NINE_FR: kind === 'golf' ? ' Ni le crépuscule, ni un tarif 9 trous quand votre prix est pour 18 trous.' : '', TECH_EX: (w.tech || [])[1] || 'Ce qui rend votre endroit unique', EXTRAS_FR: 'La location, les cours, les abonnements, la nourriture et les prix pour enfants ou aînés' } };
 }
 // The kind's own words for SPORT_TEST1_HELP_TOPICS: { en: {TOKEN: text}, fr: {…} }.
 // Sport test 3 (2026-11-20; Gord, a family driving range and mini golf: Help answered 10 of his 27 questions well): the
