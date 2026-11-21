@@ -76,7 +76,7 @@ test('report: steps, conversion between main steps, booking kinds, share methods
   assert.equal(by.book_click.of_previous, 40);
   assert.equal(by.swap.of_previous, null, 'side steps are not part of the chain');
   assert.equal(by.save.of_plans, 8.2);
-  assert.deepEqual(v4.book.map((b) => [b.key, b.n]), [['stay', 8], ['viator', 3], ['tasting', 4], ['reservation', 2], ['other', 0]]);
+  assert.deepEqual(v4.book.map((b) => [b.key, b.n]), [['stay', 8], ['viator', 3], ['fever', 0], ['tasting', 4], ['reservation', 2], ['other', 0]]);
   assert.equal(v4.commission_taps, 11);
   assert.equal(v4.book_taps, 17);
   assert.deepEqual(v4.share.map((m) => m.n), [6, 3]);

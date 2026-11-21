@@ -1,6 +1,6 @@
 'use strict';
 // Build My Trip funnel (2026-11-21, Dayton): how many visits to the planner got a plan, swapped, removed, confirmed,
-// opened "Book my trip", clicked each kind of booking link (a stay and Viator earn commission), shared and saved --
+// opened "Book my trip", clicked each kind of booking link (a stay, Viator and Fever earn commission), shared and saved --
 // for the new simple page (V4) and the old one (/trip?v=3) side by side.
 //
 // Built on the site's own daily counts (site-events.js, table site_event_counts): the page sends a fixed event name with
@@ -30,6 +30,8 @@ const NOT_ON = { v3: ['confirm', 'book_open'] };
 const BOOK_TYPES = [
   ['stay', 'Place to stay (Stay22 and other stay links)', true],
   ['viator', 'Viator tour or activity', true],
+  // Fever (2026-11-21, fever.js): an event's "Tickets" on Fever (only with FEVER_AFFILIATE_TEMPLATE set).
+  ['fever', 'Fever event tickets', true],
   ['tasting', 'Winery, brewery or distillery tasting', false],
   ['reservation', 'Restaurant, pub, café or bar reservation', false],
   ['other', 'Other booking link', false],
@@ -50,13 +52,14 @@ function bookTypeFor(venueType) {
   return TASTING.has(t) ? 'tasting' : TABLE.has(t) ? 'reservation' : 'other';
 }
 // The page sends bmt:<v>:book:venue for a booking link that is not a stay, with the link's kind (data-link) and the
-// business id when there is one; this turns it into viator, or tasting / reservation / other from the business's type.
+// business id when there is one; this turns it into viator or fever, or tasting / reservation / other from the business's type.
 // (The page script names no booking partner itself, so /trip carries no partner name when a partner is switched off.)
 // Any other name passes through unchanged.
 function resolveName(name, venueId, typeOf, link) {
   const m = /^bmt:(v3|v4):book:venue$/.exec(String(name || ''));
   if (!m) return name;
   if (link === 'viator') return `bmt:${m[1]}:book:viator`;
+  if (link === 'fever') return `bmt:${m[1]}:book:fever`;
   let type = null;
   const id = Number(venueId);
   if (Number.isInteger(id) && id > 0 && typeof typeOf === 'function') { try { type = typeOf(id); } catch (e) { type = null; } }
@@ -105,7 +108,7 @@ function report(db, days = 30, now = new Date()) {
     if (!w || w.start !== start) { w = { start, plan: 0, swap: 0, remove: 0, confirm: 0, book_open: 0, book_click: 0, book_taps: 0, commission_taps: 0, share: 0, save: 0 }; weeks.push(w); }
     for (const [s] of STEPS) w[s] += sumDay([s], day);
     w.book_taps += sumDay(bookSuffixes, day);
-    w.commission_taps += sumDay(['book:stay', 'book:viator'], day);
+    w.commission_taps += sumDay(BOOK_TYPES.filter(([, , c]) => c).map(([b]) => `book:${b}`), day);
   }
   return { since, versions, show_v3: versions.v3.any, plans_per_day, book_taps_per_day, weeks: weeks.reverse() };
 }
@@ -151,7 +154,9 @@ function clientScript() {
         if (t.closest('[data-v4-book]')) { step('book_open'); return; }
         if ((b = t.closest('[data-v4-save]'))) { if (b.getAttribute('aria-pressed') !== 'true') step('save'); return; }
         var a = t.closest('a[href]');
-        if (!a || !document.getElementById('t3Result') || !document.getElementById('t3Result').contains(a)) return;
+        // The plan (#t3Result) and the V4 sheet (#v4Sheet, a dialog outside it; 2026-11-21: its taps were not counted).
+        var res = document.getElementById('t3Result'), sheet = document.getElementById('v4Sheet');
+        if (!a || !((res && res.contains(a)) || (sheet && sheet.contains(a)))) return;
         var tr = a.getAttribute('data-track'), body;
         if (tr === 'stay_click' && a.closest('.t3-stay')) body = { name: 'bmt:' + V + ':book:stay' };
         else if (tr === 'booking') body = { name: 'bmt:' + V + ':book:venue', link: String(a.getAttribute('data-link') || '').slice(0, 24), venue_id: Number(a.getAttribute('data-venue-id')) || 0 };
