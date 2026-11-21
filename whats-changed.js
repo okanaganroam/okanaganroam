@@ -69,6 +69,8 @@ function summarize(db, now = new Date()) {
     add('bmt_book_open', 'Build My Trip: opened “Book my trip”', bmt(both2('book_open')));
     add('bmt_book_click', 'Build My Trip: visits that clicked a booking link', bmt(both2('book_click')));
     add('bmt_commission', 'Build My Trip: stay + Viator + Fever + rental car booking taps', bmt([...both2('book:stay'), ...both2('book:viator'), ...both2('book:fever'), ...both2('book:discovercars')]));
+    // Commission links (2026-11-21, commissions.js): every tap on a Stay22, Viator, Discover Cars, Fever or Whistler.com link.
+    add('commission_clicks', 'Taps on commission links (all partners, all pages)', (a, b) => one("SELECT SUM(n) FROM site_event_counts WHERE name LIKE 'commission:%' AND day BETWEEN ? AND ?", a, b));
     add('bmt_share', 'Build My Trip: visits that shared', bmt(both2('share')));
     add('bmt_save', 'Build My Trip: visits that saved to My Trip', bmt(both2('save')));
   }
