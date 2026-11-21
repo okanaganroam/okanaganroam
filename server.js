@@ -51,6 +51,8 @@ const tripBooking = require('./trip-booking');
 const viator = require('./viator');
 // Fever "Tickets" (2026-11-21, fever.js): off unless FEVER_AFFILIATE_TEMPLATE is set (Dayton's Impact link for Fever).
 const fever = require('./fever');
+// "Book a wine tour" (2026-11-21, wine-tours.js): one Viator wine tour per wine area; off with Viator off.
+const wineTours = require('./wine-tours');
 const gscReport = require('./gsc-report');
 // What is clickable on one business or event page (2026-11-05): read from the page itself, so each sheet shows that page's
 // own buttons and links. The server asks its own public page (no scripts run, so nothing is counted); kept 10 minutes.
@@ -7805,6 +7807,12 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false) {
       const bookable = new Set(((block && block.checklist) || tripBookingChecklist(plan)).map((c) => c.venueId));
       const hint = viator.tripHint(plan, text, bookable);
       if (hint) plan.viator = hint;
+      // "Book a wine tour (no driving)" (2026-11-21, wine-tours.js): V4's "Book my trip" gets one Viator wine tour step
+      // when a day has 2+ winery stops (the tour for that day's wine area). Added after planning: stops never change.
+      if (v4) {
+        const wineStep = wineTours.tripStep(plan, { bookableIds: bookable });
+        if (wineStep) wineTours.withTripStep(plan, wineStep);
+      }
     }
     // Fever (2026-11-21, fever.js): an event in the plan that Fever sells gets its "Tickets" step in V4's "Book my trip"
     // (only with FEVER_AFFILIATE_TEMPLATE set). Added after planning: the stops and their order never change.
@@ -34835,6 +34843,9 @@ function renderFoodDrinkScopedPage(venues, filter, scope, now = new Date()) {
   const label = CATEGORY_LABELS[type];
   const valleyText = FD_HUB_HEADINGS[type];
   const path = valleyWide ? `/${catSlug}` : `/${region}/${catSlug}`;
+  // "Book a wine tour" (2026-11-21, wine-tours.js): a town's wineries page carries one Viator wine tour line for that
+  // town's wine area (Viator set up only), above the list. It never changes the list or its order.
+  const wineTownLine = type === 'winery' && venues.length ? wineTours.lineHtml(region || null) : '';
 
   // Open now, status and sort (2026-10-18): the same as /food-drink -- Recommended order (places closed for the
   // season last), Top rated, A-Z; an Open now toggle over stored hours; each card's open/closed line.
@@ -34934,7 +34945,7 @@ ${renderGolfHeaderHtml()}
     ? categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(valleyText.heading)}</h1>\n  <p class="outdoor-intro fd-intro">${escapeHtml(valleyText.intro)}</p>`)
     : categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>${region === 'kelowna' && (type === 'restaurant' || type === 'cafe') ? `\n  <p class="subtitle"><a href="${BRUNCH_GUIDE_PATH}">Guide: the best brunch in Kelowna &rarr;</a></p>` : ''}${type === 'winery' ? `\n  <p class="subtitle"><a href="${WINE_GUIDE_PATH}">New to wine country? Start with our first-timer\u2019s guide &rarr;</a> &middot; <a href="/wineries">All Okanagan wineries</a></p>` : ''}`)}
   ${valleyWide ? renderCategoryRegionSelector(catSlug, venues) : regionCategoryTabsHtml(region, categoryCounts, type)}
-  ${venues.length ? `<div class="fd-toolbar">
+  ${wineTownLine}${venues.length ? `<div class="fd-toolbar">
   ${foodDrinkSearchHtml(true)}
   ${(foodDrinkFilterBarHtml(venues, state, scopeFeatures, true) || '<div class="fd-controls">\n  </div>').replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`)}
   </div>` : ''}
@@ -34951,7 +34962,7 @@ ${renderGolfHeaderHtml()}
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('fd', true)}
-  ${renderFoodDrinkHubScriptHtml({ surface: 'food_drink_category', openNow: true })}
+  ${renderFoodDrinkHubScriptHtml({ surface: 'food_drink_category', openNow: true })}${wineTownLine ? `\n  ${wineTours.clickScriptHtml('wineries_town')}` : ''}
 </body>
 </html>`;
 }
@@ -35140,6 +35151,9 @@ ${renderGolfHeaderHtml()}
 const WINE_HUB_MIN_FEATURE = 5;
 function renderWineriesHubPage(venues, filter = null, now = new Date()) {
   const f = { types: [], features: [], regions: [], ...(filter || {}), types: [] };
+  // "Book a wine tour" (2026-11-21, wine-tours.js): one Viator wine tour line under the heading (Viator set up only);
+  // the tour for the one town picked in the filter, else the default area. It never changes the list or its order.
+  const wineHubLine = wineTours.lineHtml(Array.isArray(f.regions) && f.regions.length === 1 ? f.regions[0] : null);
   const sort = FD_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
   const recommendedRank = new Map(sortFoodDrinkVenues(venues, 'recommended', now).map((v, i) => [v.id, i]));
   venues = sortFoodDrinkVenues(venues, sort, now);
@@ -35260,7 +35274,7 @@ ${renderGolfHeaderHtml()}
   ${categoryHeroHtml(categoryBannerHtml('winery'), `<h1>${escapeHtml(heading)}</h1>
   <p class="outdoor-intro fd-intro">Find your next favourite tasting, vineyard patio or little wine-country escape. 🍇</p>
   <p class="wine-guide-link"><a href="${WINE_GUIDE_PATH}">New to wine country? Start with our first-timer\u2019s guide &rarr;</a></p>`)}
-  <div class="fd-toolbar">
+  ${wineHubLine}<div class="fd-toolbar">
   ${foodDrinkSearchHtml().replace('Search food and drink', 'Search wineries').replace('Search by name, place or dish...', 'Search by name, town or wine...')}
   ${controlsHtml}
   </div>
@@ -35285,7 +35299,7 @@ ${renderGolfHeaderHtml()}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
-  ${golfCardEngagementScriptHtml('winery', true)}
+  ${golfCardEngagementScriptHtml('winery', true)}${wineHubLine ? `\n  ${wineTours.clickScriptHtml('wineries')}` : ''}
   ${renderFoodDrinkHubScriptHtml({ openNow: true, surface: 'wineries', noun: ['winery', 'wineries'] })}
   <script>
   (function(){
@@ -49244,6 +49258,11 @@ function renderEditorialGuidePage(g, path) {
     publisher: { '@type': 'Organization', name: 'Okanagan Roam', url: 'https://okanaganroam.com/' },
     ...(guideDates ? { datePublished: guideDates.published, dateModified: guideDates.modified } : {}),
   };
+  // "Book a wine tour" (2026-11-21, wine-tours.js): the wine guides named in data/viator-wine-tours.json carry one Viator
+  // wine tour line (Viator set up only), just before the closing section. Not the first-timers guide, whose tours section
+  // lists local tour companies.
+  const wineRegion = wineTours.guideRegion(path);
+  const wineLine = wineRegion === undefined ? '' : wineTours.lineHtml(wineRegion);
   const listed = [];
   const hhGuide = /^\/guides\/happy-hour(?:-|$)/.test(String(path || ''));
   const itemHtml = (item) => {
@@ -49266,6 +49285,7 @@ function renderEditorialGuidePage(g, path) {
     if (items) liveSections.add(sec.id);
     return items ? `\n      <section class="ski-guide-resort" id="${sec.id}">\n        <h2>${escapeHtml(sec.heading)}</h2>${sec.lead ? `\n        <p>${guideTipHtml(sec.lead)}</p>` : ''}\n        <ul class="ski-guide-list">${items}\n        </ul>\n      </section>` : '';
   }).join('');
+  const wineLineEnd = wineLine ? `\n      ${wineLine}` : '';
   const rowsHtml = g.table.rows.map(([area, refs]) => {
     const links = refs.map((x) => { const [ref, label] = x.split('|'); const v = guideRefVenue(ref); return v ? `<a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(label)}</a>` : ''; }).filter(Boolean);
     return links.length ? `\n          <tr><th scope="row">${escapeHtml(area)}</th><td>${links.join(', ')}</td></tr>` : '';
@@ -49309,7 +49329,7 @@ ${renderGolfHeaderHtml()}
       ${guideBylineHtml(guideDates)}
       ${thin ? `<p class="guide-thin-note"><strong>This guide is between seasons.</strong> Most of what it covered has finished for now. See our <a href="/guides">current guides</a>.</p>\n      ` : ''}<div class="ski-guide-intro">${g.intro.map((p) => `\n        <p>${guideTipHtml(p)}</p>`).join('')}
       </div>
-      <nav class="ski-guide-jump" aria-label="Jump to a section">${g.sections.filter((sec) => liveSections.has(sec.id)).map((sec) => `<a href="#${sec.id}">${escapeHtml(sec.jump)}</a>`).join('')}${rowsHtml ? `<a href="#${g.table.id}">${escapeHtml(g.table.jump)}</a>` : ''}</nav>${sectionsHtml}
+      <nav class="ski-guide-jump" aria-label="Jump to a section">${g.sections.filter((sec) => liveSections.has(sec.id)).map((sec) => `<a href="#${sec.id}">${escapeHtml(sec.jump)}</a>`).join('')}${rowsHtml ? `<a href="#${g.table.id}">${escapeHtml(g.table.jump)}</a>` : ''}</nav>${sectionsHtml}${wineLineEnd}
       <section class="ski-guide-resort" id="${g.table.id}">${rowsHtml ? `
         <h2>${escapeHtml(g.table.heading)}</h2>
         <table class="patio-picks">
@@ -49324,6 +49344,7 @@ ${renderGolfHeaderHtml()}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
+  ${wineLine ? wineTours.clickScriptHtml('wine_guide') : ''}
 </body>
 </html>`;
 }

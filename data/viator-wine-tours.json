@@ -1,0 +1,65 @@
+{
+ "updated": "2026-11-21",
+ "how": "One shared (small-group) Viator wine tour per wine area, picked by hand from drafts/viator-2026-11/viator-products.csv (Viator Partner API, 2026-11-20): currently sold, well reviewed, pickup in that area. Each product page was checked live on viator.com on 2026-11-21. URLs are Viator's own productUrl with our pid (see viator.js). wine-tours.js shows one per page; it never changes ranking or which places show. Not on the first-timers guide (2026-11-21): it lists local tour companies, and a paid link there would compete with them.",
+ "defaultArea": "kelowna",
+ "areas": {
+  "kelowna": {
+   "label": "Kelowna & West Kelowna",
+   "productCode": "74970P2",
+   "title": "Kelowna or West Kelowna Afternoon Sightseeing Wine Tour",
+   "supplier": "Red Dog Wine Tours",
+   "fromPriceCad": 165,
+   "why": "Most-reviewed wine tour in the area (4.9, 257 reviews); small group (max 11); pickup at your Kelowna or West Kelowna accommodation.",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Kelowna-or-West-Kelowna-Afternoon-sightseeing-wine-tour/d22366-74970P2?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0"
+  },
+  "lake-country": {
+   "label": "Lake Country & Vernon",
+   "productCode": "325656P6",
+   "title": "Lake Country Half Day Wine Tour- Incl. Tasting Fees & Guide Grat!",
+   "supplier": "Sip Happens Wine Tours",
+   "fromPriceCad": 159,
+   "why": "Best-reviewed Lake Country tour (4.9, 54 reviews); small group (max 14); tasting fees included; pickup in Lake Country, Vernon, Coldstream and Sparkling Hill.",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Scenic-Sip-Wine-Trail-Half-Day-Sip-Disturber/d22366-325656P6?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0"
+  },
+  "penticton": {
+   "label": "Penticton & Naramata",
+   "productCode": "325656P7",
+   "title": "Naramata Full Day Lunch Wine Tour- Incl. Tasting Fees & Gratuity!",
+   "supplier": "Sip Happens Wine Tours",
+   "fromPriceCad": 195,
+   "why": "Top-rated Naramata Bench tour (5.0, 32 reviews); small group (max 14); tasting fees and lunch stop; pickup in the Penticton area.",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Naramata-Bench-Wine-Trail-Holy-Sip-Lunch-Tour/d22366-325656P7?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0"
+  },
+  "summerland": {
+   "label": "Summerland",
+   "productCode": "325656P9",
+   "title": "Summerland Full Day Lunch Wine Tour (Incl. Tasting Fees & Grat!)",
+   "supplier": "Sip Happens Wine Tours",
+   "fromPriceCad": 195,
+   "why": "The only shared small-group Summerland (Bottleneck Drive) tour with reviews (5.0, 3 reviews); same operator as the Naramata and Lake Country picks; pickup in the Summerland area.",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Summerland-Bottleneck-Drive-Wine-Trail-Holy-Sip-Lunch-Tour/d22366-325656P9?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0"
+  },
+  "oliver-osoyoos": {
+   "label": "Oliver & Osoyoos",
+   "productCode": "325656P14",
+   "title": "Osoyoos Half Day Wine Tour (Incl. Tasting Fees & Guide Gratuity!)",
+   "supplier": "Sip Happens Wine Tours",
+   "fromPriceCad": 159,
+   "why": "Most-reviewed South Okanagan tour (4.8, 74 reviews); small group (max 14); tasting fees included; pickup at your Osoyoos or Oliver accommodation.",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Osoyoos-Oliver-Wine-Trail-Half-Day-Sip-Disturber-Tour/d22366-325656P14?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0"
+  }
+ },
+ "regions": {
+  "kelowna": "kelowna", "west-kelowna": "kelowna", "peachland": "kelowna", "big-white": "kelowna",
+  "lake-country": "lake-country", "vernon": "lake-country", "coldstream": "lake-country", "armstrong": "lake-country", "enderby": "lake-country", "lumby": "lake-country", "silverstar": "lake-country",
+  "penticton": "penticton", "naramata": "penticton", "kaleden": "penticton", "apex": "penticton",
+  "summerland": "summerland",
+  "oliver": "oliver-osoyoos", "osoyoos": "oliver-osoyoos", "okanagan-falls": "oliver-osoyoos", "baldy": "oliver-osoyoos"
+ },
+ "guides": {
+  "/guides/okanagan-winery-restaurants": "kelowna",
+  "/guides/okanagan-winter-wine": "kelowna",
+  "/guides/penticton-naramata-wine-weekend": "naramata",
+  "/guides/oliver-osoyoos-wine-weekend": "oliver"
+ }
+}
