@@ -675,7 +675,8 @@ function v4StaySrc(staySrc) {
   // that is not after the arrival is simply not sent; the plan is for the arrival day.
   swap("    if (o.arrive && /^\\d{4}-\\d{2}-\\d{2}$/.test(l)) o.leave = l;", "    if (o.arrive && /^\\d{4}-\\d{2}-\\d{2}$/.test(l) && l > o.arrive) o.leave = l;");
   swap('  function t3BookRerender(focusSel){\n', '  function t3BookRerender(focusSel){\n    if (V4) setTimeout(v4UpdateBar, 0);\n');
-  return staySrc;
+  // "Getting here" (2026-11-21, getting-here.js): the "Rent a car" step's link (data-link="discovercars") and its click.
+  return require('./getting-here').v4ClientSwaps(staySrc);
 }
 
 module.exports = { V4_STYLES, V4_CLIENT_SRC, v4StaySrc };
