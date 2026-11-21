@@ -1,0 +1,110 @@
+[
+ {
+  "id": null,
+  "name": "O'Keefe's Landing Bed & Breakfast",
+  "region": "vernon",
+  "slug": "o-keefe-s-landing-bed-and-breakfast",
+  "file": "/images/venues/o-keefe-s-landing-bed-and-breakfast-2610.jpg",
+  "dimensions": "1920x1281",
+  "source_page": "https://okeefeslanding.com/",
+  "image_url": "https://okeefeslanding.com/wp-content/uploads/2021/01/Backyard-e1611171428798.jpg",
+  "source_kind": "website",
+  "note": "Back lawn, garden and private dock on Okanagan Lake"
+ },
+ {
+  "id": null,
+  "name": "Grandpa's Heart at Nicklen Lake",
+  "region": "lumby",
+  "slug": "grandpa-s-heart-at-nicklen-lake",
+  "file": "/images/venues/grandpa-s-heart-at-nicklen-lake-2610.jpg",
+  "dimensions": "2500x1406",
+  "source_page": "https://www.grandpasheart.ca/",
+  "image_url": "https://images.squarespace-cdn.com/content/v1/64af5d0af46bfb171ab18c83/a1cc3759-057a-4b4c-83ca-577f9fd24ba2/H_Grandpa%27s+Heart+Campground_cabin.jpg?format=2500w",
+  "source_kind": "website",
+  "note": "Cabin with deck among the trees by the lake"
+ },
+ {
+  "id": null,
+  "name": "Glamping at O'Keefe Ranch",
+  "region": "vernon",
+  "slug": "glamping-at-o-keefe-ranch",
+  "file": "/images/venues/glamping-at-o-keefe-ranch-2610.jpg",
+  "dimensions": "2000x1500",
+  "source_page": "https://www.okeeferanch.ca/glamping-at-the-ranch",
+  "image_url": "https://images.squarespace-cdn.com/content/v1/6539a0a7d9f6060b8cb3fb27/b5529538-8085-4b95-9d4d-43229c443d92/20211007_161656+%281%29.jpg?format=2500w",
+  "source_kind": "website",
+  "note": "Bell tent on its deck with Adirondack chairs"
+ },
+ {
+  "id": null,
+  "name": "Upper BX Creek Campground",
+  "region": "silverstar",
+  "slug": "upper-bx-creek-campground",
+  "file": "/images/venues/upper-bx-creek-campground-2610.jpg",
+  "dimensions": "3311x2207",
+  "source_page": "https://www.skisilverstar.com/lodging-amenities/places-to-stay/upper-bx-creek-campground/",
+  "image_url": "https://cms.skisilverstar.com/sites/default/files/2025-07/Campground%20editied-3.jpg",
+  "source_kind": "website",
+  "note": "Aerial view of the terraced campsites in the forest beside Silver Star Road"
+ },
+ {
+  "id": null,
+  "name": "Okanagan Royal Park Inn",
+  "region": "vernon",
+  "slug": "okanagan-royal-park-inn",
+  "file": "/images/venues/okanagan-royal-park-inn-2610.jpg",
+  "dimensions": "5184x3456 (2400 fetched)",
+  "source_page": "Google Maps: Okanagan Royal Park Inn, 3200 25 Ave, Vernon, BC V1T 1P1",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLc6Q1z10v0EobLsMXZFdjow5bkwj9eikeHPg5bRSM1c9lk1J-ZvzJKrSQNc1KFpb-xHUAybpHnYDzY07hfOFYIFwl6g31zFf80Tp-D5wok2lwYMDpSsRvVv7z22a6lTCbgAitm0=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo of the motel front with its Royal Park Inn sign"
+ },
+ {
+  "id": null,
+  "name": "Schell Motel",
+  "region": "vernon",
+  "slug": "schell-motel",
+  "file": "/images/venues/schell-motel-2610.jpg",
+  "dimensions": "3024x4032 (portrait)",
+  "source_page": "Google Maps: Schell Motel, 2810 35 St, Vernon, BC V1T 6B5",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLehEEWhzYkKjhq_suS0yculnOiqU--Jj6fTYdz1uauN9--n0708z1V1oGwYiUj6bGEMWSVVFFTJL6NmY33Rq4Nek-4apKdcefq-CV8RysY6gARId6iYqWhtDEfM5CZRBxyJSKsd=w2400",
+  "source_kind": "google_maps",
+  "note": "Outdoor pool (visitor photo; building not in frame)"
+ },
+ {
+  "id": null,
+  "name": "Sparkling Hill Resort",
+  "region": "vernon",
+  "slug": "sparkling-hill-resort",
+  "file": "/images/venues/sparkling-hill-resort-2610.jpg",
+  "dimensions": "2000x1334",
+  "source_page": "https://www.sparklinghill.com/",
+  "image_url": "https://www.sparklinghill.com/wp-content/uploads/2024/12/Sparkling-Hill-Resort.webp",
+  "source_kind": "website",
+  "note": "Aerial of the resort on its ridge above Okanagan Lake"
+ },
+ {
+  "id": null,
+  "name": "Adela's Bed and Breakfast",
+  "region": "west-kelowna",
+  "slug": "adela-s-bed-and-breakfast",
+  "file": "/images/venues/adela-s-bed-and-breakfast-2610.jpg",
+  "dimensions": "2048x1536",
+  "source_page": "Google Maps: Adela's Bed and Breakfast, 3077 Stoneridge Dr, West Kelowna, BC V4T 2Y5",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcostDdMT_6xxzpIOwI6_hvCKQoX2fNkghInbDEc8Pk63Z8q45NWF3a10oAH4keT84W1Adz0y9mdDDurqGqHcOjxmE1pCWLtrAlpNqWkYJgaLpwy5mrv3_XS4-QH_1HMQ4P0-g=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo of the house front and garden"
+ },
+ {
+  "id": null,
+  "name": "Alexandria House Bed & Breakfast",
+  "region": "west-kelowna",
+  "slug": "alexandria-house-bed-and-breakfast",
+  "file": "/images/venues/alexandria-house-bed-and-breakfast-2610.jpg",
+  "dimensions": "2592x1936",
+  "source_page": "Google Maps: Alexandria House Bed & Breakfast, 2462 Alexandria Way, West Kelowna, BC V4T 1T6",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeitxNY07jDdWdG7-UG23-h94W16L91vrLQ4FxnOhi867Zu_34rVC-hWE1nfIzscb9TfU4F1OZGEMiMBh3AxUEW6UARSKNrv2Epgwqt1io7zx81xnlgKeinoUhpQ3757tQUvRByEw=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo of the garden deck and hot tub"
+ }
+]

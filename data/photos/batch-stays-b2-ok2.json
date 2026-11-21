@@ -1,0 +1,90 @@
+{
+ "reason": "Venue photos stays-b2-ok2",
+ "batch_id": "photos-stays-b2-ok2-2026-11-20",
+ "venues": [
+  {
+   "id": null,
+   "name": "The Log Home at O'Rourke Family Estate",
+   "region": "lake-country",
+   "slug": "the-log-home-at-o-rourke-family-estate",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-log-home-at-o-rourke-family-estate-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "The Inn at Therapy Vineyards",
+   "region": "naramata",
+   "slug": "the-inn-at-therapy-vineyards",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-inn-at-therapy-vineyards-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Silver Sage Winery B&B",
+   "region": "oliver",
+   "slug": "silver-sage-winery-b-and-b",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/silver-sage-winery-b-and-b-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Roop Nivas at Kismet Estate Winery",
+   "region": "oliver",
+   "slug": "roop-nivas-at-kismet-estate-winery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/roop-nivas-at-kismet-estate-winery-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "The Guest House at Burrowing Owl Estate Winery",
+   "region": "oliver",
+   "slug": "the-guest-house-at-burrowing-owl-estate-winery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-guest-house-at-burrowing-owl-estate-winery-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Baergnaescht Bed & Breakfast",
+   "region": "osoyoos",
+   "slug": "baergnaescht-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/baergnaescht-bed-and-breakfast-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Sonora Desert Inn at Mythology Vineyard",
+   "region": "osoyoos",
+   "slug": "sonora-desert-inn-at-mythology-vineyard",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sonora-desert-inn-at-mythology-vineyard-2610.jpg?v=20261120b2"
+   }
+  }
+ ]
+}

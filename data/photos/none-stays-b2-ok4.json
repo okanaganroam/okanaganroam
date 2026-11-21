@@ -1,0 +1,16 @@
+[
+ {
+  "id": null,
+  "name": "Vernon Hostel",
+  "region": "vernon",
+  "slug": "vernon-hostel",
+  "reason": "Google Maps has only a small room, a sink and a dim front desk; no own site; Expedia blocked"
+ },
+ {
+  "id": null,
+  "name": "Fairfield by Marriott Inn & Suites West Kelowna",
+  "region": "west-kelowna",
+  "slug": "fairfield-by-marriott-inn-and-suites-west-kelowna",
+  "reason": "marriott.com blocks plain requests (403); Booking.com bot check; Google Maps has only a window view and a bed close-up"
+ }
+]
