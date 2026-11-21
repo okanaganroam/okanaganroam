@@ -1406,6 +1406,10 @@ Object.assign(FR_TEXT, Object.fromEntries(Object.entries({
   // Fever (2026-11-21, fever.js): the commission line under an event's Fever "Tickets" button.
   'We may earn a commission if you buy tickets through this link. It never changes which events we list or their order.': 'Nous pouvons toucher une commission si vous achetez des billets par ce lien. Cela ne change jamais les événements affichés ni leur ordre.',
   'Tickets & info': 'Billets et infos',
+  // "Book a wine tour" (2026-11-21, wine-tours.js): the one Viator wine tour line on the wine guides and wineries pages.
+  'Book a wine tour (no driving):': 'Réserver un circuit vinicole (sans conduire) :',
+  'Book now ↗': 'Réserver ↗',
+  'We may earn a commission if you book through these links. It never changes which places we list or their order.': 'Nous pouvons toucher une commission si vous réservez par ces liens. Cela ne change jamais les lieux affichés ni leur ordre.',
   'Website': 'Site Web',
   'Featured in our guides:': 'Dans nos guides :',
   'Upcoming dates': 'Dates à venir',
