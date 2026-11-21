@@ -25823,6 +25823,9 @@ function tourCardKind(venue) { try { const k = tourActivityOf(venue); if (k === 
 // the lowest price of what the place actually sells (not a shuttle, insurance, add-on, child or gift-card price).
 // data/card-prices.json: { "<venue id>": { "from": 119, "note": "..." } }. No entry, no price chip.
 const CARD_PRICES = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'card-prices.json'), 'utf8')); } catch (e) { return {}; } })();
+// Free-listed places that are by donation and say so nowhere the card rule reads (Lumby & District Museum: "free / by
+// donation", Dayton, Nov 3 2026).
+const BY_DONATION_VENUES = new Set(['lumby/lumby-district-museum']);
 function cardPriceFor(venueId) {
   const e = CARD_PRICES[String(venueId)];
   // A place whose prices change show to show (no one starting price) carries { "label": "Ticket prices vary" } instead.
@@ -32396,6 +32399,9 @@ const SPORT_ACTIVITIES = [
   { slug: 'bike', label: 'Mountain Biking', pattern: /bike park|mountain[- ]bike|mtb|singletrack|freeride|bike skills|dirt jump/i, banner: { src: '/images/sports/sports.jpg', alt: 'A mountain biker riding a leafy forest trail in autumn', pos: 60 }, heading: 'Mountain Biking in the Okanagan', intro: 'Bike parks, skills areas, dirt jumps and singletrack networks — where to ride, from first jumps to lift-served downhill.' },
   { slug: 'disc', label: 'Disc Golf', pattern: /disc golf/i, banner: { src: '/images/sports/activity-disc.jpg', alt: 'A disc golf basket on a grassy fairway among tall trees', pos: 55 }, heading: 'Disc Golf in the Okanagan', intro: 'Disc golf courses through parks, pines and hillsides — most are free to play, so bring a disc and go.' },
   { slug: 'courts', label: 'Tennis, Pickleball & More', pattern: /pickleball|tennis|volleyball|basketball|courts?\b/i, banner: { src: '/images/sports/activity-courts.jpg', alt: 'Outdoor tennis and pickleball courts under a pink evening sky', pos: 55 }, heading: 'Pickleball, Tennis & Courts in the Okanagan', intro: 'Pickleball, tennis, basketball and beach volleyball courts — public places to play a game across the valley.' },
+  // Ice arenas (Dayton, 2026-11-21): ten rinks had no chip of their own. They match on their name (Arena, Rink) or, failing
+  // every other chip, on their description. Photo: the Sports & Recreation What's On banner (licensed stock, a hockey rink).
+  { slug: 'ice', label: 'Ice Skating & Hockey', pattern: /\barenas?\b|\brinks?\b|ice skat|public skat|curling|\bshinny\b/i, banner: { src: '/images/whats-on/sports-recreation.jpg', alt: 'Hockey players on the ice at an indoor arena, seen from the stands', pos: 45 }, heading: 'Ice Skating & Hockey in the Okanagan', intro: 'Indoor arenas across the valley for public skating, family skates and drop-in hockey.' },
 ];
 // Ice rinks (Dayton, 2026-11-21: Sun Bowl Arena, an ice rink, said "Skate Parks & BMX" because its description says
 // "skating" and "Skate Library"). The skate chip now needs skate park words; an arena or rink that offers skating says
@@ -34433,8 +34439,12 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
       else if (!chunk.includes('<div class="fd-price-context">')) {
         const fv = venueById.get(Number(venueId));
         if (fv && Number(fv.free_entry) === 1 && chunk.includes('<div class="card-slot card-slot-fee">')) {
-          const donation = /\b(?:admission|entry|entrance)\b(?: is)? by donation\b/i.test(String(fv.description || ''));
-          const freeHtml = donation ? '<div class="fd-price-context fd-price-free"><strong>By donation</strong><span>No set entry price</span></div>'
+          // Also by donation (2026-11-21): the place's recorded cost says so (outdoor-facts.json), or Dayton said so
+          // (BY_DONATION_VENUES).
+          const factCost = String(((typeof OUTDOOR_FACTS !== 'undefined' && OUTDOOR_FACTS[String(fv.id)]) || {}).cost || '');
+          const factDonation = /\bby donation\b|\bdonations? requested\b/i.test(factCost);
+          const donation = factDonation || BY_DONATION_VENUES.has(`${fv.region}/${fv.slug}`) || /\b(?:admission|entry|entrance)\b(?: is)? by donation\b/i.test(String(fv.description || ''));
+          const freeHtml = donation ? `<div class="fd-price-context fd-price-free"><strong>By donation</strong><span>No set entry price</span></div>`
             : '<div class="fd-price-context fd-price-free"><strong>Free</strong><span>No entry fee</span></div>';
           chunk = chunk.replace(/<span class="chip chip-feat chip-price"[^>]*>[\s\S]*?<\/span>\s*/g, (chip) => (/^Free(?: to visit)?$/i.test(chip.replace(/<[^>]+>/g, '').trim()) ? '' : chip));
           chunk = chunk.replace('<div class="card-slot card-slot-fee">', () => '<div class="card-slot card-slot-fee">' + freeHtml);

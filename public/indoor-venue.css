@@ -33,3 +33,7 @@ body.indoor-venue-page .venue-hero-photo>img{width:100%;height:100%!important;ob
 #gbLayout.gb-generic .gb-direct{margin:16px 0;max-width:340px}
 @media(max-width:899px){#gbLayout.gb-generic .gb-quick{grid-template-columns:1fr 1fr}}
 #gbLayout.gb-generic .gb-hours .venue-section{border:0;padding:0;margin:0;background:none;box-shadow:none}
+
+/* French pages (2026-11-21): the visit box the page hands in (its "En bref" or visit details) sits in the card as plain content, not a second frame. */
+#gbLayout .gb-visit>.venue-section{border:0!important;box-shadow:none!important;background:none!important;padding:0!important;margin:0!important;border-radius:0!important}
+#gbLayout .gb-visit>.venue-section+.venue-section{margin-top:18px!important}
