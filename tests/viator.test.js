@@ -182,31 +182,50 @@ test('trip hint: only uncovered interests, the main town, never touches the plan
   assert.equal(viator.destinationFor('oliver', dests), 25828);
 });
 
-test('venue page line: after the block with the own Book button, sponsored + new tab, commission line, French; else unchanged', () => {
+test('matched venue: "Book on Viator" is the Book button, the commission line and "or book direct" under it; French; else unchanged', () => {
   const url = 'https://www.viator.com/tours/Kelowna/X/d5257-11111P1?mcid=42383&pid=P00333119&medium=api&api_version=2.0&campaign=okanagan';
   const matches = { 1587: { productCode: '11111P1', url } };
-  const page = '<main><div class="venue-cta-row"><a class="cta" href="/d">Directions</a><a class="cta secondary" href="https://op.example/book" target="_blank" data-track="booking">Book a tour</a></div><p>About</p></main>';
-  const out = viator.withVenueLink(page, { id: 1587 }, 'en', { cfg: CFG, matches });
-  assert.match(out, /data-track="booking">Book a tour<\/a><\/div>\n {2}<p class="venue-viator"/, 'right under the row with the operator\'s own Book button');
-  assert.match(out, /<a href="https:\/\/www\.viator\.com\/tours\/Kelowna\/X\/d5257-11111P1\?mcid=42383&amp;pid=P00333119&amp;medium=api&amp;api_version=2\.0&amp;campaign=okanagan" target="_blank" rel="sponsored nofollow noopener" data-track="booking" data-link="viator">Also bookable on Viator <span aria-hidden="true">↗<\/span><\/a>/);
-  assert.match(out, /data-viator-disclosure[^>]*>We may earn a commission if you book through these links\. It never changes which places we list or their order\.<\/span>/);
-  assert.equal((out.match(/data-track="booking"/g) || []).length, 2);
-  assert.ok(out.indexOf('Book a tour') < out.indexOf('Also bookable'), 'the own Book button stays first');
-  const fr = viator.withVenueLink(page, { id: 1587 }, 'fr', { cfg: CFG, matches });
-  assert.match(fr, />Aussi réservable sur Viator <span/);
+  assert.deepEqual(viator.venueBooking(1587, { cfg: CFG, matches }), { url, productCode: '11111P1' });
+  assert.equal(viator.venueBooking(1587, { cfg: viator.config({}), matches }), null, 'no key');
+  assert.equal(viator.venueBooking(9, { cfg: CFG, matches }), null, 'no match');
+  assert.equal(viator.venueBooking(1587, { cfg: CFG, matches: { 1587: { productCode: 'X', url: 'https://elsewhere.example/' } } }), null);
+  const btn = viator.bookButtonHtml(url, 'en');
+  assert.equal(btn, '<a class="cta secondary" href="https://www.viator.com/tours/Kelowna/X/d5257-11111P1?mcid=42383&amp;pid=P00333119&amp;medium=api&amp;api_version=2.0&amp;campaign=okanagan" rel="sponsored nofollow noopener" target="_blank" data-track="booking" data-link="viator">Book on Viator ↗</a>');
+  assert.match(viator.bookButtonHtml(url, 'fr'), />Réserver sur Viator ↗<\/a>$/);
+  const page = `<main><div class="venue-cta-row"><a class="cta" href="/d">Directions</a>${btn}</div><p>About</p></main>`;
+  const out = viator.withVenueLink(page, { id: 1587 }, 'en', { cfg: CFG, matches, direct: { url: 'https://op.example/book', name: 'Bare Wine Tours' } });
+  assert.match(out, /data-link="viator">Book on Viator ↗<\/a><\/div>\n {2}<p class="venue-viator"/, 'right under the row with the Viator button');
+  assert.match(out, /<span class="venue-viator-note" data-viator-disclosure[^>]*>We may earn a commission if you book through these links\. It never changes which places we list or their order\.<\/span><br><a class="venue-viator-direct" href="https:\/\/op\.example\/book" target="_blank" rel="nofollow noopener" data-track="booking" data-link="direct">or book direct with Bare Wine Tours <span aria-hidden="true">↗<\/span><\/a><\/p>/);
+  assert.ok(out.indexOf('Book on Viator') < out.indexOf('or book direct'), 'Viator first, the operator\'s own link second');
+  const fr = viator.withVenueLink(page, { id: 1587 }, 'fr', { cfg: CFG, matches, direct: { url: 'https://op.example/book', name: 'Bare Wine Tours' } });
   assert.match(fr, /Nous pouvons toucher une commission/);
-  // Not shown: no key, no approved match, no Book button of its own, a match that is not a viator.com link.
+  assert.match(fr, />ou réservez directement auprès de Bare Wine Tours <span/);
+  // No own booking link: the commission line only.
+  const noDirect = viator.withVenueLink(page, { id: 1587 }, 'en', { cfg: CFG, matches });
+  assert.match(noDirect, /data-viator-disclosure/);
+  assert.doesNotMatch(noDirect, /book direct/);
+  // Not changed: no key, no match, no Viator button on the page.
   assert.equal(viator.withVenueLink(page, { id: 1587 }, 'en', { cfg: viator.config({}), matches }), page);
   assert.equal(viator.withVenueLink(page, { id: 9 }, 'en', { cfg: CFG, matches }), page);
-  const noBook = page.replace(' data-track="booking"', ' data-track="website"');
-  assert.equal(viator.withVenueLink(noBook, { id: 1587 }, 'en', { cfg: CFG, matches }), noBook);
-  assert.equal(viator.withVenueLink(page, { id: 1587 }, 'en', { cfg: CFG, matches: { 1587: { productCode: 'X', url: 'https://elsewhere.example/' } } }), page);
-  // Whenever a Viator link renders, the commission line is with it.
-  for (const lang of ['en', 'fr']) {
-    const h = viator.venueLinkHtml(1587, lang, { cfg: CFG, matches });
-    assert.equal((h.match(/data-link="viator"/g) || []).length, 1);
-    assert.match(h, /data-viator-disclosure/);
-  }
+  const plain = page.replace(btn, '<a class="cta secondary" href="https://op.example/book" data-track="booking">Book</a>');
+  assert.equal(viator.withVenueLink(plain, { id: 1587 }, 'en', { cfg: CFG, matches }), plain);
+});
+
+test('Build My Trip booking list: a matched venue uses the Viator link (affiliate, sponsored); others are unchanged', () => {
+  const url = 'https://www.viator.com/tours/Kelowna/X/d5257-11111P1?mcid=42383&pid=P00333119&medium=api&api_version=2.0&campaign=okanagan';
+  const matches = { 1587: { productCode: '11111P1', url } };
+  const own = { venueId: 1587, name: 'Bare Wine Tours', url: 'https://op.example/book', label: 'Book a tour', labelFr: 'Réserver une visite' };
+  const other = { venueId: 2, name: 'Bistro', url: 'https://bistro.example/reserve', label: 'Reserve a table', labelFr: 'Réserver une table' };
+  const it = viator.checklistItem(own, { cfg: CFG, matches });
+  assert.deepEqual(it, { venueId: 1587, name: 'Bare Wine Tours', url, label: 'Book on Viator', labelFr: 'Réserver sur Viator', affiliate: true, rel: 'sponsored nofollow noopener', link: 'viator' });
+  assert.equal(viator.checklistItem(other, { cfg: CFG, matches }), other);
+  assert.equal(viator.checklistItem(own, { cfg: viator.config({}), matches }), own, 'no key: unchanged');
+  // The box's steps keep it as an affiliate step, so its commission line shows; the others stay plain.
+  const steps = require('../trip-booking').tripBookingSteps(null, [it, other]);
+  assert.deepEqual(steps.map((x) => [x.id, x.url, x.affiliate, x.rel, x.link, x.label]), [
+    [1587, url, true, 'sponsored nofollow noopener', 'viator', 'Book on Viator'],
+    [2, other.url, false, 'nofollow noopener', 'booking', 'Reserve a table'],
+  ]);
 });
 
 test('matching: names, confidence and reasons; CSV round trip; only ok rows are applied, one product per venue', () => {

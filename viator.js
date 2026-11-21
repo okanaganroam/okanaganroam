@@ -2,8 +2,9 @@
 // Viator tours and activities (2026-11-20): the affiliate (Basic access, 8%, 30-day cookie) part of the site.
 //
 // What visitors see (both behind the env below; nothing shows and no call is made without it):
-//   - a venue page: a small "Also bookable on Viator ↗" link under the operator's own Book button, with the commission
-//     line, only for a venue Dayton approved in data/viator-matches.json (scripts/viator-match.js then viator-apply.js);
+//   - a venue page: for a venue Dayton approved in data/viator-matches.json (scripts/viator-match.js then
+//     viator-apply.js), the main Book button is "Book on Viator ↗" with the commission line under it and the operator's
+//     own booking link as a smaller "or book direct" link; Build My Trip's booking steps use the same Viator link;
 //   - Build My Trip (TRIP_STAYS or ?stays=1 only): up to 2 Viator suggestion cards for an activity the visitor asked for
 //     (wine tour, zipline, boat cruise...) when the plan has no bookable listing for it. The cards load from
 //     GET /api/trip/viator (robots.txt blocks /api/), so no Viator content is ever in a page's source.
@@ -45,7 +46,6 @@ const dataDir = () => process.env.VIATOR_DATA_DIR || path.join(__dirname, 'data'
 // The commission line (the same words as places to stay).
 const DISCLOSURE = require('./places-to-stay').DISCLOSURE;
 const TEXT = {
-  alsoOn: { en: 'Also bookable on Viator', fr: 'Aussi réservable sur Viator' },
   seeOn: { en: 'See on Viator', fr: 'Voir sur Viator' },
   photo: { en: 'Photo: Viator', fr: 'Photo : Viator' },
   powered: { en: 'Powered by Viator', fr: 'Propulsé par Viator' },
@@ -317,28 +317,46 @@ function venueMatch(venueId, matches = loadMatches()) {
   return m && typeof m === 'object' && isViatorUrl(m.url) ? m : null;
 }
 const escapeHtml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-function venueLinkHtml(venueId, lang = 'en', opts = {}) {
+// Owner decision (Dayton, 2026-11-20): a venue with an approved match books through Viator. Its main Book button is
+// "Book on Viator ↗" (sponsored, new tab, data-track="booking" data-link="viator"), with the commission line right under
+// it and the operator's own booking link kept as a smaller "or book direct with <name> ↗". A venue without a match, or
+// with Viator not set up, is exactly as before.
+// -> { url, productCode } or null.
+function venueBooking(venueId, opts = {}) {
   const cfg = opts.cfg || config();
-  if (!cfg.enabled) return '';
+  if (!cfg.enabled) return null;
   const m = venueMatch(venueId, opts.matches);
-  if (!m) return '';
-  const url = affiliateUrl(m.url, cfg, 'api');
-  if (!url) return '';
-  const fr = lang === 'fr';
-  return `<p class="venue-viator" style="margin:8px 0 0;font-size:0.86rem;line-height:1.45"><a href="${escapeHtml(url)}" target="_blank" rel="sponsored nofollow noopener" data-track="booking" data-link="viator">${escapeHtml(TEXT.alsoOn[fr ? 'fr' : 'en'])} <span aria-hidden="true">↗</span></a><br><span class="venue-viator-note" data-viator-disclosure style="font-size:0.78rem;opacity:0.75">${escapeHtml(DISCLOSURE[fr ? 'fr' : 'en'])}</span></p>`;
+  const url = m ? affiliateUrl(m.url, cfg, 'api') : null;
+  return url ? { url, productCode: m.productCode || '' } : null;
 }
-// Puts the line just after the block that holds the page's first own Book button (data-track="booking"). A page with no
-// Book button of its own gets nothing: the operator's own link always stays the main way to book.
+// The main Book button (the class is the page's own Book button class, so every layout places it the same way).
+function bookButtonHtml(url, lang = 'en', cls = 'cta secondary') {
+  return `<a class="${escapeHtml(cls)}" href="${escapeHtml(url)}" rel="sponsored nofollow noopener" target="_blank" data-track="booking" data-link="viator">${escapeHtml(TEXT.book[lang === 'fr' ? 'fr' : 'en'])} ↗</a>`;
+}
+// The line under it: the commission line, then "or book direct with <name> ↗" when the operator has a booking link.
+function venueLinkHtml(venueId, lang = 'en', opts = {}) {
+  if (!venueBooking(venueId, opts)) return '';
+  const fr = lang === 'fr';
+  const d = opts.direct && /^https?:\/\/[^\s"'<>]+$/i.test(String(opts.direct.url || '')) ? opts.direct : null;
+  const direct = d ? `<br><a class="venue-viator-direct" href="${escapeHtml(d.url)}" target="_blank" rel="nofollow noopener" data-track="booking" data-link="direct">${escapeHtml(fr ? `ou réservez directement auprès de ${d.name}` : `or book direct with ${d.name}`)} <span aria-hidden="true">↗</span></a>` : '';
+  return `<p class="venue-viator" style="margin:8px 0 0;font-size:0.86rem;line-height:1.45"><span class="venue-viator-note" data-viator-disclosure style="font-size:0.78rem;opacity:0.75">${escapeHtml(DISCLOSURE[fr ? 'fr' : 'en'])}</span>${direct}</p>`;
+}
+// Puts that line just after the block holding the page's "Book on Viator" button. No button, no line.
 function withVenueLink(html, venue, lang = 'en', opts = {}) {
   if (typeof html !== 'string' || !venue || !Number.isInteger(venue.id)) return html;
   const line = venueLinkHtml(venue.id, lang, opts);
   if (!line) return html;
-  const m = /<a\b[^>]*\bdata-track="booking"[^>]*>/.exec(html);
+  const m = /<a\b[^>]*\bdata-link="viator"[^>]*>/.exec(html);
   if (!m) return html;
   const close = html.indexOf('</div>', m.index);
   if (close < 0) return html;
   const at = close + '</div>'.length;
   return `${html.slice(0, at)}\n  ${line}${html.slice(at)}`;
+}
+// Build My Trip's booking list item ({ venueId, name, url, label, labelFr }) for a matched venue: the Viator link.
+function checklistItem(item, opts = {}) {
+  const b = item && Number.isInteger(item.venueId) ? venueBooking(item.venueId, opts) : null;
+  return b ? { ...item, url: b.url, label: TEXT.book.en, labelFr: TEXT.book.fr, affiliate: true, rel: 'sponsored nofollow noopener', link: 'viator' } : item;
 }
 
 // ---- Matching our operators to Viator products (scripts/viator-match.js) ----
@@ -435,6 +453,6 @@ module.exports = {
   request, freetext, searchProducts, productDetails, destinations, freetextBody, productSearchBody,
   pickPhoto, durationMinutes, toCard,
   siteInterests, requestInterests, interestCovered, planRegion, loadDestinations, destinationFor, tripHint, tripCards, clearCache,
-  loadMatches, venueMatch, venueLinkHtml, withVenueLink,
+  loadMatches, venueMatch, venueBooking, bookButtonHtml, venueLinkHtml, withVenueLink, checklistItem,
   normName, nameTokens, nameScore, textMentions, matchVenue, matchesCsv, parseCsv, approvedMatches,
 };

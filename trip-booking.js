@@ -177,7 +177,8 @@ function tripBookingSteps(card, checklist) {
     if (card && c.venueId === card.id) continue;
     ids.add(c.venueId);
     urls.add(urlKey(c.url));
-    out.push({ kind: 'venue', id: c.venueId, name: c.name, label: c.label, labelFr: c.labelFr, url: c.url, affiliate: false, rel: 'nofollow noopener', link: 'booking' });
+    // A venue with an approved Viator match (2026-11-20) carries its affiliate link, rel and 'viator' (viator.checklistItem).
+    out.push({ kind: 'venue', id: c.venueId, name: c.name, label: c.label, labelFr: c.labelFr, url: c.url, affiliate: !!c.affiliate, rel: c.affiliate ? (c.rel || 'sponsored nofollow noopener') : 'nofollow noopener', link: c.link === 'viator' ? 'viator' : 'booking' });
   }
   return out;
 }

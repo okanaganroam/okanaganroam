@@ -1343,7 +1343,8 @@ function t3ViatorStaySrc(staySrc) {
   swap("var key = t3BookKeyFor(s, d.w, steps);", "var key = t3BookKeyFor(s, d.w, steps.filter(function(x){ return x.kind !== 'viator'; }));");
   swap("return d ? (d.chosen.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && t3StayExt(x.url); }) : []; }",
     "return d ? (d.chosen.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && t3StayExt(x.url); }).concat(t3ViatorSteps()) : []; }");
-  swap("var track = step.kind === 'stay' ?", "var track = step.kind === 'viator' ? ' data-track=\"booking\" data-link=\"viator\" data-viator-code=\"' + esc(step.id) + '\"' : step.kind === 'stay' ?");
+  // A Viator suggestion step, and a listed venue that books through Viator (its approved match): data-link="viator".
+  swap("var track = step.kind === 'stay' ?", "var track = step.kind === 'viator' ? ' data-track=\"booking\" data-link=\"viator\" data-viator-code=\"' + esc(step.id) + '\"' : step.link === 'viator' ? ' data-track=\"booking\" data-link=\"viator\" data-venue-id=\"' + esc(step.id) + '\"' : step.kind === 'stay' ?");
   swap("(s.kind === 'venue' ? ' · ' + s.name : '')", "(s.kind !== 'stay' ? ' · ' + s.name : '')");
   swap("var aff = (s.bookingLinks || [])", "var aff = t3ViatorShown() || (s.bookingLinks || [])");
   swap("return html + t3StayDisclosureHtml(s, steps, fr) + '</section>';", "return html + t3ViatorBlockHtml(fr, true) + t3StayDisclosureHtml(s, steps, fr) + '</section>';");
@@ -1420,7 +1421,8 @@ function t3ViatorClientSrc(d) {
   }
   resultEl.addEventListener('click', function(e){
     var a = e.target.closest && e.target.closest('a[data-link="viator"]');
-    if (a) { track('outbound_click', { surface: 'trip_planner', link_type: 'booking', link: 'viator', viator_product: a.getAttribute('data-viator-code') || '' }); return; }
+    // A listed venue's own step (data-venue-id) is counted by the box's handler; a suggestion card here.
+    if (a) { if (!a.hasAttribute('data-venue-id')) track('outbound_click', { surface: 'trip_planner', link_type: 'booking', link: 'viator', viator_product: a.getAttribute('data-viator-code') || '' }); return; }
     var add = e.target.closest && e.target.closest('[data-t3-vt-add]');
     if (!add) return;
     var code = add.getAttribute('data-t3-vt-add'), list = t3ViatorAdded().slice(), at = -1;
