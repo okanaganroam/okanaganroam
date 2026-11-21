@@ -114,6 +114,22 @@
    "supplier": "Okanagan Clear Watercraft Rentals",
    "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Exclusive-Clear-Kayak-and-Clear-Paddleboard-Rentals-In-Kelowna-BC/d22366-5666945P1?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
    "approved": "2026-11-20"
+  },
+  "2168": {
+   "name": "Ogopogo Parasail",
+   "productCode": "41596P3",
+   "title": "Tandem Parasailing Experience in Kelowna",
+   "supplier": "Ogopogo Parasail",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Tandem-parasailing-for-you-and-a-friend/d22366-41596P3?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  },
+  "2169": {
+   "name": "Winds of Change Experiences",
+   "productCode": "404271P1",
+   "title": "Okanagan Lake Sailing Tour from Penticton & Naramata BC",
+   "supplier": "Winds of Change Experiences",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Sailing-Adventure-on-Okanagan-Lake-from-Penticton-and-Naramata-BC/d22366-404271P1?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
   }
  }
 }

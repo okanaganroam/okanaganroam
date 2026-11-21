@@ -1,0 +1,24 @@
+[
+ {
+  "name": "Ogopogo Parasail",
+  "region": "kelowna",
+  "slug": "ogopogo-parasail",
+  "file": "/images/venues/ogopogo-parasail-2610.jpg",
+  "dimensions": "1800x900 (+ -w960, -w480); source 2400x1600 (native 5184x3456)",
+  "source_page": "Google Maps: Ogopogo Parasail, 230 Queensway, Kelowna, BC V1Y 6S4 (fid 0x537df4aa22cd079b:0x2648d5cacdb5d6d4), photo 3",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLf8esMsBG151yOJ0UKtxlNueoUgQbIIWF8PbvOXt5LnDntKckn_y1fDprLxNItde-_Vg3IWCKIjJ-q4nCNdpW-Rs8mY2nPGaLsuIyjmRDFaSXs2HtbRmXlp2EC7oHDoenHhZT4S5Q=w2400",
+  "source_kind": "google_maps",
+  "note": "Their yellow smiley-face parasail with two riders above Okanagan Lake and the hills; Y=0.25. Own-site photos were all under 1200 px wide or selfies."
+ },
+ {
+  "name": "Winds of Change Experiences",
+  "region": "naramata",
+  "slug": "winds-of-change-experiences",
+  "file": "/images/venues/winds-of-change-experiences-2610.jpg",
+  "dimensions": "1800x900 (+ -w960, -w480); source 2403x1499",
+  "source_page": "https://www.sailingokanagan.com/gallery",
+  "image_url": "https://static.wixstatic.com/media/40f066_fd5a3d6b4e5348aabe541922ffd08d10~mv2.jpg",
+  "source_kind": "website",
+  "note": "Their yacht Anam Cara under sail on Okanagan Lake with guests aboard, name on the hull; Y=0.7."
+ }
+]
