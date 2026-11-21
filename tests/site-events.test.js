@@ -61,7 +61,7 @@ test('the homepage wrapper lists exactly the same events as the server', () => {
   const m = /var ROAM_EV = (\[[^\]]*\]);/.exec(html);
   assert.ok(m, 'ROAM_EV is in okanagan.html');
   const fromPage = JSON.parse(m[1]).sort();
-  const fromServer = [...se.EVENTS].filter((n) => !n.startsWith('page_view:') && !n.startsWith('map_filter:')).sort();
+  const fromServer = [...se.EVENTS].filter((n) => !n.startsWith('page_view:') && !n.startsWith('map_filter:') && !se.SELF_COUNTED.includes(n)).sort();
   assert.deepEqual(fromPage, fromServer);
   assert.match(html, /\/api\/trip\/signal/, 'the homepage reports adds and removes to the demand log');
 });

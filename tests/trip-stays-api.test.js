@@ -178,6 +178,14 @@ test('booking links: plain without a partner, Stay22 Allez with one; owner link 
     assert.equal(w.pick.bookingLinks[1].url, 'https://www.expedia.ca/Kelowna-Hotels-Trip-Stays-Test-Family-Inn.h1234567.Hotel-Information?chkin=2027-07-09&chkout=2027-07-12&rm1=a2');
     for (const a of w.alternatives) assert.ok(Array.isArray(a.bookingLinks));
     assert.ok(Array.isArray(w.checklist));
+    // Book your trip (2026-11-20): the estimate (family inn: level 2, 3 nights, sleeps 6 => one unit) and the steps.
+    assert.equal(w.estimate.currency, 'CAD');
+    assert.deepEqual(w.estimate.parts[0], { key: 'stay', label: 'Stay', labelFr: 'Hébergement', low: 450, high: 750, count: 3, nights: 3, rooms: 1, roomsUnknown: false });
+    assert.equal(w.estimate.people, 4);
+    assert.equal(w.bookingSteps[0].kind, 'stay');
+    assert.equal(w.bookingSteps[0].url, w.pick.bookingLinks[0].url);
+    assert.deepEqual(w.bookingSteps.slice(1).map((x) => x.id), w.checklist.map((c) => c.venueId));
+    for (const a of w.alternatives) assert.ok(a.estimate && Array.isArray(a.bookingSteps));
     assert.doesNotMatch(JSON.stringify(w.pick.bookingLinks), /Kelowna with kids|days in/, 'no request words in any URL');
 
     // With Stay22 set, the same plan's Booking.com and Expedia buttons become Allez links; the own site does not.
@@ -202,7 +210,9 @@ test('booking links: plain without a partner, Stay22 Allez with one; owner link 
       restore.push(() => (before ? db.prepare('UPDATE venue_links SET booking_url = ? WHERE venue_id = ?').run(before.booking_url, id) : db.prepare('DELETE FROM venue_links WHERE venue_id = ?').run(id)));
       db.prepare('INSERT INTO venue_links (venue_id, booking_url) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET booking_url = excluded.booking_url').run(id, `https://book.example.com/v${id}`);
     }
-    const c = JSON.parse((await post({ text: TEXT, stay: STAY }, '?stays=1')).text).whereToStay.checklist;
+    const wc = JSON.parse((await post({ text: TEXT, stay: STAY }, '?stays=1')).text).whereToStay;
+    const c = wc.checklist;
+    assert.deepEqual(wc.bookingSteps.map((x) => x.kind + x.id), [`stay${fam}`, ...c.map((x) => `venue${x.venueId}`)], 'the stay first, then the booked stops in plan order');
     for (const id of stops) {
       const item = c.find((x) => x.venueId === id);
       assert.ok(item, `stop ${id} with a booking link is on the checklist`);
@@ -217,47 +227,149 @@ test('booking links: plain without a partner, Stay22 Allez with one; owner link 
   }
 });
 
-test('card: trip line, one main button, smaller links, notes, and the disclosure only when a shown link is affiliate', async () => {
+test('Book your trip box: trip line, estimate, Book my trip steps, See all, notes and the disclosure (EN and FR)', async () => {
   const page = await (await fetch(`${base}/trip?stays=1`)).text();
-  const src = page.split('<script>').map((x) => x.split('</script>')[0]).find((x) => x.includes('function t3StayBookHtml'));
-  assert.ok(src, 'the card code ships with stays on');
+  const src = page.split('<script>').map((x) => x.split('</script>')[0]).find((x) => x.includes('function t3BookGoHtml'));
+  assert.ok(src, 'the box code ships with stays on');
   const start = src.indexOf('var T3_STAY_DISCLOSURE');
   const fns = src.slice(start, src.indexOf('function t3StayCardHtml'));
   const make = new Function(`function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
     function hrefAttr(u){ return 'href="' + esc(u) + '"'; }
+    var FR = false; function lang(){ return FR ? 'fr' : 'en'; }
+    function cad(c){ return new Intl.NumberFormat(FR ? 'fr-CA' : 'en-CA', { style: 'currency', currency: 'CAD', minimumFractionDigits: c % 100 ? 2 : 0 }).format(c / 100); }
     ${fns.replace(/^\s*var stayChoice = null;/m, '').replace(/\(function\(\)\{[\s\S]*?\}\)\(\);/, '')}
-    return { t3StayTripLine: t3StayTripLine, t3StayBookHtml: t3StayBookHtml, t3StayChecklistHtml: t3StayChecklistHtml, t3StayDisclosureHtml: t3StayDisclosureHtml };`);
+    return { setFr: function(v){ FR = v; }, setState: function(s){ bookState = s; }, t3StayTripLine: t3StayTripLine, t3EstimateHtml: t3EstimateHtml, t3BookGoHtml: t3BookGoHtml, t3BookAllHtml: t3BookAllHtml, t3StayNotesHtml: t3StayNotesHtml, t3StayDisclosureHtml: t3StayDisclosureHtml, t3LiveHtml: t3LiveHtml };`);
   const f = make();
   const t = { arrive: '2026-12-18', leave: '2026-12-21', nights: 3, adults: 2, kids: 2, dog: true, datesGiven: true };
   assert.equal(f.t3StayTripLine(t, false), 'Dec 18–21 · 3 nights · 2 adults, 2 kids · dog');
   assert.equal(f.t3StayTripLine(t, true), '18–21 déc. · 3 nuits · 2 adultes, 2 enfants · chien');
   assert.equal(f.t3StayTripLine({ arrive: '2026-12-30', leave: '2027-01-02', nights: 3, adults: 1 }, false), 'Dec 30–Jan 2 · 3 nights · 1 adult');
-  const plain = [{ key: 'booking_com', label: 'Book on Booking.com', labelFr: 'Réserver sur Booking.com', short: 'Booking.com', shortFr: 'Booking.com', url: 'https://www.booking.com/hotel/ca/x.html?checkin=2026-12-18', affiliate: false, rel: 'nofollow noopener' },
-    { key: 'own', label: 'Hotel’s own site', labelFr: 'Site de l’hôtel', short: 'Hotel’s own site', shortFr: 'Site de l’hôtel', url: 'https://x.example.com/', affiliate: false, rel: 'nofollow noopener' }];
-  const s = { id: 5, bookingLinks: plain, petsSome: true };
-  const h = f.t3StayBookHtml(s, t, false);
-  assert.match(h, /<a class="t3-btn" href="https:\/\/www\.booking\.com\/hotel\/ca\/x\.html\?checkin=2026-12-18" target="_blank" rel="nofollow noopener" data-track="stay_click" data-stay-id="5" data-link="booking_com">Book on Booking\.com/);
-  assert.match(h, /class="t3-stay-more"[^>]*data-link="own">Hotel’s own site/);
-  assert.match(h, /Pets in some rooms — check when booking\./);
-  assert.match(h, /asks for the kids’ ages/);
-  assert.equal(f.t3StayDisclosureHtml(s, false), '', 'no affiliate link, no disclosure');
-  assert.doesNotMatch(h, /Dates follow your plan/);
-  const aff = [{ ...plain[0], affiliate: true, rel: 'sponsored nofollow noopener', url: 'https://www.stay22.com/allez/booking?aid=test123' }, plain[1]];
-  const ha = f.t3StayBookHtml({ id: 5, bookingLinks: aff }, { ...t, datesGiven: false, kids: 0 }, true);
-  assert.match(ha, /rel="sponsored nofollow noopener"[^>]*data-affiliate="1">Réserver sur Booking\.com/);
-  assert.match(f.t3StayDisclosureHtml({ id: 5, bookingLinks: aff }, true), /data-stay-disclosure>Nous pouvons toucher une commission/);
-  assert.match(f.t3StayDisclosureHtml({ id: 5, bookingLinks: aff }, false), /We may earn a commission/);
-  assert.match(ha, /Les dates suivent votre plan/);
-  assert.doesNotMatch(ha, /Animaux/);
+
+  // The estimate: the total, closed until tapped; the parts; "price not listed"; the estimate wording.
+  const est = { low: 780, high: 1050, currency: 'CAD', people: 2, peopleAssumed: true, kids: 0, showTotal: true, openLow: false, openHigh: false,
+    parts: [{ key: 'stay', label: 'Stay', labelFr: 'Hébergement', low: 300, high: 500 }, { key: 'tastings', label: 'Tastings', labelFr: 'Dégustations', low: 60, high: 60 }, { key: 'meals', label: 'Meals', labelFr: 'Repas', low: 220, high: 350 }],
+    unknown: ['Knox Mountain'], notes: [{ key: 'band', text: 'Room prices are for a summer weekend night; other dates are often lower.', textFr: 'Les prix…' }] };
+  const e = f.t3EstimateHtml(est, false);
+  assert.match(e, /<strong>About \$780–\$1,050 for 2 people<\/strong> <span class="t3-book-tag">estimate<\/span>/);
+  assert.match(e, /id="t3BookEst" hidden><p class="t3-book-parts">Stay \$300–\$500 · Tastings \$60 · Meals \$220–\$350<\/p>/);
+  assert.match(e, /Price not listed, not counted: Knox Mountain/);
+  assert.match(e, /taxes, tips and fees extra; prices change/);
+  assert.match(e, /Counted for 2 people/);
+  f.setFr(true);
+  const ef = f.t3EstimateHtml(est, true);
+  assert.match(ef, /Environ 780\s\$–1\s050\s\$ pour 2 personnes/);
+  assert.match(ef, /estimation<\/span>/);
+  assert.match(ef, /Prix non indiqué, non compté : Knox Mountain/);
+  assert.match(ef, /Hébergement 300\s\$–500\s\$ · Dégustations 60\s\$ · Repas 220\s\$–350\s\$/);
+  f.setFr(false);
+  // Open-ended bands: "From" / "Up to"; too little known: the known parts only, shown without tapping.
+  assert.match(f.t3EstimateHtml({ ...est, openHigh: true, low: 1200, high: null, parts: [{ key: 'stay', label: 'Stay', labelFr: 'Hébergement', low: 1200, high: null }] }, false), /From \$1,200 for 2 people/);
+  assert.match(f.t3EstimateHtml({ ...est, openLow: true, low: null, parts: [{ key: 'stay', label: 'Stay', labelFr: 'Hébergement', low: null, high: 300 }] }, false), /Up to \$1,050 for 2 people.*Stay under \$300/s);
+  const partial = f.t3EstimateHtml({ ...est, showTotal: false }, false);
+  assert.match(partial, /Known costs so far<\/strong> <span class="t3-book-tag">partial estimate/);
+  assert.match(partial, /<\/button><p class="t3-book-parts">Stay \$300/);
+  assert.equal((partial.match(/t3-book-parts/g) || []).length, 1, 'the parts once, not again in the breakdown');
+  assert.equal(f.t3EstimateHtml({ ...est, parts: [] }, false), '');
+
+  // Book my trip: one link (a real link, one tab per tap), then Next with Open / Skip / Mark done, then All set.
+  const steps = [
+    { kind: 'stay', id: 5, name: 'Family Inn', label: 'Book on Booking.com', labelFr: 'Réserver sur Booking.com', url: 'https://www.stay22.com/allez/booking?aid=test123', affiliate: true, rel: 'sponsored nofollow noopener', link: 'booking_com' },
+    { kind: 'venue', id: 9, name: 'Wildling', label: 'Reserve a table', labelFr: 'Réserver une table', url: 'https://book.example.com/9', affiliate: false, rel: 'nofollow noopener', link: 'booking' },
+  ];
+  f.setState({ st: {}, last: null, started: false });
+  const g0 = f.t3BookGoHtml(steps, false);
+  assert.match(g0, /<a class="t3-btn t3-book-main" href="https:\/\/www\.stay22\.com\/allez\/booking\?aid=test123" target="_blank" rel="sponsored nofollow noopener" data-track="stay_click" data-stay-id="5" data-link="booking_com" data-t3-step="0" data-affiliate="1">Book my trip/);
+  assert.equal((g0.match(/<a /g) || []).length, 1, 'one link only: never several tabs at once');
+  assert.match(g0, /2 bookings, one at a time, starting with your stay\./);
+  assert.match(f.t3BookGoHtml(steps, true), /2 réservations, une à la fois, en commençant par l’hébergement\./);
+  assert.match(f.t3BookGoHtml(steps.slice(1), false), /One booking, starting with Wildling\./);
+  assert.match(f.t3BookGoHtml(steps, true), />Réserver mon voyage/);
+  f.setState({ st: { 0: 'done' }, last: 0, started: true });
+  const g1 = f.t3BookGoHtml(steps, false);
+  assert.match(g1, /1 of 2 booked/);
+  assert.match(g1, /✓<\/span> Stay — done\? <button type="button" class="t3-book-link" data-t3-bk-undo="0">Not yet/);
+  assert.match(g1, /Next: <strong>Reserve a table · Wildling<\/strong>/);
+  assert.match(g1, /data-track="booking" data-venue-id="9" data-t3-step="1">Open Wildling/);
+  assert.match(g1, /data-t3-bk-skip="1">Skip<\/button><button type="button" class="t3-btn t3-btn-ghost" data-t3-bk-mark="1">Mark done/);
+  assert.equal((g1.match(/<a /g) || []).length, 1);
+  f.setFr(true);
+  const g1f = f.t3BookGoHtml(steps, true);
+  assert.match(g1f, /1 sur 2 réservé/);
+  assert.match(g1f, /Hébergement — c’est fait\? .*Pas encore/);
+  assert.match(g1f, /Ensuite : <strong>Réserver une table · Wildling/);
+  assert.match(g1f, />Ouvrir Wildling.*>Passer<.*>Marquer fait</s);
+  f.setFr(false);
+  f.setState({ st: { 0: 'done', 1: 'skipped' }, last: null, started: true });
+  const g2 = f.t3BookGoHtml(steps, false);
+  assert.match(g2, /All set<\/strong>/);
+  assert.match(g2, /1 skipped: see the list/);
+  assert.match(g2, /data-t3-bk-restart>Start over/);
+  // See all: every booking with its done tick; the stay row keeps the stay's other links.
+  const all = f.t3BookAllHtml({ id: 5, bookingLinks: [{ key: 'booking_com', short: 'Booking.com', shortFr: 'Booking.com', url: steps[0].url, affiliate: true }, { key: 'own', short: 'Hotel’s own site', shortFr: 'Site de l’hôtel', url: 'https://x.example.com/', affiliate: false, rel: 'nofollow noopener' }] }, steps, false);
+  assert.match(all, /<summary>See all 2 bookings<\/summary>/);
+  assert.match(all, /data-t3-bk-toggle="0" aria-pressed="true"/);
+  assert.match(all, /data-t3-bk-toggle="1" aria-pressed="false"[^>]*>–</);
+  assert.match(all, /Stay · Family Inn/);
+  assert.match(all, /class="t3-book-alt"[^>]*data-link="own">Hotel’s own site/);
+  assert.match(f.t3BookAllHtml({ id: 5, bookingLinks: [] }, steps, true), /Voir les 2 réservations/);
+  assert.match(f.t3BookAllHtml({ id: 5, bookingLinks: [] }, steps.slice(0, 1), false), /<summary>See the booking<\/summary>/);
+  assert.match(f.t3BookAllHtml({ id: 5, bookingLinks: [] }, steps.slice(0, 1), true), /<summary>Voir la réservation<\/summary>/);
+  // Notes and the commission line (only with an affiliate link).
+  const notes = f.t3StayNotesHtml({ bookingLinks: [steps[0]].map((x) => ({ ...x, key: 'booking_com' })), petsSome: true }, { ...t, datesGiven: false }, false);
+  assert.match(notes, /Dates follow your plan.*kids’ ages.*Pets in some rooms/);
+  assert.match(f.t3StayNotesHtml({ bookingLinks: [{ key: 'booking_com', url: 'https://www.booking.com/hotel/ca/x.html' }] }, { ...t, datesGiven: false, kids: 0 }, true), /Dates selon votre plan/);
+  assert.equal(f.t3StayDisclosureHtml({ bookingLinks: [] }, [steps[1]], false), '');
+  assert.match(f.t3StayDisclosureHtml({ bookingLinks: [] }, steps, false), /data-stay-disclosure>We may earn a commission/);
+  assert.match(f.t3StayDisclosureHtml({ bookingLinks: [] }, steps, true), /Nous pouvons toucher une commission/);
+  // See live prices: a link (new tab without dialogs) that opens the sheet; counted as a stay click; the commission line.
+  const live = { id: 5, name: 'Family Inn', bookingLinks: [], livePrices: { url: 'https://www.stay22.com/embed/gm?aid=x&address=Kelowna%2C+BC', urlFr: 'https://www.stay22.com/embed/gm?aid=x&address=Kelowna%2C+BC&ljs=fr' } };
+  assert.match(f.t3LiveHtml(live, false), /^<a class="t3-book-live" href="https:\/\/www\.stay22\.com\/embed\/gm\?aid=x&amp;address=Kelowna%2C\+BC" target="_blank" rel="sponsored nofollow noopener" data-track="stay_click" data-stay-id="5" data-link="live_prices" data-affiliate="1" data-t3-live data-t3-live-name="Family Inn">See live prices<\/a>$/);
+  assert.match(f.t3LiveHtml(live, true), /ljs=fr"[^>]*>Voir les prix en direct</);
+  assert.equal(f.t3LiveHtml({ id: 5 }, false), '');
+  assert.equal(f.t3LiveHtml({ id: 5, livePrices: { url: 'http://www.stay22.com/x' } }, false), '');
+  assert.match(f.t3StayDisclosureHtml(live, [steps[1]], false), /We may earn a commission/);
+  assert.doesNotMatch(src, /<iframe[^>]*src=/, 'no map loads with the page');
   // A non-https URL is never shown.
-  assert.equal(f.t3StayBookHtml({ id: 5, bookingLinks: [{ ...plain[0], url: 'javascript:alert(1)' }] }, t, false), '');
-  // Checklist: only with a stop that has a booking link.
-  assert.equal(f.t3StayChecklistHtml(s, { checklist: [] }, false), '');
-  const ck = f.t3StayChecklistHtml(s, { checklist: [{ venueId: 9, name: 'Bistro', url: 'https://book.example.com/9', label: 'Reserve a table', labelFr: 'Réserver une table' }] }, false);
-  assert.match(ck, /Your trip checklist/);
-  assert.match(ck, /Book your stay<\/span><a href[^>]*data-link="booking_com">Booking\.com/);
-  assert.match(ck, /data-track="booking" data-venue-id="9">Reserve a table/);
+  f.setState({ st: {}, last: null, started: false });
+  assert.doesNotMatch(f.t3BookGoHtml([{ ...steps[0], url: 'javascript:alert(1)' }], false), /javascript/);
+  // Stay22's map may be framed only on /trip with stays on and Stay22 set up; every other page keeps frame-src 'self'.
+  const saved = { p: process.env.STAY_AFFILIATE_PROVIDER, i: process.env.STAY_AFFILIATE_ID };
+  try {
+    process.env.STAY_AFFILIATE_PROVIDER = 'stay22'; process.env.STAY_AFFILIATE_ID = 'test123';
+    const csp = (r) => r.headers.get('content-security-policy');
+    assert.match(csp(await fetch(`${base}/trip?stays=1`)), /frame-src 'self' https:\/\/www\.stay22\.com;/);
+    assert.match(csp(await fetch(`${base}/trip`)), /frame-src 'self';/);
+    assert.match(csp(await fetch(`${base}/`)), /frame-src 'self';/);
+    delete process.env.STAY_AFFILIATE_PROVIDER;
+    assert.match(csp(await fetch(`${base}/trip?stays=1`)), /frame-src 'self';/);
+  } finally {
+    if (saved.p === undefined) delete process.env.STAY_AFFILIATE_PROVIDER; else process.env.STAY_AFFILIATE_PROVIDER = saved.p;
+    if (saved.i === undefined) delete process.env.STAY_AFFILIATE_ID; else process.env.STAY_AFFILIATE_ID = saved.i;
+  }
   // Flag off: none of it on /trip.
   const off = await (await fetch(`${base}/trip`)).text();
-  assert.doesNotMatch(off, /t3StayBookHtml|t3-stay-book|T3_STAY_DISCLOSURE/);
+  assert.doesNotMatch(off, /t3BookGoHtml|t3-book|T3_STAY_DISCLOSURE|book_trip_start|Book my trip/);
+});
+
+// Review fixes (2026-11-20, Dayton): one total only, and no campground for a wine-and-food trip.
+test('one total: with the box, the plan leaves out the old per-person estimate line; flag off keeps it', async () => {
+  const on = await (await fetch(`${base}/trip?stays=1`)).text();
+  assert.match(on, /if \(hasStops && !t3StayData\(\)\) html \+= '<p class="t3-estimate" data-t3-estimate/);
+  const off = await (await fetch(`${base}/trip`)).text();
+  assert.match(off, /if \(hasStops\) html \+= '<p class="t3-estimate" data-t3-estimate/);
+  assert.doesNotMatch(off, /t3StayData/);
+});
+
+test('stay type fit: the Kelowna wine-and-food example never gets the campground; a camping request does', async () => {
+  const camp = app.createVenue({ region: 'kelowna', type: 'stay', cuisine: 'campground', slug: 'trip-stays-test-orchard-rv', name: 'Trip Stays Test Orchard RV Park', address: '1 Orchard Road, Kelowna, BC', latitude: 49.887, longitude: -119.496, image_url: '/images/trip-v3/hero.webp', description: 'A fixture used only by the trip stays tests.' });
+  made.push(camp.id);
+  db.prepare('INSERT INTO stay_info (venue_id, info_json, updated_at, batch_id) VALUES (?, ?, ?, ?)').run(camp.id, JSON.stringify({ unit_types: ['rv_site', 'tent_site'], confidence: 'high', price_level: 1 }), '2026-11-20T00:00:00Z', 'test');
+  const shown = (w) => [w.pick, ...w.alternatives].map((s) => s.id);
+  const wine = JSON.parse((await post({ text: '3 days in Kelowna: wineries, easy walks and great food' }, '?stays=1')).text).whereToStay;
+  assert.ok(wine && wine.pick, 'a base is picked');
+  assert.ok(!shown(wine).includes(camp.id), 'no campground for wineries, walks and food');
+  const camping = JSON.parse((await post({ text: '3 days camping in Kelowna' }, '?stays=1')).text).whereToStay;
+  assert.equal(camping.pick.id, camp.id, 'a camping request gets the campground first');
+  const fr = JSON.parse((await post({ text: '3 jours en VR à Kelowna' }, '?stays=1')).text).whereToStay;
+  assert.equal(fr && fr.pick.id, camp.id, 'French: « en VR »');
 });

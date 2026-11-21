@@ -22,6 +22,12 @@ const MIN_IN_TOWN = 3;
 const NEAR_KM = 35;
 const PLAN_KINDS = ['multi_day', 'day_plan', 'outing', 'itinerary'];
 
+// Stay type fit (2026-11-20, Dayton): a campground or RV park is not a base for "wineries, easy walks and great food".
+// A camping stay is the kind 'campground' (places-to-stay.js stayKind) or one whose units are all sites (unit_types).
+// Unless the request asks for camping, camping stays join only when nothing else fits in the plan's towns or nearby;
+// when it does, they come first.
+const CAMP_UNITS = ['rv_site', 'tent_site'];
+const CAMPING_RE = /(?:^|[^\p{L}])(?:camp(?:ing|ground|grounds|site|sites|er|ers)|rv|r\.v\.|rvs|motorhomes?|campervans?|trailers?|tents?|glamping|caravans?|vr|tentes?|pr[êe]t-[àa]-camper|roulottes?|campings?|caravan(?:e|es))(?=$|[^\p{L}])/iu;
 const isObj = (x) => !!x && typeof x === 'object' && !Array.isArray(x);
 const intIn = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi;
 function validDate(s) {
@@ -144,8 +150,21 @@ function tripStayContext(plan, input, today) {
   const guests = adults !== null ? adults + (kids || 0) : null;
   return {
     arrive, leave, nights, months, adults, kids, guests, withKids, dog: i.dog === true || !!party.dog, budget: budgetOf(plan.intent),
-    centre, primaryRegion: regions[0], regions, datesGiven: !!(i.arrive && i.leave),
+    centre, primaryRegion: regions[0], regions, datesGiven: !!(i.arrive && i.leave), camping: wantsCamping(plan),
   };
+}
+
+// The request asks for camping: its own words, or the interpreter's interests / activities.
+function wantsCamping(plan) {
+  if (!plan) return false;
+  const words = [plan.query, ...(((plan.understood || {}).interests) || []), ...(((plan.intent || {}).activities) || [])].filter((x) => typeof x === 'string').join(' ');
+  return CAMPING_RE.test(words);
+}
+function isCampingStay(stay) {
+  const kind = String(stay.kindKey || stay.kind || '').trim().toLowerCase();
+  if (kind === 'campground' || kind === 'camping') return true;
+  const units = isObj(stay.info) && Array.isArray(stay.info.unit_types) ? stay.info.unit_types : [];
+  return units.length > 0 && units.every((u) => CAMP_UNITS.includes(u) || u === 'glamping');
 }
 
 // -> the reason a stay is dropped ('open_months', 'max_guests', 'adults_only', 'pets', 'min_nights') or null.
@@ -195,6 +214,10 @@ function scoreStay(stay, ctx) {
   if (f.confidence === 'high') score -= 0.5;
   else if (f.confidence === 'medium') score -= 0.25;
   if (stay.photo) score -= 0.75;
+  // A camping trip: campgrounds and RV parks first.
+  if (ctx.camping) {
+    if (stay.camping) { score -= 5; matches.unshift({ key: 'camping', text: 'Camping', textFr: 'Camping' }); } else score += 5;
+  }
   return { score, distanceKm: d, matches };
 }
 
@@ -218,9 +241,15 @@ function stayCard(stay, scored) {
 // -> { pick, alternatives } (up to 2 alternatives) or null when no stay fits.
 function pickTripStays(ctx, stays) {
   if (!ctx || !Array.isArray(stays)) return null;
-  const usable = stays.map((s) => ({ ...s, coords: coords(s.latitude, s.longitude) })).filter((s) => s.coords && Number.isInteger(s.id) && s.url && !stayFails(s.info, ctx));
-  let pool = usable.filter((s) => ctx.regions.includes(s.region));
-  if (pool.length < MIN_IN_TOWN && ctx.centre) pool = pool.concat(usable.filter((s) => !ctx.regions.includes(s.region) && km(ctx.centre, s.coords) <= NEAR_KM));
+  const usable = stays.map((s) => ({ ...s, coords: coords(s.latitude, s.longitude), camping: isCampingStay(s) })).filter((s) => s.coords && Number.isInteger(s.id) && s.url && !stayFails(s.info, ctx));
+  const poolOf = (list) => {
+    let pool = list.filter((s) => ctx.regions.includes(s.region));
+    if (pool.length < MIN_IN_TOWN && ctx.centre) pool = pool.concat(list.filter((s) => !ctx.regions.includes(s.region) && km(ctx.centre, s.coords) <= NEAR_KM));
+    return pool;
+  };
+  // Not a camping trip: rooms first; camping stays only when no other stay fits the plan's towns or nearby.
+  let pool = ctx.camping ? poolOf(usable) : poolOf(usable.filter((s) => !s.camping));
+  if (!pool.length && !ctx.camping) pool = poolOf(usable);
   if (!pool.length) return null;
   const ranked = pool.map((s) => ({ s, r: scoreStay(s, ctx) })).sort((a, b) => a.r.score - b.r.score || a.s.id - b.s.id).slice(0, 3);
   const cards = ranked.map(({ s, r }) => stayCard(s, r));
@@ -244,4 +273,5 @@ function whereToStay(plan, input, stays, today) {
 module.exports = {
   MAX_NIGHTS, MAX_ADULTS, MAX_KIDS, NEAR_KM, MIN_IN_TOWN,
   parseTripStayInput, tripStayContext, partyOf, stayFails, scoreStay, pickTripStays, whereToStay, planStops, km, addDays, daysBetween,
+  wantsCamping, isCampingStay, CAMPING_RE,
 };
