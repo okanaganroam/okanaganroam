@@ -95,6 +95,8 @@ const FR_TEXT = {
   'Groups': 'Groupes',
   'Happy hour': '5 à 7',
   'Free': 'Gratuit',
+  'Ice skating': 'Patinage sur glace', 'Ice skating · Hockey': 'Patinage sur glace · Hockey',
+  'Indoor pool, gyms and fitness centre, plus 12 pickleball and 6 tennis courts (Basil Meikle) outside': 'Piscine intérieure, gymnases et centre de conditionnement physique, plus 12 terrains de pickleball et 6 courts de tennis extérieurs (Basil Meikle)',
   'By donation': 'Contribution volontaire', 'No set entry price': 'Aucun prix d’entrée fixe', 'No entry fee': 'Aucuns frais d’entrée',
   // Indoor test 1 (2026-11-19): a by-donation place's card price.
   'By donation': 'Contribution volontaire',
