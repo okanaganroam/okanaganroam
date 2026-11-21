@@ -2550,6 +2550,52 @@ Object.assign(fr.indoor, { bringExKinds: { gallery: 'La plupart des œuvres sont
 // - A theatre (its main kind) is asked about tickets, and its price is its lowest regular ticket ("Tickets from $25").
 // - A range ("$25 - $55", "25 to 55") is read as its low number.
 // - The story and Known for examples follow the main kind (like the Good to know example).
+// Sport test 9 (2026-11-21; Gord's "My prices are on my website" was filled with his Chronogolf tee-time link): a rates
+// page only, never a booking link; with none found, the box starts empty with a hint.
+Object.assign(en.indoor, { webLeadRates: 'We filled in the rates page we found on your website. Check it’s the right one.', webLeadRatesEmpty: 'Type your rates page’s address, like yourclub.com/rates (not your booking page). Or use your website’s home page.' });
+Object.assign(fr.indoor, { webLeadRates: 'Nous avons inscrit la page des tarifs trouvée sur votre site. Vérifiez que c’est la bonne.', webLeadRatesEmpty: 'Inscrivez l’adresse de votre page des tarifs, comme votreclub.com/tarifs (pas votre page de réservation). Ou prenez la page d’accueil de votre site.' });
+// Sport test 8 (2026-11-21; Dayton approved): a walk-on or 9-hole course's Good to know chips. The big-course chips that
+// don't fit it ("Pro shop", "Dress code: collared shirts", "Driving range on site") make room, so the count stays the same.
+// Sport test 8 (2026-11-21; Marg's golf course was asked "Patio only / Inside and patio / Water bowls at the door"): the
+// dog follow-up in each sport kind's own words (the same three-chip screen, reworded). [chips, example] by kind.
+Object.assign(en.indoor, { quickSportDogs: {
+  golf: ['On the course, on a leash', 'Clubhouse patio only', 'Not on the course'],
+  discgolf: ['On the course, on a leash', 'Pick up after your dog', 'Not on the course'],
+  range: ['On a leash', 'Outside only', 'Not on the range'],
+  bike: ['On a leash, off the track', 'Outside only', 'Not on the track'],
+  skatepark: ['On a leash, outside the park', 'Outside only', 'Not in the park'],
+  courts: ['On a leash, outside the courts', 'Outside only', 'Not on the courts'],
+  swim: ['Outside the pool area only', 'On a leash', 'Not in the pool area'],
+  _: ['On a leash', 'Outside only', 'Not inside'],
+}, sportDogEx: {
+  golf: 'Dogs welcome on the course on a leash. Please pick up after your dog.',
+  discgolf: 'Dogs welcome on the course on a leash. Please pick up after your dog.',
+  range: 'Dogs welcome on a leash, outside only.',
+  bike: 'Dogs welcome on a leash, off the track.',
+  skatepark: 'Dogs welcome on a leash outside the park.',
+  courts: 'Dogs welcome on a leash outside the courts.',
+  swim: 'Dogs on a leash outside the pool area only.',
+  _: 'Dogs welcome outside on a leash, not inside.',
+} });
+Object.assign(fr.indoor, { quickSportDogs: {
+  golf: ['Sur le parcours, en laisse', 'Terrasse du club-house seulement', 'Pas sur le parcours'],
+  discgolf: ['Sur le parcours, en laisse', 'Ramassez après votre chien', 'Pas sur le parcours'],
+  range: ['En laisse', 'À l’extérieur seulement', 'Pas sur le champ de pratique'],
+  bike: ['En laisse, hors de la piste', 'À l’extérieur seulement', 'Pas sur la piste'],
+  skatepark: ['En laisse, hors du parc', 'À l’extérieur seulement', 'Pas dans le parc'],
+  courts: ['En laisse, hors des terrains', 'À l’extérieur seulement', 'Pas sur les terrains'],
+  swim: ['À l’extérieur de l’aire de la piscine seulement', 'En laisse', 'Pas dans l’aire de la piscine'],
+  _: ['En laisse', 'À l’extérieur seulement', 'Pas à l’intérieur'],
+}, sportDogEx: {
+  golf: 'Chiens bienvenus sur le parcours, en laisse. Ramassez après votre chien.',
+  discgolf: 'Chiens bienvenus sur le parcours, en laisse. Ramassez après votre chien.',
+  range: 'Chiens bienvenus en laisse, à l’extérieur seulement.',
+  bike: 'Chiens bienvenus en laisse, hors de la piste.',
+  skatepark: 'Chiens bienvenus en laisse, hors du parc.',
+  courts: 'Chiens bienvenus en laisse, hors des terrains.',
+  swim: 'Chiens en laisse à l’extérieur de l’aire de la piscine seulement.',
+  _: 'Chiens bienvenus à l’extérieur en laisse, pas à l’intérieur.',
+} });
 Object.assign(en.indoor, { webLeadTickets: 'We filled in your tickets page. If your prices are on another page, change it.', researchLine: 'We picked these from what we found online. Untick anything that’s wrong.', noSetHoursHint: 'Shows or classes only? Tap this. Put box office hours in Good to know, like “Box office: Tue–Fri 11–4 and an hour before shows.”',
   ibookQShow: 'Do people need tickets ahead?', ibooksShow: { no: 'Tickets at the door are fine', busy: 'Tickets at the door, but buy ahead for busy shows', ahead: 'Please buy tickets ahead' },
   ibookNeedShow: 'Please tap one: tickets at the door, or buy ahead.',
@@ -2680,6 +2726,7 @@ const SPORT_TIMES_HINTS = {
     discgolf: ['Free to play', 'Bring your own discs', 'Course map at the first tee', 'Washrooms nearby', 'Free parking on site'],
     sportsctr: ['Lockers available', 'Bring indoor shoes', 'Drop-in times change: check the schedule', 'Free parking on site', 'Concession stand'],
     sportgen: ['Book ahead on weekends', 'Rentals available', 'Arrive 15 minutes early', 'Free parking on site', 'Washrooms on site'],
+    golfsmall: ['Walk-ons only: no tee times', 'Pull carts only', 'Cash only', 'Honour box when the clubhouse is closed', 'Cart and club rentals', 'Restaurant and patio on site', 'Free parking on site'],
   });
   Object.assign(fr.indoor.quick.good_to_know_kinds, {
     golf: ['Heures de départ conseillées', 'Location de voiturettes et de bâtons', 'Boutique du pro', 'Restaurant et terrasse sur place', 'Code vestimentaire : chemise à col', 'Champ de pratique sur place', 'Stationnement gratuit sur place'],
@@ -2694,6 +2741,7 @@ const SPORT_TIMES_HINTS = {
     discgolf: ['Gratuit', 'Apportez vos disques', 'Carte du parcours au premier départ', 'Toilettes à proximité', 'Stationnement gratuit sur place'],
     sportsctr: ['Casiers offerts', 'Apportez des souliers d’intérieur', 'Les heures libres changent : voyez l’horaire', 'Stationnement gratuit sur place', 'Comptoir de friandises'],
     sportgen: ['Réservez pour les fins de semaine', 'Location sur place', 'Arrivez 15 minutes d’avance', 'Stationnement gratuit sur place', 'Toilettes sur place'],
+    golfsmall: ['Sans réservation seulement : pas d’heures de départ', 'Chariots à tirer seulement', 'Comptant seulement', 'Boîte de paiement quand le club-house est fermé', 'Location de voiturettes et de bâtons', 'Restaurant et terrasse sur place', 'Stationnement gratuit sur place'],
   });
   Object.assign(en.indoor.bringExKinds, { golf: 'Tee times recommended on weekends. Cart and club rentals in the pro shop.', simgolf: 'Book a bay ahead for evenings. Bring your own clubs or rent ours.', range: 'Balls and clubs to rent. Covered stalls when it rains.',
     snow: 'Book lessons ahead at Christmas and spring break. Meet at the ski school sign 15 minutes early.', rink: 'Skate rentals at the front desk. Public skate times change with hockey games: check the schedule.', swim: 'Bring a swimsuit and a towel. Lifeguards on duty during public swims.',

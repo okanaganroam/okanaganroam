@@ -1696,6 +1696,19 @@
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
     if (key === 'good_to_know' && C.indoor && (T.quick || {}).good_to_know_kinds) { var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; var lk = k0 ? T.quick.good_to_know_kinds[INDOOR_CHIP_GROUP.get(k0)] : null; if (lk && lk.length) l = lk;
+      // Sport test 8 (2026-11-21; Dayton approved): a golf course whose owner picked walk-ons, or a 9-hole one, gets the
+      // small-course chips (walk-ons only, pull carts, cash, the honour box) in place of the big-course ones. For every
+      // course, no chip that says the opposite of her answers: "Tee times recommended" never under walk-ons welcome, and
+      // "Walk-ons only" only under walk-ons welcome.
+      var gBook = (S.tour && S.tour.book) || (TI && TI.book) || '';
+      if (k0 && INDOOR_CHIP_GROUP.get(k0) === 'golf') {
+        var small = T.quick.good_to_know_kinds.golfsmall;
+        if ((gBook === 'no' || C.golfSmall) && small && small.length) {
+          l = small.slice();
+          if (gBook && gBook !== 'no') { l = l.filter(function(c){ return !/^(?:Walk-ons only|Sans réservation seulement)/i.test(c) || saysIt(value, c, l); }); var tt = (lk || [])[0]; if (tt && l.indexOf(tt) < 0) l.unshift(tt); }
+        }
+        if (gBook === 'no') l = l.filter(function(c){ return !/^(?:Tee times recommended|Heures de départ conseillées)$/i.test(c) || saysIt(value, c, l); });
+      }
       // Indoor test 7 (2026-11-19): "Free on the first Sunday" makes no sense when entry is always free.
       // Indoor test 17: the waiver chip says her kind's verb ("Waiver to sign before you climb").
       if (C.waiverVerb) l = l.map(function(c){ return c.replace(/before you play$/, 'before you ' + C.waiverVerb).replace(/avant de jouer$/, 'avant de ' + C.waiverVerb); });
@@ -1713,6 +1726,9 @@
     // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
     // isn't offered "Patio only".
     if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;
+    // Sport test 8 (2026-11-21; a golf course was offered "Patio only / Inside and patio / Water bowls at the door"): a
+    // sport place's dog chips are in its main kind's words ("On the course, on a leash", "Not on the course").
+    if (key === 'dogs' && C.indoor && C.sportDogs && C.sportDogs.chips && C.sportDogs.chips.length) l = C.sportDogs.chips;
     // Breweries (2026-11-12): no "Patio only" for a taproom with no patio ticked.
     if (key === 'dogs' && C.brewery && !S.badges.patio && !S.badges.heated_patio && T.quickDogsNoPatio) l = T.quickDogsNoPatio;
     // Tour test 4 (Whistler, 2026-11-17): a tour's dog chips may show more words than they write ("On some trips (say
@@ -2932,6 +2948,12 @@
       var urlNow = S.webUrl != null ? S.webUrl : site;
       var tixUrl = INDOOR && s === 'menu:web' && T.webLeadTickets ? ((S.done.booking && S.bookUrl && /\S\.\S/.test(S.bookUrl) ? S.bookUrl : '') || CUR.booking_url || (indoorShow() ? C.bookingKnown : '') || '') : '';
       if (tixUrl) { lead2 = T.webLeadTickets; if (S.webUrl == null) urlNow = tixUrl; }
+      // Sport test 9 (2026-11-21; Gord's tee-time link was filled in as his rates page): a sport or golf place's box takes a
+      // rates page only (the one our golf data found on its site), never a booking link; with none, it starts empty.
+      if (INDOOR && C.sport && s === 'menu:web') {
+        if (C.ratesKnown) { lead2 = T.webLeadRates || lead2; if (S.webUrl == null) urlNow = C.ratesKnown; }
+        else { lead2 = T.webLeadRatesEmpty || lead2; if (S.webUrl == null) urlNow = ''; }
+      }
       x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, urlNow, { mode: 'url', max: 300 })
         // Pub test 7 (2026-11-10): one tap for the website she typed or we have ("Use sandbarpub.ca"); never one being removed.
         // Café test 5 (2026-11-12): hidden while the box already holds that address (it read as a puzzle beside it).
@@ -3036,7 +3058,7 @@
     } else if (s === 'offer:dogs') {
       // Brewery test 1 (2026-11-12): research's "Dogs on the patio" fills in "Patio only" as a suggestion (saved with the screen).
       if (C.brewery && C.suggestDogNote && !S.dogGuessSet && !S.dogNote && !((CUR.visit_rows || {}).dogs)) { S.dogGuessSet = true; S.dogNote = C.suggestDogNote; S.dogGuessed = true; }
-      x = q(T.dogQ, T.dogLead) + msgs() + (S.dogGuessed && S.dogNote === C.suggestDogNote && T.dogGuess ? '<p class="su-sent su-research" id="suDogGuess">' + h(T.dogGuess) + '</p>' : '') + quick('dogs', 'suDog', S.dogNote) + '<label class="su-sr" for="suDog">' + h(T.dogQ) + '</label><textarea class="su-field su-line" id="suDog" maxlength="180" rows="2">' + h(S.dogNote) + '</textarea>' + ex(T.dogEx)
+      x = q(T.dogQ, T.dogLead) + msgs() + (S.dogGuessed && S.dogNote === C.suggestDogNote && T.dogGuess ? '<p class="su-sent su-research" id="suDogGuess">' + h(T.dogGuess) + '</p>' : '') + quick('dogs', 'suDog', S.dogNote) + '<label class="su-sr" for="suDog">' + h(T.dogQ) + '</label><textarea class="su-field su-line" id="suDog" maxlength="180" rows="2">' + h(S.dogNote) + '</textarea>' + ex(C.indoor && C.sportDogs && C.sportDogs.ex ? C.sportDogs.ex : T.dogEx)
         + (S.nudge && S.nudge === T.dogLineNo && T.dogLineNoGo ? '<div class="su-stack su-seaskip" id="suDogNoGo">' + big('🚫', T.dogLineNoGo, '', true, 'dogToNo') + '</div>' : '')
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'dogSave') + '</div><div class="su-skip"><button type="button" class="su-link" data-act="go:' + (offerNext('offer:dogs') || 'saved:offer') + '">' + h(T.skip) + '</button></div>';
     } else if (s === 'happy') { x = C.happyHour ? yesNo('happy', T.happyQ, '', T.happyYes) : '';

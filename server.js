@@ -61965,7 +61965,9 @@ function renderOwnerSetupPage(found, opts) {
     visitResearch: ownerVisitResearchKeys(venue.id),
     // Indoor test 11 (2026-11-19; Kim: Good to know opened empty, research's line set aside and "Planetarium shows need
     // pre-registration" gone with her walk-in answer): research's lines for her Good to know box, pre-filled as found online.
-    ...(sport ? { gtkHide: sportGtkHide(venue, lang), researchOpen: sportResearchOpen(venue) } : {}),
+    ...(sport ? { gtkHide: sportGtkHide(venue, lang), researchOpen: sportResearchOpen(venue), golfSmall: sportGolfNine(venue), sportDogs: sportDogChips(venue, lang), ratesKnown: sportRatesPage(venue),
+      // Sport test 8 (2026-11-21; Marg's 9-hole course was pre-picked "Half a day or more"): about 2 hours for 9 holes.
+      ...(sportGolfNine(venue) ? { kindLength: { ...INDOOR_KIND_LENGTH, golf: '2-3h' } } : {}) } : {}),
     ...(indoor ? { gtkFound: indoorGtkFound(venue.id), groupsFound: indoorGroupsFound(venue.id), indoorLow: indoorHelpLow(venue), ...setupStaleOut(venue) } : {}),
     pageHref: fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue),
     credit: String(venue.name || '').replace(/[<>]/g, '').trim().slice(0, 80),
@@ -62762,10 +62764,10 @@ const TOUR_SETUP_HELP_TOPICS = [
   // The phone: said plainly that visitors see it (a guide with no office uses his own cell).
   { id: 'phone', pages: ['edit', 'setup'], over: ['links', 'login-privacy', 'setup-who-sees'],
     q: 'Is our phone number shown? How do I change it?', qFr: 'Notre numéro de téléphone est-il affiché? Comment le changer?',
-    keys: ['phone', 'phone number', 'telephone', 'change phone', 'change my phone', 'change our phone', 'change the phone', 'change my phone number', 'change our phone number', 'new phone', 'new phone number', 'new number', 'cell number', 'cell', 'my cell', 'see my phone number', 'see my number', 'people see my phone', 'will people see my phone number', 'is my phone number public', 'phone public', 'number public', 'shown on my page', 'private number', 'hide my number', 'hide my phone'],
-    keysFr: ['telephone', 'numero de telephone', 'numero', 'changer le telephone', 'changer mon numero', 'changer notre numero', 'nouveau numero', 'cellulaire', 'mon cellulaire', 'voient mon numero', 'voir mon numero', 'les gens voient mon numero', 'numero public', 'numero prive', 'cacher mon numero'],
-    a: `<p><strong>Yes, people see it.</strong> The phone number on your listing is public: it is the <strong>Call</strong> button on your page. Use the number you want bookings on. No number you want public? Leave it empty and people use your booking link or website.</p><p>To change it: in the setup, <strong>Basics</strong> (tap <strong>Change an answer</strong> if it’s done), or <strong>Contact</strong> on your edit page. Type it with the area code, like ${HELP_PHONE_EXAMPLE}. A new number saved in the setup shows right away.</p>`,
-    aFr: `<p><strong>Oui, les gens le voient.</strong> Le numéro de téléphone de votre fiche est public : c’est le bouton <strong>Appeler</strong> sur votre page. Indiquez le numéro où vous voulez recevoir les réservations. Aucun numéro à rendre public? Laissez la case vide : les gens utiliseront votre lien de réservation ou votre site Web.</p><p>Pour le changer : dans la configuration, <strong>L’essentiel</strong> (touchez <strong>Modifier une réponse</strong> si c’est fait), ou <strong>Coordonnées</strong> sur votre page de modification. Écrivez-le avec l’indicatif régional, comme ${HELP_PHONE_EXAMPLE}. Un nouveau numéro enregistré dans la configuration s’affiche tout de suite.</p>` },
+    keys: ['phone', 'phone number', 'telephone', 'change phone', 'change my phone', 'change our phone', 'change the phone', 'change my phone number', 'change our phone number', 'new phone', 'new phone number', 'new number', 'cell number', 'cell', 'my cell', 'see my phone number', 'see my number', 'people see my phone', 'will people see my phone number', 'is my phone number public', 'phone public', 'number public', 'shown on my page', 'private number', 'hide my number', 'hide my phone', 'extension', 'phone extension', 'the extension', 'press 1', 'ext'],
+    keysFr: ['telephone', 'numero de telephone', 'numero', 'changer le telephone', 'poste', 'numero de poste', 'changer mon numero', 'changer notre numero', 'nouveau numero', 'cellulaire', 'mon cellulaire', 'voient mon numero', 'voir mon numero', 'les gens voient mon numero', 'numero public', 'numero prive', 'cacher mon numero'],
+    a: `<p><strong>Yes, people see it.</strong> The phone number on your listing is public: it is the <strong>Call</strong> button on your page. Use the number you want bookings on. No number you want public? Leave it empty and people use your booking link or website.</p><p>To change it: in the setup, <strong>Basics</strong> (tap <strong>Change an answer</strong> if it’s done), or <strong>Contact</strong> on your edit page. Type it with the area code, like ${HELP_PHONE_EXAMPLE}. An extension? Type it after the number, like <em>250-555-0123 ext. 1</em>: the Call button dials it. A new number saved in the setup shows right away.</p>`,
+    aFr: `<p><strong>Oui, les gens le voient.</strong> Le numéro de téléphone de votre fiche est public : c’est le bouton <strong>Appeler</strong> sur votre page. Indiquez le numéro où vous voulez recevoir les réservations. Aucun numéro à rendre public? Laissez la case vide : les gens utiliseront votre lien de réservation ou votre site Web.</p><p>Pour le changer : dans la configuration, <strong>L’essentiel</strong> (touchez <strong>Modifier une réponse</strong> si c’est fait), ou <strong>Coordonnées</strong> sur votre page de modification. Écrivez-le avec l’indicatif régional, comme ${HELP_PHONE_EXAMPLE}. Un nouveau numéro enregistré dans la configuration s’affiche tout de suite. Un poste? Écrivez-le après le numéro, comme <em>250-555-0123 poste 1</em> : le bouton Appeler le compose.</p>` },
   // Parking: Good to know is in "More about your tours" (the answer pointed to the edit page).
   { id: 'parking-paid', pages: ['setup', 'edit'], over: ['plan-visit', 'cost', 'features', 'badge-wrong', 'tour-free', 'tour-free-trip', 'tour-meeting'], noRelated: ['cost'],
     q: 'No parking, or paid parking', qFr: 'Pas de stationnement, ou stationnement payant',
@@ -63543,14 +63545,14 @@ const SPORT_OWN_HELP_TOPICS = [SPORT_SEASON_TOPIC,
     q: 'Our course details on the page (holes, par, green fees)', qFr: 'Les détails de notre parcours sur la page (trous, normale, droits de jeu)',
     keys: ['holes', '18 holes', '9 holes', 'par', 'yardage', 'yards', 'slope', 'rating', 'course rating', 'course details', 'course facts', 'scorecard', 'course map', 'designer', 'executive course', 'championship course', 'twilight', 'twilight rate', 'green fee', 'green fees', 'wrong green fee', 'old green fee', 'glance'],
     keysFr: ['trous', '18 trous', '9 trous', 'normale', 'verges', 'carte de pointage', 'details du parcours', 'crepuscule', 'droit de jeu', 'droits de jeu'],
-    a: '<p>Your main green fee goes on <strong>Price</strong>: your lowest regular adult rate, 9 or 18 holes. Your card and your page show it as “Green fees from $55”. Twilight, 9-hole, cart and pass prices go in <strong>Your prices</strong>, one line each. The course facts at the top of your page (holes, par, the course map link) come from our checked golf data: something wrong there? Tap <strong>Message us</strong> and Dayton will fix it.</p>',
-    aFr: '<p>Votre droit de jeu principal va dans <strong>Prix</strong> : votre tarif adulte régulier le moins cher, 9 ou 18 trous. Votre fiche et votre page l’affichent « Droits de jeu à partir de 55 $ ». Les tarifs du crépuscule, de 9 trous, de voiturette et d’abonnement vont dans <strong>Vos tarifs</strong>, une ligne chacun. Les faits du parcours en haut de votre page (trous, normale, lien vers la carte) viennent de nos données de golf vérifiées : une erreur? Touchez <strong>Nous écrire</strong> et Dayton la corrigera.</p>' },
+    a: '<p>Your main green fee goes on <strong>Price</strong>: your lowest regular adult rate, 9 or 18 holes. Your card and your page show it as “Green fees from $55”. Twilight, 9-hole, cart and pass prices go in <strong>Your prices</strong>, one line each. The course facts at the top of your page (holes, par, the course map link) come from our checked golf data: something wrong there? Tap <strong>Message us</strong> and Dayton will fix it. Last year’s green fee table from our research? It comes off your page once your own price is in.</p>',
+    aFr: '<p>Votre droit de jeu principal va dans <strong>Prix</strong> : votre tarif adulte régulier le moins cher, 9 ou 18 trous. Votre fiche et votre page l’affichent « Droits de jeu à partir de 55 $ ». Les tarifs du crépuscule, de 9 trous, de voiturette et d’abonnement vont dans <strong>Vos tarifs</strong>, une ligne chacun. Les faits du parcours en haut de votre page (trous, normale, lien vers la carte) viennent de nos données de golf vérifiées : une erreur? Touchez <strong>Nous écrire</strong> et Dayton la corrigera. Le tableau des droits de jeu de l’an dernier, tiré de nos recherches? Il quitte votre page dès que votre propre prix est entré.</p>' },
   { id: 'sport-members', pages: ['setup', 'edit'], over: ['indoor-busy-times', 'indoor-booking', 'indoor-age'],
     q: 'Members-only times, or a private or semi-private club', qFr: 'Heures réservées aux membres, ou club privé ou semi-privé',
     keys: ['members only', 'member only', 'members times', 'member times', 'semi private', 'semi-private', 'private club', 'members and guests', 'guests of members', 'public welcome', 'non members', 'nonmembers', 'public tee times', 'members get priority', 'league nights', 'leagues', 'league'],
     keysFr: ['membres seulement', 'reserve aux membres', 'semi prive', 'club prive', 'membres et invites', 'non membres', 'ligue', 'ligues'],
-    a: '<p>Say it in <strong>Good to know</strong>, in one line, like <em>Members only before 10 AM on weekends</em> or <em>Public welcome after 1 PM</em>. On <strong>Walk-ins or booking</strong>, tap <strong>Yes, but book ahead for weekends and busy times</strong>. Only members can play at all? Then this listing isn’t for visitors: tap <strong>Message us</strong> and tell Dayton.</p>',
-    aFr: '<p>Dites-le dans <strong>Bon à savoir</strong>, en une ligne, comme <em>Membres seulement avant 10 h la fin de semaine</em> ou <em>Public bienvenu après 13 h</em>. Dans <strong>Sans réservation ou réserver</strong>, touchez <strong>Oui, mais réservez pour les fins de semaine et les périodes achalandées</strong>. Seuls les membres peuvent jouer? Cette fiche n’est alors pas pour les visiteurs : touchez <strong>Nous écrire</strong> et dites-le à Dayton.</p>' },
+    a: '<p>Say it in <strong>Good to know</strong>, in one line, like <em>Members only before 10 AM on weekends</em> or <em>Public welcome after 1 PM</em>. On <strong>Walk-ins or booking</strong>, tap <strong>Yes, but book ahead for weekends and busy times</strong>. Only members can play at all? Then this listing isn’t for visitors: tap <strong>Message us</strong> and tell Dayton.</p><p>No public tee times at a set time each week, like a men’s night or league? Say it the same way, with the day and times, like <em>Men’s night Wednesdays noon to 4:30 PM: no public tee times</em>. Build My Trip shows that line to people planning then. Closed early that day for everyone? Change that day’s closing time in your hours.</p>',
+    aFr: '<p>Dites-le dans <strong>Bon à savoir</strong>, en une ligne, comme <em>Membres seulement avant 10 h la fin de semaine</em> ou <em>Public bienvenu après 13 h</em>. Dans <strong>Sans réservation ou réserver</strong>, touchez <strong>Oui, mais réservez pour les fins de semaine et les périodes achalandées</strong>. Seuls les membres peuvent jouer? Cette fiche n’est alors pas pour les visiteurs : touchez <strong>Nous écrire</strong> et dites-le à Dayton.</p><p>Pas de départs pour le public à une heure fixe chaque semaine, comme une soirée des hommes ou une ligue? Dites-le de la même façon, avec le jour et les heures, comme <em>Soirée des hommes le mercredi de midi à 16 h 30 : pas de départs pour le public</em>. Planifier mon voyage montre cette ligne aux gens qui prévoient venir à ce moment-là. Fermé plus tôt ce jour-là pour tout le monde? Changez l’heure de fermeture de ce jour dans vos heures.</p>' },
   { id: 'sport-lessons', pages: ['setup', 'edit', 'menu'], over: ['indoor-groups', 'indoor-camps', 'event-add', 'menu-add', 'indoor-extras', 'sport-rentals', 'indoor-no-set-price'],
     q: 'Lessons, clinics, camps and leagues', qFr: 'Cours, cliniques, camps et ligues',
     keys: ['lesson', 'lessons', 'clinic', 'clinics', 'learn to ride', 'ride clinics', 'beginner clinics', 'golf lessons', 'skating lessons', 'learn to skate', 'learn to play', 'learn to ski', 'coaching', 'coach', 'pro', 'teaching pro', 'junior program', 'junior programs', 'juniors', 'camp', 'camps', 'summer camp', 'outside pros', 'outside pro', 'outside pga', 'pros set their own', 'set their own price', 'set their own prices', 'independent pro', 'independent pros', 'lessons are with', 'do i put lessons', 'lessons here', 'pga pro', 'pga pros', 'instructors set'],
@@ -63655,8 +63657,8 @@ const SPORT_TEST2_HELP_TOPICS = [
     q: 'Do my closures repeat every year?', qFr: 'Mes fermetures se répètent-elles chaque année?',
     keys: ['every year', 'is this every year', 'each year', 'again next year', 'do it again', 'do it again next year', 'have to do it again', 'next year too', 'repeat every year', 'repeats every year'],
     keysFr: ['chaque annee', 'l an prochain', 'l annee prochaine', 'recommencer', 'se repete', 'a refaire', 'refaire l an prochain'],
-    a: '<p>The holidays you tap are saved for this year and next (that’s “This year and next”), so next year’s are already on your page. A break you add with <strong>+ Closed for a week or two</strong> repeats by itself when you tick <strong>Every year</strong>.</p>',
-    aFr: '<p>Les jours fériés que vous touchez sont enregistrés pour cette année et l’an prochain (c’est « Cette année et l’an prochain »), donc ceux de l’an prochain sont déjà sur votre page. Une pause ajoutée avec <strong>+ Fermé une semaine ou deux</strong> se répète d’elle-même si vous cochez <strong>Chaque année</strong>.</p>' },
+    a: '<p>The holidays you tap are saved for this year and next (that’s “This year and next”), so next year’s are already on your page. A break you add with <strong>+ Closed for a week or two</strong> repeats by itself when you tick <strong>Every year</strong>. Its dates move each year (like Labour Day weekend)? Leave <strong>Every year</strong> off and add each year’s dates. Your season and hours repeat each year by themselves: check your prices and opening day each spring.</p>',
+    aFr: '<p>Les jours fériés que vous touchez sont enregistrés pour cette année et l’an prochain (c’est « Cette année et l’an prochain »), donc ceux de l’an prochain sont déjà sur votre page. Une pause ajoutée avec <strong>+ Fermé une semaine ou deux</strong> se répète d’elle-même si vous cochez <strong>Chaque année</strong>. Ses dates changent chaque année (comme la fin de semaine de la fête du Travail)? Laissez <strong>Chaque année</strong> décoché et ajoutez les dates de chaque année. Votre saison et vos heures se répètent d’elles-mêmes : vérifiez vos prix et votre jour d’ouverture chaque printemps.</p>' },
   { id: 'sport-sports-words', pages: ['setup', 'edit'], over: ['description', 'features', 'indoor-good-to-know'],
     q: 'My story talks about sports or big screens', qFr: 'Mon histoire parle de sports ou de grands écrans',
     keys: ['mentions sports', 'description mentions sports', 'still mentions sports', 'big screens', 'big screen', 'description still mentions'],
@@ -63733,10 +63735,10 @@ const SPORT_TEST3_HELP_TOPICS = [
   { id: 'sport-no-bar', kinds: ['golf', 'simgolf', 'range'], pages: ['setup', 'edit'], keepHappy: true, over: ['indoor-bar', 'hh-deals', 'hh-times', 'sport-food-menu', 'sport-restaurant', 'indoor-good-to-know', 'features', 'setup-happy', 'happy-hour', 'hh-add', 'dont-have'],
     q: 'We don’t serve alcohol (a snack bar)', qFr: 'Nous ne servons pas d’alcool (un casse-croûte)',
     allOf: [['dont', 'never', 'without', 'pas', 'aucun', 'sans'], ['beer', 'alcohol', 'liquor', 'licensed', 'licence', 'license', 'wine', 'alcool', 'biere', 'permis']],
-    keys: ['we dont serve beer', 'dont serve beer', 'dont serve alcohol', 'no alcohol', 'not licensed', 'no liquor', 'no liquor licence', 'its a snack bar', 'snack bar not a bar', 'why does it say happy hour', 'happy hour not done', 'we dont have a happy hour', 'no happy hour', 'dry'],
+    keys: ['we dont serve beer', 'dont serve beer', 'dont serve alcohol', 'no alcohol', 'not licensed', 'no liquor', 'no liquor licence', 'its a snack bar', 'snack bar not a bar', 'why does it say happy hour', 'happy hour not done', 'we dont have a happy hour', 'no happy hour', 'dry', 'no beer', 'no beer or food', 'no licence', 'no license', 'pop and chips', 'only has pop', 'no real happy hour'],
     keysFr: ['pas d alcool', 'nous ne servons pas d alcool', 'pas de permis d alcool', 'pas de biere', 'casse croute', 'pas de 5 a 7', 'pourquoi 5 a 7'],
-    a: '<p>Nothing to add for drinks. Happy hour is only for a place with a bar or lounge; if a <strong>Happy hour</strong> tile shows in More about your place, tap it and choose <strong>No</strong>. Say what your snack bar has in <strong>Good to know</strong>, like <em>Snack bar with pop, coffee and ice cream</em>.</p>',
-    aFr: '<p>Rien à ajouter pour les boissons. Le 5 à 7 est seulement pour un endroit avec un bar ou un salon; si une tuile <strong>5 à 7</strong> paraît dans Plus sur votre endroit, touchez-la et choisissez <strong>Non</strong>. Dites ce que votre casse-croûte offre dans <strong>Bon à savoir</strong>, comme <em>Casse-croûte avec boissons gazeuses, café et crème glacée</em>.</p>' },
+    a: '<p>Nothing to add for drinks. Happy hour is only for a place with a bar or lounge; if a <strong>Happy hour</strong> tile shows in More about your place, tap it and choose <strong>No</strong>. Say what your snack bar has in <strong>Good to know</strong>, like <em>Clubhouse with pop and snacks (no alcohol)</em>.</p>',
+    aFr: '<p>Rien à ajouter pour les boissons. Le 5 à 7 est seulement pour un endroit avec un bar ou un salon; si une tuile <strong>5 à 7</strong> paraît dans Plus sur votre endroit, touchez-la et choisissez <strong>Non</strong>. Dites ce que votre casse-croûte offre dans <strong>Bon à savoir</strong>, comme <em>Club-house avec boissons gazeuses et grignotines (sans alcool)</em>.</p>' },
   { id: 'sport-bay-link', kinds: ['range', 'simgolf', 'golf'], pages: ['setup', 'edit'], over: ['indoor-booking', 'sport-tee-times', 'indoor-book-party', 'booking', 'reservations', 'indoor-party-button'],
     q: 'My link is for booking our simulator bay', qFr: 'Mon lien sert à réserver notre baie de simulateur',
     allOf: [['link', 'lien'], ['trackman', 'simulator', 'bay', 'bays', 'baie', 'simulateur', 'toptracer']],
@@ -63801,14 +63803,14 @@ const SPORT4_HELP_TOPICS = [
     allOf: [['closed', 'close', 'closing', 'shut', 'ferme', 'fermee', 'fermes'], ['championship', 'tournament', 'tourney', 'wedding', 'championnat', 'tournoi', 'mariage']],
     keys: ['club championship', 'championship', 'closed to the public for', 'closed to the public on', 'closed for a tournament', 'closed for the tournament', 'closed for our tournament', 'closed for an event', 'closed for a private event', 'closed for a few days', 'closed for a day', 'closed one day', 'closed for the day', 'closed that day', 'closed that week', 'closed for a week', 'closed for a wedding', 'course is closed for', 'shut for a few days', 'closed to the public'],
     keysFr: ['championnat du club', 'ferme au public', 'ferme pour un tournoi', 'ferme pour un evenement', 'ferme quelques jours', 'ferme une journee', 'ferme pour la journee'],
-    a: '<p>Use <strong>Closures and holidays</strong>: tap <strong>+ Closed for a week or two (or other dates)</strong> and pick the first and last day, like for {EVENT_EN}. Only those days show as closed, on your page and in Build My Trip. Don’t use <strong>We’re closed part of the year</strong> or closed months for it: that closes you for the whole season.</p>',
-    aFr: '<p>Utilisez <strong>Fermetures et jours fériés</strong> : touchez <strong>+ Fermé une semaine ou deux (ou d’autres dates)</strong> et choisissez le premier et le dernier jour, comme pour {EVENT_FR}. Seuls ces jours paraissent fermés, sur votre page et dans Planifier mon voyage. N’utilisez pas <strong>Nous fermons une partie de l’année</strong> ni les mois fermés pour ça : cela vous ferme pour toute la saison.</p>' },
+    a: '<p>Use <strong>Closures and holidays</strong>: tap <strong>+ Closed for a week or two (or other dates)</strong> and pick the first and last day, like for {EVENT_EN}. Only those days show as closed, on your page and in Build My Trip. Don’t use <strong>We’re closed part of the year</strong> or closed months for it: that closes you for the whole season.</p><p>The dates move each year, like Labour Day weekend? Don’t tick <strong>Every year</strong>: add this year’s dates now and next year’s when you know them. You can also say it in <strong>Good to know</strong>, like <em>Closed to the public on Labour Day weekend for our Men’s Amateur</em>.</p>',
+    aFr: '<p>Utilisez <strong>Fermetures et jours fériés</strong> : touchez <strong>+ Fermé une semaine ou deux (ou d’autres dates)</strong> et choisissez le premier et le dernier jour, comme pour {EVENT_FR}. Seuls ces jours paraissent fermés, sur votre page et dans Planifier mon voyage. N’utilisez pas <strong>Nous fermons une partie de l’année</strong> ni les mois fermés pour ça : cela vous ferme pour toute la saison.</p><p>Les dates changent chaque année, comme la fin de semaine de la fête du Travail? Ne cochez pas <strong>Chaque année</strong> : ajoutez les dates de cette année maintenant, et celles de l’an prochain quand vous les connaîtrez. Vous pouvez aussi le dire dans <strong>Bon à savoir</strong>, comme <em>Fermé au public la fin de semaine de la fête du Travail pour notre tournoi amateur</em>.</p>' },
   { id: 'sport-tax', pages: ['setup', 'edit', 'menu'], over: ['cost', 'menu-add', 'indoor-price', 'menu-change', 'indoor-extras'],
     q: 'Are prices with or without tax?', qFr: 'Les prix sont-ils avec ou sans taxes?',
     keys: ['tax', 'taxes', 'with tax', 'without tax', 'before tax', 'after tax', 'tax included', 'taxes included', 'including tax', 'tax in', 'gst', 'pst', 'hst', 'plus gst', 'plus tax', 'plus taxes', 'all our prices are plus'],
     keysFr: ['taxe', 'taxes', 'avec taxes', 'sans taxes', 'taxes incluses', 'avant taxes', 'tps', 'tvp', 'tvh'],
-    a: '<p>Type your prices the way you post them. Plus tax? Add <em>plus tax</em> in a line’s details, or one line in <strong>Good to know</strong>, like <em>All rates plus GST</em>. Your card shows the price as you typed it.</p>',
-    aFr: '<p>Inscrivez vos prix comme vous les affichez. Plus taxes? Ajoutez <em>plus taxes</em> dans les détails d’une ligne, ou une ligne dans <strong>Bon à savoir</strong>, comme <em>Tous les tarifs plus TPS</em>. Votre fiche montre le prix tel que vous l’avez inscrit.</p>' },
+    a: '<p>Prices before tax are fine: type them the way you post them. Plus GST? Say <em>+GST</em> in Your prices if you like (in a line’s details), or one line in <strong>Good to know</strong>, like <em>All rates plus GST</em>. Your card shows the price as you typed it.</p>',
+    aFr: '<p>Les prix avant taxes sont corrects. Inscrivez vos prix comme vous les affichez. Plus taxes? Ajoutez <em>plus taxes</em> dans les détails d’une ligne, ou une ligne dans <strong>Bon à savoir</strong>, comme <em>Tous les tarifs plus TPS</em>. Votre fiche montre le prix tel que vous l’avez inscrit.</p>' },
   { id: 'sport-rates-next-year', pages: ['setup', 'edit', 'menu'], over: ['menu-add', 'sport-rate-change', 'sport-rate-lines', 'menu-change', 'indoor-price', 'indoor-no-set-price'],
     q: 'Next year’s rates aren’t set yet', qFr: 'Les tarifs de l’an prochain ne sont pas encore fixés',
     keys: ['rates arent set', 'rates aren t set', 'rates are not set', 'rates not set', 'prices arent set', 'prices aren t set', 'not set yet', 'arent set yet', 'aren t set yet', 'next year s rates', 'next years rates', 'next year s prices', 'these are 2026', 'these are last year s', 'last year s rates', 'last years rates', 'last year s prices', 'old rates', 'rates for next year', '2027 rates', '2026 rates', '2028 rates', 'not out yet', 'not announced yet', 'next years rates are', 'next year s rates are', 'rates are not out'],
@@ -63985,14 +63987,19 @@ function sportResearchOpen(venue) {
   try {
     if (!venue || !sportSetupType(venue.type) || (venueLinks(venue.id) || {}).open_months) return null;
     const info = venueVisitInfo(venue.id) || {}, mine = new Set(info.owner_labels || []);
-    const texts = (info.rows || []).filter((r) => r && !mine.has(r.label) && /season|open|hours/i.test(String(r.label || ''))).map((r) => String(r.text || ''));
-    const re = new RegExp(`\\b${RESEARCH_MONTHS_RE}\\s*(\\d{1,2})?(?:st|nd|rd|th)?\\s*(?:to|–|—|-|through|until|till)\\s*${RESEARCH_MONTHS_RE}\\s*(\\d{1,2})?\\b`, 'i');
+    const texts = (info.rows || []).filter((r) => r && !mine.has(r.label) && /season|open|hours|winter|summer/i.test(String(r.label || ''))).map((r) => String(r.text || ''));
+    // Sport test 9 (2026-11-21; "mid March through the end of October" started empty): early, mid, late, the start or the
+    // end of a month count too (mid = the 15th; early or the start = the 1st; the end = its last day; late = the 25th).
+    const QUAL = '(?:(?:the\\s+)?(early|mid|middle of|late|end of|start of|beginning of)[\\s-]*)?';
+    const re = new RegExp(`\\b${QUAL}${RESEARCH_MONTHS_RE}\\s*(\\d{1,2})?(?:st|nd|rd|th)?\\s*(?:to|–|—|-|through|until|till)\\s*${QUAL}${RESEARCH_MONTHS_RE}\\s*(\\d{1,2})?\\b`, 'i');
     const MO = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'], LAST = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    const qDay = (q, mo, end) => { q = String(q || '').toLowerCase(); return /^mid/.test(q) ? 15 : /^(?:early|start|beginning)/.test(q) ? 1 : /^end/.test(q) ? LAST[mo] : /^late/.test(q) ? (end ? LAST[mo] : 25) : null; };
     for (const t of texts) {
-      const m = re.exec(t);
-      if (!m) continue;
+      const m0 = re.exec(t);
+      if (!m0) continue;
+      const m = [m0[0], m0[2], m0[3], m0[5], m0[6]];
       const a = MO.indexOf(m[1].toLowerCase()), b = MO.indexOf(m[3].toLowerCase());
-      const da = m[2] ? Number(m[2]) : 1, db = m[4] ? Number(m[4]) : LAST[b];
+      const da = m[2] ? Number(m[2]) : (qDay(m0[1], a, false) || 1), db = m[4] ? Number(m[4]) : (qDay(m0[4], b, true) || LAST[b]);
       if (a < 0 || b < 0 || da < 1 || da > LAST[a] || db < 1 || db > LAST[b] || a === b) continue;
       const md = (mo, d) => `${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       return { from: md(a, da), to: md(b, db) };
@@ -64000,6 +64007,42 @@ function sportResearchOpen(venue) {
     return null;
   } catch (e) { return null; }
 }
+// Sport test 8 (2026-11-21; Marg's village 9-hole course): a 9-hole, par-3 or executive golf course, from our checked golf
+// data, else research's own words (its name or story). Owner answers never come from here; it only picks chips and a
+// starting length she can change.
+function sportGolfNine(venue) {
+  try {
+    if (!venue || venue.type !== 'golf') return false;
+    const d = golfDetailsFor([venue]).get(`${venue.region}/${venue.slug}`);
+    const holes = d && d.profile && d.profile.holes != null ? Number(d.profile.holes) : NaN;
+    if (holes === 9) return true;
+    if (holes >= 18) return false;
+    if (d && d.profile && d.profile.course_format && /par.?3|executive|pitch/i.test(String(d.profile.course_format))) return true;
+    return /\b(?:9|nine)[- ]?holes?\b|\bpar[- ]?3\b|\bexecutive (?:course|golf)\b/i.test(`${venue.name || ''} ${venue.description || ''}`);
+  } catch (e) { return false; }
+}
+// Sport test 8: the dog follow-up's chips and example in her main kind's words. -> { chips, ex } or null (not sport).
+function sportDogChips(venue, lang = 'en') {
+  try {
+    if (!venue || !sportSetupType(venue.type)) return null;
+    const k = sportMainKind(venue) || indoorKindsModule.sportKindSuggestion(venue)[0] || '';
+    const L = (OWNER_SETUP_STRINGS[lang === 'fr' ? 'fr' : 'en'] || {}).indoor || {};
+    const chips = (L.quickSportDogs || {})[k] || (L.quickSportDogs || {})._, ex = (L.sportDogEx || {})[k] || (L.sportDogEx || {})._;
+    return chips ? { chips, ex: ex || '' } : null;
+  } catch (e) { return null; }
+}
+// Sport test 9 (2026-11-21): the rates page our golf data found on the course's own site (never a booking link). '' if none.
+function sportRatesPage(venue) {
+  try {
+    if (!venue || venue.type !== 'golf') return '';
+    const d = golfDetailsFor([venue]).get(`${venue.region}/${venue.slug}`);
+    const u = d && d.feeSet && d.feeSet.source_url ? String(d.feeSet.source_url) : '';
+    if (!/^https:\/\//i.test(u) || /chronogolf|golfnow|teeon|tee-on|lightspeed|foreup|book|reserv|tee-?times?/i.test(u)) return '';
+    const site = siteHostOfUrl(venue.website), host = siteHostOfUrl(u);
+    return site && host && (host === site || host.endsWith(`.${site}`) || site.endsWith(`.${host}`)) ? u : '';
+  } catch (e) { return ''; }
+}
+function siteHostOfUrl(u) { try { return new URL(/^https?:/i.test(String(u || '')) ? String(u) : `https://${u}`).hostname.replace(/^www\./, '').toLowerCase(); } catch (e) { return ''; } }
 function sportGtkHide(venue, lang = 'en') {
   try {
     if (!venue || !sportSetupType(venue.type)) return [];
@@ -66508,7 +66551,7 @@ const OWNER_HELP_TOPICS = [
     a: '<ul><li><strong>Check spam, junk and promotions</strong>, and search your inbox for \u201cOkanagan Roam\u201d. It can take a few minutes.</li><li><strong>Ask again:</strong> <a href="/owner/link">Email me a new link</a> with the business email we have on file. Your old link keeps working until you open the new one.</li><li><strong>Still nothing?</strong> We may not have your email, or have an old one. Open your business\u2019s page and tap <strong>Claim this listing</strong>, and we\u2019ll check it\u2019s you and send a link to the email you give us.</li></ul><p>Password reset emails work the same way: check spam first, then <a href="/owner/forgot">ask again</a>.</p>',
     aFr: '<ul><li><strong>Vérifiez les courriels indésirables et l\u2019onglet Promotions</strong>, et cherchez « Okanagan Roam » dans votre boîte de réception. Ça peut prendre quelques minutes.</li><li><strong>Redemandez-le :</strong> <a href="/fr/owner/link">Recevoir un nouveau lien</a> avec le courriel de l\u2019entreprise que nous avons au dossier. Votre ancien lien fonctionne jusqu\u2019à ce que vous ouvriez le nouveau.</li><li><strong>Toujours rien?</strong> Nous n\u2019avons peut-être pas votre courriel, ou un ancien. Ouvrez la page de votre entreprise et touchez <strong>Réclamer cette fiche</strong> : nous vérifierons que c\u2019est bien vous et enverrons un lien au courriel que vous nous donnerez.</li></ul><p>Les courriels de réinitialisation du mot de passe fonctionnent de la même façon : vérifiez d\u2019abord les indésirables, puis <a href="/fr/owner/forgot">redemandez-le</a>.</p>' },
   { id: 'staff', over: ['signin', 'login-create'], q: 'Can my staff or a partner log in too?', qFr: 'Mon personnel ou un associé peut-il se connecter aussi?', pages: ['account', 'edit', 'login', 'settings'],
-    keys: ['staff', 'my staff', 'staff log in', 'staff login', 'staff sign in', 'employee', 'employees', 'employees log in', 'my manager', 'partner', 'business partner', 'co owner', 'coowner', 'second person', 'two people', '2 people', '2 logins', 'another person', 'someone else', 'colleague', 'my team', 'share access', 'share the login', 'two logins', 'second login', 'more than one person', 'add user', 'add a user', 'add a person', 'add someone', 'same login'],
+    keys: ['staff', 'my staff', 'staff log in', 'staff login', 'staff sign in', 'employee', 'employees', 'employees log in', 'my manager', 'partner', 'business partner', 'co owner', 'coowner', 'second person', 'two people', '2 people', '2 logins', 'another person', 'someone else', 'colleague', 'my team', 'share access', 'share the login', 'two logins', 'second login', 'more than one person', 'add user', 'add a user', 'add a person', 'add someone', 'same login', 'also log in', 'log in too', 'also sign in', 'his own login', 'her own login', 'head pro also'],
     keysFr: ['employe', 'employes', 'mon personnel', 'personnel', 'mon equipe', 'equipe', 'gerant', 'gerante', 'associe', 'associee', 'partenaire', 'deux personnes', 'une autre personne', 'quelqu un d autre', 'collegue', 'partager l acces', 'deuxieme compte', 'ajouter un utilisateur', 'ajouter une personne', 'plusieurs personnes', 'meme compte'],
     a: '<p>Yes. Each person can have their <strong>own login</strong> for the same listing:</p><ol><li>Send them your private edit link, privately (by text or email).</li><li>They open it and use <strong>Create a login</strong> with <strong>their own</strong> email and a password (already signed in? they tap <strong>Add to my login</strong>).</li><li>From then on they sign in at <a href="/owner/login">Business login</a> and find the listing in <strong>My listings</strong>.</li></ol><p>Please don’t share one password between people. Everyone already on the listing gets an email when a new login is added. Signed in, <strong>People with access</strong> on your edit page shows who can update it: you can remove anyone added after you; for someone added before you, <strong>Message us</strong>. Lost the edit link? <a href="/owner/link">Email me a new link</a>, or they can tap <strong>Claim this listing</strong> on your page.</p>',
     aFr: '<p>Oui. Chaque personne peut avoir <strong>son propre compte</strong> pour la même fiche :</p><ol><li>Envoyez-lui votre lien de modification privé, en privé (par texto ou par courriel).</li><li>Elle l’ouvre et utilise <strong>Créer un compte</strong> avec <strong>son propre</strong> courriel et un mot de passe (si son compte est déjà ouvert, elle touche <strong>Ajouter à mon compte</strong>).</li><li>Ensuite, elle se connecte à l’<a href="/fr/owner/login">Espace entreprises</a> et trouve la fiche dans <strong>Mes fiches</strong>.</li></ol><p>Évitez de partager un même mot de passe entre plusieurs personnes. Toutes les personnes déjà sur la fiche reçoivent un courriel quand un compte s’ajoute. Avec votre compte, <strong>Personnes ayant accès</strong>, sur votre page de modification, montre qui peut la modifier : vous pouvez retirer toute personne ajoutée après vous; pour quelqu’un ajouté avant vous, <strong>écrivez-nous</strong>. Lien perdu? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou la personne peut toucher <strong>Réclamer cette fiche</strong> sur votre page.</p>' },
@@ -66743,11 +66786,11 @@ const OWNER_HELP_TOPICS = [
   // French pass 6 (2026-10-19): a phone number of its own ("changer mon numéro de téléphone" got the links answer).
   { id: 'phone', over: ['links'], q: 'Change our phone number', qFr: 'Changer notre numéro de téléphone', pages: ['edit'],
     keys: ['phone', 'phone number', 'telephone', 'change phone', 'change my phone', 'change our phone', 'change the phone', 'change my phone number', 'change our phone number',
-      'new phone', 'new phone number', 'new number', 'cell number'],
+      'new phone', 'new phone number', 'new number', 'cell number', 'extension', 'phone extension', 'the extension', 'press 1'],
     keysFr: ['telephone', 'numero de telephone', 'numero', 'changer mon numero', 'changer le numero', 'changer notre numero', 'modifier le numero', 'modifier mon numero', 'nouveau numero',
-      'numero de cellulaire', 'cellulaire'],
-    a: '<ol><li>{ON}, find <strong>Contact</strong>, just under the hours.</li><li>Type the new number in <strong>Phone</strong>, area code first (for example 250-555-0123).</li><li>Tap {SEND}.</li></ol><p>{LIVE}</p><p>The number is the <strong>Call</strong> button on your page. Wrong on Google too? Google Maps shows your Google Business Profile, which you change at <a href="https://business.google.com" target="_blank" rel="noopener">business.google.com</a>.</p>',
-    aFr: '<ol><li>{ON}, repérez <strong>Coordonnées</strong>, juste sous les heures.</li><li>Entrez le nouveau numéro dans <strong>Téléphone</strong>, avec l’indicatif régional (par exemple 250-555-0123).</li><li>Touchez {SEND}.</li></ol><p>{LIVE}</p><p>Ce numéro est le bouton <strong>Appeler</strong> de votre page. Il est aussi erroné sur Google? Google Maps affiche votre profil d’entreprise Google, que vous modifiez à <a href="https://business.google.com" target="_blank" rel="noopener">business.google.com</a>.</p>' },
+      'numero de cellulaire', 'cellulaire', 'poste', 'numero de poste'],
+    a: '<ol><li>{ON}, find <strong>Contact</strong>, just under the hours.</li><li>Type the new number in <strong>Phone</strong>, area code first (for example 250-555-0123). An extension? Type it after the number, like 250-555-0123 ext. 1: the Call button dials it.</li><li>Tap {SEND}.</li></ol><p>{LIVE}</p><p>The number is the <strong>Call</strong> button on your page. Wrong on Google too? Google Maps shows your Google Business Profile, which you change at <a href="https://business.google.com" target="_blank" rel="noopener">business.google.com</a>.</p>',
+    aFr: '<ol><li>{ON}, repérez <strong>Coordonnées</strong>, juste sous les heures.</li><li>Entrez le nouveau numéro dans <strong>Téléphone</strong>, avec l’indicatif régional (par exemple 250-555-0123). Un poste? Écrivez-le après le numéro, comme 250-555-0123 poste 1 : le bouton Appeler le compose.</li><li>Touchez {SEND}.</li></ol><p>{LIVE}</p><p>Ce numéro est le bouton <strong>Appeler</strong> de votre page. Il est aussi erroné sur Google? Google Maps affiche votre profil d’entreprise Google, que vous modifiez à <a href="https://business.google.com" target="_blank" rel="noopener">business.google.com</a>.</p>' },
   // Help bot v2 (2026-10-18): name and address changes are always reviewed, even for signed-in owners.
   { id: 'name-address', over: ['links'], q: 'Change our business name or address', qFr: 'Changer le nom ou l\u2019adresse de l\u2019entreprise', pages: ['edit'],
     keys: ['address', 'change address', 'change the address', 'change our address', 'change my address', 'update address', 'new address', 'wrong address', 'street address', 'moved', 'we moved', 'new location', 'relocated', 'moving',
@@ -67135,7 +67178,8 @@ const OWNER_HELP_UI = {
     inputLabel: 'Type your question', placeholder: 'Type your question\u2026', ask: 'Ask',
     greet: '<p>Hi! I can help with your listing: photos, hours, events, menus, logins and links. Tap a topic or type your question.</p>',
     more: '<p>Did that help? Pick another topic, type a question, or message us.</p>',
-    unsure: '<p>I\u2019m not sure \u2014 tap <strong>Message us</strong> and Dayton will reply.</p><p>Or is it one of these?</p>',
+    unsure: '<p>I\u2019m not sure about that one, so I won\u2019t guess. Tap <strong>Ask us</strong> and your question goes to Dayton just as you typed it, with your listing and this screen. He replies by email.</p><p>Or is it one of these?</p>',
+    askUs: 'Ask us', asking: 'Sending\u2026', askSent: '<p><strong>Sent \u2014 we\u2019ll reply by email</strong>, usually within a day.</p>', askEmail: 'Your email, so Dayton can reply:', askSend: 'Send my question',
     seeErr: '<p>I can see this message on your page:</p>', other: '<p>Something else? Pick a topic or type a question.</p>',
     human: 'Message us',
     contactIntro: 'Tell us what\u2019s wrong and we\u2019ll reply by email, usually within a day. We\u2019ll see which listing and page you\u2019re on.',
@@ -67149,7 +67193,8 @@ const OWNER_HELP_UI = {
     inputLabel: 'Tapez votre question', placeholder: 'Tapez votre question\u2026', ask: 'Demander',
     greet: '<p>Bonjour! Je peux vous aider avec votre fiche : photos, heures, événements, menus, connexion et liens. Touchez un sujet ou tapez votre question.</p>',
     more: '<p>Est-ce que ça vous aide? Choisissez un autre sujet, tapez une question ou écrivez-nous.</p>',
-    unsure: '<p>Je ne suis pas certain \u2014 touchez <strong>Écrivez-nous</strong> et Dayton vous répondra.</p><p>Ou est-ce l\u2019un de ces sujets?</p>',
+    unsure: '<p>Je ne suis pas certain pour celle-là, alors je préfère ne pas deviner. Touchez <strong>Demandez-nous</strong> : votre question part chez Dayton telle que vous l\u2019avez écrite, avec votre fiche et cet écran. Il vous répond par courriel.</p><p>Ou est-ce l\u2019un de ces sujets?</p>',
+    askUs: 'Demandez-nous', asking: 'Envoi\u2026', askSent: '<p><strong>Envoyé \u2014 nous vous répondrons par courriel</strong>, en général d\u2019ici un jour.</p>', askEmail: 'Votre courriel, pour que Dayton vous réponde :', askSend: 'Envoyer ma question',
     seeErr: '<p>Je vois ce message sur votre page :</p>', other: '<p>Autre chose? Choisissez un sujet ou tapez une question.</p>',
     human: 'Écrivez-nous',
     contactIntro: 'Dites-nous ce qui ne va pas et nous vous répondrons par courriel, en général d\u2019ici un jour, en français ou en anglais. Nous verrons la fiche et la page où vous êtes.',
@@ -67225,8 +67270,10 @@ const OWNER_HELP_SCRIPT = String.raw`
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function scroll(){ log.scrollTop = log.scrollHeight; }
   function say(html, cls){ var d = document.createElement('div'); d.className = 'ohb-msg ' + (cls || 'ohb-bot'); if (!cls || cls.indexOf('ohb-bot') === 0) d.lang = curLang; d.innerHTML = html; log.appendChild(d); scroll(); return d; }
-  function chips(ids, human){
+  function chips(ids, human, askQ){
     var d = document.createElement('div'); d.className = 'ohb-chips';
+    // Sport tests 8 and 9 (2026-11-21; Dayton): when Help isn't sure, "Ask us" sends her exact question to Dayton.
+    if (askQ) { var aq = document.createElement('button'); aq.type = 'button'; aq.className = 'ohb-chip ohb-human ohb-ask'; aq.textContent = ui('askUs'); aq.addEventListener('click', function(){ askUs(askQ, d); }); d.appendChild(aq); }
     ids.forEach(function(id){ var t = byId[id]; if (!t || (cfg.noChip || []).indexOf(id) >= 0) return; var label = curLang === 'fr' ? t.qFr : t.q; var b = document.createElement('button'); b.type = 'button'; b.className = 'ohb-chip'; b.textContent = label; b.addEventListener('click', function(){ answer(id, label); }); d.appendChild(b); });
     if (human !== false) { var h = document.createElement('button'); h.type = 'button'; h.className = 'ohb-chip ohb-human'; h.textContent = ui('human'); h.addEventListener('click', contact); d.appendChild(h); }
     log.appendChild(d); scroll();
@@ -67418,11 +67465,13 @@ const OWNER_HELP_SCRIPT = String.raw`
       if (!gate[k.i] || (bare[k.i] && k.kt.length === 1) || k.kt.filter(function(w){ return !STOP[w]; }).length < 3) return;
       if (keyScore(k.kt, qt) >= 3 * k.kt.length * 0.9) longSide = true;
     });
+    var kmax = T.map(function(){ return 0; }), kw2 = T.map(function(){ return {}; }), grp = T.map(function(){ return 0; });
     KEYS.forEach(function(k){
       if (!gate[k.i] || (bare[k.i] && k.kt.length === 1)) return;
       var s = keyScore(k.kt, qt); if (!s) return;
       if (!exact[k.i] && (k.fr === qFr || keyIn(k.kt, qt))) exact[k.i] = true;
-      if (s < 0) s = -s; else side[k.i] = Math.max(side[k.i], s);
+      if (s < 0) s = -s; else { side[k.i] = Math.max(side[k.i], s); var kn = k.kt.filter(function(w){ return !STOP[w]; }).length; if (kn > kmax[k.i]) kmax[k.i] = kn; }
+      k.kt.forEach(function(w){ if (!STOP[w]) kw2[k.i][w] = 1; });
       sums[k.i] += s;
     });
     // Tour test 17 (Whistler, 2026-11-18; Sarah: "eagle float is winter only, rafting is summer"): a topic with allOf
@@ -67436,6 +67485,7 @@ const OWNER_HELP_SCRIPT = String.raw`
       // Sport test 7 (cfg.cover, sport and golf places): word groups that meet are worth what they cover. Two topics whose
       // groups both meet in "league nights … public can't play till 6" are told apart by how much of the question each one's
       // words take in (a covered word 3), on top of 20, so the loosest pair of groups no longer wins by default.
+      if (all || any) grp[i] = all ? 2 : 1;
       if (cfg.cover && (all || any)) {
         var gw = [].concat(t.allOf || [], t.allOf2 || [], [].concat.apply([], t.allOfAny || [])).reduce(function(a, g){ return a.concat(g); }, []);
         var kw = {}; KEYS.forEach(function(k){ if (k.i === i) k.kt.forEach(function(w){ kw[w] = 1; }); });
@@ -67466,11 +67516,22 @@ const OWNER_HELP_SCRIPT = String.raw`
     var sure = !!top && top.s >= 3 && top.e
       && !(next && top.s < 6 && next.s + next.b >= top.s + top.b && !refines(top, next))
       && !(top.s < 6 && unknownWords(qt) >= 2);
-    if (!sure && ts) {
-      var tr = T.map(function(t, i){ return { i: i, v: gate[i] ? ts[i] : 0 }; }).sort(function(a, b){ return b.v - a.v; });
-      if (tr[0].v >= 9 && tr[0].v >= tr[1].v * 1.35) return { id: T[tr[0].i].id, hits: [T[tr[0].i].id].concat(scored.map(function(x){ return x.id; }).filter(function(x){ return x !== T[tr[0].i].id; })), lang: langOf(q) };
+    // Sport tests 8 and 9 (2026-11-21; Dayton: "Ask us" when Help isn't sure): a long question that shares only one common
+    // word with the answer it would get ("my husband took these on his phone last summer" -> summer hours) is not sure.
+    // How much a word says is how few topics could stand on it; a question of five or more words needs more than that.
+    var askLow = false;
+    if (sure && cfg.cover && cfg.askUs !== false) {
+      var evT = evOf(qt, T.indexOf(byIdM[top.id])), conf = evT.reduce(function(a, e){ return a + Math.log(T.length / Math.max(1, e[1])); }, 0);
+      var uq = {}; qt.forEach(function(w){ if (w.length > 2 && !STOP[w]) uq[w] = 1; });
+      // (A key of two or more real words side by side, like « 5 à 7 », is an intent of its own.)
+      if (conf < 2.6 && Object.keys(uq).length >= 5 && kmax[T.indexOf(byIdM[top.id])] < 2) { sure = false; askLow = true; }
     }
-    return { id: sure ? top.id : null, hits: scored.map(function(x){ return x.id; }), lang: langOf(q) };
+    if (!sure && ts && !askLow) {
+      var tr = T.map(function(t, i){ return { i: i, v: gate[i] ? ts[i] : 0 }; }).sort(function(a, b){ return b.v - a.v; });
+      if (tr[0].v >= 9 && tr[0].v >= tr[1].v * 1.35) return { id: T[tr[0].i].id, hits: [T[tr[0].i].id].concat(scored.map(function(x){ return x.id; }).filter(function(x){ return x !== T[tr[0].i].id; })), lang: langOf(q), why: [{ id: T[tr[0].i].id, text: 1, ts: tr[0].v, ts2: tr[1].v }] };
+    }
+    var why = function(x){ if (!x) return null; var i = T.indexOf(byIdM[x.id]); return { id: x.id, s: x.s, kmax: kmax[i], kw: Object.keys(kw2[i]).length, grp: grp[i], ts: ts ? ts[i] : 0, ev: evOf(qt, i) }; };
+    return { id: sure ? top.id : null, hits: scored.map(function(x){ return x.id; }), lang: langOf(q), why: [why(top), why(next), { rel: !!(top && next && (refines(top, next) || refines(next, top))), b: top ? top.b : 0, nb: next ? next.b : 0, unk: unknownWords(qt), nq: qt.filter(function(w){ return w.length > 2 && !STOP[w]; }).length }] };
   }
   var TXT = null;
   function plainWords(h){ return toks(String(h || '').replace(/<[^>]+>/g, ' ')).filter(function(w){ return w.length >= 4 && !STOP[w] && !/^\d+$/.test(w); }).map(stemOf); }
@@ -67494,6 +67555,22 @@ const OWNER_HELP_SCRIPT = String.raw`
       return s;
     });
   }
+  // Which of the question's own words a topic can stand on (its key words, its word groups), each with how many topics
+  // could stand on it (a word every second topic has says little about which one is meant).
+  var EVK = null;
+  function evInit(){
+    EVK = T.map(function(t, i){ var o = { w: {}, g: [] }; KEYS.forEach(function(k){ if (k.i === i) k.kt.forEach(function(w){ if (!STOP[w] && w.length > 2) o.w[w] = 1; }); });
+      [].concat(t.allOf || [], t.allOf2 || [], [].concat.apply([], t.allOfAny || [])).forEach(function(g){ g.forEach(function(w){ if (w.indexOf(' ') < 0 && w.length > 2) o.g.push(w); }); }); return o; });
+  }
+  function canStand(i, x){ var o = EVK[i]; if (o.w[x]) return true; for (var j = 0; j < o.g.length; j++) if (x.indexOf(o.g[j]) === 0) return true; for (var w in o.w) if (sameWord(x, w)) return true; return false; }
+  var DFM = {};
+  function dfOf(x){ if (x in DFM) return DFM[x]; var n = 0; for (var i = 0; i < T.length; i++) if (canStand(i, x)) n++; return (DFM[x] = n); }
+  function evOf(qt, i){
+    if (!EVK) evInit();
+    var seen = {}, out = [];
+    qt.forEach(function(x){ if (x.length < 3 || STOP[x] || seen[x]) return; seen[x] = 1; if (canStand(i, x)) out.push([x, dfOf(x)]); });
+    return out;
+  }
   function match(q){ return best(q).hits; }
   function ask(q){
     q = String(q || '').trim(); if (!q) return;
@@ -67502,7 +67579,7 @@ const OWNER_HELP_SCRIPT = String.raw`
       say(esc(q), 'ohb-me');
       say(ui('unsure'), 'ohb-bot ohb-unsure');
       var seen = {}, sugg = r.hits.concat(cfg.start || []).filter(function(x){ if (seen[x] || !byId[x]) return false; seen[x] = 1; return true; }).slice(0, 3);
-      chips(sugg);
+      chips(sugg, true, q);
       return;
     }
     answer(r.id, q, r.hits.slice(1, 3));
@@ -67526,6 +67603,41 @@ const OWNER_HELP_SCRIPT = String.raw`
     }
     say(ui('greet'));
     chips(cfg.start || []);
+  }
+  // "Ask us": the question as typed, the page and the screen (the part of the address after #) go to the Message us
+  // channel; the server works out the listing and groups one visit's questions into one email. No email on file and not
+  // signed in: she adds hers once, and it's kept for the rest of the visit.
+  var visitId = Date.now(), askMail = '';
+  function askUs(q, row){
+    var lang = curLang, btn0 = row && row.querySelector ? row.querySelector('.ohb-ask') : null;
+    if (btn0) { btn0.disabled = true; btn0.textContent = ui('asking', lang); }
+    var post = function(mail, done){
+      fetch('/owner/help', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+        body: JSON.stringify({ message: q, email: mail || null, path: location.pathname, page: cfg.page || '', screen: String(location.hash || '').slice(0, 60), ask: true, visit: visitId, lang: lang, company_website: '' }) })
+        .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return { ok: r.ok, j: j }; }); })
+        .then(function(x){ done(x.ok && x.j && x.j.ok, x.j && x.j.error); })
+        .catch(function(){ done(false, null, true); });
+    };
+    var sent = function(){ if (row && row.parentNode) row.parentNode.removeChild(row); say(ui('askSent', lang)); };
+    var needMail = function(err){
+      if (btn0 && btn0.parentNode) btn0.parentNode.removeChild(btn0);
+      var d = say('<form class="ohb-contact" novalidate><label for="ohbAskMail' + visitId + '">' + esc(ui('askEmail', lang)) + '</label><input id="ohbAskMail' + visitId + '" type="email" autocomplete="email" maxlength="200"><button type="submit" class="ohb-send">' + esc(ui('askSend', lang)) + '</button><div class="ohb-err" role="alert"></div></form>');
+      var f = d.querySelector('form'), em = d.querySelector('input'), errEl = d.querySelector('.ohb-err'), sb = d.querySelector('.ohb-send');
+      if (err) errEl.textContent = err;
+      setTimeout(function(){ try { em.focus(); } catch (e) {} }, 50);
+      f.addEventListener('submit', function(e){
+        e.preventDefault(); var m = em.value.trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m)) { errEl.textContent = ui('errEmail', lang); em.focus(); return; }
+        sb.disabled = true; sb.textContent = ui('asking', lang);
+        post(m, function(ok, er, net){ if (ok) { askMail = m; d.parentNode && d.parentNode.removeChild(d); sent(); return; } sb.disabled = false; sb.textContent = ui('askSend', lang); errEl.textContent = net ? ui('errNet', lang) : (ui('srv', lang) || {})[er] || er || ui('errSend', lang); });
+      });
+    };
+    post(askMail, function(ok, er, net){
+      if (ok) return sent();
+      if (!net && er === 'Please add your email so we can reply.') return needMail('');
+      if (btn0) { btn0.disabled = false; btn0.textContent = ui('askUs', lang); }
+      say('<p>' + esc(net ? ui('errNet', lang) : (ui('srv', lang) || {})[er] || er || ui('errSend', lang)) + '</p>', 'ohb-bot ohb-alert');
+    });
   }
   function contact(){
     say(esc(ui('human')), 'ohb-me');
@@ -67677,7 +67789,14 @@ function ownerHelpWidgetHtml(page, opts = {}) {
   // Tours (2026-11-16): no happy hour at all, so its topics aren't there to be found either.
   if (opts.dropHappyHour) cfg.topics = cfg.topics.filter((t) => !HELP_HAPPY_RE.test(`${t.q} ${t.qFr}`));
   // Sport test 7: a sport or golf place's topics carry their concept groups (sport-help.js CONCEPTS; the matcher's allOfAny).
-  try { const pv0 = opts.venueId ? getVenue(opts.venueId) : null; if (pv0 && sportSetupType(pv0.type)) { const C0 = sport5HelpModule.CONCEPTS || {}; cfg.cover = true; cfg.coverAdd = 0.5; const N0 = sport5HelpModule.NOT_IF || {}; cfg.topics = cfg.topics.map((t) => (C0[t.id] ? { ...t, allOfAny: (t.allOfAny || []).concat(C0[t.id]) } : t)).map((t) => (N0[t.id] ? { ...t, notIf: (t.notIf || []).concat(N0[t.id]) } : t)); } } catch (e) { /* as they are */ }
+  try { const pv0 = opts.venueId ? getVenue(opts.venueId) : null; if (pv0 && sportSetupType(pv0.type)) { const C0 = sport5HelpModule.CONCEPTS || {}; cfg.cover = true; cfg.coverAdd = 0.5; const N0 = sport5HelpModule.NOT_IF || {}; cfg.topics = cfg.topics.map((t) => (C0[t.id] ? { ...t, allOfAny: (t.allOfAny || []).concat(C0[t.id]) } : t)).map((t) => (N0[t.id] ? { ...t, notIf: (t.notIf || []).concat(N0[t.id]) } : t));
+    // Sport test 8 (2026-11-21): a walk-on or 9-hole course's answers name its own Good to know chips, never "Tee times
+    // recommended" (the chip it isn't offered).
+    if (pv0.type === 'golf') { const bk = venueIndoorInfo(pv0.id).book || '';
+      if (bk === 'no' || sportGolfNine(pv0)) { const sw = (x, pairs) => (typeof x === 'string' ? pairs.reduce((acc, [a, b]) => acc.replace(new RegExp(a.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '[ \u00a0\u202f]'), 'g'), () => b), x) : x);
+        const en = bk === 'no' ? [['“Tee times recommended”', '“Walk-ons only: no tee times”'], ['“Pro shop”', '“Pull carts only”'], ['<em>Tee times recommended; walk-ons when there’s room</em>', '<em>Walk-ons only: no tee times</em>']] : [['“Pro shop”', '“Pull carts only”']];
+        const fr = bk === 'no' ? [['« Heures de départ conseillées »', '« Sans réservation seulement : pas d’heures de départ »'], ['« Boutique du pro »', '« Chariots à tirer seulement »'], ['<em>Heures de départ conseillées; sans réservation s’il y a de la place</em>', '<em>Sans réservation seulement : pas d’heures de départ</em>']] : [['« Boutique du pro »', '« Chariots à tirer seulement »']];
+        cfg.topics = cfg.topics.map((t) => ({ ...t, a: sw(t.a, en), aFr: sw(t.aFr, fr.map(([a, b]) => [a, frSpacingHtml(b)])) })); } } } } catch (e) { /* as they are */ }
   // Indoor test 4 (2026-11-19): topics a kind of place never has (an indoor place's restaurant "Price range").
   if (Array.isArray(opts.dropTopics) && opts.dropTopics.length) cfg.topics = cfg.topics.filter((t) => !opts.dropTopics.includes(t.id)).map((t) => ({ ...t, over: (t.over || []).filter((x) => !opts.dropTopics.includes(x)), noRelated: (t.noRelated || []).filter((x) => !opts.dropTopics.includes(x)) }));
   // Tour test 4 (Whistler, 2026-11-17): a tour has price lists, not menus ("new photos and menus wait for us to check").
@@ -67730,26 +67849,86 @@ function ownerHelpRateLimited(ip, now = Date.now()) {
   if (ownerHelpAttempts.size > 5000) for (const [k, t] of ownerHelpAttempts) if (!t.some((x) => now - x < 60 * 60 * 1000)) ownerHelpAttempts.delete(k);
   return recent.length > OWNER_HELP_RATE_LIMIT;
 }
+// "Ask us" (sport tests 8 and 9, 2026-11-21): a few questions in one visit are normal, so its own, roomier limit.
+const OWNER_ASK_RATE_LIMIT = 20;
+const ownerAskAttempts = new Map();
+function ownerAskRateLimited(ip, now = Date.now()) {
+  const recent = (ownerAskAttempts.get(ip) || []).filter((t) => now - t < 60 * 60 * 1000);
+  recent.push(now);
+  ownerAskAttempts.set(ip, recent);
+  if (ownerAskAttempts.size > 5000) for (const [k, t] of ownerAskAttempts) if (!t.some((x) => now - x < 60 * 60 * 1000)) ownerAskAttempts.delete(k);
+  return recent.length > OWNER_ASK_RATE_LIMIT;
+}
+// One visit's "Ask us" questions go to Dayton as one email: the first starts a short wait, and the ones asked in the
+// next few minutes join it (each is also in the server log, so a restart before the email loses no question).
+const OWNER_ASK_WAIT_MS = 3 * 60 * 1000;
+const ownerAskPending = new Map();
+function ownerAskQueue(a) {
+  const key = `${a.venues.map((v) => v.id).join(',') || 'none'}|${a.replyTo}|${a.visit}`;
+  console.log(`[owner-ask] ${a.venues.map((v) => `#${v.id}`).join(',') || 'no listing'} ${a.page}${a.screen}: ${a.question.slice(0, 300)}`);
+  const cur = ownerAskPending.get(key);
+  const item = { question: a.question, page: a.page, screen: a.screen, at: new Date().toISOString() };
+  if (cur) { cur.items.push(item); return key; }
+  const entry = { ...a, items: [item] };
+  ownerAskPending.set(key, entry);
+  entry.timer = setTimeout(() => { sendOwnerAsksNow(key); }, OWNER_ASK_WAIT_MS);
+  if (entry.timer && typeof entry.timer.unref === 'function') entry.timer.unref();
+  return key;
+}
+// Sends the waiting questions now (the timer's job; tests call it with no key to send them all). -> how many emails.
+async function sendOwnerAsksNow(key) {
+  const keys = key ? [key] : [...ownerAskPending.keys()];
+  let n = 0;
+  for (const k of keys) {
+    const e = ownerAskPending.get(k);
+    if (!e) continue;
+    ownerAskPending.delete(k);
+    if (e.timer) clearTimeout(e.timer);
+    const name = e.venues.length === 1 ? e.venues[0].name : (e.account ? e.account.email : 'A business owner');
+    const fields = {
+      _subject: `[OWNER HELP] ${name}: Help wasn’t sure (${e.items.length === 1 ? '1 question' : `${e.items.length} questions`})`,
+      _template: 'table', _captcha: 'false',
+      'What happened': 'They typed a question Help wasn’t sure about and tapped “Ask us”. Reply by email; if the answer belongs in Help, add it there too.',
+      'Questions': e.items.map((x, i) => `${e.items.length > 1 ? `${i + 1}. ` : ''}“${x.question}” (on ${x.page}${x.screen ? ` ${x.screen}` : ''})`).join('\n'),
+      'Reply to': e.replyTo || 'not given',
+      'Signed in': e.account ? `yes, as ${e.account.email}` : 'no',
+      'Listing': e.listing,
+      'Page': `https://okanaganroam.com${e.path}`,
+    };
+    if (e.lang === 'fr') fields['Language'] = 'French (they used the help bot in French)';
+    const text = Object.entries(fields).filter(([f]) => !f.startsWith('_')).map(([f, v]) => `${f}: ${v}`).join('\n\n');
+    try {
+      const direct = ownerDirectEmail();
+      let sent = false;
+      if (direct) { try { await direct({ to: INFO_CONTACT_EMAIL, subject: fields._subject, text, replyTo: e.replyTo || undefined }); sent = true; } catch (err) { console.error(`[owner-ask] email to info@ failed: ${String((err && err.message) || err).slice(0, 300)}`); } }
+      if (!sent) await venueSubmissionTransport(fields);
+      n++;
+    } catch (err) { console.error(`[owner-ask] could not send: ${String((err && err.message) || err).slice(0, 300)}`); }
+  }
+  return n;
+}
 async function handleOwnerHelpMessage(req, res) {
   if (!isSameOriginSubmission(req)) return sendSubmissionResponse(res, 403, { ok: false, error: 'Please use the Okanagan Roam website.' });
   if (!/^application\/json\b/i.test(String(req.headers['content-type'] || ''))) return sendSubmissionResponse(res, 415, { ok: false, error: 'Please try again.' });
   let body;
   try { body = await readLimitedJsonBody(req, 8192); } catch (err) { return sendSubmissionResponse(res, 400, { ok: false, error: 'Please try again.' }); }
-  const keys = ['message', 'email', 'path', 'page', 'page_error', 'started_at', 'lang', 'company_website'];
+  const keys = ['message', 'email', 'path', 'page', 'page_error', 'started_at', 'lang', 'company_website', 'ask', 'visit', 'screen'];
   if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => !keys.includes(k))) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please try again.' });
   if (body.company_website) return sendSubmissionResponse(res, 200, { ok: true });
   const clean = (v, max) => String(v == null ? '' : v).replace(/[<>]/g, '').trim().slice(0, max);
   const message = clean(body.message, 1500);
-  if (message.length < 5) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please tell us a little about the problem.' });
-  if (ownerHelpRateLimited(requestClientIp(req))) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many messages. Please email info@okanaganroam.com instead.' });
+  // Sport tests 8 and 9 (2026-11-21): "Ask us" sends the question Help wasn't sure about, exactly as typed (a short one too).
+  const isAsk = body.ask === true;
+  if (message.length < (isAsk ? 2 : 5)) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please tell us a little about the problem.' });
+  if (isAsk ? ownerAskRateLimited(requestClientIp(req)) : ownerHelpRateLimited(requestClientIp(req))) return sendSubmissionResponse(res, 429, { ok: false, error: 'Too many messages. Please email info@okanaganroam.com instead.' });
   // A French portal page (/fr/owner/...) names the same listing as its English address (2026-10-18).
   const path = clean(body.path, 300).replace(/^\/fr(?=\/owner\/)/, '');
   const account = ownerAccountForRequest(req);
-  let venues = [];
+  let venues = [], linkEmail = '';
   const tokenMatch = /^\/owner\/([A-Za-z0-9_-]+)/.exec(path);
   if (tokenMatch && OWNER_TOKEN_RE.test(tokenMatch[1])) {
     const found = venueForOwnerToken(tokenMatch[1]);
-    if (found) venues = [found.venue];
+    if (found) { venues = [found.venue]; linkEmail = found.contactEmail || ''; }
   }
   const accountVenue = /^\/owner\/account\/venue\/(\d+)/.exec(path);
   if (!venues.length && account && accountVenue) {
@@ -67763,9 +67942,15 @@ async function handleOwnerHelpMessage(req, res) {
     if (found && !found.redirect_to) venues = [found];
   }
   if (!venues.length && account) venues = ownerAccountVenues(account.id);
-  const replyTo = account ? account.email : clean(body.email, 200);
+  // An "Ask us" from the private edit link replies to the email that link was sent to, so she needn't type it.
+  const replyTo = account ? account.email : (clean(body.email, 200) || (isAsk && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(linkEmail) ? linkEmail : ''));
   if (!account && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(replyTo)) return sendSubmissionResponse(res, 400, { ok: false, error: 'Please add your email so we can reply.' });
   const listing = venues.length ? venues.map((v) => `${v.name} (venue #${v.id}) ${venueListingUrl(v)}`).join('\n') : 'Not known (they were not on a listing page and not signed in).';
+  if (isAsk) {
+    ownerAskQueue({ venues, replyTo, account, visit: String(Number(body.visit) || 0), lang: body.lang === 'fr' ? 'fr' : 'en', listing,
+      page: clean(body.page, 20) || 'unknown', screen: clean(body.screen, 60).replace(/[^#A-Za-z0-9:_-]/g, ''), path: path.replace(/^\/owner\/[A-Za-z0-9_-]{32}/, '/owner/<edit link>'), question: message });
+    return sendSubmissionResponse(res, 200, { ok: true });
+  }
   const fields = {
     _subject: `[OWNER HELP] ${venues.length === 1 ? venues[0].name : (account ? account.email : 'A business owner')} needs a hand`,
     _template: 'table',
@@ -72167,10 +72352,26 @@ function ownerBadgeSnippet(venue) {
   const url = venueListingUrl(venue);
   return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" title="${escapeHtml(`${venue.name} on Okanagan Roam`)}"><img src="${OWNER_BADGE_SRC}" alt="Featured on Okanagan Roam" width="240" height="72" style="border:0"></a>`;
 }
+// Sport test 8 (2026-11-21; round 7 #15: "a photo of the main entrance" for a golf course): the arrival tile in the main
+// kind's words. -> [title, sub]
+function sportArrivalWords(venue, fr) {
+  let k = '';
+  try { k = sportMainKind(venue) || ''; } catch (e) { /* the building words */ }
+  const W = {
+    golf: [['Help people find the clubhouse', 'A photo of the clubhouse or the first tee, on your phone'], ['Aidez les gens à trouver le club-house', 'Une photo du club-house ou du premier départ, avec votre téléphone']],
+    discgolf: [['Help people find the first tee', 'A photo of the first tee or the course sign, on your phone'], ['Aidez les gens à trouver le premier départ', 'Une photo du premier départ ou de l’affiche du parcours, avec votre téléphone']],
+    range: [['Help people find the way in', 'A photo of the entrance or the sign by the road, on your phone'], ['Aidez les gens à trouver l’entrée', 'Une photo de l’entrée ou de l’affiche au bord de la route, avec votre téléphone']],
+  };
+  const out = { skatepark: W.range, bike: W.range, courts: W.range, swim: W.range }[k] || W[k] || [['Help people find your door', 'A photo of the main entrance, taken outside on your phone'], ['Aidez les gens à trouver votre porte', 'Une photo de l’entrée principale, prise dehors avec votre téléphone']];
+  return out[fr ? 1 : 0];
+}
 function ownerBadgeCardHtml(venue, lang = 'en') {
   const fr = lang === 'fr';
   const L = (en, f) => (fr ? f : en);
   if (venueListingUrl(venue) === 'https://okanaganroam.com/') return '';
+  // Sport test 8 (2026-11-21; a club with only a Facebook page was told to paste the code in its website footer): only
+  // for a place with a website of its own.
+  try { if (!String(venue.website || '').trim() || venueNotOffered(venue.id).includes('website') || ownerWebsiteRemovalWaiting(venue.id)) return ''; } catch (e) { /* keep the card */ }
   const code = ownerBadgeSnippet(venue);
   return `
       <section class="op-badge" id="opBadge" data-task="home all" aria-labelledby="opBadgeHead" style="background:var(--paper);border-radius:14px;padding:14px 18px;margin:14px 0 6px">
@@ -72225,7 +72426,9 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const listing = fr && venueHasFrench(venue) ? `https://okanaganroam.com${venuePagePath(venue, 'fr')}` : venueListingUrl(venue);
   const dayLabel = (d) => (fr ? OWNER_DAY_LABELS_FR[d].charAt(0).toUpperCase() + OWNER_DAY_LABELS_FR[d].slice(1) : OWNER_DAY_LABELS[d]);
   const menuWord = isPriceList(venue) ? L('prices', 'vos prix') : L('menu', 'votre menu');
+  // Sport test 8 (2026-11-21): the Happy hour tile goes once the owner said she has none (it stays on the full page).
   const showHappyHour = happyHourAllowed(venue);
+  const happyTileOff = venueNotOffered(venue.id).includes('happy_hour');
   // Average spend per person (2026-11-08): restaurants and pubs only. Everything it adds to the page is inside this flag,
   // so the edit page of every other type is byte for byte what it was.
   const avgSpendOn = !!portalFields(venue.type).avgSpend;
@@ -72942,11 +73145,11 @@ ${renderGolfHeaderHtml()}
           ${/* Tour test 2 (Whistler, 2026-11-16): a tour runs a season (and may be by booking only): no "opening hours". */ ''}${venue.type === 'tour' ? (wineryApptOnly ? tile('hours', '&#128339;', L('Change my season', 'Modifier ma saison'), L('When you run. Trips are by booking only', 'Quand vous offrez des sorties (sur réservation seulement)')) : tile('hours', '&#128339;', L('Change my hours or season', 'Modifier mes heures ou ma saison'), L('When you run', 'Quand vous offrez des sorties'))) : tile('hours', '&#128339;', L('Change my hours', 'Modifier mes heures'), L('When you open and close', 'Vos heures d’ouverture'))}
           ${tile('photos', '&#128247;', L('Add photos', 'Ajouter des photos'), L('From your phone or computer', 'Depuis votre téléphone ou ordinateur'))}
           ${/* Tour test 1 (Whistler, 2026-11-16): a tour's tile is its tours and prices with a ticket; any price list gets a price tag, never the plate. */ ''}${hasMenu ? `<a class="op-task" href="${menuHref}"><span class="op-task-icon" aria-hidden="true">${venue.type === 'tour' ? '&#127903;' : isPriceList(venue) ? '&#127991;' : '&#127869;'}</span><span class="op-task-text"><strong>${venue.type === 'tour' ? L('Update my tours &amp; prices', 'Mettre à jour mes sorties et tarifs') : isPriceList(venue) ? L('Update my prices', 'Mettre à jour mes prix') : venue.type === 'cocktail' ? L('Update my menu or cocktail list', 'Mettre à jour mon menu ou ma carte des cocktails') : brewSetupType(venue.type) ? L(breweryListTile(venue).en[0], breweryListTile(venue).fr[0]) : L('Update my menu', 'Mettre à jour mon menu')}</strong><span>${venue.type === 'cocktail' ? L('Snap your cocktail list or menu', 'Photographiez votre carte des cocktails ou votre menu') : brewSetupType(venue.type) ? L(breweryListTile(venue).en[1], breweryListTile(venue).fr[1]) : venue.type === 'tour' ? L('A photo or a link to your price list', 'Une photo ou un lien vers votre liste de prix') : venue.type === 'indoor' ? (() => { const ik = indoorHelpKinds(venue); return L(`A photo or a link to your ${escapeHtml(indoorKindsModule.indoorKindText(ik, 'en').prices.noun)}`, `Une photo ou un lien vers votre ${escapeHtml(indoorKindsModule.indoorKindText(ik, 'fr').prices.noun)}`); })() : L('Just take a photo of it', 'Prenez-le simplement en photo')}</span></span></a>` : ''}
-          ${portalFields(venue.type).arrivalTile ? tile('arrival', '&#128205;', venue.type === 'tour' ? L('Help people find your meeting spot', 'Aidez les gens à trouver votre point de rencontre') : L('Help people find your door', 'Aidez les gens à trouver votre porte'), venue.type === 'tour' ? L('A photo taken where people meet you, on your phone', 'Une photo prise là où l’on vous rejoint, avec votre téléphone') : venue.type === 'winery' ? L('A photo of your tasting room door, taken outside on your phone', 'Une photo de la porte de votre salle de dégustation, prise dehors avec votre téléphone') : sportSetupType(venue.type) ? L('A photo of the main entrance, taken outside on your phone', 'Une photo de l’entrée principale, prise dehors avec votre téléphone') /* Sport test 6: an arena has no storefront */ : L('A storefront photo, taken outside on your phone', 'Une photo de la devanture, prise dehors avec votre téléphone')) : ''}
+          ${portalFields(venue.type).arrivalTile ? tile('arrival', '&#128205;', venue.type === 'tour' ? L('Help people find your meeting spot', 'Aidez les gens à trouver votre point de rencontre') : sportSetupType(venue.type) ? sportArrivalWords(venue, fr)[0] : L('Help people find your door', 'Aidez les gens à trouver votre porte'), venue.type === 'tour' ? L('A photo taken where people meet you, on your phone', 'Une photo prise là où l’on vous rejoint, avec votre téléphone') : venue.type === 'winery' ? L('A photo of your tasting room door, taken outside on your phone', 'Une photo de la porte de votre salle de dégustation, prise dehors avec votre téléphone') : sportSetupType(venue.type) ? sportArrivalWords(venue, fr)[1] /* Sport test 6: an arena has no storefront; sport test 8: a course has no front door */ : L('A storefront photo, taken outside on your phone', 'Une photo de la devanture, prise dehors avec votre téléphone')) : ''}
           ${ownerVideoEnabled() ? tile('video', '&#127916;', L('Share a video', 'Partager une vidéo'), L('A short clip we can turn into a reel', 'Un court clip que nous transformerons en reel')) : ''}
           ${venue.type === 'winery' ? '' : tile('events', '&#128197;', L('Add an event', 'Ajouter un événement'), venue.type === 'tour' ? L('Special trips, classes and more', 'Sorties spéciales, ateliers et plus') : sportSetupType(venue.type) ? (() => { /* Sport test 6: the main kind's own events ("Family skates, hockey games, special skates") */ const ev = indoorKindsModule.SPORT.EVENTS[sportMainKind(venue)]; return ev ? L(`${ev[0]} and more`, `${ev[1]} et plus`) : L('Tournaments, clinics, leagues and more', 'Tournois, cliniques, ligues et plus'); })() : venue.type === 'indoor' ? L('Shows, classes, demos and more', 'Spectacles, cours, démonstrations et plus') : L('Music, tastings, markets and more', 'Musique, dégustations, marchés et plus'))}
           ${tile('contact', '&#9742;', L('Phone, website or description', 'Téléphone, site Web ou description'), L('Your contact details and your story', 'Vos coordonnées et votre présentation'))}
-          ${showHappyHour && venue.type !== 'winery' ? tile('happy', venue.type === 'cocktail' ? '&#127864;' : fr ? '&#127865;' : venue.type === 'distillery' ? '&#127864;' : '&#127867;', L('Happy hour', '5 à 7'), L('Your times and what’s on special', 'Vos heures et vos spéciaux')) : ''}
+          ${showHappyHour && !happyTileOff && venue.type !== 'winery' ? tile('happy', venue.type === 'cocktail' ? '&#127864;' : fr ? '&#127865;' : venue.type === 'distillery' ? '&#127864;' : '&#127867;', L('Happy hour', '5 à 7'), L('Your times and what’s on special', 'Vos heures et vos spéciaux')) : ''}
           ${/* Indoor test 11 (2026-11-19; Kim's science centre was offered "patio, price range"): an indoor place's own words. */ ''}${kindSetupType(venue.type) ? tile('more', '&#11088;', L('Features', 'Caractéristiques'), L('Kids, access, parking, groups…', 'Enfants, accès, stationnement, groupes…')) : venue.type === 'tour' ? tile('more', '&#11088;', L('Features', 'Caractéristiques'), L('Dogs, parking, access, price range…', 'Chiens, stationnement, accès, gamme de prix…')) : tile('more', '&#11088;', L('Features and deals', 'Caractéristiques et spéciaux'), L('Dog friendly, patio, price range…', 'Chiens admis, terrasse, gamme de prix…'))}
         </div>
         ${/* Distillery test 3 (2026-11-13): the weekly tours/nights editor (how often, every other week) is one tap from the list. */ ''}
@@ -79602,6 +79805,7 @@ module.exports = {
   validateVenueSubmission,
   buildVenueSubmissionEmail,
   setVenueSubmissionTransport,
+  sendOwnerAsksNow,
   setOwnerEmailTransport,
   weekendEmail,
   weekendEmailEvents,

@@ -44,7 +44,7 @@ const Q = [
   ["held", "public9", "golf", "setup", "en", "how much do u charge for 9 holes? putting that here", ["indoor-price", "sport-golf-details", "sport-rate-lines", "indoor-price-varies"], []],
   ["train", "public9", "golf", "setup", "en", "9 holes 22, 18 holes 36, seniors 18. whats my lowest", ["indoor-price", "sport-golf-details", "sport-card-price", "sport-rate-lines"], []],
   ["held", "public9", "golf", "setup", "en", "my dad runs the course and doesnt know if we should tick free lol, we have an honesty box", ["indoor-price", "sport-kids-free", "sport-golf-details"], ["indoor-free"]],
-  ["train", "public9", "golf", "setup", "en", "no tee times, just show up and pay at the clubhouse", ["indoor-booking", "sport-tee-times", "sport-same-day"], []],
+  ["train", "public9", "golf", "setup", "en", "no tee times, just show up and pay at the clubhouse", ["sport-walk-ons", "indoor-booking", "sport-tee-times", "sport-same-day"], []],
   ["held", "public9", "golf", "setup", "fr", "on reserve juste par telephone pour les groupes, pas de site web", ["indoor-booking", "sport-tee-times", "indoor-groups"], []],
   ["train", "public9", "golf", "setup", "en", "kids can play free with an adult, do i click kid friendly", ["sport-kids-free", "indoor-age"], ["indoor-free"]],
   ["held", "public9", "golf", "setup", "en", "dogs on a leash allowed, is that dogs welcome or not", ["sport-dogs"], []],

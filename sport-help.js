@@ -471,6 +471,14 @@ const TOPICS = [
     allOf: [['twilight', 'crepuscule', 'sunset'], ['start', 'begin', 'after', 'earlier', 'later', 'time', 'fall', 'summer', 'commence', 'partir', 'heure', 'automne', 'ete']],
     a: '<p>That’s a price, not your hours: one line per twilight rate in <strong>Your prices</strong>, with its start time in the details, like <em>Twilight 18 holes $180 – after 3 PM June to August, after 1 PM in the fall</em>. Your hours stay first tee to last tee.</p>',
     aFr: '<p>C’est un tarif, pas vos heures : une ligne par tarif crépuscule dans <strong>Vos tarifs</strong>, avec l’heure de début dans les détails, comme <em>Crépuscule 18 trous 180 $ – après 15 h de juin à août, après 13 h à l’automne</em>. Vos heures restent du premier au dernier départ.</p>' },
+  // Sport test 8 (2026-11-21; Marg, a 9-hole walk-on course: "we dont do tee times at all. you just show up" was told to
+  // tap "Tee times recommended"): no tee times is the walk-on answer on the Booking screen, and its Good to know chip.
+  { id: 'sport-walk-ons', kinds: ['golf'], pages: ['setup', 'edit'], over: ['indoor-good-to-know', 'sport-tee-times', 'indoor-booking', 'sport-same-day', 'booking-link', 'sport-booking-link', 'links'],
+    q: 'We don’t do tee times: people just show up', qFr: 'Nous n’avons pas d’heures de départ : les gens arrivent, tout simplement',
+    keys: ['no tee times', 'no tee time', 'dont do tee times', 'don t do tee times', 'dont take tee times', 'we dont do tee times', 'no tee times at all', 'first come first served', 'first come first serve', 'just show up', 'just show up and play', 'just show up and go', 'walk on only', 'walk ons only', 'walk-ons only', 'walkons only', 'no bookings', 'no booking needed', 'no reservations'],
+    keysFr: ['pas d heures de depart', 'pas de reservation', 'premier arrive premier servi', 'sans reservation seulement', 'les gens arrivent'],
+    a: '<p>On <strong>Booking</strong>, tap <strong>Yes, walk-ons welcome</strong>. Your page says “Walk-ons welcome: no tee time needed”, and no Book button is added. Want to say it again under Your visit? In <strong>Good to know</strong>, tap <strong>Walk-ons only: no tee times</strong>.</p>',
+    aFr: '<p>Dans <strong>Réservation</strong>, touchez <strong>Oui, sans réservation</strong>. Votre page indique « Départs sans réservation : pas besoin de réserver », sans bouton Réserver. Vous voulez le redire sous Votre visite? Dans <strong>Bon à savoir</strong>, touchez <strong>Sans réservation seulement : pas d’heures de départ</strong>.</p>' },
 ];
 // What owners of every kind typed for the shared answers ([en keys, fr keys, topics they now beat]).
 const MORE_KEYS = {
@@ -576,6 +584,11 @@ function kindHelp(t, kind, ctx) {
       return t;
     }
     case 'sport-tee-times': title(...w('bookQ')); return t;
+    // Sport test 9: the weekly no-public-tee-times line is a golf course's.
+    case 'sport-members': return golf ? t : both(t, [[/<p>No public tee times at a set time each week[\s\S]*?<\/p>/, '']], [[/<p>Pas de départs pour le public à une heure fixe chaque semaine[\s\S]*?<\/p>/, '']]);
+    // Sport test 8 (Marg typed "20 dollars for 9 holes"): the answer says her own price line, not an example.
+    case 'sport-golf-details':
+      return ctx.price ? both(t, [['“Green fees from $55”', `“${e(ctx.price.en)}”`]], [['« Droits de jeu à partir de 55 $ »', `« ${e(ctx.price.fr)} »`]]) : t;
     // Sport test 5 (#14, #33): for a ski school a lesson IS the card's price; its extras are rentals, lift tickets and packages.
     case 'sport-card-price':
       if (kind !== 'skischool') return t;
@@ -719,8 +732,24 @@ const NOT_IF = {
   'sport-restaurant': ['social hour', 'heure sociale'], 'sport-members': ['tournament', 'tournoi', 'block it', 'member guest'],
   'indoor-summer-late': ['twilight', 'crepuscule'], 'seasonal-hours': ['twilight', 'crepuscule'], 'menu-import': ['arent on our website yet', 'not on our website yet', 'arent set', 'next year'],
   'photo-rights': ['own page', 'propre page', 'tick indoor'], 'sport-free-clubs': ['shuttle', 'navette'],
-  'sport-peak-dates': ['off peak'], 'sport-food-menu': ['beer', 'alcohol', 'licensed', 'biere'], 'sport-lessons': ['an event'],
+  'sport-peak-dates': ['off peak'], 'sport-food-menu': ['beer', 'alcohol', 'licensed', 'biere'],
   'sport-golf-details': ['why does it say', 'cart price', 'pourquoi ca dit'],
   'sport-sister-listing': ['social hour', 'heure sociale', 'happy hour', 'restaurant'], 'sport-two-courses': ['members', 'member', 'membres', 'alternate', 'alternent', 'alternating', 'swap'],
+  // Sport tests 8 and 9 (2026-11-21): one shared word is not an intent. The weekly-nights answer took any question with
+  // "men's", "members" or "Wednesday" (a Labour Day closure, a semi-private club, "no real happy hour"); the staff
+  // languages answer took "none of us speak French"; "volunteers" took a fundraiser question; "lessons" took a log-in.
+  'indoor-theme-nights': ['every year', 'each year', 'chaque annee', 'tous les ans', 'close to the public', 'closed to the public', 'ferme au public', 'amateur', 'championship', 'championnat', 'tournament', 'tournaments', 'tournoi', 'tournois', 'no real happy hour', 'no happy hour', 'pas de 5 a 7', 'semi private', 'members get', 'member times', 'members only', 'own page'],
+  'sport-staff-language': ['none of us speak', 'nobody speaks french', 'no one speaks french', 'we dont speak french', 'dont really speak french', 'write everything in french', 'everything in french', 'french version', 'write the french', 'french part', 'aucun de nous ne parle', 'personne ne parle francais'],
+  'sport-public': ['tournament', 'tournaments', 'tournoi', 'tournois', 'fundraiser', 'fundraisers'],
+  'sport-lessons': ['an event', 'log in', 'login', 'sign in', 'own login', 'se connecter'],
+  'indoor-booking': ['extension', 'press 1', 'ext', 'poste'], 'sport-tee-times': ['extension', 'press 1', 'ext', 'poste', 'no tee times', 'no tee time', 'dont do tee times', 'first come first served'],
+  'sport-second-kind': ['academy', 'lessons button', 'teaching pros', 'academie'], 'indoor-kinds-many': ['academy', 'lessons button', 'teaching pros', 'academie'],
+  'sport-holiday-short': ['every month', 'each month', 'chaque mois', 'shorter in the fall', 'earlier in june'],
+  'indoor-bar': ['no beer', 'no alcohol', 'no licence', 'no license', 'not licensed', 'no liquor', 'pas de biere', 'pas d alcool', 'no real happy hour', 'only has pop'],
+  'hh-deals': ['no beer', 'no alcohol', 'no licence', 'not licensed', 'pas de biere', 'pas d alcool', 'no real happy hour'], 'hh-times': ['no beer', 'no alcohol', 'no licence', 'not licensed', 'pas de biere', 'pas d alcool', 'no real happy hour'],
+  'sport-social-hour': ['no beer', 'no alcohol', 'no licence', 'not licensed', 'pas de biere', 'pas d alcool', 'no real happy hour'],
+  'signin': ['also log in', 'log in too', 'also sign in', 'head pro'],
+  'privacy': ['public sees', 'what visitors see', 'see what the public', 'see our page', 'see my page', 'what my page looks like'],
+  'no-website-social': ['social hour', 'heure sociale', 'normale', 'longueur du parcours', 'verges', 'par 72'],
 };
 module.exports = { WORDS, word, TOPICS, MORE_KEYS, tokens, kindHelp, fill, CONCEPTS, NOT_IF };
