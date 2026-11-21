@@ -6,8 +6,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const K = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'sport7-kayla.json'), 'utf8'));
 const WK = (o, c) => JSON.stringify(Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [[o, c]]])));
+let kn = 0;
 function kayla(app, db, o = {}) {
-  const v = app.createVenue({ ...K.venue, ...o });
+  const v = app.createVenue({ ...K.venue, slug: `${K.venue.slug}-${++kn}`, ...o });
   db.prepare('UPDATE venues SET happy_hour_times = ?, happy_hour_deals = ?, happy_hour_deals_checked_at = ?, happy_hour_source = ?, happy_hour_deals_source = ?, hours_source = ? WHERE id = ?')
     .run(K.venue.happy_hour_times, K.venue.happy_hour_deals, o.hhChecked || '2026-11-20', 'venue_owner', 'venue_owner', 'venue_owner', v.id);
   db.prepare('INSERT INTO venue_links (venue_id, booking_url, instagram_url, facebook_url, open_months) VALUES (?, ?, ?, ?, ?)').run(v.id, K.links.booking_url, K.links.instagram_url, K.links.facebook_url, K.links.open_months);
@@ -18,6 +19,9 @@ function kayla(app, db, o = {}) {
   db.prepare('INSERT INTO venue_owner_features (venue_id, features) VALUES (?, ?)').run(v.id, JSON.stringify(K.owner_features));
   if (app.clearVenueCaches) app.clearVenueCaches();
   if (app.clearHoursExtraCache) app.clearHoursExtraCache();
+  if (app.clearVenueIndoorInfoCache) app.clearVenueIndoorInfoCache();
+  if (app.clearVenueOwnerFeaturesCache) app.clearVenueOwnerFeaturesCache();
+  if (app.writeIndoorVisitRows) app.writeIndoorVisitRows(v.id);
   if (app.indoorCardPrice) app.indoorCardPrice(v.id);
   return app.getVenue(v.id);
 }

@@ -7212,7 +7212,7 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
     venues = venues.map((v, i) => ({ v, i, s: st(v), p: pinned0.has(v.id) ? 0 : 1 })).sort((a, b) => a.p - b.p || ((b.s && b.s.open ? 1 : 0) - (a.s && a.s.open ? 1 : 0)) || ((a.s && !a.s.open ? 1 : 0) - (b.s && !b.s.open ? 1 : 0)) || a.i - b.i).map((o) => o.v);
   }
   // Sport test 7 (2026-11-20; "golf in july vernon" listed three simulators above every course): for plain "golf" in the
-  // outdoor season (the day or month asked, else today), and for "golf course" any time, courses come before simulators.
+  // outdoor season (the day or month asked, else today), courses come before simulators.
   // Off-season or a rainy day keeps the order (simulators are what's open). A name match stays first.
   if (venues.length > 1) {
     const fq = smartFold(sq);
@@ -7220,7 +7220,7 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
       const mo = !day ? smartSearchMonth(fq) : null;
       const ref = day && day.date ? day.date : day && day.month ? `2027-${String(day.month).padStart(2, '0')}-15` : mo ? `2027-${String(mo.month).padStart(2, '0')}-15` : todayLocal(now);
       const md = ref.slice(5), inSeason = md >= GOLF_WINTER_DEFAULT.from && md <= GOLF_WINTER_DEFAULT.to;
-      if (inSeason || /\bgolf (?:courses?|clubs?)\b|\bterrains? de golf\b|\bparcours\b/.test(fq)) {
+      if (inSeason) {
         const pinned0 = new Set(pinnedIds), sim = (v) => v.type === 'golf' && golfSimVenue(v);
         venues = venues.map((v, i) => ({ v, i, p: pinned0.has(v.id) && !sim(v) ? 0 : 1, s: sim(v) ? 1 : 0 })).sort((a, b) => a.p - b.p || a.s - b.s || a.i - b.i).map((o) => o.v);
       }
@@ -7439,6 +7439,7 @@ function renderSearchResultsHubPage(model, lang) {
     features: ['patio', 'dog_friendly', 'kid_friendly', 'lake_view', 'great_groups', 'live_music', 'happy_hour', 'vegetarian', 'open_early', 'open_late'],
     openNow: true,
     // Indoor test 16: a weekday named: each card says that day ("Closed Mondays"), never "Open now".
+    ...(model.day ? { seasonNow: (() => { const d = model.day.date || (model.day.month ? (() => { const t0 = todayLocal(model.now); const y = Number(t0.slice(0, 4)) + (model.day.month < Number(t0.slice(5, 7)) ? 1 : 0); return `${y}-${String(model.day.month).padStart(2, '0')}-15`; })() : null); return d ? new Date(`${d}T12:00:00-07:00`) : null; })() } : {}),
     ...(model.day ? { statusOverrides: new Map(venues.map((v) => [v.id, smartDayStatus(v, model.day, lang)]).filter(([, st]) => st).map(([id, st]) => [id, { state: st.state, text: st.text, day: true }])) } : {}),
     // French: each note piece the word list knows, in French; the rest left off.
     cardNotes: lang === 'fr' ? new Map([...why].map(([id, t]) => [id, t.split(' · ').map((x) => frText(x)).filter(Boolean).join(' · ')]).filter(([, t]) => t)) : why,
@@ -25866,7 +25867,8 @@ function indoorVisitLines(venue, info) {
     if (shut.length) out.Season = { en: `All year except ${shut.map((c) => indoorMdRange(c.from, c.to, false)).join(' and ')}.`, fr: `Toute l’année, sauf ${shut.map((c) => indoorMdRange(c.from, c.to, true)).join(' et ')}.` };
   }
   if (INDOOR_LENGTHS.includes(t.length)) out['Time needed'] = { en: INDOOR_LENGTH_LINES[t.length][0], fr: INDOOR_LENGTH_LINES[t.length][1] };
-  const free = tourFreeOf(t), price = typeof t.price === 'number' && t.price > 0 ? t.price : null;
+  // Sport test 7: a sport or golf owner who skipped the Price step: her lowest plain regular line (THE SPORT HEADLINE RULE).
+  const free = tourFreeOf(t), price = typeof t.price === 'number' && t.price > 0 ? t.price : (venue && sportSetupType(venue.type) ? sportSkippedPrice(venue.id) : null);
   if (free === 'donation') out.Prices = { en: indoorDonationLine(t.suggested, false), fr: indoorDonationLine(t.suggested, true) };
   else if (free) out.Prices = { en: INDOOR_FREE_LINES[free][0], fr: INDOOR_FREE_LINES[free][1] };
   else if (price != null && indoorPerLine(t, price)) out.Prices = { en: indoorPerLine(t, price), fr: indoorPerLine(t, price, true) };
@@ -38358,7 +38360,10 @@ function renderCuratedHubPage(cfg, venues, filter = null, now = new Date()) {
   // cfg.keepOrder (2026-10-18): the list is already ranked (search results), so its first order is the given one.
   // Seasons everywhere (2026-10-18): places closed for the season go last in this first order (pinned places stay first).
   // Fix (2026-10-18): a kept order keeps its pinned places first too (search's name matches, even closed for the season).
-  let mixed = cfg.keepOrder ? [...pinned, ...seasonClosedLast(venues.filter((v) => !pinnedIds.has(v.id)), now)] : [...pinned, ...seasonClosedLast(curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now), now)];
+  // Sport test 7 (2026-11-20; "golf in july vernon" put the courses, closed in November, after the simulators): a search for
+  // a day or month puts the places closed for the season THEN last (cfg.seasonNow), not the ones closed today.
+  const seasonNow = cfg.seasonNow || now;
+  let mixed = cfg.keepOrder ? [...pinned, ...seasonClosedLast(venues.filter((v) => !pinnedIds.has(v.id)), seasonNow)] : [...pinned, ...seasonClosedLast(curatedMixedOrder(venues.filter((v) => !pinnedIds.has(v.id)), (v) => (catsById.get(v.id) || [])[0] || v.type, now), seasonNow)];
   // cfg.openFirst (2026-10-18): guide pages lead with places open now, 7 am to 11 pm (guideOpenFirst).
   if (cfg.openFirst) mixed = guideOpenFirst(mixed, now, cfg.tierOf || null);
   // cfg.reorder (2026-10-26): a last stable regrouping of that first order (town Happy Hour pages: on now first).
@@ -61905,7 +61910,7 @@ function renderOwnerSetupPage(found, opts) {
     // suggestions ("We picked this for you: check it") and saved only with the screen.
     ...(indoor ? {
       allSteps: INDOOR_SETUP_PART1.concat(INDOOR_SETUP_PART2), feeLiveMax: INDOOR_PRICE_LIVE_MAX, bringMax: TOUR_GOOD_TO_KNOW_MAX, groupsMax: sportSetupType(venue.type) ? KIND_GROUPS_MAX : 180,
-      indoorKinds: (sport ? SPORT_KINDS_SHOWN : INDOOR_KINDS_SHOWN).map((k) => ({ k, t: INDOOR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), indoorKindsTop: sport ? SPORT_KINDS_SHOWN.length : INDOOR_KINDS_TOP,
+      indoorKinds: (sport ? SPORT_KINDS_SHOWN : INDOOR_KINDS_SHOWN).map((k) => ({ k, t: INDOOR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), indoorKindsTop: sport ? SPORT_KINDS_SHOWN.length : INDOOR_KINDS_TOP, sportMain: sport ? (() => { try { return sportMainKind(venue) || indoorKindsModule.sportKindSuggestion(venue)[0] || ''; } catch (e) { return ''; } })() : '',
       // Sport and golf (2026-11-20): the sport words, each kind's usual season (the Hours step's hint) and its fallback kind.
       sport, kindSeasons: sport ? Object.fromEntries(SPORT_KINDS.map((k) => [k, indoorKindsModule.indoorKindText([k], 'en').season || ''])) : {}, otherKind: sport ? 'sportother' : 'other',
       // Indoor test 2: the card's short words for each kind, for the preview ("Escape room · arcade, VR & laser tag").
@@ -71926,7 +71931,7 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
   try { week = live.hours ? (typeof live.hours === 'string' ? JSON.parse(live.hours) : live.hours) : null; } catch (e) { week = null; }
   return portalCompleteness.renderCompleteness(portalCompleteness.scoreCompleteness(input, { today: todayLocal(), pending, liveFields: ownerCompletenessLiveFields(signedIn) }), {
     // Café test 4 (2026-11-11): the checklist without the percent and badge talk at the top of the edit page.
-    fr, canDecline: true, noScore: true, winery: venue.type === 'winery', brewery: brewSetupType(venue.type), distillery: venue.type === 'distillery', tour: venue.type === 'tour', indoor: kindSetupType(venue.type), sport: sportSetupType(venue.type), sportMain: sportSetupType(venue.type) ? (() => { try { return sportMainKind(venue) || indoorKindsModule.sportKindSuggestion(venue)[0] || ''; } catch (e) { return ''; } })() : '', indoorLow: kindSetupType(venue.type) ? indoorHelpLow(venue) : null, apptOnly: apptType(venue.type) && apptAnswers(venue.id, venue.type).visit === 'appointment',
+    fr, canDecline: true, noScore: true, winery: venue.type === 'winery', brewery: brewSetupType(venue.type), distillery: venue.type === 'distillery', tour: venue.type === 'tour', indoor: kindSetupType(venue.type), sport: sportSetupType(venue.type), indoorLow: kindSetupType(venue.type) ? indoorHelpLow(venue) : null, apptOnly: apptType(venue.type) && apptAnswers(venue.id, venue.type).visit === 'appointment',
     menuHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/menu`, lang) : ownerPath(`/owner/account/venue/${venue.id}/menu`, lang),
     setupHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang),
     hoursText: input.hasHours && week && !pending.has('hours') ? portalCompleteness.hoursLine(week, fr) : '',
@@ -79389,6 +79394,7 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  clearVenueOwnerFeaturesCache, sportPriceLineCounts, indoorLowestTyped, sportPracticeKept, golfOnSiteFood, tripOwnerClosureNotes,
   // Places to stay (2026-11-19), for tests/stays.test.js.
   getStaysByRegion, findStayBySlug, handleStaysRoute, getStayCloseBy, withStaysNavLink, getStayInfo, guardedStayInfoUpsert, venueActivityCounter,
   // Tour test 12 (Whistler, 2026-11-18).
