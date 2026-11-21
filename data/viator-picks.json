@@ -1,0 +1,28 @@
+{
+ "updated": "2026-11-21",
+ "how": "Rows for tour-picks.js (the 'Book a tour' row on hotel guest pages and the weekend email's one bookable pick). Ratings and review counts are Viator's own, from drafts/viator-2026-11/viator-products.csv (Viator Partner API, 2026-11-20); they only order the picks and are never shown. months: the months the product runs (1-12; 'ski' = the ski hill's own season). group: at most one product per group on a page. A product approved in viator-matches.json or viator-wine-tours.json shows only once it has a row here. Months for products we could not confirm are the conservative summer season; widen them once checked.",
+ "minRating": 4.6,
+ "minReviews": 5,
+ "emailMinReviews": 20,
+ "maxKm": 25,
+ "products": {
+  "394086P13": { "venue": "Meadow Vista Honey Wines", "rating": 5.0, "reviews": 9, "months": [11, 12, 1, 2, 3], "group": "tasting", "why": "Fireside winter tasting (the product is a winter warm-up)" },
+  "393825P1": { "venue": "Okanagan Spirits Craft Distillery (Vernon)", "rating": 5.0, "reviews": 33, "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "group": "tasting", "why": "Indoor distillery tasting, year-round" },
+  "5574063P2": { "venue": "Kelowna Karting & Entertainment", "rating": 5.0, "reviews": 9, "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "group": "indoor", "why": "Indoor karting, year-round" },
+  "5501052P1": { "venue": "Toast the Okanagan Wine Tours", "rating": 5.0, "reviews": 1, "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "group": "wine", "why": "1 review: below minReviews, kept for when it has more" },
+  "235533P20": { "venue": "Vivid Tours", "rating": 5.0, "reviews": 6, "months": [4, 5, 6, 7, 8, 9, 10], "group": "wine", "why": "Westside wine trail tour; winter running not confirmed" },
+  "312379P1": { "venue": "A Taste of Kelowna Food Tours", "rating": 4.99, "reviews": 560, "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "group": "food", "why": "Downtown walking food tour, year-round" },
+  "357718P11": { "venue": "Lakeside Eco-Sports", "rating": 4.84, "reviews": 19, "months": [4, 5, 6, 7, 8, 9, 10], "group": "bike", "why": "City e-bike tour, spring to fall" },
+  "31847P10": { "venue": "Canadian Craft Tours (Kelowna)", "rating": 5.0, "reviews": 1, "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "group": "brewery", "why": "1 review: below minReviews" },
+  "128006P4": { "venue": "Okanagan Life Private Boat Charters", "rating": 5.0, "reviews": 3, "months": [5, 6, 7, 8, 9], "group": "boat", "why": "Lake boat tour, summer; 3 reviews" },
+  "5585501P5": { "venue": "SunWave Boat Rentals", "rating": 5.0, "reviews": 1, "months": [5, 6, 7, 8, 9], "group": "boat", "why": "Boat rental, summer; 1 review" },
+  "91152P1": { "venue": "Teehouse Wine Tours", "rating": 4.9, "reviews": 94, "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "group": "wine", "why": "Mission Hill and Quails' Gate (both open year-round)" },
+  "152062P1": { "venue": "Western Canyoning Adventure – Okanagan", "rating": 5.0, "reviews": 118, "months": [6, 7, 8, 9], "group": "adventure", "why": "Canyoning, summer only" },
+  "41596P3": { "venue": "Ogopogo Parasail", "rating": 4.77, "reviews": 30, "months": [6, 7, 8, 9], "group": "lake", "why": "Parasailing, summer only" },
+  "404271P1": { "venue": "Winds of Change Experiences", "rating": 5.0, "reviews": 52, "months": [5, 6, 7, 8, 9], "group": "lake", "why": "Lake sailing, summer only" },
+  "74970P2": { "venue": "Red Dog Wine Tours (wine tours data, Kelowna area)", "rating": 4.9, "reviews": 257, "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "group": "wine", "why": "The site's Kelowna wine tour (wine-tours.js), currently sold" },
+  "325656P6": { "venue": "Sip Happens Wine Tours (Lake Country & Vernon)", "rating": 4.9, "reviews": 54, "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "group": "wine", "why": "The site's Lake Country wine tour (wine-tours.js), currently sold" },
+  "325656P7": { "venue": "Sip Happens Wine Tours (Penticton & Naramata)", "rating": 5.0, "reviews": 32, "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "group": "wine", "why": "The site's Naramata wine tour (wine-tours.js), currently sold" },
+  "325656P14": { "venue": "Sip Happens Wine Tours (Oliver & Osoyoos)", "rating": 4.8, "reviews": 74, "months": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "group": "wine", "why": "The site's Osoyoos wine tour (wine-tours.js), currently sold" }
+ }
+}
