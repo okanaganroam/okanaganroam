@@ -36359,7 +36359,7 @@ function renderIndoorSubPage(oldHtml, pagePath, query, scope) {
   // A town page lists that town's indoor listings only, as it always has (no simulators or tagged places from other categories).
   const hub = scope.region ? renderIndoorHubPage(getVenuesByCategory('indoor').filter(inTown), [], [], getIndoorAlsoNotes(), filter)
     : renderIndoorHubPage(getVenuesByCategory('indoor'), getIndoorGolfVenues(), getIndoorAlsoVenues(), getIndoorAlsoNotes(), filter);
-  return subPageInHubLayout(hub, oldHtml, pagePath, '/indoor', { town: !!scope.region, intro: scope.intro, activity: scope.activity });
+  return subPageInHubLayout(hub, oldHtml, pagePath, '/indoor', { town: !!scope.region, intro: scope.intro, activity: scope.activity, banner: !!scope.activity });
 }
 
 // Golf in the hub layout (2026-11-20, batch 1). /golf and /<town>/golf keep their three groups (as chips), their green
