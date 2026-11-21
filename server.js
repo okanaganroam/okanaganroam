@@ -7773,7 +7773,10 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false) {
   if (!plan || typeof plan !== 'object') return plan;
   try {
     const candidates = tripStayCandidates();
-    let block = tripStays.whereToStay(plan, stay, candidates, todayLocal(now));
+    // V4 (2026-11-21): with no dates given the stay starts today before noon (site time), else tomorrow, never a past day;
+    // and the stay type fits the request (tripStays V4 rules). The current page passes nothing new.
+    const v4Stay = v4 ? { v4: true, text, minArrive: okanaganClock(now).minutes < 720 ? todayLocal(now) : addLocalDays(todayLocal(now), 1) } : {};
+    let block = tripStays.whereToStay(plan, stay, candidates, todayLocal(now), v4Stay);
     if (block) {
       // Step 3 (2026-11-20, stay-booking-links.js): each stay's booking buttons, pre-filled with the trip's dates and
       // party (affiliate links only when STAY_AFFILIATE_PROVIDER and STAY_AFFILIATE_ID are set), and the plan's stops
