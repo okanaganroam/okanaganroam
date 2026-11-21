@@ -120,3 +120,35 @@ test('every kind pair: Build My Trip plans the main kind (above a place with it 
   } finally { delete process.env.DISCOVERY_SEARCH; }
   assert.deepEqual(bad, []);
 });
+
+// Sport test 8 (2026-11-21; Marg's golf course also picked Disc golf, and neither search nor Build My Trip ever found it for
+// disc golf): a second kind of ANOTHER type (a golf course's disc golf or skate park, an arena's driving range) is found by
+// that kind's words in search, and a golf course's outdoor second kind is planned for that kind's plain request.
+test('a second kind of another type: search finds it by that kind; Build My Trip plans a golf course for its outdoor second kind', async () => {
+  process.env.DISCOVERY_SEARCH = 'on';
+  const bad = [];
+  try {
+    const pairs = [['golf', 'discgolf'], ['golf', 'skatepark'], ['golf', 'bike'], ['rink', 'range'], ['discgolf', 'golf'], ['skatepark', 'simgolf']];
+    let n = 0;
+    for (const [main, second] of pairs) {
+      const town = TOWNS[n % TOWNS.length];
+      const v = app.createVenue({ name: `Cross Fixture ${String(++n).padStart(2, '0')}`, slug: `cross-fixture-${n}`, region: town, type: GOLFISH.includes(main) ? 'golf' : 'sport', latitude: LAT[town] + n / 900, longitude: -119.51,
+        rating: 4.4, reviews: 80, address: `${n} Cross St`, hours: JSON.stringify(WK('09:00', '20:00')), description: KIND_DESC[main], description_fr: 'Un endroit de sport.' });
+      const t = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+      const st = await change(t, { indoor_info: { kinds: [main, second], length: '1-2h', book: 'no', age: 'all', year: 'all' }, indoor_price: 12 });
+      if (![200, 201].includes(st)) { bad.push(`${main}+${second}: save ${st}`); continue; }
+      if (app.clearVenueCaches) app.clearVenueCaches();
+      const townWords = town.replace(/-/g, ' ');
+      const q = `${SK.K[second].en.search[0]} ${townWords}`;
+      if (!plain(await getText(`/search?q=${encodeURIComponent(q)}`)).includes(v.name)) bad.push(`${main}+${second}: search "${q}" misses it`);
+      if (main === 'golf' && ['discgolf', 'skatepark', 'bike'].includes(second)) {
+        const p = app.runTripPlan({ text: `${SK.K[second].en.search[0]} in ${townWords} on Saturday July 17, 2027` }, NOV);
+        if (!JSON.stringify([p.recommendations, p.itinerary, p.days, p.outing]).includes(v.name)) bad.push(`${main}+${second}: not planned for "${SK.K[second].en.search[0]}"`);
+      }
+      db0().prepare("UPDATE venues SET region = 'retired-fixture' WHERE id = ?").run(v.id);
+      if (app.clearVenueCaches) app.clearVenueCaches();
+    }
+  } finally { delete process.env.DISCOVERY_SEARCH; }
+  assert.deepEqual(bad, []);
+});
+function db0() { return require('../db.js'); }

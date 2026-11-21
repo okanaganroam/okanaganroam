@@ -391,7 +391,11 @@ const TYPE_ALIASES = {
   brewery: ['brewery', 'breweries', 'beer', 'beers', 'craft beer', 'taproom', 'taprooms', 'brewpub', 'brew pub', 'beer tour', 'beer tours', 'brewery tour', 'brewery tours', 'craft beer tour', 'craft beer tours', 'beer crawl', 'brewery crawl', 'brewery hop', 'brewery hopping', 'ale trail', 'cidery', 'cideries', 'cider house', 'cider houses', 'ciders', 'craft cider'],
   distillery: ['distillery', 'distilleries', 'spirits', 'gin', 'whisky', 'whiskey', 'vodka', 'craft spirits'],
   winery: ['wine', 'wines', 'winery', 'wineries', 'vineyard', 'vineyards', 'wine tasting', 'wine tastings', 'tasting room', 'tasting rooms', 'wine tour', 'wine tours', 'wine country'],
-  golf: ['golf', 'golfing', 'golf course', 'golf courses', 'tee time', 'tee times', 'driving range', 'mini golf', 'round of golf'],
+  golf: ['golf', 'golfing', 'golf course', 'golf courses', 'tee time', 'tee times', 'driving range', 'mini golf', 'round of golf',
+    // Sport test 8 (2026-11-21; "golf no tee time vernon" read "no" as "no golf courses", "walk on golf vernon" read "walk" as
+    // hiking): a course you play without booking is still golf. (Phrases with a negation word keep their own meaning.)
+    'no tee time', 'no tee times', 'no tee time needed', 'no tee times needed', 'without a tee time', 'without tee times', 'without booking a tee time',
+    'walk on golf', 'walk on golf course', 'walk on golf courses', 'walk ons', 'walk ons welcome', 'walk up golf', 'drop in golf', 'golf walk on', 'golf walk ons'],
   beach: ['beach', 'beaches', 'swim', 'swimming', 'swimming spot', 'swimming spots', 'swim spot', 'lake day', 'dog beach', 'dog beaches'],
   outdoor: ['outdoors', 'outdoor', 'park', 'parks', 'outside', 'outdoor activities', 'things to do outside', 'provincial park', 'regional park'],
   // Indoor & Rainy Day (2026-10-11). "indoor", "indoors", "rainy" and "rainy
