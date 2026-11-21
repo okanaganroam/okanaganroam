@@ -129,7 +129,7 @@ const NOINDEX_HEADERS = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Con
 function create(deps) {
   const { db, weekendEvents, getSender, isSameOrigin, clientIp, emailPattern } = deps;
   // bookingPick(friday) (server.js, tour-picks.js): one in-season Viator product for that weekend, or null (Viator off,
-  // nothing fits). { code, title, business, photo (the business's own photo on our site, or null), pagePath }.
+  // nothing fits). { code, title, business, photo (the business's own photo on our site; required), pagePath }.
   const bookingPick = typeof deps.bookingPick === 'function' ? deps.bookingPick : () => null;
   const env = deps.env || process.env;
   const ipHits = new Map();
@@ -254,7 +254,8 @@ function create(deps) {
     // and photo go to its page on our site.
     let book = null;
     try { book = weekend ? bookingPick(weekend) : null; } catch (e) { book = null; }
-    if (book && book.code && book.title) {
+    // Never a box without the business's own photo.
+    if (book && book.code && book.title && book.photo && /^(?:https:\/\/|\/images\/)[^\s"'<>()]+$/.test(book.photo)) {
       const tags = `utm_source=newsletter&utm_medium=email&utm_campaign=${campaign}&utm_content=book-pick`;
       const abs = (p) => (/^https:\/\//.test(p) ? p : `${SITE}${p}`);
       book = {

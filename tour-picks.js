@@ -21,8 +21,9 @@
 // products first (Whistler's ski delivery in ski season). Commission never changes which free places show or their
 // order: this row is added after the page is built and touches nothing else.
 // The email: one product, rotated week to week by the ISO week number of the weekend's Friday among every in-season,
-// well-reviewed candidate (sorted by product code, so the rotation is stable), never Viator's photo: the business's
-// own photo on our site when it has one, else no photo.
+// well-reviewed candidate whose business has its own real photo on our site (the listing's image_url; for a wine tour,
+// the operator's own listing), sorted by product code so the rotation is stable. Never Viator's photo, never stock, and
+// never a box without a photo: a product whose business has no photo here is skipped.
 //
 // One booking button per product ("Book now", rel="sponsored noopener", data-link="viator": commissions.js counts the
 // taps as viator:hotel on guest pages), the site's commission line under the row. Off when Viator is off
@@ -93,7 +94,7 @@ function candidates(ctx = {}) {
     if (!v || !meta || closed.has(v.id) || !inSeason(meta, ctx.date, ctx.skiInSeason)) continue;
     const url = viator.isViatorUrl(m.url) ? viator.affiliateUrl(m.url, cfg, 'api') : null;
     if (!url) continue;
-    out.push({ code: String(m.productCode), title: String(m.title || '').trim(), business: v.name, venue: v, url, listed: true, ...pickMeta(meta) });
+    out.push({ code: String(m.productCode), title: String(m.title || '').trim(), business: v.name, venue: v, photoVenue: v, url, listed: true, ...pickMeta(meta) });
   }
   // Wine tours (pickup at your accommodation in the area's towns; not up on the ski hills).
   const wine = ctx.wine !== undefined ? ctx.wine : (wineTours ? wineTours.loadData() : null);
@@ -104,7 +105,9 @@ function candidates(ctx = {}) {
       const url = viator.isViatorUrl(it.url) ? viator.affiliateUrl(it.url, cfg, 'api') : null;
       if (!url) continue;
       const regions = Object.entries(wine.regions || {}).filter(([r, a]) => a === area && !HILL_REGIONS.has(r)).map(([r]) => r);
-      out.push({ code: String(it.productCode), title: String(it.title || '').trim(), business: String(it.supplier || ''), venue: null, regions, url, listed: false, ...pickMeta(meta) });
+      // The operator's own listing on our site, when we list it (for the email's photo): the same business name.
+      const own = it.supplier ? [...venues.values()].find((v) => v && v.name && viator.nameScore(v.name, it.supplier) >= 0.9) || null : null;
+      out.push({ code: String(it.productCode), title: String(it.title || '').trim(), business: String(it.supplier || ''), venue: null, photoVenue: own, regions, url, listed: false, ...pickMeta(meta) });
     }
   }
   return out.filter((c) => c.title);
@@ -143,6 +146,8 @@ function guestPicks(hotel, ctx = {}, limit = 3) {
   return out;
 }
 
+const hasOwnPhoto = (v) => !!(v && /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(v.image_url || '').trim()));
+
 // ISO 8601 week number of a YYYY-MM-DD date.
 function isoWeek(date) {
   const d = new Date(`${date}T12:00:00Z`);
@@ -154,15 +159,16 @@ function isoWeek(date) {
 }
 // The email's one product for the weekend whose Friday is ctx.date, or null. Same product once per code (Black Tie's
 // three shops are one product); rotation = ISO week mod the number of candidates.
+// The pick carries photoVenue: the listing whose own photo the email shows (and whose page its name links to).
 function emailPick(ctx = {}) {
   const data = ctx.data || loadData();
   const seen = new Map();
   for (const c of candidates({ ...ctx, data })) {
     if (!wellReviewed(c.meta, data, data.emailMinReviews) || c.meta.email === false) continue;
+    if (!hasOwnPhoto(c.photoVenue)) continue;
     const prev = seen.get(c.code);
-    // One row per product: the one with its business's own photo, else the lowest venue id (stable).
-    const rank = (x) => [x.venue && x.venue.image_url ? 0 : 1, x.venue ? x.venue.id : 0];
-    if (!prev || rank(c)[0] < rank(prev)[0] || (rank(c)[0] === rank(prev)[0] && rank(c)[1] < rank(prev)[1])) seen.set(c.code, c);
+    // One row per product (Black Tie's three shops are one product): the lowest venue id with a photo (stable).
+    if (!prev || c.photoVenue.id < prev.photoVenue.id) seen.set(c.code, c);
   }
   const list = [...seen.values()].sort((a, b) => a.code.localeCompare(b.code));
   if (!list.length) return null;

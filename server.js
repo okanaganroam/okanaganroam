@@ -30533,7 +30533,8 @@ function hotelTourRowHtml(hotel, venues, closedIds, now = new Date()) {
     return tourPicks.guestRowHtml(picks, { lang: 'en', rental: hotelIsRental(hotel), venueHref: tourPickVenueHref });
   } catch (e) { return ''; } // a commission row must never break the page
 }
-// The weekend email's pick for the weekend starting on Friday `friday` (YYYY-MM-DD), or null.
+// The weekend email's pick for the weekend starting on Friday `friday` (YYYY-MM-DD), or null. Only products whose
+// business has its own photo on our site (tour-picks.js emailPick).
 function weekendBookingPick(friday) {
   try {
     if (!viator.enabled() || !/^\d{4}-\d{2}-\d{2}$/.test(String(friday || ''))) return null;
@@ -30543,8 +30544,9 @@ function weekendBookingPick(friday) {
     for (const [id, st] of getSeasonStates(at)) if (st && (st.kind === 'closed' || st.kind === 'temp_closed')) closedIds.add(id);
     const p = tourPicks.emailPick(tourPickContext(venues, closedIds, friday));
     if (!p) return null;
-    const photo = p.venue ? venueThumbPhoto(p.venue) : null;
-    return { code: p.code, title: p.title, business: p.business, photo: photo || null, pagePath: p.venue ? tourPickVenueHref(p.venue) : null };
+    const photo = venueThumbPhoto(p.photoVenue);
+    if (!photo) return null; // never a box without the business's own photo
+    return { code: p.code, title: p.title, business: p.business, photo, pagePath: tourPickVenueHref(p.photoVenue) };
   } catch (e) { return null; }
 }
 // GET /weekend-email/book/<code>: the email's "Book now". A tiny noindex page that counts the tap (Analytics, with the

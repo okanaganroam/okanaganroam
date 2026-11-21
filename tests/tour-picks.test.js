@@ -61,7 +61,7 @@ const FX_MATCHES = {
 };
 const FX_WINE = { areas: { kelowna: { productCode: 'W1', title: 'Afternoon Wine Tour', supplier: 'Red Dog', url: url('W1') } }, regions: { kelowna: 'kelowna', 'big-white': 'kelowna' } };
 const V = (id, dLat, extra = {}) => ({ id, name: `Business ${id}`, region: 'kelowna', type: 'tour', slug: `business-${id}`, latitude: KELOWNA.latitude + dLat, longitude: KELOWNA.longitude, image_url: null, ...extra });
-const VENUES = new Map([V(1, 0.01, { image_url: '/images/venues/food.jpg' }), V(2, 0.05), V(3, 0.01), V(4, 0.02), V(5, 0.03), V(6, 0.01), V(7, 0.55), V(8, 0.001), V(9, 0.002, { image_url: '/images/venues/ski.jpg' }), V(10, 0.001)].map((v) => [v.id, v]));
+const VENUES = new Map([V(1, 0.01, { image_url: '/images/venues/food.jpg' }), V(2, 0.05), V(3, 0.01), V(4, 0.02), V(5, 0.03), V(6, 0.01), V(7, 0.55), V(8, 0.001), V(9, 0.002, { image_url: '/images/venues/ski.jpg' }), V(10, 0.001), V(11, 0.004, { name: 'Red Dog', type: 'tour', image_url: '/images/venues/red-dog.jpg' })].map((v) => [v.id, v]));
 const ctx = (o = {}) => ({ cfg: ON, data: FX, matches: FX_MATCHES, wine: FX_WINE, venues: VENUES, closedIds: new Set(), date: '2026-11-27', skiInSeason: false, ...o });
 const HOTEL = { slug: 'h', name: 'Hotel', region: 'kelowna', ...KELOWNA };
 
@@ -119,19 +119,29 @@ test('guest row html: heading, one Book now per product (sponsored, Viator), the
   assert.equal(tp.guestRowHtml([], {}), '');
 });
 
-test('email pick: rotates by ISO week among in-season candidates with 20+ reviews; prefers the shop with its own photo', () => {
+test('email pick: only businesses with their own photo here; rotates by ISO week; never a product without a photo', () => {
   assert.equal(tp.isoWeek('2026-11-27'), 48);
   assert.equal(tp.isoWeek('2027-01-01'), 53);
   assert.equal(tp.isoWeek('2026-01-02'), 1);
-  const pool = ['A1', 'B1', 'D1', 'F1', 'W1']; // 20+ reviews, in season (E1 rating too low, B2 too few)
+  // 20+ reviews and in season: A1 B1 D1 F1 W1. Own photo: A1 (venue 1) and W1 (its operator, Red Dog, is listed with a photo).
+  const pool = ['A1', 'W1'];
   const seen = [];
-  for (let w = 0; w < pool.length; w++) seen.push(tp.emailPick(ctx({ weekKey: w })).code);
-  assert.deepEqual(seen, pool, 'each candidate once over a cycle, in code order');
+  for (let w = 0; w < 4; w++) seen.push(tp.emailPick(ctx({ weekKey: w })).code);
+  assert.deepEqual(seen, [...pool, ...pool], 'each candidate in turn, in code order');
   assert.equal(tp.emailPick(ctx()).code, pool[48 % pool.length], 'the real ISO week picks');
-  assert.equal(tp.emailPick(ctx()).code, tp.emailPick(ctx()).code, 'deterministic');
-  const ski = tp.emailPick(ctx({ skiInSeason: true, weekKey: 4 })); // A1 B1 D1 F1 S1 W1
+  assert.equal(tp.emailPick(ctx()).photoVenue.image_url, '/images/venues/food.jpg');
+  assert.equal(tp.emailPick(ctx({ weekKey: 1 })).photoVenue.id, 11, 'a wine tour: its operator\'s own listing');
+  for (let w = 0; w < 6; w++) assert.ok(tp.emailPick(ctx({ weekKey: w })).photoVenue.image_url, 'never a pick without a photo');
+  // Without the operator's listing, the wine tour is skipped.
+  const noRedDog = new Map([...VENUES].filter(([id]) => id !== 11));
+  assert.deepEqual([0, 1, 2].map((w) => tp.emailPick(ctx({ venues: noRedDog, weekKey: w })).code), ['A1', 'A1', 'A1']);
+  // Ski season: S1 joins; the shop with the photo (9), not the first shop (8, no photo).
+  const ski = tp.emailPick(ctx({ skiInSeason: true, weekKey: 1 })); // A1 S1 W1
   assert.equal(ski.code, 'S1');
-  assert.equal(ski.venue.id, 9, 'the shop with its own photo');
+  assert.equal(ski.photoVenue.id, 9);
+  // Nobody with a photo: no pick at all.
+  const noPhotos = new Map([...VENUES].map(([id, v]) => [id, { ...v, image_url: null }]));
+  assert.equal(tp.emailPick(ctx({ venues: noPhotos })), null);
   assert.equal(tp.emailPick(ctx({ cfg: viator.config({}) })), null);
   assert.equal(tp.emailPick(ctx({ matches: {}, wine: null })), null);
 });
@@ -216,7 +226,8 @@ test('weekend email: one pick before the footer with Book now through our counte
   assert.ok(at > 0 && at < html.indexOf('Unsubscribe in one click'), 'before the footer');
   assert.equal((html.match(/>Book now ↗</g) || []).length, 1, 'one Book now');
   assert.match(html, /We may earn a commission/);
-  assert.doesNotMatch(html, /viator\.com[^"]*\/tours\/[^"]*"[^>]*><img|media\.tacdn|tripadvisor/i, 'never a Viator photo');
+  assert.doesNotMatch(html, /media\.tacdn|tripadvisor/i, 'never a Viator photo');
+  assert.match(html, /<div class="wk-book"[\s\S]*?<img src="https:\/\/[a-z]+roam\.com\/images\/venues\/[^"]+"/, 'the business\'s own photo, always');
   const text = wk.digestText(dg, 'https://okanaganroam.com/weekend-email/unsubscribe/x');
   assert.match(text, /BOOK SOMETHING THIS WEEKEND[\s\S]*Book now: https:\/\/okanaganroam\.com\/weekend-email\/book\//);
   // A different week, a different (or the same, when only one fits) pick, always deterministic.
