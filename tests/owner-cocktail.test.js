@@ -814,7 +814,9 @@ test('chips (test 3): a tap re-checks only its own box; “Walk-ins only” and 
   assert.deepEqual(on('Dogs welcome on the patio', D), ['Patio only'], 'winery test 5 rule kept');
   assert.deepEqual(on('Dogs inside and on the patio', D), ['Inside and patio']);
   assert.deepEqual(on('Private room for 20. Groups of 10 or more: please book ahead', G), ['Private room']);
-  assert.match(s, /mine\.forEach\(function\(c\)\{ c\.setAttribute\('aria-pressed', saysIt\(box\.value, c\.getAttribute\('data-quick'\), sibs\)/);
+  // (Sport test 13: chipOn, which is saysIt for these kinds and the exact-or-tapped rule on indoor and sport places.)
+  assert.match(s, /mine\.forEach\(function\(c\)\{ c\.setAttribute\('aria-pressed', chipOn\(box\.value, c\.getAttribute\('data-quick'\), sibs, c\.getAttribute\('data-box'\)\)/);
+  assert.match(s, /function chipOn\(v, t, sibs, boxId\)\{ if \(!INDOOR \|\| boxId === 'suGroupsLine'\) return saysIt\(v, t, sibs\);/);
   assert.match(s, /return c\.getAttribute\('data-box'\) === b\.getAttribute\('data-box'\);/);
   assert.doesNotMatch(s, /screen\.querySelectorAll\('\[data-quick\]'\), function\(c\)\{ c\.setAttribute\('aria-pressed'/);
 });

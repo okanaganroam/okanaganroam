@@ -54,8 +54,8 @@ test('1: hours start as a short list of the 7 days, each with a big Change butto
     assert.match(row[1], /data-hopen="' \+ d \+ '"/);
     assert.match(row[1], /h\(T\.hoursChange\)/);
     assert.doesNotMatch(row[1], /data-h=|type="time"/, 'a folded day has no time boxes');
-    // With no hours yet, Monday opens so there is somewhere to start; otherwise every day starts folded.
-    assert.match(s, /if \(!seas && !S\.hoursOpenSet\) \{ S\.hoursOpenSet = true; S\.hoursOpen = \{\}; if \(!DAYS\.some\(function\(d\)\{ return S\.week\[d\]; \}\)\) S\.hoursOpen\.mon = true; \}/);
+    // Every day starts folded (sport test 13: with no hours yet, Monday no longer opens on its own).
+    assert.match(s, /if \(!seas && !S\.hoursOpenSet\) \{ S\.hoursOpenSet = true; S\.hoursOpen = \{\}; \}/);
     // An open day keeps everything it had: Open/Closed, the times, Midnight / 1 AM / 2 AM, the early-morning note, Same as.
     assert.match(s, /\(j === w\.length - 1 \? lateBtns\(d, j, y\) : ''\)/);
     assert.match(s, /id="suLate' \+ d \+ j \+ '"/);

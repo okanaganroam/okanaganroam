@@ -1670,7 +1670,8 @@
   // when she tapped it on this visit, or a sentence of the box is exactly the chip.
   var QTAP = {};
   function chipExact(v, t){ var k = String(t || '').toLowerCase().replace(/[\s.;:!?]+$/, '').trim(); return !!k && sentencesOf(v).some(function(x){ return x.toLowerCase().replace(/[\s.;:!?]+$/, '').trim() === k; }); }
-  function chipOn(v, t, sibs, boxId){ if (!INDOOR) return saysIt(v, t, sibs); return chipExact(v, t) || (!!QTAP[(boxId || '') + '|' + t] && has(v, t)); }
+  // (The Groups box keeps its own rules: a size or group chip there reads her sentences, as before.)
+  function chipOn(v, t, sibs, boxId){ if (!INDOOR || boxId === 'suGroupsLine') return saysIt(v, t, sibs); return chipExact(v, t) || (!!QTAP[(boxId || '') + '|' + t] && has(v, t)); }
   // Cocktail test 3 (2026-11-14): a Groups line in sentences. A "book ahead from N" sentence (a size), and the sentences
   // that carry a fact a size chip doesn't ("Private room for 20": a room, a capacity) and so are never dropped by a tap.
   function sentencesOf(v){ return String(v || '').split(/[.;!?]+(?:\s+|$)/).map(function(x){ return x.replace(/[\s.;]+$/, '').trim(); }).filter(Boolean); }
@@ -5371,13 +5372,13 @@
       var pre = String(((CUR.visit_rows || {})[qk]) || '').trim();
       // Cocktail test 3 (2026-11-14): un-pressing a chip inside a longer Groups sentence ("Private room for 20") takes
       // that whole sentence away, never leaving "for 20" behind.
-      var inLonger = qk === 'groups' && has(v, t) && sentencesOf(v).filter(function(x){ return has(x, t) && x.toLowerCase() !== t.toLowerCase(); }).length;
-      var bid = b.getAttribute('data-box'), onNow = chipOn(v, t, sibs, bid);
+      var bid = b.getAttribute('data-box'), onNow = chipOn(v, t, sibs, bid), NEWQ = INDOOR && bid !== 'suGroupsLine';
+      var inLonger = (!NEWQ || onNow) && qk === 'groups' && has(v, t) && sentencesOf(v).filter(function(x){ return has(x, t) && x.toLowerCase() !== t.toLowerCase(); }).length;
       if (inLonger) v = sentencesOf(v).filter(function(x){ return !has(x, t); }).join(sep);
       // Sport test 13: on an indoor or sport place, a chip not shown as picked is added, never cut out of her own words.
-      else if (INDOOR && !onNow && !(v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0 && !(TL && qk === 'good_to_know'))) { QTAP[bid + '|' + t] = 1; v = v ? v.replace(/[\s.,]+$/, '') + sep + t : t; }
-      else if (INDOOR && onNow && !chipExact(v, t) && has(v, t)) { delete QTAP[bid + '|' + t]; var i9 = v.toLowerCase().lastIndexOf(t.toLowerCase()); v = (v.slice(0, i9) + v.slice(i9 + t.length)).replace(/([.,])\s*[.,]/g, '$1').replace(/^[\s.,]+|[\s.,]+$/g, '').replace(/\s{2,}/g, ' '); }
-      else if (INDOOR && onNow) { delete QTAP[bid + '|' + t]; var tk = t.toLowerCase().replace(/[\s.;:!?]+$/, '').trim(); v = keepPieces(v, sentencesOf(v).filter(function(x){ return x.toLowerCase().replace(/[\s.;:!?]+$/, '').trim() !== tk; })); }
+      else if (NEWQ && !onNow && !(v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0 && !(TL && qk === 'good_to_know'))) { QTAP[bid + '|' + t] = 1; v = v ? v.replace(/[\s.,]+$/, '') + sep + t : t; }
+      else if (NEWQ && onNow && !chipExact(v, t) && has(v, t)) { delete QTAP[bid + '|' + t]; var i9 = v.toLowerCase().lastIndexOf(t.toLowerCase()); v = (v.slice(0, i9) + v.slice(i9 + t.length)).replace(/([.,])\s*[.,]/g, '$1').replace(/^[\s.,]+|[\s.,]+$/g, '').replace(/\s{2,}/g, ' '); }
+      else if (NEWQ && onNow) { delete QTAP[bid + '|' + t]; var tk = t.toLowerCase().replace(/[\s.;:!?]+$/, '').trim(); v = keepPieces(v, sentencesOf(v).filter(function(x){ return x.toLowerCase().replace(/[\s.;:!?]+$/, '').trim() !== tk; })); }
       else if (has(v, t)) { var i = v.toLowerCase().indexOf(t.toLowerCase()); v = (v.slice(0, i) + v.slice(i + t.length)).replace(/([.,])\s*[.,]/g, '$1').replace(/^[\s.,]+|[\s.,]+$/g, '').replace(/\s{2,}/g, ' '); }
       // Distillery test 2 (Whistler, 2026-11-16): the same for the line we pre-filled from research on a taproom's dogs screen
       // (« Chiens bienvenus à l'intérieur. » + « Terrasse seulement » read as both): the tap replaces it.

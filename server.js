@@ -7443,7 +7443,9 @@ function searchNearTownsWiden(run, text, lang) {
   const sporty = ((run.intent.types || []).some((t) => t === 'golf' || t === 'sport'));
   const re = new RegExp(`(^|[^A-Za-z])(?:near|nearby|around|close to|pr[eè]s de|proche de|autour de)\\s+(?:the\\s+)?${esc}(?![A-Za-z])`, 'i');
   const reTown = new RegExp(`(^|[^A-Za-z])(?:(?:in|at|a|à|en)\\s+)?${esc}(?![A-Za-z])`, 'i');
-  const m = re.exec(text) || (sporty ? reTown.exec(text) : null);
+  // (Not for a kind that has its own search answer, like mini golf or driving ranges: those keep their town's list.)
+  const smartKind = SMART_ACTIVITIES.some((a) => a.re.test(String(text || '')));
+  const m = re.exec(text) || (sporty && !smartKind ? reTown.exec(text) : null);
   if (!m) return run;
   const towns = [town, ...TRIP_NEAR_TOWNS[town], ...(SEARCH_NEAR_EXTRA[town] || []).filter((r) => !TRIP_NEAR_TOWNS[town].includes(r))].map((r) => REGION_LABELS[r]).filter(Boolean);
   const wider = runDiscovery(text.replace(re.exec(text) ? re : reTown, (all, pre) => `${pre}${towns.slice(0, -1).join(', ')} and ${towns[towns.length - 1]}`), { limit: SEARCH_PAGE_MAX_RESULTS, lang });

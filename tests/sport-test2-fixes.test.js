@@ -339,7 +339,7 @@ test('10. Help on the price-list page: ~18 realistic questions for every sport k
       ['en', `${kids} and seniors are cheaper, how do i show that`, [RL, 'indoor-line-age']], ['en', `we sell a ${pass}, where does it go`, [RL, G, NSP]], ['en', 'memberships with no set price', [RL, NSP]],
       ['en', 'our prices go up in the spring', [RC]], ['en', 'lessons are booked with the instructor, they set the price', [LS]], ['en', `${rent} is extra`, [RN, X]], ['en', 'do i have to show the price per person', [PP]],
       ['en', 'how do i change a price later', ['menu-change', RC, M]], ['en', 'do you take gift cards here', [G]],
-      ['fr', 'tous nos prix sont plus taxes', [X]], ['fr', 'nos prix augmentent au printemps', [RC]], ['fr', 'les abonnements sans prix fixe', [RL, NSP]]];
+      ['fr', 'tous nos prix sont plus taxes', [X, 'sport-tax']], ['fr', 'nos prix augmentent au printemps', [RC]], ['fr', 'les abonnements sans prix fixe', [RL, NSP]]];
     for (const [lang, q, want] of Q) { const r = bot(b, lang, 'menu').best(q); if (!r || !want.includes(r.id)) wrong.push(`${k} [${lang}] "${q}" -> ${r && r.id}`); }
   }
   assert.deepEqual(wrong, []);
