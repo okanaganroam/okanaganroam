@@ -32378,11 +32378,25 @@ function renderTourActivityHtml(venues, selected) {
 // their name and "Play:" note. Photos: licensed free Adobe Stock (283502174,
 // 513807899, 281855538); bike reuses the Sports banner.
 const SPORT_ACTIVITIES = [
-  { slug: 'skate', label: 'Skate Parks & BMX', pattern: /skate|pump track|bmx/i, banner: { src: '/images/sports/activity-skate.jpg', alt: 'A skateboarder riding a ramp at a tree-lined skate park', pos: 10 }, heading: 'Skate Parks & BMX in the Okanagan', intro: 'Skate parks, pump tracks and BMX tracks across the valley — free to ride, from beginner bowls to big street plazas.' },
+  { slug: 'skate', label: 'Skate Parks & BMX', pattern: /skate ?(?:board|park|plaza|bowl|spot)|pump track|bmx/i, banner: { src: '/images/sports/activity-skate.jpg', alt: 'A skateboarder riding a ramp at a tree-lined skate park', pos: 10 }, heading: 'Skate Parks & BMX in the Okanagan', intro: 'Skate parks, pump tracks and BMX tracks across the valley — free to ride, from beginner bowls to big street plazas.' },
   { slug: 'bike', label: 'Mountain Biking', pattern: /bike park|mountain[- ]bike|mtb|singletrack|freeride|bike skills|dirt jump/i, banner: { src: '/images/sports/sports.jpg', alt: 'A mountain biker riding a leafy forest trail in autumn', pos: 60 }, heading: 'Mountain Biking in the Okanagan', intro: 'Bike parks, skills areas, dirt jumps and singletrack networks — where to ride, from first jumps to lift-served downhill.' },
   { slug: 'disc', label: 'Disc Golf', pattern: /disc golf/i, banner: { src: '/images/sports/activity-disc.jpg', alt: 'A disc golf basket on a grassy fairway among tall trees', pos: 55 }, heading: 'Disc Golf in the Okanagan', intro: 'Disc golf courses through parks, pines and hillsides — most are free to play, so bring a disc and go.' },
   { slug: 'courts', label: 'Tennis, Pickleball & More', pattern: /pickleball|tennis|volleyball|basketball|courts?\b/i, banner: { src: '/images/sports/activity-courts.jpg', alt: 'Outdoor tennis and pickleball courts under a pink evening sky', pos: 55 }, heading: 'Pickleball, Tennis & Courts in the Okanagan', intro: 'Pickleball, tennis, basketball and beach volleyball courts — public places to play a game across the valley.' },
 ];
+// Ice rinks (Dayton, 2026-11-21: Sun Bowl Arena, an ice rink, said "Skate Parks & BMX" because its description says
+// "skating" and "Skate Library"). The skate chip now needs skate park words; an arena or rink that offers skating says
+// so in its "Play here" line instead, from its own name and description. It is a card line, not a chip.
+// A tagged place whose "Play:" note names only part of it: the card line covers what its photo shows too (Parkinson's
+// photo is its pool; its note named only the courts outside). Display only; the chips still read the stored note.
+const SPORTS_PLAY_NOTE_OVERRIDES = {
+  'kelowna/parkinson-recreation-centre': 'Indoor pool, gyms and fitness centre, plus 12 pickleball and 6 tennis courts (Basil Meikle) outside',
+};
+function sportIceLabel(venue) {
+  if (!venue || venue.type !== 'sport') return '';
+  const text = `${venue.name || ''} ${venue.description || ''}`;
+  if (!/\b(?:arenas?|rinks?)\b/i.test(text) || !/\bskat(?:e|es|ing)\b|\bice\b/i.test(text)) return '';
+  return /\bshinny\b|\bhockey\b|stick[- ]and[- ]puck/i.test(text) ? 'Ice skating \u00b7 Hockey' : 'Ice skating';
+}
 function sportActivitiesOf(venue, notes) {
   const note = notes && notes.get(venue.id);
   const text = venue.type === 'sport' ? (venue.name || '') : `${venue.name || ''} ${note || ''}`;
@@ -35520,7 +35534,7 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
   const state = { types: f.types, features: f.features, regions: f.regions, counts, openNow: false };
   const actLabel = Object.fromEntries(SPORT_ACTIVITIES.map((a) => [a.slug, a.label]));
   // "Play:" on every card: the listing's own note, else its activities.
-  const cardNotes = new Map(all.map((v) => [v.id, String(notes.get(v.id) || '').trim() || (actsById.get(v.id) || []).map((s) => actLabel[s]).join(' \u00b7 ')]));
+  const cardNotes = new Map(all.map((v) => [v.id, (SPORTS_PLAY_NOTE_OVERRIDES[`${v.region}/${v.slug}`] || String(notes.get(v.id) || '').trim()) || (actsById.get(v.id) || []).map((s) => actLabel[s]).join(' \u00b7 ') || sportIceLabel(v)]));
   // The photo follows whatever the "Play:" line names first ("Lift-served
   // bike park ..., pump track" is a bike photo, not a skate one).
   const leadActivity = (v) => {
@@ -35562,7 +35576,7 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
   };
   const payload = {};
   for (const v of venues) payload[String(v.id)] = { c: actsById.get(v.id) || [], f: featsById.get(v.id) || [], r: v.region, k: descSearchWords(`${notes.get(v.id) || ''} ${v.description || ''}`), o: recommendedRank.get(v.id) };
-  const sportDetails = new Map(all.map(v => [v.id, '<div class="sports-play-info"><strong>Play here</strong><p>' + escapeHtml(cardNotes.get(v.id).replace(/\bMTB\s+singletrack\b/gi, 'Mountain biking trails').replace(/\bMTB\b/gi, 'Mountain biking').replace(/\b(km)\s+singletrack\b/gi, '$1 of narrow trails').replace(/\bsingletrack\b/gi, 'narrow trails')) + '</p></div>']));
+  const sportDetails = new Map(all.filter(v => cardNotes.get(v.id)).map(v => [v.id, '<div class="sports-play-info"><strong>Play here</strong><p>' + escapeHtml(cardNotes.get(v.id).replace(/\bMTB\s+singletrack\b/gi, 'Mountain biking trails').replace(/\bMTB\b/gi, 'Mountain biking').replace(/\b(km)\s+singletrack\b/gi, '$1 of narrow trails').replace(/\bsingletrack\b/gi, 'narrow trails')) + '</p></div>']));
   const sportsOpenStatus = foodDrinkOpenNowInfo(venues, advisoryNotes, new Date(), { requireVerified: false }).byId;
   const statusOverrides = new Map(all.flatMap(v => {
     if (!['sport', 'outdoor', 'beach'].includes(v.type)) return [[v.id, { state:'unknown', text:'Activity hours: check venue details' }]];
