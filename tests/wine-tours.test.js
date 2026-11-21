@@ -162,7 +162,6 @@ const ids = (html) => [...html.matchAll(/data-venue-id="(\d+)"/g)].map((m) => m[
 const PAGES = [
   ['/guides/penticton-naramata-wine-weekend', '325656P7'],
   ['/guides/oliver-osoyoos-wine-weekend', '325656P14'],
-  ['/guides/okanagan-wineries-first-timers', '74970P2'],
   ['/guides/okanagan-winter-wine', '74970P2'],
   ['/guides/okanagan-winery-restaurants', '74970P2'],
   ['/wineries', '74970P2'],
@@ -204,13 +203,16 @@ test('server, Viator on: one line on each wine guide and wineries listing, the a
   off();
 });
 
-test('server: never on a winery\'s own page, and not on other guides', async () => {
+test('server: never on a winery\'s own page, the first-timers guide (EN + FR) or other guides', async () => {
   on();
   const v = app.getVenue(wineryA.id);
   const html = app.renderVenuePage(v, [], [], [], {});
   assert.doesNotMatch(html, /wine-tour-line|Book a wine tour/);
-  const other = await get('/guides/best-pizza-kelowna');
-  assert.doesNotMatch(other.text, /wine-tour-line/);
+  for (const p of ['/guides/best-pizza-kelowna', '/guides/okanagan-wineries-first-timers', '/fr/guides/okanagan-wineries-first-timers']) {
+    const r = await get(p);
+    assert.equal(r.status, 200, p);
+    assert.doesNotMatch(r.text, /wine-tour-line|data-link="viator"|circuit vinicole \(sans conduire\)/, `${p}: no wine tour line (first-timers lists local tour companies)`);
+  }
   off();
 });
 

@@ -1,6 +1,6 @@
 {
  "updated": "2026-11-21",
- "how": "One shared (small-group) Viator wine tour per wine area, picked by hand from drafts/viator-2026-11/viator-products.csv (Viator Partner API, 2026-11-20): currently sold, well reviewed, pickup in that area. Each product page was checked live on viator.com on 2026-11-21. URLs are Viator's own productUrl with our pid (see viator.js). wine-tours.js shows one per page; it never changes ranking or which places show.",
+ "how": "One shared (small-group) Viator wine tour per wine area, picked by hand from drafts/viator-2026-11/viator-products.csv (Viator Partner API, 2026-11-20): currently sold, well reviewed, pickup in that area. Each product page was checked live on viator.com on 2026-11-21. URLs are Viator's own productUrl with our pid (see viator.js). wine-tours.js shows one per page; it never changes ranking or which places show. Not on the first-timers guide (2026-11-21): it lists local tour companies, and a paid link there would compete with them.",
  "defaultArea": "kelowna",
  "areas": {
   "kelowna": {
@@ -57,7 +57,6 @@
   "oliver": "oliver-osoyoos", "osoyoos": "oliver-osoyoos", "okanagan-falls": "oliver-osoyoos", "baldy": "oliver-osoyoos"
  },
  "guides": {
-  "/guides/okanagan-wineries-first-timers": "kelowna",
   "/guides/okanagan-winery-restaurants": "kelowna",
   "/guides/okanagan-winter-wine": "kelowna",
   "/guides/penticton-naramata-wine-weekend": "naramata",

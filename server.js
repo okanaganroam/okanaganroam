@@ -49258,8 +49258,9 @@ function renderEditorialGuidePage(g, path) {
     publisher: { '@type': 'Organization', name: 'Okanagan Roam', url: 'https://okanaganroam.com/' },
     ...(guideDates ? { datePublished: guideDates.published, dateModified: guideDates.modified } : {}),
   };
-  // "Book a wine tour" (2026-11-21, wine-tours.js): the wine guides carry one Viator wine tour line (Viator set up only):
-  // after the guide's wine tours section when it has one, else just before the closing section.
+  // "Book a wine tour" (2026-11-21, wine-tours.js): the wine guides named in data/viator-wine-tours.json carry one Viator
+  // wine tour line (Viator set up only), just before the closing section. Not the first-timers guide, whose tours section
+  // lists local tour companies.
   const wineRegion = wineTours.guideRegion(path);
   const wineLine = wineRegion === undefined ? '' : wineTours.lineHtml(wineRegion);
   const listed = [];
@@ -49282,9 +49283,9 @@ function renderEditorialGuidePage(g, path) {
   const sectionsHtml = g.sections.map((sec) => {
     const items = sec.items.map(itemHtml).join('');
     if (items) liveSections.add(sec.id);
-    return items ? `\n      <section class="ski-guide-resort" id="${sec.id}">\n        <h2>${escapeHtml(sec.heading)}</h2>${sec.lead ? `\n        <p>${guideTipHtml(sec.lead)}</p>` : ''}\n        <ul class="ski-guide-list">${items}\n        </ul>${wineLine && sec.id === 'tours' ? `\n        ${wineLine}` : ''}\n      </section>` : '';
+    return items ? `\n      <section class="ski-guide-resort" id="${sec.id}">\n        <h2>${escapeHtml(sec.heading)}</h2>${sec.lead ? `\n        <p>${guideTipHtml(sec.lead)}</p>` : ''}\n        <ul class="ski-guide-list">${items}\n        </ul>\n      </section>` : '';
   }).join('');
-  const wineLineEnd = wineLine && !liveSections.has('tours') ? `\n      ${wineLine}` : '';
+  const wineLineEnd = wineLine ? `\n      ${wineLine}` : '';
   const rowsHtml = g.table.rows.map(([area, refs]) => {
     const links = refs.map((x) => { const [ref, label] = x.split('|'); const v = guideRefVenue(ref); return v ? `<a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(label)}</a>` : ''; }).filter(Boolean);
     return links.length ? `\n          <tr><th scope="row">${escapeHtml(area)}</th><td>${links.join(', ')}</td></tr>` : '';

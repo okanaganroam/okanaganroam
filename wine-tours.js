@@ -4,7 +4,7 @@
 // set up (VIATOR_API_KEY + VIATOR_PARTNER_ID, viator.config()).
 //
 // Where it shows (one tour per page, one "Book now" button, plain words):
-//   - the wine guides (data/viator-wine-tours.json "guides") and the wineries listings (/wineries and /<town>/wineries):
+//   - the wine guides named in data/viator-wine-tours.json "guides" (not the first-timers guide, which lists local tour companies) and the wineries listings (/wineries and /<town>/wineries):
 //     one short line "Book a wine tour (no driving): <tour> · Book now ↗" with the commission line under it;
 //   - Build My Trip V4, "Book my trip": one step "Book a wine tour (no driving)" when a day of the plan has 2+ winery stops.
 // Never on a winery's own page (its own "Book a tasting" stays the only booking button there).
