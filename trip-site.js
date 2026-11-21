@@ -169,14 +169,11 @@ module.exports = {
   viator: {
     campaign: 'okanagan',
     province: 'British Columbia',
-    area: 'Okanagan Valley',
-    destinationNames: ['Okanagan Valley', 'Kelowna', 'Penticton', 'Vernon', 'Osoyoos', 'Oliver', 'Summerland', 'Peachland', 'West Kelowna', 'Naramata', 'Big White'],
-    regionDestinations: {
-      kelowna: 'Kelowna', 'west-kelowna': 'Kelowna', 'lake-country': 'Kelowna', 'big-white': 'Kelowna', peachland: 'Kelowna',
-      penticton: 'Penticton', naramata: 'Penticton', summerland: 'Penticton', kaleden: 'Penticton', 'okanagan-falls': 'Penticton', apex: 'Penticton',
-      vernon: 'Vernon', coldstream: 'Vernon', silverstar: 'Vernon', armstrong: 'Vernon', lumby: 'Vernon', enderby: 'Vernon',
-      oliver: 'Osoyoos', osoyoos: 'Osoyoos', baldy: 'Osoyoos',
-    },
+    // Viator has one destination for the whole valley (checked against /destinations 2026-11-20: d22366
+    // "Kelowna & Okanagan Valley", a CITY under British Columbia d261), so every town uses it.
+    area: 'Kelowna & Okanagan Valley',
+    destinationNames: ['Kelowna & Okanagan Valley'],
+    regionDestinations: {},
     interests: ['wine_tour', 'food_tour', 'boat', 'zipline', 'paddle', 'bike_tour', 'ski_lesson', 'tour'],
   },
 

@@ -251,11 +251,11 @@ test('scripts: viator-match writes the review CSV and destinations (mock API, no
     assert.ok(api.calls.every((c) => c.url.startsWith('https://api.viator.com/partner/')), 'only the Viator API is called');
     assert.ok(api.calls.every((c) => ['/partner/destinations', '/partner/products/search', '/partner/search/freetext'].includes(c.path) || /^\/partner\/products\/\w+$/.test(c.path)), 'Basic-access endpoints only');
     const dest = JSON.parse(fs.readFileSync(path.join(dir, 'destinations-okanagan.json'), 'utf8'));
-    assert.deepEqual(dest.found, { 'Okanagan Valley': 25828, Kelowna: 5257, Penticton: 50120 }, 'the Kelowna outside BC is ignored');
-    assert.equal(dest.area, 25828);
-    assert.equal(dest.regions.kelowna, 5257);
-    assert.equal(dest.regions.naramata, 50120);
-    assert.ok(dest.missing.includes('Vernon'));
+    // Viator's real list (2026-11-20) has one Okanagan destination, d22366 "Kelowna & Okanagan Valley".
+    assert.deepEqual(dest.found, { 'Kelowna & Okanagan Valley': 22366 });
+    assert.equal(dest.area, 22366);
+    assert.deepEqual(dest.regions, {});
+    assert.deepEqual(dest.missing, []);
     const csv = viator.parseCsv(fs.readFileSync(res.csvFile, 'utf8'));
     assert.deepEqual(csv.map((r) => [r.venue_id, r.viator_product_code, r.confidence, r.ok]), [['1576', '11111P1', 'high', ''], ['1576', '44444P1', 'low', '']]);
     assert.equal(csv[0].supplier_name, 'Bare Wine Tours Ltd.');
@@ -278,7 +278,7 @@ test('scripts: viator-match writes the review CSV and destinations (mock API, no
     assert.equal(m.venues[1576].productCode, '11111P1');
     assert.equal(viator.venueMatch(1576, viator.loadMatches(path.join(dataDir, 'viator-matches.json'))).url, m.venues[1576].url);
     const d = viator.loadDestinations(path.join(dataDir, 'viator-destinations.json'));
-    assert.equal(d.area, 25828);
-    assert.equal(d.regions.kelowna, 5257);
+    assert.equal(d.area, 22366);
+    assert.deepEqual(d.regions, {});
   } finally { fs.rmSync(dir, { recursive: true, force: true }); viator.clearCache(); }
 });

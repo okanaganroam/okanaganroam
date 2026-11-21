@@ -58,6 +58,14 @@
    "lookupId": "1.999",
    "defaultCurrencyCode": "USD",
    "timeZone": "UTC"
+  },
+  {
+   "destinationId": 22366,
+   "name": "Kelowna & Okanagan Valley",
+   "type": "CITY",
+   "parentDestinationId": 262,
+   "lookupId": "8.75.262.22366",
+   "defaultCurrencyCode": "CAD"
   }
  ]
 }
