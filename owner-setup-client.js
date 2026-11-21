@@ -1040,6 +1040,22 @@
     var md = function(d){ var m = 11; while (m > 0 && CUM[m] > d) m--; return pad2(m + 1) + '-' + pad2(d - CUM[m] + 1); };
     return { from: md(hit[0]), to: md(hit[hit.length - 1]) };
   }
+  // Sport test 11 (2026-11-21; Geneviève's winter simulator hours, Jan 5 – Mar 31, saved with a ✓ outside her Apr 3 – Oct 31
+  // season and showed nowhere): the days of a stretch of other hours that fall outside the open season, and the shortest
+  // season that covers both. Every kind. -> { out: true|false, ext: { from, to } }
+  function seaOutside(per, sea){
+    if (!per || !sea || !/^\d{2}-\d{2}$/.test(per.from || '') || !/^\d{2}-\d{2}$/.test(per.to || '')) return { out: false };
+    var CUM = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+    var doy = function(md){ return CUM[+md.slice(0, 2) - 1] + Math.min(+md.slice(3), 31) - 1; };
+    var len = function(a, b){ return (doy(b) - doy(a) + 365) % 365 + 1; };
+    var out = false, i = doy(per.from), n = len(per.from, per.to);
+    for (var k = 0; k < n; k++) { var md = (function(d){ var m = 11; while (m > 0 && CUM[m] > d) m--; return pad2(m + 1) + '-' + pad2(d - CUM[m] + 1); })(i); if (!mdInRange(md, sea.from, sea.to)) { out = true; break; } i = (i + 1) % 365; }
+    if (!out) return { out: false };
+    var c = [{ from: per.from, to: sea.to }, { from: sea.from, to: per.to }, { from: per.from, to: per.to }].filter(function(x){ return mdInRange(sea.from, x.from, x.to) && mdInRange(sea.to, x.from, x.to) && mdInRange(per.from, x.from, x.to) && mdInRange(per.to, x.from, x.to); });
+    c.sort(function(x, y){ return len(x.from, x.to) - len(y.from, y.to); });
+    return { out: true, ext: c[0] || null };
+  }
+  function curOpenSea(){ return S.openTouched ? S.openSea : openSeaOf(CUR.open_months); }
   S.openSea = openSeaOf(CUR.open_months); S.openTouched = false;
   // Seasonal hours (pub test 6, 2026-11-10): the first stored set, as its months and its own day-by-day week (it was one
   // time for the days already open in the usual week, so "open daily in summer" kept Mon and Tue closed). Stored the same
@@ -1567,7 +1583,7 @@
     if (answered(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
     return '<div class="su-skip"><button type="button" class="su-link" data-act="skip:' + step + '">' + h(T.skip) + '</button></div>';
   }
-  function msgs(){ return (S.seaStaleDone ? '<p class="su-sent" id="suSeaStaleDone">' + h(S.seaStaleDone) + '</p>' : '') + (typeof seaStaleHtml === 'function' && !seaIsStep(S.step) ? seaStaleHtml() : '') + (S.nudge ? '<p class="su-error" role="alert">' + h(S.nudge) + '</p>' + (S.nudgeLink && S.nudge === T.monthsClosedOneHere ? '<p class="su-hint"><button type="button" class="su-link" data-act="go:' + S.nudgeLink + '">' + h(T.labels.closures || T.monthsClosedOneLink || '') + ' →</button></p>' : '') + (S.seaClosedNudge && S.nudge === S.seaClosedNudge && seaIsStep(S.step) ? '<div class="su-stack su-seaskip">' + big('➜', T.seasonAllClosedBtn, '', true, 'seaSkipClosed') + '</div>' : '') : '') + (S.error ? '<p class="su-error" role="alert">' + h(S.error) + '</p>' : ''); }
+  function msgs(){ return (S.seaStaleDone ? '<p class="su-sent" id="suSeaStaleDone">' + h(S.seaStaleDone) + '</p>' : '') + (typeof seaStaleHtml === 'function' && !seaIsStep(S.step) ? seaStaleHtml() : '') + (S.nudge ? '<p class="su-error" role="alert">' + h(S.nudge) + '</p>' + (S.nudgeLink && S.nudge === T.monthsClosedOneHere ? '<p class="su-hint"><button type="button" class="su-link" data-act="go:' + S.nudgeLink + '">' + h(T.labels.closures || T.monthsClosedOneLink || '') + ' →</button></p>' : '') + (S.seaClosedNudge && S.nudge === S.seaClosedNudge && seaIsStep(S.step) ? '<div class="su-stack su-seaskip">' + big('➜', T.seasonAllClosedBtn, '', true, 'seaSkipClosed') + '</div>' : '') + (S.seaOutNudge && S.nudge === S.seaOutNudge && S.seaOut ? '<div class="su-stack su-seaout" id="suSeaOut">' + (S.seaOut.ext ? big('✓', fill(T.seaOutsideYes, { a: mdLabel(S.seaOut.ext.from), b: mdLabel(S.seaOut.ext.to) }), '', false, 'seaOutOpen') : '') + big('✕', T.seaOutsideNo, T.seaOutsideNoSub, true, 'seaOutSkip') + '</div>' : '') : '') + (S.error ? '<p class="su-error" role="alert">' + h(S.error) + '</p>' : ''); }
   // Back on a question already answered: say so, and which answer we have.
   function doneLine(step){
     var d = S.done[step]; if (!d || d === 'skip' || d === 'later') return '';
@@ -1683,7 +1699,8 @@
     if (key && (CUR.visit_fr || {})[key]) return C.lang === 'fr' ? '' : frOnlyHint(id + 'Fr');
     var t = String(text || '');
     if (C.lang !== 'fr' || !t.trim() || !T.lineEnglishHint) return '';
-    var dropsEn = key === 'known_for' && T.knownFrDropsEn && (C.visitResearch || []).indexOf('known_for') >= 0 ? ' ' + T.knownFrDropsEn : '';
+    // Sport test 11: on an indoor or sport place the English page keeps research's line until hers is translated.
+    var dropsEn = key === 'known_for' && T.knownFrDropsEn && (C.visitResearch || []).indexOf('known_for') >= 0 ? ' ' + (INDOOR && T.knownFrKeepsEn ? T.knownFrKeepsEn : T.knownFrDropsEn) : '';
     var en = (t.match(/\b(?:the|and|with|from|our|its|of|is|for|to|on|at|only|welcome|recommended|ahead|book|booking|call|private|room|groups?|walk-ins?|dinner|lunch|brunch|menu|full|closes|winter|summer|patio|drinks?|kids|dogs|allowed|available|please)\b/gi) || []).length;
     if (!en || /\b(?:le|la|les|et|avec|nos|des|est|pour|du|au|aux|une?|groupes|bienvenus?|réserv\w*|salle|souper|dîner|seulement|terrasse|enfants|chiens)\b/i.test(t)) return '';
     return '<p class="su-hint su-enhint" id="' + id + '">' + h((noQuick && T.lineEnglishHintNoQuick ? T.lineEnglishHintNoQuick : T.lineEnglishHint) + dropsEn) + '</p>';
@@ -1837,6 +1854,8 @@
     // Sport test 8: a walk-on or 9-hole course's example is a small course's.
     var bk0 = (S.tour && S.tour.book) || (TI && TI.book) || '';
     if (k0 && INDOOR_CHIP_GROUP.get(k0) === 'golf' && (bk0 === 'no' || C.golfSmall) && T.bringExKinds.golfsmall) return bk0 === 'no' ? T.bringExKinds.golfsmall : T.bringExKinds.golfsmallbook || T.bringExKinds.golfsmall;
+    // Sport test 11 (2026-11-21): after « Non, réservez un départ » the example no longer says "Tee times recommended".
+    if (k0 && INDOOR_CHIP_GROUP.get(k0) === 'golf' && bk0 === 'ahead' && T.bringExKinds.golfahead) return T.bringExKinds.golfahead;
     return T.bringExKinds[INDOOR_CHIP_GROUP.get(k0)] || T.bringEx; }
   // Indoor test 3 (2026-11-19; Diane, a community theatre): the main kind (the first picked, or pre-picked), and whether it
   // is a show place (live theatre, music or comedy): it is asked about tickets, and its price is its lowest regular ticket.
@@ -2061,6 +2080,9 @@
     return (CUR.hours_seasons || []).map(function(sz){
       if (!sz || !/^\d{2}-\d{2}$/.test(sz.from || '') || !/^\d{2}-\d{2}$/.test(sz.to || '')) return '';
       var x = seasonInfo(sz); if (!x) return '';
+      // Sport test 11: hours outside the open season show nowhere: said so, with no ✓.
+      var sNow = curOpenSea();
+      if (sNow && T.seaOutsideLine && seaOutside(sz, sNow).out) return '<p class="su-hint su-seaoutline">' + h(fill(T.seaOutsideLine, { span: x.head, hours: weekShort(x.w), a: mdLabel(sNow.from), b: mdLabel(sNow.to) })) + '</p>';
       return '<p class="su-sent su-seasonnow su-seahours">' + h(x.kind ? fill(T.seasonHoursLine, { kind: x.kw, range: x.range, hours: weekShort(x.w) }) : fill(T.seasonHoursLineSpan, { span: x.head, hours: weekShort(x.w) })) + '</p>';
     }).join('');
   }
@@ -2101,6 +2123,10 @@
   function frOnlyNamed(){
     var ks = ((S.score && S.score.frOnlyKeys) || []).filter(function(k){ return T.frLineNames && T.frLineNames[k]; });
     if (!ks.length || !T.frOnlyNamed || !C.back) return '';
+    // Sport test 11 (2026-11-21; « Ajouter la version anglaise » dropped Geneviève into the English portal): on an indoor
+    // or sport place her French lines' English is queued for her (server.js queueFrLinesTranslation), so the line says so
+    // and she stays in the French portal; nothing to tap.
+    if (INDOOR && T.frOnlyQueued) return '<p class="su-hint" id="suFrOnlyNamed">' + h(fill(T.frOnlyQueued, { list: ks.map(function(k){ return T.frLineNames[k]; }).join(', ') })) + '</p>';
     var en = String(C.back).replace(/^\/fr(?=\/)/, '') + '#' + (FR_ONLY_BOX[ks[0]] || 'visit');
     return '<p class="su-hint" id="suFrOnlyNamed">' + h(fill(T.frOnlyNamed, { list: ks.map(function(k){ return T.frLineNames[k]; }).join(', ') })) + ' <a class="su-link" id="suFrOnlyAddEn" href="' + h(en) + '" onclick="try{localStorage.setItem(\'okanaganLang\',\'en\')}catch(e){}">' + h(T.frOnlyAddEn) + '</a></p>';
   }
@@ -3588,6 +3614,19 @@
       }
       // Tour test 10: any two of three; the message names the other one (the one not on screen when it can).
       for (var oa = 0; oa < list.length; oa++) for (var ob = oa + 1; ob < list.length; ob++) if (mdOverlap(list[oa], list[ob])) { var oz = list[oa === S.seaI ? ob : oa]; S.nudge = fill(T.seasonOverlap, { a: mdLabel(oz.from), b: mdLabel(oz.to) }); S.overlapNudge = S.nudge; return render(); }
+      // Sport test 11: a stretch (new or changed on this visit) with days outside the open season would never show: never a
+      // "saved ✓" for it. She is asked to open those days too, or to skip these hours (Good to know says what runs then).
+      var seaNow = curOpenSea();
+      if (seaNow && T.seaOutside) for (var oi = 0; oi < list.length; oi++) {
+        var lo = list[oi], so2 = S.seaList.filter(function(o){ return o.on; })[oi];
+        if (so2 && so2.src && !so2.dirty) continue;
+        var ox = seaOutside(lo, seaNow);
+        if (!ox.out) continue;
+        S.seaOut = { i: S.seaList.indexOf(so2), per: lo, ext: ox.ext };
+        S.nudge = fill(T.seaOutside, { a: mdLabel(seaNow.from), b: mdLabel(seaNow.to), c: mdLabel(lo.from), d: mdLabel(lo.to) }); S.seaOutNudge = S.nudge;
+        return render();
+      }
+      S.seaOut = null; S.seaOutNudge = '';
       list = list.concat(rest);
       if (JSON.stringify(list) !== JSON.stringify(stored)) ch.hours_seasons = list;
     }
@@ -3609,6 +3648,9 @@
       // Indoor test 1 (2026-11-19; Margaret, closed Christmas to mid-January): with summer and winter hours just saved, one
       // line points to Closures for a holiday break (no new step). Not when a yearly closure is already saved.
       if (C.indoor && T.seaClosuresHint && ch.hours_seasons && ch.hours_seasons.length && !(CUR.closures || []).some(function(c){ return c && c.yearly; })) S.savedLine.hours = T.savedLive + ' ' + T.seaClosuresHint;
+      // Sport test 11: hours skipped because they were outside the season: where they go instead.
+      if (S.seaOutSkipped && T.seaOutsideSkipped) { S.savedLine.hours = T.savedLive + ' ' + T.seaOutsideSkipped; }
+      S.seaOutSkipped = false;
       CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? week : JSON.stringify(week); S.seaStale = stale.length ? stale : null;
       if ('hours_holidays' in ch) CUR.hours_holidays = ch.hours_holidays;
       if (tourApptOff) { delete AI.visit; S.wine.visit = ''; }
@@ -4179,6 +4221,16 @@
       seaUse(S.seaList[zi] ? zi : 0);
       return hoursSave();
     }
+    // Sport test 11: open the days of these hours too (the season is widened to cover them), or skip these hours.
+    if (k === 'seaOutOpen' && S.seaOut && S.seaOut.ext) { S.openSea = { from: S.seaOut.ext.from, to: S.seaOut.ext.to }; S.openTouched = true; S.seaOut = null; S.seaOutNudge = ''; S.nudge = ''; return hoursSave(); }
+    if (k === 'seaOutSkip' && S.seaOut) {
+      var oz2 = S.seaList[S.seaOut.i]; S.seaOut = null; S.seaOutNudge = ''; S.nudge = '';
+      if (oz2 && oz2.src) S.seaList[S.seaList.indexOf(oz2)] = seaLoad(seaBlank(), oz2.src);
+      else if (oz2) { var zi2 = S.seaList.indexOf(oz2); if (zi2 >= 1) S.seaList.length = zi2; else S.seaList[0] = seaBlank(); }
+      seaUse(0);
+      S.seaOutSkipped = true;
+      return hoursSave();
+    }
     if (k === 'seaDropKeep') { S.dropI = null; return goBack(); }
     if (k === 'seaDropYes') { var dz = S.seaList[S.dropI]; S.dropI = null; if (dz) { dz.on = false; S.seaTouched = true; } return hoursSave(); }
     if (k === 'seaStaleFix') return seaStaleFix(+v);
@@ -4488,13 +4540,18 @@
       // Indoor places (2026-11-19): the youngest age; All ages or 5+ ticks Kids welcome, 12+ and up takes it off.
       if (INDOOR) {
         if (!S.tour.age) { S.nudge = T.tageNeed; return render(); }
-        var ia = {}; if (S.tour.age !== (TI.age || '')) ia.age = S.tour.age;
+        // Sport test 11 (2026-11-21; « Tous les âges » was pre-picked from the golf kind, Geneviève never touched it, and her
+        // semi-private course got Kid-Friendly): an age we pre-picked from the kind and she left as it was is not her
+        // answer. Neither the age nor Kids welcome is saved from it; only a tap on an age is.
+        var iGuess = !!S.tour.ageGuessed && !TI.age;
+        var ia = {}; if (!iGuess && S.tour.age !== (TI.age || '')) ia.age = S.tour.age;
         var iad = S.tour.age !== '19' && S.tour.age !== 'all' && S.tour.adult; if (iad !== (TI.adult === true)) ia.adult = iad ? true : null;
         if (Object.keys(ia).length) list.unshift(tinfo(ia));
         var ikids = S.tour.age === 'all' || S.tour.age === '5';
         // Indoor test 7 (2026-11-19; Robert's commercial gallery showed Kid-Friendly first): All ages never ticks Kids welcome
         // for a gallery, casino, library or theatre (unless it has kids' shows); the badge stays as it was there.
         if (ikids && !indoorFamilyKinds()) ikids = !!S.savedBadges.kid_friendly;
+        if (iGuess) ikids = !!S.savedBadges.kid_friendly;
         if (ikids !== !!S.savedBadges.kid_friendly) list.push({ badges: { kid_friendly: ikids } });
         return saveAll('offer', list, null, offerNext('offer'), function(){ if (ia.age) TI.age = ia.age; if ('adult' in ia) { if (ia.adult) TI.adult = true; else delete TI.adult; } S.badges.kid_friendly = ikids; S.tour.ageGuessed = false; });
       }
@@ -4502,7 +4559,8 @@
       // ticks Kids welcome (5+ too, tour test 2); 12+ and up takes it off, so a family filter never shows a 16+ tour.
       if (TOUR) {
         if (!S.tour.age) { S.nudge = T.tageNeed; return render(); }
-        var ta = {}; if (S.tour.age !== (TI.age || '')) ta.age = S.tour.age;
+        var tGuess = !!S.tour.ageGuessed && !TI.age; // sport test 11: a pre-picked age is not her answer
+        var ta = {}; if (!tGuess && S.tour.age !== (TI.age || '')) ta.age = S.tour.age;
         var adult0 = S.tour.age !== '19' && S.tour.adult; if (adult0 !== (TI.adult === true)) ta.adult = adult0 ? true : null;
         // Tour test 12: under 19s, and the waiver (each only with the rule on).
         var aa0 = adult0 && S.tour.adultAge === '19', aw0 = adult0 && S.tour.adultHow === 'waiver';
@@ -4511,6 +4569,7 @@
         if (Object.keys(ta).length) list.unshift({ tour_info: ta });
         // Tour test 10 (Whistler, 2026-11-18; Gord, riders 8+; Dayton approved): 8+ and 10+ keep Kids welcome too.
         var kidsOn = S.tour.age === 'all' || S.tour.age === '5' || S.tour.age === '6' || S.tour.age === '8' || S.tour.age === '10';
+        if (tGuess) kidsOn = !!S.savedBadges.kid_friendly;
         if (kidsOn !== !!S.savedBadges.kid_friendly) list.push({ badges: { kid_friendly: kidsOn } });
         return saveAll('offer', list, null, offerNext('offer'), function(){ if (ta.age) TI.age = ta.age; if ('adult' in ta) { if (ta.adult) TI.adult = true; else delete TI.adult; } if ('adult_age' in ta) { if (ta.adult_age) TI.adult_age = '19'; else delete TI.adult_age; } if ('adult_waiver' in ta) { if (ta.adult_waiver) TI.adult_waiver = true; else delete TI.adult_waiver; } S.badges.kid_friendly = kidsOn; });
       }

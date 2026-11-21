@@ -197,7 +197,7 @@ test('5. The price box reads "adults free, kids 15" as 15 (the kid\'s number), i
   assert.doesNotMatch(h.text(), /Just the number/);
 });
 
-test('6. A kids\' place has All ages pre-picked ("We picked…"), saved on Save, with one hint line about a range like 0 to 10 (EN + FR); another kind has no such hint', async () => {
+test('6. A kids\' place has All ages pre-picked ("We picked…"), saved once she taps it (sport test 11), with one hint line about a range like 0 to 10 (EN + FR); another kind has no such hint', async () => {
   const v = mk({ name: 'Play Area T19 Ages', cuisine: 'Indoor playground', description: STORY });
   const t = tokenFor(v.id);
   await ok(change(t, { indoor_info: { kinds: ['kids'], length: '1-2h', book: 'no' }, indoor_price: 15 }));
@@ -207,6 +207,11 @@ test('6. A kids\' place has All ages pre-picked ("We picked…"), saved on Save,
   assert.equal(g.doc.getElementById('suAgeKidsHint').textContent, 'For kids up to an age, like 0 to 10? Say it in your story.');
   assert.equal(app.venueIndoorInfo(v.id).age, undefined, 'not saved before Save');
   await g.click('offerSave');
+  // Sport test 11 (2026-11-21): a pre-picked age she didn't touch is not her answer (nor Kids welcome); her tap is.
+  assert.equal(app.venueIndoorInfo(v.id).age, undefined, 'a pre-picked age is not saved as hers');
+  const g2 = await openSetup(base, t, { hash: 'offer' });
+  await g2.click('[data-tpick="age:5"]'); await g2.click('[data-tpick="age:all"]');
+  await g2.click('offerSave');
   assert.equal(app.venueIndoorInfo(v.id).age, 'all');
   const gf = await openSetup(base, tokenFor(v.id), { hash: 'offer', lang: 'fr' });
   assert.match(gf.doc.getElementById('suAgeKidsHint').textContent, /^Pour les enfants jusqu’à un certain âge, comme de 0 à 10 ans\s?\? Dites-le dans votre histoire\.$/);

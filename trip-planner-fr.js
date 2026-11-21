@@ -393,6 +393,15 @@ const PHRASES = [
   ['champ de pratique', 'driving range'], ['simulateur de golf', 'golf simulator'], ['simulateurs de golf', 'golf simulators'], ['golf interieur', 'indoor golf'],
   ['piscine exterieure', 'outdoor pool'], ['piscines exterieures', 'outdoor pools'],
   // Sport test 2 (2026-11-20, the French sport vocabulary sweep): every sport kind's French search words read as its English.
+  // Sport test 11 (2026-11-21; « un départ le matin puis un souper » planned dinner only): a golfer's « départ » is a tee
+  // time (« un départ », « réserver un départ », « un départ de golf »); « départ de Kelowna » / « un départ du centre »
+  // is a departure. « au crépuscule » is twilight golf, « tôt » early, « une partie de golf » a round.
+  ['un depart le matin', 'a tee time in the morning'], ['un depart en matinee', 'a tee time in the morning'], ['un depart en apres midi', 'a tee time in the afternoon'], ['un depart l apres midi', 'a tee time in the afternoon'],
+  ['un depart en fin d apres midi', 'a late afternoon tee time'], ['un depart tot', 'an early tee time'], ['un depart au golf', 'a tee time'], ['un depart au crepuscule', 'a twilight tee time'], ['reserver un depart', 'book a tee time'], ['reserver une heure de depart', 'book a tee time'],
+  ['un depart de golf', 'a tee time'], ['depart de golf', 'tee time'], ['departs de golf', 'tee times'], ['un depart de', 'a departure from'], ['un depart du', 'a departure from the'], ['un depart d', 'a departure from'],
+  ['golf au crepuscule', 'twilight golf'], ['au crepuscule', 'at twilight'], ['tot le matin', 'early in the morning'], ['tot', 'early'],
+  ['une partie de golf', 'a round of golf'], ['partie de golf', 'round of golf'], ['une ronde de golf', 'a round of golf'], ['ronde de golf', 'round of golf'], ['neuf trous', '9 holes'], ['dix huit trous', '18 holes'],
+  ['voiturette', 'golf cart'], ['voiturettes', 'golf carts'], ['vert d exercice', 'putting green'], ['golfeurs', 'golfers'], ['golfeur', 'golfer'], ['golfeuse', 'golfer'],
   ['heure de depart', 'tee time'], ['heures de depart', 'tee times'], ['droits de jeu', 'green fees'], ['droit de jeu', 'green fee'], ['18 trous', '18 holes'], ['9 trous', '9 holes'],
   ['golf virtuel', 'indoor golf'], ['practice de golf', 'driving range'], ['seau de balles', 'bucket of balls'], ['seaux de balles', 'bucket of balls'],
   ['apprendre a skier', 'learn to ski'], ['ski de soiree', 'night skiing'], ['ski en soiree', 'night skiing'],
@@ -633,8 +642,13 @@ function isFrenchTripRequest(text, taxonomy) {
 // The request the planner reads: the English rewrite of a French request, or
 // the original string, unchanged, for anything else. { frenchPage: true } (a
 // search from a French page) also counts the French-only drink words.
+// Sport test 11: in a request about golf, « un départ » / « mon départ » (not « départ de Kelowna ») is a tee time.
+function golfDepartures(text) {
+  if (typeof text !== 'string' || !/golf/i.test(text)) return text;
+  return text.replace(/\b(un|mon|notre|le|nos|des|deux)\s+(d[ée]parts?)\b(?!\s+(?:de|du|des|d['’]|pour|vers\s+(?:le|la|les|l['’])|à\s+partir|a\s+partir))/gi, (m, a, d) => `${a} ${d} de golf`);
+}
 function tripPlannerText(text, taxonomy, opts = {}) {
-  const r = translateTrip(text, taxonomy, opts);
+  const r = translateTrip(golfDepartures(text), taxonomy, opts);
   return r ? r.text : text;
 }
 // The same tokens with their accents (round 10): « novembre », « marchés », for showing the visitor's own words back.

@@ -2160,7 +2160,11 @@ Object.assign(fr, {
   frLineNames: { known_for: 'Connu pour', good_to_know: 'Bon à savoir', groups: 'Groupes', dogs: 'Chiens', dietary: 'Note alimentaire', reservations: 'Réservations', takeout: 'À emporter', menu: 'Menu' },
   frOnlyNamed: '{list} : en français seulement, donc sur votre page française seulement.', frOnlyAddEn: 'Ajouter la version anglaise',
   knownFrDropsEn: 'Si vous l’écrivez en français, cette ligne en anglais quitte votre page anglaise : ajoutez-en une en anglais sur votre page de modification.',
+  // Sport test 11: indoor and sport places (their English is queued for them).
+  knownFrKeepsEn: 'Votre page anglaise garde cette ligne en anglais jusqu’à ce que nous écrivions la version anglaise de la vôtre (habituellement d’ici un jour).',
+  frOnlyQueued: '{list} : écrit en français. Nous écrivons la version anglaise pour votre page anglaise, habituellement d’ici un jour.',
 });
+Object.assign(en, { frOnlyQueued: 'Written in French: {list}. We write the English for your English page, usually within a day.' });
 // Tour test 7 (Whistler fresh eyes, Erik, a mountain guide, 2026-11-17): a day rate ("$750/day") is a price for the
 // group (Private tours, with the move button); "1450 for 3 days" is a trip length, not a group count; a bare hourly
 // rate goes in Your tours and prices. The private box takes a day rate and says so.
@@ -2597,6 +2601,9 @@ Object.assign(fr.indoor, { quickSportDogs: {
   _: 'Chiens bienvenus à l’extérieur en laisse, pas à l’intérieur.',
 } });
 Object.assign(en.indoor.bringExKinds = en.indoor.bringExKinds || {}, { golfsmall: 'Walk-ons only: no tee times. Pull carts only. Cash in the honour box when the clubhouse is closed.', golfsmallbook: 'Pull carts only. Cash only at the clubhouse.' });
+// Sport test 11: a course that books every tee time ahead: an example that doesn't tell visitors tee times are optional.
+Object.assign(en.indoor.bringExKinds, { golfahead: 'Dress code: collared shirts, no denim. Cart and club rentals in the pro shop.' });
+Object.assign(fr.indoor.bringExKinds = fr.indoor.bringExKinds || {}, { golfahead: 'Code vestimentaire : chemise à col, pas de jeans. Location de voiturettes et de bâtons à la boutique du pro.' });
 Object.assign(fr.indoor.bringExKinds = fr.indoor.bringExKinds || {}, { golfsmall: 'Sans réservation seulement : pas d’heures de départ. Chariots à tirer seulement. Comptant dans la boîte de paiement quand le club-house est fermé.', golfsmallbook: 'Chariots à tirer seulement. Comptant seulement au club-house.' });
 Object.assign(en.indoor, { webLeadTickets: 'We filled in your tickets page. If your prices are on another page, change it.', researchLine: 'We picked these from what we found online. Untick anything that’s wrong.', noSetHoursHint: 'Shows or classes only? Tap this. Put box office hours in Good to know, like “Box office: Tue–Fri 11–4 and an hour before shows.”',
   ibookQShow: 'Do people need tickets ahead?', ibooksShow: { no: 'Tickets at the door are fine', busy: 'Tickets at the door, but buy ahead for busy shows', ahead: 'Please buy tickets ahead' },
@@ -2879,6 +2886,26 @@ fr.sport = sportStrings(fr.indoor, {
   seasonHintSummer: 'La plupart des endroits comme le vôtre ferment l’hiver. Touchez « Nous fermons une partie de l’année » et choisissez votre premier et votre dernier jour.',
   seasonHintWinter: 'La plupart des endroits comme le vôtre sont ouverts l’hiver seulement. Touchez « Nous fermons une partie de l’année » et choisissez votre premier et votre dernier jour.',
 });
+// Sport test 11 (2026-11-21; Geneviève's winter simulator hours, Jan 5 – Mar 31, saved with a ✓ outside her Apr 3 – Oct 31
+// season and showed nowhere): a stretch of other hours outside the open season is asked about, never saved with a ✓.
+// Every kind. Off-season hours for a second kind (a winter simulator) go in Good to know: no new field.
+Object.assign(en, {
+  seaOutside: 'Your season is {a} – {b}, so on {c} – {d} your page says “Closed for the season” and these hours would show nowhere. Open {c} – {d} too?',
+  seaOutsideYes: 'Yes, we’re open {a} – {b}',
+  seaOutsideNo: 'No, skip these hours',
+  seaOutsideNoSub: 'Only something else runs then, like an indoor simulator? Say it in Good to know',
+  seaOutsideSkipped: 'Those other hours weren’t saved: outside your season your page says closed. Something else runs then (like a winter simulator)? Say when in Good to know, like “Indoor simulator Jan–Mar, Mon–Sat 9 AM – 9 PM”.',
+  seaOutsideLine: '{span}: {hours}. Outside your season ({a} – {b}), so these don’t show on your page.',
+});
+Object.assign(fr, {
+  seaOutside: 'Votre saison va du {a} au {b} : du {c} au {d}, votre page dit « Fermé pour la saison » et ces heures ne paraîtraient nulle part. Ouvert aussi du {c} au {d}?',
+  seaOutsideYes: 'Oui, nous sommes ouverts du {a} au {b}',
+  seaOutsideNo: 'Non, passer ces heures',
+  seaOutsideNoSub: 'Seulement autre chose est ouvert, comme un simulateur intérieur? Dites-le dans Bon à savoir',
+  seaOutsideSkipped: 'Ces autres heures n’ont pas été enregistrées : hors saison, votre page dit fermé. Autre chose est ouvert à ce moment-là (comme un simulateur l’hiver)? Dites quand dans Bon à savoir, comme « Simulateur intérieur de janvier à mars, du lundi au samedi de 9 h à 21 h ».',
+  seaOutsideLine: '{span} : {hours}. En dehors de votre saison (du {a} au {b}), ces heures ne paraissent pas sur votre page.',
+});
+
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

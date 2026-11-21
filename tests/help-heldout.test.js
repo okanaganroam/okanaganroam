@@ -20,7 +20,9 @@ const app = require('../server.js');
 const H0 = require('./help-heldout-questions.js');
 // Sport tests 8-10 (2026-11-21): Marg's, Gord's and Lorraine's real questions join the set.
 const S89 = require('./help-sport89-questions.js'), S10 = require('./help-sport10-questions.js');
-const SRC = { ...H0.SRC, ...S89.SRC, ...S10.SRC }, Q = [...H0.Q, ...S89.Q, ...S10.Q], KNOWN_MISS = H0.KNOWN_MISS;
+// Sport test 11 (2026-11-21): Geneviève's 24 (22 in French).
+const S11 = require('./help-sport11-questions.js');
+const SRC = { ...H0.SRC, ...S89.SRC, ...S10.SRC, ...S11.SRC }, Q = [...H0.Q, ...S89.Q, ...S10.Q, ...S11.Q], KNOWN_MISS = H0.KNOWN_MISS;
 app.setVenueSubmissionTransport(async () => {});
 
 let srv, base;

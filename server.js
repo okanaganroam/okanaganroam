@@ -5458,6 +5458,8 @@ function searchShortWord(w, targets, isKnown) {
 // Indoor test 9: the indoor kinds' French phrases the French word list misread (« piscine intérieure » as "pool interieure",
 // « atelier de poterie » as "workshop of poterie"), read before it (discoverySearchText) and with the rest below.
 const INDOOR_FR_SEARCH_REWRITES = [
+  // Sport test 11 (2026-11-21): a golfer's « départ » is a tee time (« réserver un départ », « départ de golf »).
+  ['un depart de golf', 'tee time'], ['depart de golf', 'tee time'], ['departs de golf', 'tee times'], ['reserver un depart', 'tee time'], ['reserver une heure de depart', 'tee time'],
   ['salle de spectacle', 'theatre'], ['salle de spectacles', 'theatre'], ['salles de spectacle', 'theatre'],
   ['piscine interieure', 'pool'], ['piscines interieures', 'pool'], ['piscine publique', 'pool'],
   ['jouer aux quilles', 'bowling'], ['salle de quilles', 'bowling'], ['parc interieur pour enfants', 'indoor playground'], ['parc interieur', 'indoor playground'], ['parcs interieurs', 'indoor playground'],
@@ -7974,6 +7976,9 @@ function getAdvisoryNotesWithDates() {
     WHERE c.kind = ? AND ci.content_type = 'venue'
     ORDER BY ci.created_at ASC, ci.rowid ASC
   `).all(ADVISORY_COLLECTION_KIND)) map.set(r.id, { note: r.note || '', addedAt: r.added_at || null });
+  // Sport test 11: not a season advisory the owner's own season answer has replaced (getCollectionNotes).
+  const own = ownerSeasonAnsweredIds();
+  for (const [id, x] of [...map]) if (own.has(id) && advisoryIsSeasonOnly(x.note)) map.delete(id);
   return map;
 }
 // 'region/slug' -> [{ label, from: 'MM-DD', to: 'MM-DD' }]: the dated rate
@@ -11104,7 +11109,26 @@ function getOutdoorLandingVenues() {
 
 // venue id -> note text for one collection kind (the most recently added
 // note wins if several). Shared by the advisory and dog-friendly kinds.
+// Sport test 11 (2026-11-21; Geneviève set her season Apr 3 – Oct 31, and research's "The course has not posted its 2026
+// closing day…" stayed on her page, her card and every Build My Trip plan into 2027): a research advisory about the season
+// or its opening or closing day stops showing once the owner has answered the season question herself (an owner save of
+// open_months: a season, or "open all year"). Advisories about anything else (a fire, works, a wildfire closure) stay.
+// Display only: the collection row is kept. Every kind, the page, the cards, Open now and the planner (they all read here).
+const ADVISORY_SEASON_RE = /\b(?:(?:closing|opening|last|first|reopening) (?:day|date)s?|off[- ]season|for the (?:season|winter)|(?:its|their|the|this|next|20\d\d) season|season(?:al)? (?:dates?|opening|closing|closure|ends?|starts?|hours)|not (?:yet )?(?:posted|announced|published|confirmed)\b[^.]*\b(?:clos\w*|open\w*|season))/i;
+const ADVISORY_NOT_SEASON_RE = /\b(?:renovat\w*|construction|wild ?fires?|fire|flood\w*|repairs?|permanently|evacuat\w*|smoke|road closure|detour)\b/i;
+function advisoryIsSeasonOnly(note) { const t = String(note || ''); return ADVISORY_SEASON_RE.test(t) && !ADVISORY_NOT_SEASON_RE.test(t); }
+function ownerSeasonAnsweredIds() {
+  try { return new Set(db.prepare(`SELECT DISTINCT venue_id AS id FROM owner_change_requests WHERE status = 'approved' AND changes LIKE '%"open_months"%'`).all().map((r) => r.id)); } catch (e) { return new Set(); }
+}
 function getCollectionNotes(kind) {
+  if (kind === ADVISORY_COLLECTION_KIND) {
+    const all = getCollectionNotesRaw(kind), own = ownerSeasonAnsweredIds();
+    if (own.size) for (const [id, note] of [...all]) if (own.has(id) && advisoryIsSeasonOnly(note)) all.delete(id);
+    return all;
+  }
+  return getCollectionNotesRaw(kind);
+}
+function getCollectionNotesRaw(kind) {
   const rows = db.prepare(`
     SELECT ci.content_id AS id, ci.note AS note
     FROM collection_items ci
@@ -12843,6 +12867,25 @@ function visitWithFrLines(info, type) {
   }
   return { ...info, rows };
 }
+// Sport test 11 (2026-11-21; Geneviève wrote her Known for and Good to know in the French setup, and the English page lost
+// its Known for row): on the English page, a row whose line she wrote only in French shows research's English line for
+// that row while hers is being translated (owner_was keeps it), else her French line marked "in French" (__frOnly). Never
+// a French line without the marker. Display only; the English she or Dayton writes replaces it.
+function visitWithFrLinesEnPage(info, type) {
+  const frl = ownerVisitFrLines(info);
+  if (!Object.keys(frl).length) return info;
+  const rows = (Array.isArray(info.rows) ? info.rows : []).map((r) => ({ ...r }));
+  const owned = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
+  const was = info.owner_was && typeof info.owner_was === 'object' ? info.owner_was : {};
+  for (const slot of visitSlotsForType(type)) {
+    const t = frl[slot.key];
+    if (!t || isPresetAnswer(t) || visitSlotRowIndex(slot, rows, owned) >= 0) continue;
+    const wl = slot.labels.find((l) => was[l] && !was[l].owned && typeof was[l].text === 'string' && was[l].text.trim());
+    if (wl) rows.push({ label: wl, text: was[wl].text, ...(was[wl].url ? { url: was[wl].url } : {}), __researchStandIn: true });
+    else rows.push({ label: visitSlotNewLabel(slot, t), text: t, __frOnly: true });
+  }
+  return { ...info, rows };
+}
 // Sport test 2 (2026-11-20; Trevor's researched "Rentals: Club rental $10" and "Practice: Lessons with outside PGA pros…"
 // went from his page the moment he typed his price, a day before Dayton approved his own list): on an indoor or sport
 // page, research's price lines a full box set aside (rentals, lessons, passes…) still show until the owner's own price
@@ -12880,6 +12923,7 @@ function sportOwnRatesLink(venue) {
 }
 function visitInfoHtml(info, fr = false, opts = {}) {
   if (fr && info) info = visitWithFrLines(info, opts.type);
+  if (!fr && info) info = visitWithFrLinesEnPage(info, opts.type);
   if (!info || !Array.isArray(info.rows) || !info.rows.length) return '';
   // Winery test 2 (2026-11-12): the owner's own lines set aside by a full box (owner_dropped, owned) are kept, folded
   // under "More" at the end, never lost.
@@ -12931,6 +12975,8 @@ function visitInfoHtml(info, fr = false, opts = {}) {
       text = text.replace(escapeHtml(linked.name), `<a href="/${linked.region}/${CATEGORY_SLUGS[linked.type]}/${linked.slug}">${escapeHtml(linked.name)}</a>`);
     }
     const more = r.url ? ` <a href="${escapeHtml(r.url)}" rel="nofollow noopener" target="_blank">${fr ? 'Plus' : 'More'} ↗</a>` : '';
+    // Sport test 11: on the English page her line in French (not translated yet) says so.
+    if (!fr && (r.__frOnly || (ownTidy && ownTidy.has(r.label) && typeof r.text === 'string' && ownerTextIsFrench(r.text)))) return `<li><span class="visit-label">${escapeHtml(shownLabel(r))}</span><span><span lang="fr">${text}</span> <span class="visit-lang-note">(in French)</span>${more}</span></li>`;
     return `<li><span class="visit-label">${escapeHtml(shownLabel(r))}</span><span>${text}${more}</span></li>`;
   };
   const enLabel = (r) => (fr ? r.__en : r.label);
@@ -12985,7 +13031,7 @@ function visitInfoHtml(info, fr = false, opts = {}) {
   let mixedSource = '';
   if (Array.isArray(info.owner_labels) && info.owner_labels.length) {
     const mineL = new Set([...info.owner_labels, ...parkedOwn.filter((r) => r.owned).map((r) => r.label)]);
-    const research = info.rows.some((r) => r && !r.__frOwn && !mineL.has(fr ? r.__en : r.label));
+    const research = info.rows.some((r) => r && !r.__frOwn && (r.__researchStandIn || !mineL.has(fr ? r.__en : r.label)));
     mixedSource = research ? (host || (fr ? 'nos recherches' : 'our research')) : '';
     host = '';
   }
@@ -13000,6 +13046,7 @@ function visitInfoHtml(info, fr = false, opts = {}) {
       .venue-visit .visit-list li { display: flex; gap: 14px; padding: 10px 0; border-bottom: 1px dotted rgba(42,32,25,0.18); line-height: 1.5; }
       .venue-visit .visit-list li:last-child { border-bottom: 0; }
       .venue-visit .visit-label { flex: 0 0 120px; font-weight: 800; }
+      .venue-visit .visit-lang-note { font-size: 0.86em; opacity: 0.75; white-space: nowrap; }
       .venue-visit .visit-more { border-top: 1px dotted rgba(42,32,25,0.18); }
       .venue-visit .visit-more summary { cursor: pointer; font-weight: 800; padding: 10px 0; min-height: 44px; box-sizing: border-box; display: flex; align-items: center; gap: 8px; list-style: none; }
       .venue-visit .visit-more summary::-webkit-details-marker { display: none; }
@@ -25443,7 +25490,12 @@ function indoorSearchExtraText(venueId, fr = false) {
   const out = [indoorVisitSearchText(venueId)];
   try {
     const row = publishedMenuRow(venueId);
-    if (row && row.source !== 'research') { const d = parseMenuData(row.data); for (const sec of (d && d.sections) || []) for (const it of sec.items || []) if (it && it.name) out.push(String(it.name)); }
+    if (row && row.source !== 'research') {
+      const d = parseMenuData(row.data);
+      // Sport test 11: a list typed in French is found by English words too (its names' English, for English search).
+      const glossEn = !fr && priceListIsFrench(d);
+      for (const sec of (d && d.sections) || []) for (const it of sec.items || []) if (it && it.name) { out.push(String(it.name)); if (glossEn) { const g = frRateWordsEn(`${it.name} ${it.description || ''}`); if (g) out.push(g); } }
+    }
   } catch (e) { /* no prices */ }
   try {
     const kinds = venueIndoorInfo(venueId).kinds || [];
@@ -55381,6 +55433,51 @@ async function queueFrStoryTranslation(venue, contactEmail) {
     return true;
   } catch (e) { console.error(`[owner-portal] French description request for venue #${venue && venue.id} failed: ${e.message}`); return false; }
 }
+// Sport test 11 (2026-11-21; Geneviève typed her Known for, Good to know, story, price names and closure note in French,
+// and the review item asked Dayton to "write the French" for them): which language an owner's own words are in, read from
+// the words themselves (not the portal she typed them in: she also typed English in the French portal). -> true for French.
+// Short price names count too (« 18 trous, matin », « Demi-voiturette »).
+const OWNER_FR_WORDS = new Set(('le la les des du de et est sont avec pour sur dans une un au aux nous vous notre nos votre vos '
+  + 'ce cette ces qui que ou où mais pas très chez sans entre jusqu après avant tous toutes tout aussi même ici '
+  + 'trous trou matin soir soirée crépuscule voiturette séance illimitée illimité droit droits jeu départ départs tarif tarifs '
+  + 'saison semaine fin enfants adultes aînés membres été hiver printemps automne ouvert ouverte fermé fermée réservez réserver '
+  + 'réservation heure heures jour jours midi privé privée cours parcours pratique champ balles chaussures '
+  + 'chemise bermudas plage bienvenus bienvenue chiens accueil souper dîner déjeuner tenue vestimentaire').split(' '));
+const OWNER_EN_WORDS = new Set(('the and is are with for on in our your of to at from by we you it this that or but not all also '
+  + 'holes hole morning afternoon evening twilight cart range bucket balls rental rentals shoes season week weekend kids adults '
+  + 'seniors members open closed book booking tee times hour hours day days private public lessons course play green fee fees '
+  + 'shirt shorts welcome dogs dinner lunch').split(' '));
+function ownerTextIsFrench(text) {
+  const t = String(text == null ? '' : text).toLowerCase().replace(/[’']/g, ' ');
+  const words = t.match(/[a-zà-ÿœ]+(?:-[a-zà-ÿœ]+)*/g) || [];
+  if (!words.length) return false;
+  let fr = 0, en = 0;
+  for (const w of words) {
+    const parts = w.split('-');
+    if (OWNER_FR_WORDS.has(w) || parts.some((x) => OWNER_FR_WORDS.has(x)) || /[àâçéèêëîïôûùüÿœ]/.test(w)) fr++;
+    else if (OWNER_EN_WORDS.has(w)) en++;
+  }
+  return fr >= 1 && fr > en * 1.5;
+}
+// A typed price list in French: its line names and details read as French (« 18 trous, matin · De l’ouverture à 12 h 59 »).
+function priceListIsFrench(data) {
+  const its = ((data && data.sections) || []).flatMap((sec) => (sec && sec.items) || []).filter((it) => it && it.name);
+  if (!its.length) return false;
+  const fr = its.filter((it) => ownerTextIsFrench(`${it.name} ${it.description || ''}`)).length;
+  return fr * 2 > its.length;
+}
+const PRICE_LIST_IN_FRENCH_NOTE = 'Price names written in French by the business.';
+// Sport test 11: English words for a French price list, so English search finds it ("twilight" for « crépuscule »).
+const FR_RATE_WORDS_EN = [[/\btrous?\b/, 'holes'], [/crépuscule/, 'twilight'], [/\bmatin\b/, 'morning'], [/après-midi/, 'afternoon'], [/\bsoir(?:ée)?\b/, 'evening'],
+  [/voiturette/, 'cart'], [/champ de pratique|\bpratique\b/, 'driving range practice'], [/illimitée?/, 'unlimited'], [/\bjeunes?\b|\bjunior/, 'junior'], [/aînés?/, 'seniors'],
+  [/enfants?/, 'kids'], [/simulateur/, 'simulator indoor golf'], [/\blocation\b/, 'rental'], [/bâtons?/, 'clubs'], [/\bseau\b|\bpanier\b/, 'bucket'], [/\bballes\b/, 'balls'],
+  [/\bcours\b|leçons?/, 'lessons'], [/fin de semaine/, 'weekend'], [/droits? de jeu/, 'green fee'], [/\bheures?\b/, 'hour'], [/abonnement|\bpasse\b/, 'pass membership'], [/membres?/, 'members'], [/visiteurs?/, 'visitors guests']];
+function frRateWordsEn(text) {
+  const t = String(text || '').toLowerCase();
+  return [...new Set(FR_RATE_WORDS_EN.filter(([re]) => re.test(t)).map(([, w]) => w))].join(' ');
+}
+// The review item's labels for words to write in English (her French lines): "Known for (write the English)".
+const FR_LINES_EN_SUFFIX = ' (write the English)';
 const FR_LINE_KEYS = [['good_to_know', 'Good to know'], ['groups', 'Groups'], ['known_for', 'Known for']];
 async function queueFrLinesTranslation(venue, rows, contactEmail) {
   try {
@@ -55389,21 +55486,42 @@ async function queueFrLinesTranslation(venue, rows, contactEmail) {
     // Sport test 1 (2026-11-20; Debbie only confirmed research's Known for, unchanged): a line she confirmed as it was
     // (_confirm) is research's own words, not a new English line: no French is asked for it.
     const confirmed = new Set(Array.isArray(rows._confirm) ? rows._confirm : []);
-    const lines = FR_LINE_KEYS.filter(([k]) => !confirmed.has(k) && typeof rows[k] === 'string' && rows[k].trim() && !(typeof fr[k] === 'string' && fr[k].trim()) && !isPresetAnswer(rows[k]))
-      .map(([k, label]) => `${label}: ${String(rows[k]).trim()}`);
-    if (!lines.length) return false;
-    const id = frLinesUpsert(venue.id, Object.fromEntries(lines.map((l) => [l.slice(0, l.indexOf(': ')), l.slice(l.indexOf(': ') + 2)])), contactEmail);
+    const parts = {};
+    for (const [k, label] of FR_LINE_KEYS) {
+      if (confirmed.has(k)) continue;
+      const frLine = typeof fr[k] === 'string' ? fr[k].trim() : '', enLine = typeof rows[k] === 'string' ? rows[k].trim() : '';
+      // Sport test 11: a line in French (typed in the French setup, or French words typed on an English screen) asks for
+      // its English; a line in English asks for its French, as before.
+      if (frLine && !isPresetAnswer(frLine)) { if (ownerTextIsFrench(frLine)) parts[label + FR_LINES_EN_SUFFIX] = frLine; else if (!enLine) parts[label] = frLine; }
+      if (enLine && !isPresetAnswer(enLine)) { if (ownerTextIsFrench(enLine)) parts[label + FR_LINES_EN_SUFFIX] = enLine; else if (!frLine) parts[label] = enLine; }
+    }
+    if (!Object.keys(parts).length) return false;
+    const id = frLinesUpsert(venue.id, parts, contactEmail);
     if (!id) return false;
     frLinesEmailSoon(venue.id, id, contactEmail || null);
     return true;
   } catch (e) { console.error(`[owner-portal] French lines request for venue #${venue && venue.id} failed: ${e.message}`); return false; }
+}
+// Sport test 11: her story written in French (the French setup's story, or French typed as the English story) asks for
+// its English in the same item. The English page keeps research's English description until then.
+function queueStoryEnglish(venue, text, contactEmail) {
+  try {
+    const t = String(text || '').trim();
+    if (!venue || !t || !ownerTextIsFrench(t)) return false;
+    const id = frLinesUpsert(venue.id, { ['Story' + FR_LINES_EN_SUFFIX]: t.replace(/\s+/g, ' ').slice(0, 700) }, contactEmail);
+    if (!id) return false;
+    frLinesEmailSoon(venue.id, id, contactEmail || null);
+    return true;
+  } catch (e) { console.error(`[owner-portal] English story request for venue #${venue && venue.id} failed: ${e.message}`); return false; }
 }
 // Sport test 8: closure notes with no French yet (a holiday tapped in the setup has its own French), in the French lines item.
 function queueClosureNotesFr(venue, closures, contactEmail) {
   try {
     const notes = [...new Set((closures || []).map((c) => String((c && c.note) || '').trim()).filter((n) => n && !closureNoteFor(n, true)))];
     if (!notes.length) return false;
-    const id = frLinesUpsert(venue.id, { Closures: notes.join(' / ') }, contactEmail);
+    // Sport test 11: a note in French asks for its English (« Championnat du club : fermé au public »).
+    const frN = notes.filter((n) => ownerTextIsFrench(n)), enN = notes.filter((n) => !ownerTextIsFrench(n));
+    const id = frLinesUpsert(venue.id, { ...(enN.length ? { Closures: enN.join(' / ') } : {}), ...(frN.length ? { ['Closures' + FR_LINES_EN_SUFFIX]: frN.join(' / ') } : {}) }, contactEmail);
     if (!id) return false;
     frLinesEmailSoon(venue.id, id, contactEmail || null);
     return true;
@@ -55412,18 +55530,30 @@ function queueClosureNotesFr(venue, closures, contactEmail) {
 // Sport test 6 (2026-11-20; Priya's setup left 4 French-lines items for one listing in /admin/review, beside the French
 // description): an owner's pending English lines and price names are ONE review item. A new line joins the open item
 // (the newest words of each line win); one is added only when there is none. -> the item's id, or null when nothing changed.
-const FR_LINES_LABELS = ['Known for', 'Good to know', 'Groups', 'Prices', 'Closures'];
+const FR_LINES_LABELS_FR = ['Known for', 'Good to know', 'Groups', 'Prices', 'Closures'];
+// Sport test 11: the same item names her French lines to write in English ("Known for (write the English): …").
+const FR_LINES_LABELS = [...FR_LINES_LABELS_FR, ...['Story', ...FR_LINES_LABELS_FR].map((l) => l + FR_LINES_EN_SUFFIX)];
 const FR_LINES_PRE = { lines: 'Their own English lines changed: please write the French for them on their listing (queued automatically).', prices: 'Their price names are in English: please write the French for them on their listing (queued automatically).',
-  both: 'Their own English lines and price names changed: please write the French for them on their listing (queued automatically).' };
+  both: 'Their own English lines and price names changed: please write the French for them on their listing (queued automatically).',
+  english: 'They wrote these in French: please write the English for them on their listing (queued automatically).',
+  mixed: 'Some of their own words need the other language: write the French for the lines in English, and the English for the ones marked (write the English), on their listing (queued automatically).' };
+// Which way the item's lines go: 'fr' (write the French), 'en' (write the English) or 'both'.
+function frLinesDirection(note) {
+  const labels = Object.keys(frLinesParts(note));
+  const en = labels.some((l) => l.endsWith(FR_LINES_EN_SUFFIX)), fr = labels.some((l) => !l.endsWith(FR_LINES_EN_SUFFIX));
+  return en && fr ? 'both' : en ? 'en' : 'fr';
+}
 function frLinesParts(note) {
   const out = {};
   const body = String(note || '').replace(/^[^.]*\(queued automatically\)\.\s*/, '');
-  for (const part of body.split(new RegExp(` \\| (?=(?:${FR_LINES_LABELS.join('|')}): )`))) { const i = part.indexOf(': '); const label = i > 0 ? part.slice(0, i) : ''; if (FR_LINES_LABELS.includes(label)) out[label] = part.slice(i + 2).trim(); }
+  const esc = (x) => x.replace(/[()]/g, '\\$&');
+  for (const part of body.split(new RegExp(` \\| (?=(?:${FR_LINES_LABELS.map(esc).join('|')}): )`))) { const i = part.indexOf(': '); const label = i > 0 ? part.slice(0, i) : ''; if (FR_LINES_LABELS.includes(label)) out[label] = part.slice(i + 2).trim(); }
   return out;
 }
 function frLinesNote(parts) {
   const labels = FR_LINES_LABELS.filter((l) => parts[l]);
-  const pre = labels.every((l) => l === 'Prices') ? FR_LINES_PRE.prices : labels.includes('Prices') ? FR_LINES_PRE.both : FR_LINES_PRE.lines;
+  const toFr = labels.filter((l) => !l.endsWith(FR_LINES_EN_SUFFIX)), toEn = labels.filter((l) => l.endsWith(FR_LINES_EN_SUFFIX));
+  const pre = toEn.length && toFr.length ? FR_LINES_PRE.mixed : toEn.length ? FR_LINES_PRE.english : toFr.every((l) => l === 'Prices') ? FR_LINES_PRE.prices : toFr.includes('Prices') ? FR_LINES_PRE.both : FR_LINES_PRE.lines;
   return `${pre} ${labels.map((l) => `${l}: ${parts[l]}`).join(' | ')}`.slice(0, 1500);
 }
 function frLinesUpsert(venueId, parts, contactEmail) {
@@ -55471,7 +55601,8 @@ function queueFrPriceNames(venueId, data) {
   if (!v || !kindSetupType(v.type)) return false;
   const names = [...new Set(((data && data.sections) || []).flatMap((sec) => [sec && sec.name, ...((sec && sec.items) || []).map((it) => it && it.name)]).map((x) => String(x || '').trim()).filter(Boolean))];
   if (!names.length) return false;
-  const id = frLinesUpsert(venueId, { Prices: names.join(' | ') }, null);
+  // Sport test 11: a list typed in French asks for its English names (it asked for "the French" of « 18 trous, matin »).
+  const id = frLinesUpsert(venueId, { [priceListIsFrench(data) ? 'Prices' + FR_LINES_EN_SUFFIX : 'Prices']: names.join(' | ') }, null);
   if (!id) return false;
   frLinesEmailSoon(venueId, id, null);
   return true;
@@ -56841,9 +56972,15 @@ async function handleOwnerChangeSubmission(req, res, token) {
   ownerMarkFrench(res, 'owner_change_requests', liveId);
   if (id && Object.keys(review).length) notifyInBackground(`owner update #${id}`, () => notifyOwnerChange(id));
   // Tour test 12: a new English story with research's French still up queues its translation (as "Leave it to us").
-  if (COMPLETENESS_TYPES.has(venue.type) && typeof changes.description === 'string' && changes.description.trim()) await queueFrStoryTranslation(venue, contact.email);
-  // Indoor test 9: her own English Good to know, Groups or Known for lines queue their French too (not from the French setup).
-  if (kindSetupType(venue.type) && res.twinLang !== 'fr' && changes.visit_rows && typeof changes.visit_rows === 'object') await queueFrLinesTranslation(venue, changes.visit_rows, contact.email);
+  // Sport test 11 (2026-11-21): a story written in French (her French story, or French typed as the English one) asks
+  // for its English instead, in the same review item as her lines; it never asks for "the French" of French words.
+  if (COMPLETENESS_TYPES.has(venue.type) && typeof changes.description === 'string' && changes.description.trim()) {
+    if (ownerTextIsFrench(changes.description)) queueStoryEnglish(venue, changes.description, contact.email); else await queueFrStoryTranslation(venue, contact.email);
+  }
+  if (COMPLETENESS_TYPES.has(venue.type) && typeof changes.description_fr === 'string' && changes.description_fr.trim()) queueStoryEnglish(venue, changes.description_fr, contact.email);
+  // Indoor test 9: her own English Good to know, Groups or Known for lines queue their French too.
+  // Sport test 11: and her French ones (from the French setup, or typed in French) queue their English.
+  if (kindSetupType(venue.type) && changes.visit_rows && typeof changes.visit_rows === 'object') await queueFrLinesTranslation(venue, changes.visit_rows, contact.email);
   // Sport test 8 (2026-11-21): her closure notes ("closed to the public for the club championship") join the same French
   // lines item, so the French page can say why once Dayton writes it (until then it says « Fermé aujourd’hui » alone).
   if (kindSetupType(venue.type) && Array.isArray(changes.closures)) queueClosureNotesFr(venue, changes.closures, contact.email);
@@ -59337,13 +59474,14 @@ function buildMenuEmail(venue, menu, kind, extra = {}) {
   // aren't tours: "(5 tours)" for 4 tours and 2 extras).
   const items = (venue && venue.type === 'tour' ? tourTripItems(parseMenuData(menu.data)).length : 0) || menuItemCount(parseMenuData(menu.data));
   const fields = {
-    _subject: kind === 'help' && menu.help_kind === SETUP_FR_LINES_KIND ? `[TRANSLATE] ${venue.name}: write the French for their own Good to know, Groups or Known for lines`
+    // Sport test 11: the subject names the way the words go (her French lines need their English).
+    _subject: kind === 'help' && menu.help_kind === SETUP_FR_LINES_KIND ? ({ fr: `[TRANSLATE] ${venue.name}: write the French for their own Good to know, Groups or Known for lines`, en: `[TRANSLATE] ${venue.name}: write the English for their own lines written in French`, both: `[TRANSLATE] ${venue.name}: write the English for their French lines and the French for their English lines` }[frLinesDirection(extra.note || menu.help_note)])
       : kind === 'help' && menu.help_kind === SETUP_FR_STORY_KIND ? `[TRANSLATE] ${venue.name} asked us to write their French description from their English story`
       : kind === 'help' ? (SETUP_NOTE_KINDS.includes(menu.help_kind) ? `[FIND LINK] ${venue.name} told us their ${SETUP_SHEET_WORDS[menu.help_kind]}: please find the link` : menu.help_kind ? `[TYPE IT UP] ${venue.name} sent their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind} to type up` : `[MENU HELP] ${venue.name} asked us to type up their ${isPriceList(venue) ? priceListWordsFor(venue).en.list : 'menu'}`)
       : `${kind === 'pending' ? '[PENDING REVIEW]' : '[LIVE]'} ${menuNoun(venue)} from ${venue.name} (${venue && venue.type === 'tour' ? menuTripCountText(venue, parseMenuData(menu.data), 'en') : menuDishCountText(items, 'en', menuKind(venue))})`,
     _template: 'table',
     _captcha: 'false',
-    'Status': kind === 'help' && menu.help_kind === SETUP_FR_LINES_KIND ? 'Queued from their English lines. The French page shows those lines in English until then: write the French for each line (in the note), save it on their listing, then press Done in /admin/review.'
+    'Status': kind === 'help' && menu.help_kind === SETUP_FR_LINES_KIND ? ({ fr: 'Queued from their English lines. The French page shows those lines in English until then: write the French for each line (in the note), save it on their listing, then press Done in /admin/review.', en: 'Queued from their lines written in French. Until then the English page shows research’s English line for that row when there is one, else her French line marked “in French”: write the English for each line marked (write the English), save it on their listing, then press Done in /admin/review.', both: 'Queued from their own lines. Write the French for the English ones, and the English for the ones marked (write the English); until then each page shows the line as typed (marked “in French” on the English page). Save them on their listing, then press Done in /admin/review.' }[frLinesDirection(extra.note || menu.help_note)])
       : kind === 'help' && menu.help_kind === SETUP_FR_STORY_KIND ? 'Sent from the French easy setup ("Leave it to us"). Nothing is on the site yet: write their French description from their English story, save it on their listing, then press Done in /admin/review.'
       : kind === 'help' && menu.help_kind ? `Sent from the easy setup: their ${SETUP_SHEET_WORDS[menu.help_kind] || menu.help_kind}. Nothing is on the site yet: read the pages (or their website) and add it to their listing from /admin/review.`
       : kind === 'help' ? 'They pressed "Can you do it for me?". Nothing is on the site yet: open the menu editor, read the pages, then publish.'
@@ -60026,10 +60164,12 @@ function indoorFirstItemName(venue, lang) {
   try {
     const t = venueIndoorInfo(venue.id);
     // Sport test 1 (2026-11-20; Debbie typed "$45 for 9 holes" and her list began "Green fee $45"): her own holes.
-    if ((t.holes === 9 || t.holes === 18) && indoorKindsModule.indoorKindKey(t.kinds) === 'golf') return lang === 'fr' ? `${t.holes} trous` : `${t.holes} holes`;
-    const w = indoorKindsModule.indoorTyperWords(t.kinds || indoorKindSuggestion(venue), lang, { per: t.per, own: indoorOwnWords(venue.id) });
-    if (t.per && indoorKindsModule.TYPER_PER[t.per]) return w.first;
-    return INDOOR_UNIT_NAME_RE.test(w.first) ? '' : w.first;
+    // Sport test 11 (2026-11-21; Geneviève's $75 was her 9-hole twilight rate, and the list began « 18 trous / 75 », the
+    // golf kind's example): the first line's name comes only from what she said on the Price step (her holes, or what
+    // her price is per); otherwise it is left empty beside her price. Never the kind's example. Every kind.
+    if ((t.holes === 9 || t.holes === 18) && (t.kinds || []).includes('golf')) return lang === 'fr' ? `${t.holes} trous` : `${t.holes} holes`;
+    if (t.per && indoorKindsModule.TYPER_PER[t.per]) return indoorKindsModule.indoorTyperWords(t.kinds || indoorKindSuggestion(venue), lang, { per: t.per, own: indoorOwnWords(venue.id) }).first;
+    return '';
   } catch (e) { return ''; }
 }
 function indoorMenuAppStrings(venue, lang) {
@@ -61536,7 +61676,7 @@ ${lang === 'fr' ? frenchHeaderFragment(renderGolfHeaderHtml()) : renderGolfHeade
   </div></main>
 <script>window.MENU_CFG = ${JSON.stringify(cfg).replace(/</g, '\\u003c')};</script>
 <script>${MENU_APP_SCRIPT}</script>
-${opts.mode === 'admin' ? '' : ownerHelpWidgetHtml('menu', { signedIn: opts.mode === 'account', lang, ...(kindSetupType(venue.type) ? { dropHappyHour: !happyHourAllowed(venue), noHappyHour: !happyHourAllowed(venue), dropTopics: INDOOR_HELP_DROP_TOPICS, extraTopics: indoorKindHelpTopics(kindSetupHelpBase(venue).filter((x) => x.pages.includes('menu') && x.id !== 'menu-add').concat(sportMenuHelpTopics(venue)), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpLow(venue), indoorHelpFree(venue), indoorHelpNoHours(venue), indoorHelpPageSay(venue)).concat(sportMenuImportTopic(venue)) } : venue.type === 'tour' ? { dropHappyHour: true, noHappyHour: true, start: TOUR_MENU_HELP_START, extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x && x.id) } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('menu')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('menu')) } : {}) })}
+${opts.mode === 'admin' ? '' : ownerHelpWidgetHtml('menu', { signedIn: opts.mode === 'account', lang, ...(kindSetupType(venue.type) ? { ...(sportSetupType(venue.type) ? { venueId: venue.id } : {}), dropHappyHour: !happyHourAllowed(venue), noHappyHour: !happyHourAllowed(venue), dropTopics: INDOOR_HELP_DROP_TOPICS, extraTopics: indoorKindHelpTopics(kindSetupHelpBase(venue).filter((x) => x.pages.includes('menu') && x.id !== 'menu-add').concat(sportMenuHelpTopics(venue)), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpLow(venue), indoorHelpFree(venue), indoorHelpNoHours(venue), indoorHelpPageSay(venue)).concat(sportMenuImportTopic(venue)) } : venue.type === 'tour' ? { dropHappyHour: true, noHappyHour: true, start: TOUR_MENU_HELP_START, extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x && x.id) } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('menu')) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('menu')) } : {}) })}
 </body>
 </html>`;
 }
@@ -63245,8 +63385,8 @@ const TOUR_SETUP_HELP_TOPICS = [
   { id: 'tour-free', pages: ['setup', 'edit'], over: ['cost'], q: 'Is this free? Do you take a booking fee?', qFr: 'Est-ce gratuit? Prenez-vous des frais de réservation?',
     keys: ['free', 'is this free', 'cost me', 'fee', 'fees', 'booking fee', 'commission', 'commissions', 'pay', 'charge', 'subscription', 'how much does this cost', 'catch', 'really free', 'is it really free', 'actually free', 'whats the catch', 'what is the catch', 'hidden fee', 'hidden fees', 'hidden cost', 'hidden costs', 'no catch'],
     keysFr: ['gratuit', 'est ce gratuit', 'frais', 'frais de reservation', 'commission', 'payer', 'abonnement', 'combien ca coute', 'vraiment gratuit', 'c est vraiment gratuit', 'est ce vraiment gratuit', 'attrape', 'c est quoi l attrape', 'quelle est l attrape', 'ou est l attrape', 'piege', 'frais caches', 'couts caches', 'caches', 'une commission', 'commission sur', 'commission sur les reservations', 'chargez plus tard', 'vous chargez'],
-    a: '<p>Yes, it’s really free, and there’s no catch. No cost, ever, and no commission: people book with you directly, through your own booking link or by phone. We never take a cut.</p>',
-    aFr: '<p>Oui, c’est vraiment gratuit, et il n’y a pas d’attrape. Aucuns frais, jamais, et aucune commission : les gens réservent directement chez vous, par votre propre lien de réservation ou par téléphone. Nous ne prenons jamais de pourcentage.</p>' },
+    a: '<p>It’s free, really, and there’s no catch. No cost, ever, and no commission: people book with you directly, through your own booking link or by phone. We never take a cut.</p>',
+    aFr: '<p>C’est gratuit, vraiment, et il n’y a pas d’attrape. Aucuns frais, jamais, et aucune commission : les gens réservent directement chez vous, par votre propre lien de réservation ou par téléphone. Nous ne prenons jamais de pourcentage.</p>' },
   // Tour test 2 (Whistler, 2026-11-16; Marc-André, in French): the questions Help missed or answered with food words.
   { id: 'tour-48h', pages: ['setup', 'edit'], over: ['tour-same-day', 'booking-link', 'links'],
     q: 'People must book 48 hours ahead', qFr: 'Il faut réserver 48 heures à l’avance',
@@ -63598,14 +63738,16 @@ const INDOOR_SETUP_HELP_TOPICS = [
     aFr: '<p>Chaque exposition, spectacle, camp ou atelier est un événement : ajoutez-le avec <strong>Ajouter un événement</strong> sur votre page (après la configuration). Il paraît dans À l’affiche et sur votre page une fois vérifié. Votre histoire peut dire quel genre de spectacles vous présentez; elle n’a pas besoin des dates.</p>' },
   // Indoor test 1 (2026-11-19; Margaret): "I don't speak French, do I have to update the French description" got the
   // generic Description answer.
-  { id: 'indoor-french', pages: ['setup', 'edit'], over: ['french', 'description', 'fr-desc-old', 'story'],
+  { id: 'indoor-french', pages: ['setup', 'edit', 'menu'], over: ['french', 'description', 'fr-desc-old', 'story'],
     q: 'Do I have to write the French description?', qFr: 'Dois-je écrire la description en français?',
     // Indoor test 11 (Kim: "will my page be in french" got the portal's French answer): her page's French.
     allOf: [['page', 'listing', 'visitors', 'fiche', 'visiteurs'], ['french', 'francais', 'anglais']],
     keys: ['will my page be in french', 'my page in french', 'page in french', 'is my page in french', 'french version', 'french version of my page', 'french page', 'my french page', 'listing in french', 'french visitors', 'dont speak french', 'i dont speak french', 'do not speak french', 'i do not speak french', 'no french', 'french description', 'the french description', 'update the french', 'update the french description', 'have to update the french', 'write in french', 'write the french', 'french text', 'need french', 'have to do the french', 'do it in french'],
     keysFr: ['ma page en francais', 'page en francais', 'ma fiche en francais', 'version francaise', 'version anglaise', 'ma page en anglais', 'description en francais', 'description francaise', 'la description francaise', 'ecrire en francais', 'ecrire la description en francais', 'je ne parle pas francais', 'je ne parle pas anglais', 'description en anglais', 'ecrire en anglais', 'mettre a jour la description', 'dois je traduire'],
-    a: '<p>Your page has a French version. We write the French for your own lines, usually within a day.</p><p>Do you have to write the French description? <strong>No.</strong> It’s optional: we translate it for you. Write your story in English only; your French page gets the French within a day. You never have to touch the French description.</p>',
-    aFr: '<p>Votre page a une version anglaise et une version française. Nous écrivons l’autre langue pour vos propres lignes, habituellement d’ici un jour.</p><p><strong>Non</strong>, vous n’avez pas à écrire l’autre description. C’est facultatif : nous la traduisons pour vous. Écrivez votre histoire dans une seule langue; nous faisons l’autre version d’ici un jour. Vous n’avez jamais à toucher à la description dans l’autre langue.</p>' },
+    // Sport test 11 (2026-11-21; Geneviève typed her lines and prices in French, and this said "we write the French"):
+    // which way it goes, both ways, and what each page shows meanwhile.
+    a: '<p>Your page has an English and a French version. Write your lines in the language you like, and we write the other one, usually within a day: lines in English get their French, lines in French get their English.</p><p>Until then the English page shows our English line for that row when we have one, otherwise your French line marked <em>in French</em>; a price list typed in French is marked the same way. The French page shows your English lines as you typed them.</p><p>Do you have to write the description in both? <strong>No.</strong> Write your story in one language; we write the other.</p>',
+    aFr: '<p>Votre page a une version anglaise et une version française. Écrivez vos lignes dans la langue de votre choix et nous écrivons l’autre, habituellement d’ici un jour : vos lignes en français reçoivent leur version anglaise, vos lignes en anglais leur version française.</p><p>D’ici là, la page anglaise montre notre ligne anglaise pour cette rangée quand nous en avons une, sinon votre ligne en français, marquée <em>in French</em> (en français); une liste de tarifs tapée en français est marquée de la même façon. La page française montre vos lignes anglaises telles que tapées.</p><p><strong>Non</strong>, vous n’avez pas à écrire la description dans les deux langues. Écrivez votre histoire dans une seule langue; nous écrivons l’autre.</p>' },
   // Indoor test 1: "we close from Christmas until the middle of January" got "I'm not sure". A yearly break is a closure
   // with Every year ticked (the screen's words are filled in by indoorClosureWords).
   { id: 'indoor-yearly-break', pages: ['setup', 'edit'], over: ['closures', 'setup-closure-fix', 'indoor-seasonal', 'seasonal-hours', 'setup-season', 'hours', 'season'],
@@ -63749,8 +63891,8 @@ const INDOOR_SETUP_HELP_TOPICS = [
       'the catch', 'what is the catch', 'advertising', 'advertise', 'ads', 'sell me', 'selling me', 'sell me advertising', 'sell me ads', 'upsell', 'upselling', 'up sell', 'sales pitch', 'scam', 'is this a scam', 'is it a scam'],
     keysFr: ['est ce gratuit', 'frais', 'frais de reservation', 'commission', 'abonnement', 'combien ca coute', 'vraiment gratuit', 'attrape', 'frais caches', 'vous chargez',
       'l attrape', 'publicite', 'de la publicite', 'me vendre', 'vendre de la publicite', 'arnaque', 'une arnaque', 'est ce une arnaque'],
-    a: '<p>Yes, it’s really free, and there’s no catch. No cost, ever, and no commission: people book or buy tickets with you directly. We never take a cut. It’s a real guide to the Okanagan run by Dayton, and nothing here asks for a credit card.</p>',
-    aFr: '<p>Oui, c’est vraiment gratuit, et il n’y a pas d’attrape. Aucuns frais, jamais, et aucune commission : les gens réservent ou achètent leurs billets directement chez vous. Nous ne prenons jamais de pourcentage. C’est un vrai guide de l’Okanagan tenu par Dayton, et rien ici ne vous demande de carte de crédit.</p>' },
+    a: '<p>It’s free, really, and there’s no catch. No cost, ever, and no commission: people book or buy tickets with you directly. We never take a cut. It’s a real guide to the Okanagan run by Dayton, and nothing here asks for a credit card.</p>',
+    aFr: '<p>C’est gratuit, vraiment, et il n’y a pas d’attrape. Aucuns frais, jamais, et aucune commission : les gens réservent ou achètent leurs billets directement chez vous. Nous ne prenons jamais de pourcentage. C’est un vrai guide de l’Okanagan tenu par Dayton, et rien ici ne vous demande de carte de crédit.</p>' },
 ];
 // Indoor test 4 (2026-11-19; Lauren, a day spa: Help gave her arcade and escape-room examples, a museum's gift shop, and two
 // price questions got the restaurant "Price range" answer). The indoor answers in the place's own kind's words
@@ -63922,8 +64064,8 @@ const SPORT_TEST1_HELP_TOPICS = [
     q: 'Our dress code', qFr: 'Notre code vestimentaire',
     keys: ['dress code', 'our dress code', 'dress code is relaxed', 'relaxed dress code', 'collared', 'collared shirt', 'collared shirts', 'chip says collared shirts', 'collars', 'no collars', 'collars not needed', 'no collars needed', 'attire', 'golf attire', 'proper golf attire', 'soft spikes', 'golf shoes', 'jeans', 'denim', 'what to wear'],
     keysFr: ['code vestimentaire', 'tenue', 'chemise a col', 'col pas necessaire', 'pas de col', 'tenue de golf', 'jeans', 'crampons souples'],
-    a: '<p>Type it in your own words in <strong>Good to know</strong>, like <em>Relaxed dress code: no collars needed</em> or <em>Collared shirts and soft spikes, please</em>. The <strong>Dress code: collared shirts</strong> chip is only a suggestion: skip it if it isn’t your rule. Your line replaces what we found online.</p>',
-    aFr: '<p>Écrivez-le dans vos mots dans <strong>Bon à savoir</strong>, comme <em>Code vestimentaire décontracté : col pas nécessaire</em> ou <em>Chemise à col et crampons souples, s’il vous plaît</em>. Le choix <strong>Code vestimentaire : chemise à col</strong> n’est qu’une suggestion : passez-le si ce n’est pas votre règle. Votre ligne remplace ce que nous avions trouvé en ligne.</p>' },
+    a: '<p>Type it in your own words in <strong>Good to know</strong>, like <em>Relaxed dress code: no collars needed</em> or <em>Collared shirts and soft spikes, please</em>. The <strong>Dress code: collared shirts</strong> chip is only a suggestion: skip it if it isn’t your rule. Your line replaces what we found online. Something else to say too, like booking by phone in winter? Same box, one line each.</p>',
+    aFr: '<p>Écrivez-le dans vos mots dans <strong>Bon à savoir</strong>, comme <em>Code vestimentaire décontracté : col pas nécessaire</em> ou <em>Chemise à col et crampons souples, s’il vous plaît</em>. Le choix <strong>Code vestimentaire : chemise à col</strong> n’est qu’une suggestion : passez-le si ce n’est pas votre règle. Votre ligne remplace ce que nous avions trouvé en ligne. Autre chose à dire, comme réserver par téléphone l’hiver? Même case, une ligne chacune.</p>' },
   { id: 'sport-no-range', kinds: ['golf'], pages: ['setup', 'edit'], over: ['indoor-good-to-know', 'sport-kinds-other', 'indoor-kinds-many', 'features', 'indoor-also-offer'],
     q: 'We don’t have a driving range (a putting green only)', qFr: 'Nous n’avons pas de champ de pratique (seulement un vert d’exercice)',
     keys: ['no driving range', 'dont have a driving range', 'don t have a driving range', 'we don t have a driving range', 'no range', 'without a range', 'just a putting green', 'putting green', 'chipping area', 'chipping green', 'practice green', 'practice area', 'short game area'],
@@ -64143,8 +64285,8 @@ const SPORT4_HELP_TOPICS = [
     q: 'Next year’s rates aren’t set yet', qFr: 'Les tarifs de l’an prochain ne sont pas encore fixés',
     keys: ['rates arent set', 'rates aren t set', 'rates are not set', 'rates not set', 'prices arent set', 'prices aren t set', 'not set yet', 'arent set yet', 'aren t set yet', 'next year s rates', 'next years rates', 'next year s prices', 'these are 2026', 'these are last year s', 'last year s rates', 'last years rates', 'last year s prices', 'old rates', 'rates for next year', '2027 rates', '2026 rates', '2028 rates', 'not out yet', 'not announced yet', 'next years rates are', 'next year s rates are', 'rates are not out'],
     keysFr: ['tarifs pas encore fixes', 'pas encore fixes', 'ne sont pas encore fixes', 'pas encore fixes ce sont', 'tarifs de l an prochain', 'tarifs de l an dernier', 'anciens tarifs', 'tarifs 2027', 'tarifs 2026'],
-    a: '<p>That’s fine: put this year’s rates. When next year’s are set, change them in <strong>Your prices</strong> (tap any line or price). Want people to know? Add a line without a price, like <em>{YEAR} rates coming soon</em>. Rates going up on a set date? Add both, with when each starts.</p>',
-    aFr: '<p>C’est correct : mettez les tarifs de cette année. Quand ceux de l’an prochain sont fixés, changez-les dans <strong>Vos tarifs</strong> (touchez une ligne ou un prix). Pour que les gens le sachent, ajoutez une ligne sans prix, comme <em>Tarifs {YEAR} à venir</em>. Des tarifs qui augmentent à une date précise? Ajoutez les deux, avec la date de début de chacun.</p>' },
+    a: '<p>That’s fine: put this year’s rates. On the Price screen, that’s your lowest rate anyone can book (your page says “From” that price). When next year’s are set, change them in <strong>Your prices</strong> (tap any line or price). Want people to know? Add a line without a price, like <em>{YEAR} rates coming soon</em>. Rates going up on a set date? Add both, with when each starts.</p>',
+    aFr: '<p>C’est correct : mettez les tarifs de cette année. À l’écran du prix, c’est votre tarif le moins cher que tout le monde peut réserver (votre page indique « À partir de » ce prix). Quand ceux de l’an prochain sont fixés, changez-les dans <strong>Vos tarifs</strong> (touchez une ligne ou un prix). Pour que les gens le sachent, ajoutez une ligne sans prix, comme <em>Tarifs {YEAR} à venir</em>. Des tarifs qui augmentent à une date précise? Ajoutez les deux, avec la date de début de chacun.</p>' },
   { id: 'sport-aeration', kinds: ['golf'], pages: ['setup', 'edit', 'menu'], over: ['hh-deals', 'hh-times', 'indoor-bar', 'menu-add', 'indoor-good-to-know', 'sport-weather', 'sport-rate-lines', 'closures', 'sport-season', 'seasonal-hours', 'indoor-seasonal', 'sport-opening-day', 'specials'],
     q: 'Aeration: should people know?', qFr: 'L’aération : faut-il le dire?',
     allOf: [['aerat', 'punch', 'perfor'], ['green', 'vert', 'course', 'parcours']],
@@ -64487,6 +64629,15 @@ function sport5HelpCtx(venue, kind) {
   } catch (e) { /* no chips */ }
   const bw = (indoorKindsModule.SPORT.BOOK_WORDS || {})[kind] || {}, ib = [OWNER_SETUP_STRINGS.en.sport.ibooks || {}, OWNER_SETUP_STRINGS.fr.sport.ibooks || {}];
   out.booking = { ahead: (bw.chips || {}).ahead || [ib[0].ahead, ib[1].ahead], busy: (bw.chips || {}).busy || [ib[0].busy, ib[1].busy], line: (bw.lines || {}).busy || INDOOR_BOOK_LINES.busy || null };
+  // Sport test 11 (2026-11-21): another listing for part of this place (a simulator lounge or range at the same address,
+  // or under the same name), so Help says "it has its own page" only when there is one.
+  try {
+    const addr = String(venue.address || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').slice(0, 3).join(' ');
+    const nm = String(venue.name || '').replace(/\s*\(.*\)\s*$/, '').trim();
+    const rows = db.prepare("SELECT id, name, address, type FROM venues WHERE id != ? AND region = ? AND redirect_to IS NULL AND type IN ('golf', 'indoor', 'sports', 'sport') LIMIT 400").all(venue.id, venue.region);
+    const sib = rows.find((r) => (addr.length > 6 && String(r.address || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().startsWith(addr)) || (nm.length > 5 && String(r.name || '').startsWith(nm)));
+    if (sib) out.sister = { id: sib.id, name: sib.name };
+  } catch (e) { /* none */ }
   // Search: a ski school asked for from a valley town lists the nearest hills (discovery-search, sport test 5 #9).
   if (kind === 'skischool') out.near = { en: 'Someone searching for ski lessons in a valley town, like Kelowna, finds the nearest ski hill’s lessons, with how far they are.', fr: 'Quelqu’un qui cherche des cours de ski dans une ville de la vallée, comme Kelowna, trouve les cours de la station la plus proche, avec la distance.' };
   return out;
@@ -66206,9 +66357,10 @@ function venueMenuPreviewHtml(venue, menu, lang) {
   // Golf pages also carry the researched green-fee table, so the course's own list says where it came from.
   const heading = menuKind(venue) === 'golf' ? (fr ? 'Tarifs de golf, selon le terrain' : 'Green fees & rates from the course') : menuNoun(venue, lang);
   // Tour test 1 (Whistler, 2026-11-16): a tour's list has a ticket beside "Tours & prices" / « Sorties et tarifs ».
+  const frList = !fr && kindSetupType(venue.type) && priceListIsFrench(menu.data);
   return `<section class="venue-section vm-preview" id="${tours ? 'prices' : 'menu'}">
     <h2>${venue.type === 'tour' ? `<span aria-hidden="true">${venueTapListIcon(venue)}</span> ` : ''}${escapeHtml(heading)}</h2>
-    <ul class="vm-list">${picks.map((it) => (secOf.get(it) ? `<li class="vm-sub">${escapeHtml(secOf.get(it))}</li>` : '') + menuItemHtml(it, lang, kindSetupType(venue.type))).join('')}${unseen.map((nm) => `<li class="vm-sub">${escapeHtml(nm)}: <a href="${menuPagePath(venue, fr ? 'fr' : 'en')}">${fr ? 'tout voir' : 'see all'}</a></li>`).join('')}</ul>
+    ${frList ? `<p class="vm-note vm-lang-note">${escapeHtml(PRICE_LIST_IN_FRENCH_NOTE)}</p>` : ''}<ul class="vm-list"${frList ? ' lang="fr"' : ''}>${picks.map((it) => (secOf.get(it) ? `<li class="vm-sub">${escapeHtml(secOf.get(it))}</li>` : '') + menuItemHtml(it, lang, kindSetupType(venue.type))).join('')}${unseen.map((nm) => `<li class="vm-sub">${escapeHtml(nm)}: <a href="${menuPagePath(venue, fr ? 'fr' : 'en')}">${fr ? 'tout voir' : 'see all'}</a></li>`).join('')}</ul>
     <a class="vm-btn" href="${menuPagePath(venue, fr ? 'fr' : 'en')}">${escapeHtml(see)} &rarr;</a>
     <p class="vm-meta">${tours ? (fr ? 'Tarifs mis à jour' : 'Prices updated') : (fr ? 'Menu mis à jour' : 'Menu updated')} ${escapeHtml(menuUpdatedLabel(menu.publishedAt, lang))}</p>
   </section>`;
@@ -66341,7 +66493,9 @@ function renderVenueMenuPage(venue, menu, opts = {}) {
     hasOfferCatalog: tours ? priceListOfferCatalog(venue, menu, lang) : undefined,
   };
   const themedShell = usesThemedVenueShell(venue.type);
-  const sections = menu.data.sections.map((s) => `<section class="vm-section">
+  // Sport test 11: an owner's list typed in French says so on the English page (until its English names are written).
+  const frList = lang !== 'fr' && kindSetupType(venue.type) && priceListIsFrench(menu.data);
+  const sections = (frList ? `<p class="vm-note vm-lang-note">${escapeHtml(PRICE_LIST_IN_FRENCH_NOTE)}</p>\n  ` : '') + menu.data.sections.map((s) => `<section class="vm-section"${frList ? ' lang="fr"' : ''}>
     ${s.name ? `<h2>${escapeHtml(s.name)}</h2>` : ''}${s.note ? `<p class="vm-note">${escapeHtml(s.note)}</p>` : ''}
     <ul class="vm-list">${s.items.map((it) => menuItemHtml(it, lang, kindSetupType(venue.type))).join('')}</ul>
   </section>`).join('\n  ');
@@ -66878,11 +67032,19 @@ const OWNER_HELP_TOPICS = [
     keysFr: ['jamais recu', 'pas recu', 'rien recu', 'aucun courriel', 'pas de courriel', 'courriel pas arrive', 'pas arrive', 'indesirables', 'courriels indesirables', 'pourriel', 'spam', 'toujours rien'],
     a: '<ul><li><strong>Check spam, junk and promotions</strong>, and search your inbox for \u201cOkanagan Roam\u201d. It can take a few minutes.</li><li><strong>Ask again:</strong> <a href="/owner/link">Email me a new link</a> with the business email we have on file. Your old link keeps working until you open the new one.</li><li><strong>Still nothing?</strong> We may not have your email, or have an old one. Open your business\u2019s page and tap <strong>Claim this listing</strong>, and we\u2019ll check it\u2019s you and send a link to the email you give us.</li></ul><p>Password reset emails work the same way: check spam first, then <a href="/owner/forgot">ask again</a>.</p>',
     aFr: '<ul><li><strong>Vérifiez les courriels indésirables et l\u2019onglet Promotions</strong>, et cherchez « Okanagan Roam » dans votre boîte de réception. Ça peut prendre quelques minutes.</li><li><strong>Redemandez-le :</strong> <a href="/fr/owner/link">Recevoir un nouveau lien</a> avec le courriel de l\u2019entreprise que nous avons au dossier. Votre ancien lien fonctionne jusqu\u2019à ce que vous ouvriez le nouveau.</li><li><strong>Toujours rien?</strong> Nous n\u2019avons peut-être pas votre courriel, ou un ancien. Ouvrez la page de votre entreprise et touchez <strong>Réclamer cette fiche</strong> : nous vérifierons que c\u2019est bien vous et enverrons un lien au courriel que vous nous donnerez.</li></ul><p>Les courriels de réinitialisation du mot de passe fonctionnent de la même façon : vérifiez d\u2019abord les indésirables, puis <a href="/fr/owner/forgot">redemandez-le</a>.</p>' },
+  // Sport test 11 (2026-11-21; « J'ai appuyé sur Créer mon compte et j'ai eu une page blanche qui dit Not found » got the
+  // menu-link answer): the French login page opened /fr/fr/… (fixed the same day). The login was made; where to sign in.
+  { id: 'login-not-found', over: ['login-create', 'signin', 'menu-website', 'forgot', 'newlink'], q: 'I got an error or “Not found” page after creating my login', qFr: 'J’ai eu une erreur ou une page « Not found » après avoir créé mon compte', pages: ['edit', 'account', 'login', 'link', 'setup', 'settings'],
+    allOf: [['not found', 'page blanche', 'blank page', 'blank', 'erreur', 'error', '404', 'broken', 'didnt work', 'didn t work', 'n a pas marche', 'pas fonctionne', 'ne marche pas', 'ne fonctionne pas', 'bug', 'plante'], ['login', 'log in', 'account', 'compte', 'connexion', 'connecte', 'sign in', 'signed in', 'password', 'mot de passe', 'creer', 'create']],
+    keys: ['not found', 'page not found', 'blank page', 'error after create a login', 'create a login error', 'did my login work', 'did my account work', 'login didnt work', 'login didn t work'],
+    keysFr: ['not found', 'page blanche', 'mon compte a marche', 'mon compte a fonctionne', 'erreur apres creer mon compte', 'creer mon compte erreur', 'le compte n a pas marche', 'ca n a pas marche'],
+    a: '<p>Sorry about that: the page after <strong>Create a login</strong> had a bug, and it’s fixed. Your login was made. Sign in at <a href="/owner/login">Business login</a> with the email and password you chose, and your listing is in <strong>My listings</strong>. Still stuck? Tap <strong>Message us</strong>.</p>',
+    aFr: '<p>Désolés : la page qui suit <strong>Créer mon compte</strong> avait un problème, et il est corrigé. Votre compte a bien été créé. Connectez-vous à l’<a href="/fr/owner/login">Espace entreprises</a> avec le courriel et le mot de passe choisis, et votre fiche est dans <strong>Mes fiches</strong>. Toujours bloqué? Touchez <strong>Écrivez-nous</strong>.</p>' },
   { id: 'staff', over: ['signin', 'login-create'], q: 'Can my staff or a partner log in too?', qFr: 'Mon personnel ou un associé peut-il se connecter aussi?', pages: ['account', 'edit', 'login', 'settings'],
     keys: ['staff', 'my staff', 'staff log in', 'staff login', 'staff sign in', 'employee', 'employees', 'employees log in', 'my manager', 'partner', 'business partner', 'co owner', 'coowner', 'second person', 'two people', '2 people', '2 logins', 'another person', 'someone else', 'colleague', 'my team', 'share access', 'share the login', 'two logins', 'second login', 'more than one person', 'add user', 'add a user', 'add a person', 'add someone', 'same login', 'also log in', 'log in too', 'also sign in', 'his own login', 'her own login', 'head pro also'],
     keysFr: ['employe', 'employes', 'mon personnel', 'personnel', 'mon equipe', 'equipe', 'gerant', 'gerante', 'associe', 'associee', 'partenaire', 'deux personnes', 'une autre personne', 'quelqu un d autre', 'collegue', 'partager l acces', 'deuxieme compte', 'ajouter un utilisateur', 'ajouter une personne', 'plusieurs personnes', 'meme compte'],
     a: '<p>Yes. Each person can have their <strong>own login</strong> for the same listing:</p><ol><li>Send them your private edit link, privately (by text or email).</li><li>They open it and use <strong>Create a login</strong> with <strong>their own</strong> email and a password (already signed in? they tap <strong>Add to my login</strong>).</li><li>From then on they sign in at <a href="/owner/login">Business login</a> and find the listing in <strong>My listings</strong>.</li></ol><p>Please don’t share one password between people. Everyone already on the listing gets an email when a new login is added. Signed in, <strong>People with access</strong> on your edit page shows who can update it: you can remove anyone added after you; for someone added before you, <strong>Message us</strong>. Lost the edit link? <a href="/owner/link">Email me a new link</a>, or they can tap <strong>Claim this listing</strong> on your page.</p>',
-    aFr: '<p>Oui. Chaque personne peut avoir <strong>son propre compte</strong> pour la même fiche :</p><ol><li>Envoyez-lui votre lien de modification privé, en privé (par texto ou par courriel).</li><li>Elle l’ouvre et utilise <strong>Créer un compte</strong> avec <strong>son propre</strong> courriel et un mot de passe (si son compte est déjà ouvert, elle touche <strong>Ajouter à mon compte</strong>).</li><li>Ensuite, elle se connecte à l’<a href="/fr/owner/login">Espace entreprises</a> et trouve la fiche dans <strong>Mes fiches</strong>.</li></ol><p>Évitez de partager un même mot de passe entre plusieurs personnes. Toutes les personnes déjà sur la fiche reçoivent un courriel quand un compte s’ajoute. Avec votre compte, <strong>Personnes ayant accès</strong>, sur votre page de modification, montre qui peut la modifier : vous pouvez retirer toute personne ajoutée après vous; pour quelqu’un ajouté avant vous, <strong>écrivez-nous</strong>. Lien perdu? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou la personne peut toucher <strong>Réclamer cette fiche</strong> sur votre page.</p>' },
+    aFr: '<p>Oui. Chaque personne peut avoir <strong>son propre compte</strong> pour la même fiche :</p><ol><li>Envoyez-lui votre lien de modification privé, en privé (par texto ou par courriel).</li><li>Cette personne l’ouvre et utilise <strong>Créer un compte</strong> avec <strong>son propre</strong> courriel et un mot de passe (si son compte est déjà ouvert, elle touche <strong>Ajouter à mon compte</strong>).</li><li>Ensuite, elle se connecte à l’<a href="/fr/owner/login">Espace entreprises</a> et trouve la fiche dans <strong>Mes fiches</strong>.</li></ol><p>Évitez de partager un même mot de passe entre plusieurs personnes. Toutes les personnes déjà sur la fiche reçoivent un courriel quand un compte s’ajoute. Avec votre compte, <strong>Personnes ayant accès</strong>, sur votre page de modification, montre qui peut la modifier : vous pouvez retirer toute personne ajoutée après vous; pour quelqu’un ajouté avant vous, <strong>écrivez-nous</strong>. Lien perdu? <a href="/fr/owner/link">Recevoir un nouveau lien</a>, ou la personne peut toucher <strong>Réclamer cette fiche</strong> sur votre page.</p>' },
   // Dispute (2026-10-18): "someone else claimed my business" used to match the staff topic ("Yes. Each person can
   // have their own login…"), which read like approval of a possible hijack. Its keys are longer phrases than the
   // staff ones ('someone else', 'another person', 'my manager') so it wins whenever access or a change is disputed.
@@ -67349,6 +67511,14 @@ const OWNER_HELP_TOPICS = [
     aFr: '<p><strong>Oui — pas besoin d’être le propriétaire; les gérants, le personnel et les bénévoles peuvent aussi utiliser ce lien.</strong> Toute personne à qui l’entreprise confie ce lien privé peut mettre la page à jour.</p><ul><li>Le mieux : chaque personne crée <strong>son propre compte</strong>. {ON}, elle touche <strong>Créer un compte</strong> et utilise son propre courriel. Évitez de partager un mot de passe.</li><li>Une fois connecté, <strong>Personnes ayant accès</strong> montre toutes les personnes qui peuvent modifier la page, et vous pouvez retirer celles ajoutées après vous.</li><li>Les mêmes règles s’appliquent à tous : les réponses rapides sont en ligne tout de suite, et un nouveau site Web, une description ou un lien sont vérifiés d’abord, en général d’ici un jour.</li></ul>' },
   // Indoor test 10 (2026-11-19; Sandra, city staff: "the photos belong to the City of Vernon, not me. Can I still tick
   // this?" got "I'm not sure"): yes, when she's allowed to share them.
+  // Sport test 11 (2026-11-21; Geneviève: « Est-ce que je peux mettre son nom en crédit sous la photo? » got the photo
+  // rights answer): the credit box is on the edit page's photo form (ofCredit); nothing new on the setup screen.
+  { id: 'photo-credit', over: ['photo-rights', 'photo-add'], q: 'Credit the photographer under a photo', qFr: 'Mettre le nom du photographe sous une photo', pages: ['edit', 'setup'],
+    allOf: [['credit', 'credits', 'credited', 'credite', 'crediter', 'name', 'nom'], ['photo', 'photos', 'picture', 'pictures', 'photographer', 'photographe', 'image', 'images']],
+    keys: ['photo credit', 'credit the photographer', 'photographer s name', 'photographers name', 'photographer credit', 'credit under the photo', 'credit line', 'photo by', 'name under the photo', 'give credit'],
+    keysFr: ['credit photo', 'en credit', 'nom en credit', 'credit sous la photo', 'nom du photographe', 'son nom sous la photo', 'mettre son nom', 'crediter le photographe', 'photo de'],
+    a: '<p>Yes. Add the photos from your edit page (after the setup): under <strong>Photos</strong>, the <strong>Credit photos to</strong> box starts with your business name. Type the photographer’s name there, like <em>Jane Smith Photography</em>, and it shows with the photo. Already sent them from the setup? Tap <strong>Message us</strong> with the name and we’ll add it.</p>',
+    aFr: '<p>Oui. Ajoutez les photos à partir de votre page de modification (après la configuration) : sous <strong>Photos</strong>, la case <strong>Crédit photo</strong> commence avec le nom de votre entreprise. Tapez-y le nom du photographe, comme <em>Photographie Jeanne Tremblay</em>, et il paraît avec la photo. Vous les avez déjà envoyées dans la configuration? Touchez <strong>Écrivez-nous</strong> avec le nom et nous l’ajouterons.</p>' },
   { id: 'photo-rights', over: ['photo-add', 'photo-credit'], q: 'The photos belong to my employer: can I still tick the box?', qFr: 'Les photos appartiennent à mon employeur : puis-je cocher la case?', pages: ['edit', 'setup'],
     keys: ['photos belong', 'photos belong to', 'belong to the city', 'belong to my employer', 'belong to the company', 'not my photos', 'not mine', 'photos are not mine', 'my employer', 'employer s photos', 'employers photos', 'city s photos', 'city photos', 'company photos', 'our photographer', 'can i still tick', 'still tick', 'tick this', 'tick the box', 'these are my photos', 'photo rights', 'rights to the photos', 'copyright', 'permission to use', 'allowed to use these photos', 'allowed to share', 'someone else took', 'i didn t take'],
     keysFr: ['photos appartiennent', 'appartiennent a la ville', 'appartiennent a mon employeur', 'pas mes photos', 'mon employeur', 'photos de la ville', 'photos de l entreprise', 'cocher la case', 'puis je cocher', 'ce sont mes photos', 'droits sur les photos', 'droit d auteur', 'permission d utiliser', 'quelqu un d autre a pris'],
@@ -68141,10 +68311,11 @@ function ownerHelpWidgetHtml(page, opts = {}) {
   // Tours (2026-11-16): no happy hour at all, so its topics aren't there to be found either.
   if (opts.dropHappyHour) cfg.topics = cfg.topics.filter((t) => !HELP_HAPPY_RE.test(`${t.q} ${t.qFr}`));
   // Sport test 7: a sport or golf place's topics carry their concept groups (sport-help.js CONCEPTS; the matcher's allOfAny).
-  try { const pv0 = opts.venueId ? getVenue(opts.venueId) : null; if (pv0 && sportSetupType(pv0.type)) { const C0 = sport5HelpModule.CONCEPTS || {}; cfg.cover = true; cfg.coverAdd = 0.5; cfg.fit = sport5HelpModule.FIT || [];
+  try { const pv0 = opts.venueId ? getVenue(opts.venueId) : null; if (pv0 && sportSetupType(pv0.type)) { const C0 = sport5HelpModule.CONCEPTS || {}; cfg.cover = true; cfg.coverAdd = 0.5; const golfCourse0 = (venueIndoorInfo(pv0.id).kinds || [])[0] === 'golf' || (pv0.type === 'golf' && !(venueIndoorInfo(pv0.id).kinds || []).length); cfg.fit = (sport5HelpModule.FIT || []).filter((r) => !r.golfCourse || golfCourse0).map(({ golfCourse, ...r }) => r);
     // Sport test 10 (2026-11-21; Lorraine: "a toll free line… Can I list both numbers?"): one phone number fits the box;
     // the second goes in Good to know (no second phone field).
-    cfg.topics = cfg.topics.map((t) => (t.id === 'phone' ? { ...t, a: `${t.a}<p>Two numbers, like a toll-free line or the restaurant? One fits the phone box: put the main one there and the other in one line in <strong>Good to know</strong>, like <em>Toll-free 1-800-555-0123</em>. Postal code missing? Add it at the end of the address.</p>`, aFr: t.aFr + frSpacingHtml(`<p>Deux numéros, comme une ligne sans frais ou le restaurant? Un seul entre dans la case du téléphone : mettez-y le principal, et l’autre en une ligne dans <strong>Bon à savoir</strong>, comme <em>Sans frais 1-800-555-0123</em>. Le code postal manque? Ajoutez-le à la fin de l’adresse.</p>`) } : t));
+    // Sport test 11 (2026-11-21; Geneviève's second number for the simulator read the line 6th): it comes first.
+    cfg.topics = cfg.topics.map((t) => (t.id === 'phone' ? { ...t, a: `<p>Two numbers, like a toll-free line, a booking line or the restaurant? One fits the phone box: put the main one there and the other in one line in <strong>Good to know</strong>, like <em>Toll-free 1-800-555-0123</em>. Postal code missing? Add it at the end of the address.</p>${t.a}`, aFr: frSpacingHtml(`<p>Deux numéros, comme une ligne sans frais, une ligne de réservation ou le restaurant? Un seul entre dans la case du téléphone : mettez-y le principal, et l’autre en une ligne dans <strong>Bon à savoir</strong>, comme <em>Réservations : 250-555-0123</em>. Le code postal manque? Ajoutez-le à la fin de l’adresse.</p>`) + t.aFr } : t));
     // Sport test 10: a shop open in the off-season doesn't make the course open; and which rate goes on Price when a course
     // has several (high season, shoulder, residents).
     // (Golf courses only: a simulator or a range listed as golf has its own words.)
@@ -71118,7 +71289,7 @@ function renderAdminMenuCard(m) {
   const pages = menuFiles(m.id);
   // Tour test 12: a tour's card counts its trips only (no Extras, add-ons or gift cards).
   const items = v && v.type === 'tour' ? (tourTripItems(parseMenuData(m.data)).length || menuItemCount(parseMenuData(m.data))) : menuItemCount(parseMenuData(m.data));
-  const what = m.status === 'help' && m.help_kind === MENU_EMAIL_KIND ? '<strong>Menu expected by email</strong> (they chose “I’ll email it” in the easy setup). When it arrives, add it and press Done; if it never comes, follow up' : m.status === 'help' && m.help_kind === SETUP_FR_STORY_KIND ? '<strong>Write their French description</strong> from their English story (they tapped “Leave it to us” in the French setup)' : m.status === 'help' && m.help_kind === SETUP_FR_LINES_KIND ? '<strong>Write the French for their own lines</strong> (Good to know, Groups or Known for, in the note)' : m.status === 'help' && SETUP_NOTE_KINDS.includes(m.help_kind) ? `<strong>Find their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind])} link and add it</strong> (they typed the name in the easy setup)` : m.status === 'help' && m.help_kind ? `<strong>Type up their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind] || m.help_kind)}</strong> (from the easy setup)` : m.status === 'help' ? '<strong>Asked us to do it</strong>' : m.status === 'published' ? '<strong>live</strong>' : 'sent from their private link';
+  const what = m.status === 'help' && m.help_kind === MENU_EMAIL_KIND ? '<strong>Menu expected by email</strong> (they chose “I’ll email it” in the easy setup). When it arrives, add it and press Done; if it never comes, follow up' : m.status === 'help' && m.help_kind === SETUP_FR_STORY_KIND ? '<strong>Write their French description</strong> from their English story (they tapped “Leave it to us” in the French setup)' : m.status === 'help' && m.help_kind === SETUP_FR_LINES_KIND ? ({ fr: '<strong>Write the French for their own lines</strong> (Good to know, Groups or Known for, in the note)', en: '<strong>Write the English for their own lines written in French</strong> (in the note)', both: '<strong>Write the other language for their own lines</strong> (the English for the ones marked “write the English”, the French for the rest, in the note)' }[frLinesDirection(m.help_note)]) : m.status === 'help' && SETUP_NOTE_KINDS.includes(m.help_kind) ? `<strong>Find their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind])} link and add it</strong> (they typed the name in the easy setup)` : m.status === 'help' && m.help_kind ? `<strong>Type up their ${adminReviewEsc(SETUP_SHEET_WORDS[m.help_kind] || m.help_kind)}</strong> (from the easy setup)` : m.status === 'help' ? '<strong>Asked us to do it</strong>' : m.status === 'published' ? '<strong>live</strong>' : 'sent from their private link';
   const thumbs = pages.map((f, i) => (f.kind === 'pdf'
     ? `<a class="rv-btn rv-reject" href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener">PDF page ${i + 1}</a>`
     : `<a href="${adminReviewEsc(f.preview)}" target="_blank" rel="noopener"><img src="${adminReviewEsc(f.preview)}" alt="Page ${i + 1}" loading="lazy" style="height:120px;border-radius:8px;margin:0 6px 6px 0"></a>`)).join('');
@@ -71604,8 +71775,8 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
   }
   // Menus, happy hour or specials sent for us to type up, and a Facebook or Instagram name for us to find (2026-11-09).
   try {
-    for (const m of db.prepare("SELECT id, help_kind, submitted_at, updated_at FROM venue_menus WHERE venue_id = ? AND status = 'help' ORDER BY id DESC LIMIT 6").all(venueId)) {
-      const t = { [MENU_EMAIL_KIND]: fr ? 'Vous enverrez votre menu par courriel' : 'You’ll email us your menu', menu_social: fr ? 'Votre menu sur Facebook ou Instagram' : 'Your menu on Facebook or Instagram', happy_hour: fr ? '5 à 7 envoyé' : 'Happy hour sent to us', specials: fr ? 'Spéciaux envoyés' : 'Weekly specials sent to us', facebook: fr ? 'Nom de votre page Facebook' : 'Your Facebook page name', instagram: fr ? 'Votre nom Instagram' : 'Your Instagram name', [SETUP_FR_STORY_KIND]: fr ? 'Votre description en français : nous l’écrivons' : 'Your French description: we’ll write it', [SETUP_FR_LINES_KIND]: fr ? 'Vos lignes en français : nous les écrivons' : 'Your lines in French: we’ll write them' }[m.help_kind] || (fr ? 'Menu envoyé' : 'Menu sent to us');
+    for (const m of db.prepare("SELECT id, help_kind, help_note, submitted_at, updated_at FROM venue_menus WHERE venue_id = ? AND status = 'help' ORDER BY id DESC LIMIT 6").all(venueId)) {
+      const t = { [MENU_EMAIL_KIND]: fr ? 'Vous enverrez votre menu par courriel' : 'You’ll email us your menu', menu_social: fr ? 'Votre menu sur Facebook ou Instagram' : 'Your menu on Facebook or Instagram', happy_hour: fr ? '5 à 7 envoyé' : 'Happy hour sent to us', specials: fr ? 'Spéciaux envoyés' : 'Weekly specials sent to us', facebook: fr ? 'Nom de votre page Facebook' : 'Your Facebook page name', instagram: fr ? 'Votre nom Instagram' : 'Your Instagram name', [SETUP_FR_STORY_KIND]: fr ? 'Votre description en français : nous l’écrivons' : 'Your French description: we’ll write it', [SETUP_FR_LINES_KIND]: ({ fr: fr ? 'Vos lignes : nous écrivons la version française' : 'Your lines: we’ll write the French', en: fr ? 'Vos lignes en français : nous écrivons la version anglaise' : 'Your French lines: we’ll write the English', both: fr ? 'Traduction demandée' : 'Translation requested' })[frLinesDirection(m.help_note)] }[m.help_kind] || (fr ? 'Menu envoyé' : 'Menu sent to us');
       // Tour test 2 (Whistler, 2026-11-16): a tour sent its tours and prices, not a menu.
       const tt = vrow && vrow.type === 'tour' ? ({ [MENU_EMAIL_KIND]: fr ? 'Vous enverrez vos sorties et tarifs par courriel' : 'You’ll email us your tours and prices', menu_social: fr ? 'Vos sorties et tarifs sur Facebook ou Instagram' : 'Your tours and prices on Facebook or Instagram' }[m.help_kind] || (!['happy_hour', 'specials', 'facebook', 'instagram', SETUP_FR_STORY_KIND, SETUP_FR_LINES_KIND].includes(m.help_kind) ? (fr ? 'Sorties et tarifs envoyés' : 'Tours and prices sent to us') : t)) : t;
       items.push({ kind: 'menu', at: m.submitted_at || m.updated_at, sent: m.submitted_at || m.updated_at, status: 'pending', reason: null, title: tt });
@@ -73030,7 +73201,9 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       if (ks.length) {
         const list = ks.map((k) => NAMES[k][fr ? 1 : 0]).join(', ');
         const enHref = `${token ? `${OWNER_LINK_PATH}${token}` : `/owner/account/venue/${venue.id}`}#${ids[ks[0]] || 'visit'}`;
-        frOnlyEditHtml = `<p class="op-hint op-fr-only" id="opVisitFrOnly">${fr ? `${escapeHtml(list)}&nbsp;: en français seulement, donc sur votre page française seulement. <a href="${escapeHtml(enHref)}" onclick="try{localStorage.setItem('okanaganLang','en')}catch(e){}">Ajouter la version anglaise</a>` : `In French only, so on your French page only: ${escapeHtml(list)}. Type the English version in its box below.`}</p>`;
+        // Sport test 11 (2026-11-21): on an indoor or sport place the English is queued for her, so she stays in French.
+        if (kindSetupType(venue.type)) frOnlyEditHtml = `<p class="op-hint op-fr-only" id="opVisitFrOnly">${fr ? `${escapeHtml(list)}&nbsp;: écrit en français. Nous écrivons la version anglaise pour votre page anglaise, habituellement d’ici un jour.` : `Written in French: ${escapeHtml(list)}. We write the English, usually within a day, or type it in its box below.`}</p>`;
+        else frOnlyEditHtml = `<p class="op-hint op-fr-only" id="opVisitFrOnly">${fr ? `${escapeHtml(list)}&nbsp;: en français seulement, donc sur votre page française seulement. <a href="${escapeHtml(enHref)}" onclick="try{localStorage.setItem('okanaganLang','en')}catch(e){}">Ajouter la version anglaise</a>` : `In French only, so on your French page only: ${escapeHtml(list)}. Type the English version in its box below.`}</p>`;
       }
     } catch (e) { frOnlyEditHtml = ''; }
     const boxes = editKeys.concat(extraKeys.filter((k) => !editKeys.includes(k))).map((k) => `
@@ -74760,7 +74933,8 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
           // Signed in (2026-10-27): open the signed-in page, which explains what goes live straight away, with a note
           // naming anything sent from this link that just went live.
           if (j.href) {
-            var go = (location.pathname.indexOf('/fr/') === 0 ? '/fr' : '') + j.href + '?welcome=1' + (j.published && j.published.length ? '&live=' + encodeURIComponent(j.published.join(',')) : '');
+            // ownerFrJson already gives the French address; /fr only when missing (was /fr/fr, sport test 11).
+            var go = (location.pathname.indexOf('/fr/') === 0 && j.href.indexOf('/fr/') !== 0 ? '/fr' : '') + j.href + '?welcome=1' + (j.published && j.published.length ? '&live=' + encodeURIComponent(j.published.join(',')) : '');
             location.href = go; return;
           }
           ls.style.display = 'none'; document.getElementById('olsDone').classList.add('show');

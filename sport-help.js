@@ -442,8 +442,9 @@ const TOPICS = [
     q: 'Part of our place already has its own page', qFr: 'Une partie de notre endroit a déjà sa propre page',
     keys: ['already has its own page', 'has its own page', 'its own page', 'own page on your site', 'its own listing', 'own listing', 'already has a page', 'already listed', 'separate page', 'sim lounge', 'simulator lounge', 'sim lounge is open', 'tick indoor golf'],
     keysFr: ['sa propre page', 'sa propre fiche', 'deja une page', 'deja une fiche', 'salon de simulateurs', 'cocher golf interieur'],
-    a: '<p>Then don’t tick it here: it has its own page, with its own hours and setup. Want golfers to know? Say it in one line in <strong>Good to know</strong>, like <em>Our indoor lounge has its own page, open November to March</em>. Outside your season your page says closed and when you reopen; the other page shows its own hours.</p>',
-    aFr: '<p>Alors ne le cochez pas ici : il a sa propre page, avec ses heures et sa configuration. Vous voulez que les golfeurs le sachent? Dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>Notre salon intérieur a sa propre page, ouvert de novembre à mars</em>. Hors saison, votre page dit fermé et quand vous rouvrez; l’autre page montre ses propres heures.</p>' },
+    // Sport test 11 (2026-11-21; Geneviève's simulator has no page of its own, and this said « il a sa propre page »): the
+    // answer follows the data: another listing at her address or under her name (ctx.sister), or none.
+    a: '{SISTER_SAYS_EN}', aFr: '{SISTER_SAYS_FR}' },
   { id: 'sport-social-hour', pages: ['setup', 'edit'], over: ['no-website-social', 'sport-shared-social', 'sport-restaurant', 'social-post', 'hh-times', 'hh-deals'],
     q: 'Our "social hour" (happy hour) at the clubhouse or its restaurant', qFr: 'Notre « heure sociale » (5 à 7) au club-house ou à son restaurant',
     keys: ['social hour', 'social hours', 'apres golf', 'après golf', 'apres ski', 'drink specials', 'happy hour at', 'happy hour on both'],
@@ -496,6 +497,24 @@ const TOPICS = [
     keysFr: ['pas de 5 a 7 mais', 'ses propres speciaux', 'speciaux du restaurant'],
     a: '<p>On <strong>Do you have a happy hour?</strong>, tap <strong>No</strong>: that’s right for your place, and nothing more is asked. The restaurant’s own specials? Put them in one line in <strong>Known for</strong> or <strong>Good to know</strong>, like <em>Grill: dinner specials Friday nights</em>. The restaurant has its own page here? Its specials can go there too.</p>',
     aFr: '<p>À <strong>Avez-vous un 5 à 7?</strong>, touchez <strong>Non</strong> : c’est le bon choix pour votre endroit, et rien d’autre n’est demandé. Les spéciaux du restaurant? Mettez-les en une ligne dans <strong>Connu pour</strong> ou <strong>Bon à savoir</strong>, comme <em>Grill : spéciaux le vendredi soir</em>. Le restaurant a sa propre page ici? Ses spéciaux peuvent aussi y aller.</p>' },
+  // Sport test 11 (2026-11-21; Geneviève's Trackman simulator runs January to March, outside her Apr 3 – Oct 31 golf season):
+  // something open in the off-season for another kind. No new field (Dayton hasn't approved "open off-season for a second
+  // kind"): the season stays the golf season, the other kind's months go in Good to know, its own listing via Message us.
+  { id: 'sport-offseason-other', kinds: ['golf'], pages: ['setup', 'edit'], over: ['sport-season-says', 'sport-season', 'season', 'indoor-seasonal', 'seasonal-hours', 'hours-third-stretch', 'indoor-closed-months', 'year-round'],
+    q: 'Something else is open in the off-season (like indoor golf)', qFr: 'Autre chose est ouvert hors saison (comme du golf intérieur)',
+    keys: ['simulator in winter', 'simulator is open in winter', 'indoor simulator opens', 'simulator only in winter', 'simulator january to march', 'winter simulator', 'open in the off season', 'open in winter for'],
+    keysFr: ['simulateur l hiver', 'simulateur en hiver', 'simulateur interieur ouvre', 'simulateur de janvier a mars', 'simulateur seulement de janvier', 'ouvert hors saison', 'ouvert l hiver pour'],
+    a: '<p>Your golf season goes in your hours: tap <strong>We’re closed part of the year</strong> and pick your first and last day of golf. Outside it, your page and card say “Closed for the season”.</p><p>Indoor golf (or anything else) runs in the off-season? Keep its kind ticked, so people find it, and say when it runs in one line in <strong>Good to know</strong>, like <em>Indoor golf January to March, Mon–Sat 9 AM – 9 PM; book by phone</em>. Don’t add those months as a second stretch of hours: outside your season they don’t show anywhere. Has it got its own name, entrance and hours? Tap <strong>Message us</strong> and Dayton will see about a listing of its own.</p>',
+    aFr: '<p>Votre saison de golf va dans vos heures : touchez <strong>Nous fermons une partie de l’année</strong> et choisissez votre premier et votre dernier jour de golf. En dehors, votre page et votre fiche indiquent « Fermé pour la saison ».</p><p>Du golf intérieur (ou autre chose) est ouvert hors saison? Gardez son genre coché, pour qu’on le trouve, et dites quand il est ouvert en une ligne dans <strong>Bon à savoir</strong>, comme <em>Golf intérieur de janvier à mars, du lundi au samedi de 9 h à 21 h; réservation par téléphone</em>. N’ajoutez pas ces mois comme une deuxième période d’heures : hors saison, elles ne paraissent nulle part. Il a son propre nom, son entrée et ses heures? Touchez <strong>Écrivez-nous</strong> et Dayton verra à une fiche à part.</p>' },
+  // Sport test 11: "Our clubhouse books Christmas parties and weddings all winter… will people think they can't book an
+  // event?" got "Nothing to add".
+  { id: 'sport-offseason-events', kinds: ['golf'], pages: ['setup', 'edit'], over: ['sport-season-says', 'sport-season', 'season', 'indoor-seasonal', 'indoor-groups', 'indoor-closed-months', 'sport-part-season', 'events', 'event-add', 'sport-tournaments'],
+    q: 'We host events all year, even when we’re closed for the season', qFr: 'Nous recevons des événements toute l’année, même fermés pour la saison',
+    allOf: [['event', 'events', 'party', 'parties', 'wedding', 'weddings', 'banquet', 'banquets', 'catering', 'christmas', 'evenement', 'evenements', 'fete', 'fetes', 'party', 'mariage', 'mariages', 'noces', 'traiteur', 'reception', 'receptions', 'noel'], ['winter', 'all year', 'year round', 'closed', 'off season', 'hiver', 'toute l annee', 'ferme', 'hors saison']],
+    keys: ['christmas parties all winter', 'weddings all winter', 'events all winter', 'events all year', 'book an event', 'cant book an event', 'can t book an event', 'parties in winter'],
+    keysFr: ['fetes de noel', 'mariages toute l annee', 'evenements toute l annee', 'reserver un evenement', 'party de noel', 'receptions l hiver'],
+    a: '<p>Your page says closed for golf outside your season, which is right for golfers. Events still book all year? Say it in one line in <strong>Groups</strong> (or Good to know), like <em>Clubhouse open all year for weddings, Christmas parties and events</em>. People planning an event read it there, in every month.</p>',
+    aFr: '<p>Votre page dit fermé pour le golf hors saison, ce qui est juste pour les golfeurs. Les événements se réservent toute l’année? Dites-le en une ligne dans <strong>Groupes</strong> (ou Bon à savoir), comme <em>Club-house ouvert toute l’année pour les mariages, les partys de Noël et les événements</em>. Les gens qui planifient un événement le lisent là, peu importe le mois.</p>' },
   // Sport tests 9 and 10: "How do I see what the public sees?" / "Can I see what our page looks like to a golfer?" was
   // "I'm not sure" (or the approval answer); the edit page has the link at the top.
   { id: 'see-page', pages: ['setup', 'edit'], over: ['privacy', 'sport-approval-first', 'setup-live-when', 'live-speed'],
@@ -567,10 +586,17 @@ function tokens(kind, ctx) {
   const peakWhen = WINTER(kind) ? ['Christmas and spring break', 'Noël et relâche'] : SUMMER(kind) ? ['July and August', 'juillet et août'] : ['weekends', 'fin de semaine'];
   const peak = Math.round(p * 1.15);
   const seasonSays = ctx.season
-    ? [`<p>Yes, already. Your season is ${e(ctx.season.en)}: outside it your page and your card say “Closed for the season”, with the day you reopen (${e(ctx.season.reopenEn)}), and Build My Trip doesn’t plan you then. Nothing to add: don’t mark those months closed again.</p>`,
-      `<p>Oui, déjà. Votre saison va ${e(ctx.season.fr)} : en dehors, votre page et votre fiche indiquent « Fermé pour la saison », avec le jour de réouverture (${e(ctx.season.reopenFr)}), et Planifier mon voyage ne vous propose pas. Rien à ajouter : ne marquez pas ces mois comme fermés une deuxième fois.</p>`]
+    // Sport test 11: "does my page still show up in winter searches?" is answered first (yes, marked closed).
+    ? [`<p>Yes: your page stays up all year and still shows in searches. Your season is ${e(ctx.season.en)}: outside it your page and your card say “Closed for the season”, with the day you reopen (${e(ctx.season.reopenEn)}), and Build My Trip doesn’t plan you then. Nothing to add: don’t mark those months closed again.</p>`,
+      `<p>Oui : votre page reste en ligne toute l’année et paraît toujours dans les recherches. Votre saison va ${e(ctx.season.fr)} : en dehors, votre page et votre fiche indiquent « Fermé pour la saison », avec le jour de réouverture (${e(ctx.season.reopenFr)}), et Planifier mon voyage ne vous propose pas. Rien à ajouter : ne marquez pas ces mois comme fermés une deuxième fois.</p>`]
     : ['<p>Yes, once your season is in. In your hours, after the days, tap <strong>We’re closed part of the year</strong> and pick your first and last day. Outside them your page and your card say “Closed for the season”, with the day you reopen, and Build My Trip doesn’t plan you.</p>',
       '<p>Oui, une fois votre saison entrée. Dans vos heures, après les jours, touchez <strong>Nous fermons une partie de l’année</strong> et choisissez votre premier et votre dernier jour. En dehors, votre page et votre fiche indiquent « Fermé pour la saison », avec le jour de réouverture, et Planifier mon voyage ne vous propose pas.</p>'];
+  // Sport test 11: "it has its own page" only when it does.
+  const sisterSays = ctx.sister
+    ? [`<p>Then don’t tick it here: ${e(ctx.sister.name)} has its own page, with its own hours and setup. Want golfers to know? Say it in one line in <strong>Good to know</strong>, like <em>${e(ctx.sister.name)} is open November to March</em>. Outside your season your page says closed and when you reopen; the other page shows its own hours.</p>`,
+      `<p>Alors ne le cochez pas ici : ${e(ctx.sister.name)} a sa propre page, avec ses heures et sa configuration. Vous voulez que les golfeurs le sachent? Dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>${e(ctx.sister.name)} est ouvert de novembre à mars</em>. Hors saison, votre page dit fermé et quand vous rouvrez; l’autre page montre ses propres heures.</p>`]
+    : ['<p>It doesn’t have a page of its own here, so keep it on this one: leave it ticked if people can use it (it helps them find it), and say when it runs in one line in <strong>Good to know</strong>, like <em>Indoor golf January to March, Mon–Sat 9 AM – 9 PM</em>. People see your season’s dates on your page, so nobody expects it in July. Want it to have its own page (its own name, entrance and hours)? Tap <strong>Message us</strong>.</p>',
+      '<p>Il n’a pas de page à lui ici, alors gardez-le sur celle-ci : laissez-le coché si les gens peuvent l’utiliser (ça aide à le trouver), et dites quand il est ouvert en une ligne dans <strong>Bon à savoir</strong>, comme <em>Golf intérieur de janvier à mars, du lundi au samedi de 9 h à 21 h</em>. Les gens voient les dates de votre saison sur votre page : personne ne s’y attend en juillet. Vous voulez qu’il ait sa propre page (son nom, son entrée et ses heures)? Touchez <strong>Écrivez-nous</strong>.</p>'];
   const bw = ctx.booking || {};
   const two = (list) => (list || []).filter((x) => !(list || []).some((o) => o !== x && (o === `${x}s` || x.startsWith(`${o} `)))).slice(0, 2);
   const search = two(K.en.search), searchFr = two(K.fr.search);
@@ -578,13 +604,13 @@ function tokens(kind, ctx) {
     en: { MEET_EX: w('meet', 0), MEET_CHIP_EN: meet ? ` Or tap <strong>${e(meet[0])}</strong> and add where.` : '', LANG_EX: w('lang', 0), ADAPT_PRICE: w('adaptPrice', 0), ADAPT_EX: w('adapt', 0), REFUND_EX: w('refund', 0), REFUND_WX: w('refundWx', 0),
       BRING_EX: w('bring', 0), BRING_CHIPS_EN: bring.length ? ` (like ${bring.map(([c]) => `<strong>${e(c)}</strong>`).join(' or ')})` : '', BUSY_EX: e(busy[0]), PEAK_EX: e(`${typer[0]} $${p} (${peakWhen[0]}: $${peak})`),
       INCL_EX: w('include', 0), NOT_INCL: w('notIncluded', 0), PKG_EX: w('pkg', 0), CARD_EN: ctx.price ? `your main price (“${e(ctx.price.en)}”)` : 'your main price', LABEL_EN: e(label[0]), BOTH_EN: w('both', 0),
-      SEASON_SAYS_EN: seasonSays[0], AHEAD_CHIP_EN: e((bw.ahead || ['No, please book ahead'])[0]), AHEAD_EX: w('ahead', 0), BUSY_CHIP_EN: e((bw.busy || ['Yes, but book ahead for weekends and busy times'])[0]),
+      SEASON_SAYS_EN: seasonSays[0], SISTER_SAYS_EN: sisterSays[0], AHEAD_CHIP_EN: e((bw.ahead || ['No, please book ahead'])[0]), AHEAD_EX: w('ahead', 0), BUSY_CHIP_EN: e((bw.busy || ['Yes, but book ahead for weekends and busy times'])[0]),
       BUSY_LINE_EN: bw.line ? `: your page says “${e(String(bw.line[0]).replace(/\.$/, ''))}”` : '', SAME_EX: w('same', 0), HOLIDAY_EX: w('holiday', 0), SEARCH_EX: e(search.join(', ') || label[0].toLowerCase()), NEAR_EN: ctx.near ? ` ${ctx.near.en}` : '', NOT_INCL_CHIP_EN: notIn ? (notIn[0] === word('notIncluded', kind)[0] ? ': it’s one tap there' : ` (or tap <strong>${e(notIn[0])}</strong>)`) : '', NOT_SOLD_EN: kind === 'skischool' ? 'lift tickets the ticket office sells' : 'another business’s tickets', LIT_EN: lit ? `, or tap <strong>${e(lit[0])}</strong> if it’s lit` : '', AGES_LINE: w('lineAges', 0),
       EXTRA_EX: w('extra', 0), EXTRA_REPEAT: w('extra', 2), EMPTY_PHOTO: w('emptyPhoto', 0), NO_RENT: w('noRent', 0), RENT_CHIP_EN: rentChip ? `the <strong>${e(rentChip[0])}</strong> chip` : 'any rentals chip', BOOK_WHAT: w('bookWhat', 0), BOOK_BTN: e((K.bookBtn || ['Book online'])[0]) },
     fr: { MEET_EX: w('meet', 1), MEET_CHIP_FR: meet ? ` Ou touchez <strong>${e(meet[1])}</strong> et ajoutez l’endroit.` : '', LANG_EX: w('lang', 1), ADAPT_PRICE: w('adaptPrice', 1), ADAPT_EX: w('adapt', 1), REFUND_EX: w('refund', 1), REFUND_WX: w('refundWx', 1),
       BRING_EX: w('bring', 1), BRING_CHIPS_FR: bring.length ? ` (comme ${bring.map(([, c]) => `<strong>${e(c)}</strong>`).join(' ou ')})` : '', BUSY_EX: e(busy[3]), PEAK_EX: e(`${typer[2]} ${p} $ (${peakWhen[1]} : ${peak} $)`),
       INCL_EX: w('include', 1), NOT_INCL: w('notIncluded', 1), PKG_EX: w('pkg', 1), CARD_FR: ctx.price ? `votre prix principal (« ${e(ctx.price.fr)} »)` : 'votre prix principal', LABEL_FR: e(label[1]), BOTH_FR: w('both', 1),
-      SEASON_SAYS_FR: seasonSays[1], AHEAD_CHIP_FR: e((bw.ahead || ['', 'Non, réservez à l’avance'])[1]), AHEAD_EX: w('ahead', 1), BUSY_CHIP_FR: e((bw.busy || ['', 'Oui, mais réservez pour les fins de semaine et les périodes achalandées'])[1]),
+      SEASON_SAYS_FR: seasonSays[1], SISTER_SAYS_FR: sisterSays[1], AHEAD_CHIP_FR: e((bw.ahead || ['', 'Non, réservez à l’avance'])[1]), AHEAD_EX: w('ahead', 1), BUSY_CHIP_FR: e((bw.busy || ['', 'Oui, mais réservez pour les fins de semaine et les périodes achalandées'])[1]),
       BUSY_LINE_FR: bw.line ? ` : votre page indique « ${e(String(bw.line[1]).replace(/\.$/, ''))} »` : '', SAME_EX: w('same', 1), HOLIDAY_EX: w('holiday', 1), SEARCH_EX_FR: e(searchFr.join(', ') || label[1].toLowerCase()), NEAR_FR: ctx.near ? ` ${ctx.near.fr}` : '', NOT_INCL_CHIP_FR: notIn ? (notIn[0] === word('notIncluded', kind)[0] ? ' : c’est un choix à toucher' : ` (ou touchez <strong>${e(notIn[1])}</strong>)`) : '', NOT_SOLD_FR: kind === 'skischool' ? 'les billets de remontée vendus à la billetterie' : 'les billets d’une autre entreprise', LIT_FR: lit ? `, ou touchez <strong>${e(lit[1])}</strong> s’il y a de l’éclairage` : '', AGES_LINE: w('lineAges', 1),
       EXTRA_EX: w('extra', 1), EXTRA_REPEAT: w('extra', 3), EMPTY_PHOTO_FR: w('emptyPhoto', 1), NO_RENT_FR: w('noRent', 1), RENT_CHIP_FR: rentChip ? `le choix <strong>${e(rentChip[1])}</strong>` : 'tout choix de location', BOOK_WHAT_FR: w('bookWhat', 1), BOOK_BTN_FR: e((K.bookBtn || [null, 'Réserver en ligne'])[1]) },
   };
@@ -795,15 +821,19 @@ const FIT = [
   // "lost the email" / "lost my link": a new link, never how to carry on.
   { id: 'lost-link', all: ['\\b(lost|lose|cant find|can t find|deleted|deleted) (the|my|our) (email|e mail|link|edit link|private link)\\b'],
     fit: ['newlink', 'noemail', 'login-create', 'signin', 'forgot'], go: ['newlink'] },
+  { id: 'lost-link-fr', all: ['\\b(perdu|efface|supprime|trouve plus|retrouve plus|retrouve pas|trouve pas) (le|mon|notre|ce) (courriel|lien|lien de modification|lien prive)\\b|\\b(le|mon|notre) (courriel|lien) (est )?(perdu|efface|supprime)\\b'],
+    fit: ['newlink', 'noemail', 'login-create', 'signin', 'forgot'], go: ['newlink'] },
   // "We also have a toll free line… Can I list both numbers?"
-  { id: 'phone2', all: ['\\b(toll free|tollfree|1 8[0-9]{2} [0-9]{3}|second (phone|number|line)|two (phone )?numbers|both (phone )?numbers|another (phone )?number|other (phone )?number|deux numeros|autre numero|numero sans frais|sans frais)\\b'],
-    fit: ['phone', 'name-address', 'google'], go: ['phone'] },
+  { id: 'phone2', all: ['\\b(toll free|tollfree|1 8[0-9]{2} [0-9]{3}|second (phone|number|line)|two (phone )?numbers|both (phone )?numbers|another (phone )?number|other (phone )?number|deux numeros|autre numero|deuxieme numero|second numero|numero sans frais|sans frais|deux telephones)\\b'],
+    fit: ['phone', 'name-address', 'google'], bad: ['sport-offseason-other', 'sport-sister-listing', 'sport-season-says', 'sport-offseason-events', 'sport-bay-link'], go: ['phone'] },
   // "The course is closed but the golf shop is open weekdays for gift cards. Does that count as being open?"
-  { id: 'offseason-shop', all: ['\\b(winter|off season|offseason|hiver|hors saison|course is (closed|shut)|course (closed|shut)|closed for (the )?(season|year|winter)|terrain est ferme)\\b', '\\b(shop|store|office|boutique)\\b', '\\b(open|ouvert|ouverte)\\b'],
+  { id: 'offseason-shop', all: ['\\b(winter|off season|offseason|hiver|hors saison|course is (closed|shut)|course (closed|shut)|closed for (the )?(season|year|winter)|terrain est ferme|parcours est ferme|ferme pour l hiver|ferme pour la saison)\\b', '\\b(shop|store|office|boutique)\\b', '\\b(open|ouvert|ouverte)\\b'],
     fit: ['sport-part-season', 'sport-season-says', 'sport-season', 'indoor-seasonal', 'season', 'sport-first-tee', 'sport-sister-listing', 'seasonal-hours', 'sport-last-booking'], go: ['sport-part-season'] },
   // "The golf club itself doesn't have a happy hour. The grill runs its own specials."
   { id: 'no-hh-specials', all: ['\\b(no|dont have|doesnt have|do not have|does not have|without|not have|pas de|n a pas|aucun) (a |an |any |real )?(happy hour|5 a 7|social hour)\\b', '\\b(special|specials|grill|restaurant|deal|deals|own page|its own|speciaux|menu)\\b'],
-    fit: ['sport-hh-none-specials', 'sport-no-bar', 'sport-sister-listing', 'dont-have', 'sport-restaurant'], go: ['sport-hh-none-specials'] },
+    // Sport test 11 (« Le club n'a pas de 5 à 7. Par contre, le restaurant 1913 fait des soupers spéciaux »): the "no bar"
+    // answer doesn't say where the restaurant's specials go, so it no longer counts as fitting.
+    fit: ['sport-hh-none-specials', 'sport-sister-listing', 'dont-have', 'sport-restaurant'], go: ['sport-hh-none-specials'] },
   // "A charity tournament closes the course to the public for a day; the date changes every year."
   { id: 'event-closure', all: ['\\b(tournament|tournaments|tournoi|tournois|championship|championnat|member guest|scramble|amateur|charity|fundraiser|tourney)\\b', '\\b(close|closed|closes|closing|shut|shuts|ferme|fermer|block|bloquer|cant book|can t book|closed to the public|to the public|no public)\\b'],
     not: ['\\b(sign ups?|signups?|registration|registrations|entries|entry|inscriptions?) (close|closes|closed)\\b'],
@@ -811,10 +841,10 @@ const FIT = [
   // "Can our head pro get his own access without using my login?"
   { id: 'own-access', all: ['\\b((his|her|their|my|our) own (access|login|log in|account|password|sign in)|own access|own login|own account|separate login|without (using )?my (login|password|account)|shouldnt use my login|share my (login|password)|give (him|her|them) access|propre acces|son propre (acces|compte)|sa propre connexion)\\b'],
     fit: ACCESS_TOPICS, go: ['staff'] },
-  { id: 'can-they-log-in', all: ['\\b(can|could|may) (he|she|they|our [a-z]+( [a-z]+)?|my [a-z]+( [a-z]+)?) (also )?(log in|login|sign in|have access|get access|access)\\b'],
+  { id: 'can-they-log-in', all: ['\\b(can|could|may) (he|she|they|our [a-z]+( [a-z]+)?|my [a-z]+( [a-z]+)?) (also )?(log in|login|sign in|have access|get access|access)\\b|\\b(peut il|peut elle|peuvent ils|peuvent elles|est ce qu il peut|est ce qu elle peut|est ce qu ils peuvent) (aussi )?(avoir (son|sa|leur) (propre )?(acces|compte)|se connecter|acceder)\\b'],
     fit: ACCESS_TOPICS, go: ['staff'] },
   // "Is there any charge to us if golfers book after finding us?"
-  { id: 'cost-to-us', all: ['\\b(any charge|charge (to )?us|charge us|charge me|do you charge|will you charge|cost us|costs us|cost (me|anything)|fee to us|fees to us|commission|take a cut|bill us|invoice us|do we (have to )?pay|will we (have to )?pay|have to pay (you|anything|for this)|pay you|pay anything|payer quelque chose|ca coute quelque chose|coute quelque chose|est ce payant|des frais pour nous)\\b'],
+  { id: 'cost-to-us', all: ['\\b(any charge|charge (to )?us|charge us|charge me|do you charge|will you charge|cost us|costs us|cost (me|anything)|fee to us|fees to us|commission|take a cut|bill us|invoice us|do we (have to )?pay|will we (have to )?pay|have to pay (you|anything|for this)|pay you|pay anything|payer quelque chose|ca coute quelque chose|coute quelque chose|est ce payant|des frais pour nous|ca nous coute|nous coute|nous couter|vous prenez une commission|une commission|faut il payer|devons nous payer|on doit payer|nous facturer|vous facturez)\\b'],
     not: ['\\bhow much do (you|u) charge\\b', '\\bwhat do (you|u) charge (for|visitors|golfers|people)\\b'],
     fit: ['cost', 'indoor-cost', 'sport-terms', 'scam', 'about', 'sport-public'], go: ['indoor-cost', 'cost'] },
   // "Which number do you want here?" (an 18-hole rate in high season and in the shoulder season, a locals' rate)
@@ -834,8 +864,37 @@ const FIT = [
   { id: 'age-not-price', all: ['\\b(age|ages|aged|year old|years old|yr old|yrs old|ans)\\b'], not: ['\\b(dollarsign|price|prices|rate|rates|fee|fees|cost|costs|free|tarif|tarifs|prix|gratuit|dollars|bucks|charge)\\b'],
     bad: ['indoor-price', 'sport-card-price', 'indoor-price-varies', 'sport-golf-details'], go: ['indoor-age'] },
   { id: 'winter-not-weather', all: ['\\b(all winter|for (the )?winter|until spring|snow melts|for the season|tout l hiver|pour l hiver|jusqu au printemps)\\b'], bad: ['sport-weather'], go: ['sport-season'] },
+  // Sport test 11 (2026-11-21; Geneviève, 22 questions in French: the fit check never fired): French wording for every
+  // intent above, and these.
+  // « Créer mon compte… une page blanche qui dit Not found » got the menu-link answer: an error page is never answered
+  // by an unrelated topic (Ask us), and an error after making a login is the login answer.
+  { id: 'error-login', all: ['\\b(not found|page blanche|blank page|erreur|error|404|n a pas marche|n a pas fonctionne|didn t work|didnt work|doesn t work|doesnt work|ne marche pas|ne fonctionne pas|broken|bug|plante|crash)\\b',
+    '\\b(compte|login|log in|account|connexion|connecte|connectee|sign in|signed in|mot de passe|password|creer mon compte|create a login)\\b'],
+    fit: ['login-not-found', 'login-create', 'signin', 'forgot', 'login-privacy'], go: ['login-not-found'] },
+  { id: 'error-any', all: ['\\b(not found|page blanche|blank page|erreur|error|404|n a pas marche|n a pas fonctionne|didn t work|didnt work|doesn t work|doesnt work|ne marche pas|ne fonctionne pas|broken|bug|plante|crash)\\b'],
+    fit: ['login-not-found', 'login-create', 'signin', 'forgot', 'newlink', 'noemail', 'photo-add', 'photo-small', 'photo-pending', 'photo-blurry', 'menu-import', 'menu-website', 'see-page', 'live-speed', 'changes-review'] },
+  // « Les golfeurs anglophones vont les voir en anglais? » / « la page anglaise va rester vide? » got the portal's language:
+  // a question about her page's words in the other language is the translation answer.
+  { id: 'content-language', all: ['\\b(anglais|anglaise|anglaises|anglophones?|english|francais|francaise|french|francophones?|traduire|traduction|traduit|traduisez|translate|translated|translation)\\b',
+    '\\b(tarifs?|prix|lignes?|rates?|prices?|lines?|histoire|description|story|page|pages|fiche|golfeurs?|visiteurs?|visitors?|golfers?|gens|people|ecrit|ecrites?|tape|tapes|typed|wrote|written|vide|empty|blank|show up|paraissent|voir)\\b'],
+    not: ['\\b(portal|portail|espace entreprises|business portal|interface|ecrans|screens|setup in french|configuration en francais|login page|page de connexion)\\b', '\\b(staff|personnel|moniteurs|instructors|instructeurs|guides|parlent|speak|speaks|bilingue|bilingual|cours en|lessons in|tours in|sorties en)\\b'],
+    fit: ['indoor-french', 'fr-desc-old', 'french-lines'], go: ['indoor-french'] },
+  // "Our clubhouse books Christmas parties and weddings all winter" got "Nothing to add".
+  { id: 'offseason-events', all: ['\\b(events?|part(y|ies)|weddings?|banquets?|catering|christmas|evenements?|fetes?|mariages?|noces|traiteur|receptions?|noel)\\b',
+    '\\b(winter|all year|year round|closed|off season|offseason|hiver|toute l annee|ferme|fermee|hors saison)\\b', '\\b(book|books|booking|booked|host|hosts|hosting|rent|rents|available|reserv[a-z]*|accueill[a-z]*|organis[a-z]*|recev[a-z]*|recoit|loue|louer|offr[a-z]*|planning|plan)\\b'],
+    not: ['\\b(closed|close|ferme|fermes|fermons) (on |le |for |pour )?(christmas|noel)\\b', '\\b(christmas day|boxing day|jour de noel|holiday|holidays|conge|feries?)\\b'],
+    golfCourse: true, fit: ['sport-offseason-events', 'indoor-groups', 'sport-part-season'], go: ['sport-offseason-events'] },
+  // « Je veux que les gens sachent… simulateur par téléphone l'hiver, et qu'on a un code vestimentaire »: the dress code
+  // answer (both lines go in Good to know).
+  { id: 'dress-code', all: ['\\b(dress code|code vestimentaire|tenue vestimentaire|tenue de golf|chemise a col|collared)\\b'],
+    fit: ['sport-dress-code', 'indoor-good-to-know', 'sport-what-to-bring'], bad: ['sport-bay-link'], go: ['sport-dress-code'] },
+  // Her Trackman simulator, January to March, outside her golf season (« sans mélanger les golfeurs? », « fermé une partie
+  // de l'année ou heures différentes l'hiver? », « les gens vont penser qu'on l'offre en plein été? »). Golf courses only:
+  // for a simulator business the simulator IS the season.
+  { id: 'offseason-other', all: ['\\b(simulat[a-z]*|trackman|indoor|interieur|interieure|dome|virtual|virtuel)\\b', '\\b(winter|hiver|off season|offseason|hors saison|january|janvier|february|fevrier|march|mars|november|novembre|december|decembre|closed|ferme|plein ete)\\b'],
+    golfCourse: true, fit: ['sport-offseason-other', 'sport-sister-listing', 'sport-part-season', 'sport-dress-code', 'phone', 'sport-bay-link', 'sport-second-kind', 'indoor-kinds-many', 'indoor-also-offer', 'sport-kinds-other', 'sport-lessons'], go: ['sport-offseason-other'] },
   // "Can I see what our page looks like to a golfer?"
-  { id: 'see-page', all: ['\\b(see|view|look at|preview|voir) (what )?(our|my|the) (page|listing|fiche)|what (our|my|the) (page|listing) looks like|what (the public|visitors|golfers|people|customers) see|ce que (le public|les visiteurs) voi|a quoi ressemble (notre|ma) (page|fiche)\\b'],
+  { id: 'see-page', all: ['\\b(see|view|look at|preview|voir) (what )?(our|my|the) (page|listing|fiche)|what (our|my|the) (page|listing) looks like|what (the public|visitors|golfers|people|customers) see|ce que (le public|les visiteurs) voi|a quoi ressemble (notre|ma) (page|fiche)|voir (notre|ma) (page|fiche) comme|comme (un|une) (golfeur|golfeuse|visiteur|visiteuse|client|cliente) (la )?voit\\b'],
     fit: ['see-page', 'setup-live-when', 'live-speed', 'photos-when', 'photo-pending', 'changes-review', 'indoor-french', 'french', 'sport-season-says', 'shows-closed'], go: ['see-page'] },
 ];
 module.exports = { WORDS, word, TOPICS, MORE_KEYS, tokens, kindHelp, fill, CONCEPTS, NOT_IF, FIT };
