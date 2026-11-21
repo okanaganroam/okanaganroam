@@ -2560,8 +2560,8 @@ Object.assign(fr.indoor, { bringExKinds: { gallery: 'La plupart des œuvres sont
 // - The story and Known for examples follow the main kind (like the Good to know example).
 // Sport test 9 (2026-11-21; Gord's "My prices are on my website" was filled with his Chronogolf tee-time link): a rates
 // page only, never a booking link; with none found, the box starts empty with a hint.
-Object.assign(en.indoor, { webLeadRates: 'We filled in the rates page we found on your website. Check it’s the right one.', webLeadRatesEmpty: 'Type your rates page’s address, like yourclub.com/rates (not your booking page). Or use your website’s home page.' });
-Object.assign(fr.indoor, { webLeadRates: 'Nous avons inscrit la page des tarifs trouvée sur votre site. Vérifiez que c’est la bonne.', webLeadRatesEmpty: 'Inscrivez l’adresse de votre page des tarifs, comme votreclub.com/tarifs (pas votre page de réservation). Ou prenez la page d’accueil de votre site.' });
+Object.assign(en.indoor, { webWhatShows: 'Your page will link to your rates page (your prices aren’t copied).', webSavedLink: 'Your page will link to your rates page, usually within a day (we check the link first).', webLeadRates: 'We filled in the rates page we found on your website. Check it’s the right one.', webLeadRatesEmpty: 'Type your rates page’s address, like yourclub.com/rates (not your booking page). Or use your website’s home page.' });
+Object.assign(fr.indoor, { webWhatShows: 'Votre page renverra à votre page des tarifs (vos prix ne sont pas copiés).', webSavedLink: 'Votre page renverra à votre page des tarifs, en général d’ici un jour (nous vérifions le lien d’abord).', webLeadRates: 'Nous avons inscrit la page des tarifs trouvée sur votre site. Vérifiez que c’est la bonne.', webLeadRatesEmpty: 'Inscrivez l’adresse de votre page des tarifs, comme votreclub.com/tarifs (pas votre page de réservation). Ou prenez la page d’accueil de votre site.' });
 // Sport test 8 (2026-11-21; Dayton approved): a walk-on or 9-hole course's Good to know chips. The big-course chips that
 // don't fit it ("Pro shop", "Dress code: collared shirts", "Driving range on site") make room, so the count stays the same.
 // Sport test 8 (2026-11-21; Marg's golf course was asked "Patio only / Inside and patio / Water bowls at the door"): the
@@ -2902,6 +2902,17 @@ Object.assign(en, {
   seaOutsideNoSub: 'Only something else runs then, like an indoor simulator? Say it in Good to know',
   seaOutsideSkipped: 'Those other hours weren’t saved: outside your season your page says closed. Something else runs then (like a winter simulator)? Say when in Good to know, like “Indoor simulator Jan–Mar, Mon–Sat 9 AM – 9 PM”.',
   seaOutsideLine: '{span}: {hours}. Outside your season ({a} – {b}), so these don’t show on your page.',
+  // Sport test 14 (2026-11-21; Marisol, season Mar 15 – Oct 31, Mar–Apr hours): only the days outside the season are named,
+  // and the main button keeps the days inside it.
+  seaOutsidePart: 'Your season is {a} – {b}, so on {out} your page says “Closed for the season”. These hours show {e} – {f}.',
+  seaOutsidePartAsk: 'Your season is {a} – {b}, so on {out} your page says “Closed for the season”. These hours show {e} – {f}. Open {out} too?',
+  seaOutsideKeep: 'Keep {e} – {f} (in your season)',
+  // Sport test 14: the seasonal-hours path in plain words (sport and golf).
+  seaPartQ: 'Different hours for part of your season? Pick the months, like spring and fall',
+  openPartSeason: 'Save, and add different hours for part of your season', openPartSeasonSub: 'Pick the months, like spring and fall',
+  seaMoreSport: 'Different hours for part of your season, like spring and fall?',
+  seaMoreClosedFirst: 'Closed part of the year too? Tap “We’re closed part of the year” first: you add these hours right after.',
+  monthsInRowSea: 'Please pick months in a row, like March to April. Different hours in another part of the season too, like October? Save these, then tap “A second stretch with different hours too?”.',
 });
 Object.assign(fr, {
   seaOutside: 'Votre saison va du {a} au {b} : du {c} au {d}, votre page dit « Fermé pour la saison » et ces heures ne paraîtraient nulle part. Ouvert aussi du {c} au {d}?',
@@ -2912,6 +2923,14 @@ Object.assign(fr, {
   seaOutsideNoSub: 'Seulement autre chose est ouvert, comme un simulateur intérieur? Dites-le dans Bon à savoir',
   seaOutsideSkipped: 'Ces autres heures n’ont pas été enregistrées : hors saison, votre page dit fermé. Autre chose est ouvert à ce moment-là (comme un simulateur l’hiver)? Dites quand dans Bon à savoir, comme « Simulateur intérieur de janvier à mars, du lundi au samedi de 9 h à 21 h ».',
   seaOutsideLine: '{span} : {hours}. En dehors de votre saison (du {a} au {b}), ces heures ne paraissent pas sur votre page.',
+  seaOutsidePart: 'Votre saison va du {a} au {b} : {out}, votre page dit « Fermé pour la saison ». Ces heures paraissent du {e} au {f}.',
+  seaOutsidePartAsk: 'Votre saison va du {a} au {b} : {out}, votre page dit « Fermé pour la saison ». Ces heures paraissent du {e} au {f}. Ouvert aussi {out}?',
+  seaOutsideKeep: 'Garder du {e} au {f} (dans votre saison)',
+  seaPartQ: 'D’autres heures pour une partie de votre saison? Choisissez les mois, comme le printemps et l’automne',
+  openPartSeason: 'Enregistrer et ajouter d’autres heures pour une partie de la saison', openPartSeasonSub: 'Choisissez les mois, comme le printemps et l’automne',
+  seaMoreSport: 'D’autres heures pour une partie de votre saison, comme le printemps et l’automne?',
+  seaMoreClosedFirst: 'Fermé aussi une partie de l’année? Touchez d’abord « Nous fermons une partie de l’année » : vous ajoutez ces heures juste après.',
+  monthsInRowSea: 'Choisissez des mois qui se suivent, comme de mars à avril. D’autres heures pour une autre partie de la saison, comme octobre? Enregistrez celles-ci, puis touchez « Une deuxième période aux heures différentes aussi? ».',
 });
 
 (function frSpaces(o) {

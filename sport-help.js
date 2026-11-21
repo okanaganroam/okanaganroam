@@ -555,6 +555,23 @@ const TOPICS = [
     keysFr: ['bon a savoir est plein', 'plus de place', 'pas assez de place', 'limite de caracteres', 'ca ne rentre pas'],
     a: '<p>Good to know holds about 320 letters, to keep your page easy to read. Keep each line short (<em>Cash or card</em>) and move what has a home of its own: group packages to <strong>Groups</strong>, what you’re known for to <strong>Known for</strong>, a weekly night like a men’s night to What’s On (<strong>Add an event</strong>, repeating every week), your prices to <strong>Your prices</strong>.</p>',
     aFr: '<p>Bon à savoir contient environ 320 caractères, pour que votre page reste facile à lire. Gardez chaque ligne courte (<em>Comptant ou carte</em>) et déplacez ce qui a sa propre place : les forfaits de groupe dans <strong>Groupes</strong>, ce qui vous distingue dans <strong>Connu pour</strong>, une soirée chaque semaine comme une soirée des hommes dans À l’affiche (<strong>Ajouter un événement</strong>, qui se répète chaque semaine), vos prix dans <strong>Vos tarifs</strong>.</p>' },
+  // Sport test 14 (2026-11-21; Marisol kept the booking link we had found, which was her website, and her page showed only
+  // Website): the Book button shows once the link is saved. That bug (a kept link that matched the website was hidden) is
+  // fixed.
+  { id: 'sport-book-button', pages: ['setup', 'edit'], over: ['sport-booking-link', 'sport-tee-times', 'booking-link', 'links', 'website-broken', 'indoor-booking', 'sport-bay-link', 'changes-review'],
+    q: 'My Book button isn’t showing (only Website)', qFr: 'Mon bouton Réserver ne paraît pas (seulement Site Web)',
+    keys: ['book button', 'booking button', 'no book button', 'dont see a book', 'don t see a book', 'button is gone', 'button disappeared', 'button isnt showing', 'button not showing', 'just website', 'only website', 'only says website'],
+    keysFr: ['bouton reserver', 'bouton de reservation', 'pas de bouton', 'bouton a disparu', 'seulement site web'],
+    a: '<p>You didn’t do anything wrong. Your Book button shows once your booking link is saved (on <strong>Booking</strong>, or Name, address &amp; links on your edit page). We found a bug: a booking link that was the same as your website was hidden, so only Website showed. That’s fixed: your saved link shows as <strong>{BOOK_BTN}</strong>. Still only Website after a day? Tap <strong>Message us</strong>.</p>',
+    aFr: '<p>Vous n’avez rien fait de travers. Votre bouton Réserver paraît dès que votre lien de réservation est enregistré (dans <strong>Réservation</strong>, ou Nom, adresse et liens sur votre page de modification). Nous avons trouvé un bogue : un lien de réservation identique à votre site Web était caché, et seul Site Web paraissait. C’est corrigé : votre lien enregistré paraît comme <strong>{BOOK_BTN_FR}</strong>. Toujours seulement Site Web après un jour? Touchez <strong>Écrivez-nous</strong>.</p>' },
+  // Sport test 14 (Marisol: "the value index says nothing included in the green fee but range balls are included" got the
+  // price answer): the course facts and the Value index are our golf data, fixed by Dayton.
+  { id: 'sport-golf-facts', kinds: ['golf'], pages: ['setup', 'edit'], over: ['sport-golf-details', 'sport-included', 'indoor-old-line', 'sport-no-range', 'features'],
+    q: 'Our course facts or Value index are wrong', qFr: 'Les faits de notre parcours ou l’indice de valeur sont faux',
+    keys: ['value index', 'value thing', 'value score', 'course facts', 'not documented', 'undocumented', 'at a glance', 'facts are wrong', 'facts wrong'],
+    keysFr: ['indice de valeur', 'faits du parcours', 'non documente', 'en un coup d oeil'],
+    a: '<p>The course facts and the Value index come from our checked golf data, not from your answers. Something wrong or missing, like range balls included with every round? Tap <strong>Message us</strong> and say what to fix: Dayton fixes it, usually within a day. Once your own prices are in, the Value index and our green fee table come off your page.</p>',
+    aFr: '<p>Les faits du parcours et l’indice de valeur viennent de nos données de golf vérifiées, pas de vos réponses. Une erreur ou un oubli, comme les balles de pratique comprises avec chaque partie? Touchez <strong>Écrivez-nous</strong> et dites quoi corriger : Dayton le corrige, en général d’ici un jour. Dès que vos propres tarifs sont entrés, l’indice de valeur et notre tableau des droits de jeu disparaissent de votre page.</p>' },
 ];
 // What owners of every kind typed for the shared answers ([en keys, fr keys, topics they now beat]).
 const MORE_KEYS = {
@@ -625,8 +642,10 @@ function tokens(kind, ctx) {
       '<p>Oui, une fois votre saison entrée. Dans vos heures, après les jours, touchez <strong>Nous fermons une partie de l’année</strong> et choisissez votre premier et votre dernier jour. En dehors, votre page et votre fiche indiquent « Fermé pour la saison », avec le jour de réouverture, et Planifier mon voyage ne vous propose pas.</p>'];
   // Sport test 11: "it has its own page" only when it does.
   const sisterSays = ctx.sister
-    ? [`<p>Then don’t tick it here: ${e(ctx.sister.name)} has its own page, with its own hours and setup. Want golfers to know? Say it in one line in <strong>Good to know</strong>, like <em>${e(ctx.sister.name)} is open November to March</em>. Outside your season your page says closed and when you reopen; the other page shows its own hours.</p>`,
-      `<p>Alors ne le cochez pas ici : ${e(ctx.sister.name)} a sa propre page, avec ses heures et sa configuration. Vous voulez que les golfeurs le sachent? Dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>${e(ctx.sister.name)} est ouvert de novembre à mars</em>. Hors saison, votre page dit fermé et quand vous rouvrez; l’autre page montre ses propres heures.</p>`]
+    // Sport test 14 (Marisol: "the restaurant already has its own page. should I talk about it in our story?"): it keeps its
+    // own page; a line here is fine; linking the two is Dayton's.
+    ? [`<p>${e(ctx.sister.name)} has its own page here, with its own hours and setup, so keep this page about your place and don’t tick it as a kind here. A line about it is fine in your story or <strong>Good to know</strong>, like <em>${e(ctx.sister.name)} is open to everyone</em>. Outside your season your page says closed and when you reopen; the other page shows its own hours. Want the two pages linked, or both on your login? Tap <strong>Message us</strong>.</p>`,
+      `<p>${e(ctx.sister.name)} a sa propre page ici, avec ses heures et sa configuration : gardez cette page pour votre endroit et ne le cochez pas comme genre ici. Une ligne à son sujet est correcte dans votre histoire ou dans <strong>Bon à savoir</strong>, comme <em>${e(ctx.sister.name)} est ouvert à tous</em>. Hors saison, votre page dit fermé et quand vous rouvrez; l’autre page montre ses propres heures. Vous voulez relier les deux pages, ou les avoir dans votre compte? Touchez <strong>Écrivez-nous</strong>.</p>`]
     : ['<p>It doesn’t have a page of its own here, so keep it on this one: leave it ticked if people can use it (it helps them find it), and say when it runs in one line in <strong>Good to know</strong>, like <em>Indoor golf January to March, Mon–Sat 9 AM – 9 PM</em>. People see your season’s dates on your page, so nobody expects it in July. Want it to have its own page (its own name, entrance and hours)? Tap <strong>Message us</strong>.</p>',
       '<p>Il n’a pas de page à lui ici, alors gardez-le sur celle-ci : laissez-le coché si les gens peuvent l’utiliser (ça aide à le trouver), et dites quand il est ouvert en une ligne dans <strong>Bon à savoir</strong>, comme <em>Golf intérieur de janvier à mars, du lundi au samedi de 9 h à 21 h</em>. Les gens voient les dates de votre saison sur votre page : personne ne s’y attend en juillet. Vous voulez qu’il ait sa propre page (son nom, son entrée et ses heures)? Touchez <strong>Écrivez-nous</strong>.</p>'];
   const bw = ctx.booking || {};
@@ -851,9 +870,16 @@ const SEASON_TOPICS = ['sport-season', 'season', 'indoor-seasonal', 'sport-openi
 // September, does that go here too?" got Closures, which would have closed the course for weeks). A part of the place with
 // its own dates or hours (the RV park, the range, the patio, the pro shop, the bistro or restaurant, the campground) is one
 // line in Good to know: never the place's closures, season or hours.
-const PART_WORDS = 'rv park|rv parks|rv sites?|rv resort|rv|campground|campgrounds|campsites?|camping|patio|patios|terrasse|terrasses|bistro|restaurant|restaurants|resto|grill|lounge|kitchen|cafe|snack bar|dining room|salle a manger|clubhouse restaurant|clubhouse bar|mini golf|minigolf|mini putt|putt putt|hot tub|day spa|spa';
-const GOLF_PART_WORDS = 'driving range|practice range|range|champ de pratique|simulators?|simulateurs?|trackman|indoor golf|golf interieur';
-const PART_TIME = '\\b(open|opens|opening|opened|close|closes|closing|closed|own season|different season|separate season|its season|their season|seasonal|sa propre saison|une autre saison|hours|hour|heures|horaire|horaires|until|till|ouvre|ouvrent|ouvert|ouverte|ouverts|ferme|ferment|fermee|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre|specificdate)\\b';
+const PART_WORDS = 'rv park|rv parks|rv sites?|rv resort|rv|campground|campgrounds|campsites?|camping|patio|patios|terrasse|terrasses|bistro|restaurant|restaurants|resto|grill|lounge|kitchen|cafe|snack bar|dining room|salle a manger|clubhouse restaurant|clubhouse bar|mini golf|minigolf|mini putt|putt putt|hot tub|day spa|spa|meeting rooms?|banquet rooms?|banquet hall|event room|party room|salle de reunion|salle de reception';
+// Sport test 14 (2026-11-21; Marisol: "the fitting bay is open all winter by appointment. should I say open all year then?"
+// was told to set the season to Open all year): any named area or service of a course (a bay, a studio, the academy, the
+// fitting bay, lessons, a meeting room) asked with open or season words is a part, never the course's season.
+const GOLF_PART_WORDS = 'driving range|practice range|range|champ de pratique|simulators?|simulateurs?|sims?|trackman|gc ?quad|indoor golf|golf interieur|fitting bays?|fitting studio|fitting centre|fitting center|club fitting|club fittings|fittings?|fitting|bays?|baies?|studios?|academy|golf academy|academie|lessons?|clinics?|golf school|short game area|practice area|putting green|meeting rooms?|banquet rooms?|banquet hall|event room|board room|boardroom';
+const PART_TIME = '\\b(by appointment|appointment only|appointments?|sur rendez vous|all winter|all year|year round|toute l annee|tout l hiver|open|opens|opening|opened|close|closes|closing|closed|own season|different season|separate season|its season|their season|seasonal|sa propre saison|une autre saison|hours|hour|heures|horaire|horaires|until|till|ouvre|ouvrent|ouvert|ouverte|ouverts|ferme|ferment|fermee|january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|janvier|fevrier|mars|avril|mai|juin|juillet|aout|septembre|octobre|novembre|decembre|specificdate)\\b';
+// Sport test 14 (Marisol: "we close the course 2 days in october for aeration but the range and restaurant stay open. do i put it
+// as a closure?" got "don't mark the place closed"): when the course itself closes for a few days, the parts that stay open
+// don't make it a part question. It is the course's closure.
+const PLACE_SHORT_CLOSE = '\\b(close|closes|closing|closed|shut|shuts)( down)? (the )?(course|golf course|whole course|club|whole place)\\b.*\\b(ndays|days|a day|the day|week|weekend|aeration|maintenance|tournament|specificdate)\\b|\\b(course|golf course|we|club)( is| are| re| will be)? (closed|closes|close|closing|shut)\\b.*\\b(ndays|days|a day|the day|week|weekend|aeration|maintenance|tournament|specificdate)\\b|\\b(ndays|aeration|maintenance)\\b.*\\b(close|closes|closed|shut) (the )?course\\b';
 // A part word and a time word within a few words of each other ("the RV park opens April 28", « le champ de pratique ouvre »).
 const near = (a, b, n = 6) => `\\b(${a})\\b(?: [a-z0-9]+){0,${n}} ${b}|${b}(?: [a-z0-9]+){0,${n}} \\b(${a})\\b`;
 // The pro shop is the course's own door in season; only its off-season days are a part of its own ("Linda opens the pro
@@ -871,10 +897,10 @@ const STILL_OPEN = '\\b(still open|still be open|open to the public|open as usua
 const FIT13 = [
   // A part of the place, named with dates, months or hours (golf courses: also the range, the simulator, the academy).
   { id: 'part-own-time', all: [near(PART_WORDS, PART_TIME)],
-    not: ['\\b(we|nous|on|course|club|arena|rink|park is|centre|center|facility|terrain|parcours|whole place|everything|tout) (is |are |re |est |sont )?(all )?(closed|close|closes|shut|ferme|fermee|fermons) (on|for|le|pour|the) (specificdate|christmas|noel|thanksgiving|good friday|easter|paques|a day|the day|that day|ce jour)\\b', '\\b(gift|gifts|cadeau|cadeaux|certificates?|certificat|cards?|cartes?)\\b(?!.*\\b(december|decembre|hours|heures|open|opens|ouvre|ouvert)\\b)', '\\b(happy hour|5 a 7|social hour)\\b', '\\b(email|courriel|instagram|facebook|website|site web) (shop|boutique)\\b', '\\bshop (name|account|page|instagram|insta)\\b', PLACE_OPENS_AT],
+    not: ['\\b(we|nous|on|course|club|arena|rink|park is|centre|center|facility|terrain|parcours|whole place|everything|tout) (is |are |re |est |sont )?(all )?(closed|close|closes|shut|ferme|fermee|fermons) (on|for|le|pour|the) (specificdate|christmas|noel|thanksgiving|good friday|easter|paques|a day|the day|that day|ce jour)\\b', '\\b(gift|gifts|cadeau|cadeaux|certificates?|certificat|cards?|cartes?)\\b(?!.*\\b(december|decembre|hours|heures|open|opens|ouvre|ouvert)\\b)', '\\b(happy hour|5 a 7|social hour)\\b', '\\b(email|courriel|instagram|facebook|website|site web) (shop|boutique)\\b', '\\bshop (name|account|page|instagram|insta)\\b', PLACE_OPENS_AT, PLACE_SHORT_CLOSE],
     fit: PART_FIT, bad: CLOSE_TOPICS.concat(SEASON_TOPICS, PLACE_HOURS), go: ['sport-part-season', 'sport-restaurant'] },
   { id: 'golf-part-own-time', golfCourse: true, all: [near(GOLF_PART_WORDS, PART_TIME)],
-    not: ['\\b(no|dont have|don t have|do not have|without|pas de) (a |any )?(driving |practice )?range\\b', '\\b(price|age|date|time) range\\b', '\\brange balls?\\b', '\\b(happy hour|5 a 7)\\b', PLACE_OPENS_AT],
+    not: ['\\b(no|dont have|don t have|do not have|without|pas de) (a |any )?(driving |practice )?range\\b', '\\b(price|age|date|time) range\\b', '\\brange balls?\\b', '\\b(happy hour|5 a 7)\\b', PLACE_OPENS_AT, PLACE_SHORT_CLOSE],
     fit: PART_FIT, bad: CLOSE_TOPICS.concat(SEASON_TOPICS, PLACE_HOURS), go: ['sport-part-season', 'sport-offseason-other'] },
   { id: 'shop-offseason', golfCourse: true, all: [`\\b(${SHOP_WORDS})\\b`, OFFSEASON_WORDS, PART_TIME], not: ['\\b(email|courriel|instagram|insta|facebook|website|site web) (shop|boutique)\\b', '\\bshop (name|account|page|instagram|insta)\\b'],
     fit: PART_FIT, bad: CLOSE_TOPICS.concat(SEASON_TOPICS, PLACE_HOURS), go: ['sport-part-season'] },
@@ -905,7 +931,7 @@ const FIT13 = [
   // course facts come from our checked golf data (Message us), never "Nothing to untick".
   { id: 'golf-facts-wrong', golfCourse: true, all: ['\\b(driving range|range|holes|par|yardage|yards|slope|putting green|course map|value|index|facts|scorecard|designer|champ de pratique|trous|normale)\\b', '\\b(not documented|undocumented|says|said|shows|showing|wrong|incorrect|missing|fix|correct|corrige|corriger|faux|fausse|erreur|isnt right|not right|out of date|dit|indique)\\b', '\\b(page|listing|site|value|index|glance|top|fiche|your)\\b'],
     not: ['\\b(no|dont have|don t have|do not have|without|pas de) (a |any )?(driving |practice )?range\\b'],
-    fit: ['sport-golf-details', 'indoor-old-line', 'google', 'sport-card-price'], bad: ['sport-no-range'], go: ['sport-golf-details'] },
+    fit: ['sport-golf-facts', 'sport-golf-details', 'indoor-old-line', 'google', 'sport-card-price'], bad: ['sport-no-range'], go: ['sport-golf-facts', 'sport-golf-details'] },
   // "The green fee table up top says 2026 rates from your research. Will it change to the prices Linda typed in?": yes,
   // research's table comes off once their own prices are in.
   { id: 'research-table', golfCourse: true, all: ['\\b(table|chart|research|tableau|recherche|recherches|up top|at the top|old rates|last year s|last years)\\b', '\\b(change|changes|replace|replaced|update|updated|switch|go away|come off|comes off|remplac[a-z]*|disparai[a-z]*|still show|still there|stay|reste)\\b', '\\b(price|prices|rates?|fees?|green fees?|tarifs?|prix|droits? de jeu)\\b'],
@@ -916,7 +942,7 @@ const FIT13 = [
   // "the bistro and RV park are extensions 102 and 103": the phone answer.
   { id: 'phone-extension', all: ['\\b(extension|extensions|ext|poste [0-9]+|un poste|le poste|postes [0-9]+)\\b'], fit: ['phone', 'name-address', 'google'], go: ['phone'] },
   // An address question is the address answer (or where people meet).
-  { id: 'address', all: ['\\b(address|addresses|adresse|adresses|civic number|numero civique|street number|no street)\\b'], not: ['\\b(email|e mail|courriel|web) (address|adresse)\\b|\\badresse (courriel|e mail|electronique|web)\\b', '\\bip address\\b'],
+  { id: 'address', all: ['\\b(address|addresses|adresse|adresses|civic number|numero civique|street number|no street)\\b'], not: ['\\b(email|e mail|courriel|web|website|web site|site|url|internet) (address|adresse)\\b|\\badresse (courriel|e mail|electronique|web|du site|de notre site|internet)\\b', '\\bip address\\b'],
     fit: ['name-address', 'sport-meeting-place', 'google', 'phone', 'not-found', 'settings', 'indoor-old-line', 'website-broken', 'map-pin'], go: ['name-address'] },
   // "How long before my changes show on the page?": how fast changes go live, never how long a visit takes.
   { id: 'changes-when', all: ['\\b(how long|combien de temps|when will|how soon|how fast|how quickly|des que|avant que|quand est ce que)\\b', '\\b(changes?|changements?|modifications?|updates?|edits?|photos?|show|shows|show up|appear|appears|live|online|en ligne|paraiss[a-z]*|parait|apparai[a-z]*|visible|mise a jour)\\b'],
@@ -957,6 +983,48 @@ const FIT13 = [
     bad: ['sport-season-says', 'shows-closed'], go: ['sport-season', 'indoor-seasonal', 'season'] },
 ];
 const FIT = [
+  // Sport test 14 (2026-11-21; Marisol at Fairview Mountain: 9 confident answers to a different question). Each was taken on a
+  // strong key that names the answer's situation ("open all year", "tick indoor golf", "own page") while the question was
+  // about something else, and no rule knew the question's own intent. These are those intents, in general words:
+  // "Is my website address ok for the tee-time link?" is the booking link, never the street address.
+  { id: 'tee-link', all: ['\\b(tee times?|tee sheet|chronogolf|golfnow|golf now|teeon|tee on|lightspeed|booking|bookings|book online|online booking|reservations?|reservation en ligne|reserver en ligne|departs?)\\b', '\\b(website|web site|site|link|links|url|address|popup|pop up|widget|lien|site web|adresse)\\b'],
+    not: ['\\b(instagram|insta|facebook|fb)\\b', '\\b(charge|charges|charged|cost|costs|fee|fees|commission|pay|paid|payer|bill|invoice|frais|cout|coute)\\b', '\\b(dont see|don t see|do not see|cant see|can t see|not showing|isnt showing|doesnt show|not there|disappeared|missing|anymore|no longer|ne vois pas|vois plus|disparu)\\b'],
+    fit: ['sport-tee-times', 'booking-link', 'sport-booking-link', 'indoor-booking', 'links', 'sport-bay-link', 'sport-walk-ons', 'indoor-book-party', 'sport-same-day', 'sport-book-ahead-hours', 'website-broken', 'indoor-groups', 'sport-members', 'sport-peak-dates', 'phone'],
+    go: ['sport-tee-times', 'booking-link'] },
+  // "I saved our tee time link but I don't see a Book a tee time button": the Book button answer.
+  { id: 'book-button-missing', all: ['\\b(dont see|don t see|do not see|cant see|can t see|not seeing|not showing|isnt showing|doesnt show|not there|isnt there|gone|disappeared|missing|no longer|anymore|went away|vanished|ne vois pas|vois plus|n apparait pas|ne parait pas|disparu)\\b', '\\b(book|booking|button|bouton|reserver|reservation)\\b'],
+    not: ['\\b(photo|photos|pic|pics|picture|pictures|menu|event|events|evenement)\\b'],
+    fit: ['sport-book-button', 'changes-review', 'live-speed', 'photo-pending', 'nothing-changed', 'see-page'], go: ['sport-book-button'] },
+  // "The restaurant at our club has its own listing here. Can I update that one too from this login?": another listing on
+  // the same login.
+  { id: 'other-listing-login', all: ['\\b(own|other|another|second|separate|sister|that|both) (listing|listings|page|pages|fiche|fiches|business|businesses|location)\\b|\\b(that one|the other one|both of them)\\b', '\\b(login|log in|logged in|account|sign in|signed in|this link|same link|compte|connexion)\\b'],
+    fit: ['more-businesses', 'sport-two-courses', 'staff', 'login-create', 'signin', 'access', 'sport-sister-listing', 'resume-device'], go: ['more-businesses', 'sport-sister-listing'] },
+  // "The restaurant already has its own page on your site. Should I talk about it in our story?": the other page's answer.
+  { id: 'own-listing', all: ['\\b(has|have|got|already|is|are|its|it s|deja|a|ont)( already| deja)? (its own|their own|a separate|a seperate|separate|sa propre|leur propre|une autre) (page|listing|listings|fiche|profile)\\b|\\b(already|deja) (has a page|has a listing|listed|une page|une fiche)\\b'],
+    not: ['\\b(login|log in|account|sign in|compte|connexion)\\b', '\\b(happy hour|5 a 7|specials?|speciaux|deals?)\\b'],
+    fit: ['sport-sister-listing', 'sport-restaurant', 'more-businesses', 'sport-two-courses', 'sport-one-listing', 'sport-hh-none-specials', 'sport-social-hour', 'sport-food-menu', 'sport-offseason-other', 'sport-part-season'], go: ['sport-sister-listing'] },
+  // A fitting bay or lesson studio (by appointment, not to play) is never Indoor golf, and never another listing.
+  { id: 'fitting', golfCourse: true, all: ['\\b(fitting|fittings|fitter|club fit|clubfitting)\\b'], not: ['\\b(all winter|all year|year round|season|seasonal|winter|off season|offseason|hiver|saison|toute l annee)\\b'],
+    fit: ['sport-bay-link', 'sport-lessons', 'indoor-good-to-know', 'description', 'sport-part-season', 'indoor-also-offer', 'sport-second-kind'], bad: ['sport-sister-listing', 'year-round'], go: ['sport-bay-link'] },
+  // "Should I add driving range here?": adding a kind, never "we don't have a driving range".
+  { id: 'add-kind', all: ['\\b(add|tick|pick|choose|select|include|ajouter|cocher|choisir)\\b(?: [a-z]+){0,3} (driving range|range|practice range|simulators?|indoor golf|mini golf|minigolf|mini putt|champ de pratique|golf interieur|simulateurs?)\\b'],
+    not: ['\\b(no|dont have|don t have|do not have|without|pas de|theres no|there s no|there is no) (a |an |any )?(driving |practice )?(range|simulators?|mini golf|champ de pratique)\\b'],
+    fit: ['sport-second-kind', 'indoor-kinds-many', 'sport-kinds-other', 'sport-part-season', 'sport-bay-link', 'indoor-also-offer', 'sport-lessons', 'sport-offseason-other', 'sport-one-listing', 'sport-sister-listing'], bad: ['sport-no-range'], go: ['sport-second-kind', 'indoor-kinds-many'] },
+  // The same shape for the hours and booking answers: an hours answer needs a time, open or close word; a booking-link
+  // answer a booking word ("the baskets get moved for winter" is no hours question; "a scorecard app, can I link it" is no
+  // booking link).
+  { id: 'hours-needs-time', all: ['.'], not: ['\\b(hours?|hrs|open|opens|opened|opening|close|closes|closed|closing|time|times|schedule|am|pm|noon|midnight|dawn|dusk|dark|daylight|sunset|sunrise|late|early|earlier|later|until|till|heures?|horaires?|ouvert|ouverte|ouverts|ouvre|ouvrons|ferme|fermee|fermons|midi|soir|matin|[0-9]{1,2}(?: ?[0-9]{2})?)\\b'],
+    bad: ['hours', 'seasonal-hours', 'hours-third-stretch', 'indoor-summer-late', 'indoor-summer-daily', 'setup-split-hours', 'setup-third-time', 'hours-right'] },
+  { id: 'booking-needs-book', all: ['.'], not: ['\\b(book|books|booked|booking|bookings|reserv[a-z]*|rental|rentals|rent|party|parties|tee times?|tee sheet|chronogolf|golfnow|walk ins?|walk ons?|tickets?|billets?|location|fete|fetes|departs?|appointments?|rendez vous|schedule|sign up|signups?|register|registration|inscri[a-z]*)\\b'],
+    bad: ['sport-booking-link', 'booking-link', 'indoor-booking', 'sport-tee-times', 'sport-bay-link', 'indoor-book-party'] },
+  // "We only have a Facebook group, not a page": no answer here fits it (Ask us).
+  { id: 'social-group', all: ['\\b(facebook|fb|insta|instagram)\\b', '\\b(group|groupe)\\b'], not: ['\\b(group (rates?|bookings?|lessons?|packages?|sizes?|events?)|groups? of)\\b'], fit: ['sport-shared-social', 'sport-two-accounts'] },
+  // "There's no street address, it's in the back of the park": where people find it, never "change your address".
+  { id: 'no-street-address', all: ['\\b(no|dont have|don t have|without|not a|isnt a|pas d|pas de) (a |any |real |civic |street )*(street )?(address|adresse|civic number|numero civique)\\b'],
+    fit: ['sport-meeting-place', 'map-pin', 'indoor-good-to-know'], go: ['sport-meeting-place'] },
+  // An answer about the restaurant or its food needs a restaurant, patio, bar or food word in the question.
+  { id: 'restaurant-needs-food', all: ['.'], not: ['\\b(restaurant|restaurants|resto|patio|patios|terrasse|bistro|cafe|grill|kitchen|food|foods|lunch|lunches|dinner|dinners|breakfast|brunch|menu|menus|clubhouse|dining|bar|bars|lounge|snack|snacks|meal|meals|eat|eats|eating|nourriture|repas|souper|soupers|diner|dejeuner|cuisine|winemaker|chef|wine|beer|drinks?|biere|vin)\\b'],
+    bad: ['sport-restaurant', 'sport-food-menu'] },
   // Sport test 12 (2026-11-21; Rob: "carringtons closes oct 17, a couple weeks before the course. does the happy hour need
   // different dates" got Closures, which would have closed his course Oct 18–31). The safety rule: the answers that close
   // the place (closures, closed months, its season), make it free, or set its main price need a strong intent: a close

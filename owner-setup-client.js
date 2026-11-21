@@ -171,7 +171,7 @@
   function seaNamed(o){ o = o || S.sea; var si = (S.seaList || [S.sea]).indexOf(o), s0 = o.src || (CUR.hours_seasons || [])[si < 0 ? 0 : si]; return !!(s0 && seaLabelKind(s0.label) && o.kind === o.storedKind); }
   function capF(x){ x = String(x || ''); return x.charAt(0).toUpperCase() + x.slice(1); }
   // The season screen's title: "Your hours from Oct 15 to Nov 25", or "Your other hours" before any dates.
-  function seaTitle(){ if (seaNamed()) return T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer; var sp = seaSpan(S.sea); return sp ? fill(T.seasonEditQSpan, { span: sp }) : S.seaI === 2 && T.seasonEditQThird ? T.seasonEditQThird : S.seaI === 1 && T.seasonEditQSecond ? T.seasonEditQSecond : T.seasonEditQOther; }
+  function seaTitle(){ if (seaNamed()) return T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer; var sp = seaSpan(S.sea); return sp ? fill(T.seasonEditQSpan, { span: sp }) : C.sport && S.seaI === 0 && T.seaPartQ && curOpenSea() ? T.seaPartQ : S.seaI === 2 && T.seasonEditQThird ? T.seasonEditQThird : S.seaI === 1 && T.seasonEditQSecond ? T.seasonEditQSecond : T.seasonEditQOther; }
   // " (from Oct 15 to Nov 25)" after "you're closed on Mon" when only the season is closed.
   function seaWhen(o){ o = o || S.sea; if (seaNamed(o)) return fill(T.closedWarnSeason, { kind: T.seasonWord[o.kind] || T.seasonWord.summer }); var sp = seaSpan(o); return sp ? ' (' + sp + ')' : T.closedWarnOther; }
   // Two yearly spans that share a day (either may run over New Year).
@@ -1064,6 +1064,26 @@
     var add = mdInRange(per.from, sea.from, sea.to) ? { from: nextMd(sea.to), to: per.to } : { from: per.from, to: mdInRange(per.to, sea.from, sea.to) ? (function(){ var d = (doy(sea.from) + 364) % 365, m = 11; while (m > 0 && CUM[m] > d) m--; return pad2(m + 1) + '-' + pad2(d - CUM[m] + 1); })() : per.to };
     return { out: true, ext: c[0], add: add };
   }
+  // Sport test 14 (2026-11-21; Marisol: season Mar 15 – Oct 31, the Mar + Apr chips at 8–6 got "these hours would show
+  // nowhere", and its main button would have dropped Mar 15 – Apr 30, which is in season): a stretch's days split into the
+  // runs inside the open season and the runs outside it, in the stretch's own order. -> { ins: [{ from, to }], outs: [...],
+  // edge: true when every day outside is in the season's own first or last month (a month chip the season only partly
+  // covers: clipped to the season without a question) }
+  function seaClip(per, sea){
+    if (!per || !sea || !/^\d{2}-\d{2}$/.test(per.from || '') || !/^\d{2}-\d{2}$/.test(per.to || '')) return { ins: [], outs: [], edge: false };
+    var CUM = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+    var doy = function(md){ return CUM[+md.slice(0, 2) - 1] + Math.min(+md.slice(3), 31) - 1; };
+    var mdOf = function(d){ var m = 11; while (m > 0 && CUM[m] > d) m--; return pad2(m + 1) + '-' + pad2(d - CUM[m] + 1); };
+    var n = (doy(per.to) - doy(per.from) + 365) % 365 + 1, i = doy(per.from), ins = [], outs = [], cur = null;
+    for (var k = 0; k < n; k++) {
+      var md = mdOf(i), inS = mdInRange(md, sea.from, sea.to), L = inS ? ins : outs;
+      if (cur && cur.inS === inS) cur.r.to = md; else { cur = { inS: inS, r: { from: md, to: md } }; L.push(cur.r); }
+      i = (i + 1) % 365;
+    }
+    var ma = sea.from.slice(0, 2), mb = sea.to.slice(0, 2);
+    var edge = ins.length === 1 && outs.length > 0 && outs.every(function(r){ var a = r.from.slice(0, 2), b = r.to.slice(0, 2); return a === b && (a === ma || a === mb); });
+    return { ins: ins, outs: outs, edge: edge };
+  }
   function curOpenSea(){ return S.openTouched ? S.openSea : openSeaOf(CUR.open_months); }
   S.openSea = openSeaOf(CUR.open_months); S.openTouched = false;
   // Seasonal hours (pub test 6, 2026-11-10): the first stored set, as its months and its own day-by-day week (it was one
@@ -1595,7 +1615,7 @@
     if (answered(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
     return '<div class="su-skip"><button type="button" class="su-link" data-act="skip:' + step + '">' + h(T.skip) + '</button></div>';
   }
-  function msgs(){ return (S.seaStaleDone ? '<p class="su-sent" id="suSeaStaleDone">' + h(S.seaStaleDone) + '</p>' : '') + (typeof seaStaleHtml === 'function' && !seaIsStep(S.step) ? seaStaleHtml() : '') + (S.nudge ? '<p class="su-error" role="alert">' + h(S.nudge) + '</p>' + (S.nudgeLink && S.nudge === T.monthsClosedOneHere ? '<p class="su-hint"><button type="button" class="su-link" data-act="go:' + S.nudgeLink + '">' + h(T.labels.closures || T.monthsClosedOneLink || '') + ' →</button></p>' : '') + (S.seaClosedNudge && S.nudge === S.seaClosedNudge && seaIsStep(S.step) ? '<div class="su-stack su-seaskip">' + big('➜', T.seasonAllClosedBtn, '', true, 'seaSkipClosed') + '</div>' : '') + (S.seaOutNudge && S.nudge === S.seaOutNudge && S.seaOut ? '<div class="su-stack su-seaout" id="suSeaOut">' + big('✕', T.seaOutsideNo, T.seaOutsideNoSub, false, 'seaOutSkip') + (S.seaOut.ext && S.seaOut.add ? big('✓', fill(T.seaOutsideYesExact || T.seaOutsideYes, { a: mdLabel(S.seaOut.add.from), b: mdLabel(S.seaOut.add.to), hours: S.seaOut.hours || '', place: (S.tour.kinds || [])[0] === 'golf' && T.seaPlaceGolf ? T.seaPlaceGolf : T.seaPlace || '' }), '', true, 'seaOutOpen') : '') + '</div>' : '') : '') + (S.error ? '<p class="su-error" role="alert">' + h(S.error) + '</p>' : ''); }
+  function msgs(){ return (S.seaStaleDone ? '<p class="su-sent" id="suSeaStaleDone">' + h(S.seaStaleDone) + '</p>' : '') + (typeof seaStaleHtml === 'function' && !seaIsStep(S.step) ? seaStaleHtml() : '') + (S.nudge ? '<p class="su-error" role="alert">' + h(S.nudge) + '</p>' + (S.nudgeLink && S.nudge === T.monthsClosedOneHere ? '<p class="su-hint"><button type="button" class="su-link" data-act="go:' + S.nudgeLink + '">' + h(T.labels.closures || T.monthsClosedOneLink || '') + ' →</button></p>' : '') + (S.seaClosedNudge && S.nudge === S.seaClosedNudge && seaIsStep(S.step) ? '<div class="su-stack su-seaskip">' + big('➜', T.seasonAllClosedBtn, '', true, 'seaSkipClosed') + '</div>' : '') + (S.seaOutNudge && S.nudge === S.seaOutNudge && S.seaOut ? '<div class="su-stack su-seaout" id="suSeaOut">' + (S.seaOut.keep ? big('✓', fill(T.seaOutsideKeep, { e: mdLabel(S.seaOut.keep.from), f: mdLabel(S.seaOut.keep.to) }), '', false, 'seaOutKeep') : big('✕', T.seaOutsideNo, T.seaOutsideNoSub, false, 'seaOutSkip')) + (S.seaOut.ext && S.seaOut.add ? big('✓', fill(T.seaOutsideYesExact || T.seaOutsideYes, { a: mdLabel(S.seaOut.add.from), b: mdLabel(S.seaOut.add.to), hours: S.seaOut.hours || '', place: (S.tour.kinds || [])[0] === 'golf' && T.seaPlaceGolf ? T.seaPlaceGolf : T.seaPlace || '' }), '', true, 'seaOutOpen') : '') + '</div>' : '') : '') + (S.error ? '<p class="su-error" role="alert">' + h(S.error) + '</p>' : ''); }
   // Back on a question already answered: say so, and which answer we have.
   function doneLine(step){
     var d = S.done[step]; if (!d || d === 'skip' || d === 'later') return '';
@@ -2310,8 +2330,12 @@
   // has changed since (saved from another screen or the edit page), that answer is left as the page has it. Typed
   // boxes not read yet are kept by screen. Every storage access is in try/catch (private mode, blocked storage).
   var DRAFT_KEYS = ['week', 'sea', 'openSea', 'openTouched', 'seaTouched', 'hoursOpen', 'months', 'closures', 'extra', 'everyYear', 'holNotes', 'cuis', 'place', 'cuiTouched', 'spend',
-    'badges', 'noDogs', 'noWash', 'noWifi', 'noSports', 'noGames', 'noDiet', 'dogNote', 'story', 'visit', 'ig', 'fb', 'socNo', 'cafe', 'wine', 'brew', 'kitchen', 'minors', 'sports', 'happy', 'happySea', 'specials', 'nights', 'cp', 'tour'];
+    'badges', 'noDogs', 'noWash', 'noWifi', 'noSports', 'noGames', 'noDiet', 'dogNote', 'story', 'visit', 'ig', 'fb', 'socNo', 'cafe', 'wine', 'brew', 'kitchen', 'minors', 'sports', 'happy', 'happySea', 'specials', 'nights', 'cp', 'tour',
+    // Sport test 14: which screen the season dates came from (the hours, or the closures screen).
+    'openFrom'];
   var DR = { base: {}, s: {}, at: {}, last: '', restored: {} };
+  // The step screens "Carry on" may open again directly (sport test 14): the hours step's own screens.
+  var RESUME_AT = /^hours:(?:edit|year|open|season)$/;
   // True while answers kept on this device (not saved yet) are shown on the step's screens.
   function pending(step){ return S.dirty === step && !!DR.restored[step]; }
   // The same key on the English and French addresses (café test 6): switching language keeps what was typed.
@@ -2354,6 +2378,9 @@
     d.s = drDiff(DR.base[b]);
     var bx = {}; Array.prototype.forEach.call(drBoxes(), function(inp){ if (inp.id === 'suCq' || !drChanged(inp)) return; var sel = drSel(inp); if (sel) bx[sel] = inp.value; });
     d.boxes = d.boxes || {}; if (Object.keys(bx).length) d.boxes[S.step] = bx; else delete d.boxes[S.step];
+    // Sport test 14 (Marisol picked her season dates, then a customer came in and the tab closed): the screen she was on,
+    // so "Carry on" opens it again with her picks.
+    d.at = S.step; d.hist = S.hist.filter(function(x){ return base(x) === b; }).slice(-4);
     if (!Object.keys(d.s).length && !Object.keys(d.boxes).length) return drDrop(b);
     drPut(b, d);
   }
@@ -2527,7 +2554,9 @@
       // ("Different hours in summer or winter?"); "Yes, all year" and "closed part of the year" stay up front.
       if (INDOOR && T.seaMore && !noSetYear() && !storedSeas().length) {
         var seaRe = /<button[^>]*data-act="yearSeason:(?:summer|winter|part)"[^>]*>[\s\S]*?<\/button>/g, seaBtns = x.match(seaRe) || [];
-        if (seaBtns.length) { var seaAt = x.indexOf(seaBtns[0]); x = x.replace(seaRe, ''); x = x.slice(0, seaAt) + seaMoreHtml(seaBtns.join('')) + x.slice(seaAt); }
+        // Sport test 14: for sport and golf, "different for part of the year" comes first in the box.
+        if (C.sport) seaBtns.sort(function(a, b){ return (/yearSeason:part/.test(b) ? 1 : 0) - (/yearSeason:part/.test(a) ? 1 : 0); });
+        if (seaBtns.length) { var seaAt = x.indexOf(x.match(seaRe)[0]); x = x.replace(seaRe, ''); x = x.slice(0, seaAt) + seaMoreHtml(seaBtns.join('')) + x.slice(seaAt); }
       }
     } else if (s === 'hours:yeardrop') {
       // Pub test 2: "Yes, all year" with other hours stored: the dates that would be removed, and a choice.
@@ -2547,7 +2576,7 @@
         // Sport test 1: a one-season kind (a golf course, an arena) is never asked about spring and fall shoulder seasons.
         + (C.sport && (C.kindSeasons || {})[indoorMainKind()] ? '' : (T.openTwice ? '<p class="su-hint su-twice">' + h(T.openTwice) + (yearlyClosed().length ? ' ' + h(fill(T.openTwiceHave, { list: andList(yearlyClosed()) }).replace(/\.\.$/, '.')) : '') + '</p>' : ''))
         + tticksHtml(true)
-        + '<div class="su-stack">' + (fromHours ? big('✓', T.openSame, T.openSameSub, false, 'openSave:same') + (winterKindOnly() && T.openPart ? big('❄️', T.openPart, T.openPartSub, true, 'openSave:part') : big('☀️', T.openSummer, T.openSummerSub, true, 'openSave:summer')) : big('✓', T.openSaveOnly, '', false, 'openSave:only'))
+        + '<div class="su-stack">' + (fromHours ? big('✓', T.openSame, T.openSameSub, false, 'openSave:same') + (winterKindOnly() && T.openPart ? big('❄️', T.openPart, T.openPartSub, true, 'openSave:part') : (C.sport && T.openPartSeason ? big('🍂', T.openPartSeason, T.openPartSeasonSub, true, 'openSave:summer') : big('☀️', T.openSummer, T.openSummerSub, true, 'openSave:summer'))) : big('✓', T.openSaveOnly, '', false, 'openSave:only'))
         + big('✕', T.allYearBtn, '', true, 'openNone') + '</div>';
     } else if (s === 'hours:edit' || seaIsStep(s)) {
       var seas = seaIsStep(s), seaOther = seas ? seaOtherOf(S.seaI) : null, seaOtherAB = seaOther && seaOther.on && seaOther.week ? seaAB([seaOther]) : null;
@@ -3036,6 +3065,8 @@
       if (INDOOR && C.sport && s === 'menu:web') {
         if (C.ratesKnown) { lead2 = T.webLeadRates || lead2; if (S.webUrl == null) urlNow = C.ratesKnown; }
         else { lead2 = T.webLeadRatesEmpty || lead2; if (S.webUrl == null) urlNow = ''; }
+        // Sport test 14 (Marisol expected her rates to be copied): what shows, exactly. Her page links to that page.
+        if (T.webWhatShows) lead2 = lead2 + ' ' + T.webWhatShows;
       }
       x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, urlNow, { mode: 'url', max: 300 })
         // Pub test 7 (2026-11-10): one tap for the website she typed or we have ("Use sandbarpub.ca"); never one being removed.
@@ -3568,7 +3599,9 @@
   // Tour simplify (2026-11-18): the third stretch's button (the year question, two stretches stored) and link (the second
   // stretch's screen) sit behind "More options" for tours (T.seaMore); every other type, and the second stretch, as before.
   function seaMoreWrap(third, html){ return third && html && T.seaMore ? seaMoreHtml(html) : html; }
-  function seaMoreHtml(inner){ return '<div class="su-skip su-seamore"><button type="button" class="su-link" id="suSeaMore" aria-expanded="' + (S.seaMore ? 'true' : 'false') + '"' + (S.seaMore ? ' aria-controls="suSeaMoreBox"' : '') + ' data-act="seaMore">' + h(T.seaMore) + '</button></div>' + (S.seaMore ? '<div id="suSeaMoreBox">' + inner + '</div>' : ''); }
+  // Sport test 14 (Marisol): for sport and golf the link says "part of your season", and the box says that a season comes
+  // first ("We're closed part of the year"), with these hours right after it.
+  function seaMoreHtml(inner){ var sp = C.sport && T.seaMoreSport && seaIsStep(S.step) === false; return '<div class="su-skip su-seamore"><button type="button" class="su-link" id="suSeaMore" aria-expanded="' + (S.seaMore ? 'true' : 'false') + '"' + (S.seaMore ? ' aria-controls="suSeaMoreBox"' : '') + ' data-act="seaMore">' + h(sp ? T.seaMoreSport : T.seaMore) + '</button></div>' + (S.seaMore ? '<div id="suSeaMoreBox">' + (sp && !curOpenSea() && T.seaMoreClosedFirst ? '<p class="su-hint" id="suSeaClosedFirst">' + h(T.seaMoreClosedFirst) + '</p>' : '') + inner + '</div>' : ''); }
   function tfoldOpen(withOff){ if (S.tfold != null) return S.tfold; var tk = tticks(); return !!(tk.weather_all || (withOff && (tk.off_request || tk.snow_open))); }
   function tticksPart(seasonal){
     if (!TOUR || !S.tticks) return null;
@@ -3626,6 +3659,21 @@
     var a = starts[0], b = a; while (obj[b % 12 + 1] && (b % 12 + 1) !== a) b = b % 12 + 1; return { a: a, b: b };
   }
   var LAST = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  // Sport test 14 (2026-11-21): a booking link kept as stored that no owner has set yet (research's) is sent with Save as the
+  // owner's own answer, so a link that is also the website keeps its Book button. Every type's booking save.
+  function bookKeep(u){ return !!u && !CUR.booking_owner_set && !!CUR.booking_url && u === CUR.booking_url; }
+  // Sport test 14: month chips in exactly two runs (Mar–Apr and Oct) become two stretches with the same day hours, when
+  // there's room for one more stretch. -> true when split.
+  function sea2Split(so, si){
+    var on = []; for (var i = 1; i <= 12; i++) if (so.months[i]) on.push(i);
+    var starts = on.filter(function(m){ return !so.months[m === 1 ? 12 : m - 1]; });
+    if (starts.length !== 2 || S.seaList.filter(function(o){ return o.on; }).length >= SEA_MAX) return false;
+    var run = function(a){ var o = {}, b = a; o[a] = true; while (so.months[b % 12 + 1] && (b % 12 + 1) !== a) { b = b % 12 + 1; o[b] = true; } return o; };
+    var o2 = seaBlank(); o2.on = true; o2.kind = 'part'; o2.months = run(starts[1]); o2.week = clone(so.week); o2.dirty = true;
+    so.months = run(starts[0]); so.dirty = true;
+    S.seaList.splice(si + 1, 0, o2); S.seaTouched = true;
+    return true;
+  }
   function hoursSave(){
     readTimes();
     if (!windowsOk(S.week)) { S.nudge = T.needOpenDay; return render(); }
@@ -3644,8 +3692,11 @@
         if (!so.on) continue;
         if (s0 && !so.dirty && (s0.holidays === true) === !!so.holidays && (s0.weather === true) === !!so.weather) { list.push(s0); continue; }
         var r = monthRun(so.months);
+        // Sport test 14 (Marisol: Mar, Apr and Oct at 8–6 got "Please pick months in a row", with no word of a second
+        // stretch): months in two runs become two stretches with the same hours, when there's room for one more.
+        if (!so.exact && r.bad && sea2Split(so, si)) return hoursSave();
         if (so.exact) { var xo = seaOut({ on: true, exact: so.exact }); if (!xo.ok) { S.nudge = xo.why; return render(); } }
-        else if (r.none || r.bad || r.all) { S.nudge = r.bad ? T.monthsInRow : T.winterNeedMonths; return render(); }
+        else if (r.none || r.bad || r.all) { S.nudge = r.bad ? (T.monthsInRowSea || T.monthsInRow) : T.winterNeedMonths; return render(); }
         // Distillery test 1 (Whistler, 2026-11-16): every day closed in the stretch is a closure ("we close for two weeks in
         // spring"), which goes under "Closed for a week or two" on the closures screen. The message says where, and a button
         // under it drops this empty stretch and carries on (a stretch already saved is kept as stored).
@@ -3663,6 +3714,14 @@
         if (so.holidays) list[list.length - 1].holidays = true;
         if (so.weather && TOUR) list[list.length - 1].weather = true;
       }
+      // Sport test 14: a stretch that starts or ends in the season's own first or last month (a month chip the season only
+      // partly covers, like March for a Mar 15 season) is clipped to the season without a question.
+      var seaNow0 = curOpenSea(), onL = S.seaList.filter(function(o){ return o.on; });
+      if (seaNow0) for (var ci = 0; ci < list.length; ci++) {
+        var so3 = onL[ci]; if (!so3 || (so3.src && !so3.dirty) || so3.exact) continue;
+        var cx = seaClip(list[ci], seaNow0);
+        if (cx.edge) { list[ci].from = cx.ins[0].from; list[ci].to = cx.ins[0].to; so3.exact = { from: cx.ins[0].from, to: cx.ins[0].to }; }
+      }
       // Tour test 10: any two of three; the message names the other one (the one not on screen when it can).
       for (var oa = 0; oa < list.length; oa++) for (var ob = oa + 1; ob < list.length; ob++) if (mdOverlap(list[oa], list[ob])) { var oz = list[oa === S.seaI ? ob : oa]; S.nudge = fill(T.seasonOverlap, { a: mdLabel(oz.from), b: mdLabel(oz.to) }); S.overlapNudge = S.nudge; return render(); }
       // Sport test 11: a stretch (new or changed on this visit) with days outside the open season would never show: never a
@@ -3673,6 +3732,15 @@
         if (so2 && so2.src && !so2.dirty) continue;
         var ox = seaOutside(lo, seaNow);
         if (!ox.out) continue;
+        // Sport test 14: some of its days are in season. The message names only the days outside it; the main button keeps the
+        // days in season (never drops them); "Yes" opens the days outside too, when they touch the season.
+        var cl = seaClip(lo, seaNow), outTxt = cl.outs.map(function(z){ return C.lang === 'fr' ? 'du ' + mdLabel(z.from) + ' au ' + mdLabel(z.to) : mdLabel(z.from) + ' – ' + mdLabel(z.to); }).join(andWord());
+        if (cl.ins.length === 1 && T.seaOutsidePart) {
+          var one = cl.outs.length === 1 && ox.ext && ox.add;
+          S.seaOut = { i: S.seaList.indexOf(so2), per: lo, ext: one ? ox.ext : null, add: one ? ox.add : null, keep: cl.ins[0], hours: weekShort(lo.hours) };
+          S.nudge = fill(one ? T.seaOutsidePartAsk : T.seaOutsidePart, { a: mdLabel(seaNow.from), b: mdLabel(seaNow.to), out: outTxt, e: mdLabel(cl.ins[0].from), f: mdLabel(cl.ins[0].to) }); S.seaOutNudge = S.nudge;
+          return render();
+        }
         S.seaOut = { i: S.seaList.indexOf(so2), per: lo, ext: ox.ext, add: ox.add, hours: weekShort(lo.hours) };
         S.nudge = fill(ox.ext || !T.seaOutsideApart ? T.seaOutside : T.seaOutsideApart, { a: mdLabel(seaNow.from), b: mdLabel(seaNow.to), c: mdLabel(lo.from), d: mdLabel(lo.to) }); S.seaOutNudge = S.nudge;
         return render();
@@ -4171,7 +4239,17 @@
     if (k === 'later') return record(v, 'later');
     if (k === 'open') { S.toList = false; S.hist = ['more']; S.step = 'more'; return go(filled(v)); }
     if (k === 'after') return after(v);
-    if (k === 'resume') { S.toList = false; var f = firstOpen(); return go(f); }
+    if (k === 'resume') {
+      S.toList = false; var f = firstOpen();
+      // Sport test 14: picks not saved yet on one of the step's own screens (the season dates, the other hours): back on that
+      // screen, with the screens before it for Back.
+      var rd = drGet(f), ra = rd && rd.at;
+      if (ra && ra !== f && base(ra) === f && RESUME_AT.test(ra) && (rd.boxes && rd.boxes[ra] || Object.keys(rd.s || {}).length) && (!seaIsStep(ra) || ra === 'hours:season')) {
+        go(f); S.hist.push(f); (rd.hist || []).forEach(function(x){ if (x !== f && x !== ra && base(x) === f && S.hist[S.hist.length - 1] !== x) S.hist.push(x); });
+        S.step = ra; render(); window.scrollTo(0, 0); return;
+      }
+      return go(f);
+    }
     if (k === 'jump') { S.toFinish = true; S.toList = false; return go(filled(v)); }
     if (k === 'jumpEss') { S.hist = ['ess']; S.step = 'ess'; go(filled(v)); S.toEss = true; return render(); }
     // "I'm done for now": the portal's own checklist may speak up again from here on.
@@ -4274,6 +4352,12 @@
     }
     // Sport test 11: open the days of these hours too (the season is widened to cover them), or skip these hours.
     if (k === 'seaOutOpen' && S.seaOut && S.seaOut.ext) { S.openSea = { from: S.seaOut.ext.from, to: S.seaOut.ext.to }; S.openTouched = true; S.seaOut = null; S.seaOutNudge = ''; S.nudge = ''; return hoursSave(); }
+    // Sport test 14: keep only the stretch's days in season (the days outside it are dropped, never the ones in it).
+    if (k === 'seaOutKeep' && S.seaOut && S.seaOut.keep) {
+      var kz = S.seaList[S.seaOut.i], kk = S.seaOut.keep; S.seaOut = null; S.seaOutNudge = ''; S.nudge = '';
+      if (kz) { kz.exact = { from: kk.from, to: kk.to }; kz.dirty = true; S.seaTouched = true; }
+      return hoursSave();
+    }
     if (k === 'seaOutSkip' && S.seaOut) {
       var oz2 = S.seaList[S.seaOut.i]; S.seaOut = null; S.seaOutNudge = ''; S.nudge = '';
       if (oz2 && oz2.src) S.seaList[S.seaList.indexOf(oz2)] = seaLoad(seaBlank(), oz2.src);
@@ -4319,6 +4403,10 @@
         // Sport test 5 (2026-11-20): a winter-only kind (a ski school) adds hours for part of its winter season (Christmas, night
         // lessons), never "summer hours in July and August".
         if (v === 'part') { if (S.sea.kind !== 'winter' || !S.sea.week) { var keepW = !!(S.sea.week && (CUR.hours_seasons || []).length); S.sea.kind = 'winter'; if (!keepW) { S.sea.months = {}; [12, 1, 2, 3].forEach(function(m){ S.sea.months[m] = true; }); S.sea.week = clone(S.week); } } S.sea.on = true; S.sea.open = {}; S.sea.dirty = true; S.seaTouched = true; return go('hours:season'); }
+        // Sport test 14 (Marisol: "Save, and add different summer hours" opened "Your hours from June to August", though her
+        // usual hours were her summer hours and she needed spring and fall): for sport and golf, the stretch opens with no months
+        // picked, titled "Different hours for part of your season?".
+        if (v === 'summer' && C.sport && T.seaPartQ) { if (!(S.sea.week && (CUR.hours_seasons || []).length)) { S.sea.kind = 'part'; S.sea.months = {}; delete S.sea.exact; S.sea.week = clone(S.week); } S.sea.on = true; S.sea.open = {}; S.sea.dirty = true; S.seaTouched = true; return go('hours:season'); }
         if (v === 'summer') { if (S.sea.kind !== 'summer' || !S.sea.week) { var keepSt = !!(S.sea.week && (CUR.hours_seasons || []).length); S.sea.kind = 'summer'; if (!keepSt) { S.sea.months = {}; SEA_MONTHS.summer.forEach(function(m){ S.sea.months[m] = true; }); S.sea.week = clone(S.week); } } S.sea.on = true; S.sea.open = {}; S.sea.dirty = true; S.seaTouched = true; return go('hours:season'); }
         if (k === 'openNone') return go('hours:year', true);
         if (v !== 'keep') { S.seaList.forEach(function(o){ o.on = false; }); S.seaTouched = true; }
@@ -4495,7 +4583,7 @@
     if (k === 'menuCam') return el('suMenuCam').click();
     if (k === 'sendMenuFiles') return sendPages(S.menuFiles, null, 'menu', T.menuNote);
     if (k === 'sendMenuPages') return sendPages(S.menuPages, null, 'menu', T.menuNote);
-    if (k === 'menuWebSave') { var u = lastHttp(el('suUrl').value.trim()); S.webUrl = u; if (!u) { S.nudge = T.webEmpty; return render(); } return saveAll('menu', [{ menu_url: u }], 'day'); }
+    if (k === 'menuWebSave') { var u = lastHttp(el('suUrl').value.trim()); S.webUrl = u; if (!u) { S.nudge = T.webEmpty; return render(); } if (C.sport && T.webSavedLink) S.savedLine.menu = T.webSavedLink; return saveAll('menu', [{ menu_url: u }], 'day'); }
     if (k === 'menuEmailDone') return record('menu', 'email');
     if (k === 'menuDaily') {
       // Café test 2 (2026-11-11): saved as the café's answer (cafe_info.menu_daily), live at once; never the type-up queue.
@@ -4783,7 +4871,7 @@
       if (gline && S.notOffered.indexOf('pyv_groups') >= 0) gl2.push({ not_offered: { remove: ['pyv_groups'] } });
       // Sent even when unchanged: saying it's right makes research's line hers (a full box never drops it).
       if (gline || bline) { var vr2 = {}; if (gline) vr2.groups = gline; if (bline) vr2.reservations = bline; gl2.push({ visit_rows: vr2 }); }
-      if (glinkCh) gl2.push({ booking_url: gbu });
+      if (glinkCh || bookKeep(gbu)) gl2.push({ booking_url: gbu });
       S.savedLine.groups = glinkCh ? T.groupsSavedLink : '';
       return saveAll('groups', gl2, null, null, function(){ if (bline) { S.visit.reservations = bline; CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.reservations = bline; C.visitResearch = (C.visitResearch || []).filter(function(kk){ return kk !== 'reservations'; }); } if (glinkCh) CUR.booking_url = gbu; if (!gline && CK) return; S.visit.groups = gline; CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.groups = gline; if (glinkCh) CUR.booking_url = gbu; C.visitResearch = (C.visitResearch || []).filter(function(kk){ return kk !== 'groups'; }); });
     }
@@ -4854,12 +4942,15 @@
       var ibl = [];
       if (ib0.book && ib0.book !== (TI.book || '')) ibl.push(tinfo({ book: ib0.book }));
       var ibCh = ibu !== null && !!ibu && !ib0.noBook && ibu !== (CUR.booking_url || C.bookingKnown || '');
-      if (ibCh) ibl.push({ booking_url: ibu });
+      // Sport test 14 (Marisol kept the link we had found; it was her website, and the page showed only Website): a kept link
+      // that no owner has set yet is sent as her own answer, so the page keeps its Book button.
+      var ibKeep = !ibCh && !ib0.noBook && bookKeep(ibu);
+      if (ibCh || ibKeep) ibl.push({ booking_url: ibu });
       var ibNone = ib0.noBook && !ibu;
       if (ibNone && S.notOffered.indexOf('booking_link') < 0) ibl.push({ not_offered: { add: ['booking_link'] } });
       if (!ibNone && S.notOffered.indexOf('booking_link') >= 0) ibl.push({ not_offered: { remove: ['booking_link'] } });
       S.savedLine.booking = ibCh ? T.tbookSavedLink : '';
-      return saveAll('booking', ibl, null, null, function(){ if (ib0.book) TI.book = ib0.book; if (ibCh) CUR.booking_url = ibu; S.tour.bookGuessed = false; });
+      return saveAll('booking', ibl, null, null, function(){ if (ib0.book) TI.book = ib0.book; if (ibCh) CUR.booking_url = ibu; if (ibKeep && CUR.booking_url) CUR.booking_owner_set = true; S.tour.bookGuessed = false; });
     }
     if (k === 'tourSave') {
       var tk0 = S.tour.kinds.slice(), tl0 = S.tour.length;
@@ -4919,7 +5010,7 @@
       var bl = [];
       if (bk0 && bk0 !== (TI.book || '')) bl.push({ tour_info: { book: bk0 } });
       var blinkCh = bu1 !== null && !!bu1 && !tb0.noBook && bu1 !== (CUR.booking_url || C.bookingKnown || '');
-      if (blinkCh) bl.push({ booking_url: bu1 });
+      if (blinkCh || (!tb0.noBook && bookKeep(bu1))) bl.push({ booking_url: bu1 });
       var bNone = tb0.noBook && !bu1;
       if (bNone && S.notOffered.indexOf('booking_link') < 0) bl.push({ not_offered: { add: ['booking_link'] } });
       if (!bNone && S.notOffered.indexOf('booking_link') >= 0) bl.push({ not_offered: { remove: ['booking_link'] } });
@@ -4985,7 +5076,7 @@
       if (Object.keys(wi2).length) vl.push(apptClear ? { winery_info: wi2, hours: none2, hours_checked: true } : { winery_info: wi2 });
       var linkCh = bu !== null && !!bu && (!wv2.noBook || wv2.visit === 'walk_in') && bu !== (CUR.booking_url || C.bookingKnown || '');
       if (bu && !siteOk(bu)) { S.nudge = T.bookLinkBad; S.badField = 'suBookUrl'; return render(); }
-      if (linkCh) vl.push({ booking_url: bu });
+      if (linkCh || ((!wv2.noBook || wv2.visit === 'walk_in') && bookKeep(bu))) vl.push({ booking_url: bu });
       var wantNone = wv2.noBook && wv2.visit !== 'walk_in' && !bu;
       if (wantNone && S.notOffered.indexOf('booking_link') < 0) vl.push({ not_offered: { add: ['booking_link'] } });
       if (!wantNone && S.notOffered.indexOf('booking_link') >= 0) vl.push({ not_offered: { remove: ['booking_link'] } });
@@ -5027,7 +5118,7 @@
       // The booking link (pub test 9): its own box on this screen; a link in the line is offered a move, never refused.
       var bkUrl = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null; if (bkUrl !== null) S.bookUrl = bkUrl;
       if (bkUrl !== null) { var inl = linkIn(line); if (inl) { S.visit[key] = el('suLine').value; S.linkOffer = inl.url; S.nudge = ''; render(); var mv0 = el('suMoveLink'); if (mv0) mv0.scrollIntoView({ block: 'center' }); return; } S.linkOffer = ''; }
-      var linkChanged = bkUrl !== null && bkUrl !== (CUR.booking_url || '');
+      var linkChanged = bkUrl !== null && (bkUrl !== (CUR.booking_url || '') || bookKeep(bkUrl));
       if (!line && !(bkUrl && step === 'book')) { if (step === 'known') { S.nudge = T.needLine; return render(); } S.nudge = T.needLine; return render(); }
       if (!line) { return saveAll(step, (S.badges.takes_reservations ? [] : [{ badges: { takes_reservations: true } }]).concat(linkChanged ? [{ booking_url: bkUrl }] : []), null, null, function(){ S.badges.takes_reservations = true; CUR.booking_url = bkUrl; }); }
       var sameLine = (S.visit[key] || '') === line && ((S.visitSaved || CUR.visit_rows || {})[key] || '') === line;

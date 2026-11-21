@@ -190,7 +190,9 @@ test('4. the off-season warning: widen the season only for a stretch that touche
   const mar = JSON.parse(JSON.stringify(ctx.seaOutside({ from: '03-15', to: '04-30' }, sea)));
   assert.deepEqual(mar.add, { from: '03-15', to: '03-31' });
   assert.equal(ctx.seaOutside({ from: '11-01', to: '11-15', label: 'Pro shop' }, sea).ext, null, 'a labelled stretch is another part of the place');
-  assert.match(src, /big\('✕', T\.seaOutsideNo, T\.seaOutsideNoSub, false, 'seaOutSkip'\) \+ \(S\.seaOut\.ext && S\.seaOut\.add/, 'Skip is first and the main button');
+  // Sport test 14: Skip is first and the main button when every day is outside the season; with some days in season, Keep
+  // those (seaOutKeep) takes its place (tests/sport-test14-fixes.test.js).
+  assert.match(src, /big\('✕', T\.seaOutsideNo, T\.seaOutsideNoSub, false, 'seaOutSkip'\)\) \+ \(S\.seaOut\.ext && S\.seaOut\.add/, 'Skip is first and the main button');
   const T = require('../owner-setup-text.js');
   const en = (T.en || T.STRINGS?.en || {}).indoor || T.en;
   assert.ok(JSON.stringify(T).includes('Yes: {place} will show open {a} – {b}, {hours}'));

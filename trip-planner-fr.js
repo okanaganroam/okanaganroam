@@ -510,6 +510,8 @@ const PHRASES = [
   ['et', 'and'], ['ou', 'or'], ['puis', 'then'], ['ensuite', 'then'], ['apres ca', 'then'], ['apres', 'after'], ['avant', 'before'],
   ['aussi', 'also'], ['mais', 'but'], ['avec', 'with'], ['pour', 'for'], ['sur', 'on'], ['dans', 'in'], ['pres de', 'near'],
   ['proche de', 'near'], ['autour de', 'around'], ['chez', 'at'], ['entre', 'between'],
+  // Sport test 14 (2026-11-21): « près d'Oliver » (pres d oliver) left « pres » in the plan's heading as a thing to do.
+  ['pres d', 'near'], ['proche d', 'near'], ['autour d', 'around'], ['tout pres de', 'near'], ['tout pres d', 'near'], ['pres', 'near'], ['proche', 'near'],
   // everything else: English filler words or nothing
   ['je', 'i'], ['j', 'i'], ['nous', 'we'], ['on', 'we'], ['voudrais', 'want'], ['voudrions', 'want'], ['veux', 'want'],
   ['voulons', 'want'], ['aimerais', 'want'], ['aimerions', 'want'], ['souhaite', 'want'], ['souhaitons', 'want'],

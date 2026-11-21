@@ -247,7 +247,10 @@ function searchVenues(intent, venues) {
   const empty = { total: 0, items: [], exclusions: { applied: [], notApplied: [] } };
   if (!intent || intent.mode === 'events' || intent.mode === 'unknown') return empty;
   const R = intent.regions || [], T = intent.types || [], F = intent.features || [], C = intent.collections || [], A = intent.activities || [];
-  const cuisines = intent.cuisines || [], terms = intent.textTerms || [];
+  // Sport test 14 (2026-11-21; "golf tournament venue oliver" found nothing: no course says "venue"): for a golf or sport
+  // search, a word for "a place" is not a word the place must say.
+  const SPORT_FILLER = new Set(['venue', 'venues', 'spot', 'spots', 'place', 'places', 'location', 'locations', 'facility', 'facilities', 'option', 'options', 'lieu', 'lieux', 'endroit', 'endroits']);
+  const cuisines = intent.cuisines || [], terms = (intent.textTerms || []).filter((t) => !(T.some((x) => x === 'golf' || x === 'sport') && SPORT_FILLER.has(t)));
   if (!R.length && !T.length && !F.length && !C.length && !A.length && !cuisines.length && !terms.length) return empty;
   const plan = exclusionPlan(intent.excluded);
   const fr = !!intent.frenchText;

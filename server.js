@@ -7251,19 +7251,31 @@ function searchPartyOnly(intent) {
 //   4. a place its owner has set up (its kinds and its own hours) before one nobody has, in the town asked before the
 //      towns around it ("near Vernon").
 // Other kinds of places keep their slots and their order.
-const SEARCH_GOLF_FACTS = [[/\b(?:9|nine)[ -]?holes?\b|\b9 trous\b/, /\bnine holes?\b|\b9[- ]holes?\b/], [/\bpar (?:3|three)\b/, /\bpar (?:3|three)\b|\bexecutive\b/]];
-function searchSportOrder(sq, run, venues, pinnedIds) {
+// Sport test 14 (2026-11-21; "golf tournament venue oliver" found nothing, though Fairview's Groups line says "Tournaments and
+// corporate golf"): a tournament search puts first the courses that say tournaments in their own words or lines.
+const SEARCH_GOLF_FACTS = [[/\b(?:9|nine)[ -]?holes?\b|\b9 trous\b/, /\bnine holes?\b|\b9[- ]holes?\b/], [/\bpar (?:3|three)\b/, /\bpar (?:3|three)\b|\bexecutive\b/], [/\btournaments?\b|\btourneys?\b|\btournois?\b/, /\btournament|\btourney|\btournoi/]];
+function searchSportOrder(sq, run, venues, pinnedIds, namedIds) {
   const sportish = (v) => !!v && sportSetupType(v.type);
+  // Sport test 14 ("golf and wine oliver" listed Oliver's 42 wineries, then Fairview last): a search that names a sport kind
+  // and another kind lists the sport places first (after any name match), then the others.
+  const typesAsked = (run && run.intent && run.intent.types) || [];
+  let sportLead = null;
+  if (typesAsked.some((t) => t === 'golf' || t === 'sport') && typesAsked.some((t) => t !== 'golf' && t !== 'sport')) {
+    const named = namedIds || pinnedIds;
+    const rank = (v) => (named.includes(v.id) ? 0 : sportish(v) ? 1 : 2);
+    venues = venues.map((v, i) => ({ v, i })).sort((a, b) => rank(a.v) - rank(b.v) || a.i - b.i).map((x) => x.v);
+    sportLead = venues.filter((v) => rank(v) === 1).map((v) => v.id);
+  }
   // The name matches ("Lumby …" for "disc golf lumby") are sorted among themselves, the rest among themselves.
   const groups = [true, false].map((pin) => venues.map((v, i) => (sportish(v) && pinnedIds.includes(v.id) === pin ? i : -1)).filter((i) => i >= 0)).filter((g) => g.length > 1);
-  if (!groups.length) return { venues, priceSorted: false };
+  if (!groups.length) return { venues, priceSorted: false, lead: sportLead };
   const fq = ` ${smartFold(sq)} `;
   const norm = discoveryIntentModule().normalizeDiscoveryText;
   const kindsAsked = SK_KINDS_ALL().filter((k) => { const e = indoorKindsModule.INDOOR_KIND_TEXT[k]; if (!e || k === 'golf' || k === 'sportother') return false; return e.en.search.concat(e.fr.search).map((w) => ` ${norm(w)} `).some((w) => w.trim().length > 3 && fq.includes(w)); });
   const facts = SEARCH_GOLF_FACTS.filter(([qre]) => qre.test(fq));
   const cheap = !!(run.intent && run.intent.budget === 'budget') && !/\bfree\b|\bgratuit/.test(fq);
   const asked = (run.askedTowns || []).length ? run.askedTowns : null;
-  const own = (v) => smartFold(`${v.name || ''} ${v.description || ''} ${v.type === 'golf' ? sportGolfSearchFacts(v) : ''}`);
+  const own = (v) => smartFold(`${v.name || ''} ${v.description || ''} ${v.type === 'golf' ? sportGolfSearchFacts(v) : ''} ${facts.length ? indoorVisitSearchText(v.id) : ''}`);
   const kindRank = (v) => { if (!kindsAsked.length) return 0; const ks = venueIndoorInfo(v.id).kinds || []; if (ks.some((k) => kindsAsked.includes(k))) return 0; const t = ` ${own(v)} `; return kindsAsked.some((k) => indoorKindsModule.INDOOR_KIND_TEXT[k].en.search.some((w) => t.includes(` ${norm(w)} `))) ? 1 : 2; };
   const factRank = (v) => (facts.length && !facts.every(([, vre]) => vre.test(own(v))) ? 1 : 0);
   const price = (v) => { const e = CARD_PRICES[String(v.id)]; const n = e && Number(e.from); return Number.isFinite(n) && n > 0 ? n : Infinity; };
@@ -7284,7 +7296,7 @@ function searchSportOrder(sq, run, venues, pinnedIds) {
     slots.forEach((slot, j) => { out[slot] = keyed[j].v; });
   }
   for (const v of out) if (sportish(v) && bookAhead(v)) notes.set(v.id, ['Please book a tee time ahead.', 'Réservez votre départ à l’avance.']);
-  return { venues: out, priceSorted: cheap && priced, notes };
+  return { venues: out, priceSorted: cheap && priced, notes, lead: sportLead ? out.filter((v) => sportLead.includes(v.id)).map((v) => v.id) : null };
 }
 function searchPageModel(run, now = new Date(), lang = 'en') {
   // French gaps (2026-10-18): q is what the visitor typed (shown on the page); sq is the text the request was read
@@ -7338,6 +7350,7 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
   // Tour test 15 (Whistler, 2026-11-18; "SUP", "paddleboard" and "snowshoe tours" put Dave's paddle-and-snowshoe company
   // low or under a snowmobile company): a tour whose own name or kind words name what was typed (SUP, stand up paddle and
   // paddleboard as one thing) comes right after the name matches, even when it's closed for the season (the card says so).
+  const namedIds = pinnedIds.slice();
   if (!(plan && plan.list) && run.results.kind !== 'events' && venues.length > 1) {
     const kindIds = searchKindMatchIds(sq, run.intent, venues);
     if (kindIds.length) {
@@ -7349,8 +7362,10 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
   // Sport tests 8 and 9 (2026-11-21): sports and golf places in search, by what the visitor asked.
   let priceSorted = false;
   if (!(plan && plan.list) && run.results.kind !== 'events' && venues.length > 1) {
-    const o = searchSportOrder(sq, run, venues, pinnedIds);
+    const o = searchSportOrder(sq, run, venues, pinnedIds, namedIds);
     venues = o.venues; priceSorted = o.priceSorted;
+    // Sport test 14: the sport places lead the cards too (after the name matches), above another kind's own matches.
+    if (o.lead && o.lead.length) { const lead = new Set(o.lead); pinnedIds = [...pinnedIds.filter((id) => namedIds.includes(id)), ...o.lead, ...pinnedIds.filter((id) => !namedIds.includes(id) && !lead.has(id))]; }
     for (const [id, nt] of o.notes || []) why.set(id, lang === 'fr' ? nt[1] : nt[0]);
   }
   // Sport test 12 (2026-11-21; "golf and dinner kelowna" listed 48 golf courses and restaurants without Rob's course, which
@@ -13170,7 +13185,14 @@ function visitInfoHtml(info, fr = false, opts = {}) {
     // #15 again): its practice, rentals, lessons and passes lines too (the price lines PENDING_PRICE_ROW_RE names).
     const keepEn = (r) => kindSetupType(opts.type) && (VISIT_KEEP_RESEARCH_RE.test(String(r.label || '')) || PENDING_PRICE_ROW_RE.test(String(r.label || ''))) && typeof r.text === 'string' && r.text.trim() ? r.text : null;
     const ownLine = (r) => (mineFr.has(r.label) && typeof r.text === 'string' && r.text.trim() ? (kindSetupType(opts.type) && !isPresetAnswer(r.text) ? r.text : presetAnswer(r.text, 'fr')) : keepEn(r));
-    const rowsFr = info.rows.map((r) => ({ ...r, text: r.__frOwn ? r.text : ownFr[r.label] && ownFr[r.label].en === r.text && ownFr[r.label].fr ? ownFr[r.label].fr : (typeof r.text === 'string' ? presetOrFr(r.text, visitTextFr) : visitTextFr(r.text)) ?? ownLine(r), label: visitLabelFr(r.label), __en: r.label })).filter((r) => r.text != null);
+    // Sport test 14 (2026-11-21): a line still in English on the French page (hers, not translated yet: it is queued for
+    // French) says so, as the English page says "(in French)" for hers in French.
+    const rowsFr = info.rows.map((r) => {
+      const t1 = r.__frOwn ? r.text : ownFr[r.label] && ownFr[r.label].en === r.text && ownFr[r.label].fr ? ownFr[r.label].fr : (typeof r.text === 'string' ? presetOrFr(r.text, visitTextFr) : visitTextFr(r.text));
+      const text = t1 ?? ownLine(r);
+      const enOnly = t1 == null && kindSetupType(opts.type) && mineFr.has(r.label) && typeof text === 'string' && text === r.text && !ownerTextIsFrench(text);
+      return { ...r, text, label: visitLabelFr(r.label), __en: r.label, ...(enOnly ? { __enOnly: true } : {}) };
+    }).filter((r) => r.text != null);
     if (!rowsFr.length) return '';
     info = { ...info, rows: rowsFr };
   } else {
@@ -13189,6 +13211,7 @@ function visitInfoHtml(info, fr = false, opts = {}) {
     const more = r.url ? ` <a href="${escapeHtml(r.url)}" rel="nofollow noopener" target="_blank">${fr ? 'Plus' : 'More'} ↗</a>` : '';
     // Sport test 11: on the English page her line in French (not translated yet) says so.
     if (!fr && (r.__frOnly || (ownTidy && ownTidy.has(r.label) && typeof r.text === 'string' && ownerTextIsFrench(r.text)))) return `<li><span class="visit-label">${escapeHtml(shownLabel(r))}</span><span><span lang="fr">${text}</span> <span class="visit-lang-note">(in French)</span>${more}</span></li>`;
+    if (fr && r.__enOnly) return `<li><span class="visit-label">${escapeHtml(shownLabel(r))}</span><span><span lang="en">${text}</span> <span class="visit-lang-note">(en anglais)</span>${more}</span></li>`;
     return `<li><span class="visit-label">${escapeHtml(shownLabel(r))}</span><span>${text}${more}</span></li>`;
   };
   const enLabel = (r) => (fr ? r.__en : r.label);
@@ -56321,6 +56344,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       }
     }
     if (url !== current[f]) changes[f] = url || null;
+    // Sport test 14: from the easy setup, a booking link kept as it was (research's, never set by an owner) is her own answer
+    // now: it is recorded (live, nothing on the page changes but the Book button), so a link that is also her website keeps
+    // its Book button.
+    else if (f === 'booking_url' && url && body && body.from_setup === true && !ownerSetBookingLink(venue.id, url)) changes[f] = url;
   }
   if ('open_months' in input) {
     const raw = typeof input.open_months === 'string' ? input.open_months.trim() : '';
@@ -57150,7 +57177,7 @@ async function handleOwnerChangeSubmission(req, res, token) {
   const ipHash = crypto.createHash('sha256').update(`okanagan-roam-owner-change:${requestClientIp(req)}`).digest('hex');
   const live = {}, livePrev = {}, review = {}, reviewPrev = {};
   for (const k of Object.keys(changes)) {
-    if (((instantOk && OWNER_INSTANT_FIELDS.has(k)) || (linkInstantOk && OWNER_LINK_INSTANT_FIELDS.has(k)) || (setupInstantOk && OWNER_SETUP_LINK_INSTANT_FIELDS.has(k))) && ownerFieldInstantValue(k, changes[k])) { live[k] = changes[k]; livePrev[k] = previous[k]; } else { review[k] = changes[k]; reviewPrev[k] = previous[k]; }
+    if (((instantOk && OWNER_INSTANT_FIELDS.has(k)) || (linkInstantOk && OWNER_LINK_INSTANT_FIELDS.has(k)) || (setupInstantOk && OWNER_SETUP_LINK_INSTANT_FIELDS.has(k)) || (linkInstantOk && k === 'booking_url' && !!changes[k] && changes[k] === previous[k])) && ownerFieldInstantValue(k, changes[k])) { live[k] = changes[k]; livePrev[k] = previous[k]; } else { review[k] = changes[k]; reviewPrev[k] = previous[k]; }
   }
   for (const k of Object.keys(carried)) {
     if (k === 'badges') { live.badges = { ...carried.badges, ...(live.badges || {}) }; livePrev.badges = { ...carriedPrev.badges, ...(livePrev.badges || {}) }; }
@@ -62495,6 +62522,10 @@ function renderOwnerSetupPage(found, opts) {
     // Pub test 9 (2026-11-10): the booking link (the same field as the edit page's, one waiting for review first). No TikTok
     // box any more (café test 3, 2026-11-11: keep it easy); a TikTok already saved stays stored and on the page.
     booking_url: (() => { const p = ownerLinkPending(venue.id, 'booking_url'); return p !== null ? p : snap.booking_url || ''; })(),
+    // Sport test 14 (2026-11-21; Marisol kept the booking link research had found, which was her website, and her page
+    // showed only Website): whether the link stored is one she (or an owner before her) set. A kept link not set by an owner
+    // is sent with Save as her own answer.
+    booking_owner_set: !!snap.booking_url && ownerSetBookingLink(venue.id, snap.booking_url),
     // Restaurant test 1 (2026-11-14): a restaurant's kitchen / last seating answer too.
     ...(pub || venue.type === 'restaurant' ? { pub_info: snap.pub_info || {} } : {}),
     // Cocktail lounges: the price on the card (number | 'none' | null) and one over $40 still waiting for our check.
@@ -64635,8 +64666,9 @@ function sport4KindHelp(t, kind, venue, happy) {
   if (t.id === 'sport-second-kind' && kind === 'simgolf') return both([['like an outdoor mini putt in summer', 'like a patio open only in summer'], ['<em>Outdoor mini putt in summer</em>', '<em>Patio open in summer</em>']], [['comme un mini-golf extérieur l’été', 'comme une terrasse ouverte seulement l’été'], ['<em>Mini-golf extérieur l’été</em>', '<em>Terrasse ouverte l’été</em>']]);
   // A golf course's simulator people can book (Ryan's GC Quad): a second kind with its own price line, or Good to know.
   if (t.id === 'sport-bay-link' && kind === 'golf') {
-    return { ...t, a: '<p>Your <strong>Book a tee time</strong> button stays for your course. If people can book the indoor one to play, tap <strong>Indoor golf or simulators</strong> as a second kind on What kind of place, and add its rates as their own lines in <strong>Your prices</strong>, like <em>Indoor, 1 hour $40</em>. Or say it in one line in <strong>Good to know</strong>, like <em>Indoor GC Quad: book by phone, winter only</em>. Lessons by phone? Say so there too.</p>',
-      aFr: '<p>Votre bouton <strong>Réserver un départ</strong> reste pour votre parcours. Si les gens peuvent réserver l’intérieur pour jouer, touchez <strong>Golf intérieur ou simulateurs</strong> comme deuxième genre dans Votre genre d’endroit, et ajoutez ses tarifs en lignes à part dans <strong>Vos tarifs</strong>, comme <em>Intérieur, 1 heure 40 $</em>. Ou dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>GC Quad intérieur : réservez par téléphone, l’hiver seulement</em>. Des cours par téléphone? Dites-le là aussi.</p>' };
+    // Sport test 14 (Marisol's club fitting bay, by appointment, not to play): a fitting bay or lesson studio isn't Indoor golf.
+    return { ...t, a: '<p>A fitting bay or lesson studio by appointment isn’t Indoor golf: leave that unticked and say it in your story or one line in <strong>Good to know</strong>, like <em>Club fitting by appointment (Trackman)</em>.</p><p>Your <strong>Book a tee time</strong> button stays for your course. If people can book the indoor one to play, tap <strong>Indoor golf or simulators</strong> as a second kind on What kind of place, and add its rates as their own lines in <strong>Your prices</strong>, like <em>Indoor, 1 hour $40</em>. Or say it in one line in <strong>Good to know</strong>, like <em>Indoor GC Quad: book by phone, winter only</em>. Lessons by phone? Say so there too.</p>',
+      aFr: '<p>Une baie d’ajustement ou un studio de cours sur rendez-vous n’est pas du golf intérieur : ne le cochez pas, et dites-le dans votre histoire ou en une ligne dans <strong>Bon à savoir</strong>, comme <em>Ajustement de bâtons sur rendez-vous (Trackman)</em>.</p><p>Votre bouton <strong>Réserver un départ</strong> reste pour votre parcours. Si les gens peuvent réserver l’intérieur pour jouer, touchez <strong>Golf intérieur ou simulateurs</strong> comme deuxième genre dans Votre genre d’endroit, et ajoutez ses tarifs en lignes à part dans <strong>Vos tarifs</strong>, comme <em>Intérieur, 1 heure 40 $</em>. Ou dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>GC Quad intérieur : réservez par téléphone, l’hiver seulement</em>. Des cours par téléphone? Dites-le là aussi.</p>' };
   }
   if (t.id === 'sport-tee-times') {
     const noun = { golf: ['tee-time booking page', 'page de réservation des départs'], simgolf: ['bay booking page', 'page de réservation des baies'], courts: ['court booking page', 'page de réservation des terrains'], skischool: ['lesson booking page', 'page de réservation des cours'] }[kind] || ['booking page', 'page de réservation'];

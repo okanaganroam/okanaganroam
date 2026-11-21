@@ -3461,6 +3461,21 @@ function chooseDayRegions(facts, ctx, days, centroids) {
   let regions;
   if (ctx.regions.length) {
     regions = ctx.regions.slice();
+    // Sport test 14 (2026-11-21; "golf weekend in the South Okanagan" planned Summerland and Kaleden, never Oliver or
+    // Osoyoos): a golf trip asked for a whole area (more towns than days) plays its days in the area's golf towns: the towns
+    // with owner-set-up courses first, then the most courses, a tie to the south (the area's own golf country). Then north
+    // to south as before.
+    if (ctx.types.has('golf') && regions.length > days && days >= 1) {
+      const courses = (r) => (byRegion[r] || []).filter((v) => v.type === 'golf' && !v.indoorGolf);
+      const golfTowns = regions.filter((r) => courses(r).length && !SITE.notDayBaseRegions.includes(r));
+      if (golfTowns.length) {
+        const score = (r) => courses(r).filter((v) => v.ownerSetUp).length * 10 + Math.min(courses(r).length, 5);
+        const pick = golfTowns.slice().sort((a, b) => score(b) - score(a) || lat(a) - lat(b) || a.localeCompare(b)).slice(0, days);
+        pick.sort((a, b) => lat(b) - lat(a) || a.localeCompare(b));
+        if (ctx.intent && ctx.intent.fromSouth) pick.reverse();
+        return Array.from({ length: days }, (_, i) => pick[Math.floor((i * pick.length) / days)]);
+      }
+    }
     // A thinly listed town on a longer trip (2026-10-25: 3 days in Mount Currie had empty afternoons) shares its days
     // with the next town over, within about 15 minutes.
     if (regions.length === 1 && days >= 2 && !ctx.types.has('golf') && (byRegion[regions[0]] || []).length < 25) {

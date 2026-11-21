@@ -30,7 +30,7 @@ const Q = [
   ['sport13', 'edit', 'en', 'My wife Linda and I share this one phone. Does she need her own login or can we both use this?', ['staff', 'login-create', 'UNSURE'], []],
   ['sport13', 'edit', 'en', 'where do I put when the RV park is open? its a different season from the golf course', ['sport-part-season', 'indoor-good-to-know'], CLOSING],
   ['sport13', 'edit', 'en', 'is the RV park its own listing on your site or part of ours?', ['sport-sister-listing', 'sport-one-listing', 'UNSURE'], []],
-  ['sport13', 'edit', 'en', 'Your value thing on our page says driving range not documented but we have a driving range. Can you fix that?', ['sport-golf-details'], []],
+  ['sport13', 'edit', 'en', 'Your value thing on our page says driving range not documented but we have a driving range. Can you fix that?', ['sport-golf-details', 'sport-golf-facts'], []],
   ['sport13', 'edit', 'en', 'The green fee table up top says 2026 rates from your research. Will it change to the prices Linda typed in?', ['sport-golf-details'], []],
   ['sport13', 'edit', 'en', 'We\'re closed right now until April. Does the page tell people that or do I have to do something?', ['sport-season-says', 'shows-closed'], []],
   ['sport13', 'edit', 'en', 'Can somebody else change our page? Who checks what goes on it?', ['access', 'dispute', 'sport-approval-first', 'changes-review', 'staff'], []],

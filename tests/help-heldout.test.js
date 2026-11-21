@@ -26,7 +26,9 @@ const S11 = require('./help-sport11-questions.js');
 const S12 = require('./help-sport12-questions.js');
 // Sport test 13 (2026-11-21): Gord and Linda's 22.
 const S13 = require('./help-sport13-questions.js');
-const SRC = { ...H0.SRC, ...S89.SRC, ...S10.SRC, ...S11.SRC, ...S12.SRC, ...S13.SRC }, Q = [...H0.Q, ...S89.Q, ...S10.Q, ...S11.Q, ...S12.Q, ...S13.Q], KNOWN_MISS = H0.KNOWN_MISS;
+// Sport test 14 (2026-11-21): Marisol's 27.
+const S14 = require('./help-sport14-questions.js');
+const SRC = { ...H0.SRC, ...S89.SRC, ...S10.SRC, ...S11.SRC, ...S12.SRC, ...S13.SRC, ...S14.SRC }, Q = [...H0.Q, ...S89.Q, ...S10.Q, ...S11.Q, ...S12.Q, ...S13.Q, ...S14.Q], KNOWN_MISS = H0.KNOWN_MISS;
 app.setVenueSubmissionTransport(async () => {});
 
 let srv, base;
