@@ -52,7 +52,7 @@ const TEXT = {
   from: { en: 'From', fr: 'À partir de' },
   add: { en: 'Add to trip', fr: 'Ajouter au voyage' },
   added: { en: 'Added', fr: 'Ajouté' },
-  book: { en: 'Book on Viator', fr: 'Réserver sur Viator' },
+  book: { en: 'Book now', fr: 'Réserver' }, // owner decision 2026-11-20: plain label; the link goes to Viator (affiliate), commission line under it
   heading: { en: 'Tours you can book', fr: 'Activités à réserver' },
   priceNote: { en: 'Price per person from Viator, in CAD; the final price is on Viator.', fr: 'Prix par personne selon Viator, en $ CA; le prix final est sur Viator.' },
 };

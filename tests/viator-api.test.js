@@ -146,8 +146,8 @@ test('Build My Trip booking list: a matched venue books through Viator (also wit
   try {
     const list = app.tripBookingChecklist(plan);
     assert.deepEqual(list.map((c) => [c.venueId, c.url, c.affiliate, c.rel, c.link, c.label, c.labelFr]), [
-      [tour.id, PRODUCT_URL, true, 'sponsored nofollow noopener', 'viator', 'Book on Viator', 'Réserver sur Viator'],
-      [noBook.id, PRODUCT_URL.replace('11111P1', '22222P3'), true, 'sponsored nofollow noopener', 'viator', 'Book on Viator', 'Réserver sur Viator'],
+      [tour.id, PRODUCT_URL, true, 'sponsored nofollow noopener', 'viator', 'Book now', 'Réserver'],
+      [noBook.id, PRODUCT_URL.replace('11111P1', '22222P3'), true, 'sponsored nofollow noopener', 'viator', 'Book now', 'Réserver'],
     ]);
   } finally { keyOff(); }
 });
@@ -165,8 +165,8 @@ test('venue page: "Book on Viator" is the Book button, commission line and "or b
     assert.equal((await get(`/fr${tourPath()}`)).text, beforeFr);
     process.env.VIATOR_DATA_DIR = dataDir;
     const en = (await get(tourPath())).text;
-    assert.match(en, /<a class="cta secondary" href="https:\/\/www\.viator\.com\/tours\/Kelowna\/Bare-Wine-Tours\/d5257-11111P1\?mcid=42383&amp;pid=P00333119&amp;medium=api&amp;api_version=2\.0&amp;campaign=okanagan" rel="sponsored nofollow noopener" target="_blank" data-track="booking" data-link="viator">Book on Viator ↗<\/a>/);
-    const vi = en.indexOf('data-link="viator">Book on Viator'), note = en.indexOf('data-viator-disclosure'), direct = en.indexOf('data-link="direct">or book direct with Viator Test Wine Tours');
+    assert.match(en, /<a class="cta secondary" href="https:\/\/www\.viator\.com\/tours\/Kelowna\/Bare-Wine-Tours\/d5257-11111P1\?mcid=42383&amp;pid=P00333119&amp;medium=api&amp;api_version=2\.0&amp;campaign=okanagan" rel="sponsored nofollow noopener" target="_blank" data-track="booking" data-link="viator">Book now ↗<\/a>/);
+    const vi = en.indexOf('data-link="viator">Book now'), note = en.indexOf('data-viator-disclosure'), direct = en.indexOf('data-link="direct">or book direct with Viator Test Wine Tours');
     assert.ok(vi > 0 && note > vi && direct > note, 'Viator button, then the commission line, then the operator\'s own link');
     assert.match(en, /href="https:\/\/viator-test-wine-tours\.example\/book" target="_blank" rel="nofollow noopener" data-track="booking" data-link="direct"/);
     assert.equal((en.match(/https:\/\/viator-test-wine-tours\.example\/book/g) || []).length, 1, 'the own link only as the small line');
@@ -174,12 +174,12 @@ test('venue page: "Book on Viator" is the Book button, commission line and "or b
     assert.match(en, /\["viator","a\[data-link=\\"viator\\"\]"/, 'its own click key on this page');
     assert.doesNotMatch(before, /\["viator"/, 'and not on pages without a Viator button');
     const fr = (await get(`/fr${tourPath()}`)).text;
-    assert.match(fr, /data-link="viator">Réserver sur Viator ↗<\/a>/);
+    assert.match(fr, /data-link="viator">Réserver ↗<\/a>/);
     assert.match(fr, /Nous pouvons toucher une commission/);
     assert.match(fr, />ou réservez directement auprès de Viator Test Wine Tours <span/);
     // A match with no own booking link: the Viator button and the commission line, no "book direct".
     const nb = (await get(`/kelowna/${app.CATEGORY_SLUGS.tour}/viator-test-no-booking`)).text;
-    assert.match(nb, /data-link="viator">Book on Viator ↗<\/a>/);
+    assert.match(nb, /data-link="viator">Book now ↗<\/a>/);
     assert.match(nb, /data-viator-disclosure/);
     assert.doesNotMatch(nb, /book direct/);
     // Not in the sitemap or llms.txt.
