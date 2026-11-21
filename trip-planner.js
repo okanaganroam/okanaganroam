@@ -2749,6 +2749,9 @@ function rotateWithinType(cands, ctx, score = (c) => c.score, opts = {}) {
     if (appointmentOnly(c.v) && !appointmentOnly(best.v)) continue;
     // Indoor test 15: a Complete & Verified best place never rotates to one its owner hasn't confirmed.
     if (best.v.completeVerified && !c.v.completeVerified) continue;
+    // Sport test 10 (2026-11-21): a sport or golf place its owner has set up never rotates to one nobody has (Lorraine's
+    // course lost "tee time then dinner" and "golf on Tuesday afternoon" to an unverified course this way).
+    if (best.v.ownerSetUp && !c.v.ownerSetUp) continue;
     const km = kmOrNull(best.v, c.v);
     if (km != null && km > ROTATE_MAX_KM) continue;
     pool.push(c);
@@ -2979,7 +2982,7 @@ function stopFrom(v, scored, extra, ctx) {
 }
 function compareScored(a, b) {
   // Indoor test 15: a Complete & Verified place (all confirmed by its owner) breaks a tie before rating and reviews.
-  return b.score - a.score || (b.v.completeVerified ? 1 : 0) - (a.v.completeVerified ? 1 : 0) || (b.v.rating || 0) - (a.v.rating || 0) || (b.v.reviews || 0) - (a.v.reviews || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id;
+  return b.score - a.score || (b.v.completeVerified ? 1 : 0) - (a.v.completeVerified ? 1 : 0) || (b.v.ownerSetUp ? 1 : 0) - (a.v.ownerSetUp ? 1 : 0) || (b.v.rating || 0) - (a.v.rating || 0) || (b.v.reviews || 0) - (a.v.reviews || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id;
 }
 
 // ---------- classification ----------

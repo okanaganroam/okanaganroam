@@ -479,6 +479,31 @@ const TOPICS = [
     keysFr: ['pas d heures de depart', 'pas de reservation', 'premier arrive premier servi', 'sans reservation seulement', 'les gens arrivent'],
     a: '<p>On <strong>Booking</strong>, tap <strong>Yes, walk-ons welcome</strong>. Your page says “Walk-ons welcome: no tee time needed”, and no Book button is added. Want to say it again under Your visit? In <strong>Good to know</strong>, tap <strong>Walk-ons only: no tee times</strong>.</p>',
     aFr: '<p>Dans <strong>Réservation</strong>, touchez <strong>Oui, sans réservation</strong>. Votre page indique « Départs sans réservation : pas besoin de réserver », sans bouton Réserver. Vous voulez le redire sous Votre visite? Dans <strong>Bon à savoir</strong>, touchez <strong>Sans réservation seulement : pas d’heures de départ</strong>.</p>' },
+  // Sport test 10 (2026-11-21; Lorraine, the office manager of an 18-hole club, started on the office laptop and finished on
+  // her phone): "Will I lose what I've done?" got the log-out answer, and "How do I get back in tonight on my phone?" the
+  // not-the-owner one. Picked by the fit check (FIT below), and by its own keys.
+  { id: 'resume-device', pages: ['setup', 'edit'], over: ['logout', 'setup-change-later', 'login-create', 'not-owner', 'newlink', 'signin', 'setup-status'],
+    q: 'Finish later, or on another device (like your phone)', qFr: 'Finir plus tard, ou sur un autre appareil (comme votre téléphone)',
+    keys: ['finish it on my phone', 'finish on my phone', 'finish later', 'finish it later', 'on my phone tonight', 'lose what i ve done', 'lose what ive done', 'lose my work', 'lose my answers', 'have to start again', 'start over', 'pick up where i left off', 'carry on later', 'on my phone at home', 'from my phone later'],
+    keysFr: ['finir sur mon telephone', 'finir plus tard', 'continuer plus tard', 'perdre mes reponses', 'recommencer', 'revenir plus tard', 'sur mon cellulaire'],
+    a: '<p>Nothing is lost: your answers save as you go. To carry on on your phone (or any other device), open this same link there (it’s in your email), or tap <strong>Create a login</strong> on your edit page now and sign in at Business login on your phone: you go straight back to your answers.</p>',
+    aFr: '<p>Rien n’est perdu : vos réponses s’enregistrent au fur et à mesure. Pour continuer sur votre téléphone (ou un autre appareil), ouvrez-y ce même lien (il est dans votre courriel), ou touchez <strong>Créer un compte</strong> sur votre page de modification maintenant et connectez-vous à l’Espace entreprise sur votre téléphone : vous retrouvez vos réponses tout de suite.</p>' },
+  // Sport test 10: "The golf club itself doesn't have a happy hour. Masa's Grill runs its own Friday specials." got how to
+  // fill in the deals (test 9's Gord asked the same).
+  { id: 'sport-hh-none-specials', pages: ['setup', 'edit'], over: ['hh-deals', 'hh-times', 'indoor-bar', 'sport-social-hour', 'dont-have', 'sport-restaurant', 'sport-sister-listing', 'specials', 'sport-no-bar'],
+    q: 'No happy hour, but our restaurant has its own specials', qFr: 'Pas de 5 à 7, mais notre restaurant a ses propres spéciaux',
+    keys: ['no happy hour but', 'doesnt have a happy hour', 'does not have a happy hour', 'dont have a happy hour', 'no real happy hour', 'runs its own specials', 'its own specials', 'grill specials', 'restaurant specials'],
+    keysFr: ['pas de 5 a 7 mais', 'ses propres speciaux', 'speciaux du restaurant'],
+    a: '<p>On <strong>Do you have a happy hour?</strong>, tap <strong>No</strong>: that’s right for your place, and nothing more is asked. The restaurant’s own specials? Put them in one line in <strong>Known for</strong> or <strong>Good to know</strong>, like <em>Grill: dinner specials Friday nights</em>. The restaurant has its own page here? Its specials can go there too.</p>',
+    aFr: '<p>À <strong>Avez-vous un 5 à 7?</strong>, touchez <strong>Non</strong> : c’est le bon choix pour votre endroit, et rien d’autre n’est demandé. Les spéciaux du restaurant? Mettez-les en une ligne dans <strong>Connu pour</strong> ou <strong>Bon à savoir</strong>, comme <em>Grill : spéciaux le vendredi soir</em>. Le restaurant a sa propre page ici? Ses spéciaux peuvent aussi y aller.</p>' },
+  // Sport tests 9 and 10: "How do I see what the public sees?" / "Can I see what our page looks like to a golfer?" was
+  // "I'm not sure" (or the approval answer); the edit page has the link at the top.
+  { id: 'see-page', pages: ['setup', 'edit'], over: ['privacy', 'sport-approval-first', 'setup-live-when', 'live-speed'],
+    q: 'See your page as visitors see it', qFr: 'Voir votre page comme les visiteurs la voient',
+    keys: ['what our page looks like', 'what my page looks like', 'what the page looks like', 'what the public sees', 'what visitors see', 'see our page', 'see my page', 'preview my page', 'preview our page', 'see it like a visitor'],
+    keysFr: ['voir notre page', 'voir ma page', 'a quoi ressemble notre page', 'a quoi ressemble ma page', 'ce que les visiteurs voient', 'apercu de ma page'],
+    a: '<p>Tap <strong>your page</strong> (or See your page) at the top of your edit page: it opens your public page, just as visitors see it. Your quick answers show there as soon as they’re saved; a new story, photos and links show after a quick check, usually within a day.</p>',
+    aFr: '<p>Touchez <strong>votre page</strong> (ou Voir votre fiche) en haut de votre page de modification : elle ouvre votre page publique, comme les visiteurs la voient. Vos réponses rapides y paraissent dès qu’elles sont enregistrées; une nouvelle histoire, des photos et des liens paraissent après une courte vérification, en général d’ici un jour.</p>' },
 ];
 // What owners of every kind typed for the shared answers ([en keys, fr keys, topics they now beat]).
 const MORE_KEYS = {
@@ -752,4 +777,64 @@ const NOT_IF = {
   'privacy': ['public sees', 'what visitors see', 'see what the public', 'see our page', 'see my page', 'what my page looks like'],
   'no-website-social': ['social hour', 'heure sociale', 'normale', 'longueur du parcours', 'verges', 'par 72'],
 };
-module.exports = { WORDS, word, TOPICS, MORE_KEYS, tokens, kindHelp, fill, CONCEPTS, NOT_IF };
+// Sport test 10 (2026-11-21; Lorraine: 8 of her 26 questions got a confident answer to a different question, and only one
+// "Ask us"). Does the answer fit the question? Each rule is an intent read from the question (every pattern in `all`
+// found in its normalized words, none of `not`), with the topics that answer it (`fit`), or that never do (`bad`). When
+// the answer Help picked is not one that fits (or is a bad one), Help takes the rule's `go` topic when this place has it,
+// else says "I'm not sure" with Ask us. Dayton: an honest "Ask us" beats a wrong answer. Patterns run on the matcher's
+// normalized text: lower case, no accents, $ as "dollarsign", apostrophes dropped (don't -> dont), a date as "specificdate".
+const PRICE_TOPICS = ['indoor-price', 'sport-card-price', 'sport-golf-details', 'sport-rate-lines', 'indoor-price-varies', 'sport-tax', 'sport-member-rates', 'sport-no-rate', 'sport-kids-free', 'sport-package', 'sport-per-person', 'indoor-price-two', 'sport-rate-change', 'sport-rates-next-year', 'indoor-free', 'menu-add', 'indoor-typer-first', 'sport-included', 'sport-twilight-times', 'sport-peak-dates', 'indoor-min-players', 'sport-said-twice', 'menu-import', 'sport-lessons', 'indoor-extras', 'sport-rentals', 'sport-line-ages', 'sport-adaptive', 'indoor-gift', 'indoor-cost'];
+const HOURS_TOPICS = ['hours', 'seasonal-hours', 'hours-third-stretch', 'indoor-summer-late', 'indoor-summer-daily', 'setup-split-hours', 'setup-third-time', 'sport-first-tee', 'sport-dawn-dusk', 'indoor-holiday-open', 'hours-open-holidays', 'sport-holiday-short', 'season', 'indoor-seasonal', 'sport-season', 'sport-opening-day', 'indoor-closed-months', 'year-round', 'indoor-yearly-break', 'setup-short-closure'];
+const ACCESS_TOPICS = ['staff', 'login-create', 'access', 'not-owner', 'login-privacy', 'settings', 'signin', 'resume-device'];
+const FIT = [
+  // "Will I lose what I've done if I finish on my phone?", "How do I get back in tonight on my phone?"
+  { id: 'resume', all: ['\\b(phone|cell|mobile|laptop|computer|tablet|ipad|tonight|tomorrow|at home|another device|other device|telephone|cellulaire|ordinateur|tablette|ce soir|demain|a la maison)\\b',
+    '\\b(lose|lost|start again|start over|get back in|get back into|come back to|back in|finish|pick up where|carry on|continue|resume|perdre|perdu|perdrai|recommencer|revenir|continuer|finir|terminer)\\b'],
+    not: ['\\b(lost|lose) (my|the|our) (edit )?link\\b', '\\bpassword\\b', '\\b(photo|photos|pics|pictures)\\b'],
+    fit: ['resume-device', 'setup-change-later', 'login-create', 'newlink', 'signin', 'setup-status', 'indoor-fill-all', 'sport-approval-first', 'setup-live-when', 'easy-setup', 'settings', 'forgot', 'staff'], go: ['resume-device'] },
+  // "lost the email" / "lost my link": a new link, never how to carry on.
+  { id: 'lost-link', all: ['\\b(lost|lose|cant find|can t find|deleted|deleted) (the|my|our) (email|e mail|link|edit link|private link)\\b'],
+    fit: ['newlink', 'noemail', 'login-create', 'signin', 'forgot'], go: ['newlink'] },
+  // "We also have a toll free line… Can I list both numbers?"
+  { id: 'phone2', all: ['\\b(toll free|tollfree|1 8[0-9]{2} [0-9]{3}|second (phone|number|line)|two (phone )?numbers|both (phone )?numbers|another (phone )?number|other (phone )?number|deux numeros|autre numero|numero sans frais|sans frais)\\b'],
+    fit: ['phone', 'name-address', 'google'], go: ['phone'] },
+  // "The course is closed but the golf shop is open weekdays for gift cards. Does that count as being open?"
+  { id: 'offseason-shop', all: ['\\b(winter|off season|offseason|hiver|hors saison|course is (closed|shut)|course (closed|shut)|closed for (the )?(season|year|winter)|terrain est ferme)\\b', '\\b(shop|store|office|boutique)\\b', '\\b(open|ouvert|ouverte)\\b'],
+    fit: ['sport-part-season', 'sport-season-says', 'sport-season', 'indoor-seasonal', 'season', 'sport-first-tee', 'sport-sister-listing', 'seasonal-hours', 'sport-last-booking'], go: ['sport-part-season'] },
+  // "The golf club itself doesn't have a happy hour. The grill runs its own specials."
+  { id: 'no-hh-specials', all: ['\\b(no|dont have|doesnt have|do not have|does not have|without|not have|pas de|n a pas|aucun) (a |an |any |real )?(happy hour|5 a 7|social hour)\\b', '\\b(special|specials|grill|restaurant|deal|deals|own page|its own|speciaux|menu)\\b'],
+    fit: ['sport-hh-none-specials', 'sport-no-bar', 'sport-sister-listing', 'dont-have', 'sport-restaurant'], go: ['sport-hh-none-specials'] },
+  // "A charity tournament closes the course to the public for a day; the date changes every year."
+  { id: 'event-closure', all: ['\\b(tournament|tournaments|tournoi|tournois|championship|championnat|member guest|scramble|amateur|charity|fundraiser|tourney)\\b', '\\b(close|closed|closes|closing|shut|shuts|ferme|fermer|block|bloquer|cant book|can t book|closed to the public|to the public|no public)\\b'],
+    fit: ['sport-one-off-closure', 'closures', 'setup-short-closure', 'sport-closures-yearly', 'sport-tournaments', 'setup-closures', 'setup-closure-fix', 'closures-count', 'sport-peak-dates'], go: ['sport-one-off-closure', 'closures'] },
+  // "Can our head pro get his own access without using my login?"
+  { id: 'own-access', all: ['\\b((his|her|their|my|our) own (access|login|log in|account|password|sign in)|own access|own login|own account|separate login|without (using )?my (login|password|account)|shouldnt use my login|share my (login|password)|give (him|her|them) access|propre acces|son propre (acces|compte)|sa propre connexion)\\b'],
+    fit: ACCESS_TOPICS, go: ['staff'] },
+  { id: 'can-they-log-in', all: ['\\b(can|could|may) (he|she|they|our [a-z]+( [a-z]+)?|my [a-z]+( [a-z]+)?) (also )?(log in|login|sign in|have access|get access|access)\\b'],
+    fit: ACCESS_TOPICS, go: ['staff'] },
+  // "Is there any charge to us if golfers book after finding us?"
+  { id: 'cost-to-us', all: ['\\b(any charge|charge (to )?us|charge us|charge me|do you charge|will you charge|cost us|costs us|cost (me|anything)|fee to us|fees to us|commission|take a cut|bill us|invoice us|do we (have to )?pay|will we (have to )?pay|have to pay (you|anything|for this)|pay you|pay anything|payer quelque chose|ca coute quelque chose|coute quelque chose|est ce payant|des frais pour nous)\\b'],
+    not: ['\\bhow much do (you|u) charge\\b', '\\bwhat do (you|u) charge (for|visitors|golfers|people)\\b'],
+    fit: ['cost', 'indoor-cost', 'sport-terms', 'scam', 'about', 'sport-public'], go: ['indoor-cost', 'cost'] },
+  // "Which number do you want here?" (an 18-hole rate in high season and in the shoulder season, a locals' rate)
+  { id: 'which-price', all: ['\\b(dollarsign|price|prices|rate|rates|fee|fees|tarif|tarifs|prix|dollars|bucks)\\b', '\\b(which (number|price|rate|one|fee|amount)|what (number|price|rate|amount)|what do (i|we) (put|enter|use|type)|which do (i|we)|lequel|quel (prix|tarif|montant|chiffre)|which should (i|we)|what should (i|we) (put|enter))\\b'],
+    fit: PRICE_TOPICS, go: ['indoor-price'] },
+  // A question with a price in it ($) is never answered by an hours or season answer.
+  { id: 'money-not-hours', all: ['\\bdollarsign\\b'], not: ['\\b(happy hour|5 a 7|twilight|crepuscule|after [0-9]|apres [0-9])\\b'], bad: HOURS_TOPICS },
+  // A subject the answer needs: a happy-hour answer needs a drink or happy-hour word in the question, a photo answer a
+  // photo word, a log-in answer a log-in word ("kids lessons from age 4" is not a price answer either).
+  { id: 'hh-needs-hh', all: ['.'], not: ['\\b(happy|5 a 7|cinq a sept|social|sociale|drink|drinks|deal|deals|pint|pints|beer|beers|wine|cocktail|cocktails|special|specials|apps|appies|bar|biere|bieres|vin|speciaux|alcohol|alcool|licence|license|licensed|liquor|pub|lounge|patio)\\b'],
+    bad: ['hh-deals', 'hh-times', 'hh-some-months', 'setup-happy-split', 'sport-social-hour', 'indoor-bar'] },
+  { id: 'photo-needs-photo', all: ['.'], not: ['\\b(photo|photos|pic|pics|pix|picture|pictures|image|images|foto|fotos|shot|shots|drone|photographer|photographe|camera|logo|banner|instagram|facebook|upload|uploaded|televers)'],
+    bad: ['photo-add', 'photo-small', 'photo-pending', 'photo-main', 'photo-position', 'photo-rights', 'sport-photo-consent', 'photo-order', 'photo-blurry', 'photos-when'] },
+  { id: 'consent-needs-people', all: ['\\b(photo|photos|pic|pics|picture|pictures|image|images)'], not: ['\\b(kid|kids|child|children|people|faces|face|students|customers|clients|skaters|swimmers|riders|golfers|players|guests|minors|enfants|gens|visages|eleves|consent|consentement)\\b'],
+    bad: ['sport-photo-consent'], go: ['photo-rights'] },
+  { id: 'photo-count', all: ['\\bhow many (photos|pics|pictures|images)\\b|\\bcombien de (photos|images)\\b'], fit: ['photo-add', 'photo-order', 'photo-main'], go: ['photo-add'] },
+  { id: 'age-not-price', all: ['\\b(age|ages|aged|year old|years old|yr old|yrs old|ans)\\b'], not: ['\\b(dollarsign|price|prices|rate|rates|fee|fees|cost|costs|free|tarif|tarifs|prix|gratuit|dollars|bucks|charge)\\b'],
+    bad: ['indoor-price', 'sport-card-price', 'indoor-price-varies', 'sport-golf-details'], go: ['indoor-age'] },
+  { id: 'winter-not-weather', all: ['\\b(all winter|for (the )?winter|until spring|snow melts|for the season|tout l hiver|pour l hiver|jusqu au printemps)\\b'], bad: ['sport-weather'], go: ['sport-season'] },
+  // "Can I see what our page looks like to a golfer?"
+  { id: 'see-page', all: ['\\b(see|view|look at|preview|voir) (what )?(our|my|the) (page|listing|fiche)|what (our|my|the) (page|listing) looks like|what (the public|visitors|golfers|people|customers) see|ce que (le public|les visiteurs) voi|a quoi ressemble (notre|ma) (page|fiche)\\b'],
+    fit: ['see-page', 'setup-live-when', 'live-speed', 'photos-when', 'photo-pending', 'changes-review', 'indoor-french', 'french', 'sport-season-says', 'shows-closed'], go: ['see-page'] },
+];
+module.exports = { WORDS, word, TOPICS, MORE_KEYS, tokens, kindHelp, fill, CONCEPTS, NOT_IF, FIT };

@@ -1705,9 +1705,11 @@
         var small = T.quick.good_to_know_kinds.golfsmall;
         if ((gBook === 'no' || C.golfSmall) && small && small.length) {
           l = small.slice();
-          if (gBook && gBook !== 'no') { l = l.filter(function(c){ return !/^(?:Walk-ons only|Sans réservation seulement)/i.test(c) || saysIt(value, c, l); }); var tt = (lk || [])[0]; if (tt && l.indexOf(tt) < 0) l.unshift(tt); }
+          if (gBook && gBook !== 'no') { l = l.filter(function(c){ return !/^(?:Walk-ons only|Sans réservation seulement)/i.test(c) || saysIt(value, c, l); }); var tt = (lk || [])[0]; if (tt && l.indexOf(tt) < 0 && gBook !== 'ahead') l.unshift(tt); }
         }
-        if (gBook === 'no') l = l.filter(function(c){ return !/^(?:Tee times recommended|Heures de départ conseillées)$/i.test(c) || saysIt(value, c, l); });
+        // Sport test 10 (2026-11-21; Lorraine): nor after "No, please book a tee time" (her Booking line already says to book
+        // ahead; "recommended" said the opposite).
+        if (gBook === 'no' || gBook === 'ahead') l = l.filter(function(c){ return !/^(?:Tee times recommended|Heures de départ conseillées)$/i.test(c) || saysIt(value, c, l); });
       }
       // Indoor test 7 (2026-11-19): "Free on the first Sunday" makes no sense when entry is always free.
       // Indoor test 17: the waiver chip says her kind's verb ("Waiver to sign before you climb").
@@ -2620,7 +2622,7 @@
       x = q(T.closeAddQ, T.closeAddLead) + msgs() + field('suCf', T.firstDay, S.addFrom || nextMonth(), { type: 'date' })
         + '<p class="su-q">' + h(T.howLong) + '</p><div class="su-chips">' + [['1', T.len1], ['7', T.len7], ['14', T.len14], ['pick', T.lenPick]].map(function(o){ return '<button type="button" class="su-chip" aria-pressed="' + (S.addLen === o[0] ? 'true' : 'false') + '" data-len="' + o[0] + '">' + h(o[1]) + '</button>'; }).join('') + '</div>'
         + (S.addLen === 'pick' ? field('suCt', T.lastDay, S.addTo || '', { type: 'date' }) : '<p class="su-sent su-cends" id="suCends" aria-live="polite">' + h(closeEnds(S.addFrom || nextMonth())) + '</p>')
-        + field('suCn', T.why, S.addNote || '', { max: 60 }) + ex(T.whyEx)
+        + field('suCn', T.why, S.addNote || '', { max: 120, data: 'aria-describedby="suCnC"' }) + '<p class="su-count' + (60 - String(S.addNote || '').trim().length < 0 ? ' su-over' : '') + '" id="suCnC" aria-live="polite">' + h(leftText(60 - String(S.addNote || '').trim().length)) + '</p>' + ex(T.whyEx)
         // Café test 1 (2026-11-11): "Every year" for her own dates, like the holidays' "This year and next".
         + '<label class="su-tick" style="margin:12px 0 0"><input type="checkbox" id="suCyear"' + (S.addYearly ? ' checked' : '') + '><span>' + h(T.closeYearly) + '</span></label><p class="su-example">' + h(T.closeYearlySub) + '</p>'
         + (S.closeInside && T.closeInsideKeep ? '<div class="su-stack" id="suCloseInside">' + big('✓', T.closeInsideKeep, '', false, 'closureKeep') + big('✎', T.closeInsideFix, '', true, 'closureFix') + '</div>'
@@ -4340,7 +4342,10 @@
       var to = cf;
       if (S.addLen === 'pick') to = S.addTo && S.addTo >= cf ? S.addTo : cf;
       else { var d0 = new Date(cf + 'T12:00:00'); d0.setDate(d0.getDate() + (+S.addLen - 1)); to = ymd(d0); }
-      var cnote = cn.replace(/[()&<>]/g, '').slice(0, 60), cy = el('suCyear'); S.addYearly = !!(cy && cy.checked);
+      // Sport test 10 (2026-11-21; Lorraine): "Why?" was cut at 60 characters with no word ("…Golf Club Charit"). It shows
+      // what's left as she types, and a longer one is a nudge to shorten it, never a cut.
+      var cnote = cn.replace(/[()&<>]/g, '').replace(/\s+/g, ' ').trim(), cy = el('suCyear'); S.addYearly = !!(cy && cy.checked);
+      if (cnote.length > 60) { S.nudge = fill(T.whyLong || T.charsOver, { n: cnote.length - 60, max: 60 }); S.badField = 'suCn'; return render(); }
       // Café test 2 (2026-11-11): "Every year" is one yearly rule ({ from: 'MM-DD', to: 'MM-DD', yearly: true }, "Every year:
       // Apr 1 – Apr 24"), not a dated copy for this year and next. Up to a year long, like any closure.
       // Tour test 8 (Whistler, 2026-11-17; Linda): a mistyped "Every year: Jan 4 – Jun 14" closed most of her Dec 10 – Sep 15
@@ -4355,6 +4360,11 @@
         if (!S.extra.some(function(c){ return c.yearly && c.from === yr.from && c.to === yr.to; })) S.extra.push(yr); S.added = closureLabel(yr); }
       else { S.extra.push({ from: cf, to: to, note: cnote }); S.added = dateLabel(cf) + (to !== cf ? ' – ' + dateLabel(to) : ''); }
       S.addFrom = ''; S.addTo = ''; S.addNote = ''; S.addLen = '1'; S.addYearly = false;
+      // Sport test 10: the next closure starts with an empty "Why?". The box was kept as an unsaved draft of this screen and
+      // came back (her shorter retype went nowhere, and "First note AAA" + "Second note BBB" were saved as one note).
+      ['suCn', 'suCf', 'suCt'].forEach(function(id){ var b0 = el(id); if (b0) { b0.value = ''; b0.defaultValue = ''; } });
+      var dcl = drGet('closures'); if (dcl && dcl.boxes && dcl.boxes['closures:add']) { delete dcl.boxes['closures:add']; drPut('closures', dcl); }
+      if (DR.at && DR.at.step === 'closures:add') DR.at = {};
       S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render();
     }
     if (k === 'spend') { S.spend = Math.round(Math.max(C.cafe ? 2 : 5, Math.min(300, S.spend + (+v))) * 4) / 4; if (!C.cafe) S.spend = Math.round(S.spend); return render(); }
@@ -5064,6 +5074,7 @@
     var cfIn = el('suCf'); if (cfIn) cfIn.oninput = cfIn.onchange = function(){ S.addFrom = cfIn.value; var ce = el('suCends'); if (ce) ce.textContent = closeEnds(cfIn.value); };
     var cyIn = el('suCyear'); if (cyIn) cyIn.onchange = function(){ S.addYearly = cyIn.checked; };
     Array.prototype.forEach.call(screen.querySelectorAll('[data-len]'), function(b){ b.onclick = function(){ S.addFrom = el('suCf').value; S.addNote = el('suCn').value; var ct = el('suCt'); if (ct) S.addTo = ct.value; S.addLen = b.getAttribute('data-len'); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+    var cnBox = el('suCn'); if (cnBox) cnBox.addEventListener('input', function(){ var c = el('suCnC'), left = 60 - cnBox.value.trim().length; if (c) { c.textContent = leftText(left); c.className = 'su-count' + (left < 0 ? ' su-over' : ''); } });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-xdel]'), function(b){ b.onclick = function(){ S.extra.splice(+b.getAttribute('data-xdel'), 1); S.added = ''; render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-cui]'), function(b){ b.onclick = function(){
       var c = b.getAttribute('data-cui'), i = S.cuis.indexOf(c);

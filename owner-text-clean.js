@@ -88,19 +88,20 @@ function placeCoreName(name) {
   if (!n || n.length < 4 || !/^[A-Z]/.test(n)) return null;
   return n;
 }
-// The names a site knows, from its own data: { phrases: ['Joffre Lakes', ...], words: ['Joffre', 'Squamish', ...] }.
-// `places`: outdoor place names; `towns`: town names; `lowerSeen(word)`: true when the site's own text uses the word in
-// lower case (then it is an ordinary word, like "green").
+// The names a site knows, from its own data: { phrases: ['Joffre Lakes', ...], words: ['Squamish', 'BC', ...] }.
+// `places`: outdoor place names; `towns`: town names. (`lowerSeen` is kept for callers; since sport test 10 no single word
+// is taken from a longer name, so nothing needs it.)
 function buildKnownNames(places, towns, lowerSeen = () => false) {
   const phrases = new Set(), words = new Set(['BC']);
-  for (const t of towns || []) { const s = String(t || '').trim(); if (!s) continue; if (/\s/.test(s)) phrases.add(s); else words.add(s); for (const w of s.split(/\s+/)) if (w.length >= 5 && !PLACE_COMMON_WORDS.has(w.toLowerCase())) words.add(w); }
+  // Sport test 10 (2026-11-21; Lorraine's "no tank tops or gym shorts" was saved as "gym Shorts", from the trail "Shorts
+  // Creek Canyon"): a name of several words gets its capitals only when the whole name is typed. No single word of it is a
+  // known name on its own ("shorts", "country" in Lake Country, "harvest", "summit"); a one-word town still is.
+  for (const t of towns || []) { const s = String(t || '').trim(); if (!s) continue; if (/\s/.test(s)) phrases.add(s); else words.add(s); }
   for (const p of places || []) {
     const c = placeCoreName(p);
     if (!c) continue;
     const ws = c.split(/\s+/);
     if (ws.length >= 2 && ws.length <= 4 && ws.every((w) => /^[A-Z0-9]/.test(w) || /^(?:of|to|the|and)$/.test(w))) phrases.add(c);
-    const first = ws[0];
-    if (ws.length >= 2 && first.length >= 5 && /^[A-Z][a-z]+$/.test(first) && !PLACE_COMMON_WORDS.has(first.toLowerCase()) && !lowerSeen(first.toLowerCase())) words.add(first);
   }
   return { phrases: [...phrases].sort((a, b) => b.length - a.length), words: [...words] };
 }

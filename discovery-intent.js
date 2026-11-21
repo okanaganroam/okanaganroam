@@ -596,7 +596,9 @@ const WHEN_ALIASES = {
 const DAYPART_ALIASES = {
   morning: ['morning', 'in the morning'],
   afternoon: ['afternoon', 'in the afternoon'],
-  evening: ['evening', 'in the evening', 'night'],
+  // Sport test 10 (2026-11-21; "golf after work kelowna" looked for the word "work"): after work is an evening time, as the
+  // planner reads it.
+  evening: ['evening', 'in the evening', 'night', 'after work', 'right after work', 'straight after work', 'after my shift', 'apres le travail', 'apres le boulot'],
 };
 const WHEN_PHRASE_DAYPART = { 'this morning': 'morning', 'this afternoon': 'afternoon', tonight: 'evening', 'this evening': 'evening' };
 // Which of those resolve onto an existing What's On preset (the rest are

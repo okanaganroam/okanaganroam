@@ -17,7 +17,10 @@ for (const s of ['', '-wal', '-shm', '-journal']) { try { fs.unlinkSync(DB_FILE 
 process.env.ENRICHMENT_ADMIN_TOKEN = 'help-heldout-admin-token';
 delete process.env.BREVO_API_KEY;
 const app = require('../server.js');
-const { SRC, Q, KNOWN_MISS } = require('./help-heldout-questions.js');
+const H0 = require('./help-heldout-questions.js');
+// Sport tests 8-10 (2026-11-21): Marg's, Gord's and Lorraine's real questions join the set.
+const S89 = require('./help-sport89-questions.js'), S10 = require('./help-sport10-questions.js');
+const SRC = { ...H0.SRC, ...S89.SRC, ...S10.SRC }, Q = [...H0.Q, ...S89.Q, ...S10.Q], KNOWN_MISS = H0.KNOWN_MISS;
 app.setVenueSubmissionTransport(async () => {});
 
 let srv, base;
@@ -40,8 +43,8 @@ async function botsFor(src, n) {
   const v = app.createVenue({ name: `Heldout ${src}`, slug: `heldout-${src}`, region: 'kelowna', type: c.type, latitude: 49.88 + n / 1000, longitude: -119.49, address: `${n} Water St, Kelowna`, website: `https://example-${n}.com`, hours: JSON.stringify(WK), description: 'A fixture.' });
   const t = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
   const post = (changes) => fetch(`${base}/owner/${t}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.66.${n}.1` }, body: JSON.stringify({ changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) });
-  if (c.season) assert.ok([200, 201].includes((await post({ hours: WK, open_months: SEA[c.season] })).status), `${src} season`);
-  const info = { kinds: c.kinds, length: '1-2h', book: c.book, age: c.age || 'all', year: c.season || c.year === 'seasonal' ? 'seasonal' : 'all' };
+  if (c.season) assert.ok([200, 201].includes((await post({ hours: WK, open_months: SEA[c.season] || c.season })).status), `${src} season`);
+  const info = { kinds: c.kinds, length: c.length || '1-2h', book: c.book, age: c.age || 'all', year: c.season || c.year === 'seasonal' ? 'seasonal' : 'all' };
   const r = await post({ indoor_info: info, indoor_price: c.free || c.price });
   assert.ok([200, 201].includes(r.status), `${src} setup`);
   const out = {};

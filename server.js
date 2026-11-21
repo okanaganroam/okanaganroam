@@ -7225,16 +7225,22 @@ function searchSportOrder(sq, run, venues, pinnedIds) {
   const price = (v) => { const e = CARD_PRICES[String(v.id)]; const n = e && Number(e.from); return Number.isFinite(n) && n > 0 ? n : Infinity; };
   const done = (v) => ((venueIndoorInfo(v.id).kinds || []).length && v.hours_source === 'venue_owner' ? 0 : 1);
   const town = (v) => (asked && !asked.includes(v.region) ? 1 : 0);
+  // Sport test 10 (2026-11-21; "walk on golf kelowna" listed Lorraine's course 6th, though she answered "No, please book a
+  // tee time"): a walk-on search puts a course whose owner asks people to book ahead last, with a note saying so.
+  const walkOn = /\b(?:walk ?ons?|walk up|drop in|no tee times?|without (?:a )?tee times?|sans reservation)\b/.test(fq);
+  const bookAhead = (v) => (walkOn && v.type === 'golf' && venueIndoorInfo(v.id).book === 'ahead' ? 1 : 0);
+  const notes = new Map();
   const out = venues.slice();
   let priced = false;
   for (const slots of groups) {
     const list = slots.map((i) => venues[i]);
     if (list.some((v) => price(v) < Infinity)) priced = true;
-    const keyed = list.map((v, i) => ({ v, i, k: [kindRank(v), factRank(v), cheap ? price(v) : 0, town(v), done(v)] }));
+    const keyed = list.map((v, i) => ({ v, i, k: [bookAhead(v), kindRank(v), factRank(v), cheap ? price(v) : 0, town(v), done(v)] }));
     keyed.sort((a, b) => { for (let j = 0; j < a.k.length; j++) if (a.k[j] !== b.k[j]) return a.k[j] - b.k[j]; return a.i - b.i; });
     slots.forEach((slot, j) => { out[slot] = keyed[j].v; });
   }
-  return { venues: out, priceSorted: cheap && priced };
+  for (const v of out) if (sportish(v) && bookAhead(v)) notes.set(v.id, ['Please book a tee time ahead.', 'Réservez votre départ à l’avance.']);
+  return { venues: out, priceSorted: cheap && priced, notes };
 }
 function searchPageModel(run, now = new Date(), lang = 'en') {
   // French gaps (2026-10-18): q is what the visitor typed (shown on the page); sq is the text the request was read
@@ -7301,6 +7307,7 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
   if (!(plan && plan.list) && run.results.kind !== 'events' && venues.length > 1) {
     const o = searchSportOrder(sq, run, venues, pinnedIds);
     venues = o.venues; priceSorted = o.priceSorted;
+    for (const [id, nt] of o.notes || []) why.set(id, lang === 'fr' ? nt[1] : nt[0]);
   }
   // What's On events for the words ("cider fest") or the plan's own (free events), soonest best match first.
   const found = plan && plan.events ? plan.events() : run.results.kind === 'events' ? { total: 0, items: [] } : (run.textEvents || searchTextEvents(run.intent, now));
@@ -7829,6 +7836,8 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       rating: v.rating == null ? null : Number(v.rating), reviews: v.reviews == null ? 0 : Number(v.reviews),
       price: v.price == null ? null : Number(v.price), address: v.address || null,
       ...(cvIds.has(v.id) ? { completeVerified: true } : {}),
+      // Sport test 10: a sport or golf place its owner has set up (kinds and own hours) is picked before one nobody has.
+      ...((v.type === 'golf' || v.type === 'sport') && ownerSetUpRank(v) === 0 ? { ownerSetUp: true } : {}),
       lat: v.latitude == null ? null : Number(v.latitude), lng: v.longitude == null ? null : Number(v.longitude),
       // Sport test 4 (2026-11-20; Ryan's "Golf course & driving range" read as a range, a disc golf course with a skate park
       // as its second kind as a skate park): the planner reads a sport or golf listing's category words from its owner's
@@ -11575,6 +11584,16 @@ function seasonOnlyStates(now = new Date()) {
 // after those (receivership, "the tasting room is closed", "Temporarily closed", "Closed for wildfire recovery"). It
 // stays listed and visible, just last. Same rule as trip-planner.js ADVISORY_NOT_OPERATING_RE, which also keeps these
 // places out of trip plans; a partial closure or a season note is not this.
+// Sport test 10 (2026-11-21): 0 for a sport or golf place its owner has set up (the kinds they picked and their own hours),
+// else 1. Search (round 8), the golf and sports hubs and Build My Trip put these first.
+// (A hub's list rows may not carry hours_source: then it is read from the listing.)
+function ownerSetUpRank(v) {
+  try {
+    if (!v || !(venueIndoorInfo(v.id).kinds || []).length) return 1;
+    const src = v.hours_source !== undefined ? v.hours_source : (db.prepare('SELECT hours_source FROM venues WHERE id = ?').get(v.id) || {}).hours_source;
+    return src === 'venue_owner' ? 0 : 1;
+  } catch (e) { return 1; }
+}
 function seasonClosedLast(list, now = new Date(), states = null) {
   const seasons = states || getSeasonStates(now);
   const notOperating = advisoryNotOperatingIds();
@@ -36812,7 +36831,8 @@ function renderSportsHubPage(sportVenues, alsoVenues, notes, filter = null) {
   const actsById = new Map(all.map((v) => [v.id, sportActivitiesOf(v, notes)]));
   const scale = new Map(all.map((v) => [v.id, sportScaleScore(v, notes.get(v.id))]));
   const byName = (a, b) => String(a.name).localeCompare(String(b.name), 'en', { sensitivity: 'base' });
-  const recommended = all.slice().sort((a, b) => scale.get(b.id) - scale.get(a.id) || byName(a, b));
+  // Sport test 10: a place its owner has set up first (within open / closed for the season), as on the golf hub.
+  const recommended = all.slice().sort((a, b) => ownerSetUpRank(a) - ownerSetUpRank(b) || scale.get(b.id) - scale.get(a.id) || byName(a, b));
   // Seasons everywhere (2026-10-18): places closed for the season last.
   recommended.splice(0, recommended.length, ...seasonClosedLast(recommended));
   const recommendedRank = new Map(recommended.map((v, i) => [v.id, i]));
@@ -37664,8 +37684,12 @@ function renderGolfHubLayoutPage(oldHtml, venues, query, scope = {}) {
   const kindOf = (v) => { const mk = ownMain(v); if (mk === 'golf') return 'courses'; if (mk === 'range') return 'practice'; if (mk === 'simgolf') return 'simulators'; return isIndoorGolfVenue(v) ? 'simulators' : isPractice(v) ? 'practice' : 'courses'; };
   const byName = (a, b) => String(a.name).localeCompare(String(b.name));
   const group = (k) => venues.filter((v) => kindOf(v) === k);
-  const courses = seasonClosedLast(group('courses').sort((a, b) => foodDrinkRecommendedScore(b) - foodDrinkRecommendedScore(a) || byName(a, b)));
-  const ordered = [...courses, ...seasonClosedLast(group('practice')), ...group('simulators')];
+  // Sport test 10 (2026-11-21; Lorraine's Harvest was 9th on /kelowna/golf, behind 8 listings nobody has set up): within
+  // the open and closed-for-season groups, a place its owner has set up (its kinds and its own hours) comes first, as in
+  // search. Only the order changes.
+  const courses = seasonClosedLast(group('courses').sort((a, b) => ownerSetUpRank(a) - ownerSetUpRank(b) || foodDrinkRecommendedScore(b) - foodDrinkRecommendedScore(a) || byName(a, b)));
+  const ownFirst = (list) => list.map((v, i) => [v, i]).sort((x, y) => ownerSetUpRank(x[0]) - ownerSetUpRank(y[0]) || x[1] - y[1]).map((x) => x[0]);
+  const ordered = [...courses, ...seasonClosedLast(ownFirst(group('practice'))), ...ownFirst(group('simulators'))];
   const rankOf = new Map(ordered.map((v, i) => [v.id, i + 1]));
   const cents = (v) => (golfData ? golfData.comparisonCents(details.get(keyOf(v)), today) : null);
   const kinds = GOLF_HUB_KINDS.filter((k) => ordered.some((v) => kindOf(v) === k.type));
@@ -37697,7 +37721,7 @@ function renderGolfHubLayoutPage(oldHtml, venues, query, scope = {}) {
     search: { label: 'Search golf courses', placeholder: 'Search by course name or town...' },
     allLabel: '✨ All golf',
     cardOptsExtra: { priceAllowed: () => false },
-    sortHelp: { summary: 'How sorting works', text: 'Recommended lists golf courses first, best-rated with the most reviews at the top and courses closed for the season after the open ones, then driving ranges, then indoor golf. Price sorting uses each course’s standard adult green fee for its standard round, at prime time in peak season, as published by the course. Places with no published fee come last.' },
+    sortHelp: { summary: 'How sorting works', text: 'Recommended lists golf courses first, those set up by their own staff at the top, then best-rated with the most reviews, and courses closed for the season after the open ones, then driving ranges, then indoor golf. Price sorting uses each course’s standard adult green fee for its standard round, at prime time in peak season, as published by the course. Places with no published fee come last.' },
   }, ordered, filter);
   return subPageInHubLayout(hub, oldHtml, pagePath, pagePath, {});
 }
@@ -54121,7 +54145,7 @@ function ownerKnownNames() {
       for (const m of String(r.description).matchAll(/[a-z]\s+([a-z]{5,})\b/g)) lower.add(m[1]);
     }
   } catch (e) { places = []; }
-  ownerKnownNamesCache = ownerTextCleanLib.buildKnownNames(places, Object.values(REGION_LABELS), (w) => lower.has(w));
+  ownerKnownNamesCache = ownerTextCleanLib.buildKnownNames(places, [...Object.values(REGION_LABELS), "Okanagan"], (w) => lower.has(w));
   ownerKnownNamesAt = Date.now();
   return ownerKnownNamesCache;
 }
@@ -55813,6 +55837,11 @@ function ownerNanpPhone(raw) {
   return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}${m && m[2] ? ` ext. ${m[2]}` : ''}`;
 }
 const OWNER_SETUP_PHONE_ERROR = 'Please enter a 10-digit phone number with the area code, like 250-555-0123.';
+// Sport test 10 (2026-11-21; Lorraine typed "250-862-3103, toll free 1-800-257-8577"): two numbers get a message that says
+// where the second one goes (one phone box; no second phone field). Places whose setup has Good to know say that box.
+const OWNER_SETUP_PHONE_TWO_ERROR = 'One phone number fits here, like 250-555-0123. A second one (toll-free, the restaurant) can go in Good to know.';
+const OWNER_SETUP_PHONE_TWO_ERROR_STORY = 'One phone number fits here, like 250-555-0123. A second one (toll-free, another line) can go in your story.';
+function ownerTwoPhones(raw) { return (String(raw || '').match(/(?:\+?1[\s.-]*)?\(?\d{3}\)?[\s.-]*\d{3}[\s.-]*\d{4}/g) || []).length >= 2; }
 // Winery test 4 (2026-11-12): a winery with every day closed is pointed to the one "no set hours" choice.
 const OWNER_WINERY_NO_DAY_ERROR = 'Hours: add at least one open day. No set hours? Tap “We don’t have set hours. Visits are by appointment”.';
 function validateOwnerChanges(venue, happyHourTimes, body) {
@@ -55845,7 +55874,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     // From the easy setup: a real North American number, written 250-555-0123 (it goes live straight away). The same
     // number typed another way is not a change.
     const phone = ownerNanpPhone(input.phone);
-    if (!phone) errors.phone = OWNER_SETUP_PHONE_ERROR;
+    if (!phone) errors.phone = ownerTwoPhones(input.phone) ? (['golf', 'sport', 'indoor', 'tour'].includes(venue && venue.type) ? OWNER_SETUP_PHONE_TWO_ERROR : OWNER_SETUP_PHONE_TWO_ERROR_STORY) : OWNER_SETUP_PHONE_ERROR;
     else if (phone !== current.phone && (ownerNanpPhone(current.phone || '') || '') !== phone) changes.phone = phone;
   } else if ('phone' in input) {
     const phone = typeof input.phone === 'string' ? input.phone.trim().replace(/\s+/g, ' ') : '';
@@ -63887,8 +63916,8 @@ const SPORT_TEST1_HELP_TOPICS = [
     q: 'Our restaurant, café or patio (open to everyone?)', qFr: 'Notre restaurant, café ou terrasse (ouvert à tous?)',
     keys: ['restaurant', 'our restaurant', 'the restaurant', 'clubhouse restaurant', 'restaurant and patio', 'restaurant is open', 'open to the public', 'open to everyone', 'not just golfers', 'non golfers', 'non-golfers', 'separate page', 'separate page for the restaurant', 'a separate page', 'separate listing', 'its own page', 'own listing', 'restaurant page', 'bistro', 'grill', 'cafe', 'cafe on site', 'restaurant on site', 'concession', 'canteen', 'snack bar', 'breakfast deal', 'kitchen', 'our kitchen', 'serves food', 'serve food', 'food all day', 'cafeteria', 'day lodge', 'food court'],
     keysFr: ['cafeteria', 'cantine', 'restaurant', 'notre restaurant', 'restaurant du club house', 'ouvert au public', 'ouverts au public', 'ouverts a tous', 'non golfeurs', 'page separee', 'page a part', 'une page pour le restaurant', 'fiche separee', 'casse croute'],
-    a: '<p>One page is enough. Say it in one line in <strong>Good to know</strong>, like <em>{PUBLIC_EX}</em>, and in your story: search and Build My Trip read both.{HH_EN} Your restaurant runs on its own, with its own name, hours and menu? Tap <strong>Message us</strong> and Dayton will look at giving it its own page.</p>',
-    aFr: '<p>Une seule page suffit. Dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>{PUBLIC_EX}</em>, et dans votre histoire : la recherche et Planifier mon voyage lisent les deux.{HH_FR} Votre restaurant fonctionne à part, avec son propre nom, ses heures et son menu? Touchez <strong>Écrivez-nous</strong> et Dayton verra à lui donner sa propre page.</p>' },
+    a: '<p>One page is enough. Say it in one line in <strong>Good to know</strong>, like <em>{PUBLIC_EX}</em>, and in your story: search and Build My Trip read both.{HH_EN} Your restaurant runs on its own, with its own name, hours and menu? It may already have its own page here (search for its name): then leave it off this one. No page yet? Tap <strong>Message us</strong> and Dayton will look at giving it one.</p>',
+    aFr: '<p>Une seule page suffit. Dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>{PUBLIC_EX}</em>, et dans votre histoire : la recherche et Planifier mon voyage lisent les deux.{HH_FR} Votre restaurant fonctionne à part, avec son propre nom, ses heures et son menu? Il a peut-être déjà sa propre page ici (cherchez son nom) : alors laissez-le hors de celle-ci. Pas encore de page? Touchez <strong>Écrivez-nous</strong> et Dayton verra à lui en donner une.</p>' },
   { id: 'sport-dress-code', kinds: ['golf', 'simgolf', 'range'], pages: ['setup', 'edit'], over: ['indoor-good-to-know', 'features'],
     q: 'Our dress code', qFr: 'Notre code vestimentaire',
     keys: ['dress code', 'our dress code', 'dress code is relaxed', 'relaxed dress code', 'collared', 'collared shirt', 'collared shirts', 'chip says collared shirts', 'collars', 'no collars', 'collars not needed', 'no collars needed', 'attire', 'golf attire', 'proper golf attire', 'soft spikes', 'golf shoes', 'jeans', 'denim', 'what to wear'],
@@ -67742,7 +67771,31 @@ const OWNER_HELP_SCRIPT = String.raw`
   function stemOf(w){ return w.length > 4 ? w.replace(/(?:ing|ed|es|s)$/, '').replace(/e$/, '') : w; }
   function sameWord(a, b){ return a === b || (a.length > 3 && b.length > 3 && stemOf(a) === stemOf(b)); }
   function keyIn(kt, qt){ return kt.every(function(w){ return qt.some(function(x){ return sameWord(x, w); }); }); }
+  // Sport test 10 (2026-11-21; Lorraine: 8 of 26 confident answers were to a different question): does the answer fit the
+  // question? cfg.fit (sport-help.js FIT, sport and golf places): intents read from the question, each with the topics that
+  // answer it (fit) or never do (bad). An answer that fits none of the question's intents is swapped for the intent's own
+  // topic (go) when this place has it, else it becomes "I'm not sure" with Ask us. An unsure question with a clear intent
+  // gets that intent's topic.
+  var FITRE = (cfg.fit || []).map(function(r){ var mk = function(a){ return (a || []).map(function(x){ return new RegExp(x); }); }; return { r: r, all: mk(r.all), not: mk(r.not) }; });
   function best(q){
+    var r = best0(q);
+    if (!FITRE.length) return r;
+    var qs = ' ' + toks(q).join(' ') + ' ';
+    var M = FITRE.filter(function(f){ return f.all.every(function(x){ return x.test(qs); }) && !f.not.some(function(x){ return x.test(qs); }); }).map(function(f){ return f.r; });
+    if (!M.length) return r;
+    var fitRules = M.filter(function(f){ return f.fit; });
+    var fits = !!r.id && fitRules.some(function(f){ return f.fit.indexOf(r.id) >= 0; });
+    var bad = !!r.id && M.some(function(f){ return f.bad && f.bad.indexOf(r.id) >= 0; });
+    if (r.id && !bad && (fits || !fitRules.length)) return r;
+    if (!r.id && !fitRules.length) return r;
+    var go = null, goFrom = fitRules.length ? fitRules : M.filter(function(f){ return f.bad && f.bad.indexOf(r.id) >= 0; });
+    for (var i = 0; i < goFrom.length && !go; i++) (goFrom[i].go || []).forEach(function(g){ if (!go && byIdM[g] && g !== r.id) go = g; });
+    var lead = go ? [go] : [];
+    if (!go) fitRules.forEach(function(f){ f.fit.forEach(function(x){ if (byIdM[x] && lead.indexOf(x) < 0 && lead.length < 2) lead.push(x); }); });
+    var hits = lead.concat(r.hits.filter(function(x){ return lead.indexOf(x) < 0 && !(fitRules.length && fitRules.every(function(f){ return f.fit.indexOf(x) < 0; }) && x === r.id); }));
+    return { id: go, hits: hits, lang: r.lang, why: (r.why || []).concat([{ fit: M.map(function(f){ return f.id; }), was: r.id }]) };
+  }
+  function best0(q){
     var qt = toks(q), sums = T.map(function(){ return 0; }), side = T.map(function(){ return 0; }), exact = T.map(function(){ return false; }), qFr = langOf(q) === 'fr';
     // Sport test 6 (2026-11-20; Priya: "how do i add the holiday skates dec 26 to jan 3" got Special closures, which would
     // have closed her on her busiest days): a topic with needs (word starts) is only in play when the question has one of
@@ -68088,7 +68141,14 @@ function ownerHelpWidgetHtml(page, opts = {}) {
   // Tours (2026-11-16): no happy hour at all, so its topics aren't there to be found either.
   if (opts.dropHappyHour) cfg.topics = cfg.topics.filter((t) => !HELP_HAPPY_RE.test(`${t.q} ${t.qFr}`));
   // Sport test 7: a sport or golf place's topics carry their concept groups (sport-help.js CONCEPTS; the matcher's allOfAny).
-  try { const pv0 = opts.venueId ? getVenue(opts.venueId) : null; if (pv0 && sportSetupType(pv0.type)) { const C0 = sport5HelpModule.CONCEPTS || {}; cfg.cover = true; cfg.coverAdd = 0.5; const N0 = sport5HelpModule.NOT_IF || {}; cfg.topics = cfg.topics.map((t) => (C0[t.id] ? { ...t, allOfAny: (t.allOfAny || []).concat(C0[t.id]) } : t)).map((t) => (N0[t.id] ? { ...t, notIf: (t.notIf || []).concat(N0[t.id]) } : t));
+  try { const pv0 = opts.venueId ? getVenue(opts.venueId) : null; if (pv0 && sportSetupType(pv0.type)) { const C0 = sport5HelpModule.CONCEPTS || {}; cfg.cover = true; cfg.coverAdd = 0.5; cfg.fit = sport5HelpModule.FIT || [];
+    // Sport test 10 (2026-11-21; Lorraine: "a toll free line… Can I list both numbers?"): one phone number fits the box;
+    // the second goes in Good to know (no second phone field).
+    cfg.topics = cfg.topics.map((t) => (t.id === 'phone' ? { ...t, a: `${t.a}<p>Two numbers, like a toll-free line or the restaurant? One fits the phone box: put the main one there and the other in one line in <strong>Good to know</strong>, like <em>Toll-free 1-800-555-0123</em>. Postal code missing? Add it at the end of the address.</p>`, aFr: t.aFr + frSpacingHtml(`<p>Deux numéros, comme une ligne sans frais ou le restaurant? Un seul entre dans la case du téléphone : mettez-y le principal, et l’autre en une ligne dans <strong>Bon à savoir</strong>, comme <em>Sans frais 1-800-555-0123</em>. Le code postal manque? Ajoutez-le à la fin de l’adresse.</p>`) } : t));
+    // Sport test 10: a shop open in the off-season doesn't make the course open; and which rate goes on Price when a course
+    // has several (high season, shoulder, residents).
+    if (pv0.type === 'golf') cfg.topics = cfg.topics.map((t) => (t.id === 'sport-part-season' ? { ...t, a: `${t.a}<p>The shop open in the off-season, for gift cards? That doesn’t count as open: visitors plan by your season, so your page still says Closed for the season. Add one line in <strong>Good to know</strong>, like <em>Golf shop open weekdays 9 to 5 in winter</em>.</p>`, aFr: t.aFr + frSpacingHtml(`<p>La boutique ouverte hors saison, pour les cartes-cadeaux? Ça ne compte pas comme ouvert : les visiteurs se fient à votre saison, donc votre page indique toujours Fermé pour la saison. Ajoutez une ligne dans <strong>Bon à savoir</strong>, comme <em>Boutique de golf ouverte en semaine de 9 h à 17 h l’hiver</em>.</p>`) }
+      : t.id === 'indoor-price' ? { ...t, a: `${t.a}<p>Several rates (high season, shoulder season, residents)? Price is your regular adult rate: the lowest green fee any visitor can book. High-season, resident, twilight and other rates go in <strong>Your prices</strong>, one line each.</p>`, aFr: t.aFr + frSpacingHtml(`<p>Plusieurs tarifs (haute saison, intersaison, résidents)? Le prix est votre tarif adulte régulier : le droit de jeu le plus bas que tout visiteur peut réserver. Les tarifs de haute saison, des résidents, du crépuscule et les autres vont dans <strong>Vos tarifs</strong>, une ligne chacun.</p>`) } : t)); const N0 = sport5HelpModule.NOT_IF || {}; cfg.topics = cfg.topics.map((t) => (C0[t.id] ? { ...t, allOfAny: (t.allOfAny || []).concat(C0[t.id]) } : t)).map((t) => (N0[t.id] ? { ...t, notIf: (t.notIf || []).concat(N0[t.id]) } : t));
     // Sport test 8 (2026-11-21): a walk-on or 9-hole course's answers name its own Good to know chips, never "Tee times
     // recommended" (the chip it isn't offered).
     if (pv0.type === 'golf') { const bk = venueIndoorInfo(pv0.id).book || '';
@@ -68386,6 +68446,8 @@ const OWNER_PORTAL_MESSAGES_FR = {
   [OWNER_NOTHING_NEW_WAITING]: 'Vos modifications précédentes sont déjà en attente de révision. Il n’y a rien de nouveau à envoyer.',
   'Please enter a phone number, like 250-555-0123.': 'Entrez un numéro de téléphone, comme 250-555-0123.',
   [OWNER_SETUP_PHONE_ERROR]: 'Entrez un numéro de téléphone à 10 chiffres avec l’indicatif régional, comme 250-555-0123.',
+  [OWNER_SETUP_PHONE_TWO_ERROR]: 'Un seul numéro de téléphone entre ici, comme 250-555-0123. Un deuxième (sans frais, le restaurant) peut aller dans Bon à savoir.',
+  [OWNER_SETUP_PHONE_TWO_ERROR_STORY]: 'Un seul numéro de téléphone entre ici, comme 250-555-0123. Un deuxième (sans frais, une autre ligne) peut aller dans votre histoire.',
   'Please check the web address, for example yourbusiness.com': 'Vérifiez l’adresse Web, par exemple votreentreprise.com',
   [`Please keep the description between ${OWNER_DESCRIPTION_MIN} and ${OWNER_DESCRIPTION_MAX} characters.`]: `Votre description doit compter de ${OWNER_DESCRIPTION_MIN} à ${frNumber(OWNER_DESCRIPTION_MAX.toLocaleString('en-CA'))} caractères.`,
   'Please leave out < and > characters.': 'N’utilisez pas les caractères < et >.',
@@ -71419,6 +71481,17 @@ const OWNER_NONE_WORDS = { website: ['a website', 'de site Web'], dietary: ['veg
   // Winery test 1 (2026-11-12): every "none" key a setup can send has words (it read "booking_link").
   booking_link: ['online booking', 'de réservation en ligne'], washroom: ['a customer washroom', 'de toilettes pour les clients'],
   wifi: ['Wi-Fi', 'de Wi-Fi'], ordering: ['online ordering, a drive-thru or pre-orders (order at the counter only)', 'de commande en ligne, de service au volant ni de précommandes (commande au comptoir seulement)'] };
+// Sport test 10 (2026-11-21; "You told us you don't have: dogs allowed" on a golf course): a sport or golf place's "no
+// dogs" in its main kind's words.
+function ownerSportDogNone(v) {
+  if (!v || !sportSetupType(v.type)) return null;
+  let k = ''; try { k = (venueIndoorInfo(v.id).kinds || [])[0] || ''; } catch (e) { k = ''; }
+  if (k === 'golf' || k === 'discgolf') return ['dogs on the course', 'de chiens sur le parcours'];
+  if (k === 'range') return ['dogs at the range', 'de chiens au champ de pratique'];
+  if (k === 'bike') return ['dogs on the trails', 'de chiens sur les sentiers'];
+  if (k === 'skischool') return ['dogs at lessons', 'de chiens aux cours'];
+  return ['dogs at your place', 'de chiens chez vous'];
+}
 // What one save changed, in the owner's words (pub test 6, 2026-11-10): only what actually changed. A kitchen-only save
 // is "Kitchen" (not "Kitchen, who's welcome and sports"); a happy hour save is "Happy hour" (the Happy hour badge and the
 // deals that come with it are part of it, not "What you offer, happy hour, happy hour deals"). Restaurants and pubs.
@@ -71441,7 +71514,9 @@ function ownerFieldLabelsFor(venue, fr) {
   if (venue.type === 'tour') return { ...base, menu_url: fr ? 'Lien des tarifs' : 'Prices link' };
   // Indoor test 5 (2026-11-19; Chris's log said "Adult price" for his passes): the price in its kind's word ("Passes",
   // "Tickets", "Treatments and passes").
-  if (kindSetupType(venue.type)) { let w = null; try { w = indoorKindsModule.indoorKindText(venueIndoorInfo(venue.id).kinds, fr ? 'fr' : 'en').price.basis; } catch (e) { w = null; } return w ? { ...base, indoor_price: fr ? `Prix (${w.toLowerCase()})` : `Price (${w.toLowerCase()})` } : base; }
+  // Sport test 10 (2026-11-21; Lorraine's update read "Listing update: Address, menu link" for her golf rates page): a sport
+  // or golf place's prices link is its rates link, for every kind.
+  if (kindSetupType(venue.type)) { let w = null; try { w = indoorKindsModule.indoorKindText(venueIndoorInfo(venue.id).kinds, fr ? 'fr' : 'en').price.basis; } catch (e) { w = null; } const rates = sportSetupType(venue.type) ? { menu_url: fr ? 'Lien des tarifs' : 'Rates link' } : {}; return w ? { ...base, ...rates, indoor_price: fr ? `Prix (${w.toLowerCase()})` : `Price (${w.toLowerCase()})` } : { ...base, ...rates }; }
   if (venue.type === 'brewery') { let k = ''; try { k = breweryWordsKind(venue); } catch (e) { k = ''; } const ev = { weekly_nights: fr ? 'Événements de la semaine' : 'Weekly events' }; return k === 'Cidery' ? { ...base, ...ev, brewery_info: fr ? 'Réponses sur votre cidrerie' : 'Your cidery answers' } : { ...base, ...ev }; }
   return base;
 }
@@ -71498,7 +71573,7 @@ function ownerVenueActivity(venueId, limit = 12, lang = 'en') {
         let before = [];
         try { before = (JSON.parse(r.previous || '{}').not_offered) || []; } catch (e) { before = []; }
         const added = ch.not_offered.filter((k) => !before.includes(k));
-        const names = (added.length ? added : ch.not_offered).map((k) => (OWNER_NONE_WORDS[k] || [k, k])[fr ? 1 : 0]);
+        const names = (added.length ? added : ch.not_offered).map((k) => ((k === 'dogs' && ownerSportDogNone(vrow)) || OWNER_NONE_WORDS[k] || [k, k])[fr ? 1 : 0]);
         none = names.length ? (fr ? `Vous nous avez dit que vous n’avez pas : ${names.join(', ')}` : `You told us you don’t have: ${names.join(', ')}`)
           : (fr ? 'Vous avez retiré une réponse « nous n’en avons pas »' : 'You took back a “we don’t have one” answer');
       }
@@ -73427,6 +73502,9 @@ ${renderGolfHeaderHtml()}
     <div class="op-head">
       <span class="eyebrow">${L('Owner edit page', 'Page de modification')}</span>
       <h1>${escapeHtml(venue.name)}</h1>
+      ${/* Sport test 10 (2026-11-21; Lorraine): after Create a login, "You're signed in" was in the full page only, far below
+         where the page opens. It sits under the name now. */ ''}
+      ${found.welcome ? `<p class="op-done show" id="opWelcome" role="status">${L(`You&rsquo;re signed in.${found.welcome.live.length ? ` What you sent from your link is now live: ${escapeHtml(ownerFieldNames(found.welcome.live, 'en'))}.` : ''} From now on your changes go live as soon as you save them. Next time, sign in at <a href="/owner/login">okanaganroam.com/owner/login</a>.`, `Vous êtes connecté.${found.welcome.live.length ? ` Ce que vous avez envoyé avec votre lien est maintenant en ligne : ${escapeHtml(ownerFieldNames(found.welcome.live, 'fr'))}.` : ''} Désormais, vos modifications sont en ligne dès que vous les enregistrez. La prochaine fois, connectez-vous à <a href="/fr/owner/login">okanaganroam.com/fr/owner/login</a>.`)}</p>` : ''}
       <p class="op-free" id="opFree" style="display:inline-block;margin:6px 0 4px;padding:6px 14px;border-radius:999px;background:#E3F1E8;color:#1E6B3A;font-weight:800"><span aria-hidden="true">&#10003;</span> ${L('Free. No cost, ever.', 'Gratuit. Sans frais, pour toujours.')}</p>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id, { nearly: true }), venue.type) : ''}${completeHtml}
       <p class="op-staff" id="opStaff">${ownerStaffLineHtml(lang, !!token)}</p>
       ${(() => { try { return ownerStatsModule.ownerStatsHtml(ownerStatsModule.ownerStats(db, venue.id), lang, { listKind: venue.type === 'tour' ? 'tours' : isPriceList(venue) ? 'prices' : '' }); } catch (e) { return ''; } })()}
@@ -73477,7 +73555,6 @@ ${renderGolfHeaderHtml()}
     </div>
     <nav class="op-secnav" id="opSecNav" data-task="all" aria-label="${L('Parts of this page', 'Sections de cette page')}"><a href="#hours">${L('Hours', 'Heures')}</a><a href="#photos">Photos</a>${portalFields(venue.type).menu ? `<a href="#opMenuCard">${venue.type === 'tour' ? L('Tours &amp; prices', 'Sorties et tarifs') : isPriceList(venue) ? L('Prices', 'Prix') : 'Menu'}</a>` : ''}<a href="#events">${L('Events', 'Événements')}</a></nav>
     <div class="op-head">
-      ${found.welcome ? `<p class="op-done show" id="opWelcome" role="status">${L(`You&rsquo;re signed in.${found.welcome.live.length ? ` What you sent from your link is now live: ${escapeHtml(ownerFieldNames(found.welcome.live, 'en'))}.` : ''} From now on your changes go live as soon as you save them. Next time, sign in at <a href="/owner/login">okanaganroam.com/owner/login</a>.`, `Vous êtes connecté.${found.welcome.live.length ? ` Ce que vous avez envoyé avec votre lien est maintenant en ligne : ${escapeHtml(ownerFieldNames(found.welcome.live, 'fr'))}.` : ''} Désormais, vos modifications sont en ligne dès que vous les enregistrez. La prochaine fois, connectez-vous à <a href="/fr/owner/login">okanaganroam.com/fr/owner/login</a>.`)}</p>` : ''}
       ${(() => { const last = ownerLastUpdatedAt(venue.id); return last ? `<p class="op-last">${L('Last updated', 'Dernière mise à jour :')} ${ownerUpdatedDate(last, fr)}</p>` : ''; })()}
       <div data-task="home all">${pendingNote}
       ${ownerActivityHtml(ownerVenueActivity(venue.id, 200, lang), lang)}</div>
