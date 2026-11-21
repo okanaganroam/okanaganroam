@@ -1,0 +1,30 @@
+{
+ "reason": "Places-to-stay photos, batch 3 (Nov 20 2026); ids are filled in after import by drafts/stays-2026-11/batch2-resolve.js",
+ "batch_id": "photos-stays-b3-ok-2026-11-20",
+ "venues": [
+  {
+   "id": null,
+   "name": "Kelowna Bed & Breakfast Chatham House",
+   "region": "kelowna",
+   "slug": "kelowna-bed-and-breakfast-chatham-house",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/kelowna-bed-and-breakfast-chatham-house-2610.jpg?v=20261120b3"
+   }
+  },
+  {
+   "id": null,
+   "name": "Nirvana Cabanas Beach Club",
+   "region": "vernon",
+   "slug": "nirvana-cabanas-beach-club",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/nirvana-cabanas-beach-club-2610.jpg?v=20261120b3"
+   }
+  }
+ ]
+}

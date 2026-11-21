@@ -1,0 +1,26 @@
+[
+ {
+  "id": null,
+  "name": "Kelowna Bed & Breakfast Chatham House",
+  "region": "kelowna",
+  "slug": "kelowna-bed-and-breakfast-chatham-house",
+  "file": "/images/venues/kelowna-bed-and-breakfast-chatham-house-2610.jpg",
+  "dimensions": "1800x900",
+  "source_page": "https://www.google.com/maps/place/data=!4m2!3m1!1s0x537df3541eb16e93:0x996b2155885d023b",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLd7pTGovNrhbmddEOQLFU_3cmAZTctDzt78Y8scV4Ncmqs5XGwXiQD8gnb6sCA9-rif3y6fKByeJzTizc-QMV-4y1ctbBcUvt1nxP9V5IRefTrIoXPq7hiX_wkXYivA826AxmpH=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo on Google Maps (place \"Kelowna Bed and Breakfast (CHATHAM HOUSE)\", 1009 Lawrence Ave): the garden deck patio with umbrella and planters (source 6240x4160)"
+ },
+ {
+  "id": null,
+  "name": "Nirvana Cabanas Beach Club",
+  "region": "vernon",
+  "slug": "nirvana-cabanas-beach-club",
+  "file": "/images/venues/nirvana-cabanas-beach-club-2610.jpg",
+  "dimensions": "1440x720",
+  "source_page": "http://www.okanaganlakesidesuites.com/home.html",
+  "image_url": "https://nebula.wsimg.com/f848f766b231b600727b0eaab0de0570?AccessKeyId=B671ABBBA9FF43FDE2FE&disposition=0&alloworigin=1",
+  "source_kind": "website",
+  "note": "Own site: the lakeside lawn, gazebo and dock on Okanagan Lake (source 1440x1080; site images max 1920 wide)"
+ }
+]
