@@ -4356,6 +4356,8 @@
     if (k === 'seaOutKeep' && S.seaOut && S.seaOut.keep) {
       var kz = S.seaList[S.seaOut.i], kk = S.seaOut.keep; S.seaOut = null; S.seaOutNudge = ''; S.nudge = '';
       if (kz) { kz.exact = { from: kk.from, to: kk.to }; kz.dirty = true; S.seaTouched = true; }
+      // (The screen's own date boxes are read again on Save: they take the kept dates first.)
+      [['sxfhours', kk.from], ['sxthours', kk.to]].forEach(function(b){ var mm = el(b[0] + 'M'), dd = el(b[0] + 'D'); if (mm) mm.value = String(+b[1].slice(0, 2)); if (dd) dd.value = String(+b[1].slice(3)); });
       return hoursSave();
     }
     if (k === 'seaOutSkip' && S.seaOut) {
