@@ -43211,12 +43211,12 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const badge = (cvRel ? completeVerifiedCardChipHtml(fr) + ' ' : '') + ((relatedNearbyHiddenGemIds.has(v.id) && !v.redirect_to) ? hiddenGemBadgeHtml() : '')
       + ((relatedNearbyLocalFavouriteIds.has(v.id) && !v.redirect_to) ? (relatedNearbyHiddenGemIds.has(v.id) ? ' ' : '') + localFavouriteBadgeHtml() : '');
     const photo = venueThumbPhoto(v, relatedStockPhotosUsed);
-    const typeLabel = ((fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[v.type] || {}).singular || v.type;
+    const typeLabel = (v.type === 'golf' && sportKindSingular(v, fr)) || ((fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[v.type] || {}).singular || v.type; // sport test 3: a simulator or range card says its kind
     const href = fr && venueHasFrench(v) ? venuePagePath(v, 'fr') : `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
     const away = typeof v.distance_km === 'number' ? (v.distance_km < 1 ? `${Math.max(100, Math.round(v.distance_km * 10) * 100)} m` : `${num(v.distance_km.toFixed(1))} km`) : '';
     const metaLine = [meta, away].filter(Boolean).join(' \u00b7 ');
     if (!photo) {
-      const band = fr ? compactVisualBandHtml(v.type, { size: 'small' }).replace(`>${escapeHtml(CATEGORY_LABELS[v.type] ? CATEGORY_LABELS[v.type].singular : v.type)}<`, `>${escapeHtml(typeLabel)}<`) : compactVisualBandHtml(v.type, { size: 'small' });
+      const band = fr || v.type === 'golf' ? compactVisualBandHtml(v.type, { size: 'small' }).replace(`>${escapeHtml(CATEGORY_LABELS[v.type] ? CATEGORY_LABELS[v.type].singular : v.type)}<`, `>${escapeHtml(typeLabel)}<`) : compactVisualBandHtml(v.type, { size: 'small' });
       return `<div class="related-card related-card-${v.type}">
       ${band}
       <a href="${href}">${escapeHtml(v.name)}</a>
@@ -43257,7 +43257,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       ? L(`${Math.max(1, Math.round(km * 12))} min walk`, `${Math.max(1, Math.round(km * 12))} min à pied`)
       : L(`${Math.round(km * 1.6 + 2)} min drive`, `${Math.round(km * 1.6 + 2)} min en voiture`));
     const cardItems = pool.map(({ v, km }) => {
-      const typeLabel = ((fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[v.type] || {}).singular || v.type;
+      const typeLabel = (v.type === 'golf' && sportKindSingular(v, fr)) || ((fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[v.type] || {}).singular || v.type; // sport test 3: a simulator or range card says its kind
       const href = fr && venueHasFrench(v) ? venuePagePath(v, 'fr') : `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
       const photo = venueThumbPhoto(v, nearbyStripPhotos);
       const tripQuery = `${v.name}, ${REGION_LABELS[v.region] || v.region}, Okanagan Valley, BC`;
@@ -58769,7 +58769,7 @@ function priceListAppStrings(kind, lang, words = null) {
     blurry: 'This photo is a little hard to read. Could you try again in good light, holding the phone straight above the page?',
     notMenu: 'Hmm, that doesn&rsquo;t look like a price list. Could you try another photo?',
     unavailable: 'Our reader is taking a break right now. No problem: press the button below and we&rsquo;ll type it up for you.',
-    reviewTitle: `Here are ${e.what}`, reviewIntro: `This is how customers will see them. Tap any ${e.item} or price to fix it.`,
+    reviewTitle: `Here are ${e.what}`, reviewIntro: `This is how customers will see them. Tap any ${e.item === 'price' ? 'line' : e.item} or price to fix it.`,
     dishName: e.name, description: `Description: ${e.desc} (optional)`, deleteDish: `Delete this ${e.item}`,
     addDish: `+ Add a ${e.item}`, newDish: `New ${e.item}`, emptySection: `No ${e.items} yet.`,
     live: `Your ${L} are live!`, liveSub: `Customers can now see ${e.what} on Okanagan Roam.`,
