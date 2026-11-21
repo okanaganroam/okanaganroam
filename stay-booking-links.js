@@ -183,6 +183,57 @@ function stayBookingLinks(stay, trip, opts = {}) {
   return out.slice(0, 3);
 }
 
+// "See live prices" (2026-11-20): Stay22's Maps embed for the trip's dates, around the chosen stay.
+//   Source: https://dev.stay22.com/docs/maps/parameters (checked 2026-11-20): https://www.stay22.com/embed/gm with aid,
+//   address or lat/lng, checkin/checkout, adults/children, priceper=nightly, currency, campaign, ljs (language),
+//   nelat/nelng/swlat/swlng (a bounding box), poi (our own pins, a URL-encoded JSON array) and onlyhcids (Booking.com
+//   hotel ids only).
+//   One hotel only (onlyhcids) needs the Booking.com hotel id, which we don't have and can't get the honest way (the
+//   Booking.com page answers a plain request with a bot check; Stay22's id lookup is its keyed Direct Travel API). So the
+//   map is the stay's own block instead: the town as the address ("Oliver, British Columbia, Canada": Stay22 answers "404" for "Oliver, BC" and for many exact coordinates, seen
+//   2026-11-20), a box about 650 m across around the stay, and a star pin with the stay's name (poi). Other places nearby
+//   show too, with their nightly prices.
+//   Shown only with STAY_AFFILIATE_PROVIDER=stay22 + STAY_AFFILIATE_ID, and only for stays listed as loading in
+//   data/stay22-maps.json (scripts/stay22-map-check.js); a stay that isn't checked gets no button.
+const STAY22_MAP = 'https://www.stay22.com/embed/gm';
+const MAP_BOX = { lat: 0.003, lng: 0.005 };
+let mapChecks = null;
+function stay22MapChecks() {
+  if (mapChecks) return mapChecks;
+  try { mapChecks = require('./data/stay22-maps.json').stays || {}; } catch (e) { mapChecks = {}; }
+  return mapChecks;
+}
+// stay: { id, name, latitude, longitude, regionLabel }; trip as above; opts: { env, checks, province }.
+// -> { url, urlFr } or null.
+function stay22MapUrl(stay, trip, opts = {}) {
+  const env = opts.env || process.env;
+  const cfg = placesToStay.affiliateConfig(env);
+  if (cfg.provider !== 'stay22' || !stay || !Number.isInteger(stay.id)) return null;
+  const checks = opts.checks || stay22MapChecks();
+  const c = checks[String(stay.id)];
+  if (!c || c.ok !== true) return null;
+  const lat = Number(stay.latitude), lng = Number(stay.longitude);
+  const town = String(stay.regionLabel || '').trim();
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || (!lat && !lng) || !town) return null;
+  const p = tripParams(trip);
+  const r6 = (n) => String(Math.round(n * 1e6) / 1e6);
+  const q = new URLSearchParams();
+  q.set('aid', cfg.id);
+  q.set('address', `${town}, ${opts.province || 'British Columbia, Canada'}`);
+  q.set('nelat', r6(lat + MAP_BOX.lat)); q.set('nelng', r6(lng + MAP_BOX.lng));
+  q.set('swlat', r6(lat - MAP_BOX.lat)); q.set('swlng', r6(lng - MAP_BOX.lng));
+  q.set('poi', JSON.stringify([{ lat: Number(r6(lat)), lng: Number(r6(lng)), name: String(stay.name || '').slice(0, 80) }]));
+  if (p.dates) { q.set('checkin', p.dates.arrive); q.set('checkout', p.dates.leave); }
+  if (p.adults !== null) q.set('adults', String(p.adults));
+  if (p.kids !== null && p.kids > 0) q.set('children', String(p.kids));
+  q.set('priceper', 'nightly');
+  q.set('currency', 'CAD');
+  if (cfg.campaign) q.set('campaign', cfg.campaign.replace(/-/g, '_'));
+  const url = `${STAY22_MAP}?${q.toString()}`;
+  if (!httpsOn(url, STAY22_HOSTS, true)) return null;
+  return { url, urlFr: `${url}&ljs=fr` };
+}
+
 // "Pets in some rooms -- check when booking": a dog trip and a stay whose pets answer is "some".
 function stayPetsNote(info, trip) {
   return !!(trip && trip.dog && info && info.pets === 'some');
@@ -195,6 +246,8 @@ function withBookingLinks(block, byId, opts = {}) {
     const stay = byId.get(card.id);
     if (!stay) return { ...card, bookingLinks: [] };
     const out = { ...card, bookingLinks: stayBookingLinks(stay, block.trip, { env: opts.env, regionLabel: card.regionLabel }) };
+    const live = stay22MapUrl({ ...stay, regionLabel: card.regionLabel }, block.trip, { env: opts.env, checks: opts.mapChecks });
+    if (live) out.livePrices = live;
     if (stayPetsNote(stay.info, block.trip)) out.petsSome = true;
     return out;
   };
@@ -204,4 +257,5 @@ function withBookingLinks(block, byId, opts = {}) {
 module.exports = {
   BOOKING_HOSTS, EXPEDIA_HOSTS, STAY22_HOSTS, STAY22_ALLEZ, LABELS, REL_AFFILIATE, REL_PLAIN,
   httpsOn, tripParams, bookingComUrl, expediaUrl, stay22Wrap, stayBookingLinks, stayPetsNote, withBookingLinks,
+  STAY22_MAP, MAP_BOX, stay22MapUrl,
 };

@@ -102,7 +102,7 @@ function collect(db, { site = 'site', days = 30, now = new Date() } = {}) {
     return {
       pages: { home: g('page_view:home'), roam_now: g('page_view:map'), build_my_trip: g('page_view:trip'), whats_on: g('page_view:whats_on'), browse: g('page_view:browse'), hidden_gems: g('page_view:hidden_gems') },
       roam_now: { opens: g('page_view:map'), near_me: g('map_near_me'), searches: g('map_search'), empty_searches: g('map_search_empty'), voice: g('map_voice_search'), filters: g('map_filter'), pins: g('map_pin'), directions: g('map_directions'), shares: g('map_share') },
-      trip: { page_views: g('page_view:trip'), plans_started: g('trip_plan_start'), plans_completed: g('trip_plan_complete'), shared: g('trip_share'), adds: g('add_to_trip'), removes: g('remove_from_trip'), tray_opens: g('open_my_trip'), build_my_trip_clicks: g('build_my_trip_click') },
+      trip: { page_views: g('page_view:trip'), plans_started: g('trip_plan_start'), plans_completed: g('trip_plan_complete'), shared: g('trip_share'), adds: g('add_to_trip'), removes: g('remove_from_trip'), tray_opens: g('open_my_trip'), build_my_trip_clicks: g('build_my_trip_click'), book_trip_starts: g('book_trip_start'), book_trip_completes: g('book_trip_complete') },
       roam_now_per_day: series(per['page_view:map'] || [], list),
       trip_per_day: series(per['page_view:trip'] || [], list),
       totals: t,

@@ -139,3 +139,37 @@ test('withBookingLinks: pick and alternatives get their buttons; petsSome only o
   const noDog = L.withBookingLinks({ ...block, trip: { ...TRIP, dog: false } }, byId, NONE);
   assert.equal(noDog.pick.petsSome, undefined);
 });
+
+// "See live prices" (2026-11-20): the Stay22 Maps embed around the stay, only with Stay22 and a checked stay.
+test('stay22MapUrl: Stay22 only, checked stays only; town + box + star pin + dates, nightly CAD, French', () => {
+  const sbl = require('../stay-booking-links');
+  const stay = { id: 1994, name: 'Delta Grand & Spa', regionLabel: 'Kelowna', latitude: 49.891494, longitude: -119.49763 };
+  const trip = { arrive: '2026-12-18', leave: '2026-12-20', adults: 2, kids: 1 };
+  const env = { STAY_AFFILIATE_PROVIDER: 'stay22', STAY_AFFILIATE_ID: 'okanaganroam', STAY_AFFILIATE_CAMPAIGN: 'trip-box' };
+  const checks = { 1994: { ok: true }, 5: { ok: false } };
+  const r = sbl.stay22MapUrl(stay, trip, { env, checks });
+  const u = new URL(r.url);
+  assert.equal(`${u.origin}${u.pathname}`, 'https://www.stay22.com/embed/gm');
+  const q = Object.fromEntries(u.searchParams);
+  assert.deepEqual(q, {
+    aid: 'okanaganroam', address: 'Kelowna, British Columbia, Canada', nelat: '49.894494', nelng: '-119.49263', swlat: '49.888494', swlng: '-119.50263',
+    poi: JSON.stringify([{ lat: 49.891494, lng: -119.49763, name: 'Delta Grand & Spa' }]),
+    checkin: '2026-12-18', checkout: '2026-12-20', adults: '2', children: '1', priceper: 'nightly', currency: 'CAD', campaign: 'trip_box',
+  });
+  assert.equal(r.urlFr, `${r.url}&ljs=fr`);
+  // No dates or party: none sent (the map asks).
+  const bare = new URL(sbl.stay22MapUrl(stay, null, { env, checks }).url).searchParams;
+  assert.equal(bare.get('checkin'), null);
+  assert.equal(bare.get('adults'), null);
+  // Not Stay22, no id, not checked, checked as not loading, or no town: no button.
+  assert.equal(sbl.stay22MapUrl(stay, trip, { env: { STAY_AFFILIATE_PROVIDER: 'booking', STAY_AFFILIATE_ID: 'x' }, checks }), null);
+  assert.equal(sbl.stay22MapUrl(stay, trip, { env: { STAY_AFFILIATE_PROVIDER: 'stay22' }, checks }), null);
+  assert.equal(sbl.stay22MapUrl(stay, trip, { env: {}, checks }), null);
+  assert.equal(sbl.stay22MapUrl({ ...stay, id: 7 }, trip, { env, checks }), null);
+  assert.equal(sbl.stay22MapUrl({ ...stay, id: 5 }, trip, { env, checks }), null);
+  assert.equal(sbl.stay22MapUrl({ ...stay, regionLabel: '' }, trip, { env, checks }), null);
+  // withBookingLinks adds it to the card.
+  const block = sbl.withBookingLinks({ trip, pick: { id: 1994, regionLabel: 'Kelowna' }, alternatives: [] }, new Map([[1994, { ...stay, info: {} }]]), { env, mapChecks: checks });
+  assert.equal(block.pick.livePrices.url, r.url);
+  assert.equal(sbl.withBookingLinks({ trip, pick: { id: 1994, regionLabel: 'Kelowna' }, alternatives: [] }, new Map([[1994, { ...stay, info: {} }]]), { env: {}, mapChecks: checks }).pick.livePrices, undefined);
+});

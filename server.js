@@ -46,6 +46,7 @@ const { renderOutboundPage } = require('./outbound-page');
 const placesToStay = require('./places-to-stay');
 const tripStays = require('./trip-stays');
 const stayBookingLinks = require('./stay-booking-links');
+const tripBooking = require('./trip-booking');
 const gscReport = require('./gsc-report');
 // What is clickable on one business or event page (2026-11-05): read from the page itself, so each sheet shows that page's
 // own buttons and links. The server asks its own public page (no scripts run, so nothing is counted); kept 10 minutes.
@@ -187,6 +188,9 @@ const CSP_POLICY = [
   "form-action 'self'",
   `report-uri ${CSP_REPORT_PATH}`,
 ].join('; ');
+// Build My Trip with places to stay and Stay22 (2026-11-20): the same policy, plus Stay22's map in the "See live prices"
+// sheet (https://www.stay22.com/embed/gm). Sent on /trip only while that preview is on; every other page keeps CSP_POLICY.
+const TRIP_STAYS_CSP = `${CSP_POLICY.replace("frame-src 'self'", "frame-src 'self' https://www.stay22.com")}; frame-ancestors 'self'`;
 // The report-only name is kept for older callers (tests, other branches).
 const CSP_REPORT_ONLY = CSP_POLICY;
 const SECURITY_HEADERS = {
@@ -7759,6 +7763,8 @@ function withTripStays(plan, stay, now = new Date()) {
       // that already have a booking link, for the card's "Your trip checklist".
       block = stayBookingLinks.withBookingLinks(block, new Map(candidates.map((c) => [c.id, c])));
       block.checklist = tripBookingChecklist(plan);
+      // "Book your trip" (2026-11-20, trip-booking.js): the estimated total and the "Book my trip" steps, per stay card.
+      block = tripBooking.withTripBooking(block, plan);
       plan.whereToStay = block;
     }
   } catch (e) { console.error(`[trip] where to stay: ${e.message}`); }
@@ -17995,7 +18001,7 @@ function renderAnalyticsHeadHtml(pageType) {
   function gtag(){ dataLayer.push(arguments); }
 ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
   // Site event counts (2026-11-05): a per-day count of fixed-list feature events on our own server (no visitor id, nothing typed).
-  var ROAM_EV = ${JSON.stringify([...siteEvents.EVENTS].filter((n) => !n.startsWith('page_view:') && !n.startsWith('map_filter:')))};
+  var ROAM_EV = ${JSON.stringify([...siteEvents.EVENTS].filter((n) => !n.startsWith('page_view:') && !n.startsWith('map_filter:') && !siteEvents.SELF_COUNTED.includes(n)))};
   function roamCount(n){
     try {
       if (!navigator.sendBeacon || /(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) return;
@@ -75095,7 +75101,10 @@ const server = http.createServer(async (req, res) => {
       // Any query (?q= examples and shared plans, ?region=, campaign tags): noindex, follow, canonical /trip (trip SEO).
       const tripHasQuery = Object.keys(query || {}).length > 0;
       if (tripPlannerV3ActiveFor(req)) {
-        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview', noindex: tripHasQuery, stays: isTripStaysEnabled() ? 'on' : tripStaysEnabledFor(query) ? 'preview' : null });
+        const staysMode = isTripStaysEnabled() ? 'on' : tripStaysEnabledFor(query) ? 'preview' : null;
+        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview', noindex: tripHasQuery, stays: staysMode });
+        // "See live prices" (2026-11-20): only this page, only with stays on and Stay22 set up, may frame Stay22's map.
+        if (staysMode && placesToStay.affiliateConfig().provider === 'stay22') res.setHeader('Content-Security-Policy', TRIP_STAYS_CSP);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
         return res.end(html);
       }

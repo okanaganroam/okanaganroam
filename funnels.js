@@ -21,6 +21,8 @@ const TRIP_STEPS = [...PLANNER_STEPS, ...MYTRIP_STEPS];
 const TRIP_EXTRA = [
   ['build_my_trip_click', 'Clicked the Build My Trip button'],
   ['trip_plan_regenerate', 'Asked for a different plan'],
+  ['book_trip_start', 'Started “Book my trip”'],
+  ['book_trip_complete', 'Finished “Book my trip” (every booking done or skipped)'],
   ['remove_from_trip', 'Removed a place from My Trip'],
   ['shared_trip_view', 'Opened a trip someone shared'],
   ['shared_trip_save', 'Saved a shared trip'],
