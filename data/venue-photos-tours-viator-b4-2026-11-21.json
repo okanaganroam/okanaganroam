@@ -57,6 +57,17 @@
    "set": {
     "image_url": "/images/venues/carpe-diem-tours-2610.jpg?v=20261121"
    }
+  },
+  {
+   "name": "Msurf Okanagan",
+   "region": "kelowna",
+   "slug": "msurf-okanagan",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/msurf-okanagan-2610.jpg?v=20261121"
+   }
   }
  ]
 }
