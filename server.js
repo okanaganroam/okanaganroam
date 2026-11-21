@@ -8078,6 +8078,46 @@ function buildTripPlannerTaxonomy() {
 // Apex, SilverStar and Big White with one or two stops: between seasons almost everything on a ski hill is closed. When
 // a plan for a ski hill alone fills under half its slots, it is planned from the town below instead, with a note.
 const TRIP_SKI_HILL_BASE = TRIP_SITE.skiHillBase;
+function runTripPlan(args, now = new Date()) {
+  if (!args || !args.v4) return runTripPlanBase(args, now);
+  let a = args;
+  if (typeof a.text === 'string') { const plain = v4PlainText(a.text); if (plain !== a.text) a = { ...a, text: plain }; }
+  if (typeof a.text === 'string' && V4_NOT_RUSHED_RE.test(a.text) && !(a.overrides && a.overrides.pace)) a = { ...a, overrides: { ...(a.overrides || {}), pace: 'relaxed' } };
+  let plan = runTripPlanBase(a, now);
+  try {
+    const it = plan && plan.intent;
+    const preset = it && it.when && it.when.preset;
+    const focus = it && ((it.types || []).length || (it.foodTerms || []).length || (it.features || []).length || (it.collections || []).length || (it.activities || []).length || (it.regions || []).length);
+    // Round 4 (2026-11-21: "rainy day tomorrow in penticton with 3 year old twins, indoor" was a list): a day ("tomorrow",
+    // "a rainy day", "a day out") is a day plan with or without a focus, unless the request asks for a list.
+    const listAsked = /\b(?:ideas?|list|places|spots|options|best|recommend\w*|suggest\w*|where (?:to|can|should)|which)\b/i.test(String(a.text || ''));
+    const dayAsked = /\b(?:rainy|rain|wet)\s+day\b|\bday\s+(?:out|trip)\b|\bjourn[ée]e\s+(?:de\s+pluie|pluvieuse)\b/i.test(String(a.text || ''));
+    const want = V4_WHEN_DAYS[preset] && (!focus || !listAsked) ? V4_WHEN_DAYS[preset] : (dayAsked && !listAsked ? 1 : 0);
+    if (plan && ['discover', 'recommendations'].includes(plan.kind) && want && !(focus && listAsked) && !(a.overrides && a.overrides.days)) {
+      const longer = runTripPlanBase({ ...a, overrides: { ...(a.overrides || {}), days: want } }, now);
+      if (longer && ['multi_day', 'day_plan'].includes(longer.kind) && (longer.days || []).length) plan = longer;
+    }
+  } catch (e) { /* keep the list */ }
+  try { v4TidyDays(plan); } catch (e) { /* keep the plan as planned */ }
+  try { v4DropAfterDark(plan); } catch (e) { /* keep the plan as planned */ }
+  try { v4AddStopPhones(plan); } catch (e) { /* phones are a convenience */ }
+  return plan;
+}
+function v4AddStopPhones(plan) {
+  const ids = new Set();
+  const visit = (s) => { if (s && s.venue && Number.isInteger(s.venue.id)) ids.add(s.venue.id); };
+  for (const d of (plan && plan.days) || []) (d.stops || []).forEach(visit);
+  ((plan && plan.outing && plan.outing.stops) || []).forEach(visit);
+  ((plan && plan.itinerary && plan.itinerary.stops) || []).forEach(visit);
+  if (!ids.size) return;
+  const list = [...ids].slice(0, 80);
+  const rows = db.prepare(`SELECT id, phone FROM venues WHERE id IN (${list.map(() => '?').join(',')}) AND phone IS NOT NULL AND phone != ''`).all(...list);
+  const byId = new Map(rows.map((r) => [r.id, String(r.phone).trim()]));
+  const put = (s) => { if (s && s.venue && byId.has(s.venue.id) && /\d{3}.*\d{4}/.test(byId.get(s.venue.id))) s.venue.phone = byId.get(s.venue.id); };
+  for (const d of plan.days || []) (d.stops || []).forEach(put);
+  ((plan.outing && plan.outing.stops) || []).forEach(put);
+  ((plan.itinerary && plan.itinerary.stops) || []).forEach(put);
+}
 // Build My Trip V4, round 1 fresh eyes (2026-11-21), only for POST /api/trip/plan?v=4 (args.v4):
 //  - "nothing too rushed", "no rush", « sans se presser »: a relaxed pace, unless a pace was set;
 //  - "things to do this weekend" with no town and no kind of place is a 2-day plan ("today", "tomorrow": a day plan),
@@ -8152,41 +8192,6 @@ function v4DropAfterDark(plan) {
   const ids = new Set(gone.map((v) => v.id)), names = gone.map((v) => v.name);
   plan.schedule = rows.filter((r) => !(r && ids.has(r.venueId) && dark.includes(r)));
   for (const k of ['warnings', 'scheduleWarnings']) if (Array.isArray(plan[k])) plan[k] = plan[k].filter((w) => !names.some((n) => String(w).startsWith(`${n}:`)));
-}
-function runTripPlan(args, now = new Date()) {
-  if (!args || !args.v4) return runTripPlanBase(args, now);
-  let a = args;
-  if (typeof a.text === 'string') { const plain = v4PlainText(a.text); if (plain !== a.text) a = { ...a, text: plain }; }
-  if (typeof a.text === 'string' && V4_NOT_RUSHED_RE.test(a.text) && !(a.overrides && a.overrides.pace)) a = { ...a, overrides: { ...(a.overrides || {}), pace: 'relaxed' } };
-  let plan = runTripPlanBase(a, now);
-  try {
-    const it = plan && plan.intent;
-    const preset = it && it.when && it.when.preset;
-    const focus = it && ((it.types || []).length || (it.foodTerms || []).length || (it.features || []).length || (it.collections || []).length || (it.activities || []).length || (it.regions || []).length);
-    if (plan && plan.kind === 'discover' && !focus && V4_WHEN_DAYS[preset] && !(a.overrides && a.overrides.days)) {
-      const longer = runTripPlanBase({ ...a, overrides: { ...(a.overrides || {}), days: V4_WHEN_DAYS[preset] } }, now);
-      if (longer && ['multi_day', 'day_plan'].includes(longer.kind) && (longer.days || []).length) plan = longer;
-    }
-  } catch (e) { /* keep the list */ }
-  try { v4TidyDays(plan); } catch (e) { /* keep the plan as planned */ }
-  try { v4DropAfterDark(plan); } catch (e) { /* keep the plan as planned */ }
-  try { v4AddStopPhones(plan); } catch (e) { /* phones are a convenience */ }
-  return plan;
-}
-function v4AddStopPhones(plan) {
-  const ids = new Set();
-  const visit = (s) => { if (s && s.venue && Number.isInteger(s.venue.id)) ids.add(s.venue.id); };
-  for (const d of (plan && plan.days) || []) (d.stops || []).forEach(visit);
-  ((plan && plan.outing && plan.outing.stops) || []).forEach(visit);
-  ((plan && plan.itinerary && plan.itinerary.stops) || []).forEach(visit);
-  if (!ids.size) return;
-  const list = [...ids].slice(0, 80);
-  const rows = db.prepare(`SELECT id, phone FROM venues WHERE id IN (${list.map(() => '?').join(',')}) AND phone IS NOT NULL AND phone != ''`).all(...list);
-  const byId = new Map(rows.map((r) => [r.id, String(r.phone).trim()]));
-  const put = (s) => { if (s && s.venue && byId.has(s.venue.id) && /\d{3}.*\d{4}/.test(byId.get(s.venue.id))) s.venue.phone = byId.get(s.venue.id); };
-  for (const d of plan.days || []) (d.stops || []).forEach(put);
-  ((plan.outing && plan.outing.stops) || []).forEach(put);
-  ((plan.itinerary && plan.itinerary.stops) || []).forEach(put);
 }
 function runTripPlanBase(args, now = new Date()) {
   const first = runTripPlanCore(args, now);

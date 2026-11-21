@@ -44,7 +44,7 @@ test('V4 server: "nothing too rushed" is a relaxed pace, and "things to do this 
   for (const t of ['3 days, nothing too rushed', 'no rush please', 'we want to take our time', 'deux jours sans se presser', 'pas trop pressés']) assert.ok(re.test(t), t);
   for (const t of ['a rush of adrenaline', '3 days in Kelowna', 'gold rush history']) assert.ok(!re.test(t), t);
   assert.ok(/const V4_WHEN_DAYS = \{ 'this-weekend': 2, 'next-weekend': 2, weekend: 2, today: 1, tomorrow: 1 \};/.test(src));
-  assert.ok(/plan\.kind === 'discover' && !focus && V4_WHEN_DAYS\[preset\]/.test(src), 'only a list with no town or kind of place');
+  assert.ok(/\['discover', 'recommendations'\]\.includes\(plan\.kind\) && want && !\(focus && listAsked\)/.test(src), 'a list only when a list is asked for');
   assert.ok(/function runTripPlan\(args, now = new Date\(\)\) \{\n  if \(!args \|\| !args\.v4\) return runTripPlanBase\(args, now\);/.test(src), 'the current page goes straight to the planner as before');
 });
 
@@ -128,4 +128,19 @@ test('V4 round 3: the plan on screen survives a reload, Back and EN / FR; no out
   assert.deepEqual(p.itinerary.stops.map((s) => s.venue.id), [1, 3]);
   assert.deepEqual(p.warnings, []);
   assert.ok(/\(\?:days\?\|jours\?\|journ\[ée\]es\?\)/.test(ssrc), '"3 days" wins over the dates; "a weekend" does not');
+});
+
+// ---- Round 4 (2026-11-21): wine couple, rainy toddlers, Big White group, "this weekend", dog owner ----
+test('V4 round 4: a day is a plan, the guessed town is said, no timing boilerplate, an edit starts unconfirmed', () => {
+  const ssrc = require('node:fs').readFileSync(require.resolve('../server.js'), 'utf8');
+  assert.ok(/const dayAsked = \/\\b\(\?:rainy\|rain\|wet\)/.test(ssrc), '"a rainy day" is a day');
+  const src = v4page.V4_CLIENT_SRC;
+  assert.ok(/picked: 'We picked \{town\}\. Name a town in your request to change it\.'/.test(src) && /picked: 'Nous avons choisi \{town\}/.test(src));
+  assert.ok(/x\.kind !== 'timing' && x\.kind !== 'event_timing'/.test(src), 'Before you go keeps only what is particular');
+  assert.ok(/v4\.confirmed = false; v4\.ask = false; v4\.gone = \{\}; v4\.saved = false;/.test(src));
+  assert.ok(/\.v4-confirmed \.v4-gone \{ display: none; \}/.test(v4page.V4_STYLES) || /\.t3-v4 \.v4-confirmed \.v4-gone/.test(v4page.V4_STYLES));
+  assert.ok(!/about ' \+ Math\.round\(s\.freeTime\.minutes/.test(src), 'no free-time hours that go stale');
+  const html = pageHtml({ v4: 'on' });
+  const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).filter((x) => x.includes('v4Render'));
+  assert.doesNotThrow(() => new Function(scripts[0])); // eslint-disable-line no-new-func
 });

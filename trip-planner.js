@@ -7664,12 +7664,14 @@ function v4FillerSkip(v, ctx) {
 // ski day): a request with a focus (a kind of place, an activity, an occasion) on an adult trip never gets a stop from the
 // off-theme list above as one of its picks, unless the request names it or asks for that kind of place. A request with
 // no focus ("things to do this weekend") keeps them. Only with input.v4.
+const V4_BROAD_ACTIVITIES = ['winter', 'summer', 'nature', 'outdoors', 'viewpoints', 'family', 'indoor', 'rainy'];
 function v4OffTheme(v, ctx) {
   if (!ctx || !ctx.v4 || ctx.kids || !v || (ctx.types && ctx.types.has(v.type))) return false;
   const focus = (ctx.types && ctx.types.size) || (ctx.activities && ctx.activities.size) || ctx.occasion || (ctx.foodTerms && ctx.foodTerms.length);
   if (!focus) return false;
   // Round 3 (Whistler: "mountain biking" lost the bike park): a place that does an activity the request asks for is on theme.
-  if (ctx.activities && ctx.activities.size && (v.activities || []).some((a) => ctx.activities.has(a))) return false;
+  // Round 4: not a broad one ("winter" kept the skating rink and sleigh rides on a ski weekend for six friends).
+  if (ctx.activities && ctx.activities.size && (v.activities || []).some((a) => ctx.activities.has(a) && !V4_BROAD_ACTIVITIES.includes(a))) return false;
   const hits = [...v4KindText(v).matchAll(new RegExp(V4_OFF_THEME_FILLER_RE.source, 'g'))].map((m) => m[0]);
   if (!hits.length) return false;
   return !hits.some((w) => new RegExp(`\\b${w.split(' ')[0].replace(/s$/, '').replace(/e$/, '')}`).test(ctx.queryText || ''));
@@ -7713,7 +7715,25 @@ function v4Polish(result, input) {
     const inDay = (v) => (!regionList.length || regionList.includes(v.region)) && eligible(v, ctx, false) && !seasonClosedOnTrip(v, { date }) && tripRequirements.venueAllowed(v, ctx.requirements, d, ctx.tripDate);
     const factOf = (s) => (s && s.venue ? byId.get(s.venue.id) || null : null);
     const nearBefore = (i) => { for (let k = i - 1; k >= 0; k--) if (factOf(stops[k])) return stops[k]; for (let k = i + 1; k < stops.length; k++) if (factOf(stops[k])) return stops[k]; return null; };
-    if (stops.some((s) => s && (s.skiDay || s.onHill))) continue;
+    if (stops.some((s) => s && (s.skiDay || s.onHill))) {
+      // Round 4 (2026-11-21: "big white ski weekend ... apres" got a sleigh ride and the tube park at 3:45 every day):
+      // after a ski day, "après" is a pub, bar or brewery in the afternoon slot, from the listings, open then.
+      if (/\bapr[eè]s\b/.test(text) && !stops.some((x) => x && x.venue && ['pub', 'cocktail', 'brewery'].includes(x.venue.type) && x.daypart !== 'midday')) {
+        const at = stops.findIndex((x) => x && x.venue && !x.skiDay && !x.onHill && x.daypart === 'afternoon' && !['restaurant', 'cafe'].includes(x.venue.type) && !kept.has(x.venue.id));
+        if (at >= 0) {
+          // A village bar closed between seasons today is still a pick for a ski-season date (as the ski day's own pool does).
+          const skiOk = (v) => (!regionList.length || regionList.includes(v.region)) && eligible(v, { ...ctx, ignoreSeason: !!v.seasonClosedToday, features: [] }, false) && tripRequirements.venueAllowed(v, ctx.requirements, d, ctx.tripDate) && (!seasonClosedOnTrip(v, { date }) || v.seasonClosedToday);
+          const pool = facts.filter((v) => skiOk(v) && ['pub', 'cocktail', 'brewery'].includes(v.type) && !used.has(v.id)).sort((a, b) => base(b).score - base(a).score || a.id - b.id);
+          const pick = pool[0];
+          if (pick) {
+            used.delete(stops[at].venue.id); used.add(pick.id);
+            stops[at] = themeStop(ctx, 'afternoon', pick, base(pick), null, [{ code: 'theme', text: 'Après-ski after the lifts close', weight: 4 }], []);
+            changed = true;
+          }
+        }
+      }
+      continue;
+    }
     // 1. A nice-dinner trip's dinners are sit-down restaurants.
     if (niceAsked) {
       for (let i = 0; i < stops.length; i++) {

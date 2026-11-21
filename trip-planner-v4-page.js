@@ -54,7 +54,7 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-icon { width: 44px; height: 44px; border-radius: 999px; border: 0; background: transparent; color: var(--ref-navy); font-size: 1.15rem; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
   .t3-v4 .v4-icon:hover { background: rgba(27,43,58,0.07); }
   .t3-v4 .v4-icon[aria-busy="true"] { opacity: 0.4; }
-  .t3-v4 .v4-confirmed .v4-acts, .t3-v4 .v4-confirmed .t3-swap-note { display: none; }
+  .t3-v4 .v4-confirmed .v4-acts, .t3-v4 .v4-confirmed .t3-swap-note, .t3-v4 .v4-confirmed .v4-gone { display: none; }
   .t3-v4 .v4-confirmed .v4-row { grid-template-columns: 56px minmax(0, 1fr); padding-right: 12px; }
   .t3-v4 .v4-more { padding: 0 14px 12px 80px; font-size: 0.86rem; line-height: 1.45; color: var(--ref-navy); }
   .t3-v4 .v4-more p { margin: 0 0 4px; }
@@ -133,7 +133,7 @@ const V4_CLIENT_SRC = String.raw`
   // ---------- V4: the simple plan view ----------
   var V4_TEXT = {
     en: { yourPlan: 'Your plan', edit: 'Edit request', tip: 'Tap a stop for details. Swap ⇄ or remove ✕ anything, then confirm.', tipDone: 'Plan confirmed. Book it in one go, then share it with your group.',
-      confirm: 'Confirm plan', confirmNote: 'You can still swap or remove stops after this.', book: 'Book my trip', share: 'Share', save: 'Save', saved: 'Saved ✓', editPlan: 'Edit plan',
+      confirm: 'Confirm plan', confirmNote: 'You can still change it with Edit plan.', picked: 'We picked {town}. Name a town in your request to change it.', book: 'Book my trip', share: 'Share', save: 'Save', saved: 'Saved ✓', editPlan: 'Edit plan',
       note: 'Times are suggestions. Check hours before you go.', options: 'More options and notes', day: 'Day', stops1: '1 stop', stopsN: '{n} stops', days1: '1 day', daysN: '{n} days',
       swap: 'Swap {name}', remove: 'Remove {name}', removed: 'Removed', undo: 'Undo', another: 'Suggest another', details: 'See the place', why: 'Why it fits', hours: 'Hours',
       lunch: 'Lunch', dinner: 'Dinner', free: 'Free time', freeEve: 'Free evening', event: 'Event', noDinner: 'Dinner not scheduled', close: 'Close',
@@ -143,7 +143,7 @@ const V4_CLIENT_SRC = String.raw`
       savedReplaced: 'Saved ✓ Your trip is in My Trip.', notPriced: 'Not priced yet: {names}', freeLabel: 'Free', dogsOk: 'Dogs allowed',
       tipNoBook: 'Plan confirmed. Share it with your group or save it.' },
     fr: { yourPlan: 'Votre plan', edit: 'Modifier la demande', tip: 'Touchez un arrêt pour les détails. Remplacez ⇄ ou retirez ✕ ce que vous voulez, puis confirmez.', tipDone: 'Plan confirmé. Réservez tout d’un coup, puis partagez-le avec votre groupe.',
-      confirm: 'Confirmer le plan', confirmNote: 'Vous pourrez encore remplacer ou retirer des arrêts.', book: 'Tout réserver', share: 'Partager', save: 'Enregistrer', saved: 'Enregistré ✓', editPlan: 'Modifier le plan',
+      confirm: 'Confirmer le plan', confirmNote: 'Vous pourrez encore le modifier avec « Modifier le plan ».', picked: 'Nous avons choisi {town}. Nommez une ville dans votre demande pour la changer.', book: 'Tout réserver', share: 'Partager', save: 'Enregistrer', saved: 'Enregistré ✓', editPlan: 'Modifier le plan',
       note: 'Heures suggérées. Vérifiez les horaires avant de partir.', options: 'Plus d’options et notes', day: 'Jour', stops1: '1 arrêt', stopsN: '{n} arrêts', days1: '1 jour', daysN: '{n} jours',
       swap: 'Remplacer {name}', remove: 'Retirer {name}', removed: 'Retiré', undo: 'Annuler', another: 'Autre suggestion', details: 'Voir le lieu', why: 'Pourquoi ce choix', hours: 'Heures',
       lunch: 'Dîner', dinner: 'Souper', free: 'Temps libre', freeEve: 'Soirée libre', event: 'Événement', noDinner: 'Souper non planifié', close: 'Fermer',
@@ -153,6 +153,9 @@ const V4_CLIENT_SRC = String.raw`
       savedReplaced: 'Enregistré ✓ Votre voyage est dans Mon voyage.', notPriced: 'Prix pas encore indiqué : {names}', freeLabel: 'Gratuit', dogsOk: 'Chiens admis',
       tipNoBook: 'Plan confirmé. Partagez-le avec votre groupe ou enregistrez-le.' }
   };
+  // Round 4 (2026-11-21: "Before you go" repeated "Confirm the preceding stop's timing..." for every stop): the V4 notes keep
+  // only what is particular (a place closed that day, a request not included); the plan already says to check hours.
+  if (typeof t3PlanNextSteps === 'function') { var t3NextAll = t3PlanNextSteps; t3PlanNextSteps = function(p){ return t3NextAll(p).filter(function(x){ return x && x.kind !== 'timing' && x.kind !== 'event_timing'; }); }; }
   function vt(k, vars){
     var s = (V4_TEXT[lang()] || V4_TEXT.en)[k] || V4_TEXT.en[k] || k;
     if (vars) Object.keys(vars).forEach(function(x){ s = s.split('{' + x + '}').join(String(vars[x])); });
@@ -306,8 +309,9 @@ const V4_CLIENT_SRC = String.raw`
         var evening = !(s.freeTime && s.freeTime.minutes > 0), fid = 'v4d-f' + esc(key || Math.random().toString(36).slice(2));
         var note = evening ? '' : String((fr ? s.freeTime.noteFr : s.freeTime.note) || '').replace(/^(?:Free time|Temps libre)\s*:\s*/, '');
         var ideas = evening ? s.freeEvening.map(function(x){ var u = placeUrl(x); return u ? '<a ' + hrefAttr(u) + '>' + esc(x.name) + '</a>' : esc(x.name); }).join(fr ? ' ou ' : ' or ') : '';
-        var hrs = evening ? '' : (fr ? 'environ ' + String(Math.round(s.freeTime.minutes / 30) / 2).replace('.', ',') + ' h' : 'about ' + Math.round(s.freeTime.minutes / 30) / 2 + ' h');
-        return '<li class="v4-stop v4-free"><div class="v4-row">' + v4Thumb(null) + '<button type="button" class="v4-main" aria-expanded="false" aria-controls="' + fid + '" data-v4-toggle="' + fid + '"><span class="v4-name">' + esc(evening ? vt('freeEve') : vt('free')) + '</span><span class="v4-line">' + esc(hrs || (fr ? 'Idées pour manger' : 'Ideas to eat out')) + '</span></button><span></span></div>'
+        // Round 4 (2026-11-21): no "about 5.5 h" on free time; it went wrong once stops around it moved or were left out.
+        var hrs = evening ? (fr ? 'Idées pour manger' : 'Ideas to eat out') : '';
+        return '<li class="v4-stop v4-free"><div class="v4-row">' + v4Thumb(null) + '<button type="button" class="v4-main" aria-expanded="false" aria-controls="' + fid + '" data-v4-toggle="' + fid + '"><span class="v4-name">' + esc(evening ? vt('freeEve') : vt('free')) + '</span>' + (hrs ? '<span class="v4-line">' + esc(hrs) + '</span>' : '') + '</button><span></span></div>'
           + '<div class="v4-more" id="' + fid + '" hidden><p>' + (note ? esc(note.charAt(0).toUpperCase() + note.slice(1)) : ideas) + '</p></div></li>';
       }
       return '';
@@ -541,7 +545,7 @@ const V4_CLIENT_SRC = String.raw`
     try { if (!v4.saved && addState().state === 'added') v4.saved = true; } catch (err) {}
     bar.setAttribute('aria-label', v4.confirmed ? vt('book') : vt('confirm'));
     bar.innerHTML = v4BarHtml();
-    var tip = resultEl.querySelector('.v4-tip'); if (tip) tip.textContent = v4.confirmed ? (canBookNow ? vt('tipDone') : vt('tipNoBook')) : vt('tip');
+    var tip = resultEl.querySelector('.v4-tip:not(.v4-picked)'); if (tip) tip.textContent = v4.confirmed ? (canBookNow ? vt('tipDone') : vt('tipNoBook')) : vt('tip');
     var plan = resultEl.querySelector('.v4'); if (plan) plan.classList.toggle('v4-confirmed', v4.confirmed);
     document.body.style.paddingBottom = bar.offsetHeight ? bar.offsetHeight + 'px' : '';
   }
@@ -554,9 +558,12 @@ const V4_CLIENT_SRC = String.raw`
     var n = v4Count(p), nd = (p.days || []).length;
     var where = planKinds ? ((p.days || []).map(function(d){ return d.regionLabel; }).filter(function(x, i, a){ return x && a.indexOf(x) === i; }).slice(0, 2).join(', ')) : '';
     var sub = [nd > 1 ? vt('daysN', { n: nd }) : '', where, n === 1 ? vt('stops1') : vt('stopsN', { n: n })].filter(Boolean).join(' · ');
+    // Round 4 (2026-11-21: "things to do this weekend" quietly became Kelowna): one line says the town was our pick.
+    var picked = planKinds && p.understood && p.understood.valleyWide && !(p.understood.base || []).length && where && where.indexOf(',') === -1 ? vt('picked', { town: where }) : '';
     var html = '<div class="t3-plan v4' + (v4.confirmed ? ' v4-confirmed' : '') + '"><header class="v4-head"><h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(p.headline || p.summary || vt('yourPlan')) + '</h2>'
       + '<p class="v4-sub">' + esc(sub) + '</p><button type="button" class="v4-edit" data-v4-edit>✎ ' + esc(vt('edit')) + '</button></header>'
       + (p.eventAmbiguity ? '<section class="t3-warnings" role="alert"><p>' + esc(fr ? 'Plusieurs événements correspondent à «' + p.eventAmbiguity.phrase + '». Choisissez :' : 'More than one listed event matches “' + p.eventAmbiguity.phrase + '”. Choose one:') + '</p><div class="t3-event-choices">' + p.eventAmbiguity.candidates.map(function(name, i){ var cid = p.eventAmbiguity.candidateIds && p.eventAmbiguity.candidateIds[i]; return Number.isSafeInteger(cid) && cid > 0 ? '<button type="button" class="t3-btn t3-btn-ghost" data-t3-event-choice="' + cid + '">' + esc(name) + '</button>' : ''; }).join('') + '</div></section>' : '')
+      + (picked ? '<p class="v4-tip v4-picked">' + esc(picked) + '</p>' : '')
       + '<p class="v4-tip">' + esc(v4.confirmed ? (v4CanBook() ? vt('tipDone') : vt('tipNoBook')) : vt('tip')) + '</p>'
       + '<p class="t3-plan-status" id="t3PlanStatus" role="status" aria-live="polite"></p><div class="v4-days">';
     if (planKinds) {
@@ -642,6 +649,8 @@ const V4_CLIENT_SRC = String.raw`
       return;
     }
     if ((b = t.closest('[data-v4-edit]'))) {
+      // Round 4 (2026-11-21): a new request starts unconfirmed (an edited request came back already confirmed).
+      v4.confirmed = false; v4.ask = false; v4.gone = {}; v4.saved = false;
       var m = v4Main(); if (m) m.classList.add('v4-editing');
       setCompact(false);
       try { form.scrollIntoView({ block: 'center' }); } catch (err) {}
