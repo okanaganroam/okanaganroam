@@ -471,7 +471,8 @@ test('indoor test 11: Kim\'s Help questions (a science centre) land on the right
   assert.match(sd, /Open this day/);
   assert.match(sd, /Don’t tap We’re closed part of the year/);
   assert.match(plain(b.en.topic(LO).a), /non-profits, societies, co-ops and community groups count when they’re run locally/);
-  assert.match(plain(b.en.topic(FRN).a), /^ ?Your page has a French version\. We write the French for your own lines, usually within a day\./);
+  // Sport test 11 (2026-11-21): the translation answer says which way it goes, both ways.
+  assert.match(plain(b.en.topic(FRN).a), /^ ?Your page has an English and a French version\. Write your lines in the language you like, and we write the other one, usually within a day: lines in English get their French, lines in French get their English\./);
   const th = plain(b.en.topic(TH).a);
   assert.match(th, /Known for/);
   assert.match(th, /Add an event/);

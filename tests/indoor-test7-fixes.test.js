@@ -219,7 +219,9 @@ test('7. Kid-Friendly: All ages never ticks it for a gallery, casino, library or
     await ok(change(t, { indoor_info: { kinds: [kind], length: '1h', book: 'no' } }));
     const s = await openSetup(base, t, { hash: 'offer' });
     // Indoor test 15: a gallery, museum or library starts on All ages (our pick): it is saved as it is, not tapped off.
-    if (!s.has('[data-tpick="age:all"][aria-pressed="true"]')) await s.click('[data-tpick="age:all"]');
+    // Sport test 11 (2026-11-21): a pre-picked age is not her answer; she taps All ages.
+    if (s.has('[data-tpick="age:all"][aria-pressed="true"]')) await s.click('[data-tpick="age:5"]');
+    await s.click('[data-tpick="age:all"]');
     await s.click('offerSave');
     return db.prepare('SELECT kid_friendly FROM venues WHERE id = ?').get(v.id).kid_friendly;
   };

@@ -60170,9 +60170,12 @@ function indoorFirstItemName(venue, lang) {
     // Sport test 11 (2026-11-21; Geneviève's $75 was her 9-hole twilight rate, and the list began « 18 trous / 75 », the
     // golf kind's example): the first line's name comes only from what she said on the Price step (her holes, or what
     // her price is per); otherwise it is left empty beside her price. Never the kind's example. Every kind.
+    // (Indoor places keep their neutral unit names, "One player", "Shortest treatment": indoor tests 16-18.)
     if ((t.holes === 9 || t.holes === 18) && (t.kinds || []).includes('golf')) return lang === 'fr' ? `${t.holes} trous` : `${t.holes} holes`;
-    if (t.per && indoorKindsModule.TYPER_PER[t.per]) return indoorKindsModule.indoorTyperWords(t.kinds || indoorKindSuggestion(venue), lang, { per: t.per, own: indoorOwnWords(venue.id) }).first;
-    return '';
+    const w = indoorKindsModule.indoorTyperWords(t.kinds || indoorKindSuggestion(venue), lang, { per: t.per, own: indoorOwnWords(venue.id) });
+    if (t.per && indoorKindsModule.TYPER_PER[t.per]) return w.first;
+    if (sportSetupType(venue.type)) return '';
+    return INDOOR_UNIT_NAME_RE.test(w.first) ? '' : w.first;
   } catch (e) { return ''; }
 }
 function indoorMenuAppStrings(venue, lang) {

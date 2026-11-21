@@ -80,6 +80,8 @@ test('2. a golf course, Part 1 with real taps: Golf course picked, the season hi
   await sim.type('suBookUrl', 'https://example.com/tee-times');
   await sim.click('bookingSave');
   assert.ok(sim.has('[data-tpick="age:all"][aria-pressed="true"]'), 'All ages is a golf course\'s usual answer');
+  // Sport test 11 (2026-11-21): the pre-pick is a suggestion; her tap is the answer.
+  await sim.click('[data-tpick="age:5"]'); await sim.click('[data-tpick="age:all"]');
   await sim.click('offerSave');
   const en = plain(page(v));
   for (const l of ['Half a day or more.', 'Green fees from $59.', 'All ages.', 'Walk-ons when there’s room. Book tee times for weekends and busy times.']) assert.ok(en.includes(l), l);
