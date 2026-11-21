@@ -430,9 +430,14 @@ function kindHelp(t, kind, ctx) {
       title(...w('ratesQ'));
       // A package is its own answer (sport-package).
       t = { ...t, keys: (t.keys || []).filter((k) => !/^packages?$/.test(k)), keysFr: (t.keysFr || []).filter((k) => !/^forfaits?$/.test(k)) };
+      if (kind === 'skischool') t = both(t, [[/Your card shows your lowest regular adult price\. [^<]*? never/, 'Your card shows your lowest group lesson. Rentals, lift tickets, packages and kids’ programs never']], [[/Votre fiche montre votre prix adulte régulier le plus bas\. [^<]*? ne deviennent jamais/, 'Votre fiche montre votre cours de groupe le moins cher. La location, les billets de remontée, les forfaits et les programmes pour enfants ne deviennent jamais']]);
       return t;
     }
     case 'sport-tee-times': title(...w('bookQ')); return t;
+    // Sport test 5 (#14, #33): for a ski school a lesson IS the card's price; its extras are rentals, lift tickets and packages.
+    case 'sport-card-price':
+      if (kind !== 'skischool') return t;
+      return both(t, [['Rentals, lessons, memberships, food and kids’ or senior prices', 'Rentals, lift tickets, packages, food and kids’ programs']], [['La location, les cours, les abonnements, la nourriture et les prix pour enfants ou aînés', 'La location, les billets de remontée, les forfaits, la nourriture et les programmes pour enfants']]);
     case 'sport-rentals': title(...w('rentQ')); return t;
     case 'sport-opening-day': { const m = w('moves'); title(`Our opening day changes every year (${m[0]})`, `Notre jour d’ouverture change chaque année (selon ${m[1].replace(/^de /, '').replace(/^de l’/, 'l’')})`); return t; }
     case 'sport-season': {

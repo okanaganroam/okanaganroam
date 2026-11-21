@@ -143,6 +143,14 @@ function requestKidAges(text) {
   return [...new Set(out)].sort((a, b) => a - b);
 }
 // Tour test 2 (2026-11-16): the ages as typed (ctx.kidAges, read by the server before "10-year-old" becomes "kids").
+// Sport test 5: the owner's lowest price line whose own ages hold the youngest child the request names (server.js
+// ownerAgePrices), or null.
+function kidAgePrice(v, ctx) {
+  const age = kidsYoungest(ctx);
+  if (age == null || !v || !Array.isArray(v.agePrices) || !v.agePrices.length) return null;
+  const fit = v.agePrices.filter((p) => p && age >= p.min && age <= p.max && p.max < 99).sort((a, b) => a.price - b.price);
+  return fit[0] || null;
+}
 function kidsYoungest(ctx) { if (!ctx) return null; const a = Array.isArray(ctx.kidAges) && ctx.kidAges.length ? ctx.kidAges.slice().sort((x, y) => x - y) : requestKidAges(ctx.queryText || ''); return a.length ? a[0] : null; }
 // Whistler #190 (2026-11-17): an active party place for a kids' birthday, read from the listing's own name and category.
 const KIDS_PARTY_ACTIVE_RE = /\b(?:adventure parks?|aerial (?:adventure )?(?:parks?|courses?)|tree ?top|ropes? courses?|obstacle courses?|zip ?lines?|mini ?golf|climbing (?:gyms?|walls?)|trampoline\w*)\b/;
@@ -2328,6 +2336,9 @@ function publicVenue(v, ctx) {
     // Indoor test 13: the owner's own price line for the day or cheap night asked ("Cheap Tuesdays $8").
     : indoorFrom && !Array.isArray(v.indoorPerLine) && indoorAskedPriceLine(v, ctx) ? { ...indoorAskedPriceLine(v, ctx), label: 'Indoor', labelFr: 'Intérieur', source: null, lineFr: indoorAskedPriceLine(v, ctx).line, asked: true }
     // Indoor test 18: THE PRICE RULE (indoor-kinds.js): its amount is the lowest real price ("From $70" with a $70 pedicure).
+    // Sport test 5 (2026-11-20): a child's own line from the owner's list ("Kids Club (ages 5 to 12), full day: $259"), never
+    // the adult price, when the request names the child's age.
+    : indoorFrom && kidAgePrice(v, ctx) ? { cents: Math.round(kidAgePrice(v, ctx).price * 100), label: v.type === 'golf' ? 'Golf' : 'Activity', labelFr: v.type === 'golf' ? 'Golf' : 'Activité', source: null, line: `${kidAgePrice(v, ctx).name}: {x}`, lineFr: `${kidAgePrice(v, ctx).name} : {x}`, kidLine: true }
     : indoorFrom && Array.isArray(v.indoorPriceLine) ? { cents: Math.round((typeof v.indoorPriceAt === 'number' && v.indoorPriceAt > 0 ? v.indoorPriceAt : indoorFrom) * 100), label: v.kindOwn ? (v.type === 'golf' ? 'Golf' : 'Activity') : 'Indoor', labelFr: v.kindOwn ? (v.type === 'golf' ? 'Golf' : 'Activité') : 'Intérieur', source: null, line: v.indoorPriceLine[0], lineFr: v.indoorPriceLine[1] }
     : indoorFrom ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null }
     : cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
@@ -2355,6 +2366,8 @@ function publicVenue(v, ctx) {
     // Sport test 4: a golf course whose owner also picked a range is a golf course; "& driving range" only when the request
     // asked for the range (Ryan's card read "DRIVING RANGE · Green fees from $55").
     ...(v.type === 'golf' && !v.indoorGolf && golfPartLabel(v) && ownerMainKind(v) === 'golf' && askedGolfPart(v, ctx) ? { typeLabel: `Golf course & ${golfPartLabel(v)[0].toLowerCase()}`, typeLabelFr: `Terrain de golf et ${golfPartLabel(v)[1].toLowerCase()}` } : {}),
+    // Sport test 5: a sports listing planned as a tour, indoor or outdoor stop says its own kind ("Ski & snowboard lessons").
+    ...(v.kindOwn && Array.isArray(v.sportKindWords) && v.sportKindWords[0] ? { typeLabel: v.sportKindWords[0], typeLabelFr: v.sportKindWords[1] || v.sportKindWords[0] } : {}),
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
     // Tour test 4: no $-$$$$ tier beside a tour's own price ("Free · $$", "From $35 · $$").
     rating: v.rating, reviews: v.reviews, price: tourIsFree || tourFrom || indoorFrom || ((v.type === 'indoor' || v.kindOwn) && v.indoorFree) ? null : v.price, freeEntry: !!v.features?.free_entry || ((v.type === 'indoor' || v.kindOwn) && !!v.indoorFree), address: v.address || null,
@@ -2890,10 +2903,16 @@ function stopFrom(v, scored, extra, ctx) {
     if (!caveats.includes(bn)) caveats.push(bn);
   }
   if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = tourBookAheadNote(v); if (!caveats.includes(bn)) caveats.push(bn); }
+  // Sport test 5: a ski school planned as a tour books lessons, not tour departures.
+  else if (v && v.kindOwn && typeof v.sportBookNote === 'string') { if (!caveats.includes(v.sportBookNote)) caveats.push(v.sportBookNote); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
   // Tour test 4 (Whistler, 2026-11-17), bug 12: the operator's one booking and age answer stands for several unlike trips
   // (its own Tours & prices list names different lengths or ages): say so, once.
   if (v && v.type === 'tour' && v.tourVaries && (TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead] || v.tourMinAge) && !caveats.includes(TOUR_VARIES_NOTE)) caveats.push(TOUR_VARIES_NOTE);
+  // Sport test 5 (2026-11-20; Jen's ski school on an undated plan made Nov 20, before her Nov 26 opening day, read "Listed
+  // hours: 8 AM – 4:30 PM daily" while the resort beside her said it was closed): an undated plan made while an owner's own
+  // season is closed says so on her stop too, with her reopening day.
+  { const on = ownerSeasonClosedNowNote(v, ctx); if (on && !caveats.includes(on)) caveats.push(on); }
   // Indoor test 16 (2026-11-19; Tyler: 12+ on their own, 8 to 11 with a paying adult): with kids, the owner's adult rule.
   { const an = indoorAdultNote(v, ctx); if (an && !caveats.includes(an)) caveats.push(an); }
   if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|8|10|12|14|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
@@ -5170,12 +5189,15 @@ function indoorKindPlurals(ctx) {
 }
 // Sport test 3: "Mini golf in Kelowna", "Driving ranges in Kelowna" (never "Indoor & rainy day spots" or "Golf courses").
 const GOLF_PART_PLURALS = { mini_golf: 'mini golf', driving_range: 'driving ranges' };
+const TOUR_KIND_SET_FOR_SUMMARY = new Set(tripRequirements.TOUR_PLANNER_KINDS || []);
 function interestsText(ctx) {
   const items = [];
   const kindNames = indoorKindPlurals(ctx);
   const golfParts = [...new Set((ctx.plannerKinds || []).filter((k) => GOLF_PART_PLURALS[k]).map((k) => GOLF_PART_PLURALS[k]))];
   if (golfParts.length) items.push(...golfParts);
-  for (const t of ctx.types) { if (golfParts.length && (t === 'indoor' || t === 'golf' || t === 'outdoor' || t === 'sport')) continue; if (t === 'indoor' && kindNames.length) { items.push(...kindNames); continue; } items.push(typeLabel(ctx, t).toLowerCase()); }
+  // Sport test 5 (2026-11-20; "first time skiing" read "focused on tours & experiences"): a lesson request says lessons.
+  const lessonsOnly = (ctx.plannerKinds || []).includes('ski_lessons') && !(ctx.plannerKinds || []).some((k) => k !== 'ski_lessons' && TOUR_KIND_SET_FOR_SUMMARY.has(k));
+  for (const t of ctx.types) { if (t === 'tour' && lessonsOnly) { items.push('ski and snowboard lessons'); continue; } if (golfParts.length && (t === 'indoor' || t === 'golf' || t === 'outdoor' || t === 'sport')) continue; if (t === 'indoor' && kindNames.length) { items.push(...kindNames); continue; } items.push(typeLabel(ctx, t).toLowerCase()); }
   for (const a of ctx.activities) items.push(activityLabel(ctx, a));
   for (const c of ctx.collections) items.push(collectionLabel(ctx, c));
   // Indoor test 6 (2026-11-19; "paint your own pottery" read "Indoor & rainy day spots, “paint” and “own”"): with an
@@ -5812,7 +5834,7 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
       const item={day:group.day,date,venueId:v?.id,status:timed?.bad?'unmet':timed?(timed.provisional||provisional?'provisional':'estimated'):'unverified',assumedStart:assumed};
       // Tour test 16: a tour's time on the card is its own departure ("departure": true), or "Book a departure time" when the
       // operator listed none (bookDeparture), never a made-up afternoon slot. Rentals-only operators keep their hours.
-      if(v&&v.type==='tour'&&timed&&!timed.bad){if(timed.departure)item.departure=true;else if(requirements.startMinutes==null&&!(Array.isArray(v.tourKinds)&&v.tourKinds.length&&v.tourKinds.every(k=>k==='rentals')))item.bookDeparture=true;}
+      if(v&&v.type==='tour'&&timed&&!timed.bad){if(timed.departure)item.departure=true;else if(requirements.startMinutes==null&&!(Array.isArray(v.tourKinds)&&v.tourKinds.length&&v.tourKinds.every(k=>k==='rentals'))){item.bookDeparture=true;if(Array.isArray(v.sportBookLabel))item.bookLabel=v.sportBookLabel.slice();}}
       let note;
       if(timed&&!timed.bad){
         Object.assign(item,{startMinutes:timed.start,endMinutes:timed.end,waitMinutes:timed.wait,transferMinutes:timed.transfer});
@@ -9501,6 +9523,16 @@ const OPERATING_MONTHS = ['january','february','march','april','may','june','jul
 const OPERATING_PERIOD_RE = new RegExp(`\\b(?:opens?|operates?|runs?)\\s+(?:daily\\s+)?(?:from\\s+)?(${OPERATING_MONTHS.join('|')})\\s+(?:to|through|until|into)\\s+(?:(?:early|mid|late)\\s+)?(${OPERATING_MONTHS.join('|')})\\b`);
 // Tour test 13 (Whistler, 2026-11-18; Matthias: "winter only by request"): a tour that ticked "Off-season trips by
 // request" is not closed for its season (its stop says "by request, rare": seasonOffRequest); its owner closures are.
+function ownerSeasonClosedNowNote(v, ctx) {
+  try {
+    if (!v || !ctx || !/^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || ''))) return null;
+    if ((ctx.requirements && ctx.requirements.startDate) || (ctx.seasonInfo && (ctx.seasonInfo.named || Number.isInteger(ctx.seasonInfo.month)))) return null;
+    const ex = /^(\d{2}-\d{2}):(\d{2}-\d{2})$/.exec(String(v.openMonths || ''));
+    if (!ex || !seasonClosedOnTripRaw({ ...v, ownerClosures: undefined }, { date: ctx.tripDate })) return null;
+    const md = ex[1], y = Number(ctx.tripDate.slice(0, 4)), iso = `${ctx.tripDate.slice(5, 10) < md ? y : y + 1}-${md}`;
+    return `${v.name} is closed for the season right now and reopens on ${MONTH_NAMES[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}. This plan is for when it’s open.`;
+  } catch (e) { return null; }
+}
 function seasonClosedOnTrip(v, season) {
   if (v && v.tourOffRequest && !(v.ownerClosures && v.ownerClosures.some((c) => ((season && season.date) || ownerClosureToday()) >= c.from && ((season && season.date) || ownerClosureToday()) <= c.to))) return false;
   return seasonClosedOnTripRaw(v, season);

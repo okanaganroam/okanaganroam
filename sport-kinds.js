@@ -308,7 +308,8 @@ const SPORT_KIND_LENGTH = { golf: 'half', simgolf: '1-2h', range: '1h', rink: '1
 // Good to know words: "Tee times recommended; walk-ons when there's room").
 const SPORT_KIND_BOOK = { golf: 'busy', simgolf: 'ahead', range: 'no', rink: 'no', skatepark: 'no', discgolf: 'no', bike: 'no', swim: 'no', courts: 'no', skischool: 'ahead', sportsctr: 'no' };
 // Public, open-to-all kinds start on All ages (a suggestion, saved only with the screen).
-const SPORT_ALL_AGES_KINDS = ['golf', 'range', 'rink', 'skatepark', 'discgolf', 'bike', 'swim', 'courts', 'sportsctr'];
+// Sport test 5 (2026-11-20; Jen: nothing pre-picked, and her youngest is 3): a ski school too (kids' programs from age 3).
+const SPORT_ALL_AGES_KINDS = ['golf', 'range', 'rink', 'skatepark', 'discgolf', 'bike', 'swim', 'courts', 'sportsctr', 'skischool'];
 // The kinds research's words name (the name first, then the story), up to 3, as the starting picks.
 const SPORT_KIND_HINTS = [['simgolf', /simulator|indoor golf|sim golf|golf lounge|sim lounge|virtual golf|golfbox|trackman|sportszone/], ['range', /driving range|mini ?golf|mini ?putt|\brange\b/],
   ['discgolf', /disc golf|frisbee golf/], ['golf', /(?<!disc |frisbee |mini[- ]|mini)\bgolf\b|country club|\blinks\b/], ['rink', /arena|rink|skating|curling|hockey|sun bowl|ice cent/], ['skatepark', /skate ?park|skateboard|youth park/],
@@ -330,8 +331,8 @@ const BOOK_WORDS = {
     lines: { no: ['First come, first served: no need to book.', 'Premier arrivé, premier servi : pas besoin de réserver.'], busy: ['First come, first served. Book a court for evenings, weekends and busy times.', 'Premier arrivé, premier servi. Réservez un terrain pour les soirées, les fins de semaine et les périodes achalandées.'], ahead: ['Please book a court ahead.', 'Réservez un terrain à l’avance.'] },
     notes: { busy: own('First come, first served; book a court for evenings, weekends and busy times', 'Premier arrivé, premier servi; réservez un terrain pour les soirées, les fins de semaine et les périodes achalandées'), ahead: own('Book a court ahead', 'Réservez un terrain à l’avance') } },
   skischool: { chips: { no: ['Yes, drop-in lessons', 'Oui, cours sans réservation'], busy: ['Yes, but book ahead for weekends and holidays', 'Oui, mais réservez pour les fins de semaine et les congés'], ahead: ['No, please book lessons ahead', 'Non, réservez les cours à l’avance'] },
-    lines: { no: ['Drop-in lessons: no need to book.', 'Cours sans réservation : pas besoin de réserver.'], busy: ['Drop-in lessons when there’s room. Book ahead for weekends and holidays.', 'Cours sans réservation s’il y a de la place. Réservez pour les fins de semaine et les congés.'], ahead: ['Please book lessons ahead.', 'Réservez vos cours à l’avance.'] },
-    notes: { busy: own('Drop-in lessons when there’s room; book ahead for weekends and holidays', 'Cours sans réservation s’il y a de la place; réservez pour les fins de semaine et les congés'), ahead: own('Book lessons ahead', 'Réservez vos cours à l’avance') } },
+    lines: { no: ['Drop-in lessons: no need to book.', 'Cours sans réservation : pas besoin de réserver.'], busy: ['Same-day lessons when there’s room. Book ahead for weekends and holidays.', 'Cours le jour même s’il y a de la place. Réservez pour les fins de semaine et les congés.'], ahead: ['Please book lessons ahead.', 'Réservez vos cours à l’avance.'] },
+    notes: { busy: own('Same-day lessons when there’s room; book ahead for weekends and holidays', 'Cours le jour même s’il y a de la place; réservez pour les fins de semaine et les congés'), ahead: own('Book lessons ahead', 'Réservez vos cours à l’avance') } },
   // Open-to-all outdoor places: nobody "walks in" to a skate park, a disc golf course or a pump track.
   skatepark: { chips: { no: ['Yes, open to everyone', 'Oui, ouvert à tous'] }, lines: { no: ['Open to everyone: no need to book.', 'Ouvert à tous : pas besoin de réserver.'] } },
   discgolf: { chips: { no: ['Yes, open to everyone', 'Oui, ouvert à tous'] }, lines: { no: ['Open to everyone: no need to book.', 'Ouvert à tous : pas besoin de réserver.'] } },

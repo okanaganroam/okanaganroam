@@ -1808,6 +1808,7 @@
   // Indoor test 3 (2026-11-19; Diane, a community theatre): the main kind (the first picked, or pre-picked), and whether it
   // is a show place (live theatre, music or comedy): it is asked about tickets, and its price is its lowest regular ticket.
   // Sport and golf (2026-11-20): the main kind's usual season's hint on the Hours step ('' for none).
+  function winterKindOnly(){ return !!C.sport && (C.kindSeasons || {})[indoorMainKind()] === 'winter'; }
   function sportSeasonHint(){ if (!C.sport) return ''; if (T.seasonHintKind) return T.seasonHintKind; var se = (C.kindSeasons || {})[indoorMainKind()] || ''; return se === 'summer' ? (T.seasonHintSummer || '') : se === 'winter' ? (T.seasonHintWinter || '') : ''; }
   function indoorMainKind(){ if (!C.indoor) return ''; return ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0] || ''; }
   function indoorShow(){ return indoorMainKind() === 'theatre' && !!T.ibookQShow; }
@@ -2439,7 +2440,7 @@
         // Sport test 1: a one-season kind (a golf course, an arena) is never asked about spring and fall shoulder seasons.
         + (C.sport && (C.kindSeasons || {})[indoorMainKind()] ? '' : (T.openTwice ? '<p class="su-hint su-twice">' + h(T.openTwice) + (yearlyClosed().length ? ' ' + h(fill(T.openTwiceHave, { list: andList(yearlyClosed()) }).replace(/\.\.$/, '.')) : '') + '</p>' : ''))
         + tticksHtml(true)
-        + '<div class="su-stack">' + (fromHours ? big('✓', T.openSame, T.openSameSub, false, 'openSave:same') + big('☀️', T.openSummer, T.openSummerSub, true, 'openSave:summer') : big('✓', T.openSaveOnly, '', false, 'openSave:only'))
+        + '<div class="su-stack">' + (fromHours ? big('✓', T.openSame, T.openSameSub, false, 'openSave:same') + (winterKindOnly() && T.openPart ? big('❄️', T.openPart, T.openPartSub, true, 'openSave:part') : big('☀️', T.openSummer, T.openSummerSub, true, 'openSave:summer')) : big('✓', T.openSaveOnly, '', false, 'openSave:only'))
         + big('✕', T.allYearBtn, '', true, 'openNone') + '</div>';
     } else if (s === 'hours:edit' || seaIsStep(s)) {
       var seas = seaIsStep(s), seaOther = seas ? seaOtherOf(S.seaI) : null, seaOtherAB = seaOther && seaOther.on && seaOther.week ? seaAB([seaOther]) : null;
@@ -4171,6 +4172,9 @@
       if (S.openFrom === 'appt') { if (k === 'openNone') return go('hours:year', true); return seasonOnlySave(); }
       if (S.openFrom === 'hours') {
         if (APPT) S.wYearPick = 'seasonal';
+        // Sport test 5 (2026-11-20): a winter-only kind (a ski school) adds hours for part of its winter season (Christmas, night
+        // lessons), never "summer hours in July and August".
+        if (v === 'part') { if (S.sea.kind !== 'winter' || !S.sea.week) { var keepW = !!(S.sea.week && (CUR.hours_seasons || []).length); S.sea.kind = 'winter'; if (!keepW) { S.sea.months = {}; [12, 1, 2, 3].forEach(function(m){ S.sea.months[m] = true; }); S.sea.week = clone(S.week); } } S.sea.on = true; S.sea.open = {}; S.sea.dirty = true; S.seaTouched = true; return go('hours:season'); }
         if (v === 'summer') { if (S.sea.kind !== 'summer' || !S.sea.week) { var keepSt = !!(S.sea.week && (CUR.hours_seasons || []).length); S.sea.kind = 'summer'; if (!keepSt) { S.sea.months = {}; SEA_MONTHS.summer.forEach(function(m){ S.sea.months[m] = true; }); S.sea.week = clone(S.week); } } S.sea.on = true; S.sea.open = {}; S.sea.dirty = true; S.seaTouched = true; return go('hours:season'); }
         if (k === 'openNone') return go('hours:year', true);
         if (v !== 'keep') { S.seaList.forEach(function(o){ o.on = false; }); S.seaTouched = true; }
@@ -5414,6 +5418,9 @@
   // typing anywhere else, deleting, or a box that holds her own words is left exactly as it is.
   // The words that carry a chip's sentence on (Sport test 4): "for up to 144", "with mini golf", "in summer".
   var JOIN_WORDS = /^(?:for|with|in|on|at|up|from|to|and|or|but|plus|until|till|after|before|by|during|except|only|all|every|each|including|when|if|of|as|via|near|inside|outside|pour|avec|en|au|aux|à|de|du|des|et|ou|jusqu|dès|sauf|seulement|sur|dans|le|la|les)$/;
+  // Sport test 5 (2026-11-20; Jen pasted " midweek" after "School and club groups": "groups. Midweek."): a time word typed in
+  // lower case carries the chip on too ("School and club groups midweek"), pasted or typed (server.js OWNER_CHIP_CONT_WORDS).
+  var CONT_WORDS = /^(?:midweek|weekdays?|weekends?|weeknights?|daily|nightly|mornings?|afternoons?|evenings?|weekly|monthly|year-round|too|also|mostly|usually|sometimes)$/;
   var quickJoin = function(box, prev, sibs, sep){
     var v = box.value, p0 = String(prev || '');
     // Sport test 3 (2026-11-20; Gord tapped "Birthday parties", then typed "with mini golf for up to 20 kids": it saved as
@@ -5430,9 +5437,9 @@
       if (/^\s?[,;]/.test(add0)) { nv0 = p0.replace(/\. $/, '') + add0.replace(/^\s/, ''); return put0(nv0, nv0.length - v.length); }
       if (!/^\s?[a-zà-ÿ]/.test(add0)) return false;
       var w0 = add0.replace(/^\s/, '');
-      if (!/[\s,.;:!?]/.test(w0)) return 'wait';
       var first0 = (/^[a-zà-ÿ’'-]+/.exec(w0) || [''])[0];
-      if (JOIN_WORDS.test(first0)) { nv0 = p0.replace(/\. $/, ' ') + w0; return put0(nv0, nv0.length - v.length); }
+      if (!/[\s,.;:!?]/.test(w0) && !(CONT_WORDS.test(w0) && add0.length > 2)) return 'wait';
+      if (JOIN_WORDS.test(first0) || CONT_WORDS.test(first0)) { nv0 = p0.replace(/\. $/, ' ') + w0; return put0(nv0, nv0.length - v.length); }
       nv0 = p0 + w0.charAt(0).toUpperCase() + w0.slice(1);
       return put0(nv0, nv0.length - v.length);
     }
