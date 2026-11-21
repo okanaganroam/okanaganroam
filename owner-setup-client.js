@@ -4923,7 +4923,16 @@
     // Seasons (pub test 7): All year / Only some months / exact dates / back to months, and the month chips.
     Array.prototype.forEach.call(screen.querySelectorAll('[data-sea]'), function(b){ b.onclick = function(){
       readEntries(); readTimes(); var q2 = b.getAttribute('data-sea').split(':'), o = seaObj(q2[0]); if (!o) return;
-      if (q2[1] === 'all') o.on = false; else if (q2[1] === 'some') o.on = true;
+      if (q2[1] === 'all') o.on = false;
+      else if (q2[1] === 'some') {
+        o.on = true;
+        // Sport test 4 (2026-11-20; Ryan tapped April to October by hand for a course open March 6 to November 1): a happy
+        // hour's months start as the place's own open months, to untick what doesn't apply.
+        if (q2[0].indexOf('happy') === 0 && !o.exact && !Object.keys(o.months).some(function(k){ return o.months[k]; })) {
+          var os0 = (S.openSea && S.openSea.from ? S.openSea : null) || openSeaOf(CUR.open_months);
+          if (os0 && os0.from && os0.to) { var mb0 = +os0.to.slice(0, 2); o.months = seaFrom(os0.from.slice(0, 2) + '-01', pad2(mb0) + '-' + MLAST[mb0 - 1]).months; }
+        }
+      }
       else if (q2[1] === 'exact') { var r0 = monthRun(o.months); o.exact = r0.a ? { from: pad2(r0.a) + '-01', to: pad2(r0.b) + '-' + MLAST[r0.b - 1] } : { from: '', to: '' }; }
       else if (q2[1] === 'months') { var sm = seaMonths({ on: true, months: o.months, exact: o.exact }); o.exact = null; o.months = sm; }
       if (q2[0] === 'hours') { S.seaTouched = true; S.sea.dirty = true; }
@@ -5317,7 +5326,7 @@
       // Tour test 14: a space typed right after a chip's ". " is not a second space.
       // Indoor test 11 (2026-11-19; Kim): no double space after a chip, also when a phone keyboard puts a space before the word
       // it adds (" School") after the chip's own ". ".
-      inp.addEventListener('input', function(){ if (inp._qPrev && / $/.test(inp._qPrev) && inp.value.indexOf(inp._qPrev + ' ') === 0) { inp.value = inp._qPrev + inp.value.slice(inp._qPrev.length + 1).replace(/^ +/, ''); inp._qPrev = inp.value === inp._qPrev ? inp._qPrev : ''; try { var nq = inp.value.length; inp.setSelectionRange(nq, nq); } catch (e) {} } });
+      inp.addEventListener('input', function(){ if (inp._qPrev && / $/.test(inp._qPrev) && inp.value.indexOf(inp._qPrev + ' ') === 0) { inp.value = inp._qPrev + inp.value.slice(inp._qPrev.length + 1).replace(/^ +/, ''); /* Sport test 4: the chip's line stays the one the words are joined to (quickJoin). */ try { var nq = inp.value.length; inp.setSelectionRange(nq, nq); } catch (e) {} } });
       inp.addEventListener('click', function(){ if (!(S.chipFilled && S.chipFilled[inp.id] != null && S.chipFilled[inp.id] === inp.value) || inp._chipEnd) return; inp._chipEnd = true; try { var ne = inp.value.length; if (inp.selectionStart !== ne || inp.selectionEnd !== ne) inp.setSelectionRange(ne, ne); } catch (e) {} });
       inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) { inp.select(); inp._autoSel = Date.now(); } else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
       // "…or tap again to add to it": a second tap on the story box while our own select is still on it puts the cursor
@@ -5403,17 +5412,29 @@
   // onlyDogs welcome…". When the box holds only quick answers and she types on at the end, the chips' own separator
   // (". ", or ", " for takeout) goes in first: "Patio only. Dogs welcome…". Nothing she typed is ever changed or lost;
   // typing anywhere else, deleting, or a box that holds her own words is left exactly as it is.
+  // The words that carry a chip's sentence on (Sport test 4): "for up to 144", "with mini golf", "in summer".
+  var JOIN_WORDS = /^(?:for|with|in|on|at|up|from|to|and|or|but|plus|until|till|after|before|by|during|except|only|all|every|each|including|when|if|of|as|via|near|inside|outside|pour|avec|en|au|aux|à|de|du|des|et|ou|jusqu|dès|sauf|seulement|sur|dans|le|la|les)$/;
   var quickJoin = function(box, prev, sibs, sep){
     var v = box.value, p0 = String(prev || '');
     // Sport test 3 (2026-11-20; Gord tapped "Birthday parties", then typed "with mini golf for up to 20 kids": it saved as
     // "Birthday parties. With mini golf…"): a chip's ". " (tour test 10) is a space again when the words typed right after
     // it carry the chip on in lower case, as the distillery fix below does for a box without the ". ".
+    // Sport test 4 (2026-11-20; Ryan): words that arrive in one go (a paste, dictation or a predicted word, often with a
+    // space first) join the same way; a comma or semicolon carries the chip on ("Dress code: collared shirts, no denim",
+    // never "shirts. , no denim"); and only a linking word joins with a space ("Group lessons and clinics" + "junior camps
+    // in July" is a new sentence, "Junior camps in July", never "clinics junior camps"). Typed key by key, the first word
+    // is judged once it is finished.
     if (sep === '. ' && /[^.!?\s]\. $/.test(p0) && v.length > p0.length && v.slice(0, p0.length) === p0) {
-      var add0 = v.slice(p0.length);
-      if (!/^[a-zà-ÿ]/.test(add0)) return false;
-      var at0 = box.selectionStart, nv0 = (p0.replace(/\. $/, ' ') + add0).slice(0, box.maxLength > 0 ? box.maxLength : 180);
-      box.value = nv0; try { if (at0 != null) box.setSelectionRange(Math.min(nv0.length, at0 - 1), Math.min(nv0.length, at0 - 1)); } catch (e1) {}
-      return true;
+      var add0 = v.slice(p0.length), cut0 = box.maxLength > 0 ? box.maxLength : 180, at0 = box.selectionStart, nv0;
+      var put0 = function(nv, shift){ box.value = nv.slice(0, cut0); try { if (at0 != null) { var q0 = Math.max(0, Math.min(box.value.length, at0 + shift)); box.setSelectionRange(q0, q0); } } catch (e1) {} return true; };
+      if (/^\s?[,;]/.test(add0)) { nv0 = p0.replace(/\. $/, '') + add0.replace(/^\s/, ''); return put0(nv0, nv0.length - v.length); }
+      if (!/^\s?[a-zà-ÿ]/.test(add0)) return false;
+      var w0 = add0.replace(/^\s/, '');
+      if (!/[\s,.;:!?]/.test(w0)) return 'wait';
+      var first0 = (/^[a-zà-ÿ’'-]+/.exec(w0) || [''])[0];
+      if (JOIN_WORDS.test(first0)) { nv0 = p0.replace(/\. $/, ' ') + w0; return put0(nv0, nv0.length - v.length); }
+      nv0 = p0 + w0.charAt(0).toUpperCase() + w0.slice(1);
+      return put0(nv0, nv0.length - v.length);
     }
     if (!p0.trim() || v.length <= p0.length || v.slice(0, p0.length) !== p0 || /[\s.,;:!?]$/.test(p0)) return false;
     var added = v.slice(p0.length);

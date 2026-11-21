@@ -266,7 +266,7 @@ const DEBBIE_LOG = [
   ['en', 'setup', 'do you list weddings? we do weddings in the clubhouse', [G]],
   ['en', 'setup', 'lessons with our CPGA pro, where do they go', [LS]],
   ['en', 'setup', "can I add our men's night on wednesdays", [TH]],
-  ['en', 'setup', 'the course is closed to the public for a tournament on june 12', CL.concat([TOUR])],
+  ['en', 'setup', 'the course is closed to the public for a tournament on june 12', CL.concat([TOUR, 'sport-one-off-closure'])], // sport test 4: a one-off closure's own answer
   ['en', 'setup', 'frost delays in spring, what do I do', [W]],
   ['en', 'setup', 'if it rains do we show as closed', [W]],
   ['en', 'setup', 'kids under 12 golf free with a paying adult', [P, 'sport-kids-free']], // sport test 3: kids free is a price line
@@ -386,5 +386,14 @@ test('sport test 3: Gord\'s Help log (a driving range and mini golf) lands, with
   const page = (lang, pg) => (pg === 'menu' ? (lang === 'fr' ? b.frMenu : b.menu) : (lang === 'fr' ? b.fr : b.en));
   const wrong = [];
   for (const [lang, pg, q, want] of GORD_LOG) { const r = page(lang, pg).best(q); if (!r || !want.includes(r.id)) wrong.push(`[${lang} ${pg}] "${q}" -> ${r && r.id}`); }
+  assert.deepEqual(wrong, []);
+});
+
+test('sport test 4: Ryan\'s Help log (a golf course with a range) lands, with French twins of his misses and partials (EN + FR, on the page he asked from)', async () => {
+  const { RYAN_LOG } = require('./sport4-help-log.js');
+  const b = await botsFor('golf');
+  const page = (lang, pg) => (pg === 'menu' ? (lang === 'fr' ? b.frMenu : b.menu) : (lang === 'fr' ? b.fr : b.en));
+  const wrong = [];
+  for (const [lang, pg, q, want] of RYAN_LOG) { const r = page(lang, pg).best(q); if (!r || !want.includes(r.id)) wrong.push(`[${lang} ${pg}] "${q}" -> ${r && r.id} (hits ${r && r.hits.slice(0, 4).join(',')})`); }
   assert.deepEqual(wrong, []);
 });

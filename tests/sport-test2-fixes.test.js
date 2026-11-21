@@ -403,7 +403,9 @@ test('13. research lines kept: Groups keeps the league sentence (240 for a sport
   assert.match(en, /Lessons with outside PGA of Canada pros/);
   const fr = page(v, 'fr');
   assert.match(fr, /Full bar with beer on tap/, 'French keeps research\'s Food row');
-  assert.match(fr, /Sans réservation si une baie est libre[^.]*\.[^]*Book online or by phone/, 'French keeps the booking detail');
+  // Sport test 4 (2026-11-20): the French booking row never mixes in research's English (it adds it once translated).
+  assert.match(fr, /Sans réservation si une baie est libre/);
+  assert.doesNotMatch(fr, /Sans réservation si une baie est libre[^.]*\.\s*Book online or by phone/, 'no English inside the French booking row');
   assert.doesNotMatch(fr, /Plus : durée/);
   // Approved list: research's price rows step back.
   db.prepare("INSERT INTO venue_menus (venue_id, status, data, submitted_by, submitted_at, published_at, source) VALUES (?, 'published', ?, 'owner-link', datetime('now'), datetime('now'), 'owner')")

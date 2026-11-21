@@ -1335,6 +1335,22 @@ function kindSeasonAsked(v, ctx) {
 // (trip-requirements.js golfPartKind), and a part of the place closed for its own season on the trip's day ("Mini golf:
 // April to mid-October", server.js sportPartSeasons).
 const GOLF_PART_KINDS = ['mini_golf', 'driving_range'];
+// Sport test 4 (2026-11-20; Ryan's course also ticked "Driving range or mini golf": its category words "Golf course &
+// driving range" read as a range, so Build My Trip left it out of every plain golf request): a golf or sport listing's
+// kind is its owner's MAIN kind (sportKinds[0], server.js sportMainKind); extra kinds add, never replace. Its category
+// words decide only for a listing with no owner kinds. null when the owner picked none.
+function ownerMainKind(v) { return v && Array.isArray(v.sportKinds) && v.sportKinds.length ? v.sportKinds[0] : null; }
+// A range or mini golf (not a course): its owner's main kind, else its category words.
+function golfRangeOnly(v, wordsRe) {
+  if (!v || v.type !== 'golf') return false;
+  const mk = ownerMainKind(v);
+  if (mk) return mk === 'range';
+  return wordsRe.test(normWords(v.cuisine || ''));
+}
+// The planner kinds an owner's main kind is (trip-requirements.js SPORT_KIND_PLANNER, and a range's mini golf and driving
+// range): a place whose MAIN kind was asked for comes before one that has it only as a second kind.
+const MAIN_KIND_PLANNER = { range: ['mini_golf', 'driving_range'], skatepark: ['skatepark'], discgolf: ['disc_golf'], bike: ['bmx'], courts: ['tennis', 'pickleball'], rink: ['skating'], skischool: ['ski_lessons'] };
+function askedMainKind(v, ctx) { const mk = ownerMainKind(v); return !!mk && !!ctx && (MAIN_KIND_PLANNER[mk] || []).some((k) => (ctx.plannerKinds || []).includes(k)); }
 function askedGolfPart(v, ctx) { return !!v && !!ctx && (ctx.plannerKinds || []).some((k) => GOLF_PART_KINDS.includes(k) && (v.plannerKinds || []).includes(k)); }
 function golfPartShut(v, ctx) {
   if (!v || !Array.isArray(v.partSeasons) || !v.partSeasons.length || !ctx) return false;
@@ -1516,7 +1532,7 @@ function eligible(v, ctx, strict) {
   // Young kids (2026-10-25: "something to do with a 5 year old" got an ice-cave heli tour): no heli, backcountry or
   // big-thrill outfitters unless the request names one.
   if (ctx.kids && v.type === 'tour' && !['all', '5', '6', '8', '10'].includes(v.tourMinAge) && !(v.tourMinAge && kidsYoungest(ctx) != null && kidsAllowed(v, ctx)) && /\b(?:heli\w*|helicopter|backcountry|bungee|bungy|skydiv\w*|paraglid\w*|via ferrata|cat ski\w*|snowcat|ice cave|avalanche|mountaineering|ski touring|kiteboard\w*|kitesurf\w*|wing foil\w*|rock climbing guides?|climbing guides?|whitewater)\b/.test(normWords(v.cuisine || '')) && !namedInRequest(v, ctx)) return false;
-  if (v.type === 'golf' && /\bdriving range\b/.test(normWords(v.cuisine || '')) && !askedGolfPart(v, ctx) && !/\b(?:range|practice|lesson|lessons|mini ?golf|mini ?putt|minigolf|buckets?|balls)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
+  if (golfRangeOnly(v, /\bdriving range\b/) && !askedGolfPart(v, ctx) && !/\b(?:range|practice|lesson|lessons|mini ?golf|mini ?putt|minigolf|buckets?|balls)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
   if (golfPartShut(v, ctx) && !namedInRequest(v, ctx)) return false;
   if (specialistOutdoorBlocked(v, ctx)) return false;
   if (!ctx.ignoreSeason && offSeasonBlocked(v, ctx)) return false;
@@ -1785,7 +1801,10 @@ function scoreVenue(v, ctx) {
   // An 18-hole round takes half a day: on a general trip it is only planned when golf is asked for (2026-10-25).
   if (v.type === 'golf' && !v.indoorGolf && !ctx.types.has('golf') && !askedGolfPart(v, ctx) && !/\bgolf\w*\b/.test(ctx.queryText || '')) add('golf_unasked', -20, null);
   // A driving range is practice, not the round a golf trip came for (2026-10-25).
-  if (v.type === 'golf' && /\b(?:driving range|range|practice)\b/.test(normWords(v.cuisine || '')) && !askedGolfPart(v, ctx) && !/\b(?:range|practice|lesson|lessons|mini ?golf|mini ?putt|minigolf|buckets?|balls)\b/.test(ctx.queryText || '')) add('range', -35, null);
+  // Sport test 4: the kind asked for is this place's main kind (an arena for skating, not a pool whose second kind is a rink).
+  if (askedMainKind(v, ctx)) add('main_kind', 15, null);
+  else if (ownerMainKind(v) && v.sportKinds.slice(1).flatMap((k) => MAIN_KIND_PLANNER[k] || []).some((k) => (ctx.plannerKinds || []).includes(k))) add('second_kind', -25, null);
+  if (golfRangeOnly(v, /\b(?:driving range|range|practice)\b/) && !askedGolfPart(v, ctx) && !/\b(?:range|practice|lesson|lessons|mini ?golf|mini ?putt|minigolf|buckets?|balls)\b/.test(ctx.queryText || '')) add('range', -35, null);
   for (const c of v.collections) {
     if (ctx.collections.has(c)) add('collection', 22, c === 'hidden_gem' ? `One of ${SITE.brand}’s Hidden Gems` : `On ${SITE.brand}’s ${collectionLabel(ctx, c)} list`);
   }
@@ -2332,7 +2351,10 @@ function publicVenue(v, ctx) {
     // place's card always says its own kind (the owner's main kind, else its listed kind), in French too.
     ...(v.type === 'indoor' && indoorCardKind(v) ? { typeLabel: indoorCardKind(v)[0], typeLabelFr: indoorCardKind(v)[1] } : {}),
     // Sport test 3 (2026-11-20; Gord's range read "INDOOR GOLF" / "GOLF COURSE"): a range or mini golf says what it is.
-    ...(v.type === 'golf' && !v.indoorGolf && golfPartLabel(v) ? { typeLabel: golfPartLabel(v)[0], typeLabelFr: golfPartLabel(v)[1] } : {}),
+    ...(v.type === 'golf' && !v.indoorGolf && golfPartLabel(v) && ownerMainKind(v) !== 'golf' ? { typeLabel: golfPartLabel(v)[0], typeLabelFr: golfPartLabel(v)[1] } : {}),
+    // Sport test 4: a golf course whose owner also picked a range is a golf course; "& driving range" only when the request
+    // asked for the range (Ryan's card read "DRIVING RANGE · Green fees from $55").
+    ...(v.type === 'golf' && !v.indoorGolf && golfPartLabel(v) && ownerMainKind(v) === 'golf' && askedGolfPart(v, ctx) ? { typeLabel: `Golf course & ${golfPartLabel(v)[0].toLowerCase()}`, typeLabelFr: `Terrain de golf et ${golfPartLabel(v)[1].toLowerCase()}` } : {}),
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
     // Tour test 4: no $-$$$$ tier beside a tour's own price ("Free · $$", "From $35 · $$").
     rating: v.rating, reviews: v.reviews, price: tourIsFree || tourFrom || indoorFrom || ((v.type === 'indoor' || v.kindOwn) && v.indoorFree) ? null : v.price, freeEntry: !!v.features?.free_entry || ((v.type === 'indoor' || v.kindOwn) && !!v.indoorFree), address: v.address || null,

@@ -1432,7 +1432,12 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   const masked = tokens.map((tok, i) => (preClaimed[i] ? '\u0000' : tok));
   const matchedPhrases = matchPhrases(masked, table);
   const claimed = matchedPhrases.claimed;
-  const accepted = withoutNameDogHits(matchedPhrases.accepted, masked, t);
+  // Sport test 4 (2026-11-20; "junior golf camp penticton" read as Camping and found nothing): "camp" beside golf, junior,
+  // kids, summer, day, a sport or lessons is a camp people sign up for, never camping (the word is still used up).
+  const CAMP_KIND_WORDS = new Set(['golf', 'junior', 'juniors', 'kids', 'kid', 'children', 'youth', 'summer', 'day', 'spring', 'winter', 'hockey', 'ski', 'skate', 'skating', 'tennis', 'pickleball', 'soccer', 'basketball', 'sport', 'sports', 'swim', 'bike', 'bmx', 'art', 'arts', 'dance', 'music', 'theatre', 'lesson', 'lessons', 'clinic', 'break', 'pd', 'march']);
+  const sportCamp = (h) => h.assign.some((a) => a.field === 'activity' && a.value === 'camping') && /^camps?$/.test(h.phrase)
+    && [masked[h.start - 2], masked[h.start - 1], masked[h.end], masked[h.end + 1]].some((w) => CAMP_KIND_WORDS.has(w));
+  const accepted = withoutNameDogHits(matchedPhrases.accepted.filter((h) => !sportCamp(h)), masked, t);
   // 3b. Stage 3.1: polarity. Negated phrases and words go to intent.excluded,
   // never to the positive fields below.
   const neg = findNegations(masked, accepted, claimed);
