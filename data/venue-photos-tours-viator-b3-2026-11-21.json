@@ -1,0 +1,29 @@
+{
+ "reason": "Tours batch 3 (Viator operators): real photo of each new tour listing, credited",
+ "batch_id": "photos-tours-viator-b3-2026-11-21",
+ "note": "Keyed by region + slug: the venues are created by drafts/tours-viator-2026-11-batch3/run.sh; drafts/tours-viator-2026-11-batch3/apply-photos.js looks up their ids at run time and applies with scripts/apply-venue-updates.js.",
+ "venues": [
+  {
+   "name": "Ogopogo Parasail",
+   "region": "kelowna",
+   "slug": "ogopogo-parasail",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/ogopogo-parasail-2610.jpg?v=20261121"
+   }
+  },
+  {
+   "name": "Winds of Change Experiences",
+   "region": "naramata",
+   "slug": "winds-of-change-experiences",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/winds-of-change-experiences-2610.jpg?v=20261121"
+   }
+  }
+ ]
+}
