@@ -18,6 +18,9 @@ const { renderBusinessPage } = require('./venue-activity-page');
 const { renderPortalPage } = require('./portal-activity-page');
 const { renderReferralsPage } = require('./referrals-page');
 const siteEvents = require('./site-events');
+const commissions = require('./commissions');
+const commissionsPage = require('./commissions-page');
+const commissionEarnings = commissionsPage.createEarnings(db);
 const siteEventCounter = siteEvents.createCounter(db);
 const portalActivity = require('./portal-activity');
 const portalCompleteness = require('./portal-completeness');
@@ -18181,6 +18184,7 @@ ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
       navigator.sendBeacon('/api/site-event', new Blob([JSON.stringify({ name: n })], { type: 'application/json' }));
     } catch (e) { /* counting must never break the site */ }
   }
+${commissions.clientJs(pageType)}
   function roamVenue(p, name){
     try {
       if (!p || !(p.venue_id || p.event_id) || !navigator.sendBeacon || /(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) return;
@@ -51395,7 +51399,7 @@ function renderPrivacyPage() {
     <p>We use Microsoft Clarity to automatically record masked interactions such as clicks, scrolling and navigation on selected public pages to improve the site. We use its limited, cookieless mode: advertising and analytics cookie storage are denied, and page visits are not linked into a persistent visitor journey. Text and form fields are masked. Private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments are excluded.</p>
     <p>We honour Global Privacy Control and Do Not Track browser signals, and earlier recording refusals saved in your browser. These prevent the recorder from loading. Clarity processes usage, device and network data; see the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. This cookieless setting applies to Clarity; Google Analytics is separate.</p>` : ''}
     <h2>Saved in your own browser</h2>
-    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business or event page is viewed and which buttons and links on it are clicked, how often steps in the business portal (such as signing in) are used and, when a step needs fixing, a short reason such as a wrong password or a missing field (never what you typed), how often the QR code on a hotel&rsquo;s or rental&rsquo;s guest card is scanned and the link in our email to them is opened, and which website, AI assistant or email (such as Google, ChatGPT or one of our own emails) sent a visit to which page, which missing pages were asked for (and which page linked to them), the words typed into search, Roam Now and Build My Trip (leaving out anything that looks like an email, web address or number), which pages are opened and which page led to a business or event page, which filters are used on Roam Now and which businesses people open or get directions to from it (never where you are), as plain daily totals with nothing that identifies you.</p>
+    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business or event page is viewed and which buttons and links on it are clicked, how often a link to one of our booking partners (places to stay, tours, rental cars or tickets) is tapped and on what kind of page, how often steps in the business portal (such as signing in) are used and, when a step needs fixing, a short reason such as a wrong password or a missing field (never what you typed), how often the QR code on a hotel&rsquo;s or rental&rsquo;s guest card is scanned and the link in our email to them is opened, and which website, AI assistant or email (such as Google, ChatGPT or one of our own emails) sent a visit to which page, which missing pages were asked for (and which page linked to them), the words typed into search, Roam Now and Build My Trip (leaving out anything that looks like an email, web address or number), which pages are opened and which page led to a business or event page, which filters are used on Roam Now and which businesses people open or get directions to from it (never where you are), as plain daily totals with nothing that identifies you.</p>
     <h2>Services that help run the site</h2>
     <p>Like any website, the pages are delivered by hosting and network providers (including Railway and Cloudflare), which process technical information such as your IP address to send you the page and keep the site secure. Fonts come from Google Fonts and maps use OpenStreetMap, which receive the same kind of technical information when your browser loads them.</p>
     <h2>Your location on the map</h2>
@@ -76274,6 +76278,8 @@ const server = http.createServer(async (req, res) => {
       res.setHeader('Cache-Control', 'no-store');
       const dd = dashboardData.collect(db, { site: 'okanagan', days: query.days });
       dd.traffic = await gaReport.report(query.days);
+      // Commissions (2026-11-21): each program's state and the taps we sent it.
+      try { dd.commissions = commissions.siteReport(db, 'okanagan'); } catch (e) { /* never break the dashboard */ }
       return sendJSON(res, 200, dd);
     }
     if ((pathname === '/admin/dashboard' || pathname === '/admin/dashboard/') && (method === 'GET' || method === 'HEAD')) {
@@ -76303,7 +76309,7 @@ const server = http.createServer(async (req, res) => {
         try {
           const notice = { sent: 'Sent to the site inbox.', email_off: 'Email is off until BREVO_API_KEY is set in Railway, so nothing was sent.', failed: 'The email could not be sent right now.', rate: 'Three a hour is the limit; try again later.' }[query.digest] || '';
           const inboxes = Object.fromEntries(sites.map((x) => [x.key, x.data && x.data.inbox]));
-          home = whatsChangedPage.homeHtml(await weeklyDigestSites(), { notice, goals: await goalsData(), inboxes });
+          home = whatsChangedPage.homeHtml(await weeklyDigestSites(), { notice, goals: await goalsData(), inboxes, commissions: commissionMonth() });
           // Weekend email list (2026-11-16): the subscriber count, linking to its page.
           const wk = weekendEmail.counts().total;
           home.body += `<div class="card"><h3>Weekend email</h3><p><a href="/admin/weekend-email"><b>${wk.confirmed}</b> confirmed subscriber${wk.confirmed === 1 ? '' : 's'}</a> · ${wk.pending} waiting to confirm · ${wk.unsubscribed} unsubscribed</p></div>`;
@@ -76543,6 +76549,45 @@ const server = http.createServer(async (req, res) => {
         } catch (e) { whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Couldn’t reach Whistler Roam right now.' }; }
       }
       return res.end(renderStaysPage({ days, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: stayScans.report(days, hotelList()) }, whistler] }));
+    }
+    // Commissions (2026-11-21, commissions.js + commissions-page.js). GET /api/admin/commissions -> this site's programs (on or
+    // off, from its own settings) and the taps we sent each one. Admin token; Whistler Roam serves the same.
+    if (pathname === '/api/admin/commissions' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      res.setHeader('Cache-Control', 'no-store');
+      return sendJSON(res, 200, commissions.siteReport(db, 'okanagan'));
+    }
+    // The page: /admin/dashboard/commissions (both sites' programs and taps, and the earnings typed in here).
+    if ((pathname === '/admin/dashboard/commissions' || pathname === '/admin/dashboard/commissions/') && (method === 'GET' || method === 'HEAD')) {
+      const signedIn = adminSessionValid(req);
+      res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+      if (method === 'HEAD') return res.end();
+      if (!ENRICHMENT_ADMIN_TOKEN) return res.end(ownerSimplePage('Commissions', '<h1>Commissions</h1><p>The admin key is not set up on this server.</p>'));
+      if (!signedIn) return res.end(renderAdminReviewLoginPage());
+      const sites = [{ key: 'okanagan', name: 'Okanagan Roam', data: null, error: null }, { key: 'whistler', name: 'Whistler Roam', data: null, error: null }];
+      try { sites[0].data = commissions.siteReport(db, 'okanagan'); } catch (e) { sites[0].error = 'Could not read this site’s numbers.'; }
+      const wToken = (process.env.WHISTLER_ADMIN_TOKEN || '').trim();
+      if (!wToken) sites[1].error = 'Not connected yet: add WHISTLER_ADMIN_TOKEN to this site.';
+      else {
+        try {
+          const r = await fetch(`${process.env.WHISTLER_BASE_URL || 'https://whistlerroam.com'}/api/admin/commissions`, { headers: { Authorization: `Bearer ${wToken}`, 'User-Agent': 'okanaganroam-dashboard' }, signal: AbortSignal.timeout(8000) });
+          if (r.status === 200) sites[1].data = await r.json();
+          else sites[1].error = r.status === 404 ? 'Whistler Roam doesn’t have the Commissions update yet.' : `Whistler Roam answered ${r.status}.`;
+        } catch (e) { sites[1].error = 'Couldn’t reach Whistler Roam right now.'; }
+      }
+      return res.end(commissionsPage.renderCommissionsPage({ sites, rows: commissionEarnings.list(), notice: String(query.notice || '').slice(0, 40) }));
+    }
+    // Save or delete an earnings line. Signed-in admin, same site only (like the other dashboard forms); back to the page.
+    if ((pathname === '/admin/dashboard/commissions/save' || pathname === '/admin/dashboard/commissions/delete') && method === 'POST') {
+      if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
+      if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
+      let form = null;
+      try { form = await commissionsPage.readForm(req); } catch (e) { form = null; }
+      let notice;
+      if (pathname.endsWith('/delete')) notice = form && commissionEarnings.remove(form.id) ? 'deleted' : 'not_found';
+      else { const r = form ? commissionEarnings.save(form) : { ok: false, error: 'amount' }; notice = r.ok ? 'saved' : `error_${r.error}`; }
+      res.writeHead(303, { Location: `/admin/dashboard/commissions?notice=${notice}${notice === 'saved' || notice === 'deleted' ? '#earnings' : ''}`, 'Cache-Control': 'no-store' });
+      return res.end();
     }
     // Business portal activity (2026-11-05). GET /api/admin/portal-activity?days=30 -> this site's portal steps. Admin token.
     if (pathname === '/api/admin/portal-activity' && method === 'GET') {
@@ -77311,6 +77356,10 @@ async function goalsData(now = new Date()) {
     return seoGoals.evaluate(cfg, { gsc_nonbrand: gsc, ga_chatgpt: ga }, now);
   } catch (e) { return null; }
 }
+// Earnings typed in for this month (Commissions page), for Home and the Monday email; null when none or unreadable.
+function commissionMonth(now = new Date()) {
+  try { const rows = commissionEarnings.list(); return rows.length ? commissionsPage.monthLine(rows, now) : null; } catch (e) { return null; }
+}
 // Both sites' summaries for the dashboard card and the Monday email.
 async function weeklyDigestSites(now = new Date()) {
   const sites = [{ key: 'okanagan', name: 'Okanagan Roam', data: null, error: null }, { key: 'whistler', name: 'Whistler Roam', data: null, error: null }];
@@ -77334,7 +77383,7 @@ async function sendWeeklyDigest(now = new Date()) {
     const sites = await weeklyDigestSites(now);
     const goals = await goalsData(now);
     const w = whatsChanged.windows(now);
-    await send({ to: String(process.env.DIGEST_EMAIL || 'okanaganroam@gmail.com').trim(), subject: `What changed this week: ${w.cur.start} to ${w.cur.end}`, text: whatsChangedPage.emailText(sites, { goals }), html: whatsChangedPage.emailHtml(sites, { goals }) });
+    await send({ to: String(process.env.DIGEST_EMAIL || 'okanaganroam@gmail.com').trim(), subject: `What changed this week: ${w.cur.start} to ${w.cur.end}`, text: whatsChangedPage.emailText(sites, { goals, commissions: commissionMonth(now) }), html: whatsChangedPage.emailHtml(sites, { goals, commissions: commissionMonth(now) }) });
     return 'sent';
   } catch (e) { console.error('[digest] send failed:', e.message); return 'failed'; }
 }

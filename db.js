@@ -1695,4 +1695,24 @@ CREATE TABLE IF NOT EXISTS stay_info (
 );
 `);
 
+// Commission earnings (2026-11-21, commissions-page.js): what each affiliate program says we earned, typed in by hand on
+// /admin/dashboard/commissions (no partner sends it to us). One line per month, program and site; saving the same three
+// again replaces the line. amount_cents in the currency given (CAD or USD). Admin only; nothing about visitors.
+db.exec(`
+CREATE TABLE IF NOT EXISTS commission_earnings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  month TEXT NOT NULL,
+  program TEXT NOT NULL,
+  site TEXT NOT NULL,
+  bookings INTEGER,
+  amount_cents INTEGER NOT NULL DEFAULT 0,
+  currency TEXT NOT NULL DEFAULT 'CAD',
+  status TEXT NOT NULL DEFAULT 'pending',
+  note TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (month, program, site)
+);
+`);
+
 module.exports = db;

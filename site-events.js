@@ -4,6 +4,7 @@
 // below, and a number. No visitor id, no IP, no search words, no venue, no location, nothing a person typed.
 const { isBot, isInternal, dayOf, enabled: demandEnabled } = require('./trip-demand');
 const tripFunnel = require('./trip-funnel');
+const commissions = require('./commissions');
 
 // Event names the pages already send to Google Analytics, plus page_view:<key> for a few key pages.
 const EVENTS = new Set([
@@ -21,12 +22,15 @@ const EVENTS = new Set([
   'page_view:home', 'page_view:map', 'page_view:trip', 'page_view:whats_on', 'page_view:browse', 'page_view:hidden_gems',
   // Build My Trip funnel (2026-11-21, trip-funnel.js): bmt:<v4|v3>:<step>, :book:<kind>, :share:<method>.
   ...tripFunnel.NAMES,
+  // Commission links (2026-11-21, commissions.js): commission:<program>:<kind of page>, one per tap.
+  ...commissions.NAMES,
 ]);
 
 // Counted by their own page code (roamCount), not through the site-wide list, so pages without them stay unchanged:
 // the "Book my trip" steps ship only with Build My Trip's places to stay (TRIP_STAYS / ?stays=1).
 // The Build My Trip funnel names too: only the planner page sends them (trip-funnel.js clientScript).
-const SELF_COUNTED = ['book_trip_start', 'book_trip_complete', ...tripFunnel.NAMES];
+// The commission-link counts too: one small script in the analytics head sends them (commissions.js clientJs).
+const SELF_COUNTED = ['book_trip_start', 'book_trip_complete', ...tripFunnel.NAMES, ...commissions.NAMES];
 
 const RATE_PER_HOUR = 400;
 const hits = new Map();
