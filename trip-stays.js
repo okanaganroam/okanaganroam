@@ -123,14 +123,18 @@ function budgetOf(intent) {
 // plan with no venue stops, or not a plan at all). centre: the middle of the stops that have a map location (null when
 // none has one; the stays are then ranked without distance, in the plan's towns only).
 //   plan: the planner's result; input: parseTripStayInput's value (or null); today: 'YYYY-MM-DD'.
-function tripStayContext(plan, input, today) {
+// opts (Build My Trip V4 only, 2026-11-21; without opts.v4 nothing below changes):
+//   minArrive: the earliest arrival for a trip with no dates given (today before noon in the site's time, else
+//   tomorrow), so the stay is never booked for a day already past; text: the request, for the stay type fit.
+function tripStayContext(plan, input, today, opts = {}) {
   if (!plan || !PLAN_KINDS.includes(plan.kind)) return null;
   const stops = planStops(plan);
   if (!stops.length) return null;
   const i = input || {};
   const planDays = Array.isArray(plan.days) && plan.days.length ? plan.days.length : 1;
   const firstDate = ((plan.schedule || []).find((r) => r && validDate(r.date)) || {}).date || (validDate(plan.listDate) ? plan.listDate : null);
-  const arrive = i.arrive || firstDate || (validDate(today) ? today : null);
+  let arrive = i.arrive || firstDate || (validDate(today) ? today : null);
+  if (opts.v4 && !i.arrive && validDate(opts.minArrive) && (!arrive || arrive < opts.minArrive)) arrive = opts.minArrive;
   const nights = i.arrive && i.leave ? daysBetween(i.arrive, i.leave) : planDays - 1;
   if (!(nights >= 1) || !arrive) return null;
   const leave = i.leave || addDays(arrive, nights);
@@ -151,9 +155,26 @@ function tripStayContext(plan, input, today) {
   return {
     arrive, leave, nights, months, adults, kids, guests, withKids, dog: i.dog === true || !!party.dog, budget: budgetOf(plan.intent),
     centre, primaryRegion: regions[0], regions, datesGiven: !!(i.arrive && i.leave), camping: wantsCamping(plan),
+    ...(opts.v4 ? { v4: true, couple: V4_COUPLE_RE.test(v4Words(plan, opts.text)), budgetStay: V4_BUDGET_STAY_RE.test(v4Words(plan, opts.text)) } : {}),
   };
 }
 
+// V4 stay type fit (2026-11-21, Dayton: a college residence was the base for a couple's wine trip). A room for students,
+// conferences or shared dorms (a college or university residence, a hostel, a dorm) is a base only when the request asks
+// for a budget, a hostel or student housing, or nothing else fits. A couple's trip (partner, romantic, honeymoon,
+// anniversary...) puts B&Bs, inns, resorts, hotels and lodges first, then the rest. Judged from the stay's kind, name and
+// unit types only.
+const V4_DORM_RE = /\b(?:residences?|dorms?|dormitor(?:y|ies)|hostels?|college|university|campus|students?|conference cent(?:re|er)|backpackers?|bunkhouse)\b/i;
+const V4_DORM_UNITS = ['dorm', 'dorm_bed', 'shared_room', 'bunk'];
+const V4_BUDGET_STAY_RE = /\b(?:budget|cheap|cheapest|inexpensive|affordable|low cost|hostels?|backpack(?:er|ers|ing)?|students?|dorms?|petit budget|auberge de jeunesse)\b/i;
+const V4_COUPLE_RE = /\b(?:partner|partners|romantic|romance|couples?|honeymoon|anniversary|wife|husband|girlfriend|boyfriend|fianc[eé]e?|spouse|date night|getaway for two|for two|en amoureux|romantique|lune de miel|anniversaire de mariage|conjointe?|ma blonde|mon chum)\b/i;
+const V4_COUPLE_KINDS = ['b&b', 'inn', 'resort', 'hotel', 'lodge'];
+function v4Words(plan, text) { return [text, plan && plan.query, ...(((plan && plan.understood) || {}).occasion ? [plan.understood.occasion] : [])].filter((x) => typeof x === 'string').join(' '); }
+function v4DormStay(stay) {
+  const units = isObj(stay.info) && Array.isArray(stay.info.unit_types) ? stay.info.unit_types : [];
+  return V4_DORM_RE.test(`${stay.name || ''} ${stay.kind || ''}`) || (units.length > 0 && units.some((u) => V4_DORM_UNITS.includes(u)));
+}
+function v4StayKindKey(stay) { return String(stay.kindKey || stay.kind || '').trim().toLowerCase(); }
 // The request asks for camping: its own words, or the interpreter's interests / activities.
 function wantsCamping(plan) {
   if (!plan) return false;
@@ -214,6 +235,16 @@ function scoreStay(stay, ctx) {
   if (f.confidence === 'high') score -= 0.5;
   else if (f.confidence === 'medium') score -= 0.25;
   if (stay.photo) score -= 0.75;
+  if (ctx.v4) {
+    // Rooms for students or conferences, and dorms: last unless a budget, hostel or student stay was asked for.
+    if (!ctx.budgetStay && v4DormStay(stay)) score += 40;
+    // A couple's trip: a B&B, inn, resort, hotel or lodge before a motel, guest house or cabin.
+    if (ctx.couple) {
+      const k = v4StayKindKey(stay);
+      if (V4_COUPLE_KINDS.includes(k)) { score -= k === 'b&b' || k === 'inn' || k === 'resort' ? 3 : 2; }
+      else score += 3;
+    }
+  }
   // A camping trip: campgrounds and RV parks first.
   if (ctx.camping) {
     if (stay.camping) { score -= 5; matches.unshift({ key: 'camping', text: 'Camping', textFr: 'Camping' }); } else score += 5;
@@ -250,6 +281,8 @@ function pickTripStays(ctx, stays) {
   // Not a camping trip: rooms first; camping stays only when no other stay fits the plan's towns or nearby.
   let pool = ctx.camping ? poolOf(usable) : poolOf(usable.filter((s) => !s.camping));
   if (!pool.length && !ctx.camping) pool = poolOf(usable);
+  // V4: no student residence, hostel or dorm among the three shown when other stays fit (unless asked for).
+  if (ctx.v4 && !ctx.budgetStay && pool.some((s) => !v4DormStay(s))) pool = pool.filter((s) => !v4DormStay(s));
   if (!pool.length) return null;
   const ranked = pool.map((s) => ({ s, r: scoreStay(s, ctx) })).sort((a, b) => a.r.score - b.r.score || a.s.id - b.s.id).slice(0, 3);
   const cards = ranked.map(({ s, r }) => stayCard(s, r));
@@ -257,8 +290,8 @@ function pickTripStays(ctx, stays) {
 }
 
 // The plan's "whereToStay" block, or null. The trip's dates and party (for booking links later) and the chosen stay.
-function whereToStay(plan, input, stays, today) {
-  const ctx = tripStayContext(plan, input, today);
+function whereToStay(plan, input, stays, today, opts = {}) {
+  const ctx = tripStayContext(plan, input, today, opts);
   if (!ctx) return null;
   const picked = pickTripStays(ctx, stays);
   if (!picked) return null;
@@ -274,4 +307,5 @@ module.exports = {
   MAX_NIGHTS, MAX_ADULTS, MAX_KIDS, NEAR_KM, MIN_IN_TOWN,
   parseTripStayInput, tripStayContext, partyOf, stayFails, scoreStay, pickTripStays, whereToStay, planStops, km, addDays, daysBetween,
   wantsCamping, isCampingStay, CAMPING_RE,
+  v4DormStay, V4_COUPLE_RE, V4_BUDGET_STAY_RE,
 };

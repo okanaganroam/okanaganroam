@@ -5983,7 +5983,7 @@ function fillDinnerGaps(result, input, requirements) {
     else {
       const cands = [];
       for (const v of facts) {
-        if (estateUsed.has(v.id) || ctx.exclude.has(v.id) || ctx.avoid.has(v.id) || !GAP_FILL_TYPES.includes(v.type) || !hasCoords(v)) continue;
+        if (estateUsed.has(v.id) || ctx.exclude.has(v.id) || ctx.avoid.has(v.id) || !GAP_FILL_TYPES.includes(v.type) || !hasCoords(v) || v4FillerSkip(v, ctx)) continue;
         if ((placeKey(v) && usedPlaces.has(placeKey(v))) || (ctx.kids && familyAvoid(v))) continue;
         if (regions.length && !regions.includes(v.region)) continue;
         // Round 11 (2026-10-20): a round of golf is never a filler before dinner (a second round ran 2:54-6:54 PM, past
@@ -6278,7 +6278,7 @@ function fillItineraryGaps(result, input, requirements) {
     const kinds = GAP_FILL_TYPES.filter((t) => asked.has(t) || !GAP_ALCOHOL_TYPES.includes(t)).filter((t) => t !== 'cafe' && !single(t));
     // Planner (2026-10-27): never a booked outfitter or tour base as a walk-in stop (Hoodoo Adventure Company sat in the
     // middle of a Penticton pub crawl), as in fillDinnerGaps.
-    const pool = facts.filter((v) => kinds.includes(v.type) && !(ctx.kids && familyAvoid(v)) && !eveningOnlyVenue(v) && !bookedOutfitter(v) && !appointmentOnly(v) && !rotateBooked(v) && !spaPlace(v) && !longDayHike(v));
+    const pool = facts.filter((v) => kinds.includes(v.type) && !(ctx.kids && familyAvoid(v)) && !eveningOnlyVenue(v) && !bookedOutfitter(v) && !appointmentOnly(v) && !rotateBooked(v) && !spaPlace(v) && !longDayHike(v) && !v4FillerSkip(v, ctx));
     const ranked = near(from, pool, 'afternoon').map((c) => ({ ...c, score: c.score + (asked.has(c.v.type) ? 12 : 0) })).sort((x, y) => y.score - x.score || x.v.id - y.v.id);
     for (const c of ranked.slice(0, 5)) {
       const stop = { kind: 'venue', label: PLAN_DAYPART_LABELS.afternoon, daypart: 'afternoon', component: null, gapFill: true, ...stopFrom(c.v, { reasons: scoreVenue(c.v, ctx).reasons.concat({ code: 'gap', text: 'Fills the free time in the afternoon', weight: 2 }), caveats: [] }, regionReason(c.v, ctx), ctx), alternates: [] };
@@ -6363,7 +6363,7 @@ function idleGapCandidates(result, input, requirements, g) {
   const start0 = g.pr.endMinutes, end0 = g.nr.startMinutes;
   const out = [];
   for (const v of facts) {
-    if (!kinds.includes(v.type) || spaPlace(v) || longDayHike(v) || used.has(v.id) || estateUsed.has(v.id) || ctx.exclude.has(v.id) || ctx.avoid.has(v.id) || !hasCoords(v)) continue;
+    if (!kinds.includes(v.type) || spaPlace(v) || longDayHike(v) || used.has(v.id) || estateUsed.has(v.id) || ctx.exclude.has(v.id) || ctx.avoid.has(v.id) || !hasCoords(v) || v4FillerSkip(v, ctx)) continue;
     if ((placeKey(v) && usedPlaces.has(placeKey(v))) || (ctx.kids && familyAvoid(v)) || (regions.length && !regions.includes(v.region))) continue;
     if (capped(v.type) || (dayTypes[v.type] || 0) >= (crawl ? 4 : 2) || (eveningOnlyVenue(v) && end0 < 1020)) continue;
     if (v.type === 'indoor' && sameIndoorKindToday(v, g.stops, facts, ctx)) continue; // indoor test 17
@@ -7638,6 +7638,18 @@ const V4_WINERY_DAY_MAX = 2;
 // The day's winery limit (V4): two, one on every second day of a 3+ day trip; none when a number of wineries was asked for.
 function v4WineDayMax(day, days) { return days >= 3 && day % 2 === 0 ? 1 : V4_WINERY_DAY_MAX; }
 function v4WineCapped(ctx, type, dayTypes, day, days, caps) { return !!(ctx && ctx.v4 && type === 'winery' && !(caps || []).some((i) => i.value === 'winery') && (dayTypes.winery || 0) >= v4WineDayMax(day, days)); }
+// V4 fillers (2026-11-21, Dayton: Okanagan Bowling Club filled the afternoon of a couple's wine trip and showed up as
+// "Book a lane"): a stop added to fill free time on an adult trip is something that fits any trip (a viewpoint or walk,
+// a café, a gallery or museum, a market, a tasting), never a sports club, bowling, an arcade, a kids' play place or the
+// like, unless the request names it. Kids' trips keep the family fillers. Only with input.v4.
+const V4_OFF_THEME_FILLER_RE = /\b(?:bowl|bowling|bowls|lawn bowling|curling|arena|arenas|rink|rinks|skating|arcade|arcades|laser tag|trampoline|play centre|play center|playground|indoor playground|kids|children|childrens|mini golf|minigolf|go kart|go karts|karting|climbing|bouldering|gym|fitness|axe throwing|escape room|escape rooms|escape games|paintball|pickleball|tennis|squash|badminton|swimming pool|aquatic centre|aquatic center|leisure centre|recreation centre|community centre|community center|bingo|casino|batting cages|driving range|disc golf|skate park|skatepark|bmx|bike park|sports club|sports centre|sportsplex|racquet|lanes|club house|legion)\b/;
+function v4FillerSkip(v, ctx) {
+  if (!ctx || !ctx.v4 || ctx.kids || !v) return false;
+  if (v.type === 'golf' || v.type === 'sport') return true;
+  const m = V4_OFF_THEME_FILLER_RE.exec(`${v.textName || normWords(v.name)} ${v.textCuisine || normWords(v.cuisine || '')}`);
+  if (!m) return false;
+  return !new RegExp(`\\b${m[0].split(' ')[0].replace(/s$/, '')}`).test(ctx.queryText || '');
+}
 function v4Input(input) {
   if (!input || !input.v4 || !input.requirements || input.requirements.explicitMealCount !== 1) return input;
   const text = normWords(input.text || input.requirements.text || '');
@@ -10182,7 +10194,7 @@ function scheduleNotes(result, ctx) {
 
 module.exports = {
   // Build My Trip V4 (2026-11-20)
-  v4Input, v4Polish, v4CasualDinner, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
+  v4Input, v4Polish, v4CasualDinner, v4FillerSkip, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
   // Tour test 17 (Whistler, 2026-11-18)
   regionMinutes, PICKUP_ASK_RE, KIND_SEASON_ASK_WORDS, kindSeasonOff, tourTripFor, normWords,
   dropNameOnlyTypes,
