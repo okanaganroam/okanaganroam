@@ -72670,7 +72670,7 @@ function ownerBadgeCardHtml(venue, lang = 'en') {
   if (venueListingUrl(venue) === 'https://okanaganroam.com/') return '';
   // Sport test 8 (2026-11-21; a club with only a Facebook page was told to paste the code in its website footer): only
   // for a place with a website of its own.
-  try { if (!String(venue.website || '').trim() || venueNotOffered(venue.id).includes('website') || ownerWebsiteRemovalWaiting(venue.id)) return ''; } catch (e) { /* keep the card */ }
+  try { if ((sportSetupType(venue.type) && !String(venue.website || '').trim()) || venueNotOffered(venue.id).includes('website') || ownerWebsiteRemovalWaiting(venue.id)) return ''; } catch (e) { /* keep the card */ }
   const code = ownerBadgeSnippet(venue);
   return `
       <section class="op-badge" id="opBadge" data-task="home all" aria-labelledby="opBadgeHead" style="background:var(--paper);border-radius:14px;padding:14px 18px;margin:14px 0 6px">
@@ -72727,7 +72727,7 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   const menuWord = isPriceList(venue) ? L('prices', 'vos prix') : L('menu', 'votre menu');
   // Sport test 8 (2026-11-21): the Happy hour tile goes once the owner said she has none (it stays on the full page).
   const showHappyHour = happyHourAllowed(venue);
-  const happyTileOff = venueNotOffered(venue.id).includes('happy_hour');
+  const happyTileOff = !!sportSetupType(venue.type) && venueNotOffered(venue.id).includes('happy_hour');
   // Average spend per person (2026-11-08): restaurants and pubs only. Everything it adds to the page is inside this flag,
   // so the edit page of every other type is byte for byte what it was.
   const avgSpendOn = !!portalFields(venue.type).avgSpend;

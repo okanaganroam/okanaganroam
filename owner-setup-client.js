@@ -1834,7 +1834,7 @@
   function indoorBringEx(){ if (!C.indoor || !T.bringExKinds) return T.bringEx; var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0];
     // Sport test 8: a walk-on or 9-hole course's example is a small course's.
     var bk0 = (S.tour && S.tour.book) || (TI && TI.book) || '';
-    if (k0 && INDOOR_CHIP_GROUP.get(k0) === 'golf' && (bk0 === 'no' || C.golfSmall) && T.bringExGolfSmall) return bk0 === 'no' ? T.bringExGolfSmall : T.bringExGolfSmallBook || T.bringExGolfSmall;
+    if (k0 && INDOOR_CHIP_GROUP.get(k0) === 'golf' && (bk0 === 'no' || C.golfSmall) && T.bringExKinds.golfsmall) return bk0 === 'no' ? T.bringExKinds.golfsmall : T.bringExKinds.golfsmallbook || T.bringExKinds.golfsmall;
     return T.bringExKinds[INDOOR_CHIP_GROUP.get(k0)] || T.bringEx; }
   // Indoor test 3 (2026-11-19; Diane, a community theatre): the main kind (the first picked, or pre-picked), and whether it
   // is a show place (live theatre, music or comedy): it is asked about tickets, and its price is its lowest regular ticket.

@@ -22359,8 +22359,9 @@ test('Help bot v2 (2026-10-18): every topic has French, the new topics say the r
         assert.doesNotMatch(t.aFr.replace(/<strong>[^<]*<\/strong>/g, ''), /\b(the|and|you’re|we’ll)\b/, `${t.id}: no English left in the French`);
       }
       assert.ok(cfg.start.every((id) => cfg.topics.some((t) => t.id === id)), page);
-      assert.ok(cfg.ui.en.unsure.includes('I’m not sure — tap <strong>Message us</strong> and Dayton will reply.'));
-      assert.ok(cfg.ui.fr.unsure.includes('Dayton vous répondra'));
+      // Sport tests 8 and 9 (2026-11-21; Dayton): not sure says so and offers Ask us (her question to Dayton as typed).
+      assert.ok(cfg.ui.en.unsure.includes('I’m not sure about that one, so I won’t guess. Tap <strong>Ask us</strong>'));
+      assert.ok(cfg.ui.fr.unsure.includes('Il vous répond par courriel'));
     }
   }
   const topics = (page, signedIn) => Object.fromEntries(ohbConfig(app.ownerHelpWidgetHtml(page, { signedIn })).topics.map((t) => [t.id, t]));
@@ -22447,9 +22448,10 @@ test('Help bot v2 (2026-10-18): the page script answers, says "not sure", switch
   assert.match(page.said()[0], /Hi! I can help with your listing/);
   page.ask('can you build me a website for my bakery');
   const unsure = page.said().slice(-2);
-  assert.match(unsure[0], /I’m not sure — tap <strong>Message us<\/strong> and Dayton will reply/);
+  assert.match(unsure[0], /I’m not sure about that one, so I won’t guess\. Tap <strong>Ask us<\/strong>/);
   const chipLabels = unsure[1].split(' | ');
-  assert.ok(chipLabels.length >= 3 && chipLabels.length <= 4, unsure[1]);
+  assert.ok(chipLabels.length >= 4 && chipLabels.length <= 5, unsure[1]);
+  assert.equal(chipLabels[0], 'Ask us');
   assert.equal(chipLabels[chipLabels.length - 1], 'Message us');
   page.ask('how do i chnage the adress');
   assert.ok(page.said().some((h) => /always checked by us first/.test(h)));
