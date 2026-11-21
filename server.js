@@ -49809,6 +49809,122 @@ function renderFileGuidePage(pathname) {
   return g ? renderEditorialGuidePage(g, pathname) : null;
 }
 
+// ---------- Data stories (2026-11-20): figures pages for press pitches ----------
+// data/data-stories/<slug>.json, served at /guides/<slug>. Deliberately NOT a file guide (data/guides/): file guides
+// feed the /guides hub, the sitemap (and so IndexNow), smart search, "Featured in our guides" and the About count;
+// nothing reads this folder except the route below, so a data story appears in none of them. Each story's own
+// "indexable" field is its one noindex switch: false = <meta name="robots" content="noindex, follow"> plus an
+// X-Robots-Tag header. Flipping it to true only drops the noindex; listing it in the sitemap or hub is a separate step.
+// Aggregates only: no venue names and no venue prices (owner rule for press material).
+const DATA_STORIES = (() => {
+  const out = {};
+  const dir = path.join(__dirname, 'data', 'data-stories');
+  let files = [];
+  try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.json')); } catch (e) { return out; }
+  for (const f of files.sort()) {
+    try { out[`/guides/${f.replace(/\.json$/, '')}`] = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')); } catch (e) { /* bad file: not served */ }
+  }
+  return out;
+})();
+const dataStoryIndexable = (s) => !!(s && s.indexable === true);
+function renderDataStoryPage(pathname) {
+  const s = DATA_STORIES[pathname];
+  if (!s) return null;
+  const indexable = dataStoryIndexable(s);
+  const canonical = `https://okanaganroam.com${pathname}`;
+  const breadcrumb = breadcrumbListSchema([
+    { name: 'Home', url: 'https://okanaganroam.com/' },
+    { name: 'Guides', url: 'https://okanaganroam.com/guides' },
+    { name: s.heading, url: canonical },
+  ]);
+  const article = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: s.heading,
+    description: s.description,
+    mainEntityOfPage: canonical,
+    author: { '@type': 'Person', name: 'Dayton', url: 'https://okanaganroam.com/about' },
+    publisher: { '@type': 'Organization', name: 'Okanagan Roam', url: 'https://okanaganroam.com/' },
+    dateModified: s.lastChecked.datetime,
+  };
+  const t = s.table;
+  const rowsHtml = t.rows.map((r, i) => `\n            <tr${i === t.rows.length - 1 ? ' class="data-story-total"' : ''}><th scope="row">${escapeHtml(r[0])}</th>${r.slice(1).map((c) => `<td>${escapeHtml(String(c))}</td>`).join('')}</tr>`).join('');
+  let head = pageHead(s.title, s.description, canonical, [breadcrumb, article], { golfTheme: true, noindex: !indexable });
+  if (!indexable) head = head.replace('<meta name="robots" content="noindex">', '<meta name="robots" content="noindex, follow">');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+${head}
+${renderAnalyticsHeadHtml('guide')}
+<style>
+  body.ski-guide-page .ski-guide { max-width: 760px; margin: 0 auto; padding: 12px 0 48px; }
+  body.ski-guide-page .ski-guide h1 { margin: 8px 0 6px; }
+  body.ski-guide-page .ski-guide-intro p, body.ski-guide-page .ski-guide-resort p { font-size: 1.05rem; line-height: 1.6; }
+  body.ski-guide-page .guide-byline { margin: 0 0 14px; font-size: 0.9rem; color: var(--ink-soft, #5a6570); }
+  body.ski-guide-page .guide-byline a { color: inherit; }
+  body.ski-guide-page .ski-guide-resort { margin-top: 32px; }
+  body.ski-guide-page .data-story-facts { margin: 18px 0 0; padding: 16px 18px 16px 2.2em; background: var(--paper, #fffdf7); border-radius: 16px; }
+  body.ski-guide-page .data-story-facts li { margin: 0 0 10px; line-height: 1.55; }
+  body.ski-guide-page .data-story-facts li:last-child { margin-bottom: 0; }
+  body.ski-guide-page .data-story-table-wrap { overflow-x: auto; }
+  body.ski-guide-page .patio-picks { width: 100%; border-collapse: collapse; margin: 8px 0 14px; }
+  body.ski-guide-page .patio-picks caption { text-align: left; font-size: .9rem; color: var(--ink-soft, #5a6570); padding: 0 0 6px; }
+  body.ski-guide-page .patio-picks th, body.ski-guide-page .patio-picks td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid rgba(27,43,58,.12); line-height: 1.45; }
+  body.ski-guide-page .patio-picks thead th { font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-muted, #6B5D54); }
+  body.ski-guide-page .patio-picks tbody th { font-weight: 700; }
+  body.ski-guide-page .patio-picks tr.data-story-total th, body.ski-guide-page .patio-picks tr.data-story-total td { font-weight: 800; border-bottom: 0; }
+  body.ski-guide-page .ski-guide-list { padding-left: 1.2em; margin: 0; }
+  body.ski-guide-page .ski-guide-list li { margin: 0 0 10px; line-height: 1.55; }
+  body.ski-guide-page .data-story-checked { font-weight: 700; }
+</style>
+</head>
+<body class="golf-page ski-guide-page">
+  ${renderGolfTripTrayHtml()}
+<div id="floatingTooltip"></div>
+${renderGolfHeaderHtml()}
+  <main class="wrap-wide golf-main" id="main">
+  ${breadcrumbNavHtml([
+    { name: 'Home', href: '/' },
+    { name: 'Guides', href: '/guides' },
+    { name: s.heading },
+  ])}
+    <article class="ski-guide">
+      <h1>${escapeHtml(s.heading)}</h1>
+      ${guideBylineHtml(null)}
+      <div class="ski-guide-intro">${s.intro.map((p) => `\n        <p>${escapeHtml(p)}</p>`).join('')}
+      </div>
+      <ul class="data-story-facts" aria-label="Key figures">${s.facts.map((f) => `\n        <li>${escapeHtml(f)}</li>`).join('')}
+      </ul>
+      <section class="ski-guide-resort" id="by-town">
+        <h2>${escapeHtml(t.heading)}</h2>
+        <div class="data-story-table-wrap">
+          <table class="patio-picks">
+            <caption>${escapeHtml(t.caption)}</caption>
+            <thead><tr>${t.head.map((h) => `<th scope="col">${escapeHtml(h)}</th>`).join('')}</tr></thead>
+            <tbody>${rowsHtml}
+            </tbody>
+          </table>
+        </div>${t.notes.map((p) => `\n        <p>${escapeHtml(p)}</p>`).join('')}
+      </section>${s.sections.map((sec) => `
+      <section class="ski-guide-resort" id="${escapeHtml(sec.id)}">
+        <h2>${escapeHtml(sec.heading)}</h2>${sec.paragraphs.map((p) => `\n        <p>${escapeHtml(p)}</p>`).join('')}
+      </section>`).join('')}
+      <section class="ski-guide-resort" id="how-we-measured">
+        <h2>How we measured</h2>
+        <ul class="ski-guide-list">${s.method.map((p) => `\n          <li>${escapeHtml(p)}</li>`).join('')}
+        </ul>
+        <p class="data-story-checked">Last checked: <time datetime="${escapeHtml(s.lastChecked.datetime)}">${escapeHtml(s.lastChecked.text)}</time></p>
+        <p>${escapeHtml(s.press)} Questions: <a href="/contact">contact us</a>.</p>
+        <p><a href="/guides">More Okanagan guides &rarr;</a></p>
+      </section>
+    </article>
+  </main>
+  ${renderHomeFooterHTML(true)}
+  ${GOLF_APP_SCRIPT_TAG}
+</body>
+</html>`;
+}
+
 // ---------- Guide registry, /guides index, thin guides, "Featured in" (2026-10-13) ----------
 // Every editorial guide in one list, so the /guides page, the sitemap, the
 // homepage's seasonal link and venue/event "Featured in" links all agree.
@@ -75285,6 +75401,12 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(301, { Location: `${res.twinLang === 'fr' ? '/fr' : ''}${MERGED_GUIDES[pathname.replace(/\/$/, '')]}` });
       return res.end();
     }
+    // Data stories (2026-11-20): noindex while their "indexable" field is false; see DATA_STORIES.
+    if (method === 'GET' && DATA_STORIES[pathname.replace(/\/$/, '')]) {
+      const story = DATA_STORIES[pathname.replace(/\/$/, '')];
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...(dataStoryIndexable(story) ? {} : { 'X-Robots-Tag': 'noindex' }) });
+      return res.end(renderDataStoryPage(pathname.replace(/\/$/, '')));
+    }
     if (method === 'GET' && FILE_GUIDES[pathname.replace(/\/$/, '')]) {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end(renderFileGuidePage(pathname.replace(/\/$/, '')));
@@ -77200,6 +77322,8 @@ module.exports = {
   GUIDE_BANNERS,
   GUIDE_PHOTOS,
   renderFileGuidePage,
+  renderDataStoryPage,
+  DATA_STORIES,
   guideRefVenue,
   renderEditorialGuidePage,
   renderListYourVenuePage,

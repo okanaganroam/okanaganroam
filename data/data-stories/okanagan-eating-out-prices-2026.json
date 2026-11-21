@@ -1,0 +1,77 @@
+{
+ "_note": "Data story for press pitches. NOT a file guide (data/guides/ is scanned into the guide hub, sitemap, search and Featured-in lists; this folder is not). Numbers come from drafts/food-prices-2026-11/press-stats.py (own published menus, tier A_menu only). To let search engines index the page later, change \"indexable\" to true; nothing else reads this file, so the sitemap and guide lists stay as they are until someone adds the page to them on purpose.",
+ "indexable": false,
+ "heading": "What It Costs to Eat Out in the Okanagan (2026)",
+ "title": "What It Costs to Eat Out in the Okanagan (2026) | Okanagan Roam",
+ "description": "Typical restaurant and pub prices across the Okanagan in 2026, from 263 places' own published menus: about $30 for a main and a drink, before tax and tip.",
+ "lastChecked": { "datetime": "2026-11-04", "text": "November 3 to 4, 2026" },
+ "intro": [
+  "How much does a meal out cost in the Okanagan right now? In early November 2026 we read the published menus of restaurants, pubs, breweries and cafés across the valley and worked out what one person would typically spend.",
+  "Every figure below is drawn from many places at once. We don't single out any one restaurant."
+ ],
+ "facts": [
+  "A typical meal for one at an Okanagan restaurant or pub, a middle-priced main and a drink, comes to about $30 before tax and tip. The middle value across 263 places was $28.",
+  "Half of the places came to between about $23 and $34. About 1 in 8 (32 places) came in under $20, and about 1 in 10 (27 places) came to $40 or more.",
+  "Kelowna, the biggest city, is not the priciest. Its middle value was $27, compared with $30 in Vernon. Penticton ($26.50) and Kelowna are within 50 cents of each other, so neither is really cheaper than the other.",
+  "The cheapest glass of a brewery's own beer is about $8: the middle value was $7.97 across 11 breweries, from $6 to $8.25."
+ ],
+ "table": {
+  "heading": "A typical meal for one, by town",
+  "caption": "Restaurants and pubs, a middle-priced main and one drink, before tax and tip, early November 2026",
+  "head": ["Town", "Places counted", "Typical meal for one", "Middle value before rounding"],
+  "rows": [
+   ["Kelowna", 119, "about $25", "$27.00"],
+   ["Vernon", 42, "about $30", "$30.12"],
+   ["Penticton", 31, "about $25", "$26.50"],
+   ["West Kelowna", 19, "about $30", "$27.98"],
+   ["Other towns and ski villages, combined", 52, "about $30", "$30.00"],
+   ["All places", 263, "about $30", "$28.00"]
+  ],
+  "notes": [
+   "Rounding to the nearest $5 makes the gaps between towns look bigger than they are. West Kelowna's middle value is only about $1 above Kelowna's, and Kelowna's is about $3 below Vernon's.",
+   "Towns with fewer than 15 places counted are combined into one row: Osoyoos, Lake Country, Oliver, Big White, SilverStar, Summerland, Peachland, Armstrong, Coldstream, Enderby, Kaleden, Naramata and Okanagan Falls."
+  ]
+ },
+ "sections": [
+  {
+   "id": "pubs-and-restaurants",
+   "heading": "Pubs and restaurants",
+   "paragraphs": [
+    "Pubs were the most predictable. Across 27 pubs, a main and a drink came to about $30 (middle value $30), and every one landed between $25 and $36.",
+    "Restaurants varied far more, from about $11 to $63 for the same main-and-a-drink measure, with a middle value of $27.25 across 236 places."
+   ]
+  },
+  {
+   "id": "breweries",
+   "heading": "Breweries",
+   "paragraphs": [
+    "At the 11 breweries whose own menus list prices, the cheapest glass of their own beer ranged from $6 to $8.25, with a middle value of $7.97, so about $8.",
+    "Pour sizes vary. The cheapest glass was 12, 14 or 16 oz depending on the brewery, so these are not like-for-like pints."
+   ]
+  },
+  {
+   "id": "cafes",
+   "heading": "Cafés",
+   "paragraphs": [
+    "A drip coffee and a pastry (a muffin, cookie, cinnamon bun or banana bread) came to about $8, with a middle value of $7.75 and a range of $5.50 to $8.35.",
+    "This is a small sample: only 7 cafés listed both a drip coffee and a pastry on their own menus. At 9 cafés that listed a latte instead, a latte and a pastry came to about $9 (middle value $8.75)."
+   ]
+  },
+  {
+   "id": "wineries",
+   "heading": "Wineries",
+   "paragraphs": [
+    "We left wineries out. Only a handful publish a tasting fee on their own website, too few for a fair figure."
+   ]
+  }
+ ],
+ "method": [
+  "We read each place's own published menu: its website, its menu PDF or its own online ordering page. Prices from delivery apps were not used.",
+  "Restaurants and pubs: the middle-priced main on the menu (not appetizers, sides, kids' meals or specials) plus one typical drink at the menu's own price, such as a pint, a glass of house wine or, where no alcohol is served, a soft drink or coffee. Only places whose menu priced both the mains and a drink are counted: 263 in all.",
+  "Each town's figure is the middle value (the median) of its places, rounded to the nearest $5. Brewery and café figures are rounded to the nearest dollar.",
+  "All prices are in Canadian dollars, at regular prices (not happy hour), before tax and tip.",
+  "Towns with fewer than 15 places counted are combined into one row.",
+  "Menus change. These figures describe menus as published in early November 2026, not any one visit."
+ ],
+ "press": "Reporters and editors are welcome to use these figures with a link to this page."
+}
