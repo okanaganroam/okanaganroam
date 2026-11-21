@@ -39,7 +39,9 @@ function renderOutdoorLayout(p) {
   const heads = rows.find((r) => r[0] === 'Heads up');
   const save = p.actions.filter((a) => /fav-btn|trip-btn/.test(a));
   // A place you book (a tee time, a tour) leads with its booking button.
-  const main = p.actions.filter((a) => !/fav-btn|trip-btn/.test(a)).sort((a, b) => /data-track="booking"/.test(b) - /data-track="booking"/.test(a));
+  // (A walk-in place's booking link, data-book-secondary, like an arena's ice rentals, stays after Website.)
+  const leads = (a) => /data-track="booking"/.test(a) && !/data-book-secondary/.test(a);
+  const main = p.actions.filter((a) => !/fav-btn|trip-btn/.test(a)).sort((a, b) => leads(b) - leads(a));
 
   // Before you go: the researched facts except the ones shown elsewhere (the notice, the parking box, the source line).
   const shown = (label) => tiles.some((t) => t.includes(`<small>${label}</small>`));

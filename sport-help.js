@@ -110,7 +110,7 @@ const WORDS = {
     courts: ['First come, first served when a court is free', 'Premier arrivé, premier servi si un terrain est libre'],
   },
   holiday: {
-    _: ['Christmas Eve: closes at 2 PM', 'Veille de Noël : ferme à 14 h'], skischool: ['Christmas Eve: the desk closes at 2 PM', 'Veille de Noël : le comptoir ferme à 14 h'],
+    _: ['Christmas Eve: closes at 2 PM', 'Veille de Noël : ferme à 14 h'], rink: ['Dec 24: public skate until 4 PM', '24 déc. : patinage libre jusqu’à 16 h'], skischool: ['Christmas Eve: the desk closes at 2 PM', 'Veille de Noël : le comptoir ferme à 14 h'],
     golf: ['Canada Day: last tee time 4 PM', 'Fête du Canada : dernier départ à 16 h'], range: ['Canada Day: open 10 AM to 4 PM', 'Fête du Canada : ouvert de 10 h à 16 h'],
     swim: ['Canada Day: open 10 AM to 4 PM', 'Fête du Canada : ouvert de 10 h à 16 h'], skatepark: ['Canada Day: lights off at 9 PM', 'Fête du Canada : éclairage éteint à 21 h'],
     bike: ['Canada Day: open 10 AM to 4 PM', 'Fête du Canada : ouvert de 10 h à 16 h'], discgolf: ['Canada Day: open 10 AM to 4 PM', 'Fête du Canada : ouvert de 10 h à 16 h'],
@@ -213,6 +213,36 @@ const WORDS = {
   pro: {
     _: ['Private coaching on request: ask at the desk', 'Entraînement privé sur demande : demandez à l’accueil'],
   },
+  // Sport test 6 (2026-11-20; Priya, City recreation staff at an arena): extra sessions on set dates, a photo with no
+  // faces, and "we don't have rentals" in the kind's words.
+  extra: {
+    _: ['Holiday drop-in sessions, December 27, 1–3 PM', 'Séances libres des fêtes, 27 décembre, de 13 h à 15 h', 'daily to January 3', 'tous les jours jusqu’au 3 janvier'],
+    rink: ['Holiday public skates, December 26, 1–3 PM', 'Patinage libre des fêtes, 26 décembre, de 13 h à 15 h', 'daily to January 3', 'tous les jours jusqu’au 3 janvier'],
+    skischool: ['Holiday lessons, December 26, 9:30 AM', 'Cours des fêtes, 26 décembre, 9 h 30', 'daily to January 3', 'tous les jours jusqu’au 3 janvier'],
+    swim: ['Extra public swims, July 1, 1–4 PM', 'Bains libres en plus, 1er juillet, de 13 h à 16 h', 'daily to July 5', 'tous les jours jusqu’au 5 juillet'],
+    golf: ['Holiday twilight golf, July 1, from 4 PM', 'Golf au crépuscule, 1er juillet, dès 16 h', 'daily to July 5', 'tous les jours jusqu’au 5 juillet'],
+    range: ['Glow mini golf nights, July 1, 7–10 PM', 'Mini-golf fluo, 1er juillet, de 19 h à 22 h', 'daily to July 5', 'tous les jours jusqu’au 5 juillet'],
+    simgolf: ['Holiday open bays, December 27, 10 AM–2 PM', 'Baies libres des fêtes, 27 décembre, de 10 h à 14 h', 'daily to January 3', 'tous les jours jusqu’au 3 janvier'],
+  },
+  emptyPhoto: {
+    _: ['your place with nobody in it', 'votre endroit sans personne'], rink: ['the empty ice, or the front doors', 'la glace vide ou l’entrée'],
+    swim: ['the empty pool', 'la piscine vide'], golf: ['the course', 'le parcours'], range: ['the range', 'le champ de pratique'], simgolf: ['an empty bay', 'une baie vide'],
+    skischool: ['the slopes or your school sign', 'les pentes ou votre affiche'], skatepark: ['the empty park', 'le parc vide'], courts: ['the empty courts', 'les terrains vides'],
+    sportsctr: ['the empty gym', 'le gymnase vide'], bike: ['the track', 'la piste'], discgolf: ['a basket on the course', 'un panier du parcours'],
+  },
+  bookWhat: {
+    _: ['a time or a spot', 'une période ou une place'], rink: ['ice rentals or birthday parties', 'la glace ou les fêtes d’anniversaire'], golf: ['tee times', 'les départs'],
+    simgolf: ['bays', 'les baies'], range: ['lessons', 'les cours'], skischool: ['lessons', 'les cours'], swim: ['lessons or pool rentals', 'les cours ou la location de la piscine'],
+    courts: ['courts', 'les terrains'], sportsctr: ['a gym, a court or a room', 'un gymnase, un terrain ou une salle'], skatepark: ['lessons or camps', 'les cours ou les camps'],
+    bike: ['race or practice nights', 'les soirées de course ou d’entraînement'], discgolf: ['leagues or tournaments', 'les ligues ou les tournois'],
+  },
+  noRent: {
+    _: ['No rentals here: bring your own gear', 'Pas de location sur place : apportez votre équipement'],
+    rink: ['No skate rentals or sharpening here: bring your own skates', 'Pas de location ni d’aiguisage de patins ici : apportez vos patins'],
+    golf: ['No club rentals: bring your own clubs', 'Pas de location de bâtons : apportez vos bâtons'], range: ['No club rentals: bring your own clubs', 'Pas de location de bâtons : apportez vos bâtons'],
+    skischool: ['No rentals at the school: rent at the resort’s shop', 'Pas de location à l’école : louez à la boutique de la station'],
+    swim: ['No towel or swimsuit rentals: bring your own', 'Pas de location de serviettes ni de maillots : apportez les vôtres'],
+  },
 };
 const word = (field, kind) => { const f = WORDS[field] || {}; return f[kind] || f._ || ['', '']; };
 const WINTER = (kind) => (SK.K[kind] || {}).season === 'winter';
@@ -228,6 +258,8 @@ const TOPICS = [
     a: '<p>There’s no box for it: say it in <strong>Good to know</strong>, in one line, like <em>{MEET_EX}</em>. It shows under “Your visit” on your page, and Build My Trip reads it.{MEET_CHIP_EN} The map sends people to your address: is that the wrong spot? Tap <strong>Message us</strong>.</p>',
     aFr: '<p>Il n’y a pas de case pour ça : dites-le dans <strong>Bon à savoir</strong>, en une ligne, comme <em>{MEET_EX}</em>. Ça paraît sous « Planifiez votre visite » sur votre page, et Planifier mon voyage le lit.{MEET_CHIP_FR} La carte envoie les gens à votre adresse : ce n’est pas le bon endroit? Touchez <strong>Écrivez-nous</strong>.</p>' },
   { id: 'sport-staff-language', pages: ['setup', 'edit'], over: ['french', 'indoor-french', 'staff', 'not-owner', 'indoor-good-to-know', 'description', 'sport-lessons', 'photo-add', 'indoor-access'],
+    // Sport test 6 (Priya: "does the page need to be in french too? i dont speak french"): the page's French, not staff.
+    notIf: ['i dont speak french', 'i do not speak french', 'need to be in french', 'be in french too', 'je ne parle pas francais', 'doit etre en francais'],
     q: 'Our staff or instructors speak French (or other languages)', qFr: 'Notre personnel ou nos moniteurs parlent français (ou d’autres langues)',
     allOf: [['speak', 'speaks', 'speaking', 'bilingual', 'language', 'langu', 'parlent', 'parle', 'francophone', 'anglophone', 'bilingue'], ['instructor', 'staff', 'coach', 'pro', 'pros', 'moniteur', 'personnel', 'entraineur', 'guide', 'we', 'nous', 'lesson', 'cours', 'francais', 'french', 'english', 'anglais', 'spanish', 'german', 'teacher', 'lifeguard', 'team', 'equipe']],
     allOf2: [['lessons', 'lesson', 'cours', 'instruction'], ['in english', 'in french', 'en anglais', 'en francais', 'english only', 'french only']],
@@ -340,7 +372,63 @@ const TOPICS = [
     keys: ['dawn to dusk', 'dawn till dusk', 'dawn til dusk', 'sunrise to sunset', 'daylight hours', 'always open', 'open 24 hours', 'no set hours', 'no gate', 'its a park', 'do we need hours', 'it never closes'],
     keysFr: ['de l aube au crepuscule', 'du lever au coucher du soleil', 'toujours ouvert', 'pas d heures fixes', 'c est un parc'],
     a: '<p>Put the hours most people can use it, like <em>7 AM to 10 PM</em>, so your page can say open or closed. Then say it in one line in <strong>Good to know</strong>, like <em>Open dawn to dusk</em>{LIT_EN}.</p>',
-    aFr: '<p>Mettez les heures où la plupart des gens peuvent l’utiliser, comme <em>de 7 h à 22 h</em>, pour que votre page puisse dire ouvert ou fermé. Dites-le ensuite en une ligne dans <strong>Bon à savoir</strong>, comme <em>Ouvert du lever au coucher du soleil</em>{LIT_FR}.</p>' },
+    aFr: '<p>Mettez les heures où la plupart des gens peuvent l’utiliser, comme <em>de 7 h à 22 h</em>, pour que votre page puisse dire ouvert ou fermé. Dites-le ensuite en une ligne dans <strong>Bon à savoir</strong>, comme <em>Ouvert du lever au coucher du soleil</em>{LIT_FR}.</p>' },  // ── Sport test 6 (2026-11-20; Priya, recreation programmer for the City at an arena: 11 good answers of 34; any question
+  // that said "the city" got one answer, and "add the holiday skates dec 26 to jan 3" got Special closures). ──
+  { id: 'sport-extra-sessions', pages: ['setup', 'edit'], over: ['closures', 'setup-closures', 'setup-closure-fix', 'event-add', 'event-repeat', 'indoor-camps', 'sport-holiday-short', 'indoor-holiday-open', 'hours-open-holidays', 'hours', 'seasonal-hours', 'sport-peak-dates', 'sport-one-off-closure', 'indoor-theme-nights', 'indoor-swim-times', 'setup-third-time', 'hours-third-stretch', 'indoor-busy-times', 'sport-public'],
+    q: 'Extra times on set dates (like holiday sessions)', qFr: 'Des périodes en plus à des dates précises (comme pendant les fêtes)',
+    allOf: [['add', 'extra', 'special', 'more', 'bonus', 'additional', 'ajout', 'supplement', 'speciau', 'special'], ['skate', 'skating', 'session', 'swim', 'shinny', 'patin', 'seance', 'bain', 'periode', 'bays', 'baies']],
+    allOf2: [['holiday', 'christmas', 'xmas', 'spring', 'fetes', 'noel', 'relache'], ['skates', 'sessions', 'swims', 'patinages', 'seances', 'bains']],
+    keys: ['holiday skates', 'extra skates', 'extra public skates', 'special skates', 'add skates', 'add the skates', 'holiday public skates', 'extra public skating', 'extra sessions', 'holiday sessions', 'extra lessons on', 'extra times', 'so people see them', 'run extra'],
+    keysFr: ['patinages des fetes', 'patinage des fetes', 'patinages supplementaires', 'patinages en plus', 'seances supplementaires', 'seances en plus', 'bains supplementaires', 'ajouter des patinages', 'periodes en plus'],
+    a: '<p>Those are extra open times, not closures: leave those days unticked in <strong>Closures and holidays</strong> (ticked, your page would say you’re closed). On your page, tap <strong>Add an event</strong>, give it the first date and time, like <em>{EXTRA_EX}</em>, and write <em>{EXTRA_REPEAT}</em> in <strong>Repeats or other dates?</strong>. It shows on your page and on What’s On, and we add the other dates for you, usually within a day.</p><p>Closed on Christmas Day? Tick it in Closures and holidays. Closing early one day? Say it in one line in <strong>Good to know</strong>, like <em>{HOLIDAY_EX}</em>.</p>',
+    aFr: '<p>Ce sont des périodes d’ouverture en plus, pas des fermetures : laissez ces jours non cochés dans <strong>Fermetures et jours fériés</strong> (cochés, votre page dirait que vous êtes fermé). Sur votre page, touchez <strong>Ajouter un événement</strong>, donnez la première date et l’heure, comme <em>{EXTRA_EX}</em>, et écrivez <em>{EXTRA_REPEAT}</em> dans <strong>Récurrent ou autres dates?</strong>. L’événement paraît sur votre page et dans À l’affiche, et nous ajoutons les autres dates pour vous, en général d’ici un jour.</p><p>Fermé le jour de Noël? Cochez-le dans Fermetures et jours fériés. Vous fermez plus tôt un jour? Dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>{HOLIDAY_EX}</em>.</p>' },
+  { id: 'sport-city-say', pages: ['setup', 'edit'], over: ['sport-public', 'not-owner', 'staff', 'description', 'story', 'indoor-local-owned', 'sport-shared-social', 'logo', 'photo-add'],
+    q: 'Can we say it’s a City facility? (We don’t endorse the site)', qFr: 'Pouvons-nous dire que c’est une installation de la ville? (Sans appuyer le site)',
+    allOf: [['say', 'mention', 'write', 'call', 'dire', 'mentionn', 'indiqu', 'ecrire', 'preciser'], ['city', 'citys', 'ville', 'municip', 'district', 'town']],
+    keys: ['endorse', 'endorsing', 'endorsement', 'endorsed', 'endorses', 'city logo', 'our logo', 'official city', 'look like the city', 'say its a city', 'say it is a city', 'say we are a city', 'say its run by the city', 'not an endorsement'],
+    keysFr: ['appuyer', 'appui', 'approuve votre site', 'endosser', 'logo de la ville', 'arena de la ville', 'installation de la ville'],
+    a: '<p>Yes. Say it in your story, like <em>Run by the City’s recreation department</em>. Okanagan Roam is an independent visitor guide: your page is a free listing, never paid for, and it doesn’t say or suggest the City endorses the site. No logo is needed.</p>',
+    aFr: '<p>Oui. Dites-le dans votre histoire, comme <em>Géré par le service des loisirs de la ville</em>. Okanagan Roam est un guide indépendant pour les visiteurs : votre page est une fiche gratuite, jamais payée, et elle ne dit pas et ne laisse pas entendre que la ville appuie le site. Aucun logo n’est nécessaire.</p>' },
+  { id: 'sport-approval-first', pages: ['setup', 'edit'], over: ['access', 'staff', 'setup-change-later', 'setup-live-when', 'setup-who-sees', 'login-create', 'easy-setup', 'indoor-fill-all', 'sport-public', 'settings', 'live-speed', 'description', 'story'],
+    q: 'Someone has to approve what we write before it goes public', qFr: 'Quelqu’un doit approuver ce que nous écrivons avant que ce soit public',
+    allOf: [['approv', 'comms', 'communications', 'supervisor', 'manager', 'boss', 'council', 'sign off', 'review', 'approb', 'superviseur', 'gestionnaire', 'patron', 'conseil'], ['first', 'before', 'public', 'live', 'goes', 'come back', 'save', 'avant', 'public', 'enregistr', 'revenir', 'see']],
+    keys: ['approved by', 'has to be approved', 'needs approval', 'need approval', 'approval first', 'approved first', 'comms team', 'communications team', 'our comms', 'before it goes public', 'before it goes live', 'save it and come back', 'come back later', 'sign off on', 'needs to see anything'],
+    keysFr: ['approuve par', 'doit etre approuve', 'approbation', 'equipe des communications', 'les communications', 'avant que ce soit public', 'enregistrer et revenir', 'revenir plus tard'],
+    a: '<p>That’s fine. Your answers save as you go: skip any screen, leave it empty and come back with the same link. Most answers (hours, prices, who can come) show on your page as soon as they’re saved, so leave one empty until it’s approved. Your story and photos are checked by Dayton first and show within a day. Your comms team can open this same link, or each make their own login (tap <strong>Create a login</strong> on the finish screen).</p>',
+    aFr: '<p>Aucun problème. Vos réponses s’enregistrent au fur et à mesure : passez un écran, laissez-le vide et revenez avec le même lien. La plupart des réponses (heures, prix, qui peut venir) paraissent sur votre page dès qu’elles sont enregistrées : laissez-en une vide jusqu’à son approbation. Votre histoire et vos photos sont d’abord vérifiées par Dayton et paraissent d’ici un jour. Votre équipe des communications peut ouvrir ce même lien, ou chacun peut créer sa connexion (touchez <strong>Créer une connexion</strong> sur l’écran de fin).</p>' },
+  { id: 'sport-photo-consent', pages: ['setup', 'edit'], over: ['photo-add', 'photo-rights', 'photo-credit', 'sport-public', 'indoor-age', 'privacy', 'photos-when'],
+    q: 'Our photos have kids in them (photo consent)', qFr: 'Nos photos montrent des enfants (consentement)',
+    allOf: [['photo', 'picture', 'pics', 'image'], ['kid', 'child', 'consent', 'face', 'minor', 'enfant', 'consentement', 'visage', 'mineur', 'parents']],
+    keys: ['consent', 'photo consent', 'consent policy', 'consent form', 'release form', 'model release', 'kids in them', 'kids in the photos', 'children in the photos', 'faces in them', 'photo policy'],
+    keysFr: ['consentement', 'enfants sur les photos', 'des enfants sur', 'visages', 'politique de photos', 'formulaire de consentement'],
+    a: '<p>Only send photos you’re allowed to share: ones with no faces, or with the signed consent your policy asks for. A photo of {EMPTY_PHOTO} works well. Need one taken down later? Tap <strong>Message us</strong> and Dayton removes it, usually within a day.</p>',
+    aFr: '<p>N’envoyez que des photos que vous pouvez partager : sans visages, ou avec le consentement signé que votre politique demande. Une photo de {EMPTY_PHOTO_FR} fonctionne bien. Il faut en retirer une plus tard? Touchez <strong>Écrivez-nous</strong> et Dayton la retire, en général d’ici un jour.</p>' },
+  { id: 'sport-terms', pages: ['setup', 'edit'], over: ['cost', 'sport-public', 'not-owner', 'staff', 'privacy', 'claim', 'indoor-fill-all'],
+    q: 'Do I have to sign anything? (Terms, cost)', qFr: 'Dois-je signer quelque chose? (Conditions, coût)',
+    allOf: [['sign', 'signer', 'agree', 'accept', 'paperwork', 'contract', 'contrat', 'legal'], ['anything', 'terms', 'condition', 'employee', 'something', 'quelque', 'contract', 'agreement', 'form', 'formulaire', 'employe']],
+    keys: ['sign anything', 'agree to terms', 'terms and conditions', 'terms of use', 'the terms', 'a contract', 'an agreement', 'paperwork', 'as a city employee', 'as an employee', 'legal'],
+    keysFr: ['signer quelque chose', 'conditions d utilisation', 'les conditions', 'un contrat', 'une entente', 'paperasse', 'comme employe'],
+    a: '<p>Nothing to sign, and no cost: the listing is free. Using the portal means the site’s <a href="/terms" target="_blank" rel="noopener">terms</a> apply. Need something for your files? Tap <strong>Message us</strong> and Dayton sends you a short note.</p>',
+    aFr: '<p>Rien à signer, et c’est gratuit : la fiche ne coûte rien. Utiliser le portail veut dire que les <a href="/terms" target="_blank" rel="noopener">conditions</a> du site s’appliquent. Il vous faut quelque chose pour vos dossiers? Touchez <strong>Écrivez-nous</strong> et Dayton vous envoie une courte note.</p>' },
+  { id: 'sport-no-rentals', pages: ['setup', 'edit'], over: ['sport-rentals', 'indoor-extras', 'indoor-good-to-know', 'menu-add', 'dont-have', 'indoor-price', 'features'],
+    q: 'We don’t have rentals: where do I say that?', qFr: 'Nous n’avons pas de location : où le dire?',
+    keys: ['no skate rentals', 'dont have skate rentals', 'dont have rentals', 'dont do rentals', 'no rentals', 'no rental', 'dont rent', 'no sharpening', 'dont have sharpening', 'dont offer rentals', 'no club rentals', 'dont have club rentals', 'bring your own'],
+    keysFr: ['pas de location', 'pas de location de patins', 'aucune location', 'pas d aiguisage', 'on ne loue pas', 'nous ne louons pas'],
+    a: '<p>Say it in one line in <strong>Good to know</strong>, like <em>{NO_RENT}</em>, and leave {RENT_CHIP_EN} unticked. Your page and search then don’t say you rent.</p>',
+    aFr: '<p>Dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>{NO_RENT_FR}</em>, et laissez {RENT_CHIP_FR} non coché. Votre page et la recherche ne diront pas que vous louez.</p>' },
+  { id: 'sport-booking-link', pages: ['setup', 'edit'], over: ['indoor-booking', 'indoor-book-party', 'indoor-groups', 'booking-link', 'links', 'newlink', 'tour-booking-only', 'sport-tee-times', 'website-broken'],
+    q: 'Our booking link is for rentals or parties: does it go here?', qFr: 'Notre lien de réservation sert aux locations ou aux fêtes : va-t-il ici?',
+    allOf: [['link', 'lien', 'url'], ['book', 'reserv', 'rental', 'rent', 'location']],
+    keys: ['do i put that link here', 'put that link here', 'is that the booking link', 'which link do i put', 'booking link here', 'that link here', 'booked through the city', 'booked through the city website'],
+    keysFr: ['ce lien ici', 'je mets ce lien', 'quel lien mettre', 'reserve sur le site de la ville'],
+    a: '<p>Yes, if it’s where people book {BOOK_WHAT}. Paste it in the booking link box: your page’s button says <strong>{BOOK_BTN}</strong> (<strong>Book a party</strong> when the link is your party page). Walk-ins welcome? It’s a smaller button after Website, and your page still says there’s no need to book.</p>',
+    aFr: '<p>Oui, si c’est là que les gens réservent {BOOK_WHAT_FR}. Collez-le dans la case du lien de réservation : le bouton de votre page indique <strong>{BOOK_BTN_FR}</strong> (<strong>Réserver une fête</strong> si le lien est votre page de fêtes). Sans réservation? C’est un bouton plus petit après Site Web, et votre page indique toujours qu’il n’est pas nécessaire de réserver.</p>' },
+  { id: 'sport-drop-in-hockey', kinds: ['rink'], pages: ['setup', 'edit', 'menu'], over: ['indoor-also-offer', 'sport-rate-lines', 'indoor-price-varies', 'indoor-extras', 'indoor-theme-nights', 'menu-add', 'indoor-price', 'sport-lessons', 'indoor-good-to-know', 'sport-what-to-bring', 'indoor-groups', 'sport-kinds-other', 'sport-second-kind'],
+    q: 'Shinny, stick and puck or drop-in hockey', qFr: 'Hockey libre, bâton et rondelle',
+    keys: ['shinny', 'stick and puck', 'stick n puck', 'stick puck', 'drop in hockey', 'pickup hockey', 'pick up hockey', 'adult hockey', 'hockey drop in', 'cage only', 'helmets with cage', 'full cage'],
+    keysFr: ['hockey libre', 'baton et rondelle', 'batons et rondelles', 'grille complete', 'casque avec grille'],
+    a: '<p>Each one is a line in <strong>Your prices</strong>, like <em>Shinny $9</em> and <em>Stick and puck $8</em>, with its times in the line’s details if they’re set. Gear rules go in one line in <strong>Good to know</strong>, like <em>Helmets with full cages for shinny and stick and puck</em>. Your adult public skate stays your main price, and search finds you for shinny and drop-in hockey.</p>',
+    aFr: '<p>Chacun est une ligne dans <strong>Vos tarifs</strong>, comme <em>Hockey libre 9 $</em> et <em>Bâton et rondelle 8 $</em>, avec ses heures dans les détails de la ligne si elles sont fixes. Les règles d’équipement vont en une ligne dans <strong>Bon à savoir</strong>, comme <em>Casque avec grille complète pour le hockey libre et bâton et rondelle</em>. Votre patinage libre adulte reste votre prix principal, et la recherche vous trouve pour le hockey libre.</p>' },
 ];
 // What owners of every kind typed for the shared answers ([en keys, fr keys, topics they now beat]).
 const MORE_KEYS = {
@@ -350,19 +438,27 @@ const MORE_KEYS = {
   'sport-lessons': [['private vs group', 'private and group', 'group and private', 'private or group', 'show private', 'private lessons and group', 'race programs', 'freestyle programs', 'race and freestyle', 'programs for teens', 'race team', 'freestyle'], ['prives et de groupe', 'cours prives', 'prive et de groupe', 'cliniques d initiation', 'clinique d initiation', 'initiation', 'cours pour debutants'], ['indoor-price-varies', 'indoor-seasonal', 'seasonal-hours', 'season']],
   'indoor-camps': [['christmas camp', 'holiday camp', 'spring break camp', 'should that be an event', 'is that an event', 'camp is dec', 'camp dates'], ['camp de noel', 'camp des fetes', 'camp de la relache', 'est ce un evenement'], ['closures', 'setup-closures', 'setup-closure-fix', 'sport-one-off-closure', 'setup-short-closure', 'indoor-yearly-break']],
   'indoor-holiday-open': [['open christmas day', 'open on christmas', 'we are open christmas', 'open boxing day', 'open new years day', 'open on holidays', 'open on stat holidays'], ['ouvert a noel', 'ouverts a noel', 'ouvert le jour de noel', 'on est ouvert a noel'], ['closures', 'setup-closures']],
-  'indoor-access': [['wheelchair', 'wheelchair accessible', 'accessible', 'elevator', 'ramp', 'stairs', 'accessible washroom'], ['fauteuil roulant', 'accessible', 'ascenseur', 'rampe'], []],
-  'indoor-swim-times': [['lessons go out at', 'lesson times', 'lessons start at', 'desk opens', 'lessons at 9'], ['heures des cours', 'les cours partent', 'le comptoir ouvre', 'heures de patinage libre changent', 'changent chaque semaine'], ['hours', 'setup-split-hours', 'sport-last-booking', 'setup-third-time', 'indoor-extras']],
-  'indoor-french': [['write this in french', 'in french too', 'do i have to write it in french', 'guests are from quebec', 'french page', 'french version'], ['en francais aussi', 'ecrire en francais', 'version francaise'], []],
+  'indoor-swim-times': [['lessons go out at', 'lesson times', 'lessons start at', 'desk opens', 'lessons at 9',
+    // Sport test 6 (Priya): public skate times that change every week with hockey bookings, and the City's schedule page.
+    'change every week', 'changes every week', 'change weekly', 'changes weekly', 'times change every', 'schedule changes', 'schedule is posted', 'posted on the city website', 'link to that', 'link to the schedule', 'link the schedule', 'link our schedule', 'what do i put for hours', 'show the wrong time', 'wrong time', 'doors are open', 'building is open'],
+    ['heures des cours', 'les cours partent', 'le comptoir ouvre', 'heures de patinage libre changent', 'changent chaque semaine', 'change chaque semaine', 'horaire change', 'horaire du patinage libre', 'quoi mettre comme heures', 'lien vers l horaire', 'horaire de la ville'], ['hours', 'setup-split-hours', 'sport-last-booking', 'setup-third-time', 'indoor-extras', 'sport-opening-day', 'event-repeat', 'sport-public', 'links', 'website-broken', 'indoor-price', 'sport-season', 'season', 'indoor-seasonal', 'seasonal-hours']],
+  'indoor-french': [['write this in french', 'in french too', 'do i have to write it in french', 'guests are from quebec', 'french page', 'french version', 'need to be in french', 'page need to be in french', 'dont speak french', 'do not speak french', 'i cant write french', 'be in french'], ['en francais aussi', 'ecrire en francais', 'version francaise', 'je ne parle pas francais'], ['sport-staff-language']],
   'sport-rentals': [['rentals are separate', 'rentals extra', 'rentals cost extra'], ['location en plus', 'location a part'], []],
   'sport-weather': [['lifts close', 'the lifts close', 'cancelled for wind', 'canceled for wind', 'wind hold', 'lift closures', 'too cold', 'cold days', 'any weather', 'run in any weather', 'rain or shine', 'too warm', 'even in snow', 'deep snow', 'all weather'], ['remontees ferment', 'grand vent', 'par tous les temps', 'beau temps mauvais temps', 'mouille', 'quand c est mouille'], ['sport-opening-day']],
-  'indoor-good-to-know': [['washrooms', 'washroom', 'washrooms nearby', 'bathrooms', 'toilets', 'change rooms', 'helmets are required', 'helmets required for', 'is there a chip'], ['toilettes', 'vestiaires', 'trottinettes', 'velos permis', 'trottinettes et velos', 'carte du parcours'], ['indoor-price', 'indoor-age']],
-  'indoor-theme-nights': [[], ['mini golf fluo', 'soiree jam', 'soirees jam', 'chaque vendredi', 'basketball libre', 'le vendredi soir', 'patinage familial', 'bain familial'], ['sport-tournaments']],
+  'indoor-good-to-know': [['washrooms', 'washroom', 'washrooms nearby', 'bathrooms', 'toilets', 'change rooms', 'helmets are required', 'helmets required for', 'is there a chip', 'helmets required', 'helmets are mandatory'], ['toilettes', 'vestiaires', 'trottinettes', 'velos permis', 'trottinettes et velos', 'carte du parcours'], ['indoor-price', 'indoor-age']],
+  'indoor-theme-nights': [['family skate', 'family skates', 'adult only skate', 'adults only skate', 'parent and tot', 'parent and tot skate', 'seniors skate', 'know the difference', 'noon hour skate'], ['mini golf fluo', 'soiree jam', 'soirees jam', 'chaque vendredi', 'basketball libre', 'le vendredi soir', 'patinage familial', 'bain familial'], ['sport-tournaments']],
   'indoor-price': [['adult skate is', 'adult swim is'], [], ['indoor-theme-nights']],
   'indoor-price-varies': [['small and large', 'small and large buckets', 'off peak', 'peak and off peak', 'peak after'], ['petit seau', 'grand seau', 'hors pointe'], []],
   'sport-season': [['to labour day', 'until labour day', 'to thanksgiving', 'victoria day to', 'end of october', 'early april', 'for the season'], ['a la fete du travail'], []],
   'indoor-groups': [['ice rentals by the hour', 'ice rental by the hour'], [], ['indoor-extras']],
+  // Sport test 6 (Priya: "ice rentals and birthday parties are booked through the city website. do i put that link here?").
+  'indoor-booking': [['do i put that link here', 'put that link here', 'booked through the city', 'booked through the city website', 'booking page', 'ice rentals are booked', 'parties are booked'], ['reserve sur le site de la ville', 'ce lien ici'], ['indoor-groups', 'indoor-book-party']],
+  'sport-season-says': [['no ice', 'when there is no ice', 'ice is out', 'ice comes out', 'ice out', 'think we are closed', 'think were closed', 'what happens in summer', 'dry floor'], ['la glace est enlevee', 'glace enlevee', 'pas de glace', 'sans glace', 'que dit la page', 'en ete'], ['sport-opening-day', 'indoor-closed-months', 'sport-season', 'indoor-seasonal']],
+  'indoor-access': [['wheelchair', 'wheelchair accessible', 'accessible', 'elevator', 'ramp', 'stairs', 'accessible washroom'], ['fauteuil roulant', 'accessible', 'ascenseur', 'rampe'], []],
   'sport-free-clubs': [[], [], ['sport-included']],
+  'sport-tax': [['plus gst', 'plus tax', 'plus taxes', 'gst extra', 'tax extra', 'plus gst and pst'], ['plus taxes', 'taxes en sus', 'plus tps'], ['indoor-extras', 'sport-included']],
   'sport-dogs': [[], [], ['sport-what-to-bring']],
+  'sport-bay-link': [[], [], ['sport-booking-link']],
   'sport-dress-code': [[], [], ['sport-what-to-bring']],
   'sport-restaurant': [[], [], ['sport-one-listing']],
   'photo-add': [['photo of our instructors', 'photo of our staff', 'photos of our team', 'picture of our coaches', 'photo of our pros'], ['photo de nos moniteurs', 'photo de notre equipe'], ['sport-staff-language']],
@@ -388,6 +484,7 @@ function tokens(kind, ctx) {
   const e = ctx.esc, K = SK.K[kind] || SK.K.sportother, w = (f, i) => e(word(f, kind)[i]);
   const chipOf = (re) => { const i = (ctx.gtk.en || []).findIndex((c) => re.test(c)); return i >= 0 ? [ctx.gtk.en[i], (ctx.gtk.fr || [])[i] || ctx.gtk.en[i]] : null; };
   const meet = chipOf(/\bmeet\b|check in|arrive/i), lit = chipOf(/^lit\b/i), notIn = chipOf(/not included/i);
+  const rentChip = chipOf(/rental|to rent/i);
   const bring = (ctx.gtk.en || []).map((c, i) => [c, (ctx.gtk.fr || [])[i] || c]).filter(([c]) => /\bbring\b|\bdress\b|helmet|swimsuit|shoes|clubs to borrow|racquet|discs/i.test(c)).slice(0, 2);
   const label = SK.SPORT_KIND_LABELS_OWNER[kind] || ['your kind', 'votre genre'];
   const busy = SK.BUSY_THEME[kind] || SK.BUSY_THEME.sportother;
@@ -407,12 +504,14 @@ function tokens(kind, ctx) {
       BRING_EX: w('bring', 0), BRING_CHIPS_EN: bring.length ? ` (like ${bring.map(([c]) => `<strong>${e(c)}</strong>`).join(' or ')})` : '', BUSY_EX: e(busy[0]), PEAK_EX: e(`${typer[0]} $${p} (${peakWhen[0]}: $${peak})`),
       INCL_EX: w('include', 0), NOT_INCL: w('notIncluded', 0), PKG_EX: w('pkg', 0), CARD_EN: ctx.price ? `your main price (“${e(ctx.price.en)}”)` : 'your main price', LABEL_EN: e(label[0]), BOTH_EN: w('both', 0),
       SEASON_SAYS_EN: seasonSays[0], AHEAD_CHIP_EN: e((bw.ahead || ['No, please book ahead'])[0]), AHEAD_EX: w('ahead', 0), BUSY_CHIP_EN: e((bw.busy || ['Yes, but book ahead for weekends and busy times'])[0]),
-      BUSY_LINE_EN: bw.line ? `: your page says “${e(String(bw.line[0]).replace(/\.$/, ''))}”` : '', SAME_EX: w('same', 0), HOLIDAY_EX: w('holiday', 0), SEARCH_EX: e(search.join(', ') || label[0].toLowerCase()), NEAR_EN: ctx.near ? ` ${ctx.near.en}` : '', NOT_INCL_CHIP_EN: notIn ? (notIn[0] === word('notIncluded', kind)[0] ? ': it’s one tap there' : ` (or tap <strong>${e(notIn[0])}</strong>)`) : '', NOT_SOLD_EN: kind === 'skischool' ? 'lift tickets the ticket office sells' : 'another business’s tickets', LIT_EN: lit ? `, or tap <strong>${e(lit[0])}</strong> if it’s lit` : '', AGES_LINE: w('lineAges', 0) },
+      BUSY_LINE_EN: bw.line ? `: your page says “${e(String(bw.line[0]).replace(/\.$/, ''))}”` : '', SAME_EX: w('same', 0), HOLIDAY_EX: w('holiday', 0), SEARCH_EX: e(search.join(', ') || label[0].toLowerCase()), NEAR_EN: ctx.near ? ` ${ctx.near.en}` : '', NOT_INCL_CHIP_EN: notIn ? (notIn[0] === word('notIncluded', kind)[0] ? ': it’s one tap there' : ` (or tap <strong>${e(notIn[0])}</strong>)`) : '', NOT_SOLD_EN: kind === 'skischool' ? 'lift tickets the ticket office sells' : 'another business’s tickets', LIT_EN: lit ? `, or tap <strong>${e(lit[0])}</strong> if it’s lit` : '', AGES_LINE: w('lineAges', 0),
+      EXTRA_EX: w('extra', 0), EXTRA_REPEAT: w('extra', 2), EMPTY_PHOTO: w('emptyPhoto', 0), NO_RENT: w('noRent', 0), RENT_CHIP_EN: rentChip ? `the <strong>${e(rentChip[0])}</strong> chip` : 'any rentals chip', BOOK_WHAT: w('bookWhat', 0), BOOK_BTN: e((K.bookBtn || ['Book online'])[0]) },
     fr: { MEET_EX: w('meet', 1), MEET_CHIP_FR: meet ? ` Ou touchez <strong>${e(meet[1])}</strong> et ajoutez l’endroit.` : '', LANG_EX: w('lang', 1), ADAPT_PRICE: w('adaptPrice', 1), ADAPT_EX: w('adapt', 1), REFUND_EX: w('refund', 1), REFUND_WX: w('refundWx', 1),
       BRING_EX: w('bring', 1), BRING_CHIPS_FR: bring.length ? ` (comme ${bring.map(([, c]) => `<strong>${e(c)}</strong>`).join(' ou ')})` : '', BUSY_EX: e(busy[3]), PEAK_EX: e(`${typer[2]} ${p} $ (${peakWhen[1]} : ${peak} $)`),
       INCL_EX: w('include', 1), NOT_INCL: w('notIncluded', 1), PKG_EX: w('pkg', 1), CARD_FR: ctx.price ? `votre prix principal (« ${e(ctx.price.fr)} »)` : 'votre prix principal', LABEL_FR: e(label[1]), BOTH_FR: w('both', 1),
       SEASON_SAYS_FR: seasonSays[1], AHEAD_CHIP_FR: e((bw.ahead || ['', 'Non, réservez à l’avance'])[1]), AHEAD_EX: w('ahead', 1), BUSY_CHIP_FR: e((bw.busy || ['', 'Oui, mais réservez pour les fins de semaine et les périodes achalandées'])[1]),
-      BUSY_LINE_FR: bw.line ? ` : votre page indique « ${e(String(bw.line[1]).replace(/\.$/, ''))} »` : '', SAME_EX: w('same', 1), HOLIDAY_EX: w('holiday', 1), SEARCH_EX_FR: e(searchFr.join(', ') || label[1].toLowerCase()), NEAR_FR: ctx.near ? ` ${ctx.near.fr}` : '', NOT_INCL_CHIP_FR: notIn ? (notIn[0] === word('notIncluded', kind)[0] ? ' : c’est un choix à toucher' : ` (ou touchez <strong>${e(notIn[1])}</strong>)`) : '', NOT_SOLD_FR: kind === 'skischool' ? 'les billets de remontée vendus à la billetterie' : 'les billets d’une autre entreprise', LIT_FR: lit ? `, ou touchez <strong>${e(lit[1])}</strong> s’il y a de l’éclairage` : '', AGES_LINE: w('lineAges', 1) },
+      BUSY_LINE_FR: bw.line ? ` : votre page indique « ${e(String(bw.line[1]).replace(/\.$/, ''))} »` : '', SAME_EX: w('same', 1), HOLIDAY_EX: w('holiday', 1), SEARCH_EX_FR: e(searchFr.join(', ') || label[1].toLowerCase()), NEAR_FR: ctx.near ? ` ${ctx.near.fr}` : '', NOT_INCL_CHIP_FR: notIn ? (notIn[0] === word('notIncluded', kind)[0] ? ' : c’est un choix à toucher' : ` (ou touchez <strong>${e(notIn[1])}</strong>)`) : '', NOT_SOLD_FR: kind === 'skischool' ? 'les billets de remontée vendus à la billetterie' : 'les billets d’une autre entreprise', LIT_FR: lit ? `, ou touchez <strong>${e(lit[1])}</strong> s’il y a de l’éclairage` : '', AGES_LINE: w('lineAges', 1),
+      EXTRA_EX: w('extra', 1), EXTRA_REPEAT: w('extra', 3), EMPTY_PHOTO_FR: w('emptyPhoto', 1), NO_RENT_FR: w('noRent', 1), RENT_CHIP_FR: rentChip ? `le choix <strong>${e(rentChip[1])}</strong>` : 'tout choix de location', BOOK_WHAT_FR: w('bookWhat', 1), BOOK_BTN_FR: e((K.bookBtn || [null, 'Réserver en ligne'])[1]) },
   };
 }
 // The shared answers (and their titles, which are also the suggestion buttons) in the kind's own words.

@@ -26155,6 +26155,10 @@ function indoorPartyBooking(venue, bookingUrl) {
 // theatres), "Class schedule" (class kinds), "Book a party" (a walk-in place's party page), "Book a visit" (a walk-in
 // place's booking page), else "Book". -> [en, fr].
 const SPORT_BAY_URL_RE = /alleytrak|trackman|toptracer|golfsim|sim-?golf|\bbays?\b|simulator/i;
+// Sport test 6: a sport place people drop in to (the owner's "no need to book"): its booking link is secondary.
+function sportDropInBooking(venue) {
+  try { return !!venue && !!sportSetupType(venue.type) && venueIndoorInfo(venue.id).book === 'no'; } catch (e) { return false; }
+}
 function indoorBookButton(venue, bookingUrl) {
   const B = indoorKindsModule.INDOOR_BOOK_BUTTONS;
   try {
@@ -26162,6 +26166,13 @@ function indoorBookButton(venue, bookingUrl) {
     const t = venueIndoorInfo(venue.id), k = indoorKindsModule.indoorKindText(t.kinds, 'en');
     // Sport (2026-11-20): a tee-time, bay, lesson or court booking page says so ("Book a tee time").
     if (k.bookBtn && t.book !== 'no' && !INDOOR_WAIVER_URL_RE.test(String(bookingUrl || ''))) return k.bookBtn;
+    // Sport test 6 (2026-11-20; Priya's walk-in arena: its ice-rental link said "Book a visit"): a walk-in sport place's
+    // link is never "Book a visit": a waiver or a party page says so, anything else says what the kind books ("Rent the ice").
+    if (sportSetupType(venue.type) && t.book === 'no' && k.bookBtn) {
+      if (INDOOR_WAIVER_URL_RE.test(String(bookingUrl || ''))) return B.waiver;
+      if (indoorPartyBooking(venue, bookingUrl)) return B.party;
+      return k.bookBtn;
+    }
     // Sport test 3 (2026-11-20; Gord's range: his Trackman bay booking said "Book a visit"): a place with simulators among
     // its kinds whose link is a bay booking (its address says Trackman, bays or a bay booking system) says "Book a bay".
     if (sportSetupType(venue.type) && (t.kinds || []).includes('simgolf') && SPORT_BAY_URL_RE.test(String(bookingUrl || ''))) return indoorKindsModule.SPORT.K.simgolf.bookBtn;
@@ -43573,7 +43584,9 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // Viator (2026-11-20, owner decision): a venue with an approved Viator match has "Book on Viator" as its Book button
     // (its own booking link moves to a smaller "or book direct" line under it: renderVenuePage, viator.withVenueLink).
     viatorBook ? viator.bookButtonHtml(viatorBook.url, fr ? 'fr' : 'en')
-      : venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(L(...indoorBookButton(venue, venueLinkRow.booking_url)))}</a>`
+      // Sport test 6: a walk-in sport place's booking link (ice rentals, parties) is a smaller button after Website, never the
+      // page's main button (data-book-secondary: the layouts keep it in place).
+      : venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}${sportDropInBooking(venue) ? ' data-book-secondary' : ''}>${escapeHtml(L(...indoorBookButton(venue, venueLinkRow.booking_url)))}</a>`
       // A winery's tasting booking page from its Plan your visit box (2026-10-29), when it has no booking link of its own.
       : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(fr ? visitBookLabelFr(visitInfo, venue.type) : (visitInfo.booking_label || VISIT_BOOK_LABELS[venue.type] || 'Book'))}</a>` : null,
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
@@ -61896,10 +61909,12 @@ const SETUP_CHANGE_LATER_HELP_TOPIC = { id: 'setup-change-later', pages: ['setup
     'si je fais une erreur', 'faire une erreur', 'une erreur', 'erreur', 'erreurs', 'pas doue avec les ordinateurs', 'pas douee avec les ordinateurs', 'ordinateurs', 'ordinateur', 'informatique', 'pas doue en informatique', 'le faire pour moi', 'le faire a ma place', 'quelqu un peut le faire', 'pouvez vous le faire', 'le remplir pour moi', 'tout briser', 'tout gacher'],
   a: '<p><strong>Use this same link, any time.</strong> Keep it somewhere safe (it is your private link).</p><ul><li>Open it and tap <strong>Change an answer</strong>: every answer is listed, tap the one to change.</li><li>Or tap <strong>Back to my edit page</strong> (at the end of the setup): everything is there on one long page.</li></ul><p>Most changes show on your page right away; photos, your story and new links show after we check them, usually within a day. A wrong tap can’t break anything: change it the same way.</p><p><strong>Would you rather have us do it?</strong> That’s no problem. Email us at <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a>: a photo of your price list or a few words is plenty.</p>',
   aFr: '<p><strong>Utilisez ce même lien, n’importe quand.</strong> Gardez-le en lieu sûr (c’est votre lien privé).</p><ul><li>Ouvrez-le et touchez <strong>Modifier une réponse</strong> : toutes vos réponses sont là, touchez celle à changer.</li><li>Ou touchez <strong>Retour à ma page de modification</strong> (à la fin de la configuration) : tout y est, sur une seule longue page.</li></ul><p>La plupart des changements paraissent tout de suite; les photos, votre histoire et les nouveaux liens paraissent après notre vérification, habituellement en moins d’une journée. Une erreur ne brise rien : changez-la de la même façon.</p><p><strong>Vous préférez que nous le fassions?</strong> Aucun problème. Écrivez-nous à <a href="mailto:info@okanaganroam.com">info@okanaganroam.com</a> : une photo de votre liste de prix ou quelques mots suffisent.</p>' };
-const SETUP_WHO_SEES_HELP_TOPIC = { id: 'setup-who-sees', pages: ['setup', 'edit'], over: ['staff', 'access', 'signin', 'login-create', 'setup-status', 'setup-live-when', 'edit-link', 'link-lost', 'email', 'setup-change-later'],
+const SETUP_WHO_SEES_HELP_TOPIC = { id: 'setup-who-sees', pages: ['setup', 'edit'], over: ['staff', 'access', 'signin', 'login-create', 'setup-status', 'setup-live-when', 'edit-link', 'link-lost', 'email', 'setup-change-later', 'settings'],
   q: 'Can my boss see what I changed? Do they get an email?', qFr: 'Mon patron voit-il ce que j’ai changé? Reçoit-il un courriel?',
-  keys: ['my boss', 'the boss', 'boss see', 'can my boss see', 'will my boss see', 'boss get an email', 'does my boss get', 'the owner see', 'can the owner see', 'will the owner see', 'owner get an email', 'does the owner get', 'owner be told', 'owner know', 'will the owner know', 'my manager see', 'see what i did', 'see what i changed', 'see my changes', 'see what was changed', 'who changed', 'who changed what', 'record of changes', 'log of changes', 'history of changes', 'change history', 'get an email', 'get emailed', 'send an email to', 'email the owner', 'copy of my answers', 'a copy of what i', 'confirmation email', 'will anyone be told', 'does anyone get told', 'is anyone notified', 'notified', 'notification'],
-  keysFr: ['mon patron', 'ma patronne', 'le patron', 'patron voit', 'patron peut voir', 'le proprietaire voit', 'la proprietaire voit', 'proprietaire peut voir', 'proprietaire recoit', 'patron recoit un courriel', 'recoit un courriel', 'recevoir un courriel', 'voir ce que j ai fait', 'voir ce que j ai change', 'voir mes changements', 'qui a change', 'qui a change quoi', 'historique des changements', 'historique', 'copie de mes reponses', 'courriel de confirmation', 'est ce que quelqu un est avise', 'avise', 'notification'],
+  keys: ['my boss', 'the boss', 'boss see', 'can my boss see', 'will my boss see', 'boss get an email', 'does my boss get', 'the owner see', 'can the owner see', 'will the owner see', 'owner get an email', 'does the owner get', 'owner be told', 'owner know', 'will the owner know', 'my manager see', 'see what i did', 'see what i changed', 'see my changes', 'see what was changed', 'who changed', 'who changed what', 'record of changes', 'log of changes', 'history of changes', 'change history', 'get an email', 'get emailed', 'send an email to', 'email the owner', 'copy of my answers', 'a copy of what i', 'confirmation email', 'will anyone be told', 'does anyone get told', 'is anyone notified', 'notified', 'notification',
+    // Sport test 6 (Priya: "can my supervisor get an email when i change something" got Account settings).
+    'my supervisor', 'supervisor get an email', 'supervisor see', 'email when i change', 'email when i change something', 'email when something changes'],
+  keysFr: ['mon superviseur', 'ma superviseure', 'superviseur recoit', 'mon patron', 'ma patronne', 'le patron', 'patron voit', 'patron peut voir', 'le proprietaire voit', 'la proprietaire voit', 'proprietaire peut voir', 'proprietaire recoit', 'patron recoit un courriel', 'recoit un courriel', 'recevoir un courriel', 'voir ce que j ai fait', 'voir ce que j ai change', 'voir mes changements', 'qui a change', 'qui a change quoi', 'historique des changements', 'historique', 'copie de mes reponses', 'courriel de confirmation', 'est ce que quelqu un est avise', 'avise', 'notification'],
   a: '<p><strong>They can see it, but nothing is sent to them when you save.</strong></p><ul><li><strong>On your page:</strong> what you save shows on the public page (most of it right away; photos, your story and new links after we check them, usually within a day).</li><li><strong>With this link:</strong> anyone who opens the same link and taps <strong>Change an answer</strong> sees every answer as it is now.</li></ul><p>There is no list of who changed what, and no email goes out each time you save. An email is sent only when we approve or decline something we check first (a photo, your story, a link): it goes to the logins on the listing or, if there are none, to the email this link was sent to. People with a login also get an email when a new login is added.</p>',
   aFr: '<p><strong>Il peut le voir, mais rien ne lui est envoyé quand vous enregistrez.</strong></p><ul><li><strong>Sur votre page :</strong> ce que vous enregistrez paraît sur la page publique (presque tout, tout de suite; les photos, votre histoire et les nouveaux liens après notre vérification, habituellement en moins d’une journée).</li><li><strong>Avec ce lien :</strong> toute personne qui ouvre le même lien et touche <strong>Modifier une réponse</strong> voit chaque réponse telle qu’elle est maintenant.</li></ul><p>Il n’y a pas de liste de qui a changé quoi, et aucun courriel n’est envoyé à chaque enregistrement. Un courriel part seulement quand nous approuvons ou refusons quelque chose que nous vérifions d’abord (une photo, votre histoire, un lien) : il va aux comptes de la fiche ou, s’il n’y en a pas, au courriel auquel ce lien a été envoyé. Les personnes qui ont un compte reçoivent aussi un courriel quand un compte s’ajoute.</p>' };
 // Tour test 4 (Whistler, 2026-11-17): the examples in the tour help that differ by site. The Whistler fork overrides these
@@ -62628,14 +62643,17 @@ const INDOOR_SETUP_HELP_TOPICS = [
     // Indoor test 13 (2026-11-19; Dan: "cheap tuesdays $8" got a weekly event to add): a cheap night or a deal with its price
     // is one of Your prices (and a Known for line, the answer says).
     allOf2: [['cheap', 'discount', 'deal', 'bargain', 'toonie', 'half', 'rabais', 'reduit', 'reduc', 'aubaine'], ['1', '2', '3', '4', '5', '6', '7', '8', '9']],
-    keys: ['cheap tuesdays', 'cheap tuesday', 'cheap night', 'cheap nights', 'toonie tuesday', 'toonie tuesdays', 'discount day', 'discount days', 'discount night', 'cheap movie night', 'half price', 'tuesday deal', 'tuesday special',
+    keys: ['price per person but', 'per person but you can book', 'cheap tuesdays', 'cheap tuesday', 'cheap night', 'cheap nights', 'toonie tuesday', 'toonie tuesdays', 'discount day', 'discount days', 'discount night', 'cheap movie night', 'half price', 'tuesday deal', 'tuesday special',
       'kids get in free', 'kids free', 'kids are free', 'children free', 'children are free', 'free for kids', 'free for children', 'kids get in', 'under 5 free', 'under 12 free', 'price', 'prices', 'what price', 'which price', 'admission', 'admission price', 'entry fee', 'ticket price', 'tickets', 'how much', 'kids price', 'child price', 'children price', 'senior', 'seniors', 'student', 'students', 'family price', 'family pass', 'membership', 'memberships', 'season pass', 'punch card', 'day pass', 'drop in rate', 'per hour', 'two prices', 'different prices', 'adult price', 'taxes', 'gst', 'adult ticket', 'adult tickets', 'kids and seniors', 'adult drop in', 'visit pass', '10 visit pass', 'class pass', '10 class pass', 'the piece', 'plus the piece', 'per round', 'a round', 'per 30 min', 'game cards', 'credits', 'adults free', 'members get in free', 'members free',
       // Indoor test 9 (Melissa: "we sell 10 visit passes" got "I'm not sure").
       'visit passes', '10 visit passes', 'we sell passes', 'sell passes', 'punch pass', 'punch passes', 'punch cards', 'multi visit pass', '10 visits', 'we sell memberships', 'annual pass', 'annual passes', 'crawlers', 'infants', 'babies are', 'under 1', 'under 2'],
-    keysFr: ['mardis a prix reduit', 'mardi a prix reduit', 'prix reduit', 'soiree a prix reduit', 'soirees a prix reduit', 'a moitie prix', 'cartes de 10 entrees', 'carte de 10 entrees', 'carte de 10', 'cartes prepayees', 'carte prepayee', 'laissez passer', 'bebes', 'moins d un an', 'enfants entrent gratuitement', 'les enfants entrent gratuitement', 'gratuit pour les enfants', 'enfants gratuits', 'gratuit pour enfants', 'prix', 'quel prix', 'entree', 'prix d entree', 'billet', 'billets', 'combien', 'prix enfant', 'enfants', 'aines', 'etudiants', 'prix famille', 'forfait familial', 'abonnement', 'passe de saison', 'carte', 'par heure', 'prix adulte', 'taxes'],
+    keysFr: ['prix par personne mais', 'mardis a prix reduit', 'mardi a prix reduit', 'prix reduit', 'soiree a prix reduit', 'soirees a prix reduit', 'a moitie prix', 'cartes de 10 entrees', 'carte de 10 entrees', 'carte de 10', 'cartes prepayees', 'carte prepayee', 'laissez passer', 'bebes', 'moins d un an', 'enfants entrent gratuitement', 'les enfants entrent gratuitement', 'gratuit pour les enfants', 'enfants gratuits', 'gratuit pour enfants', 'prix', 'quel prix', 'entree', 'prix d entree', 'billet', 'billets', 'combien', 'prix enfant', 'enfants', 'aines', 'etudiants', 'prix famille', 'forfait familial', 'abonnement', 'passe de saison', 'carte', 'par heure', 'prix adulte', 'taxes'],
     a: '<p>In <strong>Price</strong>, put the price for one adult (the regular admission, or your lowest per-person price for a game or a class). Your card shows it. Priced per room, lane or group? Tap <strong>Per room or group</strong> under the box. Kids’, seniors’ and family prices, passes and memberships go in <strong>Your prices</strong> (in More about your place): type each one with its price, like <em>Kids under 12: Free</em>.</p>',
     aFr: '<p>Dans <strong>Prix</strong>, indiquez le prix pour un adulte (l’entrée habituelle, ou votre prix le plus bas par personne pour une partie ou un cours). Votre fiche l’affiche. Un prix par salle, par allée ou par groupe? Touchez <strong>Par salle ou groupe</strong> sous la case. Les prix pour enfants, aînés et familles, les laissez-passer et les abonnements vont dans <strong>Vos tarifs</strong> (dans Plus sur votre endroit) : tapez chacun avec son prix, comme <em>Enfants de moins de 12 ans : gratuit</em>.</p>' },
   { id: 'indoor-free', pages: ['setup', 'edit'], over: ['indoor-price', 'cost', 'features'], noRelated: ['cost'],
+    // Sport test 6 (held-out Help check): "kids under 3 are free", "parents free", "first class free" are one price, never
+    // "We're free" (which would make the whole place Free): the bare "free" stands down for them.
+    bareOff: ['kid', 'child', 'enfant', 'under', 'moins', 'baby', 'babies', 'bebe', 'toddler', 'tot', 'infant', 'first', 'premi', 'senior', 'aine', 'parent', 'birthday', 'anniv', 'demo', 'trial', 'essai', 'junior', 'youth', 'jeune', 'student', 'etudiant', 'parking', 'stationnement', 'wifi', 'rental', 'location', 'helmet', 'casque', 'spectat', 'watch', 'coffee', 'cafe'],
     q: 'We’re free (or by donation)', qFr: 'C’est gratuit (ou contribution volontaire)',
     keys: ['free entry', 'free admission', 'admission is free', 'we are free', 'were free', 'it s free', 'no charge', 'no admission', 'by donation', 'donation', 'donations', 'suggested donation', 'suggested donation is', 'the suggested donation', 'suggested amount', 'suggested', 'pay what you can', 'pay what you want', 'free to visit', 'free museum', 'free gallery', 'free', 'library cards are free', 'cards are free', 'library card', 'library cards'],
     keysFr: ['entree gratuite', 'entree libre', 'c est gratuit', 'gratuit', 'gratuite', 'contribution volontaire', 'contribution suggeree', 'la contribution suggeree', 'montant suggere', 'don', 'dons', 'don suggere', 'payez ce que vous voulez'],
@@ -62645,6 +62663,8 @@ const INDOOR_SETUP_HELP_TOPICS = [
   // Indoor test 2 (2026-11-19; Jordan, escape rooms: "we price per room not per person", "it says adults but we charge per
   // room"): the Per room or group choice on the Price screen.
   { id: 'indoor-per-room', pages: ['setup', 'edit'], over: ['indoor-price', 'cost', 'menu-add', 'indoor-groups'], noRelated: ['cost'],
+    // Held-out Help check (indoor test 16: "price per person but you can book the whole room" would have made the card "/room").
+    notIf: ['price per person', 'priced per person', 'price is per person', 'is per person', 'charge per person', 'prix par personne', 'est par personne'],
     q: 'We price per room, lane or group, not per person', qFr: 'Notre prix est par salle, par allée ou par groupe, pas par personne',
     keys: ['per room', 'per room not per person', 'price per room', 'priced per room', 'charge per room', 'we charge per room', 'by the room', 'the whole room', 'for the room', 'per lane', 'by the lane', 'per group', 'per party', 'per team', 'per booking', 'not per person', 'not by the person', 'isnt per person', 'not a person', 'it says adults', 'says adults', 'says adult', 'adult price is wrong', 'not an adult price', 'players', '2 6 players', 'up to 6 players', 'room price', 'lane price', 'group price', 'private room price'],
     keysFr: ['par salle', 'prix par salle', 'pour la salle', 'toute la salle', 'par allee', 'par piste', 'par groupe', 'par equipe', 'par reservation', 'pas par personne', 'ca dit adultes', 'indique adultes', 'prix adulte est faux', 'joueurs', 'prix de la salle', 'prix du groupe'],
@@ -62789,6 +62809,9 @@ const INDOOR_SETUP_HELP_TOPICS = [
   // Indoor test 1: "school groups by appointment only" / "group tours by appointment": a group word with an appointment word
   // is this answer (allOf), never "We don't have set hours".
   { id: 'indoor-groups', pages: ['setup', 'edit'], over: ['booking-link', 'tour-groups', 'indoor-booking', 'indoor-no-hours'],
+    // Held-out Help check: a question that says its price is per person is about the price ("price per person but you can
+    // book the whole room"), never Groups.
+    notIf: ['price per person', 'priced per person', 'price is per person', 'prix par personne'],
     q: 'Birthday parties, school groups and private bookings', qFr: 'Fêtes d’anniversaire, groupes scolaires et réservations privées',
     allOf: [['group', 'school', 'scolair', 'field'], ['appointment', 'rendez', 'arrangement', 'request', 'demande']],
     // Indoor test 15 (Aaron: "the gallery can be rented for events" got the exhibitions answer): renting out the place.
@@ -63005,6 +63028,8 @@ const INDOOR_SETUP_HELP_TOPICS = [
   // hour" got Per room or group, which would have turned his $6.50 a game into a price per lane): extras go in Your prices
   // and the main price stays as it is.
   { id: 'indoor-extras', pages: ['setup', 'edit', 'menu'], over: ['indoor-price', 'indoor-per-room', 'menu-add', 'indoor-good-to-know', 'indoor-groups', 'cost', 'indoor-booking'], noRelated: ['cost', 'price-range', 'avg-spend', 'indoor-per-room'],
+    // Sport test 6: "we don't have skate rentals" is not an extra to price.
+    notIf: ['no rentals', 'no skate rentals', 'dont have rentals', 'dont have skate rentals', 'dont do rentals', 'pas de location', 'aucune location'],
     q: 'Extras: shoe or gear rental, lanes by the hour', qFr: 'Les extras : location de souliers ou d’équipement, allées à l’heure',
     allOf: [['shoe', 'soulier', 'chaussure', 'harness', 'baudrier', 'gear', 'equip', 'mat', 'tapis', 'skate', 'patin', 'lane', 'allee', 'ice', 'glace', 'towel', 'robe', 'locker'], ['rent', 'rental', 'extra', 'location', 'louer', 'hour', 'heure', 'add on', 'addon']],
     // Indoor test 17 (2026-11-19; Megan: "plus tax" got "I'm not sure"): prices before tax are written so in Your prices.
@@ -63134,8 +63159,12 @@ const SPORT_OWN_HELP_TOPICS = [SPORT_SEASON_TOPIC,
     aFr: '<p>Leurs prix vont dans <strong>Vos tarifs</strong> (dans Plus sur votre endroit), une ligne chacun, comme <em>Voiturette 25 $</em> ou <em>Location de patins 5 $</em>. Les voiturettes, la location, les seaux, les cours et les abonnements ne sont jamais le prix de votre fiche : elle garde votre prix adulte régulier le plus bas. Pour que les gens le sachent avant de venir, ajoutez une ligne dans <strong>Bon à savoir</strong>, comme <em>Location de bâtons et de voiturettes à la boutique du pro</em>.</p>' },
   { id: 'sport-public', pages: ['setup', 'edit'], over: ['not-owner', 'staff', 'indoor-local-owned', 'indoor-free'],
     q: 'We’re a city or public facility: can we fill this in?', qFr: 'Nous sommes une installation municipale ou publique : pouvons-nous remplir ceci?',
-    keys: ['city', 'the city', 'municipal', 'municipality', 'district', 'regional district', 'township', 'public facility', 'city facility', 'city park', 'city pool', 'city arena', 'city run', 'run by the city', 'rec department', 'recreation department', 'parks and rec', 'parks and recreation', 'rec centre staff', 'not the owner', 'we dont own', 'government', 'club volunteers', 'run by club volunteers', 'run by volunteers', 'non profit club', 'society', 'run by a society', 'volunteer', 'volunteers'],
-    keysFr: ['ville', 'la ville', 'par la ville', 'geres par la ville', 'gere par la ville', 'geree par la ville', 'gerees par la ville', 'municipal', 'municipale', 'municipalite', 'par la municipalite', 'installation municipale', 'district regional', 'installation publique', 'service des loisirs', 'parcs et loisirs', 'benevoles', 'par des benevoles', 'gere par des benevoles', 'club sans but lucratif'],
+    // Who runs it (a city, a district, a club's volunteers) plus a word about doing the setup.
+    allOf: [['city', 'citys', 'ville', 'municip', 'district', 'town', 'volunteer', 'benevol', 'societ'], ['run', 'staff', 'work', 'employ', 'allowed', 'fill', 'owner', 'manage', 'gere', 'travaill', 'personnel', 'remplir', 'proprietaire', 'autoris']],
+    // Sport test 6 (Priya: every question that said "the city" got this answer): no bare "city", « ville », "district" or
+    // "volunteers"; only the phrases that say who runs the place.
+    keys: ['city staff', 'work for the city', 'i work for the city', 'city employee', 'city owned', 'owned by the city', 'municipal facility', 'municipally owned', 'regional district', 'township', 'public facility', 'city facility', 'city park', 'city pool', 'city arena', 'city run', 'run by the city', 'rec department', 'recreation department', 'parks and rec', 'parks and recreation', 'rec centre staff', 'not the owner', 'we dont own', 'government run', 'club volunteers', 'run by club volunteers', 'run by volunteers', 'non profit club', 'run by a society', 'we are volunteers', 'volunteer run'],
+    keysFr: ['par la ville', 'employe de la ville', 'employee de la ville', 'personnel de la ville', 'je travaille pour la ville', 'geres par la ville', 'gere par la ville', 'geree par la ville', 'gerees par la ville', 'par la municipalite', 'installation municipale', 'district regional', 'installation publique', 'service des loisirs', 'parcs et loisirs', 'par des benevoles', 'gere par des benevoles', 'club sans but lucratif'],
     a: '<p>Yes. Anyone who runs the place can: city or district staff, a parks and rec office, or a club’s volunteers. Answer for what visitors find: your season and hours, the price (or <strong>Free entry</strong>), who can come and your photos. Several people help? Each can use this same link, or tap <strong>Create a login</strong> on the finish screen.</p>',
     aFr: '<p>Oui. Toute personne qui gère l’endroit le peut : le personnel de la ville ou du district, un bureau des parcs et loisirs, ou les bénévoles d’un club. Répondez pour ce que les visiteurs trouvent : votre saison et vos heures, le prix (ou <strong>Entrée gratuite</strong>), qui peut venir et vos photos. Plusieurs personnes aident? Chacune peut utiliser ce même lien, ou toucher <strong>Créer une connexion</strong> sur l’écran de fin.</p>' },
   // Sport test 2: a golf course's own answer (a simulator was told about holes, par and the course map).
@@ -63403,9 +63432,9 @@ const SPORT4_HELP_TOPICS = [
     keysFr: ['championnat du club', 'ferme au public', 'ferme pour un tournoi', 'ferme pour un evenement', 'ferme quelques jours', 'ferme une journee', 'ferme pour la journee'],
     a: '<p>Use <strong>Closures and holidays</strong>: tap <strong>+ Closed for a week or two (or other dates)</strong> and pick the first and last day, like for {EVENT_EN}. Only those days show as closed, on your page and in Build My Trip. Don’t use <strong>We’re closed part of the year</strong> or closed months for it: that closes you for the whole season.</p>',
     aFr: '<p>Utilisez <strong>Fermetures et jours fériés</strong> : touchez <strong>+ Fermé une semaine ou deux (ou d’autres dates)</strong> et choisissez le premier et le dernier jour, comme pour {EVENT_FR}. Seuls ces jours paraissent fermés, sur votre page et dans Planifier mon voyage. N’utilisez pas <strong>Nous fermons une partie de l’année</strong> ni les mois fermés pour ça : cela vous ferme pour toute la saison.</p>' },
-  { id: 'sport-tax', pages: ['setup', 'edit', 'menu'], over: ['cost', 'menu-add', 'indoor-price', 'menu-change'],
+  { id: 'sport-tax', pages: ['setup', 'edit', 'menu'], over: ['cost', 'menu-add', 'indoor-price', 'menu-change', 'indoor-extras'],
     q: 'Are prices with or without tax?', qFr: 'Les prix sont-ils avec ou sans taxes?',
-    keys: ['tax', 'taxes', 'with tax', 'without tax', 'before tax', 'after tax', 'tax included', 'taxes included', 'including tax', 'tax in', 'gst', 'pst', 'hst'],
+    keys: ['tax', 'taxes', 'with tax', 'without tax', 'before tax', 'after tax', 'tax included', 'taxes included', 'including tax', 'tax in', 'gst', 'pst', 'hst', 'plus gst', 'plus tax', 'plus taxes', 'all our prices are plus'],
     keysFr: ['taxe', 'taxes', 'avec taxes', 'sans taxes', 'taxes incluses', 'avant taxes', 'tps', 'tvp', 'tvh'],
     a: '<p>Type your prices the way you post them. Plus tax? Add <em>plus tax</em> in a line’s details, or one line in <strong>Good to know</strong>, like <em>All rates plus GST</em>. Your card shows the price as you typed it.</p>',
     aFr: '<p>Inscrivez vos prix comme vous les affichez. Plus taxes? Ajoutez <em>plus taxes</em> dans les détails d’une ligne, ou une ligne dans <strong>Bon à savoir</strong>, comme <em>Tous les tarifs plus TPS</em>. Votre fiche montre le prix tel que vous l’avez inscrit.</p>' },
@@ -63862,12 +63891,13 @@ function indoorKindHelpTopics(topics, kinds, price = null, low = null, free = nu
           : en.classKind ? '<p>Your class schedule link goes in <strong>Your class schedule link</strong>, whatever you tap: your page’s button says <strong>Class schedule</strong>.</p>'
           : en.kind === 'kids' ? '<p>Walk-ins welcome, and your link is for parties or groups? Tap <strong>Walk-ins welcome</strong> and paste it in <strong>Party or group booking link</strong>. When the link or your Groups line is about parties, your page’s button says <strong>Book a party</strong>.</p>'
           // Sport test 4 (2026-11-20): a sport or golf kind's own button ("Book a tee time"), never "Book a visit".
-          : indoorKindsModule.SPORT.K[en.kind] ? `<p>Paste your booking page in the booking link box: your page’s button says <strong>${E((indoorKindsModule.SPORT.K[en.kind].bookBtn || ['Book'])[0])}</strong>.</p>`
+          // Sport test 6: a walk-in place's link (an arena's ice rentals) is a smaller button after Website.
+          : indoorKindsModule.SPORT.K[en.kind] ? `<p>Paste your booking page in the booking link box: your page’s button says <strong>${E((indoorKindsModule.SPORT.K[en.kind].bookBtn || ['Book'])[0])}</strong> (<strong>Book a party</strong> when the link is your party page). Walk-ins welcome? It’s a smaller button after Website, and your page still says there’s no need to book.</p>`
           : '<p>Walk-ins welcome, and you have a booking page? Tap <strong>Walk-ins welcome</strong> and paste it in <strong>Party or group booking link</strong>: your page’s button says <strong>Book a visit</strong> (<strong>Book a party</strong> when the link is your party page).</p>'),
       aFr: t.aFr.replace(/<p>Certaines activités[\s\S]*<\/p>$/, `<p>Certaines activités se réservent et d’autres non? Choisissez ce qui vaut pour votre activité principale, et ajoutez l’exception sous <strong>Bon à savoir</strong>, comme <em>${E(fr.help.walkin)}</em>.</p>`)
         + (fr.ticketed ? '<p>Votre lien d’horaires ou de billets va dans <strong>Votre lien d’horaires ou de billets</strong>, peu importe ce que vous touchez : le bouton de votre page indique <strong>Horaires et billets</strong>.</p>'
           : fr.classKind ? '<p>Votre lien d’horaire des cours va dans <strong>Votre lien d’horaire des cours</strong>, peu importe ce que vous touchez : le bouton de votre page indique <strong>Horaire des cours</strong>.</p>'
-          : indoorKindsModule.SPORT.K[fr.kind] ? `<p>Collez votre page de réservation dans la case du lien de réservation : le bouton de votre page indique <strong>${E((indoorKindsModule.SPORT.K[fr.kind].bookBtn || [null, 'Réserver'])[1])}</strong>.</p>`
+          : indoorKindsModule.SPORT.K[fr.kind] ? `<p>Collez votre page de réservation dans la case du lien de réservation : le bouton de votre page indique <strong>${E((indoorKindsModule.SPORT.K[fr.kind].bookBtn || [null, 'Réserver'])[1])}</strong> (<strong>Réserver une fête</strong> si le lien est votre page de fêtes). Sans réservation? C’est un bouton plus petit après Site Web, et votre page indique toujours qu’il n’est pas nécessaire de réserver.</p>`
           : fr.kind === 'kids' ? '<p>Sans réservation, et votre lien sert aux fêtes ou aux groupes? Touchez <strong>Sans réservation</strong> et collez-le dans <strong>Lien de réservation de fête ou de groupe</strong>. Si le lien ou votre ligne Groupes parle de fêtes, le bouton de votre page indique <strong>Réserver une fête</strong>.</p>'
           : '<p>Sans réservation, et vous avez une page de réservation? Touchez <strong>Sans réservation</strong> et collez-la dans <strong>Lien de réservation de fête ou de groupe</strong> : le bouton de votre page indique <strong>Réserver une visite</strong> (<strong>Réserver une fête</strong> si le lien est votre page de fêtes).</p>') };
     // Indoor test 9 (Melissa, a play centre for kids 0 to 10: "the age thing only goes up to all ages but we are 0 to 10"):
@@ -65593,13 +65623,13 @@ ${VENUE_MENU_CSS}
   ${researchedMenuSourceHtml(venue, menu, lang)}
   ${sections}
   <div class="vm-note-box">${tours ? (fr
-    ? `Les prix, horaires et disponibilités peuvent changer. Vérifiez auprès ${escapeHtml(frDe(venue.name))} avant de réserver.`
+    ? `Les prix, horaires et disponibilités peuvent changer. Vérifiez auprès ${escapeHtml(frDe(venue.name))} avant ${menuKind(venue) === 'tours' || menuKind(venue) === 'golf' ? 'de réserver' : 'd’y aller'}.`
     : `Prices, times and availability can change. Check with ${escapeHtml(venue.name)} before you ${menuKind(venue) === 'tours' || menuKind(venue) === 'golf' ? 'book' : 'go'}.`) : fr
     ? `Les plats et les prix peuvent changer. Vérifiez auprès ${escapeHtml(frDe(venue.name))} avant d’y aller, et confirmez toute allergie ou restriction alimentaire directement avec l’établissement.`
     : `Dishes and prices can change. Check with ${escapeHtml(venue.name)} before you go, and confirm any allergies or dietary needs with them directly.`}</div>
   <p>
     <a class="vm-btn" href="${venuePagePath(venue, lang)}">${fr ? `Infos, heures et carte ${escapeHtml(frDe(venue.name))}` : `Hours, map and more for ${escapeHtml(venue.name)}`}</a>
-    ${viatorMenuBook ? `${viator.bookButtonHtml(viatorMenuBook.url, lang)}<p class="vm-note" data-viator-disclosure>${escapeHtml(viator.DISCLOSURE[lang === 'fr' ? 'fr' : 'en'])}</p>` : booking ? `<a class="cta secondary" href="${escapeHtml(booking)}" rel="nofollow noopener" target="_blank" data-track="booking">${L('Book online', 'Réserver en ligne')} ↗</a>` : ''}
+    ${viatorMenuBook ? `${viator.bookButtonHtml(viatorMenuBook.url, lang)}<p class="vm-note" data-viator-disclosure>${escapeHtml(viator.DISCLOSURE[lang === 'fr' ? 'fr' : 'en'])}</p>` : booking ? `<a class="cta secondary" href="${escapeHtml(booking)}" rel="nofollow noopener" target="_blank" data-track="booking">${kindSetupType(venue.type) ? escapeHtml(L(...indoorBookButton(venue, booking))) : L('Book online', 'Réserver en ligne')} ↗</a>` : ''}
     ${venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}" data-track="phone">${L('Call', 'Appeler')} ${escapeHtml(venue.phone)}</a>` : ''}
     ${website ? `<a class="cta secondary" href="${escapeHtml(website)}" rel="nofollow noopener" target="_blank" data-track="website">${L('Website', 'Site Web')} ↗</a>` : ''}
   </p>
@@ -66061,6 +66091,9 @@ const OWNER_HELP_FILL = {
     },
   },
 };
+// Sport test 6 (2026-11-20): the word starts a closures answer needs in the question (see best() in the widget): closed,
+// shut, hours, open, a vacation or renovation, a day off, a private event. Not "holiday" or a date on their own.
+const OWNER_HELP_CLOSED_NEEDS = ['clos', 'shut', 'ferm', 'hour', 'hrs', 'heure', 'horaire', 'open', 'ouvr', 'ouvert', 'vacation', 'vacanc', 'renovat', 'tempor', 'private', 'prive', 'off', 'away', 'break', 'conge', 'down', 'cancel', 'annul'];
 const OWNER_HELP_TOPICS = [
   { id: 'signin', q: 'I can\u2019t sign in', qFr: 'Je n\u2019arrive pas à me connecter', pages: ['login', 'account'],
     keys: ['sign in', 'signin', 'log in', 'login', 'cant get in', 'password wrong', 'wrong password', 'dont match', 'locked', 'locked out', 'cannot log', 'cant log'],
@@ -66136,6 +66169,8 @@ const OWNER_HELP_TOPICS = [
     } },
   // Round 9 (2026-10-19): "is my info public" / « mes infos sont-elles publiques » had no answer.
   { id: 'privacy', q: 'Is my information public?', qFr: 'Mes renseignements sont-ils publics?', pages: ['account', 'edit', 'settings', 'login', 'claim'],
+    // Sport test 6: "public skate", "a public facility", « patinage public » are not about the owner's information.
+    bareOff: ['skat', 'swim', 'patin', 'bain', 'facilit', 'installation', 'city', 'ville', 'municip', 'golf', 'open', 'ouvert', 'event', 'evenement', 'restaurant', 'washroom', 'toilet', 'park', 'parc', 'beach', 'plage', 'pool', 'piscine', 'hockey', 'arena', 'rink', 'court', 'transit', 'library', 'biblio'],
     keys: ['public', 'is my info public', 'is my information public', 'my info', 'my information', 'personal information', 'privacy', 'privacy policy', 'is it private', 'kept private',
       'who can see my email', 'see my email', 'my email public', 'is my email shown', 'show my email', 'my data', 'who sees my details', 'privacy settings', 'data privacy'],
     keysFr: ['public', 'publique', 'publiques', 'publics', 'mes infos', 'mes informations', 'mes renseignements', 'renseignements personnels', 'confidentialite', 'confidentiel', 'politique de confidentialite',
@@ -66255,6 +66290,8 @@ const OWNER_HELP_TOPICS = [
     a: '<ol><li>{ON}, open <strong>Seasonal hours</strong> (with your opening hours) and tick <strong>We have different hours part of the year</strong>.</li><li>Give it a name if you like (“Winter hours”), pick the first and last day (for example November 1 to April 30), and fill in that season’s hours for each day.</li><li>Tap {SEND}.</li></ol><p>Every year between those days your page shows these hours instead of your usual ones, then switches back by itself. {LIVE}</p><p>Closed for the whole off-season instead? Choose <strong>Open some months only</strong>. Closed for a day or two? Use <strong>Special closures</strong>. Different hours on just one holiday? <strong>Message us</strong> with the date and times.</p>',
     aFr: '<ol><li>{ON}, ouvrez <strong>Heures saisonnières</strong> (sous vos heures d’ouverture) et cochez <strong>Nous avons d’autres heures pendant une partie de l’année</strong>.</li><li>Donnez-leur un nom si vous voulez (« Heures d’hiver »), choisissez le premier et le dernier jour (par exemple du 1er novembre au 30 avril) et entrez les heures de cette saison pour chaque jour.</li><li>Touchez {SEND}.</li></ol><p>Chaque année entre ces dates, votre page affiche ces heures au lieu de vos heures habituelles, puis revient d’elle-même aux heures habituelles. {LIVE}</p><p>Fermé toute la basse saison? Choisissez plutôt <strong>Ouvert certains mois seulement</strong>. Fermé un jour ou deux? Utilisez <strong>Fermetures spéciales</strong>. Des heures différentes un seul jour férié? <strong>Écrivez-nous</strong> avec la date et les heures.</p>' },
   { id: 'closures', over: ['hours'], q: 'Closed on a holiday or a special day', qFr: 'Fermé un jour férié ou un jour spécial', pages: ['edit'],
+    // Sport test 6: only with a closed, hours or open word (never "holiday" or a date alone: "add the holiday skates").
+    needs: OWNER_HELP_CLOSED_NEEDS,
     // Indoor test 15 (Aaron: "we close on stat holidays" led with Open on holidays, the opposite): closed + a holiday word is
     // this answer first, in every kind of place.
     allOf: [['close', 'shut', 'ferm'], ['stat', 'holiday', 'ferie', 'conge']],
@@ -66981,7 +67018,19 @@ const OWNER_HELP_SCRIPT = String.raw`
   function keyIn(kt, qt){ return kt.every(function(w){ return qt.some(function(x){ return sameWord(x, w); }); }); }
   function best(q){
     var qt = toks(q), sums = T.map(function(){ return 0; }), side = T.map(function(){ return 0; }), exact = T.map(function(){ return false; }), qFr = langOf(q) === 'fr';
+    // Sport test 6 (2026-11-20; Priya: "how do i add the holiday skates dec 26 to jan 3" got Special closures, which would
+    // have closed her on her busiest days): a topic with needs (word starts) is only in play when the question has one of
+    // them. A bare "holiday" or a date is never enough for a closures answer: it needs a closed, hours or open word.
+    var gate = T.map(function(t){ return !t.needs || !t.needs.length || t.needs.some(function(w){ return qt.some(function(x){ return x.indexOf(w) === 0; }); }); });
+    // ...and a topic with notIf (phrases) is out of play when one of them is in the question side by side ("price per person
+    // but you can book the whole room" is a per-person price, never "We charge per room").
+    var qs = ' ' + qt.join(' ') + ' ';
+    T.forEach(function(t, i){ if (gate[i] && t.notIf && t.notIf.some(function(p){ var n = toks(p).join(' '); return n && qs.indexOf(' ' + n + ' ') >= 0; })) gate[i] = false; });
+    // A topic's bare one-word keys ("free", "public") stand down when the question has one of its bareOff word starts:
+    // "kids under 3 are free" is a kids' price, never "We're free"; "public skate" is not "Is my information public?".
+    var bare = T.map(function(t){ return !!t.bareOff && t.bareOff.some(function(w){ return qt.some(function(x){ return x.indexOf(w) === 0; }); }); });
     KEYS.forEach(function(k){
+      if (!gate[k.i] || (bare[k.i] && k.kt.length === 1)) return;
       var s = keyScore(k.kt, qt); if (!s) return;
       if (!exact[k.i] && (k.fr === qFr || keyIn(k.kt, qt))) exact[k.i] = true;
       if (s < 0) s = -s; else side[k.i] = Math.max(side[k.i], s);
@@ -66992,7 +67041,7 @@ const OWNER_HELP_SCRIPT = String.raw`
     T.forEach(function(t, i){
       // Indoor test 12 (2026-11-19): a second set of groups (allOf2) counts the same way.
       var has = function(gs){ return !!gs && gs.length > 0 && gs.every(function(g){ return g.some(function(w){ return qt.some(function(x){ return x.indexOf(w) === 0; }); }); }); };
-      var all = has(t.allOf) || has(t.allOf2);
+      var all = gate[i] && (has(t.allOf) || has(t.allOf2));
       if (all) { sums[i] += 40; side[i] = Math.max(side[i], 3); exact[i] = true; }
     });
     var scored = T.map(function(t, i){ return { id: t.id, s: sums[i], c: side[i], e: exact[i], b: (t.pages || []).indexOf(cfg.page) >= 0 ? 1 : 0 }; })
@@ -67182,7 +67231,7 @@ function ownerHelpWidgetHtml(page, opts = {}) {
     signedIn: !!opts.signedIn,
     start: opts.start || OWNER_HELP_START[page],
     // A page's own topic with the same id as a general one replaces it (cafés' "How does Set up your page work?").
-    topics: (opts.extraTopics || []).concat(OWNER_HELP_TOPICS.filter((t) => !(opts.extraTopics || []).some((x) => x.id === t.id))).filter((t) => (!t.avgSpendOnly || opts.avgSpend) && (!t.completenessOnly || opts.completeness)).map((t) => ({ id: t.id, q: t.q, qFr: typeof t.qFr === 'string' ? OWNER_SETUP_STRINGS.frSpacing(t.qFr) : t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [], noRelated: t.noRelated || [], ...(t.allOf ? { allOf: t.allOf } : {}), ...(t.allOf2 ? { allOf2: t.allOf2 } : {}), ...(t.keepHappy ? { keepHappy: true } : {}),
+    topics: (opts.extraTopics || []).concat(OWNER_HELP_TOPICS.filter((t) => !(opts.extraTopics || []).some((x) => x.id === t.id))).filter((t) => (!t.avgSpendOnly || opts.avgSpend) && (!t.completenessOnly || opts.completeness)).map((t) => ({ id: t.id, q: t.q, qFr: typeof t.qFr === 'string' ? OWNER_SETUP_STRINGS.frSpacing(t.qFr) : t.qFr, keys: t.keys, keysFr: t.keysFr, pages: t.pages, over: t.over || [], noRelated: t.noRelated || [], ...(t.allOf ? { allOf: t.allOf } : {}), ...(t.allOf2 ? { allOf2: t.allOf2 } : {}), ...(Array.isArray(t.needs) && t.needs.length ? { needs: t.needs } : {}), ...(Array.isArray(t.bareOff) && t.bareOff.length ? { bareOff: t.bareOff } : {}), ...(Array.isArray(t.notIf) && t.notIf.length ? { notIf: t.notIf } : {}), ...(t.keepHappy ? { keepHappy: true } : {}),
       a: helpEditHref(inPortal ? ownerHelpPortalWording(ownerHelpAnswer(t.a, 'en', mode), 'en') : ownerHelpAnswer(t.a, 'en', mode), opts.editHref),
       aFr: helpEditHref(frSpacingHtml(inPortal ? ownerHelpPortalWording(ownerHelpAnswer(t.aFr, 'fr', mode), 'fr') : ownerHelpAnswer(t.aFr, 'fr', mode)), opts.editHref) })),
     rules: OWNER_HELP_ERROR_RULES.map(([re, id]) => [re.source, id]),
@@ -73705,7 +73754,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
   });
 })();
 </script>
-${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: completeOn ? venue.id : null, noHappyHour: !happyHourAllowed(venue), dropHappyHour: venue.type === 'tour' || (kindSetupType(venue.type) && !happyHourAllowed(venue)), ...(kindSetupType(venue.type) ? { extraTopics: indoorKindHelpTopics(kindSetupHelpBase(venue).filter((x) => x.pages.includes('edit')).map(indoorClosureWords), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpLow(venue), indoorHelpFree(venue), indoorHelpNoHours(venue), indoorHelpPageSay(venue)).concat(sportMenuImportTopic(venue)), dropTopics: INDOOR_HELP_DROP_TOPICS } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: cafeHelpTopics('edit').filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'tour' ? { extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')).map(tourYearlyBreakWords).concat([TOUR_THIRD_STRETCH_HELP_TOPIC, SETUP_OPEN_HOLIDAYS_HELP_TOPIC]) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
+${ownerHelpWidgetHtml('edit', { signedIn: !token, lang, avgSpend: avgSpendOn, completeness: completeOn, venueId: completeOn ? venue.id : null, noHappyHour: !happyHourAllowed(venue), dropHappyHour: venue.type === 'tour' || (kindSetupType(venue.type) && !happyHourAllowed(venue)), ...(kindSetupType(venue.type) ? { extraTopics: indoorKindHelpTopics(kindSetupHelpBase(venue).filter((x) => x.pages.includes('edit')).map(indoorClosureWords), indoorHelpKinds(venue), indoorHelpPrice(venue), indoorHelpLow(venue), indoorHelpFree(venue), indoorHelpNoHours(venue), indoorHelpPageSay(venue)).concat(sportMenuImportTopic(venue), /* Sport test 6: "can my supervisor get an email" on the edit page too. */ sportSetupType(venue.type) ? [SETUP_WHO_SEES_HELP_TOPIC] : []), dropTopics: INDOOR_HELP_DROP_TOPICS } : venue.type === 'cocktail' ? { extraTopics: COCKTAIL_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'cafe' ? { extraTopics: cafeHelpTopics('edit').filter((x) => x.pages.includes('edit')) } : venue.type === 'winery' ? { extraTopics: WINERY_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')) } : venue.type === 'tour' ? { extraTopics: TOUR_SETUP_HELP_TOPICS.filter((x) => x.pages.includes('edit')).map(tourYearlyBreakWords).concat([TOUR_THIRD_STRETCH_HELP_TOPIC, SETUP_OPEN_HOLIDAYS_HELP_TOPIC]) } : brewSetupType(venue.type) ? { extraTopics: brewHelpTopics(venue.type).filter((x) => x.pages.includes('edit')) } : {}) })}
 </body>
 </html>`;
 }

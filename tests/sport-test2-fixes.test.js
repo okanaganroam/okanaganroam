@@ -274,7 +274,7 @@ const TREVOR_LOG = [
   ['en', 'setup', 'a full 18 holes takes 4 people about 3 hours but most book 2 hours, what do i pick', ['indoor-visit-length']],
   ['en', 'setup', 'we charge per bay not per person, up to 8 people a bay. will people think its $45 each?', ['sport-per-person', 'indoor-price']],
   ['en', 'setup', 'its $45 an hour weekdays before 5:30 and $60 nights and weekends. which one do i put', ['indoor-price', 'indoor-price-varies', 'sport-rate-lines']],
-  ['en', 'setup', 'plus GST?', ['indoor-extras']],
+  ['en', 'setup', 'plus GST?', ['indoor-extras', 'sport-tax']],
   ['en', 'setup', 'people can book online or just call us, and walk ins are fine if a bay is free. what do i pick', ['sport-tee-times', 'indoor-booking']],
   ['en', 'setup', 'we have a 24 hour cancellation policy where does that go', ['indoor-good-to-know', 'sport-refunds']], // sport test 5: its own answer
   ['en', 'setup', 'kids are welcome with an adult until 8pm, after 8 its 19+ because of the bar. what age do i pick', ['indoor-age']],
@@ -335,7 +335,7 @@ test('10. Help on the price-list page: ~18 realistic questions for every sport k
     const [rent, kids, pass] = W[k];
     const b = await botsFor(k);
     const Q = [['en', 'how do i add the rest of our prices', [M, 'menu-import']], ['en', 'what goes in the first line', ['indoor-typer-first']], ['en', 'can i just take a picture of our price board', [M, 'menu-blurry']],
-      ['en', 'our prices are on our website, can you get them from there', ['menu-import', 'menu-website', M]], ['en', 'all our prices are plus gst', [X]], ['en', `will the ${rent} price become the price on my card`, [CP, X, RN]],
+      ['en', 'our prices are on our website, can you get them from there', ['menu-import', 'menu-website', M]], ['en', 'all our prices are plus gst', [X, 'sport-tax']], ['en', `will the ${rent} price become the price on my card`, [CP, X, RN]],
       ['en', `${kids} and seniors are cheaper, how do i show that`, [RL, 'indoor-line-age']], ['en', `we sell a ${pass}, where does it go`, [RL, G, NSP]], ['en', 'memberships with no set price', [RL, NSP]],
       ['en', 'our prices go up in the spring', [RC]], ['en', 'lessons are booked with the instructor, they set the price', [LS]], ['en', `${rent} is extra`, [RN, X]], ['en', 'do i have to show the price per person', [PP]],
       ['en', 'how do i change a price later', ['menu-change', RC, M]], ['en', 'do you take gift cards here', [G]],

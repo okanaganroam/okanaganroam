@@ -728,4 +728,55 @@ function foreignIn(main, text, id) {
   const m = new RegExp(`(?<![\\p{L}])(?:${words.join('|')})(?![\\p{L}])`, 'iu').exec(t);
   return m ? `"${m[0]}" …${t.slice(Math.max(0, m.index - 60), m.index + 40)}…` : null;
 }
+// Sport test 6 (2026-11-20): Priya's own log (drafts/fresh-eyes-sport6-2026-11-20/help-log.json), City recreation staff at an
+// arena, asked on the setup screens, with the topics the held-out check (tests/help-heldout-questions.js) accepts.
+const PRIYA_LOG = [
+  ["en", "setup", "i work for the city of kelowna rec department, not the owner exactly. am i allowed to do this for a city arena?", ["sport-public","not-owner"]],
+  ["en", "setup", "who else can edit this? my supervisor and our comms team need to see anything before it goes public", ["setup-who-sees","staff","access","setup-live-when","sport-approval-first"]],
+  ["en", "setup", "public skate times change every week because of hockey bookings. the building is open 6am to 11pm but public skating is only certain times. what do i put for hours?", ["indoor-swim-times"]],
+  ["en", "setup", "the schedule is posted on the city website every week, can i just link to that", ["indoor-swim-times"]],
+  ["en", "setup", "the ice comes out mid march and goes back in late september. in summer the building is still open, its a dry floor for lacrosse and events. no public skating though. which one do i pick", ["sport-season","sport-opening-day","sport-season-says"]],
+  ["en", "setup", "adult drop in is 5.00 right now but council approves new rates every january 1. do i have to come back and change it?", ["sport-rate-change","sport-rates-next-year"]],
+  ["en", "setup", "is it ok to put the price? our rates are in the fees bylaw", ["indoor-price","sport-public"]],
+  ["en", "setup", "public skating is drop in, no booking. but ice rentals and birthday parties are booked through the city of kelowna website, not us. do i put that link here?", ["indoor-book-party","indoor-booking","sport-booking-link"]],
+  ["en", "setup", "main entrance and the viewing area are accessible, but getting onto the ice needs staff help through the zamboni door. is that wheelchair accessible?", ["indoor-access"]],
+  ["en", "setup", "helmets are required for kids under 10 during public skates. where does that go", ["indoor-good-to-know","sport-what-to-bring"]],
+  ["en", "setup", "does locally owned count if its owned by the city?", ["indoor-local-owned"]],
+  ["en", "setup", "our photos have kids in them from public skates. is that a problem? the city has a photo consent policy", ["photo-rights","sport-photo-consent"]],
+  ["en", "setup", "we sell 10 visit passes for adults, youth and kids. how do i show those", ["sport-rate-lines","indoor-price","indoor-price-varies"]],
+  ["en", "setup", "we dont have skate rentals or sharpening at memorial, rutland arena has them. should i say that", ["indoor-good-to-know","sport-no-rentals"]],
+  ["en", "setup", "can i say its a city of kelowna facility? i dont want it to look like the city is endorsing your site", ["sport-city-say"]],
+  ["en", "setup", "anything i write has to be approved by our communications team first. can i save it and come back?", ["indoor-fill-all","setup-change-later","setup-live-when","sport-approval-first"]],
+  ["en", "setup", "we have family skate on weekends and adult only skate weekday noon hours. how do people know the difference", ["indoor-busy-times","indoor-swim-times","indoor-good-to-know","indoor-theme-nights"]],
+  ["en", "setup", "we run shinny and stick and puck too. do those go here or somewhere else?", ["indoor-also-offer","sport-rate-lines","indoor-price-varies","sport-drop-in-hockey"]],
+  ["en", "setup", "the arena doesnt have its own instagram. the city has @cityofkelowna but comms runs it. do i put that or leave it blank", ["sport-shared-social"]],
+  ["en", "setup", "over the holidays we run extra public skates every afternoon dec 26 to jan 3, 1 to 3pm. closed christmas day and new years day. christmas eve and new years eve we close at 4. how do i show all that", ["sport-holiday-short","closures","event-add","sport-extra-sessions"]],
+  ["en", "setup", "does the page need to be in french too? i dont speak french", ["indoor-french"]],
+  ["en", "setup", "drop in prices are different for kids youth seniors and families. which one shows on the card", ["sport-card-price","indoor-price"]],
+  ["en", "setup", "our public skate schedule changes every week. will google or your site show the wrong times?", ["indoor-swim-times","google"]],
+  ["en", "setup", "how do i add the holiday skates dec 26 to jan 3 so people see them", ["event-add","event-repeat","indoor-camps","sport-extra-sessions"]],
+  ["en", "setup", "can my supervisor get an email when i change something", ["setup-who-sees"]],
+  ["en", "setup", "the rates go up jan 1 2027 to 5.25. can i put that in now", ["sport-rate-change"]],
+  ["en", "setup", "is there a way to say stick and puck is helmets with cage only", ["indoor-good-to-know","sport-what-to-bring","sport-drop-in-hockey"]],
+  ["en", "setup", "we close the ice for a tournament some weekends. what do i do", ["sport-one-off-closure","closures"]],
+  ["en", "setup", "what happens in summer when there is no ice? will people think we are closed", ["sport-season-says"]],
+  ["en", "setup", "do i need to sign anything or agree to terms as a city employee", ["sport-terms"]],
+  ["fr", "setup", "l’horaire du patinage libre change chaque semaine, quoi mettre comme heures?", ["indoor-swim-times"]],
+  ["fr", "setup", "les casques sont obligatoires pour les enfants de moins de 10 ans", ["indoor-good-to-know","sport-what-to-bring","indoor-age"]],
+  ["fr", "setup", "c’est un aréna de la ville, est-ce que je peux le dire?", ["sport-city-say"]],
+  ["fr", "setup", "la glace est enlevée en été, que dit la page?", ["sport-season-says"]],
+  // French twins of her misses.
+  ["fr", "setup", "comment ajouter les patinages des fêtes du 26 décembre au 3 janvier", ["sport-extra-sessions"]],
+  ["fr", "setup", "nos photos montrent des enfants, la ville a une politique de consentement", ["sport-photo-consent", "photo-rights"]],
+  ["fr", "setup", "tout doit être approuvé par l’équipe des communications avant que ce soit public", ["sport-approval-first"]],
+  ["fr", "setup", "dois-je signer quelque chose comme employé de la ville?", ["sport-terms"]],
+  ["fr", "setup", "nous avons du hockey libre et bâton et rondelle aussi", ["sport-drop-in-hockey"]],
+  ["fr", "setup", "pas de location de patins ici, où le dire?", ["sport-no-rentals"]],
+  ["fr", "setup", "l’horaire est sur le site de la ville, est-ce que je mets un lien vers l’horaire?", ["indoor-swim-times"]],
+  ["fr", "setup", "la location de glace se réserve sur le site de la ville, je mets ce lien ici?", ["sport-booking-link", "indoor-booking"]],
+  ["fr", "setup", "est-ce que la page doit être en français? je ne parle pas français", ["indoor-french"]],
+  ["fr", "setup", "je travaille pour la ville, est-ce que je peux remplir ceci?", ["sport-public", "not-owner"]],
+];
+QUESTIONS.rink = QUESTIONS.rink.concat(PRIYA_LOG);
+
 module.exports = { makeOwner, QUESTIONS, foreignIn, KIND_WORDS, SEASONS, PRICE };

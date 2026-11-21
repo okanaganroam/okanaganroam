@@ -47,7 +47,7 @@ K.simgolf = kind({ bookBtn: ['Book a bay', 'Réserver une baie'], gtk: 'simgolf'
     groups: { chips: ['Événements d’entreprise et fêtes', 'Ligues et tournois', 'Réservation privée de baies'], lead: 'Touchez une taille, puis ajoutez les événements d’entreprise, les ligues ou les réservations privées dans vos mots.', ex: 'Jusqu’à 6 joueurs par baie. Fêtes d’entreprise jusqu’à 40 personnes' },
     search: ['simulateur de golf', 'simulateurs de golf', 'golf intérieur', 'golf virtuel'] } });
 
-K.range = kind({ day: true, gtk: 'range', ex: 'range', season: 'summer', planner: 'outdoor',
+K.range = kind({ bookBtn: ['Book a lesson', 'Réserver un cours'], day: true, gtk: 'range', ex: 'range', season: 'summer', planner: 'outdoor',
   en: { price: { page: 'From {x}.', basis: 'Buckets and rounds', label: 'Your lowest price (a small bucket or one round), in dollars', ph: '', lead: 'Your lowest price: a small bucket of balls or one round of mini golf. It shows on your card.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Buckets, mini golf rounds, lessons and passes, with their prices. A photo of your price board or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; lessons by booking', ages: 'All ages; kids under 10 with an adult', gift: 'Gift cards and range cards at the counter', prices: 'Large bucket $18, mini golf kids $9' },
@@ -72,7 +72,9 @@ K.skischool = kind({ bookBtn: ['Book a lesson', 'Réserver un cours'], day: true
     groups: { chips: ['Groupes scolaires et de clubs', 'Cours privés de groupe', 'Journées de ski d’entreprise'], lead: 'Touchez une taille, puis ajoutez les groupes scolaires, les cours privés de groupe ou les journées d’entreprise dans vos mots.', ex: 'Groupes scolaires en semaine. Cours privés pour les familles jusqu’à 5 personnes' },
     search: ['cours de ski', 'cours de planche à neige', 'école de ski', 'apprendre à skier', 'ski de soirée', 'ski en soirée'] } });
 
-K.rink = kind({ gtk: 'rink', ex: 'rink', season: 'winter', planner: 'indoor',
+// Sport test 6 (2026-11-20; Priya's ice-rental link showed as "Book a visit" beside "Drop in… no need to book"): every kind
+// names what its booking link is for. A drop-in kind's link is a smaller button after Website (server.js ctaEntries).
+K.rink = kind({ bookBtn: ['Rent the ice', 'Louer la glace'], gtk: 'rink', ex: 'rink', season: 'winter', planner: 'indoor',
   en: { price: { page: 'Adult public skate {x}.', basis: 'Adult public skate', label: 'Adult public skate, in dollars', ph: '', lead: 'Your adult public skating price. It shows on your card.' },
     prices: { noun: 'rates page', page: PRICES_PAGE[0], lead: 'Public skating, drop-in hockey, skate rental and ice rental, with their prices. A photo of your rates or a link to your rates page is perfect. It’s optional.' },
     help: { walkin: 'Drop in during public skating; ice rentals by booking', ages: 'All ages; helmets for kids under 12', gift: 'Passes at the front desk', prices: 'Kids $3, skate rental $5, 10-skate pass $40' },
@@ -84,7 +86,7 @@ K.rink = kind({ gtk: 'rink', ex: 'rink', season: 'winter', planner: 'indoor',
     groups: { chips: ['Fêtes d’anniversaire sur la glace', 'Groupes scolaires bienvenus', 'Location de glace privée'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes scolaires ou la location de glace dans vos mots.', ex: 'Fêtes d’anniversaire avec une salle après le patin. Location de glace à l’heure' },
     search: ['patinage', 'patin', 'patinage libre', 'patinoire', 'aréna', 'arénas', 'hockey', 'hockey libre'] } });
 
-K.swim = kind({ day: true, gtk: 'swim', ex: 'swim', season: 'summer', planner: 'outdoor',
+K.swim = kind({ bookBtn: ['Book lessons or rentals', 'Réserver cours ou location'], day: true, gtk: 'swim', ex: 'swim', season: 'summer', planner: 'outdoor',
   en: { price: { page: 'Adult swim {x}.', basis: 'Adult swim', label: 'Adult swim, in dollars', ph: '', lead: 'Your adult swim price. It shows on your card.' },
     prices: { noun: 'rates page', page: PRICES_PAGE[0], lead: 'Swims for adults, kids and families, passes and lessons, with their prices. A photo of your rates or a link to your rates page is perfect. It’s optional.' },
     help: { walkin: 'Drop in during public swims; lessons need booking', ages: 'All ages; under 8 with an adult in the water', gift: 'Passes at the front desk', prices: 'Kids $3, family swim $12, 10-swim pass $45' },
@@ -96,7 +98,7 @@ K.swim = kind({ day: true, gtk: 'swim', ex: 'swim', season: 'summer', planner: '
     groups: { chips: ['Fêtes d’anniversaire', 'Groupes de camp et scolaires', 'Location de la piscine sur demande'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes de camp ou la location de la piscine dans vos mots.', ex: 'Fêtes d’anniversaire la fin de semaine. Groupes de camp bienvenus en semaine le matin' },
     search: ['piscine extérieure', 'piscines extérieures', 'jeux d’eau', 'parc aquatique', 'bain libre', 'baignade'] } });
 
-K.skatepark = kind({ day: true, gtk: 'skate', ex: 'skatepark', season: 'summer', planner: 'outdoor',
+K.skatepark = kind({ bookBtn: ['Sign up for lessons', 'S’inscrire aux cours'], day: true, gtk: 'skate', ex: 'skatepark', season: 'summer', planner: 'outdoor',
   en: { price: { page: 'From {x}.', basis: 'Per person', label: 'Your price for one person, if you charge one, in dollars', ph: '', lead: 'The price for one person, if there is one. Free to use? Tap Free entry.' },
     prices: { noun: 'programs page', page: PRICES_PAGE[0], lead: 'Lessons, camps and programs, with their prices. A link to your programs page is perfect. It’s optional.' },
     help: { walkin: 'Open to everyone; no need to book', ages: 'All ages; helmets strongly recommended', gift: 'Lessons can be booked through the rec centre', prices: 'Beginner lessons $25' },
@@ -108,7 +110,7 @@ K.skatepark = kind({ day: true, gtk: 'skate', ex: 'skatepark', season: 'summer',
     groups: { chips: ['Cours et camps', 'Compétitions et jams', 'Groupes scolaires et de jeunes'], lead: 'Touchez ce que vous offrez, comme des cours ou des jams, ou écrivez-le dans vos mots.', ex: 'Camps de planche l’été pour les 7 à 14 ans. Soirées jam pour les jeunes' },
     search: ['planchodrome', 'planchodromes', 'parc de planche', 'skatepark', 'planche à roulettes'] } });
 
-K.bike = kind({ day: true, gtk: 'bike', ex: 'bike', season: 'summer', planner: 'outdoor',
+K.bike = kind({ bookBtn: ['Register to ride', 'S’inscrire'], day: true, gtk: 'bike', ex: 'bike', season: 'summer', planner: 'outdoor',
   en: { price: { page: 'From {x}.', basis: 'Per rider', label: 'Your price for one rider (like a practice night), if you charge one, in dollars', ph: '', lead: 'The price for one rider, like a practice night, if there is one. Free to ride? Tap Free entry.' },
     prices: { noun: 'programs page', page: PRICES_PAGE[0], lead: 'Practice nights, race nights, memberships and bike rentals, with their prices. A link to your club or programs page is perfect. It’s optional.' },
     help: { walkin: 'Open to riders when there’s no race or practice on', ages: 'All ages; helmets required', gift: 'Club memberships online', prices: 'Practice night $10, season membership $90' },
@@ -132,7 +134,7 @@ K.courts = kind({ bookBtn: ['Book a court', 'Réserver un terrain'], day: true, 
     groups: { chips: ['Soirées de jeu libre', 'Cours et cliniques', 'Ligues et tournois'], lead: 'Touchez ce que vous offrez, comme le jeu libre ou des ligues, ou écrivez-le dans vos mots.', ex: 'Pickleball libre en semaine le matin. Cliniques pour débutants le samedi' },
     search: ['tennis', 'court de tennis', 'courts de tennis', 'pickleball', 'terrain de pickleball', 'terrain de basketball'] } });
 
-K.discgolf = kind({ day: true, gtk: 'discgolf', ex: 'discgolf', season: '', planner: 'outdoor',
+K.discgolf = kind({ bookBtn: ['Sign up', 'S’inscrire'], day: true, gtk: 'discgolf', ex: 'discgolf', season: '', planner: 'outdoor',
   en: { price: { page: 'From {x}.', basis: 'Per round', label: 'Your price for one round, if you charge one, in dollars', ph: '', lead: 'The price for one round, if there is one. Free to play? Tap Free entry.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Rounds, disc rentals and leagues, with their prices. A link to your page is perfect. It’s optional.' },
     help: { walkin: 'Free to play any time in daylight', ages: 'All ages', gift: 'Discs at the local shop', prices: 'Disc rental $5' },
@@ -144,7 +146,7 @@ K.discgolf = kind({ day: true, gtk: 'discgolf', ex: 'discgolf', season: '', plan
     groups: { chips: ['Soirées de ligue', 'Tournois', 'Cliniques d’initiation'], lead: 'Touchez ce que vous offrez, comme des ligues ou des tournois, ou écrivez-le dans vos mots.', ex: 'Soirées de ligue le mercredi à 18 h. Deux tournois par année' },
     search: ['disque-golf', 'disque golf', 'parcours de disque-golf', 'golf frisbee'] } });
 
-K.sportsctr = kind({ gtk: 'sportsctr', ex: 'sportsctr', season: '', planner: 'indoor',
+K.sportsctr = kind({ bookBtn: ['Book a space', 'Réserver un espace'], gtk: 'sportsctr', ex: 'sportsctr', season: '', planner: 'indoor',
   en: { price: { page: 'Drop-in from {x}.', basis: 'Drop-in', label: 'Your lowest adult drop-in price, in dollars', ph: '', lead: 'Your lowest adult drop-in price. It shows on your card.' },
     prices: { noun: 'rates page', page: PRICES_PAGE[0], lead: 'Drop-in, passes, programs and rentals, with their prices. A photo of your rates or a link to your rates page is perfect. It’s optional.' },
     help: { walkin: 'Drop in during public times; programs by registration', ages: 'All ages; under 12 with an adult', gift: 'Passes at the front desk', prices: 'Youth $3, 10-visit pass $45' },
@@ -156,7 +158,7 @@ K.sportsctr = kind({ gtk: 'sportsctr', ex: 'sportsctr', season: '', planner: 'in
     groups: { chips: ['Fêtes d’anniversaire', 'Groupes scolaires et de camp', 'Location du gymnase ou de salles'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes scolaires ou les locations dans vos mots.', ex: 'Fêtes d’anniversaire avec une salle. Location du gymnase à l’heure' },
     search: ['centre sportif', 'complexe sportif', 'complexe récréatif', 'sports libres', 'gymnase'] } });
 
-K.sportother = kind({ day: true, gtk: 'sportgen', ex: 'sportgen', season: '', planner: null,
+K.sportother = kind({ bookBtn: ['Book online', 'Réserver en ligne'], day: true, gtk: 'sportgen', ex: 'sportgen', season: '', planner: null,
   en: { price: { page: 'From {x}.', basis: 'Per person', label: 'Your lowest price for one person, in dollars', ph: '', lead: 'Your lowest price for one person. Free? Tap Free entry. It shows on your card.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Every pass, lesson, rental or program and what it costs. A photo of your price list or a link to your prices page is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; book ahead on weekends', ages: 'All ages; kids under 12 with an adult', gift: 'Gift cards at the front desk or online', prices: 'Kids under 12: $10' },
