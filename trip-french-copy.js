@@ -235,7 +235,10 @@ function t3FrenchTextCore(value){
    // Sport test 3 (2026-11-20): one part of a place is closed for its own season (Gord's mini golf).
    text=text.replace(/^(Mini golf|The driving range) is closed for the season at (.+) \(reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})\)\.$/,(_,p,n,m,dd)=>(p==='Mini golf'?'Le mini-golf est fermé':'Le champ de pratique est fermé')+' pour la saison à '+n+' (réouverture le '+frDom(dd)+' '+FR_SHORT[m]+').');
    text=text.replace(/^Closed for the season: (.+)\.$/,(_,n)=>'Fermés pour la saison : '+n.replace(/ \(reopens (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})\)/g,(w,m,dd)=>' (réouverture le '+frDom(dd)+' '+FR_SHORT[m]+')')+'.');
-   text=text.replace(/^Closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?: \((.+?)\))?: (.+)\.$/,(_,m,d,h,n)=>'Fermés le '+frDom(d)+' '+FR_SHORT[m]+(h?' ('+(FR_HOLIDAYS[h.replace(/'/g,'’')]||h)+')':'')+' : '+n+'.'); }
+   text=text.replace(/^Closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})(?: \((.+?)\))?: (.+)\.$/,(_,m,d,h,n)=>'Fermés le '+frDom(d)+' '+FR_SHORT[m]+(h?' ('+(FR_HOLIDAYS[h.replace(/'/g,'’')]||h)+')':'')+' : '+n+'.');
+   // Sport test 16 (2026-11-21; « golf à Kelowna le lundi 28 juin » read "Closed Jun 28–29 (Course aeration…): …"): an owner's
+   // closure of a few days, in French (her reason stays as she wrote it).
+   text=text.replace(/^Closed (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})–(?:(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) )?(\d{1,2})(?: \((.+?)\))?: (.+)\.$/,(_,m,d,m2,d2,h,n)=>'Fermés du '+frDom(d)+(m2&&m2!==m?' '+FR_SHORT[m]:'')+' au '+frDom(d2)+' '+FR_SHORT[m2||m]+(h?' ('+(FR_HOLIDAYS[h.replace(/'/g,'’')]||h)+')':'')+' : '+n+'.'); }
  // Indoor test 8: the owner's own line quoted on a stop.
  text=text.replace(/^(“.+”) \(the owner’s own words\)$/,'$1 (les mots de l’établissement)');
  text=text.replace(/^These places match but are closed on (\w+) (\d{1,2}): (.+?)\. Ask again with another date to plan them\.$/,(_,m,d,n)=>'Ces lieux correspondent, mais sont fermés le '+frDom(d)+' '+(FR_MONTHS_BY_EN[m]||m)+' : '+n.replace(/ and (?!.* and )/,' et ')+'. Essayez une autre date pour les planifier.');

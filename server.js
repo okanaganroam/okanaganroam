@@ -4626,10 +4626,13 @@ function buildDiscoverySearchVenues() {
   for (const a of OUTDOOR_ACTIVITIES) for (const id of getCollectionVenueIds(a.kind)) add(id, 'activities', a.slug);
   for (const [type, kind] of Object.entries(FD_CATEGORY_KIND_BY_TYPE)) for (const id of getCollectionVenueIds(kind)) add(id, 'fdTypes', type);
   const venues = [];
+  const nowS = new Date(), seasonsS = getSeasonStates(nowS);
   for (const row of db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\'').all()) {
     if (!REGION_LABELS[row.region] || !CATEGORY_SLUGS[row.type]) continue;
     const features = {};
     for (const f of BOOL_FIELDS) if (badgeOnPublic(row, f)) features[f] = true;
+    // Sport test 16: a happy hour visitors can't see today (closed for the season, or outside its months) is not searched.
+    if (features.happy_hour && happyHourHiddenNow(row, nowS, seasonsS)) delete features.happy_hour;
     // Indoor test 2: an indoor place open past 11 PM on some day is found by "late night" too (matched on its hours).
     if (row.type === 'indoor' && !features.open_late && indoorLateClose(row.hours) != null) features.open_late = true;
     const m = member.get(row.id) || { collections: [], activities: [], fdTypes: [] };
@@ -4665,7 +4668,8 @@ const DISCOVERY_SEARCH_COLLECTION_KINDS = ['hidden_gem', 'local_favorite', 'dog_
 // submission) may have changed what it holds. Memory only; never persisted.
 let discoverySearchCache = null;
 function discoverySearchVenues() {
-  const version = db.prepare('SELECT total_changes() AS n').get().n;
+  // Sport test 16: and the day (a happy hour's months and a season's dates change what it finds).
+  const version = `${db.prepare('SELECT total_changes() AS n').get().n}|${todayLocal()}`;
   if (!discoverySearchCache || discoverySearchCache.version !== version) {
     discoverySearchCache = { version, venues: buildDiscoverySearchVenues() };
   }
@@ -5247,7 +5251,10 @@ const FR_SEARCH_SYNONYMS = [
   ['citrouille', 'pumpkin'], ['champ de citrouilles', 'pumpkin patch'], ['autocueillette de citrouilles', 'pumpkin patch'], ['labyrinthe de mais', 'corn maze'],
   ['labyrinthe dans le mais', 'corn maze'], ['labyrinthe', 'maze'], ['maison hantee', 'haunted house'], ['maisons hantees', 'haunted house'], ['hantee', 'haunted'], ['hante', 'haunted'],
   ['marche de noel', 'christmas market'], ['marches de noel', 'christmas market'], ['marche des fetes', 'christmas market'], ['marches des fetes', 'christmas market'],
-  ['marche de fetes', 'christmas market'], ['noel', 'christmas'], ['sapin de noel', 'christmas tree'], ['sapins de noel', 'christmas tree'], ['pere noel', 'santa'],
+  ['marche de fetes', 'christmas market'],
+  // Sport test 16 (2026-11-21): « fête de Noël », « party de bureau » is a holiday or office party to book, never December 25.
+  ...['fete', 'fetes', 'party', 'partys', 'souper', 'soupers', 'diner', 'diners'].flatMap((w) => [[`${w} de noel`, 'christmas party'], [`${w}s de noel`, 'christmas party'], [`${w} des fetes`, 'christmas party'], [`${w} de bureau`, 'office party'], [`${w} d entreprise`, 'office party']]),
+  ['noel', 'christmas'], ['sapin de noel', 'christmas tree'], ['sapins de noel', 'christmas tree'], ['pere noel', 'santa'],
   ['lumieres de noel', 'christmas lights'], ['illuminations de noel', 'christmas lights'], ['casse noisette', 'nutcracker'], ['temps des fetes', 'holiday'],
   ['jour de l an', 'new years'], ['nouvel an', 'new years'], ['veille du jour de l an', 'new years eve'], ['reveillon', 'new years eve'], ['action de grace', 'thanksgiving'],
   ['vendanges', 'harvest'], ['recolte', 'harvest'], ['feux d artifice', 'fireworks'], ['paques', 'easter'], ['chasse aux oeufs', 'egg hunt'], ['saint valentin', 'valentines'],
@@ -6221,6 +6228,31 @@ const SMART_MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil
 // Sport test 15 (2026-11-21; "holiday party venue kelowna" put Kelowna Springs last, "Dec 25 · Closed for the season"): a
 // Christmas or holiday party (dinner, function) with no date is a group booking, never December 25.
 const SMART_PARTY_RE = /(?:^| )(?:christmas|xmas|noel|holiday|holidays|office|staff|company|work)s? (?:party|parties|partie|do|dinner|dinners|lunch|lunches|function|functions|event|events|gathering|gatherings|celebration)(?: |$)|(?:^| )(?:party|parties|fete|fetes|souper|diner) (?:de |des )?(?:noel|fetes|bureau)(?: |$)/;
+// What a place's own words say when it hosts a holiday or office party (folded text, spaces around).
+const SMART_HOLIDAY_PARTY_SAID_RE = / (?:christmas|xmas|holiday|holidays|festive|office|company|staff|work|corporate|year end) (?:party|parties|events?|functions?|dinners?|gatherings?|celebrations?) | (?:fetes?|partys?|soupers?|diners?) (?:de |des )?(?:noel|fetes|bureau) /;
+// Sport test 16: "canyon bar and grill" -> the listing whose own words name it ("the Canyon Bar & Grill", its parts line
+// "Canyon Bar & Grill: Wed–Fri 5–8 PM in winter"). Three words or more, with a bar, grill or restaurant word and a name word.
+const SMART_PART_PLACE_RE = / (?:bar|grill|restaurant|bistro|cafe|lounge|pub|kitchen|clubhouse|taproom|dining room|eatery|diner|tavern|cantina) /;
+const SMART_PART_GENERIC = new Set(['bar', 'and', 'grill', 'restaurant', 'bistro', 'cafe', 'lounge', 'pub', 'kitchen', 'clubhouse', 'taproom', 'dining', 'room', 'eatery', 'diner', 'tavern', 'cantina', 'the', 'a', 'in', 'near', 'at', 'with', 'golf', 'club', 'course', 'best', 'good', 'open', 'now', 'food', 'sports', 'patio', 'happy', 'hour', 'menu', 'kids', 'family', 'cheap', 'late', 'night']);
+function smartNamedPartPick(text, region) {
+  try {
+    let q = ` ${smartFold(String(text || '').replace(/&/g, ' and '))} `;
+    for (const lb of Object.values(REGION_LABELS)) { const r = ` ${smartFold(lb)} `; while (q.includes(r)) q = q.replace(r, ' '); }
+    q = q.replace(/ (?:in|near|at)\s*$/, ' ').replace(/^\s*(?:the) /, ' ').replace(/\s+/g, ' ');
+    const words = q.trim().split(' ').filter(Boolean);
+    if (words.length < 3 || !SMART_PART_PLACE_RE.test(q) || !words.some((w) => !SMART_PART_GENERIC.has(w) && w.length > 2)) return null;
+    const phrase = ` ${words.join(' ')} `;
+    const own = (v) => { let rows = ''; try { rows = ((venueVisitInfo(v.id) || {}).rows || []).map((r) => (typeof r.text === 'string' ? r.text : '')).join(' '); } catch (e) { rows = ''; } return ` ${smartFold(`${v.row.description || ''} ${rows}`.replace(/&/g, ' and '))} `; };
+    const named = (v) => ` ${smartFold(String(v.row.name || '').replace(/&/g, ' and '))} `.includes(phrase);
+    const all = discoverySearchVenues().filter((v) => !region || v.region === region);
+    if (all.some(named)) return null;
+    const label = words.map((w) => (w === 'and' ? '&' : w.charAt(0).toUpperCase() + w.slice(1))).join(' ');
+    const list = () => smartPickVenues((v) => ((!region || v.region === region) && own(v).includes(phrase) ? 'Names it in its own words' : false), (v) => foodDrinkRecommendedScore(v.row));
+    const got = list();
+    if (!got.length || got.length > 5) return null;
+    return { key: 'named_part', heading: `${label}${region ? ` in ${REGION_LABELS[region]}` : ''}`, headingFr: `${label}${region ? ` à ${REGION_LABELS[region]}` : ''}`, guides: [], list };
+  } catch (e) { return null; }
+}
 function smartHolidayOf(folded) { return SMART_HOLIDAYS.find(([re, m, d]) => re.test(folded) && !(m === 12 && d === 25 && SMART_PARTY_RE.test(folded) && !/(?:^| )(?:christmas day|xmas day|jour de noel|dec 25|december 25|25 dec|25 decembre)(?: |$)/.test(folded))); }
 function smartStripHoliday(folded) {
   const h = smartHolidayOf(folded) || (!/\bweekend\b|\bfin de semaine\b|\blong\b/.test(folded) && SMART_MOVING_HOLIDAYS.find(([re]) => re.test(folded)));
@@ -6738,6 +6770,21 @@ function smartSearchPlan(text, intent = interpretDiscoveryText(text), now = new 
   // other request and block the breakfast/brunch routing below.
   const others = intent.cuisines.filter((c) => !/^(breakfast|brunch)/i.test(c)).length || intent.collections.length || intent.activities.length;
 
+  // Sport test 16 (2026-11-21; "canyon bar and grill" listed only Pubs: hers is the Canyon Bar & Grill inside Gallagher's
+  // Canyon, named in her story and her parts line): a named bar, grill or restaurant inside a listed place, found in that
+  // place's own words.
+  const namedPart = smartNamedPartPick(text, region);
+  if (namedPart) return namedPart;
+  // Sport test 16 ("holiday party venue kelowna" and "christmas party kelowna" never listed Gallagher's Canyon, whose Groups
+  // line says "Holiday parties up to 150 in the clubhouse"): a Christmas, holiday or office party is the town's places
+  // whose own words offer one (name, story, Groups, Good to know), Great for Groups first. Not a kids' party.
+  if (region && SMART_PARTY_RE.test(` ${folded} `) && !smartHas(folded, SMART_FAMILY_WORDS) && !intent.cuisines.length && !intent.activities.length) {
+    const hasT = T.length ? (v) => T.includes(v.type) || v.fdTypes.some((t) => T.includes(t)) : () => true;
+    const said = (v) => SMART_HOLIDAY_PARTY_SAID_RE.test(` ${smartFold(`${v.row.name || ''} ${v.row.description || ''} ${indoorVisitSearchText(v.id)}`)} `);
+    const list = () => smartPickVenues((v) => (v.region === region && hasT(v) && F.every((f) => v.features[f]) && said(v) ? 'Hosts holiday or office parties (its own words)' : false),
+      (v) => (Number(v.row.great_groups) === 1 ? 5 : 0) + foodDrinkRecommendedScore(v.row) / 10);
+    if (list().length) return { key: 'holiday_party', heading: `Holiday & office parties in ${town}`, headingFr: `Fêtes de Noël et de bureau à ${town}`, guides: [], list };
+  }
   // Indoor test 5 (2026-11-19; Chris: "kids birthday party in Vernon" listed the 89 Kid-Friendly places in Vernon, A-Z,
   // restaurants and trails among them): a kids' birthday party is the town's indoor Family Fun places, the ones whose own
   // Groups or Good to know line offers parties first. No town: the Indoor hub's Family Fun.
@@ -13196,7 +13243,8 @@ function visitInfoHtml(info, fr = false, opts = {}) {
     const rowsFr = info.rows.map((r) => {
       const t1 = r.__frOwn ? r.text : ownFr[r.label] && ownFr[r.label].en === r.text && ownFr[r.label].fr ? ownFr[r.label].fr : (typeof r.text === 'string' ? presetOrFr(r.text, visitTextFr) : visitTextFr(r.text));
       const text = t1 ?? ownLine(r);
-      const enOnly = t1 == null && kindSetupType(opts.type) && mineFr.has(r.label) && typeof text === 'string' && text === r.text && !ownerTextIsFrench(text);
+      // Sport test 16 (2026-11-21): research's own line kept in English on a sport page (Practice, Rentals) says so too.
+      const enOnly = t1 == null && kindSetupType(opts.type) && (mineFr.has(r.label) || (sportSetupType(opts.type) && keepEn(r) != null)) && typeof text === 'string' && text === r.text && !ownerTextIsFrench(text);
       return { ...r, text, label: visitLabelFr(r.label), __en: r.label, ...(enOnly ? { __enOnly: true } : {}) };
     }).filter((r) => r.text != null);
     if (!rowsFr.length) return '';
@@ -26925,15 +26973,34 @@ const GOLF_GREEN_FEE_RE = /\b(?:\d{1,2}[- ]?holes?|nine|eighteen|green ?fees?|wa
 // rate of her main kind. A rate for some people, some times or a bundle never is: replay or a second round, twilight,
 // resort or hotel guests, stay and play, packages, members and their guests, juniors, seniors, students, military,
 // groups, promos, early bird, off-peak or shoulder (and the extras above). No price typed: the lowest plain line is it.
-const SPORT_QUALIFIED_PRICE_RE = /\b(?:re-?play|second (?:round|18|nine|9)|2nd (?:round|18|nine|9)|same[- ]day|twilight|super twilight|sunset|evening|after \d|resort|hotel|lodge|(?:resort |hotel )?guests?|stay(?: (?:and|&|n) play)?|packages?|bundles?|members?|membership|reciprocal|punch|passes|pass|juniors?|seniors?|students?|military|veterans?|groups?|team|corporate|tournaments?|promo\w*|specials?|deals?|early[- ]?bird|off[- ]?peak|shoulder|replay|forfaits?|membres?|invit[ée]s?|groupes?|militaires?|cr[ée]puscule|hors[- ]saison|l[èe]ve[- ]t[ôo]t|aîn[ée]s?|[ée]tudiants?)\b/i;
-// -> true when a typed price line may set or lower the card price for this sport kind.
-function sportPriceLineCounts(kind, name, desc = '', section = '') {
+const SPORT_QUALIFIED_PRICE_RE = /\b(?:re-?play|second (?:round|18|nine|9)|2nd (?:round|18|nine|9)|same[- ]day|twilight|super twilight|sunset|evening|resort|hotel|lodge|(?:resort |hotel )?guests?|stay(?: (?:and|&|n) play)?|packages?|bundles?|members?|membership|reciprocal|punch|passes|pass|juniors?|seniors?|students?|military|veterans?|groups?|team|corporate|tournaments?|promo\w*|specials?|deals?|early[- ]?bird|off[- ]?peak|shoulder|replay|forfaits?|membres?|invit[ée]s?|groupes?|militaires?|cr[ée]puscule|hors[- ]saison|l[èe]ve[- ]t[ôo]t|aîn[ée]s?|[ée]tudiants?|stand-?by|en attente|apr[èe]s \d+(?:\s*h(?:\d\d)?)?|after \d+(?:[:.]\d\d)?(?:\s*[ap]\.?m)?)\b/i;
+// Sport test 16 (2026-11-21; Nadia's $200 Canyon course read "Green fees from $65", her "9 holes · After 5 pm or on
+// standby" line): the qualifying words count in a line's description too, not only its name ("9 holes" + "After 5 pm or on
+// standby" is a late rate). And on an 18-hole course a 9-hole line never lowers the headline: it is a different round.
+const SPORT_NINE_LINE_RE = /\b(?:9|nine)[- ]?holes?\b|\b9 trous\b|\bneuf trous\b/i;
+const SPORT_EIGHTEEN_LINE_RE = /\b(?:18|eighteen)[- ]?holes?\b|\b18 trous\b/i;
+// -> true when a typed price line may set or lower the card price for this sport kind. opts.eighteen: an 18-hole course.
+function sportPriceLineCounts(kind, name, desc = '', section = '', opts = {}) {
   const own = SPORT_OWN_MAIN_RE[kind];
   const n = own ? String(name).replace(own, ' ') : String(name);
   if (SPORT_EXTRA_PRICE_RE.test(n) || SPORT_DISCOUNT_PERSON_RE.test(String(name)) || SPORT_DISCOUNT_DESC_RE.test(String(desc || ''))) return false;
-  if (SPORT_QUALIFIED_PRICE_RE.test(String(name))) return false;
+  if (SPORT_QUALIFIED_PRICE_RE.test(String(name)) || SPORT_QUALIFIED_PRICE_RE.test(String(desc || ''))) return false;
   if (kind === 'golf' && !GOLF_GREEN_FEE_RE.test(String(name))) return false;
+  if (kind === 'golf' && opts && opts.eighteen && SPORT_NINE_LINE_RE.test(`${name} ${desc || ''}`) && !SPORT_EIGHTEEN_LINE_RE.test(String(name))) return false;
   return true;
+}
+// An 18-hole (or bigger) course: our checked golf data says so, or her own list has an 18-hole line.
+function sportGolfEighteen(venueId, menu) {
+  try {
+    const v = db.prepare('SELECT id, slug, region, type, name, description FROM venues WHERE id = ?').get(venueId);
+    if (!v || v.type !== 'golf') return false;
+    const d = golfDetailsFor([v]).get(`${v.region}/${v.slug}`);
+    const holes = d && d.profile && d.profile.holes != null ? Number(d.profile.holes) : NaN;
+    if (holes >= 18) return true;
+    if (holes === 9) return false;
+    for (const sec of (menu && menu.data && menu.data.sections) || []) for (const it of sec.items || []) if (it && SPORT_EIGHTEEN_LINE_RE.test(String(it.name || ''))) return true;
+    return false;
+  } catch (e) { return false; }
 }
 function indoorLowestTyped(venueId) {
   try {
@@ -26942,10 +27009,11 @@ function indoorLowestTyped(venueId) {
     let lo = null;
     const kinds = venueIndoorInfo(venueId).kinds;
     const sportKind = Array.isArray(kinds) && kinds.length && indoorKindsModule.SPORT_KIND_TEXT_KINDS.includes(kinds[0]) ? kinds[0] : null;
+    const eighteen = sportKind === 'golf' && sportGolfEighteen(venueId, menu);
     for (const sec of menu.data.sections || []) for (const it of sec.items || []) {
       const raw = String(it && it.price || '');
       if (!it || !it.name || INDOOR_NOT_A_PRICE_RE.test(String(it.name)) || /%/.test(raw) || INDOOR_ONE_DAY_DEAL_RE.test(`${it.name} ${it.description || ''}`)) continue;
-      if (sportKind && !sportPriceLineCounts(sportKind, String(it.name), String(it.description || ''), String(sec.name || ''))) continue;
+      if (sportKind && !sportPriceLineCounts(sportKind, String(it.name), String(it.description || ''), String(sec.name || ''), { eighteen })) continue;
       const m = /(\d+(?:[.,]\d{1,2})?)/.exec(raw.replace(/,(?=\d{3}\b)/g, ''));
       const n = m ? Number(m[1].replace(',', '.')) : NaN;
       if (Number.isFinite(n) && n > 0 && (lo == null || n < lo)) lo = n;
@@ -43073,6 +43141,20 @@ function seasonTagSpan(s, fr) {
   return t ? ` <span class="venue-season-tag">(${escapeHtml(t)})</span>` : '';
 }
 // Inside a 'MM-DD' from/to season on a date ('YYYY-MM-DD')? No season is every day.
+// Sport test 7 / sport test 16 (2026-11-21; Nadia's winter-only happy hour at a course closed Nov–Mar never showed, but its
+// badge led "More in Kelowna" and ranked her 1st for "golf happy hour kelowna"): a happy hour visitors can't see today:
+// the place is closed for the season (or in a temporary closure), or today is outside the happy hour's own months. The
+// page's badge, its "More in" links and search's happy hour feature all ask this. seasons: getSeasonStates(now), when known.
+function happyHourHiddenNow(v, now = new Date(), seasons = null) {
+  try {
+    if (!v) return false;
+    const st = v.redirect_to ? null : (seasons || getSeasonStates(now)).get(v.id);
+    if (st && seasonStateBlocksOffers(st)) return true;
+    // (A venue from getVenue has no happy_hour_times: read it.)
+    const hh = v.happy_hour_times !== undefined ? v.happy_hour_times : v.id != null ? (db.prepare('SELECT happy_hour_times FROM venues WHERE id = ?').get(v.id) || {}).happy_hour_times : null;
+    return !!hh && !inMonthDaySeason(happyHourSeasonOf(hh), todayLocal(now));
+  } catch (e) { return false; }
+}
 function inMonthDaySeason(season, date) {
   if (!season || !season.from || !season.to) return true;
   return hoursModule ? hoursModule.mdInRange(String(date).slice(5), season.from, season.to) : true;
@@ -44132,7 +44214,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   }
   // Sport test 7 (test 4 #16; the Happy Hour badge showed Nov–Apr while the page said Closed for the season): no Happy Hour
   // badge while the place is closed for the season, or outside the happy hour's own months.
-  const hhBadgeOff = (() => { try { const now0 = opts.now || new Date(); const st = venue.redirect_to ? null : getSeasonStates(now0).get(venue.id); return (!!st && seasonStateBlocksOffers(st)) || (!!venue.happy_hour_times && !inMonthDaySeason(happyHourSeasonOf(venue.happy_hour_times), todayLocal(now0))); } catch (e) { return false; } })();
+  const hhBadgeOff = happyHourHiddenNow(venue, opts.now || new Date());
   const attributeChipsFor = (skipHappyHour0) => { const skipHappyHour = skipHappyHour0 || hhBadgeOff; return (fr && venue.type === 'cafe' && !venue.redirect_to ? cafeFrChipsHtml(venue, dogFriendlyNote, { skipHappyHour }) : venueBadgeChipsHtml(venue, { fr, skipDogFriendly: dogFriendlyNote !== undefined, skipHappyHour })); };
   // Round 11 (2026-10-20): the dog chip's tooltip (the place's dog rule) in French on French venue pages too; the twin's
   // own pass never sees these pages, so Gyro Beach and Peach Orchard Dog Beach kept the English rule.
@@ -44842,6 +44924,9 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       </div>`
     : '';
 
+  // Sport test 16 (2026-11-21): no "More in Kelowna: Happy Hour" link while her happy hour can't be seen (closed for the
+  // season, or outside its own months), as the badge.
+  if (hhBadgeOff && Array.isArray(venueGuidePages)) venueGuidePages = venueGuidePages.filter((c) => c.badge !== 'happy_hour');
   const guideLinks = fr ? '' : featuredInGuidesHtml(`${venue.region}/${venue.slug}`) + (venueGuidePages.length
     // Tap targets (2026-10-19, round 7): the "More in" badge chips are 44px tall pills (they were 30px).
     ? `<p class="venue-meta venue-more-in" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px"><span>More in ${escapeHtml(regionLabel)}:</span> ${venueGuidePages.map((c) => `<a href="/guide/${c.region}/${c.badge}" aria-label="${escapeHtml(BADGE_LABELS[c.badge].title)} places in ${escapeHtml(regionLabel)}" style="display:inline-flex;align-items:center;min-height:44px;box-sizing:border-box;padding:0 14px;border:1px solid rgba(42,107,103,0.35);border-radius:999px;text-decoration:none;font-weight:700;font-size:.82rem">${escapeHtml(BADGE_LABELS[c.badge].title)}</a>`).join(' ')}</p>`
@@ -63842,8 +63927,10 @@ const INDOOR_SETUP_HELP_TOPICS = [
     allOf: [['local', 'locale', 'locally'], ['owned', 'own', 'apply', 'count', 'non', 'nonprofit', 'profit', 'charity', 'society', 'community', 'city', 'municipal', 'propriete', 'proprietaire', 'organisme', 'lucratif', 'communautaire', 'ville', 'applique', 'compte']],
     keys: ['locally owned', 'locally owned apply', 'does locally owned apply', 'is locally owned for', 'locally owned non profit', 'locally owned nonprofit', 'local owned', 'locally run', 'run locally', 'local non profit', 'local society', 'local charity'],
     keysFr: ['propriete locale', 'la propriete locale', 'propriete locale s applique', 'organisme local', 'gere localement', 'sans but lucratif local', 'organisme sans but lucratif'],
-    a: '<p>Yes, if you’re run here. <strong>Locally owned</strong> means owned or run in the valley: non-profits, societies, co-ops and community groups count when they’re run locally. A chain or a place run from a head office elsewhere doesn’t. Tick it on <strong>Who can come?</strong> (in the setup).</p>',
-    aFr: '<p>Oui, si vous êtes gérés ici. <strong>Propriété locale</strong> veut dire possédé ou géré dans la vallée : les organismes sans but lucratif, les sociétés, les coopératives et les groupes communautaires comptent s’ils sont gérés localement. Une chaîne ou un endroit géré par un siège ailleurs, non. Cochez-la à <strong>Qui peut venir?</strong> (dans la configuration).</p>' },
+    // Sport test 16 (2026-11-21; Nadia: "we're owned by golfbc, they have a few courses around bc" got "Yes, if you're run
+    // here"): a group or management company with places elsewhere isn't locally owned; a cautious answer, never "Yes" first.
+    a: '<p><strong>Locally owned</strong> means owned or run here in the valley by local people: non-profits, societies, co-ops and community groups count when they’re run locally. Owned by a chain, a group with places in other towns, or a management company run from a head office? Then it doesn’t count: leave it unticked. Not sure? Leave it unticked and tap <strong>Message us</strong>. It’s on <strong>Who can come?</strong> (in the setup).</p>',
+    aFr: '<p><strong>Propriété locale</strong> veut dire possédé ou géré ici, dans la vallée, par des gens d’ici : les organismes sans but lucratif, les sociétés, les coopératives et les groupes communautaires comptent s’ils sont gérés localement. Possédé par une chaîne, un groupe qui a des endroits dans d’autres villes, ou une société de gestion dirigée par un siège social? Alors ça ne compte pas : ne la cochez pas. Pas certain? Ne la cochez pas et touchez <strong>Écrivez-nous</strong>. C’est à <strong>Qui peut venir?</strong> (dans la configuration).</p>' },
   { id: 'indoor-fill-all', pages: ['setup', 'edit'], over: ['easy-setup', 'setup-change-later', 'setup-live-when', 'setup-status'],
     q: 'Do I have to fill all of this in?', qFr: 'Dois-je tout remplir?',
     keys: ['fill all of this', 'fill all this', 'fill all of this out', 'fill everything', 'fill everything in', 'fill everything out', 'fill it all', 'fill it all out', 'have to fill', 'need to fill', 'do i have to fill', 'do i need to fill', 'have to answer everything', 'answer everything', 'all of this required', 'is all of this required', 'is this required', 'required', 'mandatory', 'so many questions', 'too many questions', 'how many questions', 'how long does this take', 'skip', 'do all of these', 'have to do all', 'answer all', 'answer all of it'],
@@ -64350,8 +64437,8 @@ const SPORT_SEASON_TOPIC = { id: 'sport-season', pages: ['setup', 'edit'], over:
     .concat(...SPORT_MONTHS_EN.map((a) => SPORT_MONTHS_EN.filter((b) => b !== a).map((b) => `${a} to ${b}`))),
   keysFr: ['seulement l ete', 'seulement l hiver', 'ouvert l ete', 'ouvert l hiver', 'ferme l hiver', 'ferme l ete', 'hors saison', 'notre saison', 'saisonnier']
     .concat(...SPORT_MONTHS_FR.map((a) => SPORT_MONTHS_FR.filter((b) => b !== a).map((b) => `${a} a ${b}`))),
-  a: '<p>In your hours, after the days, tap <strong>We’re closed part of the year</strong> and pick your first and last day (like April 1 and October 31, or December 1 and March 31). The dates repeat every year; outside them your page and your card say “Closed for the season” with the day you reopen, and Build My Trip doesn’t plan you. Opening day moves with the snow, the ice or the greens? Change the first day when it’s set. Shorter hours in spring and fall? Tap <strong>Different hours in summer or winter?</strong>.</p>',
-  aFr: '<p>Dans vos heures, après les jours, touchez <strong>Nous fermons une partie de l’année</strong> et choisissez votre premier et votre dernier jour (comme le 1er avril et le 31 octobre, ou le 1er décembre et le 31 mars). Les dates se répètent chaque année; en dehors, votre page et votre fiche indiquent « Fermé pour la saison » avec le jour de réouverture, et Planifier mon voyage ne vous propose pas. Le jour d’ouverture dépend de la neige, de la glace ou des verts? Changez le premier jour quand il est fixé. Des heures plus courtes au printemps et à l’automne? Touchez <strong>Des heures différentes l’été ou l’hiver?</strong>.</p>' };
+  a: '<p>In your hours, after the days, tap <strong>We’re closed part of the year</strong> and pick your first and last day (like April 1 and October 31, or December 1 and March 31). The dates repeat every year; outside them your page and your card say “Closed for the season” with the day you reopen, and Build My Trip doesn’t plan you. Opening day moves with the snow, the ice or the greens? Change the first day when it’s set. Shorter hours in spring and fall, like April and October? After your dates, tap <strong>Save, and add different hours for part of your season</strong>, then pick those months and set their hours.</p>',
+  aFr: '<p>Dans vos heures, après les jours, touchez <strong>Nous fermons une partie de l’année</strong> et choisissez votre premier et votre dernier jour (comme le 1er avril et le 31 octobre, ou le 1er décembre et le 31 mars). Les dates se répètent chaque année; en dehors, votre page et votre fiche indiquent « Fermé pour la saison » avec le jour de réouverture, et Planifier mon voyage ne vous propose pas. Le jour d’ouverture dépend de la neige, de la glace ou des verts? Changez le premier jour quand il est fixé. Des heures plus courtes au printemps et à l’automne, comme en avril et en octobre? Après vos dates, touchez <strong>Enregistrer et ajouter d’autres heures pour une partie de la saison</strong>, puis choisissez ces mois et indiquez leurs heures.</p>' };
 const SPORT_OWN_HELP_TOPICS = [SPORT_SEASON_TOPIC,
   { id: 'sport-kinds-other', pages: ['setup', 'edit'], over: ['cuisine', 'indoor-kinds-many'],
     q: 'My kind of place isn’t on the list', qFr: 'Mon genre d’endroit n’est pas dans la liste',
@@ -64425,8 +64512,8 @@ const SPORT_TEST1_HELP_TOPICS = [
     keys: ['twilight', 'twilight rate', 'twilight rates', 'twilight rates start', 'twilight starts', 'after 2 pm', 'after 3 pm', 'after 4 pm', 'late day rate', 'evening rate', 'junior rate', 'junior rates', 'juniors rate', 'junior price', 'our junior rate', 'junior rate shown', 'rate shown as', 'senior rate', 'senior rates', 'seniors rate', 'student rate', 'youth rate',
       'for twilight', 'put twilight', 'show twilight', 'twilight green fee', 'membership', 'memberships', 'season membership', 'season memberships', 'season pass', 'season passes', 'annual pass', 'yearly pass', 'punch card', 'punch cards', 'dont post a price', 'don t post a price', 'we don t post a price', 'no posted price', 'price on request', 'call for price', 'call for prices', 'where do memberships go', 'where do season memberships go', 'monthly membership', 'monthly memberships', 'membership coming', 'coming in january', 'coming soon', 'can i add it now', 'add it now', 'starting in january', 'starts in january', 'new membership', 'punch pass', 'punch passes', 'packages', 'package', 'seniors are cheaper', 'kids are cheaper', 'juniors are cheaper', 'cheaper for kids', 'cheaper for seniors', 'kids and seniors', 'juniors and seniors', 'youth and seniors', 'kids price', 'seniors price', 'senior price', 'skate pass', '10 skate pass', 'swim pass', '10 swim pass', 'visit pass', '10 visit pass', 'range card', 'range cards', 'lesson pack', 'lesson packs', 'camp pass', 'league fee', 'league fees', 'we sell a', 'multi visit pass', 'drop in pass'],
     keysFr: ['sans prix affiche', 'abonnements de saison sans prix', 'crepuscule', 'tarif crepuscule', 'tarifs crepuscule', 'tarif du crepuscule', 'nos tarifs crepuscule', 'apres 14 h', 'tarif junior', 'tarifs juniors', 'tarif aine', 'tarifs aines', 'tarif etudiant', 'abonnement', 'abonnements', 'abonnement de saison', 'abonnements de saison', 'carte de saison', 'sans prix', 'prix sur demande', 'pas de prix affiche', 'abonnement mensuel', 'abonnements mensuels', 'en janvier', 'bientot', 'carte prepayee', 'forfait', 'forfaits', 'aines moins cher', 'enfants moins cher', 'prix enfants', 'prix aines', 'carte de 10', 'carte de patinage', 'carte de baignade', 'forfait de cours', 'frais de ligue', 'on vend une carte'],
-    a: '<p>Put each one as its own line in <strong>Your prices</strong>, with when or who it’s for in its details, like <em>{RATE_EX}</em>. A membership or pass you don’t post a price for? Add the line without a price, like <em>{MEMBER_EX}</em>. Starting later? Add it now with when it starts, like <em>Monthly membership $99 (from January)</em>.</p><p>Your card shows your lowest regular adult price. {EXTRAS_EN} never become your card’s price.</p>',
-    aFr: '<p>Mettez chacun en une ligne dans <strong>Vos tarifs</strong>, avec le moment ou les personnes visées dans ses détails, comme <em>{RATE_EX}</em>. Un abonnement ou une carte sans prix affiché? Ajoutez la ligne sans prix, comme <em>{MEMBER_EX}</em>. Ça commence plus tard? Ajoutez-le maintenant avec la date de début, comme <em>Abonnement mensuel 99 $ (dès janvier)</em>.</p><p>Votre fiche montre votre prix adulte régulier le plus bas. {EXTRAS_FR} ne deviennent jamais le prix de votre fiche.</p>' },
+    a: '<p>Put each one as its own line in <strong>Your prices</strong>, with when or who it’s for in its details, like <em>{RATE_EX}</em>. A membership or pass you don’t post a price for? Add the line without a price, like <em>{MEMBER_EX}</em>. Starting later? Add it now with when it starts, like <em>Monthly membership $99 (from January)</em>. Prices that move? Write <em>from $85</em> or <em>varies</em>.</p><p>Your card keeps the regular adult price you typed on Price, not your lowest. {EXTRAS_EN} and late or replay rates never become your card’s price.</p>',
+    aFr: '<p>Mettez chacun en une ligne dans <strong>Vos tarifs</strong>, avec le moment ou les personnes visées dans ses détails, comme <em>{RATE_EX}</em>. Un abonnement ou une carte sans prix affiché? Ajoutez la ligne sans prix, comme <em>{MEMBER_EX}</em>. Ça commence plus tard? Ajoutez-le maintenant avec la date de début, comme <em>Abonnement mensuel 99 $ (dès janvier)</em>. Des prix qui bougent? Écrivez <em>à partir de 85 $</em> ou <em>varie</em>.</p><p>Votre fiche garde le prix adulte régulier inscrit à Prix, pas le plus bas. {EXTRAS_FR} et les tarifs tardifs ou de deuxième ronde ne deviennent jamais le prix de votre fiche.</p>' },
   { id: 'sport-rate-change', pages: ['setup', 'edit', 'menu'], over: ['menu-add', 'indoor-price', 'indoor-price-varies', 'indoor-age', 'indoor-line-age', 'sport-rate-lines', 'indoor-seasonal', 'sport-season'],
     q: 'Our rates change on a date (new rates for the season)', qFr: 'Nos tarifs changent à une date (nouveaux tarifs pour la saison)',
     allOf: [['rate', 'price', 'fee', 'tarif', 'prix'], ['up', 'increas', 'rais', 'chang', 'new', 'next', 'augment', 'hausse', 'nouveau', 'nouveaux', 'both', 'deux']],
@@ -64494,8 +64581,8 @@ const SPORT_TEST2_HELP_TOPICS = [
     allOf: [['card', 'fiche'], ['show', 'shows', 'say', 'says', 'price', 'become', 'affich', 'prix', 'indiqu', 'devien', 'green fee', 'droits']],
     keys: ['what shows on the card', 'still what shows', 'shows on the card', 'show on the card', 'shows on my card', 'on my card', 'my card says', 'card says', 'card price', 'become my price', 'become my card price', 'become the card price', 'will it show', 'show 10 for clubs', 'my card on the golf page', 'says green fees', 'dont have green fees', 'we rent bays'],
     keysFr: ['sur ma fiche', 'ma fiche indique', 'prix de ma fiche', 'deviendra', 'affichera', 'droits de jeu sur ma fiche'],
-    a: '<p>Your card keeps your main price from <strong>Price</strong>, in your kind’s words: “{PAGE_SAY}”. {EXTRAS_EN} never become your card’s price, even when they’re cheaper. Only a lower {MAIN_LINE_EN} in Your prices can lower it. Words that don’t fit your place? Check <strong>What kind of place</strong>: your card reads its words.</p>',
-    aFr: '<p>Votre fiche garde votre prix principal de <strong>Prix</strong>, dans les mots de votre genre : « {PAGE_SAY} ». {EXTRAS_FR} ne deviennent jamais le prix de votre fiche, même moins chers. Seul un {MAIN_LINE_FR} plus bas dans Vos tarifs peut le baisser. Des mots qui ne conviennent pas? Vérifiez <strong>Quel genre d’endroit</strong> : votre fiche en lit les mots.</p>' },
+    a: '<p>Your card keeps your main price from <strong>Price</strong>, in your kind’s words: “{PAGE_SAY}”. {EXTRAS_EN} never become your card’s price, even when they’re cheaper. Only a lower plain adult {MAIN_LINE_EN} in Your prices can lower it: never a rate for some times or some people, like after 5 PM, twilight, standby, replay, junior or senior.{NINE_EN} Words that don’t fit your place? Check <strong>What kind of place</strong>: your card reads its words.</p>',
+    aFr: '<p>Votre fiche garde votre prix principal de <strong>Prix</strong>, dans les mots de votre genre : « {PAGE_SAY} ». {EXTRAS_FR} ne deviennent jamais le prix de votre fiche, même moins chers. Seul un {MAIN_LINE_FR} adulte ordinaire plus bas dans Vos tarifs peut le baisser : jamais un tarif pour certaines heures ou certaines personnes, comme après 17 h, crépuscule, en attente, deuxième ronde, junior ou aîné.{NINE_FR} Des mots qui ne conviennent pas? Vérifiez <strong>Quel genre d’endroit</strong> : votre fiche en lit les mots.</p>' },
   { id: 'sport-sim-tech', kinds: ['simgolf', 'range'], pages: ['setup', 'edit'], over: ['indoor-good-to-know', 'description', 'features', 'indoor-french', 'sport-kinds-other'],
     q: 'Our simulators, brand and courses: do I say it?', qFr: 'Nos simulateurs, la marque et les parcours : est-ce que je le dis?',
     keys: ['simulator brand', 'which simulator', 'brand', 'trackman', 'uneekor', 'foresight', 'gspro', 'gs pro', 'full swing', 'launch monitor', 'launch monitors', 'courses we have', 'how many courses', 'does anybody care', 'does anyone care', 'our sims', 'our simulators', 'our technology', 'toptracer'],
@@ -64541,10 +64628,10 @@ function sportTest2Tokens(kind, venue) {
   return {
     en: { LAST_UNIT_EN: (w.last || [])[0] || 'entry', LAST_EX: (w.last || [])[2] || 'Last entry 8:30 PM', MAIN_EN: label[0], UNIT_EN: (w.unit || [])[0] || 'group',
       PER_EX: `${typer.first} $${price}`, PAGE_SAY: en.price.page.replace('{x}', `$${price}`).replace(/\.$/, ''), SPLIT_EX: (w.split || [])[0] || 'Groups of 10 or more: ask about group rates',
-      MAIN_LINE_EN: String(typer.first || 'main price').toLowerCase(), TECH_EX: (w.tech || [])[0] || 'What makes your place special', EXTRAS_EN: 'Rentals, lessons, memberships, food and kids’ or senior prices' },
+      MAIN_LINE_EN: String(typer.first || 'main price').toLowerCase(), NINE_EN: kind === 'golf' ? ' On an 18-hole course, a 9-hole rate never lowers it either.' : '', TECH_EX: (w.tech || [])[0] || 'What makes your place special', EXTRAS_EN: 'Rentals, lessons, memberships, food and kids’ or senior prices' },
     fr: { LAST_UNIT_FR: (w.last || [])[1] || 'entrée', LAST_EX: (w.last || [])[3] || 'Dernière entrée à 20 h 30', MAIN_FR: label[1], UNIT_FR: (w.unit || [])[1] || 'groupe',
       PER_EX: `${typerFr.first} ${price} $`, PAGE_SAY: fr.price.page.replace('{x}', `${price} $`).replace(/\.$/, ''), SPLIT_EX: (w.split || [])[1] || 'Groupes de 10 ou plus : demandez les tarifs de groupe',
-      MAIN_LINE_FR: String(typerFr.first || 'prix principal').toLowerCase(), TECH_EX: (w.tech || [])[1] || 'Ce qui rend votre endroit unique', EXTRAS_FR: 'La location, les cours, les abonnements, la nourriture et les prix pour enfants ou aînés' } };
+      MAIN_LINE_FR: String(typerFr.first || 'prix principal').toLowerCase(), NINE_FR: kind === 'golf' ? ' Sur un parcours de 18 trous, un tarif 9 trous ne le baisse pas non plus.' : '', TECH_EX: (w.tech || [])[1] || 'Ce qui rend votre endroit unique', EXTRAS_FR: 'La location, les cours, les abonnements, la nourriture et les prix pour enfants ou aînés' } };
 }
 // The kind's own words for SPORT_TEST1_HELP_TOPICS: { en: {TOKEN: text}, fr: {…} }.
 // Sport test 3 (2026-11-20; Gord, a family driving range and mini golf: Help answered 10 of his 27 questions well): the
@@ -64690,7 +64777,7 @@ const SPORT4_HELP_TOPICS = [
     q: 'We don’t have a senior (or junior) rate', qFr: 'Nous n’avons pas de tarif aîné (ou junior)',
     keys: ['dont have a senior', 'don t have a senior', 'no senior rate', 'no senior rates', 'dont have a junior', 'don t have a junior', 'no junior rate', 'dont have a student', 'no student rate', 'no kids rate', 'think we forgot', 'will people think', 'people think we forgot'],
     keysFr: ['pas de tarif aine', 'pas de tarif junior', 'pas de tarif etudiant', 'on a oublie', 'pense qu on a oublie'],
-    a: '<p>No. Leave out any rate you don’t have: people only see the rates you list, and nobody expects every one. Your card shows your lowest regular adult price.</p>',
+    a: '<p>No. Leave out any rate you don’t have: people only see the rates you list, and nobody expects every one. Your card keeps the usual adult price you typed on Price.</p>',
     aFr: '<p>Non. Laissez de côté les tarifs que vous n’avez pas : les gens voient seulement ceux que vous inscrivez, et personne ne s’attend à tous les avoir. Votre fiche montre votre prix adulte régulier le plus bas.</p>' },
   { id: 'sport-said-twice', pages: ['setup', 'edit'], over: ['sport-rate-lines', 'indoor-price', 'menu-add', 'indoor-good-to-know', 'indoor-gift'],
     q: 'It’s already in my prices: do I say it here too?', qFr: 'C’est déjà dans mes tarifs : le dire ici aussi?',
@@ -64754,8 +64841,10 @@ function sport4KindHelp(t, kind, venue, happy) {
     // Sport test 15 (Kurt): one answer, never "No" and then Good to know: the pro shop's winter hours go on that line too,
     // a line in months stays right every year, and a day only that part closes is not a Special closure.
     const shop = kind === 'golf' ? ['<p>The pro shop open in the off-season, for gift cards? That doesn’t count as open either: your page still says Closed for the season, with the shop’s line beside your hours, like <em>Golf shop: December–February, weekdays 10–2</em>.</p>', '<p>La boutique du pro ouverte hors saison, pour les cartes-cadeaux? Ça ne compte pas comme ouvert non plus : votre page indique toujours Fermé pour la saison, avec la ligne de la boutique à côté de vos heures, comme <em>Boutique : de décembre à février, en semaine de 10 h à 14 h</em>.</p>'] : ['', ''];
-    return { ...t, a: `<p>No: that line never changes your season or hours, which are ${what[0]}. Your own season decides when your page shows open or closed. A part with its own times, like ${parts[0]}? On your hours, under <strong>Part of the place with its own times?</strong>, add one line, like <em>${ex[0]}</em> or <em>Club fitting: all winter by appointment</em>. Your page shows it beside your hours as that part’s times. Write it in months and it stays right every year: no need to come back and change it.</p>${shop[0]}<p>Don’t mark the whole place closed, or open all year, for a part, and don’t add a Special closure for a day only that part closes.</p>`,
-      aFr: `<p>Non : cette ligne ne change jamais votre saison ni vos heures, qui sont ${what[1]}. C’est votre saison qui décide quand votre page indique ouvert ou fermé. Une partie a ses propres heures, comme ${parts[1]}? Dans vos heures, sous <strong>Une partie de l’endroit a ses propres heures?</strong>, ajoutez une ligne, comme <em>${ex[1]}</em> ou <em>Ajustement de bâtons : tout l’hiver sur rendez-vous</em>. Votre page l’affiche à côté de vos heures, comme les heures de cette partie. Écrite en mois, elle reste juste chaque année : inutile de revenir la changer.</p>${shop[1]}<p>Ne marquez pas tout l’endroit fermé, ni ouvert toute l’année, pour une partie, et n’ajoutez pas de fermeture spéciale pour un jour où seule cette partie ferme.</p>` };
+    // Sport test 16 (Nadia: "when the course opens in april will the grill line still say 'in winter'?" got "No:"): the line
+    // shows as typed, all year; it never changes the season. No "No:" opener (it misfired on "which button" and "will it still say").
+    return { ...t, a: `<p>That line never changes your season or hours, which are ${what[0]}: your own season decides when your page shows open or closed. A part with its own times, like ${parts[0]}? On your hours, under <strong>Part of the place with its own times?</strong>, add one line, like <em>${ex[0]}</em> or <em>Club fitting: all winter by appointment</em>. Your page shows it beside your hours as that part’s times, just as you typed it, all year. Write it in months, like <em>November–March</em> rather than “in winter”, and it stays right every year: no need to come back and change it.</p>${shop[0]}<p>Don’t mark the whole place closed, or open all year, for a part, and don’t add a Special closure for a day only that part closes.</p>`,
+      aFr: `<p>Cette ligne ne change jamais votre saison ni vos heures, qui sont ${what[1]} : c’est votre saison qui décide quand votre page indique ouvert ou fermé. Une partie a ses propres heures, comme ${parts[1]}? Dans vos heures, sous <strong>Une partie de l’endroit a ses propres heures?</strong>, ajoutez une ligne, comme <em>${ex[1]}</em> ou <em>Ajustement de bâtons : tout l’hiver sur rendez-vous</em>. Votre page l’affiche à côté de vos heures, comme les heures de cette partie, telle que vous l’avez écrite, toute l’année. Écrite en mois, comme <em>de novembre à mars</em> plutôt que « l’hiver », elle reste juste chaque année : inutile de revenir la changer.</p>${shop[1]}<p>Ne marquez pas tout l’endroit fermé, ni ouvert toute l’année, pour une partie, et n’ajoutez pas de fermeture spéciale pour un jour où seule cette partie ferme.</p>` };
   }
   if (t.id === 'sport-season' && golfish) return both([['like the mini golf?', 'like the patio?'], ['<em>Mini golf April to mid-October</em>', '<em>Patio open May to September</em>']], [['comme le mini-golf?', 'comme la terrasse?'], ['<em>Mini-golf d’avril à la mi-octobre</em>', '<em>Terrasse ouverte de mai à septembre</em>']]);
   if (t.id === 'sport-second-kind' && kind === 'golf') {
@@ -64991,7 +65080,7 @@ function kindSetupHelpBase(venue) {
         a: `<p>Say it in one line in <strong>Good to know</strong>, like <em>${escapeHtml(g)}</em>. Gift cards don’t go in Your prices, and they never change your card’s price.</p>`,
         aFr: `<p>Dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>${escapeHtml(gf)}</em>. Les cartes-cadeaux ne vont pas dans Vos tarifs et ne changent jamais le prix de votre fiche.</p>` }; }
     // Sport test 3: the season answer never closes a whole place whose part is seasonal.
-    if (t.id === 'sport-season' && ['range', 'golf', 'simgolf'].includes(kind)) return { ...t, a: t.a.replace(/<\/p>$/, ' Only part of your place closes, like the mini golf? Keep your hours all year and add one line in <strong>Good to know</strong>, like <em>Mini golf April to mid-October</em>.</p>'), aFr: t.aFr.replace(/<\/p>$/, ' Seule une partie ferme, comme le mini-golf? Gardez vos heures toute l’année et ajoutez une ligne dans <strong>Bon à savoir</strong>, comme <em>Mini-golf d’avril à la mi-octobre</em>.</p>') };
+    if (t.id === 'sport-season' && ['range', 'golf', 'simgolf'].includes(kind)) return { ...t, a: t.a.replace(/<\/p>$/, ' Only part of your place closes, or has its own months, like the mini golf? Don’t change your season for it: add one line under <strong>Part of the place with its own times?</strong> on your hours, like <em>Mini golf April to mid-October</em>.</p>'), aFr: t.aFr.replace(/<\/p>$/, ' Seule une partie ferme, ou a ses propres mois, comme le mini-golf? Ne changez pas votre saison pour elle : ajoutez une ligne sous <strong>Une partie de l’endroit a ses propres heures?</strong> dans vos heures, comme <em>Mini-golf d’avril à la mi-octobre</em>.</p>') };
     // Weekly nights in sport words: men's and ladies' nights, leagues (Known for, then an event that repeats).
     if (t.id === 'indoor-theme-nights') return { ...t, over: (t.over || []).concat(['indoor-summer-daily', 'indoor-summer-late', 'indoor-price', 'sport-golf-details', 'indoor-extras', 'sport-members']),
       allOf: (t.allOf || []).map((g, i) => (i === 0 ? g.filter((w) => w !== 'tournament' && w !== 'tournoi').concat(['men', 'mens', 'ladies', 'couple', 'senior', 'junior', 'league', 'homme', 'hommes', 'ligue']) : g)),
@@ -67821,8 +67910,8 @@ const OWNER_HELP_TOPICS = [
   { id: 'hh-some-months', over: ['hh-times', 'hh-deals', 'seasonal-hours', 'distillery-cocktail-special', 'specials'], q: 'One happy hour runs only some months', qFr: 'Un 5 à 7 n’a lieu que certains mois', pages: ['setup'],
     keys: ['only in winter', 'winter only', 'only in summer', 'summer only', 'some months', 'only some months', 'seasonal happy hour', 'happy hour in winter', 'happy hour in summer', 'apres only in winter', 'apres in winter', 'winter apres', 'apres winter only', 'not all year', 'second happy hour winter'],
     keysFr: ['seulement l hiver', 'en hiver seulement', 'l hiver seulement', 'seulement l ete', 'l ete seulement', 'certains mois', 'seulement certains mois', 'pas toute l annee', '5 a 7 l hiver', '5 a 7 l ete', 'apres ski l hiver', 'apres ski seulement l hiver', 'apres ski en hiver'],
-    a: '<p>Yes. On <strong>Happy hour</strong>, type its days and times, then tap <strong>Only some months</strong> under it and pick its months (or exact dates). Already set up? In <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Happy hour</strong>. With two happy hours or more, each has its own <strong>All year</strong> / <strong>Only some months</strong> under it.</p><p>Your page shows it only in those months, with them beside its time, and Build My Trip plans it only then. No need to write “(winter)” in the deal.</p>',
-    aFr: '<p>Oui. Sur <strong>5 à 7</strong>, écrivez ses jours et ses heures, puis touchez <strong>Seulement certains mois</strong> en dessous et choisissez ses mois (ou des dates exactes). Déjà configuré? Dans <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>5 à 7</strong>. Avec deux 5 à 7 ou plus, chacun a son propre <strong>Toute l’année</strong> / <strong>Seulement certains mois</strong> en dessous.</p><p>Votre page ne l’affiche que pendant ces mois, avec les mois à côté de l’heure, et Planifier mon voyage ne le prévoit qu’à ce moment-là. Inutile d’écrire « (hiver) » dans le spécial.</p>' },
+    a: '<p>Yes. On <strong>Happy hour</strong>, type its days and times, then tap <strong>Only some months</strong> under it and pick its months (or exact dates). Already set up? In <strong>Set up your page</strong>, tap <strong>Change an answer</strong>, then <strong>Happy hour</strong>. With two happy hours or more, each has its own <strong>All year</strong> / <strong>Only some months</strong> under it.</p><p>Your page shows it only in those months, with them beside its time, and Build My Trip plans it only then. No need to write “(winter)” in the deal. It shows only while you’re open, though: never in months your page says <strong>Closed for the season</strong>.</p>',
+    aFr: '<p>Oui. Sur <strong>5 à 7</strong>, écrivez ses jours et ses heures, puis touchez <strong>Seulement certains mois</strong> en dessous et choisissez ses mois (ou des dates exactes). Déjà configuré? Dans <strong>Configurez votre page</strong>, touchez <strong>Modifier une réponse</strong>, puis <strong>5 à 7</strong>. Avec deux 5 à 7 ou plus, chacun a son propre <strong>Toute l’année</strong> / <strong>Seulement certains mois</strong> en dessous.</p><p>Votre page ne l’affiche que pendant ces mois, avec les mois à côté de l’heure, et Planifier mon voyage ne le prévoit qu’à ce moment-là. Inutile d’écrire « (hiver) » dans le spécial. Il paraît seulement quand vous êtes ouvert, par contre : jamais pendant les mois où votre page indique <strong>Fermé pour la saison</strong>.</p>' },
   { id: 'hh-deals', over: ['features', 'menu-add', 'hh-times'], q: 'How do I add my happy hour deals?', qFr: 'Comment ajouter les spéciaux de mon 5 à 7?', pages: ['edit'],
     keys: ['happy hour deals', 'happy hour deal', 'happy hour specials', 'happy hour special', 'happy hour prices', 'happy hour menu', 'drink specials', 'drink deals', 'specials', 'deals', 'add deals', 'add my deals', 'pint prices', 'cheap pints', 'half price', 'apps specials', 'what is on special'],
     keysFr: ['speciaux du happy hour', 'specials du happy hour', 'speciaux', 'special', 'aubaines', 'aubaine', 'prix du happy hour', 'menu du happy hour', 'speciaux du 5 a 7', 'speciaux de mon 5 a 7', 'speciaux de notre 5 a 7', 'speciaux du cinq a sept', 'rabais', 'moitie prix'],
@@ -68785,7 +68874,7 @@ function ownerHelpWidgetHtml(page, opts = {}) {
   // Tours (2026-11-16): no happy hour at all, so its topics aren't there to be found either.
   if (opts.dropHappyHour) cfg.topics = cfg.topics.filter((t) => !HELP_HAPPY_RE.test(`${t.q} ${t.qFr}`));
   // Sport test 7: a sport or golf place's topics carry their concept groups (sport-help.js CONCEPTS; the matcher's allOfAny).
-  try { const pv0 = opts.venueId ? getVenue(opts.venueId) : null; if (pv0 && sportSetupType(pv0.type)) { const C0 = sport5HelpModule.CONCEPTS || {}; cfg.cover = true; cfg.coverAdd = 0.5; cfg.sure = true; cfg.danger = sport5HelpModule.DANGER || []; cfg.screens = sport5HelpModule.SCREENS || {}; const golfCourse0 = (venueIndoorInfo(pv0.id).kinds || [])[0] === 'golf' || (pv0.type === 'golf' && !(venueIndoorInfo(pv0.id).kinds || []).length); cfg.fit = (sport5HelpModule.FIT || []).filter((r) => !r.golfCourse || golfCourse0).map(({ golfCourse, ...r }) => r);
+  try { const pv0 = opts.venueId ? getVenue(opts.venueId) : null; if (pv0 && sportSetupType(pv0.type)) { const C0 = sport5HelpModule.CONCEPTS || {}; cfg.cover = true; cfg.coverAdd = 0.5; cfg.sure = true; cfg.danger = sport5HelpModule.DANGER || []; cfg.screens = sport5HelpModule.SCREENS || {}; { /* Sport test 16 (2026-11-21): on a sport or golf place the summer/winter buttons sit under "Different hours for part of your season, like spring and fall?": Help names that link, never the indoor one. */ const se = OWNER_SETUP_STRINGS.en.seaMoreSport, sf = OWNER_SETUP_STRINGS.fr.seaMoreSport, oe = OWNER_SETUP_STRINGS.en.indoor.seaMore, of = OWNER_SETUP_STRINGS.fr.indoor.seaMore; const rx = (x) => new RegExp(String(x).replace(/[\s\u202f\u00a0]*\?$/, '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/’/g, '(?:’|\'|&#39;|&rsquo;)') + '[\\s\\u202f\\u00a0]*\\?', 'g'); if (se && sf && oe && of) { const re = rx(oe), rf = rx(of); cfg.topics = cfg.topics.map((t) => ({ ...t, a: typeof t.a === 'string' ? t.a.replace(re, se) : t.a, aFr: typeof t.aFr === 'string' ? t.aFr.replace(rf, sf) : t.aFr })); } } const golfCourse0 = (venueIndoorInfo(pv0.id).kinds || [])[0] === 'golf' || (pv0.type === 'golf' && !(venueIndoorInfo(pv0.id).kinds || []).length); try { /* Sport test 16 (2026-11-21; Nadia, the Canyon Course: "canyon 18 is $200 … pinnacle 9 holes is $55. which one goes here?"): on the price screens, a question that names the other listing (its own word, like Pinnacle) gets "this page is this course; the other one's price goes on its own page". */ const sib0 = (sport5HelpCtx(pv0, (venueIndoorInfo(pv0.id).kinds || [])[0] || 'golf') || {}).sister; const nw = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().split(' '); const own0 = new Set(nw(pv0.name)); const sw = sib0 ? nw(sib0.name).filter((w) => w.length > 3 && !own0.has(w) && !/^(course|courses|golf|club|country|the|and|centre|center|range|driving|simulators?|indoor|lounge|academy|park|terrain|parcours)$/.test(w)) : []; if (sw.length && golfCourse0) { const pk = { all: [`\\b(${sw.join('|')})\\b`], id: 'sport-two-courses' }; cfg.screens = { ...cfg.screens }; for (const k of ['price', 'menu', 'type']) if (cfg.screens[k]) cfg.screens[k] = { ...cfg.screens[k], pick: [pk].concat(cfg.screens[k].pick || []) }; } } catch (e) { /* no other listing */ } cfg.fit = (sport5HelpModule.FIT || []).filter((r) => !r.golfCourse || golfCourse0).map(({ golfCourse, ...r }) => r);
     // Sport test 10 (2026-11-21; Lorraine: "a toll free line… Can I list both numbers?"): one phone number fits the box;
     // the second goes in Good to know (no second phone field).
     // Sport test 11 (2026-11-21; Geneviève's second number for the simulator read the line 6th): it comes first.
@@ -80674,7 +80763,7 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
-  clearVenueOwnerFeaturesCache, sportPriceLineCounts, indoorLowestTyped, sportPracticeKept, golfOnSiteFood, tripOwnerClosureNotes,
+  clearVenueOwnerFeaturesCache, sportPriceLineCounts, happyHourHiddenNow, indoorLowestTyped, sportPracticeKept, golfOnSiteFood, tripOwnerClosureNotes,
   // Places to stay (2026-11-19), for tests/stays.test.js.
   getStaysByRegion, findStayBySlug, handleStaysRoute, getStayCloseBy, withStaysNavLink, getStayInfo, guardedStayInfoUpsert, venueActivityCounter,
   // Tour test 12 (Whistler, 2026-11-18).

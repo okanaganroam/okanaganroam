@@ -240,7 +240,9 @@ test('5. chips then typing: a comma carries the chip on, words that arrive in on
   assert.match(page(v), /Dress code: collared shirts, no denim, soft spikes only/);
 });
 
-test('6. happy hour "Only some months" starts with his own season\'s months (March to November); a place with no season starts empty', async () => {
+// Sport test 16 (2026-11-21; Nadia's winter grill deal cost 12 taps to move the lit Apr–Oct to Nov–Mar): the chips start
+// empty, with a season or without (they started as the season's months here before).
+test('6. happy hour "Only some months" starts with no months picked, with a season (March to November) or without', async () => {
   const { openSetup } = require('./setup-sim.js');
   const { v, t } = await ryan({ region: 'peachland', latitude: 49.77, longitude: -119.73 }, { prices: false });
   db.prepare('UPDATE venues SET happy_hour_times = ? WHERE id = ?').run(JSON.stringify(WK('15:00', '18:00')), v.id);
@@ -250,7 +252,7 @@ test('6. happy hour "Only some months" starts with his own season\'s months (Mar
     await sim.click('[data-sea="happy:some"]');
     return sim.doc.querySelectorAll('[data-smon]').filter((x) => x.getAttribute('aria-pressed') === 'true').map((x) => +x.getAttribute('data-smon').split(':')[1]);
   };
-  assert.deepEqual(await on(t), [3, 4, 5, 6, 7, 8, 9, 10, 11]);
+  assert.deepEqual(await on(t), []);
   // All year: nothing to start from.
   const w = mk('golf', { name: 'Peachland All Year Fixture', region: 'peachland', latitude: 49.771, longitude: -119.73, happy_hour: 1, happy_hour_times: JSON.stringify(WK('15:00', '18:00')) });
   const tw = tokenFor(w.id);

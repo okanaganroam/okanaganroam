@@ -92,7 +92,8 @@ test('1. Help: his 29 questions on the screens he asked them land well (or on ch
   assert.notEqual(S.best(hh, 'closures').id, 'sport-part-season');
   // The part answer: one answer (the shop's winter hours on that line too), never "No" and then Good to know.
   const part = S.answer('sport-part-season');
-  assert.match(part, /^<p>No: that line never changes your season or hours/);
+  // Sport test 16: no "No:" opener (it misfired on "which button" and "will it still say" questions).
+  assert.match(part, /^<p>That line never changes your season or hours/);
   assert.match(part, /stays right every year/);
   assert.match(part, /Golf shop: December–February/);
   assert.doesNotMatch(part, /Good to know/);

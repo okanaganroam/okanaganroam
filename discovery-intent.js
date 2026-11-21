@@ -684,7 +684,7 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'i im me my we us our you your it its is are be was were been being am do does did done doing can could should would will shall may might must '
   + 'want wants wanted like love need needs looking look find finding show give get getting go going going visit visiting see some any somewhere something '
   + 'please thanks thank plan planning where what which who whom how when why there here this that these those just really very so too also '
-  + 'good nice fun place places spot spots area areas town city day days night nights time trip trips weekend lets let us okay ok hi hey '
+  + 'good nice fun place places spot spots venue venues area areas town city day days night nights time trip trips weekend lets let us okay ok hi hey '
   + 'if then than else only one ones all more most much many few little lot lots kind sort type types option options idea ideas '
   + 'around tonight today tomorrow while during after before next last then take takes taking bring bringing stay staying '
   + 'whats wanna gonna ive id nearby close near '

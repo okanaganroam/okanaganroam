@@ -30,7 +30,9 @@ const S13 = require('./help-sport13-questions.js');
 const S14 = require('./help-sport14-questions.js');
 // Sport test 15 (2026-11-21): Kurt's 29.
 const S15 = require('./help-sport15-questions.js');
-const SRC = { ...H0.SRC, ...S89.SRC, ...S10.SRC, ...S11.SRC, ...S12.SRC, ...S13.SRC, ...S14.SRC, ...S15.SRC }, Q = [...H0.Q, ...S89.Q, ...S10.Q, ...S11.Q, ...S12.Q, ...S13.Q, ...S14.Q, ...S15.Q], KNOWN_MISS = H0.KNOWN_MISS;
+// Sport test 16 (2026-11-21): Nadia's 30 (her club's other course has its own listing: SRC.sport16.sister).
+const S16 = require('./help-sport16-questions.js');
+const SRC = { ...H0.SRC, ...S89.SRC, ...S10.SRC, ...S11.SRC, ...S12.SRC, ...S13.SRC, ...S14.SRC, ...S15.SRC, ...S16.SRC }, Q = [...H0.Q, ...S89.Q, ...S10.Q, ...S11.Q, ...S12.Q, ...S13.Q, ...S14.Q, ...S15.Q, ...S16.Q], KNOWN_MISS = H0.KNOWN_MISS;
 app.setVenueSubmissionTransport(async () => {});
 
 let srv, base;
@@ -51,6 +53,7 @@ const SEA = { winter: '11-26:04-06', summer: '04-01:10-31' };
 async function botsFor(src, n) {
   const c = SRC[src];
   const v = app.createVenue({ name: `Heldout ${src}`, slug: `heldout-${src}`, region: 'kelowna', type: c.type, latitude: 49.88 + n / 1000, longitude: -119.49, address: `${n} Water St, Kelowna`, website: `https://example-${n}.com`, hours: JSON.stringify(WK), description: 'A fixture.' });
+  if (c.sister) app.createVenue({ name: `${c.sister} ${src}`, slug: `heldout-${src}-sister`, region: 'kelowna', type: c.type, latitude: 49.88 + n / 1000, longitude: -119.48, address: `${n} Water St, Kelowna`, hours: JSON.stringify(WK), description: 'Its sister listing.' });
   const t = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
   const post = (changes) => fetch(`${base}/owner/${t}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.66.${n}.1` }, body: JSON.stringify({ changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) });
   if (c.season) assert.ok([200, 201].includes((await post({ hours: WK, open_months: SEA[c.season] || c.season })).status), `${src} season`);

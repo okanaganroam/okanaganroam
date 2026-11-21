@@ -163,6 +163,8 @@
     if (a === b) return fill(T.seaSpanMonth, { a: ma });
     return fill(T.seaSpanMonths, { a: ma, b: mb, de: /^[aeiouyéèêh]/i.test(ma) ? 'd’' : 'de ' });
   }
+  // Sport test 16: a saved open season (dates) and no other hours stored, on the year question (not by-booking places).
+  function seaKeepOn(){ return !!(T.yearKeepSea && S.openSea && S.openSea.from && S.openSea.to && !storedSeas().length && !noSetYear()); }
   function seaSpan(o){ var r = o && o.on ? seaOut(o) : null; return r && r.ok && r.from ? spanOf(r.from, r.to) : ''; }
   function seaLabelKind(lab){ lab = String(lab || '').toLowerCase(); return /summer|été|ete\b/.test(lab) ? 'summer' : /winter|hiver/.test(lab) ? 'winter' : ''; }
   // Brewery test 1 (Whistler, 2026-11-15): up to two "other hours" periods (a spring and a fall shoulder season). S.seaList
@@ -251,8 +253,10 @@
   // day ("Set lunch 12–3" on a Monday that opens at 5) gets the same gentle heads-up as a happy hour (specialHoursWarn).
   function warnOf(key, e){
     // Distillery test 2 (Whistler, 2026-11-16): with two happy hours or more, each one's own months.
-    if (key === 'happy' && S.happy && S.happy.length > 1 && e.sea) { var hw2 = hoursWarn(e); return [closedWarnAny(e.days, e.sea), hw2, hw2 && happySplitGap(e) ? T.happySplit : ''].filter(Boolean).join(' '); }
-    if (key === 'happy') { var hw = hoursWarn(e); return [closedWarnAny(e.days, S.happySea), hw, hw && happySplitGap(e) ? T.happySplit : ''].filter(Boolean).join(' '); }
+    // Sport test 16 (2026-11-21; Nadia's grill deal, Nov–Mar, at a course closed Nov–Mar, never showed): a happy hour whose
+    // months fall wholly in the closed season says so first, in plain words.
+    if (key === 'happy' && S.happy && S.happy.length > 1 && e.sea) { var hc2 = happyClosedWarn(e.sea); if (hc2) return hc2; var hw2 = hoursWarn(e); return [closedWarnAny(e.days, e.sea), hw2, hw2 && happySplitGap(e) ? T.happySplit : ''].filter(Boolean).join(' '); }
+    if (key === 'happy') { var hc = happyClosedWarn(S.happySea); if (hc) return hc; var hw = hoursWarn(e); return [closedWarnAny(e.days, S.happySea), hw, hw && happySplitGap(e) ? T.happySplit : ''].filter(Boolean).join(' '); }
     if (key === 'specials') return [closedWarn(e.days, e.sea), specialHoursWarn(e)].filter(Boolean).join(' ');
     // Brewery test 2 (Whistler, 2026-11-16): an event on a day closed in the usual week or in a stretch of other hours gets
     // the happy hour screen's heads-up (it names the stretch); the page marks the event "(not Oct 13 – Nov 26)" meanwhile.
@@ -310,6 +314,13 @@
   // Cocktail test 2 (2026-11-13): checked against the hours that apply in the months it runs: a summer-only happy hour
   // against the summer hours only, an all-year one against both weeks (outside either is a heads-up). A day closed in
   // those months is the closed-day heads-up's (closedWarnAny), not this one's.
+  // -> the closed-season heads-up when every month of this happy hour is outside the place's open season, else ''.
+  function happyClosedWarn(sea){
+    var os = S.openSea; if (!T.happyClosedSea || !os || !os.from || !os.to || !sea || !sea.on) return '';
+    var H = seaMonths(sea), O = seaMonths(seaFrom(os.from, os.to));
+    for (var i = 1; i <= 12; i++) if (H[i] && O[i]) return '';
+    return fill(T.happyClosedSea, { a: mdLabel(os.from), b: mdLabel(os.to) }) + (partTimesOn() && T.happyClosedSeaPart ? ' ' + T.happyClosedSeaPart : '');
+  }
   function hoursWarn(e){ return timesWarn(e.from, e.close ? null : e.to, e.days, happySeaOf(e)); }
   // Distillery test 2 (Whistler, 2026-11-16): with two happy hours or more each has its own months (e.sea); one alone
   // keeps the screen's one box (S.happySea), as before.
@@ -1396,6 +1407,9 @@
   function capFirst(t){ t = String(t || ''); return t.charAt(0).toUpperCase() + t.slice(1); }
   function musicOftenWaiting(){ return !!CUR.weekly_nights_waiting && (C.nightsOften || []).some(Boolean) && (!C.waiting || C.waiting.indexOf('*') >= 0 || C.waiting.indexOf('music') >= 0); }
   function stText(step, d){
+    // Sport test 16 (2026-11-21; Nadia's half-typed Good to know came back whole in a new tab, but her list said "not done
+    // yet"): a step with unsaved answers kept on this phone says so, after the essentials too.
+    if ((!d || d === 'none' || d === 'half') && T.stDraft && drHas(step)) return T.stDraft;
     // Sport test 15: a price list started in the editor and not sent yet says so ("4 rates saved, not sent yet").
     if (step === 'menu' && (d === 'none' || d === 'half') && C.menuDraftLines > 0 && T.stMenuDraft) return fill(C.menuDraftLines === 1 && T.stMenuDraft1 ? T.stMenuDraft1 : T.stMenuDraft, { n: C.menuDraftLines });
     // Winery test 1 (2026-11-12): a winery's story screen sends the story for a check but puts Known for on the page at
@@ -2361,6 +2375,7 @@
   function drPut(b, d){ d.exp = Date.now() + DR_TTL; var j = JSON.stringify(d); try { window.localStorage.setItem(drKey(b), j); } catch (e) {} try { window.sessionStorage.setItem(drKey(b), j); } catch (e2) {} }
   function drDrop(b){ try { window.localStorage.removeItem(drKey(b)); } catch (e) {} try { window.sessionStorage.removeItem(drKey(b)); } catch (e) {} }
   // The first step with answers kept on this device and not saved yet ('' when none).
+  function drHas(b){ var d = drGet(b); return !!(d && ((d.s && Object.keys(d.s).length) || (d.boxes && Object.keys(d.boxes).length))); }
   function drWaiting(){ for (var i = 0; i < STEPS.length; i++) { var d = drGet(STEPS[i]); if (d && ((d.s && Object.keys(d.s).length) || (d.boxes && Object.keys(d.boxes).length))) return STEPS[i]; } return ''; }
   function js(v){ return v === undefined ? '~' : JSON.stringify(v); }
   function isObj(v){ return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -2471,7 +2486,7 @@
       var nxt = firstOpen();
       // Welcome back: the button first, then what's done.
       x = any ? q(T.soFarQ, nxt === 'finish' ? T.changeLead : T.welcomeLead) + msgs() + '<div class="su-stack" style="margin-bottom:22px">'
-          + (nxt === 'finish' ? big('➜', T.seeFinish, '', false, 'go:finish') : nxt === 'more' ? big('➜', T.moreOpt, T.optional, false, 'go:more') + big('👀', T.seeFinish, '', true, 'go:ess') : big('➜', T.carryOn, (drWaiting() || C.menuDraftLines > 0) && T.draftWaiting ? T.draftWaiting : fill(T.nextIs, { step: T.labels[nxt] }), false, 'resume')) + '</div>'
+          + (nxt === 'finish' ? big('➜', T.seeFinish, '', false, 'go:finish') : nxt === 'more' ? (drWaiting() && T.draftWaiting ? big('➜', T.moreOpt, T.draftWaiting, false, 'resume') : big('➜', T.moreOpt, T.optional, false, 'go:more')) + big('👀', T.seeFinish, '', true, 'go:ess') : big('➜', T.carryOn, (drWaiting() || C.menuDraftLines > 0) && T.draftWaiting ? T.draftWaiting : fill(T.nextIs, { step: T.labels[nxt] }), false, 'resume')) + '</div>'
           + statusRows(P1) + (p1Done() || p2Count() ? '<h2 class="su-h2">' + h(T.moreQ) + '</h2>' + statusRows(P2) : '')
         // Pub test 8 (2026-11-10): nothing said it was free, and an owner wary of money read the badge and prices as an upsell.
         // Café test 4 (2026-11-11): no staff-access note here before anything is done; the edit page, where "People with
@@ -2557,7 +2572,9 @@
         // Sport and golf (2026-11-20): a kind with a usual season (golf and pools in summer, rinks and ski lessons in
         // winter) says so once, while no season is stored. A hint only: nothing is picked for her.
         + (sportSeasonHint() && !stS.length && !S.openSea ? '<p class="su-hint" id="suSportSeason">' + h(sportSeasonHint()) + '</p>' : '')
-        + '<div class="su-stack">' + (stS.length && T.yearKeep ? big('✓', T.yearKeep, '', false, 'yearKeep') : '') + big(stS.length && T.yearKeep ? '✕' : '✓', stS.length && T.yearKeep && T.allYearSame ? T.allYearSame : T.allYearYes, '', !!(stS.length && T.yearKeep), 'yearAll') + (TL && !stS.length ? big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed') : '') + (stS.length ? stS.map(function(st){ return big('✎', fill(T.seaChange, st), T.seaChangeSub, true, 'yearSeasonEdit:' + st.i); }).join('')
+        // Sport test 16 (2026-11-21): a season and no other hours stored: "No change, keep Apr 1 – Oct 31" first, "Yes, all
+        // year" light (it asks before removing the season).
+        + '<div class="su-stack">' + (stS.length && T.yearKeep ? big('✓', T.yearKeep, '', false, 'yearKeep') : seaKeepOn() ? big('✓', fill(T.yearKeepSea, { a: mdLabel(S.openSea.from), b: mdLabel(S.openSea.to) }), '', false, 'yearKeepSea') : '') + big((stS.length && T.yearKeep) || seaKeepOn() ? '✕' : '✓', stS.length && T.yearKeep && T.allYearSame ? T.allYearSame : T.allYearYes, '', !!(stS.length && T.yearKeep) || seaKeepOn(), 'yearAll') + (TL && !stS.length ? big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed') : '') + (stS.length ? stS.map(function(st){ return big('✎', fill(T.seaChange, st), T.seaChangeSub, true, 'yearSeasonEdit:' + st.i); }).join('')
           // Brewery test 1 (Whistler, 2026-11-15): a second stretch (a spring and a fall shoulder season), then a third.
           + seaMoreWrap(stS.length > 1, (stS.length < SEA_MAX && S.seaList.length < SEA_MAX && T.seaAdd ? big('🍂', stS.length > 1 ? T.seaAdd3 : T.seaAdd, stS.length > 1 ? T.seaAdd3Sub : T.seaAddSub, true, 'yearSeasonAdd') : '')) : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
           // Restaurant test 3 (Whistler, 2026-11-15): a shoulder season is neither summer nor winter: the season screen with no
@@ -2581,6 +2598,10 @@
         if (C.sport) seaBtns.sort(function(a, b){ return (/yearSeason:part/.test(b) ? 1 : 0) - (/yearSeason:part/.test(a) ? 1 : 0); });
         if (seaBtns.length) { var seaAt = x.indexOf(x.match(seaRe)[0]); x = x.replace(seaRe, ''); x = x.slice(0, seaAt) + seaMoreHtml(seaBtns.join('')) + x.slice(seaAt); }
       }
+    } else if (s === 'hours:yeardrop' && S.seaDropAsk && S.openSea) {
+      // Sport test 16: "Yes, all year" with a season stored: say what goes, and keep it unless she says so.
+      var sdA = { a: mdLabel(S.openSea.from), b: mdLabel(S.openSea.to) };
+      x = q(T.yearSeaDropQ, fill(T.yearSeaDropLead, sdA)) + msgs() + '<div class="su-stack" id="suSeaDrop">' + big('✓', fill(T.yearSeaDropKeep, sdA), '', false, 'yearDropKeep') + big('✕', T.yearSeaDropYes, T.yearSeaDropYesSub, true, 'yearSeaDropYes') + '</div>';
     } else if (s === 'hours:yeardrop') {
       // Pub test 2: "Yes, all year" with other hours stored: the dates that would be removed, and a choice.
       // Brewery test 1 (Whistler, 2026-11-15): with two periods it names both; "Remove these hours" on a period's own
@@ -4352,7 +4373,12 @@
     // Café test 4: a café's "Yes, all year" is its season answer on the checklist too (closures no longer asks it).
     // Pub test 2 (Whistler, 2026-11-14): with other hours stored, "Yes, all year" first says which dates would go and asks
     // (one tap removed Marc's Oct 15 – Nov 25 hours without a word). "No, keep them" saves the usual hours and keeps them.
-    if (k === 'yearAll' && storedSeas().length) { S.dropI = null; return go('hours:yeardrop'); }
+    if (k === 'yearAll' && storedSeas().length) { S.dropI = null; S.seaDropAsk = false; return go('hours:yeardrop'); }
+    // Sport test 16 (2026-11-21): a stored season is never cleared by one tap: asked first; "No change" keeps it.
+    if (k === 'yearAll' && seaKeepOn()) { S.dropI = null; S.seaDropAsk = true; return go('hours:yeardrop'); }
+    if (k === 'yearSeaDropYes') { S.seaDropAsk = false; k = 'yearAll'; }
+    if (k === 'yearKeepSea') k = 'yearKeep';
+    if (k === 'yearDropKeep') S.seaDropAsk = false;
     if (k === 'yearKeep' || k === 'yearDropKeep') { S.seaList.forEach(function(o){ var sk = o.src, sf0 = sk ? seaFrom(sk.from, sk.to) : null; if (sf0) { o.on = true; o.months = sf0.months; o.exact = sf0.exact; o.week = parseWeek(sk.hours); o.kind = o.storedKind; o.monthsWas = JSON.stringify(o.months); o.dirty = false; } }); S.seaTouched = false; return hoursSave(); }
     if (k === 'yearDropYes') k = 'yearAll';
     // Brewery test 1 (Whistler, 2026-11-15): a second period; "Copy the hours from …"; removing one of two (asked first).
@@ -4369,7 +4395,7 @@
     if (k === 'seaWeather') { readTimes(); S.sea.weather = !S.sea.weather; S.sea.dirty = true; S.seaTouched = true; S.dirty = 'hours'; mark(); var wy = window.scrollY; render(); window.scrollTo(0, wy); var wb = el('suSeaWeather'); if (wb) wb.focus(); return; }
     if (k === 'hoursSaveAdd') { S.seaAddNext = true; hoursSave(); S.seaAddNext = false; return; }
     if (k === 'seaCopy') { readTimes(); var co = seaOtherOf(S.seaI); if (co && co.week) { S.sea.week = clone(co.week); S.sea.open = {}; S.seaTouched = true; S.nudge = ''; mark(); var cy = window.scrollY; render(); window.scrollTo(0, cy); } return; }
-    if (k === 'seaRemove') { readTimes(); S.dropI = S.seaI; return go('hours:yeardrop'); }
+    if (k === 'seaRemove') { readTimes(); S.dropI = S.seaI; S.seaDropAsk = false; return go('hours:yeardrop'); }
     // Distillery test 1 (Whistler, 2026-11-16): "Skip these dates and keep going" under the all-closed message. A new
     // stretch is dropped; one already saved goes back to what is stored. Then the hours save as usual and the setup moves on.
     // Tour test 5: "Put $650 in Private tours" under the per-boat nudge moves the number to the private box and empties the
@@ -5224,12 +5250,9 @@
       if (q2[1] === 'all') o.on = false;
       else if (q2[1] === 'some') {
         o.on = true;
-        // Sport test 4 (2026-11-20; Ryan tapped April to October by hand for a course open March 6 to November 1): a happy
-        // hour's months start as the place's own open months, to untick what doesn't apply.
-        if (q2[0].indexOf('happy') === 0 && !o.exact && !Object.keys(o.months).some(function(k){ return o.months[k]; })) {
-          var os0 = (S.openSea && S.openSea.from ? S.openSea : null) || openSeaOf(CUR.open_months);
-          if (os0 && os0.from && os0.to) { var mb0 = +os0.to.slice(0, 2); o.months = seaFrom(os0.from.slice(0, 2) + '-01', pad2(mb0) + '-' + MLAST[mb0 - 1]).months; }
-        }
+        // Sport test 4 (2026-11-20) had a happy hour's months start as the place's own open months.
+        // Sport test 16 (2026-11-21; Nadia's winter deal cost 12 taps to move the lit Apr–Oct to Nov–Mar): they start empty.
+
       }
       else if (q2[1] === 'exact') { var r0 = monthRun(o.months); o.exact = r0.a ? { from: pad2(r0.a) + '-01', to: pad2(r0.b) + '-' + MLAST[r0.b - 1] } : { from: '', to: '' }; }
       // Sport test 15 (2026-11-21; Sunset Ranch: "Use whole months instead" with no dates picked yet opened with all 12

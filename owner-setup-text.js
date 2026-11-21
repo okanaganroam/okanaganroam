@@ -6,7 +6,7 @@
 const en = {
   title: 'Set up your page', exit: 'Exit setup', back: '← Back', skip: 'Skip this for now', step: 'Step {n} of {total}', allDone: 'All done',
   hi: 'Hi {name} 👋', hiLead: 'Let’s get your page ready, one question at a time. About 15 to 30 minutes. You can stop any time and carry on later.', start: 'Start',
-  welcome: 'Welcome back 👋', welcomeLead: 'Here’s what you’ve done so far.', carryOn: 'Carry on', draftWaiting: 'You have unsaved changes from earlier', stMenuDraft: '{n} prices saved, not sent yet', stMenuDraft1: '1 price saved, not sent yet', nextIs: 'Next: {step}', seeFinish: 'See how your page looks',
+  welcome: 'Welcome back 👋', welcomeLead: 'Here’s what you’ve done so far.', carryOn: 'Carry on', draftWaiting: 'You have unsaved changes from earlier', stDraft: 'unsaved changes from earlier', stMenuDraft: '{n} prices saved, not sent yet', stMenuDraft1: '1 price saved, not sent yet', nextIs: 'Next: {step}', seeFinish: 'See how your page looks',
   st: { live: 'on your page', day: 'on your page within a day', email: 'waiting for your email', skip: 'skipped', later: 'next time you’re at your place', none: 'not done yet', half: 'hours saved, holidays and closures still to do' },
   labels: {
     basics: 'Address, phone and website', hours: 'Hours', season: 'Seasons', closures: 'Holidays and closures', spend: 'Price per person', cuisine: 'What you serve',
@@ -94,7 +94,7 @@ const en = {
 const fr = {
   title: 'Configurez votre page', exit: 'Quitter', back: '← Retour', skip: 'Passer pour l’instant', step: 'Étape {n} sur {total}', allDone: 'Terminé',
   hi: 'Bonjour {name} 👋', hiLead: 'Préparons votre page, une question à la fois. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.', start: 'Commencer',
-  welcome: 'Bon retour 👋', welcomeLead: 'Voici ce que vous avez déjà fait.', carryOn: 'Continuer', draftWaiting: 'Vous avez des changements non enregistrés', stMenuDraft: '{n} prix enregistrés, pas encore envoyés', stMenuDraft1: '1 prix enregistré, pas encore envoyé', nextIs: 'Suivant : {step}', seeFinish: 'Voir à quoi ressemble votre page',
+  welcome: 'Bon retour 👋', welcomeLead: 'Voici ce que vous avez déjà fait.', carryOn: 'Continuer', draftWaiting: 'Vous avez des changements non enregistrés', stDraft: 'changements non enregistrés', stMenuDraft: '{n} prix enregistrés, pas encore envoyés', stMenuDraft1: '1 prix enregistré, pas encore envoyé', nextIs: 'Suivant : {step}', seeFinish: 'Voir à quoi ressemble votre page',
   st: { live: 'sur votre page', day: 'sur votre page d’ici un jour', email: 'en attente de votre courriel', skip: 'passé', later: 'la prochaine fois que vous serez sur place', none: 'pas encore fait', half: 'heures enregistrées, jours fériés et fermetures à faire' },
   labels: {
     basics: 'Adresse, téléphone et site Web', hours: 'Heures', season: 'Saisons', closures: 'Jours fériés et fermetures', spend: 'Prix par personne', cuisine: 'Ce que vous servez',
@@ -2933,6 +2933,29 @@ Object.assign(fr, {
   seaMoreSport: 'D’autres heures pour une partie de votre saison, comme le printemps et l’automne?',
   seaMoreClosedFirst: 'Fermé aussi une partie de l’année? Touchez d’abord « Nous fermons une partie de l’année » : vous ajoutez ces heures juste après.',
   monthsInRowSea: 'Choisissez des mois qui se suivent, comme de mars à avril. D’autres heures pour une autre partie de la saison, comme octobre? Enregistrez celles-ci, puis touchez « Une deuxième période aux heures différentes aussi? ».',
+});
+
+// Sport test 16 (2026-11-21; one tap on the dark "Yes, all year" wiped the Pinnacle's Apr–Oct season on a revisit): with a
+// season and no other hours stored, "No change, keep …" comes first, and "Yes, all year" asks before it removes the season.
+Object.assign(en, {
+  yearKeepSea: 'No change, keep {a} – {b}',
+  yearSeaDropQ: 'Open all year?', yearSeaDropLead: 'Your page now says open {a} to {b} and closed the rest of the year. “Yes, open all year” removes that season: your page will say open in every month.',
+  yearSeaDropKeep: 'No, keep {a} – {b}', yearSeaDropYes: 'Yes, open all year', yearSeaDropYesSub: 'Your page shows open every month',
+});
+Object.assign(fr, {
+  yearKeepSea: 'Aucun changement, garder du {a} au {b}',
+  yearSeaDropQ: 'Ouvert toute l’année?', yearSeaDropLead: 'Votre page dit maintenant ouvert du {a} au {b} et fermé le reste de l’année. Avec « Oui, ouvert toute l’année », cette saison est retirée : votre page dira ouvert tous les mois.',
+  yearSeaDropKeep: 'Non, garder du {a} au {b}', yearSeaDropYes: 'Oui, ouvert toute l’année', yearSeaDropYesSub: 'Votre page dit ouvert tous les mois',
+});
+
+// Sport test 16 (2026-11-21): a happy hour set only for the months the place is closed for the season never shows.
+Object.assign(en, {
+  happyClosedSea: 'Heads up: your page says closed for the season outside {a} to {b}, and a happy hour never shows while you’re closed. This one runs only in those closed months, so visitors won’t see it.',
+  happyClosedSeaPart: 'A part that stays open, like your grill? Put its times and deal in the “Part of the place with its own times?” line on your hours instead, like “Grill: Wed–Fri 5–8 PM, November–March; half-price apps Wed 5–6”.',
+});
+Object.assign(fr, {
+  happyClosedSea: 'Attention : votre page dit fermé pour la saison en dehors du {a} au {b}, et un 5 à 7 ne paraît jamais pendant que vous êtes fermé. Celui-ci a lieu seulement pendant ces mois fermés : les visiteurs ne le verront pas.',
+  happyClosedSeaPart: 'Une partie reste ouverte, comme votre grill? Mettez plutôt ses heures et son offre dans la ligne « Une partie de l’endroit a ses propres heures? » de vos heures, comme « Grill : mer.–ven. 17 h–20 h, de novembre à mars; entrées à moitié prix le mer. 17 h–18 h ».',
 });
 
 (function frSpaces(o) {

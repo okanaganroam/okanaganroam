@@ -169,6 +169,9 @@ const FR_TEXT = {
   'A winery suits a romantic outing': 'Un vignoble convient à une sortie romantique',
   'Opens early': 'Ouvre tôt',
   'Mentions breakfast or brunch': 'Mentionne le déjeuner ou le brunch',
+  // Sport test 16 (2026-11-21): a holiday or office party, a named bar or grill inside a place.
+  'Hosts holiday or office parties (its own words)': 'Accueille des fêtes de Noël ou de bureau (ses propres mots)',
+  'Names it in its own words': 'Le nomme dans ses propres mots',
   'Also listed as a restaurant': 'Aussi répertorié comme restaurant',
   'Mentions its restaurant or dining': 'Mentionne son restaurant ou sa salle à manger',
   // Search gaps (2026-10-18): the new /fr/search card notes.

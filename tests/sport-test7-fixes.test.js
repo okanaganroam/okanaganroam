@@ -46,7 +46,7 @@ const mkSport = (type, o = {}) => app.createVenue({ name: `Sport Seven ${++n}`, 
 const publish = (id, sections) => db.prepare("INSERT INTO venue_menus (venue_id, status, data, submitted_by, submitted_at, published_at, source) VALUES (?, 'published', ?, 'owner-link', datetime('now'), datetime('now'), 'owner')")
   .run(id, JSON.stringify({ sections: sections.map(([name, items]) => ({ name, note: '', items: items.map(([nm, price, d = '']) => ({ name: nm, description: d, price: String(price), dietary: [], check: false })) })) }));
 
-test('1. THE SPORT HEADLINE RULE: her typed $210 is the headline on the page, the card, Build My Trip and Help (EN + FR); "Replay round", twilight and guests never lower it; a plain 9 holes does; a skipped Price step takes the lowest plain line', async () => {
+test('1. THE SPORT HEADLINE RULE: her typed $210 is the headline on the page, the card, Build My Trip and Help (EN + FR); "Replay round", twilight and guests never lower it; a plain 9 holes does only on a course with no 18-hole line; a skipped Price step takes the lowest plain line', async () => {
   const v = kayla(app, db);
   const en = plain(page(v, NOV)), fr = plain(page(v, NOV, 'fr'));
   if (!/Green fees from \$210\./.test(en)) console.log('PAGE', en.slice(0, 3000));
@@ -67,7 +67,8 @@ test('1. THE SPORT HEADLINE RULE: her typed $210 is the headline on the page, th
   for (const nm of ['18 holes', '9 holes, weekdays', 'Green fee', '18 holes, spring']) assert.equal(app.sportPriceLineCounts('golf', nm, '', 'Rates'), true, nm);
   assert.equal(app.sportPriceLineCounts('golf', 'Weekday', '', 'Green fees'), false, 'a section never makes a line a green fee');
   const nine = kayla(app, db, { slug: 'predator-fixture-nine', name: 'Predator Nine Fixture', menu: { sections: [...K.menu.sections, { name: 'Nine', note: '', items: [{ name: '9 holes', description: '', price: '120', dietary: [], check: false }] }] } });
-  assert.equal(app.cardPriceFor(nine.id), 'From $120');
+  // Sport test 16 (2026-11-21): her list has 18-hole lines, so a 9-hole line is a different round and never lowers it.
+  assert.equal(app.cardPriceFor(nine.id), 'From $210');
   // No Price-step answer: the lowest plain regular line is the headline.
   const skip = kayla(app, db, { slug: 'predator-fixture-skip', name: 'Predator Skip Fixture', sportInfo: { price: null } });
   assert.equal(app.indoorPriceValue(skip.id), null, 'her own answer stays unanswered');
