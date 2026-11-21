@@ -1,0 +1,14 @@
+{
+  "verifiedOn": "2026-11-21",
+  "about": "Listing removed at Dayton's request (Nov 21 2026). Applied with scripts/apply-listing-removals.js data/listing-removals-2026-11-21.json.",
+  "redirect": [],
+  "delete": [
+    {
+      "id": 265,
+      "region": "kelowna",
+      "slug": "happy-slice-pizza-orchardpark-mall",
+      "name": "Happy Slice Pizza (OrchardPark Mall)",
+      "reason": "Removed at Dayton's request, Nov 21 2026."
+    }
+  ]
+}
