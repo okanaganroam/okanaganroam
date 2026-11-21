@@ -4,6 +4,7 @@
 //  2. Business claims and the portal: visits from our emails -> claim or edit link opened -> claim or changes sent -> login -> edits.
 // Steps are counts of actions (not people): the site keeps no visitor id. "Of the step before" shows where people drop off.
 const { dayOf } = require('./trip-demand');
+const tripFunnel = require('./trip-funnel');
 
 const PLANNER_STEPS = [
   ['page_view:trip', 'Opened Build My Trip'],
@@ -69,6 +70,8 @@ function createFunnels(db) {
       extra: TRIP_EXTRA.map(([k, text]) => ({ key: k, text, n: g(k) })),
       people,
       starts_per_day: series('trip_plan_start'), completes_per_day: series('trip_plan_complete'),
+      // The step-by-step Build My Trip funnel, new page and old (trip-funnel.js, 2026-11-21).
+      funnel: tripFunnel.report(db, days, now),
     };
 
     // Claims and the portal: portal steps (counted on the server), campaign visits, and the real claim/account records.

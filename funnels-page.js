@@ -7,9 +7,33 @@ const pct = (n) => (n === null || n === undefined ? '' : `${n}%`);
 const stepRows = (steps) => steps.map((s) => [esc(s.text), `<b>${num(s.n)}</b>`, pct(s.of_previous)]);
 const rec = (n) => (n === null || n === undefined ? '–' : num(n));
 
+// The step-by-step funnel (trip-funnel.js): the new page, and the old one (/trip?v=3) only while it still has visits.
+function funnelCard(f) {
+  if (!f) return '';
+  const cell = (n) => (n === null ? '<span class="empty">not on this page</span>' : `<b>${num(n)}</b>`);
+  const one = (v, title) => {
+    const x = f.versions[v];
+    const rows = x.steps.map((s) => [s.main ? esc(s.text) : `<span style="padding-left:1em">${esc(s.text)}</span>`, cell(s.n), s.main ? pct(s.of_previous) : '', pct(s.of_plans)]);
+    const book = x.book.map((b) => [esc(b.text) + (b.commission ? ' <small>(earns commission)</small>' : ''), `<b>${num(b.n)}</b>`]);
+    const share = x.share.map((m) => [esc(m.text), num(m.n)]);
+    return `<h4>${esc(title)} <small>${num(x.commission_taps)} commission taps of ${num(x.book_taps)} booking taps</small></h4>
+    ${table(['Step', 'Visits', 'Of the step before', 'Of visits with a plan'], rows)}
+    ${table(['Booking link tapped', 'Taps'], book)}
+    ${table(['How they shared', 'Times'], share)}`;
+  };
+  const weekRows = f.weeks.map((w) => [`<span style="white-space:nowrap">${esc(w.start)}</span>`, num(w.plan), num(w.confirm), num(w.book_open), num(w.book_click), num(w.commission_taps), num(w.share), num(w.save)]);
+  return `<h3>Build My Trip funnel</h3>
+    <p class="empty">Main path: got a plan, confirmed, opened “Book my trip”, clicked a booking link. Swap, remove, share and save are side steps, shown as a share of visits with a plan. Each step counts once per visit to the page.</p>
+    ${bars(f.plans_per_day, 'Visits that got a plan, per day')}${bars(f.book_taps_per_day, 'Booking link taps per day')}
+    ${one('v4', f.show_v3 ? 'New page (V4)' : 'Build My Trip')}
+    ${f.show_v3 ? one('v3', 'Old page (/trip?v=3)') : ''}
+    <h4>Week by week <small>both pages together, weeks start Monday</small></h4>
+    ${table(['Week of', 'Plans', 'Confirmed', 'Opened Book', 'Clicked to book', 'Stay + Viator taps', 'Shared', 'Saved'], weekRows)}`;
+}
+
 function tripCard(d) {
   const t = d.trip; const p = t.people;
-  return `<h3>Build My Trip</h3>
+  return `${funnelCard(t.funnel)}<h3>Build My Trip</h3>
     <h4>Planner path <small>each step as a share of the one before</small></h4>
     ${table(['Step', 'Times', 'Of the step before'], stepRows(t.planner))}
     ${bars(t.starts_per_day, 'Plans started per day')}

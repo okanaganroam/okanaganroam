@@ -1,0 +1,54 @@
+{
+ "reason": "Venue photos stays-b2-ok1",
+ "batch_id": "photos-stays-b2-ok1-2026-11-20",
+ "venues": [
+  {
+   "id": null,
+   "name": "Apex Mountain Lodge",
+   "region": "apex",
+   "slug": "apex-mountain-lodge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/apex-mountain-lodge-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Armstrong Inn",
+   "region": "armstrong",
+   "slug": "armstrong-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/armstrong-inn-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Whitefoot Lodge",
+   "region": "big-white",
+   "slug": "whitefoot-lodge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/whitefoot-lodge-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Canyon Farms RV Park",
+   "region": "kelowna",
+   "slug": "canyon-farms-rv-park",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/canyon-farms-rv-park-2610.jpg?v=20261120b2"
+   }
+  }
+ ]
+}

@@ -1,0 +1,90 @@
+{
+ "reason": "Venue photos stays-b2-ok3",
+ "batch_id": "photos-stays-b2-ok3-2026-11-20",
+ "venues": [
+  {
+   "id": null,
+   "name": "Falcon Resort",
+   "region": "osoyoos",
+   "slug": "falcon-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/falcon-resort-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Poplars Motel on the Lake",
+   "region": "osoyoos",
+   "slug": "poplars-motel-on-the-lake",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/poplars-motel-on-the-lake-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Riviera Motel",
+   "region": "osoyoos",
+   "slug": "riviera-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/riviera-motel-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Safari Beach Resort",
+   "region": "osoyoos",
+   "slug": "safari-beach-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/safari-beach-resort-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Pineacre on the Lake",
+   "region": "peachland",
+   "slug": "pineacre-on-the-lake",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/pineacre-on-the-lake-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Wesbert Guest Suites",
+   "region": "penticton",
+   "slug": "wesbert-guest-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/wesbert-guest-suites-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Summerland Waterfront Resort & Spa",
+   "region": "summerland",
+   "slug": "summerland-waterfront-resort-and-spa",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/summerland-waterfront-resort-and-spa-2610.jpg?v=20261120b2"
+   }
+  }
+ ]
+}

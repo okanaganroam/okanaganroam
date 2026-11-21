@@ -1,0 +1,18 @@
+{
+ "reason": "Tours batch 1 (Viator operators): real photo of each new tour listing, credited",
+ "batch_id": "photos-tours-viator-2026-11-20",
+ "note": "Keyed by region + slug: the venues are created by drafts/tours-viator-2026-11/run.sh; drafts/tours-viator-2026-11/apply-photos.js looks up their ids at run time and applies with scripts/apply-venue-updates.js.",
+ "venues": [
+  {
+   "name": "Okanagan Clear Watercraft Rentals",
+   "region": "kelowna",
+   "slug": "okanagan-clear-watercraft-rentals",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/okanagan-clear-watercraft-rentals-2610.jpg?v=20261120"
+   }
+  }
+ ]
+}

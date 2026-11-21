@@ -20,7 +20,7 @@ const detailOf = (db, key) => golf.getGolfDetails(db, [v(key)]).get(key);
 test('the reviewed data file validates, and every published fee set is sourced, dated and has exactly one comparison rate', () => {
   assert.deepEqual(golf.validateGolfData(REAL), []);
   const courses = Object.entries(REAL.courses);
-  assert.equal(courses.length, 40);
+  assert.equal(courses.length, 41);
   for (const [key, c] of courses) {
     assert.match(key, /^[a-z-]+\/[a-z0-9-]+$/);
     assert.match(c.fees.verified_at, /^\d{4}-\d{2}-\d{2}$/, key);
@@ -37,7 +37,7 @@ test('the reviewed data file validates, and every published fee set is sourced, 
     }
   }
   const statuses = courses.reduce((acc, [, c]) => ({ ...acc, [c.fees.status]: (acc[c.fees.status] || 0) + 1 }), {});
-  assert.deepEqual(statuses, { not_published: 5, unverified: 4, published: 28, not_applicable: 1, private: 1, dynamic: 1 });
+  assert.deepEqual(statuses, { not_published: 5, unverified: 5, published: 28, not_applicable: 1, private: 1, dynamic: 1 });
 });
 
 test('the driving range is classified as a practice facility with no green fee', () => {
@@ -55,7 +55,7 @@ test('loader: loads once, is a no-op when unchanged, rebuilds on change, and lea
   assert.deepEqual(golf.loadGolfData(db, REAL), { loaded: false, reason: 'unchanged' });
   const count = (t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n;
   const before = { p: count('golf_course_profiles'), f: count('golf_green_fees'), m: count('golf_course_media') };
-  assert.deepEqual(before, { p: 40, f: 181, m: 18 });
+  assert.deepEqual(before, { p: 41, f: 181, m: 18 });
   const changed = clone(REAL);
   changed.courses['penticton/skaha-meadows-golf-course'].fees.rates.pop();
   assert.equal(golf.loadGolfData(db, changed).loaded, true);
@@ -225,7 +225,7 @@ test('golf CSS never uses the golf card attribute selector (so the Beach/Outdoor
 });
 
 // ---- Okanagan Roam Value Index (2026-09-26) ----
-test('value index: reproduces the approved like-for-like results exactly for all 22 rated courses', () => {
+test('value index: reproduces the approved like-for-like results exactly for all 28 rated courses', () => {
   const approved = {
     'penticton/penticton-golf-country-club': [70, 0, 15, 85, 'Excellent value'],
     'osoyoos/osoyoos-golf-club-park-meadows': [53, 15, 15, 83, 'Excellent value'],
@@ -249,6 +249,13 @@ test('value index: reproduces the approved like-for-like results exactly for all
     'kelowna/orchard-greens-golf-club': [56, 0, 0, 56, 'Good value'],
     'penticton/skaha-meadows-golf-course': [50, 0, 4, 54, 'Good value'],
     'kaleden/st-andrews-by-the-lake-golf-resort': [48, 0, 0, 48, 'Good value'],
+    // Rated once their par was researched from the official scorecards (2026-11-21).
+    'kaleden/twin-lakes-golf-course': [70, 0, 0, 70, 'Great value'],
+    'kelowna/kelowna-springs-golf-club': [43, 0, 0, 43, 'Fair value'],
+    'kelowna/tower-ranch-golf-country-club': [37, 10, 0, 47, 'Good value'],
+    'oliver/nkmip-canyon-desert-golf-course': [67, 5, 0, 72, 'Great value'],
+    'summerland/summerland-golf-country-club': [70, 5, 0, 75, 'Excellent value'],
+    'vernon/spallumcheen-golf-country-club-executive-course': [53, 0, 0, 53, 'Good value'],
   };
   const db = loadReal();
   const got = {};
@@ -261,7 +268,7 @@ test('value index: reproduces the approved like-for-like results exactly for all
   }
   assert.deepEqual(got, approved);
   const dist = Object.values(got).reduce((a, r) => ({ ...a, [r[4]]: (a[r[4]] || 0) + 1 }), {});
-  assert.deepEqual(dist, { 'Excellent value': 6, 'Great value': 5, 'Good value': 9, 'Fair value': 2 });
+  assert.deepEqual(dist, { 'Excellent value': 7, 'Great value': 7, 'Good value': 11, 'Fair value': 3 });
 });
 
 test('value index: like-for-like groups with fixed 2026 reference fees ($149 / $52 / $41)', () => {
@@ -331,8 +338,16 @@ test('value index: unavailable without a published current rate or a known par; 
   const db = loadReal();
   const vi = (k, today = TODAY) => golf.computeValueIndex(detailOf(db, k), today);
   for (const k of ['kelowna/kelowna-golf-country-club', 'vernon/rise-golf-course', 'west-kelowna/shannon-lake-golf-club', 'armstrong/overlander-golf-event-centre',
-    'kaleden/twin-lakes-golf-course', 'kelowna/kelowna-springs-golf-club', 'summerland/summerland-golf-country-club']) {
+    'lumby/lumby-golf-club']) {
     assert.deepEqual(vi(k), { available: false }, k);
+  }
+  // Every real course with published rates now has a par, so an unknown par is checked on a copy.
+  const noPar = clone(REAL);
+  for (const k of ['kaleden/twin-lakes-golf-course', 'kelowna/kelowna-springs-golf-club', 'summerland/summerland-golf-country-club']) noPar.courses[k].profile.par = null;
+  const dbNoPar = freshDb();
+  golf.loadGolfData(dbNoPar, noPar);
+  for (const k of ['kaleden/twin-lakes-golf-course', 'kelowna/kelowna-springs-golf-club', 'summerland/summerland-golf-country-club']) {
+    assert.deepEqual(golf.computeValueIndex(detailOf(dbNoPar, k), TODAY), { available: false }, `${k} without a par`);
   }
   assert.deepEqual(vi('osoyoos/osoyoos-golf-club-park-meadows', '2027-05-01'), { available: false }, 'last season’s rates are not a current value assessment');
   assert.equal(vi('kelowna/kelowna-driving-range-mini-golf'), null);
@@ -340,7 +355,7 @@ test('value index: unavailable without a published current rate or a known par; 
   assert.equal(golf.golfCardValueHtml(detailOf(db, 'vernon/rise-golf-course'), TODAY), '', 'a list card leaves out a missing index (2026-10-14)');
   assert.equal(golf.golfCardValueHtml(detailOf(db, 'kelowna/kelowna-driving-range-mini-golf'), TODAY), '');
   const rated = Object.keys(REAL.courses).filter((k) => { const x = vi(k); return x && x.available; });
-  assert.equal(rated.length, 22);
+  assert.equal(rated.length, 28);
 });
 
 test('value index: labels, wording, basis line; no stars, no review markup', () => {
