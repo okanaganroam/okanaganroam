@@ -2596,6 +2596,8 @@ Object.assign(fr.indoor, { quickSportDogs: {
   swim: 'Chiens en laisse à l’extérieur de l’aire de la piscine seulement.',
   _: 'Chiens bienvenus à l’extérieur en laisse, pas à l’intérieur.',
 } });
+Object.assign(en.indoor, { bringExGolfSmall: 'Walk-ons only: no tee times. Pull carts only. Cash in the honour box when the clubhouse is closed.', bringExGolfSmallBook: 'Pull carts only. Cash only at the clubhouse.' });
+Object.assign(fr.indoor, { bringExGolfSmall: 'Sans réservation seulement : pas d’heures de départ. Chariots à tirer seulement. Comptant dans la boîte de paiement quand le club-house est fermé.', bringExGolfSmallBook: 'Chariots à tirer seulement. Comptant seulement au club-house.' });
 Object.assign(en.indoor, { webLeadTickets: 'We filled in your tickets page. If your prices are on another page, change it.', researchLine: 'We picked these from what we found online. Untick anything that’s wrong.', noSetHoursHint: 'Shows or classes only? Tap this. Put box office hours in Good to know, like “Box office: Tue–Fri 11–4 and an hour before shows.”',
   ibookQShow: 'Do people need tickets ahead?', ibooksShow: { no: 'Tickets at the door are fine', busy: 'Tickets at the door, but buy ahead for busy shows', ahead: 'Please buy tickets ahead' },
   ibookNeedShow: 'Please tap one: tickets at the door, or buy ahead.',
