@@ -27,7 +27,7 @@ const off = () => { delete process.env.VIATOR_API_KEY; delete process.env.VIATOR
 const DATA = wt.loadData();
 
 test('data file: one real, linked product per area; every town has an area; the wine guides are named', () => {
-  assert.deepEqual(Object.keys(DATA.areas).sort(), ['kelowna', 'lake-country', 'oliver-osoyoos', 'penticton', 'summerland']);
+  assert.deepEqual(Object.keys(DATA.areas).sort(), ['kelowna', 'lake-country', 'oliver-osoyoos', 'penticton']);
   for (const [k, a] of Object.entries(DATA.areas)) {
     assert.match(a.productCode, /^\d+P\d+$/, k);
     assert.ok(a.title && a.why && a.supplier, k);
@@ -49,7 +49,7 @@ test('areas: the town\'s own area, the closest for a town without one, the defau
   assert.equal(a('vernon'), 'lake-country');
   assert.equal(a('naramata'), 'penticton');
   assert.equal(a('penticton'), 'penticton');
-  assert.equal(a('summerland'), 'summerland');
+  assert.equal(a('summerland'), 'penticton');
   assert.equal(a('oliver'), 'oliver-osoyoos');
   assert.equal(a('osoyoos'), 'oliver-osoyoos');
   assert.equal(a('okanagan-falls'), 'oliver-osoyoos');
