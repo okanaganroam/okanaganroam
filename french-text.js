@@ -1403,6 +1403,8 @@ Object.assign(FR_TEXT, Object.fromEntries(Object.entries({
   'Add to calendar': 'Ajouter au calendrier',
   'Add to Google Calendar': 'Ajouter à Google Agenda',
   'Tickets & info ↗': 'Billets et infos ↗',
+  // Fever (2026-11-21, fever.js): the commission line under an event's Fever "Tickets" button.
+  'We may earn a commission if you buy tickets through this link. It never changes which events we list or their order.': 'Nous pouvons toucher une commission si vous achetez des billets par ce lien. Cela ne change jamais les événements affichés ni leur ordre.',
   'Tickets & info': 'Billets et infos',
   'Website': 'Site Web',
   'Featured in our guides:': 'Dans nos guides :',

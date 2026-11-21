@@ -49,6 +49,8 @@ const stayBookingLinks = require('./stay-booking-links');
 const tripBooking = require('./trip-booking');
 // Viator tours (2026-11-20, viator.js): off unless VIATOR_API_KEY and VIATOR_PARTNER_ID are both set.
 const viator = require('./viator');
+// Fever "Tickets" (2026-11-21, fever.js): off unless FEVER_AFFILIATE_TEMPLATE is set (Dayton's Impact link for Fever).
+const fever = require('./fever');
 const gscReport = require('./gsc-report');
 // What is clickable on one business or event page (2026-11-05): read from the page itself, so each sheet shows that page's
 // own buttons and links. The server asks its own public page (no scripts run, so nothing is counted); kept 10 minutes.
@@ -7804,6 +7806,9 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false) {
       const hint = viator.tripHint(plan, text, bookable);
       if (hint) plan.viator = hint;
     }
+    // Fever (2026-11-21, fever.js): an event in the plan that Fever sells gets its "Tickets" step in V4's "Book my trip"
+    // (only with FEVER_AFFILIATE_TEMPLATE set). Added after planning: the stops and their order never change.
+    if (v4 && fever.enabled()) fever.withTripSteps(plan);
   } catch (e) { console.error(`[trip] where to stay: ${e.message}`); }
   return plan;
 }
@@ -38810,7 +38815,7 @@ function whatsOnEventCardHtml(ev, todayArg = null, now = null, claimHostPhoto = 
         <div class="card-actions">
           <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(ev.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(ev.name)}">${APP_FAV_LABEL_HTML}</button>
           <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(ev.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(ev.region)}" data-trip-ref="event:${ev.id}" aria-pressed="false" aria-label="Add ${escapeHtml(ev.name)} to trip">${APP_TRIP_LABEL_HTML}</button>
-        </div>
+        </div>${fever.cardHtml(ev.id)}
       </li>`;
 }
 function whatsOnSelectedTagsHtml(selectedRegions, selectedCategories) {
@@ -39856,6 +39861,7 @@ ${renderGolfHeaderHtml()}
   ${GOLF_APP_SCRIPT_TAG}
   ${renderWhatsOnFilterScriptHtml({ hasInventory, dateState, scope })}
   ${welcomeLayout ? welcomeLayout.script : ''}
+  ${fever.enabled() ? fever.clickScriptHtml('whatson_card') : ''}
 </body>
 </html>`;
 }
@@ -44506,13 +44512,16 @@ ${pastOccs.map(dateItem).join('\n')}
       : full.venue_name_text ? `${full.venue_name_text}, ${regionLabel}, BC` : null;
   const builtInDirections = mapDirectionsAvailable()&&!expired&&mapDestination('/'+full.region+'/events/'+full.slug,now)?roamDirectionsHref('/'+full.region+'/events/'+full.slug,opts.lang==='fr'?'fr':'en'):null;
   const directionsUrl = placeQuery && full.valley_wide !== 1 ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placeQuery)}` : null;
+  // Fever (2026-11-21, fever.js): an event Fever sells, with FEVER_AFFILIATE_TEMPLATE set, has "Tickets" (Fever, commission)
+  // as its one main ticket button, with the commission line under the row; every other event is exactly as before.
+  const feverTickets = expired ? null : fever.eventTickets(full.id);
   const ctaHtml = expired ? '' : `
   <div class="event-cta-row">
-    ${full.website ? `<a class="cta event-cta-primary" href="${escapeHtml(full.website)}" rel="nofollow noopener" target="_blank">Tickets &amp; info &#8599;</a>` : ''}
+    ${feverTickets ? fever.linkHtml(full.id, feverTickets.url, 'cta event-cta-primary') : full.website ? `<a class="cta event-cta-primary" href="${escapeHtml(full.website)}" rel="nofollow noopener" target="_blank">Tickets &amp; info &#8599;</a>` : ''}
     ${directionsUrl ? `<a class="cta secondary" href="${escapeHtml(builtInDirections || directionsUrl)}" ${builtInDirections ? 'data-roam-directions' : 'rel="nofollow noopener" target="_blank"'}>${builtInDirections ? 'Get directions' : 'Open in Google Maps'}</a>` : ''}
     ${next ? `<a class="cta secondary" href="/${full.region}/events/${full.slug}/calendar.ics" download>Add to calendar</a>` : ''}
     ${next ? `<a class="cta secondary" data-gcal href="${escapeHtml(googleCalendarUrl(full, next, eventCalendarLocation(full, hostVenue), canonical))}" rel="nofollow noopener" target="_blank">Add to Google Calendar</a>` : ''}
-  </div>`;
+  </div>${feverTickets ? fever.disclosureHtml('en', 'fever-note event-fever-note') : ''}`;
   const tripQuery = `${full.name}, ${regionLabel}, Okanagan Valley, BC`;
   const actionsHtml = `
   <div class="venue-cta-row event-actions" data-venue-category="whatson" data-venue-id="event-${full.id}" data-venue-region="${escapeHtml(full.region)}" data-venue-name="${escapeHtml(full.name)}"${savedOccurrenceAttrs(upcoming[0])} data-surface="event_page">
@@ -44533,7 +44542,7 @@ ${pastOccs.map(dateItem).join('\n')}
   function ctx(){ var c = {}; for (var k in pageCtx) c[k] = pageCtx[k]; return c; }
   function track(name, params){ if (window.trackEvent) window.trackEvent(name, params); }
   (function(){ var v = ctx(), extra = ${viewCtx}; for (var k in extra) v[k] = extra[k]; track('event_view', v); })();
-  ${clickLabels.clientClassifierJs()}
+  ${clickLabels.clientClassifierJs(feverTickets ? { fever: true } : {})}
   document.addEventListener('click', function(e){
     try {
       var el = e.target && e.target.closest ? e.target.closest('a,button,summary') : null;
@@ -44693,6 +44702,7 @@ ${renderGolfHeaderHtml()}
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${actionsScript}
+  ${feverTickets ? fever.clickScriptHtml('event_page') : ''}
 ${ROAM_RETURN_SCRIPT}
 </body>
 </html>`;
