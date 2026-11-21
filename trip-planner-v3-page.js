@@ -2414,65 +2414,6 @@ ${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3
       + stopsListHtml(d.stops, function(s){ return d.day + '-' + s.daypart; }, counts)
       + '</section>';
   }
-  function warningSummaryHtml(p){
-    var stops=(p.days||[]).reduce(function(all,d){return all.concat(d.stops||[]);},[]).concat((p.itinerary||{}).stops||[],(p.outing||{}).stops||[],p.recommendations||[]);
-    var missingEvents=t3PlanNextSteps(p).filter(function(step){return step.kind==='missing_event';});
-    var visible=[], repeated=[];
-    (p.warnings||[]).forEach(function(w){
-      if(missingEvents.some(function(step){return w.indexOf('Not met: '+step.label)===0||w.indexOf('Non satisfait : '+t3FrenchText(step.label))===0;}))return;
-      var duplicate=stops.some(function(s){
-        var name=s.venue?s.venue.name:s.event?s.event.name:null;
-        var prefix=name?name+': ':'';
-        var body=w.slice(prefix.length);
-        return prefix && w.indexOf(prefix)===0 && (body.indexOf('Provisional visit')===0 || body.indexOf('Visite provisoire')===0) && s.scheduleNote && s.scheduleNote.indexOf(body)===0;
-      });
-      (duplicate?repeated:visible).push(w);
-    });
-    var list=function(items){return '<ul>'+items.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul>';};
-    var html=visible.length?'<div class="t3-warnings" role="note">'+list(visible)+'</div>':'';
-    if(repeated.length)html+='<details class="t3-warnings"><summary>'+(lang()==='fr'?'Détails horaires déjà indiqués avec vos arrêts':'Timing details already shown with your stops')+' ('+repeated.length+')</summary>'+list(repeated)+'</details>';
-    return html;
-  }
-  function droppedHtml(p, fr){
-    var dropped = t3DroppedRequests(p);
-    if (!dropped.length) return '';
-    var q = function(w){ return (fr ? '«\u00a0' : '“') + esc(w) + (fr ? '\u00a0»' : '”'); };
-    return '<details open><summary>' + esc(fr ? 'Non utilisé' : 'Not used') + ' (' + dropped.length + ')</summary><ul>' + dropped.map(function(w){ return '<li>' + q(w) + ' — ' + esc(fr ? 'le planificateur n’a pas pu l’appliquer à ce plan' : 'the planner couldn’t apply this to the plan') + '</li>'; }).join('') + '</ul></details>';
-  }
-  // When every request matched, the check is good news, not a warning: one quiet line that opens to the details.
-  function requirementSummaryBlock(p){
-    var html = requirementSummaryHtml(p);
-    var checks = p.requirementResults || [];
-    // A request the planner could not use (2026-10-19) means it is not "all matched": the checks stay open and list it.
-    if (html && t3DroppedRequests(p).length) return html.slice(0, html.length - ('</' + 'section>').length) + droppedHtml(p, lang() === 'fr') + '</' + 'section>';
-    if (!html || !checks.every(function(i){ return i.status === 'satisfied'; })) return html;
-    var fr = lang() === 'fr';
-    var h3End = html.indexOf('</' + 'h3>');
-    var inner = html.slice(h3End + 5, html.length - ('</' + 'section>').length);
-    return '<details class="t3-checks"><summary>' + esc(checks.length === 1 ? (fr ? '✓ Votre demande correspond à une fiche' : '✓ Your request matched a listing') : (fr ? '✓ Vos ' + checks.length + ' demandes correspondent à des fiches' : '✓ All ' + checks.length + ' of your requests matched a listing')) + '</summary>' + inner + '</details>';
-  }
-  function requirementSummaryHtml(p){
-    var checks = p.requirementResults || [];
-    if (!checks.length) return '';
-    var fr = lang() === 'fr';
-    var titles = fr ? ['Demandes vérifiées', 'Correspondances', 'Manquant', 'À confirmer'] : ['Requests checked', 'Matched', 'Missing', 'Needs confirmation'];
-    var names = fr ? {museum:'musée', gallery:'galerie', pottery:'atelier de poterie', spa:'spa', easy_walk:'promenade facile', walk:'promenade', sunset:'point de vue au coucher du soleil', cafe:'café', restaurant:'restaurant', winery:'vignoble', rainy:'activité intérieure', duration:'durée', price_limit:'coût total', 'exact budget':'budget exact', 'party size':'taille du groupe', 'age suitability':'âge des enfants', accessibility:'accessibilité'} : {pottery:'pottery class', easy_walk:'easy walk', sunset:'sunset viewpoint', cafe:'coffee', rainy:'indoor suitability', duration:'visit duration', price_limit:'total cost'};
-    var statuses = ['satisfied', 'unmet', 'unverified'];
-    return '<section class="t3-warnings" aria-label="' + esc(titles[0]) + '"><h3>' + esc(titles[0]) + '</h3><p>' + esc(fr ? 'Les correspondances concernent les fiches du site. Les disponibilités, les réservations et le temps de trajet restent à confirmer.' : 'Matches refer to listing information. Availability, reservations and travel timing still need confirmation.') + '</p>' + statuses.map(function(status, n){
-      var items = checks.filter(function(i){ return i.status === status; });
-      if (!items.length) return '';
-      return '<details><summary>' + esc(titles[n + 1]) + ' (' + items.length + ')</summary><ul>' + items.map(function(i){
-        var value = i.kind === 'duration' || i.kind === 'price_limit' || i.kind === 'rainy' ? i.kind : i.value;
-        var label = names[value] || String(value).replace(/_/g, ' ');
-        if (i.kind === 'days') label = i.value + (fr ? ' jour(s)' : ' day(s)');
-        // Distillery test 3: the place's name, not the visitor's request in lower case ("monday in kelowna bench road …").
-        if (i.kind === 'venue') label = i.venueName || i.sourceText || label;
-        if (i.reason && i.sourceText && (i.kind === 'venue' || i.sourceText.length > 25) && String(i.reason).indexOf(i.sourceText) >= 0) return '<li>' + esc(label) + ' — ' + esc(String(i.reason).split(i.sourceText).join(label)) + '</li>';
-        if (i.kind.indexOf('excluded_') === 0) label = (fr ? 'Sans ' : 'No ') + label;
-        return '<li>' + esc(label) + (i.reason ? ' — ' + esc(i.reason) : '') + '</li>';
-      }).join('') + '</ul></details>';
-    }).join('') + '</section>';
-  }
   // The plan's notes, checks and repair buttons (and its Dates control), shared by the V4 view's "More options".
   function t3PlanDetails(p){
     var html = '';
@@ -2581,6 +2522,65 @@ ${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3
     html += t3ListingGapSummaryHtml(p,lang()==='fr',esc);
     html += warningSummaryHtml(p);
     return { html: html, schedHtml: schedHtml };
+  }
+  function warningSummaryHtml(p){
+    var stops=(p.days||[]).reduce(function(all,d){return all.concat(d.stops||[]);},[]).concat((p.itinerary||{}).stops||[],(p.outing||{}).stops||[],p.recommendations||[]);
+    var missingEvents=t3PlanNextSteps(p).filter(function(step){return step.kind==='missing_event';});
+    var visible=[], repeated=[];
+    (p.warnings||[]).forEach(function(w){
+      if(missingEvents.some(function(step){return w.indexOf('Not met: '+step.label)===0||w.indexOf('Non satisfait : '+t3FrenchText(step.label))===0;}))return;
+      var duplicate=stops.some(function(s){
+        var name=s.venue?s.venue.name:s.event?s.event.name:null;
+        var prefix=name?name+': ':'';
+        var body=w.slice(prefix.length);
+        return prefix && w.indexOf(prefix)===0 && (body.indexOf('Provisional visit')===0 || body.indexOf('Visite provisoire')===0) && s.scheduleNote && s.scheduleNote.indexOf(body)===0;
+      });
+      (duplicate?repeated:visible).push(w);
+    });
+    var list=function(items){return '<ul>'+items.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul>';};
+    var html=visible.length?'<div class="t3-warnings" role="note">'+list(visible)+'</div>':'';
+    if(repeated.length)html+='<details class="t3-warnings"><summary>'+(lang()==='fr'?'Détails horaires déjà indiqués avec vos arrêts':'Timing details already shown with your stops')+' ('+repeated.length+')</summary>'+list(repeated)+'</details>';
+    return html;
+  }
+  function droppedHtml(p, fr){
+    var dropped = t3DroppedRequests(p);
+    if (!dropped.length) return '';
+    var q = function(w){ return (fr ? '«\u00a0' : '“') + esc(w) + (fr ? '\u00a0»' : '”'); };
+    return '<details open><summary>' + esc(fr ? 'Non utilisé' : 'Not used') + ' (' + dropped.length + ')</summary><ul>' + dropped.map(function(w){ return '<li>' + q(w) + ' — ' + esc(fr ? 'le planificateur n’a pas pu l’appliquer à ce plan' : 'the planner couldn’t apply this to the plan') + '</li>'; }).join('') + '</ul></details>';
+  }
+  // When every request matched, the check is good news, not a warning: one quiet line that opens to the details.
+  function requirementSummaryBlock(p){
+    var html = requirementSummaryHtml(p);
+    var checks = p.requirementResults || [];
+    // A request the planner could not use (2026-10-19) means it is not "all matched": the checks stay open and list it.
+    if (html && t3DroppedRequests(p).length) return html.slice(0, html.length - ('</' + 'section>').length) + droppedHtml(p, lang() === 'fr') + '</' + 'section>';
+    if (!html || !checks.every(function(i){ return i.status === 'satisfied'; })) return html;
+    var fr = lang() === 'fr';
+    var h3End = html.indexOf('</' + 'h3>');
+    var inner = html.slice(h3End + 5, html.length - ('</' + 'section>').length);
+    return '<details class="t3-checks"><summary>' + esc(checks.length === 1 ? (fr ? '✓ Votre demande correspond à une fiche' : '✓ Your request matched a listing') : (fr ? '✓ Vos ' + checks.length + ' demandes correspondent à des fiches' : '✓ All ' + checks.length + ' of your requests matched a listing')) + '</summary>' + inner + '</details>';
+  }
+  function requirementSummaryHtml(p){
+    var checks = p.requirementResults || [];
+    if (!checks.length) return '';
+    var fr = lang() === 'fr';
+    var titles = fr ? ['Demandes vérifiées', 'Correspondances', 'Manquant', 'À confirmer'] : ['Requests checked', 'Matched', 'Missing', 'Needs confirmation'];
+    var names = fr ? {museum:'musée', gallery:'galerie', pottery:'atelier de poterie', spa:'spa', easy_walk:'promenade facile', walk:'promenade', sunset:'point de vue au coucher du soleil', cafe:'café', restaurant:'restaurant', winery:'vignoble', rainy:'activité intérieure', duration:'durée', price_limit:'coût total', 'exact budget':'budget exact', 'party size':'taille du groupe', 'age suitability':'âge des enfants', accessibility:'accessibilité'} : {pottery:'pottery class', easy_walk:'easy walk', sunset:'sunset viewpoint', cafe:'coffee', rainy:'indoor suitability', duration:'visit duration', price_limit:'total cost'};
+    var statuses = ['satisfied', 'unmet', 'unverified'];
+    return '<section class="t3-warnings" aria-label="' + esc(titles[0]) + '"><h3>' + esc(titles[0]) + '</h3><p>' + esc(fr ? 'Les correspondances concernent les fiches du site. Les disponibilités, les réservations et le temps de trajet restent à confirmer.' : 'Matches refer to listing information. Availability, reservations and travel timing still need confirmation.') + '</p>' + statuses.map(function(status, n){
+      var items = checks.filter(function(i){ return i.status === status; });
+      if (!items.length) return '';
+      return '<details><summary>' + esc(titles[n + 1]) + ' (' + items.length + ')</summary><ul>' + items.map(function(i){
+        var value = i.kind === 'duration' || i.kind === 'price_limit' || i.kind === 'rainy' ? i.kind : i.value;
+        var label = names[value] || String(value).replace(/_/g, ' ');
+        if (i.kind === 'days') label = i.value + (fr ? ' jour(s)' : ' day(s)');
+        // Distillery test 3: the place's name, not the visitor's request in lower case ("monday in kelowna bench road …").
+        if (i.kind === 'venue') label = i.venueName || i.sourceText || label;
+        if (i.reason && i.sourceText && (i.kind === 'venue' || i.sourceText.length > 25) && String(i.reason).indexOf(i.sourceText) >= 0) return '<li>' + esc(label) + ' — ' + esc(String(i.reason).split(i.sourceText).join(label)) + '</li>';
+        if (i.kind.indexOf('excluded_') === 0) label = (fr ? 'Sans ' : 'No ') + label;
+        return '<li>' + esc(label) + (i.reason ? ' — ' + esc(i.reason) : '') + '</li>';
+      }).join('') + '</ul></details>';
+    }).join('') + '</section>';
   }
   function render(focus){
     // V4 (2026-11-20): a day-by-day plan or a short outing in the simple view; lists, events and the rest as before.
