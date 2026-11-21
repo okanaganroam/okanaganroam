@@ -42,8 +42,8 @@ const sp = (x) => String(x).replace(/[\s  ]+/g, ' ').trim();
 const plain = (h) => sp(String(h).replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&#39;/g, '’'));
 const page = (v, lang = 'en') => plain(app.renderVenuePage(app.getVenue(v.id), [], [], [], { lang, now: NOW }));
 const money = (x, lang) => (lang === 'fr' ? `${String(x).replace('.', ',')} $` : `$${x}`);
-const publishPrices = (id, items) => db.prepare("INSERT INTO venue_menus (venue_id, status, data, submitted_by, submitted_at, published_at, source) VALUES (?, 'published', ?, 'owner-link', datetime('now'), datetime('now'), 'owner')")
-  .run(id, JSON.stringify({ sections: [{ name: 'Prices', note: '', items: items.map(([name, price]) => ({ name, description: '', price, dietary: [], check: false })) }] }));
+const publishPrices = (id, items, section = 'Prices') => db.prepare("INSERT INTO venue_menus (venue_id, status, data, submitted_by, submitted_at, published_at, source) VALUES (?, 'published', ?, 'owner-link', datetime('now'), datetime('now'), 'owner')")
+  .run(id, JSON.stringify({ sections: [{ name: section, note: '', items: items.map(([name, price]) => ({ name, description: '', price, dietary: [], check: false })) }] }));
 const helpSay = async (t, lang) => {
   const h = await getText(`${lang === 'fr' ? '/fr' : ''}/owner/${t}/setup`);
   const cfg = JSON.parse(/<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>/.exec(h)[1]);
@@ -65,6 +65,10 @@ const SCENARIOS = {
   // Sport test 1 (2026-11-20; Debbie's card said her $23 power cart): extras and discounted people's lines lower than the
   // main price never become the headline, for every sport kind (they read as the main price only).
   extras: { price: MAIN, typed: [['Main', String(MAIN)], ['Power cart', '10'], ['Club rental', '9'], ['Junior rate', '8'], ['Seniors', '7'], ['Kids under 12', '6'], ['Season membership', '5']], extras: true },
+  // Sport test 7 (2026-11-20; Kayla's "Replay round $150" beat her typed $210 everywhere): THE SPORT HEADLINE RULE. A line
+  // for some people, some times or a bundle never lowers the typed price, for every kind, whatever section it sits in.
+  qualified: { price: MAIN, section: 'Green fees', typed: [['Main', String(MAIN)], ['Replay round', '15'], ['Twilight 18 holes', '14'], ['Resort guest rate', '13'], ['Stay and play', '12'], ['Golf package', '11'],
+    ['Member rate', '10'], ['Guest of member', '9'], ['Military', '8'], ['Group rate', '7'], ['Early bird special', '6'], ['Off-peak', '5'], ['Shoulder season', '4'], ['Second round', '3'], ['Students', '2'], ['Promo night', '2']], extras: true },
   free: { price: 'free' },
   minimum: { price: PERSON, info: { per_min: 2 } },
 };
@@ -84,7 +88,7 @@ test('THE PRICE RULE for sport: every sport kind × every price scenario: the pa
       const t = tokenFor(v.id);
       await ok(change(t, { indoor_info: { kinds: [k], length: '1-2h', book: 'no', age: 'all', year: 'all', ...(cfg.info || {}) }, indoor_price: cfg.price }));
       // Sport test 1 (2026-11-20): only an adult green-fee line may lower a golf course's card, so its lower line is one.
-      if (cfg.typed) publishPrices(v.id, cfg.typed.map(([nm, pr]) => [k === 'golf' && nm === 'Lower one' ? '9 holes, weekdays' : nm, pr]));
+      if (cfg.typed) publishPrices(v.id, cfg.typed.map(([nm, pr]) => [k === 'golf' && nm === 'Lower one' ? '9 holes, weekdays' : nm, pr]), cfg.section);
       app.writeIndoorVisitRows(v.id);
       app.indoorCardPrice(v.id);
       const perPerson = typeof cfg.price === 'number' && !(cfg.info && cfg.info.per);
@@ -100,7 +104,7 @@ test('THE PRICE RULE for sport: every sport kind × every price scenario: the pa
       for (const lang of ['en', 'fr']) want(!BAD_WORDS_RE.test(L[lang]), `${id}: ${lang} "${L[lang]}" says Adult price`);
       if (!exact) for (const lang of ['en', 'fr']) want(!EXACT_RE.test(L[lang]), `${id}: a range kind's ${lang} line names an exact label: "${L[lang]}"`);
       // What each scenario must say.
-      if (sc === 'main' || sc === 'higher' || sc === 'extras') want(L.en === (exact ? `${EXACT[k][0]} ${money(MAIN, 'en')}.` : IK.indoorKindText([k], 'en').price.page.replace('{x}', money(MAIN, 'en'))), `${id}: EN "${L.en}"`);
+      if (sc === 'main' || sc === 'higher' || sc === 'extras' || sc === 'qualified') want(L.en === (exact ? `${EXACT[k][0]} ${money(MAIN, 'en')}.` : IK.indoorKindText([k], 'en').price.page.replace('{x}', money(MAIN, 'en'))), `${id}: EN "${L.en}"`);
       if (sc === 'lower') {
         want(L.en.includes(money(LOWER, 'en')), `${id}: EN "${L.en}" leads with the lowest`);
         want(exact ? L.en === `From ${money(LOWER, 'en')} (${EXACT[k][0].charAt(0).toLowerCase()}${EXACT[k][0].slice(1)} ${money(MAIN, 'en')}).` : !L.en.includes(money(MAIN, 'en')), `${id}: EN "${L.en}"`);

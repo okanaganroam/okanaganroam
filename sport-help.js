@@ -429,6 +429,48 @@ const TOPICS = [
     keysFr: ['hockey libre', 'baton et rondelle', 'batons et rondelles', 'grille complete', 'casque avec grille'],
     a: '<p>Each one is a line in <strong>Your prices</strong>, like <em>Shinny $9</em> and <em>Stick and puck $8</em>, with its times in the line’s details if they’re set. Gear rules go in one line in <strong>Good to know</strong>, like <em>Helmets with full cages for shinny and stick and puck</em>. Your adult public skate stays your main price, and search finds you for shinny and drop-in hockey.</p>',
     aFr: '<p>Chacun est une ligne dans <strong>Vos tarifs</strong>, comme <em>Hockey libre 9 $</em> et <em>Bâton et rondelle 8 $</em>, avec ses heures dans les détails de la ligne si elles sont fixes. Les règles d’équipement vont en une ligne dans <strong>Bon à savoir</strong>, comme <em>Casque avec grille complète pour le hockey libre et bâton et rondelle</em>. Votre patinage libre adulte reste votre prix principal, et la recherche vous trouve pour le hockey libre.</p>' },
+  // Sport test 7 (2026-11-20; Kayla, Predator Ridge: the resort questions Help missed). Each answer explains what to do
+  // with what is already here: no new fields (Dayton: "Copy my answers to our other course" is not a feature).
+  { id: 'sport-two-courses', pages: ['setup', 'edit'], over: ['sport-one-listing', 'sport-second-kind', 'indoor-kinds-many', 'more-businesses', 'setup-status', 'sport-rate-change', 'indoor-booking'],
+    q: 'We have two courses (or two rinks, pools…): do I do this twice?', qFr: 'Nous avons deux terrains (ou deux patinoires…) : je fais tout deux fois?',
+    keys: ['two courses', 'two 18s', 'two 18', 'both courses', 'second course', 'other course', 'our other course', 'sister course', 'two golf courses', 'do this twice', 'whole thing twice', 'do it twice', 'do this for both', 'two rinks', 'two arenas', 'two pools', 'two parks', 'other rink', 'other pool', 'other location', 'second location', 'two locations', 'each course'],
+    keysFr: ['deux terrains', 'deux parcours', 'deux 18 trous', 'autre terrain', 'autre parcours', 'deuxieme terrain', 'deux fois', 'tout refaire', 'les deux terrains', 'deux patinoires', 'deux piscines', 'autre emplacement'],
+    allOf: [['two', 'both', 'second', 'other', 'sister', 'twice', 'deux', 'autre', 'deuxieme', 'jumeau'], ['course', 'courses', '18s', 'nines', 'rinks', 'arenas', 'pools', 'parks', 'locations', 'terrain', 'parcours', 'patinoires', 'piscines', 'emplacement']],
+    a: '<p>Yes, one at a time: each course has its own page here, with its own private link and its own setup, so its hours, season, prices and photos are right for that course. Do this one now. The other course’s answers are mostly the same, so the second goes quicker. No link for the other one? Tap <strong>Message us</strong> and Dayton will send it.</p>',
+    aFr: '<p>Oui, un à la fois : chaque terrain a sa propre page ici, avec son propre lien privé et sa propre configuration, pour que ses heures, sa saison, ses tarifs et ses photos soient les bons. Faites celui-ci maintenant. Les réponses de l’autre terrain sont surtout les mêmes : le deuxième va plus vite. Pas de lien pour l’autre? Touchez <strong>Écrivez-nous</strong> et Dayton vous l’enverra.</p>' },
+  { id: 'sport-sister-listing', pages: ['setup', 'edit'], over: ['sport-second-kind', 'indoor-kinds-many', 'sport-kinds-other', 'photo-rights', 'sport-one-listing', 'sport-season-says', 'sport-season'],
+    q: 'Our simulator lounge (or restaurant) already has its own page', qFr: 'Notre salon de simulateurs (ou restaurant) a déjà sa propre page',
+    keys: ['already has its own page', 'has its own page', 'its own page', 'own page on your site', 'its own listing', 'own listing', 'already has a page', 'already listed', 'separate page', 'sim lounge', 'simulator lounge', 'sim lounge is open', 'tick indoor golf'],
+    keysFr: ['sa propre page', 'sa propre fiche', 'deja une page', 'deja une fiche', 'salon de simulateurs', 'cocher golf interieur'],
+    a: '<p>Then don’t tick it here: it has its own page, with its own hours and setup. Want golfers to know? Say it in one line in <strong>Good to know</strong>, like <em>Callaway SIM Lounge in the clubhouse, November to March</em>. Outside your season your page says closed and when you reopen; the lounge’s own page shows it open in winter.</p>',
+    aFr: '<p>Alors ne le cochez pas ici : il a sa propre page, avec ses heures et sa configuration. Vous voulez que les golfeurs le sachent? Dites-le en une ligne dans <strong>Bon à savoir</strong>, comme <em>Salon de simulateurs Callaway au club-house, de novembre à mars</em>. Hors saison, votre page dit fermé et quand vous rouvrez; la page du salon le montre ouvert l’hiver.</p>' },
+  { id: 'sport-social-hour', pages: ['setup', 'edit'], over: ['no-website-social', 'sport-shared-social', 'sport-restaurant', 'social-post', 'hh-times', 'hh-deals'],
+    q: 'Our "social hour" (happy hour) at the clubhouse or its restaurant', qFr: 'Notre « heure sociale » (5 à 7) au club-house ou à son restaurant',
+    keys: ['social hour', 'social hours', 'apres golf', 'après golf', 'apres ski', 'drink specials', 'happy hour at', 'happy hour on both'],
+    keysFr: ['heure sociale', 'apres golf', '5 a 7 au', 'cinq a sept'],
+    allOf: [['social', 'sociale'], ['hour', 'heure', '3 5', 'pints', 'flatbreads', 'specials', 'deals', 'daily']],
+    a: '<p>That’s your happy hour: tap <strong>Happy hour</strong> in More about your place, pick the days and times, and add the deals, like <em>$7 pints, $9 wine</em>. Your page says “Happy hour on now” at those times. The restaurant has its own page too? That’s fine: put it on both.</p>',
+    aFr: '<p>C’est votre 5 à 7 : touchez <strong>5 à 7</strong> dans Plus sur votre endroit, choisissez les jours et les heures, et ajoutez les spéciaux, comme <em>Pintes à 7 $, vin à 9 $</em>. Votre page indique « 5 à 7 en cours » à ces heures. Le restaurant a aussi sa page? C’est correct : mettez-le sur les deux.</p>' },
+  { id: 'sport-two-accounts', pages: ['setup', 'edit'], over: ['no-website-social', 'sport-shared-social', 'links', 'social-post'],
+    q: 'We have two Instagram (or Facebook) accounts: which one?', qFr: 'Nous avons deux comptes Instagram (ou Facebook) : lequel?',
+    keys: ['two instagram', 'two instagrams', 'second instagram', 'another instagram', 'golf only instagram', 'golf instagram', 'which instagram', 'which account', 'which one should go here', 'two accounts', 'two facebook', 'which facebook', 'resort instagram', 'also run a'],
+    keysFr: ['deux instagram', 'deux comptes', 'quel compte', 'quel instagram', 'autre compte', 'deux facebook'],
+    allOf: [['two', 'second', 'another', 'which', 'deux', 'autre', 'quel'], ['instagram', 'insta', 'facebook', 'account', 'compte', 'handle']],
+    a: '<p>Put the one visitors to this place should follow: usually the account just for it (your golf one), else the resort’s. There’s one box for each, Instagram and Facebook, so pick one of each.</p>',
+    aFr: '<p>Mettez celui que les visiteurs de cet endroit devraient suivre : d’habitude le compte qui lui est propre (celui du golf), sinon celui du centre. Il y a une case pour chacun, Instagram et Facebook : choisissez-en un de chaque.</p>' },
+  { id: 'sport-shuttle', pages: ['setup', 'edit'], over: ['sport-free-clubs', 'indoor-good-to-know', 'description', 'parking-paid', 'indoor-free', 'getting-there'],
+    q: 'A shuttle or getting around (resort shuttle, parking shuttle)', qFr: 'Une navette ou les déplacements sur place',
+    keys: ['shuttle', 'shuttles', 'free shuttle', 'resort shuttle', 'shuttle bus', 'shuttle from', 'getting around the resort', 'golf cart to the', 'transport from the lodge', 'pick up from the lodge'],
+    keysFr: ['navette', 'navettes', 'navette gratuite', 'navette du centre', 'transport sur place'],
+    a: '<p>Worth a line: say it in <strong>Good to know</strong>, like <em>Free shuttle from the Lodge and cottages to the clubhouse</em>, or in your story. It shows under “Your visit” on your page, and Build My Trip reads it.</p>',
+    aFr: '<p>Ça vaut une ligne : dites-le dans <strong>Bon à savoir</strong>, comme <em>Navette gratuite du Lodge et des chalets au club-house</em>, ou dans votre histoire. Ça paraît sous « Votre visite » sur votre page, et Planifier mon voyage le lit.</p>' },
+  { id: 'sport-twilight-times', kinds: ['golf', 'range'], pages: ['setup', 'edit', 'menu'], over: ['sport-rate-lines', 'indoor-summer-late', 'seasonal-hours', 'hours', 'indoor-busy-times', 'setup-season'],
+    q: 'Twilight starts at different times through the season', qFr: 'Le tarif crépuscule commence à des heures différentes selon la saison',
+    keys: ['twilight starts', 'twilight start', 'twilight time', 'twilight times', 'twilight begins', 'twilight after', 'twilight rate starts', 'twilight is after', 'when twilight starts'],
+    keysFr: ['crepuscule commence', 'tarif crepuscule', 'crepuscule a partir', 'crepuscule des'],
+    allOf: [['twilight', 'crepuscule', 'sunset'], ['start', 'begin', 'after', 'earlier', 'later', 'time', 'fall', 'summer', 'commence', 'partir', 'heure', 'automne', 'ete']],
+    a: '<p>That’s a price, not your hours: one line per twilight rate in <strong>Your prices</strong>, with its start time in the details, like <em>Twilight 18 holes $180 – after 3 PM June to August, after 1 PM in the fall</em>. Your hours stay first tee to last tee.</p>',
+    aFr: '<p>C’est un tarif, pas vos heures : une ligne par tarif crépuscule dans <strong>Vos tarifs</strong>, avec l’heure de début dans les détails, comme <em>Crépuscule 18 trous 180 $ – après 15 h de juin à août, après 13 h à l’automne</em>. Vos heures restent du premier au dernier départ.</p>' },
 ];
 // What owners of every kind typed for the shared answers ([en keys, fr keys, topics they now beat]).
 const MORE_KEYS = {
@@ -634,4 +676,50 @@ function kindHelp(t, kind, ctx) {
     default: return t;
   }
 }
-module.exports = { WORDS, word, TOPICS, MORE_KEYS, tokens, kindHelp, fill };
+// Sport test 7 (2026-11-20; 180 blind questions from six owner types, written without this file: 64% landed well): ideas
+// in any words, not phrases. Each topic's concept groups (server.js allOfAny): a set of word-start groups that is a strong
+// match when the question has a word from every group of it, anywhere. Kept narrow: two ideas that only meet in that topic.
+const PLACE_NOUNS = ['course', 'courses', 'cours', 'page', 'pages', 'listing', 'rink', 'arena', 'pool', 'park', 'facilit', 'location', 'site', 'terrain', 'parcours', 'patinoire', 'piscine', 'fiche', '18s', 'nines', 'club', 'school', 'ecole', 'centre', 'center', 'lounge', 'shop', 'boutique'];
+const KIND_NOUNS = ['golf', 'range', 'spa', 'pool', 'rink', 'arena', 'simulat', 'sims', 'bike', 'bikes', 'rent', 'rental', 'repair', 'shop', 'store', 'restaurant', 'cafe', 'bar', 'mini', 'court', 'tennis', 'pickle', 'ski', 'snowboard', 'skate', 'disc', 'piscine', 'patinoire', 'velo', 'boutique', 'location', 'reparation', 'lessons', 'cours', 'gym'];
+const CLOSED = ['closed', 'close', 'closing', 'shut', 'ferme', 'fermer', 'fermons', 'fermeture'];
+const PHOTO = ['photo', 'pic ', 'pics', 'pix', 'picture', 'image', 'foto', 'shots'];
+const CONCEPTS = {
+  'sport-rates-next-year': [[['rate', 'price', 'fee', 'tarif', 'prix'], ['next year', 'next season', 'not set', 'arent set', 'aren t set', 'not on our website', 'arent on our website', 'not final', 'l an prochain', 'annee prochaine', 'pas encore sur', 'pas fixes']]],
+  'sport-sister-listing': [[['sim', 'simulat', 'lounge', 'spa', 'salon'], ['own page', 'own listing', 'already', 'separate', 'propre page', 'propre fiche', 'deja']]],
+  'sport-one-listing': [[['two', 'second', 'another', 'both', 'each', 'twice', 'deux', 'autre', 'chaque', 'sister', 'jumeau'], PLACE_NOUNS.filter((w) => !['page', 'pages', 'shop', 'boutique', 'cours'].includes(w)).concat(['both on', 'same page', 'one page', 'meme page'])]],
+  'indoor-kinds-many': [[['tick', 'pick', 'choose', 'select', 'check', 'coch', 'choisi', 'both', 'all of', 'tous'], KIND_NOUNS, ['and', 'et', 'plus', 'also', 'aussi', 'both', 'a range', 'a spa', 'a pool']]],
+  'description': [[['long', 'short', 'words', 'mots', 'length', 'longueur', 'characters', 'caracteres', 'write', 'ecrire', 'paragraph'], ['description', 'story', 'histoire', 'texte', 'text', 'blurb', 'about us', 'bio']]],
+  'menu-import': [[['upload', 'pdf', 'scan', 'file', 'fichier', 'import', 'televers', 'attach', 'joindre', 'instead of typing', 'au lieu de taper'], ['rate', 'price', 'menu', 'list', 'sheet', 'tarif', 'prix', 'grille', 'fees', 'liste']]],
+  'sport-members': [[['membres', 'members', 'member'], ['public', 'alternent', 'alternate', 'swap', 'every other', 'un jour sur deux', 'seulement', 'only']], [['public', 'visitors', 'guests', 'non member', 'nonmember', 'grand public', 'visiteurs'], ['cant', 'cannot', 'can t', 'not allowed', 'till', 'until', 'reserved', 'only', 'jusqu', 'reserve', 'interdit', 'peut pas', 'peuvent pas']]],
+  'sport-approval-first': [[['council', 'approv', 'board', 'manager', 'boss', 'conseil', 'approuv', 'sign off', 'city hall', 'mairie', 'ville'], ['yet', 'later', 'wait', 'before', 'encore', 'attendre', 'plus tard', 'pending', 'not final', 'confirmed']]],
+  'sport-one-off-closure': [[['tournament', 'tournoi', 'member guest', 'championship', 'championnat', 'block', 'bloquer', 'event'], ['specificdate', 'dates', 'days', 'jours', 'cant book', 'can t book', 'public', 'closed', 'ferme', 'block it', 'those days']], [CLOSED, ['ndays', 'weeks', 'week', 'semaine', 'broke', 'broken', 'repair', 'maintenance', 'renovat', 'tournament', 'tournoi', 'reparation', 'bris', 'brise', 'panne', 'swap', 'replace', 'resurfac', 'event']], [['broke', 'broken', 'breakdown', 'panne', 'brise', 'flood', 'leak', 'power outage'], ['tell', 'say', 'show', 'let', 'dire', 'indiquer', 'aviser', 'closed', 'ferme']]],
+  'closures': [[CLOSED, ['dec 24', 'dec 25', 'dec 26', 'christmas', 'noel', 'holiday', 'jan 1', 'stat', 'specificdate', 'boxing', 'new year']]],
+  'photo-rights': [[PHOTO, ['use', 'using', 'allowed', 'okay', 'rights', 'permission', 'copyright', 'took', 'taken', 'marketing', 'company', 'utilis', 'droit', 'permis', 'correct', 'legal', 'credit', 'facebook', 'instagram', 'website', 'photographer', 'photographe', 'customers', 'clients', 'kids faces']]],
+  'sport-photo-consent': [[PHOTO, ['customers', 'clients', 'kids', 'children', 'students', 'skaters', 'swimmers', 'riders', 'golfers', 'people in', 'faces', 'enfants', 'eleves', 'visages', 'gens']]],
+  'sport-dawn-dusk': [[['dawn', 'dusk', 'sunrise', 'daylight', 'always open', 'anytime', 'any time', '24', 'tout le temps', 'toujours', 'aube', 'unstaffed', 'no staff', 'pas de personnel', 'personne sur place', 'jour et nuit', 'night and day'], ['open', 'hours', 'ouvert', 'heure', 'times', 'horaire', 'what time', 'quand']]],
+  'sport-season': [[CLOSED, ['all winter', 'for winter', 'for the winter', 'winters', 'off season', 'offseason', 'hiver', 'l hiver', 'season', 'saison', 'until spring', 'jusqu au printemps', 'snow melts', 'fonte']]],
+  'indoor-swim-times': [[['public skate', 'public swim', 'drop in', 'skate times', 'swim times', 'ice times', 'patinage libre', 'bain libre', 'bains libres', 'lane swim', 'sessions', 'seances'], ['change', 'changent', 'vary', 'varie', 'every week', 'weekly', 'chaque semaine', 'different each', 'differ']]],
+  'indoor-price': [[['price', 'prix', 'tarif', 'rate', 'cost', 'combien', 'how much', 'dollarsign', 'fee'], ['what do i put', 'what do i enter', 'which one', 'which price', 'quoi mettre', 'je mets quoi', 'lequel', 'quel prix', 'what number', 'enter for', 'put for', 'a mettre']]],
+  'indoor-min-players': [[['minimum', 'at least', 'au moins'], ['players', 'people', 'hour', 'hours', 'joueurs', 'personnes', 'heure', 'hr', 'hrs', 'groupsize']]],
+  'indoor-age': [[['age', 'ages', 'year old', 'yr old', 'yrs', 'ans', 'agenum', 'and up', 'et plus'], ['kids', 'children', 'adults', 'teens', 'enfants', 'adultes', 'ados', 'tick', 'what age', 'minimum age', 'too']]],
+  'indoor-good-to-know': [[['where', 'what box', 'which box', 'quelle case', 'je mets ou', 'ca va ou'], ['bathroom', 'washroom', 'toilet', 'restroom', 'toilettes', 'tees', 'baskets', 'paniers', 'water', 'eau', 'shade', 'benches', 'parking only', 'info', 'details', 'rules', 'regles', 'dress', 'tenue']]],
+  'booking-link': [[['book', 'booking', 'reserv', 'software', 'system', 'app', 'logiciel', 'systeme'], ['link', 'lien', 'click', 'cliquer', 'button', 'bouton', 'from my listing', 'from the page', 'url', 'website']]],
+  'sport-booking-link': [[['book', 'booking', 'reserv', 'software', 'system', 'app', 'logiciel', 'systeme'], ['link', 'lien', 'click', 'cliquer', 'button', 'bouton', 'from my listing', 'from the page', 'url']]],
+  'sport-dogs': [[['dog', 'dogs', 'chien', 'pets', 'animaux'], ['service', 'guide', 'permis', 'interdit', 'leash', 'laisse', 'bienvenus', 'on leash', 'off leash']]],
+  'indoor-access': [[['wheelchair', 'fauteuil', 'accessib', 'ramp', 'rampe', 'elevator', 'ascenseur', 'mobility', 'adaptive', 'adapte', 'stairs', 'escalier', 'service dog', 'chiens guides', 'chien guide'], ['tick', 'say', 'show', 'put', 'dire', 'mettre', 'how', 'comment', 'where', 'tile', 'case', 'okay', 'can']]],
+  'photos-when': [[PHOTO, ['not showing', 'not appear', 'dont see', 'don t see', 'cant see', 'missing', 'yet', 'when will', 'apparue', 'apparait', 'pas encore', 'vois pas', 'quand', 'still', 'after i']]],
+  'photo-small': [[PHOTO, ['how many', 'combien', 'big', 'large', 'size', 'gros', 'grand', 'taille', 'format', 'mb', 'resolution', 'too big', 'trop']]],
+  'indoor-french': [[['translat', 'tradui', 'traduction', 'french', 'francais', 'en francais'], ['who', 'someone', 'do i have to', 'have to', 'qui', 'quelqu', 'dois je', 'je dois', 'need to', 'faut il', 'vous']]],
+  'sport-lessons': [[['lesson', 'lecon', 'clinic', 'academy', 'academie', 'camp', 'instruction', 'coaching'], ['price', 'prix', 'tarif', 'rate', 'cost', 'combien', 'how much', 'dollarsign', 'fee']]],
+};
+// Sport test 7: what a topic's answer is NOT for (server.js notIf): "social hour" is never social media; a tournament's
+// dates are a closure, not members' times; twilight is a price, not summer hours.
+const NOT_IF = {
+  'no-website-social': ['social hour', 'heure sociale'], 'sport-shared-social': ['social hour', 'heure sociale', 'two instagram', 'golf only instagram', 'which one should go here'],
+  'sport-restaurant': ['social hour', 'heure sociale'], 'sport-members': ['tournament', 'tournoi', 'block it', 'member guest'],
+  'indoor-summer-late': ['twilight', 'crepuscule'], 'seasonal-hours': ['twilight', 'crepuscule'], 'menu-import': ['arent on our website yet', 'not on our website yet', 'arent set', 'next year'],
+  'photo-rights': ['own page', 'propre page', 'tick indoor'], 'sport-free-clubs': ['shuttle', 'navette'],
+  'sport-golf-details': ['why does it say', 'cart price', 'pourquoi ca dit'],
+  'sport-sister-listing': ['social hour', 'heure sociale', 'happy hour', 'restaurant'], 'sport-two-courses': ['members', 'member', 'membres', 'alternate', 'alternent', 'alternating', 'swap'],
+};
+module.exports = { WORDS, word, TOPICS, MORE_KEYS, tokens, kindHelp, fill, CONCEPTS, NOT_IF };

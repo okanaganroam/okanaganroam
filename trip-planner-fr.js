@@ -415,6 +415,15 @@ const PHRASES = [
   // Round 10: Christmas markets, and « de la musique » with shows is live music.
   ['marches de noel', 'christmas markets'], ['marche de noel', 'christmas market'], ['marches du temps des fetes', 'christmas markets'], ['marche des fetes', 'christmas market'],
   ['reveillon du nouvel an', "new year's eve"], ['veille du jour de l an', "new year's eve"], ['jour de l an', "new year's day"], ['nouvel an', "new year's"], ['saint valentin', "valentine's"], ['st valentin', "valentine's"], ['action de grace', 'thanksgiving'], ['jour du souvenir', 'remembrance day'], ['paques', 'easter'], ['fete des meres', "mother's day"], ['fete des peres', "father's day"],
+  // Sport test 7 (2026-11-20; « golf … (fête du Canada) » read as a celebration plus the word « canada »): every holiday
+  // name is that holiday, never « fête » (a celebration) plus a place word.
+  ['fete du canada', 'canada day'], ['jour du canada', 'canada day'], ['la fete du canada', 'canada day'], ['fete nationale du canada', 'canada day'],
+  ['fete de la reine', 'victoria day'], ['fete de victoria', 'victoria day'], ['journee nationale des patriotes', 'victoria day'], ['fete des patriotes', 'victoria day'],
+  ['fete du travail', 'labour day'], ['jour de la famille', 'family day'], ['fete de la famille', 'family day'],
+  ['jour de la colombie britannique', 'bc day'], ['fete de la colombie britannique', 'bc day'], ['jour de la c b', 'bc day'], ['fete de la c b', 'bc day'],
+  ['action de graces', 'thanksgiving'], ['jour de l action de grace', 'thanksgiving'], ['jour de l action de graces', 'thanksgiving'], ['fin de semaine de l action de grace', 'thanksgiving weekend'],
+  ['jour de noel', 'christmas day'], ['veille de noel', 'christmas eve'], ['lendemain de noel', 'boxing day'], ['jour du souvenir', 'remembrance day'],
+  ['jour de l an', "new year's day"], ['premier de l an', "new year's day"], ['fete du nouvel an', "new year's day"],
   ['noel', 'christmas'], ['temps des fetes', 'holidays'],
   ['de la musique', 'live music'], ['musique', 'live music'],
   ['marches', 'markets'],
@@ -701,6 +710,17 @@ function translateTrip(text, taxonomy, { frenchPage = false } = {}) {
     // Brewery test 2 (Whistler, 2026-11-16): a French date (« le lundi 3 mai », « le 1er juin ») is that date in the English
     // the planner reads ("monday may 3"): it was read as the month alone, and its time was lost. Not inside a « du 3 au
     // 5 mai » range (handled below).
+    // Sport test 7 (2026-11-20; « les 17 et 18 juillet » was planned Jul 18–19): a list of days in one month (« les 17 et
+    // 18 juillet », « 16, 17 et 18 juillet ») is that range, first day to last.
+    {
+      let j = i; const days = [];
+      while (/^(\d{1,2})(?:er)?$/.test(tokens[j] || '') && !keep.has(j)) { days.push(Number(/^(\d{1,2})/.exec(tokens[j])[1])); j += 1; if (tokens[j] === 'et' || tokens[j] === ',') { j += 1; continue; } break; }
+      const mEn = days.length >= 2 ? FR_DATE_MONTHS[tokens[j]] : null;
+      if (mEn && !keep.has(j) && days.every((d) => d >= 1 && d <= 31) && days[days.length - 1] > days[0] && days[days.length - 1] - days[0] <= 6 && tokens[i - 1] !== 'du') {
+        if (['the', 'on'].includes(out[out.length - 1])) { out.pop(); pieces.pop(); }
+        out.push(`${mEn} ${days[0]} to ${mEn} ${days[days.length - 1]}`); i = j + 1; continue;
+      }
+    }
     const dm = /^(\d{1,2})(?:er)?$/.exec(w), monthEn = dm ? FR_DATE_MONTHS[tokens[i + 1]] : null;
     if (dm && monthEn && Number(dm[1]) >= 1 && Number(dm[1]) <= 31 && !keep.has(i + 1) && !(tokens[i - 1] === 'au' && /^\d{1,2}$/.test(tokens[i - 2] || '')) && tokens[i - 1] !== 'du') {
       if (out[out.length - 1] === 'the') { out.pop(); pieces.pop(); }

@@ -623,6 +623,9 @@
   var WI = clone(CUR.winery_info || {});
   // Tours (2026-11-16): their own answers (venue_tour_info), read here so the Hours step's "By booking only" can use them.
   var TI = clone((INDOOR ? CUR.indoor_info : CUR.tour_info) || {});
+  // Sport test 7 (test 4 #10; a golf course's new days started at 10 AM – 5 PM): an outdoor sport kind's new day starts
+  // at its usual daylight hours (a course's first to last tee), never a shop's 10 to 5.
+  if (C.sport) { var SPORT_DAY_NEW = { golf: ['07:00', '19:00'], range: ['08:00', '20:00'], discgolf: ['07:00', '21:00'], bike: ['09:00', '20:00'], skatepark: ['08:00', '21:00'], courts: ['07:00', '21:00'], skischool: ['08:30', '16:00'] }; var mk0 = ((TI.kinds || [])[0]) || C.sportMain || ''; if (SPORT_DAY_NEW[mk0]) DAY_NEW = SPORT_DAY_NEW[mk0]; }
   S.wine = {
     food: WI.food || '', rname: (WI.restaurant || {}).name || '', rwhen: (WI.restaurant || {}).when || '',
     fee: CUR.tasting_fee == null ? null : CUR.tasting_fee, feeOther: false, waived: WI.waived || '',
@@ -1641,7 +1644,12 @@
   // Indoor test 2 (2026-11-19; Jordan typed "Corporate team building and birthday parties", tapped 10+, and lost his words):
   // a size chip (no t) keeps every sentence but an older size line (or a bare "Groups welcome", which the size line says
   // better: cocktail test 3); only a quick answer drops what it says itself.
-  function groupsKeep(v, t, sibs){ if (!t) return sentencesOf(v).filter(function(x){ return !isSizeLine(x) && !/^(?:(?:large|big|small) )?(?:groups?|parties) (?:are )?(?:welcome|ok|okay)(?:,? call ahead)?$|^(?:great|good) for groups$|^group[- ]friendly$|^groupes? bienvenus?$/i.test(String(x).trim()); }); return sentencesOf(v).filter(function(x){ return groupsFact(x) && !(has(x, t) || saysIt(x, t, sibs)); }); }
+  // Sport test 7 (2026-11-20; Kayla tapped 15+ and research's "groups of 16 plus get special rates" was gone): a sentence
+  // that states a size AND says something more (rates, players, a room) is a fact, never replaced by a size chip.
+  function sizeFact(x){ if (!isSizeLine(x)) return false; var rest = String(x).toLowerCase().replace(/\d+/g, ' ').replace(/[^a-zà-ÿ’']+/g, ' ').split(' ').filter(function(w){ return w && !/^(?:groups?|of|or|more|plus|and|up|over|please|book|booking|call|ahead|people|persons?|guests?|for|a|an|the|groupes?|de|ou|personnes?|réservez|réserver|à|l’avance|l'avance|avance|appelez|pour|et|svp|merci|minimum|min)$/.test(w); }); return rest.length > 0 && !(T.groupsLine && new RegExp('^' + T.groupsLine.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace('\\{n\\}', '\\d+') + '$').test(String(x).trim())); }
+  // The chip a research size sentence matches: the largest size chip at or under its number ("groups of 16 plus…": 15+).
+  function sizeFactChip(v){ var f = sentencesOf(v).filter(sizeFact)[0], m = f && /\b(\d{1,3})\b/.exec(f); if (!m) return null; var n = +m[1], best = null; GROUP_SIZES.forEach(function(z){ if (z <= n) best = z; }); return best; }
+  function groupsKeep(v, t, sibs){ if (!t) return sentencesOf(v).filter(function(x){ return (!isSizeLine(x) || sizeFact(x)) && !/^(?:(?:large|big|small) )?(?:groups?|parties) (?:are )?(?:welcome|ok|okay)(?:,? call ahead)?$|^(?:great|good) for groups$|^group[- ]friendly$|^groupes? bienvenus?$/i.test(String(x).trim()); }); return sentencesOf(v).filter(function(x){ return groupsFact(x) && !(has(x, t) || saysIt(x, t, sibs)); }); }
   // Indoor test 8 (2026-11-19; Gary): a quick answer or a size rebuilt the line from its sentences, so research's "Groups
   // welcome; private bookings" came back as "Groups welcome. Private bookings". The sentences kept, with their own
   // punctuation (";" stays ";"), then the new one.
@@ -2381,7 +2389,7 @@
       // Winery test 4 (2026-11-12): a winery says "We don't have set hours. Visits are by appointment" here (and on the
       // day list); once it has, the screen says so and "Yes, that's right" keeps it.
       var anyOpen = S.week && DAYS.some(function(d){ return S.week[d]; }), noneNow = APPT && AI.visit === 'appointment' && !anyOpen && !!CUR.hours;
-      x = doneLine('hours') + q(T.hoursQ) + (anyOpen ? classNightsHint() : '') + msgs() + (anyOpen ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit')
+      x = doneLine('hours') + q(anyOpen || noneNow || !T.hoursQNone ? T.hoursQ : T.hoursQNone) + (anyOpen ? classNightsHint() : '') + msgs() + (anyOpen ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit')
         // Distillery test 2 (Whistler, 2026-11-16): a stretch of other hours is changed from here in one tap (« Modifier mes
         // heures du 15 juin au 7 sept. »); it took four screens (the week, Next, the year question, then this button).
         + storedSeas().map(function(st){ return big('✎', fill(T.seaChange, st), '', true, 'yearSeasonEdit:' + st.i); }).join('') + noSetBtn() + '</div>'
@@ -3130,7 +3138,7 @@
       // "book ahead" is never said twice), the line in her own words, and the booking link box, which always shows (a
       // walk-in taproom can still add a page for group bookings). "We can't take big groups" is the explicit answer.
       // Cocktail test 3 (2026-11-14): the pressed size is the one in the "book ahead" sentence, not "for 20" of a room.
-      var gl = S.brew.groups, gszS = sentencesOf(gl).filter(function(x){ return isSizeLine(x) || /book|réserv/i.test(x); })[0] || '', gsz = (/\b(\d{1,2})\b/.exec(gszS) || [])[1];
+      var gl = S.brew.groups, gszS = sentencesOf(gl).filter(function(x){ return (isSizeLine(x) && !sizeFact(x)) || (/book|réserv/i.test(x) && !sizeFact(x)); })[0] || '', gsz = (/\b(\d{1,2})\b/.exec(gszS) || [])[1] || sizeFactChip(gl);
       // Tour test 7 (Whistler, 2026-11-17): a booked tour's sizes start at "Up to 4" (a guide takes 4 a day; it started at 6).
       // Tour test 8 (Whistler, 2026-11-17; Linda, sleds of 2): every tour starts at 4 ("4+" when it has set hours; it showed
       // only for a tour by booking).
@@ -5121,7 +5129,7 @@
     // Indoor test 8 (Gary cleared the Groups box and 10+ stayed pressed, with nothing saved): typing in the box (or
     // clearing it) re-lights the sizes and quick answers from what the box says.
     var gsx = el('suGroupsLine'); if (gsx) gsx.addEventListener('input', function(){
-      var gv = gsx.value, gs = sentencesOf(gv).filter(function(x){ return isSizeLine(x) || /book|réserv/i.test(x); })[0] || '', gn = (/\b(\d{1,2})\b/.exec(gs) || [])[1];
+      var gv = gsx.value, gs = sentencesOf(gv).filter(function(x){ return (isSizeLine(x) || /book|réserv/i.test(x)) && !sizeFact(x); })[0] || '', gn = (/\b(\d{1,2})\b/.exec(gs) || [])[1] || sizeFactChip(gv);
       Array.prototype.forEach.call(screen.querySelectorAll('[data-bgroup]'), function(c){ var n0 = +c.getAttribute('data-bgroup'); c.setAttribute('aria-pressed', sentencesOf(gv).indexOf(groupsSizeLine(n0)) >= 0 || (!!gn && +gn === n0) ? 'true' : 'false'); });
       var qs = Array.prototype.filter.call(screen.querySelectorAll('[data-quick]'), function(c){ return c.getAttribute('data-box') === 'suGroupsLine'; }), ql = qs.map(function(c){ return c.getAttribute('data-quick'); });
       qs.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(gv, c.getAttribute('data-quick'), ql) ? 'true' : 'false'); });

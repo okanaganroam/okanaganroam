@@ -6106,23 +6106,41 @@ const SMART_HOLIDAY_WORDS = ['christmas day', 'xmas day', 'christmas eve', 'xmas
   'new year s day', 'new years', 'jour de l an', 'veille du jour de l an', 'canada day', 'fete du canada', 'dec 24', 'dec 25', 'dec 26', 'dec 31', 'december 24', 'december 25', 'december 26', 'december 31', '24 dec', '25 dec', '26 dec', '31 dec',
   '24 decembre', '25 decembre', '26 decembre', '31 decembre', 'jan 1', 'january 1', '1er janvier', 'july 1', '1er juillet', 'on', 'le', 'day', 'jour',
   // Sport test 3 (2026-11-20): « le jour de Noël » arrives as "the day of christmas".
-  'the day of christmas', 'day of christmas', 'of', 'the'];
+  'the day of christmas', 'day of christmas', 'of', 'the',
+  // Sport test 7: the Monday holidays.
+  'thanksgiving', 'thanksgiving day', 'thanksgiving monday', 'action de grace', 'jour de l action de grace', 'victoria day', 'fete de la reine', 'labour day', 'labor day', 'fete du travail', 'bc day', 'family day', 'fete de la famille'];
 const SMART_MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const SMART_MONTHS_FR = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 // Indoor test 19 (2026-11-19; Priyanka: "indoor playground kelowna december 25" said "“december” isn’t something search
 // can apply" with no Closed line on her card, and "boxing day" was read as the word "boxing"): the search's words without
 // the holiday it named (and an "on" or "le" before it), for the place search; the date goes on the cards instead.
 function smartStripHoliday(folded) {
-  const h = SMART_HOLIDAYS.find(([re]) => re.test(folded));
+  const h = SMART_HOLIDAYS.find(([re]) => re.test(folded)) || (!/\bweekend\b|\bfin de semaine\b|\blong\b/.test(folded) && SMART_MOVING_HOLIDAYS.find(([re]) => re.test(folded)));
   if (!h) return folded;
   const re = new RegExp(`(?:^| )(?:(?:on|for|le|pour) )?(?:${h[0].source.replace(/^\(\?:\^\| \)\(\?:/, '').replace(/\)\(\?: \|\$\)$/, '')})(?= |$)`);
   return folded.replace(re, ' ').replace(/\s+/g, ' ').trim();
 }
+// Sport test 7 (2026-11-20; "golf on thanksgiving vernon" was no date): the Monday holidays, as dates (the next one).
+const SMART_MOVING_HOLIDAYS = [
+  [/(?:^| )(?:thanksgiving(?: day| monday)?|action de grace|jour de l action de grace)(?: |$)/, (y) => { const d = new Date(Date.UTC(y, 9, 1)); d.setUTCDate(1 + ((8 - d.getUTCDay()) % 7) + 7); return d; }],
+  [/(?:^| )(?:victoria day|fete de la reine|journee nationale des patriotes)(?: |$)/, (y) => { const d = new Date(Date.UTC(y, 4, 24)); d.setUTCDate(24 - ((d.getUTCDay() + 6) % 7)); return d; }],
+  [/(?:^| )(?:labou?r day|fete du travail)(?: |$)/, (y) => { const d = new Date(Date.UTC(y, 8, 1)); d.setUTCDate(1 + ((8 - d.getUTCDay()) % 7)); return d; }],
+  [/(?:^| )(?:bc day|b c day|fete de la c b|jour de la c b)(?: |$)/, (y) => { const d = new Date(Date.UTC(y, 7, 1)); d.setUTCDate(1 + ((8 - d.getUTCDay()) % 7)); return d; }],
+  [/(?:^| )(?:family day|fete de la famille|jour de la famille)(?: |$)/, (y) => { const d = new Date(Date.UTC(y, 1, 1)); d.setUTCDate(1 + ((8 - d.getUTCDay()) % 7) + 14); return d; }],
+];
 function smartSearchHoliday(folded, now = new Date()) {
-  const h = SMART_HOLIDAYS.find(([re]) => re.test(folded));
+  let h = SMART_HOLIDAYS.find(([re]) => re.test(folded));
+  if (!h && !/\bweekend\b|\bfin de semaine\b|\blong\b/.test(folded)) {
+    const mv = SMART_MOVING_HOLIDAYS.find(([re]) => re.test(folded));
+    if (mv) {
+      const today0 = todayLocal(now), y = Number(today0.slice(0, 4));
+      let d = mv[1](y); if (d.toISOString().slice(0, 10) < today0) d = mv[1](y + 1);
+      h = [mv[0], d.getUTCMonth() + 1, d.getUTCDate(), d.getUTCFullYear()];
+    }
+  }
   if (!h) return null;
   const today = todayLocal(now), y0 = Number(today.slice(0, 4));
-  let date = `${y0}-${String(h[1]).padStart(2, '0')}-${String(h[2]).padStart(2, '0')}`;
+  let date = `${h[3] || y0}-${String(h[1]).padStart(2, '0')}-${String(h[2]).padStart(2, '0')}`;
   if (date < today) date = `${y0 + 1}${date.slice(4)}`;
   const idx = new Date(`${date}T12:00:00Z`).getUTCDay();
   return { key: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][idx], idx, date, en: `${SMART_MONTHS_SHORT[h[1] - 1]} ${h[2]}`, fr: `${h[2] === 1 ? '1er' : h[2]} ${SMART_MONTHS_FR[h[1] - 1]}`, holiday: true };
@@ -7193,7 +7211,34 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
     const pinned0 = new Set(pinnedIds);
     venues = venues.map((v, i) => ({ v, i, s: st(v), p: pinned0.has(v.id) ? 0 : 1 })).sort((a, b) => a.p - b.p || ((b.s && b.s.open ? 1 : 0) - (a.s && a.s.open ? 1 : 0)) || ((a.s && !a.s.open ? 1 : 0) - (b.s && !b.s.open ? 1 : 0)) || a.i - b.i).map((o) => o.v);
   }
-  return { run, q, plan, venues, why, guides, fuzzy, events, now, nameOnly, pinnedIds, day };
+  // Sport test 7 (2026-11-20; "golf in july vernon" listed three simulators above every course): for plain "golf" in the
+  // outdoor season (the day or month asked, else today), and for "golf course" any time, courses come before simulators.
+  // Off-season or a rainy day keeps the order (simulators are what's open). A name match stays first.
+  if (venues.length > 1) {
+    const fq = smartFold(sq);
+    if (/\bgolf\b/.test(fq) && !/\b(?:simulators?|sims?|indoor|virtual|lounges?|screen|trackman|rain\w*|wet|stormy|covered|interieur|simulateurs?)\b/.test(fq) && venues.some((v) => v.type === 'golf' && golfSimVenue(v)) && venues.some((v) => v.type === 'golf' && !golfSimVenue(v))) {
+      const mo = !day ? smartSearchMonth(fq) : null;
+      const ref = day && day.date ? day.date : day && day.month ? `2027-${String(day.month).padStart(2, '0')}-15` : mo ? `2027-${String(mo.month).padStart(2, '0')}-15` : todayLocal(now);
+      const md = ref.slice(5), inSeason = md >= GOLF_WINTER_DEFAULT.from && md <= GOLF_WINTER_DEFAULT.to;
+      if (inSeason || /\bgolf (?:courses?|clubs?)\b|\bterrains? de golf\b|\bparcours\b/.test(fq)) {
+        const pinned0 = new Set(pinnedIds), sim = (v) => v.type === 'golf' && golfSimVenue(v);
+        venues = venues.map((v, i) => ({ v, i, p: pinned0.has(v.id) && !sim(v) ? 0 : 1, s: sim(v) ? 1 : 0 })).sort((a, b) => a.p - b.p || a.s - b.s || a.i - b.i).map((o) => o.v);
+      }
+    }
+  }
+  // Sport test 7 (2026-11-20; "wheelchair accessible golf vernon" said it "isn't something search can apply yet", though she
+  // ticked Wheelchair accessible): the owners' own Wheelchair accessible answer (never research) puts those places first,
+  // and the card says why. With none of them in the list, the note stays.
+  let accessApplied = false;
+  if (venues.length && /\bwheel ?chairs?\b|\b(?:wheelchair )?accessib(?:le|ility)\b|\bfauteuils? roulants?\b|\baccessibles?\b|\baccessibilite\b/.test(smartFold(sq))) {
+    const acc = (v) => { try { return !!venueOwnerFeatures(v.id).wheelchair_accessible; } catch (e) { return false; } };
+    if (venues.some(acc)) {
+      accessApplied = true;
+      venues = venues.map((v, i) => ({ v, i, a: acc(v) ? 0 : 1 })).sort((a, b) => a.a - b.a || a.i - b.i).map((o) => o.v);
+      for (const v of venues) if (acc(v)) why.set(v.id, ['Wheelchair accessible (the owner’s answer)', why.get(v.id)].filter(Boolean).join(' · '));
+    }
+  }
+  return { run, q, plan, venues, why, guides, fuzzy, events, now, nameOnly, pinnedIds, day, accessApplied };
 }
 // Round 12 (2026-10-20): a /search page that would show nothing: no places, no events, no page of its own to go to.
 // Indoor test 9 (2026-11-19; "indoor playground Kelowna" missed Melissa's play centre next door in West Kelowna): a search
@@ -7350,6 +7395,7 @@ function searchSummaryHtml(model, lang) {
     // a day leaves off the notes about its date words, and a list of places of that kind leaves off "No … in <town>".
     .filter((n) => !(((plan && plan.list && plan.day) || model.day) && n.field === 'phrase' && SEARCH_DATE_WORD_RE.test(smartFold(String(n.value || '')))))
     .filter((n) => !(plan && plan.list && n.code === 'kind_nearest' && model.venues && model.venues.length && SEARCH_KIND_ACTIVITY[n.value] === plan.key))
+    .filter((n) => !(model.accessApplied && n.field === 'phrase' && /wheel ?chair|accessib|fauteuil/i.test(String(n.value || ''))))
     .map((n) => (lang === 'fr' ? discoveryNoteTextFr(n, labels) : discoveryNoteText(n, labels))).filter((t, i, all) => t && all.indexOf(t) === i);
   const noteHtml = notes.length ? `<ul class="search-notes">${notes.map((t) => `<li>${esc(t)}</li>`).join('')}</ul>` : '';
   const quote = lang === 'fr' ? `« ${esc(q)} »` : `“${esc(q)}”`;
@@ -7665,7 +7711,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       ...(() => { const own = sportSetupType(v.type) ? (venueIndoorInfo(v.id).kinds || []) : []; const w = own.length ? (indoorKindsModule.SPORT.SPORT_KIND_WORDS[own[0]] || [])[0] : undefined;
         return own.length ? { cuisine: w ? w.toLowerCase() : null, cuisines: w ? [w.toLowerCase()] : [] } : { cuisine: v.cuisine ? String(v.cuisine).toLowerCase().trim() : null, cuisines: venueCuisineList(v).map((c) => String(c).toLowerCase().trim()) }; })(),
       cuisineLabel: v.cuisine || null,
-      textName: normalize(v.name || ''), textCuisine: normalize(venueCuisineList(v).join(' ') || v.cuisine || ''), textDesc: normalize(`${v.description || ''}${knownForById.has(v.id) ? ` ${knownForById.get(v.id)}` : ''}${v.type === 'shop' ? ' shop shops shopping store stores' : ''}${v.type === 'cafe' ? cafePlannerWords(v) : ''}`),
+      textName: normalize(v.name || ''), textCuisine: normalize(venueCuisineList(v).join(' ') || v.cuisine || ''), textDesc: normalize(`${v.description || ''}${knownForById.has(v.id) ? ` ${knownForById.get(v.id)}` : ''}${v.type === 'shop' ? ' shop shops shopping store stores' : ''}${v.type === 'cafe' ? cafePlannerWords(v) : ''}`) + (sportSetupType(v.type) ? sportPlannerWords(v).map((x) => ` ${normalize(x)}`).join('') : ''),
       ...(v.type === 'shop' ? { isShop: true } : {}),
       ...(groupsById.has(v.id) ? { groupsText: groupsById.get(v.id) } : {}),
       ...(dateNightById.has(v.id) ? { dateNightLine: dateNightById.get(v.id) } : {}),
@@ -8329,6 +8375,8 @@ function runTripPlan(args, now = new Date()) {
   try { plan = tripPickupWordsUsed(plan, args); } catch (e) { /* keep the plan */ }
   try { plan = tripShowPlacesFallback(plan, args); } catch (e) { console.error(`[trip] show places: ${e.message}`); }
   try { plan = tripKindClosureNotes(plan, args, now); } catch (e) { console.error(`[trip] kind closures: ${e.message}`); }
+  try { plan = tripOwnerClosureNotes(plan, args, now); } catch (e) { console.error(`[trip] owner closures: ${e.message}`); }
+  try { plan = tripClubhouseMeal(plan, args); } catch (e) { console.error(`[trip] clubhouse meal: ${e.message}`); }
   try { plan = tripIndoorGolfWords(plan, args); } catch (e) { console.error(`[trip] indoor golf words: ${e.message}`); }
   try { plan = tripGolfPartSeasonNotes(plan, args, now); } catch (e) { console.error(`[trip] part seasons: ${e.message}`); }
   return plan;
@@ -8456,6 +8504,90 @@ function tripKindClosureNotes(plan, args, now) {
   // A day plan's "… is closed on your dates, so pool is not in this plan." becomes the named closure (said once).
   const generic = (w) => add.some((a) => String(w).startsWith(`${a.name} is closed on your dates, so `));
   plan.warnings = (plan.warnings || []).filter((w) => !generic(w)).concat(add.map((a) => a.line));
+  return plan;
+}
+// Sport test 7 (2026-11-20; "round of golf then dinner on a patio at the clubhouse" planned dinner 13 km away): a golf
+// course's own place to eat: research's Food or Restaurant row, or the owner's own "Restaurant and patio on site" (or her
+// lines saying a restaurant on site). -> its words, or null. Simulators and ranges are not courses here.
+function golfOnSiteFood(venueId) {
+  try {
+    const v = db.prepare('SELECT * FROM venues WHERE id = ?').get(venueId);
+    if (!v || v.type !== 'golf' || golfSimVenue(v)) return null;
+    const info = venueVisitInfo(venueId) || {};
+    const row = (info.rows || []).find((r) => r && /^(?:food|restaurant|dining)$/i.test(r.label || '') && typeof r.text === 'string' && r.text.trim());
+    if (row) return String(row.text).trim().replace(/\.$/, '');
+    const own = indoorOwnLines(venueId, /^(?:good to know|known for)$/i).find((x) => SPORT_PATIO_CHIP_RE.test(x) || /\b(?:restaurant|clubhouse dining|grill|bistro)\b[^.]*\bon site\b|\bon[- ]site (?:restaurant|dining|grill|bistro)\b/i.test(x));
+    return own ? String(own).trim().replace(/\.$/, '') : null;
+  } catch (e) { return null; }
+}
+// The same request: a golf day whose meal is "at the clubhouse" (« au club-house », on site) has that meal at the course's own
+// restaurant when the course has one, and the course with one is the golf stop.
+const TRIP_CLUBHOUSE_RE = /\b(?:club ?house|club-house|at the course|on site|on-site|at the club|au club|sur place|au terrain)\b/i;
+const TRIP_CLUB_MEAL_RE = /\b(?:dinner|lunch|supper|brunch|eat|bite|food|drinks?|beers?|happy hour|souper|d[iî]ner|d[ée]jeuner|manger|5 [àa] 7)\b/i;
+function tripClubhouseMeal(plan, args) {
+  if (!plan || args.swap || args.pinned || !plan.itinerary || !Array.isArray(plan.itinerary.stops)) return plan;
+  const text = String(args.text || '');
+  if (!/\bgolf|\btee time/i.test(text) || !TRIP_CLUBHOUSE_RE.test(text) || !TRIP_CLUB_MEAL_RE.test(text)) return plan;
+  const fr = args.lang === 'fr';
+  const stops = plan.itinerary.stops;
+  const gi = stops.findIndex((x) => x && x.venue && x.venue.type === 'golf');
+  const mi = stops.findIndex((x, i) => i > gi && x && x.venue && x.venue.type !== 'golf' && /^(?:dinner|lunch|supper|souper|d[iî]ner|d[ée]jeuner|drinks?|happy hour)/i.test(String(x.label || '')));
+  if (gi < 0 || mi < 0) return plan;
+  const g = stops[gi];
+  const cands = [g.venue, ...((g.alternates || []).map((a) => a && a.venue))].filter((x) => x && x.type === 'golf');
+  const pick = cands.find((x) => golfOnSiteFood(x.id));
+  if (!pick) return plan;
+  const food = golfOnSiteFood(pick.id);
+  if (pick.id !== g.venue.id) {
+    const old = g.venue, why0 = fr ? 'Son propre restaurant pour après votre partie' : 'Its own restaurant for after your round';
+    g.venue = pick; g.alternates = [{ venue: old }, ...(g.alternates || []).filter((a) => a && a.venue && a.venue.id !== pick.id)];
+    g.reasons = [{ code: 'type', text: fr ? 'Correspond à votre demande de terrains de golf' : 'Matches your request for golf courses' }, { code: 'onsite', text: why0 }]; g.why = g.reasons.map((r) => r.text);
+  }
+  // "Clubhouse" is applied now: not a word we couldn't use.
+  const cw = /club ?-?house/i;
+  if (Array.isArray(plan.notes)) plan.notes = plan.notes.filter((n) => !(cw.test(String(n)) && /doesn’t list|ne répertorie|n’indique/i.test(String(n))));
+  if (Array.isArray(plan.unsupported)) plan.unsupported = plan.unsupported.filter((u) => !cw.test(String(u)));
+  if (typeof plan.summary === 'string') plan.summary = plan.summary.replace(/,? (?:and |et )?[“«]\s?club ?-?house\s?[”»]/i, '').replace(/ ,/g, ',');
+  if (plan.understood) { if (Array.isArray(plan.understood.interests)) plan.understood.interests = plan.understood.interests.filter((x) => !cw.test(String(x))); if (Array.isArray(plan.understood.notUsed)) plan.understood.notUsed = plan.understood.notUsed.filter((x) => !cw.test(String(x))); }
+  const m = stops[mi];
+  const was = m.venue;
+  const line = fr ? `Au terrain même : ${food}` : `At the course itself: ${food}`;
+  stops[mi] = { ...m, venue: pick, reasons: [{ code: 'onsite', text: line }], why: [line], caveats: [], alternates: was ? [{ venue: was }] : [] };
+  return plan;
+}
+// Sport test 7 (2026-11-20; "golf in Vernon on Saturday August 14, 2027" rightly left Kayla out, closed to the public Aug
+// 13–15 for a tournament, but said nothing): a dated plan names the places of the kinds asked, in its towns, that their
+// owner closed on one of its dates for a one-off closure, in one line each ("Closed Aug 13–15 (member-guest tournament):
+// Predator Ridge — Predator Course."). Every type; a yearly closure or a season is said elsewhere.
+function tripOwnerClosureNotes(plan, args, now) {
+  if (!plan || args.swap || args.pinned) return plan;
+  const fr = args.lang === 'fr' || /^\/fr\b/.test(String(args.path || ''));
+  const types = [...new Set(((plan.intent && plan.intent.types) || []).filter(Boolean))];
+  if (!types.length) return plan;
+  const dates = [...new Set([...(plan.schedule || []).map((r) => r && r.date), plan.listDate, ...((plan.days || []).map((d) => d && d.date))].filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ''))))];
+  if (!dates.length) return plan;
+  const own = ((plan.overview && plan.overview.regions) || []).map((r) => r && r.slug).filter(Boolean);
+  const regions = own.length ? own : ((plan.intent && plan.intent.regions) || []);
+  if (!regions.length) return plan;
+  const inPlan = new Set([...(plan.recommendations || []), ...((plan.outing && plan.outing.stops) || []), ...((plan.itinerary && plan.itinerary.stops) || []), ...(plan.days || []).flatMap((d) => d.stops || [])]
+    .filter((x) => x && x.venue).map((x) => x.venue.id));
+  const said = [...(plan.warnings || []), ...(plan.notes || [])].join(' \n ');
+  const M = fr ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juill.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const day = (d) => (fr ? `${Number(d.slice(8, 10)) === 1 ? '1er' : Number(d.slice(8, 10))} ${M[Number(d.slice(5, 7)) - 1]}` : `${M[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}`);
+  const span = (a, b) => (a === b ? day(a) : a.slice(5, 7) === b.slice(5, 7) ? (fr ? `${Number(a.slice(8, 10)) === 1 ? '1er' : Number(a.slice(8, 10))} au ${day(b)}` : `${day(a)}–${Number(b.slice(8, 10))}`) : `${day(a)}–${day(b)}`);
+  const why = (n) => String(n || '').trim().replace(/[.!]\s*$/, '').replace(/^(?:closed|ferm[ée]e?s?)\s+(?:to the public\s+|au public\s+)?(?:for\s+(?:the\s+)?|pour\s+(?:le\s+|la\s+|l’|l')?)?/i, '').trim();
+  const add = [];
+  const rows = db.prepare(`SELECT * FROM venues WHERE redirect_to IS NULL AND type IN (${types.map(() => '?').join(',')}) AND region IN (${regions.map(() => '?').join(',')}) ORDER BY name`).all(...types, ...regions);
+  for (const v of rows) {
+    if (inPlan.has(v.id) || said.includes(v.name)) continue;
+    const c = (venueHoursExtras(v.id).raw || []).find((x) => x && /^\d{4}-\d{2}-\d{2}$/.test(String(x.from || '')) && !(hoursModule && hoursModule.isYearlyClosure && hoursModule.isYearlyClosure(x)) && dates.some((d) => d >= String(x.from) && d <= String(x.to || x.from)));
+    if (!c) continue;
+    const w = why(c.note);
+    add.push(fr ? `Fermé du ${span(String(c.from), String(c.to || c.from))}${w ? ` (${w})` : ''} : ${v.name}.`.replace(/^Fermé du (\d+(?:er)? \S+)( \(|\s:)/, 'Fermé le $1$2') : `Closed ${span(String(c.from), String(c.to || c.from))}${w ? ` (${w})` : ''}: ${v.name}.`);
+    if (add.length >= 5) break;
+  }
+  if (!add.length) return plan;
+  plan.warnings = (plan.warnings || []).concat(add.filter((l) => !said.includes(l)));
   return plan;
 }
 // Indoor test 9 (2026-11-19; Melissa's play centre in West Kelowna: "indoor playground Kelowna" left her out, and Kelowna
@@ -11574,6 +11706,11 @@ function seasonalCheckStale(checkedAt, now, windowDays, from, to) {
   const age = localDaysBetween(checkedAt, today);
   if (age <= windowDays) return false;
   if (!/^\d{2}-\d{2}$/.test(from || '') || !/^\d{2}-\d{2}$/.test(to || '') || from === to || !hoursModule) return true;
+  // Sport test 7 (2026-11-20; Kayla checked her Apr–Oct happy hour in November and it vanished on Jul 31): one check covers
+  // the whole season it was made in or for: through the last day of the first season that ends on or after the check.
+  for (let d = String(checkedAt).slice(0, 10), n = 0; n < 400; d = addLocalDays(d, 1), n++) {
+    if (hoursModule.mdInRange(d.slice(5), from, to) && !hoursModule.mdInRange(addLocalDays(d, 1).slice(5), from, to)) { if (today <= d) return false; break; }
+  }
   // Days out of season after the check, through today, and the length of one off-season.
   let off = 0, offYear = 0;
   for (let t = Date.UTC(2028, 0, 1); t < Date.UTC(2029, 0, 1); t += 86400000) if (!hoursModule.mdInRange(new Date(t).toISOString().slice(5, 10), from, to)) offYear++;
@@ -12321,7 +12458,9 @@ function visitTextFr(text) {
 // The Book button's words on a French page: the French of the box's own label, or plain "Réserver".
 function visitBookLabelFr(info, type) {
   const en = (info && info.booking_label) || VISIT_BOOK_LABELS[type] || '';
-  return (en && frLookup(en)) || 'Réserver';
+  // Sport test 7: research's "Book a tee time" says the kind's own French (« Réserver un départ »).
+  const kindFr = en && Object.values(indoorKindsModule.SPORT.K).find((k) => k && k.bookBtn && k.bookBtn[0].toLowerCase() === en.toLowerCase());
+  return (en && frLookup(en)) || (kindFr && kindFr.bookBtn[1]) || 'Réserver';
 }
 // Cleanup (2026-11-01): a Canadian number reads 250-491-2695, not +1 250-491-2695 (the tel: link keeps the stored number).
 function displayPhone(p) {
@@ -12444,7 +12583,13 @@ function visitWithPendingPriceRows(venue, info) {
     if (!info || !venue || !kindSetupType(venue.type) || !Array.isArray(info.rows) || !Array.isArray(info.owner_dropped)) return info;
     const back = info.owner_dropped.filter((r) => r && !r.owned && r.label && PENDING_PRICE_ROW_RE.test(r.label) && typeof r.text === 'string' && r.text.trim() && !info.rows.some((x) => x.label === r.label));
     if (!back.length) return info;
-    if (db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND status = 'published' AND help_kind IS NULL AND (source IS NULL OR source != 'research') LIMIT 1").get(venue.id)) return info;
+    if (db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND status = 'published' AND help_kind IS NULL AND (source IS NULL OR source != 'research') LIMIT 1").get(venue.id)) {
+      // Sport test 7 (2026-11-20): research's Practice or Lessons row stays once her list is published, without its prices
+      // ("Academy lessons, clinics and club fittings offered."), unless her own lines say there are none.
+      if (!sportSetupType(venue.type)) return info;
+      const keep = back.filter((r) => /^(?:practice|lessons?)$/i.test(r.label)).map((r) => ({ label: r.label, text: sportPracticeKept(venue, r.text) })).filter((r) => r.text);
+      return keep.length ? { ...info, rows: info.rows.concat(keep) } : info;
+    }
     return { ...info, rows: info.rows.concat(back.map((r) => ({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}) }))) };
   } catch (e) { return info; }
 }
@@ -24052,11 +24197,63 @@ function tourRowsVaryNotes(venue, info) {
   } catch (e) { return info; }
 }
 const VISIT_EVENTS_LABEL_RE = /^(?:events?|weekly events|entertainment|what'?s on)$/i;
-function visitRowsOwnerCovered(venue, info) {
+// Sport test 7 (2026-11-20; Kayla's page said "Course season ended Sept 27" all through July 2027): a research Season or
+// Winter row's dated season sentences go once they are past ("ended Sept 27", half a year on; "reopens April 16" after
+// April 16), or once the owner has set her own season (it says it better). Its other sentences stay ("Callaway SIM Lounge
+// in the clubhouse…"). Display only; the stored row is never changed. Every kind of place.
+const STALE_SEASON_LABEL_RE = /^(?:winter|seasons?|off[- ]season|opening|closing|summer|hiver|saison)$/i;
+const SEASON_MONTHS = { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, sept: 9, oct: 10, nov: 11, dec: 12 };
+const SEASON_DATE_RE = /\b(jan|feb|mar|apr|may|jun|jul|aug|sept?|oct|nov|dec)[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?\b(?:,?\s*(20\d\d))?/i;
+const SEASON_PAST_WORDS_RE = /\b(?:ended|closed|wrapped|finished|was|last day|season (?:is )?over)\b/i;
+const SEASON_FUTURE_WORDS_RE = /\b(?:reopens?|re-opens?|opens?|opening|starts?|begins?|until|through|thru|till|closes?|closing|last day)\b/i;
+const SEASON_TOPIC_RE = /\b(?:season|course|open(?:s|ing)?|clos(?:e|es|ed|ing)|reopen\w*|lifts?|ice|pool)\b/i;
+function staleSeasonRows(venue, info, now = new Date()) {
+  try {
+    if (!venue || !info || !Array.isArray(info.rows)) return info;
+    const own = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
+    if (!info.rows.some((r) => r && !own.has(r.label) && STALE_SEASON_LABEL_RE.test(String(r.label || '')))) return info;
+    const today = todayLocal(now);
+    const ownSeason = !!((db.prepare('SELECT open_months FROM venue_links WHERE venue_id = ?').get(venue.id) || {}).open_months);
+    const checked = parseLocalDate(String(info.checked_at || '').slice(0, 10)) || null;
+    const dateOf = (m) => {
+      const mo = SEASON_MONTHS[m[1].toLowerCase().slice(0, m[1].toLowerCase().startsWith('sept') ? 4 : 3)] || SEASON_MONTHS[m[1].toLowerCase().slice(0, 3)], d = Number(m[2]);
+      if (!mo || d < 1 || d > 31) return null;
+      if (m[3]) return `${m[3]}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      if (!checked) return null;
+      // No year: the occurrence nearest the research check (within half a year of it).
+      const y = Number(checked.slice(0, 4));
+      const c = [y - 1, y, y + 1].map((yy) => `${yy}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`).filter(parseLocalDate);
+      c.sort((a, b) => Math.abs(localDaysBetween(checked, a)) - Math.abs(localDaysBetween(checked, b)));
+      return c[0] || null;
+    };
+    let changed = false;
+    const rows = info.rows.map((r) => {
+      if (!r || own.has(r.label) || !STALE_SEASON_LABEL_RE.test(String(r.label || '')) || typeof r.text !== 'string') return r;
+      const parts = r.text.split(/(?<=[.;!?])\s+/);
+      const keep = parts.filter((x) => {
+        const m = SEASON_DATE_RE.exec(x);
+        if (!m || !SEASON_TOPIC_RE.test(x)) return true;
+        if (ownSeason) return false;
+        const dt = dateOf(m);
+        if (!dt) return true;
+        if (SEASON_PAST_WORDS_RE.test(x)) return localDaysBetween(dt, today) <= 150;
+        if (SEASON_FUTURE_WORDS_RE.test(x)) return today <= dt;
+        return true;
+      });
+      if (keep.length === parts.length) return r;
+      changed = true;
+      const left = keep.join(' ').trim();
+      return left ? { ...r, text: left } : null;
+    }).filter(Boolean);
+    return changed ? { ...info, rows } : info;
+  } catch (e) { return info; }
+}
+function visitRowsOwnerCovered(venue, info, now = new Date()) {
   try {
     if (!venue || !info || !Array.isArray(info.rows) || !info.rows.length) return info;
     // Indoor test 14: research sentences her answers made wrong (or that ran out) stay off the page.
     if (kindSetupType(venue.type)) { info = indoorStaleRows(venue, info); if (!info.rows.length) return info; }
+    info = staleSeasonRows(venue, info, now); if (!info.rows.length) return info;
     const own = new Set(Array.isArray(info.owner_labels) ? info.owner_labels : []);
     let rows = info.rows, ownerFr = info.owner_fr, changed = false;
     if (rows.some((r) => r && VISIT_EVENTS_LABEL_RE.test(String(r.label || '')) && !own.has(r.label))
@@ -24966,6 +25163,29 @@ function indoorSearchExtraText(venueId, fr = false) {
   } catch (e) { /* no kinds */ }
   return out.filter(Boolean).join(' ; ');
 }
+// Sport test 7 (2026-11-20; "golf lessons in Vernon" and "junior golf camp" left out Kayla's course, whose own price list
+// says "Private lesson, 1 hour" and "Junior golf camp, 5 days"): Build My Trip reads a sport or golf place's own price-list
+// line names, her Good to know and Groups lines, and research's Practice or Lessons row (as her page shows it), for word
+// matches. -> [text…]
+function sportPlannerWords(v) {
+  try {
+    const own = indoorSearchExtraText(v.id);
+    const info = venueVisitInfo(v.id) || {};
+    const rows = [...(info.rows || []), ...(Array.isArray(info.owner_dropped) ? info.owner_dropped : [])].filter((r) => r && typeof r.text === 'string' && /^(?:practice|lessons?|programs?|academy|camps?|clinics?)$/i.test(String(r.label || '')));
+    const research = sportPracticeKept(v, rows.map((r) => r.text).join(' '));
+    // Each piece on its own (the word reader keeps about 500 characters of one text).
+    return [...String(own || '').split(' ; '), research].map((x) => String(x || '').trim()).filter(Boolean);
+  } catch (e) { return []; }
+}
+// Sport test 7: research's Practice row ("Range $25 per bag or $75 day pass. Academy lessons, clinics and club fittings
+// offered.") once her own price list is published: its sentences without a price (her list is the prices now), unless
+// her own lines say she has no lessons, clinics or camps.
+function sportPracticeKept(v, text) {
+  const own = indoorOwnLines(v.id, /^(?:good to know|known for|groups)$/i).join(' ');
+  if (/\bno (?:golf )?(?:lessons?|academy|clinics?|camps?|instruction)\b|\blessons? (?:are )?not (?:offered|available)\b/i.test(own)) return '';
+  const published = (() => { try { const m = publishedMenu(v.id); return !!(m && m.source === 'owner'); } catch (e) { return false; } })();
+  return String(text || '').split(/(?<=[.;!?])\s+/).filter((x) => !published || !/\$\s?\d|\d\s?\$/.test(x)).join(' ').trim();
+}
 function tourSearchExtraText(venueId) { return [tourListText(venueId), tourVisitSearchText(venueId)].filter(Boolean).join(' ; '); }
 function tourVisitSearchText(venueId) {
   try { const info = venueVisitInfo(venueId) || {}; return (info.rows || []).filter((r) => r && typeof r.text === 'string' && /^(?:known for|good to know|groups)$/i.test(String(r.label || ''))).map((r) => searchWithoutNegated(r.text)).filter(Boolean).join(' ; '); } catch (e) { return ''; }
@@ -25554,12 +25774,27 @@ function indoorInfoAnswers(venueId) { const o = { ...venueIndoorInfo(venueId) };
 // one. A badge the owner set (or research set before) is never touched.
 const indoorArtsKindIn = (kinds) => (Array.isArray(kinds) ? kinds : []).some((k) => INDOOR_ARTS_KINDS.includes(k));
 function setIndoorArtsAuto(venueId, on) { const cur = venueIndoorInfo(venueId); if (!!cur.arts_auto === !!on || (!on && !Object.keys(cur).length)) return; writeVenueIndoorInfo(venueId, { ...cur, arts_auto: !!on }); }
-function indoorPrice(venueId) { const f = venueIndoorInfo(venueId).price; return typeof f === 'number' && Number.isFinite(f) && f > 0 ? f : null; }
+function indoorPrice(venueId) {
+  const f = venueIndoorInfo(venueId).price;
+  if (typeof f === 'number' && Number.isFinite(f) && f > 0) return f;
+  // Sport test 7: a sport or golf owner who skipped the Price step: her lowest plain regular line (THE SPORT HEADLINE RULE).
+  return sportSkippedPrice(venueId);
+}
+function sportSkippedPrice(venueId) {
+  try {
+    const t = venueIndoorInfo(venueId);
+    if (!t || t.free || INDOOR_PER_UNITS.includes(t.per) || !(t.kinds || []).length || !indoorKindsModule.SPORT_KIND_TEXT_KINDS.includes(t.kinds[0])) return null;
+    const v = db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId);
+    return v && sportSetupType(v.type) ? indoorLowestTyped(venueId) : null;
+  } catch (e) { return null; }
+}
 function indoorFree(venueId) { return tourFreeOf(venueIndoorInfo(venueId)); }
 // The suggested donation (a number) while the answer is By donation, or null.
 function indoorSuggested(venueId) { const t = venueIndoorInfo(venueId); return tourFreeOf(t) === 'donation' && typeof t.suggested === 'number' && t.suggested > 0 ? t.suggested : null; }
 // What the 'indoor_price' field holds: the adult price (a number), 'free' / 'donation', or null.
-function indoorPriceValue(venueId) { return indoorFree(venueId) || indoorPrice(venueId); }
+// Her Price-step answer as she typed it (never the skipped-step fallback): the setup's own answers.
+function indoorTypedPrice(venueId) { const f = venueIndoorInfo(venueId).price; return typeof f === 'number' && Number.isFinite(f) && f > 0 ? f : null; }
+function indoorPriceValue(venueId) { return indoorFree(venueId) || indoorTypedPrice(venueId); }
 // -> { value } (a number from 1 to INDOOR_PRICE_MAX, 'free' or 'donation'; null clears) or { error }. "$25", "25 $",
 // "24.50", "free", "0", "by donation", « gratuit » all read.
 function cleanIndoorPrice(x) {
@@ -26085,13 +26320,21 @@ const SPORT_EXTRA_PRICE_RE = /\b(?:carts?|power ?carts?|pull ?carts?|push ?carts
 const SPORT_DISCOUNT_PERSON_RE = /\b(?:juniors?|seniors?|kids?|child(?:ren)?|youths?|students?|toddlers?|infants?|under ?\d+|\d+ ?(?:and|&) ?(?:under|younger)|families|a[îi]n[ée]s?|enfants?|jeunes|[ée]tudiants?)\b/i;
 const SPORT_DISCOUNT_DESC_RE = /\b(?:under ?\d+|\d+ ?(?:and|&) ?(?:under|younger)|juniors?|seniors?|kids? only|children only|students? only)\b/i;
 const SPORT_OWN_MAIN_RE = { range: /\b(?:buckets?|balls|range|seaux?)\b/gi, skischool: /\b(?:lessons?|clinics?|camps?|cours)\b/gi };
-const GOLF_GREEN_FEE_RE = /\b(?:\d{1,2}[- ]?holes?|nine|eighteen|green ?fees?|twilight|walking|rounds?|\d{1,2} trous|droits? de jeu|cr[ée]puscule)\b/i;
+const GOLF_GREEN_FEE_RE = /\b(?:\d{1,2}[- ]?holes?|nine|eighteen|green ?fees?|walking|rounds?|\d{1,2} trous|droits? de jeu)\b/i;
+// Sport test 7 (2026-11-20; Kayla's course read "Green fees from $150", her "Replay round", though she typed $210 as her
+// lowest regular green fee): THE SPORT HEADLINE RULE. For every sport and golf kind the price she typed on the Price step is
+// the headline; a Your-prices line may only lower it when its OWN name (never its section's) is a plain, regular, adult
+// rate of her main kind. A rate for some people, some times or a bundle never is: replay or a second round, twilight,
+// resort or hotel guests, stay and play, packages, members and their guests, juniors, seniors, students, military,
+// groups, promos, early bird, off-peak or shoulder (and the extras above). No price typed: the lowest plain line is it.
+const SPORT_QUALIFIED_PRICE_RE = /\b(?:re-?play|second (?:round|18|nine|9)|2nd (?:round|18|nine|9)|same[- ]day|twilight|super twilight|sunset|evening|after \d|resort|hotel|lodge|(?:resort |hotel )?guests?|stay(?: (?:and|&|n) play)?|packages?|bundles?|members?|membership|reciprocal|punch|passes|pass|juniors?|seniors?|students?|military|veterans?|groups?|team|corporate|tournaments?|promo\w*|specials?|deals?|early[- ]?bird|off[- ]?peak|shoulder|replay|forfaits?|membres?|invit[ée]s?|groupes?|militaires?|cr[ée]puscule|hors[- ]saison|l[èe]ve[- ]t[ôo]t|aîn[ée]s?|[ée]tudiants?)\b/i;
 // -> true when a typed price line may set or lower the card price for this sport kind.
 function sportPriceLineCounts(kind, name, desc = '', section = '') {
   const own = SPORT_OWN_MAIN_RE[kind];
   const n = own ? String(name).replace(own, ' ') : String(name);
   if (SPORT_EXTRA_PRICE_RE.test(n) || SPORT_DISCOUNT_PERSON_RE.test(String(name)) || SPORT_DISCOUNT_DESC_RE.test(String(desc || ''))) return false;
-  if (kind === 'golf' && !GOLF_GREEN_FEE_RE.test(`${section} ${name}`)) return false;
+  if (SPORT_QUALIFIED_PRICE_RE.test(String(name))) return false;
+  if (kind === 'golf' && !GOLF_GREEN_FEE_RE.test(String(name))) return false;
   return true;
 }
 function indoorLowestTyped(venueId) {
@@ -26117,8 +26360,9 @@ function indoorLowestTyped(venueId) {
 function indoorPriceView(venueId, info, lang = 'en') {
   try {
     const t = info || venueIndoorInfo(venueId);
-    if (!(typeof t.price === 'number' && t.price > 0) || tourFreeOf(t) || INDOOR_PER_UNITS.includes(t.per)) return null;
-    return indoorKindsModule.indoorPriceShow(t.kinds, lang, t.price, { low: indoorLowestTyped(venueId), money: tourMoney });
+    const main = typeof t.price === 'number' && t.price > 0 ? t.price : sportSkippedPrice(venueId);
+    if (!(main > 0) || tourFreeOf(t) || INDOOR_PER_UNITS.includes(t.per)) return null;
+    return indoorKindsModule.indoorPriceShow(t.kinds, lang, main, { low: indoorLowestTyped(venueId), money: tourMoney });
   } catch (e) { return null; }
 }
 // The card says the price without "From" ("$12 · Adult admission"): an exact kind with no lower typed price.
@@ -26184,6 +26428,16 @@ function indoorBookButton(venue, bookingUrl) {
   try {
     if (!venue || !kindSetupType(venue.type)) return B.book;
     const t = venueIndoorInfo(venue.id), k = indoorKindsModule.indoorKindText(t.kinds, 'en');
+    // Sport test 7 (2026-11-20; an unclaimed Predator Course said "Book" / « Réserver »): a sport or golf listing nobody has
+    // set up keeps research's own button words ("Book a tee time") for that link, else a golf listing says what its main
+    // kind books (a course "Book a tee time", a simulator "Book a bay"). A sport listing with no kind keeps the plain word.
+    if (sportSetupType(venue.type) && !(t.kinds || []).length) {
+      const vi = venueVisitInfo(venue.id) || {};
+      if (vi.booking_label && (!vi.booking_url || !bookingUrl || String(vi.booking_url).replace(/\/+$/, '') === String(bookingUrl).replace(/\/+$/, ''))) return [vi.booking_label, visitBookLabelFr(vi, venue.type)];
+      const mk = venue.type === 'golf' ? sportMainKind(venue) : '';
+      if (mk && indoorKindsModule.SPORT.K[mk] && indoorKindsModule.SPORT.K[mk].bookBtn && ['golf', 'simgolf'].includes(mk)) return indoorKindsModule.SPORT.K[mk].bookBtn;
+      return B.book;
+    }
     // Sport (2026-11-20): a tee-time, bay, lesson or court booking page says so ("Book a tee time").
     // Sport test 6: a simulator bay booking at a place with simulators among its kinds says "Book a bay" before the main kind's own button.
     if (sportSetupType(venue.type) && (t.kinds || []).includes('simgolf') && SPORT_BAY_URL_RE.test(String(bookingUrl || ''))) return indoorKindsModule.SPORT.K.simgolf.bookBtn;
@@ -43211,7 +43465,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       if (/patio|terrasse/i.test(dt) && !/inside|indoor|int[ée]rieur/i.test(dt)) dogFriendlyNote = fr ? 'Chiens sur la terrasse' : 'Dogs on the patio';
     } catch (e) { /* no visit info */ }
   }
-  const attributeChipsFor = (skipHappyHour) => (fr && venue.type === 'cafe' && !venue.redirect_to ? cafeFrChipsHtml(venue, dogFriendlyNote, { skipHappyHour }) : venueBadgeChipsHtml(venue, { fr, skipDogFriendly: dogFriendlyNote !== undefined, skipHappyHour }));
+  // Sport test 7 (test 4 #16; the Happy Hour badge showed Nov–Apr while the page said Closed for the season): no Happy Hour
+  // badge while the place is closed for the season, or outside the happy hour's own months.
+  const hhBadgeOff = (() => { try { const now0 = opts.now || new Date(); const st = venue.redirect_to ? null : getSeasonStates(now0).get(venue.id); return (!!st && seasonStateBlocksOffers(st)) || (!!venue.happy_hour_times && !inMonthDaySeason(happyHourSeasonOf(venue.happy_hour_times), todayLocal(now0))); } catch (e) { return false; } })();
+  const attributeChipsFor = (skipHappyHour0) => { const skipHappyHour = skipHappyHour0 || hhBadgeOff; return (fr && venue.type === 'cafe' && !venue.redirect_to ? cafeFrChipsHtml(venue, dogFriendlyNote, { skipHappyHour }) : venueBadgeChipsHtml(venue, { fr, skipDogFriendly: dogFriendlyNote !== undefined, skipHappyHour })); };
   // Round 11 (2026-10-20): the dog chip's tooltip (the place's dog rule) in French on French venue pages too; the twin's
   // own pass never sees these pages, so Gyro Beach and Peach Orchard Dog Beach kept the English rule.
   const frChip = (html) => (fr ? html.replace('Hidden Gem', 'Tr\u00e9sor cach\u00e9').replace('Local Favourite', 'Coup de c\u0153ur local').replace('Dog Friendly', 'Chiens bienvenus') : html);
@@ -43474,7 +43731,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     const text = fr ? visitTextFr(row.text) : visitTextPolish(row.text);
     return text ? `<p class="venue-glance">${escapeHtml(text)}</p>` : '';
   })();
-  const visitHtml = visitInfoHtml(tourRowsVaryNotes(venue, breweryFoodRowOn(venue, visitRowsOwnerCovered(venue, visitInfoRaw), opts.now || new Date())), fr, { type: venue.type });
+  const visitHtml = visitInfoHtml(tourRowsVaryNotes(venue, breweryFoodRowOn(venue, visitRowsOwnerCovered(venue, visitInfoRaw, opts.now || new Date()), opts.now || new Date())), fr, { type: venue.type });
   const visitInfo = visitHtml ? visitInfoRaw : null;
   // Box polish (2026-10-31): Good to Know drops its Menu row when the Plan your visit box already links that page
   // (a winery's "Menu" was its restaurant's menu, also behind the Restaurant row's "More").
@@ -43652,7 +43909,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       // page's main button (data-book-secondary: the layouts keep it in place).
       : venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}${sportDropInBooking(venue) ? ' data-book-secondary' : ''}>${escapeHtml(L(...indoorBookButton(venue, venueLinkRow.booking_url)))}</a>`
       // A winery's tasting booking page from its Plan your visit box (2026-10-29), when it has no booking link of its own.
-      : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(fr ? visitBookLabelFr(visitInfo, venue.type) : (visitInfo.booking_label || VISIT_BOOK_LABELS[venue.type] || 'Book'))}</a>` : null,
+      : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(sportSetupType(venue.type) ? L(...indoorBookButton(venue, visitInfo.booking_url)) : fr ? visitBookLabelFr(visitInfo, venue.type) : (visitInfo.booking_label || VISIT_BOOK_LABELS[venue.type] || 'Book'))}</a>` : null,
     venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).
@@ -43697,7 +43954,10 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const golfOwnList = golfFeesHtml0 && ownerPriceListLiveOrWaiting(venue.id);
   const golfFeesHtml = golfOwnList || (golfOwnPrices && golfFeesHtml0 && !/<table/.test(golfFeesHtml0)) ? '' : golfFeesHtml0;
   const golfValueHtml0 = !fr && golfData && golfDetail ? golfData.golfValueSectionHtml(golfDetail) : '';
-  const golfValueHtml = golfOwnPrices && /golf-value-none/.test(golfValueHtml0) ? '' : golfValueHtml0;
+  // Sport test 7 (2026-11-20; Kayla: research's "Value index 35… $300 for 18 holes… Nothing extra included" sat above her
+  // own "$210, power cart and range balls included"): round 4's one-rate-table rule for the value box too. Once her own
+  // price list is live or waiting, research's value index (built from research's rates) goes with research's fee table.
+  const golfValueHtml = (golfOwnPrices && /golf-value-none/.test(golfValueHtml0)) || (golfValueHtml0 && ownerPriceListLiveOrWaiting(venue.id)) ? '' : golfValueHtml0;
   // Golf fees and course details exist only in English, so the French page links to them.
   // Sport test 4: not once his own price list shows on the French page (it is the prices).
   const golfEnglishNote = fr && golfDetail && !((publishedMenu(venue.id) || {}).source === 'owner') ? `<p class="venue-meta">Tarifs et d\u00e9tails du parcours\u00a0: <a href="${venuePagePath(venue)}" hreflang="en" lang="en">voir la page en anglais</a>.</p>` : '';
@@ -60837,7 +61097,7 @@ function renderMenuAppPage(found, opts) {
   const cfg = {
     base: opts.base, mode: opts.mode, lang, back: opts.back || null, website: normalizeWebsiteUrl(venue.website) || '', email: found.contactEmail || '', venueName: venue.name, adminNote: opts.adminNote || null,
     kind: menuKind(venue),
-    ...(kindSetupType(venue.type) && opts.mode !== 'admin' && indoorPrice(venue.id) != null ? { firstItem: { name: indoorFirstItemName(venue, lang), price: lang === 'fr' ? String(indoorPrice(venue.id)).replace('.', ',') : String(Number.isInteger(indoorPrice(venue.id)) ? indoorPrice(venue.id) : indoorPrice(venue.id).toFixed(2)) } } : {}),
+    ...(kindSetupType(venue.type) && opts.mode !== 'admin' && indoorTypedPrice(venue.id) != null ? { firstItem: { name: indoorFirstItemName(venue, lang), price: lang === 'fr' ? String(indoorTypedPrice(venue.id)).replace('.', ',') : String(Number.isInteger(indoorPrice(venue.id)) ? indoorPrice(venue.id) : indoorPrice(venue.id).toFixed(2)) } } : {}),
     linkOk: MENU_LINK_TYPES.has(venue.type) && opts.mode !== 'admin' && !!opts.back,
     t: { ...t, networkText: t.network, newDishText: plain(t.newDish), newSectionText: plain(t.newSection), takeDownConfirmText: plain(t.takeDownConfirm), firstSectionText: plain(t.firstSection) },
     state,
@@ -63602,6 +63862,10 @@ function sport4KindHelp(t, kind, venue, happy) {
   const golfish = ['golf', 'simgolf'].includes(kind);
   const ev = SPORT4_EVENT_EX[kind] || SPORT4_EVENT_EX.sportother;
   if (t.id === 'sport-one-off-closure') return both([['{EVENT_EN}', escapeHtml(ev[0])]], [['{EVENT_FR}', escapeHtml(ev[1])]]);
+  // Sport test 7 (Kayla: "hours = first tee to last tee? or when the golf shop is open" got the bar example): a course's own example.
+  if (t.id === 'sport-last-booking' && kind === 'golf') return both([['(like 11 PM when the bar is open till 11)', '(for a course, from when the pro shop opens to when the last players come in, like 6:30 AM to 8 PM)']], [['(comme 23 h si le bar est ouvert jusqu’à 23 h)', '(pour un terrain, de l’ouverture de la boutique du pro au retour des derniers joueurs, comme de 6 h 30 à 20 h)']]);
+  // Sport test 7 (Kayla's SoloRider cart): an adaptive cart or gear is one line in Good to know.
+  if (t.id === 'indoor-access' && golfish) return { ...t, a: `${t.a}<p>An adaptive cart? One line in <strong>Good to know</strong>, like <em>SoloRider adaptive cart: book ahead</em>.</p>`, aFr: `${t.aFr}<p>Une voiturette adaptée? Une ligne dans <strong>Bon à savoir</strong>, comme <em>Voiturette adaptée SoloRider : réservez à l’avance</em>.</p>` };
   if (t.id === 'sport-rates-next-year') { const y = String(new Date().getFullYear() + 1); return both([['{YEAR}', y]], [['{YEAR}', y]]); }
   if (t.id === 'sport-member-rates') return both([['{MEMBERS_EN}', kind === 'golf' ? 'Memberships: ask the pro shop' : 'Memberships: ask at the front desk']], [['{MEMBERS_FR}', kind === 'golf' ? 'Abonnements : demandez à la boutique du pro' : 'Abonnements : demandez à l’accueil']]);
   // The reopening day from her own season ("Closed for the season. Reopens March 6").
@@ -63689,6 +63953,9 @@ const SPORT_SETUP_HELP_TOPICS = sport5HelpModule.TOPICS.concat(SPORT4_HELP_TOPIC
   ...(SPORT_HELP_MORE_KEYS[t.id] ? { keys: t.keys.concat(SPORT_HELP_MORE_KEYS[t.id][0]), keysFr: (t.keysFr || []).concat(SPORT_HELP_MORE_KEYS[t.id][1]) } : {}),
   // "Open May to September" is a season, not "open every day in summer": « sept » (seven) also starts "September".
   ...(t.id === 'indoor-summer-daily' && Array.isArray(t.allOf) ? { allOf: t.allOf.map((g) => g.filter((w) => w !== 'sept')) } : {}) })));
+// Sport test 7: her own Good to know says the "Restaurant and patio on site" chip (EN or FR).
+const SPORT_PATIO_CHIP_RE = /\brestaurant and patio on site\b|\brestaurant et terrasse sur place\b/i;
+function sportOwnPatioChip(venueId) { try { return indoorOwnLines(venueId, /^good to know$/i).some((x) => SPORT_PATIO_CHIP_RE.test(x)); } catch (e) { return false; } }
 // The base topics for a place run by the indoor engine: sport and golf have their own.
 // Sport test 1 (2026-11-20; Debbie: the "Dress code: collared shirts" chip beside research's "collars not needed"): a Good
 // to know chip is never offered when research's own words already say that fact or the opposite. [English chip, what in
@@ -67026,6 +67293,8 @@ const OWNER_HELP_SCRIPT = String.raw`
     // Tour test 6 (Whistler, 2026-11-17): a length written « 2h30 » / "1h30" is one key word (two of them read as trip
     // lengths: « tyrolienne 2h30, parcours 1h30 »).
     x = x.replace(/\b\d{1,2} ?h ?[0-5]\d\b/g, ' hhmm ').replace(/\s+/g, ' ').trim();
+    // Sport test 7: a number of days ("closed 3 days", « 4 jours ») is one key word, a short stretch.
+    x = x.replace(/\b(?:\d{1,2}|two|three|four|five|six|deux|trois|quatre|cinq) (?:days|jours)\b/g, ' ndays ').replace(/\s+/g, ' ').trim();
     // Round 8 (2026-10-19): "business" as owners mistype it ("busness" was too far from any key to be read).
     return x.replace(/\b(?:busness|buisness|bussiness|busines|bizness|buissness|businness)\b/g, 'business');
   }
@@ -67134,6 +67403,15 @@ const OWNER_HELP_SCRIPT = String.raw`
     // A topic's bare one-word keys ("free", "public") stand down when the question has one of its bareOff word starts:
     // "kids under 3 are free" is a kids' price, never "We're free"; "public skate" is not "Is my information public?".
     var bare = T.map(function(t){ return !!t.bareOff && t.bareOff.some(function(w){ return qt.some(function(x){ return x.indexOf(w) === 0; }); }); });
+    // Sport test 7 (2026-11-20; blind owner questions: « patinage libre … heures changent chaque semaine » went to skate
+    // rentals, whose loose word groups « patin… » + « heure… » beat the three-word key « changent chaque semaine »): a key
+    // of three or more words found side by side is specific; while one is in the question, a topic's loose word groups
+    // (allOf) count for less than it.
+    var longSide = false;
+    KEYS.forEach(function(k){
+      if (!gate[k.i] || (bare[k.i] && k.kt.length === 1) || k.kt.filter(function(w){ return !STOP[w]; }).length < 3) return;
+      if (keyScore(k.kt, qt) >= 3 * k.kt.length * 0.9) longSide = true;
+    });
     KEYS.forEach(function(k){
       if (!gate[k.i] || (bare[k.i] && k.kt.length === 1)) return;
       var s = keyScore(k.kt, qt); if (!s) return;
@@ -67145,10 +67423,29 @@ const OWNER_HELP_SCRIPT = String.raw`
     // (groups of word starts) is a strong match when the question has a word from every group, anywhere in it.
     T.forEach(function(t, i){
       // Indoor test 12 (2026-11-19): a second set of groups (allOf2) counts the same way.
-      var has = function(gs){ return !!gs && gs.length > 0 && gs.every(function(g){ return g.some(function(w){ return qt.some(function(x){ return x.indexOf(w) === 0; }); }); }); };
+      // Sport test 7: a group's entry of several words ("no staff", « tout le temps ») is those words side by side.
+      var has = function(gs){ return !!gs && gs.length > 0 && gs.every(function(g){ return g.some(function(w){ return w.indexOf(' ') > 0 ? qs.indexOf(' ' + w) >= 0 : qt.some(function(x){ return x.indexOf(w) === 0; }); }); }); };
       var all = gate[i] && (has(t.allOf) || has(t.allOf2));
-      if (all) { sums[i] += 40; side[i] = Math.max(side[i], 3); exact[i] = true; }
+      var any = gate[i] && Array.isArray(t.allOfAny) && t.allOfAny.some(has);
+      // Sport test 7 (cfg.cover, sport and golf places): word groups that meet are worth what they cover. Two topics whose
+      // groups both meet in "league nights … public can't play till 6" are told apart by how much of the question each one's
+      // words take in (a covered word 3), on top of 20, so the loosest pair of groups no longer wins by default.
+      if (cfg.cover && (all || any)) {
+        var gw = [].concat(t.allOf || [], t.allOf2 || [], [].concat.apply([], t.allOfAny || [])).reduce(function(a, g){ return a.concat(g); }, []);
+        var kw = {}; KEYS.forEach(function(k){ if (k.i === i) k.kt.forEach(function(w){ kw[w] = 1; }); });
+        var cov = qt.filter(function(x, xi){ return x.length > 2 && !STOP[x] && qt.indexOf(x) === xi && (kw[x] || gw.some(function(w){ return w.indexOf(' ') < 0 && x.indexOf(w) === 0; })); }).length;
+        sums[i] += (longSide ? 6 : 20) + 3 * cov; side[i] = Math.max(side[i], 3); exact[i] = true;
+      }
+      else if (all) { sums[i] += longSide ? 8 : 40; side[i] = Math.max(side[i], 3); exact[i] = true; }
+      // Sport test 7: concept groups (allOfAny: several sets of word groups, each a strong match when every group of it is
+      // in the question): an idea in any words ("two" + "courses", "closed" + "days"), weaker than allOf.
+      else if (any) { sums[i] += longSide ? 6 : 14; side[i] = Math.max(side[i], 3); exact[i] = true; }
     });
+    // Sport test 7 (cfg.cover, sport and golf places; 180 blind owner questions in fresh words): the answers' own words count
+    // too. Each topic's title and answer, word by word (rarer words worth more), added lightly to its key score; and with no
+    // sure key match, a topic whose own words clearly share the question's is taken.
+    var ts = cfg.cover ? textScores(qt, qFr) : null;
+    if (ts) for (var ti = 0; ti < T.length; ti++) if (gate[ti] && ts[ti] > 0 && sums[ti] > 0) sums[ti] += ts[ti] * 0.5;
     var scored = T.map(function(t, i){ return { id: t.id, s: sums[i], c: side[i], e: exact[i], b: (t.pages || []).indexOf(cfg.page) >= 0 ? 1 : 0 }; })
       .filter(function(x){ return x.s > 0; }).sort(function(a, b){ return (b.s + b.b) - (a.s + a.b) || b.s - a.s; });
     // A narrower topic that matched a whole key word goes above the broader one it refines ("closed on Thanksgiving"
@@ -67163,7 +67460,33 @@ const OWNER_HELP_SCRIPT = String.raw`
     var sure = !!top && top.s >= 3 && top.e
       && !(next && top.s < 6 && next.s + next.b >= top.s + top.b && !refines(top, next))
       && !(top.s < 6 && unknownWords(qt) >= 2);
+    if (!sure && ts) {
+      var tr = T.map(function(t, i){ return { i: i, v: gate[i] ? ts[i] : 0 }; }).sort(function(a, b){ return b.v - a.v; });
+      if (tr[0].v >= 9 && tr[0].v >= tr[1].v * 1.35) return { id: T[tr[0].i].id, hits: [T[tr[0].i].id].concat(scored.map(function(x){ return x.id; }).filter(function(x){ return x !== T[tr[0].i].id; })), lang: langOf(q) };
+    }
     return { id: sure ? top.id : null, hits: scored.map(function(x){ return x.id; }), lang: langOf(q) };
+  }
+  var TXT = null;
+  function plainWords(h){ return toks(String(h || '').replace(/<[^>]+>/g, ' ')).filter(function(w){ return w.length >= 4 && !STOP[w] && !/^\d+$/.test(w); }).map(stemOf); }
+  function textScores(qt, fr){
+    if (!TXT) {
+      TXT = { en: { t: [], a: [], df: {} }, fr: { t: [], a: [], df: {} } };
+      T.forEach(function(t){
+        [['en', t.q, t.a], ['fr', t.qFr || t.q, t.aFr || t.a]].forEach(function(x){
+          var L = TXT[x[0]], tw = {}, aw = {};
+          plainWords(x[1]).forEach(function(w){ tw[w] = 1; }); plainWords(x[2]).forEach(function(w){ aw[w] = 1; });
+          L.t.push(tw); L.a.push(aw);
+          Object.keys(Object.assign({}, tw, aw)).forEach(function(w){ L.df[w] = (L.df[w] || 0) + 1; });
+        });
+      });
+    }
+    var L = TXT[fr ? 'fr' : 'en'], N = T.length, seen = {};
+    var qw = qt.filter(function(w){ return w.length >= 4 && !STOP[w] && !/^\d+$/.test(w); }).map(stemOf).filter(function(w){ if (seen[w]) return false; seen[w] = 1; return true; });
+    return T.map(function(t, i){
+      var s = 0;
+      qw.forEach(function(w){ var df = L.df[w]; if (!df || df > N / 4) return; var idf = Math.log(N / df); if (L.t[i][w]) s += 2 * idf; else if (L.a[i][w]) s += idf; });
+      return s;
+    });
   }
   function match(q){ return best(q).hits; }
   function ask(q){
@@ -67347,6 +67670,8 @@ function ownerHelpWidgetHtml(page, opts = {}) {
   // itself still gets its answer.
   // Tours (2026-11-16): no happy hour at all, so its topics aren't there to be found either.
   if (opts.dropHappyHour) cfg.topics = cfg.topics.filter((t) => !HELP_HAPPY_RE.test(`${t.q} ${t.qFr}`));
+  // Sport test 7: a sport or golf place's topics carry their concept groups (sport-help.js CONCEPTS; the matcher's allOfAny).
+  try { const pv0 = opts.venueId ? getVenue(opts.venueId) : null; if (pv0 && sportSetupType(pv0.type)) { const C0 = sport5HelpModule.CONCEPTS || {}; cfg.cover = true; const N0 = sport5HelpModule.NOT_IF || {}; cfg.topics = cfg.topics.map((t) => (C0[t.id] ? { ...t, allOfAny: (t.allOfAny || []).concat(C0[t.id]) } : t)).map((t) => (N0[t.id] ? { ...t, notIf: (t.notIf || []).concat(N0[t.id]) } : t)); } } catch (e) { /* as they are */ }
   // Indoor test 4 (2026-11-19): topics a kind of place never has (an indoor place's restaurant "Price range").
   if (Array.isArray(opts.dropTopics) && opts.dropTopics.length) cfg.topics = cfg.topics.filter((t) => !opts.dropTopics.includes(t.id)).map((t) => ({ ...t, over: (t.over || []).filter((x) => !opts.dropTopics.includes(x)), noRelated: (t.noRelated || []).filter((x) => !opts.dropTopics.includes(x)) }));
   // Tour test 4 (Whistler, 2026-11-17): a tour has price lists, not menus ("new photos and menus wait for us to check").
@@ -69280,6 +69605,11 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
     // Indoor test 10: and new closures (a yearly shutdown is part of the Season line: "All year except Aug 16–29.").
     if (kindSetupType(venue.type) && (chosen.includes('description') || chosen.includes('visit_rows') || chosen.includes('closures')) && !chosen.includes('indoor_info')) {
       try { const w = writeIndoorVisitRows(venue.id, now); if (w.before !== w.after) log.run(venue.id, 'visit_info', w.before, w.after, meta.reason, meta.batch_id, reviewer); } catch (e) { console.error(`[owner-portal] indoor lines for #${venue.id} failed: ${e.message}`); }
+    }
+    // Sport test 7 (2026-11-20; Kayla ticked "Restaurant and patio on site" and "golf restaurant patio vernon" missed her):
+    // her own chip is her answer, so it sets the Patio badge (badges are otherwise research's). Only ever set, never cleared.
+    if (sportSetupType(venue.type) && chosen.includes('visit_rows')) {
+      try { if (sportOwnPatioChip(venue.id) && !Number((db.prepare('SELECT patio FROM venues WHERE id = ?').get(venue.id) || {}).patio)) { db.prepare('UPDATE venues SET patio = 1 WHERE id = ?').run(venue.id); log.run(venue.id, 'patio', '0', '1', meta.reason, meta.batch_id, reviewer); } } catch (e) { console.error(`[owner-portal] patio for #${venue.id} failed: ${e.message}`); }
     }
     db.exec('RELEASE owner_approve');
   } catch (err) {
@@ -71596,7 +71926,7 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
   try { week = live.hours ? (typeof live.hours === 'string' ? JSON.parse(live.hours) : live.hours) : null; } catch (e) { week = null; }
   return portalCompleteness.renderCompleteness(portalCompleteness.scoreCompleteness(input, { today: todayLocal(), pending, liveFields: ownerCompletenessLiveFields(signedIn) }), {
     // Café test 4 (2026-11-11): the checklist without the percent and badge talk at the top of the edit page.
-    fr, canDecline: true, noScore: true, winery: venue.type === 'winery', brewery: brewSetupType(venue.type), distillery: venue.type === 'distillery', tour: venue.type === 'tour', indoor: kindSetupType(venue.type), sport: sportSetupType(venue.type), indoorLow: kindSetupType(venue.type) ? indoorHelpLow(venue) : null, apptOnly: apptType(venue.type) && apptAnswers(venue.id, venue.type).visit === 'appointment',
+    fr, canDecline: true, noScore: true, winery: venue.type === 'winery', brewery: brewSetupType(venue.type), distillery: venue.type === 'distillery', tour: venue.type === 'tour', indoor: kindSetupType(venue.type), sport: sportSetupType(venue.type), sportMain: sportSetupType(venue.type) ? (() => { try { return sportMainKind(venue) || indoorKindsModule.sportKindSuggestion(venue)[0] || ''; } catch (e) { return ''; } })() : '', indoorLow: kindSetupType(venue.type) ? indoorHelpLow(venue) : null, apptOnly: apptType(venue.type) && apptAnswers(venue.id, venue.type).visit === 'appointment',
     menuHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/menu`, lang) : ownerPath(`/owner/account/venue/${venue.id}/menu`, lang),
     setupHref: token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang),
     hoursText: input.hasHours && week && !pending.has('hours') ? portalCompleteness.hoursLine(week, fr) : '',

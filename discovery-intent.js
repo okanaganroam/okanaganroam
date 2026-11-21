@@ -226,6 +226,23 @@ function holidayWeekendDates(name, now = new Date()) {
   }
   return null;
 }
+// Sport test 7 (2026-11-20; "golf on thanksgiving vernon" was no date, though Canada Day was): a Monday holiday named on
+// its own (not "... weekend") is the next one's date ("on october 11 2027").
+function movingHolidayDate(name, now = new Date()) {
+  const w = holidayWeekendDates(name, now);
+  const m = w && /(\w+) (\d{1,2}) to (\w+) (\d{1,2}) (\d{4})/.exec(w);
+  if (!m) return null;
+  // The weekend runs Saturday to Monday: the holiday is its last day (Canada Day keeps its own July 1).
+  return name === 'canada day' ? ` on july 1 ${m[5]} ` : ` on ${m[3]} ${m[4]} ${m[5]} `;
+}
+function movingHolidayDates(text, now = new Date()) {
+  return String(text).replace(/\b(?:on |for )?(thanksgiving|labou?r day|victoria day|family day|easter monday|bc day|b c day)(?: day| monday)?(?! (?:long )?weekend)\b/g, (m, h) => {
+    const k = h === 'labor day' ? 'labour day' : h === 'easter monday' ? 'easter' : h;
+    if (k === 'bc day' || k === 'b c day') { const y = now.getUTCFullYear(); for (const yy of [y, y + 1]) { const d = new Date(Date.UTC(yy, 7, 1)); d.setUTCDate(1 + ((8 - d.getUTCDay()) % 7)); if (d.getTime() >= Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) return ` ${h} on august ${d.getUTCDate()} ${yy} `; } return m; }
+    const d = movingHolidayDate(k, now);
+    return d ? ` ${h}${d}` : m;
+  }).replace(/\s+/g, ' ');
+}
 function stripTravelNoise(normalized) {
   let s = ` ${mergeSegmentStays(normalized)} `;
   if (ORIGIN_RE) s = s.replace(ORIGIN_RE, ' ');
@@ -311,7 +328,8 @@ function stripTravelNoise(normalized) {
   s = s.replace(/\b(\d{1,2}|two|three|four|five|six|eight|ten|twelve) (?:players|golfers)\b/g, ' $1 friends ');
   s = s.replace(/\b(?:a|one|another|the next) rounds? of (drinks?|beers?|cocktails?|wine)\b/g, ' $1 ');
   if (/\bgolf/.test(s)) {
-    s = s.replace(/\b(?:(?:a|one|1|two|2) )?rounds?(?: of golf)?\b(?! of (?:drinks?|beers?|applause))|\b18 holes\b|\b(?:nine|9) holes\b|\b(?:foursome|threesome|twosome)\b/g, ' ');
+    // Sport test 7 (2026-11-20): "round of golf then dinner" lost its golf with the words: "of golf" stays golf.
+    s = s.replace(/\b(?:(?:a|one|1|two|2) )?rounds?( of golf)?\b(?! of (?:drinks?|beers?|applause))|\b18 holes\b|\b(?:nine|9) holes\b|\b(?:foursome|threesome|twosome)\b/g, (m, g) => (g ? ' golf ' : ' '));
   }
   // "no early mornings", "we like to sleep in", "late starts": a slow start, which the planner reads as a relaxed pace.
   s = s.replace(/\b(?:no|nothing|not|avoid|without) (?:any )?early (?:mornings?|starts?|wake ?ups?|alarms?)\b|\b(?:we|i) (?:like|love|want|prefer|need) to sleep in\b|\bsleep(?:ing)? in\b|\blate starts?\b|\b(?:not|aren t|arent) (?:a )?(?:morning|early) (?:person|people|birds?|risers?)\b|\bslow mornings?\b|\b(?:don t|do not) want to (?:get up|wake up|be up) early\b/g, ' relaxed ');
@@ -324,6 +342,7 @@ function stripTravelNoise(normalized) {
   // Holiday weekends become the dates of that long weekend (the next one coming).
   s = s.replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/g, (m, h) => holidayWeekendDates(h) || m);
   s = fixedHolidayDates(s, true);
+  s = movingHolidayDates(s);
   // "I hate the cold" is a feeling about the weather, not a place.
   s = s.replace(/\b(?:i |we )?(?:hate|dislike|can t stand|cannot stand|do not like|don t like)(?: the)? (?:cold|snow|winter)\b/g, ' ');
   // French (2026-11-06): "nous arrivons de Paris", "un couple dans la soixantaine".
