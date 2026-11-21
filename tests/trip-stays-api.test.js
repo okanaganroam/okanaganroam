@@ -350,3 +350,26 @@ test('Book your trip box: trip line, estimate, Book my trip steps, See all, note
   const off = await (await fetch(`${base}/trip`)).text();
   assert.doesNotMatch(off, /t3BookGoHtml|t3-book|T3_STAY_DISCLOSURE|book_trip_start|Book my trip/);
 });
+
+// Review fixes (2026-11-20, Dayton): one total only, and no campground for a wine-and-food trip.
+test('one total: with the box, the plan leaves out the old per-person estimate line; flag off keeps it', async () => {
+  const on = await (await fetch(`${base}/trip?stays=1`)).text();
+  assert.match(on, /if \(hasStops && !t3StayData\(\)\) html \+= '<p class="t3-estimate" data-t3-estimate/);
+  const off = await (await fetch(`${base}/trip`)).text();
+  assert.match(off, /if \(hasStops\) html \+= '<p class="t3-estimate" data-t3-estimate/);
+  assert.doesNotMatch(off, /t3StayData/);
+});
+
+test('stay type fit: the Kelowna wine-and-food example never gets the campground; a camping request does', async () => {
+  const camp = app.createVenue({ region: 'kelowna', type: 'stay', cuisine: 'campground', slug: 'trip-stays-test-orchard-rv', name: 'Trip Stays Test Orchard RV Park', address: '1 Orchard Road, Kelowna, BC', latitude: 49.887, longitude: -119.496, image_url: '/images/trip-v3/hero.webp', description: 'A fixture used only by the trip stays tests.' });
+  made.push(camp.id);
+  db.prepare('INSERT INTO stay_info (venue_id, info_json, updated_at, batch_id) VALUES (?, ?, ?, ?)').run(camp.id, JSON.stringify({ unit_types: ['rv_site', 'tent_site'], confidence: 'high', price_level: 1 }), '2026-11-20T00:00:00Z', 'test');
+  const shown = (w) => [w.pick, ...w.alternatives].map((s) => s.id);
+  const wine = JSON.parse((await post({ text: '3 days in Kelowna: wineries, easy walks and great food' }, '?stays=1')).text).whereToStay;
+  assert.ok(wine && wine.pick, 'a base is picked');
+  assert.ok(!shown(wine).includes(camp.id), 'no campground for wineries, walks and food');
+  const camping = JSON.parse((await post({ text: '3 days camping in Kelowna' }, '?stays=1')).text).whereToStay;
+  assert.equal(camping.pick.id, camp.id, 'a camping request gets the campground first');
+  const fr = JSON.parse((await post({ text: '3 jours en VR à Kelowna' }, '?stays=1')).text).whereToStay;
+  assert.equal(fr && fr.pick.id, camp.id, 'French: « en VR »');
+});

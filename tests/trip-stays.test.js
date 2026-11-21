@@ -202,3 +202,33 @@ test('the card: sleeps, price band, links, reasons in English and French; whereT
   const bare = ts.whereToStay(plan(), null, [stay({ id: 8, km: 1 })], '2026-07-01');
   assert.deepEqual([bare.pick.sleeps, bare.pick.priceBand, bare.trip.adults, bare.trip.kids, bare.trip.datesGiven], [null, null, null, null, false]);
 });
+
+// Stay type fit (2026-11-20, Dayton): no RV park or campground for "wineries, easy walks and great food" unless nothing
+// else fits; a camping request gets campgrounds first.
+test('stay type fit: campgrounds only for camping requests (EN + FR), or when nothing else fits', () => {
+  const camp = (o = {}) => ({ ...stay({ photo: '/images/x.jpg', ...o }), kind: 'Campground', kindKey: 'campground' });
+  const rvOnly = (o = {}) => ({ ...stay({ photo: '/images/x.jpg', ...o, info: { unit_types: ['rv_site', 'tent_site'], confidence: 'high' } }), kind: null, kindKey: null });
+  const ask = (q, extra = {}) => ({ ...plan(), query: q, ...extra });
+  // The Kelowna example: the campground and the RV park sit on the stops, the hotel is 3 km away; the hotel wins.
+  const near = camp({ id: 801, name: 'Orchard RV Park' });
+  const sites = rvOnly({ id: 802, name: 'Lakeside Sites' });
+  const hotel = stay({ id: 803, name: 'Downtown Hotel', km: 3 });
+  const motel = stay({ id: 804, name: 'Valley Motel', km: 5, info: { unit_types: ['room'] } });
+  const kelowna = ask('3 days in Kelowna: wineries, easy walks and great food');
+  assert.equal(ts.wantsCamping(kelowna), false);
+  const r = ts.pickTripStays(ctxOf(kelowna, null), [near, sites, hotel, motel]);
+  assert.equal(r.pick.name, 'Downtown Hotel');
+  assert.deepEqual([r.pick, ...r.alternatives].map((s) => s.id), [803, 804], 'no campground or RV-only stay among the three');
+  assert.ok(ts.isCampingStay(near) && ts.isCampingStay(sites) && !ts.isCampingStay(hotel) && !ts.isCampingStay(motel));
+  assert.ok(!ts.isCampingStay({ kindKey: 'resort', info: { unit_types: ['room', 'rv_site'] } }), 'a resort with rooms and RV sites is not camping only');
+  // Nothing else in the plan's towns or nearby: the campground is still offered rather than nothing.
+  assert.equal(ts.pickTripStays(ctxOf(kelowna, null), [near, stay({ id: 805, km: 80, region: 'osoyoos' })]).pick.id, 801);
+  // A camping request (EN, FR, or the interpreter's "Camping" interest): campgrounds first.
+  for (const p of [ask('camping weekend in Kelowna'), ask('RV trip to Kelowna'), ask('glamping in Kelowna'), ask('week-end en VR à Kelowna'), ask('du camping à Kelowna'), ask('un prêt-à-camper à Kelowna'), ask('2 jours en tente'), ask('2 days in Kelowna', { understood: { party: [], interests: ['Camping'] } })]) {
+    assert.equal(ts.wantsCamping(p), true, p.query);
+    const c = ts.pickTripStays(ctxOf(p, null), [hotel, near, motel, sites]);
+    assert.ok([801, 802].includes(c.pick.id), p.query);
+    assert.ok(c.pick.reasons.some((x) => x.key === 'camping') || c.pick.reasons.length >= 1);
+  }
+  for (const q of ['ski camp at Big White', 'concerts at the campus', 'advent market in Kelowna', 'vineyard tour']) assert.equal(ts.wantsCamping(ask(q)), false, q);
+});

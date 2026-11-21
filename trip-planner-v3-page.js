@@ -1242,6 +1242,8 @@ const T3_STAY_CLIENT_SRC = `
     if (steps.length) html += t3BookGoHtml(steps, fr) + t3StayNotesHtml(s, t, fr) + t3BookAllHtml(s, steps, fr);
     return html + t3StayDisclosureHtml(s, steps, fr) + '</section>';
   }
+  // One total only (2026-11-20, Dayton): while this box is shown, the plan leaves out the older "Estimated total per
+  // person" line (the render skips it when t3StayData() has a stay), so visitors never see two different numbers.
   function t3BookSteps(){ var d = t3StayData(); return d ? (d.chosen.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && t3StayExt(x.url); }) : []; }
   function t3BookRerender(focusSel){
     var card = resultEl.querySelector('[data-t3-stay]');
@@ -2490,7 +2492,7 @@ ${d.stays ? "    html += t3StayCardHtml();\n" : ''}    // Dates and the trip map
     }
     // Indoor test 3 (2026-11-19): no dated show fits a show request: the theatres in town whose own words say they host it.
     html += t3ShowPlacesHtml(p, lang() === 'fr', esc, hrefAttr);
-    if (hasStops) html += '<p class="t3-estimate" data-t3-estimate hidden aria-live="polite"></p>';
+    if (hasStops${d.stays ? ' && !t3StayData()' : ''}) html += '<p class="t3-estimate" data-t3-estimate hidden aria-live="polite"></p>';
     html += tripDetails;
     if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" ' + hrefAttr(p.seeAll.url) + '>' + esc(tx('tripv3.seeAll')) + '</a>';
     html += '</div>';

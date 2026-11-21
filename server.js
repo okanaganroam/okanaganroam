@@ -7722,6 +7722,7 @@ function tripStayCandidates() {
     return {
       id: v.id, name: v.name, region: v.region, regionLabel: REGION_LABELS[v.region],
       kind: placesToStay.stayKindLabel(v.cuisine, 'en') || null, kindFr: placesToStay.stayKindLabel(v.cuisine, 'fr') || null,
+      kindKey: (placesToStay.stayKind(v.cuisine) || {}).key || null,
       latitude: v.latitude, longitude: v.longitude, photo,
       url: placesToStay.stayPath(v, 'en'), urlFr: placesToStay.stayPath(v, 'fr'),
       info: infoById.get(v.id) || null,
