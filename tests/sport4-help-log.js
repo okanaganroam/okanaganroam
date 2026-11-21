@@ -9,7 +9,7 @@ const RYAN_LOG = [
   ['en', 'setup', 'opening day depends on the weather, usually first week of march. what if it changes', ['sport-opening-day']],
   ['en', 'setup', 'we also have a driving range, and in winter i teach lessons indoors on a gc quad. should i pick those too', ['sport-second-kind']],
   ['en', 'setup', '9 holes is 55 and 18 is 99. most people play 18. which one do i put', ['sport-golf-details', 'indoor-price', 'sport-card-price']],
-  ['en', 'setup', 'twilight is 79 after 2pm, juniors 55. where does that go', ['sport-rate-lines']],
+  ['en', 'setup', 'twilight is 79 after 2pm, juniors 55. where does that go', ['sport-rate-lines', 'sport-twilight-times']],
   ['en', 'setup', 'is it with tax or without', ['sport-tax']],
   ['en', 'setup', 'saturday and sunday before 9 are members only. public after that. where do i say that', ['sport-members']],
   ['en', 'setup', 'people can also call the shop to book', ['sport-tee-times']],

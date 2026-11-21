@@ -110,7 +110,7 @@ const QUESTIONS = {
     ['en', 'setup', 'were closed in january obviously, will my page say that', [SS]],
     ['en', 'setup', 'greens open depends on the weather in spring', [OD]],
     ['en', 'setup', 'what green fee do i put 9 or 18', [GD, P, CP]],
-    ['en', 'menu', 'twilight is after 3, 49 bucks', [RL]],
+    ['en', 'menu', 'twilight is after 3, 49 bucks', [RL, 'sport-twilight-times']],
     ['en', 'menu', 'is the cart included in the green fee? its not', [INC, RN]],
     ['en', 'menu', 'stay and play package with the hotel, 18 holes and lunch', [PKG]],
     ['en', 'menu', 'prices are plus gst', [TX, X]],

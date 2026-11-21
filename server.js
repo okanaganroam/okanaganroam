@@ -25170,7 +25170,8 @@ function indoorSearchExtraText(venueId, fr = false) {
 // matches. -> [text…]
 function sportPlannerWords(v) {
   try {
-    const own = indoorSearchExtraText(v.id);
+    // Her own words only: the kinds' search words stay out (a second kind's words never rank a place for that kind).
+    const own = [indoorVisitSearchText(v.id), (() => { try { const row = publishedMenuRow(v.id); if (!row || row.source === 'research') return ''; const d = parseMenuData(row.data); return ((d && d.sections) || []).flatMap((sec) => (sec.items || []).map((it) => (it && it.name ? String(it.name) : ''))).filter(Boolean).join(' ; '); } catch (e) { return ''; } })()].filter(Boolean).join(' ; ');
     const info = venueVisitInfo(v.id) || {};
     const rows = [...(info.rows || []), ...(Array.isArray(info.owner_dropped) ? info.owner_dropped : [])].filter((r) => r && typeof r.text === 'string' && /^(?:practice|lessons?|programs?|academy|camps?|clinics?)$/i.test(String(r.label || '')));
     const research = sportPracticeKept(v, rows.map((r) => r.text).join(' '));
@@ -63870,7 +63871,7 @@ function sport4KindHelp(t, kind, venue, happy) {
   // Sport test 7 (Kayla: "hours = first tee to last tee? or when the golf shop is open" got the bar example): a course's own example.
   if (t.id === 'sport-last-booking' && kind === 'golf') return both([['(like 11 PM when the bar is open till 11)', '(for a course, from when the pro shop opens to when the last players come in, like 6:30 AM to 8 PM)']], [['(comme 23 h si le bar est ouvert jusqu’à 23 h)', '(pour un terrain, de l’ouverture de la boutique du pro au retour des derniers joueurs, comme de 6 h 30 à 20 h)']]);
   // Sport test 7 (Kayla's SoloRider cart): an adaptive cart or gear is one line in Good to know.
-  if (t.id === 'indoor-access' && golfish) return { ...t, a: `${t.a}<p>An adaptive cart? One line in <strong>Good to know</strong>, like <em>SoloRider adaptive cart: book ahead</em>.</p>`, aFr: `${t.aFr}<p>Une voiturette adaptée? Une ligne dans <strong>Bon à savoir</strong>, comme <em>Voiturette adaptée SoloRider : réservez à l’avance</em>.</p>` };
+  if (t.id === 'indoor-access' && kind === 'golf') return { ...t, a: `${t.a}<p>An adaptive cart? One line in <strong>Good to know</strong>, like <em>SoloRider adaptive cart: book ahead</em>.</p>`, aFr: `${t.aFr}<p>Une voiturette adaptée? Une ligne dans <strong>Bon à savoir</strong>, comme <em>Voiturette adaptée SoloRider : réservez à l’avance</em>.</p>` };
   if (t.id === 'sport-rates-next-year') { const y = String(new Date().getFullYear() + 1); return both([['{YEAR}', y]], [['{YEAR}', y]]); }
   if (t.id === 'sport-member-rates') return both([['{MEMBERS_EN}', kind === 'golf' ? 'Memberships: ask the pro shop' : 'Memberships: ask at the front desk']], [['{MEMBERS_FR}', kind === 'golf' ? 'Abonnements : demandez à la boutique du pro' : 'Abonnements : demandez à l’accueil']]);
   // The reopening day from her own season ("Closed for the season. Reopens March 6").
@@ -67299,7 +67300,7 @@ const OWNER_HELP_SCRIPT = String.raw`
     // lengths: « tyrolienne 2h30, parcours 1h30 »).
     x = x.replace(/\b\d{1,2} ?h ?[0-5]\d\b/g, ' hhmm ').replace(/\s+/g, ' ').trim();
     // Sport test 7: a number of days ("closed 3 days", « 4 jours ») is one key word, a short stretch.
-    x = x.replace(/\b(?:\d{1,2}|two|three|four|five|six|deux|trois|quatre|cinq) (?:days|jours)\b/g, ' ndays ').replace(/\s+/g, ' ').trim();
+    x = x.replace(/\b(?:\d{1,2}|two|three|four|five|six|deux|trois|quatre|cinq) (days|jours)\b/g, ' ndays $1 ').replace(/\s+/g, ' ').trim();
     // Round 8 (2026-10-19): "business" as owners mistype it ("busness" was too far from any key to be read).
     return x.replace(/\b(?:busness|buisness|bussiness|busines|bizness|buissness|businness)\b/g, 'business');
   }
@@ -67450,7 +67451,7 @@ const OWNER_HELP_SCRIPT = String.raw`
     // too. Each topic's title and answer, word by word (rarer words worth more), added lightly to its key score; and with no
     // sure key match, a topic whose own words clearly share the question's is taken.
     var ts = cfg.cover ? textScores(qt, qFr) : null;
-    if (ts) for (var ti = 0; ti < T.length; ti++) if (gate[ti] && ts[ti] > 0 && sums[ti] > 0) sums[ti] += ts[ti] * 0.5;
+    if (ts && cfg.coverAdd) for (var ti = 0; ti < T.length; ti++) if (gate[ti] && ts[ti] > 0 && sums[ti] > 0) sums[ti] += Math.min(ts[ti] * cfg.coverAdd, cfg.coverCap || 99);
     var scored = T.map(function(t, i){ return { id: t.id, s: sums[i], c: side[i], e: exact[i], b: (t.pages || []).indexOf(cfg.page) >= 0 ? 1 : 0 }; })
       .filter(function(x){ return x.s > 0; }).sort(function(a, b){ return (b.s + b.b) - (a.s + a.b) || b.s - a.s; });
     // A narrower topic that matched a whole key word goes above the broader one it refines ("closed on Thanksgiving"
@@ -67676,7 +67677,7 @@ function ownerHelpWidgetHtml(page, opts = {}) {
   // Tours (2026-11-16): no happy hour at all, so its topics aren't there to be found either.
   if (opts.dropHappyHour) cfg.topics = cfg.topics.filter((t) => !HELP_HAPPY_RE.test(`${t.q} ${t.qFr}`));
   // Sport test 7: a sport or golf place's topics carry their concept groups (sport-help.js CONCEPTS; the matcher's allOfAny).
-  try { const pv0 = opts.venueId ? getVenue(opts.venueId) : null; if (pv0 && sportSetupType(pv0.type)) { const C0 = sport5HelpModule.CONCEPTS || {}; cfg.cover = true; const N0 = sport5HelpModule.NOT_IF || {}; cfg.topics = cfg.topics.map((t) => (C0[t.id] ? { ...t, allOfAny: (t.allOfAny || []).concat(C0[t.id]) } : t)).map((t) => (N0[t.id] ? { ...t, notIf: (t.notIf || []).concat(N0[t.id]) } : t)); } } catch (e) { /* as they are */ }
+  try { const pv0 = opts.venueId ? getVenue(opts.venueId) : null; if (pv0 && sportSetupType(pv0.type)) { const C0 = sport5HelpModule.CONCEPTS || {}; cfg.cover = true; cfg.coverAdd = 0.5; const N0 = sport5HelpModule.NOT_IF || {}; cfg.topics = cfg.topics.map((t) => (C0[t.id] ? { ...t, allOfAny: (t.allOfAny || []).concat(C0[t.id]) } : t)).map((t) => (N0[t.id] ? { ...t, notIf: (t.notIf || []).concat(N0[t.id]) } : t)); } } catch (e) { /* as they are */ }
   // Indoor test 4 (2026-11-19): topics a kind of place never has (an indoor place's restaurant "Price range").
   if (Array.isArray(opts.dropTopics) && opts.dropTopics.length) cfg.topics = cfg.topics.filter((t) => !opts.dropTopics.includes(t.id)).map((t) => ({ ...t, over: (t.over || []).filter((x) => !opts.dropTopics.includes(x)), noRelated: (t.noRelated || []).filter((x) => !opts.dropTopics.includes(x)) }));
   // Tour test 4 (Whistler, 2026-11-17): a tour has price lists, not menus ("new photos and menus wait for us to check").
