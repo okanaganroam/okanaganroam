@@ -3662,6 +3662,7 @@ function buildDays(facts, ctx, days, pinned) {
     const region = regionList[0] || null;
     const actualDate = ctx.tripDate ? new Date(new Date(`${ctx.tripDate}T12:00:00Z`).getTime() + (d - 1) * 86400000).toISOString().slice(0, 10) : null;
     const dayPool = pool.filter((v) => {
+      if (v4OffTheme(v, ctx)) return false;
       if (ctx.requirements && seasonClosedOnTrip(v, { date: actualDate })) return false;
       if(regionList.length && !regionList.includes(v.region))return false;
       const activities=(ctx.requirements?.items||[]).filter(i=>i.kind==='activity'&&i.strength==='must'&&(!tripRequirements.requirementDay(i,ctx.tripDate)||tripRequirements.requirementDay(i,ctx.tripDate)===d));
@@ -4653,7 +4654,7 @@ function buildWineDays(facts, ctx, days, pinned) {
     const where = region ? ` in ${listText(regionList.map((r) => regionLabel(ctx, r)))}` : '';
     const date = dayDate(ctx, d);
     const inDay = (v) => (!regionList.length || regionList.includes(v.region)) && !seasonClosedOnTrip(v, { date }) && tripRequirements.venueAllowed(v, ctx.requirements, d, ctx.tripDate);
-    const dayPool = pool.filter(inDay);
+    const dayPool = pool.filter((v) => inDay(v) && !v4OffTheme(v, ctx));
     // A kept stop wins over the Swap exclusion (2026-10-19): the same place on another day (the ski resort, a repeated
     // village dinner) is still kept when one copy of it is swapped.
     const pin = (part) => { const id = pinned && pinned[`${d}-${part}`]; const v = id && byId.get(id); return v || null; };
@@ -4945,7 +4946,7 @@ function buildSkiDays(facts, ctx, days, pinned) {
     // ski-season date those hours say nothing about when it is open, so they are not used to rule it out.
     const skiDate = date && SKI_SEASON_MONTHS.includes(Number(date.slice(5, 7)));
     const village = SKI_VILLAGE_FOR_HILL[region] || null;
-    const dayPool = pool.filter((v) => (v.region === region || (village && v.region === village)) && v.id !== (resort && resort.id) && !seasonClosedOnTrip(v, { date }) && tripRequirements.venueAllowed(v, ctx.requirements, d, ctx.tripDate))
+    const dayPool = pool.filter((v) => !v4OffTheme(v, ctx) && (v.region === region || (village && v.region === village)) && v.id !== (resort && resort.id) && !seasonClosedOnTrip(v, { date }) && tripRequirements.venueAllowed(v, ctx.requirements, d, ctx.tripDate))
       .map((v) => (skiDate && v.seasonClosedToday && SKI_HILL_REGIONS.includes(v.region) && v.hours && !v.seasonHours ? { ...v, hours: null, _hours: undefined } : v));
     // Tour test 14 (Whistler, 2026-11-18; Lucía): "ski lessons", "snowboard lesson for my 8 year old", "kids ski camp week":
     // the lesson operator is planned next to the resort on the first ski day, as "add a lesson" (lessons are never just a
@@ -6362,6 +6363,8 @@ function idleGapCandidates(result, input, requirements, g) {
   const kinds = crawl ? [...new Set(venueTypes)] : GAP_FILL_TYPES;
   const start0 = g.pr.endMinutes, end0 = g.nr.startMinutes;
   const out = [];
+  // V4 (round 1, 2026-11-21): a relaxed pace keeps its free time between stops, as it does before dinner.
+  if (ctx.v4 && ctx.pace === 'relaxed') return { cands: out, ctx: dayCtx };
   for (const v of facts) {
     if (!kinds.includes(v.type) || spaPlace(v) || longDayHike(v) || used.has(v.id) || estateUsed.has(v.id) || ctx.exclude.has(v.id) || ctx.avoid.has(v.id) || !hasCoords(v) || v4FillerSkip(v, ctx)) continue;
     if ((placeKey(v) && usedPlaces.has(placeKey(v))) || (ctx.kids && familyAvoid(v)) || (regions.length && !regions.includes(v.region))) continue;
@@ -7642,13 +7645,32 @@ function v4WineCapped(ctx, type, dayTypes, day, days, caps) { return !!(ctx && c
 // "Book a lane"): a stop added to fill free time on an adult trip is something that fits any trip (a viewpoint or walk,
 // a café, a gallery or museum, a market, a tasting), never a sports club, bowling, an arcade, a kids' play place or the
 // like, unless the request names it. Kids' trips keep the family fillers. Only with input.v4.
-const V4_OFF_THEME_FILLER_RE = /\b(?:bowl|bowling|bowls|lawn bowling|curling|arena|arenas|rink|rinks|skating|arcade|arcades|laser tag|trampoline|play centre|play center|playground|indoor playground|kids|children|childrens|mini golf|minigolf|go kart|go karts|karting|climbing|bouldering|gym|fitness|axe throwing|escape room|escape rooms|escape games|paintball|pickleball|tennis|squash|badminton|swimming pool|aquatic centre|aquatic center|leisure centre|recreation centre|community centre|community center|bingo|casino|batting cages|driving range|disc golf|skate park|skatepark|bmx|bike park|sports club|sports centre|sportsplex|racquet|lanes|club house|legion)\b/;
+const V4_OFF_THEME_FILLER_RE = /\b(?:bowl|bowling|bowls|lawn bowling|curling|arena|arenas|rink|rinks|skating|arcade|arcades|laser tag|lazer tag|virtual reality|vr|trampoline|play centre|play center|playground|indoor playground|kids|children|childrens|mini golf|minigolf|go kart|go karts|karting|climbing|bouldering|gym|fitness|axe throwing|escape room|escape rooms|escape games|paintball|pickleball|tennis|squash|badminton|swimming pool|aquatic centre|aquatic center|leisure centre|recreation centre|community centre|community center|bingo|casino|batting cages|driving range|disc golf|skate park|skatepark|bmx|bike park|sports club|sports centre|sportsplex|racquet|lanes|club house|legion)\b/;
+// The words judged: the name, the kind of place, and an indoor place's own kind ("Arcade, VR & laser tag" for a place
+// named "Planet Lazer"; round 1, 2026-11-21).
+function v4KindText(v) {
+  let own = '';
+  if (v.type === 'indoor') { try { const k = indoorCardKind(v); own = k ? normWords(k[0]) : ''; } catch (e) { own = ''; } }
+  return `${v.textName || normWords(v.name)} ${v.textCuisine || normWords(v.cuisine || '')} ${own}`;
+}
 function v4FillerSkip(v, ctx) {
   if (!ctx || !ctx.v4 || ctx.kids || !v) return false;
   if (v.type === 'golf' || v.type === 'sport') return true;
-  const m = V4_OFF_THEME_FILLER_RE.exec(`${v.textName || normWords(v.name)} ${v.textCuisine || normWords(v.cuisine || '')}`);
+  const m = V4_OFF_THEME_FILLER_RE.exec(v4KindText(v));
   if (!m) return false;
   return !new RegExp(`\\b${m[0].split(' ')[0].replace(/s$/, '')}`).test(ctx.queryText || '');
+}
+// V4 off-theme stops (round 1 fresh eyes, 2026-11-21: an arcade and laser tag on a couple's wine trip, ice skating after a
+// ski day): a request with a focus (a kind of place, an activity, an occasion) on an adult trip never gets a stop from the
+// off-theme list above as one of its picks, unless the request names it or asks for that kind of place. A request with
+// no focus ("things to do this weekend") keeps them. Only with input.v4.
+function v4OffTheme(v, ctx) {
+  if (!ctx || !ctx.v4 || ctx.kids || !v || (ctx.types && ctx.types.has(v.type))) return false;
+  const focus = (ctx.types && ctx.types.size) || (ctx.activities && ctx.activities.size) || ctx.occasion || (ctx.foodTerms && ctx.foodTerms.length);
+  if (!focus) return false;
+  const hits = [...v4KindText(v).matchAll(new RegExp(V4_OFF_THEME_FILLER_RE.source, 'g'))].map((m) => m[0]);
+  if (!hits.length) return false;
+  return !hits.some((w) => new RegExp(`\\b${w.split(' ')[0].replace(/s$/, '')}`).test(ctx.queryText || ''));
 }
 function v4Input(input) {
   if (!input || !input.v4 || !input.requirements || input.requirements.explicitMealCount !== 1) return input;
@@ -7713,6 +7735,16 @@ function v4Polish(result, input) {
       for (let n = wines.length - 1, over = wines.length - dayMax; n >= 0 && over > 0; n--) {
         if (kept.has(wines[n].venue.id)) continue;
         stops.splice(stops.indexOf(wines[n]), 1); used.delete(wines[n].venue.id); over -= 1; changed = true;
+      }
+    }
+    // 4. A relaxed pace (V4, round 1: "nothing too rushed" still had five stops a day): no late-afternoon stop on top of the
+    // day's morning, lunch, afternoon and dinner, unless it is kept, an event or a meal.
+    if (ctx.pace === 'relaxed') {
+      for (let i = stops.length - 1; i >= 0; i--) {
+        const s = stops[i];
+        if (!s || s.daypart !== 'late' || !s.venue || s.event || kept.has(s.venue.id) || isDinnerStop(s) || isLunchStop(s)) continue;
+        if (stops.filter((x) => x && (x.venue || x.event)).length <= 4) break;
+        stops.splice(i, 1); used.delete(s.venue.id); changed = true;
       }
     }
     // 3. Lunch on every full day.
@@ -10194,7 +10226,7 @@ function scheduleNotes(result, ctx) {
 
 module.exports = {
   // Build My Trip V4 (2026-11-20)
-  v4Input, v4Polish, v4CasualDinner, v4FillerSkip, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
+  v4Input, v4Polish, v4CasualDinner, v4FillerSkip, v4OffTheme, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
   // Tour test 17 (Whistler, 2026-11-18)
   regionMinutes, PICKUP_ASK_RE, KIND_SEASON_ASK_WORDS, kindSeasonOff, tourTripFor, normWords,
   dropNameOnlyTypes,

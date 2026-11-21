@@ -8075,7 +8075,46 @@ function buildTripPlannerTaxonomy() {
 // Apex, SilverStar and Big White with one or two stops: between seasons almost everything on a ski hill is closed. When
 // a plan for a ski hill alone fills under half its slots, it is planned from the town below instead, with a note.
 const TRIP_SKI_HILL_BASE = TRIP_SITE.skiHillBase;
+// Build My Trip V4, round 1 fresh eyes (2026-11-21), only for POST /api/trip/plan?v=4 (args.v4):
+//  - "nothing too rushed", "no rush", « sans se presser »: a relaxed pace, unless a pace was set;
+//  - "things to do this weekend" with no town and no kind of place is a 2-day plan ("today", "tomorrow": a day plan),
+//    not a list of ideas; the town is the planner's own valley-wide default, shown on the plan and easy to change;
+//  - each stop carries its listed phone, for the Book sheet's Call link on a meal booked by phone.
+const V4_NOT_RUSHED_RE = /\b(?:(?:nothing|not|nothing too|not too|never|don'?t want to be|don.t want to feel)\s+(?:too\s+)?rushed|no rush(?:ing)?|unrushed|no hurry|in no hurry|at our own pace|take (?:our|my) time|pas (?:trop )?press[ée]s?|sans (?:se )?presser|sans rush|pas de rush|prendre (?:notre|mon) temps|[àa] notre rythme)\b/i;
+const V4_WHEN_DAYS = { 'this-weekend': 2, 'next-weekend': 2, weekend: 2, today: 1, tomorrow: 1 };
 function runTripPlan(args, now = new Date()) {
+  if (!args || !args.v4) return runTripPlanBase(args, now);
+  let a = args;
+  if (typeof a.text === 'string' && V4_NOT_RUSHED_RE.test(a.text) && !(a.overrides && a.overrides.pace)) a = { ...a, overrides: { ...(a.overrides || {}), pace: 'relaxed' } };
+  let plan = runTripPlanBase(a, now);
+  try {
+    const it = plan && plan.intent;
+    const preset = it && it.when && it.when.preset;
+    const focus = it && ((it.types || []).length || (it.foodTerms || []).length || (it.features || []).length || (it.collections || []).length || (it.activities || []).length || (it.regions || []).length);
+    if (plan && plan.kind === 'discover' && !focus && V4_WHEN_DAYS[preset] && !(a.overrides && a.overrides.days)) {
+      const longer = runTripPlanBase({ ...a, overrides: { ...(a.overrides || {}), days: V4_WHEN_DAYS[preset] } }, now);
+      if (longer && ['multi_day', 'day_plan'].includes(longer.kind) && (longer.days || []).length) plan = longer;
+    }
+  } catch (e) { /* keep the list */ }
+  try { v4AddStopPhones(plan); } catch (e) { /* phones are a convenience */ }
+  return plan;
+}
+function v4AddStopPhones(plan) {
+  const ids = new Set();
+  const visit = (s) => { if (s && s.venue && Number.isInteger(s.venue.id)) ids.add(s.venue.id); };
+  for (const d of (plan && plan.days) || []) (d.stops || []).forEach(visit);
+  ((plan && plan.outing && plan.outing.stops) || []).forEach(visit);
+  ((plan && plan.itinerary && plan.itinerary.stops) || []).forEach(visit);
+  if (!ids.size) return;
+  const list = [...ids].slice(0, 80);
+  const rows = db.prepare(`SELECT id, phone FROM venues WHERE id IN (${list.map(() => '?').join(',')}) AND phone IS NOT NULL AND phone != ''`).all(...list);
+  const byId = new Map(rows.map((r) => [r.id, String(r.phone).trim()]));
+  const put = (s) => { if (s && s.venue && byId.has(s.venue.id) && /\d{3}.*\d{4}/.test(byId.get(s.venue.id))) s.venue.phone = byId.get(s.venue.id); };
+  for (const d of plan.days || []) (d.stops || []).forEach(put);
+  ((plan.outing && plan.outing.stops) || []).forEach(put);
+  ((plan.itinerary && plan.itinerary.stops) || []).forEach(put);
+}
+function runTripPlanBase(args, now = new Date()) {
   const first = runTripPlanCore(args, now);
   let plan = first;
   try {

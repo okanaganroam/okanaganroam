@@ -1730,7 +1730,7 @@ ${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3
       : { text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude };
     // French (2026-10-18): a plan made on /fr/trip keeps its French address, so a reload or a shared link stays French.
     var base = (location.pathname + '/').indexOf('/fr/') === 0 ? '/fr/trip' : '/trip';
-    try { history.replaceState(null, '', base + t3StateToQuery(s)${d.stays === 'preview' && !d.v4 ? " + (t3StateToQuery(s) ? '&' : '?') + 'stays=1'" : ''}${d.v4 === 'preview' ? " + (t3StateToQuery(s) ? '&' : '?') + 'v=4'" : ''}); } catch (e) {}
+    try { history.replaceState(null, '', base + t3StateToQuery(s)${d.stays === 'preview' && !d.v4 ? " + (t3StateToQuery(s) ? '&' : '?') + 'stays=1'" : ''}${d.v4 ? " + v4UrlExtra(t3StateToQuery(s))" : ''}${d.v4 === 'preview' ? " + (t3StateToQuery(s) || v4UrlExtra('') ? '&' : '?') + 'v=4'" : ''}); } catch (e) {}
   }
 
   // ---- plan helpers ----
@@ -3176,7 +3176,7 @@ ${d.stays ? "    html += t3StayCardHtml();\n" + (d.viator ? "    if (!t3StayData
   if (restored) {
     var arrival = 'link';
     try { var nav = performance.getEntriesByType('navigation')[0]; if (nav && (nav.type === 'reload' || nav.type === 'back_forward')) arrival = 'restore'; } catch (e) {}
-    input.value = restored.text;
+    input.value = restored.text;${d.v4 ? "\n    v4RestoreInputs(location.search); // V4 (round 1): the dates, guests and Confirm from the address bar" : ''}
     // A shared link to a French request opens in French too (a reload keeps whatever language was chosen).
     if (arrival !== 'restore' && lang() !== 'fr' && !document.documentElement.getAttribute('data-page-lang') && t3LooksFrench(restored.text) && typeof setLanguage === 'function') setLanguage('fr');
     state = { text: restored.text, seed: restored.seed, overrides: restored.overrides, locks: restored.locks, exclude: restored.exclude, removed: {}, last: null, lastReq: null };
