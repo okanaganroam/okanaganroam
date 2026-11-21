@@ -36320,6 +36320,17 @@ function subPageInHubLayout(hubHtml, oldHtml, pagePath, hubPath, opts = {}) {
   if (nav) body = body.replace(/<nav class="breadcrumb"[\s\S]*?<\/nav>/, () => nav[0]);
   if (h1) body = body.replace(/(<h1[^>]*>)[\s\S]*?(<\/h1>)/, (m, a, b) => a + h1[1] + b);
   if (opts.intro) body = body.replace(/(<p class="outdoor-intro fd-intro"[^>]*>)[\s\S]*?(<\/p>)/, (m, a, b) => a + escapeHtml(opts.intro) + b);
+  // opts.banner (Dayton, 2026-11-21): the page shows its own banner photo (a rink on Ice Skating & Hockey, a skate park
+  // on Skate Parks & BMX) instead of the hub's, with the photo's preload hint.
+  if (opts.banner) {
+    const bannerRe = /<div class="category-banner">\s*(?:<picture[\s\S]*?<\/picture>|<img[^>]*>)\s*<\/div>/, preloadRe = /<link rel="preload" as="image"[^>]*>/;
+    const oldBanner = oldMain.match(bannerRe) || oldHtml.match(bannerRe);
+    if (oldBanner && bannerRe.test(body)) {
+      body = body.replace(bannerRe, () => oldBanner[0]);
+      const oldPreload = oldHead.match(preloadRe);
+      if (oldPreload && preloadRe.test(head)) head = head.replace(preloadRe, () => oldPreload[0]);
+    }
+  }
   // Links back to the page itself, not to the hub.
   body = body.replace(new RegExp(`href="${hubPath}" id="fdNoResultsClear"`), `href="${pagePath}" id="fdNoResultsClear"`);
   if (opts.activity) body = body.replace('data-filter="fd-type"', `data-filter="fd-type" data-default-types="${opts.activity}"`);
@@ -36336,7 +36347,7 @@ function renderSportsSubPage(oldHtml, pagePath, query, scope) {
   const filter = { ...parseFoodDrinkFilterQuery(query), types: types.length || !scope.activity ? types : [scope.activity], sort: SPORTS_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' };
   if (scope.region) filter.regions = [];
   const hub = renderSportsHubPage(getVenuesByCategory('sport').filter(inTown), getSportsAlsoVenues().filter(inTown), getSportsAlsoNotes(), filter);
-  return subPageInHubLayout(hub, oldHtml, pagePath, '/sports', { town: !!scope.region, intro: scope.intro, activity: scope.activity });
+  return subPageInHubLayout(hub, oldHtml, pagePath, '/sports', { town: !!scope.region, intro: scope.intro, activity: scope.activity, banner: !!scope.activity });
 }
 function renderIndoorSubPage(oldHtml, pagePath, query, scope) {
   const inTown = (v) => !scope.region || v.region === scope.region;
