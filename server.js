@@ -7334,6 +7334,20 @@ function isTripStaysEnabled() {
 function tripStaysEnabledFor(query) {
   return isTripStaysEnabled() || String((query && query.stays) || '') === '1';
 }
+// Build My Trip V4 (2026-11-20, Dayton: "super easy, not a big wall of text"): the simple plan page (type -> plan -> swap or
+// remove -> confirm -> book -> share) and the planner's V4 rules (lunch every full day, nice dinners at sit-down restaurants,
+// at most two wineries a day, quarter-hour times). A preview: /trip?v=4 for that request only, noindex like every /trip URL
+// with a query; the page sends POST /api/trip/plan?v=4, the only way the planner uses the V4 rules. TRIP_V4=on (off by
+// default) makes it the /trip page for everyone (/trip?v=3 still shows the current page). Needs the V3 page
+// (TRIP_PLANNER_V3) and turns the stays box on for the page (it holds the bookings).
+function isTripV4Enabled() {
+  return /^(1|on|true|yes)$/i.test(String(process.env.TRIP_V4 || '').trim());
+}
+function tripV4EnabledFor(query) {
+  const v = String((query && query.v) || '');
+  if (v === '3') return false;
+  return isTripV4Enabled() || v === '4';
+}
 // Loaded lazily for the same reason as the interpreter (see
 // discoveryIntentModule): server.js still starts without the file.
 function tripPlannerModule() {
@@ -7703,7 +7717,7 @@ function parseTripPlanBody(body, opts = {}) {
       || (w.times !== undefined && (!w.times || typeof w.times !== 'object' || Array.isArray(w.times) || Object.keys(w.times).length > 28 || !Object.entries(w.times).every(([k, m]) => swapKey(k) && Number.isInteger(m) && m >= 0 && m < 1440)))) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>", id: <venue id>, locked: ["<day>-<daypart>"], times: { "<day>-<daypart>": <minutes> } }.' };
     swap = { key: w.key, type: w.type, ...(w.id !== undefined ? { id: w.id } : {}), ...(w.locked !== undefined ? { locked: w.locked.slice() } : {}), ...(w.times !== undefined ? { times: { ...w.times } } : {}), ...(w.stops !== undefined ? { stops: w.stops.map((x) => ({ ...x })) } : {}) };
   }
-  return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap, ...(stay ? { stay } : {}) } };
+  return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap, ...(stay ? { stay } : {}), ...(opts.v4 ? { v4: true } : {}) } };
 }
 
 // Every place to stay with a map location, its stay_info facts and what the "Where to stay" card shows.
@@ -7753,9 +7767,9 @@ function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
       try { const longer = run({ ...base, overrides: { ...(base.overrides || {}), days: want } }, now); if (longer && ['multi_day', 'day_plan'].includes(longer.kind)) plan = longer; } catch (e) { /* keep the plan as asked */ }
     }
   }
-  return withTripStays(plan, stay, now, args.text);
+  return withTripStays(plan, stay, now, args.text, !!args.v4);
 }
-function withTripStays(plan, stay, now = new Date(), text = '') {
+function withTripStays(plan, stay, now = new Date(), text = '', v4 = false) {
   if (!plan || typeof plan !== 'object') return plan;
   try {
     const candidates = tripStayCandidates();
@@ -7769,6 +7783,11 @@ function withTripStays(plan, stay, now = new Date(), text = '') {
       // "Book your trip" (2026-11-20, trip-booking.js): the estimated total and the "Book my trip" steps, per stay card.
       block = tripBooking.withTripBooking(block, plan);
       plan.whereToStay = block;
+    } else if (v4 && ['multi_day', 'day_plan', 'itinerary', 'outing'].includes(plan.kind)) {
+      // V4 (2026-11-20): with no place to stay to suggest, "Book my trip" still steps through the stops' own booking links,
+      // with the same estimate (no stay part).
+      const checklist = tripBookingChecklist(plan);
+      plan.v4Booking = { steps: tripBooking.tripBookingSteps(null, checklist), estimate: tripBooking.tripEstimate(plan, null, stay || {}) };
     }
     // Viator (2026-11-20, viator.js): which activities the visitor asked for that no planned stop can book (a wine tour,
     // a zipline...), for up to 2 suggestion cards the page loads from /api/trip/viator. Added after planning: it never
@@ -9358,7 +9377,7 @@ function lateAfterMinutes(text) {
 }
 const TEAM_BUILDING_WORDS_RE = /\bteam[\s-]?building(?:\s+(?:activit(?:y|ies)|events?|ideas?|outings?|days?|nights?|games?|exercises?|experiences?|venues?|places?|spots?|fun|things to do))+\b|\bteambuilding\b/gi;
 const TRIP_SWIM_OFF_MONTHS = [11, 12, 1, 2, 3, 4];
-function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null }, now = new Date()) {
+function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null, v4 = false }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   // 2026-11-05: trip-length, clock-time, holiday-weekend and tour wording made plain; a beer, cider or distillery "tour" is a run of
   // breweries, cideries or distilleries. (planText is the French layer's own text; planTextPlain is what the planner reads.)
@@ -9929,6 +9948,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
       clock: rolledWindow ? null : okanaganClock(now),
       tripDate: rolledWindow ? requirements.startDate : (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now),
       kidAges: tripKidAges, askText: tripAskText,
+      ...(v4 ? { v4: true } : {}),
     });
     plan.seeAll = null;
     if (eventWindow) plan.eventWindow = eventWindow;
@@ -9978,6 +9998,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     holidayEvents: !!holidayEvents,
     tripDate: requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now) || tripPlanDate(intent.when, now),
     kidAges: tripKidAges, askText: tripAskText,
+    ...(v4 ? { v4: true } : {}),
     startWeekday: requirements?.startDate ? localWeekdayKey(requirements.startDate) : tripStartWeekday(intent.when, now),
     clock: rolledWindow ? null : okanaganClock(now),
   });
@@ -45911,7 +45932,7 @@ function tripSamplePlan(now = Date.now()) {
 // ?region= from the town pages, campaign tags) is noindex, follow and canonical to /trip, so no new indexable page.
 const TRIP_PAGE_TITLE = 'Okanagan Trip Planner: Free Day-by-Day Itinerary | Okanagan Roam';
 const TRIP_PAGE_DESCRIPTION = 'Plan an Okanagan trip in one sentence: a free day-by-day itinerary for Kelowna, Penticton, Vernon and wine country, built from places open on your dates.';
-function renderTripPlannerV3Page({ preview = false, noindex = false, stays = null, viator: viatorOn = false } = {}) {
+function renderTripPlannerV3Page({ preview = false, noindex = false, stays = null, viator: viatorOn = false, v4 = null } = {}) {
   if (!tripPlannerV3PageModule) return renderTripPlannerPage(isTripPlannerV2Enabled());
   const canonical = 'https://okanaganroam.com/trip';
   let tripTrayHtml = '';
@@ -45950,6 +45971,8 @@ function renderTripPlannerV3Page({ preview = false, noindex = false, stays = nul
     ...(stays ? { stays } : {}),
     // Viator suggestions (2026-11-20): only with the stays box and Viator set up.
     ...(stays && viatorOn ? { viator: true } : {}),
+    // Build My Trip V4 (2026-11-20): 'preview' (/trip?v=4) or 'on' (TRIP_V4).
+    ...(v4 ? { v4 } : {}),
   }));
 }
 
@@ -75352,7 +75375,7 @@ const server = http.createServer(async (req, res) => {
         return sendJSON(res, 400, { error: 'Malformed JSON body.' });
       }
       const staysOn = tripStaysEnabledFor(query);
-      const parsed = parseTripPlanBody(body, { stays: staysOn });
+      const parsed = parseTripPlanBody(body, { stays: staysOn, v4: String(query.v || '') === '4' });
       if (parsed.error) return sendJSON(res, 400, { error: parsed.error });
       // Weekly specials (2026-10-27): a stop on its special's day says so, added after planning like the deals.
       try {
@@ -75401,8 +75424,10 @@ const server = http.createServer(async (req, res) => {
       // Any query (?q= examples and shared plans, ?region=, campaign tags): noindex, follow, canonical /trip (trip SEO).
       const tripHasQuery = Object.keys(query || {}).length > 0;
       if (tripPlannerV3ActiveFor(req)) {
-        const staysMode = isTripStaysEnabled() ? 'on' : tripStaysEnabledFor(query) ? 'preview' : null;
-        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview', noindex: tripHasQuery, stays: staysMode, ...(staysMode && viator.enabled() ? { viator: true } : {}) });
+        // V4 (2026-11-20): the simple page holds the bookings, so it always has the stays box (on, or as a preview).
+        const v4Mode = tripV4EnabledFor(query) ? (isTripV4Enabled() && String(query.v || '') !== '4' ? 'on' : 'preview') : null;
+        const staysMode = isTripStaysEnabled() ? 'on' : (tripStaysEnabledFor(query) || v4Mode) ? 'preview' : null;
+        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview', noindex: tripHasQuery, stays: staysMode, ...(staysMode && viator.enabled() ? { viator: true } : {}), ...(v4Mode ? { v4: v4Mode } : {}) });
         // "See live prices" (2026-11-20): only this page, only with stays on and Stay22 set up, may frame Stay22's map.
         if (staysMode && placesToStay.affiliateConfig().provider === 'stay22') res.setHeader('Content-Security-Policy', TRIP_STAYS_CSP);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -78190,7 +78215,7 @@ module.exports = {
   tripPlannerLabels,
   parseTripPlanBody,
   runTripPlan, runTripPlanCore, ownerClosureCount,
-  runTripPlanWithStay, withTripStays, tripStayCandidates, isTripStaysEnabled, tripStaysEnabledFor,
+  runTripPlanWithStay, withTripStays, tripStayCandidates, isTripStaysEnabled, tripStaysEnabledFor, isTripV4Enabled, tripV4EnabledFor,
   tripBookingChecklist,
   // Planner (2026-10-27): the happy hour crawl.
   tripHappyHourAsk,
