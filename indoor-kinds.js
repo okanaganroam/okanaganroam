@@ -605,11 +605,19 @@ function sportKindSuggestion(venue) {
   }
   return out.slice(0, 3);
 }
+// Sport test 9 (2026-11-21): « Voir la droits de jeu et tarifs ». The French article from the page's first word: plural
+// (« les droits de jeu et tarifs », « les cours et tarifs »), else « la » for the feminine nouns used here, « l’ » before a vowel.
+function frArticle(page) {
+  const w = String(page || '').trim().split(/\s+/)[0].toLowerCase();
+  if (/(?:s|x)$/.test(w)) return 'les ';
+  if (/^[aeéèêiîoôuh]/.test(w)) return 'l’';
+  return /(?:e|ion|té)$/.test(w) ? 'la ' : 'le ';
+}
 // One kind's words in one language ({ price, prices, help, groups, search, boxOffice, arts }).
 function indoorKindText(kinds, lang) {
   const k = indoorKindKey(kinds), e = K[k], w = e[lang === 'fr' ? 'fr' : 'en'];
   // The prices link's words on the page: "See prices & rates" / « Voir les tarifs », a spa's "See the spa menu".
-  const see = w.prices.page === PRICES_PAGE[lang === 'fr' ? 1 : 0] ? (lang === 'fr' ? 'Voir les tarifs' : 'See prices & rates') : lang === 'fr' ? `Voir la ${w.prices.page.toLowerCase()}` : `See the ${w.prices.page.toLowerCase()}`;
+  const see = w.prices.page === PRICES_PAGE[lang === 'fr' ? 1 : 0] ? (lang === 'fr' ? 'Voir les tarifs' : 'See prices & rates') : lang === 'fr' ? `Voir ${frArticle(w.prices.page)}${w.prices.page.toLowerCase()}` : `See the ${w.prices.page.toLowerCase()}`;
   return { kind: k, bookBtn: e.bookBtn || null, season: e.season || '', planner: e.planner === undefined ? undefined : e.planner, exPrice: e.exPrice || 15, single: !!e.single, slot: e.slot || null, ticketed: !!e.ticketed, classKind: !!e.classKind, boxOffice: !!e.boxOffice, arts: !!e.arts, quiet: !!e.quiet, day: !!(e.day || e.quiet), gtk: e.gtk || 'general', ex: e.ex || 'general', ...w, prices: { ...w.prices, see } };
 }
 // The card's small lines in both languages (English -> French), for french-text.js.

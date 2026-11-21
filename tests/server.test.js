@@ -26701,7 +26701,7 @@ test('Reset edit link (2026-10-18): the longest-standing login resets the link (
     assert.equal((await s.post(`/owner/${token}/changes`, { changes: { phone: '250-555-0100' }, started_at: Date.now() - 10000 })).status, 404);
     assert.deepEqual(mail.map((m) => m.to), ['reset.owner@example.com']);
     assert.match(mail[0].text, /You reset the private edit link for Reset Link Fixture/);
-    const newToken = /\/owner\/([A-Za-z0-9_-]{32})\b/.exec(mail[0].text)[1];
+    const newToken = /\/owner\/([A-Za-z0-9_-]{32})(?![A-Za-z0-9_-])/.exec(mail[0].text)[1];
     assert.equal((await s.get(`/owner/${newToken}`)).status, 200);
     assert.match(dayton[dayton.length - 1]._subject, /\[FYI\] Edit link reset for Reset Link Fixture/);
     // Both logins keep their access.
@@ -26716,7 +26716,7 @@ test('Reset edit link (2026-10-18): the longest-standing login resets the link (
     assert.equal(rf.status, 200, JSON.stringify(rf.body));
     assert.equal(mail[0].subject, 'Nouveau lien de modification pour Reset Link Fixture');
     assert.match(mail[0].text, /https:\/\/okanaganroam\.com\/fr\/owner\/[A-Za-z0-9_-]{32}/);
-    const frToken = /\/owner\/([A-Za-z0-9_-]{32})\b/.exec(mail[0].text)[1];
+    const frToken = /\/owner\/([A-Za-z0-9_-]{32})(?![A-Za-z0-9_-])/.exec(mail[0].text)[1];
     assert.equal((await s.get(`/owner/${newToken}`)).status, 404);
     // A claim approved after a reset makes a working link (and the reset link keeps working until it's opened).
     const claimId = Number(db.prepare(`INSERT INTO venue_claims (venue_id, name, role, email, phone, verify_method) VALUES (?, 'Casey', 'owner', 'casey@example.com', '250 555 0111', 'call')`).run(v.id).lastInsertRowid);

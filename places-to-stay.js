@@ -317,7 +317,7 @@ function renderStayVenuePage({ venue, regionLabel, lang = 'en', closeBy = [] }, 
   const actions = [
     ratesButtonHtml(link, venue, esc),
     site && !(link && link.source === 'website') ? `<a href="${esc(site)}" rel="nofollow noopener" target="_blank" data-track="website">${fr ? 'Site Web ↗' : 'Website ↗'}</a>` : '',
-    venue.phone ? `<a href="tel:${esc(venue.phone)}" data-track="phone">${fr ? 'Appeler' : 'Call'}</a>` : '',
+    venue.phone ? `<a href="${esc(require('./tel-href.js').telHref(venue.phone))}" data-track="phone">${fr ? 'Appeler' : 'Call'}</a>` : '',
   ].filter(Boolean).join('\n    ');
   return `<!DOCTYPE html>
 <html lang="${fr ? 'fr-CA' : 'en'}">
