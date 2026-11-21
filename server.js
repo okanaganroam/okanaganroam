@@ -21070,6 +21070,9 @@ const GOLF_AT_A_GLANCE_FACTS = {
     ['Pro shop', 'Honesty cash box rather than a full shop'],
     ['Extras', 'Dry RV camping on site'],
   ],
+  'lumby/lumby-golf-club': [
+    ['Course', '9 holes · par 33 · sand greens'],
+  ],
   'enderby/mabel-lake-golf-country-club': [
     ['Course', '9 holes · par 36 (18-hole round, par 72)'],
     ['Designer', 'Les Furber'],

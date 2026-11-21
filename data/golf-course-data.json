@@ -1394,6 +1394,22 @@
     "source": "Okanagan Roam verified course facts (2026-09-19 golf content pass; practice facilities recorded only when confirmed by official sources)"
    }
   },
+  "lumby/lumby-golf-club": {
+   "name": "Lumby Golf Club",
+   "profile": {
+    "holes": 9,
+    "par": 33,
+    "course_format": "executive",
+    "source_url": "https://www.golfadvisor.com/courses/26640-lumby-golf-course",
+    "source_note": "Golf directory (GolfAdvisor/GolfPass): 9 holes, par 33, 2,476 yards, executive; no official scorecard found (checked 2026-11-21); par approved by Dayton"
+   },
+   "fees": {
+    "status": "unverified",
+    "source_url": "https://lumby.ca/lumby-golf-club/",
+    "verified_at": "2026-11-21",
+    "note": "Green fees were not checked in this pass; rates need a manual check."
+   }
+  },
   "oliver/fairview-mountain-golf-club": {
    "name": "Fairview Mountain Golf Club",
    "profile": {
@@ -1791,10 +1807,10 @@
    "name": "Sonora Dunes Golf Course",
    "profile": {
     "holes": 9,
-    "par": 36,
+    "par": 35,
     "course_format": "regulation",
     "source_url": "https://sonoradunes.com/hole-by-hole/",
-    "source_note": "Official hole-by-hole: 9 holes, par 36"
+    "source_note": "Official: 9 holes, par 35 (4-3-4-4-4-4-5-3-4), 2,523 yards from the green tees; the hole-by-hole page headings and the club's archived official scorecard (web.archive.org, 2015) agree, and the archived official hole 6 page calls it a double-dogleg par 4 (the current page's \"Par 5\" in the hole 6 text is a typo) (checked 2026-11-21)"
    },
    "fees": {
     "status": "published",
