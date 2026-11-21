@@ -74,6 +74,7 @@ async function clickableOnPage(kind, id) {
 async function sheetWithPage(kind, d) { return d ? venueActivity.applyInventory(d, kind, await clickableOnPage(kind, d.venue.id)) : d; }
 const { renderDashboardPage } = require('./dashboard-page');
 const tripDemand = require('./trip-demand');
+const tripFunnel = require('./trip-funnel');
 const TRIP_SITE = require('./trip-site.js');
 const tripDemandLog = tripDemand.createLogger(db);
 const r2 = require('./r2');
@@ -45950,7 +45951,7 @@ function renderTripPlannerV3Page({ preview = false, noindex = false, stays = nul
       .replace(/href="#top"/g, 'href="/"')));
     headerHtml = withNavRefresh(headerHtml);
   }
-  return withPlanShareButton(tripPlannerV3PageModule.renderTripPlannerV3Page({
+  return tripFunnel.withTripFunnelScript(withPlanShareButton(tripPlannerV3PageModule.renderTripPlannerV3Page({
     esc: escapeHtml,
     title: TRIP_PAGE_TITLE,
     description: TRIP_PAGE_DESCRIPTION,
@@ -45976,7 +45977,14 @@ function renderTripPlannerV3Page({ preview = false, noindex = false, stays = nul
     ...(stays && viatorOn ? { viator: true } : {}),
     // Build My Trip V4 (2026-11-20): 'preview' (/trip?v=4) or 'on' (TRIP_V4).
     ...(v4 ? { v4 } : {}),
-  }));
+  })));
+}
+// A business's type, for the Build My Trip funnel's booking kinds (tasting / table / other). Read only.
+let tripFunnelTypeStmt = null;
+function tripFunnelVenueType(id) {
+  if (!tripFunnelTypeStmt) tripFunnelTypeStmt = db.prepare('SELECT type FROM venues WHERE id = ?');
+  const r = tripFunnelTypeStmt.get(id);
+  return r ? r.type : null;
 }
 
 // Mobile 404 (2026-09-26): the page had no viewport meta (phones laid it
@@ -75695,7 +75703,9 @@ const server = http.createServer(async (req, res) => {
       if (!tripDemand.enabled() || !isSameOriginSubmission(req)) { res.writeHead(204); return res.end(); }
       try {
         const b = await readLimitedJsonBody(req, 512);
-        if (b && typeof b.name === 'string') siteEventCounter.record(req, b.name, requestClientIp(req));
+        // A Build My Trip booking tap on a business's own link names the business only so its type can say tasting or
+        // table (trip-funnel.js); the id is not kept.
+        if (b && typeof b.name === 'string') siteEventCounter.record(req, tripFunnel.resolveName(b.name, b.venue_id, tripFunnelVenueType), requestClientIp(req));
       } catch (e) { /* ignore: counting only */ }
       res.writeHead(204);
       return res.end();

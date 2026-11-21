@@ -3,6 +3,7 @@
 // Roam Now (the map), Build My Trip and the rest without Google. Counts only: a day, an event name from the fixed list
 // below, and a number. No visitor id, no IP, no search words, no venue, no location, nothing a person typed.
 const { isBot, isInternal, dayOf, enabled: demandEnabled } = require('./trip-demand');
+const tripFunnel = require('./trip-funnel');
 
 // Event names the pages already send to Google Analytics, plus page_view:<key> for a few key pages.
 const EVENTS = new Set([
@@ -18,11 +19,14 @@ const EVENTS = new Set([
   // Which Roam Now filter was turned on (fixed keys; the map sends these when a filter goes on).
   'map_filter:open', 'map_filter:top', 'map_filter:drinks', 'map_filter:food', 'map_filter:coffee', 'map_filter:wine', 'map_filter:beach', 'map_filter:outdoor', 'map_filter:golf', 'map_filter:do', 'map_filter:indoor', 'map_filter:patio', 'map_filter:dogs', 'map_filter:happy', 'map_filter:specials', 'map_filter:nights', 'map_filter:music', 'map_filter:lake', 'map_filter:kids', 'map_filter:veg', 'map_filter:vegan', 'map_filter:gf', 'map_filter:late', 'map_filter:early', 'map_filter:groups', 'map_filter:sports', 'map_filter:nonalc', 'map_filter:free',
   'page_view:home', 'page_view:map', 'page_view:trip', 'page_view:whats_on', 'page_view:browse', 'page_view:hidden_gems',
+  // Build My Trip funnel (2026-11-21, trip-funnel.js): bmt:<v4|v3>:<step>, :book:<kind>, :share:<method>.
+  ...tripFunnel.NAMES,
 ]);
 
 // Counted by their own page code (roamCount), not through the site-wide list, so pages without them stay unchanged:
 // the "Book my trip" steps ship only with Build My Trip's places to stay (TRIP_STAYS / ?stays=1).
-const SELF_COUNTED = ['book_trip_start', 'book_trip_complete'];
+// The Build My Trip funnel names too: only the planner page sends them (trip-funnel.js clientScript).
+const SELF_COUNTED = ['book_trip_start', 'book_trip_complete', ...tripFunnel.NAMES];
 
 const RATE_PER_HOUR = 400;
 const hits = new Map();
