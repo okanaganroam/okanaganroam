@@ -29,6 +29,9 @@ test('booking kinds: a business link is a tasting, a table or other from its typ
   assert.equal(tf.resolveName('bmt:v4:book:venue', 3, typeOf), 'bmt:v4:book:other');
   assert.equal(tf.resolveName('bmt:v4:book:venue', 'x', typeOf), 'bmt:v4:book:other');
   assert.equal(tf.resolveName('bmt:v4:book:venue', 9, () => { throw new Error('db'); }), 'bmt:v4:book:other');
+  assert.equal(tf.resolveName('bmt:v4:book:venue', 1, typeOf, 'viator'), 'bmt:v4:book:viator', 'a partner link wins over the type');
+  assert.equal(tf.resolveName('bmt:v4:book:venue', 0, typeOf, 'viator'), 'bmt:v4:book:viator');
+  assert.equal(tf.resolveName('bmt:v4:book:venue', 2, typeOf, 'booking'), 'bmt:v4:book:reservation');
   assert.equal(tf.resolveName('bmt:v4:plan', 1, typeOf), 'bmt:v4:plan');
   assert.equal(tf.resolveName('trip_share', undefined, typeOf), 'trip_share');
   // The unresolved name is never stored.
@@ -185,7 +188,7 @@ test('page script: booking taps by kind (stay, Viator, a business), share by met
   p.window.trackEvent('trip_plan_share', { share_method: 'native' }); // the same share, said twice by the page
   p.window.trackEvent('trip_share', { method: 'manual' });
   assert.deepEqual(p.sent.map((s) => s[1]), [
-    { name: 'bmt:v4:book:stay' }, { name: 'bmt:v4:book_click' }, { name: 'bmt:v4:book:viator' }, { name: 'bmt:v4:book:venue', venue_id: 12 },
+    { name: 'bmt:v4:book:stay' }, { name: 'bmt:v4:book_click' }, { name: 'bmt:v4:book:venue', link: 'viator', venue_id: 9 }, { name: 'bmt:v4:book:venue', link: '', venue_id: 12 },
     { name: 'bmt:v4:share:native' }, { name: 'bmt:v4:share' }, { name: 'bmt:v4:share:copy' },
   ]);
 
@@ -207,6 +210,7 @@ test('page script: our own visits (roam_internal) send nothing; the script only 
   assert.doesNotMatch(tf.clientScript(), /window\.trackEvent = function\(name, params\)/, 'the site has one analytics wrapper; this only listens');
   assert.equal(tf.withTripFunnelScript('<html><body>home</body></html>'), '<html><body>home</body></html>');
   assert.ok(tf.clientScript().length < 4000, 'small: the page stays fast');
+  assert.doesNotMatch(tf.clientScript(), /viator/i, 'names no booking partner (a switched-off partner leaves no trace on /trip)');
 });
 
 // ---- the real endpoint and page (uses this checkout's database; rows it adds are taken out again) ----
@@ -226,11 +230,13 @@ test('POST /api/site-event: a business booking tap is stored as its kind, never 
   try {
     assert.equal((await post({ name: 'bmt:v4:book:venue', venue_id: v.id })).status, 204);
     assert.equal((await post({ name: 'bmt:v4:plan' })).status, 204);
+    assert.equal((await post({ name: 'bmt:v4:book:venue', link: 'viator', venue_id: v.id })).status, 204);
     assert.equal((await post({ name: 'bmt:v4:plan' }, 'okanaganroam-check/1.0')).status, 204);
     const rows = Object.fromEntries(db.prepare("SELECT name, n FROM site_event_counts WHERE day = ? AND name LIKE 'bmt:%'").all(day).map((r) => [r.name, r.n]));
     const was = Object.fromEntries(before.map((r) => [r.name, r.n]));
     assert.equal((rows['bmt:v4:book:tasting'] || 0) - (was['bmt:v4:book:tasting'] || 0), 1);
     assert.equal((rows['bmt:v4:plan'] || 0) - (was['bmt:v4:plan'] || 0), 1, 'the check script is not counted');
+    assert.equal((rows['bmt:v4:book:viator'] || 0) - (was['bmt:v4:book:viator'] || 0), 1);
     assert.ok(!('bmt:v4:book:venue' in rows));
     process.env.TRIP_PLANNER_V3 = 'on';
     const html = await (await fetch(`${base}/trip?v=4`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } })).text();

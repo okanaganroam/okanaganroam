@@ -75705,7 +75705,7 @@ const server = http.createServer(async (req, res) => {
         const b = await readLimitedJsonBody(req, 512);
         // A Build My Trip booking tap on a business's own link names the business only so its type can say tasting or
         // table (trip-funnel.js); the id is not kept.
-        if (b && typeof b.name === 'string') siteEventCounter.record(req, tripFunnel.resolveName(b.name, b.venue_id, tripFunnelVenueType), requestClientIp(req));
+        if (b && typeof b.name === 'string') siteEventCounter.record(req, tripFunnel.resolveName(b.name, b.venue_id, tripFunnelVenueType, b.link), requestClientIp(req));
       } catch (e) { /* ignore: counting only */ }
       res.writeHead(204);
       return res.end();

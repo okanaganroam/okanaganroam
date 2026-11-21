@@ -49,11 +49,14 @@ function bookTypeFor(venueType) {
   const t = String(venueType || '').toLowerCase();
   return TASTING.has(t) ? 'tasting' : TABLE.has(t) ? 'reservation' : 'other';
 }
-// The page sends bmt:<v>:book:venue with the business id for a business's own booking link; this turns it into
-// tasting / reservation / other from the business's type. Any other name passes through unchanged.
-function resolveName(name, venueId, typeOf) {
+// The page sends bmt:<v>:book:venue for a booking link that is not a stay, with the link's kind (data-link) and the
+// business id when there is one; this turns it into viator, or tasting / reservation / other from the business's type.
+// (The page script names no booking partner itself, so /trip carries no partner name when a partner is switched off.)
+// Any other name passes through unchanged.
+function resolveName(name, venueId, typeOf, link) {
   const m = /^bmt:(v3|v4):book:venue$/.exec(String(name || ''));
   if (!m) return name;
+  if (link === 'viator') return `bmt:${m[1]}:book:viator`;
   let type = null;
   const id = Number(venueId);
   if (Number.isInteger(id) && id > 0 && typeof typeOf === 'function') { try { type = typeOf(id); } catch (e) { type = null; } }
@@ -149,13 +152,10 @@ function clientScript() {
         if ((b = t.closest('[data-v4-save]'))) { if (b.getAttribute('aria-pressed') !== 'true') step('save'); return; }
         var a = t.closest('a[href]');
         if (!a || !document.getElementById('t3Result') || !document.getElementById('t3Result').contains(a)) return;
-        var tr = a.getAttribute('data-track'), kind = null, body;
-        if (a.getAttribute('data-link') === 'viator') kind = 'viator';
-        else if (tr === 'stay_click' && a.closest('.t3-stay')) kind = 'stay';
-        else if (tr === 'booking' && a.closest('.t3-stay')) kind = a.getAttribute('data-venue-id') ? 'venue' : 'other';
-        if (!kind) return;
-        body = { name: 'bmt:' + V + ':book:' + kind };
-        if (kind === 'venue') body.venue_id = Number(a.getAttribute('data-venue-id')) || 0;
+        var tr = a.getAttribute('data-track'), body;
+        if (tr === 'stay_click' && a.closest('.t3-stay')) body = { name: 'bmt:' + V + ':book:stay' };
+        else if (tr === 'booking') body = { name: 'bmt:' + V + ':book:venue', link: String(a.getAttribute('data-link') || '').slice(0, 24), venue_id: Number(a.getAttribute('data-venue-id')) || 0 };
+        else return;
         send(body); step('book_click');
       } catch (err) { /* never in the way */ }
     }, true);
