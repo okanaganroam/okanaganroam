@@ -43,6 +43,7 @@ const STEPS = [
   ['settings_change', 'Changed email, password or sign-outs', 'Inside the portal'],
   ['access_change', 'Changed who has access to a listing', 'Inside the portal'],
   ['help_message', 'Sent a message through the Help button', 'Inside the portal'],
+  ['portal_badge_copy', 'Copied the “on Okanagan Roam” badge code', 'Inside the portal'],
   ['logout', 'Signed out', 'Inside the portal'],
 ];
 const CLIENT_KEYS = new Set(STEPS.map((s) => s[0]).filter((k) => k.startsWith('portal_')));

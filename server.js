@@ -70038,6 +70038,47 @@ function frTypographyPage(html) {
     .map((part, i) => (i % 2 ? part : frSpacingHtml(part).replace(/(>[^<]*?\d) :(?=[\s<])/g, '$1\u00a0:').replace(/^([^<]*?\d) :(?=[\s<])/, '$1\u00a0:'))).join('');
 }
 
+// "Show visitors you're on Okanagan Roam" (2026-11-20): a small card on the portal home with the badge, the code to paste
+// (linking to the venue's public page, absolute, no tracking tags) and a Copy button. Nothing to fill in or save. Copying
+// counts "portal_badge_copy" (a daily total, like the other portal steps). The badge and its alt text are English on both
+// portals, so the pasted code is the same everywhere.
+// In the code box the colon of "https://" is written &#58; (the box shows and copies it as ":"), so the local-server
+// link rewrite (ownerLinksForRequest) never turns the code into a localhost address.
+const OWNER_BADGE_SRC = 'https://okanaganroam.com/badges/featured-on-okanagan-roam.svg';
+function ownerBadgeSnippet(venue) {
+  const url = venueListingUrl(venue);
+  return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" title="${escapeHtml(`${venue.name} on Okanagan Roam`)}"><img src="${OWNER_BADGE_SRC}" alt="Featured on Okanagan Roam" width="240" height="72" style="border:0"></a>`;
+}
+function ownerBadgeCardHtml(venue, lang = 'en') {
+  const fr = lang === 'fr';
+  const L = (en, f) => (fr ? f : en);
+  if (venueListingUrl(venue) === 'https://okanaganroam.com/') return '';
+  const code = ownerBadgeSnippet(venue);
+  return `
+      <section class="op-badge" id="opBadge" data-task="home all" aria-labelledby="opBadgeHead" style="background:var(--paper);border-radius:14px;padding:14px 18px;margin:14px 0 6px">
+        <h2 id="opBadgeHead" style="font-size:1.05rem;margin:0 0 8px">${L('Show visitors you’re on Okanagan Roam', 'Montrez à vos visiteurs que vous êtes sur Okanagan Roam')}</h2>
+        <img src="/badges/featured-on-okanagan-roam.svg" alt="${L('Featured on Okanagan Roam badge', 'Badge « Featured on Okanagan Roam »')}" width="240" height="72" style="display:block;border:0;max-width:100%;height:auto">
+        <label for="opBadgeCode" class="op-hint" style="display:block;margin:10px 0 4px">${L('Code for your website', 'Code pour votre site Web')}</label>
+        <textarea id="opBadgeCode" readonly rows="4" spellcheck="false" style="width:100%;box-sizing:border-box;font:0.8rem/1.4 ui-monospace,Menlo,Consolas,monospace;padding:8px 10px;border-radius:10px;border:1px solid rgba(42,32,25,0.25);background:#fff;resize:vertical">${escapeHtml(code).replace(/https:\/\//g, 'https&#58;//')}</textarea>
+        <p style="margin:8px 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px"><button type="button" class="op-btn" id="opBadgeCopy" data-done="${escapeHtml(L('Copied', 'Copié'))}" data-select="${escapeHtml(L('Selected: press Ctrl+C (or ⌘+C) to copy', 'Sélectionné : appuyez sur Ctrl+C (ou ⌘+C) pour copier'))}">${L('Copy code', 'Copier le code')}</button><span class="op-hint" id="opBadgeDone" role="status" style="margin:0"></span></p>
+        <p class="op-hint" style="margin:8px 0 0">${L('Paste it in your website footer or your happy hour page; it links to your page here.', 'Collez-le dans le pied de page de votre site Web ou sur votre page 5 à 7; il mène à votre fiche ici.')}</p>
+        <script>
+        (function(){
+          var b = document.getElementById('opBadgeCopy'), ta = document.getElementById('opBadgeCode'), out = document.getElementById('opBadgeDone');
+          if (!b || !ta) return;
+          function count(){ try { if (navigator.sendBeacon && !/(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) navigator.sendBeacon('/api/site-event', new Blob([JSON.stringify({ name: 'portal_badge_copy' })], { type: 'application/json' })); } catch (e) {} }
+          function selectAll(){ ta.focus(); ta.select(); try { ta.setSelectionRange(0, ta.value.length); } catch (e) {} }
+          ta.addEventListener('focus', selectAll);
+          b.addEventListener('click', function(){
+            function fallback(){ selectAll(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} out.textContent = ok ? b.getAttribute('data-done') : b.getAttribute('data-select'); if (ok) count(); }
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(function(){ out.textContent = b.getAttribute('data-done'); count(); }, fallback);
+            else fallback();
+          });
+        })();
+        </script>
+      </section>`;
+}
+
 // French (2026-10-18): lang 'fr' writes the whole page in French (L(en, fr)); its links, posts and the help bot stay
 // on the French addresses. The script's words come from one JSON object (T), so the code is the same in both.
 function renderOwnerPageHtml(found, token, pending, lang = 'en') {
@@ -70820,6 +70861,7 @@ ${renderGolfHeaderHtml()}
       ${(() => { const last = ownerLastUpdatedAt(venue.id); return last ? `<p class="op-last">${L('Last updated', 'Dernière mise à jour :')} ${ownerUpdatedDate(last, fr)}</p>` : ''; })()}
       <div data-task="home all">${pendingNote}
       ${ownerActivityHtml(ownerVenueActivity(venue.id, 200, lang), lang)}</div>
+      ${ownerBadgeCardHtml(venue, lang)}
       ${found.account ? `<p class="op-bar-in">${L('Signed in as', 'Connecté en tant que')} <strong>${escapeHtml(found.account.email)}</strong> &middot; <a href="${P('/owner/account')}">${L('My listings', 'Mes fiches')}</a> &middot; <a href="${P('/owner/account/settings')}">${L('Account settings', 'Paramètres du compte')}</a></p>` : viewer && found.viewerManages ? `
       <p class="op-login">${L(`You&rsquo;re signed in as <strong>${escapeHtml(viewer.email)}</strong>, and this business is on your login. <a href="/owner/account/venue/${venue.id}"><strong>Open it from My listings</strong></a> so your photos${portalFields(venue.type).menu ? ` and ${isPriceList(venue) ? 'prices' : 'menu'}` : ''} go live straight away.`, `Vous êtes connecté en tant que <strong>${escapeHtml(viewer.email)}</strong>, et cette entreprise est liée à votre compte. <a href="/fr/owner/account/venue/${venue.id}"><strong>Ouvrez-la à partir de Mes fiches</strong></a> pour que vos photos${portalFields(venue.type).menu ? ` et ${menuWord} soient mis` : ' soient mises'} en ligne tout de suite.`)}</p>` : viewer ? `
       <div class="op-login" id="opAddLogin" data-task="home all">
