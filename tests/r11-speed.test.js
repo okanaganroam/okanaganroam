@@ -108,7 +108,7 @@ test('R11 speed: the admin backfill lists, stores and serves the 160 and 240px c
 
 test('R11 speed: the strip lists 160/240/480px copies with sizes for its box; the phone copy sits after the buttons', async () => {
   // Winery pages (2026-11-08) use the winery layout: its thumbnails sit beside the photo on phones too, so the strip is in the
-  // page once (no phone copy). The French page keeps the older two-strip layout, checked below.
+  // page once (no phone copy). The French page uses the Food & Drink layout (2026-11-20): one strip too, with French labels.
   const page = (await get('/naramata/wineries/r11-gallery-winery')).text;
   const mosaic = thumbsIn(mosaicStrip(page));
   assert.equal(mosaic.length, 4);
@@ -128,8 +128,10 @@ test('R11 speed: the strip lists 160/240/480px copies with sizes for its box; th
   assert.equal(fr.status, 200);
   assert.match(fr.text, /<html lang="fr"/);
   {
-    assert.match(phoneStrip(fr.text), /aria-label="Ouvrir la photo 2 sur 5"/);
-    assert.match(fr.text, /<div class="vg-phone">[\s\S]*?Photo : R11 Winery/);
+    assert.match(mosaicStrip(fr.text), /aria-label="Ouvrir la photo 2 sur 5"/);
+    assert.doesNotMatch(fr.text, /<div class="vg-phone">/, 'one strip, no phone copy');
+    assert.match(fr.text, /Photo : R11 Winery/);
+    assert.match(fr.text, /<script src="\/food-drink-venue\.js\?v=[0-9a-f]{12}"><\/script>/);
   }
 });
 
@@ -158,8 +160,11 @@ test('R11 speed: the hero sizes match its box, the preload repeats them, and the
 });
 
 test('R11 speed: the thumbnail loader waits for the photo, then loads only the strip on screen (the other on resize)', async () => {
-  // The French page keeps the two-strip layout and this loader (the winery layout's one strip has its own, in food-drink-venue.js).
-  const page = (await get('/fr/naramata/wineries/r11-gallery-winery')).text;
+  // Outdoors and indoor pages keep the two-strip layout and this loader (the Food & Drink layout's one strip has its own, in
+  // food-drink-venue.js), so the listing is an outdoor place for this check.
+  db.prepare("UPDATE venues SET type = 'outdoor' WHERE id = ?").run(galleryId);
+  let page;
+  try { page = (await get('/naramata/outdoors/r11-gallery-winery')).text; } finally { db.prepare("UPDATE venues SET type = 'winery' WHERE id = ?").run(galleryId); }
   const script = (page.match(/<script>\s*\(function\(\)\{\s*function show\(img\)[\s\S]*?<\/script>/) || [''])[0].replace(/^<script>|<\/script>$/g, '');
   assert.ok(script, 'the loader is in the page');
   assert.ok(page.indexOf(script) > page.indexOf('<div class="vg-phone">'), 'after both strips');
