@@ -29594,7 +29594,7 @@ test('Round 7 phone: the open phone menu leaves a dimmed strip to tap, and a tap
   const hrefs = [...page.matchAll(/<link rel="stylesheet" href="(\/[^"]+)"/g)].map((m) => m[1]);
   const all = page + (await Promise.all(hrefs.map(async (h) => (await get(h)).text))).join('\n');
   assert.match(all, /\.nav-links\.open \{ max-height: calc\(100vh - 160px\); max-height: calc\(100dvh - 160px\); \}/);
-  assert.match(all, /if \(t && t\.nodeType === 1 && \(links\.contains\(t\) \|\| \(burger && burger\.contains\(t\)\)\)\) return;\s*e\.preventDefault\(\); e\.stopPropagation\(\);\s*links\.classList\.remove\('open'\);/);
+  assert.match(all, /if \(t && t\.nodeType === 1 && \(links\.contains\(t\) \|\| \(burger && burger\.contains\(t\)\) \|\| t\.id === 'langToggle'\)\) return;\s*e\.preventDefault\(\); e\.stopPropagation\(\);\s*links\.classList\.remove\('open'\);/);
 }));
 
 test('Round 7 phone: 44px tap targets on My Trip, venue Favorite/Add and badge chips; plan selects are 16px and 44px', () => withPass4Server(async (get) => {

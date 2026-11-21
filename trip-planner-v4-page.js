@@ -27,6 +27,9 @@ const V4_STYLES = `<style>
   .t3-v4.has-plan .t3-result { padding-bottom: 24px; }
   .t3-v4 .v4 { max-width: 720px; margin: 0 auto; }
   .t3-v4 .v4-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: start; margin: 0 0 10px; }
+  /* position + z-index 0 (round 1, 2026-11-21): app.css's sticky header rule also matches this <header>; it covered the
+     site menu and took taps meant for it ("Edit request" opened instead of the menu). */
+  .t3-v4 .v4-head { position: relative; z-index: 0; }
   .t3-v4 .v4-head h2 { grid-column: 1; margin: 0; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: clamp(1.35rem, 4.6vw, 1.85rem); line-height: 1.15; color: var(--ref-navy); }
   .t3-v4 .v4-head h2:focus { outline: none; }
   .t3-v4 .v4-sub { grid-column: 1; margin: 0; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy-muted, #56636E); }
@@ -51,7 +54,7 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-icon { width: 44px; height: 44px; border-radius: 999px; border: 0; background: transparent; color: var(--ref-navy); font-size: 1.15rem; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
   .t3-v4 .v4-icon:hover { background: rgba(27,43,58,0.07); }
   .t3-v4 .v4-icon[aria-busy="true"] { opacity: 0.4; }
-  .t3-v4 .v4-confirmed .v4-acts { display: none; }
+  .t3-v4 .v4-confirmed .v4-acts, .t3-v4 .v4-confirmed .t3-swap-note, .t3-v4 .v4-confirmed .v4-gone { display: none; }
   .t3-v4 .v4-confirmed .v4-row { grid-template-columns: 56px minmax(0, 1fr); padding-right: 12px; }
   .t3-v4 .v4-more { padding: 0 14px 12px 80px; font-size: 0.86rem; line-height: 1.45; color: var(--ref-navy); }
   .t3-v4 .v4-more p { margin: 0 0 4px; }
@@ -61,6 +64,9 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-leg { list-style: none; padding: 4px 12px 4px 80px; font-size: 0.78rem; font-weight: 700; color: var(--ref-navy-muted, #56636E); background: rgba(27,43,58,0.03); }
   .t3-v4 .v4-free .v4-name, .t3-v4 .v4-gone .v4-name { font-weight: 700; color: var(--ref-navy-muted, #56636E); }
   .t3-v4 .v4-gone .v4-name { text-decoration: line-through; }
+  /* A removed stop (round 1): its name keeps the full width; Undo and Suggest another go on the line under it. */
+  .t3-v4 .v4-gone .v4-row { grid-template-columns: 56px minmax(0, 1fr); }
+  .t3-v4 .v4-gone .v4-acts { grid-column: 2; flex-wrap: wrap; margin: -6px 0 0 -10px; }
   .t3-v4 .v4-gone .v4-acts .v4-text { min-height: 44px; padding: 0 10px; border: 0; background: none; font-weight: 800; font-size: 0.84rem; color: var(--ref-navy); cursor: pointer; text-decoration: underline; }
   .t3-v4 .t3-swap-note { margin: 0; padding: 6px 12px 0 80px; font-size: 0.78rem; font-weight: 800; color: var(--ref-gold-ink, #8A6A0F); }
   .t3-v4 .v4-stop.is-swapped { background: rgba(201,162,39,0.10); transition: background .4s; }
@@ -107,7 +113,12 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-next .t3-btn { width: 100%; box-sizing: border-box; justify-content: center; min-height: 50px; font-size: 1rem; }
   .t3-v4 .v4-sheet .t3-book-est { margin: 6px 0; }
   .t3-v4 .v4-sheet-h4 { margin: 14px 0 4px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ref-navy-muted, #56636E); }
-  .t3-v4 .v4-toast { position: fixed; left: 50%; bottom: calc(160px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 45; background: var(--ref-navy-deep, #101B24); color: #fff; padding: 10px 16px; border-radius: 999px; font-weight: 800; font-size: 0.86rem; max-width: calc(100vw - 32px); }
+  .t3-v4 .v4-toast { position: fixed; left: 50%; bottom: calc(160px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 45; background: var(--ref-navy-deep, #101B24); color: #fff; padding: 10px 16px; border-radius: 999px; font-weight: 800; font-size: 0.86rem; max-width: calc(100vw - 32px); box-sizing: border-box; overflow-wrap: anywhere; text-align: center; }
+  .t3-v4 .t3-plan-status { overflow-wrap: anywhere; }
+  .t3-v4 .v4-ask { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); }
+  .t3-v4 .v4-bar-btns.v4-ask-btns { grid-template-columns: 1fr 1fr auto; }
+  .t3-v4 .v4-check .v4-call { white-space: nowrap; }
+  .t3-v4 .v4-book-unpriced { margin: 4px 0 0; font-size: 0.82rem; color: var(--ref-navy-muted, #56636E); }
   @media (min-width: 721px) {
     .t3-v4 .v4-row { grid-template-columns: 72px minmax(0, 1fr) auto; padding: 12px 10px 12px 14px; }
     .t3-v4 .v4-thumb { width: 72px; height: 72px; }
@@ -122,22 +133,29 @@ const V4_CLIENT_SRC = String.raw`
   // ---------- V4: the simple plan view ----------
   var V4_TEXT = {
     en: { yourPlan: 'Your plan', edit: 'Edit request', tip: 'Tap a stop for details. Swap ⇄ or remove ✕ anything, then confirm.', tipDone: 'Plan confirmed. Book it in one go, then share it with your group.',
-      confirm: 'Confirm plan', confirmNote: 'You can still swap or remove stops after this.', book: 'Book my trip', share: 'Share', save: 'Save', saved: 'Saved ✓', editPlan: 'Edit plan',
+      confirm: 'Confirm plan', confirmNote: 'You can still change it with Edit plan.', picked: 'We picked {town}. Name a town in your request to change it.', book: 'Book my trip', share: 'Share', save: 'Save', saved: 'Saved ✓', editPlan: 'Edit plan',
       note: 'Times are suggestions. Check hours before you go.', options: 'More options and notes', day: 'Day', stops1: '1 stop', stopsN: '{n} stops', days1: '1 day', daysN: '{n} days',
       swap: 'Swap {name}', remove: 'Remove {name}', removed: 'Removed', undo: 'Undo', another: 'Suggest another', details: 'See the place', why: 'Why it fits', hours: 'Hours',
       lunch: 'Lunch', dinner: 'Dinner', free: 'Free time', freeEve: 'Free evening', event: 'Event', noDinner: 'Dinner not scheduled', close: 'Close',
       sheet: 'Book your trip', next: 'Open next booking', nextOf: 'Next: {name}', allSet: 'All booked ✓', progress: '{d} of {n} booked', reserve: 'Reserve by phone or on their site', noOnline: 'No online booking listed',
       toBook: 'To book', copied: 'Trip copied. Paste it into your group chat.', copyThis: 'Copy this link: ', shareTitle: 'Our trip', estFor: 'for {n}', est: 'estimate', more: '+{n} more',
-      startOver: 'Start over', stay: 'Stay', addBookings: 'Add to bookings', added: 'Added' },
+      startOver: 'Start over', stay: 'Stay', addBookings: 'Add to bookings', added: 'Added', call: 'Call', contact: 'Contact', byPhone: 'Reserve by phone',
+      savedReplaced: 'Saved ✓ Your trip is in My Trip.', notPriced: 'Not priced yet: {names}', freeLabel: 'Free', dogsOk: 'Dogs allowed',
+      tipNoBook: 'Plan confirmed. Share it with your group or save it.' },
     fr: { yourPlan: 'Votre plan', edit: 'Modifier la demande', tip: 'Touchez un arrêt pour les détails. Remplacez ⇄ ou retirez ✕ ce que vous voulez, puis confirmez.', tipDone: 'Plan confirmé. Réservez tout d’un coup, puis partagez-le avec votre groupe.',
-      confirm: 'Confirmer le plan', confirmNote: 'Vous pourrez encore remplacer ou retirer des arrêts.', book: 'Réserver mon voyage', share: 'Partager', save: 'Enregistrer', saved: 'Enregistré ✓', editPlan: 'Modifier le plan',
+      confirm: 'Confirmer le plan', confirmNote: 'Vous pourrez encore le modifier avec « Modifier le plan ».', picked: 'Nous avons choisi {town}. Nommez une ville dans votre demande pour la changer.', book: 'Tout réserver', share: 'Partager', save: 'Enregistrer', saved: 'Enregistré ✓', editPlan: 'Modifier le plan',
       note: 'Heures suggérées. Vérifiez les horaires avant de partir.', options: 'Plus d’options et notes', day: 'Jour', stops1: '1 arrêt', stopsN: '{n} arrêts', days1: '1 jour', daysN: '{n} jours',
       swap: 'Remplacer {name}', remove: 'Retirer {name}', removed: 'Retiré', undo: 'Annuler', another: 'Autre suggestion', details: 'Voir le lieu', why: 'Pourquoi ce choix', hours: 'Heures',
       lunch: 'Dîner', dinner: 'Souper', free: 'Temps libre', freeEve: 'Soirée libre', event: 'Événement', noDinner: 'Souper non planifié', close: 'Fermer',
       sheet: 'Réserver votre voyage', next: 'Ouvrir la prochaine réservation', nextOf: 'Ensuite : {name}', allSet: 'Tout est réservé ✓', progress: '{d} sur {n} réservés', reserve: 'Réservez par téléphone ou sur leur site', noOnline: 'Pas de réservation en ligne indiquée',
       toBook: 'À réserver', copied: 'Voyage copié. Collez-le dans la discussion de votre groupe.', copyThis: 'Copiez ce lien : ', shareTitle: 'Notre voyage', estFor: 'pour {n}', est: 'estimation', more: '+{n} autres',
-      startOver: 'Recommencer', stay: 'Hébergement', addBookings: 'Ajouter aux réservations', added: 'Ajouté' }
+      startOver: 'Recommencer', stay: 'Hébergement', addBookings: 'Ajouter aux réservations', added: 'Ajouté', call: 'Appeler', contact: 'Coordonnées', byPhone: 'Réserver par téléphone',
+      savedReplaced: 'Enregistré ✓ Votre voyage est dans Mon voyage.', notPriced: 'Prix pas encore indiqué : {names}', freeLabel: 'Gratuit', dogsOk: 'Chiens admis',
+      tipNoBook: 'Plan confirmé. Partagez-le avec votre groupe ou enregistrez-le.' }
   };
+  // Round 4 (2026-11-21: "Before you go" repeated "Confirm the preceding stop's timing..." for every stop): the V4 notes keep
+  // only what is particular (a place closed that day, a request not included); the plan already says to check hours.
+  if (typeof t3PlanNextSteps === 'function') { var t3NextAll = t3PlanNextSteps; t3PlanNextSteps = function(p){ return t3NextAll(p).filter(function(x){ return x && x.kind !== 'timing' && x.kind !== 'event_timing'; }); }; }
   function vt(k, vars){
     var s = (V4_TEXT[lang()] || V4_TEXT.en)[k] || V4_TEXT.en[k] || k;
     if (vars) Object.keys(vars).forEach(function(x){ s = s.split('{' + x + '}').join(String(vars[x])); });
@@ -145,7 +163,52 @@ const V4_CLIENT_SRC = String.raw`
   }
   // Viator's "Add to trip" is "Add to bookings" here: one verb per action (My Trip is "Save").
   if (typeof T3_VT !== 'undefined') { T3_VT.add = { en: V4_TEXT.en.addBookings, fr: V4_TEXT.fr.addBookings }; T3_VT.added = { en: V4_TEXT.en.added, fr: V4_TEXT.fr.added }; }
-  var v4 = { confirmed: false, open: {}, saved: false };
+  var v4 = { confirmed: false, open: {}, saved: false, ask: false, restoreConfirm: false, gone: {} };
+  // EN / FR (round 1, 2026-11-21: the switch did nothing on /trip): /trip and /fr/trip are twins with no hreflang (a /trip
+  // link with a plan is noindex), so app.js's setLanguage opens the other one through data-twin-path, with the address
+  // bar's plan (request, edits, dates, guests, confirmed) in the query. The same plan, in the other language.
+  document.documentElement.setAttribute('data-twin-path', (location.pathname + '/').indexOf('/fr/') === 0 ? '/trip' : '/fr/trip');
+  // The address bar keeps the trip inputs and the confirmed state too (round 1: a reload or Back lost the dates and
+  // guests, so the plan changed, and Confirm was undone). Only ids, dates and small numbers; never a name or a fact.
+  function v4UrlExtra(qs){
+    var o = typeof t3StayInput === 'function' ? (t3StayInput() || {}) : {}, p = [];
+    if (o.arrive) p.push('arrive=' + o.arrive);
+    if (o.arrive && o.leave) p.push('leave=' + o.leave);
+    if (o.adults) p.push('adults=' + o.adults);
+    if (o.kids) p.push('kids=' + o.kids);
+    if (o.dog) p.push('dog=1');
+    if (v4.confirmed) p.push('ok=1');
+    return p.length ? (qs ? '&' : '?') + p.join('&') : '';
+  }
+  // The plan on screen, kept for this tab (round 3, 2026-11-21: after a Swap, a reload, Back from My Trip or EN / FR asked
+  // the planner again and got a different plan, so the saved and shared trips no longer matched). Keyed by the address
+  // bar's plan (the request, edits, dates and guests); Confirm is not part of the key. sessionStorage: this tab only.
+  function v4CacheKey(search){ return String(search || '').replace(/^\?/, '').split('&').filter(function(x){ return x && !/^(?:ok|v)=/.test(x); }).join('&'); }
+  function v4CacheSave(){
+    if (!state.last) return;
+    try { sessionStorage.setItem('t3v4plan', JSON.stringify({ key: v4CacheKey(location.search), last: state.last, lastReq: state.lastReq, removed: state.removed, locks: state.locks, exclude: state.exclude, gone: v4.gone })); } catch (e) {}
+  }
+  function v4FromCache(){
+    var o = null;
+    try { o = JSON.parse(sessionStorage.getItem('t3v4plan') || 'null'); } catch (e) { o = null; }
+    if (!o || !o.last || o.key !== v4CacheKey(location.search)) return false;
+    state.last = o.last; state.lastReq = o.lastReq || null; state.removed = o.removed || {}; state.locks = o.locks || {}; state.exclude = o.exclude || [];
+    v4.gone = o.gone || {};
+    try { render(true); } catch (e) { return false; }
+    return true;
+  }
+  function v4RestoreInputs(search){
+    var q = {};
+    String(search || '').replace(/^\?/, '').split('&').forEach(function(x){ var i = x.indexOf('='); if (i > 0) q[x.slice(0, i)] = x.slice(i + 1); });
+    var set = function(id, v){ var el = document.getElementById(id); if (el && v != null) el.value = v; return !!el; };
+    var any = false;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(q.arrive || '')) { any = set('t3Arrive', q.arrive) || any; if (/^\d{4}-\d{2}-\d{2}$/.test(q.leave || '') && q.leave > q.arrive) set('t3Leave', q.leave); }
+    if (/^([1-9]|1[0-6])$/.test(q.adults || '')) any = set('t3Adults', q.adults) || any;
+    if (/^([0-9]|1[0-2])$/.test(q.kids || '')) any = set('t3Kids', q.kids) || any;
+    if (q.dog === '1') { var dg = document.getElementById('t3Dog'); if (dg) { dg.checked = true; any = true; } }
+    if (any) { var box = document.getElementById('t3StayIn'); if (box) box.open = true; }
+    if (q.ok === '1') v4.restoreConfirm = true;
+  }
   function v4Handles(p){
     if (!p) return false;
     if (p.kind === 'multi_day' || p.kind === 'day_plan') return (p.days || []).length > 0;
@@ -191,9 +254,12 @@ const V4_CLIENT_SRC = String.raw`
     if (/dog/.test(party)) want.dog_friendly = 1;
     if (/kid/.test(party)) want.kid_friendly = 1;
     ((p.intent && p.intent.features) || []).forEach(function(f){ want[f] = 1; });
-    return (v.badges || []).filter(function(b){ return b && want[b.key]; }).slice(0, 2).map(function(b){
+    var out = (v.badges || []).filter(function(b){ return b && want[b.key]; }).slice(0, 2).map(function(b){
       return b.key === 'dog_friendly' && v.dogsPatioOnly ? (lang() === 'fr' ? 'Chiens sur la terrasse' : 'Dogs on patio') : frLabel(BADGE_KEYS[b.key], b.label);
     });
+    // Round 2 (2026-11-21): a walk, park or beach on the official dog list says so on a dog trip, like a patio does.
+    if (want.dog_friendly && !(v.badges || []).some(function(b){ return b && b.key === 'dog_friendly'; }) && (v.collections || []).some(function(c){ return c && c.key === 'dog_friendly'; })) out.unshift(vt('dogsOk'));
+    return out.slice(0, 2);
   }
   function v4Line(s){ return [v4Kind(s), v4Price(s.venue)].concat(v4Badges(s.venue)).filter(Boolean).join(' · '); }
   function v4Thumb(v){
@@ -243,18 +309,24 @@ const V4_CLIENT_SRC = String.raw`
         var evening = !(s.freeTime && s.freeTime.minutes > 0), fid = 'v4d-f' + esc(key || Math.random().toString(36).slice(2));
         var note = evening ? '' : String((fr ? s.freeTime.noteFr : s.freeTime.note) || '').replace(/^(?:Free time|Temps libre)\s*:\s*/, '');
         var ideas = evening ? s.freeEvening.map(function(x){ var u = placeUrl(x); return u ? '<a ' + hrefAttr(u) + '>' + esc(x.name) + '</a>' : esc(x.name); }).join(fr ? ' ou ' : ' or ') : '';
-        var hrs = evening ? '' : (fr ? 'environ ' + String(Math.round(s.freeTime.minutes / 30) / 2).replace('.', ',') + ' h' : 'about ' + Math.round(s.freeTime.minutes / 30) / 2 + ' h');
-        return '<li class="v4-stop v4-free"><div class="v4-row">' + v4Thumb(null) + '<button type="button" class="v4-main" aria-expanded="false" aria-controls="' + fid + '" data-v4-toggle="' + fid + '"><span class="v4-name">' + esc(evening ? vt('freeEve') : vt('free')) + '</span><span class="v4-line">' + esc(hrs || (fr ? 'Idées pour manger' : 'Ideas to eat out')) + '</span></button><span></span></div>'
+        // Round 4 (2026-11-21): no "about 5.5 h" on free time; it went wrong once stops around it moved or were left out.
+        var hrs = evening ? (fr ? 'Idées pour manger' : 'Ideas to eat out') : '';
+        return '<li class="v4-stop v4-free"><div class="v4-row">' + v4Thumb(null) + '<button type="button" class="v4-main" aria-expanded="false" aria-controls="' + fid + '" data-v4-toggle="' + fid + '"><span class="v4-name">' + esc(evening ? vt('freeEve') : vt('free')) + '</span>' + (hrs ? '<span class="v4-line">' + esc(hrs) + '</span>' : '') + '</button><span></span></div>'
           + '<div class="v4-more" id="' + fid + '" hidden><p>' + (note ? esc(note.charAt(0).toUpperCase() + note.slice(1)) : ideas) + '</p></div></li>';
       }
       return '';
     }
     var v = s.venue, id = key || ('s' + v.id), did = 'v4d-' + esc(id);
+    // Round 2 (2026-11-21: an evening out or a day of parts had Swap only): a stop with no day slot is removed here, with Undo.
+    if (!key && v4.gone[v.id]) {
+      return '<li class="v4-stop v4-gone"><div class="v4-row">' + v4Thumb(null) + '<div class="v4-main"><span class="v4-time">' + esc(vt('removed')) + '</span><span class="v4-name">' + esc(v.name) + '</span></div>'
+        + '<div class="v4-acts"><button type="button" class="v4-text" data-v4-undo-id="' + esc(v.id) + '">' + esc(vt('undo')) + '</button></div></div></li>';
+    }
     var html = '<li class="v4-stop" data-venue-id="' + esc(v.id) + '"><div class="v4-row">' + v4Thumb(v)
       + '<button type="button" class="v4-main" aria-expanded="' + (v4.open[id] ? 'true' : 'false') + '" aria-controls="' + did + '" data-v4-toggle="' + did + '" data-v4-id="' + esc(id) + '"><span class="v4-time">' + esc(v4Start(s, key)) + '</span><span class="v4-name">' + esc(v.name) + '</span><span class="v4-line">' + esc(v4Line(s)) + '</span></button>'
       + '<div class="v4-acts">'
       + (key ? (s.noSwap ? '' : '<button type="button" class="v4-icon" data-t3-swap="' + esc(key) + '" aria-label="' + esc(vt('swap', { name: v.name })) + '" title="' + esc(vt('swap', { name: v.name })) + '">⇄</button>') + '<button type="button" class="v4-icon" data-t3-remove="' + esc(key) + '" aria-label="' + esc(vt('remove', { name: v.name })) + '" title="' + esc(vt('remove', { name: v.name })) + '">✕</button>'
-        : '<button type="button" class="v4-icon" data-t3-swap-id="' + esc(v.id) + '" aria-label="' + esc(vt('swap', { name: v.name })) + '" title="' + esc(vt('swap', { name: v.name })) + '">⇄</button>')
+        : '<button type="button" class="v4-icon" data-t3-swap-id="' + esc(v.id) + '" aria-label="' + esc(vt('swap', { name: v.name })) + '" title="' + esc(vt('swap', { name: v.name })) + '">⇄</button><button type="button" class="v4-icon" data-v4-remove-id="' + esc(v.id) + '" aria-label="' + esc(vt('remove', { name: v.name })) + '" title="' + esc(vt('remove', { name: v.name })) + '">✕</button>')
       + '</div></div>'
       + '<div class="v4-more" id="' + did + '"' + (v4.open[id] ? '' : ' hidden') + '>' + v4Details(s, id) + '</div>'
       + v4TripBtn(v, key) + '</li>';
@@ -264,7 +336,11 @@ const V4_CLIENT_SRC = String.raw`
     var html = '<ol class="v4-stops">', prev = null;
     stops.forEach(function(s){
       var key = keyFor ? keyFor(s) : null;
-      if (s.venue && prev && s.driveFrom && !(key && state.removed[key])) html += '<li class="v4-leg">' + esc(t3DriveText(s.driveFrom, lang())) + '</li>';
+      // Round 2 (2026-11-21): no "Drive from Whistler Blackcomb to Whistler" after a lunch on the hill or between two places
+      // in the same village (you ski down or walk).
+      var near = prev && prev.venue && typeof t3Km === 'function' ? t3Km(prev.venue, s.venue) : null;
+      var skiLeg = !!(prev && (prev.skiDay || prev.onHill)) || !!(s.skiDay || s.onHill);
+      if (s.venue && prev && s.driveFrom && !(key && state.removed[key]) && !skiLeg && !(near !== null && near < 2.5)) html += '<li class="v4-leg">' + esc(t3DriveText(s.driveFrom, lang())) + '</li>';
       html += v4StopHtml(s, key, counts);
       if (s.venue && !(key && state.removed[key])) prev = s;
     });
@@ -279,7 +355,7 @@ const V4_CLIENT_SRC = String.raw`
   function v4Count(p){
     var n = 0;
     (p.days || []).forEach(function(d){ d.stops.forEach(function(s){ if ((s.venue || (s.kind === 'event' && s.event)) && !state.removed[d.day + '-' + s.daypart]) n++; }); });
-    ((p.outing && p.outing.stops) || (p.itinerary && p.itinerary.stops) || []).forEach(function(s){ if (s.venue || s.event) n++; });
+    ((p.outing && p.outing.stops) || (p.itinerary && p.itinerary.stops) || []).forEach(function(s){ if ((s.venue && !v4.gone[s.venue.id]) || s.event) n++; });
     return n;
   }
   // ---- booking: the same steps as the stays box ("Book my trip"), in a sheet ----
@@ -304,6 +380,12 @@ const V4_CLIENT_SRC = String.raw`
       if (['restaurant', 'pub'].indexOf(s.venue.type) === -1 || !(['evening', 'night'].indexOf(s.daypart) !== -1 || /dinner|supper/i.test(s.label || ''))) return;
       seen[s.venue.id] = 1; out.push({ s: s, day: d.day });
     }); });
+    // Round 2 (2026-11-21: a date night's dinner was not in "Book my trip"): an evening out's or a day of parts' restaurant.
+    var p = state.last || {};
+    ((p.outing && p.outing.stops) || (p.itinerary && p.itinerary.stops) || []).forEach(function(s){
+      if (!s.venue || v4.gone[s.venue.id] || ids[s.venue.id] || seen[s.venue.id] || s.venue.type !== 'restaurant') return;
+      seen[s.venue.id] = 1; out.push({ s: s, day: 0 });
+    });
     return out;
   }
   function v4BookCardHtml(){
@@ -324,7 +406,7 @@ const V4_CLIENT_SRC = String.raw`
       }).join('') + '</ul>';
     }
     var e = v4Estimate();
-    if (e) html += t3EstimateHtml(e, fr, d ? d.chosen : null);
+    if (e) html += v4EstimateHtml(e, fr, d ? d.chosen : null);
     var st = bookState.st || {}, next = -1, done = 0;
     steps.forEach(function(x, n){ if (st[n] === 'done') done++; if (next < 0 && !st[n]) next = n; });
     if (steps.length) {
@@ -340,13 +422,31 @@ const V4_CLIENT_SRC = String.raw`
     }
     var reserve = v4ReserveRows(steps);
     if (reserve.length) html += '<p class="v4-sheet-h4">' + esc(vt('reserve')) + '</p><ol class="v4-check">' + reserve.map(function(r){
-      var u = placeUrl(r.s.venue);
-      return '<li><span aria-hidden="true" style="text-align:center">☎</span><span class="v4-check-name">' + esc(r.s.venue.name) + '<small>' + esc(vt('day') + ' ' + r.day + ' · ' + vt('noOnline')) + '</small></span>' + (u ? '<a ' + hrefAttr(u) + '>' + esc(fr ? 'Coordonnées' : 'Contact') + '</a>' : '<span></span>') + '</li>';
+      var u = placeUrl(r.s.venue), tel = v4Tel(r.s.venue.phone);
+      // Round 1 (2026-11-21): a Call link straight from the sheet when the place lists a phone, else its page.
+      return '<li><span aria-hidden="true" style="text-align:center">☎</span><span class="v4-check-name">' + esc(r.s.venue.name) + '<small>' + esc((r.day ? vt('day') + ' ' + r.day + ' · ' : '') + (tel ? vt('byPhone') + ' · ' + r.s.venue.phone : vt('noOnline'))) + '</small></span>'
+        + (tel ? '<a class="v4-call" href="' + esc(tel) + '" data-track="booking" data-venue-id="' + esc(r.s.venue.id) + '">' + esc(vt('call')) + '</a>' : u ? '<a ' + hrefAttr(u) + '>' + esc(vt('contact')) + '</a>' : '<span></span>') + '</li>';
     }).join('') + '</ol>';
     if (typeof t3ViatorBlockHtml === 'function') html += t3ViatorBlockHtml(fr, true);
     var aff = steps.some(function(x){ return x.affiliate; }) || (typeof t3ViatorShown === 'function' && t3ViatorShown()) || !!(d && ((d.chosen.bookingLinks || []).some(function(l){ return l && l.affiliate; }) || (d.chosen.livePrices && t3StayExt(d.chosen.livePrices.url))));
     if (aff) html += '<p class="t3-stay-disclosure" data-stay-disclosure>' + esc(fr ? T3_STAY_DISCLOSURE.fr : T3_STAY_DISCLOSURE.en) + '</p>';
     return html + '</section>';
+  }
+  function v4Tel(phone){
+    var d = String(phone || '').replace(/[^0-9+]/g, '');
+    if (/^\+?1?\d{10}$/.test(d)) return 'tel:+1' + d.replace(/^\+?1?/, '').slice(-10);
+    return /^\+\d{8,15}$/.test(d) ? 'tel:' + d : '';
+  }
+  // The estimate (round 1, 2026-11-21: "Activities Free" while bowling, the pool and lift tickets had no price): a part
+  // that adds up to $0 is left out of the line while some stops have no listed price, and those stops are named under it.
+  function v4EstimateHtml(e, fr, chosen){
+    var unknown = (e.unknown || []).slice();
+    var parts = (e.parts || []).filter(function(x){ return !(unknown.length && x && x.low === 0 && x.high === 0); });
+    var e2 = {}; Object.keys(e).forEach(function(k){ e2[k] = e[k]; });
+    e2.parts = parts; e2.unknown = [];
+    var html = t3EstimateHtml(e2, fr, chosen) || (unknown.length ? '<div class="t3-book-est"></div>' : '');
+    if (unknown.length) html = html.replace(/<\/div>$/, '') + '<p class="v4-book-unpriced">' + esc(vt('notPriced', { names: unknown.slice(0, 6).join(', ') + (unknown.length > 6 ? ' ' + vt('more', { n: unknown.length - 6 }) : '') })) + '</p></div>';
+    return html;
   }
   function v4CanBook(){ return t3BookSteps().length > 0 || v4ReserveRows([]).length > 0 || !!t3StayData(); }
   function v4OpenSheet(){
@@ -373,19 +473,27 @@ const V4_CLIENT_SRC = String.raw`
     if (list.length && list.every(function(x){ return x.day > 0; })) u += '&days=' + list.map(function(x){ return x.day; }).join(',');
     return u;
   }
-  function v4ShareText(list){
-    var p = state.last || {}, fr = lang() === 'fr', lines = [];
-    var head = document.getElementById('t3Headline');
+  // The group-chat message (round 1, 2026-11-21: "Day 1: A, B, C +2 more" hid the dinner and had no times or dates):
+  // the title, then each day with its date and every stop with its time, then the stay. Read from the plan on screen,
+  // so swaps and removals are in it, in the page's language.
+  function v4ShareText(){
+    var fr = lang() === 'fr', lines = [], head = document.getElementById('t3Headline');
     lines.push((head && head.textContent) || vt('shareTitle'));
-    var byDay = {};
-    list.forEach(function(x){ var k = x.day || 1; (byDay[k] = byDay[k] || []).push(x.name); });
-    var keys = Object.keys(byDay).map(Number).sort(function(a, b){ return a - b; });
-    var multi = (p.days || []).length > 1;
-    keys.slice(0, 4).forEach(function(k){
-      var names = byDay[k], shown = names.slice(0, 3).join(', ') + (names.length > 3 ? ' ' + vt('more', { n: names.length - 3 }) : '');
-      lines.push((multi ? vt('day') + ' ' + k + ': ' : '') + shown);
+    Array.prototype.forEach.call(resultEl.querySelectorAll('.v4-day'), function(sec){
+      var t = sec.querySelector('.v4-day-title'), rows = [];
+      Array.prototype.forEach.call(sec.querySelectorAll('.v4-stop:not(.v4-gone):not(.v4-free)'), function(li){
+        var time = li.querySelector('.v4-time'), name = li.querySelector('.v4-name');
+        if (!name || !name.textContent.trim()) return;
+        rows.push(((time && time.textContent.trim()) ? time.textContent.trim() + ' ' : '') + name.textContent.trim());
+      });
+      if (!rows.length) return;
+      if (t && t.textContent.trim()) { lines.push(''); lines.push(t.textContent.replace(/\s+/g, ' ').trim()); }
+      rows.forEach(function(r){ lines.push(r); });
     });
-    if (keys.length > 4) lines.push(vt('more', { n: keys.length - 4 }));
+    var d = typeof t3StayData === 'function' ? t3StayData() : null;
+    if (d && d.chosen && d.chosen.name) { lines.push(''); lines.push((fr ? 'Hébergement : ' : 'Stay: ') + d.chosen.name); }
+    var est = v4EstimateText().replace(/<small>[\s\S]*?<\/small>/g, '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    if (est) lines.push(est);
     return lines.join('\n');
   }
   function v4Toast(text){
@@ -397,16 +505,31 @@ const V4_CLIENT_SRC = String.raw`
   function v4Share(){
     var list = v4ShareStops();
     if (!list.length) return;
-    var url = v4ShareLink(list), text = v4ShareText(list), f = planFacts(state.last);
+    var url = v4ShareLink(list), text = v4ShareText(), f = planFacts(state.last);
     var done = function(method){ track('trip_share', { method: method, stop_count: list.length, source: 'plan_v4' }); track('trip_plan_share', { share_method: method, plan_kind: f.plan_kind, day_count: f.day_count }); };
     if (navigator.share) { navigator.share({ title: text.split('\n')[0], text: text, url: url }).then(function(){ done('native'); }, function(){}); return; }
-    var manual = function(){ done('manual'); announce(vt('copyThis') + url); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text + '\n' + url).then(function(){ done('copy'); v4Toast(vt('copied')); }, manual);
-    else manual();
+    // No share sheet: copy; when the clipboard is blocked, the older copy command; only then show the link to copy by hand
+    // (it wraps, so the page never scrolls sideways).
+    var legacy = function(){
+      var ok = false, ta = document.createElement('textarea');
+      ta.value = text + '\n' + url; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+      document.body.removeChild(ta);
+      if (ok) { done('copy'); v4Toast(vt('copied')); } else { done('manual'); v4Toast(vt('copyThis') + url); }
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text + '\n' + url).then(function(){ done('copy'); v4Toast(vt('copied')); }, legacy);
+    else legacy();
   }
   // ---- the sticky bar ----
   function v4BarHtml(){
     var fr = lang() === 'fr';
+    if (v4.ask) {
+      var st = addState(), others = tripSize() - (st.total - st.missing);
+      return '<div class="v4-bar-in"><p class="v4-ask">' + esc(tx('tripv3.replaceAsk', { stops: stopsText(Math.max(1, others)) })) + '</p><div class="v4-bar-btns v4-ask-btns">'
+        + '<button type="button" class="v4-btn" data-v4-replace="replace">' + esc(tx('tripv3.replace')) + '</button><button type="button" class="v4-btn v4-btn-2" data-v4-replace="add">' + esc(tx('tripv3.addToIt')) + '</button>'
+        + '<button type="button" class="v4-btn v4-btn-2" data-v4-replace="cancel" aria-label="' + esc(tx('tripv3.cancel')) + '">✕</button></div></div>';
+    }
     if (!v4.confirmed) return '<div class="v4-bar-in"><button type="button" class="v4-btn v4-wide" data-v4-confirm style="width:100%;max-width:none">' + esc(vt('confirm')) + '</button><p class="v4-disc" style="text-align:center">' + esc(vt('confirmNote')) + '</p></div>';
     var est = v4EstimateText(), canBook = v4CanBook();
     return '<div class="v4-bar-in"><div class="v4-bar-top"><p class="v4-est">' + (est || '&nbsp;') + '</p><button type="button" class="v4-bar-link" data-v4-unconfirm>' + esc(vt('editPlan')) + '</button></div>'
@@ -417,9 +540,12 @@ const V4_CLIENT_SRC = String.raw`
     var main = v4Main(), bar = document.getElementById('v4Bar');
     if (!main || !main.classList.contains('has-plan')) return;
     if (!bar) { bar = document.createElement('div'); bar.id = 'v4Bar'; bar.className = 'v4-bar'; bar.setAttribute('role', 'region'); main.appendChild(bar); }
+    var canBookNow = v4CanBook();
+    // Round 2: Save says Saved when every stop of this plan is already in My Trip (after a reload too).
+    try { if (!v4.saved && addState().state === 'added') v4.saved = true; } catch (err) {}
     bar.setAttribute('aria-label', v4.confirmed ? vt('book') : vt('confirm'));
     bar.innerHTML = v4BarHtml();
-    var tip = resultEl.querySelector('.v4-tip'); if (tip) tip.textContent = v4.confirmed ? vt('tipDone') : vt('tip');
+    var tip = resultEl.querySelector('.v4-tip:not(.v4-picked)'); if (tip) tip.textContent = v4.confirmed ? (canBookNow ? vt('tipDone') : vt('tipNoBook')) : vt('tip');
     var plan = resultEl.querySelector('.v4'); if (plan) plan.classList.toggle('v4-confirmed', v4.confirmed);
     document.body.style.paddingBottom = bar.offsetHeight ? bar.offsetHeight + 'px' : '';
   }
@@ -428,13 +554,17 @@ const V4_CLIENT_SRC = String.raw`
     renderedVenueCardAnchors = {}; renderedPhotos = {};
     var fr = lang() === 'fr', counts = nameCounts(), planKinds = p.kind === 'multi_day' || p.kind === 'day_plan';
     var main = v4Main(); if (main) { main.classList.add('has-plan'); main.classList.remove('v4-editing'); }
+    if (v4.restoreConfirm) { v4.restoreConfirm = false; v4.confirmed = true; }
     var n = v4Count(p), nd = (p.days || []).length;
     var where = planKinds ? ((p.days || []).map(function(d){ return d.regionLabel; }).filter(function(x, i, a){ return x && a.indexOf(x) === i; }).slice(0, 2).join(', ')) : '';
     var sub = [nd > 1 ? vt('daysN', { n: nd }) : '', where, n === 1 ? vt('stops1') : vt('stopsN', { n: n })].filter(Boolean).join(' · ');
+    // Round 4 (2026-11-21: "things to do this weekend" quietly became Kelowna): one line says the town was our pick.
+    var picked = planKinds && p.understood && p.understood.valleyWide && !(p.understood.base || []).length && where && where.indexOf(',') === -1 ? vt('picked', { town: where }) : '';
     var html = '<div class="t3-plan v4' + (v4.confirmed ? ' v4-confirmed' : '') + '"><header class="v4-head"><h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(p.headline || p.summary || vt('yourPlan')) + '</h2>'
       + '<p class="v4-sub">' + esc(sub) + '</p><button type="button" class="v4-edit" data-v4-edit>✎ ' + esc(vt('edit')) + '</button></header>'
       + (p.eventAmbiguity ? '<section class="t3-warnings" role="alert"><p>' + esc(fr ? 'Plusieurs événements correspondent à «' + p.eventAmbiguity.phrase + '». Choisissez :' : 'More than one listed event matches “' + p.eventAmbiguity.phrase + '”. Choose one:') + '</p><div class="t3-event-choices">' + p.eventAmbiguity.candidates.map(function(name, i){ var cid = p.eventAmbiguity.candidateIds && p.eventAmbiguity.candidateIds[i]; return Number.isSafeInteger(cid) && cid > 0 ? '<button type="button" class="t3-btn t3-btn-ghost" data-t3-event-choice="' + cid + '">' + esc(name) + '</button>' : ''; }).join('') + '</div></section>' : '')
-      + '<p class="v4-tip">' + esc(v4.confirmed ? vt('tipDone') : vt('tip')) + '</p>'
+      + (picked ? '<p class="v4-tip v4-picked">' + esc(picked) + '</p>' : '')
+      + '<p class="v4-tip">' + esc(v4.confirmed ? (v4CanBook() ? vt('tipDone') : vt('tipNoBook')) : vt('tip')) + '</p>'
       + '<p class="t3-plan-status" id="t3PlanStatus" role="status" aria-live="polite"></p><div class="v4-days">';
     if (planKinds) {
       (p.days || []).forEach(function(d){
@@ -461,10 +591,15 @@ const V4_CLIENT_SRC = String.raw`
     if (window.__syncTripButtons) window.__syncTripButtons();
     v4UpdateBar();
     if (focus) {
-      var siteHead = document.querySelector('header#top');
-      var headH = siteHead && getComputedStyle(siteHead).position === 'sticky' ? siteHead.getBoundingClientRect().height : 0;
-      var top = resultEl.getBoundingClientRect().top + (window.pageYOffset || 0) - headH - 8;
-      try { window.scrollTo({ top: Math.max(0, top), behavior: 'auto' }); } catch (e) { window.scrollTo(0, Math.max(0, top)); }
+      var toTop = function(){
+        var siteHead = document.querySelector('header#top');
+        var headH = siteHead && getComputedStyle(siteHead).position === 'sticky' ? siteHead.getBoundingClientRect().height : 0;
+        var top = resultEl.getBoundingClientRect().top + (window.pageYOffset || 0) - headH - 8;
+        try { window.scrollTo({ top: Math.max(0, top), behavior: 'auto' }); } catch (e) { window.scrollTo(0, Math.max(0, top)); }
+      };
+      toTop();
+      // Round 2 (2026-11-21): again once the hidden hero and photos have settled, so the title is in view.
+      if (window.requestAnimationFrame) requestAnimationFrame(function(){ requestAnimationFrame(toTop); });
       var t = document.getElementById('t3Headline'); if (t) { try { t.focus({ preventScroll: true }); } catch (e) { t.focus(); } }
     }
   }
@@ -486,20 +621,36 @@ const V4_CLIENT_SRC = String.raw`
       var f = planFacts(state.last);
       track('trip_plan_confirm', { plan_kind: f.plan_kind, day_count: f.day_count, stop_count: v4ShareStops().length });
       var c = resultEl.querySelector('.v4-confirm'); if (c) c.parentNode.removeChild(c);
-      v4UpdateBar();
+      v4UpdateBar(); syncUrl();
       var bk = document.querySelector('#v4Bar [data-v4-book], #v4Bar [data-v4-share]'); if (bk) { try { bk.focus({ preventScroll: true }); } catch (err) {} }
+      var hd = document.getElementById('t3Headline'); if (hd && hd.getBoundingClientRect().top < 0) { try { hd.scrollIntoView({ block: 'center' }); } catch (err) {} }
       return;
     }
-    if ((b = t.closest('[data-v4-unconfirm]'))) { v4.confirmed = false; render(false); return; }
+    if ((b = t.closest('[data-v4-remove-id]')) && resultEl.contains(b)) { v4.gone[b.getAttribute('data-v4-remove-id')] = 1; v4.saved = false; render(false); v4CacheSave(); return; }
+    if ((b = t.closest('[data-v4-undo-id]')) && resultEl.contains(b)) { delete v4.gone[b.getAttribute('data-v4-undo-id')]; render(false); v4CacheSave(); return; }
+    if ((b = t.closest('[data-v4-unconfirm]'))) { v4.confirmed = false; v4.ask = false; render(false); syncUrl(); return; }
     if ((b = t.closest('[data-v4-book]'))) { v4OpenSheet(); return; }
     if ((b = t.closest('[data-v4-close]'))) { var dlg = document.getElementById('v4Sheet'); if (dlg) { if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); } return; }
     if ((b = t.closest('[data-v4-share]'))) { v4Share(); return; }
+    if ((b = t.closest('[data-v4-replace]'))) {
+      var ch = b.getAttribute('data-v4-replace');
+      v4.ask = false;
+      if (ch === 'replace' && window.__roamTripReplace) { window.__roamTripReplace(); addStops(null); v4.saved = true; v4Toast(vt('savedReplaced')); }
+      else if (ch === 'add') { addStops(null, { offset: tripDayOffset() }); v4.saved = true; v4Toast(vt('saved')); }
+      v4UpdateBar();
+      return;
+    }
     if ((b = t.closest('[data-v4-save]'))) {
-      if (!v4.saved) { addStops(null, { offset: tripDayOffset() }); v4.saved = true; v4UpdateBar(); v4Toast(vt('saved')); }
+      // Round 1 (2026-11-21): Save never mixes this plan into another saved trip without asking (one tap: Replace).
+      var as = addState(), oth = tripSize() - (as.total - as.missing);
+      if (!v4.saved && as.state === 'ready' && oth > 0 && window.__roamTripReplace) { v4.ask = true; v4UpdateBar(); var rb = document.querySelector('#v4Bar [data-v4-replace]'); if (rb) { try { rb.focus({ preventScroll: true }); } catch (err) {} } return; }
+      if (!v4.saved) { addStops(null, { offset: tripDayOffset() }); v4.saved = true; v4UpdateBar(); v4Toast(vt('savedReplaced')); }
       else { var panel = document.getElementById('tripTrayPanel'), toggle = document.getElementById('tripTrayToggle'); if (panel && !panel.classList.contains('open') && toggle) setTimeout(function(){ toggle.click(); }, 0); }
       return;
     }
     if ((b = t.closest('[data-v4-edit]'))) {
+      // Round 4 (2026-11-21): a new request starts unconfirmed (an edited request came back already confirmed).
+      v4.confirmed = false; v4.ask = false; v4.gone = {}; v4.saved = false;
       var m = v4Main(); if (m) m.classList.add('v4-editing');
       setCompact(false);
       try { form.scrollIntoView({ block: 'center' }); } catch (err) {}
@@ -520,6 +671,9 @@ function v4StaySrc(staySrc) {
   const swap = (from, to) => { if (!staySrc.includes(from)) throw new Error(`v4 hook not found: ${from.slice(0, 60)}`); staySrc = staySrc.replace(from, to); };
   swap('  function t3StayCardHtml(){\n', '  function t3StayCardHtml(){\n    if (V4) return v4BookCardHtml();\n');
   swap('  function t3BookSteps(){ var d = t3StayData(); return d ?', '  function t3BookSteps(){ var d = t3StayData(); if (!d && V4) { var fb = v4Fallback(); return ((fb && fb.steps) || []).filter(function(x){ return x && t3StayExt(x.url); }).concat(typeof t3ViatorSteps === \'function\' ? t3ViatorSteps() : []); } return d ?');
+  // Round 3 (2026-11-21: an evening out with Arrive = Leave showed "stay.leave must be after stay.arrive."): a leave date
+  // that is not after the arrival is simply not sent; the plan is for the arrival day.
+  swap("    if (o.arrive && /^\\d{4}-\\d{2}-\\d{2}$/.test(l)) o.leave = l;", "    if (o.arrive && /^\\d{4}-\\d{2}-\\d{2}$/.test(l) && l > o.arrive) o.leave = l;");
   swap('  function t3BookRerender(focusSel){\n', '  function t3BookRerender(focusSel){\n    if (V4) setTimeout(v4UpdateBar, 0);\n');
   return staySrc;
 }

@@ -110,7 +110,7 @@ test('V4 page: the simple view only with d.v4; title, canonical and the SEO text
   assert.ok(about(v4).length > 200);
   assert.ok(/\.t3-v4\.has-plan \.t3-hero, \.t3-v4\.has-plan #t3How, \.t3-v4\.has-plan \.t3-about, \.t3-v4\.has-plan \.t3-guide \{ display: none; \}/.test(v4), 'hidden only while a plan is shown');
   assert.ok(v4.includes("fetch('/api/trip/plan?stays=1&v=4'"), 'the page asks the planner for the V4 rules');
-  assert.ok(v4.includes("+ (t3StateToQuery(s) ? '&' : '?') + 'v=4'"), 'a shared plan link keeps the preview');
+  assert.ok(v4.includes("+ (t3StateToQuery(s) || v4UrlExtra('') ? '&' : '?') + 'v=4'"), 'a shared plan link keeps the preview');
 });
 
 test('V4 page: one verb per action, in English and French, and the commission line is kept', () => {
