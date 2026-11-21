@@ -1,0 +1,330 @@
+{
+ "reason": "Places-to-stay photos, batch 2 (Nov 20 2026); ids are filled in after import by drafts/stays-2026-11/batch2-resolve.js",
+ "batch_id": "photos-stays-b2-ok-2026-11-20",
+ "venues": [
+  {
+   "id": null,
+   "name": "Apex Mountain Lodge",
+   "region": "apex",
+   "slug": "apex-mountain-lodge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/apex-mountain-lodge-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Armstrong Inn",
+   "region": "armstrong",
+   "slug": "armstrong-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/armstrong-inn-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Whitefoot Lodge",
+   "region": "big-white",
+   "slug": "whitefoot-lodge",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/whitefoot-lodge-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Canyon Farms RV Park",
+   "region": "kelowna",
+   "slug": "canyon-farms-rv-park",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/canyon-farms-rv-park-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "The Log Home at O'Rourke Family Estate",
+   "region": "lake-country",
+   "slug": "the-log-home-at-o-rourke-family-estate",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-log-home-at-o-rourke-family-estate-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "The Inn at Therapy Vineyards",
+   "region": "naramata",
+   "slug": "the-inn-at-therapy-vineyards",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-inn-at-therapy-vineyards-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Silver Sage Winery B&B",
+   "region": "oliver",
+   "slug": "silver-sage-winery-b-and-b",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/silver-sage-winery-b-and-b-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Roop Nivas at Kismet Estate Winery",
+   "region": "oliver",
+   "slug": "roop-nivas-at-kismet-estate-winery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/roop-nivas-at-kismet-estate-winery-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "The Guest House at Burrowing Owl Estate Winery",
+   "region": "oliver",
+   "slug": "the-guest-house-at-burrowing-owl-estate-winery",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/the-guest-house-at-burrowing-owl-estate-winery-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Baergnaescht Bed & Breakfast",
+   "region": "osoyoos",
+   "slug": "baergnaescht-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/baergnaescht-bed-and-breakfast-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Sonora Desert Inn at Mythology Vineyard",
+   "region": "osoyoos",
+   "slug": "sonora-desert-inn-at-mythology-vineyard",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sonora-desert-inn-at-mythology-vineyard-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Falcon Resort",
+   "region": "osoyoos",
+   "slug": "falcon-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/falcon-resort-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Poplars Motel on the Lake",
+   "region": "osoyoos",
+   "slug": "poplars-motel-on-the-lake",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/poplars-motel-on-the-lake-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Riviera Motel",
+   "region": "osoyoos",
+   "slug": "riviera-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/riviera-motel-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Safari Beach Resort",
+   "region": "osoyoos",
+   "slug": "safari-beach-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/safari-beach-resort-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Pineacre on the Lake",
+   "region": "peachland",
+   "slug": "pineacre-on-the-lake",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/pineacre-on-the-lake-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Wesbert Guest Suites",
+   "region": "penticton",
+   "slug": "wesbert-guest-suites",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/wesbert-guest-suites-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Summerland Waterfront Resort & Spa",
+   "region": "summerland",
+   "slug": "summerland-waterfront-resort-and-spa",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/summerland-waterfront-resort-and-spa-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "O'Keefe's Landing Bed & Breakfast",
+   "region": "vernon",
+   "slug": "o-keefe-s-landing-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/o-keefe-s-landing-bed-and-breakfast-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Grandpa's Heart at Nicklen Lake",
+   "region": "lumby",
+   "slug": "grandpa-s-heart-at-nicklen-lake",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/grandpa-s-heart-at-nicklen-lake-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Glamping at O'Keefe Ranch",
+   "region": "vernon",
+   "slug": "glamping-at-o-keefe-ranch",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/glamping-at-o-keefe-ranch-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Upper BX Creek Campground",
+   "region": "silverstar",
+   "slug": "upper-bx-creek-campground",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/upper-bx-creek-campground-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Okanagan Royal Park Inn",
+   "region": "vernon",
+   "slug": "okanagan-royal-park-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/okanagan-royal-park-inn-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Schell Motel",
+   "region": "vernon",
+   "slug": "schell-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/schell-motel-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Sparkling Hill Resort",
+   "region": "vernon",
+   "slug": "sparkling-hill-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sparkling-hill-resort-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Adela's Bed and Breakfast",
+   "region": "west-kelowna",
+   "slug": "adela-s-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/adela-s-bed-and-breakfast-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Alexandria House Bed & Breakfast",
+   "region": "west-kelowna",
+   "slug": "alexandria-house-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/alexandria-house-bed-and-breakfast-2610.jpg?v=20261120b2"
+   }
+  }
+ ]
+}

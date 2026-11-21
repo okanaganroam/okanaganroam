@@ -1,0 +1,86 @@
+[
+ {
+  "id": null,
+  "name": "The Log Home at O'Rourke Family Estate",
+  "region": "lake-country",
+  "slug": "the-log-home-at-o-rourke-family-estate",
+  "file": "/images/venues/the-log-home-at-o-rourke-family-estate-2610.jpg",
+  "dimensions": "1500x1000",
+  "source_page": "https://orourkefamilyestate.com/log-home/",
+  "image_url": "https://orourkefamilyestate.com/wp-content/uploads/2025/09/Log-Home-70.jpg",
+  "source_kind": "website",
+  "note": "Front of the log home with Okanagan Lake and vineyard behind (own site, 1500px source)."
+ },
+ {
+  "id": null,
+  "name": "The Inn at Therapy Vineyards",
+  "region": "naramata",
+  "slug": "the-inn-at-therapy-vineyards",
+  "file": "/images/venues/the-inn-at-therapy-vineyards-2610.jpg",
+  "dimensions": "2500x1107",
+  "source_page": "https://discovernaramata.com/business-directory/inn-at-therapy-vineyards/",
+  "image_url": "https://discovernaramata.com/wp-content/uploads/2026/04/InnTherapy1.jpg",
+  "source_kind": "tourism_board",
+  "note": "Inn and winery buildings above the vineyard with Okanagan Lake behind."
+ },
+ {
+  "id": null,
+  "name": "Silver Sage Winery B&B",
+  "region": "oliver",
+  "slug": "silver-sage-winery-b-and-b",
+  "file": "/images/venues/silver-sage-winery-b-and-b-2610.jpg",
+  "dimensions": "4032x3024",
+  "source_page": "Google Maps: Silver Sage Winery, 4852 Ryegrass Rd, Oliver, BC V0H 1T1",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdh1xKB0Zyyam9IJPFN77kC2rGoYPnpk47H-vruLAomzc9uzdrHQZPZSveRBbxiteeWUiIEu4GBMRXkJFZ-fS5DJqyv3aKXZ8Zckrmwtk79NGNPoTVDL4ojMozj6xWsKS2w4vcsmA=w2400",
+  "source_kind": "google_maps",
+  "note": "The villa building (same as the Visit Oliver B&B exterior photo) behind the rose garden."
+ },
+ {
+  "id": null,
+  "name": "Roop Nivas at Kismet Estate Winery",
+  "region": "oliver",
+  "slug": "roop-nivas-at-kismet-estate-winery",
+  "file": "/images/venues/roop-nivas-at-kismet-estate-winery-2610.jpg",
+  "dimensions": "1536x1024",
+  "source_page": "Google Maps: Roop Nivas at Kismet Estate Winery, 316 Rd 20, Oliver, BC V0H 1T1",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdbGXg6GIM3r8ohvbf5hL1UhbhuaOrZnT4KLZmKTZ5JV2EpnqsoWy0Xn4YpVfwjPO_mk7G0mpNhf9XS2S8jvbrlXglarxdlIOtfkQ-FvUjaHKewST42v8oOJCHDmn0hbgVgOIUnLzR7Z-MG=w2400",
+  "source_kind": "google_maps",
+  "note": "The two-storey suites building at dusk (owner photo). Own-site room images look like renders, not used."
+ },
+ {
+  "id": null,
+  "name": "The Guest House at Burrowing Owl Estate Winery",
+  "region": "oliver",
+  "slug": "the-guest-house-at-burrowing-owl-estate-winery",
+  "file": "/images/venues/the-guest-house-at-burrowing-owl-estate-winery-2610.jpg",
+  "dimensions": "2560x1696",
+  "source_page": "https://www.burrowingowlwine.ca/the-guest-house/",
+  "image_url": "https://www.burrowingowlwine.ca/wp-content/uploads/2014/07/BO-2686-1-scaled.jpg",
+  "source_kind": "website",
+  "note": "Guest house pool deck with the vineyard and valley behind."
+ },
+ {
+  "id": null,
+  "name": "Baergnaescht Bed & Breakfast",
+  "region": "osoyoos",
+  "slug": "baergnaescht-bed-and-breakfast",
+  "file": "/images/venues/baergnaescht-bed-and-breakfast-2610.jpg",
+  "dimensions": "2048x1152",
+  "source_page": "Google Maps: Baergnaescht Bed & Breakfast, 1175 Highway 3 East, Osoyoos, BC V0H 1V6",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdIF1zOKpF45b9pl_MvybgrOIFQ4iMwi5uhFrE97tz2FfZyumEBz6SPEmMVOjCr8FG7QikN1ZGtC-C5Jxk5Da9xE6092DQLpqinrklCrgSrVOIgo1VsspVC6Cg8ZWY9X2RV5Qzb=w2400",
+  "source_kind": "google_maps",
+  "note": "Adobe-style house with mountains behind (owner photo); own-site photos are under 1100px."
+ },
+ {
+  "id": null,
+  "name": "Sonora Desert Inn at Mythology Vineyard",
+  "region": "osoyoos",
+  "slug": "sonora-desert-inn-at-mythology-vineyard",
+  "file": "/images/venues/sonora-desert-inn-at-mythology-vineyard-2610.jpg",
+  "dimensions": "3000x2000",
+  "source_page": "https://www.mythologyvineyard.ca/pages/reservations",
+  "image_url": "https://www.mythologyvineyard.ca/cdn/shop/files/Mythology_Inn_and_Rooms00002.jpg?width=3000",
+  "source_kind": "website",
+  "note": "The inn house above the vineyard rows."
+ }
+]

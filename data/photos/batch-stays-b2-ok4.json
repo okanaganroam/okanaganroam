@@ -1,0 +1,114 @@
+{
+ "reason": "Venue photos stays-b2-ok4",
+ "batch_id": "photos-stays-b2-ok4-2026-11-20",
+ "venues": [
+  {
+   "id": null,
+   "name": "O'Keefe's Landing Bed & Breakfast",
+   "region": "vernon",
+   "slug": "o-keefe-s-landing-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/o-keefe-s-landing-bed-and-breakfast-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Grandpa's Heart at Nicklen Lake",
+   "region": "lumby",
+   "slug": "grandpa-s-heart-at-nicklen-lake",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/grandpa-s-heart-at-nicklen-lake-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Glamping at O'Keefe Ranch",
+   "region": "vernon",
+   "slug": "glamping-at-o-keefe-ranch",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/glamping-at-o-keefe-ranch-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Upper BX Creek Campground",
+   "region": "silverstar",
+   "slug": "upper-bx-creek-campground",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/upper-bx-creek-campground-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Okanagan Royal Park Inn",
+   "region": "vernon",
+   "slug": "okanagan-royal-park-inn",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/okanagan-royal-park-inn-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Schell Motel",
+   "region": "vernon",
+   "slug": "schell-motel",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/schell-motel-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Sparkling Hill Resort",
+   "region": "vernon",
+   "slug": "sparkling-hill-resort",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sparkling-hill-resort-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Adela's Bed and Breakfast",
+   "region": "west-kelowna",
+   "slug": "adela-s-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/adela-s-bed-and-breakfast-2610.jpg?v=20261120b2"
+   }
+  },
+  {
+   "id": null,
+   "name": "Alexandria House Bed & Breakfast",
+   "region": "west-kelowna",
+   "slug": "alexandria-house-bed-and-breakfast",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/alexandria-house-bed-and-breakfast-2610.jpg?v=20261120b2"
+   }
+  }
+ ]
+}

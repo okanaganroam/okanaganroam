@@ -1,0 +1,16 @@
+[
+ {
+  "id": null,
+  "name": "Adriatic Motel",
+  "region": "osoyoos",
+  "slug": "adriatic-motel",
+  "reason": "no own website; Google Maps has only 4 small photos (none 800px+); destinationosoyoos.com and OTAs blocked plain requests (429/bot page)"
+ },
+ {
+  "id": null,
+  "name": "Green Gables Beach Resort",
+  "region": "osoyoos",
+  "slug": "green-gables-beach-resort",
+  "reason": "own site blocks plain requests (403); Google Maps owner photo is not this place (paddleboarders on a different lake), the rest are a night 360 sphere and a dark bedroom; Destination BC listing has no photos; OTAs blocked"
+ }
+]
