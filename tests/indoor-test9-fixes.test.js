@@ -193,9 +193,11 @@ test('8. Family Fun: the chip and /indoor/family list the same places; play cent
   const { v } = await melissa({ name: 'Family First Play T9' });
   const hub = await fetch(`${base}/indoor`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text());
   const fam = await fetch(`${base}/indoor/family`, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text());
-  const chipCount = (h) => Number((/href="\/indoor\/family"[^>]*>Family Fun <span>\((\d+)\)<\/span>/.exec(h) || [])[1]);
-  const summary = Number((/(\d+) matching spots? — Family Fun/.exec(plain(fam)) || [])[1]);
+  // The hub layout (2026-11-21): Family Fun is the pressed chip with its count, and the page says "N of M places".
+  const chipCount = (h) => Number((/data-fd-type="family" aria-pressed="true">[^<]*Family Fun <span class="outdoor-activity-count">(\d+)<\/span>/.exec(h) || [])[1]);
+  const summary = Number((/(\d+) of \d+ places/.exec(plain(fam)) || [])[1]);
   assert.ok(Number.isFinite(summary) && summary > 0, 'the family page counts its places');
+  assert.equal((fam.match(/<li class="venue-card"/g) || []).length, summary, 'and lists that many');
   const famChip = chipCount(fam);
   assert.equal(famChip, summary, 'the chip and the list agree');
   // Her place is in the first few under Family Fun.

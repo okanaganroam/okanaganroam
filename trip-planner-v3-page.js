@@ -904,6 +904,564 @@ function t3AboutHtml(d) {
   </section>`;
 }
 
+// ---- Where to stay (step 2, 2026-11-20; TRIP_STAYS or /trip?stays=1, see server.js) ----
+// The optional Dates and Guests row under the request box (folded until opened), and its styles. Nothing here is on
+// the page while the flag is off.
+const T3_STAY_STYLES = `<style>
+  .t3-stay-in { margin: 6px 0 2px; border-top: 1px solid rgba(27,43,58,0.12); padding-top: 8px; }
+  .t3-stay-in summary { cursor: pointer; font-weight: 800; font-size: 0.88rem; color: var(--ref-navy); min-height: 32px; display: flex; align-items: center; gap: 6px; }
+  .t3-stay-in summary small { font-weight: 600; color: rgba(27,43,58,0.6); }
+  .t3-stay-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px 10px; padding: 6px 0 4px; }
+  .t3-stay-row label { display: flex; flex-direction: column; gap: 2px; font-size: 0.78rem; font-weight: 800; color: rgba(27,43,58,0.75); }
+  .t3-stay-row input, .t3-stay-row select { min-height: 40px; border: 1px solid rgba(27,43,58,0.25); border-radius: 10px; padding: 6px 8px; font: 600 0.92rem 'Nunito', 'Nunito Fallback', sans-serif; color: var(--ref-navy); background: #fff; min-width: 0; width: 100%; box-sizing: border-box; }
+  .t3-stay-row label.t3-stay-dog { grid-column: 1 / -1; flex-direction: row; align-items: center; gap: 8px; min-height: 40px; font-size: 0.88rem; cursor: pointer; }
+  .t3-stay-row label.t3-stay-dog input { width: 20px; height: 20px; min-height: 0; margin: 0; accent-color: var(--ref-navy); flex: none; }
+  @media (max-width: 640px) { .t3-stay-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .t3-stay { background: #fff; border-radius: 18px; padding: 16px; margin: 0 0 18px; box-shadow: 0 10px 26px -20px rgba(0,0,0,0.5); }
+  .t3-stay h3 { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.2rem; margin: 0 0 2px; color: var(--ref-navy); }
+  .t3-stay-sub { margin: 0 0 12px; font-size: 0.86rem; color: rgba(27,43,58,0.7); }
+  .t3-stay-pick { display: grid; grid-template-columns: 180px minmax(0, 1fr); gap: 14px; align-items: start; }
+  .t3-stay-pick img, .t3-stay-pick .t3-stay-nophoto { width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 12px; background: rgba(27,43,58,0.08); display: block; }
+  @media (max-width: 640px) { .t3-stay-pick { grid-template-columns: 1fr; } .t3-stay-pick img, .t3-stay-pick .t3-stay-nophoto { aspect-ratio: 16 / 9; } }
+  .t3-stay-kicker { margin: 0; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ref-gold); }
+  .t3-stay-name { margin: 2px 0 4px; font-size: 1.1rem; font-weight: 800; }
+  .t3-stay-name a, .t3-stay-alt a { color: var(--ref-navy); }
+  .t3-stay-facts { margin: 0 0 6px; font-weight: 700; font-size: 0.9rem; }
+  .t3-stay-why { margin: 0; padding-left: 18px; font-size: 0.88rem; }
+  .t3-stay-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .t3-stay-alts { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+  .t3-stay-alts[hidden] { display: none; }
+  .t3-stay-alt { display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid rgba(27,43,58,0.15); border-radius: 12px; padding: 10px 12px; }
+  .t3-stay-alt p { margin: 0; font-size: 0.84rem; }
+  .t3-stay-alt .t3-btn { min-height: 40px; padding: 8px 16px; flex: none; }
+  /* Step 3 (2026-11-20): the trip line, the booking buttons (one main button, the others smaller), notes, the
+     commission line and "Your trip checklist". */
+  .t3-stay-trip { margin: 12px 0 0; font-weight: 800; font-size: 0.9rem; color: var(--ref-navy); }
+  .t3-stay-book { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-top: 10px; }
+  .t3-stay-book .t3-btn { min-height: 48px; padding: 12px 22px; font-size: 0.98rem; }
+  @media (max-width: 640px) { .t3-stay-book .t3-btn { width: 100%; justify-content: center; box-sizing: border-box; } }
+  .t3-stay-more { display: inline-flex; align-items: center; min-height: 44px; font-weight: 800; font-size: 0.86rem; color: var(--ref-navy); }
+  .t3-stay-note { margin: 6px 0 0; font-size: 0.82rem; color: rgba(27,43,58,0.72); }
+  .t3-stay-disclosure { margin: 10px 0 0; font-size: 0.78rem; color: rgba(27,43,58,0.62); }
+  .t3-stay-check { margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid rgba(27,43,58,0.12); }
+  .t3-stay-check h4 { margin: 0 0 6px; font-size: 0.95rem; color: var(--ref-navy); }
+  .t3-stay-check ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  .t3-stay-check li { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 2px 12px; min-height: 44px; font-size: 0.88rem; border-bottom: 1px dashed rgba(27,43,58,0.12); }
+  .t3-stay-check li:last-child { border-bottom: 0; }
+  .t3-stay-check li a { font-weight: 800; color: var(--ref-navy); }
+  /* "Book your trip" (2026-11-20): the compact box (stay line, estimate, Book my trip steps, See all). */
+  .t3-book h3 { margin-bottom: 10px; }
+  .t3-book-stay { display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+  .t3-book-stay img, .t3-book-stay .t3-stay-nophoto { width: 64px; height: 64px; object-fit: cover; border-radius: 10px; background: rgba(27,43,58,0.08); display: block; }
+  .t3-book-stay .t3-stay-name { margin: 0; font-size: 1rem; line-height: 1.25; }
+  .t3-book-stay .t3-stay-facts { margin: 2px 0 0; font-size: 0.82rem; font-weight: 700; color: rgba(27,43,58,0.72); }
+  .t3-book-stay .t3-stay-kicker { font-size: 0.68rem; }
+  .t3-book-link { background: none; border: 0; padding: 0 4px; min-height: 44px; font: inherit; font-weight: 800; font-size: 0.86rem; color: var(--ref-navy); text-decoration: underline; cursor: pointer; }
+  .t3-book-est { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: #e9f1ec; }
+  .t3-book-est-btn { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; width: 100%; min-height: 32px; background: none; border: 0; padding: 0; font: inherit; text-align: left; color: var(--ref-navy); cursor: pointer; }
+  .t3-book-est-btn strong { font-size: 1rem; }
+  .t3-book-tag { font-size: 0.74rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: rgba(27,43,58,0.6); }
+  .t3-book-caret { margin-left: auto; }
+  .t3-book-est-btn[aria-expanded="true"] .t3-book-caret { transform: rotate(180deg); }
+  .t3-book-parts { margin: 6px 0 0; font-size: 0.86rem; font-weight: 700; }
+  .t3-book-est-stay a { display: inline-flex; align-items: center; min-height: 32px; color: var(--ref-navy); font-weight: 800; }
+  .t3-book-note, .t3-book-hint { margin: 4px 0 0; font-size: 0.8rem; color: rgba(27,43,58,0.72); }
+  .t3-book-go { margin: 12px 0 0; }
+  .t3-book-main { min-height: 48px; padding: 12px 24px; font-size: 1rem; }
+  @media (max-width: 640px) { .t3-book-go > .t3-book-main { width: 100%; justify-content: center; box-sizing: border-box; } }
+  .t3-book-prog { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; font-size: 0.82rem; font-weight: 800; }
+  .t3-book-bar { flex: 1; height: 6px; border-radius: 3px; background: rgba(27,43,58,0.12); overflow: hidden; }
+  .t3-book-bar span { display: block; height: 100%; background: var(--ref-navy); }
+  .t3-book-last, .t3-book-next, .t3-book-done { margin: 4px 0; font-size: 0.92rem; }
+  .t3-book-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .t3-book-acts .t3-btn-ghost { min-height: 48px; }
+  @media (max-width: 640px) { .t3-book-acts .t3-book-main { flex: 1 1 100%; justify-content: center; } .t3-book-acts .t3-btn-ghost { flex: 1; justify-content: center; } }
+  .t3-book-all { margin: 10px 0 0; }
+  .t3-book-all summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 800; font-size: 0.86rem; color: var(--ref-navy); }
+  .t3-book-all ul { list-style: none; margin: 0; padding: 0; }
+  .t3-book-all li { display: flex; align-items: center; gap: 10px; min-height: 48px; border-top: 1px dashed rgba(27,43,58,0.12); font-size: 0.86rem; }
+  .t3-book-row { flex: 1; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; align-items: center; }
+  .t3-book-row a { font-weight: 800; color: var(--ref-navy); }
+  .t3-book-alt { font-size: 0.8rem; font-weight: 700 !important; }
+  .t3-book-tick { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(27,43,58,0.35); background: #fff; color: var(--ref-navy); font-weight: 900; cursor: pointer; padding: 0; position: relative; }
+  .t3-book-tick::after { content: ''; position: absolute; inset: -8px; }
+  .t3-book-tick[aria-pressed="true"] { background: var(--ref-navy); color: #fff; border-color: var(--ref-navy); }
+  .t3-book-live { display: inline-flex; align-items: center; min-height: 36px; margin-top: 2px; font-weight: 800; font-size: 0.84rem; color: var(--ref-navy); }
+  .t3-live { width: min(960px, calc(100vw - 16px)); height: min(760px, calc(100vh - 16px)); height: min(760px, calc(100dvh - 16px)); max-width: none; max-height: none; padding: 0; border: 0; border-radius: 16px; overflow: hidden; }
+  .t3-live[open] { display: flex; flex-direction: column; }
+  .t3-live::backdrop { background: rgba(10,16,28,0.6); }
+  .t3-live-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 8px 6px 16px; border-bottom: 1px solid rgba(27,43,58,0.12); }
+  .t3-live-head h2 { margin: 0; font-size: 1rem; color: var(--ref-navy); }
+  .t3-live-x { width: 44px; height: 44px; border: 0; border-radius: 50%; background: rgba(27,43,58,0.08); font-size: 1.5rem; line-height: 1; cursor: pointer; color: var(--ref-navy); }
+  .t3-live-head h2 { flex: 1; }
+  .t3-live-tab { font-size: 0.82rem; font-weight: 800; color: var(--ref-navy); min-height: 44px; display: inline-flex; align-items: center; }
+  .t3-live-wrap { position: relative; flex: 1; min-height: 0; }
+  .t3-live-wait { position: absolute; inset: 0; margin: 0; display: flex; align-items: center; justify-content: center; font-weight: 800; color: rgba(27,43,58,0.55); }
+  .t3-live-map { position: relative; width: 100%; height: 100%; border: 0; display: block; background: transparent; }
+  .t3-live-note { margin: 0; padding: 6px 12px; font-size: 0.74rem; color: rgba(27,43,58,0.7); }
+</style>`;
+function t3StayInputsHtml() {
+  const opts = (from, to) => '<option value="">–</option>' + Array.from({ length: to - from + 1 }, (_, i) => `<option value="${from + i}">${from + i}</option>`).join('');
+  return `${T3_STAY_STYLES}
+        <details class="t3-stay-in" id="t3StayIn">
+          <summary><span class="t3-en">Dates and guests</span><span class="t3-fr" lang="fr">Dates et voyageurs</span> <small><span class="t3-en">(optional)</span><span class="t3-fr" lang="fr">(facultatif)</span></small></summary>
+          <div class="t3-stay-row">
+            <label><span><span class="t3-en">Arrive</span><span class="t3-fr" lang="fr">Arrivée</span></span><input type="date" id="t3Arrive"></label>
+            <label><span><span class="t3-en">Leave</span><span class="t3-fr" lang="fr">Départ</span></span><input type="date" id="t3Leave"></label>
+            <label><span><span class="t3-en">Adults</span><span class="t3-fr" lang="fr">Adultes</span></span><select id="t3Adults">${opts(1, 16)}</select></label>
+            <label><span><span class="t3-en">Kids</span><span class="t3-fr" lang="fr">Enfants</span></span><select id="t3Kids">${opts(0, 12)}</select></label>
+            <label class="t3-stay-dog"><input type="checkbox" id="t3Dog"><span><span class="t3-en">Bringing a dog</span><span class="t3-fr" lang="fr">Avec un chien</span></span></label>
+          </div>
+        </details>
+`;
+}
+// Browser code for the row and the "Where to stay" card (shipped only while the flag is on). The card reads the raw
+// plan (state.last.whereToStay), never the copy with times and dates rewritten for display.
+const T3_STAY_CLIENT_SRC = `
+  var T3_STAY_DISCLOSURE = ${JSON.stringify(require('./places-to-stay').DISCLOSURE)};` + String.raw`
+  var stayChoice = null;
+  function t3StayInput(){
+    var g = function(id){ var el = document.getElementById(id); return el ? el.value : ''; };
+    var o = {}, a = g('t3Arrive'), l = g('t3Leave'), ad = g('t3Adults'), k = g('t3Kids');
+    if (/^\d{4}-\d{2}-\d{2}$/.test(a)) o.arrive = a;
+    if (o.arrive && /^\d{4}-\d{2}-\d{2}$/.test(l)) o.leave = l;
+    if (/^\d+$/.test(ad)) o.adults = Number(ad);
+    if (/^\d+$/.test(k)) o.kids = Number(k);
+    var dg = document.getElementById('t3Dog'); if (dg && dg.checked) o.dog = true;
+    return Object.keys(o).length ? o : null;
+  }
+  (function(){
+    var a = document.getElementById('t3Arrive'), l = document.getElementById('t3Leave');
+    if (!a || !l) return;
+    var today = new Date(); today = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+    a.min = today; l.min = today;
+    a.addEventListener('change', function(){
+      if (!a.value) return;
+      var next = new Date(a.value + 'T12:00:00Z'); next.setUTCDate(next.getUTCDate() + 1);
+      l.min = next.toISOString().slice(0, 10);
+      if (l.value && l.value < l.min) l.value = '';
+    });
+  })();
+  function t3StayData(){
+    var w = state.last && state.last.whereToStay;
+    if (!w || !w.pick) return null;
+    var all = [w.pick].concat(w.alternatives || []);
+    var chosen = all.filter(function(s){ return s.id === stayChoice; })[0] || w.pick;
+    w.stayId = chosen.id;
+    return { w: w, chosen: chosen, others: all.filter(function(s){ return s !== chosen; }) };
+  }
+  function t3StayFacts(s, fr){
+    return [s.sleeps ? (fr ? 'Jusqu’à ' + s.sleeps + ' pers.' : 'Sleeps ' + s.sleeps) : '', s.priceBand || ''].filter(Boolean).join(' · ');
+  }
+  // Step 3 (2026-11-20): "Dec 18–21 · 3 nights · 2 adults, 2 kids · dog" (French: "18–21 déc. · 3 nuits · …").
+  function t3StayTripLine(t, fr){
+    var MO = fr ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var ok = function(x){ return typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x); };
+    var parts = [];
+    if (ok(t.arrive) && ok(t.leave)) {
+      var am = Number(t.arrive.slice(5, 7)) - 1, ad = Number(t.arrive.slice(8)), lm = Number(t.leave.slice(5, 7)) - 1, ld = Number(t.leave.slice(8));
+      parts.push(fr ? (am === lm ? ad + '–' + ld + ' ' + MO[am] : ad + ' ' + MO[am] + '–' + ld + ' ' + MO[lm]) : (am === lm ? MO[am] + ' ' + ad + '–' + ld : MO[am] + ' ' + ad + '–' + MO[lm] + ' ' + ld));
+    }
+    if (t.nights) parts.push(fr ? t.nights + (t.nights > 1 ? ' nuits' : ' nuit') : t.nights + (t.nights > 1 ? ' nights' : ' night'));
+    var who = [];
+    if (t.adults) who.push(fr ? t.adults + (t.adults > 1 ? ' adultes' : ' adulte') : t.adults + (t.adults > 1 ? ' adults' : ' adult'));
+    if (t.kids) who.push(fr ? t.kids + (t.kids > 1 ? ' enfants' : ' enfant') : t.kids + (t.kids > 1 ? ' kids' : ' kid'));
+    if (who.length) parts.push(who.join(', '));
+    if (t.dog) parts.push(fr ? 'chien' : 'dog');
+    return parts.join(' · ');
+  }
+  function t3StayExt(u){ return typeof u === 'string' && /^https:\/\/[^\s"'<>]+$/.test(u) ? u : null; }
+  function t3StayLinkHtml(s, l, cls, text){
+    var u = t3StayExt(l.url);
+    if (!u) return '';
+    return '<a ' + (cls ? 'class="' + cls + '" ' : '') + hrefAttr(u) + ' target="_blank" rel="' + esc(l.rel || 'nofollow noopener') + '" data-track="stay_click" data-stay-id="' + esc(s.id) + '" data-link="' + esc(l.key) + '"' + (l.affiliate ? ' data-affiliate="1"' : '') + '>' + esc(text) + ' <span aria-hidden="true">↗</span></a>';
+  }
+  // "Book your trip" (2026-11-20, trip-booking.js): one compact box above Day 1. The chosen stay with Change, the trip's
+  // estimate (tap for the parts), one "Book my trip" button that steps through every booking one tab at a time, and
+  // "See all N bookings". The server sends the numbers and the steps (estimate, bookingSteps on each stay card).
+  var bookState = {}, bookKey = '';
+  function t3BookLoad(key){
+    var s = null;
+    try { s = JSON.parse(window.localStorage.getItem(key) || 'null'); } catch (e) { s = null; }
+    return s && typeof s === 'object' && s.st && typeof s.st === 'object' ? s : { st: {}, last: null, started: false, completed: false };
+  }
+  function t3BookSave(){ try { window.localStorage.setItem(bookKey, JSON.stringify(bookState)); } catch (e) {} }
+  function t3BookKeyFor(s, w, steps){
+    var t = w.trip || {};
+    return 't3book:' + [s.id, t.arrive || '', t.nights || '', steps.map(function(x){ return x.kind.charAt(0) + x.id; }).join('.')].join(':');
+  }
+  function t3Money(n){ return cad(Math.round(n) * 100); }
+  function t3Range(low, high, fr){
+    if (low === null && high === null) return '';
+    if (low === null) return (fr ? 'moins de ' : 'under ') + t3Money(high);
+    if (high === null) return t3Money(low) + '+';
+    if (!low && !high) return fr ? 'Gratuit' : 'Free';
+    return low === high ? t3Money(low) : t3Money(low) + '–' + t3Money(high);
+  }
+  function t3EstimateHead(e, fr){
+    var who = fr ? ' pour ' + e.people + (e.people > 1 ? ' personnes' : ' personne') : ' for ' + e.people + (e.people > 1 ? ' people' : ' person');
+    if (e.showTotal) {
+      var amt = e.openLow ? (fr ? 'Jusqu’à ' : 'Up to ') + t3Money(e.high) : e.openHigh ? (fr ? 'À partir de ' : 'From ') + t3Money(e.low)
+        : (fr ? 'Environ ' : 'About ') + (e.low === e.high ? t3Money(e.low) : t3Money(e.low) + '–' + t3Money(e.high));
+      return { amount: amt + who, tag: fr ? 'estimation' : 'estimate' };
+    }
+    return { amount: fr ? 'Coût connu jusqu’ici' : 'Known costs so far', tag: fr ? 'estimation partielle' : 'partial estimate' };
+  }
+  // The stay's price is missing from the estimate (no price band, 2026-11-20): one line that opens its live prices (the
+  // same sheet as "See live prices"), else its main booking link, so the visitor can still see what the stay costs.
+  function t3EstimateStayHtml(e, s, fr){
+    if (!s || (e.parts || []).some(function(p){ return p && p.key === 'stay'; })) return '';
+    var label = fr ? 'voir les prix en direct' : 'see live prices', a = '';
+    var l = s.livePrices, lu = l && t3StayExt(fr && l.urlFr ? l.urlFr : l.url);
+    if (lu) a = '<a ' + hrefAttr(lu) + ' target="_blank" rel="sponsored nofollow noopener" data-track="stay_click" data-stay-id="' + esc(s.id) + '" data-link="live_prices" data-affiliate="1" data-t3-live data-t3-live-name="' + esc(s.name) + '">' + esc(label) + ' <span aria-hidden="true">↗</span></a>';
+    else {
+      var b = (s.bookingLinks || []).filter(function(x){ return x && t3StayExt(x.url); })[0];
+      if (b) a = t3StayLinkHtml(s, b, '', label);
+    }
+    return a ? '<p class="t3-book-parts t3-book-est-stay">' + esc(fr ? 'Hébergement : ' : 'Stay: ') + a + '</p>' : '';
+  }
+  function t3EstimateHtml(e, fr, s){
+    if (!e || !e.parts || !e.parts.length) return '';
+    var head = t3EstimateHead(e, fr);
+    var parts = e.parts.map(function(p){ return (fr ? p.labelFr : p.label) + ' ' + t3Range(p.low, p.high, fr); }).join(' · ');
+    // The parts: inside the tap-to-open breakdown under a total; shown straight away when there is no total.
+    var more = e.showTotal ? '<p class="t3-book-parts">' + esc(parts) + '</p>' : '';
+    if (e.unknown && e.unknown.length) more += '<p class="t3-book-note">' + esc((fr ? 'Prix non indiqué, non compté : ' : 'Price not listed, not counted: ') + e.unknown.join(', ')) + '</p>';
+    (e.notes || []).forEach(function(n){ more += '<p class="t3-book-note">' + esc(fr ? n.textFr : n.text) + '</p>'; });
+    if (e.peopleAssumed) more += '<p class="t3-book-note">' + esc(fr ? 'Pour 2 personnes : changez le nombre sous « Dates et voyageurs ».' : 'Counted for 2 people: change it under “Dates and guests”.') + '</p>';
+    more += '<p class="t3-book-note">' + esc(fr ? 'Estimation seulement, en dollars canadiens : taxes, pourboires et frais en sus; les prix changent.' : 'Estimate only, in CAD: taxes, tips and fees extra; prices change.') + '</p>';
+    return '<div class="t3-book-est"><button type="button" class="t3-book-est-btn" data-t3-est aria-expanded="false" aria-controls="t3BookEst"><strong>' + esc(head.amount) + '</strong> <span class="t3-book-tag">' + esc(head.tag) + '</span> <span aria-hidden="true" class="t3-book-caret">▾</span></button>'
+      + (e.showTotal ? '' : '<p class="t3-book-parts">' + esc(parts) + '</p>' + t3EstimateStayHtml(e, s, fr))
+      + '<div class="t3-book-more" id="t3BookEst" hidden>' + more + '</div></div>';
+  }
+  function t3StepLinkHtml(step, cls, text, n){
+    var u = t3StayExt(step.url);
+    if (!u) return '';
+    var track = step.kind === 'stay' ? ' data-track="stay_click" data-stay-id="' + esc(step.id) + '" data-link="' + esc(step.link || '') + '"' : ' data-track="booking" data-venue-id="' + esc(step.id) + '"';
+    return '<a ' + (cls ? 'class="' + cls + '" ' : '') + hrefAttr(u) + ' target="_blank" rel="' + esc(step.rel || 'nofollow noopener') + '"' + track + ' data-t3-step="' + n + '"' + (step.affiliate ? ' data-affiliate="1"' : '') + '>' + esc(text) + ' <span aria-hidden="true">↗</span></a>';
+  }
+  function t3StepName(step, fr){ return step.kind === 'stay' ? (fr ? 'Hébergement' : 'Stay') : step.name; }
+  function t3StepVerb(step, fr){ return fr ? (step.labelFr || step.label) : step.label; }
+  function t3BookGoHtml(steps, fr){
+    var st = bookState.st, n = steps.length, i;
+    var resolved = 0, done = 0, next = -1;
+    for (i = 0; i < n; i++) { if (st[i]) resolved++; if (st[i] === 'done') done++; if (next < 0 && !st[i]) next = i; }
+    if (!bookState.started && !resolved) {
+      return '<div class="t3-book-go" data-t3-book-go>' + t3StepLinkHtml(steps[0], 't3-btn t3-book-main', fr ? 'Réserver mon voyage' : 'Book my trip', 0)
+        + '<p class="t3-book-hint">' + esc(fr ? (n > 1 ? n + ' réservations, une à la fois, ' : 'Une réservation, ') + 'en commençant par ' + (steps[0].kind === 'stay' ? 'l’hébergement' : steps[0].name) + '.'
+          : (n > 1 ? n + ' bookings, one at a time, ' : 'One booking, ') + 'starting with ' + (steps[0].kind === 'stay' ? 'your stay' : steps[0].name) + '.') + '</p></div>';
+    }
+    var html = '<div class="t3-book-go" data-t3-book-go aria-live="polite"><p class="t3-book-prog"><span>' + esc(fr ? done + ' sur ' + n + ' réservé' + (done > 1 ? 's' : '') : done + ' of ' + n + ' booked') + '</span><span class="t3-book-bar" aria-hidden="true"><span style="width:' + Math.round(resolved / n * 100) + '%"></span></span></p>';
+    var last = bookState.last;
+    if (last !== null && last >= 0 && last < n && st[last] === 'done' && next !== -1) {
+      html += '<p class="t3-book-last"><span aria-hidden="true">✓</span> ' + esc(t3StepName(steps[last], fr) + (fr ? ' — c’est fait?' : ' — done?')) + ' <button type="button" class="t3-book-link" data-t3-bk-undo="' + last + '">' + esc(fr ? 'Pas encore' : 'Not yet') + '</button></p>';
+    }
+    if (next === -1) {
+      html += '<p class="t3-book-done"><strong>' + esc(fr ? 'Tout est prêt' : 'All set') + '</strong> <span aria-hidden="true">✓</span>' + (resolved > done ? ' <span class="t3-book-hint">' + esc(fr ? (resolved - done) + ' passé(s) : voir la liste' : (resolved - done) + ' skipped: see the list') + '</span>' : '') + '</p>'
+        + '<button type="button" class="t3-book-link" data-t3-bk-restart>' + esc(fr ? 'Recommencer' : 'Start over') + '</button>';
+    } else {
+      var s = steps[next];
+      html += '<p class="t3-book-next">' + esc(fr ? 'Ensuite : ' : 'Next: ') + '<strong>' + esc(t3StepVerb(s, fr) + (s.kind === 'venue' ? ' · ' + s.name : '')) + '</strong></p>'
+        + '<div class="t3-book-acts">' + t3StepLinkHtml(s, 't3-btn t3-book-main', (fr ? 'Ouvrir ' : 'Open ') + (s.kind === 'stay' ? (fr ? 'la réservation' : 'booking') : s.name), next)
+        + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-bk-skip="' + next + '">' + esc(fr ? 'Passer' : 'Skip') + '</button>'
+        + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-bk-mark="' + next + '">' + esc(fr ? 'Marquer fait' : 'Mark done') + '</button></div>';
+    }
+    return html + '</div>';
+  }
+  function t3BookAllHtml(s, steps, fr){
+    var others = (s.bookingLinks || []).filter(function(l){ return l && t3StayExt(l.url); }).slice(1);
+    var rows = steps.map(function(step, n){
+      var mark = bookState.st[n];
+      var extra = step.kind === 'stay' ? others.map(function(l){ return t3StayLinkHtml(s, l, 't3-book-alt', fr ? l.shortFr : l.short); }).join('') : '';
+      return '<li><button type="button" class="t3-book-tick" data-t3-bk-toggle="' + n + '" aria-pressed="' + (mark === 'done' ? 'true' : 'false') + '" aria-label="' + esc((fr ? 'Fait : ' : 'Done: ') + t3StepName(step, fr)) + '">' + (mark === 'done' ? '✓' : mark === 'skipped' ? '–' : '') + '</button>'
+        + '<span class="t3-book-row"><span>' + esc(step.kind === 'stay' ? (fr ? 'Hébergement · ' : 'Stay · ') + step.name : step.name) + '</span>' + t3StepLinkHtml(step, '', step.kind === 'stay' ? (fr ? (s.bookingLinks[0] || {}).shortFr || 'Réserver' : (s.bookingLinks[0] || {}).short || 'Book') : t3StepVerb(step, fr), n) + extra + '</span></li>';
+    }).join('');
+    var sum = steps.length === 1 ? (fr ? 'Voir la réservation' : 'See the booking') : (fr ? 'Voir les ' + steps.length + ' réservations' : 'See all ' + steps.length + ' bookings');
+    return '<details class="t3-book-all"><summary>' + esc(sum) + '</summary><ul>' + rows + '</ul></details>';
+  }
+  function t3StayNotesHtml(s, t, fr){
+    var html = '';
+    var prefilled = (s.bookingLinks || []).some(function(l){ return l && l.key !== 'own' && t3StayExt(l.url); });
+    var bits = [];
+    if (prefilled && !t.datesGiven) bits.push(fr ? 'Dates selon votre plan; modifiables sur le site de réservation.' : 'Dates follow your plan; change them on the booking site.');
+    if (prefilled && t.kids) bits.push(fr ? 'Le site demande l’âge des enfants.' : 'The booking site asks for the kids’ ages.');
+    if (s.petsSome) bits.push(fr ? 'Animaux dans certaines chambres : à vérifier.' : 'Pets in some rooms: check when booking.');
+    if (bits.length) html = '<p class="t3-book-note">' + esc(bits.join(' ')) + '</p>';
+    return html;
+  }
+  // The commission line, last in the box, whenever a shown link can earn one.
+  function t3StayDisclosureHtml(s, steps, fr){
+    var aff = (s.bookingLinks || []).some(function(l){ return l && l.affiliate && t3StayExt(l.url); }) || steps.some(function(x){ return x.affiliate; }) || !!(s.livePrices && t3StayExt(s.livePrices.url));
+    return aff ? '<p class="t3-stay-disclosure" data-stay-disclosure>' + esc(fr ? T3_STAY_DISCLOSURE.fr : T3_STAY_DISCLOSURE.en) + '</p>' : '';
+  }
+  // "See live prices" (2026-11-20, stay-booking-links.js stay22MapUrl): Stay22's map of the stay's block for the trip's
+  // dates, with a star on the stay. A link (new tab) that opens in a sheet on the page where dialogs work; the map loads
+  // only when opened, never with the page.
+  function t3LiveHtml(s, fr){
+    var l = s.livePrices, u = l && t3StayExt(fr && l.urlFr ? l.urlFr : l.url);
+    if (!u) return '';
+    return '<a class="t3-book-live" ' + hrefAttr(u) + ' target="_blank" rel="sponsored nofollow noopener" data-track="stay_click" data-stay-id="' + esc(s.id) + '" data-link="live_prices" data-affiliate="1" data-t3-live data-t3-live-name="' + esc(s.name) + '">' + esc(fr ? 'Voir les prix en direct' : 'See live prices') + '</a>';
+  }
+  function t3LiveOpen(a){
+    if (typeof HTMLDialogElement !== 'function') return false;
+    var fr = lang() === 'fr', d = document.getElementById('t3LiveDlg');
+    if (!d) {
+      d = document.createElement('dialog');
+      d.id = 't3LiveDlg';
+      d.className = 't3-live';
+      d.setAttribute('aria-labelledby', 't3LiveHead');
+      d.innerHTML = '<div class="t3-live-head"><h2 id="t3LiveHead"></h2><a class="t3-live-tab" target="_blank" rel="sponsored nofollow noopener"></a><button type="button" class="t3-live-x" data-t3-live-close></button></div><div class="t3-live-wrap"><p class="t3-live-wait" aria-hidden="true"></p><iframe class="t3-live-map" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div><p class="t3-live-note"></p>';
+      document.body.appendChild(d);
+      d.addEventListener('click', function(e){ if (e.target === d || (e.target.closest && e.target.closest('[data-t3-live-close]'))) d.close(); });
+      d.addEventListener('close', function(){ var f = d.querySelector('iframe'); if (f) f.removeAttribute('src'); var back = (d._t3From && d._t3From.isConnected) ? d._t3From : document.querySelector('[data-t3-stay] [data-t3-live]'); if (back) back.focus(); });
+    }
+    d._t3From = a;
+    var name = a.getAttribute('data-t3-live-name') || '';
+    d.querySelector('h2').textContent = fr ? 'Prix en direct' : 'Live prices';
+    var x = d.querySelector('.t3-live-x'); x.textContent = '×'; x.setAttribute('aria-label', fr ? 'Fermer' : 'Close');
+    d.querySelector('.t3-live-note').textContent = (fr ? '★ = ' + name + '. Prix par nuit des sites de réservation, par Stay22. ' : '★ = ' + name + '. Nightly prices from booking sites, via Stay22. ') + (fr ? T3_STAY_DISCLOSURE.fr : T3_STAY_DISCLOSURE.en);
+    // The map can take a while to load: a waiting line behind it, and the same map in a new tab.
+    d.querySelector('.t3-live-wait').textContent = fr ? 'Chargement des prix…' : 'Loading prices…';
+    var tab = d.querySelector('.t3-live-tab'); tab.href = a.href; tab.textContent = fr ? 'Nouvel onglet ↗' : 'New tab ↗';
+    var f = d.querySelector('iframe');
+    f.setAttribute('title', (fr ? 'Carte des prix en direct près de ' : 'Live prices map near ') + name);
+    f.src = a.href;
+    d.showModal();
+    return true;
+  }
+  function t3StayCardHtml(){
+    var d = t3StayData();
+    if (!d) return '';
+    var fr = lang() === 'fr', s = d.chosen, t = d.w.trip || {};
+    var steps = (s.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && t3StayExt(x.url); });
+    var key = t3BookKeyFor(s, d.w, steps);
+    if (key !== bookKey) { bookKey = key; bookState = t3BookLoad(key); }
+    var url = function(x){ return safeUrl((fr && x.urlFr) || x.url); };
+    var u = url(s), facts = t3StayFacts(s, fr);
+    var kicker = [fr ? (s.kindFr || s.kind) : s.kind, s.regionLabel].filter(Boolean).join(' · ');
+    var tripLine = t3StayTripLine(t, fr);
+    var html = '<section class="t3-stay t3-book" data-t3-stay aria-labelledby="t3StayHead"><h3 id="t3StayHead">' + esc(fr ? 'Réserver votre voyage' : 'Book your trip') + '</h3>'
+      + '<div class="t3-book-stay">' + (s.photo ? '<img src="' + esc(s.photo) + '" alt="" loading="lazy" width="96" height="96">' : '<span class="t3-stay-nophoto" aria-hidden="true"></span>')
+      + '<div class="t3-book-stay-txt">' + (kicker ? '<p class="t3-stay-kicker">' + esc((fr ? 'Où dormir · ' : 'Where to stay · ') + kicker) + '</p>' : '')
+      + '<p class="t3-stay-name">' + (u ? '<a ' + hrefAttr(u) + '>' + esc(s.name) + '</a>' : esc(s.name)) + '</p>'
+      + '<p class="t3-stay-facts">' + esc([facts, tripLine].filter(Boolean).join(' · ')) + '</p>' + t3LiveHtml(s, fr) + '</div>'
+      + (d.others.length ? '<button type="button" class="t3-book-link t3-book-change" data-t3-stay-change aria-expanded="false" aria-controls="t3StayAlts">' + esc(fr ? 'Changer' : 'Change') + '</button>' : '') + '</div>';
+    if (d.others.length) {
+      html += '<ul class="t3-stay-alts" id="t3StayAlts" hidden>' + d.others.map(function(o){
+          var ou = url(o), of = t3StayFacts(o, fr), why = (o.reasons || [])[0];
+          return '<li class="t3-stay-alt"><div><p><strong>' + (ou ? '<a ' + hrefAttr(ou) + '>' + esc(o.name) + '</a>' : esc(o.name)) + '</strong></p><p>' + esc([o.regionLabel, of, why ? (fr ? why.textFr : why.text) : ''].filter(Boolean).join(' · ')) + '</p></div>'
+            + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-stay-choose="' + esc(o.id) + '">' + esc(fr ? 'Choisir' : 'Choose') + '</button></li>';
+        }).join('') + '</ul>';
+    }
+    html += t3EstimateHtml(s.estimate || d.w.estimate, fr, s);
+    if (steps.length) html += t3BookGoHtml(steps, fr) + t3StayNotesHtml(s, t, fr) + t3BookAllHtml(s, steps, fr);
+    return html + t3StayDisclosureHtml(s, steps, fr) + '</section>';
+  }
+  // One total only (2026-11-20, Dayton): while this box is shown, the plan leaves out the older "Estimated total per
+  // person" line (the render skips it when t3StayData() has a stay), so visitors never see two different numbers.
+  function t3BookSteps(){ var d = t3StayData(); return d ? (d.chosen.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && t3StayExt(x.url); }) : []; }
+  function t3BookRerender(focusSel){
+    var card = resultEl.querySelector('[data-t3-stay]');
+    if (!card) return;
+    var openAll = card.querySelector('.t3-book-all[open]'), openEst = card.querySelector('[data-t3-est][aria-expanded="true"]');
+    card.outerHTML = t3StayCardHtml();
+    card = resultEl.querySelector('[data-t3-stay]');
+    if (openAll) { var a = card.querySelector('.t3-book-all'); if (a) a.open = true; }
+    if (openEst) { var b = card.querySelector('[data-t3-est]'), m = document.getElementById('t3BookEst'); if (b && m) { b.setAttribute('aria-expanded', 'true'); m.hidden = false; } }
+    var f = focusSel && card.querySelector(focusSel);
+    if (f) { if (!f.hasAttribute('tabindex') && !/^(A|BUTTON)$/.test(f.tagName)) f.setAttribute('tabindex', '-1'); try { f.focus({ preventScroll: true }); } catch (e) { f.focus(); } }
+  }
+  // book_trip_start / book_trip_complete: to Google Analytics like the other events, and to our own daily counts
+  // (site-events.js SELF_COUNTED; the owner dashboard's Build My Trip row and funnels).
+  function t3BookCount(name, n){ track(name, { surface: 'trip_planner', step_count: n }); try { if (typeof window.roamCount === 'function') window.roamCount(name); } catch (e) {} }
+  // The visitor's progress after a change: book_trip_complete once, when every step is done or skipped and one is done.
+  function t3BookAfter(steps){
+    var all = steps.length && steps.every(function(x, n){ return !!bookState.st[n]; });
+    var any = steps.some(function(x, n){ return bookState.st[n] === 'done'; });
+    if (all && any && !bookState.completed) { bookState.completed = true; t3BookCount('book_trip_complete', steps.length); }
+    t3BookSave();
+  }
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible' && bookState.awaiting) { bookState.awaiting = false; t3BookSave(); t3BookRerender('.t3-book-next, .t3-book-done'); }
+  });
+  resultEl.addEventListener('click', function(e){
+    // Booking taps are counted like the stay pages' Check rates (stay_click) and the venue pages' Book (booking).
+    var bk = e.target.closest && e.target.closest('.t3-stay a[data-track]');
+    if (bk) {
+      var kind = bk.getAttribute('data-track'), vid = Number(bk.getAttribute(kind === 'stay_click' ? 'data-stay-id' : 'data-venue-id'));
+      if (vid) {
+        var p = { venue_id: vid, surface: 'trip_planner', link_type: kind };
+        if (kind === 'stay_click') { p.venue_category = 'stay'; p.stay_link = bk.getAttribute('data-link') || ''; }
+        track('outbound_click', p);
+        track('page_click', { venue_id: vid, click_key: kind });
+      }
+      if (bk.hasAttribute('data-t3-live')) { if (t3LiveOpen(bk)) e.preventDefault(); return; }
+      // A step of "Book my trip": the tab opens (the link's own target, one per tap); the box moves on to the next one.
+      var n = bk.hasAttribute('data-t3-step') ? Number(bk.getAttribute('data-t3-step')) : -1, steps = t3BookSteps();
+      if (n >= 0 && n < steps.length) {
+        if (!bookState.started) { bookState.started = true; t3BookCount('book_trip_start', steps.length); }
+        bookState.st[n] = 'done'; bookState.last = n; bookState.awaiting = true;
+        t3BookAfter(steps);
+        setTimeout(function(){ t3BookRerender(); }, 0);
+      }
+      return;
+    }
+    var est = e.target.closest && e.target.closest('[data-t3-est]');
+    if (est) { var m = document.getElementById('t3BookEst'); if (m) { m.hidden = !m.hidden; est.setAttribute('aria-expanded', m.hidden ? 'false' : 'true'); } return; }
+    var act = e.target.closest && e.target.closest('[data-t3-bk-skip],[data-t3-bk-mark],[data-t3-bk-undo],[data-t3-bk-toggle],[data-t3-bk-restart]');
+    if (act) {
+      var all = t3BookSteps();
+      if (act.hasAttribute('data-t3-bk-restart')) { bookState = { st: {}, last: null, started: false, completed: false }; t3BookSave(); t3BookRerender('.t3-book-main'); return; }
+      if (!bookState.started) { bookState.started = true; t3BookCount('book_trip_start', all.length); }
+      var i;
+      if (act.hasAttribute('data-t3-bk-skip')) { i = Number(act.getAttribute('data-t3-bk-skip')); bookState.st[i] = 'skipped'; bookState.last = null; }
+      else if (act.hasAttribute('data-t3-bk-mark')) { i = Number(act.getAttribute('data-t3-bk-mark')); bookState.st[i] = 'done'; bookState.last = null; }
+      else if (act.hasAttribute('data-t3-bk-undo')) { i = Number(act.getAttribute('data-t3-bk-undo')); delete bookState.st[i]; bookState.last = null; bookState.completed = false; }
+      else { i = Number(act.getAttribute('data-t3-bk-toggle')); if (bookState.st[i] === 'done') { delete bookState.st[i]; bookState.completed = false; } else bookState.st[i] = 'done'; bookState.last = null; }
+      t3BookAfter(all);
+      t3BookRerender(act.hasAttribute('data-t3-bk-toggle') ? '[data-t3-bk-toggle="' + i + '"]' : '.t3-book-next, .t3-book-done');
+      return;
+    }
+    var ch = e.target.closest && e.target.closest('[data-t3-stay-change]');
+    if (ch) { var list = document.getElementById('t3StayAlts'); if (list) { list.hidden = !list.hidden; ch.setAttribute('aria-expanded', list.hidden ? 'false' : 'true'); } return; }
+    var pick = e.target.closest && e.target.closest('[data-t3-stay-choose]');
+    if (!pick) return;
+    stayChoice = Number(pick.getAttribute('data-t3-stay-choose'));
+    var card = resultEl.querySelector('[data-t3-stay]');
+    if (card) { card.outerHTML = t3StayCardHtml(); var head = document.getElementById('t3StayHead'); if (head) { head.setAttribute('tabindex', '-1'); head.focus(); } }
+  });
+`;
+
+// Viator suggestions (2026-11-20, viator.js), only when the stays box is on AND Viator is set up (d.viator): the stays
+// script with four small hooks (Viator steps join "Book my trip" only after "Add to trip"; the commission line shows
+// with any Viator link; a Viator step counts as a booking tap), plus the cards. The cards load from /api/trip/viator
+// after the plan, so the page source never holds Viator content. Without d.viator the page is exactly as before.
+const T3_VIATOR_STYLES = `<style>
+  .t3-vt { margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid rgba(27,43,58,0.12); }
+  .t3-vt h4 { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 10px; margin: 0 0 8px; font-size: 0.95rem; color: var(--ref-navy); }
+  .t3-vt-by { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: rgba(27,43,58,0.6); }
+  .t3-vt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .t3-vt-card { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: start; }
+  .t3-vt-ph { position: relative; margin: 0; }
+  .t3-vt-ph img { width: 96px; height: 72px; object-fit: cover; border-radius: 10px; display: block; background: rgba(27,43,58,0.08); }
+  .t3-vt-ph figcaption { margin: 2px 0 0; font-size: 0.66rem; color: rgba(27,43,58,0.6); }
+  .t3-vt-title { margin: 0; font-weight: 800; font-size: 0.92rem; line-height: 1.3; color: var(--ref-navy); }
+  .t3-vt-meta { margin: 2px 0 0; font-size: 0.8rem; font-weight: 700; color: rgba(27,43,58,0.72); }
+  .t3-vt-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 4px; }
+  .t3-vt-acts a { display: inline-flex; align-items: center; min-height: 44px; font-weight: 800; font-size: 0.86rem; color: var(--ref-navy); }
+  .t3-vt-add[aria-pressed="true"] { text-decoration: none; }
+  .t3-vt-alone h3 { margin-bottom: 8px; }
+  .t3-vt-alone .t3-vt { margin: 0; padding: 0; border: 0; }
+</style>`;
+function t3ViatorStaySrc(staySrc) {
+  const swap = (from, to) => { if (!staySrc.includes(from)) throw new Error(`viator hook not found: ${from.slice(0, 60)}`); staySrc = staySrc.replace(from, to); };
+  swap("var steps = (s.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && t3StayExt(x.url); });",
+    "var steps = (s.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && t3StayExt(x.url); }).concat(t3ViatorSteps());");
+  swap("var key = t3BookKeyFor(s, d.w, steps);", "var key = t3BookKeyFor(s, d.w, steps.filter(function(x){ return x.kind !== 'viator'; }));");
+  swap("return d ? (d.chosen.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && t3StayExt(x.url); }) : []; }",
+    "return d ? (d.chosen.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && t3StayExt(x.url); }).concat(t3ViatorSteps()) : []; }");
+  // A Viator suggestion step, and a listed venue that books through Viator (its approved match): data-link="viator".
+  swap("var track = step.kind === 'stay' ?", "var track = step.kind === 'viator' ? ' data-track=\"booking\" data-link=\"viator\" data-viator-code=\"' + esc(step.id) + '\"' : step.link === 'viator' ? ' data-track=\"booking\" data-link=\"viator\" data-venue-id=\"' + esc(step.id) + '\"' : step.kind === 'stay' ?");
+  swap("(s.kind === 'venue' ? ' · ' + s.name : '')", "(s.kind !== 'stay' ? ' · ' + s.name : '')");
+  swap("var aff = (s.bookingLinks || [])", "var aff = t3ViatorShown() || (s.bookingLinks || [])");
+  swap("return html + t3StayDisclosureHtml(s, steps, fr) + '</section>';", "return html + t3ViatorBlockHtml(fr, true) + t3StayDisclosureHtml(s, steps, fr) + '</section>';");
+  return staySrc;
+}
+function t3ViatorClientSrc(d) {
+  return `
+  var T3_VT = ${JSON.stringify(require('./viator').TEXT)};
+  var T3_VT_QS = ${JSON.stringify(d.stays === 'preview' ? '&stays=1' : '')};` + String.raw`
+  var vtState = { key: '', cards: null, loading: false };
+  function t3ViatorHint(){ var p = state.last; return p && p.viator && p.viator.interests && p.viator.interests.length ? p.viator : null; }
+  function t3VtText(k, fr){ return (T3_VT[k] || {})[fr ? 'fr' : 'en'] || ''; }
+  // The cards for this plan and language: null while they load (nothing shows), [] when Viator has none.
+  function t3ViatorCards(){
+    var h = t3ViatorHint();
+    if (!h) return null;
+    var fr = lang() === 'fr';
+    var key = h.interests.map(function(x){ return x.key; }).join(',') + '|' + (h.region || '') + '|' + (fr ? 'fr' : 'en');
+    if (vtState.key === key) return vtState.cards;
+    vtState = { key: key, cards: null, loading: true };
+    fetch('/api/trip/viator?i=' + encodeURIComponent(key.split('|')[0]) + '&r=' + encodeURIComponent(h.region || '') + '&lang=' + (fr ? 'fr' : 'en') + T3_VT_QS, { headers: { Accept: 'application/json' } })
+      .then(function(r){ return r.ok ? r.json() : { cards: [] }; })
+      .catch(function(){ return { cards: [] }; })
+      .then(function(j){
+        if (vtState.key !== key) return;
+        vtState.loading = false;
+        vtState.cards = (j && Array.isArray(j.cards) ? j.cards : []).filter(function(c){ return c && c.code && t3StayExt(c.url); }).slice(0, 2);
+        t3ViatorRefresh();
+      });
+    return null;
+  }
+  function t3ViatorShown(){ var c = vtState.cards; return !!(c && c.length && t3ViatorHint()) || t3ViatorSteps().length > 0; }
+  // Viator steps join "Book my trip" only when the visitor taps "Add to trip" (kept with that plan's progress).
+  function t3ViatorAdded(){ return bookState && Array.isArray(bookState.vt) ? bookState.vt : []; }
+  function t3ViatorSteps(){
+    return t3ViatorAdded().filter(function(x){ return x && x.id && t3StayExt(x.url); }).map(function(x){
+      return { kind: 'viator', id: x.id, name: x.name, label: t3VtText('book', false), labelFr: t3VtText('book', true), url: x.url, affiliate: true, rel: 'sponsored nofollow noopener', link: 'viator' };
+    });
+  }
+  function t3VtDuration(d, fr){
+    if (!d || !d.from) return '';
+    var f = function(m){ var h = Math.floor(m / 60), r = m % 60; return h ? h + ' h' + (r ? ' ' + r + (fr ? '' : ' min') : '') : r + ' min'; };
+    return d.to && d.to !== d.from ? (d.from % 60 || d.to % 60 ? f(d.from) + '–' + f(d.to) : (d.from / 60) + '–' + (d.to / 60) + ' h') : f(d.from);
+  }
+  function t3VtCardHtml(c, fr, canAdd){
+    var meta = [];
+    if (c.rating) meta.push('★ ' + (fr ? String(c.rating).replace('.', ',') : c.rating) + (c.reviews ? ' (' + c.reviews + ')' : ''));
+    if (c.fromPrice && c.currency === 'CAD') meta.push(t3VtText('from', fr) + ' ' + cad(c.fromPrice * 100));
+    var dur = t3VtDuration(c.duration, fr); if (dur) meta.push(dur);
+    var added = t3ViatorAdded().some(function(x){ return x.id === c.code; });
+    var ph = c.photo && t3StayExt(c.photo.url) ? '<figure class="t3-vt-ph"><img src="' + esc(c.photo.url) + '" alt="" loading="lazy" width="96" height="72"><figcaption>' + esc(t3VtText('photo', fr)) + '</figcaption></figure>' : '<span></span>';
+    return '<li class="t3-vt-card" data-t3-vt-code="' + esc(c.code) + '">' + ph + '<div><p class="t3-vt-title">' + esc(c.title) + '</p>' + (meta.length ? '<p class="t3-vt-meta">' + esc(meta.join(' · ')) + '</p>' : '')
+      + '<div class="t3-vt-acts"><a ' + hrefAttr(c.url) + ' target="_blank" rel="sponsored nofollow noopener" data-track="booking" data-link="viator" data-viator-code="' + esc(c.code) + '">' + esc(t3VtText('seeOn', fr)) + ' <span aria-hidden="true">↗</span></a>'
+      + (canAdd ? '<button type="button" class="t3-book-link t3-vt-add" data-t3-vt-add="' + esc(c.code) + '" aria-pressed="' + (added ? 'true' : 'false') + '">' + esc(added ? '✓ ' + t3VtText('added', fr) : t3VtText('add', fr)) + '</button>' : '') + '</div></div></li>';
+  }
+  // inBox: inside "Book your trip" (with Add to trip); else on its own under the plan's summary (no box to add to).
+  function t3ViatorBlockHtml(fr, inBox){
+    var cards = t3ViatorCards();
+    if (!cards || !cards.length) return '<div data-t3-viator hidden></div>';
+    return '<div class="t3-vt" data-t3-viator><h4><span>' + esc(t3VtText('heading', fr)) + '</span><span class="t3-vt-by">' + esc(t3VtText('powered', fr)) + '</span></h4><ul class="t3-vt-list">'
+      + cards.map(function(c){ return t3VtCardHtml(c, fr, inBox); }).join('') + '</ul><p class="t3-book-note">' + esc(t3VtText('priceNote', fr)) + '</p></div>';
+  }
+  function t3ViatorAloneHtml(){
+    if (!t3ViatorHint()) return '';
+    var fr = lang() === 'fr', inner = t3ViatorBlockHtml(fr, false);
+    if (!/class="t3-vt"/.test(inner)) return '<section class="t3-stay t3-vt-alone" data-t3-vt-alone hidden>' + inner + '</section>';
+    return '<section class="t3-stay t3-vt-alone" data-t3-vt-alone aria-labelledby="t3VtHead"><h3 id="t3VtHead">' + esc(t3VtText('heading', fr)) + '</h3>' + inner.replace(/<h4>[\s\S]*?<\/h4>/, '<p class="t3-vt-by">' + esc(t3VtText('powered', fr)) + '</p>')
+      + '<p class="t3-stay-disclosure" data-stay-disclosure>' + esc(fr ? T3_STAY_DISCLOSURE.fr : T3_STAY_DISCLOSURE.en) + '</p></section>';
+  }
+  function t3ViatorRefresh(){
+    if (resultEl.querySelector('[data-t3-stay]')) { t3BookRerender(); return; }
+    var alone = resultEl.querySelector('[data-t3-vt-alone]');
+    if (alone) alone.outerHTML = t3ViatorAloneHtml();
+  }
+  resultEl.addEventListener('click', function(e){
+    var a = e.target.closest && e.target.closest('a[data-link="viator"]');
+    // A listed venue's own step (data-venue-id) is counted by the box's handler; a suggestion card here.
+    if (a) { if (!a.hasAttribute('data-venue-id')) track('outbound_click', { surface: 'trip_planner', link_type: 'booking', link: 'viator', viator_product: a.getAttribute('data-viator-code') || '' }); return; }
+    var add = e.target.closest && e.target.closest('[data-t3-vt-add]');
+    if (!add) return;
+    var code = add.getAttribute('data-t3-vt-add'), list = t3ViatorAdded().slice(), at = -1;
+    list.forEach(function(x, n){ if (x.id === code) at = n; });
+    var base = t3BookSteps().length - t3ViatorSteps().length;
+    if (at >= 0) {
+      // Taking one out: the later Viator steps move up, so their marks go with them.
+      for (var n = base + at; n < base + list.length; n++) { if (bookState.st[n + 1] !== undefined) bookState.st[n] = bookState.st[n + 1]; else delete bookState.st[n]; }
+      list.splice(at, 1);
+    } else {
+      var c = (vtState.cards || []).filter(function(x){ return x.code === code; })[0];
+      if (!c) return;
+      list.push({ id: c.code, name: c.title, url: c.url });
+      track('viator_add_to_trip', { surface: 'trip_planner', viator_product: c.code });
+    }
+    bookState.vt = list;
+    t3BookSave();
+    t3BookRerender('[data-t3-vt-add="' + code.replace(/"/g, '') + '"]');
+  });
+`;
+}
+
 function renderBody(d) {
   const esc = d.esc;
   // data-i18n: /scripts/app.js shows these in the visitor's language (the
@@ -923,7 +1481,7 @@ function renderBody(d) {
       <form class="t3-composer" id="t3Form" novalidate>
         <label class="t3-sr" for="t3Input" data-i18n="tripv3.inputLabel">Describe the trip you want</label>
         <textarea id="t3Input" rows="3" maxlength="500" placeholder="${SITE_PAGE.placeholder}" data-i18n-placeholder="tripv3.placeholder"></textarea>
-        <div class="t3-composer-foot">
+${d.stays ? t3StayInputsHtml() + (d.viator ? T3_VIATOR_STYLES + '\n' : '') : ''}        <div class="t3-composer-foot">
           <span class="t3-hint"><span class="t3-en">Get a day-by-day plan you can edit, save, and share.</span><span class="t3-fr" lang="fr">Obtenez un plan jour par jour à modifier, à enregistrer et à partager.</span></span>
           <button type="submit" class="t3-submit" id="t3Submit"><span data-i18n="tripv3.submit">Plan my trip</span> <span aria-hidden="true">&rarr;</span></button>
         </div>
@@ -1007,7 +1565,7 @@ function renderScript(d) {
   ${t3FrenchPlan.toString()}
   var state = { text: '', seed: 0, overrides: {}, locks: {}, exclude: [], removed: {}, last: null, lastReq: null };
   var renderedVenueCardAnchors = {};
-
+${d.stays ? (d.viator ? t3ViatorStaySrc(T3_STAY_CLIENT_SRC) + t3ViatorClientSrc(d) : T3_STAY_CLIENT_SRC) : ''}
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   // Crawlable links (2026-10-19, round 8): link markup glued together in this script as a quoted href attribute
   // around esc(url) read to crawlers that scan the page's HTML as links to the code itself (fake 404s). The
@@ -1080,7 +1638,7 @@ function renderScript(d) {
     var o = state.overrides, ov = {};
     ['days', 'pace', 'baseRegion', 'budgetMode', 'durationMinutes', 'startDate', 'startMinutes', 'dayStartMinutes', 'shortWalkVenueIds', 'eventId'].forEach(function(k){ if (o[k] !== undefined) ov[k] = o[k]; });
     if (Object.keys(ov).length) body.overrides = ov;
-    for (var k in extra) body[k] = extra[k];
+    for (var k in extra) body[k] = extra[k];${d.stays ? "\n    var stayIn = t3StayInput(); if (stayIn) body.stay = stayIn;" : ''}
     var requestType = opts.requestType || 'initial';
     var trigger = opts.trigger || null;
     setStatus(tx('tripv3.planning'), 'loading');
@@ -1089,7 +1647,7 @@ function renderScript(d) {
     if (trigger) { trigger.disabled = true; trigger.setAttribute('aria-busy', 'true'); }
     clearEditError();
     function done(){ submitBtn.disabled = false; resultEl.removeAttribute('aria-busy'); if (trigger) { trigger.disabled = false; trigger.removeAttribute('aria-busy'); } }
-    return fetch('/api/trip/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    return fetch('/api/trip/plan${d.stays === 'preview' ? '?stays=1' : ''}', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function(r){ return r.json().then(function(j){ return { ok: r.ok, status: r.status, j: j }; }); })
       .then(function(res){
         done();
@@ -1171,7 +1729,7 @@ function renderScript(d) {
       : { text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude };
     // French (2026-10-18): a plan made on /fr/trip keeps its French address, so a reload or a shared link stays French.
     var base = (location.pathname + '/').indexOf('/fr/') === 0 ? '/fr/trip' : '/trip';
-    try { history.replaceState(null, '', base + t3StateToQuery(s)); } catch (e) {}
+    try { history.replaceState(null, '', base + t3StateToQuery(s)${d.stays === 'preview' ? " + (t3StateToQuery(s) ? '&' : '?') + 'stays=1'" : ''}); } catch (e) {}
   }
 
   // ---- plan helpers ----
@@ -2053,7 +2611,7 @@ function renderScript(d) {
     html += warningSummaryHtml(p);
     var tripDetails = html.slice(aboveStopsLength);
     html = html.slice(0, aboveStopsLength);
-    // Dates and the trip map share one tidy row of tools above the days (2026-10-14).
+${d.stays ? "    html += t3StayCardHtml();\n" + (d.viator ? "    if (!t3StayData()) html += t3ViatorAloneHtml();\n" : '') : ''}    // Dates and the trip map share one tidy row of tools above the days (2026-10-14).
     if (planKinds && days().length) {
       html += '<div class="t3-tools">' + schedHtml + '<div class="t3-map-slot" data-t3-map-slot></div></div>';
       // Round 12 (2026-10-20): French day tabs say « Squamish et Whistler » (the plan's own days are not translated).
@@ -2082,7 +2640,7 @@ function renderScript(d) {
     }
     // Indoor test 3 (2026-11-19): no dated show fits a show request: the theatres in town whose own words say they host it.
     html += t3ShowPlacesHtml(p, lang() === 'fr', esc, hrefAttr);
-    if (hasStops) html += '<p class="t3-estimate" data-t3-estimate hidden aria-live="polite"></p>';
+    if (hasStops${d.stays ? ' && !t3StayData()' : ''}) html += '<p class="t3-estimate" data-t3-estimate hidden aria-live="polite"></p>';
     html += tripDetails;
     if (p.seeAll && safeUrl(p.seeAll.url)) html += '<a class="t3-seeall" ' + hrefAttr(p.seeAll.url) + '>' + esc(tx('tripv3.seeAll')) + '</a>';
     html += '</div>';

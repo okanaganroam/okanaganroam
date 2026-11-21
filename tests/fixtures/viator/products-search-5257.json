@@ -1,0 +1,362 @@
+{
+ "products": [
+  {
+   "productCode": "11111P1",
+   "title": "Bare Wine Tours: Lake Country Wine Tasting Tour",
+   "description": "Visit four wineries with Bare Wine Tours.",
+   "images": [
+    {
+     "imageSource": "SUPPLIER_PROVIDED",
+     "caption": "",
+     "isCover": true,
+     "variants": [
+      {
+       "height": 50,
+       "width": 50,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-50x50/0f/11111p1.jpg"
+      },
+      {
+       "height": 100,
+       "width": 100,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-100x100/0f/11111p1.jpg"
+      },
+      {
+       "height": 200,
+       "width": 200,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-200x200/0f/11111p1.jpg"
+      },
+      {
+       "height": 160,
+       "width": 240,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-240x160/0f/11111p1.jpg"
+      },
+      {
+       "height": 240,
+       "width": 360,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-360x240/0f/11111p1.jpg"
+      },
+      {
+       "height": 320,
+       "width": 480,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-480x320/0f/11111p1.jpg"
+      },
+      {
+       "height": 480,
+       "width": 720,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-720x480/0f/11111p1.jpg"
+      }
+     ]
+    }
+   ],
+   "reviews": {
+    "sources": [
+     {
+      "provider": "VIATOR",
+      "totalCount": 210,
+      "averageRating": 4.9
+     }
+    ],
+    "totalReviews": 210,
+    "combinedAverageRating": 4.9
+   },
+   "duration": {
+    "fixedDurationInMinutes": 360
+   },
+   "confirmationType": "INSTANT",
+   "itineraryType": "STANDARD",
+   "pricing": {
+    "summary": {
+     "fromPrice": 149.0,
+     "fromPriceBeforeDiscount": 149.0
+    },
+    "currency": "CAD"
+   },
+   "productUrl": "https://www.viator.com/tours/Kelowna/Bare-Wine-Tours:-Lake-Country-Wine-Tasting-Tour/d5257-11111P1?mcid=42383&pid=P00333119&medium=api&api_version=2.0&campaign=okanagan",
+   "destinations": [
+    {
+     "ref": "5257",
+     "primary": true
+    }
+   ],
+   "tags": [
+    21946
+   ],
+   "flags": [
+    "FREE_CANCELLATION"
+   ],
+   "translationInfo": {
+    "containsMachineTranslatedText": false,
+    "translationSource": "ORIGINAL"
+   }
+  },
+  {
+   "productCode": "22222P3",
+   "title": "Kelowna Craft Beer Tour",
+   "description": "A walking tour of breweries.",
+   "images": [
+    {
+     "imageSource": "SUPPLIER_PROVIDED",
+     "caption": "",
+     "isCover": true,
+     "variants": [
+      {
+       "height": 50,
+       "width": 50,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-50x50/0f/22222p3.jpg"
+      },
+      {
+       "height": 100,
+       "width": 100,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-100x100/0f/22222p3.jpg"
+      },
+      {
+       "height": 200,
+       "width": 200,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-200x200/0f/22222p3.jpg"
+      },
+      {
+       "height": 160,
+       "width": 240,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-240x160/0f/22222p3.jpg"
+      },
+      {
+       "height": 240,
+       "width": 360,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-360x240/0f/22222p3.jpg"
+      },
+      {
+       "height": 320,
+       "width": 480,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-480x320/0f/22222p3.jpg"
+      },
+      {
+       "height": 480,
+       "width": 720,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-720x480/0f/22222p3.jpg"
+      }
+     ]
+    }
+   ],
+   "reviews": {
+    "sources": [
+     {
+      "provider": "VIATOR",
+      "totalCount": 45,
+      "averageRating": 4.6
+     }
+    ],
+    "totalReviews": 45,
+    "combinedAverageRating": 4.6
+   },
+   "duration": {
+    "fixedDurationInMinutes": 180
+   },
+   "confirmationType": "INSTANT",
+   "itineraryType": "STANDARD",
+   "pricing": {
+    "summary": {
+     "fromPrice": 89.5,
+     "fromPriceBeforeDiscount": 89.5
+    },
+    "currency": "CAD"
+   },
+   "productUrl": "https://www.viator.com/tours/Kelowna/Kelowna-Craft-Beer-Tour/d5257-22222P3?mcid=42383&pid=P00333119&medium=api&api_version=2.0&campaign=okanagan",
+   "destinations": [
+    {
+     "ref": "5257",
+     "primary": true
+    }
+   ],
+   "tags": [
+    21946
+   ],
+   "flags": [
+    "FREE_CANCELLATION"
+   ],
+   "translationInfo": {
+    "containsMachineTranslatedText": false,
+    "translationSource": "ORIGINAL"
+   }
+  },
+  {
+   "productCode": "33333P2",
+   "title": "Okanagan Lake Sunset Cruise",
+   "description": "Two hours on the lake.",
+   "images": [
+    {
+     "imageSource": "SUPPLIER_PROVIDED",
+     "caption": "",
+     "isCover": true,
+     "variants": [
+      {
+       "height": 50,
+       "width": 50,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-50x50/0f/33333p2.jpg"
+      },
+      {
+       "height": 100,
+       "width": 100,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-100x100/0f/33333p2.jpg"
+      },
+      {
+       "height": 200,
+       "width": 200,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-200x200/0f/33333p2.jpg"
+      },
+      {
+       "height": 160,
+       "width": 240,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-240x160/0f/33333p2.jpg"
+      },
+      {
+       "height": 240,
+       "width": 360,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-360x240/0f/33333p2.jpg"
+      },
+      {
+       "height": 320,
+       "width": 480,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-480x320/0f/33333p2.jpg"
+      },
+      {
+       "height": 480,
+       "width": 720,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-720x480/0f/33333p2.jpg"
+      }
+     ]
+    }
+   ],
+   "reviews": {
+    "sources": [
+     {
+      "provider": "VIATOR",
+      "totalCount": 120,
+      "averageRating": 4.8
+     }
+    ],
+    "totalReviews": 120,
+    "combinedAverageRating": 4.8
+   },
+   "duration": {
+    "variableDurationFromMinutes": 120,
+    "variableDurationToMinutes": 240
+   },
+   "confirmationType": "INSTANT",
+   "itineraryType": "STANDARD",
+   "pricing": {
+    "summary": {
+     "fromPrice": 79.0,
+     "fromPriceBeforeDiscount": 79.0
+    },
+    "currency": "CAD"
+   },
+   "productUrl": "https://www.viator.com/tours/Kelowna/Okanagan-Lake-Sunset-Cruise/d5257-33333P2?mcid=42383&pid=P00333119&medium=api&api_version=2.0&campaign=okanagan",
+   "destinations": [
+    {
+     "ref": "5257",
+     "primary": true
+    }
+   ],
+   "tags": [
+    21946
+   ],
+   "flags": [
+    "FREE_CANCELLATION"
+   ],
+   "translationInfo": {
+    "containsMachineTranslatedText": false,
+    "translationSource": "ORIGINAL"
+   }
+  },
+  {
+   "productCode": "44444P1",
+   "title": "Private Wine Tour from Kelowna",
+   "description": "A private car and driver. Also visits stops on the Bare Wine Tours route.",
+   "images": [
+    {
+     "imageSource": "SUPPLIER_PROVIDED",
+     "caption": "",
+     "isCover": true,
+     "variants": [
+      {
+       "height": 50,
+       "width": 50,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-50x50/0f/44444p1.jpg"
+      },
+      {
+       "height": 100,
+       "width": 100,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-100x100/0f/44444p1.jpg"
+      },
+      {
+       "height": 200,
+       "width": 200,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-200x200/0f/44444p1.jpg"
+      },
+      {
+       "height": 160,
+       "width": 240,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-240x160/0f/44444p1.jpg"
+      },
+      {
+       "height": 240,
+       "width": 360,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-360x240/0f/44444p1.jpg"
+      },
+      {
+       "height": 320,
+       "width": 480,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-480x320/0f/44444p1.jpg"
+      },
+      {
+       "height": 480,
+       "width": 720,
+       "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-720x480/0f/44444p1.jpg"
+      }
+     ]
+    }
+   ],
+   "reviews": {
+    "sources": [
+     {
+      "provider": "VIATOR",
+      "totalCount": 12,
+      "averageRating": 4.7
+     }
+    ],
+    "totalReviews": 12,
+    "combinedAverageRating": 4.7
+   },
+   "duration": {
+    "fixedDurationInMinutes": 480
+   },
+   "confirmationType": "INSTANT",
+   "itineraryType": "STANDARD",
+   "pricing": {
+    "summary": {
+     "fromPrice": 450.0,
+     "fromPriceBeforeDiscount": 450.0
+    },
+    "currency": "CAD"
+   },
+   "productUrl": "https://www.viator.com/tours/Kelowna/Private-Wine-Tour-from-Kelowna/d5257-44444P1?mcid=42383&pid=P00333119&medium=api&api_version=2.0&campaign=okanagan",
+   "destinations": [
+    {
+     "ref": "5257",
+     "primary": true
+    }
+   ],
+   "tags": [
+    21946
+   ],
+   "flags": [
+    "FREE_CANCELLATION"
+   ],
+   "translationInfo": {
+    "containsMachineTranslatedText": false,
+    "translationSource": "ORIGINAL"
+   }
+  }
+ ],
+ "totalCount": 4
+}

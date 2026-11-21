@@ -144,6 +144,39 @@ module.exports = {
     byId: {},
   },
 
+  // Build My Trip "Book your trip" estimate (2026-11-20, trip-booking.js). CAD, before tax, from documented sources only:
+  //   stayNight: stay_info.price_level bands for one standard unit, one night (drafts/stays-2026-11/stay-info-schema.md:
+  //     1 under $150, 2 $150-249, 3 $250-399, 4 $400+). null = the band has no edge there (never guessed).
+  //   stayBandMonths: the months the bands are for (here a summer weekend); other months get the "often lower" note.
+  //   mealPerPerson: one meal for one person by the venue's $-$$$$ level. Source: drafts/food-prices-2026-11
+  //     final-kelowna.json + final-valley.json (tiers A_menu/B_partial, "median main + a drink"): restaurants $ median $25
+  //     (p10 $20, p90 $35, n=9), $$ median $25 (p25 $25, p75 $35, n=45), pubs $$ $30 (n=4), cafés $-$$ $7-9 (coffee and
+  //     a pastry, n=7). $$$ and $$$$ had too few research rows (n=3, n=1), so their ranges are wide and high on purpose.
+  tripEstimate: {
+    stayNight: { 1: [null, 150], 2: [150, 250], 3: [250, 400], 4: [400, null] },
+    stayBandMonths: [6, 7, 8, 9],
+    stayBandNote: { en: 'Room prices are for a summer weekend night; other dates are often lower.', fr: 'Les prix des chambres sont ceux d’une nuit de fin de semaine en été; ils sont souvent plus bas à d’autres dates.' },
+    mealPerPerson: {
+      restaurant: { 1: [20, 30], 2: [25, 40], 3: [40, 70], 4: [70, 120] },
+      pub: { 1: [20, 30], 2: [25, 40], 3: [40, 70], 4: [70, 120] },
+      cafe: { 1: [8, 15], 2: [10, 20], 3: [15, 30], 4: [15, 30] },
+    },
+  },
+
+  // Viator (2026-11-20, viator.js): the affiliate campaign tag, the Viator destinations the match script looks up (by
+  // name, under British Columbia) and which one each of our towns uses for Build My Trip suggestions (else `area`), and
+  // the activity interests Build My Trip may suggest Viator tours for (keys of viator.js INTERESTS).
+  viator: {
+    campaign: 'okanagan',
+    province: 'British Columbia',
+    // Viator has one destination for the whole valley (checked against /destinations 2026-11-20: d22366
+    // "Kelowna & Okanagan Valley", a CITY under British Columbia d261), so every town uses it.
+    area: 'Kelowna & Okanagan Valley',
+    destinationNames: ['Kelowna & Okanagan Valley'],
+    regionDestinations: {},
+    interests: ['wine_tour', 'food_tour', 'boat', 'zipline', 'paddle', 'bike_tour', 'ski_lesson', 'tour'],
+  },
+
   // French requests: place words the interpreter turns into English.
   frenchRequests: { regions: { 'kelowna ouest': 'west kelowna', 'ouest de kelowna': 'west kelowna', 'chutes okanagan': 'okanagan falls' },
     // Tour test 11 port (2026-11-18): « canyon Myra » (the day trips' Myra Canyon), like Whistler's « lacs Joffre ».

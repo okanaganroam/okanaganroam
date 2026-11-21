@@ -92,14 +92,17 @@ test('a place with almost nothing recorded shows only what it has, and invents n
   assert.equal((html.match(/<h1[\s>]/g) || []).length, 1, 'the banner that takes the photo\'s place carries the only h1');
 });
 
-test('GOLFBOX keeps its own page; an outdoor golf course and French pages keep theirs', () => {
+test('GOLFBOX keeps its own page; an outdoor golf course keeps its own; French pages use the layout in French (2026-11-20)', () => {
   const g = page(golfbox);
   assert.match(g, /<body[^>]*golfbox-page/);
   assert.match(g, /Book a bay/); assert.match(g, /\$35–\$60 per bay/);
   assert.doesNotMatch(layoutOf(page(rich)), /Book a bay|TrackMan/);
   assert.doesNotMatch(page(outdoorGolf), /id="gbLayout"/);
-  assert.doesNotMatch(page(rich, 'fr'), /id="gbLayout"/);
-  assert.doesNotMatch(page(sim, 'fr'), /id="gbLayout"/);
+  for (const fr of [page(rich, 'fr'), page(sim, 'fr')]) {
+    assert.match(fr, /id="gbLayout"/);
+    assert.match(fr, /S’y rendre 📍/);
+    assert.doesNotMatch(fr, /Getting here|Meet you there|Know something we should update/);
+  }
   const redirected = { ...app.getVenue(rich.id), redirect_to: bare.id };
   assert.doesNotMatch(app.renderVenuePage(redirected, [], [], [], { now: NOW }), /id="gbLayout"/);
 });

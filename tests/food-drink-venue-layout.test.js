@@ -163,10 +163,13 @@ test('every winery uses the layout (the tasting-focused version); French pages k
   assert.match(page(plainWinery), /<div class="fd-layout">/);
 });
 
-test('French pages and redirects keep their existing layout', () => {
+test('French pages use the layout too, with its labels in French (2026-11-20)', () => {
   const fr = app.renderVenuePage(app.getVenue(rich.id), [], [], [], { now: NOW, lang: 'fr' });
-  assert.doesNotMatch(fr, /<body[^>]*fd-venue-page|<div class="fd-layout">/);
-  assert.match(fr, /class="venue-layout"/);
+  assert.match(fr, /<body[^>]*fd-venue-page/);
+  assert.match(fr, /<div class="fd-layout">/);
+  assert.doesNotMatch(fr, /class="venue-layout"/);
+  assert.match(fr, /Gardez cette adresse sous la main/);
+  assert.doesNotMatch(fr, /Keep this one handy/);
 });
 
 test('the intro is whole sentences; the rest of a long description is kept in an expandable section', () => {

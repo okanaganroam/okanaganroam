@@ -9,13 +9,20 @@ const EVENTS = new Set([
   'open_map', 'map_near_me', 'map_filter', 'map_search', 'map_search_empty', 'map_voice_search', 'map_pin', 'map_directions',
   'map_share', 'map_arrived', 'map_outside', 'nearby_click',
   'build_my_trip_click', 'trip_plan_start', 'trip_plan_complete', 'trip_plan_regenerate', 'trip_share', 'add_whole_trip',
+  // Build My Trip "Book my trip" (2026-11-20): the step-through started, and every booking done or skipped.
+  'book_trip_start', 'book_trip_complete',
   'open_my_trip', 'add_to_trip', 'remove_from_trip', 'shared_trip_view', 'shared_trip_save', 'shared_trip_cta_click',
   'hotel_page_click', 'bio_link_click', 'listing_submit', 'outbound_click', 'search',
   'portal_login_click_menu', 'portal_login_click_venue_page', 'portal_login_click_footer', 'portal_login_click_other', 'portal_claim_click',
+  'portal_badge_copy',
   // Which Roam Now filter was turned on (fixed keys; the map sends these when a filter goes on).
   'map_filter:open', 'map_filter:top', 'map_filter:drinks', 'map_filter:food', 'map_filter:coffee', 'map_filter:wine', 'map_filter:beach', 'map_filter:outdoor', 'map_filter:golf', 'map_filter:do', 'map_filter:indoor', 'map_filter:patio', 'map_filter:dogs', 'map_filter:happy', 'map_filter:specials', 'map_filter:nights', 'map_filter:music', 'map_filter:lake', 'map_filter:kids', 'map_filter:veg', 'map_filter:vegan', 'map_filter:gf', 'map_filter:late', 'map_filter:early', 'map_filter:groups', 'map_filter:sports', 'map_filter:nonalc', 'map_filter:free',
   'page_view:home', 'page_view:map', 'page_view:trip', 'page_view:whats_on', 'page_view:browse', 'page_view:hidden_gems',
 ]);
+
+// Counted by their own page code (roamCount), not through the site-wide list, so pages without them stay unchanged:
+// the "Book my trip" steps ship only with Build My Trip's places to stay (TRIP_STAYS / ?stays=1).
+const SELF_COUNTED = ['book_trip_start', 'book_trip_complete'];
 
 const RATE_PER_HOUR = 400;
 const hits = new Map();
@@ -45,4 +52,4 @@ function createCounter(db) {
   return { record, summary };
 }
 
-module.exports = { EVENTS, createCounter, rateLimited, RATE_PER_HOUR };
+module.exports = { EVENTS, SELF_COUNTED, createCounter, rateLimited, RATE_PER_HOUR };

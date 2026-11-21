@@ -95,6 +95,9 @@ const FR_TEXT = {
   'Groups': 'Groupes',
   'Happy hour': '5 à 7',
   'Free': 'Gratuit',
+  'Ice skating': 'Patinage sur glace', 'Ice skating · Hockey': 'Patinage sur glace · Hockey',
+  'Indoor pool, gyms and fitness centre, plus 12 pickleball and 6 tennis courts (Basil Meikle) outside': 'Piscine intérieure, gymnases et centre de conditionnement physique, plus 12 terrains de pickleball et 6 courts de tennis extérieurs (Basil Meikle)',
+  'By donation': 'Contribution volontaire', 'No set entry price': 'Aucun prix d’entrée fixe', 'No entry fee': 'Aucuns frais d’entrée',
   // Indoor test 1 (2026-11-19): a by-donation place's card price.
   'By donation': 'Contribution volontaire',
   // Indoor test 2 (2026-11-19): a price for a whole room, lane, game or group (the card's small line under the price).
@@ -1090,7 +1093,7 @@ const FR_TEXT = {
   'closed then': 'fermé à cette date',
   '✨ All golf': '✨ Tout le golf',
   'How sorting works': 'Comment fonctionne le tri',
-  'Recommended puts the best-rated courses with the most reviews first, then driving ranges and indoor golf; places closed for the season move lower down. Price sorting uses each course’s standard adult green fee for its standard round, at prime time in peak season, as published by the course. Places with no published fee come last.': '« Recommandés » place d’abord les terrains les mieux notés et les plus évalués, puis les champs de pratique et le golf intérieur; les lieux fermés pour la saison descendent plus bas. Le tri par prix utilise le droit de jeu adulte régulier de chaque terrain pour sa ronde habituelle, aux heures de pointe en haute saison, tel que publié par le terrain. Les lieux sans tarif publié viennent en dernier.',
+  'Recommended lists golf courses first, best-rated with the most reviews at the top and courses closed for the season after the open ones, then driving ranges, then indoor golf. Price sorting uses each course’s standard adult green fee for its standard round, at prime time in peak season, as published by the course. Places with no published fee come last.': '« Recommandés » présente d’abord les terrains de golf, les mieux notés et les plus évalués en tête et les terrains fermés pour la saison après ceux qui sont ouverts, puis les champs de pratique, puis le golf intérieur. Le tri par prix utilise le droit de jeu adulte régulier de chaque terrain pour sa ronde habituelle, aux heures de pointe en haute saison, tel que publié par le terrain. Les lieux sans tarif publié viennent en dernier.',
   'Search by course name or town...': 'Chercher par nom de terrain ou ville...',
   'Search golf courses': 'Chercher des terrains de golf',
     '{a0}Choose a town{a1}': '{a0}Choisir une ville{a1}',

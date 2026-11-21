@@ -1,0 +1,1364 @@
+{
+ "checked_at": "2026-11-20",
+ "how": "GET the See live prices URL (stay22MapUrl, no dates); ok = 200 and not the 404 page",
+ "stays": {
+  "1936": {
+   "name": "Tim's By The River Campsite",
+   "lat": 50.455368,
+   "lng": -119.369943,
+   "ok": true,
+   "status": 200
+  },
+  "1937": {
+   "name": "Tinhorn Lodge",
+   "lat": 49.153269,
+   "lng": -119.242525,
+   "ok": false,
+   "status": 404
+  },
+  "1938": {
+   "name": "Bullet Creek Cabins",
+   "lat": 49.722345,
+   "lng": -118.920406,
+   "ok": true,
+   "status": 200
+  },
+  "1939": {
+   "name": "Woodcutter Cabins",
+   "lat": 49.719138,
+   "lng": -118.925708,
+   "ok": true,
+   "status": 200
+  },
+  "1940": {
+   "name": "Urban Retreat Hostel",
+   "lat": 49.723924,
+   "lng": -118.929539,
+   "ok": true,
+   "status": 200
+  },
+  "1941": {
+   "name": "Chateau Big White",
+   "lat": 49.72153,
+   "lng": -118.928585,
+   "ok": true,
+   "status": 200
+  },
+  "1942": {
+   "name": "Inn at Big White",
+   "lat": 49.720993,
+   "lng": -118.928668,
+   "ok": true,
+   "status": 200
+  },
+  "1943": {
+   "name": "White Crystal Inn",
+   "lat": 49.722282,
+   "lng": -118.925139,
+   "ok": true,
+   "status": 200
+  },
+  "1944": {
+   "name": "Ptarmigan Inn",
+   "lat": 49.722519,
+   "lng": -118.927944,
+   "ok": true,
+   "status": 200
+  },
+  "1945": {
+   "name": "Copper Kettle Lodge",
+   "lat": 49.723537,
+   "lng": -118.91788,
+   "ok": true,
+   "status": 200
+  },
+  "1946": {
+   "name": "Grizzly Lodge",
+   "lat": 49.721553,
+   "lng": -118.924903,
+   "ok": true,
+   "status": 200
+  },
+  "1947": {
+   "name": "Stonebridge Lodge",
+   "lat": 49.722717,
+   "lng": -118.924876,
+   "ok": true,
+   "status": 200
+  },
+  "1948": {
+   "name": "Sundance Resort",
+   "lat": 49.723491,
+   "lng": -118.920103,
+   "ok": true,
+   "status": 200
+  },
+  "1949": {
+   "name": "Mara Cottage Campground",
+   "lat": 50.677074,
+   "lng": -119.058016,
+   "ok": true,
+   "status": 200
+  },
+  "1950": {
+   "name": "Quilakwa RV Park & Campground",
+   "lat": 50.55387,
+   "lng": -119.12765,
+   "ok": true,
+   "status": 200
+  },
+  "1951": {
+   "name": "Mountain Springs Nature Retreat & B&B",
+   "lat": 49.371147,
+   "lng": -119.661089,
+   "ok": true,
+   "status": 200
+  },
+  "1952": {
+   "name": "Ponderosa Point Resort",
+   "lat": 49.380346,
+   "lng": -119.578071,
+   "ok": true,
+   "status": 200
+  },
+  "1953": {
+   "name": "Camp-Along Resort",
+   "lat": 49.406418,
+   "lng": -119.60512,
+   "ok": true,
+   "status": 200
+  },
+  "1954": {
+   "name": "A Vista Villa Couples Retreat",
+   "lat": 49.898418,
+   "lng": -119.444567,
+   "ok": true,
+   "status": 200
+  },
+  "1955": {
+   "name": "Beds by the Bridge",
+   "lat": 49.879677,
+   "lng": -119.500264,
+   "ok": true,
+   "status": 200
+  },
+  "1956": {
+   "name": "Chateau Okanagan",
+   "lat": 49.939686,
+   "lng": -119.464482,
+   "ok": true,
+   "status": 200
+  },
+  "1957": {
+   "name": "Hillcrest Farm Market B&B",
+   "lat": 49.882542,
+   "lng": -119.37155,
+   "ok": true,
+   "status": 200
+  },
+  "1958": {
+   "name": "Magnolia Bed and Breakfast",
+   "lat": 49.827416,
+   "lng": -119.479331,
+   "ok": true,
+   "status": 200
+  },
+  "1959": {
+   "name": "Apple Valley Orchard & RV Park",
+   "lat": 49.926862,
+   "lng": -119.433106,
+   "ok": true,
+   "status": 200
+  },
+  "1960": {
+   "name": "Big Sky RV Park",
+   "lat": 49.823379,
+   "lng": -119.427134,
+   "ok": true,
+   "status": 200
+  },
+  "1961": {
+   "name": "Farming Karma RV Park",
+   "lat": 49.890204,
+   "lng": -119.364008,
+   "ok": true,
+   "status": 200
+  },
+  "1962": {
+   "name": "Heartland Family Campground",
+   "lat": 49.859652,
+   "lng": -119.275652,
+   "ok": true,
+   "status": 200
+  },
+  "1963": {
+   "name": "MacDonald Acres RV Park",
+   "lat": 49.858763,
+   "lng": -119.293201,
+   "ok": true,
+   "status": 200
+  },
+  "1964": {
+   "name": "Kelowna Okanagan Lake Hostel",
+   "lat": 49.886535,
+   "lng": -119.487606,
+   "ok": true,
+   "status": 200
+  },
+  "1965": {
+   "name": "Residence & Conference Centre - Kelowna (Okanagan College)",
+   "lat": 49.861312,
+   "lng": -119.48425,
+   "ok": true,
+   "status": 200
+  },
+  "1966": {
+   "name": "Stay at UBC Okanagan",
+   "lat": 49.941709,
+   "lng": -119.396241,
+   "ok": true,
+   "status": 200
+  },
+  "1967": {
+   "name": "Accent Inns Kelowna",
+   "lat": 49.883944,
+   "lng": -119.475653,
+   "ok": true,
+   "status": 200
+  },
+  "1968": {
+   "name": "Best Western Plus Kelowna Hotel & Suites",
+   "lat": 49.885032,
+   "lng": -119.429039,
+   "ok": true,
+   "status": 200
+  },
+  "1969": {
+   "name": "Coast Capri Hotel",
+   "lat": 49.882519,
+   "lng": -119.474935,
+   "ok": true,
+   "status": 200
+  },
+  "1970": {
+   "name": "Comfort Suites Kelowna",
+   "lat": 49.893691,
+   "lng": -119.417016,
+   "ok": true,
+   "status": 200
+  },
+  "1971": {
+   "name": "Econo Lodge Inn & Suites Kelowna",
+   "lat": 49.883932,
+   "lng": -119.47803,
+   "ok": true,
+   "status": 200
+  },
+  "1972": {
+   "name": "Fairfield by Marriott Kelowna",
+   "lat": 49.888859,
+   "lng": -119.423303,
+   "ok": true,
+   "status": 200
+  },
+  "1973": {
+   "name": "Four Points by Sheraton Kelowna Airport",
+   "lat": 49.951056,
+   "lng": -119.388631,
+   "ok": true,
+   "status": 200
+  },
+  "1974": {
+   "name": "Hampton Inn & Suites by Hilton Kelowna Airport",
+   "lat": 49.950538,
+   "lng": -119.389462,
+   "ok": true,
+   "status": 200
+  },
+  "1975": {
+   "name": "Holiday Inn Express & Suites Kelowna East",
+   "lat": 49.889592,
+   "lng": -119.422429,
+   "ok": true,
+   "status": 200
+  },
+  "1976": {
+   "name": "Hotel Eldorado at Eldorado Resort",
+   "lat": 49.847389,
+   "lng": -119.488066,
+   "ok": true,
+   "status": 200
+  },
+  "1977": {
+   "name": "Hotel Zed Kelowna",
+   "lat": 49.88467,
+   "lng": -119.499036,
+   "ok": true,
+   "status": 200
+  },
+  "1978": {
+   "name": "Hyatt Place Kelowna",
+   "lat": 49.883687,
+   "lng": -119.453866,
+   "ok": true,
+   "status": 200
+  },
+  "1979": {
+   "name": "La Quinta Inn & Suites by Wyndham Kelowna BC",
+   "lat": 49.892586,
+   "lng": -119.418908,
+   "ok": true,
+   "status": 200
+  },
+  "1980": {
+   "name": "Park Inn by Radisson Kelowna",
+   "lat": 49.892816,
+   "lng": -119.415829,
+   "ok": true,
+   "status": 200
+  },
+  "1981": {
+   "name": "Prestige Beach House",
+   "lat": 49.883912,
+   "lng": -119.499046,
+   "ok": true,
+   "status": 200
+  },
+  "1982": {
+   "name": "Ramada by Wyndham Kelowna Hotel & Conference Center",
+   "lat": 49.882671,
+   "lng": -119.43874,
+   "ok": true,
+   "status": 200
+  },
+  "1983": {
+   "name": "Royal Anne Hotel",
+   "lat": 49.88664,
+   "lng": -119.495723,
+   "ok": true,
+   "status": 200
+  },
+  "1984": {
+   "name": "Sandman Hotel & Suites Kelowna",
+   "lat": 49.882646,
+   "lng": -119.44042,
+   "ok": true,
+   "status": 200
+  },
+  "1985": {
+   "name": "Siesta Suites",
+   "lat": 49.860075,
+   "lng": -119.49166,
+   "ok": true,
+   "status": 200
+  },
+  "1986": {
+   "name": "The Royal Kelowna",
+   "lat": 49.892147,
+   "lng": -119.498599,
+   "ok": true,
+   "status": 200
+  },
+  "1987": {
+   "name": "Canadas Best Value Inn Kelowna",
+   "lat": 49.894446,
+   "lng": -119.414405,
+   "ok": true,
+   "status": 200
+  },
+  "1988": {
+   "name": "Days Inn by Wyndham Kelowna",
+   "lat": 49.893973,
+   "lng": -119.414502,
+   "ok": true,
+   "status": 200
+  },
+  "1989": {
+   "name": "Dilworth Inn",
+   "lat": 49.882934,
+   "lng": -119.436942,
+   "ok": true,
+   "status": 200
+  },
+  "1990": {
+   "name": "Oasis Inn",
+   "lat": 49.879981,
+   "lng": -119.477644,
+   "ok": true,
+   "status": 200
+  },
+  "1991": {
+   "name": "Recreation Inn & Suites",
+   "lat": 49.882928,
+   "lng": -119.455651,
+   "ok": true,
+   "status": 200
+  },
+  "1992": {
+   "name": "Super 8 by Wyndham Kelowna BC",
+   "lat": 49.892535,
+   "lng": -119.418217,
+   "ok": true,
+   "status": 200
+  },
+  "1993": {
+   "name": "Borgata Lodge at Quail Ridge",
+   "lat": 49.954281,
+   "lng": -119.397162,
+   "ok": true,
+   "status": 200
+  },
+  "1994": {
+   "name": "Delta Hotels by Marriott Grand Okanagan Resort",
+   "lat": 49.891494,
+   "lng": -119.49763,
+   "ok": true,
+   "status": 200
+  },
+  "1995": {
+   "name": "Manteo at Eldorado Resort",
+   "lat": 49.847389,
+   "lng": -119.488066,
+   "ok": true,
+   "status": 200
+  },
+  "1996": {
+   "name": "McCulloch Lake Resort",
+   "lat": 49.780242,
+   "lng": -119.173723,
+   "ok": true,
+   "status": 200
+  },
+  "1997": {
+   "name": "Ley's RV Park",
+   "lat": 50.077036,
+   "lng": -119.374082,
+   "ok": true,
+   "status": 200
+  },
+  "1998": {
+   "name": "The Orchard RV Retreat",
+   "lat": 50.068187,
+   "lng": -119.376621,
+   "ok": true,
+   "status": 200
+  },
+  "1999": {
+   "name": "Super 8 by Wyndham Lake Country/Winfield Area Airport North",
+   "lat": 50.021003,
+   "lng": -119.406927,
+   "ok": true,
+   "status": 200
+  },
+  "2000": {
+   "name": "Beaver Lake Resort",
+   "lat": 50.043993,
+   "lng": -119.254088,
+   "ok": true,
+   "status": 200
+  },
+  "2001": {
+   "name": "Holiday Park Resort",
+   "lat": 50.007273,
+   "lng": -119.396336,
+   "ok": true,
+   "status": 200
+  },
+  "2002": {
+   "name": "Bench d'Or",
+   "lat": 49.578815,
+   "lng": -119.58184,
+   "ok": true,
+   "status": 200
+  },
+  "2003": {
+   "name": "Naramata Courtyard Suites",
+   "lat": 49.597909,
+   "lng": -119.599413,
+   "ok": true,
+   "status": 200
+  },
+  "2004": {
+   "name": "Villa Magnolia Guest House",
+   "lat": 49.590948,
+   "lng": -119.593804,
+   "ok": true,
+   "status": 200
+  },
+  "2005": {
+   "name": "Naramata Inn",
+   "lat": 49.59728,
+   "lng": -119.60304,
+   "ok": true,
+   "status": 200
+  },
+  "2006": {
+   "name": "The Village Motel",
+   "lat": 49.597488,
+   "lng": -119.600846,
+   "ok": true,
+   "status": 200
+  },
+  "2007": {
+   "name": "Sandy Beach Lodge & Resort",
+   "lat": 49.60172,
+   "lng": -119.597258,
+   "ok": true,
+   "status": 200
+  },
+  "2008": {
+   "name": "Skaha Lakefront Inn",
+   "lat": 49.351687,
+   "lng": -119.568853,
+   "ok": true,
+   "status": 200
+  },
+  "2009": {
+   "name": "Sun & Sand RV Park",
+   "lat": 49.346598,
+   "lng": -119.577474,
+   "ok": true,
+   "status": 200
+  },
+  "2010": {
+   "name": "Ok Falls Beach Motel",
+   "lat": 49.34642,
+   "lng": -119.574033,
+   "ok": true,
+   "status": 200
+  },
+  "2011": {
+   "name": "Global Village Permaculture Bed & Breakfast",
+   "lat": 49.177273,
+   "lng": -119.556693,
+   "ok": true,
+   "status": 200
+  },
+  "2012": {
+   "name": "Uncorked Bed & Breakfast",
+   "lat": 49.203153,
+   "lng": -119.537623,
+   "ok": true,
+   "status": 200
+  },
+  "2013": {
+   "name": "Vintage Merlot Bed & Breakfast",
+   "lat": 49.191099,
+   "lng": -119.537679,
+   "ok": true,
+   "status": 200
+  },
+  "2014": {
+   "name": "River Stone Cottage",
+   "lat": 49.214933,
+   "lng": -119.543402,
+   "ok": true,
+   "status": 200
+  },
+  "2015": {
+   "name": "Apple Beach RV Park",
+   "lat": 49.204196,
+   "lng": -119.539942,
+   "ok": true,
+   "status": 200
+  },
+  "2016": {
+   "name": "Desert Lake RV Resort",
+   "lat": 49.20356,
+   "lng": -119.542439,
+   "ok": true,
+   "status": 200
+  },
+  "2017": {
+   "name": "The Orchard at Oliver",
+   "lat": 49.169448,
+   "lng": -119.559596,
+   "ok": true,
+   "status": 200
+  },
+  "2018": {
+   "name": "Black Hills Vineyard Lodge",
+   "lat": 49.108874,
+   "lng": -119.550671,
+   "ok": true,
+   "status": 200
+  },
+  "2019": {
+   "name": "High Chaparral Guest House",
+   "lat": 49.215462,
+   "lng": -119.567755,
+   "ok": true,
+   "status": 200
+  },
+  "2020": {
+   "name": "Tokios House at Rust Wine Co.",
+   "lat": 49.118187,
+   "lng": -119.584484,
+   "ok": true,
+   "status": 200
+  },
+  "2021": {
+   "name": "Coast Oliver Hotel",
+   "lat": 49.18393,
+   "lng": -119.548338,
+   "ok": true,
+   "status": 200
+  },
+  "2022": {
+   "name": "King Hotel",
+   "lat": 49.18469,
+   "lng": -119.550007,
+   "ok": true,
+   "status": 200
+  },
+  "2023": {
+   "name": "Pipe Dreams Winery Suites",
+   "lat": 49.230138,
+   "lng": -119.554602,
+   "ok": true,
+   "status": 200
+  },
+  "2024": {
+   "name": "The Villa at Hester Creek",
+   "lat": 49.142333,
+   "lng": -119.593176,
+   "ok": true,
+   "status": 200
+  },
+  "2025": {
+   "name": "The Lodge at Gallagher Lake",
+   "lat": 49.244599,
+   "lng": -119.522098,
+   "ok": true,
+   "status": 200
+  },
+  "2026": {
+   "name": "Cactus Tree Inn",
+   "lat": 49.17747,
+   "lng": -119.551988,
+   "ok": true,
+   "status": 200
+  },
+  "2027": {
+   "name": "Maple Leaf Motel & RV Resort",
+   "lat": 49.158196,
+   "lng": -119.56868,
+   "ok": true,
+   "status": 200
+  },
+  "2028": {
+   "name": "Mount View Motel",
+   "lat": 49.176686,
+   "lng": -119.553542,
+   "ok": true,
+   "status": 200
+  },
+  "2029": {
+   "name": "Oliver Motel & Inn",
+   "lat": 49.178742,
+   "lng": -119.552251,
+   "ok": true,
+   "status": 200
+  },
+  "2030": {
+   "name": "Pine Bluff Motel",
+   "lat": 49.243117,
+   "lng": -119.524732,
+   "ok": true,
+   "status": 200
+  },
+  "2031": {
+   "name": "The Lakeside Resort",
+   "lat": 49.192945,
+   "lng": -119.541482,
+   "ok": true,
+   "status": 200
+  },
+  "2032": {
+   "name": "Vaseux Lakeside Resort",
+   "lat": 49.274027,
+   "lng": -119.520612,
+   "ok": true,
+   "status": 200
+  },
+  "2033": {
+   "name": "Inkaneep Point Resort",
+   "lat": 49.063455,
+   "lng": -119.507191,
+   "ok": true,
+   "status": 200
+  },
+  "2034": {
+   "name": "Brookvale Holiday Resort (Brookvale Campground & RV)",
+   "lat": 49.004801,
+   "lng": -119.43523,
+   "ok": true,
+   "status": 200
+  },
+  "2035": {
+   "name": "Sunterra Campground",
+   "lat": 49.02112,
+   "lng": -119.434026,
+   "ok": true,
+   "status": 200
+  },
+  "2036": {
+   "name": "Best Western Plus Osoyoos Hotel & Suites",
+   "lat": 49.028684,
+   "lng": -119.443246,
+   "ok": true,
+   "status": 200
+  },
+  "2037": {
+   "name": "Coast Osoyoos Beach Hotel",
+   "lat": 49.028639,
+   "lng": -119.455377,
+   "ok": true,
+   "status": 200
+  },
+  "2038": {
+   "name": "Holiday Inn & Suites Osoyoos",
+   "lat": 49.028483,
+   "lng": -119.457264,
+   "ok": true,
+   "status": 200
+  },
+  "2039": {
+   "name": "Park Inn by Radisson Osoyoos",
+   "lat": 49.033926,
+   "lng": -119.47292,
+   "ok": true,
+   "status": 200
+  },
+  "2040": {
+   "name": "Avalon Inn",
+   "lat": 49.033713,
+   "lng": -119.470506,
+   "ok": true,
+   "status": 200
+  },
+  "2041": {
+   "name": "Boundary Motel",
+   "lat": 49.030883,
+   "lng": -119.474104,
+   "ok": true,
+   "status": 200
+  },
+  "2042": {
+   "name": "Osoyoos Lakeview Inn & Suites",
+   "lat": 49.023948,
+   "lng": -119.470259,
+   "ok": true,
+   "status": 200
+  },
+  "2043": {
+   "name": "Sahara Courtyard Inn & Suites",
+   "lat": 49.029613,
+   "lng": -119.448533,
+   "ok": true,
+   "status": 200
+  },
+  "2044": {
+   "name": "Sun Beach Motel",
+   "lat": 49.028214,
+   "lng": -119.452858,
+   "ok": true,
+   "status": 200
+  },
+  "2045": {
+   "name": "Westridge Motor Inn",
+   "lat": 49.035052,
+   "lng": -119.479125,
+   "ok": true,
+   "status": 200
+  },
+  "2046": {
+   "name": "Richter Pass Beach Resort",
+   "lat": 49.028772,
+   "lng": -119.45459,
+   "ok": true,
+   "status": 200
+  },
+  "2047": {
+   "name": "Sandy Beach Suites",
+   "lat": 49.030003,
+   "lng": -119.450179,
+   "ok": true,
+   "status": 200
+  },
+  "2048": {
+   "name": "Spirit Ridge, in The Unbound Collection by Hyatt",
+   "lat": 49.039688,
+   "lng": -119.433659,
+   "ok": true,
+   "status": 200
+  },
+  "2049": {
+   "name": "Walnut Beach Resort",
+   "lat": 49.017787,
+   "lng": -119.436882,
+   "ok": true,
+   "status": 200
+  },
+  "2050": {
+   "name": "Watermark Beach Resort",
+   "lat": 49.031781,
+   "lng": -119.462397,
+   "ok": true,
+   "status": 200
+  },
+  "2051": {
+   "name": "Peachland Beach Resort",
+   "lat": 49.791527,
+   "lng": -119.702493,
+   "ok": true,
+   "status": 200
+  },
+  "2052": {
+   "name": "Above the Beach Guest Suites",
+   "lat": 49.452304,
+   "lng": -119.577981,
+   "ok": true,
+   "status": 200
+  },
+  "2053": {
+   "name": "Bialto Bed & Breakfast",
+   "lat": 49.489712,
+   "lng": -119.538164,
+   "ok": true,
+   "status": 200
+  },
+  "2054": {
+   "name": "Cormier's Studio Guest Suites",
+   "lat": 49.503608,
+   "lng": -119.585274,
+   "ok": true,
+   "status": 200
+  },
+  "2055": {
+   "name": "Munson Mountain Estates",
+   "lat": 49.520124,
+   "lng": -119.570692,
+   "ok": true,
+   "status": 200
+  },
+  "2056": {
+   "name": "O.K. Whistlestop B&B",
+   "lat": 49.531233,
+   "lng": -119.563345,
+   "ok": true,
+   "status": 200
+  },
+  "2057": {
+   "name": "Farm House at D'Angelo Vineyards",
+   "lat": 49.52794,
+   "lng": -119.569655,
+   "ok": true,
+   "status": 200
+  },
+  "2058": {
+   "name": "HI Penticton Hostel",
+   "lat": 49.496412,
+   "lng": -119.589754,
+   "ok": true,
+   "status": 200
+  },
+  "2059": {
+   "name": "Best Western Inn at Penticton",
+   "lat": 49.460101,
+   "lng": -119.588189,
+   "ok": true,
+   "status": 200
+  },
+  "2060": {
+   "name": "Coast Penticton Hotel",
+   "lat": 49.471684,
+   "lng": -119.583171,
+   "ok": true,
+   "status": 200
+  },
+  "2061": {
+   "name": "Days Inn & Conference Centre Penticton",
+   "lat": 49.49852,
+   "lng": -119.613204,
+   "ok": true,
+   "status": 200
+  },
+  "2062": {
+   "name": "Fairfield Inn & Suites by Marriott Penticton",
+   "lat": 49.492747,
+   "lng": -119.600957,
+   "ok": true,
+   "status": 200
+  },
+  "2063": {
+   "name": "Four Points by Sheraton Penticton at the Convention Centre",
+   "lat": 49.496185,
+   "lng": -119.608375,
+   "ok": true,
+   "status": 200
+  },
+  "2064": {
+   "name": "Penticton Lakeside Resort & Conference Centre",
+   "lat": 49.502754,
+   "lng": -119.594496,
+   "ok": true,
+   "status": 200
+  },
+  "2065": {
+   "name": "Sandman Hotel Penticton",
+   "lat": 49.497269,
+   "lng": -119.608834,
+   "ok": true,
+   "status": 200
+  },
+  "2066": {
+   "name": "The Balcomo - A Ramada by Wyndham Penticton",
+   "lat": 49.494716,
+   "lng": -119.612416,
+   "ok": true,
+   "status": 200
+  },
+  "2067": {
+   "name": "Casa Grande Inn & Guest Suites",
+   "lat": 49.501343,
+   "lng": -119.610527,
+   "ok": true,
+   "status": 200
+  },
+  "2068": {
+   "name": "Sahara Courtyard Inn",
+   "lat": 49.495846,
+   "lng": -119.612578,
+   "ok": true,
+   "status": 200
+  },
+  "2069": {
+   "name": "5000 Motel",
+   "lat": 49.479429,
+   "lng": -119.584141,
+   "ok": true,
+   "status": 200
+  },
+  "2070": {
+   "name": "Apple Tree Inn",
+   "lat": 49.470649,
+   "lng": -119.583232,
+   "ok": true,
+   "status": 200
+  },
+  "2071": {
+   "name": "Beachside Motel",
+   "lat": 49.455137,
+   "lng": -119.586596,
+   "ok": true,
+   "status": 200
+  },
+  "2072": {
+   "name": "Black Sea Motel",
+   "lat": 49.50131,
+   "lng": -119.608897,
+   "ok": true,
+   "status": 200
+  },
+  "2073": {
+   "name": "Bowmont Motel",
+   "lat": 49.500191,
+   "lng": -119.611047,
+   "ok": true,
+   "status": 200
+  },
+  "2074": {
+   "name": "Empire Motel",
+   "lat": 49.45679,
+   "lng": -119.587653,
+   "ok": true,
+   "status": 200
+  },
+  "2075": {
+   "name": "Flamingo Motel",
+   "lat": 49.471177,
+   "lng": -119.583463,
+   "ok": true,
+   "status": 200
+  },
+  "2076": {
+   "name": "Golden Sands Resort",
+   "lat": 49.501329,
+   "lng": -119.60967,
+   "ok": true,
+   "status": 200
+  },
+  "2077": {
+   "name": "Holiday House Motel",
+   "lat": 49.457897,
+   "lng": -119.588039,
+   "ok": true,
+   "status": 200
+  },
+  "2078": {
+   "name": "Lakecity Inn",
+   "lat": 49.482706,
+   "lng": -119.585776,
+   "ok": true,
+   "status": 200
+  },
+  "2079": {
+   "name": "Lakeside Villa & Nordic Spa",
+   "lat": 49.451352,
+   "lng": -119.608421,
+   "ok": true,
+   "status": 200
+  },
+  "2080": {
+   "name": "Plaza Motel",
+   "lat": 49.482429,
+   "lng": -119.585676,
+   "ok": true,
+   "status": 200
+  },
+  "2081": {
+   "name": "Riverside Motel",
+   "lat": 49.499443,
+   "lng": -119.611843,
+   "ok": true,
+   "status": 200
+  },
+  "2082": {
+   "name": "Shoreline Resort",
+   "lat": 49.501294,
+   "lng": -119.607707,
+   "ok": true,
+   "status": 200
+  },
+  "2083": {
+   "name": "Slumber Lodge",
+   "lat": 49.501936,
+   "lng": -119.597934,
+   "ok": true,
+   "status": 200
+  },
+  "2084": {
+   "name": "Spanish Villa Resort",
+   "lat": 49.501289,
+   "lng": -119.606697,
+   "ok": true,
+   "status": 200
+  },
+  "2085": {
+   "name": "Sunny Beach Motel",
+   "lat": 49.454805,
+   "lng": -119.586476,
+   "ok": true,
+   "status": 200
+  },
+  "2086": {
+   "name": "Swiss Sunset Inn",
+   "lat": 49.467304,
+   "lng": -119.585179,
+   "ok": true,
+   "status": 200
+  },
+  "2087": {
+   "name": "The Traveler's Motel",
+   "lat": 49.455681,
+   "lng": -119.58677,
+   "ok": true,
+   "status": 200
+  },
+  "2088": {
+   "name": "Valleystar Motel",
+   "lat": 49.457223,
+   "lng": -119.587801,
+   "ok": true,
+   "status": 200
+  },
+  "2089": {
+   "name": "Waterfront Inn",
+   "lat": 49.454574,
+   "lng": -119.586398,
+   "ok": true,
+   "status": 200
+  },
+  "2090": {
+   "name": "Kettle Valley Beach Resort",
+   "lat": 49.501297,
+   "lng": -119.608206,
+   "ok": true,
+   "status": 200
+  },
+  "2091": {
+   "name": "Okanagan Lakefront Resort",
+   "lat": 49.501303,
+   "lng": -119.60862,
+   "ok": true,
+   "status": 200
+  },
+  "2092": {
+   "name": "Tiki Shores Inn & Suites",
+   "lat": 49.5013,
+   "lng": -119.607194,
+   "ok": true,
+   "status": 200
+  },
+  "2093": {
+   "name": "Lord Aberdeen Hotel",
+   "lat": 50.359511,
+   "lng": -119.059253,
+   "ok": true,
+   "status": 200
+  },
+  "2094": {
+   "name": "The Bulldog Hotel Silver Star",
+   "lat": 50.35909,
+   "lng": -119.058822,
+   "ok": true,
+   "status": 200
+  },
+  "2095": {
+   "name": "Vance Creek Hotel & Conference Centre",
+   "lat": 50.36017,
+   "lng": -119.0587,
+   "ok": true,
+   "status": 200
+  },
+  "2097": {
+   "name": "The Pinnacles Suites",
+   "lat": 50.361301,
+   "lng": -119.061044,
+   "ok": true,
+   "status": 200
+  },
+  "2098": {
+   "name": "Rosedale Motel",
+   "lat": 49.605105,
+   "lng": -119.67687,
+   "ok": true,
+   "status": 200
+  },
+  "2099": {
+   "name": "Summerland Motel",
+   "lat": 49.573697,
+   "lng": -119.631701,
+   "ok": true,
+   "status": 200
+  },
+  "2100": {
+   "name": "Spirit Lodge at Silver Star (B&B)",
+   "lat": 50.323693,
+   "lng": -119.181271,
+   "ok": true,
+   "status": 200
+  },
+  "2101": {
+   "name": "Swan Lake RV Park & Campground",
+   "lat": 50.318722,
+   "lng": -119.264653,
+   "ok": true,
+   "status": 200
+  },
+  "2102": {
+   "name": "Swan Lake RV Resort",
+   "lat": 50.334256,
+   "lng": -119.245115,
+   "ok": true,
+   "status": 200
+  },
+  "2103": {
+   "name": "Best Western Pacific Inn",
+   "lat": 50.281803,
+   "lng": -119.276401,
+   "ok": true,
+   "status": 200
+  },
+  "2104": {
+   "name": "Best Western Premier Route 97 Vernon",
+   "lat": 50.285477,
+   "lng": -119.272696,
+   "ok": true,
+   "status": 200
+  },
+  "2105": {
+   "name": "Days Inn by Wyndham Vernon",
+   "lat": 50.284103,
+   "lng": -119.265569,
+   "ok": true,
+   "status": 200
+  },
+  "2106": {
+   "name": "Divya Sutra Plaza & Conference Centre",
+   "lat": 50.282424,
+   "lng": -119.265876,
+   "ok": true,
+   "status": 200
+  },
+  "2107": {
+   "name": "Fairfield Inn & Suites Vernon",
+   "lat": 50.285061,
+   "lng": -119.273138,
+   "ok": true,
+   "status": 200
+  },
+  "2108": {
+   "name": "Holiday Inn Express & Suites Vernon",
+   "lat": 50.281087,
+   "lng": -119.276507,
+   "ok": true,
+   "status": 200
+  },
+  "2109": {
+   "name": "Prestige Hotel Vernon",
+   "lat": 50.277739,
+   "lng": -119.273721,
+   "ok": true,
+   "status": 200
+  },
+  "2110": {
+   "name": "Prestige Vernon Lodge & Conference Centre",
+   "lat": 50.271735,
+   "lng": -119.275037,
+   "ok": true,
+   "status": 200
+  },
+  "2111": {
+   "name": "Quality Inn & Suites Vernon",
+   "lat": 50.274211,
+   "lng": -119.274189,
+   "ok": true,
+   "status": 200
+  },
+  "2112": {
+   "name": "Sandman Hotel & Suites Vernon",
+   "lat": 50.273128,
+   "lng": -119.273011,
+   "ok": true,
+   "status": 200
+  },
+  "2113": {
+   "name": "The Castle at Swan Lake",
+   "lat": 50.333342,
+   "lng": -119.239479,
+   "ok": true,
+   "status": 200
+  },
+  "2114": {
+   "name": "Canada's Best Value Inn & Suites Vernon",
+   "lat": 50.27218,
+   "lng": -119.274491,
+   "ok": true,
+   "status": 200
+  },
+  "2115": {
+   "name": "Courtyard Inn Vernon",
+   "lat": 50.272632,
+   "lng": -119.274213,
+   "ok": true,
+   "status": 200
+  },
+  "2116": {
+   "name": "Silver Star Motel",
+   "lat": 50.26911,
+   "lng": -119.274187,
+   "ok": true,
+   "status": 200
+  },
+  "2117": {
+   "name": "Outback Lakeside Vacation Homes",
+   "lat": 50.171316,
+   "lng": -119.444638,
+   "ok": true,
+   "status": 200
+  },
+  "2118": {
+   "name": "Predator Ridge Resort",
+   "lat": 50.189134,
+   "lng": -119.387608,
+   "ok": true,
+   "status": 200
+  },
+  "2119": {
+   "name": "A Lakeview Heights Bed & Breakfast",
+   "lat": 49.83478,
+   "lng": -119.584203,
+   "ok": true,
+   "status": 200
+  },
+  "2120": {
+   "name": "A View of the Lake Bed & Breakfast",
+   "lat": 49.882448,
+   "lng": -119.550204,
+   "ok": true,
+   "status": 200
+  },
+  "2121": {
+   "name": "A View to Remember B&B",
+   "lat": 49.8556,
+   "lng": -119.560545,
+   "ok": true,
+   "status": 200
+  },
+  "2122": {
+   "name": "Salish Bed & Breakfast and Spa",
+   "lat": 49.851416,
+   "lng": -119.644138,
+   "ok": true,
+   "status": 200
+  },
+  "2123": {
+   "name": "Seclusion Bay Resort",
+   "lat": 49.801483,
+   "lng": -119.662389,
+   "ok": true,
+   "status": 200
+  },
+  "2124": {
+   "name": "The Outside Inn at Niche Wine Co.",
+   "lat": 49.884233,
+   "lng": -119.585576,
+   "ok": true,
+   "status": 200
+  },
+  "2125": {
+   "name": "The Lake House at Quails' Gate",
+   "lat": 49.843071,
+   "lng": -119.566597,
+   "ok": true,
+   "status": 200
+  },
+  "2126": {
+   "name": "DoubleTree by Hilton West Kelowna",
+   "lat": 49.827602,
+   "lng": -119.635843,
+   "ok": true,
+   "status": 200
+  },
+  "2127": {
+   "name": "TownePlace Suites by Marriott West Kelowna",
+   "lat": 49.836939,
+   "lng": -119.610527,
+   "ok": true,
+   "status": 200
+  },
+  "2128": {
+   "name": "Super 8 by Wyndham West Kelowna BC",
+   "lat": 49.861248,
+   "lng": -119.5841,
+   "ok": true,
+   "status": 200
+  },
+  "2129": {
+   "name": "Casa Loma Lakeshore Resort",
+   "lat": 49.856018,
+   "lng": -119.53798,
+   "ok": true,
+   "status": 200
+  },
+  "2130": {
+   "name": "The Cove Lakeside Resort",
+   "lat": 49.811894,
+   "lng": -119.623334,
+   "ok": true,
+   "status": 200
+  }
+ }
+}

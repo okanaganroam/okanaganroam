@@ -13472,19 +13472,22 @@ test('Measurement Phase C: add_to_trip carries trip_source (individual by defaul
 
 test('Measurement Phase C: open_my_trip fires once per visitor click that opens the tray -- not on close, not for code-triggered clicks', () => {
   const h = ga4Harness();
-  const cap = h.listeners.filter((l) => l.type === 'click' && l.capture === true);
-  assert.equal(cap.length, 1, 'one capture-phase listener');
+  const cap = h.listeners.filter((l) => l.type === 'click' && l.capture === true && String(l.fn).includes('open_my_trip'));
+  assert.equal(cap.length, 1, 'one capture-phase My Trip listener');
   const open = { v: false };
   h.els.tripTrayPanel = { classList: { contains: (c) => c === 'open' && open.v } };
   h.els.tripTrayCount = { textContent: '3' };
-  const toggle = { closest: (sel) => (sel === '#tripTrayToggle' ? toggle : null) };
+  const toggle = { id: 'tripTrayToggle', closest: (sel) => (sel.split(', ').includes('#tripTrayToggle') ? toggle : null) };
+  const header = { id: '', closest: (sel) => (sel.split(', ').includes('.nav-mytrip-btn') ? header : null) };
   const other = { closest: () => null };
   const click = (target, isTrusted = true) => cap[0].fn({ target, isTrusted });
   click(toggle);                 // opens -> counted
   open.v = true; click(toggle);  // closes -> not counted
   open.v = false; click(toggle, false); // page code (e.g. "View My Trip") -> not counted here
   click(other);                  // unrelated click
-  assert.deepEqual(h.events(), [['open_my_trip', { trip_size: 3, open_source: 'tray_button' }]]);
+  click(header);                 // header My Trip button (live since 2026-10-13) opens -> counted
+  open.v = true; click(header);  // closes -> not counted
+  assert.deepEqual(h.events(), [['open_my_trip', { trip_size: 3, open_source: 'tray_button' }], ['open_my_trip', { trip_size: 3, open_source: 'header_button' }]]);
 });
 
 test('Measurement Phase C: venue pages -- every type tags its outbound links; Food & Drink gets venue_view + outbound_click and (since 2026-10-14) the Favorite module', () => {
@@ -16026,7 +16029,7 @@ test('Browse hub: /browse lists every venue in the hub shape -- server-rendered 
   assert.match(html, /<a class="fd-pop-btn bh-map-link" id="bhMapLink" href="\/map">/);
   // None of the wizard.
   assert.doesNotMatch(html, /id="wizardStep1"|id="searchInput"|id="venueGrid"|<body class="wizard-active page-browse">|browse-directory-styles|__roamPrefill/);
-  assert.match(html, /<body class="golf-page outdoor-page fd-page browse-page">/);
+  assert.match(html, /<body class="golf-page outdoor-page fd-page fd-refresh browse-page">/);
   // One GA4 tag with its own page type; one capture script; app.js once, versioned.
   assert.equal((html.match(/page_type: '[a-z_]+'/g) || []).length, 1);
   assert.ok(html.includes("var cfg = { page_type: 'browse' };"));
@@ -18471,9 +18474,8 @@ test('Indoor discovery: URL filters select real venues and family is the hub\'s 
         const cards = page.text.match(/<ul class="card-grid"[^>]*>[\s\S]*?<\/ul>/g)?.join('') || '';
         fixtures.forEach((v, i) => assert.equal(cards.includes(`href="/kelowna/indoor/${v.slug}"`), Array.isArray(selected) ? selected.includes(i) : i === selected, `${activity}: ${v.name}`));
         // The activity page is the /indoor page with that activity chosen (2026-11-20).
-        // /indoor/family keeps its older page (the hub's Family Fun).
-        if (activity === 'family') { assert.match(page.text, /aria-current="page"/); assert.match(page.text, /[1-9]\d* matching spots?/); }
-        else assert.match(page.text, new RegExp(`data-fd-type="${activity}" aria-pressed="true"`));
+        // /indoor/family too since 2026-11-21 (the same places as the hub's Family Fun).
+        assert.match(page.text, new RegExp(`data-fd-type="${activity}" aria-pressed="true"`));
       }
       const unknown = await WINTER_GET(base, '/indoor?activity=unknown');
       fixtures.forEach((v) => assert.ok(unknown.text.includes(`href="/kelowna/indoor/${v.slug}"`)));
@@ -18785,7 +18787,9 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
 test('Sports activity chips (2026-10-13): /sports?activity= narrows to skate, bike, disc golf or courts (a spot can sit under several), and swaps the banner, heading and intro', () => {
   const fs = require('node:fs');
   const path = require('node:path');
-  assert.deepEqual(app.SPORT_ACTIVITIES.map((a) => a.slug), ['skate', 'bike', 'disc', 'courts']);
+  // Ice Skating & Hockey (2026-11-21): the ice arenas have a chip of their own.
+  assert.deepEqual(app.SPORT_ACTIVITIES.map((a) => a.slug), ['skate', 'bike', 'disc', 'courts', 'ice']);
+  assert.deepEqual(app.sportActivitiesOf({ id: 990106, type: 'sport', name: 'Sun Bowl Arena', description: 'Public skating and a Skate Library.' }, new Map()), ['ice'], 'an arena is ice, not a skate park');
   for (const a of app.SPORT_ACTIVITIES) {
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', a.banner.src)), `${a.slug} photo exists`);
     assert.ok(a.heading && a.intro && a.banner.alt, `${a.slug} has its own heading, intro and alt text`);
@@ -19377,7 +19381,7 @@ test('French place pages (2026-10-13): /fr/... renders the place in French, pair
   assert.match(page.text, /<meta property="og:image" content="https:\/\/okanaganroam\.com\/share\/fr\/kelowna\/restaurants\/test-trattoria\.png\?v=/);
   assert.match(page.text, /<a href="\/kelowna\/restaurants\/test-trattoria" hreflang="en" lang="en">English<\/a>/);
   assert.doesNotMatch(page.text, /class="desc-en"/, 'only the French description');
-  assert.match(page.text, /Bon à savoir/);
+  assert.match(page.text, /Gardez cette adresse sous la main/);
   const ld = s5jsonLd(page.text);
   assert.deepEqual(ld.find((b) => b['@type'] === 'BreadcrumbList').itemListElement[0].name, 'Accueil');
   assert.equal(ld.find((b) => b['@type'] !== 'BreadcrumbList').description, app.getVenue(venue.id).description_fr);
@@ -31463,8 +31467,9 @@ test('Round 9 accessibility: on a venue page the facts (map, phone, website) com
     db.prepare("UPDATE venues SET phone = '250-555-0199', website = 'https://example.com/', address = '1 Test St, Kelowna' WHERE id = ?").run(v.id);
     for (const lang of ['en', 'fr']) {
       const html = app.renderVenuePage(app.findVenueBySlug('kelowna', 'cafe', 'r9-order-cafe'), [], [], [], { lang });
-      // English Food & Drink pages (2026-11-07): the sidebar closes the facts, and the visitor photos and tips come after it.
-      const fdPage = lang === 'en';
+      // Food & Drink pages (2026-11-07; French too since 2026-11-20): the sidebar closes the facts, and the visitor photos
+      // and tips come after it.
+      const fdPage = true;
       const aside = html.indexOf(fdPage ? '<aside class="fd-aside">' : '<aside class="venue-aside">'), asideEnd = html.indexOf('</aside>'), extra = fdPage ? asideEnd : html.indexOf('<div class="venue-extra">');
       assert.ok(aside > 0 && extra >= asideEnd, 'the extras follow the sidebar');
       // (#572: one map link, the Directions button; a place with no coordinates for the built-in directions gets the Google Maps button.)
@@ -31930,28 +31935,16 @@ test('Round 10 phone: venue pages put Call / Directions / Favorite / Add to trip
   const venue = app.findVenueBySlug('kelowna', 'restaurant', 'test-trattoria');
   for (const opts of [{}, { lang: 'fr' }]) {
     const html = app.renderVenuePage({ ...venue, description_fr: 'Une trattoria fictive pour les tests.' }, [], [], [], opts);
-    if (!opts.lang) {
-      // English Food & Drink pages (2026-11-07) follow Copper's approved order: a short introduction, then the main buttons
+    {
+      // Food & Drink pages (2026-11-07; French too since 2026-11-20) follow Copper's approved order: a short introduction, then the main buttons
       // (Directions, Menu, Hours); Call and the save buttons sit in the "Keep this one handy" card with the facts.
       const top = html.slice(html.indexOf('<div class="fd-content">'), html.indexOf('<aside class="fd-aside">'));
-      assert.ok(top.indexOf('<div class="venue-header">') >= 0 && top.indexOf('<p class="venue-description">') > top.indexOf('<div class="venue-header">'));
-      assert.ok(top.indexOf('<div class="venue-cta-row"') > top.indexOf('<p class="venue-description">'), 'the introduction, then the main buttons');
+      assert.ok(top.indexOf('<div class="venue-header">') >= 0 && top.indexOf('<p class="venue-description"') > top.indexOf('<div class="venue-header">'));
+      assert.ok(top.indexOf('<div class="venue-cta-row"') > top.indexOf('<p class="venue-description"'), 'the introduction, then the main buttons');
       assert.match(html, /<div class="fd-actions fd-contact-actions"[^>]*><a class="cta secondary" href="tel:/, 'the Call button is in the contact card');
       assert.match(html, /<div class="fd-actions fd-save-actions"[^>]*>\s*<button type="button" class="card-action fav-btn"/);
       assert.ok(html.indexOf('<aside class="fd-aside">') < html.indexOf('id="vcOpen"') || !html.includes('id="vcOpen"'), 'the facts come before the visitor photos and tips');
-      continue;
     }
-    const main = html.slice(html.indexOf('<div class="venue-main">'), html.indexOf('<aside class="venue-aside">'));
-    const at = (s) => main.indexOf(s);
-    assert.ok(at('<div class="venue-header">') >= 0 && at('<div class="venue-cta-row"') > 0 && at('<p class="venue-description"') > 0);
-    assert.ok(at('<div class="venue-header">') < at('<div class="venue-cta-row"'), 'header first');
-    assert.ok(at('<div class="venue-cta-row"') < at('<p class="venue-description"'), 'the buttons come before the description in the page (tab order)');
-    assert.match(main, /<a class="cta secondary" href="tel:/, 'the Call button is in that row');
-    // #402: the contact block (sidebar) still comes before the visitor photos and tips.
-    assert.ok(html.indexOf('<aside class="venue-aside">') < html.indexOf('<div class="venue-extra">'));
-    // Wider screens show the description first again through CSS order, and phones keep the page order.
-    assert.match(html, /@media \(min-width: 641px\) \{\n    body\.golf-page \.venue-main > \.venue-header \{ order: -4; \}\n    body\.golf-page \.venue-main > \.venue-description \{ order: -3; \}\n    body\.golf-page \.venue-main > aside \{ order: -2; \}\n    body\.golf-page \.venue-main > \.venue-editorial \{ order: -1; \}/);
-    assert.match(html, /@media \(min-width: 960px\) \{[\s\S]*?body\.golf-page \.venue-main \{ display: flex; flex-direction: column; \}/);
   }
   // Editorial story sections (Elora) follow the description in the page and are marked for the wide-screen order.
   const elora = app.renderVenuePage(eloraPageFixture(), [], [], []);
@@ -33115,4 +33108,18 @@ test('Kalamalka parking: named entrances resolve to distinct sourced parking poi
   assert.notEqual(a.url, path, 'do not replace the entrance with the matching generic park marker on load');
   assert.equal(app.mapDestination(path, new Date(), 'invented'), null);
   assert.equal(app.mapDestination('/kelowna/outdoors/another-place', new Date(), 'twin-bays'), null);
+});
+
+test('Roam Now (2026-11-20): when Open now hides every match, the empty list offers closed places as well as unlisted hours', async () => {
+  await withDiscoveryServer(async (base) => {
+    const en = await (await fetch(`${base}/map`)).text();
+    const fr = await (await fetch(`${base}/fr/map`)).text();
+    const i = en.indexOf("'No matching places are listed as open now.'");
+    assert.ok(i > 0);
+    const msg = en.slice(i, i + 600);
+    assert.ok(msg.includes('data-relax="open">') && msg.includes("'Show places that are closed now too'"), 'closed-too button');
+    assert.ok(msg.includes('data-relax="unlisted">'), 'unlisted-hours button kept');
+    assert.ok(msg.indexOf('data-relax="open"') < msg.indexOf('data-relax="unlisted"'), 'closed-too first');
+    assert.ok(fr.includes('Afficher aussi les lieux fermés actuellement'));
+  });
 });

@@ -1,0 +1,55 @@
+{
+ "updated": "2026-11-21",
+ "source": "matches-okanagan.csv",
+ "how": "scripts/viator-match.js then rows marked ok by Dayton, applied by scripts/viator-apply.js",
+ "venues": {
+  "1495": {
+   "name": "Kelowna Karting & Entertainment",
+   "productCode": "5574063P2",
+   "title": "Indoor Go Kart Racing in Kelowna",
+   "supplier": "Kelowna Karting",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Indoor-Go-Kart-Racing-in-Kelowna-Adult-Kart-Drop-In-Race/d22366-5574063P2?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  },
+  "1578": {
+   "name": "Vivid Tours",
+   "productCode": "235533P20",
+   "title": "Jason Parkes Trail Full Day Guided Westside Wine Tour in Kelowna",
+   "supplier": "Vivid Tours",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Jason-Parkes-Trail-Full-Day-Guided-Westside-Tour-in-Kelowna/d22366-235533P20?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  },
+  "1582": {
+   "name": "A Taste of Kelowna Food Tours",
+   "productCode": "312379P1",
+   "title": "Kelowna: #1 Rated Walking Food Tour with 7 Tastings and 4 Drinks",
+   "supplier": "A Taste Of Kelowna Food Tours",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Walking-Food-Tour-Downtown-Kelowna/d22366-312379P1?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  },
+  "1588": {
+   "name": "Lakeside Eco-Sports",
+   "productCode": "357718P11",
+   "title": "Kelowna E-Bike Guided City Highlights Tour",
+   "supplier": "Lakeside Eco-Sports",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Kelowna-E-Bike-Guided-City-Highlights-Tour/d22366-357718P11?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  },
+  "1611": {
+   "name": "Okanagan Life Private Boat Charters",
+   "productCode": "128006P4",
+   "title": "Vernon Luxury Full Day Boat Tour with Lunch Stop",
+   "supplier": "Okanagan Life Private Boat Charters",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Up-to-Max-4-Guests-Captained-Private-Cruise-on-Luxury-22ft-Pontoon-Boat/d22366-128006P4?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  },
+  "1763": {
+   "name": "Lust 4 Luxury Tours",
+   "productCode": "142555P5",
+   "title": "Private West Kelowna Wine Tour with Custom Itinerary",
+   "supplier": "Lust 4 Luxury Tours",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Private-Luxury-Wine-Tour-in-West-Kelowna-with-Custom-Itinarary/d22366-142555P5?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  }
+ }
+}

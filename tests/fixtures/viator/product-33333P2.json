@@ -1,0 +1,95 @@
+{
+ "productCode": "33333P2",
+ "title": "Okanagan Lake Sunset Cruise",
+ "description": "Two hours on the lake.",
+ "images": [
+  {
+   "imageSource": "SUPPLIER_PROVIDED",
+   "caption": "",
+   "isCover": true,
+   "variants": [
+    {
+     "height": 50,
+     "width": 50,
+     "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-50x50/0f/33333p2.jpg"
+    },
+    {
+     "height": 100,
+     "width": 100,
+     "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-100x100/0f/33333p2.jpg"
+    },
+    {
+     "height": 200,
+     "width": 200,
+     "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-200x200/0f/33333p2.jpg"
+    },
+    {
+     "height": 160,
+     "width": 240,
+     "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-240x160/0f/33333p2.jpg"
+    },
+    {
+     "height": 240,
+     "width": 360,
+     "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-360x240/0f/33333p2.jpg"
+    },
+    {
+     "height": 320,
+     "width": 480,
+     "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-480x320/0f/33333p2.jpg"
+    },
+    {
+     "height": 480,
+     "width": 720,
+     "url": "https://hare-media-cdn.tripadvisor.com/media/attractions-splice-spp-720x480/0f/33333p2.jpg"
+    }
+   ]
+  }
+ ],
+ "reviews": {
+  "sources": [
+   {
+    "provider": "VIATOR",
+    "totalCount": 120,
+    "averageRating": 4.8
+   }
+  ],
+  "totalReviews": 120,
+  "combinedAverageRating": 4.8
+ },
+ "duration": {
+  "variableDurationFromMinutes": 120,
+  "variableDurationToMinutes": 240
+ },
+ "confirmationType": "INSTANT",
+ "itineraryType": "STANDARD",
+ "pricing": {
+  "summary": {
+   "fromPrice": 79.0,
+   "fromPriceBeforeDiscount": 79.0
+  },
+  "currency": "CAD"
+ },
+ "productUrl": "https://www.viator.com/tours/Kelowna/Okanagan-Lake-Sunset-Cruise/d5257-33333P2?mcid=42383&pid=P00333119&medium=api&api_version=2.0&campaign=okanagan",
+ "destinations": [
+  {
+   "ref": "5257",
+   "primary": true
+  }
+ ],
+ "tags": [
+  21946
+ ],
+ "flags": [
+  "FREE_CANCELLATION"
+ ],
+ "translationInfo": {
+  "containsMachineTranslatedText": false,
+  "translationSource": "ORIGINAL"
+ },
+ "status": "ACTIVE",
+ "language": "en-CA",
+ "supplier": {
+  "name": "Lake Cruises Co"
+ }
+}

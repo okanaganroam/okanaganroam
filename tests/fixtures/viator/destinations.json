@@ -1,0 +1,71 @@
+{
+ "destinations": [
+  {
+   "destinationId": 75,
+   "name": "Canada",
+   "type": "COUNTRY",
+   "parentDestinationId": 8,
+   "lookupId": "8.75",
+   "defaultCurrencyCode": "CAD",
+   "timeZone": "America/Toronto"
+  },
+  {
+   "destinationId": 262,
+   "name": "British Columbia",
+   "type": "PROVINCE",
+   "parentDestinationId": 75,
+   "lookupId": "8.75.262",
+   "defaultCurrencyCode": "CAD",
+   "timeZone": "America/Vancouver"
+  },
+  {
+   "destinationId": 25828,
+   "name": "Okanagan Valley",
+   "type": "REGION",
+   "parentDestinationId": 262,
+   "lookupId": "8.75.262.25828",
+   "defaultCurrencyCode": "CAD",
+   "timeZone": "America/Vancouver"
+  },
+  {
+   "destinationId": 5257,
+   "name": "Kelowna",
+   "type": "CITY",
+   "parentDestinationId": 25828,
+   "lookupId": "8.75.262.25828.5257",
+   "destinationUrl": "https://www.viator.com/Kelowna/d5257-ttd?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
+   "defaultCurrencyCode": "CAD",
+   "timeZone": "America/Vancouver",
+   "center": {
+    "latitude": 49.888,
+    "longitude": -119.496
+   }
+  },
+  {
+   "destinationId": 50120,
+   "name": "Penticton",
+   "type": "CITY",
+   "parentDestinationId": 25828,
+   "lookupId": "8.75.262.25828.50120",
+   "defaultCurrencyCode": "CAD",
+   "timeZone": "America/Vancouver"
+  },
+  {
+   "destinationId": 999,
+   "name": "Kelowna",
+   "type": "CITY",
+   "parentDestinationId": 1,
+   "lookupId": "1.999",
+   "defaultCurrencyCode": "USD",
+   "timeZone": "UTC"
+  },
+  {
+   "destinationId": 22366,
+   "name": "Kelowna & Okanagan Valley",
+   "type": "CITY",
+   "parentDestinationId": 262,
+   "lookupId": "8.75.262.22366",
+   "defaultCurrencyCode": "CAD"
+  }
+ ]
+}

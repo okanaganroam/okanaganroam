@@ -21,6 +21,8 @@ const RULES = [
   // Places to stay (2026-11-19): the Check rates button (affiliate partner, own booking link or website).
   ['stay_click', 'Check rates (place to stay)', 'Top buttons', 'a[data-track~="stay_click"]', V],
   ['website', 'Website', 'Top buttons', 'a[data-track~="website"]', V],
+  // Viator (2026-11-20): a matched venue's "Book on Viator" button (affiliate).
+  ['viator', 'Book on Viator (commission link)', 'Top buttons', 'a[data-link="viator"]', V],
   ['booking', 'Book online / buy tickets', 'Top buttons', 'a[data-track~="booking"]', V],
   ['call_button', 'Call button', 'Top buttons', '.venue-cta-row a[data-track~="phone"]', V],
   ['phone_number', 'Phone number (in the details)', 'Details', 'a[data-track~="phone"]', V],
@@ -59,8 +61,9 @@ const labelsFor = (kind) => LABELS.filter((l) => l.pages.includes(kind));
 const isKey = (k) => typeof k === 'string' && KEYS.has(k);
 
 // Browser code, shared by business and event pages. report(key) is supplied by the page.
-function clientClassifierJs() {
-  const list = JSON.stringify(LABELS.map((l) => [l.key, l.sel, l.pages]));
+// opts.viator: include the Viator key (only pages with a "Book on Viator" button, so every other page is unchanged).
+function clientClassifierJs(opts = {}) {
+  const list = JSON.stringify(LABELS.filter((l) => l.key !== 'viator' || opts.viator).map((l) => [l.key, l.sel, l.pages]));
   return `var ROAM_CLICKS = ${list};
   function roamClickKey(el, kind){
     for (var i = 0; i < ROAM_CLICKS.length; i++) {
