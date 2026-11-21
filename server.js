@@ -47,6 +47,8 @@ const placesToStay = require('./places-to-stay');
 const tripStays = require('./trip-stays');
 const stayBookingLinks = require('./stay-booking-links');
 const tripBooking = require('./trip-booking');
+// Viator tours (2026-11-20, viator.js): off unless VIATOR_API_KEY and VIATOR_PARTNER_ID are both set.
+const viator = require('./viator');
 const gscReport = require('./gsc-report');
 // What is clickable on one business or event page (2026-11-05): read from the page itself, so each sheet shows that page's
 // own buttons and links. The server asks its own public page (no scripts run, so nothing is counted); kept 10 minutes.
@@ -7750,9 +7752,9 @@ function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
       try { const longer = run({ ...base, overrides: { ...(base.overrides || {}), days: want } }, now); if (longer && ['multi_day', 'day_plan'].includes(longer.kind)) plan = longer; } catch (e) { /* keep the plan as asked */ }
     }
   }
-  return withTripStays(plan, stay, now);
+  return withTripStays(plan, stay, now, args.text);
 }
-function withTripStays(plan, stay, now = new Date()) {
+function withTripStays(plan, stay, now = new Date(), text = '') {
   if (!plan || typeof plan !== 'object') return plan;
   try {
     const candidates = tripStayCandidates();
@@ -7766,6 +7768,14 @@ function withTripStays(plan, stay, now = new Date()) {
       // "Book your trip" (2026-11-20, trip-booking.js): the estimated total and the "Book my trip" steps, per stay card.
       block = tripBooking.withTripBooking(block, plan);
       plan.whereToStay = block;
+    }
+    // Viator (2026-11-20, viator.js): which activities the visitor asked for that no planned stop can book (a wine tour,
+    // a zipline...), for up to 2 suggestion cards the page loads from /api/trip/viator. Added after planning: it never
+    // changes the stops or their order. Only with VIATOR_API_KEY and VIATOR_PARTNER_ID set.
+    if (viator.enabled()) {
+      const bookable = new Set(((block && block.checklist) || tripBookingChecklist(plan)).map((c) => c.venueId));
+      const hint = viator.tripHint(plan, text, bookable);
+      if (hint) plan.viator = hint;
     }
   } catch (e) { console.error(`[trip] where to stay: ${e.message}`); }
   return plan;
@@ -42200,7 +42210,9 @@ function renderVenuePage(venue, relatedVenues, nearbyVenues, venueGuidePages, op
   venue = venueSeasonStory(venue);
   const cv = !!venue && venueBadgeState(venue, opts.now || new Date()) === 'earned';
   const html = renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages, cv ? { ...opts, completeVerified: true } : opts);
-  return cv && typeof html === 'string' ? stripVerifiedRepeats(html) : html;
+  // Viator (2026-11-20): "Also bookable on Viator" under the venue's own Book button, only for a match Dayton approved
+  // (data/viator-matches.json) and only with VIATOR_API_KEY + VIATOR_PARTNER_ID set; every other page is unchanged.
+  return viator.withVenueLink(cv && typeof html === 'string' ? stripVerifiedRepeats(html) : html, venue, opts.lang);
 }
 function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages, opts = {}) {
   // French twin (2026-10-13): opts.lang 'fr' renders /fr/... in French; L(en, fr) picks the page's wording.
@@ -45799,7 +45811,7 @@ function tripSamplePlan(now = Date.now()) {
 // ?region= from the town pages, campaign tags) is noindex, follow and canonical to /trip, so no new indexable page.
 const TRIP_PAGE_TITLE = 'Okanagan Trip Planner: Free Day-by-Day Itinerary | Okanagan Roam';
 const TRIP_PAGE_DESCRIPTION = 'Plan an Okanagan trip in one sentence: a free day-by-day itinerary for Kelowna, Penticton, Vernon and wine country, built from places open on your dates.';
-function renderTripPlannerV3Page({ preview = false, noindex = false, stays = null } = {}) {
+function renderTripPlannerV3Page({ preview = false, noindex = false, stays = null, viator: viatorOn = false } = {}) {
   if (!tripPlannerV3PageModule) return renderTripPlannerPage(isTripPlannerV2Enabled());
   const canonical = 'https://okanaganroam.com/trip';
   let tripTrayHtml = '';
@@ -45836,6 +45848,8 @@ function renderTripPlannerV3Page({ preview = false, noindex = false, stays = nul
     noindex,
     // Where to stay (2026-11-20): the Dates and Guests row, only with TRIP_STAYS or /trip?stays=1 ('preview').
     ...(stays ? { stays } : {}),
+    // Viator suggestions (2026-11-20): only with the stays box and Viator set up.
+    ...(stays && viatorOn ? { viator: true } : {}),
   }));
 }
 
@@ -75081,6 +75095,21 @@ const server = http.createServer(async (req, res) => {
       } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
     }
 
+    // GET /api/trip/viator?i=wine_tour,zipline&r=kelowna&lang=fr (2026-11-20, viator.js): up to 2 Viator suggestion cards
+    // for Build My Trip, only with Viator set up (VIATOR_API_KEY + VIATOR_PARTNER_ID) and the stays box on (TRIP_STAYS or
+    // ?stays=1). Loaded by the page after the plan, so no Viator text is in any page's source (/api/ is robots-blocked).
+    // Answers are cached for 24 hours per destination, interest and language; a Viator error is just no cards.
+    if (pathname === '/api/trip/viator' && method === 'GET' && viator.enabled() && tripStaysEnabledFor(query)) {
+      const keys = String(query.i || '').split(',').map((k) => k.trim()).filter((k, n, a) => viator.siteInterests().includes(k) && a.indexOf(k) === n).slice(0, 2);
+      const region = String(query.r || '');
+      if (!keys.length || (region && !REGION_LABELS[region])) return sendJSON(res, 400, { error: 'i must name known interests and r a known town.' });
+      const lang = query.lang === 'fr' ? 'fr' : 'en';
+      const cards = await viator.tripCards(keys, region || null, lang);
+      res.setHeader('Cache-Control', 'private, max-age=3600');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      return sendJSON(res, 200, { cards, disclosure: viator.DISCLOSURE[lang] });
+    }
+
     // GET /trip — Build My Trip, Stage 2. A fixed, exact path, registered
     // before the generic /:region catch-all below for the same reason
     // /events is (otherwise "trip" would be treated as an unrecognized
@@ -75102,7 +75131,7 @@ const server = http.createServer(async (req, res) => {
       const tripHasQuery = Object.keys(query || {}).length > 0;
       if (tripPlannerV3ActiveFor(req)) {
         const staysMode = isTripStaysEnabled() ? 'on' : tripStaysEnabledFor(query) ? 'preview' : null;
-        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview', noindex: tripHasQuery, stays: staysMode });
+        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview', noindex: tripHasQuery, stays: staysMode, ...(staysMode && viator.enabled() ? { viator: true } : {}) });
         // "See live prices" (2026-11-20): only this page, only with stays on and Stay22 set up, may frame Stay22's map.
         if (staysMode && placesToStay.affiliateConfig().provider === 'stay22') res.setHeader('Content-Security-Policy', TRIP_STAYS_CSP);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });

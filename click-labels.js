@@ -21,6 +21,8 @@ const RULES = [
   // Places to stay (2026-11-19): the Check rates button (affiliate partner, own booking link or website).
   ['stay_click', 'Check rates (place to stay)', 'Top buttons', 'a[data-track~="stay_click"]', V],
   ['website', 'Website', 'Top buttons', 'a[data-track~="website"]', V],
+  // Viator (2026-11-20): the small "Also bookable on Viator" link under a venue's own Book button (affiliate).
+  ['viator', 'Also bookable on Viator (commission link)', 'Top buttons', 'a[data-link="viator"]', V],
   ['booking', 'Book online / buy tickets', 'Top buttons', 'a[data-track~="booking"]', V],
   ['call_button', 'Call button', 'Top buttons', '.venue-cta-row a[data-track~="phone"]', V],
   ['phone_number', 'Phone number (in the details)', 'Details', 'a[data-track~="phone"]', V],

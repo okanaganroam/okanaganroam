@@ -163,6 +163,23 @@ module.exports = {
     },
   },
 
+  // Viator (2026-11-20, viator.js): the affiliate campaign tag, the Viator destinations the match script looks up (by
+  // name, under British Columbia) and which one each of our towns uses for Build My Trip suggestions (else `area`), and
+  // the activity interests Build My Trip may suggest Viator tours for (keys of viator.js INTERESTS).
+  viator: {
+    campaign: 'okanagan',
+    province: 'British Columbia',
+    area: 'Okanagan Valley',
+    destinationNames: ['Okanagan Valley', 'Kelowna', 'Penticton', 'Vernon', 'Osoyoos', 'Oliver', 'Summerland', 'Peachland', 'West Kelowna', 'Naramata', 'Big White'],
+    regionDestinations: {
+      kelowna: 'Kelowna', 'west-kelowna': 'Kelowna', 'lake-country': 'Kelowna', 'big-white': 'Kelowna', peachland: 'Kelowna',
+      penticton: 'Penticton', naramata: 'Penticton', summerland: 'Penticton', kaleden: 'Penticton', 'okanagan-falls': 'Penticton', apex: 'Penticton',
+      vernon: 'Vernon', coldstream: 'Vernon', silverstar: 'Vernon', armstrong: 'Vernon', lumby: 'Vernon', enderby: 'Vernon',
+      oliver: 'Osoyoos', osoyoos: 'Osoyoos', baldy: 'Osoyoos',
+    },
+    interests: ['wine_tour', 'food_tour', 'boat', 'zipline', 'paddle', 'bike_tour', 'ski_lesson', 'tour'],
+  },
+
   // French requests: place words the interpreter turns into English.
   frenchRequests: { regions: { 'kelowna ouest': 'west kelowna', 'ouest de kelowna': 'west kelowna', 'chutes okanagan': 'okanagan falls' },
     // Tour test 11 port (2026-11-18): « canyon Myra » (the day trips' Myra Canyon), like Whistler's « lacs Joffre ».
