@@ -725,6 +725,9 @@ function slotFit(v, ctx, windowKey, dayIndex, daypart) {
   const weekday = live ? live.weekday : weekdayFor(ctx, dayIndex);
   const fit = hoursFit(v, live ? live.win : windowKey, weekday);
   if (fit.status === 'closed') return { ok: false };
+  // Sport test 8 (2026-11-21; "Tuesday evening golf in Lumby" planned a course with no hours on file 6–10 PM, past dark): a
+  // golf course whose hours we don't have is never put in an evening slot (a round there would end after dark).
+  if (v && v.type === 'golf' && !v.indoorGolf && fit.status === 'unknown' && (windowKey === 'evening' || daypart === 'evening')) return { ok: false };
   const label = SLOT_WINDOWS[windowKey].label;
   const kidsMin = ctx.kids ? kidsUntilMinutes(v) : null, kidsWin = live ? live.win : SLOT_WINDOWS[windowKey];
   if (kidsMin != null && kidsWin && kidsWin.from >= kidsMin) return { ok: false };
@@ -5988,10 +5991,14 @@ const DINNER_GAP_MINUTES = 90;
 const SKI_DAY_END = 930; // 3:30 PM, when the lifts wind down
 const SKI_LUNCH_MINUTES = 60;
 const SWAP_FLEX_TYPES = ['outdoor', 'beach', 'indoor', 'tour', 'sport', 'winery', 'brewery', 'distillery', 'golf'];
-function gapFillMinutes(v) { return Math.min(90, Math.max(60, VISIT_ALLOWANCE[v.type] || 60)); }
+const OWN_ROUND_MINUTES = { '1h': 60, '1-2h': 120, '2-3h': 150 };
+function gapFillMinutes(v) { if (shortOwnRound(v)) return OWN_ROUND_MINUTES[v.indoorLength]; return Math.min(90, Math.max(60, VISIT_ALLOWANCE[v.type] || 60)); }
+// Sport test 8 (2026-11-21; "a weekend in Lumby" left Marg's 9-hole course out with 5.5 hours free before dinner on Day 2):
+// a golf course its owner set up as a short visit (1 to 3 hours, a 9-hole walk-on round) can fill a long free afternoon.
+function shortOwnRound(v) { return !!(v && v.type === 'golf' && !v.indoorGolf && v.kindOwn && !!OWN_ROUND_MINUTES[v.indoorLength]); }
 function gapFillStart(arrive, spare) { return arrive + Math.max(0, Math.floor(spare / 2 / 15) * 15); }
 // Round 10 (2026-10-19): no tour company (Hoodoo Adventures, Full Cyrcle) as a walk-in filler; tours are booked.
-const GAP_FILL_TYPES = ['outdoor', 'indoor', 'beach', 'winery', 'brewery', 'distillery', 'cafe'];
+const GAP_FILL_TYPES = ['outdoor', 'indoor', 'beach', 'winery', 'brewery', 'distillery', 'cafe', 'golf'];
 const GAP_ALCOHOL_TYPES = ['winery', 'brewery', 'distillery'];
 const GAP_KIDS_RE = /\b(?:kids?|children|family|families|play|playground|science|museum|aquarium|zoo|farm|petting|mini golf|bowling|arcade|trampoline|climbing|pool|splash|park|beach|gelato|ice cream)\b/;
 function fillDinnerGaps(result, input, requirements) {
@@ -6078,7 +6085,7 @@ function fillDinnerGaps(result, input, requirements) {
         // sunset), and a day has one round.
         // 2026-10-25 (tools audit): a rainy day is all indoors, so a third indoor stop may fill a long late afternoon
         // ("rainy day in Whistler" had a spa and a museum, then 3 h 15 min free before dinner).
-        if (capped(v.type) || (dayTypes[v.type] || 0) >= (v.type === 'indoor' && (ctx.rainy || dayCtx.rainy) ? 3 : 2) || (v.type === 'golf' && !v.indoorGolf) || eveningOnlyVenue(v)) continue;
+        if (capped(v.type) || (dayTypes[v.type] || 0) >= (v.type === 'indoor' && (ctx.rainy || dayCtx.rainy) ? 3 : 2) || (v.type === 'golf' && !v.indoorGolf && !(shortOwnRound(v) && !dayTypes.golf && (gapEnd - gapStart) >= GAP_MINUTES + 60)) || (v.type === 'golf' && v.indoorGolf) || eveningOnlyVenue(v)) continue;
         if (v.type === 'indoor' && sameIndoorKindToday(v, day.stops, facts, ctx)) continue; // indoor test 17: one place of each kind a day
         if (v.type === 'outdoor' && (/\b(?:steep|summit|summits|ladder|ladders|chains)\b/.test(normWords(v.trailText || '')) || (trailMinutes(v) || 0) >= 150)) continue; // a summit trail is not a pre-dinner filler
         if (spaPlace(v) && (day.stops || []).some((x) => x.venue && spaPlace(x.venue))) continue; // one spa a day (2026-10-25)
@@ -9817,6 +9824,8 @@ function planItinerary(input) {
       if (walking && previousVenue && (v.region !== previousVenue.region || kmBetween(previousVenue,v) == null || kmBetween(previousVenue,v) > walkingLimit)) continue;
       if (c.venueId && c.venueId !== v.id) continue;
       if (!c.venueId && mountainLodge(v) && (c.meal === 'dinner' || ['evening', 'night'].includes(daypart))) continue; // lodges close with the lifts
+      // Sport test 8: a golf course with no hours on file is never an evening round (it would end after dark).
+      if (!c.venueId && v.type === 'golf' && !v.indoorGolf && ['evening', 'night'].includes(daypart) && !(v._hours || (v._hours = parseVenueHours(v.hours))).known) continue;
       // A generic rainy-day suggestion should fit the travelling party.
       // Preserve an explicitly requested venue and family playground requests.
       if (input.requirements && c.rainyOption && !c.kids && !c.venueId && /\b(?:indoor playground|young kids|toddlers|ball pit|play structures)\b/i.test(v.plannerDescription || v.textDesc || v.description || '')) continue;

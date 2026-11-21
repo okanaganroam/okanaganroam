@@ -353,7 +353,10 @@ function inferPlannerKinds(v) {
   // are saved), so an ATV request finds it.
   const text = norm([v.name,v.description,v.textName,v.textDesc,v.type==='tour'?v.cuisine:''].filter(Boolean).join(' '));
   const name = norm(v.name);
-  return Object.entries(v.type==='sport'?{...KINDS,...SPORT_KINDS}:KINDS).filter(([kind,re]) => {
+  const golfKinds = v.type==='golf'&&Array.isArray(v.sportKinds)&&v.sportKinds.length>1;
+  return Object.entries(v.type==='sport'||golfKinds?{...KINDS,...SPORT_KINDS}:KINDS).filter(([kind,re]) => {
+    // Sport test 8: a golf listing is a sports kind (disc golf) only when its owner picked it.
+    if (golfKinds&&SPORT_KINDS[kind]&&!KINDS[kind]) return v.sportKinds.some(k=>(SPORT_KIND_PLANNER[k]||[]).includes(kind));
     if (INDOOR_ONLY_PLANNER_KINDS.has(kind)&&v.type&&v.type!=='indoor') return false;
     if (kind==='challenging_hike') {
       if(v.type!=='outdoor')return false;
@@ -370,7 +373,8 @@ function inferPlannerKinds(v) {
     if (v.type==='tour'&&Array.isArray(v.tourKinds)&&v.tourKinds.some(k=>(TOUR_KIND_PLANNER[k]||[]).includes(kind))) return true;
     if (v.type==='indoor'&&Array.isArray(v.indoorKinds)&&v.indoorKinds.some(k=>(INDOOR_KIND_PLANNER[k]||[]).includes(kind))) return true;
     // Sport setup (2026-11-20): a sports listing is the kind its owner picked (an arena is skating, a skate park a skatepark).
-    if (v.type==='sport'&&Array.isArray(v.sportKinds)&&v.sportKinds.some(k=>(SPORT_KIND_PLANNER[k]||[]).includes(kind))) return true;
+    // Sport test 8 (2026-11-21; Marg's golf course with disc golf as her second kind): every owner kind, whatever the type.
+    if ((v.type==='sport'||v.type==='golf')&&Array.isArray(v.sportKinds)&&v.sportKinds.some(k=>(SPORT_KIND_PLANNER[k]||[]).includes(kind))) return true;
     // Tour test 17 (Whistler, 2026-11-18): a tour's own "Wildlife viewing" (the chip's page words) or "eagle viewing" is a
     // wildlife tour; a viewing area or a boardwalk (not a tour) isn't.
     if (kind==='wildlife_tour'&&v.type==='tour'&&/\bwildlife viewing\b|\beagle (?:viewing|watching)\b/.test(text)) return true;
@@ -1608,6 +1612,12 @@ const GROUP_FOOD_RE=/\b(?:dinners?|lunch(?:es)?|brunch|breakfast|suppers?|meals?
 const WALKS_NEGATED_RE=/\b(?:no|without|skip|avoid|not into|no more|don.?t (?:want|like|do|need)(?: to)?|do not (?:want|like|do|need)(?: to)?)\s+(?:\w+\s+)?(?:hik\w*|walks?|walking|trails?)\b/i;
 // Sport setup (2026-11-20): « disque-golf » (French) asks for disc golf.
 REQUEST_SYNONYMS.push([/\bdisques?[- ]golf\b/gi, 'disc golf']);
+// Sport test 8 (2026-11-21; "9 holes after work on Tuesday… around 5:30" planned Marg's course, which closes at 4 PM on
+// Tuesdays, and read "work" as something to look for): a bare evening clock ("around 5:30", "at 6") is PM, and "after work"
+// is about 5:30 PM (unless a time is given); neither is a word to find. The same for "balls" in "hit some balls".
+REQUEST_SYNONYMS.push([/\b(at|around|about|by|from)\s+([1-9])(?::([0-5]\d))?(?![\d:])(?!\s*(?:a\.?m\b|p\.?m\b|o.?clock\s*(?:in the morning)?|h\b|hours?\b|hrs?\b|minutes?\b|mins?\b|days?\b|people\b|kids\b|of us\b|holes?\b|trous\b|km\b|years?\b|yr\b|\$|dollars?\b|%))/gi,(m,w,h,mm,off,str)=>(Number(h)>=4&&Number(h)<=7&&!/\b(?:coffee|breakfast|brunch|caf[eé]|latte|espresso|morning|mornings|sunrise|early|start\w*|begin\w*|leav\w*|depart\w*|opens?|first tee|tee times?|wake|up)\b[^.;!?]{0,30}$/i.test(str.slice(Math.max(0,off-40),off))&&!/^\s*(?:in the morning|du matin)/i.test(str.slice(off+m.length))?`${w} ${h}:${mm||'00'} pm`:m)]);
+REQUEST_SYNONYMS.push([/,?\s*\b(?:right |straight |just )?after (?:work|my shift|the office|school)\b/gi,(m,off,str)=>(/\b(?:at|around|about|from)\s+(?:1[0-2]|[1-9])(?::[0-5]\d)?\s*(?:am|pm)\b/i.test(str)?' ':' at 5:30 pm ')]);
+REQUEST_SYNONYMS.push([/\bhit (?:some|a few|a bucket of) balls\b/gi,'driving range']);
 function tripRequestSynonyms(text){let out=String(text||'');const walksNegated=WALKS_NEGATED_RE.test(out);for(const [re,w] of REQUEST_SYNONYMS)out=out.replace(re,walksNegated&&w==='relaxed easy walks'?'relaxed':w);
  // "Best brunch then a walk" (2026-10-25): "best" ranks a list; in a request with several parts it emptied the plan.
  if(/\b(?:then|followed by|after that|afterwards)\b/i.test(out))out=out.replace(/\b(?:the )?(?:best|top|top rated|highest rated)\s+(?=\w)/gi,'');

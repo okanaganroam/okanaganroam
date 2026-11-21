@@ -1,0 +1,179 @@
+{
+ "venue": {
+  "name": "Summerland Golf & Country Club (test)",
+  "region": "summerland",
+  "type": "golf",
+  "cuisine": "Golf course & driving range",
+  "phone": "250-494-9554 ext. 1",
+  "description": "Summerland Golf & Country Club is a course of two distinct halves. The front nine, on Paradise Flats, plays relatively flat and open with links-style and tree-lined holes, including four par 4s over 400 yards. The back nine turns into a grove of ponderosa pines and drops into Trout Creek Canyon terrain: rolling, elevated, and dramatic, with five holes skirting the canyon and a signature 17th requiring a tee shot across it. The closing hole is a risk-reward par 5 reachable in two for aggressive players. This semi-private club is open to public tee times, backs it up with a 300-plus-yard range, two putting greens, a chipping green, and practice bunkers, plus PGA of Canada lessons and Canyonview Bar & Grill's clubhouse dining. The Canyonview Bar & Grill reopens in spring 2027 after a full renovation.",
+  "patio": 1,
+  "kid_friendly": 1,
+  "address": "2405 Mountain Avenue, Summerland, BC",
+  "website": "https://summerlandgolf.com/",
+  "slug": "summerland-golf-country-club",
+  "latitude": 49.55952,
+  "longitude": -119.69214,
+  "great_groups": 1,
+  "hours": "{\"mon\":[[\"08:00\",\"18:00\"]],\"tue\":[[\"08:00\",\"18:00\"]],\"wed\":[[\"08:00\",\"18:00\"]],\"thu\":[[\"08:00\",\"18:00\"]],\"fri\":[[\"08:00\",\"18:00\"]],\"sat\":[[\"08:00\",\"18:00\"]],\"sun\":[[\"08:00\",\"18:00\"]]}",
+  "description_fr": "Le Summerland Golf & Country Club offre deux neuf trous bien différents. L'aller, sur le plateau Paradise Flats, est plutôt plat et dégagé, avec des trous de style links et d'autres bordés d'arbres, dont quatre normales 4 de plus de 400 verges. Le retour s'enfonce dans une forêt de pins ponderosa et plonge dans le relief du canyon de Trout Creek : vallonné, surélevé et spectaculaire, avec cinq trous qui longent le canyon et un 17e emblématique qui exige un coup de départ par-dessus. Le dernier trou, une normale 5 atteignable en deux coups, récompense les joueurs audacieux. Ce club semi-privé accepte les départs publics et compte un champ de pratique de plus de 300 verges, deux verts d'exercice, un vert d'approche et des fosses de sable, en plus de leçons d'un pro de la PGA du Canada et des repas au Canyonview Bar & Grill du pavillon.",
+  "hours_source": "venue_owner"
+ },
+ "links": {
+  "menu_url": "https://summerlandgolf.com/rates",
+  "booking_url": "https://www.chronogolf.ca/club/summerland-golf-country-club",
+  "facebook_url": "https://www.facebook.com/summerlandgolfclub",
+  "open_months": "03-20:10-31"
+ },
+ "hours_extra": {
+  "seasons": "[{\"from\":\"06-01\",\"to\":\"08-31\",\"label\":\"\",\"hours\":{\"mon\":[[\"06:30\",\"20:00\"]],\"tue\":[[\"06:30\",\"20:00\"]],\"wed\":[[\"06:30\",\"20:00\"]],\"thu\":[[\"06:30\",\"20:00\"]],\"fri\":[[\"06:30\",\"20:00\"]],\"sat\":[[\"06:30\",\"20:00\"]],\"sun\":[[\"06:30\",\"20:00\"]]}}]",
+  "closures": "[{\"from\":\"2027-09-04\",\"to\":\"2027-09-06\",\"note\":\"Closed to the public for the Summerland Men's Amateur\"}]"
+ },
+ "visit_info": {
+  "rows": [
+   {
+    "label": "Booking",
+    "text": "Walk-ons when there’s room. Book tee times for weekends and busy times. Book tee times online or through the pro shop; member-guest rates apply when playing with a member."
+   },
+   {
+    "label": "Prices",
+    "text": "Green fees from $76.19."
+   },
+   {
+    "label": "Ages",
+    "text": "All ages."
+   },
+   {
+    "label": "Known for",
+    "text": "The 17th, a tee shot right over Trout Creek Canyon"
+   },
+   {
+    "label": "Good to know",
+    "text": "Tee times recommended. Cart and club rentals. Restaurant and patio on site. Driving range on site. Dress code: collared shirts, no metal spikes. In winter the pro shop is open Tue to Fri 9-5 and Sat 10-2 for gift cards and club fittings."
+   },
+   {
+    "label": "Groups",
+    "text": "Groups of 12 or more: please book ahead. Tournaments and corporate golf. Group lessons and clinics. Weddings and private events up to 120 golfers, banquet room seats 150. Use the tournament form on our website."
+   },
+   {
+    "label": "Winter",
+    "text": "Golf season runs mid March through the end of October; the Canyonview Bar & Grill follows a seasonal schedule."
+   }
+  ],
+  "booking_url": "https://www.chronogolf.ca/club/summerland-golf-country-club",
+  "source_url": "https://summerlandgolf.com/",
+  "checked_at": "2026-11-21",
+  "owner_labels": [
+   "Ages",
+   "Booking",
+   "Good to know",
+   "Groups",
+   "Known for",
+   "Prices",
+   "Season",
+   "Time needed"
+  ],
+  "owner_was": {
+   "Season": {
+    "text": ""
+   },
+   "Time needed": {
+    "text": ""
+   },
+   "Prices": {
+    "text": ""
+   },
+   "Booking": {
+    "text": "Book tee times online or through the pro shop; member-guest rates apply when playing with a member."
+   },
+   "Ages": {
+    "text": ""
+   }
+  },
+  "owner_fr": {
+   "Season": {
+    "en": "Mar 20 – Oct 31.",
+    "fr": "Du 20 mars au 31 oct."
+   },
+   "Time needed": {
+    "en": "Half a day or more.",
+    "fr": "Une demi-journée ou plus."
+   },
+   "Prices": {
+    "en": "Green fees from $76.19.",
+    "fr": "Droits de jeu à partir de 76,19 $."
+   },
+   "Booking": {
+    "en": "Walk-ons when there’s room. Book tee times for weekends and busy times. Book tee times online or through the pro shop; member-guest rates apply when playing with a member.",
+    "fr": "Départs sans réservation s’il y a de la place. Réservez vos départs pour les fins de semaine et les périodes achalandées."
+   },
+   "Ages": {
+    "en": "All ages.",
+    "fr": "Tous les âges."
+   }
+  },
+  "winery_labels": [
+   "Ages",
+   "Booking",
+   "Prices",
+   "Season",
+   "Time needed"
+  ],
+  "owner_dropped": [
+   {
+    "label": "Green fees",
+    "text": "2026 18 holes: prime time to 3:29 pm $103.81, twilight $88.10; 9 holes $66.67 (before 3 pm) or $47.62. Plus GST; includes range before round."
+   },
+   {
+    "label": "Rentals",
+    "text": "Per person, 18 holes: power cart $20.54, push cart $8.93, club rental $58.04. 9 holes: $14.29, $5.81, $35.71. Plus tax."
+   },
+   {
+    "label": "Season",
+    "text": "Mar 20 – Oct 31.",
+    "owned": true
+   },
+   {
+    "label": "Time needed",
+    "text": "Half a day or more.",
+    "owned": true
+   },
+   {
+    "label": "Dress code",
+    "text": "Collared shirts preferred; no tank tops, sweatpants or cut-offs. Soft-spike or spikeless shoes preferred; no metal spikes or work boots."
+   },
+   {
+    "label": "Practice",
+    "text": "300+ yard practice facility with grass and synthetic tees, bunker, chipping green and 2 putting greens. Daily range use $22.32."
+   }
+  ]
+ },
+ "sport_info": {
+  "kinds": [
+   "golf",
+   "range"
+  ],
+  "length": "half",
+  "book": "busy",
+  "age": "all",
+  "year": "seasonal",
+  "price": 76.19,
+  "cuisine_was": ""
+ },
+ "owner_features": {
+  "free_parking": true,
+  "locally_owned": true,
+  "service_dogs": true
+ },
+ "not_offered": [
+  "dogs",
+  "happy_hour"
+ ],
+ "menu": null,
+ "price_override": {
+  "from_price": 76.19,
+  "basis": "Green fees",
+  "hidden": 0,
+  "decided_at": "2026-11-21T09:14:04.391Z",
+  "reviewer": "owner"
+ }
+}
