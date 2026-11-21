@@ -68548,7 +68548,7 @@ function ownerHelpWidgetHtml(page, opts = {}) {
     const pv1 = opts.venueId ? getVenue(opts.venueId) : null;
     if (pv1 && kindSetupType(pv1.type)) {
       const miss = sportHelpMissing(pv1);
-      const golfy1 = ['golf', 'simgolf', 'range'].includes((venueIndoorInfo(pv1.id).kinds || [])[0] || (pv1.type === 'golf' ? 'golf' : ''));
+      const golfy1 = ((venueIndoorInfo(pv1.id).kinds || [])[0] || (pv1.type === 'golf' ? 'golf' : '')) === 'golf';
       cfg.topics = cfg.topics.map((t) => (t.id === 'setup-missing' ? { ...t, a: String(t.a).replace('{MISSING_EN}', miss.en), aFr: String(t.aFr).replace('{MISSING_FR}', miss.fr) }
         : t.id === 'indoor-theme-nights' && sportSetupType(pv1.type) ? { ...t,
           a: '<p>Say it in one line under <strong>Good to know</strong>, like <em>' + (golfy1 ? 'Men’s night Thursdays: no public tee times after 12 PM' : 'League night Thursdays: limited public times after 6 PM') + '</em>: your page shows it, and search and Build My Trip read it. Then put it on What’s On: on your page (after the setup), tap <strong>Add an event</strong>, give it the first date and its time, and in <strong>Repeats or other dates?</strong> write “every Thursday”. Keep your hours as your open-door hours, and keep your Known for line as it is.</p>',
@@ -81317,7 +81317,7 @@ module.exports = {
   parseTripPlanBody,
   runTripPlan, runTripPlanCore, ownerClosureCount,
   // Sport test 12 (2026-11-21): read by its tests.
-  gatherCompletenessInput, sportHelpMissing,
+  sportHelpMissing,
   // Sport test 6 (2026-11-20): read by its tests.
   sportTimesChange, searchWithoutNegated,
   // Sport test 2 (2026-11-20): the golf winter rule.

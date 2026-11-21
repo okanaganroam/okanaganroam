@@ -1599,12 +1599,12 @@
   // Back on a question already answered: say so, and which answer we have.
   function doneLine(step){
     var d = S.done[step]; if (!d || d === 'skip' || d === 'later') return '';
+    // Never "Saved" over answers that aren't saved yet (bug-check 2026-11-12: a language switch mid-edit).
+    if (pending(step)) return '';
     // Sport test 12 (2026-11-21; Rob saved "Who can come" without tapping an age: the screen said "✓ Saved" over the
     // pre-picked All ages, so he never knew the age was still open). An age we suggested and he never tapped is not
     // saved: the screen says "Suggested: All ages. Tap it to confirm." instead (every kind).
     if (step === 'offer' && INDOOR && S.tour.ageGuessed && S.tour.age && !TI.age) return '';
-    // Never "Saved" over answers that aren't saved yet (bug-check 2026-11-12: a language switch mid-edit).
-    if (pending(step)) return '';
     // Winery test 1 (2026-11-12): a screen reached by moving on after a save already shows that save's "Saved" line, so
     // it never stacks a second "Saved. You can change it here." on top.
     if (S.flashOn && S.flashOn === S.step) return '';
@@ -2556,7 +2556,8 @@
       // now starts from the current hours as a short list, one row a day with a big Change button; only the days tapped
       // open up (the full card: Open/Closed, the times, Midnight / 1 AM / 2 AM, the early-morning note, "Same as"). An
       // open day can copy its hours to every day or Mon–Fri. Days never opened keep their hours exactly as stored.
-      if (!seas && !S.hoursOpenSet) { S.hoursOpenSet = true; S.hoursOpen = {}; if (!DAYS.some(function(d){ return S.week[d]; })) { S.hoursOpen.mon = true; S.hoursAutoMon = true; } }
+      if (!seas && !S.hoursOpenSet) { S.hoursOpenSet = true; S.hoursOpen = {}; if (!DAYS.some(function(d){ return S.week[d]; })) S.hoursOpen.mon = true; }
+      if (!seas && !S.hoursAutoMonSet) { S.hoursAutoMonSet = true; if (S.hoursOpen.mon && !DAYS.some(function(d){ return S.week[d]; })) S.hoursAutoMon = true; }
       var wk = W(), hop = HO(), firstOpenCard = DAYS.filter(function(d){ return hop[d] && wk[d]; })[0];
       // Exact days (pub test 7): "open late May to early September" without rounding to whole months.
       // Café test 2 (Whistler, 2026-11-15): no « Quels mois ? » heading left over the exact dates (it has no month chips then).

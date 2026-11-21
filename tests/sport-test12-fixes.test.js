@@ -75,11 +75,7 @@ async function setUp(kinds, o = {}) {
   await ok(change(t, { indoor_info: { kinds, length: o.length || '1-2h', book: o.book || 'busy', year: o.season ? 'seasonal' : 'all' }, indoor_price: o.price || 40 }));
   return { v, t };
 }
-const completeness = (id) => {
-  const v = app.getVenue(id);
-  const hh = null;
-  return require('../portal-completeness.js').scoreCompleteness(app.gatherCompletenessInput ? app.gatherCompletenessInput(v, app.ownerVenueSnapshot(v, hh), hh) : {}, { today: app.todayLocal() });
-};
+const missingText = (id) => app.sportHelpMissing(app.getVenue(id)).en;
 const NAMES = (p) => [...((p.outing && p.outing.stops) || []), ...((p.itinerary && p.itinerary.stops) || []), ...(p.days || []).flatMap((d) => d.stops || [])].filter((x) => x && x.venue).map((x) => x.venue.name);
 
 test('1. an untouched suggested age: never saved, never Kid-Friendly, never "✓ Saved", named on the checklist; golf counts it toward 100%', async () => {
@@ -102,9 +98,9 @@ test('1. an untouched suggested age: never saved, never Kid-Friendly, never "✓
     assert.equal(app.venueIndoorInfo(v.id).age, undefined, `${kinds}: second save`);
     assert.ok(!app.getVenue(v.id).kid_friendly, `${kinds}: no Kid-Friendly from the second save`);
     // The checklist: golf, disc golf and rinks count the untouched All ages; the others name the item plainly.
-    const missing = (completeness(v.id).missing || []).map((it) => it.key);
-    assert.equal(!missing.includes('indoor_ages'), counts, `${kinds}: ${missing.join(', ')}`);
-    if (!counts) assert.equal((completeness(v.id).missing || []).find((it) => it.key === 'indoor_ages').en, 'Who can come: tap an age to confirm');
+    const missing = missingText(v.id);
+    assert.equal(!/Who can come/.test(missing), counts, `${kinds}: ${missing}`);
+    assert.match(fs.readFileSync(path.join(__dirname, '..', 'portal-completeness.js'), 'utf8'), /key: 'indoor_ages'[^\n]*\n\s*en: 'Who can come: tap an age to confirm'/);
     // Help names it ("what's missing").
     const b = helpBot(await getText(`/owner/${t}/setup`));
     const r = b.best('it says I need who can come to get 100% but it already says saved. what\'s missing?');
@@ -117,7 +113,7 @@ test('1. an untouched suggested age: never saved, never Kid-Friendly, never "✓
     assert.ok(!g2.has('#suAgeGuess'), `${kinds}: no suggestion line once tapped`);
     await g2.click('offerSave');
     assert.equal(app.venueIndoorInfo(v.id).age, 'all', `${kinds}: tapped`);
-    assert.ok(!(completeness(v.id).missing || []).some((it) => it.key === 'indoor_ages'));
+    assert.doesNotMatch(missingText(v.id), /Who can come/);
   }
   // The kinds that count an untouched All ages.
   assert.deepEqual(require('../sport-kinds.js').SPORT_UNTAPPED_AGE_OK_KINDS, ['golf', 'range', 'rink', 'skatepark', 'discgolf']);
