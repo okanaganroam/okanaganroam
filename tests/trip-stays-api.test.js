@@ -270,6 +270,27 @@ test('Book your trip box: trip line, estimate, Book my trip steps, See all, note
   assert.match(partial, /<\/button><p class="t3-book-parts">Stay \$300/);
   assert.equal((partial.match(/t3-book-parts/g) || []).length, 1, 'the parts once, not again in the breakdown');
   assert.equal(f.t3EstimateHtml({ ...est, parts: [] }, false), '');
+  // No price band for the stay (2026-11-20): "Stay: see live prices" inside the estimate opens the live-prices sheet,
+  // else the stay's main booking link; nothing when the stay is priced or has no link.
+  const noStay = { ...est, showTotal: false, parts: est.parts.slice(1) };
+  const liveStay = { id: 5, name: 'Family Inn', bookingLinks: [{ key: 'booking_com', url: 'https://www.booking.com/hotel/ca/x.html', affiliate: false, rel: 'nofollow noopener' }], livePrices: { url: 'https://www.stay22.com/embed/gm?aid=x', urlFr: 'https://www.stay22.com/embed/gm?aid=x&ljs=fr' } };
+  const ls = f.t3EstimateHtml(noStay, false, liveStay);
+  assert.match(ls, /Known costs so far<\/strong>/);
+  assert.match(ls, /<p class="t3-book-parts">Tastings \$60 · Meals \$220–\$350<\/p><p class="t3-book-parts t3-book-est-stay">Stay: <a href="https:\/\/www\.stay22\.com\/embed\/gm\?aid=x" target="_blank" rel="sponsored nofollow noopener" data-track="stay_click" data-stay-id="5" data-link="live_prices" data-affiliate="1" data-t3-live data-t3-live-name="Family Inn">see live prices <span aria-hidden="true">↗<\/span><\/a><\/p><div class="t3-book-more"/);
+  f.setFr(true);
+  assert.match(f.t3EstimateHtml(noStay, true, liveStay), /t3-book-est-stay">Hébergement : <a href="https:\/\/www\.stay22\.com\/embed\/gm\?aid=x&amp;ljs=fr"[^>]*data-t3-live[^>]*>voir les prix en direct <span aria-hidden="true">↗<\/span><\/a>/);
+  f.setFr(false);
+  const own = { id: 5, name: 'Family Inn', bookingLinks: [{ key: 'own', url: 'http://bad.example.com/' }, { key: 'own', url: 'https://www.example.com/book', affiliate: false, rel: 'nofollow noopener' }] };
+  const os = f.t3EstimateHtml(noStay, false, own);
+  assert.match(os, /t3-book-est-stay">Stay: <a href="https:\/\/www\.example\.com\/book" target="_blank" rel="nofollow noopener" data-track="stay_click" data-stay-id="5" data-link="own">see live prices <span aria-hidden="true">↗<\/span><\/a><\/p>/);
+  assert.doesNotMatch(os, /data-t3-live|data-t3-step/, 'the booking link does not open the sheet or count as a Book my trip step');
+  f.setFr(true);
+  assert.match(f.t3EstimateHtml(noStay, true, own), />Hébergement : <a href="https:\/\/www\.example\.com\/book"[^>]*>voir les prix en direct/);
+  f.setFr(false);
+  assert.doesNotMatch(f.t3EstimateHtml(noStay, false, { id: 5, name: 'X', bookingLinks: [] }), /t3-book-est-stay/, 'no link: no line');
+  assert.doesNotMatch(f.t3EstimateHtml({ ...est, showTotal: false }, false, liveStay), /t3-book-est-stay/, 'a priced stay: no line');
+  assert.doesNotMatch(f.t3EstimateHtml(est, false, liveStay), /t3-book-est-stay/, 'a full estimate: no line');
+  assert.equal(f.t3EstimateHtml({ ...noStay, parts: [] }, false, liveStay), '');
 
   // Book my trip: one link (a real link, one tab per tap), then Next with Open / Skip / Mark done, then All set.
   const steps = [
