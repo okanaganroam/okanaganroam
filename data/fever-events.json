@@ -1,0 +1,6 @@
+{
+ "updated": "2026-11-21",
+ "how": "Our What's On event id -> the Fever page that sells tickets for that same event. Add an event only after checking it is the same show at the same venue on the same date(s) (GET /api/events, then the Fever page). Never create an event from Fever's list. Used only when FEVER_AFFILIATE_TEMPLATE is set (fever.js).",
+ "checked": "2026-11-21: none of Fever's 10 Kelowna shows and games (feverup.com/en/kelowna) is in our What's On yet, so no matches.",
+ "events": {}
+}
