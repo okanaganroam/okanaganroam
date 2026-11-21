@@ -514,6 +514,10 @@ function rowToVenue(row) {
       if (closures.length) v.special_closures = closures;
       if (x.seasons.length || closures.length || x.holidays) v.hours_live = hoursWithExtras(v);
     }
+    // Temporary hours (2026-11-21): `hours` is the temporary week until hours_until (Pacific, inclusive), then
+    // hours_regular comes back by itself.
+    const t = activeTempHours(v);
+    if (t && t.until >= todayLocal()) { v.hours_until = t.until; v.hours_regular = t.regular; }
   }
   return v;
 }
@@ -1348,6 +1352,26 @@ function guardedHoursVerifyUpdate(id, expectedCurrentHours, verified, meta, now 
   if (!existing) return { ok: false, reason: 'venue_not_found' };
   if (existing.redirect_to !== null && existing.redirect_to !== undefined) return { ok: false, reason: 'venue_redirected' };
 
+  // Temporary hours (2026-11-21): meta.temporary = { until, regular_hours?, note? }. The verified week shows until the
+  // end of `until` (Pacific), then expireTemporaryItems() puts the regular week back: regular_hours, or the hours stored
+  // now. Never on a listing the business manages ("Verified by the business": its hours are the owner's).
+  let temp = null;
+  if (m.temporary !== undefined && m.temporary !== null) {
+    const t = m.temporary;
+    if (!t || typeof t !== 'object' || Array.isArray(t)) return { ok: false, reason: 'invalid_temporary', detail: 'temporary must be { until, regular_hours?, note? } or null' };
+    const extraT = Object.keys(t).filter((k) => !['until', 'regular_hours', 'note'].includes(k));
+    if (extraT.length) return { ok: false, reason: 'invalid_temporary', detail: `temporary has unexpected field(s): ${extraT.join(', ')}` };
+    const untilErr = untilDateError(t.until, {}, now);
+    if (untilErr) return { ok: false, reason: 'invalid_temporary', detail: untilErr };
+    const reg = validateVerifiedHours(t.regular_hours !== undefined ? t.regular_hours : existing.hours);
+    if (!reg.ok) return { ok: false, reason: 'invalid_temporary', detail: t.regular_hours !== undefined ? `regular_hours: ${reg.detail}` : 'no regular hours to go back to: send temporary.regular_hours' };
+    if (canonicalWeek(reg.json) === canonicalWeek(checked.json)) return { ok: false, reason: 'invalid_temporary', detail: 'the temporary week is the same as the regular week' };
+    if (t.note !== undefined && t.note !== null && (typeof t.note !== 'string' || t.note.length > 200)) return { ok: false, reason: 'invalid_temporary', detail: 'note: a string up to 200 characters' };
+    if (venueIsClaimed(id)) return { ok: false, reason: 'owner_verified', detail: 'the business manages this listing ("Verified by the business"); its hours are theirs' };
+    temp = { until: t.until, hours: checked.json, regular: reg.json, regular_source: t.regular_hours !== undefined ? null : existing.hours_source, regular_checked_at: t.regular_hours !== undefined ? null : existing.hours_checked_at,
+      note: typeof t.note === 'string' && t.note.trim() ? t.note.trim() : null, set_at: todayLocal(now), batch_id: m.batch_id.trim() };
+  }
+
   const next = { hours: checked.json, hours_source: v.hours_source, hours_checked_at: v.hours_checked_at };
   const expected = expectedCurrentHours === undefined ? null : expectedCurrentHours;
   let txOpen = false;
@@ -1378,9 +1402,18 @@ function guardedHoursVerifyUpdate(id, expectedCurrentHours, verified, meta, now 
     for (const f of changedFields) {
       logStmt.run(id, f, existing[f] === null ? null : String(existing[f]), next[f], next.hours_source, m.reason.trim(), m.batch_id.trim(), m.reviewed_by || null);
     }
+    // A verified week always replaces a pending temporary stretch (a new one, or none).
+    let prevTemp = null;
+    try { prevTemp = (db.prepare('SELECT temp_hours FROM venue_hours_extra WHERE venue_id = ?').get(id) || {}).temp_hours || null; } catch (e) { prevTemp = null; }
+    const tempJson = temp ? JSON.stringify(temp) : null;
+    if (tempJson || prevTemp) {
+      db.prepare('INSERT INTO venue_hours_extra (venue_id, temp_hours) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET temp_hours = excluded.temp_hours, updated_at = CURRENT_TIMESTAMP').run(id, tempJson);
+      if (tempJson !== prevTemp) logStmt.run(id, 'temp_hours', prevTemp, tempJson, next.hours_source, m.reason.trim(), m.batch_id.trim(), m.reviewed_by || null);
+      clearTempHoursCache();
+    }
     db.exec('COMMIT');
     txOpen = false;
-    return { ok: true, changedFields, ...next };
+    return { ok: true, changedFields: tempJson !== prevTemp ? [...changedFields, 'temp_hours'] : changedFields, ...next, temporary: temp ? { until: temp.until, regular_hours: temp.regular, note: temp.note } : null };
   } catch (err) {
     if (txOpen) {
       try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ }
@@ -7594,9 +7627,9 @@ function getAdvisoryNotesWithDates() {
     SELECT ci.content_id AS id, ci.note AS note, ci.created_at AS added_at
     FROM collection_items ci
     JOIN collections c ON c.id = ci.collection_id
-    WHERE c.kind = ? AND ci.content_type = 'venue'
+    WHERE c.kind = ? AND ci.content_type = 'venue' AND (ci.until_date IS NULL OR ci.until_date >= ?)
     ORDER BY ci.created_at ASC, ci.rowid ASC
-  `).all(ADVISORY_COLLECTION_KIND)) map.set(r.id, { note: r.note || '', addedAt: r.added_at || null });
+  `).all(ADVISORY_COLLECTION_KIND, todayLocal())) map.set(r.id, { note: r.note || '', addedAt: r.added_at || null });
   return map;
 }
 // 'region/slug' -> [{ label, from: 'MM-DD', to: 'MM-DD' }]: the dated rate
@@ -10547,8 +10580,9 @@ function getCollectionNotes(kind) {
     JOIN collections c ON c.id = ci.collection_id
     JOIN venues v ON v.id = ci.content_id
     WHERE c.kind = ? AND ci.content_type = 'venue' AND v.redirect_to IS NULL AND v.type != 'stay'
+      AND (ci.until_date IS NULL OR ci.until_date >= ?)
     ORDER BY ci.created_at ASC, ci.rowid ASC
-  `).all(kind);
+  `).all(kind, todayLocal());
   const map = new Map();
   for (const r of rows) map.set(r.id, r.note || '');
   return map;
@@ -11691,6 +11725,13 @@ function validateVisitInfo(input) {
       if (!httpUrl(r.url)) return { ok: false, detail: 'row url must be an http(s) link' };
       row.url = r.url.trim();
     }
+    // until (2026-11-21): a temporary line ("Pre-season hours ...") shows to the end of this day (Pacific), then
+    // drops out by itself (venueVisitInfo, expireTemporaryItems).
+    if (r.until !== undefined && r.until !== null) {
+      const err = untilDateError(r.until);
+      if (err) return { ok: false, detail: `row until: ${err}` };
+      row.until = r.until;
+    }
     rows.push(row);
   }
   if (v.booking_url !== undefined && v.booking_url !== null && !httpUrl(v.booking_url)) return { ok: false, detail: 'booking_url must be an http(s) link or null' };
@@ -11709,8 +11750,15 @@ function validateVisitInfo(input) {
 function venueVisitInfo(venueId) {
   try {
     const r = db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(venueId);
-    return r ? JSON.parse(r.info) : null;
+    return r ? visitInfoWithoutExpired(JSON.parse(r.info)) : null;
   } catch (e) { return null; }
+}
+// A box without its lines whose `until` day is over (Pacific); null when nothing is left to show.
+function visitInfoWithoutExpired(info, today = todayLocal()) {
+  if (!info || !Array.isArray(info.rows) || !info.rows.some((x) => x && x.until)) return info;
+  const rows = info.rows.filter((x) => !(x && x.until && x.until < today));
+  if (rows.length === info.rows.length) return info;
+  return rows.length || info.booking_url ? { ...info, rows } : null;
 }
 function currentVisitInfoJson(venueId) {
   try { const r = db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(venueId); return r ? r.info : null; } catch (e) { return null; }
@@ -13556,23 +13604,36 @@ function guardedCollectionMembershipUpdate(kind, venueId, action, note, meta) {
     .prepare("SELECT 1 FROM collection_items WHERE collection_id = ? AND content_type = 'venue' AND content_id = ?")
     .get(collection.id, venueId);
   if (action === 'add' && existing) return { ok: false, reason: 'already_member' };
-  if (action === 'remove' && !existing) return { ok: false, reason: 'not_member' };
+  if ((action === 'remove' || action === 'set_until') && !existing) return { ok: false, reason: 'not_member' };
+  // Ends by itself (2026-11-21): meta.until ('YYYY-MM-DD', the last day it shows, Pacific) on an add, or action
+  // 'set_until' to give an existing membership an end date (null clears it). expireTemporaryItems() removes it after.
+  const until = meta && typeof meta.until === 'string' ? meta.until : null;
 
   let txOpen = false;
   try {
     db.exec('BEGIN');
     txOpen = true;
+    if (action === 'set_until') {
+      const before = db.prepare("SELECT until_date FROM collection_items WHERE collection_id = ? AND content_type = 'venue' AND content_id = ?").get(collection.id, venueId);
+      db.prepare("UPDATE collection_items SET until_date = ? WHERE collection_id = ? AND content_type = 'venue' AND content_id = ?").run(until, collection.id, venueId);
+      db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(venueId);
+      db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+        VALUES (?, ?, ?, ?, 'editorial_collection', ?, 'high', ?, 0, ?)`).run(venueId, `collection:${kind}:until`, before ? before.until_date : null, until, meta.reason, meta.batch_id, meta.reviewed_by || null);
+      db.exec('COMMIT');
+      txOpen = false;
+      return { ok: true, kind, venue_id: venueId, action, until };
+    }
     if (action === 'add') {
       const next = db
         .prepare('SELECT COALESCE(MAX(position), 0) + 1 AS p FROM collection_items WHERE collection_id = ?')
         .get(collection.id).p;
       // French advisories (2026-10-19, round 7): meta.note_fr, when given, is stored beside the English note.
       if (meta && typeof meta.note_fr === 'string' && meta.note_fr.trim()) {
-        db.prepare(`INSERT INTO collection_items (collection_id, content_type, content_id, note, note_fr, position) VALUES (?, 'venue', ?, ?, ?, ?)`)
-          .run(collection.id, venueId, note, meta.note_fr.trim(), next);
+        db.prepare(`INSERT INTO collection_items (collection_id, content_type, content_id, note, note_fr, position, until_date) VALUES (?, 'venue', ?, ?, ?, ?, ?)`)
+          .run(collection.id, venueId, note, meta.note_fr.trim(), next, until);
       } else {
-        db.prepare(`INSERT INTO collection_items (collection_id, content_type, content_id, note, position) VALUES (?, 'venue', ?, ?, ?)`)
-          .run(collection.id, venueId, note, next);
+        db.prepare(`INSERT INTO collection_items (collection_id, content_type, content_id, note, position, until_date) VALUES (?, 'venue', ?, ?, ?, ?)`)
+          .run(collection.id, venueId, note, next, until);
       }
     } else {
       db.prepare("DELETE FROM collection_items WHERE collection_id = ? AND content_type = 'venue' AND content_id = ?")
@@ -13601,7 +13662,7 @@ function guardedCollectionMembershipUpdate(kind, venueId, action, note, meta) {
   const members = db
     .prepare("SELECT COUNT(*) AS n FROM collection_items WHERE collection_id = ? AND content_type = 'venue'")
     .get(collection.id).n;
-  return { ok: true, kind, venue_id: venueId, action, members };
+  return { ok: true, kind, venue_id: venueId, action, members, ...(until ? { until } : {}) };
 }
 
 // Venue page picks (2026-10-14). These used to be the six highest raw
@@ -42653,6 +42714,13 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     if (season && season.until && season.kind !== 'reopening') {
       localBusiness.openingHoursSpecification = localBusiness.openingHoursSpecification.map((spec) => (spec.validThrough ? spec : { ...spec, validThrough: season.until }));
     }
+    // Temporary hours (2026-11-21): the temporary week runs through its last day, and the regular week follows it.
+    const temp = activeTempHours(venue);
+    if (temp && temp.until >= todayLocal(opts.now || new Date())) {
+      const after = addLocalDays(temp.until, 1);
+      localBusiness.openingHoursSpecification = localBusiness.openingHoursSpecification.map((spec) => (spec.validThrough ? spec : { ...spec, validThrough: temp.until }))
+        .concat(openingSpecsFor(temp.regular, { validFrom: after }));
+    }
   }
   // Temporary closures (2026-10-19, round 8): closed dates go in specialOpeningHoursSpecification, also for a place
   // with no weekly hours stored.
@@ -53488,7 +53556,7 @@ function hoursExtrasMap() {
   }
   return hoursExtraCache.map;
 }
-function clearHoursExtraCache() { hoursExtraCache = null; }
+function clearHoursExtraCache() { hoursExtraCache = null; tempHoursCache = null; }
 // -> { seasons: [...], closures: [...] } (both lists empty when the venue has none).
 function venueHoursExtras(venueId) {
   const x = hoursExtrasMap().get(venueId);
@@ -53519,6 +53587,168 @@ function hoursWithExtras(v, now = new Date()) {
   if (x.holidays) obj._holidays = true;
   return JSON.stringify(obj);
 }
+
+// ---------- Items that end by themselves (2026-11-21, Dayton approved) ----------
+// A temporary change used to need someone to remember to undo it (opening-week hours, pre-season hours, "closed Nov 24"
+// notices). Now it can carry its last day, `until` ('YYYY-MM-DD', Pacific, inclusive), and the site stops showing it the
+// day after, with no deploy and no script:
+//   advisories (any collection kind): collection_items.until_date, set with POST /admin/collection-membership
+//     (until on 'add', or action 'set_until'). Readers skip it from the next day; expireTemporaryItems() then removes it.
+//   "Plan your visit" lines: a row's own `until` (POST /admin/set-visit-info). venueVisitInfo() skips it; the sweep
+//     takes it out of the stored box.
+//   hours: POST /admin/verify-hours with temporary: { until, regular_hours? }. venues.hours holds the temporary week (so
+//     every reader -- cards, Roam Now / Open Now, the venue page, JSON-LD, the API -- shows the same thing), and
+//     venue_hours_extra.temp_hours keeps the regular week it goes back to. Build My Trip asks for a date (weekJsonOn), so a
+//     trip after `until` already gets the regular week. After `until` the sweep writes the regular week back (audited,
+//     'auto_expire'), but only while venues.hours is still the temporary week: hours changed since (the owner, research)
+//     win and the pending revert is dropped.
+// Closures (venue_hours_extra.closures) and season notices (venue_seasons) already end on their own dates.
+// expireTemporaryItems() runs at startup and every 5 minutes (startExpiryTimer); every write bumps venues.updated_at,
+// so the cached pages and the Roam Now data move with it.
+const UNTIL_MAX_DAYS = 400;
+function untilDateError(value, { allowNull = false } = {}, now = new Date()) {
+  if (value === null && allowNull) return null;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || !parseLocalDate(value)) return 'until must be a real YYYY-MM-DD date';
+  const today = todayLocal(now);
+  if (value < today) return 'until is already over (it is the last day the item shows, Pacific time)';
+  if (value > addLocalDays(today, UNTIL_MAX_DAYS)) return `until must be within ${UNTIL_MAX_DAYS} days`;
+  return null;
+}
+// An hours JSON as one comparable string (days in mon..sun order), or null.
+function canonicalWeek(raw) {
+  let o = raw;
+  try { if (typeof raw === 'string') o = JSON.parse(raw); } catch (e) { return null; }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  const week = {};
+  for (const d of ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']) week[d] = o[d] === undefined ? '__absent__' : o[d];
+  return JSON.stringify(week);
+}
+var tempHoursCache = null; // var: clearHoursExtraCache (above) may clear it
+// venue id -> { until, hours, regular, regular_source, regular_checked_at, note, set_at, batch_id }
+function tempHoursMap() {
+  if (!tempHoursCache || Date.now() - tempHoursCache.at > 60000) {
+    const map = new Map();
+    try {
+      for (const r of db.prepare('SELECT venue_id, temp_hours FROM venue_hours_extra WHERE temp_hours IS NOT NULL').all()) {
+        let t = null;
+        try { t = JSON.parse(r.temp_hours); } catch (e) { t = null; }
+        if (t && typeof t.until === 'string' && t.hours && t.regular) map.set(r.venue_id, t);
+      }
+    } catch (e) { /* an old copy without the column */ }
+    tempHoursCache = { at: Date.now(), map };
+  }
+  return tempHoursCache.map;
+}
+function clearTempHoursCache() { tempHoursCache = null; }
+// The venue's temporary stretch while its stored hours are still the temporary week, or null.
+function activeTempHours(v) {
+  const t = v && v.id != null && v.hours ? tempHoursMap().get(v.id) : null;
+  return t && canonicalWeek(v.hours) === canonicalWeek(t.hours) ? t : null;
+}
+// The usual week on a date: the regular hours once a temporary stretch is over (a trip after `until`), else v.hours.
+function baseHoursOn(v, date) {
+  const t = activeTempHours(v);
+  return t && date && String(date).slice(0, 10) > t.until ? t.regular : (v ? v.hours : null);
+}
+
+// Removes what has ended. -> { advisories, visit_rows, hours_reverted, hours_dropped }. Idempotent; each change is its own
+// small transaction guarded on the stored value, logged in venue_enrichment_log (source 'auto_expire').
+function expireTemporaryItems(now = new Date()) {
+  const today = todayLocal(now);
+  const out = { advisories: 0, visit_rows: 0, hours_reverted: 0, hours_dropped: 0 };
+  const batch = `auto-expire-${today}`;
+  const log = db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+    VALUES (?, ?, ?, ?, 'auto_expire', ?, 'high', ?, 1, NULL)`);
+  const touch = db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+  const tx = (fn) => {
+    db.exec('BEGIN IMMEDIATE');
+    try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { try { db.exec('ROLLBACK'); } catch (_) { /* none */ } throw e; }
+  };
+  let items = [];
+  try {
+    items = db.prepare(`SELECT ci.rowid AS rid, ci.content_id AS id, ci.note AS note, ci.until_date AS until, c.kind AS kind FROM collection_items ci
+      JOIN collections c ON c.id = ci.collection_id WHERE ci.content_type = 'venue' AND ci.until_date IS NOT NULL AND ci.until_date < ?`).all(today);
+  } catch (e) { items = []; }
+  for (const it of items) {
+    tx(() => {
+      if (db.prepare('DELETE FROM collection_items WHERE rowid = ? AND until_date = ?').run(it.rid, it.until).changes !== 1) return;
+      log.run(it.id, `collection:${it.kind}`, 'member', 'absent', `ended ${it.until}: ${String(it.note || '').slice(0, 300)}`, batch);
+      touch.run(it.id);
+      out.advisories++;
+    });
+  }
+  let boxes = [];
+  try { boxes = db.prepare(`SELECT venue_id, info FROM venue_visit_info WHERE info LIKE '%"until"%'`).all(); } catch (e) { boxes = []; }
+  for (const b of boxes) {
+    let info = null;
+    try { info = JSON.parse(b.info); } catch (e) { continue; }
+    const kept = visitInfoWithoutExpired(info, today);
+    if (kept === info) continue;
+    tx(() => {
+      const nextJson = kept ? JSON.stringify(kept) : null;
+      const ch = nextJson === null
+        ? db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ? AND info = ?').run(b.venue_id, b.info).changes
+        : db.prepare('UPDATE venue_visit_info SET info = ?, updated_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND info = ?').run(nextJson, b.venue_id, b.info).changes;
+      if (ch !== 1) return;
+      log.run(b.venue_id, 'visit_info', b.info, nextJson, 'a line ended (until)', batch);
+      touch.run(b.venue_id);
+      out.visit_rows += (info.rows || []).length - (kept ? kept.rows.length : 0);
+    });
+  }
+  let temps = [];
+  try { temps = db.prepare('SELECT venue_id, temp_hours FROM venue_hours_extra WHERE temp_hours IS NOT NULL').all(); } catch (e) { temps = []; }
+  for (const r of temps) {
+    let t = null;
+    try { t = JSON.parse(r.temp_hours); } catch (e) { t = null; }
+    if (t && typeof t.until === 'string' && t.until >= today) continue;
+    tx(() => {
+      if (db.prepare('UPDATE venue_hours_extra SET temp_hours = NULL, updated_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND temp_hours = ?').run(r.venue_id, r.temp_hours).changes !== 1) return;
+      const v = db.prepare('SELECT hours FROM venues WHERE id = ? AND redirect_to IS NULL').get(r.venue_id);
+      if (t && t.regular && v && canonicalWeek(v.hours) === canonicalWeek(t.hours)) {
+        const ch = db.prepare(`UPDATE venues SET hours = ?, hours_source = COALESCE(?, hours_source), hours_checked_at = COALESCE(?, hours_checked_at), updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND hours IS ?`).run(t.regular, t.regular_source || null, t.regular_checked_at || null, r.venue_id, v.hours).changes;
+        if (ch === 1) {
+          syncDerivedHoursBadges(r.venue_id);
+          log.run(r.venue_id, 'hours', v.hours, t.regular, `temporary hours ended ${t.until}: back to the regular week`, batch);
+          out.hours_reverted++;
+          return;
+        }
+      }
+      log.run(r.venue_id, 'temp_hours', r.temp_hours, null, 'temporary hours ended; hours had changed since, so they were kept', batch);
+      out.hours_dropped++;
+    });
+  }
+  if (out.hours_reverted || out.hours_dropped) { clearTempHoursCache(); clearHoursExtraCache(); }
+  if (out.advisories || out.visit_rows || out.hours_reverted || out.hours_dropped) console.log(`[expire] ${today}: ${JSON.stringify(out)}`);
+  return out;
+}
+// Everything with an end date still to come (the admin page and GET /admin/temporary-items).
+function temporaryItemsList(now = new Date()) {
+  const today = todayLocal(now);
+  const name = (id) => { const v = db.prepare('SELECT name, region, type, slug FROM venues WHERE id = ?').get(id); return v ? v.name : `#${id}`; };
+  const advisories = db.prepare(`SELECT ci.content_id AS id, c.kind AS kind, ci.note AS note, ci.until_date AS until FROM collection_items ci JOIN collections c ON c.id = ci.collection_id
+    WHERE ci.content_type = 'venue' AND ci.until_date IS NOT NULL ORDER BY ci.until_date, ci.content_id`).all().map((r) => ({ ...r, name: name(r.id), ended: r.until < today }));
+  const visit_rows = [];
+  for (const b of db.prepare(`SELECT venue_id, info FROM venue_visit_info WHERE info LIKE '%"until"%'`).all()) {
+    let info = null;
+    try { info = JSON.parse(b.info); } catch (e) { continue; }
+    for (const row of (info && info.rows) || []) if (row && row.until) visit_rows.push({ id: b.venue_id, name: name(b.venue_id), label: row.label, text: row.text, until: row.until, ended: row.until < today });
+  }
+  const hours = [];
+  for (const [id, t] of tempHoursMap()) {
+    const v = db.prepare('SELECT hours FROM venues WHERE id = ?').get(id);
+    hours.push({ id, name: name(id), until: t.until, hours: t.hours, regular: t.regular, note: t.note || null, still_temporary: !!(v && canonicalWeek(v.hours) === canonicalWeek(t.hours)), ended: t.until < today });
+  }
+  hours.sort((a, b) => a.until.localeCompare(b.until) || a.id - b.id);
+  return { today, advisories, visit_rows, hours };
+}
+function startExpiryTimer() {
+  if (process.env.NODE_ENV === 'test' || process.env.EXPIRY_DISABLED === '1') return;
+  const run = () => { try { expireTemporaryItems(); } catch (e) { console.error('[expire]', e.message); } };
+  run();
+  const t = setInterval(run, 5 * 60 * 1000);
+  t.unref();
+}
 // The plain week that applies on a date (a seasonal set, or the usual hours), for readers that only know weekdays
 // (Build My Trip). Closures are handled separately (venueClosedOn).
 function weekJsonOn(v, date) {
@@ -53538,14 +53768,15 @@ function weekJsonOn(v, date) {
   // works the same way outside a stretch.
   if (!s && v && v.hours && hoursModule && hoursModule.holidayOn(String(date).slice(0, 10)) && venueHoursExtras(v.id).holidays) {
     try {
-      const wd = localWeekdayKey(String(date).slice(0, 10)), week = JSON.parse(v.hours);
+      const wd = localWeekdayKey(String(date).slice(0, 10)), week = JSON.parse(baseHoursOn(v, date));
       if (week && typeof week === 'object' && !Array.isArray(week) && (!Array.isArray(week[wd]) || !week[wd].length)) {
         const src = ['sat', 'sun', 'fri', 'mon', 'tue', 'wed', 'thu'].find((d) => Array.isArray(week[d]) && week[d].length);
         if (src) { week[wd] = week[src]; return JSON.stringify(week); }
       }
     } catch (e) { /* the week as stored */ }
   }
-  return s ? JSON.stringify(s.hours) : v ? v.hours : null;
+  // Temporary hours (2026-11-21): a date after the stretch's last day gets the regular week.
+  return s ? JSON.stringify(s.hours) : v ? baseHoursOn(v, date) : null;
 }
 // The owner's seasonal set that applies on a date, or null (the usual hours).
 function weekSeasonOn(v, date) {
@@ -66731,6 +66962,13 @@ const weekendEmail = require('./weekend-email').create({
   db, weekendEvents: weekendEmailEvents, bookingPick: (friday) => weekendBookingPick(friday), getSender: () => ownerDirectEmail(),
   isSameOrigin: (req) => isSameOriginSubmission(req), clientIp: (req) => requestClientIp(req), emailPattern: SUBMISSION_EMAIL_PATTERN,
 });
+// The weekend email sends itself (2026-11-21; only with WEEKEND_EMAIL_AUTO=on): Wednesday preview with a hold link to the
+// Monday email's address, Thursday 8 AM send. Ticked with the Monday email (startDigestTimer).
+const weekendAuto = require('./weekend-email-auto').create({
+  db, weekendEmail, getSender: () => ownerDirectEmail(), site: { name: 'Okanagan Roam', url: 'https://okanaganroam.com' },
+  adminEmail: () => String(process.env.WEEKEND_EMAIL_ADMIN || process.env.DIGEST_EMAIL || 'okanaganroam@gmail.com').trim(),
+  secret: () => ENRICHMENT_ADMIN_TOKEN,
+});
 
 function ownerResetRecentCount(accountId) {
   return db.prepare("SELECT COUNT(*) AS n FROM owner_password_resets WHERE account_id = ? AND created_at > datetime('now', '-1 hour')").get(accountId).n;
@@ -74019,7 +74257,7 @@ const server = http.createServer(async (req, res) => {
       // note_fr / french_pending (2026-10-19, round 7): an advisory shows on /fr pages too, so adding one needs its
       // French wording (note_fr). french_pending: true lets an urgent English-only advisory through, with a warning;
       // the French page then shows a French fallback built from known phrasings.
-      const ALLOWED_MEMBERSHIP_KEYS = ['kind', 'venue_id', 'action', 'note', 'note_fr', 'french_pending', 'reason', 'batch_id'];
+      const ALLOWED_MEMBERSHIP_KEYS = ['kind', 'venue_id', 'action', 'note', 'note_fr', 'french_pending', 'reason', 'batch_id', 'until'];
       const unexpectedMembershipKeys = Object.keys(body).filter((k) => !ALLOWED_MEMBERSHIP_KEYS.includes(k));
       if (unexpectedMembershipKeys.length > 0) {
         return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedMembershipKeys.join(', ')}` });
@@ -74030,8 +74268,15 @@ const server = http.createServer(async (req, res) => {
       if (!Number.isInteger(body.venue_id) || body.venue_id <= 0) {
         return sendJSON(res, 400, { error: 'venue_id must be a positive integer.' });
       }
-      if (body.action !== 'add' && body.action !== 'remove') {
-        return sendJSON(res, 400, { error: "action must be 'add' or 'remove'." });
+      if (body.action !== 'add' && body.action !== 'remove' && body.action !== 'set_until') {
+        return sendJSON(res, 400, { error: "action must be 'add', 'remove' or 'set_until'." });
+      }
+      // until (2026-11-21): the last day the item shows (Pacific), on 'add' or 'set_until' (null clears it on set_until).
+      {
+        const untilErr = untilDateError(body.until, { allowNull: body.action === 'set_until' });
+        if (body.action === 'remove' && body.until !== undefined) return sendJSON(res, 400, { error: 'until is only for add or set_until.' });
+        if (body.action === 'set_until' && body.until === undefined) return sendJSON(res, 400, { error: 'until is required for set_until (YYYY-MM-DD, or null to clear it).' });
+        if (body.until !== undefined && untilErr) return sendJSON(res, 400, { error: untilErr });
       }
       if (body.note !== undefined && body.note !== null && typeof body.note !== 'string') {
         return sendJSON(res, 400, { error: 'note must be a string when provided.' });
@@ -74050,6 +74295,7 @@ const server = http.createServer(async (req, res) => {
       }
       const membershipNoteFr = typeof body.note_fr === 'string' && body.note_fr.trim() !== '' ? body.note_fr.trim() : null;
       const missingFrench = body.kind === ADVISORY_COLLECTION_KIND && body.action === 'add' && !membershipNoteFr;
+      const membershipUntil = typeof body.until === 'string' ? body.until : null;
       if (missingFrench && body.french_pending !== true) {
         return sendJSON(res, 400, { error: 'note_fr is required for an advisory: give the French wording (or send french_pending: true to add it in English only for now).' });
       }
@@ -74061,7 +74307,7 @@ const server = http.createServer(async (req, res) => {
           body.venue_id,
           body.action,
           typeof body.note === 'string' && body.note.trim() !== '' ? body.note.trim() : null,
-          { reason: body.reason.trim(), batch_id: body.batch_id.trim(), reviewed_by: null, note_fr: membershipNoteFr }
+          { reason: body.reason.trim(), batch_id: body.batch_id.trim(), reviewed_by: null, note_fr: membershipNoteFr, until: membershipUntil }
         );
       } catch (err) {
         return sendJSON(res, 500, { error: 'Membership change failed and was rolled back.', detail: String(err.message || err) });
@@ -74277,6 +74523,47 @@ const server = http.createServer(async (req, res) => {
     // so hours corrected here stay eligible for Open Now (the unguarded
     // PUT /api/venues/:id clears them). Same bearer-token check and strict key
     // allowlist as every admin route.
+    // GET /admin/temporary-items (2026-11-21): every item with an end date (advisories, "Plan your visit" lines,
+    // temporary hours) and the day it ends. Bearer token -> JSON; signed-in admin in a browser -> a small page.
+    // GET /admin/temporary-items/:id -> one venue's current values for fix scripts (compare-and-set + owner check).
+    {
+      const tiOne = /^\/admin\/temporary-items\/(\d+)$/.exec(pathname);
+      if ((pathname === '/admin/temporary-items' || tiOne) && method === 'GET') {
+        if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Temporary-items endpoint is not configured.' });
+        const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+        const bearer = !!(match && safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN));
+        res.setHeader('Cache-Control', 'no-store');
+        if (tiOne) {
+          if (!bearer) return sendJSON(res, 401, { error: 'Unauthorized.' });
+          const id = Number(tiOne[1]);
+          const v = db.prepare('SELECT id, name, region, type, slug, hours, redirect_to FROM venues WHERE id = ?').get(id);
+          if (!v) return sendJSON(res, 404, { error: 'venue_not_found' });
+          const adv = db.prepare(`SELECT ci.note AS note, ci.until_date AS until FROM collection_items ci JOIN collections c ON c.id = ci.collection_id
+            WHERE c.kind = ? AND ci.content_type = 'venue' AND ci.content_id = ? ORDER BY ci.created_at DESC, ci.rowid DESC LIMIT 1`).get(ADVISORY_COLLECTION_KIND, id) || null;
+          const t = tempHoursMap().get(id) || null;
+          return sendJSON(res, 200, { id, name: v.name, region: v.region, type: v.type, slug: v.slug, redirect_to: v.redirect_to == null ? null : v.redirect_to,
+            claimed: venueIsClaimed(id), hours: v.hours, temporary_hours: t, advisory: adv, visit_info: currentVisitInfoJson(id) });
+        }
+        const list = temporaryItemsList();
+        if (bearer) return sendJSON(res, 200, list);
+        if (!adminSessionValid(req)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex, nofollow' }); return res.end(renderAdminReviewLoginPage()); }
+        const e = escapeHtml;
+        const dayText = (d) => formatLocalDateLong(d, { weekday: true, year: false });
+        const ends = (x) => `${x.ended ? '<strong>ended</strong> ' : ''}${e(dayText(x.until))} <small>(${e(x.until)}; gone the next day)</small>`;
+        const table = (head, rows) => (rows.length ? `<table><tr>${head.map((h) => `<th>${e(h)}</th>`).join('')}</tr>${rows.join('')}</table>` : '<p>None.</p>');
+        const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>Temporary items | Admin</title>
+<style>body{margin:0;background:#f6f4ef;color:#1b2e39;font:15px/1.5 Arial,sans-serif}main{max-width:1000px;margin:0 auto;padding:24px 16px 60px}h1,h2{font-family:Georgia,serif}table{border-collapse:collapse;background:#fff;width:100%}td,th{padding:6px 10px;border:1px solid #e0d8c3;text-align:left;vertical-align:top}small{color:#55646a}code{font-size:12px;word-break:break-all}</style></head><body><main>
+<p><a href="/admin/dashboard">&larr; Dashboard</a></p><h1>Temporary items</h1>
+<p>Each of these ends by itself after its last day (Pacific time). Today is ${e(list.today)}.</p>
+<h2>Notices</h2>${table(['Listing', 'Notice', 'Last day shown'], list.advisories.map((x) => `<tr><td>${e(x.name)} <small>#${x.id} · ${e(x.kind)}</small></td><td>${e(x.note || '')}</td><td>${ends(x)}</td></tr>`))}
+<h2>Plan your visit lines</h2>${table(['Listing', 'Line', 'Last day shown'], list.visit_rows.map((x) => `<tr><td>${e(x.name)} <small>#${x.id}</small></td><td><strong>${e(x.label)}:</strong> ${e(x.text)}</td><td>${ends(x)}</td></tr>`))}
+<h2>Temporary hours</h2>${table(['Listing', 'Temporary week', 'Then back to', 'Last day'], list.hours.map((x) => `<tr><td>${e(x.name)} <small>#${x.id}</small>${x.note ? `<br><small>${e(x.note)}</small>` : ''}${x.still_temporary ? '' : '<br><small>Hours changed since: the stored hours stay.</small>'}</td><td><code>${e(x.hours)}</code></td><td><code>${e(x.regular)}</code></td><td>${ends(x)}</td></tr>`))}
+</main></body></html>`;
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex, nofollow' });
+        return res.end(html);
+      }
+    }
+
     if (pathname === '/admin/verify-hours' && method === 'POST') {
       if (!ENRICHMENT_ADMIN_TOKEN) {
         return sendJSON(res, 503, { error: 'Verify-hours endpoint is not configured.' });
@@ -74296,7 +74583,7 @@ const server = http.createServer(async (req, res) => {
       if (!body || typeof body !== 'object' || Array.isArray(body)) {
         return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
       }
-      const ALLOWED_VERIFY_HOURS_KEYS = ['id', 'expected_current_hours', 'verified', 'reason', 'batch_id'];
+      const ALLOWED_VERIFY_HOURS_KEYS = ['id', 'expected_current_hours', 'verified', 'reason', 'batch_id', 'temporary'];
       const unexpectedVerifyKeys = Object.keys(body).filter((k) => !ALLOWED_VERIFY_HOURS_KEYS.includes(k));
       if (unexpectedVerifyKeys.length > 0) {
         return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedVerifyKeys.join(', ')}` });
@@ -74322,13 +74609,14 @@ const server = http.createServer(async (req, res) => {
           reason: body.reason,
           batch_id: body.batch_id,
           reviewed_by: null,
+          temporary: body.temporary,
         });
       } catch (err) {
         return sendJSON(res, 500, { error: 'Hours verification failed and was rolled back.', detail: String(err.message || err) });
       }
       if (!result.ok) {
         const statusMap = {
-          invalid_meta: 400, invalid_hours: 400, invalid_source: 400, invalid_checked_at: 400,
+          invalid_meta: 400, invalid_hours: 400, invalid_source: 400, invalid_checked_at: 400, invalid_temporary: 400, owner_verified: 409,
           venue_not_found: 404, venue_redirected: 409, mismatch: 409, hours_module_unavailable: 503,
         };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
@@ -74338,6 +74626,7 @@ const server = http.createServer(async (req, res) => {
         id: body.id,
         changedFields: result.changedFields,
         venue: { hours: result.hours, hours_source: result.hours_source, hours_checked_at: result.hours_checked_at },
+        temporary: result.temporary,
       });
     }
 
@@ -76861,13 +77150,26 @@ const server = http.createServer(async (req, res) => {
         return res.end(renderWeekendBookHop(link));
       }
     }
+    if (pathname.startsWith('/weekend-email/hold/') && weekendAuto.handleHoldLink(req, res, pathname, method)) return;
     if (pathname.startsWith('/weekend-email/') && await weekendEmail.handlePublic(req, res, pathname, method)) return;
     // The admin page: counts, this weekend's preview, a test send and the real send (Dayton presses it; no timer).
     if ((pathname === '/admin/weekend-email' || pathname === '/admin/weekend-email/') && method === 'GET') {
       res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, weekendEmail.NOINDEX_HEADERS);
       if (!ENRICHMENT_ADMIN_TOKEN) return res.end(ownerSimplePage('Weekend email', '<h1>Weekend email</h1><p>The admin key is not set up on this server.</p>'));
       if (!adminSessionValid(req)) return res.end(renderAdminReviewLoginPage());
-      return res.end(weekendEmail.adminPage({ notice: String(query.notice || ''), confirmStep: query.step === 'confirm' }));
+      return res.end(weekendEmail.adminPage({ notice: String(query.notice || ''), confirmStep: query.step === 'confirm', autoHtml: weekendAuto.statusHtml() }));
+    }
+    // Hold / release this week's automatic send (2026-11-21), from the admin page.
+    if (pathname === '/admin/weekend-email/hold' && method === 'POST') {
+      if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
+      if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
+      let form;
+      try { form = await weekendEmail.readForm(req); } catch (e) { form = null; }
+      const weekend = weekendEmail.buildDigest().weekend;
+      const back = (q) => { res.writeHead(303, { Location: `/admin/weekend-email?${q}`, 'Cache-Control': 'no-store' }); return res.end(); };
+      if (!form || form.weekend !== weekend) return back('notice=stale');
+      weekendAuto.setHold(weekend, form.hold === 'yes', 'admin page');
+      return back(form.hold === 'yes' ? 'notice=held' : 'notice=released');
     }
     if ((pathname === '/admin/weekend-email/test' || pathname === '/admin/weekend-email/send') && method === 'POST') {
       if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
@@ -77524,6 +77826,7 @@ function startDigestTimer() {
   if (process.env.NODE_ENV === 'test' || process.env.DIGEST_DISABLED === '1') return;
   const t = setInterval(() => {
     digestTick().catch((e) => console.error('[digest]', e.message)); healthAlertTick().catch((e) => console.error('[health]', e.message));
+    weekendAuto.tick().catch((e) => console.error('[weekend-auto]', e.message)); // only with WEEKEND_EMAIL_AUTO=on
     // Complete & Verified reminders (2026-11-09): from 10 AM Okanagan time, only with BADGE_REMINDERS=1.
     if (badgeRemindersOn() && okanaganHourNow() >= 10) badgeReminderTick().then((r) => { if (r.sent) console.log(`[badge-reminder] sent ${r.sent}`); }).catch((e) => console.error('[badge-reminder]', e.message));
   }, 15 * 60 * 1000);
@@ -77540,6 +77843,7 @@ function startServer() {
   server.listen(PORT, () => {
     console.log(`Okanagan Roam API listening on http://localhost:${PORT}`);
     startDigestTimer(); // Monday email (2026-11-06)
+    startExpiryTimer(); // temporary items that end by themselves (2026-11-21)
 
     // Slug backfill runs AFTER the server is already listening and serving
     // every existing route (homepage, /api/*, /guide/*, etc.) — deliberately
@@ -77820,6 +78124,8 @@ module.exports = {
   setVenueSubmissionTransport,
   setOwnerEmailTransport,
   weekendEmail,
+  // Weekend email auto-send and items that end by themselves (2026-11-21).
+  weekendAuto, expireTemporaryItems, temporaryItemsList, untilDateError, tempHoursMap, activeTempHours, baseHoursOn, canonicalWeek,
   weekendEmailEvents,
   digestTick, sendWeeklyDigest, pacificNow, healthAlertTick, goalsData,
   createOwnerPasswordReset,
