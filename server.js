@@ -21002,6 +21002,7 @@ const GOLF_AT_A_GLANCE_FACTS = {
     ['Lessons', 'PGA professionals'],
   ],
   'kelowna/tower-ranch-golf-country-club': [
+    ['Course', '18 holes · par 72'],
     ['Designer', 'Thomas McBroom'],
     ['Access', 'Public'],
     ['Driving range', 'None — nets on site; partner range at World Beat Family Golf'],
@@ -21052,14 +21053,14 @@ const GOLF_AT_A_GLANCE_FACTS = {
     ['Clubhouse', 'On-site restaurant'],
   ],
   'kelowna/shadow-ridge-golf-club': [
-    ['Course', 'Par 71 · flat and walkable'],
+    ['Course', '18 holes · par 71 · flat and walkable'],
     ['Putting', 'Putting practice area'],
     ['Rentals', 'Clubs and carts'],
     ['Pro shop', 'Well-stocked golf shop'],
     ['Clubhouse', 'Full-service restaurant'],
   ],
   'kelowna/kelowna-springs-golf-club': [
-    ['Course', '9 holes · play twice for 18'],
+    ['Course', '9 holes · par 35 · play twice for 18'],
     ['Designer', 'Les Furber (opened 1990)'],
     ['Practice', 'Warm-up areas on site'],
   ],
@@ -21110,7 +21111,7 @@ const GOLF_AT_A_GLANCE_FACTS = {
     ['Clubhouse', 'Greenside Bar & Grill, lakeview patio'],
   ],
   'kaleden/twin-lakes-golf-course': [
-    ['Course', '18 holes · regulation length'],
+    ['Course', '18 holes · par 72 · regulation length'],
     ['Driving range', 'Yes'],
     ['Putting', 'Putting green'],
     ['Short game', 'Chipping green'],
@@ -21172,7 +21173,7 @@ const GOLF_AT_A_GLANCE_FACTS = {
     ['Short game', 'Combined chipping and putting area'],
   ],
   'summerland/summerland-golf-country-club': [
-    ['Course', '18 holes · flats front nine, canyon back nine'],
+    ['Course', '18 holes · par 72 · flats front nine, canyon back nine'],
     ['Access', 'Semi-private with public tee times'],
     ['Driving range', '300-plus-yard range'],
     ['Putting', 'Two putting greens'],
@@ -21198,7 +21199,7 @@ const GOLF_AT_A_GLANCE_FACTS = {
     ['Clubhouse', 'Restaurant patio over the first tee'],
   ],
   'oliver/nkmip-canyon-desert-golf-course': [
-    ['Course', 'Desert terrain · long par 4s and target-golf holes'],
+    ['Course', '18 holes · par 72 · desert terrain, long par 4s'],
     ['Ownership', 'Osoyoos Indian Band'],
     ['Driving range', '15-stall range'],
     ['Putting', 'Large putting green'],
@@ -21241,7 +21242,7 @@ const GOLF_AT_A_GLANCE_FACTS = {
     ['Lessons', 'PGA of Canada'],
   ],
   'vernon/spallumcheen-golf-country-club-executive-course': [
-    ['Course', '9 holes · three par 5s'],
+    ['Course', '9 holes · par 34 · two par 5s'],
     ['Driving range', 'Full-length, targets out to 260 yards (shared)'],
     ['Putting', 'Putting green'],
     ['Short game', 'Two chipping greens'],

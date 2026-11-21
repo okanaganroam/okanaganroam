@@ -104,10 +104,10 @@
    "name": "Twin Lakes Golf Course",
    "profile": {
     "holes": 18,
-    "par": null,
+    "par": 72,
     "course_format": "regulation",
     "source_url": "https://twinlakesgolfresort.com/course-details/",
-    "source_note": "Official: 18-hole regulation length; par not stated"
+    "source_note": "Official: 18-hole regulation length; par 72 (36 out, 36 in) from the official scorecard on the course-details page (checked 2026-11-21)"
    },
    "fees": {
     "status": "published",
@@ -459,9 +459,10 @@
    "name": "Kelowna Springs Golf Club",
    "profile": {
     "holes": 9,
-    "par": null,
-    "course_format": null,
-    "source_note": "Official: 9-hole course (play twice for 18); par not stated"
+    "par": 35,
+    "course_format": "regulation",
+    "source_url": "https://www.kelownasprings.com/golf/scorecard",
+    "source_note": "Official: 9-hole course (play twice for 18); par 35 (4-4-4-3-5-4-4-3-4), 3,055 yards from the blue tees, from the official 2025 scorecard PDF linked on the scorecard page (checked 2026-11-21)"
    },
    "fees": {
     "status": "published",
@@ -799,10 +800,12 @@
   "kelowna/shadow-ridge-golf-club": {
    "name": "Shadow Ridge Golf Club",
    "profile": {
-    "holes": null,
+    "holes": 18,
     "par": 71,
-    "course_format": null,
-    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass); hole count not confirmed"
+    "course_format": "regulation",
+    "access": "public",
+    "source_url": "https://www.shadowridgekelowna.com/golf/",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass); 18 holes and public access from the official golf page (\"Public, 18-hole course, Par 71, Yardage 6,183\"), par 71 matches the official scorecard (checked 2026-11-21)"
    },
    "fees": {
     "status": "unverified",
@@ -1224,11 +1227,11 @@
    "name": "Tower Ranch Golf & Country Club",
    "profile": {
     "holes": 18,
-    "par": null,
+    "par": 72,
     "course_format": "regulation",
     "access": "public",
     "source_url": "https://www.golftowerranch.com/course-overview/",
-    "source_note": "Official: 18-hole course; par not stated"
+    "source_note": "Official: 18-hole course; par 72 (36 out, 36 in) from the official scorecard linked on the course-overview page (checked 2026-11-21)"
    },
    "fees": {
     "status": "published",
@@ -1471,9 +1474,10 @@
    "name": "Nk'Mip Canyon Desert Golf Course",
    "profile": {
     "holes": 18,
-    "par": null,
+    "par": 72,
     "course_format": "regulation",
-    "source_note": "Official rates list 18-hole rounds; par not stated"
+    "source_url": "https://nkmipcanyon.ca/scorecard/",
+    "source_note": "Official scorecard: 18 holes, par 72 (36 out, 36 in; the card shows hole 14 as par 4/5, so 72/73) (checked 2026-11-21)"
    },
    "fees": {
     "status": "published",
@@ -2043,10 +2047,11 @@
    "name": "Summerland Golf & Country Club",
    "profile": {
     "holes": 18,
-    "par": null,
+    "par": 72,
     "course_format": "regulation",
     "access": "semi_private",
-    "source_note": "Official: 18-hole course; par not stated"
+    "source_url": "https://www.summerlandgolf.com/scorecard/",
+    "source_note": "Official: 18-hole course; par 72 for men (35 out, 37 in; 74 for women) from the official 2026 scorecard (checked 2026-11-21)"
    },
    "fees": {
     "status": "published",
@@ -2443,9 +2448,10 @@
    "name": "Spallumcheen Golf & Country Club - Executive Course",
    "profile": {
     "holes": 9,
-    "par": null,
+    "par": 34,
     "course_format": "executive",
-    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass); par not stated"
+    "source_url": "https://spallumcheengolf.com/wp-content/uploads/sites/32/2025/05/EXECUTIVE-CARD.pdf",
+    "source_note": "Okanagan Roam owner-approved course facts (2026-09-19 content pass); par 34 (4-3-3-5-5-4-3-3-4), 2,643 yards from the white tees, from the club's official Executive Course scorecard (checked 2026-11-21)"
    },
    "fees": {
     "status": "published",
