@@ -74,7 +74,7 @@ test('funnel: a Fever tap is its own commission kind; click sheet key only on pa
   assert.equal(funnel.resolveName('bmt:v4:book:venue', 0, () => 'restaurant', 'fever'), 'bmt:v4:book:fever');
   assert.equal(funnel.resolveName('bmt:v3:book:venue', 0, null, 'fever'), 'bmt:v3:book:fever');
   assert.ok(funnel.NAMES.includes('bmt:v4:book:fever'));
-  assert.deepEqual(funnel.BOOK_TYPES.filter(([, , c]) => c).map(([k]) => k), ['stay', 'viator', 'fever']);
+  assert.deepEqual(funnel.BOOK_TYPES.filter(([, , c]) => c).map(([k]) => k), ['stay', 'viator', 'fever', 'discovercars']);
   assert.ok(require('../site-events').EVENTS.has('bmt:v4:book:fever'));
   // V4's "Book my trip" sheet is a dialog outside the plan: its taps count too.
   assert.match(funnel.clientScript(), /getElementById\('v4Sheet'\)/);

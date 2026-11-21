@@ -68,7 +68,7 @@ function summarize(db, now = new Date()) {
     add('bmt_confirm', 'Build My Trip: plans confirmed', bmt(both2('confirm')));
     add('bmt_book_open', 'Build My Trip: opened “Book my trip”', bmt(both2('book_open')));
     add('bmt_book_click', 'Build My Trip: visits that clicked a booking link', bmt(both2('book_click')));
-    add('bmt_commission', 'Build My Trip: stay + Viator + Fever booking taps', bmt([...both2('book:stay'), ...both2('book:viator'), ...both2('book:fever')]));
+    add('bmt_commission', 'Build My Trip: stay + Viator + Fever + rental car booking taps', bmt([...both2('book:stay'), ...both2('book:viator'), ...both2('book:fever'), ...both2('book:discovercars')]));
     add('bmt_share', 'Build My Trip: visits that shared', bmt(both2('share')));
     add('bmt_save', 'Build My Trip: visits that saved to My Trip', bmt(both2('save')));
   }

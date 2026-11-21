@@ -51,6 +51,8 @@ const tripBooking = require('./trip-booking');
 const viator = require('./viator');
 // Fever "Tickets" (2026-11-21, fever.js): off unless FEVER_AFFILIATE_TEMPLATE is set (Dayton's Impact link for Fever).
 const fever = require('./fever');
+// "Getting here" (2026-11-21, getting-here.js): Discover Cars rental cars + Viator airport shuttles; off until DISCOVERCARS_AID is set.
+const gettingHere = require('./getting-here');
 const gscReport = require('./gsc-report');
 // What is clickable on one business or event page (2026-11-05): read from the page itself, so each sheet shows that page's
 // own buttons and links. The server asks its own public page (no scripts run, so nothing is counted); kept 10 minutes.
@@ -7809,6 +7811,8 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false) {
     // Fever (2026-11-21, fever.js): an event in the plan that Fever sells gets its "Tickets" step in V4's "Book my trip"
     // (only with FEVER_AFFILIATE_TEMPLATE set). Added after planning: the stops and their order never change.
     if (v4 && fever.enabled()) fever.withTripSteps(plan);
+    // "Getting here" (2026-11-21, getting-here.js): a "Rent a car" step for a plan over 2+ towns or days (DISCOVERCARS_AID set).
+    if (v4 && gettingHere.enabled()) gettingHere.withTripStep(plan, stay);
   } catch (e) { console.error(`[trip] where to stay: ${e.message}`); }
   return plan;
 }
@@ -40258,6 +40262,8 @@ function frDecode(s) {
 // (counts, opening times, "Wineries in Kelowna" ...), which may translate pieces through frText again.
 // The list keyed the way lookups are: one space between words, straight apostrophes.
 const frNorm = (s) => frDecode(String(s)).replace(/\s+/g, ' ').replace(/[\u2019\u2018]/g, "'").trim();
+// "Getting here" (2026-11-21): its own French words (getting-here.js FR_TEXT) join the list; existing entries win.
+for (const [k, v] of Object.entries(gettingHere.FR_TEXT)) if (frenchText.FR_TEXT && !Object.prototype.hasOwnProperty.call(frenchText.FR_TEXT, k)) frenchText.FR_TEXT[k] = v;
 const FR_TEXT_MAP = new Map(Object.entries(frenchText.FR_TEXT).map(([k, v]) => [frNorm(k), v]));
 function frLookup(key) { const k = frNorm(key); return FR_TEXT_MAP.has(k) ? FR_TEXT_MAP.get(k) : null; }
 // A French short month that ends a sentence keeps one period: "jusqu’au 31 oct." not "oct.." (2026-10-18).
@@ -77148,7 +77154,8 @@ const server = http.createServer(async (req, res) => {
         const categoryCounts = getRegionCategoryCounts(region);
         if (Object.keys(categoryCounts).length > 0) {
           const regionGuidePages = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region);
-          const html = withStaysNavLink(renderRegionPage(region, categoryCounts, regionGuidePages), region);
+          // "Getting here" (2026-11-21, getting-here.js): rental car + airport shuttles in the page's Getting around box.
+          const html = gettingHere.withRegionBox(withStaysNavLink(renderRegionPage(region, categoryCounts, regionGuidePages), region), region);
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }

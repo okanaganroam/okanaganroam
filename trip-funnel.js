@@ -32,6 +32,8 @@ const BOOK_TYPES = [
   ['viator', 'Viator tour or activity', true],
   // Fever (2026-11-21, fever.js): an event's "Tickets" on Fever (only with FEVER_AFFILIATE_TEMPLATE set).
   ['fever', 'Fever event tickets', true],
+  // Getting here (2026-11-21, getting-here.js): "Rent a car" on Discover Cars (only with DISCOVERCARS_AID set).
+  ['discovercars', 'Rental car (Discover Cars)', true],
   ['tasting', 'Winery, brewery or distillery tasting', false],
   ['reservation', 'Restaurant, pub, café or bar reservation', false],
   ['other', 'Other booking link', false],
@@ -60,6 +62,7 @@ function resolveName(name, venueId, typeOf, link) {
   if (!m) return name;
   if (link === 'viator') return `bmt:${m[1]}:book:viator`;
   if (link === 'fever') return `bmt:${m[1]}:book:fever`;
+  if (link === 'discovercars') return `bmt:${m[1]}:book:discovercars`;
   let type = null;
   const id = Number(venueId);
   if (Number.isInteger(id) && id > 0 && typeof typeOf === 'function') { try { type = typeOf(id); } catch (e) { type = null; } }
