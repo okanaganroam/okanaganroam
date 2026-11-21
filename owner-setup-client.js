@@ -3601,7 +3601,7 @@
   function seaMoreWrap(third, html){ return third && html && T.seaMore ? seaMoreHtml(html) : html; }
   // Sport test 14 (Marisol): for sport and golf the link says "part of your season", and the box says that a season comes
   // first ("We're closed part of the year"), with these hours right after it.
-  function seaMoreHtml(inner){ var sp = C.sport && T.seaMoreSport && seaIsStep(S.step) === false; return '<div class="su-skip su-seamore"><button type="button" class="su-link" id="suSeaMore" aria-expanded="' + (S.seaMore ? 'true' : 'false') + '"' + (S.seaMore ? ' aria-controls="suSeaMoreBox"' : '') + ' data-act="seaMore">' + h(sp ? T.seaMoreSport : T.seaMore) + '</button></div>' + (S.seaMore ? '<div id="suSeaMoreBox">' + (sp && !curOpenSea() && T.seaMoreClosedFirst ? '<p class="su-hint" id="suSeaClosedFirst">' + h(T.seaMoreClosedFirst) + '</p>' : '') + inner + '</div>' : ''); }
+  function seaMoreHtml(inner){ var sp = typeof C !== 'undefined' && !!C.sport && !!T.seaMoreSport && !seaIsStep(S.step); return '<div class="su-skip su-seamore"><button type="button" class="su-link" id="suSeaMore" aria-expanded="' + (S.seaMore ? 'true' : 'false') + '"' + (S.seaMore ? ' aria-controls="suSeaMoreBox"' : '') + ' data-act="seaMore">' + h(sp ? T.seaMoreSport : T.seaMore) + '</button></div>' + (S.seaMore ? '<div id="suSeaMoreBox">' + (sp && !curOpenSea() && T.seaMoreClosedFirst ? '<p class="su-hint" id="suSeaClosedFirst">' + h(T.seaMoreClosedFirst) + '</p>' : '') + inner + '</div>' : ''); }
   function tfoldOpen(withOff){ if (S.tfold != null) return S.tfold; var tk = tticks(); return !!(tk.weather_all || (withOff && (tk.off_request || tk.snow_open))); }
   function tticksPart(seasonal){
     if (!TOUR || !S.tticks) return null;

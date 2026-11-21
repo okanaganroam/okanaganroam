@@ -1023,7 +1023,7 @@ const FIT = [
   { id: 'no-street-address', all: ['\\b(no|dont have|don t have|without|not a|isnt a|pas d|pas de) (a |any |real |civic |street )*(street )?(address|adresse|civic number|numero civique)\\b'],
     fit: ['sport-meeting-place', 'map-pin', 'indoor-good-to-know'], go: ['sport-meeting-place'] },
   // An answer about the restaurant or its food needs a restaurant, patio, bar or food word in the question.
-  { id: 'restaurant-needs-food', all: ['.'], not: ['\\b(restaurant|restaurants|resto|patio|patios|terrasse|bistro|cafe|grill|kitchen|food|foods|lunch|lunches|dinner|dinners|breakfast|brunch|menu|menus|clubhouse|dining|bar|bars|lounge|snack|snacks|meal|meals|eat|eats|eating|nourriture|repas|souper|soupers|diner|dejeuner|cuisine|winemaker|chef|wine|beer|drinks?|biere|vin)\\b'],
+  { id: 'restaurant-needs-food', all: ['.'], not: ['\\b(restaurant|restaurants|resto|patio|patios|terrasse|bistro|cafe|grill|kitchen|food|foods|lunch|lunches|dinner|dinners|breakfast|brunch|menu|menus|clubhouse|dining|bar|bars|lounge|snack|snacks|meal|meals|eat|eats|eating|nourriture|repas|souper|soupers|diner|dejeuner|cuisine|winemaker|chef|wine|beer|drinks?|biere|vin|cafeteria|canteen|concession|concessions|lodge|deli|food court|cantine|casse croute)\\b'],
     bad: ['sport-restaurant', 'sport-food-menu'] },
   // Sport test 12 (2026-11-21; Rob: "carringtons closes oct 17, a couple weeks before the course. does the happy hour need
   // different dates" got Closures, which would have closed his course Oct 18–31). The safety rule: the answers that close

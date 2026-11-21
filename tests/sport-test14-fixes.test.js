@@ -200,7 +200,7 @@ test('3. Help: her 27 questions land well, none harmful', async () => {
   // The answers she needed.
   assert.match(E.answer('sport-book-button'), /We found a bug/);
   assert.match(E.answer('sport-golf-facts'), /Message us/);
-  assert.match(S.answer('sport-bay-link'), /fitting bay or lesson studio/);
+  assert.match(S.answer('sport-bay-link'), /club-fitting room or lesson studio/);
 });
 
 test('4. resume: "Carry on" opens the hours screen she left', async () => {
