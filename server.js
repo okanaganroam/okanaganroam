@@ -34392,6 +34392,19 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
         });
         chunk = chunk.replace('<div class="card-slot card-slot-fee">', () => '<div class="card-slot card-slot-fee">' + priceHtml);
       }
+      // Free and by-donation places (Dayton, 2026-11-21): a place with no price box that is free to visit says so in the
+      // same box, so nobody opens the page to find out and the cards line up. "By donation" when its own description says
+      // admission or entry is by donation. The box replaces the card's Free chip.
+      else if (!chunk.includes('<div class="fd-price-context">')) {
+        const fv = venueById.get(Number(venueId));
+        if (fv && Number(fv.free_entry) === 1 && chunk.includes('<div class="card-slot card-slot-fee">')) {
+          const donation = /\b(?:admission|entry|entrance)\b(?: is)? by donation\b/i.test(String(fv.description || ''));
+          const freeHtml = donation ? '<div class="fd-price-context fd-price-free"><strong>By donation</strong><span>No set entry price</span></div>'
+            : '<div class="fd-price-context fd-price-free"><strong>Free</strong><span>No entry fee</span></div>';
+          chunk = chunk.replace(/<span class="chip chip-feat chip-price"[^>]*>[\s\S]*?<\/span>\s*/g, (chip) => (/^Free(?: to visit)?$/i.test(chip.replace(/<[^>]+>/g, '').trim()) ? '' : chip));
+          chunk = chunk.replace('<div class="card-slot card-slot-fee">', () => '<div class="card-slot card-slot-fee">' + freeHtml);
+        }
+      }
       const more = chunk.match(/<span class="chip chip-more" title="([^"]*)"[^>]*>\+?(\d+)(?: more features)?<\/span>/);
       if (!more) return chunk;
       // Labels in the original title are already HTML-escaped by capChips.
