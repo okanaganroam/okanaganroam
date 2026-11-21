@@ -18471,9 +18471,8 @@ test('Indoor discovery: URL filters select real venues and family is the hub\'s 
         const cards = page.text.match(/<ul class="card-grid"[^>]*>[\s\S]*?<\/ul>/g)?.join('') || '';
         fixtures.forEach((v, i) => assert.equal(cards.includes(`href="/kelowna/indoor/${v.slug}"`), Array.isArray(selected) ? selected.includes(i) : i === selected, `${activity}: ${v.name}`));
         // The activity page is the /indoor page with that activity chosen (2026-11-20).
-        // /indoor/family keeps its older page (the hub's Family Fun).
-        if (activity === 'family') { assert.match(page.text, /aria-current="page"/); assert.match(page.text, /[1-9]\d* matching spots?/); }
-        else assert.match(page.text, new RegExp(`data-fd-type="${activity}" aria-pressed="true"`));
+        // /indoor/family too since 2026-11-21 (the same places as the hub's Family Fun).
+        assert.match(page.text, new RegExp(`data-fd-type="${activity}" aria-pressed="true"`));
       }
       const unknown = await WINTER_GET(base, '/indoor?activity=unknown');
       fixtures.forEach((v) => assert.ok(unknown.text.includes(`href="/kelowna/indoor/${v.slug}"`)));

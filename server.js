@@ -35192,6 +35192,13 @@ function renderIndoorHubPage(indoorVenues, golfVenues, alsoVenues, notes, filter
   }
   // Seasons everywhere (2026-10-18): places closed for the season last.
   recommended.splice(0, recommended.length, ...seasonClosedLast(recommended));
+  // f.keepOrder (2026-11-21): a list of venue ids that open the Recommended order, in that order (/indoor/family keeps
+  // the order its older page had: the active family places first).
+  if (Array.isArray(f.keepOrder) && f.keepOrder.length) {
+    const at = new Map(f.keepOrder.map((id, i) => [String(id), i]));
+    const first = recommended.filter((v) => at.has(String(v.id))).sort((x, y) => at.get(String(x.id)) - at.get(String(y.id)));
+    recommended.splice(0, recommended.length, ...first, ...recommended.filter((v) => !at.has(String(v.id))));
+  }
   const recommendedRank = new Map(recommended.map((v, i) => [v.id, i]));
   const venues = sort === 'az' ? all.slice().sort(byName)
     : sort === 'town' ? all.slice().sort((a, b) => String(REGION_LABELS[a.region] || '').localeCompare(String(REGION_LABELS[b.region] || '')) || byName(a, b))
@@ -36278,6 +36285,8 @@ function renderIndoorSubPage(oldHtml, pagePath, query, scope) {
   const types = String(query.types || '').split(',').filter((t) => INDOOR_HUB_EXPERIENCES.some((a) => a.slug === t));
   const filter = { ...parseFoodDrinkFilterQuery(query), types: types.length || !scope.activity ? types : [scope.activity], openNow: query.open === 'now', sort: INDOOR_SORT_KEYS.has(query.sort) ? query.sort : 'recommended' };
   if (scope.region) filter.regions = [];
+  // Family Fun keeps the order of its older page (the same places as the hub's Family Fun chip, active family places first).
+  if (scope.activity === 'family') filter.keepOrder = [...String(oldHtml).matchAll(/<li class="venue-card[^"]*"[^>]*data-venue-id="(\d+)"/g)].map((m) => m[1]);
   // A town page lists that town's indoor listings only, as it always has (no simulators or tagged places from other categories).
   const hub = scope.region ? renderIndoorHubPage(getVenuesByCategory('indoor').filter(inTown), [], [], getIndoorAlsoNotes(), filter)
     : renderIndoorHubPage(getVenuesByCategory('indoor'), getIndoorGolfVenues(), getIndoorAlsoVenues(), getIndoorAlsoNotes(), filter);
@@ -76671,8 +76680,8 @@ const server = http.createServer(async (req, res) => {
         // Batch 1 (2026-11-20): the activity page in the /sports or /indoor layout, with its own title, schema and heading.
         const introOf = (h) => { const m = h.slice(h.indexOf('<main')).match(/<p class="(?:outdoor-intro|hub-intro)[^"]*"[^>]*>([\s\S]*?)<\/p>/); return m ? m[1].replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').trim() : ''; };
         const laidOut = type === 'sport' && SPORT_ACTIVITIES.some((a) => a.slug === slug) ? renderSportsSubPage(html, `/sports/${slug}`, query, { activity: slug, intro: introOf(html) })
-          // /indoor/family stays on its older page: it lists every kid-friendly indoor place, a wider set than the /indoor page's Family Fun chip.
-          : type === 'indoor' && slug !== 'family' && INDOOR_HUB_EXPERIENCES.some((a) => a.slug === slug) ? renderIndoorSubPage(html, `/indoor/${slug}`, query, { activity: slug, intro: introOf(html) })
+          // /indoor/family too (2026-11-21): since Indoor test 9 it lists the same places as the /indoor page's Family Fun chip.
+          : type === 'indoor' && INDOOR_HUB_EXPERIENCES.some((a) => a.slug === slug) ? renderIndoorSubPage(html, `/indoor/${slug}`, query, { activity: slug, intro: introOf(html) })
             : html;
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
         return res.end(laidOut);
