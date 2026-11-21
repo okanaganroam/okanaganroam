@@ -424,7 +424,8 @@ test('sport test 5: every sport kind’s questions land on a right answer, on th
     const b = await ownerBots(k);
     for (const [lang, pg, q, want] of FX.QUESTIONS[k]) {
       const r = b[(lang === 'fr' ? 'fr' : '') + pg].best(q);
-      if (!r || !want.includes(r.id)) wrong.push(`${k} [${lang} ${pg}] "${q}" -> ${r && r.id} (want ${want.join(' or ')}; hits ${r && r.hits.slice(0, 4).join(',')})`);
+      // (Sport test 13: UNSURE in want: an honest Ask us is right too.)
+      if (!r || !(r.id ? want.includes(r.id) : want.includes('UNSURE'))) wrong.push(`${k} [${lang} ${pg}] "${q}" -> ${r && r.id} (want ${want.join(' or ')}; hits ${r && r.hits.slice(0, 4).join(',')})`);
     }
   }
   assert.deepEqual(wrong, []);

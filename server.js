@@ -68229,11 +68229,14 @@ const OWNER_HELP_SCRIPT = String.raw`
     var r = bestFit(q);
     if (!cfg.sure || !r.id || !r.why || !r.why[0] || r.why[0].id !== r.id || r.why.some(function(w){ return w && w.fit; })) return r;
     var w0 = r.why[0], w1 = r.why[1], rel = r.why[2] && r.why[2].rel;
+    // Strong: a key of two or more real words side by side, a topic's word groups, or a clear lead (twice the next score).
+    // An answer that would change the place's own closures, season, Free entry, per-room or main price also needs more than
+    // one loose word (a score of 6) and no unrelated topic within 10% of it; any other answer is only unsure on a near tie.
     var s0 = w0.s || 0, s1 = w1 ? w1.s || 0 : 0;
     var strong = w0.kmax >= 2 || w0.grp >= 1 || (w1 ? s0 >= 2 * s1 : s0 >= 6);
-    var close = !!w1 && !rel && s1 >= s0 * 0.9;
+    var close = !!w1 && !rel && s1 >= s0 * 0.9, tie = !!w1 && !rel && s1 >= s0 * 0.97;
     var danger = (cfg.danger || []).indexOf(r.id) >= 0;
-    var unsure = danger ? (!strong || (close && !w0.grp) || (w0.text && !s0)) : (close && w0.kmax < 2 && !w0.grp);
+    var unsure = danger ? ((!strong && (close || s0 < 6)) || (w0.text && !s0)) : (tie && w0.kmax < 2 && !w0.grp);
     if (!unsure) return r;
     return { id: null, hits: r.hits, lang: r.lang, why: r.why.concat([{ sure: false, was: r.id, danger: danger }]) };
   }
@@ -68251,14 +68254,15 @@ const OWNER_HELP_SCRIPT = String.raw`
     var isBad = function(id){ return M.some(function(f){ return f.bad && f.bad.indexOf(id) >= 0; }); };
     var fits = !!r.id && (!wide.length || wide.some(function(f){ return f.fit.indexOf(r.id) >= 0; })) && inNarrow(r.id);
     var bad = !!r.id && isBad(r.id);
-    if (r.id && !bad && (fits || !fitRules.length)) return r;
+    // Sport test 13: the topics a rule says never answer it aren't offered as the next things to read either.
+    if (r.id && !bad && (fits || !fitRules.length)) return { id: r.id, hits: r.hits.filter(function(x){ return x === r.id || !isBad(x); }), lang: r.lang, why: r.why };
     if (!r.id && !fitRules.length) return r;
     var go = null, goFrom = fitRules.length ? wide.concat(narrow) : M.filter(function(f){ return f.bad && f.bad.indexOf(r.id) >= 0; });
     for (var i = 0; i < goFrom.length && !go; i++) (goFrom[i].go || []).forEach(function(g){ if (!go && byIdM[g] && g !== r.id && inNarrow(g) && !isBad(g)) go = g; });
     for (var i2 = 0; i2 < goFrom.length && !go; i2++) (goFrom[i2].go || []).forEach(function(g){ if (!go && byIdM[g] && g !== r.id) go = g; });
     var lead = go ? [go] : [];
     if (!go) fitRules.forEach(function(f){ f.fit.forEach(function(x){ if (byIdM[x] && lead.indexOf(x) < 0 && lead.length < 2) lead.push(x); }); });
-    var hits = lead.concat(r.hits.filter(function(x){ return lead.indexOf(x) < 0 && !(fitRules.length && fitRules.every(function(f){ return f.fit.indexOf(x) < 0; }) && x === r.id); }));
+    var hits = lead.concat(r.hits.filter(function(x){ return lead.indexOf(x) < 0 && !isBad(x) && !(fitRules.length && fitRules.every(function(f){ return f.fit.indexOf(x) < 0; }) && x === r.id); }));
     return { id: go, hits: hits, lang: r.lang, why: (r.why || []).concat([{ fit: M.map(function(f){ return f.id; }), was: r.id }]) };
   }
   function best0(q){

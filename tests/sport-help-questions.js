@@ -737,7 +737,8 @@ const PRIYA_LOG = [
   ["en", "setup", "the schedule is posted on the city website every week, can i just link to that", ["indoor-swim-times"]],
   ["en", "setup", "the ice comes out mid march and goes back in late september. in summer the building is still open, its a dry floor for lacrosse and events. no public skating though. which one do i pick", ["sport-season","sport-opening-day","sport-season-says"]],
   ["en", "setup", "adult drop in is 5.00 right now but council approves new rates every january 1. do i have to come back and change it?", ["sport-rate-change","sport-rates-next-year"]],
-  ["en", "setup", "is it ok to put the price? our rates are in the fees bylaw", ["indoor-price","sport-public"]],
+  // Sport test 13 (Dayton: answer only when sure): one loose word ("price") for the main price answer is an honest Ask us.
+  ["en", "setup", "is it ok to put the price? our rates are in the fees bylaw", ["indoor-price","sport-public","UNSURE"]],
   ["en", "setup", "public skating is drop in, no booking. but ice rentals and birthday parties are booked through the city of kelowna website, not us. do i put that link here?", ["indoor-book-party","indoor-booking","sport-booking-link"]],
   ["en", "setup", "main entrance and the viewing area are accessible, but getting onto the ice needs staff help through the zamboni door. is that wheelchair accessible?", ["indoor-access"]],
   ["en", "setup", "helmets are required for kids under 10 during public skates. where does that go", ["indoor-good-to-know","sport-what-to-bring"]],
