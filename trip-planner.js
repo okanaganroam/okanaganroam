@@ -2389,6 +2389,8 @@ function publicVenue(v, ctx) {
     listedHours: v.hours && v.ownerAppointment !== true ? listedHoursText(v, null, null) : null,
     // Brewery test 1 (2026-11-12): hours the business confirmed (no "check before you go"), and its time for minors.
     ...(v.ownerHours ? { hoursByOwner: true } : {}),
+    // Sport test 6: the hours are the building's; the public skate (swim, drop-in) times change ("check the schedule").
+    ...(Array.isArray(v.timesChangeNote) ? { timesChange: { en: v.timesChangeNote[0], fr: v.timesChangeNote[1] || v.timesChangeNote[0] } } : {}),
     ...(kidsUntilMinutes(v) != null && v.features && v.features.kid_friendly ? { kidsUntil: v.kidsUntil } : {}),
     ...(v.dogsOutsideOnly && v.features && v.features.dog_friendly ? { dogsOutsideOnly: true } : {}),
     ...(v.dogsPatioOnly && v.features && v.features.dog_friendly ? { dogsPatioOnly: true } : {}),

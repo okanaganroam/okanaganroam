@@ -346,6 +346,14 @@ const FR_TEXT = {
   'Indoor Golf & Simulators': 'Golf intérieur et simulateurs',
   'Driving Ranges & Practice': 'Champs de pratique',
   'Skate Parks & BMX': 'Planchodromes et BMX',
+  // Sport test 6 (2026-11-20): the /fr sports hubs' activity chips were in English (main's own labels).
+  'Tennis, Pickleball & More': 'Tennis, pickleball et plus',
+  // The sports hubs' sort (main's own words): « Les plus grands d’abord » and how it works.
+  'Largest places first': 'Les plus grands d’abord',
+  'How “Largest places first” works': 'Comment fonctionne « Les plus grands d’abord »',
+  'We use the listed trail distances and numbers of trails, courts or course holes to bring larger facilities and networks higher up. Seasonal closures also affect the order.': 'Nous utilisons les distances de sentiers indiquées et le nombre de sentiers, de terrains ou de trous pour placer plus haut les grandes installations et les grands réseaux. Les fermetures saisonnières jouent aussi sur l’ordre.',
+  '1 place to play': '1 lieu pour bouger',
+  'Ice Skating & Hockey': 'Patinage et hockey',
   'Mountain Biking': 'Vélo de montagne',
   'Disc Golf': 'Disc golf',
   'Courts': 'Terrains',
@@ -1143,6 +1151,8 @@ const FR_PATTERNS = [
   // What's On (2026-10-19): the month headings past next week, a one-day "Showing Sun Oct 18" under the dates, and
   // "No more live music tonight. Next:" above the next three events of that kind.
   [/^Later in (January|February|March|April|May|June|July|August|September|October|November|December)$/, (m) => `Plus tard en ${MONTHS_LONG[m[1]]}`],
+  // Sport test 6: a chip or button that is an emoji and a label the table has (« 🛹 Planchodromes et BMX »).
+  [/^(\p{Extended_Pictographic}\uFE0F?)\s+(.+)$/u, (m, tr) => { const t = tr(m[2]); return t === m[2] ? null : `${m[1]} ${t}`; }],
   [/^Showing ((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2})$/, (m, tr) => { const d = tr(m[1]); return d === m[1] ? null : `Le ${d}`; }],
   [/^No more (.+) (tonight|today)\. Next:$/, (m) => {
     const when = m[2] === 'tonight' ? 'ce soir' : 'aujourd’hui';
@@ -1183,6 +1193,8 @@ const FR_PATTERNS = [
   // Seasons everywhere (2026-10-18): the card tag "Open until Oct 31", and the venue page's hours note.
   [/^(?:Open until|Closes) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m) => /^Closes/.test(m.input) ? `Ferme le ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}` : `Ouvert jusqu’au ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}`],
   [/^(Open now · Closes |Open 24 hours$|Closed today|Closed · Opens |Closed now$)/, (m, tr, c) => c.status(m.input)],
+  // Sport test 6 (2026-11-20): an arena's, a pool's or a sports centre's open line when its public times change.
+  [/^(?:Building open|Pool open|Open) · (?:public skate|public swim|drop-in|activity) times change$/, (m, tr, c) => c.status(m.input)],
   // The "Check before you go" box on list cards (2026-10-18): its source link ("Official source: example.com ↗").
   [/^Official source(?:: (.+?))? ↗$/, (m) => `Source officielle${m[1] ? ` : ${m[1]}` : ''} ↗`],
   [/^Places to start in (.+)$/, (m) => `Par où commencer à ${m[1]}`],

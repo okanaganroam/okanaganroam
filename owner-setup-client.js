@@ -1213,6 +1213,8 @@
   function thirdMonday(y, mo){ return nthMonday(y, mo, 3); }
   // Every day but `d` is marked Closed (no hours yet): copying may fill them all.
   function othersClosed(d){ var w = W(); return !DAYS.some(function(x){ return x !== d && w && w[x]; }); }
+  // Sport test 6: the hours saved before this screen have an open day (an existing page), so an unset day there is closed.
+  function savedOpenAny(){ var o = parseWeek(CUR.hours); return !!o && DAYS.some(function(x){ return !!o[x]; }); }
   // Café test 4 (2026-11-11): days the owner marked Closed on this screen. "Every open day" never fills them, even on a
   // new page with no hours yet (where it fills every other day).
   function tapClosed(d, on){ S.closedTap = S.closedTap || {}; if (on) S.closedTap[S.step + d] = true; else delete S.closedTap[S.step + d]; }
@@ -2512,6 +2514,8 @@
             // Indoor test 7 (Robert, closed Monday and Tuesday): not when Tuesday itself is closed.
             + (T.copyTueSat && !W().mon && W().tue && TUE_SAT.indexOf(d) >= 0 ? '<button type="button" class="su-toggle" data-copytuesat="' + d + '">' + h(T.copyTueSat) + '</button>' : '')
             + '<button type="button" class="su-toggle" data-copywe="' + d + '">' + h(T.copyWeekend) + '</button>' + hDone(d) + '</div>'
+            // Sport test 6: a named copy that left a closed day closed says so, under the day it was copied from.
+            + ((S.copySkipped || []).length && S.copyFrom === d && T.copySkipped ? '<p class="su-hint su-copyskip" aria-live="polite">' + h(fill(T.copySkipped, { days: S.copySkipped.map(longDay).join(', ') })) + '</p>' : '')
             // Said once, under the first open card (café test 5: it repeated under every open day).
             + (!seas && d === firstOpenCard && DAYS.some(function(x){ return x !== d && !copyGets(d, x); }) ? '<p class="su-hint su-copynote">' + h(T.copyClosedNote) + '</p>' : '') : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
       }).join('') + '</div>'
@@ -4954,7 +4958,10 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-hoff]'), function(b){ b.onclick = function(){
       readTimes(); var d = b.getAttribute('data-hoff'), wk = W(); S.hoffWas = S.hoffWas || {};
       if (wk[d]) { S.hoffWas[S.step + d] = wk[d]; wk[d] = null; tapClosed(d, true); }
-      else { tapClosed(d, false); var tpl = S.hoffWas[S.step + d] || wk[DAYS.filter(function(x){ return wk[x]; })[0]] || S.week[d] || S.week.mon; wk[d] = tpl ? clone(tpl) : [DAY_NEW.slice()]; delete S.hoffWas[S.step + d]; }
+      // Sport test 6 (2026-11-20; Priya opened Sunday and got Monday's 6 AM–11 PM, not Saturday's 7 AM–10 PM): a reopened day
+      // takes the hours of the nearest open day before it (Sunday gets Saturday's).
+      else { tapClosed(d, false); var di = DAYS.indexOf(d), before = null; for (var k = 1; k < 7 && !before; k++) { var px = DAYS[(di - k + 7) % 7]; if (wk[px]) before = wk[px]; }
+        var tpl = S.hoffWas[S.step + d] || before || S.week[d] || S.week.mon; wk[d] = tpl ? clone(tpl) : [DAY_NEW.slice()]; delete S.hoffWas[S.step + d]; }
       mark(); var y = window.scrollY; render(); window.scrollTo(0, y); var nb = screen.querySelector('[data-hoff="' + d + '"]'); if (nb) try { nb.focus({ preventScroll: true }); } catch (e) {} }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-dayclosed]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-dayclosed'), wk = W(); if (wk[d]) { wk[d] = null; tapClosed(d, true); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); } }; });
     // Restaurant test 1: "+ Add a second time (lunch & dinner)" and its ✕. A dinner-only day gets lunch before it, a
@@ -4993,7 +5000,9 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-copytuesat]'), function(b){ b.onclick = function(){
       readTimes(); var wk = W(), d = b.getAttribute('data-copytuesat'), src = wk[d]; if (!src || wk.mon) return;
       // Tuesday to Saturday, open days or (a new page) every one of them that isn't marked Closed; Monday and Sunday as they are.
-      var gets = TUE_SAT.filter(function(x){ return x !== d && (wk[x] || copyGets(d, x)); });
+      // Sport test 6: a named copy opens every day it names (a day marked Closed too); only "Every open day" skips them.
+      var gets = TUE_SAT.filter(function(x){ return x !== d && (wk[x] || copyGets(d, x) || (!savedOpenAny() && !(S.closedTap || {})[S.step + x])); });
+      S.copyFrom = d; S.copySkipped = TUE_SAT.filter(function(x){ return x !== d && !wk[x] && gets.indexOf(x) < 0; });
       gets.forEach(function(x){ wk[x] = clone(src); }); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-copysat]'), function(b){ b.onclick = function(){
       readTimes(); var wk = W(), src = wk.fri; if (!src || !copyGets('fri', 'sat')) return;
@@ -5006,6 +5015,11 @@
       // other day is closed (a new page with no hours yet) does it fill them all.
       var gets = DAYS.filter(function(x){ return copyGets(d, x); });
       gets.forEach(function(x){ if (all || (we ? ['sat', 'sun'] : ['mon', 'tue', 'wed', 'thu', 'fri']).indexOf(x) >= 0) wk[x] = clone(src); });
+      // Sport test 6 (2026-11-20; Priya, a new page: "Copy these hours to: Sat–Sun" from Saturday left Sunday closed, a day she
+      // had never set): a named copy also opens the days it names that were never set (no saved hours, not marked Closed
+      // here); a day closed in her saved hours or marked Closed stays closed, and the screen says which (copySkipped).
+      S.copySkipped = []; S.copyFrom = d;
+      if (!all) (we ? ['sat', 'sun'] : ['mon', 'tue', 'wed', 'thu', 'fri']).forEach(function(x){ if (x === d || wk[x]) return; if (!savedOpenAny() && !(S.closedTap || {})[S.step + x]) wk[x] = clone(src); else S.copySkipped.push(x); });
       if (all) delete HO()[d];
       mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-same]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-same'), i = DAYS.indexOf(d), wk = W(); wk[d] = clone(wk[DAYS[i - 1]]); render(); }; });
@@ -5418,7 +5432,10 @@
   // (". ", or ", " for takeout) goes in first: "Patio only. Dogs welcome…". Nothing she typed is ever changed or lost;
   // typing anywhere else, deleting, or a box that holds her own words is left exactly as it is.
   // The words that carry a chip's sentence on (Sport test 4): "for up to 144", "with mini golf", "in summer".
-  var JOIN_WORDS = /^(?:for|with|in|on|at|up|from|to|and|or|but|plus|until|till|after|before|by|during|except|only|all|every|each|including|when|if|of|as|via|near|inside|outside|pour|avec|en|au|aux|à|de|du|des|et|ou|jusqu|dès|sauf|seulement|sur|dans|le|la|les)$/;
+  // Sport test 6 (2026-11-20; Priya: "Helmets for kids" + " under 10" saved as "Helmets for kids. Under 10.", and "Private
+  // ice rentals" + " through the City of Kelowna booking office" split the same way): ages, limits and "through" carry it on
+  // too, and so does a number ("Lockers 25 cents", "ages 5 to 12").
+  var JOIN_WORDS = /^(?:for|with|in|on|at|up|from|to|and|or|but|plus|until|till|after|before|by|during|except|only|all|every|each|including|when|if|of|as|via|near|inside|outside|under|over|through|throughout|around|about|between|without|than|ages?|aged|pour|avec|en|au|aux|à|de|du|des|et|ou|jusqu|dès|sauf|seulement|sur|dans|le|la|les|moins|pendant|avant|après|entre|par|sans|âges?)$/;
   // Sport test 5 (2026-11-20; Jen pasted " midweek" after "School and club groups": "groups. Midweek."): a time word typed in
   // lower case carries the chip on too ("School and club groups midweek"), pasted or typed (server.js OWNER_CHIP_CONT_WORDS).
   var CONT_WORDS = /^(?:midweek|weekdays?|weekends?|weeknights?|daily|nightly|mornings?|afternoons?|evenings?|weekly|monthly|year-round|too|also|mostly|usually|sometimes)$/;
@@ -5436,6 +5453,8 @@
       var add0 = v.slice(p0.length), cut0 = box.maxLength > 0 ? box.maxLength : 180, at0 = box.selectionStart, nv0;
       var put0 = function(nv, shift){ box.value = nv.slice(0, cut0); try { if (at0 != null) { var q0 = Math.max(0, Math.min(box.value.length, at0 + shift)); box.setSelectionRange(q0, q0); } } catch (e1) {} return true; };
       if (/^\s?[,;]/.test(add0)) { nv0 = p0.replace(/\. $/, '') + add0.replace(/^\s/, ''); return put0(nv0, nv0.length - v.length); }
+      // A number right after the chip carries it on ("Helmets for kids" + " 10 and under").
+      if (/^\s?\d/.test(add0)) { var wd = add0.replace(/^\s/, ''); if (!/[\s,.;:!?]/.test(wd)) return 'wait'; nv0 = p0.replace(/\. $/, ' ') + wd; return put0(nv0, nv0.length - v.length); }
       if (!/^\s?[a-zà-ÿ]/.test(add0)) return false;
       var w0 = add0.replace(/^\s/, '');
       var first0 = (/^[a-zà-ÿ’'-]+/.exec(w0) || [''])[0];

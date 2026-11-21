@@ -479,7 +479,7 @@ Object.assign(en.holidays, { victoria: 'Victoria Day', canada: 'Canada Day', bcD
 Object.assign(fr.holidays, { victoria: 'Fête de Victoria', canada: 'Fête du Canada', bcDay: 'Jour de la Colombie-Britannique', labour: 'Fête du Travail', truth: 'Journée de la vérité et de la réconciliation', thanks: 'Action de grâce', remembrance: 'Jour du Souvenir' });
 Object.assign(en, {
   // Hours: copying never reopens a closed day.
-  copyOpen: 'Every open day', copyClosedNote: 'Days marked Closed stay closed.',
+  copyOpen: 'Every open day', copyClosedNote: 'Days marked Closed stay closed.', copySkipped: '{days} stayed closed (marked Closed). Tap Open this day there to open it with these hours.',
   // Closures: the next few holidays, then the rest.
   holAll: 'Show all holidays ({n})', holFewer: 'Show fewer holidays',
   // Menu on Facebook or Instagram; no website filled in when there is none.
@@ -493,7 +493,7 @@ Object.assign(en, {
   storySportsHint: 'You said you don’t show sports, but your description says “{bit}”. Change or remove that part, then save. We check it first.',
 });
 Object.assign(fr, {
-  copyOpen: 'Chaque jour ouvert', copyClosedNote: 'Les journées marquées Fermé restent fermées.',
+  copyOpen: 'Chaque jour ouvert', copyClosedNote: 'Les journées marquées Fermé restent fermées.', copySkipped: '{days} : resté fermé (marqué Fermé). Touchez Ouvrir ce jour pour l’ouvrir avec ces heures.',
   holAll: 'Voir tous les jours fériés ({n})', holFewer: 'Voir moins de jours fériés',
   menuSocial: 'Mon menu est sur Facebook ou Instagram', menuSocialQ: 'Où est votre menu?', menuSocialLead: 'Collez le lien de votre page ou publication Facebook ou Instagram avec le menu. Ou tapez le nom de la page et nous le trouverons.',
   menuSocialLabel: 'Lien ou nom de la page', menuSocialEx: 'facebook.com/votrepub ou @votrepub', menuSocialEmpty: 'Collez le lien ou tapez le nom de votre page.',
@@ -2660,6 +2660,12 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
 // arenas, skate parks, disc golf, BMX tracks, outdoor pools, courts, ski lessons and sports centres. The same 7 essentials
 // and 6 optional tiles; no new fields. Each sport kind's own chips and examples sit in the indoor tables too (their keys
 // never repeat an indoor one), so Help's chip lists read them the same way.
+// Sport test 6: the hours screen's line for kinds whose public times change (the page then says "check the schedule").
+const SPORT_TIMES_HINTS = {
+  rink: ['Public skate times change week to week? Enter the hours the building is open; your page will say to check the schedule.', 'L’horaire du patinage libre change d’une semaine à l’autre? Entrez les heures d’ouverture du bâtiment; votre page dira de vérifier l’horaire.'],
+  swim: ['Public swim times change week to week? Enter the hours the pool is open; your page will say to check the schedule.', 'L’horaire des bains libres change d’une semaine à l’autre? Entrez les heures d’ouverture de la piscine; votre page dira de vérifier l’horaire.'],
+  sportsctr: ['Drop-in times change week to week? Enter the hours the building is open; your page will say to check the schedule.', 'L’horaire des activités libres change d’une semaine à l’autre? Entrez les heures d’ouverture du bâtiment; votre page dira de vérifier l’horaire.'],
+};
 (function sportWords() {
   Object.assign(en.indoor.quick.good_to_know_kinds, {
     golf: ['Tee times recommended', 'Cart and club rentals', 'Pro shop', 'Restaurant and patio on site', 'Dress code: collared shirts', 'Driving range on site', 'Free parking on site'],
@@ -2754,7 +2760,10 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
         // Sport test 1 (2026-11-20): a sport kind's own words for the three booking choices ("Walk-ons when there's room; book
         // tee times for busy times" on a golf course).
         ...(IK.SPORT.BOOK_WORDS[k] && IK.SPORT.BOOK_WORDS[k].chips ? { ibooks: Object.fromEntries(Object.entries(IK.SPORT.BOOK_WORDS[k].chips).map(([b, w]) => [b, w[fr2 ? 1 : 0]])) } : {}),
-        classNightsHint: k === 'classes' ? (fr2 ? 'Des cours le soir en dehors de ces heures? Gardez ici vos heures d’atelier libre, et ajoutez les soirs de cours dans Bon à savoir.' : 'Evening classes outside these hours? Keep your open studio hours here, and add class nights in Good to know.') : '',
+        // Sport test 6 (2026-11-20; Priya: "public skate times change every week… what do i put for hours"): one line on a rink's,
+        // a pool's or a sports centre's hours screens (SPORT_TIMES_HINTS).
+        classNightsHint: SPORT_TIMES_HINTS[k] ? SPORT_TIMES_HINTS[k][fr2 ? 1 : 0]
+          : k === 'classes' ? (fr2 ? 'Des cours le soir en dehors de ces heures? Gardez ici vos heures d’atelier libre, et ajoutez les soirs de cours dans Bon à savoir.' : 'Evening classes outside these hours? Keep your open studio hours here, and add class nights in Good to know.') : '',
       };
       // Sport test 2 (2026-11-20): the kind's own words where the sport screens had a golf course's (sport-kinds.js).
       const sw = (IK.SPORT.KIND_SETUP_WORDS || {})[k];

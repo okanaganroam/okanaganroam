@@ -575,6 +575,10 @@ function kindHelp(t, kind, ctx) {
     }
     case 'indoor-swim-times': {
       title(...w('swimQ'));
+      // Sport test 6 (Priya: public skate times change every week; the building is open 6 AM to 11 PM): what her page says.
+      const tw = { rink: [['Building open', 'public skate times change'], ['Aréna ouvert', 'horaire du patinage libre variable']], swim: [['Pool open', 'public swim times change'], ['Piscine ouverte', 'horaire des bains libres variable']], sportsctr: [['Building open', 'drop-in times change'], ['Centre ouvert', 'horaire des activités libres variable']] }[kind];
+      if (tw) t = { ...t, a: `${t.a}<p>Times change week to week? While you’re open, your page says <em>${e(tw[0][0])} · ${e(tw[0][1])}: see schedule ↗</em>, linked to your <strong>Website</strong> (put your schedule page there, or a link to it on your site), and Build My Trip tells people to check the schedule before they go.</p>`,
+        aFr: `${t.aFr}<p>Les heures changent d’une semaine à l’autre? Pendant vos heures d’ouverture, votre page indique <em>${e(tw[1][0])} · ${e(tw[1][1])} : voir l’horaire ↗</em>, avec un lien vers votre <strong>Site Web</strong> (mettez-y votre page d’horaire, ou un lien vers celle-ci), et Planifier mon voyage dit de vérifier l’horaire avant d’y aller.</p>` };
       if (kind === 'skischool') return both(t, [[/The exact lesson times/, 'The lesson start times'], [/“Drop-in times daily 1–3 PM”|“Lesson[^”]*”/, '“Lessons at 9:15 AM and 1:15 PM”'], [/<em>Times change by season, see our website<\/em>/, '<em>Lesson times change with the season: see our website</em>']],
         [[/Les heures précises des séances/, 'Les heures de début des cours'], [/« Périodes libres tous les jours de 13 h à 15 h »/, '« Cours à 9 h 15 et 13 h 15 »'], [/<em>Les heures changent selon la saison, voyez notre site Web<\/em>/, '<em>Les heures des cours changent selon la saison : voyez notre site Web</em>']]);
       return t;

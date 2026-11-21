@@ -289,7 +289,9 @@ function stripTravelNoise(normalized) {
   // More plain talk: "Instagrammable" is a view, "locals only / no tourist traps" is hidden gems, a car and a rack, 3 generations, "do together", a snowy day is an indoor day.
   s = s.replace(/\s+/g, " ").replace(/\b(?:most )?(?:instagram(?:m)?able|photogenic|picture perfect)\b/g, ' viewpoints ').replace(/\b(?:locals? only|only locals?|(?:no|not|without|avoid) (?:the )?(?:tourist )?traps?|off the beaten (?:path|track))\b/g, ' hidden gems ');
   s = s.replace(/\b(?:\d|two|three|four|five) generations?\b/g, ' ').replace(/\bdo together\b/g, ' do ').replace(/\b(?:i|we) (?:have|got|bring|are bringing) (?:a|our|my) (?:car|rental|van|suv)(?: with (?:a |our )?(?:bike|roof|bikes) ?racks?)?\b/g, ' ');
-  s = s.replace(/\b(?:a )?(?:snowy|snowing|snowstorm|stormy|freezing) (?:day|afternoon|morning|evening|weekend)\b/g, ' a rainy day ');
+  // Sport test 6 (2026-11-20; "cold day, something indoor in Kelowna" left the indoor arena out and noted "cold"): a cold day
+  // is an indoor day too.
+  s = s.replace(/\b(?:a )?(?:snowy|snowing|snowstorm|stormy|freezing|cold|chilly|frigid|bitter(?:ly)? cold|really cold|very cold) (?:day|days|afternoon|morning|evening|weekend)\b/g, ' a rainy day ');
   // "six year olds", "a group of 6 guys", "bus tour group": ages and head counts, not places.
   s = s.replace(/\b(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen) (?:years? old|year olds?|yo)\b/g, ' kids ');
   s = s.replace(/\b(?:coach|bus|motorcoach) (?:tour )?(?:group|trip)\b/g, ' ');
@@ -434,6 +436,8 @@ const COLLECTION_ALIASES = {
   local_favorite: ['local favourite', 'local favourites', 'local favorite', 'local favorites', 'where locals go', 'locals favourite', 'locals favorite', 'local spots'],
 };
 
+// Sport test 6: the activity phrases search reads as plain words (see the phrase table).
+const SEARCH_WORD_NOT_ACTIVITY = new Set(['skating', 'ice skating']);
 const ACTIVITY_ALIASES = {
   // 2026-10-14: "a walk" / "a stroll" is a trail or park outing too ("Sunday brunch and a walk" found nothing). Bare
   // "walking" is left out so "walking distance" is never read as a hike.
@@ -893,7 +897,14 @@ function buildPhraseTable(taxonomy) {
   if (t.types.includes('indoor')) for (const p of ALSO_INDOOR_PHRASES) if (!(taxonomy && taxonomy.planner) || !ALSO_INDOOR_SEARCH_ONLY.has(p)) add(p, 'type', 'indoor');
   for (const [feature, phrases] of Object.entries(FEATURE_ALIASES)) if (t.features.includes(feature)) for (const p of phrases) add(p, 'feature', feature);
   for (const [kind, phrases] of Object.entries(COLLECTION_ALIASES)) if (t.collections.includes(kind)) for (const p of phrases) add(p, 'collection', kind);
-  for (const [slug, phrases] of Object.entries(ACTIVITY_ALIASES)) if (t.activities.includes(slug)) for (const p of phrases) add(p, 'activity', slug);
+  // Sport test 6 (2026-11-20; "skating with kids kelowna" found 0 places and "skating in july" showed an indoor arena "Open
+  // now"): in search, "skating" and "ice skating" are the words they are (an arena's "Arena & skating", an outdoor rink's
+  // own words, with "skate" and "rink" as their synonyms), never the outdoor Winter activity, which an arena is not in.
+  // Build My Trip (taxonomy.planner) keeps reading them as before: its rink kind plans arenas and outdoor rinks.
+  for (const [slug, phrases] of Object.entries(ACTIVITY_ALIASES)) if (t.activities.includes(slug)) for (const p of phrases) {
+    if (!(taxonomy && taxonomy.planner) && SEARCH_WORD_NOT_ACTIVITY.has(p)) continue;
+    add(p, 'activity', slug);
+  }
   const typeWords = new Set(Object.values(TYPE_ALIASES).flat().map(normalizeDiscoveryText));
   for (const cuisine of t.cuisines) if (!typeWords.has(normalizeDiscoveryText(cuisine))) add(cuisine, 'cuisine', cuisine);
   for (const [cuisine, phrases] of Object.entries(CUISINE_SYNONYMS)) if (t.cuisines.includes(cuisine)) for (const p of phrases) add(p, 'cuisine', cuisine);

@@ -2146,6 +2146,8 @@ ${d.stays ? (d.viator ? t3ViatorStaySrc(T3_STAY_CLIENT_SRC) + t3ViatorClientSrc(
       + '<div class="t3-card-tags">' + badgesHtml(v) + '</div>'
       + '<div class="t3-card-body">'
       + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + (v.hoursByOwner ? ' <span class="t3-nowrap">' + esc(lang() === 'fr' ? '(confirmés par l’entreprise)' : '(confirmed by the business)') + '</span>' : /venue page|page du lieu/i.test(v.listedHours) ? '' : ' <span class="t3-nowrap"><span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></span>') + '</p>' : '')
+      // Sport test 6: a rink's hours are the building's; its public skate times change.
+      + (v.timesChange ? '<p class="t3-hours t3-times-change">' + esc(lang() === 'fr' ? v.timesChange.fr : v.timesChange.en) + '</p>' : '')
       // Indoor test 1 (2026-11-19): a yearly closure in the month asked for (or the next weeks, with no date).
       + (v.yearlyClosure ? '<p class="t3-hours t3-closure">' + esc(lang() === 'fr' ? v.yearlyClosure.fr : v.yearlyClosure.en) + '</p>' : '')
       // Happy hour deals (2026-10-26): a stop timed inside the venue's happy hour says what is on.
