@@ -99,7 +99,8 @@ test('2. "Ask us": not sure says so and offers Ask us (EN + FR); the question go
   assert.match(en.cfg.ui.en.askSent, /Sent — we’ll reply by email/);
   assert.match(fr.cfg.ui.fr.askSent, /Envoyé — nous vous répondrons par courriel/);
   assert.match(en.script, /function askUs\(q, row\)/); assert.match(en.script, /chips\(sugg, true, q\)/);
-  assert.equal(en.best('How do I see what the public sees on our page?').id, null);
+  // (Sport test 10: "How do I see what the public sees on our page?" has its own answer now, See your page.)
+  assert.equal(en.best('my husband took these on his phone last summer is that alright').id, null);
   sent.length = 0;
   const post = (body) => fetch(`${base}/owner/help`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': '10.129.0.9' }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, j: await r.json() }));
   const visit = Date.now();

@@ -806,7 +806,8 @@ const FIT = [
     fit: ['sport-hh-none-specials', 'sport-no-bar', 'sport-sister-listing', 'dont-have', 'sport-restaurant'], go: ['sport-hh-none-specials'] },
   // "A charity tournament closes the course to the public for a day; the date changes every year."
   { id: 'event-closure', all: ['\\b(tournament|tournaments|tournoi|tournois|championship|championnat|member guest|scramble|amateur|charity|fundraiser|tourney)\\b', '\\b(close|closed|closes|closing|shut|shuts|ferme|fermer|block|bloquer|cant book|can t book|closed to the public|to the public|no public)\\b'],
-    fit: ['sport-one-off-closure', 'closures', 'setup-short-closure', 'sport-closures-yearly', 'sport-tournaments', 'setup-closures', 'setup-closure-fix', 'closures-count', 'sport-peak-dates'], go: ['sport-one-off-closure', 'closures'] },
+    not: ['\\b(sign ups?|signups?|registration|registrations|entries|entry|inscriptions?) (close|closes|closed)\\b'],
+    fit: ['sport-book-ahead-hours', 'sport-one-off-closure', 'closures', 'setup-short-closure', 'sport-closures-yearly', 'sport-tournaments', 'setup-closures', 'setup-closure-fix', 'closures-count', 'sport-peak-dates'], go: ['sport-one-off-closure', 'closures'] },
   // "Can our head pro get his own access without using my login?"
   { id: 'own-access', all: ['\\b((his|her|their|my|our) own (access|login|log in|account|password|sign in)|own access|own login|own account|separate login|without (using )?my (login|password|account)|shouldnt use my login|share my (login|password)|give (him|her|them) access|propre acces|son propre (acces|compte)|sa propre connexion)\\b'],
     fit: ACCESS_TOPICS, go: ['staff'] },
