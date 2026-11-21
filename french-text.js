@@ -95,6 +95,7 @@ const FR_TEXT = {
   'Groups': 'Groupes',
   'Happy hour': '5 à 7',
   'Free': 'Gratuit',
+  'By donation': 'Contribution volontaire', 'No set entry price': 'Aucun prix d’entrée fixe', 'No entry fee': 'Aucuns frais d’entrée',
   // Indoor test 1 (2026-11-19): a by-donation place's card price.
   'By donation': 'Contribution volontaire',
   // Indoor test 2 (2026-11-19): a price for a whole room, lane, game or group (the card's small line under the price).
