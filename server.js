@@ -4578,6 +4578,16 @@ function sportSearchExtraPieces(row, fr = false) {
   // Her own price lines that are free ("Disc golf — free"), so "free disc golf" finds her.
   try { const r = publishedMenuRow(row.id); if (r && r.source !== 'research') { const d = parseMenuData(r.data); for (const sec of (d && d.sections) || []) for (const it of sec.items || []) if (it && it.name && /^(?:free|gratuit|0(?:\.00)?)$/i.test(String(it.price || '').trim())) out.push(`${it.name} free gratuit`); } } catch (e) { /* no list */ }
   out.push(sportGolfSearchFacts(row));
+  // Sport test 12 (2026-11-21; "golf lessons kelowna" and « cours de golf » missed Rob's course, whose page shows research's
+  // "Practice: Golf Academy with a CPGA instructor offers lessons…"; "mens night golf" missed a weekly Men's Night): the
+  // Practice or Lessons row as his page keeps it (sportPracticeKept), and his own weekly events' names and details.
+  try {
+    const info = venueVisitInfo(row.id) || {};
+    const pr = [...(info.rows || []), ...(Array.isArray(info.owner_dropped) ? info.owner_dropped : [])].filter((r) => r && typeof r.text === 'string' && /^(?:practice|lessons?|academy)$/i.test(String(r.label || '')));
+    const kept = pr.length ? sportPracticeKept(row, pr.map((r) => r.text).join(' ')) : '';
+    if (kept) out.push(kept);
+  } catch (e) { /* no rows */ }
+  try { for (const n of venueWeeklyNightsList(row.id)) { if (n.source !== 'venue_owner') continue; const t = [fr ? n.title_fr || n.title : n.title, fr ? n.detail_fr || n.detail : n.detail].filter(Boolean).join(' '); if (t) out.push(searchWithoutNegated(t)); } } catch (e) { /* no nights */ }
   const desc = String((fr ? row.description_fr : row.description) || '');
   if (desc.length > 400) out.push(...desc.split(/(?<=[.!?])\s+/));
   return out.filter(Boolean);
@@ -5545,6 +5555,10 @@ const SEARCH_PHRASE_REWRITES = [
   ['stand up paddle', 'paddleboard'], ['stand up paddling', 'paddleboarding'], ['stand up paddleboard', 'paddleboard'], ['stand up paddleboarding', 'paddleboarding'],
   ['stand up paddle board', 'paddleboard'], ['stand up paddle boarding', 'paddleboarding'],
   ['xmas', 'christmas'], ['x mas', 'christmas'], ['xmas market', 'christmas market'], ['xmas markets', 'christmas market'],
+  // Sport test 12 (2026-11-21; "christmas party venue kelowna" read Christmas as the date and "venue" as a word, and missed
+  // Rob's Groups line "christmas parties in the clubhouse"): a Christmas, holiday or office party is a party to book.
+  ...['christmas', 'xmas', 'holiday', 'office', 'staff', 'company', 'work'].flatMap((w) => ['party', 'parties', 'party venue', 'party venues', 'party place', 'party places', 'party spot', 'party spots'].map((x) => [`${w} ${x}`, 'christmas parties'])),
+  ['party venue', 'parties'], ['party venues', 'parties'],
   // Round 10 (2026-10-19): "ice wine" read as wineries mentioning "ice" and listed the Fire & Ice festivals.
   ['ice wine', 'icewine'], ['ice wines', 'icewine'], ['icewines', 'icewine'],
 ];
@@ -7311,6 +7325,17 @@ function searchPageModel(run, now = new Date(), lang = 'en') {
     const o = searchSportOrder(sq, run, venues, pinnedIds);
     venues = o.venues; priceSorted = o.priceSorted;
     for (const [id, nt] of o.notes || []) why.set(id, lang === 'fr' ? nt[1] : nt[0]);
+  }
+  // Sport test 12 (2026-11-21; "golf and dinner kelowna" listed 48 golf courses and restaurants without Rob's course, which
+  // has Carrington's restaurant and 9 & Dine): golf asked with a meal puts the golf places whose own words name a
+  // restaurant, dining or dinner on site first (an owner-set-up one before the others), in their own order.
+  if (!(plan && plan.list) && run.results.kind !== 'events' && venues.length > 1 && (run.intent.types || []).includes('golf') && (run.intent.types || []).some((t) => t === 'restaurant')) {
+    const dineRe = /\b(?:restaurants?|dining|dine|dinner|bistro|grill|eatery|supper|souper|resto)\b|\b9 (?:&|and) dine\b/i;
+    const dines = (v) => v.type === 'golf' && dineRe.test(`${v.description || ''} ${visitLinesText(venueVisitInfo(v.id), ['Food', 'Known for', 'Good to know', 'Groups'])}`);
+    const ids = new Set(pinnedIds);
+    const top = venues.filter((v) => !ids.has(v.id) && dines(v)).sort((a, b) => ownerSetUpRank(a) - ownerSetUpRank(b));
+    // The first three stay on top even when closed for the season (their cards say so), like a name match.
+    if (top.length) { const t = new Set(top.map((v) => v.id)); venues = [...venues.filter((v) => ids.has(v.id)), ...top, ...venues.filter((v) => !ids.has(v.id) && !t.has(v.id))]; pinnedIds = [...pinnedIds, ...top.slice(0, 3).map((v) => v.id)]; }
   }
   // What's On events for the words ("cider fest") or the plan's own (free events), soonest best match first.
   const found = plan && plan.events ? plan.events() : run.results.kind === 'events' ? { total: 0, items: [] } : (run.textEvents || searchTextEvents(run.intent, now));
@@ -13047,7 +13072,10 @@ function visitWithPendingPriceRows(venue, info) {
       // Sport test 7 (2026-11-20): research's Practice or Lessons row stays once her list is published, without its prices
       // ("Academy lessons, clinics and club fittings offered."), unless her own lines say there are none.
       if (!sportSetupType(venue.type)) return info;
-      const keep = back.filter((r) => /^(?:practice|lessons?)$/i.test(r.label)).map((r) => ({ label: r.label, text: sportPracticeKept(venue, r.text) })).filter((r) => r.text);
+      // Sport test 12 (2026-11-21; Rob's rates link took research's "Rentals: Shared power cart is mandatory and included.
+      // Rental clubs $65 to $75." off his page): a Rentals row stays too, as its rules only (its priced sentences go).
+      const noPrices = (t) => String(t || '').split(/(?<=[.;!?])\s+/).filter((x) => !/\$\s?\d|\d\s?\$/.test(x)).join(' ').trim();
+      const keep = back.filter((r) => /^(?:practice|lessons?|rentals?)$/i.test(r.label)).map((r) => ({ label: r.label, text: /^rentals?$/i.test(r.label) ? noPrices(r.text) : sportPracticeKept(venue, r.text) })).filter((r) => r.text);
       return keep.length ? { ...info, rows: info.rows.concat(keep) } : info;
     }
     return { ...info, rows: info.rows.concat(back.map((r) => ({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}) }))) };
@@ -55688,10 +55716,24 @@ function queueClosureNotesFr(venue, closures, contactEmail) {
     return true;
   } catch (e) { console.error(`[owner-portal] French closure notes for venue #${venue && venue.id} failed: ${e.message}`); return false; }
 }
+// Sport test 12: an indoor or sport owner's happy hour deal lines with no translation yet, in the French lines item.
+function queueHappyHourDealsFr(venue, deals, contactEmail) {
+  try {
+    const en = (deals.deals || []).map((d) => String((d && d.text) || '').trim()).filter(Boolean), frd = (deals.deals_fr || []).map((d) => String((d && d.text) || '').trim()).filter(Boolean);
+    const parts = {};
+    if (en.length && !frd.length) { const f = en.filter((t) => ownerTextIsFrench(t)), e = en.filter((t) => !ownerTextIsFrench(t)); if (e.length) parts['Happy hour'] = e.join(' / '); if (f.length) parts['Happy hour' + FR_LINES_EN_SUFFIX] = f.join(' / '); }
+    else if (!en.length && frd.length) parts['Happy hour' + FR_LINES_EN_SUFFIX] = frd.join(' / ');
+    if (!Object.keys(parts).length) return false;
+    const id = frLinesUpsert(venue.id, parts, contactEmail);
+    if (!id) return false;
+    frLinesEmailSoon(venue.id, id, contactEmail || null);
+    return true;
+  } catch (e) { console.error(`[owner-portal] French happy hour lines for venue #${venue && venue.id} failed: ${e.message}`); return false; }
+}
 // Sport test 6 (2026-11-20; Priya's setup left 4 French-lines items for one listing in /admin/review, beside the French
 // description): an owner's pending English lines and price names are ONE review item. A new line joins the open item
 // (the newest words of each line win); one is added only when there is none. -> the item's id, or null when nothing changed.
-const FR_LINES_LABELS_FR = ['Known for', 'Good to know', 'Groups', 'Prices', 'Closures'];
+const FR_LINES_LABELS_FR = ['Known for', 'Good to know', 'Groups', 'Happy hour', 'Prices', 'Closures'];
 // Sport test 11: the same item names her French lines to write in English ("Known for (write the English): …").
 const FR_LINES_LABELS = [...FR_LINES_LABELS_FR, ...['Story', ...FR_LINES_LABELS_FR].map((l) => l + FR_LINES_EN_SUFFIX)];
 const FR_LINES_PRE = { lines: 'Their own English lines changed: please write the French for them on their listing (queued automatically).', prices: 'Their price names are in English: please write the French for them on their listing (queued automatically).',
@@ -56293,7 +56335,10 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       else if (!en.deals.length && frList.deals.length) { const next = { deals: [], deals_fr: frList.deals }; if (!sameHappyHourDeals(next, current.happy_hour_deals)) changes.happy_hour_deals = next; }
       else if (!en.deals.length) { if (current.happy_hour_deals) changes.happy_hour_deals = null; }
       else {
-        const next = { deals: en.deals, deals_fr: frList.deals };
+        // Sport test 12 (2026-11-21; Rob's "drink and appy specials at Carrington's" stayed lower case): an indoor or sport
+        // owner's typed deal gets a capital first letter, as his other lines do (ownerLineTidy, no full stop added).
+        const tidy = (list) => (kindSetupType(venue.type) ? list.map((d) => (d && typeof d.text === 'string' ? { ...d, text: ownerLineTidy(d.text, false) } : d)) : list);
+        const next = { deals: tidy(en.deals), deals_fr: tidy(frList.deals) };
         if (!sameHappyHourDeals(next, current.happy_hour_deals)) changes.happy_hour_deals = next;
       }
     }
@@ -57145,6 +57190,9 @@ async function handleOwnerChangeSubmission(req, res, token) {
   // Sport test 8 (2026-11-21): her closure notes ("closed to the public for the club championship") join the same French
   // lines item, so the French page can say why once Dayton writes it (until then it says « Fermé aujourd’hui » alone).
   if (kindSetupType(venue.type) && Array.isArray(changes.closures)) queueClosureNotesFr(venue, changes.closures, contact.email);
+  // Sport test 12 (2026-11-21): his happy hour deal lines join the same item (« drink and appy specials… » showed in English
+  // on the French page with nothing queued): English deals with no French ask for their French, French ones their English.
+  if (kindSetupType(venue.type) && changes.happy_hour_deals && typeof changes.happy_hour_deals === 'object') queueHappyHourDealsFr(venue, changes.happy_hour_deals, contact.email);
   // Tour test 3 (Whistler, 2026-11-17): the category words the kinds just wrote, so the setup's finish preview shows what
   // the page and the cards show (it listed the chips' names).
   let tourWords = null;
@@ -64726,7 +64774,8 @@ function sportMenuImportTopic(venue) {
   } catch (e) { return []; }
 }
 function kindSetupHelpBase(venue) {
-  if (!(venue && sportSetupType(venue.type))) return INDOOR_SETUP_HELP_TOPICS;
+  // Sport test 12: "What's still missing" (by name) on indoor places too.
+  if (!(venue && sportSetupType(venue.type))) return INDOOR_SETUP_HELP_TOPICS.concat(sport5HelpModule.TOPICS.filter((t) => t.id === 'setup-missing'));
   const happy = happyHourAllowed(venue);
   // Sport test 1: the topics for the main kind only (kinds), in the kind's own words.
   const kind = indoorKindsModule.sportKindKey((venueIndoorInfo(venue.id).kinds || []).length ? venueIndoorInfo(venue.id).kinds : indoorKindSuggestion(venue));
@@ -68492,6 +68541,25 @@ function ownerHelpWidgetHtml(page, opts = {}) {
         const en = bk === 'no' ? [['“Tee times recommended”', '“Walk-ons only: no tee times”'], ['“Pro shop”', '“Pull carts only”'], ['Tee times recommended; walk-ons when there’s room', 'Walk-ons only: no tee times']] : [['“Pro shop”', '“Pull carts only”']];
         const fr = bk === 'no' ? [['« Heures de départ conseillées »', '« Sans réservation seulement : pas d’heures de départ »'], ['« Boutique du pro »', '« Chariots à tirer seulement »'], ['Heures de départ conseillées; sans réservation s’il y a de la place', 'Sans réservation seulement : pas d’heures de départ']] : [['« Boutique du pro »', '« Chariots à tirer seulement »']];
         cfg.topics = cfg.topics.map((t) => ({ ...t, a: sw(t.a, en), aFr: sw(t.aFr, fr.map(([a, b]) => [a, frSpacingHtml(b)])) })); } } } } catch (e) { /* as they are */ }
+  // Sport test 12 (2026-11-21; Rob at 95% asked "what's missing?" and got the general checklist answer): on a sport or golf
+  // place, "What's still missing" names his own open items and what to tap. A weekly night (men's night, league night) is a
+  // Good to know line plus an event that repeats, never a Known for line (his one Known for line would be replaced).
+  try {
+    const pv1 = opts.venueId ? getVenue(opts.venueId) : null;
+    if (pv1 && kindSetupType(pv1.type)) {
+      const miss = sportHelpMissing(pv1);
+      const golfy1 = ['golf', 'simgolf', 'range'].includes((venueIndoorInfo(pv1.id).kinds || [])[0] || (pv1.type === 'golf' ? 'golf' : ''));
+      cfg.topics = cfg.topics.map((t) => (t.id === 'setup-missing' ? { ...t, a: String(t.a).replace('{MISSING_EN}', miss.en), aFr: String(t.aFr).replace('{MISSING_FR}', miss.fr) }
+        : t.id === 'indoor-theme-nights' && sportSetupType(pv1.type) ? { ...t,
+          a: '<p>Say it in one line under <strong>Good to know</strong>, like <em>' + (golfy1 ? 'Men’s night Thursdays: no public tee times after 12 PM' : 'League night Thursdays: limited public times after 6 PM') + '</em>: your page shows it, and search and Build My Trip read it. Then put it on What’s On: on your page (after the setup), tap <strong>Add an event</strong>, give it the first date and its time, and in <strong>Repeats or other dates?</strong> write “every Thursday”. Keep your hours as your open-door hours, and keep your Known for line as it is.</p>',
+          aFr: frSpacingHtml('<p>Dites-le en une ligne sous <strong>Bon à savoir</strong>, comme <em>' + (golfy1 ? 'Soirée des hommes le jeudi : pas de départs pour le public après 12 h' : 'Soir de ligue le jeudi : peu de places pour le public après 18 h') + '</em> : votre page l’affiche, et la recherche et Planifier mon voyage la lisent. Ajoutez-la ensuite à À l’affiche : sur votre page (après la configuration), touchez <strong>Ajouter un événement</strong>, donnez la première date et l’heure, et dans <strong>Se répète ou autres dates?</strong> écrivez « chaque jeudi ». Gardez vos heures d’ouverture comme elles sont, et votre ligne Connu pour aussi.</p>') }
+        : t.id === 'sport-members' && sportSetupType(pv1.type) ? { ...t,
+          a: `${t.a}<p>It’s a weekly night, like a men’s night? Put it on What’s On too: tap <strong>Add an event</strong> on your page and write “every Thursday” in <strong>Repeats or other dates?</strong>. Your Known for line stays as it is.</p>`,
+          aFr: t.aFr + frSpacingHtml('<p>C’est une soirée chaque semaine, comme une soirée des hommes? Ajoutez-la aussi à À l’affiche : touchez <strong>Ajouter un événement</strong> sur votre page et écrivez « chaque jeudi » dans <strong>Se répète ou autres dates?</strong>. Votre ligne Connu pour reste telle quelle.</p>') }
+        : t));
+    }
+  } catch (e) { /* as they are */ }
+  cfg.topics = cfg.topics.filter((t) => !/\{MISSING_(?:EN|FR)\}/.test(`${t.a} ${t.aFr}`));
   // Indoor test 4 (2026-11-19): topics a kind of place never has (an indoor place's restaurant "Price range").
   if (Array.isArray(opts.dropTopics) && opts.dropTopics.length) cfg.topics = cfg.topics.filter((t) => !opts.dropTopics.includes(t.id)).map((t) => ({ ...t, over: (t.over || []).filter((x) => !opts.dropTopics.includes(x)), noRelated: (t.noRelated || []).filter((x) => !opts.dropTopics.includes(x)) }));
   // Tour test 4 (Whistler, 2026-11-17): a tour has price lists, not menus ("new photos and menus wait for us to check").
@@ -72783,7 +72851,10 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
     // Indoor places (2026-11-19): the same, with their indoor answers and adult price.
     ...(kindSetupType(venue.type) ? { openMonths: venueLinks(venue.id).open_months || '', hasSeasons: ((venueHoursExtras(venue.id) || {}).seasons || []).length > 0,
       indoorInfo: live.indoor_info || indoorInfoAnswers(venue.id),
-      ...(sportSetupType(venue.type) && ((live.indoor_info || indoorInfoAnswers(venue.id) || {}).kinds || [])[0] ? { kindWhy: sportKindWhyOf(((live.indoor_info || indoorInfoAnswers(venue.id)).kinds)[0]) } : {}), indoorPrice: 'indoor_price' in live ? live.indoor_price : indoorPriceValue(venue.id),
+      ...(sportSetupType(venue.type) && ((live.indoor_info || indoorInfoAnswers(venue.id) || {}).kinds || [])[0] ? { kindWhy: sportKindWhyOf(((live.indoor_info || indoorInfoAnswers(venue.id)).kinds)[0]) } : {}),
+      // Sport test 12 (2026-11-21): an untouched suggested All ages counts toward 100% on a golf course, range, rink, skate
+      // park or disc golf course (portal-completeness.js indoor_ages).
+      ...(sportSetupType(venue.type) ? (() => { const k0 = (((live.indoor_info || indoorInfoAnswers(venue.id) || {}).kinds) || [])[0]; return k0 && SPORT_KINDS_MOD.SPORT_UNTAPPED_AGE_OK_KINDS.includes(k0) && indoorKindAgeFor(venue)[k0] === 'all' ? { ageDefaultAll: true } : {}; })() : {}), indoorPrice: 'indoor_price' in live ? live.indoor_price : indoorPriceValue(venue.id),
       offerAnswered: (() => { try { return ['live', 'day'].includes(setupProgress(venue.id).done.offer); } catch (e) { return false; } })() } : {}),
     ownerFeatures: Object.entries(venueOwnerFeaturesFor(venue)).filter(([, on]) => on).map(([k]) => k),
   };
@@ -72846,6 +72917,25 @@ function ownerCompletenessHtmlFor(venue, live, happyHourTimes, waitingReq, token
     // Complete & Verified (2026-11-09): the badge block under the ring (earned, paused, or how to earn it).
     claimed: venueIsClaimed(venue.id),
   });
+}
+// Sport test 12 (2026-11-21): Help's "What's still missing" for a sport or golf place: its own open checklist items by
+// name, with what to tap. -> { en, fr } (HTML, escaped).
+function sportHelpMissing(venue) {
+  try {
+    const hh = (db.prepare('SELECT happy_hour_times FROM venues WHERE id = ?').get(venue.id) || {}).happy_hour_times || null;
+    const live = ownerVenueSnapshot(venue, hh);
+    const sc = portalCompleteness.scoreCompleteness(gatherCompletenessInput(venue, live, hh), { today: todayLocal() });
+    const items = (sc.missing || []).filter((it) => it && !it.waiting);
+    if (!items.length) return { en: 'Nothing is missing on your checklist. Something you sent with <strong>Send changes</strong> counts once we check it, usually within a day.', fr: 'Il ne manque rien à votre liste. Ce que vous avez envoyé avec <strong>Envoyer les modifications</strong> compte dès que nous le vérifions, habituellement en moins d’une journée.' };
+    const one = (it, fr) => {
+      if (it.key === 'indoor_ages') return fr ? '<strong>Qui peut venir</strong> : l’âge est seulement suggéré tant que vous ne l’avez pas touché. Ouvrez Qui peut venir, touchez un âge (Tous les âges si tout le monde peut venir), puis Enregistrer. Enregistrer sans toucher un âge le laisse ouvert.'
+        : '<strong>Who can come</strong>: the age is only suggested until you tap it. Open Who can come, tap an age (All ages if anyone can play), then Save. Saving without a tap leaves it open.';
+      return `<strong>${escapeHtml(fr ? it.fr : it.en)}</strong>`;
+    };
+    const list = (fr) => `${items.slice(0, 4).map((it) => one(it, fr)).join(fr ? ' ; ' : '; ')}.`.replace(/\.\.$/, '.');
+    return { en: `Still open: ${list(false)} Tap it under “To reach 100%” on the last screen of Set up your page, or in Your page checklist at the top of your edit page.`,
+      fr: frSpacingHtml(`Encore à faire : ${list(true)} Touchez-le sous « Pour atteindre 100 % » au dernier écran de Configurez votre page, ou dans la liste de votre fiche en haut de votre page de modification.`) };
+  } catch (e) { return { en: 'Open <strong>Your page checklist</strong> at the top of your edit page: it lists each item still missing, with a button to the right spot.', fr: 'Ouvrez <strong>La liste de votre fiche</strong> en haut de votre page de modification : elle montre chaque élément qui manque, avec un bouton vers le bon endroit.' }; }
 }
 // ---------- Complete & Verified badge (2026-11-09) ----------
 // One rule for every place the badge shows: portalCompleteness.badgeState() on the same score the portal shows, from live
@@ -81226,6 +81316,8 @@ module.exports = {
   tripPlannerLabels,
   parseTripPlanBody,
   runTripPlan, runTripPlanCore, ownerClosureCount,
+  // Sport test 12 (2026-11-21): read by its tests.
+  gatherCompletenessInput, sportHelpMissing,
   // Sport test 6 (2026-11-20): read by its tests.
   sportTimesChange, searchWithoutNegated,
   // Sport test 2 (2026-11-20): the golf winter rule.

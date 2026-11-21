@@ -327,9 +327,13 @@ function stripTravelNoise(normalized) {
   // "4 players", "a foursome", "one round of golf": party size and golf wording, not places.
   s = s.replace(/\b(\d{1,2}|two|three|four|five|six|eight|ten|twelve) (?:players|golfers)\b/g, ' $1 friends ');
   s = s.replace(/\b(?:a|one|another|the next) rounds? of (drinks?|beers?|cocktails?|wine)\b/g, ' $1 ');
+  // Sport test 12 (2026-11-21; "golf … 9 hole after work": "hole" became a word): "9 hole", "9-hole", "nine holes" and
+  // "18 holes" are a round's length. With no "golf" in the request, they ask for golf.
+  const HOLES_RE = /\b(?:18|eighteen|nine|9)[- ]?holes?\b(?: (?:round|course|game))?/g;
+  if (!/\bgolf/.test(s) && HOLES_RE.test(s)) s = s.replace(HOLES_RE, ' golf ');
   if (/\bgolf/.test(s)) {
     // Sport test 7 (2026-11-20): "round of golf then dinner" lost its golf with the words: "of golf" stays golf.
-    s = s.replace(/\b(?:(?:a|one|1|two|2) )?rounds?( of golf)?\b(?! of (?:drinks?|beers?|applause))|\b18 holes\b|\b(?:nine|9) holes\b|\b(?:foursome|threesome|twosome)\b/g, (m, g) => (g ? ' golf ' : ' '));
+    s = s.replace(/\b(?:(?:a|one|1|two|2) )?rounds?( of golf)?\b(?! of (?:drinks?|beers?|applause))|\b(?:18|eighteen|nine|9)[- ]?holes?\b(?: (?:round|course|game))?|\b(?:foursome|threesome|twosome)\b/g, (m, g) => (g ? ' golf ' : ' '));
   }
   // "no early mornings", "we like to sleep in", "late starts": a slow start, which the planner reads as a relaxed pace.
   s = s.replace(/\b(?:no|nothing|not|avoid|without) (?:any )?early (?:mornings?|starts?|wake ?ups?|alarms?)\b|\b(?:we|i) (?:like|love|want|prefer|need) to sleep in\b|\bsleep(?:ing)? in\b|\blate starts?\b|\b(?:not|aren t|arent) (?:a )?(?:morning|early) (?:person|people|birds?|risers?)\b|\bslow mornings?\b|\b(?:don t|do not) want to (?:get up|wake up|be up) early\b/g, ' relaxed ');

@@ -166,13 +166,15 @@ test('2. hours outside the season: asked about (open those days too, or skip the
   vm.runInContext(`function pad2(n){ return ('0' + n).slice(-2); } ${mdIn} ${src} this.f = seaOutside;`, ctx);
   const her = ctx.f({ from: '01-05', to: '03-31' }, { from: '04-03', to: '10-31' });
   assert.equal(her.out, true);
-  assert.deepEqual({ ...her.ext }, { from: '01-05', to: '10-31' });
+  // Sport test 12 (2026-11-21): her stretch ends Mar 31 and her season starts Apr 3, so it doesn't touch the season: no
+  // "Yes, open those days too" (it would open Apr 1–2 at her usual hours); Skip and Good to know.
+  assert.equal(her.ext, null);
   assert.equal(ctx.f({ from: '07-01', to: '08-31' }, { from: '04-03', to: '10-31' }).out, false, 'summer hours inside the season are fine');
   assert.deepEqual({ ...ctx.f({ from: '10-15', to: '11-15' }, { from: '04-03', to: '10-31' }).ext }, { from: '04-03', to: '11-15' });
   assert.equal(ctx.f({ from: '12-01', to: '02-28' }, { from: '11-26', to: '04-06' }).out, false, 'a winter season across New Year');
   // The save asks first, and the line on the hours screen has no ✓ for them.
   assert.match(client, /var ox = seaOutside\(lo, seaNow\);/);
-  assert.match(client, /S\.nudge = fill\(T\.seaOutside, \{ a: mdLabel\(seaNow\.from\), b: mdLabel\(seaNow\.to\), c: mdLabel\(lo\.from\), d: mdLabel\(lo\.to\) \}\);/);
+  assert.match(client, /S\.nudge = fill\(ox\.ext \|\| !T\.seaOutsideApart \? T\.seaOutside : T\.seaOutsideApart, \{ a: mdLabel\(seaNow\.from\), b: mdLabel\(seaNow\.to\), c: mdLabel\(lo\.from\), d: mdLabel\(lo\.to\) \}\);/);
   assert.match(client, /if \(sNow && T\.seaOutsideLine && seaOutside\(sz, sNow\)\.out\) return '<p class="su-hint su-seaoutline">'/);
   assert.match(client, /'seaOutOpen'[\s\S]*'seaOutSkip'/);
   for (const L of ['en', 'fr']) for (const k of ['seaOutside', 'seaOutsideYes', 'seaOutsideNo', 'seaOutsideNoSub', 'seaOutsideSkipped', 'seaOutsideLine']) assert.ok(text[L][k], `${L}.${k}`);

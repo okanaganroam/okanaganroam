@@ -374,7 +374,7 @@ const INDOOR_ITEMS = [
   { key: 'booking_link', noneEn: 'We don’t take bookings online', noneFr: 'Nous ne prenons pas de réservations en ligne', group: 'indoor', w: 3, fix: true, target: { setup: 'booking' }, fields: ['booking_url'],
     en: 'Booking or tickets link', fr: 'Lien de réservation ou de billets', whyEn: 'The page where people book or buy tickets.', whyFr: 'La page où l’on réserve ou achète des billets.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '📅' },
   { key: 'indoor_ages', group: 'yourvisit', w: 5, fix: true, target: { setup: 'offer' }, fields: ['indoor_info'],
-    en: 'Who can come', fr: 'Qui peut venir', whyEn: 'All ages, or from what age (5+, 8+, 12+, 16+, 19+).', whyFr: 'Tous les âges, ou à partir de quel âge (5+, 8+, 12+, 16+, 19+).', btnEn: 'Answer', btnFr: 'Répondre', icon: '👪' },
+    en: 'Who can come: tap an age to confirm', fr: 'Qui peut venir : touchez un âge pour confirmer', whyEn: 'All ages, or from what age (5+, 8+, 12+, 16+, 19+).', whyFr: 'Tous les âges, ou à partir de quel âge (5+, 8+, 12+, 16+, 19+).', btnEn: 'Answer', btnFr: 'Répondre', icon: '👪' },
   { key: 'access', group: 'yourvisit', w: 3, fix: true, target: { setup: 'offer' }, fields: ['owner_features'],
     en: 'Wheelchair access and parking', fr: 'Accès en fauteuil roulant et stationnement', whyEn: 'Tick Wheelchair accessible or Free parking on “Who can come”.', whyFr: 'Cochez Accessible en fauteuil roulant ou Stationnement gratuit dans « Qui peut venir ».', btnEn: 'Tick them', btnFr: 'Cocher', icon: '♿' },
   R('menu', { group: 'indoor', w: 4, target: { setup: 'menu' }, en: 'Your prices', fr: 'Vos tarifs', whyEn: 'Every ticket, pass or class and what it costs. A photo of your price sheet or a link to your prices page is fine.', whyFr: 'Chaque billet, laissez-passer ou cours et son prix. Une photo de votre grille tarifaire ou un lien vers votre page de prix suffit.', btnEn: 'Add them', btnFr: 'Ajouter', icon: '🎟️' }),
@@ -691,7 +691,10 @@ function doneMap(input, today) {
         // away for walk-ins): Walk-ins welcome with no link answers it.
         booking_link: nonBlank(i.bookingUrl) || t.book === 'no',
         indoor_booking: INDOOR_BOOK.includes(t.book),
-        indoor_ages: INDOOR_AGES.includes(String(t.age || '')),
+        // Sport test 12 (2026-11-21; Rob, a golf GM, saved "Who can come" without tapping the suggested All ages and sat at
+        // 95%): on a golf course, range, rink, skate park or disc golf course (i.ageDefaultAll, server.js), a saved screen
+        // with the suggested All ages left as it was counts here. It never ticks Kid-Friendly or shows "All ages".
+        indoor_ages: INDOOR_AGES.includes(String(t.age || '')) || (!!i.ageDefaultAll && !!i.offerAnswered),
         access: ['wheelchair_accessible', 'free_parking'].some((k) => feats.has(k)) || !!i.offerAnswered,
       };
     })() : {}),

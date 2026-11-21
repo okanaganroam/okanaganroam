@@ -616,7 +616,7 @@ const AARON = [
   ['first friday opening reception every month', [O], 'vernissage le premier vendredi de chaque mois'],
   ['open late thursdays in summer', [SL], 'ouvert tard le jeudi l’été'],
   ['doors open at 10 for the opening', [DO, O], 'les portes ouvrent à 10 h pour le vernissage'],
-  ['how do I get to 100%', ['page-complete'], 'comment arriver à 100 %'],
+  ['how do I get to 100%', ['page-complete', 'setup-missing'], 'comment arriver à 100 %'],
   ['where do our class prices go', [M, X, P, F], 'où vont les prix de nos cours'],
   ['is it ok to say no dogs, service dogs are allowed', [AC], 'puis-je dire pas de chiens, mais les chiens d’assistance sont acceptés'],
   ['we are closed on all stat holidays, is there one button', CLOSED_HOL, 'nous sommes fermés tous les jours fériés, y a-t-il un seul bouton?'],

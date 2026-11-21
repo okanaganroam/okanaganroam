@@ -290,7 +290,7 @@ const Q = [
   ["indoor15","setup","en","first friday opening reception every month",["indoor-openings","indoor-family-day"],["hours"]],
   ["indoor15","setup","en","open late thursdays in summer",["indoor-summer-late","seasonal-hours"],["indoor-seasonal","indoor-closed-months"]],
   ["indoor15","setup","en","doors open at 10 for the opening",["indoor-doors-open","indoor-openings"],["hours"]],
-  ["indoor15","setup","en","how do I get to 100%",["page-complete","indoor-fill-all"],[]],
+  ["indoor15","setup","en","how do I get to 100%",["page-complete","indoor-fill-all","setup-missing"],[]],
   ["indoor15","setup","en","where do our class prices go",["menu-add","indoor-intro-class","indoor-courses"],[]],
   ["indoor15","setup","en","is it ok to say no dogs, service dogs are allowed",["indoor-access"],[]],
   ["indoor15","setup","en","we are closed on all stat holidays, is there one button",["closures"],[]],

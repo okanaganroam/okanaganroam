@@ -2982,6 +2982,8 @@ function stopFrom(v, scored, extra, ctx) {
     caveats,
   };
 }
+// Sport test 12: the weight an owner-set-up sport or golf place gets in a time-slot itinerary's stop of its kind.
+const OWNER_SET_UP_SLOT_WEIGHT = 10;
 function compareScored(a, b) {
   // Indoor test 15: a Complete & Verified place (all confirmed by its owner) breaks a tie before rating and reviews.
   return b.score - a.score || (b.v.completeVerified ? 1 : 0) - (a.v.completeVerified ? 1 : 0) || (b.v.ownerSetUp ? 1 : 0) - (a.v.ownerSetUp ? 1 : 0) || (b.v.rating || 0) - (a.v.rating || 0) || (b.v.reviews || 0) - (a.v.reviews || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id;
@@ -9683,7 +9685,10 @@ function seasonFit(v, c, season, ctx) {
     } else {
       const windows = v.golfSeasons || [];
       const covered = windows.find((w) => mdInWindow(season.md, w.from, w.to));
-      if (covered) add(6, `Its published ${covered.label ? `${covered.label} ` : ''}rates run ${mdText(covered.from)} – ${mdText(covered.to)}`);
+      // Sport test 12 (2026-11-21; Rob's Tower Ranch lost "tee time then dinner" to a course whose 2026 rate card gave it
+      // "in season" points): an owner's own season that covers the trip's date counts the same as published rates.
+      if (v.ownerSetUp && v.openMonths && season.date && !seasonClosedOnTripRaw({ ...v, ownerClosures: undefined }, { date: season.date })) add(6, `Open on your date: its owner’s season`);
+      else if (covered) add(6, `Its published ${covered.label ? `${covered.label} ` : ''}rates run ${mdText(covered.from)} – ${mdText(covered.to)}`);
       else {
         if (season.golf === 'off') add(-12, null);
         else if (season.golf === 'shoulder' && windows.length) add(-4, null);
@@ -10085,6 +10090,10 @@ function planItinerary(input) {
       const dogCaveat = dogSeasonCaveat(v, c);
       const caveats = (t ? t.caveats : []).concat(sf.caveats, nearby.caveats, adv ? [adv.caveat] : [], dogCaveat ? [dogCaveat] : [], fbCaveats);
       if (kFit) { score += namedIds.has(v.id) ? 500 : -10; reasons.unshift({ code: 'meal', text: kitchenMealText(v, c.meal, kFit.closes), weight: 20 }); }
+      // Sport test 12 (2026-11-21; Rob's owner-set-up Tower Ranch lost three time-slot plans to unverified courses: it was only
+      // a tie-break after the score): a sport or golf place whose owner set it up (its kinds and its own hours) gets a real
+      // weight in the slot of its kind, so it wins over places nobody has confirmed unless it is clearly worse for the ask.
+      if (v.ownerSetUp && (c.types || []).includes(v.type)) score += OWNER_SET_UP_SLOT_WEIGHT;
       scored.push({ v, score, base: s.score, reasons, caveats, seasonFlags: sf.flags, advisory: !!adv, ...(kFit ? { kitchenMeal: true } : {}), ...(c.liveMusicFallback && musicNightOn(v) ? { nightOn: musicNightOn(v) } : {}) });
     }
     scored.sort(compareScored);

@@ -523,6 +523,38 @@ const TOPICS = [
     keysFr: ['voir notre page', 'voir ma page', 'a quoi ressemble notre page', 'a quoi ressemble ma page', 'ce que les visiteurs voient', 'apercu de ma page'],
     a: '<p>Tap <strong>your page</strong> (or See your page) at the top of your edit page: it opens your public page, just as visitors see it. Your quick answers show there as soon as they’re saved; a new story, photos and links show after a quick check, usually within a day.</p>',
     aFr: '<p>Touchez <strong>votre page</strong> (ou Voir votre fiche) en haut de votre page de modification : elle ouvre votre page publique, comme les visiteurs la voient. Vos réponses rapides y paraissent dès qu’elles sont enregistrées; une nouvelle histoire, des photos et des liens paraissent après une courte vérification, en général d’ici un jour.</p>' },
+  // Sport test 12 (2026-11-21; Rob at 95%: "it says I need who can come to get 100% but it already says saved. what's
+  // missing?" got the general checklist answer): what is still missing, by name, with what to tap (server.js fills
+  // {MISSING_EN} / {MISSING_FR} from his own checklist when the page is drawn).
+  { id: 'setup-missing', pages: ['setup', 'edit'], over: ['page-complete', 'setup-status', 'changes-review', 'nothing-changed', 'indoor-fill-all', 'easy-setup', 'indoor-age'],
+    q: 'What’s still missing to reach 100%?', qFr: 'Qu’est-ce qui manque pour atteindre 100 %?',
+    allOf: [['missing', 'manque', 'left', 'reste', 'stuck', 'bloque'], ['100', '95', '96', '97', '98', '99', 'percent', 'pour cent', 'complete', 'saved', 'enregistre', 'done', 'fait']],
+    keys: ['whats missing', 'what s missing', 'what is missing', 'still missing', 'what is left', 'whats left', 'get to 100', 'reach 100', 'to get 100', 'stuck at 95', 'stuck at 96', 'stuck at 97', 'stuck at 98', 'stuck at 99', 'it already says saved', 'already says saved', 'says saved', 'why not 100', 'not 100', 'still 95', 'need who can come'],
+    keysFr: ['qu est ce qui manque', 'ce qui manque', 'il manque quoi', 'atteindre 100', 'pour avoir 100', 'bloque a 95', 'toujours 95', 'pourquoi pas 100', 'deja enregistre', 'dit enregistre'],
+    a: '<p>{MISSING_EN}</p>', aFr: '<p>{MISSING_FR}</p>' },
+  // Sport test 12 (Rob: "page says kid friendly now… junior rates 18 and under but its a championship course, not a family
+  // fun spot. should that be on" got the junior-rates answer): Kid-Friendly comes from Who can come.
+  { id: 'sport-kid-badge', pages: ['setup', 'edit'], over: ['indoor-age', 'features', 'sport-rate-lines', 'sport-no-rate', 'indoor-price', 'sport-kids-free', 'sport-line-ages', 'sport-lessons'],
+    q: 'Kid-Friendly is on my page: should it be?', qFr: 'Enfants bienvenus est sur ma page : est-ce que ça devrait?',
+    allOf: [['kid', 'kids', 'family'], ['friendly', 'badge']],
+    keys: ['kid friendly', 'kid-friendly', 'kids friendly', 'family friendly', 'family fun', 'not a family', 'not a family fun spot', 'kid friendly badge', 'remove kid friendly', 'take off kid friendly', 'why does it say kid friendly'],
+    keysFr: ['badge enfants bienvenus', 'enlever enfants bienvenus', 'retirer enfants bienvenus', 'pas un endroit familial'],
+    a: '<p><strong>Kid-Friendly comes from Who can come.</strong> All ages (or 5+) turns it on; 12+ and older takes it off. Juniors can play, but you’re not a family spot? Keep All ages if anyone can book, or tap <strong>12+</strong> (or older) and Kid-Friendly comes off. Tap <strong>Change an answer</strong>, then <strong>Who can come</strong>. Junior rates go in <strong>Your prices</strong> either way.</p>',
+    aFr: '<p><strong>Enfants bienvenus vient de Qui peut venir.</strong> Tous les âges (ou 5+) l’active; 12+ et plus l’enlève. Les juniors peuvent venir, mais vous n’êtes pas un endroit familial? Gardez Tous les âges si tout le monde peut réserver, ou touchez <strong>12+</strong> (ou plus) et Enfants bienvenus disparaît. Touchez <strong>Modifier une réponse</strong>, puis <strong>Qui peut venir</strong>. Les tarifs juniors vont dans <strong>Vos tarifs</strong> dans les deux cas.</p>' },
+  // Sport test 12 (Rob: groups of 16 or more, and no 16+ chip): no new chip; his own words say it.
+  { id: 'sport-group-size', pages: ['setup', 'edit'], over: ['indoor-groups', 'sport-tournaments'],
+    q: 'Our group size isn’t one of the chips (like 16 or more)', qFr: 'La taille de nos groupes n’est pas dans les choix (comme 16 et plus)',
+    keys: ['16+', '16 or more', 'groups of 16', 'no 16', 'there s no 16', 'theres no 16', 'group size isn t there', 'group size not there', 'size chips', 'not one of the chips', 'our group size'],
+    keysFr: ['16 et plus', 'groupes de 16', 'pas de 16', 'taille de groupe', 'taille des groupes'],
+    a: '<p>Type it in your own words in <strong>Groups</strong>, like <em>Group packages for 16 or more: call us</em>, and skip the size chips (one would say a second number). Your page shows your line as you wrote it.</p>',
+    aFr: '<p>Écrivez-le dans vos mots dans <strong>Groupes</strong>, comme <em>Forfaits de groupe pour 16 personnes et plus : appelez-nous</em>, et ne touchez pas les choix de taille (ils diraient un deuxième nombre). Votre page affiche votre ligne telle quelle.</p>' },
+  // Sport test 12 (Rob's Good to know was nearly full, 281 of 320): no bigger box; where the rest goes.
+  { id: 'sport-gtk-full', pages: ['setup', 'edit'], over: ['indoor-good-to-know', 'plan-visit', 'description'],
+    q: 'Good to know is full: where does the rest go?', qFr: 'Bon à savoir est plein : où va le reste?',
+    keys: ['good to know is full', 'box is full', 'no more room', 'not enough room', 'character limit', 'out of room', 'it won t fit', 'wont fit', 'doesnt fit', 'over the limit'],
+    keysFr: ['bon a savoir est plein', 'plus de place', 'pas assez de place', 'limite de caracteres', 'ca ne rentre pas'],
+    a: '<p>Good to know holds about 320 letters, to keep your page easy to read. Keep each line short (<em>Cash or card</em>) and move what has a home of its own: group packages to <strong>Groups</strong>, what you’re known for to <strong>Known for</strong>, a weekly night like a men’s night to What’s On (<strong>Add an event</strong>, repeating every week), your prices to <strong>Your prices</strong>.</p>',
+    aFr: '<p>Bon à savoir contient environ 320 caractères, pour que votre page reste facile à lire. Gardez chaque ligne courte (<em>Comptant ou carte</em>) et déplacez ce qui a sa propre place : les forfaits de groupe dans <strong>Groupes</strong>, ce qui vous distingue dans <strong>Connu pour</strong>, une soirée chaque semaine comme une soirée des hommes dans À l’affiche (<strong>Ajouter un événement</strong>, qui se répète chaque semaine), vos prix dans <strong>Vos tarifs</strong>.</p>' },
 ];
 // What owners of every kind typed for the shared answers ([en keys, fr keys, topics they now beat]).
 const MORE_KEYS = {
@@ -812,7 +844,42 @@ const NOT_IF = {
 const PRICE_TOPICS = ['indoor-price', 'sport-card-price', 'sport-golf-details', 'sport-rate-lines', 'indoor-price-varies', 'sport-tax', 'sport-member-rates', 'sport-no-rate', 'sport-kids-free', 'sport-package', 'sport-per-person', 'indoor-price-two', 'sport-rate-change', 'sport-rates-next-year', 'indoor-free', 'menu-add', 'indoor-typer-first', 'sport-included', 'sport-twilight-times', 'sport-peak-dates', 'indoor-min-players', 'sport-said-twice', 'menu-import', 'sport-lessons', 'indoor-extras', 'sport-rentals', 'sport-line-ages', 'sport-adaptive', 'indoor-gift', 'indoor-cost'];
 const HOURS_TOPICS = ['hours', 'seasonal-hours', 'hours-third-stretch', 'indoor-summer-late', 'indoor-summer-daily', 'setup-split-hours', 'setup-third-time', 'sport-first-tee', 'sport-dawn-dusk', 'indoor-holiday-open', 'hours-open-holidays', 'sport-holiday-short', 'season', 'indoor-seasonal', 'sport-season', 'sport-opening-day', 'indoor-closed-months', 'year-round', 'indoor-yearly-break', 'setup-short-closure'];
 const ACCESS_TOPICS = ['staff', 'login-create', 'access', 'not-owner', 'login-privacy', 'settings', 'signin', 'resume-device'];
+// Sport test 12 (2026-11-21): the answers that close the place (closures, closed months, a yearly break) and its season.
+const CLOSE_TOPICS = ['closures', 'setup-short-closure', 'sport-one-off-closure', 'indoor-closed-months', 'indoor-yearly-break', 'sport-closures-yearly', 'setup-closure-fix', 'closures-count'];
+const SEASON_TOPICS = ['sport-season', 'season', 'indoor-seasonal', 'sport-opening-day', 'year-round', 'edit-season', 'setup-season'];
 const FIT = [
+  // Sport test 12 (2026-11-21; Rob: "carringtons closes oct 17, a couple weeks before the course. does the happy hour need
+  // different dates" got Closures, which would have closed his course Oct 18–31). The safety rule: the answers that close
+  // the place (closures, closed months, its season), make it free, or set its main price need a strong intent: a close
+  // word (closed, close, shut…) about the place itself, a free word, a price word. A question about a part of the place
+  // (its restaurant, patio, happy hour, pro shop, simulator) closing is never answered by them: it gets the topic its
+  // subject points to (happy hour months here), else "I'm not sure" with Ask us.
+  { id: 'hh-dates', not: ['\\b(no|dont have|doesnt have|do not have|does not have|without|not have|pas de|n a pas|aucun) (a |an |any |real )?(happy hour|5 a 7|social hour)\\b'], all: ['\\b(happy hour|happy hours|5 a 7|cinq a sept|social hour|heure sociale)\\b', '\\b(dates?|months?|mois|ends?|ending|until|jusqu|closes?|closing|closed|ferme|fermes|fermee|season|saison|october|oct|september|sept|april|november|specificdate|mid|early|late|before the course)\\b'],
+    fit: ['hh-some-months', 'hh-times', 'setup-happy-split', 'sport-social-hour', 'indoor-bar', 'hh-deals'], bad: CLOSE_TOPICS.concat(SEASON_TOPICS), go: ['hh-some-months', 'hh-times'] },
+  { id: 'close-needs-close', all: ['.'], not: ['\\b(close|closed|closes|closing|closure|closures|shut|shuts|shutting|off|vacation|holiday|holidays|break|not open|no public|ferme|fermee|fermes|fermons|fermer|fermeture|fermetures|conge|conges|feries?|vacances|pause|reopen|reopens|rouvre|tournament|tournoi|championship|championnat|private event|evenement prive|season|saison|winter|hiver|summer|ete|months?|mois|year|annee|snow|neige|specificdate|dates?)\\b'],
+    bad: CLOSE_TOPICS },
+  { id: 'part-closes', all: ['\\b(restaurant|restaurants|resto|patio|terrasse|bar|lounge|grill|bistro|kitchen|cafe|pro shop|happy hour|5 a 7|carringtons|dining room|salle a manger)(?: [a-z0-9]+){0,3} (closes|closing|closed|ferme|fermee|ends|until)\\b'],
+    not: ['\\b(we|nous|on|course|club|arena|rink|park|centre|center|facility|terrain|parcours|place|whole)(?: [a-z0-9]+){0,3} (close|closes|closing|closed|shut|shuts|ferme|fermons|fermee)\\b'],
+    fit: ['sport-part-season', 'sport-restaurant', 'indoor-good-to-know', 'hh-some-months', 'hh-times', 'sport-offseason-other', 'sport-hh-none-specials', 'sport-food-menu', 'sport-season-says', 'sport-sister-listing', 'sport-bay-link', 'phone'], bad: CLOSE_TOPICS.concat(SEASON_TOPICS), go: ['sport-part-season', 'sport-restaurant'] },
+  { id: 'free-needs-free', all: ['.'], not: ['\\b(free|gratuit|gratuite|gratuits|gratuites|donation|dons?|no charge|no cost|pay what|costs? nothing|sans frais|honesty box|boite|admission|entry|entree|charge|charges|payer|pay|paid|fee|fees|frais|cost|costs|cout|price|prix|dollarsign)\\b'], bad: ['indoor-free'] },
+  { id: 'price-needs-money', all: ['.'], not: ['\\b(dollarsign|price|prices|pricing|priced|rate|rates|fee|fees|cost|costs|charge|charges|tarif|tarifs|prix|cout|coute|coutent|dollars?|bucks|green fees?|droits? de jeu|how much|combien|cheap|cheaper|cheapest|expensive|discount|discounts|rabais|pay|payer|paid|adult|adults|adulte|adultes|senior|seniors|aines?|junior|juniors|kids|enfants?|child|children|family|familial|ticket|tickets|billet|billets|admission|entry|entree|bucket|buckets|seau|pass|passes|[0-9]{1,4})\\b'], bad: ['indoor-price'] },
+  // "2027 rates: 229 peak, 179 april/oct, 9 holes after 4 is 89. cart included. which one goes here": several prices and
+  // "which one" is the Price rule, never what's included.
+  { id: 'which-of-several', not: ['\\b(without|not included|isnt included|excluded|extra|plus tax|en sus)\\b'], all: ['\\b(which (one|number|price|rate|fee|amount)|which goes|goes here|what goes here|which do (i|we)|lequel|laquelle|quel (prix|tarif|montant))\\b', '\\b[0-9]{2,4}\\b.*\\b[0-9]{2,4}\\b'],
+    fit: ['indoor-price', 'sport-card-price', 'sport-golf-details', 'sport-package', 'sport-lessons'], bad: ['sport-included', 'sport-rate-lines', 'menu-add', 'sport-peak-dates', 'sport-twilight-times'], go: ['indoor-price'] },
+  // "it says I need who can come to get 100% but it already says saved. what's missing?"
+  { id: 'missing-item', all: ['\\b(missing|manque|manquant|left to do|still need|stuck|bloque|why not|pourquoi pas)\\b', '\\b(100|9[0-9]|percent|pour cent|complete|saved|enregistre|who can come|qui peut venir)\\b'],
+    fit: ['setup-missing', 'page-complete'], go: ['setup-missing'] },
+  // "there's no 16+ chip, our group packages are 16 or more": no new chip; his own words (sport-group-size).
+  { id: 'group-size', all: ['\\b(16|18|20|24|30|32|40)( or more| plus| and up| and over| et plus)?\\b', '\\b(group|groups|groupe|groupes|package|packages|forfaits?)\\b', '\\b(chip|chips|choice|choices|option|options|size|sizes|taille|there s no|theres no|there is no|not there|isnt there|missing|pas de)\\b'],
+    fit: ['sport-group-size', 'indoor-groups'], go: ['sport-group-size'] },
+  // "page says kid friendly now… should that be on"
+  { id: 'kid-badge', all: ['\\b(kid friendly|kids friendly|family friendly|family fun spot|not a family|badge enfants bienvenus|pas un endroit familial)\\b'],
+    fit: ['sport-kid-badge', 'indoor-age', 'features'], go: ['sport-kid-badge'] },
+  // "thursdays after noon theres no public tee times because of mens night. how do i tell people": a Good to know line (and
+  // a weekly event), never a Known for line.
+  { id: 'no-public-times', all: ['\\b(no public (tee times?|times?|play|golf|bookings?|access)|public (cant|can t|cannot) (play|book|golf|come)|members only|member only|pas de departs? (pour le|au) public|reserve aux membres|membres seulement)\\b'],
+    fit: ['sport-members', 'indoor-busy-times'], bad: ['indoor-theme-nights', 'description', 'plan-visit'], go: ['sport-members', 'indoor-busy-times'] },
   // "Will I lose what I've done if I finish on my phone?", "How do I get back in tonight on my phone?"
   { id: 'resume', all: ['\\b(phone|cell|mobile|laptop|computer|tablet|ipad|tonight|tomorrow|at home|another device|other device|telephone|cellulaire|ordinateur|tablette|ce soir|demain|a la maison)\\b',
     '\\b(lose|lost|start again|start over|get back in|get back into|come back to|back in|finish|pick up where|carry on|continue|resume|perdre|perdu|perdrai|recommencer|revenir|continuer|finir|terminer)\\b'],

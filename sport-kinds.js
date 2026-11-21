@@ -312,6 +312,10 @@ const SPORT_KIND_BOOK = { golf: 'busy', simgolf: 'ahead', range: 'no', rink: 'no
 // Public, open-to-all kinds start on All ages (a suggestion, saved only with the screen).
 // Sport test 5 (2026-11-20; Jen: nothing pre-picked, and her youngest is 3): a ski school too (kids' programs from age 3).
 const SPORT_ALL_AGES_KINDS = ['golf', 'range', 'rink', 'skatepark', 'discgolf', 'bike', 'swim', 'courts', 'sportsctr', 'skischool'];
+// Sport test 12 (2026-11-21): the kinds where All ages is the obvious answer, so an untouched suggested All ages on a saved
+// "Who can come" still counts toward 100% (never toward Kid-Friendly). Not bike, swim, courts, sports centres or ski schools
+// (rentals, lessons and leagues often have a minimum age).
+const SPORT_UNTAPPED_AGE_OK_KINDS = ['golf', 'range', 'rink', 'skatepark', 'discgolf'];
 // The kinds research's words name (the name first, then the story), up to 3, as the starting picks.
 const SPORT_KIND_HINTS = [['simgolf', /simulator|indoor golf|sim golf|golf lounge|sim lounge|virtual golf|golfbox|trackman|sportszone/], ['range', /driving range|mini ?golf|mini ?putt|\brange\b/],
   ['discgolf', /disc golf|frisbee golf/], ['golf', /(?<!disc |frisbee |mini[- ]|mini)\bgolf\b|country club|\blinks\b/], ['rink', /arena|rink|skating|curling|hockey|sun bowl|ice cent/], ['skatepark', /skate ?park|skateboard|youth park/],
@@ -384,4 +388,4 @@ const OUTDOOR_KINDS = ['golf', 'range', 'skatepark', 'discgolf', 'bike', 'swim',
 
 const SPORT_KINDS = SPORT_KIND_ORDER.slice();
 module.exports = { K, KIND_SETUP_WORDS, GOLF_COURSE_ONLY_RE, PRICE_PH, BOOK_WORDS, OUTDOOR_KINDS, TYPER, TYPER_TRUE, TYPE_SUB, BUSY_THEME, EX_PRICE, EXACT, PREFILL, SLOT, EVENTS, BOOK_AHEAD_UNIT, LABEL_PARTS,
-  SPORT_KINDS, SPORT_KIND_ORDER, SPORT_KIND_LABELS_OWNER, SPORT_KIND_WORDS, SPORT_KIND_LENGTH, SPORT_KIND_BOOK, SPORT_ALL_AGES_KINDS, SPORT_KIND_HINTS };
+  SPORT_KINDS, SPORT_KIND_ORDER, SPORT_KIND_LABELS_OWNER, SPORT_KIND_WORDS, SPORT_KIND_LENGTH, SPORT_KIND_BOOK, SPORT_ALL_AGES_KINDS, SPORT_UNTAPPED_AGE_OK_KINDS, SPORT_KIND_HINTS };

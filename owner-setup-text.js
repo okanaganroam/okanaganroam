@@ -2355,6 +2355,7 @@ en.indoor = {
   kindsGuess: 'We picked these from your page. Check them: tap to change.', kindsGuessFold: 'We picked this from your page. Not right? Tap Change.', kindsChange: 'Change',
   guessCheck: 'We picked the usual for your kind of place. Tap another if it’s different.',
   guessKind: 'We picked the usual for your kind of place. Tap another if it’s different.',
+  ageSuggest: 'Suggested: {age}. Tap it to confirm, or tap another age.',
   // Price
   tpriceQ: 'What does it cost?', tpriceLead: 'The price for one adult. It shows on your card.', tpriceLeadPick: 'Your card will say “Adults {x}”.', tpriceLeadFree: 'Your card will say “Free”.',
   tpriceLabel: 'Adult price, in dollars', tpriceMore: 'Your other prices (kids, seniors, passes, packages) go in “Your prices”, the first of the extra details.',
@@ -2446,6 +2447,7 @@ fr.indoor = {
   kindsGuess: 'Nous les avons choisis d’après votre page. Vérifiez-les : touchez pour changer.', kindsGuessFold: 'Nous l’avons choisi d’après votre page. Ce n’est pas ça? Touchez Modifier.', kindsChange: 'Modifier',
   guessCheck: 'Nous avons choisi l’habituel pour votre genre d’endroit. Touchez-en un autre si c’est différent.',
   guessKind: 'Nous avons choisi l’habituel pour votre genre d’endroit. Touchez-en un autre si c’est différent.',
+  ageSuggest: 'Suggéré : {age}. Touchez-le pour confirmer, ou touchez un autre âge.',
   tpriceQ: 'Combien ça coûte?', tpriceLead: 'Le prix pour un adulte. Il paraît sur votre fiche.', tpriceLeadPick: 'Votre fiche indiquera « Adultes : {x} ».', tpriceLeadFree: 'Votre fiche indiquera « Gratuit ».',
   tpriceLabel: 'Prix adulte, en dollars', tpriceMore: 'Vos autres prix (enfants, aînés, laissez-passer, forfaits) vont dans « Vos tarifs », le premier des détails facultatifs.',
   tpriceGuess: 'Nous l’avons choisi d’après votre page. Vérifiez-le, et changez-le s’il n’est pas exact.',
@@ -2892,6 +2894,8 @@ fr.sport = sportStrings(fr.indoor, {
 Object.assign(en, {
   seaOutside: 'Your season is {a} – {b}, so on {c} – {d} your page says “Closed for the season” and these hours would show nowhere. Open {c} – {d} too?',
   seaOutsideYes: 'Yes, we’re open {a} – {b}',
+  seaOutsideYesExact: 'Yes: {place} will show open {a} – {b}, {hours}', seaPlace: 'your place', seaPlaceGolf: 'your course',
+  seaOutsideApart: 'Your season is {a} – {b}, so on {c} – {d} your page says “Closed for the season” and these hours would show nowhere. Only part of the place is open then (like the pro shop)? Skip these hours and say it in Good to know.',
   seaOutsideNo: 'No, skip these hours',
   seaOutsideNoSub: 'Only something else runs then, like an indoor simulator? Say it in Good to know',
   seaOutsideSkipped: 'Those other hours weren’t saved: outside your season your page says closed. Something else runs then (like a winter simulator)? Say when in Good to know, like “Indoor simulator Jan–Mar, Mon–Sat 9 AM – 9 PM”.',
@@ -2900,6 +2904,8 @@ Object.assign(en, {
 Object.assign(fr, {
   seaOutside: 'Votre saison va du {a} au {b} : du {c} au {d}, votre page dit « Fermé pour la saison » et ces heures ne paraîtraient nulle part. Ouvert aussi du {c} au {d}?',
   seaOutsideYes: 'Oui, nous sommes ouverts du {a} au {b}',
+  seaOutsideYesExact: 'Oui : {place} paraîtra ouvert du {a} au {b}, {hours}', seaPlace: 'votre endroit', seaPlaceGolf: 'votre parcours',
+  seaOutsideApart: 'Votre saison va du {a} au {b} : du {c} au {d}, votre page dit « Fermé pour la saison » et ces heures ne paraîtraient nulle part. Seule une partie de l’endroit est ouverte (comme la boutique du pro)? Passez ces heures et dites-le dans Bon à savoir.',
   seaOutsideNo: 'Non, passer ces heures',
   seaOutsideNoSub: 'Seulement autre chose est ouvert, comme un simulateur intérieur? Dites-le dans Bon à savoir',
   seaOutsideSkipped: 'Ces autres heures n’ont pas été enregistrées : hors saison, votre page dit fermé. Autre chose est ouvert à ce moment-là (comme un simulateur l’hiver)? Dites quand dans Bon à savoir, comme « Simulateur intérieur de janvier à mars, du lundi au samedi de 9 h à 21 h ».',
