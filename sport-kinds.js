@@ -47,7 +47,7 @@ K.simgolf = kind({ bookBtn: ['Book a bay', 'Réserver une baie'], gtk: 'simgolf'
     groups: { chips: ['Événements d’entreprise et fêtes', 'Ligues et tournois', 'Réservation privée de baies'], lead: 'Touchez une taille, puis ajoutez les événements d’entreprise, les ligues ou les réservations privées dans vos mots.', ex: 'Jusqu’à 6 joueurs par baie. Fêtes d’entreprise jusqu’à 40 personnes' },
     search: ['simulateur de golf', 'simulateurs de golf', 'golf intérieur', 'golf virtuel'] } });
 
-K.range = kind({ bookBtn: ['Book a lesson', 'Réserver un cours'], day: true, gtk: 'range', ex: 'range', season: 'summer', planner: 'outdoor',
+K.range = kind({ bookBtn: ['Book range time', 'Réserver au champ de pratique'], day: true, gtk: 'range', ex: 'range', season: 'summer', planner: 'outdoor',
   en: { price: { page: 'From {x}.', basis: 'Buckets and rounds', label: 'Your lowest price (a small bucket or one round), in dollars', ph: '', lead: 'Your lowest price: a small bucket of balls or one round of mini golf. It shows on your card.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Buckets, mini golf rounds, lessons and passes, with their prices. A photo of your price board or a link to it is perfect. It’s optional.' },
     help: { walkin: 'Walk-ins welcome; lessons by booking', ages: 'All ages; kids under 10 with an adult', gift: 'Gift cards and range cards at the counter', prices: 'Large bucket $18, mini golf kids $9' },
@@ -98,7 +98,7 @@ K.swim = kind({ bookBtn: ['Book lessons or rentals', 'Réserver cours ou locatio
     groups: { chips: ['Fêtes d’anniversaire', 'Groupes de camp et scolaires', 'Location de la piscine sur demande'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes de camp ou la location de la piscine dans vos mots.', ex: 'Fêtes d’anniversaire la fin de semaine. Groupes de camp bienvenus en semaine le matin' },
     search: ['piscine extérieure', 'piscines extérieures', 'jeux d’eau', 'parc aquatique', 'bain libre', 'baignade'] } });
 
-K.skatepark = kind({ bookBtn: ['Sign up for lessons', 'S’inscrire aux cours'], day: true, gtk: 'skate', ex: 'skatepark', season: 'summer', planner: 'outdoor',
+K.skatepark = kind({ bookBtn: ['Sign up for lessons', 'Inscription aux cours'], day: true, gtk: 'skate', ex: 'skatepark', season: 'summer', planner: 'outdoor',
   en: { price: { page: 'From {x}.', basis: 'Per person', label: 'Your price for one person, if you charge one, in dollars', ph: '', lead: 'The price for one person, if there is one. Free to use? Tap Free entry.' },
     prices: { noun: 'programs page', page: PRICES_PAGE[0], lead: 'Lessons, camps and programs, with their prices. A link to your programs page is perfect. It’s optional.' },
     help: { walkin: 'Open to everyone; no need to book', ages: 'All ages; helmets strongly recommended', gift: 'Lessons can be booked through the rec centre', prices: 'Beginner lessons $25' },
@@ -110,7 +110,7 @@ K.skatepark = kind({ bookBtn: ['Sign up for lessons', 'S’inscrire aux cours'],
     groups: { chips: ['Cours et camps', 'Compétitions et jams', 'Groupes scolaires et de jeunes'], lead: 'Touchez ce que vous offrez, comme des cours ou des jams, ou écrivez-le dans vos mots.', ex: 'Camps de planche l’été pour les 7 à 14 ans. Soirées jam pour les jeunes' },
     search: ['planchodrome', 'planchodromes', 'parc de planche', 'skatepark', 'planche à roulettes'] } });
 
-K.bike = kind({ bookBtn: ['Register to ride', 'S’inscrire'], day: true, gtk: 'bike', ex: 'bike', season: 'summer', planner: 'outdoor',
+K.bike = kind({ bookBtn: ['Register for race nights', 'Inscription aux soirées de course'], day: true, gtk: 'bike', ex: 'bike', season: 'summer', planner: 'outdoor',
   en: { price: { page: 'From {x}.', basis: 'Per rider', label: 'Your price for one rider (like a practice night), if you charge one, in dollars', ph: '', lead: 'The price for one rider, like a practice night, if there is one. Free to ride? Tap Free entry.' },
     prices: { noun: 'programs page', page: PRICES_PAGE[0], lead: 'Practice nights, race nights, memberships and bike rentals, with their prices. A link to your club or programs page is perfect. It’s optional.' },
     help: { walkin: 'Open to riders when there’s no race or practice on', ages: 'All ages; helmets required', gift: 'Club memberships online', prices: 'Practice night $10, season membership $90' },
@@ -134,7 +134,7 @@ K.courts = kind({ bookBtn: ['Book a court', 'Réserver un terrain'], day: true, 
     groups: { chips: ['Soirées de jeu libre', 'Cours et cliniques', 'Ligues et tournois'], lead: 'Touchez ce que vous offrez, comme le jeu libre ou des ligues, ou écrivez-le dans vos mots.', ex: 'Pickleball libre en semaine le matin. Cliniques pour débutants le samedi' },
     search: ['tennis', 'court de tennis', 'courts de tennis', 'pickleball', 'terrain de pickleball', 'terrain de basketball'] } });
 
-K.discgolf = kind({ bookBtn: ['Sign up', 'S’inscrire'], day: true, gtk: 'discgolf', ex: 'discgolf', season: '', planner: 'outdoor',
+K.discgolf = kind({ bookBtn: ['Join a league', 'Rejoindre une ligue'], day: true, gtk: 'discgolf', ex: 'discgolf', season: '', planner: 'outdoor',
   en: { price: { page: 'From {x}.', basis: 'Per round', label: 'Your price for one round, if you charge one, in dollars', ph: '', lead: 'The price for one round, if there is one. Free to play? Tap Free entry.' },
     prices: { noun: 'price list', page: PRICES_PAGE[0], lead: 'Rounds, disc rentals and leagues, with their prices. A link to your page is perfect. It’s optional.' },
     help: { walkin: 'Free to play any time in daylight', ages: 'All ages', gift: 'Discs at the local shop', prices: 'Disc rental $5' },

@@ -243,7 +243,10 @@ test('7. Polish: "Every day" closes Monday\'s hours editor; the French title say
   await ok(change(t2, { visit_rows: { known_for: 'Toddler-only mornings Tuesday and Thursday' } }));
   await new Promise((r) => setTimeout(r, 30));
   assert.equal(sent.filter((m) => /\[TRANSLATE\]/.test(JSON.stringify(m))).length, 0, 'held for a few minutes');
-  assert.ok(db.prepare("SELECT COUNT(*) AS n FROM venue_menus WHERE venue_id = ? AND help_kind = 'fr_lines'").get(v2.id).n >= 3, 'each line in the admin queue at once');
+  // Sport test 6 (2026-11-20): every line is in the admin queue at once, in ONE review item per listing.
+  const frRows = db.prepare("SELECT help_note FROM venue_menus WHERE venue_id = ? AND help_kind = 'fr_lines'").all(v2.id);
+  assert.equal(frRows.length, 1, 'one review item');
+  for (const w of ['Good to know: Shoes off', 'Groups: Birthday parties', 'Known for: Toddler-only']) assert.ok(frRows[0].help_note.includes(w), w);
   assert.equal(app.sendFrLinesEmailNow(v2.id), true);
   await new Promise((r) => setTimeout(r, 30));
   const tr = sent.filter((m) => /\[TRANSLATE\]/.test(JSON.stringify(m)));

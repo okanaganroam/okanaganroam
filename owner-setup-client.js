@@ -1766,11 +1766,11 @@
     if (book === 'no' && new RegExp(B.party, 'i').test(u.replace(/[-_/.?=&]+/g, ' '))) return W.party;
     if (B.kind === 'shows') return W.shows; if (B.kind === 'classes') return W.classes;
     // Sport (2026-11-20): a golf course's, simulator's, lesson's or court's own button when people book ahead.
-    // Sport test 6: a walk-in sport place's link says what the kind books too (an arena's "Rent the ice"), never "Book a visit".
-    var kb = (B.kindBtn || {})[indoorMainKind()]; if (kb && (book !== 'no' || C.sport)) return kb;
     // Sport test 3: a bay booking link at a place with simulators among its kinds (server.js indoorBookButton).
     var allK = (S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [];
     if (B.bay && allK.indexOf('simgolf') >= 0 && new RegExp(B.bay.re, 'i').test(u)) return B.bay.word;
+    // Sport test 6: a walk-in sport place's link says what the kind books too (an arena's "Rent the ice"), never "Book a visit".
+    var kb = (B.kindBtn || {})[indoorMainKind()]; if (kb && (book !== 'no' || C.sport)) return kb;
     return book === 'no' ? W.visit : W.book;
   }
   function bookShowsLine(url, book){ var w = bookShowsWord(url, book); return C.bookShows && T.bookShows ? '<p class="su-hint" id="suBookShows" aria-live="polite"' + (w ? '' : ' hidden') + '>' + h(w ? fill(T.bookShows, { x: w }) : '') + '</p>' : ''; }

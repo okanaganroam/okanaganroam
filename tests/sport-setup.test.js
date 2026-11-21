@@ -231,7 +231,8 @@ test('9. the edit page (golf with a happy hour badge): the checklist and the ans
   assert.match(text, /Green fees from \$70\./);
   assert.match(text, /Please book a tee time ahead\./);
   assert.match(text, /Your times and what’s on special/, 'the happy hour tile');
-  assert.match(text, /Tournaments, clinics, leagues and more/, 'the events tile in sport words');
+  // Sport test 6: the main kind's own events (a golf course's).
+  assert.match(text, /Tournaments, clinics, open houses and more/, 'the events tile in sport words');
   const fr = plain((await getText(`/fr/owner/${t}`)).text);
   assert.match(fr, /Droits de jeu à partir de 70 \$\./);
   // The public page keeps what research found (no data change).

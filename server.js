@@ -26185,6 +26185,8 @@ function indoorBookButton(venue, bookingUrl) {
     if (!venue || !kindSetupType(venue.type)) return B.book;
     const t = venueIndoorInfo(venue.id), k = indoorKindsModule.indoorKindText(t.kinds, 'en');
     // Sport (2026-11-20): a tee-time, bay, lesson or court booking page says so ("Book a tee time").
+    // Sport test 6: a simulator bay booking at a place with simulators among its kinds says "Book a bay" before the main kind's own button.
+    if (sportSetupType(venue.type) && (t.kinds || []).includes('simgolf') && SPORT_BAY_URL_RE.test(String(bookingUrl || ''))) return indoorKindsModule.SPORT.K.simgolf.bookBtn;
     if (k.bookBtn && t.book !== 'no' && !INDOOR_WAIVER_URL_RE.test(String(bookingUrl || ''))) return k.bookBtn;
     // Sport test 6 (2026-11-20; Priya's walk-in arena: its ice-rental link said "Book a visit"): a walk-in sport place's
     // link is never "Book a visit": a waiver or a party page says so, anything else says what the kind books ("Rent the ice").
@@ -26692,7 +26694,7 @@ function venueCardHtml(venue, opts = {}) {
     return `
       <li class="venue-card"${liAttrs}>
         <h2>${nameHtml}</h2>
-        <p class="venue-meta">${isTourCard && tourKind ? `${meta ? meta + ' &middot; ' : ''}${escapeHtml(tourKind)}`.replace(/ &middot; Tour &amp; Experience/, '') : meta}</p>${opts.statusLine ? `\n        <p class="fd-open-status" data-fd-open="${opts.statusLine.state}">${escapeHtml(opts.statusLine.text)}</p>` : ''}
+        <p class="venue-meta">${isTourCard && tourKind ? `${meta ? meta + ' &middot; ' : ''}${escapeHtml(tourKind)}`.replace(/ &middot; Tour &amp; Experience/, '') : meta}</p>${opts.statusLine ? `\n        <p class="fd-open-status" data-fd-open="${opts.statusLine.state}"${SPORT_TIMES_CARD_RE.test(String(opts.statusLine.text || '')) ? ' data-fd-times="1"' : ''}>${escapeHtml(opts.statusLine.text)}</p>` : ''}
         <div class="card-slot card-slot-fee">${golfFeeHtml ? '\n        ' + golfFeeHtml + '\n        ' : ''}</div>
         <div class="card-slot card-slot-desc">${tourSummaryHtml ? '\n        ' + tourSummaryHtml + '\n        ' : ''}</div>
         <div class="card-slot card-slot-notice">${advisoryHtml ? advisoryHtml + '\n        ' : ''}</div>
@@ -34625,7 +34627,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
       var nx = openNextOf(status, label, clock);
       if (nx) NEXT_OPEN[id] = nx;
       var el = card.querySelector('.fd-open-status');
-      if (el && !el.hasAttribute('data-fd-day')) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
+      if (el && !el.hasAttribute('data-fd-day') && !(label.state === 'open' && el.hasAttribute('data-fd-times'))) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
     });
   }
   function paintOpenCount(types, features, regions){
@@ -35147,7 +35149,7 @@ function foodDrinkBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, 
     cardChunks = cardChunks.map((chunk) => {
       const cid = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
       const line = (extra.statusOverrides && extra.statusOverrides.get(cid)) || cardStatusFor(openStatusById.get(cid), venueById.get(cid));
-      return cardSeasonOnce(chunk, line).replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}"${line.day ? ' data-fd-day="1"' : ''}>${escapeHtml(line.text)}</p>`);
+      return cardSeasonOnce(chunk, line).replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}"${line.day ? ' data-fd-day="1"' : ''}${SPORT_TIMES_CARD_RE.test(String(line.text || '')) ? ' data-fd-times="1"' : ''}>${escapeHtml(line.text)}</p>`);
     });
   }
   if (extra.welcoming) {
@@ -47921,7 +47923,7 @@ function browseBatchedCardsHtml(venues, matchIds, matchCount, advisoryNotes, ope
     cardChunks = cardChunks.map((chunk) => {
       const cid = Number((chunk.match(/data-venue-id="(\d+)"/) || [])[1]);
       const line = cardStatusFor(openStatusById.get(cid), venueById.get(cid));
-      return cardSeasonOnce(chunk, line).replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}"${line.day ? ' data-fd-day="1"' : ''}>${escapeHtml(line.text)}</p>`);
+      return cardSeasonOnce(chunk, line).replace(/(<p class="venue-meta">[\s\S]*?<\/p>)/, `$1\n        <p class="fd-open-status" data-fd-open="${line.state}"${line.day ? ' data-fd-day="1"' : ''}${SPORT_TIMES_CARD_RE.test(String(line.text || '')) ? ' data-fd-times="1"' : ''}>${escapeHtml(line.text)}</p>`);
     });
   }
   const firstBatch = [], deferred = [];
@@ -48065,7 +48067,7 @@ function bhStart(){
       var nx = openNextOf(status, label, clock);
       if (nx) NEXT_OPEN[id] = nx;
       var el = card.querySelector('.fd-open-status');
-      if (el && !el.hasAttribute('data-fd-day')) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
+      if (el && !el.hasAttribute('data-fd-day') && !(label.state === 'open' && el.hasAttribute('data-fd-times'))) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
     });
   }
   // Favourites: the saved-items rule itself (window.__roamFav), read once per

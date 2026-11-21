@@ -18266,7 +18266,9 @@ test('Sports & Recreation: discovery sends skate park, pickleball, tennis, disc 
     }
     assert.deepEqual(app.interpretDiscoveryText('sports bar').features, ['sports_tv']);
     assert.ok(!app.interpretDiscoveryText('sports bar').types.includes('sport'));
-    assert.deepEqual(app.interpretDiscoveryText('ice skating').activities, ['winter']);
+    // Sport test 6 (2026-11-20): in search "ice skating" is the words (an arena's "Arena & skating", an outdoor rink's own
+    // words), never the outdoor Winter activity an arena is not in.
+    assert.deepEqual(app.interpretDiscoveryText('ice skating').activities, []);
     assert.deepEqual(app.interpretDiscoveryText('beaches').types, ['beach']);
     assert.deepEqual(app.interpretDiscoveryText('parks').types, ['outdoor']);
     // The trip planner has no sport type: its reading is unchanged.
