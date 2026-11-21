@@ -391,6 +391,8 @@ const PHRASES = [
   ['location d equipement', 'equipment rentals'], ['location de materiel', 'equipment rentals'],
   ['jouer au golf', 'golf'], ['terrain de golf', 'golf course'], ['terrains de golf', 'golf courses'],
   ['parcours de golf', 'golf course'], ['golfer', 'golf'],
+  // Sport test 15 (2026-11-21; « cours de golf près de Kelowna » planned Kurt's course first, with no lessons): golf lessons.
+  ['cours de golf', 'golf lessons'], ['lecons de golf', 'golf lessons'], ['lecon de golf', 'golf lessons'], ['cours de golf prives', 'private golf lessons'], ['cours de golf prive', 'private golf lesson'],
   // Sport setup (2026-11-20): the sport kinds' French words.
   ['disque golf', 'disc golf'], ['disques golf', 'disc golf'], ['parcours de disque golf', 'disc golf course'], ['golf frisbee', 'disc golf'],
   ['piste de bmx', 'bmx track'], ['pistes de bmx', 'bmx tracks'],

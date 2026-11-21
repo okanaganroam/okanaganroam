@@ -187,7 +187,7 @@ test('3. Help in French: her 24 questions land well; the 30 held-out French ques
   const { t } = await setUp();
   const bots = {};
   for (const [page, p] of [['setup', '/setup'], ['edit', ''], ['menu', '/menu']]) bots[page] = { en: helpBot(await getText(`/owner/${t}${p}`)), fr: helpBot(await getText(`/fr/owner/${t}${p}`)) };
-  const grade = ([, page, lang, q, okIds, harm]) => { const r = bots[page][lang].best(q); return r.id && harm.includes(r.id) ? 'harm' : r.id ? (okIds.includes(r.id) ? 'good' : 'wrong') : (okIds.includes('UNSURE') ? 'good' : 'askus'); };
+  const grade = ([, page, lang, q, okIds, harm]) => { const r = bots[page][lang].best(q); return r.id && harm.includes(r.id) ? 'harm' : r.id ? (okIds.includes(r.id) ? 'good' : 'wrong') : (okIds.includes('UNSURE') || r.hits.slice(0, 3).some((x) => okIds.includes(x)) ? 'good' : 'askus'); };
   const bad = Q.map((row) => [grade(row), row[3]]).filter(([g]) => g !== 'good');
   assert.deepEqual(bad, []);
   const held = HELD.map(grade);

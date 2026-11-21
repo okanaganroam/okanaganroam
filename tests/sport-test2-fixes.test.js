@@ -34,9 +34,9 @@ let n = 0, ipN = 0, srv, base;
 const mk = (type, o = {}) => app.createVenue({ name: `Sport Two Fixture ${++n}`, slug: `sport-two-fixture-${n}`, region: 'kelowna', type, latitude: 49.88 + n / 3000, longitude: -119.47,
   rating: 4.4, reviews: 90, address: `${700 + n} Vaughan Ave, Kelowna`, phone: '250-555-0188', website: 'https://example.com', hours: JSON.stringify(WK('10:00', '23:00')), description: 'A fixture for sport test 2.', ...o });
 const tokenFor = (id) => app.createOwnerLink(id, { reset: true }).url.split('/owner/')[1];
-test.before(async () => { srv = http.createServer(app.server.listeners('request')[0]); await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`; });
+test.before(async () => { srv = http.createServer(app.server.listeners('request')[0]); srv.keepAliveTimeout = 120000; await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`; });
 test.after(() => srv && srv.close());
-const change = (t, changes) => fetch(`${base}/owner/${t}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.122.${Math.floor(++ipN / 250)}.${ipN % 250 + 1}` },
+const change = (t, changes) => fetch(`${base}/owner/${t}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Connection: 'close', Origin: base, 'X-Real-IP': `10.122.${Math.floor(++ipN / 250)}.${ipN % 250 + 1}` },
   body: JSON.stringify({ changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) }).then(async (r) => ({ status: r.status === 201 ? 200 : r.status, body: await r.json().catch(() => ({})) }));
 const ok = (r) => { assert.equal(r.status, 200, JSON.stringify(r.body)); return r; };
 const getText = (p) => fetch(base + p, { headers: { 'User-Agent': 'okanaganroam-check/1.0' } }).then((r) => r.text());
@@ -321,7 +321,7 @@ const bot = (b, lang, pg) => b[(lang === 'fr' ? 'fr' : '') + pg];
 test('9. Help: Trevor\'s 38 questions and French twins of every miss land on the right answer, on the page he asked from', async () => {
   const b = await botsFor('simgolf');
   const wrong = [];
-  for (const [lang, pg, q, want] of TREVOR_LOG) { const r = bot(b, lang, pg).best(q); if (!r || !want.includes(r.id)) wrong.push(`[${lang} ${pg}] "${q}" -> ${r && r.id}`); }
+  for (const [lang, pg, q, want] of TREVOR_LOG) { const r = bot(b, lang, pg).best(q); if (!r || !(r.id ? want.includes(r.id) : r.hits.slice(0, 3).some((x) => want.includes(x)))) wrong.push(`[${lang} ${pg}] "${q}" -> ${r && r.id}`); }
   assert.deepEqual(wrong, []);
 });
 
@@ -340,7 +340,7 @@ test('10. Help on the price-list page: ~18 realistic questions for every sport k
       ['en', 'our prices go up in the spring', [RC]], ['en', 'lessons are booked with the instructor, they set the price', [LS]], ['en', `${rent} is extra`, [RN, X]], ['en', 'do i have to show the price per person', [PP]],
       ['en', 'how do i change a price later', ['menu-change', RC, M]], ['en', 'do you take gift cards here', [G]],
       ['fr', 'tous nos prix sont plus taxes', [X, 'sport-tax']], ['fr', 'nos prix augmentent au printemps', [RC]], ['fr', 'les abonnements sans prix fixe', [RL, NSP]]];
-    for (const [lang, q, want] of Q) { const r = bot(b, lang, 'menu').best(q); if (!r || !want.includes(r.id)) wrong.push(`${k} [${lang}] "${q}" -> ${r && r.id}`); }
+    for (const [lang, q, want] of Q) { const r = bot(b, lang, 'menu').best(q); if (!r || !(r.id ? want.includes(r.id) : r.hits.slice(0, 3).some((x) => want.includes(x)))) wrong.push(`${k} [${lang}] "${q}" -> ${r && r.id}`); }
   }
   assert.deepEqual(wrong, []);
 });

@@ -185,7 +185,7 @@ test('3. Help: her 27 questions land well, none harmful', async () => {
   for (const [, page, lang, q, okIds, harm] of Q) {
     const r = bots[page][lang].best(q);
     if (r.id && harm.includes(r.id)) bad.push(`HARM "${q}" -> ${r.id}`);
-    else if (!(r.id ? okIds.includes(r.id) : okIds.includes('UNSURE'))) bad.push(`"${q}" -> ${r.id || 'not sure'} (wants ${okIds.join(' / ')})`);
+    else if (!(r.id ? okIds.includes(r.id) : okIds.includes('UNSURE') || r.hits.slice(0, 3).some((x) => okIds.includes(x)))) bad.push(`"${q}" -> ${r.id || 'not sure'} (wants ${okIds.join(' / ')})`);
   }
   assert.deepEqual(bad, []);
   const S = bots.setup.en, E = bots.edit.en;
@@ -196,7 +196,9 @@ test('3. Help: her 27 questions land well, none harmful', async () => {
     assert.ok(!r.id || !SEASONY.test(r.id), `${q} -> ${r.id}`);
   }
   // The course itself closing for days is a closure.
-  assert.match(S.best('we close the course 2 days in october for aeration but the range and restaurant stay open. do i put it as a closure?').id || '', /^(?:sport-aeration|sport-one-off-closure|setup-short-closure|closures)$/);
+  // (Sport test 15: or "Is it one of these?" with it first.)
+  const aer = S.best('we close the course 2 days in october for aeration but the range and restaurant stay open. do i put it as a closure?');
+  assert.match(aer.id || aer.hits[0] || '', /^(?:sport-aeration|sport-one-off-closure|setup-short-closure|closures)$/);
   // The answers she needed.
   assert.match(E.answer('sport-book-button'), /We found a bug/);
   assert.match(E.answer('sport-golf-facts'), /Message us/);
@@ -266,6 +268,9 @@ test('9. the parts\' own times (golf): on the season question, beside the hours 
   db.prepare("UPDATE venues SET hours_source = 'venue_owner' WHERE id = ?").run(v.id);
   const g = await openSetup(base, t, { hash: 'hours' });
   await g.click('hoursOk');
+  // Sport test 15: under the year answers, folded behind one line.
+  assert.match(g.text(), /Part of the place has its own times\? Add it/);
+  await g.click('partTimesOpen');
   assert.match(g.text(), /Part of the place with its own times\? \(optional\)/);
   assert.equal(g.doc.getElementById('suPartTimes').value, '', 'never filled in for her');
   await g.type('suPartTimes', 'Range: March–November\nFitting bay: open all winter by appointment');
@@ -316,5 +321,6 @@ test('9b. no other sport kind sees the line, and the server takes it for golf on
   const { t } = await setUp(['simgolf'], { type: 'golf' });
   const g = await openSetup(base, t, { hash: 'hours' });
   await g.click('hoursOk');
+  await g.click('partTimesOpen');
   assert.ok(g.doc.getElementById('suPartTimes'));
 });

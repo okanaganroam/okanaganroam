@@ -6,7 +6,7 @@
 const en = {
   title: 'Set up your page', exit: 'Exit setup', back: '← Back', skip: 'Skip this for now', step: 'Step {n} of {total}', allDone: 'All done',
   hi: 'Hi {name} 👋', hiLead: 'Let’s get your page ready, one question at a time. About 15 to 30 minutes. You can stop any time and carry on later.', start: 'Start',
-  welcome: 'Welcome back 👋', welcomeLead: 'Here’s what you’ve done so far.', carryOn: 'Carry on', nextIs: 'Next: {step}', seeFinish: 'See how your page looks',
+  welcome: 'Welcome back 👋', welcomeLead: 'Here’s what you’ve done so far.', carryOn: 'Carry on', draftWaiting: 'You have unsaved changes from earlier', stMenuDraft: '{n} prices saved, not sent yet', stMenuDraft1: '1 price saved, not sent yet', nextIs: 'Next: {step}', seeFinish: 'See how your page looks',
   st: { live: 'on your page', day: 'on your page within a day', email: 'waiting for your email', skip: 'skipped', later: 'next time you’re at your place', none: 'not done yet', half: 'hours saved, holidays and closures still to do' },
   labels: {
     basics: 'Address, phone and website', hours: 'Hours', season: 'Seasons', closures: 'Holidays and closures', spend: 'Price per person', cuisine: 'What you serve',
@@ -94,7 +94,7 @@ const en = {
 const fr = {
   title: 'Configurez votre page', exit: 'Quitter', back: '← Retour', skip: 'Passer pour l’instant', step: 'Étape {n} sur {total}', allDone: 'Terminé',
   hi: 'Bonjour {name} 👋', hiLead: 'Préparons votre page, une question à la fois. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.', start: 'Commencer',
-  welcome: 'Bon retour 👋', welcomeLead: 'Voici ce que vous avez déjà fait.', carryOn: 'Continuer', nextIs: 'Suivant : {step}', seeFinish: 'Voir à quoi ressemble votre page',
+  welcome: 'Bon retour 👋', welcomeLead: 'Voici ce que vous avez déjà fait.', carryOn: 'Continuer', draftWaiting: 'Vous avez des changements non enregistrés', stMenuDraft: '{n} prix enregistrés, pas encore envoyés', stMenuDraft1: '1 prix enregistré, pas encore envoyé', nextIs: 'Suivant : {step}', seeFinish: 'Voir à quoi ressemble votre page',
   st: { live: 'sur votre page', day: 'sur votre page d’ici un jour', email: 'en attente de votre courriel', skip: 'passé', later: 'la prochaine fois que vous serez sur place', none: 'pas encore fait', half: 'heures enregistrées, jours fériés et fermetures à faire' },
   labels: {
     basics: 'Adresse, téléphone et site Web', hours: 'Heures', season: 'Saisons', closures: 'Jours fériés et fermetures', spend: 'Prix par personne', cuisine: 'Ce que vous servez',
@@ -2560,9 +2560,9 @@ Object.assign(fr.indoor, { bringExKinds: { gallery: 'La plupart des œuvres sont
 // - The story and Known for examples follow the main kind (like the Good to know example).
 // Sport test 9 (2026-11-21; Gord's "My prices are on my website" was filled with his Chronogolf tee-time link): a rates
 // page only, never a booking link; with none found, the box starts empty with a hint.
-Object.assign(en.indoor, { partTimesQ: 'Part of the place with its own times? (optional)', partTimesPh: 'Range: April–October\nFitting bay: open all winter by appointment', partTimesHint: 'One line each, up to 3. Your season and hours stay as they are: this shows beside them as that part’s times.', partTimesKeep: 'Add: “{line}”' });
+Object.assign(en.indoor, { partTimesQ: 'Part of the place with its own times? (optional)', partTimesOpen: 'Part of the place has its own times? Add it', partTimesPh: 'e.g. Range: April–October\nFitting bay: open all winter by appointment', partTimesHint: 'One line each, up to 3. Your season and hours stay as they are: this shows beside them as that part’s times. Then tap your answer above.', partTimesKeep: 'Add: “{line}”' });
 Object.assign(en.indoor, { webWhatShows: 'Your page will link to your rates page (your prices aren’t copied).', webSavedLink: 'Your page will link to your rates page, usually within a day (we check the link first).', webLeadRates: 'We filled in the rates page we found on your website. Check it’s the right one.', webLeadRatesEmpty: 'Type your rates page’s address, like yourclub.com/rates (not your booking page). Or use your website’s home page.' });
-Object.assign(fr.indoor, { partTimesQ: 'Une partie de l’endroit a ses propres heures? (facultatif)', partTimesPh: 'Champ de pratique : d’avril à octobre\nBaie d’ajustement : ouverte tout l’hiver sur rendez-vous', partTimesHint: 'Une ligne chacune, jusqu’à 3. Votre saison et vos heures restent les mêmes : ceci paraît à côté, comme les heures de cette partie.', partTimesKeep: 'Ajouter : « {line} »' });
+Object.assign(fr.indoor, { partTimesQ: 'Une partie de l’endroit a ses propres heures? (facultatif)', partTimesOpen: 'Une partie de l’endroit a ses propres heures? Ajoutez-la', partTimesPh: 'p. ex. Champ de pratique : d’avril à octobre\nBaie d’ajustement : ouverte tout l’hiver sur rendez-vous', partTimesHint: 'Une ligne chacune, jusqu’à 3. Votre saison et vos heures restent les mêmes : ceci paraît à côté, comme les heures de cette partie. Puis touchez votre réponse plus haut.', partTimesKeep: 'Ajouter : « {line} »' });
 Object.assign(fr.indoor, { webWhatShows: 'Votre page renverra à votre page des tarifs (vos prix ne sont pas copiés).', webSavedLink: 'Votre page renverra à votre page des tarifs, en général d’ici un jour (nous vérifions le lien d’abord).', webLeadRates: 'Nous avons inscrit la page des tarifs trouvée sur votre site. Vérifiez que c’est la bonne.', webLeadRatesEmpty: 'Inscrivez l’adresse de votre page des tarifs, comme votreclub.com/tarifs (pas votre page de réservation). Ou prenez la page d’accueil de votre site.' });
 // Sport test 8 (2026-11-21; Dayton approved): a walk-on or 9-hole course's Good to know chips. The big-course chips that
 // don't fit it ("Pro shop", "Dress code: collared shirts", "Driving range on site") make room, so the count stays the same.

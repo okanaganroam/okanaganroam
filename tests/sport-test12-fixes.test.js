@@ -156,7 +156,7 @@ test('3. Help: Rob\'s 16 questions land well, none harmful; the answers he neede
   for (const [, page, , q, okIds, harm] of Q) {
     const r = bots[page].best(q);
     if (r.id && harm.includes(r.id)) bad.push(`HARM ${q} -> ${r.id}`);
-    else if (!(r.id ? okIds.includes(r.id) : okIds.includes('UNSURE'))) bad.push(`${q} -> ${r.id || 'not sure'}`);
+    else if (!(r.id ? okIds.includes(r.id) : okIds.includes('UNSURE') || r.hits.slice(0, 3).some((x) => okIds.includes(x)))) bad.push(`${q} -> ${r.id || 'not sure'}`);
   }
   assert.deepEqual(bad, []);
   const e = bots.edit;

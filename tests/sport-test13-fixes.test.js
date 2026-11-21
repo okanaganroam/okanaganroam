@@ -99,7 +99,7 @@ test('1. Help: Gord and Linda\'s 22 questions land well, none harmful; only-when
   for (const [, page, lang, q, okIds, harm] of Q) {
     const r = bots[page][lang].best(q);
     if (r.id && harm.includes(r.id)) bad.push(`HARM "${q}" -> ${r.id}`);
-    else if (!(r.id ? okIds.includes(r.id) : okIds.includes('UNSURE'))) bad.push(`"${q}" -> ${r.id || 'not sure'} (wants ${okIds.join(' / ')})`);
+    else if (!(r.id ? okIds.includes(r.id) : okIds.includes('UNSURE') || r.hits.slice(0, 3).some((x) => okIds.includes(x)))) bad.push(`"${q}" -> ${r.id || 'not sure'} (wants ${okIds.join(' / ')})`);
   }
   assert.deepEqual(bad, []);
   const S = bots.setup.en, E = bots.edit.en;

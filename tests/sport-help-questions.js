@@ -8,14 +8,17 @@
 const SEASONS = { winter: '11-26:04-06', summer: '05-01:09-30' };
 const PRICE = { golf: 65, simgolf: 45, range: 12, rink: 5, skatepark: 'free', discgolf: 'free', bike: 10, swim: 5, courts: 'free', skischool: 129, sportsctr: 6, sportother: 15 };
 // An owner of the kind as the setup leaves them: the kind, its price, and its usual season (winter or summer kinds).
+// Each place has its own slug (a test that failed half way never leaves one behind for the next test), and every POST
+// closes its connection (a kept-alive socket the server had just closed failed about 1 run in 3 with ECONNRESET).
+let makeSeq = 0;
 async function makeOwner(app, db, base, kind, n) {
   const SK = require('../sport-kinds.js');
   const golfish = ['golf', 'simgolf', 'range'].includes(kind);
   const WK = Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['09:00', '17:00']]]));
-  const v = app.createVenue({ name: `Sport Help Q ${kind} ${n}`, slug: `sport-help-q-${kind}-${n}`, region: 'kelowna', type: golfish ? 'golf' : 'sport', latitude: 49.88 + n / 1000, longitude: -119.49, address: `${n} Water St, Kelowna`, website: `https://example-${n}.com`, hours: JSON.stringify(WK), description: 'A fixture.' });
+  const v = app.createVenue({ name: `Sport Help Q ${kind} ${n}`, slug: `sport-help-q-${kind}-${n}-${++makeSeq}`, region: 'kelowna', type: golfish ? 'golf' : 'sport', latitude: 49.88 + n / 1000, longitude: -119.49, address: `${n} Water St, Kelowna`, website: `https://example-${n}.com`, hours: JSON.stringify(WK), description: 'A fixture.' });
   const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
   const season = SEASONS[SK.K[kind].season];
-  const post = (changes) => fetch(`${base}/owner/${token}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.77.${n}.1` }, body: JSON.stringify({ changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) });
+  const post = (changes) => fetch(`${base}/owner/${token}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Connection: 'close', Origin: base, 'X-Real-IP': `10.77.${n}.1` }, body: JSON.stringify({ changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) });
   if (season) { const r0 = await post({ hours: WK, open_months: season }); if (![200, 201].includes(r0.status)) throw new Error(`${kind} season: ${r0.status}`); }
   const r = await post({ indoor_info: { kinds: [kind], length: '1-2h', book: 'busy', age: 'all', ...(season ? { year: 'seasonal' } : {}) }, indoor_price: PRICE[kind] });
   if (![200, 201].includes(r.status)) throw new Error(`${kind}: ${r.status}`);

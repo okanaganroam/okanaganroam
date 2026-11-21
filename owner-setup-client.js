@@ -1396,6 +1396,8 @@
   function capFirst(t){ t = String(t || ''); return t.charAt(0).toUpperCase() + t.slice(1); }
   function musicOftenWaiting(){ return !!CUR.weekly_nights_waiting && (C.nightsOften || []).some(Boolean) && (!C.waiting || C.waiting.indexOf('*') >= 0 || C.waiting.indexOf('music') >= 0); }
   function stText(step, d){
+    // Sport test 15: a price list started in the editor and not sent yet says so ("4 rates saved, not sent yet").
+    if (step === 'menu' && (d === 'none' || d === 'half') && C.menuDraftLines > 0 && T.stMenuDraft) return fill(C.menuDraftLines === 1 && T.stMenuDraft1 ? T.stMenuDraft1 : T.stMenuDraft, { n: C.menuDraftLines });
     // Winery test 1 (2026-11-12): a winery's story screen sends the story for a check but puts Known for on the page at
     // once, and "Booking and groups" puts the answers up at once while a new booking link waits: each row says both.
     if (C.winery && d === 'day' && step === 'story' && S.wine.known && T.stStoryKnown) return T.stStoryKnown;
@@ -2333,7 +2335,9 @@
   var DRAFT_KEYS = ['week', 'sea', 'openSea', 'openTouched', 'seaTouched', 'hoursOpen', 'months', 'closures', 'extra', 'everyYear', 'holNotes', 'cuis', 'place', 'cuiTouched', 'spend',
     'badges', 'noDogs', 'noWash', 'noWifi', 'noSports', 'noGames', 'noDiet', 'dogNote', 'story', 'visit', 'ig', 'fb', 'socNo', 'cafe', 'wine', 'brew', 'kitchen', 'minors', 'sports', 'happy', 'happySea', 'specials', 'nights', 'cp', 'tour',
     // Sport test 14: which screen the season dates came from (the hours, or the closures screen).
-    'openFrom'];
+    'openFrom',
+    // Sport test 15: the typed "Part of the place with its own times?" lines.
+    'partTimes'];
   var DR = { base: {}, s: {}, at: {}, last: '', restored: {} };
   // The step screens "Carry on" may open again directly (sport test 14): the hours step's own screens.
   var RESUME_AT = /^hours:(?:edit|year|open|season)$/;
@@ -2341,9 +2345,23 @@
   function pending(step){ return S.dirty === step && !!DR.restored[step]; }
   // The same key on the English and French addresses (café test 6): switching language keeps what was typed.
   function drKey(b){ return 'suDraft:' + String(C.base).replace(/^\/fr(?=\/owner\/)/, '') + ':' + b; }
-  function drGet(b){ try { var v = window.sessionStorage.getItem(drKey(b)); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
-  function drPut(b, d){ try { window.sessionStorage.setItem(drKey(b), JSON.stringify(d)); } catch (e) {} }
-  function drDrop(b){ try { window.sessionStorage.removeItem(drKey(b)); } catch (e) {} }
+  // Sport test 15 (2026-11-21; Kurt came back through the emailed link in a new tab on Android, and his season picks and
+  // parts line were gone): kept on this device (localStorage), by the link (its token) and the step, for 7 days; this
+  // tab's sessionStorage keeps a copy (blocked or full localStorage).
+  var DR_TTL = 7 * 24 * 3600 * 1000;
+  function drGet(b){
+    var v = null, k = drKey(b);
+    try { v = window.localStorage.getItem(k); } catch (e) { v = null; }
+    if (!v) { try { v = window.sessionStorage.getItem(k); } catch (e) { v = null; } }
+    if (!v) return null;
+    var d; try { d = JSON.parse(v); } catch (e) { return null; }
+    if (!d || (d.exp && d.exp < Date.now())) { drDrop(b); return null; }
+    return d;
+  }
+  function drPut(b, d){ d.exp = Date.now() + DR_TTL; var j = JSON.stringify(d); try { window.localStorage.setItem(drKey(b), j); } catch (e) {} try { window.sessionStorage.setItem(drKey(b), j); } catch (e2) {} }
+  function drDrop(b){ try { window.localStorage.removeItem(drKey(b)); } catch (e) {} try { window.sessionStorage.removeItem(drKey(b)); } catch (e) {} }
+  // The first step with answers kept on this device and not saved yet ('' when none).
+  function drWaiting(){ for (var i = 0; i < STEPS.length; i++) { var d = drGet(STEPS[i]); if (d && ((d.s && Object.keys(d.s).length) || (d.boxes && Object.keys(d.boxes).length))) return STEPS[i]; } return ''; }
   function js(v){ return v === undefined ? '~' : JSON.stringify(v); }
   function isObj(v){ return !!v && typeof v === 'object' && !Array.isArray(v); }
   function drSnap(){ var o = {}; DRAFT_KEYS.forEach(function(k){ o[k] = S[k] === undefined ? undefined : clone(S[k]); }); return o; }
@@ -2374,7 +2392,7 @@
     if (S.leaving) return;
     var b = base(S.step); if (!isStep(b) || !DR.base[b]) return;
     // What's typed in the time and deal boxes, as the screen's own Save reads it (so "Are these your hours?" shows them).
-    try { if (S.step === 'hours:edit' || seaIsStep(S.step)) readTimes(); if (/^(happy|specials):type$|^music:yes$/.test(S.step)) readEntries(); if (C.cafe) readCafe(); if (C.winery) readWine(); if (C.brewery) readBrew(); if (TL) { readTour(); readBrew(); } } catch (e) {}
+    try { if (el('suPartTimes')) partTimesRead(); if (S.step === 'hours:edit' || seaIsStep(S.step)) readTimes(); if (/^(happy|specials):type$|^music:yes$/.test(S.step)) readEntries(); if (C.cafe) readCafe(); if (C.winery) readWine(); if (C.brewery) readBrew(); if (TL) { readTour(); readBrew(); } } catch (e) {}
     var d = drGet(b) || { s: {}, boxes: {} };
     d.s = drDiff(DR.base[b]);
     var bx = {}; Array.prototype.forEach.call(drBoxes(), function(inp){ if (inp.id === 'suCq' || !drChanged(inp)) return; var sel = drSel(inp); if (sel) bx[sel] = inp.value; });
@@ -2453,7 +2471,7 @@
       var nxt = firstOpen();
       // Welcome back: the button first, then what's done.
       x = any ? q(T.soFarQ, nxt === 'finish' ? T.changeLead : T.welcomeLead) + msgs() + '<div class="su-stack" style="margin-bottom:22px">'
-          + (nxt === 'finish' ? big('➜', T.seeFinish, '', false, 'go:finish') : nxt === 'more' ? big('➜', T.moreOpt, T.optional, false, 'go:more') + big('👀', T.seeFinish, '', true, 'go:ess') : big('➜', T.carryOn, fill(T.nextIs, { step: T.labels[nxt] }), false, 'resume')) + '</div>'
+          + (nxt === 'finish' ? big('➜', T.seeFinish, '', false, 'go:finish') : nxt === 'more' ? big('➜', T.moreOpt, T.optional, false, 'go:more') + big('👀', T.seeFinish, '', true, 'go:ess') : big('➜', T.carryOn, (drWaiting() || C.menuDraftLines > 0) && T.draftWaiting ? T.draftWaiting : fill(T.nextIs, { step: T.labels[nxt] }), false, 'resume')) + '</div>'
           + statusRows(P1) + (p1Done() || p2Count() ? '<h2 class="su-h2">' + h(T.moreQ) + '</h2>' + statusRows(P2) : '')
         // Pub test 8 (2026-11-10): nothing said it was free, and an owner wary of money read the badge and prices as an upsell.
         // Café test 4 (2026-11-11): no staff-access note here before anything is done; the edit page, where "People with
@@ -2553,8 +2571,10 @@
         + (APPT && T.allYearAppt ? big('📞', T.allYearAppt, T.allYearApptSub, true, 'yearAppt') : '') + '</div>';
       // Indoor places (2026-11-19): the summer, winter and part-of-the-year hours buttons fold under one link
       // ("Different hours in summer or winter?"); "Yes, all year" and "closed part of the year" stay up front.
-      // Sport test 14: the parts' own times (golf), above the year answers.
-      if (s === 'hours:year' && !noSetYear() && partTimesOn()) x = x.replace('<div class="su-stack">', partTimesHtml() + '<div class="su-stack">');
+      // Sport test 14: the parts' own times (golf). Sport test 15 (2026-11-21; at 393 wide the box pushed "We're closed part
+      // of the year" below the fold): under the year answers, folded behind one line until she opens it or has lines.
+      if (s === 'hours:year' && !noSetYear() && partTimesOn()) x += (S.partOpen || String(S.partTimes || '').trim() || !T.partTimesOpen) ? partTimesHtml()
+        : '<p class="su-hint" id="suPartTimesLink" style="margin-top:14px"><button type="button" class="su-link" data-act="partTimesOpen">' + h(T.partTimesOpen) + '</button></p>';
       if (INDOOR && T.seaMore && !noSetYear() && !storedSeas().length) {
         var seaRe = /<button[^>]*data-act="yearSeason:(?:summer|winter|part)"[^>]*>[\s\S]*?<\/button>/g, seaBtns = x.match(seaRe) || [];
         // Sport test 14: for sport and golf, "different for part of the year" comes first in the box.
@@ -4260,7 +4280,7 @@
     if (k === 'open') { S.toList = false; S.hist = ['more']; S.step = 'more'; return go(filled(v)); }
     if (k === 'after') return after(v);
     if (k === 'resume') {
-      S.toList = false; var f = firstOpen();
+      S.toList = false; var f = drWaiting() || firstOpen();
       // Sport test 14: picks not saved yet on one of the step's own screens (the season dates, the other hours): back on that
       // screen, with the screens before it for Back.
       var rd = drGet(f), ra = rd && rd.at;
@@ -4373,6 +4393,7 @@
     // Sport test 11: open the days of these hours too (the season is widened to cover them), or skip these hours.
     if (k === 'seaOutOpen' && S.seaOut && S.seaOut.ext) { S.openSea = { from: S.seaOut.ext.from, to: S.seaOut.ext.to }; S.openTouched = true; S.seaOut = null; S.seaOutNudge = ''; S.nudge = ''; return hoursSave(); }
     // Sport test 14: keep only the stretch's days in season (the days outside it are dropped, never the ones in it).
+    if (k === 'partTimesOpen') { S.partOpen = true; var my3 = window.scrollY; render(); window.scrollTo(0, my3); var pb = el('suPartTimes'); if (pb) { try { pb.focus({ preventScroll: true }); } catch (e) { pb.focus(); } } return; }
     if (k === 'partTimesUse') { partTimesRead(); var pts = (C.partTimesSuggest || []).filter(function(t){ return String(S.partTimes || '').indexOf(t) < 0; })[+v]; if (pts) S.partTimes = (String(S.partTimes || '').trim() ? String(S.partTimes).trim() + '\n' : '') + pts; var my2 = window.scrollY; render(); window.scrollTo(0, my2); return; }
     if (k === 'seaOutKeep' && S.seaOut && S.seaOut.keep) {
       var kz = S.seaList[S.seaOut.i], kk = S.seaOut.keep; S.seaOut = null; S.seaOutNudge = ''; S.nudge = '';
@@ -5211,7 +5232,9 @@
         }
       }
       else if (q2[1] === 'exact') { var r0 = monthRun(o.months); o.exact = r0.a ? { from: pad2(r0.a) + '-01', to: pad2(r0.b) + '-' + MLAST[r0.b - 1] } : { from: '', to: '' }; }
-      else if (q2[1] === 'months') { var sm = seaMonths({ on: true, months: o.months, exact: o.exact }); o.exact = null; o.months = sm; }
+      // Sport test 15 (2026-11-21; Sunset Ranch: "Use whole months instead" with no dates picked yet opened with all 12
+      // chips lit, so tapping Mar and Apr left May to February): no dates is no months picked (or the months it had).
+      else if (q2[1] === 'months') { var ex0 = o.exact, sm = ex0 && ex0.from && ex0.to ? seaMonths({ on: true, months: o.months, exact: ex0 }) : Object.keys(o.months || {}).some(function(k){ return o.months[k]; }) ? clone(o.months) : {}; o.exact = null; o.months = sm; }
       if (q2[0] === 'hours') { S.seaTouched = true; S.sea.dirty = true; }
       S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-smon]'), function(b){ b.onclick = function(){

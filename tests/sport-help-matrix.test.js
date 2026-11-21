@@ -22,7 +22,7 @@ const IK = require('../indoor-kinds.js');
 app.setVenueSubmissionTransport(async () => {});
 
 let srv, base;
-test.before(async () => { srv = http.createServer(app.server.listeners('request')[0]); await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`; });
+test.before(async () => { srv = http.createServer(app.server.listeners('request')[0]); srv.keepAliveTimeout = 120000; await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`; });
 test.after(() => srv && srv.close());
 const get = (p) => fetch(base + p).then((r) => r.text());
 const helpBot = (html) => {
@@ -219,6 +219,8 @@ const MATRIX = {
   ],
 };
 
+// Sport test 15: "Is it one of these?" (no answer, the choices) with the wanted answer among its three choices lands too.
+const landed = (r, want) => !!r && (r.id ? want.includes(r.id) : want.includes('UNSURE') || r.hits.slice(0, 3).some((x) => want.includes(x)));
 test('the Help matrix covers every sport kind with 8–10 English questions and French twins', () => {
   for (const k of IK.SPORT_KIND_TEXT_KINDS) {
     const rows = MATRIX[k] || [];
@@ -385,7 +387,7 @@ test('sport test 3: Gord\'s Help log (a driving range and mini golf) lands, with
   const b = await botsFor('range');
   const page = (lang, pg) => (pg === 'menu' ? (lang === 'fr' ? b.frMenu : b.menu) : (lang === 'fr' ? b.fr : b.en));
   const wrong = [];
-  for (const [lang, pg, q, want] of GORD_LOG) { const r = page(lang, pg).best(q); if (!r || !want.includes(r.id)) wrong.push(`[${lang} ${pg}] "${q}" -> ${r && r.id}`); }
+  for (const [lang, pg, q, want] of GORD_LOG) { const r = page(lang, pg).best(q); if (!landed(r, want)) wrong.push(`[${lang} ${pg}] "${q}" -> ${r && r.id}`); }
   assert.deepEqual(wrong, []);
 });
 
@@ -394,7 +396,7 @@ test('sport test 4: Ryan\'s Help log (a golf course with a range) lands, with Fr
   const b = await botsFor('golf');
   const page = (lang, pg) => (pg === 'menu' ? (lang === 'fr' ? b.frMenu : b.menu) : (lang === 'fr' ? b.fr : b.en));
   const wrong = [];
-  for (const [lang, pg, q, want] of RYAN_LOG) { const r = page(lang, pg).best(q); if (!r || !want.includes(r.id)) wrong.push(`[${lang} ${pg}] "${q}" -> ${r && r.id} (hits ${r && r.hits.slice(0, 4).join(',')})`); }
+  for (const [lang, pg, q, want] of RYAN_LOG) { const r = page(lang, pg).best(q); if (!landed(r, want)) wrong.push(`[${lang} ${pg}] "${q}" -> ${r && r.id} (hits ${r && r.hits.slice(0, 4).join(',')})`); }
   assert.deepEqual(wrong, []);
 });
 
@@ -425,7 +427,7 @@ test('sport test 5: every sport kind’s questions land on a right answer, on th
     for (const [lang, pg, q, want] of FX.QUESTIONS[k]) {
       const r = b[(lang === 'fr' ? 'fr' : '') + pg].best(q);
       // (Sport test 13: UNSURE in want: an honest Ask us is right too.)
-      if (!r || !(r.id ? want.includes(r.id) : want.includes('UNSURE'))) wrong.push(`${k} [${lang} ${pg}] "${q}" -> ${r && r.id} (want ${want.join(' or ')}; hits ${r && r.hits.slice(0, 4).join(',')})`);
+      if (!landed(r, want)) wrong.push(`${k} [${lang} ${pg}] "${q}" -> ${r && r.id} (want ${want.join(' or ')}; hits ${r && r.hits.slice(0, 4).join(',')})`);
     }
   }
   assert.deepEqual(wrong, []);

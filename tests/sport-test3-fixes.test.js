@@ -261,7 +261,7 @@ test('7. Help: Gord\'s log, French twins and more range and mini golf questions 
   const { t } = await gord({ region: 'penticton', latitude: 49.49, longitude: -119.59 });
   const b = { setup: helpBot(await getText(`/owner/${t}/setup`)), frsetup: helpBot(await getText(`/fr/owner/${t}/setup`)), menu: helpBot(await getText(`/owner/${t}/menu`)), frmenu: helpBot(await getText(`/fr/owner/${t}/menu`)) };
   const wrong = [];
-  for (const [lang, pg, q, want] of GORD_LOG) { const r = bot(b, lang, pg).best(q); if (!r || !want.includes(r.id)) wrong.push(`[${lang} ${pg}] "${q}" -> ${r && r.id} (${r && r.hits.slice(0, 3).join(',')})`); }
+  for (const [lang, pg, q, want] of GORD_LOG) { const r = bot(b, lang, pg).best(q); if (!r || !(r.id ? want.includes(r.id) : r.hits.slice(0, 3).some((x) => want.includes(x)))) wrong.push(`[${lang} ${pg}] "${q}" -> ${r && r.id} (${r && r.hits.slice(0, 3).join(',')})`); }
   assert.deepEqual(wrong, []);
   for (const bb of Object.values(b)) for (const tp of bb.topics) assert.doesNotMatch(`${JSON.stringify(tp.a)} ${JSON.stringify(tp.aFr)}`, /Pints \$6|Pintes 6/, tp.id);
   const price = b.setup.byId['indoor-price'];

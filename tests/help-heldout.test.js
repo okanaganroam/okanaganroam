@@ -28,7 +28,9 @@ const S12 = require('./help-sport12-questions.js');
 const S13 = require('./help-sport13-questions.js');
 // Sport test 14 (2026-11-21): Marisol's 27.
 const S14 = require('./help-sport14-questions.js');
-const SRC = { ...H0.SRC, ...S89.SRC, ...S10.SRC, ...S11.SRC, ...S12.SRC, ...S13.SRC, ...S14.SRC }, Q = [...H0.Q, ...S89.Q, ...S10.Q, ...S11.Q, ...S12.Q, ...S13.Q, ...S14.Q], KNOWN_MISS = H0.KNOWN_MISS;
+// Sport test 15 (2026-11-21): Kurt's 29.
+const S15 = require('./help-sport15-questions.js');
+const SRC = { ...H0.SRC, ...S89.SRC, ...S10.SRC, ...S11.SRC, ...S12.SRC, ...S13.SRC, ...S14.SRC, ...S15.SRC }, Q = [...H0.Q, ...S89.Q, ...S10.Q, ...S11.Q, ...S12.Q, ...S13.Q, ...S14.Q, ...S15.Q], KNOWN_MISS = H0.KNOWN_MISS;
 app.setVenueSubmissionTransport(async () => {});
 
 let srv, base;
@@ -41,7 +43,7 @@ const helpBot = (html) => {
   const stub = () => ({ addEventListener() {}, appendChild() {}, querySelector() { return null; } });
   const ctx = { window: {}, document: { getElementById: (id) => (id === 'ohbCfg' ? { textContent: m[1] } : stub()), createElement: stub, querySelectorAll: () => [] }, setTimeout };
   vm.createContext(ctx); vm.runInContext(m[2], ctx);
-  return { best: (q) => ctx.window.__ohbBest(q) };
+  return { best: (q, s) => ctx.window.__ohbBest(q, s) };
 };
 const WK = Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['09:00', '17:00']]]));
 const SEA = { winter: '11-26:04-06', summer: '04-01:10-31' };
@@ -64,9 +66,12 @@ test('held-out Help: real owner questions land on a good answer, never a harmful
   const bots = {}; let n = 0;
   for (const src of Object.keys(SRC)) bots[src] = await botsFor(src, ++n);
   const harmful = [], newMiss = [], askUs = [];
-  let good = 0;
-  for (const [src, page, lang, q, ok, harm] of Q) {
-    const r = bots[src][page][lang].best(q);
+  let good = 0, choices = 0;
+  for (const [src, page, lang, q, ok, harm, screen] of Q) {
+    const r = bots[src][page][lang].best(q, screen);
+    // Sport test 15 (Dayton's Ask us, extended): not clearly sure is "Is it one of these?"; with the right answer among its
+    // three choices that is a fine outcome too (counted).
+    if (!r.id && !ok.includes('UNSURE') && r.hits.slice(0, 3).some((x) => ok.includes(x))) { choices++; good++; continue; }
     const fine = r.id ? ok.includes(r.id) : ok.includes('UNSURE');
     if (r.id && harm.includes(r.id)) harmful.push(`${src} "${q}" -> ${r.id}`);
     if (fine && !(r.id && harm.includes(r.id))) good++;
@@ -79,4 +84,5 @@ test('held-out Help: real owner questions land on a good answer, never a harmful
   assert.deepEqual(newMiss, [], 'a question that landed well must keep landing well');
   assert.ok(askUs.length <= 4, `Ask us in place of an answer: ${askUs.join('; ')}`);
   assert.ok(good / Q.length >= 0.97, `held-out good ${good}/${Q.length}`);
+  assert.ok(choices <= 60, `choices ${choices}`);
 });

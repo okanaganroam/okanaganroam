@@ -5697,6 +5697,9 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         const tourDeps=ownTrip?(ownTrip.departs||[]):candidate.tourDepartures;
         let duration=Math.min(candidate.indoorGolf?120:1440,stop.gapFill||stop.afterSki?gapFillMinutes(candidate):trailTime||longHike||ownTourMin||(one?.complete?one.maxMinutes:hiking?180:(VISIT_ALLOWANCE[candidate.type]||60)));
         // Setting up camp (2026-10-25) is about 45 minutes, not a three-hour outdoor visit.
+        // Sport test 15 (2026-11-21; Kurt's 9-hole course was always booked 9 AM – 1 PM, then "About 4.5 hours before dinner"):
+        // an owner-set-up 9-hole course is a 2 to 2.5 hour round (the owner's own visit length when it says 1 to 3 hours).
+        if(candidate.type==='golf'&&!candidate.indoorGolf&&candidate.golfNine&&candidate.kindOwn&&!stop.gapFill&&!stop.afterSki)duration=Math.min(duration,(OWN_ROUND_MINUTES[candidate.indoorLength]||0)>=120?OWN_ROUND_MINUTES[candidate.indoorLength]:150);
         if(stop.campBase)duration=45;
         // Build My Trip fixes (2026-11-18): a spa visit (a Nordic spa's hot-cold circuit) is about two and a half hours, not a
         // 90-minute stop with an unasked-for museum after it.
@@ -8912,7 +8915,9 @@ function planTripCore(input) {
     const shown = new Set(rec.items.map((i) => i.venue && i.venue.id));
     const seasonShut = buildRecommendations(facts, { ...ctx, ignoreSeason: true }).items.map((x) => x.venue && facts.find((f) => f.id === x.venue.id))
       .filter((f) => f && !shown.has(f.id) && f.openMonths && !ownerClosureOn(f, d) && seasonClosedOnTripRaw({ ...f, ownerClosures: undefined }, { date: d }));
-    const reopen = (f) => { const m = /^(\d{2})-(\d{2}):/.exec(String(f.openMonths || '')); return m ? `${CLOSURE_MONTHS_EN[Number(m[1]) - 1]} ${Number(m[2])}` : ''; };
+    // Sport test 15 (2026-11-21; Kurt's season saved as whole months, "3-11", had no reopen date beside it): any season shape,
+    // read as the first day it is open again after the trip's date.
+    const reopen = (f) => { const m = /^(\d{2})-(\d{2}):/.exec(String(f.openMonths || '')); if (m) return `${CLOSURE_MONTHS_EN[Number(m[1]) - 1]} ${Number(m[2])}`; const ro = reopensAfter({ ...f, ownerClosures: undefined }, d); return ro ? `${CLOSURE_MONTHS_EN[Number(ro.slice(5, 7)) - 1]} ${Number(ro.slice(8, 10))}` : ''; };
     const named = seasonShut.slice(0, 4).map((f) => (reopen(f) ? `${f.name} (reopens ${reopen(f)})` : f.name));
     if (named.length) result.warnings.push(`Closed for the season: ${named.join(', ')}.`);
     // Sport test 2 (2026-11-20; "golf in January" listed 8 closed outdoor courses and no simulator): when the courses are

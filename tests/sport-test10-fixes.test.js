@@ -77,7 +77,7 @@ test('1. Help: every one of Lorraine’s 26 questions lands on a right answer (o
   for (const [, page, lang, q, ok, harm] of Q) {
     const r = bots[page][lang].best(q);
     if (r.id && harm.includes(r.id)) bad.push(`HARM "${q}" -> ${r.id}`);
-    else if (r.id ? !ok.includes(r.id) : !ok.includes('UNSURE')) bad.push(`"${q}" -> ${r.id || 'not sure'} (wants ${ok.join(' / ')})`);
+    else if (r.id ? !ok.includes(r.id) : !(ok.includes('UNSURE') || r.hits.slice(0, 3).some((x) => ok.includes(x)))) bad.push(`"${q}" -> ${r.id || 'not sure'} (wants ${ok.join(' / ')})`);
   }
   assert.deepEqual(bad, []);
   // The eight that landed on a different question, with the answers Dayton asked for.
@@ -85,8 +85,8 @@ test('1. Help: every one of Lorraine’s 26 questions lands on a right answer (o
   const want = [
     [e, "I'll start this on my work computer today and finish it on my phone at home tonight. Will I lose what I've done or have to start again?", 'resume-device', /Nothing is lost: your answers save as you go[\s\S]*same link[\s\S]*Create a login/],
     [s, 'We also have a toll free line for out of town golfers, 1-800-257-8577. Can I list both numbers?', 'phone', /One fits the phone box[\s\S]*Good to know/],
-    [s, 'Right now the course is closed but the golf shop is open weekdays 9 to 5 for gift cards. Does that count as being open?', 'sport-part-season', /doesn’t count as open[\s\S]*Good to know/],
-    [s, 'Our 18 hole rate is $215 in high season and $175 in the shoulder season. Locals get $160 with proof of residence. Which number do you want here?', 'indoor-price', /regular adult rate[\s\S]*Your prices/],
+    [s, 'Right now the course is closed but the golf shop is open weekdays 9 to 5 for gift cards. Does that count as being open?', 'sport-part-season', /doesn’t count as open[\s\S]*Golf shop: December–February/],
+    [s, 'Our 18 hole rate is $215 in high season and $175 in the shoulder season. Locals get $160 with proof of residence. Which number do you want here?', 'indoor-price', /usual adult green fee[\s\S]*Your prices/],
     [s, "The golf club itself doesn't have a happy hour. Masa's Grill runs its own Friday specials. What should I do on this one?", 'sport-hh-none-specials', /tap <strong>No<\/strong>[\s\S]*Known for<\/strong> or <strong>Good to know/],
     [s, 'Every June the Ladies Charity Tournament closes the course to the public for a day. The date changes every year. How do I put that in?', 'sport-one-off-closure', /Closed for a week or two[\s\S]*Every year/],
     [e, 'Our head professional would like to post the junior camp dates himself. Can he get his own access without using my login?', 'staff', /Create a login/],

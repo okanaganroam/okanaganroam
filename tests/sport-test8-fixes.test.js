@@ -68,7 +68,7 @@ test('1. Help on both owners’ real questions: no harmful or wrong-way answer; 
   for (const [src, page, lang, q, ok, harm] of Q) {
     const r = bots[src][page][lang].best(q);
     if (r.id && harm.includes(r.id)) bad.push(`HARM ${src} "${q}" -> ${r.id}`);
-    else if (r.id ? !ok.includes(r.id) : !ok.includes('UNSURE')) bad.push(`${src} "${q}" -> ${r.id || 'not sure'} (wants ${ok.join(' / ')})`);
+    else if (r.id ? !ok.includes(r.id) : !(ok.includes('UNSURE') || r.hits.slice(0, 3).some((x) => ok.includes(x)))) bad.push(`${src} "${q}" -> ${r.id || 'not sure'} (wants ${ok.join(' / ')})`);
   }
   assert.deepEqual(bad, []);
   // The hijack: the weekly-nights answer needs a weekly night, never one shared word.
@@ -181,7 +181,7 @@ test('4. Setup words: dog chips in the kind’s words, 9 holes is 2 to 3 hours, 
   assert.notEqual(bigCfg.golfSmall, true); assert.notEqual((bigCfg.kindLength || {}).golf, '2-3h');
   // The price screen's line.
   const sk = require('../sport-kinds.js');
-  assert.match(sk.K.golf.en.price.lead, /Type your regular adult rate/); assert.match(sk.K.golf.en.price.lead, /Twilight and other rates go in Your prices\./);
+  assert.match(sk.K.golf.en.price.lead, /Type your usual adult green fee/); assert.match(sk.K.golf.en.price.lead, /Twilight and other rates go in Your prices\./);
   assert.match(sk.K.golf.fr.price.lead, /Les tarifs du crépuscule et les autres vont dans Vos tarifs\./);
   // "My prices are on my website": a tee-time booking link never fills the rates box.
   db.prepare('INSERT OR REPLACE INTO venue_links (venue_id, booking_url) VALUES (?, ?)').run(big.v.id, 'https://www.chronogolf.ca/club/fixture-golf');

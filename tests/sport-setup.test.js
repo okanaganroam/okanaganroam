@@ -71,7 +71,7 @@ test('2. a golf course, Part 1 with real taps: Golf course picked, the season hi
   await sim.click('indoorSave');
   assert.deepEqual(app.venueIndoorInfo(v.id).kinds, ['golf']);
   assert.equal(app.getVenue(v.id).cuisine, 'Golf course');
-  assert.match(sim.text(), /Your lowest adult green fee/);
+  assert.match(sim.text(), /Your usual adult green fee/);
   await sim.type('suTprice', '$59');
   await sim.click('priceSave');
   assert.equal(app.indoorPriceValue(v.id), 59);
