@@ -52,6 +52,7 @@ const stayBookingLinks = require('./stay-booking-links');
 const tripBooking = require('./trip-booking');
 // Viator tours (2026-11-20, viator.js): off unless VIATOR_API_KEY and VIATOR_PARTNER_ID are both set.
 const viator = require('./viator');
+const tourPicks = require('./tour-picks');
 // Fever "Tickets" (2026-11-21, fever.js): off unless FEVER_AFFILIATE_TEMPLATE is set (Dayton's Impact link for Fever).
 const fever = require('./fever');
 // "Getting here" (2026-11-21, getting-here.js): Discover Cars rental cars + Viator airport shuttles; off until DISCOVERCARS_AID is set.
@@ -18094,7 +18095,7 @@ const GA4_MEASUREMENT_ID = 'G-J312FGJPSC';
 // V3 page views and its trip_plan_* events are told apart from V2's ('trip').
 // Same URL (/trip), served only while TRIP_PLANNER_V3 allows it.
 // Analytics (2026-10-19, round 8): 'info' is /about, /contact, /privacy and /terms (EN+FR); /guides itself is a 'hub'.
-const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'trip_v3', 'listing_form', 'not_found', 'search', 'favorites', 'browse', 'my_trip', 'info', 'hotel']);
+const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'trip_v3', 'listing_form', 'not_found', 'search', 'favorites', 'browse', 'my_trip', 'info', 'hotel', 'email_book']);
 
 // Internal-traffic separation (Measurement Phase B, 2026-09-27), in the same
 // snippet, so every server template gets it and nothing else changes:
@@ -30515,6 +30516,72 @@ function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map()) 
 function hotelAwayText(km) {
   return km <= 1.2 ? `${Math.max(1, Math.round(km * 12))} min walk` : `${Math.round(km * 1.6 + 2)} min drive`;
 }
+// ---------- Bookable tour picks (2026-11-21, tour-picks.js) ----------
+// The "Book a tour" row at the end of a hotel guest page, and the weekend email's one bookable pick. Only Viator
+// products we already link; off with Viator off; nothing when nothing fits. It never changes the free picks above it.
+function tourPickContext(venues, closedIds, date) {
+  const skiInSeason = false; // no ski rental product on this site
+  return { venues: new Map(venues.map((v) => [v.id, v])), closedIds, date, skiInSeason };
+}
+function tourPickVenueHref(v) {
+  return v && v.slug && CATEGORY_SLUGS[v.type] ? `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}` : null;
+}
+function hotelTourRowHtml(hotel, venues, closedIds, now = new Date()) {
+  try {
+    if (!viator.enabled()) return '';
+    const picks = tourPicks.guestPicks(hotel, tourPickContext(venues, closedIds, todayLocal(now)));
+    return tourPicks.guestRowHtml(picks, { lang: 'en', rental: hotelIsRental(hotel), venueHref: tourPickVenueHref });
+  } catch (e) { return ''; } // a commission row must never break the page
+}
+// The weekend email's pick for the weekend starting on Friday `friday` (YYYY-MM-DD), or null. Only products whose
+// business has its own photo on our site (tour-picks.js emailPick).
+function weekendBookingPick(friday) {
+  try {
+    if (!viator.enabled() || !/^\d{4}-\d{2}-\d{2}$/.test(String(friday || ''))) return null;
+    const at = new Date(`${friday}T20:00:00Z`); // Friday noon, local
+    const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL').all().map(rowToVenue);
+    const closedIds = new Set(advisoryNotOperatingIds());
+    for (const [id, st] of getSeasonStates(at)) if (st && (st.kind === 'closed' || st.kind === 'temp_closed')) closedIds.add(id);
+    const p = tourPicks.emailPick(tourPickContext(venues, closedIds, friday));
+    if (!p) return null;
+    const photo = venueThumbPhoto(p.photoVenue);
+    if (!photo) return null; // never a box without the business's own photo
+    return { code: p.code, title: p.title, business: p.business, photo, pagePath: tourPickVenueHref(p.photoVenue) };
+  } catch (e) { return null; }
+}
+// GET /weekend-email/book/<code>: the email's "Book now". A tiny noindex page that counts the tap (Analytics, with the
+// email's campaign tags on this address, and commission:viator:email) and goes straight on to the product on Viator.
+function renderWeekendBookHop(link) {
+  const url = JSON.stringify(link.url).replace(/</g, '\\u003c');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Opening Viator…</title>
+<noscript><meta http-equiv="refresh" content="0;url=${escapeHtml(link.url)}"></noscript>
+${renderAnalyticsHeadHtml('email_book')}
+<style>body{margin:0;background:#f8f5ed;color:#1b2e39;font:16px/1.5 Arial,sans-serif}main{max-width:520px;margin:0 auto;padding:40px 16px}a{color:#1b2e39;font-weight:700}small{display:block;margin-top:14px;color:#55646a;font-size:13px}</style>
+</head>
+<body>
+<main>
+<p>Taking you to Viator to book <strong>${escapeHtml(link.title)}</strong>…</p>
+<p><a href="${escapeHtml(link.url)}" rel="sponsored noopener">Continue to Viator ↗</a></p>
+<small>${escapeHtml(viator.DISCLOSURE.en)}</small>
+</main>
+<script>
+(function(){
+  var u = ${url}, done = false;
+  function go(){ if (done) return; done = true; location.replace(u); }
+  try { if (typeof roamCount === 'function') roamCount('commission:viator:email'); } catch (e) {}
+  try { if (typeof gtag === 'function') gtag('event', 'outbound_click', { link_type: 'viator', surface: 'weekend_email', viator_code: ${JSON.stringify(link.code)}, event_callback: go, event_timeout: 800 }); } catch (e) {}
+  setTimeout(go, 900);
+})();
+</script>
+</body>
+</html>`;
+}
 // ---------- Places to stay (2026-11-19, places-to-stay.js) ----------
 // Own reads, own routes: type 'stay' is not in CATEGORY_SLUGS, and every shared list query leaves it out
 // (type != 'stay'), so stays never reach another category, the map, Roam Now, Build My Trip, Editor's Picks or the
@@ -30773,6 +30840,7 @@ ${renderGolfHeaderHtml()}
     <ul class="ht-events">${events.map(eventItem).join('')}</ul>
     <p class="ht-more"><a href="/${hotel.region}/events">All events in ${escapeHtml(town)}</a></p>
   </section>` : ''}
+  ${hotelTourRowHtml(hotel, venues, closedIds, now)}
   </div>
   </main>
   ${renderHomeFooterHTML(true)}
@@ -30781,10 +30849,10 @@ ${renderGolfHeaderHtml()}
 document.addEventListener('click', function(e){
   if (!window.trackEvent || !e.target.closest) return;
   var hotel = document.body.getAttribute('data-hotel');
-  var a = e.target.closest('.ht-link, .ht-event, [data-ht-cta]');
+  var a = e.target.closest('.ht-link, .ht-event, [data-ht-cta], .ht-tour-biz, .ht-tour-book');
   if (!a) return;
   var c = a.closest('.ht-card');
-  window.trackEvent('hotel_page_click', { hotel: hotel, link_url: a.getAttribute('href'), venue_id: c ? Number(c.getAttribute('data-venue-id')) : null });
+  window.trackEvent('hotel_page_click', { hotel: hotel, link_url: a.getAttribute('href'), venue_id: c ? Number(c.getAttribute('data-venue-id')) : null, link_type: a.classList.contains('ht-tour-book') ? 'viator' : undefined });
 });
 </script>
 </body>
@@ -66660,7 +66728,7 @@ function weekendEmailEvents(now = new Date()) {
   return { from: win.from, to: win.to, events: out };
 }
 const weekendEmail = require('./weekend-email').create({
-  db, weekendEvents: weekendEmailEvents, getSender: () => ownerDirectEmail(),
+  db, weekendEvents: weekendEmailEvents, bookingPick: (friday) => weekendBookingPick(friday), getSender: () => ownerDirectEmail(),
   isSameOrigin: (req) => isSameOriginSubmission(req), clientIp: (req) => requestClientIp(req), emailPattern: SUBMISSION_EMAIL_PATTERN,
 });
 
@@ -76784,6 +76852,15 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/weekend-email' && method === 'POST') {
       return await weekendEmail.handleSignup(req, res);
     }
+    {
+      const bm = method === 'GET' ? /^\/weekend-email\/book\/([a-z0-9_-]{2,40})\/?$/.exec(pathname) : null;
+      if (bm) {
+        const link = tourPicks.linkFor(bm[1]);
+        if (!link) { res.writeHead(302, { Location: '/whats-on?when=this-weekend', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' }); return res.end(); }
+        res.writeHead(200, { ...weekendEmail.NOINDEX_HEADERS, 'Referrer-Policy': 'no-referrer-when-downgrade' });
+        return res.end(renderWeekendBookHop(link));
+      }
+    }
     if (pathname.startsWith('/weekend-email/') && await weekendEmail.handlePublic(req, res, pathname, method)) return;
     // The admin page: counts, this weekend's preview, a test send and the real send (Dayton presses it; no timer).
     if ((pathname === '/admin/weekend-email' || pathname === '/admin/weekend-email/') && method === 'GET') {
@@ -77562,6 +77639,7 @@ module.exports = {
   // Card badges (2026-10-29)
   cardBadgeChipsHtml, cardBadgeExpected, guideDatesFor, guideBylineHtml,
   // Hotel QR pages (2026-10-20)
+  hotelTourRowHtml, weekendBookingPick, renderWeekendBookHop, tourPickContext,
   hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelTitleLine, hotelPageGroups, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
   // IndexNow (2026-10-20, IndexNow)
   INDEXNOW_KEY, INDEXNOW_MAX_URLS, buildSitemapXml, listSitemapUrls, indexNowSubmit, createIndexNowQueue, indexNowQueue, indexNowQueueUrls,

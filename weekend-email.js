@@ -78,6 +78,11 @@ const TEXT = {
   },
 };
 const T = (lang) => TEXT[lang === 'fr' ? 'fr' : 'en'];
+// The bookable pick's words (the email is in English). The commission line is the site's own (places-to-stay.js).
+const BOOK_TEXT = {
+  heading: 'Book something this weekend',
+  disclosure: require('./places-to-stay').DISCLOSURE.en,
+};
 
 // The box on What's On and the homepage. Plain English markup: the /fr twins translate it through french-text.js. Fixed
 // height content rendered with the page (no layout shift), a few lines of CSS and a small inline script, no bundle.
@@ -123,6 +128,9 @@ const NOINDEX_HEADERS = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Con
 
 function create(deps) {
   const { db, weekendEvents, getSender, isSameOrigin, clientIp, emailPattern } = deps;
+  // bookingPick(friday) (server.js, tour-picks.js): one in-season Viator product for that weekend, or null (Viator off,
+  // nothing fits). { code, title, business, photo (the business's own photo on our site; required), pagePath }.
+  const bookingPick = typeof deps.bookingPick === 'function' ? deps.bookingPick : () => null;
   const env = deps.env || process.env;
   const ipHits = new Map();
   const inflight = new Set();
@@ -241,8 +249,24 @@ function create(deps) {
       events: byDay.get(d).sort((a, b) => String(a.sortTime).localeCompare(String(b.sortTime)) || a.name.localeCompare(b.name)),
     }));
     const range = from && to ? (from.slice(0, 7) === to.slice(0, 7) ? `${monthDay(from)}–${Number(to.slice(8, 10))}` : `${monthDay(from)} – ${monthDay(to)}`) : '';
+    // "Book something this weekend" (2026-11-21): one Viator pick before the footer. Book now goes through our own
+    // /weekend-email/book/<code> page (counted in Analytics with these tags, then on to Viator); the business's name
+    // and photo go to its page on our site.
+    let book = null;
+    try { book = weekend ? bookingPick(weekend) : null; } catch (e) { book = null; }
+    // Never a box without the business's own photo.
+    if (book && book.code && book.title && book.photo && /^(?:https:\/\/|\/images\/)[^\s"'<>()]+$/.test(book.photo)) {
+      const tags = `utm_source=newsletter&utm_medium=email&utm_campaign=${campaign}&utm_content=book-pick`;
+      const abs = (p) => (/^https:\/\//.test(p) ? p : `${SITE}${p}`);
+      book = {
+        title: String(book.title), business: String(book.business || ''),
+        photo: book.photo && /^(?:https:\/\/|\/images\/)[^\s"'<>()]+$/.test(book.photo) ? abs(book.photo) : null,
+        pageUrl: book.pagePath && /^\/[a-z0-9/_-]+$/.test(book.pagePath) ? `${SITE}${book.pagePath}?${tags}` : null,
+        bookUrl: `${SITE}/weekend-email/book/${encodeURIComponent(String(book.code).toLowerCase())}?${tags}`,
+      };
+    } else book = null;
     return {
-      weekend, from, to, campaign, days, count: ranked.length, totalFound: events.length,
+      weekend, from, to, campaign, days, count: ranked.length, totalFound: events.length, book,
       subject: `This weekend in the Okanagan: ${range}`,
       whatsOnUrl: `${SITE}/whats-on?when=this-weekend&utm_source=newsletter&utm_medium=email&utm_campaign=${campaign}`,
     };
@@ -261,7 +285,11 @@ function create(deps) {
         lines.push(`  ${e.url}`, '');
       }
     }
-    lines.push(`Everything on this weekend: ${dg.whatsOnUrl}`, '', ...digestFooterText(unsubUrl));
+    lines.push(`Everything on this weekend: ${dg.whatsOnUrl}`, '');
+    if (dg.book) {
+      lines.push(BOOK_TEXT.heading.toUpperCase(), '', `* ${dg.book.title}${dg.book.business ? ` (${dg.book.business})` : ''}`, `  Book now: ${dg.book.bookUrl}`, `  ${BOOK_TEXT.disclosure}`, '');
+    }
+    lines.push(...digestFooterText(unsubUrl));
     return lines.join('\n');
   }
   function digestFooterText(unsubUrl) {
@@ -269,6 +297,19 @@ function create(deps) {
     return ['—', 'You’re getting this because you signed up for the Okanagan Roam weekend email on okanaganroam.com and confirmed your address.',
       `Unsubscribe in one click: ${unsubUrl}`, 'Or reply “unsubscribe” to stop.', '',
       `Okanagan Roam · ${CONTACT}`, addr || '[Mailing address missing: set NEWSLETTER_MAILING_ADDRESS]'];
+  }
+  // The one bookable pick: its photo (our own copy of the business's photo, if any), one line, Book now, the commission line.
+  function bookHtml(b) {
+    if (!b) return '';
+    const name = b.pageUrl ? `<a href="${esc(b.pageUrl)}" style="color:#1b2e39">${esc(b.business)}</a>` : esc(b.business);
+    const img = b.photo ? `${b.pageUrl ? `<a href="${esc(b.pageUrl)}">` : ''}<img src="${esc(b.photo)}" alt="${esc(b.business)}" width="568" style="display:block;width:100%;max-width:568px;height:auto;border-radius:10px;margin:0 0 10px">${b.pageUrl ? '</a>' : ''}` : '';
+    return `<div class="wk-book" style="margin:8px 0 24px;padding:14px 16px;background:#fff;border:1px solid #e0d8c3;border-radius:12px">
+<h2 style="font-family:Georgia,serif;font-size:19px;margin:0 0 10px;color:#1b2e39">${esc(BOOK_TEXT.heading)}</h2>
+${img}<p style="margin:0 0 10px;font-size:15px"><strong>${esc(b.title)}</strong>${b.business ? ` · ${name}` : ''}</p>
+<p style="margin:0 0 8px"><a href="${esc(b.bookUrl)}" rel="sponsored noopener" style="display:inline-block;border:1px solid #1b2e39;color:#1b2e39;padding:8px 16px;border-radius:22px;text-decoration:none;font-weight:700">Book now ↗</a></p>
+<p style="margin:0;font-size:12px;color:#55646a">${esc(BOOK_TEXT.disclosure)}</p>
+</div>
+`;
   }
   // The email body's inner part, also shown as the admin preview.
   function digestInnerHtml(dg, unsubUrl) {
@@ -281,7 +322,7 @@ ${d.events.map((e) => `<p style="margin:0 0 14px"><a href="${esc(e.url)}" style=
 <p style="margin:0;color:#55646a;font-size:15px">${esc(`${dg.count} picks for Friday to Sunday from What’s On.`)}</p>
 ${dayHtml}
 <p style="margin:24px 0"><a href="${esc(dg.whatsOnUrl)}" style="display:inline-block;background:#1b2e39;color:#fff;padding:10px 18px;border-radius:22px;text-decoration:none;font-weight:700">Everything on this weekend</a></p>
-<hr style="border:0;border-top:1px solid #e0d8c3;margin:24px 0 12px">
+${bookHtml(dg.book)}<hr style="border:0;border-top:1px solid #e0d8c3;margin:24px 0 12px">
 <p style="font-size:13px;color:#55646a;margin:0 0 8px">You’re getting this because you signed up for the Okanagan Roam weekend email on okanaganroam.com and confirmed your address.</p>
 <p style="font-size:13px;color:#55646a;margin:0 0 8px"><a href="${esc(unsubUrl)}" style="color:#55646a">Unsubscribe in one click</a>, or reply “unsubscribe” to stop.</p>
 <p style="font-size:13px;color:#55646a;margin:0">Okanagan Roam · <a href="mailto:${CONTACT}" style="color:#55646a">${CONTACT}</a><br>${addr ? esc(addr) : '<strong>[Mailing address missing: set NEWSLETTER_MAILING_ADDRESS]</strong>'}</p>

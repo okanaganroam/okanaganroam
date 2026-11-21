@@ -54,6 +54,7 @@ const SURFACES = [
   ['listing', 'Business pages'],
   ['list', 'Lists and search'],
   ['hotel', 'Hotel guest pages (QR cards)'],
+  ['email', 'Weekend email (Book now)'],
   ['other', 'Other pages'],
 ];
 const SURFACE_KEYS = SURFACES.map(([k]) => k);
@@ -127,6 +128,7 @@ function totalBetween(db, a, b) {
 // for a place-to-stay button (data-track stay_click) or else by its data-link (viator, discovercars, fever, whistlercom);
 // the server keeps only the names in NAMES. The script names no partner, so a partner that is off appears in no page.
 // The kind of page comes from the address and the page type.
+// The weekend email's Book now (2026-11-21) opens /weekend-email/book/<code>, which counts commission:viator:email itself.
 function clientJs(pageType) {
   return `  // Commission links (2026-11-21, commissions.js): one count per tap, by partner and kind of page. Counts only.
   (function(){
@@ -141,6 +143,7 @@ function clientJs(pageType) {
       var p = location.pathname.replace(/^\\/fr(?=\\/|$)/, '') || '/';
       if (/^\\/(trip|my-trip)(\\/|$)/.test(p) || PT === 'trip' || PT === 'trip_v3' || PT === 'my_trip') return 'trip';
       if (/^\\/near\\//.test(p) || PT === 'hotel') return 'hotel';
+      if (/^\\/weekend-email\\//.test(p) || PT === 'email_book') return 'email';
       if (/^\\/whats-on(\\/|$)/.test(p) || PT === 'event') return 'event';
       if (/^\\/guides\\//.test(p) || PT === 'guide') return 'guide';
       if (a.hasAttribute('data-stay-id')) return 'stays';
