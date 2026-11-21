@@ -186,9 +186,10 @@ test('3. search: a date reads the season\'s hours (every type); "junior golf cam
 
 test('4. his page: one rate table once his price list is live or waiting (course facts stay); the French page has no "voir la page en anglais", no second « Bon à savoir », no English in the booking row', async () => {
   const { v, t } = await ryan({ region: 'penticton', slug: 'penticton-golf-country-club', name: 'Penticton Golf & Country Club Fixture' }, { prices: false });
+  // Sport test 9 (2026-11-21): his typed green fee alone is already the page's price story, before his list.
   const before = page(v);
-  assert.match(before, /Standard adult rate/, 'research\'s fee table before his list');
-  assert.match(page(v, 'fr'), /voir la page en anglais/, 'before his list');
+  assert.doesNotMatch(before, /Standard adult rate/, 'research\'s fee table goes with his typed price');
+  assert.doesNotMatch(page(v, 'fr'), /voir la page en anglais/, 'with his typed price');
   // Waiting for review: research's fee table goes.
   db.prepare("INSERT INTO venue_menus (venue_id, status, data, submitted_by, submitted_at, source) VALUES (?, 'pending', ?, 'owner-link', datetime('now'), 'owner')").run(v.id, JSON.stringify({ sections: [{ name: 'Green fees', note: '', items: [{ name: '9 holes', description: '', price: '55', dietary: [], check: false }] }] }));
   const waiting = page(v);

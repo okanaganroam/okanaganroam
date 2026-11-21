@@ -12464,6 +12464,7 @@ function visitBookLabelFr(info, type) {
   return (en && frLookup(en)) || (kindFr && kindFr.bookBtn[1]) || 'Réserver';
 }
 // Cleanup (2026-11-01): a Canadian number reads 250-491-2695, not +1 250-491-2695 (the tel: link keeps the stored number).
+const { telHref } = require('./tel-href.js');
 function displayPhone(p) {
   const m = /^\s*(?:\+?1[\s.-]?)?\(?(\d{3})\)?[\s.-]*(\d{3})[\s.-]*(\d{4})\s*$/.exec(String(p || ''));
   return m ? `${m[1]}-${m[2]}-${m[3]}` : String(p || '');
@@ -12584,7 +12585,9 @@ function visitWithPendingPriceRows(venue, info) {
     if (!info || !venue || !kindSetupType(venue.type) || !Array.isArray(info.rows) || !Array.isArray(info.owner_dropped)) return info;
     const back = info.owner_dropped.filter((r) => r && !r.owned && r.label && PENDING_PRICE_ROW_RE.test(r.label) && typeof r.text === 'string' && r.text.trim() && !info.rows.some((x) => x.label === r.label));
     if (!back.length) return info;
-    if (db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND status = 'published' AND help_kind IS NULL AND (source IS NULL OR source != 'research') LIMIT 1").get(venue.id)) {
+    // Sport test 9 (2026-11-21; Gord typed his price and sent "My prices are on my website"): his price and his rates link
+    // are the price story, so research's price lines go the same way as when his list is published.
+    if (db.prepare("SELECT 1 FROM venue_menus WHERE venue_id = ? AND status = 'published' AND help_kind IS NULL AND (source IS NULL OR source != 'research') LIMIT 1").get(venue.id) || sportOwnRatesLink(venue)) {
       // Sport test 7 (2026-11-20): research's Practice or Lessons row stays once her list is published, without its prices
       // ("Academy lessons, clinics and club fittings offered."), unless her own lines say there are none.
       if (!sportSetupType(venue.type)) return info;
@@ -12593,6 +12596,19 @@ function visitWithPendingPriceRows(venue, info) {
     }
     return { ...info, rows: info.rows.concat(back.map((r) => ({ label: r.label, text: r.text, ...(r.url ? { url: r.url } : {}) }))) };
   } catch (e) { return info; }
+}
+// Sport test 8: an owner's typed or dictated line as a sentence: a capital first letter and, when stop is true, a final full
+// stop ("dogs on a leash are welcome" -> "Dogs on a leash are welcome."). Lines that already end in punctuation keep it.
+function ownerLineTidy(t, stop = true) {
+  let x = String(t == null ? '' : t).trim();
+  if (!x) return x;
+  x = x.replace(/^([a-zà-ÿ])/, (m) => m.toUpperCase());
+  if (stop && /[A-Za-zÀ-ÿ0-9)]$/.test(x)) x += '.';
+  return x;
+}
+// Sport test 9: a golf or sport owner's own headline price with a rates page link (his "My prices are on my website").
+function sportOwnRatesLink(venue) {
+  try { return !!(venue && sportSetupType(venue.type) && (indoorPrice(venue.id) != null || indoorFree(venue.id)) && (venueLinks(venue.id) || {}).menu_url); } catch (e) { return false; }
 }
 function visitInfoHtml(info, fr = false, opts = {}) {
   if (fr && info) info = visitWithFrLines(info, opts.type);
@@ -12636,9 +12652,13 @@ function visitInfoHtml(info, fr = false, opts = {}) {
   } else {
     info = { ...info, rows: info.rows.map((r) => (r && typeof r.text === 'string' ? { ...r, text: presetInLang(r.text, 'en') } : r)) };
   }
+  // Sport test 8 (2026-11-21; Marg dictated "dogs on a leash are welcome on the course please pick up after your dog"): on an
+  // indoor or sport page an owner's own line shows with a capital and a full stop (Known for stays a phrase). Display only.
+  const ownTidy = kindSetupType(opts.type) && Array.isArray(info.owner_labels) ? new Set(info.owner_labels) : null;
+  const tidy = (r, t) => (ownTidy && ownTidy.has(enLabel(r)) && typeof t === 'string' ? ownerLineTidy(t, enLabel(r) !== 'Known for') : t);
   const rowHtml = (r) => {
     const linked = r.venue_id ? db.prepare('SELECT region, type, slug, name FROM venues WHERE id = ? AND redirect_to IS NULL').get(r.venue_id) : null;
-    let text = escapeHtml(fr ? r.text : visitTextPolish(r.text));
+    let text = escapeHtml(tidy(r, fr ? r.text : visitTextPolish(r.text)));
     if (linked && linked.slug && CATEGORY_SLUGS[linked.type] && r.text.includes(linked.name)) {
       text = text.replace(escapeHtml(linked.name), `<a href="/${linked.region}/${CATEGORY_SLUGS[linked.type]}/${linked.slug}">${escapeHtml(linked.name)}</a>`);
     }
@@ -34884,7 +34904,7 @@ ${O(`  // Open Now: hours.js and okanaganClock() themselves, so the browser read
       var nx = openNextOf(status, label, clock);
       if (nx) NEXT_OPEN[id] = nx;
       var el = card.querySelector('.fd-open-status');
-      if (el && !el.hasAttribute('data-fd-day') && !(label.state === 'open' && el.hasAttribute('data-fd-times'))) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
+      if (el && !el.hasAttribute('data-fd-day')) { if (!(label.state === 'open' && el.hasAttribute('data-fd-times'))) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; } }
     });
   }
   function paintOpenCount(types, features, regions){
@@ -42061,7 +42081,9 @@ function frStatusText(text) {
   // Any other closure note the French list has (an owner's "(Renovations)") in French too.
   // Café test 2 (Whistler, 2026-11-15): and a holiday tapped in the setup, stored by its English name ("Christmas Day"),
   // as the French hours block already says it: « Fermé aujourd’hui (Noël) ».
-  text = text.replace(/^Closed today \(([^()]{2,80})\)/, (m, note) => { const fr = /^(holiday|temporary closure)$/.test(note) ? null : closureNoteFor(note, true); return fr ? `Ferm\u00e9 aujourd\u2019hui (${fr})` : m; });
+  // Sport test 8 (2026-11-21; « Fermé aujourd’hui (closed to the public for the club championship) »): a note with no French
+  // yet is left off (« Fermé aujourd’hui »); it is queued for Dayton to write (queueClosureNotesFr).
+  text = text.replace(/^Closed today \(([^()]{2,80})\)/, (m, note) => { if (/^(holiday|temporary closure)$/.test(note)) return m; const fr = closureNoteFor(note, true); return fr ? `Ferm\u00e9 aujourd\u2019hui (${fr})` : 'Closed today'; });
   // "midnight" (pub fresh-eyes, 2026-11-10: English never says "12 AM" now) is "minuit".
   const time = (t) => t.replace(/\b(\d{1,2})(?::(\d{2}))? (AM|PM)\b/g, (m, h, mm, ap) => { let H = Number(h) % 12; if (ap === 'PM') H += 12; return `${H} h${mm ? ` ${mm}` : ''}`; }).replace(/\bmidnight\b/g, 'minuit');
   return time(text
@@ -43686,7 +43708,11 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const golfDetail = venue.type === 'golf' ? golfDetailsFor([venue]).get(`${venue.region}/${venue.slug}`) : undefined;
   // Sport test 3 (2026-11-20; Gord's page read "Driving Range & Practice" / « Champ de pratique »: no mini golf, and EN and
   // FR different): a listing whose owner picked a kind that isn't a golf course says that kind, as its card does.
-  const golfKindLabel = venue.type === 'golf' && sportKindSingular(venue, fr) && (venueIndoorInfo(venue.id).kinds || []).length ? sportKindSingular(venue, fr)
+  // Sport test 8 (2026-11-21; Marg ticked Disc golf too): the top line says every kind she picked, as her card and Category
+  // row do ("Golf course & disc golf" / « Terrain de golf et disque-golf »), not just "Golf Course".
+  const golfKindsLine = (() => { try { if (venue.type !== 'golf' || (venueIndoorInfo(venue.id).kinds || []).length < 2 || !/&/.test(String(venue.cuisine || ''))) return null; const c = venueCuisineList(venue)[0]; return c ? (fr ? frCuisineShown(c) || null : c) : null; } catch (e) { return null; } })();
+  const golfKindLabel = golfKindsLine ? golfKindsLine
+    : venue.type === 'golf' && sportKindSingular(venue, fr) && (venueIndoorInfo(venue.id).kinds || []).length ? sportKindSingular(venue, fr)
     : (venue.type === 'golf' && isIndoorGolfVenue(venue)) ? L('Indoor Golf', 'Golf int\u00e9rieur')
     : (golfData && golfData.isPracticeFacility(golfDetail)) ? L('Driving Range & Practice', 'Champ de pratique')
     // Indoor test 9: a French indoor page's hero says its category (« Aire de jeux intérieure »), as its top line does.
@@ -43775,7 +43801,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     // (office: 4230 Gateway Dr)" instead of a meeting point.
     tourPickup(venue) ? [L('Pickup', 'Prise en charge'), escapeHtml(tourPickupText(venue, fr))]
     : venue.address ? [tourAddressIsMeetingPoint(venue) ? L('Meeting point', 'Point de rencontre') : L('Address', 'Adresse'), `${escapeHtml(fr ? frTextOr(venue.address) : venue.address)}`] : null, // the map link is the Get Directions button (cleanup, 2026-11-01)
-    venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${escapeHtml(displayPhone(venue.phone))}</a>`] : null,
+    venue.phone ? [L('Phone', 'T\u00e9l\u00e9phone'), `<a href="${escapeHtml(telHref(venue.phone))}"${trackAttr('phone')}>${escapeHtml(displayPhone(venue.phone))}</a>`] : null,
     // Website and Book are the buttons above the card (cleanup, 2026-11-01); they were repeated here.
     // Owner-supplied links (2026-10-15, venue_links): shown only once approved. Researched venue links (2026-10-27):
     // menu / booking links from POST /admin/set-venue-links show here too (same table), with no verified pill.
@@ -43908,6 +43934,9 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     mapsUrl ? `<a class="cta" href="${builtInDirections || mapsUrl}" ${builtInDirections ? 'data-roam-directions' : 'rel="nofollow noopener" target="_blank"'}${trackAttr('directions')}>${pickupOffice ? (builtInDirections ? L('Directions to the office', 'Itin\u00e9raire vers le bureau') : L('Office in Google Maps', 'Bureau dans Google Maps')) : builtInDirections ? L('Get Directions', 'Itin\u00e9raire') : L('Open in Google Maps','Ouvrir dans Google Maps')}</a>` : null,
     // Brewery test 2 (2026-11-13): a website that is the same Facebook page as the Facebook link shows once, as Facebook.
     venue.website && !ownBookingIsWebsite && !websiteIsFacebookLink(venue.website, venueLinkRow.facebook_url) && !websiteIsInstagramLink(venue.website, venueLinkRow.instagram_url) ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(normalizeWebsiteUrl(venue.website))}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>${mapsUrl ? L('Website \u2197', 'Site Web \u2197') : L('Visit Website', 'Visiter le site Web')}</a>` : null,
+    // Sport test 8 (2026-11-21; Marg's club has a Facebook page only, where it posts "flooded today"): with no website on
+    // an indoor or sport page, Facebook takes the Website button's place (it still shows under Social too).
+    !venue.website && kindSetupType(venue.type) && /^https:\/\/(?:www\.|m\.)?facebook\.com\//i.test(String(venueLinkRow.facebook_url || '')) ? `<a class="cta${mapsUrl ? ' secondary' : ''}" href="${escapeHtml(venueLinkRow.facebook_url)}" rel="nofollow noopener" target="_blank"${trackAttr('website')}>Facebook \u2197</a>` : null,
     // Viator (2026-11-20, owner decision): a venue with an approved Viator match has "Book on Viator" as its Book button
     // (its own booking link moves to a smaller "or book direct" line under it: renderVenuePage, viator.withVenueLink).
     viatorBook ? viator.bookButtonHtml(viatorBook.url, fr ? 'fr' : 'en')
@@ -43916,7 +43945,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
       : venueLinkRow.booking_url ? `<a class="cta secondary" href="${escapeHtml(venueLinkRow.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}${sportDropInBooking(venue) ? ' data-book-secondary' : ''}>${escapeHtml(L(...indoorBookButton(venue, venueLinkRow.booking_url)))}</a>`
       // A winery's tasting booking page from its Plan your visit box (2026-10-29), when it has no booking link of its own.
       : visitInfo && visitInfo.booking_url ? `<a class="cta secondary" href="${escapeHtml(visitInfo.booking_url)}" rel="nofollow noopener" target="_blank"${trackAttr('booking')}>${escapeHtml(sportSetupType(venue.type) ? L(...indoorBookButton(venue, visitInfo.booking_url)) : fr ? visitBookLabelFr(visitInfo, venue.type) : (visitInfo.booking_label || VISIT_BOOK_LABELS[venue.type] || 'Book'))}</a>` : null,
-    venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
+    venue.phone ? `<a class="cta secondary" href="${escapeHtml(telHref(venue.phone))}"${trackAttr('phone')}>${L('Call', 'Appeler')}</a>` : null,
     // Golf-only: Favorite + Add to Trip sit with the contact actions on
     // the venue page (they were moved off the listing card).
     venuePageUsesEngagement(venue.type) ? (fr ? frFavTripButtons(golfFavTripButtonsHtml(venue, { appLabels: themedShell }), venue) : golfFavTripButtonsHtml(venue, { appLabels: themedShell })) : null,
@@ -43958,15 +43987,19 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // rates and his "Green fees from $55"): once his own price list is live or waiting for review, research's fee table goes
   // (the course facts, holes, par and yardage, stay in At a glance), so the page has one rate table and one headline.
   const golfOwnList = golfFeesHtml0 && ownerPriceListLiveOrWaiting(venue.id);
-  const golfFeesHtml = golfOwnList || (golfOwnPrices && golfFeesHtml0 && !/<table/.test(golfFeesHtml0)) ? '' : golfFeesHtml0;
+  // Sport test 9 (2026-11-21; Gord typed "Green fees from $76.19" and sent his rates page as a link): research's 2026 table
+  // and its "$103.81" headline sat above his price. Once the owner's own headline price is in (typed or free), research's
+  // fee table and value index go too: one price story on the page (holes, par and yardage stay in At a glance).
+  const golfFeesHtml = golfOwnList || golfOwnPrices ? '' : golfFeesHtml0;
   const golfValueHtml0 = !fr && golfData && golfDetail ? golfData.golfValueSectionHtml(golfDetail) : '';
   // Sport test 7 (2026-11-20; Kayla: research's "Value index 35… $300 for 18 holes… Nothing extra included" sat above her
   // own "$210, power cart and range balls included"): round 4's one-rate-table rule for the value box too. Once her own
   // price list is live or waiting, research's value index (built from research's rates) goes with research's fee table.
-  const golfValueHtml = (golfOwnPrices && /golf-value-none/.test(golfValueHtml0)) || (golfValueHtml0 && ownerPriceListLiveOrWaiting(venue.id)) ? '' : golfValueHtml0;
+  const golfValueHtml = golfOwnPrices || (golfValueHtml0 && ownerPriceListLiveOrWaiting(venue.id)) ? '' : golfValueHtml0;
   // Golf fees and course details exist only in English, so the French page links to them.
   // Sport test 4: not once his own price list shows on the French page (it is the prices).
-  const golfEnglishNote = fr && golfDetail && !((publishedMenu(venue.id) || {}).source === 'owner') ? `<p class="venue-meta">Tarifs et d\u00e9tails du parcours\u00a0: <a href="${venuePagePath(venue)}" hreflang="en" lang="en">voir la page en anglais</a>.</p>` : '';
+  // Sport test 9: not once the owner's own price is in either (the English page's research fees are gone then).
+  const golfEnglishNote = fr && golfDetail && !golfOwnPrices && !((publishedMenu(venue.id) || {}).source === 'owner') ? `<p class="venue-meta">Tarifs et d\u00e9tails du parcours\u00a0: <a href="${venuePagePath(venue)}" hreflang="en" lang="en">voir la page en anglais</a>.</p>` : '';
 
   // One bulk lookup for all related+nearby cards together (reusing the
   // existing getHiddenGemVenueIds(), not a new query) -- O(1) Set lookups
@@ -44287,7 +44320,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
           : row),
       } : null;
       if (weeklyNightsForPage && weeklyNightsForPage.rows.some((row) => row.s.kind === 'trivia')) {
-        extraDealsHtml = '<div class="fd-trivia-booking"><a class="cta" href="tel:' + escapeHtml(triviaBooking.phone) + '"' + trackAttr('booking') + '>Call to book trivia</a><p>Reservations with Copper · ' + escapeHtml(triviaBooking.displayPhone) + '</p><a href="' + escapeHtml(triviaBooking.sourceUrl) + '" target="_blank" rel="nofollow noopener">Copper’s reservation details ↗</a></div>';
+        extraDealsHtml = '<div class="fd-trivia-booking"><a class="cta" href="' + escapeHtml(telHref(triviaBooking.phone)) + '"' + trackAttr('booking') + '>Call to book trivia</a><p>Reservations with Copper · ' + escapeHtml(triviaBooking.displayPhone) + '</p><a href="' + escapeHtml(triviaBooking.sourceUrl) + '" target="_blank" rel="nofollow noopener">Copper’s reservation details ↗</a></div>';
       }
     }
     const dogNote = dogFriendlyNote !== undefined && dogFriendlyNote !== null ? String(dogFriendlyNote).trim() : '';
@@ -48333,7 +48366,7 @@ function bhStart(){
       var nx = openNextOf(status, label, clock);
       if (nx) NEXT_OPEN[id] = nx;
       var el = card.querySelector('.fd-open-status');
-      if (el && !el.hasAttribute('data-fd-day') && !(label.state === 'open' && el.hasAttribute('data-fd-times'))) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; }
+      if (el && !el.hasAttribute('data-fd-day')) { if (!(label.state === 'open' && el.hasAttribute('data-fd-times'))) { el.setAttribute('data-fd-open', label.state); el.textContent = label.text; } }
     });
   }
   // Favourites: the saved-items rule itself (window.__roamFav), read once per
@@ -55092,10 +55125,21 @@ async function queueFrLinesTranslation(venue, rows, contactEmail) {
     return true;
   } catch (e) { console.error(`[owner-portal] French lines request for venue #${venue && venue.id} failed: ${e.message}`); return false; }
 }
+// Sport test 8: closure notes with no French yet (a holiday tapped in the setup has its own French), in the French lines item.
+function queueClosureNotesFr(venue, closures, contactEmail) {
+  try {
+    const notes = [...new Set((closures || []).map((c) => String((c && c.note) || '').trim()).filter((n) => n && !closureNoteFor(n, true)))];
+    if (!notes.length) return false;
+    const id = frLinesUpsert(venue.id, { Closures: notes.join(' / ') }, contactEmail);
+    if (!id) return false;
+    frLinesEmailSoon(venue.id, id, contactEmail || null);
+    return true;
+  } catch (e) { console.error(`[owner-portal] French closure notes for venue #${venue && venue.id} failed: ${e.message}`); return false; }
+}
 // Sport test 6 (2026-11-20; Priya's setup left 4 French-lines items for one listing in /admin/review, beside the French
 // description): an owner's pending English lines and price names are ONE review item. A new line joins the open item
 // (the newest words of each line win); one is added only when there is none. -> the item's id, or null when nothing changed.
-const FR_LINES_LABELS = ['Known for', 'Good to know', 'Groups', 'Prices'];
+const FR_LINES_LABELS = ['Known for', 'Good to know', 'Groups', 'Prices', 'Closures'];
 const FR_LINES_PRE = { lines: 'Their own English lines changed: please write the French for them on their listing (queued automatically).', prices: 'Their price names are in English: please write the French for them on their listing (queued automatically).',
   both: 'Their own English lines and price names changed: please write the French for them on their listing (queued automatically).' };
 function frLinesParts(note) {
@@ -56522,6 +56566,9 @@ async function handleOwnerChangeSubmission(req, res, token) {
   if (COMPLETENESS_TYPES.has(venue.type) && typeof changes.description === 'string' && changes.description.trim()) await queueFrStoryTranslation(venue, contact.email);
   // Indoor test 9: her own English Good to know, Groups or Known for lines queue their French too (not from the French setup).
   if (kindSetupType(venue.type) && res.twinLang !== 'fr' && changes.visit_rows && typeof changes.visit_rows === 'object') await queueFrLinesTranslation(venue, changes.visit_rows, contact.email);
+  // Sport test 8 (2026-11-21): her closure notes ("closed to the public for the club championship") join the same French
+  // lines item, so the French page can say why once Dayton writes it (until then it says « Fermé aujourd’hui » alone).
+  if (kindSetupType(venue.type) && Array.isArray(changes.closures)) queueClosureNotesFr(venue, changes.closures, contact.email);
   // Tour test 3 (Whistler, 2026-11-17): the category words the kinds just wrote, so the setup's finish preview shows what
   // the page and the cards show (it listed the chips' names).
   let tourWords = null;
@@ -58494,6 +58541,9 @@ function menuPriceNumber(price) {
 // How a price shows: a bare number gets a dollar sign ("18.50" -> "$18.50", French "18,50 $"); anything else as printed.
 function menuPriceLabel(price, lang = 'en') {
   const p = String(price || '').trim();
+  // Sport test 8 (2026-11-21; Marg typed "free" for disc golf and kids under 12): a price that is just the word shows as
+  // "Free" on the English page (the French says « gratuit » as typed, menuFreeFr).
+  if (lang !== 'fr' && /^free$/i.test(p)) return 'Free';
   if (/^\$?\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?$/.test(p)) { // thousands: "$1,299", French "1 299 $"
     const t = p.replace('$', '');
     return lang === 'fr' ? `${t.replace(/,/g, ' ').replace('.', ',')} $` : `$${t}`;
@@ -66008,7 +66058,7 @@ ${VENUE_MENU_CSS}
   <p>
     <a class="vm-btn" href="${venuePagePath(venue, lang)}">${fr ? `Infos, heures et carte ${escapeHtml(frDe(venue.name))}` : `Hours, map and more for ${escapeHtml(venue.name)}`}</a>
     ${viatorMenuBook ? `${viator.bookButtonHtml(viatorMenuBook.url, lang)}<p class="vm-note" data-viator-disclosure>${escapeHtml(viator.DISCLOSURE[lang === 'fr' ? 'fr' : 'en'])}</p>` : booking ? `<a class="cta secondary" href="${escapeHtml(booking)}" rel="nofollow noopener" target="_blank" data-track="booking">${kindSetupType(venue.type) ? escapeHtml(L(...indoorBookButton(venue, booking))) : L('Book online', 'Réserver en ligne')} ↗</a>` : ''}
-    ${venue.phone ? `<a class="cta secondary" href="tel:${escapeHtml(venue.phone)}" data-track="phone">${L('Call', 'Appeler')} ${escapeHtml(venue.phone)}</a>` : ''}
+    ${venue.phone ? `<a class="cta secondary" href="${escapeHtml(telHref(venue.phone))}" data-track="phone">${L('Call', 'Appeler')} ${escapeHtml(venue.phone)}</a>` : ''}
     ${website ? `<a class="cta secondary" href="${escapeHtml(website)}" rel="nofollow noopener" target="_blank" data-track="website">${L('Website', 'Site Web')} ↗</a>` : ''}
   </p>
   <p class="vm-meta">${L('Own this business?', 'C’est votre entreprise?')} <a href="/owner/login" rel="nofollow">${tours ? L('Sign in to update your prices', 'Connectez-vous pour modifier vos tarifs') : L('Sign in to update your menu', 'Connectez-vous pour modifier votre menu')}</a></p>
@@ -69055,7 +69105,7 @@ function renderAdminClaimCard(c) {
   const f = claimOnFile(c.venue_id);
   const v = f.venue;
   const esc = adminReviewEsc;
-  const tel = (p) => (p ? `<a href="tel:${esc(String(p).replace(/[^0-9+]/g, ''))}">${esc(p)}</a>` : '<em>none</em>');
+  const tel = (p) => (p ? `<a href="${esc(/,\d+$/.test(telHref(p)) ? telHref(p) : `tel:${String(p).replace(/[^0-9+]/g, '')}`)}">${esc(p)}</a>` : '<em>none</em>');
   const site = v.website ? `<a href="${esc(v.website)}" target="_blank" rel="noopener nofollow">${esc(v.website)}</a>` : '<em>none</em>';
   const match = v.website && claimEmailMatchesWebsite(c.email, v.website);
   const check = {

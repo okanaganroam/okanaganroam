@@ -5443,7 +5443,9 @@
   // Sport test 6 (2026-11-20; Priya: "Helmets for kids" + " under 10" saved as "Helmets for kids. Under 10.", and "Private
   // ice rentals" + " through the City of Kelowna booking office" split the same way): ages, limits and "through" carry it on
   // too, and so does a number ("Lockers 25 cents", "ages 5 to 12").
-  var JOIN_WORDS = /^(?:for|with|in|on|at|up|from|to|and|or|but|plus|until|till|after|before|by|during|except|only|all|every|each|including|when|if|of|as|via|near|inside|outside|under|over|through|throughout|around|about|between|without|than|ages?|aged|pour|avec|en|au|aux|à|de|du|des|et|ou|jusqu|dès|sauf|seulement|sur|dans|le|la|les|moins|pendant|avant|après|entre|par|sans|âges?)$/;
+  var JOIN_WORDS = /^(?:for|with|in|on|at|from|and|or|but|plus|until|till|after|before|by|during|except|only|all|every|each|including|when|if|of|as|via|near|inside|outside|under|over|through|throughout|around|about|between|without|than|ages?|aged|pour|avec|en|au|aux|à|de|du|des|et|ou|jusqu|dès|sauf|seulement|sur|dans|le|la|les|moins|pendant|avant|après|entre|par|sans|âges?)$/;
+  // Sport test 9 (2026-11-21; Gord: "Weddings and private events" + " up to 120 golfers, banquet room seats 150" read as
+  // weddings of 120 golfers): a bare "up to" or "to" no longer carries a chip on; it starts its own sentence ("for up to" does).
   // Sport test 5 (2026-11-20; Jen pasted " midweek" after "School and club groups": "groups. Midweek."): a time word typed in
   // lower case carries the chip on too ("School and club groups midweek"), pasted or typed (server.js OWNER_CHIP_CONT_WORDS).
   var CONT_WORDS = /^(?:midweek|weekdays?|weekends?|weeknights?|daily|nightly|mornings?|afternoons?|evenings?|weekly|monthly|year-round|too|also|mostly|usually|sometimes)$/;

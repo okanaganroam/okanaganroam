@@ -108,9 +108,9 @@ test('3. the value box: research’s value index (its $300, "Nothing extra inclu
   const v = kayla(app, db, { slug: 'predator-ridge-predator-course', name: 'Predator Value Fixture' });
   const h = page(v, NOV);
   assert.doesNotMatch(h, /class="golf-value/); assert.doesNotMatch(plain(h), /Nothing extra included/);
-  // Without her list, research's value box is the page's (as before).
+  // Without her list but with her own typed price, research's value box stays off too (sport test 9: one price story).
   db.prepare("UPDATE venue_menus SET status = 'removed' WHERE venue_id = ?").run(v.id); if (app.clearVenueCaches) app.clearVenueCaches();
-  assert.match(page(v, NOV), /class="golf-value/);
+  assert.doesNotMatch(page(v, NOV), /class="golf-value/);
   const bare = v;
   retire([v.id, bare.id]);
 });
