@@ -68,6 +68,7 @@ const WORDS = {
   },
   include: {
     _: ['Admission: equipment included', 'Entrée : équipement compris'], golf: ['18 holes with a power cart $89', '18 trous avec voiturette 89 $'],
+    skischool: ['Discover package: lesson, rentals and a beginner lift ticket', 'Forfait Découverte : cours, location et billet de remontée débutant'],
     simgolf: ['One bay, one hour: clubs and balls included', 'Une baie, une heure : bâtons et balles compris'], range: ['Large bucket: clubs to borrow', 'Grand seau : bâtons prêtés'],
     rink: ['Public skate: skate rental $5 extra', 'Patinage libre : location de patins 5 $ en plus'], swim: ['Adult swim: change rooms and lockers included', 'Baignade adulte : vestiaires et casiers compris'],
     skatepark: ['Camp week: helmet and board included', 'Semaine de camp : casque et planche compris'], bike: ['Practice night: coaching included', 'Soirée d’entraînement : entraînement compris'],
@@ -75,7 +76,7 @@ const WORDS = {
     sportsctr: ['Drop-in: equipment included', 'À la séance : équipement compris'],
   },
   notIncluded: {
-    _: ['Rentals not included', 'Location non comprise'], golf: ['Power carts not included', 'Voiturettes non comprises'], rink: ['Skate rental not included', 'Location de patins non comprise'],
+    _: ['Rentals not included', 'Location non comprise'], skischool: ['Lift ticket not included', 'Billet de remontée non compris'], golf: ['Power carts not included', 'Voiturettes non comprises'], rink: ['Skate rental not included', 'Location de patins non comprise'],
     swim: ['Towels not included', 'Serviettes non comprises'], courts: ['Racquets not included', 'Raquettes non comprises'], discgolf: ['Discs not included', 'Disques non compris'],
     simgolf: ['Food and drinks not included', 'Nourriture et boissons non comprises'],
   },
@@ -267,8 +268,8 @@ const TOPICS = [
     allOf2: [['lift', 'remontee'], ['ticket', 'tickets', 'billet', 'billets', 'pass']],
     keys: ['is it included', 'is the lift ticket included', 'lift ticket included', 'whats included', 'what is included', 'what s included', 'not included', 'included in the price', 'lift ticket', 'lift tickets', 'lift ticket prices', 'lift pass', 'we dont sell them', 'we don t sell them', 'ticket office', 'balls included', 'clubs included', 'cart included', 'helmet included'],
     keysFr: ['est il inclus', 'est inclus', 'inclus', 'compris', 'non compris', 'billet de remontee', 'billets de remontee', 'ce qui est compris', 'pas compris', 'nous ne les vendons pas'],
-    a: '<p>Say what a price includes in the line’s details in <strong>Your prices</strong>, like <em>{INCL_EX}</em>. Something people often ask about that isn’t included? One line in <strong>Good to know</strong>, like <em>{NOT_INCL}</em>. Something you don’t sell yourself stays off your list.</p>',
-    aFr: '<p>Dites ce que comprend un prix dans les détails de la ligne dans <strong>Vos tarifs</strong>, comme <em>{INCL_EX}</em>. Une chose que les gens demandent souvent et qui n’est pas comprise? Une ligne dans <strong>Bon à savoir</strong>, comme <em>{NOT_INCL}</em>. Ce que vous ne vendez pas vous-même reste hors de votre liste.</p>' },
+    a: '<p>Say what a price includes in the line’s details in <strong>Your prices</strong>, like <em>{INCL_EX}</em>. Something people often ask about that isn’t included? One line in <strong>Good to know</strong>, like <em>{NOT_INCL}</em>{NOT_INCL_CHIP_EN}. Something you don’t sell yourself, like {NOT_SOLD_EN}, stays off your list: that line says it.</p>',
+    aFr: '<p>Dites ce que comprend un prix dans les détails de la ligne dans <strong>Vos tarifs</strong>, comme <em>{INCL_EX}</em>. Une chose que les gens demandent souvent et qui n’est pas comprise? Une ligne dans <strong>Bon à savoir</strong>, comme <em>{NOT_INCL}</em>{NOT_INCL_CHIP_FR}. Ce que vous ne vendez pas vous-même, comme {NOT_SOLD_FR}, reste hors de votre liste : cette ligne le dit.</p>' },
   { id: 'sport-package', pages: ['setup', 'edit', 'menu'], over: ['sport-rate-lines', 'menu-add', 'indoor-price-two', 'indoor-price', 'indoor-extras', 'sport-card-price', 'hours', 'indoor-price-varies', 'indoor-typer-first', 'sport-included', 'sport-rentals', 'indoor-also-offer', 'description', 'indoor-groups'],
     q: 'A package or bundle (like a first-timer package)', qFr: 'Un forfait (comme un forfait pour débutants)',
     allOf: [['package', 'bundle', 'combo', 'forfait', 'timer', 'starter', 'discover'], ['includ', 'with', 'lift', 'rental', 'rentals', 'lesson', 'where', 'how', 'go', 'put', 'avec', 'location', 'cours', 'billet', 'inclus', 'comprend', 'ou']],
@@ -386,7 +387,7 @@ function fill(x, m) { return typeof x === 'string' ? x.replace(/\{([A-Z_]+)\}/g,
 function tokens(kind, ctx) {
   const e = ctx.esc, K = SK.K[kind] || SK.K.sportother, w = (f, i) => e(word(f, kind)[i]);
   const chipOf = (re) => { const i = (ctx.gtk.en || []).findIndex((c) => re.test(c)); return i >= 0 ? [ctx.gtk.en[i], (ctx.gtk.fr || [])[i] || ctx.gtk.en[i]] : null; };
-  const meet = chipOf(/\bmeet\b|check in|arrive/i), lit = chipOf(/^lit\b/i);
+  const meet = chipOf(/\bmeet\b|check in|arrive/i), lit = chipOf(/^lit\b/i), notIn = chipOf(/not included/i);
   const bring = (ctx.gtk.en || []).map((c, i) => [c, (ctx.gtk.fr || [])[i] || c]).filter(([c]) => /\bbring\b|\bdress\b|helmet|swimsuit|shoes|clubs to borrow|racquet|discs/i.test(c)).slice(0, 2);
   const label = SK.SPORT_KIND_LABELS_OWNER[kind] || ['your kind', 'votre genre'];
   const busy = SK.BUSY_THEME[kind] || SK.BUSY_THEME.sportother;
@@ -406,12 +407,12 @@ function tokens(kind, ctx) {
       BRING_EX: w('bring', 0), BRING_CHIPS_EN: bring.length ? ` (like ${bring.map(([c]) => `<strong>${e(c)}</strong>`).join(' or ')})` : '', BUSY_EX: e(busy[0]), PEAK_EX: e(`${typer[0]} $${p} (${peakWhen[0]}: $${peak})`),
       INCL_EX: w('include', 0), NOT_INCL: w('notIncluded', 0), PKG_EX: w('pkg', 0), CARD_EN: ctx.price ? `your main price (“${e(ctx.price.en)}”)` : 'your main price', LABEL_EN: e(label[0]), BOTH_EN: w('both', 0),
       SEASON_SAYS_EN: seasonSays[0], AHEAD_CHIP_EN: e((bw.ahead || ['No, please book ahead'])[0]), AHEAD_EX: w('ahead', 0), BUSY_CHIP_EN: e((bw.busy || ['Yes, but book ahead for weekends and busy times'])[0]),
-      BUSY_LINE_EN: bw.line ? `: your page says “${e(String(bw.line[0]).replace(/\.$/, ''))}”` : '', SAME_EX: w('same', 0), HOLIDAY_EX: w('holiday', 0), SEARCH_EX: e(search.join(', ') || label[0].toLowerCase()), NEAR_EN: ctx.near ? ` ${ctx.near.en}` : '', LIT_EN: lit ? `, or tap <strong>${e(lit[0])}</strong> if it’s lit` : '', AGES_LINE: w('lineAges', 0) },
+      BUSY_LINE_EN: bw.line ? `: your page says “${e(String(bw.line[0]).replace(/\.$/, ''))}”` : '', SAME_EX: w('same', 0), HOLIDAY_EX: w('holiday', 0), SEARCH_EX: e(search.join(', ') || label[0].toLowerCase()), NEAR_EN: ctx.near ? ` ${ctx.near.en}` : '', NOT_INCL_CHIP_EN: notIn ? (notIn[0] === word('notIncluded', kind)[0] ? ': it’s one tap there' : ` (or tap <strong>${e(notIn[0])}</strong>)`) : '', NOT_SOLD_EN: kind === 'skischool' ? 'lift tickets the ticket office sells' : 'another business’s tickets', LIT_EN: lit ? `, or tap <strong>${e(lit[0])}</strong> if it’s lit` : '', AGES_LINE: w('lineAges', 0) },
     fr: { MEET_EX: w('meet', 1), MEET_CHIP_FR: meet ? ` Ou touchez <strong>${e(meet[1])}</strong> et ajoutez l’endroit.` : '', LANG_EX: w('lang', 1), ADAPT_PRICE: w('adaptPrice', 1), ADAPT_EX: w('adapt', 1), REFUND_EX: w('refund', 1), REFUND_WX: w('refundWx', 1),
       BRING_EX: w('bring', 1), BRING_CHIPS_FR: bring.length ? ` (comme ${bring.map(([, c]) => `<strong>${e(c)}</strong>`).join(' ou ')})` : '', BUSY_EX: e(busy[3]), PEAK_EX: e(`${typer[2]} ${p} $ (${peakWhen[1]} : ${peak} $)`),
       INCL_EX: w('include', 1), NOT_INCL: w('notIncluded', 1), PKG_EX: w('pkg', 1), CARD_FR: ctx.price ? `votre prix principal (« ${e(ctx.price.fr)} »)` : 'votre prix principal', LABEL_FR: e(label[1]), BOTH_FR: w('both', 1),
       SEASON_SAYS_FR: seasonSays[1], AHEAD_CHIP_FR: e((bw.ahead || ['', 'Non, réservez à l’avance'])[1]), AHEAD_EX: w('ahead', 1), BUSY_CHIP_FR: e((bw.busy || ['', 'Oui, mais réservez pour les fins de semaine et les périodes achalandées'])[1]),
-      BUSY_LINE_FR: bw.line ? ` : votre page indique « ${e(String(bw.line[1]).replace(/\.$/, ''))} »` : '', SAME_EX: w('same', 1), HOLIDAY_EX: w('holiday', 1), SEARCH_EX_FR: e(searchFr.join(', ') || label[1].toLowerCase()), NEAR_FR: ctx.near ? ` ${ctx.near.fr}` : '', LIT_FR: lit ? `, ou touchez <strong>${e(lit[1])}</strong> s’il y a de l’éclairage` : '', AGES_LINE: w('lineAges', 1) },
+      BUSY_LINE_FR: bw.line ? ` : votre page indique « ${e(String(bw.line[1]).replace(/\.$/, ''))} »` : '', SAME_EX: w('same', 1), HOLIDAY_EX: w('holiday', 1), SEARCH_EX_FR: e(searchFr.join(', ') || label[1].toLowerCase()), NEAR_FR: ctx.near ? ` ${ctx.near.fr}` : '', NOT_INCL_CHIP_FR: notIn ? (notIn[0] === word('notIncluded', kind)[0] ? ' : c’est un choix à toucher' : ` (ou touchez <strong>${e(notIn[1])}</strong>)`) : '', NOT_SOLD_FR: kind === 'skischool' ? 'les billets de remontée vendus à la billetterie' : 'les billets d’une autre entreprise', LIT_FR: lit ? `, ou touchez <strong>${e(lit[1])}</strong> s’il y a de l’éclairage` : '', AGES_LINE: w('lineAges', 1) },
   };
 }
 // The shared answers (and their titles, which are also the suggestion buttons) in the kind's own words.
@@ -493,8 +494,9 @@ function kindHelp(t, kind, ctx) {
     case 'indoor-camps': {
       const c = w('camp');
       if (WINTER(kind)) title('Christmas, spring break or PD-day camps', 'Camps de Noël, de la relâche ou des journées pédagogiques');
-      return both(t, [['(summer, spring break or a PD day)', WINTER(kind) ? '(Christmas, spring break or a PD day)' : '(summer, spring break or a PD day)'], [/<em>Summer art camps for ages 6–12<\/em>/, `<em>${e(c[0])}</em>`]],
-        [['(l’été, la relâche ou une journée pédagogique)', WINTER(kind) ? '(Noël, la relâche ou une journée pédagogique)' : '(l’été, la relâche ou une journée pédagogique)'], [/<em>Camps d’art d’été pour les 6 à 12 ans<\/em>/, `<em>${e(c[1])}</em>`]]);
+      return both(t, [['(summer, spring break or a PD day)', WINTER(kind) ? '(Christmas, spring break or a PD day)' : '(summer, spring break or a PD day)'], [/<em>Summer art camps for ages 6–12<\/em>/, `<em>${e(c[0])}</em>`], ['like July 5 to August 27', WINTER(kind) ? 'like December 21 to 26' : 'like July 5 to August 27']],
+        // A winter kind's camp dates are in winter.
+        [['(l’été, la relâche ou une journée pédagogique)', WINTER(kind) ? '(Noël, la relâche ou une journée pédagogique)' : '(l’été, la relâche ou une journée pédagogique)'], [/<em>Camps d’art d’été pour les 6 à 12 ans<\/em>/, `<em>${e(c[1])}</em>`], ['comme du 5 juillet au 27 août', WINTER(kind) ? 'comme du 21 au 26 décembre' : 'comme du 5 juillet au 27 août']]);
     }
     case 'indoor-price-varies': {
       const two = w('two'), sec = w('twoSection'), fr = w('twoFrom');
@@ -517,6 +519,11 @@ function kindHelp(t, kind, ctx) {
       const typer = SK.TYPER[kind] || SK.TYPER.sportother, p = (typeof ctx.amount === 'number' && ctx.amount > 0 ? ctx.amount : SK.EX_PRICE[kind] || 15) * 2;
       return both(t, [[/<em>Date night for two<\/em> and <em>95<\/em>|<em>Date night for two and 95<\/em>/, `<em>${e(typer[0])} for two</em> and <em>${p}</em>`], [/A package \(a couples’ massage, a spa day\) is the same: one line with its name and price, like <em>Couples’ massage package<\/em> and <em>260<\/em>\./, 'A package is the same: one line with its name and price.'], [/A package \(a couples’ massage, a spa day\) is the same: one line with its name and price, like <em>Couples’ massage package and 260<\/em>\./, 'A package is the same: one line with its name and price.'], [/, like <em>Couples’ packages<\/em>/, '']],
         [[/<em>Soirée en amoureux pour deux<\/em> et <em>95<\/em>|<em>Soirée en amoureux pour deux et 95<\/em>/, `<em>${e(typer[2])} pour deux</em> et <em>${p}</em>`], [/Un forfait \(un massage en couple, une journée au spa\) c’est pareil : une ligne avec son nom et son prix, comme <em>Forfait massage en couple[^<]*<\/em>(?: et <em>260<\/em>)?\./, 'Un forfait, c’est pareil : une ligne avec son nom et son prix.'], [/, comme <em>Forfaits pour couples<\/em>/, '']]);
+    }
+    case 'sport-per-person': {
+      const ex = { skischool: ['Private lesson, 1 hour $189 (1 to 3 people, same price)', 'Cours privé, 1 heure 189 $ (1 à 3 personnes, même prix)'] }[kind];
+      t = both(t, [['<p>No. Show your prices the way you charge, like', '<p>Show each price the way you charge it, with who it’s for in its details, like']], [['<p>Non. Montrez vos prix comme vous les facturez, comme', '<p>Montrez chaque prix comme vous le facturez, avec pour qui dans ses détails, comme']]);
+      return ex ? both(t, [[/<em>[^<]*<\/em>/, `<em>${e(ex[0])}</em>`]], [[/<em>[^<]*<\/em>/, `<em>${e(ex[1])}</em>`]]) : t;
     }
     case 'indoor-extras': title('Extras: rentals and add-ons', 'Extras : location et suppléments'); return { ...t, over: (t.over || []).filter((x) => x !== 'indoor-groups') };
     case 'indoor-also-offer': title('Where do I put the other things we offer?', 'Où mettre les autres choses que nous offrons?'); return t;

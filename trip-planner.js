@@ -1779,7 +1779,8 @@ function scoreVenue(v, ctx) {
     const t = ctx.types.has(v.type) ? v.type : (v.fdTypes || []).find((x) => ctx.types.has(x));
     // Build My Trip fixes (2026-11-18): an indoor place that isn't the kind asked for (the Whistler Museum on a spa
     // request) never says it matches it ("Matches your request for spas").
-    add('type', 30, t === 'indoor' && !indoorAskedFits(indoorAskedLabel(ctx.queryText, 'plural'), v) ? null : `Matches your request for ${typeLabel(ctx, t).toLowerCase()}`);
+    // Sport test 5: a ski school planned as a tour stop is never "a request for tours & experiences" (its lesson reason says it).
+    add('type', 30, (t === 'indoor' && !indoorAskedFits(indoorAskedLabel(ctx.queryText, 'plural'), v)) || (t === 'tour' && v.kindOwn && v.sportBookNote) ? null : `Matches your request for ${typeLabel(ctx, t).toLowerCase()}`);
   }
   const acts = v.activities.filter((a) => ctx.activities.has(a));
   if (acts.length) add('activity', 25, `Listed on ${SITE.brand} for ${listText(acts.map((a) => activityLabel(ctx, a)))}`);
