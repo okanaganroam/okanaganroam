@@ -18784,7 +18784,9 @@ test('Category banners (2026-10-12): every Food & Drink type and winery pages op
 test('Sports activity chips (2026-10-13): /sports?activity= narrows to skate, bike, disc golf or courts (a spot can sit under several), and swaps the banner, heading and intro', () => {
   const fs = require('node:fs');
   const path = require('node:path');
-  assert.deepEqual(app.SPORT_ACTIVITIES.map((a) => a.slug), ['skate', 'bike', 'disc', 'courts']);
+  // Ice Skating & Hockey (2026-11-21): the ice arenas have a chip of their own.
+  assert.deepEqual(app.SPORT_ACTIVITIES.map((a) => a.slug), ['skate', 'bike', 'disc', 'courts', 'ice']);
+  assert.deepEqual(app.sportActivitiesOf({ id: 990106, type: 'sport', name: 'Sun Bowl Arena', description: 'Public skating and a Skate Library.' }, new Map()), ['ice'], 'an arena is ice, not a skate park');
   for (const a of app.SPORT_ACTIVITIES) {
     assert.ok(fs.existsSync(path.join(__dirname, '..', 'public', a.banner.src)), `${a.slug} photo exists`);
     assert.ok(a.heading && a.intro && a.banner.alt, `${a.slug} has its own heading, intro and alt text`);
