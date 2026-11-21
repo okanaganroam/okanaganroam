@@ -7668,9 +7668,11 @@ function v4OffTheme(v, ctx) {
   if (!ctx || !ctx.v4 || ctx.kids || !v || (ctx.types && ctx.types.has(v.type))) return false;
   const focus = (ctx.types && ctx.types.size) || (ctx.activities && ctx.activities.size) || ctx.occasion || (ctx.foodTerms && ctx.foodTerms.length);
   if (!focus) return false;
+  // Round 3 (Whistler: "mountain biking" lost the bike park): a place that does an activity the request asks for is on theme.
+  if (ctx.activities && ctx.activities.size && (v.activities || []).some((a) => ctx.activities.has(a))) return false;
   const hits = [...v4KindText(v).matchAll(new RegExp(V4_OFF_THEME_FILLER_RE.source, 'g'))].map((m) => m[0]);
   if (!hits.length) return false;
-  return !hits.some((w) => new RegExp(`\\b${w.split(' ')[0].replace(/s$/, '')}`).test(ctx.queryText || ''));
+  return !hits.some((w) => new RegExp(`\\b${w.split(' ')[0].replace(/s$/, '').replace(/e$/, '')}`).test(ctx.queryText || ''));
 }
 function v4Input(input) {
   if (!input || !input.v4 || !input.requirements || input.requirements.explicitMealCount !== 1) return input;

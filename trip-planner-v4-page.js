@@ -177,6 +177,23 @@ const V4_CLIENT_SRC = String.raw`
     if (v4.confirmed) p.push('ok=1');
     return p.length ? (qs ? '&' : '?') + p.join('&') : '';
   }
+  // The plan on screen, kept for this tab (round 3, 2026-11-21: after a Swap, a reload, Back from My Trip or EN / FR asked
+  // the planner again and got a different plan, so the saved and shared trips no longer matched). Keyed by the address
+  // bar's plan (the request, edits, dates and guests); Confirm is not part of the key. sessionStorage: this tab only.
+  function v4CacheKey(search){ return String(search || '').replace(/^\?/, '').split('&').filter(function(x){ return x && !/^(?:ok|v)=/.test(x); }).join('&'); }
+  function v4CacheSave(){
+    if (!state.last) return;
+    try { sessionStorage.setItem('t3v4plan', JSON.stringify({ key: v4CacheKey(location.search), last: state.last, lastReq: state.lastReq, removed: state.removed, locks: state.locks, exclude: state.exclude, gone: v4.gone })); } catch (e) {}
+  }
+  function v4FromCache(){
+    var o = null;
+    try { o = JSON.parse(sessionStorage.getItem('t3v4plan') || 'null'); } catch (e) { o = null; }
+    if (!o || !o.last || o.key !== v4CacheKey(location.search)) return false;
+    state.last = o.last; state.lastReq = o.lastReq || null; state.removed = o.removed || {}; state.locks = o.locks || {}; state.exclude = o.exclude || [];
+    v4.gone = o.gone || {};
+    try { render(true); } catch (e) { return false; }
+    return true;
+  }
   function v4RestoreInputs(search){
     var q = {};
     String(search || '').replace(/^\?/, '').split('&').forEach(function(x){ var i = x.indexOf('='); if (i > 0) q[x.slice(0, i)] = x.slice(i + 1); });
@@ -602,8 +619,8 @@ const V4_CLIENT_SRC = String.raw`
       var hd = document.getElementById('t3Headline'); if (hd && hd.getBoundingClientRect().top < 0) { try { hd.scrollIntoView({ block: 'center' }); } catch (err) {} }
       return;
     }
-    if ((b = t.closest('[data-v4-remove-id]')) && resultEl.contains(b)) { v4.gone[b.getAttribute('data-v4-remove-id')] = 1; v4.saved = false; render(false); return; }
-    if ((b = t.closest('[data-v4-undo-id]')) && resultEl.contains(b)) { delete v4.gone[b.getAttribute('data-v4-undo-id')]; render(false); return; }
+    if ((b = t.closest('[data-v4-remove-id]')) && resultEl.contains(b)) { v4.gone[b.getAttribute('data-v4-remove-id')] = 1; v4.saved = false; render(false); v4CacheSave(); return; }
+    if ((b = t.closest('[data-v4-undo-id]')) && resultEl.contains(b)) { delete v4.gone[b.getAttribute('data-v4-undo-id')]; render(false); v4CacheSave(); return; }
     if ((b = t.closest('[data-v4-unconfirm]'))) { v4.confirmed = false; v4.ask = false; render(false); syncUrl(); return; }
     if ((b = t.closest('[data-v4-book]'))) { v4OpenSheet(); return; }
     if ((b = t.closest('[data-v4-close]'))) { var dlg = document.getElementById('v4Sheet'); if (dlg) { if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); } return; }
@@ -645,6 +662,9 @@ function v4StaySrc(staySrc) {
   const swap = (from, to) => { if (!staySrc.includes(from)) throw new Error(`v4 hook not found: ${from.slice(0, 60)}`); staySrc = staySrc.replace(from, to); };
   swap('  function t3StayCardHtml(){\n', '  function t3StayCardHtml(){\n    if (V4) return v4BookCardHtml();\n');
   swap('  function t3BookSteps(){ var d = t3StayData(); return d ?', '  function t3BookSteps(){ var d = t3StayData(); if (!d && V4) { var fb = v4Fallback(); return ((fb && fb.steps) || []).filter(function(x){ return x && t3StayExt(x.url); }).concat(typeof t3ViatorSteps === \'function\' ? t3ViatorSteps() : []); } return d ?');
+  // Round 3 (2026-11-21: an evening out with Arrive = Leave showed "stay.leave must be after stay.arrive."): a leave date
+  // that is not after the arrival is simply not sent; the plan is for the arrival day.
+  swap("    if (o.arrive && /^\\d{4}-\\d{2}-\\d{2}$/.test(l)) o.leave = l;", "    if (o.arrive && /^\\d{4}-\\d{2}-\\d{2}$/.test(l) && l > o.arrive) o.leave = l;");
   swap('  function t3BookRerender(focusSel){\n', '  function t3BookRerender(focusSel){\n    if (V4) setTimeout(v4UpdateBar, 0);\n');
   return staySrc;
 }

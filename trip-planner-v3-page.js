@@ -1730,7 +1730,7 @@ ${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3
       : { text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude };
     // French (2026-10-18): a plan made on /fr/trip keeps its French address, so a reload or a shared link stays French.
     var base = (location.pathname + '/').indexOf('/fr/') === 0 ? '/fr/trip' : '/trip';
-    try { history.replaceState(null, '', base + t3StateToQuery(s)${d.stays === 'preview' && !d.v4 ? " + (t3StateToQuery(s) ? '&' : '?') + 'stays=1'" : ''}${d.v4 ? " + v4UrlExtra(t3StateToQuery(s))" : ''}${d.v4 === 'preview' ? " + (t3StateToQuery(s) || v4UrlExtra('') ? '&' : '?') + 'v=4'" : ''}); } catch (e) {}
+    try { history.replaceState(null, '', base + t3StateToQuery(s)${d.stays === 'preview' && !d.v4 ? " + (t3StateToQuery(s) ? '&' : '?') + 'stays=1'" : ''}${d.v4 ? " + v4UrlExtra(t3StateToQuery(s))" : ''}${d.v4 === 'preview' ? " + (t3StateToQuery(s) || v4UrlExtra('') ? '&' : '?') + 'v=4'" : ''}); } catch (e) {}${d.v4 ? '\n    v4CacheSave();' : ''}
   }
 
   // ---- plan helpers ----
@@ -3187,7 +3187,7 @@ ${d.stays ? "    html += t3StayCardHtml();\n" + (d.viator ? "    if (!t3StayData
     if (restored.pinned) replay.pinned = restored.pinned;
     else if (Object.keys(restored.locks).length) replay.pinned = restored.locks;
     if (restored.avoid.length) replay.avoidVenueIds = restored.avoid;
-    request(replay, { requestType: arrival === 'restore' ? 'restore' : 'shared_link', removedKeys: restored.removed });
+    ${d.v4 ? 'if (!v4FromCache()) ' : ''}request(replay, { requestType: arrival === 'restore' ? 'restore' : 'shared_link', removedKeys: restored.removed });
   } else if (/(?:^|[?&])(?:q|seed|days|pace|base|keep|skip|pin|avoid|rm)=/.test(location.search)) {
     track('trip_plan_error', { request_type: 'shared_link', error_type: 'invalid_share' });
   }

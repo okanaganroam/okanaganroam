@@ -7763,7 +7763,8 @@ function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
   if (stay && stay.arrive && !(base.overrides && base.overrides.startDate)) base.overrides = { ...(base.overrides || {}), startDate: stay.arrive };
   let plan = run(base, now);
   // V4 (round 2, 2026-11-21: "3 days" with Aug 10-13 became a 4-day plan): a length the request names wins over the dates.
-  const typedDays = !!(args.v4 && plan && plan.intent && Number.isInteger(plan.intent.days) && plan.intent.days > 0);
+  // Round 3: only a number of days ("3 days", « 3 jours »); "a weekend" Fri-Sun still covers Sunday.
+  const typedDays = !!(args.v4 && plan && plan.intent && Number.isInteger(plan.intent.days) && plan.intent.days > 0 && /\b(?:\d+|one|two|three|four|five|six|seven|un|deux|trois|quatre|cinq|six|sept)\s*(?:-\s*)?(?:days?|jours?|journ[ée]es?)\b/i.test(String(args.text || '')));
   if (stay && stay.arrive && stay.leave && plan && !typedDays && ['multi_day', 'day_plan'].includes(plan.kind) && !(base.overrides && base.overrides.days !== undefined)) {
     const want = Math.min(7, tripStays.daysBetween(stay.arrive, stay.leave) + 1);
     if (want !== ((plan.days || []).length || 1)) {
@@ -8088,6 +8089,9 @@ const V4_WHEN_DAYS = { 'this-weekend': 2, 'next-weekend': 2, weekend: 2, today: 
 // dessert" after dinner had no stop (a dessert café is one).
 function v4PlainText(text) {
   if (typeof text !== 'string') return text;
+  // Round 3: "sunset drinks with a lake view" was read as a sunset viewpoint (a trail after dark); drinks out, with no beer,
+  // wine or cider named, are a cocktail lounge.
+  if (!/\b(?:beers?|brew\w*|wines?|winer\w*|ciders?|cider\w*|pubs?|bi[èe]res?|vins?|vignobles?)\b/i.test(text)) text = text.replace(/\b(?:sunset\s+)?(?:drinks|cocktails)(?:\s+at\s+sunset)?\b/gi, 'cocktails');
   return text
     .replace(/\bgentle\s+(day|days|pace|trip|outing|weekend)\b/gi, 'relaxed $1')
     .replace(/\b(?:easy\s+)?flat\s+(?:and\s+easy\s+)?(walks?|paths?|trails?|strolls?)\b/gi, 'easy $1')
@@ -8124,6 +8128,31 @@ function v4TidyDays(plan) {
     }
   }
 }
+// Round 3 (2026-11-21: a trail at 7:45 PM in November after an anniversary dinner, parks at 9 PM): an outdoor stop the
+// schedule puts wholly after sunset is left out (its time stays free), unless it is the only stop. Its warning goes too.
+function v4DropAfterDark(plan) {
+  const rows = (plan && plan.schedule) || [];
+  const dark = rows.filter((r) => r && r.daylight && r.daylight.status === 'conflict' && Number.isFinite(r.startMinutes) && Number.isFinite(r.daylight.sunsetMinutes) && r.startMinutes >= r.daylight.sunsetMinutes - 15 && Number.isInteger(r.venueId));
+  if (!dark.length) return;
+  const gone = [];
+  const prune = (list, day) => {
+    if (!Array.isArray(list)) return list;
+    const venues = list.filter((x) => x && x.venue).length;
+    return list.filter((x) => {
+      if (!x || !x.venue || venues <= 1) return true;
+      const hit = dark.some((r) => r.venueId === x.venue.id && (day === null || r.day === undefined || r.day === day));
+      if (hit) gone.push(x.venue);
+      return !hit;
+    });
+  };
+  for (const d of plan.days || []) d.stops = prune(d.stops, d.day);
+  if (plan.itinerary && plan.itinerary.stops) plan.itinerary.stops = prune(plan.itinerary.stops, null);
+  if (plan.outing && plan.outing.stops) plan.outing.stops = prune(plan.outing.stops, null);
+  if (!gone.length) return;
+  const ids = new Set(gone.map((v) => v.id)), names = gone.map((v) => v.name);
+  plan.schedule = rows.filter((r) => !(r && ids.has(r.venueId) && dark.includes(r)));
+  for (const k of ['warnings', 'scheduleWarnings']) if (Array.isArray(plan[k])) plan[k] = plan[k].filter((w) => !names.some((n) => String(w).startsWith(`${n}:`)));
+}
 function runTripPlan(args, now = new Date()) {
   if (!args || !args.v4) return runTripPlanBase(args, now);
   let a = args;
@@ -8140,6 +8169,7 @@ function runTripPlan(args, now = new Date()) {
     }
   } catch (e) { /* keep the list */ }
   try { v4TidyDays(plan); } catch (e) { /* keep the plan as planned */ }
+  try { v4DropAfterDark(plan); } catch (e) { /* keep the plan as planned */ }
   try { v4AddStopPhones(plan); } catch (e) { /* phones are a convenience */ }
   return plan;
 }

@@ -27,6 +27,8 @@ test('V4 off-theme: a wine trip (a focus) never picks an arcade, laser tag or bo
   assert.equal(tp.v4OffTheme(ARCADE, { ...ctx, types: new Set(), queryText: 'things to do' }), false, 'no focus: kept');
   assert.equal(tp.v4OffTheme(ARCADE, { ...ctx, queryText: 'wineries and laser tag' }), false, 'named: kept');
   assert.equal(tp.v4OffTheme(ARCADE, { ...ctx, v4: false }), false, 'the current page: unchanged');
+  const bikePark = { name: 'Whistler Mountain Bike Park', type: 'sport', cuisine: 'Lift-access bike park', activities: ['cycling'] };
+  assert.equal(tp.v4OffTheme(bikePark, { ...ctx, types: new Set(), activities: new Set(['cycling']), queryText: 'mountain biking in whistler' }), false, 'round 3: the bike park on a biking trip');
 });
 
 test('V4 relaxed pace: no day has more than four stops, and the free time stays free', () => {
@@ -84,6 +86,8 @@ test('V4 round 2 server: plain words, one stop per part of the day, the typed le
   assert.equal(v4PlainText('cocktails, a great dinner, then dessert'), 'cocktails, a great dinner, then a dessert cafe');
   assert.equal(v4PlainText('then a dessert spot'), 'then a dessert spot', 'already a place');
   assert.equal(v4PlainText('3 days in Kelowna, wineries'), '3 days in Kelowna, wineries');
+  assert.equal(v4PlainText('sunset drinks with a lake view, romantic dinner'), 'cocktails with a lake view, romantic dinner');
+  assert.equal(v4PlainText('wineries and drinks'), 'wineries and drinks', 'wine named: left as typed');
   const tidyBody = /function v4TidyDays\(plan\) \{[\s\S]*?\n\}/.exec(src)[0];
   const v4TidyDays = new Function(`${tidyBody}; return v4TidyDays;`)(); // eslint-disable-line no-new-func
   const st = (id, part, type) => ({ daypart: part, venue: { id, type } });
@@ -103,4 +107,25 @@ test('V4 round 2 page: Remove on an evening out, dinner in Book, dog walks say d
   assert.ok(/tipNoBook: 'Plan confirmed\. Share it with your group or save it\.'/.test(src) && /tipNoBook: 'Plan confirmé\./.test(src));
   assert.ok(/skiLeg/.test(src) && /near < 2\.5/.test(src), 'no drive line inside a ski day or a village');
   assert.ok(/addState\(\)\.state === 'added'/.test(src), 'Saved stays Saved after a reload');
+});
+
+// ---- Round 3 (2026-11-21): multi-town, Whistler biking, wine weekend for 4, French family, anniversary evening ----
+test('V4 round 3: the plan on screen survives a reload, Back and EN / FR; no outdoor stop after dark; a weekend keeps Sunday', () => {
+  const src = v4page.V4_CLIENT_SRC;
+  assert.ok(/sessionStorage\.setItem\('t3v4plan'/.test(src) && /function v4FromCache\(\)/.test(src));
+  assert.ok(/!\/\^\(\?:ok\|v\)=\/\.test\(x\)/.test(src), 'Confirm and the preview flag are not part of the key');
+  const html = pageHtml({ v4: 'on' });
+  assert.ok(html.includes('if (!v4FromCache()) request(replay,'), 'a cached plan is shown instead of asking again');
+  assert.ok(html.includes('v4CacheSave();'), 'every change is cached');
+  assert.ok(html.includes('&& l > o.arrive) o.leave = l;'), 'Arrive = Leave is one day, not an error');
+  assert.ok(!pageHtml({}).includes('v4FromCache'), 'the current page is unchanged');
+  const ssrc = require('node:fs').readFileSync(require.resolve('../server.js'), 'utf8');
+  const body = /function v4DropAfterDark\(plan\) \{[\s\S]*?\n\}/.exec(ssrc)[0];
+  const drop = new Function(`${body}; return v4DropAfterDark;`)(); // eslint-disable-line no-new-func
+  const p = { kind: 'itinerary', itinerary: { stops: [{ venue: { id: 1, name: 'HUMO' } }, { venue: { id: 2, name: 'Mission Ridge Park Loop' } }, { venue: { id: 3, name: 'Crepe Cafe' } }] },
+    schedule: [{ venueId: 1, startMinutes: 1080 }, { venueId: 2, startMinutes: 1185, daylight: { status: 'conflict', sunsetMinutes: 963 } }, { venueId: 3, startMinutes: 1260 }], warnings: ['Mission Ridge Park Loop: Estimated daylight ...'], scheduleWarnings: [] };
+  drop(p);
+  assert.deepEqual(p.itinerary.stops.map((s) => s.venue.id), [1, 3]);
+  assert.deepEqual(p.warnings, []);
+  assert.ok(/\(\?:days\?\|jours\?\|journ\[ée\]es\?\)/.test(ssrc), '"3 days" wins over the dates; "a weekend" does not');
 });
