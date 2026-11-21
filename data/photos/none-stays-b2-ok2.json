@@ -1,0 +1,16 @@
+[
+ {
+  "id": null,
+  "name": "Gatehouse Suites at O'Rourke Family Estate",
+  "region": "lake-country",
+  "slug": "gatehouse-suites-at-o-rourke-family-estate",
+  "reason": "Own site has only bed, bathroom and detail close-ups of the suites; Google Maps photos are of the winery and restaurant, not the Gatehouse."
+ },
+ {
+  "id": null,
+  "name": "Royal Anchor Resort",
+  "region": "naramata",
+  "slug": "royal-anchor-resort",
+  "reason": "Own-site and Discover Naramata photos are all under 800px; Google has only an orchard-lawn shot and a lake view that don't show the resort."
+ }
+]

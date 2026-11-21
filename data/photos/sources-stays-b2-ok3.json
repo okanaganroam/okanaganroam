@@ -1,0 +1,86 @@
+[
+ {
+  "id": null,
+  "name": "Falcon Resort",
+  "region": "osoyoos",
+  "slug": "falcon-resort",
+  "file": "/images/venues/falcon-resort-2610.jpg",
+  "dimensions": "4128x2322",
+  "source_page": "Google Maps: Falcon Resort, 7106 Main St, Osoyoos, BC V0H 1V3",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcdRBUEFWj-1eRAPkqGxUl0dY41yIDIDOrWrcNAuMtamef0I148VqBmPqcyLGDDKvdX3O9b_IJqEKG-RHzcR8kj9qDpYDq_4DzrTDJsVMK0uJI5j3h26aogzUacNsMiYpCqO2tJxA=w2400",
+  "source_kind": "google_maps",
+  "note": "Pool, picnic shelter and stone-faced motel building with Osoyoos Lake and mountains behind (user photo; own-site images are 475px)"
+ },
+ {
+  "id": null,
+  "name": "Poplars Motel on the Lake",
+  "region": "osoyoos",
+  "slug": "poplars-motel-on-the-lake",
+  "file": "/images/venues/poplars-motel-on-the-lake-2610.jpg",
+  "dimensions": "1334x1000",
+  "source_page": "https://hotels.cloudbeds.com/reservation/1lbnIU",
+  "image_url": "https://h-img1.cloudbeds.com/uploads/301983/20230703_154648~~64ad9e37d5600.jpg",
+  "source_kind": "website",
+  "note": "Two-storey motel block beside the lawn, picnic tables and Osoyoos Lake (own Cloudbeds gallery; only 1334px wide, nothing bigger shows the building)"
+ },
+ {
+  "id": null,
+  "name": "Riviera Motel",
+  "region": "osoyoos",
+  "slug": "riviera-motel",
+  "file": "/images/venues/riviera-motel-2610.jpg",
+  "dimensions": "3510x2634",
+  "source_page": "Google Maps: Riviera Motel, 6004 Maple Dr, Osoyoos, BC V0H 1V3",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdxEx8EeOozceR_EAXBnpnwpw3Zg6_PrYq0iJLym0w9aINXs8P-Wh_na0F7Up1KncGKiCvd6DNlNYM2gi-hTyxX7gkfKoT1q3pOMJDudyec-0X3iX8yG4ffeuKEfrge92qVFoHllA=w2400",
+  "source_kind": "google_maps",
+  "note": "Two-storey green motel building with the red Riviera Motel sign (user photo)"
+ },
+ {
+  "id": null,
+  "name": "Safari Beach Resort",
+  "region": "osoyoos",
+  "slug": "safari-beach-resort",
+  "file": "/images/venues/safari-beach-resort-2610.jpg",
+  "dimensions": "2288x1520",
+  "source_page": "https://safaribeachresort.com/gallery/",
+  "image_url": "https://safaribeachresort.com/wp-content/uploads/2018/12/5.jpg",
+  "source_kind": "website",
+  "note": "Pool deck with loungers, the resort building and Osoyoos Lake beach behind"
+ },
+ {
+  "id": null,
+  "name": "Pineacre on the Lake",
+  "region": "peachland",
+  "slug": "pineacre-on-the-lake",
+  "file": "/images/venues/pineacre-on-the-lake-2610.jpg",
+  "dimensions": "1600x1040",
+  "source_page": "https://www.pineacreonthelake.com/",
+  "image_url": "https://www.pineacreonthelake.com/new/wp-content/uploads/2020/02/whole-house-Flag-copy.jpeg",
+  "source_kind": "website",
+  "note": "The house and entrance court among pines with Okanagan Lake behind"
+ },
+ {
+  "id": null,
+  "name": "Wesbert Guest Suites",
+  "region": "penticton",
+  "slug": "wesbert-guest-suites",
+  "file": "/images/venues/wesbert-guest-suites-2610.jpg",
+  "dimensions": "4032x3024",
+  "source_page": "https://www.wesbertwinery.com/guest-suites",
+  "image_url": "https://static.wixstatic.com/media/925c1e_511e36afa8e643ada5112f50e7bb619f~mv2.jpeg",
+  "source_kind": "website",
+  "note": "Guest room with king bed and balcony door looking onto the vineyard (no exterior shot of the suites on the site; different photo from the winery listing)"
+ },
+ {
+  "id": null,
+  "name": "Summerland Waterfront Resort & Spa",
+  "region": "summerland",
+  "slug": "summerland-waterfront-resort-and-spa",
+  "file": "/images/venues/summerland-waterfront-resort-and-spa-2610.jpg",
+  "dimensions": "3504x2336",
+  "source_page": "https://summerlandresorthotel.com/",
+  "image_url": "https://summerlandresorthotel.com/assets/images-homepage-hero/SWR-at-Sunset-high.jpg",
+  "source_kind": "website",
+  "note": "The resort's lakeside lodge buildings at sunset (homepage hero)"
+ }
+]

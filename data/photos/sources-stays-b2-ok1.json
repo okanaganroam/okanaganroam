@@ -1,0 +1,50 @@
+[
+ {
+  "id": null,
+  "name": "Apex Mountain Lodge",
+  "region": "apex",
+  "slug": "apex-mountain-lodge",
+  "file": "/images/venues/apex-mountain-lodge-2610.jpg",
+  "dimensions": "8160x6144",
+  "source_page": "https://www.book-it-now.com/apexmountainlodge/",
+  "image_url": "https://www.book-it-now.com/apexmountainlodge/sites/book-it-now.com.apexmountainlodge/files/UserFiles/Image/Products/Dining%20Room1.jpg",
+  "source_kind": "website",
+  "note": "Living/dining room of the 4-bedroom suite (own site exterior shots only 1024px; Google has only bunk room + bathroom). Cropped above the 'DINING' label."
+ },
+ {
+  "id": null,
+  "name": "Armstrong Inn",
+  "region": "armstrong",
+  "slug": "armstrong-inn",
+  "file": "/images/venues/armstrong-inn-2610.jpg",
+  "dimensions": "4032x3024",
+  "source_page": "Google Maps: Armstrong Inn, 3400 Smith Dr, Armstrong, BC V0E 1B0",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLcC7bVZsylr8R_koBJqrFiC-jFaIbSOgjZUivu3Aq7ZFbkqvfshw9vCTuBr5MT6wbONst0_L60FvYRysau4EqvNzMS3tfbLzEm-DJ2PewdCePuHdzU32wyox2yrbcQb_TUiY0Jy=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner photo of a guest room with kitchenette; only usable photo (others: bathroom, bed close-up, motel sign alone)."
+ },
+ {
+  "id": null,
+  "name": "Whitefoot Lodge",
+  "region": "big-white",
+  "slug": "whitefoot-lodge",
+  "file": "/images/venues/whitefoot-lodge-2610.jpg",
+  "dimensions": "2000x800",
+  "source_page": "https://www.bigwhite.com/plan-your-trip/accommodation/whitefoot-lodge",
+  "image_url": "https://www.bigwhite.com/sites/default/files/2023-02/Winter-Accom-Whitefoot-exterior-2000x800px.jpg",
+  "source_kind": "website",
+  "note": "Lodge exterior in snow from the village."
+ },
+ {
+  "id": null,
+  "name": "Canyon Farms RV Park",
+  "region": "kelowna",
+  "slug": "canyon-farms-rv-park",
+  "file": "/images/venues/canyon-farms-rv-park-2610.jpg",
+  "dimensions": "4032x2268",
+  "source_page": "Google Maps: Canyon Farms Rv Park, 4020 Field Rd, Kelowna, BC V1W 4G1",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeYy_nkzJqD98oztouRtbl0Ycv3cpbK8I6fW2x5nKyAeGKKOYYHdOwytsqi2jJx46E5FS6WIYxC_wvW6km9n5UOeWuVHfyBoARJh_ixvIdrFgnpy1iIQ9tNa90YdCWm8VVWIZ9NqSpls2dS=w2400",
+  "source_kind": "google_maps",
+  "note": "RV site with gazebo and picnic table among pines at the park."
+ }
+]
