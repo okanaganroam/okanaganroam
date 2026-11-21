@@ -20,7 +20,7 @@ const detailOf = (db, key) => golf.getGolfDetails(db, [v(key)]).get(key);
 test('the reviewed data file validates, and every published fee set is sourced, dated and has exactly one comparison rate', () => {
   assert.deepEqual(golf.validateGolfData(REAL), []);
   const courses = Object.entries(REAL.courses);
-  assert.equal(courses.length, 40);
+  assert.equal(courses.length, 41);
   for (const [key, c] of courses) {
     assert.match(key, /^[a-z-]+\/[a-z0-9-]+$/);
     assert.match(c.fees.verified_at, /^\d{4}-\d{2}-\d{2}$/, key);
@@ -37,7 +37,7 @@ test('the reviewed data file validates, and every published fee set is sourced, 
     }
   }
   const statuses = courses.reduce((acc, [, c]) => ({ ...acc, [c.fees.status]: (acc[c.fees.status] || 0) + 1 }), {});
-  assert.deepEqual(statuses, { not_published: 5, unverified: 4, published: 28, not_applicable: 1, private: 1, dynamic: 1 });
+  assert.deepEqual(statuses, { not_published: 5, unverified: 5, published: 28, not_applicable: 1, private: 1, dynamic: 1 });
 });
 
 test('the driving range is classified as a practice facility with no green fee', () => {
@@ -55,7 +55,7 @@ test('loader: loads once, is a no-op when unchanged, rebuilds on change, and lea
   assert.deepEqual(golf.loadGolfData(db, REAL), { loaded: false, reason: 'unchanged' });
   const count = (t) => db.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get().n;
   const before = { p: count('golf_course_profiles'), f: count('golf_green_fees'), m: count('golf_course_media') };
-  assert.deepEqual(before, { p: 40, f: 181, m: 18 });
+  assert.deepEqual(before, { p: 41, f: 181, m: 18 });
   const changed = clone(REAL);
   changed.courses['penticton/skaha-meadows-golf-course'].fees.rates.pop();
   assert.equal(golf.loadGolfData(db, changed).loaded, true);
@@ -337,7 +337,8 @@ test('value index: "not documented" is never "no", earns nothing, and does not m
 test('value index: unavailable without a published current rate or a known par; never for practice facilities or courses without data', () => {
   const db = loadReal();
   const vi = (k, today = TODAY) => golf.computeValueIndex(detailOf(db, k), today);
-  for (const k of ['kelowna/kelowna-golf-country-club', 'vernon/rise-golf-course', 'west-kelowna/shannon-lake-golf-club', 'armstrong/overlander-golf-event-centre']) {
+  for (const k of ['kelowna/kelowna-golf-country-club', 'vernon/rise-golf-course', 'west-kelowna/shannon-lake-golf-club', 'armstrong/overlander-golf-event-centre',
+    'lumby/lumby-golf-club']) {
     assert.deepEqual(vi(k), { available: false }, k);
   }
   // Every real course with published rates now has a par, so an unknown par is checked on a copy.

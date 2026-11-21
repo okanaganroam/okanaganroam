@@ -92,6 +92,7 @@ const VALUES = {
   'Les Furber (opened 1990)': 'Les Furber (ouvert en 1990)',
   'Warm-up areas on site': 'Zones d’échauffement sur place',
   '9 holes · par 36 · 2,715 yards': `9 trous · par 36 · 2${N}715${N}verges`,
+  '9 holes · par 33 · sand greens': '9 trous · par 33 · verts en sable',
   'Yes, with rental buckets': 'Oui, seaux de balles en location',
   'Honesty cash box rather than a full shop': 'Caisse libre-service plutôt qu’une boutique complète',
   'Dry RV camping on site': 'Camping pour VR sans services sur place',
