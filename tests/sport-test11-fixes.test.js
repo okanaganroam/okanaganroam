@@ -94,6 +94,7 @@ test('1a. her French lines ask for their English; the English page keeps researc
   assert.match(en, /<span class="visit-label">Known for<\/span><span>Private-club golf with lake views since 1913\.?<\/span>/);
   assert.match(en, /<span lang="fr">Code vestimentaire[^<]*<\/span> <span class="visit-lang-note">\(in French\)<\/span>/);
   assert.match(en, /From the venue and/, 'research’s stand-in line is not called the venue’s');
+  assert.ok(en.indexOf('visit-lang-note') < (en.indexOf('class="visit-more"') >>> 0), 'her French line shows open, never under More');
   // The French page: her own lines.
   const fr = plain(await getText(pagePath(v, 'fr')));
   assert.match(fr, /Club semi-privé, ouvert au public/);

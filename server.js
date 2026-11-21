@@ -12871,7 +12871,9 @@ function visitWithFrLines(info, type) {
 // its Known for row): on the English page, a row whose line she wrote only in French shows research's English line for
 // that row while hers is being translated (owner_was keeps it), else her French line marked "in French" (__frOnly). Never
 // a French line without the marker. Display only; the English she or Dayton writes replaces it.
+// Indoor and sport places only (the types whose French lines queue their English); other types are as before.
 function visitWithFrLinesEnPage(info, type) {
+  if (!kindSetupType(type)) return info;
   const frl = ownerVisitFrLines(info);
   if (!Object.keys(frl).length) return info;
   const rows = (Array.isArray(info.rows) ? info.rows : []).map((r) => ({ ...r }));
@@ -12992,7 +12994,8 @@ function visitInfoHtml(info, fr = false, opts = {}) {
   if (tourOwn) for (const r of parkedOwn) if (r.owned) parkedSet.delete(r.label);
   const ownFirst = tourOwn || ((Array.isArray(info.winery_labels) || Array.isArray(info.winery_extra)) && Array.isArray(info.owner_labels) && info.owner_labels.length);
   const ownSet = new Set(ownFirst ? info.owner_labels.concat(tourOwn ? parkedOwn.filter((r) => r.owned).map((r) => r.label) : []) : []);
-  const isShown = (r) => !parkedSet.has(enLabel(r)) && (VISIT_ROWS_SHOWN.has(enLabel(r)) || ownSet.has(enLabel(r)));
+  // Sport test 11: her line in French (or research's stand-in for it) shows open like her other lines.
+  const isShown = (r) => !parkedSet.has(enLabel(r)) && (VISIT_ROWS_SHOWN.has(enLabel(r)) || ownSet.has(enLabel(r)) || !!r.__frOnly || !!r.__researchStandIn);
   const shown = info.rows.filter(isShown).sort((a, b) => (enLabel(b) === 'The hike') * 2 + (enLabel(b) === 'Known for') - ((enLabel(a) === 'The hike') * 2 + (enLabel(a) === 'Known for')) || (ownSet.has(enLabel(b)) - ownSet.has(enLabel(a))));
   const folded = info.rows.filter((r) => !isShown(r));
   // Tour test 4 (all types): a line of the owner's that a full box set aside is never under "More" while one of
