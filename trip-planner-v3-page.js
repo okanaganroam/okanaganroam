@@ -964,6 +964,7 @@ const T3_STAY_STYLES = `<style>
   .t3-book-caret { margin-left: auto; }
   .t3-book-est-btn[aria-expanded="true"] .t3-book-caret { transform: rotate(180deg); }
   .t3-book-parts { margin: 6px 0 0; font-size: 0.86rem; font-weight: 700; }
+  .t3-book-est-stay a { display: inline-flex; align-items: center; min-height: 32px; color: var(--ref-navy); font-weight: 800; }
   .t3-book-note, .t3-book-hint { margin: 4px 0 0; font-size: 0.8rem; color: rgba(27,43,58,0.72); }
   .t3-book-go { margin: 12px 0 0; }
   .t3-book-main { min-height: 48px; padding: 12px 24px; font-size: 1rem; }
@@ -1106,7 +1107,20 @@ const T3_STAY_CLIENT_SRC = `
     }
     return { amount: fr ? 'Coût connu jusqu’ici' : 'Known costs so far', tag: fr ? 'estimation partielle' : 'partial estimate' };
   }
-  function t3EstimateHtml(e, fr){
+  // The stay's price is missing from the estimate (no price band, 2026-11-20): one line that opens its live prices (the
+  // same sheet as "See live prices"), else its main booking link, so the visitor can still see what the stay costs.
+  function t3EstimateStayHtml(e, s, fr){
+    if (!s || (e.parts || []).some(function(p){ return p && p.key === 'stay'; })) return '';
+    var label = fr ? 'voir les prix en direct' : 'see live prices', a = '';
+    var l = s.livePrices, lu = l && t3StayExt(fr && l.urlFr ? l.urlFr : l.url);
+    if (lu) a = '<a ' + hrefAttr(lu) + ' target="_blank" rel="sponsored nofollow noopener" data-track="stay_click" data-stay-id="' + esc(s.id) + '" data-link="live_prices" data-affiliate="1" data-t3-live data-t3-live-name="' + esc(s.name) + '">' + esc(label) + ' <span aria-hidden="true">↗</span></a>';
+    else {
+      var b = (s.bookingLinks || []).filter(function(x){ return x && t3StayExt(x.url); })[0];
+      if (b) a = t3StayLinkHtml(s, b, '', label);
+    }
+    return a ? '<p class="t3-book-parts t3-book-est-stay">' + esc(fr ? 'Hébergement : ' : 'Stay: ') + a + '</p>' : '';
+  }
+  function t3EstimateHtml(e, fr, s){
     if (!e || !e.parts || !e.parts.length) return '';
     var head = t3EstimateHead(e, fr);
     var parts = e.parts.map(function(p){ return (fr ? p.labelFr : p.label) + ' ' + t3Range(p.low, p.high, fr); }).join(' · ');
@@ -1117,7 +1131,7 @@ const T3_STAY_CLIENT_SRC = `
     if (e.peopleAssumed) more += '<p class="t3-book-note">' + esc(fr ? 'Pour 2 personnes : changez le nombre sous « Dates et voyageurs ».' : 'Counted for 2 people: change it under “Dates and guests”.') + '</p>';
     more += '<p class="t3-book-note">' + esc(fr ? 'Estimation seulement, en dollars canadiens : taxes, pourboires et frais en sus; les prix changent.' : 'Estimate only, in CAD: taxes, tips and fees extra; prices change.') + '</p>';
     return '<div class="t3-book-est"><button type="button" class="t3-book-est-btn" data-t3-est aria-expanded="false" aria-controls="t3BookEst"><strong>' + esc(head.amount) + '</strong> <span class="t3-book-tag">' + esc(head.tag) + '</span> <span aria-hidden="true" class="t3-book-caret">▾</span></button>'
-      + (e.showTotal ? '' : '<p class="t3-book-parts">' + esc(parts) + '</p>')
+      + (e.showTotal ? '' : '<p class="t3-book-parts">' + esc(parts) + '</p>' + t3EstimateStayHtml(e, s, fr))
       + '<div class="t3-book-more" id="t3BookEst" hidden>' + more + '</div></div>';
   }
   function t3StepLinkHtml(step, cls, text, n){
@@ -1199,8 +1213,9 @@ const T3_STAY_CLIENT_SRC = `
       d.innerHTML = '<div class="t3-live-head"><h2 id="t3LiveHead"></h2><a class="t3-live-tab" target="_blank" rel="sponsored nofollow noopener"></a><button type="button" class="t3-live-x" data-t3-live-close></button></div><div class="t3-live-wrap"><p class="t3-live-wait" aria-hidden="true"></p><iframe class="t3-live-map" loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe></div><p class="t3-live-note"></p>';
       document.body.appendChild(d);
       d.addEventListener('click', function(e){ if (e.target === d || (e.target.closest && e.target.closest('[data-t3-live-close]'))) d.close(); });
-      d.addEventListener('close', function(){ var f = d.querySelector('iframe'); if (f) f.removeAttribute('src'); var back = document.querySelector('[data-t3-stay] [data-t3-live]'); if (back) back.focus(); });
+      d.addEventListener('close', function(){ var f = d.querySelector('iframe'); if (f) f.removeAttribute('src'); var back = (d._t3From && d._t3From.isConnected) ? d._t3From : document.querySelector('[data-t3-stay] [data-t3-live]'); if (back) back.focus(); });
     }
+    d._t3From = a;
     var name = a.getAttribute('data-t3-live-name') || '';
     d.querySelector('h2').textContent = fr ? 'Prix en direct' : 'Live prices';
     var x = d.querySelector('.t3-live-x'); x.textContent = '×'; x.setAttribute('aria-label', fr ? 'Fermer' : 'Close');
@@ -1238,7 +1253,7 @@ const T3_STAY_CLIENT_SRC = `
             + '<button type="button" class="t3-btn t3-btn-ghost" data-t3-stay-choose="' + esc(o.id) + '">' + esc(fr ? 'Choisir' : 'Choose') + '</button></li>';
         }).join('') + '</ul>';
     }
-    html += t3EstimateHtml(s.estimate || d.w.estimate, fr);
+    html += t3EstimateHtml(s.estimate || d.w.estimate, fr, s);
     if (steps.length) html += t3BookGoHtml(steps, fr) + t3StayNotesHtml(s, t, fr) + t3BookAllHtml(s, steps, fr);
     return html + t3StayDisclosureHtml(s, steps, fr) + '</section>';
   }
