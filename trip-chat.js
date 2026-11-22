@@ -1368,7 +1368,7 @@ function planTurnCore(ops, ctx) {
         const ids = Array.isArray(p2.tourReplaced) ? p2.tourReplaced : [];
         if (nw2.some((x) => x.day === dayT && x.id !== fresh.id && covers.includes(x.type))) return;
         if (!tourRunSteady(cur.stops.filter((x) => !cur.removed.has(x.key)), nw2, ids, dayT, covers)) return;
-        r.fresh = f2; r.covered = cur.stops.filter((x) => ids.includes(x.id) && !(r.inPlaceOf && r.inPlaceOf.id === x.id)); r.coveredGone = true;
+        r.fresh = f2; r.covered = cur.stops.filter((x) => (ids.includes(x.id) || (x.day === dayT && covers.includes(x.type))) && !nw2.some((y) => y.id === x.id) && !cur.removed.has(x.key) && !(r.inPlaceOf && r.inPlaceOf.id === x.id)); r.coveredGone = true;
         cur = { plan: p2, stops: nw2, args: { ...a2, overrides: cur.args.overrides || null, trustedPins: undefined }, locks: cur.locks, removed: new Set() };
       };
       if (covered.length && !(op.stops || []).length) {
