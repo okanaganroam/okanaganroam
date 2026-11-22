@@ -64,7 +64,7 @@ const setupAll = async (t) => {
   ok(await change(t, { visit_rows: { groups: 'Groups of 12 or more: please book ahead. Tournaments and corporate golf. Weddings and private events. . Charity tournaments up to 144 golfers.' } }));
 };
 
-test('1. the card price: a golf course\'s power cart, junior rate and club rental never lower it; only an adult green-fee line may', async () => {
+test('1. the card price: a golf course\'s power cart, junior rate and club rental never lower it; once a Price is typed no line does, else the lowest adult green-fee line', async () => {
   const { v, t } = await debbie();
   await setupAll(t);
   publishPrices(v.id, DEBBIE_PRICES);
@@ -78,10 +78,15 @@ test('1. the card price: a golf course\'s power cart, junior rate and club renta
   // The setup's price screen and Help read the same lowest price.
   const cfg = cfgOf(await getText(`/owner/${t}/setup`));
   assert.ok(cfg.indoorLow == null || cfg.indoorLow >= 45, `setup low ${cfg.indoorLow}`);
-  // A cheaper adult green fee does lower it (walking 9 holes).
+  // Sport fix round 16 (THE SPORT CARD RULE): once she typed a Price, no line lowers it, not even a cheaper adult green fee.
   publishPrices(v.id, DEBBIE_PRICES.concat([['Walking 9 holes, weekdays', 40, 'Adults']]));
   app.indoorCardPrice(v.id);
-  assert.equal(app.cardPriceFor(v.id), 'From $40');
+  assert.equal(app.cardPriceFor(v.id), 'From $45');
+  // With no Price typed, her lowest plain 18-hole green fee sets the card (her list has 18-hole lines, so a 9-hole one is
+  // a different round).
+  ok(await change(t, { indoor_price: null }));
+  app.indoorCardPrice(v.id);
+  assert.equal(app.cardPriceFor(v.id), 'From $72');
 });
 
 test('2. every sport kind: extras and discounted people\'s lines never become the headline price', async () => {
@@ -97,10 +102,13 @@ test('2. every sport kind: extras and discounted people\'s lines never become th
     const cp = app.cardPriceFor(v.id);
     if (!/\$20\b/.test(cp)) bad.push(`${k}: ${cp}`);
   }
-  // A range's bucket and a ski school's lesson are their main prices: a cheaper one lowers the card.
+  // A range's bucket and a ski school's lesson are their main prices. Sport fix round 16: her typed $15 holds; with no
+  // Price typed, the cheaper bucket sets the card.
   const r = mk('golf', { name: 'Bucket Range Fixture' }); const rt = tokenFor(r.id);
   ok(await change(rt, { indoor_info: { kinds: ['range'] }, indoor_price: 15 })); publishPrices(r.id, [['Small bucket', 10]], 'Range'); app.indoorCardPrice(r.id);
-  if (!/\$10\b/.test(app.cardPriceFor(r.id))) bad.push(`range bucket: ${app.cardPriceFor(r.id)}`);
+  if (!/\$15\b/.test(app.cardPriceFor(r.id))) bad.push(`range bucket typed: ${app.cardPriceFor(r.id)}`);
+  ok(await change(rt, { indoor_price: null })); app.indoorCardPrice(r.id);
+  if (!/\$10\b/.test(app.cardPriceFor(r.id))) bad.push(`range bucket, no Price: ${app.cardPriceFor(r.id)}`);
   assert.deepEqual(bad, []);
 });
 

@@ -403,11 +403,22 @@
   function splitOn(key, e){ return key === 'happy' && !!T.happySplitBtn && !!hoursWarn(e) && happySplitGap(e); }
   // Sport test 16 (2026-11-21; Nadia's grill deal, Nov–Mar, at a course closed Nov–Mar, never showed): a happy hour whose
   // months fall wholly in the closed season says so first, in plain words.
-  function warnShown(key, e){ if (key === 'happy' && e) { var hc = happyClosedWarn(S.happy && S.happy.length > 1 && e.sea ? e.sea : S.happySea); if (hc) return hc; } return warnOf(key, e); }
+  // Sport fix round 16 (2026-11-21; sport test 17: Marlene's heads-up sat 800 px above the month chips, under the day chips,
+  // and she never saw it): the closed-season heads-up sits right under the month chips (happyClosedHtml), not here.
+  function warnShown(key, e){ return warnOf(key, e); }
+  // The closed-season heads-up under a happy hour's month chips: i '' for the screen's one box, else that happy hour's.
+  function happyClosedHtml(i, sea){ var t = happyClosedWarn(sea); return '<p class="su-hint su-closedwarn" id="suHappyClosed' + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
+  // Every happy hour on the screen runs only in the closed months (nothing it saves can show).
+  function happyAllClosed(){ return !!(S.happy && S.happy.length) && S.happy.every(function(e){ return !!happyClosedWarn(happySeaOf(e)); }); }
   function warnHtml(key, i, e){ var t = warnShown(key, e); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'
     + (key === 'happy' && T.happySplitBtn ? '<div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" id="suSplitHours' + i + '" data-act="go:hours:edit"' + (splitOn(key, e) ? '' : ' hidden') + '>' + h(T.happySplitBtn) + '</button></div>' : ''); }
   function warnRefresh(){
     ['specials', 'nights', 'happy'].forEach(function(key){ (S[key] || []).forEach(function(e, i){ var n = el('suWarn' + key + i); if (!n) return; var t = warnShown(key, e); n.textContent = t; n.hidden = !t; var b = key === 'happy' && el('suSplitHours' + i); if (b) b.hidden = !splitOn(key, e); }); });
+    // -> the closed-season heads-up that has just appeared (to scroll it into view), or null.
+    var shown = null;
+    [['', S.happySea]].concat((S.happy || []).map(function(e, i){ return [String(i), e.sea]; })).forEach(function(x){
+      var n = el('suHappyClosed' + x[0]); if (!n || !x[1]) return; var t = happyClosedWarn(x[1]), was = !n.hidden; n.textContent = t; n.hidden = !t; if (t && !was) shown = n; });
+    return shown;
   }
 
   // ---------- State ----------
@@ -1426,6 +1437,8 @@
     // Winery test 5 (2026-11-12): "Instagram and Facebook · we’ll add it within a day" while Instagram was already live.
     if (d === 'day' && step === 'social' && S.done.instagram === 'live' && S.done.facebook === 'day' && T.stSocialIgLive) return T.stSocialIgLive;
     if (d === 'day' && step === 'social' && S.done.facebook === 'live' && S.done.instagram === 'day' && T.stSocialFbLive) return T.stSocialFbLive;
+    // Sport fix round 16 (sport test 17: "Happy hour · on your page ✓" for a deal only in her closed months): it says so.
+    if (step === 'happy' && d === 'live' && T.stHappyClosed && happyAllClosed()) return T.stHappyClosed;
     return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic && !CK ? T.stSoon : T.st[d]; }
   // Brewery test 1 (2026-11-12): a step answered "within a day" reads "on your page" once nothing it sent is still
   // pending (C.waiting: the server's list of steps with something pending now, refreshed with every save).
@@ -1580,7 +1593,7 @@
   function go(step, replace){
     var sv = /^saved:(.+)$/.exec(step);
     if (sv && !savedKept(sv[1])) { S.flash = savedText(sv[1]); S.flashStory = sv[1] === 'story' ? S.storySent || '' : ''; return after(sv[1]); }
-    var fl = S.flash || ''; S.flash = ''; S.nightUndo = null;
+    var fl = S.flash || ''; S.flash = ''; S.nightUndo = null; S.happyClosedAsk = false; S.happyClosedOk = false;
     step = entry(step); S.fresh = false;
     // Review fix (2026-11-12): saved on the way to the other language (photos sent first): she lands where she'd go next,
     // not back on the screen just saved.
@@ -2033,6 +2046,8 @@
   function statusRows(steps){
     return list(steps.map(function(s){
       var d = half(s) ? 'half' : nowSt(s, fin(s)) || 'none', k = d === 'live' || d === 'day' || d === 'no' || d === 'unsure' ? '✓' : d === 'email' ? '✉' : d === 'later' ? '🕓' : d === 'skip' ? '–' : '○';
+      // Sport fix round 16: a happy hour only in the closed months is saved but can't show: no tick.
+      if (s === 'happy' && d === 'live' && T.stHappyClosed && happyAllClosed()) k = '!';
       // Indoor test 8 (2026-11-19): with Free entry or By donation, Your prices is optional and already counts: never "not done yet".
       var optFree = s === 'menu' && (d === 'none' || d === 'skip') && freeIndoor() && T.stMenuFree;
       if (optFree) { d = 'live'; k = '✓'; }
@@ -3240,9 +3255,12 @@
           + field('hw' + i, T.whatsOn, e.what, { max: 60, data: 'data-hh="' + i + ':what" data-room="' + i + '" aria-describedby="hwc' + i + '"' }) + '<p class="su-count' + (hhRoom(i) - String(e.what || '').trim().length < 0 ? ' su-over' : '') + '" id="hwc' + i + '" aria-live="polite">' + h(roomText(i, e.what)) + '</p>' + (i === 0 ? ex(T.whatsOnEx) : '')
           // Distillery test 2 (Whistler, 2026-11-16): with two or more, each happy hour has its own "All year / Only some
           // months" (an après deal in winter only), the same box as before, once per happy hour.
-          + (S.happy.length > 1 ? seasonBox('happy.' + i, e.sea || (e.sea = clone(S.happySea)), fill(T.happySeasonEach || T.happySeasonH, { n: i + 1 })) : '') + '</div>';
+          + (S.happy.length > 1 ? seasonBox('happy.' + i, e.sea || (e.sea = clone(S.happySea)), fill(T.happySeasonEach || T.happySeasonH, { n: i + 1 })) + happyClosedHtml(String(i), e.sea) : '') + '</div>';
       }).join('') + (S.happy.length < 6 ? '<button type="button" class="su-more" data-act="add:happy">' + h(T.addHappy) + '</button>' : '')
-        + (S.happy.length > 1 ? '' : '<div class="su-day">' + seasonBox('happy', S.happySea, T.happySeasonH) + '</div>') + '<div class="su-stack">' + big('✓', T.saveHappy, '', false, 'happySave') + '</div>';
+        + (S.happy.length > 1 ? '' : '<div class="su-day">' + seasonBox('happy', S.happySea, T.happySeasonH) + happyClosedHtml('', S.happySea) + '</div>')
+        // Sport fix round 16: Save on a happy hour that can't show asks once ("Save anyway" / "Change months").
+        + (S.happyClosedAsk && T.happyClosedAskQ ? '<div class="su-stack" id="suHappyClosedAsk" role="group" aria-labelledby="suHappyClosedAskQ"><p class="su-q" id="suHappyClosedAskQ">' + h(T.happyClosedAskQ) + '</p>' + big('✓', T.happyClosedYes, '', false, 'happyClosedYes') + big('✎', T.happyClosedNo, '', true, 'happyClosedNo') + '</div>'
+          : '<div class="su-stack">' + big('✓', T.saveHappy, '', false, 'happySave') + '</div>');
     } else if (s === 'specials') { x = yesNo('specials', T.specialsQ, T.specialsLead);
     } else if (s === 'specials:type') {
       if (!S.specials.length) S.specials.push({ days: {}, text: '', price: '', start: '', end: '' });
@@ -3953,6 +3971,10 @@
       if (!same) { var sl = {}; S.happy.forEach(function(e, i){ if (!outs[i].from) return; DAYS.forEach(function(d){ if (e.days[d]) (sl[d] = sl[d] || {})[e.from] = { from: outs[i].from, to: outs[i].to }; }); }); week._slot_seasons = Object.keys(sl).length ? sl : null; }
     }
     week._close = Object.keys(close).length ? close : null;
+    // Sport fix round 16 (2026-11-21; sport test 17: Marlene saved a Nov–Dec deal at a course closed Nov–Mar in one tap):
+    // every happy hour here runs only in the closed months, so it asks once before saving.
+    if (happyAllClosed() && !S.happyClosedOk && T.happyClosedAskQ) { S.happyClosedAsk = true; render(); var ak = el('suHappyClosedAsk'); if (ak && ak.scrollIntoView) { try { ak.scrollIntoView({ block: 'center' }); } catch (x) { ak.scrollIntoView(); } } return; }
+    S.happyClosedAsk = false; S.happyClosedOk = false;
     S.happyTyped = true;
     var list = [];
     if (S.notOffered.indexOf('happy_hour') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'happy_hour'; }) });
@@ -4881,6 +4903,8 @@
     if (k === 'add' && v === 'happy') { readEntries(); if (S.happy.length === 1) S.happy[0].sea = clone(S.happySea); var nh = happyDefault(); nh.sea = clone(S.happySea); S.happy.push(nh); return render(); }
     if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? happyDefault() : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
     if (k === 'happySave') return happySave();
+    if (k === 'happyClosedYes') { S.happyClosedOk = true; return happySave(); }
+    if (k === 'happyClosedNo') { readEntries(); S.happyClosedAsk = false; S.happyClosedOk = false; render(); var hsb = el('suSeahappy') || screen.querySelector('[id^="suSeahappy"]'); if (hsb && hsb.scrollIntoView) { try { hsb.scrollIntoView({ block: 'start' }); } catch (x) { hsb.scrollIntoView(); } } return; }
     if (k === 'specialsSave') return specialsSave();
     if (k === 'musicSave') return musicSave();
     if (k === 'storyFix') { S.storyReturn = 'offer'; S.hist.push(S.step); S.step = 'story'; S.nudge = ''; S.error = ''; render(); var ta = el('suStory'); if (ta) { var bi = sportsAt(); try { ta.focus({ preventScroll: true }); if (bi) ta.setSelectionRange(bi[0], bi[1]); } catch (e) {} } return; }
@@ -4983,6 +5007,9 @@
     if (k === 'priceSave' && INDOOR) {
       // Indoor test 18: words before the number ("Facials from $95") say what it is; the number is the price.
       readTour(); var ipf = S.tour.free, ipb = el('suTprice') ? el('suTprice').value : '', ipbP = !ipf ? indoorPaidPart(ipb) : null; if (ipbP) ipb = ipbP; var ipbL = !ipf ? indoorLeadWords(ipb) : null; if (ipbL) ipb = ipbL.rest; var ipp = ipf ? 0 : !S.tour.per && indoorRangeLow(ipb) != null ? indoorRangeLow(ipb) : tourPriceNumber(ipb);
+      // Sport fix round 16 (sport test 17: "143143" said "We couldn't find a price"): a number typed twice says so.
+      var ipRaw = String(el('suTprice') ? el('suTprice').value : '').replace(/[\s$,]/g, ''), ipHalf = ipRaw.length >= 4 && ipRaw.length % 2 === 0 && /^\d+$/.test(ipRaw) ? ipRaw.slice(0, ipRaw.length / 2) : '';
+      if (!ipf && ipHalf && ipHalf === ipRaw.slice(ipRaw.length / 2) && T.tpriceDoubled && (String(CUR.indoor_price) === ipHalf || ipp == null || isNaN(ipp) || ipp > 2000)) { S.nudge = fill(T.tpriceDoubled, { x: ipHalf }); S.badField = 'suTprice'; return render(); }
       if (!ipf && (ipp == null || isNaN(ipp))) { S.nudge = T.tpriceNeed; S.badField = 'suTprice'; return render(); }
       // Indoor test 2 (Jordan): a price per room, lane, game or group is never saved as a price for one person. Per person
       // with words that say otherwise ("per room", "per boat", "for 4 people"): ask, and offer Per room or group.
@@ -5264,7 +5291,9 @@
       S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-smon]'), function(b){ b.onclick = function(){
       var q2 = b.getAttribute('data-smon').split(':'), o = seaObj(q2[0]); if (!o) return; o.months[q2[1]] = !o.months[q2[1]];
-      b.setAttribute('aria-pressed', o.months[q2[1]] ? 'true' : 'false'); S.nudge = ''; mark(); warnRefresh(); if (q2[0] === 'hours') seaTitleRefresh(); }; });
+      b.setAttribute('aria-pressed', o.months[q2[1]] ? 'true' : 'false'); S.nudge = ''; mark(); var nw = warnRefresh(); if (q2[0] === 'hours') seaTitleRefresh();
+      // Sport fix round 16: the closed-season heads-up that a month chip just made true comes into view.
+      if (nw && q2[0].indexOf('happy') === 0 && nw.scrollIntoView) { try { nw.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (x) { nw.scrollIntoView(false); } } }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-sexact]'), function(inp){ inp.addEventListener('change', function(){ readSeasons(); if (inp.getAttribute('data-sexact').indexOf('hours') === 0) { S.seaTouched = true; seaTitleRefresh();
       // Brewery test 2 (Whistler, 2026-11-16): the "these dates overlap" message goes as soon as a date changes (it stayed
       // on screen after the dates were fixed, until Save). The picker keeps its focus: only the message is taken away.
@@ -5672,6 +5701,13 @@
       inp.addEventListener('input', function(){ if (inp._qPrev && / $/.test(inp._qPrev) && inp.value.indexOf(inp._qPrev + ' ') === 0) { inp.value = inp._qPrev + inp.value.slice(inp._qPrev.length + 1).replace(/^ +/, ''); /* Sport test 4: the chip's line stays the one the words are joined to (quickJoin). */ try { var nq = inp.value.length; inp.setSelectionRange(nq, nq); } catch (e) {} } });
       inp.addEventListener('click', function(){ if (!(S.chipFilled && S.chipFilled[inp.id] != null && S.chipFilled[inp.id] === inp.value) || inp._chipEnd) return; inp._chipEnd = true; try { var ne = inp.value.length; if (inp.selectionStart !== ne || inp.selectionEnd !== ne) inp.setSelectionRange(ne, ne); } catch (e) {} });
       inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) { inp.select(); inp._autoSel = Date.now(); } else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
+      // Sport fix round 16 (sport test 17, a Samsung: the Price box's saved "143" became "143143" on a revisit; the tap's
+      // own mouseup put the cursor at the end after the select): a saved price is selected on each first tap, like the
+      // rate editor's boxes, so typing replaces it.
+      if (PRICE_BOXES.indexOf(inp.id) >= 0 && inp.value) { var pf = true;
+        inp.addEventListener('mouseup', function(e){ if (pf) { e.preventDefault(); try { inp.select(); } catch (x) {} pf = false; } });
+        inp.addEventListener('touchend', function(){ if (pf) setTimeout(function(){ try { inp.select(); } catch (x) {} pf = false; }, 0); });
+        inp.addEventListener('blur', function(){ pf = true; }); }
       // "…or tap again to add to it": a second tap on the story box while our own select is still on it puts the cursor
       // at the end (most phones do this themselves; where the tap leaves the text selected, this does it). The first
       // tap's own click, right after the focus, is left alone.

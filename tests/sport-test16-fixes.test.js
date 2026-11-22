@@ -95,9 +95,14 @@ test('1. her $200 stays the card price: a 9-hole "After 5 pm or on standby" line
   assert.equal(c('Standby', ''), false); assert.equal(c('18 holes', 'standby'), false); assert.equal(c('18 holes', 'after 10 pm'), false); assert.equal(c('18 holes', 'après 17 h'), false);
   assert.equal(c('18 holes', 'Twilight rate'), false); assert.equal(c('18 holes', 'Replay same day'), false); assert.equal(c('18 holes', 'Seniors 65+'), false);
   assert.equal(c('18 holes, spring', 'April and October'), true, 'a plain adult round in another month still may');
-  // A 9-hole course: its 9-hole line is its plain round.
+  // A 9-hole course: its 9-hole line is its plain round. Sport fix round 16 (THE SPORT CARD RULE): her typed $47 holds;
+  // only with no Price typed does her lowest plain line ($42, never the after-4 rate) set the card.
   const nine = await setUp(['golf'], { season: '04-01:10-31', price: 47, name: 'Nine Hole Sixteen' });
   publishPrices(nine.v.id, [['9 holes walking', '42', ''], ['9 holes', '30', 'After 4 pm']]);
+  app.indoorCardPrice(nine.v.id);
+  assert.equal(app.cardPriceFor(nine.v.id), 'From $47');
+  await ok(change(nine.t, { indoor_price: null }));
+  if (app.clearVenueCaches) app.clearVenueCaches();
   app.indoorCardPrice(nine.v.id);
   assert.equal(app.cardPriceFor(nine.v.id), 'From $42');
 });
@@ -143,16 +148,17 @@ test('3. a happy hour only in the closed months says it won\'t show; no Happy Ho
   assert.ok(g.screen().includes('data-smon="happy:'), 'the month chips');
   assert.deepEqual([...g.screen().matchAll(/aria-pressed="true"[^>]*data-smon="happy:(\d+)"|data-smon="happy:(\d+)"[^>]*aria-pressed="true"/g)].map((m) => m[1] || m[2]), [], 'no months picked for her');
   for (const m of [11, 12, 1, 2, 3]) await g.click(`[data-smon="happy:${m}"]`);
-  const w = g.doc.getElementById('suWarnhappy0');
+  // Sport fix round 16: the heads-up sits right under the month chips (suHappyClosed), and Save asks once.
+  const w = g.doc.getElementById('suHappyClosed');
   assert.ok(w && !w.hidden, 'the heads-up shows as soon as the months are all closed ones');
   assert.match(sp(w.textContent), /closed for the season outside Apr 1 to Oct 31[\s\S]*visitors won’t see it[\s\S]*Part of the place with its own times\?/);
   await g.type('hw0', 'Half-price apps');
-  await g.click('happySave'); await g.settle();
+  await g.click('happySave'); await g.click('happyClosedYes'); await g.settle();
   // Saved: it says so again when she comes back, EN and FR.
   for (const lang of ['en', 'fr']) {
     const g2 = await openSetup(base, t, lang === 'fr' ? { lang } : {});
     await toHappyType(g2);
-    const w2 = g2.doc.getElementById('suWarnhappy0');
+    const w2 = g2.doc.getElementById('suHappyClosed');
     assert.ok(w2 && !w2.hidden, `${lang}: the heads-up shows for the saved one`);
     assert.match(sp(w2.textContent), lang === 'fr' ? /fermé pour la saison[\s\S]*ne le verront pas[\s\S]*Une partie de l’endroit a ses propres heures/ : /visitors won’t see it/);
   }
@@ -163,7 +169,7 @@ test('3. a happy hour only in the closed months says it won\'t show; no Happy Ho
   await toHappyType(g3);
   await g3.click('hhDays:0,wk'); await g3.click('[data-sea="happy:some"]');
   for (const m of [5, 6, 7]) await g3.click(`[data-smon="happy:${m}"]`);
-  assert.ok(g3.doc.getElementById('suWarnhappy0').hidden, 'nothing to say');
+  assert.ok(g3.doc.getElementById('suHappyClosed').hidden, 'nothing to say');
   db.prepare('UPDATE venues SET happy_hour = 1, great_groups = 1, happy_hour_times = ? WHERE id = ?').run(JSON.stringify({ wed: [['17:00', '18:00']], _season: { from: '11-01', to: '03-31' } }), v.id);
   // While it can't be seen (closed for the season, or outside its months): no "More in Kelowna: Happy Hour", no search match.
   db.prepare('UPDATE venues SET happy_hour_times = ? WHERE id = ?').run(JSON.stringify({ wed: [['17:00', '18:00']], _season: { from: '11-01', to: '03-31' } }), v.id);
@@ -222,7 +228,8 @@ test('4. Help: her 30 questions on the screens she asked them land well (or on c
   assert.match(S.answer('indoor-local-owned'), /management company run from a head office\? Then it doesn’t count: leave it unticked/);
   // The card rule, said as it is (#13, #28).
   assert.match(E.answer('sport-card-price'), /Green fees from \$200/);
-  assert.match(E.answer('sport-card-price'), /standby[\s\S]*Nor does twilight, or a 9-hole rate when your price is for 18 holes/);
+  // Sport fix round 16 (THE SPORT CARD RULE): no Your prices line lowers a typed Price, so Help says so plainly.
+  assert.match(E.answer('sport-card-price'), /Nothing in Your prices lowers it, not even a cheaper rate for some times, some months or some people/);
   assert.match(S.answer('sport-rate-lines'), /Write <em>from \$85<\/em> or <em>varies<\/em>[\s\S]*not your lowest/);
   assert.doesNotMatch(`${S.answer('sport-rate-lines')} ${S.answer('sport-no-rate')}`, /lowest regular adult price/);
   // The parts line: shows as typed all year (no "No:" opener).

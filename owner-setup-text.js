@@ -2952,10 +2952,18 @@ Object.assign(fr, {
 Object.assign(en, {
   happyClosedSea: 'Heads up: your page says closed for the season outside {a} to {b}, and a happy hour never shows while you’re closed. This one runs only in those closed months, so visitors won’t see it.',
   happyClosedSeaPart: 'A part that stays open, like your grill? Put its times and deal in the “Part of the place with its own times?” line on your hours instead, like “Grill: Wed–Fri 5–8 PM, November–March; half-price apps Wed 5–6”.',
+  // Sport fix round 16 (sport test 17: Marlene never saw the heads-up, and her list said "on your page ✓"): one question on
+  // Save, and the list says it can't show.
+  happyClosedAskQ: 'Visitors won’t see this while you’re closed. Save anyway?', happyClosedYes: 'Save anyway', happyClosedNo: 'Change months',
+  stHappyClosed: 'saved, not shown while you’re closed',
+  tpriceDoubled: 'That looks like two prices run together. Did you mean {x}? Type it once.',
 });
 Object.assign(fr, {
   happyClosedSea: 'Attention : votre page dit fermé pour la saison en dehors du {a} au {b}, et un 5 à 7 ne paraît jamais pendant que vous êtes fermé. Celui-ci a lieu seulement pendant ces mois fermés : les visiteurs ne le verront pas.',
   happyClosedSeaPart: 'Une partie reste ouverte, comme votre grill? Mettez plutôt ses heures et son offre dans la ligne « Une partie de l’endroit a ses propres heures? » de vos heures, comme « Grill : mer.–ven. 17 h–20 h, de novembre à mars; entrées à moitié prix le mer. 17 h–18 h ».',
+  happyClosedAskQ: 'Les visiteurs ne le verront pas pendant que vous êtes fermé. Enregistrer quand même?', happyClosedYes: 'Enregistrer quand même', happyClosedNo: 'Changer les mois',
+  stHappyClosed: 'enregistré, caché pendant que vous êtes fermé',
+  tpriceDoubled: 'On dirait deux prix collés. Vouliez-vous dire {x}? Tapez-le une seule fois.',
 });
 
 (function frSpaces(o) {

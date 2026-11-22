@@ -580,10 +580,10 @@ const TOPICS = [
   // and it never showed): a happy hour shows only while the place is open.
   { id: 'hh-closed-season', kinds: ['golf', 'simgolf', 'range'], pages: ['setup', 'edit'], over: ['hh-some-months', 'hh-times', 'see-page', 'sport-social-hour'],
     q: 'My happy hour isn’t showing (we’re closed for the season)', qFr: 'Mon 5 à 7 ne paraît pas (nous sommes fermés pour la saison)',
-    keys: ['happy hour not showing', 'happy hour isnt showing', 'happy hour not there', 'happy hour is not there', 'happy hour missing', 'cant see my happy hour', 'happy hour while closed', 'happy hour when closed', 'happy hour in the off season', 'only when the course is closed', 'when the course is closed'],
+    keys: ['can people see my happy hour', 'will people see my happy hour', 'does my happy hour show', 'is my happy hour showing', 'after the course closes', 'happy hour not showing', 'happy hour isnt showing', 'happy hour not there', 'happy hour is not there', 'happy hour missing', 'cant see my happy hour', 'happy hour while closed', 'happy hour when closed', 'happy hour in the off season', 'only when the course is closed', 'when the course is closed'],
     keysFr: ['5 a 7 ne parait pas', 'mon 5 a 7 n est pas la', 'quand le terrain est ferme', '5 a 7 hors saison'],
-    a: '<p>A happy hour shows on your page, in search and in Build My Trip only while you’re open: never while your page says <strong>Closed for the season</strong>, and only in its own months. So a deal only for the months you’re closed, like a winter one at a course closed November to March, won’t show anywhere. The Happy hour screen says so when you set one.</p><p>Part of your place stays open then, like the grill? Put its times and the deal in one line under <strong>Part of the place with its own times?</strong> on your hours, like <em>Grill: Wed–Fri 5–8 PM, November–March; half-price apps Wed 5–6</em>. Your page shows that line all year beside your hours.</p><p>Open now and it still isn’t there? Check its days and times on <strong>Happy hour</strong> (Change an answer), then reload your page.</p>',
-    aFr: '<p>Un 5 à 7 paraît sur votre page, dans la recherche et dans Planifier mon voyage seulement pendant que vous êtes ouvert : jamais quand votre page indique <strong>Fermé pour la saison</strong>, et seulement pendant ses propres mois. Un spécial seulement pour les mois où vous êtes fermé, comme un 5 à 7 d’hiver à un terrain fermé de novembre à mars, ne paraît donc nulle part. L’écran 5 à 7 vous le dit quand vous en indiquez un.</p><p>Une partie de votre endroit reste ouverte, comme le grill? Mettez ses heures et le spécial en une ligne sous <strong>Une partie de l’endroit a ses propres heures?</strong> dans vos heures, comme <em>Grill : mer.–ven. 17 h–20 h, de novembre à mars; entrées à moitié prix le mer. 17 h–18 h</em>. Votre page affiche cette ligne toute l’année à côté de vos heures.</p><p>Vous êtes ouvert et il n’y est toujours pas? Vérifiez ses jours et ses heures à <strong>5 à 7</strong> (Modifier une réponse), puis rechargez votre page.</p>' },
+    a: '<p>Not while you’re closed. A happy hour shows on your page, in search and in Build My Trip only while you’re open: never while your page says <strong>Closed for the season</strong>, and only in its own months. So a deal only for the months you’re closed, like a winter one at a course closed November to March, won’t show anywhere. The Happy hour screen says so when you set one.</p><p>Part of your place stays open then, like the grill? Put its times and the deal in one line under <strong>Part of the place with its own times?</strong> on your hours, like <em>Grill: Wed–Fri 5–8 PM, November–March; half-price apps Wed 5–6</em>. Your page shows that line all year beside your hours.</p><p>Open now and it still isn’t there? Check its days and times on <strong>Happy hour</strong> (Change an answer), then reload your page.</p>',
+    aFr: '<p>Pas pendant que vous êtes fermé. Un 5 à 7 paraît sur votre page, dans la recherche et dans Planifier mon voyage seulement pendant que vous êtes ouvert : jamais quand votre page indique <strong>Fermé pour la saison</strong>, et seulement pendant ses propres mois. Un spécial seulement pour les mois où vous êtes fermé, comme un 5 à 7 d’hiver à un terrain fermé de novembre à mars, ne paraît donc nulle part. L’écran 5 à 7 vous le dit quand vous en indiquez un.</p><p>Une partie de votre endroit reste ouverte, comme le grill? Mettez ses heures et le spécial en une ligne sous <strong>Une partie de l’endroit a ses propres heures?</strong> dans vos heures, comme <em>Grill : mer.–ven. 17 h–20 h, de novembre à mars; entrées à moitié prix le mer. 17 h–18 h</em>. Votre page affiche cette ligne toute l’année à côté de vos heures.</p><p>Vous êtes ouvert et il n’y est toujours pas? Vérifiez ses jours et ses heures à <strong>5 à 7</strong> (Modifier une réponse), puis rechargez votre page.</p>' },
   // Sport test 12 (Rob's Good to know was nearly full, 281 of 320): no bigger box; where the rest goes.
   { id: 'sport-gtk-full', pages: ['setup', 'edit'], over: ['indoor-good-to-know', 'plan-visit', 'description'],
     q: 'Good to know is full: where does the rest go?', qFr: 'Bon à savoir est plein : où va le reste?',
@@ -608,6 +608,22 @@ const TOPICS = [
     keysFr: ['indice de valeur', 'faits du parcours', 'non documente', 'en un coup d oeil'],
     a: '<p>The course facts and the Value index come from our checked golf data, not from your answers. Something wrong or missing, like range balls included with every round? Tap <strong>Message us</strong> and say what to fix: Dayton fixes it, usually within a day. Once your own prices are in, the Value index and our green fee table come off your page.</p>',
     aFr: '<p>Les faits du parcours et l’indice de valeur viennent de nos données de golf vérifiées, pas de vos réponses. Une erreur ou un oubli, comme les balles de pratique comprises avec chaque partie? Touchez <strong>Écrivez-nous</strong> et dites quoi corriger : Dayton le corrige, en général d’ici un jour. Dès que vos propres tarifs sont entrés, l’indice de valeur et notre tableau des droits de jeu disparaissent de votre page.</p>' },
+  // Sport fix round 16 (2026-11-21; sport test 17, Marlene: "Morning, matinee, twilight, super twilight, juniors and the
+  // Daily Double. Do I have to put every one in?" got the men's-night answer): no, the main ones are enough.
+  { id: 'sport-every-rate', pages: ['setup', 'edit', 'menu'], over: ['sport-rate-lines', 'menu-add', 'indoor-fill-all', 'indoor-theme-nights', 'indoor-price-varies'],
+    q: 'Do I have to put every rate in?', qFr: 'Dois-je entrer tous mes tarifs?',
+    keys: ['put every one in', 'every one in', 'put every rate', 'every rate', 'all of our rates', 'all our rates', 'all the rates', 'every single rate', 'a lot of rates', 'lots of rates', 'so many rates', 'every price', 'all of them in', 'put them all in', 'have to put all'],
+    keysFr: ['tous nos tarifs', 'tous les tarifs', 'chaque tarif', 'beaucoup de tarifs', 'tous les mettre'],
+    a: '<p>No, your main ones are enough; the card uses your <strong>Price</strong>. Put the rates visitors ask about most, one line each. You can add more any time, and none of them changes your card’s price.</p>',
+    aFr: '<p>Non, vos principaux suffisent; la fiche utilise votre <strong>Prix</strong>. Mettez les tarifs que les visiteurs demandent le plus, une ligne chacun. Vous pouvez en ajouter d’autres en tout temps, et aucun ne change le prix de votre fiche.</p>' },
+  // Sport fix round 16 (Marlene: "I am not sure about Instagram, one of the young fellows in the pro shop looks after that"
+  // got Ask us): the screen's own "Not sure / someone else runs it" button.
+  { id: 'sport-social-unsure', pages: ['setup'], over: ['no-website-social', 'links', 'sport-shared-social', 'sport-two-accounts', 'dont-have'],
+    q: 'Someone else runs our Instagram (or I’m not sure of it)', qFr: 'Quelqu’un d’autre s’occupe de notre Instagram (ou je ne suis pas sûr)',
+    keys: ['someone else runs', 'somebody else runs', 'someone else does', 'looks after that', 'looks after our instagram', 'not sure about instagram', 'not sure about our instagram', 'dont know our instagram', 'don t know the instagram', 'someone else handles'],
+    keysFr: ['quelqu un d autre s en occupe', 'pas sur pour instagram', 'je ne connais pas notre instagram'],
+    a: '<p>Tap <strong>Not sure / someone else runs it</strong> on this screen: that’s fine, and we won’t ask again. Put in the one you know, like your Facebook page. When you have the Instagram name, add it any time from your edit page.</p>',
+    aFr: '<p>Touchez <strong>Je ne sais pas / quelqu’un d’autre s’en occupe</strong> sur cet écran : c’est correct, et nous ne le redemanderons pas. Mettez celui que vous connaissez, comme votre page Facebook. Quand vous aurez le nom Instagram, ajoutez-le en tout temps depuis votre page de modification.</p>' },
 ];
 // What owners of every kind typed for the shared answers ([en keys, fr keys, topics they now beat]).
 const MORE_KEYS = {
@@ -718,7 +734,7 @@ function kindHelp(t, kind, ctx) {
       title(...w('ratesQ'));
       // A package is its own answer (sport-package).
       t = { ...t, keys: (t.keys || []).filter((k) => !/^packages?$/.test(k)), keysFr: (t.keysFr || []).filter((k) => !/^forfaits?$/.test(k)) };
-      if (kind === 'skischool') t = both(t, [[/Your card keeps the regular adult price you typed on Price, not your lowest\. [^<]*? never/, 'Your card shows your lowest group lesson. Rentals, lift tickets, packages and kids’ programs never']], [[/Votre fiche garde le prix adulte régulier inscrit à Prix, pas le plus bas\. [^<]*? ne deviennent jamais/, 'Votre fiche montre votre cours de groupe le moins cher. La location, les billets de remontée, les forfaits et les programmes pour enfants ne deviennent jamais']]);
+      if (kind === 'skischool') t = both(t, [[/Your card keeps the regular adult price you typed on Price, not your lowest\. [^<]*? never/, 'Your card keeps the price you typed on Price, not your lowest. Rentals, lift tickets, packages and kids’ programs never']], [[/Votre fiche garde le prix adulte régulier inscrit à Prix, pas le plus bas\. [^<]*? ne deviennent jamais/, 'Votre fiche garde le prix inscrit à Prix, pas le plus bas. La location, les billets de remontée, les forfaits et les programmes pour enfants ne deviennent jamais']]);
       return t;
     }
     case 'sport-tee-times': title(...w('bookQ')); return t;
@@ -1196,6 +1212,21 @@ const FIT = [
   // page): it only shows while the place is open, in its own months.
   { id: 'hh-not-showing', all: ['\\b(happy hour|happy hours|5 a 7|social hour|appy hour)\\b', '\\b(not there|isnt there|isn t there|not showing|isnt showing|isn t showing|not show|doesnt show|doesn t show|dont see|don t see|cant see|can t see|cannot see|missing|gone|disappeared|not on (my|the|our) page|n est pas la|ne parait pas|absent|disparu)\\b'],
     fit: ['hh-closed-season', 'hh-times', 'hh-some-months', 'setup-happy-split'], bad: ['see-page'], go: ['hh-closed-season'] },
+  // Sport fix round 16 (2026-11-21; sport test 17, Marlene on her owner home: "Do I have to do the whole thing again for
+  // Park Meadows? Who sends me that link?" got session times): the other course or listing is its own page and link.
+  { id: 'other-course-again', all: ['\\b(whole thing|all of (this|it)|all this|everything|the setup|it all|this all) (again|twice|over)\\b|\\b(do|fill|go through|set up|fill in) (it|this|all this|all of this|the whole thing|everything|the setup) (again|twice|over)\\b|\\b(tout|tout ca|tout cela) (recommencer|refaire|encore)\\b|\\b(refaire|recommencer) (tout|tout ca)\\b',
+    '\\b(other|second|another|both|link|links|sister|course|courses|listing|page|for|autre|deuxieme|lien|terrain|parcours|pour)\\b'],
+    not: ['\\b(next year|every year|each year|next season|next spring|every spring|each spring|every season|mistake|mistakes|wrong|l an prochain|chaque annee|erreur)\\b'],
+    fit: ['sport-two-courses', 'sport-sister-listing', 'more-businesses', 'sport-one-listing', 'newlink'], go: ['sport-two-courses', 'sport-sister-listing', 'more-businesses'] },
+  // Sport fix round 16 (Marlene: "I am 68 … If I make a mistake can I go back and fix it later?" got Ask us): yes, any time.
+  { id: 'fix-later', all: ['\\b(mistake|mistakes|wrong|mess up|messed up|mess it up|error|errors|oops|erreur|erreurs|trompe|tromper)\\b', '\\b(later|go back|fix it|fix them|change it|undo|afterwards|after|plus tard|corriger|revenir|changer)\\b'],
+    not: ['\\b(closed dates?|closures?|photo|photos|password|email|courriel|address|adresse|name|nom|phone|google|price|prices|card)\\b'],
+    fit: ['setup-change-later', 'setup-closure-fix', 'changes-review', 'easy-setup', 'live-speed', 'resume-device'], go: ['setup-change-later'] },
+  // Sport fix round 16 (Marlene: "Is there room to say the putting green is for putting only … And that a cart and range
+  // balls come with every green fee?" got "We don't have a driving range"): a putting green is not "no range".
+  { id: 'putting-not-no-range', all: ['\\b(putting green|putting|chipping|practice green|short game|vert d exercice)\\b'],
+    not: ['\\b(no|dont have|don t have|do not have|without|pas de|n avons pas)\\b(?: [a-z]+){0,2} (range|champ)\\b', '\\b(only|just|seulement)\\b(?: [a-z]+){0,2} (putting|practice|chipping) (greens?|area)\\b|\\b(only|just|seulement)\\b(?: [a-z]+){0,2} vert d exercice\\b', '\\bno driving range\\b'],
+    bad: ['sport-no-range'], go: ['indoor-good-to-know', 'sport-included'] },
   // Sport test 13: the rules above, narrow (they only ever take answers away, never let one through).
   ...FIT13.map((r) => ({ ...r, narrow: true })),
 ];
@@ -1214,6 +1245,10 @@ const PARTS_LINE = '\\b(that box|this box|the box|that line|this line|the line|g
 const SHOWS_STATE = '\\b(show|shows|showing|look|looks|say|says|appear|appears|read|reads|be|mark|marks|make|makes) (us |the course |it |the club |our course |as )?(closed|open|shut|ferme|ouvert)\\b|\\b(affiche|indique|paraitre|paraitra) (ferme|ouvert)\\b';
 const HOURS_SCREEN = { words: ['\\b(hours|hour|open|opens|opening|close|closes|closed|closing|shut|season|seasons|seasonal|all year|year round|winter|summer|spring|fall|autumn|frost|weather|' + MONTHS_RE + '|heures|horaires?|ouvert|ouverte|ouvre|ferme|fermee|saison|hiver|ete|printemps|automne|toute l annee)\\b'],
   own: HOURS_OWN, pick: [{ all: [PARTS_LINE, SHOWS_STATE], id: 'sport-part-season' },
+    // Sport fix round 16 (Marlene: "the driving range closes at 4 o'clock every Tuesday for maintenance. Does that matter?"
+    // got Ask us): a part of the place (the range, the grill, the shop) with its own closing time is the parts line.
+    { all: [near(GOLF_PART_WORDS + '|' + PART_WORDS + '|' + SHOP_WORDS, '(closes|close|closed|closing|shuts|shut|opens|open|ferme|ouvre)', 3), '\\b(mondays?|tuesdays?|wednesdays?|thursdays?|fridays?|saturdays?|sundays?|weekdays?|lundis?|mardis?|mercredis?|jeudis?|vendredis?|samedis?|dimanches?)\\b'],
+      not: ['\\b(no|dont have|don t have|without|pas de) (a |any )?(driving |practice )?range\\b', '\\brange balls?\\b', '\\b(happy hour|5 a 7)\\b', '\\b(course|club|we|the place|terrain|parcours|nous) (opens|closes|open|close|is open|is closed|ouvre|ferme)\\b', PLACE_OPENS_AT, PLACE_SHORT_CLOSE], id: 'sport-part-season' },
     // Sport test 16 (Nadia: "april and october we shut earlier … more like 9 to 6. where does that go"): hours for part of the season.
     { all: ['\\b(shut|shuts|close|closes|closing|open|opens|opening) (a bit |an hour |a little |up )?(earlier|later)\\b|\\bshorter (hours|days)\\b|\\bferm[a-z]* plus tot\\b|\\bheures plus courtes\\b', '\\b(' + MONTHS_RE + '|spring|fall|autumn|shoulder|printemps|automne)\\b'],
       not: ['\\b(season|seasons|snow|depending|closed for|weather|frost|saison|neige|meteo)\\b', PARTS_LINE], id: 'sport-shoulder-hours' }] };
@@ -1224,6 +1259,9 @@ const PRICE_SCREEN = { words: [PRICE_WORDS],
     { all: ['\\b(breakfast|lunch|dinner|dine|brunch|meal|meals|burger|hot ?dogs?|beer|stay and play|stay play|package|packages|bundle|combo|forfaits?|dejeuner|diner|souper|repas)\\b', '\\b(price|special|specials|deal|line|rate|dollarsign|prix|tarif|speciale?)\\b'], not: ['\\b(happy hour|5 a 7|card|carte)\\b'], id: 'sport-package' },
     // "Our green fees change 5 times a season": rates that change through the season.
     { all: ['\\b(change|changes|changing|different|varies|vary|go up|goes up|switch|changent|change)\\b', '\\b(times a (season|year)|through the season|every season|each season|during the season|early|spring|summer|fall|late season|shoulder|season|seasons|saison|saisons|printemps|automne|specificdate|' + MONTHS_RE + ')\\b'], not: ['\\b(next year|next season|l an prochain|annee prochaine|aren t out|arent out|not out|not set|peak|christmas|spring break|holidays?|noel|twilight|crepuscule|starts? at)\\b'], id: 'sport-rate-change' },
+    // Sport fix round 16 (Marlene: "The 2027 morning rate is $155. Last year it was $148. Which one should I use?"): rates
+    // change on a date: today's, changed on the day.
+    { all: ['\\b(last year|last season|old rates?|l an dernier|l annee derniere|anciens tarifs)\\b', '\\b(which|lequel|laquelle|quel|quelle)\\b'], not: ['\\b(card|carte|two courses|other course|autre terrain)\\b'], id: 'sport-rate-change' },
     { all: ['\\b(next year|next season|next spring|l an prochain|l annee prochaine|annee prochaine|aren t out|arent out|not out yet|not set yet|not set|pas encore)\\b'], id: 'sport-rates-next-year' },
     // "It says regular rate and lowest in the same sentence … Which number?": the one Price rule.
     // Sport test 16 (Nadia: "canyon 18 is $200 in summer but pinnacle 9 holes is $55. which one goes here?"): this course's own.
@@ -1231,7 +1269,10 @@ const PRICE_SCREEN = { words: [PRICE_WORDS],
     { all: ['\\b(two courses|2 courses|both courses|other course|second course|sister course|each course|deux terrains|deux parcours|autre terrain|autre parcours)\\b'], id: 'sport-two-courses' },
     { all: ['\\b(which number|which one|which rate|which price|what number|regular|lowest|cheapest|usual|lequel|laquelle|quel prix|quel tarif)\\b'], not: ['\\b(card|carte)\\b'], id: 'indoor-price' },
   ] };
-const MENU_SCREEN = { words: [PRICE_WORDS, '\\b(list|lines|line|type|typed|photo|upload|website|menu|liste|ligne|lignes)\\b'], own: PRICE_OWN, pick: PRICE_SCREEN.pick.filter((p) => p.id !== 'indoor-price') };
+// Sport fix round 16 (Marlene: "There are a lot of rates … Do I have to put every one in?" got the men's-night answer).
+const EVERY_RATE_PICK = { all: ['\\b(every|all|tous|toutes|chaque) (one|single one|single rate|rate|rates|price|prices|of them|of our rates|our rates|the rates|tarifs?|les tarifs|nos tarifs|un)\\b', '\\b(have to|need to|must|dois je|faut il|obligatoire)\\b'],
+  not: ['\\b(card|carte|french|francais|tax|taxes|gst|pst|tps|tvq|change|changes|changing|times a (season|year)|walking|riding|photo|upload|website)\\b'], id: 'sport-every-rate' };
+const MENU_SCREEN = { words: [PRICE_WORDS, '\\b(list|lines|line|type|typed|photo|upload|website|menu|liste|ligne|lignes)\\b'], own: PRICE_OWN.concat(['sport-every-rate']), pick: [EVERY_RATE_PICK].concat(PRICE_SCREEN.pick.filter((p) => p.id !== 'indoor-price')) };
 const SCREENS = {
   // "Happy Appy Hour is in the grill … only while the grill is open April to October. Can I say that here?": yes, Only some months.
   happy: { words: ['\\b(happy|appy|5 a 7|cinq a sept|social hour|heure sociale|apero|aperitif|drink specials?|deals?)\\b'], own: HH_OWN, strict: true,
@@ -1242,8 +1283,12 @@ const SCREENS = {
       { all: ['\\b(' + MONTHS_RE + '|only (while|when|in)|some months|season|seasonal|summer|winter|spring|fall|saison|ete|hiver|certains mois|seulement (quand|l))\\b'], not: ['\\b(no|dont have|don t have|do not have|pas de|n a pas)\\b (a |an |any )?(real )?(happy hour|5 a 7)'], id: 'hh-some-months' }],
     go: 'hh-times' },
   // Sport test 16 (Nadia: "'semi-private' makes ppl think they cant play … can i fix that bit"): the words go right here.
-  story: { words: ['\\b(fix|change|reword|rewrite|edit|word|words|wording|bit|phrase|sentence|line|says|sounds?|think|story|corriger|changer|modifier|mot|mots|phrase|histoire)\\b'],
-    pick: [{ all: ['\\b(fix|change|reword|rewrite|edit|corriger|changer|modifier)\\b', '\\b(word|words|wording|bit|phrase|sentence|line|says|sounds|think|thinks|story|description|that part|mot|mots|histoire)\\b'],
+  // Sport fix round 16 (Marlene: "That sounds a little scary for our seniors … Can I make it sound friendlier?" went to the
+  // edit page): any question about the story's words or tone changes them right here.
+  story: { words: ['\\b(fix|change|reword|rewrite|edit|word|words|wording|bit|phrase|sentence|line|says|sounds?|think|story|tone|friendly|friendlier|nicer|kinder|softer|soften|gentler|warmer|scary|harsh|corriger|changer|modifier|mot|mots|phrase|histoire|ton|adoucir)\\b'],
+    pick: [{ all: ['\\b(friendl(y|ier)|soften|softer|tone( it)? down|tone|nicer|kinder|gentler|warmer|more welcoming|less (scary|harsh|intimidating|serious)|scary|harsh|intimidating|sounds? (better|nicer|friendlier|warmer|softer)|plus (amical|chaleureux|doux|accueillant)|adoucir|moins (dur|severe|intimidant))\\b'],
+      not: ['\\b(french|francais|english|anglais|photo|photos|picture|prices?|rates?|fees?|table|tarifs?|prix|dollarsign)\\b'], id: 'story-words' },
+      { all: ['\\b(fix|change|reword|rewrite|edit|corriger|changer|modifier)\\b', '\\b(word|words|wording|bit|phrase|sentence|line|says|sounds|think|thinks|story|description|that part|mot|mots|histoire)\\b'],
       not: ['\\b(french|francais|english|anglais|photo|photos|picture|prices?|rates?|fees?|table|tarifs?|prix|dollarsign)\\b'], id: 'story-words' }] },
   // Sport test 16 (Nadia: "tournaments are 24 to 150 golfers. smallest size here is 20+, is that close enough" got Closures).
   groups: { words: ['\\b(group|groups|size|sizes|golfers|people|players|guests|tournaments?|chip|chips|smallest|biggest|largest|minimum|groupe|groupes|taille|joueurs|golfeurs)\\b'],
@@ -1259,6 +1304,10 @@ const SCREENS = {
   indoor: { words: ['\\b(kind|kinds|type|category|pick|choose|tick|long|takes|take|time|length|hours|minutes|round|rounds|holes|visit|genre|duree|temps)\\b'],
     own: ['indoor-kinds-many', 'sport-kinds-other', 'sport-second-kind', 'sport-one-listing', 'sport-no-range', 'indoor-visit-length', 'indoor-also-offer', 'sport-bay-link', 'sport-two-courses', 'sport-sister-listing', 'cuisine-pick', 'sport-find-me', 'sport-part-season', 'indoor-age', 'indoor-booking', 'sport-walk-ons', 'sport-tee-times', 'sport-golf-details', 'sport-lessons', 'sport-members', 'sport-public', 'indoor-camps'],
     pick: [{ all: ['\\b(how long|takes|take about|takes about|hourrange|minutes|round twice|go round|play twice|twice|length|duree|combien de temps|[0-9]+ hours?|an hour|half a day|half day|all day)\\b'], not: ['\\b(kind|kinds|category|categories|genre|range|simulators?|sims?|mini golf|lessons?|cours)\\b'], id: 'indoor-visit-length' }] },
+  // Sport fix round 16 (Marlene: "I am not sure about Instagram, one of the young fellows in the pro shop looks after that"):
+  // the screen's own "Not sure / someone else runs it" button.
+  social: { words: ['\\b(instagram|insta|facebook|fb|account|accounts|page|social|compte|reseaux)\\b'],
+    pick: [{ all: ['\\b(not sure|unsure|dont know|don t know|do not know|no idea|someone else|somebody else|one of the|looks after|look after|runs it|run by|handles|manages|takes care|pas sur|pas certain|je ne sais pas|quelqu un d autre|s en occupe)\\b'], not: ['\\b(two accounts|2 accounts|resort|resorts|club s|city|municipal|head office|its own|our own|own instagram|app|apps|application|appli|deux comptes|ville)\\b'], id: 'sport-social-unsure' }] },
   closures: { words: ['\\b(close|closes|closed|closing|closure|closures|shut|tick|holiday|holidays|thanksgiving|christmas|frost|weather|rain|snow|aeration|tournament|ferme|fermee|fermeture|fermetures|cocher|conge|feries?|noel)\\b'],
     own: CLOSE_TOPICS.concat(['sport-weather', 'sport-aeration', 'sport-part-season', 'sport-holiday-short', 'hours-open-holidays', 'indoor-holiday-open', 'sport-tournaments', 'sport-season', 'indoor-seasonal', 'season', 'sport-season-says', 'shows-closed', 'sport-offseason-events', 'sport-offseason-other', 'sport-restaurant', 'event-add', 'sport-one-listing']) },
 };

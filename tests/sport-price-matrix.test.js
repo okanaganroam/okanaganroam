@@ -60,7 +60,11 @@ const MAIN = 40, LOWER = 25, HIGHER = 90, ROOM = 120, PERSON = 30, SUGG = 5;
 // Scenario -> how the owner set it up.
 const SCENARIOS = {
   main: { price: MAIN },
+  // Sport fix round 16 (2026-11-21; sport test 17, Marlene's $155 read "From $109"): THE SPORT CARD RULE. Once a Price is
+  // typed, no Your-prices line lowers it, for every sport kind: a lower plain line stays in her list only.
   lower: { price: MAIN, typed: [['Main', String(MAIN)], ['Lower one', String(LOWER)], ['Locker', '1']] },
+  // No Price typed: her lowest plain line sets the card.
+  skipped: { typed: [['Main', String(MAIN)], ['Lower one', String(LOWER)], ['Locker', '1']] },
   higher: { price: MAIN, typed: [['Main', String(MAIN)], ['Bigger one', String(HIGHER)]] },
   // Sport test 1 (2026-11-20; Debbie's card said her $23 power cart): extras and discounted people's lines lower than the
   // main price never become the headline, for every sport kind (they read as the main price only).
@@ -96,7 +100,7 @@ test('THE PRICE RULE for sport: every sport kind × every price scenario: the pa
       app.writeIndoorVisitRows(v.id);
       app.indoorCardPrice(v.id);
       const perPerson = typeof cfg.price === 'number' && !(cfg.info && cfg.info.per);
-      const lowest = cfg.extras ? cfg.price : cfg.typed ? Math.min(cfg.price, ...cfg.typed.filter((x) => x[0] !== 'Locker').map((x) => Number(x[1]))) : cfg.price;
+      const lowest = cfg.extras || sc === 'lower' ? cfg.price : cfg.typed ? Math.min(cfg.price, ...cfg.typed.filter((x) => x[0] !== 'Locker').map((x) => Number(x[1]))) : cfg.price;
       const exact = !!EXACT[k];
       // 1. The page's Prices row (EN + FR).
       const en = page(v), fr = page(v, 'fr');
@@ -108,11 +112,11 @@ test('THE PRICE RULE for sport: every sport kind × every price scenario: the pa
       for (const lang of ['en', 'fr']) want(!BAD_WORDS_RE.test(L[lang]), `${id}: ${lang} "${L[lang]}" says Adult price`);
       if (!exact) for (const lang of ['en', 'fr']) want(!EXACT_RE.test(L[lang]), `${id}: a range kind's ${lang} line names an exact label: "${L[lang]}"`);
       // What each scenario must say.
-      if (sc === 'main' || sc === 'higher' || sc === 'extras' || sc === 'qualified' || sc === 'described') want(L.en === (exact ? `${EXACT[k][0]} ${money(MAIN, 'en')}.` : IK.indoorKindText([k], 'en').price.page.replace('{x}', money(MAIN, 'en'))), `${id}: EN "${L.en}"`);
-      if (sc === 'lower') {
-        want(L.en.includes(money(LOWER, 'en')), `${id}: EN "${L.en}" leads with the lowest`);
-        want(exact ? L.en === `From ${money(LOWER, 'en')} (${EXACT[k][0].charAt(0).toLowerCase()}${EXACT[k][0].slice(1)} ${money(MAIN, 'en')}).` : !L.en.includes(money(MAIN, 'en')), `${id}: EN "${L.en}"`);
-        want(L.fr.includes(sp(money(LOWER, 'fr'))), `${id}: FR "${L.fr}" leads with the lowest`);
+      if (sc === 'main' || sc === 'lower' || sc === 'higher' || sc === 'extras' || sc === 'qualified' || sc === 'described') want(L.en === (exact ? `${EXACT[k][0]} ${money(MAIN, 'en')}.` : IK.indoorKindText([k], 'en').price.page.replace('{x}', money(MAIN, 'en'))), `${id}: EN "${L.en}"`);
+      if (sc === 'lower') want(!L.en.includes(money(LOWER, 'en')) && !L.fr.includes(sp(money(LOWER, 'fr'))), `${id}: a lower line never lowers a typed Price: "${L.en}" / "${L.fr}"`);
+      if (sc === 'skipped') {
+        want(L.en.includes(money(LOWER, 'en')) && L.fr.includes(sp(money(LOWER, 'fr'))), `${id}: no Price typed: her lowest plain line, "${L.en}" / "${L.fr}"`);
+        want(String(app.cardPriceFor(v.id)).includes(money(LOWER, 'en')), `${id}: no Price typed: card "${app.cardPriceFor(v.id)}" (want ${LOWER})`);
       }
       if (sc === 'room') want(/^From \$120 per room/.test(L.en) && /^À partir de 120 \$ par salle/.test(L.fr), `${id}: "${L.en}" / "${L.fr}"`);
       if (sc === 'free') want(L.en === 'Free entry.' && L.fr === 'Entrée gratuite.', `${id}: "${L.en}" / "${L.fr}"`);
@@ -121,7 +125,7 @@ test('THE PRICE RULE for sport: every sport kind × every price scenario: the pa
       // 2. The card: the lowest real price, "From" unless an exact kind with nothing lower; its small line.
       const card = app.cardPriceFor(v.id), basis = (db.prepare('SELECT basis FROM price_overrides WHERE venue_id = ?').get(v.id) || {}).basis;
       if (perPerson) {
-        want(card === `${exact && sc !== 'lower' ? '' : 'From '}${money(lowest, 'en')}`, `${id}: card "${card}" (want the lowest, ${lowest})`);
+        want(card === `${exact ? '' : 'From '}${money(lowest, 'en')}`, `${id}: card "${card}" (want the lowest, ${lowest})`);
         want(!BAD_WORDS_RE.test(String(basis)) && (exact || !EXACT_RE.test(String(basis))), `${id}: card line "${basis}"`);
         // Build My Trip: its words and amount are the page's.
         const f = app.indoorPlannerFacts(v.id);
