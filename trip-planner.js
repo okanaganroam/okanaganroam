@@ -5974,7 +5974,7 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         const matched=requirements.items.filter(i=>['type','type_count','venue_kind','activity','feature'].includes(i.kind)&&tripRequirements.matches(v,i));
         // Round 9: a stop kept through a Swap is only replaced when it cannot fit at all, never for a better-verified one.
         const softKept=Object.entries(input.pinned||{}).some(([k,id])=>id===v?.id&&softPins.has(k));
-        for(const alt of softKept?[]:stop.alternates||[]){
+        for(const alt of softKept||options.noReplace?[]:stop.alternates||[]){
           const candidate=byId.get(alt.venue?.id), alternative=candidate&&fit(candidate);
           if(!alternative||alternative.bad||alternative.provisional||!matched.every(i=>tripRequirements.matches(candidate,i))||group.stops.some(s=>s.venue?.id===candidate.id))continue;
           if(candidate.type==='golf'&&!candidate.indoorGolf&&group.stops.some(s=>s!==stop&&s.venue&&s.venue.type==='golf'))continue; // round 11: one round a day
@@ -5985,7 +5985,7 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         // Round 8 (2026-10-19): a stop whose listed hours do not fit (lunch that cannot start before 3 PM, a place that
         // closes first) is replaced by a nearby place of the same kind that does fit, rather than leaving a timing
         // conflict and the rest of the day untimed.
-        if(timed?.bad&&!options.probe&&!stop.event){
+        if(timed?.bad&&!options.probe&&!options.noReplace&&!stop.event){
           const inPlan=new Set(groups.flatMap(g=>g.stops.map(s=>s.venue&&s.venue.id).filter(Boolean)));
           const exclude=new Set([...(input.excludeIds||[]),...(input.avoidIds||[])]);
           const matched=requirements.items.filter(i=>['type','venue_kind','feature'].includes(i.kind)&&i.strength!=='prefer'&&tripRequirements.matches(v,i));
@@ -8610,11 +8610,155 @@ function v4SwapSteady(result, input) {
 //   input.stopStarts      { "<day>-<part>": minutes }  one stop's start time, honoured as given; refused only when the
 //                         place is closed then or there is no room before the next stop -> result.stopStartRefused
 const AGENT_PART_START = { early: 480, morning: 600, midday: 720, afternoon: 810, late: 930, evening: 1080, night: 1185 };
+// Round 5 (2026-11-22): a tour that includes a meal ("Lunch Wine Tour", "lunch included") -- the lunch inside its
+// window gives way instead of moving.
+const TOUR_MEAL_INCLUDED_RE = /\b(?:lunch (?:wine |winery |food )?tours?|tours? with lunch|(?:with|includ(?:es|ing|ed)?|plus) (?:a |an )?(?:(?:gourmet|winery|picnic|bistro|hot|light|plated|catered|two course|three course) )?(?:lunch|meal)|(?:lunch|meal) (?:is )?included|stop for lunch|lunch stop|lunch at (?:a |the |one )?(?:winery|vineyard|bistro|restaurant))\b/;
+function tourIncludesMeal(v) {
+  const t = normWords(`${(v && v.name) || ''} ${(v && v.description) || ''}`).replace(/\b(?:bring|pack) (?:your own|a) (?:lunch|picnic)\b|\b(?:lunch|meals?) (?:is |are )?not included\b|\b(?:lunch|meals?) (?:is |are )?extra\b/g, ' ');
+  return TOUR_MEAL_INCLUDED_RE.test(t);
+}
+// A meal stop on a day plan: a restaurant or pub, or a café in the morning or at midday (a café later is a treat).
+function v4MealStop(s) {
+  const t = s && s.venue && s.venue.type;
+  return !!t && (t === 'restaurant' || t === 'pub' || (t === 'cafe' && (s.daypart === 'morning' || s.daypart === 'midday')));
+}
+// Round 5: a tour placed as a timed stop owns its window. After the day is timed again, every other stop inside it:
+//   a meal the tour includes gives way; lunch (a meal at midday) moves after the tour, else before it, else the tour
+//   starts after lunch, else lunch gives way; dinner moves after the tour; any other stop moves to a free gap in its open
+//   hours (taking a free part of the day in time order), else gives way. -> tourReplaced (gave way), tourMoved
+//   [{ id, from, to, startMinutes }] (moved), tourAdjust [{ listingId, how, id?, startMinutes? }] (what happened to lunch
+//   or the tour's own start: lunch_in_tour, lunch_after, lunch_before, tour_after_lunch, lunch_gave_way, dinner_after).
+function v4ClearTourWindow(result, t, byId, out) {
+  const day = t.day, sch = () => result.schedule || [];
+  const rowOf = (s) => sch().find((r) => r.day === day.day && ((s.venue && r.venueId === s.venue.id) || (s.event && r.eventId === s.event.id))) || null;
+  const tourStop = day.stops.find((s) => s && s.venue && s.venue.id === t.id);
+  const tourRow = sch().find((r) => r.day === day.day && r.venueId === t.id);
+  if (!tourStop || !tourRow) return;
+  const wd = day.date ? WEEKDAYS[(new Date(`${day.date}T12:00:00Z`).getUTCDay() + 6) % 7] : null;
+  const openRanges = (s) => {
+    const fv = s.venue && byId.get(s.venue.id);
+    const h = fv && wd ? (fv._hours || (fv._hours = parseVenueHours(fv.hours))) : null;
+    if (h && h.known && h.days[wd]) return h.days[wd].status === 'open' ? h.days[wd].ranges : [];
+    return v4MealStop(s) ? [[420, 1320]] : [[540, 1140]];
+  };
+  const fits = (s, a, b) => openRanges(s).some(([x, y]) => a >= x && b <= y);
+  // A stop the timing left without a time (it could not fit around the tour) gets its part of the day's usual time.
+  for (const s of day.stops) {
+    if (!s || !s.venue || s.venue.id === t.id) continue;
+    let r = rowOf(s);
+    if (r && Number.isFinite(r.startMinutes)) continue;
+    if (!r) { r = { day: day.day, ...(day.date ? { date: day.date } : {}), venueId: s.venue.id }; result.schedule = sch().concat([r]); }
+    r.startMinutes = AGENT_PART_START[s.daypart] || 720; r.endMinutes = r.startMinutes + (v4MealStop(s) ? 75 : 60); r.status = 'estimated';
+  }
+  const busy = (except) => day.stops.filter((s) => s && s !== except && (s.venue || s.event)).map((s) => ({ s, r: rowOf(s) })).filter((x) => x.r && Number.isFinite(x.r.startMinutes)).map((x) => ({ s: x.s, a: x.r.startMinutes, b: Number.isFinite(x.r.endMinutes) ? x.r.endMinutes : x.r.startMinutes + 60 }));
+  const clashes = (s, a, b) => busy(s).some((x) => a < x.b + 10 && b + 10 > x.a);
+  const key = (s) => `${day.day}-${s.daypart}`;
+  // The part of the day a stop takes at a new time: its own when the order still holds, else a free one in time order.
+  const partFor = (s, a) => {
+    const others = busy(s).filter((x) => x.s.daypart);
+    const before = others.filter((x) => x.a < a).map((x) => V4_DAYPARTS.indexOf(x.s.daypart));
+    const after = others.filter((x) => x.a >= a).map((x) => V4_DAYPARTS.indexOf(x.s.daypart));
+    const lo = before.length ? Math.max(...before) : -1, hi = after.length ? Math.min(...after) : V4_DAYPARTS.length;
+    const own = V4_DAYPARTS.indexOf(s.daypart);
+    if (own > lo && own < hi) return s.daypart;
+    const taken = new Set(day.stops.filter((x) => x && x !== s && (x.venue || x.event)).map((x) => x.daypart));
+    for (let i = lo + 1; i < hi; i++) if (!taken.has(V4_DAYPARTS[i])) return V4_DAYPARTS[i];
+    return null;
+  };
+  const sortDay = () => day.stops.sort((x, y) => V4_DAYPARTS.indexOf(x.daypart) - V4_DAYPARTS.indexOf(y.daypart));
+  const place = (s, a, len) => {
+    const part = partFor(s, a);
+    if (!part) return false;
+    const r = rowOf(s), from = key(s);
+    if (!r) return false;
+    if (part !== s.daypart) { day.stops = day.stops.filter((x) => !(x && x !== s && x.daypart === part && !x.venue && !x.event)); s.daypart = part; s.label = PLAN_DAYPART_LABELS[part] || s.label; }
+    r.startMinutes = a; r.endMinutes = a + len; if (['unmet', 'unverified'].includes(r.status)) r.status = 'estimated';
+    s.keepStart = a;
+    sortDay();
+    if (s.venue) out.tourMoved.push({ id: s.venue.id, from, to: key(s), startMinutes: a });
+    return true;
+  };
+  const giveWay = (s) => {
+    day.stops.splice(day.stops.indexOf(s), 1);
+    result.schedule = sch().filter((r) => !(r.day === day.day && s.venue && r.venueId === s.venue.id));
+    if (s.venue && !out.tourReplaced.includes(s.venue.id)) out.tourReplaced.push(s.venue.id);
+  };
+  // A free gap of the day for a stop of length len, nearest to where it was.
+  const gapFor = (s, len, was) => {
+    const cands = [];
+    for (const [x, y] of openRanges(s)) for (let a = Math.max(x, 480); a + len <= Math.min(y, 1320); a += 15) if (!clashes(s, a, a + len)) cands.push(a);
+    cands.sort((p, q) => Math.abs(p - was) - Math.abs(q - was));
+    for (const a of cands) if (partFor(s, a)) return a;
+    return null;
+  };
+  const tv = byId.get(t.id);
+  const tourMeal = tourIncludesMeal(tv);
+  for (let guard = 0; guard < 12; guard++) {
+    const ts = tourRow.startMinutes, te = tourRow.endMinutes;
+    const hit = busy(tourStop).find((x) => x.a < te && x.b > ts && !x.s.event);
+    if (!hit) break;
+    const s = hit.s, len = Math.max(45, Math.min(120, hit.b - hit.a));
+    const lunch = v4MealStop(s) && (s.daypart === 'midday' || (hit.a >= 660 && hit.a < 900));
+    const dinner = v4MealStop(s) && !lunch && (s.daypart === 'evening' || s.daypart === 'night' || hit.a >= 1020);
+    if (lunch && tourMeal) { giveWay(s); out.tourAdjust.push({ listingId: t.id, how: 'lunch_in_tour', id: s.venue.id }); continue; }
+    if (lunch) {
+      const after = te + 15, before = ts - 15 - len;
+      if (after <= 900 && !clashes(s, after, after + len) && fits(s, after, after + len) && place(s, after, len)) { out.tourAdjust.push({ listingId: t.id, how: 'lunch_after', id: s.venue.id, startMinutes: after }); continue; }
+      if (before >= 690 && !clashes(s, before, before + len) && fits(s, before, before + len) && place(s, before, len)) { out.tourAdjust.push({ listingId: t.id, how: 'lunch_before', id: s.venue.id, startMinutes: before }); continue; }
+      // The tour starts after lunch (lunch as early as it sensibly can be: 11:30, or when it opens) when the tour still
+      // ends before dinner.
+      const dur = te - ts;
+      const nextMeal = busy(tourStop).filter((x) => x.s !== s && x.a > hit.a && v4MealStop(x.s)).map((x) => x.a).sort((p, q) => p - q)[0];
+      const prevEnd = Math.max(0, ...busy(tourStop).filter((x) => x.s !== s && x.a < Math.min(ts, hit.a)).map((x) => x.b));
+      const la0 = Math.max(690, prevEnd + 10);
+      const lr = openRanges(s).find(([x, y]) => Math.max(x, la0) + 60 <= y);
+      const la = lr ? Math.max(lr[0], la0) : null;
+      const ns = la == null ? null : la + 60 + 15, ne = ns == null ? null : ns + dur;
+      if (la != null && la <= 810 && ne <= 1170 && (!nextMeal || ne + 15 <= nextMeal) && (!tv || !tv.hours || fits({ venue: { id: t.id }, daypart: tourStop.daypart }, ns, ne))) {
+        const lunchRow = rowOf(s);
+        tourRow.startMinutes = ns; tourRow.endMinutes = ne; tourStop.keepStart = ns; t.start = ns; t.end = ne;
+        if (lunchRow) { lunchRow.startMinutes = la; lunchRow.endMinutes = la + 60; s.keepStart = la; }
+        // Lunch comes first in the day's order, then the tour (a free later part of the day, else they trade parts).
+        const tp = partFor(tourStop, ns);
+        if (tp && tp !== tourStop.daypart) { tourStop.daypart = tp; tourStop.label = PLAN_DAYPART_LABELS[tp] || tourStop.label; sortDay(); }
+        else if (V4_DAYPARTS.indexOf(s.daypart) > V4_DAYPARTS.indexOf(tourStop.daypart)) { const p0 = tourStop.daypart; tourStop.daypart = s.daypart; s.daypart = p0; tourStop.label = PLAN_DAYPART_LABELS[tourStop.daypart] || tourStop.label; s.label = PLAN_DAYPART_LABELS[s.daypart] || s.label; sortDay(); }
+        out.tourAdjust.push({ listingId: t.id, how: 'tour_after_lunch', id: s.venue.id, startMinutes: ns, lunchMinutes: la });
+        continue;
+      }
+      if (te + 15 <= 945 && !clashes(s, te + 15, te + 15 + len) && fits(s, te + 15, te + 15 + len) && place(s, te + 15, len)) { out.tourAdjust.push({ listingId: t.id, how: 'lunch_after', id: s.venue.id, startMinutes: te + 15 }); continue; }
+      giveWay(s); out.tourAdjust.push({ listingId: t.id, how: 'lunch_gave_way', id: s.venue.id });
+      continue;
+    }
+    if (dinner) {
+      const a = Math.max(te + 15, hit.a);
+      if (a <= 1230 && !clashes(s, a, a + len) && fits(s, a, a + len) && place(s, a, len)) { out.tourAdjust.push({ listingId: t.id, how: 'dinner_after', id: s.venue.id, startMinutes: a }); continue; }
+      giveWay(s);
+      continue;
+    }
+    const L = Math.min(len, 75);
+    const a = gapFor(s, L, hit.a);
+    if (a != null && place(s, a, L)) continue;
+    giveWay(s);
+  }
+}
 function v4AgentHooks(result, input) {
   if (!input || !input.v4 || !result || !['multi_day', 'day_plan'].includes(result.kind) || !(result.days || []).length) return result;
   const moves = Array.isArray(input.moves) ? input.moves : [];
-  const tours = Array.isArray(input.tourStops) ? input.tourStops : [];
   const pinned = input.pinned || {};
+  // Round 5: one entry per tour (a later entry for the same tour is a move to its new day), and a tour the plan on screen
+  // shows on another day (moved there earlier, so its pin is there) follows that pin.
+  const tours = [];
+  for (const t0 of (Array.isArray(input.tourStops) ? input.tourStops : [])) {
+    if (!t0) continue;
+    const i = tours.findIndex((x) => x.listingId === t0.listingId);
+    if (i >= 0) tours.splice(i, 1);
+    tours.push({ ...t0 });
+  }
+  for (const t0 of tours) {
+    const pk = Object.keys(pinned).find((k) => pinned[k] === t0.listingId);
+    const m = pk && /^([1-7])-(morning|midday|afternoon|late|evening|night)$/.exec(pk);
+    if (m && Number(m[1]) !== t0.day) { const keepTime = m[2] === t0.part; t0.day = Number(m[1]); t0.part = m[2]; if (!keepTime) delete t0.startMinutes; }
+  }
   const trusted = input.keepOnDateChange ? Object.keys(pinned) : (Array.isArray(input.trustedPins) ? input.trustedPins.filter((k) => pinned[k]) : []);
   const starts = input.stopStarts && typeof input.stopStarts === 'object' ? input.stopStarts : {};
   if (!moves.length && !tours.length && !trusted.length && !Object.keys(starts).length) return result;
@@ -8647,6 +8791,9 @@ function v4AgentHooks(result, input) {
     empty(to, b.part);
     s.daypart = b.part; s.label = PLAN_DAYPART_LABELS[b.part] || s.label; delete s.keepStart;
     to.stops.push(s);
+    // A tour that moves takes its timed slot with it (same time of day when the part of the day is the same).
+    const tt = s.venue && tours.find((x) => x.listingId === s.venue.id);
+    if (tt) { if (tt.part !== b.part) delete tt.startMinutes; tt.day = b.d; tt.part = b.part; }
     order(from); order(to);
     moved.push({ from: m.from, to: m.to, id: (s.venue || s.event).id });
     changed = true;
@@ -8697,7 +8844,7 @@ function v4AgentHooks(result, input) {
   // The day is timed again with the new stops (a dated plan by its hours; an undated one by its usual times).
   if (changed) {
     try {
-      if (input.requirements && (result.schedule || []).length && !result.suggestedTimes) scheduleTripByHours(result, input, { ...input.requirements, items: input.requirements.items || [], conflicts: input.requirements.conflicts || [] });
+      if (input.requirements && (result.schedule || []).length && !result.suggestedTimes) scheduleTripByHours(result, input, { ...input.requirements, items: input.requirements.items || [], conflicts: input.requirements.conflicts || [] }, tours.length ? { noReplace: true } : {});
       else { result.schedule = []; addSuggestedTimes(result, input); }
     } catch (e) { /* keep the times it had */ }
     try { refreshPlanCounts(result, input); } catch (e) { /* cosmetic */ }
@@ -8757,9 +8904,19 @@ function v4AgentHooks(result, input) {
     if (['unmet', 'unverified'].includes(r.status)) r.status = 'estimated';
     s.keepStart = min;
   }
+  // Round 5: the tour's window is its own (no stop inside it), after every other change.
+  const tourMoved = [], tourAdjust = [];
+  for (const t of placed) { try { v4ClearTourWindow(result, t, byId, { tourReplaced, tourMoved, tourAdjust }); } catch (e) { /* the tour stands as placed */ } }
+  for (const t of placed) { const e = tours.find((x) => x.listingId === t.id); if (e) { e.day = t.day.day; e.startMinutes = t.start; const st = t.day.stops.find((x) => x && x.venue && x.venue.id === t.id); if (st) e.part = st.daypart; } }
   if (moves.length) { result.moved = moved; if (moveConflicts.length) result.moveConflicts = moveConflicts; }
   if (trusted.length) result.droppedPins = droppedPins;
-  if (tours.length) { result.tourReplaced = tourReplaced; if (tourStopErrors.length) result.tourStopErrors = tourStopErrors; }
+  if (tours.length) {
+    result.tourReplaced = tourReplaced; if (tourStopErrors.length) result.tourStopErrors = tourStopErrors;
+    if (tourMoved.length) result.tourMoved = tourMoved;
+    if (tourAdjust.length) result.tourAdjust = tourAdjust;
+    // The tours as they are now on the plan: the chat sends this list back as tourStops next time.
+    result.tourStops = tours.filter((x) => placed.some((p) => p.id === x.listingId));
+  }
   if (Object.keys(starts).length && stopStartRefused.length) result.stopStartRefused = stopStartRefused;
   return result;
 }
