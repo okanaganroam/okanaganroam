@@ -6827,6 +6827,38 @@ function clarifyEventMealConflict(plan,input={}){
 // the plan, or -- when there is none -- keeps the place that was there (swap.id) with a friendly note. It used to drop
 // the ski day's optional activity silently, or offer a place already planned on another day.
 const SWAP_ORDER = ['morning', 'midday', 'afternoon', 'late', 'evening', 'night'];
+// Travel agent chat (2026-11-22, trip-chat.js): a Swap can ask for a kind of place rather than the old stop's own type
+// ("swap the brewery for something for the kids", "ice cream after lunch") and a cheaper or fancier one ("cheaper
+// dinner"). The slot, its time and every other stop stay as they are; only the candidates change. swap.want is one of
+// these keys; swap.priceMax / priceMin bound the stored price (1-4). Nothing of that kind fits: result.swapMissed, and
+// the slot is left as the planner had it (never another kind of place passed off as the one asked for).
+const SWAP_WANTS = {
+  kids: { types: ['outdoor', 'indoor', 'beach', 'tour', 'golf', 'sport'], feature: 'kid_friendly' },
+  ice_cream: { types: ['cafe', 'restaurant'], name: /\b(?:ice ?cream\w*|gelat\w*|creamer\w*|glaces?|froyo|frozen yog\w*|shake shop|soft serve)\b/i },
+  outdoor: { types: ['outdoor', 'beach'] },
+  hike: { types: ['outdoor'] },
+  viewpoint: { types: ['outdoor'] },
+  indoor: { types: ['indoor'] },
+  arts: { types: ['indoor', 'outdoor', 'tour'], feature: 'arts_culture' },
+  spa: { types: ['indoor', 'outdoor', 'sport'], name: /\bspa\b/i },
+  lake_view: { feature: 'lake_view' },
+  patio: { feature: 'patio' },
+  live_music: { feature: 'live_music' },
+};
+function swapWantOk(v, swap) {
+  if (!v || !swap) return false;
+  const w = swap.want ? SWAP_WANTS[swap.want] : null;
+  if (w) {
+    if (w.types && !w.types.includes(v.type)) return false;
+    if (w.feature && !(v.features && v.features[w.feature])) return false;
+    if (w.name && !w.name.test(`${v.name || ''} ${v.cuisine || ''}`)) return false;
+  }
+  const price = Number(v.price);
+  if (Number.isInteger(swap.priceMax) && !(price >= 1 && price <= swap.priceMax)) return false;
+  if (Number.isInteger(swap.priceMin) && !(price >= swap.priceMin)) return false;
+  return true;
+}
+const swapAsksKind = (swap) => !!(swap && (swap.want || swap.priceMax !== undefined || swap.priceMin !== undefined));
 const SWAP_TYPE_WORDS = { restaurant: 'restaurant', cafe: 'café', pub: 'pub', cocktail: 'lounge', brewery: 'brewery', distillery: 'distillery', winery: 'winery', beach: 'beach', golf: 'golf course', outdoor: 'outdoor stop', indoor: 'indoor attraction', tour: 'tour', sport: 'activity' };
 // Round 8 (2026-10-19): the slot keeps its purpose. A winery lunch is swapped for another winery that serves food, a
 // vegan lunch for another vegan spot, a romantic dinner for another sit-down dinner (never pizza), dinner "in Brackendale"
@@ -6882,7 +6914,7 @@ function swapSlotStop(result, input, day, stop, part, allStops) {
   const original = swap.id ? byId.get(swap.id) : null;
   const purpose = swapPurposeTest(original, stop, part, result, input, ctx, regions);
   const corePick = stop && stop.venue && byId.get(stop.venue.id);
-  if (corePick && corePick.type === swap.type && !dup && corePick.id !== swap.id && purpose.ok(corePick) && (!purpose.home || corePick.region === purpose.home)) return;
+  if (corePick && (swap.want ? true : corePick.type === swap.type) && swapWantOk(corePick, swap) && !dup && corePick.id !== swap.id && purpose.ok(corePick) && (!purpose.home || corePick.region === purpose.home)) return;
   const k = stop ? day.stops.indexOf(stop) : day.stops.findIndex((s) => SWAP_ORDER.indexOf(s.daypart) > SWAP_ORDER.indexOf(part));
   const at = k < 0 ? day.stops.length : k;
   const neighbours = [day.stops.slice(0, at).reverse().find((s) => s.venue && s !== stop), day.stops.slice(at).find((s) => s.venue && s !== stop)].filter(Boolean).map((s) => byId.get(s.venue.id)).filter(Boolean);
@@ -6929,13 +6961,14 @@ function swapSlotStop(result, input, day, stop, part, allStops) {
   const estateWords = estateKitchens(facts).words;
   const planEstates = new Set([...others].map((id) => estateKey(byId.get(id), estateWords)).filter(Boolean));
   const estateOk = (v) => { const k = ['winery', 'restaurant'].includes(v.type) ? estateKey(v, estateWords) : null; return !k || !planEstates.has(k); };
-  const typeOk = (v) => v.type === swap.type || (purpose.wineryLunch && ['winery', 'restaurant'].includes(v.type));
+  const typeOk = (v) => (swap.want ? true : (v.type === swap.type || (purpose.wineryLunch && ['winery', 'restaurant'].includes(v.type)))) && swapWantOk(v, swap);
   const cands = facts.filter((v) => typeOk(v) && estateOk(v) && !(daytimePart(part) && eveningOnlyVenue(v)) && !(purpose.wineryLunch && (tastingRoomWithRestaurant(v, facts) || wineryLunchRank(v, estateWords) < 15)) && !others.has(v.id) && v.id !== swap.id && !ctx.exclude.has(v.id) && (!towns.length || towns.includes(v.region)) && mealOk(v) && daylightOk(v) && golfOk(v) && fitsKept(v) && !offSeasonSkip(v, { ...ctx, tripDate: date || ctx.tripDate })
     && (!skiExtra || (SKI_EXTRA_RE.test(v.textName || '') && (!skiDark || SKI_LIT_RE.test(v.textName || '')))) && purpose.ok(v)
     && eligible(v, ctx, false) && hoursFit(v, win, weekday).status !== 'closed' && !(date && seasonClosedOnTrip(v, { date })) && tripRequirements.venueAllowed(v, input.requirements, day.day, input.tripDate))
     .map((v) => { const km = neighbours.map((n) => kmBetween(n, v)).filter((x) => x != null); return { v, score: scoreVenue(v, ctx).score + purpose.bonus(v) + openAtKept(v) - (km.length ? Math.min(...km) * 1.5 : 6) }; });
   const pick = themePick(cands);
   const keepStop = corePick && !dup && corePick.id !== swap.id && !(purpose.wineryLunch && !(purpose.ok(corePick) && estateOk(corePick))) && !(DINING_TYPES.includes(corePick.type) && neighbours.some((n) => DINING_TYPES.includes(n.type) && n.type !== 'cafe'));
+  if (!pick && swapAsksKind(swap)) { result.swapMissed = { key: swap.key }; return; }
   if (!pick && keepStop) return; // the planner found another kind of place for the slot; that is still a swap
   const chosen = pick ? pick.v : original;
   if (!chosen) return;
@@ -6952,6 +6985,8 @@ function swapSlotStop(result, input, day, stop, part, allStops) {
   Object.keys(stop).forEach((key) => { delete stop[key]; });
   const purposeReasons = purpose.wineryLunch && chosen.type === 'winery' ? [{ code: 'meal', text: 'Lunch at a winery that serves food, so it is a tasting too', weight: 4 }] : [];
   Object.assign(stop, keep, stopFrom(chosen, { reasons: purposeReasons.concat(scoreVenue(chosen, ctx).reasons), caveats: extraCaveats }, regionReason(chosen, ctx), ctx));
+  // Chat (2026-11-22): a stop swapped for a kind of place keeps the slot's time (no earlier than the one shown).
+  if (swapAsksKind(swap) && keptStart != null && !stop.gapFill) stop.keepStart = keptStart;
   if (!pick) {
     const word = skiExtra ? 'after-ski activity' : purpose.wineryLunch ? 'winery that serves lunch' : SWAP_TYPE_WORDS[swap.type] || 'place';
     result.swapKept = { key: swap.key, id: chosen.id, name: chosen.name };
@@ -10459,6 +10494,7 @@ function scheduleNotes(result, ctx) {
 }
 
 module.exports = {
+  SWAP_WANTS, swapWantOk,
   // Build My Trip V4 (2026-11-20)
   v4Input, v4Polish, v4CasualDinner, v4FillerSkip, v4OffTheme, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
   // Tour test 17 (Whistler, 2026-11-18)

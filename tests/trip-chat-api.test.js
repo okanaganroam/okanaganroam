@@ -159,3 +159,38 @@ test('French: replies in French', async () => {
   const c = await post({ ...bodyFor(plan, 'réserver une table'), lang: 'fr' }, '?v=4&chat=1', freshIp());
   assert.equal(c.j.reply, tc.T.fr.booking);
 });
+
+// Live eval round 2 (2026-11-22): one-stop edits with the real planner. The repo database has food and drink only, so a
+// kids' activity is added for this test (removed after; `git checkout -q okanagan.db` if a run is interrupted).
+test('real planner: "swap the day 1 brewery for something for the kids" and "ice cream after lunch on day 1" change one stop, in place', async () => {
+  const db = require('../db.js');
+  const id = Number(db.prepare('INSERT INTO venues (name, region, type, slug, description, kid_friendly, price) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run('Test Family Farm', 'penticton', 'outdoor', 'test-family-farm-chat', 'Petting farm with animals and a playground for kids.', 1, 1).lastInsertRowid);
+  try {
+    app.setTripChatReader(null);
+    const text = '2 days in Penticton with a brewery and a beach';
+    const plan = planNow(text);
+    const before = tc.planStops(plan);
+    const brewery = before.find((s) => s.day === 1 && s.type === 'brewery');
+    assert.ok(brewery, 'the plan has a day 1 brewery');
+    const body = (m) => ({ ...bodyFor(plan, m), plan: { text, seed: 0, excludeVenueIds: [] } });
+    const kids = await post(body('swap the day 1 brewery for something for the kids'), '?v=4&chat=1', freshIp());
+    assert.equal(kids.status, 200);
+    assert.deepEqual(kids.j.changed, [brewery.key], kids.j.reply);
+    const k = tc.planStops(kids.j.plan).find((s) => s.key === brewery.key);
+    assert.equal(k.id, id);
+    assert.ok(k.start >= brewery.start, 'the slot keeps its time');
+    assert.match(kids.j.reply, /^Done\. Swapped .+ for Test Family Farm at /);
+    const lunch = before.find((s) => s.day === 1 && s.role === 'lunch');
+    const ice = await post(body('ice cream after lunch on day 1'), '?v=4&chat=1', freshIp());
+    assert.equal(ice.status, 200);
+    const after = tc.planStops(ice.j.plan);
+    const cone = after.find((s) => s.key === '1-afternoon');
+    assert.match(cone.name, /shake shop|ice ?cream|gelat/i);
+    assert.ok(cone.start > lunch.start && cone.start <= lunch.start + 180, `right after lunch (${cone.start})`);
+    assert.equal(after.find((s) => s.id === brewery.id).key, '1-late', 'the brewery moves one slot later');
+    assert.deepEqual(ice.j.changed.sort(), ['1-afternoon', '1-late']);
+    assert.match(ice.j.reply, /^Done\. Added .+ at \d.+\. .+ moves to /);
+    for (const s of before.filter((x) => x.key !== '1-afternoon')) assert.ok(after.some((n) => n.id === s.id), `${s.name} stays`);
+  } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(id); }
+});

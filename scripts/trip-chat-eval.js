@@ -40,7 +40,7 @@ const CASES = [
   { plan: 'beer', msg: 'remove the brewery on day 2', ops: [{ o: 'remove', sel: { type: 'brewery', day: 2 } }] },
   { plan: 'beer', msg: 'swap the day 1 brewery for something for the kids', ops: [{ o: 'replace', kind: 'kids', sel: { type: 'brewery', day: 1 } }] },
   { plan: 'beer', msg: 'add a beach day 2', ops: [{ o: 'add', kind: 'beach', day: 2 }] },
-  { plan: 'beer', msg: 'ice cream after lunch on day 1', ops: [{ o: 'add', kind: 'ice_cream' }] },
+  { plan: 'beer', msg: 'ice cream after lunch on day 1', ops: [{ o: 'add', kind: 'ice_cream', sel: { role: 'lunch', day: 1 } }] },
   { plan: 'beer', msg: 'make it 3 days', ops: [{ o: 'days', n: 3 }] },
   { plan: 'beer', msg: 'redo day 2', ops: [{ o: 'redo_day', day: 2 }] },
   { plan: 'beer', msg: "we're bringing our dog", ops: [{ o: 'party', value: 'dog' }] },
@@ -88,6 +88,15 @@ const pct = (a, q) => { if (!a.length) return null; const s = a.slice().sort((x,
 (async () => {
   const live = process.argv.includes('--live');
   if (live && !tc.apiKey()) { console.error('--live needs ANTHROPIC_API_KEY'); process.exit(2); }
+  // --fixtures: the repo database has food and drink only; this adds three test activities (a kids' farm, a park, indoor
+  // mini golf) for the run and deletes them after, so "something for the kids" / "something outdoors" can be planned.
+  const added = [];
+  if (process.argv.includes('--fixtures')) {
+    const db = require('../db.js');
+    const ins = db.prepare('INSERT INTO venues (name, region, type, slug, description, kid_friendly, price) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    for (const v of [['Test Family Farm', 'penticton', 'outdoor', 'eval-family-farm', 'Petting farm and playground for kids.', 1, 1], ['Test Lakeside Park', 'kelowna', 'outdoor', 'eval-lakeside-park', 'Lakeside park with paths and a playground.', 1, 1], ['Test Mini Golf', 'penticton', 'indoor', 'eval-mini-golf', 'Indoor mini golf and arcade for families.', 1, 2]]) added.push(Number(ins.run(...v).lastInsertRowid));
+    process.on('exit', () => { for (const id of added) db.prepare('DELETE FROM venues WHERE id = ?').run(id); });
+  }
   const regions = Object.keys(app.REGION_LABELS);
   const plans = {};
   for (const [k, text] of Object.entries(PLANS)) {
