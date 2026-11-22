@@ -80,7 +80,7 @@ test('no key: the word rules read it, the planner re-plans, the reply is a templ
   assert.equal(book.j.cant, 'booking');
   assert.equal(book.j.plan, null);
   const junk = await post(bodyFor(plan, 'asdf qwerty zzz'), '?v=4&chat=1', freshIp());
-  assert.equal(junk.j.reply, tc.T.en.unclear);
+  assert.match(junk.j.reply, /^Sorry, I didn’t catch that. Try “remove .+”, “cheaper dinner” or “more for kids”.$/, 'examples from the plan on screen');
 });
 
 test('mocked model: its operations drive the planner; every new stop is a real listing the planner picked', async () => {

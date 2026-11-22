@@ -60,6 +60,9 @@ const KINDS = {
   patio: { text: 'with a patio', en: 'a patio', fr: 'une terrasse', badge: 'patio' },
   live_music: { text: 'live music', en: 'live music', fr: 'de la musique live', badge: 'live_music' },
   spa: { text: 'spa', en: 'a spa', fr: 'un spa', name: /\bspa\b/i },
+  // Fix round (2026-11-22): "add an activity after dinner" (« ajoute une activité après le souper ») is a thing to do,
+  // never a meal.
+  activity: { text: 'things to do', en: 'an activity', fr: 'une activité', types: ['outdoor', 'indoor', 'tour', 'golf', 'sport', 'beach'] },
 };
 const KIND_KEYS = Object.keys(KINDS);
 // A kind for each venue type, for "more like the winery".
@@ -333,6 +336,7 @@ async function readChatMessage(message, opts = {}) {
 
 // ---------- The rules (no AI): the same operations from plain words, English and French ----------
 const KIND_WORDS = [
+  ['activity', /\b(?:activit(?:y|ies|e|es)|something to do|things to do|quelque chose a faire)\b/],
   ['kids', /\b(?:kids?|children|child|toddlers?|family|families|enfants?|famille|petits)\b/],
   ['ice_cream', /\b(?:ice ?cream|gelato|creme glacee|glaces?|froyo)\b/],
   ['beach', /\b(?:beach(?:es)?|plages?|swim(?:ming)?|baignade)\b/],
@@ -423,6 +427,9 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1 }
   if (nd) ops.push(op('days', { n: Math.min(7, Number(nd[1]) || NUM_WORDS[nd[1]] || 1) }));
   else if (/\b(?:add (?:a|one|another) day|one more day|extra day|un jour de plus|une journee de plus)\b/.test(t)) ops.push(op('days', { n: Math.min(7, days + 1) }));
   else if (/\b(?:one day less|one less day|shorter trip|un jour de moins)\b/.test(t) && days > 1) ops.push(op('days', { n: days - 1 }));
+  // "the second day is too busy" (fix round 2026-11-22): that day only, lighter (pace with a day).
+  const dayWord = /\b(?:first|1st|premier|premiere)\s+(?:day|jour)\b/.test(t) ? 1 : /\b(?:second|2nd|deuxieme)\s+(?:day|jour)\b/.test(t) ? 2 : /\b(?:third|3rd|troisieme)\s+(?:day|jour)\b/.test(t) ? 3 : /\b(?:last|dernier)\s+(?:day|jour)\b/.test(t) ? days : null;
+  if (/\b(?:too (?:busy|much|packed|full|long)|trop (?:charge|rempli|long))\b/.test(t) && (day || dayWord)) return { ops: [op('pace', { value: 'relaxed', day: day || dayWord })], cant: null };
   // Pace
   if (/\b(?:slow(?:er)?|relax(?:ed|ing)?|chill(?:er)?|less rushed|not rushed|fewer stops|less busy|easier|plus relax|moins charge|tranquille|moins d'arrets)\b/.test(t)) ops.push(op('pace', { value: 'relaxed' }));
   else if (/\b(?:busier|packed|more stops|fill (?:it|the day)|plus charge|plus d'arrets|plus rempli)\b/.test(t)) ops.push(op('pace', { value: 'packed' }));
@@ -479,7 +486,12 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1 }
     if (day && afterStops.some((s) => s.day === day)) afterStops = afterStops.filter((s) => s.day === day);
     const want = kindsNamed(t, new Set()).filter((k) => !(k === 'kids' && ops.some((o) => o.o === 'party' && o.value === 'kids')) && !(after && KIND_WORDS.find(([kk]) => kk === k)[1].test(after[1])));
     const time = /\bmorning|matin\b/.test(t) ? 'morning' : /\bafternoon|apres-midi\b/.test(t) ? 'afternoon' : /\bevening|tonight|soir\b/.test(t) ? 'evening' : null;
-    for (const k of want.slice(0, 2)) ops.push(op('add', { kind: k, time, day, stops: afterStops.slice(0, 1), ...(before && afterStops.length ? { value: 'earlier' } : {}) }));
+    // "a winery on each day": one on each day of the plan (fix round 2026-11-22).
+    const eachDay = !day && !afterStops.length && /\b(?:each|every) day\b|\bchaque jour\b|\btous les jours\b/.test(t) && days > 1;
+    for (const k of want.slice(0, 2)) {
+      if (eachDay) for (let d = 1; d <= days; d++) ops.push(op('add', { kind: k, time, day: d }));
+      else ops.push(op('add', { kind: k, time, day, stops: afterStops.slice(0, 1), ...(before && afterStops.length ? { value: 'earlier' } : {}) }));
+    }
   }
   return { ops, cant: null };
 }
@@ -527,6 +539,12 @@ function reconcileReads(ai, rules, message) {
     if (!m) continue;
     for (const k of ['kind', 'value', 'region']) if (r[k] && !m[k]) { m[k] = r[k]; fixes.push(`fill_${k}`); }
     if ((r.ages || []).length && !(m.ages || []).length) { m.ages = r.ages.slice(); fixes.push('fill_ages'); }
+  }
+  // (d) "add an activity after dinner" read as a swap of the dinner: the add, as the rules read it.
+  for (const r of rules.ops || []) {
+    if (r.o !== 'add' || !(r.stops || []).length) continue;
+    const i = ops.findIndex((o) => (o.o === 'replace' || o.o === 'budget') && stopIds(o) === stopIds(r));
+    if (i >= 0) { ops[i] = { ...r }; fixes.push('swap_to_add'); }
   }
   // (c) "lessons for the kids": the lessons only. A "party kids" op re-plans every stop; dropped when the rules read an
   // activity for the kids and no change of who is coming.
@@ -815,6 +833,8 @@ function broadTurn(ops, ctx) {
 // the plan is left exactly as it was and the reply says why. Short plans (an evening out) keep the earlier path.
 const DAYPARTS = ['morning', 'midday', 'afternoon', 'late', 'evening', 'night'];
 const EVENING_KINDS = new Set(['cocktail', 'live_music', 'pub']);
+// After dinner: an activity, something indoors or arts can take the night slot too.
+const NIGHT_KINDS = new Set(['activity', 'indoor', 'arts']);
 // How a kind is asked of the planner's Swap: a venue type, or one of its SWAP_WANTS (trip-planner.js).
 const KIND_SWAP = {
   winery: { type: 'winery' }, brewery: { type: 'brewery' }, distillery: { type: 'distillery' }, cafe: { type: 'cafe' }, restaurant: { type: 'restaurant' },
@@ -822,6 +842,7 @@ const KIND_SWAP = {
   outdoor: { type: 'outdoor', want: 'outdoor' }, hike: { type: 'outdoor', want: 'hike' }, viewpoint: { type: 'outdoor', want: 'viewpoint' }, indoor: { type: 'indoor', want: 'indoor' },
   kids: { type: 'outdoor', want: 'kids' }, ice_cream: { type: 'cafe', want: 'ice_cream' }, arts: { type: 'indoor', want: 'arts' }, spa: { type: 'indoor', want: 'spa' },
   lake_view: { type: 'restaurant', want: 'lake_view' }, patio: { type: 'restaurant', want: 'patio' }, live_music: { type: 'pub', want: 'live_music' },
+  activity: { type: 'indoor', want: 'activity' },
 };
 const partOf = (key) => String(key).split('-')[1];
 const isLocalOp = (op, days) => ['replace', 'more_like'].includes(op.o) || (op.o === 'add' && !(op.day && op.day > days)) || (op.o === 'budget' && (op.stops || []).length > 0);
@@ -833,7 +854,7 @@ function placeAdd(op, kind, cur) {
   const day = op.day || (anchor && anchor.day) || 1;
   const occ = new Map(cur.stops.filter((s) => s.day === day && !cur.removed.has(s.key)).map((s) => [partOf(s.key), s]));
   const evening = EVENING_KINDS.has(kind);
-  const usable = (p) => p && p !== 'midday' && (p !== 'evening' || evening) && (p !== 'night' || evening);
+  const usable = (p) => p && p !== 'midday' && (p !== 'evening' || evening) && (p !== 'night' || evening || NIGHT_KINDS.has(kind));
   let order;
   if (anchor) { const i = DAYPARTS.indexOf(partOf(anchor.key)); order = [DAYPARTS[before ? i - 1 : i + 1]]; } else if (op.time) order = { morning: ['morning'], midday: ['afternoon'], afternoon: ['afternoon', 'late'], evening: evening ? ['night', 'late'] : ['late'] }[op.time];
   else order = evening ? ['night', 'late'] : ['afternoon', 'late', 'morning'];
@@ -882,7 +903,7 @@ function slotEdit(cur, spec, ctx) {
 }
 // The planner's Swap already checked the badge (kid_friendly, lake_view...) on its own facts; this checks the kind of
 // place it came back with (a kids' stop is an activity, never a restaurant, deli or café).
-const WANT_TYPES = { kids: ['outdoor', 'indoor', 'beach', 'tour', 'golf', 'sport'], outdoor: ['outdoor', 'beach'], hike: ['outdoor'], viewpoint: ['outdoor'], indoor: ['indoor'], arts: ['indoor', 'outdoor', 'tour'] };
+const WANT_TYPES = { activity: ['outdoor', 'indoor', 'tour', 'golf', 'sport', 'beach'], kids: ['outdoor', 'indoor', 'beach', 'tour', 'golf', 'sport'], outdoor: ['outdoor', 'beach'], hike: ['outdoor'], viewpoint: ['outdoor'], indoor: ['indoor'], arts: ['indoor', 'outdoor', 'tour'] };
 function wantMatches(kind, v) {
   if (!kind) return true;
   if (WANT_TYPES[kind]) return WANT_TYPES[kind].includes(v.type);
@@ -890,7 +911,16 @@ function wantMatches(kind, v) {
   return kindMatches(kind, v);
 }
 
+// A lighter day: the last non-meal stop(s) of that day come off (one; two when it has four or more), never a meal or a kept
+// stop; every other day is untouched.
+function lighterDayOps(op, ctx) {
+  const pool = (ctx.stops || []).filter((s) => s.day === op.day && !s.role && !(ctx.locks || {})[s.key] && !(ctx.removed || []).includes(s.key));
+  if (!pool.length) return null;
+  const n = pool.length >= 4 ? 2 : 1;
+  return { ...op, o: 'remove', stops: pool.slice(-n), value: null, lighterDay: op.day };
+}
 function planTurn(ops, ctx) {
+  ops = ops.map((o) => (o.o === 'pace' && o.value === 'relaxed' && o.day ? lighterDayOps(o, ctx) || o : o));
   if (ctx.short) return broadTurn(ops, ctx);
   const days = ctx.days || 1;
   const locals = ops.filter((o) => isLocalOp(o, days));
@@ -988,7 +1018,7 @@ const T = {
     stayWhat: { budget: 'a cheaper place', upscale: 'a nicer place', pool: 'a place with a pool', hot_tub: 'a place with a hot tub', kitchen: 'a place with a kitchen', region: 'a place in {town}' },
     carYes: 'Rental cars at {airport}: tap See cars on the Getting here card.', carNo: 'I can’t book rental cars here yet. {airport} has rental desks.', driving: 'Got it, you’re driving. I took the rental car off.',
     noCarShuttle: 'Without a car: the Getting here card has an airport shuttle. Most other stops need a car or a taxi.', noCar: 'Most of these stops need a car. Staying central in {town} helps; taxis are limited, so book rides ahead.',
-    unclear: 'Sorry, I didn’t catch that. Try “remove the brewery” or “more for kids”.', busy: 'Too many messages in a short time. Try again in a few minutes.', error: 'Something went wrong. Your plan is unchanged.',
+    unclear: 'Sorry, I didn’t catch that. Try “remove the brewery” or “more for kids”.', unclearFrom: 'Sorry, I didn’t catch that. Try “remove {name}”, “cheaper dinner” or “more for kids”.', busy: 'Too many messages in a short time. Try again in a few minutes.', error: 'Something went wrong. Your plan is unchanged.',
   },
   fr: {
     done: 'C’est fait.', took: 'J’ai retiré {names}.', kept: 'J’ai gardé {names}.', keptStays: 'J’ai gardé {names}. {it} si vous changez autre chose.', itStays: 'Il reste', theyStay: 'Ils restent',
@@ -1009,15 +1039,18 @@ const T = {
     stayWhat: { budget: 'un logement moins cher', upscale: 'un logement plus chic', pool: 'un logement avec piscine', hot_tub: 'un logement avec spa', kitchen: 'un logement avec cuisine', region: 'un logement à {town}' },
     carYes: 'Location de voitures à {airport} : touchez Voir les voitures dans la carte Pour venir.', carNo: 'Je ne peux pas encore réserver de voiture ici. {airport} a des comptoirs de location.', driving: 'Parfait, vous venez en voiture. J’ai retiré la location.',
     noCarShuttle: 'Sans voiture : la carte Pour venir propose une navette depuis l’aéroport. La plupart des autres arrêts demandent une voiture ou un taxi.', noCar: 'La plupart de ces arrêts demandent une voiture. Loger au centre de {town} aide; les taxis sont rares, réservez vos trajets à l’avance.',
-    unclear: 'Désolé, je n’ai pas compris. Essayez « enlève la microbrasserie » ou « plus pour les enfants ».', busy: 'Trop de messages en peu de temps. Réessayez dans quelques minutes.', error: 'Un problème est survenu. Votre plan n’a pas changé.',
+    unclear: 'Désolé, je n’ai pas compris. Essayez « enlève la microbrasserie » ou « plus pour les enfants ».', unclearFrom: 'Désolé, je n’ai pas compris. Essayez « enlève {name} », « souper moins cher » ou « plus pour les enfants ».', busy: 'Trop de messages en peu de temps. Réessayez dans quelques minutes.', error: 'Un problème est survenu. Votre plan n’a pas changé.',
   },
 };
 // A name that ends with a period ("Cannery Brewing Co.") does not get a second one.
 function fill(s, vars) { return String(s).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m)).replace(/\.\./g, '.'); }
-function cantReply(cant, lang, what = null) {
+function cantReply(cant, lang, what = null, stops = null) {
   const L = lang === 'fr' ? 'fr' : 'en';
   const t = T[L];
   if (cant === 'not_found') return fill(t.notFound, { what: what && KINDS[what] ? KINDS[what][L] : (L === 'fr' ? 'cet arrêt' : 'that stop') });
+  // Fix round (2026-11-22: « enlève la microbrasserie » was suggested on a plan with no brewery): examples from the plan.
+  const ex = (stops || []).find((s) => !s.role && s.name);
+  if (cant === 'unclear' && ex) return fill(t.unclearFrom, { name: ex.name });
   return t[cant] || t.other;
 }
 function dateText(iso, lang) { try { return new Date(`${iso}T12:00:00Z`).toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' }); } catch (e) { return iso; } }
@@ -1095,7 +1128,8 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null } = {}) {
   if (!out.plan && out.failed && !(out.actions && (out.actions.remove.length || out.actions.keep.length))) parts.push(t.unchanged);
   // Words only the planner read (no AI, no rule): honest when they changed nothing.
   if (out.results.length === 1 && out.results[0].op === 'refine' && (!out.plan || (!(out.added || []).length && !(out.gone || []).length))) return t.refineSame;
-  const text = parts.filter(Boolean).join(' ');
+  // Each sentence once ("I couldn't find a winery…" for each of three days is said once).
+  const text = parts.filter((x, i) => x && parts.indexOf(x) === i).join(' ');
   const didSomething = out.plan ? (out.changed || []).length > 0 : !!(out.actions && (out.actions.remove.length || out.actions.keep.length));
   return (allOk && didSomething ? `${t.done} ` : '') + text;
 }

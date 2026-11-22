@@ -84,7 +84,10 @@ function httpsOn(raw, hosts, keepTags = false) {
 function tripParams(trip) {
   const t = trip || {};
   const dates = isDate(t.arrive) && isDate(t.leave) && t.leave > t.arrive ? { arrive: t.arrive, leave: t.leave } : null;
-  return { dates, adults: count(t.adults, 1, 16), kids: count(t.kids, 0, 12) };
+  const kids = count(t.kids, 0, 12);
+  // Fix round (2026-11-22): the children's ages, when the visitor typed them ("kids 6 and 9"); never guessed.
+  const kidAges = kids && Array.isArray(t.kidAges) && t.kidAges.length === kids && t.kidAges.every((a) => Number.isInteger(a) && a >= 0 && a <= 17) ? t.kidAges.slice() : null;
+  return { dates, adults: count(t.adults, 1, 16), kids, kidAges };
 }
 
 function bookingComUrl(raw, p) {
@@ -94,6 +97,7 @@ function bookingComUrl(raw, p) {
   if (p.dates) { q.set('checkin', p.dates.arrive); q.set('checkout', p.dates.leave); }
   if (p.adults !== null) q.set('group_adults', String(p.adults));
   if (p.kids !== null) q.set('group_children', String(p.kids));
+  if (p.kidAges) for (const a of p.kidAges) q.append('age', String(a));
   q.set('no_rooms', '1');
   return u;
 }
@@ -102,8 +106,10 @@ function expediaUrl(raw, p) {
   if (!u || !/\.h\d+\.Hotel-Information$/i.test(u.pathname)) return null;
   const q = u.searchParams;
   if (p.dates) { q.set('chkin', p.dates.arrive); q.set('chkout', p.dates.leave); }
-  // Adults only: children need their ages (rm1=a2:c8:c10), which we don't have.
-  if (p.adults !== null) q.set('rm1', `a${p.adults}`);
+  // Children need their ages (rm1=a2:c8:c10): only when the visitor typed them. Kids with no adult count: 2 adults (the
+  // room needs one; Expedia's own default), so a family of four is not booked as two travellers.
+  if (p.kidAges) q.set('rm1', `a${p.adults !== null ? p.adults : 2}${p.kidAges.map((a) => `:c${a}`).join('')}`);
+  else if (p.adults !== null) q.set('rm1', `a${p.adults}`);
   return u;
 }
 // Stay22 Allez around a Booking.com or Expedia property URL.
