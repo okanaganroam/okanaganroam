@@ -8036,7 +8036,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
     facts.push({
       id: v.id, name: v.name, region: v.region, type: plannerType, url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`,
       rating: v.rating == null ? null : Number(v.rating), reviews: v.reviews == null ? 0 : Number(v.reviews),
-      price: v.price == null ? null : Number(v.price), address: v.address || null,
+      price: v.price == null ? null : Number(v.price), address: v.address || null, website: v.website || null,
       ...(cvIds.has(v.id) ? { completeVerified: true } : {}),
       // Sport test 10: a sport or golf place its owner has set up (kinds and own hours) is picked before one nobody has.
       ...((v.type === 'golf' || v.type === 'sport') && ownerSetUpRank(v) === 0 ? { ownerSetUp: true } : {}),

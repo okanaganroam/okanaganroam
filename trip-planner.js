@@ -2382,6 +2382,7 @@ function publicVenue(v, ctx) {
     // Indoor test 1 (2026-11-19; Margaret): a by-donation museum says "By donation (suggested $5)", never "Free entry".
     ...((v.type === 'indoor' || v.kindOwn) && v.indoorFree === 'donation' ? { byDonation: typeof v.indoorSuggested === 'number' && v.indoorSuggested > 0 ? v.indoorSuggested : true } : {}),
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
+    ...(typeof v.website === 'string' && /^https:\/\/[^\s"'<>]+$/i.test(v.website) ? { website: v.website } : {}),
     ...(cost ? { cost } : {}),
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.type === 'cocktail' ? 'Cocktail lounge' : v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : BREWERY_KIND_LABEL[v.type === 'brewery' && v.breweryKind] ? BREWERY_KIND_LABEL[v.breweryKind][0] : ctx ? (v.type === 'indoor' ? indoorVenueLabel(ctx, v, 'singular') : typeLabel(ctx, v.type, 'singular')) : v.type,
     // Brewery test 3 (2026-11-13): the kind the owner picked (« Cidrerie »), in French too.
