@@ -8328,7 +8328,7 @@ function parseTripPlanBody(body, opts = {}) {
 const TRIP_CHAT_KEY_RE = /^(?:[1-7]-(?:early|morning|midday|afternoon|late|evening|night)|it-\d{1,2})$/;
 function parseTripChatBody(body, opts = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: 'Body must be an object.' };
-  const unexpected = Object.keys(body).filter((k) => !['message', 'chip', 'lang', 'plan', 'locks', 'removed', 'stops', 'events', 'stayTown'].includes(k));
+  const unexpected = Object.keys(body).filter((k) => !['message', 'chip', 'lang', 'plan', 'locks', 'removed', 'stops', 'events', 'stayTown', 'stayId'].includes(k));
   if (unexpected.length) return { error: `Unexpected field(s): ${unexpected.join(', ')}` };
   const message = typeof body.message === 'string' ? body.message.replace(/\s+/g, ' ').trim() : '';
   const chip = body.chip === undefined || body.chip === null ? null : body.chip;
@@ -8357,7 +8357,9 @@ function parseTripChatBody(body, opts = {}) {
   if (!Array.isArray(events) || events.length > 20 || !events.every((x) => Number.isInteger(x) && x > 0)) return { error: 'events must list event ids.' };
   const stayTown = body.stayTown === undefined || body.stayTown === null ? null : body.stayTown;
   if (stayTown !== null && !(typeof stayTown === 'string' && REGION_LABELS[stayTown])) return { error: 'stayTown must be a town.' };
-  return { value: { message, chip, lang: body.lang === 'fr' ? 'fr' : 'en', args: plan.value, locks, removed: [...new Set(removed)], stops, events: [...new Set(events)], stayTown } };
+  const stayId = body.stayId === undefined || body.stayId === null ? null : body.stayId;
+  if (stayId !== null && !(Number.isInteger(stayId) && stayId > 0)) return { error: 'stayId must be a positive integer.' };
+  return { value: { message, chip, lang: body.lang === 'fr' ? 'fr' : 'en', args: plan.value, locks, removed: [...new Set(removed)], stops, events: [...new Set(events)], stayTown, stayId } };
 }
 // The stops on screen, named from our own database (the page sends only slots and ids): what the model and the
 // templates see. Stops whose place is gone are left out.
@@ -8383,6 +8385,7 @@ function tripChatStops(list) {
 }
 // Tests replace the model with a mock (no network): setTripChatReader(async (message, opts) => ({ ok, ops, cant })).
 let tripChatReader = null;
+let tripChatKeepStayId = null;
 function setTripChatReader(fn) { tripChatReader = typeof fn === 'function' ? fn : null; }
 async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   const regions = VALID_REGIONS.filter((r) => REGION_LABELS[r]);
@@ -8397,7 +8400,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     // The word rules first (instant), then the AI (live eval 2026-11-22: p50 1.1 s, some 3 s timeouts). When the rules
     // read the message confidently, the AI gets a short grace (TRIP_CHAT_GRACE_MS, default 1500 ms) and the rules answer
     // if it is slower; otherwise it gets the full timeout. Both readings are then reconciled (tripChat.reconcileReads).
-    const r = tripChat.rulesRead(v.message, stops, { regions, regionLabels: REGION_LABELS, days });
+    const r = tripChat.rulesRead(v.message, stops, { regions, regionLabels: REGION_LABELS, days, weekdays: tripChat.weekdayDays((v.args.overrides && v.args.overrides.startDate) || (v.args.stay && v.args.stay.arrive) || null, days) });
     what = r.what || null;
     // A stay or getting-here message the rules read confidently is answered by fixed server logic, so the AI is not
     // waited for (2026-11-22: a stay change took 6-14 s on the live site).
@@ -8416,7 +8419,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     if (ai && !ai.ok && ai.reason === 'slow') source = 'ai_slow';
     // Words no rule read go to the planner as typed when it can read them (a kind of food, an occasion...); else "Sorry,
     // I didn't catch that". Never words that say no / not (the planner could read "no brewery" as "a brewery").
-    if (!ops.length && !cant) { if (tripChat.plannerCanRead(v.message)) ops = [{ o: 'refine', text: v.message, stops: [] }]; else cant = 'unclear'; }
+    if (!ops.length && !cant) { if (short && tripChat.plannerCanRead(v.message)) ops = [{ o: 'refine', text: v.message, stops: [] }]; else cant = 'unclear'; }
   }
   timing.read = Date.now() - timing.start;
   // Events (rows of the plan the planner adds, with no Swap or Remove): a message that takes one out, and "we don't
@@ -8451,8 +8454,11 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // The place to stay and getting here (2026-11-22, agent round) are answered here; every other op goes to the planner.
   const extra = ops.filter((o) => o.o === 'stay' || o.o === 'transport' || o.o === 'avoid');
   const planOps = ops.filter((o) => o.o !== 'stay' && o.o !== 'transport' && o.o !== 'avoid');
-  const out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: v.locks, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run })
-    : { plan: null, req: null, actions: { remove: [], keep: [] }, results: [], changed: [] };
+  // Round 4: a change to the stops keeps the place to stay the visitor sees (it changed with unrelated messages).
+  tripChatKeepStayId = extra.some((o) => o.o === 'stay') ? null : v.stayId || null;
+  let out;
+  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: v.locks, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run })
+    : { plan: null, req: null, actions: { remove: [], keep: [] }, results: [], changed: [] }; } finally { tripChatKeepStayId = null; }
   let reply = planOps.length ? tripChat.buildReply(out, { lang, regionLabels: REGION_LABELS, cant }) : '';
   let plan = out.plan || null, req = out.req || null, stayPref, transport, stayBlock, newText = null, card = null;
   if (eventReply) reply = [reply, eventReply].filter(Boolean).join(' ');
@@ -8554,7 +8560,7 @@ function tripChatStayTurn(stayOps, { v, plan, req, stops, lang, staysOn, runCore
   if (am && am.elsewhere) return done({ ...out, reply: tripChat.fill(T.stayElsewhere, { what: list(am.keys, T.amen), town: REGION_LABELS[am.town] || am.town || '', name: next.name, facts }) + kindMiss });
   const winter = am && am.winterCheck && (next.has || []).includes('pool') ? T.poolWinter : '';
   const has = am && (next.has || []).length ? tripChat.fill(T.stayHas, { what: list(next.has, T.amen) }) + winter : '';
-  if (next.id === cur.id) {
+  if (next.id === (v.stayId || cur.id)) {
     // The place already on the plan has it: said, and it stays (its chip shows now).
     if (has) return done({ ...out, reply: tripChat.fill(T.stayKept, { name: next.name, facts, what: list(next.has, T.amen) + winter }) + kindMiss });
     return done({ reply: tripChat.fill(T.stayFail, { what, name: cur.name }) });
@@ -8709,6 +8715,12 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
       if (asked && !stayIn.pref) stayIn.pref = asked;
     }
     let block = tripStays.whereToStay(plan, stayIn && Object.keys(stayIn).length ? stayIn : null, candidates, todayLocal(now), v4Stay);
+    // Travel agent chat: the stay on screen stays through a change to the stops (the other places stay as alternatives).
+    if (block && block.pick && tripChatKeepStayId && block.pick.id !== tripChatKeepStayId) {
+      const only = candidates.filter((c) => c.id === tripChatKeepStayId);
+      const kept = only.length ? tripStays.whereToStay(plan, stayIn && Object.keys(stayIn).length ? stayIn : null, only, todayLocal(now), v4Stay) : null;
+      if (kept && kept.pick && kept.pick.id === tripChatKeepStayId) { kept.alternatives = [block.pick, ...(block.alternatives || [])].filter((c) => c && c.id !== tripChatKeepStayId).slice(0, Math.max(1, (block.alternatives || []).length)); block = kept; }
+    }
     const askedAms = v4 && stayIn && stayIn.pref ? tripStays.prefAmenities(stayIn.pref) : [];
     if (block && askedAms.length) {
       block.pref = { amenities: askedAms, ...(stayIn.pref.kind ? { kind: stayIn.pref.kind } : {}) };
@@ -80142,7 +80154,7 @@ const server = http.createServer(async (req, res) => {
       try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
       const lang = body && body.lang === 'fr' ? 'fr' : 'en';
       const ip = requestClientIp(req);
-      if (tripChat.rateLimited(ip)) return sendJSON(res, 429, { error: 'Too many messages.', reply: tripChat.T[lang].busy });
+      if (tripChat.rateLimited(ip)) { const wait = tripChat.rateWaitMinutes(ip); return sendJSON(res, 429, { error: 'Too many messages.', retryAfterMinutes: wait, reply: tripChat.busyReply(lang, wait) }); }
       const staysOn = tripStaysEnabledFor(query);
       const parsed = parseTripChatBody(body, { stays: staysOn });
       if (parsed.error) return sendJSON(res, 400, { error: parsed.error });

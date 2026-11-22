@@ -6921,12 +6921,23 @@ function swapWantOk(v, swap) {
     // or dessert place whose own description opens by saying what it is counts too (its first sentence only).
     if (w.name && !w.name.test(`${v.name || ''} ${v.cuisine || ''}`) && !(v.type === 'cafe' && w.name.test(v.plannerDescription || v.description ? String(v.plannerDescription || v.description).split(/(?<=[.!?])\s/)[0] : String(v.textDesc || '').split(' ').slice(0, 20).join(' ')))) return false;
   }
+  // Travel agent chat, round 4 (2026-11-23; "swap the ramen for pizza" gave JOEY, "add bowling" a park): the chat can ask
+  // for the listings' own words. swap.types bounds the kind of place; swap.words (plain lowercase words) must be in the
+  // place's name or cuisine, or in the first sentence of its own description.
+  if (Array.isArray(swap.types) && swap.types.length && !swap.types.includes(v.type)) return false;
+  if (Array.isArray(swap.words) && swap.words.length) {
+    const head = `${v.name || ''} ${v.cuisine || ''} ${v.textCuisine || ''}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const first = (v.plannerDescription || v.description ? String(v.plannerDescription || v.description).split(/(?<=[.!?])\s/)[0].slice(0, 160) : String(v.textDesc || '').split(' ').slice(0, 14).join(' ')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const has = (text, w) => new RegExp(`(?:^|[^a-z])${w.replace(/[^a-z0-9 ]/g, '.')}`).test(text);
+    if (!swap.words.some((w) => has(head, w) || has(first, w))) return false;
+  }
   const price = Number(v.price);
   if (Number.isInteger(swap.priceMax) && !(price >= 1 && price <= swap.priceMax)) return false;
   if (Number.isInteger(swap.priceMin) && !(price >= swap.priceMin)) return false;
   return true;
 }
-const swapAsksKind = (swap) => !!(swap && (swap.want || swap.priceMax !== undefined || swap.priceMin !== undefined));
+const swapAsksKind = (swap) => !!(swap && (swap.want || swapAsksWords(swap) || swap.priceMax !== undefined || swap.priceMin !== undefined));
+const swapAsksWords = (swap) => !!(swap && ((Array.isArray(swap.words) && swap.words.length) || (Array.isArray(swap.types) && swap.types.length)));
 const SWAP_TYPE_WORDS = { restaurant: 'restaurant', cafe: 'café', pub: 'pub', cocktail: 'lounge', brewery: 'brewery', distillery: 'distillery', winery: 'winery', beach: 'beach', golf: 'golf course', outdoor: 'outdoor stop', indoor: 'indoor attraction', tour: 'tour', sport: 'activity' };
 // Round 8 (2026-10-19): the slot keeps its purpose. A winery lunch is swapped for another winery that serves food, a
 // vegan lunch for another vegan spot, a romantic dinner for another sit-down dinner (never pizza), dinner "in Brackendale"
@@ -6982,7 +6993,7 @@ function swapSlotStop(result, input, day, stop, part, allStops) {
   const original = swap.id ? byId.get(swap.id) : null;
   const purpose = swapPurposeTest(original, stop, part, result, input, ctx, regions);
   const corePick = stop && stop.venue && byId.get(stop.venue.id);
-  if (corePick && (swap.want ? true : corePick.type === swap.type) && swapWantOk(corePick, swap) && !dup && corePick.id !== swap.id && purpose.ok(corePick) && (!purpose.home || corePick.region === purpose.home)) return;
+  if (corePick && (swap.want || swapAsksWords(swap) ? true : corePick.type === swap.type) && swapWantOk(corePick, swap) && !dup && corePick.id !== swap.id && purpose.ok(corePick) && (!purpose.home || corePick.region === purpose.home)) return;
   const k = stop ? day.stops.indexOf(stop) : day.stops.findIndex((s) => SWAP_ORDER.indexOf(s.daypart) > SWAP_ORDER.indexOf(part));
   const at = k < 0 ? day.stops.length : k;
   const neighbours = [day.stops.slice(0, at).reverse().find((s) => s.venue && s !== stop), day.stops.slice(at).find((s) => s.venue && s !== stop)].filter(Boolean).map((s) => byId.get(s.venue.id)).filter(Boolean);
@@ -7029,22 +7040,29 @@ function swapSlotStop(result, input, day, stop, part, allStops) {
   const estateWords = estateKitchens(facts).words;
   const planEstates = new Set([...others].map((id) => estateKey(byId.get(id), estateWords)).filter(Boolean));
   const estateOk = (v) => { const k = ['winery', 'restaurant'].includes(v.type) ? estateKey(v, estateWords) : null; return !k || !planEstates.has(k); };
-  const typeOk = (v) => (swap.want ? true : (v.type === swap.type || (purpose.wineryLunch && ['winery', 'restaurant'].includes(v.type)))) && swapWantOk(v, swap);
+  // Round 4 (2026-11-23; "pick another winery" found none of the 48 around Penticton, "a fancier dinner" none): a Swap asked
+  // by the chat (swap.wide) also takes a place in a neighbouring town when it is close to the stops around it (Naramata
+  // for a Penticton day), and the slot's kept time decides whether a place is open (fitsKept), not the whole slot's window
+  // (an 11 AM tasting was ruled out by the "morning" window).
+  const wideKm = swap.wide ? 14 : 0;
+  const nearTown = (v) => wideKm > 0 && neighbours.some((n) => { const d = kmBetween(n, v); return d != null && d <= wideKm; });
+  const keptOnly = !!swap.wide && keptStart != null && !!weekday;
+  const typeOk = (v) => (swap.want || swapAsksWords(swap) ? true : (v.type === swap.type || (purpose.wineryLunch && ['winery', 'restaurant'].includes(v.type)))) && swapWantOk(v, swap);
   // Round 2 fresh eyes (2026-11-22; "more indoor things" on a trip that asked for "a place with a pool" found nothing: every
   // indoor place that is not a pool was ruled out by the request's own kind): a Swap that asks for a kind of place
   // (swap.want) is judged on that kind, not on the kinds the first request named. In the evening or at night a thing to do
   // must be open then by its listed hours (never a guess), and a place to bowl, play, climb or watch a film comes first.
-  const wantCtx = swap.want ? { ...ctx, plannerKinds: [] } : ctx;
-  const wantReq = swap.want && input.requirements ? { ...input.requirements, items: (input.requirements.items || []).filter((i) => !['venue_kind', 'type', 'type_count'].includes(i.kind)) } : input.requirements;
+  const wantCtx = swap.want || swapAsksWords(swap) ? { ...ctx, plannerKinds: [] } : ctx;
+  const wantReq = (swap.want || swapAsksWords(swap)) && input.requirements ? { ...input.requirements, items: (input.requirements.items || []).filter((i) => !['venue_kind', 'type', 'type_count'].includes(i.kind)) } : input.requirements;
   const wantAllowed = (v) => tripRequirements.venueAllowed(v, wantReq, day.day, input.tripDate);
   const eveningThing = ['evening', 'night'].includes(part) && ['activity', 'indoor', 'kids', 'arts'].includes(swap.want);
   const eveningOpenOk = (v) => !eveningThing || DINING_TYPES.includes(v.type) || hoursFit(v, win, weekday).status === 'verified';
   const eveningFunBonus = (v) => (eveningThing && (v.plannerKinds || tripRequirements.inferPlannerKinds(v)).includes('evening_fun') ? 12 : 0);
   // Fresh eyes (2026-11-22): ice cream asked for in the chat (swap.want) is asked for, so the cold-month "summer only" guess
   // (summerOnly) no longer leaves the ice cream shops out; their listed hours still decide.
-  const cands = facts.filter((v) => typeOk(v) && estateOk(v) && !(daytimePart(part) && eveningOnlyVenue(v)) && !(purpose.wineryLunch && (tastingRoomWithRestaurant(v, facts) || wineryLunchRank(v, estateWords) < 15)) && !others.has(v.id) && v.id !== swap.id && !ctx.exclude.has(v.id) && (!towns.length || towns.includes(v.region)) && mealOk(v) && daylightOk(v) && golfOk(v) && fitsKept(v) && !offSeasonSkip(v, { ...ctx, tripDate: date || ctx.tripDate, ...(swap.want === 'ice_cream' ? { queryText: `${ctx.queryText || ''} ice cream gelato creamery frozen yogurt`, requirements: { ...(ctx.requirements || {}), text: `${(ctx.requirements && ctx.requirements.text) || ''} ice cream gelato creamery frozen yogurt` } } : {}) })
+  const cands = facts.filter((v) => typeOk(v) && estateOk(v) && !(daytimePart(part) && eveningOnlyVenue(v)) && !(purpose.wineryLunch && (tastingRoomWithRestaurant(v, facts) || wineryLunchRank(v, estateWords) < 15)) && !others.has(v.id) && v.id !== swap.id && !ctx.exclude.has(v.id) && (!towns.length || towns.includes(v.region) || nearTown(v)) && mealOk(v) && daylightOk(v) && golfOk(v) && fitsKept(v) && !offSeasonSkip(v, { ...ctx, tripDate: date || ctx.tripDate, ...(swap.want === 'ice_cream' ? { queryText: `${ctx.queryText || ''} ice cream gelato creamery frozen yogurt`, requirements: { ...(ctx.requirements || {}), text: `${(ctx.requirements && ctx.requirements.text) || ''} ice cream gelato creamery frozen yogurt` } } : {}) })
     && (!skiExtra || (SKI_EXTRA_RE.test(v.textName || '') && (!skiDark || SKI_LIT_RE.test(v.textName || '')))) && purpose.ok(v)
-    && eligible(v, wantCtx, false) && hoursFit(v, win, weekday).status !== 'closed' && eveningOpenOk(v) && !(date && seasonClosedOnTrip(v, { date })) && wantAllowed(v))
+    && eligible(v, wantCtx, false) && (keptOnly || hoursFit(v, win, weekday).status !== 'closed') && eveningOpenOk(v) && !(date && seasonClosedOnTrip(v, { date })) && wantAllowed(v))
     .map((v) => { const km = neighbours.map((n) => kmBetween(n, v)).filter((x) => x != null); return { v, score: scoreVenue(v, ctx).score + purpose.bonus(v) + openAtKept(v) + eveningFunBonus(v) - (km.length ? Math.min(...km) * 1.5 : 6) }; });
   const pick = themePick(cands);
   const keepStop = corePick && !dup && corePick.id !== swap.id && !(purpose.wineryLunch && !(purpose.ok(corePick) && estateOk(corePick))) && !(DINING_TYPES.includes(corePick.type) && neighbours.some((n) => DINING_TYPES.includes(n.type) && n.type !== 'cafe'));
