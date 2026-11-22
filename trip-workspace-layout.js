@@ -38,6 +38,17 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
 .t3-v4.tw-workspace .tw-book-note {background:#edf3e4;border-radius:12px;padding:10px 14px;font-size:13px;color:#43584b;line-height:1.5;}
 .t3-v4.tw-workspace .tw-options {margin:18px 0;background:#fffdf8;border:1px solid #e1ddd2;border-radius:14px;padding:12px;}
 .t3-v4.tw-workspace .tw-options summary {font-weight:800;cursor:pointer;min-height:36px;}
+.t3-v4.tw-workspace .tw-options .v4-gh {margin:8px 0 0;padding:0;background:transparent;box-shadow:none;}
+.t3-v4.tw-workspace .tw-options .v4-gh .v4-card-h {display:none;}
+.t3-v4.tw-workspace .v4-stay-card {margin:0 0 14px;padding:12px;border:1px solid #e1ddd2;border-radius:18px;background:#fffdf8;box-shadow:none;}
+.t3-v4.tw-workspace .v4-stay-card .v4-stay-acts {margin-top:8px;}
+.t3-v4.tw-workspace .tw-book {margin:16px 0 10px;}
+.t3-v4.tw-workspace .tw-book-btn {width:100%;max-width:360px;min-height:50px;border:0;border-radius:14px;background:#1b303c;color:#fff;font:800 16px Nunito,sans-serif;cursor:pointer;}
+.t3-v4.tw-workspace .v4-thumb--none {display:none;}
+.t3-v4.tw-workspace .v4-row:has(.v4-thumb--none) {grid-template-columns:minmax(0,1fr) auto;}
+.t3-v4.tw-workspace .v4-gone .v4-row {align-items:center;}
+.t3-v4.tw-workspace .v4-gone .v4-acts {flex-direction:row;flex-wrap:wrap;justify-content:flex-end;}
+.t3-v4.tw-workspace .v4-gone .v4-name {font-size:17px;margin:4px 0 0;}
 .t3-v4.tw-workspace .tw-updated {display:inline-block;font-size:11px;font-weight:800;background:#e5efd4;color:#3c672d;padding:3px 8px;border-radius:12px;margin:4px 0;}
 .t3-v4.tw-workspace .v4-bar.has-chat {grid-column:2;grid-row:1;position:sticky;top:96px;bottom:auto;left:auto;right:auto;width:100%;box-sizing:border-box;background:#fffdf8;border:1px solid #e1ddd2;border-radius:20px;box-shadow:0 6px 24px #1b303c0a;padding:18px;z-index:20;max-height:calc(100dvh - 115px);overflow:auto;}
 .t3-v4.tw-workspace .v4-bar .tw-chat-title {font:600 24px Fraunces,serif;margin:0 0 8px;}
@@ -70,6 +81,9 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
  .t3-v4.tw-workspace .tw-day-tabs button {min-width:88px;}
  .t3-v4.tw-workspace .v4-row {grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:0 12px 12px;}
  .t3-v4.tw-workspace .v4-thumb {grid-column:1/-1;width:calc(100% + 24px);max-width:none;margin:0 -12px;height:155px;border-radius:0;}
+ .t3-v4.tw-workspace .v4-row:has(.v4-thumb--none) {padding-top:12px;}
+ .t3-v4.tw-workspace .v4-agent {margin:0 0 12px;}
+ .t3-v4.tw-workspace .tw-book-btn {max-width:none;}
  .t3-v4.tw-workspace .v4-name {font-size:21px;}
  .t3-v4.tw-workspace .tw-links {margin-top:4px;gap:0 12px;}
  .t3-v4.tw-workspace .v4-icon {min-width:68px;min-height:40px;}
@@ -102,6 +116,20 @@ const WORKSPACE_CLIENT_SRC=String.raw`
     else if(v.website&&t3StayExt(v.website))links+='<a '+hrefAttr(t3StayExt(v.website))+' target="_blank" rel="noopener">'+esc(twText('Venue website','Site du lieu'))+' ↗</a>';
     return '<li class="v4-stop" data-venue-id="'+esc(v.id)+'"><div class="v4-row">'+v4Thumb(v)+'<div class="tw-card-info"><button type="button" class="v4-main" aria-expanded="'+(v4.open[id]?'true':'false')+'" aria-controls="'+esc(did)+'" data-v4-toggle="'+esc(did)+'" data-v4-id="'+esc(id)+'"><span class="v4-time">'+esc(v4Start(s,key))+'</span><span class="v4-name">'+esc(v.name)+'</span><span class="v4-line">'+esc(v4Line(s))+'</span></button>'+(reason?'<p class="tw-fit">'+esc(reason)+'</p>':'')+'<div class="tw-links">'+links+'</div></div><div class="v4-acts">'+actions+'</div></div><div class="v4-more" id="'+esc(did)+'"'+(v4.open[id]?'':' hidden')+'>'+v4Details(s,id)+'</div>'+v4TripBtn(v,key)+'</li>';
   }
+  // An event on the plan is a card like any stop: photo, time, name, "View details" and Remove; once removed it is the
+  // same "Removed … Undo" row as a venue (it used to vanish with no word, and the count stayed).
+  function tripWorkspaceEventHtml(s,key){
+    var e=s.event,eu=placeUrl(e),eid='v4d-e'+esc(e.id),day=key?key.split('-')[0]:'';
+    if(chat.goneEvents[e.id])return '<li class="v4-stop v4-gone"><div class="v4-row">'+v4Thumb(null)+'<div class="v4-main"><span class="v4-time">'+esc(vt('removed'))+'</span><span class="v4-name">'+esc(e.name)+'</span></div><div class="v4-acts"><button type="button" class="v4-text" data-v4-event-undo="'+esc(e.id)+'">'+esc(vt('undo'))+'</button></div></div></li>';
+    var why=(s.why||[])[0]||'',more=t3EventPlaceHtml(e,lang(),esc);
+    var links=eu?'<a '+hrefAttr(eu)+'>'+esc(twText('View details','Voir les détails'))+'</a>':'';
+    return '<li class="v4-stop tw-event" data-event-id="'+esc(e.id)+'"><div class="v4-row">'+v4Thumb(e.photo?{photo:e.photo}:null)+'<div class="tw-card-info"><button type="button" class="v4-main" aria-expanded="false" aria-controls="'+eid+'" data-v4-toggle="'+eid+'"><span class="v4-time">'+esc(v4Start(s,key)||e.time||'')+'</span><span class="v4-name">'+esc(e.name)+'</span><span class="v4-line">'+esc([vt('event'),e.regionLabel].filter(Boolean).join(' · '))+'</span></button>'+(why?'<p class="tw-fit">'+esc(why)+'</p>':'')+'<div class="tw-links">'+links+'</div></div><div class="v4-acts"><button type="button" class="v4-icon" data-v4-event-x="'+esc(e.id)+'" aria-label="'+esc(vt('remove',{name:e.name}))+'">× '+esc(twText('Remove','Retirer'))+'</button></div></div><div class="v4-more" id="'+eid+'" hidden>'+more+'</div><button type="button" class="trip-btn" hidden data-plan-stop'+(day?' data-plan-day="'+esc(day)+'"':'')+' data-trip-name="'+esc(e.name)+'" data-trip-query="'+esc(e.name)+'" data-trip-region="'+esc(e.region||'')+'"'+(e.id?' data-trip-ref="event:'+esc(e.id)+'"':'')+' aria-pressed="false">+</button></li>';
+  }
+  // "Book my trip" (one button under the plan) opens the checklist sheet: the stay, each stop's own booking link, the
+  // meals to reserve by phone, tours and the estimate in one place. Only once the plan has dates or a place to stay.
+  function twCanBook(){
+    try{var st=typeof t3StayInputBase==='function'?(t3StayInputBase()||{}):{};var stay=typeof t3StayData==='function'&&!chat.noStay&&t3StayData();return v4CanBook()&&!!(stay||st.arrive||chatHasDates());}catch(e){return false;}
+  }
   function twShowDay(day){
     twSelectedDay=Number(day);
     resultEl.querySelectorAll('.v4-day[id]').forEach(function(sec){var n=Number(sec.id.replace('t3-day-',''));sec.hidden=n!==twSelectedDay;});
@@ -120,13 +148,20 @@ const WORKSPACE_CLIENT_SRC=String.raw`
     if(sections.length>1&&!root.querySelector('.tw-day-tabs')){var tabs=document.createElement('div');tabs.className='tw-day-tabs';tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label',twText('Choose a day','Choisir un jour'));tabs.innerHTML=dayNumbers.map(function(n){return '<button type="button" role="tab" data-tw-day="'+n+'" aria-controls="t3-day-'+n+'">'+esc(twText('Day ','Jour ')+n)+'</button>';}).join('');daysEl.before(tabs);sections.forEach(function(sec){sec.setAttribute('role','tabpanel');});}
     if(twSelectedDay!==null)twShowDay(twSelectedDay);
     if(!root.querySelector('.tw-book-note')){var note=document.createElement('p');note.className='tw-book-note';note.textContent=twText('Book directly with each business. Your saved trip is a plan, not a reservation.','Réservez auprès de chaque lieu. Votre voyage enregistré est un plan, pas une réservation.');daysEl.after(note);}
-    var options=root.querySelector('.tw-options');
-    if(!options){options=document.createElement('details');options.className='tw-options';options.innerHTML='<summary>'+esc(twText('Dates & travel options','Dates et options de voyage'))+'</summary>';options.open=twOptionsOpen;root.querySelector('.tw-book-note').after(options);}
-    root.querySelectorAll('.v4-stay-card,.v4-gh').forEach(function(el){options.appendChild(el);});
+    var bookBox=root.querySelector('.tw-book'),canBook=twCanBook();
+    if(canBook&&!bookBox){bookBox=document.createElement('div');bookBox.className='tw-book';bookBox.innerHTML='<button type="button" class="tw-book-btn" data-v4-book>'+esc(vt('book'))+'</button>';daysEl.after(bookBox);}
+    else if(!canBook&&bookBox)bookBox.remove();
+    // The place to stay stays in the plan (above the days). Only the car, shuttle and tour links fold away.
+    var options=root.querySelector('.tw-options'),gh=root.querySelector('.v4-gh');
+    if(gh&&!options){options=document.createElement('details');options.className='tw-options';options.innerHTML='<summary>'+esc(twText('Getting here & tours','Pour venir et excursions'))+'</summary>';options.open=twOptionsOpen;root.querySelector('.tw-book-note').after(options);}
+    if(gh&&gh.parentNode!==options)options.appendChild(gh);
+    var stayCard=root.querySelector('.v4-stay-card'),stayAt=root.querySelector('.tw-day-tabs')||daysEl;
+    if(stayCard&&stayCard.nextElementSibling!==stayAt)stayAt.before(stayCard);
     if(!bar.querySelector('.tw-chat-title')){var heading=document.createElement('h2');heading.className='tw-chat-title';heading.textContent=twText('✨ Your trip helper','✨ Votre assistant voyage');var hint=document.createElement('p');hint.className='tw-chat-hint';hint.textContent=twText('Tell me what to change. Your plan stays right here.','Dites-moi quoi changer. Votre plan reste ici.');bar.prepend(hint);bar.prepend(heading);}
     var agent=resultEl.querySelector('#v4Agent');if(agent){var old=bar.querySelector('#v4Agent');if(old)old.remove();}
     else agent=bar.querySelector('#v4Agent');
-    if(agent){if(window.matchMedia('(min-width:900px)').matches)bar.querySelector('.tw-chat-hint').after(agent);else options.prepend(agent);}
+    // The agent's first line and "When are you coming?": in the chat sidebar on a wide screen, at the top of the plan on a phone.
+    if(agent){if(window.matchMedia('(min-width:900px)').matches)bar.querySelector('.tw-chat-hint').after(agent);else if(head)head.after(agent);}
     var input=document.getElementById('v4ChatIn');if(input)input.placeholder=twText('Ask for a change…','Demandez un changement…');
     twPad();
   }
@@ -147,7 +182,7 @@ const WORKSPACE_CLIENT_SRC=String.raw`
   v4BarHtml=function(){return v4.ask?twBaseBar():'';};
   var twBasePad=chatPad;chatPad=function(){twBasePad();twPad();};
   var twBaseGlow=chatGlow;
-  chatGlow=function(keys){for(var i=0;i<keys.length;i++){var row=chatRow(keys[i]),sec=row&&row.closest('.v4-day[id]');if(sec){twShowDay(sec.id.replace('t3-day-',''));break;}}twBaseGlow(keys);keys.forEach(function(k){var row=chatRow(k),info=row&&row.querySelector('.tw-card-info');if(info&&!info.querySelector('.tw-updated')){var badge=document.createElement('span');badge.className='tw-updated';badge.textContent=twText('Updated','Modifié');info.prepend(badge);}});};
+  chatGlow=function(keys){if(keys.indexOf('gh')!==-1){var opt=resultEl.querySelector('.tw-options');if(opt){opt.open=true;twOptionsOpen=true;}}for(var i=0;i<keys.length;i++){var row=chatRow(keys[i]),sec=row&&row.closest('.v4-day[id]');if(sec){twShowDay(sec.id.replace('t3-day-',''));break;}}twBaseGlow(keys);keys.forEach(function(k){var row=chatRow(k),info=row&&row.querySelector('.tw-card-info');if(info&&!info.querySelector('.tw-updated')){var badge=document.createElement('span');badge.className='tw-updated';badge.textContent=twText('Updated','Modifié');info.prepend(badge);}});};
   document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-tw-day]');if(b){twShowDay(b.dataset.twDay);}});
   document.addEventListener('keydown',function(e){var b=e.target.closest&&e.target.closest('[data-tw-day]');if(!b||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;var buttons=Array.from(resultEl.querySelectorAll('[data-tw-day]')),i=buttons.indexOf(b);i=e.key==='Home'?0:e.key==='End'?buttons.length-1:(i+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;e.preventDefault();twShowDay(buttons[i].dataset.twDay);buttons[i].focus();});
   window.addEventListener('resize',function(){if(state.last)tripWorkspaceChrome();});

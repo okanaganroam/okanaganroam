@@ -186,7 +186,7 @@ const V4_CLIENT_SRC = String.raw`
   function v4CacheKey(search){ return String(search || '').replace(/^\?/, '').split('&').filter(function(x){ return x && !/^(?:ok|v)=/.test(x); }).join('&'); }
   function v4CacheSave(){
     if (!state.last) return;
-    try { sessionStorage.setItem('t3v4plan', JSON.stringify({ key: v4CacheKey(location.search), last: state.last, lastReq: state.lastReq, removed: state.removed, locks: state.locks, exclude: state.exclude, gone: v4.gone })); } catch (e) {}
+    try { sessionStorage.setItem('t3v4plan', JSON.stringify({ key: v4CacheKey(location.search), last: state.last, lastReq: state.lastReq, removed: state.removed, locks: state.locks, exclude: state.exclude, gone: v4.gone, goneEvents: typeof chat !== 'undefined' && chat ? chat.goneEvents : undefined })); } catch (e) {}
   }
   function v4FromCache(){
     var o = null;
@@ -194,6 +194,8 @@ const V4_CLIENT_SRC = String.raw`
     if (!o || !o.last || o.key !== v4CacheKey(location.search)) return false;
     state.last = o.last; state.lastReq = o.lastReq || null; state.removed = o.removed || {}; state.locks = o.locks || {}; state.exclude = o.exclude || [];
     v4.gone = o.gone || {};
+    // An event taken off the plan stays off after a reload, like a removed stop.
+    if (typeof chat !== 'undefined' && chat && o.goneEvents) chat.goneEvents = o.goneEvents;
     try { render(true); } catch (e) { return false; }
     return true;
   }
@@ -301,6 +303,7 @@ const V4_CLIENT_SRC = String.raw`
     if (s.unscheduledMeal) return '<li class="v4-stop v4-free"><div class="v4-row">' + v4Thumb(null) + '<div class="v4-main"><span class="v4-name">' + esc(vt('noDinner')) + '</span></div></div></li>';
     if (!s.venue) {
       if (s.kind === 'event' && s.event) {
+        if (typeof tripWorkspaceEventHtml === 'function') return tripWorkspaceEventHtml(s, key);
         var e = s.event, eu = placeUrl(e), eid = 'v4d-e' + esc(e.id);
         return '<li class="v4-stop"><div class="v4-row">' + v4Thumb(e.photo ? { photo: e.photo } : null) + '<button type="button" class="v4-main" aria-expanded="false" aria-controls="' + eid + '" data-v4-toggle="' + eid + '"><span class="v4-time">' + esc(v4Start(s, key) || e.time || '') + '</span><span class="v4-name">' + esc(e.name) + '</span><span class="v4-line">' + esc([vt('event'), e.regionLabel].filter(Boolean).join(' · ')) + '</span></button><span></span></div>'
           + '<div class="v4-more" id="' + eid + '" hidden>' + ((s.why || []).length ? '<p class="v4-quiet">' + s.why.slice(0, 2).map(esc).join(' · ') + '</p>' : '') + t3EventPlaceHtml(e, lang(), esc) + (eu ? '<p><a ' + hrefAttr(eu) + '>' + esc(vt('details')) + ' →</a></p>' : '') + '</div>'
@@ -356,8 +359,11 @@ const V4_CLIENT_SRC = String.raw`
   }
   function v4Count(p){
     var n = 0;
-    (p.days || []).forEach(function(d){ d.stops.forEach(function(s){ if ((s.venue || (s.kind === 'event' && s.event)) && !state.removed[d.day + '-' + s.daypart]) n++; }); });
-    ((p.outing && p.outing.stops) || (p.itinerary && p.itinerary.stops) || []).forEach(function(s){ if ((s.venue && !v4.gone[s.venue.id]) || s.event) n++; });
+    // An event taken off the plan (the chat page's ✕ / Remove) is not counted ("6 stops" stood over 5).
+    var goneEv = typeof chat !== 'undefined' && chat && chat.goneEvents ? chat.goneEvents : {};
+    var evOn = function(s){ return s.kind === 'event' && s.event && !goneEv[s.event.id]; };
+    (p.days || []).forEach(function(d){ d.stops.forEach(function(s){ if (s.venue ? !state.removed[d.day + '-' + s.daypart] : evOn(s)) n++; }); });
+    ((p.outing && p.outing.stops) || (p.itinerary && p.itinerary.stops) || []).forEach(function(s){ if (s.venue ? !v4.gone[s.venue.id] : evOn(s)) n++; });
     return n;
   }
   // ---- booking: the same steps as the stays box ("Book my trip"), in a sheet ----
@@ -664,7 +670,7 @@ const V4_CLIENT_SRC = String.raw`
   });
   // Clicking the sheet's backdrop closes it; closing it refreshes the bar's estimate and progress.
   document.addEventListener('click', function(e){ var dlg = document.getElementById('v4Sheet'); if (dlg && e.target === dlg && dlg.close) dlg.close(); });
-  document.addEventListener('close', function(e){ if (e.target && e.target.id === 'v4Sheet') { v4UpdateBar(); var bk = document.querySelector('#v4Bar [data-v4-book]'); if (bk) { try { bk.focus({ preventScroll: true }); } catch (err) {} } } }, true);
+  document.addEventListener('close', function(e){ if (e.target && e.target.id === 'v4Sheet') { v4UpdateBar(); var bk = document.querySelector('#v4Bar [data-v4-book], .tw-book [data-v4-book]'); if (bk) { try { bk.focus({ preventScroll: true }); } catch (err) {} } } }, true);
   window.addEventListener('resize', function(){ var bar = document.getElementById('v4Bar'); if (bar) document.body.style.paddingBottom = bar.offsetHeight + 'px'; });
   // The page's example-trip links keep the preview.
   if (V4_PREVIEW) Array.prototype.forEach.call(document.querySelectorAll('.t3-about a[href^="/trip?q="], .t3-guide a[href^="/trip?q="]'), function(a){ a.setAttribute('href', a.getAttribute('href') + '&v=4'); });
