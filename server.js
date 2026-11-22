@@ -8558,6 +8558,8 @@ function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
   // unless the request already names a dog.
   if (stay && stay.dog && typeof base.text === 'string' && !TRIP_DOG_WORDS_RE.test(base.text) && base.text.trim().length + 13 <= discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) base.text = `${base.text.trim()} with our dog`;
   if (stay && stay.arrive && !(base.overrides && base.overrides.startDate)) base.overrides = { ...(base.overrides || {}), startDate: stay.arrive };
+  // Round 2 fresh eyes (V4): the day the visitor leaves is known, so its plan ends early (trip-planner.js v4SaneDays).
+  if (args.v4 && stay && stay.arrive && stay.leave && stay.leave > stay.arrive) base.departureDate = stay.leave;
   let plan = run(base, now);
   // V4 (round 2, 2026-11-21: "3 days" with Aug 10-13 became a 4-day plan): a length the request names wins over the dates.
   // Round 3: only a number of days ("3 days", « 3 jours »); "a weekend" Fri-Sun still covers Sunday.
@@ -8594,8 +8596,10 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false) {
     const stayIn = v4 ? { ...(stay || {}) } : stay;
     if (v4) {
       const words = String(text || '').toLowerCase();
-      const ages = tripPlannerModule().requestKidAges(words);
-      if (ages.length && stayIn.kids === undefined) { stayIn.kids = Math.min(12, ages.length); stayIn.kidAges = ages.slice(0, 12); }
+      // Round 2 fresh eyes: one age per child as typed (twins twice), also when the party control already says how many
+      // kids and the request names that many ages (the ages were dropped, so the booking site guessed them).
+      const ages = tripPlannerModule().requestKidAgeList(words.replace(/-/g, ' '));
+      if (ages.length && (stayIn.kids === undefined || stayIn.kids === ages.length)) { stayIn.kids = Math.min(12, ages.length); stayIn.kidAges = ages.slice(0, 12); }
       const amenity = tripStayAmenityAsked(words);
       if (amenity && !stayIn.pref) stayIn.pref = { amenity };
     }
@@ -8929,9 +8933,29 @@ function runTripPlan(args, now = new Date()) {
   let a = args;
   if (typeof a.text === 'string') { const plain = v4PlainText(a.text); if (plain !== a.text) a = { ...a, text: plain }; }
   if (typeof a.text === 'string' && V4_NOT_RUSHED_RE.test(a.text) && !(a.overrides && a.overrides.pace)) a = { ...a, overrides: { ...(a.overrides || {}), pace: 'relaxed' } };
+  // Round 2 fresh eyes (2026-11-22; "one night in Osoyoos next Friday" was read as an evening: day 1 had dinner only and
+  // day 2 was a full day with a second dinner): N nights is N + 1 days, and the last one is the day they leave.
+  if (typeof a.text === 'string') { const n = v4NightsText(a.text); if (n) a = { ...a, text: n.text, departureLast: true }; }
   let sunsetDinner = null;
   try { sunsetDinner = v4SunsetDinner(a, now); if (sunsetDinner) a = { ...a, text: sunsetDinner.text }; } catch (e) { sunsetDinner = null; }
   let plan = runTripPlanBase(a, now);
+  // Round 2 fresh eyes: a kind of place asked for that the town does not list at all ("spa" in Osoyoos) is said up front
+  // (plan.notIncluded) and the days are planned without it, rather than left half empty waiting for it.
+  try {
+    v4NotIncluded(plan);
+    const none = ((plan && plan.notIncluded) || []).filter((n) => n.reason === 'none_listed');
+    if (none.length && !a.swap && !a.pinned && typeof a.text === 'string') {
+      const TR = require('./trip-requirements');
+      let t = a.text;
+      for (const n of none) { const re = TR.KINDS[n.kind]; if (re) t = t.replace(new RegExp(`(?:,?\\s*(?:and|et|with|avec|plus)\\s+)?(?:an?\\s+|some\\s+|un\\s+|une\\s+|the\\s+)?(?:${re.source})(?:\\s+(?:days?|visits?|time|treatments?))?`, 'gi'), ' '); }
+      t = t.replace(/\s{2,}/g, ' ').replace(/\s+,/g, ',').replace(/,\s*,/g, ',').trim();
+      const stopsOf = (p) => ((p && p.days) || []).reduce((k, d) => k + (d.stops || []).filter((x) => x && (x.venue || x.event)).length, 0);
+      if (t && t !== a.text) {
+        const retry = runTripPlanBase({ ...a, text: t }, now);
+        if (retry && retry.kind === plan.kind && stopsOf(retry) > stopsOf(plan)) { retry.notIncluded = plan.notIncluded; retry.query = plan.query; plan = retry; }
+      }
+    }
+  } catch (e) { /* keep the plan as planned */ }
   if (sunsetDinner && plan && Array.isArray(plan.notes)) plan.notes = [sunsetDinner.note].concat(plan.notes);
   try {
     const it = plan && plan.intent;
@@ -8948,9 +8972,44 @@ function runTripPlan(args, now = new Date()) {
     }
   } catch (e) { /* keep the list */ }
   try { v4TidyDays(plan); } catch (e) { /* keep the plan as planned */ }
+  try { if (plan && !plan.notIncluded) v4NotIncluded(plan); } catch (e) { /* the notes stay in the warnings */ }
   try { v4DropAfterDark(plan); } catch (e) { /* keep the plan as planned */ }
   try { v4AddStopPhones(plan); } catch (e) { /* phones are a convenience */ }
   return plan;
+}
+const V4_NIGHT_WORDS = { a: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5 };
+function v4NightsText(text) {
+  if (/\b(?:\d+|one|two|three|four|five|six|seven|un|deux|trois|quatre|cinq|six|sept)\s*(?:-\s*)?(?:days?|jours?|journ[ée]es?)\b/i.test(text)) return null;
+  const re = /\b(\d|a|one|two|three|four|five|six|une?|deux|trois|quatre|cinq)(?:\s+single)?[\s-]+(?:nights?|nuits?|nuit[ée]es?)\b(?!\s+(?:out|only|market|markets|club|life|skiing|ski)\b)/i;
+  const m = re.exec(text);
+  if (!m) return null;
+  const n = V4_NIGHT_WORDS[m[1].toLowerCase()] || Number(m[1]);
+  if (!(n >= 1 && n <= 6)) return null;
+  return { text: text.replace(m[0], `${n + 1} days`), nights: n };
+}
+// Round 2 fresh eyes (2026-11-22; "spa and a nice dinner" in Osoyoos had no spa and said so only under More options): what
+// the visitor asked for by kind and the plan could not include, as one top-level list the page and the travel agent chat
+// can say up front. plan.notIncluded = [{ kind, label, reason: 'none_listed' | 'not_fitted', town, nearest, text }].
+const V4_TYPE_WORDS = { restaurant: 'restaurant', cafe: 'café', winery: 'winery', brewery: 'brewery', distillery: 'distillery', pub: 'pub', cocktail: 'cocktail lounge', golf: 'golf course', beach: 'beach', tour: 'tour', outdoor: 'outdoor stop', indoor: 'indoor stop' };
+function v4NotIncluded(plan) {
+  if (!plan || !Array.isArray(plan.requirementResults)) return;
+  const TR = require('./trip-requirements');
+  const towns = ((plan.overview && plan.overview.regions) || []).map((r) => r && r.label).filter(Boolean);
+  const town = towns.length ? (towns.length > 1 ? `${towns.slice(0, -1).join(', ')} or ${towns[towns.length - 1]}` : towns[0]) : null;
+  const warned = (plan.warnings || []).join(' \n ');
+  const out = [];
+  for (const r of plan.requirementResults) {
+    if (!r || r.status !== 'unmet' || r.strength !== 'must' || !['venue_kind', 'type'].includes(r.kind)) continue;
+    const label = r.kind === 'venue_kind' ? (TR.LABELS[r.value] || String(r.value).replace(/_/g, ' ')) : (V4_TYPE_WORDS[r.value] || String(r.value));
+    if (out.some((x) => x.label === label)) continue;
+    const noneListed = new RegExp(`Nothing matching ${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s? was available`, 'i').test(warned);
+    const alt = (r.optionalAlternatives || []).find((x) => x && x.reasonCode === 'different_region' && x.name);
+    const nearest = alt ? { id: alt.id, name: alt.name, region: alt.region, regionLabel: REGION_LABELS[alt.region] || alt.region, url: alt.url, ...(alt.urlFr ? { urlFr: alt.urlFr } : {}) } : null;
+    const an = /^[aeiou]/i.test(label) ? 'an' : 'a';
+    const text = (noneListed && town ? `There’s no ${label} listed in ${town}, so this plan has none.` : `I couldn’t fit ${an} ${label} into this plan.`) + (nearest ? ` The nearest is ${nearest.name} in ${nearest.regionLabel}.` : '');
+    out.push({ kind: r.value, label, reason: noneListed ? 'none_listed' : 'not_fitted', town, nearest, text });
+  }
+  if (out.length) plan.notIncluded = out;
 }
 function v4AddStopPhones(plan) {
   const ids = new Set();
@@ -10160,6 +10219,9 @@ function tripFullVenueNames(text, taxonomy) {
     if (!(` ${lower} `).includes(` ${e.word} `) || lower.includes(e.fullNorm)) continue;
     const re = new RegExp(`(\\b(?:at|to)\\s+)(?:the\\s+)?${e.word}\\b|\\b(?:the\\s+)?${e.word[0].toUpperCase()}${e.word.slice(1)}\\b`, 'i');
     const m = re.exec(out);
+    // Round 2 fresh eyes (2026-11-22; "coming from Vancouver" became Vancouver Pizza Kitchen, a stop to find): a word
+    // right after "from" is where they are coming from, never a place to visit.
+    if (m && !m[1] && /\b(?:from|depuis|de)\s+(?:the\s+)?$/i.test(out.slice(0, m.index))) continue;
     if (m && (m[1] || /^[A-Z]/.test(m[0]))) out = out.slice(0, m.index) + (m[1] || '') + e.full + out.slice(m.index + m[0].length);
   }
   return unmask(out);
@@ -10723,7 +10785,7 @@ function lateAfterMinutes(text) {
 const TEAM_BUILDING_WORDS_RE = /\bteam[\s-]?building(?:\s+(?:activit(?:y|ies)|events?|ideas?|outings?|days?|nights?|games?|exercises?|experiences?|venues?|places?|spots?|fun|things to do))+\b|\bteambuilding\b/gi;
 const TRIP_SWIM_OFF_MONTHS = [11, 12, 1, 2, 3, 4];
 const TRIP_SIM_GOLF_RE = /\b(?:indoor )?(?:golf simulators?|golf sims?|sim golf|simulator golf|virtual golf|golf lounges?|indoor golf (?:simulators?|lounges?|centres?|centers?))\b/gi;
-function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null, v4 = false }, now = new Date()) {
+function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null, v4 = false, departureDate = null, departureLast = false }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   // 2026-11-05: trip-length, clock-time, holiday-weekend and tour wording made plain; a beer, cider or distillery "tour" is a run of
   // breweries, cideries or distilleries. (planText is the French layer's own text; planTextPlain is what the planner reads.)
@@ -11297,7 +11359,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
       clock: rolledWindow ? null : okanaganClock(now),
       tripDate: rolledWindow ? requirements.startDate : (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now),
       kidAges: tripKidAges, askText: tripAskText,
-      ...(v4 ? { v4: true } : {}),
+      ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}) } : {}),
     });
     plan.seeAll = null;
     if (eventWindow) plan.eventWindow = eventWindow;
@@ -11347,7 +11409,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     holidayEvents: !!holidayEvents,
     tripDate: requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now) || tripPlanDate(intent.when, now),
     kidAges: tripKidAges, askText: tripAskText,
-    ...(v4 ? { v4: true } : {}),
+    ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}) } : {}),
     startWeekday: requirements?.startDate ? localWeekdayKey(requirements.startDate) : tripStartWeekday(intent.when, now),
     clock: rolledWindow ? null : okanaganClock(now),
   });

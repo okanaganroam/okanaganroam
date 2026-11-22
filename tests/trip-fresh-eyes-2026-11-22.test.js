@@ -83,7 +83,7 @@ test('3. a day is called by the towns its stops are in (V4)', () => {
   assert.equal(plan.days[1].regionLabel, 'Penticton', 'one stop next door does not rename the day');
   assert.equal(plan.days[2].regionLabel, 'Naramata and Penticton', 'already right');
   assert.equal(plan.days[3].regionLabel, 'Penticton', 'no stops: kept');
-  assert.ok(/if \(input && input\.v4\) \{ v4Polish\(result, input\); v4DayTownLabels\(result, input\); \}/.test(fs.readFileSync(require.resolve('../trip-planner.js'), 'utf8')), 'V4 only');
+  assert.ok(/if \(input && input\.v4\) \{ v4Polish\(result, input\); (?:v4SaneDays\(result, input\); )?v4DayTownLabels\(result, input\);/.test(fs.readFileSync(require.resolve('../trip-planner.js'), 'utf8')), 'V4 only');
 });
 
 // ---- 4. Daylight ----
