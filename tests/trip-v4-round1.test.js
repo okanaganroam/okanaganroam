@@ -44,7 +44,7 @@ test('V4 server: "nothing too rushed" is a relaxed pace, and "things to do this 
   for (const t of ['3 days, nothing too rushed', 'no rush please', 'we want to take our time', 'deux jours sans se presser', 'pas trop pressés']) assert.ok(re.test(t), t);
   for (const t of ['a rush of adrenaline', '3 days in Kelowna', 'gold rush history']) assert.ok(!re.test(t), t);
   assert.ok(/const V4_WHEN_DAYS = \{ 'this-weekend': 2, 'next-weekend': 2, weekend: 2, today: 1, tomorrow: 1 \};/.test(src));
-  assert.ok(/\['discover', 'recommendations'\]\.includes\(plan\.kind\) && want && !\(focus && listAsked\)/.test(src), 'a list only when a list is asked for');
+  assert.ok(/\['discover', 'recommendations'\]\.includes\(plan\.kind\) && \(want \|\| vague\) && !\(focus && listAsked\)/.test(src), 'a list only when a list is asked for');
   assert.ok(/function runTripPlan\(args, now = new Date\(\)\) \{\n  if \(!args \|\| !args\.v4\) return runTripPlanBase\(args, now\);/.test(src), 'the current page goes straight to the planner as before');
 });
 

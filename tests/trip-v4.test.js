@@ -28,7 +28,8 @@ test('V4 lunch: every full day of the plan has a lunch stop at a restaurant or c
 
 test('V4 nice dinner: "a nice dinner" on a 3-day trip is a sit-down restaurant every evening, never a pub or sports bar', () => {
   const p = plan(Q, true);
-  for (const day of p.days) {
+  // (Round 3, 2026-11-22: the last day of a trip is the day they leave, a light day with no dinner.)
+  for (const day of p.days.slice(0, -1)) {
     const dinner = venueStops(day).find((s) => ['evening', 'night'].includes(s.daypart));
     assert.ok(dinner, `day ${day.day} has dinner`);
     assert.equal(dinner.venue.type, 'restaurant');

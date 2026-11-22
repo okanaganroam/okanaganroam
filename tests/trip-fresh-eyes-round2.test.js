@@ -35,8 +35,8 @@ test('1. a one-night trip: lunch and dinner at meal times, every stop timed, the
   assert.ok(last.stops.filter((s) => s.venue || s.event).length >= 1, 'the last day still has a morning');
   assert.ok(last.stops.every((s) => ['early', 'morning', 'midday'].includes(s.daypart)), `no afternoon or dinner on the day they leave: ${last.stops.map((s) => s.daypart)}`);
   assert.ok(p.days[0].stops.some((s) => isMeal(s, 'evening')), 'day 1 keeps its dinner');
-  // Without the leaving day the same request is two full days (the current page is unchanged).
-  const full = fx.plan('anniversary weekend in Kelowna, wineries and good food on November 28', { extra: { v4: true } });
+  // Not V4: the same request is two full days (the current page is unchanged).
+  const full = fx.plan('anniversary weekend in Kelowna, wineries and good food on November 28', {});
   assert.ok(full.days[1].stops.some((s) => s.daypart === 'evening'));
 });
 
@@ -119,7 +119,7 @@ test('3. "coming from Vancouver" is where they come from, never Vancouver Pizza 
 
 test('3. what was asked for and could not be included is one top-level list (plan.notIncluded)', () => {
   const body = /const V4_TYPE_WORDS = [\s\S]*?\nfunction v4NotIncluded\(plan\) \{[\s\S]*?\n\}/.exec(SRC)[0];
-  const fn = new Function('require', 'REGION_LABELS', `${body}; return v4NotIncluded;`)((m) => (m === './trip-requirements' ? tr : require(m)), { kelowna: 'Kelowna', osoyoos: 'Osoyoos' }); // eslint-disable-line no-new-func
+  const fn = new Function('require', 'REGION_LABELS', 'getVenue', 'venueIndoorInfo', 'venueTourInfo', `${body}; return v4NotIncluded;`)((m) => (m === './trip-requirements' ? tr : require(m)), { kelowna: 'Kelowna', osoyoos: 'Osoyoos' }, (id) => (id === 7 ? { id: 7, name: 'Thermal Spa', type: 'indoor', description: 'A thermal spa with steam rooms.' } : null), () => ({}), () => ({})); // eslint-disable-line no-new-func
   const plan = {
     overview: { regions: [{ slug: 'osoyoos', label: 'Osoyoos' }] },
     warnings: ['Nothing matching spa was available in Osoyoos.', 'No spa could be fitted into this plan.'],
@@ -182,7 +182,7 @@ test('5. "no car" on a trip of days keeps to the base town with short hops, not 
   assert.ok(keep(q, 3, false), 'not V4: as before');
   const p = fx.plan(q, { extra: { v4: true } });
   assert.deepEqual(p.noCar, { maxKm: tp.V4_NO_CAR_KM });
-  assert.match(p.notes[0], /^No car: every stop is in or right by your base town/);
+  assert.match(p.notes[0], /^No car: every stop is in town/);
   assert.ok(!(p.warnings || []).some((w) => /walking itinerary|car-free/i.test(w)), JSON.stringify(p.warnings));
   assert.ok(p.days.every((d) => d.stops.every((s) => !s.venue || s.venue.region === 'kelowna')));
   assert.ok(p.days.every((d) => d.stops.filter((s) => s.venue).length >= 3), 'full days');
