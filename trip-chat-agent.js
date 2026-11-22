@@ -131,6 +131,24 @@ function agentRules(t, stops, ctx, h) {
   const regionIn = (s) => regions.find((x) => new RegExp(`\\b${fold(regionLabels[x] || x).replace(/[^a-z0-9 ]/g, '.')}\\b`).test(s)) || null;
   const editVerb = EDIT_VERB_RE.test(t);
 
+  // 0. "add a spa on Saturday afternoon instead of the park": the stop named after "instead of" is the one replaced.
+  const inst = /\b(?:instead of|in place of|rather than|au lieu d[eu]|a la place d[eu])\s+(?:the\s+|our\s+|that\s+|la\s+|le\s+|l')?([a-z' -]+?)(?:\s+(?:on|le|du)\s+.*)?[.!]*$/.exec(t);
+  if (inst) {
+    let target = h.stopsNamed(inst[1], stops);
+    // A plain word of the stop's name ("the park", "the gallery") names it here.
+    if (!target.length) { const ws = inst[1].split(/[^a-z0-9']+/).filter((w) => w.length >= 4); target = stops.filter((s) => ws.some((w) => fold(s.name).split(/[^a-z0-9']+/).includes(w))); }
+    if (day && target.some((s) => s.day === day)) target = target.filter((s) => s.day === day);
+    const kind = h.kindsNamed(t.slice(0, inst.index))[0] || null;
+    if (target.length && kind) return { ops: [op('replace', { stops: [target[0]], kind })], cant: null, exact: true };
+    if (!target.length && kind) return { ops: [], cant: 'not_found', what: null };
+  }
+  // 0b. "we like to sleep in, start the days at 10:30": every day starts then.
+  const startAt = /\b(?:start|begin|commence[rz]?|debute[rz]?)\b[^.]*\b(?:days?|mornings?|journees?|jours?)\b[^.]*\b(?:at|a|vers)\s+(\d{1,2})(?:[:h](\d{2}))?\s*(am|pm|h)?(?![\w-])/.exec(t);
+  if (startAt && !/\b(?:day|jour)\s*\d\b/.test(t)) {
+    let hh = Number(startAt[1]); const mm = Number(startAt[2] || 0);
+    if (startAt[3] === 'pm' && hh < 12) hh += 12;
+    if (hh >= 6 && hh <= 15 && mm < 60) return { ops: Array.from({ length: days }, (_, i) => op('time', { value: 'later', day: i + 1, n: hh * 60 + mm })), cant: null, exact: true };
+  }
   // 1. A question about a stop, answered from its listing's stored facts (never a guess).
   const asksQ = (/\?\s*$/.test(t) || QUESTION_START_RE.test(t)) && !editVerb && !(/^(?:can|could|would|will|may|peux|pouvez|peut-on|pourrait-on)\b/.test(t) && !/\b(?:bring|allowed|welcome|go in|amener|acceptes?)\b/.test(t));
   if (asksQ) {
@@ -419,7 +437,7 @@ const AGENT_T = {
     stayHave: 'You’re staying at {name} ({facts}){has}.', stayRemoved: 'Took the place to stay off the plan.', stayNoneAlready: 'There’s no place to stay on this plan.',
     stayNoListing: 'I couldn’t find a place to stay near these stops in our list.',
     tourAdded: 'Added {new}{at}.', tourFor: 'Added {new}{at} in place of {old}.', tourCovers: 'It covers that day’s {what}, so I took out {names}.', tourCoversW: { winery: 'wineries', brewery: 'breweries' },
-    tourNone: 'We don’t list {kind} that fits there.', tourNoneOffer: 'We don’t list {kind} that fits there. The nearest thing we list is {near}: say “add {nearShort}”.', tourNoneCard: 'We don’t list {kind} that fits into the plan there, but here’s one to book for {town}, under “Dates & travel options”.',
+    tourNone: 'We don’t list {kind} that fits there.', tourNoneOffer: 'We don’t list {kind} that fits there. The nearest thing we list is {near}: say “add {nearShort}”.', tourNoneCard: 'We don’t list {kind} that fits into the plan there, but here’s one to book for {town}, under “Getting here & tours”.',
     tourNoWine: 'We don’t list wine tours here. I can add a snowmobile tour, ziplining, the bobsleigh or a bear viewing tour.',
     ask_which: 'Which stop do you mean? Ask with its name, like “is {name} open Sunday?”', ask_whichNone: 'Which stop do you mean? Ask with its name.',
     qDetails: 'Tap {name} for its details.', qCheck: ' Check before you go.', qSeason: ' It is seasonal, so check before you go.',
@@ -445,7 +463,7 @@ const AGENT_T = {
     stayHave: 'Vous logez à {name} ({facts}){has}.', stayRemoved: 'J’ai retiré le logement du plan.', stayNoneAlready: 'Il n’y a pas de logement dans ce plan.',
     stayNoListing: 'Je n’ai pas trouvé de logement près de ces arrêts dans notre liste.',
     tourAdded: 'J’ai ajouté {new}{at}.', tourFor: 'J’ai ajouté {new}{at} à la place de {old}.', tourCovers: 'Il couvre les {what} de cette journée, donc j’ai retiré {names}.', tourCoversW: { winery: 'vignobles', brewery: 'microbrasseries' },
-    tourNone: 'Nous n’avons pas {kind} qui convienne à ce moment dans notre liste.', tourNoneOffer: 'Nous n’avons pas {kind} qui convienne à ce moment. Le plus proche dans notre liste : {near}. Dites « ajoute {nearShort} ».', tourNoneCard: 'Nous n’avons pas {kind} qui s’insère dans le plan à ce moment, mais en voici un à réserver pour {town}, sous « Dates et options de voyage ».',
+    tourNone: 'Nous n’avons pas {kind} qui convienne à ce moment dans notre liste.', tourNoneOffer: 'Nous n’avons pas {kind} qui convienne à ce moment. Le plus proche dans notre liste : {near}. Dites « ajoute {nearShort} ».', tourNoneCard: 'Nous n’avons pas {kind} qui s’insère dans le plan à ce moment, mais en voici un à réserver pour {town}, sous « Pour venir et excursions ».',
     tourNoWine: 'Nous n’avons pas de tours des vignobles ici. Je peux ajouter une excursion en motoneige, de la tyrolienne, du bobsleigh ou une observation des ours.',
     ask_which: 'De quel arrêt parlez-vous? Demandez avec son nom, par exemple « est-ce que {name} est ouvert dimanche? »', ask_whichNone: 'De quel arrêt parlez-vous? Demandez avec son nom.',
     qDetails: 'Touchez {name} pour ses détails.', qCheck: ' Vérifiez avant d’y aller.', qSeason: ' C’est saisonnier : vérifiez avant d’y aller.',

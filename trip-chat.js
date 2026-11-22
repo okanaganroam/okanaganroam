@@ -104,7 +104,7 @@ const WORD_KINDS = {
 for (const [k, w] of Object.entries(agent.TOUR_KINDS)) WORD_KINDS[k] = { en: w.en, fr: w.fr, types: w.types, words: w.words, re: w.re, tour: true };
 for (const [k, w] of Object.entries(WORD_KINDS)) KINDS[k] = { text: w.en, en: w.en, fr: w.fr, types: w.types, words: w.words };
 // "something relaxing": a spa, a sauna, a float.
-KINDS.spa = { ...KINDS.spa, types: ['indoor', 'outdoor', 'sport'], words: ['spa', 'sauna', 'wellness', 'hot spring', 'float', 'nordic'] };
+KINDS.spa = { ...KINDS.spa, types: ['indoor', 'outdoor', 'sport'], words: ['spa', 'sauna', 'thermal', 'hot spring', 'float', 'nordic'] };
 const KIND_KEYS = Object.keys(KINDS);
 // A kind for each venue type, for "more like the winery".
 const TYPE_KIND = { winery: 'winery', brewery: 'brewery', distillery: 'distillery', cafe: 'cafe', restaurant: 'restaurant', pub: 'pub', cocktail: 'cocktail', golf: 'golf', beach: 'beach', outdoor: 'outdoor', indoor: 'indoor', tour: 'tour' };
@@ -704,7 +704,7 @@ function reconcileReads(ai, rules, message) {
   const rops = rules.ops || [];
   // Travel agent abilities: several asks each read by the rules, and the asks only the rules place exactly (a question
   // about a stop, a move, one stop's time, the stay, getting there, adults, a tour) stand as read.
-  const agentOp = (o) => ['ask', 'move', 'set_time', 'stay', 'transport'].includes(o.o) || (o.o === 'party' && o.value === 'adults') || (o.o === 'add' && agent.TOUR_KINDS[o.kind]) || (o.o === 'days' && o.region);
+  const agentOp = (o) => ['ask', 'move', 'set_time', 'stay', 'transport'].includes(o.o) || (o.o === 'time' && Number.isInteger(o.n) && o.n >= 360) || (o.o === 'party' && o.value === 'adults') || (o.o === 'add' && agent.TOUR_KINDS[o.kind]) || (o.o === 'days' && o.region);
   if (rops.length && ((rules.multi && !rules.partial) || rops.every(agentOp))) return { ops: rops, cant: null, source: 'rules_over_ai', fixes: [rules.multi ? 'multi' : 'agent'] };
   if (!rops.length && ['ask_which', 'days_max', 'days_min'].includes(rules.cant) && !(ai.ops || []).length) return { ops: [], cant: rules.cant, source: 'rules_over_ai', fixes: [rules.cant] };
   // The AI read a question the rules did not: its stop stands; with no stop, "which stop?".
@@ -1009,7 +1009,10 @@ function broadTurn(ops, ctx) {
         const d = op.day || (target && target.day) || 1;
         const first = stops.filter((s) => s.day === d && Number.isInteger(s.start)).sort((a, b) => a.start - b.start)[0];
         const cur = (first && first.start) || 600;
-        const next = Math.max(360, Math.min(900, cur + (op.value === 'later' ? 60 : -60)));
+        // An exact start asked for ("start the days at 10:30") is that time; else an hour later or earlier.
+        const exactStart = Number.isInteger(op.n) && op.n >= 360;
+        if (exactStart) op.value = op.n >= cur ? 'later' : 'earlier';
+        const next = exactStart ? Math.max(360, Math.min(900, op.n)) : Math.max(360, Math.min(900, cur + (op.value === 'later' ? 60 : -60)));
         r.day = d; r.target = target || first || null; r.value = op.value;
         if (next === cur) { r.ok = false; r.why = 'limit'; break; }
         if (days > 1) overrides.dayStartMinutes = { ...(overrides.dayStartMinutes || {}), [d]: next };
@@ -1447,7 +1450,7 @@ const T = {
     avoidNone: 'There’s no {what} in your plan. I’ll keep it out.', avoidWhat: { arts: 'museum', winery: 'winery', brewery: 'brewery', distillery: 'distillery', pub: 'pub', cocktail: 'cocktail bar', golf: 'golf', beach: 'beach', hike: 'hike', tour: 'tour', indoor: 'indoor attraction', spa: 'spa', cafe: 'café' },
     partyKnown: { kids: 'Your plan is already set for the kids.', no_alcohol: 'Your plan is already alcohol-free.', dog: 'Your plan is already set for your dog.' },
     time_at: 'I can’t set an exact time for one stop yet. I can start the day earlier or later, or swap that stop.',
-    wineTour: 'Here’s a wine tour with a driver for {town}. It’s under “Dates & travel options”, with its Book button.', wineTourNone: 'I don’t have a wine tour to offer for {town} right now.',
+    wineTour: 'Here’s a wine tour with a driver for {town}. It’s under “Getting here & tours”, with its Book button.', wineTourNone: 'I don’t have a wine tour to offer for {town} right now.',
     poolWinter: ' (check it’s open in winter)',
     done: 'Done.', took: 'Took out {names}.', kept: 'Kept {names}.', keptStays: 'Kept {names}. {it} when you change other things.', itStays: 'It stays', theyStay: 'They stay',
     swapped: 'Swapped {old} for {new}{at}.', swapFail: 'I couldn’t find {kind} that fits there, so {old} stays.', swapFailSame: 'Nothing else nearby fits there, so {old} stays.',
@@ -1478,7 +1481,7 @@ const T = {
     avoidNone: 'Il n’y a pas de {what} dans votre plan. Je n’en ajouterai pas.', avoidWhat: { arts: 'musée', winery: 'vignoble', brewery: 'microbrasserie', distillery: 'distillerie', pub: 'pub', cocktail: 'bar à cocktails', golf: 'golf', beach: 'plage', hike: 'randonnée', tour: 'visite guidée', indoor: 'activité intérieure', spa: 'spa', cafe: 'café' },
     partyKnown: { kids: 'Votre plan est déjà adapté aux enfants.', no_alcohol: 'Votre plan est déjà sans alcool.', dog: 'Votre plan est déjà adapté à votre chien.' },
     time_at: 'Je ne peux pas encore fixer l’heure exacte d’un seul arrêt. Je peux commencer la journée plus tôt ou plus tard, ou remplacer cet arrêt.',
-    wineTour: 'Voici un tour des vignobles avec chauffeur pour {town}. Il est sous « Dates et options de voyage », avec son bouton Réserver.', wineTourNone: 'Je n’ai pas de tour des vignobles à proposer pour {town} en ce moment.',
+    wineTour: 'Voici un tour des vignobles avec chauffeur pour {town}. Il est sous « Pour venir et excursions », avec son bouton Réserver.', wineTourNone: 'Je n’ai pas de tour des vignobles à proposer pour {town} en ce moment.',
     poolWinter: ' (vérifiez qu’elle est ouverte en hiver)',
     done: 'C’est fait.', took: 'J’ai retiré {names}.', kept: 'J’ai gardé {names}.', keptStays: 'J’ai gardé {names}. {it} si vous changez autre chose.', itStays: 'Il reste', theyStay: 'Ils restent',
     swapped: 'J’ai remplacé {old} par {new}{at}.', swapFail: 'Je n’ai pas trouvé {kind} qui convienne à ce moment, donc {old} reste.', swapFailSame: 'Rien d’autre à proximité ne convient à ce moment, donc {old} reste.',

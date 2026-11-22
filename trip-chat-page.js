@@ -263,13 +263,14 @@ function chatClientSrc(d) {
         // Travel agent abilities: a stay added to a plan with no night (stay.force rides along with later requests), and the number of adults.
         if (j.stayForce !== undefined) { chat.stayForce = !!j.stayForce; chat.stayArrive = j.stayForce && j.stayArrive ? j.stayArrive : null; touched = true; }
         if (j.party && j.party.adults > 0) { var adEl = document.getElementById('t3Adults'); if (adEl) adEl.value = String(j.party.adults); chat.adults = j.party.adults; }
-        if (acts.transport) { chat.transport = acts.transport; touched = true; if (acts.transport === 'rental') changed.push('gh'); }
+        var planOnly = touched;
+        if (acts.transport) { chat.transport = acts.transport; touched = true; if (acts.transport === 'rental' || acts.transport === 'no_car') changed.push('gh'); }
         // Events taken out by chat, a wine tour offered as a card, and words added to the request ("no museums").
         (acts.removeEvents || []).forEach(function(id){ chat.goneEvents[id] = 1; touched = true; });
         // Round 4: the wine tour card is an offer, not a change to the plan: it shows no Undo (Undo undid nothing).
         var before = touched, wasConfirmed = !!v4.confirmed;
         if (j.card && j.card.kind === 'wine_tour') { chat.wineTour = j.card; touched = true; changed.push('gh'); }
-        var planTouched = before;
+        var planTouched = before && (planOnly || !acts.transport || j.stayBlock || j.stayPref !== undefined || (acts.removeEvents || []).length > 0);
         if (typeof j.text === 'string' && j.text && !(j.plan && j.req)) { state.text = j.text; }
         // Round 4: a change asked for in the chat keeps a confirmed plan confirmed (Book, Share and Save stay, for the plan
         // as it is now); only Save is offered again.
@@ -424,6 +425,8 @@ function chatClientSrc(d) {
     Array.prototype.forEach.call(root.querySelectorAll('.v4-stop'), function(li){
       var eb = li.querySelector('.trip-btn[data-trip-ref^="event:"]');
       if (eb) {
+        // The photo-led layout (trip-workspace-layout.js) draws the event card itself: Remove, then "Removed … Undo".
+        if (typeof tripWorkspaceEventHtml === 'function') return;
         var id = Number(String(eb.getAttribute('data-trip-ref')).slice(6));
         if (chat.goneEvents[id]) { li.parentNode.removeChild(li); return; }
         if (!v4.confirmed) { li.classList.add('has-event-x'); li.insertAdjacentHTML('beforeend', '<button type="button" class="v4-icon v4-event-x" data-v4-event-x="' + id + '" aria-label="' + esc(ag('removeEvent', { name: eb.getAttribute('data-trip-name') || '' })) + '">✕</button>'); }
@@ -495,7 +498,25 @@ function chatClientSrc(d) {
       track('trip_chat', { chat_source: 'when_' + w, changed: 'no' });
       return;
     }
-    if ((b = t.closest('[data-v4-event-x]'))) { chat.goneEvents[Number(b.getAttribute('data-v4-event-x'))] = 1; chat.rendering = true; try { render(false); } finally { chat.rendering = false; } return; }
+    // An event comes off like a venue: a "Removed … Undo" row, the same line in the chat, and the stop count follows.
+    if ((b = t.closest('[data-v4-event-x]'))) {
+      var xid = Number(b.getAttribute('data-v4-event-x')), xname = '';
+      days().forEach(function(d){ d.stops.forEach(function(s){ if (s.kind === 'event' && s.event && s.event.id === xid) xname = s.event.name; }); });
+      chat.goneEvents[xid] = 1; v4.saved = false;
+      render(false);
+      var xu = resultEl.querySelector('[data-v4-event-undo="' + xid + '"]'); if (xu) { try { xu.focus({ preventScroll: true }); } catch (err) {} }
+      if (xname && typeof announce === 'function') announce(tx('tripv3.wasRemoved', { name: xname }));
+      v4CacheSave();
+      return;
+    }
+    if ((b = t.closest('[data-v4-event-undo]'))) {
+      var uid = Number(b.getAttribute('data-v4-event-undo'));
+      delete chat.goneEvents[uid]; v4.saved = false;
+      render(false);
+      var ux = resultEl.querySelector('[data-v4-event-x="' + uid + '"]'); if (ux) { try { ux.focus({ preventScroll: true }); } catch (err) {} }
+      v4CacheSave();
+      return;
+    }
     if ((b = t.closest('[data-v4-stay-more]'))) { chat.stayMore = !chat.stayMore; render(false); return; }
     if ((b = t.closest('[data-v4-stay-choose]'))) { stayChoice = Number(b.getAttribute('data-v4-stay-choose')); chat.stayMore = false; render(false); chatGlow(['stay']); return; }
   });
