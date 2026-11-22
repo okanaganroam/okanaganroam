@@ -14,8 +14,10 @@
 //   - Build My Trip V4, "Book my trip": one last step "Rent a car at <airport>" (the airport nearest the plan's first
 //     town) when the plan spans 2+ towns or more than one day.
 // Discover Cars links: its own airport landing pages (https://www.discovercars.com/canada/<city>/<iata>) with
-// ?a_aid=<id>. Those pages take no dates, so the pick-up date is chosen on Discover Cars. No sub-id is added (Discover
-// Cars' docs do not name one).
+// ?a_aid=<id>. Those pages take no dates, so the pick-up date is chosen on Discover Cars.
+// Tracking (2026-11-22): &chan=<site channel> (created in the Discover Cars panel: "okanagan" / "whistler"; the
+// DISCOVERCARS_CHANNEL env overrides) and &data1=<placement> (page = a town/ski page box, trip = Build My Trip's
+// booking step, chat = the travel agent chat card), so their Channel stats / commission reports say where a booking came from.
 // Clicks: data-link="discovercars" / "viator" (Build My Trip funnel bmt:<v>:book:discovercars / :viator; outbound_click
 // link_type "discovercars" / "viator", surface "getting_here" or "trip_planner").
 // French: FR_TEXT below is added to the site's French list (server.js), so /fr pages read in French.
@@ -44,18 +46,22 @@ const TEXT = {
 const DISCLOSURE = require('./places-to-stay').DISCLOSURE;
 
 const cleanAid = (s) => { const t = String(s || '').trim(); return /^[A-Za-z0-9_-]{1,40}$/.test(t) ? t : ''; };
+const DEFAULT_CHANNEL = 'okanagan';
+const PLACEMENTS = ['page', 'trip', 'chat'];
 function config(env = process.env) {
   const aid = cleanAid(env.DISCOVERCARS_AID);
-  return { enabled: !!aid, aid };
+  return { enabled: !!aid, aid, channel: cleanAid(env.DISCOVERCARS_CHANNEL) || DEFAULT_CHANNEL };
 }
 const enabled = (env = process.env) => config(env).enabled;
 
 const airportFor = (region) => AIRPORTS[REGION_AIRPORT[String(region || '')]] ? REGION_AIRPORT[region] : null;
-// The Discover Cars link for an airport key ('ylw' / 'yyf'), or null when off.
-function carUrl(key, cfg = config()) {
+// The Discover Cars link for an airport key ('ylw' / 'yyf'), or null when off. placement: 'page' | 'trip' | 'chat'.
+function carUrl(key, cfg = config(), placement = 'page') {
   const a = AIRPORTS[key];
   if (!a || !cfg || !cfg.enabled) return null;
-  return `${DC_BASE}${a.path}?a_aid=${encodeURIComponent(cfg.aid)}`;
+  const chan = cfg.channel || DEFAULT_CHANNEL;
+  const where = PLACEMENTS.includes(placement) ? placement : 'page';
+  return `${DC_BASE}${a.path}?a_aid=${encodeURIComponent(cfg.aid)}&chan=${encodeURIComponent(chan)}&data1=${where}`;
 }
 
 // GETTING_HERE_DATA_DIR: tests only; the site reads data/.
@@ -94,7 +100,7 @@ function regionBoxHtml(region, opts = {}) {
   if (!cfg.enabled) return '';
   const key = airportFor(region);
   const rows = [];
-  const car = key ? carUrl(key, cfg) : null;
+  const car = key ? carUrl(key, cfg, 'page') : null;
   if (car) rows.push(`<li><span>${escapeHtml(rentText(key, 'en'))}</span> <a href="${escapeHtml(car)}" rel="sponsored noopener" target="_blank" data-track="booking" data-link="discovercars" data-airport="${escapeHtml(AIRPORTS[key].code)}">${escapeHtml(TEXT.seeCars.en)} <span aria-hidden="true">↗</span></a></li>`);
   for (const s of regionShuttles(region, opts)) {
     rows.push(`<li><span>${escapeHtml(s.label.en)}</span> <a href="${escapeHtml(s.url)}" rel="sponsored noopener" target="_blank" data-track="booking" data-link="viator" data-viator-code="${escapeHtml(s.productCode)}">${escapeHtml(viator.TEXT.book.en)} <span aria-hidden="true">↗</span></a></li>`);
@@ -153,7 +159,7 @@ function tripStep(plan, stay, opts = {}) {
   if (!cfg.enabled || !wantsCar(plan, stay)) return null;
   const first = planStops(plan).map(stopRegion).find((r) => airportFor(r));
   const key = first ? airportFor(first) : null;
-  const url = key ? carUrl(key, cfg) : null;
+  const url = key ? carUrl(key, cfg, 'trip') : null;
   if (!url) return null;
   return { kind: 'transport', id: `car-${key}`, name: rentText(key, 'en'), nameFr: rentText(key, 'fr'), label: TEXT.seeCars.en, labelFr: TEXT.seeCars.fr, url, affiliate: true, rel: 'sponsored noopener', link: 'discovercars' };
 }
@@ -169,7 +175,7 @@ function tripCard(plan, stay, opts = {}) {
   const first = planStops(plan).map(stopRegion).find((r) => airportFor(r));
   const key = first ? airportFor(first) : null;
   if (!key) return null;
-  const car = carUrl(key, opts.cfg || config());
+  const car = carUrl(key, opts.cfg || config(), 'chat');
   const shuttles = regionShuttles(first, opts).map((x) => ({ label: x.label, url: x.url, productCode: x.productCode }));
   return { airport: { key, code: AIRPORTS[key].code, en: AIRPORTS[key].en, fr: AIRPORTS[key].fr }, region: first, car, carLabel: car ? { en: rentText(key, 'en'), fr: rentText(key, 'fr') } : null, shuttles };
 }
