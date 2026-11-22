@@ -222,6 +222,17 @@ test('3. a stale research advisory: hidden on an owner-verified page and in plan
   assert.ok(String(app.getAdvisoryNotes(new Date('2026-12-01T12:00:00-08:00')).get(v5.id) || '').includes('Wildfire'));
 });
 
+test('3c. main #992: a research note given its own last day (until_date) shows through that day, then goes', async () => {
+  const { v } = await setUp(['golf'], { season: '03-06:10-31' });
+  advisory(v.id, NOTE);
+  db.prepare("UPDATE collection_items SET until_date = '2027-11-30' WHERE content_type = 'venue' AND content_id = ?").run(v.id);
+  if (app.clearVenueCaches) app.clearVenueCaches();
+  const JAN = new Date('2027-01-13T12:00:00-08:00'), LAST = new Date('2027-11-30T12:00:00-08:00'), AFTER = new Date('2027-12-01T12:00:00-08:00');
+  // Its dates passed long ago, but the explicit last day wins over the dates-in-the-note guess.
+  for (const d of [JAN, LAST]) assert.ok(String(app.getAdvisoryNotes(d).get(v.id) || '').includes('public tournament'), `shown on ${d.toISOString()}`);
+  assert.ok(!app.getCollectionNotes('advisory', AFTER).has(v.id), 'gone the day after its last day');
+});
+
 test('3b. the EN season sentence is the owner\'s season; the FR fallback keeps « Réouverture le … »', async () => {
   // Research said it reopens March 13; she then saved her own season, Mar 6 – Oct 31.
   const v = mk();
