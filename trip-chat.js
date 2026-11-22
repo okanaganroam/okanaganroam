@@ -27,9 +27,13 @@ const MAX_STOPS = 40;
 const MAX_TEXT = 500; // the planner's request limit (discovery-intent DISCOVERY_MAX_TEXT_LENGTH)
 const RATE = { max: 20, windowMs: 10 * 60 * 1000 };
 
-const OPS = ['remove', 'keep', 'more_like', 'replace', 'add', 'budget', 'pace', 'party', 'days', 'date', 'town', 'redo_day', 'start_over', 'time'];
+const OPS = ['remove', 'keep', 'more_like', 'replace', 'add', 'budget', 'pace', 'party', 'days', 'date', 'town', 'redo_day', 'start_over', 'time', 'stay', 'transport'];
 const TIMES = ['', 'morning', 'midday', 'afternoon', 'evening'];
-const VALUES = ['', 'budget', 'upscale', 'relaxed', 'packed', 'standard', 'kids', 'dog', 'accessible', 'no_alcohol', 'vegan', 'vegetarian', 'gluten_free', 'later', 'earlier'];
+const VALUES = ['', 'budget', 'upscale', 'relaxed', 'packed', 'standard', 'kids', 'dog', 'accessible', 'no_alcohol', 'vegan', 'vegetarian', 'gluten_free', 'later', 'earlier',
+  // The place to stay and getting here (2026-11-22, agent round): stay v / transport v.
+  'pool', 'hot_tub', 'kitchen', 'have_place', 'rental', 'driving', 'no_car'];
+const STAY_VALUES = ['budget', 'upscale', 'pool', 'hot_tub', 'kitchen', 'have_place'];
+const TRANSPORT_VALUES = ['rental', 'driving', 'no_car'];
 const CANT = ['', 'booking', 'transport', 'weather', 'other', 'unclear'];
 
 // The kinds of stop a visitor can ask for. text: the planner's own words for it (what its rules already read);
@@ -162,6 +166,8 @@ function systemPrompt(regions, regionLabels) {
     '- redo_day: d = the day to plan again ("redo day 2", "a different day 1").',
     '- start_over: a completely new plan for the same request ("start over", "something totally different").',
     '- time: v later or earlier, to start the day later or earlier; d = the day, s = the stop it is about ("move lunch later" -> v later, s [lunch id]).',
+    '- stay: the place to stay (not the stops). v budget ("somewhere cheaper to stay"), upscale (nicer), pool, hot_tub, kitchen ("a hotel with a pool" -> pool), have_place ("we already have a place", "staying with friends"); or r = the town to stay in ("stay in Naramata" -> r naramata, v "").',
+    '- transport: getting here. v rental ("we need a rental car"), driving ("we are driving from Vancouver", "we have our own car"), no_car ("we don\'t have a car").',
     'Several ops can come from one message ("remove the brewery and add a beach" -> remove, add). Use as few ops as cover the message.',
     'cant (with no ops) when the message is not an edit we can make: booking (book, reserve, pay, tickets), transport (flights, rides, rental cars, shuttles, buses), weather (a forecast), other (a question, a request for something we do not do, anything off topic), unclear (nonsense, or you cannot tell what they want). Otherwise cant "".',
     'Kinds (k): ' + KIND_KEYS.join(', ') + '. kids = something for children; ice_cream for ice cream or gelato; arts for a museum or gallery; cafe for coffee.',
@@ -253,6 +259,7 @@ function validateWire(wire, stops, { regions = [], today = null } = {}) {
       remove: () => op.stops.length > 0, keep: () => op.stops.length > 0, more_like: () => op.stops.length === 1, replace: () => op.stops.length === 1,
       add: () => !!op.kind, budget: () => ['budget', 'upscale'].includes(op.value), pace: () => ['relaxed', 'packed', 'standard'].includes(op.value),
       party: () => ['kids', 'dog', 'accessible', 'no_alcohol', 'vegan', 'vegetarian', 'gluten_free'].includes(op.value) || (!op.value && op.ages.length > 0),
+      stay: () => STAY_VALUES.includes(op.value) || (!op.value && !!op.region), transport: () => TRANSPORT_VALUES.includes(op.value),
       days: () => isInt(op.n, 1, 7), date: () => !!op.date, town: () => !!op.region, redo_day: () => true, start_over: () => true, time: () => ['later', 'earlier'].includes(op.value),
     };
     if (!need[op.o]()) { drop(`incomplete_${op.o}`); continue; }
@@ -382,7 +389,20 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1 }
   const op = (o, extra = {}) => ({ ...base, o, ...extra });
   if (!t || !/[a-z]{2}/.test(t)) return { ops: [], cant: 'unclear' };
   if (/\b(?:ignore|disregard|system prompt|instructions|jailbreak|pretend you)\b/.test(t)) return { ops: [], cant: 'other' };
-  if (/\b(?:flights?|fly|plane|airport|uber|lyft|taxi|shuttles?|rental cars?|rent a car|car rental|avion|vol|navette)\b/.test(t)) return { ops: [], cant: 'transport' };
+  // Getting here and the place to stay (2026-11-22, agent round), read before "flights" (a rental car is ours to show).
+  if (/\b(?:rent(?:al)? (?:a )?cars?|car rentals?|need a car|louer une voiture|location de voiture)\b/.test(t)) return { ops: [op('transport', { value: 'rental' })], cant: null };
+  if (/\b(?:no car|don'?t have a car|do not have a car|without a car|sans voiture|pas de voiture)\b/.test(t)) return { ops: [op('transport', { value: 'no_car' })], cant: null };
+  if (/\b(?:driving (?:from|up|in|down|over)|we'?ll drive|we are driving|we'?re driving|our own car|bringing (?:our|the) car|en voiture depuis|on arrive en voiture)\b/.test(t)) return { ops: [op('transport', { value: 'driving' })], cant: null };
+  const stayWord = /\b(?:stay|staying|hotel|motel|place to stay|accommodations?|lodging|room|rooms|airbnb|cabin|condo|resort|b&b|inn|logement|hebergement|hotel|dormir|loger)\b/.test(t);
+  if (/\b(?:already have (?:a|our|an) (?:place|hotel|airbnb|room|cabin|condo|rental)|staying with (?:friends|family)|we have (?:a|an) (?:place|airbnb|cabin|condo)|deja (?:un|notre) logement|chez des amis)\b/.test(t)) return { ops: [op('stay', { value: 'have_place' })], cant: null };
+  if (stayWord) {
+    const stayIn = /\b(?:stay|sleep|hotel|lodging|based?|loger|dormir|sejourner)\s+(?:in|at|near|a|en|pres de)\s+([a-z' -]+)/.exec(t);
+    const r = stayIn ? regions.find((x) => fold(stayIn[1]).startsWith(fold(regionLabels[x] || x))) : null;
+    const v = /\b(?:cheaper|cheap|budget|less expensive|affordable|moins chere?)\b/.test(t) ? 'budget' : /\b(?:nicer|fancier|luxur\w*|upscale|plus chic|haut de gamme)\b/.test(t) ? 'upscale'
+      : /\b(?:pool|piscine)\b/.test(t) ? 'pool' : /\b(?:hot ?tub|jacuzzi|bain a remous)\b/.test(t) ? 'hot_tub' : /\b(?:kitchen|kitchenette|cuisine)\b/.test(t) ? 'kitchen' : null;
+    if (v || r) return { ops: [op('stay', { value: v, region: r || null })], cant: null };
+  }
+  if (/\b(?:flights?|fly|plane|airport|uber|lyft|taxi|shuttles?|avion|vol|navette)\b/.test(t)) return { ops: [], cant: 'transport' };
   if (/\b(?:weather|forecast|meteo)\b/.test(t)) return { ops: [], cant: 'weather' };
   if (/\b(?:book|reserve|reservation|pay|buy tickets?|reserver|payer)\b/.test(t) && !/\bbook my trip\b/.test(t)) return { ops: [], cant: 'booking' };
   if (/\b(?:start over|start again|from scratch|brand new plan|something (?:totally|completely) different|recommencer|tout recommencer)\b/.test(t)) return { ops: [op('start_over')], cant: null };
@@ -909,6 +929,10 @@ const T = {
     tooLong: 'That’s a lot of changes for one plan. Try Start over with a new request.', unchanged: 'Your plan is unchanged.', cantChange: 'I couldn’t change the plan that way.',
     booking: 'I can’t book things in this chat, but confirm the plan and “Book my trip” opens each booking.', transport: 'I can’t book flights or rides, but I can change the plan around when you arrive.',
     weather: 'I can’t check the weather, but I can make it an indoor day. Try “something indoors”.', other: 'I can only change this plan: take stops out, swap them, add a kind of stop, or change the pace, budget, days or who’s coming.',
+    stayNow: 'Now staying at {name} ({facts}).', stayNone: 'Got it, you have a place. I took the stay off the plan.', stayFail: 'I couldn’t find {what} near your plan, so {name} stays.', stayOff: 'This plan has no night away, so there’s no place to stay to change.',
+    stayWhat: { budget: 'a cheaper place', upscale: 'a nicer place', pool: 'a place with a pool', hot_tub: 'a place with a hot tub', kitchen: 'a place with a kitchen', region: 'a place in {town}' },
+    carYes: 'Rental cars at {airport}: tap See cars on the Getting here card.', carNo: 'I can’t book rental cars here yet. {airport} has rental desks.', driving: 'Got it, you’re driving. I took the rental car off.',
+    noCarShuttle: 'Without a car: the Getting here card has an airport shuttle. Most other stops need a car or a taxi.', noCar: 'Most of these stops need a car. Staying central in {town} helps; taxis are limited, so book rides ahead.',
     unclear: 'Sorry, I didn’t catch that. Try “remove the brewery” or “more for kids”.', busy: 'Too many messages in a short time. Try again in a few minutes.', error: 'Something went wrong. Your plan is unchanged.',
   },
   fr: {
@@ -926,6 +950,10 @@ const T = {
     tooLong: 'Ça fait beaucoup de changements pour un plan. Essayez Recommencer avec une nouvelle demande.', unchanged: 'Votre plan n’a pas changé.', cantChange: 'Je n’ai pas pu changer le plan de cette façon.',
     booking: 'Je ne peux pas réserver dans cette discussion, mais confirmez le plan et « Tout réserver » ouvre chaque réservation.', transport: 'Je ne peux pas réserver de vols ni de transport, mais je peux adapter le plan à votre arrivée.',
     weather: 'Je ne peux pas vérifier la météo, mais je peux prévoir une journée à l’intérieur. Essayez « activités intérieures ».', other: 'Je peux seulement modifier ce plan : retirer ou remplacer des arrêts, ajouter un type d’arrêt, ou changer le rythme, le budget, les jours ou qui vient.',
+    stayNow: 'Vous logez maintenant à {name} ({facts}).', stayNone: 'Parfait, vous avez déjà un logement. Je l’ai retiré du plan.', stayFail: 'Je n’ai pas trouvé {what} près de votre plan, donc {name} reste.', stayOff: 'Ce plan n’a pas de nuit sur place, donc pas de logement à changer.',
+    stayWhat: { budget: 'un logement moins cher', upscale: 'un logement plus chic', pool: 'un logement avec piscine', hot_tub: 'un logement avec spa', kitchen: 'un logement avec cuisine', region: 'un logement à {town}' },
+    carYes: 'Location de voitures à {airport} : touchez Voir les voitures dans la carte Pour venir.', carNo: 'Je ne peux pas encore réserver de voiture ici. {airport} a des comptoirs de location.', driving: 'Parfait, vous venez en voiture. J’ai retiré la location.',
+    noCarShuttle: 'Sans voiture : la carte Pour venir propose une navette depuis l’aéroport. La plupart des autres arrêts demandent une voiture ou un taxi.', noCar: 'La plupart de ces arrêts demandent une voiture. Loger au centre de {town} aide; les taxis sont rares, réservez vos trajets à l’avance.',
     unclear: 'Désolé, je n’ai pas compris. Essayez « enlève la microbrasserie » ou « plus pour les enfants ».', busy: 'Trop de messages en peu de temps. Réessayez dans quelques minutes.', error: 'Un problème est survenu. Votre plan n’a pas changé.',
   },
 };
@@ -1018,6 +1046,7 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null } = {}) {
 }
 
 module.exports = {
+  STAY_VALUES, TRANSPORT_VALUES, fill,
   MODEL, PRICE_PER_TOKEN, DEFAULT_TIMEOUT_MS, DEFAULT_DAILY_USD, MAX_MESSAGE, MAX_STOPS, RATE, OPS, TIMES, VALUES, CANT, KINDS, KIND_KEYS, CHIPS, T,
   enabled, apiKey, wireSchema, systemPrompt, stopsForModel, stripPII, validateWire, readChatMessage, rulesRead, chipOps,
   planStops, planTurn, broadTurn, placeAdd, buildReply, cantReply, plannerCanRead, kindMatches, joinText, clock, isDayPlan, isShortPlan,

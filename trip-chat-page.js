@@ -32,9 +32,43 @@ const CHAT_STYLES = `<style>
   .t3-v4 .v4-chips button { flex: none; min-height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: var(--ref-cream, #F5F3ED); color: var(--ref-navy); font-weight: 800; font-size: 0.8rem; cursor: pointer; }
   .t3-v4 .v4-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .t3-v4 .v4-stop { scroll-margin: 90px 0 240px; }
-  .t3-v4 .v4-stop.v4-glow { animation: v4glow 2.2s ease-out; }
+  .t3-v4 .v4-stop.v4-glow, .t3-v4 .v4-card.v4-glow { animation: v4glow 2.2s ease-out; }
   @keyframes v4glow { 0%, 45% { background: rgba(201,162,39,0.30); box-shadow: inset 4px 0 0 var(--ref-gold, #C9A227); } 100% { background: transparent; box-shadow: inset 0 0 0 transparent; } }
   @media (prefers-reduced-motion: reduce) { .t3-v4 .v4-stop.v4-glow { animation: none; background: rgba(201,162,39,0.18); } }
+  /* Agent round (2026-11-22, Dayton: "it works but it isn't that user friendly"): the agent speaks first and above the
+     plan; the place to stay and getting here are in the plan; the bar is the chat (Confirm is at the end of the plan). */
+  .t3-v4.v4-chat-mode .v4-edit, .t3-v4.v4-chat-mode .v4-tip:not(.v4-picked), .t3-v4.v4-chat-mode .t3-editbar { display: none !important; }
+  .t3-v4.v4-chat-mode .t3-lead, .t3-v4.v4-chat-mode .t3-hint, .t3-v4.v4-chat-mode #t3StayIn, .t3-v4.v4-chat-mode .t3-examples-label { display: none; }
+  .t3-v4.v4-chat-mode .t3-examples .t3-example:nth-of-type(n+5) { display: none; }
+  .t3-v4 .v4-agent-hi { margin: 4px 0 12px; max-width: 34rem; padding: 12px 14px; border-radius: 18px 18px 18px 6px; background: #fff; color: var(--ref-navy); font-weight: 700; font-size: 1.02rem; line-height: 1.35; box-shadow: 0 8px 22px -18px rgba(0,0,0,0.6); }
+  .t3-v4 .v4-agent-who { display: block; margin: 0 0 2px; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ref-gold-ink, #8A6A0F); }
+  .t3-v4 .v4-agent { margin: 0 0 12px; padding: 10px 14px; border-radius: 18px 18px 18px 6px; background: #fff; color: var(--ref-navy); font-weight: 700; font-size: 0.95rem; line-height: 1.4; box-shadow: 0 8px 22px -18px rgba(0,0,0,0.6); }
+  .t3-v4 .v4-agent p { margin: 0; }
+  .t3-v4 .v4-ask { margin: 10px 0 0; }
+  .t3-v4 .v4-ask-q { margin: 0 0 6px; }
+  .t3-v4 .v4-ask-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+  .t3-v4 .v4-ask-btns button { min-height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.22); background: var(--ref-cream, #F5F3ED); color: var(--ref-navy); font-weight: 800; font-size: 0.84rem; cursor: pointer; }
+  .t3-v4 .v4-ask-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 0; }
+  .t3-v4 .v4-ask-dates input { min-height: 40px; font: inherit; font-size: 16px; border: 1px solid rgba(27,43,58,0.25); border-radius: 10px; padding: 0 8px; }
+  .t3-v4 .v4-card { margin: 0 0 14px; background: #fff; border-radius: 16px; padding: 12px; box-shadow: 0 1px 0 rgba(27,43,58,0.06), 0 8px 24px -18px rgba(16,27,36,0.35); }
+  .t3-v4 .v4-card-h { margin: 0 0 8px; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ref-navy-muted, #56636E); }
+  .t3-v4 .v4-stay-row { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: center; }
+  .t3-v4 .v4-stay-img { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; display: block; background: var(--ref-cream-deep, #EAE6D9); }
+  .t3-v4 .v4-stay-name { display: block; font-weight: 800; font-size: 1rem; line-height: 1.25; color: var(--ref-navy); overflow-wrap: anywhere; }
+  .t3-v4 .v4-stay-facts { display: block; margin-top: 2px; font-size: 0.82rem; color: var(--ref-navy-muted, #56636E); }
+  .t3-v4 .v4-stay-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 0; }
+  .t3-v4 .v4-stay-acts .v4-btn { min-height: 42px; padding: 0 16px; font-size: 0.9rem; }
+  .t3-v4 .v4-link { border: 0; background: none; padding: 0; min-height: 40px; font: inherit; font-weight: 800; font-size: 0.86rem; color: var(--ref-navy); text-decoration: underline; cursor: pointer; }
+  .t3-v4 .v4-stay-alts { list-style: none; margin: 8px 0 0; padding: 0; border-top: 1px solid rgba(27,43,58,0.08); }
+  .t3-v4 .v4-stay-alts li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; font-size: 0.86rem; }
+  .t3-v4 .v4-stay-alts b { display: block; }
+  .t3-v4 .v4-disc-line { margin: 8px 0 0; font-size: 0.72rem; line-height: 1.35; color: var(--ref-navy-muted, #56636E); }
+  .t3-v4 .v4-gh-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 12px; font-size: 0.9rem; font-weight: 700; color: var(--ref-navy); }
+  .t3-v4 .v4-gh-row + .v4-gh-row { margin-top: 6px; }
+  .t3-v4 .v4-gh-row a { font-weight: 800; color: var(--ref-navy); white-space: nowrap; min-height: 32px; display: inline-flex; align-items: center; }
+  .t3-v4 .v4-confirm-end { margin: 18px 0 6px; text-align: center; }
+  .t3-v4 .v4-bar.has-chat:not(.is-confirmed) .v4-bar-main { display: none; }
+  .t3-v4 .v4-bar.has-chat:not(.is-confirmed) .v4-chat { margin: 0; }
 </style>`;
 
 // Browser code, inside the V3 page script after V4_CLIENT_SRC (same scope: state, render, syncUrl, v4, v4UpdateBar...).
@@ -70,6 +104,7 @@ function chatClientSrc(d) {
     bar.classList.add('has-chat');
     // Hidden once the plan is confirmed or while Save asks Replace / Add (like Swap and Remove).
     bar.classList.toggle('v4-chat-off', !!(v4.confirmed || v4.ask));
+    bar.classList.toggle('is-confirmed', !!(v4.confirmed || v4.ask));
     return bar.querySelector('.v4-bar-main');
   }
   function chatPad(){ var bar = document.getElementById('v4Bar'); if (bar) document.body.style.paddingBottom = bar.offsetHeight + 'px'; }
@@ -114,6 +149,8 @@ function chatClientSrc(d) {
     render(false); syncUrl();
   }
   function chatRow(key){
+    if (key === 'gh') return resultEl.querySelector('.v4-gh');
+    if (key === 'stay') return resultEl.querySelector('.v4-stay-card');
     if (/^it-\d+$/.test(key)) { var s = shortStops()[Number(key.slice(3))]; return s && s.venue ? resultEl.querySelector('.v4-stop[data-venue-id="' + s.venue.id + '"]') : null; }
     var b = resultEl.querySelector('[data-t3-swap="' + key + '"], [data-t3-remove="' + key + '"], [data-t3-undo="' + key + '"]');
     return b ? b.closest('.v4-stop') : null;
@@ -156,6 +193,10 @@ function chatClientSrc(d) {
           touched = true; changed.push(k);
         });
         (acts.keep || []).forEach(function(k){ var ks = /^it-/.test(k) ? null : stopAt(k); if (ks) { state.locks[k] = ks.venue.id; touched = true; changed.push(k); } });
+        // The place to stay and getting here (agent round): the visitor's stay preference rides along with every later
+        // request (t3StayInput below); the Getting here card follows "rental car" / "driving" / "no car".
+        if (j.stayPref !== undefined) { chat.stayPref = j.stayPref; chat.noStay = !!(j.stayPref && j.stayPref.none); touched = true; changed.push('stay'); }
+        if (acts.transport) { chat.transport = acts.transport; touched = true; if (acts.transport === 'rental') changed.push('gh'); }
         if (touched) { v4.confirmed = false; v4.saved = false; render(false); syncUrl(); }
         chat.undo = touched ? snap : null;
         chatShow(you, j.reply || ct('err'), { undo: touched });
@@ -178,6 +219,122 @@ function chatClientSrc(d) {
     if ((b = t.closest('[data-v4-chip]'))) { chatSend(null, b.getAttribute('data-v4-chip'), b.textContent); return; }
     if ((b = t.closest('[data-v4-chat-undo]')) && chat.undo) { var snap = chat.undo; chat.undo = null; chatRestore(snap); chatShow('', ct('undone'), {}); track('trip_chat', { chat_source: 'undo', changed: 'yes' }); }
   });
+
+  // ---------- Agent round (2026-11-22): the agent speaks; stay and getting here in the plan; Confirm at the end ----------
+  var AG = {
+    en: { who: 'Trip agent', hi: 'Hi! Where are you headed, and what do you love doing?', day: 'Here’s a day in {town}{for}.', days: 'Here’s a {n}-day {town} plan{for}{stay}.', plan: 'Here’s your plan{for}.', more: ' Want me to change anything?',
+      fam: ' for your family', dog: ' for you and your dog', stay: ', with a place to stay', when: 'When are you coming?', weekend: 'This weekend', pick: 'Pick dates', notSure: 'Not sure yet', done: 'Done', from: 'Arrive', to: 'Leave',
+      stayH: 'Where you’ll stay', rates: 'Check rates', seeMore: 'See {n} more', fewer: 'Hide', choose: 'Choose', ghH: 'Getting here', seeCars: 'See cars', book: 'Book', confirm: 'Confirm plan', sleeps: 'Sleeps {n}' },
+    fr: { who: 'Agent de voyage', hi: 'Bonjour! Où allez-vous, et qu’aimez-vous faire?', day: 'Voici une journée à {town}{for}.', days: 'Voici un plan de {n} jours à {town}{for}{stay}.', plan: 'Voici votre plan{for}.', more: ' Voulez-vous changer quelque chose?',
+      fam: ' pour votre famille', dog: ' pour vous et votre chien', stay: ', avec un logement', when: 'Quand venez-vous?', weekend: 'Ce week-end', pick: 'Choisir les dates', notSure: 'Pas encore sûr', done: 'OK', from: 'Arrivée', to: 'Départ',
+      stayH: 'Où vous logerez', rates: 'Voir les tarifs', seeMore: 'Voir {n} autres', fewer: 'Masquer', choose: 'Choisir', ghH: 'Pour venir', seeCars: 'Voir les voitures', book: 'Réserver', confirm: 'Confirmer le plan', sleeps: 'Jusqu’à {n} pers.' }
+  };
+  function ag(k, vars){ var x = (AG[lang()] || AG.en)[k]; if (vars) Object.keys(vars).forEach(function(v){ x = x.split('{' + v + '}').join(String(vars[v])); }); return x; }
+  var chatMain = document.getElementById('tripV3'); if (chatMain) chatMain.classList.add('v4-chat-mode');
+  // The first screen: one message from the agent, the request box under it, four example chips.
+  (function(){
+    var f = document.getElementById('t3Form'); if (!f || document.getElementById('v4AgentHi')) return;
+    var hi = document.createElement('p'); hi.className = 'v4-agent-hi'; hi.id = 'v4AgentHi';
+    hi.innerHTML = '<span class="v4-agent-who">' + esc(ag('who')) + '</span>' + esc(ag('hi'));
+    f.parentNode.insertBefore(hi, f);
+    var ta = document.getElementById('t3Input'); if (ta) ta.rows = 2;
+  })();
+  // The visitor's stay preference ("somewhere cheaper", "with a pool", "we already have a place") goes with every request.
+  var t3StayInputBase = t3StayInput;
+  t3StayInput = function(){ var o = t3StayInputBase() || {}; if (chat.stayPref) o.pref = chat.stayPref; return Object.keys(o).length ? o : null; };
+  function chatOvernight(){ var st = t3StayInputBase() || {}; return days().length > 1 || !!(st.arrive && st.leave); }
+  function chatPartyFor(){
+    var u = (state.last && state.last.understood) || {}, party = (u.party || []).join(' ') + ' ' + String(state.text || '');
+    if (/\b(?:kids?|children|family|toddlers?|teens?|enfants?|famille)\b/i.test(party)) return ag('fam');
+    if (/\b(?:dogs?|pup|chiens?)\b/i.test(party)) return ag('dog');
+    return '';
+  }
+  function chatAgentHtml(){
+    var p = state.last || {}, n = days().length, town = n ? (days()[0].regionLabel || '') : '';
+    var stay = chatOvernight() && !chat.noStay && t3StayData() ? ag('stay') : '';
+    var line = n > 1 ? ag('days', { n: n, town: town, for: chatPartyFor(), stay: stay }) : n === 1 && town ? ag('day', { town: town, for: chatPartyFor() }) : ag('plan', { for: chatPartyFor() });
+    var html = '<div class="v4-agent" id="v4Agent"><span class="v4-agent-who">' + esc(ag('who')) + '</span><p>' + esc(line + ag('more')) + '</p>';
+    // One short follow-up, with tap answers: the dates of an overnight trip, when none were given.
+    var st = t3StayInputBase() || {};
+    if (chatOvernight() && !st.arrive && !chat.askedWhen) {
+      html += '<div class="v4-ask"><p class="v4-ask-q">' + esc(ag('when')) + '</p><div class="v4-ask-btns"><button type="button" data-v4-when="weekend">' + esc(ag('weekend')) + '</button><button type="button" data-v4-when="pick">' + esc(ag('pick')) + '</button><button type="button" data-v4-when="later">' + esc(ag('notSure')) + '</button></div>'
+        + (chat.pickDates ? '<div class="v4-ask-dates"><label>' + esc(ag('from')) + ' <input type="date" id="v4WhenA"></label><label>' + esc(ag('to')) + ' <input type="date" id="v4WhenB"></label><button type="button" class="v4-link" data-v4-when="set">' + esc(ag('done')) + '</button></div>' : '') + '</div>';
+    }
+    return html + '</div>';
+  }
+  function chatImg(u){ return typeof u === 'string' && (/^\/[^\/]/.test(u) || /^https:\/\/[^\s"'<>]+$/.test(u)) ? u : null; }
+  var chatDiscShown = false;
+  function chatStayHtml(){
+    if (!chatOvernight() || chat.noStay) return '';
+    var d = t3StayData(); if (!d) return '';
+    var s = d.chosen, fr = lang() === 'fr';
+    var step = (s.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && x.kind === 'stay' && t3StayExt(x.url); })[0];
+    var facts = [fr ? (s.kindFr || s.kind) : s.kind, s.regionLabel, s.priceBand, s.sleeps ? ag('sleeps', { n: s.sleeps }) : ''].filter(Boolean).join(' · ');
+    var trip = t3StayTripLine(d.w.trip || {}, fr), img = chatImg(s.photo);
+    var html = '<section class="v4-card v4-stay-card t3-stay" aria-label="' + esc(ag('stayH')) + '"><p class="v4-card-h">' + esc(ag('stayH')) + (trip ? ' · ' + esc(trip) : '') + '</p>'
+      + '<div class="v4-stay-row">' + (img ? '<img class="v4-stay-img" src="' + esc(img) + '" alt="" width="64" height="64" loading="lazy">' : '<span class="v4-stay-img" aria-hidden="true"></span>')
+      + '<div><span class="v4-stay-name">' + esc(s.name) + '</span><span class="v4-stay-facts">' + esc(facts) + '</span></div></div>'
+      + '<div class="v4-stay-acts">' + (step ? t3StayLinkHtml(s, { url: step.url, rel: step.rel, key: step.link, affiliate: step.affiliate }, 'v4-btn', ag('rates')) : '')
+      + (d.others.length ? '<button type="button" class="v4-link" data-v4-stay-more aria-expanded="' + (chat.stayMore ? 'true' : 'false') + '">' + esc(chat.stayMore ? ag('fewer') : ag('seeMore', { n: d.others.length })) + '</button>' : '') + '</div>';
+    if (chat.stayMore && d.others.length) html += '<ul class="v4-stay-alts">' + d.others.map(function(o){ return '<li><span><b>' + esc(o.name) + '</b>' + esc([fr ? (o.kindFr || o.kind) : o.kind, o.regionLabel, o.priceBand].filter(Boolean).join(' · ')) + '</span><button type="button" class="v4-link" data-v4-stay-choose="' + esc(o.id) + '">' + esc(ag('choose')) + '</button></li>'; }).join('') + '</ul>';
+    if (step && step.affiliate) { html += '<p class="v4-disc-line">' + esc(T3_STAY_DISCLOSURE[fr ? 'fr' : 'en'] || T3_STAY_DISCLOSURE.en) + '</p>'; chatDiscShown = true; }
+    return html + '</section>';
+  }
+  function chatGhHtml(){
+    var g = state.last && state.last.gettingHere;
+    if (!g || !chatOvernight() || chat.transport === 'driving') return '';
+    var fr = lang() === 'fr', L = fr ? 'fr' : 'en', rows = [];
+    if (g.car && g.carLabel && chat.transport !== 'no_car') rows.push('<div class="v4-gh-row"><span>' + esc(g.carLabel[L]) + '</span><a ' + hrefAttr(g.car) + ' rel="sponsored noopener" target="_blank" data-track="booking" data-link="discovercars" data-gh-step="car-' + esc(g.airport.key) + '">' + esc(ag('seeCars')) + ' <span aria-hidden="true">↗</span></a></div>');
+    (g.shuttles || []).forEach(function(x){ if (x && x.url && /^https:\/\//.test(x.url) && x.label) rows.push('<div class="v4-gh-row"><span>' + esc(x.label[L] || x.label.en) + '</span><a ' + hrefAttr(x.url) + ' rel="sponsored noopener" target="_blank" data-track="booking" data-link="viator">' + esc(ag('book')) + ' <span aria-hidden="true">↗</span></a></div>'); });
+    if (!rows.length) return '';
+    return '<section class="v4-card v4-gh" aria-label="' + esc(ag('ghH')) + '"><p class="v4-card-h">' + esc(ag('ghH')) + '</p>' + rows.join('') + (chatDiscShown ? '' : '<p class="v4-disc-line">' + esc(T3_STAY_DISCLOSURE[L] || T3_STAY_DISCLOSURE.en) + '</p>') + '</section>';
+  }
+  function chatDecorate(){
+    var root = resultEl.querySelector('.v4'); if (!root) return;
+    chatDiscShown = false;
+    var head = root.querySelector('.v4-head');
+    if (head) head.insertAdjacentHTML('beforebegin', chatAgentHtml());
+    var daysEl = root.querySelector('.v4-days');
+    if (daysEl) {
+      daysEl.insertAdjacentHTML('beforebegin', chatStayHtml() + chatGhHtml());
+      if (!v4.confirmed) daysEl.insertAdjacentHTML('afterend', '<div class="v4-confirm v4-confirm-end"><button type="button" class="v4-btn v4-wide" data-v4-confirm>' + esc(ag('confirm')) + '</button></div>');
+    }
+  }
+  var v4RenderBase = v4Render;
+  v4Render = function(focus){ v4RenderBase(focus); try { chatDecorate(); } catch (e) { if (window.console) console.error('[trip chat]', e); } };
+  function chatWeekend(){
+    var now = new Date(), wd = now.getDay(), add = wd === 5 || wd === 6 ? 0 : wd === 0 ? 0 : 5 - wd;
+    var a = new Date(now.getFullYear(), now.getMonth(), now.getDate() + add), n = Math.max(1, days().length - 1 || 2);
+    var b = new Date(a.getFullYear(), a.getMonth(), a.getDate() + n);
+    var iso = function(x){ return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+    return [iso(a), iso(b)];
+  }
+  function chatSetDates(a, b){
+    var ea = document.getElementById('t3Arrive'), eb = document.getElementById('t3Leave');
+    if (!ea || !eb || !/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(b) || b <= a) return false;
+    ea.value = a; eb.value = b; chat.askedWhen = true; chat.pickDates = false;
+    // The same stops, planned for those days (hours and the place to stay follow the dates).
+    request({ pinned: currentPins([]) }, { requestType: 'refine', focus: false });
+    return true;
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target && e.target.closest ? e.target : null; if (!t) return;
+    var b;
+    if ((b = t.closest('[data-v4-when]'))) {
+      var w = b.getAttribute('data-v4-when');
+      if (w === 'weekend') { var ab = chatWeekend(); chatSetDates(ab[0], ab[1]); }
+      else if (w === 'pick') { chat.pickDates = true; render(false); var ia = document.getElementById('v4WhenA'); if (ia) ia.focus(); }
+      else if (w === 'set') { var A = document.getElementById('v4WhenA'), B = document.getElementById('v4WhenB'); if (A && B && !chatSetDates(A.value, B.value)) B.focus(); }
+      else { chat.askedWhen = true; render(false); }
+      track('trip_chat', { chat_source: 'when_' + w, changed: 'no' });
+      return;
+    }
+    if ((b = t.closest('[data-v4-stay-more]'))) { chat.stayMore = !chat.stayMore; render(false); return; }
+    if ((b = t.closest('[data-v4-stay-choose]'))) { stayChoice = Number(b.getAttribute('data-v4-stay-choose')); chat.stayMore = false; render(false); chatGlow(['stay']); return; }
+  });
+  // The chips only while nothing is typed and the box is not in use (the bar stays small).
+  document.addEventListener('focusin', function(e){ if (e.target && e.target.id === 'v4ChatIn') { var c = document.getElementById('v4Chips'); if (c) c.hidden = true; chatPad(); } });
+  document.addEventListener('focusout', function(e){ if (e.target && e.target.id === 'v4ChatIn' && !e.target.value && !chat.used) { var c = document.getElementById('v4Chips'); if (c) c.hidden = false; chatPad(); } });
 `;
 }
 
