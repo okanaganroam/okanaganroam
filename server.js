@@ -9320,7 +9320,9 @@ function tripOutdoorSeasonFact(id) {
   const f = (typeof OUTDOOR_FACTS !== 'undefined' && OUTDOOR_FACTS && OUTDOOR_FACTS[String(id)]) || null;
   if (!f) return {};
   const winter = (Array.isArray(f.extras) ? f.extras : []).find((x) => x && /^winter$/i.test(String(x.label || '').trim()) && x.text);
-  return f.season || winter ? { outdoorSeason: { season: f.season ? String(f.season) : '', winter: winter ? String(winter.text) : '' } } : {};
+  // Round 3: the trail's own Difficulty line too (for an "easy hike" request).
+  const diff = (Array.isArray(f.extras) ? f.extras : []).find((x) => x && /^difficulty$/i.test(String(x.label || '').trim()) && x.text);
+  return f.season || winter || diff ? { outdoorSeason: { season: f.season ? String(f.season) : '', winter: winter ? String(winter.text) : '', ...(diff ? { difficulty: String(diff.text) } : {}) } } : {};
 }
 // Round 3 (2026-11-21: a trail at 7:45 PM in November after an anniversary dinner, parks at 9 PM): an outdoor stop the
 // schedule puts wholly after sunset is left out (its time stays free), unless it is the only stop. Its warning goes too.

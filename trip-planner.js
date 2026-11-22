@@ -1535,6 +1535,8 @@ function specialistOutdoorBlocked(v, ctx) {
   // "Easy walks" or a trip with kids keeps big summit and alpine hikes out even though "hike" was said.
   return !!rule.notEasy && (/\b(?:easy|gentle|short|stroll|strolls|flat|accessible|stroller)\b/.test(text) || !!ctx.kids);
 }
+const EASY_HIKE_ASK_RE = /\b(?:easy|easier|beginners?|gentle|flat|short|kid friendly|family friendly|stroller|not too (?:hard|steep|long)|nothing (?:too )?(?:hard|steep|strenuous)|facile|faciles|debutants?)\b[^.]{0,40}\b(?:hik\w*|trails?|walks?|randonn\w*|sentiers?)\b|\b(?:hik\w*|trails?|walks?|randonn\w*|sentiers?)\b[^.]{0,40}\b(?:easy|beginners?|gentle|flat|facile|faciles|debutants?)\b/;
+const HARD_TRAIL_RE = /\b(?:hard|steep|strenuous|difficult|especially difficult|challenging|demanding|gruell?ing|scrambl\w*|expert|advanced|experienced hikers|paddling across|river crossing|unbridged|very long|long hike|long day)\b/;
 const ADULT_VENUE_RE = /\b(?:comedy clubs?|comedy lounge|nightclubs?|night clubs?|lounges?|cabarets?|burlesque|cocktail bars?|speakeasy|speakeasies|wine bars?|taprooms?|casinos?)\b/;
 function eligible(v, ctx, strict) {
   if (ctx.exclude.has(v.id)) return false;
@@ -1560,6 +1562,11 @@ function eligible(v, ctx, strict) {
   if (golfRangeOnly(v, /\bdriving range\b/) && !askedGolfPart(v, ctx) && !/\b(?:range|practice|lesson|lessons|mini ?golf|mini ?putt|minigolf|buckets?|balls)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
   if (golfPartShut(v, ctx) && !namedInRequest(v, ctx)) return false;
   if (specialistOutdoorBlocked(v, ctx)) return false;
+  // Round 3 (2026-11-22; an "easy / beginners" hike gave Echo Lake Trail, "Hard 7 km … paddling across the Squamish River",
+  // then Petgill Lake, "Steep, long hike"): when the request asks for an easy hike or walk, a trail whose own description
+  // or facts say it is hard, steep, strenuous or a scramble is not offered. A trail whose listing says nothing about its
+  // difficulty is not judged (we do not guess).
+  if (EASY_HIKE_ASK_RE.test(ctx.queryText || '') && ['outdoor', 'beach'].includes(v.type) && HARD_TRAIL_RE.test(`${v.textDesc || ''} ${normWords((v.outdoorSeason && v.outdoorSeason.difficulty) || '')}`) && !namedInRequest(v, ctx)) return false;
   if (!ctx.ignoreSeason && offSeasonBlocked(v, ctx)) return false;
   if (horseOffBlocked(v, ctx)) return false;
   if (!ctx.ignoreSeason && kindSeasonBlocked(v, ctx)) return false;
@@ -10860,7 +10867,7 @@ function scheduleNotes(result, ctx) {
 module.exports = {
   SWAP_WANTS, swapWantOk,
   // Build My Trip V4 (2026-11-20)
-  outdoorFactsSeasonOff, ADULT_VENUE_RE,
+  outdoorFactsSeasonOff, ADULT_VENUE_RE, EASY_HIKE_ASK_RE, HARD_TRAIL_RE,
   eventKeyMoment, v4Input, v4NoCarInput, v4NoCarFacts, V4_NO_CAR_CORE_KM, v4MealDaypartInput, V4_NO_CAR_KM, v4Polish, v4SaneDays, eventAtDrinkPlace, v4DayTownLabels, v4CasualDinner, v4FillerSkip, v4OffTheme, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
   // Tour test 17 (Whistler, 2026-11-18)
   regionMinutes, PICKUP_ASK_RE, KIND_SEASON_ASK_WORDS, kindSeasonOff, tourTripFor, normWords,

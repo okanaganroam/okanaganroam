@@ -181,3 +181,17 @@ test('6. the headline is made from the stops the plan ends up with', () => {
   tp.v4DayTownLabels(p, { v4: true, intent: p.intent || {}, labels: fx.LABELS, facts: fx.FACTS, text: '3 days in Kelowna, wineries and good food' });
   assert.ok(!/wine/i.test(p.headline), `no wine in the headline once no winery is left: ${p.headline}`);
 });
+
+test('5. an easy or beginner hike never gets a trail whose own words say hard, steep or a river crossing', () => {
+  for (const q of ['an easy hike in squamish', 'hiking for beginners', 'easy trails with the kids', 'a gentle walk', 'randonnee facile']) assert.ok(tp.EASY_HIKE_ASK_RE.test(q), q);
+  for (const q of ['hiking and a brewery', 'a hard hike', 'easy dinner then a hike tomorrow. hiking']) assert.ok(!tp.EASY_HIKE_ASK_RE.test(q) || /easy/.test(q), q);
+  assert.ok(tp.HARD_TRAIL_RE.test('hard 7 km round trip gaining nearly 900 m reaching the trailhead means paddling across the squamish river'));
+  assert.ok(tp.HARD_TRAIL_RE.test('steep long hike starting across the highway'));
+  assert.ok(!tp.HARD_TRAIL_RE.test('a flat 2 km loop around the lake with benches'));
+  const hard = fx.add({ name: 'Echo Ridge Trail', region: 'kelowna', type: 'outdoor', rating: 5, activities: ['hiking', 'viewpoints'], desc: 'Hard 7 km round trip gaining nearly 900 m, with a river crossing.', dLat: 0.01 });
+  try {
+    const easy = fx.plan('2 days in Kelowna, an easy hike and good food', { extra: { v4: true } });
+    assert.ok(!easy.days.some((d) => d.stops.some((s) => s.venue && s.venue.id === hard.id)), 'not on an easy-hike trip');
+    assert.ok(easy.days.some((d) => d.stops.some((s) => s.venue && s.venue.type === 'outdoor')), 'another trail is planned');
+  } finally { fx.FACTS.splice(fx.FACTS.indexOf(hard), 1); }
+});
