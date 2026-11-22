@@ -220,13 +220,16 @@ function tripStayContext(plan, input, today, opts = {}) {
   const located = stops.filter((s) => s.lat !== null);
   const centre = located.length ? { lat: located.reduce((t, s) => t + s.lat, 0) / located.length, lng: located.reduce((t, s) => t + s.lng, 0) / located.length } : null;
   const party = partyOf(plan);
-  const adults = Number.isInteger(i.adults) ? i.adults : null;
   const kids = Number.isInteger(i.kids) ? i.kids : null;
+  // Round 5 (2026-11-22: "two kids" showed "2 kids" with no adults): kids with no adult count are 2 adults plus the kids,
+  // said as "2 adults, 2 kids" (adultsAssumed: the visitor can change it under Dates and guests).
+  const adultsAssumed = !Number.isInteger(i.adults) && kids > 0;
+  const adults = Number.isInteger(i.adults) ? i.adults : adultsAssumed ? 2 : null;
   // Kids: the party size when given, else the request's own words ("with kids").
   const withKids = kids !== null ? kids > 0 : !!party.kids;
   const guests = adults !== null ? adults + (kids || 0) : null;
   return {
-    arrive, leave, nights, months, adults, kids, guests, withKids, dog: i.dog === true || !!party.dog, budget: budgetOf(plan.intent),
+    arrive, leave, nights, months, adults, ...(adultsAssumed ? { adultsAssumed: true } : {}), kids, guests, withKids, dog: i.dog === true || !!party.dog, budget: budgetOf(plan.intent),
     centre, primaryRegion: regions[0], regions, datesGiven: !!(i.arrive && i.leave), camping: wantsCamping(plan),
     ...(opts.v4 ? { v4: true, couple: V4_COUPLE_RE.test(v4Words(plan, opts.text)), budgetStay: V4_BUDGET_STAY_RE.test(v4Words(plan, opts.text)) } : {}),
   };
@@ -420,7 +423,7 @@ function whereToStay(plan, input, stays, today, opts = {}) {
   const pick = tag(picked.pick);
   return {
     stayId: picked.pick.id,
-    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, kids: ctx.kids, ...(input && Array.isArray(input.kidAges) && input.kidAges.length === ctx.kids ? { kidAges: input.kidAges.slice() } : {}), dog: !!ctx.dog, datesGiven: ctx.datesGiven },
+    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, ...(ctx.adultsAssumed ? { adultsAssumed: true } : {}), kids: ctx.kids, ...(input && Array.isArray(input.kidAges) && input.kidAges.length === ctx.kids ? { kidAges: input.kidAges.slice() } : {}), dog: !!ctx.dog, datesGiven: ctx.datesGiven },
     pick,
     alternatives: picked.alternatives.map(tag),
     ...(amenity ? { amenity } : {}),

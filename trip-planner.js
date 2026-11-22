@@ -8834,7 +8834,7 @@ function v4AgentHooks(result, input) {
     const gone = day.stops.filter((s) => s && s.venue && ((covers.includes(s.venue.type) && inside(s)) || (s.daypart === part)));
     for (const s of gone) { day.stops.splice(day.stops.indexOf(s), 1); tourReplaced.push(s.venue.id); }
     empty(day, part);
-    const stop = { ...themeStop(ctx, part, fv, scoreVenue(fv, ctx), null, [{ code: 'tour', text: covers.length ? 'Your tour for this part of the day' : 'Added to your plan', weight: 5 }], []), tourStop: true, keepStart: start, noSwap: true };
+    const stop = { ...themeStop(ctx, part, fv, scoreVenue(fv, ctx), null, [{ code: 'tour', text: covers.length ? 'Your tour for this part of the day' : 'Added to your plan', weight: 5 }], []), tourStop: true, keepStart: start, noSwap: true, ...(covers.length ? { tourCovers: covers.slice() } : {}) };
     day.stops.push(stop);
     order(day);
     placed.push({ day, id: fv.id, start, end });

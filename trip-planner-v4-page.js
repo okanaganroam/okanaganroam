@@ -474,6 +474,27 @@ const V4_CLIENT_SRC = String.raw`
     ((p.itinerary && p.itinerary.stops) || (p.outing && p.outing.stops) || []).forEach(function(s){ if (s && s.venue && shown[s.venue.id]) names[s.venue.name] = 1; });
     return names;
   }
+  function v4PartyUrl(raw){
+    try {
+      var g = function(id){ var el = document.getElementById(id); return el && /^\d+$/.test(el.value) ? Number(el.value) : null; };
+      var ad = g('t3Adults'), kd = g('t3Kids');
+      if (ad === null && kd === null) return raw;
+      if (ad === null && kd > 0) ad = 2;
+      var u = new URL(raw), h = u.hostname.replace(/^www\./, ''), q = u.searchParams;
+      if (/(^|\.)booking\.com$/.test(h) && /^\/hotel\//.test(u.pathname)) {
+        if (ad) q.set('group_adults', String(ad));
+        if (kd !== null) { if (Number(q.get('group_children') || 0) !== kd) q.delete('age'); q.set('group_children', String(kd)); }
+      } else if (/(^|\.)expedia\.(ca|com)$/.test(h)) {
+        var rm = q.get('rm1') || '', ages = rm.indexOf(':c') !== -1 ? rm.slice(rm.indexOf(':c')) : '';
+        if (ad && (!ages || ages.split(':c').length - 1 === kd)) q.set('rm1', 'a' + ad + ages);
+      } else if (/(^|\.)stay22\.com$/.test(h)) {
+        if (ad) q.set('adults', String(ad));
+        if (kd !== null) q.set('children', String(kd));
+        if (q.get('link')) q.set('link', v4PartyUrl(q.get('link')));
+      } else return raw;
+      return u.toString();
+    } catch (e) { return raw; }
+  }
   function v4RemovedIds(){ var ids = {}, p = state.last || {}; (p.days || []).forEach(function(d){ (d.stops || []).forEach(function(s){ if (s.venue && state.removed[d.day + '-' + s.daypart]) ids[s.venue.id] = 1; }); }); Object.keys(v4.gone || {}).forEach(function(id){ if (v4.gone[id]) ids[id] = 1; }); return ids; }
   function v4CanBook(){ return t3BookSteps().length > 0 || v4ReserveRows([]).length > 0 || !!t3StayData(); }
   function v4OpenSheet(){
@@ -704,6 +725,11 @@ function v4StaySrc(staySrc) {
   // Round 3 (2026-11-21: an evening out with Arrive = Leave showed "stay.leave must be after stay.arrive."): a leave date
   // that is not after the arrival is simply not sent; the plan is for the arrival day.
   swap("    if (o.arrive && /^\\d{4}-\\d{2}-\\d{2}$/.test(l)) o.leave = l;", "    if (o.arrive && /^\\d{4}-\\d{2}-\\d{2}$/.test(l) && l > o.arrive) o.leave = l;");
+  // Round 5 (2026-11-22: after "we are 4 adults" the Booking.com link had dates but no guest count): a stay link carries
+  // the party in the Dates and guests fields as the visitor sees them now (formats checked on live pages 2026-11-22:
+  // Booking.com group_adults / group_children / age; Expedia rm1=a<adults>[:c<age>...]; Stay22 adults / children).
+  swap('  function t3StayLinkHtml(s, l, cls, text){\n    var u = t3StayExt(l.url);', '  function t3StayLinkHtml(s, l, cls, text){\n    var u = t3StayExt(v4PartyUrl(l.url));');
+  swap('  function t3StepLinkHtml(step, cls, text, n){\n    var u = t3StayExt(step.url);', '  function t3StepLinkHtml(step, cls, text, n){\n    var u = t3StayExt(step.kind === \'stay\' ? v4PartyUrl(step.url) : step.url);');
   swap('  function t3BookRerender(focusSel){\n', '  function t3BookRerender(focusSel){\n    if (V4) setTimeout(v4UpdateBar, 0);\n');
   // "Getting here" (2026-11-21, getting-here.js): the "Rent a car" step's link (data-link="discovercars") and its click.
   return require('./getting-here').v4ClientSwaps(staySrc);

@@ -9425,7 +9425,10 @@ function v4NotIncluded(plan) {
       const rows = stops.map((x) => { const v = getVenue(x.venue.id); if (!v) return null; let kinds = []; try { const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; kinds = TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); } catch (e) { kinds = []; } return { type: v.type, planType: x.venue.type, kinds }; }).filter(Boolean);
       for (const r of plan.requirementResults) {
         if (!r || r.status !== 'satisfied' || r.strength !== 'must' || r.dayIndex) continue;
-        const has = r.kind === 'type' ? rows.some((x) => x.type === r.value || x.planType === r.value || (r.value === 'restaurant' && ['restaurant', 'pub', 'cafe'].includes(x.type)) || (['outdoor', 'tour', 'indoor', 'breakfast'].includes(r.value)))
+        // Round 5 (2026-11-22: a wine tour replaced Moraine and Poplar Grove, then "I couldn't fit winery"): a tour that
+        // covers that kind of place (a wine tour visits wineries) counts as it.
+        const toured = r.kind === 'type' && stops.some((x) => x.tourStop && ((x.tourCovers || []).includes(r.value) || (r.value === 'winery' && /\bwine|winery|wineries|vineyard/i.test(String(x.venue.name || ''))) || (r.value === 'brewery' && /\b(?:brew|beer|craft)/i.test(String(x.venue.name || '')))));
+        const has = toured || r.kind === 'type' ? toured || rows.some((x) => x.type === r.value || x.planType === r.value || (r.value === 'restaurant' && ['restaurant', 'pub', 'cafe'].includes(x.type)) || (['outdoor', 'tour', 'indoor', 'breakfast'].includes(r.value)))
           : r.kind === 'venue_kind' ? rows.some((x) => (r.value === 'shopping' ? x.type === 'shop' : x.kinds.includes(r.value))) || !['spa', 'shopping', 'bowling', 'cinema', 'museum', 'gallery', 'escape', 'arcade', 'climbing', 'pool', 'casino', 'evening_fun'].includes(r.value) : true;
         if (!has) { r.status = 'unmet'; r.reason = 'Not in this plan.'; }
       }
