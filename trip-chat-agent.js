@@ -71,7 +71,7 @@ function readAll(message, read) {
   if (!reads.every((r) => (r.ops || []).length && !(r.ops || []).some((o) => o.o === 'refine'))) {
     // One part is a clear "can't" or was not read: the whole message's reading stands, unless it read less.
     const some = reads.filter((r) => (r.ops || []).length && !(r.ops || []).some((o) => o.o === 'refine'));
-    const missed = reads.filter((r) => !(r.ops || []).length && ['not_found', 'booking', 'ask_which', 'time_at', 'weather', 'days_max', 'days_min'].includes(r.cant)).map((r) => ({ cant: r.cant, what: r.what || null }));
+    const missed = reads.filter((r) => !(r.ops || []).length && ['not_found', 'booking', 'ask_which', 'time_at', 'weather', 'days_max', 'days_min', 'q_none', 'q_missing'].includes(r.cant)).map((r) => ({ cant: r.cant, what: r.what || null }));
     // Every part read (some as a plain "can't"): the parts stand. A part not read at all: the whole message's reading, unless the parts read more.
     const allRead = some.length + missed.length === reads.length;
     if (!some.length || (some.length + missed.length < 2) || (!allRead && (whole.ops || []).length >= some.reduce((n, r) => n + r.ops.length, 0))) return whole;
@@ -116,7 +116,8 @@ const Q_TOPICS = [
   ['q_vegan', /\b(?:vegan|vegetalien\w*|vegetarian|vegetarien\w*|gluten)\b/],
   ['q_view', /\b(?:lake ?view|view|vue)\b/],
 ];
-const Q_VALUES = Q_TOPICS.map(([k]) => k);
+const Q_VALUES = [...Q_TOPICS.map(([k]) => k), 'q_where'];
+const MEAL_RE = /\b(?:restaurants?|dinner|supper|lunch|souper|diner|dejeuner|meal|repas)\b/;
 const SKI_ASK_RE = /\b(?:lifts?|gondolas?|chairlifts?|ski hill|remontees?|telecabines?)\b/;
 const SKI_NAME_RE = /\b(?:ski|resort|blackcomb|big white|silverstar|silver star|apex mountain|baldy|gondola|sun peaks)\b/;
 
@@ -163,12 +164,32 @@ function agentRules(t, stops, ctx, h) {
       // "is it open Sunday?" with one stop that day, or a plan with one stop.
       if (!named.length && /\b(?:it|this|that|they|c'est|il|elle)\b/.test(t)) { const pool = day ? stops.filter((s) => s.day === day) : stops; if (pool.length === 1) named = pool; }
       const far = topic === 'q_far';
+      // Round 6 (2026-11-22; "is the first winery open Sunday?" with no winery, "why this restaurant?", « le musée »): a
+      // kind of place named is looked for on the plan. None there: said plainly. "This restaurant": the day's (or the
+      // plan's only) meal, else the one the chat changed last, else the first.
+      if (!named.length) {
+        const kind = MEAL_RE.test(t) ? 'meal' : (h.kindsNamed(t).filter((k) => k !== 'kids' && k !== 'activity')[0] || null);
+        if (kind) {
+          let pool = stops.filter((s) => (kind === 'meal' ? !!s.role || ['restaurant', 'pub'].includes(s.type) : h.kindMatches(kind, s) || (kind === 'arts' && /\b(?:museum|musee|gallery|galerie|art)\b/.test(fold(s.name)))));
+          if (!pool.length) return { ops: [], cant: 'q_none', what: kind === 'meal' ? 'restaurant' : kind };
+          if (day && pool.some((s) => s.day === day) && topic !== 'q_open') pool = pool.filter((s) => s.day === day);
+          pool = h.ordinalPick(t, pool);
+          const recent = (ctx.recent || []).map((k) => pool.find((s) => s.key === k)).filter(Boolean);
+          named = pool.length === 1 ? pool : recent.length ? [recent[recent.length - 1]] : [pool[0]];
+        }
+      }
       // "how far is it from the hotel": without a stop named, every stop is too vague; the first stop of the day is not a guess we make.
       if (!named.length) return { ops: [], cant: far && /\b(?:hotel|stay|motel|logement|hebergement)\b/.test(t) && stops.length ? 'ask_which' : 'ask_which' };
       return { ops: [op('ask', { value: topic, stops: named.slice(0, far ? 2 : 1), day, wd: wdM ? WD_KEYS[wdM[1]] : null })], cant: null };
     }
   }
 
+  // 1b. "where's the spa?": a kind asked of the plan that is not on it.
+  if (asksQ && /^(?:where(?:'s| is| are)|what happened to|ou est|ou sont|qu'est-ce qui est arrive)\b/.test(t)) {
+    const kind = h.kindsNamed(t).filter((k) => k !== 'kids' && k !== 'activity')[0] || null;
+    if (kind && !stops.some((s) => h.kindMatches(kind, s))) return { ops: [], cant: 'q_missing', what: kind };
+    if (kind) { const s = stops.find((x) => h.kindMatches(kind, x)); return { ops: [op('ask', { value: 'q_where', stops: [s], day: s.day })], cant: null }; }
+  }
   // 2. Getting there and around.
   if (NO_RENTAL_RE.test(t)) return { ops: [op('transport', { value: 'no_rental' })], cant: null };
   if (FLY_RE.test(t) && !/\b(?:book|find|cheap|price of|cost of)\b[^.]*\bflights?\b/.test(t)) {
@@ -402,8 +423,16 @@ function answerQuestion(op, fact, extra = {}, lang = 'en') {
       return fill(t.qOpenDay, { name, day: dayName, from: hm(slots[0][0], L), to: hm(slots[slots.length - 1][1], L) }) + (fact.seasonal ? t.qSeason : t.qCheck);
     }
     case 'q_why': {
+      // Round 6 ("why Kinton Ramen?" said it "fits what you asked for: … vegetarian ramen" though vegetarian was never
+      // asked): only what the request really asked for and the listing really has is claimed; else its own words.
       const line = extra.reason || firstSentence(L === 'fr' ? (fact.description_fr || '') : (fact.description || ''));
-      return line ? fill(t.qWhy, { name, line: line.replace(/[.!?]+$/, '') }) : fill(t.qNoWhy, { name }) + ' ' + details;
+      const m = (extra.matches || []).slice(0, 2);
+      if (m.length) return fill(line ? t.qWhyMatch : t.qWhyMatchOnly, { name, what: m.join(L === 'fr' ? ' et ' : ' and '), line: (line || '').replace(/[.!?]+$/, '') });
+      return line ? fill(t.qWhyPlain, { name, line: line.replace(/[.!?]+$/, '') }) : fill(t.qNoWhy, { name }) + ' ' + details;
+    }
+    case 'q_where': {
+      const st = (op.stops || [])[0] || {};
+      return fill(t.qWhere, { name, d: st.day || 1, at: Number.isInteger(st.start) ? (L === 'fr' ? ` à ${hm(`${Math.floor(st.start / 60)}:${String(st.start % 60).padStart(2, '0')}`, L)}` : ` at ${hm(`${Math.floor(st.start / 60)}:${String(st.start % 60).padStart(2, '0')}`, L)}`) : '' });
     }
     case 'q_far': {
       const to = extra.other || extra.stay || null;
@@ -442,7 +471,7 @@ const AGENT_T = {
     ask_which: 'Which stop do you mean? Ask with its name, like “is {name} open Sunday?”', ask_whichNone: 'Which stop do you mean? Ask with its name.',
     qDetails: 'Tap {name} for its details.', qCheck: ' Check before you go.', qSeason: ' It is seasonal, so check before you go.',
     qNoHours: 'We don’t have hours on file for {name}.', qOpenDay: '{name} is listed as open {day}, {from} to {to}.', qClosedDay: '{name} is listed as closed on {day}.', qOpenDaily: '{name} is listed as open every day, {from} to {to}.', qOpenDays: '{name} is listed as open {days}.',
-    qWhy: 'I picked {name} because it fits what you asked for: {line}.', qNoWhy: 'I picked {name} because it fits what you asked for and is near your other stops.',
+    qWhy: 'I picked {name} because it fits what you asked for: {line}.', qWhyMatch: 'I picked {name} because you asked for {what}. Its listing says: {line}.', qWhyMatchOnly: 'I picked {name} because you asked for {what}.', qWhyPlain: '{name} is close to your other stops. Its listing says: {line}.', qWhere: '{name} is on day {d}{at}.', qNoWhy: 'I picked {name} because it fits what you asked for and is near your other stops.',
     qFar: '{name} is about {km} km from {to} in a straight line; the drive is a little longer.', qFarNoStay: 'There’s no place to stay on this plan to measure from. Ask “how far is {name} from” another stop.', qFarUnknown: 'I don’t have a map point for both {name} and {to}.',
     qKidsYes: '{name} is listed as kid-friendly.', qKidsUnknown: 'The listing for {name} doesn’t say if it suits kids.', qDogYes: '{name} is listed as dog-friendly.', qDogUnknown: 'The listing for {name} doesn’t say if dogs are welcome.',
     qPatioYes: '{name} is listed with a patio.', qPatioUnknown: 'The listing for {name} doesn’t mention a patio.', qViewYes: '{name} is listed with a lake view.', qViewUnknown: 'The listing for {name} doesn’t mention a lake view.',
@@ -468,7 +497,7 @@ const AGENT_T = {
     ask_which: 'De quel arrêt parlez-vous? Demandez avec son nom, par exemple « est-ce que {name} est ouvert dimanche? »', ask_whichNone: 'De quel arrêt parlez-vous? Demandez avec son nom.',
     qDetails: 'Touchez {name} pour ses détails.', qCheck: ' Vérifiez avant d’y aller.', qSeason: ' C’est saisonnier : vérifiez avant d’y aller.',
     qNoHours: 'Nous n’avons pas les heures de {name}.', qOpenDay: 'Selon sa fiche, {name} est ouvert {day}, de {from} à {to}.', qClosedDay: 'Selon sa fiche, {name} est fermé le {day}.', qOpenDaily: 'Selon sa fiche, {name} est ouvert tous les jours, de {from} à {to}.', qOpenDays: 'Selon sa fiche, {name} est ouvert : {days}.',
-    qWhy: 'J’ai choisi {name} parce qu’il correspond à votre demande : {line}.', qNoWhy: 'J’ai choisi {name} parce qu’il correspond à votre demande et qu’il est près de vos autres arrêts.',
+    qWhy: 'J’ai choisi {name} parce qu’il correspond à votre demande : {line}.', qWhyMatch: 'J’ai choisi {name} parce que vous avez demandé {what}. Sa fiche dit : {line}.', qWhyMatchOnly: 'J’ai choisi {name} parce que vous avez demandé {what}.', qWhyPlain: '{name} est près de vos autres arrêts. Sa fiche dit : {line}.', qWhere: '{name} est au jour {d}{at}.', qNoWhy: 'J’ai choisi {name} parce qu’il correspond à votre demande et qu’il est près de vos autres arrêts.',
     qFar: '{name} est à environ {km} km de {to} à vol d’oiseau; la route est un peu plus longue.', qFarNoStay: 'Il n’y a pas de logement dans ce plan pour mesurer. Demandez « à quelle distance est {name} de » un autre arrêt.', qFarUnknown: 'Je n’ai pas de point sur la carte pour {name} et {to}.',
     qKidsYes: 'Selon sa fiche, {name} convient aux enfants.', qKidsUnknown: 'La fiche de {name} ne dit pas si ça convient aux enfants.', qDogYes: 'Selon sa fiche, {name} accepte les chiens.', qDogUnknown: 'La fiche de {name} ne dit pas si les chiens sont acceptés.',
     qPatioYes: 'Selon sa fiche, {name} a une terrasse.', qPatioUnknown: 'La fiche de {name} ne mentionne pas de terrasse.', qViewYes: 'Selon sa fiche, {name} a une vue sur le lac.', qViewUnknown: 'La fiche de {name} ne mentionne pas de vue sur le lac.',

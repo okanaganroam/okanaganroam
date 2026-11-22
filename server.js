@@ -8424,6 +8424,55 @@ function tripChatStops(list) {
   }
   return out;
 }
+// Round 6 (2026-11-22; "ice cream" gave a crêpe café, "bowling" a laser tag arena): for a kind asked by its words, the
+// listings that say it only further down their description, not in their name or cuisine. The chat tries the others
+// first (trip-chat.js slotEdit). Read from our own listings, kept for ten minutes.
+const tripChatWeakCache = { at: 0, byKind: new Map() };
+function tripChatWeakFor(kind) {
+  const k = tripChat.KINDS[kind];
+  if (!k || !(k.name || (k.words && k.words.length))) return [];
+  if (Date.now() - tripChatWeakCache.at > 10 * 60 * 1000) { tripChatWeakCache.at = Date.now(); tripChatWeakCache.byKind.clear(); }
+  if (tripChatWeakCache.byKind.has(kind)) return tripChatWeakCache.byKind.get(kind);
+  const types = k.types || (k.type ? [k.type] : kind === 'ice_cream' ? ['cafe', 'restaurant'] : []);
+  let out = [];
+  try {
+    const fold = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const says = (text) => (k.name ? k.name.test(text) : k.words.some((w) => new RegExp(`(?:^|[^a-z])${w.trim().replace(/[^a-z0-9 ]/g, '.')}`).test(text)));
+    const rows = db.prepare(`SELECT id, name, cuisine, description FROM venues WHERE redirect_to IS NULL${types.length ? ` AND type IN (${types.map(() => '?').join(',')})` : ''}`).all(...types);
+    out = rows.filter((r) => !says(fold(`${r.name} ${r.cuisine || ''}`)) && says(fold(r.description))).map((r) => r.id).slice(0, 120);
+  } catch (e) { out = []; }
+  tripChatWeakCache.byKind.set(kind, out);
+  return out;
+}
+// "Why this place?" (round 6): what the request asked for that the listing really has (its badges, its kind, its food).
+function tripChatWhyMatches(fact, text, L) {
+  const t = tripChat.agent.fold(text || '');
+  const fr = L === 'fr';
+  const out = [];
+  const pairs = [
+    [/\b(?:kids?|children|child|toddlers?|family|famille|enfants?)\b/, 'kid_friendly', fr ? 'un endroit pour les enfants' : 'somewhere good for kids'],
+    [/\b(?:dogs?|pup|chiens?)\b/, 'dog_friendly', fr ? 'un endroit qui accepte les chiens' : 'somewhere dog-friendly'],
+    [/\b(?:vegan|vegetalien\w*)\b/, 'vegan', fr ? 'des options végétaliennes' : 'vegan options'],
+    [/\b(?:vegetarian|vegetarien\w*)\b/, 'vegetarian', fr ? 'des options végétariennes' : 'vegetarian options'],
+    [/\bgluten\b/, 'gluten_free', fr ? 'des options sans gluten' : 'gluten-free options'],
+    [/\b(?:lake ?view|lakeside|lakefront|on the lake|vue sur le lac|bord du lac)\b/, 'lake_view', fr ? 'une vue sur le lac' : 'a lake view'],
+    [/\b(?:patio|terrasse)\b/, 'patio', fr ? 'une terrasse' : 'a patio'],
+    [/\b(?:live music|musique live)\b/, 'live_music', fr ? 'de la musique live' : 'live music'],
+    [/\b(?:museums?|musees?|galler(?:y|ies)|art|culture)\b/, 'arts_culture', fr ? 'de l’art et de la culture' : 'arts and culture'],
+  ];
+  for (const [re, col, label] of pairs) if (re.test(t) && fact[col] === 1) out.push(label);
+  const typeWords = { winery: /\b(?:wine\w*|winer(?:y|ies)|vignobles?|vins?)\b/, brewery: /\b(?:beers?|brewer(?:y|ies)|bieres?|microbrasseries?)\b/, distillery: /\b(?:distiller(?:y|ies)|spirits)\b/, golf: /\bgolf\b/, beach: /\b(?:beach\w*|plages?)\b/ };
+  if (typeWords[fact.type] && typeWords[fact.type].test(t)) out.push(tripChat.KINDS[fact.type][fr ? 'fr' : 'en']);
+  const head = tripChat.agent.fold(`${fact.name} ${fact.cuisine || ''}`);
+  for (const w of Object.values(tripChat.WORD_KINDS)) if (w.meal && w.re.test(t) && w.words.some((x) => head.includes(x))) out.push(w[fr ? 'fr' : 'en']);
+  return [...new Set(out)];
+}
+// Whether the visitor's own request asked for that kind of place ("a weekend with a spa"): its words are in the text.
+function tripChatAsked(kind, text) {
+  if (!kind || !text) return false;
+  const re = (tripChat.KIND_WORDS || []).find(([k]) => k === kind);
+  return !!(re && re[1].test(tripChat.agent.fold(text)));
+}
 // Tests replace the model with a mock (no network): setTripChatReader(async (message, opts) => ({ ok, ops, cant })).
 let tripChatReader = null;
 let tripChatKeepStayId = null;
@@ -8445,7 +8494,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     // The word rules first (instant), then the AI (live eval 2026-11-22: p50 1.1 s, some 3 s timeouts). When the rules
     // read the message confidently, the AI gets a short grace (TRIP_CHAT_GRACE_MS, default 1500 ms) and the rules answer
     // if it is slower; otherwise it gets the full timeout. Both readings are then reconciled (tripChat.reconcileReads).
-    const r = tripChat.rulesRead(v.message, stops, { regions, regionLabels: REGION_LABELS, days, weekdays: tripChat.weekdayDays((v.dayDates || []).some(Boolean) ? v.dayDates : (v.args.overrides && v.args.overrides.startDate) || (v.args.stay && v.args.stay.arrive) || null, days) });
+    const r = tripChat.rulesRead(v.message, stops, { regions, regionLabels: REGION_LABELS, days, recent: Object.keys(v.soft || {}), weekdays: tripChat.weekdayDays((v.dayDates || []).some(Boolean) ? v.dayDates : (v.args.overrides && v.args.overrides.startDate) || (v.args.stay && v.args.stay.arrive) || null, days) });
     what = r.what || null;
     // A stay or getting-here message the rules read confidently is answered by fixed server logic, so the AI is not
     // waited for (2026-11-22: a stay change took 6-14 s on the live site).
@@ -8495,7 +8544,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   if (!ops.length) {
     logTiming();
     const c = cant || 'unclear';
-    return { source, cant: c, plan: null, actions: none, response: { reply: tripChat.cantReply(c, lang, what, stops), source, cant: c, plan: null, req: null, changed: [], actions: none, ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) } };
+    return { source, cant: c, plan: null, actions: none, response: { reply: tripChat.cantReply(c, lang, what, stops, { asked: tripChatAsked(what, v.args.text) }), source, cant: c, plan: null, req: null, changed: [], actions: none, ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) } };
   }
   const timed = (fn) => (a) => { const t0 = Date.now(); try { return fn(a); } finally { timing.plans += 1; timing.planMs += Date.now() - t0; } };
   const planValue = (a) => ({ text: a.text, seed: a.seed || 0, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: a.pinned || null, overrides: a.overrides || null, swap: a.swap || null, ...(a.stay ? { stay: a.stay } : {}), v4: true,
@@ -8512,7 +8561,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // Round 4: a change to the stops keeps the place to stay the visitor sees (it changed with unrelated messages).
   tripChatKeepStayId = extra.some((o) => o.o === 'stay') ? null : v.stayId || null;
   let out;
-  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run, hooks })
+  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run, hooks, weakFor: tripChatWeakFor })
     : { plan: null, req: null, actions: { remove: [], keep: [] }, results: [], changed: [] }; } finally { tripChatKeepStayId = null; }
   // What the chat added or changed goes back as "soft" (the chat keeps it; the Swap button sends it as an ordinary stop,
   // never a hard lock: "A locked stop cannot be kept: Forged Axe Throwing..."). Only the visitor's own kept stops are locks.
@@ -8568,7 +8617,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     reply = [reply, r.reply].filter(Boolean).join(' ');
   }
   // A part of a several-ask message that could not be done (no such stop on the plan...) is said, once.
-  if (missed.length) { const line = tripChat.cantReply(missed[0].cant, lang, missed[0].what, stops); if (!reply.includes(line)) reply = [reply, line].filter(Boolean).join(' '); }
+  if (missed.length) { const line = tripChat.cantReply(missed[0].cant, lang, missed[0].what, stops, { asked: tripChatAsked(missed[0].what, v.args.text) }); if (!reply.includes(line)) reply = [reply, line].filter(Boolean).join(' '); }
   const actions = { ...out.actions, ...(transport ? { transport } : {}), ...(goneEvents.length ? { removeEvents: goneEvents.map((e) => e.id) } : {}) };
   logTiming();
   return {
@@ -8749,7 +8798,7 @@ function tripChatAskTurn(op, { v, stops, lang }) {
   let stay = null;
   if (v.stayId) { try { const r = db.prepare("SELECT name, latitude, longitude FROM venues WHERE id = ? AND type = 'stay'").get(v.stayId); if (r) stay = { name: r.name, lat: r.latitude, lng: r.longitude }; } catch (e) { stay = null; } }
   const planWd = tripChat.agent.wdOfDate((v.dayDates || [])[s.day - 1]);
-  return { reply: tripChat.agent.answerQuestion(op, fact, { stay, other, planWd }, L) };
+  return { reply: tripChat.agent.answerQuestion(op, fact, { stay, other, planWd, matches: op.value === 'q_why' ? tripChatWhyMatches(fact, v.args.text, L) : [] }, L) };
 }
 // The nearest thing we list to a tour that is not listed: another kind of tour that one of the plan's towns does have.
 function tripChatTourOffer(kind, stops, lang) {

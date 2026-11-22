@@ -117,7 +117,8 @@ test('4. questions about a stop are read (EN + FR), and answered from the listin
   assert.equal(A('q_open', { planWd: 'sat' }), 'La Frenz is listed as open Saturday, 11 AM to 5 PM. Check before you go.', 'no day said: the day it is on the plan');
   assert.equal(A('q_open', {}, { ...fact, hours: null }), 'We don’t have hours on file for La Frenz. Tap La Frenz for its details.');
   assert.equal(A('q_open', {}, fact, 'fr', 'sun'), 'Selon sa fiche, La Frenz est ouvert dimanche, de midi à 16 h 30. Vérifiez avant d’y aller.');
-  assert.equal(A('q_why'), 'I picked La Frenz because it fits what you asked for: A small family winery on the Naramata Bench with a view of the lake.');
+  // Round 6: only what was really asked is claimed; with nothing asked, the listing's own words.
+  assert.equal(A('q_why'), 'La Frenz is close to your other stops. Its listing says: A small family winery on the Naramata Bench with a view of the lake.');
   assert.equal(A('q_kids'), 'The listing for La Frenz doesn’t say if it suits kids. Tap La Frenz for its details.', 'no fact: said so, never a guess');
   assert.equal(A('q_dog'), 'La Frenz is listed as dog-friendly.');
   assert.equal(A('q_price'), 'La Frenz is listed at $$ (moderate). Tap La Frenz for its details.');

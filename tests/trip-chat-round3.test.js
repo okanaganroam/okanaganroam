@@ -191,8 +191,10 @@ test('"a sunset dinner with a lake view" swaps that day\'s dinner (its slot, a p
   assert.deepEqual(R('can we get a sunset dinner with a lake view'), [['replace', 'lake_view', [15], null]]);
   assert.deepEqual(R('a patio lunch please'), [['replace', 'patio', [12], null]]);
   assert.deepEqual(R('un souper avec vue sur le lac'), [['replace', 'lake_view', [15], null]]);
-  assert.deepEqual(R('a dinner with a lake view', DAY.slice(0, 4)), [['add', 'restaurant', [], 'evening']], 'no dinner that day: one is added, in the dinner slot');
+  // Round 6: the added dinner keeps the lake view asked for (it was a plain restaurant: a ramen shop).
+  assert.deepEqual(R('a dinner with a lake view', DAY.slice(0, 4)), [['add', 'lake_view', [], 'evening']], 'no dinner that day: one is added, in the dinner slot');
   assert.equal(tc.placeAdd(OP({ o: 'add', kind: 'restaurant', time: 'evening' }), 'restaurant', { stops: DAY.slice(0, 4), removed: new Set(), locks: {} }).slot, '1-evening');
+  assert.equal(tc.placeAdd(OP({ o: 'add', kind: 'lake_view', time: 'evening' }), 'lake_view', { stops: DAY.slice(0, 4), removed: new Set(), locks: {} }).slot, '1-evening');
   // The AI's "add a lake view stop" becomes the dinner swap.
   const rules = tc.rulesRead('can we get a sunset dinner with a lake view', DAY, { regions: [], regionLabels: {}, days: 1 });
   const m = tc.reconcileReads({ ok: true, cant: null, ops: [OP({ o: 'add', kind: 'lake_view' })] }, rules, 'can we get a sunset dinner with a lake view');
