@@ -464,7 +464,9 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1 }
   }
   // "swap dinner for something fancier" is the budget op alone (no second, plain swap of the same stop).
   else if (/\b(?:swap|replace|instead of|switch|change|different|another|autre|remplace[rz]?|change[rz]?)\b/.test(t) && named.length && !ops.some((o) => o.o === 'time' || o.o === 'budget')) {
-    const wanted = kindsNamed(t.replace(/^.*?\b(?:for|with|to|par|pour|avec)\b/, ''), namedTypes)[0] || null;
+    // The kind wanted comes after "for / with / to" ("swap the brewery for something outdoors"); "a different winery" names none.
+    const forPart = /\b(?:for|with|to|par|pour|avec)\b/.test(t) ? t.replace(/^.*?\b(?:for|with|to|par|pour|avec)\b/, '') : '';
+    const wanted = forPart ? kindsNamed(forPart, namedTypes)[0] || null : null;
     ops.push(op('replace', { stops: named.slice(0, 1), kind: wanted }));
   } else if (/\b(?:more like|more of|similar|another one like|plus comme|plus de ce genre|un autre comme)\b/.test(t) && named.length) ops.push(op('more_like', { stops: named.slice(0, 1) }));
   else if (/\b(?:love[ds]?|liked?|keep|great|perfect|awesome|adore[sz]?|garde[rz]?|j'aime|parfait|super)\b/.test(t) && named.length && !cheaper && !fancier) ops.push(op('keep', { stops: named }));
