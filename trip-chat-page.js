@@ -258,7 +258,7 @@ function chatClientSrc(d) {
           stayChoice = null; touched = true; changed.push('stay');
         }
         if (j.stayPref !== undefined) { chat.stayPref = j.stayPref; chat.noStay = !!(j.stayPref && j.stayPref.none); touched = true; if (changed.indexOf('stay') === -1) changed.push('stay'); }
-        if (acts.transport) { chat.transport = acts.transport; touched = true; if (acts.transport === 'rental') changed.push('gh'); }
+        if (acts.transport) { chat.transport = acts.transport; touched = true; if (acts.transport === 'rental' || acts.transport === 'no_car') changed.push('gh'); }
         // Events taken out by chat, a wine tour offered as a card, and words added to the request ("no museums").
         (acts.removeEvents || []).forEach(function(id){ chat.goneEvents[id] = 1; touched = true; });
         // Round 4: the wine tour card is an offer, not a change to the plan: it shows no Undo (Undo undid nothing).
