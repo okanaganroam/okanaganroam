@@ -1358,7 +1358,7 @@ function planTurnCore(ops, ctx) {
       // The planner's tourStops hook, when it is there: the tour as a timed stop with its own length; it says what it replaced.
       const tourHook = (fresh) => {
         if (!(ctx.hooks && ctx.hooks.tourStops) || !fresh) return;
-        const a2 = { ...cur.args, swap: null, pinned: Object.fromEntries(cur.stops.filter((x) => /^\d-/.test(x.key) && x.id !== fresh.id && !cur.removed.has(x.key)).map((x) => [x.key, x.id])), trustedPins: cur.stops.filter((x) => /^\d-/.test(x.key) && x.id !== fresh.id && !cur.removed.has(x.key)).map((x) => x.key), overrides: { ...(cur.args.overrides || {}), stopStarts: { ...agent.startsOf(cur.stops.filter((x) => x.day !== dayT)), ...((cur.args.overrides || {}).stopStarts || {}) } }, tourStops: [...(cur.args.tourStops || []), { day: dayT, part: partOf(fresh.key), listingId: fresh.id, startMinutes: fresh.start, durationMinutes: tk.minutes, covers }] };
+        const a2 = { ...cur.args, swap: null, pinned: Object.fromEntries(cur.stops.filter((x) => /^\d-/.test(x.key) && x.id !== fresh.id && !cur.removed.has(x.key) && !(x.day === dayT && covers.includes(x.type))).map((x) => [x.key, x.id])), trustedPins: cur.stops.filter((x) => /^\d-/.test(x.key) && x.id !== fresh.id && !cur.removed.has(x.key) && !(x.day === dayT && covers.includes(x.type))).map((x) => x.key), overrides: { ...(cur.args.overrides || {}), stopStarts: { ...agent.startsOf(cur.stops.filter((x) => x.day !== dayT)), ...((cur.args.overrides || {}).stopStarts || {}) } }, tourStops: [...(cur.args.tourStops || []), { day: dayT, part: partOf(fresh.key), listingId: fresh.id, startMinutes: fresh.start, durationMinutes: tk.minutes, covers }] };
         let p2 = null;
         try { p2 = ctx.run(a2); } catch (e) { p2 = null; }
         if (p2 && isDayPlan(p2)) agent.stripExtras(p2, new Set([...cur.stops.map((x) => x.id), fresh.id]));
@@ -1366,6 +1366,7 @@ function planTurnCore(ops, ctx) {
         const f2 = nw2 && nw2.find((x) => x.id === fresh.id);
         if (!f2) return;
         const ids = Array.isArray(p2.tourReplaced) ? p2.tourReplaced : [];
+        if (nw2.some((x) => x.day === dayT && x.id !== fresh.id && covers.includes(x.type))) return;
         if (!tourRunSteady(cur.stops.filter((x) => !cur.removed.has(x.key)), nw2, ids, dayT, covers)) return;
         r.fresh = f2; r.covered = cur.stops.filter((x) => ids.includes(x.id) && !(r.inPlaceOf && r.inPlaceOf.id === x.id)); r.coveredGone = true;
         cur = { plan: p2, stops: nw2, args: { ...a2, overrides: cur.args.overrides || null, trustedPins: undefined }, locks: cur.locks, removed: new Set() };
