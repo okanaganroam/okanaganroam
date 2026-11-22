@@ -8560,7 +8560,7 @@ function tripChatStayTurn(stayOps, { v, plan, req, stops, lang, staysOn, runCore
   if (am && am.elsewhere) return done({ ...out, reply: tripChat.fill(T.stayElsewhere, { what: list(am.keys, T.amen), town: REGION_LABELS[am.town] || am.town || '', name: next.name, facts }) + kindMiss });
   const winter = am && am.winterCheck && (next.has || []).includes('pool') ? T.poolWinter : '';
   const has = am && (next.has || []).length ? tripChat.fill(T.stayHas, { what: list(next.has, T.amen) }) + winter : '';
-  if (next.id === cur.id) {
+  if (next.id === (v.stayId || cur.id)) {
     // The place already on the plan has it: said, and it stays (its chip shows now).
     if (has) return done({ ...out, reply: tripChat.fill(T.stayKept, { name: next.name, facts, what: list(next.has, T.amen) + winter }) + kindMiss });
     return done({ reply: tripChat.fill(T.stayFail, { what, name: cur.name }) });

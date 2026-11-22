@@ -524,7 +524,7 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1, 
     const later = stops.filter((x) => x.day === d && (lunchStop ? partIx(x) > partIx(lunchStop) : partIx(x) >= 2));
     if (later.length) return { ops: [op('remove', { stops: later })], cant: null };
   }
-  if (day && /\b(?:lighter|light|easy|easier|plus leger|plus legere|moins charge)\b/.test(t) && !/\b(?:hikes?|trails?|walks?|randonnees?)\b/.test(t)) return { ops: [op('pace', { value: 'relaxed', day })], cant: null };
+  if (day && /\b(?:lighter|light|easy|easier|allege[rz]?|plus leger|plus legere|moins charge)\b/.test(t) && !/\b(?:hikes?|trails?|walks?|randonnees?)\b/.test(t)) return { ops: [op('pace', { value: 'relaxed', day })], cant: null };
   // Days
   const nd = /\b(?:make it|for|en|sur|plan)\s+(\d|one|two|three|four|five|six|seven|un|une|deux|trois|quatre|cinq|sept)\s*(?:days?|jours?)\b/.exec(t);
   if (nd) ops.push(op('days', { n: Math.min(7, Number(nd[1]) || NUM_WORDS[nd[1]] || 1) }));
@@ -618,6 +618,7 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1, 
     let afterStops = after ? stopsNamed(after[1], stops) : [];
     if (day && afterStops.some((s) => s.day === day)) afterStops = afterStops.filter((s) => s.day === day);
     const want = kindsNamed(t, new Set()).filter((k) => !(k === 'kids' && ops.some((o) => o.o === 'party' && o.value === 'kids')) && !(after && KIND_WORDS.find(([kk]) => kk === k)[1].test(after[1])));
+    if (!want.length && mealWord && /\b(?:add|ajoute[rz]?)\b/.test(t) && !(after && /^(?:lunch|dinner|supper|souper|diner|dejeuner)$/.test(after[1]))) want.push('restaurant');
     const time = /\bmorning|matin\b/.test(t) ? 'morning' : /\bafternoon|apres-midi\b/.test(t) ? 'afternoon' : /\bevening|tonight|soir\b/.test(t) ? 'evening' : null;
     // "fill the day: a winery, lunch and something relaxing": lunch is added only when the day has none.
     if (fillKinds && /\b(?:lunch|diner|dejeuner)\b/.test(t) && !stops.some((x) => x.role === 'lunch' && x.day === (day || 1))) ops.push(op('add', { kind: 'restaurant', time: 'midday', day }));
@@ -628,6 +629,8 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1, 
       else ops.push(op('add', { kind: k, time, day, stops: afterStops.slice(0, 1), ...(before && afterStops.length ? { value: 'earlier' } : {}) }));
     }
   }
+  // "add dinner in Squamish": the stop asked for, not a new base town for the whole trip.
+  if (ops.some((o) => o.o === 'add') && /\b(?:add|ajoute[rz]?)\b/.test(t)) { const i = ops.findIndex((o) => o.o === 'town'); if (i >= 0) ops.splice(i, 1); }
   return { ops, cant: null };
 }
 

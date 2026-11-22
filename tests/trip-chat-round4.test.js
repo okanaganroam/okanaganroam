@@ -157,3 +157,9 @@ test('page: the stay on screen is sent; a queued message\'s answer follows the f
   assert.match(html, /v4\.confirmed = wasConfirmed; v4\.saved = false/);
   assert.match(html, /chat\.undo = planTouched \? snap : null/);
 });
+
+test('"add dinner in Squamish after the brewery" adds a dinner after that stop (no new base town, no re-plan); the stay on screen decides "it stays"', () => {
+  const r = R('add dinner in Squamish after the brewery', PLAN.filter((x) => x.id !== 15), { regions: ['squamish'], regionLabels: { squamish: 'Squamish' } });
+  assert.deepEqual(brief(r), [['add', 'restaurant', [14], null, null, null]]);
+  assert.match(require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'server.js'), 'utf8'), /if \(next\.id === \(v\.stayId \|\| cur\.id\)\) \{/);
+});
