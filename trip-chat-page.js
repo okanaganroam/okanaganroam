@@ -419,6 +419,8 @@ function chatClientSrc(d) {
     Array.prototype.forEach.call(root.querySelectorAll('.v4-stop'), function(li){
       var eb = li.querySelector('.trip-btn[data-trip-ref^="event:"]');
       if (eb) {
+        // The photo-led layout (trip-workspace-layout.js) draws the event card itself: Remove, then "Removed … Undo".
+        if (typeof tripWorkspaceEventHtml === 'function') return;
         var id = Number(String(eb.getAttribute('data-trip-ref')).slice(6));
         if (chat.goneEvents[id]) { li.parentNode.removeChild(li); return; }
         if (!v4.confirmed) { li.classList.add('has-event-x'); li.insertAdjacentHTML('beforeend', '<button type="button" class="v4-icon v4-event-x" data-v4-event-x="' + id + '" aria-label="' + esc(ag('removeEvent', { name: eb.getAttribute('data-trip-name') || '' })) + '">✕</button>'); }
@@ -490,7 +492,23 @@ function chatClientSrc(d) {
       track('trip_chat', { chat_source: 'when_' + w, changed: 'no' });
       return;
     }
-    if ((b = t.closest('[data-v4-event-x]'))) { chat.goneEvents[Number(b.getAttribute('data-v4-event-x'))] = 1; chat.rendering = true; try { render(false); } finally { chat.rendering = false; } return; }
+    // An event comes off like a venue: a "Removed … Undo" row, the same line in the chat, and the stop count follows.
+    if ((b = t.closest('[data-v4-event-x]'))) {
+      var xid = Number(b.getAttribute('data-v4-event-x')), xname = '';
+      days().forEach(function(d){ d.stops.forEach(function(s){ if (s.kind === 'event' && s.event && s.event.id === xid) xname = s.event.name; }); });
+      chat.goneEvents[xid] = 1; v4.saved = false;
+      render(false);
+      var xu = resultEl.querySelector('[data-v4-event-undo="' + xid + '"]'); if (xu) { try { xu.focus({ preventScroll: true }); } catch (err) {} }
+      if (xname && typeof announce === 'function') announce(tx('tripv3.wasRemoved', { name: xname }));
+      return;
+    }
+    if ((b = t.closest('[data-v4-event-undo]'))) {
+      var uid = Number(b.getAttribute('data-v4-event-undo'));
+      delete chat.goneEvents[uid]; v4.saved = false;
+      render(false);
+      var ux = resultEl.querySelector('[data-v4-event-x="' + uid + '"]'); if (ux) { try { ux.focus({ preventScroll: true }); } catch (err) {} }
+      return;
+    }
     if ((b = t.closest('[data-v4-stay-more]'))) { chat.stayMore = !chat.stayMore; render(false); return; }
     if ((b = t.closest('[data-v4-stay-choose]'))) { stayChoice = Number(b.getAttribute('data-v4-stay-choose')); chat.stayMore = false; render(false); chatGlow(['stay']); return; }
   });
