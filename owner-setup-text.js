@@ -2957,6 +2957,13 @@ Object.assign(en, {
   happyClosedAskQ: 'Visitors won’t see this while you’re closed. Save anyway?', happyClosedYes: 'Save anyway', happyClosedNo: 'Change months',
   stHappyClosed: 'saved, not shown while you’re closed',
   tpriceDoubled: 'That looks like two prices run together. Did you mean {x}? Type it once.',
+  // Dayton (2026-11-21): a happy hour at a part of the place from her "Part of the place with its own times?" line.
+  happyAtQ: 'Is this happy hour at {part}?', happyAtQMany: 'Is this happy hour at one of these?', happyAtYes: 'Yes, at {part}', happyAtNo: 'No',
+  happyAtShows: 'This happy hour shows at {part}: on the days your “Part of the place with its own times?” line gives it, at these times, even while you’re closed for the season.',
+  happyAtUndo: 'It isn’t at {part}', stHappyAt: 'on your page at {part}, on its days',
+  // Dayton (2026-11-21): one line naming a sister listing (another listing at her address or under her name).
+  sisterOne: '{a} has its own page and its own setup link. Need it?', sisterTwo: '{a} and {b} each have their own page and their own setup link. Need one?',
+  sisterMsgUs: 'Message us', sisterMsg: 'Please send me the setup link for {a}.',
 });
 Object.assign(fr, {
   happyClosedSea: 'Attention : votre page dit fermé pour la saison en dehors du {a} au {b}, et un 5 à 7 ne paraît jamais pendant que vous êtes fermé. Celui-ci a lieu seulement pendant ces mois fermés : les visiteurs ne le verront pas.',
@@ -2964,6 +2971,11 @@ Object.assign(fr, {
   happyClosedAskQ: 'Les visiteurs ne le verront pas pendant que vous êtes fermé. Enregistrer quand même?', happyClosedYes: 'Enregistrer quand même', happyClosedNo: 'Changer les mois',
   stHappyClosed: 'enregistré, caché pendant que vous êtes fermé',
   tpriceDoubled: 'On dirait deux prix collés. Vouliez-vous dire {x}? Tapez-le une seule fois.',
+  happyAtQ: 'Ce 5 à 7 a-t-il lieu à {part}?', happyAtQMany: 'Ce 5 à 7 a-t-il lieu à l’un de ces endroits?', happyAtYes: 'Oui, à {part}', happyAtNo: 'Non',
+  happyAtShows: 'Ce 5 à 7 paraît à {part} : les jours que donne votre ligne « Une partie de l’endroit a ses propres heures? », à ces heures, même pendant que vous êtes fermé pour la saison.',
+  happyAtUndo: 'Il n’a pas lieu à {part}', stHappyAt: 'sur votre page à {part}, les jours où c’est ouvert',
+  sisterOne: '{a} a sa propre page et son propre lien de configuration. Vous en avez besoin?', sisterTwo: '{a} et {b} ont chacun leur propre page et leur propre lien de configuration. Vous en avez besoin?',
+  sisterMsgUs: 'Écrivez-nous', sisterMsg: 'Pouvez-vous m’envoyer le lien de configuration de {a}?',
 });
 
 (function frSpaces(o) {

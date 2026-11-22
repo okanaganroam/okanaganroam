@@ -313,11 +313,11 @@
   // against the summer hours only, an all-year one against both weeks (outside either is a heads-up). A day closed in
   // those months is the closed-day heads-up's (closedWarnAny), not this one's.
   // -> the closed-season heads-up when every month of this happy hour is outside the place's open season, else ''.
-  function happyClosedWarn(sea){
+  function happyClosedWarn(sea, noPartTip){
     var os = S.openSea; if (!T.happyClosedSea || !os || !os.from || !os.to || !sea || !sea.on) return '';
     var H = seaMonths(sea), O = seaMonths(seaFrom(os.from, os.to));
     for (var i = 1; i <= 12; i++) if (H[i] && O[i]) return '';
-    return fill(T.happyClosedSea, { a: mdLabel(os.from), b: mdLabel(os.to) }) + (partTimesOn() && T.happyClosedSeaPart ? ' ' + T.happyClosedSeaPart : '');
+    return fill(T.happyClosedSea, { a: mdLabel(os.from), b: mdLabel(os.to) }) + (!noPartTip && partTimesOn() && T.happyClosedSeaPart ? ' ' + T.happyClosedSeaPart : '');
   }
   function hoursWarn(e){ return timesWarn(e.from, e.close ? null : e.to, e.days, happySeaOf(e)); }
   // Distillery test 2 (Whistler, 2026-11-16): with two happy hours or more each has its own months (e.sea); one alone
@@ -407,7 +407,43 @@
   // and she never saw it): the closed-season heads-up sits right under the month chips (happyClosedHtml), not here.
   function warnShown(key, e){ return warnOf(key, e); }
   // The closed-season heads-up under a happy hour's month chips: i '' for the screen's one box, else that happy hour's.
-  function happyClosedHtml(i, sea){ var t = happyClosedWarn(sea); return '<p class="su-hint su-closedwarn" id="suHappyClosed' + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
+  // Dayton (2026-11-21): with a "Part of the place with its own times?" line, that heads-up is one question instead: "Is this
+  // happy hour at Greenside Bar & Grill?", one button per named part and "No". Her pick is saved with the happy hour ("_at")
+  // and it then shows at that part on the days its line gives, even while she's closed. "No" (or no parts line): as before.
+  function happyParts(){
+    if (!partTimesOn() || !T.happyAtQ) return [];
+    return partTimesOut((CUR.visit_rows || {}).part_times).split('; ').map(function(x){ var m = /^([^:]{2,40}):\s*\S/.exec(x); return m ? m[1].trim() : ''; }).filter(Boolean);
+  }
+  function partKey(x){ return String(x || '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9\u00e0-\u00ff]+/g, ' ').trim(); }
+  // Her pick, while that part is still in her line and every happy hour here runs only in the closed months.
+  function happyAtOk(){ if (!S.happyAt) return ''; var k = partKey(S.happyAt), hit = happyParts().filter(function(n){ return partKey(n) === k; })[0]; return hit || ''; }
+  // -> { text: the line under the month chips, ask: show the question }
+  function happyClosedState(sea){
+    var t = happyClosedWarn(sea); if (!t) return { text: '', ask: false, at: '' };
+    var parts = happyParts(); if (!parts.length || !happyAllClosed()) return { text: t, ask: false, at: '' };
+    var at = happyAtOk(); if (at) return { text: fill(T.happyAtShows, { part: at }), ask: false, at: at };
+    if (S.happyAtNo) return { text: happyClosedWarn(sea, true), ask: false, at: '' };
+    return { text: '', ask: true, at: '' };
+  }
+  function happyAtAskHtml(i){
+    var parts = happyParts(); if (!parts.length) return '';
+    return '<div class="su-stack" id="suHappyAt' + i + '" role="group" aria-labelledby="suHappyAtQ' + i + '"><p class="su-q" id="suHappyAtQ' + i + '">' + h(parts.length === 1 ? fill(T.happyAtQ, { part: parts[0] }) : T.happyAtQMany) + '</p>'
+      + parts.map(function(n, k){ return big('✓', parts.length === 1 ? fill(T.happyAtYes, { part: n }) : n, '', k > 0, 'happyAt:' + k); }).join('') + big('✕', T.happyAtNo, '', true, 'happyAtNo') + '</div>';
+  }
+  function happyClosedHtml(i, sea){
+    var st = happyClosedState(sea), ask = st.ask && (i === '' || i === '0');
+    // Shown at her part: good news, in the "saved" green, not the heads-up's red.
+    return '<p class="' + (st.at ? 'su-sent' : 'su-hint su-closedwarn') + '" id="suHappyClosed' + i + '" role="status"' + (st.text ? '' : ' hidden') + '>' + h(st.text) + '</p>'
+      + (st.at && (i === '' || i === '0') ? '<div class="su-skip" style="margin:0 0 10px"><button type="button" class="su-link" id="suHappyAtUndo" data-act="happyAtNo">' + h(fill(T.happyAtUndo, { part: st.at })) + '</button></div>' : '')
+      + (ask ? happyAtAskHtml(i) : '');
+  }
+  // Dayton (2026-11-21): one plain line when another listing is at her address or under her name (C.sisters: names only),
+  // with the Help's own Message us form.
+  function sisterLine(){
+    var s = (C.sisters || []).slice(0, 2); if (!s.length || !T.sisterOne) return '';
+    var txt = s.length === 1 ? fill(T.sisterOne, { a: s[0] }) : fill(T.sisterTwo, { a: s[0], b: s[1] });
+    return '<p class="su-hint" id="suSister">' + h(txt) + ' <button type="button" class="su-link" id="suSisterMsg" data-ohb-contact="' + h(fill(T.sisterMsg, { a: s.join(' / ') })) + '">' + h(T.sisterMsgUs) + '</button></p>';
+  }
   // Every happy hour on the screen runs only in the closed months (nothing it saves can show).
   function happyAllClosed(){ return !!(S.happy && S.happy.length) && S.happy.every(function(e){ return !!happyClosedWarn(happySeaOf(e)); }); }
   function warnHtml(key, i, e){ var t = warnShown(key, e); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'
@@ -415,9 +451,13 @@
   function warnRefresh(){
     ['specials', 'nights', 'happy'].forEach(function(key){ (S[key] || []).forEach(function(e, i){ var n = el('suWarn' + key + i); if (!n) return; var t = warnShown(key, e); n.textContent = t; n.hidden = !t; var b = key === 'happy' && el('suSplitHours' + i); if (b) b.hidden = !splitOn(key, e); }); });
     // -> the closed-season heads-up that has just appeared (to scroll it into view), or null.
-    var shown = null;
+    var shown = null, redo = null;
     [['', S.happySea]].concat((S.happy || []).map(function(e, i){ return [String(i), e.sea]; })).forEach(function(x){
-      var n = el('suHappyClosed' + x[0]); if (!n || !x[1]) return; var t = happyClosedWarn(x[1]), was = !n.hidden; n.textContent = t; n.hidden = !t; if (t && !was) shown = n; });
+      var n = el('suHappyClosed' + x[0]); if (!n || !x[1]) return; var st = happyClosedState(x[1]), t = st.text, was = !n.hidden; n.textContent = t; n.hidden = !t; if (t && !was) shown = n;
+      // The part question comes and goes with the months (Dayton, 2026-11-21).
+      if ((x[0] === '' || x[0] === '0') && (!!el('suHappyAt' + x[0]) !== st.ask || !!el('suHappyAtUndo') !== !!st.at)) redo = x[0];
+    });
+    if (redo !== null) { readEntries(); var ry = window.scrollY; render(); window.scrollTo(0, ry); return el('suHappyAt' + redo) || el('suHappyClosed' + redo); }
     return shown;
   }
 
@@ -1270,6 +1310,7 @@
   S.nightsSaved = (CUR.weekly_nights || []).slice();
   S.happySea = (function(){ try { var o = typeof CUR.happy_hour === 'string' ? JSON.parse(CUR.happy_hour) : CUR.happy_hour; var z = o && o._season; return seaFrom(z && z.from, z && z.to); } catch (e) { return seaFrom(); } })();
   S.happySeaWas = seaKey(S.happySea);
+  S.happyAt = (function(){ try { var o = typeof CUR.happy_hour === 'string' ? JSON.parse(CUR.happy_hour) : CUR.happy_hour; return o && typeof o._at === 'string' ? o._at : ''; } catch (e) { return ''; } })(); S.happyAtNo = false;
   // Distillery test 2 (Whistler, 2026-11-16): each happy hour's own months ("_slot_seasons": { sat: { '14:00': { from, to } } },
   // by its first day and start). A week stored before (one "_season") gives every happy hour that season.
   (function(){
@@ -1438,7 +1479,7 @@
     if (d === 'day' && step === 'social' && S.done.instagram === 'live' && S.done.facebook === 'day' && T.stSocialIgLive) return T.stSocialIgLive;
     if (d === 'day' && step === 'social' && S.done.facebook === 'live' && S.done.instagram === 'day' && T.stSocialFbLive) return T.stSocialFbLive;
     // Sport fix round 16 (sport test 17: "Happy hour · on your page ✓" for a deal only in her closed months): it says so.
-    if (step === 'happy' && d === 'live' && T.stHappyClosed && happyAllClosed()) return T.stHappyClosed;
+    if (step === 'happy' && d === 'live' && T.stHappyClosed && happyAllClosed()) return happyAtOk() && T.stHappyAt ? fill(T.stHappyAt, { part: happyAtOk() }) : T.stHappyClosed;
     return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic && !CK ? T.stSoon : T.st[d]; }
   // Brewery test 1 (2026-11-12): a step answered "within a day" reads "on your page" once nothing it sent is still
   // pending (C.waiting: the server's list of steps with something pending now, refreshed with every save).
@@ -2503,11 +2544,11 @@
       // Welcome back: the button first, then what's done.
       x = any ? q(T.soFarQ, nxt === 'finish' ? T.changeLead : T.welcomeLead) + msgs() + '<div class="su-stack" style="margin-bottom:22px">'
           + (nxt === 'finish' ? big('➜', T.seeFinish, '', false, 'go:finish') : nxt === 'more' ? (drWaiting() && T.draftWaiting ? big('➜', T.moreOpt, T.draftWaiting, false, 'resume') : big('➜', T.moreOpt, T.optional, false, 'go:more')) + big('👀', T.seeFinish, '', true, 'go:ess') : big('➜', T.carryOn, (drWaiting() || C.menuDraftLines > 0) && T.draftWaiting ? T.draftWaiting : fill(T.nextIs, { step: T.labels[nxt] }), false, 'resume')) + '</div>'
-          + statusRows(P1) + (p1Done() || p2Count() ? '<h2 class="su-h2">' + h(T.moreQ) + '</h2>' + statusRows(P2) : '')
+          + sisterLine() + statusRows(P1) + (p1Done() || p2Count() ? '<h2 class="su-h2">' + h(T.moreQ) + '</h2>' + statusRows(P2) : '')
         // Pub test 8 (2026-11-10): nothing said it was free, and an owner wary of money read the badge and prices as an upsell.
         // Café test 4 (2026-11-11): no staff-access note here before anything is done; the edit page, where "People with
         // access" is, keeps it.
-        : q(fill(T.hi, { name: C.name }), fill(T.hiLead, { type: C.typeWord })) + '<p class="su-free" id="suFree"><span aria-hidden="true">✓</span> ' + h(T.freeLine) + '</p><div class="su-stack">' + big('➜', T.start, '', false, 'go:basics') + '</div>';
+        : q(fill(T.hi, { name: C.name }), fill(T.hiLead, { type: C.typeWord })) + '<p class="su-free" id="suFree"><span aria-hidden="true">✓</span> ' + h(T.freeLine) + '</p><div class="su-stack">' + big('➜', T.start, '', false, 'go:basics') + '</div>' + sisterLine();
     } else if (p[0] === 'saved') {
       var how = S.done[p[1]];
       // Two phrases only (pub fresh-eyes, 2026-11-10): "Saved ✓ It's on your page now." or "Sent ✓ It'll show on your page
@@ -3971,9 +4012,11 @@
       if (!same) { var sl = {}; S.happy.forEach(function(e, i){ if (!outs[i].from) return; DAYS.forEach(function(d){ if (e.days[d]) (sl[d] = sl[d] || {})[e.from] = { from: outs[i].from, to: outs[i].to }; }); }); week._slot_seasons = Object.keys(sl).length ? sl : null; }
     }
     week._close = Object.keys(close).length ? close : null;
+    // Dayton (2026-11-21): the part it's at (only for a happy hour that runs only in the closed months); null clears it.
+    if (happyParts().length) week._at = happyAllClosed() && happyAtOk() ? happyAtOk() : null;
     // Sport fix round 16 (2026-11-21; sport test 17: Marlene saved a Nov–Dec deal at a course closed Nov–Mar in one tap):
-    // every happy hour here runs only in the closed months, so it asks once before saving.
-    if (happyAllClosed() && !S.happyClosedOk && T.happyClosedAskQ) { S.happyClosedAsk = true; render(); var ak = el('suHappyClosedAsk'); if (ak && ak.scrollIntoView) { try { ak.scrollIntoView({ block: 'center' }); } catch (x) { ak.scrollIntoView(); } } return; }
+    // every happy hour here runs only in the closed months, so it asks once before saving. Not once it's at a part.
+    if (happyAllClosed() && !S.happyClosedOk && T.happyClosedAskQ && !week._at) { S.happyClosedAsk = true; render(); var ak = el('suHappyClosedAsk'); if (ak && ak.scrollIntoView) { try { ak.scrollIntoView({ block: 'center' }); } catch (x) { ak.scrollIntoView(); } } return; }
     S.happyClosedAsk = false; S.happyClosedOk = false;
     S.happyTyped = true;
     var list = [];
@@ -4904,6 +4947,8 @@
     if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? happyDefault() : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
     if (k === 'happySave') return happySave();
     if (k === 'happyClosedYes') { S.happyClosedOk = true; return happySave(); }
+    // Dayton (2026-11-21): "Is this happy hour at Greenside Bar & Grill?" (a part from her parts line), or "No".
+    if (k === 'happyAt' || k === 'happyAtNo') { readEntries(); S.happyAt = k === 'happyAt' ? happyParts()[+v] || '' : ''; S.happyAtNo = k === 'happyAtNo'; S.happyClosedAsk = false; var hy = window.scrollY; render(); window.scrollTo(0, hy); return; }
     if (k === 'happyClosedNo') { readEntries(); S.happyClosedAsk = false; S.happyClosedOk = false; render(); var hsb = el('suSeahappy') || screen.querySelector('[id^="suSeahappy"]'); if (hsb && hsb.scrollIntoView) { try { hsb.scrollIntoView({ block: 'start' }); } catch (x) { hsb.scrollIntoView(); } } return; }
     if (k === 'specialsSave') return specialsSave();
     if (k === 'musicSave') return musicSave();
