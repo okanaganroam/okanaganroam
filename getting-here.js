@@ -157,6 +157,22 @@ function tripStep(plan, stay, opts = {}) {
   if (!url) return null;
   return { kind: 'transport', id: `car-${key}`, name: rentText(key, 'en'), nameFr: rentText(key, 'fr'), label: TEXT.seeCars.en, labelFr: TEXT.seeCars.fr, url, affiliate: true, rel: 'sponsored noopener', link: 'discovercars' };
 }
+// The travel agent chat's "Getting here" card (2026-11-22, trip-chat-page.js; shown only in chat mode): for an
+// overnight trip (2+ days, or a stay over a night; never a day trip or an evening), the airport nearest the plan's first
+// town, its Discover Cars link (null while DISCOVERCARS_AID is unset) and that town's airport shuttles on Viator.
+// -> { airport: { key, code, en, fr }, car, carLabel, shuttles: [{ label, url, productCode }] } or null.
+function tripCard(plan, stay, opts = {}) {
+  if (!plan || typeof plan !== 'object') return null;
+  const days = Array.isArray(plan.days) ? plan.days.length : 0;
+  const nights = !!(stay && stay.arrive && stay.leave && stay.leave > stay.arrive);
+  if (!(days > 1 || nights)) return null;
+  const first = planStops(plan).map(stopRegion).find((r) => airportFor(r));
+  const key = first ? airportFor(first) : null;
+  if (!key) return null;
+  const car = carUrl(key, opts.cfg || config());
+  const shuttles = regionShuttles(first, opts).map((x) => ({ label: x.label, url: x.url, productCode: x.productCode }));
+  return { airport: { key, code: AIRPORTS[key].code, en: AIRPORTS[key].en, fr: AIRPORTS[key].fr }, region: first, car, carLabel: car ? { en: rentText(key, 'en'), fr: rentText(key, 'fr') } : null, shuttles };
+}
 // Adds the step at the end of every "Book my trip" list (the stays box's pick, its alternatives, V4's own list), once.
 function withTripStep(plan, stay, opts = {}) {
   const step = tripStep(plan, stay, opts);
@@ -199,4 +215,4 @@ for (const it of Object.values(loadData(path.join(__dirname, 'data', 'getting-he
 }
 clearCache();
 
-module.exports = { AIRPORTS, REGION_AIRPORT, TEXT, FR_TEXT, config, enabled, cleanAid, airportFor, carUrl, loadData, clearCache, regionShuttles, regionBoxHtml, withRegionBox, wantsCar, tripStep, withTripStep, v4ClientSwaps };
+module.exports = { AIRPORTS, REGION_AIRPORT, TEXT, FR_TEXT, config, enabled, cleanAid, airportFor, carUrl, loadData, clearCache, regionShuttles, regionBoxHtml, withRegionBox, wantsCar, tripStep, withTripStep, tripCard, v4ClientSwaps };

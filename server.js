@@ -8355,7 +8355,7 @@ function parseTripChatBody(body, opts = {}) {
 function tripChatStops(list) {
   const ids = [...new Set(list.map((x) => x.id))];
   if (!ids.length) return [];
-  const rows = db.prepare(`SELECT id, name, type, price, kid_friendly, lake_view, patio, live_music, arts_culture, dog_friendly FROM venues WHERE redirect_to IS NULL AND id IN (${ids.map(() => '?').join(',')})`).all(...ids);
+  const rows = db.prepare(`SELECT id, name, type, region, price, kid_friendly, lake_view, patio, live_music, arts_culture, dog_friendly FROM venues WHERE redirect_to IS NULL AND id IN (${ids.map(() => '?').join(',')})`).all(...ids);
   const byId = new Map(rows.map((r) => [r.id, r]));
   const out = [];
   for (const x of list) {
@@ -8368,7 +8368,7 @@ function tripChatStops(list) {
     const role = m ? (daypart === 'midday' && meal ? 'lunch' : ['evening', 'night'].includes(daypart) && v.type !== 'cafe' && meal ? 'dinner' : '')
       : (meal && start !== null && start >= 660 && start <= 870 ? 'lunch' : meal && v.type !== 'cafe' && start !== null && start >= 1020 ? 'dinner' : '');
     out.push({ key: x.key, ref: `s${out.length + 1}`, id: v.id, name: v.name, type: v.type, price: Number(v.price) || null,
-      badges: ['kid_friendly', 'lake_view', 'patio', 'live_music', 'arts_culture', 'dog_friendly'].filter((b) => v[b] === 1), day: m ? Number(m[1]) : 1, start, role });
+      badges: ['kid_friendly', 'lake_view', 'patio', 'live_music', 'arts_culture', 'dog_friendly'].filter((b) => v[b] === 1), day: m ? Number(m[1]) : 1, start, role, region: v.region });
   }
   return out;
 }
@@ -8398,15 +8398,78 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     const c = cant || 'unclear';
     return { source, cant: c, plan: null, actions: none, response: { reply: tripChat.cantReply(c, lang, what), source, cant: c, plan: null, req: null, changed: [], actions: none, ...(ai && !ai.ok ? { fallback: ai.reason } : {}) } };
   }
-  const out = tripChat.planTurn(ops, {
-    args: v.args, locks: v.locks, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS,
-    run: (a) => runTripPlanRequest({ text: a.text, seed: a.seed || 0, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: a.pinned || null, overrides: a.overrides || null, swap: a.swap || null, ...(a.stay ? { stay: a.stay } : {}), v4: true }, staysOn),
-  });
-  const reply = tripChat.buildReply(out, { lang, regionLabels: REGION_LABELS, cant });
+  const run = (a) => runTripPlanRequest({ text: a.text, seed: a.seed || 0, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: a.pinned || null, overrides: a.overrides || null, swap: a.swap || null, ...(a.stay ? { stay: a.stay } : {}), v4: true }, staysOn);
+  // The place to stay and getting here (2026-11-22, agent round) are answered here; every other op goes to the planner.
+  const extra = ops.filter((o) => o.o === 'stay' || o.o === 'transport');
+  const planOps = ops.filter((o) => o.o !== 'stay' && o.o !== 'transport');
+  const out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: v.locks, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run })
+    : { plan: null, req: null, actions: { remove: [], keep: [] }, results: [], changed: [] };
+  let reply = planOps.length ? tripChat.buildReply(out, { lang, regionLabels: REGION_LABELS, cant }) : '';
+  let plan = out.plan || null, req = out.req || null, stayPref, transport;
+  for (const op of extra) {
+    const r = op.o === 'stay' ? tripChatStayTurn(op, { v, plan, req, stops, lang, staysOn, run }) : tripChatTransportTurn(op, { stops, lang });
+    if (r.plan) { plan = r.plan; req = r.req; }
+    if (r.stayPref !== undefined) stayPref = r.stayPref;
+    if (r.transport) transport = r.transport;
+    reply = [reply, r.reply].filter(Boolean).join(' ');
+  }
+  const actions = { ...out.actions, ...(transport ? { transport } : {}) };
   return {
-    source, cant: null, plan: out.plan, actions: out.actions,
-    response: { reply, source, plan: out.plan || null, req: out.req || null, changed: out.changed || [], actions: out.actions, ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
+    source, cant: null, plan, actions,
+    response: { reply, source, plan, req, changed: out.changed || [], actions, ...(stayPref !== undefined ? { stayPref } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
   };
+}
+// "somewhere cheaper to stay", "a hotel with a pool", "stay in Naramata", "we already have a place": the same plan (every
+// stop pinned to its slot) planned again with the visitor's stay preference (stay.pref, trip-stays.js), so the place to
+// stay is the planner's own pick among the stays that fit it. -> { plan, req, stayPref, reply }
+function tripChatStayTurn(op, { v, plan, req, stops, lang, staysOn, run }) {
+  const T = tripChat.T[lang === 'fr' ? 'fr' : 'en'];
+  const base = req ? { ...v.args, text: req.text, seed: req.seed, overrides: Object.keys(req.overrides || {}).length ? req.overrides : null, excludeVenueIds: req.excludeVenueIds, avoidVenueIds: req.avoidVenueIds, pinned: req.pinned }
+    : { ...v.args, pinned: Object.fromEntries(stops.filter((s) => /^\d-/.test(s.key) && !v.removed.includes(s.key)).map((s) => [s.key, s.id])) };
+  if (base.pinned && !Object.keys(base.pinned).length) base.pinned = null;
+  if (!staysOn) return { reply: T.stayOff };
+  const stayIn = { ...(v.args.stay || {}) };
+  const before = plan || run(base);
+  const cur = before && before.whereToStay && before.whereToStay.pick;
+  const old = { ...(stayIn.pref || {}) };
+  if (op.value === 'have_place') {
+    const pref = { none: true };
+    const p = run({ ...base, stay: { ...stayIn, pref } });
+    return { plan: p, req: tripChatReq(base, p), stayPref: pref, reply: T.stayNone };
+  }
+  if (!cur) return { reply: T.stayOff };
+  const pref = { ...old };
+  delete pref.none;
+  if (op.value === 'budget') { delete pref.minPrice; pref.maxPrice = Math.max(1, (cur.priceLevel || 3) - 1); }
+  if (op.value === 'upscale') { delete pref.maxPrice; pref.minPrice = Math.min(4, (cur.priceLevel || 2) + 1); }
+  // A new kind of place or town starts from any price band again ("cheaper", then "with a pool": the pool wins).
+  if (['pool', 'hot_tub', 'kitchen'].includes(op.value)) { pref.amenity = op.value; delete pref.maxPrice; delete pref.minPrice; }
+  if (op.region) { pref.region = op.region; if (!op.value) { delete pref.maxPrice; delete pref.minPrice; } }
+  const what = op.value ? T.stayWhat[op.value] : tripChat.fill(T.stayWhat.region, { town: REGION_LABELS[op.region] || op.region });
+  const tooCheap = op.value === 'budget' && cur.priceLevel === 1;
+  const p = tooCheap ? null : run({ ...base, stay: { ...stayIn, pref } });
+  const next = p && p.whereToStay && p.whereToStay.pick;
+  if (!next || next.id === cur.id) return { reply: tripChat.fill(T.stayFail, { what, name: cur.name }) };
+  const facts = [lang === 'fr' ? (next.kindFr || next.kind) : next.kind, next.regionLabel, next.priceBand].filter(Boolean).join(' · ');
+  return { plan: p, req: tripChatReq(base, p), stayPref: pref, reply: tripChat.fill(T.stayNow, { name: next.name, facts }) };
+}
+function tripChatReq(base, p) {
+  const pins = {};
+  for (const s of tripChat.planStops(p)) if (/^\d-/.test(s.key)) pins[s.key] = s.id;
+  return { text: base.text, seed: base.seed || 0, overrides: base.overrides || {}, excludeVenueIds: base.excludeVenueIds || [], avoidVenueIds: base.avoidVenueIds || [], pinned: pins, locks: {} };
+}
+// "we need a rental car", "we're driving from Vancouver", "we don't have a car": the page shows or hides its Getting here
+// card; the reply says what there is (an airport shuttle on Viator where we have one; else that most stops need a car).
+function tripChatTransportTurn(op, { stops, lang }) {
+  const L = lang === 'fr' ? 'fr' : 'en';
+  const T = tripChat.T[L];
+  const region = (stops.find((s) => gettingHere.airportFor(s.region)) || {}).region || null;
+  const key = region ? gettingHere.airportFor(region) : null;
+  const airport = key ? gettingHere.AIRPORTS[key][L] : (L === 'fr' ? 'l’aéroport de Kelowna (YLW)' : 'Kelowna airport (YLW)');
+  if (op.value === 'driving') return { transport: 'driving', reply: T.driving };
+  if (op.value === 'rental') return { transport: 'rental', reply: tripChat.fill(gettingHere.enabled() && key ? T.carYes : T.carNo, { airport }) };
+  const shuttles = region ? gettingHere.regionShuttles(region) : [];
+  return { transport: 'no_car', reply: shuttles.length ? T.noCarShuttle : tripChat.fill(T.noCar, { town: REGION_LABELS[region] || (L === 'fr' ? 'la ville' : 'town') }) };
 }
 
 // Every place to stay with a map location, its stay_info facts and what the "Where to stay" card shows.
@@ -8510,6 +8573,8 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false) {
     if (v4 && fever.enabled()) fever.withTripSteps(plan);
     // "Getting here" (2026-11-21, getting-here.js): a "Rent a car" step for a plan over 2+ towns or days (DISCOVERCARS_AID set).
     if (v4 && gettingHere.enabled()) gettingHere.withTripStep(plan, stay);
+    // The travel agent chat's "Getting here" card (2026-11-22): the data only; the page shows it in chat mode only.
+    if (v4) { const gh = gettingHere.tripCard(plan, stay); if (gh) plan.gettingHere = gh; }
   } catch (e) { console.error(`[trip] where to stay: ${e.message}`); }
   return plan;
 }
