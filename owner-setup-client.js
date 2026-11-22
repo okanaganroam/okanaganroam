@@ -3255,9 +3255,9 @@
           + field('hw' + i, T.whatsOn, e.what, { max: 60, data: 'data-hh="' + i + ':what" data-room="' + i + '" aria-describedby="hwc' + i + '"' }) + '<p class="su-count' + (hhRoom(i) - String(e.what || '').trim().length < 0 ? ' su-over' : '') + '" id="hwc' + i + '" aria-live="polite">' + h(roomText(i, e.what)) + '</p>' + (i === 0 ? ex(T.whatsOnEx) : '')
           // Distillery test 2 (Whistler, 2026-11-16): with two or more, each happy hour has its own "All year / Only some
           // months" (an après deal in winter only), the same box as before, once per happy hour.
-          + (S.happy.length > 1 ? seasonBox('happy.' + i, e.sea || (e.sea = clone(S.happySea)), fill(T.happySeasonEach || T.happySeasonH, { n: i + 1 })) + happyClosedHtml(String(i), e.sea) : '') + '</div>';
+          + (S.happy.length > 1 ? seasonBox('happy.' + i, e.sea || (e.sea = clone(S.happySea)), fill(T.happySeasonEach || T.happySeasonH, { n: i + 1 })) : '') + (S.happy.length > 1 ? happyClosedHtml(String(i), e.sea) : '') + '</div>';
       }).join('') + (S.happy.length < 6 ? '<button type="button" class="su-more" data-act="add:happy">' + h(T.addHappy) + '</button>' : '')
-        + (S.happy.length > 1 ? '' : '<div class="su-day">' + seasonBox('happy', S.happySea, T.happySeasonH) + happyClosedHtml('', S.happySea) + '</div>')
+        + (S.happy.length > 1 ? '' : '<div class="su-day">' + seasonBox('happy', S.happySea, T.happySeasonH) + '</div>') + (S.happy.length > 1 ? '' : happyClosedHtml('', S.happySea))
         // Sport fix round 16: Save on a happy hour that can't show asks once ("Save anyway" / "Change months").
         + (S.happyClosedAsk && T.happyClosedAskQ ? '<div class="su-stack" id="suHappyClosedAsk" role="group" aria-labelledby="suHappyClosedAskQ"><p class="su-q" id="suHappyClosedAskQ">' + h(T.happyClosedAskQ) + '</p>' + big('✓', T.happyClosedYes, '', false, 'happyClosedYes') + big('✎', T.happyClosedNo, '', true, 'happyClosedNo') + '</div>'
           : '<div class="su-stack">' + big('✓', T.saveHappy, '', false, 'happySave') + '</div>');
