@@ -72587,8 +72587,10 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
         if (j && j.ok) {
           // Signed in (2026-10-27): open the signed-in page, which explains what goes live straight away, with a note
           // naming anything sent from this link that just went live.
+          // The French JSON reply already gives the French address (ownerFrJson), so /fr is added only when it is
+          // missing: adding it again opened /fr/fr/owner/... and a raw "Not found" (sport test 11, 2026-11-21).
           if (j.href) {
-            var go = (location.pathname.indexOf('/fr/') === 0 ? '/fr' : '') + j.href + '?welcome=1' + (j.published && j.published.length ? '&live=' + encodeURIComponent(j.published.join(',')) : '');
+            var go = (location.pathname.indexOf('/fr/') === 0 && j.href.indexOf('/fr/') !== 0 ? '/fr' : '') + j.href + '?welcome=1' + (j.published && j.published.length ? '&live=' + encodeURIComponent(j.published.join(',')) : '');
             location.href = go; return;
           }
           ls.style.display = 'none'; document.getElementById('olsDone').classList.add('show');

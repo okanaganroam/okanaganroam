@@ -27021,6 +27021,23 @@ test('French portal (2026-10-18): every signed-in page has a French address with
   for (const p of ['/fr/owner/login', '/fr/owner/link']) assert.doesNotMatch(await (await get(p)).text(), /en anglais pour l’instant/, p);
 }));
 
+test('French portal: Créer mon compte lands on /fr/owner/account/venue/<id>, not /fr/fr/... (sport test 11, 2026-11-21)', () => withFrenchPortal(async ({ get, post, v, token }) => {
+  const page = await (await get(`/fr/owner/${token}`)).text();
+  const line = /var go = ([^;]+);/.exec(page);
+  assert.ok(line, 'the create-login redirect is on the French link page');
+  const made = await post(`/fr/owner/${token}/account`, { email: 'portail@example.com', password: 'a long enough password' });
+  assert.equal(made.status, 201);
+  assert.equal(made.body.href, `/fr/owner/account/venue/${v.id}`);
+  // Run the page's own redirect line with what the server sent back, on the French and on the English page.
+  const go = (pathname, j) => new Function('location', 'j', `return ${line[1]};`)({ pathname }, j);
+  const fr = go(`/fr/owner/${token}`, made.body);
+  assert.equal(fr, `/fr/owner/account/venue/${v.id}?welcome=1`);
+  assert.equal(go(`/owner/${token}`, { href: `/owner/account/venue/${v.id}` }), `/owner/account/venue/${v.id}?welcome=1`);
+  const landed = await get(fr, made.cookie);
+  assert.equal(landed.status, 200);
+  assert.match(await landed.text(), /Vous êtes connecté/);
+}));
+
 test('French portal (2026-10-18): forms post from French pages, messages and emails come back in French, English stays English', () => withFrenchPortal(async ({ get, post, base, v, token, token2, mails }) => {
   const made = await post(`/fr/owner/${token}/account`, { email: 'portail@example.com', password: 'a long enough password' });
   assert.equal(made.status, 201);
