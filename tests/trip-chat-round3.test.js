@@ -223,8 +223,8 @@ test('edits stick: a stop changed by chat is kept through a later re-plan; "the 
   const cheap = await chat(bodyFor(plan, 'cheaper dinner on day 1', text));
   if (cheap.j.plan) {
     const now = tc.planStops(cheap.j.plan).find((s) => s.key === dinner.key);
-    assert.equal(cheap.j.req.locks[dinner.key], now.id, 'the new dinner is a kept stop from now on');
-    const next = { ...bodyFor(cheap.j.plan, 'slower pace', text), locks: cheap.j.req.locks, plan: { text: cheap.j.req.text, seed: cheap.j.req.seed, excludeVenueIds: cheap.j.req.excludeVenueIds } };
+    assert.equal(cheap.j.req.soft[dinner.key], now.id, 'the new dinner is kept by the chat from now on (soft: never a hard lock, round 5)');
+    const next = { ...bodyFor(cheap.j.plan, 'slower pace', text), locks: cheap.j.req.locks, soft: cheap.j.req.soft, plan: { text: cheap.j.req.text, seed: cheap.j.req.seed, excludeVenueIds: cheap.j.req.excludeVenueIds } };
     const slow = await chat(next);
     if (slow.j.plan) assert.ok(tc.planStops(slow.j.plan).some((s) => s.id === now.id), `${now.name} is still there after "slower pace"`);
   }

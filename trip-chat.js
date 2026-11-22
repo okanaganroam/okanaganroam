@@ -1398,6 +1398,7 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null } = {}) {
       case 'keep': parts.push(out.plan ? fill(t.kept, { names: joinList(r.names, L) }) : fill(t.keptStays, { names: joinList(r.names, L), it: r.names.length > 1 ? t.theyStay : t.itStays })); break;
       case 'replace':
         if (r.ok && r.fresh) { parts.push(fill(t.swapped, { old: r.old.name, new: r.fresh.name, at: at(r.fresh) })); described.add(r.fresh.id); described.add(r.old.id); } else if (r.ok) parts.push(t.refine);
+        else if (!r.old) parts.push(fill(t.notFound, { what: L === 'fr' ? 'cet arrêt' : 'that stop' })); // no stop was named
         else parts.push(r.kind ? fill(t.swapFail, { kind: kindLabel(r.kind), old: r.old.name }) : fill(t.swapFailSame, { old: r.old.name }));
         break;
       case 'add':
