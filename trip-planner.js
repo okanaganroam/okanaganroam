@@ -3558,7 +3558,7 @@ const WINTER_ONLY_RE = /\b(?:snowshoe|snowshoes|snowshoeing|dog sled|dog sleddin
 function winterOnly(v) { return ['outdoor', 'tour'].includes(v.type) && (WINTER_ONLY_RE.test(v.textName || normWords(v.name)) || (v.type === 'tour' && Array.isArray(v.plannerKinds) && v.plannerKinds.includes('ski_lessons') && !v.tourYearAll)); }
 // Warm-weather outings (round 9, 2026-10-19): ice cream in January and the Speedway or a beach in November were picked.
 // From November to March they are only planned when the request names them.
-const SUMMER_ONLY_RE = /\b(?:ice cream|gelato|frozen yogurt|froyo|creamery|speedway|go karts?|gokarts?|waterslides?|water ?park|splash ?pad|mini golf|minigolf|beach|beaches|paddle ?boards?|paddle (?:centre|center|club)|sup|kayak rentals?|boat rentals?|parasail|parasailing|wakeboard|cable park|bumper boats?)\b/;
+const SUMMER_ONLY_RE = /\b(?:channel float|river float|water ?sports|sea ?doos?|jet ?skis?|ice cream|gelato|frozen yogurt|froyo|creamery|speedway|go karts?|gokarts?|waterslides?|water ?park|splash ?pad|mini golf|minigolf|beach|beaches|paddle ?boards?|paddle (?:centre|center|club)|sup|kayak rentals?|boat rentals?|parasail|parasailing|wakeboard|cable park|bumper boats?)\b/;
 const COLD_MONTHS = [11, 12, 1, 2, 3];
 // 2026-10-21: water parks, speedways, go-karts and rentals on the water close after Labour Day and open in May, so
 // October and April trips leave them out too (a late-October family plan had Splash BC and Squamish Speedway).
@@ -3583,6 +3583,44 @@ const PLACE_PART_RE = /\b(?:rv park|rv parks|rv sites?|rv resort|campground|camp
 function seasonSentences(text) {
   const lead = new RegExp(`^(?:(?:the|our|its|their|a|an|and|also|plus)\\s+)*(?:${PLACE_PART_RE.source.slice(2, -2)})\\b`);
   return String(text || '').split(/(?<=[.;!?])\s+|\n+/).map((x) => normWords(x)).filter((x) => x && !lead.test(x)).join(' . ');
+}
+// Fresh eyes (2026-11-22; Hoodoo Adventure Company was a late-November family stop with "Tours run at set times: book
+// ahead", while its own Season facts say "Fall: limited shop hours for bike rentals and shuttles" and "Winter: Snowshoe
+// rentals"): an outdoor place's researched season (data/outdoor-facts.json season and Winter line, v.outdoorSeason) is
+// read in the cold months (November to March). It is left out when
+//  - the season says it is closed now ("Closed for the season", "Closed for winter", "Closed for 2026", "off season"), or
+//  - all it does then is rentals, shuttles or its shop (no tours, no "open daily / year-round"),
+// unless the request names the place or asks for rentals, snowshoes or bikes. Researched words only; an owner's own
+// season (v.ownerSetUp && v.openMonths) always wins.
+const OUTDOOR_FACTS_CLOSED_RE = /\b(?:closed for (?:the )?(?:season|winter|off season|20\d\d)|closed for the 20\d\d season|closed (?:now|for winter)|closed october to april|closed for the off season)\b/;
+const OUTDOOR_FACTS_RENTAL_RE = /\b(?:rentals?|rent|shuttles?|shop hours|shop)\b/;
+const OUTDOOR_FACTS_RUNS_RE = /\b(?:tours?|guided|lessons?|open (?:daily|all year|year round)|year round|walking|hiking|trails? (?:free|open))\b/;
+const MONTH_ABBR = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+const OUTDOOR_FACTS_RANGE_RE = /\b(jan\w*|feb\w*|mar\w*|apr\w*|may|jun\w*|jul\w*|aug\w*|sep\w*|oct\w*|nov\w*|dec\w*)(?: \d{1,2})?(?: 20\d\d)? (?:to|through|thru|until|till) (?:(?:early|mid|late|the end of) )?(jan\w*|feb\w*|mar\w*|apr\w*|may|jun\w*|jul\w*|aug\w*|sep\w*|oct\w*|nov\w*|dec\w*)\b/;
+const OUTDOOR_FACTS_ASK_RE =/\b(?:rent\w*|snowshoe\w*|bikes?|biking|e ?bikes?|cycling|shuttles?|outfitters?)\b/;
+function outdoorFactsSeasonOff(v, ctx, month) {
+  const s = v && v.outdoorSeason;
+  if (!s || !COLD_MONTHS.includes(month) || (v.ownerSetUp && v.openMonths)) return false;
+  const asked = normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || '');
+  if ((v.textName || '').split(' ').length >= 2 && asked.includes((v.textName || '').split(' ').slice(0, 2).join(' '))) return false;
+  const season = normWords(s.season || ''), winter = normWords(s.winter || '');
+  // "Closed" is read for summer places only (never a rink or ski place waiting for winter), and not when it says it
+  // reopens in the cold months.
+  const winterPlace = (v.activities || []).some((a) => ['winter', 'skiing', 'snowshoeing'].includes(a)) || /\b(?:ski|skiing|nordic|rink|skating|snowshoe\w*|tubing|sleigh\w*|ice)\b/.test(`${v.textName || ''} ${season}`);
+  if (!winterPlace && OUTDOOR_FACTS_CLOSED_RE.test(season) && !/\breopen\w* (?:nov|dec|jan|feb|mar)/.test(season)) return true;
+  // An open season of months ("Open daily May 15 to Sept 7, 2026", "Shop open mid-April through September", "April to
+  // October") that leaves out the trip's month.
+  const r = !winterPlace ? OUTDOOR_FACTS_RANGE_RE.exec(season) : null;
+  if (r && !/\b(?:services|fees?|camping|road|gate|entrance|upkeep|parking|water|restaurant)\b/.test(season.slice(0, r.index))) {
+    const a = MONTH_ABBR.indexOf(r[1].slice(0, 3)) + 1, b = MONTH_ABBR.indexOf(r[2].slice(0, 3)) + 1;
+    // A summer season only (it starts March to July and ends April to October): "Oct 15 to Dec 31: open 6 am to 6 pm" is
+    // a park's winter hours, not its season.
+    if (a >= 3 && a <= 7 && b >= 4 && b <= 10 && a < b && (month < a || month > b)) return true;
+  }
+  // What it does in the cold months: its Winter line, and its season line unless that is about spring or summer.
+  const now = [winter, /^(?:spring|summer)\b/.test(season) ? '' : season].filter(Boolean);
+  if (!now.length || OUTDOOR_FACTS_ASK_RE.test(asked)) return false;
+  return now.every((t) => OUTDOOR_FACTS_RENTAL_RE.test(t) && !OUTDOOR_FACTS_RUNS_RE.test(t));
 }
 function offSeasonSkip(v, ctx) {
   // A named month is judged in that month, not on the planned date ("driving range in June" asked in October).
@@ -3631,6 +3669,7 @@ function offSeasonSkip(v, ctx) {
     }
   }
   if (month && COLD_MONTHS.includes(month) && !v.indoorGolf && !v.sportYearAll && (v.indoorEvidence !== 'explicit' || ['cafe', 'restaurant'].includes(v.type)) && summerOnly(v, ctx)) return true;
+  if (month && outdoorFactsSeasonOff(v, ctx, month)) return true;
   if (!month || ctx.types.has(v.type) || (v.type === 'beach' && ctx.lake) || (v.type === 'golf' && (v.indoorGolf || v.sportYearAll))) return false;
   return (OFF_SEASON_MONTHS[v.type] || []).includes(month);
 }
@@ -6853,7 +6892,9 @@ function swapWantOk(v, swap) {
   if (w) {
     if (w.types && !w.types.includes(v.type)) return false;
     if (w.feature && !(v.features && v.features[w.feature])) return false;
-    if (w.name && !w.name.test(`${v.name || ''} ${v.cuisine || ''}`)) return false;
+    // Fresh eyes (2026-11-22; Tickleberry's Downtown, "a Penticton ice cream and coffee shop", was not ice cream): a café
+    // or dessert place whose own description opens by saying what it is counts too (its first sentence only).
+    if (w.name && !w.name.test(`${v.name || ''} ${v.cuisine || ''}`) && !(v.type === 'cafe' && w.name.test(v.plannerDescription || v.description ? String(v.plannerDescription || v.description).split(/(?<=[.!?])\s/)[0] : String(v.textDesc || '').split(' ').slice(0, 20).join(' ')))) return false;
   }
   const price = Number(v.price);
   if (Number.isInteger(swap.priceMax) && !(price >= 1 && price <= swap.priceMax)) return false;
@@ -6964,7 +7005,9 @@ function swapSlotStop(result, input, day, stop, part, allStops) {
   const planEstates = new Set([...others].map((id) => estateKey(byId.get(id), estateWords)).filter(Boolean));
   const estateOk = (v) => { const k = ['winery', 'restaurant'].includes(v.type) ? estateKey(v, estateWords) : null; return !k || !planEstates.has(k); };
   const typeOk = (v) => (swap.want ? true : (v.type === swap.type || (purpose.wineryLunch && ['winery', 'restaurant'].includes(v.type)))) && swapWantOk(v, swap);
-  const cands = facts.filter((v) => typeOk(v) && estateOk(v) && !(daytimePart(part) && eveningOnlyVenue(v)) && !(purpose.wineryLunch && (tastingRoomWithRestaurant(v, facts) || wineryLunchRank(v, estateWords) < 15)) && !others.has(v.id) && v.id !== swap.id && !ctx.exclude.has(v.id) && (!towns.length || towns.includes(v.region)) && mealOk(v) && daylightOk(v) && golfOk(v) && fitsKept(v) && !offSeasonSkip(v, { ...ctx, tripDate: date || ctx.tripDate })
+  // Fresh eyes (2026-11-22): ice cream asked for in the chat (swap.want) is asked for, so the cold-month "summer only" guess
+  // (summerOnly) no longer leaves the ice cream shops out; their listed hours still decide.
+  const cands = facts.filter((v) => typeOk(v) && estateOk(v) && !(daytimePart(part) && eveningOnlyVenue(v)) && !(purpose.wineryLunch && (tastingRoomWithRestaurant(v, facts) || wineryLunchRank(v, estateWords) < 15)) && !others.has(v.id) && v.id !== swap.id && !ctx.exclude.has(v.id) && (!towns.length || towns.includes(v.region)) && mealOk(v) && daylightOk(v) && golfOk(v) && fitsKept(v) && !offSeasonSkip(v, { ...ctx, tripDate: date || ctx.tripDate, ...(swap.want === 'ice_cream' ? { queryText: `${ctx.queryText || ''} ice cream gelato creamery frozen yogurt`, requirements: { ...(ctx.requirements || {}), text: `${(ctx.requirements && ctx.requirements.text) || ''} ice cream gelato creamery frozen yogurt` } } : {}) })
     && (!skiExtra || (SKI_EXTRA_RE.test(v.textName || '') && (!skiDark || SKI_LIT_RE.test(v.textName || '')))) && purpose.ok(v)
     && eligible(v, ctx, false) && hoursFit(v, win, weekday).status !== 'closed' && !(date && seasonClosedOnTrip(v, { date })) && tripRequirements.venueAllowed(v, input.requirements, day.day, input.tripDate))
     .map((v) => { const km = neighbours.map((n) => kmBetween(n, v)).filter((x) => x != null); return { v, score: scoreVenue(v, ctx).score + purpose.bonus(v) + openAtKept(v) - (km.length ? Math.min(...km) * 1.5 : 6) }; });
@@ -7974,7 +8017,28 @@ function v4Polish(result, input) {
   try { refreshPlanCounts(result, input); } catch (e) { /* counts are cosmetic */ }
   return result;
 }
-function planTripOnce(input) { const anchor = input && input.nearAnchor; input = withNearAnchor(withTownMountain(v4Input(input))); const result = dedupeNotes(withoutRepeatedAlternates(planTripUnchecked(input))); if (input && input.v4) v4Polish(result, input); addSuggestedTimes(result, input || {}); labelLateLunches(result); relabelDayparts(result, input || {}); labelSkiEveningStops(result); addBeachSeasonNotes(result, input || {}); if (anchor && anchor.name && Array.isArray(result.notes)) result.notes.unshift(`Places within about ${anchor.km || NEAR_ANCHOR_KM} km of ${anchor.name}.`); namedLeftOutNotes(result, input || {}); tooYoungNotes(result, input || {}); withdrawMetFocusWarnings(result, input || {}); coldWaterNote(result, input || {}); kidsUntilFlags(result, input || {}); return addStory(result, input || {}); }
+// Fresh eyes (2026-11-22: after a re-plan with dates a day called "Penticton" had all five stops in Summerland): a day is
+// called by the towns its stops are in, most stops first (a town with a single stop is named only when it is the only
+// one). A day with no place stops keeps its town. Only with input.v4.
+function v4DayTownLabels(result, input) {
+  if (!result || !['multi_day', 'day_plan'].includes(result.kind)) return result;
+  const labels = (input && input.labels && input.labels.regions) || {};
+  for (const day of result.days || []) {
+    const count = new Map();
+    for (const s of day.stops || []) { const r = s && s.venue && s.venue.region; if (r) count.set(r, (count.get(r) || 0) + 1); }
+    if (!count.size) continue;
+    const ranked = [...count.entries()].sort((a, b) => b[1] - a[1]).map(([r, n]) => ({ r, n }));
+    const towns = ranked.filter((x, i) => i === 0 || x.n >= 2).map((x) => x.r);
+    const had = [].concat(day.regions || day.region || []).filter(Boolean);
+    // The label already names the main town and no town without a stop: kept as it is.
+    if (had.includes(towns[0]) && had.every((r) => count.has(r))) continue;
+    day.region = towns[0];
+    if (towns.length > 1) day.regions = towns; else delete day.regions;
+    day.regionLabel = listText(towns.map((r) => labels[r] || r));
+  }
+  return result;
+}
+function planTripOnce(input) { const anchor = input && input.nearAnchor; input = withNearAnchor(withTownMountain(v4Input(input))); const result = dedupeNotes(withoutRepeatedAlternates(planTripUnchecked(input))); if (input && input.v4) { v4Polish(result, input); v4DayTownLabels(result, input); } addSuggestedTimes(result, input || {}); labelLateLunches(result); relabelDayparts(result, input || {}); labelSkiEveningStops(result); addBeachSeasonNotes(result, input || {}); if (anchor && anchor.name && Array.isArray(result.notes)) result.notes.unshift(`Places within about ${anchor.km || NEAR_ANCHOR_KM} km of ${anchor.name}.`); namedLeftOutNotes(result, input || {}); tooYoungNotes(result, input || {}); withdrawMetFocusWarnings(result, input || {}); coldWaterNote(result, input || {}); kidsUntilFlags(result, input || {}); return addStory(result, input || {}); }
 // Planner (2026-10-27): a short outing's stop is called by the part of the day it is timed in (the audit saw Railside
 // Brewing at 7:45 PM as "afternoon", Barley Mill at 11 AM as "late" and CedarCreek at noon as "morning"). Itineraries and
 // outings only (a day plan's parts are its slots); meal stops keep theirs, and a label that was the old part's name
@@ -10498,7 +10562,8 @@ function scheduleNotes(result, ctx) {
 module.exports = {
   SWAP_WANTS, swapWantOk,
   // Build My Trip V4 (2026-11-20)
-  v4Input, v4Polish, v4CasualDinner, v4FillerSkip, v4OffTheme, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
+  outdoorFactsSeasonOff,
+  v4Input, v4Polish, v4DayTownLabels, v4CasualDinner, v4FillerSkip, v4OffTheme, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
   // Tour test 17 (Whistler, 2026-11-18)
   regionMinutes, PICKUP_ASK_RE, KIND_SEASON_ASK_WORDS, kindSeasonOff, tourTripFor, normWords,
   dropNameOnlyTypes,

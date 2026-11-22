@@ -1321,8 +1321,13 @@ function estimateDaylight(date,location){
  const cosine=Math.cos(rad(90.833))/(Math.cos(rad(location.lat))*Math.cos(dec))-Math.tan(rad(location.lat))*Math.tan(dec);
  if(Math.abs(cosine)>1)return null;
  const angle=Math.acos(cosine)*180/Math.PI;
- const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Vancouver',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(noon);
- const value=t=>Number(parts.find(p=>p.type===t).value),offset=value('hour')*60+value('minute')-720;
+ // Fresh eyes (2026-11-22): B.C. is on fixed UTC-7 from November 1, 2026 (no fall back; server.js BC_PERMANENT_UTC7_FROM).
+ // Runtimes whose bundled tzdata predates the change (Node's 2026a) still fell back to UTC-8 here, so the same plan showed
+ // sunset an hour apart on two machines. From that date the offset is UTC-7 whatever the tzdata says.
+ let offset;
+ if(noon.getTime()>=Date.UTC(2026,10,1,9,0))offset=-420;
+ else{const parts=new Intl.DateTimeFormat('en-GB',{timeZone:'America/Vancouver',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(noon);
+  const value=t=>Number(parts.find(p=>p.type===t).value);offset=value('hour')*60+value('minute')-720;}
  return {sunriseMinutes:Math.ceil(720-4*(location.lng+angle)-eq+offset),sunsetMinutes:Math.floor(720-4*(location.lng-angle)-eq+offset)};
 }
 // Conservative timing from an outdoor listing, not independently verified.
@@ -1618,6 +1623,11 @@ REQUEST_SYNONYMS.push([/\bdisques?[- ]golf\b/gi, 'disc golf']);
 REQUEST_SYNONYMS.push([/\b(at|around|about|by|from)\s+([1-9])(?::([0-5]\d))?(?![\d:])(?!\s*(?:a\.?m\b|p\.?m\b|o.?clock\s*(?:in the morning)?|h\b|hours?\b|hrs?\b|minutes?\b|mins?\b|days?\b|people\b|kids\b|of us\b|holes?\b|trous\b|km\b|years?\b|yr\b|\$|dollars?\b|%))/gi,(m,w,h,mm,off,str)=>(Number(h)>=4&&Number(h)<=7&&!/\b(?:coffee|breakfast|brunch|caf[eé]|latte|espresso|morning|mornings|sunrise|early|start\w*|begin\w*|leav\w*|depart\w*|opens?|first tee|tee times?|wake|up)\b[^.;!?]{0,30}$/i.test(str.slice(Math.max(0,off-40),off))&&!/^\s*(?:in the morning|du matin)/i.test(str.slice(off+m.length))?`${w} ${h}:${mm||'00'} pm`:m)]);
 REQUEST_SYNONYMS.push([/,?\s*\b(?:right |straight |just )?after (?:work|my shift|the office|school)\b/gi,(m,off,str)=>(/\b(?:at|around|about|from)\s+(?:1[0-2]|[1-9])(?::[0-5]\d)?\s*(?:am|pm)\b/i.test(str)?' ':' at 5:30 pm ')]);
 REQUEST_SYNONYMS.push([/\bhit (?:some|a few|a bucket of) balls\b/gi,'driving range']);
+// Fresh eyes (2026-11-22; "we love wine and good food, no driving after wineries" planned no winery at all): not driving
+// after the tastings is how they get around (a ride or a wine tour), never a car-free trip and never "no wineries". The
+// wineries stay asked for; the drinks words go (the travel agent chat offers the wine tour).
+const NO_DRIVE_AFTER_DRINKS_RE=/,?\s*\b(?:but\s+|and\s+)?(?:no|not|never|avoid|without|(?:we |i )?(?:don'?t|do not|won'?t|will not|can'?t|cannot)(?: want to| wanna| plan to)?(?: be)?)\s+(?:any\s+)?(?:driving|drive|car)\s+(?:after|between|to and from|from|home from|back from)\s+(?:the\s+|our\s+|any\s+)?(wineries|winery|vineyards?|wine tastings?|tastings?|wine|breweries|brewery|brewpubs?|taprooms?|distilleries|distillery|cideries|cidery|drinks|drinking|cocktails|bars?|pubs?)\b|,?\s*\b(?:no|not)\s+(?:drinking and driving|drink(?:ing)? (?:and|&) driv\w+)\b/gi;
+REQUEST_SYNONYMS.push([NO_DRIVE_AFTER_DRINKS_RE,(m,what)=>{const w=String(what||'').toLowerCase();return /win|vineyard|tasting/.test(w)?', wineries':/brew|taproom/.test(w)?', breweries':/distill/.test(w)?', distilleries':/cider/.test(w)?', cideries':' ';}]);
 function tripRequestSynonyms(text){let out=String(text||'');const walksNegated=WALKS_NEGATED_RE.test(out);for(const [re,w] of REQUEST_SYNONYMS)out=out.replace(re,walksNegated&&w==='relaxed easy walks'?'relaxed':w);
  // "Best brunch then a walk" (2026-10-25): "best" ranks a list; in a request with several parts it emptied the plan.
  if(/\b(?:then|followed by|after that|afterwards)\b/i.test(out))out=out.replace(/\b(?:the )?(?:best|top|top rated|highest rated)\s+(?=\w)/gi,'');
