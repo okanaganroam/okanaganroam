@@ -45,6 +45,7 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
 .t3-v4.tw-workspace .v4-agent {box-shadow:none;background:#f3f0e7;padding:12px;margin-bottom:18px;font-size:13px;}
 .t3-v4.tw-workspace .v4-chat-reply {max-height:36dvh;font-size:14px;line-height:1.5;}
 .t3-v4.tw-workspace .v4-chat-you {white-space:normal;padding:12px;background:#fbe8d9;border-radius:16px;margin-bottom:12px;font-weight:600;}
+.t3-v4.tw-workspace .v4-chat-you:empty {display:none;}
 .t3-v4.tw-workspace .v4-chat-agent {background:#edf1e2;border-radius:16px;padding:12px;margin-bottom:18px;font-weight:600;}
 .t3-v4.tw-workspace .v4-chat-undo {display:block;margin-top:7px;min-height:32px;}
 .t3-v4.tw-workspace .v4-chat-undo[hidden] {display:none;}
@@ -75,7 +76,8 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
  .t3-v4.tw-workspace .v4-bar.has-chat {position:fixed;top:auto;bottom:0;left:0;right:0;width:100%;max-height:42dvh;border-radius:18px 18px 0 0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -5px 24px #1b303c12;z-index:100;}
  .t3-v4.tw-workspace .tw-chat-title,.t3-v4.tw-workspace .tw-chat-hint,.t3-v4.tw-workspace .v4-chat-you {display:none;}
  .t3-v4.tw-workspace .v4-chat-reply {max-height:130px;font-size:13px;}
- .t3-v4.tw-workspace .v4-chat-agent {padding:8px 12px;margin-bottom:6px;}
+ .t3-v4.tw-workspace .v4-chat-you:empty {display:none;}
+.t3-v4.tw-workspace .v4-chat-agent {padding:8px 12px;margin-bottom:6px;}
  .t3-v4.tw-workspace .v4-chat-undo {display:inline-block;min-height:32px;margin-left:8px;}
  .t3-v4.tw-workspace .v4-chat-form {margin-top:0;}
  .t3-v4.tw-workspace .v4-chat-form input {font-size:16px;}
