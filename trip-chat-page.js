@@ -217,6 +217,9 @@ function chatClientSrc(d) {
     var inEl = document.getElementById('v4ChatIn');
     var body = { lang: lang() === 'fr' ? 'fr' : 'en', plan: chatPlanBody(), locks: state.locks, removed: Object.keys(state.removed), stops: chatStops() };
     var evs = chatEventIds(); if (evs.length) body.events = evs;
+    // Round 5: each day's own date (so "Friday" is the right day) and the stops the chat added or changed earlier.
+    try { var dd = ((state.last && state.last.days) || []).map(function(d){ return /^\d{4}-\d{2}-\d{2}$/.test(String(d && d.date || '')) ? d.date : null; }).slice(0, 7); if (dd.some(Boolean)) body.dayDates = dd; } catch (e) { /* none */ }
+    if (chat.soft && Object.keys(chat.soft).length) body.soft = chat.soft;
     var sd = typeof t3StayData === 'function' && !chat.noStay ? t3StayData() : null; if (sd && sd.chosen && sd.chosen.region) body.stayTown = sd.chosen.region; if (sd && sd.chosen && sd.chosen.id > 0) body.stayId = sd.chosen.id;
     if (chip) body.chip = chip; else body.message = message;
     function done(){
@@ -234,7 +237,7 @@ function chatClientSrc(d) {
         // Fix round (2026-11-22): a new plan only when a stop changed ("The plan already fits that" changes nothing and
         // shows no Undo); the place to stay alone comes back as stayBlock and never touches the stops.
         if (j.plan && j.req && changed.length) {
-          state.text = j.req.text; state.seed = j.req.seed; state.overrides = j.req.overrides || {}; state.exclude = (j.req.excludeVenueIds || []).slice(); state.locks = j.req.locks || {};
+          state.text = j.req.text; state.seed = j.req.seed; state.overrides = j.req.overrides || {}; state.exclude = (j.req.excludeVenueIds || []).slice(); state.locks = j.req.locks || {}; chat.soft = j.req.soft || {};
           state.removed = {}; v4.gone = {}; state.last = j.plan;
           state.lastReq = { seed: j.req.seed, overrides: j.req.overrides || {}, exclude: (j.req.excludeVenueIds || []).slice(), pinned: j.req.pinned || null, avoid: j.req.avoidVenueIds || [] };
           touched = true;

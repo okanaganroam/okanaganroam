@@ -24,6 +24,10 @@ const PLANS = {
 };
 // sel: which stop(s) of the plan: { type, role, day, nth } (nth 1-based among matches)
 const CASES = [
+  // Round 5 (2026-11-23, fourth fresh-eyes test).
+  { plan: 'wine', msg: 'something more romantic for dinner', ops: [{ o: 'budget', value: 'upscale', sel: { role: 'dinner', nth: 1 } }] },
+  { plan: 'wine', msg: 'what time does the first stop open?', cant: ['info', 'other', 'unclear'] },
+  { plan: 'wine', msg: 'add a movie after dinner', ops: [{ o: 'add', kind: 'cinema', sel: { role: 'dinner', nth: 1 } }] },
   // Round 4 (2026-11-23, third fresh-eyes test): the phrases that failed live.
   { plan: 'wine', msg: 'swap dinner for pizza', ops: [{ o: 'replace', kind: 'pizza', sel: { role: 'dinner', nth: 1 } }] },
   { plan: 'wine', msg: 'add bowling in the afternoon', ops: [{ o: 'add', kind: 'bowling' }] },

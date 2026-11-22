@@ -270,7 +270,7 @@ test('mapping: "add a beach after lunch" with no free slot before dinner says so
   const full = [STOPS[0], STOPS[1], STOPS[2], { key: '1-late', id: 15, name: 'Red Rooster', type: 'winery', start: 960, badges: [], price: 2, role: '', day: 1, ref: 's5' }, STOPS[3]];
   const run = fakeRun(() => { throw new Error('should not plan'); });
   const out = tc.planTurn(ops({ o: 'add', kind: 'beach', stops: [STOPS[1]] }), ctx(run, { stops: full }));
-  assert.equal(run.calls.length, 0);
+  assert.equal(run.calls.length, 1, 'round 5: it tries the place of the stop there (the afternoon winery) first; that fails here');
   assert.equal(out.plan, null);
   assert.equal(tc.buildReply(out, { lang: 'en' }), 'There’s no free spot for a beach after lunch without dropping a stop. Remove or swap one first.');
   assert.match(tc.buildReply(out, { lang: 'fr' }), /^Pas de place libre pour une plage après le dîner/);

@@ -196,7 +196,7 @@ test('"a sunset dinner with a lake view" swaps that day\'s dinner (its slot, a p
   // The AI's "add a lake view stop" becomes the dinner swap.
   const rules = tc.rulesRead('can we get a sunset dinner with a lake view', DAY, { regions: [], regionLabels: {}, days: 1 });
   const m = tc.reconcileReads({ ok: true, cant: null, ops: [OP({ o: 'add', kind: 'lake_view' })] }, rules, 'can we get a sunset dinner with a lake view');
-  assert.deepEqual(m.fixes, ['add_to_meal_swap']);
+  assert.deepEqual(m.fixes, ['rules_specific']);
   assert.equal(m.ops[0].o, 'replace');
   // A winery with a lake view is not a dinner.
   const winery = { ...DAY[4], id: 99, name: 'Lakeview Winery', type: 'winery' };
