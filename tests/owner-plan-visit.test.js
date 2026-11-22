@@ -217,7 +217,7 @@ test('indexing: Plan your visit lines are not owner content (yet); like any live
 });
 
 test('other types: no Plan your visit section, and the field is refused (EN + FR pages)', async () => {
-  for (const t of ['golf', 'beach', 'shop', 'outdoor']) { // distilleries have the setup since 2026-11-13; tours since 2026-11-16; indoor places since 2026-11-19
+  for (const t of ['beach', 'shop', 'outdoor']) { // distilleries have the setup since 2026-11-13; tours since 2026-11-16; indoor places since 2026-11-19; golf and sport have the setup since 2026-11-20
     const v = mk(t);
     for (const lang of ['', '/fr']) {
       const html = await get(`${lang}/owner/${tokenFor(v.id)}`);

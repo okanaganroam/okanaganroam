@@ -1,0 +1,91 @@
+// Held-out Help check (sport test 6, 2026-11-20; Priya: the 631-question matrix passed, yet 11 of her 34 real questions got
+// a good answer, and one would have closed her arena on her busiest skating days). Every real owner question from sport
+// tests 1-6 and indoor tests 1-19 (tests/help-heldout-questions.js) is asked through the widget's own matcher
+// (window.__ohbBest) on the page it was asked from, with a place set up like that test's. None may land on a harmful
+// answer; every question that lands well today must keep landing well; at least 97% must land well.
+// Runs on a throwaway database (like server.test.js); the runner puts okanagan.db back afterwards.
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const fs = require('node:fs');
+const http = require('node:http');
+const vm = require('node:vm');
+
+const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
+for (const s of ['', '-wal', '-shm', '-journal']) { try { fs.unlinkSync(DB_FILE + s); } catch (e) { /* not there */ } }
+process.env.ENRICHMENT_ADMIN_TOKEN = 'help-heldout-admin-token';
+delete process.env.BREVO_API_KEY;
+const app = require('../server.js');
+const H0 = require('./help-heldout-questions.js');
+// Sport tests 8-10 (2026-11-21): Marg's, Gord's and Lorraine's real questions join the set.
+const S89 = require('./help-sport89-questions.js'), S10 = require('./help-sport10-questions.js');
+// Sport test 11 (2026-11-21): Geneviève's 24 (22 in French).
+const S11 = require('./help-sport11-questions.js');
+// Sport test 12 (2026-11-21): Rob's 16.
+const S12 = require('./help-sport12-questions.js');
+// Sport test 13 (2026-11-21): Gord and Linda's 22.
+const S13 = require('./help-sport13-questions.js');
+// Sport test 14 (2026-11-21): Marisol's 27.
+const S14 = require('./help-sport14-questions.js');
+// Sport test 15 (2026-11-21): Kurt's 29.
+const S15 = require('./help-sport15-questions.js');
+// Sport test 16 (2026-11-21): Nadia's 30 (her club's other course has its own listing: SRC.sport16.sister).
+const S16 = require('./help-sport16-questions.js');
+const SRC = { ...H0.SRC, ...S89.SRC, ...S10.SRC, ...S11.SRC, ...S12.SRC, ...S13.SRC, ...S14.SRC, ...S15.SRC, ...S16.SRC }, Q = [...H0.Q, ...S89.Q, ...S10.Q, ...S11.Q, ...S12.Q, ...S13.Q, ...S14.Q, ...S15.Q, ...S16.Q], KNOWN_MISS = H0.KNOWN_MISS;
+app.setVenueSubmissionTransport(async () => {});
+
+let srv, base;
+test.before(async () => { srv = http.createServer(app.server.listeners('request')[0]); await new Promise((r) => srv.listen(0, '127.0.0.1', r)); base = `http://127.0.0.1:${srv.address().port}`; });
+test.after(() => srv && srv.close());
+const get = (p) => fetch(base + p, { headers: { Connection: 'close' } }).then((r) => r.text());
+const helpBot = (html) => {
+  const m = /<script type="application\/json" id="ohbCfg">([\s\S]*?)<\/script>\s*<script>([\s\S]*?)<\/script>/.exec(html);
+  assert.ok(m, 'the page has the Help widget');
+  const stub = () => ({ addEventListener() {}, appendChild() {}, querySelector() { return null; } });
+  const ctx = { window: {}, document: { getElementById: (id) => (id === 'ohbCfg' ? { textContent: m[1] } : stub()), createElement: stub, querySelectorAll: () => [] }, setTimeout };
+  vm.createContext(ctx); vm.runInContext(m[2], ctx);
+  return { best: (q, s) => ctx.window.__ohbBest(q, s) };
+};
+const WK = Object.fromEntries(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].map((d) => [d, [['09:00', '17:00']]]));
+const SEA = { winter: '11-26:04-06', summer: '04-01:10-31' };
+
+async function botsFor(src, n) {
+  const c = SRC[src];
+  const v = app.createVenue({ name: `Heldout ${src}`, slug: `heldout-${src}`, region: 'kelowna', type: c.type, latitude: 49.88 + n / 1000, longitude: -119.49, address: `${n} Water St, Kelowna`, website: `https://example-${n}.com`, hours: JSON.stringify(WK), description: 'A fixture.' });
+  if (c.sister) app.createVenue({ name: `${c.sister} ${src}`, slug: `heldout-${src}-sister`, region: 'kelowna', type: c.type, latitude: 49.88 + n / 1000, longitude: -119.48, address: `${n} Water St, Kelowna`, hours: JSON.stringify(WK), description: 'Its sister listing.' });
+  const t = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
+  const post = (changes) => fetch(`${base}/owner/${t}/changes?from=setup`, { method: 'POST', headers: { 'Content-Type': 'application/json', Connection: 'close', Origin: base, 'X-Real-IP': `10.66.${n}.1` }, body: JSON.stringify({ changes, from_setup: true, note: '', contact_name: '', contact_email: '', company_website: '', started_at: Date.now() - 60000 }) });
+  if (c.season) assert.ok([200, 201].includes((await post({ hours: WK, open_months: SEA[c.season] || c.season })).status), `${src} season`);
+  const info = { kinds: c.kinds, length: c.length || '1-2h', book: c.book, age: c.age || 'all', year: c.season || c.year === 'seasonal' ? 'seasonal' : 'all' };
+  const r = await post({ indoor_info: info, indoor_price: c.free || c.price });
+  assert.ok([200, 201].includes(r.status), `${src} setup`);
+  const out = {};
+  for (const [page, p] of [['setup', '/setup'], ['edit', ''], ['menu', '/menu']]) out[page] = { en: helpBot(await get(`/owner/${t}${p}`)), fr: helpBot(await get(`/fr/owner/${t}${p}`)) };
+  return out;
+}
+
+test('held-out Help: real owner questions land on a good answer, never a harmful one', async () => {
+  const bots = {}; let n = 0;
+  for (const src of Object.keys(SRC)) bots[src] = await botsFor(src, ++n);
+  const harmful = [], newMiss = [], askUs = [];
+  let good = 0, choices = 0;
+  for (const [src, page, lang, q, ok, harm, screen] of Q) {
+    const r = bots[src][page][lang].best(q, screen);
+    // Sport test 15 (Dayton's Ask us, extended): not clearly sure is "Is it one of these?"; with the right answer among its
+    // three choices that is a fine outcome too (counted).
+    if (!r.id && !ok.includes('UNSURE') && r.hits.slice(0, 3).some((x) => ok.includes(x))) { choices++; good++; continue; }
+    const fine = r.id ? ok.includes(r.id) : ok.includes('UNSURE');
+    if (r.id && harm.includes(r.id)) harmful.push(`${src} "${q}" -> ${r.id}`);
+    if (fine && !(r.id && harm.includes(r.id))) good++;
+    // Sport test 13 (Dayton: answer only when sure): on a sport or golf place a weak match may become an honest Ask us
+    // (counted below), never a wrong answer.
+    else if (!r.id && !/^indoor/.test(src)) askUs.push(`${src} "${q}"`);
+    else if (!KNOWN_MISS.includes(q)) newMiss.push(`${src} "${q}" -> ${r.id || 'not sure'} (wants ${ok.join(' / ')})`);
+  }
+  assert.deepEqual(harmful, [], 'no real question may land on an answer that undoes the owner’s setup');
+  assert.deepEqual(newMiss, [], 'a question that landed well must keep landing well');
+  assert.ok(askUs.length <= 4, `Ask us in place of an answer: ${askUs.join('; ')}`);
+  assert.ok(good / Q.length >= 0.97, `held-out good ${good}/${Q.length}`);
+  assert.ok(choices <= 60, `choices ${choices}`);
+});

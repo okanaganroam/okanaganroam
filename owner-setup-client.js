@@ -163,6 +163,8 @@
     if (a === b) return fill(T.seaSpanMonth, { a: ma });
     return fill(T.seaSpanMonths, { a: ma, b: mb, de: /^[aeiouyéèêh]/i.test(ma) ? 'd’' : 'de ' });
   }
+  // Sport test 16: a saved open season (dates) and no other hours stored, on the year question (not by-booking places).
+  function seaKeepOn(){ return !!(T.yearKeepSea && S.openSea && S.openSea.from && S.openSea.to && !storedSeas().length && !noSetYear()); }
   function seaSpan(o){ var r = o && o.on ? seaOut(o) : null; return r && r.ok && r.from ? spanOf(r.from, r.to) : ''; }
   function seaLabelKind(lab){ lab = String(lab || '').toLowerCase(); return /summer|été|ete\b/.test(lab) ? 'summer' : /winter|hiver/.test(lab) ? 'winter' : ''; }
   // Brewery test 1 (Whistler, 2026-11-15): up to two "other hours" periods (a spring and a fall shoulder season). S.seaList
@@ -171,7 +173,7 @@
   function seaNamed(o){ o = o || S.sea; var si = (S.seaList || [S.sea]).indexOf(o), s0 = o.src || (CUR.hours_seasons || [])[si < 0 ? 0 : si]; return !!(s0 && seaLabelKind(s0.label) && o.kind === o.storedKind); }
   function capF(x){ x = String(x || ''); return x.charAt(0).toUpperCase() + x.slice(1); }
   // The season screen's title: "Your hours from Oct 15 to Nov 25", or "Your other hours" before any dates.
-  function seaTitle(){ if (seaNamed()) return T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer; var sp = seaSpan(S.sea); return sp ? fill(T.seasonEditQSpan, { span: sp }) : S.seaI === 2 && T.seasonEditQThird ? T.seasonEditQThird : S.seaI === 1 && T.seasonEditQSecond ? T.seasonEditQSecond : T.seasonEditQOther; }
+  function seaTitle(){ if (seaNamed()) return T.seasonEditQ[S.sea.kind] || T.seasonEditQ.summer; var sp = seaSpan(S.sea); return sp ? fill(T.seasonEditQSpan, { span: sp }) : C.sport && S.seaI === 0 && T.seaPartQ && curOpenSea() ? T.seaPartQ : S.seaI === 2 && T.seasonEditQThird ? T.seasonEditQThird : S.seaI === 1 && T.seasonEditQSecond ? T.seasonEditQSecond : T.seasonEditQOther; }
   // " (from Oct 15 to Nov 25)" after "you're closed on Mon" when only the season is closed.
   function seaWhen(o){ o = o || S.sea; if (seaNamed(o)) return fill(T.closedWarnSeason, { kind: T.seasonWord[o.kind] || T.seasonWord.summer }); var sp = seaSpan(o); return sp ? ' (' + sp + ')' : T.closedWarnOther; }
   // Two yearly spans that share a day (either may run over New Year).
@@ -310,6 +312,13 @@
   // Cocktail test 2 (2026-11-13): checked against the hours that apply in the months it runs: a summer-only happy hour
   // against the summer hours only, an all-year one against both weeks (outside either is a heads-up). A day closed in
   // those months is the closed-day heads-up's (closedWarnAny), not this one's.
+  // -> the closed-season heads-up when every month of this happy hour is outside the place's open season, else ''.
+  function happyClosedWarn(sea){
+    var os = S.openSea; if (!T.happyClosedSea || !os || !os.from || !os.to || !sea || !sea.on) return '';
+    var H = seaMonths(sea), O = seaMonths(seaFrom(os.from, os.to));
+    for (var i = 1; i <= 12; i++) if (H[i] && O[i]) return '';
+    return fill(T.happyClosedSea, { a: mdLabel(os.from), b: mdLabel(os.to) }) + (partTimesOn() && T.happyClosedSeaPart ? ' ' + T.happyClosedSeaPart : '');
+  }
   function hoursWarn(e){ return timesWarn(e.from, e.close ? null : e.to, e.days, happySeaOf(e)); }
   // Distillery test 2 (Whistler, 2026-11-16): with two happy hours or more each has its own months (e.sea); one alone
   // keeps the screen's one box (S.happySea), as before.
@@ -392,10 +401,24 @@
     return out.length ? fill(T.kitchenLate, { days: daysInFull(out) }) : '';
   }
   function splitOn(key, e){ return key === 'happy' && !!T.happySplitBtn && !!hoursWarn(e) && happySplitGap(e); }
-  function warnHtml(key, i, e){ var t = warnOf(key, e); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'
+  // Sport test 16 (2026-11-21; Nadia's grill deal, Nov–Mar, at a course closed Nov–Mar, never showed): a happy hour whose
+  // months fall wholly in the closed season says so first, in plain words.
+  // Sport fix round 16 (2026-11-21; sport test 17: Marlene's heads-up sat 800 px above the month chips, under the day chips,
+  // and she never saw it): the closed-season heads-up sits right under the month chips (happyClosedHtml), not here.
+  function warnShown(key, e){ return warnOf(key, e); }
+  // The closed-season heads-up under a happy hour's month chips: i '' for the screen's one box, else that happy hour's.
+  function happyClosedHtml(i, sea){ var t = happyClosedWarn(sea); return '<p class="su-hint su-closedwarn" id="suHappyClosed' + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'; }
+  // Every happy hour on the screen runs only in the closed months (nothing it saves can show).
+  function happyAllClosed(){ return !!(S.happy && S.happy.length) && S.happy.every(function(e){ return !!happyClosedWarn(happySeaOf(e)); }); }
+  function warnHtml(key, i, e){ var t = warnShown(key, e); return '<p class="su-hint su-closedwarn" id="suWarn' + key + i + '" role="status"' + (t ? '' : ' hidden') + '>' + h(t) + '</p>'
     + (key === 'happy' && T.happySplitBtn ? '<div class="su-samerow" style="margin:0 0 8px"><button type="button" class="su-toggle" id="suSplitHours' + i + '" data-act="go:hours:edit"' + (splitOn(key, e) ? '' : ' hidden') + '>' + h(T.happySplitBtn) + '</button></div>' : ''); }
   function warnRefresh(){
-    ['specials', 'nights', 'happy'].forEach(function(key){ (S[key] || []).forEach(function(e, i){ var n = el('suWarn' + key + i); if (!n) return; var t = warnOf(key, e); n.textContent = t; n.hidden = !t; var b = key === 'happy' && el('suSplitHours' + i); if (b) b.hidden = !splitOn(key, e); }); });
+    ['specials', 'nights', 'happy'].forEach(function(key){ (S[key] || []).forEach(function(e, i){ var n = el('suWarn' + key + i); if (!n) return; var t = warnShown(key, e); n.textContent = t; n.hidden = !t; var b = key === 'happy' && el('suSplitHours' + i); if (b) b.hidden = !splitOn(key, e); }); });
+    // -> the closed-season heads-up that has just appeared (to scroll it into view), or null.
+    var shown = null;
+    [['', S.happySea]].concat((S.happy || []).map(function(e, i){ return [String(i), e.sea]; })).forEach(function(x){
+      var n = el('suHappyClosed' + x[0]); if (!n || !x[1]) return; var t = happyClosedWarn(x[1]), was = !n.hidden; n.textContent = t; n.hidden = !t; if (t && !was) shown = n; });
+    return shown;
   }
 
   // ---------- State ----------
@@ -433,7 +456,11 @@
   var SPORTS_RE = /\b(?:sports?|tvs?|televisions?|big[- ]screens?|the game|game day|game night|hockey night|playoffs?|nhl|nfl|cfl|ufc|pay[- ]per[- ]view)\b/i;
   function sportsAt(){ var t = String(S.story || ''), m = SPORTS_RE.exec(t); return m ? [m.index, m.index + m[0].length] : null; }
   // A short quote around it ("…and the game on"), for the gentle prompt.
+  // Sport test 2 (2026-11-20; Trevor's golf simulator: "Your description still mentions sports… Fix my description", with no
+  // Sports TV tile to answer it): the nudge is only for a place whose setup offers the Sports TV tile (pubs, restaurants…).
+  function sportsTileHere(){ return (C.offerGroups || []).some(function(g){ return (g.keys || []).indexOf('sports_tv') >= 0; }); }
   function sportsBit(){
+    if (!sportsTileHere()) return '';
     var at = sportsAt(); if (!at) return ''; var t = String(S.story), a = Math.max(0, at[0] - 24), b = Math.min(t.length, at[1] + 24);
     while (a > 0 && /\S/.test(t.charAt(a - 1))) a--; while (b < t.length && /\S/.test(t.charAt(b))) b++;
     return (a > 0 ? '…' : '') + t.slice(a, b).trim().replace(/[.,;:!]+$/, '') + (b < t.length ? '…' : '');
@@ -619,6 +646,9 @@
   var WI = clone(CUR.winery_info || {});
   // Tours (2026-11-16): their own answers (venue_tour_info), read here so the Hours step's "By booking only" can use them.
   var TI = clone((INDOOR ? CUR.indoor_info : CUR.tour_info) || {});
+  // Sport test 7 (test 4 #10; a golf course's new days started at 10 AM – 5 PM): an outdoor sport kind's new day starts
+  // at its usual daylight hours (a course's first to last tee), never a shop's 10 to 5.
+  if (C.sport) { var SPORT_DAY_NEW = { golf: ['07:00', '19:00'], range: ['08:00', '20:00'], discgolf: ['07:00', '21:00'], bike: ['09:00', '20:00'], skatepark: ['08:00', '21:00'], courts: ['07:00', '21:00'], skischool: ['08:30', '16:00'] }; var mk0 = ((TI.kinds || [])[0]) || C.sportMain || ''; if (SPORT_DAY_NEW[mk0]) DAY_NEW = SPORT_DAY_NEW[mk0]; }
   S.wine = {
     food: WI.food || '', rname: (WI.restaurant || {}).name || '', rwhen: (WI.restaurant || {}).when || '',
     fee: CUR.tasting_fee == null ? null : CUR.tasting_fee, feeOther: false, waived: WI.waived || '',
@@ -698,7 +728,8 @@
     var k0 = (S.tour.kinds || [])[0];
     if (!k0) return;
     if ((!S.tour.length || S.tour.lengthGuessed) && !TI.length && (C.kindLength || {})[k0]) { S.tour.length = C.kindLength[k0]; S.tour.lengthGuessed = true; }
-    if ((!S.tour.book || S.tour.bookGuessed) && !TI.book && (C.kindBook || {})[k0]) { S.tour.book = C.kindBook[k0]; S.tour.bookGuessed = true; }
+    // Sport test 2: research's own walk-in words first ("Walk-ins welcome; booking ahead recommended" -> busy), every kind.
+    if ((!S.tour.book || S.tour.bookGuessed) && !TI.book && (C.researchBook || (C.kindBook || {})[k0])) { S.tour.book = C.researchBook || C.kindBook[k0]; S.tour.bookGuessed = true; }
     // Indoor test 12 (2026-11-19): research's price pre-fills only for the kind it names (a yoga drop-in, a museum's adult
     // admission); another main kind picked takes its own, or an empty box.
     if (C.researchFeeKinds && !S.tour.free && (S.tour.price == null || S.tour.priceGuessed) && CUR.indoor_price == null) { var rf = C.researchFeeKinds[k0]; if (typeof rf === 'number') { S.tour.price = rf; S.tour.priceGuessed = true; } else if (S.tour.priceGuessed) { S.tour.price = null; S.tour.priceGuessed = false; } }
@@ -812,7 +843,8 @@
       // who it's for; with Per room or group on, the number at the start is the price.
       if (INDOOR && !fw) {
         var pr = indoorPerRead(lw0 ? lw0.words + ' ' + x : x); S.tour.ptext = xTyped;
-        if (pr.per && S.tour.perTapped !== 'person') { S.tour.perAuto = S.tour.per !== pr.per || S.tour.perAuto; S.tour.per = pr.per; }
+        // Sport (2026-11-20): no Per room or group choice (a golf fee is per person; a bay's hour is in the kind's words).
+        if (pr.per && S.tour.perTapped !== 'person' && !C.sport) { S.tour.perAuto = S.tour.per !== pr.per || S.tour.perAuto; S.tour.per = pr.per; }
         else if (!pr.per && S.tour.perAuto) { S.tour.per = ''; S.tour.perAuto = false; }
         if (S.tour.per) { S.tour.perMin = pr.min; S.tour.perMax = pr.max; var nn = tourPriceNumber(x); S.tour.price = nn == null ? (String(x).trim() ? NaN : null) : nn; S.tour.priceFirst = false; }
         S.tour.perWords = pr.per;
@@ -1031,7 +1063,53 @@
     var md = function(d){ var m = 11; while (m > 0 && CUM[m] > d) m--; return pad2(m + 1) + '-' + pad2(d - CUM[m] + 1); };
     return { from: md(hit[0]), to: md(hit[hit.length - 1]) };
   }
+  // Sport test 11 (2026-11-21; Geneviève's winter simulator hours, Jan 5 – Mar 31, saved with a ✓ outside her Apr 3 – Oct 31
+  // season and showed nowhere): the days of a stretch of other hours that fall outside the open season, and the shortest
+  // season that covers both. Every kind. -> { out: true|false, ext: { from, to } }
+  function seaOutside(per, sea){
+    if (!per || !sea || !/^\d{2}-\d{2}$/.test(per.from || '') || !/^\d{2}-\d{2}$/.test(per.to || '')) return { out: false };
+    var CUM = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+    var doy = function(md){ return CUM[+md.slice(0, 2) - 1] + Math.min(+md.slice(3), 31) - 1; };
+    var len = function(a, b){ return (doy(b) - doy(a) + 365) % 365 + 1; };
+    var out = false, i = doy(per.from), n = len(per.from, per.to);
+    for (var k = 0; k < n; k++) { var md = (function(d){ var m = 11; while (m > 0 && CUM[m] > d) m--; return pad2(m + 1) + '-' + pad2(d - CUM[m] + 1); })(i); if (!mdInRange(md, sea.from, sea.to)) { out = true; break; } i = (i + 1) % 365; }
+    if (!out) return { out: false };
+    var c = [{ from: per.from, to: sea.to }, { from: sea.from, to: per.to }, { from: per.from, to: per.to }].filter(function(x){ return mdInRange(sea.from, x.from, x.to) && mdInRange(sea.to, x.from, x.to) && mdInRange(per.from, x.from, x.to) && mdInRange(per.to, x.from, x.to); });
+    c.sort(function(x, y){ return len(x.from, x.to) - len(y.from, y.to); });
+    // Sport test 12 (2026-11-21; Rob's pro shop, Dec 1–23, after an Apr 1 – Oct 31 season: the green "Yes" would have opened
+    // the whole course every day of November at the usual hours): widening the season is offered only when the stretch
+    // touches it (starts in it or the day after it ends, or ends in it or the day before it starts), and has no label of
+    // its own (a "Pro shop" or "Simulator" stretch is another part of the place). Then the added days are exactly the
+    // stretch's own days outside the season, at the stretch's own hours.
+    var nextMd = function(md){ var d = (doy(md) + 1) % 365, m = 11; while (m > 0 && CUM[m] > d) m--; return pad2(m + 1) + '-' + pad2(d - CUM[m] + 1); };
+    var touches = mdInRange(per.from, sea.from, sea.to) || mdInRange(per.to, sea.from, sea.to) || nextMd(sea.to) === per.from || nextMd(per.to) === sea.from;
+    if (!touches || (per.label && String(per.label).trim()) || !c[0]) return { out: true, ext: null };
+    var add = mdInRange(per.from, sea.from, sea.to) ? { from: nextMd(sea.to), to: per.to } : { from: per.from, to: mdInRange(per.to, sea.from, sea.to) ? (function(){ var d = (doy(sea.from) + 364) % 365, m = 11; while (m > 0 && CUM[m] > d) m--; return pad2(m + 1) + '-' + pad2(d - CUM[m] + 1); })() : per.to };
+    return { out: true, ext: c[0], add: add };
+  }
+  // Sport test 14 (2026-11-21; Marisol: season Mar 15 – Oct 31, the Mar + Apr chips at 8–6 got "these hours would show
+  // nowhere", and its main button would have dropped Mar 15 – Apr 30, which is in season): a stretch's days split into the
+  // runs inside the open season and the runs outside it, in the stretch's own order. -> { ins: [{ from, to }], outs: [...],
+  // edge: true when every day outside is in the season's own first or last month (a month chip the season only partly
+  // covers: clipped to the season without a question) }
+  function seaClip(per, sea){
+    if (!per || !sea || !/^\d{2}-\d{2}$/.test(per.from || '') || !/^\d{2}-\d{2}$/.test(per.to || '')) return { ins: [], outs: [], edge: false };
+    var CUM = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+    var doy = function(md){ return CUM[+md.slice(0, 2) - 1] + Math.min(+md.slice(3), 31) - 1; };
+    var mdOf = function(d){ var m = 11; while (m > 0 && CUM[m] > d) m--; return pad2(m + 1) + '-' + pad2(d - CUM[m] + 1); };
+    var n = (doy(per.to) - doy(per.from) + 365) % 365 + 1, i = doy(per.from), ins = [], outs = [], cur = null;
+    for (var k = 0; k < n; k++) {
+      var md = mdOf(i), inS = mdInRange(md, sea.from, sea.to), L = inS ? ins : outs;
+      if (cur && cur.inS === inS) cur.r.to = md; else { cur = { inS: inS, r: { from: md, to: md } }; L.push(cur.r); }
+      i = (i + 1) % 365;
+    }
+    var ma = sea.from.slice(0, 2), mb = sea.to.slice(0, 2);
+    var edge = ins.length === 1 && outs.length > 0 && outs.every(function(r){ var a = r.from.slice(0, 2), b = r.to.slice(0, 2); return a === b && (a === ma || a === mb); });
+    return { ins: ins, outs: outs, edge: edge };
+  }
+  function curOpenSea(){ return S.openTouched ? S.openSea : openSeaOf(CUR.open_months); }
   S.openSea = openSeaOf(CUR.open_months); S.openTouched = false;
+  S.partTimes = String(((CUR.visit_rows || {}).part_times) || '').split(/\s*;\s*/).filter(Boolean).join('\n');
   // Seasonal hours (pub test 6, 2026-11-10): the first stored set, as its months and its own day-by-day week (it was one
   // time for the days already open in the usual week, so "open daily in summer" kept Mon and Tue closed). Stored the same
   // way as always (hours_seasons: { from, to, label, hours: { mon: [...], ... } }); older sets read back as they are.
@@ -1207,8 +1285,13 @@
   function thirdMonday(y, mo){ return nthMonday(y, mo, 3); }
   // Every day but `d` is marked Closed (no hours yet): copying may fill them all.
   function othersClosed(d){ var w = W(); return !DAYS.some(function(x){ return x !== d && w && w[x]; }); }
+  // Sport test 6: the hours saved before this screen have an open day (an existing page), so an unset day there is closed.
+  function savedOpenAny(){ var o = parseWeek(CUR.hours); return !!o && DAYS.some(function(x){ return !!o[x]; }); }
   // Café test 4 (2026-11-11): days the owner marked Closed on this screen. "Every open day" never fills them, even on a
   // new page with no hours yet (where it fills every other day).
+  // Sport test 12 (2026-11-21; t9–t12: a page with no hours opened the editor on Monday showing Closed): the Monday card we
+  // open on a page with no hours shows neither Open nor Closed until a tap (it reads as "Closed" only once tapped).
+  function autoMonUnset(d){ return d === 'mon' && !!S.hoursAutoMon && S.step === 'hours:edit' && !(S.closedTap || {})[S.step + 'mon'] && !DAYS.some(function(x){ return (S.week || {})[x]; }); }
   function tapClosed(d, on){ S.closedTap = S.closedTap || {}; if (on) S.closedTap[S.step + d] = true; else delete S.closedTap[S.step + d]; }
   // Indoor test 6 (2026-11-19; Priya, closed Mondays, new page with no hours): "Mon–Fri" from Tuesday opened her Monday,
   // whose card she had open, showing Closed. A closed day whose card is open (she sees it Closed) counts as marked Closed.
@@ -1227,9 +1310,11 @@
     if (staleIn(C.staleKept, line)) return false;
     if (staleIn(C.stale, line)) return true;
     var book = S.tour.book || TI.book || '', age = S.tour.age || TI.age || '';
-    return ((book === 'no' || book === 'busy') && CLASH_BOOK_RE.test(line)) || ((age === 'all' || age === '5') && CLASH_AGE_RE.test(line));
+    // Sport test 2: "19+ after 8 PM" (« 19 ans et plus après 20 h ») is all ages before then, never a clash with All ages.
+    var timedAge = /\b(?:19|18)\s*\+?\s*(?:and (?:over|older|up)\s*)?(?:ans et plus\s*)?(?:after|from|apr[èe]s|d[èe]s|à partir de)\s+\d|\b(?:adults?[- ]only|adultes seulement)\s+(?:after|apr[èe]s|d[èe]s)\s+\d/i.test(line);
+    return ((book === 'no' || book === 'busy') && CLASH_BOOK_RE.test(line)) || ((age === 'all' || age === '5') && CLASH_AGE_RE.test(line) && !timedAge);
   }
-  function copyGets(d, x){ var w = W(), open = typeof HO === 'function' ? HO() : {}; return x !== d && (!!w[x] || (othersClosed(d) && !(S.closedTap || {})[S.step + x] && !open[x])); }
+  function copyGets(d, x){ var w = W(), open = typeof HO === 'function' ? HO() : {}; return x !== d && (!!w[x] || (othersClosed(d) && !(S.closedTap || {})[S.step + x] && !(open[x] && !autoMonUnset(x)))); }
   function nthMonday(y, mo, nth){ var d = new Date(y, mo, 1); var n = 0; while (true) { if (d.getDay() === 1 && ++n === nth) return d; d.setDate(d.getDate() + 1); } }
   // Pub test 5 (2026-11-10): every BC stat holiday, not only Dec 24 to Easter Monday (Thanksgiving couldn't be entered).
   // Each one's next date from today, in date order; "This year and next" saves next year's own date (fn(year + 1): the
@@ -1334,6 +1419,11 @@
   function capFirst(t){ t = String(t || ''); return t.charAt(0).toUpperCase() + t.slice(1); }
   function musicOftenWaiting(){ return !!CUR.weekly_nights_waiting && (C.nightsOften || []).some(Boolean) && (!C.waiting || C.waiting.indexOf('*') >= 0 || C.waiting.indexOf('music') >= 0); }
   function stText(step, d){
+    // Sport test 16 (2026-11-21; Nadia's half-typed Good to know came back whole in a new tab, but her list said "not done
+    // yet"): a step with unsaved answers kept on this phone says so, after the essentials too.
+    if ((!d || d === 'none' || d === 'half') && T.stDraft && drHas(step)) return T.stDraft;
+    // Sport test 15: a price list started in the editor and not sent yet says so ("4 rates saved, not sent yet").
+    if (step === 'menu' && (d === 'none' || d === 'half') && C.menuDraftLines > 0 && T.stMenuDraft) return fill(C.menuDraftLines === 1 && T.stMenuDraft1 ? T.stMenuDraft1 : T.stMenuDraft, { n: C.menuDraftLines });
     // Winery test 1 (2026-11-12): a winery's story screen sends the story for a check but puts Known for on the page at
     // once, and "Booking and groups" puts the answers up at once while a new booking link waits: each row says both.
     if (C.winery && d === 'day' && step === 'story' && S.wine.known && T.stStoryKnown) return T.stStoryKnown;
@@ -1347,6 +1437,8 @@
     // Winery test 5 (2026-11-12): "Instagram and Facebook · we’ll add it within a day" while Instagram was already live.
     if (d === 'day' && step === 'social' && S.done.instagram === 'live' && S.done.facebook === 'day' && T.stSocialIgLive) return T.stSocialIgLive;
     if (d === 'day' && step === 'social' && S.done.facebook === 'live' && S.done.instagram === 'day' && T.stSocialFbLive) return T.stSocialFbLive;
+    // Sport fix round 16 (sport test 17: "Happy hour · on your page ✓" for a deal only in her closed months): it says so.
+    if (step === 'happy' && d === 'live' && T.stHappyClosed && happyAllClosed()) return T.stHappyClosed;
     return d === 'no' ? (T.noLabels[step] || T.st.no) : step === 'spend' && d === 'live' && !C.spendPublic && !CK ? T.stSoon : T.st[d]; }
   // Brewery test 1 (2026-11-12): a step answered "within a day" reads "on your page" once nothing it sent is still
   // pending (C.waiting: the server's list of steps with something pending now, refreshed with every save).
@@ -1501,7 +1593,7 @@
   function go(step, replace){
     var sv = /^saved:(.+)$/.exec(step);
     if (sv && !savedKept(sv[1])) { S.flash = savedText(sv[1]); S.flashStory = sv[1] === 'story' ? S.storySent || '' : ''; return after(sv[1]); }
-    var fl = S.flash || ''; S.flash = ''; S.nightUndo = null;
+    var fl = S.flash || ''; S.flash = ''; S.nightUndo = null; S.happyClosedAsk = false; S.happyClosedOk = false;
     step = entry(step); S.fresh = false;
     // Review fix (2026-11-12): saved on the way to the other language (photos sent first): she lands where she'd go next,
     // not back on the screen just saved.
@@ -1554,12 +1646,16 @@
     if (answered(step)) return '<div class="su-stack" style="margin-top:14px">' + big('➜', nextLabel(step), '', true, 'after:' + step) + '</div>';
     return '<div class="su-skip"><button type="button" class="su-link" data-act="skip:' + step + '">' + h(T.skip) + '</button></div>';
   }
-  function msgs(){ return (S.seaStaleDone ? '<p class="su-sent" id="suSeaStaleDone">' + h(S.seaStaleDone) + '</p>' : '') + (typeof seaStaleHtml === 'function' && !seaIsStep(S.step) ? seaStaleHtml() : '') + (S.nudge ? '<p class="su-error" role="alert">' + h(S.nudge) + '</p>' + (S.nudgeLink && S.nudge === T.monthsClosedOneHere ? '<p class="su-hint"><button type="button" class="su-link" data-act="go:' + S.nudgeLink + '">' + h(T.labels.closures || T.monthsClosedOneLink || '') + ' →</button></p>' : '') + (S.seaClosedNudge && S.nudge === S.seaClosedNudge && seaIsStep(S.step) ? '<div class="su-stack su-seaskip">' + big('➜', T.seasonAllClosedBtn, '', true, 'seaSkipClosed') + '</div>' : '') : '') + (S.error ? '<p class="su-error" role="alert">' + h(S.error) + '</p>' : ''); }
+  function msgs(){ return (S.seaStaleDone ? '<p class="su-sent" id="suSeaStaleDone">' + h(S.seaStaleDone) + '</p>' : '') + (typeof seaStaleHtml === 'function' && !seaIsStep(S.step) ? seaStaleHtml() : '') + (S.nudge ? '<p class="su-error" role="alert">' + h(S.nudge) + '</p>' + (S.nudgeLink && S.nudge === T.monthsClosedOneHere ? '<p class="su-hint"><button type="button" class="su-link" data-act="go:' + S.nudgeLink + '">' + h(T.labels.closures || T.monthsClosedOneLink || '') + ' →</button></p>' : '') + (S.seaClosedNudge && S.nudge === S.seaClosedNudge && seaIsStep(S.step) ? '<div class="su-stack su-seaskip">' + big('➜', T.seasonAllClosedBtn, '', true, 'seaSkipClosed') + '</div>' : '') + (S.seaOutNudge && S.nudge === S.seaOutNudge && S.seaOut ? '<div class="su-stack su-seaout" id="suSeaOut">' + (S.seaOut.keep ? big('✓', fill(T.seaOutsideKeep, { e: mdLabel(S.seaOut.keep.from), f: mdLabel(S.seaOut.keep.to) }), '', false, 'seaOutKeep') : big('✕', T.seaOutsideNo, T.seaOutsideNoSub, false, 'seaOutSkip')) + (S.seaOut.ext && S.seaOut.add ? big('✓', fill(T.seaOutsideYesExact || T.seaOutsideYes, { a: mdLabel(S.seaOut.add.from), b: mdLabel(S.seaOut.add.to), hours: S.seaOut.hours || '', place: (S.tour.kinds || [])[0] === 'golf' && T.seaPlaceGolf ? T.seaPlaceGolf : T.seaPlace || '' }), '', true, 'seaOutOpen') : '') + '</div>' : '') : '') + (S.error ? '<p class="su-error" role="alert">' + h(S.error) + '</p>' : ''); }
   // Back on a question already answered: say so, and which answer we have.
   function doneLine(step){
     var d = S.done[step]; if (!d || d === 'skip' || d === 'later') return '';
     // Never "Saved" over answers that aren't saved yet (bug-check 2026-11-12: a language switch mid-edit).
     if (pending(step)) return '';
+    // Sport test 12 (2026-11-21; Rob saved "Who can come" without tapping an age: the screen said "✓ Saved" over the
+    // pre-picked All ages, so he never knew the age was still open). An age we suggested and he never tapped is not
+    // saved: the screen says "Suggested: All ages. Tap it to confirm." instead (every kind).
+    if (step === 'offer' && INDOOR && S.tour.ageGuessed && S.tour.age && !TI.age) return '';
     // Winery test 1 (2026-11-12): a screen reached by moving on after a save already shows that save's "Saved" line, so
     // it never stacks a second "Saved. You can change it here." on top.
     if (S.flashOn && S.flashOn === S.step) return '';
@@ -1620,6 +1716,13 @@
       });
     });
   }
+  // Sport test 13 (2026-11-21; Gord's own line "Pro shop open Tue and Thu 10 to 2 in December…" lit the "Pro shop" chip,
+  // and a tap on it would have cut "Pro shop" out of his sentence): on an indoor or sport place a chip shows as picked only
+  // when she tapped it on this visit, or a sentence of the box is exactly the chip.
+  var QTAP = {};
+  function chipExact(v, t){ var k = String(t || '').toLowerCase().replace(/[\s.;:!?]+$/, '').trim(); return !!k && sentencesOf(v).some(function(x){ return x.toLowerCase().replace(/[\s.;:!?]+$/, '').trim() === k; }); }
+  // (The Groups box keeps its own rules: a size or group chip there reads her sentences, as before.)
+  function chipOn(v, t, sibs, boxId){ if (!INDOOR || boxId === 'suGroupsLine') return saysIt(v, t, sibs); return chipExact(v, t) || (!!QTAP[(boxId || '') + '|' + t] && has(v, t)); }
   // Cocktail test 3 (2026-11-14): a Groups line in sentences. A "book ahead from N" sentence (a size), and the sentences
   // that carry a fact a size chip doesn't ("Private room for 20": a room, a capacity) and so are never dropped by a tap.
   function sentencesOf(v){ return String(v || '').split(/[.;!?]+(?:\s+|$)/).map(function(x){ return x.replace(/[\s.;]+$/, '').trim(); }).filter(Boolean); }
@@ -1631,7 +1734,12 @@
   // Indoor test 2 (2026-11-19; Jordan typed "Corporate team building and birthday parties", tapped 10+, and lost his words):
   // a size chip (no t) keeps every sentence but an older size line (or a bare "Groups welcome", which the size line says
   // better: cocktail test 3); only a quick answer drops what it says itself.
-  function groupsKeep(v, t, sibs){ if (!t) return sentencesOf(v).filter(function(x){ return !isSizeLine(x) && !/^(?:(?:large|big|small) )?(?:groups?|parties) (?:are )?(?:welcome|ok|okay)(?:,? call ahead)?$|^(?:great|good) for groups$|^group[- ]friendly$|^groupes? bienvenus?$/i.test(String(x).trim()); }); return sentencesOf(v).filter(function(x){ return groupsFact(x) && !(has(x, t) || saysIt(x, t, sibs)); }); }
+  // Sport test 7 (2026-11-20; Kayla tapped 15+ and research's "groups of 16 plus get special rates" was gone): a sentence
+  // that states a size AND says something more (rates, players, a room) is a fact, never replaced by a size chip.
+  function sizeFact(x){ if (!isSizeLine(x)) return false; var rest = String(x).toLowerCase().replace(/\d+/g, ' ').replace(/[^a-zà-ÿ’']+/g, ' ').split(' ').filter(function(w){ return w && !/^(?:groups?|of|or|more|plus|and|up|over|please|book|booking|call|ahead|people|persons?|guests?|for|a|an|the|groupes?|de|ou|personnes?|réservez|réserver|à|l’avance|l'avance|avance|appelez|pour|et|svp|merci|minimum|min)$/.test(w); }); return rest.length > 0 && !(T.groupsLine && new RegExp('^' + T.groupsLine.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace('\\{n\\}', '\\d+') + '$').test(String(x).trim())); }
+  // The chip a research size sentence matches: the largest size chip at or under its number ("groups of 16 plus…": 15+).
+  function sizeFactChip(v){ var f = sentencesOf(v).filter(sizeFact)[0], m = f && /\b(\d{1,3})\b/.exec(f); if (!m) return null; var n = +m[1], best = null; GROUP_SIZES.forEach(function(z){ if (z <= n) best = z; }); return best; }
+  function groupsKeep(v, t, sibs){ if (!t) return sentencesOf(v).filter(function(x){ return (!isSizeLine(x) || sizeFact(x)) && !/^(?:(?:large|big|small) )?(?:groups?|parties) (?:are )?(?:welcome|ok|okay)(?:,? call ahead)?$|^(?:great|good) for groups$|^group[- ]friendly$|^groupes? bienvenus?$/i.test(String(x).trim()); }); return sentencesOf(v).filter(function(x){ return groupsFact(x) && !(has(x, t) || saysIt(x, t, sibs)); }); }
   // Indoor test 8 (2026-11-19; Gary): a quick answer or a size rebuilt the line from its sentences, so research's "Groups
   // welcome; private bookings" came back as "Groups welcome. Private bookings". The sentences kept, with their own
   // punctuation (";" stays ";"), then the new one.
@@ -1665,7 +1773,8 @@
     if (key && (CUR.visit_fr || {})[key]) return C.lang === 'fr' ? '' : frOnlyHint(id + 'Fr');
     var t = String(text || '');
     if (C.lang !== 'fr' || !t.trim() || !T.lineEnglishHint) return '';
-    var dropsEn = key === 'known_for' && T.knownFrDropsEn && (C.visitResearch || []).indexOf('known_for') >= 0 ? ' ' + T.knownFrDropsEn : '';
+    // Sport test 11: on an indoor or sport place the English page keeps research's line until hers is translated.
+    var dropsEn = key === 'known_for' && T.knownFrDropsEn && (C.visitResearch || []).indexOf('known_for') >= 0 ? ' ' + (INDOOR && T.knownFrKeepsEn ? T.knownFrKeepsEn : T.knownFrDropsEn) : '';
     var en = (t.match(/\b(?:the|and|with|from|our|its|of|is|for|to|on|at|only|welcome|recommended|ahead|book|booking|call|private|room|groups?|walk-ins?|dinner|lunch|brunch|menu|full|closes|winter|summer|patio|drinks?|kids|dogs|allowed|available|please)\b/gi) || []).length;
     if (!en || /\b(?:le|la|les|et|avec|nos|des|est|pour|du|au|aux|une?|groupes|bienvenus?|réserv\w*|salle|souper|dîner|seulement|terrasse|enfants|chiens)\b/i.test(t)) return '';
     return '<p class="su-hint su-enhint" id="' + id + '">' + h((noQuick && T.lineEnglishHintNoQuick ? T.lineEnglishHintNoQuick : T.lineEnglishHint) + dropsEn) + '</p>';
@@ -1675,13 +1784,45 @@
   // exGroup), so a pool is never offered grip socks and a yoga studio never a swimsuit.
   function indoorGroupOf(k, key){ var o = (T0.kindGroups || {})[k]; return (o && o[key === 'exGroup' ? 1 : 0]) || 'general'; }
   var INDOOR_CHIP_GROUP = { get: function(k){ return indoorGroupOf(k, 'chipGroup'); } };
+  // "No driving range", « pas de champ de pratique », "we don't have a pro shop": the chip's own thing, said not to be there.
+  function chipNegated(value, chip){
+    var v = ' ' + String(value || '').toLowerCase().replace(/[’']/g, '\'') + ' ';
+    if (!v.trim()) return false;
+    var base = String(chip || '').toLowerCase().replace(/[’']/g, '\'').split(':')[0]
+      .replace(/\s+(?:on site|sur place|to borrow|à emprunter|recommended|required|conseillées?|conseillés?|obligatoires?|available|disponibles?|welcome|bienvenus?|for evening play|in the evening|le soir)$/, '')
+      .replace(/^(?:free|gratuit[es]*)\s+/, '').trim();
+    if (base.length < 3) return false;
+    var esc = function(x){ return x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+'); };
+    var keys = base.split(/\s+(?:and|et|&)\s+/).filter(function(x){ return x.length > 2; });
+    var w = base.split(/\s+/); if (w.length === 2 && w[1].length > 3) keys.push(w[1]);
+    var neg = '(?:no|not|without|never|there is no|there are no|we don\'t have(?: an?)?|we do not have(?: an?)?|pas de|pas d\'|pas d’|aucune?|sans)\\s+(?:an?\\s+|any\\s+|on[- ]site\\s+|free\\s+|de\\s+)?';
+    return keys.some(function(k){ return new RegExp('(?:^|[^a-zà-ÿ])' + neg + esc(k) + '(?:s|x)?(?![a-zà-ÿ])', 'i').test(v); });
+  }
   function quick(key, boxId, value){
     var l = (T.quick || {})[key]; if (!l) return '';
     if (key === 'good_to_know' && C.indoor && (T.quick || {}).good_to_know_kinds) { var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; var lk = k0 ? T.quick.good_to_know_kinds[INDOOR_CHIP_GROUP.get(k0)] : null; if (lk && lk.length) l = lk;
+      // Sport test 8 (2026-11-21; Dayton approved): a golf course whose owner picked walk-ons, or a 9-hole one, gets the
+      // small-course chips (walk-ons only, pull carts, cash, the honour box) in place of the big-course ones. For every
+      // course, no chip that says the opposite of her answers: "Tee times recommended" never under walk-ons welcome, and
+      // "Walk-ons only" only under walk-ons welcome.
+      var gBook = (S.tour && S.tour.book) || (TI && TI.book) || '';
+      if (k0 && INDOOR_CHIP_GROUP.get(k0) === 'golf') {
+        var small = T.quick.good_to_know_kinds.golfsmall;
+        if ((gBook === 'no' || C.golfSmall) && small && small.length) {
+          l = small.slice();
+          if (gBook && gBook !== 'no') { l = l.filter(function(c){ return !/^(?:Walk-ons only|Sans réservation seulement)/i.test(c) || saysIt(value, c, l); }); var tt = (lk || [])[0]; if (tt && l.indexOf(tt) < 0 && gBook !== 'ahead') l.unshift(tt); }
+        }
+        // Sport test 10 (2026-11-21; Lorraine): nor after "No, please book a tee time" (her Booking line already says to book
+        // ahead; "recommended" said the opposite).
+        if (gBook === 'no' || gBook === 'ahead') l = l.filter(function(c){ return !/^(?:Tee times recommended|Heures de départ conseillées)$/i.test(c) || saysIt(value, c, l); });
+      }
       // Indoor test 7 (2026-11-19): "Free on the first Sunday" makes no sense when entry is always free.
       // Indoor test 17: the waiver chip says her kind's verb ("Waiver to sign before you climb").
       if (C.waiverVerb) l = l.map(function(c){ return c.replace(/before you play$/, 'before you ' + C.waiverVerb).replace(/avant de jouer$/, 'avant de ' + C.waiverVerb); });
       if (freeIndoor()) l = l.filter(function(c){ return !/first Sunday|premier dimanche/i.test(c); });
+      // Sport test 1 (2026-11-20): never a chip research's own words already say, or contradict ("Dress code: collared
+      // shirts" beside "collars not needed"), unless her line already says it.
+      if (C.gtkHide && C.gtkHide.length) l = l.filter(function(c){ return C.gtkHide.indexOf(c) < 0 || saysIt(value, c, l); });
       // Indoor test 11 (2026-11-19; Kim was asked about free parking twice): free parking is the Free parking tile in What you
       // offer, so its Good to know chip isn't offered (unless her line already says it, so she can take it out).
       l = l.filter(function(c){ return !/^(?:Free parking on site|Stationnement gratuit sur place)$/i.test(c) || saysIt(value, c, l); });
@@ -1692,16 +1833,24 @@
     // Café test 4 (2026-11-11): only quick answers that fit. A takeout window gets window answers; a café with no patio
     // isn't offered "Patio only".
     if (key === 'dogs' && C.cafe) l = S.cafe.stay.seats === 'takeout' ? T.quickDogsWindow : S.badges.patio ? l : T.quickDogsNoPatio;
+    // Sport test 8 (2026-11-21; a golf course was offered "Patio only / Inside and patio / Water bowls at the door"): a
+    // sport place's dog chips are in its main kind's words ("On the course, on a leash", "Not on the course").
+    if (key === 'dogs' && C.indoor && C.sportDogs && C.sportDogs.chips && C.sportDogs.chips.length) l = C.sportDogs.chips;
     // Breweries (2026-11-12): no "Patio only" for a taproom with no patio ticked.
     if (key === 'dogs' && C.brewery && !S.badges.patio && !S.badges.heated_patio && T.quickDogsNoPatio) l = T.quickDogsNoPatio;
     // Tour test 4 (Whistler, 2026-11-17): a tour's dog chips may show more words than they write ("On some trips (say
     // which)" puts "On some trips" in the box, and she types which).
+    // Sport test 12 (2026-11-21; Rob typed "No driving range" and was then offered "Driving range on site"): never a chip
+    // the owner's own words in the box say is not so, for every chip and kind (unless the chip's words are in the box).
+    l = l.filter(function(c){ return saysIt(value, c, l) || !chipNegated(value, c); });
     var shown = key === 'dogs' && TOUR && T.dogChipLabels && T.dogChipLabels.length === l.length ? T.dogChipLabels : l;
-    return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t, qi){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (saysIt(value, t, l) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-key="' + key + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(shown[qi]) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
+    return '<p class="su-q">' + h(T.quickLead) + '</p><div class="su-chips" role="group" aria-label="' + h(T.quickLead) + '">' + l.map(function(t, qi){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (chipOn(value, t, l, boxId) ? 'true' : 'false') + '" data-quick="' + h(t) + '" data-box="' + boxId + '" data-key="' + key + '" data-sep="' + (key === 'takeout' ? ', ' : '. ') + '">' + h(shown[qi]) + '</button>'; }).join('') + '</div><p class="su-q">' + h(T.quickOr) + '</p>';
   }
   // Tour test 2 (Whistler, 2026-11-16): Good to know stopped mid-sentence at the limit with no word. A visible counter
   // ("212 / 240") that says so at the limit; a tour's Good to know holds 240 (C.bringMax, the server's own limit).
   var BRING_MAX = C.bringMax || 180;
+  // Sport test 2: an indoor or sport place's Groups line holds 240 (C.groupsMax).
+  var GROUPS_MAX = C.groupsMax || 180;
   // Tour test 13 (Whistler, 2026-11-18; Matthias pasted a long line: the box cut it at the limit, "If we cancel b", and it
   // was saved): the boxes no longer cut a paste (their maxlength has room past the limit); at Save, text over the limit is
   // kept to its last full sentence (or word), the box shows it, and the message says where the rest goes. Nothing is saved
@@ -1750,6 +1899,12 @@
     if (new RegExp(B.waiver, 'i').test(u)) return W.waiver;
     if (book === 'no' && new RegExp(B.party, 'i').test(u.replace(/[-_/.?=&]+/g, ' '))) return W.party;
     if (B.kind === 'shows') return W.shows; if (B.kind === 'classes') return W.classes;
+    // Sport (2026-11-20): a golf course's, simulator's, lesson's or court's own button when people book ahead.
+    // Sport test 3: a bay booking link at a place with simulators among its kinds (server.js indoorBookButton).
+    var allK = (S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [];
+    if (B.bay && allK.indexOf('simgolf') >= 0 && new RegExp(B.bay.re, 'i').test(u)) return B.bay.word;
+    // Sport test 6: a walk-in sport place's link says what the kind books too (an arena's "Rent the ice"), never "Book a visit".
+    var kb = (B.kindBtn || {})[indoorMainKind()]; if (kb && (book !== 'no' || C.sport)) return kb;
     return book === 'no' ? W.visit : W.book;
   }
   function bookShowsLine(url, book){ var w = bookShowsWord(url, book); return C.bookShows && T.bookShows ? '<p class="su-hint" id="suBookShows" aria-live="polite"' + (w ? '' : ' hidden') + '>' + h(w ? fill(T.bookShows, { x: w }) : '') + '</p>' : ''; }
@@ -1786,9 +1941,18 @@
   // them. The kinds picked (or pre-picked) on What kind of place; none yet: shown as before.
   // Indoor test 2 (2026-11-19; Jordan's escape room was shown "Grip socks required"): the Good to know example follows the
   // main kind, as its chips do (owner-setup-text.js bringExKinds).
-  function indoorBringEx(){ if (!C.indoor || !T.bringExKinds) return T.bringEx; var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0]; return T.bringExKinds[INDOOR_CHIP_GROUP.get(k0)] || T.bringEx; }
+  function indoorBringEx(){ if (!C.indoor || !T.bringExKinds) return T.bringEx; var k0 = ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0];
+    // Sport test 8: a walk-on or 9-hole course's example is a small course's.
+    var bk0 = (S.tour && S.tour.book) || (TI && TI.book) || '';
+    if (k0 && INDOOR_CHIP_GROUP.get(k0) === 'golf' && (bk0 === 'no' || C.golfSmall) && T.bringExKinds.golfsmall) return bk0 === 'no' ? T.bringExKinds.golfsmall : T.bringExKinds.golfsmallbook || T.bringExKinds.golfsmall;
+    // Sport test 11 (2026-11-21): after « Non, réservez un départ » the example no longer says "Tee times recommended".
+    if (k0 && INDOOR_CHIP_GROUP.get(k0) === 'golf' && bk0 === 'ahead' && T.bringExKinds.golfahead) return T.bringExKinds.golfahead;
+    return T.bringExKinds[INDOOR_CHIP_GROUP.get(k0)] || T.bringEx; }
   // Indoor test 3 (2026-11-19; Diane, a community theatre): the main kind (the first picked, or pre-picked), and whether it
   // is a show place (live theatre, music or comedy): it is asked about tickets, and its price is its lowest regular ticket.
+  // Sport and golf (2026-11-20): the main kind's usual season's hint on the Hours step ('' for none).
+  function winterKindOnly(){ return !!C.sport && (C.kindSeasons || {})[indoorMainKind()] === 'winter'; }
+  function sportSeasonHint(){ if (!C.sport) return ''; if (T.seasonHintKind) return T.seasonHintKind; var se = (C.kindSeasons || {})[indoorMainKind()] || ''; return se === 'summer' ? (T.seasonHintSummer || '') : se === 'winter' ? (T.seasonHintWinter || '') : ''; }
   function indoorMainKind(){ if (!C.indoor) return ''; return ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0] || ''; }
   function indoorShow(){ return indoorMainKind() === 'theatre' && !!T.ibookQShow; }
   // The story and Known for examples by the main kind (owner-setup-text.js storyExKinds / knownExKinds).
@@ -1882,10 +2046,15 @@
   function statusRows(steps){
     return list(steps.map(function(s){
       var d = half(s) ? 'half' : nowSt(s, fin(s)) || 'none', k = d === 'live' || d === 'day' || d === 'no' || d === 'unsure' ? '✓' : d === 'email' ? '✉' : d === 'later' ? '🕓' : d === 'skip' ? '–' : '○';
+      // Sport fix round 16: a happy hour only in the closed months is saved but can't show: no tick.
+      if (s === 'happy' && d === 'live' && T.stHappyClosed && happyAllClosed()) k = '!';
       // Indoor test 8 (2026-11-19): with Free entry or By donation, Your prices is optional and already counts: never "not done yet".
       var optFree = s === 'menu' && (d === 'none' || d === 'skip') && freeIndoor() && T.stMenuFree;
       if (optFree) { d = 'live'; k = '✓'; }
-      return '<li class="su-li-btn"><button type="button" class="su-rowbtn" data-act="edit:' + s + '"><span class="su-k su-k-' + d + '" aria-hidden="true">' + k + '</span><span>' + h(T.labels[s]) + ' <span class="su-dim">· ' + h(optFree ? T.stMenuFree : stText(s, d)) + (s === 'music' && musicEventsLine() ? ' · ' + h(musicEventsLine()) : (s === 'music' && musicOftenLine() ? ' · ' + h(musicOftenLine()) : '')) + '</span></span><span class="su-chev" aria-hidden="true">›</span></button></li>';
+      // Sport test 12 (2026-11-21): Who can come saved with a suggested age never tapped: no ✓, "tap an age to confirm".
+      var ageOpen = s === 'offer' && INDOOR && !!S.tour.ageGuessed && !!S.tour.age && !TI.age && T.stAgeTap;
+      if (ageOpen) { d = 'none'; k = '○'; }
+      return '<li class="su-li-btn"><button type="button" class="su-rowbtn" data-act="edit:' + s + '"><span class="su-k su-k-' + d + '" aria-hidden="true">' + k + '</span><span>' + h(T.labels[s]) + ' <span class="su-dim">· ' + h(optFree ? T.stMenuFree : ageOpen ? T.stAgeTap : stText(s, d)) + (s === 'music' && musicEventsLine() ? ' · ' + h(musicEventsLine()) : (s === 'music' && musicOftenLine() ? ' · ' + h(musicOftenLine()) : '')) + '</span></span><span class="su-chev" aria-hidden="true">›</span></button></li>';
     }).join(''));
   }
   // Pub test 3 (Whistler, 2026-11-14): the spend's − and + move $2 at a time ($1 at a time was slow from $18 to $26); cafés
@@ -2004,9 +2173,15 @@
       return { kind: kind, kw: kw, w: w, range: range, head: kw + ' (' + range + ')' };
   }
   function seasonLines(){
-    return (CUR.hours_seasons || []).map(function(sz){
+    // Sport test 12 (2026-11-21; Rob's "Are these still your hours?" listed the days and May–Sep, not his Apr 1 – Oct 31
+    // season): the open season first, when there is one.
+    var sOpen = curOpenSea(), openLine = sOpen && sOpen.from && sOpen.to && T.recapSeason ? '<p class="su-sent su-seasonnow" id="suOpenSeason">' + h(fill(T.recapSeason, { a: mdLabel(sOpen.from), b: mdLabel(sOpen.to) })) + '</p>' : '';
+    return openLine + (CUR.hours_seasons || []).map(function(sz){
       if (!sz || !/^\d{2}-\d{2}$/.test(sz.from || '') || !/^\d{2}-\d{2}$/.test(sz.to || '')) return '';
       var x = seasonInfo(sz); if (!x) return '';
+      // Sport test 11: hours outside the open season show nowhere: said so, with no ✓.
+      var sNow = curOpenSea();
+      if (sNow && T.seaOutsideLine && seaOutside(sz, sNow).out) return '<p class="su-hint su-seaoutline">' + h(fill(T.seaOutsideLine, { span: x.head, hours: weekShort(x.w), a: mdLabel(sNow.from), b: mdLabel(sNow.to) })) + '</p>';
       return '<p class="su-sent su-seasonnow su-seahours">' + h(x.kind ? fill(T.seasonHoursLine, { kind: x.kw, range: x.range, hours: weekShort(x.w) }) : fill(T.seasonHoursLineSpan, { span: x.head, hours: weekShort(x.w) })) + '</p>';
     }).join('');
   }
@@ -2047,6 +2222,10 @@
   function frOnlyNamed(){
     var ks = ((S.score && S.score.frOnlyKeys) || []).filter(function(k){ return T.frLineNames && T.frLineNames[k]; });
     if (!ks.length || !T.frOnlyNamed || !C.back) return '';
+    // Sport test 11 (2026-11-21; « Ajouter la version anglaise » dropped Geneviève into the English portal): on an indoor
+    // or sport place her French lines' English is queued for her (server.js queueFrLinesTranslation), so the line says so
+    // and she stays in the French portal; nothing to tap.
+    if (INDOOR && T.frOnlyQueued) return '<p class="su-hint" id="suFrOnlyNamed">' + h(fill(T.frOnlyQueued, { list: ks.map(function(k){ return T.frLineNames[k]; }).join(', ') })) + '</p>';
     var en = String(C.back).replace(/^\/fr(?=\/)/, '') + '#' + (FR_ONLY_BOX[ks[0]] || 'visit');
     return '<p class="su-hint" id="suFrOnlyNamed">' + h(fill(T.frOnlyNamed, { list: ks.map(function(k){ return T.frLineNames[k]; }).join(', ') })) + ' <a class="su-link" id="suFrOnlyAddEn" href="' + h(en) + '" onclick="try{localStorage.setItem(\'okanaganLang\',\'en\')}catch(e){}">' + h(T.frOnlyAddEn) + '</a></p>';
   }
@@ -2070,7 +2249,9 @@
     var en = location.pathname.replace(/^\/fr(?=\/)/, '');
     // Tour test 10 (Whistler, 2026-11-18; Gord): "Leave it to us" queues the French description for us (the same queue as a
     // Facebook name), then goes back to the English setup. The link still works without the script.
-    return '<p class="su-hint" id="suFrDescEnLead" lang="en">' + h(E.lead) + ' <a class="su-link" id="suFrDescLeave" data-act="frLeave" href="' + h(en) + '">' + h(E.leave) + '</a></p>';
+    // Sport test 13 (2026-11-21): the French screen says it in French first; the English follows for her, marked English.
+    var fr = T.frDescEnLead && T.frDescEnLead !== E.lead ? T.frDescEnLead : '', frLeave = T.frDescLeave && T.frDescLeave !== E.leave ? T.frDescLeave : '';
+    return '<p class="su-hint" id="suFrDescEnLead"' + (fr ? '' : ' lang="en"') + '>' + (fr ? h(fr) + ' <span lang="en">(' + h(E.lead) + ')</span>' : h(E.lead)) + ' <a class="su-link" id="suFrDescLeave" data-act="frLeave" href="' + h(en) + '">' + (frLeave ? h(frLeave) + ' <span lang="en">(' + h(E.leave) + ')</span>' : h(E.leave)) + '</a></p>';
   }
   function frOnlyFinish(){ var noFr = !CUR.description_fr && T.frOnlyFinishNoStory; return T.frOnlyFinish && frOnlyAny() ? '<p class="su-hint" id="suFrOnlyFinish"' + (noFr ? ' data-nostory="1"' : '') + '>' + h(noFr ? fill(T.frOnlyFinishNoStory, { story: T.labels.story }) : T.frOnlyFinish) + '</p>' : ''; }
   // Indoor test 7 (2026-11-19; Robert's gallery): one source of truth with the checklist. A skipped step whose scored items
@@ -2095,7 +2276,7 @@
       if (k === 'menu' && tapOnly()) { if (C.menuKnown) return; seen[k] = true; out.push({ step: k, label: T.finishTap || T.labels[k] }); return; }
       seen[k] = true; out.push({ step: k, label: T.labels[k] });
     });
-    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k], chk = st, lab = C.lang === 'fr' ? it.fr : it.en; if (COMBO && (it.k === 'instagram' || it.k === 'facebook')) { if (socialGiven()) return; st = 'social'; lab = T.labels.social; } if (itemStep(it.k)) st = chk = itemStep(it.k); if (CLO_SUB && st === 'closures') st = chk = 'hours'; if (!st || (st === 'spend' && S.spendNotSure)) return; if (seen[st]) return addName(out, st, lab); if (chk.indexOf(':') < 0 && answered(chk) && !C.brewery) return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: lab, items: true }); });
+    ((S.score && S.score.left) || []).forEach(function(it){ var st = ITEM_STEP[it.k], chk = st, lab = C.lang === 'fr' ? it.fr : it.en; if (COMBO && (it.k === 'instagram' || it.k === 'facebook')) { if (socialGiven()) return; st = 'social'; lab = T.labels.social; } if (itemStep(it.k)) st = chk = itemStep(it.k); if (CLO_SUB && st === 'closures') st = chk = 'hours'; if (!st || (st === 'spend' && S.spendNotSure)) return; if (seen[st]) return addName(out, st, lab); if (chk.indexOf(':') < 0 && answered(chk) && !C.brewery && it.k !== 'indoor_ages') return; if (tickedBy[st] && S.badges[tickedBy[st]]) return; seen[st] = true; out.push({ step: st, label: lab, items: true }); });
     return out;
   }
   // Pub test (Whistler, 2026-11-14): at 96% only "Dietary options" was offered, though Games was open too (both are
@@ -2182,15 +2363,36 @@
   // has changed since (saved from another screen or the edit page), that answer is left as the page has it. Typed
   // boxes not read yet are kept by screen. Every storage access is in try/catch (private mode, blocked storage).
   var DRAFT_KEYS = ['week', 'sea', 'openSea', 'openTouched', 'seaTouched', 'hoursOpen', 'months', 'closures', 'extra', 'everyYear', 'holNotes', 'cuis', 'place', 'cuiTouched', 'spend',
-    'badges', 'noDogs', 'noWash', 'noWifi', 'noSports', 'noGames', 'noDiet', 'dogNote', 'story', 'visit', 'ig', 'fb', 'socNo', 'cafe', 'wine', 'brew', 'kitchen', 'minors', 'sports', 'happy', 'happySea', 'specials', 'nights', 'cp', 'tour'];
+    'badges', 'noDogs', 'noWash', 'noWifi', 'noSports', 'noGames', 'noDiet', 'dogNote', 'story', 'visit', 'ig', 'fb', 'socNo', 'cafe', 'wine', 'brew', 'kitchen', 'minors', 'sports', 'happy', 'happySea', 'specials', 'nights', 'cp', 'tour',
+    // Sport test 14: which screen the season dates came from (the hours, or the closures screen).
+    'openFrom',
+    // Sport test 15: the typed "Part of the place with its own times?" lines.
+    'partTimes'];
   var DR = { base: {}, s: {}, at: {}, last: '', restored: {} };
+  // The step screens "Carry on" may open again directly (sport test 14): the hours step's own screens.
+  var RESUME_AT = /^hours:(?:edit|year|open|season)$/;
   // True while answers kept on this device (not saved yet) are shown on the step's screens.
   function pending(step){ return S.dirty === step && !!DR.restored[step]; }
   // The same key on the English and French addresses (café test 6): switching language keeps what was typed.
   function drKey(b){ return 'suDraft:' + String(C.base).replace(/^\/fr(?=\/owner\/)/, '') + ':' + b; }
-  function drGet(b){ try { var v = window.sessionStorage.getItem(drKey(b)); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
-  function drPut(b, d){ try { window.sessionStorage.setItem(drKey(b), JSON.stringify(d)); } catch (e) {} }
-  function drDrop(b){ try { window.sessionStorage.removeItem(drKey(b)); } catch (e) {} }
+  // Sport test 15 (2026-11-21; Kurt came back through the emailed link in a new tab on Android, and his season picks and
+  // parts line were gone): kept on this device (localStorage), by the link (its token) and the step, for 7 days; this
+  // tab's sessionStorage keeps a copy (blocked or full localStorage).
+  var DR_TTL = 7 * 24 * 3600 * 1000;
+  function drGet(b){
+    var v = null, k = drKey(b);
+    try { v = window.localStorage.getItem(k); } catch (e) { v = null; }
+    if (!v) { try { v = window.sessionStorage.getItem(k); } catch (e) { v = null; } }
+    if (!v) return null;
+    var d; try { d = JSON.parse(v); } catch (e) { return null; }
+    if (!d || (d.exp && d.exp < Date.now())) { drDrop(b); return null; }
+    return d;
+  }
+  function drPut(b, d){ d.exp = Date.now() + DR_TTL; var j = JSON.stringify(d); try { window.localStorage.setItem(drKey(b), j); } catch (e) {} try { window.sessionStorage.setItem(drKey(b), j); } catch (e2) {} }
+  function drDrop(b){ try { window.localStorage.removeItem(drKey(b)); } catch (e) {} try { window.sessionStorage.removeItem(drKey(b)); } catch (e) {} }
+  // The first step with answers kept on this device and not saved yet ('' when none).
+  function drHas(b){ var d = drGet(b); return !!(d && ((d.s && Object.keys(d.s).length) || (d.boxes && Object.keys(d.boxes).length))); }
+  function drWaiting(){ for (var i = 0; i < STEPS.length; i++) { var d = drGet(STEPS[i]); if (d && ((d.s && Object.keys(d.s).length) || (d.boxes && Object.keys(d.boxes).length))) return STEPS[i]; } return ''; }
   function js(v){ return v === undefined ? '~' : JSON.stringify(v); }
   function isObj(v){ return !!v && typeof v === 'object' && !Array.isArray(v); }
   function drSnap(){ var o = {}; DRAFT_KEYS.forEach(function(k){ o[k] = S[k] === undefined ? undefined : clone(S[k]); }); return o; }
@@ -2221,11 +2423,14 @@
     if (S.leaving) return;
     var b = base(S.step); if (!isStep(b) || !DR.base[b]) return;
     // What's typed in the time and deal boxes, as the screen's own Save reads it (so "Are these your hours?" shows them).
-    try { if (S.step === 'hours:edit' || seaIsStep(S.step)) readTimes(); if (/^(happy|specials):type$|^music:yes$/.test(S.step)) readEntries(); if (C.cafe) readCafe(); if (C.winery) readWine(); if (C.brewery) readBrew(); if (TL) { readTour(); readBrew(); } } catch (e) {}
+    try { if (el('suPartTimes')) partTimesRead(); if (S.step === 'hours:edit' || seaIsStep(S.step)) readTimes(); if (/^(happy|specials):type$|^music:yes$/.test(S.step)) readEntries(); if (C.cafe) readCafe(); if (C.winery) readWine(); if (C.brewery) readBrew(); if (TL) { readTour(); readBrew(); } } catch (e) {}
     var d = drGet(b) || { s: {}, boxes: {} };
     d.s = drDiff(DR.base[b]);
     var bx = {}; Array.prototype.forEach.call(drBoxes(), function(inp){ if (inp.id === 'suCq' || !drChanged(inp)) return; var sel = drSel(inp); if (sel) bx[sel] = inp.value; });
     d.boxes = d.boxes || {}; if (Object.keys(bx).length) d.boxes[S.step] = bx; else delete d.boxes[S.step];
+    // Sport test 14 (Marisol picked her season dates, then a customer came in and the tab closed): the screen she was on,
+    // so "Carry on" opens it again with her picks.
+    d.at = S.step; d.hist = S.hist.filter(function(x){ return base(x) === b; }).slice(-4);
     if (!Object.keys(d.s).length && !Object.keys(d.boxes).length) return drDrop(b);
     drPut(b, d);
   }
@@ -2297,7 +2502,7 @@
       var nxt = firstOpen();
       // Welcome back: the button first, then what's done.
       x = any ? q(T.soFarQ, nxt === 'finish' ? T.changeLead : T.welcomeLead) + msgs() + '<div class="su-stack" style="margin-bottom:22px">'
-          + (nxt === 'finish' ? big('➜', T.seeFinish, '', false, 'go:finish') : nxt === 'more' ? big('➜', T.moreOpt, T.optional, false, 'go:more') + big('👀', T.seeFinish, '', true, 'go:ess') : big('➜', T.carryOn, fill(T.nextIs, { step: T.labels[nxt] }), false, 'resume')) + '</div>'
+          + (nxt === 'finish' ? big('➜', T.seeFinish, '', false, 'go:finish') : nxt === 'more' ? (drWaiting() && T.draftWaiting ? big('➜', T.moreOpt, T.draftWaiting, false, 'resume') : big('➜', T.moreOpt, T.optional, false, 'go:more')) + big('👀', T.seeFinish, '', true, 'go:ess') : big('➜', T.carryOn, (drWaiting() || C.menuDraftLines > 0) && T.draftWaiting ? T.draftWaiting : fill(T.nextIs, { step: T.labels[nxt] }), false, 'resume')) + '</div>'
           + statusRows(P1) + (p1Done() || p2Count() ? '<h2 class="su-h2">' + h(T.moreQ) + '</h2>' + statusRows(P2) : '')
         // Pub test 8 (2026-11-10): nothing said it was free, and an owner wary of money read the badge and prices as an upsell.
         // Café test 4 (2026-11-11): no staff-access note here before anything is done; the edit page, where "People with
@@ -2357,7 +2562,7 @@
       // Winery test 4 (2026-11-12): a winery says "We don't have set hours. Visits are by appointment" here (and on the
       // day list); once it has, the screen says so and "Yes, that's right" keeps it.
       var anyOpen = S.week && DAYS.some(function(d){ return S.week[d]; }), noneNow = APPT && AI.visit === 'appointment' && !anyOpen && !!CUR.hours;
-      x = doneLine('hours') + q(T.hoursQ) + (anyOpen ? classNightsHint() : '') + msgs() + (anyOpen ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit')
+      x = doneLine('hours') + q(anyOpen || noneNow || !T.hoursQNone ? T.hoursQ : T.hoursQNone) + (anyOpen ? classNightsHint() : '') + msgs() + (anyOpen ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit')
         // Distillery test 2 (Whistler, 2026-11-16): a stretch of other hours is changed from here in one tap (« Modifier mes
         // heures du 15 juin au 7 sept. »); it took four screens (the week, Next, the year question, then this button).
         + storedSeas().map(function(st){ return big('✎', fill(T.seaChange, st), '', true, 'yearSeasonEdit:' + st.i); }).join('') + noSetBtn() + '</div>'
@@ -2378,7 +2583,11 @@
         // ("Yes, all year" then "No, keep them" was the only way through, and it scared her).
         // Indoor test 10 (2026-11-19; Sandra's August maintenance shutdown had no place here): a short yearly shutdown is a
         // closure, said in one line (indoor places only).
-        + (T.allYearShutHint ? '<p class="su-hint" id="suShutHint">' + h(T.allYearShutHint) + '</p>' : '')
+        // Sport (2026-11-20): one hint at a time: the season hint takes the shutdown hint's place.
+        + (T.allYearShutHint && !(sportSeasonHint() && !stS.length && !S.openSea) ? '<p class="su-hint" id="suShutHint">' + h(T.allYearShutHint) + '</p>' : '')
+        // Sport and golf (2026-11-20): a kind with a usual season (golf and pools in summer, rinks and ski lessons in
+        // winter) says so once, while no season is stored. A hint only: nothing is picked for her.
+        + (sportSeasonHint() && !stS.length && !S.openSea ? '<p class="su-hint" id="suSportSeason">' + h(sportSeasonHint()) + '</p>' : '')
         + '<div class="su-stack">' + (stS.length && T.yearKeep ? big('✓', T.yearKeep, '', false, 'yearKeep') : '') + big(stS.length && T.yearKeep ? '✕' : '✓', stS.length && T.yearKeep && T.allYearSame ? T.allYearSame : T.allYearYes, '', !!(stS.length && T.yearKeep), 'yearAll') + (TL && !stS.length ? big('🗓️', T.allYearClosed, T.allYearClosedSub, true, 'yearClosed') : '') + (stS.length ? stS.map(function(st){ return big('✎', fill(T.seaChange, st), T.seaChangeSub, true, 'yearSeasonEdit:' + st.i); }).join('')
           // Brewery test 1 (Whistler, 2026-11-15): a second stretch (a spring and a fall shoulder season), then a third.
           + seaMoreWrap(stS.length > 1, (stS.length < SEA_MAX && S.seaList.length < SEA_MAX && T.seaAdd ? big('🍂', stS.length > 1 ? T.seaAdd3 : T.seaAdd, stS.length > 1 ? T.seaAdd3Sub : T.seaAddSub, true, 'yearSeasonAdd') : '')) : big('☀️', T.allYearSummer, T.allYearSummerSub, true, 'yearSeason:summer') + big('❄️', T.allYearWinter, T.allYearWinterSub, true, 'yearSeason:winter')
@@ -2393,10 +2602,23 @@
         + (APPT && T.allYearAppt ? big('📞', T.allYearAppt, T.allYearApptSub, true, 'yearAppt') : '') + '</div>';
       // Indoor places (2026-11-19): the summer, winter and part-of-the-year hours buttons fold under one link
       // ("Different hours in summer or winter?"); "Yes, all year" and "closed part of the year" stay up front.
+      // Sport test 14: the parts' own times (golf). Sport test 15 (2026-11-21; at 393 wide the box pushed "We're closed part
+      // of the year" below the fold): under the year answers, folded behind one line until she opens it or has lines.
+      if (s === 'hours:year' && !noSetYear() && partTimesOn()) x += (S.partOpen || String(S.partTimes || '').trim() || !T.partTimesOpen) ? partTimesHtml()
+        : '<p class="su-hint" id="suPartTimesLink" style="margin-top:14px"><button type="button" class="su-link" data-act="partTimesOpen">' + h(T.partTimesOpen) + '</button></p>';
       if (INDOOR && T.seaMore && !noSetYear() && !storedSeas().length) {
         var seaRe = /<button[^>]*data-act="yearSeason:(?:summer|winter|part)"[^>]*>[\s\S]*?<\/button>/g, seaBtns = x.match(seaRe) || [];
-        if (seaBtns.length) { var seaAt = x.indexOf(seaBtns[0]); x = x.replace(seaRe, ''); x = x.slice(0, seaAt) + seaMoreHtml(seaBtns.join('')) + x.slice(seaAt); }
+        // Sport test 14: for sport and golf, "different for part of the year" comes first in the box.
+        if (C.sport) seaBtns.sort(function(a, b){ return (/yearSeason:part/.test(b) ? 1 : 0) - (/yearSeason:part/.test(a) ? 1 : 0); });
+        if (seaBtns.length) { var seaAt = x.indexOf(x.match(seaRe)[0]); x = x.replace(seaRe, ''); x = x.slice(0, seaAt) + seaMoreHtml(seaBtns.join('')) + x.slice(seaAt); }
       }
+      // Sport test 16 (2026-11-21; one tap on the dark "Yes, all year" wiped a saved Apr–Oct season): a season and no other
+      // hours stored: "No change, keep Apr 1 – Oct 31" first, "Yes, all year" light (it asks before removing the season).
+      if (s === 'hours:year' && seaKeepOn()) { var yaDark = big('✓', T.allYearYes, '', false, 'yearAll'); if (x.indexOf(yaDark) >= 0) x = x.replace(yaDark, big('✓', fill(T.yearKeepSea, { a: mdLabel(S.openSea.from), b: mdLabel(S.openSea.to) }), '', false, 'yearKeepSea') + big('✕', T.allYearYes, '', true, 'yearAll')); }
+    } else if (s === 'hours:yeardrop' && S.seaDropAsk && S.openSea && S.dropI == null && !storedSeas().length) {
+      // Sport test 16: "Yes, all year" with a season stored: say what goes, and keep it unless she says so.
+      var sdA = { a: mdLabel(S.openSea.from), b: mdLabel(S.openSea.to) };
+      x = q(T.yearSeaDropQ, fill(T.yearSeaDropLead, sdA)) + msgs() + '<div class="su-stack" id="suSeaDrop">' + big('✓', fill(T.yearSeaDropKeep, sdA), '', false, 'yearDropKeep') + big('✕', T.yearSeaDropYes, T.yearSeaDropYesSub, true, 'yearSeaDropYes') + '</div>';
     } else if (s === 'hours:yeardrop') {
       // Pub test 2: "Yes, all year" with other hours stored: the dates that would be removed, and a choice.
       // Brewery test 1 (Whistler, 2026-11-15): with two periods it names both; "Remove these hours" on a period's own
@@ -2406,14 +2628,16 @@
         : q(T.yearAllDropQ, fill(T.yearAllDropLead, { span: dAll.join(andWord()) || seaSpan(S.sea) })) + msgs() + '<div class="su-stack">' + big('✓', T.yearAllDropKeep, T.yearAllDropKeepSub, false, 'yearDropKeep') + big('✕', T.yearAllDropYes, T.yearAllDropYesSub, true, 'yearDropYes') + '</div>';
     } else if (s === 'hours:open') {
       // Café test 2: "Open from [Apr 25] to [Oct 12] every year". Whole months stay a quick path (the months screen).
-      var os0 = S.openDraft || S.openSea || { from: '', to: '' }, fromHours = S.openFrom === 'hours';
+      // Sport test 1 (2026-11-20): research's own season dates start the boxes when there's nothing yet (saved only with the screen).
+      var os0 = S.openDraft || S.openSea || (C.researchOpen && C.researchOpen.from ? { from: C.researchOpen.from, to: C.researchOpen.to } : { from: '', to: '' }), fromHours = S.openFrom === 'hours';
       x = q(T.openQ, T.openLead) + msgs() + (S.splitSaved ? '<p class="su-sent" id="suSplitSaved">' + h(S.splitSaved) + '</p>' : '') + '<div class="su-seadates su-openseason"><p class="su-q">' + h(T.openFrom) + '</p>' + mdPick('suOf', os0.from, T.openFrom) + '<p class="su-q">' + h(T.openTo) + '</p>' + mdPick('suOt', os0.to, T.openTo) + '</div>'
         + '<p class="su-hint su-repeats">' + h(T.repeatsYearly) + '</p><p class="su-hint"><button type="button" class="su-link" data-act="openMonths">' + h(T.openMonthsLink) + '</button></p>'
         // Restaurant test 1 (Whistler, 2026-11-14): closed twice a year is two yearly closures ("Every year"), and the ones
         // already saved are named.
-        + (T.openTwice ? '<p class="su-hint su-twice">' + h(T.openTwice) + (yearlyClosed().length ? ' ' + h(fill(T.openTwiceHave, { list: andList(yearlyClosed()) }).replace(/\.\.$/, '.')) : '') + '</p>' : '')
+        // Sport test 1: a one-season kind (a golf course, an arena) is never asked about spring and fall shoulder seasons.
+        + (C.sport && (C.kindSeasons || {})[indoorMainKind()] ? '' : (T.openTwice ? '<p class="su-hint su-twice">' + h(T.openTwice) + (yearlyClosed().length ? ' ' + h(fill(T.openTwiceHave, { list: andList(yearlyClosed()) }).replace(/\.\.$/, '.')) : '') + '</p>' : ''))
         + tticksHtml(true)
-        + '<div class="su-stack">' + (fromHours ? big('✓', T.openSame, T.openSameSub, false, 'openSave:same') + big('☀️', T.openSummer, T.openSummerSub, true, 'openSave:summer') : big('✓', T.openSaveOnly, '', false, 'openSave:only'))
+        + '<div class="su-stack">' + (fromHours ? big('✓', T.openSame, T.openSameSub, false, 'openSave:same') + (winterKindOnly() && T.openPart ? big('❄️', T.openPart, T.openPartSub, true, 'openSave:part') : (C.sport && T.openPartSeason ? big('🍂', T.openPartSeason, T.openPartSeasonSub, true, 'openSave:summer') : big('☀️', T.openSummer, T.openSummerSub, true, 'openSave:summer'))) : big('✓', T.openSaveOnly, '', false, 'openSave:only'))
         + big('✕', T.allYearBtn, '', true, 'openNone') + '</div>';
     } else if (s === 'hours:edit' || seaIsStep(s)) {
       var seas = seaIsStep(s), seaOther = seas ? seaOtherOf(S.seaI) : null, seaOtherAB = seaOther && seaOther.on && seaOther.week ? seaAB([seaOther]) : null;
@@ -2431,7 +2655,10 @@
       // now starts from the current hours as a short list, one row a day with a big Change button; only the days tapped
       // open up (the full card: Open/Closed, the times, Midnight / 1 AM / 2 AM, the early-morning note, "Same as"). An
       // open day can copy its hours to every day or Mon–Fri. Days never opened keep their hours exactly as stored.
-      if (!seas && !S.hoursOpenSet) { S.hoursOpenSet = true; S.hoursOpen = {}; if (!DAYS.some(function(d){ return S.week[d]; })) S.hoursOpen.mon = true; }
+      // Sport test 13 (2026-11-21; t9–t13: a page with no hours opened the editor with Monday's card open, on "Closed" in the
+      // owner's eyes): no day's card is opened for her; every day is a row with its Change button.
+      if (!seas && !S.hoursOpenSet) { S.hoursOpenSet = true; S.hoursOpen = {}; }
+      if (!seas && !S.hoursAutoMonSet) { S.hoursAutoMonSet = true; if (S.hoursOpen.mon && !DAYS.some(function(d){ return S.week[d]; })) S.hoursAutoMon = true; }
       var wk = W(), hop = HO(), firstOpenCard = DAYS.filter(function(d){ return hop[d] && wk[d]; })[0];
       // Exact days (pub test 7): "open late May to early September" without rounding to whole months.
       // Café test 2 (Whistler, 2026-11-15): no « Quels mois ? » heading left over the exact dates (it has no month chips then).
@@ -2460,7 +2687,7 @@
             // too) went; the button's own name says it ("Monday closed. Open Monday again").
             : hoffUndo(d) ? '<button type="button" class="su-hoff su-hoff-undo" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.dayClosedNow, { day: longDay(d) }) + '. ' + fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.reopenDay || T.undo) + '</button>'
             : '<button type="button" class="su-hoff" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.openDayBtn) + '</button>') + '</div></div>';
-        return '<div class="su-day su-hopen" id="suRow' + d + '"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
+        return '<div class="su-day su-hopen" id="suRow' + d + '"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w || autoMonUnset(d) ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
           + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '">' + (w.length > 1 ? '<button type="button" class="su-toggle su-rmtime" data-rmtime="' + d + ':' + j + '" aria-label="' + h(T.removeSecond + (C.lang === 'fr' ? '\u00a0: ' : ': ') + t12(y[0]) + ' – ' + t12(y[1])) + '"><span aria-hidden="true">✕</span> ' + h(T.removeSecond) + '</button>' : '') + '</div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + brewQuick(d, j, y, w.length - 1) + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
             // Restaurant test 1 (Whistler, 2026-11-14): lunch and dinner on one day, as the edit page's "+ second time" (two
             // ranges at most, the server's rule). With two, "✕ Remove this time" on each (the one added may be the first).
@@ -2484,6 +2711,8 @@
             // Indoor test 7 (Robert, closed Monday and Tuesday): not when Tuesday itself is closed.
             + (T.copyTueSat && !W().mon && W().tue && TUE_SAT.indexOf(d) >= 0 ? '<button type="button" class="su-toggle" data-copytuesat="' + d + '">' + h(T.copyTueSat) + '</button>' : '')
             + '<button type="button" class="su-toggle" data-copywe="' + d + '">' + h(T.copyWeekend) + '</button>' + hDone(d) + '</div>'
+            // Sport test 6: a named copy that left a closed day closed says so, under the day it was copied from.
+            + ((S.copySkipped || []).length && S.copyFrom === d && T.copySkipped ? '<p class="su-hint su-copyskip" aria-live="polite">' + h(fill(T.copySkipped, { days: S.copySkipped.map(longDay).join(', ') })) + '</p>' : '')
             // Said once, under the first open card (café test 5: it repeated under every open day).
             + (!seas && d === firstOpenCard && DAYS.some(function(x){ return x !== d && !copyGets(d, x); }) ? '<p class="su-hint su-copynote">' + h(T.copyClosedNote) + '</p>' : '') : '<div class="su-samerow su-hdonerow">' + hDone(d) + '</div>') + '</div>';
       }).join('') + '</div>'
@@ -2560,7 +2789,7 @@
       x = q(T.closeAddQ, T.closeAddLead) + msgs() + field('suCf', T.firstDay, S.addFrom || nextMonth(), { type: 'date' })
         + '<p class="su-q">' + h(T.howLong) + '</p><div class="su-chips">' + [['1', T.len1], ['7', T.len7], ['14', T.len14], ['pick', T.lenPick]].map(function(o){ return '<button type="button" class="su-chip" aria-pressed="' + (S.addLen === o[0] ? 'true' : 'false') + '" data-len="' + o[0] + '">' + h(o[1]) + '</button>'; }).join('') + '</div>'
         + (S.addLen === 'pick' ? field('suCt', T.lastDay, S.addTo || '', { type: 'date' }) : '<p class="su-sent su-cends" id="suCends" aria-live="polite">' + h(closeEnds(S.addFrom || nextMonth())) + '</p>')
-        + field('suCn', T.why, S.addNote || '', { max: 60 }) + ex(T.whyEx)
+        + field('suCn', T.why, S.addNote || '', { max: 120, data: 'aria-describedby="suCnC"' }) + '<p class="su-count' + (60 - String(S.addNote || '').trim().length < 0 ? ' su-over' : '') + '" id="suCnC" aria-live="polite">' + h(leftText(60 - String(S.addNote || '').trim().length)) + '</p>' + ex(T.whyEx)
         // Café test 1 (2026-11-11): "Every year" for her own dates, like the holidays' "This year and next".
         + '<label class="su-tick" style="margin:12px 0 0"><input type="checkbox" id="suCyear"' + (S.addYearly ? ' checked' : '') + '><span>' + h(T.closeYearly) + '</span></label><p class="su-example">' + h(T.closeYearlySub) + '</p>'
         + (S.closeInside && T.closeInsideKeep ? '<div class="su-stack" id="suCloseInside">' + big('✓', T.closeInsideKeep, '', false, 'closureKeep') + big('✎', T.closeInsideFix, '', true, 'closureFix') + '</div>'
@@ -2647,7 +2876,7 @@
       x = doneLine('price') + '<h1 id="suQ">' + h(T.tpriceQ) + '</h1><p class="su-lead" id="suTpriceLead">' + h(tourPriceLead()) + '</p>'
         + (ip.priceGuessed && (ip.free || (ip.price != null && !isNaN(ip.price))) && T.tpriceGuess ? '<p class="su-sent su-research" id="suFeeGuess">' + h(T.tpriceGuess) + '</p>' : '')
         + (CUR.indoor_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.indoor_price_waiting) })) + '</p>' : '') + msgs()
-        + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suFreeChips">' + ['free', 'donation'].map(function(f){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ip.free === f ? 'true' : 'false') + '" data-ifree="' + f + '">' + h(tourFreeWord(f)) + '</button>'; }).join('') + '</div>'
+        + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suFreeChips">' + (C.sport && ip.free !== 'donation' ? ['free'] : ['free', 'donation']).map(function(f){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ip.free === f ? 'true' : 'false') + '" data-ifree="' + f + '">' + h(tourFreeWord(f)) + '</button>'; }).join('') + '</div>'
         // Indoor test 1: By donation keeps the box, as "Suggested amount (optional)".
         + (ip.free === 'donation' && T.tsuggLabel ? field('suTsugg', T.tsuggLabel, ip.suggText != null ? ip.suggText : ip.sugg != null ? String(ip.sugg) : '', { max: 12, mode: 'decimal' }) + '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>'
           : ip.free ? '' : field('suTprice', ip.per && T.iperOne ? T.iperOne[ip.per] : T.tpriceLabel, ip.ptext != null ? ip.ptext : ip.per && indoorPerBox() ? indoorPerBox() : indoorMinSize() && typeof ip.price === 'number' ? boxVal('suTprice', ip.price) + indoorMinSize() : boxVal('suTprice', ip.price), { max: 60, ph: T.tpricePh || '' })
@@ -2892,6 +3121,14 @@
       var urlNow = S.webUrl != null ? S.webUrl : site;
       var tixUrl = INDOOR && s === 'menu:web' && T.webLeadTickets ? ((S.done.booking && S.bookUrl && /\S\.\S/.test(S.bookUrl) ? S.bookUrl : '') || CUR.booking_url || (indoorShow() ? C.bookingKnown : '') || '') : '';
       if (tixUrl) { lead2 = T.webLeadTickets; if (S.webUrl == null) urlNow = tixUrl; }
+      // Sport test 9 (2026-11-21; Gord's tee-time link was filled in as his rates page): a sport or golf place's box takes a
+      // rates page only (the one our golf data found on its site), never a booking link; with none, it starts empty.
+      if (INDOOR && C.sport && s === 'menu:web') {
+        if (C.ratesKnown) { lead2 = T.webLeadRates || lead2; if (S.webUrl == null) urlNow = C.ratesKnown; }
+        else { lead2 = T.webLeadRatesEmpty || lead2; if (S.webUrl == null) urlNow = ''; }
+        // Sport test 14 (Marisol expected her rates to be copied): what shows, exactly. Her page links to that page.
+        if (T.webWhatShows) lead2 = lead2 + ' ' + T.webWhatShows;
+      }
       x = q(s === 'menu:web' ? (site ? T.webQ : T.webQEmpty) : T.webWhereQ, lead2) + msgs() + field('suUrl', T.webLabel, urlNow, { mode: 'url', max: 300 })
         // Pub test 7 (2026-11-10): one tap for the website she typed or we have ("Use sandbarpub.ca"); never one being removed.
         // Café test 5 (2026-11-12): hidden while the box already holds that address (it read as a puzzle beside it).
@@ -2923,7 +3160,7 @@
       if (ownDogsBiz() && !S.done.offer && !S.dogResearchOff && S.badges.dog_friendly && (C.researchTicks || []).indexOf('dog_friendly') >= 0) { S.dogResearchOff = true; S.badges.dog_friendly = false; }
       // Tours (2026-11-16): "Who can come" asks the minimum age first, then dogs and access.
       // Indoor places (2026-11-19): the youngest age first (All ages, 5+, 8+, 12+, 16+, 19+), "Under 18s come with an adult".
-      var tourAges = INDOOR ? '<h2 class="su-h2" style="margin-top:6px" id="suAgeQ">' + h(T.tageQ) + '</h2>' + (S.tour.ageGuessed && S.tour.age && T.guessKind ? '<p class="su-sent su-research" id="suAgeGuess">' + h(T.guessKind) + '</p>' : '') + tchips('age', ['all', '5', '8', '12', '16', '19'], T.tages, T.tageQ, 'suAgeQ')
+      var tourAges = INDOOR ? '<h2 class="su-h2" style="margin-top:6px" id="suAgeQ">' + h(T.tageQ) + '</h2>' + (S.tour.ageGuessed && S.tour.age && (T.ageSuggest || T.guessKind) ? '<p class="su-sent su-research" id="suAgeGuess">' + h(T.ageSuggest ? fill(T.ageSuggest, { age: (T.tages || {})[S.tour.age] || S.tour.age }) : T.guessKind) + '</p>' : '') + tchips('age', ['all', '5', '8', '12', '16', '19'], T.tages, T.tageQ, 'suAgeQ')
           // Indoor test 19: a kids' place's one hint line (its range is said in its story, not picked here).
           + ((S.tour.kinds || []).indexOf('kids') >= 0 && T.tageKidsHint ? '<p class="su-sent" id="suAgeKidsHint">' + h(T.tageKidsHint) + '</p>' : '')
         + (S.tour.age && S.tour.age !== '19' && S.tour.age !== 'all' ? '<div class="su-chips" role="group" style="margin-top:8px"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (S.tour.adult ? 'true' : 'false') + '" data-tadult="1" id="suAdultRule">' + h(T.tadult) + '</button></div>' : '')
@@ -2947,7 +3184,7 @@
             + (C.offerLabels.service_dogs ? '<button type="button" class="su-tile su-tile-wide su-subtile" id="suServiceDogs" aria-pressed="' + (S.badges.service_dogs ? 'true' : 'false') + '" data-off="service_dogs"' + (S.noDogs ? '' : ' hidden') + '><span class="su-e" aria-hidden="true">' + C.offerIcons.service_dogs + '</span>' + h(C.offerLabels.service_dogs) + '<span class="su-tile-sub">' + h(T.serviceDogsSub) + '</span></button>'
               // Restaurant test 1 (Whistler, 2026-11-14): it was ticked for her, so say so (a tap meant to tick it unticked it).
               + (T.serviceDogsTicked ? '<p class="su-hint" id="suSdogTicked" role="status"' + (S.sdogAuto && S.noDogs && S.badges.service_dogs ? '' : ' hidden') + '>' + h(T.serviceDogsTicked) + '</p>' : '') : '') : '') + '</div>'; }).join('')
-        + '<p class="su-hint su-sportsnote" id="suSportsNote" role="status"' + (sportsBit() && !S.badges.sports_tv ? '' : ' hidden') + '>' + h(fill(T.storySportsLead, { bit: sportsBit() })) + '</p>'
+        + (sportsTileHere() ? '<p class="su-hint su-sportsnote" id="suSportsNote" role="status"' + (sportsBit() && !S.badges.sports_tv ? '' : ' hidden') + '>' + h(fill(T.storySportsLead, { bit: sportsBit() })) + '</p>' : '')
         + '<div class="su-stack su-offer-save">' + big('✓', T.saveOffer, '', false, 'offerSave') + '</div>' + skip('offer');
     } else if (s === 'offer:laptops') {
       x = q(T.laptopQ, T.laptopLead) + msgs() + radios('stay.laptops', ['all_day', 'not_busy', 'none'], T.laptops, T.laptopSub)
@@ -2996,7 +3233,7 @@
     } else if (s === 'offer:dogs') {
       // Brewery test 1 (2026-11-12): research's "Dogs on the patio" fills in "Patio only" as a suggestion (saved with the screen).
       if (C.brewery && C.suggestDogNote && !S.dogGuessSet && !S.dogNote && !((CUR.visit_rows || {}).dogs)) { S.dogGuessSet = true; S.dogNote = C.suggestDogNote; S.dogGuessed = true; }
-      x = q(T.dogQ, T.dogLead) + msgs() + (S.dogGuessed && S.dogNote === C.suggestDogNote && T.dogGuess ? '<p class="su-sent su-research" id="suDogGuess">' + h(T.dogGuess) + '</p>' : '') + quick('dogs', 'suDog', S.dogNote) + '<label class="su-sr" for="suDog">' + h(T.dogQ) + '</label><textarea class="su-field su-line" id="suDog" maxlength="180" rows="2">' + h(S.dogNote) + '</textarea>' + ex(T.dogEx)
+      x = q(T.dogQ, T.dogLead) + msgs() + (S.dogGuessed && S.dogNote === C.suggestDogNote && T.dogGuess ? '<p class="su-sent su-research" id="suDogGuess">' + h(T.dogGuess) + '</p>' : '') + quick('dogs', 'suDog', S.dogNote) + '<label class="su-sr" for="suDog">' + h(T.dogQ) + '</label><textarea class="su-field su-line" id="suDog" maxlength="180" rows="2">' + h(S.dogNote) + '</textarea>' + ex(C.indoor && C.sportDogs && C.sportDogs.ex ? C.sportDogs.ex : T.dogEx)
         + (S.nudge && S.nudge === T.dogLineNo && T.dogLineNoGo ? '<div class="su-stack su-seaskip" id="suDogNoGo">' + big('🚫', T.dogLineNoGo, '', true, 'dogToNo') + '</div>' : '')
         + '<div class="su-stack">' + big('✓', T.saveThis, '', false, 'dogSave') + '</div><div class="su-skip"><button type="button" class="su-link" data-act="go:' + (offerNext('offer:dogs') || 'saved:offer') + '">' + h(T.skip) + '</button></div>';
     } else if (s === 'happy') { x = C.happyHour ? yesNo('happy', T.happyQ, '', T.happyYes) : '';
@@ -3018,9 +3255,12 @@
           + field('hw' + i, T.whatsOn, e.what, { max: 60, data: 'data-hh="' + i + ':what" data-room="' + i + '" aria-describedby="hwc' + i + '"' }) + '<p class="su-count' + (hhRoom(i) - String(e.what || '').trim().length < 0 ? ' su-over' : '') + '" id="hwc' + i + '" aria-live="polite">' + h(roomText(i, e.what)) + '</p>' + (i === 0 ? ex(T.whatsOnEx) : '')
           // Distillery test 2 (Whistler, 2026-11-16): with two or more, each happy hour has its own "All year / Only some
           // months" (an après deal in winter only), the same box as before, once per happy hour.
-          + (S.happy.length > 1 ? seasonBox('happy.' + i, e.sea || (e.sea = clone(S.happySea)), fill(T.happySeasonEach || T.happySeasonH, { n: i + 1 })) : '') + '</div>';
+          + (S.happy.length > 1 ? seasonBox('happy.' + i, e.sea || (e.sea = clone(S.happySea)), fill(T.happySeasonEach || T.happySeasonH, { n: i + 1 })) : '') + (S.happy.length > 1 ? happyClosedHtml(String(i), e.sea) : '') + '</div>';
       }).join('') + (S.happy.length < 6 ? '<button type="button" class="su-more" data-act="add:happy">' + h(T.addHappy) + '</button>' : '')
-        + (S.happy.length > 1 ? '' : '<div class="su-day">' + seasonBox('happy', S.happySea, T.happySeasonH) + '</div>') + '<div class="su-stack">' + big('✓', T.saveHappy, '', false, 'happySave') + '</div>';
+        + (S.happy.length > 1 ? '' : '<div class="su-day">' + seasonBox('happy', S.happySea, T.happySeasonH) + '</div>') + (S.happy.length > 1 ? '' : happyClosedHtml('', S.happySea))
+        // Sport fix round 16: Save on a happy hour that can't show asks once ("Save anyway" / "Change months").
+        + (S.happyClosedAsk && T.happyClosedAskQ ? '<div class="su-stack" id="suHappyClosedAsk" role="group" aria-labelledby="suHappyClosedAskQ"><p class="su-q" id="suHappyClosedAskQ">' + h(T.happyClosedAskQ) + '</p>' + big('✓', T.happyClosedYes, '', false, 'happyClosedYes') + big('✎', T.happyClosedNo, '', true, 'happyClosedNo') + '</div>'
+          : '<div class="su-stack">' + big('✓', T.saveHappy, '', false, 'happySave') + '</div>');
     } else if (s === 'specials') { x = yesNo('specials', T.specialsQ, T.specialsLead);
     } else if (s === 'specials:type') {
       if (!S.specials.length) S.specials.push({ days: {}, text: '', price: '', start: '', end: '' });
@@ -3098,7 +3338,7 @@
       // "book ahead" is never said twice), the line in her own words, and the booking link box, which always shows (a
       // walk-in taproom can still add a page for group bookings). "We can't take big groups" is the explicit answer.
       // Cocktail test 3 (2026-11-14): the pressed size is the one in the "book ahead" sentence, not "for 20" of a room.
-      var gl = S.brew.groups, gszS = sentencesOf(gl).filter(function(x){ return isSizeLine(x) || /book|réserv/i.test(x); })[0] || '', gsz = (/\b(\d{1,2})\b/.exec(gszS) || [])[1];
+      var gl = S.brew.groups, gszS = sentencesOf(gl).filter(function(x){ return (isSizeLine(x) && !sizeFact(x)) || (/book|réserv/i.test(x) && !sizeFact(x)); })[0] || '', gsz = (/\b(\d{1,2})\b/.exec(gszS) || [])[1] || sizeFactChip(gl);
       // Tour test 7 (Whistler, 2026-11-17): a booked tour's sizes start at "Up to 4" (a guide takes 4 a day; it started at 6).
       // Tour test 8 (Whistler, 2026-11-17; Linda, sleds of 2): every tour starts at 4 ("4+" when it has set hours; it showed
       // only for a tour by booking).
@@ -3111,7 +3351,7 @@
         // Tour test 9 (Whistler, 2026-11-18; Tanis, school programs of about 30): a last size, "21+ or whole classes", in
         // the same question (an option, not a new field).
         + '<div class="su-chips" role="group" aria-labelledby="' + (gKids ? 'suGroupSizesQ' : 'suQ') + '" id="suGroupSizes">' + (TOUR ? [4].concat(GROUP_SIZES, T.groupsChipBig ? [21] : []) : GROUP_SIZES).map(function(n){ var on = sentencesOf(gl).indexOf(groupsSizeLine(n)) >= 0 || (!!gsz && +gsz === n); return '<button type="button" class="su-chip' + (n === 21 ? ' su-chip-wide' : '') + '" aria-pressed="' + (on ? 'true' : 'false') + '" data-bgroup="' + n + '">' + (n === 21 && T.groupsChipBig ? h(T.groupsChipBig) : S.groupsBooked && T.groupsChipBooked ? h(fill(T.groupsChipBooked, { n: n })) : n + '+') + '</button>'; }).join('') + '</div>';
-      var gLine = enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TL) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TL ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 780, area: true, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, 180) + trimNoteHtml('suGroupsLine') + ex(T.groupsEx);
+      var gLine = enLineHint(gl === ((CUR.visit_rows || {}).groups || '') ? gl : '', 'suGroupsEn', !((CK || TL) && quick('groups', 'suGroupsLine', gl)), 'groups') + (CK || TL ? quick('groups', 'suGroupsLine', gl) : '') + field('suGroupsLine', T.groupsLineLabel, gl, { max: 780, area: true, data: 'aria-describedby="suGroupsLineCount"' }) + countLine('suGroupsLine', gl, GROUPS_MAX) + trimNoteHtml('suGroupsLine') + ex(T.groupsEx);
       // Indoor test 11 (Kim): research's Groups line, untouched, says it came from online, as Known for and Good to know do.
       var gGuess = INDOOR && T.groupsGuess && !!gl && ((gl === ((CUR.visit_rows || {}).groups || '') && (C.visitResearch || []).indexOf('groups') >= 0) || (!(CUR.visit_rows || {}).groups && gl === C.groupsFound)) ? '<p class="su-sent su-research" id="suGroupsGuess">' + h(T.groupsGuess) + '</p>' : '';
       x = doneLine('groups') + q(INDOOR && T.groupsQAhead && ((S.tour && S.tour.book) || TI.book) === 'ahead' ? T.groupsQAhead : T.groupsQ, T.groupsLead) + msgs() + gGuess
@@ -3423,7 +3663,9 @@
   // Tour simplify (2026-11-18): the third stretch's button (the year question, two stretches stored) and link (the second
   // stretch's screen) sit behind "More options" for tours (T.seaMore); every other type, and the second stretch, as before.
   function seaMoreWrap(third, html){ return third && html && T.seaMore ? seaMoreHtml(html) : html; }
-  function seaMoreHtml(inner){ return '<div class="su-skip su-seamore"><button type="button" class="su-link" id="suSeaMore" aria-expanded="' + (S.seaMore ? 'true' : 'false') + '"' + (S.seaMore ? ' aria-controls="suSeaMoreBox"' : '') + ' data-act="seaMore">' + h(T.seaMore) + '</button></div>' + (S.seaMore ? '<div id="suSeaMoreBox">' + inner + '</div>' : ''); }
+  // Sport test 14 (Marisol): for sport and golf the link says "part of your season", and the box says that a season comes
+  // first ("We're closed part of the year"), with these hours right after it.
+  function seaMoreHtml(inner){ var sp = typeof C !== 'undefined' && !!C.sport && !!T.seaMoreSport && !seaIsStep(S.step); return '<div class="su-skip su-seamore"><button type="button" class="su-link" id="suSeaMore" aria-expanded="' + (S.seaMore ? 'true' : 'false') + '"' + (S.seaMore ? ' aria-controls="suSeaMoreBox"' : '') + ' data-act="seaMore">' + h(sp ? T.seaMoreSport : T.seaMore) + '</button></div>' + (S.seaMore ? '<div id="suSeaMoreBox">' + (sp && !curOpenSea() && T.seaMoreClosedFirst ? '<p class="su-hint" id="suSeaClosedFirst">' + h(T.seaMoreClosedFirst) + '</p>' : '') + inner + '</div>' : ''); }
   function tfoldOpen(withOff){ if (S.tfold != null) return S.tfold; var tk = tticks(); return !!(tk.weather_all || (withOff && (tk.off_request || tk.snow_open))); }
   function tticksPart(seasonal){
     if (!TOUR || !S.tticks) return null;
@@ -3481,6 +3723,34 @@
     var a = starts[0], b = a; while (obj[b % 12 + 1] && (b % 12 + 1) !== a) b = b % 12 + 1; return { a: a, b: b };
   }
   var LAST = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  // Sport test 14 (2026-11-21): a booking link kept as stored that no owner has set yet (research's) is sent with Save as the
+  // owner's own answer, so a link that is also the website keeps its Book button. Every type's booking save.
+  // Sport test 14 (2026-11-21; Dayton approved, golf only): "Part of the place with its own times? (optional)" on the
+  // season question, up to 3 short lines ("Range: April–October"). Saved with the hours as the owner's own line (never
+  // filled in for her: research's sentences are offered to keep); it shows beside the hours as that part's times and never
+  // changes the course's season or hours.
+  function partTimesOn(){ return !!C.sport && !!T.partTimesQ && ['golf', 'range', 'simgolf'].indexOf(indoorMainKind()) >= 0; }
+  function partTimesOut(v){ return String(v || '').split(/\s*(?:\n|;)\s*/).map(function(x){ return x.trim(); }).filter(Boolean).slice(0, 3).join('; '); }
+  function partTimesRead(){ var b = el('suPartTimes'); if (b) S.partTimes = b.value; }
+  function partTimesHtml(){
+    var sug = (C.partTimesSuggest || []).filter(function(t){ return String(S.partTimes || '').indexOf(t) < 0; });
+    return '<div class="su-parttimes" id="suPartTimesBox" style="margin:14px 0 12px"><label class="su-q" for="suPartTimes">' + h(T.partTimesQ) + '</label><p class="su-hint" id="suPartTimesHint">' + h(T.partTimesHint) + '</p>'
+      + '<textarea class="su-field su-line" id="suPartTimes" rows="3" maxlength="180" aria-describedby="suPartTimesHint" placeholder="' + h(T.partTimesPh) + '">' + h(S.partTimes || '') + '</textarea>'
+      + sug.map(function(t, i){ return '<p class="su-hint"><button type="button" class="su-link" data-act="partTimesUse:' + i + '">' + h(fill(T.partTimesKeep, { line: t })) + '</button></p>'; }).join('') + '</div>';
+  }
+  function bookKeep(u){ return !!u && !CUR.booking_owner_set && !!CUR.booking_url && u === CUR.booking_url; }
+  // Sport test 14: month chips in exactly two runs (Mar–Apr and Oct) become two stretches with the same day hours, when
+  // there's room for one more stretch. -> true when split.
+  function sea2Split(so, si){
+    var on = []; for (var i = 1; i <= 12; i++) if (so.months[i]) on.push(i);
+    var starts = on.filter(function(m){ return !so.months[m === 1 ? 12 : m - 1]; });
+    if (starts.length !== 2 || S.seaList.filter(function(o){ return o.on; }).length >= SEA_MAX) return false;
+    var run = function(a){ var o = {}, b = a; o[a] = true; while (so.months[b % 12 + 1] && (b % 12 + 1) !== a) { b = b % 12 + 1; o[b] = true; } return o; };
+    var o2 = seaBlank(); o2.on = true; o2.kind = 'part'; o2.months = run(starts[1]); o2.week = clone(so.week); o2.dirty = true;
+    so.months = run(starts[0]); so.dirty = true;
+    S.seaList.splice(si + 1, 0, o2); S.seaTouched = true;
+    return true;
+  }
   function hoursSave(){
     readTimes();
     if (!windowsOk(S.week)) { S.nudge = T.needOpenDay; return render(); }
@@ -3499,8 +3769,11 @@
         if (!so.on) continue;
         if (s0 && !so.dirty && (s0.holidays === true) === !!so.holidays && (s0.weather === true) === !!so.weather) { list.push(s0); continue; }
         var r = monthRun(so.months);
+        // Sport test 14 (Marisol: Mar, Apr and Oct at 8–6 got "Please pick months in a row", with no word of a second
+        // stretch): months in two runs become two stretches with the same hours, when there's room for one more.
+        if (!so.exact && r.bad && sea2Split(so, si)) return hoursSave();
         if (so.exact) { var xo = seaOut({ on: true, exact: so.exact }); if (!xo.ok) { S.nudge = xo.why; return render(); } }
-        else if (r.none || r.bad || r.all) { S.nudge = r.bad ? T.monthsInRow : T.winterNeedMonths; return render(); }
+        else if (r.none || r.bad || r.all) { S.nudge = r.bad ? (T.monthsInRowSea || T.monthsInRow) : T.winterNeedMonths; return render(); }
         // Distillery test 1 (Whistler, 2026-11-16): every day closed in the stretch is a closure ("we close for two weeks in
         // spring"), which goes under "Closed for a week or two" on the closures screen. The message says where, and a button
         // under it drops this empty stretch and carries on (a stretch already saved is kept as stored).
@@ -3518,8 +3791,38 @@
         if (so.holidays) list[list.length - 1].holidays = true;
         if (so.weather && TOUR) list[list.length - 1].weather = true;
       }
+      // Sport test 14: a stretch that starts or ends in the season's own first or last month (a month chip the season only
+      // partly covers, like March for a Mar 15 season) is clipped to the season without a question.
+      var seaNow0 = curOpenSea(), onL = S.seaList.filter(function(o){ return o.on; });
+      if (seaNow0) for (var ci = 0; ci < list.length; ci++) {
+        var so3 = onL[ci]; if (!so3 || (so3.src && !so3.dirty) || so3.exact) continue;
+        var cx = seaClip(list[ci], seaNow0);
+        if (cx.edge) { list[ci].from = cx.ins[0].from; list[ci].to = cx.ins[0].to; so3.exact = { from: cx.ins[0].from, to: cx.ins[0].to }; }
+      }
       // Tour test 10: any two of three; the message names the other one (the one not on screen when it can).
       for (var oa = 0; oa < list.length; oa++) for (var ob = oa + 1; ob < list.length; ob++) if (mdOverlap(list[oa], list[ob])) { var oz = list[oa === S.seaI ? ob : oa]; S.nudge = fill(T.seasonOverlap, { a: mdLabel(oz.from), b: mdLabel(oz.to) }); S.overlapNudge = S.nudge; return render(); }
+      // Sport test 11: a stretch (new or changed on this visit) with days outside the open season would never show: never a
+      // "saved ✓" for it. She is asked to open those days too, or to skip these hours (Good to know says what runs then).
+      var seaNow = curOpenSea();
+      if (seaNow && T.seaOutside) for (var oi = 0; oi < list.length; oi++) {
+        var lo = list[oi], so2 = S.seaList.filter(function(o){ return o.on; })[oi];
+        if (so2 && so2.src && !so2.dirty) continue;
+        var ox = seaOutside(lo, seaNow);
+        if (!ox.out) continue;
+        // Sport test 14: some of its days are in season. The message names only the days outside it; the main button keeps the
+        // days in season (never drops them); "Yes" opens the days outside too, when they touch the season.
+        var cl = seaClip(lo, seaNow), outTxt = cl.outs.map(function(z){ return C.lang === 'fr' ? 'du ' + mdLabel(z.from) + ' au ' + mdLabel(z.to) : mdLabel(z.from) + ' – ' + mdLabel(z.to); }).join(andWord());
+        if (cl.ins.length === 1 && T.seaOutsidePart) {
+          var one = cl.outs.length === 1 && ox.ext && ox.add;
+          S.seaOut = { i: S.seaList.indexOf(so2), per: lo, ext: one ? ox.ext : null, add: one ? ox.add : null, keep: cl.ins[0], hours: weekShort(lo.hours) };
+          S.nudge = fill(one ? T.seaOutsidePartAsk : T.seaOutsidePart, { a: mdLabel(seaNow.from), b: mdLabel(seaNow.to), out: outTxt, e: mdLabel(cl.ins[0].from), f: mdLabel(cl.ins[0].to) }); S.seaOutNudge = S.nudge;
+          return render();
+        }
+        S.seaOut = { i: S.seaList.indexOf(so2), per: lo, ext: ox.ext, add: ox.add, hours: weekShort(lo.hours) };
+        S.nudge = fill(ox.ext || !T.seaOutsideApart ? T.seaOutside : T.seaOutsideApart, { a: mdLabel(seaNow.from), b: mdLabel(seaNow.to), c: mdLabel(lo.from), d: mdLabel(lo.to) }); S.seaOutNudge = S.nudge;
+        return render();
+      }
+      S.seaOut = null; S.seaOutNudge = '';
       list = list.concat(rest);
       if (JSON.stringify(list) !== JSON.stringify(stored)) ch.hours_seasons = list;
     }
@@ -3534,6 +3837,9 @@
     var tourApptOff = TL && AI.visit === 'appointment';
     if (tourApptOff) listH.push(tinfo({ visit: null }));
     var tkpH = tticksPart(!!openVal(S.openTouched ? S.openSea : null) || !!(CUR.open_months && !S.openTouched)); if (tkpH) listH.push(tkpH);
+    // Sport test 14: the parts' own times, when changed (their own line, never the hours).
+    partTimesRead(); var ptNew = partTimesOn() ? partTimesOut(S.partTimes) : null, ptCh = ptNew !== null && ptNew !== String((CUR.visit_rows || {}).part_times || '');
+    if (ptCh) listH.push({ visit_rows: C.lang === 'fr' ? { part_times: ptNew, _lang: 'fr' } : { part_times: ptNew } });
     // Bug 9 (brewery test 1): a usual day changed on this visit while a stored period still has that day's old time.
     var stale = seaStaleOf(ch.hours_seasons || CUR.hours_seasons || []), addNext = !!S.seaAddNext; S.seaAddNext = false;
     saveAll('hours', listH, null, addNext ? seaStepOf(Math.min(S.seaList.filter(function(o){ return o.on; }).length, SEA_MAX - 1)) : KITCHEN_Q ? 'hours:kitchen' : CLO_SUB ? 'closures' : null, function(){
@@ -3541,6 +3847,9 @@
       // Indoor test 1 (2026-11-19; Margaret, closed Christmas to mid-January): with summer and winter hours just saved, one
       // line points to Closures for a holiday break (no new step). Not when a yearly closure is already saved.
       if (C.indoor && T.seaClosuresHint && ch.hours_seasons && ch.hours_seasons.length && !(CUR.closures || []).some(function(c){ return c && c.yearly; })) S.savedLine.hours = T.savedLive + ' ' + T.seaClosuresHint;
+      // Sport test 11: hours skipped because they were outside the season: where they go instead.
+      if (S.seaOutSkipped && T.seaOutsideSkipped) { S.savedLine.hours = T.savedLive + ' ' + T.seaOutsideSkipped; }
+      S.seaOutSkipped = false;
       CUR.hours = CUR.hours && typeof CUR.hours === 'object' ? week : JSON.stringify(week); S.seaStale = stale.length ? stale : null;
       if ('hours_holidays' in ch) CUR.hours_holidays = ch.hours_holidays;
       if (tourApptOff) { delete AI.visit; S.wine.visit = ''; }
@@ -3555,6 +3864,7 @@
         S.seaList = keep; S.seaI = 0; S.sea = keep[0];
       }
       if ('open_months' in ch) CUR.open_months = ch.open_months;
+      if (ptCh) { CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.part_times = ptNew; }
       S.seaTouched = false; S.openTouched = false;
       if (addNext) seaAddStart();
     });
@@ -3661,6 +3971,10 @@
       if (!same) { var sl = {}; S.happy.forEach(function(e, i){ if (!outs[i].from) return; DAYS.forEach(function(d){ if (e.days[d]) (sl[d] = sl[d] || {})[e.from] = { from: outs[i].from, to: outs[i].to }; }); }); week._slot_seasons = Object.keys(sl).length ? sl : null; }
     }
     week._close = Object.keys(close).length ? close : null;
+    // Sport fix round 16 (2026-11-21; sport test 17: Marlene saved a Nov–Dec deal at a course closed Nov–Mar in one tap):
+    // every happy hour here runs only in the closed months, so it asks once before saving.
+    if (happyAllClosed() && !S.happyClosedOk && T.happyClosedAskQ) { S.happyClosedAsk = true; render(); var ak = el('suHappyClosedAsk'); if (ak && ak.scrollIntoView) { try { ak.scrollIntoView({ block: 'center' }); } catch (x) { ak.scrollIntoView(); } } return; }
+    S.happyClosedAsk = false; S.happyClosedOk = false;
     S.happyTyped = true;
     var list = [];
     if (S.notOffered.indexOf('happy_hour') >= 0) list.push({ not_offered: S.notOffered.filter(function(k){ return k !== 'happy_hour'; }) });
@@ -4010,7 +4324,17 @@
     if (k === 'later') return record(v, 'later');
     if (k === 'open') { S.toList = false; S.hist = ['more']; S.step = 'more'; return go(filled(v)); }
     if (k === 'after') return after(v);
-    if (k === 'resume') { S.toList = false; var f = firstOpen(); return go(f); }
+    if (k === 'resume') {
+      S.toList = false; var f = drWaiting() || firstOpen();
+      // Sport test 14: picks not saved yet on one of the step's own screens (the season dates, the other hours): back on that
+      // screen, with the screens before it for Back.
+      var rd = drGet(f), ra = rd && rd.at;
+      if (ra && ra !== f && base(ra) === f && RESUME_AT.test(ra) && (rd.boxes && rd.boxes[ra] || Object.keys(rd.s || {}).length) && (!seaIsStep(ra) || ra === 'hours:season')) {
+        go(f); S.hist.push(f); (rd.hist || []).forEach(function(x){ if (x !== f && x !== ra && base(x) === f && S.hist[S.hist.length - 1] !== x) S.hist.push(x); });
+        S.step = ra; render(); window.scrollTo(0, 0); return;
+      }
+      return go(f);
+    }
     if (k === 'jump') { S.toFinish = true; S.toList = false; return go(filled(v)); }
     if (k === 'jumpEss') { S.hist = ['ess']; S.step = 'ess'; go(filled(v)); S.toEss = true; return render(); }
     // "I'm done for now": the portal's own checklist may speak up again from here on.
@@ -4074,6 +4398,11 @@
     // Pub test 2 (Whistler, 2026-11-14): with other hours stored, "Yes, all year" first says which dates would go and asks
     // (one tap removed Marc's Oct 15 – Nov 25 hours without a word). "No, keep them" saves the usual hours and keeps them.
     if (k === 'yearAll' && storedSeas().length) { S.dropI = null; return go('hours:yeardrop'); }
+    // Sport test 16 (2026-11-21): a stored season is never cleared by one tap: asked first; "No change" keeps it.
+    if (k === 'yearAll' && seaKeepOn()) { S.dropI = null; S.seaDropAsk = true; return go('hours:yeardrop'); }
+    if (k === 'yearSeaDropYes') { S.seaDropAsk = false; k = 'yearAll'; }
+    if (k === 'yearKeepSea') k = 'yearKeep';
+    if (k === 'yearDropKeep') S.seaDropAsk = false;
     if (k === 'yearKeep' || k === 'yearDropKeep') { S.seaList.forEach(function(o){ var sk = o.src, sf0 = sk ? seaFrom(sk.from, sk.to) : null; if (sf0) { o.on = true; o.months = sf0.months; o.exact = sf0.exact; o.week = parseWeek(sk.hours); o.kind = o.storedKind; o.monthsWas = JSON.stringify(o.months); o.dirty = false; } }); S.seaTouched = false; return hoursSave(); }
     if (k === 'yearDropYes') k = 'yearAll';
     // Brewery test 1 (Whistler, 2026-11-15): a second period; "Copy the hours from …"; removing one of two (asked first).
@@ -4111,6 +4440,26 @@
       seaUse(S.seaList[zi] ? zi : 0);
       return hoursSave();
     }
+    // Sport test 11: open the days of these hours too (the season is widened to cover them), or skip these hours.
+    if (k === 'seaOutOpen' && S.seaOut && S.seaOut.ext) { S.openSea = { from: S.seaOut.ext.from, to: S.seaOut.ext.to }; S.openTouched = true; S.seaOut = null; S.seaOutNudge = ''; S.nudge = ''; return hoursSave(); }
+    // Sport test 14: keep only the stretch's days in season (the days outside it are dropped, never the ones in it).
+    if (k === 'partTimesOpen') { S.partOpen = true; var my3 = window.scrollY; render(); window.scrollTo(0, my3); var pb = el('suPartTimes'); if (pb) { try { pb.focus({ preventScroll: true }); } catch (e) { pb.focus(); } } return; }
+    if (k === 'partTimesUse') { partTimesRead(); var pts = (C.partTimesSuggest || []).filter(function(t){ return String(S.partTimes || '').indexOf(t) < 0; })[+v]; if (pts) S.partTimes = (String(S.partTimes || '').trim() ? String(S.partTimes).trim() + '\n' : '') + pts; var my2 = window.scrollY; render(); window.scrollTo(0, my2); return; }
+    if (k === 'seaOutKeep' && S.seaOut && S.seaOut.keep) {
+      var kz = S.seaList[S.seaOut.i], kk = S.seaOut.keep; S.seaOut = null; S.seaOutNudge = ''; S.nudge = '';
+      if (kz) { kz.exact = { from: kk.from, to: kk.to }; kz.dirty = true; S.seaTouched = true; }
+      // (The screen's own date boxes are read again on Save: they take the kept dates first.)
+      [['sxfhours', kk.from], ['sxthours', kk.to]].forEach(function(b){ var mm = el(b[0] + 'M'), dd = el(b[0] + 'D'); if (mm) mm.value = String(+b[1].slice(0, 2)); if (dd) dd.value = String(+b[1].slice(3)); });
+      return hoursSave();
+    }
+    if (k === 'seaOutSkip' && S.seaOut) {
+      var oz2 = S.seaList[S.seaOut.i]; S.seaOut = null; S.seaOutNudge = ''; S.nudge = '';
+      if (oz2 && oz2.src) S.seaList[S.seaList.indexOf(oz2)] = seaLoad(seaBlank(), oz2.src);
+      else if (oz2) { var zi2 = S.seaList.indexOf(oz2); if (zi2 >= 1) S.seaList.length = zi2; else S.seaList[0] = seaBlank(); }
+      seaUse(0);
+      S.seaOutSkipped = true;
+      return hoursSave();
+    }
     if (k === 'seaDropKeep') { S.dropI = null; return goBack(); }
     if (k === 'seaDropYes') { var dz = S.seaList[S.dropI]; S.dropI = null; if (dz) { dz.on = false; S.seaTouched = true; } return hoursSave(); }
     if (k === 'seaStaleFix') return seaStaleFix(+v);
@@ -4145,6 +4494,13 @@
       if (S.openFrom === 'appt') { if (k === 'openNone') return go('hours:year', true); return seasonOnlySave(); }
       if (S.openFrom === 'hours') {
         if (APPT) S.wYearPick = 'seasonal';
+        // Sport test 5 (2026-11-20): a winter-only kind (a ski school) adds hours for part of its winter season (Christmas, night
+        // lessons), never "summer hours in July and August".
+        if (v === 'part') { if (S.sea.kind !== 'winter' || !S.sea.week) { var keepW = !!(S.sea.week && (CUR.hours_seasons || []).length); S.sea.kind = 'winter'; if (!keepW) { S.sea.months = {}; [12, 1, 2, 3].forEach(function(m){ S.sea.months[m] = true; }); S.sea.week = clone(S.week); } } S.sea.on = true; S.sea.open = {}; S.sea.dirty = true; S.seaTouched = true; return go('hours:season'); }
+        // Sport test 14 (Marisol: "Save, and add different summer hours" opened "Your hours from June to August", though her
+        // usual hours were her summer hours and she needed spring and fall): for sport and golf, the stretch opens with no months
+        // picked, titled "Different hours for part of your season?".
+        if (v === 'summer' && C.sport && T.seaPartQ) { if (!(S.sea.week && (CUR.hours_seasons || []).length)) { S.sea.kind = 'part'; S.sea.months = {}; delete S.sea.exact; S.sea.week = clone(S.week); } S.sea.on = true; S.sea.open = {}; S.sea.dirty = true; S.seaTouched = true; return go('hours:season'); }
         if (v === 'summer') { if (S.sea.kind !== 'summer' || !S.sea.week) { var keepSt = !!(S.sea.week && (CUR.hours_seasons || []).length); S.sea.kind = 'summer'; if (!keepSt) { S.sea.months = {}; SEA_MONTHS.summer.forEach(function(m){ S.sea.months[m] = true; }); S.sea.week = clone(S.week); } } S.sea.on = true; S.sea.open = {}; S.sea.dirty = true; S.seaTouched = true; return go('hours:season'); }
         if (k === 'openNone') return go('hours:year', true);
         if (v !== 'keep') { S.seaList.forEach(function(o){ o.on = false; }); S.seaTouched = true; }
@@ -4271,7 +4627,10 @@
       var to = cf;
       if (S.addLen === 'pick') to = S.addTo && S.addTo >= cf ? S.addTo : cf;
       else { var d0 = new Date(cf + 'T12:00:00'); d0.setDate(d0.getDate() + (+S.addLen - 1)); to = ymd(d0); }
-      var cnote = cn.replace(/[()&<>]/g, '').slice(0, 60), cy = el('suCyear'); S.addYearly = !!(cy && cy.checked);
+      // Sport test 10 (2026-11-21; Lorraine): "Why?" was cut at 60 characters with no word ("…Golf Club Charit"). It shows
+      // what's left as she types, and a longer one is a nudge to shorten it, never a cut.
+      var cnote = cn.replace(/[()&<>]/g, '').replace(/\s+/g, ' ').trim(), cy = el('suCyear'); S.addYearly = !!(cy && cy.checked);
+      if (cnote.length > 60) { S.nudge = fill(T.whyLong || T.charsOver, { n: cnote.length - 60, max: 60 }); S.badField = 'suCn'; return render(); }
       // Café test 2 (2026-11-11): "Every year" is one yearly rule ({ from: 'MM-DD', to: 'MM-DD', yearly: true }, "Every year:
       // Apr 1 – Apr 24"), not a dated copy for this year and next. Up to a year long, like any closure.
       // Tour test 8 (Whistler, 2026-11-17; Linda): a mistyped "Every year: Jan 4 – Jun 14" closed most of her Dec 10 – Sep 15
@@ -4286,6 +4645,11 @@
         if (!S.extra.some(function(c){ return c.yearly && c.from === yr.from && c.to === yr.to; })) S.extra.push(yr); S.added = closureLabel(yr); }
       else { S.extra.push({ from: cf, to: to, note: cnote }); S.added = dateLabel(cf) + (to !== cf ? ' – ' + dateLabel(to) : ''); }
       S.addFrom = ''; S.addTo = ''; S.addNote = ''; S.addLen = '1'; S.addYearly = false;
+      // Sport test 10: the next closure starts with an empty "Why?". The box was kept as an unsaved draft of this screen and
+      // came back (her shorter retype went nowhere, and "First note AAA" + "Second note BBB" were saved as one note).
+      ['suCn', 'suCf', 'suCt'].forEach(function(id){ var b0 = el(id); if (b0) { b0.value = ''; b0.defaultValue = ''; } });
+      var dcl = drGet('closures'); if (dcl && dcl.boxes && dcl.boxes['closures:add']) { delete dcl.boxes['closures:add']; drPut('closures', dcl); }
+      if (DR.at && DR.at.step === 'closures:add') DR.at = {};
       S.step = S.hist.pop() || 'closures'; S.nudge = ''; return render();
     }
     if (k === 'spend') { S.spend = Math.round(Math.max(C.cafe ? 2 : 5, Math.min(300, S.spend + (+v))) * 4) / 4; if (!C.cafe) S.spend = Math.round(S.spend); return render(); }
@@ -4313,7 +4677,7 @@
     if (k === 'menuCam') return el('suMenuCam').click();
     if (k === 'sendMenuFiles') return sendPages(S.menuFiles, null, 'menu', T.menuNote);
     if (k === 'sendMenuPages') return sendPages(S.menuPages, null, 'menu', T.menuNote);
-    if (k === 'menuWebSave') { var u = lastHttp(el('suUrl').value.trim()); S.webUrl = u; if (!u) { S.nudge = T.webEmpty; return render(); } return saveAll('menu', [{ menu_url: u }], 'day'); }
+    if (k === 'menuWebSave') { var u = lastHttp(el('suUrl').value.trim()); S.webUrl = u; if (!u) { S.nudge = T.webEmpty; return render(); } if (C.sport && T.webSavedLink) S.savedLine.menu = T.webSavedLink; return saveAll('menu', [{ menu_url: u }], 'day'); }
     if (k === 'menuEmailDone') return record('menu', 'email');
     if (k === 'menuDaily') {
       // Café test 2 (2026-11-11): saved as the café's answer (cafe_info.menu_daily), live at once; never the type-up queue.
@@ -4409,21 +4773,27 @@
       // Indoor places (2026-11-19): the youngest age; All ages or 5+ ticks Kids welcome, 12+ and up takes it off.
       if (INDOOR) {
         if (!S.tour.age) { S.nudge = T.tageNeed; return render(); }
-        var ia = {}; if (S.tour.age !== (TI.age || '')) ia.age = S.tour.age;
+        // Sport test 11 (2026-11-21; « Tous les âges » was pre-picked from the golf kind, Geneviève never touched it, and her
+        // semi-private course got Kid-Friendly): an age we pre-picked from the kind and she left as it was is not her
+        // answer. Neither the age nor Kids welcome is saved from it; only a tap on an age is.
+        var iGuess = !!S.tour.ageGuessed && !TI.age;
+        var ia = {}; if (!iGuess && S.tour.age !== (TI.age || '')) ia.age = S.tour.age;
         var iad = S.tour.age !== '19' && S.tour.age !== 'all' && S.tour.adult; if (iad !== (TI.adult === true)) ia.adult = iad ? true : null;
         if (Object.keys(ia).length) list.unshift(tinfo(ia));
         var ikids = S.tour.age === 'all' || S.tour.age === '5';
         // Indoor test 7 (2026-11-19; Robert's commercial gallery showed Kid-Friendly first): All ages never ticks Kids welcome
         // for a gallery, casino, library or theatre (unless it has kids' shows); the badge stays as it was there.
         if (ikids && !indoorFamilyKinds()) ikids = !!S.savedBadges.kid_friendly;
+        if (iGuess) ikids = !!S.savedBadges.kid_friendly;
         if (ikids !== !!S.savedBadges.kid_friendly) list.push({ badges: { kid_friendly: ikids } });
-        return saveAll('offer', list, null, offerNext('offer'), function(){ if (ia.age) TI.age = ia.age; if ('adult' in ia) { if (ia.adult) TI.adult = true; else delete TI.adult; } S.badges.kid_friendly = ikids; S.tour.ageGuessed = false; });
+        return saveAll('offer', list, null, offerNext('offer'), function(){ if (ia.age) TI.age = ia.age; if ('adult' in ia) { if (ia.adult) TI.adult = true; else delete TI.adult; } S.badges.kid_friendly = ikids; S.tour.ageGuessed = iGuess; });
       }
       // Tours (2026-11-16): the minimum age (and "under 18s with an adult") is this screen's first answer. All ages or 6+
       // ticks Kids welcome (5+ too, tour test 2); 12+ and up takes it off, so a family filter never shows a 16+ tour.
       if (TOUR) {
         if (!S.tour.age) { S.nudge = T.tageNeed; return render(); }
-        var ta = {}; if (S.tour.age !== (TI.age || '')) ta.age = S.tour.age;
+        var tGuess = !!S.tour.ageGuessed && !TI.age; // sport test 11: a pre-picked age is not her answer
+        var ta = {}; if (!tGuess && S.tour.age !== (TI.age || '')) ta.age = S.tour.age;
         var adult0 = S.tour.age !== '19' && S.tour.adult; if (adult0 !== (TI.adult === true)) ta.adult = adult0 ? true : null;
         // Tour test 12: under 19s, and the waiver (each only with the rule on).
         var aa0 = adult0 && S.tour.adultAge === '19', aw0 = adult0 && S.tour.adultHow === 'waiver';
@@ -4432,6 +4802,7 @@
         if (Object.keys(ta).length) list.unshift({ tour_info: ta });
         // Tour test 10 (Whistler, 2026-11-18; Gord, riders 8+; Dayton approved): 8+ and 10+ keep Kids welcome too.
         var kidsOn = S.tour.age === 'all' || S.tour.age === '5' || S.tour.age === '6' || S.tour.age === '8' || S.tour.age === '10';
+        if (tGuess) kidsOn = !!S.savedBadges.kid_friendly;
         if (kidsOn !== !!S.savedBadges.kid_friendly) list.push({ badges: { kid_friendly: kidsOn } });
         return saveAll('offer', list, null, offerNext('offer'), function(){ if (ta.age) TI.age = ta.age; if ('adult' in ta) { if (ta.adult) TI.adult = true; else delete TI.adult; } if ('adult_age' in ta) { if (ta.adult_age) TI.adult_age = '19'; else delete TI.adult_age; } if ('adult_waiver' in ta) { if (ta.adult_waiver) TI.adult_waiver = true; else delete TI.adult_waiver; } S.badges.kid_friendly = kidsOn; });
       }
@@ -4532,6 +4903,8 @@
     if (k === 'add' && v === 'happy') { readEntries(); if (S.happy.length === 1) S.happy[0].sea = clone(S.happySea); var nh = happyDefault(); nh.sea = clone(S.happySea); S.happy.push(nh); return render(); }
     if (k === 'add') { readEntries(); var arr = S[v]; arr.push(v === 'happy' ? happyDefault() : v === 'specials' ? { days: {}, text: '', price: '', sea: seaFrom() } : { days: {}, kind: '', what: '', sea: seaFrom() }); return render(); }
     if (k === 'happySave') return happySave();
+    if (k === 'happyClosedYes') { S.happyClosedOk = true; return happySave(); }
+    if (k === 'happyClosedNo') { readEntries(); S.happyClosedAsk = false; S.happyClosedOk = false; render(); var hsb = el('suSeahappy') || screen.querySelector('[id^="suSeahappy"]'); if (hsb && hsb.scrollIntoView) { try { hsb.scrollIntoView({ block: 'start' }); } catch (x) { hsb.scrollIntoView(); } } return; }
     if (k === 'specialsSave') return specialsSave();
     if (k === 'musicSave') return musicSave();
     if (k === 'storyFix') { S.storyReturn = 'offer'; S.hist.push(S.step); S.step = 'story'; S.nudge = ''; S.error = ''; render(); var ta = el('suStory'); if (ta) { var bi = sportsAt(); try { ta.focus({ preventScroll: true }); if (bi) ta.setSelectionRange(bi[0], bi[1]); } catch (e) {} } return; }
@@ -4575,7 +4948,7 @@
       return saveAll('flights', fl, null, null, function(){ Object.keys(bi2).forEach(function(kk){ if (bi2[kk] == null) delete BI[kk]; else BI[kk] = bi2[kk]; }); if (fb2.noFlights) { S.savedFlight = null; CUR.flight_fee = null; } else if (ff <= C.feeLiveMax) { S.savedFlight = ff; CUR.flight_fee = ff; CUR.flight_fee_waiting = null; } else if (ff !== S.savedFlight) CUR.flight_fee_waiting = ff; fb2.feeGuessed = false; S.togoGuessed = false; });
     }
     if (k === 'brewGroupsSave') {
-      var gFit = overMaxOwn('suGroupsLine', 180, 'groups'); if (gFit) { S.brew.groups = gFit.text; if (!gFit.go) return render(); }
+      var gFit = overMaxOwn('suGroupsLine', GROUPS_MAX, 'groups'); if (gFit) { S.brew.groups = gFit.text; if (!gFit.go) return render(); }
       readBrew(); var gline = String(S.brew.groups || '').trim(), gbu = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null;
       // Tour test 14 (Lucía): "Groups of 6 or moreMore than 4 people?… welcome.: please book ahead." went live. Two sentences
       // run together (a lowercase letter then a capital, or ".:") are asked about once; Save again keeps the line.
@@ -4594,7 +4967,7 @@
       if (gline && S.notOffered.indexOf('pyv_groups') >= 0) gl2.push({ not_offered: { remove: ['pyv_groups'] } });
       // Sent even when unchanged: saying it's right makes research's line hers (a full box never drops it).
       if (gline || bline) { var vr2 = {}; if (gline) vr2.groups = gline; if (bline) vr2.reservations = bline; gl2.push({ visit_rows: vr2 }); }
-      if (glinkCh) gl2.push({ booking_url: gbu });
+      if (glinkCh || bookKeep(gbu)) gl2.push({ booking_url: gbu });
       S.savedLine.groups = glinkCh ? T.groupsSavedLink : '';
       return saveAll('groups', gl2, null, null, function(){ if (bline) { S.visit.reservations = bline; CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.reservations = bline; C.visitResearch = (C.visitResearch || []).filter(function(kk){ return kk !== 'reservations'; }); } if (glinkCh) CUR.booking_url = gbu; if (!gline && CK) return; S.visit.groups = gline; CUR.visit_rows = CUR.visit_rows || {}; CUR.visit_rows.groups = gline; if (glinkCh) CUR.booking_url = gbu; C.visitResearch = (C.visitResearch || []).filter(function(kk){ return kk !== 'groups'; }); });
     }
@@ -4634,6 +5007,9 @@
     if (k === 'priceSave' && INDOOR) {
       // Indoor test 18: words before the number ("Facials from $95") say what it is; the number is the price.
       readTour(); var ipf = S.tour.free, ipb = el('suTprice') ? el('suTprice').value : '', ipbP = !ipf ? indoorPaidPart(ipb) : null; if (ipbP) ipb = ipbP; var ipbL = !ipf ? indoorLeadWords(ipb) : null; if (ipbL) ipb = ipbL.rest; var ipp = ipf ? 0 : !S.tour.per && indoorRangeLow(ipb) != null ? indoorRangeLow(ipb) : tourPriceNumber(ipb);
+      // Sport fix round 16 (sport test 17: "143143" said "We couldn't find a price"): a number typed twice says so.
+      var ipRaw = String(el('suTprice') ? el('suTprice').value : '').replace(/[\s$,]/g, ''), ipHalf = ipRaw.length >= 4 && ipRaw.length % 2 === 0 && /^\d+$/.test(ipRaw) ? ipRaw.slice(0, ipRaw.length / 2) : '';
+      if (!ipf && ipHalf && ipHalf === ipRaw.slice(ipRaw.length / 2) && T.tpriceDoubled && (String(CUR.indoor_price) === ipHalf || ipp == null || isNaN(ipp) || ipp > 2000)) { S.nudge = fill(T.tpriceDoubled, { x: ipHalf }); S.badField = 'suTprice'; return render(); }
       if (!ipf && (ipp == null || isNaN(ipp))) { S.nudge = T.tpriceNeed; S.badField = 'suTprice'; return render(); }
       // Indoor test 2 (Jordan): a price per room, lane, game or group is never saved as a price for one person. Per person
       // with words that say otherwise ("per room", "per boat", "for 4 people"): ask, and offer Per room or group.
@@ -4648,13 +5024,15 @@
       var iio = {};
       if (ipf === 'donation' && isg !== (typeof TI.suggested === 'number' ? TI.suggested : null)) iio.suggested = isg;
       if (iper !== (TI.per || '') || ipmin !== (TI.per_min || null) || ipmax !== (TI.per_max || null)) { iio.per = iper || null; iio.per_min = ipmin; iio.per_max = ipmax; }
+      // Sport test 1 (2026-11-20): a golf course's "$45 for 9 holes" keeps its holes for the first line of her price list.
+      if (C.sport && indoorMainKind() === 'golf' && !ipf) { var ihr = el('suTprice') ? el('suTprice').value : '', ihm = /\b(9|18|nine|eighteen)[- ]?(?:holes?|trous)\b/i.exec(ihr), ih = ihm ? (/^(?:18|eighteen)$/i.test(ihm[1]) ? 18 : 9) : null; if (ih !== (TI.holes || null)) iio.holes = ih; }
       if (Object.keys(iio).length) ipl.push(tinfo(iio));
       if (ival !== S.savedTourPrice || (CUR.indoor_price_waiting != null && ival !== CUR.indoor_price_waiting)) ipl.push(tprice(ival));
       // Free entry is the Free to Visit badge too (on with free, off with a price), so the Free filters agree with the card.
       var ifreeB = !!ipf; if (ifreeB !== !!(S.savedBadges.free_entry || (CUR.badges || {}).free_entry) && ipl.length) ipl.push({ badges: { free_entry: ifreeB } });
       var ilive = ipf || ipp <= (C.feeLiveMax || 300);
       S.savedLine.price = ipf === 'donation' && T.tpriceSavedDonation ? T.tpriceSavedDonation : ipf ? T.tpriceSavedFree : ilive ? T.tpriceSavedLive : fill(T.tpriceSavedDay, { x: tourMoney(ipp), n: tourMoney(C.feeLiveMax || 300) });
-      return saveAll('price', ipl, null, null, function(){ if (ilive) { S.savedTourPrice = ival; CUR.indoor_price = ival; CUR.indoor_price_waiting = null; } else CUR.indoor_price_waiting = ipp; S.tour.priceGuessed = false; S.savedBadges.free_entry = ifreeB; if (iper) { TI.per = iper; S.tour.per = iper; } else { delete TI.per; S.tour.per = ''; } if (ipmin) TI.per_min = ipmin; else delete TI.per_min; if (ipmax) TI.per_max = ipmax; else delete TI.per_max; S.tour.ptext = null; S.tour.perAuto = false; S.tour.perTapped = ''; if (ipf === 'donation') { TI.suggested = isg; if (isg == null) delete TI.suggested; S.tour.sugg = isg; S.tour.suggText = null; } });
+      return saveAll('price', ipl, null, null, function(){ if (ilive) { S.savedTourPrice = ival; CUR.indoor_price = ival; CUR.indoor_price_waiting = null; } else CUR.indoor_price_waiting = ipp; S.tour.priceGuessed = false; S.savedBadges.free_entry = ifreeB; if ('holes' in iio) { if (iio.holes) TI.holes = iio.holes; else delete TI.holes; } if (iper) { TI.per = iper; S.tour.per = iper; } else { delete TI.per; S.tour.per = ''; } if (ipmin) TI.per_min = ipmin; else delete TI.per_min; if (ipmax) TI.per_max = ipmax; else delete TI.per_max; S.tour.ptext = null; S.tour.perAuto = false; S.tour.perTapped = ''; if (ipf === 'donation') { TI.suggested = isg; if (isg == null) delete TI.suggested; S.tour.sugg = isg; S.tour.suggText = null; } });
     }
     if (k === 'bookingSave' && INDOOR) {
       readTour(); var ib0 = S.tour, ibu = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null; if (ibu !== null) S.bookUrl = ibu;
@@ -4663,12 +5041,15 @@
       var ibl = [];
       if (ib0.book && ib0.book !== (TI.book || '')) ibl.push(tinfo({ book: ib0.book }));
       var ibCh = ibu !== null && !!ibu && !ib0.noBook && ibu !== (CUR.booking_url || C.bookingKnown || '');
-      if (ibCh) ibl.push({ booking_url: ibu });
+      // Sport test 14 (Marisol kept the link we had found; it was her website, and the page showed only Website): a kept link
+      // that no owner has set yet is sent as her own answer, so the page keeps its Book button.
+      var ibKeep = !ibCh && !ib0.noBook && bookKeep(ibu);
+      if (ibCh || ibKeep) ibl.push({ booking_url: ibu });
       var ibNone = ib0.noBook && !ibu;
       if (ibNone && S.notOffered.indexOf('booking_link') < 0) ibl.push({ not_offered: { add: ['booking_link'] } });
       if (!ibNone && S.notOffered.indexOf('booking_link') >= 0) ibl.push({ not_offered: { remove: ['booking_link'] } });
       S.savedLine.booking = ibCh ? T.tbookSavedLink : '';
-      return saveAll('booking', ibl, null, null, function(){ if (ib0.book) TI.book = ib0.book; if (ibCh) CUR.booking_url = ibu; S.tour.bookGuessed = false; });
+      return saveAll('booking', ibl, null, null, function(){ if (ib0.book) TI.book = ib0.book; if (ibCh) CUR.booking_url = ibu; if (ibKeep && CUR.booking_url) CUR.booking_owner_set = true; S.tour.bookGuessed = false; });
     }
     if (k === 'tourSave') {
       var tk0 = S.tour.kinds.slice(), tl0 = S.tour.length;
@@ -4728,7 +5109,7 @@
       var bl = [];
       if (bk0 && bk0 !== (TI.book || '')) bl.push({ tour_info: { book: bk0 } });
       var blinkCh = bu1 !== null && !!bu1 && !tb0.noBook && bu1 !== (CUR.booking_url || C.bookingKnown || '');
-      if (blinkCh) bl.push({ booking_url: bu1 });
+      if (blinkCh || (!tb0.noBook && bookKeep(bu1))) bl.push({ booking_url: bu1 });
       var bNone = tb0.noBook && !bu1;
       if (bNone && S.notOffered.indexOf('booking_link') < 0) bl.push({ not_offered: { add: ['booking_link'] } });
       if (!bNone && S.notOffered.indexOf('booking_link') >= 0) bl.push({ not_offered: { remove: ['booking_link'] } });
@@ -4794,7 +5175,7 @@
       if (Object.keys(wi2).length) vl.push(apptClear ? { winery_info: wi2, hours: none2, hours_checked: true } : { winery_info: wi2 });
       var linkCh = bu !== null && !!bu && (!wv2.noBook || wv2.visit === 'walk_in') && bu !== (CUR.booking_url || C.bookingKnown || '');
       if (bu && !siteOk(bu)) { S.nudge = T.bookLinkBad; S.badField = 'suBookUrl'; return render(); }
-      if (linkCh) vl.push({ booking_url: bu });
+      if (linkCh || ((!wv2.noBook || wv2.visit === 'walk_in') && bookKeep(bu))) vl.push({ booking_url: bu });
       var wantNone = wv2.noBook && wv2.visit !== 'walk_in' && !bu;
       if (wantNone && S.notOffered.indexOf('booking_link') < 0) vl.push({ not_offered: { add: ['booking_link'] } });
       if (!wantNone && S.notOffered.indexOf('booking_link') >= 0) vl.push({ not_offered: { remove: ['booking_link'] } });
@@ -4836,7 +5217,7 @@
       // The booking link (pub test 9): its own box on this screen; a link in the line is offered a move, never refused.
       var bkUrl = el('suBookUrl') ? urlFromPaste(el('suBookUrl').value) : null; if (bkUrl !== null) S.bookUrl = bkUrl;
       if (bkUrl !== null) { var inl = linkIn(line); if (inl) { S.visit[key] = el('suLine').value; S.linkOffer = inl.url; S.nudge = ''; render(); var mv0 = el('suMoveLink'); if (mv0) mv0.scrollIntoView({ block: 'center' }); return; } S.linkOffer = ''; }
-      var linkChanged = bkUrl !== null && bkUrl !== (CUR.booking_url || '');
+      var linkChanged = bkUrl !== null && (bkUrl !== (CUR.booking_url || '') || bookKeep(bkUrl));
       if (!line && !(bkUrl && step === 'book')) { if (step === 'known') { S.nudge = T.needLine; return render(); } S.nudge = T.needLine; return render(); }
       if (!line) { return saveAll(step, (S.badges.takes_reservations ? [] : [{ badges: { takes_reservations: true } }]).concat(linkChanged ? [{ booking_url: bkUrl }] : []), null, null, function(){ S.badges.takes_reservations = true; CUR.booking_url = bkUrl; }); }
       var sameLine = (S.visit[key] || '') === line && ((S.visitSaved || CUR.visit_rows || {})[key] || '') === line;
@@ -4895,14 +5276,24 @@
     // Seasons (pub test 7): All year / Only some months / exact dates / back to months, and the month chips.
     Array.prototype.forEach.call(screen.querySelectorAll('[data-sea]'), function(b){ b.onclick = function(){
       readEntries(); readTimes(); var q2 = b.getAttribute('data-sea').split(':'), o = seaObj(q2[0]); if (!o) return;
-      if (q2[1] === 'all') o.on = false; else if (q2[1] === 'some') o.on = true;
+      if (q2[1] === 'all') o.on = false;
+      else if (q2[1] === 'some') {
+        o.on = true;
+        // Sport test 4 (2026-11-20) had a happy hour's months start as the place's own open months.
+        // Sport test 16 (2026-11-21; Nadia's winter deal cost 12 taps to move the lit Apr–Oct to Nov–Mar): they start empty.
+
+      }
       else if (q2[1] === 'exact') { var r0 = monthRun(o.months); o.exact = r0.a ? { from: pad2(r0.a) + '-01', to: pad2(r0.b) + '-' + MLAST[r0.b - 1] } : { from: '', to: '' }; }
-      else if (q2[1] === 'months') { var sm = seaMonths({ on: true, months: o.months, exact: o.exact }); o.exact = null; o.months = sm; }
+      // Sport test 15 (2026-11-21; Sunset Ranch: "Use whole months instead" with no dates picked yet opened with all 12
+      // chips lit, so tapping Mar and Apr left May to February): no dates is no months picked (or the months it had).
+      else if (q2[1] === 'months') { var ex0 = o.exact, sm = ex0 && ex0.from && ex0.to ? seaMonths({ on: true, months: o.months, exact: ex0 }) : Object.keys(o.months || {}).some(function(k){ return o.months[k]; }) ? clone(o.months) : {}; o.exact = null; o.months = sm; }
       if (q2[0] === 'hours') { S.seaTouched = true; S.sea.dirty = true; }
       S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-smon]'), function(b){ b.onclick = function(){
       var q2 = b.getAttribute('data-smon').split(':'), o = seaObj(q2[0]); if (!o) return; o.months[q2[1]] = !o.months[q2[1]];
-      b.setAttribute('aria-pressed', o.months[q2[1]] ? 'true' : 'false'); S.nudge = ''; mark(); warnRefresh(); if (q2[0] === 'hours') seaTitleRefresh(); }; });
+      b.setAttribute('aria-pressed', o.months[q2[1]] ? 'true' : 'false'); S.nudge = ''; mark(); var nw = warnRefresh(); if (q2[0] === 'hours') seaTitleRefresh();
+      // Sport fix round 16: the closed-season heads-up that a month chip just made true comes into view.
+      if (nw && q2[0].indexOf('happy') === 0 && nw.scrollIntoView) { try { nw.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (x) { nw.scrollIntoView(false); } } }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-sexact]'), function(inp){ inp.addEventListener('change', function(){ readSeasons(); if (inp.getAttribute('data-sexact').indexOf('hours') === 0) { S.seaTouched = true; seaTitleRefresh();
       // Brewery test 2 (Whistler, 2026-11-16): the "these dates overlap" message goes as soon as a date changes (it stayed
       // on screen after the dates were fixed, until Save). The picker keeps its focus: only the message is taken away.
@@ -4912,9 +5303,12 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-hoff]'), function(b){ b.onclick = function(){
       readTimes(); var d = b.getAttribute('data-hoff'), wk = W(); S.hoffWas = S.hoffWas || {};
       if (wk[d]) { S.hoffWas[S.step + d] = wk[d]; wk[d] = null; tapClosed(d, true); }
-      else { tapClosed(d, false); var tpl = S.hoffWas[S.step + d] || wk[DAYS.filter(function(x){ return wk[x]; })[0]] || S.week[d] || S.week.mon; wk[d] = tpl ? clone(tpl) : [DAY_NEW.slice()]; delete S.hoffWas[S.step + d]; }
+      // Sport test 6 (2026-11-20; Priya opened Sunday and got Monday's 6 AM–11 PM, not Saturday's 7 AM–10 PM): a reopened day
+      // takes the hours of the nearest open day before it (Sunday gets Saturday's).
+      else { tapClosed(d, false); var di = DAYS.indexOf(d), before = null; for (var k = 1; k < 7 && !before; k++) { var px = DAYS[(di - k + 7) % 7]; if (wk[px]) before = wk[px]; }
+        var tpl = S.hoffWas[S.step + d] || before || S.week[d] || S.week.mon; wk[d] = tpl ? clone(tpl) : [DAY_NEW.slice()]; delete S.hoffWas[S.step + d]; }
       mark(); var y = window.scrollY; render(); window.scrollTo(0, y); var nb = screen.querySelector('[data-hoff="' + d + '"]'); if (nb) try { nb.focus({ preventScroll: true }); } catch (e) {} }; });
-    Array.prototype.forEach.call(screen.querySelectorAll('[data-dayclosed]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-dayclosed'), wk = W(); if (wk[d]) { wk[d] = null; tapClosed(d, true); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); } }; });
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-dayclosed]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-dayclosed'), wk = W(); if (wk[d] || autoMonUnset(d)) { wk[d] = null; tapClosed(d, true); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); } }; });
     // Restaurant test 1: "+ Add a second time (lunch & dinner)" and its ✕. A dinner-only day gets lunch before it, a
     // lunch-only day dinner after it, and one long range (11:30 AM – 10 PM) is split at 2:30 PM and 5 PM.
     Array.prototype.forEach.call(screen.querySelectorAll('[data-addtime]'), function(b){ b.onclick = function(){
@@ -4951,7 +5345,9 @@
     Array.prototype.forEach.call(screen.querySelectorAll('[data-copytuesat]'), function(b){ b.onclick = function(){
       readTimes(); var wk = W(), d = b.getAttribute('data-copytuesat'), src = wk[d]; if (!src || wk.mon) return;
       // Tuesday to Saturday, open days or (a new page) every one of them that isn't marked Closed; Monday and Sunday as they are.
-      var gets = TUE_SAT.filter(function(x){ return x !== d && (wk[x] || copyGets(d, x)); });
+      // Sport test 6: a named copy opens every day it names (a day marked Closed too); only "Every open day" skips them.
+      var gets = TUE_SAT.filter(function(x){ return x !== d && (wk[x] || copyGets(d, x) || (!savedOpenAny() && !(S.closedTap || {})[S.step + x])); });
+      S.copyFrom = d; S.copySkipped = TUE_SAT.filter(function(x){ return x !== d && !wk[x] && gets.indexOf(x) < 0; });
       gets.forEach(function(x){ wk[x] = clone(src); }); mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-copysat]'), function(b){ b.onclick = function(){
       readTimes(); var wk = W(), src = wk.fri; if (!src || !copyGets('fri', 'sat')) return;
@@ -4964,6 +5360,11 @@
       // other day is closed (a new page with no hours yet) does it fill them all.
       var gets = DAYS.filter(function(x){ return copyGets(d, x); });
       gets.forEach(function(x){ if (all || (we ? ['sat', 'sun'] : ['mon', 'tue', 'wed', 'thu', 'fri']).indexOf(x) >= 0) wk[x] = clone(src); });
+      // Sport test 6 (2026-11-20; Priya, a new page: "Copy these hours to: Sat–Sun" from Saturday left Sunday closed, a day she
+      // had never set): a named copy also opens the days it names that were never set (no saved hours, not marked Closed
+      // here); a day closed in her saved hours or marked Closed stays closed, and the screen says which (copySkipped).
+      S.copySkipped = []; S.copyFrom = d;
+      if (!all) (we ? ['sat', 'sun'] : ['mon', 'tue', 'wed', 'thu', 'fri']).forEach(function(x){ if (x === d || wk[x]) return; if (!savedOpenAny() && !(S.closedTap || {})[S.step + x]) wk[x] = clone(src); else S.copySkipped.push(x); });
       if (all) delete HO()[d];
       mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-same]'), function(b){ b.onclick = function(){ readTimes(); var d = b.getAttribute('data-same'), i = DAYS.indexOf(d), wk = W(); wk[d] = clone(wk[DAYS[i - 1]]); render(); }; });
@@ -4974,6 +5375,7 @@
     var cfIn = el('suCf'); if (cfIn) cfIn.oninput = cfIn.onchange = function(){ S.addFrom = cfIn.value; var ce = el('suCends'); if (ce) ce.textContent = closeEnds(cfIn.value); };
     var cyIn = el('suCyear'); if (cyIn) cyIn.onchange = function(){ S.addYearly = cyIn.checked; };
     Array.prototype.forEach.call(screen.querySelectorAll('[data-len]'), function(b){ b.onclick = function(){ S.addFrom = el('suCf').value; S.addNote = el('suCn').value; var ct = el('suCt'); if (ct) S.addTo = ct.value; S.addLen = b.getAttribute('data-len'); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
+    var cnBox = el('suCn'); if (cnBox) cnBox.addEventListener('input', function(){ var c = el('suCnC'), left = 60 - cnBox.value.trim().length; if (c) { c.textContent = leftText(left); c.className = 'su-count' + (left < 0 ? ' su-over' : ''); } });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-xdel]'), function(b){ b.onclick = function(){ S.extra.splice(+b.getAttribute('data-xdel'), 1); S.added = ''; render(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-cui]'), function(b){ b.onclick = function(){
       var c = b.getAttribute('data-cui'), i = S.cuis.indexOf(c);
@@ -5057,7 +5459,7 @@
       // Tour test 9 (Whistler, 2026-11-18; Tanis): "Groups of up to 20School and group programs…" went live: the size line
       // ends with ". " so what she types next starts its own sentence (as the Good to know answers do).
       readBrew(); S.brew.groups = addPiece(keepPieces(S.brew.groups, groupsKeep(S.brew.groups)), groupsSizeLine(+b.getAttribute('data-bgroup')) + '.') + ' ';
-      var gpre = researchOf('groups'), gtr = gpre ? trimResearch(S.brew.groups, gpre, 180, groupsSizeLine(+b.getAttribute('data-bgroup'))) : null;
+      var gpre = researchOf('groups'), gtr = gpre ? trimResearch(S.brew.groups, gpre, GROUPS_MAX, groupsSizeLine(+b.getAttribute('data-bgroup'))) : null;
       if (gtr) { S.brew.groups = gtr.v + ' '; S.trimNote = { box: 'suGroupsLine', step: S.step, text: fill(T.trimResearch || '{rest}', { rest: gtr.rest.length > 90 ? gtr.rest.slice(0, 88) + '…' : gtr.rest }) }; } (S.chipFilled = S.chipFilled || {}).suGroupsLine = S.brew.groups; S.nudge = ''; mark(); var y = window.scrollY; render(); window.scrollTo(0, y);
       // Tour test 14 (Lucía, Pixel): her tap on the box after a size chip put the cursor mid-line, so her words went inside
       // "Groups of 6 or more: please book ahead." The box takes the focus with the cursor at the end (as the quick chips do).
@@ -5065,16 +5467,18 @@
     // Indoor test 8 (Gary cleared the Groups box and 10+ stayed pressed, with nothing saved): typing in the box (or
     // clearing it) re-lights the sizes and quick answers from what the box says.
     var gsx = el('suGroupsLine'); if (gsx) gsx.addEventListener('input', function(){
-      var gv = gsx.value, gs = sentencesOf(gv).filter(function(x){ return isSizeLine(x) || /book|réserv/i.test(x); })[0] || '', gn = (/\b(\d{1,2})\b/.exec(gs) || [])[1];
+      var gv = gsx.value, gs = sentencesOf(gv).filter(function(x){ return (isSizeLine(x) || /book|réserv/i.test(x)) && !sizeFact(x); })[0] || '', gn = (/\b(\d{1,2})\b/.exec(gs) || [])[1] || sizeFactChip(gv);
       Array.prototype.forEach.call(screen.querySelectorAll('[data-bgroup]'), function(c){ var n0 = +c.getAttribute('data-bgroup'); c.setAttribute('aria-pressed', sentencesOf(gv).indexOf(groupsSizeLine(n0)) >= 0 || (!!gn && +gn === n0) ? 'true' : 'false'); });
       var qs = Array.prototype.filter.call(screen.querySelectorAll('[data-quick]'), function(c){ return c.getAttribute('data-box') === 'suGroupsLine'; }), ql = qs.map(function(c){ return c.getAttribute('data-quick'); });
-      qs.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(gv, c.getAttribute('data-quick'), ql) ? 'true' : 'false'); });
+      qs.forEach(function(c){ c.setAttribute('aria-pressed', chipOn(gv, c.getAttribute('data-quick'), ql, 'suGroupsLine') ? 'true' : 'false'); });
       if (!gv.trim() && S.trimNote) trimNoteSet('suGroupsLine', ''); });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-bq]'), function(b){ b.onclick = function(){ readTimes(); var q11 = b.getAttribute('data-bq').split(':'), wk = W(), w11 = wk[q11[0]] && wk[q11[0]][+q11[1]]; if (!w11) return; w11[+q11[2]] = q11[3] + ':' + q11[4]; mark(); var y = window.scrollY; render(); window.scrollTo(0, y); }; });
     // Tours (2026-11-16): one-of-a-few answers, the kinds (up to 3), "under 18s with an adult" and "no online bookings".
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tpick]'), function(b){ b.onclick = function(){
       readTour(); var qt = b.getAttribute('data-tpick').split(':'), kt = qt[0], vt = qt[1];
-      S.tour[kt] = String(S.tour[kt]) === vt && kt !== 'bookYes' && kt !== 'adultAge' && kt !== 'adultHow' ? '' : vt;
+      // Sport test 12: a tap on the suggested age confirms it (it used to take it off).
+      var confirmAge = kt === 'age' && S.tour.ageGuessed && String(S.tour.age) === vt;
+      S.tour[kt] = String(S.tour[kt]) === vt && kt !== 'bookYes' && kt !== 'adultAge' && kt !== 'adultHow' && !confirmAge ? '' : vt;
       if (kt === 'length') S.tour.lengthGuessed = false;
       if (kt === 'book') S.tour.bookGuessed = false;
       if (kt === 'age') S.tour.ageGuessed = false;
@@ -5159,8 +5563,13 @@
       var pre = String(((CUR.visit_rows || {})[qk]) || '').trim();
       // Cocktail test 3 (2026-11-14): un-pressing a chip inside a longer Groups sentence ("Private room for 20") takes
       // that whole sentence away, never leaving "for 20" behind.
-      var inLonger = qk === 'groups' && has(v, t) && sentencesOf(v).filter(function(x){ return has(x, t) && x.toLowerCase() !== t.toLowerCase(); }).length;
+      var bid = b.getAttribute('data-box'), onNow = chipOn(v, t, sibs, bid), NEWQ = INDOOR && bid !== 'suGroupsLine';
+      var inLonger = (!NEWQ || onNow) && qk === 'groups' && has(v, t) && sentencesOf(v).filter(function(x){ return has(x, t) && x.toLowerCase() !== t.toLowerCase(); }).length;
       if (inLonger) v = sentencesOf(v).filter(function(x){ return !has(x, t); }).join(sep);
+      // Sport test 13: on an indoor or sport place, a chip not shown as picked is added, never cut out of her own words.
+      else if (NEWQ && !onNow && !(v && pre && v === pre && (C.visitResearch || []).indexOf(qk) >= 0 && !(TL && qk === 'good_to_know'))) { QTAP[bid + '|' + t] = 1; v = v ? v.replace(/[\s.,]+$/, '') + sep + t : t; }
+      else if (NEWQ && onNow && !chipExact(v, t) && has(v, t)) { delete QTAP[bid + '|' + t]; var i9 = v.toLowerCase().lastIndexOf(t.toLowerCase()); v = (v.slice(0, i9) + v.slice(i9 + t.length)).replace(/([.,])\s*[.,]/g, '$1').replace(/^[\s.,]+|[\s.,]+$/g, '').replace(/\s{2,}/g, ' '); }
+      else if (NEWQ && onNow) { delete QTAP[bid + '|' + t]; var tk = t.toLowerCase().replace(/[\s.;:!?]+$/, '').trim(); v = keepPieces(v, sentencesOf(v).filter(function(x){ return x.toLowerCase().replace(/[\s.;:!?]+$/, '').trim() !== tk; })); }
       else if (has(v, t)) { var i = v.toLowerCase().indexOf(t.toLowerCase()); v = (v.slice(0, i) + v.slice(i + t.length)).replace(/([.,])\s*[.,]/g, '$1').replace(/^[\s.,]+|[\s.,]+$/g, '').replace(/\s{2,}/g, ' '); }
       // Distillery test 2 (Whistler, 2026-11-16): the same for the line we pre-filled from research on a taproom's dogs screen
       // (« Chiens bienvenus à l'intérieur. » + « Terrasse seulement » read as both): the tap replaces it.
@@ -5178,7 +5587,7 @@
       if (sep === '. ' && v && qk !== 'takeout') v = v.replace(/[\s]+$/, '').replace(/([^.!?])$/, '$1.') + ' ';
       // Tour test 14 (Lucía): no double space inside the line (a space she typed after an earlier chip's ". ").
       v = v.replace(/([^\s])[ \u00a0]{2,}(?=\S)/g, '$1 ');
-      var lim0 = qk === 'groups' ? 180 : qk === 'good_to_know' ? BRING_MAX : 0, rpre = lim0 ? researchOf(qk) : '', tr0 = lim0 && rpre ? trimResearch(v, rpre, lim0, t) : null;
+      var lim0 = qk === 'groups' ? GROUPS_MAX : qk === 'good_to_know' ? BRING_MAX : 0, rpre = lim0 ? researchOf(qk) : '', tr0 = lim0 && rpre ? trimResearch(v, rpre, lim0, t) : null;
       if (tr0) { v = tr0.v + (sep === '. ' && !/[.!?]$/.test(tr0.v) ? '.' : '') + ' '; trimNoteSet(box.id, tr0.rest); } else if (lim0 && S.trimNote && S.trimNote.box === box.id && v.trim().length <= lim0) trimNoteSet(box.id, '');
       box.value = v.slice(0, box.maxLength > 0 ? box.maxLength : 180); box._qPrev = box.value; countUpdate(box); mark();
       // Tour test 11 (Whistler, 2026-11-18; Min-jun dictates): a Good to know chip puts the cursor in the box, at the end.
@@ -5188,7 +5597,7 @@
       // had text still takes the focus at its end (tour test 12).
       // Indoor test 5 (Chris): every chip box, so what is typed next goes at the end, never mid-line.
       if (!wasEmpty || touchTap) { try { box.focus(); var bl = box.value.length; box.setSelectionRange(bl, bl); } catch (e9) { /* older phones */ } }
-      mine.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(box.value, c.getAttribute('data-quick'), sibs) ? 'true' : 'false'); });
+      mine.forEach(function(c){ c.setAttribute('aria-pressed', chipOn(box.value, c.getAttribute('data-quick'), sibs, c.getAttribute('data-box')) ? 'true' : 'false'); });
     }; });
     var fold = el('suFold'); if (fold) fold.addEventListener('toggle', function(){ S.moreOpen = fold.open; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-sport]'), function(b){ b.onclick = function(){ var k = b.getAttribute('data-sport'); S.sports.list[k] = !S.sports.list[k]; b.setAttribute('aria-pressed', S.sports.list[k] ? 'true' : 'false'); S.nudge = ''; }; });
@@ -5289,9 +5698,16 @@
       // Tour test 14: a space typed right after a chip's ". " is not a second space.
       // Indoor test 11 (2026-11-19; Kim): no double space after a chip, also when a phone keyboard puts a space before the word
       // it adds (" School") after the chip's own ". ".
-      inp.addEventListener('input', function(){ if (inp._qPrev && / $/.test(inp._qPrev) && inp.value.indexOf(inp._qPrev + ' ') === 0) { inp.value = inp._qPrev + inp.value.slice(inp._qPrev.length + 1).replace(/^ +/, ''); inp._qPrev = inp.value === inp._qPrev ? inp._qPrev : ''; try { var nq = inp.value.length; inp.setSelectionRange(nq, nq); } catch (e) {} } });
+      inp.addEventListener('input', function(){ if (inp._qPrev && / $/.test(inp._qPrev) && inp.value.indexOf(inp._qPrev + ' ') === 0) { inp.value = inp._qPrev + inp.value.slice(inp._qPrev.length + 1).replace(/^ +/, ''); /* Sport test 4: the chip's line stays the one the words are joined to (quickJoin). */ try { var nq = inp.value.length; inp.setSelectionRange(nq, nq); } catch (e) {} } });
       inp.addEventListener('click', function(){ if (!(S.chipFilled && S.chipFilled[inp.id] != null && S.chipFilled[inp.id] === inp.value) || inp._chipEnd) return; inp._chipEnd = true; try { var ne = inp.value.length; if (inp.selectionStart !== ne || inp.selectionEnd !== ne) inp.setSelectionRange(ne, ne); } catch (e) {} });
       inp.addEventListener('focus', function(){ var n = inp.value.length; if (!n) return; var sel = pre && first; first = false; setTimeout(function(){ try { if (inp.value.length !== n) return; if (sel) { inp.select(); inp._autoSel = Date.now(); } else inp.setSelectionRange(n, n); } catch (e) {} }, 0); });
+      // Sport fix round 16 (sport test 17, a Samsung: the Price box's saved "143" became "143143" on a revisit; the tap's
+      // own mouseup put the cursor at the end after the select): a saved price is selected on each first tap, like the
+      // rate editor's boxes, so typing replaces it.
+      if (PRICE_BOXES.indexOf(inp.id) >= 0 && inp.value) { var pf = true;
+        inp.addEventListener('mouseup', function(e){ if (pf) { e.preventDefault(); try { inp.select(); } catch (x) {} pf = false; } });
+        inp.addEventListener('touchend', function(){ if (pf) setTimeout(function(){ try { inp.select(); } catch (x) {} pf = false; }, 0); });
+        inp.addEventListener('blur', function(){ pf = true; }); }
       // "…or tap again to add to it": a second tap on the story box while our own select is still on it puts the cursor
       // at the end (most phones do this themselves; where the tap leaves the text selected, this does it). The first
       // tap's own click, right after the focus, is left alone.
@@ -5375,8 +5791,40 @@
   // onlyDogs welcome…". When the box holds only quick answers and she types on at the end, the chips' own separator
   // (". ", or ", " for takeout) goes in first: "Patio only. Dogs welcome…". Nothing she typed is ever changed or lost;
   // typing anywhere else, deleting, or a box that holds her own words is left exactly as it is.
+  // The words that carry a chip's sentence on (Sport test 4): "for up to 144", "with mini golf", "in summer".
+  // Sport test 6 (2026-11-20; Priya: "Helmets for kids" + " under 10" saved as "Helmets for kids. Under 10.", and "Private
+  // ice rentals" + " through the City of Kelowna booking office" split the same way): ages, limits and "through" carry it on
+  // too, and so does a number ("Lockers 25 cents", "ages 5 to 12").
+  var JOIN_WORDS = /^(?:for|with|in|on|at|from|and|or|but|plus|until|till|after|before|by|during|except|only|all|every|each|including|when|if|of|as|via|near|inside|outside|under|over|through|throughout|around|about|between|without|than|ages?|aged|pour|avec|en|au|aux|à|de|du|des|et|ou|jusqu|dès|sauf|seulement|sur|dans|le|la|les|moins|pendant|avant|après|entre|par|sans|âges?)$/;
+  // Sport test 9 (2026-11-21; Gord: "Weddings and private events" + " up to 120 golfers, banquet room seats 150" read as
+  // weddings of 120 golfers): a bare "up to" or "to" no longer carries a chip on; it starts its own sentence ("for up to" does).
+  // Sport test 5 (2026-11-20; Jen pasted " midweek" after "School and club groups": "groups. Midweek."): a time word typed in
+  // lower case carries the chip on too ("School and club groups midweek"), pasted or typed (server.js OWNER_CHIP_CONT_WORDS).
+  var CONT_WORDS = /^(?:midweek|weekdays?|weekends?|weeknights?|daily|nightly|mornings?|afternoons?|evenings?|weekly|monthly|year-round|too|also|mostly|usually|sometimes)$/;
   var quickJoin = function(box, prev, sibs, sep){
     var v = box.value, p0 = String(prev || '');
+    // Sport test 3 (2026-11-20; Gord tapped "Birthday parties", then typed "with mini golf for up to 20 kids": it saved as
+    // "Birthday parties. With mini golf…"): a chip's ". " (tour test 10) is a space again when the words typed right after
+    // it carry the chip on in lower case, as the distillery fix below does for a box without the ". ".
+    // Sport test 4 (2026-11-20; Ryan): words that arrive in one go (a paste, dictation or a predicted word, often with a
+    // space first) join the same way; a comma or semicolon carries the chip on ("Dress code: collared shirts, no denim",
+    // never "shirts. , no denim"); and only a linking word joins with a space ("Group lessons and clinics" + "junior camps
+    // in July" is a new sentence, "Junior camps in July", never "clinics junior camps"). Typed key by key, the first word
+    // is judged once it is finished.
+    if (sep === '. ' && /[^.!?\s]\. $/.test(p0) && v.length > p0.length && v.slice(0, p0.length) === p0) {
+      var add0 = v.slice(p0.length), cut0 = box.maxLength > 0 ? box.maxLength : 180, at0 = box.selectionStart, nv0;
+      var put0 = function(nv, shift){ box.value = nv.slice(0, cut0); try { if (at0 != null) { var q0 = Math.max(0, Math.min(box.value.length, at0 + shift)); box.setSelectionRange(q0, q0); } } catch (e1) {} return true; };
+      if (/^\s?[,;]/.test(add0)) { nv0 = p0.replace(/\. $/, '') + add0.replace(/^\s/, ''); return put0(nv0, nv0.length - v.length); }
+      // A number right after the chip carries it on ("Helmets for kids" + " 10 and under").
+      if (/^\s?\d/.test(add0)) { var wd = add0.replace(/^\s/, ''); if (!/[\s,.;:!?]/.test(wd)) return 'wait'; nv0 = p0.replace(/\. $/, ' ') + wd; return put0(nv0, nv0.length - v.length); }
+      if (!/^\s?[a-zà-ÿ]/.test(add0)) return false;
+      var w0 = add0.replace(/^\s/, '');
+      var first0 = (/^[a-zà-ÿ’'-]+/.exec(w0) || [''])[0];
+      if (!/[\s,.;:!?]/.test(w0) && !(CONT_WORDS.test(w0) && add0.length > 2)) return 'wait';
+      if (JOIN_WORDS.test(first0) || CONT_WORDS.test(first0)) { nv0 = p0.replace(/\. $/, ' ') + w0; return put0(nv0, nv0.length - v.length); }
+      nv0 = p0 + w0.charAt(0).toUpperCase() + w0.slice(1);
+      return put0(nv0, nv0.length - v.length);
+    }
     if (!p0.trim() || v.length <= p0.length || v.slice(0, p0.length) !== p0 || /[\s.,;:!?]$/.test(p0)) return false;
     var added = v.slice(p0.length);
     // A space typed first: wait for the next letter (the box still holds only the chips).
@@ -5398,7 +5846,7 @@
     var mine = Array.prototype.filter.call(screen.querySelectorAll('[data-quick]'), function(c){ return c.getAttribute('data-box') === id; }); if (!mine.length) return;
     var sibs = mine.map(function(c){ return c.getAttribute('data-quick'); });
     if (e.target._qPrev == null || quickJoin(e.target, e.target._qPrev, sibs, mine[0].getAttribute('data-sep') || '. ') !== 'wait') e.target._qPrev = e.target.value;
-    mine.forEach(function(c){ c.setAttribute('aria-pressed', saysIt(e.target.value, c.getAttribute('data-quick'), sibs) ? 'true' : 'false'); });
+    mine.forEach(function(c){ c.setAttribute('aria-pressed', chipOn(e.target.value, c.getAttribute('data-quick'), sibs, id) ? 'true' : 'false'); });
   };
   screen.addEventListener('input', quickTyped);
   screen.addEventListener('input', function(e){ countUpdate(e.target); });
@@ -5407,6 +5855,7 @@
   screen.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('[data-off],[data-cui],[data-place],[data-hol],[data-chip],[data-len],[data-xdel],[data-kind],[data-rm],[data-closed],[data-same],[data-samemon],[data-dayopen],[data-dayclosed],[data-hoff],[data-addtime],[data-rmtime],[data-copyevery],[data-copywe],[data-sport],[data-tv],[data-minors],[data-ctog],[data-cpick],[data-cbadge],[data-soc],[data-wpick],[data-fee],[data-wnobook],[data-xq],[data-bpick],[data-bfee],[data-btogo],[data-bgroup],[data-bq],[data-tpick],[data-tkind],[data-tadult],[data-tnobook],[data-ifree],[data-iper]') : null; if (t) mark(); }, true);
   // Kept as the owner taps and types, and once more on the way out.
   var drT = null; function drSoon(){ clearTimeout(drT); drT = setTimeout(drSave, 250); }
+  screen.addEventListener('input', function(e){ if (e && e.target && e.target.id === 'suPartTimes') S.partTimes = e.target.value; });
   screen.addEventListener('input', drSoon); screen.addEventListener('change', drSoon); screen.addEventListener('click', function(){ setTimeout(drSave, 0); });
   window.addEventListener('pagehide', drSave);
   // ---------- Where she is, in the address (bug-check 2026-11-12) ----------

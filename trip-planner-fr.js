@@ -51,6 +51,10 @@ const STRONG_ON_FRENCH_PAGE = new Set(['brasserie', 'brasseries', 'cidrerie', 'c
 // interpreter's own English phrases (discovery-intent.js), so nothing here
 // can introduce a meaning the planner does not already have. '' drops a word.
 const PHRASES = [
+  // Sport test 13 (2026-11-21): « fin de semaine de golf dans le sud de l'Okanagan » planned the whole valley around
+  // « sud » (and Kelowna on the live site): the south and north of the Okanagan are those areas' towns.
+  ['dans le sud de l okanagan', 'in the south okanagan'], ['le sud de l okanagan', 'the south okanagan'], ['sud de l okanagan', 'south okanagan'], ['dans l okanagan sud', 'in the south okanagan'], ['l okanagan sud', 'the south okanagan'], ['okanagan sud', 'south okanagan'],
+  ['dans le nord de l okanagan', 'in the north okanagan'], ['le nord de l okanagan', 'the north okanagan'], ['nord de l okanagan', 'north okanagan'], ['dans l okanagan nord', 'in the north okanagan'], ['l okanagan nord', 'the north okanagan'], ['okanagan nord', 'north okanagan'],
   // Tour test 15 (Whistler, 2026-11-18; Dave, canoe, kayak and SUP rentals, a sunset paddle, snowshoe and fondue evenings):
   // « location de canot à Whistler en juillet » read « location of canoe » and found nothing. Rentals by what is rented
   // (singular and plural, canoë too), the paddle at sunset, the snowshoe-and-fondue evening (a snowshoe tour, not a
@@ -387,6 +391,33 @@ const PHRASES = [
   ['location d equipement', 'equipment rentals'], ['location de materiel', 'equipment rentals'],
   ['jouer au golf', 'golf'], ['terrain de golf', 'golf course'], ['terrains de golf', 'golf courses'],
   ['parcours de golf', 'golf course'], ['golfer', 'golf'],
+  // Sport test 15 (2026-11-21; « cours de golf près de Kelowna » planned Kurt's course first, with no lessons): golf lessons.
+  ['cours de golf', 'golf lessons'], ['lecons de golf', 'golf lessons'], ['lecon de golf', 'golf lessons'], ['cours de golf prives', 'private golf lessons'], ['cours de golf prive', 'private golf lesson'],
+  // Sport setup (2026-11-20): the sport kinds' French words.
+  ['disque golf', 'disc golf'], ['disques golf', 'disc golf'], ['parcours de disque golf', 'disc golf course'], ['golf frisbee', 'disc golf'],
+  ['piste de bmx', 'bmx track'], ['pistes de bmx', 'bmx tracks'],
+  ['champ de pratique', 'driving range'], ['simulateur de golf', 'golf simulator'], ['simulateurs de golf', 'golf simulators'], ['golf interieur', 'indoor golf'],
+  ['piscine exterieure', 'outdoor pool'], ['piscines exterieures', 'outdoor pools'],
+  // Sport test 2 (2026-11-20, the French sport vocabulary sweep): every sport kind's French search words read as its English.
+  // Sport test 11 (2026-11-21; « un départ le matin puis un souper » planned dinner only): a golfer's « départ » is a tee
+  // time (« un départ », « réserver un départ », « un départ de golf »); « départ de Kelowna » / « un départ du centre »
+  // is a departure. « au crépuscule » is twilight golf, « tôt » early, « une partie de golf » a round.
+  ['un depart le matin', 'a tee time in the morning'], ['un depart en matinee', 'a tee time in the morning'], ['un depart en apres midi', 'a tee time in the afternoon'], ['un depart l apres midi', 'a tee time in the afternoon'],
+  ['un depart en fin d apres midi', 'a late afternoon tee time'], ['un depart tot', 'an early tee time'], ['un depart au golf', 'a tee time'], ['un depart au crepuscule', 'a twilight tee time'], ['reserver un depart', 'book a tee time'], ['reserver une heure de depart', 'book a tee time'],
+  ['un depart de golf', 'a tee time'], ['depart de golf', 'tee time'], ['departs de golf', 'tee times'], ['un depart de', 'a departure from'], ['un depart du', 'a departure from the'], ['un depart d', 'a departure from'],
+  ['golf au crepuscule', 'twilight golf'], ['au crepuscule', 'at twilight'], ['tot le matin', 'early in the morning'], ['tot', 'early'],
+  ['une partie de golf', 'a round of golf'], ['partie de golf', 'round of golf'], ['une ronde de golf', 'a round of golf'], ['ronde de golf', 'round of golf'], ['neuf trous', '9 holes'], ['dix huit trous', '18 holes'],
+  ['voiturette', 'golf cart'], ['voiturettes', 'golf carts'], ['vert d exercice', 'putting green'], ['golfeurs', 'golfers'], ['golfeur', 'golfer'], ['golfeuse', 'golfer'],
+  ['heure de depart', 'tee time'], ['heures de depart', 'tee times'], ['droits de jeu', 'green fees'], ['droit de jeu', 'green fee'], ['18 trous', '18 holes'], ['9 trous', '9 holes'],
+  ['golf virtuel', 'indoor golf'], ['practice de golf', 'driving range'], ['seau de balles', 'bucket of balls'], ['seaux de balles', 'bucket of balls'],
+  ['apprendre a skier', 'learn to ski'], ['ski de soiree', 'night skiing'], ['ski en soiree', 'night skiing'],
+  ['patinage libre', 'public skating'], ['patinoire', 'skating rink'], ['patinoires', 'skating rinks'], ['hockey libre', 'drop in hockey'],
+  ['jeux d eau', 'splash park'], ['parc aquatique', 'water park'], ['parcs aquatiques', 'water parks'], ['planchodromes', 'skate parks'], ['parc de planche', 'skate park'],
+  ['parc de velo', 'bike park'], ['parcs de velo', 'bike parks'], ['sentiers de velo de montagne', 'mountain bike trails'],
+  ['court de tennis', 'tennis court'], ['courts de tennis', 'tennis courts'], ['terrain de tennis', 'tennis court'], ['terrains de tennis', 'tennis courts'],
+  ['terrain de pickleball', 'pickleball court'], ['terrains de pickleball', 'pickleball courts'], ['terrain de basketball', 'basketball court'], ['terrains de basketball', 'basketball courts'],
+  ['centre sportif', 'sports centre'], ['centres sportifs', 'sports centres'], ['complexe sportif', 'sports complex'], ['complexe recreatif', 'recreation complex'],
+  ['sports libres', 'drop in sports'], ['gymnase', 'gymnasium'], ['sports et loisirs', 'sports and recreation'], ['loisirs', 'recreation'],
   ['vue sur le lac', 'lake view'], ['vue sur lac', 'lake view'], ['vue sur la lac', 'lake view'],
   ['au bord du lac', 'by the lake'], ['bord du lac', 'by the lake'], ['pres du lac', 'by the lake'], ['sur le lac', 'on the lake'],
   ['au bord de l eau', 'waterfront'], ['bord de l eau', 'waterfront'], ...SITE_FRENCH_LAKES, ['lac', 'lake'], ['lacs', 'lakes'],
@@ -399,6 +430,15 @@ const PHRASES = [
   // Round 10: Christmas markets, and « de la musique » with shows is live music.
   ['marches de noel', 'christmas markets'], ['marche de noel', 'christmas market'], ['marches du temps des fetes', 'christmas markets'], ['marche des fetes', 'christmas market'],
   ['reveillon du nouvel an', "new year's eve"], ['veille du jour de l an', "new year's eve"], ['jour de l an', "new year's day"], ['nouvel an', "new year's"], ['saint valentin', "valentine's"], ['st valentin', "valentine's"], ['action de grace', 'thanksgiving'], ['jour du souvenir', 'remembrance day'], ['paques', 'easter'], ['fete des meres', "mother's day"], ['fete des peres', "father's day"],
+  // Sport test 7 (2026-11-20; « golf … (fête du Canada) » read as a celebration plus the word « canada »): every holiday
+  // name is that holiday, never « fête » (a celebration) plus a place word.
+  ['fete du canada', 'canada day'], ['jour du canada', 'canada day'], ['la fete du canada', 'canada day'], ['fete nationale du canada', 'canada day'],
+  ['fete de la reine', 'victoria day'], ['fete de victoria', 'victoria day'], ['journee nationale des patriotes', 'victoria day'], ['fete des patriotes', 'victoria day'],
+  ['fete du travail', 'labour day'], ['jour de la famille', 'family day'], ['fete de la famille', 'family day'],
+  ['jour de la colombie britannique', 'bc day'], ['fete de la colombie britannique', 'bc day'], ['jour de la c b', 'bc day'], ['fete de la c b', 'bc day'],
+  ['action de graces', 'thanksgiving'], ['jour de l action de grace', 'thanksgiving'], ['jour de l action de graces', 'thanksgiving'], ['fin de semaine de l action de grace', 'thanksgiving weekend'],
+  ['jour de noel', 'christmas day'], ['veille de noel', 'christmas eve'], ['lendemain de noel', 'boxing day'], ['jour du souvenir', 'remembrance day'],
+  ['jour de l an', "new year's day"], ['premier de l an', "new year's day"], ['fete du nouvel an', "new year's day"],
   ['noel', 'christmas'], ['temps des fetes', 'holidays'],
   ['de la musique', 'live music'], ['musique', 'live music'],
   ['marches', 'markets'],
@@ -472,6 +512,8 @@ const PHRASES = [
   ['et', 'and'], ['ou', 'or'], ['puis', 'then'], ['ensuite', 'then'], ['apres ca', 'then'], ['apres', 'after'], ['avant', 'before'],
   ['aussi', 'also'], ['mais', 'but'], ['avec', 'with'], ['pour', 'for'], ['sur', 'on'], ['dans', 'in'], ['pres de', 'near'],
   ['proche de', 'near'], ['autour de', 'around'], ['chez', 'at'], ['entre', 'between'],
+  // Sport test 14 (2026-11-21): « près d'Oliver » (pres d oliver) left « pres » in the plan's heading as a thing to do.
+  ['pres d', 'near'], ['proche d', 'near'], ['autour d', 'around'], ['tout pres de', 'near'], ['tout pres d', 'near'], ['pres', 'near'], ['proche', 'near'],
   // everything else: English filler words or nothing
   ['je', 'i'], ['j', 'i'], ['nous', 'we'], ['on', 'we'], ['voudrais', 'want'], ['voudrions', 'want'], ['veux', 'want'],
   ['voulons', 'want'], ['aimerais', 'want'], ['aimerions', 'want'], ['souhaite', 'want'], ['souhaitons', 'want'],
@@ -608,8 +650,13 @@ function isFrenchTripRequest(text, taxonomy) {
 // The request the planner reads: the English rewrite of a French request, or
 // the original string, unchanged, for anything else. { frenchPage: true } (a
 // search from a French page) also counts the French-only drink words.
+// Sport test 11: in a request about golf, « un départ » / « mon départ » (not « départ de Kelowna ») is a tee time.
+function golfDepartures(text) {
+  if (typeof text !== 'string' || !/golf/i.test(text)) return text;
+  return text.replace(/\b(un|mon|notre|le|nos|des|deux)\s+(d[ée]parts?)\b(?!\s+(?:de|du|des|d['’]|pour|vers\s+(?:le|la|les|l['’])|à\s+partir|a\s+partir))/gi, (m, a, d) => `${a} ${d} de golf`);
+}
 function tripPlannerText(text, taxonomy, opts = {}) {
-  const r = translateTrip(text, taxonomy, opts);
+  const r = translateTrip(golfDepartures(text), taxonomy, opts);
   return r ? r.text : text;
 }
 // The same tokens with their accents (round 10): « novembre », « marchés », for showing the visitor's own words back.
@@ -685,6 +732,17 @@ function translateTrip(text, taxonomy, { frenchPage = false } = {}) {
     // Brewery test 2 (Whistler, 2026-11-16): a French date (« le lundi 3 mai », « le 1er juin ») is that date in the English
     // the planner reads ("monday may 3"): it was read as the month alone, and its time was lost. Not inside a « du 3 au
     // 5 mai » range (handled below).
+    // Sport test 7 (2026-11-20; « les 17 et 18 juillet » was planned Jul 18–19): a list of days in one month (« les 17 et
+    // 18 juillet », « 16, 17 et 18 juillet ») is that range, first day to last.
+    {
+      let j = i; const days = [];
+      while (/^(\d{1,2})(?:er)?$/.test(tokens[j] || '') && !keep.has(j)) { days.push(Number(/^(\d{1,2})/.exec(tokens[j])[1])); j += 1; if (tokens[j] === 'et' || tokens[j] === ',') { j += 1; continue; } break; }
+      const mEn = days.length >= 2 ? FR_DATE_MONTHS[tokens[j]] : null;
+      if (mEn && !keep.has(j) && days.every((d) => d >= 1 && d <= 31) && days[days.length - 1] > days[0] && days[days.length - 1] - days[0] <= 6 && tokens[i - 1] !== 'du') {
+        if (['the', 'on'].includes(out[out.length - 1])) { out.pop(); pieces.pop(); }
+        out.push(`${mEn} ${days[0]} to ${mEn} ${days[days.length - 1]}`); i = j + 1; continue;
+      }
+    }
     const dm = /^(\d{1,2})(?:er)?$/.exec(w), monthEn = dm ? FR_DATE_MONTHS[tokens[i + 1]] : null;
     if (dm && monthEn && Number(dm[1]) >= 1 && Number(dm[1]) <= 31 && !keep.has(i + 1) && !(tokens[i - 1] === 'au' && /^\d{1,2}$/.test(tokens[i - 2] || '')) && tokens[i - 1] !== 'du') {
       if (out[out.length - 1] === 'the') { out.pop(); pieces.pop(); }

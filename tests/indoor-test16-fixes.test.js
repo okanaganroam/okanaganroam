@@ -153,7 +153,7 @@ test('4. Groups: for a place everyone books ahead, the size question asks when a
   await ok(change(tw, { indoor_info: { kinds: ['bowling'], length: '1-2h', book: 'busy', age: 'all', year: 'all' } }));
   assert.match((await openSetup(base, tw, { hash: 'groups' })).text(), /Groups and parties: from what size should they book ahead\?/);
   // Every kind has its own book-ahead question.
-  for (const [k, q] of Object.entries(T.en.indoor.kindText)) assert.match(q.groupsQAhead, /^Big groups: from what size should they (?:call or book more than one \w+|call ahead)\?$/, k);
+  for (const [k, q] of Object.entries(T.en.indoor.kindText)) assert.match(q.groupsQAhead, /^Big groups: from what size should they (?:call or book more than one \w+(?: \w+)?|call ahead)\?$/, k); // sport (2026-11-20): "one tee time"
   for (const [k, q] of Object.entries(T.fr.indoor.kindText)) assert.match(q.groupsQAhead, /^Grands groupes\s*:\s*à partir de combien/, k);
 });
 

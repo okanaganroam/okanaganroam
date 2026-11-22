@@ -6,7 +6,7 @@
 const en = {
   title: 'Set up your page', exit: 'Exit setup', back: '← Back', skip: 'Skip this for now', step: 'Step {n} of {total}', allDone: 'All done',
   hi: 'Hi {name} 👋', hiLead: 'Let’s get your page ready, one question at a time. About 15 to 30 minutes. You can stop any time and carry on later.', start: 'Start',
-  welcome: 'Welcome back 👋', welcomeLead: 'Here’s what you’ve done so far.', carryOn: 'Carry on', nextIs: 'Next: {step}', seeFinish: 'See how your page looks',
+  welcome: 'Welcome back 👋', welcomeLead: 'Here’s what you’ve done so far.', carryOn: 'Carry on', draftWaiting: 'You have unsaved changes from earlier', stDraft: 'unsaved changes from earlier', stMenuDraft: '{n} prices saved, not sent yet', stMenuDraft1: '1 price saved, not sent yet', nextIs: 'Next: {step}', seeFinish: 'See how your page looks',
   st: { live: 'on your page', day: 'on your page within a day', email: 'waiting for your email', skip: 'skipped', later: 'next time you’re at your place', none: 'not done yet', half: 'hours saved, holidays and closures still to do' },
   labels: {
     basics: 'Address, phone and website', hours: 'Hours', season: 'Seasons', closures: 'Holidays and closures', spend: 'Price per person', cuisine: 'What you serve',
@@ -21,7 +21,7 @@ const en = {
   yes: 'Yes', no: 'No', putBack: 'Put it back', example: 'For example: {x}', remove: 'Remove',
   basicsQ: 'Is this your address, phone and website?', address: 'Address', phone: 'Phone', website: 'Website', noWebsiteYet: 'No website yet', noWebsiteSaid: 'You don’t have a website', yesRight: 'Yes, that’s right', changeThem: 'Change them',
   basicsEditQ: 'Change your address, phone or website', streetLabel: 'Street address', phoneLabel: 'Phone number', websiteLabel: 'Website', websiteEx: 'For example: yourbusiness.com', noWebsiteBtn: 'We don’t have a website', websiteBad: 'Please check the web address, for example yourbusiness.com', saveThese: 'Save these', noChange: 'Nothing changed. If they’re right, tap Back and then “Yes, that’s right”.',
-  hoursQ: 'Are these still your hours?', closed: 'Closed', open: 'Open', hoursEditQ: 'Change your hours', hoursEditLead: 'Tap a time to change it.',
+  hoursQ: 'Are these still your hours?', hoursQNone: 'What are your hours?', closed: 'Closed', open: 'Open', hoursEditQ: 'Change your hours', hoursEditLead: 'Tap a time to change it.',
   sameAs: 'Same as {day}', opens: '{day} opens', closes: '{day} closes', to: 'to', saveHours: 'Save my hours', needOpenDay: 'Please set at least one day you’re open.',
   winterQ: 'Different hours part of the year?', winterHint: 'For example, shorter winter hours from November to April.', whichMonths: 'Which months?', hoursThen: 'Hours in those months',
   winterNeedMonths: 'Please tap the months for your other hours.', noHours: 'We don’t have your hours yet. Tap “Add my hours” to add them.', addHours: 'Add my hours',
@@ -30,7 +30,7 @@ const en = {
   monthsInRow: 'Please pick months in a row, like May to October.', monthsNeed: 'Please tap the months you’re open.',
   closuresQ: 'Any days you’ll be closed coming up?', closuresLead: 'Tap the holidays you’re closed. They show as closed on your page on those days.', anotherDay: '+ Another day or dates',
   saveClosures: 'Save my closures', nothingComing: 'No, nothing coming up', closeAddQ: 'When are you closed?', closeAddLead: 'For renovations, a private event or a holiday that’s not on the list.',
-  firstDay: 'First day closed', lastDay: 'Last day closed (if more than one day)', why: 'Why? (optional, shown on your page)', whyEx: 'Closed for renovations. Back on March 1.', addDates: 'Add these dates', needFirst: 'Please pick the first day you’re closed.',
+  firstDay: 'First day closed', lastDay: 'Last day closed (if more than one day)', why: 'Why? (optional, shown on your page)', whyEx: 'Closed for renovations. Back on March 1.', whyLong: 'Please keep “Why?” to {max} characters, so it fits on your page ({n} too many).', addDates: 'Add these dates', needFirst: 'Please pick the first day you’re closed.',
   holidays: { xmasEve: 'Christmas Eve', xmas: 'Christmas Day', boxing: 'Boxing Day', nye: 'New Year’s Eve', nyd: 'New Year’s Day', family: 'Family Day', goodFri: 'Good Friday', easterMon: 'Easter Monday' },
   spendQ: 'About how much does one person spend?', spendLead: 'One main and a soft drink, before tax and tip.', spendGuess: 'We guessed ${n} from your menu.', less: 'Less', more: 'More', spendYes: 'Yes, about ${n}',
   cuisineQ: 'What kind of food do you serve?', cuisineLead: 'Pick up to 3.', picked: 'Picked: {list}', showMore: 'Don’t see yours? Show more kinds of food', typeToFind: 'Or type to find it',
@@ -94,7 +94,7 @@ const en = {
 const fr = {
   title: 'Configurez votre page', exit: 'Quitter', back: '← Retour', skip: 'Passer pour l’instant', step: 'Étape {n} sur {total}', allDone: 'Terminé',
   hi: 'Bonjour {name} 👋', hiLead: 'Préparons votre page, une question à la fois. Environ 15 à 30 minutes. Vous pouvez arrêter à tout moment et continuer plus tard.', start: 'Commencer',
-  welcome: 'Bon retour 👋', welcomeLead: 'Voici ce que vous avez déjà fait.', carryOn: 'Continuer', nextIs: 'Suivant : {step}', seeFinish: 'Voir à quoi ressemble votre page',
+  welcome: 'Bon retour 👋', welcomeLead: 'Voici ce que vous avez déjà fait.', carryOn: 'Continuer', draftWaiting: 'Vous avez des changements non enregistrés', stDraft: 'changements non enregistrés', stMenuDraft: '{n} prix enregistrés, pas encore envoyés', stMenuDraft1: '1 prix enregistré, pas encore envoyé', nextIs: 'Suivant : {step}', seeFinish: 'Voir à quoi ressemble votre page',
   st: { live: 'sur votre page', day: 'sur votre page d’ici un jour', email: 'en attente de votre courriel', skip: 'passé', later: 'la prochaine fois que vous serez sur place', none: 'pas encore fait', half: 'heures enregistrées, jours fériés et fermetures à faire' },
   labels: {
     basics: 'Adresse, téléphone et site Web', hours: 'Heures', season: 'Saisons', closures: 'Jours fériés et fermetures', spend: 'Prix par personne', cuisine: 'Ce que vous servez',
@@ -109,7 +109,7 @@ const fr = {
   yes: 'Oui', no: 'Non', putBack: 'Remettre comme avant', example: 'Par exemple : {x}', remove: 'Retirer',
   basicsQ: 'Est-ce bien votre adresse, votre téléphone et votre site Web?', address: 'Adresse', phone: 'Téléphone', website: 'Site Web', noWebsiteYet: 'Pas encore de site Web', noWebsiteSaid: 'Vous n’avez pas de site Web', yesRight: 'Oui, c’est exact', changeThem: 'Les modifier',
   basicsEditQ: 'Modifier votre adresse, votre téléphone ou votre site Web', streetLabel: 'Adresse', phoneLabel: 'Numéro de téléphone', websiteLabel: 'Site Web', websiteEx: 'Par exemple : votreentreprise.com', noWebsiteBtn: 'Nous n’avons pas de site Web', websiteBad: 'Vérifiez l’adresse Web, par exemple votreentreprise.com', saveThese: 'Enregistrer', noChange: 'Rien n’a changé. S’ils sont exacts, touchez Retour puis « Oui, c’est exact ».',
-  hoursQ: 'Est-ce que ce sont toujours vos heures?', closed: 'Fermé', open: 'Ouvert', hoursEditQ: 'Modifier vos heures', hoursEditLead: 'Touchez une heure pour la changer.',
+  hoursQ: 'Est-ce que ce sont toujours vos heures?', hoursQNone: 'Quelles sont vos heures d’ouverture?', closed: 'Fermé', open: 'Ouvert', hoursEditQ: 'Modifier vos heures', hoursEditLead: 'Touchez une heure pour la changer.',
   sameAs: 'Comme {day}', opens: '{day} ouverture', closes: '{day} fermeture', to: 'à', saveHours: 'Enregistrer mes heures', needOpenDay: 'Indiquez au moins un jour d’ouverture.',
   winterQ: 'D’autres heures une partie de l’année?', winterHint: 'Par exemple, des heures d’hiver plus courtes de novembre à avril.', whichMonths: 'Quels mois?', hoursThen: 'Heures pendant ces mois',
   winterNeedMonths: 'Touchez les mois de vos autres heures.', noHours: 'Nous n’avons pas encore vos heures. Touchez « Ajouter mes heures » pour les ajouter.', addHours: 'Ajouter mes heures',
@@ -118,7 +118,7 @@ const fr = {
   monthsInRow: 'Choisissez des mois qui se suivent, comme de mai à octobre.', monthsNeed: 'Touchez les mois où vous êtes ouvert.',
   closuresQ: 'Des jours de fermeture à venir?', closuresLead: 'Touchez les jours fériés où vous êtes fermé. Ils s’affichent comme fermés sur votre page ces jours-là.', anotherDay: '+ Une autre date',
   saveClosures: 'Enregistrer mes fermetures', nothingComing: 'Non, rien à venir', closeAddQ: 'Quand êtes-vous fermé?', closeAddLead: 'Pour des rénovations, un événement privé ou un jour férié qui n’est pas sur la liste.',
-  firstDay: 'Premier jour de fermeture', lastDay: 'Dernier jour de fermeture (si plus d’un jour)', why: 'Pourquoi? (facultatif, affiché sur votre page)', whyEx: 'Fermé pour rénovations. De retour le 1er mars.', addDates: 'Ajouter ces dates', needFirst: 'Choisissez le premier jour de fermeture.',
+  firstDay: 'Premier jour de fermeture', lastDay: 'Dernier jour de fermeture (si plus d’un jour)', why: 'Pourquoi? (facultatif, affiché sur votre page)', whyEx: 'Fermé pour rénovations. De retour le 1er mars.', whyLong: 'Gardez « Pourquoi? » à {max} caractères, pour qu’il tienne sur votre page ({n} de trop).', addDates: 'Ajouter ces dates', needFirst: 'Choisissez le premier jour de fermeture.',
   holidays: { xmasEve: 'Veille de Noël', xmas: 'Noël', boxing: 'Lendemain de Noël', nye: 'Veille du jour de l’An', nyd: 'Jour de l’An', family: 'Jour de la famille', goodFri: 'Vendredi saint', easterMon: 'Lundi de Pâques' },
   spendQ: 'Environ combien dépense une personne?', spendLead: 'Un plat principal et une boisson sans alcool, avant taxes et pourboire.', spendGuess: 'D’après votre menu, nous avons estimé {n} $.', less: 'Moins', more: 'Plus', spendYes: 'Oui, environ {n} $',
   cuisineQ: 'Quel genre de cuisine servez-vous?', cuisineLead: 'Choisissez-en jusqu’à 3.', picked: 'Choisi : {list}', showMore: 'Vous ne la voyez pas? Afficher plus de cuisines', typeToFind: 'Ou tapez pour la trouver',
@@ -479,7 +479,7 @@ Object.assign(en.holidays, { victoria: 'Victoria Day', canada: 'Canada Day', bcD
 Object.assign(fr.holidays, { victoria: 'Fête de Victoria', canada: 'Fête du Canada', bcDay: 'Jour de la Colombie-Britannique', labour: 'Fête du Travail', truth: 'Journée de la vérité et de la réconciliation', thanks: 'Action de grâce', remembrance: 'Jour du Souvenir' });
 Object.assign(en, {
   // Hours: copying never reopens a closed day.
-  copyOpen: 'Every open day', copyClosedNote: 'Days marked Closed stay closed.',
+  copyOpen: 'Every open day', copyClosedNote: 'Days marked Closed stay closed.', copySkipped: '{days} stayed closed (marked Closed). Tap Open this day there to open it with these hours.',
   // Closures: the next few holidays, then the rest.
   holAll: 'Show all holidays ({n})', holFewer: 'Show fewer holidays',
   // Menu on Facebook or Instagram; no website filled in when there is none.
@@ -493,7 +493,7 @@ Object.assign(en, {
   storySportsHint: 'You said you don’t show sports, but your description says “{bit}”. Change or remove that part, then save. We check it first.',
 });
 Object.assign(fr, {
-  copyOpen: 'Chaque jour ouvert', copyClosedNote: 'Les journées marquées Fermé restent fermées.',
+  copyOpen: 'Chaque jour ouvert', copyClosedNote: 'Les journées marquées Fermé restent fermées.', copySkipped: '{days} : resté fermé (marqué Fermé). Touchez Ouvrir ce jour pour l’ouvrir avec ces heures.',
   holAll: 'Voir tous les jours fériés ({n})', holFewer: 'Voir moins de jours fériés',
   menuSocial: 'Mon menu est sur Facebook ou Instagram', menuSocialQ: 'Où est votre menu?', menuSocialLead: 'Collez le lien de votre page ou publication Facebook ou Instagram avec le menu. Ou tapez le nom de la page et nous le trouverons.',
   menuSocialLabel: 'Lien ou nom de la page', menuSocialEx: 'facebook.com/votrepub ou @votrepub', menuSocialEmpty: 'Collez le lien ou tapez le nom de votre page.',
@@ -780,7 +780,7 @@ Object.assign(en, {
   allYearClosed: 'We’re closed part of the year', allYearClosedSub: 'Like open spring to fall. You pick the dates.',
   openQ: 'When are you open each year?', openLead: 'Outside these dates your page says “Closed for the season”, and when you reopen.',
   openFrom: 'Open from', openTo: 'Open until (your last day)', repeatsYearly: 'These dates repeat every year. No need to pick a year.',
-  openSame: 'Save: same hours all season', openSameSub: 'The hours you just set', openSummer: 'Save, and add different summer hours', openSummerSub: 'Like longer hours in July and August',
+  openSame: 'Save: same hours all season', openSameSub: 'The hours you just set', openSummer: 'Save, and add different summer hours', openSummerSub: 'Like longer hours in July and August', openPart: 'Save, and add different hours for part of the season', openPartSub: 'Like longer hours over Christmas, or night hours',
   openSaveOnly: 'Save these dates', openMonthsLink: 'Closed for whole months? Tap the months instead',
   openNeed: 'Please pick the first and last day you’re open.', openSameDay: 'The first and last day are the same. Please check them.',
   openNow: 'Open {a} to {b} every year', openChange: 'Change', partYearBtn: '+ We’re closed part of the year (pick your open dates)',
@@ -792,7 +792,7 @@ Object.assign(fr, {
   allYearClosed: 'Nous fermons une partie de l’année', allYearClosedSub: 'Par exemple ouvert du printemps à l’automne. Vous choisissez les dates.',
   openQ: 'Quand êtes-vous ouverts chaque année?', openLead: 'En dehors de ces dates, votre page indique « Fermé pour la saison » et la date de réouverture.',
   openFrom: 'Ouvert à partir du', openTo: 'Ouvert jusqu’au (votre dernier jour)', repeatsYearly: 'Ces dates reviennent chaque année. Pas besoin de choisir l’année.',
-  openSame: 'Enregistrer : mêmes heures toute la saison', openSameSub: 'Les heures que vous venez d’indiquer', openSummer: 'Enregistrer et ajouter des heures d’été différentes', openSummerSub: 'Comme des heures plus longues en juillet et août',
+  openSame: 'Enregistrer : mêmes heures toute la saison', openSameSub: 'Les heures que vous venez d’indiquer', openSummer: 'Enregistrer et ajouter des heures d’été différentes', openSummerSub: 'Comme des heures plus longues en juillet et août', openPart: 'Enregistrer et ajouter des heures différentes pour une partie de la saison', openPartSub: 'Comme des heures plus longues à Noël, ou des heures de soirée',
   openSaveOnly: 'Enregistrer ces dates', openMonthsLink: 'Fermé des mois entiers? Touchez plutôt les mois',
   openNeed: 'Choisissez le premier et le dernier jour d’ouverture.', openSameDay: 'Le premier et le dernier jour sont les mêmes. Vérifiez-les.',
   openNow: 'Ouvert du {a} au {b} chaque année', openChange: 'Modifier', partYearBtn: '+ Nous fermons une partie de l’année (choisissez vos dates d’ouverture)',
@@ -2160,7 +2160,11 @@ Object.assign(fr, {
   frLineNames: { known_for: 'Connu pour', good_to_know: 'Bon à savoir', groups: 'Groupes', dogs: 'Chiens', dietary: 'Note alimentaire', reservations: 'Réservations', takeout: 'À emporter', menu: 'Menu' },
   frOnlyNamed: '{list} : en français seulement, donc sur votre page française seulement.', frOnlyAddEn: 'Ajouter la version anglaise',
   knownFrDropsEn: 'Si vous l’écrivez en français, cette ligne en anglais quitte votre page anglaise : ajoutez-en une en anglais sur votre page de modification.',
+  // Sport test 11: indoor and sport places (their English is queued for them).
+  knownFrKeepsEn: 'Votre page anglaise garde cette ligne en anglais jusqu’à ce que nous écrivions la version anglaise de la vôtre (habituellement d’ici un jour).',
+  frOnlyQueued: '{list} : écrit en français. Nous écrivons la version anglaise pour votre page anglaise, habituellement d’ici un jour.',
 });
+Object.assign(en, { frOnlyQueued: 'Written in French: {list}. We write the English for your English page, usually within a day.' });
 // Tour test 7 (Whistler fresh eyes, Erik, a mountain guide, 2026-11-17): a day rate ("$750/day") is a price for the
 // group (Private tours, with the move button); "1450 for 3 days" is a trip length, not a group count; a bare hourly
 // rate goes in Your tours and prices. The private box takes a day rate and says so.
@@ -2351,6 +2355,8 @@ en.indoor = {
   kindsGuess: 'We picked these from your page. Check them: tap to change.', kindsGuessFold: 'We picked this from your page. Not right? Tap Change.', kindsChange: 'Change',
   guessCheck: 'We picked the usual for your kind of place. Tap another if it’s different.',
   guessKind: 'We picked the usual for your kind of place. Tap another if it’s different.',
+  ageSuggest: 'Suggested: {age}. Tap it to confirm, or tap another age.',
+  stAgeTap: 'tap an age to confirm',
   // Price
   tpriceQ: 'What does it cost?', tpriceLead: 'The price for one adult. It shows on your card.', tpriceLeadPick: 'Your card will say “Adults {x}”.', tpriceLeadFree: 'Your card will say “Free”.',
   tpriceLabel: 'Adult price, in dollars', tpriceMore: 'Your other prices (kids, seniors, passes, packages) go in “Your prices”, the first of the extra details.',
@@ -2442,6 +2448,8 @@ fr.indoor = {
   kindsGuess: 'Nous les avons choisis d’après votre page. Vérifiez-les : touchez pour changer.', kindsGuessFold: 'Nous l’avons choisi d’après votre page. Ce n’est pas ça? Touchez Modifier.', kindsChange: 'Modifier',
   guessCheck: 'Nous avons choisi l’habituel pour votre genre d’endroit. Touchez-en un autre si c’est différent.',
   guessKind: 'Nous avons choisi l’habituel pour votre genre d’endroit. Touchez-en un autre si c’est différent.',
+  ageSuggest: 'Suggéré : {age}. Touchez-le pour confirmer, ou touchez un autre âge.',
+  stAgeTap: 'touchez un âge pour confirmer',
   tpriceQ: 'Combien ça coûte?', tpriceLead: 'Le prix pour un adulte. Il paraît sur votre fiche.', tpriceLeadPick: 'Votre fiche indiquera « Adultes : {x} ».', tpriceLeadFree: 'Votre fiche indiquera « Gratuit ».',
   tpriceLabel: 'Prix adulte, en dollars', tpriceMore: 'Vos autres prix (enfants, aînés, laissez-passer, forfaits) vont dans « Vos tarifs », le premier des détails facultatifs.',
   tpriceGuess: 'Nous l’avons choisi d’après votre page. Vérifiez-le, et changez-le s’il n’est pas exact.',
@@ -2550,6 +2558,59 @@ Object.assign(fr.indoor, { bringExKinds: { gallery: 'La plupart des œuvres sont
 // - A theatre (its main kind) is asked about tickets, and its price is its lowest regular ticket ("Tickets from $25").
 // - A range ("$25 - $55", "25 to 55") is read as its low number.
 // - The story and Known for examples follow the main kind (like the Good to know example).
+// Sport test 9 (2026-11-21; Gord's "My prices are on my website" was filled with his Chronogolf tee-time link): a rates
+// page only, never a booking link; with none found, the box starts empty with a hint.
+Object.assign(en.indoor, { partTimesQ: 'Part of the place with its own times? (optional)', partTimesOpen: 'Part of the place has its own times? Add it', partTimesPh: 'e.g. Range: April–October\nFitting bay: open all winter by appointment', partTimesHint: 'One line each, up to 3. Your season and hours stay as they are: this shows beside them as that part’s times. Then tap your answer above.', partTimesKeep: 'Add: “{line}”' });
+Object.assign(en.indoor, { webWhatShows: 'Your page will link to your rates page (your prices aren’t copied).', webSavedLink: 'Your page will link to your rates page, usually within a day (we check the link first).', webLeadRates: 'We filled in the rates page we found on your website. Check it’s the right one.', webLeadRatesEmpty: 'Type your rates page’s address, like yourclub.com/rates (not your booking page). Or use your website’s home page.' });
+Object.assign(fr.indoor, { partTimesQ: 'Une partie de l’endroit a ses propres heures? (facultatif)', partTimesOpen: 'Une partie de l’endroit a ses propres heures? Ajoutez-la', partTimesPh: 'p. ex. Champ de pratique : d’avril à octobre\nBaie d’ajustement : ouverte tout l’hiver sur rendez-vous', partTimesHint: 'Une ligne chacune, jusqu’à 3. Votre saison et vos heures restent les mêmes : ceci paraît à côté, comme les heures de cette partie. Puis touchez votre réponse plus haut.', partTimesKeep: 'Ajouter : « {line} »' });
+Object.assign(fr.indoor, { webWhatShows: 'Votre page renverra à votre page des tarifs (vos prix ne sont pas copiés).', webSavedLink: 'Votre page renverra à votre page des tarifs, en général d’ici un jour (nous vérifions le lien d’abord).', webLeadRates: 'Nous avons inscrit la page des tarifs trouvée sur votre site. Vérifiez que c’est la bonne.', webLeadRatesEmpty: 'Inscrivez l’adresse de votre page des tarifs, comme votreclub.com/tarifs (pas votre page de réservation). Ou prenez la page d’accueil de votre site.' });
+// Sport test 8 (2026-11-21; Dayton approved): a walk-on or 9-hole course's Good to know chips. The big-course chips that
+// don't fit it ("Pro shop", "Dress code: collared shirts", "Driving range on site") make room, so the count stays the same.
+// Sport test 8 (2026-11-21; Marg's golf course was asked "Patio only / Inside and patio / Water bowls at the door"): the
+// dog follow-up in each sport kind's own words (the same three-chip screen, reworded). [chips, example] by kind.
+Object.assign(en.indoor, { quickSportDogs: {
+  golf: ['On the course, on a leash', 'Clubhouse patio only', 'Not on the course'],
+  discgolf: ['On the course, on a leash', 'Pick up after your dog', 'Not on the course'],
+  range: ['On a leash', 'Outside only', 'Not on the range'],
+  bike: ['On a leash, off the track', 'Outside only', 'Not on the track'],
+  skatepark: ['On a leash, outside the park', 'Outside only', 'Not in the park'],
+  courts: ['On a leash, outside the courts', 'Outside only', 'Not on the courts'],
+  swim: ['Outside the pool area only', 'On a leash', 'Not in the pool area'],
+  _: ['On a leash', 'Outside only', 'Not inside'],
+}, sportDogEx: {
+  golf: 'Dogs welcome on the course on a leash. Please pick up after your dog.',
+  discgolf: 'Dogs welcome on the course on a leash. Please pick up after your dog.',
+  range: 'Dogs welcome on a leash, outside only.',
+  bike: 'Dogs welcome on a leash, off the track.',
+  skatepark: 'Dogs welcome on a leash outside the park.',
+  courts: 'Dogs welcome on a leash outside the courts.',
+  swim: 'Dogs on a leash outside the pool area only.',
+  _: 'Dogs welcome outside on a leash, not inside.',
+} });
+Object.assign(fr.indoor, { quickSportDogs: {
+  golf: ['Sur le parcours, en laisse', 'Terrasse du club-house seulement', 'Pas sur le parcours'],
+  discgolf: ['Sur le parcours, en laisse', 'Ramassez après votre chien', 'Pas sur le parcours'],
+  range: ['En laisse', 'À l’extérieur seulement', 'Pas sur le champ de pratique'],
+  bike: ['En laisse, hors de la piste', 'À l’extérieur seulement', 'Pas sur la piste'],
+  skatepark: ['En laisse, hors du parc', 'À l’extérieur seulement', 'Pas dans le parc'],
+  courts: ['En laisse, hors des terrains', 'À l’extérieur seulement', 'Pas sur les terrains'],
+  swim: ['À l’extérieur de l’aire de la piscine seulement', 'En laisse', 'Pas dans l’aire de la piscine'],
+  _: ['En laisse', 'À l’extérieur seulement', 'Pas à l’intérieur'],
+}, sportDogEx: {
+  golf: 'Chiens bienvenus sur le parcours, en laisse. Ramassez après votre chien.',
+  discgolf: 'Chiens bienvenus sur le parcours, en laisse. Ramassez après votre chien.',
+  range: 'Chiens bienvenus en laisse, à l’extérieur seulement.',
+  bike: 'Chiens bienvenus en laisse, hors de la piste.',
+  skatepark: 'Chiens bienvenus en laisse, hors du parc.',
+  courts: 'Chiens bienvenus en laisse, hors des terrains.',
+  swim: 'Chiens en laisse à l’extérieur de l’aire de la piscine seulement.',
+  _: 'Chiens bienvenus à l’extérieur en laisse, pas à l’intérieur.',
+} });
+Object.assign(en.indoor.bringExKinds = en.indoor.bringExKinds || {}, { golfsmall: 'Walk-ons only: no tee times. Pull carts only. Cash in the honour box when the clubhouse is closed.', golfsmallbook: 'Pull carts only. Cash only at the clubhouse.' });
+// Sport test 11: a course that books every tee time ahead: an example that doesn't tell visitors tee times are optional.
+Object.assign(en.indoor.bringExKinds, { golfahead: 'Dress code: collared shirts, no denim. Cart and club rentals in the pro shop.' });
+Object.assign(fr.indoor.bringExKinds = fr.indoor.bringExKinds || {}, { golfahead: 'Code vestimentaire : chemise à col, pas de jeans. Location de voiturettes et de bâtons à la boutique du pro.' });
+Object.assign(fr.indoor.bringExKinds = fr.indoor.bringExKinds || {}, { golfsmall: 'Sans réservation seulement : pas d’heures de départ. Chariots à tirer seulement. Comptant dans la boîte de paiement quand le club-house est fermé.', golfsmallbook: 'Chariots à tirer seulement. Comptant seulement au club-house.' });
 Object.assign(en.indoor, { webLeadTickets: 'We filled in your tickets page. If your prices are on another page, change it.', researchLine: 'We picked these from what we found online. Untick anything that’s wrong.', noSetHoursHint: 'Shows or classes only? Tap this. Put box office hours in Good to know, like “Box office: Tue–Fri 11–4 and an hour before shows.”',
   ibookQShow: 'Do people need tickets ahead?', ibooksShow: { no: 'Tickets at the door are fine', busy: 'Tickets at the door, but buy ahead for busy shows', ahead: 'Please buy tickets ahead' },
   ibookNeedShow: 'Please tap one: tickets at the door, or buy ahead.',
@@ -2655,6 +2716,75 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
 // its three chips (the same number as before), and the box office hint only for theatres and classes. The setup lays
 // these over the indoor words for the kind picked (owner-setup-client.js kindWords). The old three Groups chips stay in
 // quick.groups so lines saved with them still show in French.
+// Sports & recreation and golf (2026-11-20, the sport easy setup; Dayton: "keep this nice and easy for businesses to do
+// and not overwhelming for them"). The indoor screens in sport words: golf courses, simulators, ranges and mini golf,
+// arenas, skate parks, disc golf, BMX tracks, outdoor pools, courts, ski lessons and sports centres. The same 7 essentials
+// and 6 optional tiles; no new fields. Each sport kind's own chips and examples sit in the indoor tables too (their keys
+// never repeat an indoor one), so Help's chip lists read them the same way.
+// Sport test 6: the hours screen's line for kinds whose public times change (the page then says "check the schedule").
+const SPORT_TIMES_HINTS = {
+  rink: ['Public skate times change week to week? Enter the hours the building is open; your page will say to check the schedule.', 'L’horaire du patinage libre change d’une semaine à l’autre? Entrez les heures d’ouverture du bâtiment; votre page dira de vérifier l’horaire.'],
+  swim: ['Public swim times change week to week? Enter the hours the pool is open; your page will say to check the schedule.', 'L’horaire des bains libres change d’une semaine à l’autre? Entrez les heures d’ouverture de la piscine; votre page dira de vérifier l’horaire.'],
+  sportsctr: ['Drop-in times change week to week? Enter the hours the building is open; your page will say to check the schedule.', 'L’horaire des activités libres change d’une semaine à l’autre? Entrez les heures d’ouverture du bâtiment; votre page dira de vérifier l’horaire.'],
+};
+(function sportWords() {
+  Object.assign(en.indoor.quick.good_to_know_kinds, {
+    golf: ['Tee times recommended', 'Cart and club rentals', 'Pro shop', 'Restaurant and patio on site', 'Dress code: collared shirts', 'Driving range on site', 'Free parking on site'],
+    simgolf: ['Book a bay ahead', 'Clubs to borrow', 'Food and drinks on site', 'Lessons available', 'Free parking on site'],
+    range: ['Balls and clubs to rent', 'Covered stalls', 'Lessons available', 'Lit for evening play', 'Free parking on site'],
+    snow: ['Book lessons ahead', 'Rentals available', 'Lift ticket not included', 'Meet at the ski school sign', 'Dress for the weather'],
+    rink: ['Skate rentals', 'Helmets for kids', 'Public skate times change: check the schedule', 'Skate aids for beginners', 'Free parking on site', 'Concession stand'],
+    swim: ['Bring a swimsuit and a towel', 'Lifeguards on duty', 'Kids under 8 with an adult in the water', 'Change rooms', 'Shade and picnic area', 'Free parking on site'],
+    skate: ['Helmets recommended', 'Bikes and scooters welcome', 'Lit in the evening', 'Washrooms nearby', 'Free parking on site'],
+    bike: ['Helmets required', 'Closed during race nights', 'Bike rentals nearby', 'Washrooms nearby', 'Free parking on site'],
+    courts: ['First come, first served', 'Book a court for evenings', 'Bring your own racquet or paddle', 'Lit in the evening', 'Free parking on site'],
+    discgolf: ['Free to play', 'Bring your own discs', 'Course map at the first tee', 'Washrooms nearby', 'Free parking on site'],
+    sportsctr: ['Lockers available', 'Bring indoor shoes', 'Drop-in times change: check the schedule', 'Free parking on site', 'Concession stand'],
+    sportgen: ['Book ahead on weekends', 'Rentals available', 'Arrive 15 minutes early', 'Free parking on site', 'Washrooms on site'],
+    golfsmall: ['Walk-ons only: no tee times', 'Pull carts only', 'Cash only', 'Honour box when the clubhouse is closed', 'Cart and club rentals', 'Restaurant and patio on site', 'Free parking on site'],
+  });
+  Object.assign(fr.indoor.quick.good_to_know_kinds, {
+    golf: ['Heures de départ conseillées', 'Location de voiturettes et de bâtons', 'Boutique du pro', 'Restaurant et terrasse sur place', 'Code vestimentaire : chemise à col', 'Champ de pratique sur place', 'Stationnement gratuit sur place'],
+    simgolf: ['Réservez une baie à l’avance', 'Bâtons à emprunter', 'Nourriture et boissons sur place', 'Cours offerts', 'Stationnement gratuit sur place'],
+    range: ['Balles et bâtons à louer', 'Postes couverts', 'Cours offerts', 'Éclairé le soir', 'Stationnement gratuit sur place'],
+    snow: ['Réservez les cours à l’avance', 'Location sur place', 'Billet de remontée non compris', 'Rendez-vous au panneau de l’école de ski', 'Habillez-vous selon la météo'],
+    rink: ['Location de patins', 'Casque pour les enfants', 'Les heures de patinage libre changent : voyez l’horaire', 'Aides au patinage pour débutants', 'Stationnement gratuit sur place', 'Comptoir de friandises'],
+    swim: ['Apportez votre maillot et une serviette', 'Sauveteurs en service', 'Moins de 8 ans avec un adulte dans l’eau', 'Vestiaires', 'Ombre et aire de pique-nique', 'Stationnement gratuit sur place'],
+    skate: ['Casque conseillé', 'Vélos et trottinettes bienvenus', 'Éclairé le soir', 'Toilettes à proximité', 'Stationnement gratuit sur place'],
+    bike: ['Casque obligatoire', 'Fermé pendant les soirées de course', 'Location de vélos à proximité', 'Toilettes à proximité', 'Stationnement gratuit sur place'],
+    courts: ['Premier arrivé, premier servi', 'Réservez un terrain le soir', 'Apportez votre raquette', 'Éclairé le soir', 'Stationnement gratuit sur place'],
+    discgolf: ['Gratuit', 'Apportez vos disques', 'Carte du parcours au premier départ', 'Toilettes à proximité', 'Stationnement gratuit sur place'],
+    sportsctr: ['Casiers offerts', 'Apportez des souliers d’intérieur', 'Les heures libres changent : voyez l’horaire', 'Stationnement gratuit sur place', 'Comptoir de friandises'],
+    sportgen: ['Réservez pour les fins de semaine', 'Location sur place', 'Arrivez 15 minutes d’avance', 'Stationnement gratuit sur place', 'Toilettes sur place'],
+    golfsmall: ['Sans réservation seulement : pas d’heures de départ', 'Chariots à tirer seulement', 'Comptant seulement', 'Boîte de paiement quand le club-house est fermé', 'Location de voiturettes et de bâtons', 'Restaurant et terrasse sur place', 'Stationnement gratuit sur place'],
+  });
+  Object.assign(en.indoor.bringExKinds, { golf: 'Tee times recommended on weekends. Cart and club rentals in the pro shop.', simgolf: 'Book a bay ahead for evenings. Bring your own clubs or rent ours.', range: 'Balls and clubs to rent. Covered stalls when it rains.',
+    snow: 'Book lessons ahead at Christmas and spring break. Meet at the ski school sign 15 minutes early.', rink: 'Skate rentals at the front desk. Public skate times change with hockey games: check the schedule.', swim: 'Bring a swimsuit and a towel. Lifeguards on duty during public swims.',
+    skate: 'Helmets recommended. Lit until 10 PM.', bike: 'Helmets required. The track is closed to the public during race nights.', courts: 'First come, first served. Bring your own racquet or paddle.', discgolf: 'Free to play. Course map at the first tee.',
+    sportsctr: 'Bring indoor shoes. Drop-in times change: check the schedule.', sportgen: 'Arrive 15 minutes early. Free parking on site.' });
+  Object.assign(fr.indoor.bringExKinds, { golf: 'Heures de départ conseillées la fin de semaine. Location de voiturettes et de bâtons à la boutique du pro.', simgolf: 'Réservez une baie à l’avance le soir. Apportez vos bâtons ou louez les nôtres.', range: 'Balles et bâtons à louer. Postes couverts quand il pleut.',
+    snow: 'Réservez les cours à l’avance à Noël et à la relâche. Rendez-vous au panneau de l’école de ski 15 minutes d’avance.', rink: 'Location de patins à l’accueil. Les heures de patinage libre changent selon les matchs : voyez l’horaire.', swim: 'Apportez votre maillot et une serviette. Sauveteurs en service pendant les bains libres.',
+    skate: 'Casque conseillé. Éclairé jusqu’à 22 h.', bike: 'Casque obligatoire. La piste est fermée au public pendant les soirées de course.', courts: 'Premier arrivé, premier servi. Apportez votre raquette.', discgolf: 'Gratuit. Carte du parcours au premier départ.',
+    sportsctr: 'Apportez des souliers d’intérieur. Les heures libres changent : voyez l’horaire.', sportgen: 'Arrivez 15 minutes d’avance. Stationnement gratuit sur place.' });
+  Object.assign(en.indoor.storyExKinds, { golf: 'A family-run 18-hole course since 1990, with lake views from the back nine and a patio for after your round.', simgolf: 'Four TrackMan bays, 300 courses to play, lessons with a PGA pro and food and drinks while you play.',
+    range: 'A grass driving range with covered stalls, a putting green and an 18-hole mini golf course for the kids.', skischool: 'Ski and snowboard lessons for every age, from first-timers to experts, with kids’ day camps all winter.',
+    rink: 'Our community arena: public skating, drop-in hockey and skate rentals from October to March.', swim: 'An outdoor pool with a waterslide and a spray park, open daily in summer with lifeguards on duty.',
+    skatepark: 'A concrete skate park with a bowl and a street section, lit in the evening, free and open to everyone.', bike: 'A club-run BMX track with race nights in summer and learn-to-ride clinics for kids.',
+    courts: 'Six lit courts for tennis and pickleball, free to play, with drop-in nights all summer.', discgolf: 'An 18-hole disc golf course through the trees, free to play, with a map at the first tee.',
+    sportsctr: 'Our community sports centre: a gym, an arena and drop-in sports for every age.', sportgen: 'A local, family-run place since 2010. Friendly staff and something for every age.' });
+  Object.assign(fr.indoor.storyExKinds, { golf: 'Un parcours familial de 18 trous depuis 1990, avec vue sur le lac au retour et une terrasse pour après la partie.', simgolf: 'Quatre baies TrackMan, 300 parcours à jouer, des cours avec un pro de la PGA, et à manger et à boire pendant que vous jouez.',
+    range: 'Un champ de pratique sur gazon avec des postes couverts, un vert d’exercice et un mini-golf de 18 trous pour les enfants.', skischool: 'Des cours de ski et de planche pour tous les âges, des débutants aux experts, avec des camps de jour pour enfants tout l’hiver.',
+    rink: 'Notre aréna communautaire : patinage libre, hockey libre et location de patins d’octobre à mars.', swim: 'Une piscine extérieure avec glissade d’eau et jeux d’eau, ouverte tous les jours l’été avec des sauveteurs en service.',
+    skatepark: 'Un planchodrome en béton avec un bol et une section de rue, éclairé le soir, gratuit et ouvert à tous.', bike: 'Une piste de BMX gérée par un club, avec des soirées de course l’été et des cliniques d’initiation pour les enfants.',
+    courts: 'Six terrains éclairés pour le tennis et le pickleball, gratuits, avec du jeu libre tout l’été.', discgolf: 'Un parcours de disque-golf de 18 trous dans les arbres, gratuit, avec une carte au premier départ.',
+    sportsctr: 'Notre centre sportif communautaire : un gymnase, un aréna et des sports libres pour tous les âges.', sportgen: 'Un endroit local et familial depuis 2010. Une équipe accueillante et quelque chose pour tous les âges.' });
+  Object.assign(en.indoor.knownExKinds, { golf: 'Lake views from every hole on the back nine', simgolf: 'TrackMan bays and lessons with a PGA pro', range: 'Covered stalls and 18 holes of mini golf', skischool: 'Kids’ day camps and first-timer lessons',
+    rink: 'Family skates on Sunday afternoons', swim: 'The waterslide and the spray park', skatepark: 'The bowl and the street section', bike: 'Thursday race nights in summer', courts: 'Drop-in pickleball every weekday morning',
+    discgolf: '18 holes through the pines', sportsctr: 'Drop-in sports for every age', sportgen: 'Friendly, local and fun for the whole family' });
+  Object.assign(fr.indoor.knownExKinds, { golf: 'Vue sur le lac de chaque trou au retour', simgolf: 'Les baies TrackMan et les cours avec un pro de la PGA', range: 'Les postes couverts et les 18 trous de mini-golf', skischool: 'Les camps de jour pour enfants et les cours pour débutants',
+    rink: 'Le patinage familial le dimanche après-midi', swim: 'La glissade d’eau et les jeux d’eau', skatepark: 'Le bol et la section de rue', bike: 'Les soirées de course du jeudi l’été', courts: 'Le pickleball libre chaque matin de semaine',
+    discgolf: '18 trous dans les pins', sportsctr: 'Des sports libres pour tous les âges', sportgen: 'Accueillant, local et amusant pour toute la famille' });
+})();
 (function indoorKindWords() {
   const IK = require('./indoor-kinds');
   const noPeriod = (x) => String(x).replace(/\.$/, '');
@@ -2664,7 +2794,7 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
     // Codes, not words: [Good to know chip group, story example group, quiet kind, daytime kind] (an array, so the French
     // check skips it). Daytime (indoor test 5): no "Open after midnight?" row.
     T.kindGroups = {};
-    for (const k of IK.INDOOR_KIND_TEXT_KINDS) {
+    for (const k of IK.INDOOR_KIND_TEXT_KINDS.concat(IK.SPORT_KIND_TEXT_KINDS)) {
       const w = IK.indoorKindText([k], lang), line = noPeriod(w.price.page);
       T.kindText[k] = {
         tpriceLabel: w.price.label, tpricePh: w.price.ph, tpriceLead: w.price.lead,
@@ -2690,14 +2820,152 @@ fr.indoor.quick = Object.assign({}, fr.quick, {
         // row after them, optional, for school or daycare groups.
         ...(k === 'kids' ? fr2 ? { tpriceMore: 'Vos autres prix (tout-petits, bébés, adultes, cartes de 10 entrées, fêtes) vont dans « Vos tarifs », le premier des détails facultatifs.', groupsQ: 'Fêtes d’anniversaire et groupes', groupsSizeQ: 'Groupes scolaires ou de garderie : à partir de combien? (facultatif)' }
           : { tpriceMore: 'Your other prices (toddlers, babies, adults, 10-visit passes, parties) go in “Your prices”, the first of the extra details.', groupsQ: 'Birthday parties and groups', groupsSizeQ: 'School or daycare groups: from what size? (optional)' } : {}),
-        classNightsHint: k === 'classes' ? (fr2 ? 'Des cours le soir en dehors de ces heures? Gardez ici vos heures d’atelier libre, et ajoutez les soirs de cours dans Bon à savoir.' : 'Evening classes outside these hours? Keep your open studio hours here, and add class nights in Good to know.') : '',
+        // Sport test 1 (2026-11-20): a sport kind's own words for the three booking choices ("Walk-ons when there's room; book
+        // tee times for busy times" on a golf course).
+        ...(IK.SPORT.BOOK_WORDS[k] && IK.SPORT.BOOK_WORDS[k].chips ? { ibooks: Object.fromEntries(Object.entries(IK.SPORT.BOOK_WORDS[k].chips).map(([b, w]) => [b, w[fr2 ? 1 : 0]])) } : {}),
+        // Sport test 6 (2026-11-20; Priya: "public skate times change every week… what do i put for hours"): one line on a rink's,
+        // a pool's or a sports centre's hours screens (SPORT_TIMES_HINTS).
+        classNightsHint: SPORT_TIMES_HINTS[k] ? SPORT_TIMES_HINTS[k][fr2 ? 1 : 0]
+          : k === 'classes' ? (fr2 ? 'Des cours le soir en dehors de ces heures? Gardez ici vos heures d’atelier libre, et ajoutez les soirs de cours dans Bon à savoir.' : 'Evening classes outside these hours? Keep your open studio hours here, and add class nights in Good to know.') : '',
       };
+      // Sport test 2 (2026-11-20): the kind's own words where the sport screens had a golf course's (sport-kinds.js).
+      const sw = (IK.SPORT.KIND_SETUP_WORDS || {})[k];
+      if (sw) for (const [key, pair] of Object.entries(sw)) T.kindText[k][key] = pair[fr2 ? 1 : 0];
       T.quick.groups_kinds[k] = w.groups.chips;
       // Indoor test 13: [4] what its link is ('shows' for cinemas and theatres, 'classes' for class kinds, '' the rest).
       T.kindGroups[k] = [w.gtk, w.ex, w.quiet ? 1 : 0, w.day ? 1 : 0, w.ticketed ? 'shows' : w.classKind ? 'classes' : ''];
     }
   }
 })();
+// The sport strings: the indoor ones (with the kind tables above) and these words over them.
+function sportStrings(base, o) {
+  const x = JSON.parse(JSON.stringify(base));
+  for (const [k, v] of Object.entries(o)) x[k] = v && typeof v === 'object' && !Array.isArray(v) && x[k] && typeof x[k] === 'object' && !Array.isArray(x[k]) ? { ...x[k], ...v } : v;
+  // A sport listing with no kind yet reads in the "Something else" words.
+  if (x.kindText && x.kindText.sportother) x.kindText.other = x.kindText.sportother;
+  return x;
+}
+en.sport = sportStrings(en.indoor, {
+  tpriceMore: 'Your other prices (kids, passes, lessons, rentals) go in “Your prices”, the first of the extra details.',
+  // No Per room or group choice under the price box (Dayton: few screens, no extra choices): a golf fee is per person, a
+  // simulator's hour per bay is in its kind's words.
+  iperChips: null, iperNeed: '', iperRead: '',
+  labels: { groups: 'Groups and events' },
+  photosLead: 'Your place, and people playing. Three photos is perfect.',
+  allYearClosedSub: 'Like open April to October, or December to March. You pick the dates.',
+  allYearShutHint: 'Closed a week or two each year, like for maintenance? Add it under Closures and holidays.',
+  seaClosuresHint: 'Closed over Christmas, or for a tournament week? Add it under Closures in More about your place.',
+  noDogsSub: 'Not allowed', noDogsSubInside: 'Not allowed',
+  noSetHours: 'We don’t have set hours (lessons or bookings only)', noSetHoursNow: 'No set hours: lessons or bookings only ✓',
+  bookLinkLabel: 'Booking link', bookLinkEx: 'your booking page', tbookQ: 'Your booking link (optional)',
+  storyEx: 'A local, family-run place since 2010. Friendly staff and something for every age.', knownEx: 'Friendly, local and fun for the whole family',
+  bringEx: 'Arrive 15 minutes early. Free parking on site.',
+  groupsQ: 'Groups and events: from what size should they book ahead?', groupsLead: 'Tap a size, then add tournaments, parties, school groups or leagues in your own words.', groupsEx: 'Birthday parties on weekends. School groups welcome',
+  menuLead: 'Every pass, lesson or rental and what it costs. A photo of your price list or a link to your prices page is perfect. It’s optional.',
+  menuFreeSub: 'Anything that costs extra, like lessons or rentals? Optional',
+  menuLeadFree: 'It’s free, so you can skip this. Anything that costs extra, like lessons or rentals? A photo of the price list or a link is perfect.',
+  menuTypeSub: 'Each pass, lesson or rental and its price, one line at a time',
+  // Seasons matter here: the Hours screen's line under "We're closed part of the year" names the kind's usual season.
+  seasonHintSummer: 'Most places like yours close for winter. Tap “We’re closed part of the year” and pick your first and last day.',
+  seasonHintWinter: 'Most places like yours are open in winter only. Tap “We’re closed part of the year” and pick your first and last day.',
+});
+fr.sport = sportStrings(fr.indoor, {
+  tpriceMore: 'Vos autres prix (enfants, cartes, cours, locations) vont dans « Vos tarifs », le premier des détails facultatifs.',
+  // No Per room or group choice under the price box (Dayton: few screens, no extra choices): a golf fee is per person, a
+  // simulator's hour per bay is in its kind's words.
+  iperChips: null, iperNeed: '', iperRead: '',
+  labels: { groups: 'Groupes et événements' },
+  photosLead: 'Votre endroit, et des gens qui jouent. Trois photos, c’est parfait.',
+  allYearClosedSub: 'Par exemple ouvert d’avril à octobre, ou de décembre à mars. Vous choisissez les dates.',
+  allYearShutHint: 'Fermé une semaine ou deux chaque année, comme pour l’entretien? Ajoutez-le dans Fermetures et jours fériés.',
+  seaClosuresHint: 'Fermé pendant les Fêtes, ou pour une semaine de tournoi? Ajoutez-le sous Fermetures dans Plus sur votre endroit.',
+  noDogsSub: 'Pas admis', noDogsSubInside: 'Pas admis',
+  noSetHours: 'Nous n’avons pas d’heures fixes (cours ou réservations seulement)', noSetHoursNow: 'Pas d’heures fixes : cours ou réservations seulement ✓',
+  bookLinkLabel: 'Lien de réservation', bookLinkEx: 'votre page de réservation', tbookQ: 'Votre lien de réservation (facultatif)',
+  storyEx: 'Un endroit local et familial depuis 2010. Une équipe accueillante et quelque chose pour tous les âges.', knownEx: 'Accueillant, local et amusant pour toute la famille',
+  bringEx: 'Arrivez 15 minutes d’avance. Stationnement gratuit sur place.',
+  groupsQ: 'Groupes et événements : à partir de combien de personnes doivent-ils réserver?', groupsLead: 'Touchez une taille, puis ajoutez les tournois, les fêtes, les groupes scolaires ou les ligues dans vos mots.', groupsEx: 'Fêtes d’anniversaire la fin de semaine. Groupes scolaires bienvenus',
+  menuLead: 'Chaque carte, cours ou location et son prix. Une photo de votre liste de prix ou un lien vers votre page de prix, c’est parfait. C’est facultatif.',
+  menuFreeSub: 'Quelque chose de payant, comme des cours ou des locations? Facultatif',
+  menuLeadFree: 'C’est gratuit, vous pouvez donc passer cette étape. Quelque chose de payant, comme des cours ou des locations? Une photo de la liste de prix ou un lien, c’est parfait.',
+  menuTypeSub: 'Chaque carte, cours ou location et son prix, une ligne à la fois',
+  seasonHintSummer: 'La plupart des endroits comme le vôtre ferment l’hiver. Touchez « Nous fermons une partie de l’année » et choisissez votre premier et votre dernier jour.',
+  seasonHintWinter: 'La plupart des endroits comme le vôtre sont ouverts l’hiver seulement. Touchez « Nous fermons une partie de l’année » et choisissez votre premier et votre dernier jour.',
+});
+// Sport test 11 (2026-11-21; Geneviève's winter simulator hours, Jan 5 – Mar 31, saved with a ✓ outside her Apr 3 – Oct 31
+// season and showed nowhere): a stretch of other hours outside the open season is asked about, never saved with a ✓.
+// Every kind. Off-season hours for a second kind (a winter simulator) go in Good to know: no new field.
+Object.assign(en, {
+  seaOutside: 'Your season is {a} – {b}, so on {c} – {d} your page says “Closed for the season” and these hours would show nowhere. Open {c} – {d} too?',
+  seaOutsideYes: 'Yes, we’re open {a} – {b}',
+  seaOutsideYesExact: 'Yes: {place} will show open {a} – {b}, {hours}', seaPlace: 'your place', seaPlaceGolf: 'your course',
+  seaOutsideApart: 'Your season is {a} – {b}, so on {c} – {d} your page says “Closed for the season” and these hours would show nowhere. Only part of the place is open then (like the pro shop)? Skip these hours and say it in Good to know.',
+  seaOutsideNo: 'No, skip these hours',
+  seaOutsideNoSub: 'Only something else runs then, like an indoor simulator? Say it in Good to know',
+  seaOutsideSkipped: 'Those other hours weren’t saved: outside your season your page says closed. Something else runs then (like a winter simulator)? Say when in Good to know, like “Indoor simulator Jan–Mar, Mon–Sat 9 AM – 9 PM”.',
+  seaOutsideLine: '{span}: {hours}. Outside your season ({a} – {b}), so these don’t show on your page.',
+  // Sport test 14 (2026-11-21; Marisol, season Mar 15 – Oct 31, Mar–Apr hours): only the days outside the season are named,
+  // and the main button keeps the days inside it.
+  seaOutsidePart: 'Your season is {a} – {b}, so on {out} your page says “Closed for the season”. These hours show {e} – {f}.',
+  seaOutsidePartAsk: 'Your season is {a} – {b}, so on {out} your page says “Closed for the season”. These hours show {e} – {f}. Open {out} too?',
+  seaOutsideKeep: 'Keep {e} – {f} (in your season)',
+  // Sport test 14: the seasonal-hours path in plain words (sport and golf).
+  seaPartQ: 'Different hours for part of your season? Pick the months, like spring and fall',
+  openPartSeason: 'Save, and add different hours for part of your season', openPartSeasonSub: 'Pick the months, like spring and fall',
+  seaMoreSport: 'Different hours for part of your season, like spring and fall?',
+  seaMoreClosedFirst: 'Closed part of the year too? Tap “We’re closed part of the year” first: you add these hours right after.',
+  monthsInRowSea: 'Please pick months in a row, like March to April. Different hours in another part of the season too, like October? Save these, then tap “A second stretch with different hours too?”.',
+});
+Object.assign(fr, {
+  seaOutside: 'Votre saison va du {a} au {b} : du {c} au {d}, votre page dit « Fermé pour la saison » et ces heures ne paraîtraient nulle part. Ouvert aussi du {c} au {d}?',
+  seaOutsideYes: 'Oui, nous sommes ouverts du {a} au {b}',
+  seaOutsideYesExact: 'Oui : {place} paraîtra ouvert du {a} au {b}, {hours}', seaPlace: 'votre endroit', seaPlaceGolf: 'votre parcours',
+  seaOutsideApart: 'Votre saison va du {a} au {b} : du {c} au {d}, votre page dit « Fermé pour la saison » et ces heures ne paraîtraient nulle part. Seule une partie de l’endroit est ouverte (comme la boutique du pro)? Passez ces heures et dites-le dans Bon à savoir.',
+  seaOutsideNo: 'Non, passer ces heures',
+  seaOutsideNoSub: 'Seulement autre chose est ouvert, comme un simulateur intérieur? Dites-le dans Bon à savoir',
+  seaOutsideSkipped: 'Ces autres heures n’ont pas été enregistrées : hors saison, votre page dit fermé. Autre chose est ouvert à ce moment-là (comme un simulateur l’hiver)? Dites quand dans Bon à savoir, comme « Simulateur intérieur de janvier à mars, du lundi au samedi de 9 h à 21 h ».',
+  seaOutsideLine: '{span} : {hours}. En dehors de votre saison (du {a} au {b}), ces heures ne paraissent pas sur votre page.',
+  seaOutsidePart: 'Votre saison va du {a} au {b} : {out}, votre page dit « Fermé pour la saison ». Ces heures paraissent du {e} au {f}.',
+  seaOutsidePartAsk: 'Votre saison va du {a} au {b} : {out}, votre page dit « Fermé pour la saison ». Ces heures paraissent du {e} au {f}. Ouvert aussi {out}?',
+  seaOutsideKeep: 'Garder du {e} au {f} (dans votre saison)',
+  seaPartQ: 'D’autres heures pour une partie de votre saison? Choisissez les mois, comme le printemps et l’automne',
+  openPartSeason: 'Enregistrer et ajouter d’autres heures pour une partie de la saison', openPartSeasonSub: 'Choisissez les mois, comme le printemps et l’automne',
+  seaMoreSport: 'D’autres heures pour une partie de votre saison, comme le printemps et l’automne?',
+  seaMoreClosedFirst: 'Fermé aussi une partie de l’année? Touchez d’abord « Nous fermons une partie de l’année » : vous ajoutez ces heures juste après.',
+  monthsInRowSea: 'Choisissez des mois qui se suivent, comme de mars à avril. D’autres heures pour une autre partie de la saison, comme octobre? Enregistrez celles-ci, puis touchez « Une deuxième période aux heures différentes aussi? ».',
+});
+
+// Sport test 16 (2026-11-21; one tap on the dark "Yes, all year" wiped the Pinnacle's Apr–Oct season on a revisit): with a
+// season and no other hours stored, "No change, keep …" comes first, and "Yes, all year" asks before it removes the season.
+Object.assign(en, {
+  yearKeepSea: 'No change, keep {a} – {b}',
+  yearSeaDropQ: 'Open all year?', yearSeaDropLead: 'Your page now says open {a} to {b} and closed the rest of the year. “Yes, open all year” removes that season: your page will say open in every month.',
+  yearSeaDropKeep: 'No, keep {a} – {b}', yearSeaDropYes: 'Yes, open all year', yearSeaDropYesSub: 'Your page shows open every month',
+});
+Object.assign(fr, {
+  yearKeepSea: 'Aucun changement, garder du {a} au {b}',
+  yearSeaDropQ: 'Ouvert toute l’année?', yearSeaDropLead: 'Votre page dit maintenant ouvert du {a} au {b} et fermé le reste de l’année. Avec « Oui, ouvert toute l’année », cette saison est retirée : votre page dira ouvert tous les mois.',
+  yearSeaDropKeep: 'Non, garder du {a} au {b}', yearSeaDropYes: 'Oui, ouvert toute l’année', yearSeaDropYesSub: 'Votre page dit ouvert tous les mois',
+});
+
+// Sport test 16 (2026-11-21): a happy hour set only for the months the place is closed for the season never shows.
+Object.assign(en, {
+  happyClosedSea: 'Heads up: your page says closed for the season outside {a} to {b}, and a happy hour never shows while you’re closed. This one runs only in those closed months, so visitors won’t see it.',
+  happyClosedSeaPart: 'A part that stays open, like your grill? Put its times and deal in the “Part of the place with its own times?” line on your hours instead, like “Grill: Wed–Fri 5–8 PM, November–March; half-price apps Wed 5–6”.',
+  // Sport fix round 16 (sport test 17: Marlene never saw the heads-up, and her list said "on your page ✓"): one question on
+  // Save, and the list says it can't show.
+  happyClosedAskQ: 'Visitors won’t see this while you’re closed. Save anyway?', happyClosedYes: 'Save anyway', happyClosedNo: 'Change months',
+  stHappyClosed: 'saved, not shown while you’re closed',
+  tpriceDoubled: 'That looks like two prices run together. Did you mean {x}? Type it once.',
+});
+Object.assign(fr, {
+  happyClosedSea: 'Attention : votre page dit fermé pour la saison en dehors du {a} au {b}, et un 5 à 7 ne paraît jamais pendant que vous êtes fermé. Celui-ci a lieu seulement pendant ces mois fermés : les visiteurs ne le verront pas.',
+  happyClosedSeaPart: 'Une partie reste ouverte, comme votre grill? Mettez plutôt ses heures et son offre dans la ligne « Une partie de l’endroit a ses propres heures? » de vos heures, comme « Grill : mer.–ven. 17 h–20 h, de novembre à mars; entrées à moitié prix le mer. 17 h–18 h ».',
+  happyClosedAskQ: 'Les visiteurs ne le verront pas pendant que vous êtes fermé. Enregistrer quand même?', happyClosedYes: 'Enregistrer quand même', happyClosedNo: 'Changer les mois',
+  stHappyClosed: 'enregistré, caché pendant que vous êtes fermé',
+  tpriceDoubled: 'On dirait deux prix collés. Vouliez-vous dire {x}? Tapez-le une seule fois.',
+});
+
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

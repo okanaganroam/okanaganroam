@@ -224,7 +224,8 @@ test('6. polish: the trip total says "Free" for free stops (EN + FR); a gallery 
   approveAll(v.id);
   const sim = await openSetup(base, t, { hash: 'offer' });
   assert.ok(sim.has('[data-tpick="age:all"][aria-pressed="true"]'), sim.screen().slice(0, 2000));
-  assert.match(sim.text(), /We picked the usual for your kind of place/);
+  // Sport test 12 (2026-11-21): the suggestion says it waits for a tap.
+  assert.match(sim.text(), /Suggested: All ages\. Tap it to confirm/);
   assert.ok(sim.has('[data-off="no_dogs"]'), 'No dogs allowed is a real button');
   assert.equal(app.venueIndoorInfo(v.id).age, undefined);
   // Research that names an age keeps it empty.

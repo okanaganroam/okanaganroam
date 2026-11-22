@@ -85,7 +85,7 @@ test('edit page: the box shows for a restaurant (with our estimate) and a pub, i
 });
 
 test('edit page: cafes, breweries, wineries, beaches and shops do not get the box (or any of its code)', async () => {
-  for (const t of ['beach', 'shop', 'golf']) { // indoor places since 2026-11-19; tours have the setup (and its checklist script) since 2026-11-16; cafés have Price per person since 2026-11-10; distilleries since 2026-11-13
+  for (const t of ['beach', 'shop']) { // indoor places since 2026-11-19; tours have the setup (and its checklist script) since 2026-11-16; cafés have Price per person since 2026-11-10; distilleries since 2026-11-13; golf and sport have the setup since 2026-11-20
     const v = mk(t);
     const html = await get(`/owner/${tokenFor(v.id)}`);
     for (const word of ['opAvg', 'avg_spend', 'avgspend', 'Average spend', 'op-money', 'That\'s right', 'avgThanks', 'dépense moyenne']) {

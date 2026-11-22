@@ -1646,6 +1646,13 @@ CREATE TABLE IF NOT EXISTS venue_indoor_info (
   info TEXT NOT NULL DEFAULT '{}',
   updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+-- Sports & recreation and golf (2026-11-20, the sport easy setup): the same answers for types 'sport' and 'golf'
+-- (server.js venueIndoorInfo reads both tables; writeVenueIndoorInfo writes a sport or golf listing's here). Owner-only.
+CREATE TABLE IF NOT EXISTS venue_sport_info (
+  venue_id INTEGER PRIMARY KEY REFERENCES venues(id),
+  info TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+);
 `);
 // Owner events sent without a start time (2026-11-11): the occurrence says "Time to be confirmed" only when this flag is
 // set on approval. Other untimed occurrences (imports, exhibitions) stay date-only, as before.

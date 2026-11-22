@@ -143,6 +143,14 @@ function requestKidAges(text) {
   return [...new Set(out)].sort((a, b) => a - b);
 }
 // Tour test 2 (2026-11-16): the ages as typed (ctx.kidAges, read by the server before "10-year-old" becomes "kids").
+// Sport test 5: the owner's lowest price line whose own ages hold the youngest child the request names (server.js
+// ownerAgePrices), or null.
+function kidAgePrice(v, ctx) {
+  const age = kidsYoungest(ctx);
+  if (age == null || !v || !Array.isArray(v.agePrices) || !v.agePrices.length) return null;
+  const fit = v.agePrices.filter((p) => p && age >= p.min && age <= p.max && p.max < 99).sort((a, b) => a.price - b.price);
+  return fit[0] || null;
+}
 function kidsYoungest(ctx) { if (!ctx) return null; const a = Array.isArray(ctx.kidAges) && ctx.kidAges.length ? ctx.kidAges.slice().sort((x, y) => x - y) : requestKidAges(ctx.queryText || ''); return a.length ? a[0] : null; }
 // Whistler #190 (2026-11-17): an active party place for a kids' birthday, read from the listing's own name and category.
 const KIDS_PARTY_ACTIVE_RE = /\b(?:adventure parks?|aerial (?:adventure )?(?:parks?|courses?)|tree ?top|ropes? courses?|obstacle courses?|zip ?lines?|mini ?golf|climbing (?:gyms?|walls?)|trampoline\w*)\b/;
@@ -266,7 +274,13 @@ function kidsAllowed(v) {
   // Indoor places (2026-11-19): the owner's own minimum age. All ages or 5+ is fine for a family; 8+ when the kids' ages
   // say so; 12+, 16+ or 19+ never is (a kids trip doesn't say how old the kids are). Unanswered: as before.
   if (v.type === 'indoor' && indoorTooOld(v, ctx)) return false;
-  if (v.type === 'indoor' && v.indoorMinAge) {
+  // Sport test 2 (2026-11-20; Trevor's simulator is 19+ after 8 PM): a request for a time at or after the owner's "kids
+  // until" time never plans kids there ("golf simulator with my 10 year old at 9 PM").
+  if ((v.type === 'indoor' || v.kindOwn) && ctx && kidsUntilMinutes(v) != null) {
+    const at = /\b(?:at|around|by|for|from|after)\s+(\d{1,2})(?:[: ](\d{2}))?\s*(am|pm|a\.?m\.?|p\.?m\.?)(?![a-z])/i.exec(ctx.queryText || '');
+    if (at) { const min = ((Number(at[1]) % 12) + (/^p/i.test(at[3]) ? 12 : 0)) * 60 + Number(at[2] || 0); if (min >= kidsUntilMinutes(v)) return false; }
+  }
+  if ((v.type === 'indoor' || v.kindOwn) && v.indoorMinAge) {
     if (v.indoorMinAge === 'all') return true;
     const youngI = kidsYoungest(ctx);
     if (youngI != null && /^\d+$/.test(v.indoorMinAge)) return youngI >= Number(v.indoorMinAge);
@@ -713,6 +727,9 @@ function slotFit(v, ctx, windowKey, dayIndex, daypart) {
   const weekday = live ? live.weekday : weekdayFor(ctx, dayIndex);
   const fit = hoursFit(v, live ? live.win : windowKey, weekday);
   if (fit.status === 'closed') return { ok: false };
+  // Sport test 8 (2026-11-21; "Tuesday evening golf in Lumby" planned a course with no hours on file 6–10 PM, past dark): a
+  // golf course whose hours we don't have is never put in an evening slot (a round there would end after dark).
+  if (v && v.type === 'golf' && !v.indoorGolf && fit.status === 'unknown' && (windowKey === 'evening' || daypart === 'evening')) return { ok: false };
   const label = SLOT_WINDOWS[windowKey].label;
   const kidsMin = ctx.kids ? kidsUntilMinutes(v) : null, kidsWin = live ? live.win : SLOT_WINDOWS[windowKey];
   if (kidsMin != null && kidsWin && kidsWin.from >= kidsMin) return { ok: false };
@@ -925,7 +942,7 @@ const FREE_PLACE_RE = /\b(?:park|parks|trail|trails|walkway|boardwalk|greenway|b
 // $ places won): a place its owner marked Free entry or By donation (indoor or tour) fits a cheap or budget request as well
 // as a $ place does. -> true or false.
 function budgetFreeStop(v) {
-  return !!v && ((v.type === 'indoor' && (v.indoorFree === 'free' || v.indoorFree === 'donation')) || (v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation')));
+  return !!v && (((v.type === 'indoor' || v.kindOwn) && (v.indoorFree === 'free' || v.indoorFree === 'donation')) || (v.type === 'tour' && (v.tourFree === 'free' || v.tourFree === 'donation')));
 }
 // A request that asks for free places already keeps to them (no extra lift among them).
 function budgetFreeBonus(ctx, v) { return ctx.budget === 'budget' && budgetFreeStop(v) && !/\b(?:free|gratuit\w*|gratis)\b/.test(String(ctx.queryText || '').toLowerCase()); }
@@ -1327,6 +1344,45 @@ function kindSeasonAsked(v, ctx) {
   const words = normWords(`${(ctx && ctx.askText) || ''} ${(ctx && ctx.queryText) || ''}`);
   return Object.keys(seasons).filter((k) => ((tripRequirements.TOUR_KIND_PLANNER || {})[k] || []).some((x) => pk.includes(x)) || (KIND_SEASON_ASK_WORDS[k] && KIND_SEASON_ASK_WORDS[k].test(words)));
 }
+// Sport test 3 (2026-11-20; Gord's driving range and mini golf): a mini golf or driving range asked for that this place is
+// (trip-requirements.js golfPartKind), and a part of the place closed for its own season on the trip's day ("Mini golf:
+// April to mid-October", server.js sportPartSeasons).
+const GOLF_PART_KINDS = ['mini_golf', 'driving_range'];
+// Sport test 4 (2026-11-20; Ryan's course also ticked "Driving range or mini golf": its category words "Golf course &
+// driving range" read as a range, so Build My Trip left it out of every plain golf request): a golf or sport listing's
+// kind is its owner's MAIN kind (sportKinds[0], server.js sportMainKind); extra kinds add, never replace. Its category
+// words decide only for a listing with no owner kinds. null when the owner picked none.
+function ownerMainKind(v) { return v && Array.isArray(v.sportKinds) && v.sportKinds.length ? v.sportKinds[0] : null; }
+// A range or mini golf (not a course): its owner's main kind, else its category words.
+function golfRangeOnly(v, wordsRe) {
+  if (!v || v.type !== 'golf') return false;
+  const mk = ownerMainKind(v);
+  if (mk) return mk === 'range';
+  return wordsRe.test(normWords(v.cuisine || ''));
+}
+// The planner kinds an owner's main kind is (trip-requirements.js SPORT_KIND_PLANNER, and a range's mini golf and driving
+// range): a place whose MAIN kind was asked for comes before one that has it only as a second kind.
+const MAIN_KIND_PLANNER = { range: ['mini_golf', 'driving_range'], skatepark: ['skatepark'], discgolf: ['disc_golf'], bike: ['bmx'], courts: ['tennis', 'pickleball'], rink: ['skating'], skischool: ['ski_lessons'] };
+function askedMainKind(v, ctx) { const mk = ownerMainKind(v); return !!mk && !!ctx && (MAIN_KIND_PLANNER[mk] || []).some((k) => (ctx.plannerKinds || []).includes(k)); }
+function askedGolfPart(v, ctx) { return !!v && !!ctx && (ctx.plannerKinds || []).some((k) => GOLF_PART_KINDS.includes(k) && (v.plannerKinds || []).includes(k)); }
+function golfPartShut(v, ctx) {
+  if (!v || !Array.isArray(v.partSeasons) || !v.partSeasons.length || !ctx) return false;
+  const asked = (ctx.plannerKinds || []).filter((k) => GOLF_PART_KINDS.includes(k));
+  if (!asked.length) return false;
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) ? String(ctx.tripDate) : null;
+  const m = tripMonthOf(ctx);
+  if (!iso && !m) return false;
+  const md = iso && !(ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month)) ? iso.slice(5, 10) : `${String(m).padStart(2, '0')}-15`;
+  const shut = (p) => (p.from <= p.to ? (md < p.from || md > p.to) : (md < p.from && md > p.to));
+  // Closed when every part asked for that this place has is out of its own season.
+  const mine = asked.filter((k) => (v.plannerKinds || []).includes(k));
+  return mine.length > 0 && mine.every((k) => { const p = v.partSeasons.find((x) => x.kind === k); return p && shut(p); });
+}
+function golfPartLabel(v) {
+  const k = v.plannerKinds || [];
+  const mini = k.includes('mini_golf'), range = k.includes('driving_range');
+  return mini && range ? ['Driving range & mini golf', 'Champ de pratique et mini-golf'] : mini ? ['Mini golf', 'Mini-golf'] : range ? ['Driving range', 'Champ de pratique'] : null;
+}
 function kindSeasonBlocked(v, ctx) {
   if (!v || v.type !== 'tour' || !kindSeasonsOf(v) || !ctx || namedInRequest(v, ctx)) return false;
   const m = tripMonthOf(ctx);
@@ -1375,7 +1431,9 @@ function offSeasonBlocked(v, ctx) {
   if (v.type === 'tour' && /\b(?:mountain bike|e bike|bike tours?|biking|rafting|sailing|kayak\w*|canoe\w*|sup|paddle\w*|wing foil|kite\w*|horseback|trail rides?|float ?planes?|seaplane)\b/.test(sub) && !/\b(?:winter|year round|eagle|snow\w*|ski\w*|heli\w*)\b/.test(sub) && [11, 12, 1, 2, 3].includes(m) && !(ownerSeasonOpenOn(v, ctx) && (!((ctx.plannerKinds || []).some((k) => ['bike_tour', 'rentals', 'paddle_tour', 'rafting', 'horseback'].includes(k))) || ownerRidesThen(v, m, ctx)))) return true;
   if (!['beach', 'outdoor', 'golf', 'sport', 'tour'].includes(v.type)) return false;
   // Outdoor golf in winter only when golf was asked for (it then gets the course's own season caveat).
-  if (v.type === 'golf') return !v.indoorGolf && [11, 12, 1, 2, 3].includes(m) && !/\bgolf/.test(text) && !(ctx.types && ctx.types.has('golf'));
+  // Sport test 3: a range open all year by its owner's answer is judged by its own part seasons (golfPartShut), never the
+  // courses' winter.
+  if (v.type === 'golf') return !v.indoorGolf && !v.sportYearAll && [11, 12, 1, 2, 3].includes(m) && !/\bgolf/.test(text) && !(ctx.types && ctx.types.has('golf'));
   // A lift-access bike park, an aerial course, mini golf or paintball is a summer place; pump tracks, skills parks,
   // skate parks and disc golf are under snow in winter.
   if (v.type === 'outdoor' && /\blift access bike park\b/.test(sub)) return [10, 11, 12, 1, 2, 3, 4].includes(m);
@@ -1487,7 +1545,8 @@ function eligible(v, ctx, strict) {
   // Young kids (2026-10-25: "something to do with a 5 year old" got an ice-cave heli tour): no heli, backcountry or
   // big-thrill outfitters unless the request names one.
   if (ctx.kids && v.type === 'tour' && !['all', '5', '6', '8', '10'].includes(v.tourMinAge) && !(v.tourMinAge && kidsYoungest(ctx) != null && kidsAllowed(v, ctx)) && /\b(?:heli\w*|helicopter|backcountry|bungee|bungy|skydiv\w*|paraglid\w*|via ferrata|cat ski\w*|snowcat|ice cave|avalanche|mountaineering|ski touring|kiteboard\w*|kitesurf\w*|wing foil\w*|rock climbing guides?|climbing guides?|whitewater)\b/.test(normWords(v.cuisine || '')) && !namedInRequest(v, ctx)) return false;
-  if (v.type === 'golf' && /\bdriving range\b/.test(normWords(v.cuisine || '')) && !/\b(?:range|practice|lesson|lessons)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
+  if (golfRangeOnly(v, /\bdriving range\b/) && !askedGolfPart(v, ctx) && !/\b(?:range|practice|lesson|lessons|mini ?golf|mini ?putt|minigolf|buckets?|balls)\b/.test(ctx.queryText || '') && !namedInRequest(v, ctx)) return false;
+  if (golfPartShut(v, ctx) && !namedInRequest(v, ctx)) return false;
   if (specialistOutdoorBlocked(v, ctx)) return false;
   if (!ctx.ignoreSeason && offSeasonBlocked(v, ctx)) return false;
   if (horseOffBlocked(v, ctx)) return false;
@@ -1525,6 +1584,8 @@ function eligible(v, ctx, strict) {
   if (ctx.rainy) {
     if (v.type === 'beach' || v.type === 'outdoor') return false;
     if (v.type === 'golf' && !v.indoorGolf) return false;
+    // Sport test 2 (2026-11-20): an arena or a sports centre is a rainy-day place; a skate park or a pump track isn't.
+    if (v.type === 'sport' && v.indoorEvidence !== 'explicit' && !namedInRequest(v, ctx)) return false;
   }
   // Spas and saunas are adults' places (2026-10-25: a family day in Brackendale ended at a sauna).
   // Indoor test 12 (2026-11-19): "yoga with my 12 year old" asks for yoga: a yoga studio whose owner said All ages (or an age
@@ -1564,13 +1625,19 @@ function eligible(v, ctx, strict) {
     // Indoor test 16: a group asked for ("rainy day for a group of 6") is the Great for Groups badge for food and drink; a
     // place to go is ranked by it (groupFitScore), never left out for not having it.
     if (f === 'great_groups' && !BADGE_TYPES.includes(v.type)) continue;
+    // Sport test 2 (2026-11-20; "golf and happy hour on Wednesday": "No place here is listed with happy hour"): a golf
+    // simulator, course or any other place whose owner set a happy hour has it, like a pub's badge.
+    if (f === 'happy_hour' && !BADGE_TYPES.includes(v.type) && v.features.happy_hour) continue;
     if (BADGE_TYPES.includes(v.type)) { if (!v.features[f]) return false; } else if (strict) return false;
   }
   if (ctx.plannerKinds.length && ['indoor', 'tour', 'sport'].includes(v.type) && !ctx.plannerKinds.some(k => (v.plannerKinds || tripRequirements.inferPlannerKinds(v)).includes(k))) return false;
   if (strict) {
     const kindMatch = ctx.plannerKinds.some(k => (v.plannerKinds || []).includes(k));
     if (ctx.plannerKinds.length && (!ctx.types.size || ['indoor','tour','outdoor','sport'].some(t=>ctx.types.has(t))) && !kindMatch) return false;
-    if (ctx.types.size && !ctx.types.has(v.type) && !(v.fdTypes || []).some((t) => ctx.types.has(t)) && !(ctx.requirements && kindMatch && [...ctx.types].every(t=>['tour','indoor','outdoor','sport'].includes(t))) && !kidsKitchenMeal(v, ctx)) return false;
+    // Sport test 2 (2026-11-20; "rainy day in Kelowna" never offered a golf simulator): a rainy-day list of indoor places takes
+    // in golf simulators and indoor sport places (an arena, a sports centre) too.
+    const rainyIndoorSport = ctx.rainy && ctx.types.has('indoor') && v.indoorEvidence === 'explicit' && ((v.type === 'golf' && v.indoorGolf) || v.type === 'sport');
+    if (ctx.types.size && !ctx.types.has(v.type) && !rainyIndoorSport && !(v.fdTypes || []).some((t) => ctx.types.has(t)) && !(ctx.requirements && kindMatch && [...ctx.types].every(t=>['tour','indoor','outdoor','sport'].includes(t))) && !kidsKitchenMeal(v, ctx)) return false;
     // An asked-for kind of place to eat or drink ("hiking, craft beer and good food") does not need the activity's tag
     // (2026-10-25: no brewery met "hiking", so none was planned).
     if (ctx.activities.size && !v.activities.some((a) => ctx.activities.has(a)) && !(ctx.types.has(v.type) && !['outdoor', 'beach', 'tour', 'sport'].includes(v.type))) return false;
@@ -1717,7 +1784,8 @@ function scoreVenue(v, ctx) {
     const t = ctx.types.has(v.type) ? v.type : (v.fdTypes || []).find((x) => ctx.types.has(x));
     // Build My Trip fixes (2026-11-18): an indoor place that isn't the kind asked for (the Whistler Museum on a spa
     // request) never says it matches it ("Matches your request for spas").
-    add('type', 30, t === 'indoor' && !indoorAskedFits(indoorAskedLabel(ctx.queryText, 'plural'), v) ? null : `Matches your request for ${typeLabel(ctx, t).toLowerCase()}`);
+    // Sport test 5: a ski school planned as a tour stop is never "a request for tours & experiences" (its lesson reason says it).
+    add('type', 30, (t === 'indoor' && !indoorAskedFits(indoorAskedLabel(ctx.queryText, 'plural'), v)) || (t === 'tour' && v.kindOwn && v.sportBookNote) ? null : `Matches your request for ${typeLabel(ctx, t).toLowerCase()}`);
   }
   const acts = v.activities.filter((a) => ctx.activities.has(a));
   if (acts.length) add('activity', 25, `Listed on ${SITE.brand} for ${listText(acts.map((a) => activityLabel(ctx, a)))}`);
@@ -1745,9 +1813,12 @@ function scoreVenue(v, ctx) {
   // A golf trip plays the full courses first; a par-3 or academy course when asked or with kids (2026-10-25).
   if (v.type === 'golf' && /\b(?:par 3|par three|academy|pitch and putt|short course|9 hole|nine hole)\b/.test(normWords(`${v.cuisine || ''} ${v.name || ''}`)) && !ctx.kids && !/\b(?:par 3|par three|short|beginners?|easy|9 holes?|nine holes?|learn|lessons?|kids)\b/.test(ctx.queryText || '')) add('short_course', -18, null);
   // An 18-hole round takes half a day: on a general trip it is only planned when golf is asked for (2026-10-25).
-  if (v.type === 'golf' && !v.indoorGolf && !ctx.types.has('golf') && !/\bgolf\w*\b/.test(ctx.queryText || '')) add('golf_unasked', -20, null);
+  if (v.type === 'golf' && !v.indoorGolf && !ctx.types.has('golf') && !askedGolfPart(v, ctx) && !/\bgolf\w*\b/.test(ctx.queryText || '')) add('golf_unasked', -20, null);
   // A driving range is practice, not the round a golf trip came for (2026-10-25).
-  if (v.type === 'golf' && /\b(?:driving range|range|practice)\b/.test(normWords(v.cuisine || '')) && !/\b(?:range|practice|lesson|lessons)\b/.test(ctx.queryText || '')) add('range', -35, null);
+  // Sport test 4: the kind asked for is this place's main kind (an arena for skating, not a pool whose second kind is a rink).
+  if (askedMainKind(v, ctx)) add('main_kind', 15, null);
+  else if (ownerMainKind(v) && v.sportKinds.slice(1).flatMap((k) => MAIN_KIND_PLANNER[k] || []).some((k) => (ctx.plannerKinds || []).includes(k))) add('second_kind', -25, null);
+  if (golfRangeOnly(v, /\b(?:driving range|range|practice)\b/) && !askedGolfPart(v, ctx) && !/\b(?:range|practice|lesson|lessons|mini ?golf|mini ?putt|minigolf|buckets?|balls)\b/.test(ctx.queryText || '')) add('range', -35, null);
   for (const c of v.collections) {
     if (ctx.collections.has(c)) add('collection', 22, c === 'hidden_gem' ? `One of ${SITE.brand}’s Hidden Gems` : `On ${SITE.brand}’s ${collectionLabel(ctx, c)} list`);
   }
@@ -1927,6 +1998,8 @@ function scoreVenue(v, ctx) {
     if (['brewery', 'winery'].includes(v.type)) add('teen_bar', -25, null);
   }
   // On a rainy day the places people actually visit indoors come first; clubs, companies and studios last.
+  // Sport test 2: a golf simulator or an indoor sport place (an arena's public skate) is a real rainy-day outing.
+  if (ctx.rainy && (v.indoorGolf || (v.type === 'sport' && v.indoorEvidence === 'explicit'))) add('rainy_attraction', 5, 'A good rainy-day pick');
   if (ctx.rainy && v.type === 'indoor') {
     if (RAIN_BACKUP_GOOD_WORDS.some((w) => textHas(v.textName, w))) add('rainy_attraction', 5, 'A good rainy-day pick');
     if (RAIN_BACKUP_NICHE_WORDS.some((w) => textHas(v.textName, w)) && !ownVisitorKind(v)) add('rainy_niche', -10, null);
@@ -1963,7 +2036,7 @@ function scoreVenue(v, ctx) {
   // plan): never for a place whose owner said All ages or that has the Kid-Friendly badge, or whose owner-picked kind is a
   // family kind; otherwise only the name or category says it (a story can mention a lounge or a bar).
   if (ctx.kids && v.type === 'indoor' && !kidsAdultSettingExempt(v) && KIDS_ADULT_WORDS.some((w) => textHas(v.textName, w) || textHas(v.textCuisine || normWords(v.cuisine || ''), w))) add('kids_adult_setting', -40, null);
-  if (ctx.kids && v.type === 'golf' && !ctx.types.has('golf')) add('kids_golf', -15, null);
+  if (ctx.kids && v.type === 'golf' && !ctx.types.has('golf') && !askedGolfPart(v, ctx) && !(v.plannerKinds || []).includes('mini_golf')) add('kids_golf', -15, null);
   // Round 14 (2026-10-20): an indoor playground for small children is not an afternoon out for adults (Play Area Whistler
   // was day 2 of a plain Whistler weekend).
   if (!ctx.kids && v.type === 'indoor' && KIDS_ONLY_RE.test(`${v.textName || ''} ${v.textDesc || normWords(v.plannerDescription || v.description || '')}`)) add('kids_only', -30, null);
@@ -2053,7 +2126,7 @@ function ownerKidsAges(v, ctx) {
 }
 // The Kid-Friendly badge, or (indoor) the owner's own minimum age the kids named meet (indoor test 16).
 function indoorAdultNote(v, ctx) {
-  const a = v && v.type === 'indoor' && v.indoorAdultAges;
+  const a = v && (v.type === 'indoor' || v.kindOwn) && v.indoorAdultAges;
   if (!a || !ctx || !(ctx.kids || kidsYoungest(ctx) != null)) return null;
   const young = kidsYoungest(ctx);
   if (young != null && a.alone != null && young >= a.alone) return null;
@@ -2259,8 +2332,8 @@ function publicVenue(v, ctx) {
   // boat per hour"), not the tours' "From $89".
   const rental = v.type === 'tour' && !tourIsFree ? tourRentalPrice(v, ctx) : null;
   // Indoor places (2026-11-19): the owner's own adult price ("$25 · Admission"); free entry says Free (freeEntry).
-  const indoorFrom = v.type === 'indoor' && !v.indoorFree && typeof v.indoorPrice === 'number' && Number.isFinite(v.indoorPrice) && v.indoorPrice > 0 ? v.indoorPrice : null;
-  const cost = tourIsFree || (v.type === 'indoor' && v.indoorFree) ? null : rental ? rental : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
+  const indoorFrom = (v.type === 'indoor' || v.kindOwn) && !v.indoorFree && typeof v.indoorPrice === 'number' && Number.isFinite(v.indoorPrice) && v.indoorPrice > 0 ? v.indoorPrice : null;
+  const cost = tourIsFree || ((v.type === 'indoor' || v.kindOwn) && v.indoorFree) ? null : rental ? rental : tourFrom ? { cents: Math.round(tourFrom * 100), label: 'Tour', labelFr: 'Visite', source: null }
     // Indoor test 2 (2026-11-19; Jordan): a price per room, lane, game or group reads as the page says it ("From $120 per
     // room (2–6 players)"), never "per person", and stays out of the per-person estimate.
     : indoorFrom && Array.isArray(v.indoorPerLine) ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null, perGroup: v.indoorPer, unit: v.indoorPerLine[0], unitFr: v.indoorPerLine[1] }
@@ -2269,7 +2342,10 @@ function publicVenue(v, ctx) {
     // Indoor test 13: the owner's own price line for the day or cheap night asked ("Cheap Tuesdays $8").
     : indoorFrom && !Array.isArray(v.indoorPerLine) && indoorAskedPriceLine(v, ctx) ? { ...indoorAskedPriceLine(v, ctx), label: 'Indoor', labelFr: 'Intérieur', source: null, lineFr: indoorAskedPriceLine(v, ctx).line, asked: true }
     // Indoor test 18: THE PRICE RULE (indoor-kinds.js): its amount is the lowest real price ("From $70" with a $70 pedicure).
-    : indoorFrom && Array.isArray(v.indoorPriceLine) ? { cents: Math.round((typeof v.indoorPriceAt === 'number' && v.indoorPriceAt > 0 ? v.indoorPriceAt : indoorFrom) * 100), label: 'Indoor', labelFr: 'Intérieur', source: null, line: v.indoorPriceLine[0], lineFr: v.indoorPriceLine[1] }
+    // Sport test 5 (2026-11-20): a child's own line from the owner's list ("Kids Club (ages 5 to 12), full day: $259"), never
+    // the adult price, when the request names the child's age.
+    : indoorFrom && kidAgePrice(v, ctx) ? { cents: Math.round(kidAgePrice(v, ctx).price * 100), label: v.type === 'golf' ? 'Golf' : 'Activity', labelFr: v.type === 'golf' ? 'Golf' : 'Activité', source: null, line: `${kidAgePrice(v, ctx).name}: {x}`, lineFr: `${kidAgePrice(v, ctx).name} : {x}`, kidLine: true }
+    : indoorFrom && Array.isArray(v.indoorPriceLine) ? { cents: Math.round((typeof v.indoorPriceAt === 'number' && v.indoorPriceAt > 0 ? v.indoorPriceAt : indoorFrom) * 100), label: v.kindOwn ? (v.type === 'golf' ? 'Golf' : 'Activity') : 'Indoor', labelFr: v.kindOwn ? (v.type === 'golf' ? 'Golf' : 'Activité') : 'Intérieur', source: null, line: v.indoorPriceLine[0], lineFr: v.indoorPriceLine[1] }
     : indoorFrom ? { cents: Math.round(indoorFrom * 100), label: 'Admission', labelFr: 'Entrée', source: null }
     : cocktail ? { cents: Math.round(cocktail * 100), label: 'Cocktail', labelFr: 'Cocktail', source: null }
     : fee > 0 ? { cents: Math.round(fee * 100), label: 'Tasting', labelFr: 'Dégustation', source: null }
@@ -2281,7 +2357,7 @@ function publicVenue(v, ctx) {
     ...(tourIsFree ? { freeTour: v.tourFree } : {}),
     ...(yearlyClosureNote(v, ctx) ? { yearlyClosure: yearlyClosureNote(v, ctx) } : {}),
     // Indoor test 1 (2026-11-19; Margaret): a by-donation museum says "By donation (suggested $5)", never "Free entry".
-    ...(v.type === 'indoor' && v.indoorFree === 'donation' ? { byDonation: typeof v.indoorSuggested === 'number' && v.indoorSuggested > 0 ? v.indoorSuggested : true } : {}),
+    ...((v.type === 'indoor' || v.kindOwn) && v.indoorFree === 'donation' ? { byDonation: typeof v.indoorSuggested === 'number' && v.indoorSuggested > 0 ? v.indoorSuggested : true } : {}),
     id: v.id, name: v.name, region: v.region, type: v.type, url: v.url,
     ...(cost ? { cost } : {}),
     regionLabel: ctx ? regionLabel(ctx, v.region) : v.region, typeLabel: v.type === 'cocktail' ? 'Cocktail lounge' : v.isShop ? 'Shop' : v.indoorGolf ? 'Indoor golf' : BREWERY_KIND_LABEL[v.type === 'brewery' && v.breweryKind] ? BREWERY_KIND_LABEL[v.breweryKind][0] : ctx ? (v.type === 'indoor' ? indoorVenueLabel(ctx, v, 'singular') : typeLabel(ctx, v.type, 'singular')) : v.type,
@@ -2291,9 +2367,16 @@ function publicVenue(v, ctx) {
     // Indoor test 7 (2026-11-19; Robert's card read "Indoor attraction" in one plan and "Art gallery" in another): an indoor
     // place's card always says its own kind (the owner's main kind, else its listed kind), in French too.
     ...(v.type === 'indoor' && indoorCardKind(v) ? { typeLabel: indoorCardKind(v)[0], typeLabelFr: indoorCardKind(v)[1] } : {}),
+    // Sport test 3 (2026-11-20; Gord's range read "INDOOR GOLF" / "GOLF COURSE"): a range or mini golf says what it is.
+    ...(v.type === 'golf' && !v.indoorGolf && golfPartLabel(v) && ownerMainKind(v) !== 'golf' ? { typeLabel: golfPartLabel(v)[0], typeLabelFr: golfPartLabel(v)[1] } : {}),
+    // Sport test 4: a golf course whose owner also picked a range is a golf course; "& driving range" only when the request
+    // asked for the range (Ryan's card read "DRIVING RANGE · Green fees from $55").
+    ...(v.type === 'golf' && !v.indoorGolf && golfPartLabel(v) && ownerMainKind(v) === 'golf' && askedGolfPart(v, ctx) ? { typeLabel: `Golf course & ${golfPartLabel(v)[0].toLowerCase()}`, typeLabelFr: `Terrain de golf et ${golfPartLabel(v)[1].toLowerCase()}` } : {}),
+    // Sport test 5: a sports listing planned as a tour, indoor or outdoor stop says its own kind ("Ski & snowboard lessons").
+    ...(v.kindOwn && Array.isArray(v.sportKindWords) && v.sportKindWords[0] ? { typeLabel: v.sportKindWords[0], typeLabelFr: v.sportKindWords[1] || v.sportKindWords[0] } : {}),
     ...(v.indoorGolf ? { indoorGolf: true } : {}),
     // Tour test 4: no $-$$$$ tier beside a tour's own price ("Free · $$", "From $35 · $$").
-    rating: v.rating, reviews: v.reviews, price: tourIsFree || tourFrom || indoorFrom || (v.type === 'indoor' && v.indoorFree) ? null : v.price, freeEntry: !!v.features?.free_entry || (v.type === 'indoor' && !!v.indoorFree), address: v.address || null,
+    rating: v.rating, reviews: v.reviews, price: tourIsFree || tourFrom || indoorFrom || ((v.type === 'indoor' || v.kindOwn) && v.indoorFree) ? null : v.price, freeEntry: !!v.features?.free_entry || ((v.type === 'indoor' || v.kindOwn) && !!v.indoorFree), address: v.address || null,
     // The venue's own photo when it has one (2026-10-17); otherwise a photo of
     // the kind of place (the site's category photos), labelled as an example.
     photo: ownStopPhoto(v), // real photos only (2026-10-28): no example photo for a place without its own
@@ -2311,6 +2394,8 @@ function publicVenue(v, ctx) {
     listedHours: v.hours && v.ownerAppointment !== true ? listedHoursText(v, null, null) : null,
     // Brewery test 1 (2026-11-12): hours the business confirmed (no "check before you go"), and its time for minors.
     ...(v.ownerHours ? { hoursByOwner: true } : {}),
+    // Sport test 6: the hours are the building's; the public skate (swim, drop-in) times change ("check the schedule").
+    ...(Array.isArray(v.timesChangeNote) ? { timesChange: { en: v.timesChangeNote[0], fr: v.timesChangeNote[1] || v.timesChangeNote[0] } } : {}),
     ...(kidsUntilMinutes(v) != null && v.features && v.features.kid_friendly ? { kidsUntil: v.kidsUntil } : {}),
     ...(v.dogsOutsideOnly && v.features && v.features.dog_friendly ? { dogsOutsideOnly: true } : {}),
     ...(v.dogsPatioOnly && v.features && v.features.dog_friendly ? { dogsPatioOnly: true } : {}),
@@ -2666,6 +2751,9 @@ function rotateWithinType(cands, ctx, score = (c) => c.score, opts = {}) {
     if (appointmentOnly(c.v) && !appointmentOnly(best.v)) continue;
     // Indoor test 15: a Complete & Verified best place never rotates to one its owner hasn't confirmed.
     if (best.v.completeVerified && !c.v.completeVerified) continue;
+    // Sport test 10 (2026-11-21): a sport or golf place its owner has set up never rotates to one nobody has (Lorraine's
+    // course lost "tee time then dinner" and "golf on Tuesday afternoon" to an unverified course this way).
+    if (best.v.ownerSetUp && !c.v.ownerSetUp) continue;
     const km = kmOrNull(best.v, c.v);
     if (km != null && km > ROTATE_MAX_KM) continue;
     pool.push(c);
@@ -2820,12 +2908,22 @@ function stopFrom(v, scored, extra, ctx) {
     caveats = caveats.filter((c) => !c.startsWith(UNKNOWN_HOURS_CAVEAT.replace(/ — .*$/, '')) && !/listed hours/i.test(c));
     const tn = INDOOR_TIMES_NOTES[v.indoorTimes] || INDOOR_CLASS_TIME_NOTE;
     if (!caveats.includes(tn)) caveats.push(tn);
-  } else if (v && v.type === 'indoor' && INDOOR_BOOK_NOTES[v.indoorBook] && !caveats.includes(INDOOR_BOOK_NOTES[v.indoorBook]) && !(ownLine && ownLine.busy && v.indoorBook !== 'ahead')) caveats.push(INDOOR_BOOK_NOTES[v.indoorBook]);
+  } else if (v && (v.type === 'indoor' || v.kindOwn) && INDOOR_BOOK_NOTES[v.indoorBook] && !(ownLine && ownLine.busy && v.indoorBook !== 'ahead')) {
+    // Sport test 1 (2026-11-20): a sport kind's own booking words (a golf course's "Walk-ons when there's room…").
+    const bn = (typeof v.indoorBookNote === 'string' && v.indoorBookNote) || INDOOR_BOOK_NOTES[v.indoorBook];
+    if (!caveats.includes(bn)) caveats.push(bn);
+  }
   if (v && v.type === 'tour' && TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead]) { const bn = tourBookAheadNote(v); if (!caveats.includes(bn)) caveats.push(bn); }
+  // Sport test 5: a ski school planned as a tour books lessons, not tour departures.
+  else if (v && v.kindOwn && typeof v.sportBookNote === 'string') { if (!caveats.includes(v.sportBookNote)) caveats.push(v.sportBookNote); }
   else if (bookedOutfitter(v) && !caveats.includes(TOUR_BOOKING_NOTE)) caveats.push(TOUR_BOOKING_NOTE);
   // Tour test 4 (Whistler, 2026-11-17), bug 12: the operator's one booking and age answer stands for several unlike trips
   // (its own Tours & prices list names different lengths or ages): say so, once.
   if (v && v.type === 'tour' && v.tourVaries && (TOUR_BOOK_AHEAD_NOTES[v.tourBookAhead] || v.tourMinAge) && !caveats.includes(TOUR_VARIES_NOTE)) caveats.push(TOUR_VARIES_NOTE);
+  // Sport test 5 (2026-11-20; Jen's ski school on an undated plan made Nov 20, before her Nov 26 opening day, read "Listed
+  // hours: 8 AM – 4:30 PM daily" while the resort beside her said it was closed): an undated plan made while an owner's own
+  // season is closed says so on her stop too, with her reopening day.
+  { const on = ownerSeasonClosedNowNote(v, ctx); if (on && !caveats.includes(on)) caveats.push(on); }
   // Indoor test 16 (2026-11-19; Tyler: 12+ on their own, 8 to 11 with a paying adult): with kids, the owner's adult rule.
   { const an = indoorAdultNote(v, ctx); if (an && !caveats.includes(an)) caveats.push(an); }
   if (ctx && (ctx.kids || kidsYoungest(ctx) != null) && v && v.type === 'tour' && (/^(?:5|6|8|10|12|14|16)$/.test(String(v.tourMinAge || '')) || (v.tourMinAge === 'all' && kidsYoungest(ctx) != null)) && !caveats.includes(tourAgeNote(String(v.tourMinAge)))) caveats.push(tourAgeNote(String(v.tourMinAge)));
@@ -2884,9 +2982,13 @@ function stopFrom(v, scored, extra, ctx) {
     caveats,
   };
 }
+// Sport test 12: the weight an owner-set-up sport or golf place gets in a time-slot itinerary's stop of its kind.
+const OWNER_SET_UP_SLOT_WEIGHT = 10;
+// Sport test 13: how far a neighbouring town's place can be (Kaleden to Penticton is about 15 km).
+const NEIGHBOUR_TOWN_KM = 30;
 function compareScored(a, b) {
   // Indoor test 15: a Complete & Verified place (all confirmed by its owner) breaks a tie before rating and reviews.
-  return b.score - a.score || (b.v.completeVerified ? 1 : 0) - (a.v.completeVerified ? 1 : 0) || (b.v.rating || 0) - (a.v.rating || 0) || (b.v.reviews || 0) - (a.v.reviews || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id;
+  return b.score - a.score || (b.v.completeVerified ? 1 : 0) - (a.v.completeVerified ? 1 : 0) || (b.v.ownerSetUp ? 1 : 0) - (a.v.ownerSetUp ? 1 : 0) || (b.v.rating || 0) - (a.v.rating || 0) || (b.v.reviews || 0) - (a.v.reviews || 0) || String(a.v.name).localeCompare(String(b.v.name)) || a.v.id - b.v.id;
 }
 
 // ---------- classification ----------
@@ -3052,7 +3154,10 @@ function buildRecommendations(facts, ctx, count = RECOMMENDATION_COUNT) {
     scored.push(t ? { v, score: s.score + t.score, reasons: s.reasons.concat(t.reasons), caveats: t.caveats } : { v, ...s });
   }
   const priceRank = (v) => (v.price === 1 ? 0 : v.price == null || v.price === 2 ? 1 : 2);
-  scored.sort(ctx.budget === 'budget' && !freeAsked ? (a, b) => priceRank(a.v) - priceRank(b.v) || compareScored(a, b) : compareScored);
+  // Sport test 13 (2026-11-21; Twin Lakes, set up by its owners, was 7th of 8 in "golf with my kids near Penticton", behind
+  // courses nobody has confirmed): a sport or golf place its owner set up comes first among the places of the kind asked for.
+  const ownFirst = (v) => (v.ownerSetUp && (ctx.types.has(v.type) || (ctx.activities && ctx.activities.has(v.type))) ? 0 : 1);
+  scored.sort(ctx.budget === 'budget' && !freeAsked ? (a, b) => priceRank(a.v) - priceRank(b.v) || compareScored(a, b) : (a, b) => ownFirst(a.v) - ownFirst(b.v) || compareScored(a, b));
   const out = [];
   const perType = {};
   for (const s of scored) {
@@ -3356,6 +3461,21 @@ function chooseDayRegions(facts, ctx, days, centroids) {
   let regions;
   if (ctx.regions.length) {
     regions = ctx.regions.slice();
+    // Sport test 14 (2026-11-21; "golf weekend in the South Okanagan" planned Summerland and Kaleden, never Oliver or
+    // Osoyoos): a golf trip asked for a whole area (more towns than days) plays its days in the area's golf towns: the towns
+    // with owner-set-up courses first, then the most courses, a tie to the south (the area's own golf country). Then north
+    // to south as before.
+    if (ctx.types.has('golf') && regions.length > days && days >= 1) {
+      const courses = (r) => (byRegion[r] || []).filter((v) => v.type === 'golf' && !v.indoorGolf);
+      const golfTowns = regions.filter((r) => courses(r).length && !SITE.notDayBaseRegions.includes(r));
+      if (golfTowns.length) {
+        const score = (r) => courses(r).filter((v) => v.ownerSetUp).length * 10 + Math.min(courses(r).length, 5);
+        const pick = golfTowns.slice().sort((a, b) => score(b) - score(a) || lat(a) - lat(b) || a.localeCompare(b)).slice(0, days);
+        pick.sort((a, b) => lat(b) - lat(a) || a.localeCompare(b));
+        if (ctx.intent && ctx.intent.fromSouth) pick.reverse();
+        return Array.from({ length: days }, (_, i) => pick[Math.floor((i * pick.length) / days)]);
+      }
+    }
     // A thinly listed town on a longer trip (2026-10-25: 3 days in Mount Currie had empty afternoons) shares its days
     // with the next town over, within about 15 minutes.
     if (regions.length === 1 && days >= 2 && !ctx.types.has('golf') && (byRegion[regions[0]] || []).length < 25) {
@@ -3456,6 +3576,14 @@ const ROUGH_ACCESS_NOTE = 'Rough access road — the listing says to check your 
 const DESC_MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
 const DESC_SEASON_CUE_RE = /\b(?:open|opens|opening|access|accessible|road|roads|vehicle|clearance|season|seasonal|operates|operating|run|runs|snow free|snow-free|trail is|hikeable)\b/;
 const DESC_SEASON_RE = new RegExp(`\\b(?:(?:early|mid|late) )?(${DESC_MONTHS.join('|')}) (?:to|through|until|thru) (?:(?:early|mid|late) )?(${DESC_MONTHS.join('|')})\\b`);
+// Sport test 13: the parts of a golf place that have their own season or hours. A sentence naming one is about that part.
+const PLACE_PART_RE = /\b(?:rv park|rv parks|rv sites?|rv resort|campground|campgrounds|campsites?|camping|driving range|practice range|range|patio|patios|terrace|bistro|restaurant|restaurants|grill|lounge|clubhouse (?:restaurant|bar|kitchen)|dining room|cafe|pro shop|golf shop|shop|simulators?|indoor golf|mini ?golf|mini ?putt|minigolf|pool|hot tub|marina)\b/;
+// Text sentence by sentence (split before normalizing), without the sentences whose subject is a part of the place ("RV
+// park open late April to mid September", "The patio is open May to September", "Range opens mid-April").
+function seasonSentences(text) {
+  const lead = new RegExp(`^(?:(?:the|our|its|their|a|an|and|also|plus)\\s+)*(?:${PLACE_PART_RE.source.slice(2, -2)})\\b`);
+  return String(text || '').split(/(?<=[.;!?])\s+|\n+/).map((x) => normWords(x)).filter((x) => x && !lead.test(x)).join(' . ');
+}
 function offSeasonSkip(v, ctx) {
   // A named month is judged in that month, not on the planned date ("driving range in June" asked in October).
   if (ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month) && ctx.tripDate) ctx = { ...ctx, tripDate: monthDate(ctx.seasonInfo.month, ctx.tripDate) };
@@ -3472,8 +3600,13 @@ function offSeasonSkip(v, ctx) {
   // its "golf season runs from early April to mid-October". An outdoor course whose description or advisory gives its
   // season is not planned outside it (to the half month: "mid-October" ends on the 15th), nor after an advisory that
   // says the season has ended, unless the request names the course.
-  if (month && v.type === 'golf' && !v.indoorGolf) {
-    const text = `${v.textDesc || ''} ${normWords((v.advisory && v.advisory.note) || '')}`;
+  // Sport test 13 (2026-11-21; Twin Lakes: their Good to know line "RV park open late April to mid September" took the
+  // course out of every plan from Sep 16 to Oct 15, inside their own season Apr 1 – Oct 15): the owner's own season always
+  // wins over words; the words read are research's description and advisory only (never the owner's lines), sentence by
+  // sentence, leaving out any sentence about another part of the place (the RV park, the range, the patio, the bistro…).
+  if (month && v.type === 'golf' && !v.indoorGolf && !v.sportYearAll && !(v.ownerSetUp && v.openMonths)) {
+    // Sport test 3: a sentence about one part ("Mini golf is open April to mid-October") is that part's season, not the place's.
+    const text = `${v.textSeason != null ? v.textSeason : v.textDesc || ''} ${seasonSentences((v.advisory && v.advisory.note) || '')}`.replace(/\b(?:mini ?golf|mini ?putt|minigolf)\b[^.;]*/g, ' ');
     const named = normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || '').includes((v.textName || '').split(' ').slice(0, 2).join(' '));
     if (!named && [10, 11, 12, 1, 2, 3].includes(month) && /\b(?:season (?:has )?(?:ended|is over|is done|wrapped up)|closed for the (?:season|year|winter)|end of (?:the )?season)\b/.test(text)) return true;
     const g = new RegExp(`\\b(?:(early|mid|late) )?(${DESC_MONTHS.join('|')}) (?:to|through|until|thru) (?:(early|mid|late) )?(${DESC_MONTHS.join('|')})\\b`).exec(text);
@@ -3486,8 +3619,9 @@ function offSeasonSkip(v, ctx) {
   }
   // 2026-10-25: an outdoor place or tour whose description gives its season ("high-clearance vehicle, July to
   // September" for a Monashee backcountry trail) is not planned outside it unless the request names it.
-  if (month && ['outdoor', 'tour'].includes(v.type)) {
-    const desc = v.textDesc || '';
+  // (Sport test 13: a sport place planned as an outdoor stop reads its description alone, and its owner's season wins.)
+  if (month && ['outdoor', 'tour'].includes(v.type) && !(v.ownerSetUp && v.openMonths)) {
+    const desc = v.textSeason != null ? v.textSeason : v.textDesc || '';
     const w = DESC_SEASON_RE.exec(desc);
     if (w && DESC_SEASON_CUE_RE.test(desc.slice(Math.max(0, w.index - 70), w.index + w[0].length + 25))) {
       const a = DESC_MONTHS.indexOf(w[1]) + 1, b = DESC_MONTHS.indexOf(w[2]) + 1;
@@ -3496,8 +3630,8 @@ function offSeasonSkip(v, ctx) {
       if (!inside && !named && a !== b) return true;
     }
   }
-  if (month && COLD_MONTHS.includes(month) && !v.indoorGolf && (v.indoorEvidence !== 'explicit' || ['cafe', 'restaurant'].includes(v.type)) && summerOnly(v, ctx)) return true;
-  if (!month || ctx.types.has(v.type) || (v.type === 'beach' && ctx.lake) || (v.type === 'golf' && v.indoorGolf)) return false;
+  if (month && COLD_MONTHS.includes(month) && !v.indoorGolf && !v.sportYearAll && (v.indoorEvidence !== 'explicit' || ['cafe', 'restaurant'].includes(v.type)) && summerOnly(v, ctx)) return true;
+  if (!month || ctx.types.has(v.type) || (v.type === 'beach' && ctx.lake) || (v.type === 'golf' && (v.indoorGolf || v.sportYearAll))) return false;
   return (OFF_SEASON_MONTHS[v.type] || []).includes(month);
 }
 
@@ -5103,10 +5237,17 @@ function indoorKindPlurals(ctx) {
   if (!ctx || !ctx.types || !ctx.types.has('indoor') || indoorAskedLabel(ctx.queryText, 'plural')) return [];
   return [...new Set((ctx.plannerKinds || []).filter((k) => INDOOR_KIND_PLURALS[k]).map((k) => INDOOR_KIND_PLURALS[k]))];
 }
+// Sport test 3: "Mini golf in Kelowna", "Driving ranges in Kelowna" (never "Indoor & rainy day spots" or "Golf courses").
+const GOLF_PART_PLURALS = { mini_golf: 'mini golf', driving_range: 'driving ranges' };
+const TOUR_KIND_SET_FOR_SUMMARY = new Set(tripRequirements.TOUR_PLANNER_KINDS || []);
 function interestsText(ctx) {
   const items = [];
   const kindNames = indoorKindPlurals(ctx);
-  for (const t of ctx.types) { if (t === 'indoor' && kindNames.length) { items.push(...kindNames); continue; } items.push(typeLabel(ctx, t).toLowerCase()); }
+  const golfParts = [...new Set((ctx.plannerKinds || []).filter((k) => GOLF_PART_PLURALS[k]).map((k) => GOLF_PART_PLURALS[k]))];
+  if (golfParts.length) items.push(...golfParts);
+  // Sport test 5 (2026-11-20; "first time skiing" read "focused on tours & experiences"): a lesson request says lessons.
+  const lessonsOnly = (ctx.plannerKinds || []).includes('ski_lessons') && !(ctx.plannerKinds || []).some((k) => k !== 'ski_lessons' && TOUR_KIND_SET_FOR_SUMMARY.has(k));
+  for (const t of ctx.types) { if (t === 'tour' && lessonsOnly) { items.push('ski and snowboard lessons'); continue; } if (golfParts.length && (t === 'indoor' || t === 'golf' || t === 'outdoor' || t === 'sport')) continue; if (t === 'indoor' && kindNames.length) { items.push(...kindNames); continue; } items.push(typeLabel(ctx, t).toLowerCase()); }
   for (const a of ctx.activities) items.push(activityLabel(ctx, a));
   for (const c of ctx.collections) items.push(collectionLabel(ctx, c));
   // Indoor test 6 (2026-11-19; "paint your own pottery" read "Indoor & rainy day spots, “paint” and “own”"): with an
@@ -5556,6 +5697,9 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
         const tourDeps=ownTrip?(ownTrip.departs||[]):candidate.tourDepartures;
         let duration=Math.min(candidate.indoorGolf?120:1440,stop.gapFill||stop.afterSki?gapFillMinutes(candidate):trailTime||longHike||ownTourMin||(one?.complete?one.maxMinutes:hiking?180:(VISIT_ALLOWANCE[candidate.type]||60)));
         // Setting up camp (2026-10-25) is about 45 minutes, not a three-hour outdoor visit.
+        // Sport test 15 (2026-11-21; Kurt's 9-hole course was always booked 9 AM – 1 PM, then "About 4.5 hours before dinner"):
+        // an owner-set-up 9-hole course is a 2 to 2.5 hour round (the owner's own visit length when it says 1 to 3 hours).
+        if(candidate.type==='golf'&&!candidate.indoorGolf&&candidate.golfNine&&candidate.kindOwn&&!stop.gapFill&&!stop.afterSki)duration=Math.min(duration,(OWN_ROUND_MINUTES[candidate.indoorLength]||0)>=120?OWN_ROUND_MINUTES[candidate.indoorLength]:150);
         if(stop.campBase)duration=45;
         // Build My Trip fixes (2026-11-18): a spa visit (a Nordic spa's hot-cold circuit) is about two and a half hours, not a
         // 90-minute stop with an unasked-for museum after it.
@@ -5750,7 +5894,7 @@ function scheduleTripByHours(plan, input, requirements, options = {}) {
       const item={day:group.day,date,venueId:v?.id,status:timed?.bad?'unmet':timed?(timed.provisional||provisional?'provisional':'estimated'):'unverified',assumedStart:assumed};
       // Tour test 16: a tour's time on the card is its own departure ("departure": true), or "Book a departure time" when the
       // operator listed none (bookDeparture), never a made-up afternoon slot. Rentals-only operators keep their hours.
-      if(v&&v.type==='tour'&&timed&&!timed.bad){if(timed.departure)item.departure=true;else if(requirements.startMinutes==null&&!(Array.isArray(v.tourKinds)&&v.tourKinds.length&&v.tourKinds.every(k=>k==='rentals')))item.bookDeparture=true;}
+      if(v&&v.type==='tour'&&timed&&!timed.bad){if(timed.departure)item.departure=true;else if(requirements.startMinutes==null&&!(Array.isArray(v.tourKinds)&&v.tourKinds.length&&v.tourKinds.every(k=>k==='rentals'))){item.bookDeparture=true;if(Array.isArray(v.sportBookLabel))item.bookLabel=v.sportBookLabel.slice();}}
       let note;
       if(timed&&!timed.bad){
         Object.assign(item,{startMinutes:timed.start,endMinutes:timed.end,waitMinutes:timed.wait,transferMinutes:timed.transfer});
@@ -5901,10 +6045,14 @@ const DINNER_GAP_MINUTES = 90;
 const SKI_DAY_END = 930; // 3:30 PM, when the lifts wind down
 const SKI_LUNCH_MINUTES = 60;
 const SWAP_FLEX_TYPES = ['outdoor', 'beach', 'indoor', 'tour', 'sport', 'winery', 'brewery', 'distillery', 'golf'];
-function gapFillMinutes(v) { return Math.min(90, Math.max(60, VISIT_ALLOWANCE[v.type] || 60)); }
+const OWN_ROUND_MINUTES = { '1h': 60, '1-2h': 120, '2-3h': 150 };
+function gapFillMinutes(v) { if (shortOwnRound(v)) return OWN_ROUND_MINUTES[v.indoorLength]; return Math.min(90, Math.max(60, VISIT_ALLOWANCE[v.type] || 60)); }
+// Sport test 8 (2026-11-21; "a weekend in Lumby" left Marg's 9-hole course out with 5.5 hours free before dinner on Day 2):
+// a golf course its owner set up as a short visit (1 to 3 hours, a 9-hole walk-on round) can fill a long free afternoon.
+function shortOwnRound(v) { return !!(v && v.type === 'golf' && !v.indoorGolf && v.kindOwn && !!OWN_ROUND_MINUTES[v.indoorLength]); }
 function gapFillStart(arrive, spare) { return arrive + Math.max(0, Math.floor(spare / 2 / 15) * 15); }
 // Round 10 (2026-10-19): no tour company (Hoodoo Adventures, Full Cyrcle) as a walk-in filler; tours are booked.
-const GAP_FILL_TYPES = ['outdoor', 'indoor', 'beach', 'winery', 'brewery', 'distillery', 'cafe'];
+const GAP_FILL_TYPES = ['outdoor', 'indoor', 'beach', 'winery', 'brewery', 'distillery', 'cafe', 'golf'];
 const GAP_ALCOHOL_TYPES = ['winery', 'brewery', 'distillery'];
 const GAP_KIDS_RE = /\b(?:kids?|children|family|families|play|playground|science|museum|aquarium|zoo|farm|petting|mini golf|bowling|arcade|trampoline|climbing|pool|splash|park|beach|gelato|ice cream)\b/;
 function fillDinnerGaps(result, input, requirements) {
@@ -5991,7 +6139,7 @@ function fillDinnerGaps(result, input, requirements) {
         // sunset), and a day has one round.
         // 2026-10-25 (tools audit): a rainy day is all indoors, so a third indoor stop may fill a long late afternoon
         // ("rainy day in Whistler" had a spa and a museum, then 3 h 15 min free before dinner).
-        if (capped(v.type) || (dayTypes[v.type] || 0) >= (v.type === 'indoor' && (ctx.rainy || dayCtx.rainy) ? 3 : 2) || (v.type === 'golf' && !v.indoorGolf) || eveningOnlyVenue(v)) continue;
+        if (capped(v.type) || (dayTypes[v.type] || 0) >= (v.type === 'indoor' && (ctx.rainy || dayCtx.rainy) ? 3 : 2) || (v.type === 'golf' && !v.indoorGolf && !(shortOwnRound(v) && !dayTypes.golf && (gapEnd - gapStart) >= GAP_MINUTES + 60)) || (v.type === 'golf' && v.indoorGolf) || eveningOnlyVenue(v)) continue;
         if (v.type === 'indoor' && sameIndoorKindToday(v, day.stops, facts, ctx)) continue; // indoor test 17: one place of each kind a day
         if (v.type === 'outdoor' && (/\b(?:steep|summit|summits|ladder|ladders|chains)\b/.test(normWords(v.trailText || '')) || (trailMinutes(v) || 0) >= 150)) continue; // a summit trail is not a pre-dinner filler
         if (spaPlace(v) && (day.stops || []).some((x) => x.venue && spaPlace(x.venue))) continue; // one spa a day (2026-10-25)
@@ -7947,6 +8095,17 @@ function planTripUnchecked(input) {
     }
     if (kindMust('fishing_tour') || kindMust('heli_ski') || kindMust('rentals') || kindMust('snowshoe_tour') || kindMust('boat_tour') || kindMust('ski_touring') || kindMust('avalanche_course') || kindMust('multi_day_tour') || kindMust('mountain_guide')) intent.foodTerms = intent.foodTerms.filter(f => !(f.cuisine && /^(?:fishing|salmon|sturgeon|trout|salmon fishing|fishing (?:charters?|trips?|tours?|guides?)|charters?|boat charters?|heli ?skiing|cat ?skiing|snowshoe tours?|snowshoeing|(?:equipment |gear )?rentals?|ski touring|backcountry skiing|avalanche courses?|hut trips?|mountaineering|mountain guid\w*)$/.test(normWords(f.term))));
   }
+  // Sport test 3 (2026-11-20; "mini golf with kids" planned 8 golf courses, "driving range then dinner" a round at a
+  // course): a mini golf or driving range request is that kind, not golf courses, unless it names a course or a round too.
+  if (requirements.items.some(i => i.kind === 'venue_kind' && ['mini_golf', 'driving_range'].includes(i.value) && i.strength === 'must')) {
+    const rest = normWords(requirements.text || input.text || '').replace(/\b(?:mini ?golf\w*|minigolf|mini ?putt\w*|disc golf|crazy golf|glow golf|adventure golf|(?:golf )?driving ranges?|golf ranges?|golf balls?|golf lessons?)\b/g, ' ');
+    if (!/\bgolf\w*\b/.test(rest)) {
+      intent.types = (intent.types || []).filter(t => t !== 'golf');
+      requirements = { ...requirements, items: requirements.items.filter(i => !(i.kind === 'type' && i.value === 'golf')) };
+      input = { ...input, requirements };
+    }
+    intent.foodTerms = (intent.foodTerms || []).filter(f => !/^(?:mini ?golf|minigolf|mini ?putt|driving range|bucket of balls)$/.test(normWords(f.term)));
+  }
   // Tour test 4: the same for a food tour or a walking tour (real listings have the category "Food tour").
   if (requirements.items.some(i => i.kind === 'venue_kind' && i.value === 'food_tour' && i.strength === 'must')) intent.foodTerms = intent.foodTerms.filter(f => !(f.cuisine && /^(?:food|foodie|culinary|tasting|food tasting)(?: and drink)? tours?$/.test(normWords(f.term))));
   if (requirements.items.some(i => i.kind === 'venue_kind' && i.value === 'walking_tour' && i.strength === 'must')) intent.foodTerms = intent.foodTerms.filter(f => !(f.cuisine && /^(?:walking|history|ghost|heritage)(?: (?:and|or) (?:history|food))? (?:tours?|walks?)$/.test(normWords(f.term))));
@@ -8747,12 +8906,36 @@ function planTripCore(input) {
     const closedAll = buildRecommendations(facts, { ...ctx, ignoreSeason: true }).items.map((x) => x.venue && facts.find((f) => f.id === x.venue.id)).filter((f) => f && !shown.has(f.id) && ownerClosureOn(f, d));
     if (closedAll.length) result.warnings.push(`Closed ${CLOSURE_MONTHS_EN[Number(d.slice(5, 7)) - 1]} ${Number(d.slice(8, 10))}: ${closedAll.slice(0, 6).map((f) => f.name).join(', ')}.`);
   }
+  // Sport test 1 (2026-11-20; "golf in Kelowna on January 16" left Debbie's course out, closed for the season by her own
+  // dates, with no word): a dated list for a kind or type of place names the places of that kind, in the town asked, that
+  // their own season closes that day, with the day they reopen ("Closed for the season: Shadow Ridge (reopens Mar 15).").
+  let golfIndoorOnly = false;
+  if (rec.items.length && /^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || '')) && ((ctx.plannerKinds || []).length || (ctx.types && ctx.types.size && ctx.types.size <= 2))) {
+    const d = String(ctx.tripDate);
+    const shown = new Set(rec.items.map((i) => i.venue && i.venue.id));
+    const seasonShut = buildRecommendations(facts, { ...ctx, ignoreSeason: true }).items.map((x) => x.venue && facts.find((f) => f.id === x.venue.id))
+      .filter((f) => f && !shown.has(f.id) && f.openMonths && !ownerClosureOn(f, d) && seasonClosedOnTripRaw({ ...f, ownerClosures: undefined }, { date: d }));
+    // Sport test 15 (2026-11-21; Kurt's season saved as whole months, "3-11", had no reopen date beside it): any season shape,
+    // read as the first day it is open again after the trip's date.
+    const reopen = (f) => { const m = /^(\d{2})-(\d{2}):/.exec(String(f.openMonths || '')); if (m) return `${CLOSURE_MONTHS_EN[Number(m[1]) - 1]} ${Number(m[2])}`; const ro = reopensAfter({ ...f, ownerClosures: undefined }, d); return ro ? `${CLOSURE_MONTHS_EN[Number(ro.slice(5, 7)) - 1]} ${Number(ro.slice(8, 10))}` : ''; };
+    const named = seasonShut.slice(0, 4).map((f) => (reopen(f) ? `${f.name} (reopens ${reopen(f)})` : f.name));
+    if (named.length) result.warnings.push(`Closed for the season: ${named.join(', ')}.`);
+    // Sport test 2 (2026-11-20; "golf in January" listed 8 closed outdoor courses and no simulator): when the courses are
+    // closed for the season that day and the list is indoor golf, it says so.
+    const golfItems = rec.items.filter((i) => i.venue && i.venue.type === 'golf');
+    if (ctx.types && ctx.types.has('golf') && golfItems.length && golfItems.every((i) => { const f = facts.find((x) => x.id === i.venue.id); return f && f.indoorGolf; }) && seasonShut.some((f) => f.type === 'golf' && !f.indoorGolf)) golfIndoorOnly = true;
+  }
   // Audit fix (2026-10-27): the list's own day, when the request named one, so the trip API can add that day's weekly
   // nights and happy hour to each place ("Tonight: Trivia 7:30–9 PM").
   { const listDate = ctxPlanDate(ctx); if (listDate) result.listDate = listDate; }
   // Whistler #190 (2026-11-17): when the whole list comes from the nearest town that has it, the header names that town
   // (the note above says why).
   result.summary = buildSummary(kind, borrowedTown ? { ...ctx, regions: [borrowedTown] } : ctx, null);
+  if (golfIndoorOnly) {
+    result.summary = String(result.summary || '').replace(/^Golf courses\b/, 'Indoor golf').replace(/\bgolf courses\b/, 'indoor golf');
+    const mon = /^\d{4}-(\d{2})/.exec(String(ctx.tripDate || ''));
+    result.warnings.push(`Most golf courses are closed ${mon ? `in ${MONTH_NAMES[Number(mon[1]) - 1]}` : 'then'}, so these are indoor golf simulators.`);
+  }
   result.overview = buildOverview(kind, ctx, null);
   // 2026-10-25: when the only matches are closed for the season ("boat rental in Penticton" in October), say so and
   // name them, rather than "no listings match".
@@ -9540,7 +9723,10 @@ function seasonFit(v, c, season, ctx) {
     } else {
       const windows = v.golfSeasons || [];
       const covered = windows.find((w) => mdInWindow(season.md, w.from, w.to));
-      if (covered) add(6, `Its published ${covered.label ? `${covered.label} ` : ''}rates run ${mdText(covered.from)} – ${mdText(covered.to)}`);
+      // Sport test 12 (2026-11-21; Rob's Tower Ranch lost "tee time then dinner" to a course whose 2026 rate card gave it
+      // "in season" points): an owner's own season that covers the trip's date counts the same as published rates.
+      if (v.ownerSetUp && v.openMonths && season.date && !seasonClosedOnTripRaw({ ...v, ownerClosures: undefined }, { date: season.date })) add(6, `Open on your date: its owner’s season`);
+      else if (covered) add(6, `Its published ${covered.label ? `${covered.label} ` : ''}rates run ${mdText(covered.from)} – ${mdText(covered.to)}`);
       else {
         if (season.golf === 'off') add(-12, null);
         else if (season.golf === 'shoulder' && windows.length) add(-4, null);
@@ -9570,6 +9756,16 @@ const OPERATING_MONTHS = ['january','february','march','april','may','june','jul
 const OPERATING_PERIOD_RE = new RegExp(`\\b(?:opens?|operates?|runs?)\\s+(?:daily\\s+)?(?:from\\s+)?(${OPERATING_MONTHS.join('|')})\\s+(?:to|through|until|into)\\s+(?:(?:early|mid|late)\\s+)?(${OPERATING_MONTHS.join('|')})\\b`);
 // Tour test 13 (Whistler, 2026-11-18; Matthias: "winter only by request"): a tour that ticked "Off-season trips by
 // request" is not closed for its season (its stop says "by request, rare": seasonOffRequest); its owner closures are.
+function ownerSeasonClosedNowNote(v, ctx) {
+  try {
+    if (!v || !ctx || !/^\d{4}-\d{2}-\d{2}$/.test(String(ctx.tripDate || ''))) return null;
+    if ((ctx.requirements && ctx.requirements.startDate) || (ctx.seasonInfo && (ctx.seasonInfo.named || Number.isInteger(ctx.seasonInfo.month)))) return null;
+    const ex = /^(\d{2}-\d{2}):(\d{2}-\d{2})$/.exec(String(v.openMonths || ''));
+    if (!ex || !seasonClosedOnTripRaw({ ...v, ownerClosures: undefined }, { date: ctx.tripDate })) return null;
+    const md = ex[1], y = Number(ctx.tripDate.slice(0, 4)), iso = `${ctx.tripDate.slice(5, 10) < md ? y : y + 1}-${md}`;
+    return `${v.name} is closed for the season right now and reopens on ${MONTH_NAMES[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}. This plan is for when it’s open.`;
+  } catch (e) { return null; }
+}
 function seasonClosedOnTrip(v, season) {
   if (v && v.tourOffRequest && !(v.ownerClosures && v.ownerClosures.some((c) => ((season && season.date) || ownerClosureToday()) >= c.from && ((season && season.date) || ownerClosureToday()) <= c.to))) return false;
   return seasonClosedOnTripRaw(v, season);
@@ -9851,6 +10047,8 @@ function planItinerary(input) {
       if (walking && previousVenue && (v.region !== previousVenue.region || kmBetween(previousVenue,v) == null || kmBetween(previousVenue,v) > walkingLimit)) continue;
       if (c.venueId && c.venueId !== v.id) continue;
       if (!c.venueId && mountainLodge(v) && (c.meal === 'dinner' || ['evening', 'night'].includes(daypart))) continue; // lodges close with the lifts
+      // Sport test 8: a golf course with no hours on file is never an evening round (it would end after dark).
+      if (!c.venueId && v.type === 'golf' && !v.indoorGolf && ['evening', 'night'].includes(daypart) && !(v._hours || (v._hours = parseVenueHours(v.hours))).known) continue;
       // A generic rainy-day suggestion should fit the travelling party.
       // Preserve an explicitly requested venue and family playground requests.
       if (input.requirements && c.rainyOption && !c.kids && !c.venueId && /\b(?:indoor playground|young kids|toddlers|ball pit|play structures)\b/i.test(v.plannerDescription || v.textDesc || v.description || '')) continue;
@@ -9930,9 +10128,23 @@ function planItinerary(input) {
       const dogCaveat = dogSeasonCaveat(v, c);
       const caveats = (t ? t.caveats : []).concat(sf.caveats, nearby.caveats, adv ? [adv.caveat] : [], dogCaveat ? [dogCaveat] : [], fbCaveats);
       if (kFit) { score += namedIds.has(v.id) ? 500 : -10; reasons.unshift({ code: 'meal', text: kitchenMealText(v, c.meal, kFit.closes), weight: 20 }); }
+      // Sport test 12 (2026-11-21; Rob's owner-set-up Tower Ranch lost three time-slot plans to unverified courses: it was only
+      // a tie-break after the score): a sport or golf place whose owner set it up (its kinds and its own hours) gets a real
+      // weight in the slot of its kind, so it wins over places nobody has confirmed unless it is clearly worse for the ask.
+      if (v.ownerSetUp && (c.types || []).includes(v.type)) score += OWNER_SET_UP_SLOT_WEIGHT;
       scored.push({ v, score, base: s.score, reasons, caveats, seasonFlags: sf.flags, advisory: !!adv, ...(kFit ? { kitchenMeal: true } : {}), ...(c.liveMusicFallback && musicNightOn(v) ? { nightOn: musicNightOn(v) } : {}) });
     }
     scored.sort(compareScored);
+    // Sport test 13 (2026-11-21; "tee time then dinner in Kaleden" booked St. Andrews, unverified with no hours, over Twin
+    // Lakes, set up by its owners, because its bistro is next door): an unverified place with no hours never takes the stop
+    // from an owner-set-up place of the same kind in the same or a neighbouring town. It is kept only when nothing else is.
+    const ownSet = scored.filter((x) => x.v.ownerSetUp && (c.types || []).includes(x.v.type));
+    if (ownSet.length) {
+      const outranked = (x) => !x.v.ownerSetUp && !x.v.completeVerified && !x.v.hours && ownSet.some((o) => o.v.type === x.v.type && !!o.v.indoorGolf === !!x.v.indoorGolf
+        && (o.v.region === x.v.region || (kmOrNull(o.v, x.v) != null && kmOrNull(o.v, x.v) <= NEIGHBOUR_TOWN_KM)));
+      const kept = scored.filter((x) => !outranked(x));
+      if (kept.length) scored.splice(0, scored.length, ...kept);
+    }
     // A walk by the lake is on the shore when the town has one listed.
     if (c.lake) { const shore = scored.filter((x) => x.reasons.some((r) => r.code === 'lake' && r.text === 'By the lake')); if (shore.length) scored.splice(0, scored.length, ...shore); }
     const label = componentLabel(c, ctx);
@@ -10270,7 +10482,7 @@ module.exports = {
   withSameEstates, longDayHike, longDayHikeMinutes, oneSpaAsked,
   coolBeachMonth,
   dogOnlyPlace,
-  offSeasonSkip,
+  offSeasonSkip, seasonSentences, PLACE_PART_RE,
   tripTheme,
   // Build My Trip round 15 (2026-10-20)
   addSuggestedTimes, addStory, SUGGESTED_TIMES_NOTE,

@@ -1,5 +1,5 @@
 'use strict';
-const {FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE,t3FrenchHeadingCore,t3FrenchSummary,frSummaryItems,frSummaryList,frSummaryAround,frOccasionNoun}=require('./trip-french-copy');
+const {FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,SPORT_BOOK_NOTES_FR,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE,t3FrenchHeadingCore,t3FrenchSummary,frSummaryItems,frSummaryList,frSummaryAround,frOccasionNoun}=require('./trip-french-copy');
 const SITE_PAGE=require('./trip-site.js').page;
 // Build My Trip V4 (2026-11-20): the simple plan view, only with d.v4 (/trip?v=4 or TRIP_V4; see server.js).
 const V4_PAGE=require('./trip-planner-v4-page.js');
@@ -1537,6 +1537,8 @@ function renderScript(d) {
   // Fix (2026-10-19): the French helpers below read these lookups, so ship them with the functions (a season or month crashed /fr/trip).
   var FR_MONTHS_BY_EN = ${JSON.stringify(FR_MONTHS_BY_EN)};
   var FR_SEASON_WORDS = ${JSON.stringify(FR_SEASON_WORDS)};
+  // Sport test 1 (2026-11-20): each sport kind's own booking note in French.
+  var SPORT_BOOK_NOTES_FR = new Map(${JSON.stringify([...SPORT_BOOK_NOTES_FR])});
   // Round 15c: the French Ideas heading (t3FrenchText calls it) and its lookups.
   var FR_HEADING_NAMES = ${JSON.stringify(FR_HEADING_NAMES)};
   var FR_HEADING_DAYS = ${JSON.stringify(FR_HEADING_DAYS)};
@@ -2019,7 +2021,8 @@ ${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3
       if (day != null && r.day !== day) continue;
       var hit = s.event ? r.eventId === s.event.id : (s.venue && r.venueId === s.venue.id);
       // Tour test 16 (Whistler, 2026-11-18): a tour with no departure times of its own says so, never a made-up slot.
-      if (hit && r.bookDeparture) return lang() === 'fr' ? 'Réservez une heure de départ' : 'Book a departure time';
+      // Sport test 5: a ski school's own words ("Book a lesson time").
+      if (hit && r.bookDeparture) return r.bookLabel && r.bookLabel.length === 2 ? r.bookLabel[lang() === 'fr' ? 1 : 0] : lang() === 'fr' ? 'Réservez une heure de départ' : 'Book a departure time';
       if (hit && typeof r.startMinutes === 'number') return clockLabel(r.startMinutes) + (typeof r.endMinutes === 'number' ? '–' + clockLabel(r.endMinutes) : '');
     }
     return '';
@@ -2147,6 +2150,8 @@ ${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3
       + '<div class="t3-card-tags">' + badgesHtml(v) + '</div>'
       + '<div class="t3-card-body">'
       + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + (v.hoursByOwner ? ' <span class="t3-nowrap">' + esc(lang() === 'fr' ? '(confirmés par l’entreprise)' : '(confirmed by the business)') + '</span>' : /venue page|page du lieu/i.test(v.listedHours) ? '' : ' <span class="t3-nowrap"><span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></span>') + '</p>' : '')
+      // Sport test 6: a rink's hours are the building's; its public skate times change.
+      + (v.timesChange ? '<p class="t3-hours t3-times-change">' + esc(lang() === 'fr' ? v.timesChange.fr : v.timesChange.en) + '</p>' : '')
       // Indoor test 1 (2026-11-19): a yearly closure in the month asked for (or the next weeks, with no date).
       + (v.yearlyClosure ? '<p class="t3-hours t3-closure">' + esc(lang() === 'fr' ? v.yearlyClosure.fr : v.yearlyClosure.en) + '</p>' : '')
       // Happy hour deals (2026-10-26): a stop timed inside the venue's happy hour says what is on.
@@ -2437,7 +2442,7 @@ ${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3
       // three or four screens down on a phone.
       var stopCount=timeline.filter(function(r){return !r.notScheduledMeal;}).length;
       html+='<details class="t3-warnings t3-timeline" aria-label="'+(french?'Horaire du voyage':'Trip timeline')+'"><summary><strong>'+(french?'Votre horaire':'Your timeline')+'</strong> · '+(french?stopCount+(stopCount===1?' arrêt':' arrêts')+', heures et trajets':stopCount+(stopCount===1?' stop':' stops')+', times and travel')+'</summary><p>'+(french?'Visites et trajets estimés; heures des événements indiquées par les fiches. Confirmez avant de partir.':'Visits and travel are estimates; event times come from listings. Confirm before visiting.')+'</p><ol>'+timeline.map(function(row,n){
-        var time=row.notScheduledMeal?(french?'Non planifié':'Not scheduled'):row.bookDeparture?(french?'Réservez une heure de départ':'Book a departure time'):Number.isFinite(row.startMinutes)?clock(row.startMinutes)+(Number.isFinite(row.endMinutes)?'–'+clock(row.endMinutes):' · '+(french?'fin inconnue':'end unknown')):(french?'Horaire à confirmer':'Timing unverified');
+        var time=row.notScheduledMeal?(french?'Non planifié':'Not scheduled'):row.bookDeparture?(row.bookLabel&&row.bookLabel.length===2?row.bookLabel[french?1:0]:french?'Réservez une heure de départ':'Book a departure time'):Number.isFinite(row.startMinutes)?clock(row.startMinutes)+(Number.isFinite(row.endMinutes)?'–'+clock(row.endMinutes):' · '+(french?'fin inconnue':'end unknown')):(french?'Horaire à confirmer':'Timing unverified');
         if(row.mealWindow)time=(french?'Arrivée possible pour le souper : ':'Possible dinner arrival: ')+clock(row.mealWindow.earliestStartMinutes)+'–'+clock(row.mealWindow.latestStartMinutes);
         var detail=[];
         if(row.mealWindow)detail.push(french?'Fenêtre conditionnelle selon les horaires indiqués; trajet et service en cuisine à confirmer. Aucun horaire de visite fixé.':'Conditional window based on listed hours; travel and kitchen service need confirmation. No visit time is scheduled.');

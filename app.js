@@ -1387,7 +1387,9 @@ function initBlock11(){
     var phoneLink = document.createElement('a');
     phoneLink.className = 'phone-link';
     if (phone) {
-      phoneLink.href = 'tel:' + phone.replace(/[^\d+]/g, '');
+      var ext = /(?:,|;|#|\bext\.?|\bextension\b|\bx\.?|\bposte\b)\s*(\d{1,6})\s*$/i.exec(phone), main = (ext ? phone.slice(0, ext.index) : phone).replace(/[^\d+]/g, '');
+      if (ext && /^\d{10}$/.test(main)) main = '+1' + main;
+      phoneLink.href = 'tel:' + main + (ext ? ',' + ext[1] : '');
       phoneLink.textContent = '📞 ' + phone;
     } else {
       phoneLink.style.visibility = 'hidden';

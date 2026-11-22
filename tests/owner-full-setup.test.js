@@ -68,7 +68,7 @@ test('the page: the steps in two parts, the approved words, "before tax and tip"
   // Cocktail test 2 (2026-11-13): « Accepte les réservations ».
   assert.equal(fr.offerLabels.takes_reservations, 'Accepte les réservations');
   // Other types never get it.
-  const pub = mk('golf');
+  const pub = mk('beach');
   assert.equal((await get(`/owner/${tokenFor(pub.id)}/setup`)).status, 302);
 });
 
@@ -107,7 +107,7 @@ test('the classic edit page keeps its rules: the same fields without the setup f
   assert.equal(r2.status, 201, JSON.stringify(r2.body));
   assert.deepEqual(r2.body.live, []);
   // A pub sending from the setup address gets no setup rule.
-  const pub = mk('golf');
+  const pub = mk('beach');
   const r3 = await change(tokenFor(pub.id), { open_months: '5-10' });
   assert.equal(r3.status, 201, JSON.stringify(r3.body));
   assert.deepEqual(r3.body.live, []);
@@ -134,7 +134,7 @@ test('progress: answers are remembered for Welcome back; bad steps refused; the 
   // Help: "did it go through?" answers with what was sent.
   assert.match(await get(`/owner/${t}/setup`).then((r) => r.text()), /"id":"setup-status"/);
   // Other types: no progress.
-  assert.equal((await get(`/owner/${tokenFor(mk('golf').id)}/setup/progress`)).status, 404); // cafés (2026-11-10) and wineries (2026-11-12) have the setup; distilleries since 2026-11-13
+  assert.equal((await get(`/owner/${tokenFor(mk('beach').id)}/setup/progress`)).status, 404); // cafés (2026-11-10) and wineries (2026-11-12) have the setup; distilleries since 2026-11-13; golf and sport have the setup since 2026-11-20
 });
 
 test('happy hour and specials sent to type up get their own queue rows, never mixed with the menu', async () => {
@@ -178,7 +178,7 @@ test('owner-only features: stored apart, shown as chips, no new pages; reservati
   const ok = await change(t, { not_offered: [], badges: { takes_reservations: true } });
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
   // Other types can't send them.
-  const pub = mk('golf');
+  const pub = mk('beach');
   assert.equal((await change(tokenFor(pub.id), { badges: { takeout: true } })).status, 400);
   // The restaurant edit page shows the six boxes; a pub's doesn't.
   assert.match(await get(`/owner/${t}`).then((x) => x.text()), /value="takes_reservations"/);
