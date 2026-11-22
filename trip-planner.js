@@ -3606,12 +3606,14 @@ function outdoorFactsSeasonOff(v, ctx, month) {
   const season = normWords(s.season || ''), winter = normWords(s.winter || '');
   // "Closed" is read for summer places only (never a rink or ski place waiting for winter), and not when it says it
   // reopens in the cold months.
-  const winterPlace = (v.activities || []).some((a) => ['winter', 'skiing', 'snowshoeing'].includes(a)) || /\b(?:ski|skiing|nordic|rink|skating|snowshoe\w*|tubing|sleigh\w*|ice)\b/.test(`${v.textName || ''} ${season}`);
+  const winterPlace = (v.activities || []).some((a) => ['winter', 'skiing', 'snowshoeing'].includes(a)) || /\b(?:ski|skiing|nordic|rink|skating|snowshoe\w*|tube|tubing|sleigh\w*|ice)\b/.test(`${v.textName || ''} ${season}`);
   if (!winterPlace && OUTDOOR_FACTS_CLOSED_RE.test(season) && !/\breopen\w* (?:nov|dec|jan|feb|mar)/.test(season)) return true;
   // An open season of months ("Open daily May 15 to Sept 7, 2026", "Shop open mid-April through September", "April to
   // October") that leaves out the trip's month.
   const r = !winterPlace ? OUTDOOR_FACTS_RANGE_RE.exec(season) : null;
-  if (r && !/\b(?:services|fees?|camping|road|gate|entrance|upkeep|parking|water|restaurant)\b/.test(season.slice(0, r.index))) {
+  // Only a season of the place itself: "open" or "season" before the months, and nothing about a closure, a pass, a shuttle
+  // or a service ("Climbing closures usually March 15 to July 31", "Pass needed Jun 12 to Oct 12" are open all year).
+  if (r && /\b(?:open|opens|season|operates|operating)\b/.test(season.slice(0, r.index)) && !/\b(?:closures?|closed|pass|passes|permits?|shuttles?|ferry|services|fees?|camping|road|gate|entrance|upkeep|parking|water|restaurant|buildings?|interiors?|indoors?)\b/.test(season.slice(0, r.index)) && !/\b(?:year round|all year|open daily in daylight|grounds open)\b/.test(season)) {
     const a = MONTH_ABBR.indexOf(r[1].slice(0, 3)) + 1, b = MONTH_ABBR.indexOf(r[2].slice(0, 3)) + 1;
     // A summer season only (it starts March to July and ends April to October): "Oct 15 to Dec 31: open 6 am to 6 pm" is
     // a park's winter hours, not its season.

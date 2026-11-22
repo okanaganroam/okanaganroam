@@ -196,6 +196,11 @@ test('7. Hoodoo Adventure Company (rentals and shuttles in fall, snowshoe rental
   assert.equal(of('Open year-round; services mid-April to Nov 15'), false, 'services, not the place');
   assert.equal(of('Oct 15 to Dec 31: open 6 am to 6 pm; hours shift by season'), false, 'winter hours, not a summer season');
   assert.equal(of('Closed for the season now; daily 9 am to 9 pm when open', { textName: 'outdoor skating rink' }), false, 'a rink waiting for winter');
+  assert.equal(of('Closed now; opening winter 2026/2027', { textName: 'big white tube park' }), false, 'a tube park waiting for winter');
+  assert.equal(of('Climbing closures usually March 15 to July 31 for nesting falcons'), false, 'a closure, not a season');
+  assert.equal(of('Pass needed Fri to Mon and holidays, Jun 12 to Oct 12, 2026'), false, 'a pass period, not a season');
+  assert.equal(of('Grounds open daily in daylight; building interiors 8am-4pm, Mar 15 to Oct 15'), false, 'the buildings, not the grounds');
+  assert.equal(of('Alpine trails typically open July to October, snow and weather permitting'), true);
   // The server hands the facts to the planner.
   assert.ok(/\.\.\.\(v\.type === 'outdoor' \? tripOutdoorSeasonFact\(v\.id\) : \{\}\),/.test(SRC));
 });
