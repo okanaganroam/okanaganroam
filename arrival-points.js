@@ -132,6 +132,15 @@ function createArrivalPoints(deps) {
       const fr = (x) => String(x).replace(/ma devanture/g, 'la porte de ma salle de dégustation').replace(/l’emplacement de votre devanture/g, 'la porte de votre salle de dégustation').replace(/votre devanture/g, 'la porte de votre salle de dégustation').replace(/la devanture/g, 'la porte de la salle de dégustation');
       L = (e, f) => L0(en(e), fr(f));
     }
+    // Sport test 6 (2026-11-20; Priya's arena): a sports place or golf course has a main entrance, not a storefront.
+    if (venue && (venue.type === 'sport' || venue.type === 'golf')) {
+      const L0 = L;
+      const en = (x) => String(x).replace('facing your storefront', 'facing your main entrance').replace('the whole front of your business and your sign', 'the entrance and your sign')
+        .replace(/storefront spot/g, 'main entrance').replace(/a storefront/g, 'a main entrance').replace(/storefront/g, 'main entrance');
+      const fr = (x) => String(x).replace(/ma devanture/g, 'mon entrée principale').replace(/l’emplacement de votre devanture/g, 'votre entrée principale').replace(/votre devanture/g, 'votre entrée principale')
+        .replace(/de la devanture/g, 'de l’entrée principale').replace(/à la devanture/g, 'à l’entrée principale').replace(/la devanture/g, 'l’entrée principale').replace(/une devanture/g, 'une entrée principale').replace(/devanture/g, 'entrée principale');
+      L = (e, f) => L0(en(e), fr(f));
+    }
     // Tour test 1 (Whistler, 2026-11-16): a tour has a meeting spot (the office, the dock, the trailhead), not a storefront
     // or a door on a sidewalk.
     if (venue && venue.type === 'tour') {

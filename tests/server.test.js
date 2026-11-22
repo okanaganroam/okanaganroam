@@ -48,6 +48,9 @@ if (fs.existsSync(DB_FILE)) fs.unlinkSync(DB_FILE);
 // value only, never a real credential, and only exists in this test
 // process's environment.
 process.env.ENRICHMENT_ADMIN_TOKEN = 'test-fixture-admin-token';
+// Sport test 2 (2026-11-20): the golf winter rule is off here (these golf fixtures have no season and run on today's date);
+// tests/sport-test2-fixes.test.js covers it.
+process.env.GOLF_WINTER_RULE = 'off';
 
 // Seasonal homepage tiles (2026-10-11): "/" swaps Beaches/Golf for Ski &
 // Snow/Indoor from November to March. Every existing homepage and mood-card
@@ -13230,7 +13233,7 @@ const ga4Check = (html, pageType, label) => {
 
 test('Measurement Phase A: renderAnalyticsHeadHtml only accepts the fixed page types', () => {
   // Stage 4.4: + 'favorites' (the /favorites page). Stage 5A: + 'trip_v3' (the V3 view of /trip). 2026-10-05: + 'browse' (the hub-style /browse). 2026-10-16: + 'my_trip' (/my-trip, for the shared-trip events).
-  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['browse', 'category', 'event', 'favorites', 'guide', 'hotel', 'hub', 'info', 'listing_form', 'my_trip', 'not_found', 'region', 'search', 'trip', 'trip_v3', 'venue']); // 'hotel': hotel QR pages (2026-10-20)
+  assert.deepEqual([...app.GA4_PAGE_TYPES].sort(), ['browse', 'category', 'email_book', 'event', 'favorites', 'guide', 'hotel', 'hub', 'info', 'listing_form', 'my_trip', 'not_found', 'region', 'search', 'trip', 'trip_v3', 'venue']); // 'hotel': hotel QR pages (2026-10-20); 'email_book': the weekend email's Book now page (2026-11-21)
   for (const t of app.GA4_PAGE_TYPES) ga4Check(app.renderAnalyticsHeadHtml(t) + '</head>', t, t);
   for (const bad of [undefined, '', 'home', "x'});alert(1);//", 'VENUE']) assert.throws(() => app.renderAnalyticsHeadHtml(bad), /unknown page_type/, String(bad));
 });
@@ -18263,7 +18266,9 @@ test('Sports & Recreation: discovery sends skate park, pickleball, tennis, disc 
     }
     assert.deepEqual(app.interpretDiscoveryText('sports bar').features, ['sports_tv']);
     assert.ok(!app.interpretDiscoveryText('sports bar').types.includes('sport'));
-    assert.deepEqual(app.interpretDiscoveryText('ice skating').activities, ['winter']);
+    // Sport test 6 (2026-11-20): in search "ice skating" is the words (an arena's "Arena & skating", an outdoor rink's own
+    // words), never the outdoor Winter activity an arena is not in.
+    assert.deepEqual(app.interpretDiscoveryText('ice skating').activities, []);
     assert.deepEqual(app.interpretDiscoveryText('beaches').types, ['beach']);
     assert.deepEqual(app.interpretDiscoveryText('parks').types, ['outdoor']);
     // The trip planner has no sport type: its reading is unchanged.
@@ -21945,9 +21950,9 @@ test('Owner name, address & links (2026-10-15): owners propose them, we approve,
 
 test('Owner unsent changes (2026-10-15): reassurance line, unsent-changes bar and leave warning, Make more changes', async () => {
   const http = require('node:http');
-  // A golf course: cafés (2026-11-10), breweries (2026-11-12) and cocktail lounges (2026-11-13) have the easy setup's edit page; this checks the classic one.
-  seasonInsert.run({ name: 'Unsent Fixture', type: 'golf', hours: SEASON_WEEK, slug: 'unsent-fixture' });
-  const v = app.findVenueBySlug('kelowna', 'golf', 'unsent-fixture');
+  // A beach (golf has the sport setup since 2026-11-20): cafés (2026-11-10), breweries (2026-11-12) and cocktail lounges (2026-11-13) have the easy setup's edit page; this checks the classic one.
+  seasonInsert.run({ name: 'Unsent Fixture', type: 'beach', hours: SEASON_WEEK, slug: 'unsent-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'beach', 'unsent-fixture');
   const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
   const handler = app.server.listeners('request')[0];
   const srv = http.createServer(handler);
@@ -22354,8 +22359,9 @@ test('Help bot v2 (2026-10-18): every topic has French, the new topics say the r
         assert.doesNotMatch(t.aFr.replace(/<strong>[^<]*<\/strong>/g, ''), /\b(the|and|you’re|we’ll)\b/, `${t.id}: no English left in the French`);
       }
       assert.ok(cfg.start.every((id) => cfg.topics.some((t) => t.id === id)), page);
-      assert.ok(cfg.ui.en.unsure.includes('I’m not sure — tap <strong>Message us</strong> and Dayton will reply.'));
-      assert.ok(cfg.ui.fr.unsure.includes('Dayton vous répondra'));
+      // Sport tests 8 and 9 (2026-11-21; Dayton): not sure says so and offers Ask us (her question to Dayton as typed).
+      assert.ok(cfg.ui.en.unsure.includes('I’m not sure about that one, so I won’t guess. Tap <strong>Ask us</strong>'));
+      assert.ok(cfg.ui.fr.unsure.includes('Il vous répond par courriel'));
     }
   }
   const topics = (page, signedIn) => Object.fromEntries(ohbConfig(app.ownerHelpWidgetHtml(page, { signedIn })).topics.map((t) => [t.id, t]));
@@ -22442,9 +22448,10 @@ test('Help bot v2 (2026-10-18): the page script answers, says "not sure", switch
   assert.match(page.said()[0], /Hi! I can help with your listing/);
   page.ask('can you build me a website for my bakery');
   const unsure = page.said().slice(-2);
-  assert.match(unsure[0], /I’m not sure — tap <strong>Message us<\/strong> and Dayton will reply/);
+  assert.match(unsure[0], /I’m not sure about that one, so I won’t guess\. Tap <strong>Ask us<\/strong>/);
   const chipLabels = unsure[1].split(' | ');
-  assert.ok(chipLabels.length >= 3 && chipLabels.length <= 4, unsure[1]);
+  assert.ok(chipLabels.length >= 4 && chipLabels.length <= 5, unsure[1]);
+  assert.equal(chipLabels[0], 'Ask us');
   assert.equal(chipLabels[chipLabels.length - 1], 'Message us');
   page.ask('how do i chnage the adress');
   assert.ok(page.said().some((h) => /always checked by us first/.test(h)));
@@ -26422,9 +26429,9 @@ test('Owner portal phone pass (2026-10-18): checkboxes never shrink, 16px/44px f
 test('Owner portal photos (2026-10-18): the grid refreshes in place and owners move photos earlier or later; the order sticks', async () => {
   const nodeFs = require('node:fs');
   const nodePath = require('node:path');
-  // A golf course: cafés (2026-11-10), breweries (2026-11-12) and cocktail lounges (2026-11-13) have the easy setup's edit page; this checks the classic one.
-  seasonInsert.run({ name: 'Photo Order Fixture', type: 'golf', hours: SEASON_WEEK, slug: 'photo-order-fixture' });
-  const v = app.findVenueBySlug('kelowna', 'golf', 'photo-order-fixture');
+  // A beach (golf has the sport setup since 2026-11-20): cafés (2026-11-10), breweries (2026-11-12) and cocktail lounges (2026-11-13) have the easy setup's edit page; this checks the classic one.
+  seasonInsert.run({ name: 'Photo Order Fixture', type: 'beach', hours: SEASON_WEEK, slug: 'photo-order-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'beach', 'photo-order-fixture');
   const token = app.createOwnerLink(v.id, {}).url.split('/owner/')[1];
   const jpeg = Buffer.concat([Buffer.from([0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x11, 0x08, 900 >> 8, 900 & 255, 1200 >> 8, 1200 & 255, 0x03, 1, 0x22, 0, 2, 0x11, 1, 3, 0x11, 1]), Buffer.alloc(64), Buffer.from([0xFF, 0xD9])]);
   const photo = { image: `data:image/jpeg;base64,${jpeg.toString('base64')}`, credit: 'Order Cafe', rights: true, notify: false, company_website: '', started_at: Date.now() - 10000 };
@@ -26460,7 +26467,7 @@ test('Owner portal photos (2026-10-18): the grid refreshes in place and owners m
     assert.deepEqual(db.prepare('SELECT id, sort_order FROM owner_photos WHERE venue_id = ? ORDER BY sort_order').all(v.id).filter((r) => r.sort_order != null).map((r) => r.id), [b, c, a], 'stored');
     assert.deepEqual(await gridOrder(), [main, b, c, a]);
     // The public gallery uses the same order after the main photo.
-    const gallery = app.venueGalleryPhotos(app.findVenueBySlug('kelowna', 'golf', 'photo-order-fixture'));
+    const gallery = app.venueGalleryPhotos(app.findVenueBySlug('kelowna', 'beach', 'photo-order-fixture'));
     const byFile = Object.fromEntries(db.prepare('SELECT id, file FROM owner_photos WHERE venue_id = ?').all(v.id).map((r) => [`/images/owner/${r.file}`, r.id]));
     assert.deepEqual(gallery.map((g) => byFile[g.src.split('?')[0]]).filter(Boolean), [main, b, c, a]);
     // A new upload goes after the ordered ones.
@@ -26696,7 +26703,7 @@ test('Reset edit link (2026-10-18): the longest-standing login resets the link (
     assert.equal((await s.post(`/owner/${token}/changes`, { changes: { phone: '250-555-0100' }, started_at: Date.now() - 10000 })).status, 404);
     assert.deepEqual(mail.map((m) => m.to), ['reset.owner@example.com']);
     assert.match(mail[0].text, /You reset the private edit link for Reset Link Fixture/);
-    const newToken = /\/owner\/([A-Za-z0-9_-]{32})\b/.exec(mail[0].text)[1];
+    const newToken = /\/owner\/([A-Za-z0-9_-]{32})(?![A-Za-z0-9_-])/.exec(mail[0].text)[1];
     assert.equal((await s.get(`/owner/${newToken}`)).status, 200);
     assert.match(dayton[dayton.length - 1]._subject, /\[FYI\] Edit link reset for Reset Link Fixture/);
     // Both logins keep their access.
@@ -26711,7 +26718,7 @@ test('Reset edit link (2026-10-18): the longest-standing login resets the link (
     assert.equal(rf.status, 200, JSON.stringify(rf.body));
     assert.equal(mail[0].subject, 'Nouveau lien de modification pour Reset Link Fixture');
     assert.match(mail[0].text, /https:\/\/okanaganroam\.com\/fr\/owner\/[A-Za-z0-9_-]{32}/);
-    const frToken = /\/owner\/([A-Za-z0-9_-]{32})\b/.exec(mail[0].text)[1];
+    const frToken = /\/owner\/([A-Za-z0-9_-]{32})(?![A-Za-z0-9_-])/.exec(mail[0].text)[1];
     assert.equal((await s.get(`/owner/${newToken}`)).status, 404);
     // A claim approved after a reset makes a working link (and the reset link keeps working until it's opened).
     const claimId = Number(db.prepare(`INSERT INTO venue_claims (venue_id, name, role, email, phone, verify_method) VALUES (?, 'Casey', 'owner', 'casey@example.com', '250 555 0111', 'call')`).run(v.id).lastInsertRowid);
@@ -27019,6 +27026,23 @@ test('French portal (2026-10-18): every signed-in page has a French address with
   assert.deepEqual(pfrEnglishLeft(exp), []);
   // The French entry pages no longer say the portal is English.
   for (const p of ['/fr/owner/login', '/fr/owner/link']) assert.doesNotMatch(await (await get(p)).text(), /en anglais pour l’instant/, p);
+}));
+
+test('French portal: Créer mon compte lands on /fr/owner/account/venue/<id>, not /fr/fr/... (sport test 11, 2026-11-21)', () => withFrenchPortal(async ({ get, post, v, token }) => {
+  const page = await (await get(`/fr/owner/${token}`)).text();
+  const line = /var go = ([^;]+);/.exec(page);
+  assert.ok(line, 'the create-login redirect is on the French link page');
+  const made = await post(`/fr/owner/${token}/account`, { email: 'portail@example.com', password: 'a long enough password' });
+  assert.equal(made.status, 201);
+  assert.equal(made.body.href, `/fr/owner/account/venue/${v.id}`);
+  // Run the page's own redirect line with what the server sent back, on the French and on the English page.
+  const go = (pathname, j) => new Function('location', 'j', `return ${line[1]};`)({ pathname }, j);
+  const fr = go(`/fr/owner/${token}`, made.body);
+  assert.equal(fr, `/fr/owner/account/venue/${v.id}?welcome=1`);
+  assert.equal(go(`/owner/${token}`, { href: `/owner/account/venue/${v.id}` }), `/owner/account/venue/${v.id}?welcome=1`);
+  const landed = await get(fr, made.cookie);
+  assert.equal(landed.status, 200);
+  assert.match(await landed.text(), /Vous êtes connecté/);
 }));
 
 test('French portal (2026-10-18): forms post from French pages, messages and emails come back in French, English stays English', () => withFrenchPortal(async ({ get, post, base, v, token, token2, mails }) => {

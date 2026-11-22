@@ -231,8 +231,12 @@ test('Ski (round 8): the ski day runs about 9 to 3:30 with lunch on the hill, an
     assert.equal(rs.endMinutes, 930);
     assert.ok(rl.startMinutes >= 690 && rl.endMinutes <= 870, 'lunch is a break inside the ski day');
     if (extra) {
-      assert.ok(rowOf(p, extra).startMinutes >= 930, 'after the lifts');
-      assert.match(extra.venue.name, /Tube/, 'in January, only an activity that runs after dark');
+      const re = rowOf(p, extra);
+      assert.ok(re.startMinutes >= 930, 'after the lifts');
+      // Fresh eyes (2026-11-22): B.C. stays on UTC-7 all year from Nov 1, 2026, so a January sunset is about 5:15 PM, not
+      // 4:15: an extra that ends in daylight fits too; one that runs into the dark must be lit (the tube park).
+      const light = r.estimateDaylight(day.date, BY_ID.get(extra.venue.id));
+      assert.ok(/Tube/.test(extra.venue.name) || (light && re.endMinutes <= light.sunsetMinutes), `in January, an activity that runs after dark or ends in daylight: ${extra.venue.name} ${re.endMinutes}`);
     }
   }
 });

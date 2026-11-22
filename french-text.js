@@ -169,6 +169,9 @@ const FR_TEXT = {
   'A winery suits a romantic outing': 'Un vignoble convient à une sortie romantique',
   'Opens early': 'Ouvre tôt',
   'Mentions breakfast or brunch': 'Mentionne le déjeuner ou le brunch',
+  // Sport test 16 (2026-11-21): a holiday or office party, a named bar or grill inside a place.
+  'Hosts holiday or office parties (its own words)': 'Accueille des fêtes de Noël ou de bureau (ses propres mots)',
+  'Names it in its own words': 'Le nomme dans ses propres mots',
   'Also listed as a restaurant': 'Aussi répertorié comme restaurant',
   'Mentions its restaurant or dining': 'Mentionne son restaurant ou sa salle à manger',
   // Search gaps (2026-10-18): the new /fr/search card notes.
@@ -346,6 +349,14 @@ const FR_TEXT = {
   'Indoor Golf & Simulators': 'Golf intérieur et simulateurs',
   'Driving Ranges & Practice': 'Champs de pratique',
   'Skate Parks & BMX': 'Planchodromes et BMX',
+  // Sport test 6 (2026-11-20): the /fr sports hubs' activity chips were in English (main's own labels).
+  'Tennis, Pickleball & More': 'Tennis, pickleball et plus',
+  // The sports hubs' sort (main's own words): « Les plus grands d’abord » and how it works.
+  'Largest places first': 'Les plus grands d’abord',
+  'How “Largest places first” works': 'Comment fonctionne « Les plus grands d’abord »',
+  'We use the listed trail distances and numbers of trails, courts or course holes to bring larger facilities and networks higher up. Seasonal closures also affect the order.': 'Nous utilisons les distances de sentiers indiquées et le nombre de sentiers, de terrains ou de trous pour placer plus haut les grandes installations et les grands réseaux. Les fermetures saisonnières jouent aussi sur l’ordre.',
+  '1 place to play': '1 lieu pour bouger',
+  'Ice Skating & Hockey': 'Patinage et hockey',
   'Mountain Biking': 'Vélo de montagne',
   'Disc Golf': 'Disc golf',
   'Courts': 'Terrains',
@@ -1089,9 +1100,11 @@ const FR_TEXT = {
   // List pages in the Sports & Recreation layout (2026-11-20): the layout's own labels.
   'Choose a town': 'Choisir une ville',
   'Green fees': 'Droits de jeu',
+  'closed now': 'fermé en ce moment',
+  'closed then': 'fermé à cette date',
   '✨ All golf': '✨ Tout le golf',
   'How sorting works': 'Comment fonctionne le tri',
-  'Recommended lists golf courses first, best-rated with the most reviews at the top and courses closed for the season after the open ones, then driving ranges, then indoor golf. Price sorting uses each course’s standard adult green fee for its standard round, at prime time in peak season, as published by the course. Places with no published fee come last.': '« Recommandés » présente d’abord les terrains de golf, les mieux notés et les plus évalués en tête et les terrains fermés pour la saison après ceux qui sont ouverts, puis les champs de pratique, puis le golf intérieur. Le tri par prix utilise le droit de jeu adulte régulier de chaque terrain pour sa ronde habituelle, aux heures de pointe en haute saison, tel que publié par le terrain. Les lieux sans tarif publié viennent en dernier.',
+  'Recommended lists golf courses first, those set up by their own staff at the top, then best-rated with the most reviews, and courses closed for the season after the open ones, then driving ranges, then indoor golf. Price sorting uses each course’s standard adult green fee for its standard round, at prime time in peak season, as published by the course. Places with no published fee come last.': '« Recommandés » présente d’abord les terrains de golf, ceux qui ont été configurés par leur propre personnel en tête, puis les mieux notés et les plus évalués, et les terrains fermés pour la saison après ceux qui sont ouverts, puis les champs de pratique, puis le golf intérieur. Le tri par prix utilise le droit de jeu adulte régulier de chaque terrain pour sa ronde habituelle, aux heures de pointe en haute saison, tel que publié par le terrain. Les lieux sans tarif publié viennent en dernier.',
   'Search by course name or town...': 'Chercher par nom de terrain ou ville...',
   'Search golf courses': 'Chercher des terrains de golf',
     '{a0}Choose a town{a1}': '{a0}Choisir une ville{a1}',
@@ -1141,6 +1154,8 @@ const FR_PATTERNS = [
   // What's On (2026-10-19): the month headings past next week, a one-day "Showing Sun Oct 18" under the dates, and
   // "No more live music tonight. Next:" above the next three events of that kind.
   [/^Later in (January|February|March|April|May|June|July|August|September|October|November|December)$/, (m) => `Plus tard en ${MONTHS_LONG[m[1]]}`],
+  // Sport test 6: a chip or button that is an emoji and a label the table has (« 🛹 Planchodromes et BMX »).
+  [/^(\p{Extended_Pictographic}\uFE0F?)\s+(.+)$/u, (m, tr) => { const t = tr(m[2]); return t === m[2] ? null : `${m[1]} ${t}`; }],
   [/^Showing ((?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{1,2})$/, (m, tr) => { const d = tr(m[1]); return d === m[1] ? null : `Le ${d}`; }],
   [/^No more (.+) (tonight|today)\. Next:$/, (m) => {
     const when = m[2] === 'tonight' ? 'ce soir' : 'aujourd’hui';
@@ -1181,6 +1196,8 @@ const FR_PATTERNS = [
   // Seasons everywhere (2026-10-18): the card tag "Open until Oct 31", and the venue page's hours note.
   [/^(?:Open until|Closes) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2})$/, (m) => /^Closes/.test(m.input) ? `Ferme le ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}` : `Ouvert jusqu’au ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[1]]}`],
   [/^(Open now · Closes |Open 24 hours$|Closed today|Closed · Opens |Closed now$)/, (m, tr, c) => c.status(m.input)],
+  // Sport test 6 (2026-11-20): an arena's, a pool's or a sports centre's open line when its public times change.
+  [/^(?:Building open|Pool open|Open) · (?:public skate|public swim|drop-in|activity) times change$/, (m, tr, c) => c.status(m.input)],
   // The "Check before you go" box on list cards (2026-10-18): its source link ("Official source: example.com ↗").
   [/^Official source(?:: (.+?))? ↗$/, (m) => `Source officielle${m[1] ? ` : ${m[1]}` : ''} ↗`],
   [/^Places to start in (.+)$/, (m) => `Par où commencer à ${m[1]}`],
@@ -1296,7 +1313,8 @@ const FR_SCRIPT = [
   ["function hoursStatusLabel(status, clock) {", "function hoursStatusLabel(status, clock) { var __l = hoursStatusLabelEn(status, clock); __l.text = __frStatusText(__l.text); return __l; }\n" +
     "function __frStatusText(text) { var D = { Mon: 'lun.', Tue: 'mar.', Wed: 'mer.', Thu: 'jeu.', Fri: 'ven.', Sat: 'sam.', Sun: 'dim.' };\n" +
     "  var t = String(text).replace('Open now \\u00b7 Closes ', 'Ouvert \\u00b7 ferme \\u00e0 ').replace('Open 24 hours', 'Ouvert 24 h sur 24').replace('Closed today \\u00b7 Opens ', 'Ferm\\u00e9 aujourd\\u2019hui \\u00b7 ouvre ').replace('Closed \\u00b7 Opens ', 'Ferm\\u00e9 \\u00b7 ouvre ').replace('Closed today', 'Ferm\\u00e9 aujourd\\u2019hui').replace(' (holiday)', ' (jour f\\u00e9ri\\u00e9)').replace(' (temporary closure)', ' (fermeture temporaire)').replace(') \\u00b7 Opens ', ') \\u00b7 ouvre ').replace('Closed now', 'Ferm\\u00e9 en ce moment').replace('Hours not listed for today', 'Heures non indiqu\\u00e9es pour aujourd\\u2019hui').replace(/\\btomorrow /, 'demain \\u00e0 ').replace(/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun), (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\\d{1,2}), /, function(m, d, mo, n){ var M = { Jan: 'janv.', Feb: 'f\\u00e9vr.', Mar: 'mars', Apr: 'avr.', May: 'mai', Jun: 'juin', Jul: 'juil.', Aug: 'ao\\u00fbt', Sep: 'sept.', Oct: 'oct.', Nov: 'nov.', Dec: 'd\\u00e9c.' }; return D[d] + ' ' + (n === '1' ? '1er' : n) + ' ' + M[mo] + ' \\u00e0 '; }).replace(/\\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun) /, function(m, d){ return D[d] + ' \\u00e0 '; }).replace(/ouvre (\\d)/, 'ouvre \\u00e0 $1').replace(/ferme \\u00e0 (demain|lun\\.|mar\\.|mer\\.|jeu\\.|ven\\.|sam\\.|dim\\.) /, 'ferme $1 ');\n" +
-    "  return t.replace(/\\b(\\d{1,2})(?::(\\d{2}))? (AM|PM)\\b/g, function(m, h, mm, ap){ var H = Number(h) % 12; if (ap === 'PM') H += 12; return H === 0 && !mm ? 'minuit' : H + ' h' + (mm ? ' ' + mm : ''); }); }\n" +
+    // Sport test 2 (2026-11-20; the French search card said « Ouvert · ferme à midnight »): "midnight" is « minuit » here too.
+    "  return t.replace(/\\b(\\d{1,2})(?::(\\d{2}))? (AM|PM)\\b/g, function(m, h, mm, ap){ var H = Number(h) % 12; if (ap === 'PM') H += 12; return H === 0 && !mm ? 'minuit' : H + ' h' + (mm ? ' ' + mm : ''); }).replace(/\\bmidnight\\b/g, 'minuit'); }\n" +
     "function hoursStatusLabelEn(status, clock) {"],
 ];
 
@@ -1500,6 +1518,11 @@ FR_PATTERNS.unshift([/^Tours and experiences in and from (.+), booked with local
 
 // Round 10 (2026-10-19): the Free to Visit guide (#405) showed "Free Things to Do" as a chip and in the breadcrumb, and
 // its search label ("Search free things to do in kelowna") and the Arts & Culture one stayed in English.
+// Sport test 2 (2026-11-20): a sport kind's category word as search reads it (« golf simulator » -> « simulateur de golf »).
+for (const [en, fr] of Object.values(require('./sport-kinds').SPORT_KIND_WORDS)) { const k = en.toLowerCase(); if (!Object.prototype.hasOwnProperty.call(FR_TEXT, k)) FR_TEXT[k] = fr.toLowerCase(); }
+// The golf winter rule (sport test 2, 2026-11-20).
+FR_TEXT['Usually closed for the season (check before you go).'] = 'Habituellement fermé pour la saison (vérifiez avant d’y aller).';
+FR_TEXT['Usually closed for the season (check before you go)'] = 'Habituellement fermé pour la saison (vérifiez avant d’y aller)';
 FR_TEXT['Free Things to Do'] = 'Activités gratuites';
 FR_TEXT['› Free Things to Do'] = '› Activités gratuites';
 FR_TEXT['› Arts & Culture'] = '› Arts et culture';

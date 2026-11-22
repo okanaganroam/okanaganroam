@@ -1,8 +1,11 @@
 'use strict';
-const {FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE,t3FrenchHeadingCore,t3FrenchSummary,frSummaryItems,frSummaryList,frSummaryAround,frOccasionNoun}=require('./trip-french-copy');
+const {FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchEvent,t3FrenchPlan,t3FrenchStory,t3FrenchStopText,FR_MONTHS_BY_EN,FR_SEASON_WORDS,FR_STOP_NOUN,SPORT_BOOK_NOTES_FR,t3FrenchHeading,frHeadingWhen,frHeadingWhere,FR_HEADING_NAMES,FR_HEADING_DAYS,FR_HEADING_PARTS,FR_HEADING_OCCASIONS,FR_HEADING_WHEN_RE,t3FrenchHeadingCore,t3FrenchSummary,frSummaryItems,frSummaryList,frSummaryAround,frOccasionNoun}=require('./trip-french-copy');
 const SITE_PAGE=require('./trip-site.js').page;
 // Build My Trip V4 (2026-11-20): the simple plan view, only with d.v4 (/trip?v=4 or TRIP_V4; see server.js).
 const V4_PAGE=require('./trip-planner-v4-page.js');
+const CHAT_PAGE = require('./trip-chat-page.js');
+const WORKSPACE_PAGE = require('./trip-workspace-layout.js');
+const START_PAGE = require('./trip-start-page.js');
 
 // ---------- Build My Trip V3 page (Step 2, 2026-09-29) ----------
 //
@@ -1187,7 +1190,7 @@ const T3_STAY_CLIENT_SRC = `
     var prefilled = (s.bookingLinks || []).some(function(l){ return l && l.key !== 'own' && t3StayExt(l.url); });
     var bits = [];
     if (prefilled && !t.datesGiven) bits.push(fr ? 'Dates selon votre plan; modifiables sur le site de réservation.' : 'Dates follow your plan; change them on the booking site.');
-    if (prefilled && t.kids) bits.push(fr ? 'Le site demande l’âge des enfants.' : 'The booking site asks for the kids’ ages.');
+    if (prefilled && t.kids && !(t.kidAges && t.kidAges.length === t.kids)) bits.push(fr ? 'Le site demande l’âge des enfants.' : 'The booking site asks for the kids’ ages.');
     if (s.petsSome) bits.push(fr ? 'Animaux dans certaines chambres : à vérifier.' : 'Pets in some rooms: check when booking.');
     if (bits.length) html = '<p class="t3-book-note">' + esc(bits.join(' ')) + '</p>';
     return html;
@@ -1472,7 +1475,7 @@ function renderBody(d) {
   const chips = T3_EXAMPLES.map((e, i) => `<button type="button" class="t3-example" data-t3-example data-i18n="tripv3.example${i + 1}">${esc(e)}</button>`).join('\n          ');
   // Speed pass 6 (2026-10-19): the hero is a dimmed backdrop (opacity 0.55) behind the composer, yet every phone
   // took the 1600px file (127 KB). Phones get an 800px copy, wider screens a 1200px one where it is enough.
-  return `<main class="t3${d.v4 ? ' t3-v4' : ''}" id="tripV3">
+  const body = `<main class="t3${d.v4 ? ' t3-v4' : ''}" id="tripV3">
   <section class="t3-hero" aria-labelledby="t3Title">
     <picture><source media="(max-width: 640px)" srcset="/images/trip-v3/hero-w800.webp"><img class="t3-hero-img" src="/images/trip-v3/hero.webp" width="1600" height="656" srcset="/images/trip-v3/hero-w1200.webp 1200w, /images/trip-v3/hero.webp 1600w" sizes="100vw" alt="" fetchpriority="high"></picture>
     <div class="t3-hero-scrim"></div>
@@ -1508,6 +1511,7 @@ ${d.stays ? t3StayInputsHtml() + (d.viator ? T3_VIATOR_STYLES + '\n' : '') : ''}
   <section class="t3-wrap t3-result" id="t3Result" hidden aria-labelledby="t3Headline"></section>
   ${t3AboutHtml(d)}
 </main>`;
+  return d.v4 && d.chat ? START_PAGE.renderStart(body,d) : body;
 }
 
 function renderScript(d) {
@@ -1537,6 +1541,8 @@ function renderScript(d) {
   // Fix (2026-10-19): the French helpers below read these lookups, so ship them with the functions (a season or month crashed /fr/trip).
   var FR_MONTHS_BY_EN = ${JSON.stringify(FR_MONTHS_BY_EN)};
   var FR_SEASON_WORDS = ${JSON.stringify(FR_SEASON_WORDS)};
+  // Sport test 1 (2026-11-20): each sport kind's own booking note in French.
+  var SPORT_BOOK_NOTES_FR = new Map(${JSON.stringify([...SPORT_BOOK_NOTES_FR])});
   // Round 15c: the French Ideas heading (t3FrenchText calls it) and its lookups.
   var FR_HEADING_NAMES = ${JSON.stringify(FR_HEADING_NAMES)};
   var FR_HEADING_DAYS = ${JSON.stringify(FR_HEADING_DAYS)};
@@ -1567,7 +1573,9 @@ function renderScript(d) {
   var state = { text: '', seed: 0, overrides: {}, locks: {}, exclude: [], removed: {}, last: null, lastReq: null };
   var renderedVenueCardAnchors = {};
   var V4 = ${d.v4 ? 'true' : 'false'}, V4_PREVIEW = ${d.v4 === 'preview' ? 'true' : 'false'};
-${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3_STAY_CLIENT_SRC) : T3_STAY_CLIENT_SRC) + (d.viator ? t3ViatorClientSrc(d) : '')) : ''}${d.v4 ? V4_PAGE.V4_CLIENT_SRC : ''}
+  // The travel agent chat preview (/trip?chat=1) keeps chat=1 in the address bar, so a reload or a shared link keeps it.
+  function t3ChatUrl(u){ return ${d.v4 && d.chat === 'preview' ? "u + (u.indexOf('?') === -1 ? '?' : '&') + 'chat=1'" : 'u'}; }
+${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3_STAY_CLIENT_SRC) : T3_STAY_CLIENT_SRC) + (d.viator ? t3ViatorClientSrc(d) : '')) : ''}${d.v4 ? V4_PAGE.V4_CLIENT_SRC : ''}${d.v4 && d.chat ? CHAT_PAGE.chatClientSrc(d) + WORKSPACE_PAGE.WORKSPACE_CLIENT_SRC : ''}
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   // Crawlable links (2026-10-19, round 8): link markup glued together in this script as a quoted href attribute
   // around esc(url) read to crawlers that scan the page's HTML as links to the code itself (fake 404s). The
@@ -1731,7 +1739,7 @@ ${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3
       : { text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude };
     // French (2026-10-18): a plan made on /fr/trip keeps its French address, so a reload or a shared link stays French.
     var base = (location.pathname + '/').indexOf('/fr/') === 0 ? '/fr/trip' : '/trip';
-    try { history.replaceState(null, '', base + t3StateToQuery(s)${d.stays === 'preview' && !d.v4 ? " + (t3StateToQuery(s) ? '&' : '?') + 'stays=1'" : ''}${d.v4 ? " + v4UrlExtra(t3StateToQuery(s))" : ''}${d.v4 === 'preview' ? " + (t3StateToQuery(s) || v4UrlExtra('') ? '&' : '?') + 'v=4'" : ''}); } catch (e) {}${d.v4 ? '\n    v4CacheSave();' : ''}
+    try { history.replaceState(null, '', t3ChatUrl(base + t3StateToQuery(s)${d.stays === 'preview' && !d.v4 ? " + (t3StateToQuery(s) ? '&' : '?') + 'stays=1'" : ''}${d.v4 ? " + v4UrlExtra(t3StateToQuery(s))" : ''}${d.v4 === 'preview' ? " + (t3StateToQuery(s) || v4UrlExtra('') ? '&' : '?') + 'v=4'" : ''})); } catch (e) {}${d.v4 ? '\n    v4CacheSave();' : ''}
   }
 
   // ---- plan helpers ----
@@ -2019,7 +2027,8 @@ ${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3
       if (day != null && r.day !== day) continue;
       var hit = s.event ? r.eventId === s.event.id : (s.venue && r.venueId === s.venue.id);
       // Tour test 16 (Whistler, 2026-11-18): a tour with no departure times of its own says so, never a made-up slot.
-      if (hit && r.bookDeparture) return lang() === 'fr' ? 'Réservez une heure de départ' : 'Book a departure time';
+      // Sport test 5: a ski school's own words ("Book a lesson time").
+      if (hit && r.bookDeparture) return r.bookLabel && r.bookLabel.length === 2 ? r.bookLabel[lang() === 'fr' ? 1 : 0] : lang() === 'fr' ? 'Réservez une heure de départ' : 'Book a departure time';
       if (hit && typeof r.startMinutes === 'number') return clockLabel(r.startMinutes) + (typeof r.endMinutes === 'number' ? '–' + clockLabel(r.endMinutes) : '');
     }
     return '';
@@ -2147,6 +2156,8 @@ ${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3
       + '<div class="t3-card-tags">' + badgesHtml(v) + '</div>'
       + '<div class="t3-card-body">'
       + (v.listedHours ? '<p class="t3-hours">' + esc(v.listedHours) + (v.hoursByOwner ? ' <span class="t3-nowrap">' + esc(lang() === 'fr' ? '(confirmés par l’entreprise)' : '(confirmed by the business)') + '</span>' : /venue page|page du lieu/i.test(v.listedHours) ? '' : ' <span class="t3-nowrap"><span class="t3-sr">(</span>' + esc(tx('tripv3.checkBeforeGo')) + '<span class="t3-sr">)</span></span>') + '</p>' : '')
+      // Sport test 6: a rink's hours are the building's; its public skate times change.
+      + (v.timesChange ? '<p class="t3-hours t3-times-change">' + esc(lang() === 'fr' ? v.timesChange.fr : v.timesChange.en) + '</p>' : '')
       // Indoor test 1 (2026-11-19): a yearly closure in the month asked for (or the next weeks, with no date).
       + (v.yearlyClosure ? '<p class="t3-hours t3-closure">' + esc(lang() === 'fr' ? v.yearlyClosure.fr : v.yearlyClosure.en) + '</p>' : '')
       // Happy hour deals (2026-10-26): a stop timed inside the venue's happy hour says what is on.
@@ -2437,7 +2448,7 @@ ${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3
       // three or four screens down on a phone.
       var stopCount=timeline.filter(function(r){return !r.notScheduledMeal;}).length;
       html+='<details class="t3-warnings t3-timeline" aria-label="'+(french?'Horaire du voyage':'Trip timeline')+'"><summary><strong>'+(french?'Votre horaire':'Your timeline')+'</strong> · '+(french?stopCount+(stopCount===1?' arrêt':' arrêts')+', heures et trajets':stopCount+(stopCount===1?' stop':' stops')+', times and travel')+'</summary><p>'+(french?'Visites et trajets estimés; heures des événements indiquées par les fiches. Confirmez avant de partir.':'Visits and travel are estimates; event times come from listings. Confirm before visiting.')+'</p><ol>'+timeline.map(function(row,n){
-        var time=row.notScheduledMeal?(french?'Non planifié':'Not scheduled'):row.bookDeparture?(french?'Réservez une heure de départ':'Book a departure time'):Number.isFinite(row.startMinutes)?clock(row.startMinutes)+(Number.isFinite(row.endMinutes)?'–'+clock(row.endMinutes):' · '+(french?'fin inconnue':'end unknown')):(french?'Horaire à confirmer':'Timing unverified');
+        var time=row.notScheduledMeal?(french?'Non planifié':'Not scheduled'):row.bookDeparture?(row.bookLabel&&row.bookLabel.length===2?row.bookLabel[french?1:0]:french?'Réservez une heure de départ':'Book a departure time'):Number.isFinite(row.startMinutes)?clock(row.startMinutes)+(Number.isFinite(row.endMinutes)?'–'+clock(row.endMinutes):' · '+(french?'fin inconnue':'end unknown')):(french?'Horaire à confirmer':'Timing unverified');
         if(row.mealWindow)time=(french?'Arrivée possible pour le souper : ':'Possible dinner arrival: ')+clock(row.mealWindow.earliestStartMinutes)+'–'+clock(row.mealWindow.latestStartMinutes);
         var detail=[];
         if(row.mealWindow)detail.push(french?'Fenêtre conditionnelle selon les horaires indiqués; trajet et service en cuisine à confirmer. Aucun horaire de visite fixé.':'Conditional window based on listed hours; travel and kitchen service need confirmation. No visit time is scheduled.');
@@ -3106,7 +3117,7 @@ ${d.stays ? "    html += t3StayCardHtml();\n" + (d.viator ? "    if (!t3StayData
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); }
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-t3-request]'), function(btn){
-    btn.addEventListener('click', function(){ input.value = btn.getAttribute('data-t3-request'); exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
+    btn.addEventListener('click', function(){ input.value = (lang() === 'fr' && btn.getAttribute('data-t3-request-fr')) || btn.getAttribute('data-t3-request'); exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-t3-example]'), function(chip){
     chip.addEventListener('click', function(){ input.value = chip.textContent; exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
@@ -3127,6 +3138,7 @@ ${d.stays ? "    html += t3StayCardHtml();\n" + (d.viator ? "    if (!t3StayData
       var ex = ${JSON.stringify(SITE_PAGE.townExamples)};
       var fill = function(s){ return s.split('{n}').join(n); };
       var texts = (fr ? ex.fr : ex.en).map(fill);
+${d.v4 && d.chat ? "      Array.prototype.forEach.call(document.querySelectorAll('.ts-card[data-t3-request]'), function(card){ ['data-t3-request','data-t3-request-fr'].forEach(function(a){card.setAttribute(a,card.getAttribute(a).replace(/Kelowna|Penticton/g,n));}); card.querySelectorAll('.ts-card-sub span').forEach(function(label){label.textContent=label.textContent.replace(/Kelowna|Penticton/g,n);}); });" : ''}
       Array.prototype.forEach.call(document.querySelectorAll('[data-t3-example]'), function(chip, i){
         if (!texts[i]) return;
         chip.removeAttribute('data-i18n'); chip.textContent = texts[i];
@@ -3231,7 +3243,7 @@ ${d.breadcrumbJson}
 <link rel="stylesheet" href="/styles/app.css">
 <style>${d.footerStyles}</style>
 ${renderStyles()}
-${d.v4 ? V4_PAGE.V4_STYLES + '\n' : ''}${d.analyticsHead}
+${d.v4 ? V4_PAGE.V4_STYLES + '\n' : ''}${d.v4 && d.chat ? CHAT_PAGE.CHAT_STYLES + WORKSPACE_PAGE.WORKSPACE_STYLES + START_PAGE.START_STYLES + '\n' : ''}${d.analyticsHead}
 </head>
 <body class="page-trip page-trip-v3">
 ${d.tripTrayHtml}

@@ -137,10 +137,14 @@ function websiteUrl(w) {
 }
 
 // Where "Check rates" goes. -> { url, affiliate, source, rel, label } or null (no button).
+// Rule (Dayton, 2026-11-21): the button always opens THIS place's own page, never a search or a map of the town.
 //   1. the owner's / admin's own booking link (venue_links.booking_url): never an affiliate link;
-//   2. the configured affiliate partner (provider and id both set): an affiliate link;
+//   2. the place's own Booking.com or Expedia listing from its stay info (opts.info.booking), through the affiliate
+//      partner when one is set (stay-booking-links.js), else plain; then the researched own booking page (booking.own);
 //   3. the place's own website;
 //   4. nothing: no button.
+// The old name search (Stay22 /allez/roam?hotelname=..., Booking.com / Expedia search) is never used: it landed on a
+// search of the whole town, often with another place on top.
 function stayRatesLink(venue, opts = {}) {
   if (!venue || venue.type !== STAY_TYPE) return null;
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
@@ -148,10 +152,12 @@ function stayRatesLink(venue, opts = {}) {
   const label = CHECK_RATES[lang];
   const own = httpUrl(links.booking_url);
   if (own) return { url: own, affiliate: false, source: 'owner', rel: 'nofollow noopener', label };
-  const cfg = affiliateConfig(opts.env || process.env);
-  if (cfg.provider !== 'none') {
-    const url = buildAffiliateUrl(venue, cfg, { lang, regionLabel: opts.regionLabel });
-    if (url) return { url, affiliate: true, source: cfg.provider, rel: 'sponsored nofollow noopener', label };
+  const info = opts.info && typeof opts.info === 'object' ? opts.info : null;
+  if (info && info.booking && typeof info.booking === 'object') {
+    // Lazy: stay-booking-links.js requires this file. No fallback there, so this never loops back here.
+    const exact = require('./stay-booking-links').exactStayLinks({ id: venue.id, info }, null, { env: opts.env || process.env });
+    const first = exact[0];
+    if (first) return { url: first.url, affiliate: first.affiliate, source: first.key, rel: first.affiliate ? 'sponsored nofollow noopener' : 'nofollow noopener', label };
   }
   const site = websiteUrl(venue.website);
   if (site) return { url: site, affiliate: false, source: 'website', rel: 'nofollow noopener', label };
@@ -255,7 +261,7 @@ function renderStaysListPage({ region, regionLabel, stays, lang = 'en' }, deps) 
   const indexable = !fr && deps.indexable(region);
   let anyAffiliate = false;
   const cards = stays.map((v) => {
-    const link = stayRatesLink(v, { lang, links: deps.links(v.id), regionLabel: town, env: deps.env });
+    const link = stayRatesLink(v, { lang, links: deps.links(v.id), regionLabel: town, env: deps.env, info: deps.stayInfo ? deps.stayInfo(v.id) : null });
     if (link && link.affiliate) anyAffiliate = true;
     const kind = stayKindLabel(v.cuisine, lang);
     const photo = v.image_url && /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(v.image_url).trim()) ? String(v.image_url).trim() : '';
@@ -310,14 +316,14 @@ function renderStayVenuePage({ venue, regionLabel, lang = 'en', closeBy = [] }, 
   const description = (desc || `${kind || label} ${fr ? 'à' : 'in'} ${town}`).slice(0, 300);
   const canonical = `${origin}${stayPath(venue, lang)}`;
   const indexable = !fr && deps.indexable(venue.region);
-  const link = stayRatesLink(venue, { lang, links: deps.links(venue.id), regionLabel: town, env: deps.env });
+  const link = stayRatesLink(venue, { lang, links: deps.links(venue.id), regionLabel: town, env: deps.env, info: deps.stayInfo ? deps.stayInfo(venue.id) : null });
   const site = websiteUrl(venue.website);
   const photo = venue.image_url && /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(venue.image_url).trim()) ? String(venue.image_url).trim() : '';
   const crumbs = [{ name: fr ? 'Accueil' : 'Home', url: `${origin}${fr ? '/fr' : '/'}` }, { name: town, url: `${origin}${fr ? '/fr' : ''}/${venue.region}` }, { name: label, url: `${origin}${staysListPath(venue.region, lang)}` }, { name: venue.name, url: canonical }];
   const actions = [
     ratesButtonHtml(link, venue, esc),
     site && !(link && link.source === 'website') ? `<a href="${esc(site)}" rel="nofollow noopener" target="_blank" data-track="website">${fr ? 'Site Web ↗' : 'Website ↗'}</a>` : '',
-    venue.phone ? `<a href="tel:${esc(venue.phone)}" data-track="phone">${fr ? 'Appeler' : 'Call'}</a>` : '',
+    venue.phone ? `<a href="${esc(require('./tel-href.js').telHref(venue.phone))}" data-track="phone">${fr ? 'Appeler' : 'Call'}</a>` : '',
   ].filter(Boolean).join('\n    ');
   return `<!DOCTYPE html>
 <html lang="${fr ? 'fr-CA' : 'en'}">

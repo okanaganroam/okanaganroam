@@ -275,6 +275,12 @@ K.other = { gtk: 'general', ex: 'general',
     groups: { chips: ['Fêtes d’anniversaire avec salle privée', 'Groupes scolaires bienvenus', 'Réservations privées sur demande'], lead: 'Touchez une taille, puis ajoutez les fêtes d’anniversaire, les groupes scolaires ou les réservations privées dans vos mots.', ex: 'Fêtes d’anniversaire avec salle privée jusqu’à 20 personnes. Groupes scolaires bienvenus' },
     search: ['activité intérieure', 'activités intérieures', 'jour de pluie'] } };
 
+// Sports & recreation and golf (2026-11-20, the sport easy setup): the sport kinds' table (sport-kinds.js) in the same
+// shape, merged into every table below, so each helper here reads them too. INDOOR_KIND_TEXT_KINDS, INDOOR_TYPE_WORDS and
+// indoorKindsNamedIn stay the indoor kinds only.
+const SK = require('./sport-kinds');
+const INDOOR_ONLY_KEYS = Object.keys(K);
+Object.assign(K, SK.K);
 // Indoor test 18 (2026-11-19; Natalie typed "Facials from $95" as the old hint invited and was told "Just the number"): the
 // Price box's placeholder says the number it wants and what it is, by kind ([en, fr]). Words around the number are read
 // now too (owner-setup-client.js indoorLeadWords).
@@ -297,6 +303,7 @@ const PRICE_PH = {
   library: ['Your lowest price, like 10. Free to visit? Tap Free entry', 'Votre prix le plus bas, par exemple 10. La visite est gratuite? Touchez Entrée gratuite'],
   other: ['Your lowest price for one person, like 15', 'Votre prix le plus bas pour une personne, par exemple 15'],
 };
+Object.assign(PRICE_PH, SK.PRICE_PH);
 for (const [k, x] of Object.entries(PRICE_PH)) if (K[k]) { K[k].en.price.ph = x[0]; K[k].fr.price.ph = x[1]; }
 // Indoor test 5 (2026-11-19; Chris): the price typer's example line and section, per kind: [en item, en section, fr item, fr section].
 const TYPER = {
@@ -318,6 +325,7 @@ const TYPER = {
   library: ['Workshop', 'Programs', 'Atelier', 'Programmes'],
   other: ['Adult admission', 'Prices', 'Entrée adulte', 'Tarifs'],
 };
+Object.assign(TYPER, SK.TYPER);
 // Indoor test 16 (2026-11-19; Tyler's escape room, $35 per player: the typer's first line came pre-filled "Private room for 2
 // to 6 — $35"): the first line's name for a main price per person, by kind ([en, fr]); a kind whose example is per person
 // already keeps it. A room or group name is only ever paired with a price per room or group (server.js indoorFirstItemName).
@@ -348,6 +356,7 @@ const TYPER_TRUE = {
   casino: { name: ['Entry', 'Entrée'] }, library: { name: ['One program', 'Un programme'] },
   other: { name: ['One person', 'Une personne'] },
 };
+Object.assign(TYPER_TRUE, SK.TYPER_TRUE);
 // The first line's name, and the "like …" example, for a place: kinds, language, the price's unit (per: room, lane, game,
 // group; none: per person) and its own words. -> { first, item, section }
 function indoorTyperWords(kinds, lang, { per = null, own = '' } = {}) {
@@ -366,6 +375,7 @@ function indoorTyperWords(kinds, lang, { per = null, own = '' } = {}) {
 // should call or book more than one of its own unit ([en, fr]); a kind with none asks when to call ahead.
 const BOOK_AHEAD_UNIT = { escape: ['room', 'salle'], bowling: ['lane', 'allée'], curling: ['sheet', 'piste'], games: ['session', 'séance'], climbing: ['session', 'séance'],
   classes: ['class', 'cours'], yoga: ['class', 'cours'], spa: ['appointment', 'rendez-vous'], kids: ['session', 'séance'], pool: ['session', 'séance'] };
+Object.assign(BOOK_AHEAD_UNIT, SK.BOOK_AHEAD_UNIT);
 const TYPER_PER = { room: ['One room', 'Une salle'], lane: ['One lane', 'Une allée'], game: ['One game', 'Une partie'], group: ['One group', 'Un groupe'] };
 for (const [k, t] of Object.entries(TYPER)) if (K[k]) {
   const pp = TYPER_PERSON[k] || (TYPER_TRUE[k] || TYPER_TRUE.other).name;
@@ -382,6 +392,7 @@ const TYPE_SUB = {
   yoga: ['Each class or pass', 'Chaque cours ou carte'], casino: ['Each show or entry', 'Chaque spectacle ou entrée'], library: ['Each program', 'Chaque programme'],
   other: ['Each ticket or pass', 'Chaque billet ou laissez-passer'],
 };
+Object.assign(TYPE_SUB, SK.TYPE_SUB);
 for (const [k, t] of Object.entries(TYPE_SUB)) if (K[k]) { K[k].en.prices.typeSub = `${t[0]} and its price, one line at a time`; K[k].fr.prices.typeSub = `${t[1]} et son prix, une ligne à la fois`; }
 // Indoor test 8 (2026-11-19; Gary's bowling centre: "leagues use most lanes weeknights" and "cosmic bowling friday and
 // saturday nights" got "I'm not sure"): the Help examples for busy or limited times (a Good to know line) and for a theme
@@ -406,15 +417,18 @@ const BUSY_THEME = {
   library: ['Quiet study hours weekday mornings', 'Story time Saturdays at 10:30 AM', 'every Saturday', 'Heures d’étude calmes en semaine le matin', 'L’heure du conte le samedi à 10 h 30', 'chaque samedi'],
   other: ['Busiest on weekends and school holidays', 'Family night Fridays 5–8 PM', 'every Friday', 'Plus achalandé les fins de semaine et pendant les congés scolaires', 'Soirée familiale le vendredi de 17 h à 20 h', 'chaque vendredi'],
 };
+Object.assign(BUSY_THEME, SK.BUSY_THEME);
 for (const [k, t] of Object.entries(BUSY_THEME)) if (K[k]) { Object.assign(K[k].en.help, { busy: t[0], theme: t[1], repeat: t[2] }); Object.assign(K[k].fr.help, { busy: t[3], theme: t[4], repeat: t[5] }); }
 // Indoor test 10 (2026-11-19; Sandra's pool was told her card says "Drop-in from $25"): the example price Help uses for
 // each kind before the owner has typed one (a pool's drop-in is never $25).
 const EX_PRICE = { gallery: 10, museum: 12, theatre: 25, cinema: 14, spa: 65, pool: 7.5, climbing: 22, games: 15, escape: 30, bowling: 6.5, kids: 14, classes: 40, curling: 30, yoga: 20, casino: 40, library: 10, other: 15 };
+Object.assign(EX_PRICE, SK.EX_PRICE);
 for (const [k, x] of Object.entries(EX_PRICE)) if (K[k]) K[k].exPrice = x;
 // THE PRICE RULE's EXACT kinds (indoor test 18; see the top of this file): the label that truly names what the main price
 // buys ([en, fr]). Every other kind is a RANGE kind and has no exact label (a spa is never "Adult price").
 const EXACT = { gallery: ['Adult admission', 'Entrée adulte'], museum: ['Adult admission', 'Entrée adulte'], cinema: ['Adult ticket', 'Billet adulte'],
   pool: ['Adult drop-in', 'Entrée adulte à la séance'], yoga: ['Drop-in class', 'Cours à la carte'], bowling: ['One game', 'Une partie'], kids: ['Child admission', 'Entrée enfant'] };
+Object.assign(EXACT, SK.EXACT);
 for (const [k, x] of Object.entries(EXACT)) if (K[k]) {
   // single: an exact kind (no "from" before its own price; indoorKindText().single).
   K[k].single = true; K[k].en.price.exact = x[0]; K[k].fr.price.exact = x[1];
@@ -468,6 +482,7 @@ const PREFILL = {
   library: /\b(?:programs?|workshops?|admission)\b|\bateliers?\b/i,
   other: /\b(?:admission|per person|entry|tickets?|drop[- ]?ins?|day pass|adults?)\b/i,
 };
+Object.assign(PREFILL, SK.PREFILL);
 const PREFILL_NOT_RE = /\b(?:intro(?:ductory)?|new (?:students?|clients?|members?|customers?)|first (?:week|class|visit|month|time|timers?)|trial|unlimited|memberships?|members?|packages?|bundles?|punch|cards?|carte de \d+|\d+[- ]?(?:class|visit|session|pack|jump)s?|\d+ (?:weeks?|months?|days?)|weekly|monthly|annual|yearly|season|discount|deal|specials?|promo\w*|tuesdays?|cheap|groups?|private|part(?:y|ies)|per hour|an hour|hourly|lanes?|rentals?|rent|abonnements?|forfaits?|rabais)\b/i;
 const PREFILL_PASS_RE = /\b(?:pass(?:es)?|laissez[- ]passer)\b/i;
 // The pre-fill price in one research price line (or a card price's basis line) for a kind, or null.
@@ -488,6 +503,7 @@ function indoorPrefillPrice(kinds, text, amount = null) {
 // of each kind when the owner hasn't said (his Time needed answer always wins), in minutes. Null: the general indoor
 // allowance.
 const SLOT = { gallery: 60, museum: 90, theatre: 150, cinema: 150, spa: 150, pool: 90, climbing: 120, games: 90, escape: 60, bowling: 90, kids: 120, classes: 120, curling: 120, yoga: 75, casino: 120, library: 60, other: null };
+Object.assign(SLOT, SK.SLOT);
 for (const [k, x] of Object.entries(SLOT)) if (K[k]) K[k].slot = x;
 // The owner's Time needed answer (server.js INDOOR_LENGTHS) in minutes.
 const INDOOR_LENGTH_MINUTES = { '1h': 60, '1-2h': 90, '2-3h': 150, half: 240 };
@@ -531,6 +547,7 @@ const EVENTS = {
   library: ['Story times, author talks, workshops', 'Heures du conte, rencontres d’auteurs, ateliers'],
   other: ['Special events, theme nights, workshops', 'Événements spéciaux, soirées à thème, ateliers'],
 };
+Object.assign(EVENTS, SK.EVENTS);
 for (const [k, x] of Object.entries(EVENTS)) if (K[k]) { K[k].en.events = x[0]; K[k].fr.events = x[1]; }
 // Indoor test 17 (2026-11-19; Megan's bouldering-only gym read "Climbing & trampoline" on her card, page and every plan,
 // and the trampoline word cost her a place in "climbing gym" plans): a kind label that names several things shows only
@@ -545,6 +562,7 @@ const LABEL_PARTS = {
   pool: { parts: [[/\b(?:pools?|swim\w*|aquatic\w*|waterslides?|piscines?|natation|baignade)\b/i, 'Swimming pool', 'Piscine'], [/\b(?:rec(?:reation)? (?:centres?|centers?)|gym|fitness|arenas?|centre récréatif)\b/i, 'Rec centre', 'Centre récréatif']],
     both: ['Pool & rec centre', 'Piscine et centre récréatif'], none: ['Pool & rec centre', 'Piscine et centre récréatif'] },
 };
+Object.assign(LABEL_PARTS, SK.LABEL_PARTS);
 // [en, fr] for a kind and the place's own words, or null (the kind's usual words). own null: nothing is known (the usual words).
 function indoorKindLabel(kind, own) {
   const L = LABEL_PARTS[kind];
@@ -564,15 +582,43 @@ function indoorWaiverVerb(kinds, own = '') {
   return WAIVER_VERB[k] || ['play', 'jouer'];
 }
 const INDOOR_KIND_TEXT = K;
-const INDOOR_KIND_TEXT_KINDS = Object.keys(K);
+// The indoor kinds only (sport kinds have their own list: SPORT_KIND_TEXT_KINDS).
+const INDOOR_KIND_TEXT_KINDS = INDOOR_ONLY_KEYS.slice();
+const SPORT_KIND_TEXT_KINDS = SK.SPORT_KINDS.slice();
 // The kind a place reads in: its main kind (the first the owner picked), else 'other'.
 function indoorKindKey(kinds) { const k = Array.isArray(kinds) ? kinds[0] : kinds; return k && K[k] ? k : 'other'; }
+// Sport (2026-11-20): a sport or golf listing's main kind, else 'sportother'.
+function sportKindKey(kinds) { const k = Array.isArray(kinds) ? kinds[0] : kinds; return k && K[k] && SK.SPORT_KINDS.includes(k) ? k : 'sportother'; }
+// The kinds research's words name for a sport or golf listing (the name first, then the story), up to 3, as the starting
+// picks of "What kind of place are you?". A golf listing always starts on one of the three golf kinds: a simulator when its
+// words say so, a range or mini golf when they say that and not a course, else a golf course.
+function sportKindSuggestion(venue) {
+  const name = String(venue.name || '').toLowerCase(), all = `${name} ${String(venue.cuisine || '').toLowerCase()}`;
+  let out = [];
+  for (const [k, re] of SK.SPORT_KIND_HINTS) if (re.test(all) && !out.includes(k)) out.push(k);
+  const desc = String(venue.description || '').toLowerCase().slice(0, 240);
+  if (!out.length || (venue.type === 'golf' && !out.some((k) => k !== 'golf'))) for (const [k, re] of SK.SPORT_KIND_HINTS) if (re.test(desc) && !out.includes(k) && (venue.type !== 'golf' || ['simgolf', 'range'].includes(k) || !out.length)) out.push(k);
+  if (venue.type === 'golf') {
+    const course = /\bgolf (?:club|course|resort|& country|and country)|country club|\b(?:9|18|nine|eighteen|27)[- ]holes?\b/.test(`${all} ${desc}`.replace(/\b(?:\d+[- ]holes? )?mini[- ]?(?:golf|putt)(?: course)?\b/g, ' '));
+    const first = out.includes('simgolf') && !/\b18[- ]holes?\b/.test(all) ? 'simgolf' : out.includes('range') && !course ? 'range' : 'golf';
+    out = [first, ...out.filter((k) => k !== first && k !== 'golf')];
+  }
+  return out.slice(0, 3);
+}
+// Sport test 9 (2026-11-21): « Voir la droits de jeu et tarifs ». The French article from the page's first word: plural
+// (« les droits de jeu et tarifs », « les cours et tarifs »), else « la » for the feminine nouns used here, « l’ » before a vowel.
+function frArticle(page) {
+  const w = String(page || '').trim().split(/\s+/)[0].toLowerCase();
+  if (/(?:s|x)$/.test(w)) return 'les ';
+  if (/^[aeéèêiîoôuh]/.test(w)) return 'l’';
+  return /(?:e|ion|té)$/.test(w) ? 'la ' : 'le ';
+}
 // One kind's words in one language ({ price, prices, help, groups, search, boxOffice, arts }).
 function indoorKindText(kinds, lang) {
   const k = indoorKindKey(kinds), e = K[k], w = e[lang === 'fr' ? 'fr' : 'en'];
   // The prices link's words on the page: "See prices & rates" / « Voir les tarifs », a spa's "See the spa menu".
-  const see = w.prices.page === PRICES_PAGE[lang === 'fr' ? 1 : 0] ? (lang === 'fr' ? 'Voir les tarifs' : 'See prices & rates') : lang === 'fr' ? `Voir la ${w.prices.page.toLowerCase()}` : `See the ${w.prices.page.toLowerCase()}`;
-  return { kind: k, exPrice: e.exPrice || 15, single: !!e.single, slot: e.slot || null, ticketed: !!e.ticketed, classKind: !!e.classKind, boxOffice: !!e.boxOffice, arts: !!e.arts, quiet: !!e.quiet, day: !!(e.day || e.quiet), gtk: e.gtk || 'general', ex: e.ex || 'general', ...w, prices: { ...w.prices, see } };
+  const see = w.prices.page === PRICES_PAGE[lang === 'fr' ? 1 : 0] ? (lang === 'fr' ? 'Voir les tarifs' : 'See prices & rates') : lang === 'fr' ? `Voir ${frArticle(w.prices.page)}${w.prices.page.toLowerCase()}` : `See the ${w.prices.page.toLowerCase()}`;
+  return { kind: k, bookBtn: e.bookBtn || null, season: e.season || '', planner: e.planner === undefined ? undefined : e.planner, exPrice: e.exPrice || 15, single: !!e.single, slot: e.slot || null, ticketed: !!e.ticketed, classKind: !!e.classKind, boxOffice: !!e.boxOffice, arts: !!e.arts, quiet: !!e.quiet, day: !!(e.day || e.quiet), gtk: e.gtk || 'general', ex: e.ex || 'general', ...w, prices: { ...w.prices, see } };
 }
 // The card's small lines in both languages (English -> French), for french-text.js.
 const INDOOR_BASIS_FR = Object.fromEntries(Object.values(K).map((e) => [e.en.price.basis, e.fr.price.basis]).concat(Object.values(K).map((e) => [e.en.prices.page, e.fr.prices.page]))
@@ -604,6 +650,6 @@ const INDOOR_TYPE_WORD_SKIP = new Set(['history', 'heritage', 'heritage site', '
   'cours', 'barre', 'bingo', 'poker', 'gym', 'histoire', 'patrimoine', 'site patrimonial', 'pièces', 'climbing', 'rock climbing', 'escalade', 'pottery', 'poterie', 'céramique', 'ceramics', 'axe throwing', 'lancer de hache', 'trampoline', 'parkour', 'ninja', 'vr', 'bowl', 'mini putt', 'natation', 'play area', 'aire de jeux', 'kids play']);
 // The words that mean "an indoor place" in search and Build My Trip ("facial", "bouldering", "lane swim", "tenpin",
 // "learn to curl", "slots", « soin du visage »).
-const INDOOR_TYPE_WORDS = [...new Set(Object.values(K).flatMap((e) => e.en.search.concat(e.fr.search)).filter((w) => !INDOOR_TYPE_WORD_SKIP.has(w)))];
+const INDOOR_TYPE_WORDS = [...new Set(INDOOR_ONLY_KEYS.map((k) => K[k]).flatMap((e) => e.en.search.concat(e.fr.search)).filter((w) => !INDOOR_TYPE_WORD_SKIP.has(w)))];
 
-module.exports = { indoorPriceShow, INDOOR_EXACT_FR, EXACT_PRICE_LABELS: EXACT, indoorWaiverVerb, indoorTyperWords, TYPER_TRUE, indoorKindLabel, indoorKindLabels, BOOK_AHEAD_UNIT, TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, INDOOR_BASIS_FR, indoorKindsNamedIn };
+module.exports = { SPORT_KIND_TEXT_KINDS, sportKindKey, sportKindSuggestion, SPORT: SK, indoorPriceShow, INDOOR_EXACT_FR, EXACT_PRICE_LABELS: EXACT, indoorWaiverVerb, indoorTyperWords, TYPER_TRUE, indoorKindLabel, indoorKindLabels, BOOK_AHEAD_UNIT, TYPER_PER, indoorSlotMinutes, indoorTimesKind, INDOOR_TIMES_LINES, INDOOR_BOOK_BUTTONS, INDOOR_LENGTH_MINUTES, TICKETED_KINDS, CLASS_KINDS, indoorPrefillPrice, INDOOR_TYPE_WORDS, INDOOR_KIND_TEXT, INDOOR_KIND_TEXT_KINDS, indoorKindKey, indoorKindText, INDOOR_BASIS_FR, indoorKindsNamedIn };

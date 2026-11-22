@@ -37,6 +37,7 @@ function renderGolfboxLayout(p) {
         <details class="gb-fold"><summary>Contact &amp; social links</summary>${p.detailRows}</details>
       </section>
     </div>
+    ${p.dealsHtml ? `<section class="gb-card gb-deals">${p.dealsHtml}</section>` : ''}
     ${p.gallery}
     <section class="gb-card gb-more"><h2>A little more about GOLFBOX</h2><details class="gb-fold"><summary>The space &amp; group visits</summary><p>${e(p.venue.description || '')}</p><p>Ask GOLFBOX about booking the upstairs boardroom for a meeting or group event.</p>${p.guideLinks}</details>
       <details class="gb-fold"><summary>Lessons &amp; winter memberships</summary>${rows.map(r=>`<p><strong>${e(r.label)}:</strong> ${e(r.text)}</p>`).join('')}<p>Winter memberships are listed from $99/month through Apr 30, 2027. Confirm current inclusions and lesson availability with the venue.</p>${external(p.venue.website,'Explore lessons & memberships')}</details></section>

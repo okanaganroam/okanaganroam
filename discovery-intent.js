@@ -226,6 +226,23 @@ function holidayWeekendDates(name, now = new Date()) {
   }
   return null;
 }
+// Sport test 7 (2026-11-20; "golf on thanksgiving vernon" was no date, though Canada Day was): a Monday holiday named on
+// its own (not "... weekend") is the next one's date ("on october 11 2027").
+function movingHolidayDate(name, now = new Date()) {
+  const w = holidayWeekendDates(name, now);
+  const m = w && /(\w+) (\d{1,2}) to (\w+) (\d{1,2}) (\d{4})/.exec(w);
+  if (!m) return null;
+  // The weekend runs Saturday to Monday: the holiday is its last day (Canada Day keeps its own July 1).
+  return name === 'canada day' ? ` on july 1 ${m[5]} ` : ` on ${m[3]} ${m[4]} ${m[5]} `;
+}
+function movingHolidayDates(text, now = new Date()) {
+  return String(text).replace(/\b(?:on |for )?(thanksgiving|labou?r day|victoria day|family day|easter monday|bc day|b c day)(?: day| monday)?(?! (?:long )?weekend)\b/g, (m, h) => {
+    const k = h === 'labor day' ? 'labour day' : h === 'easter monday' ? 'easter' : h;
+    if (k === 'bc day' || k === 'b c day') { const y = now.getUTCFullYear(); for (const yy of [y, y + 1]) { const d = new Date(Date.UTC(yy, 7, 1)); d.setUTCDate(1 + ((8 - d.getUTCDay()) % 7)); if (d.getTime() >= Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) return ` ${h} on august ${d.getUTCDate()} ${yy} `; } return m; }
+    const d = movingHolidayDate(k, now);
+    return d ? ` ${h}${d}` : m;
+  }).replace(/\s+/g, ' ');
+}
 function stripTravelNoise(normalized) {
   let s = ` ${mergeSegmentStays(normalized)} `;
   if (ORIGIN_RE) s = s.replace(ORIGIN_RE, ' ');
@@ -289,7 +306,9 @@ function stripTravelNoise(normalized) {
   // More plain talk: "Instagrammable" is a view, "locals only / no tourist traps" is hidden gems, a car and a rack, 3 generations, "do together", a snowy day is an indoor day.
   s = s.replace(/\s+/g, " ").replace(/\b(?:most )?(?:instagram(?:m)?able|photogenic|picture perfect)\b/g, ' viewpoints ').replace(/\b(?:locals? only|only locals?|(?:no|not|without|avoid) (?:the )?(?:tourist )?traps?|off the beaten (?:path|track))\b/g, ' hidden gems ');
   s = s.replace(/\b(?:\d|two|three|four|five) generations?\b/g, ' ').replace(/\bdo together\b/g, ' do ').replace(/\b(?:i|we) (?:have|got|bring|are bringing) (?:a|our|my) (?:car|rental|van|suv)(?: with (?:a |our )?(?:bike|roof|bikes) ?racks?)?\b/g, ' ');
-  s = s.replace(/\b(?:a )?(?:snowy|snowing|snowstorm|stormy|freezing) (?:day|afternoon|morning|evening|weekend)\b/g, ' a rainy day ');
+  // Sport test 6 (2026-11-20; "cold day, something indoor in Kelowna" left the indoor arena out and noted "cold"): a cold day
+  // is an indoor day too.
+  s = s.replace(/\b(?:a )?(?:snowy|snowing|snowstorm|stormy|freezing|cold|chilly|frigid|bitter(?:ly)? cold|really cold|very cold) (?:day|days|afternoon|morning|evening|weekend)\b/g, ' a rainy day ');
   // "six year olds", "a group of 6 guys", "bus tour group": ages and head counts, not places.
   s = s.replace(/\b(?:\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen) (?:years? old|year olds?|yo)\b/g, ' kids ');
   s = s.replace(/\b(?:coach|bus|motorcoach) (?:tour )?(?:group|trip)\b/g, ' ');
@@ -308,8 +327,13 @@ function stripTravelNoise(normalized) {
   // "4 players", "a foursome", "one round of golf": party size and golf wording, not places.
   s = s.replace(/\b(\d{1,2}|two|three|four|five|six|eight|ten|twelve) (?:players|golfers)\b/g, ' $1 friends ');
   s = s.replace(/\b(?:a|one|another|the next) rounds? of (drinks?|beers?|cocktails?|wine)\b/g, ' $1 ');
+  // Sport test 12 (2026-11-21; "golf … 9 hole after work": "hole" became a word): "9 hole", "9-hole", "nine holes" and
+  // "18 holes" are a round's length. With no "golf" in the request, they ask for golf.
+  const HOLES_RE = /\b(?:18|eighteen|nine|9)[- ]?holes?\b(?: (?:round|course|game))?/g;
+  if (!/\bgolf/.test(s) && HOLES_RE.test(s)) s = s.replace(HOLES_RE, ' golf ');
   if (/\bgolf/.test(s)) {
-    s = s.replace(/\b(?:(?:a|one|1|two|2) )?rounds?(?: of golf)?\b(?! of (?:drinks?|beers?|applause))|\b18 holes\b|\b(?:nine|9) holes\b|\b(?:foursome|threesome|twosome)\b/g, ' ');
+    // Sport test 7 (2026-11-20): "round of golf then dinner" lost its golf with the words: "of golf" stays golf.
+    s = s.replace(/\b(?:(?:a|one|1|two|2) )?rounds?( of golf)?\b(?! of (?:drinks?|beers?|applause))|\b(?:18|eighteen|nine|9)[- ]?holes?\b(?: (?:round|course|game))?|\b(?:foursome|threesome|twosome)\b/g, (m, g) => (g ? ' golf ' : ' '));
   }
   // "no early mornings", "we like to sleep in", "late starts": a slow start, which the planner reads as a relaxed pace.
   s = s.replace(/\b(?:no|nothing|not|avoid|without) (?:any )?early (?:mornings?|starts?|wake ?ups?|alarms?)\b|\b(?:we|i) (?:like|love|want|prefer|need) to sleep in\b|\bsleep(?:ing)? in\b|\blate starts?\b|\b(?:not|aren t|arent) (?:a )?(?:morning|early) (?:person|people|birds?|risers?)\b|\bslow mornings?\b|\b(?:don t|do not) want to (?:get up|wake up|be up) early\b/g, ' relaxed ');
@@ -322,6 +346,7 @@ function stripTravelNoise(normalized) {
   // Holiday weekends become the dates of that long weekend (the next one coming).
   s = s.replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/g, (m, h) => holidayWeekendDates(h) || m);
   s = fixedHolidayDates(s, true);
+  s = movingHolidayDates(s);
   // "I hate the cold" is a feeling about the weather, not a place.
   s = s.replace(/\b(?:i |we )?(?:hate|dislike|can t stand|cannot stand|do not like|don t like)(?: the)? (?:cold|snow|winter)\b/g, ' ');
   // French (2026-11-06): "nous arrivons de Paris", "un couple dans la soixantaine".
@@ -370,7 +395,11 @@ const TYPE_ALIASES = {
   brewery: ['brewery', 'breweries', 'beer', 'beers', 'craft beer', 'taproom', 'taprooms', 'brewpub', 'brew pub', 'beer tour', 'beer tours', 'brewery tour', 'brewery tours', 'craft beer tour', 'craft beer tours', 'beer crawl', 'brewery crawl', 'brewery hop', 'brewery hopping', 'ale trail', 'cidery', 'cideries', 'cider house', 'cider houses', 'ciders', 'craft cider'],
   distillery: ['distillery', 'distilleries', 'spirits', 'gin', 'whisky', 'whiskey', 'vodka', 'craft spirits'],
   winery: ['wine', 'wines', 'winery', 'wineries', 'vineyard', 'vineyards', 'wine tasting', 'wine tastings', 'tasting room', 'tasting rooms', 'wine tour', 'wine tours', 'wine country'],
-  golf: ['golf', 'golfing', 'golf course', 'golf courses', 'tee time', 'tee times', 'driving range', 'mini golf', 'round of golf'],
+  golf: ['golf', 'golfing', 'golf course', 'golf courses', 'tee time', 'tee times', 'driving range', 'mini golf', 'round of golf',
+    // Sport test 8 (2026-11-21; "golf no tee time vernon" read "no" as "no golf courses", "walk on golf vernon" read "walk" as
+    // hiking): a course you play without booking is still golf. (Phrases with a negation word keep their own meaning.)
+    'no tee time', 'no tee times', 'no tee time needed', 'no tee times needed', 'without a tee time', 'without tee times', 'without booking a tee time',
+    'walk on golf', 'walk on golf course', 'walk on golf courses', 'walk ons', 'walk ons welcome', 'walk up golf', 'drop in golf', 'golf walk on', 'golf walk ons'],
   beach: ['beach', 'beaches', 'swim', 'swimming', 'swimming spot', 'swimming spots', 'swim spot', 'lake day', 'dog beach', 'dog beaches'],
   outdoor: ['outdoors', 'outdoor', 'park', 'parks', 'outside', 'outdoor activities', 'things to do outside', 'provincial park', 'regional park'],
   // Indoor & Rainy Day (2026-10-11). "indoor", "indoors", "rainy" and "rainy
@@ -434,6 +463,8 @@ const COLLECTION_ALIASES = {
   local_favorite: ['local favourite', 'local favourites', 'local favorite', 'local favorites', 'where locals go', 'locals favourite', 'locals favorite', 'local spots'],
 };
 
+// Sport test 6: the activity phrases search reads as plain words (see the phrase table).
+const SEARCH_WORD_NOT_ACTIVITY = new Set(['skating', 'ice skating']);
 const ACTIVITY_ALIASES = {
   // 2026-10-14: "a walk" / "a stroll" is a trail or park outing too ("Sunday brunch and a walk" found nothing). Bare
   // "walking" is left out so "walking distance" is never read as a hike.
@@ -569,7 +600,9 @@ const WHEN_ALIASES = {
 const DAYPART_ALIASES = {
   morning: ['morning', 'in the morning'],
   afternoon: ['afternoon', 'in the afternoon'],
-  evening: ['evening', 'in the evening', 'night'],
+  // Sport test 10 (2026-11-21; "golf after work kelowna" looked for the word "work"): after work is an evening time, as the
+  // planner reads it.
+  evening: ['evening', 'in the evening', 'night', 'after work', 'right after work', 'straight after work', 'after my shift', 'apres le travail', 'apres le boulot'],
 };
 const WHEN_PHRASE_DAYPART = { 'this morning': 'morning', 'this afternoon': 'afternoon', tonight: 'evening', 'this evening': 'evening' };
 // Which of those resolve onto an existing What's On preset (the rest are
@@ -651,7 +684,7 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
   + 'i im me my we us our you your it its is are be was were been being am do does did done doing can could should would will shall may might must '
   + 'want wants wanted like love need needs looking look find finding show give get getting go going going visit visiting see some any somewhere something '
   + 'please thanks thank plan planning where what which who whom how when why there here this that these those just really very so too also '
-  + 'good nice fun place places spot spots area areas town city day days night nights time trip trips weekend lets let us okay ok hi hey '
+  + 'good nice fun place places spot spots venue venues area areas town city day days night nights time trip trips weekend lets let us okay ok hi hey '
   + 'if then than else only one ones all more most much many few little lot lots kind sort type types option options idea ideas '
   + 'around tonight today tomorrow while during after before next last then take takes taking bring bringing stay staying '
   + 'whats wanna gonna ive id nearby close near '
@@ -893,7 +926,14 @@ function buildPhraseTable(taxonomy) {
   if (t.types.includes('indoor')) for (const p of ALSO_INDOOR_PHRASES) if (!(taxonomy && taxonomy.planner) || !ALSO_INDOOR_SEARCH_ONLY.has(p)) add(p, 'type', 'indoor');
   for (const [feature, phrases] of Object.entries(FEATURE_ALIASES)) if (t.features.includes(feature)) for (const p of phrases) add(p, 'feature', feature);
   for (const [kind, phrases] of Object.entries(COLLECTION_ALIASES)) if (t.collections.includes(kind)) for (const p of phrases) add(p, 'collection', kind);
-  for (const [slug, phrases] of Object.entries(ACTIVITY_ALIASES)) if (t.activities.includes(slug)) for (const p of phrases) add(p, 'activity', slug);
+  // Sport test 6 (2026-11-20; "skating with kids kelowna" found 0 places and "skating in july" showed an indoor arena "Open
+  // now"): in search, "skating" and "ice skating" are the words they are (an arena's "Arena & skating", an outdoor rink's
+  // own words, with "skate" and "rink" as their synonyms), never the outdoor Winter activity, which an arena is not in.
+  // Build My Trip (taxonomy.planner) keeps reading them as before: its rink kind plans arenas and outdoor rinks.
+  for (const [slug, phrases] of Object.entries(ACTIVITY_ALIASES)) if (t.activities.includes(slug)) for (const p of phrases) {
+    if (!(taxonomy && taxonomy.planner) && SEARCH_WORD_NOT_ACTIVITY.has(p)) continue;
+    add(p, 'activity', slug);
+  }
   const typeWords = new Set(Object.values(TYPE_ALIASES).flat().map(normalizeDiscoveryText));
   for (const cuisine of t.cuisines) if (!typeWords.has(normalizeDiscoveryText(cuisine))) add(cuisine, 'cuisine', cuisine);
   for (const [cuisine, phrases] of Object.entries(CUISINE_SYNONYMS)) if (t.cuisines.includes(cuisine)) for (const p of phrases) add(p, 'cuisine', cuisine);
@@ -1432,7 +1472,12 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   const masked = tokens.map((tok, i) => (preClaimed[i] ? '\u0000' : tok));
   const matchedPhrases = matchPhrases(masked, table);
   const claimed = matchedPhrases.claimed;
-  const accepted = withoutNameDogHits(matchedPhrases.accepted, masked, t);
+  // Sport test 4 (2026-11-20; "junior golf camp penticton" read as Camping and found nothing): "camp" beside golf, junior,
+  // kids, summer, day, a sport or lessons is a camp people sign up for, never camping (the word is still used up).
+  const CAMP_KIND_WORDS = new Set(['golf', 'junior', 'juniors', 'kids', 'kid', 'children', 'youth', 'summer', 'day', 'spring', 'winter', 'hockey', 'ski', 'skate', 'skating', 'tennis', 'pickleball', 'soccer', 'basketball', 'sport', 'sports', 'swim', 'bike', 'bmx', 'art', 'arts', 'dance', 'music', 'theatre', 'lesson', 'lessons', 'clinic', 'break', 'pd', 'march']);
+  const sportCamp = (h) => h.assign.some((a) => a.field === 'activity' && a.value === 'camping') && /^camps?$/.test(h.phrase)
+    && [masked[h.start - 2], masked[h.start - 1], masked[h.end], masked[h.end + 1]].some((w) => CAMP_KIND_WORDS.has(w));
+  const accepted = withoutNameDogHits(matchedPhrases.accepted.filter((h) => !sportCamp(h)), masked, t);
   // 3b. Stage 3.1: polarity. Negated phrases and words go to intent.excluded,
   // never to the positive fields below.
   const neg = findNegations(masked, accepted, claimed);

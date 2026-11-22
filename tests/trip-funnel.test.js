@@ -68,7 +68,9 @@ test('report: steps, conversion between main steps, booking kinds, share methods
   const db = memDb(); seed(db);
   const f = tf.report(db, 30, NOW);
   const v4 = f.versions.v4;
-  assert.deepEqual(v4.steps.map((s) => [s.key, s.n]), [['plan', 147], ['swap', 30], ['remove', 20], ['confirm', 50], ['book_open', 25], ['book_click', 10], ['share', 8], ['save', 12]]);
+  assert.deepEqual(v4.steps.map((s) => [s.key, s.n]), [['plan', 147], ['swap', 30], ['remove', 20], ['confirm', 50], ['book_open', 25], ['book_click', 10], ['share', 8], ['save', 12], ['chat', 0]]);
+  assert.deepEqual(v4.chat.map((c) => [c.key, c.n]), [['ai', 0], ['ai_fixed', 0], ['rules_over_ai', 0], ['ai_slow', 0], ['rules', 0], ['chip', 0], ['cant', 0], ['none', 0]], 'travel agent chat messages, by how they were read');
+  assert.deepEqual(f.versions.v3.chat, []);
   const by = Object.fromEntries(v4.steps.map((s) => [s.key, s]));
   assert.equal(by.plan.of_previous, null);
   assert.equal(by.confirm.of_previous, 34); // 50 of 147

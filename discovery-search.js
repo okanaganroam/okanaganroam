@@ -223,11 +223,34 @@ function isExcluded(v, plan) {
 const TERM_SYNONYMS_BASE = { waterfall: ['falls'], waterfalls: ['falls'], boat: ['boats', 'pontoon', 'pontoons'], rental: ['rentals', 'rent'], rentals: ['rental', 'rent'], snowshoeing: ['snowshoe', 'snowshoes'], skiing: ['ski'], skating: ['skate', 'rink'], skate: ['skating', 'rink'] };
 // More of them in data/vocabulary/shared.json (descriptionSynonyms, 2026-10-28), written the way listings word things.
 const TERM_SYNONYMS = require('./vocabulary.js').mergeAliases(TERM_SYNONYMS_BASE, require('./vocabulary.js').sharedTable('descriptionSynonyms'));
+// Sport test 2 (2026-11-20; "golf simulator kelowna" found 1 of the 6 Kelowna simulators, the one whose owner picked the
+// kind, while « simulateur de golf kelowna » found all 6): a sport kind's category word ("Golf simulator", "Arena &
+// skating") read as a stored cuisine also matches a listing whose own name or description says the kind's words, as the
+// French search does. Only each kind's own words (never a bare "golf" or "sports"), so "golf course" never finds a simulator.
+const KIND_CUISINE_WORDS = (() => {
+  const out = {};
+  try {
+    const SK = require('./sport-kinds');
+    const GENERIC = new Set(['golf', 'golfing', 'play golf', 'round of golf', 'sports', 'recreation', 'sports and recreation', 'things to do outside', 'loisirs', 'sports et loisirs', 'courts', 'swim', 'swimming', 'hockey', 'arena', 'arenas']);
+    const norm = (w) => String(w).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’'-]/g, ' ').replace(/&/g, ' and ').replace(/\s+/g, ' ').trim();
+    for (const [k, names] of Object.entries(SK.SPORT_KIND_WORDS)) {
+      const e = SK.K[k]; if (!e) continue;
+      const words = [...new Set(e.en.search.concat(e.fr.search).map(norm).filter((w) => w && !GENERIC.has(w)))];
+      // A golf listing that says "simulator" ("Golf Evolution … simulator bays") is one, as the French "simulateur" search finds it.
+      if (k === 'simgolf') words.push('simulator:golf', 'simulators:golf', 'simulateur:golf', 'simulateurs:golf');
+      for (const n of names) out[String(n).toLowerCase()] = words;
+    }
+  } catch (err) { /* no sport kinds: cuisines only */ }
+  return out;
+})();
 function searchVenues(intent, venues) {
   const empty = { total: 0, items: [], exclusions: { applied: [], notApplied: [] } };
   if (!intent || intent.mode === 'events' || intent.mode === 'unknown') return empty;
   const R = intent.regions || [], T = intent.types || [], F = intent.features || [], C = intent.collections || [], A = intent.activities || [];
-  const cuisines = intent.cuisines || [], terms = intent.textTerms || [];
+  // Sport test 14 (2026-11-21; "golf tournament venue oliver" found nothing: no course says "venue"): for a golf or sport
+  // search, a word for "a place" is not a word the place must say.
+  const SPORT_FILLER = new Set(['venue', 'venues', 'spot', 'spots', 'place', 'places', 'location', 'locations', 'facility', 'facilities', 'option', 'options', 'lieu', 'lieux', 'endroit', 'endroits']);
+  const cuisines = intent.cuisines || [], terms = (intent.textTerms || []).filter((t) => !(T.some((x) => x === 'golf' || x === 'sport') && SPORT_FILLER.has(t)));
   if (!R.length && !T.length && !F.length && !C.length && !A.length && !cuisines.length && !terms.length) return empty;
   const plan = exclusionPlan(intent.excluded);
   const fr = !!intent.frenchText;
@@ -240,6 +263,7 @@ function searchVenues(intent, venues) {
       // descriptionSynonyms, after the exact category, for tours only.
       else if (ft.cuisine && cuisines.includes(ft.cuisine) && TERM_SYNONYMS[ft.term]) dishWords.push({ term: ft.term, words: TERM_SYNONYMS[ft.term], tourOnly: true });
     }
+    for (const c of cuisines) if (KIND_CUISINE_WORDS[c] && !dishWords.some((d) => d.term === c)) dishWords.push({ term: c, words: KIND_CUISINE_WORDS[c] });
   }
 
   const scored = [];
@@ -259,7 +283,9 @@ function searchVenues(intent, venues) {
         let best = null;
         for (const d of dishWords) {
           if (d.tourOnly && v.type !== 'tour') continue;
-          for (const w of d.words) {
+          for (const w0 of d.words) {
+            const [w, onlyType] = String(w0).split(':');
+            if (onlyType && v.type !== onlyType) continue;
             const m = termMatch(v, w);
             if (m && (!best || termWeight(m) > termWeight(best.m))) best = { m, term: d.term };
           }
@@ -338,4 +364,4 @@ function searchVenuesAnyWord(intent, venues) {
   return { total: scored.length, items: scored.map(({ venue, matchedOn, hits }) => ({ venue, matchedOn, hits })), exclusions: plan };
 }
 
-module.exports = { textHas, termMatch, numberVariants, foodMatch, searchVenues, searchVenuesAnyWord, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES, CONCEPT_STRAY_WORDS, withoutConceptStrays, CONCEPT_EVENT_RULES, isEventExcluded, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };
+module.exports = { KIND_CUISINE_WORDS, textHas, termMatch, numberVariants, foodMatch, searchVenues, searchVenuesAnyWord, exclusionPlan, isExcluded, CONCEPT_PRIMARY_TYPES, CONCEPT_STRAY_WORDS, withoutConceptStrays, CONCEPT_EVENT_RULES, isEventExcluded, DISH_WORDS: Object.freeze({ ...DISH_WORDS }) };

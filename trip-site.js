@@ -12,6 +12,9 @@ module.exports = {
   areaShort: 'Okanagan',
   areaPossessive: 'the Okanagan’s',
   coverage: 'the Okanagan Valley',
+  coverageFr: 'la vallée de l’Okanagan',
+  // The sister site, named when a request asks for a place it covers (never a link we get paid for).
+  sister: { brand: 'Whistler Roam', host: 'whistlerroam.com', url: 'https://whistlerroam.com/trip', places: ['Whistler', 'Squamish', 'Pemberton'] },
   stretchName: 'the valley', // "one stretch of the valley each day"
   timeName: 'Okanagan', // "(Okanagan time)"
   exampleTowns: 'Kelowna, Penticton or Vernon',
@@ -104,7 +107,7 @@ module.exports = {
   defaultRegion: 'kelowna',
   nearTowns: {
   // Indoor test 10 (2026-11-19): nearest first (Coldstream, Armstrong and Lake Country before SilverStar; Kelowna is not next door).
-  vernon: ['coldstream', 'armstrong', 'lake-country', 'silverstar'], kelowna: ['west-kelowna', 'lake-country'], 'west-kelowna': ['kelowna', 'peachland'],
+  vernon: ['coldstream', 'armstrong', 'lake-country', 'silverstar', 'lumby'], kelowna: ['west-kelowna', 'lake-country'], 'west-kelowna': ['kelowna', 'peachland'],
   'lake-country': ['kelowna', 'vernon'], peachland: ['summerland', 'west-kelowna'], summerland: ['penticton', 'peachland'],
   penticton: ['naramata', 'summerland', 'kaleden'], naramata: ['penticton'], kaleden: ['penticton', 'okanagan-falls'],
   'okanagan-falls': ['kaleden', 'oliver'], oliver: ['osoyoos', 'okanagan-falls'], osoyoos: ['oliver'], coldstream: ['vernon', 'lumby'],

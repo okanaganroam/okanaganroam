@@ -147,8 +147,10 @@ test('3. Search: "christmas day" / "december 25" applies the date (Closed Dec 25
   assert.equal(app.smartStripHoliday('indoor playground kelowna on boxing day'), 'indoor playground kelowna');
   assert.equal(app.smartStripHoliday('escape room christmas eve penticton'), 'escape room penticton');
   assert.equal(app.smartStripHoliday('boxing gym kelowna'), 'boxing gym kelowna');
-  // A month alone (no date) still says so.
-  assert.match(plain(await getText(`/search?q=${encodeURIComponent('indoor playground kelowna december')}`)), /“december” isn’t something search can apply/);
+  // Sport test 1 (2026-11-20): a month alone (no date) is applied too ("in December"), never "can't apply".
+  const dec = plain(await getText(`/search?q=${encodeURIComponent('indoor playground kelowna december')}`));
+  assert.doesNotMatch(dec, /isn’t something search can apply/);
+  assert.match(dec, /in December/);
 });
 
 test('4. The visit box: "Season: All year." is left off, and the automatic Time needed row goes before her researched Food line or her own Groups line when the box is full', async () => {
@@ -195,7 +197,7 @@ test('5. The price box reads "adults free, kids 15" as 15 (the kid\'s number), i
   assert.doesNotMatch(h.text(), /Just the number/);
 });
 
-test('6. A kids\' place has All ages pre-picked ("We picked…"), saved on Save, with one hint line about a range like 0 to 10 (EN + FR); another kind has no such hint', async () => {
+test('6. A kids\' place has All ages pre-picked ("We picked…"), saved once she taps it (sport test 11), with one hint line about a range like 0 to 10 (EN + FR); another kind has no such hint', async () => {
   const v = mk({ name: 'Play Area T19 Ages', cuisine: 'Indoor playground', description: STORY });
   const t = tokenFor(v.id);
   await ok(change(t, { indoor_info: { kinds: ['kids'], length: '1-2h', book: 'no' }, indoor_price: 15 }));
@@ -205,6 +207,11 @@ test('6. A kids\' place has All ages pre-picked ("We picked…"), saved on Save,
   assert.equal(g.doc.getElementById('suAgeKidsHint').textContent, 'For kids up to an age, like 0 to 10? Say it in your story.');
   assert.equal(app.venueIndoorInfo(v.id).age, undefined, 'not saved before Save');
   await g.click('offerSave');
+  // Sport test 11 (2026-11-21): a pre-picked age she didn't touch is not her answer (nor Kids welcome); her tap is.
+  assert.equal(app.venueIndoorInfo(v.id).age, undefined, 'a pre-picked age is not saved as hers');
+  const g2 = await openSetup(base, t, { hash: 'offer' });
+  await g2.click('[data-tpick="age:5"]'); await g2.click('[data-tpick="age:all"]');
+  await g2.click('offerSave');
   assert.equal(app.venueIndoorInfo(v.id).age, 'all');
   const gf = await openSetup(base, tokenFor(v.id), { hash: 'offer', lang: 'fr' });
   assert.match(gf.doc.getElementById('suAgeKidsHint').textContent, /^Pour les enfants jusqu’à un certain âge, comme de 0 à 10 ans\s?\? Dites-le dans votre histoire\.$/);
@@ -241,7 +248,10 @@ test('7. Polish: "Every day" closes Monday\'s hours editor; the French title say
   await ok(change(t2, { visit_rows: { known_for: 'Toddler-only mornings Tuesday and Thursday' } }));
   await new Promise((r) => setTimeout(r, 30));
   assert.equal(sent.filter((m) => /\[TRANSLATE\]/.test(JSON.stringify(m))).length, 0, 'held for a few minutes');
-  assert.ok(db.prepare("SELECT COUNT(*) AS n FROM venue_menus WHERE venue_id = ? AND help_kind = 'fr_lines'").get(v2.id).n >= 3, 'each line in the admin queue at once');
+  // Sport test 6 (2026-11-20): every line is in the admin queue at once, in ONE review item per listing.
+  const frRows = db.prepare("SELECT help_note FROM venue_menus WHERE venue_id = ? AND help_kind = 'fr_lines'").all(v2.id);
+  assert.equal(frRows.length, 1, 'one review item');
+  for (const w of ['Good to know: Shoes off', 'Groups: Birthday parties', 'Known for: Toddler-only']) assert.ok(frRows[0].help_note.includes(w), w);
   assert.equal(app.sendFrLinesEmailNow(v2.id), true);
   await new Promise((r) => setTimeout(r, 30));
   const tr = sent.filter((m) => /\[TRANSLATE\]/.test(JSON.stringify(m)));

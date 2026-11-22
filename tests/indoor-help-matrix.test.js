@@ -471,7 +471,8 @@ test('indoor test 11: Kim\'s Help questions (a science centre) land on the right
   assert.match(sd, /Open this day/);
   assert.match(sd, /Don’t tap We’re closed part of the year/);
   assert.match(plain(b.en.topic(LO).a), /non-profits, societies, co-ops and community groups count when they’re run locally/);
-  assert.match(plain(b.en.topic(FRN).a), /^ ?Your page has a French version\. We write the French for your own lines, usually within a day\./);
+  // Sport test 11 (2026-11-21): the translation answer says which way it goes, both ways.
+  assert.match(plain(b.en.topic(FRN).a), /^ ?Your page has an English and a French version\. Write your lines in the language you like, and we write the other one, usually within a day: lines in English get their French, lines in French get their English\./);
   const th = plain(b.en.topic(TH).a);
   assert.match(th, /Known for/);
   assert.match(th, /Add an event/);
@@ -615,7 +616,7 @@ const AARON = [
   ['first friday opening reception every month', [O], 'vernissage le premier vendredi de chaque mois'],
   ['open late thursdays in summer', [SL], 'ouvert tard le jeudi l’été'],
   ['doors open at 10 for the opening', [DO, O], 'les portes ouvrent à 10 h pour le vernissage'],
-  ['how do I get to 100%', ['page-complete'], 'comment arriver à 100 %'],
+  ['how do I get to 100%', ['page-complete', 'setup-missing'], 'comment arriver à 100 %'],
   ['where do our class prices go', [M, X, P, F], 'où vont les prix de nos cours'],
   ['is it ok to say no dogs, service dogs are allowed', [AC], 'puis-je dire pas de chiens, mais les chiens d’assistance sont acceptés'],
   ['we are closed on all stat holidays, is there one button', CLOSED_HOL, 'nous sommes fermés tous les jours fériés, y a-t-il un seul bouton?'],

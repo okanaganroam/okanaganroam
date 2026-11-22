@@ -1,0 +1,287 @@
+{
+ "venue": {
+  "name": "Predator Ridge Fixture Course",
+  "region": "vernon",
+  "type": "golf",
+  "cuisine": "Golf course & driving range",
+  "phone": "1-888-578-6688",
+  "description": "The Predator Course is the elder statesman of Predator Ridge's two 18s: a 1991 Les Furber design that plays through rolling hills, native fescue, and undulating, multi-tiered greens over a full 7,034 yards at par 71. It has earned its stripes, rated 4.5 stars by Golf Digest and ranked among the Rolex World's Top 1,000, and it has hosted the World Skins Game twice. The signature 14th, a sweeping dogleg-right par 5 with water running up to the green, sums up the risk-reward character of the whole round. The resort's shared practice facility is a strength in its own right, with grass tees and TopTracer technology, target greens, and a short-game area, plus a golf academy for real instruction. Access rotates daily with the sister Ridge Course, one open to members only and the other to public and resort-guest play, with RANGE restaurant on site. Stay in the Lodge or a cottage and play both 18s on a stay-and-play package; a free resort shuttle runs between the Lodge, the cottages and the clubhouse.",
+  "description_fr": "Le Predator Course est le doyen des deux 18 trous de Predator Ridge : un tracé de Les Furber de 1991 qui serpente entre collines ondulées, fétuque indigène et verts ondulés à plusieurs plateaux, sur 7 034 verges complètes, normale 71. Il a fait ses preuves : noté 4,5 étoiles par Golf Digest, classé parmi les Rolex World's Top 1,000, il a accueilli deux fois le World Skins Game. Le 14e, trou signature, une longue normale 5 en dogleg vers la droite où l'eau longe le parcours jusqu'au vert, résume bien le caractère risque-récompense de toute la ronde. Les installations de pratique communes du centre de villégiature sont un atout en soi, avec départs sur gazon et technologie TopTracer, verts cibles et zone de petit jeu, en plus d'une académie de golf pour de vraies leçons. L'accès alterne chaque jour avec le parcours jumeau, le Ridge Course, l'un étant réservé aux membres et l'autre ouvert au public et aux clients du centre, avec le restaurant RANGE sur place.",
+  "kid_friendly": 1,
+  "address": "301 Village Centre Place, Vernon, BC V1H 1T2",
+  "website": "https://predatorridge.com/",
+  "slug": "predator-fixture-course",
+  "latitude": 50.189367,
+  "longitude": -119.381508,
+  "great_groups": 1,
+  "happy_hour": 1,
+  "hours": "{\"mon\":[[\"07:30\",\"18:00\"]],\"tue\":[[\"07:30\",\"18:00\"]],\"wed\":[[\"07:30\",\"18:00\"]],\"thu\":[[\"07:30\",\"18:00\"]],\"fri\":[[\"07:30\",\"18:00\"]],\"sat\":[[\"07:30\",\"18:00\"]],\"sun\":[[\"07:30\",\"18:00\"]]}",
+  "happy_hour_times": "{\"mon\":[[\"15:00\",\"17:00\"]],\"tue\":[[\"15:00\",\"17:00\"]],\"wed\":[[\"15:00\",\"17:00\"]],\"thu\":[[\"15:00\",\"17:00\"]],\"fri\":[[\"15:00\",\"17:00\"]],\"sat\":[[\"15:00\",\"17:00\"]],\"sun\":[[\"15:00\",\"17:00\"]],\"_season\":{\"from\":\"04-01\",\"to\":\"10-31\"}}",
+  "happy_hour_deals": "[{\"text\":\"$7 pints, $9 wine, half-price flatbreads\"}]"
+ },
+ "links": {
+  "booking_url": "https://www.predatorridge.com/golf/book-tee-time/",
+  "instagram_url": "https://www.instagram.com/predatorridge/",
+  "facebook_url": "https://www.facebook.com/predatorridge",
+  "open_months": "04-16:10-12"
+ },
+ "hours_extra": {
+  "seasons": "[{\"from\":\"06-01\",\"to\":\"08-31\",\"label\":\"\",\"hours\":{\"mon\":[[\"06:30\",\"20:00\"]],\"tue\":[[\"06:30\",\"20:00\"]],\"wed\":[[\"06:30\",\"20:00\"]],\"thu\":[[\"06:30\",\"20:00\"]],\"fri\":[[\"06:30\",\"20:00\"]],\"sat\":[[\"06:30\",\"20:00\"]],\"sun\":[[\"06:30\",\"20:00\"]]}}]",
+  "closures": "[{\"from\":\"2027-08-13\",\"to\":\"2027-08-15\",\"note\":\"Closed to the public for the member-guest tournament\"}]"
+ },
+ "visit_info": {
+  "rows": [
+   {
+    "label": "Booking",
+    "text": "Please book a tee time ahead. Book through Central Reservations; staying guests get preferred green fee pricing."
+   },
+   {
+    "label": "Prices",
+    "text": "Green fees from $150."
+   },
+   {
+    "label": "Ages",
+    "text": "All ages."
+   },
+   {
+    "label": "Known for",
+    "text": "Two championship 18s, a TopTracer range and stay-and-play packages"
+   },
+   {
+    "label": "Good to know",
+    "text": "Dress code: collared shirts, no denim, soft spikes only. Restaurant and patio on site, open to everyone. The two courses alternate daily between members and public play; book a tee time to see which is open. SoloRider adaptive cart: book ahead."
+   },
+   {
+    "label": "Groups",
+    "text": "Tournaments for 8 to 144 players across both courses; Groups of 15 or more: please book ahead. Tournaments and corporate golf. Days with shotgun starts and dinner after. Weddings and private events for up to 250 in the event centre."
+   },
+   {
+    "label": "Winter",
+    "text": "Course season ended Sept 27. Callaway SIM Lounge in the clubhouse: $60 per hour, up to 4 players, opens in November."
+   }
+  ],
+  "booking_url": "https://www.predatorridge.com/golf/book-tee-time/",
+  "source_url": "https://predatorridge.com/",
+  "checked_at": "2026-11-20",
+  "owner_labels": [
+   "Ages",
+   "Booking",
+   "Good to know",
+   "Groups",
+   "Known for",
+   "Prices",
+   "Season",
+   "Time needed"
+  ],
+  "owner_was": {
+   "Season": {
+    "text": ""
+   },
+   "Time needed": {
+    "text": ""
+   },
+   "Prices": {
+    "text": ""
+   },
+   "Booking": {
+    "text": "Book through Central Reservations; staying guests get preferred green fee pricing."
+   },
+   "Ages": {
+    "text": ""
+   }
+  },
+  "owner_fr": {
+   "Season": {
+    "en": "Apr 16 – Oct 12.",
+    "fr": "Du 16 avr. au 12 oct."
+   },
+   "Time needed": {
+    "en": "Half a day or more.",
+    "fr": "Une demi-journée ou plus."
+   },
+   "Prices": {
+    "en": "Green fees from $150.",
+    "fr": "Droits de jeu à partir de 150 $."
+   },
+   "Booking": {
+    "en": "Please book a tee time ahead. Book through Central Reservations; staying guests get preferred green fee pricing.",
+    "fr": "Réservez votre départ à l’avance."
+   },
+   "Ages": {
+    "en": "All ages.",
+    "fr": "Tous les âges."
+   }
+  },
+  "winery_labels": [
+   "Ages",
+   "Booking",
+   "Prices",
+   "Season",
+   "Time needed"
+  ],
+  "owner_dropped": [
+   {
+    "label": "Rentals",
+    "text": "Club rental $80. Maximum two golf carts per playing group; no extra ride-along carts."
+   },
+   {
+    "label": "Green fees",
+    "text": "2026 prime season daily $300, twilight $175, replay $150, junior $120 with an adult. Spring from $200."
+   },
+   {
+    "label": "Season",
+    "text": "Apr 16 – Oct 12.",
+    "owned": true
+   },
+   {
+    "label": "Time needed",
+    "text": "Half a day or more.",
+    "owned": true
+   },
+   {
+    "label": "Also",
+    "text": "groups of 16 plus get special rates."
+   },
+   {
+    "label": "Practice",
+    "text": "Range $25 per bag or $75 day pass. Academy lessons, clinics and club fittings offered."
+   }
+  ],
+  "kept_labels": [
+   "Also"
+  ]
+ },
+ "sport_info": {
+  "kinds": [
+   "golf",
+   "range"
+  ],
+  "length": "half",
+  "book": "ahead",
+  "age": "all",
+  "year": "seasonal",
+  "price": 210,
+  "cuisine_was": ""
+ },
+ "menu": {
+  "sections": [
+   {
+    "name": "Green fees",
+    "note": "",
+    "items": [
+     {
+      "name": "18 holes, spring (Apr 16 to May 31)",
+      "description": "Power cart and range balls included",
+      "price": "210",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "18 holes, prime season (June to September)",
+      "description": "Power cart and range balls included",
+      "price": "310",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Twilight 18 holes",
+      "description": "After 3 PM, June to September",
+      "price": "180",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Replay round",
+      "description": "Second 18 the same day",
+      "price": "150",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Junior (under 18)",
+      "description": "Shares a cart with a paying adult",
+      "price": "125",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Resort guest rate",
+      "description": "When you stay at Predator Ridge",
+      "price": "260",
+      "dietary": [],
+      "check": false
+     }
+    ]
+   },
+   {
+    "name": "Stay and play",
+    "note": "",
+    "items": [
+     {
+      "name": "Stay and play, per person per night",
+      "description": "Lodge room and 18 holes, 2 people sharing",
+      "price": "249",
+      "dietary": [],
+      "check": false
+     }
+    ]
+   },
+   {
+    "name": "Practice and lessons",
+    "note": "",
+    "items": [
+     {
+      "name": "Range bag",
+      "description": "",
+      "price": "25",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Range day pass",
+      "description": "",
+      "price": "75",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Private lesson, 1 hour",
+      "description": "PGA of Canada pros at the Golf Academy",
+      "price": "120",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Junior golf camp, 5 days",
+      "description": "July and August, ages 8 to 15",
+      "price": "395",
+      "dietary": [],
+      "check": false
+     }
+    ]
+   },
+   {
+    "name": "Rentals",
+    "note": "",
+    "items": [
+     {
+      "name": "Club rental",
+      "description": "Callaway sets",
+      "price": "80",
+      "dietary": [],
+      "check": false
+     }
+    ]
+   }
+  ]
+ },
+ "owner_features": {
+  "free_parking": true,
+  "wheelchair_accessible": true,
+  "service_dogs": true
+ },
+ "not_offered": [
+  "dogs"
+ ],
+ "hh_checked": null
+}

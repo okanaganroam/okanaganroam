@@ -42,10 +42,11 @@ function renderIndoorLayout(p) {
   const eyebrow = isGolf ? '⛳ Indoor golf' : p.kindLabel ? `🌧️ ${e(p.kindLabel)}` : '🌧️ Indoor &amp; rainy day';
 
   // The booking button: the place's own booking link when it has one.
-  const bookingAnchor = p.actions.find((a) => /data-track="booking"/.test(a));
+  // A walk-in sport place's booking link (data-book-secondary: ice rentals, parties) is a contact button, not the main one.
+  const bookingAnchor = p.actions.find((a) => /data-track="booking"/.test(a) && !/data-book-secondary/.test(a));
   const book = bookingAnchor ? bookingAnchor.replace(/class="[^"]*"/, 'class="gb-book"').replace(/(\s*↗)?<\/a>$/, ' ↗</a>') : '';
   const directions = p.actions.find((a) => /data-track="directions"/.test(a)) || '';
-  const contactActions = p.actions.filter((a) => /data-track="(phone|website)"/.test(a));
+  const contactActions = p.actions.filter((a) => /data-track="(phone|website)"/.test(a) || /data-book-secondary/.test(a));
   const save = p.actions.filter((a) => /fav-btn|trip-btn/.test(a));
   const mainButton = book || (directions ? directions.replace(/class="[^"]*"/, 'class="gb-book"') : '');
 
@@ -109,7 +110,7 @@ function renderIndoorLayout(p) {
         ${tiles.length >= 2 ? `<div class="gb-quick">${tiles.join('')}</div>` : ''}
         ${save.length ? `<div class="gb-save"${p.ctaRowAttrs}>${save.join('')}</div><p class="gb-help">${T('♡ Favorite saves this place for later. Add to trip puts it on your trip list.')}</p>` : ''}
       </section>
-      ${bookingCard}${pricesCard}${p.moreHtml || ''}${visitCard}${contactCard}${hoursCard}
+      ${bookingCard}${pricesCard}${p.dealsHtml ? `<section class="gb-card gb-deals">${p.dealsHtml}</section>` : ''}${p.moreHtml || ''}${visitCard}${contactCard}${hoursCard}
     </div>
     ${p.gallery || ''}${more}
     ${p.eventsHtml || ''}${p.visitorHtml || ''}

@@ -48,7 +48,7 @@ function daysBetween(a, b) { return Math.round((Date.parse(`${b}T12:00:00Z`) - D
 function parseTripStayInput(raw) {
   if (raw === undefined || raw === null) return { value: null };
   if (!isObj(raw)) return { error: 'stay must be an object with arrive, leave, adults, kids and dog.' };
-  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog'].includes(k));
+  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog', 'pref'].includes(k));
   if (extra.length) return { error: `stay may only contain arrive, leave, adults, kids and dog (not ${extra.join(', ')}).` };
   const out = {};
   for (const k of ['arrive', 'leave']) {
@@ -74,7 +74,68 @@ function parseTripStayInput(raw) {
     if (typeof raw.dog !== 'boolean') return { error: 'stay.dog must be true or false.' };
     if (raw.dog) out.dog = true;
   }
+  // Travel agent chat (2026-11-22, trip-chat.js): what the visitor said about the place to stay ("somewhere cheaper",
+  // "a hotel with a pool", "stay in Naramata", "we already have a place"). Only these keys and values.
+  if (raw.pref !== undefined && raw.pref !== null) {
+    const p = parseStayPref(raw.pref);
+    if (p.error) return p;
+    if (p.value) out.pref = p.value;
+  }
   return { value: Object.keys(out).length ? out : null };
+}
+
+// What a visitor can ask of a place to stay, and what its stay_info must say for a yes (drafts/stays-2026-11/
+// stay-info-schema.md): pool, hot_tub, accessible are true / false / null; kitchen is all | some | none; pets is yes | some
+// | no; parking is free | paid | none. Unknown (null, missing) is never a yes (2026-11-22: "a hotel with a pool" picked a
+// stay with no word about why, and kitchen, an "all / some" fact, never matched).
+const STAY_AMENITIES = ['pool', 'hot_tub', 'kitchen', 'pets', 'parking', 'accessible'];
+const AMENITY_YES = {
+  pool: (f) => f.pool === true, hot_tub: (f) => f.hot_tub === true, accessible: (f) => f.accessible === true,
+  kitchen: (f) => f.kitchen === 'all' || f.kitchen === 'some' || f.kitchen === true,
+  pets: (f) => f.pets === 'yes' || f.pets === 'some' || f.pets === true,
+  parking: (f) => f.parking === 'free',
+};
+const AMENITY_NO = {
+  pool: (f) => f.pool === false, hot_tub: (f) => f.hot_tub === false, accessible: (f) => f.accessible === false,
+  kitchen: (f) => f.kitchen === 'none' || f.kitchen === false, pets: (f) => f.pets === 'no' || f.pets === false,
+  parking: (f) => f.parking === 'paid' || f.parking === 'none',
+};
+const stayHas = (stay, key) => !!(AMENITY_YES[key] && AMENITY_YES[key](isObj(stay && stay.info) ? stay.info : {}));
+const stayHasNot = (stay, key) => !!(AMENITY_NO[key] && AMENITY_NO[key](isObj(stay && stay.info) ? stay.info : {}));
+// The amenities a preference asks for (at most two): pref.amenities, or the older single pref.amenity.
+function prefAmenities(pref) {
+  if (!pref) return [];
+  const list = Array.isArray(pref.amenities) ? pref.amenities : pref.amenity ? [pref.amenity] : [];
+  return [...new Set(list.filter((a) => STAY_AMENITIES.includes(a)))].slice(0, 2);
+}
+// "a hotel": hotels and resorts first when one fits (a motel only when none does); the reply says which it is.
+const STAY_KIND_SETS = { hotel: ['hotel', 'resort'] };
+const stayKindKey = (stay) => String((stay && (stay.kindKey || stay.kind)) || '').trim().toLowerCase();
+function parseStayPref(raw) {
+  if (!isObj(raw) || Object.keys(raw).some((k) => !['none', 'maxPrice', 'minPrice', 'amenity', 'amenities', 'kind', 'region'].includes(k))) return { error: 'stay.pref may only contain none, maxPrice, minPrice, amenity and region.' };
+  const out = {};
+  if (raw.none !== undefined) { if (raw.none !== true) return { error: 'stay.pref.none must be true.' }; out.none = true; }
+  for (const k of ['maxPrice', 'minPrice']) if (raw[k] !== undefined) { if (!intIn(raw[k], 1, 4)) return { error: `stay.pref.${k} must be 1 to 4.` }; out[k] = raw[k]; }
+  if (raw.amenity !== undefined) { if (!STAY_AMENITIES.includes(raw.amenity)) return { error: 'stay.pref.amenity is not known.' }; out.amenity = raw.amenity; }
+  if (raw.amenities !== undefined) {
+    if (!Array.isArray(raw.amenities) || raw.amenities.length < 1 || raw.amenities.length > 2 || !raw.amenities.every((a) => STAY_AMENITIES.includes(a)) || new Set(raw.amenities).size !== raw.amenities.length) return { error: 'stay.pref.amenities must list one or two known amenities.' };
+    out.amenities = raw.amenities.slice();
+  }
+  if (raw.kind !== undefined) { if (!Object.prototype.hasOwnProperty.call(STAY_KIND_SETS, raw.kind)) return { error: 'stay.pref.kind is not known.' }; out.kind = raw.kind; }
+  if (raw.region !== undefined) { if (typeof raw.region !== 'string' || !/^[a-z-]{2,24}$/.test(raw.region)) return { error: 'stay.pref.region must be a town.' }; out.region = raw.region; }
+  return { value: Object.keys(out).length ? out : null };
+}
+// The stays a preference leaves (the price band, an amenity, a town). Unknown facts never pass a stated preference.
+function staysForPref(stays, pref) {
+  if (!pref || !Array.isArray(stays)) return stays;
+  return stays.filter((st) => {
+    const f = isObj(st.info) ? st.info : {};
+    if (pref.maxPrice && !(intIn(f.price_level, 1, 4) && f.price_level <= pref.maxPrice)) return false;
+    if (pref.minPrice && !(intIn(f.price_level, 1, 4) && f.price_level >= pref.minPrice)) return false;
+    if (!prefAmenities(pref).every((a) => stayHas(st, a))) return false;
+    if (pref.region && st.region !== pref.region) return false;
+    return true;
+  });
 }
 
 // Straight-line distance in km.
@@ -293,19 +354,67 @@ function pickTripStays(ctx, stays) {
 function whereToStay(plan, input, stays, today, opts = {}) {
   const ctx = tripStayContext(plan, input, today, opts);
   if (!ctx) return null;
-  const picked = pickTripStays(ctx, stays);
+  // Chat preference (input.pref): "we already have a place" -> no stay; else only the stays it leaves, and "stay in
+  // Naramata" makes that town the base (other towns' stays still join only within NEAR_KM when it has too few).
+  const pref = input && input.pref;
+  if (pref && pref.none) return null;
+  const askedTown = ctx.primaryRegion;
+  if (pref && pref.region) { ctx.regions = [pref.region]; ctx.primaryRegion = pref.region; }
+  const ams = prefAmenities(pref);
+  const kindSet = pref && pref.kind ? STAY_KIND_SETS[pref.kind] : null;
+  // "a hotel": only hotels and resorts when one of the plan's towns has one that fits; else every kind.
+  const withKind = (list) => {
+    if (!kindSet) return list;
+    const ok = list.filter((x) => kindSet.includes(stayKindKey(x)));
+    return ok.some((x) => ctx.regions.includes(x.region)) ? ok : list;
+  };
+  let picked = pickTripStays(ctx, withKind(pref ? staysForPref(stays, pref) : stays));
+  // An amenity asked for (2026-11-22): only stays whose facts say yes. None in the plan's towns (or just outside them):
+  // the nearest town that has one (elsewhere); none there either: the closest stay that does not say no, marked "not
+  // confirmed". Never a stay passed off as having it.
+  let amenity = null;
+  if (ams.length) {
+    amenity = { keys: ams, confirmed: !!picked, town: pref && pref.region ? pref.region : askedTown };
+    if (!picked) {
+      const rest = { ...pref }; delete rest.region; delete rest.area; delete rest.amenity; delete rest.amenities;
+      const yesAll = staysForPref(stays, { ...rest, amenities: ams });
+      // "Near" is measured from the plan's stops; when none has a map location, from the middle of the asked town's stays.
+      const townStays = stays.filter((x) => x.region === amenity.town).map((x) => coords(x.latitude, x.longitude)).filter(Boolean);
+      const from = ctx.centre || (townStays.length ? { lat: townStays.reduce((t, c) => t + c.lat, 0) / townStays.length, lng: townStays.reduce((t, c) => t + c.lng, 0) / townStays.length } : null);
+      const near = from ? yesAll.map((x) => ({ x, c: coords(x.latitude, x.longitude) })).filter((o) => o.c && km(from, o.c) <= ELSEWHERE_KM).sort((a, b) => km(from, a.c) - km(from, b.c))[0] : null;
+      if (near) {
+        const ctx2 = { ...ctx, regions: [near.x.region], primaryRegion: near.x.region };
+        picked = pickTripStays(ctx2, withKind(yesAll.filter((x) => x.region === near.x.region)));
+        if (picked) { amenity.confirmed = true; amenity.elsewhere = true; }
+      }
+      if (!picked) {
+        const loose = { ...pref }; delete loose.amenity; delete loose.amenities;
+        const maybe = staysForPref(stays, loose).filter((x) => !ams.some((a) => stayHasNot(x, a)));
+        picked = pickTripStays(ctx, withKind(maybe)) || pickTripStays(ctx, withKind(staysForPref(stays, loose)));
+        amenity.confirmed = false;
+      }
+    }
+  }
   if (!picked) return null;
+  // Each card says which of the asked amenities it has (the card's chips), and the block which kind was asked for.
+  const byId = new Map(stays.map((x) => [x.id, x]));
+  const tag = (card) => ({ ...card, kindKey: stayKindKey(byId.get(card.id)) || null, ...(ams.length ? { has: ams.filter((a) => stayHas(byId.get(card.id), a)) } : {}) });
+  const pick = tag(picked.pick);
   return {
     stayId: picked.pick.id,
-    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, kids: ctx.kids, dog: !!ctx.dog, datesGiven: ctx.datesGiven },
-    pick: picked.pick,
-    alternatives: picked.alternatives,
+    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, kids: ctx.kids, ...(input && Array.isArray(input.kidAges) && input.kidAges.length === ctx.kids ? { kidAges: input.kidAges.slice() } : {}), dog: !!ctx.dog, datesGiven: ctx.datesGiven },
+    pick,
+    alternatives: picked.alternatives.map(tag),
+    ...(amenity ? { amenity } : {}),
+    ...(kindSet ? { kindAsked: pref.kind, kindMatched: kindSet.includes(pick.kindKey) } : {}),
   };
 }
+// How far the "nearest town with one" may be from the plan's stops.
+const ELSEWHERE_KM = 60;
 
 module.exports = {
   MAX_NIGHTS, MAX_ADULTS, MAX_KIDS, NEAR_KM, MIN_IN_TOWN,
-  parseTripStayInput, tripStayContext, partyOf, stayFails, scoreStay, pickTripStays, whereToStay, planStops, km, addDays, daysBetween,
+  parseTripStayInput, parseStayPref, staysForPref, STAY_AMENITIES, stayHas, stayHasNot, prefAmenities, STAY_KIND_SETS, tripStayContext, partyOf, stayFails, scoreStay, pickTripStays, whereToStay, planStops, km, addDays, daysBetween,
   wantsCamping, isCampingStay, CAMPING_RE,
   v4DormStay, V4_COUPLE_RE, V4_BUDGET_STAY_RE,
 };

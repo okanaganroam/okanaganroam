@@ -1,0 +1,229 @@
+{
+ "venue": {
+  "name": "Lumby Golf Club (test)",
+  "region": "lumby",
+  "type": "golf",
+  "cuisine": "Golf course & disc golf",
+  "phone": "250-555-0142",
+  "description": "Lumby Golf Club is a municipal nine-hole course just east of the village, open since 1963 and known for its unusual sand greens and mountain views. It's a relaxed, no-fuss round for a summer evening, and the property also has a disc golf course for anyone who'd rather throw than swing. Run by volunteers from the golf club society and everyone is welcome no membership needed",
+  "dog_friendly": 1,
+  "kid_friendly": 1,
+  "address": "2625 Hwy 6 (Vernon St), Lumby, BC V0E 2G0",
+  "slug": "lumby-golf-club",
+  "latitude": 50.25106,
+  "longitude": -118.95395,
+  "hours": "{\"mon\":[[\"07:00\",\"20:00\"]],\"tue\":[[\"07:00\",\"16:00\"]],\"wed\":[[\"07:00\",\"20:00\"]],\"thu\":[[\"07:00\",\"20:00\"]],\"fri\":[[\"07:00\",\"20:00\"]],\"sat\":[[\"07:00\",\"20:00\"]],\"sun\":[[\"07:00\",\"20:00\"]]}",
+  "description_fr": "Le Lumby Golf Club est un parcours municipal de neuf trous situé juste à l'est du village, ouvert depuis 1963 et connu pour ses verts en sable peu communs et ses vues sur les montagnes. C'est une partie détendue et sans prétention pour une soirée d'été, et le terrain compte aussi un parcours de disc golf pour ceux qui préfèrent lancer plutôt que frapper.",
+  "hours_source": "venue_owner"
+ },
+ "links": {
+  "facebook_url": "https://www.facebook.com/lumbygolfclub",
+  "open_months": "04-15:10-15"
+ },
+ "hours_extra": {
+  "closures": "[{\"from\":\"2027-08-21\",\"to\":\"2027-08-21\",\"note\":\"closed to the public for the club championship\"}]"
+ },
+ "visit_info": {
+  "booking_url": null,
+  "source_url": null,
+  "rows": [
+   {
+    "label": "Prices",
+    "text": "Green fees from $20."
+   },
+   {
+    "label": "Booking",
+    "text": "Walk-ons welcome: no tee time needed."
+   },
+   {
+    "label": "Ages",
+    "text": "All ages."
+   },
+   {
+    "label": "Dogs",
+    "text": "dogs on a leash are welcome on the course please pick up after your dog"
+   },
+   {
+    "label": "Known for",
+    "text": "Sand greens and the friendliest volunteers in the valley"
+   },
+   {
+    "label": "Good to know",
+    "text": "Cart and club rentals. Pull carts only no power carts. Cash only. If nobody is in the clubhouse use the honour box by the door. No tee times just come on down. Clubhouse has pop and snacks."
+   },
+   {
+    "label": "Groups",
+    "text": "Groups of 8 or more: please book ahead. Tournaments and corporate golf for local fundraisers phone the clubhouse to book."
+   }
+  ],
+  "checked_at": "2026-11-21",
+  "owner_labels": [
+   "Ages",
+   "Booking",
+   "Dogs",
+   "Good to know",
+   "Groups",
+   "Known for",
+   "Prices",
+   "Season",
+   "Time needed"
+  ],
+  "owner_was": {
+   "Season": {
+    "text": ""
+   },
+   "Time needed": {
+    "text": ""
+   },
+   "Prices": {
+    "text": ""
+   },
+   "Booking": {
+    "text": ""
+   },
+   "Ages": {
+    "text": ""
+   }
+  },
+  "owner_fr": {
+   "Season": {
+    "en": "Apr 15 – Oct 15.",
+    "fr": "Du 15 avr. au 15 oct."
+   },
+   "Time needed": {
+    "en": "1 to 2 hours.",
+    "fr": "1 à 2 heures."
+   },
+   "Prices": {
+    "en": "Green fees from $20.",
+    "fr": "Droits de jeu à partir de 20 $."
+   },
+   "Booking": {
+    "en": "Walk-ons welcome: no tee time needed.",
+    "fr": "Départs sans réservation : pas besoin de réserver."
+   },
+   "Ages": {
+    "en": "All ages.",
+    "fr": "Tous les âges."
+   }
+  },
+  "winery_labels": [
+   "Ages",
+   "Booking",
+   "Prices",
+   "Season",
+   "Time needed"
+  ],
+  "owner_dropped": [
+   {
+    "label": "Season",
+    "text": "Apr 15 – Oct 15.",
+    "owned": true
+   },
+   {
+    "label": "Time needed",
+    "text": "1 to 2 hours.",
+    "owned": true
+   }
+  ]
+ },
+ "sport_info": {
+  "kinds": [
+   "golf",
+   "discgolf"
+  ],
+  "length": "1-2h",
+  "book": "no",
+  "age": "all",
+  "year": "seasonal",
+  "price": 20,
+  "cuisine_was": ""
+ },
+ "owner_features": {
+  "free_parking": true
+ },
+ "not_offered": [
+  "happy_hour",
+  "instagram"
+ ],
+ "menu": {
+  "sections": [
+   {
+    "name": "Green fees",
+    "note": "",
+    "items": [
+     {
+      "name": "9 holes",
+      "description": "pay in the clubhouse or the honour box by the door cash only",
+      "price": "20",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "18 holes",
+      "description": "play the 9 twice",
+      "price": "30",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Juniors under 18",
+      "description": "",
+      "price": "10",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Kids under 12",
+      "description": "with a paying adult",
+      "price": "free",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Season pass adult",
+      "description": "",
+      "price": "450",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Junior season pass",
+      "description": "",
+      "price": "100",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Pull cart",
+      "description": "",
+      "price": "3",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Club rental",
+      "description": "",
+      "price": "10",
+      "dietary": [],
+      "check": false
+     },
+     {
+      "name": "Disc golf",
+      "description": "",
+      "price": "free",
+      "dietary": [],
+      "check": false
+     }
+    ]
+   }
+  ]
+ },
+ "price_override": {
+  "from_price": 20,
+  "basis": "Green fees",
+  "hidden": 0,
+  "decided_at": "2026-11-21T08:43:09.503Z",
+  "reviewer": "owner"
+ }
+}

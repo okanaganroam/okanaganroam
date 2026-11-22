@@ -272,7 +272,8 @@ test('10. Help: hours answers have no ski words and name the folded summer/winte
   const noHours = en.find((x) => x.id === 'indoor-no-hours');
   assert.match(noHours.q, /shows or classes only/);
   const frT = en.find((x) => x.id === 'indoor-french');
-  assert.match(frT.a, /<strong>No\.<\/strong> It’s optional: we translate it for you\./);
+  // Sport test 11 (2026-11-21): optional still, and it says which way the translation goes.
+  assert.match(frT.a, /Do you have to write the description in both\? <strong>No\.<\/strong> Write your story in one language; we write the other\./);
   const brk = en.find((x) => x.id === 'indoor-yearly-break');
   assert.match(brk.a, /open <strong>Closures and holidays<\/strong> in <strong>More about your place<\/strong>/);
   assert.match(brk.a, /Every year/);

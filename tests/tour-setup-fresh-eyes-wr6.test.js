@@ -275,7 +275,7 @@ test('9. French-only lines: the finish screen and the edit pages name them (« C
 
 test('10. minor: Groups counter, French unit words and lengths on the list, private lines not counted, private "1500 $ et plus", shoulder hours grouped, land meeting-spot words', async () => {
   // Groups line: a counter like Good to know (180).
-  assert.match(CLIENT, /field\('suGroupsLine', T\.groupsLineLabel, gl, \{ max: 780, area: true, data: 'aria-describedby="suGroupsLineCount"' \}\) \+ countLine\('suGroupsLine', gl, 180\)/);
+  assert.match(CLIENT, /field\('suGroupsLine', T\.groupsLineLabel, gl, \{ max: 780, area: true, data: 'aria-describedby="suGroupsLineCount"' \}\) \+ countLine\('suGroupsLine', gl, (?:180|GROUPS_MAX)\)/);
   // French price list words and lengths (known words only).
   const sp = (x) => String(x).replace(/[\u00a0\u202f]/g, ' ');
   assert.equal(sp(app.menuPriceLabel('69 per bike', 'fr')), '69 $ par vélo');

@@ -24,9 +24,11 @@ const STEPS = [
   ['book_click', 'Clicked a booking link', true],
   ['share', 'Shared the trip', false],
   ['save', 'Saved it to My Trip', false],
+  // Travel agent chat (2026-11-22, trip-chat.js): visits that sent the chat at least one message or chip.
+  ['chat', 'Used the chat', false],
 ];
 // The old page has no Confirm button and no Book my trip sheet (its bookings sit in the plan).
-const NOT_ON = { v3: ['confirm', 'book_open'] };
+const NOT_ON = { v3: ['confirm', 'book_open', 'chat'] };
 const BOOK_TYPES = [
   ['stay', 'Place to stay (Stay22 and other stay links)', true],
   ['viator', 'Viator tour or activity', true],
@@ -39,12 +41,15 @@ const BOOK_TYPES = [
   ['other', 'Other booking link', false],
 ];
 const SHARE_METHODS = [['native', 'Phone share sheet'], ['copy', 'Copied the link']];
+// Each chat message, counted by the server (POST /api/trip/chat) by how it was read; only on the V4 page. No words kept.
+const CHAT_KINDS = [['ai', 'Message read by AI'], ['ai_fixed', 'AI reading corrected by the word rules'], ['rules_over_ai', 'Word rules used instead of the AI'], ['ai_slow', 'AI too slow, word rules answered'], ['rules', 'Message read by word rules (no AI)'], ['chip', 'Tapped a suggestion chip'], ['cant', 'Asked for something the chat can\'t do'], ['none', 'Plan could not be changed']];
 
 const NAMES = [];
 for (const v of VERSIONS) {
   for (const [s] of STEPS) if (!(NOT_ON[v] || []).includes(s)) NAMES.push(`bmt:${v}:${s}`);
   for (const [b] of BOOK_TYPES) NAMES.push(`bmt:${v}:book:${b}`);
   for (const [m] of SHARE_METHODS) NAMES.push(`bmt:${v}:share:${m}`);
+  if (v === 'v4') for (const [c] of CHAT_KINDS) NAMES.push(`bmt:${v}:chat:${c}`);
 }
 
 const TASTING = new Set(['winery', 'brewery', 'distillery', 'cidery', 'meadery']);
@@ -95,8 +100,9 @@ function report(db, days = 30, now = new Date()) {
     });
     const book = BOOK_TYPES.map(([key, text, commission]) => ({ key, text, commission, n: g(`bmt:${v}:book:${key}`) }));
     const share = SHARE_METHODS.map(([key, text]) => ({ key, text, n: g(`bmt:${v}:share:${key}`) }));
+    const chat = v === 'v4' ? CHAT_KINDS.map(([key, text]) => ({ key, text, n: g(`bmt:${v}:chat:${key}`) })) : [];
     const total = steps.reduce((a, s) => a + (s.n || 0), 0) + book.reduce((a, b) => a + b.n, 0);
-    versions[v] = { steps, book, share, book_taps: book.reduce((a, b) => a + b.n, 0), commission_taps: book.filter((b) => b.commission).reduce((a, b) => a + b.n, 0), any: total > 0 };
+    versions[v] = { steps, book, share, chat, book_taps: book.reduce((a, b) => a + b.n, 0), commission_taps: book.filter((b) => b.commission).reduce((a, b) => a + b.n, 0), any: total > 0 };
   }
   const sumDay = (suffixes, day) => VERSIONS.reduce((a, v) => a + suffixes.reduce((b, s) => b + ((perDay[`bmt:${v}:${s}`] && perDay[`bmt:${v}:${s}`].get(day)) || 0), 0), 0);
   const bookSuffixes = BOOK_TYPES.map(([b]) => `book:${b}`);
@@ -108,7 +114,7 @@ function report(db, days = 30, now = new Date()) {
     const d = new Date(`${day}T12:00:00Z`); const wd = d.getUTCDay();
     const start = new Date(d.getTime() - ((wd + 6) % 7) * 86400000).toISOString().slice(0, 10);
     let w = weeks[weeks.length - 1];
-    if (!w || w.start !== start) { w = { start, plan: 0, swap: 0, remove: 0, confirm: 0, book_open: 0, book_click: 0, book_taps: 0, commission_taps: 0, share: 0, save: 0 }; weeks.push(w); }
+    if (!w || w.start !== start) { w = { start, plan: 0, swap: 0, remove: 0, confirm: 0, book_open: 0, book_click: 0, book_taps: 0, commission_taps: 0, share: 0, save: 0, chat: 0 }; weeks.push(w); }
     for (const [s] of STEPS) w[s] += sumDay([s], day);
     w.book_taps += sumDay(bookSuffixes, day);
     w.commission_taps += sumDay(BOOK_TYPES.filter(([, , c]) => c).map(([b]) => `book:${b}`), day);
@@ -180,4 +186,4 @@ function withTripFunnelScript(html) {
   return at < 0 ? html : `${html.slice(0, at)}${clientScript()}\n${html.slice(at)}`;
 }
 
-module.exports = { VERSIONS, STEPS, BOOK_TYPES, SHARE_METHODS, NAMES, NOT_ON, bookTypeFor, resolveName, report, clientScript, withTripFunnelScript };
+module.exports = { VERSIONS, STEPS, BOOK_TYPES, SHARE_METHODS, CHAT_KINDS, NAMES, NOT_ON, bookTypeFor, resolveName, report, clientScript, withTripFunnelScript };

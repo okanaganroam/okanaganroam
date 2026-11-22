@@ -1,0 +1,633 @@
+{
+ "venue": {
+  "name": "The Harvest Golf Club (test)",
+  "region": "kelowna",
+  "type": "golf",
+  "cuisine": "Golf course & driving range",
+  "phone": "+1 250-862-3103",
+  "description": "The Harvest is where Okanagan golf meets Okanagan agriculture: 18 semi-private holes routed through 44 acres of working apple orchard and surrounded by vineyards, with a dining room that looks out over the course, Okanagan Lake, and the city below. Par 72, and scenic in a way photos undersell. The practice facility is the standout, the largest in the Okanagan at roughly 16,000 square feet, with grass and synthetic tees, target greens, a big putting green, and two separate chipping greens with sand bunkers, open to non-members and available on a Practice On-Demand key so you're not tied to shop hours. The Harvest Golf Academy's PGA of Canada professionals run lessons for every level. Afterward, Masa's Grill on the patio is one of Kelowna's better clubhouse dining rooms, not just a place to grab a burger. Open since 1994. Nine & Dine evenings pair 9 holes and a cart with dinner at Masa's Grill.",
+  "patio": 1,
+  "kid_friendly": 1,
+  "address": "2725 K.L.O. Rd, Kelowna, BC V1W 4S1",
+  "website": "https://harvestgolf.com/",
+  "image_url": null,
+  "slug": "harvest-golf-club-test10",
+  "latitude": 49.85598,
+  "longitude": -119.42467,
+  "great_groups": 1,
+  "hours": "{\"mon\":[[\"07:30\",\"18:00\"]],\"tue\":[[\"07:30\",\"18:00\"]],\"wed\":[[\"07:30\",\"18:00\"]],\"thu\":[[\"07:30\",\"18:00\"]],\"fri\":[[\"07:30\",\"18:00\"]],\"sat\":[[\"07:30\",\"18:00\"]],\"sun\":[[\"07:30\",\"18:00\"]]}",
+  "description_fr": "The Harvest, c'est là où le golf de l'Okanagan rencontre l'agriculture de l'Okanagan : 18 trous semi-privés tracés à travers 44 acres de vergers de pommiers en exploitation et entourés de vignobles, avec une salle à manger qui donne sur le parcours, le lac Okanagan et la ville en contrebas. Normale 72, et une beauté que les photos ne rendent pas justice. Les installations de pratique sont le point fort : les plus grandes de l'Okanagan, avec environ 16 000 pieds carrés, des tertres en gazon naturel et synthétique, des verts cibles, un grand vert de roulé et deux verts d'approche distincts avec fosses de sable; elles sont ouvertes aux non-membres et accessibles avec une clé Practice On-Demand, pour ne pas dépendre des heures de la boutique. Les professionnels de PGA of Canada de la Harvest Golf Academy donnent des cours pour tous les niveaux. Après la partie, Masa's Grill, sur la terrasse, est l'une des meilleures salles à manger de club de golf de Kelowna, et pas seulement un endroit où avaler un burger."
+ },
+ "links": {
+  "menu_url": "https://harvestgolf.com/golf/rates-specials/",
+  "booking_url": "https://harvest.chelseareservations.com/",
+  "instagram_url": "https://www.instagram.com/harvestgolfclub/",
+  "facebook_url": "https://www.facebook.com/harvestgolfclub",
+  "open_months": "03-19:10-31"
+ },
+ "hours_extra": {
+  "seasons": "[{\"from\":\"04-30\",\"to\":\"10-03\",\"label\":\"\",\"hours\":{\"mon\":[[\"06:00\",\"20:00\"]],\"tue\":[[\"06:00\",\"20:00\"]],\"wed\":[[\"06:00\",\"20:00\"]],\"thu\":[[\"06:00\",\"20:00\"]],\"fri\":[[\"06:00\",\"20:00\"]],\"sat\":[[\"06:00\",\"20:00\"]],\"sun\":[[\"06:00\",\"20:00\"]]}}]",
+  "closures": "[{\"from\":\"2027-06-14\",\"to\":\"2027-06-14\",\"note\":\"Ladies Charity Tournament: closed to the public\"}]"
+ },
+ "visit_info": {
+  "rows": [
+   {
+    "label": "Known for",
+    "text": "7,109-yard, 18-hole Graham Cooke parkland course through working orchards, with 800+ fruit trees."
+   },
+   {
+    "label": "Booking",
+    "text": "Please book a tee time ahead. Tee times are booked through the online system (public and member options). Residents book 7 days or less ahead for $160 with proof of residence."
+   },
+   {
+    "label": "Prices",
+    "text": "Green fees from $175."
+   },
+   {
+    "label": "Ages",
+    "text": "All ages."
+   },
+   {
+    "label": "Good to know",
+    "text": "Restaurant and patio on site. Driving range on site. Men's Night Tuesdays 1 to 4:30 PM: no public tee times. Winter: golf shop open weekdays 9 to 5 for gift cards. Dress code: collared or golf shirts, no tank tops or gym shorts."
+   },
+   {
+    "label": "Groups",
+    "text": "Groups of 8 or more: please book ahead. Tournaments and corporate golf. Group lessons and clinics. Weddings and private events. Junior Academy for kids and teens."
+   },
+   {
+    "label": "Food",
+    "text": "Masa's Grill is closed for the season and reopens mid March 2027. Nine & Dine (9 holes, cart, dinner) is $115 after 4:30 pm in season."
+   }
+  ],
+  "booking_url": "https://harvest.chelseareservations.com/",
+  "source_url": "https://harvestgolf.com/",
+  "checked_at": "2026-11-21",
+  "owner_labels": [
+   "Ages",
+   "Booking",
+   "Good to know",
+   "Groups",
+   "Known for",
+   "Prices",
+   "Season",
+   "Time needed"
+  ],
+  "owner_dropped": [
+   {
+    "label": "Green fees",
+    "text": "2027 high season (Apr 30 to Oct 3), 18 holes with cart and range balls: prime $215, twilight from 4 pm $135, after 6 pm $115. Shoulder season is lower."
+   },
+   {
+    "label": "Rentals",
+    "text": "TaylorMade club rental $75 for 18 holes. Power cart $60 for 18 holes if not included in the rate."
+   },
+   {
+    "label": "Season",
+    "text": "Mar 19 – Oct 31.",
+    "owned": true
+   },
+   {
+    "label": "Time needed",
+    "text": "Half a day or more.",
+    "owned": true
+   },
+   {
+    "label": "Practice",
+    "text": "Large synthetic-turf practice facility with a 1,700 sq ft putting green and two chipping greens with bunkers; PGA lessons and academy."
+   },
+   {
+    "label": "Dress code",
+    "text": "Collared shirts encouraged, golf-specific collarless shirts allowed. Jeans allowed unless ripped. No tank tops, gym shorts or sweatpants."
+   }
+  ],
+  "owner_was": {
+   "Season": {
+    "text": ""
+   },
+   "Time needed": {
+    "text": ""
+   },
+   "Prices": {
+    "text": ""
+   },
+   "Booking": {
+    "text": "Tee times are booked through the online system (public and member options). Residents book 7 days or less ahead for $160 with proof of residence."
+   },
+   "Ages": {
+    "text": ""
+   }
+  },
+  "owner_fr": {
+   "Season": {
+    "en": "Mar 19 – Oct 31.",
+    "fr": "Du 19 mars au 31 oct."
+   },
+   "Time needed": {
+    "en": "Half a day or more.",
+    "fr": "Une demi-journée ou plus."
+   },
+   "Prices": {
+    "en": "Green fees from $175.",
+    "fr": "Droits de jeu à partir de 175 $."
+   },
+   "Booking": {
+    "en": "Please book a tee time ahead. Tee times are booked through the online system (public and member options). Residents book 7 days or less ahead for $160 with proof of residence.",
+    "fr": "Réservez votre départ à l’avance."
+   },
+   "Ages": {
+    "en": "All ages.",
+    "fr": "Tous les âges."
+   }
+  },
+  "winery_labels": [
+   "Ages",
+   "Booking",
+   "Prices",
+   "Season",
+   "Time needed"
+  ]
+ },
+ "sport_info": {
+  "kinds": [
+   "golf",
+   "range"
+  ],
+  "length": "half",
+  "book": "ahead",
+  "age": "all",
+  "year": "seasonal",
+  "price": 175,
+  "cuisine_was": ""
+ },
+ "owner_features": {
+  "free_parking": true,
+  "service_dogs": true
+ },
+ "not_offered": [
+  "dogs",
+  "happy_hour"
+ ],
+ "menu": null,
+ "price_override": [
+  {
+   "from_price": 175,
+   "basis": "Green fees",
+   "hidden": 0,
+   "decided_at": "2026-11-21T10:55:48.663Z",
+   "reviewer": "owner"
+  }
+ ],
+ "neighbours": [
+  {
+   "name": "Anytime Sim Golf",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Anytime Sim Golf is Kelowna's fully automated indoor golf simulator, built for golfers who'd rather skip the small talk and just play. Book a private bay online on Vaughan Avenue, and a secure CloudKey unlocks the door the moment you arrive: no front desk, no waiting. It runs day or night, 365 days a year, so a dawn session before work or a midnight round after a late shift both work fine. Bays use Foresight Sports launch monitors for real ball-flight data, and the contactless setup suits solo practice, quick lunch-break rounds, and small groups after a low-key, weather-proof way to play.",
+   "hours": "{\"mon\":[[\"00:00\",\"23:59\"]],\"tue\":[[\"00:00\",\"23:59\"]],\"wed\":[[\"00:00\",\"23:59\"]],\"thu\":[[\"00:00\",\"23:59\"]],\"fri\":[[\"00:00\",\"23:59\"]],\"sat\":[[\"00:00\",\"23:59\"]],\"sun\":[[\"00:00\",\"23:59\"]]}",
+   "latitude": 49.89413,
+   "longitude": -119.48383,
+   "slug": "anytime-sim-golf",
+   "website": "https://anytimesim.golf/",
+   "address": "103-889 Vaughan Avenue, Kelowna, BC",
+   "patio": false,
+   "kid_friendly": false,
+   "great_groups": false,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Black Mountain Golf Club",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Black Mountain has earned its reputation as one of the Okanagan's most scenic public tracks: a par-71 layout that plays 6,400 yards across dramatic cliffside terrain, capped by a famous island-green par 3 that tests nerve as much as swing. Four sets of tees keep it approachable for high-handicappers while still rewarding accurate ball-striking from the tips, a big reason it has been named a PGA of BC Golf Facility of the Year and one of ScoreGolf's top-value public courses in Canada. PGA of Canada professionals are on hand for lessons if your swing needs a tune-up, and The Grill's patio, one of the nicest in the area, delivers valley views to match the round.",
+   "latitude": 49.876317,
+   "longitude": -119.348552,
+   "slug": "black-mountain-golf-club",
+   "website": "https://blackmountaingolf.ca/",
+   "address": "575 Black Mountain Dr, Kelowna, BC V1X 7K5",
+   "patio": true,
+   "kid_friendly": false,
+   "great_groups": true,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Gallagher's Canyon Golf & Country Club — Canyon Course",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "The Canyon Course is Gallagher's Canyon's championship stage: 18 holes, par 72, threading through ponderosa pine forest along the rim of a real canyon, with rock bluffs and forested drops framing shots on both nines. It's a physically dramatic round that rewards course management over brute length, minutes from downtown Kelowna and Okanagan Lake. Between rounds, the practice facility is one of the best in the valley: the Okanagan's only 300-plus-yard, double-ended grass driving range, two putting greens, two chipping greens with bunkers, and GBC Golf Academy instructors on hand for lessons. Semi-private membership keeps tee sheets civilized, and the Canyon Bar & Grill is the spot to unwind afterward. The 9-hole Pinnacle Course shares the same grounds and practice facilities.",
+   "hours": "{\"mon\":[[\"08:00\",\"19:00\"]],\"tue\":[[\"08:00\",\"19:00\"]],\"wed\":[[\"08:00\",\"19:00\"]],\"thu\":[[\"08:00\",\"19:00\"]],\"fri\":[[\"08:00\",\"19:00\"]],\"sat\":[[\"08:00\",\"19:00\"]],\"sun\":[[\"08:00\",\"19:00\"]]}",
+   "latitude": 49.840183,
+   "longitude": -119.381963,
+   "slug": "gallaghers-canyon-canyon-course",
+   "website": "https://gallagherscanyon.com/",
+   "address": "4320 Gallagher's Drive West, Kelowna, BC V1W 3Z9",
+   "patio": true,
+   "kid_friendly": false,
+   "great_groups": true,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Gallagher's Canyon Golf & Country Club — Pinnacle Course",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Pinnacle is Gallagher's Canyon's shorter, more relaxed sibling: a 9-hole, par-32 course sharing the same canyon-rim property as the championship Canyon Course, but built for a quicker, lower-pressure round. It's a good fit for beginners building confidence, families short on time, or low-handicappers wanting a fast tune-up before or after a full 18 elsewhere. Because it's part of the same semi-private facility, Pinnacle golfers get full run of the practice setup: the Okanagan's only 300-plus-yard double-ended grass driving range, two putting greens, two bunkered chipping greens, and GBC Golf Academy lessons. Finish with a meal at the Canyon Bar & Grill. If you want the full 18-hole championship test, the Canyon Course is right next door.",
+   "hours": "{\"mon\":[[\"08:00\",\"19:00\"]],\"tue\":[[\"08:00\",\"19:00\"]],\"wed\":[[\"08:00\",\"19:00\"]],\"thu\":[[\"08:00\",\"19:00\"]],\"fri\":[[\"08:00\",\"19:00\"]],\"sat\":[[\"08:00\",\"19:00\"]],\"sun\":[[\"08:00\",\"19:00\"]]}",
+   "latitude": 49.840183,
+   "longitude": -119.381963,
+   "slug": "gallaghers-canyon-pinnacle-course",
+   "website": "https://gallagherscanyon.com/",
+   "address": "4320 Gallagher's Drive West, Kelowna, BC V1W 3Z9",
+   "patio": true,
+   "kid_friendly": true,
+   "great_groups": true,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Golf Evolution",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Golf Evolution is where Kelowna golfers go to fix their swing, not just hit balls into a screen. Three GC Hawk simulator bays deliver tour-level club and ball data across 2,000-plus courses, and a UK PGA Professional runs lessons, club fitting and maintenance in the same Enterprise Way space. Credit-based Evo Packs (from $550 plus tax) last a year and can be shared with friends and family. Park around the building, take the elevator to level 2, and linger in the lounge over food and drinks.",
+   "hours": "{\"mon\":[[\"09:00\",\"23:00\"]],\"tue\":[[\"09:00\",\"23:00\"]],\"wed\":[[\"09:00\",\"23:00\"]],\"thu\":[[\"09:00\",\"23:00\"]],\"fri\":[[\"09:00\",\"23:00\"]],\"sat\":[[\"09:00\",\"23:00\"]],\"sun\":[[\"09:00\",\"23:00\"]]}",
+   "latitude": 49.88844,
+   "longitude": -119.43042,
+   "slug": "golf-evolution",
+   "website": "https://golfevolutionkelowna.ca/",
+   "address": "220-2544 Enterprise Way, Kelowna, BC",
+   "patio": false,
+   "kid_friendly": false,
+   "great_groups": false,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "JSquared Golf",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "JSquared Golf sits on the Gallagher's Canyon property but runs as its own indoor golf operation, built around instruction as much as simulator play. Its GCQUAD launch monitor uses four high-speed cameras to capture precise club and ball data, and PGA of Canada professionals John Mlikotic and Paul Wammer teach golfers of every level, from full swing fittings to ball-flight fixes. Open daily from 8 a.m. to 10 p.m., it's a serious practice option for Kelowna golfers who want real data behind every shot rather than a rough approximation. Being steps from the Gallagher's Canyon clubhouse means a session on the simulator can end with a meal or a drink at the Canyon Bar & Grill.",
+   "hours": "{\"mon\":[[\"08:00\",\"22:00\"]],\"tue\":[[\"08:00\",\"22:00\"]],\"wed\":[[\"08:00\",\"22:00\"]],\"thu\":[[\"08:00\",\"22:00\"]],\"fri\":[[\"08:00\",\"22:00\"]],\"sat\":[[\"08:00\",\"22:00\"]],\"sun\":[[\"08:00\",\"22:00\"]]}",
+   "latitude": 49.84018,
+   "longitude": -119.38196,
+   "slug": "jsquared-golf",
+   "website": "https://jsquaredgolf.com/",
+   "address": "4320 Gallagher's Drive West, Kelowna, BC",
+   "patio": false,
+   "kid_friendly": false,
+   "great_groups": false,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Kelowna Driving Range & Mini Golf",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Kelowna's most complete practice facility and a fun night out: a 300-plus-yard grass range with 16 covered Toptracer stalls that track every shot. There's also a 4,700 sq ft bent-grass putting green, a short-game chipping area and an 18-hole championship mini-golf course for the whole family. Open daily to the public.",
+   "hours": "{\"mon\":[[\"10:00\",\"18:00\"]],\"tue\":[[\"10:00\",\"18:00\"]],\"wed\":[[\"10:00\",\"18:00\"]],\"thu\":[[\"10:00\",\"18:00\"]],\"fri\":[[\"10:00\",\"18:00\"]],\"sat\":[[\"10:00\",\"18:00\"]],\"sun\":[[\"10:00\",\"16:00\"]]}",
+   "latitude": 49.84812,
+   "longitude": -119.46953,
+   "slug": "kelowna-driving-range-mini-golf",
+   "website": "https://www.kelownadrivingrange.com/",
+   "address": "3810 Casorso Rd, Kelowna, BC",
+   "patio": false,
+   "kid_friendly": true,
+   "great_groups": false,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Kelowna Golf & Country Club",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Kelowna Golf & Country Club is the Okanagan's only private golf and country club, and it plays like it: a classic 18-hole, par-72 parkland layout on Glenmore Drive, established in 1920 and shaped by architect A.V. Macan, refined over the decades while keeping its old-Kelowna character. Membership is limited and openings are rare, so this is a course built for people who golf often and want to know their course intimately, not book a tee time once a season. The practice facilities are a strength in their own right, with a practice range with TopTracer technology and a dedicated short-game area, and members also have a restaurant and PGA professionals for lessons.",
+   "latitude": 49.89287,
+   "longitude": -119.44987,
+   "slug": "kelowna-golf-country-club",
+   "website": "https://kelownagolfandcountryclub.com/",
+   "address": "1297 Glenmore Drive, Kelowna, BC V1Y 4P4",
+   "patio": false,
+   "kid_friendly": false,
+   "great_groups": true,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Kelowna Springs Golf Club",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Kelowna Springs is a course in transition, and worth playing for exactly that reason. The Les Furber layout that opened in 1990 was trimmed to its front nine for the 2025 season while the rest of the property was redeveloped, and the City of Kelowna has since reached a land-exchange agreement to bring the remaining holes into public hands, so this nine is here to stay. What's left is the best of it: spring-fed lakes that come into play again and again in north Kelowna near the airport, playable as a quick nine or as a full 18 by looping it twice. The clubhouse and warm-up areas stayed put through the change, and the same holes play differently the second time around.",
+   "hours": "{\"mon\":[[\"07:30\",\"18:00\"]],\"tue\":[[\"07:30\",\"18:00\"]],\"wed\":[[\"07:30\",\"18:00\"]],\"thu\":[[\"07:30\",\"18:00\"]],\"fri\":[[\"07:30\",\"18:00\"]],\"sat\":[[\"07:30\",\"18:00\"]],\"sun\":[[\"07:30\",\"18:00\"]]}",
+   "latitude": 49.92595,
+   "longitude": -119.37472,
+   "slug": "kelowna-springs-golf-club",
+   "website": "https://kelownasprings.com/",
+   "address": "480 Penno Rd, Kelowna, BC V1X 6S3",
+   "patio": true,
+   "kid_friendly": false,
+   "great_groups": true,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Michaelbrook Golf Course",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Michaelbrook is Kelowna's fast, easy round: a flat, walkable course that moves along at about three hours and ten minutes for 18 holes, so you can play without burning half a day. It's an approachable, forgiving layout that suits beginners, families, and anyone squeezing in a quick nine or eighteen after work, and since the City of Kelowna bought the property in 2025, with Monaghan Golf running it day to day, it remains an affordable tee time. The Brookside Grill's dog-friendly patio, just off the Rail Trail, is a good reason to stick around after your round; golfers and non-golfers alike drop by.",
+   "hours": "{\"mon\":[[\"06:45\",\"18:00\"]],\"tue\":[[\"06:45\",\"18:00\"]],\"wed\":[[\"06:45\",\"18:00\"]],\"thu\":[[\"06:45\",\"18:00\"]],\"fri\":[[\"06:45\",\"18:00\"]],\"sat\":[[\"06:45\",\"18:00\"]],\"sun\":[[\"06:45\",\"18:00\"]]}",
+   "latitude": 49.839809,
+   "longitude": -119.47612,
+   "slug": "michaelbrook-golf-course",
+   "website": "https://michaelbrook.ca/",
+   "address": "1085 Lexington Drive, Kelowna, BC V1W 5J2",
+   "patio": true,
+   "kid_friendly": true,
+   "great_groups": false,
+   "lake_view": false,
+   "dog_friendly": true
+  },
+  {
+   "name": "Mission Creek Golf Club",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Mission Creek is a shorter, gentler round: 18 holes at a par of 61 across under 3,900 yards, winding through mature willows and cottonwoods and along ponds bordering the Mission Creek Greenway. It's been built and maintained by the same family for three generations, and it shows in how it's set up: forgiving for beginners and juniors but still useful for better players sharpening their irons and short game, with rounds typically wrapped inside three hours. There's a large putting green for warming up before you head out, and a golf instructor available if you want pointers. Grab something at the on-site restaurant afterward. It's less about length and more about a relaxed, scenic walk that doesn't eat your whole day.",
+   "hours": "{\"mon\":[[\"07:30\",\"18:00\"]],\"tue\":[[\"07:30\",\"18:00\"]],\"wed\":[[\"07:30\",\"18:00\"]],\"thu\":[[\"07:30\",\"18:00\"]],\"fri\":[[\"07:30\",\"18:00\"]],\"sat\":[[\"07:30\",\"18:00\"]],\"sun\":[[\"07:30\",\"18:00\"]]}",
+   "latitude": 49.856601,
+   "longitude": -119.453368,
+   "slug": "mission-creek-golf-club",
+   "website": "https://missioncreekgolfclub.com/",
+   "address": "1959 KLO Road, Kelowna, BC V1W 2H8",
+   "patio": false,
+   "kid_friendly": true,
+   "great_groups": false,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Okanagan Virtual Golf",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Okanagan Virtual Golf's Kelowna lounge, tucked into the Brewery District, treats indoor golf as a night out as much as a round of golf; its own tagline is \"practice, party, play.\" Four bays run Uneekor EYE XO2 launch monitors on GSPro software, opening up roughly 2,000 virtual courses, from Okanagan favourites like Predator Ridge and Tower Ranch to Augusta and Pebble Beach. A fully licensed bar pours local craft beer, cocktails, and mocktails alongside big-screen seating, and the space keeps its social energy going with organized leagues. Come summer, it flips into an outdoor mini-putt pop-up, making it a year-round hangout as much as a simulator venue.",
+   "hours": "{\"mon\":[[\"10:00\",\"23:00\"]],\"tue\":[[\"10:00\",\"23:00\"]],\"wed\":[[\"10:00\",\"23:00\"]],\"thu\":[[\"10:00\",\"23:00\"]],\"fri\":[[\"10:00\",\"00:00\"]],\"sat\":[[\"10:00\",\"00:00\"]],\"sun\":[[\"10:00\",\"23:00\"]]}",
+   "latitude": 49.89483,
+   "longitude": -119.48671,
+   "slug": "okanagan-virtual-golf",
+   "website": "https://ovgkelowna.com/",
+   "address": "106-730 Vaughan Avenue, Kelowna, BC",
+   "patio": false,
+   "kid_friendly": false,
+   "great_groups": false,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Orchard Greens Golf Club",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Orchard Greens is one of the valley's more unusual short courses, laid out through a working Okanagan orchard so fairways and greens are carved between fruit trees rather than landscaping. It's a 9-hole, mid-length, par-32 track mixing par 3s, 4s and 5s, and the orchard changes with the season, so the course looks and plays differently depending on when you show up. Its signature move is stadium-lit night golf on Wednesday, Friday and Saturday evenings, no special gear required, just a different way to play once the sun goes down. It's a fun, low-pressure round for any level, well suited to couples or groups looking for something more memorable than a standard nine, with rentals available and Miss Pat's Kitchen on site for classic, stick-to-your-ribs food and a beer afterward.",
+   "hours": "{\"mon\":[[\"09:00\",\"18:00\"]],\"tue\":[[\"09:00\",\"18:00\"]],\"wed\":[[\"09:00\",\"18:00\"]],\"thu\":[[\"09:00\",\"18:00\"]],\"fri\":[[\"09:00\",\"21:00\"]],\"sat\":[[\"09:00\",\"21:00\"]],\"sun\":[[\"09:00\",\"18:00\"]]}",
+   "latitude": 49.858675,
+   "longitude": -119.424747,
+   "slug": "orchard-greens-golf-club",
+   "website": "https://www.orchardgreens.com/",
+   "address": "2777 K.L.O. Road, Kelowna, BC",
+   "patio": false,
+   "kid_friendly": false,
+   "great_groups": true,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Shadow Ridge Golf Club",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Shadow Ridge is Kelowna golf without the fuss: a flat, walkable, par-71 course near the airport built for a relaxed, no-pretense round rather than a test of championship nerves. It plays fast and the rates are easy on the wallet, which makes it a solid pick for casual golfers, first-timers, or anyone squeezing in a round on a budget. There's a putting practice area to loosen up before you tee off, a well-stocked golf shop with club and cart rentals, and a full-service restaurant that welcomes non-golfers and draws a local crowd on its own. If you want a laid-back track that doesn't take itself too seriously, this is it.",
+   "hours": "{\"mon\":[[\"07:30\",\"17:30\"]],\"tue\":[[\"07:30\",\"17:30\"]],\"wed\":[[\"07:30\",\"17:30\"]],\"thu\":[[\"07:30\",\"17:30\"]],\"fri\":[[\"07:30\",\"17:30\"]],\"sat\":[[\"07:30\",\"17:30\"]],\"sun\":[[\"07:30\",\"17:30\"]]}",
+   "latitude": 49.9431,
+   "longitude": -119.38467,
+   "slug": "shadow-ridge-golf-club",
+   "website": "https://shadowridgekelowna.com/",
+   "address": "3770 Bulman Rd, Kelowna, BC V1X 7V1",
+   "patio": true,
+   "kid_friendly": false,
+   "great_groups": false,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Simplex Sportszone",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Simplex Sportszone is an indoor sports arcade that takes golf seriously: Trackman 4 and Full Swing studios offer 400-plus courses, with in-house PGA coaches on hand. The 6,000-square-foot licensed building adds hockey, baseball, soccer and other simulators plus six full-motion racing cockpits (ages 14 and up). Studios hold up to four players, from about $36.75 an hour Monday to Thursday; bring clubs or rent for $10, and plan an hour per golfer for 18 holes. Booking ahead is wise, and groups up to 40 can party here.",
+   "hours": "{\"mon\":[[\"10:00\",\"20:00\"]],\"tue\":[[\"10:00\",\"20:00\"]],\"wed\":[[\"10:00\",\"20:00\"]],\"thu\":[[\"10:00\",\"20:00\"]],\"fri\":[[\"10:00\",\"20:00\"]],\"sat\":[[\"10:00\",\"20:00\"]],\"sun\":[[\"12:00\",\"18:00\"]]}",
+   "latitude": 49.89048,
+   "longitude": -119.425769,
+   "slug": "simplex-sportszone",
+   "website": "https://simplexsports.com/",
+   "address": "200-2600 Enterprise Way, Kelowna, BC",
+   "patio": false,
+   "kid_friendly": true,
+   "great_groups": true,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Sunset Ranch Golf & Country Club",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Scotty Creek winds through 10 of the 18 holes at Sunset Ranch, a semi-private, par-72 course on rolling Kelowna terrain minutes from the airport. Mature trees frame tight, strategic fairways across about 6,500 yards, and Golf Digest listed it among its Best Places to Play in 2009. There's no driving range, only hitting nets, so warm up on the putting and chipping greens; the Golf Academy offers lessons. The clubhouse has a 120-seat dining room, a 40-seat lounge and two patios.",
+   "hours": "{\"mon\":[[\"07:00\",\"22:00\"]],\"tue\":[[\"07:00\",\"22:00\"]],\"wed\":[[\"07:00\",\"22:00\"]],\"thu\":[[\"07:00\",\"22:00\"]],\"fri\":[[\"07:00\",\"22:00\"]],\"sat\":[[\"07:00\",\"22:00\"]],\"sun\":[[\"07:00\",\"22:00\"]]}",
+   "latitude": 49.941012,
+   "longitude": -119.351327,
+   "slug": "sunset-ranch-golf-country-club",
+   "website": "https://sunsetranchbc.com/",
+   "address": "5101 Upper Booth Rd S, Kelowna, BC V1X 7V8",
+   "patio": true,
+   "kid_friendly": false,
+   "great_groups": true,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "The Fringe Indoor Golf",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "The Fringe Indoor Golf is Kelowna's 24/7, staffless simulator space in the AQUA building right off Lakeshore. Book online, and secure mobile access with emailed entry details replaces a front desk. Four Trackman iO bays (three open, one private room) track every shot across more than 300 virtual courses, with Trackman tournaments for anyone chasing bragging rights. A quiet, naturally lit lounge feels more private club than warehouse, and hourly rates of about $40 to $80, with member discounts, suit beginners and low-handicappers alike.",
+   "hours": "{\"mon\":[[\"00:00\",\"00:00\"]],\"tue\":[[\"00:00\",\"00:00\"]],\"wed\":[[\"00:00\",\"00:00\"]],\"thu\":[[\"00:00\",\"00:00\"]],\"fri\":[[\"00:00\",\"00:00\"]],\"sat\":[[\"00:00\",\"00:00\"]],\"sun\":[[\"00:00\",\"00:00\"]]}",
+   "latitude": 49.84443,
+   "longitude": -119.48877,
+   "slug": "fringe-indoor-golf",
+   "website": "https://golfthefringe.com/",
+   "address": "436 Cook Road, Kelowna, BC",
+   "patio": false,
+   "kid_friendly": true,
+   "great_groups": true,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "The Okanagan Golf Club — Bear Course",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "The Bear is Jack Nicklaus's take on Okanagan golf: a par-72 course stretching to 6,852 yards through ponderosa pine forest, with wider, more receptive fairways than its sister course next door. It's the longer of The Okanagan Golf Club's two 18s but the more forgiving one, favouring golfers who want to make a decisive strike from the tee without punishing every miss. As part of this 36-hole, semi-private GolfBC facility, Bear golfers get a strong practice setup: a double-ended grass driving range plus dedicated chipping and putting areas, with GBC Golf Academy instructors available. The Spanish Southwest-style clubhouse houses the golf shop and Table Nineteen restaurant, a solid stop for a post-round meal on the patio. The Quail Course, sharing the property, is the tighter, more demanding option.",
+   "latitude": 49.955773,
+   "longitude": -119.395337,
+   "slug": "okanagan-golf-club-bear-course",
+   "website": "https://okanagangolfclub.com/",
+   "address": "3200 Via Centrale, Kelowna, BC V1V 2A4",
+   "patio": true,
+   "kid_friendly": false,
+   "great_groups": true,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "The Okanagan Golf Club — Quail Course",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "The Quail is the more demanding of The Okanagan Golf Club's two courses: a Les Furber design from 1994 that's shorter than its sister Bear Course at 6,576 yards and par 71, but tighter and more strategic, winding through ponderosa pines across the more mountainous, elevation-changed part of the property. You won't always reach for the driver here; positioning matters more than power. It's part of the same 36-hole, semi-private GolfBC facility as the Bear, so Quail golfers share the double-ended grass driving range and dedicated chipping and putting greens, plus GBC Golf Academy lessons if you want them. The Spanish Southwest-style clubhouse's Table Nineteen restaurant and patio are a good finish to the round. If you want a longer, more open test, the Bear is right there.",
+   "latitude": 49.955773,
+   "longitude": -119.395337,
+   "slug": "okanagan-golf-club-quail-course",
+   "website": "https://okanagangolfclub.com/",
+   "address": "3200 Via Centrale, Kelowna, BC V1V 2A4",
+   "patio": true,
+   "kid_friendly": false,
+   "great_groups": true,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Tower Ranch Golf & Country Club",
+   "region": "kelowna",
+   "type": "golf",
+   "description": "Tower Ranch is Kelowna's high-view public course: a Thomas McBroom design perched above the valley with sweeping views toward Okanagan Lake from nearly every hole, and a routing built around risk-reward decisions rather than length alone. It has been voted Best Course in Kelowna and ranked among Canada's top public courses by SCORE Golf, and Travel + Leisure named it one of the best new courses in the world when it opened. Worth knowing: there's no driving range on the property. Golfers loosen up on hitting nets, and Tower Ranch partners with World Beat Family Golf, just down the hill on Old Vernon Road, for full range sessions. The 10,000-square-foot clubhouse is a destination on its own, with Carrington's Restaurant & Patio sharing the same valley views, plus a fitness facility and event spaces.",
+   "latitude": 49.91349,
+   "longitude": -119.3375,
+   "slug": "tower-ranch-golf-country-club",
+   "website": "https://golftowerranch.com/",
+   "address": "1855 Tower Ranch Blvd, Kelowna, BC V1P 1T9",
+   "patio": true,
+   "kid_friendly": false,
+   "great_groups": true,
+   "lake_view": true,
+   "dog_friendly": false
+  },
+  {
+   "name": "Ailm Estate",
+   "region": "kelowna",
+   "type": "winery",
+   "description": "The newest chapter from one of the Okanagan's founding wine families, Ailm Estate pours its sparkling Reserve Brut and estate wines on a covered patio above the orchards of southeast Kelowna. It still feels like a discovery: small, unhurried and personal, the kind of tasting you'll be telling friends about before everyone else finds it. Open Thursday to Sunday.",
+   "hours": "{\"mon\":[],\"tue\":[],\"wed\":[],\"thu\":[[\"12:00\",\"17:00\"]],\"fri\":[[\"12:00\",\"17:00\"]],\"sat\":[[\"12:00\",\"17:00\"]],\"sun\":[[\"12:00\",\"17:00\"]]}",
+   "latitude": 49.82452,
+   "longitude": -119.46608,
+   "slug": "ailm-estate",
+   "website": "https://ailmestate.com/",
+   "address": "950 Crawford Rd, Kelowna, BC",
+   "patio": true,
+   "kid_friendly": false,
+   "great_groups": false,
+   "lake_view": true,
+   "dog_friendly": false
+  },
+  {
+   "name": "Ancient Hill Winery",
+   "region": "kelowna",
+   "type": "winery",
+   "description": "Ancient Hill Winery brings a European sensibility that's rare among Kelowna wineries: boutique in scale and unhurried in pace, with no pressure to rush through a tasting. The outdoor seating is built for picnics, so bring your own spread, find a shaded table and let the visit turn into the whole afternoon.",
+   "hours": "{\"mon\":[[\"10:30\",\"17:30\"]],\"tue\":[[\"10:30\",\"17:30\"]],\"wed\":[[\"10:30\",\"17:30\"]],\"thu\":[[\"10:30\",\"17:30\"]],\"fri\":[[\"10:30\",\"17:30\"]],\"sat\":[[\"10:30\",\"17:30\"]],\"sun\":[[\"10:30\",\"17:30\"]]}",
+   "latitude": 49.9551704,
+   "longitude": -119.352581,
+   "slug": "ancient-hill-winery",
+   "website": "https://ancienthillwinery.com/",
+   "address": "4918 Anderson Rd, Kelowna, BC V1X 7V7",
+   "rating": 4.8,
+   "patio": true,
+   "kid_friendly": true,
+   "great_groups": false,
+   "lake_view": false,
+   "dog_friendly": true
+  },
+  {
+   "name": "Azhadi Vineyards",
+   "region": "kelowna",
+   "type": "winery",
+   "description": "Azhadi Vineyards is a striking Persian-inspired winery in Kelowna whose architecture is based on Tehran's Azadi Tower, with handmade Persian rugs and art inside. Book the curated wine-and-food pairing, served with sweeping valley views.",
+   "hours": "{\"mon\":[],\"tue\":[],\"wed\":[[\"13:00\",\"19:00\"]],\"thu\":[[\"13:00\",\"19:00\"]],\"fri\":[[\"13:00\",\"19:00\"]],\"sat\":[[\"13:00\",\"19:00\"]],\"sun\":[[\"13:00\",\"19:00\"]]}",
+   "latitude": 49.9935051,
+   "longitude": -119.437547,
+   "slug": "azhadi-vineyards",
+   "website": "https://azhadivineyards.com/",
+   "address": "3778 Hilltown Dr, Kelowna, BC V1V 0H4",
+   "rating": 4.3,
+   "reviews": 253,
+   "patio": true,
+   "kid_friendly": true,
+   "great_groups": true,
+   "lake_view": true,
+   "dog_friendly": false
+  },
+  {
+   "name": "Antico Pizza Napoletana",
+   "region": "kelowna",
+   "type": "restaurant",
+   "cuisine": "Italian",
+   "description": "Antico Pizza Napoletana bakes its pies in a wood-fired oven built in Naples, where a ninety-second bake gives the crust its charred, soft and chewy edge. The dough rises for a day or more, the tomatoes are San Marzano, and the pizzeria is recognized by the Associazione Verace Pizza Napoletana. Ordering is at the counter on Bernard Avenue, with no reservations needed, and staff are patient with families and picky young eaters.",
+   "hours": "{\"mon\":[],\"tue\":[[\"11:30\",\"22:00\"]],\"wed\":[[\"11:30\",\"22:00\"]],\"thu\":[[\"11:30\",\"22:00\"]],\"fri\":[[\"11:30\",\"22:00\"]],\"sat\":[[\"11:30\",\"22:00\"]],\"sun\":[[\"11:30\",\"22:00\"]]}",
+   "latitude": 49.8861247,
+   "longitude": -119.4959283,
+   "slug": "antico-pizza-napoletana",
+   "website": "https://www.anticapizza.ca/",
+   "address": "347 Bernard Ave, Kelowna, BC V1Y 6N6",
+   "rating": 4.6,
+   "price": 2,
+   "patio": true,
+   "kid_friendly": true,
+   "great_groups": false,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Aomi Sushi Japanese Restaurant",
+   "region": "kelowna",
+   "type": "restaurant",
+   "cuisine": "Japanese",
+   "description": "Yakiudon and sashimi have long been the reasons to visit Aomi Sushi, a small, low-key Japanese restaurant on Lakeshore Road that longtime Lower Mission diners still count among their favourites. The menu sticks to dependable standards rather than flashy specials. First-timers do well to start with those two and branch out from there.",
+   "hours": "{\"mon\":[],\"tue\":[[\"11:30\",\"20:00\"]],\"wed\":[[\"11:30\",\"20:00\"]],\"thu\":[[\"11:30\",\"20:00\"]],\"fri\":[[\"11:30\",\"20:30\"]],\"sat\":[[\"11:30\",\"20:30\"]],\"sun\":[[\"14:00\",\"20:00\"]]}",
+   "latitude": 49.817355,
+   "longitude": -119.49523,
+   "slug": "aomi-sushi-japanese-restaurant",
+   "website": "https://aomisushi.ca/",
+   "address": "4600 Lakeshore Rd #12, Kelowna, BC V1W 1X4",
+   "rating": 4.2,
+   "reviews": 197,
+   "price": 2,
+   "patio": true,
+   "kid_friendly": false,
+   "great_groups": true,
+   "lake_view": false,
+   "dog_friendly": false
+  },
+  {
+   "name": "Apni Rasoi Taste of India",
+   "region": "kelowna",
+   "type": "restaurant",
+   "cuisine": "Indian",
+   "description": "The samosas at Apni Rasoi come out flaky and genuinely fresh, not the frozen, reheated version too common at quick Indian takeout spots. This Rutland kitchen has built its reputation on portions that feel generous relative to the price, the kind of value that makes you order more than you planned. It's takeout-focused and unpretentious, no dining room theatrics, just a kitchen that consistently gets the basics right. At 4.2 stars, it's a dependable go-to rather than a destination, which is exactly the role a great neighbourhood takeout spot should play. Grab a few samosas as a starter no matter what else you order. Simple, reliable, and worth the stop.",
+   "hours": "{\"mon\":null,\"tue\":[[\"11:00\",\"21:00\"]],\"wed\":[[\"11:00\",\"21:00\"]],\"thu\":[[\"11:00\",\"21:00\"]],\"fri\":[[\"11:00\",\"22:00\"]],\"sat\":[[\"11:00\",\"22:00\"]],\"sun\":[[\"11:00\",\"21:00\"]]}",
+   "latitude": 49.8829536,
+   "longitude": -119.3987572,
+   "slug": "apni-rasoi-taste-of-india",
+   "website": "https://apnirasoitasteofindia.com/",
+   "address": "538 Hollywood Rd S, Kelowna, BC V1X 3T3",
+   "rating": 4.2,
+   "price": 2,
+   "patio": false,
+   "kid_friendly": true,
+   "great_groups": true,
+   "lake_view": false,
+   "dog_friendly": false
+  }
+ ]
+}

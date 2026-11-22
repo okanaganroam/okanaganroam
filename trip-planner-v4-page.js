@@ -49,7 +49,7 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-main { display: block; min-width: 0; text-align: left; background: none; border: 0; padding: 4px 0; margin: 0; color: inherit; cursor: pointer; font: inherit; }
   .t3-v4 .v4-time { display: block; font-size: 0.76rem; font-weight: 800; letter-spacing: 0.02em; color: var(--ref-gold-ink, #8A6A0F); }
   .t3-v4 .v4-name { display: block; font-size: 1rem; font-weight: 800; line-height: 1.25; color: var(--ref-navy); overflow-wrap: anywhere; }
-  .t3-v4 .v4-line { display: block; margin-top: 2px; font-size: 0.82rem; line-height: 1.35; color: var(--ref-navy-muted, #56636E); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .t3-v4 .v4-line { display: block; margin-top: 2px; font-size: 0.82rem; line-height: 1.35; color: var(--ref-navy-muted, #56636E); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
   .t3-v4 .v4-acts { display: flex; gap: 2px; }
   .t3-v4 .v4-icon { width: 44px; height: 44px; border-radius: 999px; border: 0; background: transparent; color: var(--ref-navy); font-size: 1.15rem; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
   .t3-v4 .v4-icon:hover { background: rgba(27,43,58,0.07); }
@@ -224,7 +224,8 @@ const V4_CLIENT_SRC = String.raw`
       var r = rows[i];
       if (day != null && r.day !== day) continue;
       var hit = s.event ? r.eventId === s.event.id : (s.venue && r.venueId === s.venue.id);
-      if (hit && r.bookDeparture) return lang() === 'fr' ? 'Heure de départ à réserver' : 'Book a departure time';
+      // Round 3: a tour with no departure times of its own shows the planned time and says the departure is booked.
+      if (hit && r.bookDeparture) return (typeof r.startMinutes === 'number' ? clockLabel(r.startMinutes) + ' · ' : '') + (lang() === 'fr' ? 'départ à réserver' : 'book a departure time');
       if (hit && typeof r.startMinutes === 'number') return clockLabel(r.startMinutes);
     }
     return '';
@@ -301,7 +302,7 @@ const V4_CLIENT_SRC = String.raw`
     if (!s.venue) {
       if (s.kind === 'event' && s.event) {
         var e = s.event, eu = placeUrl(e), eid = 'v4d-e' + esc(e.id);
-        return '<li class="v4-stop"><div class="v4-row">' + v4Thumb(null) + '<button type="button" class="v4-main" aria-expanded="false" aria-controls="' + eid + '" data-v4-toggle="' + eid + '"><span class="v4-time">' + esc(v4Start(s, key) || e.time || '') + '</span><span class="v4-name">' + esc(e.name) + '</span><span class="v4-line">' + esc([vt('event'), e.regionLabel].filter(Boolean).join(' · ')) + '</span></button><span></span></div>'
+        return '<li class="v4-stop"><div class="v4-row">' + v4Thumb(e.photo ? { photo: e.photo } : null) + '<button type="button" class="v4-main" aria-expanded="false" aria-controls="' + eid + '" data-v4-toggle="' + eid + '"><span class="v4-time">' + esc(v4Start(s, key) || e.time || '') + '</span><span class="v4-name">' + esc(e.name) + '</span><span class="v4-line">' + esc([vt('event'), e.regionLabel].filter(Boolean).join(' · ')) + '</span></button><span></span></div>'
           + '<div class="v4-more" id="' + eid + '" hidden>' + ((s.why || []).length ? '<p class="v4-quiet">' + s.why.slice(0, 2).map(esc).join(' · ') + '</p>' : '') + t3EventPlaceHtml(e, lang(), esc) + (eu ? '<p><a ' + hrefAttr(eu) + '>' + esc(vt('details')) + ' →</a></p>' : '') + '</div>'
           + '<button type="button" class="trip-btn" hidden data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : '') + ' data-trip-name="' + esc(e.name) + '" data-trip-query="' + esc(e.name) + '" data-trip-region="' + esc(e.region || '') + '"' + (e.id ? ' data-trip-ref="event:' + esc(e.id) + '"' : '') + ' aria-pressed="false">+</button></li>';
       }
@@ -322,6 +323,7 @@ const V4_CLIENT_SRC = String.raw`
       return '<li class="v4-stop v4-gone"><div class="v4-row">' + v4Thumb(null) + '<div class="v4-main"><span class="v4-time">' + esc(vt('removed')) + '</span><span class="v4-name">' + esc(v.name) + '</span></div>'
         + '<div class="v4-acts"><button type="button" class="v4-text" data-v4-undo-id="' + esc(v.id) + '">' + esc(vt('undo')) + '</button></div></div></li>';
     }
+    if (typeof tripWorkspaceStopHtml === 'function') return tripWorkspaceStopHtml(s, key, counts);
     var html = '<li class="v4-stop" data-venue-id="' + esc(v.id) + '"><div class="v4-row">' + v4Thumb(v)
       + '<button type="button" class="v4-main" aria-expanded="' + (v4.open[id] ? 'true' : 'false') + '" aria-controls="' + did + '" data-v4-toggle="' + did + '" data-v4-id="' + esc(id) + '"><span class="v4-time">' + esc(v4Start(s, key)) + '</span><span class="v4-name">' + esc(v.name) + '</span><span class="v4-line">' + esc(v4Line(s)) + '</span></button>'
       + '<div class="v4-acts">'
@@ -542,9 +544,10 @@ const V4_CLIENT_SRC = String.raw`
     if (!bar) { bar = document.createElement('div'); bar.id = 'v4Bar'; bar.className = 'v4-bar'; bar.setAttribute('role', 'region'); main.appendChild(bar); }
     var canBookNow = v4CanBook();
     // Round 2: Save says Saved when every stop of this plan is already in My Trip (after a reload too).
-    try { if (!v4.saved && addState().state === 'added') v4.saved = true; } catch (err) {}
+    try { if (typeof tripWorkspaceStopHtml !== 'function' && !v4.saved && addState().state === 'added') v4.saved = true; } catch (err) {}
     bar.setAttribute('aria-label', v4.confirmed ? vt('book') : vt('confirm'));
-    bar.innerHTML = v4BarHtml();
+    // The travel agent chat (trip-chat-page.js, only with d.chat) keeps its own part of the bar; the rest is redrawn.
+    (typeof v4ChatMount === 'function' ? v4ChatMount(bar) : bar).innerHTML = v4BarHtml();
     var tip = resultEl.querySelector('.v4-tip:not(.v4-picked)'); if (tip) tip.textContent = v4.confirmed ? (canBookNow ? vt('tipDone') : vt('tipNoBook')) : vt('tip');
     var plan = resultEl.querySelector('.v4'); if (plan) plan.classList.toggle('v4-confirmed', v4.confirmed);
     document.body.style.paddingBottom = bar.offsetHeight ? bar.offsetHeight + 'px' : '';
@@ -556,13 +559,15 @@ const V4_CLIENT_SRC = String.raw`
     var main = v4Main(); if (main) { main.classList.add('has-plan'); main.classList.remove('v4-editing'); }
     if (v4.restoreConfirm) { v4.restoreConfirm = false; v4.confirmed = true; }
     var n = v4Count(p), nd = (p.days || []).length;
-    var where = planKinds ? ((p.days || []).map(function(d){ return d.regionLabel; }).filter(function(x, i, a){ return x && a.indexOf(x) === i; }).slice(0, 2).join(', ')) : '';
+    // Round 3: each town once ("Whistler and Whistler Blackcomb, Whistler Blackcomb" was two days' labels side by side).
+    var where = planKinds ? ((p.days || []).reduce(function(all, d){ return all.concat(String(d.regionLabel || '').split(/, | and | et /)); }, []).filter(function(x, i, a){ return x && a.indexOf(x) === i; }).slice(0, 2).join(', ')) : '';
     var sub = [nd > 1 ? vt('daysN', { n: nd }) : '', where, n === 1 ? vt('stops1') : vt('stopsN', { n: n })].filter(Boolean).join(' · ');
     // Round 4 (2026-11-21: "things to do this weekend" quietly became Kelowna): one line says the town was our pick.
     var picked = planKinds && p.understood && p.understood.valleyWide && !(p.understood.base || []).length && where && where.indexOf(',') === -1 ? vt('picked', { town: where }) : '';
-    var html = '<div class="t3-plan v4' + (v4.confirmed ? ' v4-confirmed' : '') + '"><header class="v4-head"><h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(p.headline || p.summary || vt('yourPlan')) + '</h2>'
+    var html = '<div class="t3-plan v4' + (v4.confirmed ? ' v4-confirmed' : '') + '"><header class="v4-head"><h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(String(p.headline || p.summary || vt('yourPlan')).replace(/\.$/, '')) + '</h2>'
       + '<p class="v4-sub">' + esc(sub) + '</p><button type="button" class="v4-edit" data-v4-edit>✎ ' + esc(vt('edit')) + '</button></header>'
       + (p.eventAmbiguity ? '<section class="t3-warnings" role="alert"><p>' + esc(fr ? 'Plusieurs événements correspondent à «' + p.eventAmbiguity.phrase + '». Choisissez :' : 'More than one listed event matches “' + p.eventAmbiguity.phrase + '”. Choose one:') + '</p><div class="t3-event-choices">' + p.eventAmbiguity.candidates.map(function(name, i){ var cid = p.eventAmbiguity.candidateIds && p.eventAmbiguity.candidateIds[i]; return Number.isSafeInteger(cid) && cid > 0 ? '<button type="button" class="t3-btn t3-btn-ghost" data-t3-event-choice="' + cid + '">' + esc(name) + '</button>' : ''; }).join('') + '</div></section>' : '')
+      + ((p.notIncluded || []).slice(0, 3).map(function(x){ var t = (fr && x.textFr) || x.text; return t ? '<p class="v4-tip v4-picked v4-notinc">' + esc(t) + '</p>' : ''; }).join(''))
       + (picked ? '<p class="v4-tip v4-picked">' + esc(picked) + '</p>' : '')
       + '<p class="v4-tip">' + esc(v4.confirmed ? (v4CanBook() ? vt('tipDone') : vt('tipNoBook')) : vt('tip')) + '</p>'
       + '<p class="t3-plan-status" id="t3PlanStatus" role="status" aria-live="polite"></p><div class="v4-days">';
@@ -643,8 +648,8 @@ const V4_CLIENT_SRC = String.raw`
     if ((b = t.closest('[data-v4-save]'))) {
       // Round 1 (2026-11-21): Save never mixes this plan into another saved trip without asking (one tap: Replace).
       var as = addState(), oth = tripSize() - (as.total - as.missing);
-      if (!v4.saved && as.state === 'ready' && oth > 0 && window.__roamTripReplace) { v4.ask = true; v4UpdateBar(); var rb = document.querySelector('#v4Bar [data-v4-replace]'); if (rb) { try { rb.focus({ preventScroll: true }); } catch (err) {} } return; }
-      if (!v4.saved) { addStops(null, { offset: tripDayOffset() }); v4.saved = true; v4UpdateBar(); v4Toast(vt('savedReplaced')); }
+      if (!v4.saved && (as.state === 'ready' || (typeof tripWorkspaceStopHtml === 'function' && as.state === 'added')) && oth > 0 && window.__roamTripReplace) { v4.ask = true; v4UpdateBar(); var rb = document.querySelector('#v4Bar [data-v4-replace]'); if (rb) { try { rb.focus({ preventScroll: true }); } catch (err) {} } return; }
+      if (!v4.saved) { if (typeof tripWorkspaceStopHtml === 'function' && as.state === 'added' && oth <= 0) rememberDays(planStopButtons(null), 0); else addStops(null, { offset: tripDayOffset() }); v4.saved = true; v4UpdateBar(); v4Toast(vt('savedReplaced')); }
       else { var panel = document.getElementById('tripTrayPanel'), toggle = document.getElementById('tripTrayToggle'); if (panel && !panel.classList.contains('open') && toggle) setTimeout(function(){ toggle.click(); }, 0); }
       return;
     }

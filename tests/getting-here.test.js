@@ -32,8 +32,11 @@ test('switch: DISCOVERCARS_AID must be a plain id; links are the airport pages w
   assert.equal(ON.enabled, true);
   assert.equal(OFF.enabled, false);
   for (const bad of ['', '  ', 'a b', 'x"y', 'https://x', 'a&b=c']) assert.equal(gh.config({ DISCOVERCARS_AID: bad }).enabled, false, bad);
-  assert.equal(gh.carUrl('ylw', ON), 'https://www.discovercars.com/canada/kelowna/ylw?a_aid=okanaganroam');
-  assert.equal(gh.carUrl('yyf', ON), 'https://www.discovercars.com/canada/penticton/yyf?a_aid=okanaganroam');
+  assert.equal(gh.carUrl('ylw', ON), 'https://www.discovercars.com/canada/kelowna/ylw?a_aid=okanaganroam&chan=okanagan&data1=page');
+  assert.equal(gh.carUrl('yyf', ON), 'https://www.discovercars.com/canada/penticton/yyf?a_aid=okanaganroam&chan=okanagan&data1=page');
+  // Tracking (2026-11-22): the site channel (env override) and where the link sits.
+  assert.equal(gh.carUrl('ylw', gh.config({ DISCOVERCARS_AID: 'okanaganroam', DISCOVERCARS_CHANNEL: 'test1' }), 'chat'), 'https://www.discovercars.com/canada/kelowna/ylw?a_aid=okanaganroam&chan=test1&data1=chat');
+  assert.equal(gh.carUrl('ylw', gh.config({ DISCOVERCARS_AID: 'okanaganroam', DISCOVERCARS_CHANNEL: 'bad chan!' }), 'nope'), 'https://www.discovercars.com/canada/kelowna/ylw?a_aid=okanaganroam&chan=okanagan&data1=page');
   assert.equal(gh.carUrl('ylw', OFF), null);
   assert.equal(gh.airportFor('kelowna'), 'ylw');
   assert.equal(gh.airportFor('vernon'), 'ylw');
@@ -60,7 +63,7 @@ test('region box: one button per item, sponsored, commission line; nothing when 
   const out = gh.withRegionBox(html, 'big-white', { cfg: ON, viatorCfg: VON });
   assert.equal((out.match(/class="gh-box"/g) || []).length, 1, 'only the first box');
   assert.match(out, /<p>Road text\.<\/p><div class="gh-box" data-getting-here>/);
-  assert.match(out, /<span>Rent a car at Kelowna airport \(YLW\)<\/span> <a href="https:\/\/www\.discovercars\.com\/canada\/kelowna\/ylw\?a_aid=okanaganroam" rel="sponsored noopener" target="_blank" data-track="booking" data-link="discovercars" data-airport="YLW">See cars/);
+  assert.match(out, /<span>Rent a car at Kelowna airport \(YLW\)<\/span> <a href="https:\/\/www\.discovercars\.com\/canada\/kelowna\/ylw\?a_aid=okanaganroam&amp;chan=okanagan&amp;data1=page" rel="sponsored noopener" target="_blank" data-track="booking" data-link="discovercars" data-airport="YLW">See cars/);
   assert.equal((out.match(/data-link="viator"/g) || []).length, 2);
   assert.match(out, /data-viator-code="350808P616">Book now/);
   assert.equal((out.match(/rel="sponsored noopener"/g) || []).length, 3);
@@ -89,7 +92,7 @@ test('Build My Trip step: 2+ towns or 2+ days, the first town\'s airport, at the
   assert.deepEqual(plan.v4Booking.steps.map((s) => s.id), [1, 'car-yyf']);
   const s = plan.v4Booking.steps[1];
   assert.deepEqual({ kind: s.kind, name: s.name, nameFr: s.nameFr, label: s.label, labelFr: s.labelFr, url: s.url, rel: s.rel, link: s.link, affiliate: s.affiliate },
-    { kind: 'transport', name: 'Rent a car at Penticton airport (YYF)', nameFr: 'Louer une voiture à l’aéroport de Penticton (YYF)', label: 'See cars', labelFr: 'Voir les voitures', url: 'https://www.discovercars.com/canada/penticton/yyf?a_aid=okanaganroam', rel: 'sponsored noopener', link: 'discovercars', affiliate: true });
+    { kind: 'transport', name: 'Rent a car at Penticton airport (YYF)', nameFr: 'Louer une voiture à l’aéroport de Penticton (YYF)', label: 'See cars', labelFr: 'Voir les voitures', url: 'https://www.discovercars.com/canada/penticton/yyf?a_aid=okanaganroam&chan=okanagan&data1=trip', rel: 'sponsored noopener', link: 'discovercars', affiliate: true });
   const stayPlan = { kind: 'multi_day', days: plan.days, whereToStay: { pick: { id: 9, bookingSteps: [{ kind: 'stay', id: 9 }] }, alternatives: [{ id: 8 }], bookingSteps: [] } };
   gh.withTripStep(stayPlan, null, { cfg: ON });
   assert.deepEqual(stayPlan.whereToStay.pick.bookingSteps.map((x) => x.id), [9, 'car-yyf']);
@@ -154,12 +157,12 @@ test('server, set: the line sits in the Getting around box, EN + FR; SEO tags un
   on();
   const k = (await get('/kelowna')).text;
   assert.match(k, /<summary>Getting around &(?:amp;)? parking<\/summary><p>[\s\S]*?<\/p><div class="gh-box" data-getting-here>/);
-  assert.match(k, /href="https:\/\/www\.discovercars\.com\/canada\/kelowna\/ylw\?a_aid=okanaganroam" rel="sponsored noopener"/);
+  assert.match(k, /href="https:\/\/www\.discovercars\.com\/canada\/kelowna\/ylw\?a_aid=okanaganroam&amp;chan=okanagan&amp;data1=page" rel="sponsored noopener"/);
   assert.doesNotMatch(k, /data-link="viator"[^>]*data-viator-code="350808/, 'no ski shuttles in town');
   const bw = (await get('/big-white')).text;
   assert.match(bw, /data-getting-here[\s\S]*data-viator-code="350808P616"[\s\S]*data-viator-code="5520106P1"/);
   const apex = (await get('/apex')).text;
-  assert.match(apex, /penticton\/yyf\?a_aid=okanaganroam[\s\S]*data-viator-code="350808P703"/);
+  assert.match(apex, /penticton\/yyf\?a_aid=okanaganroam&amp;chan=okanagan&amp;data1=page[\s\S]*data-viator-code="350808P703"/);
   for (const [p, before] of Object.entries(offPages)) {
     const now = (await get(p)).text;
     for (const re of SEO) assert.equal((now.match(re) || [''])[0], (before.match(re) || [''])[0], `${p} ${re}`);
@@ -184,7 +187,7 @@ test('server, Build My Trip V4: "Rent a car" for a 2-day plan only when set; nev
   const b = await post('?stays=1&v=4', body);
   const car = steps(b).filter((s) => s.link === 'discovercars');
   assert.ok(car.length >= 1, JSON.stringify(steps(b)));
-  assert.equal(car[0].url, 'https://www.discovercars.com/canada/kelowna/ylw?a_aid=okanaganroam');
+  assert.equal(car[0].url, 'https://www.discovercars.com/canada/kelowna/ylw?a_aid=okanaganroam&chan=okanagan&data1=trip');
   assert.equal(JSON.stringify(b.days), JSON.stringify(a.days), 'the same stops with and without it');
   const v3 = await post('?stays=1', body);
   assert.ok(!steps(v3).some((s) => s.link === 'discovercars'), 'not on the old page');
