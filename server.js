@@ -8757,7 +8757,7 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
       // V4 (2026-11-20): with no place to stay to suggest, "Book my trip" still steps through the stops' own booking links,
       // with the same estimate (no stay part).
       const checklist = tripBookingChecklist(plan);
-      plan.v4Booking = { steps: tripBooking.tripBookingSteps(null, checklist), estimate: tripBooking.tripEstimate(plan, null, stay || {}) };
+      plan.v4Booking = { steps: tripBooking.tripBookingSteps(null, checklist), estimate: tripBooking.tripEstimate(plan, null, stayIn || stay || {}) };
     }
     // Viator (2026-11-20, viator.js): which activities the visitor asked for that no planned stop can book (a wine tour,
     // a zipline...), for up to 2 suggestion cards the page loads from /api/trip/viator. Added after planning: it never

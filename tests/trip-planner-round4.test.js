@@ -136,6 +136,7 @@ test('3/4. a meal is at a place with hours for it; no brand twice; one operator 
   assert.equal(tp.v4FillerSkip({ type: 'brewery', name: 'Hop Co.', textName: 'hop co' }, { ...ctx, queryText: 'hiking and breweries' }), false);
   const src = fs.readFileSync(require.resolve('../trip-planner.js'), 'utf8');
   assert.ok(src.includes('if (!isKept && kinds.length && kinds.every((k) => tourKinds.has(k)))'), 'one operator per kind of tour');
+  assert.ok(SRC.includes('tripBooking.tripEstimate(plan, null, stayIn || stay || {})'), 'the estimate without a stay card counts the party too');
 });
 
 // ---- 4. Occasion and variety ----

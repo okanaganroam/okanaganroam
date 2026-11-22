@@ -8234,7 +8234,11 @@ function v4Polish(result, input) {
         if (!isKept && fv.type === 'cafe' && !isLunchStop(s) && (typeCount.cafe || 0) >= 1 && !(ctx.types && ctx.types.has('cafe'))) { stops.splice(i, 1); used.delete(fv.id); i -= 1; changed = true; continue; }
         typeCount[fv.type] = (typeCount[fv.type] || 0) + 1;
         if (fv.type === 'tour') {
-          const kinds = (fv.plannerKinds || []).filter((k) => k !== 'rentals');
+          // Judged on the kinds the request asks for when it names any (an outfitter that also runs dog sleds is still a
+          // second snowmobile operator).
+          const all = (fv.plannerKinds || []).filter((k) => k !== 'rentals');
+          const askedKinds = all.filter((k) => (ctx.plannerKinds || []).includes(k));
+          const kinds = askedKinds.length ? askedKinds : all;
           if (!isKept && kinds.length && kinds.every((k) => tourKinds.has(k))) { stops.splice(i, 1); used.delete(fv.id); i -= 1; changed = true; continue; }
           kinds.forEach((k) => tourKinds.add(k));
           continue;
@@ -8537,20 +8541,23 @@ function v4SwapSteady(result, input) {
   const rowOf = (day, s) => rows.find((r) => r.day === day.day && ((s.venue && r.venueId === s.venue.id) || (s.event && r.eventId === s.event.id)));
   const [dayN, part] = String(swap.key).split('-');
   let fresh = null, freshDay = null;
+  // The place that took the slot is the one to try without, when it moved or pushed out another stop.
+  const slotStop = ((result.days || []).find((d) => d.day === Number(dayN)) || { stops: [] }).stops.find((x) => x && x.venue && x.daypart === part);
+  const culprit = slotStop ? slotStop.venue.id : undefined;
   for (const day of result.days || []) {
     for (const s of day.stops || []) {
       if (!s || !(s.venue || s.event)) continue;
       const key = `${day.day}-${s.daypart}`;
       if (key === swap.key) { fresh = s; freshDay = day; continue; }
       if (!Number.isInteger(swap.times[key])) continue;
-      if (s.venue && pinned[key] && s.venue.id !== pinned[key]) return { ok: false, why: 'moved' };
+      if (s.venue && pinned[key] && s.venue.id !== pinned[key]) return { ok: false, why: 'moved', id: culprit };
       const r = rowOf(day, s);
       if (!r) continue;
       const len = Number.isFinite(r.endMinutes) && Number.isFinite(r.startMinutes) ? r.endMinutes - r.startMinutes : null;
       if (r.startMinutes !== swap.times[key]) { r.startMinutes = swap.times[key]; if (len != null) r.endMinutes = r.startMinutes + len; r.status = r.status === 'unmet' || r.status === 'unverified' ? 'estimated' : r.status; }
     }
     // A stop that was on screen and is gone is a change too.
-    for (const key of Object.keys(pinned)) if (key.startsWith(`${day.day}-`) && key !== swap.key && !(day.stops || []).some((s) => s && s.venue && s.venue.id === pinned[key])) return { ok: false, why: 'gone' };
+    for (const key of Object.keys(pinned)) if (key.startsWith(`${day.day}-`) && key !== swap.key && !(day.stops || []).some((s) => s && s.venue && s.venue.id === pinned[key])) return { ok: false, why: 'gone', id: culprit };
   }
   if (!fresh || !freshDay || !fresh.venue) return { ok: true };
   const r = rowOf(freshDay, fresh);
