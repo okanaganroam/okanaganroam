@@ -31,7 +31,7 @@ test('1. no car: every stop is near the middle of its town, and the rental car i
   for (const q of ['3 days in Vernon, no car, on a budget', '3 days in Whistler, coming by bus from Vancouver', 'we don’t have a car', 'sans voiture']) assert.ok(re.test(q), q);
   for (const q of ['3 days in Vernon', 'a car show in Vernon', 'no driving after wineries']) assert.ok(!re.test(q), q);
   assert.ok(tr.extractTripRequirements({ text: '3 days in whistler coming by bus from vancouver', taxonomy: fx.TAXONOMY }).items.some((i) => i.kind === 'transport'), 'by bus is no car for the planner too');
-  assert.ok(/if \(v4 && gettingHere\.enabled\(\) && !drivingIn && !noCarTrip\) gettingHere\.withTripStep\(plan, stay\);/.test(SRC), 'no "Rent a car" step');
+  assert.ok(/if \(v4 && gettingHere\.enabled\(\) && !drivingIn && !noCarTrip\b[^\n]*\) gettingHere\.withTripStep\(plan, stay\);/.test(SRC), 'no "Rent a car" step');
   assert.ok(/if \(gh && noCarTrip\) \{ gh\.noCar = true; gh\.car = null; gh\.carLabel = null; \}/.test(SRC), 'no rental on the Getting here card');
   const p = fx.plan('3 days in Kelowna, good food, no car', { extra: { v4: true } });
   assert.equal(p.notes[0], 'No car: every stop is in town, a walk or a short taxi or bus ride apart.');

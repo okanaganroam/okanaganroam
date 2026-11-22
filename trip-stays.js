@@ -20,6 +20,7 @@ const MAX_KIDS = 12;
 // Other towns' stays join only when the plan's own towns give fewer than this many, and only within NEAR_KM.
 const MIN_IN_TOWN = 3;
 const NEAR_KM = 35;
+const CLOSE_KM = 12;
 const PLAN_KINDS = ['multi_day', 'day_plan', 'outing', 'itinerary'];
 
 // Stay type fit (2026-11-20, Dayton): a campground or RV park is not a base for "wineries, easy walks and great food".
@@ -48,7 +49,7 @@ function daysBetween(a, b) { return Math.round((Date.parse(`${b}T12:00:00Z`) - D
 function parseTripStayInput(raw) {
   if (raw === undefined || raw === null) return { value: null };
   if (!isObj(raw)) return { error: 'stay must be an object with arrive, leave, adults, kids and dog.' };
-  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog', 'pref'].includes(k));
+  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog', 'pref', 'force', 'none', 'kidAges'].includes(k));
   if (extra.length) return { error: `stay may only contain arrive, leave, adults, kids and dog (not ${extra.join(', ')}).` };
   const out = {};
   for (const k of ['arrive', 'leave']) {
@@ -73,6 +74,17 @@ function parseTripStayInput(raw) {
   if (raw.dog !== undefined && raw.dog !== null) {
     if (typeof raw.dog !== 'boolean') return { error: 'stay.dog must be true or false.' };
     if (raw.dog) out.dog = true;
+  }
+  // Agent hooks (2026-11-22): stay.force asks for a place to stay on a plan with no night (a one-day plan, an evening):
+  // one night from stay.arrive (or the plan's day); stay.none says the visitor wants no stay at all.
+  for (const k of ['force', 'none']) {
+    if (raw[k] === undefined || raw[k] === null) continue;
+    if (typeof raw[k] !== 'boolean') return { error: `stay.${k} must be true or false.` };
+    if (raw[k]) out[k] = true;
+  }
+  if (raw.kidAges !== undefined && raw.kidAges !== null) {
+    if (!Array.isArray(raw.kidAges) || raw.kidAges.length > MAX_KIDS || !raw.kidAges.every((a) => intIn(a, 0, 17))) return { error: 'stay.kidAges must list ages from 0 to 17.' };
+    out.kidAges = raw.kidAges.slice();
   }
   // Travel agent chat (2026-11-22, trip-chat.js): what the visitor said about the place to stay ("somewhere cheaper",
   // "a hotel with a pool", "stay in Naramata", "we already have a place"). Only these keys and values.
@@ -196,7 +208,7 @@ function tripStayContext(plan, input, today, opts = {}) {
   const firstDate = ((plan.schedule || []).find((r) => r && validDate(r.date)) || {}).date || (validDate(plan.listDate) ? plan.listDate : null);
   let arrive = i.arrive || firstDate || (validDate(today) ? today : null);
   if (opts.v4 && !i.arrive && validDate(opts.minArrive) && (!arrive || arrive < opts.minArrive)) arrive = opts.minArrive;
-  const nights = i.arrive && i.leave ? daysBetween(i.arrive, i.leave) : planDays - 1;
+  const nights = i.arrive && i.leave ? daysBetween(i.arrive, i.leave) : Math.max(planDays - 1, i.force ? 1 : 0);
   if (!(nights >= 1) || !arrive) return null;
   const leave = i.leave || addDays(arrive, nights);
   const months = [];
@@ -287,6 +299,9 @@ function scoreStay(stay, ctx) {
   if (ctx.budget && intIn(f.price_level, 1, 4)) {
     if (PRICE_FITS[ctx.budget].includes(f.price_level)) { score -= 1.5; matches.push({ key: 'price', ...PRICE_REASON[ctx.budget] }); }
     else if (Math.abs(f.price_level - PRICE_FITS[ctx.budget][0]) >= 2 && Math.abs(f.price_level - PRICE_FITS[ctx.budget][1]) >= 2) score += 2;
+    // Planner round 4 (a budget trip's "See 2 more" were the Fairmont Chateau and the Sundial): on a budget trip a $$$ or
+    // $$$$ stay comes after every stay that fits the budget or has no price on file.
+    if (ctx.budget === 'budget' && f.price_level >= 3) score += 30;
   }
   if (ctx.nights >= 4 && (f.kitchen === 'all' || f.kitchen === 'some')) {
     score -= f.kitchen === 'all' ? 1 : 0.5;
@@ -336,7 +351,9 @@ function pickTripStays(ctx, stays) {
   const usable = stays.map((s) => ({ ...s, coords: coords(s.latitude, s.longitude), camping: isCampingStay(s) })).filter((s) => s.coords && Number.isInteger(s.id) && s.url && !stayFails(s.info, ctx));
   const poolOf = (list) => {
     let pool = list.filter((s) => ctx.regions.includes(s.region));
-    if (pool.length < MIN_IN_TOWN && ctx.centre) pool = pool.concat(list.filter((s) => !ctx.regions.includes(s.region) && km(ctx.centre, s.coords) <= NEAR_KM));
+    // Planner round 4 (2026-11-22; "a cheaper hotel" for a Whistler Village plan was the Pemberton Hotel, 30 km away): a
+    // stay in another town joins only when it is close (CLOSE_KM), or when the plan's own towns have none that fit.
+    if (pool.length < MIN_IN_TOWN && ctx.centre) pool = pool.concat(list.filter((s) => !ctx.regions.includes(s.region) && km(ctx.centre, s.coords) <= (pool.length ? CLOSE_KM : NEAR_KM)));
     return pool;
   };
   // Not a camping trip: rooms first; camping stays only when no other stay fits the plan's towns or nearby.
@@ -356,6 +373,7 @@ function whereToStay(plan, input, stays, today, opts = {}) {
   if (!ctx) return null;
   // Chat preference (input.pref): "we already have a place" -> no stay; else only the stays it leaves, and "stay in
   // Naramata" makes that town the base (other towns' stays still join only within NEAR_KM when it has too few).
+  if (input && input.none) return null; // agent hooks: "no stay"
   const pref = input && input.pref;
   if (pref && pref.none) return null;
   const askedTown = ctx.primaryRegion;

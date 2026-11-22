@@ -8249,7 +8249,7 @@ function parseTripPlanBody(body, opts = {}) {
     body = { ...body };
     delete body.stay;
   }
-  const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned', 'overrides', 'swap'];
+  const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned', 'overrides', 'swap', 'tourStops', 'moves', 'trustedPins', 'keepOnDateChange'];
   const unexpected = Object.keys(body || {}).filter((k) => !allowed.includes(k));
   if (unexpected.length) return { error: `Unexpected field(s): ${unexpected.join(', ')}` };
   const text = body.text;
@@ -8282,10 +8282,12 @@ function parseTripPlanBody(body, opts = {}) {
   let overrides = null;
   if (body.overrides !== undefined) {
     const o = body.overrides;
-    if (!o || typeof o !== 'object' || Array.isArray(o) || Object.keys(o).some((k) => !['days', 'pace', 'baseRegion', 'budgetMode', 'durationMinutes', 'startDate', 'startMinutes', 'dayStartMinutes', 'shortWalkVenueIds', 'eventId'].includes(k))) {
+    if (!o || typeof o !== 'object' || Array.isArray(o) || Object.keys(o).some((k) => !['days', 'pace', 'baseRegion', 'budgetMode', 'durationMinutes', 'startDate', 'startMinutes', 'dayStartMinutes', 'shortWalkVenueIds', 'eventId', 'stopStarts'].includes(k))) {
       return { error: 'overrides may only contain days, pace, baseRegion, budgetMode, durationMinutes, startDate, startMinutes, dayStartMinutes, shortWalkVenueIds and eventId.' };
     }
     if (o.days !== undefined && !(Number.isInteger(o.days) && o.days >= 1 && o.days <= 7)) return { error: 'overrides.days must be an integer between 1 and 7.' };
+    // Agent hooks: one stop's start time, { "<day>-<daypart>": minutes }.
+    if (o.stopStarts !== undefined && (!o.stopStarts || typeof o.stopStarts !== 'object' || Array.isArray(o.stopStarts) || Object.keys(o.stopStarts).length > 28 || !Object.entries(o.stopStarts).every(([k, m]) => TRIP_PLAN_PIN_RE.test(k) && Number.isInteger(m) && m >= 0 && m < 1440))) return { error: 'Invalid stopStarts.' };
     if (o.eventId !== undefined && !(Number.isSafeInteger(o.eventId) && o.eventId > 0)) return { error: 'Invalid eventId.' };
     if (o.pace !== undefined && !TRIP_VALID_PACES.includes(o.pace)) return { error: `overrides.pace must be one of: ${TRIP_VALID_PACES.join(', ')}` };
     if (o.baseRegion !== undefined && o.baseRegion !== 'valley' && !REGION_LABELS[o.baseRegion]) return { error: 'overrides.baseRegion must be a region slug or "valley".' };
@@ -8311,14 +8313,43 @@ function parseTripPlanBody(body, opts = {}) {
     const stopsOk = (a) => Array.isArray(a) && a.length <= 12 && a.every((x) => x && typeof x === 'object' && !Array.isArray(x) && Object.keys(x).every((k) => ['ref', 'label', 'daypart', 'component', 'gapFill', 'wineryLunch'].includes(k))
       && (x.ref === null || x.ref === undefined || /^(?:venue|event):\d{1,9}$/.test(x.ref)) && (x.label === undefined || (typeof x.label === 'string' && x.label.length <= 60)) && (x.daypart === undefined || /^[a-z]{1,12}$/.test(x.daypart))
       && (x.component === undefined || x.component === null || (Number.isInteger(x.component) && x.component >= 0 && x.component < 20)) && (x.gapFill === undefined || typeof x.gapFill === 'boolean') && (x.wineryLunch === undefined || typeof x.wineryLunch === 'boolean'));
-    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type', 'id', 'locked', 'times', 'stops', 'want', 'priceMax', 'priceMin'].includes(k)) || !swapKey(w.key) || (itKey(w.key) && !stopsOk(w.stops)) || (w.stops !== undefined && !itKey(w.key)) || !/^[a-z_]{1,24}$/.test(w.type || '') || (w.id !== undefined && !(Number.isInteger(w.id) && w.id > 0))
+    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type', 'id', 'locked', 'times', 'stops', 'want', 'priceMax', 'priceMin', 'features', 'words', 'types', 'wide'].includes(k)) || !swapKey(w.key) || (itKey(w.key) && !stopsOk(w.stops)) || (w.stops !== undefined && !itKey(w.key)) || !/^[a-z_]{1,24}$/.test(w.type || '') || (w.id !== undefined && !(Number.isInteger(w.id) && w.id > 0))
       || (w.locked !== undefined && (!Array.isArray(w.locked) || w.locked.length > 28 || !w.locked.every((k) => typeof k === 'string' && TRIP_PLAN_PIN_RE.test(k))))
       || (w.times !== undefined && (!w.times || typeof w.times !== 'object' || Array.isArray(w.times) || Object.keys(w.times).length > 28 || !Object.entries(w.times).every(([k, m]) => swapKey(k) && Number.isInteger(m) && m >= 0 && m < 1440)))) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>", id: <venue id>, locked: ["<day>-<daypart>"], times: { "<day>-<daypart>": <minutes> } }.' };
     // want / priceMax / priceMin (2026-11-22, travel agent chat): a kind of place for the slot, or a cheaper / fancier one.
     if ((w.want !== undefined && !Object.prototype.hasOwnProperty.call(tripPlannerModule().SWAP_WANTS || {}, w.want)) || [w.priceMax, w.priceMin].some((x) => x !== undefined && !(Number.isInteger(x) && x >= 1 && x <= 4))) return { error: 'Invalid swap.want or swap price.' };
-    swap = { key: w.key, type: w.type, ...(w.id !== undefined ? { id: w.id } : {}), ...(w.want !== undefined ? { want: w.want } : {}), ...(w.priceMax !== undefined ? { priceMax: w.priceMax } : {}), ...(w.priceMin !== undefined ? { priceMin: w.priceMin } : {}), ...(w.locked !== undefined ? { locked: w.locked.slice() } : {}), ...(w.times !== undefined ? { times: { ...w.times } } : {}), ...(w.stops !== undefined ? { stops: w.stops.map((x) => ({ ...x })) } : {}) };
+    // Agent hooks: several constraints at once (badges, the listings' own words, kinds of place, a wider search).
+    if ((w.features !== undefined && (!Array.isArray(w.features) || w.features.length > 6 || !w.features.every((f) => BOOL_FIELDS.includes(f))))
+      || (w.words !== undefined && (!Array.isArray(w.words) || w.words.length > 8 || !w.words.every((x) => typeof x === 'string' && /^[a-z0-9 ]{2,30}$/.test(x))))
+      || (w.types !== undefined && (!Array.isArray(w.types) || w.types.length > 8 || !w.types.every((x) => typeof x === 'string' && /^[a-z_]{1,24}$/.test(x))))
+      || (w.wide !== undefined && typeof w.wide !== 'boolean')) return { error: 'Invalid swap.features, swap.words, swap.types or swap.wide.' };
+    swap = { key: w.key, type: w.type, ...(w.features !== undefined ? { features: w.features.slice() } : {}), ...(w.words !== undefined ? { words: w.words.slice() } : {}), ...(w.types !== undefined ? { types: w.types.slice() } : {}), ...(w.wide ? { wide: true } : {}), ...(w.id !== undefined ? { id: w.id } : {}), ...(w.want !== undefined ? { want: w.want } : {}), ...(w.priceMax !== undefined ? { priceMax: w.priceMax } : {}), ...(w.priceMin !== undefined ? { priceMin: w.priceMin } : {}), ...(w.locked !== undefined ? { locked: w.locked.slice() } : {}), ...(w.times !== undefined ? { times: { ...w.times } } : {}), ...(w.stops !== undefined ? { stops: w.stops.map((x) => ({ ...x })) } : {}) };
   }
-  return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap, ...(stay ? { stay } : {}), ...(opts.v4 ? { v4: true } : {}) } };
+  // Travel agent hooks (2026-11-22, trip-planner.js v4AgentHooks): optional, checked, V4 only.
+  const agent = {};
+  if (body.tourStops !== undefined) {
+    const a = body.tourStops;
+    if (!Array.isArray(a) || a.length > 7 || !a.every((x) => x && typeof x === 'object' && !Array.isArray(x) && Object.keys(x).every((k) => ['day', 'part', 'listingId', 'startMinutes', 'durationMinutes', 'covers'].includes(k))
+      && Number.isInteger(x.day) && x.day >= 1 && x.day <= 7 && /^(?:early|morning|midday|afternoon|late|evening|night)$/.test(x.part || '') && Number.isInteger(x.listingId) && x.listingId > 0
+      && (x.startMinutes === undefined || (Number.isInteger(x.startMinutes) && x.startMinutes >= 0 && x.startMinutes < 1440)) && (x.durationMinutes === undefined || (Number.isInteger(x.durationMinutes) && x.durationMinutes >= 15 && x.durationMinutes <= 720))
+      && (x.covers === undefined || (Array.isArray(x.covers) && x.covers.length <= 8 && x.covers.every((t) => /^[a-z_]{1,24}$/.test(t)))))) return { error: 'tourStops must list { day, part, listingId, startMinutes, durationMinutes, covers }.' };
+    agent.tourStops = a.map((x) => ({ ...x, ...(x.covers ? { covers: x.covers.slice() } : {}) }));
+  }
+  if (body.moves !== undefined) {
+    const a = body.moves;
+    if (!Array.isArray(a) || a.length > 14 || !a.every((x) => x && typeof x === 'object' && !Array.isArray(x) && Object.keys(x).every((k) => ['from', 'to'].includes(k)) && TRIP_PLAN_PIN_RE.test(x.from || '') && TRIP_PLAN_PIN_RE.test(x.to || '') && x.from !== x.to)) return { error: 'moves must list { from: "<day>-<daypart>", to: "<day>-<daypart>" }.' };
+    agent.moves = a.map((x) => ({ from: x.from, to: x.to }));
+  }
+  if (body.trustedPins !== undefined) {
+    const a = body.trustedPins;
+    if (!Array.isArray(a) || a.length > 28 || !a.every((k) => typeof k === 'string' && TRIP_PLAN_PIN_RE.test(k))) return { error: 'trustedPins must list "<day>-<daypart>" keys.' };
+    agent.trustedPins = a.slice();
+  }
+  if (body.keepOnDateChange !== undefined) {
+    if (typeof body.keepOnDateChange !== 'boolean') return { error: 'keepOnDateChange must be true or false.' };
+    if (body.keepOnDateChange) agent.keepOnDateChange = true;
+  }
+  return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap, ...(stay ? { stay } : {}), ...(opts.v4 ? { v4: true, ...agent } : {}) } };
 }
 
 // ---------- Build My Trip travel agent chat (2026-11-22, trip-chat.js) ----------
@@ -8696,15 +8727,15 @@ function tripPlanBeforeStays(args, run = runTripPlan, now = new Date()) {
   if (stay && stay.dog && typeof base.text === 'string' && !TRIP_DOG_WORDS_RE.test(base.text) && base.text.trim().length + 13 <= discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) base.text = `${base.text.trim()} with our dog`;
   if (stay && stay.arrive && !(base.overrides && base.overrides.startDate)) base.overrides = { ...(base.overrides || {}), startDate: stay.arrive };
   // Round 2 fresh eyes (V4): the day the visitor leaves is known, so its plan ends early (trip-planner.js v4SaneDays).
-  if (args.v4 && stay && stay.arrive && stay.leave && stay.leave > stay.arrive) base.departureDate = stay.leave;
+  if (args.v4 && stay && !stay.force && stay.arrive && stay.leave && stay.leave > stay.arrive) base.departureDate = stay.leave;
   let plan = run(base, now);
   // V4 (round 2, 2026-11-21: "3 days" with Aug 10-13 became a 4-day plan): a length the request names wins over the dates.
   // Round 3: only a number of days ("3 days", « 3 jours »); "a weekend" Fri-Sun still covers Sunday.
   const typedDays = !!(args.v4 && plan && plan.intent && Number.isInteger(plan.intent.days) && plan.intent.days > 0 && /\b(?:\d+|one|two|three|four|five|six|seven|un|deux|trois|quatre|cinq|six|sept)\s*(?:-\s*)?(?:days?|jours?|journ[ée]es?)\b/i.test(String(args.text || '')));
   // Round 3 (V4; "girls' trip: spa, cocktails, shopping" with Dec 4-6 was a two-stop outing): with dates over a night or
   // more, a short outing or a list becomes the days of the stay too.
-  const v4Nights = !!(args.v4 && stay && stay.arrive && stay.leave && stay.leave > stay.arrive && plan && ['itinerary', 'outing', 'discover', 'recommendations'].includes(plan.kind) && !args.swap);
-  if (stay && stay.arrive && stay.leave && plan && !typedDays && (['multi_day', 'day_plan'].includes(plan.kind) || v4Nights) && !(base.overrides && base.overrides.days !== undefined)) {
+  const v4Nights = !!(args.v4 && stay && !stay.force && stay.arrive && stay.leave && stay.leave > stay.arrive && plan && ['itinerary', 'outing', 'discover', 'recommendations'].includes(plan.kind) && !args.swap);
+  if (stay && stay.arrive && stay.leave && plan && !typedDays && !stay.force && (['multi_day', 'day_plan'].includes(plan.kind) || v4Nights) && !(base.overrides && base.overrides.days !== undefined)) {
     const want = Math.min(7, tripStays.daysBetween(stay.arrive, stay.leave) + 1);
     if (want !== ((plan.days || []).length || 1)) {
       try { const longer = run({ ...base, overrides: { ...(base.overrides || {}), days: want } }, now); if (longer && ['multi_day', 'day_plan'].includes(longer.kind)) plan = longer; } catch (e) { /* keep the plan as asked */ }
@@ -8735,6 +8766,13 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
       // kids and the request names that many ages (the ages were dropped, so the booking site guessed them).
       const ages = tripPlannerModule().requestKidAgeList(words.replace(/-/g, ' '));
       if (ages.length && (stayIn.kids === undefined || stayIn.kids === ages.length)) { stayIn.kids = Math.min(12, ages.length); stayIn.kidAges = ages.slice(0, 12); }
+      // Planner round 4: the party the request names ("4 adults", "4 friends", « deux enfants »), where the visitor has not
+      // set it, so the stay line, the stay links and the estimate are for the right number of people.
+      try {
+        const party = tripPlannerModule().requestParty(String(text || ''));
+        if (stayIn.adults === undefined && party.adults) stayIn.adults = Math.min(16, party.adults);
+        if (stayIn.kids === undefined && party.kids) stayIn.kids = party.kids;
+      } catch (e) { /* the party stays as given */ }
       const asked = tripChat.stayTextPref(words);
       if (asked && !stayIn.pref) stayIn.pref = asked;
     }
@@ -8770,7 +8808,7 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
       // V4 (2026-11-20): with no place to stay to suggest, "Book my trip" still steps through the stops' own booking links,
       // with the same estimate (no stay part).
       const checklist = tripBookingChecklist(plan);
-      plan.v4Booking = { steps: tripBooking.tripBookingSteps(null, checklist), estimate: tripBooking.tripEstimate(plan, null, stay || {}) };
+      plan.v4Booking = { steps: tripBooking.tripBookingSteps(null, checklist), estimate: tripBooking.tripEstimate(plan, null, stayIn || stay || {}) };
     }
     // Viator (2026-11-20, viator.js): which activities the visitor asked for that no planned stop can book (a wine tour,
     // a zipline...), for up to 2 suggestion cards the page loads from /api/trip/viator. Added after planning: it never
@@ -8794,12 +8832,15 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
     const drivingIn = TRIP_DRIVING_IN_RE.test(String(text || ''));
     // Round 3: no car (the request says so, or the plan was made for one): no "Rent a car" step and no rental on the card.
     const noCarTrip = !!(plan && plan.noCar) || TRIP_NO_CAR_RE.test(String(text || ''));
-    if (v4 && gettingHere.enabled() && !drivingIn && !noCarTrip) gettingHere.withTripStep(plan, stay);
+    if (v4 && gettingHere.enabled() && !drivingIn && !noCarTrip && !(TRIP_NO_DRIVE_RE.test(String(text || '')) && plan.__wineTour)) gettingHere.withTripStep(plan, stay);
     // The travel agent chat's "Getting here" card (2026-11-22): the data only; the page shows it in chat mode only.
     if (v4) {
       const gh = gettingHere.tripCard(plan, stay);
       if (gh && drivingIn) { gh.driving = true; gh.car = null; gh.carLabel = null; }
       if (gh && noCarTrip) { gh.noCar = true; gh.car = null; gh.carLabel = null; }
+      // Planner round 4: "no driving after wineries" with a wine tour on offer: no rental car next to it, and the plan
+      // says how the no-driving is handled.
+      if (gh && TRIP_NO_DRIVE_RE.test(String(text || '')) && plan.__wineTour) { gh.car = null; gh.carLabel = null; const line = 'No driving after the wineries: a wine tour with a driver covers the winery day (see Getting around), or take a taxi between them.'; if (Array.isArray(plan.notes) && !plan.notes.includes(line)) plan.notes.unshift(line); plan.noDrive = { wineTour: true, text: line, textFr: 'Pas de conduite après les vignobles : une visite guidée avec chauffeur couvre la journée des vignobles (voir Se déplacer), ou prenez un taxi entre eux.' }; }
       if (gh) {
         // No driving (wine days): the wine tour first, the rental car after it.
         if (TRIP_NO_DRIVE_RE.test(String(text || ''))) { gh.noDrive = true; if (plan.__wineTour) gh.wineTour = { name: plan.__wineTour.name, nameFr: plan.__wineTour.nameFr, url: plan.__wineTour.url, label: plan.__wineTour.label, labelFr: plan.__wineTour.labelFr }; }
@@ -9160,6 +9201,7 @@ function runTripPlan(args, now = new Date()) {
   } catch (e) { /* the weekday stays in the notes */ }
   try { v4DropAfterDark(plan); } catch (e) { /* keep the plan as planned */ }
   try { v4AddStopPhones(plan); } catch (e) { /* phones are a convenience */ }
+  try { v4TourStopLinks(plan); } catch (e) { /* the stop still shows */ }
   return plan;
 }
 const V4_DAY_ASKED_RE = /\b(?:one|a|1|full|whole|single)[ -]day\b(?! (?:trip|tour|pass|ticket|hike|spa)s?\b)|\bday in\b|\b(?:une|1) journ[ée]e\b/i;
@@ -9210,7 +9252,13 @@ function v4NightsText(text) {
   if (/\b(?:\d+|one|two|three|four|five|six|seven|un|deux|trois|quatre|cinq|six|sept)\s*(?:-\s*)?(?:days?|jours?|journ[ée]es?)\b/i.test(text)) return null;
   const re = /\b(\d|a|one|two|three|four|five|six|une?|deux|trois|quatre|cinq)(?:\s+single)?[\s-]+(?:nights?|nuits?|nuit[ée]es?)\b(?!\s+(?:out|only|market|markets|club|life|skiing|ski)\b)/i;
   const m = re.exec(text);
-  if (!m) return null;
+  // Planner round 4 ("Romantic anniversary night in Naramata" was an evening with no stay): "a night in / at / away",
+  // an anniversary or romantic night, « une nuit à » is one overnight.
+  if (!m) {
+    const one = /\b(?:anniversary|romantic|honeymoon|overnight|romantique)\s+night\b(?!\s+out)|\bnight\s+(?:away|in\s+(?!the\b)|at\s+(?!the\b))|\bovernight(?:er)?\b/i.exec(text);
+    if (!one || /\b(?:tonight|date night|night out|ce soir)\b/i.test(text)) return null;
+    return { text: text.replace(/\bnight\b/i, '2 days').replace(/\bovernight(?:er)?\b/i, '2 days'), nights: 1 };
+  }
   const n = V4_NIGHT_WORDS[m[1].toLowerCase()] || Number(m[1]);
   if (!(n >= 1 && n <= 6)) return null;
   return { text: text.replace(m[0], `${n + 1} days`), nights: n };
@@ -9219,6 +9267,25 @@ function v4NightsText(text) {
 // the visitor asked for by kind and the plan could not include, as one top-level list the page and the travel agent chat
 // can say up front. plan.notIncluded = [{ kind, label, reason: 'none_listed' | 'not_fitted', town, nearest, text }].
 const V4_TYPE_WORDS = { restaurant: 'restaurant', cafe: 'café', winery: 'winery', brewery: 'brewery', distillery: 'distillery', pub: 'pub', cocktail: 'cocktail lounge', golf: 'golf course', beach: 'beach', tour: 'tour', outdoor: 'outdoor stop', indoor: 'indoor stop' };
+function v4NearestOfKind(plan, kind) {
+  const TR = require('./trip-requirements');
+  const stops = (plan.days || []).flatMap((d) => d.stops || []).concat((plan.itinerary && plan.itinerary.stops) || [], (plan.outing && plan.outing.stops) || []).map((x) => x && x.venue && getVenue(x.venue.id)).filter((v) => v && v.latitude != null && v.longitude != null);
+  if (!stops.length) return null;
+  const lat = stops.reduce((t, v) => t + Number(v.latitude), 0) / stops.length, lng = stops.reduce((t, v) => t + Number(v.longitude), 0) / stops.length;
+  const km = (v) => { const R = 6371, a = (Number(v.latitude) - lat) * Math.PI / 180, b = (Number(v.longitude) - lng) * Math.PI / 180; const h = Math.sin(a / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(Number(v.latitude) * Math.PI / 180) * Math.sin(b / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+  let best = null;
+  for (const v of db.prepare("SELECT * FROM venues WHERE redirect_to IS NULL AND latitude IS NOT NULL AND longitude IS NOT NULL AND type IN ('indoor', 'outdoor', 'tour', 'sport', 'golf', 'beach')").all()) {
+    if (!REGION_LABELS[v.region]) continue;
+    let kinds = [];
+    try { const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; kinds = TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); } catch (e) { kinds = []; }
+    if (!kinds.includes(kind)) continue;
+    const d = km(v);
+    if (!best || d < best.d) best = { d, v };
+  }
+  if (!best) return null;
+  const v = best.v;
+  return { id: v.id, name: v.name, region: v.region, regionLabel: REGION_LABELS[v.region] || v.region, url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, km: Math.round(best.d) };
+}
 function v4NotIncluded(plan) {
   if (!plan || !Array.isArray(plan.requirementResults)) return;
   const TR = require('./trip-requirements');
@@ -9242,6 +9309,9 @@ function v4NotIncluded(plan) {
   } catch (e) { /* the planner's own results stand */ }
   for (const r of plan.requirementResults) {
     if (!r || r.status !== 'unmet' || r.strength !== 'must' || r.kidsSki || !['venue_kind', 'type'].includes(r.kind)) continue;
+    // Planner round 4 ("I couldn't fit ski lessons" on a trip that never asked for lessons): only what the visitor's own
+    // words ask for is listed.
+    if (r.kind === 'venue_kind' && r.value === 'ski_lessons' && !/\b(?:lessons?|ski school|snow school|instructors?|learn\w*|camps?|clinics?|cours|le[cç]ons?|moniteurs?)\b/i.test(String(plan.query || ''))) continue;
     const label = r.kind === 'venue_kind' ? (TR.LABELS[r.value] || String(r.value).replace(/_/g, ' ')) : (V4_TYPE_WORDS[r.value] || String(r.value));
     if (out.some((x) => x.label === label)) continue;
     const lre = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -9249,7 +9319,10 @@ function v4NotIncluded(plan) {
     // (Round 3: "the nearest is Alpine Burger Co." for a sleigh ride: only a place that is that kind by its own facts.)
     const ofKind = (x) => { if (r.kind !== 'venue_kind') return true; try { const v = getVenue(x.id); if (!v) return false; const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; return ['restaurant', 'cafe', 'pub'].includes(v.type) ? false : TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }).includes(r.value); } catch (e) { return false; } };
     const alt = r.value === 'shopping' ? null : (r.optionalAlternatives || []).find((x) => x && x.reasonCode === 'different_region' && x.name && ofKind(x));
-    const nearest = alt ? { id: alt.id, name: alt.name, region: alt.region, regionLabel: REGION_LABELS[alt.region] || alt.region, url: alt.url, ...(alt.urlFr ? { urlFr: alt.urlFr } : {}) } : null;
+    let nearest = alt ? { id: alt.id, name: alt.name, region: alt.region, regionLabel: REGION_LABELS[alt.region] || alt.region, url: alt.url, ...(alt.urlFr ? { urlFr: alt.urlFr } : {}) } : null;
+    // Planner round 4 (the nearest spa to Osoyoos was said to be in Kelowna; Shelter Floating Sauna in Penticton is
+    // closer): the nearest is by distance from the plan's stops, among every listing of that kind (a sauna is a spa kind).
+    try { const byKm = r.kind === 'venue_kind' && r.value !== 'shopping' ? v4NearestOfKind(plan, r.value) : null; if (byKm) nearest = byKm; } catch (e) { /* keep the planner's own alternative */ }
     const an = /(?:ing|s)$/.test(label) ? '' : /^[aeiou]/i.test(label) ? 'an ' : 'a ';
     const text = (noneListed && town ? `There’s no ${label} listed in ${town}, so this plan has none.` : `I couldn’t fit ${an}${label} into this plan.`) + (nearest ? ` The nearest is ${nearest.name} in ${nearest.regionLabel}.` : '');
     out.push({ kind: r.value, label, reason: noneListed ? 'none_listed' : 'not_fitted', town, nearest, text });
@@ -9258,6 +9331,17 @@ function v4NotIncluded(plan) {
 }
 // An event's own photo (its What's On image), only a site path or an https URL.
 function tripEventPhoto(e) { const u = e && (e.image || e.image_url); return typeof u === 'string' && /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(u.trim()) ? u.trim() : null; }
+// Agent hooks: a tour placed as a stop (stop.tourStop) carries its exact stored link: the approved Viator product for
+// that operator, else the operator's own booking page; never a search. -> stop.bookingLink { url, kind, label, labelFr }.
+function v4TourStopLinks(plan) {
+  for (const d of (plan && plan.days) || []) for (const s of d.stops || []) {
+    if (!s || !s.tourStop || !s.venue || !Number.isInteger(s.venue.id)) continue;
+    let link = null;
+    try { const vb = viator.venueBooking(s.venue.id); if (vb && vb.url) link = { url: vb.url, kind: 'viator', label: viator.TEXT.book.en, labelFr: viator.TEXT.book.fr, affiliate: true, rel: 'sponsored nofollow noopener' }; } catch (e) { link = null; }
+    if (!link) { try { const own = String((venueLinks(s.venue.id) || {}).booking_url || '').trim(); if (/^https:\/\/[^\s"'<>]+$/i.test(own)) link = { url: own, kind: 'own', label: 'Book', labelFr: 'Réserver' }; } catch (e) { link = null; } }
+    if (link) s.bookingLink = link;
+  }
+}
 function v4AddStopPhones(plan) {
   const ids = new Set();
   const visit = (s) => { if (s && s.venue && Number.isInteger(s.venue.id)) ids.add(s.venue.id); };
@@ -9354,7 +9438,9 @@ function tripOutdoorSeasonFact(id) {
   const winter = (Array.isArray(f.extras) ? f.extras : []).find((x) => x && /^winter$/i.test(String(x.label || '').trim()) && x.text);
   // Round 3: the trail's own Difficulty line too (for an "easy hike" request).
   const diff = (Array.isArray(f.extras) ? f.extras : []).find((x) => x && /^difficulty$/i.test(String(x.label || '').trim()) && x.text);
-  return f.season || winter || diff ? { outdoorSeason: { season: f.season ? String(f.season) : '', winter: winter ? String(winter.text) : '', ...(diff ? { difficulty: String(diff.text) } : {}) } } : {};
+  // Planner round 4: how the place is reached (its Road line and parking), for winter.
+  const road = [(Array.isArray(f.extras) ? f.extras : []).filter((x) => x && /\broad\b/i.test(String(x.label || '')) && x.text).map((x) => String(x.text)).join(' '), f.parking ? String(f.parking) : ''].join(' ').trim();
+  return f.season || winter || diff || road ? { outdoorSeason: { season: f.season ? String(f.season) : '', winter: winter ? String(winter.text) : '', ...(diff ? { difficulty: String(diff.text) } : {}), ...(road ? { road } : {}) } } : {};
 }
 // Round 3 (2026-11-21: a trail at 7:45 PM in November after an anniversary dinner, parks at 9 PM): an outdoor stop the
 // schedule puts wholly after sunset is left out (its time stays free), unless it is the only stop. Its warning goes too.
@@ -11037,7 +11123,7 @@ function lateAfterMinutes(text) {
 const TEAM_BUILDING_WORDS_RE = /\bteam[\s-]?building(?:\s+(?:activit(?:y|ies)|events?|ideas?|outings?|days?|nights?|games?|exercises?|experiences?|venues?|places?|spots?|fun|things to do))+\b|\bteambuilding\b/gi;
 const TRIP_SWIM_OFF_MONTHS = [11, 12, 1, 2, 3, 4];
 const TRIP_SIM_GOLF_RE = /\b(?:indoor )?(?:golf simulators?|golf sims?|sim golf|simulator golf|virtual golf|golf lounges?|indoor golf (?:simulators?|lounges?|centres?|centers?))\b/gi;
-function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null, v4 = false, departureDate = null, departureLast = false, v4DayAsked = false }, now = new Date()) {
+function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null, v4 = false, departureDate = null, departureLast = false, v4DayAsked = false, tourStops = null, moves = null, trustedPins = null, keepOnDateChange = false }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   // 2026-11-05: trip-length, clock-time, holiday-weekend and tour wording made plain; a beer, cider or distillery "tour" is a run of
   // breweries, cideries or distilleries. (planText is the French layer's own text; planTextPlain is what the planner reads.)
@@ -11616,7 +11702,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
       clock: rolledWindow ? null : okanaganClock(now),
       tripDate: rolledWindow ? requirements.startDate : (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now),
       kidAges: tripKidAges, askText: tripAskText,
-      ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}), ...(v4DayAsked && overrides && overrides.days === 1 ? { v4DayPlan: true } : {}) } : {}),
+      ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}), ...(v4DayAsked && overrides && overrides.days === 1 ? { v4DayPlan: true } : {}), ...(tourStops ? { tourStops } : {}), ...(moves ? { moves } : {}), ...(trustedPins ? { trustedPins } : {}), ...(keepOnDateChange ? { keepOnDateChange: true } : {}), ...(overrides && overrides.stopStarts ? { stopStarts: overrides.stopStarts } : {}) } : {}),
     });
     tripApplyHappyHourParts(plan, hhParts);
     plan.seeAll = null;
@@ -11668,7 +11754,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     holidayEvents: !!holidayEvents,
     tripDate: requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now) || tripPlanDate(intent.when, now),
     kidAges: tripKidAges, askText: tripAskText,
-    ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}), ...(v4DayAsked && overrides && overrides.days === 1 ? { v4DayPlan: true } : {}) } : {}),
+    ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}), ...(v4DayAsked && overrides && overrides.days === 1 ? { v4DayPlan: true } : {}), ...(tourStops ? { tourStops } : {}), ...(moves ? { moves } : {}), ...(trustedPins ? { trustedPins } : {}), ...(keepOnDateChange ? { keepOnDateChange: true } : {}), ...(overrides && overrides.stopStarts ? { stopStarts: overrides.stopStarts } : {}) } : {}),
     startWeekday: requirements?.startDate ? localWeekdayKey(requirements.startDate) : tripStartWeekday(intent.when, now),
     clock: rolledWindow ? null : okanaganClock(now),
   });
