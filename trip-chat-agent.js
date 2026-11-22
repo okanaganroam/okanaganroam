@@ -72,7 +72,9 @@ function readAll(message, read) {
     // One part is a clear "can't" or was not read: the whole message's reading stands, unless it read less.
     const some = reads.filter((r) => (r.ops || []).length && !(r.ops || []).some((o) => o.o === 'refine'));
     const missed = reads.filter((r) => !(r.ops || []).length && ['not_found', 'booking', 'ask_which', 'time_at', 'weather', 'days_max', 'days_min'].includes(r.cant)).map((r) => ({ cant: r.cant, what: r.what || null }));
-    if (!some.length || (some.length + missed.length < 2) || (whole.ops || []).length >= some.reduce((n, r) => n + r.ops.length, 0)) return whole;
+    // Every part read (some as a plain "can't"): the parts stand. A part not read at all: the whole message's reading, unless the parts read more.
+    const allRead = some.length + missed.length === reads.length;
+    if (!some.length || (some.length + missed.length < 2) || (!allRead && (whole.ops || []).length >= some.reduce((n, r) => n + r.ops.length, 0))) return whole;
     const ops2 = [];
     for (const r of some) for (const o of r.ops) if (!ops2.some((x) => opSig(x) === opSig(o))) ops2.push(o);
     // Every part was read (some as a plain "can't", said in the reply): the rules stand. A part not read at all: the AI may know better.
@@ -115,7 +117,8 @@ const Q_TOPICS = [
   ['q_view', /\b(?:lake ?view|view|vue)\b/],
 ];
 const Q_VALUES = Q_TOPICS.map(([k]) => k);
-const SKI_NAME_RE = /\b(?:ski|mountain|resort|blackcomb|big white|silverstar|silver star|apex|baldy|lifts?|gondola|remontees?)\b/;
+const SKI_ASK_RE = /\b(?:lifts?|gondolas?|chairlifts?|ski hill|remontees?|telecabines?)\b/;
+const SKI_NAME_RE = /\b(?:ski|resort|blackcomb|big white|silverstar|silver star|apex mountain|baldy|gondola|sun peaks)\b/;
 
 // The asks only this file reads. h: helpers from trip-chat.js { op, stopsNamed, ordinalPick, kindsNamed, stayAmenitiesIn }.
 // -> { ops, cant } or null (the older rules read the message).
@@ -138,7 +141,7 @@ function agentRules(t, stops, ctx, h) {
       if (by.length) named = by; else if (day && named.some((s) => s.day === day)) named = named.filter((s) => s.day === day);
       named = h.ordinalPick(t, named);
       // "the lifts", "the mountain": the ski hill on the plan.
-      if (!named.length && SKI_NAME_RE.test(t)) named = stops.filter((s) => SKI_NAME_RE.test(fold(s.name)));
+      if (!named.length && SKI_ASK_RE.test(t)) named = stops.filter((s) => SKI_NAME_RE.test(fold(s.name)));
       // "is it open Sunday?" with one stop that day, or a plan with one stop.
       if (!named.length && /\b(?:it|this|that|they|c'est|il|elle)\b/.test(t)) { const pool = day ? stops.filter((s) => s.day === day) : stops; if (pool.length === 1) named = pool; }
       const far = topic === 'q_far';
@@ -203,7 +206,7 @@ function agentRules(t, stops, ctx, h) {
 
   // 6. A stop moved to another day, another part of the day, or before / after another stop.
   if (MOVE_VERB_RE.test(t) && !editVerb && !/\b(?:later|earlier|plus tard|plus tot)\b/.test(t)) {
-    const rel = /\b(before|after|avant|apres)\s+(?:the\s+|our\s+|le\s+|la\s+|l')?([a-z' -]+)$/.exec(t.replace(/[?.!]+$/, ''));
+    const rel = /\b(before|after|avant|apres)\s+(?:the\s+|our\s+|le\s+|la\s+|l')?([a-z' -]+)$/.exec(t.replace(/[?.!]+$/, '').replace(new RegExp(`\\s+(?:on |le |du |au )?(?:(?:day|jour)\\s*\\d|${Object.keys(WD_KEYS).join('|')})$`), ''));
     const head = rel ? t.slice(0, rel.index) : t;
     let named = h.stopsNamed(head, stops);
     const by = named.byName || [];
@@ -226,6 +229,27 @@ function agentRules(t, stops, ctx, h) {
 // ---------- Moving a stop, and one stop's own time (day plans) ----------
 const DAYPARTS = ['morning', 'midday', 'afternoon', 'late', 'evening', 'night'];
 const partOf = (key) => String(key).split('-')[1];
+// A re-run that must give back the same plan: the stops' own times are sent as stopStarts, and a place the planner adds
+// to a free part of a day is kept out and the run tried again (up to three times). -> { plan, nw, args } or {}.
+const startsOf = (stops, freeKeys = []) => Object.fromEntries(stops.filter((x) => /^\d-/.test(x.key) && Number.isInteger(x.start) && !freeKeys.includes(x.key)).map((x) => [x.key, x.start]));
+function runSteady(ctx, args, known) {
+  let plan = null;
+  try { plan = ctx.run(args); } catch (e) { plan = null; }
+  if (!plan || !ctx.isDayPlan(plan)) return {};
+  stripExtras(plan, new Set(known.map((x) => x.id)));
+  return { plan, nw: ctx.planStops(plan), args: { ...args } };
+}
+// A pinned re-run fills a free part of a day with a place nobody asked for: those stops (not in keepIds, on days up to
+// maxDay) are taken out of the plan that goes back, with their rows of the schedule. -> how many.
+function stripExtras(plan, keepIds, maxDay = 99) {
+  const gone = [];
+  for (const d of (plan && plan.days) || []) {
+    if (d.day > maxDay) continue;
+    d.stops = (d.stops || []).filter((s) => { if (s && s.venue && Number.isInteger(s.venue.id) && !keepIds.has(s.venue.id)) { gone.push([d.day, s.venue.id]); return false; } return true; });
+  }
+  if (gone.length && Array.isArray(plan.schedule)) plan.schedule = plan.schedule.filter((r) => !gone.some(([d, id]) => r.day === d && r.venueId === id));
+  return gone.length;
+}
 // state: { stops, args, locks (the visitor's own kept stops) }. ctx: { run, hooks, planStops, isDayPlan }.
 // -> { plan, nw, args, result } (result.ok false with a why when it could not be done; the plan is then untouched).
 function moveStop(op, state, ctx) {
@@ -239,14 +263,18 @@ function moveStop(op, state, ctx) {
     if (!(ctx.hooks && ctx.hooks.stopStarts)) { r.why = 'no_hook'; return { result: r }; }
     const pinned = {};
     for (const x of state.stops) if (/^\d-/.test(x.key)) pinned[x.key] = x.id;
-    const args = { ...state.args, pinned, swap: null, overrides: { ...(state.args.overrides || {}), stopStarts: { ...((state.args.overrides || {}).stopStarts || {}), [s.key]: op.n } } };
-    let plan = null;
-    try { plan = ctx.run(args); } catch (e) { plan = null; }
-    const nw = plan && ctx.isDayPlan(plan) ? ctx.planStops(plan) : null;
+    const explicit = { ...((state.args.overrides || {}).stopStarts || {}), [s.key]: op.n };
+    const args = { ...state.args, pinned, trustedPins: Object.keys(pinned), swap: null, overrides: { ...(state.args.overrides || {}), stopStarts: { ...startsOf(state.stops, [s.key]), ...explicit } } };
+    const ran = runSteady(ctx, args, state.stops);
+    const plan = ran.plan, nw = ran.nw || null;
+    if (plan) ran.args.overrides = { ...ran.args.overrides, stopStarts: explicit };
     const at = nw && nw.find((x) => x.key === s.key && x.id === s.id);
-    if (!at || at.start !== op.n || !state.stops.every((x) => nw.some((y) => y.id === x.id))) { r.why = 'no_fit'; return { result: r }; }
+    // The planner says why it refused (closed then, or no room): stopStartRefused [{ key, reason, opensMinutes, closesMinutes }].
+    const refused = plan && Array.isArray(plan.stopStartRefused) ? plan.stopStartRefused.find((x) => x.key === s.key) : null;
+    if (refused) { r.why = 'refused'; r.refused = refused; return { result: r }; }
+    if (!at || at.start !== op.n || !state.stops.every((x) => nw.some((y) => y.id === x.id)) || !nw.every((y) => state.stops.some((x) => x.id === y.id))) { r.why = 'no_fit'; return { result: r }; }
     r.ok = true; r.fresh = at;
-    return { plan, nw, args, result: r };
+    return { plan, nw, args: ran.args, result: r };
   }
   const anchor = now(op.stops[1]);
   const day = op.day || (anchor && anchor.day) || s.day;
@@ -265,27 +293,36 @@ function moveStop(op, state, ctx) {
   else order = order.filter((p) => p !== 'midday' && p !== 'evening');
   order = [...new Set(order)].filter((p) => !(day === s.day && p === partOf(s.key)));
   // A free part of the day first; else the stop there trades places (never a meal with a non-meal, or a stop the visitor kept).
-  let to = order.find((p) => !occ.has(p)) || null, other = null;
-  if (!to) {
-    const p = order.find((q) => { const x = occ.get(q); return x && !!x.role === !!s.role && (state.locks || {})[x.key] !== x.id; });
-    if (p) { to = p; other = occ.get(p); }
+  let to = null, other = null;
+  for (const p of order) {
+    const x = occ.get(p);
+    if (!x) { to = p; break; }
+    if (!!x.role === !!s.role && (state.locks || {})[x.key] !== x.id) { to = p; other = x; break; }
   }
   if (!to) { r.why = 'no_room'; r.day = day; return { result: r }; }
   const toKey = `${day}-${to}`;
+  // The planner's moves hook (a stop in the target slot trades places); without it, the same by pins.
+  const useHook = !!(ctx.hooks && ctx.hooks.moves);
   const pinned = {};
-  for (const x of state.stops) { if (!/^\d-/.test(x.key)) continue; pinned[x.id === s.id ? toKey : other && x.id === other.id ? s.key : x.key] = x.id; }
-  const args = { ...state.args, pinned, swap: null, ...(ctx.hooks && ctx.hooks.moves ? { moves: [{ from: s.key, to: toKey }, ...(other ? [{ from: toKey, to: s.key }] : [])] } : {}) };
-  let plan = null;
-  try { plan = ctx.run(args); } catch (e) { plan = null; }
-  const nw = plan && ctx.isDayPlan(plan) ? ctx.planStops(plan) : null;
+  for (const x of state.stops) { if (!/^\d-/.test(x.key)) continue; pinned[useHook ? x.key : x.id === s.id ? toKey : other && x.id === other.id ? s.key : x.key] = x.id; }
+  // The stop moved (and the one that trades places with it) is free to take its new time; every other stop keeps its own.
+  const free = [s.key, toKey];
+  const kept = { ...((state.args.overrides || {}).stopStarts || {}) };
+  for (const k of free) delete kept[k];
+  const args = { ...state.args, pinned, swap: null, ...(useHook ? { trustedPins: Object.keys(pinned).filter((k) => !free.includes(k)), moves: [{ from: s.key, to: toKey }], overrides: { ...(state.args.overrides || {}), stopStarts: { ...startsOf(state.stops, free), ...kept } } } : {}) };
+  const ran = useHook ? runSteady(ctx, args, state.stops) : (() => { try { const p = ctx.run(args); return p && ctx.isDayPlan(p) ? { plan: p, nw: ctx.planStops(p), args } : {}; } catch (e) { return {}; } })();
+  const plan = ran.plan || null, nw = ran.nw || null;
+  if (plan && useHook) { ran.args.overrides = { ...ran.args.overrides, stopStarts: kept }; if (!Object.keys(kept).length) delete ran.args.overrides.stopStarts; }
   const at = nw && nw.find((x) => x.key === toKey && x.id === s.id);
+  const conflict = plan && Array.isArray(plan.moveConflicts) ? plan.moveConflicts.find((x) => x.from === s.key) : null;
+  if (conflict) r.conflict = conflict.reason;
   // Every other stop is still on the plan (a move never drops one).
-  if (!at || !state.stops.every((x) => nw.some((y) => y.id === x.id))) { r.why = 'no_fit'; r.day = day; return { result: r }; }
+  if (!at || !state.stops.every((x) => nw.some((y) => y.id === x.id)) || !nw.every((y) => state.stops.some((x) => x.id === y.id))) { r.why = 'no_fit'; r.day = day; return { result: r }; }
   // "before lunch" really is before it.
   if (anchor) { const a2 = nw.find((x) => x.id === anchor.id); if (a2 && Number.isInteger(a2.start) && Number.isInteger(at.start) && (r.before ? at.start >= a2.start : at.start <= a2.start)) { r.why = 'no_fit'; return { result: r }; } }
   r.ok = true; r.fresh = at; r.toDay = day !== s.day ? day : null;
   r.other = other ? nw.find((x) => x.id === other.id) || null : null;
-  return { plan, nw, args, result: r };
+  return { plan, nw, args: ran.args, result: r };
 }
 
 // ---------- Questions, answered from the listing's own stored facts ----------
@@ -400,6 +437,7 @@ const AGENT_T = {
     adults: 'Set for {n} adults.', adult1: 'Set for 1 adult.',
     days_max: 'A plan can be 7 days at most.', days_min: 'This plan is already a single day.', nightIn: 'Added a night: day {d} is in {town}.', nightInMiss: 'Added a day, but I couldn’t base it in {town}.',
     movedTo: 'Moved {name} to {when}.', movedDay: 'day {d}', movedSwap: '{other} takes its place{at}.', moveNoRoom: 'There’s no free spot for {name} there. Remove or swap a stop first.', moveFail: 'I couldn’t move {name} there: it isn’t open then or doesn’t fit.',
+    setTimeClosed: '{name} isn’t open at {time} (its listed hours are {from} to {to}), so it stays where it is.', setTimeNoRoom: 'There’s no room to put {name} at {time} without moving another stop.', moveClosed: '{name} isn’t open then, so it stays where it is.',
     setTime: '{name} is now at {time}.', setTimeFail: 'I couldn’t put {name} at {time}: it isn’t open then or it clashes with another stop.',
   },
   fr: {
@@ -425,6 +463,7 @@ const AGENT_T = {
     adults: 'Prévu pour {n} adultes.', adult1: 'Prévu pour 1 adulte.',
     days_max: 'Un plan peut compter 7 jours au plus.', days_min: 'Ce plan tient déjà en une journée.', nightIn: 'J’ai ajouté une nuit : le jour {d} est à {town}.', nightInMiss: 'J’ai ajouté un jour, mais je n’ai pas pu le baser à {town}.',
     movedTo: 'J’ai déplacé {name} : {when}.', movedDay: 'jour {d}', movedSwap: '{other} prend sa place{at}.', moveNoRoom: 'Pas de place libre pour {name} à ce moment. Retirez ou remplacez un arrêt d’abord.', moveFail: 'Je n’ai pas pu déplacer {name} à ce moment : ce n’est pas ouvert ou ça ne s’insère pas.',
+    setTimeClosed: '{name} n’est pas ouvert à {time} (ses heures : de {from} à {to}), donc il reste où il est.', setTimeNoRoom: 'Pas de place pour mettre {name} à {time} sans déplacer un autre arrêt.', moveClosed: '{name} n’est pas ouvert à ce moment, donc il reste où il est.',
     setTime: '{name} est maintenant à {time}.', setTimeFail: 'Je n’ai pas pu mettre {name} à {time} : ce n’est pas ouvert à cette heure ou ça chevauche un autre arrêt.',
   },
 };
@@ -443,6 +482,6 @@ const PROMPT_LINES = [
 ];
 
 module.exports = {
-  TOUR_KINDS, TOUR_TYPES, tourKindOf, splitAsks, readAll, agentRules, weekdayIn, wdOfDate, moveStop, answerQuestion, parseWeek, AGENT_T, PROMPT_LINES, Q_VALUES,
+  TOUR_KINDS, TOUR_TYPES, tourKindOf, runSteady, startsOf, stripExtras, splitAsks, readAll, agentRules, weekdayIn, wdOfDate, moveStop, answerQuestion, parseWeek, AGENT_T, PROMPT_LINES, Q_VALUES,
   STAY_REMOVE_RE, STAY_ADD_RE, NIGHT_ADD_RE, fold, km,
 };

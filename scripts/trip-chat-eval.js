@@ -26,7 +26,7 @@ const PLANS = {
 const CASES = [
   // Round 5 (2026-11-23, fourth fresh-eyes test).
   { plan: 'wine', msg: 'something more romantic for dinner', ops: [{ o: 'budget', value: 'upscale', sel: { role: 'dinner', nth: 1 } }] },
-  { plan: 'wine', msg: 'what time does the first stop open?', cant: ['info', 'other', 'unclear'] },
+  { plan: 'wine', msg: 'what time does the first stop open?', cant: ['info', 'other', 'unclear', 'ask_which'], orOps: [{ o: 'ask', value: 'q_open' }] },
   { plan: 'wine', msg: 'add a movie after dinner', ops: [{ o: 'add', kind: 'cinema', sel: { role: 'dinner', nth: 1 } }] },
   // Round 4 (2026-11-23, third fresh-eyes test): the phrases that failed live.
   { plan: 'wine', msg: 'swap dinner for pizza', ops: [{ o: 'replace', kind: 'pizza', sel: { role: 'dinner', nth: 1 } }] },
@@ -35,7 +35,7 @@ const CASES = [
   { plan: 'wine', msg: 'swap dinner for something fancier', ops: [{ o: 'budget', value: 'upscale', sel: { role: 'dinner', nth: 1 } }] },
   { plan: 'wine', msg: 'something cheaper for dinner', ops: [{ o: 'budget', value: 'budget', sel: { role: 'dinner', nth: 1 } }] },
   { plan: 'wine', msg: 'sunset dinner with a lake view', ops: [{ o: 'replace', kind: 'lake_view', sel: { role: 'dinner', nth: 1 } }] },
-  { plan: 'wine', msg: 'dinner is too late for the kids, make it 5:30', cant: ['time_at'] },
+  { plan: 'wine', msg: 'dinner is too late for the kids, make it 5:30', ops: [{ o: 'set_time', n: 1050, sel: { role: 'dinner', nth: 1 } }] },
   { plan: 'beer', msg: 'add ice cream after lunch on day 1', ops: [{ o: 'add', kind: 'ice_cream', sel: { role: 'lunch', day: 1 } }] },
   { plan: 'wine', msg: 'remove the second winery', ops: [{ o: 'remove', sel: { type: 'winery', nth: 2 } }] },
   { plan: 'wine', msg: 'loved the first winery, more like that', ops: [{ o: 'more_like', sel: { type: 'winery', nth: 1 } }] },
@@ -59,11 +59,56 @@ const CASES = [
   { plan: 'beer', msg: "we're bringing our dog", ops: [{ o: 'party', value: 'dog' }] },
   { plan: 'beer', msg: 'start over', ops: [{ o: 'start_over' }] },
   { plan: 'beer', msg: 'base us in Kelowna instead', ops: [{ o: 'town', region: 'kelowna' }] },
-  { plan: 'beer', msg: 'we need a shuttle from the airport', cant: ['transport'] },
+  { plan: 'beer', msg: 'we need a shuttle from the airport', ops: [{ o: 'transport', value: 'shuttle' }] },
   { plan: 'beer', msg: 'start day 1 later, we like to sleep in', ops: [{ o: 'time', value: 'later', day: 1 }] },
   { plan: 'fr', msg: 'enlève le deuxième vignoble', lang: 'fr', ops: [{ o: 'remove', sel: { type: 'winery', nth: 2 } }] },
   { plan: 'fr', msg: 'souper moins cher', lang: 'fr', ops: [{ o: 'budget', value: 'budget', sel: { role: 'dinner' } }] },
   { plan: 'fr', msg: "plus relax s'il vous plaît, on a deux enfants", lang: 'fr', ops: [{ o: 'pace', value: 'relaxed' }, { o: 'party', value: 'kids' }] },
+  // Travel agent abilities (2026-11-22, trip-chat-agent.js): a stay on any plan, tours as stops, several asks, questions,
+  // getting there, the shape of the trip.
+  { plan: 'wine', msg: 'find us a place to stay', ops: [{ o: 'stay', value: 'add' }] },
+  { plan: 'wine', msg: 'add a hotel', ops: [{ o: 'stay', value: 'hotel' }] },
+  { plan: 'wine', msg: 'we need somewhere to sleep tonight', ops: [{ o: 'stay', value: 'add' }] },
+  { plan: 'wine', msg: 'somewhere with a hot tub', ops: [{ o: 'stay', value: 'hot_tub' }] },
+  { plan: 'wine', msg: 'find us a place to stay with a hot tub', ops: [{ o: 'stay', value: 'hot_tub' }] },
+  { plan: 'wine', msg: 'remove the hotel', ops: [{ o: 'stay', value: 'have_place' }] },
+  { plan: 'wine', msg: "we're staying with friends", ops: [{ o: 'stay', value: 'have_place' }] },
+  { plan: 'beer', msg: 'find us a cheaper place to stay', ops: [{ o: 'stay', value: 'budget' }] },
+  { plan: 'wine', msg: 'add a wine tour', ops: [{ o: 'add', kind: 'wine_tour' }] },
+  { plan: 'wine', msg: 'book us a wine tour', ops: [{ o: 'add', kind: 'wine_tour' }] },
+  { plan: 'wine', msg: 'a boat cruise in the afternoon', ops: [{ o: 'add', kind: 'boat_tour' }] },
+  { plan: 'wine', msg: 'can we go ziplining?', ops: [{ o: 'add', kind: 'zipline' }] },
+  { plan: 'wine', msg: 'add a helicopter tour', ops: [{ o: 'add', kind: 'heli' }] },
+  { plan: 'beer', msg: 'a boat cruise on day 2', ops: [{ o: 'add', kind: 'boat_tour', day: 2 }] },
+  { plan: 'wine', msg: 'remove the second winery, add a wine tour and find us a hotel with a pool', ops: [{ o: 'remove', sel: { type: 'winery', nth: 2 } }, { o: 'add', kind: 'wine_tour' }, { o: 'stay', value: 'pool' }, { o: 'stay', value: 'hotel' }] },
+  { plan: 'wine', msg: 'drop the first winery and add ice cream after lunch', ops: [{ o: 'remove', sel: { type: 'winery', nth: 1 } }, { o: 'add', kind: 'ice_cream', sel: { role: 'lunch', nth: 1 } }] },
+  { plan: 'wine', msg: 'is the second winery open Sunday?', ops: [{ o: 'ask', value: 'q_open', sel: { type: 'winery', nth: 2 } }] },
+  { plan: 'wine', msg: 'why the first winery?', ops: [{ o: 'ask', value: 'q_why', sel: { type: 'winery', nth: 1 } }] },
+  { plan: 'wine', msg: 'is the second winery good for kids?', ops: [{ o: 'ask', value: 'q_kids', sel: { type: 'winery', nth: 2 } }] },
+  { plan: 'wine', msg: 'how far is the second winery from the hotel?', ops: [{ o: 'ask', value: 'q_far', sel: { type: 'winery', nth: 2 } }] },
+  { plan: 'wine', msg: 'are dogs allowed at the second winery?', ops: [{ o: 'ask', value: 'q_dog', sel: { type: 'winery', nth: 2 } }] },
+  { plan: 'wine', msg: 'how much is dinner?', ops: [{ o: 'ask', value: 'q_price', sel: { role: 'dinner', nth: 1 } }] },
+  { plan: 'wine', msg: "we're flying into YLW", ops: [{ o: 'transport', value: 'fly_in' }] },
+  { plan: 'wine', msg: 'we need an airport shuttle', ops: [{ o: 'transport', value: 'shuttle' }] },
+  { plan: 'wine', msg: 'no car after all', ops: [{ o: 'transport', value: 'no_rental' }] },
+  { plan: 'wine', msg: 'we need a rental car', ops: [{ o: 'transport', value: 'rental' }] },
+  { plan: 'beer', msg: 'we need a car for day 2 only', ops: [{ o: 'transport', value: 'rental', day: 2 }] },
+  { plan: 'wine', msg: 'we are 4 adults', ops: [{ o: 'party', value: 'adults', n: 4 }] },
+  { plan: 'wine', msg: 'move dinner to 6:30', ops: [{ o: 'set_time', n: 1110, sel: { role: 'dinner', nth: 1 } }] },
+  { plan: 'wine', msg: 'do the second winery before lunch', ops: [{ o: 'move', first: { type: 'winery', nth: 2 } }] },
+  { plan: 'beer', msg: 'add a night', ops: [{ o: 'days', n: 3 }] },
+  { plan: 'beer', msg: 'add a night in Kelowna', ops: [{ o: 'days', n: 3, region: 'kelowna' }] },
+  { plan: 'beer', msg: 'remove a day', ops: [{ o: 'days', n: 1 }] },
+  { plan: 'fr', msg: 'trouve-nous un hôtel avec piscine', lang: 'fr', ops: [{ o: 'stay', value: 'pool' }, { o: 'stay', value: 'hotel' }] },
+  { plan: 'fr', msg: 'on a besoin d’un endroit où dormir', lang: 'fr', ops: [{ o: 'stay', value: 'add' }] },
+  { plan: 'fr', msg: 'enlève l’hôtel', lang: 'fr', ops: [{ o: 'stay', value: 'have_place' }] },
+  { plan: 'fr', msg: 'ajoute un tour des vignobles', lang: 'fr', ops: [{ o: 'add', kind: 'wine_tour' }] },
+  { plan: 'fr', msg: 'ajoute une croisière', lang: 'fr', ops: [{ o: 'add', kind: 'boat_tour' }] },
+  { plan: 'fr', msg: 'on arrive en avion', lang: 'fr', ops: [{ o: 'transport', value: 'fly_in' }] },
+  { plan: 'fr', msg: 'est-ce que le premier vignoble est ouvert dimanche?', lang: 'fr', ops: [{ o: 'ask', value: 'q_open', sel: { type: 'winery', nth: 1 } }] },
+  { plan: 'fr', msg: 'pourquoi le premier vignoble?', lang: 'fr', ops: [{ o: 'ask', value: 'q_why', sel: { type: 'winery', nth: 1 } }] },
+  { plan: 'fr', msg: 'nous sommes 4 adultes', lang: 'fr', ops: [{ o: 'party', value: 'adults', n: 4 }] },
+  { plan: 'fr', msg: 'enlève le deuxième vignoble et ajoute un tour des vignobles', lang: 'fr', ops: [{ o: 'remove', sel: { type: 'winery', nth: 2 } }, { o: 'add', kind: 'wine_tour' }] },
 ];
 
 function pick(stops, sel) {
@@ -77,6 +122,7 @@ function opMatches(got, want, stops) {
   for (const k of ['value', 'kind', 'n', 'region']) if (want[k] !== undefined && got[k] !== want[k]) return false;
   if (want.day !== undefined && (got.day || null) !== want.day && !(got.stops || []).some((s) => s.day === want.day)) return false;
   if (want.ages && JSON.stringify((got.ages || []).slice().sort((a, b) => a - b)) !== JSON.stringify(want.ages)) return false;
+  if (want.first && !((got.stops || [])[0] && pick(stops, want.first).includes(got.stops[0].id))) return false;
   if (want.sel) {
     const ids = (got.stops || []).map((s) => s.id).sort();
     if (JSON.stringify(ids) !== JSON.stringify(pick(stops, want.sel).sort())) return false;
@@ -133,13 +179,14 @@ const pct = (a, q) => { if (!a.length) return null; const s = a.slice().sort((x,
     const mergedOk = merged ? scoreCase(c, merged.ops, merged.cant, P.stops) : null;
     const answerMs = ai ? (tc.rulesConfident(rules) ? Math.min(ai.ms, grace) : ai.ms) : 0;
     // The whole turn (planner + reply) with the model's answer (live) or the ideal answer (mocked).
-    const turnOps = ai && ai.ok ? ai.ops : idealOps(c, P.stops);
+    // The planner's part: the place to stay, getting there, questions and the number of adults are answered by the server, not planTurn.
+    const turnOps = (ai && ai.ok ? ai.ops : idealOps(c, P.stops)).filter((o) => !['stay', 'transport', 'ask', 'avoid'].includes(o.o) && !(o.o === 'party' && o.value === 'adults'));
     const t0 = Date.now();
     const out = turnOps.length ? tc.planTurn(turnOps, { args: app.parseTripPlanBody({ text: P.text }, { v4: true }).value, locks: {}, removed: [], stops: P.stops, days: Math.max(...P.stops.map((s) => s.day)), regionLabels: app.REGION_LABELS, lang,
       run: (a) => app.runTripPlanRequest({ text: a.text, seed: a.seed || 0, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: a.pinned || null, overrides: a.overrides || null, swap: a.swap || null, v4: true }, false) }) : null;
     const planMs = Date.now() - t0;
     const reply = out ? tc.buildReply(out, { lang, regionLabels: app.REGION_LABELS }) : tc.cantReply((ai && ai.ok && ai.cant) || (c.cant && c.cant[0]) || 'unclear', lang);
-    const fulfilled = c.cant ? null : !!out && out.results.every((r) => r.ok !== false);
+    const fulfilled = c.cant || !turnOps.length ? null : !!out && out.results.every((r) => r.ok !== false);
     rows.push({ c, rulesOk, aiOk, ai, planMs, reply, fulfilled, merged, mergedOk, answerMs });
     console.log(`${rulesOk ? '✓' : '✗'} rules${live ? `  ${aiOk ? '✓' : '✗'} ai ${ai.ms}ms $${(ai.costUsd || 0).toFixed(5)}${ai.ok ? '' : ` (${ai.reason})`}` : ''}  [${c.plan}] ${c.msg}\n      -> ${reply}  (planner ${planMs} ms${fulfilled === false ? ', not fully done' : ''})`);
   }

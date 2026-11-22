@@ -94,7 +94,7 @@ test('the word rules stand where they read a specific edit: bowling or a movie, 
   assert.deepEqual(brief(m), [['remove', null, [25], null]], 'Sunday ends with lunch (lunch stays); getting here is untouched');
   assert.deepEqual(brief(R('something more romantic for dinner on Saturday')), [['budget', null, [15], 'upscale']]);
   const q = R('what time do the lifts open?');
-  assert.equal(q.cant, 'info');
+  assert.equal(q.cant, 'ask_which', 'a question with no stop it can be about asks which stop (travel agent abilities answer it from the listing when one is named)');
   assert.match(tc.cantReply('info', 'en'), /Tap the stop’s name/);
 });
 

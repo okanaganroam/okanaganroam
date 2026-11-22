@@ -266,7 +266,8 @@ test('events: "take out the brewery event, we don\'t drink" takes the event out 
 test('a clock time for one stop is said plainly (no day shift); "afternoon" is not "after dinner"; the town of the stay is the one named', async () => {
   const R = (m) => tc.rulesRead(m, DAY, { regions: [], regionLabels: {}, days: 1 });
   assert.equal(R('move it to 6:30').cant, 'time_at');
-  assert.equal(R('move dinner to 7').cant, 'time_at');
+  // Travel agent abilities (2026-11-22): a stop named with a clock time is one stop's own time (the planner's stopStarts).
+  assert.deepEqual(R('move dinner to 7').ops.map((o) => [o.o, o.n, o.stops[0].id]), [['set_time', 1140, 15]]);
   assert.deepEqual(R('make it 3 days').ops.map((o) => [o.o, o.n]), [['days', 3]]);
   assert.equal(tc.cantReply('time_at', 'en'), 'I can’t set an exact time for one stop yet. I can start the day earlier or later, or swap that stop.');
   let m = tc.reconcileReads({ ok: true, cant: null, ops: [OP({ o: 'time', value: 'earlier', stops: [DAY[4]] })] }, R('move it to 6:30'), 'move it to 6:30');
@@ -284,13 +285,14 @@ test('a clock time for one stop is said plainly (no day shift); "afternoon" is n
 
 test('a wine tour with a driver is offered (or said plainly when we have none); "coming from Vancouver" in the first request hides Rent a car', async () => {
   const R = (m) => tc.rulesRead(m, DAY, { regions: [], regionLabels: {}, days: 1 });
-  assert.deepEqual(R('book us a wine tour with a driver on saturday').ops.map((o) => [o.o, o.value]), [['transport', 'wine_tour']]);
+  // Travel agent abilities: a wine tour asked for is a stop to add; "no driving" still offers the tour with a driver.
+  assert.deepEqual(R('book us a wine tour with a driver on saturday').ops.map((o) => [o.o, o.kind]), [['add', 'wine_tour']]);
   assert.deepEqual(R('no driving after wineries').ops.map((o) => [o.o, o.value]), [['transport', 'wine_tour']]);
   const text = 'a day in Kelowna with wineries';
   const plan = planNow(text);
   const r = await chat(bodyFor(plan, 'book us a wine tour with a driver on saturday', text));
   assert.notEqual(r.j.reply, tc.T.en.booking, 'never "I can\'t book things in this chat"');
-  if (r.j.card) { assert.equal(r.j.card.kind, 'wine_tour'); assert.match(r.j.card.url, /^https:\/\/www\.viator\.com\//); assert.match(r.j.reply, /^Here’s a wine tour with a driver for Kelowna/); } else assert.equal(r.j.reply, 'I don’t have a wine tour to offer for Kelowna right now.');
+  if (r.j.card) { assert.equal(r.j.card.kind, 'wine_tour'); assert.match(r.j.card.url, /^https:\/\/www\.viator\.com\//); assert.match(r.j.reply, /here’s one to book for Kelowna/); } else assert.match(r.j.reply, /^(?:Done\. Added .+|We don’t list a wine tour that fits there\.)/);
   process.env.DISCOVERCARS_AID = 'okanaganroam';
   try {
     const flying = planNow('2 days in Penticton with the kids');

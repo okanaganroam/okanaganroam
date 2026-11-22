@@ -399,7 +399,7 @@ test('reconcileReads: confident rules correct the AI; unsure rules leave it alon
   m = tc.reconcileReads(ok([], 'transport'), R("we're taking the bus"), "we're taking the bus");
   assert.equal(m.source, 'rules_over_ai'); assert.equal(m.ops[0].o, 'transport'); assert.equal(m.ops[0].value, 'no_car');
   m = tc.reconcileReads(ok([O({ o: 'town', region: 'penticton' })]), R('we want to stay in Penticton'), 'we want to stay in Penticton');
-  assert.equal(m.ops[0].o, 'stay'); assert.equal(m.ops[0].region, 'penticton'); assert.deepEqual(m.fixes, ['town_to_stay']);
+  assert.equal(m.ops[0].o, 'stay'); assert.equal(m.ops[0].region, 'penticton'); assert.deepEqual(m.fixes, ['agent'], 'the stay as the rules read it stands');
   // "base us in Penticton" is a town: the rules agree with the AI, nothing changes.
   m = tc.reconcileReads(ok([O({ o: 'town', region: 'penticton' })]), R('base us in Penticton instead'), 'base us in Penticton instead');
   assert.equal(m.source, 'ai'); assert.equal(m.ops[0].o, 'town');
