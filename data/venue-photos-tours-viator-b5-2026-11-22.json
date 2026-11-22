@@ -1,0 +1,18 @@
+{
+ "reason": "Tours batch 5 (Viator operators): real photo of each new tour listing, credited",
+ "batch_id": "photos-tours-viator-b5-2026-11-22",
+ "note": "Keyed by region + slug: the venues are created by drafts/tours-viator-2026-11-batch5/run.sh; drafts/tours-viator-2026-11-batch5/apply-photos.js looks up their ids at run time and applies with scripts/apply-venue-updates.js.",
+ "venues": [
+  {
+   "name": "Metropolis Wine Tours",
+   "region": "kelowna",
+   "slug": "metropolis-wine-tours",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/metropolis-wine-tours-2610.jpg?v=20261122"
+   }
+  }
+ ]
+}

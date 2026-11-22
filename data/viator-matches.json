@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-21",
+ "updated": "2026-11-22",
  "source": "matches-okanagan.csv",
  "how": "scripts/viator-match.js then rows marked ok by Dayton, applied by scripts/viator-apply.js",
  "venues": {
@@ -18,6 +18,14 @@
    "supplier": "Okanagan Spirits Craft Distillery",
    "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Farm-to-Flask-Tasting-Experience/d22366-393825P1?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
    "approved": "2026-11-21"
+  },
+  "1443": {
+   "name": "Myra Canyon Bicycle Rental & Tours",
+   "productCode": "111512P2",
+   "title": "Guided Bike Tour on Historical Kettle Valley Railway at Myra Canyon & Wine Tour",
+   "supplier": "Myra Canyon Bike Rentals and Tours",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Bicycle-Tour-on-Historical-Kettle-Valley-Railway-at-Myra-Canyon-and-Wine-Tour/d22366-111512P2?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-22"
   },
   "1495": {
    "name": "Kelowna Karting & Entertainment",
