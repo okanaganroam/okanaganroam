@@ -5,6 +5,7 @@ const SITE_PAGE=require('./trip-site.js').page;
 const V4_PAGE=require('./trip-planner-v4-page.js');
 const CHAT_PAGE = require('./trip-chat-page.js');
 const WORKSPACE_PAGE = require('./trip-workspace-layout.js');
+const START_PAGE = require('./trip-start-page.js');
 
 // ---------- Build My Trip V3 page (Step 2, 2026-09-29) ----------
 //
@@ -1474,7 +1475,7 @@ function renderBody(d) {
   const chips = T3_EXAMPLES.map((e, i) => `<button type="button" class="t3-example" data-t3-example data-i18n="tripv3.example${i + 1}">${esc(e)}</button>`).join('\n          ');
   // Speed pass 6 (2026-10-19): the hero is a dimmed backdrop (opacity 0.55) behind the composer, yet every phone
   // took the 1600px file (127 KB). Phones get an 800px copy, wider screens a 1200px one where it is enough.
-  return `<main class="t3${d.v4 ? ' t3-v4' : ''}" id="tripV3">
+  const body = `<main class="t3${d.v4 ? ' t3-v4' : ''}" id="tripV3">
   <section class="t3-hero" aria-labelledby="t3Title">
     <picture><source media="(max-width: 640px)" srcset="/images/trip-v3/hero-w800.webp"><img class="t3-hero-img" src="/images/trip-v3/hero.webp" width="1600" height="656" srcset="/images/trip-v3/hero-w1200.webp 1200w, /images/trip-v3/hero.webp 1600w" sizes="100vw" alt="" fetchpriority="high"></picture>
     <div class="t3-hero-scrim"></div>
@@ -1510,6 +1511,7 @@ ${d.stays ? t3StayInputsHtml() + (d.viator ? T3_VIATOR_STYLES + '\n' : '') : ''}
   <section class="t3-wrap t3-result" id="t3Result" hidden aria-labelledby="t3Headline"></section>
   ${t3AboutHtml(d)}
 </main>`;
+  return d.v4 && d.chat ? START_PAGE.renderStart(body,d) : body;
 }
 
 function renderScript(d) {
@@ -3115,7 +3117,7 @@ ${d.stays ? "    html += t3StayCardHtml();\n" + (d.viator ? "    if (!t3StayData
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); }
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-t3-request]'), function(btn){
-    btn.addEventListener('click', function(){ input.value = btn.getAttribute('data-t3-request'); exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
+    btn.addEventListener('click', function(){ input.value = (lang() === 'fr' && btn.getAttribute('data-t3-request-fr')) || btn.getAttribute('data-t3-request'); exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
   });
   Array.prototype.forEach.call(document.querySelectorAll('[data-t3-example]'), function(chip){
     chip.addEventListener('click', function(){ input.value = chip.textContent; exampleSubmit = true; form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); });
@@ -3136,6 +3138,7 @@ ${d.stays ? "    html += t3StayCardHtml();\n" + (d.viator ? "    if (!t3StayData
       var ex = ${JSON.stringify(SITE_PAGE.townExamples)};
       var fill = function(s){ return s.split('{n}').join(n); };
       var texts = (fr ? ex.fr : ex.en).map(fill);
+${d.v4 && d.chat ? "      Array.prototype.forEach.call(document.querySelectorAll('.ts-card[data-t3-request]'), function(card){ ['data-t3-request','data-t3-request-fr'].forEach(function(a){card.setAttribute(a,card.getAttribute(a).replace(/Kelowna|Penticton/g,n));}); card.querySelectorAll('.ts-card-sub span').forEach(function(label){label.textContent=label.textContent.replace(/Kelowna|Penticton/g,n);}); });" : ''}
       Array.prototype.forEach.call(document.querySelectorAll('[data-t3-example]'), function(chip, i){
         if (!texts[i]) return;
         chip.removeAttribute('data-i18n'); chip.textContent = texts[i];
@@ -3240,7 +3243,7 @@ ${d.breadcrumbJson}
 <link rel="stylesheet" href="/styles/app.css">
 <style>${d.footerStyles}</style>
 ${renderStyles()}
-${d.v4 ? V4_PAGE.V4_STYLES + '\n' : ''}${d.v4 && d.chat ? CHAT_PAGE.CHAT_STYLES + WORKSPACE_PAGE.WORKSPACE_STYLES + '\n' : ''}${d.analyticsHead}
+${d.v4 ? V4_PAGE.V4_STYLES + '\n' : ''}${d.v4 && d.chat ? CHAT_PAGE.CHAT_STYLES + WORKSPACE_PAGE.WORKSPACE_STYLES + START_PAGE.START_STYLES + '\n' : ''}${d.analyticsHead}
 </head>
 <body class="page-trip page-trip-v3">
 ${d.tripTrayHtml}
