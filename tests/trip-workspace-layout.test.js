@@ -74,3 +74,10 @@ test('"Book my trip" is one button under the plan that opens the checklist sheet
  assert.match(html,/function tripWorkspaceEventHtml/);assert.match(html,/function twCanBook/);
  for(const m of html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)){if(m[0].includes('application/ld+json'))continue;new vm.Script(m[1]);}
 });
+test('a removed event stays off after a reload (kept with the plan for this tab), and the Getting here section opens for the no-car reply',()=>{
+ assert.match(v4.V4_CLIENT_SRC,/gone: v4\.gone, goneEvents: typeof chat !== 'undefined' && chat \? chat\.goneEvents : undefined/);
+ assert.match(v4.V4_CLIENT_SRC,/if \(typeof chat !== 'undefined' && chat && o\.goneEvents\) chat\.goneEvents = o\.goneEvents;/);
+ const page=chatPage.chatClientSrc({v4:'on',chat:'on',stays:'on'});
+ assert.equal((page.match(/v4CacheSave\(\);/g)||[]).length,2);
+ assert.match(page,/acts\.transport === 'rental' \|\| acts\.transport === 'no_car'\) changed\.push\('gh'\)/);
+});

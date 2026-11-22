@@ -186,7 +186,7 @@ const V4_CLIENT_SRC = String.raw`
   function v4CacheKey(search){ return String(search || '').replace(/^\?/, '').split('&').filter(function(x){ return x && !/^(?:ok|v)=/.test(x); }).join('&'); }
   function v4CacheSave(){
     if (!state.last) return;
-    try { sessionStorage.setItem('t3v4plan', JSON.stringify({ key: v4CacheKey(location.search), last: state.last, lastReq: state.lastReq, removed: state.removed, locks: state.locks, exclude: state.exclude, gone: v4.gone })); } catch (e) {}
+    try { sessionStorage.setItem('t3v4plan', JSON.stringify({ key: v4CacheKey(location.search), last: state.last, lastReq: state.lastReq, removed: state.removed, locks: state.locks, exclude: state.exclude, gone: v4.gone, goneEvents: typeof chat !== 'undefined' && chat ? chat.goneEvents : undefined })); } catch (e) {}
   }
   function v4FromCache(){
     var o = null;
@@ -194,6 +194,8 @@ const V4_CLIENT_SRC = String.raw`
     if (!o || !o.last || o.key !== v4CacheKey(location.search)) return false;
     state.last = o.last; state.lastReq = o.lastReq || null; state.removed = o.removed || {}; state.locks = o.locks || {}; state.exclude = o.exclude || [];
     v4.gone = o.gone || {};
+    // An event taken off the plan stays off after a reload, like a removed stop.
+    if (typeof chat !== 'undefined' && chat && o.goneEvents) chat.goneEvents = o.goneEvents;
     try { render(true); } catch (e) { return false; }
     return true;
   }

@@ -500,6 +500,7 @@ function chatClientSrc(d) {
       render(false);
       var xu = resultEl.querySelector('[data-v4-event-undo="' + xid + '"]'); if (xu) { try { xu.focus({ preventScroll: true }); } catch (err) {} }
       if (xname && typeof announce === 'function') announce(tx('tripv3.wasRemoved', { name: xname }));
+      v4CacheSave();
       return;
     }
     if ((b = t.closest('[data-v4-event-undo]'))) {
@@ -507,6 +508,7 @@ function chatClientSrc(d) {
       delete chat.goneEvents[uid]; v4.saved = false;
       render(false);
       var ux = resultEl.querySelector('[data-v4-event-x="' + uid + '"]'); if (ux) { try { ux.focus({ preventScroll: true }); } catch (err) {} }
+      v4CacheSave();
       return;
     }
     if ((b = t.closest('[data-v4-stay-more]'))) { chat.stayMore = !chat.stayMore; render(false); return; }
