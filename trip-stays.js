@@ -332,7 +332,7 @@ function whereToStay(plan, input, stays, today, opts = {}) {
   if (!picked) return null;
   return {
     stayId: picked.pick.id,
-    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, kids: ctx.kids, dog: !!ctx.dog, datesGiven: ctx.datesGiven },
+    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, kids: ctx.kids, ...(input && Array.isArray(input.kidAges) && input.kidAges.length === ctx.kids ? { kidAges: input.kidAges.slice() } : {}), dog: !!ctx.dog, datesGiven: ctx.datesGiven },
     pick: picked.pick,
     alternatives: picked.alternatives,
   };

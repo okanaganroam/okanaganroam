@@ -70,10 +70,28 @@ const CHAT_STYLES = `<style>
   .t3-v4 .v4-gh-row a { font-weight: 800; color: var(--ref-navy); white-space: nowrap; min-height: 32px; display: inline-flex; align-items: center; }
   .t3-v4 .v4-confirm-end { margin: 18px 0 6px; text-align: center; }
   .t3-v4 .v4-bar.has-chat:not(.is-confirmed) .v4-bar-main { display: none; }
+  /* Fix round (2026-11-22): after Confirm the last reply is one line, the price line is short, the toast sits above the bar. */
+  .t3-v4 .v4-bar.has-chat.is-confirmed .v4-chat-you { display: none; }
+  .t3-v4 .v4-bar.has-chat.is-confirmed .v4-chat-agent { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .t3-v4 .v4-bar.has-chat.is-confirmed .v4-chat-reply { margin: 0 0 6px; }
+  .t3-v4 .v4-bar.has-chat .v4-bar-top { margin: 0 0 6px; }
+  .t3-v4 .v4-bar.has-chat .v4-est { visibility: hidden; height: 0; } /* the estimate is in the Book sheet */
+  .t3-v4 .v4-bar.has-chat .v4-bar-top { justify-content: flex-end; margin: -4px 0 2px; }
+  .t3-v4 .v4-bar.has-chat .v4-est small { display: none; }
+  .t3-v4.v4-chat-mode .v4-toast { bottom: calc(var(--v4-bar-h, 160px) + 12px); }
   .t3-v4 .v4-bar.has-chat:not(.is-confirmed) .v4-chat { margin: 0; }
 </style>`;
 
 // Browser code, inside the V3 page script after V4_CLIENT_SRC (same scope: state, render, syncUrl, v4, v4UpdateBar...).
+// "This weekend" (fix round 2026-11-22: on a Sunday it meant today to Monday): Friday or Saturday count from today; any
+// other day is the coming Saturday. The stay is the plan's nights (days - 1, at least one). Shared with the tests.
+function chatWeekendDates(now, planDays) {
+  var wd = now.getDay(), add = wd === 5 || wd === 6 ? 0 : (6 - wd + 7) % 7;
+  var a = new Date(now.getFullYear(), now.getMonth(), now.getDate() + add), n = Math.max(1, (planDays || 2) - 1);
+  var b = new Date(a.getFullYear(), a.getMonth(), a.getDate() + n);
+  var iso = function(x){ return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
+  return [iso(a), iso(b)];
+}
 function chatClientSrc(d) {
   const qs = [d.stays === 'preview' ? 'stays=1' : '', d.v4 ? 'v=4' : '', d.chat === 'preview' ? 'chat=1' : ''].filter(Boolean).join('&');
   return String.raw`
@@ -107,9 +125,12 @@ function chatClientSrc(d) {
     // Hidden only while Save asks Replace / Add; after Confirm the travel agent stays one tap away.
     bar.classList.toggle('v4-chat-off', !!v4.ask);
     bar.classList.toggle('is-confirmed', !!(v4.confirmed || v4.ask));
+    setTimeout(chatPad, 0); // the bar's height for the toast (it sits above the bar)
+    // Fix round (2026-11-22): Confirm updates the agent's line without a re-render.
+    var agentP = document.querySelector('#v4Agent p'); if (agentP && v4.confirmed && typeof ag === 'function') { agentP.textContent = ag('ready'); var ask = document.querySelector('#v4Agent .v4-ask'); if (ask) ask.hidden = true; }
     return bar.querySelector('.v4-bar-main');
   }
-  function chatPad(){ var bar = document.getElementById('v4Bar'); if (bar) document.body.style.paddingBottom = bar.offsetHeight + 'px'; }
+  function chatPad(){ var bar = document.getElementById('v4Bar'); if (bar) { document.body.style.paddingBottom = bar.offsetHeight + 'px'; document.documentElement.style.setProperty('--v4-bar-h', bar.offsetHeight + 'px'); } }
   function chatShow(you, agent, opts){
     opts = opts || {};
     var box = document.getElementById('v4ChatReply'); if (!box) return;
@@ -143,12 +164,13 @@ function chatClientSrc(d) {
     if (typeof t3StayInput === 'function') { var st = t3StayInput(); if (st) body.stay = st; }
     return body;
   }
-  function chatSnapshot(){ return JSON.stringify({ last: state.last, lastReq: state.lastReq, text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude, removed: state.removed, gone: v4.gone }); }
+  function chatSnapshot(){ return JSON.stringify({ last: state.last, lastReq: state.lastReq, text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude, removed: state.removed, gone: v4.gone, stayPref: chat.stayPref, noStay: chat.noStay, transport: chat.transport }); }
   function chatRestore(snap){
     var o = JSON.parse(snap);
     state.last = o.last; state.lastReq = o.lastReq; state.text = o.text; state.seed = o.seed; state.overrides = o.overrides || {}; state.locks = o.locks || {}; state.exclude = o.exclude || []; state.removed = o.removed || {}; v4.gone = o.gone || {};
+    chat.stayPref = o.stayPref; chat.noStay = !!o.noStay; chat.transport = o.transport || null;
     v4.confirmed = false; v4.saved = false;
-    render(false); syncUrl();
+    chat.rendering = true; try { render(false); } finally { chat.rendering = false; } syncUrl();
   }
   function chatRow(key){
     if (key === 'gh') return resultEl.querySelector('.v4-gh');
@@ -180,7 +202,9 @@ function chatClientSrc(d) {
         done();
         j = j || {};
         var acts = j.actions || {}, changed = (j.changed || []).slice(), touched = false;
-        if (j.plan && j.req) {
+        // Fix round (2026-11-22): a new plan only when a stop changed ("The plan already fits that" changes nothing and
+        // shows no Undo); the place to stay alone comes back as stayBlock and never touches the stops.
+        if (j.plan && j.req && changed.length) {
           state.text = j.req.text; state.seed = j.req.seed; state.overrides = j.req.overrides || {}; state.exclude = (j.req.excludeVenueIds || []).slice(); state.locks = j.req.locks || {};
           state.removed = {}; v4.gone = {}; state.last = j.plan;
           state.lastReq = { seed: j.req.seed, overrides: j.req.overrides || {}, exclude: (j.req.excludeVenueIds || []).slice(), pinned: j.req.pinned || null, avoid: j.req.avoidVenueIds || [] };
@@ -197,13 +221,16 @@ function chatClientSrc(d) {
         (acts.keep || []).forEach(function(k){ var ks = /^it-/.test(k) ? null : stopAt(k); if (ks) { state.locks[k] = ks.venue.id; touched = true; changed.push(k); } });
         // The place to stay and getting here (agent round): the visitor's stay preference rides along with every later
         // request (t3StayInput below); the Getting here card follows "rental car" / "driving" / "no car".
-        if (j.stayPref !== undefined) { chat.stayPref = j.stayPref; chat.noStay = !!(j.stayPref && j.stayPref.none); touched = true; changed.push('stay'); }
+        if (j.stayBlock && state.last) {
+          ['whereToStay', 'v4Booking', 'gettingHere'].forEach(function(k){ if (j.stayBlock[k]) state.last[k] = j.stayBlock[k]; else delete state.last[k]; });
+          stayChoice = null; touched = true; changed.push('stay');
+        }
+        if (j.stayPref !== undefined) { chat.stayPref = j.stayPref; chat.noStay = !!(j.stayPref && j.stayPref.none); touched = true; if (changed.indexOf('stay') === -1) changed.push('stay'); }
         if (acts.transport) { chat.transport = acts.transport; touched = true; if (acts.transport === 'rental') changed.push('gh'); }
-        if (touched) { v4.confirmed = false; v4.saved = false; render(false); syncUrl(); }
+        if (touched) { v4.confirmed = false; v4.saved = false; chat.rendering = true; try { render(false); } finally { chat.rendering = false; } syncUrl(); }
         chat.undo = touched ? snap : null;
         chatShow(you, j.reply || ct('err'), { undo: touched });
         if (touched) chatGlow(changed);
-        if (inEl && touched) inEl.value = '';
         track('trip_chat', { chat_source: /^(ai|rules|chip)$/.test(j.source || '') ? j.source : 'other', changed: touched ? 'yes' : 'no' });
       })
       .catch(function(){ done(); chatShow(you, ct('err'), {}); });
@@ -213,6 +240,8 @@ function chatClientSrc(d) {
     e.preventDefault();
     var inEl = document.getElementById('v4ChatIn'), text = inEl ? inEl.value.replace(/\s+/g, ' ').trim() : '';
     if (!text) { if (inEl) inEl.focus(); return; }
+    // Fix round (2026-11-22: the next message was typed onto the last one): cleared as soon as it is sent.
+    if (inEl) inEl.value = '';
     chatSend(text.slice(0, 400), null);
   });
   document.addEventListener('click', function(e){
@@ -226,9 +255,11 @@ function chatClientSrc(d) {
   var AG = {
     en: { who: 'Trip agent', hi: 'Hi! Where are you headed, and what do you love doing?', day: 'Here’s a day in {town}{for}.', days: 'Here’s a {n}-day {town} plan{for}{stay}.', plan: 'Here’s your plan{for}.', more: ' Want me to change anything?',
       fam: ' for your family', dog: ' for you and your dog', stay: ', with a place to stay', when: 'When are you coming?', weekend: 'This weekend', pick: 'Pick dates', notSure: 'Not sure yet', done: 'Done', from: 'Arrive', to: 'Leave',
+      datesSet: 'Planned for {a} – {b}.', ready: 'Your trip is ready. Book it, share it, or tell me what to change.', noCarNone: 'No shuttle listed for this trip.', wine: 'Wine tour (no driving)',
       stayH: 'Where you’ll stay', rates: 'Check rates', seeMore: 'See {n} more', fewer: 'Hide', choose: 'Choose', ghH: 'Getting here', seeCars: 'See cars', book: 'Book', confirm: 'Confirm plan', sleeps: 'Sleeps {n}' },
     fr: { who: 'Agent de voyage', hi: 'Bonjour! Où allez-vous, et qu’aimez-vous faire?', day: 'Voici une journée à {town}{for}.', days: 'Voici un plan de {n} jours à {town}{for}{stay}.', plan: 'Voici votre plan{for}.', more: ' Voulez-vous changer quelque chose?',
       fam: ' pour votre famille', dog: ' pour vous et votre chien', stay: ', avec un logement', when: 'Quand venez-vous?', weekend: 'Ce week-end', pick: 'Choisir les dates', notSure: 'Pas encore sûr', done: 'OK', from: 'Arrivée', to: 'Départ',
+      datesSet: 'Plan pour le {a} – {b}.', ready: 'Votre voyage est prêt. Réservez-le, partagez-le ou dites-moi quoi changer.', noCarNone: 'Aucune navette pour ce voyage.', wine: 'Tour des vignobles (sans conduire)',
       stayH: 'Où vous logerez', rates: 'Voir les tarifs', seeMore: 'Voir {n} autres', fewer: 'Masquer', choose: 'Choisir', ghH: 'Pour venir', seeCars: 'Voir les voitures', book: 'Réserver', confirm: 'Confirmer le plan', sleeps: 'Jusqu’à {n} pers.' }
   };
   function ag(k, vars){ var x = (AG[lang()] || AG.en)[k]; if (vars) Object.keys(vars).forEach(function(v){ x = x.split('{' + v + '}').join(String(vars[v])); }); return x; }
@@ -243,6 +274,12 @@ function chatClientSrc(d) {
   })();
   // The visitor's stay preference ("somewhere cheaper", "with a pool", "we already have a place") goes with every request.
   var t3StayInputBase = t3StayInput;
+  // "we don't have a car" / "we're driving": no "Rent a car" in the Book sheet either.
+  if (typeof t3BookSteps === 'function') { var t3BookStepsBase = t3BookSteps; t3BookSteps = function(){ var l = t3BookStepsBase(); return chat.transport === 'no_car' || chat.transport === 'driving' ? l.filter(function(x){ return !(x && x.link === 'discovercars'); }) : l; }; }
+  // Enter sends the first request (Shift+Enter is a new line).
+  (function(){ var ta = document.getElementById('t3Input'); if (ta) ta.addEventListener('keydown', function(e){ if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !e.metaKey && !e.ctrlKey) { e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); } }); })();
+  // Only the page's language is read out (the other language's spans are hidden from screen readers too).
+  Array.prototype.forEach.call(document.querySelectorAll(lang() === 'fr' ? '.t3 .t3-en' : '.t3 .t3-fr'), function(el){ el.setAttribute('aria-hidden', 'true'); });
   t3StayInput = function(){ var o = t3StayInputBase() || {}; if (chat.stayPref) o.pref = chat.stayPref; return Object.keys(o).length ? o : null; };
   function chatOvernight(){ var st = t3StayInputBase() || {}; return days().length > 1 || !!(st.arrive && st.leave); }
   function chatPartyFor(){
@@ -255,10 +292,10 @@ function chatClientSrc(d) {
     var p = state.last || {}, n = days().length, town = n ? (days()[0].regionLabel || '') : '';
     var stay = chatOvernight() && !chat.noStay && t3StayData() ? ag('stay') : '';
     var line = n > 1 ? ag('days', { n: n, town: town, for: chatPartyFor(), stay: stay }) : n === 1 && town ? ag('day', { town: town, for: chatPartyFor() }) : ag('plan', { for: chatPartyFor() });
-    var html = '<div class="v4-agent" id="v4Agent"><span class="v4-agent-who">' + esc(ag('who')) + '</span><p>' + esc(line + ag('more')) + '</p>';
+    var html = '<div class="v4-agent" id="v4Agent"><span class="v4-agent-who">' + esc(ag('who')) + '</span><p>' + esc(v4.confirmed ? ag('ready') : line + ag('more')) + '</p>';
     // One short follow-up, with tap answers: the dates of an overnight trip, when none were given.
     var st = t3StayInputBase() || {};
-    if (chatOvernight() && !st.arrive && !chat.askedWhen) {
+    if (chatOvernight() && !st.arrive && !chat.askedWhen && !v4.confirmed) {
       html += '<div class="v4-ask"><p class="v4-ask-q">' + esc(ag('when')) + '</p><div class="v4-ask-btns"><button type="button" data-v4-when="weekend">' + esc(ag('weekend')) + '</button><button type="button" data-v4-when="pick">' + esc(ag('pick')) + '</button><button type="button" data-v4-when="later">' + esc(ag('notSure')) + '</button></div>'
         + (chat.pickDates ? '<div class="v4-ask-dates"><label>' + esc(ag('from')) + ' <input type="date" id="v4WhenA"></label><label>' + esc(ag('to')) + ' <input type="date" id="v4WhenB"></label><button type="button" class="v4-link" data-v4-when="set">' + esc(ag('done')) + '</button></div>' : '') + '</div>';
     }
@@ -286,6 +323,7 @@ function chatClientSrc(d) {
     var g = state.last && state.last.gettingHere;
     if (!g || !chatOvernight() || chat.transport === 'driving') return '';
     var fr = lang() === 'fr', L = fr ? 'fr' : 'en', rows = [];
+    if (g.noDrive && g.wineTour && /^https:\/\//.test(g.wineTour.url)) rows.push('<div class="v4-gh-row"><span>' + esc((fr && g.wineTour.nameFr) || g.wineTour.name || ag('wine')) + '</span><a ' + hrefAttr(g.wineTour.url) + ' rel="sponsored noopener" target="_blank" data-track="booking" data-link="viator">' + esc(ag('book')) + ' <span aria-hidden="true">↗</span></a></div>');
     if (g.car && g.carLabel && chat.transport !== 'no_car') rows.push('<div class="v4-gh-row"><span>' + esc(g.carLabel[L]) + '</span><a ' + hrefAttr(g.car) + ' rel="sponsored noopener" target="_blank" data-track="booking" data-link="discovercars" data-gh-step="car-' + esc(g.airport.key) + '">' + esc(ag('seeCars')) + ' <span aria-hidden="true">↗</span></a></div>');
     (g.shuttles || []).forEach(function(x){ if (x && x.url && /^https:\/\//.test(x.url) && x.label) rows.push('<div class="v4-gh-row"><span>' + esc(x.label[L] || x.label.en) + '</span><a ' + hrefAttr(x.url) + ' rel="sponsored noopener" target="_blank" data-track="booking" data-link="viator">' + esc(ag('book')) + ' <span aria-hidden="true">↗</span></a></div>'); });
     if (!rows.length) return '';
@@ -303,20 +341,32 @@ function chatClientSrc(d) {
     }
   }
   var v4RenderBase = v4Render;
-  v4Render = function(focus){ v4RenderBase(focus); try { chatDecorate(); } catch (e) { if (window.console) console.error('[trip chat]', e); } };
-  function chatWeekend(){
-    var now = new Date(), wd = now.getDay(), add = wd === 5 || wd === 6 ? 0 : wd === 0 ? 0 : 5 - wd;
-    var a = new Date(now.getFullYear(), now.getMonth(), now.getDate() + add), n = Math.max(1, days().length - 1 || 2);
-    var b = new Date(a.getFullYear(), a.getMonth(), a.getDate() + n);
-    var iso = function(x){ return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
-    return [iso(a), iso(b)];
-  }
+  v4Render = function(focus){
+    v4RenderBase(focus);
+    try { chatDecorate(); } catch (e) { if (window.console) console.error('[trip chat]', e); }
+    // Fix round (2026-11-22): the plan changed by the buttons or a new request -> the chat's last reply (and its Undo)
+    // no longer describes it. A dates answer shows its own line once the plan is back.
+    if (!chat.rendering && !chat.busy) {
+      chat.undo = null;
+      var box = document.getElementById('v4ChatReply');
+      if (box) { if (chat.pendingNote) chatShow('', chat.pendingNote, {}); else box.hidden = true; }
+      chat.pendingNote = null;
+      chatPad();
+    }
+  };
+  // "This weekend": Friday or Saturday counts from today; any other day (Sunday too) is the coming Saturday.
+  ${chatWeekendDates.toString()}
+  function chatWeekend(){ return chatWeekendDates(new Date(), days().length); }
   function chatSetDates(a, b){
     var ea = document.getElementById('t3Arrive'), eb = document.getElementById('t3Leave');
     if (!ea || !eb || !/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(b) || b <= a) return false;
     ea.value = a; eb.value = b; chat.askedWhen = true; chat.pickDates = false;
-    // The same stops, planned for those days (hours and the place to stay follow the dates).
-    request({ pinned: currentPins([]) }, { requestType: 'refine', focus: false });
+    // The same stops (and kept stops), planned for those days (hours and the place to stay follow the dates); the agent
+    // says which dates (fix round 2026-11-22: "This weekend" rebuilt the plan with no word).
+    var fmt = function(x){ return new Date(x + 'T12:00:00Z').toLocaleDateString(lang() === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }); };
+    chat.pendingNote = ag('datesSet', { a: fmt(a), b: fmt(b) });
+    var pins = currentPins([]); Object.keys(state.locks || {}).forEach(function(k){ pins[k] = state.locks[k]; });
+    request({ pinned: pins }, { requestType: 'refine', focus: false });
     return true;
   }
   document.addEventListener('click', function(e){
@@ -325,9 +375,10 @@ function chatClientSrc(d) {
     if ((b = t.closest('[data-v4-when]'))) {
       var w = b.getAttribute('data-v4-when');
       if (w === 'weekend') { var ab = chatWeekend(); chatSetDates(ab[0], ab[1]); }
-      else if (w === 'pick') { chat.pickDates = true; render(false); var ia = document.getElementById('v4WhenA'); if (ia) ia.focus(); }
+      // Pick dates: the two date boxes stay on screen until Done (the date picker opens on the first tap of a box).
+      else if (w === 'pick') { chat.pickDates = true; chat.rendering = true; try { render(false); } finally { chat.rendering = false; } var ia = document.getElementById('v4WhenA'); if (ia) { try { ia.scrollIntoView({ block: 'center' }); } catch (err) {} } }
       else if (w === 'set') { var A = document.getElementById('v4WhenA'), B = document.getElementById('v4WhenB'); if (A && B && !chatSetDates(A.value, B.value)) B.focus(); }
-      else { chat.askedWhen = true; render(false); }
+      else { chat.askedWhen = true; chat.rendering = true; try { render(false); } finally { chat.rendering = false; } }
       track('trip_chat', { chat_source: 'when_' + w, changed: 'no' });
       return;
     }
@@ -340,4 +391,4 @@ function chatClientSrc(d) {
 `;
 }
 
-module.exports = { CHAT_STYLES, chatClientSrc };
+module.exports = { CHAT_STYLES, chatClientSrc, chatWeekendDates };

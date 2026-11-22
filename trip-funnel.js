@@ -42,7 +42,7 @@ const BOOK_TYPES = [
 ];
 const SHARE_METHODS = [['native', 'Phone share sheet'], ['copy', 'Copied the link']];
 // Each chat message, counted by the server (POST /api/trip/chat) by how it was read; only on the V4 page. No words kept.
-const CHAT_KINDS = [['ai', 'Message read by AI'], ['rules', 'Message read by word rules (no AI)'], ['chip', 'Tapped a suggestion chip'], ['cant', 'Asked for something the chat can\'t do'], ['none', 'Plan could not be changed']];
+const CHAT_KINDS = [['ai', 'Message read by AI'], ['ai_fixed', 'AI reading corrected by the word rules'], ['rules_over_ai', 'Word rules used instead of the AI'], ['ai_slow', 'AI too slow, word rules answered'], ['rules', 'Message read by word rules (no AI)'], ['chip', 'Tapped a suggestion chip'], ['cant', 'Asked for something the chat can\'t do'], ['none', 'Plan could not be changed']];
 
 const NAMES = [];
 for (const v of VERSIONS) {

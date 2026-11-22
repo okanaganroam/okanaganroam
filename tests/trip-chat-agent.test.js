@@ -105,19 +105,20 @@ test('POST /api/trip/chat: cheaper, a pool, Naramata and "we already have a plac
   const ids = (p) => tc.planStops(p).map((s) => s.id);
   const cheap = await chat(bodyFor(plan, 'somewhere cheaper to stay'));
   assert.equal(cheap.status, 200);
-  assert.equal(cheap.j.plan.whereToStay.pick.name, 'Chat Agent Test Motel');
-  assert.ok(cheap.j.plan.whereToStay.pick.priceLevel < (first.priceLevel || 4));
-  assert.deepEqual(ids(cheap.j.plan), ids(plan), 'the stops stay the same');
+  assert.equal(cheap.j.stayBlock.whereToStay.pick.name, 'Chat Agent Test Motel');
+  assert.ok(cheap.j.stayBlock.whereToStay.pick.priceLevel < (first.priceLevel || 4));
+  assert.equal(cheap.j.plan, null, 'the stops are never re-planned for the place to stay (only stayBlock comes back)');
   assert.deepEqual(cheap.j.stayPref, { maxPrice: (first.priceLevel || 3) - 1 });
   assert.equal(cheap.j.reply, 'Now staying at Chat Agent Test Motel (Motel · Penticton · $).');
   // The preference rides along with the next request: the planner's own pick, among the stays that fit it.
   const pool = await chat(bodyFor(plan, 'a hotel with a pool', { pref: cheap.j.stayPref }));
-  assert.equal(pool.j.plan.whereToStay.pick.name, 'Chat Agent Test Resort');
+  assert.equal(pool.j.stayBlock.whereToStay.pick.name, 'Chat Agent Test Resort');
   assert.deepEqual(pool.j.stayPref, { amenity: 'pool' }, 'a new kind of place starts from any price again');
   const nara = await chat(bodyFor(plan, 'stay in Naramata'));
-  assert.equal(nara.j.plan.whereToStay.pick.name, 'Chat Agent Test Naramata Inn');
+  assert.equal(nara.j.stayBlock.whereToStay.pick.name, 'Chat Agent Test Naramata Inn');
   const none = await chat(bodyFor(plan, 'we already have a place'));
-  assert.equal(none.j.plan.whereToStay, undefined);
+  assert.equal(none.j.stayBlock.whereToStay, null);
+  assert.equal(none.j.plan, null, 'the stops are never re-planned for the place to stay');
   assert.deepEqual(none.j.stayPref, { none: true });
   assert.equal(none.j.reply, tc.T.en.stayNone);
   // Nothing cheaper than the cheapest: said, and the plan is not sent back.
