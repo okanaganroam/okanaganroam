@@ -3619,8 +3619,9 @@ function outdoorFactsSeasonOff(v, ctx, month) {
     // a park's winter hours, not its season.
     if (a >= 3 && a <= 7 && b >= 4 && b <= 10 && a < b && (month < a || month > b)) return true;
   }
-  // What it does in the cold months: its Winter line, and its season line unless that is about spring or summer.
-  const now = [winter, /^(?:spring|summer)\b/.test(season) ? '' : season].filter(Boolean);
+  // What it does in the cold months: its Winter line, and its season line unless that is about spring or summer or names
+  // its months ("Shuttle runs on windy days, May 15 to Sept 15" is the summer).
+  const now = [winter, /^(?:spring|summer)\b/.test(season) || OUTDOOR_FACTS_RANGE_RE.test(season) ? '' : season].filter(Boolean);
   if (!now.length || OUTDOOR_FACTS_ASK_RE.test(asked)) return false;
   return now.every((t) => OUTDOOR_FACTS_RENTAL_RE.test(t) && !OUTDOOR_FACTS_RUNS_RE.test(t));
 }
