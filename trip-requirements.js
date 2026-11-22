@@ -364,6 +364,9 @@ function inferPlannerKinds(v) {
     // Sport test 8: a golf listing is a sports kind (disc golf) only when its owner picked it.
     if (golfKinds&&SPORT_KINDS[kind]&&!KINDS[kind]) return v.sportKinds.some(k=>(SPORT_KIND_PLANNER[k]||[]).includes(kind));
     if (INDOOR_ONLY_PLANNER_KINDS.has(kind)&&v.type&&v.type!=='indoor') return false;
+    // Planner round 4 (a yoga class was "Matches your request for spas"): a yoga, pilates or fitness studio is a spa only
+    // when its own name or kind says spa, sauna, massage or thermal.
+    if (kind==='spa'&&/\b(?:yoga|pilates|fitness|gym|barre|crossfit)\b/.test(norm([v.name,v.cuisine].filter(Boolean).join(' ')))&&!/\b(?:spas?|saunas?|massages?|thermal|hydrotherap\w*)\b/.test(norm([v.name,v.cuisine].filter(Boolean).join(' '))))return false;
     if (kind==='challenging_hike') {
       if(v.type!=='outdoor')return false;
       return String(v.description||v.textDesc||'').split(/[.;!]/).map(norm).some(c=>re.test(c)&&! /\b(?:near|nearby|no|not|without)\b/.test(c));
