@@ -4,6 +4,7 @@ const SITE_PAGE=require('./trip-site.js').page;
 // Build My Trip V4 (2026-11-20): the simple plan view, only with d.v4 (/trip?v=4 or TRIP_V4; see server.js).
 const V4_PAGE=require('./trip-planner-v4-page.js');
 const CHAT_PAGE = require('./trip-chat-page.js');
+const WORKSPACE_PAGE = require('./trip-workspace-layout.js');
 
 // ---------- Build My Trip V3 page (Step 2, 2026-09-29) ----------
 //
@@ -1572,7 +1573,7 @@ function renderScript(d) {
   var V4 = ${d.v4 ? 'true' : 'false'}, V4_PREVIEW = ${d.v4 === 'preview' ? 'true' : 'false'};
   // The travel agent chat preview (/trip?chat=1) keeps chat=1 in the address bar, so a reload or a shared link keeps it.
   function t3ChatUrl(u){ return ${d.v4 && d.chat === 'preview' ? "u + (u.indexOf('?') === -1 ? '?' : '&') + 'chat=1'" : 'u'}; }
-${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3_STAY_CLIENT_SRC) : T3_STAY_CLIENT_SRC) + (d.viator ? t3ViatorClientSrc(d) : '')) : ''}${d.v4 ? V4_PAGE.V4_CLIENT_SRC : ''}${d.v4 && d.chat ? CHAT_PAGE.chatClientSrc(d) : ''}
+${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3_STAY_CLIENT_SRC) : T3_STAY_CLIENT_SRC) + (d.viator ? t3ViatorClientSrc(d) : '')) : ''}${d.v4 ? V4_PAGE.V4_CLIENT_SRC : ''}${d.v4 && d.chat ? CHAT_PAGE.chatClientSrc(d) + WORKSPACE_PAGE.WORKSPACE_CLIENT_SRC : ''}
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   // Crawlable links (2026-10-19, round 8): link markup glued together in this script as a quoted href attribute
   // around esc(url) read to crawlers that scan the page's HTML as links to the code itself (fake 404s). The
@@ -3239,7 +3240,7 @@ ${d.breadcrumbJson}
 <link rel="stylesheet" href="/styles/app.css">
 <style>${d.footerStyles}</style>
 ${renderStyles()}
-${d.v4 ? V4_PAGE.V4_STYLES + '\n' : ''}${d.v4 && d.chat ? CHAT_PAGE.CHAT_STYLES + '\n' : ''}${d.analyticsHead}
+${d.v4 ? V4_PAGE.V4_STYLES + '\n' : ''}${d.v4 && d.chat ? CHAT_PAGE.CHAT_STYLES + WORKSPACE_PAGE.WORKSPACE_STYLES + '\n' : ''}${d.analyticsHead}
 </head>
 <body class="page-trip page-trip-v3">
 ${d.tripTrayHtml}

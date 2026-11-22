@@ -430,8 +430,9 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1 }
   const dayM = /\b(?:day|jour)\s*(\d)\b/.exec(t);
   const day = dayM ? Number(dayM[1]) : null;
   // "the brewery on day 2": only day 2's.
-  let named = ordinalPick(t, stopsNamed(t, stops));
-  if (day && named.some((s) => s.day === day)) named = named.filter((s) => s.day === day);
+  let named = stopsNamed(t, stops);
+  if (day) named = named.filter((s) => s.day === day);
+  named = ordinalPick(t, named);
   if (/\b(?:redo|re-do|different|new|refaire|autre|nouveau|nouvelle)\b[^.]*\b(?:day|jour)\s*\d\b/.test(t) && !named.length) return { ops: [op('redo_day', { day })], cant: null };
   // A kind of dinner or lunch ("a sunset dinner with a lake view", "a patio lunch", « un souper avec vue sur le lac »)
   // is that day's dinner or lunch swapped for one like that (2026-11-22: it added a second restaurant in the afternoon,
