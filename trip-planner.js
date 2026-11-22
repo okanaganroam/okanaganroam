@@ -6844,6 +6844,8 @@ const SWAP_WANTS = {
   lake_view: { feature: 'lake_view' },
   patio: { feature: 'patio' },
   live_music: { feature: 'live_music' },
+  // Fix round (2026-11-22): "an activity" (a thing to do, never a meal).
+  activity: { types: ['outdoor', 'indoor', 'tour', 'golf', 'sport', 'beach'] },
 };
 function swapWantOk(v, swap) {
   if (!v || !swap) return false;

@@ -381,3 +381,33 @@ test('chips are fixed operations', () => {
   assert.equal(tc.chipOps('slower')[0].value, 'relaxed');
   assert.equal(tc.chipOps('nope'), null);
 });
+
+test('reconcileReads: confident rules correct the AI; unsure rules leave it alone; no AI answer -> the rules', () => {
+  const R = (m) => tc.rulesRead(m, STOPS, { regions: REGIONS, regionLabels: LABELS, days: 1 });
+  const O = (o) => ({ stops: [], kind: null, time: null, day: null, value: null, n: null, ages: [], region: null, date: null, ...o });
+  const ok = (ops, cant = null) => ({ ok: true, ops, cant });
+  let m = tc.reconcileReads(ok([O({ o: 'replace', stops: [STOPS[2]] })]), R('swap the brewery for something outdoors'), 'swap the brewery for something outdoors');
+  assert.equal(m.source, 'ai_fixed'); assert.equal(m.ops[0].kind, 'outdoor'); assert.deepEqual(m.fixes, ['fill_kind']);
+  m = tc.reconcileReads(ok([], 'transport'), R("we're taking the bus"), "we're taking the bus");
+  assert.equal(m.source, 'rules_over_ai'); assert.equal(m.ops[0].o, 'transport'); assert.equal(m.ops[0].value, 'no_car');
+  m = tc.reconcileReads(ok([O({ o: 'town', region: 'penticton' })]), R('we want to stay in Penticton'), 'we want to stay in Penticton');
+  assert.equal(m.ops[0].o, 'stay'); assert.equal(m.ops[0].region, 'penticton'); assert.deepEqual(m.fixes, ['town_to_stay']);
+  // "base us in Penticton" is a town: the rules agree with the AI, nothing changes.
+  m = tc.reconcileReads(ok([O({ o: 'town', region: 'penticton' })]), R('base us in Penticton instead'), 'base us in Penticton instead');
+  assert.equal(m.source, 'ai'); assert.equal(m.ops[0].o, 'town');
+  m = tc.reconcileReads(ok([O({ o: 'add', kind: 'ice_cream' }), O({ o: 'party', value: 'kids' })]), R('add ice cream for the kids'), 'add ice cream for the kids');
+  assert.deepEqual(m.ops.map((o) => o.o), ['add']); assert.deepEqual(m.fixes, ['drop_party_kids']);
+  // "my kids are 6 and 9" IS a party change: kept.
+  m = tc.reconcileReads(ok([O({ o: 'party', value: 'kids', ages: [6, 9] })]), R('my kids are 6 and 9'), 'my kids are 6 and 9');
+  assert.equal(m.source, 'ai'); assert.equal(m.ops[0].o, 'party');
+  // Unsure rules (nothing specific): the AI's reading stands.
+  m = tc.reconcileReads(ok([O({ o: 'pace', value: 'relaxed' })]), R('make it feel more like a holiday'), 'make it feel more like a holiday');
+  assert.equal(m.source, 'ai');
+  // No AI answer (no key, timeout): the rules.
+  m = tc.reconcileReads({ ok: false, reason: 'timeout' }, R('slower pace'), 'slower pace');
+  assert.equal(m.source, 'rules'); assert.equal(m.ops[0].value, 'relaxed');
+  assert.equal(tc.rulesConfident(R('asdf qwerty')), false);
+  assert.equal(tc.rulesConfident(R('can you book a table?')), true);
+  assert.match(tc.systemPrompt(REGIONS, LABELS), /a replace with a kind always sets k/);
+  assert.match(tc.systemPrompt(REGIONS, LABELS), /Never cant for these/);
+});
