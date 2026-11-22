@@ -456,6 +456,9 @@ const V4_CLIENT_SRC = String.raw`
     if (unknown.length) html = html.replace(/<\/div>$/, '') + '<p class="v4-book-unpriced">' + esc(vt('notPriced', { names: unknown.slice(0, 6).join(', ') + (unknown.length > 6 ? ' ' + vt('more', { n: unknown.length - 6 }) : '') })) + '</p></div>';
     return html;
   }
+  // Agent hooks (2026-11-22; House of Lager was in the Book sheet right after it was removed): a stop the visitor took
+  // out of the plan is not a booking step.
+  function v4RemovedIds(){ var ids = {}, p = state.last || {}; (p.days || []).forEach(function(d){ (d.stops || []).forEach(function(s){ if (s.venue && state.removed[d.day + '-' + s.daypart]) ids[s.venue.id] = 1; }); }); Object.keys(v4.gone || {}).forEach(function(id){ if (v4.gone[id]) ids[id] = 1; }); return ids; }
   function v4CanBook(){ return t3BookSteps().length > 0 || v4ReserveRows([]).length > 0 || !!t3StayData(); }
   function v4OpenSheet(){
     var dlg = document.getElementById('v4Sheet');
@@ -681,7 +684,7 @@ const V4_CLIENT_SRC = String.raw`
 function v4StaySrc(staySrc) {
   const swap = (from, to) => { if (!staySrc.includes(from)) throw new Error(`v4 hook not found: ${from.slice(0, 60)}`); staySrc = staySrc.replace(from, to); };
   swap('  function t3StayCardHtml(){\n', '  function t3StayCardHtml(){\n    if (V4) return v4BookCardHtml();\n');
-  swap('  function t3BookSteps(){ var d = t3StayData(); return d ?', '  function t3BookSteps(){ var d = t3StayData(); if (!d && V4) { var fb = v4Fallback(); return ((fb && fb.steps) || []).filter(function(x){ return x && t3StayExt(x.url); }).concat(typeof t3ViatorSteps === \'function\' ? t3ViatorSteps() : []); } return d ?');
+  swap('  function t3BookSteps(){ var d = t3StayData(); return d ?', '  function t3BookSteps(){ var gone = V4 && typeof v4RemovedIds === \'function\' ? v4RemovedIds() : {}; return t3BookStepsAll().filter(function(x){ return !(x && x.kind === \'venue\' && gone[x.id]); }); }\n  function t3BookStepsAll(){ var d = t3StayData(); if (!d && V4) { var fb = v4Fallback(); return ((fb && fb.steps) || []).filter(function(x){ return x && t3StayExt(x.url); }).concat(typeof t3ViatorSteps === \'function\' ? t3ViatorSteps() : []); } return d ?');
   // Round 3 (2026-11-21: an evening out with Arrive = Leave showed "stay.leave must be after stay.arrive."): a leave date
   // that is not after the arrival is simply not sent; the plan is for the arrival day.
   swap("    if (o.arrive && /^\\d{4}-\\d{2}-\\d{2}$/.test(l)) o.leave = l;", "    if (o.arrive && /^\\d{4}-\\d{2}-\\d{2}$/.test(l) && l > o.arrive) o.leave = l;");

@@ -6989,12 +6989,14 @@ function swapWantOk(v, swap) {
     const has = (text, w) => new RegExp(`(?:^|[^a-z])${w.replace(/[^a-z0-9 ]/g, '.')}`).test(text);
     if (!swap.words.some((w) => has(head, w) || has(first, w))) return false;
   }
+  // Agent hooks: several badges at once (swap.features), with the words and the price bound (all must hold).
+  if (Array.isArray(swap.features) && swap.features.length && !swap.features.every((f) => v.features && v.features[f])) return false;
   const price = Number(v.price);
   if (Number.isInteger(swap.priceMax) && !(price >= 1 && price <= swap.priceMax)) return false;
   if (Number.isInteger(swap.priceMin) && !(price >= swap.priceMin)) return false;
   return true;
 }
-const swapAsksKind = (swap) => !!(swap && (swap.want || swapAsksWords(swap) || swap.priceMax !== undefined || swap.priceMin !== undefined));
+const swapAsksKind = (swap) => !!(swap && (swap.want || swapAsksWords(swap) || (Array.isArray(swap.features) && swap.features.length) || swap.priceMax !== undefined || swap.priceMin !== undefined));
 const swapAsksWords = (swap) => !!(swap && ((Array.isArray(swap.words) && swap.words.length) || (Array.isArray(swap.types) && swap.types.length)));
 const SWAP_TYPE_WORDS = { restaurant: 'restaurant', cafe: 'café', pub: 'pub', cocktail: 'lounge', brewery: 'brewery', distillery: 'distillery', winery: 'winery', beach: 'beach', golf: 'golf course', outdoor: 'outdoor stop', indoor: 'indoor attraction', tour: 'tour', sport: 'activity' };
 // Round 8 (2026-10-19): the slot keeps its purpose. A winery lunch is swapped for another winery that serves food, a
@@ -7023,9 +7025,12 @@ function swapPurposeTest(original, stop, part, result, input, ctx, regions) {
 // The pins a Swap request sent only to keep the plan steady (every shown stop but the visitor's locks): soft.
 function swapSoftPins(input) {
   const swap = input && input.swap;
-  if (!swap || !input.pinned) return new Set();
+  // Agent hooks: a trusted pin (trustedPins, or every pin with keepOnDateChange) never fails the plan when it no longer
+  // fits; the hooks pass puts it back in its slot, or reports it (droppedPins) when its place is closed that day.
+  const trusted = input && input.pinned && input.v4 ? (input.keepOnDateChange ? Object.keys(input.pinned) : (Array.isArray(input.trustedPins) ? input.trustedPins.filter((k) => input.pinned[k]) : [])) : [];
+  if (!swap || !input.pinned) return new Set(trusted);
   const locked = new Set(Array.isArray(swap.locked) ? swap.locked : []);
-  return new Set(Object.keys(input.pinned).filter((k) => !locked.has(k)));
+  return new Set(Object.keys(input.pinned).filter((k) => !locked.has(k)).concat(trusted));
 }
 function applySwapPreference(result, input) {
   const swap = input && input.swap;
@@ -8591,8 +8596,176 @@ function v4SwapSteady(result, input) {
   if (['unmet', 'unverified'].includes(r.status)) r.status = 'estimated';
   return { ok: true };
 }
+// ---------- Travel agent hooks (2026-11-22, V4 only; every input optional and inactive unless sent) ----------
+// The chat works like a travel agent: it tells the planner exactly what to put where, and the planner says what it could
+// not do. On a day-by-day plan (input.v4), after planning:
+//   input.moves           [{ from: "<day>-<part>", to: "<day>-<part>" }]   move a stop to another part of a day or another
+//                         day (a stop already there changes places with it) -> result.moved, result.moveConflicts
+//   input.trustedPins     ["<day>-<part>", ...]  pins (input.pinned) that are put in their slot even when they do not fit
+//                         the request any more (a new town, new days, a new party); only a place closed that day is dropped
+//   input.keepOnDateChange true: every pin is trusted that way -> result.droppedPins [{ key, id, reason }]
+//   input.tourStops       [{ day, part, listingId, startMinutes, durationMinutes, covers: [types] }]  a tour placed as a
+//                         timed stop; the stops of the covered types inside its window (the wineries a wine tour visits)
+//                         and the stop in its slot give way -> result.tourReplaced [ids], result.tourStopErrors
+//   input.stopStarts      { "<day>-<part>": minutes }  one stop's start time, honoured as given; refused only when the
+//                         place is closed then or there is no room before the next stop -> result.stopStartRefused
+const AGENT_PART_START = { early: 480, morning: 600, midday: 720, afternoon: 810, late: 930, evening: 1080, night: 1185 };
+function v4AgentHooks(result, input) {
+  if (!input || !input.v4 || !result || !['multi_day', 'day_plan'].includes(result.kind) || !(result.days || []).length) return result;
+  const moves = Array.isArray(input.moves) ? input.moves : [];
+  const tours = Array.isArray(input.tourStops) ? input.tourStops : [];
+  const pinned = input.pinned || {};
+  const trusted = input.keepOnDateChange ? Object.keys(pinned) : (Array.isArray(input.trustedPins) ? input.trustedPins.filter((k) => pinned[k]) : []);
+  const starts = input.stopStarts && typeof input.stopStarts === 'object' ? input.stopStarts : {};
+  if (!moves.length && !tours.length && !trusted.length && !Object.keys(starts).length) return result;
+  const facts = input.facts || [], byId = new Map(facts.map((v) => [v.id, v]));
+  const ctx = buildContext(input.intent || {}, input.labels || {}, input);
+  const dayOf = (n) => result.days.find((d) => d.day === Number(n)) || null;
+  const order = (day) => { day.stops.sort((a, b) => V4_DAYPARTS.indexOf(a.daypart) - V4_DAYPARTS.indexOf(b.daypart)); };
+  const split = (key) => { const m = /^([1-7])-(early|morning|midday|afternoon|late|evening|night)$/.exec(String(key || '')); return m ? { d: Number(m[1]), part: m[2] } : null; };
+  const closedOn = (fv, day) => !!(fv && day && day.date && (dayClosedAllDay(fv, day.date) || seasonClosedOnTrip(fv, { date: day.date })));
+  const at = (day, part) => (day.stops || []).find((s) => s && s.daypart === part && (s.venue || s.event)) || null;
+  const empty = (day, part) => { day.stops = (day.stops || []).filter((s) => !(s && s.daypart === part && !s.venue && !s.event)); };
+  let changed = false;
+
+  // 1. Moves.
+  const moved = [], moveConflicts = [];
+  for (const m of moves) {
+    const a = split(m && m.from), b = split(m && m.to);
+    const from = a && dayOf(a.d), to = b && dayOf(b.d);
+    if (!a || !b || !from || !to) { moveConflicts.push({ from: m && m.from, to: m && m.to, reason: 'no_day' }); continue; }
+    const s = at(from, a.part);
+    if (!s) { moveConflicts.push({ from: m.from, to: m.to, reason: 'no_stop' }); continue; }
+    const fv = s.venue ? byId.get(s.venue.id) : null;
+    if (s.event && from !== to) { moveConflicts.push({ from: m.from, to: m.to, id: s.event.id, reason: 'event_date' }); continue; }
+    if (closedOn(fv, to)) { moveConflicts.push({ from: m.from, to: m.to, id: s.venue.id, reason: 'closed' }); continue; }
+    const other = at(to, b.part);
+    const ofv = other && other.venue ? byId.get(other.venue.id) : null;
+    if (other && ((other.event && from !== to) || closedOn(ofv, from))) { moveConflicts.push({ from: m.from, to: m.to, id: (other.venue || other.event).id, reason: other.event ? 'event_date' : 'closed' }); continue; }
+    from.stops.splice(from.stops.indexOf(s), 1);
+    if (other) { to.stops.splice(to.stops.indexOf(other), 1); other.daypart = a.part; other.label = PLAN_DAYPART_LABELS[a.part] || other.label; delete other.keepStart; from.stops.push(other); }
+    empty(to, b.part);
+    s.daypart = b.part; s.label = PLAN_DAYPART_LABELS[b.part] || s.label; delete s.keepStart;
+    to.stops.push(s);
+    order(from); order(to);
+    moved.push({ from: m.from, to: m.to, id: (s.venue || s.event).id });
+    changed = true;
+  }
+
+  // 2. Trusted pins.
+  const droppedPins = [];
+  for (const key of trusted) {
+    const k = split(key), id = pinned[key], fv = byId.get(id);
+    const day = k && dayOf(k.d);
+    if (!k || !fv) { droppedPins.push({ key, id, reason: 'not_listed' }); continue; }
+    if (!day) { droppedPins.push({ key, id, reason: 'no_day' }); continue; }
+    if (closedOn(fv, day)) { droppedPins.push({ key, id, reason: 'closed' }); continue; }
+    const cur = at(day, k.part);
+    if (cur && cur.venue && cur.venue.id === id) continue;
+    for (const d of result.days) d.stops = d.stops.filter((s) => !(s && s.venue && s.venue.id === id));
+    const stop = { ...themeStop(ctx, k.part, fv, scoreVenue(fv, ctx), null, [], []), trustedPin: true };
+    const now = at(day, k.part);
+    if (now) day.stops.splice(day.stops.indexOf(now), 1, stop); else { empty(day, k.part); day.stops.push(stop); }
+    order(day);
+    changed = true;
+  }
+
+  // 3. Tours as timed stops.
+  const tourReplaced = [], tourStopErrors = [], placed = [];
+  for (const t of tours) {
+    const day = t && dayOf(t.day), fv = t && byId.get(t.listingId);
+    const part = t && V4_DAYPARTS.includes(t.part) ? t.part : null;
+    if (!day || !part) { tourStopErrors.push({ listingId: t && t.listingId, reason: 'no_day' }); continue; }
+    if (!fv) { tourStopErrors.push({ listingId: t.listingId, reason: 'not_listed' }); continue; }
+    if (closedOn(fv, day)) { tourStopErrors.push({ listingId: t.listingId, reason: 'closed' }); continue; }
+    const start = Number.isInteger(t.startMinutes) ? t.startMinutes : AGENT_PART_START[part];
+    const end = start + (Number.isInteger(t.durationMinutes) && t.durationMinutes > 0 ? t.durationMinutes : 180);
+    const covers = Array.isArray(t.covers) ? t.covers : [];
+    const rowOf = (s) => (result.schedule || []).find((r) => r.day === day.day && s.venue && r.venueId === s.venue.id);
+    const inside = (s) => { const r = rowOf(s); const a = r && Number.isFinite(r.startMinutes) ? r.startMinutes : AGENT_PART_START[s.daypart]; const b = r && Number.isFinite(r.endMinutes) ? r.endMinutes : a + 60; return a < end && b > start; };
+    for (const d of result.days) d.stops = d.stops.filter((s) => !(s && s.venue && s.venue.id === fv.id));
+    const gone = day.stops.filter((s) => s && s.venue && ((covers.includes(s.venue.type) && inside(s)) || (s.daypart === part)));
+    for (const s of gone) { day.stops.splice(day.stops.indexOf(s), 1); tourReplaced.push(s.venue.id); }
+    empty(day, part);
+    const stop = { ...themeStop(ctx, part, fv, scoreVenue(fv, ctx), null, [{ code: 'tour', text: covers.length ? 'Your tour for this part of the day' : 'Added to your plan', weight: 5 }], []), tourStop: true, keepStart: start, noSwap: true };
+    day.stops.push(stop);
+    order(day);
+    placed.push({ day, id: fv.id, start, end });
+    changed = true;
+  }
+
+  // The day is timed again with the new stops (a dated plan by its hours; an undated one by its usual times).
+  if (changed) {
+    try {
+      if (input.requirements && (result.schedule || []).length && !result.suggestedTimes) scheduleTripByHours(result, input, { ...input.requirements, items: input.requirements.items || [], conflicts: input.requirements.conflicts || [] });
+      else { result.schedule = []; addSuggestedTimes(result, input); }
+    } catch (e) { /* keep the times it had */ }
+    try { refreshPlanCounts(result, input); } catch (e) { /* cosmetic */ }
+    try { v4DayTownLabels(result, input); } catch (e) { /* cosmetic */ }
+  }
+  // A trusted pin the timing could not fit still gets a time: after the stop before it, inside its hours when known.
+  if (changed && (result.schedule || []).length) {
+    for (const day of result.days) for (const s of day.stops) {
+      if (!s || !s.trustedPin || !s.venue) continue;
+      let r = result.schedule.find((x) => x.day === day.day && x.venueId === s.venue.id);
+      if (r && Number.isFinite(r.startMinutes)) continue;
+      if (!r) { r = { day: day.day, ...(day.date ? { date: day.date } : {}), venueId: s.venue.id }; result.schedule.push(r); }
+      const idx = V4_DAYPARTS.indexOf(s.daypart);
+      const rows = day.stops.filter((y) => y !== s && y.venue).map((y) => ({ i: V4_DAYPARTS.indexOf(y.daypart), r: result.schedule.find((x) => x.day === day.day && x.venueId === y.venue.id) })).filter((x) => x.r && Number.isFinite(x.r.startMinutes));
+      const lo = Math.max(0, ...rows.filter((x) => x.i < idx).map((x) => (Number.isFinite(x.r.endMinutes) ? x.r.endMinutes : x.r.startMinutes + 60) + 10));
+      const hi = Math.min(1440, ...rows.filter((x) => x.i > idx).map((x) => x.r.startMinutes - 10));
+      const fv = byId.get(s.venue.id);
+      const wd = day.date ? WEEKDAYS[(new Date(`${day.date}T12:00:00Z`).getUTCDay() + 6) % 7] : null;
+      const hours = fv && wd ? (fv._hours || (fv._hours = parseVenueHours(fv.hours))) : null;
+      const range = hours && hours.known && hours.days[wd] && hours.days[wd].status === 'open' ? hours.days[wd].ranges.find(([a, b]) => b - 30 >= lo && a < hi) || null : null;
+      let start = Math.max(lo, Math.min(AGENT_PART_START[s.daypart] || lo, hi - 45));
+      if (range) start = Math.min(Math.max(start, range[0]), Math.max(range[1] - 30, range[0]));
+      r.startMinutes = start; r.endMinutes = Math.max(start + 30, Math.min(start + 60, hi, range ? range[1] : 1440));
+      r.status = 'estimated';
+    }
+  }
+  for (const t of placed) {
+    result.schedule = result.schedule || [];
+    let r = result.schedule.find((x) => x.day === t.day.day && x.venueId === t.id);
+    if (!r) { r = { day: t.day.day, ...(t.day.date ? { date: t.day.date } : {}), venueId: t.id, status: 'estimated' }; result.schedule.push(r); }
+    r.startMinutes = t.start; r.endMinutes = t.end; r.tourStop = true; delete r.bookDeparture;
+    if (['unmet', 'unverified'].includes(r.status)) r.status = 'estimated';
+  }
+
+  // 4. One stop's start time.
+  const stopStartRefused = [];
+  for (const [key, min] of Object.entries(starts)) {
+    const k = split(key), day = k && dayOf(k.d), s = day && at(day, k.part);
+    if (!s || !s.venue || !Number.isInteger(min) || min < 0 || min >= 1440) { stopStartRefused.push({ key, reason: 'no_stop' }); continue; }
+    const fv = byId.get(s.venue.id);
+    const wd = day.date ? WEEKDAYS[(new Date(`${day.date}T12:00:00Z`).getUTCDay() + 6) % 7] : (k.d === 1 ? input.startWeekday || null : null);
+    const hours = fv && wd ? (fv._hours || (fv._hours = parseVenueHours(fv.hours))) : null;
+    const h = hours && hours.known ? hours.days[wd] : null;
+    if (h && (h.status === 'closed' || (h.status === 'open' && !h.ranges.some(([a, b]) => a <= min && min + 30 <= b)))) {
+      const next = h.status === 'open' ? h.ranges.map(([a]) => a).filter((a) => a > min).sort((x, y) => x - y)[0] : null;
+      stopStartRefused.push({ key, id: s.venue.id, reason: 'closed', ...(next != null ? { opensMinutes: next } : {}), ...(h.status === 'open' && h.ranges.length ? { closesMinutes: Math.max(...h.ranges.map(([, b]) => b)) } : {}) });
+      continue;
+    }
+    result.schedule = result.schedule || [];
+    let r = result.schedule.find((x) => x.day === day.day && x.venueId === s.venue.id);
+    const len = r && Number.isFinite(r.endMinutes) && Number.isFinite(r.startMinutes) ? r.endMinutes - r.startMinutes : 90;
+    const later = result.schedule.filter((x) => x.day === day.day && x !== r && Number.isFinite(x.startMinutes) && V4_DAYPARTS.indexOf((day.stops.find((y) => (y.venue && y.venue.id === x.venueId) || (y.event && y.event.id === x.eventId)) || {}).daypart) > V4_DAYPARTS.indexOf(k.part)).map((x) => x.startMinutes);
+    const cap = later.length ? Math.min(...later) - 10 : 1440;
+    if (cap - min < 30) { stopStartRefused.push({ key, id: s.venue.id, reason: 'no_room' }); continue; }
+    if (!r) { r = { day: day.day, ...(day.date ? { date: day.date } : {}), venueId: s.venue.id, status: 'estimated' }; result.schedule.push(r); }
+    r.startMinutes = min; r.endMinutes = Math.min(min + len, cap);
+    if (['unmet', 'unverified'].includes(r.status)) r.status = 'estimated';
+    s.keepStart = min;
+  }
+  if (moves.length) { result.moved = moved; if (moveConflicts.length) result.moveConflicts = moveConflicts; }
+  if (trusted.length) result.droppedPins = droppedPins;
+  if (tours.length) { result.tourReplaced = tourReplaced; if (tourStopErrors.length) result.tourStopErrors = tourStopErrors; }
+  if (Object.keys(starts).length && stopStartRefused.length) result.stopStartRefused = stopStartRefused;
+  return result;
+}
 function planTrip(input) {
   let result = planTripOnce(input);
+  try { result = v4AgentHooks(result, input); } catch (e) { /* the plan stands as planned */ }
   if (input && input.v4 && input.swap && input.swap.times) {
     let tries = 0, steady = v4SwapSteady(result, input), cur = input;
     while (!steady.ok && steady.id && tries < 4) {
@@ -11121,7 +11294,7 @@ module.exports = {
   SWAP_WANTS, swapWantOk,
   // Build My Trip V4 (2026-11-20)
   outdoorFactsSeasonOff, ADULT_VENUE_RE, EASY_HIKE_ASK_RE, HARD_TRAIL_RE,
-  advisoryClosingFrom, WINTER_NO_WALK_RE, CHAIN_NAME_RE, ERRAND_SHOP_RE, v4SwapSteady, eventKeyMoment, v4Input, v4NoCarInput, v4NoCarFacts, V4_NO_CAR_CORE_KM, v4MealDaypartInput, V4_NO_CAR_KM, v4Polish, v4SaneDays, eventAtDrinkPlace, v4DayTownLabels, v4CasualDinner, v4FillerSkip, v4OffTheme, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
+  v4AgentHooks, advisoryClosingFrom, WINTER_NO_WALK_RE, CHAIN_NAME_RE, ERRAND_SHOP_RE, v4SwapSteady, eventKeyMoment, v4Input, v4NoCarInput, v4NoCarFacts, V4_NO_CAR_CORE_KM, v4MealDaypartInput, V4_NO_CAR_KM, v4Polish, v4SaneDays, eventAtDrinkPlace, v4DayTownLabels, v4CasualDinner, v4FillerSkip, v4OffTheme, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
   // Tour test 17 (Whistler, 2026-11-18)
   regionMinutes, PICKUP_ASK_RE, KIND_SEASON_ASK_WORDS, kindSeasonOff, tourTripFor, normWords,
   dropNameOnlyTypes,

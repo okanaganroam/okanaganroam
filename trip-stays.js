@@ -49,7 +49,7 @@ function daysBetween(a, b) { return Math.round((Date.parse(`${b}T12:00:00Z`) - D
 function parseTripStayInput(raw) {
   if (raw === undefined || raw === null) return { value: null };
   if (!isObj(raw)) return { error: 'stay must be an object with arrive, leave, adults, kids and dog.' };
-  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog', 'pref'].includes(k));
+  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog', 'pref', 'force', 'none', 'kidAges'].includes(k));
   if (extra.length) return { error: `stay may only contain arrive, leave, adults, kids and dog (not ${extra.join(', ')}).` };
   const out = {};
   for (const k of ['arrive', 'leave']) {
@@ -74,6 +74,17 @@ function parseTripStayInput(raw) {
   if (raw.dog !== undefined && raw.dog !== null) {
     if (typeof raw.dog !== 'boolean') return { error: 'stay.dog must be true or false.' };
     if (raw.dog) out.dog = true;
+  }
+  // Agent hooks (2026-11-22): stay.force asks for a place to stay on a plan with no night (a one-day plan, an evening):
+  // one night from stay.arrive (or the plan's day); stay.none says the visitor wants no stay at all.
+  for (const k of ['force', 'none']) {
+    if (raw[k] === undefined || raw[k] === null) continue;
+    if (typeof raw[k] !== 'boolean') return { error: `stay.${k} must be true or false.` };
+    if (raw[k]) out[k] = true;
+  }
+  if (raw.kidAges !== undefined && raw.kidAges !== null) {
+    if (!Array.isArray(raw.kidAges) || raw.kidAges.length > MAX_KIDS || !raw.kidAges.every((a) => intIn(a, 0, 17))) return { error: 'stay.kidAges must list ages from 0 to 17.' };
+    out.kidAges = raw.kidAges.slice();
   }
   // Travel agent chat (2026-11-22, trip-chat.js): what the visitor said about the place to stay ("somewhere cheaper",
   // "a hotel with a pool", "stay in Naramata", "we already have a place"). Only these keys and values.
@@ -197,7 +208,7 @@ function tripStayContext(plan, input, today, opts = {}) {
   const firstDate = ((plan.schedule || []).find((r) => r && validDate(r.date)) || {}).date || (validDate(plan.listDate) ? plan.listDate : null);
   let arrive = i.arrive || firstDate || (validDate(today) ? today : null);
   if (opts.v4 && !i.arrive && validDate(opts.minArrive) && (!arrive || arrive < opts.minArrive)) arrive = opts.minArrive;
-  const nights = i.arrive && i.leave ? daysBetween(i.arrive, i.leave) : planDays - 1;
+  const nights = i.arrive && i.leave ? daysBetween(i.arrive, i.leave) : Math.max(planDays - 1, i.force ? 1 : 0);
   if (!(nights >= 1) || !arrive) return null;
   const leave = i.leave || addDays(arrive, nights);
   const months = [];
@@ -362,6 +373,7 @@ function whereToStay(plan, input, stays, today, opts = {}) {
   if (!ctx) return null;
   // Chat preference (input.pref): "we already have a place" -> no stay; else only the stays it leaves, and "stay in
   // Naramata" makes that town the base (other towns' stays still join only within NEAR_KM when it has too few).
+  if (input && input.none) return null; // agent hooks: "no stay"
   const pref = input && input.pref;
   if (pref && pref.none) return null;
   const askedTown = ctx.primaryRegion;
