@@ -127,69 +127,75 @@ test('STAYS_INDEXABLE opens towns: all, or one town at a time; French pages stay
   assert.equal(stays.staysIndexable('kelowna', { STAYS_INDEXABLE: 'penticton, kelowna' }), true);
 });
 
-test('Check rates: Stay22 Allez deep link with name, address, lat/lng, aid and campaign', () => {
+// 2026-11-21 (Dayton): Check rates opens THIS place's own page (its Booking.com / Expedia listing, its own booking page or
+// its website), never a name search of the town.
+const BC = 'https://www.booking.com/hotel/ca/aardvark-lakeside-inn.html';
+const EX = 'https://www.expedia.ca/Kelowna-Hotels-Aardvark-Lakeside-Inn.h123456.Hotel-Information';
+const setInfo = (id, info) => {
+  db.prepare('DELETE FROM stay_info WHERE venue_id = ?').run(id);
+  if (info) db.prepare('INSERT INTO stay_info (venue_id, info_json, updated_at, batch_id) VALUES (?, ?, ?, ?)').run(id, JSON.stringify(info), '2026-11-21T00:00:00Z', 'test');
+};
+test.after(() => { for (const v of [A, B, C, PEN]) setInfo(v.id, null); });
+
+test('Check rates: the place\'s own Booking.com listing through Stay22, then Expedia, then its own booking page', () => {
+  const v = app.getVenue(A.id);
   const env = { STAY_AFFILIATE_PROVIDER: 'stay22', STAY_AFFILIATE_ID: 'okr123', STAY_AFFILIATE_CAMPAIGN: 'stays-kelowna' };
-  const l = stays.stayRatesLink(app.getVenue(A.id), { env, regionLabel: 'Kelowna' });
+  const l = stays.stayRatesLink(v, { env, info: { booking: { booking_com: BC, expedia: EX, own: 'https://aardvark.example.com/book' } } });
   assert.equal(l.affiliate, true);
-  assert.equal(l.source, 'stay22');
+  assert.equal(l.source, 'booking_com');
   assert.equal(l.rel, 'sponsored nofollow noopener');
   const u = new URL(l.url);
-  assert.equal(`${u.origin}${u.pathname}`, 'https://www.stay22.com/allez/roam');
+  assert.equal(`${u.origin}${u.pathname}`, 'https://www.stay22.com/allez/booking');
   assert.equal(u.searchParams.get('aid'), 'okr123');
-  assert.equal(u.searchParams.get('hotelname'), 'Aardvark Lakeside Inn');
-  assert.equal(u.searchParams.get('address'), `${A.address}, Canada`);
-  assert.equal(Number(u.searchParams.get('lat')), A.latitude);
-  assert.equal(Number(u.searchParams.get('lng')), A.longitude);
-  assert.equal(u.searchParams.get('campaign'), 'stays_kelowna', 'Stay22 splits a campaign on hyphens');
-  assert.equal(new URL(stays.stayRatesLink(app.getVenue(A.id), { env, lang: 'fr' }).url).searchParams.get('lang'), 'fr');
+  assert.equal(u.searchParams.get('link').split('?')[0], BC, 'the exact listing, not a search');
+  assert.equal(u.searchParams.get('hotelname'), null);
   assert.equal(l.label, 'Check rates');
-  assert.equal(stays.stayRatesLink(app.getVenue(A.id), { env, lang: 'fr' }).label, 'Voir les tarifs');
+  assert.equal(stays.stayRatesLink(v, { env, lang: 'fr', info: { booking: { booking_com: BC } } }).label, 'Voir les tarifs');
+  const e = stays.stayRatesLink(v, { env, info: { booking: { expedia: EX } } });
+  assert.equal(new URL(e.url).pathname, '/allez/expedia');
+  assert.equal(new URL(e.url).searchParams.get('link').split('?')[0], EX);
+  const o = stays.stayRatesLink(v, { env, info: { booking: { own: 'https://aardvark.example.com/book' } } });
+  assert.deepEqual([o.url, o.affiliate, o.source, o.rel], ['https://aardvark.example.com/book', false, 'own', 'nofollow noopener']);
+  // Without a partner: the same listing, plain.
+  const plain = stays.stayRatesLink(v, { env: {}, info: { booking: { booking_com: BC } } });
+  assert.deepEqual([plain.url.split('?')[0], plain.affiliate], [BC, false]);
+  // A search URL in the info is not a listing: skipped, the website instead.
+  const bad = stays.stayRatesLink(v, { env, info: { booking: { booking_com: 'https://www.booking.com/searchresults.html?ss=Kelowna' } } });
+  assert.equal(bad.url, A.website);
 });
 
-test('Check rates: Booking.com and Expedia search links', () => {
+test('Check rates: never a name search; no listing -> the website (not affiliate), or no button; owner link wins', () => {
   const v = app.getVenue(A.id);
-  const b = stays.stayRatesLink(v, { env: { STAY_AFFILIATE_PROVIDER: 'booking', STAY_AFFILIATE_ID: '999', STAY_AFFILIATE_CAMPAIGN: 'okr' }, regionLabel: 'Kelowna' });
-  const bu = new URL(b.url);
-  assert.equal(`${bu.origin}${bu.pathname}`, 'https://www.booking.com/searchresults.html');
-  assert.equal(bu.searchParams.get('aid'), '999');
-  assert.equal(bu.searchParams.get('label'), 'okr');
-  assert.match(bu.searchParams.get('ss'), /^Aardvark Lakeside Inn, \d+ Water Street/);
-  assert.equal(b.affiliate, true);
-  const e = stays.stayRatesLink(v, { env: { STAY_AFFILIATE_PROVIDER: 'expedia', STAY_AFFILIATE_ID: 'X1' } });
-  const eu = new URL(e.url);
-  assert.equal(`${eu.origin}${eu.pathname}`, 'https://www.expedia.ca/Hotel-Search');
-  assert.equal(eu.searchParams.get('affcid'), 'X1');
-  assert.equal(eu.searchParams.get('latLong'), `${A.latitude},${A.longitude}`);
-  assert.equal(e.rel, 'sponsored nofollow noopener');
-});
-
-test('Check rates: provider none or no id -> the website (not affiliate), or no button; owner link wins and is not affiliate', () => {
-  const v = app.getVenue(A.id);
-  for (const env of [{}, { STAY_AFFILIATE_PROVIDER: 'none', STAY_AFFILIATE_ID: 'x' }, { STAY_AFFILIATE_PROVIDER: 'stay22' }, { STAY_AFFILIATE_PROVIDER: 'nonsense', STAY_AFFILIATE_ID: 'x' }]) {
-    const l = stays.stayRatesLink(v, { env });
-    assert.equal(l.url, A.website, JSON.stringify(env));
-    assert.equal(l.affiliate, false);
-    assert.equal(l.rel, 'nofollow noopener');
-    assert.equal(l.label, 'Check rates');
+  for (const env of [{}, { STAY_AFFILIATE_PROVIDER: 'stay22', STAY_AFFILIATE_ID: 'x' }, { STAY_AFFILIATE_PROVIDER: 'booking', STAY_AFFILIATE_ID: '9' }, { STAY_AFFILIATE_PROVIDER: 'expedia', STAY_AFFILIATE_ID: 'X1' }]) {
+    for (const info of [undefined, null, {}, { booking: {} }]) {
+      const l = stays.stayRatesLink(v, { env, info });
+      assert.equal(l.url, A.website, JSON.stringify(env));
+      assert.equal(l.affiliate, false);
+      assert.equal(l.rel, 'nofollow noopener');
+    }
+    assert.equal(stays.stayRatesLink(app.getVenue(B.id), { env }), null, 'no website, no listing: no button');
   }
-  assert.equal(stays.stayRatesLink(app.getVenue(B.id), { env: {} }), null, 'no website, no partner: no button');
   const env = { STAY_AFFILIATE_PROVIDER: 'stay22', STAY_AFFILIATE_ID: 'okr123' };
-  const own = stays.stayRatesLink(v, { env, links: { booking_url: 'https://book.example.com/aardvark' } });
+  const own = stays.stayRatesLink(v, { env, links: { booking_url: 'https://book.example.com/aardvark' }, info: { booking: { booking_com: BC } } });
   assert.deepEqual([own.url, own.affiliate, own.source, own.rel], ['https://book.example.com/aardvark', false, 'owner', 'nofollow noopener']);
-  assert.equal(stays.stayRatesLink(v, { env, links: { booking_url: 'javascript:alert(1)' } }).source, 'stay22', 'a bad link is ignored');
-  assert.equal(stays.stayRatesLink(app.getVenue(B.id), { env }).affiliate, true, 'with a partner, a place with no website still gets a button');
+  assert.equal(stays.stayRatesLink(v, { env, links: { booking_url: 'javascript:alert(1)' }, info: { booking: { booking_com: BC } } }).source, 'booking_com', 'a bad link is ignored');
 });
 
 test('pages: affiliate links carry rel="sponsored" and target=_blank, and the commission line shows only with an affiliate link', async () => {
   // Default (no partner): website links, no commission line.
   let list = await get('/kelowna/stays');
   assert.ok(!list.text.includes('data-stay-disclosure'));
-  assert.ok(!list.text.includes('sponsored'));
+  assert.ok(!list.text.includes('rel="sponsored'));
   assert.match(list.text, new RegExp(`<a class="st-rates" href="${A.website.replace(/[.]/g, '\\.')}" rel="nofollow noopener" target="_blank" data-track="stay_click"`));
   assert.ok(!(await get(`/kelowna/stays/${B.slug}`)).text.includes('class="st-rates'), 'no website: no Check rates button');
   await withEnv({ STAY_AFFILIATE_PROVIDER: 'stay22', STAY_AFFILIATE_ID: 'okr123' }, async () => {
+    // No listing in its stay info: the website, never a name search, and no commission line.
     list = await get('/kelowna/stays');
-    assert.match(list.text, /<a class="st-rates" href="https:\/\/www\.stay22\.com\/allez\/roam\?aid=okr123[^"]*" rel="sponsored nofollow noopener" target="_blank" data-track="stay_click"/);
+    assert.ok(!list.text.includes('/allez/roam'), 'no name search');
+    assert.ok(!list.text.includes('data-stay-disclosure'));
+    setInfo(A.id, { booking: { booking_com: BC } });
+    list = await get('/kelowna/stays');
+    assert.match(list.text, /<a class="st-rates" href="https:\/\/www\.stay22\.com\/allez\/booking\?[^"]*link=https%3A%2F%2Fwww\.booking\.com%2Fhotel%2Fca%2Faardvark-lakeside-inn\.html[^"]*" rel="sponsored nofollow noopener" target="_blank" data-track="stay_click"/);
     assert.ok(list.text.includes(stays.DISCLOSURE.en));
     const page = await get(`/kelowna/stays/${A.slug}`);
     assert.match(page.text, /rel="sponsored nofollow noopener" target="_blank" data-track="stay_click"/);
@@ -202,7 +208,7 @@ test('pages: affiliate links carry rel="sponsored" and target=_blank, and the co
     const own = await get(`/kelowna/stays/${C.slug}`);
     assert.match(own.text, /href="https:\/\/cedar\.example\.com\/book" rel="nofollow noopener" target="_blank" data-track="stay_click"/);
     assert.ok(!own.text.includes('data-stay-disclosure'));
-    assert.ok(!own.text.includes('sponsored'));
+    assert.ok(!own.text.includes('rel="sponsored'));
     setBooking(C.id, null);
   });
 });

@@ -101,26 +101,19 @@ test('the owner\'s own booking link is the own-site button, never affiliate, and
   assert.deepEqual(L.stayBookingLinks(stay(undefined, { ownerBookingUrl: owner, info: null }), TRIP, S22).map((x) => x.key), ['own']);
 });
 
-test('fallback: with none of the three, one "Check rates" button from stayRatesLink, dates only where the target takes them', () => {
+test('fallback: with none of the three, one "Check rates" button to the place\'s own website, never a search (2026-11-21)', () => {
   const s = stay(undefined, { info: null });
-  const none = L.stayBookingLinks(s, TRIP, NONE);
-  assert.deepEqual(none.map((x) => [x.key, x.url, x.affiliate]), [['search', 'https://www.example-hotel.ca/', false]], 'the website, no dates');
-  assert.equal(none[0].label, 'Check rates');
-  assert.equal(none[0].labelFr, 'Voir les tarifs');
-  const s22 = L.stayBookingLinks(s, TRIP, S22);
-  assert.equal(s22.length, 1);
-  assert.equal(s22[0].affiliate, true);
-  assert.equal(s22[0].rel, 'sponsored nofollow noopener');
-  assert.equal(new URL(s22[0].url).pathname, '/allez/roam');
-  assert.deepEqual([q(s22[0].url).checkin, q(s22[0].url).checkout, q(s22[0].url).adults, q(s22[0].url).children, q(s22[0].url).hotelname], ['2026-12-18', '2026-12-21', '2', '2', 'Test Inn']);
-  const bk = L.stayBookingLinks(s, TRIP, BKG);
-  assert.equal(new URL(bk[0].url).pathname, '/searchresults.html');
-  assert.deepEqual([q(bk[0].url).checkin, q(bk[0].url).group_adults, q(bk[0].url).aid], ['2026-12-18', '2', '424242']);
-  const ex = L.stayBookingLinks(s, TRIP, EXP);
-  assert.equal(new URL(ex[0].url).pathname, '/Hotel-Search');
-  assert.equal(q(ex[0].url).chkin, undefined, 'Expedia search: no sourced date params, left as is');
+  for (const opts of [NONE, S22, BKG, EXP]) {
+    const r = L.stayBookingLinks(s, TRIP, opts);
+    assert.deepEqual(r.map((x) => [x.key, x.url, x.affiliate]), [['search', 'https://www.example-hotel.ca/', false]], 'the website, no dates, no affiliate search');
+    assert.equal(r[0].label, 'Check rates');
+    assert.equal(r[0].labelFr, 'Voir les tarifs');
+    assert.ok(!/allez\/roam|searchresults|Hotel-Search/.test(r[0].url));
+  }
   // Nothing at all: no button.
-  assert.deepEqual(L.stayBookingLinks(stay(undefined, { info: null, website: null }), TRIP, NONE), []);
+  assert.deepEqual(L.stayBookingLinks(stay(undefined, { info: null, website: null }), TRIP, S22), []);
+  // exactStayLinks never falls back.
+  assert.deepEqual(L.exactStayLinks(s, TRIP, S22), []);
 });
 
 test('withBookingLinks: pick and alternatives get their buttons; petsSome only on a dog trip with pets "some"', () => {
@@ -168,8 +161,7 @@ test('stay22MapUrl: Stay22 only, checked stays only; town + box + star pin + dat
   assert.equal(sbl.stay22MapUrl({ ...stay, id: 7 }, trip, { env, checks }), null);
   assert.equal(sbl.stay22MapUrl({ ...stay, id: 5 }, trip, { env, checks }), null);
   assert.equal(sbl.stay22MapUrl({ ...stay, regionLabel: '' }, trip, { env, checks }), null);
-  // withBookingLinks adds it to the card.
+  // Since 2026-11-21 withBookingLinks no longer adds it (it showed other places too: Dayton wants the place's own page).
   const block = sbl.withBookingLinks({ trip, pick: { id: 1994, regionLabel: 'Kelowna' }, alternatives: [] }, new Map([[1994, { ...stay, info: {} }]]), { env, mapChecks: checks });
-  assert.equal(block.pick.livePrices.url, r.url);
-  assert.equal(sbl.withBookingLinks({ trip, pick: { id: 1994, regionLabel: 'Kelowna' }, alternatives: [] }, new Map([[1994, { ...stay, info: {} }]]), { env: {}, mapChecks: checks }).pick.livePrices, undefined);
+  assert.equal(block.pick.livePrices, undefined);
 });
