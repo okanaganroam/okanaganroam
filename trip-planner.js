@@ -6912,6 +6912,8 @@ function swapWantOk(v, swap) {
   if (!v || !swap) return false;
   const w = swap.want ? SWAP_WANTS[swap.want] : null;
   if (w) {
+    // A badge asked of a meal slot ("a dinner with a lake view") stays somewhere to eat (chat, 2026-11-22).
+    if (!w.types && ['restaurant', 'pub'].includes(swap.type) && !['restaurant', 'pub'].includes(v.type)) return false;
     if (w.types && !w.types.includes(v.type)) return false;
     if (w.feature && !(v.features && v.features[w.feature])) return false;
     // Fresh eyes (2026-11-22; Tickleberry's Downtown, "a Penticton ice cream and coffee shop", was not ice cream): a café

@@ -81,7 +81,7 @@ test('rules and validator: the place to stay and getting here, English and Frenc
   const labels = { penticton: 'Penticton', naramata: 'Naramata' };
   const R = (m) => tc.rulesRead(m, [], { regions, regionLabels: labels }).ops.map((o) => [o.o, o.value, o.region]);
   assert.deepEqual(R('somewhere cheaper to stay'), [['stay', 'budget', null]]);
-  assert.deepEqual(R('a hotel with a pool'), [['stay', 'pool', null]]);
+  assert.deepEqual(R('a hotel with a pool'), [['stay', 'pool', null], ['stay', 'hotel', null]], 'one stay op per thing asked');
   assert.deepEqual(R('stay in Naramata'), [['stay', null, 'naramata']]);
   assert.deepEqual(R('we already have a place'), [['stay', 'have_place', null]]);
   assert.deepEqual(R('un logement moins cher'), [['stay', 'budget', null]]);
@@ -113,7 +113,7 @@ test('POST /api/trip/chat: cheaper, a pool, Naramata and "we already have a plac
   // The preference rides along with the next request: the planner's own pick, among the stays that fit it.
   const pool = await chat(bodyFor(plan, 'a hotel with a pool', { pref: cheap.j.stayPref }));
   assert.equal(pool.j.stayBlock.whereToStay.pick.name, 'Chat Agent Test Resort');
-  assert.deepEqual(pool.j.stayPref, { amenity: 'pool' }, 'a new kind of place starts from any price again');
+  assert.deepEqual(pool.j.stayPref, { kind: 'hotel', amenities: ['pool'] }, 'a new kind of place starts from any price again');
   const nara = await chat(bodyFor(plan, 'stay in Naramata'));
   assert.equal(nara.j.stayBlock.whereToStay.pick.name, 'Chat Agent Test Naramata Inn');
   const none = await chat(bodyFor(plan, 'we already have a place'));

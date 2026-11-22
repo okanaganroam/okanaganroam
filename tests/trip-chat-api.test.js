@@ -210,13 +210,12 @@ test('AI + word rules: the five live-eval misreads are corrected; a slow AI lose
   assert.match(r.j.reply, /something outdoors/, 'the reply is about the kind asked for');
   // 2. "we're taking the bus" read as "can't": it is getting here (no car), never "I can't book flights or rides".
   r = await ask("we're taking the bus from Kelowna airport", { ok: true, cant: 'transport', ops: [] });
-  assert.equal(r.j.source, 'rules_over_ai');
+  assert.equal(r.j.source, 'rules', 'a getting-here message the rules read is answered without waiting for the AI (2026-11-22)');
   assert.equal(r.j.actions.transport, 'no_car');
   assert.notEqual(r.j.reply, tc.T.en.transport);
   // 3. "we want to stay in Penticton" read as a new base town (a re-plan): it is the place to stay.
   r = await ask('we want to stay in Penticton', { ok: true, cant: null, ops: [AI_OP({ o: 'town', region: 'penticton' })] });
-  assert.equal(r.j.source, 'ai_fixed');
-  assert.deepEqual(r.j.fixes, ['town_to_stay']);
+  assert.equal(r.j.source, 'rules', 'a stay message the rules read is answered without waiting for the AI (2026-11-22)');
   assert.equal(r.j.plan, null, 'the stops are not re-planned');
   assert.equal(r.j.reply, tc.T.en.stayOff, 'this preview request has no stays box, so it says so');
   // 4. "add ice cream for the kids" read as add + party kids (which re-plans every stop): the add only.

@@ -31,9 +31,10 @@ const OPS = ['remove', 'keep', 'more_like', 'replace', 'add', 'budget', 'pace', 
 const TIMES = ['', 'morning', 'midday', 'afternoon', 'evening'];
 const VALUES = ['', 'budget', 'upscale', 'relaxed', 'packed', 'standard', 'kids', 'dog', 'accessible', 'no_alcohol', 'vegan', 'vegetarian', 'gluten_free', 'later', 'earlier',
   // The place to stay and getting here (2026-11-22, agent round): stay v / transport v.
-  'pool', 'hot_tub', 'kitchen', 'have_place', 'rental', 'driving', 'no_car'];
-const STAY_VALUES = ['budget', 'upscale', 'pool', 'hot_tub', 'kitchen', 'have_place'];
-const TRANSPORT_VALUES = ['rental', 'driving', 'no_car'];
+  'pool', 'hot_tub', 'kitchen', 'pets', 'parking', 'hotel', 'have_place', 'rental', 'driving', 'no_car', 'wine_tour'];
+const STAY_AMENITY_VALUES = ['pool', 'hot_tub', 'kitchen', 'pets', 'parking', 'accessible'];
+const STAY_VALUES = ['budget', 'upscale', ...STAY_AMENITY_VALUES, 'hotel', 'have_place'];
+const TRANSPORT_VALUES = ['rental', 'driving', 'no_car', 'wine_tour'];
 const CANT = ['', 'booking', 'transport', 'weather', 'other', 'unclear'];
 
 // The kinds of stop a visitor can ask for. text: the planner's own words for it (what its rules already read);
@@ -169,8 +170,8 @@ function systemPrompt(regions, regionLabels) {
     '- redo_day: d = the day to plan again ("redo day 2", "a different day 1").',
     '- start_over: a completely new plan for the same request ("start over", "something totally different").',
     '- time: v later or earlier, to start the day later or earlier; d = the day, s = the stop it is about ("move lunch later" -> v later, s [lunch id]).',
-    '- stay: the place to stay (not the stops). v budget ("somewhere cheaper to stay"), upscale (nicer), pool, hot_tub, kitchen ("a hotel with a pool" -> pool), have_place ("we already have a place", "staying with friends"); or r = the town to stay in ("stay in Naramata" -> r naramata, v "").',
-    '- transport: getting here. v rental ("we need a rental car"), driving ("we are driving from Vancouver", "we have our own car"), no_car ("we don\'t have a car").',
+    '- stay: the place to stay (not the stops). v budget ("somewhere cheaper to stay"), upscale (nicer), pool, hot_tub, kitchen, pets (pet-friendly), parking (free parking), accessible (accessible rooms), hotel (they ask for a hotel, not a motel), have_place ("we already have a place", "staying with friends"). One stay op per thing asked: "a hotel with a pool in Penticton" -> stay v pool r penticton, stay v hotel; or r = the town to stay in ("stay in Naramata" -> r naramata, v "").',
+    '- transport: getting here and around. v wine_tour ("book us a wine tour with a driver", "no driving after the wineries"), rental ("we need a rental car"), driving ("we are driving from Vancouver", "we have our own car"), no_car ("we don\'t have a car").',
     'Common slips to avoid (live eval, 2026-11-22):',
     '"swap the brewery for something outdoors" -> replace, s [that stop], k outdoor: a replace with a kind always sets k.',
     '"we\'re taking the bus from Kelowna airport", "by shuttle", "we don\'t have a car" -> transport no_car; "we\'re driving" -> transport driving. Never cant for these.',
@@ -399,17 +400,27 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1 }
   if (!t || !/[a-z]{2}/.test(t)) return { ops: [], cant: 'unclear' };
   if (/\b(?:ignore|disregard|system prompt|instructions|jailbreak|pretend you)\b/.test(t)) return { ops: [], cant: 'other' };
   // Getting here and the place to stay (2026-11-22, agent round), read before "flights" (a rental car is ours to show).
+  // Second fresh-eyes round (2026-11-22). A wine tour with a driver is ours to offer (Viator, wine-tours.js), not "I can't
+  // book things in this chat".
+  if (/\bwine tours?\b|\btours? (?:de|des) vignobles\b|\b(?:with|need|want|hire|get) a driver\b|\bdesignated driver\b|\bno driving\b|\bsans conduire\b/.test(t)) return { ops: [op('transport', { value: 'wine_tour' })], cant: null };
+  // A clock time for one stop ("move it to 6:30", "dinner at 7"): we can't set one stop's time yet (the planner has no
+  // field for it), and shifting the whole day instead was wrong. Said plainly.
+  const clockM = /\b(?:to|at|for|vers)\s+(\d{1,2})(?:[:h](\d{2}))?\s*(am|pm|h)?(?![\w-])/.exec(t);
+  if (clockM && /\b(?:move|change|make|set|shift|push|have|deplace[rz]?|mets|mettre)\b/.test(t) && !/\b\d+\s*(?:days?|jours?|nights?|people|adults?|kids?|stops?)\b/.test(t) && (clockM[2] || clockM[3] || /\b(?:lunch|dinner|supper|souper|breakfast|brunch|it)\b/.test(t))) return { ops: [], cant: 'time_at' };
   if (/\b(?:rent(?:al)? (?:a )?cars?|car rentals?|need a car|louer une voiture|location de voiture)\b/.test(t)) return { ops: [op('transport', { value: 'rental' })], cant: null };
   if (/\b(?:no car|don'?t have a car|do not have a car|without a car|sans voiture|pas de voiture|tak(?:e|ing) the (?:bus|shuttle)|by (?:bus|shuttle)|en autobus|en navette)\b/.test(t)) return { ops: [op('transport', { value: 'no_car' })], cant: null };
   if (/\b(?:driving (?:from|up|in|down|over)|we'?ll drive|we are driving|we'?re driving|our own car|bringing (?:our|the) car|en voiture depuis|on arrive en voiture)\b/.test(t)) return { ops: [op('transport', { value: 'driving' })], cant: null };
-  const stayWord = /\b(?:stay|staying|hotel|motel|place to stay|accommodations?|lodging|room|rooms|airbnb|cabin|condo|resort|b&b|inn|logement|hebergement|hotel|dormir|loger)\b/.test(t);
+  const stayWord = /\b(?:stay|staying|hotel|motel|place (?:to stay|with|that has)|accommodations?|lodging|room|rooms|airbnb|cabin|condo|resort|b&b|inn|logement|hebergement|hotel|dormir|loger)\b/.test(t);
   if (/\b(?:already have (?:a|our|an) (?:place|hotel|airbnb|room|cabin|condo|rental)|staying with (?:friends|family)|we have (?:a|an) (?:place|airbnb|cabin|condo)|deja (?:un|notre) logement|chez des amis)\b/.test(t)) return { ops: [op('stay', { value: 'have_place' })], cant: null };
   if (stayWord) {
-    const stayIn = /\b(?:stay|sleep|hotel|lodging|based?|loger|dormir|sejourner)\s+(?:in|at|near|a|en|pres de)\s+([a-z' -]+)/.exec(t);
+    const stayIn = /\b(?:stay|sleep|hotel|place|lodging|based?|loger|dormir|sejourner|logement|hebergement)\s+(?:in|at|near|a|en|pres de)\s+([a-z' -]+)/.exec(t);
     const r = stayIn ? regions.find((x) => fold(stayIn[1]).startsWith(fold(regionLabels[x] || x))) : null;
-    const v = /\b(?:cheaper|cheap|budget|less expensive|affordable|moins chere?)\b/.test(t) ? 'budget' : /\b(?:nicer|fancier|luxur\w*|upscale|plus chic|haut de gamme)\b/.test(t) ? 'upscale'
-      : /\b(?:pool|piscine)\b/.test(t) ? 'pool' : /\b(?:hot ?tub|jacuzzi|bain a remous)\b/.test(t) ? 'hot_tub' : /\b(?:kitchen|kitchenette|cuisine)\b/.test(t) ? 'kitchen' : null;
-    if (v || r) return { ops: [op('stay', { value: v, region: r || null })], cant: null };
+    // One stay op per thing asked (2026-11-22): the price, up to two amenities, "a hotel" (not a motel). The town rides
+    // on the first one.
+    const price = /\b(?:cheaper|cheap|budget|less expensive|affordable|moins chere?)\b/.test(t) ? 'budget' : /\b(?:nicer|fancier|luxur\w*|upscale|plus chic|haut de gamme)\b/.test(t) ? 'upscale' : null;
+    const vals = [price, ...stayAmenitiesIn(t, true), /\bhotels?\b/.test(t) && !/\bmotels?\b/.test(t) ? 'hotel' : null].filter(Boolean);
+    if (vals.length === 1 && vals[0] === 'hotel' && !r && !/\b(?:a|an|un) hotel\b/.test(t)) vals.pop();
+    if (vals.length || r) return { ops: (vals.length ? vals : [null]).map((v, i) => op('stay', { value: v, region: i === 0 ? r || null : null })), cant: null };
   }
   if (/\b(?:flights?|fly|plane|airport|uber|lyft|taxi|shuttles?|avion|vol|navette)\b/.test(t)) return { ops: [], cant: 'transport' };
   if (/\b(?:weather|forecast|meteo)\b/.test(t)) return { ops: [], cant: 'weather' };
@@ -422,6 +433,17 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1 }
   let named = ordinalPick(t, stopsNamed(t, stops));
   if (day && named.some((s) => s.day === day)) named = named.filter((s) => s.day === day);
   if (/\b(?:redo|re-do|different|new|refaire|autre|nouveau|nouvelle)\b[^.]*\b(?:day|jour)\s*\d\b/.test(t) && !named.length) return { ops: [op('redo_day', { day })], cant: null };
+  // A kind of dinner or lunch ("a sunset dinner with a lake view", "a patio lunch", « un souper avec vue sur le lac »)
+  // is that day's dinner or lunch swapped for one like that (2026-11-22: it added a second restaurant in the afternoon,
+  // which the planner then dropped as a third meal). Only a day with no such meal gets one added.
+  const mealWord = /\b(?:dinner|supper|souper)\b/.test(t) ? 'dinner' : /\b(?:lunch|diner|dejeuner)\b/.test(t) ? 'lunch' : null;
+  const sunset = /\b(?:sunset|coucher (?:de|du) soleil)\b/.test(t);
+  const mealKind = /\b(?:lake ?view|view of the lake|on the lake|lakeside|lakefront|vue sur le lac|bord du lac)\b/.test(t) || (sunset && mealWord === 'dinner') ? 'lake_view' : /\b(?:patio|terrasse)\b/.test(t) ? 'patio' : /\b(?:live music|musique live)\b/.test(t) ? 'live_music' : null;
+  if (mealWord && mealKind && !/\b(?:remove|take (?:out|off)|drop|skip|no more|cut|delete|enleve[rz]?|retire[rz]?|supprime[rz]?)\b/.test(t) && !/\b(?:after|before|apres|avant)\s+(?:the\s+|le\s+|la\s+)?(?:lunch|dinner|supper|souper|diner|dejeuner)\b/.test(t)) {
+    const meals = stops.filter((x) => x.role === mealWord && (!day || x.day === day));
+    if (meals.length) return { ops: [op('replace', { stops: [meals[0]], kind: mealKind, ...(sunset ? { sunset: true } : {}) })], cant: null };
+    return { ops: [op('add', { kind: 'restaurant', time: mealWord === 'dinner' ? 'evening' : 'midday', day })], cant: null };
+  }
   // Days
   const nd = /\b(?:make it|for|en|sur|plan)\s+(\d|one|two|three|four|five|six|seven|un|une|deux|trois|quatre|cinq|sept)\s*(?:days?|jours?)\b/.exec(t);
   if (nd) ops.push(op('days', { n: Math.min(7, Number(nd[1]) || NUM_WORDS[nd[1]] || 1) }));
@@ -440,8 +462,11 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1 }
   while ((m = ageRe.exec(t))) ages.push(Number(m[1]));
   const pair = /\b(?:kids?|children|enfants?|boys?|girls?|son|daughter)\b[^.]*?\b(?:are|aged|ages|ont|of)\s+(\d{1,2})\s*(?:and|&|,|et)\s*(\d{1,2})\b/.exec(t);
   if (pair) ages.splice(0, ages.length, Number(pair[1]), Number(pair[2]));
-  const removeWord = /\b(?:remove|take (?:out|off)|drop|skip|get rid of|no more|cut|delete|lose|ditch|don'?t want|enleve[rz]?|retire[rz]?|supprime[rz]?|pas de)\b/.test(t);
-  const kidsAsk = /\b(?:kids?|children|child|toddlers?|enfants?)\b/.test(t) && !removeWord && !/\b(?:something for|for the|pour les)\b/.test(t);
+  const removeWord = /\b(?:remove|take (?:out|off)|drop|skip|get rid of|no more|cut|delete|lose|ditch|don'?t want|hates?|don'?t like|doesn'?t like|not into|deteste(?:nt)?|n'aime(?:nt)? pas|enleve[rz]?|retire[rz]?|supprime[rz]?|pas de)\b/.test(t);
+  const dislike = /\b(?:hates?|don'?t like|doesn'?t like|not into|no more|deteste(?:nt)?|n'aime(?:nt)? pas)\b/.test(t);
+  // "more for the kids" asks for more of it (the server adds a kids' stop when the plan is already a kids' plan).
+  const moreKids = /\b(?:more|plus)\b[^.]*\b(?:kids?|children|enfants?)\b/.test(t) && !removeWord;
+  const kidsAsk = moreKids || (/\b(?:kids?|children|child|toddlers?|enfants?)\b/.test(t) && !removeWord && !/\b(?:something for|for the|pour les)\b/.test(t));
   if (kidsAsk || (ages.length && /\b(?:kids?|children|enfants?|son|daughter|boy|girl|fils|fille)\b/.test(t))) ops.push(op('party', { value: 'kids', ages: ages.filter((a) => a <= 17).slice(0, 8) }));
   if (/\b(?:dogs?|pup(?:py)?|chiens?)\b/.test(t)) ops.push(op('party', { value: 'dog' }));
   if (/\b(?:wheelchair|accessible|stroller|mobility|walker|fauteuil roulant|poussette)\b/.test(t)) ops.push(op('party', { value: 'accessible' }));
@@ -466,7 +491,10 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1 }
   if (removeWord && named.length && !ops.some((o) => o.o === 'party' && o.value === 'no_alcohol')) ops.push(op('remove', { stops: named }));
   else if (removeWord && !named.length && !ops.length) {
     // "remove the brewery" with no brewery on the plan: say so (never pass "remove the brewery" to the planner as words).
-    const k = kindsNamed(t)[0];
+    // The kind is what comes after the word ("the kids hate museums" is about museums, not kids).
+    const k = kindsNamed(t.replace(/^.*?\b(?:remove|take (?:out|off)|drop|skip|get rid of|no more|cut|delete|lose|ditch|don'?t want|hates?|don'?t like|doesn'?t like|not into|deteste(?:nt)?|n'aime(?:nt)? pas|enleve[rz]?|retire[rz]?|supprime[rz]?|pas de)\b/, ''))[0] || kindsNamed(t)[0];
+    // "the kids hate museums" with no museum on the plan: nothing to take out; that kind is kept out from now on.
+    if (dislike && k && AVOID_TEXT[k]) return { ops: [op('avoid', { kind: k })], cant: null };
     return { ops: [], cant: 'not_found', what: k || null };
   }
   // "swap dinner for something fancier" is the budget op alone (no second, plain swap of the same stop).
@@ -511,9 +539,11 @@ function plannerCanRead(message) { const t = fold(message); return PLANNER_WORDS
 // where it adds value. -> { ops, cant, source: 'ai' | 'ai_fixed' | 'rules_over_ai' | 'rules', fixes }
 const STAY_WORDS_RE = /\b(?:stay|staying|hotel|motel|place to stay|lodging|accommodations?|condo|chalet|airbnb|cabin|loger|logement|hebergement|dormir)\b/;
 const KIDS_ACTIVITY_RE = /\b(?:lessons?|school|camp|cours|lecons?|activit(?:y|ies)|something|thing|things|ice ?cream|play\w*|do)\b/;
+// A kind the visitor wants kept out, in the planner's own words (added to the request, so later re-plans leave it out).
+const AVOID_TEXT = { arts: 'no museums', winery: 'no wineries', brewery: 'no breweries', distillery: 'no distilleries', pub: 'no pubs', cocktail: 'no cocktail lounges', golf: 'no golf', beach: 'no beaches', hike: 'no hiking', tour: 'no tours', indoor: 'no indoor attractions', spa: 'no spa', cafe: 'no cafes' };
 function rulesConfident(r) {
   if (!r) return false;
-  if (!(r.ops || []).length) return ['booking', 'transport', 'weather', 'other', 'not_found'].includes(r.cant);
+  if (!(r.ops || []).length) return ['booking', 'transport', 'weather', 'other', 'not_found', 'time_at'].includes(r.cant);
   return r.ops.every((o) => o.o !== 'refine');
 }
 const stopIds = (o) => (o.stops || []).map((s) => s.id).sort((a, b) => a - b).join(',');
@@ -521,6 +551,8 @@ function reconcileReads(ai, rules, message) {
   if (!ai || !ai.ok) return { ops: rules.ops, cant: rules.cant, source: 'rules', fixes: [] };
   if (!rulesConfident(rules)) return { ops: ai.ops, cant: ai.cant, source: 'ai', fixes: [] };
   const t = fold(message);
+  // A clock time for one stop: said plainly (the AI's "start the day earlier" re-planned six stops).
+  if (rules.cant === 'time_at' && !(rules.ops || []).length) return { ops: [], cant: 'time_at', source: 'rules_over_ai', fixes: ['time_at'] };
   // (a) The AI read no edit (can't, unclear) but the rules read specific edits.
   if (!(ai.ops || []).length) {
     if ((rules.ops || []).length) return { ops: rules.ops, cant: null, source: 'rules_over_ai', fixes: [`ai_${ai.cant || 'none'}`] };
@@ -546,6 +578,19 @@ function reconcileReads(ai, rules, message) {
     const i = ops.findIndex((o) => (o.o === 'replace' || o.o === 'budget') && stopIds(o) === stopIds(r));
     if (i >= 0) { ops[i] = { ...r }; fixes.push('swap_to_add'); }
   }
+  // (e) "a sunset dinner with a lake view" read as an extra stop: the dinner swap, as the rules read it.
+  for (const r of rules.ops || []) {
+    if (r.o !== 'replace' || !(r.stops || []).length || !r.stops[0].role) continue;
+    const i = ops.findIndex((o) => o.o === 'add' && !(o.stops || []).length);
+    if (i >= 0) { ops[i] = { ...r }; fixes.push('add_to_meal_swap'); }
+  }
+  // (f) "add a spa on day 1 afternoon" read as "after dinner": the stop named by the AI is not in the message as the
+  // rules read it, so the time of day and the day stand.
+  for (const r of rules.ops || []) {
+    if (r.o !== 'add' || (r.stops || []).length) continue;
+    const m = ops.find((o) => o.o === 'add' && o.kind === r.kind && (o.stops || []).length);
+    if (m) { m.stops = []; m.time = r.time || null; m.day = r.day || null; m.value = null; fixes.push('drop_anchor'); }
+  }
   // (c) "lessons for the kids": the lessons only. A "party kids" op re-plans every stop; dropped when the rules read an
   // activity for the kids and no change of who is coming.
   if (!(rules.ops || []).some((o) => o.o === 'party' && o.value === 'kids') && (rules.ops || []).some((o) => o.o === 'add' || o.o === 'replace') && KIDS_ACTIVITY_RE.test(t)) {
@@ -554,6 +599,57 @@ function reconcileReads(ai, rules, message) {
     if (ops.length < n) fixes.push('drop_party_kids');
   }
   return { ops, cant: ops.length ? null : ai.cant, source: fixes.length ? 'ai_fixed' : 'ai', fixes };
+}
+
+// The amenities a message asks of the place to stay (at most two), from its folded words. all: the chat's stay messages
+// also read pet-friendly, free parking and accessible rooms; a first request reads only pool, hot tub and kitchen (its
+// "dog-friendly" or "accessible" may be about the stops).
+function stayAmenitiesIn(t, all = false) {
+  const out = [];
+  if (/\b(?:pool|piscine)\b/.test(t)) out.push('pool');
+  if (/\b(?:hot ?tub|jacuzzi|bain a remous)\b/.test(t) || (all && /\b(?:avec|et) (?:un )?spa\b/.test(t))) out.push('hot_tub');
+  if (/\b(?:kitchen|kitchenette|cuisine equipee|cuisinette)\b/.test(t) || (all && /\bcuisine\b/.test(t))) out.push('kitchen');
+  if (all && /\b(?:pets?|dogs?)[- ]friendly\b|\bpets? (?:allowed|welcome|ok)\b|\b(?:takes?|allows?|accepts?) (?:dogs|pets)\b|\banimaux (?:acceptes|admis)\b/.test(t)) out.push('pets');
+  if (all && /\b(?:parking|stationnement)\b/.test(t)) out.push('parking');
+  if (all && /\b(?:accessible|wheelchair|fauteuil roulant)\b/.test(t)) out.push('accessible');
+  return out.slice(0, 2);
+}
+// What a first request says about the place to stay ("need a place with a pool", "a hotel with a hot tub"):
+// -> { amenities: [...], kind: 'hotel' } (either key may be missing) or null.
+const FIRST_STAY_WORD_RE = /\b(?:place|stay|staying|hotels?|motels?|resort|condo|rooms?|accommodations?|airbnb|cabin|lodging|logement|hebergement)\b/;
+function stayTextPref(text) {
+  const t = fold(text);
+  if (!FIRST_STAY_WORD_RE.test(t)) return null;
+  const amenities = stayAmenitiesIn(t, false);
+  const kind = /\b(?:a|an|un) hotel\b/.test(t) ? 'hotel' : null;
+  return amenities.length || kind ? { ...(amenities.length ? { amenities } : {}), ...(kind ? { kind } : {}) } : null;
+}
+
+// Events on the plan (2026-11-22: "take out the brewery event" left "Photos with Santa at Abandoned Rail Brewing" in).
+// events: [{ id, name, place, alcohol }]. -> the events a "take out / no ..." message names: by the word "event" with
+// a kind of place, or by a distinctive word of the event's or its place's name.
+const EVENT_KIND_RES = [/\b(?:brewer(?:y|ies)|brewing|beers?|microbrasseries?)\b/, /\b(?:winer(?:y|ies)|wines?|vineyards?|vignobles?)\b/, /\b(?:distiller(?:y|ies)|spirits)\b/, /\b(?:pubs?|bars?|taprooms?|lounges?)\b/, /\b(?:markets?|marches?)\b/, /\b(?:concerts?|music|musique)\b/, /\b(?:hockey|games?)\b/, /\bsanta\b/];
+function eventsNamed(message, events) {
+  const t = fold(message);
+  if (!(events || []).length || !/\b(?:remove|take (?:out|off)|drop|skip|get rid of|no more|cut|delete|lose|ditch|don'?t want|hates?|don'?t like|not into|enleve[rz]?|retire[rz]?|supprime[rz]?|pas de)\b/.test(t)) return [];
+  const saysEvent = /\b(?:events?|evenements?)\b/.test(t);
+  return events.filter((e) => {
+    const text = fold(`${e.name || ''} ${e.place || ''}`);
+    const words = text.split(/[^a-z0-9']+/).filter((w) => w.length >= 5 && !GENERIC_NAME_WORDS.has(w) && !['event', 'events', 'with', 'photos'].includes(w));
+    if (words.some((w) => new RegExp(`\\b${w.replace(/[^a-z0-9]/g, '')}\\b`).test(t))) return true;
+    return saysEvent && (EVENT_KIND_RES.some((re) => re.test(t) && re.test(text)) || events.length === 1);
+  });
+}
+const ALCOHOL_PLACE_RE = /\b(?:brewer(?:y|ies)|brewing|brewpub|winer(?:y|ies)|wines?|vineyards?|cider(?:y|ies)?|distiller(?:y|ies)|spirits|taprooms?|tasting rooms?|pubs?|cocktails?|lounge|beer|bar)\b/;
+const eventAtAlcoholPlace = (e) => !!(e && (e.alcohol || ALCOHOL_PLACE_RE.test(fold(`${e.name || ''} ${e.place || ''}`))));
+// Who is coming, already in the request ("the kids", "we don't drink", "our dog"): said again, nothing is planned again.
+const PARTY_KNOWN_RE = { kids: /\b(?:kids?|children|child|toddlers?|year[- ]olds?|enfants?|ans)\b/, no_alcohol: /\b(?:no alcohol|don'?t drink|sober|alcohol[- ]free|non[- ]alcoholic|sans alcool|pas d'alcool)\b/, dog: /\b(?:dogs?|pup(?:py)?|chiens?)\b/ };
+function partyKnown(op, text) {
+  if (!op || op.o !== 'party' || !PARTY_KNOWN_RE[op.value]) return false;
+  const t = fold(text);
+  if (!PARTY_KNOWN_RE[op.value].test(t)) return false;
+  // New ages are news.
+  return !(op.value === 'kids' && (op.ages || []).some((a) => !new RegExp(`\\b${a}\\b`).test(t)));
 }
 
 // The tap-chips under the chat bar: fixed operations, no reading needed.
@@ -854,27 +950,43 @@ function placeAdd(op, kind, cur) {
   const day = op.day || (anchor && anchor.day) || 1;
   const occ = new Map(cur.stops.filter((s) => s.day === day && !cur.removed.has(s.key)).map((s) => [partOf(s.key), s]));
   const evening = EVENING_KINDS.has(kind);
-  const usable = (p) => p && p !== 'midday' && (p !== 'evening' || evening) && (p !== 'night' || evening || NIGHT_KINDS.has(kind));
+  // A meal asked for on a day with none of that kind (2026-11-22) takes the lunch or dinner slot itself.
+  const meal = kind === 'restaurant';
+  const usable = (p) => p && (p !== 'midday' || meal) && (p !== 'evening' || evening || meal) && (p !== 'night' || evening || NIGHT_KINDS.has(kind));
   let order;
-  if (anchor) { const i = DAYPARTS.indexOf(partOf(anchor.key)); order = [DAYPARTS[before ? i - 1 : i + 1]]; } else if (op.time) order = { morning: ['morning'], midday: ['afternoon'], afternoon: ['afternoon', 'late'], evening: evening ? ['night', 'late'] : ['late'] }[op.time];
+  if (anchor) { const i = DAYPARTS.indexOf(partOf(anchor.key)); order = [DAYPARTS[before ? i - 1 : i + 1]]; } else if (meal && op.time) order = [op.time === 'evening' ? 'evening' : 'midday'];
+  else if (op.time) order = { morning: ['morning'], midday: ['afternoon'], afternoon: ['afternoon', 'late'], evening: evening ? ['night', 'late'] : ['late'] }[op.time];
   else order = evening ? ['night', 'late'] : ['afternoon', 'late', 'morning'];
   order = (order || []).filter(usable);
   for (const p of order) if (!occ.has(p)) return { slot: `${day}-${p}`, shifts: {}, day };
   const T = order[0];
   if (!T || before) return { why: 'no_room', day };
+  // 2026-11-22 ("ice cream after lunch": "no free spot" with three free hours between an 11:45 lunch and a 2:45 stop): the
+  // real time between the stop named and the next one counts. With an hour or more free, the new stop starts in that gap
+  // (slotStart) and the stops after it keep their own times (keep): they only change slot name, nothing moves on screen.
+  const dayStops = cur.stops.filter((x) => x.day === day && !cur.removed.has(x.key) && Number.isInteger(x.start)).sort((a, b) => a.start - b.start);
+  const endOf = (x) => x.start + (x.role ? 75 : 60);
+  const nextStop = anchor && Number.isInteger(anchor.start) ? dayStops.find((x) => x.start > anchor.start) : null;
+  const gap = anchor && Number.isInteger(anchor.start) && nextStop ? nextStop.start - endOf(anchor) : 0;
+  const roomy = gap >= 60;
+  const slotStart = roomy ? Math.ceil((endOf(anchor) + 15) / 15) * 15 : null;
   // Make room: the stops from T up to the first free slot before dinner move one slot later (never a meal or a kept stop).
   const ti = DAYPARTS.indexOf(T), limit = DAYPARTS.indexOf(evening ? 'night' : 'evening');
   let e = -1;
   for (let j = ti + 1; j < limit + (evening ? 1 : 0); j++) if (!occ.has(DAYPARTS[j])) { e = j; break; }
+  // Every slot before dinner is taken but the time is there: dinner takes the (free) night slot at its own time, and the
+  // afternoon stops move one slot name along at their own times.
+  let tight = false;
+  if (e < 0 && roomy && !evening && !occ.has('night') && occ.has('evening')) { e = DAYPARTS.indexOf('night'); tight = true; }
   if (e < 0) return { why: 'no_room', day };
   const shifts = {};
   for (let j = e - 1; j >= ti; j--) {
-    const s = occ.get(DAYPARTS[j]);
-    if (!s) continue;
-    if (s.role || cur.locks[s.key] === s.id) return { why: 'no_room', day };
-    shifts[s.key] = `${day}-${DAYPARTS[j + 1]}`;
+    const x = occ.get(DAYPARTS[j]);
+    if (!x) continue;
+    if ((x.role && !(tight && DAYPARTS[j] === 'evening')) || cur.locks[x.key] === x.id) return { why: 'no_room', day };
+    shifts[x.key] = `${day}-${DAYPARTS[j + 1]}`;
   }
-  return { slot: `${day}-${T}`, shifts, day };
+  return { slot: `${day}-${T}`, shifts, day, ...(roomy ? { keep: true, slotStart } : {}) };
 }
 
 // One Swap on the current plan. -> { plan, nw, fresh, args, moved } | { why }
@@ -885,7 +997,7 @@ function slotEdit(cur, spec, ctx) {
     const k = spec.shifts[s.key] || s.key;
     if (k === spec.slot && !spec.shifts[s.key]) continue;
     pinned[k] = s.id;
-    if (!spec.shifts[s.key] && Number.isInteger(s.start)) times[k] = s.start;
+    if ((!spec.shifts[s.key] || spec.keep) && Number.isInteger(s.start)) times[k] = s.start;
   }
   if (Number.isInteger(spec.slotStart)) times[spec.slot] = spec.slotStart; // a replaced stop keeps its time
   const exclude = [...new Set([...(cur.args.excludeVenueIds || []), ...(spec.exclude || [])])].slice(-200);
@@ -898,7 +1010,10 @@ function slotEdit(cur, spec, ctx) {
   if (!fresh || (spec.oldId && fresh.id === spec.oldId) || !spec.check(fresh)) return { why: 'no_fit' };
   // Only that one stop changes: every other stop is still there, in its (or its moved-to) slot.
   for (const [k, id] of Object.entries(pinned)) if (!nw.some((s) => s.key === k && s.id === id)) return { why: 'disturbed' };
-  const moved = Object.entries(spec.shifts).map(([from, to]) => nw.find((s) => s.key === to)).filter(Boolean);
+  // Only the stops whose time really changed are "moved" (a stop that keeps its time only changed slot name).
+  const moved = Object.entries(spec.shifts).map(([from, to]) => { const was = cur.stops.find((s) => s.key === from), now = nw.find((s) => s.key === to); return now && was && now.start !== was.start ? now : null; }).filter(Boolean);
+  // An added stop asked for after another one starts after it (and before the next one, when there was room).
+  if (spec.after && Number.isInteger(spec.after.start) && Number.isInteger(fresh.start) && fresh.start <= spec.after.start) return { why: 'no_fit' };
   return { plan, nw, fresh, args, moved };
 }
 // The planner's Swap already checked the badge (kid_friendly, lake_view...) on its own facts; this checks the kind of
@@ -954,9 +1069,12 @@ function planTurn(ops, ctx) {
           if ((op.value === 'budget' && p <= 1) || (op.value === 'upscale' && p >= 4)) { rr.why = 'no_fit'; continue; }
           swap = { type: old.type, id: old.id, ...(op.value === 'budget' ? { priceMax: p - 1 } : { priceMin: p + 1 }) };
         } else swap = op.kind ? { ...KIND_SWAP[op.kind], id: old.id } : { type: old.type, id: old.id };
-        const res = slotEdit(cur, { slot: old.key, slotStart: old.start, shifts: {}, swap, exclude: [old.id], oldId: old.id, check: (f) => wantMatches(op.kind, f) }, ctx);
+        // A meal swapped for a kind of meal stays somewhere to eat (never a winery or a beach with a lake view).
+        const mealOk = (f) => !old.role || ['restaurant', 'pub'].includes(f.type) || (old.role === 'lunch' && f.type === 'cafe');
+        const res = slotEdit(cur, { slot: old.key, slotStart: old.start, shifts: {}, swap, exclude: [old.id], oldId: old.id, check: (f) => wantMatches(op.kind, f) && mealOk(f) }, ctx);
         if (res.why) { rr.why = res.why; continue; }
         rr.ok = true; rr.fresh = res.fresh;
+        cur.locks[old.key] = res.fresh.id; // what the visitor changed stays through later re-plans
         if (op.o === 'budget') rr.pairs = [{ old, fresh: res.fresh }];
         cur = { plan: res.plan, stops: res.nw, args: { ...res.args, swap: null }, locks: cur.locks, removed: new Set() };
       }
@@ -970,9 +1088,10 @@ function planTurn(ops, ctx) {
     const where = placeAdd(op.o === 'more_like' ? { ...op, stops: [], day: (now(op.stops[0]) || op.stops[0]).day, value: null } : { ...op, stops: (op.stops || []).map((s) => now(s) || s) }, kind, cur);
     r.anchor = (op.stops || [])[0] || null; r.before = op.value === 'earlier';
     if (where.why) { r.why = where.why; continue; }
-    const res = slotEdit(cur, { slot: where.slot, shifts: where.shifts, swap: { ...KIND_SWAP[kind] }, exclude: [], check: (f) => wantMatches(kind, f) && !cur.stops.some((o) => o.id === f.id) }, ctx);
-    if (res.why) { r.why = res.why; continue; }
+    const res = slotEdit(cur, { slot: where.slot, shifts: where.shifts, keep: !!where.keep, slotStart: where.slotStart, after: !r.before && where.keep ? (op.stops || [])[0] : null, swap: { ...KIND_SWAP[kind] }, exclude: [], check: (f) => wantMatches(kind, f) && !cur.stops.some((o) => o.id === f.id) }, ctx);
+    if (res.why) { r.why = res.why === 'disturbed' ? 'no_room' : res.why; continue; }
     r.ok = true; r.fresh = res.fresh; r.moved = res.moved;
+    cur.locks[where.slot] = res.fresh.id; // what the visitor added stays through later re-plans
     cur = { plan: res.plan, stops: res.nw, args: { ...res.args, swap: null }, locks: cur.locks, removed: new Set() };
   }
   if (!cur.plan) {
@@ -1000,6 +1119,11 @@ function planTurn(ops, ctx) {
 // ---------- Replies, from templates only ----------
 const T = {
   en: {
+    avoidNone: 'There’s no {what} in your plan. I’ll keep it out.', avoidWhat: { arts: 'museum', winery: 'winery', brewery: 'brewery', distillery: 'distillery', pub: 'pub', cocktail: 'cocktail bar', golf: 'golf', beach: 'beach', hike: 'hike', tour: 'tour', indoor: 'indoor attraction', spa: 'spa', cafe: 'café' },
+    partyKnown: { kids: 'Your plan is already set for the kids.', no_alcohol: 'Your plan is already alcohol-free.', dog: 'Your plan is already set for your dog.' },
+    time_at: 'I can’t set an exact time for one stop yet. I can start the day earlier or later, or swap that stop.',
+    wineTour: 'Here’s a wine tour with a driver for {town}: tap Book on the card above the plan.', wineTourNone: 'I don’t have a wine tour to offer for {town} right now.',
+    poolWinter: ' (check it’s open in winter)',
     done: 'Done.', took: 'Took out {names}.', kept: 'Kept {names}.', keptStays: 'Kept {names}. {it} when you change other things.', itStays: 'It stays', theyStay: 'They stay',
     swapped: 'Swapped {old} for {new}{at}.', swapFail: 'I couldn’t find {kind} that fits there, so {old} stays.', swapFailSame: 'Nothing else nearby fits there, so {old} stays.',
     added: 'Added {new}{at}.', moved: '{name} moves to {time}.', noRoom: 'There’s no free spot for {kind} {where} without dropping a stop. Remove or swap one first.', addFailWhere: 'I couldn’t find {kind} open nearby {where}.', afterW: 'after {x}', beforeW: 'before {x}', thereW: 'at that time', lunchW: 'lunch', dinnerW: 'dinner', addedClose: 'Added {new}{at}, the closest fit I found.', addFail: 'I couldn’t fit {kind} into this plan.', more: 'Added {new}{at}, more like {liked}.', moreFail: 'I kept {liked}, but couldn’t fit another like it.',
@@ -1014,13 +1138,23 @@ const T = {
     tooLong: 'That’s a lot of changes for one plan. Try Start over with a new request.', unchanged: 'Your plan is unchanged.', cantChange: 'I couldn’t change the plan that way.',
     booking: 'I can’t book things in this chat, but confirm the plan and “Book my trip” opens each booking.', transport: 'I can’t book flights or rides, but I can change the plan around when you arrive.',
     weather: 'I can’t check the weather, but I can make it an indoor day. Try “something indoors”.', other: 'I can only change this plan: take stops out, swap them, add a kind of stop, or change the pace, budget, days or who’s coming.',
-    stayNow: 'Now staying at {name} ({facts}).', stayNone: 'Got it, you have a place. I took the stay off the plan.', stayFail: 'I couldn’t find {what} near your plan, so {name} stays.', stayOff: 'This plan has no night away, so there’s no place to stay to change.',
-    stayWhat: { budget: 'a cheaper place', upscale: 'a nicer place', pool: 'a place with a pool', hot_tub: 'a place with a hot tub', kitchen: 'a place with a kitchen', region: 'a place in {town}' },
+    stayNow: 'Now staying at {name} ({facts}){has}.', stayHas: ', which has {what}', stayKept: '{name} ({facts}) has {what}, so it stays.',
+    stayNoAmenity: 'I couldn’t find a place with {what} in {town} in our list. Here’s the closest: {name} ({short} not confirmed).',
+    stayElsewhere: 'I couldn’t find a place with {what} in {town} in our list. The nearest that has it is {name} ({facts}).',
+    stayKindMiss: ' I couldn’t find a hotel that fits; this one is listed as: {kind}.', and: 'and',
+    amen: { pool: 'a pool', hot_tub: 'a hot tub', kitchen: 'a kitchen', pets: 'pet-friendly rooms', parking: 'free parking', accessible: 'accessible rooms' },
+    amenShort: { pool: 'pool', hot_tub: 'hot tub', kitchen: 'kitchen', pets: 'pets', parking: 'free parking', accessible: 'accessible rooms' }, stayNone: 'Got it, you have a place. I took the stay off the plan.', stayFail: 'I couldn’t find {what} near your plan, so {name} stays.', stayOff: 'This plan has no night away, so there’s no place to stay to change.',
+    stayWhat: { budget: 'a cheaper place', upscale: 'a nicer place', pool: 'a place with a pool', hot_tub: 'a place with a hot tub', kitchen: 'a place with a kitchen', pets: 'a pet-friendly place', parking: 'a place with free parking', accessible: 'an accessible place', hotel: 'a hotel', region: 'a place in {town}' },
     carYes: 'Rental cars at {airport}: tap See cars on the Getting here card.', carNo: 'I can’t book rental cars here yet. {airport} has rental desks.', driving: 'Got it, you’re driving. I took the rental car off.',
     noCarShuttle: 'Without a car: the Getting here card has an airport shuttle. Most other stops need a car or a taxi.', noCar: 'Most of these stops need a car. Staying central in {town} helps; taxis are limited, so book rides ahead.',
     unclear: 'Sorry, I didn’t catch that. Try “remove the brewery” or “more for kids”.', unclearFrom: 'Sorry, I didn’t catch that. Try “remove {name}”, “cheaper dinner” or “more for kids”.', busy: 'Too many messages in a short time. Try again in a few minutes.', error: 'Something went wrong. Your plan is unchanged.',
   },
   fr: {
+    avoidNone: 'Il n’y a pas de {what} dans votre plan. Je n’en ajouterai pas.', avoidWhat: { arts: 'musée', winery: 'vignoble', brewery: 'microbrasserie', distillery: 'distillerie', pub: 'pub', cocktail: 'bar à cocktails', golf: 'golf', beach: 'plage', hike: 'randonnée', tour: 'visite guidée', indoor: 'activité intérieure', spa: 'spa', cafe: 'café' },
+    partyKnown: { kids: 'Votre plan est déjà adapté aux enfants.', no_alcohol: 'Votre plan est déjà sans alcool.', dog: 'Votre plan est déjà adapté à votre chien.' },
+    time_at: 'Je ne peux pas encore fixer l’heure exacte d’un seul arrêt. Je peux commencer la journée plus tôt ou plus tard, ou remplacer cet arrêt.',
+    wineTour: 'Voici un tour des vignobles avec chauffeur pour {town} : touchez Réserver dans la carte au-dessus du plan.', wineTourNone: 'Je n’ai pas de tour des vignobles à proposer pour {town} en ce moment.',
+    poolWinter: ' (vérifiez qu’elle est ouverte en hiver)',
     done: 'C’est fait.', took: 'J’ai retiré {names}.', kept: 'J’ai gardé {names}.', keptStays: 'J’ai gardé {names}. {it} si vous changez autre chose.', itStays: 'Il reste', theyStay: 'Ils restent',
     swapped: 'J’ai remplacé {old} par {new}{at}.', swapFail: 'Je n’ai pas trouvé {kind} qui convienne à ce moment, donc {old} reste.', swapFailSame: 'Rien d’autre à proximité ne convient à ce moment, donc {old} reste.',
     added: 'J’ai ajouté {new}{at}.', moved: '{name} passe à {time}.', noRoom: 'Pas de place libre pour {kind} {where} sans retirer un arrêt. Retirez-en ou remplacez-en un d’abord.', addFailWhere: 'Je n’ai pas trouvé {kind} ouvert à proximité {where}.', afterW: 'après {x}', beforeW: 'avant {x}', thereW: 'à ce moment', lunchW: 'le dîner', dinnerW: 'le souper', addedClose: 'J’ai ajouté {new}{at}, le meilleur moment que j’ai trouvé.', addFail: 'Je n’ai pas pu ajouter {kind} à ce plan.', more: 'J’ai ajouté {new}{at}, dans le même esprit que {liked}.', moreFail: 'J’ai gardé {liked}, mais je n’ai pas pu en ajouter un autre du même genre.',
@@ -1035,8 +1169,13 @@ const T = {
     tooLong: 'Ça fait beaucoup de changements pour un plan. Essayez Recommencer avec une nouvelle demande.', unchanged: 'Votre plan n’a pas changé.', cantChange: 'Je n’ai pas pu changer le plan de cette façon.',
     booking: 'Je ne peux pas réserver dans cette discussion, mais confirmez le plan et « Tout réserver » ouvre chaque réservation.', transport: 'Je ne peux pas réserver de vols ni de transport, mais je peux adapter le plan à votre arrivée.',
     weather: 'Je ne peux pas vérifier la météo, mais je peux prévoir une journée à l’intérieur. Essayez « activités intérieures ».', other: 'Je peux seulement modifier ce plan : retirer ou remplacer des arrêts, ajouter un type d’arrêt, ou changer le rythme, le budget, les jours ou qui vient.',
-    stayNow: 'Vous logez maintenant à {name} ({facts}).', stayNone: 'Parfait, vous avez déjà un logement. Je l’ai retiré du plan.', stayFail: 'Je n’ai pas trouvé {what} près de votre plan, donc {name} reste.', stayOff: 'Ce plan n’a pas de nuit sur place, donc pas de logement à changer.',
-    stayWhat: { budget: 'un logement moins cher', upscale: 'un logement plus chic', pool: 'un logement avec piscine', hot_tub: 'un logement avec spa', kitchen: 'un logement avec cuisine', region: 'un logement à {town}' },
+    stayNow: 'Vous logez maintenant à {name} ({facts}){has}.', stayHas: ', qui a {what}', stayKept: '{name} ({facts}) a {what}, donc il reste.',
+    stayNoAmenity: 'Je n’ai pas trouvé de logement avec {what} à {town} dans notre liste. Voici le plus proche : {name} ({short} non confirmé).',
+    stayElsewhere: 'Je n’ai pas trouvé de logement avec {what} à {town} dans notre liste. Le plus proche qui en a : {name} ({facts}).',
+    stayKindMiss: ' Je n’ai pas trouvé d’hôtel qui convienne; celui-ci est de type : {kind}.', and: 'et',
+    amen: { pool: 'une piscine', hot_tub: 'un spa', kitchen: 'une cuisine', pets: 'des chambres où les animaux sont acceptés', parking: 'un stationnement gratuit', accessible: 'des chambres accessibles' },
+    amenShort: { pool: 'piscine', hot_tub: 'spa', kitchen: 'cuisine', pets: 'animaux', parking: 'stationnement gratuit', accessible: 'chambres accessibles' }, stayNone: 'Parfait, vous avez déjà un logement. Je l’ai retiré du plan.', stayFail: 'Je n’ai pas trouvé {what} près de votre plan, donc {name} reste.', stayOff: 'Ce plan n’a pas de nuit sur place, donc pas de logement à changer.',
+    stayWhat: { budget: 'un logement moins cher', upscale: 'un logement plus chic', pool: 'un logement avec piscine', hot_tub: 'un logement avec spa', kitchen: 'un logement avec cuisine', pets: 'un logement qui accepte les animaux', parking: 'un logement avec stationnement gratuit', accessible: 'un logement accessible', hotel: 'un hôtel', region: 'un logement à {town}' },
     carYes: 'Location de voitures à {airport} : touchez Voir les voitures dans la carte Pour venir.', carNo: 'Je ne peux pas encore réserver de voiture ici. {airport} a des comptoirs de location.', driving: 'Parfait, vous venez en voiture. J’ai retiré la location.',
     noCarShuttle: 'Sans voiture : la carte Pour venir propose une navette depuis l’aéroport. La plupart des autres arrêts demandent une voiture ou un taxi.', noCar: 'La plupart de ces arrêts demandent une voiture. Loger au centre de {town} aide; les taxis sont rares, réservez vos trajets à l’avance.',
     unclear: 'Désolé, je n’ai pas compris. Essayez « enlève la microbrasserie » ou « plus pour les enfants ».', unclearFrom: 'Désolé, je n’ai pas compris. Essayez « enlève {name} », « souper moins cher » ou « plus pour les enfants ».', busy: 'Trop de messages en peu de temps. Réessayez dans quelques minutes.', error: 'Un problème est survenu. Votre plan n’a pas changé.',
@@ -1135,10 +1274,10 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null } = {}) {
 }
 
 module.exports = {
-  STAY_VALUES, TRANSPORT_VALUES, fill,
+  STAY_VALUES, STAY_AMENITY_VALUES, TRANSPORT_VALUES, fill, stayAmenitiesIn, stayTextPref,
   MODEL, PRICE_PER_TOKEN, DEFAULT_TIMEOUT_MS, DEFAULT_DAILY_USD, MAX_MESSAGE, MAX_STOPS, RATE, OPS, TIMES, VALUES, CANT, KINDS, KIND_KEYS, CHIPS, T,
   enabled, apiKey, wireSchema, systemPrompt, stopsForModel, stripPII, validateWire, readChatMessage, rulesRead, chipOps,
-  rulesConfident, reconcileReads,
+  rulesConfident, reconcileReads, eventsNamed, eventAtAlcoholPlace, partyKnown, AVOID_TEXT,
   planStops, planTurn, broadTurn, placeAdd, buildReply, cantReply, plannerCanRead, kindMatches, joinText, clock, isDayPlan, isShortPlan,
   dailyCapUsd, spentToday, addSpend, resetSpend, costOf, pacificDay, rateLimited, resetRate,
 };
