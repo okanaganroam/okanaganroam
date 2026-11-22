@@ -6,12 +6,14 @@
 // More for kids, Slower pace) until the first message, then the last exchange (what they said, our short reply, Undo).
 // The plan stays on screen; the stops that changed glow for ~2 s and scroll into view. Swap ⇄ and Remove ✕ stay.
 // One fixed region at the bottom: the chat sits above Confirm / Book / Share in the same bar, so nothing covers anything.
-// After Confirm the chat is hidden ("Edit plan" brings it back), like Swap and Remove.
+// The chat stays open after Confirm too (Dayton, 2026-11-22: "there is no ai chat box now"): a slim box above Book /
+// Share / Save, no chips; a change sent then un-confirms the plan as before. Only Save's Replace / Add question hides it.
 
 const CHAT_STYLES = `<style>
   /* Travel agent chat (2026-11-22), inside the V4 sticky bar. */
   .t3-v4 .v4-chat { margin: 0 0 8px; }
   .t3-v4 .v4-bar.v4-chat-off .v4-chat { display: none; }
+  .t3-v4 .v4-bar.is-confirmed .v4-chips { display: none; } /* after Confirm: just the box, Book / Share / Save under it */
   .t3-v4 .v4-bar.has-chat { background: #fff; }
   .t3-v4 .v4-bar.has-chat .v4-disc { display: none; }
   .t3-v4 .v4-bar.has-chat [data-v4-confirm] { min-height: 44px; }
@@ -102,8 +104,8 @@ function chatClientSrc(d) {
       bar.appendChild(box); bar.appendChild(main);
     }
     bar.classList.add('has-chat');
-    // Hidden once the plan is confirmed or while Save asks Replace / Add (like Swap and Remove).
-    bar.classList.toggle('v4-chat-off', !!(v4.confirmed || v4.ask));
+    // Hidden only while Save asks Replace / Add; after Confirm the travel agent stays one tap away.
+    bar.classList.toggle('v4-chat-off', !!v4.ask);
     bar.classList.toggle('is-confirmed', !!(v4.confirmed || v4.ask));
     return bar.querySelector('.v4-bar-main');
   }
