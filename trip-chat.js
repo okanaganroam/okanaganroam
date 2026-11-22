@@ -488,7 +488,8 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
   // book things in this chat".
   // Travel agent abilities first (trip-chat-agent.js): questions, a stay on any plan, getting there, moves, adults.
   const agentRead = agent.agentRules(t, stops, { regions, regionLabels, days, weekdays }, { op, stopsNamed, ordinalPick, kindsNamed, stayAmenitiesIn });
-  if (agentRead) return agentRead;
+  // A bare "find us a place to stay" (soft) lets the stay rules below read a price, an amenity, a town or an area first.
+  if (agentRead && !agentRead.soft) return agentRead;
   // A tour asked for by its kind ("add a wine tour", "book us a snowmobile tour") is a stop to add, read further down.
   const tourAsked = Object.entries(WORD_KINDS).filter(([, w]) => w.tour && w.re.test(t)).map(([k]) => k);
   if (!tourAsked.length && /\b(?:with|need|want|hire|get) a driver\b|\bdesignated driver\b|\bno driving\b|\bsans conduire\b/.test(t)) return { ops: [op('transport', { value: 'wine_tour' })], cant: null };
@@ -511,6 +512,7 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
     if (vals.length === 1 && vals[0] === 'hotel' && !r && !/\b(?:a|an|un) hotel\b/.test(t)) vals.pop();
     if (vals.length || r) return { ops: (vals.length ? vals : [null]).map((v, i) => op('stay', { value: v, region: i === 0 ? r || null : null })), cant: null };
   }
+  if (agentRead && agentRead.soft) return { ops: agentRead.ops, cant: null };
   if (/\b(?:flights?|fly|plane|airport|uber|lyft|taxi|shuttles?|avion|vol|navette)\b/.test(t)) return { ops: [], cant: 'transport' };
   if (/\b(?:weather|forecast|meteo)\b/.test(t)) return { ops: [], cant: 'weather' };
   // A question about a place ("what time do the lifts open?", "how much is it?"): one honest, useful line.
@@ -582,7 +584,7 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
   const moreKids = /\b(?:more|plus)\b[^.]*\b(?:kids?|children|enfants?)\b/.test(t) && !removeWord;
   const kidsAsk = moreKids || (/\b(?:kids?|children|child|toddlers?|enfants?)\b/.test(t) && !removeWord && !/\b(?:something for|for the|pour les)\b/.test(t));
   if (kidsAsk || (ages.length && /\b(?:kids?|children|enfants?|son|daughter|boy|girl|fils|fille)\b/.test(t))) ops.push(op('party', { value: 'kids', ages: ages.filter((a) => a <= 17).slice(0, 8) }));
-  if (/\b(?:dogs?|pup(?:py)?|chiens?)\b/.test(t)) ops.push(op('party', { value: 'dog' }));
+  if (/\b(?:dogs?|pup(?:py)?|chiens?)\b/.test(t) && !agent.TOUR_KINDS.dog_sled.re.test(t)) ops.push(op('party', { value: 'dog' }));
   if (/\b(?:wheelchair|accessible|stroller|mobility|walker|fauteuil roulant|poussette)\b/.test(t)) ops.push(op('party', { value: 'accessible' }));
   if (/\b(?:don'?t drink|do not drink|no (?:alcohol|drinking|booze)|sober|alcohol[- ]free|non[- ]alcoholic|sans alcool|ne boit pas|ne buvons pas|pas d'alcool)\b/.test(t)) ops.push(op('party', { value: 'no_alcohol' }));
   if (/\bvegan|vegetalien/.test(t)) ops.push(op('party', { value: 'vegan' }));
@@ -642,7 +644,7 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
   }
   if (!removeWord && addWord && !ops.some((o) => ['replace', 'more_like'].includes(o.o) || (o.o === 'budget' && (o.stops || []).length))) {
     // "after lunch" / "before dinner": the stop it goes next to (value "earlier" = before it, as the model answers).
-    const after = /\b(?:after|apres|before|avant)\s+(?:the\s+|our\s+|le\s+|la\s+|l')?(\w+)/.exec(t);
+    const after = /\b(?:after|before)\s+(?:the\s+|our\s+)?(\w+)/.exec(t) || /\b(?:after|apres|before|avant)\s+(?:the\s+|our\s+|le\s+|la\s+|l')?(\w+)/.exec(t);
     const before = !!(after && /^(?:before|avant)\b/.test(after[0]));
     let afterStops = after ? stopsNamed(after[1], stops) : [];
     if (day && afterStops.some((s) => s.day === day)) afterStops = afterStops.filter((s) => s.day === day);

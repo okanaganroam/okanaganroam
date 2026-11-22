@@ -196,7 +196,7 @@ function agentRules(t, stops, ctx, h) {
     const r = regionIn(t.replace(/^.*?\b(?:in|at|near|a|en|pres de)\b/, ' ')) || (stayIn ? regionIn(stayIn[1]) : null);
     const vals = [price, ...amenities, /\bhotels?\b/.test(t) && !/\bmotels?\b/.test(t) ? 'hotel' : null].filter(Boolean);
     const ops = (vals.length ? vals : ['add']).map((v, i) => op('stay', { value: v, region: i === 0 ? r : null }));
-    return { ops, cant: null };
+    return { ops, cant: null, ...(!vals.length && !r ? { soft: true } : {}) };
   }
 
   // 4. Who is coming: the number of adults.

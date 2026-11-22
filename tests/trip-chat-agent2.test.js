@@ -271,7 +271,8 @@ const post = async (body) => {
   const r = await fetch(`${base}/api/trip/chat?stays=1&v=4&chat=1`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': UA, 'X-Real-IP': `10.9.0.${ipN++}` }, body: JSON.stringify(body) });
   return { status: r.status, j: await r.json() };
 };
-const TEXT = 'a day in Kelowna with wineries';
+// The same file runs on both sites: a wine day in Kelowna, or a day in Squamish.
+const TEXT = app.REGION_LABELS.kelowna ? 'a day in Kelowna with wineries' : 'a day in Squamish';
 function bodyFor(message, extra = {}) {
   const plan = app.runTripPlanRequest(app.parseTripPlanBody({ text: TEXT }, { v4: true }).value, false);
   return { plan, body: { message, lang: 'en', plan: { text: TEXT, seed: 0, excludeVenueIds: [] }, locks: {}, removed: [], stops: tc.planStops(plan).map((s) => ({ key: s.key, id: s.id, ...(s.start !== null ? { start: s.start } : {}) })), ...extra } };
@@ -289,17 +290,17 @@ test('API: no dead ends on a day plan (a stay, a tour, a question, several asks,
   if (!r.j.plan) assert.deepEqual(r.j.changed, [], 'nothing changes when none is listed');
   // A question is answered from the listing; nothing changes.
   const b = bodyFor('x');
-  const winery = tc.planStops(b.plan).find((s) => s.type === 'winery');
-  const word = winery.name.split(/\s+/).find((w) => w.length >= 5 && !/winery|wines|estate|vineyards?|cellars/i.test(w)) || winery.name;
+  const winery = tc.planStops(b.plan).find((s) => (app.REGION_LABELS.kelowna ? s.type === 'winery' : !s.role));
+  const word = winery.name.split(/\s+/).find((w) => /^[A-Za-z]{5,}$/.test(w) && !/winery|wines|estate|vineyards?|cellars|provincial|squamish|whistler|kelowna/i.test(w)) || winery.name;
   r = await post({ ...b.body, message: `is ${word} open Sunday?` });
   assert.match(r.j.reply, new RegExp(`^(?:${winery.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} is listed as (?:open Sunday, .+ to .+|closed on Sunday)\\.|We don’t have hours on file for )`));
   assert.equal(r.j.plan, null); assert.deepEqual(r.j.changed, []);
   r = await post({ ...b.body, message: `how far is ${word} from the hotel?` });
   assert.match(r.j.reply, /^There’s no place to stay on this plan to measure from\./);
   // Several asks: each is carried out or said.
-  r = await post({ ...b.body, message: 'remove the first winery, we are flying into YLW and we are 4 adults' });
+  r = await post({ ...b.body, message: `remove ${word}, we are flying into ${app.REGION_LABELS.kelowna ? 'YLW' : 'YVR'} and we are 4 adults` });
   assert.deepEqual(r.j.actions.remove, [winery.key]);
-  assert.match(r.j.reply, new RegExp(`^Done\\. Took out ${winery.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\. Got it, you’re flying into Kelowna airport \\(YLW\\)\\..* Set for 4 adults\\.$`));
+  assert.match(r.j.reply, new RegExp(`^Done\\. Took out ${winery.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\. Got it, you’re flying into .+ Set for 4 adults\\.$`));
   assert.deepEqual(r.j.party, { adults: 4 });
   r = await post({ ...b.body, message: 'no car after all' });
   assert.equal(r.j.reply, 'Done. I took the rental car off.'); assert.equal(r.j.actions.transport, 'driving');
