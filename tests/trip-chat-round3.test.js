@@ -218,8 +218,9 @@ test('"a sunset dinner with a lake view" swaps that day\'s dinner (its slot, a p
 test('edits stick: a stop changed by chat is kept through a later re-plan; "the kids hate museums" changes nothing; kids already known are not planned again', async () => {
   const text = '2 days in Penticton with the kids';
   const plan = planNow(text);
-  const dinner = tc.planStops(plan).find((s) => s.role === 'dinner' && s.day === 2);
-  const cheap = await chat(bodyFor(plan, 'cheaper dinner on day 2', text));
+  // (Planner round 3: the last day of a trip is a light day with no dinner, so the dinner edited here is day 1's.)
+  const dinner = tc.planStops(plan).find((s) => s.role === 'dinner' && s.day === 1);
+  const cheap = await chat(bodyFor(plan, 'cheaper dinner on day 1', text));
   if (cheap.j.plan) {
     const now = tc.planStops(cheap.j.plan).find((s) => s.key === dinner.key);
     assert.equal(cheap.j.req.locks[dinner.key], now.id, 'the new dinner is a kept stop from now on');
