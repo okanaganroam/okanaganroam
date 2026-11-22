@@ -8380,15 +8380,26 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   const stops = tripChatStops(v.stops);
   const days = Math.max(1, ...stops.map((s) => s.day));
   const short = stops.length > 0 && stops.every((s) => /^it-/.test(s.key));
-  let ops = null, cant = null, source = 'rules', ai = null, what = null;
+  let ops = null, cant = null, source = 'rules', ai = null, what = null, fixes = [];
   if (v.chip) { ops = tripChat.chipOps(v.chip); source = 'chip'; }
-  else if (tripChatReader || tripChat.apiKey()) {
-    try { ai = await (tripChatReader || tripChat.readChatMessage)(v.message, { stops, regions, regionLabels: REGION_LABELS, today: todayLocal(), lang }); } catch (e) { ai = { ok: false, reason: 'error' }; }
-    if (ai && ai.ok) { ops = ai.ops; cant = ai.cant; source = 'ai'; }
-  }
-  if (!ops) {
+  else {
+    // The word rules first (instant), then the AI (live eval 2026-11-22: p50 1.1 s, some 3 s timeouts). When the rules
+    // read the message confidently, the AI gets a short grace (TRIP_CHAT_GRACE_MS, default 1500 ms) and the rules answer
+    // if it is slower; otherwise it gets the full timeout. Both readings are then reconciled (tripChat.reconcileReads).
     const r = tripChat.rulesRead(v.message, stops, { regions, regionLabels: REGION_LABELS, days });
-    ops = r.ops; cant = r.cant; what = r.what || null;
+    what = r.what || null;
+    if (tripChatReader || tripChat.apiKey()) {
+      const aiCall = Promise.resolve().then(() => (tripChatReader || tripChat.readChatMessage)(v.message, { stops, regions, regionLabels: REGION_LABELS, today: todayLocal(), lang })).catch(() => ({ ok: false, reason: 'error' }));
+      if (tripChat.rulesConfident(r)) {
+        const grace = Number(process.env.TRIP_CHAT_GRACE_MS) > 0 ? Number(process.env.TRIP_CHAT_GRACE_MS) : 1500;
+        let timer;
+        ai = await Promise.race([aiCall, new Promise((res) => { timer = setTimeout(() => res({ ok: false, reason: 'slow' }), grace); })]);
+        clearTimeout(timer);
+      } else ai = await aiCall;
+    }
+    const merged = tripChat.reconcileReads(ai, r, v.message);
+    ops = merged.ops; cant = merged.cant; source = merged.source; fixes = merged.fixes;
+    if (ai && !ai.ok && ai.reason === 'slow') source = 'ai_slow';
     // Words no rule read go to the planner as typed when it can read them (a kind of food, an occasion...); else "Sorry,
     // I didn't catch that". Never words that say no / not (the planner could read "no brewery" as "a brewery").
     if (!ops.length && !cant) { if (tripChat.plannerCanRead(v.message)) ops = [{ o: 'refine', text: v.message, stops: [] }]; else cant = 'unclear'; }
@@ -8396,7 +8407,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   const none = { remove: [], keep: [] };
   if (!ops.length) {
     const c = cant || 'unclear';
-    return { source, cant: c, plan: null, actions: none, response: { reply: tripChat.cantReply(c, lang, what), source, cant: c, plan: null, req: null, changed: [], actions: none, ...(ai && !ai.ok ? { fallback: ai.reason } : {}) } };
+    return { source, cant: c, plan: null, actions: none, response: { reply: tripChat.cantReply(c, lang, what), source, cant: c, plan: null, req: null, changed: [], actions: none, ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) } };
   }
   const run = (a) => runTripPlanRequest({ text: a.text, seed: a.seed || 0, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: a.pinned || null, overrides: a.overrides || null, swap: a.swap || null, ...(a.stay ? { stay: a.stay } : {}), v4: true }, staysOn);
   // The place to stay and getting here (2026-11-22, agent round) are answered here; every other op goes to the planner.
@@ -8416,7 +8427,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   const actions = { ...out.actions, ...(transport ? { transport } : {}) };
   return {
     source, cant: null, plan, actions,
-    response: { reply, source, plan, req, changed: out.changed || [], actions, ...(stayPref !== undefined ? { stayPref } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
+    response: { reply, source, plan, req, changed: out.changed || [], actions, ...(stayPref !== undefined ? { stayPref } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
   };
 }
 // "somewhere cheaper to stay", "a hotel with a pool", "stay in Naramata", "we already have a place": the same plan (every

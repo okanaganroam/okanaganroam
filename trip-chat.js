@@ -168,6 +168,11 @@ function systemPrompt(regions, regionLabels) {
     '- time: v later or earlier, to start the day later or earlier; d = the day, s = the stop it is about ("move lunch later" -> v later, s [lunch id]).',
     '- stay: the place to stay (not the stops). v budget ("somewhere cheaper to stay"), upscale (nicer), pool, hot_tub, kitchen ("a hotel with a pool" -> pool), have_place ("we already have a place", "staying with friends"); or r = the town to stay in ("stay in Naramata" -> r naramata, v "").',
     '- transport: getting here. v rental ("we need a rental car"), driving ("we are driving from Vancouver", "we have our own car"), no_car ("we don\'t have a car").',
+    'Common slips to avoid (live eval, 2026-11-22):',
+    '"swap the brewery for something outdoors" -> replace, s [that stop], k outdoor: a replace with a kind always sets k.',
+    '"we\'re taking the bus from Kelowna airport", "by shuttle", "we don\'t have a car" -> transport no_car; "we\'re driving" -> transport driving. Never cant for these.',
+    '"we want to stay in Penticton", "a hotel in Naramata" -> stay (r), never town; town is only for basing the whole trip somewhere else ("plan it in Kelowna instead").',
+    '"ice cream for the kids", "something for the kids to do" -> add only (k ice_cream / k kids), no party op: the kids are already in the plan.',
     'Several ops can come from one message ("remove the brewery and add a beach" -> remove, add). Use as few ops as cover the message.',
     'cant (with no ops) when the message is not an edit we can make: booking (book, reserve, pay, tickets), transport (flights, rides, rental cars, shuttles, buses), weather (a forecast), other (a question, a request for something we do not do, anything off topic), unclear (nonsense, or you cannot tell what they want). Otherwise cant "".',
     'Kinds (k): ' + KIND_KEYS.join(', ') + '. kids = something for children; ice_cream for ice cream or gelato; arts for a museum or gallery; cafe for coffee.',
@@ -391,7 +396,7 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1 }
   if (/\b(?:ignore|disregard|system prompt|instructions|jailbreak|pretend you)\b/.test(t)) return { ops: [], cant: 'other' };
   // Getting here and the place to stay (2026-11-22, agent round), read before "flights" (a rental car is ours to show).
   if (/\b(?:rent(?:al)? (?:a )?cars?|car rentals?|need a car|louer une voiture|location de voiture)\b/.test(t)) return { ops: [op('transport', { value: 'rental' })], cant: null };
-  if (/\b(?:no car|don'?t have a car|do not have a car|without a car|sans voiture|pas de voiture)\b/.test(t)) return { ops: [op('transport', { value: 'no_car' })], cant: null };
+  if (/\b(?:no car|don'?t have a car|do not have a car|without a car|sans voiture|pas de voiture|tak(?:e|ing) the (?:bus|shuttle)|by (?:bus|shuttle)|en autobus|en navette)\b/.test(t)) return { ops: [op('transport', { value: 'no_car' })], cant: null };
   if (/\b(?:driving (?:from|up|in|down|over)|we'?ll drive|we are driving|we'?re driving|our own car|bringing (?:our|the) car|en voiture depuis|on arrive en voiture)\b/.test(t)) return { ops: [op('transport', { value: 'driving' })], cant: null };
   const stayWord = /\b(?:stay|staying|hotel|motel|place to stay|accommodations?|lodging|room|rooms|airbnb|cabin|condo|resort|b&b|inn|logement|hebergement|hotel|dormir|loger)\b/.test(t);
   if (/\b(?:already have (?:a|our|an) (?:place|hotel|airbnb|room|cabin|condo|rental)|staying with (?:friends|family)|we have (?:a|an) (?:place|airbnb|cabin|condo)|deja (?:un|notre) logement|chez des amis)\b/.test(t)) return { ops: [op('stay', { value: 'have_place' })], cant: null };
@@ -482,6 +487,54 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1 }
 const PLANNER_WORDS_RE = /\b(?:pizza|sushi|tacos?|burgers?|brunch|breakfast|ramen|thai|indian|italian|mexican|greek|seafood|steak|bbq|dessert|bakery|bakeries|market|music|patio|view|sunset|romantic|date night|anniversary|birthday|friends|group|indoors?|outdoors?|rainy|lake|paddle\w*|kayak\w*|bike|biking|cycling|ski\w*|snow\w*|hot tub|spa|museum|gallery|festival|event|show|cider\w*|tea|bagels?|donuts?|food|eat|eats|foodie|souper|brunch|plage|pizza|vin|biere)\b/;
 const NEGATION_RE = /\b(?:no|not|don'?t|without|never|sans|pas|ne|aucun)\b/;
 function plannerCanRead(message) { const t = fold(message); return PLANNER_WORDS_RE.test(t) && !NEGATION_RE.test(t); }
+
+// ---------- AI and word rules together (2026-11-22, live eval: AI 22/28 vs rules 28/28 on Whistler) ----------
+// Both readings are cheap, so both are made. When the word rules read the message confidently (specific edits, or a
+// clear "can't"), they correct the AI where it slipped: (a) the AI said can't / found nothing, (b) the AI left out a
+// kind / value / town the rules found for the same op on the same stop, (c) the AI picked a broader op for the same
+// intent (town instead of stay when the message talks about staying; "party kids", which re-plans every stop, added to
+// an activity asked for the kids). Where the rules found nothing or only plain words, the AI's reading stands: that is
+// where it adds value. -> { ops, cant, source: 'ai' | 'ai_fixed' | 'rules_over_ai' | 'rules', fixes }
+const STAY_WORDS_RE = /\b(?:stay|staying|hotel|motel|place to stay|lodging|accommodations?|condo|chalet|airbnb|cabin|loger|logement|hebergement|dormir)\b/;
+const KIDS_ACTIVITY_RE = /\b(?:lessons?|school|camp|cours|lecons?|activit(?:y|ies)|something|thing|things|ice ?cream|play\w*|do)\b/;
+function rulesConfident(r) {
+  if (!r) return false;
+  if (!(r.ops || []).length) return ['booking', 'transport', 'weather', 'other', 'not_found'].includes(r.cant);
+  return r.ops.every((o) => o.o !== 'refine');
+}
+const stopIds = (o) => (o.stops || []).map((s) => s.id).sort((a, b) => a - b).join(',');
+function reconcileReads(ai, rules, message) {
+  if (!ai || !ai.ok) return { ops: rules.ops, cant: rules.cant, source: 'rules', fixes: [] };
+  if (!rulesConfident(rules)) return { ops: ai.ops, cant: ai.cant, source: 'ai', fixes: [] };
+  const t = fold(message);
+  // (a) The AI read no edit (can't, unclear) but the rules read specific edits.
+  if (!(ai.ops || []).length) {
+    if ((rules.ops || []).length) return { ops: rules.ops, cant: null, source: 'rules_over_ai', fixes: [`ai_${ai.cant || 'none'}`] };
+    return { ops: [], cant: ai.cant || rules.cant, source: 'ai', fixes: [] };
+  }
+  let ops = ai.ops.map((o) => ({ ...o }));
+  const fixes = [];
+  for (const r of rules.ops || []) {
+    // (c) "stay in Whistler" read as a new base town: the place to stay, as the rules read it.
+    if (r.o === 'stay' && STAY_WORDS_RE.test(t)) {
+      const i = ops.findIndex((o) => o.o === 'town' && (!r.region || o.region === r.region));
+      if (i >= 0) { ops[i] = { ...r }; fixes.push('town_to_stay'); continue; }
+    }
+    // (b) The same op on the same stop(s): fill what the AI left out.
+    const m = ops.find((o) => o.o === r.o && stopIds(o) === stopIds(r));
+    if (!m) continue;
+    for (const k of ['kind', 'value', 'region']) if (r[k] && !m[k]) { m[k] = r[k]; fixes.push(`fill_${k}`); }
+    if ((r.ages || []).length && !(m.ages || []).length) { m.ages = r.ages.slice(); fixes.push('fill_ages'); }
+  }
+  // (c) "lessons for the kids": the lessons only. A "party kids" op re-plans every stop; dropped when the rules read an
+  // activity for the kids and no change of who is coming.
+  if (!(rules.ops || []).some((o) => o.o === 'party' && o.value === 'kids') && (rules.ops || []).some((o) => o.o === 'add' || o.o === 'replace') && KIDS_ACTIVITY_RE.test(t)) {
+    const n = ops.length;
+    ops = ops.filter((o) => !(o.o === 'party' && o.value === 'kids'));
+    if (ops.length < n) fixes.push('drop_party_kids');
+  }
+  return { ops, cant: ops.length ? null : ai.cant, source: fixes.length ? 'ai_fixed' : 'ai', fixes };
+}
 
 // The tap-chips under the chat bar: fixed operations, no reading needed.
 const CHIPS = {
@@ -1049,6 +1102,7 @@ module.exports = {
   STAY_VALUES, TRANSPORT_VALUES, fill,
   MODEL, PRICE_PER_TOKEN, DEFAULT_TIMEOUT_MS, DEFAULT_DAILY_USD, MAX_MESSAGE, MAX_STOPS, RATE, OPS, TIMES, VALUES, CANT, KINDS, KIND_KEYS, CHIPS, T,
   enabled, apiKey, wireSchema, systemPrompt, stopsForModel, stripPII, validateWire, readChatMessage, rulesRead, chipOps,
+  rulesConfident, reconcileReads,
   planStops, planTurn, broadTurn, placeAdd, buildReply, cantReply, plannerCanRead, kindMatches, joinText, clock, isDayPlan, isShortPlan,
   dailyCapUsd, spentToday, addSpend, resetSpend, costOf, pacificDay, rateLimited, resetRate,
 };

@@ -194,3 +194,45 @@ test('real planner: "swap the day 1 brewery for something for the kids" and "ice
     for (const s of before.filter((x) => x.key !== '1-afternoon')) assert.ok(after.some((n) => n.id === s.id), `${s.name} stays`);
   } finally { db.prepare('DELETE FROM venues WHERE id = ?').run(id); }
 });
+
+// Live eval (2026-11-22, real key): the AI's five misreads, mocked exactly, and what the word rules make of them.
+const AI_OP = (o) => ({ stops: [], kind: null, time: null, day: null, value: null, n: null, ages: [], region: null, date: null, ...o });
+test('AI + word rules: the five live-eval misreads are corrected; a slow AI loses to confident rules; the AI stands where the rules are unsure', async () => {
+  const plan = planNow();
+  const ask = async (message, answer, delayMs = 0) => {
+    app.setTripChatReader(async (m, opts) => { if (delayMs) await new Promise((r) => setTimeout(r, delayMs)); return typeof answer === 'function' ? answer(opts) : answer; });
+    try { return await post(bodyFor(plan, message), '?v=4&chat=1', freshIp()); } finally { app.setTripChatReader(null); }
+  };
+  // 1. "swap X for something outdoors" read with no kind: the rules' kind is filled in.
+  let r = await ask('swap the first winery for something outdoors', (opts) => ({ ok: true, cant: null, ops: [AI_OP({ o: 'replace', stops: [opts.stops.find((s) => s.type === 'winery')] })] }));
+  assert.equal(r.j.source, 'ai_fixed');
+  assert.deepEqual(r.j.fixes, ['fill_kind']);
+  assert.match(r.j.reply, /something outdoors/, 'the reply is about the kind asked for');
+  // 2. "we're taking the bus" read as "can't": it is getting here (no car), never "I can't book flights or rides".
+  r = await ask("we're taking the bus from Kelowna airport", { ok: true, cant: 'transport', ops: [] });
+  assert.equal(r.j.source, 'rules_over_ai');
+  assert.equal(r.j.actions.transport, 'no_car');
+  assert.notEqual(r.j.reply, tc.T.en.transport);
+  // 3. "we want to stay in Penticton" read as a new base town (a re-plan): it is the place to stay.
+  r = await ask('we want to stay in Penticton', { ok: true, cant: null, ops: [AI_OP({ o: 'town', region: 'penticton' })] });
+  assert.equal(r.j.source, 'ai_fixed');
+  assert.deepEqual(r.j.fixes, ['town_to_stay']);
+  assert.equal(r.j.plan, null, 'the stops are not re-planned');
+  assert.equal(r.j.reply, tc.T.en.stayOff, 'this preview request has no stays box, so it says so');
+  // 4. "add ice cream for the kids" read as add + party kids (which re-plans every stop): the add only.
+  r = await ask('add ice cream for the kids', { ok: true, cant: null, ops: [AI_OP({ o: 'add', kind: 'ice_cream' }), AI_OP({ o: 'party', value: 'kids' })] });
+  assert.equal(r.j.source, 'ai_fixed');
+  assert.deepEqual(r.j.fixes, ['drop_party_kids']);
+  assert.doesNotMatch(r.j.reply, /Planned for kids/);
+  // 5. A slow AI (the live 3 s timeouts): with a confident rules reading, the rules answer after the grace (1.5 s).
+  const t0 = Date.now();
+  r = await ask('slower pace', { ok: true, cant: null, ops: [AI_OP({ o: 'pace', value: 'relaxed' })] }, 2500);
+  const ms = Date.now() - t0;
+  assert.equal(r.j.source, 'ai_slow');
+  assert.equal(r.j.req.overrides.pace, 'relaxed');
+  assert.ok(ms < 2400, `answered before the AI (${ms} ms)`);
+  // Where the rules read nothing specific, the AI's reading stands (that is where it adds value).
+  r = await ask('make it feel more like a holiday', (opts) => ({ ok: true, cant: null, ops: [AI_OP({ o: 'pace', value: 'relaxed' })] }));
+  assert.equal(r.j.source, 'ai');
+  assert.equal(r.j.req.overrides.pace, 'relaxed');
+});

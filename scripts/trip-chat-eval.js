@@ -112,6 +112,13 @@ const pct = (a, q) => { if (!a.length) return null; const s = a.slice().sort((x,
     let ai = null;
     if (live) ai = await tc.readChatMessage(c.msg, { stops: P.stops, regions, regionLabels: app.REGION_LABELS, lang });
     const aiOk = ai ? (ai.ok ? scoreCase(c, ai.ops, ai.cant, P.stops) : false) : null;
+    // What the site uses (2026-11-22): the AI and the word rules reconciled; a confident rules reading answers when the
+    // AI takes longer than the grace (TRIP_CHAT_GRACE_MS, default 1500 ms).
+    const grace = Number(process.env.TRIP_CHAT_GRACE_MS) > 0 ? Number(process.env.TRIP_CHAT_GRACE_MS) : 1500;
+    const aiInTime = ai && tc.rulesConfident(rules) && ai.ms > grace ? { ok: false, reason: 'slow' } : ai;
+    const merged = ai ? tc.reconcileReads(aiInTime, rules, c.msg) : null;
+    const mergedOk = merged ? scoreCase(c, merged.ops, merged.cant, P.stops) : null;
+    const answerMs = ai ? (tc.rulesConfident(rules) ? Math.min(ai.ms, grace) : ai.ms) : 0;
     // The whole turn (planner + reply) with the model's answer (live) or the ideal answer (mocked).
     const turnOps = ai && ai.ok ? ai.ops : idealOps(c, P.stops);
     const t0 = Date.now();
@@ -120,7 +127,7 @@ const pct = (a, q) => { if (!a.length) return null; const s = a.slice().sort((x,
     const planMs = Date.now() - t0;
     const reply = out ? tc.buildReply(out, { lang, regionLabels: app.REGION_LABELS }) : tc.cantReply((ai && ai.ok && ai.cant) || (c.cant && c.cant[0]) || 'unclear', lang);
     const fulfilled = c.cant ? null : !!out && out.results.every((r) => r.ok !== false);
-    rows.push({ c, rulesOk, aiOk, ai, planMs, reply, fulfilled });
+    rows.push({ c, rulesOk, aiOk, ai, planMs, reply, fulfilled, merged, mergedOk, answerMs });
     console.log(`${rulesOk ? '✓' : '✗'} rules${live ? `  ${aiOk ? '✓' : '✗'} ai ${ai.ms}ms $${(ai.costUsd || 0).toFixed(5)}${ai.ok ? '' : ` (${ai.reason})`}` : ''}  [${c.plan}] ${c.msg}\n      -> ${reply}  (planner ${planMs} ms${fulfilled === false ? ', not fully done' : ''})`);
   }
   const n = rows.length;
@@ -136,6 +143,11 @@ const pct = (a, q) => { if (!a.length) return null; const s = a.slice().sort((x,
     const cost = rows.reduce((a, r) => a + (r.ai.costUsd || 0), 0);
     console.log(`AI reader: ${aiAcc}/${n} right (${Math.round((aiAcc / n) * 100)}%), failures ${rows.filter((r) => !r.ai.ok).length}`);
     console.log(`AI read time: p50 ${pct(ms, 0.5)} ms, p95 ${pct(ms, 0.95)} ms`);
+    const mAcc = rows.filter((r) => r.mergedOk).length;
+    const won = {}; for (const r of rows) won[r.merged.source] = (won[r.merged.source] || 0) + 1;
+    console.log(`AI + rules (what the site uses): ${mAcc}/${n} right (${Math.round((mAcc / n) * 100)}%); readings: ${JSON.stringify(won)}`);
+    const am = rows.map((r) => r.answerMs);
+    console.log(`Read time with the ${Number(process.env.TRIP_CHAT_GRACE_MS) > 0 ? Number(process.env.TRIP_CHAT_GRACE_MS) : 1500} ms grace: p50 ${pct(am, 0.5)} ms, p95 ${pct(am, 0.95)} ms`);
     console.log(`Cost: $${(cost / n).toFixed(5)} per message ($${cost.toFixed(4)} for ${n})`);
   } else {
     // Estimate (no key): the prompt + schema are cached after the first message; ~4 characters per token.
