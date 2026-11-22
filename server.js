@@ -8715,6 +8715,13 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
       // kids and the request names that many ages (the ages were dropped, so the booking site guessed them).
       const ages = tripPlannerModule().requestKidAgeList(words.replace(/-/g, ' '));
       if (ages.length && (stayIn.kids === undefined || stayIn.kids === ages.length)) { stayIn.kids = Math.min(12, ages.length); stayIn.kidAges = ages.slice(0, 12); }
+      // Planner round 4: the party the request names ("4 adults", "4 friends", « deux enfants »), where the visitor has not
+      // set it, so the stay line, the stay links and the estimate are for the right number of people.
+      try {
+        const party = tripPlannerModule().requestParty(String(text || ''));
+        if (stayIn.adults === undefined && party.adults) stayIn.adults = Math.min(16, party.adults);
+        if (stayIn.kids === undefined && party.kids) stayIn.kids = party.kids;
+      } catch (e) { /* the party stays as given */ }
       const asked = tripChat.stayTextPref(words);
       if (asked && !stayIn.pref) stayIn.pref = asked;
     }
@@ -8774,12 +8781,15 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
     const drivingIn = TRIP_DRIVING_IN_RE.test(String(text || ''));
     // Round 3: no car (the request says so, or the plan was made for one): no "Rent a car" step and no rental on the card.
     const noCarTrip = !!(plan && plan.noCar) || TRIP_NO_CAR_RE.test(String(text || ''));
-    if (v4 && gettingHere.enabled() && !drivingIn && !noCarTrip) gettingHere.withTripStep(plan, stay);
+    if (v4 && gettingHere.enabled() && !drivingIn && !noCarTrip && !(TRIP_NO_DRIVE_RE.test(String(text || '')) && plan.__wineTour)) gettingHere.withTripStep(plan, stay);
     // The travel agent chat's "Getting here" card (2026-11-22): the data only; the page shows it in chat mode only.
     if (v4) {
       const gh = gettingHere.tripCard(plan, stay);
       if (gh && drivingIn) { gh.driving = true; gh.car = null; gh.carLabel = null; }
       if (gh && noCarTrip) { gh.noCar = true; gh.car = null; gh.carLabel = null; }
+      // Planner round 4: "no driving after wineries" with a wine tour on offer: no rental car next to it, and the plan
+      // says how the no-driving is handled.
+      if (gh && TRIP_NO_DRIVE_RE.test(String(text || '')) && plan.__wineTour) { gh.car = null; gh.carLabel = null; const line = 'No driving after the wineries: a wine tour with a driver covers the winery day (see Getting around), or take a taxi between them.'; if (Array.isArray(plan.notes) && !plan.notes.includes(line)) plan.notes.unshift(line); plan.noDrive = { wineTour: true, text: line, textFr: 'Pas de conduite après les vignobles : une visite guidée avec chauffeur couvre la journée des vignobles (voir Se déplacer), ou prenez un taxi entre eux.' }; }
       if (gh) {
         // No driving (wine days): the wine tour first, the rental car after it.
         if (TRIP_NO_DRIVE_RE.test(String(text || ''))) { gh.noDrive = true; if (plan.__wineTour) gh.wineTour = { name: plan.__wineTour.name, nameFr: plan.__wineTour.nameFr, url: plan.__wineTour.url, label: plan.__wineTour.label, labelFr: plan.__wineTour.labelFr }; }
@@ -9190,7 +9200,13 @@ function v4NightsText(text) {
   if (/\b(?:\d+|one|two|three|four|five|six|seven|un|deux|trois|quatre|cinq|six|sept)\s*(?:-\s*)?(?:days?|jours?|journ[ée]es?)\b/i.test(text)) return null;
   const re = /\b(\d|a|one|two|three|four|five|six|une?|deux|trois|quatre|cinq)(?:\s+single)?[\s-]+(?:nights?|nuits?|nuit[ée]es?)\b(?!\s+(?:out|only|market|markets|club|life|skiing|ski)\b)/i;
   const m = re.exec(text);
-  if (!m) return null;
+  // Planner round 4 ("Romantic anniversary night in Naramata" was an evening with no stay): "a night in / at / away",
+  // an anniversary or romantic night, « une nuit à » is one overnight.
+  if (!m) {
+    const one = /\b(?:anniversary|romantic|honeymoon|overnight|romantique)\s+night\b(?!\s+out)|\bnight\s+(?:away|in\s+(?!the\b)|at\s+(?!the\b))|\bovernight(?:er)?\b/i.exec(text);
+    if (!one || /\b(?:tonight|date night|night out|ce soir)\b/i.test(text)) return null;
+    return { text: text.replace(/\bnight\b/i, '2 days').replace(/\bovernight(?:er)?\b/i, '2 days'), nights: 1 };
+  }
   const n = V4_NIGHT_WORDS[m[1].toLowerCase()] || Number(m[1]);
   if (!(n >= 1 && n <= 6)) return null;
   return { text: text.replace(m[0], `${n + 1} days`), nights: n };
@@ -9199,6 +9215,25 @@ function v4NightsText(text) {
 // the visitor asked for by kind and the plan could not include, as one top-level list the page and the travel agent chat
 // can say up front. plan.notIncluded = [{ kind, label, reason: 'none_listed' | 'not_fitted', town, nearest, text }].
 const V4_TYPE_WORDS = { restaurant: 'restaurant', cafe: 'café', winery: 'winery', brewery: 'brewery', distillery: 'distillery', pub: 'pub', cocktail: 'cocktail lounge', golf: 'golf course', beach: 'beach', tour: 'tour', outdoor: 'outdoor stop', indoor: 'indoor stop' };
+function v4NearestOfKind(plan, kind) {
+  const TR = require('./trip-requirements');
+  const stops = (plan.days || []).flatMap((d) => d.stops || []).concat((plan.itinerary && plan.itinerary.stops) || [], (plan.outing && plan.outing.stops) || []).map((x) => x && x.venue && getVenue(x.venue.id)).filter((v) => v && v.latitude != null && v.longitude != null);
+  if (!stops.length) return null;
+  const lat = stops.reduce((t, v) => t + Number(v.latitude), 0) / stops.length, lng = stops.reduce((t, v) => t + Number(v.longitude), 0) / stops.length;
+  const km = (v) => { const R = 6371, a = (Number(v.latitude) - lat) * Math.PI / 180, b = (Number(v.longitude) - lng) * Math.PI / 180; const h = Math.sin(a / 2) ** 2 + Math.cos(lat * Math.PI / 180) * Math.cos(Number(v.latitude) * Math.PI / 180) * Math.sin(b / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+  let best = null;
+  for (const v of db.prepare("SELECT * FROM venues WHERE redirect_to IS NULL AND latitude IS NOT NULL AND longitude IS NOT NULL AND type IN ('indoor', 'outdoor', 'tour', 'sport', 'golf', 'beach')").all()) {
+    if (!REGION_LABELS[v.region]) continue;
+    let kinds = [];
+    try { const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; kinds = TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); } catch (e) { kinds = []; }
+    if (!kinds.includes(kind)) continue;
+    const d = km(v);
+    if (!best || d < best.d) best = { d, v };
+  }
+  if (!best) return null;
+  const v = best.v;
+  return { id: v.id, name: v.name, region: v.region, regionLabel: REGION_LABELS[v.region] || v.region, url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, km: Math.round(best.d) };
+}
 function v4NotIncluded(plan) {
   if (!plan || !Array.isArray(plan.requirementResults)) return;
   const TR = require('./trip-requirements');
@@ -9222,6 +9257,9 @@ function v4NotIncluded(plan) {
   } catch (e) { /* the planner's own results stand */ }
   for (const r of plan.requirementResults) {
     if (!r || r.status !== 'unmet' || r.strength !== 'must' || r.kidsSki || !['venue_kind', 'type'].includes(r.kind)) continue;
+    // Planner round 4 ("I couldn't fit ski lessons" on a trip that never asked for lessons): only what the visitor's own
+    // words ask for is listed.
+    if (r.kind === 'venue_kind' && r.value === 'ski_lessons' && !/\b(?:lessons?|ski school|snow school|instructors?|learn\w*|camps?|clinics?|cours|le[cç]ons?|moniteurs?)\b/i.test(String(plan.query || ''))) continue;
     const label = r.kind === 'venue_kind' ? (TR.LABELS[r.value] || String(r.value).replace(/_/g, ' ')) : (V4_TYPE_WORDS[r.value] || String(r.value));
     if (out.some((x) => x.label === label)) continue;
     const lre = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -9229,7 +9267,10 @@ function v4NotIncluded(plan) {
     // (Round 3: "the nearest is Alpine Burger Co." for a sleigh ride: only a place that is that kind by its own facts.)
     const ofKind = (x) => { if (r.kind !== 'venue_kind') return true; try { const v = getVenue(x.id); if (!v) return false; const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; return ['restaurant', 'cafe', 'pub'].includes(v.type) ? false : TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }).includes(r.value); } catch (e) { return false; } };
     const alt = r.value === 'shopping' ? null : (r.optionalAlternatives || []).find((x) => x && x.reasonCode === 'different_region' && x.name && ofKind(x));
-    const nearest = alt ? { id: alt.id, name: alt.name, region: alt.region, regionLabel: REGION_LABELS[alt.region] || alt.region, url: alt.url, ...(alt.urlFr ? { urlFr: alt.urlFr } : {}) } : null;
+    let nearest = alt ? { id: alt.id, name: alt.name, region: alt.region, regionLabel: REGION_LABELS[alt.region] || alt.region, url: alt.url, ...(alt.urlFr ? { urlFr: alt.urlFr } : {}) } : null;
+    // Planner round 4 (the nearest spa to Osoyoos was said to be in Kelowna; Shelter Floating Sauna in Penticton is
+    // closer): the nearest is by distance from the plan's stops, among every listing of that kind (a sauna is a spa kind).
+    try { const byKm = r.kind === 'venue_kind' && r.value !== 'shopping' ? v4NearestOfKind(plan, r.value) : null; if (byKm) nearest = byKm; } catch (e) { /* keep the planner's own alternative */ }
     const an = /(?:ing|s)$/.test(label) ? '' : /^[aeiou]/i.test(label) ? 'an ' : 'a ';
     const text = (noneListed && town ? `There’s no ${label} listed in ${town}, so this plan has none.` : `I couldn’t fit ${an}${label} into this plan.`) + (nearest ? ` The nearest is ${nearest.name} in ${nearest.regionLabel}.` : '');
     out.push({ kind: r.value, label, reason: noneListed ? 'none_listed' : 'not_fitted', town, nearest, text });
@@ -9334,7 +9375,9 @@ function tripOutdoorSeasonFact(id) {
   const winter = (Array.isArray(f.extras) ? f.extras : []).find((x) => x && /^winter$/i.test(String(x.label || '').trim()) && x.text);
   // Round 3: the trail's own Difficulty line too (for an "easy hike" request).
   const diff = (Array.isArray(f.extras) ? f.extras : []).find((x) => x && /^difficulty$/i.test(String(x.label || '').trim()) && x.text);
-  return f.season || winter || diff ? { outdoorSeason: { season: f.season ? String(f.season) : '', winter: winter ? String(winter.text) : '', ...(diff ? { difficulty: String(diff.text) } : {}) } } : {};
+  // Planner round 4: how the place is reached (its Road line and parking), for winter.
+  const road = [(Array.isArray(f.extras) ? f.extras : []).filter((x) => x && /\broad\b/i.test(String(x.label || '')) && x.text).map((x) => String(x.text)).join(' '), f.parking ? String(f.parking) : ''].join(' ').trim();
+  return f.season || winter || diff || road ? { outdoorSeason: { season: f.season ? String(f.season) : '', winter: winter ? String(winter.text) : '', ...(diff ? { difficulty: String(diff.text) } : {}), ...(road ? { road } : {}) } } : {};
 }
 // Round 3 (2026-11-21: a trail at 7:45 PM in November after an anniversary dinner, parks at 9 PM): an outdoor stop the
 // schedule puts wholly after sunset is left out (its time stays free), unless it is the only stop. Its warning goes too.

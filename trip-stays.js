@@ -20,6 +20,7 @@ const MAX_KIDS = 12;
 // Other towns' stays join only when the plan's own towns give fewer than this many, and only within NEAR_KM.
 const MIN_IN_TOWN = 3;
 const NEAR_KM = 35;
+const CLOSE_KM = 12;
 const PLAN_KINDS = ['multi_day', 'day_plan', 'outing', 'itinerary'];
 
 // Stay type fit (2026-11-20, Dayton): a campground or RV park is not a base for "wineries, easy walks and great food".
@@ -287,6 +288,9 @@ function scoreStay(stay, ctx) {
   if (ctx.budget && intIn(f.price_level, 1, 4)) {
     if (PRICE_FITS[ctx.budget].includes(f.price_level)) { score -= 1.5; matches.push({ key: 'price', ...PRICE_REASON[ctx.budget] }); }
     else if (Math.abs(f.price_level - PRICE_FITS[ctx.budget][0]) >= 2 && Math.abs(f.price_level - PRICE_FITS[ctx.budget][1]) >= 2) score += 2;
+    // Planner round 4 (a budget trip's "See 2 more" were the Fairmont Chateau and the Sundial): on a budget trip a $$$ or
+    // $$$$ stay comes after every stay that fits the budget or has no price on file.
+    if (ctx.budget === 'budget' && f.price_level >= 3) score += 30;
   }
   if (ctx.nights >= 4 && (f.kitchen === 'all' || f.kitchen === 'some')) {
     score -= f.kitchen === 'all' ? 1 : 0.5;
@@ -336,7 +340,9 @@ function pickTripStays(ctx, stays) {
   const usable = stays.map((s) => ({ ...s, coords: coords(s.latitude, s.longitude), camping: isCampingStay(s) })).filter((s) => s.coords && Number.isInteger(s.id) && s.url && !stayFails(s.info, ctx));
   const poolOf = (list) => {
     let pool = list.filter((s) => ctx.regions.includes(s.region));
-    if (pool.length < MIN_IN_TOWN && ctx.centre) pool = pool.concat(list.filter((s) => !ctx.regions.includes(s.region) && km(ctx.centre, s.coords) <= NEAR_KM));
+    // Planner round 4 (2026-11-22; "a cheaper hotel" for a Whistler Village plan was the Pemberton Hotel, 30 km away): a
+    // stay in another town joins only when it is close (CLOSE_KM), or when the plan's own towns have none that fit.
+    if (pool.length < MIN_IN_TOWN && ctx.centre) pool = pool.concat(list.filter((s) => !ctx.regions.includes(s.region) && km(ctx.centre, s.coords) <= (pool.length ? CLOSE_KM : NEAR_KM)));
     return pool;
   };
   // Not a camping trip: rooms first; camping stays only when no other stay fits the plan's towns or nearby.
