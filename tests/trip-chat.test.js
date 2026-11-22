@@ -147,6 +147,12 @@ test('rules (no AI): common asks in English and French', () => {
   assert.equal(first('on ne boit pas').value, 'no_alcohol');
   const ice = first('ice cream after lunch');
   assert.equal(ice.o, 'add'); assert.equal(ice.kind, 'ice_cream'); assert.equal(ice.stops[0].id, 12);
+  const pre = first('a winery before dinner');
+  assert.equal(pre.o, 'add'); assert.equal(pre.kind, 'winery'); assert.equal(pre.stops[0].id, 14); assert.equal(pre.value, 'earlier');
+  const beach = first('add a beach after lunch');
+  assert.equal(beach.kind, 'beach'); assert.equal(beach.stops[0].id, 12);
+  const fancy = R('swap dinner for something fancier').ops;
+  assert.deepEqual(fancy.map((o) => [o.o, o.value]), [['budget', 'upscale']], 'one op: the dinner, fancier (no second plain swap)');
   const sw = first('swap the brewery for something for the kids');
   assert.equal(sw.o, 'replace'); assert.equal(sw.kind, 'kids'); assert.equal(sw.stops[0].id, 13);
   assert.equal(first('make it 3 days').n, 3);
@@ -189,31 +195,119 @@ test('mapping: remove and keep need no new plan (like the ✕ button and a kept 
   assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. J’ai retiré Tree Brewing. J’ai gardé Kitsch Wines. Il reste si vous changez autre chose.');
 });
 
-test('mapping: replace with a kind re-picks that slot (others pinned, old one excluded, kind words added); the reply names both', () => {
-  const farm = { key: '1-afternoon', id: 77, name: 'Kangaroo Creek Farm', type: 'outdoor', start: 840, badges: ['kid_friendly'] };
+test('mapping: replace with a kind keeps the slot and its time and changes only that stop (the planner\'s one-slot Swap)', () => {
+  const farm = { key: '1-afternoon', id: 77, name: 'Kangaroo Creek Farm', type: 'outdoor', start: 870, badges: ['kid_friendly'] };
   const run = fakeRun(() => dayPlan([STOPS[0], STOPS[1], farm, STOPS[3]]));
   const out = tc.planTurn(ops({ o: 'replace', stops: [STOPS[2]], kind: 'kids' }), ctx(run));
+  assert.equal(run.calls.length, 1, 'one planner call, no wider re-plan');
   const a = run.calls[0];
   assert.deepEqual(a.pinned, { '1-morning': 11, '1-midday': 12, '1-evening': 14 });
   assert.deepEqual(a.excludeVenueIds, [13]);
-  assert.equal(a.text, `${ARGS.text}, kid-friendly`);
+  assert.equal(a.text, ARGS.text, 'no words added to the request');
+  assert.equal(a.swap.key, '1-afternoon');
+  assert.equal(a.swap.want, 'kids');
+  assert.equal(a.swap.times['1-afternoon'], 870, 'the replaced stop keeps its time');
   assert.deepEqual(out.changed, ['1-afternoon']);
-  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Swapped Tree Brewing for Kangaroo Creek Farm at 2 PM.');
-  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. J’ai remplacé Tree Brewing par Kangaroo Creek Farm à 14 h.');
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Swapped Tree Brewing for Kangaroo Creek Farm at 2:30 PM.');
+  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. J’ai remplacé Tree Brewing par Kangaroo Creek Farm à 14 h 30.');
+  // A shared link reproduces it: every stop pinned to its slot.
+  assert.deepEqual(out.req.pinned, { '1-morning': 11, '1-midday': 12, '1-afternoon': 77, '1-evening': 14 });
 });
 
-test('mapping: when the planner cannot fill the ask, the plan stays as it is and the reply says so', () => {
-  // The planner keeps giving a brewery (never a kids' place), in both tries (slot, then wider).
-  const other = { key: '1-afternoon', id: 88, name: 'Barn Owl Brewing', type: 'brewery', start: 870 };
-  const run = fakeRun(() => dayPlan([STOPS[0], STOPS[1], other, STOPS[3]]));
-  const out = tc.planTurn(ops({ o: 'replace', stops: [STOPS[2]], kind: 'kids' }), ctx(run));
-  assert.equal(run.calls.length, 2, 'the slot, then a wider re-plan');
-  assert.equal(run.calls[1].pinned, null, 'the wider try keeps only kept stops');
+test('mapping: "something for the kids" is an activity: a deli, café or restaurant in the slot is not accepted', () => {
+  const deli = { key: '1-afternoon', id: 78, name: 'Il Vecchio Delicatessen', type: 'cafe', start: 870, badges: ['kid_friendly'] };
+  const out = tc.planTurn(ops({ o: 'replace', stops: [STOPS[2]], kind: 'kids' }), ctx(fakeRun(() => dayPlan([STOPS[0], STOPS[1], deli, STOPS[3]]))));
   assert.equal(out.plan, null);
   assert.equal(tc.buildReply(out, { lang: 'en' }), 'I couldn’t find something for kids that fits there, so Tree Brewing stays. Your plan is unchanged.');
   assert.match(tc.buildReply(out, { lang: 'fr' }), /^Je n’ai pas trouvé quelque chose pour les enfants qui convienne à ce moment, donc Tree Brewing reste\./);
-  // "A winery for the kids" is never a match, even with a kid-friendly badge.
   assert.equal(tc.kindMatches('kids', { type: 'winery', badges: ['kid_friendly'] }), false);
+});
+
+test('mapping: when the planner cannot fill the slot, or the Swap would move other stops, the plan stays exactly as it was', () => {
+  // The planner says nothing of that kind fits (swapMissed).
+  let run = fakeRun(() => ({ ...dayPlan(STOPS), swapMissed: { key: '1-afternoon' } }));
+  let out = tc.planTurn(ops({ o: 'replace', stops: [STOPS[2]], kind: 'outdoor' }), ctx(run));
+  assert.equal(run.calls.length, 1);
+  assert.equal(out.plan, null);
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'I couldn’t find something outdoors that fits there, so Tree Brewing stays. Your plan is unchanged.');
+  // A park in the slot, but lunch changed too: not "only that one stop", so not used.
+  const park = { key: '1-afternoon', id: 79, name: 'Gyro Park', type: 'outdoor', start: 870 };
+  const otherLunch = { ...STOPS[1], id: 99, name: 'Other Lunch' };
+  out = tc.planTurn(ops({ o: 'replace', stops: [STOPS[2]], kind: 'outdoor' }), ctx(fakeRun(() => dayPlan([STOPS[0], otherLunch, park, STOPS[3]]))));
+  assert.equal(out.plan, null);
+});
+
+test('mapping: "ice cream after lunch" goes right after lunch; the stop there moves one slot later; nothing else changes', () => {
+  const ice = { key: '1-afternoon', id: 81, name: 'Cherry on Top Shake Shop', type: 'cafe', start: 840 };
+  const brewLate = { ...STOPS[2], key: '1-late', start: 930 };
+  const run = fakeRun(() => dayPlan([STOPS[0], STOPS[1], ice, brewLate, STOPS[3]]));
+  const out = tc.planTurn(ops({ o: 'add', kind: 'ice_cream', stops: [STOPS[1]] }), ctx(run));
+  const a = run.calls[0];
+  assert.equal(run.calls.length, 1);
+  assert.equal(a.swap.key, '1-afternoon');
+  assert.equal(a.swap.want, 'ice_cream');
+  assert.deepEqual(a.pinned, { '1-morning': 11, '1-midday': 12, '1-late': 13, '1-evening': 14 }, 'the brewery moves to the late-afternoon slot');
+  assert.equal(a.swap.times['1-late'], undefined, 'the moved stop gets a new time');
+  assert.equal(a.text, ARGS.text);
+  assert.deepEqual(out.changed.sort(), ['1-afternoon', '1-late']);
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Added Cherry on Top Shake Shop at 2 PM. Tree Brewing moves to 3:30 PM.');
+  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. J’ai ajouté Cherry on Top Shake Shop à 14 h. Tree Brewing passe à 15 h 30.');
+  // An answer in the morning (before lunch) is not "after lunch": not used.
+  const early = { key: '1-afternoon', id: 81, name: 'Cherry on Top Shake Shop', type: 'cafe', start: 840 };
+  const wrong = tc.planTurn(ops({ o: 'add', kind: 'ice_cream', stops: [STOPS[1]] }), ctx(fakeRun(() => dayPlan([{ ...early, key: '1-morning', start: 570 }, STOPS[1], brewLate, STOPS[3]]))));
+  assert.equal(wrong.plan, null, 'the slot asked for is empty in that answer');
+});
+
+test('mapping: "add a beach after lunch" with no free slot before dinner says so and leaves the plan as it is', () => {
+  const full = [STOPS[0], STOPS[1], STOPS[2], { key: '1-late', id: 15, name: 'Red Rooster', type: 'winery', start: 960, badges: [], price: 2, role: '', day: 1, ref: 's5' }, STOPS[3]];
+  const run = fakeRun(() => { throw new Error('should not plan'); });
+  const out = tc.planTurn(ops({ o: 'add', kind: 'beach', stops: [STOPS[1]] }), ctx(run, { stops: full }));
+  assert.equal(run.calls.length, 0);
+  assert.equal(out.plan, null);
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'There’s no free spot for a beach after lunch without dropping a stop. Remove or swap one first. Your plan is unchanged.');
+  assert.match(tc.buildReply(out, { lang: 'fr' }), /^Pas de place libre pour une plage après le dîner/);
+  // A free late-afternoon slot: used directly, nothing moves.
+  const beach = { key: '1-late', id: 90, name: 'Gyro Beach', type: 'beach', start: 960 };
+  const run2 = fakeRun(() => dayPlan([STOPS[0], STOPS[1], STOPS[2], beach, STOPS[3]]));
+  const ok = tc.planTurn(ops({ o: 'add', kind: 'beach', time: 'afternoon' }), ctx(run2));
+  assert.equal(run2.calls[0].swap.key, '1-late');
+  assert.equal(run2.calls[0].swap.type, 'beach');
+  assert.deepEqual(ok.changed, ['1-late']);
+  assert.equal(tc.buildReply(ok, { lang: 'en' }), 'Done. Added Gyro Beach at 4 PM.');
+});
+
+test('mapping: "swap dinner for something fancier" keeps the dinner slot (a pricier place, same kind); "replace the winery with something outdoors" keeps its slot', () => {
+  const fancy = { ...STOPS[3], id: 141, name: 'RauDZ Regional Table', price: 4 };
+  let run = fakeRun(() => dayPlan([STOPS[0], STOPS[1], STOPS[2], fancy]));
+  let out = tc.planTurn(ops({ o: 'budget', value: 'upscale', stops: [STOPS[3]] }), ctx(run));
+  assert.equal(run.calls[0].swap.key, '1-evening');
+  assert.equal(run.calls[0].swap.type, 'restaurant');
+  assert.equal(run.calls[0].swap.priceMin, 4);
+  assert.equal(run.calls[0].text, ARGS.text);
+  assert.deepEqual(out.changed, ['1-evening']);
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Swapped HUMO Kelowna for RauDZ Regional Table, a fancier pick.');
+  run = fakeRun(() => dayPlan([STOPS[0], STOPS[1], STOPS[2], { ...STOPS[3], id: 142, name: 'Yama Kitchen', price: 2 }]));
+  out = tc.planTurn(ops({ o: 'budget', value: 'budget', stops: [STOPS[3]] }), ctx(run));
+  assert.equal(run.calls[0].swap.priceMax, 2);
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Swapped HUMO Kelowna for Yama Kitchen, a cheaper pick.');
+  const park = { key: '1-morning', id: 79, name: 'Knox Mountain Park', type: 'outdoor', start: 600 };
+  run = fakeRun(() => dayPlan([park, STOPS[1], STOPS[2], STOPS[3]]));
+  out = tc.planTurn(ops({ o: 'replace', stops: [STOPS[0]], kind: 'outdoor' }), ctx(run));
+  assert.equal(run.calls[0].swap.key, '1-morning');
+  assert.equal(run.calls[0].swap.want, 'outdoor');
+  assert.deepEqual(out.changed, ['1-morning']);
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Swapped Kitsch Wines for Knox Mountain Park at 10 AM.');
+});
+
+test('placement: after / before a stop, a part of the day, and never into lunch or dinner', () => {
+  const cur = { stops: STOPS, removed: new Set(), locks: {} };
+  const P = (o, kind = 'ice_cream') => tc.placeAdd(ops(o)[0], kind, cur);
+  assert.deepEqual(P({ o: 'add', stops: [STOPS[1]] }), { slot: '1-afternoon', shifts: { '1-afternoon': '1-late' }, day: 1 });
+  assert.deepEqual(P({ o: 'add', stops: [STOPS[3]], value: 'earlier' }), { slot: '1-late', shifts: {}, day: 1 }, 'before dinner: the free late-afternoon slot');
+  assert.deepEqual(P({ o: 'add', time: 'afternoon' }), { slot: '1-late', shifts: {}, day: 1 });
+  assert.equal(P({ o: 'add', stops: [STOPS[0]], value: 'earlier' }).why, 'no_room', 'nothing before the first stop');
+  // A kept stop is never moved to make room.
+  assert.equal(tc.placeAdd(ops({ o: 'add', stops: [STOPS[1]] })[0], 'ice_cream', { ...cur, locks: { '1-afternoon': 13 } }).why, 'no_room');
 });
 
 test('mapping: pace, party, budget, days, time, town, redo and start over use the planner\'s existing fields', () => {
@@ -230,9 +324,8 @@ test('mapping: pace, party, budget, days, time, town, redo and start over use th
   assert.deepEqual(run.calls[0].pinned, { '1-midday': 12 }, 'no alcohol lets go of a kept winery');
   assert.match(run.calls[0].text, /, no alcohol$/);
   run = fakeRun(same);
-  tc.planTurn(ops({ o: 'budget', value: 'budget', stops: [STOPS[3]] }), ctx(run));
-  assert.deepEqual(run.calls[0].excludeVenueIds, [14]);
-  assert.match(run.calls[0].text, /cheap eats$/);
+  tc.planTurn(ops({ o: 'budget', value: 'budget' }), ctx(run));
+  assert.match(run.calls[0].text, /on a budget$/, 'cheaper for the whole trip is a broad change');
   run = fakeRun(same);
   tc.planTurn(ops({ o: 'days', n: 3 }), ctx(run));
   assert.equal(run.calls[0].overrides.days, 3);
