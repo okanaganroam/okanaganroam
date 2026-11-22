@@ -8977,7 +8977,8 @@ const V4_WHEN_DAYS = { 'this-weekend': 2, 'next-weekend': 2, weekend: 2, today: 
 // Fresh eyes (2026-11-22: "sunset dinner" was planned at 7:30 PM in November, long after dark): a sunset dinner starts
 // about half an hour before the real sunset on the trip's first day (trip-requirements.js estimateDaylight, in the town
 // asked for), on the quarter hour and never before 4 PM, so the kitchens open then are the ones planned; the plan says
-// when the sun sets. A dinner time the request gives itself wins. -> { text, note } or null.
+// when the sun sets. A dinner time the request gives itself wins. With a lake view only where the site reads a sunset dinner
+// that way (TRIP_SITE.sunsetDinner). -> { text, note } or null.
 const V4_SUNSET_DINNER_RE = /\b(?:a\s+)?sunset dinners?\b|\bdinner (?:at|with|during|around|watching) (?:the |a )?sunset(?: view)?\b/i;
 function v4SunsetDinner(a, now = new Date()) {
   const text = String((a && a.text) || '');
@@ -8995,7 +8996,7 @@ function v4SunsetDinner(a, now = new Date()) {
   const start = Math.max(960, Math.min(1260, Math.floor((light.sunsetMinutes - 30) / 15) * 15));
   const clock = (x) => `${(Math.floor(x / 60) % 12) || 12}:${String(x % 60).padStart(2, '0')} ${x >= 720 ? 'pm' : 'am'}`;
   const sun = clock(light.sunsetMinutes).replace(/ (am|pm)$/, (s, p) => ` ${p.toUpperCase()}`);
-  return { text: text.replace(m[0], `dinner at ${clock(start)}${/\blake ?views?\b/i.test(text) ? '' : ' with a lake view'}`), note: `Sunset is about ${sun} that day, so the sunset dinner starts at ${clock(start).replace(/ (am|pm)$/, (s, p) => ` ${p.toUpperCase()}`)}.`, start, sunset: light.sunsetMinutes };
+  return { text: text.replace(m[0], `dinner at ${clock(start)}${/lake view/.test(TRIP_SITE.sunsetDinner.reading) && !/\blake ?views?\b/i.test(text) ? ' with a lake view' : ''}`), note: `Sunset is about ${sun} that day, so the sunset dinner starts at ${clock(start).replace(/ (am|pm)$/, (s, p) => ` ${p.toUpperCase()}`)}.`, start, sunset: light.sunsetMinutes };
 }
 // Round 2 (2026-11-21): words the planner missed. "easy flat walks" lost the walk ("flat" is not a kind of place); "then
 // dessert" after dinner had no stop (a dessert café is one).

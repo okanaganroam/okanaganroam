@@ -130,7 +130,8 @@ function sunsetFn(today = '2026-11-22') {
   const body = /const V4_SUNSET_DINNER_RE = [\s\S]*?\nfunction v4SunsetDinner\(a, now = new Date\(\)\) \{[\s\S]*?\n\}/.exec(SRC)[0];
   const db = { prepare: () => ({ get: (...a) => (a[0] === 'kelowna' ? { lat: 49.888, lng: -119.496 } : { lat: 49.49, lng: -119.59 }) }) };
   const REGION_LABELS = { kelowna: 'Kelowna', penticton: 'Penticton', 'west-kelowna': 'West Kelowna' };
-  return new Function('require', 'db', 'REGION_LABELS', 'todayLocal', `${body}; return v4SunsetDinner;`)((m) => (m === './trip-requirements' ? tr : require(m)), db, REGION_LABELS, () => today); // eslint-disable-line no-new-func
+  const TRIP_SITE = require('../trip-site.js');
+  return new Function('require', 'db', 'REGION_LABELS', 'todayLocal', 'TRIP_SITE', `${body}; return v4SunsetDinner;`)((m) => (m === './trip-requirements' ? tr : require(m)), db, REGION_LABELS, () => today, TRIP_SITE); // eslint-disable-line no-new-func
 }
 test('5. a sunset dinner starts about half an hour before the real sunset, and the plan says when the sun sets', () => {
   const sd = (text, overrides) => sunsetFn()({ text, overrides }, new Date('2026-11-22T18:00:00Z'));
