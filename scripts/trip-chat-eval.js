@@ -24,6 +24,15 @@ const PLANS = {
 };
 // sel: which stop(s) of the plan: { type, role, day, nth } (nth 1-based among matches)
 const CASES = [
+  // Round 4 (2026-11-23, third fresh-eyes test): the phrases that failed live.
+  { plan: 'wine', msg: 'swap dinner for pizza', ops: [{ o: 'replace', kind: 'pizza', sel: { role: 'dinner', nth: 1 } }] },
+  { plan: 'wine', msg: 'add bowling in the afternoon', ops: [{ o: 'add', kind: 'bowling' }] },
+  { plan: 'wine', msg: 'add hot chocolate after lunch', ops: [{ o: 'add', kind: 'hot_chocolate', sel: { role: 'lunch', nth: 1 } }] },
+  { plan: 'wine', msg: 'swap dinner for something fancier', ops: [{ o: 'budget', value: 'upscale', sel: { role: 'dinner', nth: 1 } }] },
+  { plan: 'wine', msg: 'something cheaper for dinner', ops: [{ o: 'budget', value: 'budget', sel: { role: 'dinner', nth: 1 } }] },
+  { plan: 'wine', msg: 'sunset dinner with a lake view', ops: [{ o: 'replace', kind: 'lake_view', sel: { role: 'dinner', nth: 1 } }] },
+  { plan: 'wine', msg: 'dinner is too late for the kids, make it 5:30', cant: ['time_at'] },
+  { plan: 'beer', msg: 'add ice cream after lunch on day 1', ops: [{ o: 'add', kind: 'ice_cream', sel: { role: 'lunch', day: 1 } }] },
   { plan: 'wine', msg: 'remove the second winery', ops: [{ o: 'remove', sel: { type: 'winery', nth: 2 } }] },
   { plan: 'wine', msg: 'loved the first winery, more like that', ops: [{ o: 'more_like', sel: { type: 'winery', nth: 1 } }] },
   { plan: 'wine', msg: 'my kids are 6 and 9', ops: [{ o: 'party', value: 'kids', ages: [6, 9] }] },

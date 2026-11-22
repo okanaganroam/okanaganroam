@@ -125,7 +125,7 @@ function chatClientSrc(d) {
       + '<form class="v4-chat-form" id="v4ChatForm" autocomplete="off"><label class="v4-sr" for="v4ChatIn">' + esc(ct('label')) + '</label>'
       + '<input id="v4ChatIn" type="text" maxlength="400" enterkeyhint="send" placeholder="' + esc(ct('ph')) + '">'
       + '<button type="submit" class="v4-chat-send" aria-label="' + esc(ct('send')) + '">↑</button></form>'
-      + '<div class="v4-chips" id="v4Chips"' + (chat.used ? ' hidden' : '') + '>' + ct('chips').map(function(c){ return '<button type="button" data-v4-chip="' + c[0] + '">' + esc(c[1]) + '</button>'; }).join('') + '</div>';
+      + '<div class="v4-chips" id="v4Chips"' + (chat.used ? ' hidden' : '') + '>' + ct('chips').filter(function(c){ return c[0] !== 'kids' || chatHasKids(); }).map(function(c){ return '<button type="button" data-v4-chip="' + c[0] + '">' + esc(c[1]) + '</button>'; }).join('') + '</div>';
   }
   // Called by v4UpdateBar: the chat part is made once and kept (what is typed survives every re-render of the bar).
   function v4ChatMount(bar){
@@ -146,6 +146,11 @@ function chatClientSrc(d) {
     return bar.querySelector('.v4-bar-main');
   }
   function chatPad(){ var bar = document.getElementById('v4Bar'); if (bar) { document.body.style.paddingBottom = bar.offsetHeight + 'px'; document.documentElement.style.setProperty('--v4-bar-h', bar.offsetHeight + 'px'); } }
+  // Kids on this trip: the party control, or the request's own words.
+  function chatHasKids(){
+    try { var st = typeof t3StayData === 'function' ? t3StayData() : null; if (st && st.trip && st.trip.kids > 0) return true; } catch (e) { /* none */ }
+    return /\b(?:kids?|children|child|toddlers?|famil(?:y|ies)|enfants?|famille)\b/i.test(String(state.text || ''));
+  }
   function chatShow(you, agent, opts){
     opts = opts || {};
     var box = document.getElementById('v4ChatReply'); if (!box) return;
@@ -212,7 +217,7 @@ function chatClientSrc(d) {
     var inEl = document.getElementById('v4ChatIn');
     var body = { lang: lang() === 'fr' ? 'fr' : 'en', plan: chatPlanBody(), locks: state.locks, removed: Object.keys(state.removed), stops: chatStops() };
     var evs = chatEventIds(); if (evs.length) body.events = evs;
-    var sd = typeof t3StayData === 'function' && !chat.noStay ? t3StayData() : null; if (sd && sd.chosen && sd.chosen.region) body.stayTown = sd.chosen.region;
+    var sd = typeof t3StayData === 'function' && !chat.noStay ? t3StayData() : null; if (sd && sd.chosen && sd.chosen.region) body.stayTown = sd.chosen.region; if (sd && sd.chosen && sd.chosen.id > 0) body.stayId = sd.chosen.id;
     if (chip) body.chip = chip; else body.message = message;
     function done(){
       chat.busy = false; resultEl.removeAttribute('aria-busy');
@@ -222,6 +227,7 @@ function chatClientSrc(d) {
     return fetch(CHAT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function(r){ return r.json().catch(function(){ return {}; }); })
       .then(function(j){
+        var hadQueue = !!chat.queue;
         done();
         j = j || {};
         var acts = j.actions || {}, changed = (j.changed || []).slice(), touched = false;
@@ -252,15 +258,22 @@ function chatClientSrc(d) {
         if (acts.transport) { chat.transport = acts.transport; touched = true; if (acts.transport === 'rental') changed.push('gh'); }
         // Events taken out by chat, a wine tour offered as a card, and words added to the request ("no museums").
         (acts.removeEvents || []).forEach(function(id){ chat.goneEvents[id] = 1; touched = true; });
+        // Round 4: the wine tour card is an offer, not a change to the plan: it shows no Undo (Undo undid nothing).
+        var before = touched, wasConfirmed = !!v4.confirmed;
         if (j.card && j.card.kind === 'wine_tour') { chat.wineTour = j.card; touched = true; changed.push('gh'); }
+        var planTouched = before;
         if (typeof j.text === 'string' && j.text && !(j.plan && j.req)) { state.text = j.text; }
-        if (touched) { v4.confirmed = false; v4.saved = false; chat.rendering = true; try { render(false); } finally { chat.rendering = false; } syncUrl(); }
-        chat.undo = touched ? snap : null;
-        chatShow(you, j.reply || ct('err'), { undo: touched });
+        // Round 4: a change asked for in the chat keeps a confirmed plan confirmed (Book, Share and Save stay, for the plan
+        // as it is now); only Save is offered again.
+        if (touched) { v4.confirmed = wasConfirmed; v4.saved = false; chat.rendering = true; try { render(false); } finally { chat.rendering = false; } syncUrl(); }
+        chat.undo = planTouched ? snap : null;
+        // Round 4: the answer to a message sent while this one was loading is shown after this one's (it vanished).
+        var said = (chat.carry ? chat.carry + ' ' : '') + (j.reply || ct('err')); chat.carry = hadQueue ? said : null;
+        chatShow(you, said, { undo: planTouched });
         if (touched) chatGlow(changed);
         track('trip_chat', { chat_source: /^(ai|rules|chip)$/.test(j.source || '') ? j.source : 'other', changed: touched ? 'yes' : 'no' });
       })
-      .catch(function(){ done(); chatShow(you, ct('err'), {}); });
+      .catch(function(){ chat.carry = null; done(); chatShow(you, ct('err'), {}); });
   }
   document.addEventListener('submit', function(e){
     if (!e.target || e.target.id !== 'v4ChatForm') return;

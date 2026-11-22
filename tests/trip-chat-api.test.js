@@ -74,8 +74,8 @@ test('no key: the word rules read it, the planner re-plans, the reply is a templ
   const slow = await post(bodyFor(plan, null, { message: undefined, chip: 'slower' }), '?v=4&chat=1', freshIp());
   assert.equal(slow.status, 200);
   assert.equal(slow.j.source, 'chip');
-  assert.equal(slow.j.req.overrides.pace, 'relaxed');
-  assert.ok(slow.j.plan && slow.j.plan.days.length === 1);
+  // Round 4: "slower pace" takes an extra stop off (no re-plan of every stop); a plan with fewer than two extras re-plans.
+  assert.ok(slow.j.actions.remove.length >= 1 || slow.j.req.overrides.pace === 'relaxed');
   const book = await post(bodyFor(plan, 'can you book us a table at 7?'), '?v=4&chat=1', freshIp());
   assert.equal(book.j.cant, 'booking');
   assert.equal(book.j.plan, null);
@@ -110,11 +110,11 @@ test('a model that fails, times out or names a stop not on the plan: the rules a
   const plan = planNow();
   for (const answer of [{ ok: false, reason: 'timeout' }, { ok: false, reason: 'invalid:all_dropped:unknown_stop' }]) {
     app.setTripChatReader(async () => answer);
-    const r = await post(bodyFor(plan, 'slower pace'), '?v=4&chat=1', freshIp());
+    const r = await post(bodyFor(plan, 'more stops please'), '?v=4&chat=1', freshIp());
     assert.equal(r.status, 200);
     assert.equal(r.j.source, 'rules');
     assert.equal(r.j.fallback, answer.reason);
-    assert.equal(r.j.req.overrides.pace, 'relaxed');
+    assert.equal(r.j.req.overrides.pace, 'packed');
   }
   app.setTripChatReader(async () => { throw new Error('boom'); });
   const r = await post(bodyFor(plan, 'slower pace'), '?v=4&chat=1', freshIp());
@@ -140,14 +140,15 @@ test('bad input is refused: unknown fields, long messages, stops that are not sl
   app.setTripChatReader(null);
 });
 
-test('rate limit: the 21st message in 10 minutes from one address gets a polite 429', async () => {
+test('rate limit: the 61st message in 10 minutes from one address gets a polite 429 that says how long to wait', async () => {
   tc.resetRate();
   const plan = planNow();
   const body = bodyFor(plan, 'can you book it?');
-  for (let i = 0; i < 20; i++) assert.equal((await post(body, '?v=4&chat=1', '10.9.9.9')).status, 200);
+  for (let i = 0; i < 60; i++) assert.equal((await post(body, '?v=4&chat=1', '10.9.9.9')).status, 200);
   const r = await post(body, '?v=4&chat=1', '10.9.9.9');
   assert.equal(r.status, 429);
-  assert.equal(r.j.reply, tc.T.en.busy);
+  assert.equal(r.j.reply, 'That’s a lot of messages in a short time. Try again in about 10 minutes.');
+  assert.equal(r.j.retryAfterMinutes, 10);
   tc.resetRate();
 });
 
@@ -155,7 +156,7 @@ test('French: replies in French', async () => {
   const plan = planNow();
   const r = await post({ ...bodyFor(plan, 'plus relax'), lang: 'fr' }, '?v=4&chat=1', freshIp());
   assert.equal(r.status, 200);
-  assert.match(r.j.reply, /Rythme plus relax\./);
+  assert.match(r.j.reply, /Rythme plus relax\.|^C’est fait\. J’ai retiré /);
   const c = await post({ ...bodyFor(plan, 'réserver une table'), lang: 'fr' }, '?v=4&chat=1', freshIp());
   assert.equal(c.j.reply, tc.T.fr.booking);
 });
@@ -228,10 +229,10 @@ test('AI + word rules: the five live-eval misreads are corrected; a slow AI lose
   r = await ask('slower pace', { ok: true, cant: null, ops: [AI_OP({ o: 'pace', value: 'relaxed' })] }, 2500);
   const ms = Date.now() - t0;
   assert.equal(r.j.source, 'ai_slow');
-  assert.equal(r.j.req.overrides.pace, 'relaxed');
+  assert.ok(r.j.actions.remove.length >= 1 || r.j.req.overrides.pace === 'relaxed', 'slower pace: an extra stop comes off');
   assert.ok(ms < 2400, `answered before the AI (${ms} ms)`);
   // Where the rules read nothing specific, the AI's reading stands (that is where it adds value).
   r = await ask('make it feel more like a holiday', (opts) => ({ ok: true, cant: null, ops: [AI_OP({ o: 'pace', value: 'relaxed' })] }));
   assert.equal(r.j.source, 'ai');
-  assert.equal(r.j.req.overrides.pace, 'relaxed');
+  assert.ok(r.j.actions.remove.length >= 1 || r.j.req.overrides.pace === 'relaxed');
 });

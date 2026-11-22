@@ -119,13 +119,21 @@ test('spend cap: TRIP_CHAT_DAILY_USD (default $2); over it, no call is made', as
   tc.resetSpend();
 });
 
-test('rate limit: 20 messages per 10 minutes per address, then blocked; other addresses unaffected', () => {
+test('rate limit: 60 messages per 10 minutes per address, then blocked; a blocked try does not extend the wait; other addresses unaffected', () => {
   tc.resetRate();
   const t0 = 1_000_000;
-  for (let i = 0; i < 20; i++) assert.equal(tc.rateLimited('1.2.3.4', t0 + i), false);
-  assert.equal(tc.rateLimited('1.2.3.4', t0 + 21), true);
+  assert.deepEqual(tc.RATE, { max: 60, windowMs: 600000 });
+  for (let i = 0; i < 60; i++) assert.equal(tc.rateLimited('1.2.3.4', t0 + i), false);
+  assert.equal(tc.rateLimited('1.2.3.4', t0 + 61), true);
+  assert.equal(tc.rateWaitMinutes('1.2.3.4', t0 + 61), 10);
+  // Tries while blocked are not counted: nine minutes on, one minute is left, whatever was tried in between.
+  for (let i = 0; i < 30; i++) assert.equal(tc.rateLimited('1.2.3.4', t0 + 5 * 60 * 1000 + i), true);
+  assert.equal(tc.rateWaitMinutes('1.2.3.4', t0 + 9 * 60 * 1000 + 30 * 1000), 1);
+  assert.equal(tc.busyReply('en', 4), 'That’s a lot of messages in a short time. Try again in about 4 minutes.');
+  assert.equal(tc.busyReply('fr', 1), 'Ça fait beaucoup de messages en peu de temps. Réessayez dans environ une minute.');
+  assert.equal(tc.rateLimited('1.2.3.4', t0 + 10 * 60 * 1000 + 100), false, 'let through as soon as the first messages are ten minutes old');
   assert.equal(tc.rateLimited('5.6.7.8', t0 + 22), false);
-  assert.equal(tc.rateLimited('1.2.3.4', t0 + 11 * 60 * 1000), false, 'the window moves on');
+  assert.equal(tc.rateLimited('1.2.3.4', t0 + 21 * 60 * 1000), false, 'the window moves on');
   tc.resetRate();
 });
 
@@ -191,8 +199,8 @@ test('mapping: remove and keep need no new plan (like the ✕ button and a kept 
   assert.equal(out.plan, null);
   assert.deepEqual(out.actions, { remove: ['1-afternoon'], keep: ['1-morning'] });
   assert.equal(run.calls.length, 0);
-  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Took out Tree Brewing. Kept Kitsch Wines. It stays when you change other things.');
-  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. J’ai retiré Tree Brewing. J’ai gardé Kitsch Wines. Il reste si vous changez autre chose.');
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Took out Tree Brewing. Kept Kitsch Wines.');
+  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. J’ai retiré Tree Brewing. J’ai gardé Kitsch Wines.');
 });
 
 test('mapping: replace with a kind keeps the slot and its time and changes only that stop (the planner\'s one-slot Swap)', () => {
@@ -264,7 +272,7 @@ test('mapping: "add a beach after lunch" with no free slot before dinner says so
   const out = tc.planTurn(ops({ o: 'add', kind: 'beach', stops: [STOPS[1]] }), ctx(run, { stops: full }));
   assert.equal(run.calls.length, 0);
   assert.equal(out.plan, null);
-  assert.equal(tc.buildReply(out, { lang: 'en' }), 'There’s no free spot for a beach after lunch without dropping a stop. Remove or swap one first. Your plan is unchanged.');
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'There’s no free spot for a beach after lunch without dropping a stop. Remove or swap one first.');
   assert.match(tc.buildReply(out, { lang: 'fr' }), /^Pas de place libre pour une plage après le dîner/);
   // A free late-afternoon slot: used directly, nothing moves.
   const beach = { key: '1-late', id: 90, name: 'Gyro Beach', type: 'beach', start: 960 };
@@ -313,8 +321,8 @@ test('placement: after / before a stop, a part of the day, and never into lunch 
 test('mapping: pace, party, budget, days, time, town, redo and start over use the planner\'s existing fields', () => {
   const same = () => dayPlan(STOPS);
   let run = fakeRun(same);
-  tc.planTurn(ops({ o: 'pace', value: 'relaxed' }), ctx(run, { locks: { '1-morning': 11 } }));
-  assert.equal(run.calls[0].overrides.pace, 'relaxed');
+  tc.planTurn(ops({ o: 'pace', value: 'packed' }), ctx(run, { locks: { '1-morning': 11 } }));
+  assert.equal(run.calls[0].overrides.pace, 'packed');
   assert.deepEqual(run.calls[0].pinned, { '1-morning': 11 }, 'a broad change keeps only kept stops');
   run = fakeRun(same);
   tc.planTurn(ops({ o: 'party', value: 'kids', ages: [9, 6] }), ctx(run));
@@ -351,18 +359,18 @@ test('mapping: pace, party, budget, days, time, town, redo and start over use th
   assert.deepEqual(run.calls[0].avoidVenueIds, [11, 13, 14]);
   // A kind the visitor took out entirely does not come back with the next re-plan.
   run = fakeRun(same);
-  tc.planTurn(ops({ o: 'pace', value: 'relaxed' }), ctx(run, { removed: ['1-afternoon'] }));
+  tc.planTurn(ops({ o: 'pace', value: 'packed' }), ctx(run, { removed: ['1-afternoon'] }));
   assert.match(run.calls[0].text, /, no breweries$/);
   assert.deepEqual(run.calls[0].pinned, null);
 });
 
 test('replies: a broad change names what changed (or counts it), and says when nothing changed', () => {
   const swapped = [STOPS[0], STOPS[1], { key: '1-afternoon', id: 90, name: 'Gyro Beach', type: 'beach', start: 870 }, STOPS[3]];
-  let out = tc.planTurn(ops({ o: 'pace', value: 'relaxed' }), ctx(fakeRun(() => dayPlan(swapped))));
-  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Slower pace. Took out Tree Brewing. Added Gyro Beach.');
-  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. Rythme plus relax. J’ai retiré Tree Brewing. J’ai ajouté Gyro Beach.');
-  out = tc.planTurn(ops({ o: 'pace', value: 'relaxed' }), ctx(fakeRun(() => dayPlan(STOPS))));
-  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Slower pace. The plan already fits that, so nothing changed.');
+  let out = tc.planTurn(ops({ o: 'pace', value: 'packed' }), ctx(fakeRun(() => dayPlan(swapped))));
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Busier days. Changed 1 stop.');
+  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. Journées plus remplies. 1 arrêt a changé.');
+  out = tc.planTurn(ops({ o: 'pace', value: 'packed' }), ctx(fakeRun(() => dayPlan(STOPS))));
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Busier days. The plan already fits that, so nothing changed.');
   const all = STOPS.map((s, i) => ({ ...s, id: 100 + i, name: `New ${i}` }));
   out = tc.planTurn(ops({ o: 'party', value: 'dog' }), ctx(fakeRun(() => dayPlan(all))));
   assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Planned for your dog. Changed 4 stops.');
