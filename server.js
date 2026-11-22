@@ -8052,6 +8052,9 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       // Sport test 13: a golf place's season words are read from its description alone, sentence by sentence, without the
       // sentences about a part of it (trip-planner.js offSeasonSkip).
       ...(sportSetupType(v.type) ? { textSeason: require('./trip-planner').seasonSentences(v.description || '') } : {}),
+      // Fresh eyes (2026-11-22): an outdoor place's researched season and Winter line (data/outdoor-facts.json), so a
+      // place that only rents gear or is closed in the cold months is not planned then (trip-planner.js outdoorFactsSeasonOff).
+      ...(v.type === 'outdoor' ? tripOutdoorSeasonFact(v.id) : {}),
       ...(v.type === 'shop' ? { isShop: true } : {}),
       ...(groupsById.has(v.id) ? { groupsText: groupsById.get(v.id) } : {}),
       ...(dateNightById.has(v.id) ? { dateNightLine: dateNightById.get(v.id) } : {}),
@@ -8555,6 +8558,8 @@ function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
   // unless the request already names a dog.
   if (stay && stay.dog && typeof base.text === 'string' && !TRIP_DOG_WORDS_RE.test(base.text) && base.text.trim().length + 13 <= discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) base.text = `${base.text.trim()} with our dog`;
   if (stay && stay.arrive && !(base.overrides && base.overrides.startDate)) base.overrides = { ...(base.overrides || {}), startDate: stay.arrive };
+  // Round 2 fresh eyes (V4): the day the visitor leaves is known, so its plan ends early (trip-planner.js v4SaneDays).
+  if (args.v4 && stay && stay.arrive && stay.leave && stay.leave > stay.arrive) base.departureDate = stay.leave;
   let plan = run(base, now);
   // V4 (round 2, 2026-11-21: "3 days" with Aug 10-13 became a 4-day plan): a length the request names wins over the dates.
   // Round 3: only a number of days ("3 days", « 3 jours »); "a weekend" Fri-Sun still covers Sunday.
@@ -8591,8 +8596,10 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false) {
     const stayIn = v4 ? { ...(stay || {}) } : stay;
     if (v4) {
       const words = String(text || '').toLowerCase();
-      const ages = tripPlannerModule().requestKidAges(words);
-      if (ages.length && stayIn.kids === undefined) { stayIn.kids = Math.min(12, ages.length); stayIn.kidAges = ages.slice(0, 12); }
+      // Round 2 fresh eyes: one age per child as typed (twins twice), also when the party control already says how many
+      // kids and the request names that many ages (the ages were dropped, so the booking site guessed them).
+      const ages = tripPlannerModule().requestKidAgeList(words.replace(/-/g, ' '));
+      if (ages.length && (stayIn.kids === undefined || stayIn.kids === ages.length)) { stayIn.kids = Math.min(12, ages.length); stayIn.kidAges = ages.slice(0, 12); }
       const amenity = tripStayAmenityAsked(words);
       if (amenity && !stayIn.pref) stayIn.pref = { amenity };
     }
@@ -8926,7 +8933,30 @@ function runTripPlan(args, now = new Date()) {
   let a = args;
   if (typeof a.text === 'string') { const plain = v4PlainText(a.text); if (plain !== a.text) a = { ...a, text: plain }; }
   if (typeof a.text === 'string' && V4_NOT_RUSHED_RE.test(a.text) && !(a.overrides && a.overrides.pace)) a = { ...a, overrides: { ...(a.overrides || {}), pace: 'relaxed' } };
+  // Round 2 fresh eyes (2026-11-22; "one night in Osoyoos next Friday" was read as an evening: day 1 had dinner only and
+  // day 2 was a full day with a second dinner): N nights is N + 1 days, and the last one is the day they leave.
+  if (typeof a.text === 'string') { const n = v4NightsText(a.text); if (n) a = { ...a, text: n.text, departureLast: true }; }
+  let sunsetDinner = null;
+  try { sunsetDinner = v4SunsetDinner(a, now); if (sunsetDinner) a = { ...a, text: sunsetDinner.text }; } catch (e) { sunsetDinner = null; }
   let plan = runTripPlanBase(a, now);
+  // Round 2 fresh eyes: a kind of place asked for that the town does not list at all ("spa" in Osoyoos) is said up front
+  // (plan.notIncluded) and the days are planned without it, rather than left half empty waiting for it.
+  try {
+    v4NotIncluded(plan);
+    const none = ((plan && plan.notIncluded) || []).filter((n) => n.reason === 'none_listed');
+    if (none.length && !a.swap && !a.pinned && typeof a.text === 'string') {
+      const TR = require('./trip-requirements');
+      let t = a.text;
+      for (const n of none) { const re = TR.KINDS[n.kind]; if (re) t = t.replace(new RegExp(`(?:,?\\s*(?:and|et|with|avec|plus)\\s+)?(?:an?\\s+|some\\s+|un\\s+|une\\s+|the\\s+)?(?:${re.source})(?:\\s+(?:days?|visits?|time|treatments?))?`, 'gi'), ' '); }
+      t = t.replace(/\s{2,}/g, ' ').replace(/\s+,/g, ',').replace(/,\s*,/g, ',').trim();
+      const stopsOf = (p) => ((p && p.days) || []).reduce((k, d) => k + (d.stops || []).filter((x) => x && (x.venue || x.event)).length, 0);
+      if (t && t !== a.text) {
+        const retry = runTripPlanBase({ ...a, text: t }, now);
+        if (retry && retry.kind === plan.kind && stopsOf(retry) > stopsOf(plan)) { retry.notIncluded = plan.notIncluded; retry.query = plan.query; plan = retry; }
+      }
+    }
+  } catch (e) { /* keep the plan as planned */ }
+  if (sunsetDinner && plan && Array.isArray(plan.notes)) plan.notes = [sunsetDinner.note].concat(plan.notes);
   try {
     const it = plan && plan.intent;
     const preset = it && it.when && it.when.preset;
@@ -8942,9 +8972,44 @@ function runTripPlan(args, now = new Date()) {
     }
   } catch (e) { /* keep the list */ }
   try { v4TidyDays(plan); } catch (e) { /* keep the plan as planned */ }
+  try { if (plan && !plan.notIncluded) v4NotIncluded(plan); } catch (e) { /* the notes stay in the warnings */ }
   try { v4DropAfterDark(plan); } catch (e) { /* keep the plan as planned */ }
   try { v4AddStopPhones(plan); } catch (e) { /* phones are a convenience */ }
   return plan;
+}
+const V4_NIGHT_WORDS = { a: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5 };
+function v4NightsText(text) {
+  if (/\b(?:\d+|one|two|three|four|five|six|seven|un|deux|trois|quatre|cinq|six|sept)\s*(?:-\s*)?(?:days?|jours?|journ[ée]es?)\b/i.test(text)) return null;
+  const re = /\b(\d|a|one|two|three|four|five|six|une?|deux|trois|quatre|cinq)(?:\s+single)?[\s-]+(?:nights?|nuits?|nuit[ée]es?)\b(?!\s+(?:out|only|market|markets|club|life|skiing|ski)\b)/i;
+  const m = re.exec(text);
+  if (!m) return null;
+  const n = V4_NIGHT_WORDS[m[1].toLowerCase()] || Number(m[1]);
+  if (!(n >= 1 && n <= 6)) return null;
+  return { text: text.replace(m[0], `${n + 1} days`), nights: n };
+}
+// Round 2 fresh eyes (2026-11-22; "spa and a nice dinner" in Osoyoos had no spa and said so only under More options): what
+// the visitor asked for by kind and the plan could not include, as one top-level list the page and the travel agent chat
+// can say up front. plan.notIncluded = [{ kind, label, reason: 'none_listed' | 'not_fitted', town, nearest, text }].
+const V4_TYPE_WORDS = { restaurant: 'restaurant', cafe: 'café', winery: 'winery', brewery: 'brewery', distillery: 'distillery', pub: 'pub', cocktail: 'cocktail lounge', golf: 'golf course', beach: 'beach', tour: 'tour', outdoor: 'outdoor stop', indoor: 'indoor stop' };
+function v4NotIncluded(plan) {
+  if (!plan || !Array.isArray(plan.requirementResults)) return;
+  const TR = require('./trip-requirements');
+  const towns = ((plan.overview && plan.overview.regions) || []).map((r) => r && r.label).filter(Boolean);
+  const town = towns.length ? (towns.length > 1 ? `${towns.slice(0, -1).join(', ')} or ${towns[towns.length - 1]}` : towns[0]) : null;
+  const warned = (plan.warnings || []).join(' \n ');
+  const out = [];
+  for (const r of plan.requirementResults) {
+    if (!r || r.status !== 'unmet' || r.strength !== 'must' || !['venue_kind', 'type'].includes(r.kind)) continue;
+    const label = r.kind === 'venue_kind' ? (TR.LABELS[r.value] || String(r.value).replace(/_/g, ' ')) : (V4_TYPE_WORDS[r.value] || String(r.value));
+    if (out.some((x) => x.label === label)) continue;
+    const noneListed = new RegExp(`Nothing matching ${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s? was available`, 'i').test(warned);
+    const alt = (r.optionalAlternatives || []).find((x) => x && x.reasonCode === 'different_region' && x.name);
+    const nearest = alt ? { id: alt.id, name: alt.name, region: alt.region, regionLabel: REGION_LABELS[alt.region] || alt.region, url: alt.url, ...(alt.urlFr ? { urlFr: alt.urlFr } : {}) } : null;
+    const an = /^[aeiou]/i.test(label) ? 'an' : 'a';
+    const text = (noneListed && town ? `There’s no ${label} listed in ${town}, so this plan has none.` : `I couldn’t fit ${an} ${label} into this plan.`) + (nearest ? ` The nearest is ${nearest.name} in ${nearest.regionLabel}.` : '');
+    out.push({ kind: r.value, label, reason: noneListed ? 'none_listed' : 'not_fitted', town, nearest, text });
+  }
+  if (out.length) plan.notIncluded = out;
 }
 function v4AddStopPhones(plan) {
   const ids = new Set();
@@ -8968,6 +9033,30 @@ function v4AddStopPhones(plan) {
 //  - each stop carries its listed phone, for the Book sheet's Call link on a meal booked by phone.
 const V4_NOT_RUSHED_RE = /\b(?:(?:nothing|not|nothing too|not too|never|don'?t want to be|don.t want to feel)\s+(?:too\s+)?rushed|no rush(?:ing)?|unrushed|no hurry|in no hurry|at our own pace|take (?:our|my) time|pas (?:trop )?press[ée]s?|sans (?:se )?presser|sans rush|pas de rush|prendre (?:notre|mon) temps|[àa] notre rythme)\b/i;
 const V4_WHEN_DAYS = { 'this-weekend': 2, 'next-weekend': 2, weekend: 2, today: 1, tomorrow: 1 };
+// Fresh eyes (2026-11-22: "sunset dinner" was planned at 7:30 PM in November, long after dark): a sunset dinner starts
+// about half an hour before the real sunset on the trip's first day (trip-requirements.js estimateDaylight, in the town
+// asked for), on the quarter hour and never before 4 PM, so the kitchens open then are the ones planned; the plan says
+// when the sun sets. A dinner time the request gives itself wins. With a lake view only where the site reads a sunset dinner
+// that way (TRIP_SITE.sunsetDinner). -> { text, note } or null.
+const V4_SUNSET_DINNER_RE = /\b(?:a\s+)?sunset dinners?\b|\bdinner (?:at|with|during|around|watching) (?:the |a )?sunset(?: view)?\b/i;
+function v4SunsetDinner(a, now = new Date()) {
+  const text = String((a && a.text) || '');
+  const m = V4_SUNSET_DINNER_RE.exec(text);
+  if (!m || /\b(?:dinner|supper)\s+(?:at|around|for)\s+(?:1[0-2]|[1-9])(?::[0-5]\d)?\s*(?:a\.?m\.?|p\.?m\.?)/i.test(text)) return null;
+  const TR = require('./trip-requirements');
+  let date = a.overrides && a.overrides.startDate;
+  if (!date) { try { const cal = TR.tripCalendar(text, todayLocal(now)); date = cal && cal.startDate; } catch (e) { date = null; } }
+  if (!date) date = todayLocal(now);
+  const lower = text.toLowerCase();
+  const town = Object.keys(REGION_LABELS).sort((x, y) => REGION_LABELS[y].length - REGION_LABELS[x].length).find((r) => lower.includes(REGION_LABELS[r].toLowerCase()));
+  const row = db.prepare(`SELECT AVG(latitude) AS lat, AVG(longitude) AS lng FROM venues WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND redirect_to IS NULL${town ? ' AND region = ?' : ''}`).get(...(town ? [town] : []));
+  const light = row && row.lat != null ? TR.estimateDaylight(date, { lat: Number(row.lat), lng: Number(row.lng) }) : null;
+  if (!light) return null;
+  const start = Math.max(960, Math.min(1260, Math.floor((light.sunsetMinutes - 30) / 15) * 15));
+  const clock = (x) => `${(Math.floor(x / 60) % 12) || 12}:${String(x % 60).padStart(2, '0')} ${x >= 720 ? 'pm' : 'am'}`;
+  const sun = clock(light.sunsetMinutes).replace(/ (am|pm)$/, (s, p) => ` ${p.toUpperCase()}`);
+  return { text: text.replace(m[0], `dinner at ${clock(start)}${/lake view/.test(TRIP_SITE.sunsetDinner.reading) && !/\blake ?views?\b/i.test(text) ? ' with a lake view' : ''}`), note: `Sunset is about ${sun} that day, so the sunset dinner starts at ${clock(start).replace(/ (am|pm)$/, (s, p) => ` ${p.toUpperCase()}`)}.`, start, sunset: light.sunsetMinutes };
+}
 // Round 2 (2026-11-21): words the planner missed. "easy flat walks" lost the walk ("flat" is not a kind of place); "then
 // dessert" after dinner had no stop (a dessert café is one).
 function v4PlainText(text) {
@@ -9011,11 +9100,35 @@ function v4TidyDays(plan) {
     }
   }
 }
+// The researched season facts of an outdoor place (data/outdoor-facts.json) for the planner: { outdoorSeason } or {}.
+function tripOutdoorSeasonFact(id) {
+  const f = (typeof OUTDOOR_FACTS !== 'undefined' && OUTDOOR_FACTS && OUTDOOR_FACTS[String(id)]) || null;
+  if (!f) return {};
+  const winter = (Array.isArray(f.extras) ? f.extras : []).find((x) => x && /^winter$/i.test(String(x.label || '').trim()) && x.text);
+  return f.season || winter ? { outdoorSeason: { season: f.season ? String(f.season) : '', winter: winter ? String(winter.text) : '' } } : {};
+}
 // Round 3 (2026-11-21: a trail at 7:45 PM in November after an anniversary dinner, parks at 9 PM): an outdoor stop the
 // schedule puts wholly after sunset is left out (its time stays free), unless it is the only stop. Its warning goes too.
+// Fresh eyes (2026-11-22: a Penticton trail at 3:45 PM in November ran past sunset with only a note in "More options"):
+// an outdoor visit that starts in daylight but would end after the light goes (sunset less its margin) is shortened to
+// end then, on the quarter hour, when that still leaves 45 minutes; otherwise it is left out like one after dark.
 function v4DropAfterDark(plan) {
+  const V4_DARK_MIN_VISIT = 45;
+  const v4DarkLimit = (r) => r.daylight.sunsetMinutes - (Number(r.daylight.marginMinutes) || 0);
   const rows = (plan && plan.schedule) || [];
-  const dark = rows.filter((r) => r && r.daylight && r.daylight.status === 'conflict' && Number.isFinite(r.startMinutes) && Number.isFinite(r.daylight.sunsetMinutes) && r.startMinutes >= r.daylight.sunsetMinutes - 15 && Number.isInteger(r.venueId));
+  const conflict = (r) => r && r.daylight && r.daylight.status === 'conflict' && Number.isFinite(r.startMinutes) && Number.isFinite(r.daylight.sunsetMinutes) && Number.isInteger(r.venueId);
+  const endOf = (r) => (Number.isFinite(r.endMinutes) ? r.endMinutes : Infinity);
+  const named = (r) => { for (const d of plan.days || []) for (const s of d.stops || []) if (s && s.venue && s.venue.id === r.venueId) return s.venue.name; return null; };
+  for (const r of rows) {
+    if (!conflict(r) || !Number.isFinite(r.endMinutes) || r.startMinutes < r.daylight.sunriseMinutes || r.endMinutes <= v4DarkLimit(r)) continue;
+    const end = Math.floor(v4DarkLimit(r) / 15) * 15;
+    if (end - r.startMinutes < V4_DARK_MIN_VISIT) continue;
+    r.endMinutes = end;
+    r.daylight = { ...r.daylight, status: 'estimated', shortened: true };
+    const n = named(r);
+    if (n) for (const k of ['warnings', 'scheduleWarnings']) if (Array.isArray(plan[k])) plan[k] = plan[k].filter((w) => !(String(w).startsWith(`${n}:`) && /daylight/i.test(String(w))));
+  }
+  const dark = rows.filter((r) => conflict(r) && endOf(r) > v4DarkLimit(r) && r.startMinutes >= Math.min(r.daylight.sunsetMinutes - 15, v4DarkLimit(r) - V4_DARK_MIN_VISIT));
   if (!dark.length) return;
   const gone = [];
   const prune = (list, day) => {
@@ -9458,6 +9571,10 @@ function tripIndoorKindNearTowns(first, args, now) {
     .filter((x) => { const v = getVenue(x.venue.id); if (!v) return false; const k = venueIndoorInfo(v.id).kinds; return TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) ? { indoorKinds: k } : {}) }).some((pk) => kinds.includes(pk)); });
   const firstKind = ofKind(first);
   if (firstKind.filter((x) => x.venue.region === town).length >= 2) return first;
+  // Fresh eyes (2026-11-22; "3 days in Penticton with kids 6 and 9… need a place with a pool" became a Summerland, Naramata
+  // and Penticton trip with the stay in Summerland): a day-by-day plan that already has the town's own place of that kind
+  // stays in the town the visitor named; only a list, or a plan with none there, takes in the towns next door.
+  if (['multi_day', 'day_plan'].includes(first.kind) && firstKind.some((x) => x.venue.region === town)) return first;
   const label = REGION_LABELS[town];
   const fr = /\u00e0\s*$|\ba\s*$/i.test(fold(text.slice(0, at)).replace(/\s+$/, ' ')) && tripPlannerFrModule().tripPlannerText(text, buildTripPlannerTaxonomy()) !== text;
   const towns = [town, ...TRIP_NEAR_TOWNS[town]].map((r) => REGION_LABELS[r]);
@@ -10102,6 +10219,9 @@ function tripFullVenueNames(text, taxonomy) {
     if (!(` ${lower} `).includes(` ${e.word} `) || lower.includes(e.fullNorm)) continue;
     const re = new RegExp(`(\\b(?:at|to)\\s+)(?:the\\s+)?${e.word}\\b|\\b(?:the\\s+)?${e.word[0].toUpperCase()}${e.word.slice(1)}\\b`, 'i');
     const m = re.exec(out);
+    // Round 2 fresh eyes (2026-11-22; "coming from Vancouver" became Vancouver Pizza Kitchen, a stop to find): a word
+    // right after "from" is where they are coming from, never a place to visit.
+    if (m && !m[1] && /\b(?:from|depuis|de)\s+(?:the\s+)?$/i.test(out.slice(0, m.index))) continue;
     if (m && (m[1] || /^[A-Z]/.test(m[0]))) out = out.slice(0, m.index) + (m[1] || '') + e.full + out.slice(m.index + m[0].length);
   }
   return unmask(out);
@@ -10665,7 +10785,7 @@ function lateAfterMinutes(text) {
 const TEAM_BUILDING_WORDS_RE = /\bteam[\s-]?building(?:\s+(?:activit(?:y|ies)|events?|ideas?|outings?|days?|nights?|games?|exercises?|experiences?|venues?|places?|spots?|fun|things to do))+\b|\bteambuilding\b/gi;
 const TRIP_SWIM_OFF_MONTHS = [11, 12, 1, 2, 3, 4];
 const TRIP_SIM_GOLF_RE = /\b(?:indoor )?(?:golf simulators?|golf sims?|sim golf|simulator golf|virtual golf|golf lounges?|indoor golf (?:simulators?|lounges?|centres?|centers?))\b/gi;
-function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null, v4 = false }, now = new Date()) {
+function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null, v4 = false, departureDate = null, departureLast = false }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   // 2026-11-05: trip-length, clock-time, holiday-weekend and tour wording made plain; a beer, cider or distillery "tour" is a run of
   // breweries, cideries or distilleries. (planText is the French layer's own text; planTextPlain is what the planner reads.)
@@ -11240,7 +11360,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
       clock: rolledWindow ? null : okanaganClock(now),
       tripDate: rolledWindow ? requirements.startDate : (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now),
       kidAges: tripKidAges, askText: tripAskText,
-      ...(v4 ? { v4: true } : {}),
+      ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}) } : {}),
     });
     tripApplyHappyHourParts(plan, hhParts);
     plan.seeAll = null;
@@ -11292,7 +11412,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     holidayEvents: !!holidayEvents,
     tripDate: requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now) || tripPlanDate(intent.when, now),
     kidAges: tripKidAges, askText: tripAskText,
-    ...(v4 ? { v4: true } : {}),
+    ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}) } : {}),
     startWeekday: requirements?.startDate ? localWeekdayKey(requirements.startDate) : tripStartWeekday(intent.when, now),
     clock: rolledWindow ? null : okanaganClock(now),
   });
