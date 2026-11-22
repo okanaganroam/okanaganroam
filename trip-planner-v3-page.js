@@ -3,6 +3,7 @@ const {FR_SITE,frSiteIn,frSiteOut,t3FrenchTextCore,t3FrenchText,t3FrenchEvent,t3
 const SITE_PAGE=require('./trip-site.js').page;
 // Build My Trip V4 (2026-11-20): the simple plan view, only with d.v4 (/trip?v=4 or TRIP_V4; see server.js).
 const V4_PAGE=require('./trip-planner-v4-page.js');
+const CHAT_PAGE = require('./trip-chat-page.js');
 
 // ---------- Build My Trip V3 page (Step 2, 2026-09-29) ----------
 //
@@ -1569,7 +1570,9 @@ function renderScript(d) {
   var state = { text: '', seed: 0, overrides: {}, locks: {}, exclude: [], removed: {}, last: null, lastReq: null };
   var renderedVenueCardAnchors = {};
   var V4 = ${d.v4 ? 'true' : 'false'}, V4_PREVIEW = ${d.v4 === 'preview' ? 'true' : 'false'};
-${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3_STAY_CLIENT_SRC) : T3_STAY_CLIENT_SRC) + (d.viator ? t3ViatorClientSrc(d) : '')) : ''}${d.v4 ? V4_PAGE.V4_CLIENT_SRC : ''}
+  // The travel agent chat preview (/trip?chat=1) keeps chat=1 in the address bar, so a reload or a shared link keeps it.
+  function t3ChatUrl(u){ return ${d.v4 && d.chat === 'preview' ? "u + (u.indexOf('?') === -1 ? '?' : '&') + 'chat=1'" : 'u'}; }
+${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3_STAY_CLIENT_SRC) : T3_STAY_CLIENT_SRC) + (d.viator ? t3ViatorClientSrc(d) : '')) : ''}${d.v4 ? V4_PAGE.V4_CLIENT_SRC : ''}${d.v4 && d.chat ? CHAT_PAGE.chatClientSrc(d) : ''}
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   // Crawlable links (2026-10-19, round 8): link markup glued together in this script as a quoted href attribute
   // around esc(url) read to crawlers that scan the page's HTML as links to the code itself (fake 404s). The
@@ -1733,7 +1736,7 @@ ${d.stays ? ((d.v4 ? V4_PAGE.v4StaySrc : (x) => x)(d.viator ? t3ViatorStaySrc(T3
       : { text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude };
     // French (2026-10-18): a plan made on /fr/trip keeps its French address, so a reload or a shared link stays French.
     var base = (location.pathname + '/').indexOf('/fr/') === 0 ? '/fr/trip' : '/trip';
-    try { history.replaceState(null, '', base + t3StateToQuery(s)${d.stays === 'preview' && !d.v4 ? " + (t3StateToQuery(s) ? '&' : '?') + 'stays=1'" : ''}${d.v4 ? " + v4UrlExtra(t3StateToQuery(s))" : ''}${d.v4 === 'preview' ? " + (t3StateToQuery(s) || v4UrlExtra('') ? '&' : '?') + 'v=4'" : ''}); } catch (e) {}${d.v4 ? '\n    v4CacheSave();' : ''}
+    try { history.replaceState(null, '', t3ChatUrl(base + t3StateToQuery(s)${d.stays === 'preview' && !d.v4 ? " + (t3StateToQuery(s) ? '&' : '?') + 'stays=1'" : ''}${d.v4 ? " + v4UrlExtra(t3StateToQuery(s))" : ''}${d.v4 === 'preview' ? " + (t3StateToQuery(s) || v4UrlExtra('') ? '&' : '?') + 'v=4'" : ''})); } catch (e) {}${d.v4 ? '\n    v4CacheSave();' : ''}
   }
 
   // ---- plan helpers ----
@@ -3236,7 +3239,7 @@ ${d.breadcrumbJson}
 <link rel="stylesheet" href="/styles/app.css">
 <style>${d.footerStyles}</style>
 ${renderStyles()}
-${d.v4 ? V4_PAGE.V4_STYLES + '\n' : ''}${d.analyticsHead}
+${d.v4 ? V4_PAGE.V4_STYLES + '\n' : ''}${d.v4 && d.chat ? CHAT_PAGE.CHAT_STYLES + '\n' : ''}${d.analyticsHead}
 </head>
 <body class="page-trip page-trip-v3">
 ${d.tripTrayHtml}
