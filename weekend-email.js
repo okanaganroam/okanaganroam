@@ -481,8 +481,9 @@ ${bookHtml(dg.book)}<hr style="border:0;border-top:1px solid #e0d8c3;margin:24px
     started: 'Sending has started. Reload this page to see the count go up.', not_confirmed: 'Nothing sent: tick the box to confirm first.',
     stale: 'Nothing sent: the weekend changed since the page loaded. Check the preview again.',
     blocked: 'Nothing sent. The reason is shown next to the Send button below.',
+    held: 'This week is on hold: it won’t go out automatically.', released: 'The hold is off: this week goes out automatically on Thursday.',
   };
-  function adminPage({ now = new Date(), notice = '', confirmStep = false } = {}) {
+  function adminPage({ now = new Date(), notice = '', confirmStep = false, autoHtml = '' } = {}) {
     const c = counts();
     const dg = buildDigest(now);
     const sc = sendCounts(dg.weekend);
@@ -506,7 +507,7 @@ ${rows ? `<table style="margin-top:10px"><tr><th>Signed up on</th><th>Confirmed<
 <div class="box"><p><strong>Weekend of ${esc(dg.weekend)}</strong> (${esc(dg.from || '')} to ${esc(dg.to || '')}): ${dg.count} events in the email${dg.totalFound > dg.count ? ` (of ${dg.totalFound} found)` : ''}. This weekend so far: ${sc.sent} sent${sc.failed ? `, ${sc.failed} failed (Send again retries them)` : ''}${sc.sending ? `, ${sc.sending} under way` : ''}.</p>
 <form method="post" action="/admin/weekend-email/test" style="display:inline"><button type="submit">Send test to ${CONTACT}</button></form>
 ${sendBox}
-<p style="font-size:13px;color:#55646a">Nothing goes out by itself: emails are sent only when you press Send here. The usual time is Thursday morning.</p></div>
+${autoHtml || '<p style="font-size:13px;color:#55646a">Nothing goes out by itself: emails are sent only when you press Send here. The usual time is Thursday morning.</p>'}</div>
 <h2>Preview</h2>
 <p><strong>Subject:</strong> ${esc(dg.subject)}</p>
 <div class="preview">${digestInnerHtml(dg, `${SITE}/weekend-email/unsubscribe/preview`)}</div>
