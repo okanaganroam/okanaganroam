@@ -432,7 +432,8 @@
   }
   function happyClosedHtml(i, sea){
     var st = happyClosedState(sea), ask = st.ask && (i === '' || i === '0');
-    return '<p class="su-hint su-closedwarn" id="suHappyClosed' + i + '" role="status"' + (st.text ? '' : ' hidden') + '>' + h(st.text) + '</p>'
+    // Shown at her part: good news, in the "saved" green, not the heads-up's red.
+    return '<p class="' + (st.at ? 'su-sent' : 'su-hint su-closedwarn') + '" id="suHappyClosed' + i + '" role="status"' + (st.text ? '' : ' hidden') + '>' + h(st.text) + '</p>'
       + (st.at && (i === '' || i === '0') ? '<div class="su-skip" style="margin:0 0 10px"><button type="button" class="su-link" id="suHappyAtUndo" data-act="happyAtNo">' + h(fill(T.happyAtUndo, { part: st.at })) + '</button></div>' : '')
       + (ask ? happyAtAskHtml(i) : '');
   }
