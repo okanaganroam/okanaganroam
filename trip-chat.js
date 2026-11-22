@@ -497,10 +497,11 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1, 
   const wdM = Object.keys(weekdays).length ? new RegExp(`\\b(${Object.keys(weekdays).join('|')})s?\\b`).exec(t) : null;
   const day = dayM ? Number(dayM[1]) : wdM ? weekdays[wdM[1]] : null;
   // "the brewery on day 2": only day 2's.
-  let named = ordinalPick(t, stopsNamed(t, stops));
+  let named = stopsNamed(t, stops);
   // A day named: only that day's stops (with none of that kind on it, nothing is named; it used to take another day's).
   // A stop named by its own name stands whatever day is mentioned ("La Frenz is closed on Sunday").
   if (day) { const by = named.byName || []; const on = named.filter((s) => s.day === day); named = by.length && !by.some((s) => s.day === day) ? by.slice() : on; named.byName = by.filter((s) => named.includes(s)); }
+  { const by = named.byName || []; named = ordinalPick(t, named); named.byName = by.filter((s) => named.includes(s)); }
   if (/\b(?:redo|re-do|different|new|refaire|autre|nouveau|nouvelle)\b[^.]*\b(?:day|jour)\s*\d\b/.test(t) && !named.length) return { ops: [op('redo_day', { day })], cant: null };
   // A kind of dinner or lunch ("a sunset dinner with a lake view", "a patio lunch", « un souper avec vue sur le lac »)
   // is that day's dinner or lunch swapped for one like that (2026-11-22: it added a second restaurant in the afternoon,

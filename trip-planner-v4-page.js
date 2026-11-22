@@ -322,6 +322,7 @@ const V4_CLIENT_SRC = String.raw`
       return '<li class="v4-stop v4-gone"><div class="v4-row">' + v4Thumb(null) + '<div class="v4-main"><span class="v4-time">' + esc(vt('removed')) + '</span><span class="v4-name">' + esc(v.name) + '</span></div>'
         + '<div class="v4-acts"><button type="button" class="v4-text" data-v4-undo-id="' + esc(v.id) + '">' + esc(vt('undo')) + '</button></div></div></li>';
     }
+    if (typeof tripWorkspaceStopHtml === 'function') return tripWorkspaceStopHtml(s, key, counts);
     var html = '<li class="v4-stop" data-venue-id="' + esc(v.id) + '"><div class="v4-row">' + v4Thumb(v)
       + '<button type="button" class="v4-main" aria-expanded="' + (v4.open[id] ? 'true' : 'false') + '" aria-controls="' + did + '" data-v4-toggle="' + did + '" data-v4-id="' + esc(id) + '"><span class="v4-time">' + esc(v4Start(s, key)) + '</span><span class="v4-name">' + esc(v.name) + '</span><span class="v4-line">' + esc(v4Line(s)) + '</span></button>'
       + '<div class="v4-acts">'
@@ -542,7 +543,7 @@ const V4_CLIENT_SRC = String.raw`
     if (!bar) { bar = document.createElement('div'); bar.id = 'v4Bar'; bar.className = 'v4-bar'; bar.setAttribute('role', 'region'); main.appendChild(bar); }
     var canBookNow = v4CanBook();
     // Round 2: Save says Saved when every stop of this plan is already in My Trip (after a reload too).
-    try { if (!v4.saved && addState().state === 'added') v4.saved = true; } catch (err) {}
+    try { if (typeof tripWorkspaceStopHtml !== 'function' && !v4.saved && addState().state === 'added') v4.saved = true; } catch (err) {}
     bar.setAttribute('aria-label', v4.confirmed ? vt('book') : vt('confirm'));
     // The travel agent chat (trip-chat-page.js, only with d.chat) keeps its own part of the bar; the rest is redrawn.
     (typeof v4ChatMount === 'function' ? v4ChatMount(bar) : bar).innerHTML = v4BarHtml();
@@ -644,8 +645,8 @@ const V4_CLIENT_SRC = String.raw`
     if ((b = t.closest('[data-v4-save]'))) {
       // Round 1 (2026-11-21): Save never mixes this plan into another saved trip without asking (one tap: Replace).
       var as = addState(), oth = tripSize() - (as.total - as.missing);
-      if (!v4.saved && as.state === 'ready' && oth > 0 && window.__roamTripReplace) { v4.ask = true; v4UpdateBar(); var rb = document.querySelector('#v4Bar [data-v4-replace]'); if (rb) { try { rb.focus({ preventScroll: true }); } catch (err) {} } return; }
-      if (!v4.saved) { addStops(null, { offset: tripDayOffset() }); v4.saved = true; v4UpdateBar(); v4Toast(vt('savedReplaced')); }
+      if (!v4.saved && (as.state === 'ready' || (typeof tripWorkspaceStopHtml === 'function' && as.state === 'added')) && oth > 0 && window.__roamTripReplace) { v4.ask = true; v4UpdateBar(); var rb = document.querySelector('#v4Bar [data-v4-replace]'); if (rb) { try { rb.focus({ preventScroll: true }); } catch (err) {} } return; }
+      if (!v4.saved) { if (typeof tripWorkspaceStopHtml === 'function' && as.state === 'added' && oth <= 0) rememberDays(planStopButtons(null), 0); else addStops(null, { offset: tripDayOffset() }); v4.saved = true; v4UpdateBar(); v4Toast(vt('savedReplaced')); }
       else { var panel = document.getElementById('tripTrayPanel'), toggle = document.getElementById('tripTrayToggle'); if (panel && !panel.classList.contains('open') && toggle) setTimeout(function(){ toggle.click(); }, 0); }
       return;
     }
