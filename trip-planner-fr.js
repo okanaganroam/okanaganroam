@@ -522,7 +522,7 @@ const PHRASES = [
   ['visiter', 'visit'], ['visite', 'visit'], ['passer', 'spend'], ['profiter', 'spend'], ['decouvrir', 'explore'],
   ['explorer', 'explore'], ['amener', 'bringing'], ['emmener', 'bringing'], ['amenons', 'bringing'], ['emmenons', 'bringing'],
   ['rester', 'staying'], ['restons', 'staying'], ['venir', 'coming'], ['venons', 'coming'], ['peut', 'can'], ['pouvons', 'can'],
-  ['peux', 'can'], ['quelque chose', 'something'], ['quelques', 'a few'], ['plusieurs', 'a few'], ['beaucoup', 'lots'],
+  ['peux', 'can'], ['quelque chose a faire', 'something to do'], ['quelque chose de le fun', 'something fun'], ['quelque chose', 'something'], ['quelques', 'a few'], ['plusieurs', 'a few'], ['beaucoup', 'lots'],
   ['super', 'great'], ['genial', 'great'], ['geniale', 'great'], ['excellent', 'great'], ['excellente', 'great'],
   ['excellents', 'great'], ['excellentes', 'great'], ['bon', 'good'], ['bonne', 'good'], ['bons', 'good'], ['bonnes', 'good'],
   ['beau', 'nice'], ['belle', 'nice'], ['beaux', 'nice'], ['belles', 'nice'], ['joli', 'nice'], ['jolie', 'nice'],
