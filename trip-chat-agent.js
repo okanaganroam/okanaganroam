@@ -244,7 +244,9 @@ function agentRules(t, stops, ctx, h) {
   }
 
   // 6. A stop moved to another day, another part of the day, or before / after another stop.
-  if (MOVE_VERB_RE.test(t) && !editVerb && !/\b(?:later|earlier|plus tard|plus tot)\b/.test(t)) {
+  // Round 6: "do the wine tour on Sunday instead" is a move ("instead" alone is not an edit word there).
+  const moveEdit = EDIT_VERB_RE.test(t.replace(/\b(?:instead|plutot)\b/g, ' '));
+  if (MOVE_VERB_RE.test(t) && !moveEdit && !(editVerb && !day) && !/\b(?:later|earlier|plus tard|plus tot)\b/.test(t)) {
     const rel = /\b(before|after|avant|apres)\s+(?:the\s+|our\s+|le\s+|la\s+|l')?([a-z' -]+)$/.exec(t.replace(/[?.!]+$/, '').replace(new RegExp(`\\s+(?:on |le |du |au )?(?:(?:day|jour)\\s*\\d|${Object.keys(WD_KEYS).join('|')})$`), ''));
     const head = rel ? t.slice(0, rel.index) : t;
     let named = h.stopsNamed(head, stops);
@@ -317,6 +319,28 @@ function moveStop(op, state, ctx) {
   }
   const anchor = now(op.stops[1]);
   const day = op.day || (anchor && anchor.day) || s.day;
+  // Round 6 ("do the wine tour on Sunday instead": "I couldn't move Signature Connections"): a tour the planner timed as a
+  // stop (tourStops) is moved by moving its tourStops entry to the new day; the stops it covers there give way.
+  const tours = state.args.tourStops || [];
+  const ti = tours.findIndex((x) => x.listingId === s.id);
+  if (ti >= 0 && day !== s.day && ctx.hooks && ctx.hooks.tourStops) {
+    const t0 = tours[ti];
+    const part = op.time ? ({ morning: 'morning', midday: 'midday', afternoon: 'afternoon', evening: 'late' }[op.time] || t0.part) : t0.part;
+    const covers = t0.covers || [];
+    const keep = state.stops.filter((x) => /^\d-/.test(x.key) && x.id !== s.id && !(x.day === day && (covers.includes(x.type) || partOf(x.key) === part)));
+    const pinned = Object.fromEntries(keep.map((x) => [x.key, x.id]));
+    const newTours = tours.map((x, i) => (i === ti ? { ...x, day, part, startMinutes: op.time ? undefined : (Number.isInteger(x.startMinutes) ? x.startMinutes : s.start) } : x)).map((x) => { const y = { ...x }; if (!Number.isInteger(y.startMinutes)) delete y.startMinutes; return y; });
+    const args = { ...state.args, pinned, trustedPins: Object.keys(pinned), swap: null, moves: undefined, tourStops: newTours, overrides: { ...(state.args.overrides || {}), stopStarts: { ...startsOf(keep.filter((x) => x.day !== day)), ...((state.args.overrides || {}).stopStarts || {}) } } };
+    const ran = runSteady(ctx, args, [...keep, s]);
+    const nw = ran.nw || null;
+    const at = nw && nw.find((x) => x.id === s.id && x.day === day);
+    const lost = nw ? keep.filter((x) => !nw.some((y) => y.id === x.id)) : [];
+    if (!at || lost.length) { r.why = 'no_fit'; r.day = day; return { result: r }; }
+    r.ok = true; r.fresh = at; r.toDay = day; r.covered = state.stops.filter((x) => x.day === day && x.id !== s.id && !keep.includes(x) && !nw.some((y) => y.id === x.id));
+    ran.args.overrides = { ...(state.args.overrides || {}) };
+    if (!ran.args.overrides.stopStarts) delete ran.args.overrides.stopStarts;
+    return { plan: ran.plan, nw, args: { ...ran.args, tourStops: newTours }, result: r };
+  }
   const occ = new Map(state.stops.filter((x) => x.day === day && x.id !== s.id).map((x) => [partOf(x.key), x]));
   const mealPart = s.role === 'lunch' ? 'midday' : s.role === 'dinner' ? 'evening' : null;
   let order;

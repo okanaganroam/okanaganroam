@@ -8467,6 +8467,18 @@ function tripChatWhyMatches(fact, text, L) {
   for (const w of Object.values(tripChat.WORD_KINDS)) if (w.meal && w.re.test(t) && w.words.some((x) => head.includes(x))) out.push(w[fr ? 'fr' : 'en']);
   return [...new Set(out)];
 }
+function tripChatToursCover(plan, req) {
+  if (!plan || !Array.isArray(plan.requirementResults)) return;
+  const covers = new Set(((req && req.tourStops) || []).flatMap((t) => t.covers || []));
+  const tk = tripChat.agent.TOUR_KINDS;
+  for (const d of plan.days || []) for (const s of d.stops || []) {
+    if (!s.venue || s.venue.type !== 'tour') continue;
+    const name = tripChat.agent.fold(`${s.venue.name} ${s.venue.cuisine || ''}`);
+    for (const k of Object.values(tk)) if ((k.covers || []).length && k.words.some((w) => name.includes(w.split(' ')[0]))) for (const c of k.covers) covers.add(c);
+  }
+  if (!covers.size) return;
+  plan.requirementResults = plan.requirementResults.map((i) => (i && i.status === 'unmet' && ['type', 'type_count', 'venue_kind'].includes(i.kind) && covers.has(i.value) ? { ...i, status: 'met', metBy: 'tour' } : i));
+}
 // Whether the visitor's own request asked for that kind of place ("a weekend with a spa"): its words are in the text.
 function tripChatAsked(kind, text) {
   if (!kind || !text) return false;
@@ -8619,6 +8631,9 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // A part of a several-ask message that could not be done (no such stop on the plan...) is said, once.
   if (missed.length) { const line = tripChat.cantReply(missed[0].cant, lang, missed[0].what, stops, { asked: tripChatAsked(missed[0].what, v.args.text) }); if (!reply.includes(line)) reply = [reply, line].filter(Boolean).join(' '); }
   const actions = { ...out.actions, ...(transport ? { transport } : {}), ...(goneEvents.length ? { removeEvents: goneEvents.map((e) => e.id) } : {}) };
+  // Round 6 (Penticton wine weekend: after "book us a wine tour" the agent line read "I couldn't fit winery on these
+  // dates"): the wineries a wine tour on the plan covers are not "not included".
+  if (plan) tripChatToursCover(plan, req);
   logTiming();
   return {
     timing: { ...timing, total: Date.now() - timing.start },
