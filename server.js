@@ -85,6 +85,7 @@ async function sheetWithPage(kind, d) { return d ? venueActivity.applyInventory(
 const { renderDashboardPage } = require('./dashboard-page');
 const tripDemand = require('./trip-demand');
 const tripFunnel = require('./trip-funnel');
+const tripChat = require('./trip-chat');
 const TRIP_SITE = require('./trip-site.js');
 const tripDemandLog = tripDemand.createLogger(db);
 const r2 = require('./r2');
@@ -7907,7 +7908,17 @@ function isTripV4Enabled() {
 function tripV4EnabledFor(query) {
   const v = String((query && query.v) || '');
   if (v === '3') return false;
-  return isTripV4Enabled() || v === '4';
+  // The travel agent chat preview (/trip?chat=1) is a V4 page.
+  return isTripV4Enabled() || v === '4' || String((query && query.chat) || '') === '1';
+}
+// Build My Trip travel agent chat (2026-11-22, trip-chat.js): after the first plan, the request box becomes a chat bar
+// ("remove the brewery", "more for kids", "cheaper dinner"). TRIP_CHAT=on (off by default) turns it on for the V4 page;
+// /trip?chat=1 is a public preview (and POST /api/trip/chat?chat=1, which that page sends). AI only reads the message
+// (with ANTHROPIC_API_KEY; plain word rules without it); the planner picks every stop.
+function isTripChatEnabled() { return tripChat.enabled(); }
+function tripChatEnabledFor(query) {
+  if (String((query && query.v) || '') === '3') return false;
+  return isTripChatEnabled() || String((query && query.chat) || '') === '1';
 }
 // Loaded lazily for the same reason as the interpreter (see
 // discoveryIntentModule): server.js still starts without the file.
@@ -8305,6 +8316,97 @@ function parseTripPlanBody(body, opts = {}) {
   return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap, ...(stay ? { stay } : {}), ...(opts.v4 ? { v4: true } : {}) } };
 }
 
+// ---------- Build My Trip travel agent chat (2026-11-22, trip-chat.js) ----------
+// The body of POST /api/trip/chat: { message | chip, lang, plan: <the POST /api/trip/plan body that made the plan on
+// screen>, locks: { "<slot>": venueId }, removed: ["<slot>"], stops: [{ key, id, start }] }. Only these keys, only checked
+// values; the plan's own fields go through parseTripPlanBody (its pinned / swap are not used: the chat sets its own).
+const TRIP_CHAT_KEY_RE = /^(?:[1-7]-(?:early|morning|midday|afternoon|late|evening|night)|it-\d{1,2})$/;
+function parseTripChatBody(body, opts = {}) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: 'Body must be an object.' };
+  const unexpected = Object.keys(body).filter((k) => !['message', 'chip', 'lang', 'plan', 'locks', 'removed', 'stops'].includes(k));
+  if (unexpected.length) return { error: `Unexpected field(s): ${unexpected.join(', ')}` };
+  const message = typeof body.message === 'string' ? body.message.replace(/\s+/g, ' ').trim() : '';
+  const chip = body.chip === undefined || body.chip === null ? null : body.chip;
+  if (chip !== null && !Object.prototype.hasOwnProperty.call(tripChat.CHIPS, chip)) return { error: 'Unknown chip.' };
+  if (!chip && !message) return { error: 'message is required.' };
+  if (message.length > tripChat.MAX_MESSAGE) return { error: `message must be at most ${tripChat.MAX_MESSAGE} characters.` };
+  const planBody = body.plan && typeof body.plan === 'object' && !Array.isArray(body.plan) ? { ...body.plan } : null;
+  if (!planBody) return { error: 'plan is required.' };
+  delete planBody.pinned; delete planBody.swap;
+  const plan = parseTripPlanBody(planBody, { stays: !!opts.stays, v4: true });
+  if (plan.error) return { error: `plan: ${plan.error}` };
+  const locks = {};
+  if (body.locks !== undefined) {
+    const l = body.locks;
+    if (!l || typeof l !== 'object' || Array.isArray(l) || Object.keys(l).length > 28 || !Object.entries(l).every(([k, v]) => TRIP_CHAT_KEY_RE.test(k) && Number.isInteger(v) && v > 0)) return { error: 'locks must map a stop slot to a venue id.' };
+    Object.assign(locks, l);
+  }
+  const removed = body.removed === undefined ? [] : body.removed;
+  if (!Array.isArray(removed) || removed.length > 28 || !removed.every((k) => typeof k === 'string' && TRIP_CHAT_KEY_RE.test(k))) return { error: 'removed must list stop slots.' };
+  const stops = body.stops;
+  if (!Array.isArray(stops) || stops.length > tripChat.MAX_STOPS || !stops.every((x) => x && typeof x === 'object' && !Array.isArray(x) && Object.keys(x).every((k) => ['key', 'id', 'start'].includes(k))
+    && TRIP_CHAT_KEY_RE.test(x.key || '') && Number.isInteger(x.id) && x.id > 0 && (x.start === undefined || x.start === null || (Number.isInteger(x.start) && x.start >= 0 && x.start < 1440)))) return { error: 'stops must list { key, id, start } for each stop on screen.' };
+  return { value: { message, chip, lang: body.lang === 'fr' ? 'fr' : 'en', args: plan.value, locks, removed: [...new Set(removed)], stops } };
+}
+// The stops on screen, named from our own database (the page sends only slots and ids): what the model and the
+// templates see. Stops whose place is gone are left out.
+function tripChatStops(list) {
+  const ids = [...new Set(list.map((x) => x.id))];
+  if (!ids.length) return [];
+  const rows = db.prepare(`SELECT id, name, type, price, kid_friendly, lake_view, patio, live_music, arts_culture, dog_friendly FROM venues WHERE redirect_to IS NULL AND id IN (${ids.map(() => '?').join(',')})`).all(...ids);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const out = [];
+  for (const x of list) {
+    const v = byId.get(x.id);
+    if (!v || out.some((o) => o.key === x.key)) continue;
+    const m = /^(\d)-(\w+)$/.exec(x.key);
+    const daypart = m ? m[2] : null;
+    const start = Number.isInteger(x.start) ? x.start : null;
+    const meal = ['restaurant', 'pub', 'cafe'].includes(v.type);
+    const role = m ? (daypart === 'midday' && meal ? 'lunch' : ['evening', 'night'].includes(daypart) && v.type !== 'cafe' && meal ? 'dinner' : '')
+      : (meal && start !== null && start >= 660 && start <= 870 ? 'lunch' : meal && v.type !== 'cafe' && start !== null && start >= 1020 ? 'dinner' : '');
+    out.push({ key: x.key, ref: `s${out.length + 1}`, id: v.id, name: v.name, type: v.type, price: Number(v.price) || null,
+      badges: ['kid_friendly', 'lake_view', 'patio', 'live_music', 'arts_culture', 'dog_friendly'].filter((b) => v[b] === 1), day: m ? Number(m[1]) : 1, start, role });
+  }
+  return out;
+}
+// Tests replace the model with a mock (no network): setTripChatReader(async (message, opts) => ({ ok, ops, cant })).
+let tripChatReader = null;
+function setTripChatReader(fn) { tripChatReader = typeof fn === 'function' ? fn : null; }
+async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
+  const regions = VALID_REGIONS.filter((r) => REGION_LABELS[r]);
+  const stops = tripChatStops(v.stops);
+  const days = Math.max(1, ...stops.map((s) => s.day));
+  const short = stops.length > 0 && stops.every((s) => /^it-/.test(s.key));
+  let ops = null, cant = null, source = 'rules', ai = null, what = null;
+  if (v.chip) { ops = tripChat.chipOps(v.chip); source = 'chip'; }
+  else if (tripChatReader || tripChat.apiKey()) {
+    try { ai = await (tripChatReader || tripChat.readChatMessage)(v.message, { stops, regions, regionLabels: REGION_LABELS, today: todayLocal(), lang }); } catch (e) { ai = { ok: false, reason: 'error' }; }
+    if (ai && ai.ok) { ops = ai.ops; cant = ai.cant; source = 'ai'; }
+  }
+  if (!ops) {
+    const r = tripChat.rulesRead(v.message, stops, { regions, regionLabels: REGION_LABELS, days });
+    ops = r.ops; cant = r.cant; what = r.what || null;
+    // Words no rule read go to the planner as typed when it can read them (a kind of food, an occasion...); else "Sorry,
+    // I didn't catch that". Never words that say no / not (the planner could read "no brewery" as "a brewery").
+    if (!ops.length && !cant) { if (tripChat.plannerCanRead(v.message)) ops = [{ o: 'refine', text: v.message, stops: [] }]; else cant = 'unclear'; }
+  }
+  const none = { remove: [], keep: [] };
+  if (!ops.length) {
+    const c = cant || 'unclear';
+    return { source, cant: c, plan: null, actions: none, response: { reply: tripChat.cantReply(c, lang, what), source, cant: c, plan: null, req: null, changed: [], actions: none, ...(ai && !ai.ok ? { fallback: ai.reason } : {}) } };
+  }
+  const out = tripChat.planTurn(ops, {
+    args: v.args, locks: v.locks, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS,
+    run: (a) => runTripPlanRequest({ text: a.text, seed: a.seed || 0, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: a.pinned || null, overrides: a.overrides || null, swap: a.swap || null, ...(a.stay ? { stay: a.stay } : {}), v4: true }, staysOn),
+  });
+  const reply = tripChat.buildReply(out, { lang, regionLabels: REGION_LABELS, cant });
+  return {
+    source, cant: null, plan: out.plan, actions: out.actions,
+    response: { reply, source, plan: out.plan || null, req: out.req || null, changed: out.changed || [], actions: out.actions, ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
+  };
+}
+
 // Every place to stay with a map location, its stay_info facts and what the "Where to stay" card shows.
 function tripStayCandidates() {
   let rows = [];
@@ -8337,6 +8439,13 @@ function tripStayCandidates() {
 // set the number of days. Then the plan gets its "whereToStay" block when a stay fits. Without inputs, the plan is
 // the same as runTripPlan's plus that block.
 const TRIP_DOG_WORDS_RE = /\b(?:dogs?|pups?|puppy|puppies|pooch|chiens?|chienne|toutous?)\b/i;
+// The planner exactly as POST /api/trip/plan runs it (deals, specials, French links, weekly nights; with the stays box,
+// the trip inputs and "Where to stay"). The travel agent chat (POST /api/trip/chat) plans through this too.
+function runTripPlanRequest(value, staysOn) {
+  return staysOn
+    ? runTripPlanWithStay(value, (a, n) => withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(a, n))))))
+    : withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(value)))));
+}
 function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
   const stay = args.stay || null;
   const base = { ...args };
@@ -48025,7 +48134,7 @@ function tripSamplePlan(now = Date.now()) {
 // ?region= from the town pages, campaign tags) is noindex, follow and canonical to /trip, so no new indexable page.
 const TRIP_PAGE_TITLE = 'Okanagan Trip Planner: Free Day-by-Day Itinerary | Okanagan Roam';
 const TRIP_PAGE_DESCRIPTION = 'Plan an Okanagan trip in one sentence: a free day-by-day itinerary for Kelowna, Penticton, Vernon and wine country, built from places open on your dates.';
-function renderTripPlannerV3Page({ preview = false, noindex = false, stays = null, viator: viatorOn = false, v4 = null } = {}) {
+function renderTripPlannerV3Page({ preview = false, noindex = false, stays = null, viator: viatorOn = false, v4 = null, chat = null } = {}) {
   if (!tripPlannerV3PageModule) return renderTripPlannerPage(isTripPlannerV2Enabled());
   const canonical = 'https://okanaganroam.com/trip';
   let tripTrayHtml = '';
@@ -48066,6 +48175,8 @@ function renderTripPlannerV3Page({ preview = false, noindex = false, stays = nul
     ...(stays && viatorOn ? { viator: true } : {}),
     // Build My Trip V4 (2026-11-20): 'preview' (/trip?v=4) or 'on' (TRIP_V4).
     ...(v4 ? { v4 } : {}),
+    // Travel agent chat (2026-11-22): 'preview' (/trip?chat=1) or 'on' (TRIP_CHAT), only on the V4 page.
+    ...(v4 && chat ? { chat } : {}),
   })));
 }
 // A business's type, for the Build My Trip funnel's booking kinds (tasting / table / other). Read only.
@@ -79367,13 +79478,39 @@ const server = http.createServer(async (req, res) => {
       // Weekly specials (2026-10-27): a stop on its special's day says so, added after planning like the deals.
       try {
         // Where to stay (2026-11-20): only with TRIP_STAYS or ?stays=1; otherwise exactly the plan as before.
-        const planResult = staysOn
-          ? runTripPlanWithStay(parsed.value, (a, n) => withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(a, n))))))
-          : withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(parsed.value)))));
+        const planResult = runTripPlanRequest(parsed.value, staysOn);
         // Stage 1 demand log: which businesses this plan showed (anonymous, never blocks the reply).
         try { req.__ip = requestClientIp(req); tripDemandLog.record(req, 'shown', tripDemand.collectVenueIds(planResult)); } catch (e) { /* logging must never break the planner */ }
         return sendJSON(res, 200, planResult);
       } catch (error) { if (error.code === 'TRIP_CONFLICT') return sendJSON(res, 409, {error:error.message}); throw error; }
+    }
+
+    // POST /api/trip/chat (2026-11-22, trip-chat.js): one travel agent chat turn. The page sends the message (or a chip),
+    // the request that made the plan on screen (the same fields as POST /api/trip/plan), the kept and removed stops and
+    // the stops on screen (slot + venue id + start). The stops' names and kinds come from our database. AI (or the word
+    // rules) reads the message into checked operations; the planner re-plans; the reply is a template.
+    if (pathname === '/api/trip/chat' && method === 'POST' && tripPlanApiEnabled() && tripChatEnabledFor(query)) {
+      let body;
+      try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      const lang = body && body.lang === 'fr' ? 'fr' : 'en';
+      const ip = requestClientIp(req);
+      if (tripChat.rateLimited(ip)) return sendJSON(res, 429, { error: 'Too many messages.', reply: tripChat.T[lang].busy });
+      const staysOn = tripStaysEnabledFor(query);
+      const parsed = parseTripChatBody(body, { stays: staysOn });
+      if (parsed.error) return sendJSON(res, 400, { error: parsed.error });
+      try {
+        const turn = await runTripChatTurn(parsed.value, { staysOn, lang });
+        const count = (k) => { try { siteEventCounter.record(req, `bmt:v4:chat:${k}`, ip); } catch (e) { /* counting never blocks */ } };
+        count(turn.source);
+        if (turn.cant) count('cant');
+        else if (!turn.plan && !turn.actions.remove.length && !turn.actions.keep.length) count('none');
+        if (turn.plan) { try { req.__ip = ip; tripDemandLog.record(req, 'shown', tripDemand.collectVenueIds(turn.plan)); } catch (e) { /* never blocks */ } }
+        res.setHeader('Cache-Control', 'no-store');
+        return sendJSON(res, 200, turn.response);
+      } catch (error) {
+        try { console.error('[trip-chat] turn failed:', error && error.message); } catch (e) { /* ignore */ }
+        return sendJSON(res, 200, { reply: tripChat.T[lang].error, source: 'error', plan: null, req: null, changed: [], actions: { remove: [], keep: [] } });
+      }
     }
 
     // GET /api/trip/viator?i=wine_tour,zipline&r=kelowna&lang=fr (2026-11-20, viator.js): up to 2 Viator suggestion cards
@@ -79414,7 +79551,8 @@ const server = http.createServer(async (req, res) => {
         // V4 (2026-11-20): the simple page holds the bookings, so it always has the stays box (on, or as a preview).
         const v4Mode = tripV4EnabledFor(query) ? (isTripV4Enabled() && String(query.v || '') !== '4' ? 'on' : 'preview') : null;
         const staysMode = isTripStaysEnabled() ? 'on' : (tripStaysEnabledFor(query) || v4Mode) ? 'preview' : null;
-        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview', noindex: tripHasQuery, stays: staysMode, ...(staysMode && viator.enabled() ? { viator: true } : {}), ...(v4Mode ? { v4: v4Mode } : {}) });
+        const chatMode = v4Mode && tripChatEnabledFor(query) ? (isTripChatEnabled() && String(query.chat || '') !== '1' ? 'on' : 'preview') : null;
+        const html = renderTripPlannerV3Page({ preview: tripPlannerV3Mode() === 'preview', noindex: tripHasQuery, stays: staysMode, ...(staysMode && viator.enabled() ? { viator: true } : {}), ...(v4Mode ? { v4: v4Mode } : {}), ...(chatMode ? { chat: chatMode } : {}) });
         // "See live prices" (2026-11-20): only this page, only with stays on and Stay22 set up, may frame Stay22's map.
         if (staysMode && placesToStay.affiliateConfig().provider === 'stay22') res.setHeader('Content-Security-Policy', TRIP_STAYS_CSP);
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -81377,6 +81515,8 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  // Travel agent chat (2026-11-22), for tests/trip-chat-api.test.js.
+  parseTripChatBody, tripChatStops, setTripChatReader, runTripChatTurn, runTripPlanRequest, tripChatEnabledFor,
   clearVenueOwnerFeaturesCache, sportPriceLineCounts, happyHourHiddenNow, indoorLowestTyped, sportPracticeKept, golfOnSiteFood, tripOwnerClosureNotes,
   // Places to stay (2026-11-19), for tests/stays.test.js.
   getStaysByRegion, findStayBySlug, handleStaysRoute, getStayCloseBy, withStaysNavLink, getStayInfo, guardedStayInfoUpsert, venueActivityCounter,

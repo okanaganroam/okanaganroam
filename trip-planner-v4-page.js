@@ -544,7 +544,8 @@ const V4_CLIENT_SRC = String.raw`
     // Round 2: Save says Saved when every stop of this plan is already in My Trip (after a reload too).
     try { if (!v4.saved && addState().state === 'added') v4.saved = true; } catch (err) {}
     bar.setAttribute('aria-label', v4.confirmed ? vt('book') : vt('confirm'));
-    bar.innerHTML = v4BarHtml();
+    // The travel agent chat (trip-chat-page.js, only with d.chat) keeps its own part of the bar; the rest is redrawn.
+    (typeof v4ChatMount === 'function' ? v4ChatMount(bar) : bar).innerHTML = v4BarHtml();
     var tip = resultEl.querySelector('.v4-tip:not(.v4-picked)'); if (tip) tip.textContent = v4.confirmed ? (canBookNow ? vt('tipDone') : vt('tipNoBook')) : vt('tip');
     var plan = resultEl.querySelector('.v4'); if (plan) plan.classList.toggle('v4-confirmed', v4.confirmed);
     document.body.style.paddingBottom = bar.offsetHeight ? bar.offsetHeight + 'px' : '';
