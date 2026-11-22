@@ -449,7 +449,7 @@ function approvedMatches(csvRows, today = new Date().toISOString().slice(0, 10))
 
 module.exports = {
   API_BASE, MCID, CACHE_MS, FAIL_CACHE_MS, TEXT, DISCLOSURE, INTERESTS, MATCH_COLUMNS,
-  config, enabled, isViatorUrl, affiliateUrl,
+  config, enabled, isViatorUrl, affiliateUrl, venueMatch,
   request, freetext, searchProducts, productDetails, destinations, freetextBody, productSearchBody,
   pickPhoto, durationMinutes, toCard,
   siteInterests, requestInterests, interestCovered, planRegion, loadDestinations, destinationFor, tripHint, tripCards, clearCache,

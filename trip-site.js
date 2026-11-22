@@ -12,6 +12,9 @@ module.exports = {
   areaShort: 'Okanagan',
   areaPossessive: 'the Okanagan’s',
   coverage: 'the Okanagan Valley',
+  coverageFr: 'la vallée de l’Okanagan',
+  // The sister site, named when a request asks for a place it covers (never a link we get paid for).
+  sister: { brand: 'Whistler Roam', host: 'whistlerroam.com', url: 'https://whistlerroam.com/trip', places: ['Whistler', 'Squamish', 'Pemberton'] },
   stretchName: 'the valley', // "one stretch of the valley each day"
   timeName: 'Okanagan', // "(Okanagan time)"
   exampleTowns: 'Kelowna, Penticton or Vernon',

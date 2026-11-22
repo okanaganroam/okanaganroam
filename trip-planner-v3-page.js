@@ -1188,7 +1188,7 @@ const T3_STAY_CLIENT_SRC = `
     var prefilled = (s.bookingLinks || []).some(function(l){ return l && l.key !== 'own' && t3StayExt(l.url); });
     var bits = [];
     if (prefilled && !t.datesGiven) bits.push(fr ? 'Dates selon votre plan; modifiables sur le site de réservation.' : 'Dates follow your plan; change them on the booking site.');
-    if (prefilled && t.kids) bits.push(fr ? 'Le site demande l’âge des enfants.' : 'The booking site asks for the kids’ ages.');
+    if (prefilled && t.kids && !(t.kidAges && t.kidAges.length === t.kids)) bits.push(fr ? 'Le site demande l’âge des enfants.' : 'The booking site asks for the kids’ ages.');
     if (s.petsSome) bits.push(fr ? 'Animaux dans certaines chambres : à vérifier.' : 'Pets in some rooms: check when booking.');
     if (bits.length) html = '<p class="t3-book-note">' + esc(bits.join(' ')) + '</p>';
     return html;

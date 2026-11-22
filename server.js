@@ -8675,7 +8675,10 @@ function tripPlanBeforeStays(args, run = runTripPlan, now = new Date()) {
   // V4 (round 2, 2026-11-21: "3 days" with Aug 10-13 became a 4-day plan): a length the request names wins over the dates.
   // Round 3: only a number of days ("3 days", « 3 jours »); "a weekend" Fri-Sun still covers Sunday.
   const typedDays = !!(args.v4 && plan && plan.intent && Number.isInteger(plan.intent.days) && plan.intent.days > 0 && /\b(?:\d+|one|two|three|four|five|six|seven|un|deux|trois|quatre|cinq|six|sept)\s*(?:-\s*)?(?:days?|jours?|journ[ée]es?)\b/i.test(String(args.text || '')));
-  if (stay && stay.arrive && stay.leave && plan && !typedDays && ['multi_day', 'day_plan'].includes(plan.kind) && !(base.overrides && base.overrides.days !== undefined)) {
+  // Round 3 (V4; "girls' trip: spa, cocktails, shopping" with Dec 4-6 was a two-stop outing): with dates over a night or
+  // more, a short outing or a list becomes the days of the stay too.
+  const v4Nights = !!(args.v4 && stay && stay.arrive && stay.leave && stay.leave > stay.arrive && plan && ['itinerary', 'outing', 'discover', 'recommendations'].includes(plan.kind) && !args.swap);
+  if (stay && stay.arrive && stay.leave && plan && !typedDays && (['multi_day', 'day_plan'].includes(plan.kind) || v4Nights) && !(base.overrides && base.overrides.days !== undefined)) {
     const want = Math.min(7, tripStays.daysBetween(stay.arrive, stay.leave) + 1);
     if (want !== ((plan.days || []).length || 1)) {
       try { const longer = run({ ...base, overrides: { ...(base.overrides || {}), days: want } }, now); if (longer && ['multi_day', 'day_plan'].includes(longer.kind)) plan = longer; } catch (e) { /* keep the plan as asked */ }
@@ -8687,6 +8690,7 @@ const TRIP_STAY_AMENITY_WORDS = { pool: 'a place to stay with a pool', hot_tub: 
 // "no driving after wineries", "a designated driver", "we don't want to drive": a wine tour before a rental car.
 const TRIP_NO_DRIVE_RE = /\b(?:no driving|not driving|don'?t (?:want to )?drive|without driving|designated driver|no one (?:wants to )?drive|pas de conduite|sans conduire|ne (?:veut|voulons) pas conduire)\b/i;
 // "coming from Vancouver", "driving up from Calgary", "road trip": they have a car, so no "Rent a car" (2026-11-22).
+const TRIP_NO_CAR_RE = /\b(?:no car|without (?:a |our |my )?car|(?:don['’]?t|do not) (?:have|own) (?:a |our |my )?car|car[- ]free|no vehicle|(?:don['’]?t|do not) drive|(?:coming|arriving|travell?ing|getting there|going) by (?:bus|coach|shuttle|train)|sans (?:voiture|auto)|pas de voiture|pas d['’]auto|en autobus|en autocar)\b/i;
 const TRIP_DRIVING_IN_RE = /\b(?:(?:driving|drive|road ?trip(?:ping)?|coming|travell?ing|heading)\s+(?:up |in |down |over |out )?from|our own car|bringing (?:our|the) car|road ?trip|en voiture|on arrive de|venant de)\b/i;
 function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stayList = null) {
   if (!plan || typeof plan !== 'object') return plan;
@@ -8756,11 +8760,14 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
     if (v4 && fever.enabled()) fever.withTripSteps(plan);
     // "Getting here" (2026-11-21, getting-here.js): a "Rent a car" step for a plan over 2+ towns or days (DISCOVERCARS_AID set).
     const drivingIn = TRIP_DRIVING_IN_RE.test(String(text || ''));
-    if (v4 && gettingHere.enabled() && !drivingIn) gettingHere.withTripStep(plan, stay);
+    // Round 3: no car (the request says so, or the plan was made for one): no "Rent a car" step and no rental on the card.
+    const noCarTrip = !!(plan && plan.noCar) || TRIP_NO_CAR_RE.test(String(text || ''));
+    if (v4 && gettingHere.enabled() && !drivingIn && !noCarTrip) gettingHere.withTripStep(plan, stay);
     // The travel agent chat's "Getting here" card (2026-11-22): the data only; the page shows it in chat mode only.
     if (v4) {
       const gh = gettingHere.tripCard(plan, stay);
       if (gh && drivingIn) { gh.driving = true; gh.car = null; gh.carLabel = null; }
+      if (gh && noCarTrip) { gh.noCar = true; gh.car = null; gh.carLabel = null; }
       if (gh) {
         // No driving (wine days): the wine tour first, the rental car after it.
         if (TRIP_NO_DRIVE_RE.test(String(text || ''))) { gh.noDrive = true; if (plan.__wineTour) gh.wineTour = { name: plan.__wineTour.name, nameFr: plan.__wineTour.nameFr, url: plan.__wineTour.url, label: plan.__wineTour.label, labelFr: plan.__wineTour.labelFr }; }
@@ -8779,6 +8786,7 @@ function tripBookingChecklist(plan) {
   const stops = Array.isArray(plan.days) && plan.days.length ? plan.days.flatMap((d) => (d && d.stops) || [])
     : ((plan.itinerary && plan.itinerary.stops) || (plan.outing && plan.outing.stops) || []);
   const out = [], seen = new Set();
+  const kidsTrip = !!(plan && ((plan.intent && ((plan.intent.party && plan.intent.party.kids) || plan.intent.occasion === 'family')) || ((plan.understood && plan.understood.party) || []).some((x) => /kid|child|famil/i.test(String(x)))));
   const key = (u) => String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#]+$/, '');
   for (const s of stops) {
     const id = s && s.venue && s.venue.id;
@@ -8794,9 +8802,16 @@ function tripBookingChecklist(plan) {
         : /^https:\/\/[^\s"'<>]+$/i.test(String(visit.booking_url || '').trim()) ? String(visit.booking_url).trim() : null;
       // Viator (2026-11-20, owner decision): a venue with an approved Viator match books through Viator (its own link or
       // not); viator.checklistItem leaves every other venue as it was.
-      if (!url && !viator.venueBooking(id)) continue;
+      // Round 3 (2026-11-22; "Adult Kart Drop In Race" on a plan with kids 6 and 9): with kids, a Viator product that says
+      // it is for adults is not offered; the place's own booking link stays when it has one.
+      const vm = kidsTrip ? viator.venueMatch(id) : null;
+      const adultProduct = !!(vm && /\badults?\b/i.test(`${vm.title || ''} ${String(vm.url || '').split('?')[0].replace(/[-_/]+/g, ' ')}`) && !/\b(?:kids?|child\w*|famil\w*|junior|youth|all ages)\b/i.test(String(vm.title || '')));
+      if (!url && (adultProduct || !viator.venueBooking(id))) continue;
       const [en, fr] = !url ? ['', ''] : url === own ? indoorBookButton(v, own) : [visit.booking_label || VISIT_BOOK_LABELS[v.type] || 'Book', visitBookLabelFr(visit, v.type)];
-      out.push(viator.checklistItem({ venueId: id, name: v.name, url, label: en, labelFr: fr }));
+      // Round 3: a waiver is not a booking ("Sign the waiver" was the climbing gym's Book step).
+      if (url && /\b(?:waivers?|d[ée]charge)\b/i.test(`${en} ${url}`) && !viator.venueBooking(id)) continue;
+      const item = { venueId: id, name: v.name, url, label: en, labelFr: fr };
+      out.push(adultProduct ? item : viator.checklistItem(item));
     } catch (e) { /* skip this stop */ }
   }
   return out;
@@ -8967,6 +8982,7 @@ function selectTripEvents(component, regions, when, now = new Date(), excluded =
     items: events.slice(0, 40).map((e) => ({
       id: e.id, name: e.name, description: e.description || '', region: e.region, venueName: e.venueName || '', url: discoveryEventUrl(e), valleyWide: !!e.valleyWide,
       categories: e.categories || [], dateLabel: e.dateLabel || '', time: e.time || '', startDate: e.startDate || null,
+      ...(tripEventPhoto(e) ? { photo: tripEventPhoto(e) } : {}), // round 3: the event's own photo on its stop
       endDate: e.endDate || null, // a multi-day run's last day, for the attendance date
       startTime: e.firstOccurrence?.start_time || null, endTime: e.firstOccurrence?.end_time || null, endsNextDay: e.firstOccurrence?.ends_next_day || 0, location: tripEventLocation(e, locationCandidates),
     })),
@@ -8984,6 +9000,7 @@ function tripEventOccurrenceItems(events, from, to) {
     const base = {
       id: e.id, name: e.name, description: e.description || '', region: e.region, regionLabel: REGION_LABELS[e.region], venueName: e.venueName || '', url: discoveryEventUrl(e), valleyWide: !!e.valleyWide,
       categories: e.categories || [], dateLabel: e.dateLabel || '', location,
+      ...(tripEventPhoto(e) ? { photo: tripEventPhoto(e) } : {}),
     };
     const occs = occStmt.all(e.id, from, to).map(rowToEventOccurrence);
     if (!occs.length) { out.push({ ...base, time: e.time || '', startDate: e.startDate || null, endDate: e.endDate || null, startTime: e.firstOccurrence?.start_time || null, endTime: e.firstOccurrence?.end_time || null, endsNextDay: e.firstOccurrence?.ends_next_day || 0 }); continue; }
@@ -9052,7 +9069,11 @@ function runTripPlan(args, now = new Date()) {
   if (typeof a.text === 'string') { const n = v4NightsText(a.text); if (n) a = { ...a, text: n.text, departureLast: true }; }
   let sunsetDinner = null;
   try { sunsetDinner = v4SunsetDinner(a, now); if (sunsetDinner) a = { ...a, text: sunsetDinner.text }; } catch (e) { sunsetDinner = null; }
-  let plan = runTripPlanBase(a, now);
+  // Round 3 (2026-11-22): "one day in Osoyoos with a spa and a nice dinner" was one stop (dinner) and "one day in Squamish,
+  // hiking and a brewery" two stops ending at noon: a request for a day is a day plan (lunch, dinner, the day filled),
+  // not only the stops it names. An evening, an afternoon or a morning stays a short outing.
+  if (typeof a.text === 'string' && V4_DAY_ASKED_RE.test(a.text) && !V4_PART_OF_DAY_RE.test(a.text) && !(a.overrides && a.overrides.days)) a = { ...a, v4DayAsked: true };
+  let plan = a.v4DayAsked ? v4DayPlanFirst(a, now) : runTripPlanBase(a, now);
   // Round 2 fresh eyes: a kind of place asked for that the town does not list at all ("spa" in Osoyoos) is said up front
   // (plan.notIncluded) and the days are planned without it, rather than left half empty waiting for it.
   try {
@@ -9063,10 +9084,10 @@ function runTripPlan(args, now = new Date()) {
       let t = a.text;
       for (const n of none) { const re = TR.KINDS[n.kind]; if (re) t = t.replace(new RegExp(`(?:,?\\s*(?:and|et|with|avec|plus)\\s+)?(?:an?\\s+|some\\s+|un\\s+|une\\s+|the\\s+)?(?:${re.source})(?:\\s+(?:days?|visits?|time|treatments?))?`, 'gi'), ' '); }
       t = t.replace(/\s{2,}/g, ' ').replace(/\s+,/g, ',').replace(/,\s*,/g, ',').trim();
-      const stopsOf = (p) => ((p && p.days) || []).reduce((k, d) => k + (d.stops || []).filter((x) => x && (x.venue || x.event)).length, 0);
+      const stopsOf = v4StopCount;
       if (t && t !== a.text) {
-        const retry = runTripPlanBase({ ...a, text: t }, now);
-        if (retry && retry.kind === plan.kind && stopsOf(retry) > stopsOf(plan)) { retry.notIncluded = plan.notIncluded; retry.query = plan.query; plan = retry; }
+        const retry = a.v4DayAsked ? v4DayPlanFirst({ ...a, text: t }, now) : runTripPlanBase({ ...a, text: t }, now);
+        if (retry && (retry.kind === plan.kind || a.v4DayAsked) && stopsOf(retry) > stopsOf(plan)) { retry.notIncluded = plan.notIncluded; retry.query = plan.query; plan = retry; }
       }
     }
   } catch (e) { /* keep the plan as planned */ }
@@ -9080,16 +9101,77 @@ function runTripPlan(args, now = new Date()) {
     const listAsked = /\b(?:ideas?|list|places|spots|options|best|recommend\w*|suggest\w*|where (?:to|can|should)|which)\b/i.test(String(a.text || ''));
     const dayAsked = /\b(?:rainy|rain|wet)\s+day\b|\bday\s+(?:out|trip)\b|\bjourn[ée]e\s+(?:de\s+pluie|pluvieuse)\b/i.test(String(a.text || ''));
     const want = V4_WHEN_DAYS[preset] && (!focus || !listAsked) ? V4_WHEN_DAYS[preset] : (dayAsked && !listAsked ? 1 : 0);
-    if (plan && ['discover', 'recommendations'].includes(plan.kind) && want && !(focus && listAsked) && !(a.overrides && a.overrides.days)) {
-      const longer = runTripPlanBase({ ...a, overrides: { ...(a.overrides || {}), days: want } }, now);
+    // Round 3: a request too vague to plan ("something fun", "skiing in July") is a one-day plan too, never the old list
+    // page; the plan says which town we picked and what is not part of it.
+    const vague = !listAsked ? 1 : 0;
+    if (plan && ['discover', 'recommendations'].includes(plan.kind) && (want || vague) && !(focus && listAsked) && !(a.overrides && a.overrides.days)) {
+      const longer = runTripPlanBase({ ...a, overrides: { ...(a.overrides || {}), days: want || vague } }, now);
       if (longer && ['multi_day', 'day_plan'].includes(longer.kind) && (longer.days || []).length) plan = longer;
     }
   } catch (e) { /* keep the list */ }
   try { v4TidyDays(plan); } catch (e) { /* keep the plan as planned */ }
   try { if (plan && !plan.notIncluded) v4NotIncluded(plan); } catch (e) { /* the notes stay in the warnings */ }
+  try { v4UpFront(plan); } catch (e) { /* the notes stay where they were */ }
+  // Round 3: a day the request names ("next Saturday") is shown as its date on the plan's days when no dates were picked.
+  try {
+    const wd = plan && plan.intent && plan.intent.when && plan.intent.when.weekday;
+    const days = (plan && plan.days) || [];
+    if (wd && days.length && !days.some((d) => d.date) && ['multi_day', 'day_plan'].includes(plan.kind)) {
+      const want = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(String(wd).toLowerCase());
+      if (want >= 0) {
+        const today = todayLocal(now);
+        const first = addLocalDays(today, ((want - localWeekday(today) + 7) % 7) || 7);
+        days.forEach((d, i) => { d.date = addLocalDays(first, i); });
+        plan.plannedFrom = first;
+      }
+    }
+  } catch (e) { /* the weekday stays in the notes */ }
   try { v4DropAfterDark(plan); } catch (e) { /* keep the plan as planned */ }
   try { v4AddStopPhones(plan); } catch (e) { /* phones are a convenience */ }
   return plan;
+}
+const V4_DAY_ASKED_RE = /\b(?:one|a|1|full|whole|single)[ -]day\b(?! (?:trip|tour|pass|ticket|hike|spa)s?\b)|\bday in\b|\b(?:une|1) journ[ée]e\b/i;
+const V4_PART_OF_DAY_RE = /\b(?:tonight|evenings?|nights?|afternoons?|mornings?|ce soir|soir[ée]e|apr[èe]s-midi|matin[ée]?e?)\b/i;
+function v4StopCount(p) {
+  if (!p) return 0;
+  const lists = (p.days || []).map((d) => d.stops || []).concat([(p.itinerary && p.itinerary.stops) || [], (p.outing && p.outing.stops) || []]);
+  return lists.reduce((k, l) => k + l.filter((x) => x && (x.venue || x.event)).length, 0);
+}
+function v4DayPlanFirst(a, now) {
+  let day = null;
+  try { day = runTripPlanBase({ ...a, overrides: { ...(a.overrides || {}), days: 1 } }, now); } catch (e) { if (e && e.code === 'TRIP_CONFLICT') throw e; day = null; }
+  if (day && ['day_plan', 'multi_day'].includes(day.kind) && v4StopCount(day) >= 2) return day;
+  const plain = runTripPlanBase({ ...a, v4DayAsked: false }, now);
+  return day && ['day_plan', 'multi_day'].includes(day.kind) && v4StopCount(day) > v4StopCount(plain) ? day : plain;
+}
+// Round 3: the lines a visitor must see first, not inside "More options and notes": a place we do not cover (with the
+// sister site when it does), and something asked for that is out of season. They join plan.notIncluded (each with text
+// and textFr) and leave the notes.
+function v4UpFront(plan) {
+  if (!plan || !Array.isArray(plan.notes)) return;
+  const add = [];
+  const sister = TRIP_SITE.sister || null;
+  const keep = [];
+  for (const n of plan.notes) {
+    const out = /^.+? only covers .+?, so (.+?) (?:isn’t|aren’t) included\./.exec(String(n));
+    if (out) {
+      const places = out[1];
+      const there = sister ? (sister.places || []).filter((p) => new RegExp(`\\b${p}\\b`, 'i').test(places)) : [];
+      const more = there.length ? { en: ` For ${there.join(' and ')}, see ${sister.host}.`, fr: ` Pour ${there.join(' et ')}, voyez ${sister.host}.` } : { en: '', fr: '' };
+      add.push({ kind: 'place', label: places, reason: 'not_covered', town: null, nearest: null, ...(there.length ? { sister: { name: sister.brand, url: sister.url } } : {}),
+        text: `We only cover ${TRIP_SITE.coverage}, so ${places} isn’t in this plan.${more.en}`, textFr: `Nous couvrons seulement ${TRIP_SITE.coverageFr || TRIP_SITE.coverage} : ${places} n’est pas dans ce plan.${more.fr}` });
+      continue;
+    }
+    if (/(?:isn’t|aren’t) part of this \w+ plan\b/.test(String(n))) {
+      add.push({ kind: 'season', label: 'season', reason: 'out_of_season', town: null, nearest: null, text: `${String(n).split(';')[0].replace(/\.$/, '')}.` });
+      continue;
+    }
+    keep.push(n);
+  }
+  if (!add.length) return;
+  plan.notes = keep;
+  if (Array.isArray(plan.contextNotes)) plan.contextNotes = plan.contextNotes.filter((n) => keep.includes(n));
+  plan.notIncluded = add.concat(plan.notIncluded || []);
 }
 const V4_NIGHT_WORDS = { a: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5 };
 function v4NightsText(text) {
@@ -9112,19 +9194,38 @@ function v4NotIncluded(plan) {
   const town = towns.length ? (towns.length > 1 ? `${towns.slice(0, -1).join(', ')} or ${towns[towns.length - 1]}` : towns[0]) : null;
   const warned = (plan.warnings || []).join(' \n ');
   const out = [];
+  // Round 3 (2026-11-22; "✓ All 5 of your requests matched a listing" on a plan with no shop): a kind of place asked for
+  // counts as matched only when a stop of that kind is in the plan (the place's own facts decide, never a guess).
+  try {
+    const stops = (plan.days || []).flatMap((d) => d.stops || []).concat((plan.itinerary && plan.itinerary.stops) || [], (plan.outing && plan.outing.stops) || []).filter((x) => x && x.venue && x.venue.id);
+    if (stops.length && ['multi_day', 'day_plan', 'itinerary', 'outing'].includes(plan.kind)) {
+      const rows = stops.map((x) => { const v = getVenue(x.venue.id); if (!v) return null; let kinds = []; try { const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; kinds = TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); } catch (e) { kinds = []; } return { type: v.type, planType: x.venue.type, kinds }; }).filter(Boolean);
+      for (const r of plan.requirementResults) {
+        if (!r || r.status !== 'satisfied' || r.strength !== 'must' || r.dayIndex) continue;
+        const has = r.kind === 'type' ? rows.some((x) => x.type === r.value || x.planType === r.value || (r.value === 'restaurant' && ['restaurant', 'pub', 'cafe'].includes(x.type)) || (['outdoor', 'tour', 'indoor', 'breakfast'].includes(r.value)))
+          : r.kind === 'venue_kind' ? rows.some((x) => (r.value === 'shopping' ? x.type === 'shop' : x.kinds.includes(r.value))) || !['spa', 'shopping', 'bowling', 'cinema', 'museum', 'gallery', 'escape', 'arcade', 'climbing', 'pool', 'casino', 'evening_fun'].includes(r.value) : true;
+        if (!has) { r.status = 'unmet'; r.reason = 'Not in this plan.'; }
+      }
+    }
+  } catch (e) { /* the planner's own results stand */ }
   for (const r of plan.requirementResults) {
     if (!r || r.status !== 'unmet' || r.strength !== 'must' || !['venue_kind', 'type'].includes(r.kind)) continue;
     const label = r.kind === 'venue_kind' ? (TR.LABELS[r.value] || String(r.value).replace(/_/g, ' ')) : (V4_TYPE_WORDS[r.value] || String(r.value));
     if (out.some((x) => x.label === label)) continue;
-    const noneListed = new RegExp(`Nothing matching ${label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}s? was available`, 'i').test(warned);
-    const alt = (r.optionalAlternatives || []).find((x) => x && x.reasonCode === 'different_region' && x.name);
+    const lre = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const noneListed = new RegExp(`Nothing matching ${lre}s? was available|No ${lre}s? matched in `, 'i').test(warned);
+    // (Round 3: "the nearest is Alpine Burger Co." for a sleigh ride: only a place that is that kind by its own facts.)
+    const ofKind = (x) => { if (r.kind !== 'venue_kind') return true; try { const v = getVenue(x.id); if (!v) return false; const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; return ['restaurant', 'cafe', 'pub'].includes(v.type) ? false : TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }).includes(r.value); } catch (e) { return false; } };
+    const alt = r.value === 'shopping' ? null : (r.optionalAlternatives || []).find((x) => x && x.reasonCode === 'different_region' && x.name && ofKind(x));
     const nearest = alt ? { id: alt.id, name: alt.name, region: alt.region, regionLabel: REGION_LABELS[alt.region] || alt.region, url: alt.url, ...(alt.urlFr ? { urlFr: alt.urlFr } : {}) } : null;
-    const an = /^[aeiou]/i.test(label) ? 'an' : 'a';
-    const text = (noneListed && town ? `There’s no ${label} listed in ${town}, so this plan has none.` : `I couldn’t fit ${an} ${label} into this plan.`) + (nearest ? ` The nearest is ${nearest.name} in ${nearest.regionLabel}.` : '');
+    const an = /(?:ing|s)$/.test(label) ? '' : /^[aeiou]/i.test(label) ? 'an ' : 'a ';
+    const text = (noneListed && town ? `There’s no ${label} listed in ${town}, so this plan has none.` : `I couldn’t fit ${an}${label} into this plan.`) + (nearest ? ` The nearest is ${nearest.name} in ${nearest.regionLabel}.` : '');
     out.push({ kind: r.value, label, reason: noneListed ? 'none_listed' : 'not_fitted', town, nearest, text });
   }
   if (out.length) plan.notIncluded = out;
 }
+// An event's own photo (its What's On image), only a site path or an https URL.
+function tripEventPhoto(e) { const u = e && (e.image || e.image_url); return typeof u === 'string' && /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(u.trim()) ? u.trim() : null; }
 function v4AddStopPhones(plan) {
   const ids = new Set();
   const visit = (s) => { if (s && s.venue && Number.isInteger(s.venue.id)) ids.add(s.venue.id); };
@@ -10257,6 +10358,7 @@ function tripSportPlannerType(v) {
   return null;
 }
 let tripShortNamesCache = null;
+const TRIP_OUTSIDE_WORDS = new Set((discoveryIntentModule().OUTSIDE_PLACE_NAMES || []).map((x) => String(x).toLowerCase().split(' ')[0]));
 function tripFullVenueNames(text, taxonomy) {
   const venues = (taxonomy && taxonomy.venues) || [];
   if (!tripShortNamesCache || tripShortNamesCache.n !== venues.length) {
@@ -10293,6 +10395,8 @@ function tripFullVenueNames(text, taxonomy) {
       // Four-letter names count when the name is that word alone or with a generic word ("Tuba", "Arfa Park").
       const shortName = norm(String(v.name).replace(/\([^)]*\)/g, ' ')).replace(/^the /, '').split(' ').filter(Boolean);
       if ((w.length < 5 && !(w.length === 4 && (shortName.length === 1 || (shortName.length === 2 && /^(?:park|cafe|bar|pub|grill|trail|lake|beach)$/.test(shortName[1]))))) || /\d/.test(w) || COMMON.has(w) || (firstCount.get(w) || 0) + (firstCount.get(`the ${w}`) || 0) > 1 || tokenCount.get(w) !== 1) continue;
+      // Round 3 ("a trip to Vancouver" planned Vancouver Pizza Kitchen's town): a place we do not cover is never a listing's short name.
+      if (TRIP_OUTSIDE_WORDS.has(w)) continue;
       oneWord.push({ word: w, full: v.name, fullNorm: norm(v.name) });
     }
     tripShortNamesCache = { n: venues.length, list, norm, oneWord };
@@ -10899,7 +11003,7 @@ function lateAfterMinutes(text) {
 const TEAM_BUILDING_WORDS_RE = /\bteam[\s-]?building(?:\s+(?:activit(?:y|ies)|events?|ideas?|outings?|days?|nights?|games?|exercises?|experiences?|venues?|places?|spots?|fun|things to do))+\b|\bteambuilding\b/gi;
 const TRIP_SWIM_OFF_MONTHS = [11, 12, 1, 2, 3, 4];
 const TRIP_SIM_GOLF_RE = /\b(?:indoor )?(?:golf simulators?|golf sims?|sim golf|simulator golf|virtual golf|golf lounges?|indoor golf (?:simulators?|lounges?|centres?|centers?))\b/gi;
-function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null, v4 = false, departureDate = null, departureLast = false }, now = new Date()) {
+function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null, v4 = false, departureDate = null, departureLast = false, v4DayAsked = false }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   // 2026-11-05: trip-length, clock-time, holiday-weekend and tour wording made plain; a beer, cider or distillery "tour" is a run of
   // breweries, cideries or distilleries. (planText is the French layer's own text; planTextPlain is what the planner reads.)
@@ -11082,7 +11186,8 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   if (false && intent.mode === 'events' && (intent.days > 1 || /\bweekend\b/i.test(interpretationText)) && ((intent.types || []).length || (intent.activities || []).length || /\b(?:cafes?|hikes?|hiking|walks?|restaurants?|beaches?)\b/i.test(interpretationText))) { intent.mode = 'plan'; if (!intent.days) intent.days = 2; }
   // "Weekend in Squamish in May, we like markets, cafes and easy hikes" (2026-10-25): a trip of several days with interests
   // listed is planned day by day around them, not as one day's stops (it became one November day around an event).
-  if (trip.multi && intent.days > 1 && !trip.route && !trip.components.some((c) => c.meal || c.daypart || c.venueId || (c.kind === 'event' && c.event && c.event.kind !== 'market'))) trip = { ...trip, multi: false };
+  // (Round 3, V4: "one day in Squamish, hiking and a brewery" is a day with those in it, the same way.)
+  if (trip.multi && (intent.days > 1 || (v4DayAsked && (intent.days === 1 || (overrides && overrides.days === 1)))) && !trip.route && !trip.components.some((c) => c.meal || c.daypart || c.venueId || (c.kind === 'event' && c.event && c.event.kind !== 'market'))) trip = { ...trip, multi: false };
   // "Camping and hiking in Whistler" (2026-10-25) is a day around a campground (the day planner sets up camp), not two
   // parts that both picked a summit hike for the morning.
   if (trip.multi && /\b(?:camping|campground|campsite|tenting)\b/i.test(interpretationText) && !trip.components.some((c) => c.kind === 'event' || c.meal) && !trip.route) trip = { ...trip, multi: false };
@@ -11269,6 +11374,9 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     }
   }
   if (trip.explicitStops && requirements?.items.some(i=>i.kind==='days'&&i.value>1)) trip.multi=false;
+  // Round 3 (V4): the days of a stay, or "one day in …", make a request with parts ("spa, cocktails, shopping"; "hiking and
+  // a brewery") a day-by-day plan with those in it (lunch, dinner, the day filled), not only the stops it names.
+  if (v4 && trip.multi && !trip.route && overrides && overrides.days !== undefined && (overrides.days > 1 || v4DayAsked) && !trip.components.some((c) => c.venueId || c.kind === 'event')) { trip.multi = false; intent.mode = 'plan'; intent.days = overrides.days; }
   // 2026-11-05: dates that span several days ("June 12 to June 16", "arriving Dec 20, leaving Dec 27") are a trip of that
   // length even with no "N days" in the request; "June 12 to June 16, wineries and beaches" was a two-stop outing, and
   // "from July 3 until the 9th, Penticton and Naramata" an Ideas list.
@@ -11474,7 +11582,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
       clock: rolledWindow ? null : okanaganClock(now),
       tripDate: rolledWindow ? requirements.startDate : (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now),
       kidAges: tripKidAges, askText: tripAskText,
-      ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}) } : {}),
+      ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}), ...(v4DayAsked && overrides && overrides.days === 1 ? { v4DayPlan: true } : {}) } : {}),
     });
     tripApplyHappyHourParts(plan, hhParts);
     plan.seeAll = null;
@@ -11526,7 +11634,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     holidayEvents: !!holidayEvents,
     tripDate: requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now) || tripPlanDate(intent.when, now),
     kidAges: tripKidAges, askText: tripAskText,
-    ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}) } : {}),
+    ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}), ...(v4DayAsked && overrides && overrides.days === 1 ? { v4DayPlan: true } : {}) } : {}),
     startWeekday: requirements?.startDate ? localWeekdayKey(requirements.startDate) : tripStartWeekday(intent.when, now),
     clock: rolledWindow ? null : okanaganClock(now),
   });

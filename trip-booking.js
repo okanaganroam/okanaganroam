@@ -106,7 +106,8 @@ function tripEstimate(plan, card, trip, cfg = CONFIG) {
   const known = Number.isInteger(t.adults) && t.adults > 0;
   const kids = Number.isInteger(t.kids) && t.kids > 0 ? t.kids : 0;
   // Party not given: two people, said on the box ("for 2 people") -- the same default the booking sites use.
-  const people = known ? t.adults + kids : 2;
+  // Round 3: kids named with no adult count ("two kids, 7 and 10") are 2 adults plus the kids, never "for 2 people".
+  const people = known ? t.adults + kids : 2 + kids;
   const sums = {};
   const unknown = [];
   let pricedPaid = 0, unpricedPaid = 0;
