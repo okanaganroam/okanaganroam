@@ -1125,12 +1125,20 @@ function kidsKitchenOk(v,text){
   if(!m)return true;
   return ((Number(m[1])%12)+(/^p/i.test(m[3])?12:0))*60+Number(m[2]||0)<Number(u[1])*60+Number(u[2]);
 }
+const KIDS_LESSON_WORDS=/\b(?:kids?|children|child|childrens|youth|juniors?|family|families|ski school|snow school|snow ?sports? school|all ages|beginners?)\b/;
+const NOT_KIDS_LESSON_WORDS=/\b(?:steep|steeper|steeps|expert|advanced|confident skiers|backcountry|avalanche|ski touring|heli|cat ski\w*|biathlon|rifle|adaptive|disability|disabilities|neurodiversity|nordic|cross country|clinics?|guiding)\b/;
+function kidsSkiLesson(v){const t=norm([v.name,v.cuisine,v.description||v.plannerDescription,v.textDesc].filter(Boolean).join(' '));return KIDS_LESSON_WORDS.test(t)&&!NOT_KIDS_LESSON_WORDS.test(t);}
 function matches(v,i){
   // "Lunch at a winery restaurant" (2026-10-19): a winery that serves lunch is that restaurant.
   if(i.wineryLunch&&i.kind==='type'&&v.type==='winery')return true;
   if(i.kind==='day_trip')return v.region===i.value;
   if(i.servesCoffee&&!coffeeEvidence(v))return false;
   if(i.lakeside&&i.kind==='venue_kind')return lakeWalk(v);
+  // Planner round 3 (2026-11-22; "ski weekend with two kids, 7 and 10" opened with Extremely Canadian's steep clinics, then
+  // a biathlon range and the adaptive program, each "Matches your request for a ski or snowboard lesson" though no
+  // lesson was asked): the lesson a kids' ski trip gets on its own is one for children by the listing's own words (kids,
+  // children, ski school, family), never a clinic for confident skiers, backcountry, biathlon, Nordic or adaptive lessons.
+  if(i.kidsSki&&i.kind==='venue_kind'&&!kidsSkiLesson(v))return false;
   if(i.kind==='venue_kind'||i.kind==='excluded_kind')return (v.plannerKinds||inferPlannerKinds(v)).includes(i.value);
   if(i.kind==='venue')return v.id===i.value;
   // Distillery test 2 (Whistler, 2026-11-16): a place with its own kitchen that lists a brunch (« Brunch jazz » on Sundays) is a brunch spot too.
@@ -1643,4 +1651,4 @@ function tripRequestSynonyms(text){let out=String(text||'');const walksNegated=W
  if(/\b(?:ski|skiing|snowboard\w*)\b/i.test(out)&&!/\b(?:cross.country|nordic)\b/i.test(out)&&!/\b(?:don.?t|do not|won.?t|not|no|never|without)\s+(?:\w+\s+){0,2}(?:ski|skiing|snowboard\w*)\b/i.test(out))out=out.replace(/\b(?:a )?night out\b|\bgoing out(?: at night)?\b/gi,'nightlife').replace(/\s*\b(?:in the morning|in the afternoon|in the evening)\b/gi,'').replace(/\b(?:morning|afternoon|evening)\s+(?=(?:ski|skiing|snowboard\w*|spa|apres|après|dinner|lunch|drinks)\b)/gi,'').replace(/\s{2,}/g,' ');
  return out;}
 
-module.exports={golfPartKind,SPORT_KIND_PLANNER,indoorSlotOf,morningOfOneStop,KINDS,REQUEST_KINDS,TOUR_PLANNER_KINDS,TOUR_KIND_PLANNER,INDOOR_KIND_PLANNER,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
+module.exports={kidsSkiLesson,golfPartKind,SPORT_KIND_PLANNER,indoorSlotOf,morningOfOneStop,KINDS,REQUEST_KINDS,TOUR_PLANNER_KINDS,TOUR_KIND_PLANNER,INDOOR_KIND_PLANNER,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};

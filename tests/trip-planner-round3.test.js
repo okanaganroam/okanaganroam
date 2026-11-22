@@ -195,3 +195,16 @@ test('5. an easy or beginner hike never gets a trail whose own words say hard, s
     assert.ok(easy.days.some((d) => d.stops.some((s) => s.venue && s.venue.type === 'outdoor')), 'another trail is planned');
   } finally { fx.FACTS.splice(fx.FACTS.indexOf(hard), 1); }
 });
+
+test('5. the lesson a kids ski trip gets on its own is one for children by the listing\'s own words', () => {
+  const req = tr.extractTripRequirements({ text: 'ski weekend in whistler with two kids 7 and 10 we don t drink', taxonomy: fx.TAXONOMY });
+  const item = req.items.find((i) => i.kind === 'venue_kind' && i.value === 'ski_lessons');
+  assert.ok(item && item.kidsSki, 'the lesson is the planner\'s own idea for a kids\' ski trip');
+  const v = (name, cuisine, description) => ({ name, type: 'tour', cuisine, description, plannerKinds: ['ski_lessons'] });
+  assert.equal(tr.matches(v('Extremely Canadian', 'Ski clinics & guiding', 'Ski and snowboard clinics on steeper terrain, plus guided backcountry tours; aimed at confident skiers.'), item), false);
+  assert.equal(tr.matches(v('Olympic Park Biathlon Experience', 'Biathlon lessons', 'A shooting-only introduction with a .22 biathlon rifle. Ages eight and up.'), item), false);
+  assert.equal(tr.matches(v('Adaptive Sports Program', 'Adaptive ski & snowboard lessons', 'Lessons for people of any age with a disability.'), item), false);
+  assert.equal(tr.matches(v('Mountain Snow School', 'Ski & snowboard lessons', 'Group and private lessons for kids and adults, from first-timers up.'), item), true);
+  // A lesson the visitor asks for is not filtered.
+  assert.equal(tr.matches(v('Extremely Canadian', 'Ski clinics & guiding', 'Clinics on steeper terrain.'), { kind: 'venue_kind', value: 'ski_lessons' }), true);
+});

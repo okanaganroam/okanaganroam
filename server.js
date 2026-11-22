@@ -9209,7 +9209,7 @@ function v4NotIncluded(plan) {
     }
   } catch (e) { /* the planner's own results stand */ }
   for (const r of plan.requirementResults) {
-    if (!r || r.status !== 'unmet' || r.strength !== 'must' || !['venue_kind', 'type'].includes(r.kind)) continue;
+    if (!r || r.status !== 'unmet' || r.strength !== 'must' || r.kidsSki || !['venue_kind', 'type'].includes(r.kind)) continue;
     const label = r.kind === 'venue_kind' ? (TR.LABELS[r.value] || String(r.value).replace(/_/g, ' ')) : (V4_TYPE_WORDS[r.value] || String(r.value));
     if (out.some((x) => x.label === label)) continue;
     const lre = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

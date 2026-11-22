@@ -5159,13 +5159,15 @@ function buildSkiDays(facts, ctx, days, pinned) {
     // Tour test 14 (Whistler, 2026-11-18; Lucía): "ski lessons", "snowboard lesson for my 8 year old", "kids ski camp week":
     // the lesson operator is planned next to the resort on the first ski day, as "add a lesson" (lessons are never just a
     // resort ski day). Its notes (kids' ages, the language asked for, adaptive) come from its own words.
+    // Planner round 3: a lesson nobody asked for (kids on a ski trip) is a children's lesson by the school's own words, or none.
+    const kidsSkiAuto = ((ctx.requirements && ctx.requirements.items) || []).some((i) => i.kidsSki) && !((ctx.requirements && ctx.requirements.items) || []).some((i) => i.kind === 'venue_kind' && i.value === 'ski_lessons' && !i.kidsSki);
     if (d === 1 && lessonAsked && !pin('lesson')) {
       const near = (v) => v.region === region || (village && v.region === village);
       // Undated, the ski day is "for when the lifts are running": a school that opens in the season's first weeks counts.
       const lessonOpen = (v) => !seasonClosedOnTrip(v, { date }) || (!datedTrip && !(ctx.seasonInfo && ctx.seasonInfo.named === 'month') && date && !seasonClosedOnTrip(v, { date: plusDays(date, 21) }));
       // Judged on the ski date (lessonOpen), not today (a school closed until the lifts open is still the season's school).
       const lessonCtx = { ...seasonCtx, ignoreSeason: true };
-      const cands = facts.filter((v) => v.type === 'tour' && Array.isArray(v.plannerKinds) && v.plannerKinds.includes('ski_lessons') && !used.has(v.id) && !ctx.exclude.has(v.id) && eligible(v, lessonCtx, false) && lessonOpen(v) && tripRequirements.venueAllowed(v, ctx.requirements, d, ctx.tripDate))
+      const cands = facts.filter((v) => v.type === 'tour' && Array.isArray(v.plannerKinds) && v.plannerKinds.includes('ski_lessons') && !used.has(v.id) && !ctx.exclude.has(v.id) && eligible(v, lessonCtx, false) && lessonOpen(v) && (!kidsSkiAuto || tripRequirements.kidsSkiLesson(v)) && tripRequirements.venueAllowed(v, ctx.requirements, d, ctx.tripDate))
         .map((v) => ({ v, score: base(v).score + (near(v) ? 10 : 0) + lessonFit(v, ctx), reasons: base(v).reasons }));
       const lesson = themePick(cands);
       // An adaptive or language request: the next school whose own words fit too is named on the stop ("adaptive ski
@@ -8237,7 +8239,14 @@ function v4SaneDays(result, input, opts = {}) {
   const last = result.days[result.days.length - 1];
   // Round 3: the last day of any trip of two days or more is the day they leave, dated or not: a light day. One night:
   // the morning and lunch. Longer: the morning, lunch and one afternoon stop; no dinner.
-  if (result.days.length >= 2 && !last.stops.some((s) => s && (s.skiDay || s.onHill))) {
+  const skiLast = last.stops.some((s) => s && (s.skiDay || s.onHill));
+  // (A ski trip's last day keeps its skiing and the lunch on the hill; what came after them goes.)
+  if (result.days.length >= 2 && skiLast) {
+    const before = last.stops.length;
+    last.stops = last.stops.filter((s) => !s || s.skiDay || s.onHill || s.lessonStop || kept.has(keyOf(last, s)) || (s.event && eventAsked) || ['early', 'morning', 'midday'].includes(s.daypart));
+    if (last.stops.length !== before) { changed = true; last.departureDay = true; }
+  }
+  if (result.days.length >= 2 && !skiLast) {
     const oneNight = result.days.length === 2;
     const dinnerAt = last.stops.findIndex((s) => isDinnerStop(s));
     const before = last.stops.length;
@@ -8256,8 +8265,10 @@ function v4SaneDays(result, input, opts = {}) {
   if (!named && timed) {
     const rowOf = (day, s) => (result.schedule || []).find((r) => r.day === day.day && ((s.venue && r.venueId === s.venue.id) || (s.event && r.eventId === s.event.id)));
     const bad = (day) => {
-      if (day.stops.some((s) => s && (s.skiDay || s.onHill))) return null;
+      // A ski day keeps its own hours (lifts, lunch on the hill); only its dinner time is held.
+      const ski = day.stops.some((s) => s && (s.skiDay || s.onHill));
       for (const s of day.stops) {
+        if (ski && !isDinnerStop(s)) continue;
         if (!s || !(s.venue || s.event)) continue;
         const r = rowOf(day, s);
         if (!r || !Number.isFinite(r.startMinutes)) return { s, why: 'untimed' };
@@ -8308,7 +8319,7 @@ function v4SaneDays(result, input, opts = {}) {
           // A meal still out of its window: a stop between the meals that is not kept and not a meal gives way (the last one
           // before a late dinner, the last one before a late lunch).
           const at = day.stops.indexOf(b.s);
-          const victim = b.why !== 'untimed' ? day.stops.slice(0, at).reverse().find((s) => s && (s.venue || s.event) && !kept.has(keyOf(day, s)) && !isLunchStop(s) && !isDinnerStop(s) && !(s.event && eventAsked)) : null;
+          const victim = b.why !== 'untimed' ? day.stops.slice(0, at).reverse().find((s) => s && (s.venue || s.event) && !kept.has(keyOf(day, s)) && !isLunchStop(s) && !isDinnerStop(s) && !s.skiDay && !s.onHill && !s.lessonStop && !(s.event && eventAsked)) : null;
           const r = b.why !== 'untimed' ? rowOf(day, b.s) : null;
           const late = r && r.startMinutes > (b.why === 'lunch' ? V4_LUNCH_WINDOW[1] : dinnerMax);
           // Round 3: a long morning visit before a late lunch is first made a shorter one (about an hour), not left out.
