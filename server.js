@@ -75884,6 +75884,14 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
       return res.end(SITE_WEBMANIFEST);
     }
+    // Common guesses at the contact page (2026-11-21, dashboard: 12 visitors tried /contact-us in 30 days) go to the real one.
+    {
+      const cu = method === 'GET' || method === 'HEAD' ? /^(\/fr)?\/(?:contact-us|contactus|contact_us|contact-us\.html)\/?$/i.exec(pathname) : null;
+      if (cu) {
+        res.writeHead(301, { Location: `${cu[1] || ''}/contact${parsed.search || ''}`, 'Cache-Control': 'public, max-age=86400' });
+        return res.end();
+      }
+    }
     // About, Privacy and Terms (2026-10-14), linked from the footer.
     const infoPage = { '/about': renderAboutPage, '/contact': renderContactPage, '/privacy': renderPrivacyPage, '/terms': renderTermsPage }[pathname.replace(/\/$/, '')];
     if (infoPage && method === 'GET') {
