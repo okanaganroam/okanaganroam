@@ -3,7 +3,8 @@
 // and party. Pure functions; server.js passes in the stay (venue fields + stay_info) and the trip.
 //
 // Up to three buttons, in this order: Booking.com, Expedia (the two that can earn a commission), then the place's own
-// site. A stay with none of the three gets one "Check rates" button from places-to-stay.js's stayRatesLink.
+// site, each the page of THIS place (never a search or a map: Dayton, 2026-11-21). A stay with none of the three gets
+// one "Check rates" button to its own website (places-to-stay.js's stayRatesLink), or no button.
 //
 // Commission switch (env only, no code change), from places-to-stay.js's affiliateConfig:
 //   STAY_AFFILIATE_PROVIDER=stay22 + STAY_AFFILIATE_ID  -> the Booking.com and Expedia buttons go through Stay22 Allez;
@@ -124,8 +125,8 @@ const button = (key, url, affiliate) => ({
 });
 
 // The "Check rates" fallback (a stay with no Booking.com, Expedia or own link): places-to-stay.js's stayRatesLink
-// (the affiliate partner's search for the place, else the place's website), with the dates and party added when that
-// target takes them (Stay22 Allez and Booking.com search do; a website and Expedia's search are left as they are).
+// (the place's own website since 2026-11-21; it used to be the affiliate partner's name search). The Stay22 and
+// Booking.com branches below only apply if stayRatesLink ever returns one of those again.
 function fallbackButton(venue, p, opts) {
   const link = placesToStay.stayRatesLink({ ...venue, type: placesToStay.STAY_TYPE }, { env: opts.env, regionLabel: opts.regionLabel, links: {} });
   if (!link) return null;
@@ -147,7 +148,7 @@ function fallbackButton(venue, p, opts) {
 // stay: { id, name, address, latitude, longitude, website, info (stay_info), ownerBookingUrl (venue_links.booking_url) }
 // trip: { arrive, leave, adults, kids, dog }   opts: { env, regionLabel }
 // -> [{ key, label, labelFr, short, shortFr, url, affiliate, rel }] (0 to 3).
-function stayBookingLinks(stay, trip, opts = {}) {
+function exactStayLinks(stay, trip, opts = {}) {
   if (!stay || typeof stay !== 'object') return [];
   const env = opts.env || process.env;
   const cfg = placesToStay.affiliateConfig(env);
@@ -176,11 +177,14 @@ function stayBookingLinks(stay, trip, opts = {}) {
   // The owner's link is theirs to tag as they like (kept as-is); the researched one must be plain.
   const own = httpsOn(stay.ownerBookingUrl, null, true) || httpsOn(b.own, null);
   if (own) out.push(button('own', own.toString(), false));
-  if (!out.length) {
-    const f = fallbackButton(stay, p, { env, regionLabel: opts.regionLabel });
-    if (f) out.push(f);
-  }
   return out.slice(0, 3);
+}
+// The booking buttons for Build My Trip: the exact pages above, else the place's own website (fallbackButton).
+function stayBookingLinks(stay, trip, opts = {}) {
+  const out = exactStayLinks(stay, trip, opts);
+  if (out.length) return out;
+  const f = fallbackButton(stay, tripParams(trip), { env: opts.env || process.env, regionLabel: opts.regionLabel });
+  return f ? [f] : [];
 }
 
 // "See live prices" (2026-11-20): Stay22's Maps embed for the trip's dates, around the chosen stay.
@@ -246,8 +250,8 @@ function withBookingLinks(block, byId, opts = {}) {
     const stay = byId.get(card.id);
     if (!stay) return { ...card, bookingLinks: [] };
     const out = { ...card, bookingLinks: stayBookingLinks(stay, block.trip, { env: opts.env, regionLabel: card.regionLabel }) };
-    const live = stay22MapUrl({ ...stay, regionLabel: card.regionLabel }, block.trip, { env: opts.env, checks: opts.mapChecks });
-    if (live) out.livePrices = live;
+    // "See live prices" (Stay22's map of the stay's block) is off since 2026-11-21: it showed other places too, and
+    // every booking button must open this place's own page (Dayton). stay22MapUrl stays for the check script.
     if (stayPetsNote(stay.info, block.trip)) out.petsSome = true;
     return out;
   };
@@ -256,6 +260,6 @@ function withBookingLinks(block, byId, opts = {}) {
 
 module.exports = {
   BOOKING_HOSTS, EXPEDIA_HOSTS, STAY22_HOSTS, STAY22_ALLEZ, LABELS, REL_AFFILIATE, REL_PLAIN,
-  httpsOn, tripParams, bookingComUrl, expediaUrl, stay22Wrap, stayBookingLinks, stayPetsNote, withBookingLinks,
+  httpsOn, tripParams, bookingComUrl, expediaUrl, stay22Wrap, exactStayLinks, stayBookingLinks, stayPetsNote, withBookingLinks,
   STAY22_MAP, MAP_BOX, stay22MapUrl,
 };

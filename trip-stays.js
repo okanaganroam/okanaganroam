@@ -48,7 +48,7 @@ function daysBetween(a, b) { return Math.round((Date.parse(`${b}T12:00:00Z`) - D
 function parseTripStayInput(raw) {
   if (raw === undefined || raw === null) return { value: null };
   if (!isObj(raw)) return { error: 'stay must be an object with arrive, leave, adults, kids and dog.' };
-  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog'].includes(k));
+  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog', 'pref'].includes(k));
   if (extra.length) return { error: `stay may only contain arrive, leave, adults, kids and dog (not ${extra.join(', ')}).` };
   const out = {};
   for (const k of ['arrive', 'leave']) {
@@ -74,7 +74,37 @@ function parseTripStayInput(raw) {
     if (typeof raw.dog !== 'boolean') return { error: 'stay.dog must be true or false.' };
     if (raw.dog) out.dog = true;
   }
+  // Travel agent chat (2026-11-22, trip-chat.js): what the visitor said about the place to stay ("somewhere cheaper",
+  // "a hotel with a pool", "stay in Naramata", "we already have a place"). Only these keys and values.
+  if (raw.pref !== undefined && raw.pref !== null) {
+    const p = parseStayPref(raw.pref);
+    if (p.error) return p;
+    if (p.value) out.pref = p.value;
+  }
   return { value: Object.keys(out).length ? out : null };
+}
+
+const STAY_AMENITIES = ['pool', 'hot_tub', 'kitchen'];
+function parseStayPref(raw) {
+  if (!isObj(raw) || Object.keys(raw).some((k) => !['none', 'maxPrice', 'minPrice', 'amenity', 'region'].includes(k))) return { error: 'stay.pref may only contain none, maxPrice, minPrice, amenity and region.' };
+  const out = {};
+  if (raw.none !== undefined) { if (raw.none !== true) return { error: 'stay.pref.none must be true.' }; out.none = true; }
+  for (const k of ['maxPrice', 'minPrice']) if (raw[k] !== undefined) { if (!intIn(raw[k], 1, 4)) return { error: `stay.pref.${k} must be 1 to 4.` }; out[k] = raw[k]; }
+  if (raw.amenity !== undefined) { if (!STAY_AMENITIES.includes(raw.amenity)) return { error: 'stay.pref.amenity is not known.' }; out.amenity = raw.amenity; }
+  if (raw.region !== undefined) { if (typeof raw.region !== 'string' || !/^[a-z-]{2,24}$/.test(raw.region)) return { error: 'stay.pref.region must be a town.' }; out.region = raw.region; }
+  return { value: Object.keys(out).length ? out : null };
+}
+// The stays a preference leaves (the price band, an amenity, a town). Unknown facts never pass a stated preference.
+function staysForPref(stays, pref) {
+  if (!pref || !Array.isArray(stays)) return stays;
+  return stays.filter((st) => {
+    const f = isObj(st.info) ? st.info : {};
+    if (pref.maxPrice && !(intIn(f.price_level, 1, 4) && f.price_level <= pref.maxPrice)) return false;
+    if (pref.minPrice && !(intIn(f.price_level, 1, 4) && f.price_level >= pref.minPrice)) return false;
+    if (pref.amenity && f[pref.amenity] !== true) return false;
+    if (pref.region && st.region !== pref.region) return false;
+    return true;
+  });
 }
 
 // Straight-line distance in km.
@@ -293,7 +323,12 @@ function pickTripStays(ctx, stays) {
 function whereToStay(plan, input, stays, today, opts = {}) {
   const ctx = tripStayContext(plan, input, today, opts);
   if (!ctx) return null;
-  const picked = pickTripStays(ctx, stays);
+  // Chat preference (input.pref): "we already have a place" -> no stay; else only the stays it leaves, and "stay in
+  // Naramata" makes that town the base (other towns' stays still join only within NEAR_KM when it has too few).
+  const pref = input && input.pref;
+  if (pref && pref.none) return null;
+  if (pref && pref.region) { ctx.regions = [pref.region]; ctx.primaryRegion = pref.region; }
+  const picked = pickTripStays(ctx, pref ? staysForPref(stays, pref) : stays);
   if (!picked) return null;
   return {
     stayId: picked.pick.id,
@@ -305,7 +340,7 @@ function whereToStay(plan, input, stays, today, opts = {}) {
 
 module.exports = {
   MAX_NIGHTS, MAX_ADULTS, MAX_KIDS, NEAR_KM, MIN_IN_TOWN,
-  parseTripStayInput, tripStayContext, partyOf, stayFails, scoreStay, pickTripStays, whereToStay, planStops, km, addDays, daysBetween,
+  parseTripStayInput, parseStayPref, staysForPref, STAY_AMENITIES, tripStayContext, partyOf, stayFails, scoreStay, pickTripStays, whereToStay, planStops, km, addDays, daysBetween,
   wantsCamping, isCampingStay, CAMPING_RE,
   v4DormStay, V4_COUPLE_RE, V4_BUDGET_STAY_RE,
 };

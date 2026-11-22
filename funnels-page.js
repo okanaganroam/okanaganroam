@@ -19,7 +19,7 @@ function funnelCard(f) {
     return `<h4>${esc(title)} <small>${num(x.commission_taps)} commission taps of ${num(x.book_taps)} booking taps</small></h4>
     ${table(['Step', 'Visits', 'Of the step before', 'Of visits with a plan'], rows)}
     ${table(['Booking link tapped', 'Taps'], book)}
-    ${table(['How they shared', 'Times'], share)}`;
+    ${table(['How they shared', 'Times'], share)}${(x.chat || []).some((c) => c.n) ? table(['Chat messages (travel agent chat)', 'Messages'], x.chat.map((c) => [esc(c.text), num(c.n)])) : ''}`;
   };
   const weekRows = f.weeks.map((w) => [`<span style="white-space:nowrap">${esc(w.start)}</span>`, num(w.plan), num(w.confirm), num(w.book_open), num(w.book_click), num(w.commission_taps), num(w.share), num(w.save)]);
   return `<h3>Build My Trip funnel</h3>
