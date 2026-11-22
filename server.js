@@ -8249,7 +8249,7 @@ function parseTripPlanBody(body, opts = {}) {
     body = { ...body };
     delete body.stay;
   }
-  const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned', 'overrides', 'swap'];
+  const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned', 'overrides', 'swap', 'tourStops', 'moves', 'trustedPins', 'keepOnDateChange'];
   const unexpected = Object.keys(body || {}).filter((k) => !allowed.includes(k));
   if (unexpected.length) return { error: `Unexpected field(s): ${unexpected.join(', ')}` };
   const text = body.text;
@@ -8282,10 +8282,12 @@ function parseTripPlanBody(body, opts = {}) {
   let overrides = null;
   if (body.overrides !== undefined) {
     const o = body.overrides;
-    if (!o || typeof o !== 'object' || Array.isArray(o) || Object.keys(o).some((k) => !['days', 'pace', 'baseRegion', 'budgetMode', 'durationMinutes', 'startDate', 'startMinutes', 'dayStartMinutes', 'shortWalkVenueIds', 'eventId'].includes(k))) {
+    if (!o || typeof o !== 'object' || Array.isArray(o) || Object.keys(o).some((k) => !['days', 'pace', 'baseRegion', 'budgetMode', 'durationMinutes', 'startDate', 'startMinutes', 'dayStartMinutes', 'shortWalkVenueIds', 'eventId', 'stopStarts'].includes(k))) {
       return { error: 'overrides may only contain days, pace, baseRegion, budgetMode, durationMinutes, startDate, startMinutes, dayStartMinutes, shortWalkVenueIds and eventId.' };
     }
     if (o.days !== undefined && !(Number.isInteger(o.days) && o.days >= 1 && o.days <= 7)) return { error: 'overrides.days must be an integer between 1 and 7.' };
+    // Agent hooks: one stop's start time, { "<day>-<daypart>": minutes }.
+    if (o.stopStarts !== undefined && (!o.stopStarts || typeof o.stopStarts !== 'object' || Array.isArray(o.stopStarts) || Object.keys(o.stopStarts).length > 28 || !Object.entries(o.stopStarts).every(([k, m]) => TRIP_PLAN_PIN_RE.test(k) && Number.isInteger(m) && m >= 0 && m < 1440))) return { error: 'Invalid stopStarts.' };
     if (o.eventId !== undefined && !(Number.isSafeInteger(o.eventId) && o.eventId > 0)) return { error: 'Invalid eventId.' };
     if (o.pace !== undefined && !TRIP_VALID_PACES.includes(o.pace)) return { error: `overrides.pace must be one of: ${TRIP_VALID_PACES.join(', ')}` };
     if (o.baseRegion !== undefined && o.baseRegion !== 'valley' && !REGION_LABELS[o.baseRegion]) return { error: 'overrides.baseRegion must be a region slug or "valley".' };
@@ -8311,14 +8313,43 @@ function parseTripPlanBody(body, opts = {}) {
     const stopsOk = (a) => Array.isArray(a) && a.length <= 12 && a.every((x) => x && typeof x === 'object' && !Array.isArray(x) && Object.keys(x).every((k) => ['ref', 'label', 'daypart', 'component', 'gapFill', 'wineryLunch'].includes(k))
       && (x.ref === null || x.ref === undefined || /^(?:venue|event):\d{1,9}$/.test(x.ref)) && (x.label === undefined || (typeof x.label === 'string' && x.label.length <= 60)) && (x.daypart === undefined || /^[a-z]{1,12}$/.test(x.daypart))
       && (x.component === undefined || x.component === null || (Number.isInteger(x.component) && x.component >= 0 && x.component < 20)) && (x.gapFill === undefined || typeof x.gapFill === 'boolean') && (x.wineryLunch === undefined || typeof x.wineryLunch === 'boolean'));
-    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type', 'id', 'locked', 'times', 'stops', 'want', 'priceMax', 'priceMin'].includes(k)) || !swapKey(w.key) || (itKey(w.key) && !stopsOk(w.stops)) || (w.stops !== undefined && !itKey(w.key)) || !/^[a-z_]{1,24}$/.test(w.type || '') || (w.id !== undefined && !(Number.isInteger(w.id) && w.id > 0))
+    if (!w || typeof w !== 'object' || Array.isArray(w) || Object.keys(w).some((k) => !['key', 'type', 'id', 'locked', 'times', 'stops', 'want', 'priceMax', 'priceMin', 'features', 'words', 'types', 'wide'].includes(k)) || !swapKey(w.key) || (itKey(w.key) && !stopsOk(w.stops)) || (w.stops !== undefined && !itKey(w.key)) || !/^[a-z_]{1,24}$/.test(w.type || '') || (w.id !== undefined && !(Number.isInteger(w.id) && w.id > 0))
       || (w.locked !== undefined && (!Array.isArray(w.locked) || w.locked.length > 28 || !w.locked.every((k) => typeof k === 'string' && TRIP_PLAN_PIN_RE.test(k))))
       || (w.times !== undefined && (!w.times || typeof w.times !== 'object' || Array.isArray(w.times) || Object.keys(w.times).length > 28 || !Object.entries(w.times).every(([k, m]) => swapKey(k) && Number.isInteger(m) && m >= 0 && m < 1440)))) return { error: 'swap must be { key: "<day>-<daypart>", type: "<venue type>", id: <venue id>, locked: ["<day>-<daypart>"], times: { "<day>-<daypart>": <minutes> } }.' };
     // want / priceMax / priceMin (2026-11-22, travel agent chat): a kind of place for the slot, or a cheaper / fancier one.
     if ((w.want !== undefined && !Object.prototype.hasOwnProperty.call(tripPlannerModule().SWAP_WANTS || {}, w.want)) || [w.priceMax, w.priceMin].some((x) => x !== undefined && !(Number.isInteger(x) && x >= 1 && x <= 4))) return { error: 'Invalid swap.want or swap price.' };
-    swap = { key: w.key, type: w.type, ...(w.id !== undefined ? { id: w.id } : {}), ...(w.want !== undefined ? { want: w.want } : {}), ...(w.priceMax !== undefined ? { priceMax: w.priceMax } : {}), ...(w.priceMin !== undefined ? { priceMin: w.priceMin } : {}), ...(w.locked !== undefined ? { locked: w.locked.slice() } : {}), ...(w.times !== undefined ? { times: { ...w.times } } : {}), ...(w.stops !== undefined ? { stops: w.stops.map((x) => ({ ...x })) } : {}) };
+    // Agent hooks: several constraints at once (badges, the listings' own words, kinds of place, a wider search).
+    if ((w.features !== undefined && (!Array.isArray(w.features) || w.features.length > 6 || !w.features.every((f) => BOOL_FIELDS.includes(f))))
+      || (w.words !== undefined && (!Array.isArray(w.words) || w.words.length > 8 || !w.words.every((x) => typeof x === 'string' && /^[a-z0-9 ]{2,30}$/.test(x))))
+      || (w.types !== undefined && (!Array.isArray(w.types) || w.types.length > 8 || !w.types.every((x) => typeof x === 'string' && /^[a-z_]{1,24}$/.test(x))))
+      || (w.wide !== undefined && typeof w.wide !== 'boolean')) return { error: 'Invalid swap.features, swap.words, swap.types or swap.wide.' };
+    swap = { key: w.key, type: w.type, ...(w.features !== undefined ? { features: w.features.slice() } : {}), ...(w.words !== undefined ? { words: w.words.slice() } : {}), ...(w.types !== undefined ? { types: w.types.slice() } : {}), ...(w.wide ? { wide: true } : {}), ...(w.id !== undefined ? { id: w.id } : {}), ...(w.want !== undefined ? { want: w.want } : {}), ...(w.priceMax !== undefined ? { priceMax: w.priceMax } : {}), ...(w.priceMin !== undefined ? { priceMin: w.priceMin } : {}), ...(w.locked !== undefined ? { locked: w.locked.slice() } : {}), ...(w.times !== undefined ? { times: { ...w.times } } : {}), ...(w.stops !== undefined ? { stops: w.stops.map((x) => ({ ...x })) } : {}) };
   }
-  return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap, ...(stay ? { stay } : {}), ...(opts.v4 ? { v4: true } : {}) } };
+  // Travel agent hooks (2026-11-22, trip-planner.js v4AgentHooks): optional, checked, V4 only.
+  const agent = {};
+  if (body.tourStops !== undefined) {
+    const a = body.tourStops;
+    if (!Array.isArray(a) || a.length > 7 || !a.every((x) => x && typeof x === 'object' && !Array.isArray(x) && Object.keys(x).every((k) => ['day', 'part', 'listingId', 'startMinutes', 'durationMinutes', 'covers'].includes(k))
+      && Number.isInteger(x.day) && x.day >= 1 && x.day <= 7 && /^(?:early|morning|midday|afternoon|late|evening|night)$/.test(x.part || '') && Number.isInteger(x.listingId) && x.listingId > 0
+      && (x.startMinutes === undefined || (Number.isInteger(x.startMinutes) && x.startMinutes >= 0 && x.startMinutes < 1440)) && (x.durationMinutes === undefined || (Number.isInteger(x.durationMinutes) && x.durationMinutes >= 15 && x.durationMinutes <= 720))
+      && (x.covers === undefined || (Array.isArray(x.covers) && x.covers.length <= 8 && x.covers.every((t) => /^[a-z_]{1,24}$/.test(t)))))) return { error: 'tourStops must list { day, part, listingId, startMinutes, durationMinutes, covers }.' };
+    agent.tourStops = a.map((x) => ({ ...x, ...(x.covers ? { covers: x.covers.slice() } : {}) }));
+  }
+  if (body.moves !== undefined) {
+    const a = body.moves;
+    if (!Array.isArray(a) || a.length > 14 || !a.every((x) => x && typeof x === 'object' && !Array.isArray(x) && Object.keys(x).every((k) => ['from', 'to'].includes(k)) && TRIP_PLAN_PIN_RE.test(x.from || '') && TRIP_PLAN_PIN_RE.test(x.to || '') && x.from !== x.to)) return { error: 'moves must list { from: "<day>-<daypart>", to: "<day>-<daypart>" }.' };
+    agent.moves = a.map((x) => ({ from: x.from, to: x.to }));
+  }
+  if (body.trustedPins !== undefined) {
+    const a = body.trustedPins;
+    if (!Array.isArray(a) || a.length > 28 || !a.every((k) => typeof k === 'string' && TRIP_PLAN_PIN_RE.test(k))) return { error: 'trustedPins must list "<day>-<daypart>" keys.' };
+    agent.trustedPins = a.slice();
+  }
+  if (body.keepOnDateChange !== undefined) {
+    if (typeof body.keepOnDateChange !== 'boolean') return { error: 'keepOnDateChange must be true or false.' };
+    if (body.keepOnDateChange) agent.keepOnDateChange = true;
+  }
+  return { value: { text, seed, excludeVenueIds, avoidVenueIds, pinned, overrides, swap, ...(stay ? { stay } : {}), ...(opts.v4 ? { v4: true, ...agent } : {}) } };
 }
 
 // ---------- Build My Trip travel agent chat (2026-11-22, trip-chat.js) ----------
@@ -8676,15 +8707,15 @@ function tripPlanBeforeStays(args, run = runTripPlan, now = new Date()) {
   if (stay && stay.dog && typeof base.text === 'string' && !TRIP_DOG_WORDS_RE.test(base.text) && base.text.trim().length + 13 <= discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) base.text = `${base.text.trim()} with our dog`;
   if (stay && stay.arrive && !(base.overrides && base.overrides.startDate)) base.overrides = { ...(base.overrides || {}), startDate: stay.arrive };
   // Round 2 fresh eyes (V4): the day the visitor leaves is known, so its plan ends early (trip-planner.js v4SaneDays).
-  if (args.v4 && stay && stay.arrive && stay.leave && stay.leave > stay.arrive) base.departureDate = stay.leave;
+  if (args.v4 && stay && !stay.force && stay.arrive && stay.leave && stay.leave > stay.arrive) base.departureDate = stay.leave;
   let plan = run(base, now);
   // V4 (round 2, 2026-11-21: "3 days" with Aug 10-13 became a 4-day plan): a length the request names wins over the dates.
   // Round 3: only a number of days ("3 days", « 3 jours »); "a weekend" Fri-Sun still covers Sunday.
   const typedDays = !!(args.v4 && plan && plan.intent && Number.isInteger(plan.intent.days) && plan.intent.days > 0 && /\b(?:\d+|one|two|three|four|five|six|seven|un|deux|trois|quatre|cinq|six|sept)\s*(?:-\s*)?(?:days?|jours?|journ[ée]es?)\b/i.test(String(args.text || '')));
   // Round 3 (V4; "girls' trip: spa, cocktails, shopping" with Dec 4-6 was a two-stop outing): with dates over a night or
   // more, a short outing or a list becomes the days of the stay too.
-  const v4Nights = !!(args.v4 && stay && stay.arrive && stay.leave && stay.leave > stay.arrive && plan && ['itinerary', 'outing', 'discover', 'recommendations'].includes(plan.kind) && !args.swap);
-  if (stay && stay.arrive && stay.leave && plan && !typedDays && (['multi_day', 'day_plan'].includes(plan.kind) || v4Nights) && !(base.overrides && base.overrides.days !== undefined)) {
+  const v4Nights = !!(args.v4 && stay && !stay.force && stay.arrive && stay.leave && stay.leave > stay.arrive && plan && ['itinerary', 'outing', 'discover', 'recommendations'].includes(plan.kind) && !args.swap);
+  if (stay && stay.arrive && stay.leave && plan && !typedDays && !stay.force && (['multi_day', 'day_plan'].includes(plan.kind) || v4Nights) && !(base.overrides && base.overrides.days !== undefined)) {
     const want = Math.min(7, tripStays.daysBetween(stay.arrive, stay.leave) + 1);
     if (want !== ((plan.days || []).length || 1)) {
       try { const longer = run({ ...base, overrides: { ...(base.overrides || {}), days: want } }, now); if (longer && ['multi_day', 'day_plan'].includes(longer.kind)) plan = longer; } catch (e) { /* keep the plan as asked */ }
@@ -9150,6 +9181,7 @@ function runTripPlan(args, now = new Date()) {
   } catch (e) { /* the weekday stays in the notes */ }
   try { v4DropAfterDark(plan); } catch (e) { /* keep the plan as planned */ }
   try { v4AddStopPhones(plan); } catch (e) { /* phones are a convenience */ }
+  try { v4TourStopLinks(plan); } catch (e) { /* the stop still shows */ }
   return plan;
 }
 const V4_DAY_ASKED_RE = /\b(?:one|a|1|full|whole|single)[ -]day\b(?! (?:trip|tour|pass|ticket|hike|spa)s?\b)|\bday in\b|\b(?:une|1) journ[ée]e\b/i;
@@ -9279,6 +9311,17 @@ function v4NotIncluded(plan) {
 }
 // An event's own photo (its What's On image), only a site path or an https URL.
 function tripEventPhoto(e) { const u = e && (e.image || e.image_url); return typeof u === 'string' && /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(u.trim()) ? u.trim() : null; }
+// Agent hooks: a tour placed as a stop (stop.tourStop) carries its exact stored link: the approved Viator product for
+// that operator, else the operator's own booking page; never a search. -> stop.bookingLink { url, kind, label, labelFr }.
+function v4TourStopLinks(plan) {
+  for (const d of (plan && plan.days) || []) for (const s of d.stops || []) {
+    if (!s || !s.tourStop || !s.venue || !Number.isInteger(s.venue.id)) continue;
+    let link = null;
+    try { const vb = viator.venueBooking(s.venue.id); if (vb && vb.url) link = { url: vb.url, kind: 'viator', label: viator.TEXT.book.en, labelFr: viator.TEXT.book.fr, affiliate: true, rel: 'sponsored nofollow noopener' }; } catch (e) { link = null; }
+    if (!link) { try { const own = String((venueLinks(s.venue.id) || {}).booking_url || '').trim(); if (/^https:\/\/[^\s"'<>]+$/i.test(own)) link = { url: own, kind: 'own', label: 'Book', labelFr: 'Réserver' }; } catch (e) { link = null; } }
+    if (link) s.bookingLink = link;
+  }
+}
 function v4AddStopPhones(plan) {
   const ids = new Set();
   const visit = (s) => { if (s && s.venue && Number.isInteger(s.venue.id)) ids.add(s.venue.id); };
@@ -11060,7 +11103,7 @@ function lateAfterMinutes(text) {
 const TEAM_BUILDING_WORDS_RE = /\bteam[\s-]?building(?:\s+(?:activit(?:y|ies)|events?|ideas?|outings?|days?|nights?|games?|exercises?|experiences?|venues?|places?|spots?|fun|things to do))+\b|\bteambuilding\b/gi;
 const TRIP_SWIM_OFF_MONTHS = [11, 12, 1, 2, 3, 4];
 const TRIP_SIM_GOLF_RE = /\b(?:indoor )?(?:golf simulators?|golf sims?|sim golf|simulator golf|virtual golf|golf lounges?|indoor golf (?:simulators?|lounges?|centres?|centers?))\b/gi;
-function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null, v4 = false, departureDate = null, departureLast = false, v4DayAsked = false }, now = new Date()) {
+function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds = [], pinned = null, overrides = null, swap = null, v4 = false, departureDate = null, departureLast = false, v4DayAsked = false, tourStops = null, moves = null, trustedPins = null, keepOnDateChange = false }, now = new Date()) {
   const taxonomy = buildTripPlannerTaxonomy();
   // 2026-11-05: trip-length, clock-time, holiday-weekend and tour wording made plain; a beer, cider or distillery "tour" is a run of
   // breweries, cideries or distilleries. (planText is the French layer's own text; planTextPlain is what the planner reads.)
@@ -11639,7 +11682,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
       clock: rolledWindow ? null : okanaganClock(now),
       tripDate: rolledWindow ? requirements.startDate : (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now),
       kidAges: tripKidAges, askText: tripAskText,
-      ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}), ...(v4DayAsked && overrides && overrides.days === 1 ? { v4DayPlan: true } : {}) } : {}),
+      ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}), ...(v4DayAsked && overrides && overrides.days === 1 ? { v4DayPlan: true } : {}), ...(tourStops ? { tourStops } : {}), ...(moves ? { moves } : {}), ...(trustedPins ? { trustedPins } : {}), ...(keepOnDateChange ? { keepOnDateChange: true } : {}), ...(overrides && overrides.stopStarts ? { stopStarts: overrides.stopStarts } : {}) } : {}),
     });
     tripApplyHappyHourParts(plan, hhParts);
     plan.seeAll = null;
@@ -11691,7 +11734,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     holidayEvents: !!holidayEvents,
     tripDate: requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now) || tripPlanDate(intent.when, now),
     kidAges: tripKidAges, askText: tripAskText,
-    ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}), ...(v4DayAsked && overrides && overrides.days === 1 ? { v4DayPlan: true } : {}) } : {}),
+    ...(v4 ? { v4: true, ...(departureDate ? { departureDate } : {}), ...(departureLast ? { departureLast: true } : {}), ...(v4DayAsked && overrides && overrides.days === 1 ? { v4DayPlan: true } : {}), ...(tourStops ? { tourStops } : {}), ...(moves ? { moves } : {}), ...(trustedPins ? { trustedPins } : {}), ...(keepOnDateChange ? { keepOnDateChange: true } : {}), ...(overrides && overrides.stopStarts ? { stopStarts: overrides.stopStarts } : {}) } : {}),
     startWeekday: requirements?.startDate ? localWeekdayKey(requirements.startDate) : tripStartWeekday(intent.when, now),
     clock: rolledWindow ? null : okanaganClock(now),
   });
