@@ -1,14 +1,38 @@
 {
- "updated": "2026-11-20",
+ "updated": "2026-11-21",
  "source": "matches-okanagan.csv",
  "how": "scripts/viator-match.js then rows marked ok by Dayton, applied by scripts/viator-apply.js",
  "venues": {
+  "401": {
+   "name": "Meadow Vista Honey Wines",
+   "productCode": "394086P13",
+   "title": "Fireside Warm-Up: Wine Tasting, S'mores & Mulled Wine in Kelowna",
+   "supplier": "Meadow Vista Honey Wines",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Honey-Wine-Tasting-Mulled-Wine-and-Roasted-Smores-in-Kelowna-BC/d22366-394086P13?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  },
+  "457": {
+   "name": "Okanagan Spirits Craft Distillery (Vernon)",
+   "productCode": "393825P1",
+   "title": "Farm-to-Flask Tasting Experience in Vernon",
+   "supplier": "Okanagan Spirits Craft Distillery",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Farm-to-Flask-Tasting-Experience/d22366-393825P1?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  },
   "1495": {
    "name": "Kelowna Karting & Entertainment",
    "productCode": "5574063P2",
    "title": "Indoor Go Kart Racing in Kelowna",
    "supplier": "Kelowna Karting",
    "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Indoor-Go-Kart-Racing-in-Kelowna-Adult-Kart-Drop-In-Race/d22366-5574063P2?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  },
+  "1577": {
+   "name": "Toast the Okanagan Wine Tours",
+   "productCode": "5501052P1",
+   "title": "Wine Tours in Kelowna",
+   "supplier": "Toast The Okanagan Wine Tours",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/The-Top-Wine-Tours-To-The-Best-Wineries-In-Spectacular-Kelowna/d22366-5501052P1?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
    "approved": "2026-11-21"
   },
   "1578": {
@@ -35,12 +59,36 @@
    "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Kelowna-E-Bike-Guided-City-Highlights-Tour/d22366-357718P11?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0",
    "approved": "2026-11-21"
   },
+  "1593": {
+   "name": "Canadian Craft Tours (Kelowna)",
+   "productCode": "31847P10",
+   "title": "Kelowna Brewery Tour",
+   "supplier": "Canadian Craft Tours",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Kelowna-Brewery-Tour/d22366-31847P10?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  },
   "1611": {
    "name": "Okanagan Life Private Boat Charters",
    "productCode": "128006P4",
    "title": "Vernon Luxury Full Day Boat Tour with Lunch Stop",
    "supplier": "Okanagan Life Private Boat Charters",
    "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Up-to-Max-4-Guests-Captained-Private-Cruise-on-Luxury-22ft-Pontoon-Boat/d22366-128006P4?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  },
+  "1641": {
+   "name": "SunWave Boat Rentals",
+   "productCode": "5585501P5",
+   "title": "Larson Boat Rental",
+   "supplier": "SunWave Boat Rentals",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Larson-Boat-Rental/d22366-5585501P5?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  },
+  "1762": {
+   "name": "Teehouse Wine Tours",
+   "productCode": "91152P1",
+   "title": "Full Day 4 Wineries Mission Hill & Quails Gate With Lunch Stop*",
+   "supplier": "Teehouse Wine Tours",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Teehouse-provides-the-ultimate-wine-tastings-experience-in-the-Okanagan-Valley/d22366-91152P1?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
    "approved": "2026-11-21"
   },
   "1763": {
@@ -66,6 +114,22 @@
    "supplier": "Okanagan Clear Watercraft Rentals",
    "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Exclusive-Clear-Kayak-and-Clear-Paddleboard-Rentals-In-Kelowna-BC/d22366-5666945P1?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
    "approved": "2026-11-20"
+  },
+  "2168": {
+   "name": "Ogopogo Parasail",
+   "productCode": "41596P3",
+   "title": "Tandem Parasailing Experience in Kelowna",
+   "supplier": "Ogopogo Parasail",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Tandem-parasailing-for-you-and-a-friend/d22366-41596P3?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
+  },
+  "2169": {
+   "name": "Winds of Change Experiences",
+   "productCode": "404271P1",
+   "title": "Okanagan Lake Sailing Tour from Penticton & Naramata BC",
+   "supplier": "Winds of Change Experiences",
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Sailing-Adventure-on-Okanagan-Lake-from-Penticton-and-Naramata-BC/d22366-404271P1?mcid=42383&pid=P00333119&medium=api&api_version=2.0",
+   "approved": "2026-11-21"
   }
  }
 }

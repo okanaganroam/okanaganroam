@@ -1690,6 +1690,32 @@ CREATE TABLE IF NOT EXISTS weekend_email_sends (
 );
 `);
 
+// The weekend email sends itself (2026-11-21, weekend-email-auto.js; only with WEEKEND_EMAIL_AUTO=on): one row per weekend
+// (its Friday). preview_state / send_state are claimed with conditional UPDATEs so the Wednesday preview, the Thursday
+// send and any "not sent because..." note each happen once, across ticks, restarts and servers. held_at: the admin's hold.
+db.exec(`
+CREATE TABLE IF NOT EXISTS weekend_email_auto (
+  weekend TEXT PRIMARY KEY,
+  held_at TEXT,
+  held_by TEXT,
+  preview_state TEXT,
+  preview_at TEXT,
+  send_state TEXT,
+  send_attempts INTEGER NOT NULL DEFAULT 0,
+  claimed_at TEXT,
+  sent_at TEXT,
+  decided_at TEXT,
+  note_state TEXT,
+  detail TEXT
+);
+`);
+
+// Temporary items that end by themselves (2026-11-21): an advisory (collection_items.until_date, 'YYYY-MM-DD', the last
+// day it shows, Pacific) and temporary hours (venue_hours_extra.temp_hours, JSON { until, hours, regular, ... }: the
+// regular week the venue goes back to after `until`). server.js expireTemporaryItems() applies them; see there.
+if (!db.prepare('PRAGMA table_info(collection_items)').all().some((c) => c.name === 'until_date')) db.exec('ALTER TABLE collection_items ADD COLUMN until_date TEXT');
+if (!db.prepare('PRAGMA table_info(venue_hours_extra)').all().some((c) => c.name === 'temp_hours')) db.exec('ALTER TABLE venue_hours_extra ADD COLUMN temp_hours TEXT');
+
 // Stay info (2026-11-20, places-to-stay.js): one JSON object of extra facts per place to stay (type 'stay'), in the
 // shape of drafts/stays-2026-11/stay-info-schema.md. Written only through POST /admin/stay-info (validated there, one
 // venue_enrichment_log row per change); batch_id is the research batch that last wrote it.
@@ -1699,6 +1725,26 @@ CREATE TABLE IF NOT EXISTS stay_info (
   info_json TEXT NOT NULL,
   updated_at TEXT,
   batch_id TEXT
+);
+`);
+
+// Commission earnings (2026-11-21, commissions-page.js): what each affiliate program says we earned, typed in by hand on
+// /admin/dashboard/commissions (no partner sends it to us). One line per month, program and site; saving the same three
+// again replaces the line. amount_cents in the currency given (CAD or USD). Admin only; nothing about visitors.
+db.exec(`
+CREATE TABLE IF NOT EXISTS commission_earnings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  month TEXT NOT NULL,
+  program TEXT NOT NULL,
+  site TEXT NOT NULL,
+  bookings INTEGER,
+  amount_cents INTEGER NOT NULL DEFAULT 0,
+  currency TEXT NOT NULL DEFAULT 'CAD',
+  status TEXT NOT NULL DEFAULT 'pending',
+  note TEXT,
+  created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (month, program, site)
 );
 `);
 

@@ -20,6 +20,8 @@ const LESSONS = [
   { id: 'campaign', title: 'Campaign tags', text: 'A tag is a label added to a link, so the site knows which email or post brought the visit.', why: 'Email apps hide where clicks come from. Without tags, that work looks like it did nothing.', q: 'What happens when an email link has no tag?', a: ['The email fails', 'The visit can’t be credited to that email', 'Google gets upset'], r: 1, because: 'The visit still happens, but you can’t tell it came from your email.' },
   { id: 'bounce', title: 'Email bounces', text: 'A bounce means an email came back. A hard bounce is a dead address. A soft bounce is temporary, like a full mailbox.', why: 'Lots of bounces tell mail providers you may be careless, which can push you toward spam.', q: 'What should you do with a hard bounce?', a: ['Keep trying it', 'Remove the address', 'Send it twice'], r: 1, because: 'A dead address will never work, and retrying hurts your reputation.' },
   { id: 'opens', title: 'Why email opens are fuzzy', text: 'Opens are guessed from a hidden image. Apple Mail can load it with nobody reading, and other apps block it.', why: 'Trust clicks and replies. They prove a real person acted.', q: 'Which shows a real person cared most?', a: ['An open', 'A reply', 'Delivered'], r: 1, because: 'Nobody replies by accident.' },
+  // Commissions page (2026-11-21, commissions.js): why taps and money don't line up.
+  { id: 'commission', title: 'Clicks are not bookings', text: 'A tap on a Stay22, Viator or Discover Cars link only means someone went to look. The partner pays only if they book, and only after the stay, the tour or the rental has happened.', why: 'So this week’s taps turn into money weeks or months later, and many never will. Judge a partner by a few months of earnings, not one week of clicks.', q: '40 people tapped “Book on Viator” this week. What did we earn?', a: ['40 commissions', 'Nothing we can see yet: Viator shows what was booked, and pays after the tour date', 'Exactly 8% of 40 tours'], r: 1, because: 'A tap is a visit to the partner. Bookings show up in its own dashboard, and the money comes after the trip.' },
 ];
 
 function lessonCard(l, i, shown, mine) {
@@ -36,6 +38,12 @@ function todayLesson(now, numbers = {}) {
   return `<section class="learn card" id="learn"><div class="learn-head"><h2>Today’s lesson</h2><div class="learn-p"><span id="learnCount">0</span> of ${LESSONS.length} learned<div class="track"><div class="fill" id="learnBar" style="width:0"></div></div></div></div>
     ${LESSONS.map((l, i) => lessonCard(l, i, i === start, mine[l.id])).join('')}
     <button type="button" class="next-lesson" id="nextLesson">Next lesson →</button></section>`;
+}
+
+// One lesson on its own (the Commissions page shows the commission one), answered the same way as on Home.
+function lessonHtml(id) {
+  const i = LESSONS.findIndex((l) => l.id === id);
+  return i < 0 ? '' : `<section class="learn card">${lessonCard(LESSONS[i], i, true, '')}</section>`;
 }
 
 const allLessons = () => `<section class="learn card" id="learn"><div class="learn-head"><h2>All the lessons</h2><div class="learn-p"><span id="learnCount">0</span> of ${LESSONS.length} learned<div class="track"><div class="fill" id="learnBar" style="width:0"></div></div></div></div><div class="lesson-grid">${LESSONS.map((l, i) => lessonCard(l, i, true, '')).join('')}</div></section>`;
@@ -57,4 +65,4 @@ function milestonesHtml(numbers) {
   return `<h2 class="sec">Milestones <small>${n} of ${rows.length} reached this week, from your real numbers</small></h2><div class="wins">${rows.map((x) => `<div class="win${x.won ? ' on' : ''}"><span class="win-i" aria-hidden="true">${x.won ? '★' : '☆'}</span><b>${esc(x.t)}</b><span>${esc(x.d)}</span>${x.won ? '<em>Reached</em>' : `<div class="track"><div class="fill" style="width:${Math.min(100, Math.round((x.have / x.need) * 100))}%"></div></div><em>${x.have.toLocaleString('en-CA')} of ${x.need.toLocaleString('en-CA')}</em>`}</div>`).join('')}</div>`;
 }
 
-module.exports = { LESSONS, MILESTONES, todayLesson, allLessons, milestonesHtml };
+module.exports = { LESSONS, MILESTONES, todayLesson, allLessons, milestonesHtml, lessonHtml };

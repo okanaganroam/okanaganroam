@@ -1,0 +1,39 @@
+{
+ "updated": "2026-11-21",
+ "how": "Airport shuttles and transfers sold on Viator, from drafts/viator-2026-11/viator-products.csv (Viator Partner API, 2026-11-20). Only products Viator itself sells; never invented. getting-here.js shows them on the ski resort pages' \"Getting here & parking\" box, one Book now button each.",
+ "viator": {
+  "ylw-big-white": {
+   "productCode": "350808P616",
+   "title": "Kelowna Airport (YLW) to Big White Mountain - Arrival Transfer",
+   "supplier": "taxiGo Limo Airport Service",
+   "label": { "en": "Kelowna airport (YLW) to Big White, private transfer", "fr": "Aéroport de Kelowna (YLW) à Big White, transfert privé" },
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Kelowna-Airport-YLW-to-Big-White-Silver-Star-Arrival-Transfer/d22366-350808P616?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0"
+  },
+  "kelowna-big-white": {
+   "productCode": "5520106P1",
+   "title": "Private Shuttle Kelowna to Big White",
+   "supplier": "Kelowna Transfers",
+   "label": { "en": "Kelowna to Big White, private shuttle", "fr": "Kelowna à Big White, navette privée" },
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Private-Shuttle-from-Kelowna-to-Big-White-Ski-Resort/d22366-5520106P1?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0"
+  },
+  "kelowna-silverstar": {
+   "productCode": "5520106P3",
+   "title": "Private Shuttle Kelowna to SilverStar",
+   "supplier": "Kelowna Transfers",
+   "label": { "en": "Kelowna to SilverStar, private shuttle", "fr": "Kelowna à SilverStar, navette privée" },
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Private-Shuttle-Kelowna-to-SilverStar/d22366-5520106P3?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0"
+  },
+  "ylw-apex": {
+   "productCode": "350808P703",
+   "title": "Kelowna Airport (YLW) to Apex Mountain - Arrival Private Transfer",
+   "supplier": "taxiGo Limo Airport Service",
+   "label": { "en": "Kelowna airport (YLW) to Apex, private transfer", "fr": "Aéroport de Kelowna (YLW) à Apex, transfert privé" },
+   "url": "https://www.viator.com/en-CA/tours/Kelowna-and-Okanagan-Valley/Kelowna-Airport-YLW-to-Apex-Mountain-Arrival-Private-Transfer/d22366-350808P703?mcid=42383&campaign=okanagan&pid=P00333119&medium=api&api_version=2.0"
+  }
+ },
+ "regions": {
+  "big-white": ["ylw-big-white", "kelowna-big-white"],
+  "silverstar": ["kelowna-silverstar"],
+  "apex": ["ylw-apex"]
+ }
+}

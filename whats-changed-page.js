@@ -162,19 +162,37 @@ function goHtml() {
   return `<h2 class="sec">Where do you want to go?</h2><div class="go">${items.map((i) => `<a href="${i.href}"><b>${esc(i.ask)}</b><span>${esc(i.label)}</span></a>`).join('')}</div>`;
 }
 
+// Commissions (2026-11-21): taps on commission links this week against last (both sites, from the weekly summary) and the
+// earnings typed in for this month (commissions-page.js monthLine). One line for Home and one for the Monday email.
+function commissionTaps(weekly) {
+  let cur = 0; let prev = 0; let any = false;
+  for (const s of weekly) { const m = s.data && metric(s.data, 'commission_clicks'); if (m) { any = true; cur += m.cur; prev += m.prev; } }
+  return any ? { cur, prev } : null;
+}
+function commissionText(weekly, money) {
+  const t = commissionTaps(weekly);
+  const taps = t ? `${num(t.cur)} taps on commission links this week (${num(t.prev)} the week before)` : 'Taps on commission links: not counted yet';
+  return money ? `${taps}. Earnings entered for ${money.month}: ${money.earned}.` : `${taps}.`;
+}
+function commissionCard(weekly, money) {
+  const t = commissionTaps(weekly);
+  const c = t ? chip({ cur: t.cur, prev: t.prev, recent: t.cur }) : '';
+  return `<div class="card"><h3>Commissions</h3><p><a href="/admin/dashboard/commissions"><b>${num(t ? t.cur : 0)}</b> taps on commission links this week</a> ${c} · ${money ? `earned in ${esc(money.month)}: <b>${esc(money.earned)}</b> · waiting to be paid: ${esc(money.waiting)}` : 'no earnings entered yet'}</p><p class="empty">A tap is not a booking. Partners pay weeks later, after the stay, tour or rental.</p></div>`;
+}
+
 // Home: { top, body }. weekly = this week's summary per site; inboxes = { siteKey: inbox counts }.
-function homeHtml(weekly, { notice = '', goals = null, inboxes = {}, now = new Date() } = {}) {
+function homeHtml(weekly, { notice = '', goals = null, inboxes = {}, now = new Date(), commissions = null } = {}) {
   const clicks = weekly.reduce((a, s) => { const m = s.data && metric(s.data, 'outbound'); return a + (m ? shownValue(m) : 0); }, 0);
   const sum = (keys) => weekly.reduce((a, s) => { const m = s.data && metricSum(s.data, keys); return a + (m ? shownValue(m) : 0); }, 0);
   const numbers = { clicks, views: sum(['views']), ai: sum(['visits_ai']), trips: sum(['trip_plan_complete']) };
   const top = `<section class="hero"><svg class="peaks" viewBox="0 0 1200 96" preserveAspectRatio="none" aria-hidden="true"><path fill="rgba(255,255,255,.08)" d="M0 96V62l130-38 120 34 150-52 170 56 130-36 150 40 140-46 210 54v22z"/><path fill="rgba(8,24,32,.32)" d="M0 96V78l170-30 140 30 190-34 150 36 170-26 170 28 210-24v38z"/></svg><p class="hi" id="hi">Welcome back, Dayton</p><p class="quote">${esc(quoteFor(now))}</p>${clicks ? `<p class="impact">In the last 7 days, visitors clicked through to local businesses ${num(clicks)} times because of what you built.</p>` : ''}</section>${notice ? `<p class="status"><span class="dot"></span>${esc(notice)}</p>` : ''}`;
-  const body = `${weekly.map((s) => siteHome(s, inboxes[s.key])).join('')}${todayLesson(now, numbers)}${milestonesHtml(numbers)}${goalsCard(goals)}${goHtml()}
+  const body = `${weekly.map((s) => siteHome(s, inboxes[s.key])).join('')}${commissionCard(weekly, commissions)}${todayLesson(now, numbers)}${milestonesHtml(numbers)}${goalsCard(goals)}${goHtml()}
     <form method="post" action="/admin/dashboard/digest-send" class="foot"><button type="submit">Email me this summary now</button> It also arrives by itself every Monday morning.</form>`;
   return { top, body };
 }
 
-function emailText(sites, { goals = null } = {}) {
-  const lines = ['Okanagan Roam and Whistler Roam: what changed this week', ''];
+function emailText(sites, { goals = null, commissions = null } = {}) {
+  const lines = ['Okanagan Roam and Whistler Roam: what changed this week', '', `Commissions: ${commissionText(sites, commissions)} ${ABS}/admin/dashboard/commissions`, ''];
   for (const s of sites) {
     lines.push(s.name.toUpperCase());
     if (s.error || !s.data) { lines.push(`  (${s.error || 'no data'})`, ''); continue; }
@@ -190,7 +208,7 @@ function emailText(sites, { goals = null } = {}) {
   return lines.join('\n');
 }
 
-function emailHtml(sites, { goals = null } = {}) {
+function emailHtml(sites, { goals = null, commissions = null } = {}) {
   const body = sites.map((s) => {
     if (s.error || !s.data) return `<h2 style="margin:24px 0 4px">${esc(s.name)}</h2><p style="color:#b42318">${esc(s.error || 'No data.')}</p>`;
     const d = s.data;
@@ -199,7 +217,7 @@ function emailHtml(sites, { goals = null } = {}) {
       ${d.headlines.length ? `<ul style="padding-left:18px">${d.headlines.map((h) => `<li style="margin:3px 0"><b>${esc(h)}</b></li>`).join('')}</ul>` : '<p>A quiet week: nothing moved much.</p>'}
       ${sections(d).map((x) => `<h3 style="margin:14px 0 4px;font-size:14px">${esc(x.h)}</h3><table style="border-collapse:collapse;width:100%">${x.rows.map((r) => `<tr><td style="padding:2px 8px 2px 0;border-bottom:1px solid #eee">${esc(r[0])}</td><td style="padding:2px 0;border-bottom:1px solid #eee;text-align:right;white-space:nowrap">${esc(r[1])}</td></tr>`).join('')}</table>`).join('')}`;
   }).join('');
-  return `<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;max-width:640px;margin:0 auto;color:#1c1c1c;font-size:14px;line-height:1.45"><h1 style="font-size:20px">What changed this week</h1>${body}${goals ? `<h2 style="margin:24px 0 4px">Goals for ${esc(goals.deadline)}</h2><table style="border-collapse:collapse;width:100%">${goals.goals.map((x) => `<tr><td style="padding:3px 8px 3px 0;border-bottom:1px solid #eee">${esc(x.label)}</td><td style="padding:3px 0;border-bottom:1px solid #eee;text-align:right">${x.current === null ? 'not measured' : `${esc(String(x.current))} of ${esc(String(x.target))} (${esc(x.status)})`}</td></tr>`).join('')}</table>` : ''}<p style="margin-top:24px"><a href="${ABS}/admin/dashboard">Open the full dashboard</a></p></div>`;
+  return `<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;max-width:640px;margin:0 auto;color:#1c1c1c;font-size:14px;line-height:1.45"><h1 style="font-size:20px">What changed this week</h1><p style="margin:0 0 12px"><b>Commissions:</b> ${esc(commissionText(sites, commissions))} <a href="${ABS}/admin/dashboard/commissions">See commissions</a></p>${body}${goals ? `<h2 style="margin:24px 0 4px">Goals for ${esc(goals.deadline)}</h2><table style="border-collapse:collapse;width:100%">${goals.goals.map((x) => `<tr><td style="padding:3px 8px 3px 0;border-bottom:1px solid #eee">${esc(x.label)}</td><td style="padding:3px 0;border-bottom:1px solid #eee;text-align:right">${x.current === null ? 'not measured' : `${esc(String(x.current))} of ${esc(String(x.target))} (${esc(x.status)})`}</td></tr>`).join('')}</table>` : ''}<p style="margin-top:24px"><a href="${ABS}/admin/dashboard">Open the full dashboard</a></p></div>`;
 }
 
-module.exports = { sections, healthLines, homeHtml, quoteFor, QUOTES, moves, emailText, emailHtml };
+module.exports = { sections, healthLines, homeHtml, quoteFor, QUOTES, moves, emailText, emailHtml, commissionText };

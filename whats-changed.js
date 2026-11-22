@@ -61,14 +61,16 @@ function summarize(db, now = new Date()) {
       add(k, label, (a, b) => one('SELECT SUM(n) FROM site_event_counts WHERE name = ? AND day BETWEEN ? AND ?', k, a, b));
     }
     // Build My Trip funnel (trip-funnel.js, 2026-11-21): both pages added together; visits that did the step, and taps
-    // on the booking links that can earn a commission (a place to stay, Viator).
+    // on the booking links that can earn a commission (a place to stay, Viator, Fever).
     const bmt = (names) => (a, b) => one(`SELECT SUM(n) FROM site_event_counts WHERE name IN (${names.map(() => '?').join(',')}) AND day BETWEEN ? AND ?`, ...names, a, b);
     const both2 = (s) => ['v4', 'v3'].map((v) => `bmt:${v}:${s}`);
     add('bmt_plan', 'Build My Trip: visits that got a plan', bmt(both2('plan')));
     add('bmt_confirm', 'Build My Trip: plans confirmed', bmt(both2('confirm')));
     add('bmt_book_open', 'Build My Trip: opened “Book my trip”', bmt(both2('book_open')));
     add('bmt_book_click', 'Build My Trip: visits that clicked a booking link', bmt(both2('book_click')));
-    add('bmt_commission', 'Build My Trip: stay + Viator booking taps', bmt([...both2('book:stay'), ...both2('book:viator')]));
+    add('bmt_commission', 'Build My Trip: stay + Viator + Fever + rental car booking taps', bmt([...both2('book:stay'), ...both2('book:viator'), ...both2('book:fever'), ...both2('book:discovercars')]));
+    // Commission links (2026-11-21, commissions.js): every tap on a Stay22, Viator, Discover Cars, Fever or Whistler.com link.
+    add('commission_clicks', 'Taps on commission links (all partners, all pages)', (a, b) => one("SELECT SUM(n) FROM site_event_counts WHERE name LIKE 'commission:%' AND day BETWEEN ? AND ?", a, b));
     add('bmt_share', 'Build My Trip: visits that shared', bmt(both2('share')));
     add('bmt_save', 'Build My Trip: visits that saved to My Trip', bmt(both2('save')));
   }

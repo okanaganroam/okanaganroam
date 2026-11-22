@@ -411,12 +411,12 @@ const V4_CLIENT_SRC = String.raw`
     steps.forEach(function(x, n){ if (st[n] === 'done') done++; if (next < 0 && !st[n]) next = n; });
     if (steps.length) {
       html += '<p class="v4-sheet-h4">' + esc(done ? vt('progress', { d: done, n: steps.length }) : vt('toBook')) + '</p><ol class="v4-check">' + steps.map(function(x, n){
-        var mark = st[n], name = x.kind === 'stay' ? vt('stay') + ' · ' + x.name : x.name;
+        var mark = st[n], name = x.kind === 'stay' ? vt('stay') + ' · ' + x.name : ((fr && x.nameFr) || x.name);
         var verb = x.kind === 'stay' ? (fr ? ((d && d.chosen.bookingLinks[0]) || {}).shortFr || 'Réserver' : ((d && d.chosen.bookingLinks[0]) || {}).short || 'Book') : t3StepVerb(x, fr);
         return '<li class="' + (mark === 'done' ? 'is-done' : n === next ? 'is-next' : '') + '"><button type="button" class="t3-book-tick" data-t3-bk-toggle="' + n + '" aria-pressed="' + (mark === 'done' ? 'true' : 'false') + '" aria-label="' + esc((fr ? 'Fait : ' : 'Done: ') + name) + '">' + (mark === 'done' ? '✓' : mark === 'skipped' ? '–' : '') + '</button>'
           + '<span class="v4-check-name">' + esc(name) + '</span>' + t3StepLinkHtml(x, '', verb, n) + '</li>';
       }).join('') + '</ol>';
-      html += next >= 0 ? '<div class="v4-next">' + t3StepLinkHtml(steps[next], 't3-btn t3-book-main', done ? vt('nextOf', { name: steps[next].kind === 'stay' ? vt('stay') : steps[next].name }) : vt('next'), next) + '</div>'
+      html += next >= 0 ? '<div class="v4-next">' + t3StepLinkHtml(steps[next], 't3-btn t3-book-main', done ? vt('nextOf', { name: steps[next].kind === 'stay' ? vt('stay') : ((fr && steps[next].nameFr) || steps[next].name) }) : vt('next'), next) + '</div>'
         : '<p class="v4-sheet-h4">' + esc(vt('allSet')) + ' <button type="button" class="t3-book-link" data-t3-bk-restart>' + esc(vt('startOver')) + '</button></p>';
       if (d) html += t3StayNotesHtml(d.chosen, d.w.trip || {}, fr);
     }
@@ -675,7 +675,8 @@ function v4StaySrc(staySrc) {
   // that is not after the arrival is simply not sent; the plan is for the arrival day.
   swap("    if (o.arrive && /^\\d{4}-\\d{2}-\\d{2}$/.test(l)) o.leave = l;", "    if (o.arrive && /^\\d{4}-\\d{2}-\\d{2}$/.test(l) && l > o.arrive) o.leave = l;");
   swap('  function t3BookRerender(focusSel){\n', '  function t3BookRerender(focusSel){\n    if (V4) setTimeout(v4UpdateBar, 0);\n');
-  return staySrc;
+  // "Getting here" (2026-11-21, getting-here.js): the "Rent a car" step's link (data-link="discovercars") and its click.
+  return require('./getting-here').v4ClientSwaps(staySrc);
 }
 
 module.exports = { V4_STYLES, V4_CLIENT_SRC, v4StaySrc };

@@ -27,6 +27,8 @@ const RULES = [
   ['call_button', 'Call button', 'Top buttons', '.venue-cta-row a[data-track~="phone"]', V],
   ['phone_number', 'Phone number (in the details)', 'Details', 'a[data-track~="phone"]', V],
   ['cta_other', 'Another top button (see its name)', 'Top buttons', '.venue-cta-row a.cta', V],
+  // Fever (2026-11-21, fever.js): an event's "Tickets" button when Fever sells it (affiliate).
+  ['fever', 'Tickets on Fever (commission link)', 'Top buttons', 'a[data-link="fever"]', E],
   ['tickets_info', 'Tickets & info', 'Top buttons', '.event-cta-primary', E],
   ['add_to_calendar', 'Add to calendar', 'Top buttons', 'a[href$=".ics"]', E],
   ['add_to_google_calendar', 'Add to Google Calendar', 'Top buttons', 'a[data-gcal]', E],
@@ -62,8 +64,9 @@ const isKey = (k) => typeof k === 'string' && KEYS.has(k);
 
 // Browser code, shared by business and event pages. report(key) is supplied by the page.
 // opts.viator: include the Viator key (only pages with a "Book on Viator" button, so every other page is unchanged).
+// opts.fever: the same for the Fever key (only event pages with a Fever "Tickets" button).
 function clientClassifierJs(opts = {}) {
-  const list = JSON.stringify(LABELS.filter((l) => l.key !== 'viator' || opts.viator).map((l) => [l.key, l.sel, l.pages]));
+  const list = JSON.stringify(LABELS.filter((l) => (l.key !== 'viator' || opts.viator) && (l.key !== 'fever' || opts.fever)).map((l) => [l.key, l.sel, l.pages]));
   return `var ROAM_CLICKS = ${list};
   function roamClickKey(el, kind){
     for (var i = 0; i < ROAM_CLICKS.length; i++) {

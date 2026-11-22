@@ -1139,7 +1139,8 @@ const T3_STAY_CLIENT_SRC = `
   function t3StepLinkHtml(step, cls, text, n){
     var u = t3StayExt(step.url);
     if (!u) return '';
-    var track = step.kind === 'stay' ? ' data-track="stay_click" data-stay-id="' + esc(step.id) + '" data-link="' + esc(step.link || '') + '"' : ' data-track="booking" data-venue-id="' + esc(step.id) + '"';
+    // An event's step (Fever tickets, 2026-11-21): data-link="fever" and the event id, never a business id.
+    var track = step.kind === 'stay' ? ' data-track="stay_click" data-stay-id="' + esc(step.id) + '" data-link="' + esc(step.link || '') + '"' : step.kind === 'event' ? ' data-track="booking" data-link="' + esc(step.link || '') + '" data-event-id="' + esc(step.eventId || '') + '"' : ' data-track="booking" data-venue-id="' + esc(step.id) + '"';
     return '<a ' + (cls ? 'class="' + cls + '" ' : '') + hrefAttr(u) + ' target="_blank" rel="' + esc(step.rel || 'nofollow noopener') + '"' + track + ' data-t3-step="' + n + '"' + (step.affiliate ? ' data-affiliate="1"' : '') + '>' + esc(text) + ' <span aria-hidden="true">↗</span></a>';
   }
   function t3StepName(step, fr){ return step.kind === 'stay' ? (fr ? 'Hébergement' : 'Stay') : step.name; }
@@ -1296,7 +1297,7 @@ const T3_STAY_CLIENT_SRC = `
         if (kind === 'stay_click') { p.venue_category = 'stay'; p.stay_link = bk.getAttribute('data-link') || ''; }
         track('outbound_click', p);
         track('page_click', { venue_id: vid, click_key: kind });
-      }
+      } else if (bk.getAttribute('data-link') === 'fever') track('outbound_click', { event_id: Number(bk.getAttribute('data-event-id')) || 0, surface: 'trip_planner', link_type: 'fever' });
       if (bk.hasAttribute('data-t3-live')) { if (t3LiveOpen(bk)) e.preventDefault(); return; }
       // A step of "Book my trip": the tab opens (the link's own target, one per tap); the box moves on to the next one.
       var n = bk.hasAttribute('data-t3-step') ? Number(bk.getAttribute('data-t3-step')) : -1, steps = t3BookSteps();

@@ -18,6 +18,9 @@ const { renderBusinessPage } = require('./venue-activity-page');
 const { renderPortalPage } = require('./portal-activity-page');
 const { renderReferralsPage } = require('./referrals-page');
 const siteEvents = require('./site-events');
+const commissions = require('./commissions');
+const commissionsPage = require('./commissions-page');
+const commissionEarnings = commissionsPage.createEarnings(db);
 const siteEventCounter = siteEvents.createCounter(db);
 const portalActivity = require('./portal-activity');
 const portalCompleteness = require('./portal-completeness');
@@ -49,6 +52,13 @@ const stayBookingLinks = require('./stay-booking-links');
 const tripBooking = require('./trip-booking');
 // Viator tours (2026-11-20, viator.js): off unless VIATOR_API_KEY and VIATOR_PARTNER_ID are both set.
 const viator = require('./viator');
+const tourPicks = require('./tour-picks');
+// Fever "Tickets" (2026-11-21, fever.js): off unless FEVER_AFFILIATE_TEMPLATE is set (Dayton's Impact link for Fever).
+const fever = require('./fever');
+// "Getting here" (2026-11-21, getting-here.js): Discover Cars rental cars + Viator airport shuttles; off until DISCOVERCARS_AID is set.
+const gettingHere = require('./getting-here');
+// "Book a wine tour" (2026-11-21, wine-tours.js): one Viator wine tour per wine area; off with Viator off.
+const wineTours = require('./wine-tours');
 const gscReport = require('./gsc-report');
 // What is clickable on one business or event page (2026-11-05): read from the page itself, so each sheet shows that page's
 // own buttons and links. The server asks its own public page (no scripts run, so nothing is counted); kept 10 minutes.
@@ -529,6 +539,10 @@ function rowToVenue(row) {
       if (closures.length) v.special_closures = closures;
       if (x.seasons.length || closures.length || x.holidays) v.hours_live = hoursWithExtras(v);
     }
+    // Temporary hours (2026-11-21): `hours` is the temporary week until hours_until (Pacific, inclusive), then
+    // hours_regular comes back by itself.
+    const t = activeTempHours(v);
+    if (t && t.until >= todayLocal()) { v.hours_until = t.until; v.hours_regular = t.regular; }
   }
   return v;
 }
@@ -1363,6 +1377,26 @@ function guardedHoursVerifyUpdate(id, expectedCurrentHours, verified, meta, now 
   if (!existing) return { ok: false, reason: 'venue_not_found' };
   if (existing.redirect_to !== null && existing.redirect_to !== undefined) return { ok: false, reason: 'venue_redirected' };
 
+  // Temporary hours (2026-11-21): meta.temporary = { until, regular_hours?, note? }. The verified week shows until the
+  // end of `until` (Pacific), then expireTemporaryItems() puts the regular week back: regular_hours, or the hours stored
+  // now. Never on a listing the business manages ("Verified by the business": its hours are the owner's).
+  let temp = null;
+  if (m.temporary !== undefined && m.temporary !== null) {
+    const t = m.temporary;
+    if (!t || typeof t !== 'object' || Array.isArray(t)) return { ok: false, reason: 'invalid_temporary', detail: 'temporary must be { until, regular_hours?, note? } or null' };
+    const extraT = Object.keys(t).filter((k) => !['until', 'regular_hours', 'note'].includes(k));
+    if (extraT.length) return { ok: false, reason: 'invalid_temporary', detail: `temporary has unexpected field(s): ${extraT.join(', ')}` };
+    const untilErr = untilDateError(t.until, {}, now);
+    if (untilErr) return { ok: false, reason: 'invalid_temporary', detail: untilErr };
+    const reg = validateVerifiedHours(t.regular_hours !== undefined ? t.regular_hours : existing.hours);
+    if (!reg.ok) return { ok: false, reason: 'invalid_temporary', detail: t.regular_hours !== undefined ? `regular_hours: ${reg.detail}` : 'no regular hours to go back to: send temporary.regular_hours' };
+    if (canonicalWeek(reg.json) === canonicalWeek(checked.json)) return { ok: false, reason: 'invalid_temporary', detail: 'the temporary week is the same as the regular week' };
+    if (t.note !== undefined && t.note !== null && (typeof t.note !== 'string' || t.note.length > 200)) return { ok: false, reason: 'invalid_temporary', detail: 'note: a string up to 200 characters' };
+    if (venueIsClaimed(id)) return { ok: false, reason: 'owner_verified', detail: 'the business manages this listing ("Verified by the business"); its hours are theirs' };
+    temp = { until: t.until, hours: checked.json, regular: reg.json, regular_source: t.regular_hours !== undefined ? null : existing.hours_source, regular_checked_at: t.regular_hours !== undefined ? null : existing.hours_checked_at,
+      note: typeof t.note === 'string' && t.note.trim() ? t.note.trim() : null, set_at: todayLocal(now), batch_id: m.batch_id.trim() };
+  }
+
   const next = { hours: checked.json, hours_source: v.hours_source, hours_checked_at: v.hours_checked_at };
   const expected = expectedCurrentHours === undefined ? null : expectedCurrentHours;
   let txOpen = false;
@@ -1393,9 +1427,18 @@ function guardedHoursVerifyUpdate(id, expectedCurrentHours, verified, meta, now 
     for (const f of changedFields) {
       logStmt.run(id, f, existing[f] === null ? null : String(existing[f]), next[f], next.hours_source, m.reason.trim(), m.batch_id.trim(), m.reviewed_by || null);
     }
+    // A verified week always replaces a pending temporary stretch (a new one, or none).
+    let prevTemp = null;
+    try { prevTemp = (db.prepare('SELECT temp_hours FROM venue_hours_extra WHERE venue_id = ?').get(id) || {}).temp_hours || null; } catch (e) { prevTemp = null; }
+    const tempJson = temp ? JSON.stringify(temp) : null;
+    if (tempJson || prevTemp) {
+      db.prepare('INSERT INTO venue_hours_extra (venue_id, temp_hours) VALUES (?, ?) ON CONFLICT(venue_id) DO UPDATE SET temp_hours = excluded.temp_hours, updated_at = CURRENT_TIMESTAMP').run(id, tempJson);
+      if (tempJson !== prevTemp) logStmt.run(id, 'temp_hours', prevTemp, tempJson, next.hours_source, m.reason.trim(), m.batch_id.trim(), m.reviewed_by || null);
+      clearTempHoursCache();
+    }
     db.exec('COMMIT');
     txOpen = false;
-    return { ok: true, changedFields, ...next };
+    return { ok: true, changedFields: tempJson !== prevTemp ? [...changedFields, 'temp_hours'] : changedFields, ...next, temporary: temp ? { until: temp.until, regular_hours: temp.regular, note: temp.note } : null };
   } catch (err) {
     if (txOpen) {
       try { db.exec('ROLLBACK'); } catch (_) { /* nothing left to roll back */ }
@@ -8122,9 +8165,9 @@ function getAdvisoryNotesWithDates() {
     SELECT ci.content_id AS id, ci.note AS note, ci.created_at AS added_at
     FROM collection_items ci
     JOIN collections c ON c.id = ci.collection_id
-    WHERE c.kind = ? AND ci.content_type = 'venue'
+    WHERE c.kind = ? AND ci.content_type = 'venue' AND (ci.until_date IS NULL OR ci.until_date >= ?)
     ORDER BY ci.created_at ASC, ci.rowid ASC
-  `).all(ADVISORY_COLLECTION_KIND)) map.set(r.id, { note: r.note || '', addedAt: r.added_at || null });
+  `).all(ADVISORY_COLLECTION_KIND, todayLocal())) map.set(r.id, { note: r.note || '', addedAt: r.added_at || null });
   // Sport test 11: not a season advisory the owner's own season answer has replaced (getCollectionNotes).
   const own = ownerSeasonAnsweredIds();
   for (const [id, x] of [...map]) if (own.has(id) && advisoryIsSeasonOnly(x.note)) map.delete(id);
@@ -8344,7 +8387,18 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false) {
       const bookable = new Set(((block && block.checklist) || tripBookingChecklist(plan)).map((c) => c.venueId));
       const hint = viator.tripHint(plan, text, bookable);
       if (hint) plan.viator = hint;
+      // "Book a wine tour (no driving)" (2026-11-21, wine-tours.js): V4's "Book my trip" gets one Viator wine tour step
+      // when a day has 2+ winery stops (the tour for that day's wine area). Added after planning: stops never change.
+      if (v4) {
+        const wineStep = wineTours.tripStep(plan, { bookableIds: bookable });
+        if (wineStep) wineTours.withTripStep(plan, wineStep);
+      }
     }
+    // Fever (2026-11-21, fever.js): an event in the plan that Fever sells gets its "Tickets" step in V4's "Book my trip"
+    // (only with FEVER_AFFILIATE_TEMPLATE set). Added after planning: the stops and their order never change.
+    if (v4 && fever.enabled()) fever.withTripSteps(plan);
+    // "Getting here" (2026-11-21, getting-here.js): a "Rent a car" step for a plan over 2+ towns or days (DISCOVERCARS_AID set).
+    if (v4 && gettingHere.enabled()) gettingHere.withTripStep(plan, stay);
   } catch (e) { console.error(`[trip] where to stay: ${e.message}`); }
   return plan;
 }
@@ -11460,30 +11514,43 @@ function dropStaleResearchAdvisories(all, now = new Date()) {
   try {
     const research = [...all].filter(([, note]) => ADVISORY_CHECKED_RE.test(String(note || '')));
     if (!research.length) return all;
-    const claimed = claimedVenueIds(), ids = research.map(([id]) => id).filter((id) => claimed.has(id));
+    // Main #992 (temporary items end by themselves): a note given its own last day (collection_items.until_date) keeps
+    // showing through that day; getCollectionNotesRaw already skips it after. The dates-in-the-note guess below is only
+    // for research notes nobody gave a last day, so the two rules never both decide one note.
+    const dated = advisoryUntilIds();
+    const claimed = claimedVenueIds(), ids = research.map(([id]) => id).filter((id) => claimed.has(id) && !dated.has(id));
     if (!ids.length) return all;
     const saved = ownerHoursSavedOn(ids, now), today = todayLocal(now);
     for (const id of ids) if (advisoryResearchStale(all.get(id), saved.get(id), today)) all.delete(id);
   } catch (e) { /* keep every note */ }
   return all;
 }
+// venue ids whose advisory row has its own last day (main #992's until_date).
+function advisoryUntilIds() {
+  try {
+    return new Set(db.prepare(`SELECT ci.content_id AS id FROM collection_items ci JOIN collections c ON c.id = ci.collection_id
+      WHERE c.kind = ? AND ci.content_type = 'venue' AND ci.until_date IS NOT NULL`).all(ADVISORY_COLLECTION_KIND).map((r) => r.id));
+  } catch (e) { return new Set(); }
+}
 function getCollectionNotes(kind, now = new Date()) {
   if (kind === ADVISORY_COLLECTION_KIND) {
-    const all = getCollectionNotesRaw(kind), own = ownerSeasonAnsweredIds();
+    const all = getCollectionNotesRaw(kind, now), own = ownerSeasonAnsweredIds();
     if (own.size) for (const [id, note] of [...all]) if (own.has(id) && advisoryIsSeasonOnly(note)) all.delete(id);
     return dropStaleResearchAdvisories(all, now);
   }
   return getCollectionNotesRaw(kind);
 }
-function getCollectionNotesRaw(kind) {
+// `now`: one Okanagan day for the until_date check (#992) and the stale-research rule above.
+function getCollectionNotesRaw(kind, now = new Date()) {
   const rows = db.prepare(`
     SELECT ci.content_id AS id, ci.note AS note
     FROM collection_items ci
     JOIN collections c ON c.id = ci.collection_id
     JOIN venues v ON v.id = ci.content_id
     WHERE c.kind = ? AND ci.content_type = 'venue' AND v.redirect_to IS NULL AND v.type != 'stay'
+      AND (ci.until_date IS NULL OR ci.until_date >= ?)
     ORDER BY ci.created_at ASC, ci.rowid ASC
-  `).all(kind);
+  `).all(kind, todayLocal(now));
   const map = new Map();
   for (const r of rows) map.set(r.id, r.note || '');
   return map;
@@ -12736,6 +12803,13 @@ function validateVisitInfo(input) {
       if (!httpUrl(r.url)) return { ok: false, detail: 'row url must be an http(s) link' };
       row.url = r.url.trim();
     }
+    // until (2026-11-21): a temporary line ("Pre-season hours ...") shows to the end of this day (Pacific), then
+    // drops out by itself (venueVisitInfo, expireTemporaryItems).
+    if (r.until !== undefined && r.until !== null) {
+      const err = untilDateError(r.until);
+      if (err) return { ok: false, detail: `row until: ${err}` };
+      row.until = r.until;
+    }
     rows.push(row);
   }
   if (v.booking_url !== undefined && v.booking_url !== null && !httpUrl(v.booking_url)) return { ok: false, detail: 'booking_url must be an http(s) link or null' };
@@ -12754,8 +12828,15 @@ function validateVisitInfo(input) {
 function venueVisitInfo(venueId) {
   try {
     const r = db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(venueId);
-    return r ? JSON.parse(r.info) : null;
+    return r ? visitInfoWithoutExpired(JSON.parse(r.info)) : null;
   } catch (e) { return null; }
+}
+// A box without its lines whose `until` day is over (Pacific); null when nothing is left to show.
+function visitInfoWithoutExpired(info, today = todayLocal()) {
+  if (!info || !Array.isArray(info.rows) || !info.rows.some((x) => x && x.until)) return info;
+  const rows = info.rows.filter((x) => !(x && x.until && x.until < today));
+  if (rows.length === info.rows.length) return info;
+  return rows.length || info.booking_url ? { ...info, rows } : null;
 }
 function currentVisitInfoJson(venueId) {
   try { const r = db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(venueId); return r ? r.info : null; } catch (e) { return null; }
@@ -14696,23 +14777,36 @@ function guardedCollectionMembershipUpdate(kind, venueId, action, note, meta) {
     .prepare("SELECT 1 FROM collection_items WHERE collection_id = ? AND content_type = 'venue' AND content_id = ?")
     .get(collection.id, venueId);
   if (action === 'add' && existing) return { ok: false, reason: 'already_member' };
-  if (action === 'remove' && !existing) return { ok: false, reason: 'not_member' };
+  if ((action === 'remove' || action === 'set_until') && !existing) return { ok: false, reason: 'not_member' };
+  // Ends by itself (2026-11-21): meta.until ('YYYY-MM-DD', the last day it shows, Pacific) on an add, or action
+  // 'set_until' to give an existing membership an end date (null clears it). expireTemporaryItems() removes it after.
+  const until = meta && typeof meta.until === 'string' ? meta.until : null;
 
   let txOpen = false;
   try {
     db.exec('BEGIN');
     txOpen = true;
+    if (action === 'set_until') {
+      const before = db.prepare("SELECT until_date FROM collection_items WHERE collection_id = ? AND content_type = 'venue' AND content_id = ?").get(collection.id, venueId);
+      db.prepare("UPDATE collection_items SET until_date = ? WHERE collection_id = ? AND content_type = 'venue' AND content_id = ?").run(until, collection.id, venueId);
+      db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(venueId);
+      db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+        VALUES (?, ?, ?, ?, 'editorial_collection', ?, 'high', ?, 0, ?)`).run(venueId, `collection:${kind}:until`, before ? before.until_date : null, until, meta.reason, meta.batch_id, meta.reviewed_by || null);
+      db.exec('COMMIT');
+      txOpen = false;
+      return { ok: true, kind, venue_id: venueId, action, until };
+    }
     if (action === 'add') {
       const next = db
         .prepare('SELECT COALESCE(MAX(position), 0) + 1 AS p FROM collection_items WHERE collection_id = ?')
         .get(collection.id).p;
       // French advisories (2026-10-19, round 7): meta.note_fr, when given, is stored beside the English note.
       if (meta && typeof meta.note_fr === 'string' && meta.note_fr.trim()) {
-        db.prepare(`INSERT INTO collection_items (collection_id, content_type, content_id, note, note_fr, position) VALUES (?, 'venue', ?, ?, ?, ?)`)
-          .run(collection.id, venueId, note, meta.note_fr.trim(), next);
+        db.prepare(`INSERT INTO collection_items (collection_id, content_type, content_id, note, note_fr, position, until_date) VALUES (?, 'venue', ?, ?, ?, ?, ?)`)
+          .run(collection.id, venueId, note, meta.note_fr.trim(), next, until);
       } else {
-        db.prepare(`INSERT INTO collection_items (collection_id, content_type, content_id, note, position) VALUES (?, 'venue', ?, ?, ?)`)
-          .run(collection.id, venueId, note, next);
+        db.prepare(`INSERT INTO collection_items (collection_id, content_type, content_id, note, position, until_date) VALUES (?, 'venue', ?, ?, ?, ?)`)
+          .run(collection.id, venueId, note, next, until);
       }
     } else {
       db.prepare("DELETE FROM collection_items WHERE collection_id = ? AND content_type = 'venue' AND content_id = ?")
@@ -14741,7 +14835,7 @@ function guardedCollectionMembershipUpdate(kind, venueId, action, note, meta) {
   const members = db
     .prepare("SELECT COUNT(*) AS n FROM collection_items WHERE collection_id = ? AND content_type = 'venue'")
     .get(collection.id).n;
-  return { ok: true, kind, venue_id: venueId, action, members };
+  return { ok: true, kind, venue_id: venueId, action, members, ...(until ? { until } : {}) };
 }
 
 // Venue page picks (2026-10-14). These used to be the six highest raw
@@ -19240,7 +19334,7 @@ const GA4_MEASUREMENT_ID = 'G-J312FGJPSC';
 // V3 page views and its trip_plan_* events are told apart from V2's ('trip').
 // Same URL (/trip), served only while TRIP_PLANNER_V3 allows it.
 // Analytics (2026-10-19, round 8): 'info' is /about, /contact, /privacy and /terms (EN+FR); /guides itself is a 'hub'.
-const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'trip_v3', 'listing_form', 'not_found', 'search', 'favorites', 'browse', 'my_trip', 'info', 'hotel']);
+const GA4_PAGE_TYPES = new Set(['hub', 'region', 'category', 'venue', 'event', 'guide', 'trip', 'trip_v3', 'listing_form', 'not_found', 'search', 'favorites', 'browse', 'my_trip', 'info', 'hotel', 'email_book']);
 
 // Internal-traffic separation (Measurement Phase B, 2026-09-27), in the same
 // snippet, so every server template gets it and nothing else changes:
@@ -19330,6 +19424,7 @@ ${renderGa4ConfigIifeJs(`{ page_type: '${pageType}' }`)}
       navigator.sendBeacon('/api/site-event', new Blob([JSON.stringify({ name: n })], { type: 'application/json' }));
     } catch (e) { /* counting must never break the site */ }
   }
+${commissions.clientJs(pageType)}
   function roamVenue(p, name){
     try {
       if (!p || !(p.venue_id || p.event_id) || !navigator.sendBeacon || /(?:^|;\\s*)roam_internal=1(?:;|$)/.test(document.cookie)) return;
@@ -31997,6 +32092,72 @@ function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map()) 
 function hotelAwayText(km) {
   return km <= 1.2 ? `${Math.max(1, Math.round(km * 12))} min walk` : `${Math.round(km * 1.6 + 2)} min drive`;
 }
+// ---------- Bookable tour picks (2026-11-21, tour-picks.js) ----------
+// The "Book a tour" row at the end of a hotel guest page, and the weekend email's one bookable pick. Only Viator
+// products we already link; off with Viator off; nothing when nothing fits. It never changes the free picks above it.
+function tourPickContext(venues, closedIds, date) {
+  const skiInSeason = false; // no ski rental product on this site
+  return { venues: new Map(venues.map((v) => [v.id, v])), closedIds, date, skiInSeason };
+}
+function tourPickVenueHref(v) {
+  return v && v.slug && CATEGORY_SLUGS[v.type] ? `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}` : null;
+}
+function hotelTourRowHtml(hotel, venues, closedIds, now = new Date()) {
+  try {
+    if (!viator.enabled()) return '';
+    const picks = tourPicks.guestPicks(hotel, tourPickContext(venues, closedIds, todayLocal(now)));
+    return tourPicks.guestRowHtml(picks, { lang: 'en', rental: hotelIsRental(hotel), venueHref: tourPickVenueHref });
+  } catch (e) { return ''; } // a commission row must never break the page
+}
+// The weekend email's pick for the weekend starting on Friday `friday` (YYYY-MM-DD), or null. Only products whose
+// business has its own photo on our site (tour-picks.js emailPick).
+function weekendBookingPick(friday) {
+  try {
+    if (!viator.enabled() || !/^\d{4}-\d{2}-\d{2}$/.test(String(friday || ''))) return null;
+    const at = new Date(`${friday}T20:00:00Z`); // Friday noon, local
+    const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL').all().map(rowToVenue);
+    const closedIds = new Set(advisoryNotOperatingIds());
+    for (const [id, st] of getSeasonStates(at)) if (st && (st.kind === 'closed' || st.kind === 'temp_closed')) closedIds.add(id);
+    const p = tourPicks.emailPick(tourPickContext(venues, closedIds, friday));
+    if (!p) return null;
+    const photo = venueThumbPhoto(p.photoVenue);
+    if (!photo) return null; // never a box without the business's own photo
+    return { code: p.code, title: p.title, business: p.business, photo, pagePath: tourPickVenueHref(p.photoVenue) };
+  } catch (e) { return null; }
+}
+// GET /weekend-email/book/<code>: the email's "Book now". A tiny noindex page that counts the tap (Analytics, with the
+// email's campaign tags on this address, and commission:viator:email) and goes straight on to the product on Viator.
+function renderWeekendBookHop(link) {
+  const url = JSON.stringify(link.url).replace(/</g, '\\u003c');
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Opening Viator…</title>
+<noscript><meta http-equiv="refresh" content="0;url=${escapeHtml(link.url)}"></noscript>
+${renderAnalyticsHeadHtml('email_book')}
+<style>body{margin:0;background:#f8f5ed;color:#1b2e39;font:16px/1.5 Arial,sans-serif}main{max-width:520px;margin:0 auto;padding:40px 16px}a{color:#1b2e39;font-weight:700}small{display:block;margin-top:14px;color:#55646a;font-size:13px}</style>
+</head>
+<body>
+<main>
+<p>Taking you to Viator to book <strong>${escapeHtml(link.title)}</strong>…</p>
+<p><a href="${escapeHtml(link.url)}" rel="sponsored noopener">Continue to Viator ↗</a></p>
+<small>${escapeHtml(viator.DISCLOSURE.en)}</small>
+</main>
+<script>
+(function(){
+  var u = ${url}, done = false;
+  function go(){ if (done) return; done = true; location.replace(u); }
+  try { if (typeof roamCount === 'function') roamCount('commission:viator:email'); } catch (e) {}
+  try { if (typeof gtag === 'function') gtag('event', 'outbound_click', { link_type: 'viator', surface: 'weekend_email', viator_code: ${JSON.stringify(link.code)}, event_callback: go, event_timeout: 800 }); } catch (e) {}
+  setTimeout(go, 900);
+})();
+</script>
+</body>
+</html>`;
+}
 // ---------- Places to stay (2026-11-19, places-to-stay.js) ----------
 // Own reads, own routes: type 'stay' is not in CATEGORY_SLUGS, and every shared list query leaves it out
 // (type != 'stay'), so stays never reach another category, the map, Roam Now, Build My Trip, Editor's Picks or the
@@ -32255,6 +32416,7 @@ ${renderGolfHeaderHtml()}
     <ul class="ht-events">${events.map(eventItem).join('')}</ul>
     <p class="ht-more"><a href="/${hotel.region}/events">All events in ${escapeHtml(town)}</a></p>
   </section>` : ''}
+  ${hotelTourRowHtml(hotel, venues, closedIds, now)}
   </div>
   </main>
   ${renderHomeFooterHTML(true)}
@@ -32263,10 +32425,10 @@ ${renderGolfHeaderHtml()}
 document.addEventListener('click', function(e){
   if (!window.trackEvent || !e.target.closest) return;
   var hotel = document.body.getAttribute('data-hotel');
-  var a = e.target.closest('.ht-link, .ht-event, [data-ht-cta]');
+  var a = e.target.closest('.ht-link, .ht-event, [data-ht-cta], .ht-tour-biz, .ht-tour-book');
   if (!a) return;
   var c = a.closest('.ht-card');
-  window.trackEvent('hotel_page_click', { hotel: hotel, link_url: a.getAttribute('href'), venue_id: c ? Number(c.getAttribute('data-venue-id')) : null });
+  window.trackEvent('hotel_page_click', { hotel: hotel, link_url: a.getAttribute('href'), venue_id: c ? Number(c.getAttribute('data-venue-id')) : null, link_type: a.classList.contains('ht-tour-book') ? 'viator' : undefined });
 });
 </script>
 </body>
@@ -36431,6 +36593,9 @@ function renderFoodDrinkScopedPage(venues, filter, scope, now = new Date()) {
   const label = CATEGORY_LABELS[type];
   const valleyText = FD_HUB_HEADINGS[type];
   const path = valleyWide ? `/${catSlug}` : `/${region}/${catSlug}`;
+  // "Book a wine tour" (2026-11-21, wine-tours.js): a town's wineries page carries one Viator wine tour line for that
+  // town's wine area (Viator set up only), above the list. It never changes the list or its order.
+  const wineTownLine = type === 'winery' && venues.length ? wineTours.lineHtml(region || null) : '';
 
   // Open now, status and sort (2026-10-18): the same as /food-drink -- Recommended order (places closed for the
   // season last), Top rated, A-Z; an Open now toggle over stored hours; each card's open/closed line.
@@ -36530,7 +36695,7 @@ ${renderGolfHeaderHtml()}
     ? categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(valleyText.heading)}</h1>\n  <p class="outdoor-intro fd-intro">${escapeHtml(valleyText.intro)}</p>`)
     : categoryHeroHtml(categoryBannerHtml(type), `<h1>${escapeHtml(label.plural)} in ${escapeHtml(regionLabel)}, BC</h1>${region === 'kelowna' && (type === 'restaurant' || type === 'cafe') ? `\n  <p class="subtitle"><a href="${BRUNCH_GUIDE_PATH}">Guide: the best brunch in Kelowna &rarr;</a></p>` : ''}${type === 'winery' ? `\n  <p class="subtitle"><a href="${WINE_GUIDE_PATH}">New to wine country? Start with our first-timer\u2019s guide &rarr;</a> &middot; <a href="/wineries">All Okanagan wineries</a></p>` : ''}`)}
   ${valleyWide ? renderCategoryRegionSelector(catSlug, venues) : regionCategoryTabsHtml(region, categoryCounts, type)}
-  ${venues.length ? `<div class="fd-toolbar">
+  ${wineTownLine}${venues.length ? `<div class="fd-toolbar">
   ${foodDrinkSearchHtml(true)}
   ${(foodDrinkFilterBarHtml(venues, state, scopeFeatures, true) || '<div class="fd-controls">\n  </div>').replace(/\n  <\/div>$/, `\n    ${foodDrinkOpenNowToggleHtml(openNow, openCount)}\n  </div>`)}
   </div>` : ''}
@@ -36547,7 +36712,7 @@ ${renderGolfHeaderHtml()}
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${golfCardEngagementScriptHtml('fd', true)}
-  ${renderFoodDrinkHubScriptHtml({ surface: 'food_drink_category', openNow: true })}
+  ${renderFoodDrinkHubScriptHtml({ surface: 'food_drink_category', openNow: true })}${wineTownLine ? `\n  ${wineTours.clickScriptHtml('wineries_town')}` : ''}
 </body>
 </html>`;
 }
@@ -36736,6 +36901,9 @@ ${renderGolfHeaderHtml()}
 const WINE_HUB_MIN_FEATURE = 5;
 function renderWineriesHubPage(venues, filter = null, now = new Date()) {
   const f = { types: [], features: [], regions: [], ...(filter || {}), types: [] };
+  // "Book a wine tour" (2026-11-21, wine-tours.js): one Viator wine tour line under the heading (Viator set up only);
+  // the tour for the one town picked in the filter, else the default area. It never changes the list or its order.
+  const wineHubLine = wineTours.lineHtml(Array.isArray(f.regions) && f.regions.length === 1 ? f.regions[0] : null);
   const sort = FD_SORT_KEYS.has(f.sort) ? f.sort : 'recommended';
   const recommendedRank = new Map(sortFoodDrinkVenues(venues, 'recommended', now).map((v, i) => [v.id, i]));
   venues = sortFoodDrinkVenues(venues, sort, now);
@@ -36856,7 +37024,7 @@ ${renderGolfHeaderHtml()}
   ${categoryHeroHtml(categoryBannerHtml('winery'), `<h1>${escapeHtml(heading)}</h1>
   <p class="outdoor-intro fd-intro">Find your next favourite tasting, vineyard patio or little wine-country escape. 🍇</p>
   <p class="wine-guide-link"><a href="${WINE_GUIDE_PATH}">New to wine country? Start with our first-timer\u2019s guide &rarr;</a></p>`)}
-  <div class="fd-toolbar">
+  ${wineHubLine}<div class="fd-toolbar">
   ${foodDrinkSearchHtml().replace('Search food and drink', 'Search wineries').replace('Search by name, place or dish...', 'Search by name, town or wine...')}
   ${controlsHtml}
   </div>
@@ -36881,7 +37049,7 @@ ${renderGolfHeaderHtml()}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
-  ${golfCardEngagementScriptHtml('winery', true)}
+  ${golfCardEngagementScriptHtml('winery', true)}${wineHubLine ? `\n  ${wineTours.clickScriptHtml('wineries')}` : ''}
   ${renderFoodDrinkHubScriptHtml({ openNow: true, surface: 'wineries', noun: ['winery', 'wineries'] })}
   <script>
   (function(){
@@ -40447,7 +40615,7 @@ function whatsOnEventCardHtml(ev, todayArg = null, now = null, claimHostPhoto = 
         <div class="card-actions">
           <button type="button" class="card-action fav-btn" data-fav-name="${escapeHtml(ev.name)}" aria-pressed="false" aria-label="Favorite ${escapeHtml(ev.name)}">${APP_FAV_LABEL_HTML}</button>
           <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(ev.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(ev.region)}" data-trip-ref="event:${ev.id}" aria-pressed="false" aria-label="Add ${escapeHtml(ev.name)} to trip">${APP_TRIP_LABEL_HTML}</button>
-        </div>
+        </div>${fever.cardHtml(ev.id)}
       </li>`;
 }
 function whatsOnSelectedTagsHtml(selectedRegions, selectedCategories) {
@@ -41493,6 +41661,7 @@ ${renderGolfHeaderHtml()}
   ${GOLF_APP_SCRIPT_TAG}
   ${renderWhatsOnFilterScriptHtml({ hasInventory, dateState, scope })}
   ${welcomeLayout ? welcomeLayout.script : ''}
+  ${fever.enabled() ? fever.clickScriptHtml('whatson_card') : ''}
 </body>
 </html>`;
 }
@@ -41890,6 +42059,8 @@ function frDecode(s) {
 // (counts, opening times, "Wineries in Kelowna" ...), which may translate pieces through frText again.
 // The list keyed the way lookups are: one space between words, straight apostrophes.
 const frNorm = (s) => frDecode(String(s)).replace(/\s+/g, ' ').replace(/[\u2019\u2018]/g, "'").trim();
+// "Getting here" (2026-11-21): its own French words (getting-here.js FR_TEXT) join the list; existing entries win.
+for (const [k, v] of Object.entries(gettingHere.FR_TEXT)) if (frenchText.FR_TEXT && !Object.prototype.hasOwnProperty.call(frenchText.FR_TEXT, k)) frenchText.FR_TEXT[k] = v;
 const FR_TEXT_MAP = new Map(Object.entries(frenchText.FR_TEXT).map(([k, v]) => [frNorm(k), v]));
 function frLookup(key) { const k = frNorm(key); return FR_TEXT_MAP.has(k) ? FR_TEXT_MAP.get(k) : null; }
 // A French short month that ends a sentence keeps one period: "jusqu’au 31 oct." not "oct.." (2026-10-18).
@@ -44271,6 +44442,13 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     if (season && season.until && season.kind !== 'reopening') {
       localBusiness.openingHoursSpecification = localBusiness.openingHoursSpecification.map((spec) => (spec.validThrough ? spec : { ...spec, validThrough: season.until }));
     }
+    // Temporary hours (2026-11-21): the temporary week runs through its last day, and the regular week follows it.
+    const temp = activeTempHours(venue);
+    if (temp && temp.until >= todayLocal(opts.now || new Date())) {
+      const after = addLocalDays(temp.until, 1);
+      localBusiness.openingHoursSpecification = localBusiness.openingHoursSpecification.map((spec) => (spec.validThrough ? spec : { ...spec, validThrough: temp.until }))
+        .concat(openingSpecsFor(temp.regular, { validFrom: after }));
+    }
   }
   // Temporary closures (2026-10-19, round 8): closed dates go in specialOpeningHoursSpecification, also for a place
   // with no weekly hours stored.
@@ -46289,13 +46467,16 @@ ${pastOccs.map(dateItem).join('\n')}
       : full.venue_name_text ? `${full.venue_name_text}, ${regionLabel}, BC` : null;
   const builtInDirections = mapDirectionsAvailable()&&!expired&&mapDestination('/'+full.region+'/events/'+full.slug,now)?roamDirectionsHref('/'+full.region+'/events/'+full.slug,opts.lang==='fr'?'fr':'en'):null;
   const directionsUrl = placeQuery && full.valley_wide !== 1 ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(placeQuery)}` : null;
+  // Fever (2026-11-21, fever.js): an event Fever sells, with FEVER_AFFILIATE_TEMPLATE set, has "Tickets" (Fever, commission)
+  // as its one main ticket button, with the commission line under the row; every other event is exactly as before.
+  const feverTickets = expired ? null : fever.eventTickets(full.id);
   const ctaHtml = expired ? '' : `
   <div class="event-cta-row">
-    ${full.website ? `<a class="cta event-cta-primary" href="${escapeHtml(full.website)}" rel="nofollow noopener" target="_blank">Tickets &amp; info &#8599;</a>` : ''}
+    ${feverTickets ? fever.linkHtml(full.id, feverTickets.url, 'cta event-cta-primary') : full.website ? `<a class="cta event-cta-primary" href="${escapeHtml(full.website)}" rel="nofollow noopener" target="_blank">Tickets &amp; info &#8599;</a>` : ''}
     ${directionsUrl ? `<a class="cta secondary" href="${escapeHtml(builtInDirections || directionsUrl)}" ${builtInDirections ? 'data-roam-directions' : 'rel="nofollow noopener" target="_blank"'}>${builtInDirections ? 'Get directions' : 'Open in Google Maps'}</a>` : ''}
     ${next ? `<a class="cta secondary" href="/${full.region}/events/${full.slug}/calendar.ics" download>Add to calendar</a>` : ''}
     ${next ? `<a class="cta secondary" data-gcal href="${escapeHtml(googleCalendarUrl(full, next, eventCalendarLocation(full, hostVenue), canonical))}" rel="nofollow noopener" target="_blank">Add to Google Calendar</a>` : ''}
-  </div>`;
+  </div>${feverTickets ? fever.disclosureHtml('en', 'fever-note event-fever-note') : ''}`;
   const tripQuery = `${full.name}, ${regionLabel}, Okanagan Valley, BC`;
   const actionsHtml = `
   <div class="venue-cta-row event-actions" data-venue-category="whatson" data-venue-id="event-${full.id}" data-venue-region="${escapeHtml(full.region)}" data-venue-name="${escapeHtml(full.name)}"${savedOccurrenceAttrs(upcoming[0])} data-surface="event_page">
@@ -46316,7 +46497,7 @@ ${pastOccs.map(dateItem).join('\n')}
   function ctx(){ var c = {}; for (var k in pageCtx) c[k] = pageCtx[k]; return c; }
   function track(name, params){ if (window.trackEvent) window.trackEvent(name, params); }
   (function(){ var v = ctx(), extra = ${viewCtx}; for (var k in extra) v[k] = extra[k]; track('event_view', v); })();
-  ${clickLabels.clientClassifierJs()}
+  ${clickLabels.clientClassifierJs(feverTickets ? { fever: true } : {})}
   document.addEventListener('click', function(e){
     try {
       var el = e.target && e.target.closest ? e.target.closest('a,button,summary') : null;
@@ -46476,6 +46657,7 @@ ${renderGolfHeaderHtml()}
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
   ${actionsScript}
+  ${feverTickets ? fever.clickScriptHtml('event_page') : ''}
 ${ROAM_RETURN_SCRIPT}
 </body>
 </html>`;
@@ -51017,6 +51199,11 @@ function renderEditorialGuidePage(g, path) {
     publisher: { '@type': 'Organization', name: 'Okanagan Roam', url: 'https://okanaganroam.com/' },
     ...(guideDates ? { datePublished: guideDates.published, dateModified: guideDates.modified } : {}),
   };
+  // "Book a wine tour" (2026-11-21, wine-tours.js): the wine guides named in data/viator-wine-tours.json carry one Viator
+  // wine tour line (Viator set up only), just before the closing section. Not the first-timers guide, whose tours section
+  // lists local tour companies.
+  const wineRegion = wineTours.guideRegion(path);
+  const wineLine = wineRegion === undefined ? '' : wineTours.lineHtml(wineRegion);
   const listed = [];
   const hhGuide = /^\/guides\/happy-hour(?:-|$)/.test(String(path || ''));
   const itemHtml = (item) => {
@@ -51039,6 +51226,7 @@ function renderEditorialGuidePage(g, path) {
     if (items) liveSections.add(sec.id);
     return items ? `\n      <section class="ski-guide-resort" id="${sec.id}">\n        <h2>${escapeHtml(sec.heading)}</h2>${sec.lead ? `\n        <p>${guideTipHtml(sec.lead)}</p>` : ''}\n        <ul class="ski-guide-list">${items}\n        </ul>\n      </section>` : '';
   }).join('');
+  const wineLineEnd = wineLine ? `\n      ${wineLine}` : '';
   const rowsHtml = g.table.rows.map(([area, refs]) => {
     const links = refs.map((x) => { const [ref, label] = x.split('|'); const v = guideRefVenue(ref); return v ? `<a href="${escapeHtml(guideVenueHref(v))}">${escapeHtml(label)}</a>` : ''; }).filter(Boolean);
     return links.length ? `\n          <tr><th scope="row">${escapeHtml(area)}</th><td>${links.join(', ')}</td></tr>` : '';
@@ -51082,7 +51270,7 @@ ${renderGolfHeaderHtml()}
       ${guideBylineHtml(guideDates)}
       ${thin ? `<p class="guide-thin-note"><strong>This guide is between seasons.</strong> Most of what it covered has finished for now. See our <a href="/guides">current guides</a>.</p>\n      ` : ''}<div class="ski-guide-intro">${g.intro.map((p) => `\n        <p>${guideTipHtml(p)}</p>`).join('')}
       </div>
-      <nav class="ski-guide-jump" aria-label="Jump to a section">${g.sections.filter((sec) => liveSections.has(sec.id)).map((sec) => `<a href="#${sec.id}">${escapeHtml(sec.jump)}</a>`).join('')}${rowsHtml ? `<a href="#${g.table.id}">${escapeHtml(g.table.jump)}</a>` : ''}</nav>${sectionsHtml}
+      <nav class="ski-guide-jump" aria-label="Jump to a section">${g.sections.filter((sec) => liveSections.has(sec.id)).map((sec) => `<a href="#${sec.id}">${escapeHtml(sec.jump)}</a>`).join('')}${rowsHtml ? `<a href="#${g.table.id}">${escapeHtml(g.table.jump)}</a>` : ''}</nav>${sectionsHtml}${wineLineEnd}
       <section class="ski-guide-resort" id="${g.table.id}">${rowsHtml ? `
         <h2>${escapeHtml(g.table.heading)}</h2>
         <table class="patio-picks">
@@ -51097,6 +51285,7 @@ ${renderGolfHeaderHtml()}
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
+  ${wineLine ? wineTours.clickScriptHtml('wine_guide') : ''}
 </body>
 </html>`;
 }
@@ -53141,7 +53330,7 @@ function renderPrivacyPage() {
     <p>We use Microsoft Clarity to automatically record masked interactions such as clicks, scrolling and navigation on selected public pages to improve the site. We use its limited, cookieless mode: advertising and analytics cookie storage are denied, and page visits are not linked into a persistent visitor journey. Text and form fields are masked. Private forms, trip-planning pages, internal visits, and pages with URL parameters or fragments are excluded.</p>
     <p>We honour Global Privacy Control and Do Not Track browser signals, and earlier recording refusals saved in your browser. These prevent the recorder from loading. Clarity processes usage, device and network data; see the <a href="https://privacy.microsoft.com/privacystatement" rel="noopener" target="_blank">Microsoft Privacy Statement</a>. This cookieless setting applies to Clarity; Google Analytics is separate.</p>` : ''}
     <h2>Saved in your own browser</h2>
-    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business or event page is viewed and which buttons and links on it are clicked, how often steps in the business portal (such as signing in) are used and, when a step needs fixing, a short reason such as a wrong password or a missing field (never what you typed), how often the QR code on a hotel&rsquo;s or rental&rsquo;s guest card is scanned and the link in our email to them is opened, and which website, AI assistant or email (such as Google, ChatGPT or one of our own emails) sent a visit to which page, which missing pages were asked for (and which page linked to them), the words typed into search, Roam Now and Build My Trip (leaving out anything that looks like an email, web address or number), which pages are opened and which page led to a business or event page, which filters are used on Roam Now and which businesses people open or get directions to from it (never where you are), as plain daily totals with nothing that identifies you.</p>
+    <p>Your favourites, your trip and your language choice are saved in your own browser on your own device. We don&rsquo;t receive them, and clearing your browser&rsquo;s site data removes them. When you build a trip, the choices you make (such as towns, dates and interests) are sent to our server to create the plan; they are not linked to your name or email. We also keep a simple anonymous count of which businesses were shown in plans and which were added to a trip, with no name, email or IP address attached, to see what visitors are looking for. We also count how often features such as the map and Build My Trip are used, and how often each business or event page is viewed and which buttons and links on it are clicked, how often a link to one of our booking partners (places to stay, tours, rental cars or tickets) is tapped and on what kind of page, how often steps in the business portal (such as signing in) are used and, when a step needs fixing, a short reason such as a wrong password or a missing field (never what you typed), how often the QR code on a hotel&rsquo;s or rental&rsquo;s guest card is scanned and the link in our email to them is opened, and which website, AI assistant or email (such as Google, ChatGPT or one of our own emails) sent a visit to which page, which missing pages were asked for (and which page linked to them), the words typed into search, Roam Now and Build My Trip (leaving out anything that looks like an email, web address or number), which pages are opened and which page led to a business or event page, which filters are used on Roam Now and which businesses people open or get directions to from it (never where you are), as plain daily totals with nothing that identifies you.</p>
     <h2>Services that help run the site</h2>
     <p>Like any website, the pages are delivered by hosting and network providers (including Railway and Cloudflare), which process technical information such as your IP address to send you the page and keep the site secure. Fonts come from Google Fonts and maps use OpenStreetMap, which receive the same kind of technical information when your browser loads them.</p>
     <h2>Your location on the map</h2>
@@ -55226,7 +55415,7 @@ function hoursExtrasMap() {
   }
   return hoursExtraCache.map;
 }
-function clearHoursExtraCache() { hoursExtraCache = null; }
+function clearHoursExtraCache() { hoursExtraCache = null; tempHoursCache = null; }
 // -> { seasons: [...], closures: [...] } (both lists empty when the venue has none).
 function venueHoursExtras(venueId) {
   const x = hoursExtrasMap().get(venueId);
@@ -55257,6 +55446,168 @@ function hoursWithExtras(v, now = new Date()) {
   if (x.holidays) obj._holidays = true;
   return JSON.stringify(obj);
 }
+
+// ---------- Items that end by themselves (2026-11-21, Dayton approved) ----------
+// A temporary change used to need someone to remember to undo it (opening-week hours, pre-season hours, "closed Nov 24"
+// notices). Now it can carry its last day, `until` ('YYYY-MM-DD', Pacific, inclusive), and the site stops showing it the
+// day after, with no deploy and no script:
+//   advisories (any collection kind): collection_items.until_date, set with POST /admin/collection-membership
+//     (until on 'add', or action 'set_until'). Readers skip it from the next day; expireTemporaryItems() then removes it.
+//   "Plan your visit" lines: a row's own `until` (POST /admin/set-visit-info). venueVisitInfo() skips it; the sweep
+//     takes it out of the stored box.
+//   hours: POST /admin/verify-hours with temporary: { until, regular_hours? }. venues.hours holds the temporary week (so
+//     every reader -- cards, Roam Now / Open Now, the venue page, JSON-LD, the API -- shows the same thing), and
+//     venue_hours_extra.temp_hours keeps the regular week it goes back to. Build My Trip asks for a date (weekJsonOn), so a
+//     trip after `until` already gets the regular week. After `until` the sweep writes the regular week back (audited,
+//     'auto_expire'), but only while venues.hours is still the temporary week: hours changed since (the owner, research)
+//     win and the pending revert is dropped.
+// Closures (venue_hours_extra.closures) and season notices (venue_seasons) already end on their own dates.
+// expireTemporaryItems() runs at startup and every 5 minutes (startExpiryTimer); every write bumps venues.updated_at,
+// so the cached pages and the Roam Now data move with it.
+const UNTIL_MAX_DAYS = 400;
+function untilDateError(value, { allowNull = false } = {}, now = new Date()) {
+  if (value === null && allowNull) return null;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || !parseLocalDate(value)) return 'until must be a real YYYY-MM-DD date';
+  const today = todayLocal(now);
+  if (value < today) return 'until is already over (it is the last day the item shows, Pacific time)';
+  if (value > addLocalDays(today, UNTIL_MAX_DAYS)) return `until must be within ${UNTIL_MAX_DAYS} days`;
+  return null;
+}
+// An hours JSON as one comparable string (days in mon..sun order), or null.
+function canonicalWeek(raw) {
+  let o = raw;
+  try { if (typeof raw === 'string') o = JSON.parse(raw); } catch (e) { return null; }
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return null;
+  const week = {};
+  for (const d of ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']) week[d] = o[d] === undefined ? '__absent__' : o[d];
+  return JSON.stringify(week);
+}
+var tempHoursCache = null; // var: clearHoursExtraCache (above) may clear it
+// venue id -> { until, hours, regular, regular_source, regular_checked_at, note, set_at, batch_id }
+function tempHoursMap() {
+  if (!tempHoursCache || Date.now() - tempHoursCache.at > 60000) {
+    const map = new Map();
+    try {
+      for (const r of db.prepare('SELECT venue_id, temp_hours FROM venue_hours_extra WHERE temp_hours IS NOT NULL').all()) {
+        let t = null;
+        try { t = JSON.parse(r.temp_hours); } catch (e) { t = null; }
+        if (t && typeof t.until === 'string' && t.hours && t.regular) map.set(r.venue_id, t);
+      }
+    } catch (e) { /* an old copy without the column */ }
+    tempHoursCache = { at: Date.now(), map };
+  }
+  return tempHoursCache.map;
+}
+function clearTempHoursCache() { tempHoursCache = null; }
+// The venue's temporary stretch while its stored hours are still the temporary week, or null.
+function activeTempHours(v) {
+  const t = v && v.id != null && v.hours ? tempHoursMap().get(v.id) : null;
+  return t && canonicalWeek(v.hours) === canonicalWeek(t.hours) ? t : null;
+}
+// The usual week on a date: the regular hours once a temporary stretch is over (a trip after `until`), else v.hours.
+function baseHoursOn(v, date) {
+  const t = activeTempHours(v);
+  return t && date && String(date).slice(0, 10) > t.until ? t.regular : (v ? v.hours : null);
+}
+
+// Removes what has ended. -> { advisories, visit_rows, hours_reverted, hours_dropped }. Idempotent; each change is its own
+// small transaction guarded on the stored value, logged in venue_enrichment_log (source 'auto_expire').
+function expireTemporaryItems(now = new Date()) {
+  const today = todayLocal(now);
+  const out = { advisories: 0, visit_rows: 0, hours_reverted: 0, hours_dropped: 0 };
+  const batch = `auto-expire-${today}`;
+  const log = db.prepare(`INSERT INTO venue_enrichment_log (venue_id, field_name, old_value, new_value, source, source_ref, confidence, batch_id, auto_accepted, reviewed_by)
+    VALUES (?, ?, ?, ?, 'auto_expire', ?, 'high', ?, 1, NULL)`);
+  const touch = db.prepare('UPDATE venues SET updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+  const tx = (fn) => {
+    db.exec('BEGIN IMMEDIATE');
+    try { const r = fn(); db.exec('COMMIT'); return r; } catch (e) { try { db.exec('ROLLBACK'); } catch (_) { /* none */ } throw e; }
+  };
+  let items = [];
+  try {
+    items = db.prepare(`SELECT ci.rowid AS rid, ci.content_id AS id, ci.note AS note, ci.until_date AS until, c.kind AS kind FROM collection_items ci
+      JOIN collections c ON c.id = ci.collection_id WHERE ci.content_type = 'venue' AND ci.until_date IS NOT NULL AND ci.until_date < ?`).all(today);
+  } catch (e) { items = []; }
+  for (const it of items) {
+    tx(() => {
+      if (db.prepare('DELETE FROM collection_items WHERE rowid = ? AND until_date = ?').run(it.rid, it.until).changes !== 1) return;
+      log.run(it.id, `collection:${it.kind}`, 'member', 'absent', `ended ${it.until}: ${String(it.note || '').slice(0, 300)}`, batch);
+      touch.run(it.id);
+      out.advisories++;
+    });
+  }
+  let boxes = [];
+  try { boxes = db.prepare(`SELECT venue_id, info FROM venue_visit_info WHERE info LIKE '%"until"%'`).all(); } catch (e) { boxes = []; }
+  for (const b of boxes) {
+    let info = null;
+    try { info = JSON.parse(b.info); } catch (e) { continue; }
+    const kept = visitInfoWithoutExpired(info, today);
+    if (kept === info) continue;
+    tx(() => {
+      const nextJson = kept ? JSON.stringify(kept) : null;
+      const ch = nextJson === null
+        ? db.prepare('DELETE FROM venue_visit_info WHERE venue_id = ? AND info = ?').run(b.venue_id, b.info).changes
+        : db.prepare('UPDATE venue_visit_info SET info = ?, updated_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND info = ?').run(nextJson, b.venue_id, b.info).changes;
+      if (ch !== 1) return;
+      log.run(b.venue_id, 'visit_info', b.info, nextJson, 'a line ended (until)', batch);
+      touch.run(b.venue_id);
+      out.visit_rows += (info.rows || []).length - (kept ? kept.rows.length : 0);
+    });
+  }
+  let temps = [];
+  try { temps = db.prepare('SELECT venue_id, temp_hours FROM venue_hours_extra WHERE temp_hours IS NOT NULL').all(); } catch (e) { temps = []; }
+  for (const r of temps) {
+    let t = null;
+    try { t = JSON.parse(r.temp_hours); } catch (e) { t = null; }
+    if (t && typeof t.until === 'string' && t.until >= today) continue;
+    tx(() => {
+      if (db.prepare('UPDATE venue_hours_extra SET temp_hours = NULL, updated_at = CURRENT_TIMESTAMP WHERE venue_id = ? AND temp_hours = ?').run(r.venue_id, r.temp_hours).changes !== 1) return;
+      const v = db.prepare('SELECT hours FROM venues WHERE id = ? AND redirect_to IS NULL').get(r.venue_id);
+      if (t && t.regular && v && canonicalWeek(v.hours) === canonicalWeek(t.hours)) {
+        const ch = db.prepare(`UPDATE venues SET hours = ?, hours_source = COALESCE(?, hours_source), hours_checked_at = COALESCE(?, hours_checked_at), updated_at = CURRENT_TIMESTAMP
+          WHERE id = ? AND hours IS ?`).run(t.regular, t.regular_source || null, t.regular_checked_at || null, r.venue_id, v.hours).changes;
+        if (ch === 1) {
+          syncDerivedHoursBadges(r.venue_id);
+          log.run(r.venue_id, 'hours', v.hours, t.regular, `temporary hours ended ${t.until}: back to the regular week`, batch);
+          out.hours_reverted++;
+          return;
+        }
+      }
+      log.run(r.venue_id, 'temp_hours', r.temp_hours, null, 'temporary hours ended; hours had changed since, so they were kept', batch);
+      out.hours_dropped++;
+    });
+  }
+  if (out.hours_reverted || out.hours_dropped) { clearTempHoursCache(); clearHoursExtraCache(); }
+  if (out.advisories || out.visit_rows || out.hours_reverted || out.hours_dropped) console.log(`[expire] ${today}: ${JSON.stringify(out)}`);
+  return out;
+}
+// Everything with an end date still to come (the admin page and GET /admin/temporary-items).
+function temporaryItemsList(now = new Date()) {
+  const today = todayLocal(now);
+  const name = (id) => { const v = db.prepare('SELECT name, region, type, slug FROM venues WHERE id = ?').get(id); return v ? v.name : `#${id}`; };
+  const advisories = db.prepare(`SELECT ci.content_id AS id, c.kind AS kind, ci.note AS note, ci.until_date AS until FROM collection_items ci JOIN collections c ON c.id = ci.collection_id
+    WHERE ci.content_type = 'venue' AND ci.until_date IS NOT NULL ORDER BY ci.until_date, ci.content_id`).all().map((r) => ({ ...r, name: name(r.id), ended: r.until < today }));
+  const visit_rows = [];
+  for (const b of db.prepare(`SELECT venue_id, info FROM venue_visit_info WHERE info LIKE '%"until"%'`).all()) {
+    let info = null;
+    try { info = JSON.parse(b.info); } catch (e) { continue; }
+    for (const row of (info && info.rows) || []) if (row && row.until) visit_rows.push({ id: b.venue_id, name: name(b.venue_id), label: row.label, text: row.text, until: row.until, ended: row.until < today });
+  }
+  const hours = [];
+  for (const [id, t] of tempHoursMap()) {
+    const v = db.prepare('SELECT hours FROM venues WHERE id = ?').get(id);
+    hours.push({ id, name: name(id), until: t.until, hours: t.hours, regular: t.regular, note: t.note || null, still_temporary: !!(v && canonicalWeek(v.hours) === canonicalWeek(t.hours)), ended: t.until < today });
+  }
+  hours.sort((a, b) => a.until.localeCompare(b.until) || a.id - b.id);
+  return { today, advisories, visit_rows, hours };
+}
+function startExpiryTimer() {
+  if (process.env.NODE_ENV === 'test' || process.env.EXPIRY_DISABLED === '1') return;
+  const run = () => { try { expireTemporaryItems(); } catch (e) { console.error('[expire]', e.message); } };
+  run();
+  const t = setInterval(run, 5 * 60 * 1000);
+  t.unref();
+}
 // The plain week that applies on a date (a seasonal set, or the usual hours), for readers that only know weekdays
 // (Build My Trip). Closures are handled separately (venueClosedOn).
 function weekJsonOn(v, date) {
@@ -55276,14 +55627,15 @@ function weekJsonOn(v, date) {
   // works the same way outside a stretch.
   if (!s && v && v.hours && hoursModule && hoursModule.holidayOn(String(date).slice(0, 10)) && venueHoursExtras(v.id).holidays) {
     try {
-      const wd = localWeekdayKey(String(date).slice(0, 10)), week = JSON.parse(v.hours);
+      const wd = localWeekdayKey(String(date).slice(0, 10)), week = JSON.parse(baseHoursOn(v, date));
       if (week && typeof week === 'object' && !Array.isArray(week) && (!Array.isArray(week[wd]) || !week[wd].length)) {
         const src = ['sat', 'sun', 'fri', 'mon', 'tue', 'wed', 'thu'].find((d) => Array.isArray(week[d]) && week[d].length);
         if (src) { week[wd] = week[src]; return JSON.stringify(week); }
       }
     } catch (e) { /* the week as stored */ }
   }
-  return s ? JSON.stringify(s.hours) : v ? v.hours : null;
+  // Temporary hours (2026-11-21): a date after the stretch's last day gets the regular week.
+  return s ? JSON.stringify(s.hours) : v ? baseHoursOn(v, date) : null;
 }
 // The owner's seasonal set that applies on a date, or null (the usual hours).
 function weekSeasonOn(v, date) {
@@ -69979,8 +70331,15 @@ function weekendEmailEvents(now = new Date()) {
   return { from: win.from, to: win.to, events: out };
 }
 const weekendEmail = require('./weekend-email').create({
-  db, weekendEvents: weekendEmailEvents, getSender: () => ownerDirectEmail(),
+  db, weekendEvents: weekendEmailEvents, bookingPick: (friday) => weekendBookingPick(friday), getSender: () => ownerDirectEmail(),
   isSameOrigin: (req) => isSameOriginSubmission(req), clientIp: (req) => requestClientIp(req), emailPattern: SUBMISSION_EMAIL_PATTERN,
+});
+// The weekend email sends itself (2026-11-21; only with WEEKEND_EMAIL_AUTO=on): Wednesday preview with a hold link to the
+// Monday email's address, Thursday 8 AM send. Ticked with the Monday email (startDigestTimer).
+const weekendAuto = require('./weekend-email-auto').create({
+  db, weekendEmail, getSender: () => ownerDirectEmail(), site: { name: 'Okanagan Roam', url: 'https://okanaganroam.com' },
+  adminEmail: () => String(process.env.WEEKEND_EMAIL_ADMIN || process.env.DIGEST_EMAIL || 'okanaganroam@gmail.com').trim(),
+  secret: () => ENRICHMENT_ADMIN_TOKEN,
 });
 
 function ownerResetRecentCount(accountId) {
@@ -75666,8 +76025,9 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
         if (j && j.ok) {
           // Signed in (2026-10-27): open the signed-in page, which explains what goes live straight away, with a note
           // naming anything sent from this link that just went live.
+          // The French JSON reply already gives the French address (ownerFrJson), so /fr is added only when it is
+          // missing: adding it again opened /fr/fr/owner/... and a raw "Not found" (sport test 11, 2026-11-21).
           if (j.href) {
-            // ownerFrJson already gives the French address; /fr only when missing (was /fr/fr, sport test 11).
             var go = (location.pathname.indexOf('/fr/') === 0 && j.href.indexOf('/fr/') !== 0 ? '/fr' : '') + j.href + '?welcome=1' + (j.published && j.published.length ? '&live=' + encodeURIComponent(j.published.join(',')) : '');
             location.href = go; return;
           }
@@ -77351,7 +77711,7 @@ const server = http.createServer(async (req, res) => {
       // note_fr / french_pending (2026-10-19, round 7): an advisory shows on /fr pages too, so adding one needs its
       // French wording (note_fr). french_pending: true lets an urgent English-only advisory through, with a warning;
       // the French page then shows a French fallback built from known phrasings.
-      const ALLOWED_MEMBERSHIP_KEYS = ['kind', 'venue_id', 'action', 'note', 'note_fr', 'french_pending', 'reason', 'batch_id'];
+      const ALLOWED_MEMBERSHIP_KEYS = ['kind', 'venue_id', 'action', 'note', 'note_fr', 'french_pending', 'reason', 'batch_id', 'until'];
       const unexpectedMembershipKeys = Object.keys(body).filter((k) => !ALLOWED_MEMBERSHIP_KEYS.includes(k));
       if (unexpectedMembershipKeys.length > 0) {
         return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedMembershipKeys.join(', ')}` });
@@ -77362,8 +77722,15 @@ const server = http.createServer(async (req, res) => {
       if (!Number.isInteger(body.venue_id) || body.venue_id <= 0) {
         return sendJSON(res, 400, { error: 'venue_id must be a positive integer.' });
       }
-      if (body.action !== 'add' && body.action !== 'remove') {
-        return sendJSON(res, 400, { error: "action must be 'add' or 'remove'." });
+      if (body.action !== 'add' && body.action !== 'remove' && body.action !== 'set_until') {
+        return sendJSON(res, 400, { error: "action must be 'add', 'remove' or 'set_until'." });
+      }
+      // until (2026-11-21): the last day the item shows (Pacific), on 'add' or 'set_until' (null clears it on set_until).
+      {
+        const untilErr = untilDateError(body.until, { allowNull: body.action === 'set_until' });
+        if (body.action === 'remove' && body.until !== undefined) return sendJSON(res, 400, { error: 'until is only for add or set_until.' });
+        if (body.action === 'set_until' && body.until === undefined) return sendJSON(res, 400, { error: 'until is required for set_until (YYYY-MM-DD, or null to clear it).' });
+        if (body.until !== undefined && untilErr) return sendJSON(res, 400, { error: untilErr });
       }
       if (body.note !== undefined && body.note !== null && typeof body.note !== 'string') {
         return sendJSON(res, 400, { error: 'note must be a string when provided.' });
@@ -77382,6 +77749,7 @@ const server = http.createServer(async (req, res) => {
       }
       const membershipNoteFr = typeof body.note_fr === 'string' && body.note_fr.trim() !== '' ? body.note_fr.trim() : null;
       const missingFrench = body.kind === ADVISORY_COLLECTION_KIND && body.action === 'add' && !membershipNoteFr;
+      const membershipUntil = typeof body.until === 'string' ? body.until : null;
       if (missingFrench && body.french_pending !== true) {
         return sendJSON(res, 400, { error: 'note_fr is required for an advisory: give the French wording (or send french_pending: true to add it in English only for now).' });
       }
@@ -77393,7 +77761,7 @@ const server = http.createServer(async (req, res) => {
           body.venue_id,
           body.action,
           typeof body.note === 'string' && body.note.trim() !== '' ? body.note.trim() : null,
-          { reason: body.reason.trim(), batch_id: body.batch_id.trim(), reviewed_by: null, note_fr: membershipNoteFr }
+          { reason: body.reason.trim(), batch_id: body.batch_id.trim(), reviewed_by: null, note_fr: membershipNoteFr, until: membershipUntil }
         );
       } catch (err) {
         return sendJSON(res, 500, { error: 'Membership change failed and was rolled back.', detail: String(err.message || err) });
@@ -77609,6 +77977,47 @@ const server = http.createServer(async (req, res) => {
     // so hours corrected here stay eligible for Open Now (the unguarded
     // PUT /api/venues/:id clears them). Same bearer-token check and strict key
     // allowlist as every admin route.
+    // GET /admin/temporary-items (2026-11-21): every item with an end date (advisories, "Plan your visit" lines,
+    // temporary hours) and the day it ends. Bearer token -> JSON; signed-in admin in a browser -> a small page.
+    // GET /admin/temporary-items/:id -> one venue's current values for fix scripts (compare-and-set + owner check).
+    {
+      const tiOne = /^\/admin\/temporary-items\/(\d+)$/.exec(pathname);
+      if ((pathname === '/admin/temporary-items' || tiOne) && method === 'GET') {
+        if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Temporary-items endpoint is not configured.' });
+        const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+        const bearer = !!(match && safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN));
+        res.setHeader('Cache-Control', 'no-store');
+        if (tiOne) {
+          if (!bearer) return sendJSON(res, 401, { error: 'Unauthorized.' });
+          const id = Number(tiOne[1]);
+          const v = db.prepare('SELECT id, name, region, type, slug, hours, redirect_to FROM venues WHERE id = ?').get(id);
+          if (!v) return sendJSON(res, 404, { error: 'venue_not_found' });
+          const adv = db.prepare(`SELECT ci.note AS note, ci.until_date AS until FROM collection_items ci JOIN collections c ON c.id = ci.collection_id
+            WHERE c.kind = ? AND ci.content_type = 'venue' AND ci.content_id = ? ORDER BY ci.created_at DESC, ci.rowid DESC LIMIT 1`).get(ADVISORY_COLLECTION_KIND, id) || null;
+          const t = tempHoursMap().get(id) || null;
+          return sendJSON(res, 200, { id, name: v.name, region: v.region, type: v.type, slug: v.slug, redirect_to: v.redirect_to == null ? null : v.redirect_to,
+            claimed: venueIsClaimed(id), hours: v.hours, temporary_hours: t, advisory: adv, visit_info: currentVisitInfoJson(id) });
+        }
+        const list = temporaryItemsList();
+        if (bearer) return sendJSON(res, 200, list);
+        if (!adminSessionValid(req)) { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex, nofollow' }); return res.end(renderAdminReviewLoginPage()); }
+        const e = escapeHtml;
+        const dayText = (d) => formatLocalDateLong(d, { weekday: true, year: false });
+        const ends = (x) => `${x.ended ? '<strong>ended</strong> ' : ''}${e(dayText(x.until))} <small>(${e(x.until)}; gone the next day)</small>`;
+        const table = (head, rows) => (rows.length ? `<table><tr>${head.map((h) => `<th>${e(h)}</th>`).join('')}</tr>${rows.join('')}</table>` : '<p>None.</p>');
+        const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex, nofollow"><title>Temporary items | Admin</title>
+<style>body{margin:0;background:#f6f4ef;color:#1b2e39;font:15px/1.5 Arial,sans-serif}main{max-width:1000px;margin:0 auto;padding:24px 16px 60px}h1,h2{font-family:Georgia,serif}table{border-collapse:collapse;background:#fff;width:100%}td,th{padding:6px 10px;border:1px solid #e0d8c3;text-align:left;vertical-align:top}small{color:#55646a}code{font-size:12px;word-break:break-all}</style></head><body><main>
+<p><a href="/admin/dashboard">&larr; Dashboard</a></p><h1>Temporary items</h1>
+<p>Each of these ends by itself after its last day (Pacific time). Today is ${e(list.today)}.</p>
+<h2>Notices</h2>${table(['Listing', 'Notice', 'Last day shown'], list.advisories.map((x) => `<tr><td>${e(x.name)} <small>#${x.id} · ${e(x.kind)}</small></td><td>${e(x.note || '')}</td><td>${ends(x)}</td></tr>`))}
+<h2>Plan your visit lines</h2>${table(['Listing', 'Line', 'Last day shown'], list.visit_rows.map((x) => `<tr><td>${e(x.name)} <small>#${x.id}</small></td><td><strong>${e(x.label)}:</strong> ${e(x.text)}</td><td>${ends(x)}</td></tr>`))}
+<h2>Temporary hours</h2>${table(['Listing', 'Temporary week', 'Then back to', 'Last day'], list.hours.map((x) => `<tr><td>${e(x.name)} <small>#${x.id}</small>${x.note ? `<br><small>${e(x.note)}</small>` : ''}${x.still_temporary ? '' : '<br><small>Hours changed since: the stored hours stay.</small>'}</td><td><code>${e(x.hours)}</code></td><td><code>${e(x.regular)}</code></td><td>${ends(x)}</td></tr>`))}
+</main></body></html>`;
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex, nofollow' });
+        return res.end(html);
+      }
+    }
+
     if (pathname === '/admin/verify-hours' && method === 'POST') {
       if (!ENRICHMENT_ADMIN_TOKEN) {
         return sendJSON(res, 503, { error: 'Verify-hours endpoint is not configured.' });
@@ -77628,7 +78037,7 @@ const server = http.createServer(async (req, res) => {
       if (!body || typeof body !== 'object' || Array.isArray(body)) {
         return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
       }
-      const ALLOWED_VERIFY_HOURS_KEYS = ['id', 'expected_current_hours', 'verified', 'reason', 'batch_id'];
+      const ALLOWED_VERIFY_HOURS_KEYS = ['id', 'expected_current_hours', 'verified', 'reason', 'batch_id', 'temporary'];
       const unexpectedVerifyKeys = Object.keys(body).filter((k) => !ALLOWED_VERIFY_HOURS_KEYS.includes(k));
       if (unexpectedVerifyKeys.length > 0) {
         return sendJSON(res, 400, { error: `Unexpected field(s): ${unexpectedVerifyKeys.join(', ')}` });
@@ -77654,13 +78063,14 @@ const server = http.createServer(async (req, res) => {
           reason: body.reason,
           batch_id: body.batch_id,
           reviewed_by: null,
+          temporary: body.temporary,
         });
       } catch (err) {
         return sendJSON(res, 500, { error: 'Hours verification failed and was rolled back.', detail: String(err.message || err) });
       }
       if (!result.ok) {
         const statusMap = {
-          invalid_meta: 400, invalid_hours: 400, invalid_source: 400, invalid_checked_at: 400,
+          invalid_meta: 400, invalid_hours: 400, invalid_source: 400, invalid_checked_at: 400, invalid_temporary: 400, owner_verified: 409,
           venue_not_found: 404, venue_redirected: 409, mismatch: 409, hours_module_unavailable: 503,
         };
         return sendJSON(res, statusMap[result.reason] || 400, { error: result.reason, detail: result.detail, live: result.live });
@@ -77670,6 +78080,7 @@ const server = http.createServer(async (req, res) => {
         id: body.id,
         changedFields: result.changedFields,
         venue: { hours: result.hours, hours_source: result.hours_source, hours_checked_at: result.hours_checked_at },
+        temporary: result.temporary,
       });
     }
 
@@ -79216,6 +79627,14 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
       return res.end(SITE_WEBMANIFEST);
     }
+    // Common guesses at the contact page (2026-11-21, dashboard: 12 visitors tried /contact-us in 30 days) go to the real one.
+    {
+      const cu = method === 'GET' || method === 'HEAD' ? /^(\/fr)?\/(?:contact-us|contactus|contact_us|contact-us\.html)\/?$/i.exec(pathname) : null;
+      if (cu) {
+        res.writeHead(301, { Location: `${cu[1] || ''}/contact${parsed.search || ''}`, 'Cache-Control': 'public, max-age=86400' });
+        return res.end();
+      }
+    }
     // About, Privacy and Terms (2026-10-14), linked from the footer.
     const infoPage = { '/about': renderAboutPage, '/contact': renderContactPage, '/privacy': renderPrivacyPage, '/terms': renderTermsPage }[pathname.replace(/\/$/, '')];
     if (infoPage && method === 'GET') {
@@ -79678,6 +80097,8 @@ const server = http.createServer(async (req, res) => {
       res.setHeader('Cache-Control', 'no-store');
       const dd = dashboardData.collect(db, { site: 'okanagan', days: query.days });
       dd.traffic = await gaReport.report(query.days);
+      // Commissions (2026-11-21): each program's state and the taps we sent it.
+      try { dd.commissions = commissions.siteReport(db, 'okanagan'); } catch (e) { /* never break the dashboard */ }
       return sendJSON(res, 200, dd);
     }
     if ((pathname === '/admin/dashboard' || pathname === '/admin/dashboard/') && (method === 'GET' || method === 'HEAD')) {
@@ -79707,7 +80128,7 @@ const server = http.createServer(async (req, res) => {
         try {
           const notice = { sent: 'Sent to the site inbox.', email_off: 'Email is off until BREVO_API_KEY is set in Railway, so nothing was sent.', failed: 'The email could not be sent right now.', rate: 'Three a hour is the limit; try again later.' }[query.digest] || '';
           const inboxes = Object.fromEntries(sites.map((x) => [x.key, x.data && x.data.inbox]));
-          home = whatsChangedPage.homeHtml(await weeklyDigestSites(), { notice, goals: await goalsData(), inboxes });
+          home = whatsChangedPage.homeHtml(await weeklyDigestSites(), { notice, goals: await goalsData(), inboxes, commissions: commissionMonth() });
           // Weekend email list (2026-11-16): the subscriber count, linking to its page.
           const wk = weekendEmail.counts().total;
           home.body += `<div class="card"><h3>Weekend email</h3><p><a href="/admin/weekend-email"><b>${wk.confirmed}</b> confirmed subscriber${wk.confirmed === 1 ? '' : 's'}</a> · ${wk.pending} waiting to confirm · ${wk.unsubscribed} unsubscribed</p></div>`;
@@ -79948,6 +80369,45 @@ const server = http.createServer(async (req, res) => {
       }
       return res.end(renderStaysPage({ days, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: stayScans.report(days, hotelList()) }, whistler] }));
     }
+    // Commissions (2026-11-21, commissions.js + commissions-page.js). GET /api/admin/commissions -> this site's programs (on or
+    // off, from its own settings) and the taps we sent each one. Admin token; Whistler Roam serves the same.
+    if (pathname === '/api/admin/commissions' && method === 'GET') {
+      if (!requireAdminToken(req, res)) return;
+      res.setHeader('Cache-Control', 'no-store');
+      return sendJSON(res, 200, commissions.siteReport(db, 'okanagan'));
+    }
+    // The page: /admin/dashboard/commissions (both sites' programs and taps, and the earnings typed in here).
+    if ((pathname === '/admin/dashboard/commissions' || pathname === '/admin/dashboard/commissions/') && (method === 'GET' || method === 'HEAD')) {
+      const signedIn = adminSessionValid(req);
+      res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' });
+      if (method === 'HEAD') return res.end();
+      if (!ENRICHMENT_ADMIN_TOKEN) return res.end(ownerSimplePage('Commissions', '<h1>Commissions</h1><p>The admin key is not set up on this server.</p>'));
+      if (!signedIn) return res.end(renderAdminReviewLoginPage());
+      const sites = [{ key: 'okanagan', name: 'Okanagan Roam', data: null, error: null }, { key: 'whistler', name: 'Whistler Roam', data: null, error: null }];
+      try { sites[0].data = commissions.siteReport(db, 'okanagan'); } catch (e) { sites[0].error = 'Could not read this site’s numbers.'; }
+      const wToken = (process.env.WHISTLER_ADMIN_TOKEN || '').trim();
+      if (!wToken) sites[1].error = 'Not connected yet: add WHISTLER_ADMIN_TOKEN to this site.';
+      else {
+        try {
+          const r = await fetch(`${process.env.WHISTLER_BASE_URL || 'https://whistlerroam.com'}/api/admin/commissions`, { headers: { Authorization: `Bearer ${wToken}`, 'User-Agent': 'okanaganroam-dashboard' }, signal: AbortSignal.timeout(8000) });
+          if (r.status === 200) sites[1].data = await r.json();
+          else sites[1].error = r.status === 404 ? 'Whistler Roam doesn’t have the Commissions update yet.' : `Whistler Roam answered ${r.status}.`;
+        } catch (e) { sites[1].error = 'Couldn’t reach Whistler Roam right now.'; }
+      }
+      return res.end(commissionsPage.renderCommissionsPage({ sites, rows: commissionEarnings.list(), notice: String(query.notice || '').slice(0, 40) }));
+    }
+    // Save or delete an earnings line. Signed-in admin, same site only (like the other dashboard forms); back to the page.
+    if ((pathname === '/admin/dashboard/commissions/save' || pathname === '/admin/dashboard/commissions/delete') && method === 'POST') {
+      if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
+      if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
+      let form = null;
+      try { form = await commissionsPage.readForm(req); } catch (e) { form = null; }
+      let notice;
+      if (pathname.endsWith('/delete')) notice = form && commissionEarnings.remove(form.id) ? 'deleted' : 'not_found';
+      else { const r = form ? commissionEarnings.save(form) : { ok: false, error: 'amount' }; notice = r.ok ? 'saved' : `error_${r.error}`; }
+      res.writeHead(303, { Location: `/admin/dashboard/commissions?notice=${notice}${notice === 'saved' || notice === 'deleted' ? '#earnings' : ''}`, 'Cache-Control': 'no-store' });
+      return res.end();
+    }
     // Business portal activity (2026-11-05). GET /api/admin/portal-activity?days=30 -> this site's portal steps. Admin token.
     if (pathname === '/api/admin/portal-activity' && method === 'GET') {
       if (!requireAdminToken(req, res)) return;
@@ -80143,13 +80603,35 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/weekend-email' && method === 'POST') {
       return await weekendEmail.handleSignup(req, res);
     }
+    {
+      const bm = method === 'GET' ? /^\/weekend-email\/book\/([a-z0-9_-]{2,40})\/?$/.exec(pathname) : null;
+      if (bm) {
+        const link = tourPicks.linkFor(bm[1]);
+        if (!link) { res.writeHead(302, { Location: '/whats-on?when=this-weekend', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex' }); return res.end(); }
+        res.writeHead(200, { ...weekendEmail.NOINDEX_HEADERS, 'Referrer-Policy': 'no-referrer-when-downgrade' });
+        return res.end(renderWeekendBookHop(link));
+      }
+    }
+    if (pathname.startsWith('/weekend-email/hold/') && weekendAuto.handleHoldLink(req, res, pathname, method)) return;
     if (pathname.startsWith('/weekend-email/') && await weekendEmail.handlePublic(req, res, pathname, method)) return;
     // The admin page: counts, this weekend's preview, a test send and the real send (Dayton presses it; no timer).
     if ((pathname === '/admin/weekend-email' || pathname === '/admin/weekend-email/') && method === 'GET') {
       res.writeHead(ENRICHMENT_ADMIN_TOKEN ? 200 : 503, weekendEmail.NOINDEX_HEADERS);
       if (!ENRICHMENT_ADMIN_TOKEN) return res.end(ownerSimplePage('Weekend email', '<h1>Weekend email</h1><p>The admin key is not set up on this server.</p>'));
       if (!adminSessionValid(req)) return res.end(renderAdminReviewLoginPage());
-      return res.end(weekendEmail.adminPage({ notice: String(query.notice || ''), confirmStep: query.step === 'confirm' }));
+      return res.end(weekendEmail.adminPage({ notice: String(query.notice || ''), confirmStep: query.step === 'confirm', autoHtml: weekendAuto.statusHtml() }));
+    }
+    // Hold / release this week's automatic send (2026-11-21), from the admin page.
+    if (pathname === '/admin/weekend-email/hold' && method === 'POST') {
+      if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
+      if (!isSameOriginSubmission(req)) return sendJSON(res, 403, { error: 'Forbidden.' });
+      let form;
+      try { form = await weekendEmail.readForm(req); } catch (e) { form = null; }
+      const weekend = weekendEmail.buildDigest().weekend;
+      const back = (q) => { res.writeHead(303, { Location: `/admin/weekend-email?${q}`, 'Cache-Control': 'no-store' }); return res.end(); };
+      if (!form || form.weekend !== weekend) return back('notice=stale');
+      weekendAuto.setHold(weekend, form.hold === 'yes', 'admin page');
+      return back(form.hold === 'yes' ? 'notice=held' : 'notice=released');
     }
     if ((pathname === '/admin/weekend-email/test' || pathname === '/admin/weekend-email/send') && method === 'POST') {
       if (!adminSessionValid(req)) return sendJSON(res, 401, { error: 'Please sign in again (reload the page).' });
@@ -80579,7 +81061,8 @@ const server = http.createServer(async (req, res) => {
         const categoryCounts = getRegionCategoryCounts(region);
         if (Object.keys(categoryCounts).length > 0) {
           const regionGuidePages = listGuideCombos(MIN_GUIDE_VENUES).filter((c) => c.region === region);
-          const html = withStaysNavLink(renderRegionPage(region, categoryCounts, regionGuidePages), region);
+          // "Getting here" (2026-11-21, getting-here.js): rental car + airport shuttles in the page's Getting around box.
+          const html = gettingHere.withRegionBox(withStaysNavLink(renderRegionPage(region, categoryCounts, regionGuidePages), region), region);
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           return res.end(html);
         }
@@ -80714,6 +81197,10 @@ async function goalsData(now = new Date()) {
     return seoGoals.evaluate(cfg, { gsc_nonbrand: gsc, ga_chatgpt: ga }, now);
   } catch (e) { return null; }
 }
+// Earnings typed in for this month (Commissions page), for Home and the Monday email; null when none or unreadable.
+function commissionMonth(now = new Date()) {
+  try { const rows = commissionEarnings.list(); return rows.length ? commissionsPage.monthLine(rows, now) : null; } catch (e) { return null; }
+}
 // Both sites' summaries for the dashboard card and the Monday email.
 async function weeklyDigestSites(now = new Date()) {
   const sites = [{ key: 'okanagan', name: 'Okanagan Roam', data: null, error: null }, { key: 'whistler', name: 'Whistler Roam', data: null, error: null }];
@@ -80737,7 +81224,7 @@ async function sendWeeklyDigest(now = new Date()) {
     const sites = await weeklyDigestSites(now);
     const goals = await goalsData(now);
     const w = whatsChanged.windows(now);
-    await send({ to: String(process.env.DIGEST_EMAIL || 'okanaganroam@gmail.com').trim(), subject: `What changed this week: ${w.cur.start} to ${w.cur.end}`, text: whatsChangedPage.emailText(sites, { goals }), html: whatsChangedPage.emailHtml(sites, { goals }) });
+    await send({ to: String(process.env.DIGEST_EMAIL || 'okanaganroam@gmail.com').trim(), subject: `What changed this week: ${w.cur.start} to ${w.cur.end}`, text: whatsChangedPage.emailText(sites, { goals, commissions: commissionMonth(now) }), html: whatsChangedPage.emailHtml(sites, { goals, commissions: commissionMonth(now) }) });
     return 'sent';
   } catch (e) { console.error('[digest] send failed:', e.message); return 'failed'; }
 }
@@ -80801,6 +81288,7 @@ function startDigestTimer() {
   if (process.env.NODE_ENV === 'test' || process.env.DIGEST_DISABLED === '1') return;
   const t = setInterval(() => {
     digestTick().catch((e) => console.error('[digest]', e.message)); healthAlertTick().catch((e) => console.error('[health]', e.message));
+    weekendAuto.tick().catch((e) => console.error('[weekend-auto]', e.message)); // only with WEEKEND_EMAIL_AUTO=on
     // Complete & Verified reminders (2026-11-09): from 10 AM Okanagan time, only with BADGE_REMINDERS=1.
     if (badgeRemindersOn() && okanaganHourNow() >= 10) badgeReminderTick().then((r) => { if (r.sent) console.log(`[badge-reminder] sent ${r.sent}`); }).catch((e) => console.error('[badge-reminder]', e.message));
   }, 15 * 60 * 1000);
@@ -80817,6 +81305,7 @@ function startServer() {
   server.listen(PORT, () => {
     console.log(`Okanagan Roam API listening on http://localhost:${PORT}`);
     startDigestTimer(); // Monday email (2026-11-06)
+    startExpiryTimer(); // temporary items that end by themselves (2026-11-21)
 
     // Slug backfill runs AFTER the server is already listening and serving
     // every existing route (homepage, /api/*, /guide/*, etc.) — deliberately
@@ -80917,6 +81406,7 @@ module.exports = {
   // Card badges (2026-10-29)
   cardBadgeChipsHtml, cardBadgeExpected, guideDatesFor, guideBylineHtml,
   // Hotel QR pages (2026-10-20)
+  hotelTourRowHtml, weekendBookingPick, renderWeekendBookHop, tourPickContext,
   hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelTitleLine, hotelPageGroups, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
   // IndexNow (2026-10-20, IndexNow)
   INDEXNOW_KEY, INDEXNOW_MAX_URLS, buildSitemapXml, listSitemapUrls, indexNowSubmit, createIndexNowQueue, indexNowQueue, indexNowQueueUrls,
@@ -81098,6 +81588,8 @@ module.exports = {
   sendOwnerAsksNow,
   setOwnerEmailTransport,
   weekendEmail,
+  // Weekend email auto-send and items that end by themselves (2026-11-21).
+  weekendAuto, expireTemporaryItems, temporaryItemsList, untilDateError, tempHoursMap, activeTempHours, baseHoursOn, canonicalWeek,
   weekendEmailEvents,
   digestTick, sendWeeklyDigest, pacificNow, healthAlertTick, goalsData,
   createOwnerPasswordReset,
