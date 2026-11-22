@@ -56,7 +56,7 @@ test('rules: a stop named by its name stands whatever day is mentioned; one hike
   assert.deepEqual(brief(R('an easier hike, we are beginners', [...PLAN.slice(0, 5), S({ key: '2-morning', id: 31, name: 'Sea to Sky Trail', type: 'outdoor', day: 2, start: 585 })])), [['replace', 'hike', [11], null, null, null]], 'the hike only: no pace change, no second swap');
   assert.deepEqual(brief(R('something cheaper for dinner on Saturday')), [['budget', null, [15], null, null, 'budget']], 'that dinner only');
   assert.deepEqual(brief(R('cheaper')), [['budget', null, [12, 15, 22], null, null, 'budget']], 'every meal, one by one (no re-plan)');
-  assert.equal(R('dinner on Saturday is too late for the kids, make it 5:30').cant, 'time_at');
+  assert.deepEqual(R('dinner on Saturday is too late for the kids, make it 5:30').ops.map((o) => [o.o, o.n, o.stops[0].id]), [['set_time', 1050, 15]], 'one stop\'s own time (travel agent abilities)');
   assert.deepEqual(brief(R('make Sunday lighter, we drive home after lunch')), [['remove', null, [23], null, null, null]], 'Sunday ends with lunch; Saturday is untouched');
   assert.deepEqual(brief(R('more indoor things')), [['replace', 'indoor', [11], null, null, null], ['replace', 'indoor', [21], null, null, null]], 'the outdoor stops, one by one');
   const fill = R('fill the day: a winery, lunch and something relaxing', PLAN.slice(0, 1));

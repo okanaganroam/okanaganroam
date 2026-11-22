@@ -16,6 +16,7 @@
 // simple word rules (rulesRead), and anything they can't read is added to the request text, which the planner already
 // reads in plain words.
 
+const agent = require('./trip-chat-agent');
 const MODEL = 'claude-haiku-5-5';
 // Claude Haiku 5.5 list price (claude-api skill, cached 2026-10-06): $0.10 / $0.50 per million input / output tokens.
 const PRICE_PER_TOKEN = { input: 0.10 / 1e6, output: 0.50 / 1e6 };
@@ -29,14 +30,18 @@ const MAX_TEXT = 500; // the planner's request limit (discovery-intent DISCOVERY
 // 60 per 10 minutes; a blocked try is not counted; the reply says how long to wait. The daily USD cap guards the cost.
 const RATE = { max: 60, windowMs: 10 * 60 * 1000 };
 
-const OPS = ['remove', 'keep', 'more_like', 'replace', 'add', 'budget', 'pace', 'party', 'days', 'date', 'town', 'redo_day', 'start_over', 'time', 'stay', 'transport'];
+const OPS = ['remove', 'keep', 'more_like', 'replace', 'add', 'budget', 'pace', 'party', 'days', 'date', 'town', 'redo_day', 'start_over', 'time', 'stay', 'transport',
+  // Travel agent abilities (2026-11-22, trip-chat-agent.js): a question about a stop, and a stop moved in the plan.
+  'ask', 'move'];
 const TIMES = ['', 'morning', 'midday', 'afternoon', 'evening'];
 const VALUES = ['', 'budget', 'upscale', 'relaxed', 'packed', 'standard', 'kids', 'dog', 'accessible', 'no_alcohol', 'vegan', 'vegetarian', 'gluten_free', 'later', 'earlier',
   // The place to stay and getting here (2026-11-22, agent round): stay v / transport v.
-  'pool', 'hot_tub', 'kitchen', 'pets', 'parking', 'hotel', 'have_place', 'rental', 'driving', 'no_car', 'wine_tour'];
+  'pool', 'hot_tub', 'kitchen', 'pets', 'parking', 'hotel', 'have_place', 'rental', 'driving', 'no_car', 'wine_tour',
+  // Travel agent abilities: a stay added to any plan, getting there, the number of adults, questions (q_*).
+  'add', 'fly_in', 'shuttle', 'no_rental', 'adults', ...agent.Q_VALUES];
 const STAY_AMENITY_VALUES = ['pool', 'hot_tub', 'kitchen', 'pets', 'parking', 'accessible'];
-const STAY_VALUES = ['budget', 'upscale', ...STAY_AMENITY_VALUES, 'hotel', 'have_place'];
-const TRANSPORT_VALUES = ['rental', 'driving', 'no_car', 'wine_tour'];
+const STAY_VALUES = ['budget', 'upscale', ...STAY_AMENITY_VALUES, 'hotel', 'have_place', 'add'];
+const TRANSPORT_VALUES = ['rental', 'driving', 'no_car', 'wine_tour', 'fly_in', 'shuttle', 'no_rental'];
 const CANT = ['', 'booking', 'transport', 'weather', 'other', 'unclear'];
 
 // The kinds of stop a visitor can ask for. text: the planner's own words for it (what its rules already read);
@@ -94,9 +99,12 @@ const WORD_KINDS = {
   mini_golf: { en: 'mini golf', fr: 'du mini-golf', types: ['indoor', 'outdoor', 'golf', 'sport'], words: ['mini golf', 'minigolf', 'mini-golf', 'putt'], re: /\b(?:mini[- ]?golf|minigolf|mini putt)\b/ },
   escape_room: { en: 'an escape room', fr: 'un jeu d’évasion', types: ['indoor'], words: ['escape'], night: true, re: /\b(?:escape rooms?|jeux? d'evasion)\b/ },
 };
+// Tours and bookable activities (trip-chat-agent.js): kinds of stop like the rest, picked by the planner from the
+// listings ("add a wine tour", "book us a snowmobile tour", "a boat cruise", "ziplining").
+for (const [k, w] of Object.entries(agent.TOUR_KINDS)) WORD_KINDS[k] = { en: w.en, fr: w.fr, types: w.types, words: w.words, re: w.re, tour: true };
 for (const [k, w] of Object.entries(WORD_KINDS)) KINDS[k] = { text: w.en, en: w.en, fr: w.fr, types: w.types, words: w.words };
 // "something relaxing": a spa, a sauna, a float.
-KINDS.spa = { ...KINDS.spa, types: ['indoor', 'outdoor', 'sport'], words: ['spa', 'sauna', 'wellness', 'hot spring', 'float', 'nordic'] };
+KINDS.spa = { ...KINDS.spa, types: ['indoor', 'outdoor', 'sport'], words: ['spa', 'sauna', 'thermal', 'hot spring', 'float', 'nordic'] };
 const KIND_KEYS = Object.keys(KINDS);
 // A kind for each venue type, for "more like the winery".
 const TYPE_KIND = { winery: 'winery', brewery: 'brewery', distillery: 'distillery', cafe: 'cafe', restaurant: 'restaurant', pub: 'pub', cocktail: 'cocktail', golf: 'golf', beach: 'beach', outdoor: 'outdoor', indoor: 'indoor', tour: 'tour' };
@@ -204,14 +212,15 @@ function systemPrompt(regions, regionLabels) {
     '- start_over: a completely new plan for the same request ("start over", "something totally different").',
     '- time: v later or earlier, to start the day later or earlier; d = the day, s = the stop it is about ("move lunch later" -> v later, s [lunch id]).',
     '- stay: the place to stay (not the stops). v budget ("somewhere cheaper to stay"), upscale (nicer), pool, hot_tub, kitchen, pets (pet-friendly), parking (free parking), accessible (accessible rooms), hotel (they ask for a hotel, not a motel), have_place ("we already have a place", "staying with friends"). One stay op per thing asked: "a hotel with a pool in Penticton" -> stay v pool r penticton, stay v hotel; or r = the town to stay in ("stay in Naramata" -> r naramata, v "").',
-    '- transport: getting here and around. v wine_tour ("book us a wine tour with a driver", "no driving after the wineries"), rental ("we need a rental car"), driving ("we are driving from Vancouver", "we have our own car"), no_car ("we don\'t have a car").',
+    '- transport: getting here and around. v wine_tour ("no driving after the wineries", "we need a designated driver"), rental ("we need a rental car"), driving ("we are driving from Vancouver", "we have our own car"), no_car ("we don\'t have a car").',
     'Common slips to avoid (live eval, 2026-11-22):',
     '"swap the brewery for something outdoors" -> replace, s [that stop], k outdoor: a replace with a kind always sets k.',
     '"we\'re taking the bus from Kelowna airport", "by shuttle", "we don\'t have a car" -> transport no_car; "we\'re driving" -> transport driving. Never cant for these.',
     '"we want to stay in Penticton", "a hotel in Naramata" -> stay (r), never town; town is only for basing the whole trip somewhere else ("plan it in Kelowna instead").',
     '"ice cream for the kids", "something for the kids to do" -> add only (k ice_cream / k kids), no party op: the kids are already in the plan.',
+    ...agent.PROMPT_LINES,
     'Several ops can come from one message ("remove the brewery and add a beach" -> remove, add). Use as few ops as cover the message.',
-    'cant (with no ops) when the message is not an edit we can make: booking (book, reserve, pay, tickets), transport (flights, rides, rental cars, shuttles, buses), weather (a forecast), other (a question, a request for something we do not do, anything off topic), unclear (nonsense, or you cannot tell what they want). Otherwise cant "".',
+    'cant (with no ops) when the message is not an edit we can make: booking (pay, buy tickets, reserve a table or a room for us), transport (book flights or rides), weather (a forecast), other (a question that is not about a stop on the plan, a request for something we do not do, anything off topic), unclear (nonsense, or you cannot tell what they want). Otherwise cant "".',
     'Kinds (k): ' + KIND_KEYS.join(', ') + '. kids = something for children; ice_cream for ice cream or gelato; arts for a museum or gallery; cafe for coffee.',
     'The message may be in French; read it the same way (« enlève la microbrasserie », « plus pour les enfants », « moins cher », « plus relax », « on ne boit pas »). In Canadian French « dîner » is lunch and « souper » is dinner.',
   ].join('\n');
@@ -300,7 +309,7 @@ function validateWire(wire, stops, { regions = [], today = null } = {}) {
     if (!TIMES.includes(it.t)) { drop('time'); continue; }
     if (!isInt(it.d, 0, 7)) { drop('day'); continue; }
     if (!VALUES.includes(it.v)) { drop('value'); continue; }
-    if (!isInt(it.n, 0, 7)) { drop('number'); continue; }
+    if (!isInt(it.n, 0, 12)) { drop('number'); continue; }
     if (!Array.isArray(it.ka) || it.ka.length > 8 || !it.ka.every((a) => isInt(a, 0, 17))) { drop('ages'); continue; }
     if (typeof it.r !== 'string' || !(it.r === '' || regions.includes(it.r))) { drop('town'); continue; }
     if (typeof it.sd !== 'string' || !(it.sd === '' || validDate(it.sd, today))) { drop('date'); continue; }
@@ -308,7 +317,8 @@ function validateWire(wire, stops, { regions = [], today = null } = {}) {
     const need = {
       remove: () => op.stops.length > 0, keep: () => op.stops.length > 0, more_like: () => op.stops.length === 1, replace: () => op.stops.length === 1,
       add: () => !!op.kind, budget: () => ['budget', 'upscale'].includes(op.value), pace: () => ['relaxed', 'packed', 'standard'].includes(op.value),
-      party: () => ['kids', 'dog', 'accessible', 'no_alcohol', 'vegan', 'vegetarian', 'gluten_free'].includes(op.value) || (!op.value && op.ages.length > 0),
+      party: () => ['kids', 'dog', 'accessible', 'no_alcohol', 'vegan', 'vegetarian', 'gluten_free'].includes(op.value) || (op.value === 'adults' && isInt(op.n, 1, 12)) || (!op.value && op.ages.length > 0),
+      ask: () => agent.Q_VALUES.includes(op.value) && op.stops.length <= 2, move: () => op.stops.length >= 1 && op.stops.length <= 2 && (op.stops.length === 2 || !!op.day || !!op.time),
       stay: () => STAY_VALUES.includes(op.value) || (!op.value && !!op.region), transport: () => TRANSPORT_VALUES.includes(op.value),
       days: () => isInt(op.n, 1, 7), date: () => !!op.date, town: () => !!op.region, redo_day: () => true, start_over: () => true, time: () => ['later', 'earlier'].includes(op.value),
     };
@@ -401,7 +411,7 @@ const KIND_WORDS = [
   ['live_music', /\b(?:live music|musique live)\b/],
 ];
 const NUM_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, sept: 7 };
-const GENERIC_NAME_WORDS = new Set(['the', 'and', 'winery', 'wineries', 'estate', 'vineyard', 'vineyards', 'wines', 'brewing', 'brewery', 'company', 'restaurant', 'kitchen', 'cafe', 'coffee', 'bistro', 'kelowna', 'penticton', 'vernon', 'oliver', 'osoyoos', 'summerland', 'peachland', 'naramata', 'lake', 'country', 'okanagan', 'house', 'grill', 'bar', 'park', 'beach', 'family', 'cellars']);
+const GENERIC_NAME_WORDS = new Set(['time', 'tour', 'tours', 'open', 'what', 'when', 'this', 'that', 'with', 'from', 'place', 'night', 'after', 'before', 'move', 'more', 'some', 'good', 'kids', 'about', 'there', 'where', 'does', 'into', 'only', 'need', 'find', 'book', 'stay', 'hotel', 'heure', 'avec', 'pour', 'dans', 'the', 'and', 'winery', 'wineries', 'estate', 'vineyard', 'vineyards', 'wines', 'brewing', 'brewery', 'company', 'restaurant', 'kitchen', 'cafe', 'coffee', 'bistro', 'kelowna', 'penticton', 'vernon', 'oliver', 'osoyoos', 'summerland', 'peachland', 'naramata', 'lake', 'country', 'okanagan', 'house', 'grill', 'bar', 'park', 'beach', 'family', 'cellars']);
 
 // Weekday names -> the day of the plan (from the trip's first date). -> { saturday: 1, samedi: 1, ... }
 const WEEKDAY_NAMES = [['sunday', 'dimanche'], ['monday', 'lundi'], ['tuesday', 'mardi'], ['wednesday', 'mercredi'], ['thursday', 'jeudi'], ['friday', 'vendredi'], ['saturday', 'samedi']];
@@ -422,7 +432,7 @@ function stopsNamed(t, stops) {
   const found = new Set();
   for (const s of stops) {
     const words = fold(s.name).split(/[^a-z0-9']+/).filter((w) => w.length >= 4 && !GENERIC_NAME_WORDS.has(w));
-    if (words.some((w) => new RegExp(`\\b${w.replace(/[^a-z0-9]/g, '')}\\b`).test(t))) found.add(s);
+    if (words.some((w) => { const re = new RegExp(`\\b${w.replace(/[^a-z0-9]/g, '')}\\b`); return re.test(t) || (w.includes("'") && re.test(t.replace(/'/g, ''))); })) found.add(s);
   }
   const lunch = /\b(?:lunch|diner|dejeuner)\b/.test(t), dinner = /\b(?:dinner|supper|souper)\b/.test(t);
   const byName = new Set(found);
@@ -434,7 +444,8 @@ function stopsNamed(t, stops) {
   let tk = t;
   for (const [kind, w] of Object.entries(WORD_KINDS)) {
     if (!w.re.test(t)) continue;
-    tk = tk.replace(new RegExp(w.re.source, 'g'), (m) => m.replace(/(wine|bars?|vins?|golf)/g, '$1_'));
+    tk = tk.replace(new RegExp(w.re.source, 'g'), (m) => (w.tour ? ' _ ' : m.replace(/(wine|bars?|vins?|golf)/g, '$1_')));
+    if (w.tour) { const own = stops.filter((s) => kindMatches(kind, s)); for (const s of (own.length ? own : stops.filter((x) => x.type === 'tour'))) { found.add(s); byName.add(s); } continue; }
     if (w.words.length) for (const s of stops) if (kindMatches(kind, s)) { found.add(s); byName.add(s); }
   }
   for (const [kind, re] of KIND_WORDS) {
@@ -458,12 +469,15 @@ function ordinalPick(t, named) {
 function kindsNamed(t, exceptTypes = new Set()) {
   // A word kind's own words are not read again as a broader kind ("wine bar" is not a winery and a bar).
   let tk = t;
-  for (const w of Object.values(WORD_KINDS)) if (w.re.test(t)) tk = tk.replace(new RegExp(w.re.source, 'g'), (m) => m.replace(/(wine|bars?|vins?|golf)/g, '$1_'));
+  for (const w of Object.values(WORD_KINDS)) if (w.re.test(t)) tk = tk.replace(new RegExp(w.re.source, 'g'), (m) => (w.tour ? ' _ ' : m.replace(/(wine|bars?|vins?|golf)/g, '$1_')));
   tk = tk.replace(/\b(?:something|somewhere) relaxing\b|\bquelque chose de relaxant\b/g, 'something_relaxing');
-  return KIND_WORDS.filter(([kind, re]) => re.test(WORD_KINDS[kind] ? t : tk) && !(KINDS[kind].type && exceptTypes.has(KINDS[kind].type))).map(([kind]) => kind);
+  const out = KIND_WORDS.filter(([kind, re]) => re.test(WORD_KINDS[kind] ? t : tk) && !(KINDS[kind].type && exceptTypes.has(KINDS[kind].type))).map(([kind]) => kind);
+  // "a snowmobile tour" is the snowmobile tour, not also "a tour".
+  return out.some((k) => agent.TOUR_KINDS[k]) ? out.filter((k) => k !== 'tour' && !(k === 'winery' && out.includes('wine_tour')) && !(k === 'brewery' && out.includes('brewery_tour'))) : out;
 }
-// -> { ops, cant }
-function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1, weekdays = {} } = {}) {
+// -> { ops, cant }. Several asks in one message are each read and carried out in order (trip-chat-agent.js readAll).
+function rulesRead(message, stops, opts = {}) { return agent.readAll(message, (m) => rulesReadOne(m, stops, opts)); }
+function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 1, weekdays = {} } = {}) {
   const t = fold(message).replace(/\s+/g, ' ').trim();
   const base = { stops: [], kind: null, time: null, day: null, value: null, n: null, ages: [], region: null, date: null };
   const op = (o, extra = {}) => ({ ...base, o, ...extra });
@@ -472,7 +486,13 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1, 
   // Getting here and the place to stay (2026-11-22, agent round), read before "flights" (a rental car is ours to show).
   // Second fresh-eyes round (2026-11-22). A wine tour with a driver is ours to offer (Viator, wine-tours.js), not "I can't
   // book things in this chat".
-  if (/\bwine tours?\b|\btours? (?:de|des) vignobles\b|\b(?:with|need|want|hire|get) a driver\b|\bdesignated driver\b|\bno driving\b|\bsans conduire\b/.test(t)) return { ops: [op('transport', { value: 'wine_tour' })], cant: null };
+  // Travel agent abilities first (trip-chat-agent.js): questions, a stay on any plan, getting there, moves, adults.
+  const agentRead = agent.agentRules(t, stops, { regions, regionLabels, days, weekdays }, { op, stopsNamed, ordinalPick, kindsNamed, stayAmenitiesIn });
+  // A bare "find us a place to stay" (soft) lets the stay rules below read a price, an amenity, a town or an area first.
+  if (agentRead && !agentRead.soft) return agentRead;
+  // A tour asked for by its kind ("add a wine tour", "book us a snowmobile tour") is a stop to add, read further down.
+  const tourAsked = Object.entries(WORD_KINDS).filter(([, w]) => w.tour && w.re.test(t)).map(([k]) => k);
+  if (!tourAsked.length && /\b(?:with|need|want|hire|get) a driver\b|\bdesignated driver\b|\bno driving\b|\bsans conduire\b/.test(t)) return { ops: [op('transport', { value: 'wine_tour' })], cant: null };
   // A clock time for one stop ("move it to 6:30", "dinner at 7"): we can't set one stop's time yet (the planner has no
   // field for it), and shifting the whole day instead was wrong. Said plainly.
   const clockM = /\b(?:to|at|for|vers)\s+(\d{1,2})(?:[:h](\d{2}))?\s*(am|pm|h)?(?![\w-])/.exec(t) || /\b(?:make it|it)\s+(\d{1,2})(?:[:h](\d{2}))\s*(am|pm|h)?(?![\w-])/.exec(t);
@@ -480,7 +500,7 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1, 
   if (/\b(?:rent(?:al)? (?:a )?cars?|car rentals?|need a car|louer une voiture|location de voiture)\b/.test(t)) return { ops: [op('transport', { value: 'rental' })], cant: null };
   if (/\b(?:no car|don'?t have a car|do not have a car|without a car|sans voiture|pas de voiture|tak(?:e|ing) the (?:bus|shuttle)|by (?:bus|shuttle)|en autobus|en navette)\b/.test(t)) return { ops: [op('transport', { value: 'no_car' })], cant: null };
   if (/\b(?:driving (?:from|up|in|down|over)|we'?ll drive|we are driving|we'?re driving|our own car|bringing (?:our|the) car|en voiture depuis|on arrive en voiture)\b/.test(t)) return { ops: [op('transport', { value: 'driving' })], cant: null };
-  const stayWord = /\b(?:stay|staying|hotel|motel|place (?:to stay|with|that has)|accommodations?|lodging|room|rooms|airbnb|cabin|condo|resort|b&b|inn|logement|hebergement|hotel|dormir|loger)\b/.test(t);
+  const stayWord = /\b(?:stay|staying|hotel|motel|place (?:to stay|with|that has)|somewhere (?:to stay|to sleep|with|that has)|accommodations?|lodging|room|rooms|airbnb|cabin|condo|resort|b&b|inn|logement|hebergement|hotel|dormir|loger)\b/.test(t);
   if (/\b(?:already have (?:a|our|an) (?:place|hotel|airbnb|room|cabin|condo|rental)|staying with (?:friends|family)|we have (?:a|an) (?:place|airbnb|cabin|condo)|deja (?:un|notre) logement|chez des amis)\b/.test(t)) return { ops: [op('stay', { value: 'have_place' })], cant: null };
   if (stayWord) {
     const stayIn = /\b(?:stay|sleep|hotel|place|lodging|based?|loger|dormir|sejourner|logement|hebergement)\s+(?:in|at|near|a|en|pres de)\s+([a-z' -]+)/.exec(t);
@@ -492,11 +512,14 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1, 
     if (vals.length === 1 && vals[0] === 'hotel' && !r && !/\b(?:a|an|un) hotel\b/.test(t)) vals.pop();
     if (vals.length || r) return { ops: (vals.length ? vals : [null]).map((v, i) => op('stay', { value: v, region: i === 0 ? r || null : null })), cant: null };
   }
+  if (agentRead && agentRead.soft) return { ops: agentRead.ops, cant: null };
   if (/\b(?:flights?|fly|plane|airport|uber|lyft|taxi|shuttles?|avion|vol|navette)\b/.test(t)) return { ops: [], cant: 'transport' };
   if (/\b(?:weather|forecast|meteo)\b/.test(t)) return { ops: [], cant: 'weather' };
   // A question about a place ("what time do the lifts open?", "how much is it?"): one honest, useful line.
   if (/^(?:what time|when (?:do|does|is|are)|how much|how long|is it open|are they open|do (?:they|we) need|a quelle heure|combien|c'est ouvert)\b/.test(t) && !/\b(?:add|swap|remove|replace|ajoute|enleve|remplace)\b/.test(t)) return { ops: [], cant: 'info' };
-  if (/\b(?:book|reserve|reservation|pay|buy tickets?|reserver|payer)\b/.test(t) && !/\bbook my trip\b/.test(t)) return { ops: [], cant: 'booking' };
+  // "book us a snowmobile tour" with none on the plan adds one (its Book button is on the stop); with one on the plan, or anything else, the booking line.
+  const tourToAdd = tourAsked.some((k) => !stops.some((x) => kindMatches(k, x) || x.type === 'tour'));
+  if (/\b(?:book|reserve|reservation|pay|buy tickets?|reserver|payer)\b/.test(t) && !/\bbook my trip\b/.test(t) && !tourToAdd) return { ops: [], cant: 'booking' };
   if (/\b(?:start over|start again|from scratch|brand new plan|something (?:totally|completely) different|recommencer|tout recommencer)\b/.test(t)) return { ops: [op('start_over')], cant: null };
   const ops = [];
   const dayM = /\b(?:day|jour)\s*(\d)\b/.exec(t);
@@ -561,7 +584,7 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1, 
   const moreKids = /\b(?:more|plus)\b[^.]*\b(?:kids?|children|enfants?)\b/.test(t) && !removeWord;
   const kidsAsk = moreKids || (/\b(?:kids?|children|child|toddlers?|enfants?)\b/.test(t) && !removeWord && !/\b(?:something for|for the|pour les)\b/.test(t));
   if (kidsAsk || (ages.length && /\b(?:kids?|children|enfants?|son|daughter|boy|girl|fils|fille)\b/.test(t))) ops.push(op('party', { value: 'kids', ages: ages.filter((a) => a <= 17).slice(0, 8) }));
-  if (/\b(?:dogs?|pup(?:py)?|chiens?)\b/.test(t)) ops.push(op('party', { value: 'dog' }));
+  if (/\b(?:dogs?|pup(?:py)?|chiens?)\b/.test(t) && !agent.TOUR_KINDS.dog_sled.re.test(t)) ops.push(op('party', { value: 'dog' }));
   if (/\b(?:wheelchair|accessible|stroller|mobility|walker|fauteuil roulant|poussette)\b/.test(t)) ops.push(op('party', { value: 'accessible' }));
   if (/\b(?:don'?t drink|do not drink|no (?:alcohol|drinking|booze)|sober|alcohol[- ]free|non[- ]alcoholic|sans alcool|ne boit pas|ne buvons pas|pas d'alcool)\b/.test(t)) ops.push(op('party', { value: 'no_alcohol' }));
   if (/\bvegan|vegetalien/.test(t)) ops.push(op('party', { value: 'vegan' }));
@@ -612,7 +635,7 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1, 
     const k = kindsNamed(t.replace(/\b(?:for|with|par|pour|avec)\b.*$/, ''))[0] || null;
     return { ops: [], cant: 'not_found', what: k };
   }
-  const addWord = /\b(?:add|include|also|fit in|squeeze in|want|would like|some|fill|ajoute[rz]?|aussi|inclure|veux|voudrions)\b/.test(t) || /\b(?:after|before|apres|avant)\b/.test(t) || (!ops.length && !named.length && Object.values(WORD_KINDS).some((w) => w.re.test(t)));
+  const addWord = /\b(?:add|include|also|fit in|squeeze in|want|would like|some|fill|ajoute[rz]?|aussi|inclure|veux|voudrions)\b/.test(t) || tourToAdd || /\b(?:after|before|apres|avant)\b/.test(t) || (!ops.length && !named.length && Object.values(WORD_KINDS).some((w) => w.re.test(t)));
   // "more indoor things": the outdoor stops become indoor ones, one by one (up to three); never a re-plan.
   const moreKind = /\b(?:more|plus d[e']?)\s*(?:indoor|inside|(?:choses |activites )?(?:a l')?interieur)/.test(t) ? 'indoor' : /\b(?:more|plus d[e']?)\s*(?:outdoor|outside|(?:choses |activites )?(?:en |de )?plein air)/.test(t) ? 'outdoor' : null;
   if (!removeWord && moreKind && !ops.length) {
@@ -621,7 +644,7 @@ function rulesRead(message, stops, { regions = [], regionLabels = {}, days = 1, 
   }
   if (!removeWord && addWord && !ops.some((o) => ['replace', 'more_like'].includes(o.o) || (o.o === 'budget' && (o.stops || []).length))) {
     // "after lunch" / "before dinner": the stop it goes next to (value "earlier" = before it, as the model answers).
-    const after = /\b(?:after|apres|before|avant)\s+(?:the\s+|our\s+|le\s+|la\s+|l')?(\w+)/.exec(t);
+    const after = /\b(?:after|before)\s+(?:the\s+|our\s+)?(\w+)/.exec(t) || /\b(?:after|apres|before|avant)\s+(?:the\s+|our\s+|le\s+|la\s+|l')?(\w+)/.exec(t);
     const before = !!(after && /^(?:before|avant)\b/.test(after[0]));
     let afterStops = after ? stopsNamed(after[1], stops) : [];
     if (day && afterStops.some((s) => s.day === day)) afterStops = afterStops.filter((s) => s.day === day);
@@ -661,7 +684,7 @@ const KIDS_ACTIVITY_RE = /\b(?:lessons?|school|camp|cours|lecons?|activit(?:y|ie
 const AVOID_TEXT = { arts: 'no museums', winery: 'no wineries', brewery: 'no breweries', distillery: 'no distilleries', pub: 'no pubs', cocktail: 'no cocktail lounges', golf: 'no golf', beach: 'no beaches', hike: 'no hiking', tour: 'no tours', indoor: 'no indoor attractions', spa: 'no spa', cafe: 'no cafes' };
 function rulesConfident(r) {
   if (!r) return false;
-  if (!(r.ops || []).length) return ['booking', 'transport', 'weather', 'other', 'not_found', 'time_at', 'info'].includes(r.cant);
+  if (!(r.ops || []).length) return ['booking', 'transport', 'weather', 'other', 'not_found', 'time_at', 'info', 'ask_which', 'days_max', 'days_min'].includes(r.cant);
   return r.ops.every((o) => o.o !== 'refine');
 }
 const stopIds = (o) => (o.stops || []).map((s) => s.id).sort((a, b) => a - b).join(',');
@@ -681,6 +704,13 @@ function reconcileReads(ai, rules, message) {
   // (bowling, pizza, a movie), "more indoor things" (swaps, not adds), a thing to do after dinner (never a second
   // dinner), and a day that ends after lunch.
   const rops = rules.ops || [];
+  // Travel agent abilities: several asks each read by the rules, and the asks only the rules place exactly (a question
+  // about a stop, a move, one stop's time, the stay, getting there, adults, a tour) stand as read.
+  const agentOp = (o) => ['ask', 'move', 'set_time', 'stay', 'transport'].includes(o.o) || (o.o === 'time' && Number.isInteger(o.n) && o.n >= 360) || (o.o === 'party' && o.value === 'adults') || (o.o === 'add' && agent.TOUR_KINDS[o.kind]) || (o.o === 'days' && o.region);
+  if (rops.length && ((rules.multi && !rules.partial) || rops.every(agentOp))) return { ops: rops, cant: null, source: 'rules_over_ai', fixes: [rules.multi ? 'multi' : 'agent'] };
+  if (!rops.length && ['ask_which', 'days_max', 'days_min'].includes(rules.cant) && !(ai.ops || []).length) return { ops: [], cant: rules.cant, source: 'rules_over_ai', fixes: [rules.cant] };
+  // The AI read a question the rules did not: its stop stands; with no stop, "which stop?".
+  if ((ai.ops || []).some((o) => o.o === 'ask' && !(o.stops || []).length) && !rops.length) return { ops: [], cant: 'ask_which', source: 'ai', fixes: [] };
   if (rops.length && rops.every((o) => EDIT_OPS.includes(o.o)) && (rules.exact || rops.some((o) => WORD_KINDS[o.kind])
     || (rops.every((o) => o.o === 'replace' && o.kind) && !(ai.ops || []).some((o) => o.o === 'replace'))
     || (rops.every((o) => o.o === 'budget' && (o.stops || []).length) && !(ai.ops || []).some((o) => o.o === 'budget'))
@@ -949,6 +979,8 @@ function broadTurn(ops, ctx) {
       case 'days': {
         const n = op.n;
         overrides.days = n; r.n = n;
+        // "add a night in Penticton": the new day is asked for there, in the planner's own words.
+        if (op.region) { addText(`day ${n} in ${(ctx.regionLabels || {})[op.region] || op.region}`); r.region = op.region; }
         if (ctx.short) { want('broad'); break; }
         want('pins');
         const prev = pinFilter; pinFilter = (s) => prev(s) && s.day <= n;
@@ -979,7 +1011,10 @@ function broadTurn(ops, ctx) {
         const d = op.day || (target && target.day) || 1;
         const first = stops.filter((s) => s.day === d && Number.isInteger(s.start)).sort((a, b) => a.start - b.start)[0];
         const cur = (first && first.start) || 600;
-        const next = Math.max(360, Math.min(900, cur + (op.value === 'later' ? 60 : -60)));
+        // An exact start asked for ("start the days at 10:30") is that time; else an hour later or earlier.
+        const exactStart = Number.isInteger(op.n) && op.n >= 360;
+        if (exactStart) op.value = op.n >= cur ? 'later' : 'earlier';
+        const next = exactStart ? Math.max(360, Math.min(900, op.n)) : Math.max(360, Math.min(900, cur + (op.value === 'later' ? 60 : -60)));
         r.day = d; r.target = target || first || null; r.value = op.value;
         if (next === cur) { r.ok = false; r.why = 'limit'; break; }
         if (days > 1) overrides.dayStartMinutes = { ...(overrides.dayStartMinutes || {}), [d]: next };
@@ -1022,6 +1057,17 @@ function broadTurn(ops, ctx) {
     }
     const args = { ...args0, text: textTooLong ? args0.text : text, seed, overrides: Object.keys(overrides).length ? { ...overrides } : null, excludeVenueIds: exclude.slice(-200), avoidVenueIds: [...new Set(avoid)].slice(0, 200), pinned: Object.keys(pinned).length ? pinned : null, swap: m === 'local' ? swapArg : null };
     let plan = null;
+    const daysOnly = !!(ctx.hooks && ctx.hooks.moves) && m === 'pins' && ops.every((o) => ['days', 'remove', 'keep'].includes(o.o));
+    if (ctx.hooks && ctx.hooks.moves && args.pinned && m !== 'local') args.trustedPins = Object.keys(args.pinned);
+    if (daysOnly && args.pinned) {
+      const kept = stops.filter((s) => args.pinned[s.key] === s.id);
+      args.overrides = { ...(args.overrides || {}), stopStarts: { ...agent.startsOf(kept), ...((args.overrides || {}).stopStarts || {}) } };
+      const explicit = (args0.overrides || {}).stopStarts || null;
+      try { plan = ctx.run(args); } catch (e) { return null; }
+      if (plan && isDayPlan(plan)) agent.stripExtras(plan, new Set(stops.map((o) => o.id)), days);
+      if (explicit) args.overrides.stopStarts = explicit; else delete args.overrides.stopStarts;
+      if (!plan) return null;
+    } else
     try { plan = ctx.run(args); } catch (e) { return null; }
     // The plan must still be the same kind of plan (a day-by-day plan stays one; a short one stays a short one).
     if (!plan || (ctx.short ? !(isShortPlan(plan) || isDayPlan(plan)) : !isDayPlan(plan))) return null;
@@ -1160,6 +1206,8 @@ function slotEdit(cur, spec, ctx) {
   let plan = null;
   try { plan = ctx.run(args); } catch (e) { return { why: 'conflict' }; }
   if (!plan || !isDayPlan(plan) || plan.swapMissed || (plan.swapKept && plan.swapKept.key === spec.slot)) return { why: 'no_fit' };
+  // Only that one stop changes: a place the planner put into another free part of a day is taken out again.
+  { const f0 = planStops(plan).find((s) => s.key === spec.slot); agent.stripExtras(plan, new Set([...cur.stops.map((s) => s.id), ...(f0 ? [f0.id] : [])])); }
   const nw = planStops(plan);
   const fresh = nw.find((s) => s.key === spec.slot);
   if (!fresh || (spec.oldId && fresh.id === spec.oldId) || !spec.check(fresh)) return { why: 'no_fit' };
@@ -1191,7 +1239,53 @@ function lighterDayOps(op, ctx) {
   const n = pool.length >= 4 && !ctx.one ? 2 : 1;
   return { ...op, o: 'remove', stops: pool.slice(-n), value: null, lighterDay: op.day };
 }
+// Travel agent abilities (trip-chat-agent.js): a stop moved to another day or part of the day, and one stop's own time,
+// are applied after the message's other edits, on the plan as it then is. Every other stop stays on the plan.
 function planTurn(ops, ctx) {
+  const moves = ops.filter((o) => o.o === 'move' || o.o === 'set_time');
+  if (!moves.length) return planTurnCore(ops, ctx);
+  const rest = ops.filter((o) => !moves.includes(o));
+  const out = rest.length ? planTurnCore(rest, ctx) : { plan: null, req: null, actions: { remove: [], keep: [] }, results: [], changed: [], locks: ctx.locks || {} };
+  const stops0 = ctx.stops || [];
+  const gone = new Set([...(ctx.removed || []), ...((out.actions && out.actions.remove) || [])]);
+  let state = out.plan ? { stops: planStops(out.plan), args: { ...ctx.args, text: out.req.text, seed: out.req.seed, overrides: Object.keys(out.req.overrides || {}).length ? out.req.overrides : null, excludeVenueIds: out.req.excludeVenueIds, avoidVenueIds: out.req.avoidVenueIds }, locks: out.locks || {} }
+    : { stops: stops0.filter((s) => !gone.has(s.key)), args: { ...ctx.args, excludeVenueIds: [...new Set([...(ctx.args.excludeVenueIds || []), ...stops0.filter((s) => gone.has(s.key)).map((s) => s.id)])] }, locks: ctx.locks || {} };
+  let plan = out.plan || null;
+  const softLocks = { ...(out.locks || ctx.locks || {}) };
+  for (const op of moves) {
+    const res = ctx.short ? { result: { op: op.o, ok: false, local: true, why: 'no_fit', stop: op.stops[0] } } : agent.moveStop(op, state, { run: ctx.run, hooks: ctx.hooks || {}, planStops, isDayPlan });
+    out.results.push(res.result);
+    if (!res.plan) continue;
+    plan = res.plan;
+    // What the visitor moved stays where they put it through later changes.
+    for (const k of Object.keys(softLocks)) if (!res.nw.some((s) => s.key === k && s.id === softLocks[k])) delete softLocks[k];
+    softLocks[res.result.fresh.key] = res.result.fresh.id;
+    state = { stops: res.nw, args: { ...res.args, moves: undefined, trustedPins: undefined }, locks: state.locks };
+  }
+  if (!plan || plan === out.plan) return out;
+  const nw = planStops(plan);
+  const pins = {};
+  for (const s of nw) if (/^\d-/.test(s.key)) pins[s.key] = s.id;
+  const a = state.args;
+  return {
+    ...out, plan, failed: false,
+    req: { text: a.text, seed: a.seed, overrides: a.overrides || {}, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: pins, locks: softLocks, ...((a.tourStops || []).length ? { tourStops: a.tourStops } : {}) },
+    changed: nw.filter((s) => !stops0.some((o) => o.key === s.key && o.id === s.id && (!Number.isInteger(o.start) || !Number.isInteger(s.start) || o.start === s.start))).map((s) => s.key),
+    added: nw.filter((s) => !stops0.some((o) => o.id === s.id)), gone: stops0.filter((s) => !nw.some((n) => n.id === s.id) && !gone.has(s.key)), locks: softLocks, newDays: (plan.days || []).length || 1,
+  };
+}
+// A plan re-run with a tour stop (tourStops) is used only when it is the same plan with the tour in it: no stop added,
+// none lost but those the tour replaced or covers on its day, and the other days' stops at their own times.
+function tourRunSteady(before, after, replacedIds, day, covers) {
+  if (after.some((x) => !before.some((o) => o.id === x.id))) return false;
+  for (const o of before) {
+    const n = after.find((x) => x.id === o.id);
+    if (!n) { if (replacedIds.includes(o.id) || (o.day === day && covers.includes(o.type))) continue; return false; }
+    if (o.day !== day && (n.key !== o.key || (Number.isInteger(o.start) && Number.isInteger(n.start) && n.start !== o.start))) return false;
+  }
+  return true;
+}
+function planTurnCore(ops, ctx) {
   // Round 4: "slower pace" takes the last extra stop off each day that has two or more (it used to re-plan every stop,
   // and the place to stay with them).
   ops = ops.flatMap((o) => {
@@ -1251,6 +1345,48 @@ function planTurn(ops, ctx) {
     r.kind = kind;
     if (op.o === 'more_like') { const liked = now(op.stops[0]) || op.stops[0]; r.liked = liked; cur.locks[liked.key] = liked.id; if (!actions.keep.includes(liked.key)) actions.keep.push(liked.key); }
     if (!kind || !KIND_SWAP[kind]) { r.why = 'no_fit'; continue; }
+    const tk = op.o === 'add' ? agent.tourKindOf(kind) : null;
+    if (tk) {
+      r.tour = true;
+      const covers = tk.covers || [];
+      const coveredOn = (d) => cur.stops.filter((x) => x.day === d && covers.includes(x.type) && !cur.removed.has(x.key) && (ctx.locks || {})[x.key] !== x.id);
+      // No day said: the day with the most stops it covers (the wineries), else the day the planner finds room.
+      const anchor0 = now((op.stops || [])[0]);
+      const dayT = op.day || (anchor0 && anchor0.day) || [...new Set(cur.stops.map((x) => x.day))].sort((a, b) => coveredOn(b).length - coveredOn(a).length || a - b)[0] || 1;
+      r.day = dayT;
+      const covered = coveredOn(dayT);
+      // The planner's tourStops hook, when it is there: the tour as a timed stop with its own length; it says what it replaced.
+      const tourHook = (fresh) => {
+        if (!(ctx.hooks && ctx.hooks.tourStops) || !fresh) return;
+        const a2 = { ...cur.args, swap: null, pinned: Object.fromEntries(cur.stops.filter((x) => /^\d-/.test(x.key) && x.id !== fresh.id && !cur.removed.has(x.key) && !(x.day === dayT && covers.includes(x.type))).map((x) => [x.key, x.id])), trustedPins: cur.stops.filter((x) => /^\d-/.test(x.key) && x.id !== fresh.id && !cur.removed.has(x.key) && !(x.day === dayT && covers.includes(x.type))).map((x) => x.key), overrides: { ...(cur.args.overrides || {}), stopStarts: { ...agent.startsOf(cur.stops.filter((x) => x.day !== dayT)), ...((cur.args.overrides || {}).stopStarts || {}) } }, tourStops: [...(cur.args.tourStops || []), { day: dayT, part: partOf(fresh.key), listingId: fresh.id, startMinutes: fresh.start, durationMinutes: tk.minutes, covers }] };
+        let p2 = null;
+        try { p2 = ctx.run(a2); } catch (e) { p2 = null; }
+        if (p2 && isDayPlan(p2)) agent.stripExtras(p2, new Set([...cur.stops.map((x) => x.id), fresh.id]));
+        const nw2 = p2 && isDayPlan(p2) ? planStops(p2) : null;
+        const f2 = nw2 && nw2.find((x) => x.id === fresh.id);
+        if (!f2) return;
+        const ids = Array.isArray(p2.tourReplaced) ? p2.tourReplaced : [];
+        if (nw2.some((x) => x.day === dayT && x.id !== fresh.id && covers.includes(x.type))) return;
+        if (!tourRunSteady(cur.stops.filter((x) => !cur.removed.has(x.key)), nw2, ids, dayT, covers)) return;
+        r.fresh = f2; r.covered = cur.stops.filter((x) => (ids.includes(x.id) || (x.day === dayT && covers.includes(x.type))) && !nw2.some((y) => y.id === x.id) && !cur.removed.has(x.key) && !(r.inPlaceOf && r.inPlaceOf.id === x.id)); r.coveredGone = true;
+        cur = { plan: p2, stops: nw2, args: { ...a2, overrides: cur.args.overrides || null, trustedPins: undefined }, locks: cur.locks, removed: new Set() };
+      };
+      if (covered.length && !(op.stops || []).length) {
+        const first = (op.time && covered.find((x) => ({ morning: ['morning'], midday: ['midday', 'afternoon'], afternoon: ['afternoon', 'late'], evening: ['late', 'evening', 'night'] }[op.time] || []).includes(partOf(x.key)))) || covered[0];
+        const resT = slotEdit(cur, { slot: first.key, slotStart: first.start, shifts: {}, swap: { ...KIND_SWAP[kind], id: first.id }, exclude: [first.id], oldId: first.id, check: (f) => wantMatches(kind, f) && !cur.stops.some((o) => o.id === f.id) }, ctx);
+        if (!resT.why) {
+          r.ok = true; r.fresh = resT.fresh; r.inPlaceOf = first; r.moved = [];
+          cur.locks[first.key] = resT.fresh.id;
+          const rest = covered.filter((x) => x.id !== first.id);
+          cur = { plan: resT.plan, stops: resT.nw, args: { ...resT.args, swap: null }, locks: cur.locks, removed: new Set() };
+          tourHook(r.fresh);
+          if (!r.coveredGone) { r.covered = rest; for (const x of rest) { if (!actions.remove.includes(x.key)) actions.remove.push(x.key); cur.removed.add(x.key); delete cur.locks[x.key]; } }
+          r.coverType = covers[0];
+          continue;
+        }
+      }
+      op.day = op.day || ((op.stops || []).length ? null : dayT);
+    }
     const where = placeAdd(op.o === 'more_like' ? { ...op, stops: [], day: (now(op.stops[0]) || op.stops[0]).day, value: null } : { ...op, stops: (op.stops || []).map((s) => now(s) || s) }, kind, cur);
     r.anchor = (op.stops || [])[0] || null; r.before = op.value === 'earlier';
     if (where.why === 'no_room') {
@@ -1277,6 +1413,17 @@ function planTurn(ops, ctx) {
     r.ok = true; r.fresh = res.fresh; r.moved = res.moved;
     cur.locks[where.slot] = res.fresh.id; // what the visitor added stays through later re-plans
     cur = { plan: res.plan, stops: res.nw, args: { ...res.args, swap: null }, locks: cur.locks, removed: new Set() };
+    if (tk && ctx.hooks && ctx.hooks.tourStops) {
+      const keepPins = cur.stops.filter((x) => /^\d-/.test(x.key) && x.id !== r.fresh.id);
+      const a2 = { ...cur.args, pinned: Object.fromEntries(keepPins.map((x) => [x.key, x.id])), trustedPins: keepPins.map((x) => x.key), overrides: { ...(cur.args.overrides || {}), stopStarts: { ...agent.startsOf(cur.stops.filter((x) => x.day !== r.fresh.day)), ...((cur.args.overrides || {}).stopStarts || {}) } }, tourStops: [...(cur.args.tourStops || []), { day: r.fresh.day, part: partOf(r.fresh.key), listingId: r.fresh.id, startMinutes: r.fresh.start, durationMinutes: tk.minutes, covers: tk.covers || [] }] };
+      let p2 = null;
+      try { p2 = ctx.run(a2); } catch (e) { p2 = null; }
+      if (p2 && isDayPlan(p2)) agent.stripExtras(p2, new Set(cur.stops.map((x) => x.id)));
+      const nw2 = p2 && isDayPlan(p2) ? planStops(p2) : null;
+      const f2 = nw2 && nw2.find((x) => x.id === r.fresh.id);
+      const ids2 = f2 && Array.isArray(p2.tourReplaced) ? p2.tourReplaced : [];
+      if (f2 && tourRunSteady(cur.stops, nw2, ids2, r.fresh.day, tk.covers || [])) { const ids = ids2; r.covered = cur.stops.filter((x) => ids.includes(x.id)); r.coveredGone = true; r.coverType = (tk.covers || [])[0]; r.fresh = f2; cur = { plan: p2, stops: nw2, args: { ...a2, overrides: cur.args.overrides || null, trustedPins: undefined }, locks: cur.locks, removed: new Set() }; }
+    }
   }
   if (!cur.plan) {
     // Nothing could be re-planned: the plan on screen stays exactly as it was (removes and keeps still apply).
@@ -1295,7 +1442,7 @@ function planTurn(ops, ctx) {
   const a = cur.args;
   return {
     plan: cur.plan,
-    req: { text: a.text, seed: a.seed, overrides: a.overrides || {}, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: pins, locks: newLocks },
+    req: { text: a.text, seed: a.seed, overrides: a.overrides || {}, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: pins, locks: newLocks, ...((a.tourStops || []).length ? { tourStops: a.tourStops } : {}) },
     actions, results, changed, added, gone, locks: newLocks, newDays: (cur.plan.days || []).length || 1,
   };
 }
@@ -1365,6 +1512,7 @@ const T = {
     unclear: 'Désolé, je n’ai pas compris. Essayez « enlève la microbrasserie » ou « plus pour les enfants ».', unclearFrom: 'Désolé, je n’ai pas compris. Essayez « enlève {name} », « souper moins cher » ou « plus pour les enfants ».', busy: 'Trop de messages en peu de temps. Réessayez dans quelques minutes.', busyIn: 'Ça fait beaucoup de messages en peu de temps. Réessayez dans environ {n} minutes.', busyOne: 'Ça fait beaucoup de messages en peu de temps. Réessayez dans environ une minute.', error: 'Un problème est survenu. Votre plan n’a pas changé.',
   },
 };
+for (const L of ['en', 'fr']) Object.assign(T[L], agent.AGENT_T[L]);
 // A name that ends with a period ("Cannery Brewing Co.") does not get a second one.
 function fill(s, vars) { return String(s).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m)).replace(/\.\./g, '.'); }
 function cantReply(cant, lang, what = null, stops = null) {
@@ -1374,11 +1522,12 @@ function cantReply(cant, lang, what = null, stops = null) {
   // Fix round (2026-11-22: « enlève la microbrasserie » was suggested on a plan with no brewery): examples from the plan.
   const ex = (stops || []).find((s) => !s.role && s.name);
   if (cant === 'unclear' && ex) return fill(t.unclearFrom, { name: ex.name });
+  if (cant === 'ask_which') return ex ? fill(t.ask_which, { name: ex.name }) : t.ask_whichNone;
   return t[cant] || t.other;
 }
 function dateText(iso, lang) { try { return new Date(`${iso}T12:00:00Z`).toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' }); } catch (e) { return iso; } }
 // out: planTurn's result. -> one or two short sentences.
-function buildReply(out, { lang = 'en', regionLabels = {}, cant = null } = {}) {
+function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1 } = {}) {
   const L = lang === 'fr' ? 'fr' : 'en';
   const t = T[L];
   if (cant && !(out && out.results && out.results.length)) return cantReply(cant, L);
@@ -1402,6 +1551,16 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null } = {}) {
         else parts.push(r.kind ? fill(t.swapFail, { kind: kindLabel(r.kind), old: r.old.name }) : fill(t.swapFailSame, { old: r.old.name }));
         break;
       case 'add':
+        if (r.tour) {
+          // A tour or bookable activity: what it took the place of and what it covers; or plainly that none is listed.
+          if (r.ok && r.fresh) {
+            parts.push(fill(r.inPlaceOf ? t.tourFor : t.tourAdded, { new: r.fresh.name, at: at(r.fresh), old: r.inPlaceOf ? r.inPlaceOf.name : '' }));
+            described.add(r.fresh.id); if (r.inPlaceOf) described.add(r.inPlaceOf.id);
+            if ((r.covered || []).length) { parts.push(fill(t.tourCovers, { what: t.tourCoversW[r.coverType] || '', names: joinList(r.covered.map((x) => x.name), L) })); for (const x of r.covered) described.add(x.id); }
+          } else if (r.why === 'no_room') parts.push(fill(t.noRoom, { kind: kindLabel(r.kind), where: t.thereW }));
+          else parts.push(r.offer ? fill(t.tourNoneOffer, { kind: kindLabel(r.kind), near: r.offer.name, nearShort: r.offer.short }) : fill(t.tourNone, { kind: kindLabel(r.kind) }));
+          break;
+        }
         if (r.ok && r.fresh && r.inPlaceOf) { parts.push(fill(t.addedFor, { new: r.fresh.name, at: at(r.fresh), old: r.inPlaceOf.name })); described.add(r.fresh.id); described.add(r.inPlaceOf.id); }
         else if (r.ok && r.fresh) { parts.push(fill(r.closest ? t.addedClose : t.added, { new: r.fresh.name, at: at(r.fresh) })); described.add(r.fresh.id); }
         else if (r.local) {
@@ -1433,6 +1592,24 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null } = {}) {
         else parts.push(fill(t.timeFail, { d: r.day, dir: r.value === 'later' ? t.laterW : t.earlierW }));
         break;
       case 'refine': if (out.plan) parts.push(t.refine); break;
+      case 'move': {
+        const nm = (r.stop && r.stop.name) || '';
+        if (r.ok && r.fresh) {
+          const when = [r.toDay ? fill(t.movedDay, { d: r.toDay }) : '', Number.isInteger(r.fresh.start) ? clock(r.fresh.start, L) : ''].filter(Boolean).join(L === 'fr' ? ', ' : ' at ').replace(/^(\d)/, L === 'fr' ? '$1' : '$1');
+          parts.push(fill(t.movedTo, { name: nm, when: when || (L === 'fr' ? 'à ce moment' : 'that time') }));
+          described.add(r.fresh.id);
+          if (r.other) { parts.push(fill(t.movedSwap, { other: r.other.name, at: at(r.other) })); described.add(r.other.id); }
+        } else parts.push(fill(r.why === 'no_room' ? t.moveNoRoom : r.conflict === 'closed' ? t.moveClosed : t.moveFail, { name: nm }));
+        break;
+      }
+      case 'set_time': {
+        const nm = (r.stop && r.stop.name) || '';
+        if (r.ok && r.fresh) { parts.push(fill(t.setTime, { name: nm, time: clock(r.fresh.start, L) })); described.add(r.fresh.id); }
+        else if (r.why === 'refused' && r.refused.reason === 'closed' && Number.isInteger(r.refused.opensMinutes) && Number.isInteger(r.refused.closesMinutes)) parts.push(fill(t.setTimeClosed, { name: nm, time: clock(r.minutes, L), from: clock(r.refused.opensMinutes, L), to: clock(r.refused.closesMinutes, L) }));
+        else if (r.why === 'refused' && r.refused.reason === 'no_room') parts.push(fill(t.setTimeNoRoom, { name: nm, time: clock(r.minutes, L) }));
+        else parts.push(r.why === 'no_hook' ? t.time_at : fill(t.setTimeFail, { name: nm, time: clock(r.minutes, L) }));
+        break;
+      }
       default: break;
     }
   }
@@ -1460,7 +1637,8 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null } = {}) {
   // Round 4: one or two short sentences. A longer answer becomes a count (the changed stops glow on the page), with a
   // plain word when part of it could not be done.
   const split = (x) => x.split(/(?<=[.!?])\s+(?=[A-ZÀ-Ý“«])/).filter(Boolean);
-  const over = (list) => list.filter((x) => x !== t.done).length > 2;
+  const maxLines = Math.max(2, Math.min(4, asks || 1));
+  const over = (list) => list.filter((x) => x !== t.done).length > maxLines;
   if (!over(split(full))) return full;
   // First without the lines that only explain ("Your plan is unchanged." after a reason, "It stays when you change...").
   const lean = split(full).filter((x) => x !== t.unchanged && !x.startsWith(t.itStays) && !x.startsWith(t.theyStay));
@@ -1480,5 +1658,6 @@ module.exports = {
   enabled, apiKey, wireSchema, systemPrompt, stopsForModel, stripPII, validateWire, readChatMessage, rulesRead, chipOps,
   rulesConfident, reconcileReads, eventsNamed, eventAtAlcoholPlace, partyKnown, AVOID_TEXT,
   planStops, planTurn, broadTurn, placeAdd, buildReply, cantReply, plannerCanRead, kindMatches, joinText, clock, isDayPlan, isShortPlan,
+  rulesReadOne, agent,
   dailyCapUsd, spentToday, addSpend, resetSpend, costOf, pacificDay, EXPLICIT_DATE_RE, rateLimited, rateWaitMinutes, busyReply, resetRate, WORD_KINDS, weekdayDays,
 };

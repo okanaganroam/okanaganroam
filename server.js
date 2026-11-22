@@ -8435,7 +8435,11 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   const days = Math.max(1, ...stops.map((s) => s.day));
   const short = stops.length > 0 && stops.every((s) => /^it-/.test(s.key));
   const timing = { start: Date.now(), read: 0, plans: 0, planMs: 0, stayMs: 0 };
-  let ops = null, cant = null, source = 'rules', ai = null, what = null, fixes = [];
+  // A tour stop the planner timed (tourStops) rides along only while that tour is still on the plan.
+  if ((v.args.tourStops || []).length) v.args.tourStops = v.args.tourStops.filter((t) => stops.some((s) => s.id === t.listingId && !v.removed.includes(s.key)));
+  // One stop's own time (stopStarts) rides along only while a stop is in that slot.
+  if (v.args.overrides && v.args.overrides.stopStarts) { const ss = Object.fromEntries(Object.entries(v.args.overrides.stopStarts).filter(([k]) => stops.some((s) => s.key === k && !v.removed.includes(k)))); if (Object.keys(ss).length) v.args.overrides.stopStarts = ss; else delete v.args.overrides.stopStarts; }
+  let ops = null, cant = null, source = 'rules', ai = null, what = null, fixes = [], missed = [], asks = 1;
   if (v.chip) { ops = tripChat.chipOps(v.chip); source = 'chip'; }
   else {
     // The word rules first (instant), then the AI (live eval 2026-11-22: p50 1.1 s, some 3 s timeouts). When the rules
@@ -8445,7 +8449,8 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     what = r.what || null;
     // A stay or getting-here message the rules read confidently is answered by fixed server logic, so the AI is not
     // waited for (2026-11-22: a stay change took 6-14 s on the live site).
-    const direct = tripChat.rulesConfident(r) && r.ops.length > 0 && r.ops.every((o) => o.o === 'stay' || o.o === 'transport' || o.o === 'avoid');
+    const direct = tripChat.rulesConfident(r) && r.ops.length > 0 && r.ops.every((o) => o.o === 'stay' || o.o === 'transport' || o.o === 'avoid' || o.o === 'ask' || (o.o === 'party' && o.value === 'adults'));
+    missed = r.missed || []; asks = r.multi || 1;
     if (!direct && (tripChatReader || tripChat.apiKey())) {
       const aiCall = Promise.resolve().then(() => (tripChatReader || tripChat.readChatMessage)(v.message, { stops, regions, regionLabels: REGION_LABELS, today: todayLocal(), lang })).catch(() => ({ ok: false, reason: 'error' }));
       if (tripChat.rulesConfident(r)) {
@@ -8457,6 +8462,11 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     }
     const merged = tripChat.reconcileReads(ai, r, v.message);
     ops = merged.ops; cant = merged.cant; source = merged.source; fixes = merged.fixes;
+    // Several asks: a part the rules read as a plain "can't" is said in the reply; with the AI's reading, none is.
+    if (!(source === 'rules' || fixes.includes('multi'))) missed = [];
+    asks = Math.max(asks, (ops || []).length ? new Set(ops.map((o) => o.o + ((o.stops || [])[0] ? (o.stops[0].id) : ''))).size : 1);
+    // A question's weekday comes from the visitor's own words ("open Sunday?").
+    for (const o of ops || []) if (o.o === 'ask' && !o.wd) o.wd = tripChat.agent.weekdayIn(v.message);
     if (ai && !ai.ok && ai.reason === 'slow') source = 'ai_slow';
     // Words no rule read go to the planner as typed when it can read them (a kind of food, an occasion...); else "Sorry,
     // I didn't catch that". Never words that say no / not (the planner could read "no brewery" as "a brewery").
@@ -8488,17 +8498,21 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     return { source, cant: c, plan: null, actions: none, response: { reply: tripChat.cantReply(c, lang, what, stops), source, cant: c, plan: null, req: null, changed: [], actions: none, ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) } };
   }
   const timed = (fn) => (a) => { const t0 = Date.now(); try { return fn(a); } finally { timing.plans += 1; timing.planMs += Date.now() - t0; } };
-  const planValue = (a) => ({ text: a.text, seed: a.seed || 0, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: a.pinned || null, overrides: a.overrides || null, swap: a.swap || null, ...(a.stay ? { stay: a.stay } : {}), v4: true });
+  const planValue = (a) => ({ text: a.text, seed: a.seed || 0, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: a.pinned || null, overrides: a.overrides || null, swap: a.swap || null, ...(a.stay ? { stay: a.stay } : {}), v4: true,
+    // The planner's travel agent hooks (trip-planner.js v4AgentHooks): tours as timed stops, a stop moved, pins the chat trusts.
+    ...((a.tourStops || []).length ? { tourStops: a.tourStops } : {}), ...((a.moves || []).length ? { moves: a.moves } : {}), ...((a.trustedPins || []).length && a.pinned ? { trustedPins: a.trustedPins.filter((k) => a.pinned[k] !== undefined) } : {}) });
+  const hooks = typeof tripPlannerModule().v4AgentHooks === 'function' ? { tourStops: true, moves: true, stopStarts: true, stayForce: true } : {};
   const run = tripChatSafeRun(timed((a) => runTripPlanRequest(planValue(a), staysOn)));
   // The plan before its "where to stay" part (one planner run; the stay turn then works out the stay for each preference).
   const runCore = tripChatSafeRun(timed((a) => tripPlanBeforeStays(planValue(a), tripPlanDecorated)));
   // The place to stay and getting here (2026-11-22, agent round) are answered here; every other op goes to the planner.
-  const extra = ops.filter((o) => o.o === 'stay' || o.o === 'transport' || o.o === 'avoid');
-  const planOps = ops.filter((o) => o.o !== 'stay' && o.o !== 'transport' && o.o !== 'avoid');
+  const isExtra = (o) => o.o === 'stay' || o.o === 'transport' || o.o === 'avoid' || o.o === 'ask' || (o.o === 'party' && o.value === 'adults');
+  const extra = ops.filter(isExtra);
+  const planOps = ops.filter((o) => !isExtra(o));
   // Round 4: a change to the stops keeps the place to stay the visitor sees (it changed with unrelated messages).
   tripChatKeepStayId = extra.some((o) => o.o === 'stay') ? null : v.stayId || null;
   let out;
-  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run })
+  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run, hooks })
     : { plan: null, req: null, actions: { remove: [], keep: [] }, results: [], changed: [] }; } finally { tripChatKeepStayId = null; }
   // What the chat added or changed goes back as "soft" (the chat keeps it; the Swap button sends it as an ordinary stop,
   // never a hard lock: "A locked stop cannot be kept: Forged Axe Throwing..."). Only the visitor's own kept stops are locks.
@@ -8507,15 +8521,41 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     for (const [k, id] of Object.entries(out.req.locks)) (((v.locks || {})[k] === id || (out.actions.keep || []).includes(k)) ? L : S)[k] = id;
     out.req.locks = L; out.req.soft = S;
   }
-  let reply = planOps.length ? tripChat.buildReply(out, { lang, regionLabels: REGION_LABELS, cant }) : '';
-  let plan = out.plan || null, req = out.req || null, stayPref, transport, stayBlock, newText = null, card = null;
+  // A tour we do not list (or that does not fit there): the nearest thing we do list is offered; a wine tour falls back
+  // to the one to book for the plan's wine area (wine-tours.js), as a card.
+  let tourCard = null;
+  for (const r of (out && out.results) || []) {
+    if (!r.tour || r.ok || r.why === 'no_room') continue;
+    if (r.kind === 'wine_tour' && !tourCard) { const w = tripChatTransportTurn({ value: 'wine_tour' }, { stops, lang, stayTown: v.stayTown }); if (w.card) { tourCard = w; continue; } }
+    r.offer = tripChatTourOffer(r.kind, stops, lang);
+  }
+  let reply = planOps.length ? tripChat.buildReply(out, { lang, regionLabels: REGION_LABELS, cant, asks }) : '';
+  let plan = out.plan || null, req = out.req || null, stayPref, transport, stayBlock, newText = null, card = null, stayForce, stayArrive, party;
+  if (tourCard) {
+    const TT = tripChat.T[lang === 'fr' ? 'fr' : 'en'];
+    const town = REGION_LABELS[(stops.find((x) => x.type === 'winery') || stops[0] || {}).region] || '';
+    reply = reply.replace(tripChat.fill(TT.tourNone, { kind: tripChat.KINDS.wine_tour[lang === 'fr' ? 'fr' : 'en'] }), tripChat.fill(TT.tourNoneCard, { kind: tripChat.KINDS.wine_tour[lang === 'fr' ? 'fr' : 'en'], town })).replace(` ${TT.unchanged}`, '');
+    card = tourCard.card; transport = tourCard.transport;
+  }
+  // "add a night in Penticton": whether the new day really is there is read from the plan that came back.
+  for (const o of planOps) {
+    if (o.o !== 'days' || !o.region || !plan) continue;
+    const TT = tripChat.T[lang === 'fr' ? 'fr' : 'en'];
+    const last = (plan.days || [])[o.n - 1];
+    const there = !!last && (last.stops || []).some((s) => s.venue && s.venue.region === o.region);
+    reply = [reply, tripChat.fill(there ? TT.nightIn : TT.nightInMiss, { d: o.n, town: REGION_LABELS[o.region] || o.region })].filter(Boolean).join(' ');
+  }
   if (eventReply) reply = [reply, eventReply].filter(Boolean).join(' ');
   // Every stay op of the message is one change to the place to stay (one reply, one look-up).
   const stayOps = extra.filter((o) => o.o === 'stay');
   for (const op of [...(stayOps.length ? [stayOps] : []), ...extra.filter((o) => o.o !== 'stay')]) {
-    const r = Array.isArray(op) ? tripChatStayTurn(op, { v, plan, req, stops, lang, staysOn, runCore, timing })
+    const r = Array.isArray(op) ? tripChatStayTurn(op, { v, plan, req, stops, lang, staysOn, runCore, timing, days, short })
       : op.o === 'avoid' ? tripChatAvoidTurn(op, { v, req, lang })
-        : tripChatTransportTurn(op, { stops, lang, stayTown: v.stayTown });
+        : op.o === 'ask' ? tripChatAskTurn(op, { v, stops, lang })
+          : op.o === 'party' ? { party: { adults: op.n }, reply: tripChat.fill(tripChat.T[lang === 'fr' ? 'fr' : 'en'][op.n === 1 ? 'adult1' : 'adults'], { n: op.n }) }
+            : tripChatTransportTurn(op, { stops, lang, stayTown: v.stayTown, dayDates: v.dayDates });
+    if (r.stayForce !== undefined) { stayForce = r.stayForce; stayArrive = r.stayArrive || null; }
+    if (r.party) party = r.party;
     if (r.text) newText = r.text;
     if (r.card) card = r.card;
     if (r.plan) { plan = r.plan; req = r.req; }
@@ -8527,12 +8567,14 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     if (r.transport) transport = r.transport;
     reply = [reply, r.reply].filter(Boolean).join(' ');
   }
+  // A part of a several-ask message that could not be done (no such stop on the plan...) is said, once.
+  if (missed.length) { const line = tripChat.cantReply(missed[0].cant, lang, missed[0].what, stops); if (!reply.includes(line)) reply = [reply, line].filter(Boolean).join(' '); }
   const actions = { ...out.actions, ...(transport ? { transport } : {}), ...(goneEvents.length ? { removeEvents: goneEvents.map((e) => e.id) } : {}) };
   logTiming();
   return {
     timing: { ...timing, total: Date.now() - timing.start },
     source, cant: null, plan, actions,
-    response: { reply, source, plan, req, changed: out.changed || [], actions, ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(newText && !plan ? { text: newText } : {}), ...(card ? { card } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
+    response: { reply, source, plan, req, changed: out.changed || [], actions, ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(stayForce !== undefined ? { stayForce } : {}), ...(stayArrive ? { stayArrive } : {}), ...(party ? { party } : {}), ...(newText && !plan ? { text: newText } : {}), ...(card ? { card } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
   };
 }
 // "somewhere cheaper to stay", "a hotel with a pool", "stay in Naramata", "we already have a place": the same plan (every
@@ -8553,7 +8595,7 @@ function tripChatStayBlock(p) {
 // stays are read once, and the stay is then worked out for the old and the new preference on that one plan. Honesty: an
 // amenity asked for filters to stays whose facts say yes (trip-stays.js); the reply names it ("..., which has a pool"),
 // or says plainly that none in that town is confirmed.
-function tripChatStayTurn(stayOps, { v, plan, req, stops, lang, staysOn, runCore, timing = {} }) {
+function tripChatStayTurn(stayOps, { v, plan, req, stops, lang, staysOn, runCore, timing = {}, days = 1, short = false }) {
   const L = lang === 'fr' ? 'fr' : 'en';
   const T = tripChat.T[L];
   if (!staysOn) return { reply: T.stayOff };
@@ -8572,11 +8614,30 @@ function tripChatStayTurn(stayOps, { v, plan, req, stops, lang, staysOn, runCore
   const done = (r) => { timing.stayMs = (timing.stayMs || 0) + (Date.now() - t0); return r; };
   if (stayOps.some((o) => o.value === 'have_place')) {
     const pref = { none: true };
-    return done({ stayBlock: tripChatStayBlock(withPref(pref)) || { whereToStay: null, v4Booking: null, gettingHere: null }, stayPref: pref, reply: T.stayNone });
+    // "remove the hotel" says what was done; with no stay on the plan there is nothing to take off.
+    const had = !!(v.stayId || (plan && plan.whereToStay));
+    const asked = tripChat.agent.STAY_REMOVE_RE.test(tripChat.agent.fold(v.message || '')) && !/\b(?:friends|family|chez)\b/.test(tripChat.agent.fold(v.message || ''));
+    delete stayIn.force;
+    return done({ stayBlock: tripChatStayBlock(withPref(pref)) || { whereToStay: null, v4Booking: null, gettingHere: null }, stayPref: pref, stayForce: false, reply: !had && asked ? T.stayNoneAlready : asked ? T.stayRemoved : T.stayNone });
   }
-  const before = plan && plan.whereToStay ? plan : withPref(old);
-  const cur = before && before.whereToStay && before.whereToStay.pick;
-  if (!cur) return done({ reply: T.stayOff });
+  let before = plan && plan.whereToStay ? plan : withPref(old);
+  let cur = before && before.whereToStay && before.whereToStay.pick;
+  // Travel agent abilities (2026-11-22): a plan with no place to stay (a day plan, an evening out, or "we have a place"
+  // said earlier) gets one when the visitor asks: one night near the day's stops (stay.force; the plan is not made longer).
+  let added = null;
+  if (!cur) {
+    delete old.none;
+    let arriveSet = null;
+    if (days <= 1 || short) {
+      stayIn.force = true;
+      // The night is the plan's own day ("tonight" is tonight), when it is not already past.
+      const d0 = ((core.schedule || []).find((x) => x && /^\d{4}-\d{2}-\d{2}$/.test(String(x.date || ''))) || {}).date || null;
+      if (!stayIn.arrive && d0 && d0 >= todayLocal()) { stayIn.arrive = d0; arriveSet = d0; }
+    }
+    before = withPref(old); cur = before && before.whereToStay && before.whereToStay.pick;
+    if (!cur) return done({ reply: T.stayNoListing });
+    added = { force: !!stayIn.force, arrive: arriveSet, trip: before.whereToStay.trip || {} };
+  }
   const pref = { ...old };
   delete pref.none;
   let ams = tripStays.prefAmenities(pref);
@@ -8593,25 +8654,39 @@ function tripChatStayTurn(stayOps, { v, plan, req, stops, lang, staysOn, runCore
   // Round 5 ("a cheaper hotel" on a Whistler Village plan gave a hotel in Pemberton): cheaper or nicer stays in the town
   // of the stay on screen unless the visitor names another.
   if (!pref.region && v.stayTown && stayOps.length && stayOps.every((o) => ['budget', 'upscale'].includes(o.value) && !o.region)) pref.region = v.stayTown;
-  const first = stayOps[0] || {};
-  const what = first.value ? T.stayWhat[first.value] : tripChat.fill(T.stayWhat.region, { town: REGION_LABELS[first.region] || first.region });
+  const first = stayOps.find((o) => o.value !== 'add') || {};
+  const justAdd = !first.value && !first.region;
+  const what = justAdd ? '' : first.value ? T.stayWhat[first.value] : tripChat.fill(T.stayWhat.region, { town: REGION_LABELS[first.region] || first.region });
   const tooCheap = stayOps.some((o) => o.value === 'budget') && cur.priceLevel === 1;
-  const p = tooCheap ? null : withPref(pref);
+  const p = tooCheap ? null : justAdd ? before : withPref(pref);
   const w = p && p.whereToStay;
   const next = w && w.pick;
+  // The stay just added, in the travel agent's words: for which night, and what it has.
+  const addedReply = (o, has0 = '') => {
+    const tr = (o.whereToStay && o.whereToStay.trip) || added.trip || {};
+    const pk = o.whereToStay.pick;
+    const f = [L === 'fr' ? (pk.kindFr || pk.kind) : pk.kind, pk.regionLabel, pk.priceBand].filter(Boolean).join(' · ');
+    const night = tr.nights === 1 && tr.arrive ? tripChat.fill(T.nightOf, { date: new Date(`${tr.arrive}T12:00:00Z`).toLocaleDateString(L === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' }) }) : '';
+    return tripChat.fill(night ? T.stayAdded : T.stayAddedDays, { night, name: pk.name, facts: f, has: has0 });
+  };
+  if (!next && added) return done({ stayBlock: tripChatStayBlock(before), stayPref: old, ...(added.force ? { stayForce: true, ...(added.arrive ? { stayArrive: added.arrive } : {}) } : {}), reply: addedReply(before) + (what ? ' ' + tripChat.fill(T.stayFail, { what, name: cur.name }) : '') });
   if (!next) return done({ reply: tripChat.fill(T.stayFail, { what, name: cur.name }) });
   const facts = [L === 'fr' ? (next.kindFr || next.kind) : next.kind, next.regionLabel, next.priceBand].filter(Boolean).join(' · ');
   const list = (keys, words) => { const a = keys.map((k) => words[k]); return a.length > 1 ? `${a.slice(0, -1).join(', ')} ${T.and} ${a[a.length - 1]}` : a[0] || ''; };
   const am = w.amenity || null;
   const kindMiss = w.kindAsked && !w.kindMatched ? tripChat.fill(T.stayKindMiss, { kind: (L === 'fr' ? (next.kindFr || next.kind) : next.kind) || '' }) : '';
-  const out = { stayBlock: tripChatStayBlock(p), stayPref: pref };
+  const out = { stayBlock: tripChatStayBlock(p), stayPref: pref, ...(added && added.force ? { stayForce: true, ...(added.arrive ? { stayArrive: added.arrive } : {}) } : {}) };
+  // "we need somewhere Saturday night" on a plan that already has its place to stay: said, nothing changes.
+  if (justAdd && !added) return done({ reply: tripChat.fill(T.stayHave, { name: cur.name, facts: [L === 'fr' ? (cur.kindFr || cur.kind) : cur.kind, cur.regionLabel, cur.priceBand].filter(Boolean).join(' · '), has: '' }) });
   // The amenity asked for is not confirmed anywhere near: said plainly, with the closest place.
   if (am && !am.confirmed) return done({ ...out, reply: tripChat.fill(T.stayNoAmenity, { what: list(am.keys, T.amen), town: REGION_LABELS[am.town] || am.town || '', name: next.name, short: list(am.keys, T.amenShort) }) + kindMiss });
   // Confirmed, but only in another town.
   if (am && am.elsewhere) return done({ ...out, reply: tripChat.fill(T.stayElsewhere, { what: list(am.keys, T.amen), town: REGION_LABELS[am.town] || am.town || '', name: next.name, facts }) + kindMiss });
   const winter = am && am.winterCheck && (next.has || []).includes('pool') ? T.poolWinter : '';
   const has = am && (next.has || []).length ? tripChat.fill(T.stayHas, { what: list(next.has, T.amen) }) + winter : '';
-  if (next.id === (v.stayId || cur.id)) {
+  if (added && !(am && (!am.confirmed || am.elsewhere))) return done({ ...out, reply: addedReply(p, has) + kindMiss });
+  if (added) { /* the amenity lines above said which place it is */ }
+  else if (next.id === (v.stayId || cur.id)) {
     // The place already on the plan has it: said, and it stays (its chip shows now).
     if (has) return done({ ...out, reply: tripChat.fill(T.stayKept, { name: next.name, facts, what: list(next.has, T.amen) + winter }) + kindMiss });
     return done({ reply: tripChat.fill(T.stayFail, { what, name: cur.name }) });
@@ -8652,7 +8727,45 @@ function tripChatAvoidTurn(op, { v, req, lang }) {
   if (req && text) req.text = text;
   return { reply: tripChat.fill(T.avoidNone, { what: T.avoidWhat[op.kind] || '' }), ...(text ? { text } : {}) };
 }
-function tripChatTransportTurn(op, { stops, lang, stayTown = null }) {
+// A question about a stop: one line from the listing's own stored facts (hours, badges, price band, description, map
+// point, booking link). A fact we do not hold is said so. Nothing changes on the plan.
+function tripChatAskTurn(op, { v, stops, lang }) {
+  const L = lang === 'fr' ? 'fr' : 'en';
+  const T = tripChat.T[L];
+  const s = (op.stops || [])[0];
+  if (!s) return { reply: tripChat.cantReply('ask_which', L, null, stops) };
+  const factOf = (id) => {
+    let row = null;
+    try { row = db.prepare('SELECT * FROM venues WHERE id = ? AND redirect_to IS NULL').get(id); } catch (e) { row = null; }
+    if (!row) return null;
+    let booking = false, seasonal = false;
+    try { booking = !!db.prepare('SELECT 1 FROM venue_links WHERE venue_id = ? AND booking_url IS NOT NULL').get(id); } catch (e) { booking = false; }
+    try { seasonal = !!db.prepare('SELECT 1 FROM venue_seasons WHERE venue_id = ?').get(id); } catch (e) { seasonal = false; }
+    return { ...row, lat: Number.isFinite(row.latitude) ? row.latitude : null, lng: Number.isFinite(row.longitude) ? row.longitude : null, booking, seasonal };
+  };
+  const fact = factOf(s.id);
+  if (!fact) return { reply: tripChat.fill(T.qDetails, { name: s.name }) };
+  const other = (op.stops || [])[1] ? factOf(op.stops[1].id) : null;
+  let stay = null;
+  if (v.stayId) { try { const r = db.prepare("SELECT name, latitude, longitude FROM venues WHERE id = ? AND type = 'stay'").get(v.stayId); if (r) stay = { name: r.name, lat: r.latitude, lng: r.longitude }; } catch (e) { stay = null; } }
+  const planWd = tripChat.agent.wdOfDate((v.dayDates || [])[s.day - 1]);
+  return { reply: tripChat.agent.answerQuestion(op, fact, { stay, other, planWd }, L) };
+}
+// The nearest thing we list to a tour that is not listed: another kind of tour that one of the plan's towns does have.
+function tripChatTourOffer(kind, stops, lang) {
+  const L = lang === 'fr' ? 'fr' : 'en';
+  const regions = [...new Set(stops.map((s) => s.region).filter(Boolean))];
+  if (!regions.length) return null;
+  let rows = [];
+  try { rows = db.prepare(`SELECT name, cuisine, description, type FROM venues WHERE redirect_to IS NULL AND type IN ('tour', 'outdoor', 'sport') AND region IN (${regions.map(() => '?').join(',')})`).all(...regions); } catch (e) { rows = []; }
+  const text = (r) => tripChat.agent.fold(`${r.name} ${r.cuisine || ''} ${String(r.description || '').split(/[.!?]/)[0]}`);
+  for (const [k, tk] of Object.entries(tripChat.agent.TOUR_KINDS)) {
+    if (k === kind) continue;
+    if (rows.some((r) => tk.types.includes(r.type) && tk.words.some((w) => text(r).includes(w)))) return { name: tripChat.KINDS[k][L], short: tripChat.KINDS[k][L].replace(/^(?:an?|the|une?|du|de la|de l’|des|le|la)\s+/i, '') };
+  }
+  return null;
+}
+function tripChatTransportTurn(op, { stops, lang, stayTown = null, dayDates = [] }) {
   const L = lang === 'fr' ? 'fr' : 'en';
   const T = tripChat.T[L];
   if (op.value === 'wine_tour') {
@@ -8668,6 +8781,17 @@ function tripChatTransportTurn(op, { stops, lang, stayTown = null }) {
   const key = region ? gettingHere.airportFor(region) : null;
   const airport = key ? gettingHere.AIRPORTS[key][L] : (L === 'fr' ? 'l’aéroport de Kelowna (YLW)' : 'Kelowna airport (YLW)');
   if (op.value === 'driving') return { transport: 'driving', reply: T.driving };
+  // Travel agent abilities: flying in, an airport shuttle, a car for one day, no car after all.
+  const ghOn = gettingHere.enabled() && !!key;
+  const shuttleList = region ? gettingHere.regionShuttles(region) : [];
+  if (op.value === 'no_rental') return { transport: 'driving', reply: T.noRental };
+  if (op.value === 'fly_in') return { transport: 'rental', reply: ghOn ? tripChat.fill(T.flyIn, { airport, shuttle: shuttleList.length ? T.flyInShuttle : '' }) : tripChat.fill(T.flyInNoCard, { airport }) };
+  if (op.value === 'shuttle') return shuttleList.length ? { transport: 'no_car', reply: tripChat.fill(T.shuttleYes, { airport }) } : { reply: tripChat.fill(T.shuttleNo, { airport: airport.charAt(0).toUpperCase() + airport.slice(1) }) };
+  if (op.value === 'rental' && op.day) {
+    const iso = (dayDates || [])[op.day - 1];
+    const dayWord = iso ? new Date(`${iso}T12:00:00Z`).toLocaleDateString(L === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' }) : (L === 'fr' ? `le jour ${op.day}` : `day ${op.day}`);
+    return { transport: 'rental', reply: tripChat.fill(ghOn ? T.carDay : T.carDayNo, { airport: ghOn ? airport : airport.charAt(0).toUpperCase() + airport.slice(1), day: dayWord }) };
+  }
   if (op.value === 'rental') return { transport: 'rental', reply: tripChat.fill(gettingHere.enabled() && key ? T.carYes : T.carNo, { airport }) };
   const shuttles = region ? gettingHere.regionShuttles(region) : [];
   return { transport: 'no_car', reply: shuttles.length ? T.noCarShuttle : tripChat.fill(T.noCar, { town: REGION_LABELS[stayTown] || REGION_LABELS[region] || (L === 'fr' ? 'la ville' : 'town') }) };

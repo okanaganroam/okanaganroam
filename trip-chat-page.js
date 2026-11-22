@@ -178,17 +178,19 @@ function chatClientSrc(d) {
   function chatPlanBody(){
     var body = { text: state.text, seed: state.seed, excludeVenueIds: state.exclude.slice(-200) };
     var o = state.overrides, ov = {};
-    ['days', 'pace', 'baseRegion', 'budgetMode', 'durationMinutes', 'startDate', 'startMinutes', 'dayStartMinutes', 'shortWalkVenueIds', 'eventId'].forEach(function(k){ if (o[k] !== undefined) ov[k] = o[k]; });
+    ['days', 'pace', 'baseRegion', 'budgetMode', 'durationMinutes', 'startDate', 'startMinutes', 'dayStartMinutes', 'shortWalkVenueIds', 'eventId', 'stopStarts'].forEach(function(k){ if (o[k] !== undefined) ov[k] = o[k]; });
     if (Object.keys(ov).length) body.overrides = ov;
     if (state.lastReq && (state.lastReq.avoid || []).length) body.avoidVenueIds = state.lastReq.avoid.slice(0, 200);
     if (typeof t3StayInput === 'function') { var st = t3StayInput(); if (st) body.stay = st; }
+    // Travel agent abilities: a tour the planner timed as a stop rides along while it is on the plan.
+    if ((chat.tourStops || []).length) body.tourStops = chat.tourStops;
     return body;
   }
-  function chatSnapshot(){ return JSON.stringify({ last: state.last, lastReq: state.lastReq, text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude, removed: state.removed, gone: v4.gone, stayPref: chat.stayPref, noStay: chat.noStay, transport: chat.transport, goneEvents: chat.goneEvents, wineTour: chat.wineTour }); }
+  function chatSnapshot(){ return JSON.stringify({ last: state.last, lastReq: state.lastReq, text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude, removed: state.removed, gone: v4.gone, stayPref: chat.stayPref, noStay: chat.noStay, transport: chat.transport, goneEvents: chat.goneEvents, wineTour: chat.wineTour, stayForce: chat.stayForce, stayArrive: chat.stayArrive, tourStops: chat.tourStops }); }
   function chatRestore(snap){
     var o = JSON.parse(snap);
     state.last = o.last; state.lastReq = o.lastReq; state.text = o.text; state.seed = o.seed; state.overrides = o.overrides || {}; state.locks = o.locks || {}; state.exclude = o.exclude || []; state.removed = o.removed || {}; v4.gone = o.gone || {};
-    chat.stayPref = o.stayPref; chat.noStay = !!o.noStay; chat.transport = o.transport || null; chat.goneEvents = o.goneEvents || {}; chat.wineTour = o.wineTour || null;
+    chat.stayPref = o.stayPref; chat.noStay = !!o.noStay; chat.transport = o.transport || null; chat.goneEvents = o.goneEvents || {}; chat.wineTour = o.wineTour || null; chat.stayForce = !!o.stayForce; chat.stayArrive = o.stayArrive || null; chat.tourStops = o.tourStops || [];
     v4.confirmed = false; v4.saved = false;
     chat.rendering = true; try { render(false); } finally { chat.rendering = false; } syncUrl();
   }
@@ -237,7 +239,7 @@ function chatClientSrc(d) {
         // Fix round (2026-11-22): a new plan only when a stop changed ("The plan already fits that" changes nothing and
         // shows no Undo); the place to stay alone comes back as stayBlock and never touches the stops.
         if (j.plan && j.req && changed.length) {
-          state.text = j.req.text; state.seed = j.req.seed; state.overrides = j.req.overrides || {}; state.exclude = (j.req.excludeVenueIds || []).slice(); state.locks = j.req.locks || {}; chat.soft = j.req.soft || {};
+          state.text = j.req.text; state.seed = j.req.seed; state.overrides = j.req.overrides || {}; state.exclude = (j.req.excludeVenueIds || []).slice(); state.locks = j.req.locks || {}; chat.soft = j.req.soft || {}; chat.tourStops = j.req.tourStops || [];
           state.removed = {}; v4.gone = {}; state.last = j.plan;
           state.lastReq = { seed: j.req.seed, overrides: j.req.overrides || {}, exclude: (j.req.excludeVenueIds || []).slice(), pinned: j.req.pinned || null, avoid: j.req.avoidVenueIds || [] };
           touched = true;
@@ -258,13 +260,17 @@ function chatClientSrc(d) {
           stayChoice = null; touched = true; changed.push('stay');
         }
         if (j.stayPref !== undefined) { chat.stayPref = j.stayPref; chat.noStay = !!(j.stayPref && j.stayPref.none); touched = true; if (changed.indexOf('stay') === -1) changed.push('stay'); }
+        // Travel agent abilities: a stay added to a plan with no night (stay.force rides along with later requests), and the number of adults.
+        if (j.stayForce !== undefined) { chat.stayForce = !!j.stayForce; chat.stayArrive = j.stayForce && j.stayArrive ? j.stayArrive : null; touched = true; }
+        if (j.party && j.party.adults > 0) { var adEl = document.getElementById('t3Adults'); if (adEl) adEl.value = String(j.party.adults); chat.adults = j.party.adults; }
+        var planOnly = touched;
         if (acts.transport) { chat.transport = acts.transport; touched = true; if (acts.transport === 'rental' || acts.transport === 'no_car') changed.push('gh'); }
         // Events taken out by chat, a wine tour offered as a card, and words added to the request ("no museums").
         (acts.removeEvents || []).forEach(function(id){ chat.goneEvents[id] = 1; touched = true; });
         // Round 4: the wine tour card is an offer, not a change to the plan: it shows no Undo (Undo undid nothing).
         var before = touched, wasConfirmed = !!v4.confirmed;
         if (j.card && j.card.kind === 'wine_tour') { chat.wineTour = j.card; touched = true; changed.push('gh'); }
-        var planTouched = before;
+        var planTouched = before && (planOnly || !acts.transport || j.stayBlock || j.stayPref !== undefined || (acts.removeEvents || []).length > 0);
         if (typeof j.text === 'string' && j.text && !(j.plan && j.req)) { state.text = j.text; }
         // Round 4: a change asked for in the chat keeps a confirmed plan confirmed (Book, Share and Save stay, for the plan
         // as it is now); only Save is offered again.
@@ -329,7 +335,7 @@ function chatClientSrc(d) {
   (function(){ var ta = document.getElementById('t3Input'); if (ta) ta.addEventListener('keydown', function(e){ if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !e.metaKey && !e.ctrlKey) { e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); } }); })();
   // Only the page's language is read out (the other language's spans are hidden from screen readers too).
   Array.prototype.forEach.call(document.querySelectorAll(lang() === 'fr' ? '.t3 .t3-en' : '.t3 .t3-fr'), function(el){ el.setAttribute('aria-hidden', 'true'); });
-  t3StayInput = function(){ var o = t3StayInputBase() || {}; if (chat.stayPref) o.pref = chat.stayPref; return Object.keys(o).length ? o : null; };
+  t3StayInput = function(){ var o = t3StayInputBase() || {}; if (chat.stayPref) o.pref = chat.stayPref; if (chat.stayForce && !(chat.stayPref && chat.stayPref.none)) { o.force = true; if (!o.arrive && chat.stayArrive) o.arrive = chat.stayArrive; } if (chat.adults && o.adults === undefined) o.adults = chat.adults; return Object.keys(o).length ? o : null; };
   function chatOvernight(){ var st = t3StayInputBase() || {}; return days().length > 1 || !!(st.arrive && st.leave); }
   function chatPartyFor(){
     var u = (state.last && state.last.understood) || {}, party = (u.party || []).join(' ') + ' ' + String(state.text || '');
