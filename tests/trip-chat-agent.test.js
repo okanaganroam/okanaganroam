@@ -70,7 +70,7 @@ test('Getting here card data: overnight trips only; the airport by town; the car
   assert.equal(off.airport.code, 'YYF');
   assert.equal(off.car, null);
   const on = gh.tripCard(two, null, { cfg: { enabled: true, aid: 'okanaganroam' }, viatorCfg: { enabled: false } });
-  assert.match(on.car, /^https:\/\/www\.discovercars\.com\/canada\/penticton\/yyf\?a_aid=okanaganroam$/);
+  assert.match(on.car, /^https:\/\/www\.discovercars\.com\/canada\/penticton\/yyf\?a_aid=okanaganroam&chan=okanagan&data1=chat$/);
   assert.equal(on.carLabel.en, 'Rent a car at Penticton airport (YYF)');
   assert.equal(gh.tripCard(one, null, { cfg: { enabled: true, aid: 'x' }, viatorCfg: { enabled: false } }), null, 'never on a day trip');
   assert.equal(gh.tripCard(one, { arrive: '2027-07-09', leave: '2027-07-10' }, { cfg: { enabled: true, aid: 'x' }, viatorCfg: { enabled: false } }).airport.code, 'YLW', 'a day plan with a night away is overnight');
