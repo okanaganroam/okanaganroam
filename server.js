@@ -10977,9 +10977,10 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
       eventWindow = eventWindow || sel.window;
       return selectedNamedEvent ? sel.items.filter(e => e.id === selectedNamedEvent.id) : sel.items;
     });
+    const hhParts = new Map();
     const plan = planner.planTrip({
       intent, trip, tripEvents, requirements, askedMinutes, text: requirementsText, ownTourAsked: OWN_TOUR_WORDS_RE.test(planText), budgetMode: overrides?.budgetMode,
-      facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now)),
+      facts: tripHappyHourPartFacts(buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now)), intent, rolledWindow ? requirements.startDate : (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now), now, hhParts),
       labels: tripPlannerLabels(),
       seed,
       excludeIds: excludeVenueIds,
@@ -10993,6 +10994,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
       kidAges: tripKidAges, askText: tripAskText,
       ...(v4 ? { v4: true } : {}),
     });
+    tripApplyHappyHourParts(plan, hhParts);
     plan.seeAll = null;
     if (eventWindow) plan.eventWindow = eventWindow;
   plan.query = text;
@@ -11027,9 +11029,10 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     }
   }
   const events = intent.mode === 'events' ? selectDiscoveryEvents(intent, 12, now, eventCalendar) : null;
+  const hhParts = new Map();
   const plan = tripPlannerModule().planTrip({
     intent, requirements, askedMinutes, text: requirementsText, ownTourAsked: OWN_TOUR_WORDS_RE.test(planText), budgetMode: overrides?.budgetMode, nearAnchor, niceDinnerOnce, lengthOverride: Number.isInteger(overrides?.days) ? overrides.days : null,
-    facts: buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now)),
+    facts: tripHappyHourPartFacts(buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now)), intent, requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now) || tripPlanDate(intent.when, now), now, hhParts),
     labels: tripPlannerLabels(),
     seed,
     excludeIds: excludeVenueIds,
@@ -11045,6 +11048,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     startWeekday: requirements?.startDate ? localWeekdayKey(requirements.startDate) : tripStartWeekday(intent.when, now),
     clock: rolledWindow ? null : okanaganClock(now),
   });
+  tripApplyHappyHourParts(plan, hhParts);
   if (plan.kind === 'events' && intent.eventFarmers && !selectedNamedEvent) {
     const listed = listedFarmersMarkets(intent.regions, (events && events.window) || (requirements?.startDate ? { from: requirements.startDate, to: requirements.endDate || requirements.startDate } : null), now);
     if (listed.open.length) plan.events = listed.open.concat(plan.events || []);
@@ -12219,7 +12223,7 @@ function guardedHappyHourUpdate(id, expectedCurrentTimes, input, meta, now = new
   if (v.times !== null) {
     if (!v.times || typeof v.times !== 'object' || Array.isArray(v.times)) return { ok: false, reason: 'invalid_times', detail: 'times must be an object keyed by day, or null' };
     const days = hoursModule ? hoursModule.HOURS_WEEKDAYS : FD_HOURS_DAYS;
-    const extra = Object.keys(v.times).filter((k) => !days.includes(k) && k !== '_season' && k !== '_close' && k !== '_slot_seasons');
+    const extra = Object.keys(v.times).filter((k) => !days.includes(k) && k !== '_season' && k !== '_close' && k !== '_slot_seasons' && k !== '_at');
     if (extra.length) return { ok: false, reason: 'invalid_times', detail: `unexpected key(s): ${extra.join(', ')}` };
     // Pub test 7 (2026-11-10): the happy hour's own season ({ from, to } 'MM-DD', every year) rides along.
     var hhSeason = null;
@@ -12246,7 +12250,9 @@ function guardedHappyHourUpdate(id, expectedCurrentTimes, input, meta, now = new
     const hhClose = v.times._close != null ? happyHourCloseOf({ ...JSON.parse(checked.json), _close: v.times._close }) : null;
     // Distillery test 2 (Whistler, 2026-11-16): each happy hour's own months, kept for windows that start at the times named.
     const hhSlots = v.times._slot_seasons != null ? happyHourSlotSeasonsOf({ ...JSON.parse(checked.json), _slot_seasons: v.times._slot_seasons }) : null;
-    next = { happy_hour_times: hhSeason || hhClose || hhSlots ? JSON.stringify({ ...JSON.parse(checked.json), ...(hhSeason ? { _season: hhSeason } : {}), ...(hhClose ? { _close: hhClose } : {}), ...(hhSlots ? { _slot_seasons: hhSlots } : {}) }) : checked.json, happy_hour_source: v.source_url, happy_hour_checked_at: v.checked_at };
+    // Dayton (2026-11-21): the part of the place it is at (the owner's own pick, checked when she saved it).
+    const hhAt = ownerSource ? happyHourAtOf(v.times) : null;
+    next = { happy_hour_times: hhSeason || hhClose || hhSlots || hhAt ? JSON.stringify({ ...JSON.parse(checked.json), ...(hhSeason ? { _season: hhSeason } : {}), ...(hhClose ? { _close: hhClose } : {}), ...(hhSlots ? { _slot_seasons: hhSlots } : {}), ...(hhAt ? { _at: hhAt } : {}) }) : checked.json, happy_hour_source: v.source_url, happy_hour_checked_at: v.checked_at };
   }
   const existing = db.prepare('SELECT id, redirect_to, happy_hour_times, happy_hour_source, happy_hour_checked_at FROM venues WHERE id = ?').get(id);
   if (!existing) return { ok: false, reason: 'venue_not_found' };
@@ -12491,6 +12497,57 @@ function happyHourOnNowText(h, clock, fr) {
 // Build My Trip (2026-10-26): a stop timed inside the venue's happy hour says what is on ("Happy hour: $6 House pints,
 // $10 Cocktails"; French « Happy hour : … », the English lines when no French was given). Text only: the planner's
 // choices and order are unchanged. Reads plan.schedule (venueId, date, startMinutes) after planning.
+// Dayton (2026-11-21): Build My Trip and a happy hour at a part of a golf place (happyHourPartOf). A happy hour request on a
+// date the course is closed for the season, the part's own line has it open and the happy hour runs: the place is planned
+// as that part, for its happy hour (its times as the hours), never as the course. -> facts, with `parts` (id -> part name)
+// filled in for tripApplyHappyHourParts.
+function tripHappyHourPartFacts(facts, intent, date, now = new Date(), parts = new Map()) {
+  try {
+    if (!Array.isArray(facts) || !((intent && intent.features) || []).includes('happy_hour') || !hoursModule) return facts;
+    const d = parseLocalDate(date) ? date : todayLocal(now), wd = localWeekdayKey(d), planner = tripPlannerModule();
+    return facts.map((f) => {
+      if (!f || f.type !== 'golf' || !(f.features && f.features.happy_hour)) return f;
+      const row = db.prepare('SELECT happy_hour_times FROM venues WHERE id = ?').get(f.id) || {};
+      if (!happyHourAtOf(row.happy_hour_times)) return f;
+      const part = happyHourPartOn({ id: f.id, type: 'golf', happy_hour_times: row.happy_hour_times }, d);
+      if (!part || !inMonthDaySeason(happyHourSeasonOf(row.happy_hour_times), d)) return f;
+      if (!(planner.seasonClosedOnTrip(f, { date: d }) || (!parseLocalDate(date) && f.seasonClosedToday))) return f;
+      // A written advisory (works, a fire) still keeps it out; a "closed for the season" note doesn't.
+      if (f.advisory && f.advisory.note && !advisoryIsSeasonOnly(f.advisory.note)) return f;
+      let day = null;
+      try { day = hoursModule.parseHours(happyHourTimesOn(row.happy_hour_times, d)).days[wd]; } catch (e) { day = null; }
+      if (!day || day.status !== 'open' || !day.ranges.length) return f;
+      const hh = happyHourTimesOn(row.happy_hour_times, d);
+      let week = null;
+      try { const o = JSON.parse(hh); week = Object.fromEntries(SPECIAL_WEEK.map((k) => [k, k === wd && Array.isArray(o[k]) ? o[k] : null])); } catch (e) { week = null; }
+      parts.set(f.id, part.name);
+      return { ...f, seasonClosed: null, seasonClosedToday: false, seasonReopens: undefined, openMonths: undefined, advisory: null, golfSeasons: [], sportYearAll: true, hours: week ? JSON.stringify(week) : f.hours, _hours: undefined, hhPart: part.name };
+    });
+  } catch (e) { return facts; }
+}
+// Each such stop names the part ("Greenside Bar & Grill (Desert Gold)") and drops the course's green fees and tee-time
+// words; its happy hour lines say where (withTripHappyHourDeals).
+const TRIP_TEE_WORDS_RE = /\b(?:tee[- ]?times?|green fees?|droits de jeu|d[ée]parts?|golf courses?|terrains? de golf|holes|trous|rounds?)\b/i;
+function tripApplyHappyHourParts(plan, parts) {
+  if (!plan || !parts || !parts.size) return plan;
+  const seen = new Set();
+  const walk = (o, depth) => {
+    if (!o || typeof o !== 'object' || depth > 8 || seen.has(o)) return;
+    seen.add(o);
+    if (Array.isArray(o)) { for (const x of o) walk(x, depth + 1); return; }
+    if (o.venue && typeof o.venue === 'object' && parts.has(o.venue.id) && !o.venue.hhPart) {
+      const part = parts.get(o.venue.id), v = o.venue;
+      v.hhPart = part; v.hhPartOf = v.name; v.name = `${part} (${v.name})`;
+      v.cost = null; if (v.listedHours) v.listedHours = null;
+      const keep = (r) => { const t = typeof r === 'string' ? r : (r && r.text) || ''; return !TRIP_TEE_WORDS_RE.test(t) && !/^Listed hours\b/.test(t) && !(r && typeof r === 'object' && (r.code === 'hours' || r.code === 'cost' || r.code === 'price')); };
+      for (const k of ['reasons', 'why', 'caveats']) if (Array.isArray(o[k])) o[k] = o[k].filter(keep);
+      for (const k of ['note', 'bookNote', 'tip']) if (typeof o[k] === 'string' && TRIP_TEE_WORDS_RE.test(o[k])) delete o[k];
+    }
+    for (const k of Object.keys(o)) if (o[k] && typeof o[k] === 'object') walk(o[k], depth + 1);
+  };
+  walk(plan, 0);
+  return plan;
+}
 function withTripHappyHourDeals(plan, now = new Date()) {
   // Audit fix (2026-10-27): a happy hour Ideas list ("happy hour crawl in Kelowna", "… on Friday") showed only "Has the
   // Happy Hour badge"; each place now says its happy hour on the list's day (today when undated) and what is on.
@@ -12533,7 +12590,7 @@ function withTripHappyHourDeals(plan, now = new Date()) {
       const dd = inMonthDaySeason(happyHourSeasonOf(x0.json), item.date) && x.times.days[weekday];
       if (dd && dd.status === 'open' && dd.ranges.length) {
         const line = `Happy hour ${happyHourJoinedRangesText(dd.ranges, false)} on ${TRIP_HH_WEEKDAY_NAMES[weekday][0]}, from its listing`;
-        for (const s of stops) if (s.venue.id === item.venueId) tripSwapBadgeReason(s, 'Has the Happy Hour badge', line);
+        for (const s of stops) if (s.venue.id === item.venueId) { tripSwapBadgeReason(s, 'Has the Happy Hour badge', line); tripHappyHourPartLine(s); }
       }
     } catch (e) { /* the badge line stays */ }
     let on = false;
@@ -12547,6 +12604,7 @@ function withTripHappyHourDeals(plan, now = new Date()) {
       s.happyHourLine = s.happyHourWhen ? `Happy hour ${s.happyHourWhen}: ${s.happyHourDeals}` : `Happy hour: ${s.happyHourDeals}`;
       s.happyHourLineFr = s.happyHourWhenFr ? `5 à 7 (${s.happyHourWhenFr}) : ${s.happyHourDealsFr}` : `5 à 7 : ${s.happyHourDealsFr}`;
       if (!x.deals.fr) s.happyHourLineFrLang = 'en';
+      tripHappyHourPartLine(s);
     }
   }
   return plan;
@@ -12568,6 +12626,7 @@ function withTripListHappyHour(plan, now = new Date()) {
     const when = (fr) => day.ranges.map(([a, b]) => happyHourRangeText(a, b % 1440, fr)).join(', ');
     // Distillery test 2 (Whistler, 2026-11-16): the time in place of "Has the Happy Hour badge", deals or not.
     tripSwapBadgeReason(s, 'Has the Happy Hour badge', `Happy hour ${happyHourJoinedRangesText(day.ranges, false)} on ${TRIP_HH_WEEKDAY_NAMES[weekday][0]}, from its listing`);
+    tripHappyHourPartLine(s);
     const deals = happyHourDealsShown(row, now);
     if (!deals) continue;
     s.happyHourDeals = happyHourDealsCompact(deals.en);
@@ -12577,8 +12636,21 @@ function withTripListHappyHour(plan, now = new Date()) {
     s.happyHourLine = `Happy hour ${s.happyHourWhen}: ${s.happyHourDeals}`;
     s.happyHourLineFr = `5 à 7 (${s.happyHourWhenFr}) : ${s.happyHourDealsFr}`;
     if (!deals.fr) s.happyHourLineFrLang = 'en';
+    tripHappyHourPartLine(s);
   }
   return plan;
+}
+// Dayton (2026-11-21): a stop planned as a part of the place (tripApplyHappyHourParts) says where its happy hour is:
+// "Happy hour at the Greenside Bar & Grill 5–6 PM: …" (« 5 à 7 au Greenside Bar & Grill (17 h–18 h) : … »).
+function tripHappyHourPartLine(s) {
+  const part = s && s.venue && s.venue.hhPart;
+  if (!part) return;
+  const en = happyHourAtText(part, false).replace(/^At/, 'at'), fr = happyHourAtText(part, true).replace(/^Aux?/, (m) => m.toLowerCase()).replace(/^À/, 'à');
+  if (typeof s.happyHourLine === 'string' && !s.happyHourLine.includes(en)) s.happyHourLine = s.happyHourLine.replace(/^Happy hour/, `Happy hour ${en}`);
+  if (typeof s.happyHourLineFr === 'string' && !s.happyHourLineFr.includes(fr)) s.happyHourLineFr = s.happyHourLineFr.replace(/^5 à 7/, `5 à 7 ${fr}`);
+  const swap = (x) => (typeof x === 'string' && !x.includes(en) ? x.replace(/^(Happy hour .*? on \w+), from its listing$/, `$1 ${en}, from its listing`) : x);
+  if (Array.isArray(s.reasons)) s.reasons = s.reasons.map((r) => (r && typeof r === 'object' ? { ...r, text: swap(r.text) } : swap(r)));
+  if (Array.isArray(s.why)) s.why = s.why.map(swap);
 }
 // A day's happy hour windows with the ones that run into each other joined ("2–5 PM" for 2–4 and 3–5).
 function happyHourJoinedRangesText(ranges, fr) {
@@ -31440,7 +31512,8 @@ function mapPlacesData(now = new Date()) {
       // [11] happy hour times (researched, compact like the hours), or 0; none while the place has a closure notice.
       // Pub test 7: none either on a day the place itself is closed (weekly hours, closed months) or outside the
       // happy hour's own season.
-      v.happy_hour_times && !blocked && !happyHourOffOn(v, hhToday, now, openMonths) ? mapHappyHourTimes(happyHourTimesOn(v.happy_hour_times, hhToday)) : 0,
+      // Dayton (2026-11-21): a happy hour at a part of the place that is open today shows while the course is closed.
+      v.happy_hour_times && (!blocked || (happyHourPartOn(v, hhToday) && happyHourSeasonOnlyBlock(v.id, now, seasons))) && !happyHourOffOn(v, hhToday, now, openMonths) ? mapHappyHourTimes(happyHourTimesOn(v.happy_hour_times, hhToday)) : 0,
       // [12] price level 1-4 ($ to $$$$), or 0 when not listed.
       Number(v.price) >= 1 && Number(v.price) <= 4 && v.type !== 'shop' ? Number(v.price) : 0,
       // [13] 1 when the place is closed for the season today (2026-10-18), else 0.
@@ -43411,11 +43484,130 @@ function seasonTagSpan(s, fr) {
 // badge led "More in Kelowna" and ranked her 1st for "golf happy hour kelowna"): a happy hour visitors can't see today:
 // the place is closed for the season (or in a temporary closure), or today is outside the happy hour's own months. The
 // page's badge, its "More in" links and search's happy hour feature all ask this. seasons: getSeasonStates(now), when known.
+// Dayton (2026-11-21, after sport test 17: "a part's happy hour shows while the course is closed"): a happy hour at a part of
+// a golf place with its own times. On the Happy hour screen, a happy hour whose months are all in the closed season can be
+// tied to one part from her "Part of the place with its own times?" line; the stored week then carries "_at" (that part's
+// name, "Greenside Bar & Grill"). On a date that part's own line has it open (its months or dates, and its days, when the
+// line names them), the course's closed season and its hours don't hide the happy hour: its own days, months and times
+// still decide, and so do written advisories, temporary closures and special closures. Without "_at", or once that part
+// is no longer in her line, nothing changes.
+function happyHourAtOf(json) {
+  let o = json;
+  if (typeof o === 'string') { try { o = JSON.parse(o); } catch (e) { return null; } }
+  return o && typeof o === 'object' && typeof o._at === 'string' && o._at.trim() ? o._at.trim().slice(0, 60) : null;
+}
+// Her parts line as named parts: "Greenside Bar & Grill: Nov 9 – Dec 19, Tue–Thu 11–3" -> { name, when }. Her own line
+// only (never research's), English first, else her French. A line with no "Name:" has no name to pick.
+function venuePartTimesParts(venueId) {
+  let info = null; try { info = venueVisitInfo(venueId); } catch (e) { info = null; }
+  if (!info || !Array.isArray(info.rows)) return [];
+  const mine = new Set(info.owner_labels || []);
+  const row = info.rows.find((r) => r && r.label === PART_TIMES_LABEL && mine.has(r.label));
+  let text = row && typeof row.text === 'string' ? row.text : '';
+  if (!text) { try { const f = ownerVisitFrLines(info).part_times; if (typeof f === 'string') text = f; } catch (e) { text = ''; } }
+  return partTimesLines(text).map((x) => /^([^:]{2,40}):\s*(.+)$/.exec(x)).filter(Boolean).map((m) => ({ name: m[1].trim(), when: m[2].trim() }));
+}
+const PART_HH_MONTHS = { jan: 0, january: 0, janv: 0, janvier: 0, feb: 1, february: 1, fev: 1, fevr: 1, fevier: 1, fevrier: 1, mar: 2, march: 2, mars: 2, apr: 3, april: 3, avr: 3, avril: 3, may: 4, mai: 4,
+  jun: 5, june: 5, juin: 5, jul: 6, july: 6, juil: 6, juillet: 6, aug: 7, august: 7, aout: 7, sep: 8, sept: 8, september: 8, septembre: 8, oct: 9, october: 9, octobre: 9, nov: 10, november: 10, novembre: 10, dec: 11, december: 11, decembre: 11 };
+const PART_HH_MON = '(jan(?:uary)?|janv(?:ier)?|feb(?:ruary)?|fevr?(?:ier)?|march|mars|mar|apr(?:il)?|avr(?:il)?|may|mai|june?|juin|july?|juil(?:let)?|aug(?:ust)?|aout|sep(?:t|tember|tembre)?|oct(?:ober|obre)?|nov(?:ember|embre)?|dec(?:ember|embre)?)(?![a-z])\\.?';
+const PART_HH_DAY = '(mon(?:day)?s?|tue(?:s|sday)?s?|wed(?:nesday)?s?|thu(?:r|rs|rsday)?s?|fri(?:day)?s?|sat(?:urday)?s?|sun(?:day)?s?|lun(?:di)?s?|mardis?|mar\\.|mer(?:credi)?s?|jeu(?:di)?s?|ven(?:dredi)?s?|sam(?:edi)?s?|dim(?:anche)?s?)\\.?';
+const PART_HH_DAY_KEYS = [['mon', 'lun'], ['tue', 'mardi', 'mar.'], ['wed', 'mer'], ['thu', 'jeu'], ['fri', 'ven'], ['sat', 'sam'], ['sun', 'dim']];
+function partHhDayKey(t) { const x = String(t).replace(/s$/, ''); const i = PART_HH_DAY_KEYS.findIndex((ks) => ks.some((k) => x === k || x.startsWith(k.replace('.', '')) && (k !== 'mar.' || x === 'mardi'))); return i >= 0 ? SPECIAL_WEEK[i] : null; }
+// When a part's line says it is open: { range: { from, to } 'MM-DD' | null, days: Set | null } (null: the line doesn't
+// say, so that doesn't limit it). "Nov 9 – Dec 19", "November–March", « du 9 nov. au 19 déc. »; "Tue–Thu", "Wed, Fri",
+// "daily", "weekends", « mar.–jeu. »; "closed Mondays" / "except Mondays" take that day away. Hours of the day are left
+// to the happy hour's own times.
+function partHhWhen(text) {
+  let t = String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[–—]/g, '-').replace(/[’`]/g, "'").replace(/\s+/g, ' ');
+  const LAST = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const monOf = (x) => { const k = String(x).replace(/\.$/, ''); return k in PART_HH_MONTHS ? PART_HH_MONTHS[k] : -1; };
+  let range = null;
+  const RNG = new RegExp(`(?:\\b(\\d{1,2})(?:er)? )?\\b${PART_HH_MON}(?: (\\d{1,2})(?:st|nd|rd|th|er)?\\b)? ?(?:-|\\bto\\b|\\bthrough\\b|\\bthru\\b|\\buntil\\b|\\btill\\b|\\bau\\b|\\ba\\b|\\bjusqu'?au\\b) ?(?:\\b(\\d{1,2})(?:er)? )?\\b${PART_HH_MON}(?: (\\d{1,2})(?:st|nd|rd|th|er)?\\b)?`);
+  const m = RNG.exec(t);
+  if (m) {
+    const a = monOf(m[2]), b = monOf(m[5]);
+    if (a >= 0 && b >= 0) {
+      const da = Math.min(Number(m[3] || m[1] || 1), LAST[a]), db2 = Math.min(Number(m[6] || m[4] || LAST[b]), LAST[b]);
+      const md = (x, d) => `${String(x + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      if (md(a, da) !== md(b, db2)) range = { from: md(a, da), to: md(b, db2) };
+      t = t.slice(0, m.index) + ' ' + t.slice(m.index + m[0].length);
+    }
+  }
+  const open = new Set(), shut = new Set();
+  const all = () => SPECIAL_WEEK.forEach((d) => open.add(d));
+  if (/\b(daily|every ?day|7 days|seven days|tous les jours|chaque jour)\b/.test(t)) all();
+  if (/\b(weekends?|fins? de semaine)\b/.test(t)) { open.add('sat'); open.add('sun'); }
+  if (/\b(weekdays|en semaine)\b/.test(t)) ['mon', 'tue', 'wed', 'thu', 'fri'].forEach((d) => open.add(d));
+  const DR = new RegExp(`\\b${PART_HH_DAY} ?(?:-|\\bto\\b|\\bthrough\\b|\\bau\\b|\\ba\\b) ?\\b${PART_HH_DAY}(?![a-z])`, 'g');
+  let r;
+  const neg = (i) => /\b(closed|except|not|no|sauf|ferme|fermee|pas le|pas)(?: on| le| les)?(?: the)? ?$/.test(t.slice(Math.max(0, i - 14), i));
+  while ((r = DR.exec(t))) {
+    const a = SPECIAL_WEEK.indexOf(partHhDayKey(r[1])), b = SPECIAL_WEEK.indexOf(partHhDayKey(r[2]));
+    if (a < 0 || b < 0) continue;
+    const into = neg(r.index) ? shut : open;
+    for (let i = a, k = 0; k < 7; i = (i + 1) % 7, k++) { into.add(SPECIAL_WEEK[i]); if (i === b) break; }
+    t = t.slice(0, r.index) + ' '.repeat(r[0].length) + t.slice(r.index + r[0].length);
+    DR.lastIndex = 0;
+  }
+  const D1 = new RegExp(`\\b${PART_HH_DAY}(?![a-z])`, 'g');
+  while ((r = D1.exec(t))) { const k = partHhDayKey(r[1]); if (k) (neg(r.index) ? shut : open).add(k); }
+  if (!open.size && shut.size) all();
+  for (const d of shut) open.delete(d);
+  return { range, days: open.size ? open : null };
+}
+// The part her happy hour is at, while it is still in her parts line: { name, range, days } | null.
+function happyHourPartOf(v) {
+  try {
+    if (!v || v.id == null || v.type && v.type !== 'golf') return null;
+    const hh = v.happy_hour_times !== undefined ? v.happy_hour_times : (db.prepare('SELECT happy_hour_times FROM venues WHERE id = ?').get(v.id) || {}).happy_hour_times;
+    const at = happyHourAtOf(hh);
+    if (!at) return null;
+    const key = (x) => String(x).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
+    const p = venuePartTimesParts(v.id).find((x) => key(x.name) === key(at));
+    return p ? { name: p.name, ...partHhWhen(p.when) } : null;
+  } catch (e) { return null; }
+}
+// That part on a date ('YYYY-MM-DD'): its part when its line has it open then (or doesn't say), else null.
+function happyHourPartOn(v, date, part) {
+  const p = part === undefined ? happyHourPartOf(v) : part;
+  if (!p || !parseLocalDate(date)) return null;
+  if (p.range && hoursModule && !hoursModule.mdInRange(String(date).slice(5), p.range.from, p.range.to)) return null;
+  if (p.days && !p.days.has(localWeekdayKey(date))) return null;
+  return p;
+}
+// On a day the part is open, what hides the happy hour is only the course being closed for the season (or a research
+// "closed for the season" note): never a written advisory or a temporary closure in force.
+function happyHourSeasonOnlyBlock(id, now = new Date(), seasons = null) {
+  try {
+    const st = (seasons || getSeasonStates(now)).get(id);
+    if (st && st.kind === 'temp_closed' && st.current) return false;
+    const note = getCollectionNotes(ADVISORY_COLLECTION_KIND, now).get(id);
+    if (note && !advisoryIsSeasonOnly(typeof note === 'string' ? note : note.note || '')) return false;
+    return true;
+  } catch (e) { return false; }
+}
+// The part's gate for happyHourState() on its open days: its dates and its days (the course's hours and season left out).
+function happyHourPartGateOpts(p, hh) {
+  let placeHours = null;
+  if (p.days && !happyHourCloseOf(hh)) placeHours = JSON.stringify(Object.fromEntries(SPECIAL_WEEK.map((d) => [d, p.days.has(d) ? [['00:00', '23:59']] : null])));
+  return { placeHours, openMonths: p.range ? `${p.range.from}:${p.range.to}` : null };
+}
+// "At the Greenside Bar & Grill" (« Au Greenside Bar & Grill »).
+function happyHourAtText(name, fr) {
+  const n = String(name || '').trim();
+  if (!n) return '';
+  if (fr) {
+    const m = /^(le|la|les|l['’])\s*(.+)$/i.exec(n);
+    if (m) { const a = m[1].toLowerCase(); return a === 'le' ? `Au ${m[2]}` : a === 'les' ? `Aux ${m[2]}` : a === 'la' ? `À la ${m[2]}` : `À l’${m[2]}`; }
+    return `Au ${n}`;
+  }
+  return /^the\s/i.test(n) || /^[^\s]+['’]s\b/i.test(n) ? `At ${n}` : `At the ${n}`;
+}
 function happyHourHiddenNow(v, now = new Date(), seasons = null) {
   try {
     if (!v) return false;
     const st = v.redirect_to ? null : (seasons || getSeasonStates(now)).get(v.id);
-    if (st && seasonStateBlocksOffers(st)) return true;
+    if (st && seasonStateBlocksOffers(st) && !(st.kind === 'closed' && happyHourPartOn(v, todayLocal(now)))) return true;
     // (A venue from getVenue has no happy_hour_times: read it.)
     const hh = v.happy_hour_times !== undefined ? v.happy_hour_times : v.id != null ? (db.prepare('SELECT happy_hour_times FROM venues WHERE id = ?').get(v.id) || {}).happy_hour_times : null;
     return !!hh && !inMonthDaySeason(happyHourSeasonOf(hh), todayLocal(now));
@@ -43429,6 +43621,12 @@ function inMonthDaySeason(season, date) {
 // included) and its yearly open months, so a weekday it is closed, or a month it is closed for the season, has no
 // happy hour "on now", "later today" or "next". -> happyHourState() opts
 function happyHourGateOpts(v, now = new Date(), openMonthsById = null) {
+  // A happy hour at a part of the place, on a day that part is open: the part's own dates and days.
+  const part = happyHourPartOn(v, todayLocal(now));
+  if (part) return happyHourPartGateOpts(part, v.happy_hour_times);
+  return happyHourCourseGateOpts(v, now, openMonthsById);
+}
+function happyHourCourseGateOpts(v, now = new Date(), openMonthsById = null) {
   let openMonths = null;
   if (openMonthsById) openMonths = openMonthsById.get(v.id) || null;
   else { try { openMonths = venueLinks(v.id).open_months || null; } catch (e) { openMonths = null; } }
@@ -43441,7 +43639,9 @@ function happyHourGateOpts(v, now = new Date(), openMonthsById = null) {
 function happyHourOffOn(v, date, now = new Date(), openMonthsById = null) {
   if (!hoursModule || !v || !v.happy_hour_times) return false;
   if (!inMonthDaySeason(happyHourSeasonOf(v.happy_hour_times), date)) return true;
-  const g = happyHourGateOpts(v, now, openMonthsById);
+  // At a part of the place that is open on that date: the course's own hours and season don't stop it.
+  if (happyHourPartOn(v, date)) return false;
+  const g = happyHourCourseGateOpts(v, now, openMonthsById);
   const om = /^(\d{1,2})-(\d{1,2})$/.exec(String(g.openMonths || ''));
   // Exact days (café test 2): "04-25:10-12".
   const os = !om ? hoursModule.parseOpenSeason(g.openMonths) : null;
@@ -43550,9 +43750,15 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   // claim "Happy hour on now" either (the page said it was on while the deals block had gone). The times row stays.
   const dealsHidden = !deals && !!Number(row.happy_hour) && !!row.happy_hour_deals && !!(parseHappyHourDealsJson(row.happy_hour_deals) || parseHappyHourDealsJson(row.happy_hour_deals_fr))
     && happyHourDealsStale(row.happy_hour_deals_checked_at, now, seasonOfHappyHour(row.happy_hour_times));
-  if (offersBlockedIds(now).has(venue.id) || venueClosureInForce(venue.id, now)) return null;
+  // Dayton (2026-11-21): a happy hour at a part of the place shows on the days that part is open, even while the course
+  // is closed for the season, and says where ("At the Greenside Bar & Grill: Wed 5–6 PM").
+  const partOf = happyHourPartOf({ id: venue.id, type: venue.type, happy_hour_times: row.happy_hour_times });
+  const partToday = happyHourPartOn(venue, todayLocal(now), partOf);
+  const partOpen = !!partToday && happyHourSeasonOnlyBlock(venue.id, now);
+  if ((offersBlockedIds(now).has(venue.id) || venueClosureInForce(venue.id, now)) && !partOpen) return null;
   // Brewery test 4 (2026-11-13): happy hour on a day the place is closed (all year or in a season): "(when open)".
-  const week = happyHourWeekText(row.happy_hour_times, fr, todayLocal(now)) + (happyHourOnClosedDay(venue.id, row.hours, row.happy_hour_times, todayLocal(now)) ? (fr ? ' (les jours d’ouverture)' : ' (when open)') : '');
+  const week0 = happyHourWeekText(row.happy_hour_times, fr, todayLocal(now)) + (!partOf && happyHourOnClosedDay(venue.id, row.hours, row.happy_hour_times, todayLocal(now)) ? (fr ? ' (les jours d’ouverture)' : ' (when open)') : '');
+  const week = week0 && partOf ? `${happyHourAtText(partOf.name, fr)}${fr ? ' : ' : ': '}${week0}` : week0;
   if (!week && !deals) return null;
   // Distillery test 2 (Whistler, 2026-11-16): a deal line of a happy hour with months of its own ("Sat, Sun: Après …",
   // Dec–Mar) shows only inside them.
@@ -43563,7 +43769,7 @@ function venueHappyHour(venue, statusHours, fr, now = new Date()) {
   const dealsOut = deals && dealItems.length ? { items: dealItems, english: !!(fr && !deals.fr), checked: happyHourCheckedText(deals.checked, fr), checkedAt: deals.checked || null,
     confirmed: row.happy_hour_deals_source === 'venue_owner' ? venueConfirmedHtml(venue.name, deals.checked, fr) : '' } : null;
   if (!week) return { week: '', checked: '', checkedAt: null, live: null, deals: dealsOut };
-  const place = statusHours ? venueHoursStatusAt(statusHours, now) : null;
+  const place = statusHours && !partToday ? venueHoursStatusAt(statusHours, now) : null;
   const clock = okanaganClock(now);
   let h = null;
   // Special closures (pub test 6): no happy hour on a closure day, and "next" skips them. Pub test 7: nor on a day the
@@ -43854,12 +44060,14 @@ function happyHourStatesFor(venues, now = new Date()) {
   const blockedIds = offersBlockedIds(now), openMonths = openMonthsMap();
   for (const v of venues || []) {
     if (!v || !v.happy_hour_times || v.redirect_to) continue;
-    if (blockedIds.has(v.id)) {
+    // Dayton (2026-11-21): a happy hour at a part of the place that is open today (happyHourPartOn).
+    const partToday = happyHourPartOn(v, clock.date);
+    if (blockedIds.has(v.id) && !(partToday && happyHourSeasonOnlyBlock(v.id, now))) {
       byId.set(v.id, { h: null, blocked: true, closedToday: false });
       continue;
     }
     let place = null;
-    try { place = v.hours ? hoursModule.statusAt(hoursModule.parseHours(hoursWithExtras(v, now)), clock) : null; } catch (e) { place = null; }
+    try { place = v.hours && !partToday ? hoursModule.statusAt(hoursModule.parseHours(hoursWithExtras(v, now)), clock) : null; } catch (e) { place = null; }
     let h = null;
     // Pub test 7: the place's own closed days (weekly, seasonal, closed months) and the happy hour's own season.
     try { h = hoursModule.happyHourState(v.happy_hour_times, clock, !!(place && place.state === 'closed'), upcomingClosures(venueHoursExtras(v.id).closures, now), happyHourGateOpts(v, now, openMonths)); } catch (e) { h = null; }
@@ -56760,7 +56968,7 @@ function ownerSeasonValue(x) {
 }
 function ownerWeekJson(input, label, { allowEmptyWeek, season: allowSeason = false }) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return { ok: false, detail: `${label} must list each day.` };
-  const extra = Object.keys(input).filter((k) => !OWNER_DAYS.includes(k) && !(allowSeason && (k === '_season' || k === '_close' || k === '_slot_seasons')));
+  const extra = Object.keys(input).filter((k) => !OWNER_DAYS.includes(k) && !(allowSeason && (k === '_season' || k === '_close' || k === '_slot_seasons' || k === '_at')));
   if (extra.length) return { ok: false, detail: `${label}: unexpected day(s) ${extra.join(', ')}.` };
   const week = {};
   for (const d of OWNER_DAYS) {
@@ -56802,7 +57010,13 @@ function ownerWeekJson(input, label, { allowEmptyWeek, season: allowSeason = fal
     const keep = happyHourSlotSeasonsOf({ ...JSON.parse(json), _slot_seasons: c });
     if (keep) json = JSON.stringify({ ...JSON.parse(json), _slot_seasons: keep });
   }
-  return { ok: true, json, empty: OWNER_DAYS.every((d) => !week[d]), seasonGiven: allowSeason && '_season' in input, closeGiven: allowSeason && '_close' in input, slotsGiven: allowSeason && '_slot_seasons' in input };
+  // Dayton (2026-11-21): the part of the place a happy hour is at ("Greenside Bar & Grill"), checked against her parts line
+  // by the caller (ownerHappyHourAt).
+  if (allowSeason && input._at != null) {
+    if (typeof input._at !== 'string' || !input._at.trim() || input._at.length > 60 || /[<>]/.test(input._at)) return { ok: false, detail: `${label}: please pick the part again.` };
+    json = JSON.stringify({ ...JSON.parse(json), _at: input._at.trim() });
+  }
+  return { ok: true, json, empty: OWNER_DAYS.every((d) => !week[d]), seasonGiven: allowSeason && '_season' in input, closeGiven: allowSeason && '_close' in input, slotsGiven: allowSeason && '_slot_seasons' in input, atGiven: allowSeason && '_at' in input };
 }
 
 // The weekdays a stored hours JSON leaves out (or holds no list for): read as "unknown", never as closed (hours.js).
@@ -56825,6 +57039,8 @@ function sameJsonWeek(a, b) {
       if (cl) out._close = cl;
       const sl = happyHourSlotSeasonsOf(o);
       if (sl) out._slot_seasons = sl;
+      const at = happyHourAtOf(o);
+      if (at) out._at = at;
       return JSON.stringify(out);
     } catch (e) { return String(s); }
   };
@@ -56991,6 +57207,15 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       if (w.ok && !w.empty && !w.closeGiven) { const was = happyHourCloseOf(current.happy_hour); const keep = was && happyHourCloseOf({ ...JSON.parse(w.json), _close: was }); if (keep) w.json = JSON.stringify({ ...JSON.parse(w.json), _close: keep }); }
       // And each happy hour's own months (distillery test 2): kept for the windows that still start at the same time.
       if (w.ok && !w.empty && !w.slotsGiven) { const was = happyHourSlotSeasonsOf(current.happy_hour); const keep = was && happyHourSlotSeasonsOf({ ...JSON.parse(w.json), _slot_seasons: was }); if (keep) w.json = JSON.stringify({ ...JSON.parse(w.json), _slot_seasons: keep }); }
+      // Dayton (2026-11-21): the part it is at. A save that doesn't name one (the edit page's week) keeps hers; a part named
+      // must be one of the parts in her own parts line (golf places only).
+      if (w.ok && !w.empty && !w.atGiven) { const was = happyHourAtOf(current.happy_hour); if (was) w.json = JSON.stringify({ ...JSON.parse(w.json), _at: was }); }
+      if (w.ok && !w.empty && w.atGiven) {
+        const at = happyHourAtOf(w.json);
+        const key = (x) => String(x).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
+        const part = at && venue.type === 'golf' ? venuePartTimesParts(venue.id).find((x) => key(x.name) === key(at)) : null;
+        if (at && !part) { w.ok = false; w.detail = 'Happy hour: please pick the part again.'; } else if (part) w.json = JSON.stringify({ ...JSON.parse(w.json), _at: part.name });
+      }
       if (!w.ok) errors.happy_hour = w.detail;
       else if (w.empty) { if (current.happy_hour) changes.happy_hour = null; }
       else if (!sameJsonWeek(w.json, current.happy_hour)) changes.happy_hour = w.json;
@@ -63312,6 +63537,8 @@ function renderOwnerSetupPage(found, opts) {
       bookingKnown: (!snap.booking_url && (venueVisitInfo(venue.id) || {}).booking_url) || '',
       // Sport test 14: research's sentences about a part of a golf place with its own times, offered to keep (never filled in).
       partTimesSuggest: venue.type === 'golf' ? partTimesFromResearch(venue.id) : [],
+      // Dayton (2026-11-21): the one line naming a sister listing (names only, never its link).
+      sisters: setupSisterNames(venue),
       // Sport test 15 (Kurt closed the tab with 4 rates in the price-list editor, and the list said "not done yet"): lines in
       // a price list started and not sent yet.
       menuDraftLines: (() => { try { const d0 = activeMenuDraft(venue.id); if (!d0 || d0.status !== 'draft' || !d0.data) return 0; return (normalizeMenuData(JSON.parse(d0.data)).sections || []).reduce((a, x) => a + ((x && x.items) || []).length, 0); } catch (e) { return 0; } })(),
@@ -65542,6 +65769,53 @@ function kindSetupHelpBase(venue) {
 }
 // Sport test 5 (2026-11-20; Jen's ski school: Help answered 11 of 42 well, in golf words): sport-help.js holds every
 // kind's own words for every answer and the answers no answer covered; this is what it needs to know about her listing.
+// Sport test 11 (2026-11-21), one detection for Help's "it has its own page" and the setup's sister line (Dayton,
+// 2026-11-21): other listings for this place in its town, at the same street address (its first three words, with the
+// number), or under its name: a name that starts with hers, or the same name before a dash or colon ("Osoyoos Golf Club —
+// Desert Gold" and "Osoyoos Golf Club — Park Meadows"). types: the types to look at (null: every type but stays).
+// -> [{ id, name }] (never a link or a token), at most `limit`.
+const SISTER_HELP_TYPES = ['golf', 'indoor', 'sports', 'sport'];
+function sisterNameStem(n) { return String(n || '').replace(/\s*\(.*\)\s*$/, '').replace(/\s+[—–-]\s+[^—–-]+$|:\s+[^:]+$/, '').trim(); }
+function sisterListingsOf(venue, { types = null, limit = 2 } = {}) {
+  try {
+    if (!venue || venue.id == null || !venue.region) return [];
+    // "Road" and "Rd", "Drive" and "Dr" (the same street typed two ways).
+    const SUF = { road: 'rd', drive: 'dr', avenue: 'ave', av: 'ave', street: 'st', place: 'pl', way: 'wy', crescent: 'cres', court: 'ct', boulevard: 'blvd', highway: 'hwy', lane: 'ln', trail: 'trl' };
+    const norm = (a) => String(a || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').map((w) => SUF[w] || w).join(' ');
+    const addr = norm(venue.address).split(' ').slice(0, 3).join(' ');
+    const addrOk = addr.length > 6 && /\d/.test(addr);
+    const nm = String(venue.name || '').replace(/\s*\(.*\)\s*$/, '').trim(), stem = sisterNameStem(venue.name);
+    const typeSql = types ? `AND type IN (${types.map(() => '?').join(',')})` : "AND type != 'stay'";
+    const rows = db.prepare(`SELECT id, name, address, type FROM venues WHERE id != ? AND region = ? AND redirect_to IS NULL ${typeSql} ORDER BY id LIMIT 800`).all(venue.id, venue.region, ...(types || []));
+    const byName = (r) => (nm.length > 5 && String(r.name || '').startsWith(nm)) || (stem.length > 5 && stem !== nm && sisterNameStem(r.name) === stem);
+    // Under her name first, then her own type, then the rest (a course's other course before the clubhouse restaurant).
+    const rank = (r) => (byName(r) ? 0 : 2) + (r.type === venue.type ? 0 : 1);
+    return rows.filter((r) => byName(r) || (addrOk && norm(r.address).startsWith(addr)))
+      .sort((a, b) => rank(a) - rank(b) || a.id - b.id).slice(0, limit).map((r) => ({ id: r.id, name: r.name }));
+  } catch (e) { return []; }
+}
+// Dayton (2026-11-21): the setup's one line naming a sister listing. Sport and golf places only (a shared street address
+// is a mall or a plaza for restaurants and cafés). Names only: "Osoyoos Golf Club — Park Meadows" reads "Park Meadows"
+// beside "Osoyoos Golf Club — Desert Gold". -> [name] (up to 2)
+function setupSisterNames(venue) {
+  if (!venue || !sportSetupType(venue.type)) return [];
+  const stem = sisterNameStem(venue.name);
+  return sisterListingsOf(venue, { types: null, limit: 2 }).map((r) => {
+    const m = stem.length > 5 && r.name.startsWith(stem) ? /^\s*[—–:-]\s*(.{3,})$/.exec(r.name.slice(stem.length)) : null;
+    return m ? m[1].trim() : r.name;
+  });
+}
+// The sister line on the owner home (her edit page), like the setup's: "Park Meadows has its own page and its own setup
+// link. Need it? Message us." (the Help's Message us form). Names only.
+function ownerSisterLineHtml(venue, lang) {
+  const names = setupSisterNames(venue);
+  if (!names.length) return '';
+  const T0 = OWNER_SETUP_STRINGS[lang === 'fr' ? 'fr' : 'en'];
+  if (!T0.sisterOne) return '';
+  const fill = (t, o) => String(t).replace(/\{(\w+)\}/g, (m, k) => (k in o ? o[k] : m));
+  const txt = names.length === 1 ? fill(T0.sisterOne, { a: names[0] }) : fill(T0.sisterTwo, { a: names[0], b: names[1] });
+  return `<p class="op-sister" id="opSister" style="margin:8px 0 4px">${escapeHtml(txt)} <button type="button" class="op-sister-msg" data-ohb-contact="${escapeHtml(fill(T0.sisterMsg, { a: names.join(' / ') }))}" style="background:none;border:0;padding:0;font:inherit;font-weight:700;color:#1E4F4C;text-decoration:underline;cursor:pointer">${escapeHtml(T0.sisterMsgUs)}</button></p>`;
+}
 function sport5HelpCtx(venue, kind) {
   const out = { esc: escapeHtml, kind, price: null, amount: null, season: null, gtk: { en: [], fr: [] }, booking: {}, event: SPORT4_EVENT_EX[kind] || SPORT4_EVENT_EX.sportother, near: null };
   try {
@@ -65566,13 +65840,8 @@ function sport5HelpCtx(venue, kind) {
   out.booking = { ahead: (bw.chips || {}).ahead || [ib[0].ahead, ib[1].ahead], busy: (bw.chips || {}).busy || [ib[0].busy, ib[1].busy], line: (bw.lines || {}).busy || INDOOR_BOOK_LINES.busy || null };
   // Sport test 11 (2026-11-21): another listing for part of this place (a simulator lounge or range at the same address,
   // or under the same name), so Help says "it has its own page" only when there is one.
-  try {
-    const addr = String(venue.address || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(' ').slice(0, 3).join(' ');
-    const nm = String(venue.name || '').replace(/\s*\(.*\)\s*$/, '').trim();
-    const rows = db.prepare("SELECT id, name, address, type FROM venues WHERE id != ? AND region = ? AND redirect_to IS NULL AND type IN ('golf', 'indoor', 'sports', 'sport') LIMIT 400").all(venue.id, venue.region);
-    const sib = rows.find((r) => (addr.length > 6 && String(r.address || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().startsWith(addr)) || (nm.length > 5 && String(r.name || '').startsWith(nm)));
-    if (sib) out.sister = { id: sib.id, name: sib.name };
-  } catch (e) { /* none */ }
+  const sib = sisterListingsOf(venue, { types: SISTER_HELP_TYPES, limit: 1 })[0];
+  if (sib) out.sister = { id: sib.id, name: sib.name };
   // Search: a ski school asked for from a valley town lists the nearest hills (discovery-search, sport test 5 #9).
   // Sport test 13 (2026-11-21): a town search ("golf penticton") also shows places in the towns next to it (Kaleden,
   // Summerland, Naramata, Okanagan Falls), after that town's own.
@@ -69231,6 +69500,12 @@ const OWNER_HELP_SCRIPT = String.raw`
   if (typeof document.addEventListener === 'function') document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && !panel.hidden && !(panel.contains && panel.contains(e.target))) close(); });
   form.addEventListener('submit', function(e){ e.preventDefault(); var q = input.value; input.value = ''; ask(q); });
   window.__ohbMatch = match; window.__ohbBest = best; window.__ohbFill = patFill;
+  // Dayton (2026-11-21): a "Message us" link on the page itself (the setup's sister-listing line) opens this same Message
+  // us form, with its note started for her ([data-ohb-contact]: the note).
+  if (typeof document.addEventListener === 'function') document.addEventListener('click', function(e){
+    var a = e.target && e.target.closest ? e.target.closest('[data-ohb-contact]') : null; if (!a) return;
+    e.preventDefault(); open(); contact(); var n = document.getElementById('ohbNote'); if (n && !n.value) n.value = a.getAttribute('data-ohb-contact') || '';
+  });
 })();
 `;
 // One answer for how the owner got here (mode 'in' signed in, 'link' the emailed edit link, 'out' signed out), with
@@ -71433,7 +71708,7 @@ function applyOwnerFieldsInner(venue, values, chosen, meta, reviewer, now = new 
       times = {};
       for (const d of OWNER_DAYS) if (o[d] && o[d].length) times[d] = o[d];
       if (!Object.keys(times).length) times = null;
-      else { if (o._season) times._season = o._season; if (o._close) times._close = o._close; if (o._slot_seasons) times._slot_seasons = o._slot_seasons; } // its own season (pub test 7), until close (pub test 9), each happy hour's months (distillery test 2)
+      else { if (o._season) times._season = o._season; if (o._close) times._close = o._close; if (o._slot_seasons) times._slot_seasons = o._slot_seasons; if (happyHourAtOf(o)) times._at = happyHourAtOf(o); } // its own season (pub test 7), until close (pub test 9), each happy hour's months (distillery test 2)
     }
     const r = guardedHappyHourUpdate(venue.id, venue.happy_hour_times, { times, source_url: times ? 'venue_owner' : listing, checked_at: todayLocal(now) }, { reason: meta.reason, batch_id: meta.batch_id, reviewed_by: reviewer, log_source: 'venue_owner' }, now);
     if (!r.ok) return { ok: false, reason: 'happy_hour_failed', detail: r.reason, applied };
@@ -74772,7 +75047,7 @@ ${renderGolfHeaderHtml()}
       ${/* Sport test 10 (2026-11-21; Lorraine): after Create a login, "You're signed in" was in the full page only, far below
          where the page opens. It sits under the name now. */ ''}
       ${found.welcome ? `<p class="op-done show" id="opWelcome" role="status">${L(`You&rsquo;re signed in.${found.welcome.live.length ? ` What you sent from your link is now live: ${escapeHtml(ownerFieldNames(found.welcome.live, 'en'))}.` : ''} From now on your changes go live as soon as you save them.${sportSetupType(venue.type) ? ' Your story is still checked first, usually within a day.' : ''} Next time, sign in at <a href="/owner/login">okanaganroam.com/owner/login</a>.`, `Vous êtes connecté.${found.welcome.live.length ? ` Ce que vous avez envoyé avec votre lien est maintenant en ligne : ${escapeHtml(ownerFieldNames(found.welcome.live, 'fr'))}.` : ''} Désormais, vos modifications sont en ligne dès que vous les enregistrez.${sportSetupType(venue.type) ? ' Votre histoire est encore vérifiée d’abord, en général d’ici un jour.' : ''} La prochaine fois, connectez-vous à <a href="/fr/owner/login">okanaganroam.com/fr/owner/login</a>.`)}</p>` : ''}
-      <p class="op-free" id="opFree" style="display:inline-block;margin:6px 0 4px;padding:6px 14px;border-radius:999px;background:#E3F1E8;color:#1E6B3A;font-weight:800"><span aria-hidden="true">&#10003;</span> ${L('Free. No cost, ever.', 'Gratuit. Sans frais, pour toujours.')}</p>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id, { nearly: true }), venue.type) : ''}${completeHtml}
+      <p class="op-free" id="opFree" style="display:inline-block;margin:6px 0 4px;padding:6px 14px;border-radius:999px;background:#E3F1E8;color:#1E6B3A;font-weight:800"><span aria-hidden="true">&#10003;</span> ${L('Free. No cost, ever.', 'Gratuit. Sans frais, pour toujours.')}</p>${completeOn ? ownerSetupCardHtml(token ? ownerPath(`${OWNER_LINK_PATH}${token}/setup`, lang) : ownerPath(`/owner/account/venue/${venue.id}/setup`, lang), lang, setupState(venue.id, { nearly: true }), venue.type) : ''}${ownerSisterLineHtml(venue, lang)}${completeHtml}
       <p class="op-staff" id="opStaff">${ownerStaffLineHtml(lang, !!token)}</p>
       ${(() => { try { return ownerStatsModule.ownerStatsHtml(ownerStatsModule.ownerStats(db, venue.id), lang, { listKind: venue.type === 'tour' ? 'tours' : isPriceList(venue) ? 'prices' : '' }); } catch (e) { return ''; } })()}
       ${(() => {
@@ -81377,7 +81652,7 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
-  clearVenueOwnerFeaturesCache, sportPriceLineCounts, happyHourHiddenNow, indoorLowestTyped, sportPracticeKept, golfOnSiteFood, tripOwnerClosureNotes,
+  clearVenueOwnerFeaturesCache, sportPriceLineCounts, happyHourHiddenNow, venueHappyHourForTest: (v, now, fr = false) => venueHappyHour(v, null, fr, now), happyHourStatesForTest: happyHourStatesFor, setupSisterNamesForTest: setupSisterNames, sisterListingsOf, partHhWhen, happyHourPartOf, happyHourPartOn, happyHourAtText, indoorLowestTyped, sportPracticeKept, golfOnSiteFood, tripOwnerClosureNotes,
   // Places to stay (2026-11-19), for tests/stays.test.js.
   getStaysByRegion, findStayBySlug, handleStaysRoute, getStayCloseBy, withStaysNavLink, getStayInfo, guardedStayInfoUpsert, venueActivityCounter,
   // Tour test 12 (Whistler, 2026-11-18).
