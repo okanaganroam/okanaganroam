@@ -8359,7 +8359,7 @@ function parseTripPlanBody(body, opts = {}) {
 const TRIP_CHAT_KEY_RE = /^(?:[1-7]-(?:early|morning|midday|afternoon|late|evening|night)|it-\d{1,2})$/;
 function parseTripChatBody(body, opts = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: 'Body must be an object.' };
-  const unexpected = Object.keys(body).filter((k) => !['message', 'chip', 'lang', 'plan', 'locks', 'removed', 'stops', 'events', 'stayTown', 'stayId'].includes(k));
+  const unexpected = Object.keys(body).filter((k) => !['message', 'chip', 'lang', 'plan', 'locks', 'removed', 'stops', 'events', 'stayTown', 'stayId', 'dayDates', 'soft'].includes(k));
   if (unexpected.length) return { error: `Unexpected field(s): ${unexpected.join(', ')}` };
   const message = typeof body.message === 'string' ? body.message.replace(/\s+/g, ' ').trim() : '';
   const chip = body.chip === undefined || body.chip === null ? null : body.chip;
@@ -8388,9 +8388,19 @@ function parseTripChatBody(body, opts = {}) {
   if (!Array.isArray(events) || events.length > 20 || !events.every((x) => Number.isInteger(x) && x > 0)) return { error: 'events must list event ids.' };
   const stayTown = body.stayTown === undefined || body.stayTown === null ? null : body.stayTown;
   if (stayTown !== null && !(typeof stayTown === 'string' && REGION_LABELS[stayTown])) return { error: 'stayTown must be a town.' };
+  // Round 5: the date of each day of the plan on screen ("Friday" is the day that is a Friday), and the stops the chat
+  // added or changed earlier (soft: kept by the chat, never sent as the visitor's own locks).
+  const dayDates = body.dayDates === undefined ? [] : body.dayDates;
+  if (!Array.isArray(dayDates) || dayDates.length > 7 || !dayDates.every((d) => d === null || (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)))) return { error: 'dayDates must list dates.' };
+  const soft = {};
+  if (body.soft !== undefined) {
+    const l = body.soft;
+    if (!l || typeof l !== 'object' || Array.isArray(l) || Object.keys(l).length > 28 || !Object.entries(l).every(([k, x]) => TRIP_CHAT_KEY_RE.test(k) && Number.isInteger(x) && x > 0)) return { error: 'soft must map a stop slot to a venue id.' };
+    for (const [k, x] of Object.entries(l)) if (stops.some((st) => st.key === k && st.id === x) && locks[k] === undefined) soft[k] = x;
+  }
   const stayId = body.stayId === undefined || body.stayId === null ? null : body.stayId;
   if (stayId !== null && !(Number.isInteger(stayId) && stayId > 0)) return { error: 'stayId must be a positive integer.' };
-  return { value: { message, chip, lang: body.lang === 'fr' ? 'fr' : 'en', args: plan.value, locks, removed: [...new Set(removed)], stops, events: [...new Set(events)], stayTown, stayId } };
+  return { value: { message, chip, lang: body.lang === 'fr' ? 'fr' : 'en', args: plan.value, locks, removed: [...new Set(removed)], stops, events: [...new Set(events)], stayTown, stayId, dayDates, soft } };
 }
 // The stops on screen, named from our own database (the page sends only slots and ids): what the model and the
 // templates see. Stops whose place is gone are left out.
@@ -8431,7 +8441,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     // The word rules first (instant), then the AI (live eval 2026-11-22: p50 1.1 s, some 3 s timeouts). When the rules
     // read the message confidently, the AI gets a short grace (TRIP_CHAT_GRACE_MS, default 1500 ms) and the rules answer
     // if it is slower; otherwise it gets the full timeout. Both readings are then reconciled (tripChat.reconcileReads).
-    const r = tripChat.rulesRead(v.message, stops, { regions, regionLabels: REGION_LABELS, days, weekdays: tripChat.weekdayDays((v.args.overrides && v.args.overrides.startDate) || (v.args.stay && v.args.stay.arrive) || null, days) });
+    const r = tripChat.rulesRead(v.message, stops, { regions, regionLabels: REGION_LABELS, days, weekdays: tripChat.weekdayDays((v.dayDates || []).some(Boolean) ? v.dayDates : (v.args.overrides && v.args.overrides.startDate) || (v.args.stay && v.args.stay.arrive) || null, days) });
     what = r.what || null;
     // A stay or getting-here message the rules read confidently is answered by fixed server logic, so the AI is not
     // waited for (2026-11-22: a stay change took 6-14 s on the live site).
@@ -8488,8 +8498,15 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // Round 4: a change to the stops keeps the place to stay the visitor sees (it changed with unrelated messages).
   tripChatKeepStayId = extra.some((o) => o.o === 'stay') ? null : v.stayId || null;
   let out;
-  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: v.locks, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run })
+  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run })
     : { plan: null, req: null, actions: { remove: [], keep: [] }, results: [], changed: [] }; } finally { tripChatKeepStayId = null; }
+  // What the chat added or changed goes back as "soft" (the chat keeps it; the Swap button sends it as an ordinary stop,
+  // never a hard lock: "A locked stop cannot be kept: Forged Axe Throwing..."). Only the visitor's own kept stops are locks.
+  if (out && out.req && out.req.locks) {
+    const L = {}, S = {};
+    for (const [k, id] of Object.entries(out.req.locks)) (((v.locks || {})[k] === id || (out.actions.keep || []).includes(k)) ? L : S)[k] = id;
+    out.req.locks = L; out.req.soft = S;
+  }
   let reply = planOps.length ? tripChat.buildReply(out, { lang, regionLabels: REGION_LABELS, cant }) : '';
   let plan = out.plan || null, req = out.req || null, stayPref, transport, stayBlock, newText = null, card = null;
   if (eventReply) reply = [reply, eventReply].filter(Boolean).join(' ');
@@ -8573,6 +8590,9 @@ function tripChatStayTurn(stayOps, { v, plan, req, stops, lang, staysOn, runCore
     if (op.region) { pref.region = op.region; if (!op.value) { delete pref.maxPrice; delete pref.minPrice; } }
   }
   if (ams.length) pref.amenities = ams;
+  // Round 5 ("a cheaper hotel" on a Whistler Village plan gave a hotel in Pemberton): cheaper or nicer stays in the town
+  // of the stay on screen unless the visitor names another.
+  if (!pref.region && v.stayTown && stayOps.length && stayOps.every((o) => ['budget', 'upscale'].includes(o.value) && !o.region)) pref.region = v.stayTown;
   const first = stayOps[0] || {};
   const what = first.value ? T.stayWhat[first.value] : tripChat.fill(T.stayWhat.region, { town: REGION_LABELS[first.region] || first.region });
   const tooCheap = stayOps.some((o) => o.value === 'budget') && cur.priceLevel === 1;

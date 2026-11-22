@@ -217,6 +217,9 @@ function chatClientSrc(d) {
     var inEl = document.getElementById('v4ChatIn');
     var body = { lang: lang() === 'fr' ? 'fr' : 'en', plan: chatPlanBody(), locks: state.locks, removed: Object.keys(state.removed), stops: chatStops() };
     var evs = chatEventIds(); if (evs.length) body.events = evs;
+    // Round 5: each day's own date (so "Friday" is the right day) and the stops the chat added or changed earlier.
+    try { var dd = ((state.last && state.last.days) || []).map(function(d){ return /^\d{4}-\d{2}-\d{2}$/.test(String(d && d.date || '')) ? d.date : null; }).slice(0, 7); if (dd.some(Boolean)) body.dayDates = dd; } catch (e) { /* none */ }
+    if (chat.soft && Object.keys(chat.soft).length) body.soft = chat.soft;
     var sd = typeof t3StayData === 'function' && !chat.noStay ? t3StayData() : null; if (sd && sd.chosen && sd.chosen.region) body.stayTown = sd.chosen.region; if (sd && sd.chosen && sd.chosen.id > 0) body.stayId = sd.chosen.id;
     if (chip) body.chip = chip; else body.message = message;
     function done(){
@@ -234,7 +237,7 @@ function chatClientSrc(d) {
         // Fix round (2026-11-22): a new plan only when a stop changed ("The plan already fits that" changes nothing and
         // shows no Undo); the place to stay alone comes back as stayBlock and never touches the stops.
         if (j.plan && j.req && changed.length) {
-          state.text = j.req.text; state.seed = j.req.seed; state.overrides = j.req.overrides || {}; state.exclude = (j.req.excludeVenueIds || []).slice(); state.locks = j.req.locks || {};
+          state.text = j.req.text; state.seed = j.req.seed; state.overrides = j.req.overrides || {}; state.exclude = (j.req.excludeVenueIds || []).slice(); state.locks = j.req.locks || {}; chat.soft = j.req.soft || {};
           state.removed = {}; v4.gone = {}; state.last = j.plan;
           state.lastReq = { seed: j.req.seed, overrides: j.req.overrides || {}, exclude: (j.req.excludeVenueIds || []).slice(), pinned: j.req.pinned || null, avoid: j.req.avoidVenueIds || [] };
           touched = true;
@@ -255,7 +258,7 @@ function chatClientSrc(d) {
           stayChoice = null; touched = true; changed.push('stay');
         }
         if (j.stayPref !== undefined) { chat.stayPref = j.stayPref; chat.noStay = !!(j.stayPref && j.stayPref.none); touched = true; if (changed.indexOf('stay') === -1) changed.push('stay'); }
-        if (acts.transport) { chat.transport = acts.transport; touched = true; if (acts.transport === 'rental') changed.push('gh'); }
+        if (acts.transport) { chat.transport = acts.transport; touched = true; if (acts.transport === 'rental' || acts.transport === 'no_car') changed.push('gh'); }
         // Events taken out by chat, a wine tour offered as a card, and words added to the request ("no museums").
         (acts.removeEvents || []).forEach(function(id){ chat.goneEvents[id] = 1; touched = true; });
         // Round 4: the wine tour card is an offer, not a change to the plan: it shows no Undo (Undo undid nothing).
@@ -416,6 +419,8 @@ function chatClientSrc(d) {
     Array.prototype.forEach.call(root.querySelectorAll('.v4-stop'), function(li){
       var eb = li.querySelector('.trip-btn[data-trip-ref^="event:"]');
       if (eb) {
+        // The photo-led layout (trip-workspace-layout.js) draws the event card itself: Remove, then "Removed … Undo".
+        if (typeof tripWorkspaceEventHtml === 'function') return;
         var id = Number(String(eb.getAttribute('data-trip-ref')).slice(6));
         if (chat.goneEvents[id]) { li.parentNode.removeChild(li); return; }
         if (!v4.confirmed) { li.classList.add('has-event-x'); li.insertAdjacentHTML('beforeend', '<button type="button" class="v4-icon v4-event-x" data-v4-event-x="' + id + '" aria-label="' + esc(ag('removeEvent', { name: eb.getAttribute('data-trip-name') || '' })) + '">✕</button>'); }
@@ -487,7 +492,25 @@ function chatClientSrc(d) {
       track('trip_chat', { chat_source: 'when_' + w, changed: 'no' });
       return;
     }
-    if ((b = t.closest('[data-v4-event-x]'))) { chat.goneEvents[Number(b.getAttribute('data-v4-event-x'))] = 1; chat.rendering = true; try { render(false); } finally { chat.rendering = false; } return; }
+    // An event comes off like a venue: a "Removed … Undo" row, the same line in the chat, and the stop count follows.
+    if ((b = t.closest('[data-v4-event-x]'))) {
+      var xid = Number(b.getAttribute('data-v4-event-x')), xname = '';
+      days().forEach(function(d){ d.stops.forEach(function(s){ if (s.kind === 'event' && s.event && s.event.id === xid) xname = s.event.name; }); });
+      chat.goneEvents[xid] = 1; v4.saved = false;
+      render(false);
+      var xu = resultEl.querySelector('[data-v4-event-undo="' + xid + '"]'); if (xu) { try { xu.focus({ preventScroll: true }); } catch (err) {} }
+      if (xname && typeof announce === 'function') announce(tx('tripv3.wasRemoved', { name: xname }));
+      v4CacheSave();
+      return;
+    }
+    if ((b = t.closest('[data-v4-event-undo]'))) {
+      var uid = Number(b.getAttribute('data-v4-event-undo'));
+      delete chat.goneEvents[uid]; v4.saved = false;
+      render(false);
+      var ux = resultEl.querySelector('[data-v4-event-x="' + uid + '"]'); if (ux) { try { ux.focus({ preventScroll: true }); } catch (err) {} }
+      v4CacheSave();
+      return;
+    }
     if ((b = t.closest('[data-v4-stay-more]'))) { chat.stayMore = !chat.stayMore; render(false); return; }
     if ((b = t.closest('[data-v4-stay-choose]'))) { stayChoice = Number(b.getAttribute('data-v4-stay-choose')); chat.stayMore = false; render(false); chatGlow(['stay']); return; }
   });
