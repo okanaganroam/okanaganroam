@@ -27,7 +27,12 @@ const CHAT_STYLES = `<style>
   .t3-v4 .v4-chat-form input { flex: 1; min-width: 0; min-height: 46px; box-sizing: border-box; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.28); background: #fff; color: var(--ref-navy); font: inherit; font-size: 16px; }
   .t3-v4 .v4-chat-form input:focus { outline: 2px solid var(--ref-navy); outline-offset: 1px; }
   .t3-v4 .v4-chat-send { flex: none; width: 46px; height: 46px; border-radius: 999px; border: 0; background: var(--ref-navy); color: #fff; font-size: 1.2rem; font-weight: 800; cursor: pointer; }
-  .t3-v4 .v4-chat.is-busy .v4-chat-send, .t3-v4 .v4-chat.is-busy input { opacity: 0.55; }
+  .t3-v4 .v4-chat.is-busy .v4-chat-send { opacity: 0.55; }
+  .t3-v4 .v4-chat.is-busy .v4-chat-agent span::after { content: ' …'; }
+  .t3-v4 .v4-chat.has-queue .v4-chat-send { background: var(--ref-gold-ink, #8A6A0F); opacity: 1; }
+  .t3-v4 .v4-event-x { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); }
+  .t3-v4 .v4-stop.has-event-x { position: relative; }
+  .t3-v4 .v4-stop.has-event-x .v4-row { padding-right: 52px; }
   .t3-v4 .v4-chips { display: flex; gap: 6px; margin: 8px 0 0; overflow-x: auto; scrollbar-width: none; }
   .t3-v4 .v4-chips::-webkit-scrollbar { display: none; }
   .t3-v4 .v4-chips[hidden] { display: none; }
@@ -57,6 +62,10 @@ const CHAT_STYLES = `<style>
   .t3-v4 .v4-stay-row { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: center; }
   .t3-v4 .v4-stay-img { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; display: block; background: var(--ref-cream-deep, #EAE6D9); }
   .t3-v4 .v4-stay-name { display: block; font-weight: 800; font-size: 1rem; line-height: 1.25; color: var(--ref-navy); overflow-wrap: anywhere; }
+  /* The amenity asked for (2026-11-22): one or two small chips on the stay card, only what the visitor asked. */
+  .t3-v4 .v4-stay-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 0; }
+  .t3-v4 .v4-stay-chip { display: inline-flex; align-items: center; min-height: 24px; padding: 0 9px; border-radius: 999px; background: rgba(46,125,91,0.12); color: #1E5B41; font-weight: 800; font-size: 0.74rem; }
+  .t3-v4 .v4-stay-chip.is-unsure { background: rgba(27,43,58,0.07); color: var(--ref-navy-muted, #56636E); }
   .t3-v4 .v4-stay-facts { display: block; margin-top: 2px; font-size: 0.82rem; color: var(--ref-navy-muted, #56636E); }
   .t3-v4 .v4-stay-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 0; }
   .t3-v4 .v4-stay-acts .v4-btn { min-height: 42px; padding: 0 16px; font-size: 0.9rem; }
@@ -103,7 +112,13 @@ function chatClientSrc(d) {
     fr: { label: 'Dites-nous quoi changer', ph: 'Dites-moi quoi changer…', send: 'Envoyer', thinking: 'Je regarde…', undo: 'Annuler', undone: 'Annulé. Votre plan est revenu.', err: 'Un problème est survenu. Votre plan n’a pas changé.', you: 'Vous : ',
       chips: [['cheaper', 'Moins cher'], ['kids', 'Plus pour les enfants'], ['slower', 'Plus relax']] }
   };
-  var chat = { busy: false, undo: null, used: false };
+  var chat = { busy: false, undo: null, used: false, goneEvents: {}, queue: null, wineTour: null };
+  // The events on the plan (rows the planner adds; they have no Swap): ids only.
+  function chatEventIds(){
+    var out = [];
+    days().forEach(function(d){ d.stops.forEach(function(s){ if (s.kind === 'event' && s.event && s.event.id && !chat.goneEvents[s.event.id] && out.indexOf(s.event.id) === -1) out.push(s.event.id); }); });
+    return out.slice(0, 20);
+  }
   function ct(k){ return (CHAT_T[lang()] || CHAT_T.en)[k]; }
   function v4ChatHtml(){
     return '<div class="v4-chat-reply" id="v4ChatReply" role="status" aria-live="polite" hidden><p class="v4-chat-you"></p><p class="v4-chat-agent"><span></span> <button type="button" class="v4-chat-undo" data-v4-chat-undo hidden>' + esc(ct('undo')) + '</button></p></div>'
@@ -164,11 +179,11 @@ function chatClientSrc(d) {
     if (typeof t3StayInput === 'function') { var st = t3StayInput(); if (st) body.stay = st; }
     return body;
   }
-  function chatSnapshot(){ return JSON.stringify({ last: state.last, lastReq: state.lastReq, text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude, removed: state.removed, gone: v4.gone, stayPref: chat.stayPref, noStay: chat.noStay, transport: chat.transport }); }
+  function chatSnapshot(){ return JSON.stringify({ last: state.last, lastReq: state.lastReq, text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude, removed: state.removed, gone: v4.gone, stayPref: chat.stayPref, noStay: chat.noStay, transport: chat.transport, goneEvents: chat.goneEvents, wineTour: chat.wineTour }); }
   function chatRestore(snap){
     var o = JSON.parse(snap);
     state.last = o.last; state.lastReq = o.lastReq; state.text = o.text; state.seed = o.seed; state.overrides = o.overrides || {}; state.locks = o.locks || {}; state.exclude = o.exclude || []; state.removed = o.removed || {}; v4.gone = o.gone || {};
-    chat.stayPref = o.stayPref; chat.noStay = !!o.noStay; chat.transport = o.transport || null;
+    chat.stayPref = o.stayPref; chat.noStay = !!o.noStay; chat.transport = o.transport || null; chat.goneEvents = o.goneEvents || {}; chat.wineTour = o.wineTour || null;
     v4.confirmed = false; v4.saved = false;
     chat.rendering = true; try { render(false); } finally { chat.rendering = false; } syncUrl();
   }
@@ -186,16 +201,24 @@ function chatClientSrc(d) {
     if (rows[0]) { try { rows[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { rows[0].scrollIntoView(); } }
   }
   function chatSend(message, chip, label){
-    if (chat.busy || !state.last) return;
+    if (!state.last) return;
+    // Second fresh-eyes round (2026-11-22: a message typed while waiting was dropped): it waits its turn.
+    if (chat.busy) { chat.queue = { message: message, chip: chip, label: label }; var qb = document.getElementById('v4Chat'); if (qb) qb.classList.add('has-queue'); return; }
     var snap = chatSnapshot(), you = message || label || '';
     chat.busy = true; chat.used = true;
     if (window.__roamTripFunnel) window.__roamTripFunnel.step('chat');
     chatShow(you, ct('thinking'), { busy: true });
     resultEl.setAttribute('aria-busy', 'true');
-    var inEl = document.getElementById('v4ChatIn'); if (inEl) inEl.disabled = true;
+    var inEl = document.getElementById('v4ChatIn');
     var body = { lang: lang() === 'fr' ? 'fr' : 'en', plan: chatPlanBody(), locks: state.locks, removed: Object.keys(state.removed), stops: chatStops() };
+    var evs = chatEventIds(); if (evs.length) body.events = evs;
+    var sd = typeof t3StayData === 'function' && !chat.noStay ? t3StayData() : null; if (sd && sd.chosen && sd.chosen.region) body.stayTown = sd.chosen.region;
     if (chip) body.chip = chip; else body.message = message;
-    function done(){ chat.busy = false; resultEl.removeAttribute('aria-busy'); if (inEl) { inEl.disabled = false; } }
+    function done(){
+      chat.busy = false; resultEl.removeAttribute('aria-busy');
+      var q = chat.queue; chat.queue = null; var qb = document.getElementById('v4Chat'); if (qb) qb.classList.remove('has-queue');
+      if (q) setTimeout(function(){ chatSend(q.message, q.chip, q.label); }, 0);
+    }
     return fetch(CHAT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function(r){ return r.json().catch(function(){ return {}; }); })
       .then(function(j){
@@ -227,6 +250,10 @@ function chatClientSrc(d) {
         }
         if (j.stayPref !== undefined) { chat.stayPref = j.stayPref; chat.noStay = !!(j.stayPref && j.stayPref.none); touched = true; if (changed.indexOf('stay') === -1) changed.push('stay'); }
         if (acts.transport) { chat.transport = acts.transport; touched = true; if (acts.transport === 'rental') changed.push('gh'); }
+        // Events taken out by chat, a wine tour offered as a card, and words added to the request ("no museums").
+        (acts.removeEvents || []).forEach(function(id){ chat.goneEvents[id] = 1; touched = true; });
+        if (j.card && j.card.kind === 'wine_tour') { chat.wineTour = j.card; touched = true; changed.push('gh'); }
+        if (typeof j.text === 'string' && j.text && !(j.plan && j.req)) { state.text = j.text; }
         if (touched) { v4.confirmed = false; v4.saved = false; chat.rendering = true; try { render(false); } finally { chat.rendering = false; } syncUrl(); }
         chat.undo = touched ? snap : null;
         chatShow(you, j.reply || ct('err'), { undo: touched });
@@ -254,11 +281,17 @@ function chatClientSrc(d) {
   // ---------- Agent round (2026-11-22): the agent speaks; stay and getting here in the plan; Confirm at the end ----------
   var AG = {
     en: { who: 'Trip agent', hi: 'Hi! Where are you headed, and what do you love doing?', day: 'Here’s a day in {town}{for}.', days: 'Here’s a {n}-day {town} plan{for}{stay}.', plan: 'Here’s your plan{for}.', more: ' Want me to change anything?',
-      fam: ' for your family', dog: ' for you and your dog', stay: ', with a place to stay', when: 'When are you coming?', weekend: 'This weekend', pick: 'Pick dates', notSure: 'Not sure yet', done: 'Done', from: 'Arrive', to: 'Leave',
+      fam: ' for your family', dog: ' for you and your dog', stay: ', with a place to stay', stayWith: ', with a place to stay with {what}', stayUnsure: ', with a place to stay ({what} not confirmed)', and: 'and', notConfirmed: '{what} not confirmed',
+      amen: { pool: 'a pool', hot_tub: 'a hot tub', kitchen: 'a kitchen', pets: 'pet-friendly rooms', parking: 'free parking', accessible: 'accessible rooms' },
+      chip: { pool: 'Pool', hot_tub: 'Hot tub', kitchen: 'Kitchen', pets: 'Pets welcome', parking: 'Free parking', accessible: 'Accessible' }, when: 'When are you coming?', weekend: 'This weekend', pick: 'Pick dates', notSure: 'Not sure yet', done: 'Done', from: 'Arrive', to: 'Leave',
+      datesFail: 'I couldn’t plan those dates. Your plan is unchanged.', missing: 'I couldn’t fit {what} on these dates; tell me if you’d like me to try another day.', removeEvent: 'Remove {name}', poolWinter: 'check it’s open in winter',
       datesSet: 'Planned for {a} – {b}.', ready: 'Your trip is ready. Book it, share it, or tell me what to change.', noCarNone: 'No shuttle listed for this trip.', wine: 'Wine tour (no driving)',
       stayH: 'Where you’ll stay', rates: 'Check rates', seeMore: 'See {n} more', fewer: 'Hide', choose: 'Choose', ghH: 'Getting here', seeCars: 'See cars', book: 'Book', confirm: 'Confirm plan', sleeps: 'Sleeps {n}' },
     fr: { who: 'Agent de voyage', hi: 'Bonjour! Où allez-vous, et qu’aimez-vous faire?', day: 'Voici une journée à {town}{for}.', days: 'Voici un plan de {n} jours à {town}{for}{stay}.', plan: 'Voici votre plan{for}.', more: ' Voulez-vous changer quelque chose?',
-      fam: ' pour votre famille', dog: ' pour vous et votre chien', stay: ', avec un logement', when: 'Quand venez-vous?', weekend: 'Ce week-end', pick: 'Choisir les dates', notSure: 'Pas encore sûr', done: 'OK', from: 'Arrivée', to: 'Départ',
+      fam: ' pour votre famille', dog: ' pour vous et votre chien', stay: ', avec un logement', stayWith: ', avec un logement qui a {what}', stayUnsure: ', avec un logement ({what} non confirmé)', and: 'et', notConfirmed: '{what} non confirmé',
+      amen: { pool: 'une piscine', hot_tub: 'un spa', kitchen: 'une cuisine', pets: 'des chambres où les animaux sont acceptés', parking: 'un stationnement gratuit', accessible: 'des chambres accessibles' },
+      chip: { pool: 'Piscine', hot_tub: 'Spa', kitchen: 'Cuisine', pets: 'Animaux acceptés', parking: 'Stationnement gratuit', accessible: 'Accessible' }, when: 'Quand venez-vous?', weekend: 'Ce week-end', pick: 'Choisir les dates', notSure: 'Pas encore sûr', done: 'OK', from: 'Arrivée', to: 'Départ',
+      datesFail: 'Je n’ai pas pu planifier ces dates. Votre plan n’a pas changé.', missing: 'Je n’ai pas pu inclure {what} à ces dates; dites-moi si vous voulez que j’essaie un autre jour.', removeEvent: 'Retirer {name}', poolWinter: 'vérifiez qu’elle est ouverte en hiver',
       datesSet: 'Plan pour le {a} – {b}.', ready: 'Votre voyage est prêt. Réservez-le, partagez-le ou dites-moi quoi changer.', noCarNone: 'Aucune navette pour ce voyage.', wine: 'Tour des vignobles (sans conduire)',
       stayH: 'Où vous logerez', rates: 'Voir les tarifs', seeMore: 'Voir {n} autres', fewer: 'Masquer', choose: 'Choisir', ghH: 'Pour venir', seeCars: 'Voir les voitures', book: 'Réserver', confirm: 'Confirmer le plan', sleeps: 'Jusqu’à {n} pers.' }
   };
@@ -275,7 +308,7 @@ function chatClientSrc(d) {
   // The visitor's stay preference ("somewhere cheaper", "with a pool", "we already have a place") goes with every request.
   var t3StayInputBase = t3StayInput;
   // "we don't have a car" / "we're driving": no "Rent a car" in the Book sheet either.
-  if (typeof t3BookSteps === 'function') { var t3BookStepsBase = t3BookSteps; t3BookSteps = function(){ var l = t3BookStepsBase(); return chat.transport === 'no_car' || chat.transport === 'driving' ? l.filter(function(x){ return !(x && x.link === 'discovercars'); }) : l; }; }
+  if (typeof t3BookSteps === 'function') { var t3BookStepsBase = t3BookSteps; t3BookSteps = function(){ var l = t3BookStepsBase(); return chat.transport === 'no_car' || chat.transport === 'driving' || (state.last && state.last.gettingHere && state.last.gettingHere.driving) ? l.filter(function(x){ return !(x && x.link === 'discovercars'); }) : l; }; }
   // Enter sends the first request (Shift+Enter is a new line).
   (function(){ var ta = document.getElementById('t3Input'); if (ta) ta.addEventListener('keydown', function(e){ if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && !e.metaKey && !e.ctrlKey) { e.preventDefault(); form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event('submit', { cancelable: true })); } }); })();
   // Only the page's language is read out (the other language's spans are hidden from screen readers too).
@@ -288,14 +321,42 @@ function chatClientSrc(d) {
     if (/\b(?:dogs?|pup|chiens?)\b/i.test(party)) return ag('dog');
     return '';
   }
+  // The agent's words for the place to stay: "..., with a place to stay with a pool" when the chosen stay has what was
+  // asked; "(pool not confirmed)" when it doesn't say so; plain otherwise.
+  function chatAmenList(keys, words){ var a = keys.map(function(k){ return words[k] || k; }); return a.length > 1 ? a.slice(0, -1).join(', ') + ' ' + ag('and') + ' ' + a[a.length - 1] : (a[0] || ''); }
+  function chatStayWords(){
+    var d = t3StayData(), am = d && d.w.amenity;
+    if (!am || !(am.keys || []).length) return ag('stay');
+    var has = (d.chosen.has || []), miss = am.keys.filter(function(k){ return has.indexOf(k) === -1; });
+    if (!miss.length) return ag('stayWith', { what: chatAmenList(am.keys, AG[lang()] ? AG[lang()].amen : AG.en.amen) }) + (am.winterCheck && has.indexOf('pool') !== -1 ? ' (' + ag('poolWinter') + ')' : '');
+    return ag('stayUnsure', { what: chatAmenList(miss, AG[lang()] ? AG[lang()].chip : AG.en.chip).toLowerCase() });
+  }
+  function chatStayChips(card, w){
+    var am = w && w.amenity; if (!am || !(am.keys || []).length) return '';
+    var chips = AG[lang()] ? AG[lang()].chip : AG.en.chip, has = card.has || [];
+    return '<span class="v4-stay-chips">' + am.keys.slice(0, 2).map(function(k){ return has.indexOf(k) !== -1 ? '<span class="v4-stay-chip">' + esc((chips[k] || k) + (k === 'pool' && am.winterCheck ? ' · ' + ag('poolWinter') : '')) + '</span>' : '<span class="v4-stay-chip is-unsure">' + esc(ag('notConfirmed', { what: chips[k] || k })) + '</span>'; }).join('') + '</span>';
+  }
+  // The request itself gave dates ("next Friday", "Dec 5"): no "When are you coming?", and the stay card may show them.
+  function chatHasDates(){
+    var p = state.last || {}, u = p.understood || {};
+    return !!(u.when || state.overrides.startDate || (p.whereToStay && p.whereToStay.trip && p.whereToStay.trip.datesGiven));
+  }
+  // A kind the request asked for that the plan could not include (the plan's own notes): said in the first line.
+  function chatMissing(){
+    // A pool, hot tub or kitchen asked of the place to stay is not a missing stop.
+    var out = [], stayAsk = !!(state.last && state.last.whereToStay && state.last.whereToStay.amenity);
+    try { t3PlanNextSteps(state.last || {}).forEach(function(x){ if (x && x.kind === 'missing' && !x.venue && x.label && out.indexOf(x.label) === -1 && !(stayAsk && /pool|piscine|hot tub|kitchen|spa\b/i.test(x.label))) out.push(lang() === 'fr' && x.labelFr ? x.labelFr : x.label); }); } catch (e) {}
+    return out.slice(0, 2);
+  }
   function chatAgentHtml(){
     var p = state.last || {}, n = days().length, town = n ? (days()[0].regionLabel || '') : '';
-    var stay = chatOvernight() && !chat.noStay && t3StayData() ? ag('stay') : '';
+    var stay = chatOvernight() && !chat.noStay && t3StayData() ? chatStayWords() : '';
     var line = n > 1 ? ag('days', { n: n, town: town, for: chatPartyFor(), stay: stay }) : n === 1 && town ? ag('day', { town: town, for: chatPartyFor() }) : ag('plan', { for: chatPartyFor() });
-    var html = '<div class="v4-agent" id="v4Agent"><span class="v4-agent-who">' + esc(ag('who')) + '</span><p>' + esc(v4.confirmed ? ag('ready') : line + ag('more')) + '</p>';
+    var miss = chatMissing(), missLine = miss.length ? ' ' + ag('missing', { what: miss.join(' ' + ag('and') + ' ') }) : '';
+    var html = '<div class="v4-agent" id="v4Agent"><span class="v4-agent-who">' + esc(ag('who')) + '</span><p>' + esc(v4.confirmed ? ag('ready') : line + missLine + (missLine ? '' : ag('more'))) + '</p>';
     // One short follow-up, with tap answers: the dates of an overnight trip, when none were given.
     var st = t3StayInputBase() || {};
-    if (chatOvernight() && !st.arrive && !chat.askedWhen && !v4.confirmed) {
+    if (chatOvernight() && !st.arrive && !chat.askedWhen && !v4.confirmed && !chatHasDates()) {
       html += '<div class="v4-ask"><p class="v4-ask-q">' + esc(ag('when')) + '</p><div class="v4-ask-btns"><button type="button" data-v4-when="weekend">' + esc(ag('weekend')) + '</button><button type="button" data-v4-when="pick">' + esc(ag('pick')) + '</button><button type="button" data-v4-when="later">' + esc(ag('notSure')) + '</button></div>'
         + (chat.pickDates ? '<div class="v4-ask-dates"><label>' + esc(ag('from')) + ' <input type="date" id="v4WhenA"></label><label>' + esc(ag('to')) + ' <input type="date" id="v4WhenB"></label><button type="button" class="v4-link" data-v4-when="set">' + esc(ag('done')) + '</button></div>' : '') + '</div>';
     }
@@ -309,21 +370,27 @@ function chatClientSrc(d) {
     var s = d.chosen, fr = lang() === 'fr';
     var step = (s.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && x.kind === 'stay' && t3StayExt(x.url); })[0];
     var facts = [fr ? (s.kindFr || s.kind) : s.kind, s.regionLabel, s.priceBand, s.sleeps ? ag('sleeps', { n: s.sleeps }) : ''].filter(Boolean).join(' · ');
-    var trip = t3StayTripLine(d.w.trip || {}, fr), img = chatImg(s.photo);
+    // No dates on the card until the visitor has given them (it showed tonight's date before "When are you coming?").
+    var tripIn = d.w.trip || {}, known = chatHasDates() || !!((t3StayInputBase() || {}).arrive);
+    var trip = t3StayTripLine(known ? tripIn : { adults: tripIn.adults, kids: tripIn.kids, dog: tripIn.dog }, fr), img = chatImg(s.photo);
     var html = '<section class="v4-card v4-stay-card t3-stay" aria-label="' + esc(ag('stayH')) + '"><p class="v4-card-h">' + esc(ag('stayH')) + (trip ? ' · ' + esc(trip) : '') + '</p>'
       + '<div class="v4-stay-row">' + (img ? '<img class="v4-stay-img" src="' + esc(img) + '" alt="" width="64" height="64" loading="lazy">' : '<span class="v4-stay-img" aria-hidden="true"></span>')
-      + '<div><span class="v4-stay-name">' + esc(s.name) + '</span><span class="v4-stay-facts">' + esc(facts) + '</span></div></div>'
+      + '<div><span class="v4-stay-name">' + esc(s.name) + '</span><span class="v4-stay-facts">' + esc(facts) + '</span>' + chatStayChips(s, d.w) + '</div></div>'
       + '<div class="v4-stay-acts">' + (step ? t3StayLinkHtml(s, { url: step.url, rel: step.rel, key: step.link, affiliate: step.affiliate }, 'v4-btn', ag('rates')) : '')
       + (d.others.length ? '<button type="button" class="v4-link" data-v4-stay-more aria-expanded="' + (chat.stayMore ? 'true' : 'false') + '">' + esc(chat.stayMore ? ag('fewer') : ag('seeMore', { n: d.others.length })) + '</button>' : '') + '</div>';
-    if (chat.stayMore && d.others.length) html += '<ul class="v4-stay-alts">' + d.others.map(function(o){ return '<li><span><b>' + esc(o.name) + '</b>' + esc([fr ? (o.kindFr || o.kind) : o.kind, o.regionLabel, o.priceBand].filter(Boolean).join(' · ')) + '</span><button type="button" class="v4-link" data-v4-stay-choose="' + esc(o.id) + '">' + esc(ag('choose')) + '</button></li>'; }).join('') + '</ul>';
+    if (chat.stayMore && d.others.length) html += '<ul class="v4-stay-alts">' + d.others.map(function(o){ return '<li><span><b>' + esc(o.name) + '</b>' + esc([fr ? (o.kindFr || o.kind) : o.kind, o.regionLabel, o.priceBand].concat((o.has || []).map(function(k){ return (AG[lang()] ? AG[lang()].chip : AG.en.chip)[k] || k; })).filter(Boolean).join(' · ')) + '</span><button type="button" class="v4-link" data-v4-stay-choose="' + esc(o.id) + '">' + esc(ag('choose')) + '</button></li>'; }).join('') + '</ul>';
     if (step && step.affiliate) { html += '<p class="v4-disc-line">' + esc(T3_STAY_DISCLOSURE[fr ? 'fr' : 'en'] || T3_STAY_DISCLOSURE.en) + '</p>'; chatDiscShown = true; }
     return html + '</section>';
   }
   function chatGhHtml(){
     var g = state.last && state.last.gettingHere;
-    if (!g || !chatOvernight() || chat.transport === 'driving') return '';
     var fr = lang() === 'fr', L = fr ? 'fr' : 'en', rows = [];
-    if (g.noDrive && g.wineTour && /^https:\/\//.test(g.wineTour.url)) rows.push('<div class="v4-gh-row"><span>' + esc((fr && g.wineTour.nameFr) || g.wineTour.name || ag('wine')) + '</span><a ' + hrefAttr(g.wineTour.url) + ' rel="sponsored noopener" target="_blank" data-track="booking" data-link="viator">' + esc(ag('book')) + ' <span aria-hidden="true">↗</span></a></div>');
+    // A wine tour with a driver, offered by the chat ("book us a wine tour", "no driving after the wineries").
+    var wt = chat.wineTour;
+    if (wt && /^https:\/\//.test(wt.url || '')) rows.push('<div class="v4-gh-row"><span>' + esc((fr && wt.nameFr) || wt.name || ag('wine')) + '</span><a ' + hrefAttr(wt.url) + ' rel="sponsored noopener" target="_blank" data-track="booking" data-link="viator">' + esc(ag('book')) + ' <span aria-hidden="true">↗</span></a></div>');
+    if ((!g || !chatOvernight() || chat.transport === 'driving') && !rows.length) return '';
+    if (!g || !chatOvernight() || chat.transport === 'driving') g = { shuttles: [] };
+    if (!wt && g.noDrive && g.wineTour && /^https:\/\//.test(g.wineTour.url)) rows.push('<div class="v4-gh-row"><span>' + esc((fr && g.wineTour.nameFr) || g.wineTour.name || ag('wine')) + '</span><a ' + hrefAttr(g.wineTour.url) + ' rel="sponsored noopener" target="_blank" data-track="booking" data-link="viator">' + esc(ag('book')) + ' <span aria-hidden="true">↗</span></a></div>');
     if (g.car && g.carLabel && chat.transport !== 'no_car') rows.push('<div class="v4-gh-row"><span>' + esc(g.carLabel[L]) + '</span><a ' + hrefAttr(g.car) + ' rel="sponsored noopener" target="_blank" data-track="booking" data-link="discovercars" data-gh-step="car-' + esc(g.airport.key) + '">' + esc(ag('seeCars')) + ' <span aria-hidden="true">↗</span></a></div>');
     (g.shuttles || []).forEach(function(x){ if (x && x.url && /^https:\/\//.test(x.url) && x.label) rows.push('<div class="v4-gh-row"><span>' + esc(x.label[L] || x.label.en) + '</span><a ' + hrefAttr(x.url) + ' rel="sponsored noopener" target="_blank" data-track="booking" data-link="viator">' + esc(ag('book')) + ' <span aria-hidden="true">↗</span></a></div>'); });
     if (!rows.length) return '';
@@ -332,6 +399,17 @@ function chatClientSrc(d) {
   function chatDecorate(){
     var root = resultEl.querySelector('.v4'); if (!root) return;
     chatDiscShown = false;
+    // Event rows get a Remove button (they had none) and stay out once removed; untimed "Free time" rows are not shown.
+    Array.prototype.forEach.call(root.querySelectorAll('.v4-stop'), function(li){
+      var eb = li.querySelector('.trip-btn[data-trip-ref^="event:"]');
+      if (eb) {
+        var id = Number(String(eb.getAttribute('data-trip-ref')).slice(6));
+        if (chat.goneEvents[id]) { li.parentNode.removeChild(li); return; }
+        if (!v4.confirmed) { li.classList.add('has-event-x'); li.insertAdjacentHTML('beforeend', '<button type="button" class="v4-icon v4-event-x" data-v4-event-x="' + id + '" aria-label="' + esc(ag('removeEvent', { name: eb.getAttribute('data-trip-name') || '' })) + '">✕</button>'); }
+        return;
+      }
+      if (li.classList.contains('v4-free') && li.querySelector('[data-v4-toggle^="v4d-f"]') && !li.querySelector('.v4-time')) li.parentNode.removeChild(li);
+    });
     var head = root.querySelector('.v4-head');
     if (head) head.insertAdjacentHTML('beforebegin', chatAgentHtml());
     var daysEl = root.querySelector('.v4-days');
@@ -340,6 +418,13 @@ function chatClientSrc(d) {
       if (!v4.confirmed) daysEl.insertAdjacentHTML('afterend', '<div class="v4-confirm v4-confirm-end"><button type="button" class="v4-btn v4-wide" data-v4-confirm>' + esc(ag('confirm')) + '</button></div>');
     }
   }
+  // A stop the visitor swapped with the ⇄ button is theirs: kept through later re-plans (until they change it again).
+  document.addEventListener('click', function(e){
+    var b = e.target && e.target.closest ? e.target.closest('[data-t3-swap]') : null;
+    if (b && resultEl.contains(b)) chat.swapKey = b.getAttribute('data-t3-swap');
+  }, true);
+  // What a button did ("Swapped X for Y") is said in the chat line too, where the visitor is looking.
+  if (typeof announce === 'function') { var announceBase = announce; announce = function(text){ announceBase(text); if (text && !chat.busy) { chatShow('', text, {}); if (chat.swapKey) { var ks = stopAt(chat.swapKey); if (ks) { state.locks[chat.swapKey] = ks.venue.id; syncUrl(); } chat.swapKey = null; } } }; }
   var v4RenderBase = v4Render;
   v4Render = function(focus){
     v4RenderBase(focus);
@@ -366,7 +451,14 @@ function chatClientSrc(d) {
     var fmt = function(x){ return new Date(x + 'T12:00:00Z').toLocaleDateString(lang() === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }); };
     chat.pendingNote = ag('datesSet', { a: fmt(a), b: fmt(b) });
     var pins = currentPins([]); Object.keys(state.locks || {}).forEach(function(k){ pins[k] = state.locks[k]; });
-    request({ pinned: pins }, { requestType: 'refine', focus: false });
+    var req = request({ pinned: pins }, { requestType: 'refine', focus: false });
+    // The plan didn't come back for those dates (a kept stop that is closed then): once more without the pins; if that
+    // fails too, said plainly.
+    if (req && req.then) req.then(function(){
+      if (!chat.pendingNote) return;
+      var again = request({}, { requestType: 'refine', focus: false });
+      if (again && again.then) again.then(function(){ if (chat.pendingNote) { chat.pendingNote = null; chatShow('', ag('datesFail'), {}); } });
+    });
     return true;
   }
   document.addEventListener('click', function(e){
@@ -382,6 +474,7 @@ function chatClientSrc(d) {
       track('trip_chat', { chat_source: 'when_' + w, changed: 'no' });
       return;
     }
+    if ((b = t.closest('[data-v4-event-x]'))) { chat.goneEvents[Number(b.getAttribute('data-v4-event-x'))] = 1; chat.rendering = true; try { render(false); } finally { chat.rendering = false; } return; }
     if ((b = t.closest('[data-v4-stay-more]'))) { chat.stayMore = !chat.stayMore; render(false); return; }
     if ((b = t.closest('[data-v4-stay-choose]'))) { stayChoice = Number(b.getAttribute('data-v4-stay-choose')); chat.stayMore = false; render(false); chatGlow(['stay']); return; }
   });

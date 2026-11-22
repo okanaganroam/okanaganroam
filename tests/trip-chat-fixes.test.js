@@ -126,7 +126,7 @@ test('5. Undo only when something changed; the buttons replace the chat\'s last 
 test('6. the first request\'s own words: "a place with a pool" is the stay preference (and understood); kids\' ages reach the booking link; no car -> no "Rent a car" in the Book sheet', () => {
   const plan = planNow();
   assert.equal(plan.whereToStay.pick.name, 'Chat Fix Pool Resort', 'the pool stay');
-  assert.deepEqual(plan.whereToStay.pref, { amenity: 'pool' });
+  assert.deepEqual(plan.whereToStay.pref, { amenities: ['pool'] });
   assert.ok(plan.understood.interests.includes('a place to stay with a pool'));
   assert.equal(plan.whereToStay.trip.kids, 2);
   assert.deepEqual(plan.whereToStay.trip.kidAges, [6, 9]);
@@ -137,7 +137,7 @@ test('6. the first request\'s own words: "a place with a pool" is the stay prefe
   assert.match(p[0].url, /group_children=2/);
   assert.match(p[0].url, /age=6&age=9/);
   const html = app.renderTripPlannerV3Page({ v4: 'preview', stays: 'preview', chat: 'preview' });
-  assert.match(html, /chat\.transport === 'no_car' \|\| chat\.transport === 'driving' \? l\.filter\(function\(x\)\{ return !\(x && x\.link === 'discovercars'\); \}\)/);
+  assert.match(html, /chat\.transport === 'no_car' \|\| chat\.transport === 'driving' \|\| \(state\.last && state\.last\.gettingHere && state\.last\.gettingHere\.driving\) \? l\.filter\(function\(x\)\{ return !\(x && x\.link === 'discovercars'\); \}\)/);
   // "no driving after wineries": the Getting here card puts a wine tour (when there is one) before the car.
   process.env.DISCOVERCARS_AID = 'okanaganroam';
   try {
