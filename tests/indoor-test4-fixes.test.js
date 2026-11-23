@@ -232,7 +232,7 @@ test('7. Polish: the phone reads 250-860-0188; Known for says where it really sh
   // Known for: the line says "under “Your visit”", and the English page has it there.
   await ok(change(t, { visit_rows: { known_for: 'Nordic hydrotherapy circuit, massage and facials' } }));
   const st = await openSetup(base, t, { hash: 'story' });
-  assert.match(st.text(), /It shows under “Your visit” on your page\./);
+  assert.match(st.text(), /It shows under “Plan your visit” on your page\./);
   assert.doesNotMatch(st.text(), /at the top of “Plan your visit”/);
   const en = page(v);
   const visitAt = en.indexOf('Your visit ✨');

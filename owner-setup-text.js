@@ -2383,7 +2383,7 @@ en.indoor = {
   bringClash: 'Found online, may not match your answers: check it. Type your own line below, or skip to leave it as it is.',
   // Your story and Known for
   storyQ: 'Tell visitors about your place', storyLabel: 'About your place', storyEx: 'A family-run escape room since 2016, with six themed rooms for 2 to 8 players.',
-  knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows under “Your visit” on your page.', knownEx: 'Six themed rooms, great for birthdays',
+  knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows under “Plan your visit” on your page.', knownEx: 'Six themed rooms, great for birthdays',
   knownGuess: 'We found this online. Check it, and change any words that aren’t right.',
   storyKnownSaved: 'Your Known for line is on your page now. Your story will show within a day.',
   // Groups and parties

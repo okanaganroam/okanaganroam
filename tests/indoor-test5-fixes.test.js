@@ -136,7 +136,7 @@ test('4. Help: the examples use his own price, "put your…", camps go to the Gr
   assert.match(g, /tap School and camp groups in Groups and parties/);
   assert.match(g, /A camp on set dates \(a PD-day or spring break camp\) can also go on What’s On: add it with Add an event/);
   assert.match(plain(topic('indoor-groups').aFr), /touchez Groupes scolaires et camps dans Groupes et fêtes/);
-  assert.match(plain(topic('indoor-good-to-know').a), /It shows in “Your visit” on your page\./);
+  assert.match(plain(topic('indoor-good-to-know').a), /It shows in “Plan your visit” on your page\./);
   for (const x of cfg.topics) assert.doesNotMatch(String(x.a || ''), /“Plan your visit”/, x.id);
   // Other kinds: "put your adult admission" (a museum).
   const m = mk('indoor', { name: 'Vernon Museum T5', cuisine: 'Museum', description: 'A history museum.' });
