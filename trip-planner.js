@@ -3684,6 +3684,15 @@ function outdoorFactsSeasonOff(v, ctx, month) {
   return now.every((t) => OUTDOOR_FACTS_RENTAL_RE.test(t) && !OUTDOOR_FACTS_RUNS_RE.test(t));
 }
 const WINTER_NO_WALK_RE = /\bin (?:the )?winter\b[^.]*\b(?:ticket holders only|pass holders only|not allowed|not permitted|closed to (?:walkers|hikers|the public))\b|\b(?:walkers|hikers)[^.]{0,40}\bnot allowed\b[^.]*\bwinter\b/i;
+function v4ComingSaturday(now = new Date()) {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 12));
+  d.setUTCDate(d.getUTCDate() + ((6 - d.getUTCDay() + 7) % 7));
+  return d.toISOString().slice(0, 10);
+}
+function v4WinterOn(date) {
+  const m = Number(String(date || '').slice(5, 7)), day = Number(String(date || '').slice(8, 10));
+  return [12, 1, 2, 3].includes(m) || (m === 11 && day >= 25);
+}
 function offSeasonSkip(v, ctx) {
   // A named month is judged in that month, not on the planned date ("driving range in June" asked in October).
   if (ctx.seasonInfo && Number.isInteger(ctx.seasonInfo.month) && ctx.tripDate) ctx = { ...ctx, tripDate: monthDate(ctx.seasonInfo.month, ctx.tripDate) };
@@ -3736,6 +3745,9 @@ function offSeasonSkip(v, ctx) {
   // own notice: "In winter, Lost Lake Park is for ski and snowshoe ticket holders only… Walkers, bikers and dogs are not
   // allowed then"): a notice that rules out the planned use in winter takes the place out from December to March,
   // unless the trip is for Nordic skiing or snowshoeing.
+  // Round 5 (2026-11-22): an undated plan is judged on the coming weekend, and winter there starts with the ski season
+  // (November 25 on).
+  if (['outdoor', 'beach'].includes(v.type) && v.advisory && WINTER_NO_WALK_RE.test(String(v.advisory.note || '')) && (v4WinterOn(ctx.tripDate) || (!/\b(?:today|tonight|tomorrow|this (?:morning|afternoon|evening)|aujourd|ce soir|demain)\b/i.test(String((ctx.requirements && ctx.requirements.text) || ctx.queryText || '')) && (!ctx.tripDate || ctx.tripDate <= v4ComingSaturday()) && v4WinterOn(v4ComingSaturday()))) && !/\b(?:nordic|cross country|xc ski\w*|snowshoe\w*|ski de fond|raquettes?)\b/.test(normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || ''))) return true;
   if (month && [12, 1, 2, 3].includes(month) && ['outdoor', 'beach'].includes(v.type) && v.advisory && WINTER_NO_WALK_RE.test(String(v.advisory.note || '')) && !/\b(?:nordic|cross country|xc ski\w*|snowshoe\w*|ski de fond|raquettes?)\b/.test(normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || ''))) return true;
   if (!month || ctx.types.has(v.type) || (v.type === 'beach' && ctx.lake) || (v.type === 'golf' && (v.indoorGolf || v.sportYearAll))) return false;
   return (OFF_SEASON_MONTHS[v.type] || []).includes(month);
@@ -8896,7 +8908,12 @@ function v4AgentHooks(result, input) {
     result.schedule = result.schedule || [];
     let r = result.schedule.find((x) => x.day === day.day && x.venueId === s.venue.id);
     const len = r && Number.isFinite(r.endMinutes) && Number.isFinite(r.startMinutes) ? r.endMinutes - r.startMinutes : 90;
-    const later = result.schedule.filter((x) => x.day === day.day && x !== r && Number.isFinite(x.startMinutes) && V4_DAYPARTS.indexOf((day.stops.find((y) => (y.venue && y.venue.id === x.venueId) || (y.event && y.event.id === x.eventId)) || {}).daypart) > V4_DAYPARTS.indexOf(k.part)).map((x) => x.startMinutes);
+    // Round 5 (Whistler, 2026-11-22: "move dinner to 6:30" turned every ski day's 9 AM-3:30 PM into 9-11:50 AM): a start
+    // that is already the stop's start changes nothing, and a stop planned inside another's span (lunch on the hill
+    // during a ski day) is neither the end of that span nor in its way.
+    if (r && r.startMinutes === min) { s.keepStart = min; continue; }
+    const nestedIn = (x, y) => x && y && Number.isFinite(x.startMinutes) && Number.isFinite(y.startMinutes) && Number.isFinite(y.endMinutes) && x.startMinutes >= y.startMinutes && (Number.isFinite(x.endMinutes) ? x.endMinutes : x.startMinutes + 60) <= y.endMinutes;
+    const later = result.schedule.filter((x) => x.day === day.day && x !== r && Number.isFinite(x.startMinutes) && !nestedIn(x, r) && V4_DAYPARTS.indexOf((day.stops.find((y) => (y.venue && y.venue.id === x.venueId) || (y.event && y.event.id === x.eventId)) || {}).daypart) > V4_DAYPARTS.indexOf(k.part)).map((x) => x.startMinutes);
     const cap = later.length ? Math.min(...later) - 10 : 1440;
     if (cap - min < 30) { stopStartRefused.push({ key, id: s.venue.id, reason: 'no_room' }); continue; }
     // Round 5 (2026-11-22: a sunset dinner at 4:30 PM inside a gallery visit to 5:15; "the snowmobile tour at 1 PM" while
@@ -8905,7 +8922,7 @@ function v4AgentHooks(result, input) {
     // (reason 'overlap', with the stop in the way). A tour or an event before it is never cut short.
     const earlier = day.stops.filter((y) => y && y !== s && (y.venue || y.event) && V4_DAYPARTS.indexOf(y.daypart) < V4_DAYPARTS.indexOf(k.part))
       .map((y) => ({ y, row: result.schedule.find((x) => x.day === day.day && ((y.venue && x.venueId === y.venue.id) || (y.event && x.eventId === y.event.id))) }))
-      .filter((x) => x.row && Number.isFinite(x.row.startMinutes) && (Number.isFinite(x.row.endMinutes) ? x.row.endMinutes : x.row.startMinutes + 60) > min - 10);
+      .filter((x) => x.row && Number.isFinite(x.row.startMinutes) && (Number.isFinite(x.row.endMinutes) ? x.row.endMinutes : x.row.startMinutes + 60) > min - 10 && !nestedIn(r, x.row) && !(x.row.endMinutes >= min + 30 && (x.y.venue && /\bski|snowboard|resort|mountain\b/i.test(x.y.venue.name || '') && v4MealStop(s))));
     const blocked = earlier.find((x) => { const a = x.row.startMinutes, b = Number.isFinite(x.row.endMinutes) ? x.row.endMinutes : a + 60; return x.y.tourStop || x.y.event || min - 10 - a < Math.max(45, (b - a) / 2); });
     // A meal's own time wins over a sight or activity before it that cannot be cut short: that stop gives way
     // (-> stopStartGaveWay [{ key, id }]).
@@ -8948,6 +8965,16 @@ function v4MealPacing(result, input) {
   if (!input || !input.v4 || !result || !['multi_day', 'day_plan'].includes(result.kind) || !(result.schedule || []).length) return result;
   const byId = new Map((input.facts || []).map((v) => [v.id, v]));
   const out = [];
+  // Round 5 (Whistler, 2026-11-22: Whistler Core Climbing and Meadow Park Sports Centre 9 AM-3:30 PM over a 12 PM lunch,
+  // after they took a ski day's slot): a stop's span is at most what its own kind takes (a climbing gym is not 6.5 hours).
+  const SPAN_MAX = { indoor: 180, sport: 180, cafe: 90, restaurant: 120, pub: 120, brewery: 120, winery: 120, distillery: 120, cocktail: 120, shop: 90 };
+  for (const day of result.days || []) for (const st of day.stops || []) {
+    if (!st || !st.venue || st.tourStop) continue;
+    const max = SPAN_MAX[st.venue.type] + (/\b(?:spa|nordic|scandinave|baths?)\b/i.test(st.venue.name || '') ? 60 : 0);
+    if (!max) continue;
+    const r = (result.schedule || []).find((x) => x.day === day.day && x.venueId === st.venue.id && Number.isFinite(x.startMinutes) && Number.isFinite(x.endMinutes));
+    if (r && r.endMinutes - r.startMinutes > max) { r.endMinutes = r.startMinutes + max; out.push({ day: day.day, how: 'span_capped', id: st.venue.id }); }
+  }
   for (const day of result.days || []) {
     const rowOf = (s) => (result.schedule || []).find((r) => r.day === day.day && s.venue && r.venueId === s.venue.id && Number.isFinite(r.startMinutes));
     const stops = (day.stops || []).filter((s) => s && s.venue && rowOf(s));

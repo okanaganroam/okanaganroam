@@ -118,7 +118,7 @@ function t3PlanNextSteps(p) {
     return '/'+(region?region+'/':'')+slug;
   }
   (p.requirementResults||[]).forEach(function(i){
-    if(i.status!=='unmet'||['type','type_count','venue_kind','venue','activity','event','rainy','feature'].indexOf(i.kind)===-1)return;
+    if(i.status!=='unmet'||i.silent||['type','type_count','venue_kind','venue','activity','event','rainy','feature'].indexOf(i.kind)===-1)return;
     var key=i.kind+':'+i.value;if(seen[key])return;seen[key]=true;
     var eventLabels={hockey:'hockey game','live-music':'live music',festival:'festival',market:'market',comedy:'comedy show',show:'show',concert:'concert'};
     var requestLabels={pottery:'pottery class'};

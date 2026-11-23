@@ -8880,6 +8880,9 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
     // V4 (2026-11-21): with no dates given the stay starts today before noon (site time), else tomorrow, never a past day;
     // and the stay type fits the request (tripStays V4 rules). The current page passes nothing new.
     const v4Stay = v4 ? { v4: true, text, minArrive: okanaganClock(now).minutes < 720 ? todayLocal(now) : addLocalDays(todayLocal(now), 1) } : {};
+    // Round 5 (2026-11-22: an undated "fin de semaine" ski trip was booked Mon Nov 23, before the hill opens): with no
+    // dates, a stay is never before a plan stop reopens for the season (venue_seasons reopens_date).
+    if (v4) { try { const ids = [...new Set((plan.days || []).flatMap((d) => (d.stops || []).map((s) => s && s.venue && s.venue.id)).filter(Boolean))]; let nb = null; for (const id of ids) { const r = db.prepare("SELECT status, reopens_date FROM venue_seasons WHERE venue_id = ? AND status = 'closed'").get(id); if (r && /^\d{4}-\d{2}-\d{2}$/.test(r.reopens_date || '') && r.reopens_date > (nb || '')) nb = r.reopens_date; } if (nb) v4Stay.notBefore = nb; } catch (e) { /* no season facts */ } }
     // Fix round (2026-11-22): the request's own words count for the stay. Kids' ages typed in the request ("kids 6 and
     // 9") go to the booking links (Expedia rm1=a2:c6:c9; Booking.com and Stay22 children=2), and "a place with a pool"
     // (hot tub, kitchen) is the stay preference until the chat changes it. Only what the visitor left empty.
@@ -9459,11 +9462,20 @@ function v4NotIncluded(plan) {
       }
     }
   } catch (e) { /* the planner's own results stand */ }
+  // Round 5 (2026-11-22: "I couldn't fit vegetarian" with every restaurant Vegetarian-Friendly): a food feature asked for
+  // is met when every meal stop on the plan has it.
+  try {
+    const meals = (plan.days || []).flatMap((d) => d.stops || []).filter((x) => x && x.venue && ['restaurant', 'cafe', 'pub'].includes(x.venue.type));
+    for (const r of plan.requirementResults) {
+      if (!r || r.status !== 'unmet' || r.kind !== 'feature' || !['vegetarian', 'vegan', 'gluten_free'].includes(r.value) || !meals.length) continue;
+      if (meals.every((x) => (x.venue.features || []).some((f) => f && (f.key === r.value || f === r.value)))) { r.status = 'satisfied'; r.reason = 'Every meal stop has it.'; }
+    }
+  } catch (e) { /* the planner's own results stand */ }
   for (const r of plan.requirementResults) {
     if (!r || r.status !== 'unmet' || r.strength !== 'must' || r.kidsSki || !['venue_kind', 'type'].includes(r.kind)) continue;
     // Planner round 4 ("I couldn't fit ski lessons" on a trip that never asked for lessons): only what the visitor's own
     // words ask for is listed.
-    if (r.kind === 'venue_kind' && r.value === 'ski_lessons' && !/\b(?:lessons?|ski school|snow school|instructors?|learn\w*|camps?|clinics?|cours|le[cç]ons?|moniteurs?)\b/i.test(String(plan.query || ''))) continue;
+    if (r.kind === 'venue_kind' && r.value === 'ski_lessons' && !/\b(?:lessons?|ski school|snow school|instructors?|learn\w*|camps?|clinics?|cours|le[cç]ons?|moniteurs?)\b/i.test(String(plan.query || ''))) { r.silent = true; continue; }
     const label = r.kind === 'venue_kind' ? (TR.LABELS[r.value] || String(r.value).replace(/_/g, ' ')) : (V4_TYPE_WORDS[r.value] || String(r.value));
     if (out.some((x) => x.label === label)) continue;
     const lre = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -9618,6 +9630,18 @@ function v4DropAfterDark(plan) {
   const V4_DARK_MIN_VISIT = 45;
   const v4DarkLimit = (r) => r.daylight.sunsetMinutes - (Number(r.daylight.marginMinutes) || 0);
   const rows = (plan && plan.schedule) || [];
+  // Round 5 (Whistler, 2026-11-22: Florence Petersen Park and Rebagliati Park at 3:45-5:15 PM in January, after dark, as
+  // filler): a park, trail or beach timed with no daylight check gets one from its own map spot and the date.
+  try {
+    const TR = require('./trip-requirements');
+    for (const r of rows) {
+      if (!r || r.daylight || !Number.isInteger(r.venueId) || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.date || '')) || !Number.isFinite(r.startMinutes) || !Number.isFinite(r.endMinutes)) continue;
+      const v = getVenue(r.venueId);
+      if (!v || !['outdoor', 'beach'].includes(v.type) || v.latitude == null || /\b(?:ski|skiing|snowboard|tube|tubing|rink|skating|snowshoe\w*|nordic|sleigh|lit|lights?|illuminat\w*|hot springs?|resort|blackcomb|mountain)\b/i.test(v.name || '')) continue;
+      const light = TR.estimateDaylight(r.date, { lat: Number(v.latitude), lng: Number(v.longitude) });
+      if (light && Number.isFinite(light.sunsetMinutes) && r.endMinutes > light.sunsetMinutes) r.daylight = { status: 'conflict', sunsetMinutes: light.sunsetMinutes, sunriseMinutes: light.sunriseMinutes || 0, marginMinutes: 0, added: true };
+    }
+  } catch (e) { /* the plan's own daylight checks stand */ }
   const conflict = (r) => r && r.daylight && r.daylight.status === 'conflict' && Number.isFinite(r.startMinutes) && Number.isFinite(r.daylight.sunsetMinutes) && Number.isInteger(r.venueId);
   const endOf = (r) => (Number.isFinite(r.endMinutes) ? r.endMinutes : Infinity);
   const named = (r) => { for (const d of plan.days || []) for (const s of d.stops || []) if (s && s.venue && s.venue.id === r.venueId) return s.venue.name; return null; };

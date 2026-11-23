@@ -208,6 +208,16 @@ function tripStayContext(plan, input, today, opts = {}) {
   const firstDate = ((plan.schedule || []).find((r) => r && validDate(r.date)) || {}).date || (validDate(plan.listDate) ? plan.listDate : null);
   let arrive = i.arrive || firstDate || (validDate(today) ? today : null);
   if (opts.v4 && !i.arrive && validDate(opts.minArrive) && (!arrive || arrive < opts.minArrive)) arrive = opts.minArrive;
+  // Round 5 (2026-11-22): no dates given -- never before a stop reopens for the season (opts.notBefore), and a
+  // "weekend" starts on the coming Saturday (Friday for a 3-day weekend).
+  if (opts.v4 && !i.arrive && !firstDate) {
+    if (validDate(opts.notBefore) && (!arrive || arrive < opts.notBefore)) arrive = opts.notBefore;
+    if (arrive && /\b(?:week-?ends?|fin de semaine|fins de semaine)\b/i.test(String(opts.text || ''))) {
+      const want = planDays >= 3 ? 5 : 6; // 5 = Friday, 6 = Saturday (getUTCDay)
+      const wd = new Date(`${arrive}T12:00:00Z`).getUTCDay();
+      arrive = addDays(arrive, (want - wd + 7) % 7);
+    }
+  }
   const nights = i.arrive && i.leave ? daysBetween(i.arrive, i.leave) : Math.max(planDays - 1, i.force ? 1 : 0);
   if (!(nights >= 1) || !arrive) return null;
   const leave = i.leave || addDays(arrive, nights);
