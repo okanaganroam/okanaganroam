@@ -8562,7 +8562,7 @@ function v4SwapSteady(result, input) {
       if (r.startMinutes !== swap.times[key]) { r.startMinutes = swap.times[key]; if (len != null) r.endMinutes = r.startMinutes + len; r.status = r.status === 'unmet' || r.status === 'unverified' ? 'estimated' : r.status; }
     }
     // A stop that was on screen and is gone is a change too.
-    for (const key of Object.keys(pinned)) if (key.startsWith(`${day.day}-`) && key !== swap.key && !(day.stops || []).some((s) => s && s.venue && s.venue.id === pinned[key])) return { ok: false, why: 'gone', id: culprit };
+    for (const key of Object.keys(pinned)) if (key.startsWith(`${day.day}-`) && key !== swap.key && !(result.stopStartGaveWay || []).some((g) => g.id === pinned[key]) && !(day.stops || []).some((s) => s && s.venue && s.venue.id === pinned[key])) return { ok: false, why: 'gone', id: culprit };
   }
   if (!fresh || !freshDay || !fresh.venue) return { ok: true };
   const r = rowOf(freshDay, fresh);
@@ -8880,7 +8880,7 @@ function v4AgentHooks(result, input) {
   }
 
   // 4. One stop's start time.
-  const stopStartRefused = [];
+  const stopStartRefused = [], stopStartShifted = [], stopStartGaveWay = [];
   for (const [key, min] of Object.entries(starts)) {
     const k = split(key), day = k && dayOf(k.d), s = day && at(day, k.part);
     if (!s || !s.venue || !Number.isInteger(min) || min < 0 || min >= 1440) { stopStartRefused.push({ key, reason: 'no_stop' }); continue; }
@@ -8899,6 +8899,23 @@ function v4AgentHooks(result, input) {
     const later = result.schedule.filter((x) => x.day === day.day && x !== r && Number.isFinite(x.startMinutes) && V4_DAYPARTS.indexOf((day.stops.find((y) => (y.venue && y.venue.id === x.venueId) || (y.event && y.event.id === x.eventId)) || {}).daypart) > V4_DAYPARTS.indexOf(k.part)).map((x) => x.startMinutes);
     const cap = later.length ? Math.min(...later) - 10 : 1440;
     if (cap - min < 30) { stopStartRefused.push({ key, id: s.venue.id, reason: 'no_room' }); continue; }
+    // Round 5 (2026-11-22: a sunset dinner at 4:30 PM inside a gallery visit to 5:15; "the snowmobile tour at 1 PM" while
+    // skiing ran to 3:30): a stop earlier in the day that would still be going ends 10 minutes before (when it keeps at
+    // least half its time and 45 minutes; -> stopStartShifted [{ key, id, endMinutes }]), else the start is refused
+    // (reason 'overlap', with the stop in the way). A tour or an event before it is never cut short.
+    const earlier = day.stops.filter((y) => y && y !== s && (y.venue || y.event) && V4_DAYPARTS.indexOf(y.daypart) < V4_DAYPARTS.indexOf(k.part))
+      .map((y) => ({ y, row: result.schedule.find((x) => x.day === day.day && ((y.venue && x.venueId === y.venue.id) || (y.event && x.eventId === y.event.id))) }))
+      .filter((x) => x.row && Number.isFinite(x.row.startMinutes) && (Number.isFinite(x.row.endMinutes) ? x.row.endMinutes : x.row.startMinutes + 60) > min - 10);
+    const blocked = earlier.find((x) => { const a = x.row.startMinutes, b = Number.isFinite(x.row.endMinutes) ? x.row.endMinutes : a + 60; return x.y.tourStop || x.y.event || min - 10 - a < Math.max(45, (b - a) / 2); });
+    // A meal's own time wins over a sight or activity before it that cannot be cut short: that stop gives way
+    // (-> stopStartGaveWay [{ key, id }]).
+    if (blocked && v4MealStop(s) && !blocked.y.tourStop && !blocked.y.event && !v4MealStop(blocked.y) && earlier.filter((x) => x !== blocked).every((x) => !x.y.tourStop && !x.y.event)) {
+      day.stops.splice(day.stops.indexOf(blocked.y), 1);
+      result.schedule = result.schedule.filter((x) => x !== blocked.row);
+      earlier.splice(earlier.indexOf(blocked), 1);
+      stopStartGaveWay.push({ key: `${day.day}-${blocked.y.daypart}`, id: blocked.y.venue.id });
+    } else if (blocked) { stopStartRefused.push({ key, id: s.venue.id, reason: 'overlap', withId: (blocked.y.venue || blocked.y.event).id, withKey: `${day.day}-${blocked.y.daypart}`, ...(Number.isFinite(blocked.row.endMinutes) ? { freeFromMinutes: blocked.row.endMinutes + 10 } : {}) }); continue; }
+    for (const x of earlier) { x.row.endMinutes = min - 10; x.y.keepStart = x.row.startMinutes; stopStartShifted.push({ key: `${day.day}-${x.y.daypart}`, id: (x.y.venue || x.y.event).id, endMinutes: min - 10 }); }
     if (!r) { r = { day: day.day, ...(day.date ? { date: day.date } : {}), venueId: s.venue.id, status: 'estimated' }; result.schedule.push(r); }
     r.startMinutes = min; r.endMinutes = Math.min(min + len, cap);
     if (['unmet', 'unverified'].includes(r.status)) r.status = 'estimated';
@@ -8918,6 +8935,8 @@ function v4AgentHooks(result, input) {
     result.tourStops = tours.filter((x) => placed.some((p) => p.id === x.listingId));
   }
   if (Object.keys(starts).length && stopStartRefused.length) result.stopStartRefused = stopStartRefused;
+  if (stopStartShifted.length) result.stopStartShifted = stopStartShifted;
+  if (stopStartGaveWay.length) result.stopStartGaveWay = stopStartGaveWay;
   return result;
 }
 function planTrip(input) {
@@ -8931,6 +8950,8 @@ function planTrip(input) {
       let next = null;
       try { next = planTripOnce(cur); } catch (e) { next = null; }
       if (!next) break;
+      // Round 5: a plan planned again for the Swap keeps the agent hooks (a stop's own start, tours, moves).
+      try { next = v4AgentHooks(next, cur); } catch (e) { /* as planned */ }
       result = next;
       steady = v4SwapSteady(result, cur);
     }

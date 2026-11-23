@@ -9266,6 +9266,19 @@ function runTripPlan(args, now = new Date()) {
   if (typeof a.text === 'string') { const n = v4NightsText(a.text); if (n) a = { ...a, text: n.text, departureLast: true }; }
   let sunsetDinner = null;
   try { sunsetDinner = v4SunsetDinner(a, now); if (sunsetDinner) a = { ...a, text: sunsetDinner.text }; } catch (e) { sunsetDinner = null; }
+  // Round 5: a Swap of a dinner asked as a sunset dinner (the chat's Swap words) starts ~30 minutes before that day's
+  // sunset in that town, through overrides.stopStarts (a start the chat sent itself wins).
+  try {
+    const w = a.swap;
+    const m = w && /^([1-7])-(evening|night)$/.exec(w.key || '');
+    if (m && /\bsunset|coucher (?:du|de) soleil/i.test(JSON.stringify([w.words || null, w.want || null]))) {
+      const start0 = (a.overrides && a.overrides.startDate) || (a.stay && a.stay.arrive) || null;
+      const date = start0 ? addLocalDays(start0, Number(m[1]) - 1) : null;
+      const v0 = w.id ? getVenue(w.id) : null;
+      const sd = date ? sunsetDinnerStart(date, v0 && v0.region) : null;
+      if (sd && !(a.overrides && a.overrides.stopStarts && a.overrides.stopStarts[w.key] !== undefined)) a = { ...a, swap: { ...w, ...(w.times ? { times: { ...w.times, [w.key]: sd.startMinutes } } : {}) }, overrides: { ...(a.overrides || {}), stopStarts: { ...((a.overrides && a.overrides.stopStarts) || {}), [w.key]: sd.startMinutes } } };
+    }
+  } catch (e) { /* the swap keeps its usual time */ }
   // Round 3 (2026-11-22): "one day in Osoyoos with a spa and a nice dinner" was one stop (dinner) and "one day in Squamish,
   // hiking and a brewery" two stops ending at noon: a request for a day is a day plan (lunch, dinner, the day filled),
   // not only the stops it names. An evening, an afternoon or a morning stays a short outing.
@@ -9496,6 +9509,19 @@ const V4_WHEN_DAYS = { 'this-weekend': 2, 'next-weekend': 2, weekend: 2, today: 
 // asked for), on the quarter hour and never before 4 PM, so the kitchens open then are the ones planned; the plan says
 // when the sun sets. A dinner time the request gives itself wins. With a lake view only where the site reads a sunset dinner
 // that way (TRIP_SITE.sunsetDinner). -> { text, note } or null.
+// Round 5 (2026-11-22: a Swap to "sunset dinner with a lake view" put Palmer Kitchen at 6:15 PM, after the ~5:05 PM
+// sunset): the start of a sunset dinner on a date in a town (a region key; null = the whole site), for the chat's Swap /
+// overrides.stopStarts path too: about 30 minutes before that day's real sunset, on the quarter hour, 4 PM to 9 PM.
+// -> { startMinutes, sunsetMinutes } or null.
+function sunsetDinnerStart(date, town = null) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const TR = require('./trip-requirements');
+  const r = town && REGION_LABELS[town] ? town : null;
+  const row = db.prepare(`SELECT AVG(latitude) AS lat, AVG(longitude) AS lng FROM venues WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND redirect_to IS NULL${r ? ' AND region = ?' : ''}`).get(...(r ? [r] : []));
+  const light = row && row.lat != null ? TR.estimateDaylight(date, { lat: Number(row.lat), lng: Number(row.lng) }) : null;
+  if (!light || !Number.isFinite(light.sunsetMinutes)) return null;
+  return { startMinutes: Math.max(960, Math.min(1260, Math.floor((light.sunsetMinutes - 30) / 15) * 15)), sunsetMinutes: Math.round(light.sunsetMinutes) };
+}
 const V4_SUNSET_DINNER_RE = /\b(?:a\s+)?sunset dinners?\b|\bdinner (?:at|with|during|around|watching) (?:the |a )?sunset(?: view)?\b/i;
 function v4SunsetDinner(a, now = new Date()) {
   const text = String((a && a.text) || '');
@@ -9507,10 +9533,9 @@ function v4SunsetDinner(a, now = new Date()) {
   if (!date) date = todayLocal(now);
   const lower = text.toLowerCase();
   const town = Object.keys(REGION_LABELS).sort((x, y) => REGION_LABELS[y].length - REGION_LABELS[x].length).find((r) => lower.includes(REGION_LABELS[r].toLowerCase()));
-  const row = db.prepare(`SELECT AVG(latitude) AS lat, AVG(longitude) AS lng FROM venues WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND redirect_to IS NULL${town ? ' AND region = ?' : ''}`).get(...(town ? [town] : []));
-  const light = row && row.lat != null ? TR.estimateDaylight(date, { lat: Number(row.lat), lng: Number(row.lng) }) : null;
-  if (!light) return null;
-  const start = Math.max(960, Math.min(1260, Math.floor((light.sunsetMinutes - 30) / 15) * 15));
+  const sd = sunsetDinnerStart(date, town);
+  if (!sd) return null;
+  const light = { sunsetMinutes: sd.sunsetMinutes }, start = sd.startMinutes;
   const clock = (x) => `${(Math.floor(x / 60) % 12) || 12}:${String(x % 60).padStart(2, '0')} ${x >= 720 ? 'pm' : 'am'}`;
   const sun = clock(light.sunsetMinutes).replace(/ (am|pm)$/, (s, p) => ` ${p.toUpperCase()}`);
   return { text: text.replace(m[0], `dinner at ${clock(start)}${/lake view/.test(TRIP_SITE.sunsetDinner.reading) && !/\blake ?views?\b/i.test(text) ? ' with a lake view' : ''}`), note: `Sunset is about ${sun} that day, so the sunset dinner starts at ${clock(start).replace(/ (am|pm)$/, (s, p) => ` ${p.toUpperCase()}`)}.`, start, sunset: light.sunsetMinutes };
@@ -82518,6 +82543,7 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  sunsetDinnerStart,
   // Travel agent chat (2026-11-22), for tests/trip-chat-api.test.js.
   parseTripChatBody, tripChatStops, setTripChatReader, runTripChatTurn, runTripPlanRequest, tripChatEnabledFor,
   tripChatSafeRun,
