@@ -533,6 +533,12 @@ const V4_CLIENT_SRC = String.raw`
       if (d) html += t3StayNotesHtml(d.chosen, d.w.trip || {}, fr);
     }
     // Honest plan (2026-11-22): said once in the sheet. Nothing here is a confirmed booking.
+    // Trip needs (2026-11-23): what the listings leave to confirm for a wheelchair user and a dog, in the summary's own
+    // short words (the full sentences are under Details and on each stop), so the checklist says the same thing.
+    try {
+      var needFacts = (typeof tripSummaryFacts === 'function' ? tripSummaryFacts(state.last, lang() === 'fr', { removed: typeof v4RemovedIds === 'function' ? v4RemovedIds() : {} }) : []).filter(function(f){ return f && f.kind === 'flag' && (f.ask === 'accessible' || f.ask === 'dog_friendly'); });
+      if (needFacts.length) html += '<p class="t3-book-note v4-book-honest" data-v4-book-needs>' + esc((lang() === 'fr' ? 'À confirmer auprès de chaque endroit : ' : 'To confirm with each place: ') + needFacts.map(function(f){ return f.text; }).join('. ') + '.') + '</p>';
+    } catch (e) { /* the sheet stands without the line */ }
     if (steps.length || v4ReserveRows(steps).length) html += '<p class="t3-book-note v4-book-honest" data-v4-book-note>' + esc(vt('bookNote')) + '</p>';
     var reserve = v4ReserveRows(steps);
     if (reserve.length) html += '<p class="v4-sheet-h4">' + esc(vt('reserve')) + '</p><ol class="v4-check">' + reserve.map(function(r){

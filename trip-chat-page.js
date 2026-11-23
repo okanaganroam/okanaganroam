@@ -404,8 +404,15 @@ function chatClientSrc(d) {
   }
   function chatStayChips(card, w){
     var am = w && w.amenity; if (!am || !(am.keys || []).length) return '';
-    var chips = AG[lang()] ? AG[lang()].chip : AG.en.chip, has = card.has || [];
-    return '<span class="v4-stay-chips">' + am.keys.slice(0, 2).map(function(k){ return has.indexOf(k) !== -1 ? '<span class="v4-stay-chip">' + esc(chips[k] || k) + (k === 'pool' && am.winterCheck ? '<span class="v4-chip-extra"> · ' + esc(ag('poolWinter')) + '</span>' : '') + '</span>' : '<span class="v4-stay-chip is-unsure">' + esc(ag('notConfirmed', { what: chips[k] || k })) + '</span>'; }).join('') + '</span>';
+    var chips = AG[lang()] ? AG[lang()].chip : AG.en.chip, has = card.has || [], fr = lang() === 'fr';
+    // (2026-11-23) A wheelchair user and a dog, at a stay whose listing has accessible rooms and pet-friendly rooms: that
+    // is not one room with both, so the two chips never stand side by side as settled. Once the stay's dates are
+    // confirmed the card's own sentence says it (no chips); before that, one "to confirm" chip.
+    if (card.handoffAsk && card.handoffAsk.both && am.keys.indexOf('accessible') !== -1 && am.keys.indexOf('pets') !== -1) {
+      var st = (w.trip || {}).stayStatus;
+      return st && st !== 'proposed' ? '' : '<span class="v4-stay-chips"><span class="v4-stay-chip is-unsure" data-v4-chip-both>' + esc(fr ? 'Accessible + chien : à confirmer' : 'Accessible + dog: to confirm') + '</span></span>';
+    }
+    return '<span class="v4-stay-chips">' + am.keys.slice(0, 2).map(function(k){ return has.indexOf(k) !== -1 ? '<span class="v4-stay-chip">' + esc(k === 'pets' && card.petsSome ? (fr ? 'Animaux : certaines chambres' : 'Pets in some rooms') : chips[k] || k) + (k === 'pool' && am.winterCheck ? '<span class="v4-chip-extra"> · ' + esc(ag('poolWinter')) + '</span>' : '') + '</span>' : '<span class="v4-stay-chip is-unsure">' + esc(ag('notConfirmed', { what: chips[k] || k })) + '</span>'; }).join('') + '</span>';
   }
   // The request itself gave dates ("next Friday", "Dec 5"): no "When are you coming?", and the stay card may show them.
   function chatHasDates(){

@@ -305,7 +305,7 @@ function dogStopMore(r, fr, cold) {
 const STAY_BOTH = {
   its: { text: 'Its listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both: ask the hotel to confirm an accessible, dog-friendly room.', textFr: 'Sa fiche indique des chambres accessibles et des chambres où les animaux sont acceptés, mais ne dit pas qu’une même chambre offre les deux : demandez à l’hôtel de confirmer une chambre accessible qui accepte les chiens.' },
   named: (name) => ({ text: `Place to stay: ${name}’s listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both: ask the hotel to confirm an accessible, dog-friendly room.`, textFr: `Hébergement : la fiche de ${name} indique des chambres accessibles et des chambres où les animaux sont acceptés, mais ne dit pas qu’une même chambre offre les deux : demandez à l’hôtel de confirmer une chambre accessible qui accepte les chiens.` }),
-  short: 'Stay: accessible + dog-friendly room to confirm', shortFr: 'Hébergement : chambre accessible + chien à confirmer',
+  short: 'Stay: accessible + dog room to confirm', shortFr: 'Hébergement : chambre accessible + chien à confirmer',
 };
 const stayBoth = (needs, facts) => hasNeed(needs, 'wheelchair') && hasNeed(needs, 'dog') && !!facts && facts.accessible === true && (facts.pets === 'yes' || facts.pets === 'some');
 

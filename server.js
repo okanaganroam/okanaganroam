@@ -55172,7 +55172,9 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
       if (plan.needs) out.needs = plan.needs;
       if (plan.thinDays) out.thinDays = plan.thinDays;
       // (A need's own entries are always printed, with their caveats: a copy never drops them.)
-      out.lines = out.evidence.filter((e) => e.status !== 'verified' || ['nonalcoholic', 'no_alcohol', 'accessible'].includes(e.ask) || /^stay:/.test(e.ask) || tripHonestPlan.DIET.includes(e.ask) || (e.ask === 'dog_friendly' && plan.needs)).slice(0, plan.needs ? 8 : 5).map((e) => ({ ask: e.ask, status: e.status,
+      // (The stay's one-room sentence is already said under the stay itself: not twice on a copy.)
+      const stayBothSaid = !!(out.stay && out.stay.handoffAsk && out.stay.handoffAsk.both);
+      out.lines = out.evidence.filter((e) => !(e.both && stayBothSaid)).filter((e) => e.status !== 'verified' || ['nonalcoholic', 'no_alcohol', 'accessible'].includes(e.ask) || /^stay:/.test(e.ask) || tripHonestPlan.DIET.includes(e.ask) || (e.ask === 'dog_friendly' && plan.needs)).slice(0, plan.needs ? 8 : 5).map((e) => ({ ask: e.ask, status: e.status,
         // (A copy can't add events: the line says the plan has no dates, not "I'll add what's on".)
         text: (fr ? e.textFr : e.text).replace(': pick your dates and I’ll add what’s on.', ', and this plan has no dates yet.').replace(' Choisissez vos dates et j’ajouterai ce qui est à l’affiche.', ' Ce plan n’a pas encore de dates.') }));
       // A day the plan could not fill: its line (no buttons on a copy).

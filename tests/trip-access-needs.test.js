@@ -238,7 +238,7 @@ test('7. a thin day is said with a true reason and next steps; the summary carri
   const st = plan([{ day: 1, stops: DAY1() }], { whereToStay: { pick: { id: 9, name: 'Test Inn', needFacts: { accessible: true, pets: 'some' } } } });
   H.applyEvidence(st, ctx);
   const sf = L.tripSummaryFacts(st, false, {}).map((f) => `${f.kind}|${f.text}`);
-  assert.ok(sf.includes('flag|Stay: accessible + dog-friendly room to confirm') && !sf.some((x) => /Stay lists accessible rooms ✓|Dog at the stay/.test(x)), sf.join('\n'));
+  assert.ok(sf.includes('flag|Stay: accessible + dog room to confirm') && !sf.some((x) => /Stay lists accessible rooms ✓|Dog at the stay/.test(x)), sf.join('\n'));
   const stW = plan([{ day: 1, stops: DAY1() }], { needs: [needs[0]], whereToStay: { pick: { id: 9, name: 'Test Inn', needFacts: { accessible: true, pets: 'some' } } } });
   H.applyEvidence(stW, ctx);
   assert.ok(L.tripSummaryFacts(stW, false, {}).some((f) => f.kind === 'ok' && f.text === 'Stay lists accessible rooms ✓'), 'a wheelchair need alone keeps its own item');
@@ -387,7 +387,7 @@ test('11. the Vernon plan: nothing is "confirmed" from a section, a feature or a
   assert.equal(d.stops[1].more, 'Dog: has the Dog-Friendly badge; its listing doesn’t say if dogs can come inside or only on a patio (a patio may be closed in January): ask before you go.');
   // The summary: short flagged items, never a ✓ for the access or the dog.
   const facts = L.tripSummaryFacts(p, false, {}).map((f) => `${f.kind}|${f.text}`);
-  assert.deepEqual(facts.filter((f) => /Wheelchair|Dog|Stay/.test(f)), ['flag|Dog-friendly: 3 walks yes · 3 badges to confirm', 'flag|Wheelchair access: none fully confirmed · 3 partial notes · 3 don’t say', 'flag|Stay: accessible + dog-friendly room to confirm']);
+  assert.deepEqual(facts.filter((f) => /Wheelchair|Dog|Stay/.test(f)), ['flag|Dog-friendly: 3 walks yes · 3 badges to confirm', 'flag|Wheelchair access: none fully confirmed · 3 partial notes · 3 don’t say', 'flag|Stay: accessible + dog room to confirm']);
   const factsFr = L.tripSummaryFacts(p, true, {}).map((f) => f.text);
   assert.ok(factsFr.includes('Chiens admis : 3 sorties oui · 3 badges à confirmer') && factsFr.includes('Accès en fauteuil roulant : aucun confirmé · 3 notes partielles · 3 non précisés') && factsFr.includes('Hébergement : chambre accessible + chien à confirmer'), factsFr.join('\n'));
   for (const f of facts) assert.ok(f.length <= 80, f);
