@@ -245,6 +245,8 @@ function chatClientSrc(d) {
     var evs = chatEventIds(); if (evs.length) body.events = evs;
     // Round 5: each day's own date (so "Friday" is the right day) and the stops the chat added or changed earlier.
     try { var dd = ((state.last && state.last.days) || []).map(function(d){ return /^\d{4}-\d{2}-\d{2}$/.test(String(d && d.date || '')) ? d.date : null; }).slice(0, 7); if (dd.some(Boolean)) body.dayDates = dd; } catch (e) { /* none */ }
+    // Trip dates (2026-11-23): where the days' dates came from, so "yes, book those nights" is read against given dates only.
+    try { var tds = state.last && state.last.tripDates; if (tds && tds.source) body.tripSource = tds.source; } catch (e) { /* none */ }
     if (chat.soft && Object.keys(chat.soft).length) body.soft = chat.soft;
     var sd = typeof t3StayData === 'function' && !chat.noStay ? t3StayData() : null; if (sd && sd.chosen && sd.chosen.region) body.stayTown = sd.chosen.region; if (sd && sd.chosen && sd.chosen.id > 0) body.stayId = sd.chosen.id;
     if (chip) body.chip = chip; else body.message = message;
@@ -295,6 +297,9 @@ function chatClientSrc(d) {
         if (j.stayPref !== undefined) { chat.stayPref = j.stayPref; chat.noStay = !!(j.stayPref && j.stayPref.none); touched = true; if (changed.indexOf('stay') === -1) changed.push('stay'); }
         // Travel agent abilities: a stay added to a plan with no night (stay.force rides along with later requests), and the number of adults.
         if (j.stayForce !== undefined) { chat.stayForce = !!j.stayForce; chat.stayArrive = j.stayForce && j.stayArrive ? j.stayArrive : null; touched = true; }
+        // The stay's dates set or confirmed in the chat: the Dates fields, so every stay link, the shared copy and a
+        // later request carry them.
+        if (j.stayDates && j.stayDates.arrive && j.stayDates.leave) { var sdA = document.getElementById('t3Arrive'), sdB = document.getElementById('t3Leave'); if (sdA && sdB) { sdA.value = j.stayDates.arrive; sdB.value = j.stayDates.leave; chat.askedWhen = true; } touched = true; if (changed.indexOf('stay') === -1) changed.push('stay'); }
         // Rooms set in the chat ("make it 3 rooms"): the Rooms field, so every stay link and a later request carry it.
         if (j.party && j.party.rooms > 0) { var rmSet = document.getElementById('t3Rooms'); if (rmSet) { rmSet.value = String(j.party.rooms); rmSet.setAttribute('data-v4-auto', '1'); } touched = true; }
         if (j.party && j.party.adults > 0) { var adEl = document.getElementById('t3Adults'); if (adEl) { adEl.value = String(j.party.adults); adEl.setAttribute('data-v4-auto', '1'); } chat.adults = j.party.adults; }
