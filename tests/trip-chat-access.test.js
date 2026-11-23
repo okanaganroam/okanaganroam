@@ -404,7 +404,11 @@ test('end to end: a later “add a café” honours the needs (its listing has t
   assert.ok(added, j.reply);
   const acc = app.tripChatAccessOf(added.id) === true, dog = app.tripChatHasBadge(added.id, 'dog_friendly');
   if (acc) assert.match(j.reply, /Its listing notes wheelchair access/, j.reply); else assert.match(j.reply, /doesn’t say if it’s wheelchair accessible/, j.reply);
-  if (dog) assert.match(j.reply, /dogs welcome/, j.reply); else assert.match(j.reply, /doesn’t say/, j.reply);
+  // (2026-11-23, card caveats) A café with only the Dog-Friendly badge is said in its card's own short note, not as
+  // "dogs welcome": the reply and the card it just added say one thing.
+  const dd = app.tripDogOf(added.id);
+  if (dd.has === true && dd.where === 'unsaid') { assert.match(j.reply, /Dogs: check indoor or patio access\./, j.reply); assert.doesNotMatch(j.reply, /dogs welcome/, j.reply); }
+  else if (dog) assert.match(j.reply, /dogs welcome/, j.reply); else assert.match(j.reply, /doesn’t say/, j.reply);
   assert.equal(added.id, F.C_OK.id, 'the café whose listing has both is the one added when it fits');
   for (const s of page0.stops) assert.ok(page1.stops.some((x) => x.key === s.key && x.id === s.id && x.start === s.start), `${s.key} unchanged`);
 });

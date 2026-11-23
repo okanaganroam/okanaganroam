@@ -9635,10 +9635,18 @@ function tripChatHonourNeeds(out, needs, ctx) {
     }
     const got = mine.filter((n) => !miss.includes(n));
     const j = (a) => (a.length <= 1 ? (a[0] || '') : `${a.slice(0, -1).join(', ')}${t.and}${a[a.length - 1]}`);
-    if (got.length) lines.push(A.fillT(t.needKept, { what: j(got.map((n) => t.noted[n])) }));
-    if (miss.length) lines.push(A.fillT(t.needUnknown, { say: miss.map((n) => t.say1[n]).join(L === 'fr' ? ' ni ' : ' or ') }));
+    // (2026-11-23) A stop listed for one section, with only a mobility note, or with a Dog-Friendly badge that doesn't
+    // say indoors or patio, is said in its card's own short note (trip-access-needs.js), never as "doesn't say" or
+    // "notes dogs welcome": the reply and the card it just put on the plan say one thing.
+    const said = [], frL = L === 'fr';
+    const det = (n) => { try { return tripChatNeedDetail(n, fresh); } catch (e) { return null; } };
+    const plainGot = got.filter((n) => { if (n !== 'dog') return true; const d = det('dog'); if (d && d.where && !['outdoors', 'inside'].includes(d.where)) { said.push(tripAccess.dogShort({ has: true, where: d.where, says: d.says }, frL)); return false; } return true; });
+    const plainMiss = miss.filter((n) => { if (n !== 'accessible') return true; const d = det('accessible'); if (d && (d.level === 'wheelchair_part' || d.level === 'mobility')) { said.unshift(tripAccess.accessShort(d, frL)); return false; } return true; });
+    if (plainGot.length) lines.push(A.fillT(t.needKept, { what: j(plainGot.map((n) => t.noted[n])) }));
+    if (plainMiss.length) lines.push(A.fillT(t.needUnknown, { say: plainMiss.map((n) => t.say1[n]).join(L === 'fr' ? ' ni ' : ' or ') }));
+    for (const x of said) lines.push(`${x}.`);
   }
-  return lines.slice(0, 2).join(' ');
+  return lines.slice(0, 3).join(' ');
 }
 // The nearest thing we list to a tour that is not listed: another kind of tour that one of the plan's towns does have.
 function tripChatTourOffer(kind, stops, lang, reqText = '') {
@@ -9745,7 +9753,7 @@ function tripHonestEvidence(plan, on = true) {
       town: towns.length === 1 ? towns[0] : (regions.length === 1 ? REGION_LABELS[regions[0]] : null),
       // A place to go (a park, a beach) shows no badges on its plan card; its stored flags say what its listing has.
       flags: (id) => { try { return getVenue(id); } catch (e) { return null; } },
-      accessOf: tripAccessOf, dogOf: tripDogOf, stayNeedFacts: tripStayNeedFacts, thin: tripThinInfo,
+      accessOf: tripAccessOf, dogOf: tripDogOf, entranceOf: tripAccessEntrance, stayNeedFacts: tripStayNeedFacts, thin: tripThinInfo,
       kindsOf: (id) => { try { const v = getVenue(id); if (!v) return []; const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; const kinds = TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); return wheel ? tripNeedKinds(v, kinds, tripAccessOf(v.id), tripAccess.needOf(plan.needs, 'wheelchair')) : kinds; } catch (e) { return []; } },
       kindLabel: (k) => TR.LABELS[k] || String(k).replace(/_/g, ' '),
       kindLabelFr: (k) => { try { return require('./trip-french-copy').t3FrenchText(TR.LABELS[k] || String(k).replace(/_/g, ' ')); } catch (e) { return null; } },
@@ -9775,6 +9783,39 @@ function tripAccessOf(id) {
     try { owner = !!venueOwnerFeatures(v.id).wheelchair_accessible; } catch (e) { owner = false; }
     return tripAccess.accessOf({ ownerAccessible: owner, accessLine: line });
   } catch (e) { return { has: null, says: null, source: null }; }
+}
+// (2026-11-23) The pin of the entrance a listing's Access line names ("Juniper Trail is paved to the twin bays"), only
+// from the site's own entrance data (data/*-trail-access.json: { venuePath, entrances: { key: { name, lat, lng,
+// description, road } } }) and only when that entrance's own words name the part. Nothing is geocoded or guessed:
+// a listing without such data gets null, and its directions say they go to the listing's map location.
+const TRIP_ENTRANCE_FILES = ['kalamalka-trail-access.json'];
+const TRIP_ENTRANCE_GENERIC = new Set(['trail', 'trails', 'access', 'section', 'road', 'path', 'loop', 'park', 'from', 'main', 'with', 'only', 'north', 'south', 'east', 'west', 'beach', 'lake', 'street', 'avenue', 'parking']);
+let tripEntranceCache = null;
+function tripEntranceData() {
+  if (tripEntranceCache) return tripEntranceCache;
+  tripEntranceCache = new Map();
+  for (const f of TRIP_ENTRANCE_FILES) {
+    try {
+      const d = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', f), 'utf8'));
+      const m = /^\/([a-z0-9-]+)\/([a-z0-9-]+)\/([a-z0-9-]+)$/.exec(String(d.venuePath || ''));
+      if (!m || !d.entrances) continue;
+      const type = Object.keys(CATEGORY_SLUGS).find((t) => CATEGORY_SLUGS[t] === m[2]);
+      const row = type ? db.prepare('SELECT id FROM venues WHERE region = ? AND type = ? AND slug = ? AND redirect_to IS NULL').get(m[1], type, m[3]) : null;
+      if (row) tripEntranceCache.set(row.id, Object.values(d.entrances).filter((e) => e && e.name && Number.isFinite(Number(e.lat)) && Number.isFinite(Number(e.lng))));
+    } catch (e) { /* no entrance data for this file */ }
+  }
+  return tripEntranceCache;
+}
+function tripAccessEntrance(id, part) {
+  try {
+    const list = tripEntranceData().get(Number(id));
+    if (!list || !list.length || !part) return null;
+    const words = String(part).toLowerCase().match(/[a-z]{4,}/g) || [];
+    const key = words.filter((w) => !TRIP_ENTRANCE_GENERIC.has(w));
+    if (!key.length) return null;
+    const hit = list.filter((e) => { const t = `${e.name} ${e.description || ''} ${e.road || ''}`.toLowerCase(); return key.every((w) => t.includes(w)); });
+    return hit.length === 1 ? { name: hit[0].name, lat: Number(hit[0].lat), lng: Number(hit[0].lng) } : null;
+  } catch (e) { return null; }
 }
 // What a listing's own data says about dogs: its Dogs line (outdoor facts) when it says yes or no, else its Dog-Friendly
 // badge or its place on the site's dog-friendly list. -> { has, says, source }
@@ -55162,7 +55203,7 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
       for (const d of plan.days) { const r = (stops.find((x) => (x.day || 0) === d.day) || {}).region; if (r) { d.region = r; d.regionLabel = REGION_LABELS[r] || null; } }
       tripHonestPlan.applyEvidence(plan, {
         town: regions.length === 1 ? REGION_LABELS[regions[0]] : null, flags: (id) => getVenue(id),
-        accessOf: tripAccessOf, dogOf: tripDogOf, stayNeedFacts: tripStayNeedFacts, thin: tripThinInfo,
+        accessOf: tripAccessOf, dogOf: tripDogOf, entranceOf: tripAccessEntrance, stayNeedFacts: tripStayNeedFacts, thin: tripThinInfo,
         kindsOf: (id) => { const k = (stops.find((x) => x.id === id) || {}).kinds || []; return wheelNeed ? tripNeedKinds(getVenue(id) || {}, k, tripAccessOf(id), wheelNeed) : k; },
         kindLabel: (k) => TR.LABELS[k] || String(k).replace(/_/g, ' '),
         kindLabelFr: (k) => { try { return require('./trip-french-copy').t3FrenchText(TR.LABELS[k] || String(k).replace(/_/g, ' ')); } catch (e) { return null; } },
@@ -55179,6 +55220,19 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
         text: (fr ? e.textFr : e.text).replace(': pick your dates and I’ll add what’s on.', ', and this plan has no dates yet.').replace(' Choisissez vos dates et j’ajouterai ce qui est à l’affiche.', ' Ce plan n’a pas encore de dates.') }));
       // A day the plan could not fill: its line (no buttons on a copy).
       for (const t of out.thinDays || []) out.lines.push({ ask: `thin:${t.day}`, status: 'unknown', text: fr ? t.textFr : t.text });
+      // (2026-11-23) Each stop's short need note, as on the plan's card (trip-access-needs.js stopNeedNotes: the same
+      // rows, the same words), and the directions line of a stop listed for one entrance. Only for a link that carries
+      // a need; an older link has no notes and reads as before.
+      if (plan.needs) {
+        const notes = {};
+        for (const x of stops) {
+          const n = tripAccess.stopNeedNotes(plan, x.id, fr);
+          if (!n.text) continue;
+          const d = n.dir;
+          notes[`venue:${x.id}`] = { text: n.text, ...(d ? { dir: (fr ? d.textFr : d.text), ...(d.pin ? { q: `${d.pin.lat},${d.pin.lng}` } : {}) } : {}) };
+        }
+        if (Object.keys(notes).length) out.stopNotes = notes;
+      }
     } catch (e) { out.lines = []; }
   }
   return out;
@@ -55499,6 +55553,8 @@ ${renderAnalyticsHeadHtml('my_trip')}
   body.my-trip-page .leaflet-popup-content a { display: inline-flex; align-items: center; min-height: 44px; }
   body.my-trip-page .mt-meta { margin: 2px 0 0; font-size: 0.86rem; opacity: 0.75; }
   /* A suggested time's note ("Suggested time · Check sessions ↗"): the link's hit area is 44px tall without adding height. */
+  body.my-trip-page .mt-need { font-weight: 700; opacity: 0.85; overflow-wrap: anywhere; }
+  body.my-trip-page .mt-need-dir { overflow-wrap: anywhere; }
   body.my-trip-page .mt-sched a { position: relative; white-space: nowrap; font-weight: 800; color: inherit; }
   body.my-trip-page .mt-sched a::after { content: ""; position: absolute; inset: -14px -6px; }
   body.my-trip-page .mt-num { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; border-radius: 999px; background: var(--ref-gold, #E0A94E); color: #16233a; font-weight: 800; font-size: 0.8rem; margin-right: 6px; }
@@ -55558,6 +55614,9 @@ ${renderGolfHeaderHtml()}
   function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); } // round 8: no glued href text for crawlers
   // Suggested times: the words for a stop that runs on a schedule we do not hold (trip-timing.js, the one table).
   ${require('./trip-timing').clientSource()}
+  // Trip needs (2026-11-23): a shared plan's short note per stop, as on the plan's own cards, worked out again from the
+  // listings by the server (tripShareContext). Empty for a link without a wheelchair or dog need, and for your own trip.
+  var NEED_NOTES = ${JSON.stringify((shareContext && shareContext.stopNotes) || {}).replace(/</g, '\\u003c')};
   var trip = (load(KEY, []) || []).filter(function(x){ return x && typeof x === 'object' && typeof x.name === 'string' && x.name; });
   var days = load(DAYS, {}) || {};
   // The planner's dates and times (2026-10-19): ref -> { d: 'YYYY-MM-DD', s: start minutes, e: end minutes }.
@@ -55669,7 +55728,8 @@ ${renderGolfHeaderHtml()}
   }
   function dirUrl(stops){
     // At most 11 stops: an origin, nine waypoints and a destination, Google's limit for one route link (2026-10-18).
-    var q = stops.map(function(s){ return s.query || (info[s.ref] && info[s.ref].query) || s.name; }).slice(0, 11);
+    // (A shared plan's stop listed for one entrance, with that entrance's pin on file, routes to the entrance.)
+    var q = stops.map(function(s){ var nn = viewing === 'shared' && NEED_NOTES[s.ref]; return (nn && nn.q) || s.query || (info[s.ref] && info[s.ref].query) || s.name; }).slice(0, 11);
     if (q.length === 1) return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q[0]);
     var u = 'https://www.google.com/maps/dir/?api=1&origin=' + encodeURIComponent(q[0]) + '&destination=' + encodeURIComponent(q[q.length - 1]);
     if (q.length > 2) u += '&waypoints=' + encodeURIComponent(q.slice(1, -1).join('|'));
@@ -55719,6 +55779,9 @@ ${renderGolfHeaderHtml()}
           var skOn = sk && TT_WORDS[sk], skAges = skOn && d.schedAges ? ttAgeNote({ schedule: sk, agesSaid: d.schedAges.agesSaid, kidAges: d.schedAges.kidAges, kids: d.schedAges.kids }, fr) : '';
           var skTo = skOn ? (/^https:\\/\\//.test(d.schedUrl || '') ? d.schedUrl : (fr && d.urlFr) || d.url || '') : '';
           var skHtml = skOn ? '<span class="mt-sched" data-mt-sched="' + esc(sk) + '">' + ttNote({ schedule: sk }, d.name || x.s.name, fr, skTo, skTo === d.schedUrl && !!skTo, esc, '') + (skAges ? ' <span data-mt-sched-ages>' + esc(skAges) + '</span>' : '') + '</span>' : '';
+          // The stop's need note, under the suggested-time note, in the plan card's own words; then the directions
+          // line when its listing covers one entrance or section (the day's map link goes to the listing's location).
+          var nn = !mine && NEED_NOTES[x.s.ref], needHtml = nn && nn.text ? '<p class="mt-meta mt-need" data-mt-need>' + esc(nn.text) + '</p>' + (nn.dir ? '<p class="mt-meta mt-need-dir" data-mt-need-dir' + (nn.q ? '="pin"' : '="listing"') + '>' + esc(nn.dir) + '</p>' : '') : '';
           var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="' + esc(T.moveUp.replace('{name}', x.s.name)) + '"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="' + esc(T.moveDown.replace('{name}', x.s.name)) + '"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="' + esc(T.remove.replace('{name}', x.s.name)) + '">✕</button></div>' : '';
           // A closure or advisory on the stop (round 8, 2026-10-19), as on its card.
           var nt = d.notice && (fr && d.notice.textFr || d.notice.text);
@@ -55726,7 +55789,7 @@ ${renderGolfHeaderHtml()}
           var noPin = d.kind === 'event' && !d.missing && d.lat == null ? '<p class="mt-meta mt-nopin">' + esc(T.noPin) + '</p>' : '';
           // A shared plan's stop keeps its own booking link (the listing's stored link; the business's or provider's site).
           var bk = !mine && d.book && /^https:\\/\\//.test(d.book.url || '') ? '<a class="mt-book" ' + hrefAttr(d.book.url) + ' target="_blank" rel="' + esc(d.book.rel || 'nofollow noopener') + '" data-track="booking" data-venue-id="' + esc(String(x.s.ref).split(':')[1]) + '"' + (d.book.affiliate ? ' data-affiliate="1"' : '') + '>' + esc((fr && d.book.labelFr) || d.book.label || (fr ? 'Réserver' : 'Book')) + ' <span aria-hidden="true">↗</span></a>' + (d.book.affiliate ? '<small>' + (fr ? 'Nous pouvons toucher une commission' : 'We may earn a commission') + '</small>' : '') : '';
-          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p>' + (skHtml ? '<p class="mt-meta">' + skHtml + '</p>' : '') + notice + noPin + bk + '</div>' + tools + '</li>';
+          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p>' + (skHtml ? '<p class="mt-meta">' + skHtml + '</p>' : '') + needHtml + notice + noPin + bk + '</div>' + tools + '</li>';
         }).join('') + '</ol></section>';
     }).join('');
     drawMap(shown);
@@ -85116,7 +85179,7 @@ module.exports = {
   sportTimesChange, searchWithoutNegated,
   // Sport test 2 (2026-11-20): the golf winter rule.
   golfWinterSeasonMap, GOLF_WINTER_RULE_ON, golfCardBasis, sportMainKind, sportPartSeasons, priceListWordsFor,
-  tripAccessOf, tripDogOf, tripStayNeedFacts, tripNeedFacts, tripThinInfo,
+  tripAccessOf, tripDogOf, tripAccessEntrance, tripStayNeedFacts, tripNeedFacts, tripThinInfo,
   runTripPlanWithStay, tripTimingVenue, tripTimingParty, tripDatesOf, withTripStays, tripStayCandidates, isTripStaysEnabled, tripStaysEnabledFor, isTripV4Enabled, tripV4EnabledFor,
   tripBookingChecklist,
   // Planner (2026-10-27): the happy hour crawl.

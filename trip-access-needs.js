@@ -276,11 +276,112 @@ function accessStopText(r, fr) {
   if (r.level === 'mobility') return fr ? `${r.name} : ${q}. Aucune mention des fauteuils roulants : vérifiez la surface et la largeur.` : `${r.name}: ${q}. No mention of wheelchairs: check the surface and width.`;
   return '';
 }
-// The short note for a stop's card ("Wheelchair: playground only", "Access: Deleenheer Rd access · check ahead").
+// ---- the short notes (2026-11-23): ONE place for the few words said of a stop for a need ----
+// The owner's report: the BX Ranch Trail card said "A good walk with your dog" and nothing of the wheelchair; restaurant
+// cards showed "Dog-Friendly" without saying indoors or patio is unconfirmed. Every surface that says a stop's need in
+// a few words (the plan's collapsed card, the Book my trip sheet, the shared copy, the copied itinerary) reads it here,
+// so they never differ. compact: the shorter form for a line that also carries the other need or a suggested time.
+//   accessShort(r)  r: { level, part, amenity }   (an 'accessible' evidence row)
+//   dogShort(r)     r: { has, where, says }       (a 'dog_friendly' evidence row)
+// Nothing is upgraded: 'unknown' is "check ahead", a badge with no word on indoors is "check indoor or patio access".
+function accessShort(r, fr, compact) {
+  const x = r || {}, level = x.level || (x.has === true ? 'wheelchair' : x.has === false ? 'no' : 'unknown');
+  if (level === 'wheelchair') return compact ? (fr ? 'Fauteuil : oui selon la fiche' : 'Wheelchair: yes per listing') : (fr ? 'Accessible en fauteuil selon sa fiche' : 'Wheelchair accessible per its listing');
+  if (level === 'wheelchair_part') return fr ? `Fauteuil roulant : ${x.part ? `${x.part} seulement` : 'en partie seulement'}` : `Wheelchair: ${x.part ? `${x.part} only` : 'in part only'}`;
+  if (level === 'mobility') {
+    if (x.amenity) return fr ? 'Accès : installations seulement · à vérifier' : 'Access: facilities only · check ahead';
+    if (x.part) return fr ? `Accès : ${x.part} · à vérifier` : `Access: ${x.part} · check ahead`;
+    return fr ? 'Note de mobilité seulement · à vérifier' : 'Mobility note only · check ahead';
+  }
+  if (level === 'no') return compact ? (fr ? 'Fauteuil : non selon la fiche' : 'Wheelchair: no per listing') : (fr ? 'Non accessible en fauteuil selon sa fiche' : 'Not wheelchair accessible per its listing');
+  return compact ? (fr ? 'Fauteuil : à vérifier' : 'Wheelchair: check ahead') : (fr ? 'Accès en fauteuil : à vérifier' : 'Wheelchair access: check ahead');
+}
+// A listing's own Dogs line in a few words: its condition, without "Dogs allowed". The first clause when the line is
+// long, and then "· limits apply" if what is left out limits where or when (no, not, only, except), else "…".
+const DOG_LEAD_RE = /^(?:leashed |well-behaved )?(?:dogs?|pets?)(?: (?:are|is))? (?:allowed|welcome|permitted|ok)\b[\s,;:]*(?:but |if (?:kept )?|when )?/i;
+const DOG_LIMIT_RE = /\b(?:no|not|none|never|only|except|excepted|prohibited|banned)\b/i;
+const DOG_SHORT_MAX = 38;
+const DOG_FR = [[/^on[- ](?:a )?leash only$/i, 'en laisse seulement'], [/^on[- ](?:a )?leash$/i, 'en laisse'], [/^on[- ](?:a )?leash at all times$/i, 'en laisse en tout temps'], [/^allowed$/i, 'admis'], [/^must be on (?:a )?leash$/i, 'en laisse obligatoire']];
+function dogLineShort(says, fr) {
+  const whole = String(says || '').replace(/[“”"«»]/g, '').replace(/\s+/g, ' ').trim().replace(/[.;,]+$/, '');
+  if (!whole) return '';
+  const tidy = (t) => {
+    // "… on leash only (Deleenheer Rd section)" -> "… on leash only, Deleenheer Rd section"
+    let x = String(t).trim().replace(/[.;,]+$/, '').replace(/\s+\(([^()]{3,40})\)$/, ', $1');
+    const lead = /^(?:dogs?|pets?) (?:must|on|under|can|only|not)\b/i.test(x), leashed = /^leashed (?:dogs?|pets?)\b/i.test(x);
+    if (leashed) x = x.replace(/^leashed (?:dogs?|pets?)\s*/i, '').replace(/^(?:are |is )?(?:allowed|welcome|permitted|ok)\b/i, '');
+    else x = lead ? x.replace(/^(?:dogs?|pets?) /i, '') : x.replace(DOG_LEAD_RE, '');
+    x = x.trim().replace(/^[,;:]\s*/, '').replace(/^(.+?) (?:are |is )?(?:welcome|ok)$/i, '$1');
+    if (leashed) x = x ? `on leash${/^(?:in|on|at|only)\b/i.test(x) ? ' ' : '; '}${x}` : 'on leash';
+    if (!x) x = 'allowed';
+    if (/^[A-Z][a-z'-]*(?: [a-z(]|$)/.test(x)) x = x.charAt(0).toLowerCase() + x.slice(1);
+    return x;
+  };
+  let text = tidy(whole), rest = '';
+  if (text.length > DOG_SHORT_MAX) {
+    const cut = /^(.*?)(?:\s*;\s*|\s+\(|,\s+(?=but |except |not |no |none ))(.*)$/.exec(whole);
+    if (cut && tidy(cut[1]).length <= DOG_SHORT_MAX + 8) { text = tidy(cut[1]); rest = cut[2]; }
+    else { const w = text.slice(0, DOG_SHORT_MAX + 1); rest = text.slice(w.lastIndexOf(' ')); text = w.slice(0, w.lastIndexOf(' ')).replace(/[,;:]+$/, ''); }
+  }
+  if (fr) for (const [re, f] of DOG_FR) if (re.test(text)) { text = f; break; }
+  if (!rest) return text;
+  return DOG_LIMIT_RE.test(rest) ? `${text} · ${fr ? 'avec limites' : 'limits apply'}` : `${text}…`;
+}
+function dogShort(r, fr, compact) {
+  const x = r || {}, line = dogLineShort(x.says, fr);
+  if (x.has === false) return fr ? 'Chiens non admis selon sa fiche' : 'No dogs per its listing';
+  if (x.has === true) {
+    if (x.where === 'unsaid') return compact ? (fr ? 'Chiens : intérieur ou terrasse à vérifier' : 'Dogs: check inside or patio') : (fr ? 'Chiens : vérifier intérieur ou terrasse' : 'Dogs: check indoor or patio access');
+    if (x.where === 'patio') return fr ? 'Chiens : terrasse seulement' : 'Dogs: patio only';
+    if (x.where === 'outside') return fr ? 'Chiens : dehors seulement' : 'Dogs: outside only';
+    if (x.where === 'some_trips') return fr ? 'Chiens : certaines sorties seulement' : 'Dogs: some trips only';
+    if (x.where === 'inside' && (!line || /…$|limits apply$|avec limites$/.test(line))) return fr ? 'Chiens : admis à l’intérieur' : 'Dogs: welcome inside';
+    if (line) return /^(?:no|not) /i.test(line) ? (/^no dogs\b/i.test(line) ? line.charAt(0).toUpperCase() + line.slice(1) : `${fr ? 'Chiens : ' : 'Dogs: '}${line}`) : `${fr ? 'Chiens : ' : 'Dogs: '}${line}`;
+    return fr ? 'Chiens : indiqué comme admis' : 'Dogs: listed as dog-friendly';
+  }
+  // The listing has a Dogs line that says both yes and no (a season, an area): its own first words, never a yes.
+  if (line) return /^no dogs\b/i.test(line) ? line.charAt(0).toUpperCase() + line.slice(1) : `${fr ? 'Chiens : ' : 'Dogs: '}${line}${/limits apply|avec limites|…$/.test(line) || DOG_LIMIT_RE.test(line) ? '' : ` · ${fr ? 'à vérifier' : 'check ahead'}`}`;
+  return fr ? 'Chiens : à vérifier' : 'Dogs: check ahead';
+}
+// Is this short note something to check (not a plain yes)? For the Book my trip sheet's "To confirm with each place".
+const accessOpen = (r) => !!r && (r.level || (r.has === true ? 'wheelchair' : 'unknown')) !== 'wheelchair';
+// (A badge beside a Dogs line that says both yes and no, a season or an area, is still to check.)
+const dogOpen = (r) => !!r && !(r.has === true && (!r.where || r.where === 'outdoors' || r.where === 'inside') && !(!r.where && r.says && dogFromText(r.says) !== true));
+// The notes of one stop from a plan's evidence, only for the needs the plan carries (plan.needs).
+// -> { access, dog (evidence rows or null), notes: [full], compact: [compact], text (full, " · "), open: [notes still to check],
+//      chipOff (the Dog-Friendly chip would read as settled: the note stands in for it), dir (directions caveat or pin) }
+function stopNeedNotes(plan, id, fr) {
+  const out = { access: null, dog: null, notes: [], compact: [], text: '', open: [], chipOff: false, dir: null };
+  const p = plan || {}, needs = p.needs;
+  if (id == null || !Array.isArray(p.evidence)) return out;
+  const row = (ask) => { const e = p.evidence.find((x) => x && x.ask === ask && Array.isArray(x.stops)); return (e && e.stops.find((x) => x && x.id === id)) || null; };
+  if (hasNeed(needs, 'wheelchair')) out.access = row('accessible');
+  if (hasNeed(needs, 'dog')) out.dog = row('dog_friendly');
+  if (out.access) { const n = accessShort(out.access, fr); out.notes.push(n); out.compact.push(accessShort(out.access, fr, true)); if (accessOpen(out.access)) out.open.push(n); if (out.access.dir) out.dir = out.access.dir; }
+  if (out.dog) { const n = dogShort(out.dog, fr); out.notes.push(n); out.compact.push(dogShort(out.dog, fr, true)); if (dogOpen(out.dog)) out.open.push(n); out.chipOff = out.dog.has === true && out.dog.where === 'unsaid'; }
+  out.text = out.notes.join(' · ');
+  return out;
+}
+// Directions for a stop whose listing covers only a named entrance or section (2026-11-23). The plan's and the shared
+// copy's map links go to the listing's own map location, which is not necessarily that entrance: said in one line,
+// unless the listing's data holds a pin for it (pin: { name, lat, lng }, from the site's own entrance data), which the
+// link then uses, named. Never a word that the route or the whole place is accessible.
+// (A feature such as a playground, a building or a viewpoint is not an entrance or a stretch of the route.)
+const PART_ENTRANCE_RE = /\b(?:access|entrance|section|trail|loop|path|pathway|lot|gate|trailhead|parking|rd|road|blvd|ave|avenue|st|street|hwy|from|to)\b/i;
+function accessDirections(r, pin) {
+  const x = r || {};
+  if (!(x.level === 'wheelchair_part' || x.level === 'mobility') || !x.part || x.amenity || !PART_ENTRANCE_RE.test(x.part)) return null;
+  if (pin && Number.isFinite(Number(pin.lat)) && Number.isFinite(Number(pin.lng)) && pin.name) {
+    const name = String(pin.name).trim();
+    return { pin: { name, lat: Number(pin.lat), lng: Number(pin.lng) }, url: `https://www.google.com/maps/search/?api=1&query=${Number(pin.lat)},${Number(pin.lng)}`,
+      label: `Directions to ${name}`, labelFr: `Itinéraire vers ${name}`,
+      text: `Directions go to ${name}, the entrance on file for ${withThe(x.part)}.`, textFr: `L’itinéraire mène à ${name}, l’entrée au dossier pour : ${x.part}.` };
+  }
+  return { pin: null, text: `Directions go to the listing’s map location, not necessarily ${withThe(x.part)}: check the entrance.`, textFr: `L’itinéraire mène à l’emplacement de la fiche, pas forcément à : ${x.part}. Vérifiez l’entrée.` };
+}
+// Kept for older callers: the short note of a stop listed in part or with only a mobility note.
 function accessStopNote(r, fr) {
-  if (r.level === 'wheelchair_part') return fr ? `Fauteuil roulant : ${r.part ? `${r.part} seulement` : 'en partie seulement'}` : `Wheelchair: ${r.part ? `${r.part} only` : 'in part only'}`;
-  if (r.level === 'mobility') return fr ? `Accès : ${r.amenity ? 'installations seulement' : r.part || 'note de mobilité'} · à vérifier` : `Access: ${r.amenity ? 'facilities only' : r.part || 'mobility note'} · check ahead`;
-  return '';
+  return r && (r.level === 'wheelchair_part' || r.level === 'mobility') ? accessShort(r, fr) : '';
 }
 // The expanded card's line for one stop (no name: the card is the stop's own).
 function accessStopMore(r, fr) {
@@ -366,4 +467,4 @@ function thinDays(plan, ctx = {}) {
   return out;
 }
 
-module.exports = { readNeeds, hasNeed, needOf, accessFromText, accessGrade, accessRank, dogFromText, accessOf, dogOf, thinDays, ACCESS_PAVED_RE, coldSeason, accessStopText, accessStopNote, accessStopMore, dogStopMore, STAY_BOTH, stayBoth, OPEN_AIR_TYPES };
+module.exports = { readNeeds, hasNeed, needOf, accessFromText, accessGrade, accessRank, dogFromText, accessOf, dogOf, thinDays, ACCESS_PAVED_RE, coldSeason, accessStopText, accessStopNote, accessStopMore, dogStopMore, accessShort, dogShort, dogLineShort, stopNeedNotes, accessDirections, accessOpen, dogOpen, STAY_BOTH, stayBoth, OPEN_AIR_TYPES };

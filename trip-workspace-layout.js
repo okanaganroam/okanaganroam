@@ -122,6 +122,9 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
 .t3-v4.tw-workspace .v4-time {display:inline-block;padding:3px 8px;border-radius:12px;background:#fff0cc;color:#745319;}
 .t3-v4.tw-workspace .tw-fit {font-size:13px;line-height:1.45;color:#52665e;margin:7px 0;}
 .t3-v4.tw-workspace .tw-need {font-weight:700;overflow-wrap:anywhere;}
+/* One line per need (a long note wraps inside the card). */
+.t3-v4.tw-workspace .tw-need span {display:block;}
+.t3-v4.tw-workspace .v4-note+.tw-need {margin-top:-3px;}
 .t3-v4.tw-workspace .v4-note {font-size:13px;line-height:1.45;font-weight:700;color:#52665e;margin:7px 0;padding:0;}
 .t3-v4.tw-workspace .v4-note a {color:#1b303c;}
 .t3-v4.tw-workspace .v4-acts {display:flex;flex-direction:column;gap:6px;}
@@ -251,6 +254,10 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
  .t3-v4.tw-workspace .v4-stop.tw-timed {container-type:inline-size;}
  .t3-v4.tw-workspace .tw-timed .v4-main {min-height:86px;}
  .t3-v4.tw-workspace .v4-note {width:max-content;max-width:calc(100vw - 58px);max-width:calc(100cqw - 24px);overflow-wrap:anywhere;}
+ /* The need notes use the card's width the same way (they may run under Swap / Remove, never past the card). */
+ .t3-v4.tw-workspace .v4-stop.tw-needs {container-type:inline-size;}
+ .t3-v4.tw-workspace .tw-needs .v4-main {min-height:86px;}
+ .t3-v4.tw-workspace .tw-needs .tw-need {width:max-content;max-width:calc(100vw - 58px);max-width:calc(100cqw - 24px);font-size:12.5px;}
  .t3-v4.tw-workspace .v4-icon {min-width:68px;min-height:40px;}
  .t3-v4.tw-workspace .v4-bar.has-chat {position:fixed;top:auto;bottom:0;left:0;right:0;width:100%;max-height:42dvh;border-radius:18px 18px 0 0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -5px 24px #1b303c12;z-index:100;}
  .t3-v4.tw-workspace .tw-chat-title,.t3-v4.tw-workspace .tw-chat-hint,.t3-v4.tw-workspace .v4-chat-you {display:none;}
@@ -281,14 +288,18 @@ const WORKSPACE_CLIENT_SRC=String.raw`
     // Trip needs (2026-11-23): a stop whose listing covers one section or feature for a wheelchair, or has only a
     // mobility note, says so in one short line ("Access: Deleenheer Rd access · check ahead") in place of the generic
     // "Matches your request…" line (still under "Why it fits" once opened), so the card does not grow.
-    var need=typeof v4NeedLines==='function'?v4NeedLines(s).note:'';
+    // (2026-11-23, the owner's report: "A good walk with your dog" stood alone on a walk whose wheelchair access is
+    // unknown.) Every stop of a plan with a wheelchair or dog need says its note for each need; with a suggested time
+    // the time note comes first and the needs follow in their shorter forms on one more line. The generic line shows
+    // only when there is neither.
+    var need=typeof v4NeedHtml==='function'?v4NeedHtml(s,!!note):'';
     var links=(url?'<a '+hrefAttr(url)+'>'+esc(twText('View details','Voir les détails'))+'</a>':'');
     if(booking)links+=t3StepLinkHtml(booking,'tw-book-link',twText(booking.affiliate?'Book with provider':'Book with business',booking.affiliate?'Réserver chez le prestataire':'Réserver auprès du lieu'),steps.indexOf(booking));
     // A suggested time (a session, showtime, lane or booked slot we do not hold) says so in one short line under the
     // name, with the step to check it: "Suggested time · Check sessions ↗". It stands in for the generic "Matches your
     // request…" line (still under "Why it fits" once opened), and for "Venue website" when that is the same link.
     else if(v.website&&t3StayExt(v.website)&&!(note&&note.url===t3StayExt(v.website)))links+='<a '+hrefAttr(t3StayExt(v.website))+' target="_blank" rel="noopener">'+esc(twText('Venue website','Site du lieu'))+' ↗</a>';
-    return '<li class="v4-stop'+(note?' tw-timed':'')+'" data-venue-id="'+esc(v.id)+'"><div class="v4-row">'+v4Thumb(v)+'<div class="tw-card-info"><button type="button" class="v4-main" aria-expanded="'+(v4.open[id]?'true':'false')+'" aria-controls="'+esc(did)+'" data-v4-toggle="'+esc(did)+'" data-v4-id="'+esc(id)+'"><span class="v4-time">'+esc(v4Start(s,key))+'</span><span class="v4-name">'+esc(v.name)+'</span><span class="v4-line">'+esc(v4Line(s))+'</span></button>'+(note?note.html:need?'<p class="tw-fit tw-need" data-tw-need>'+esc(need)+'</p>':reason?'<p class="tw-fit">'+esc(reason)+'</p>':'')+'<div class="tw-links">'+links+'</div></div><div class="v4-acts">'+actions+'</div></div><div class="v4-more" id="'+esc(did)+'"'+(v4.open[id]?'':' hidden')+'>'+v4Details(s,id)+'</div>'+v4TripBtn(v,key)+'</li>';
+    return '<li class="v4-stop'+(note?' tw-timed':'')+(need?' tw-needs':'')+'" data-venue-id="'+esc(v.id)+'"><div class="v4-row">'+v4Thumb(v)+'<div class="tw-card-info"><button type="button" class="v4-main" aria-expanded="'+(v4.open[id]?'true':'false')+'" aria-controls="'+esc(did)+'" data-v4-toggle="'+esc(did)+'" data-v4-id="'+esc(id)+'"><span class="v4-time">'+esc(v4Start(s,key))+'</span><span class="v4-name">'+esc(v.name)+'</span><span class="v4-line">'+esc(v4Line(s))+'</span></button>'+(note||need?(note?note.html:'')+need:reason?'<p class="tw-fit">'+esc(reason)+'</p>':'')+'<div class="tw-links">'+links+'</div></div><div class="v4-acts">'+actions+'</div></div><div class="v4-more" id="'+esc(did)+'"'+(v4.open[id]?'':' hidden')+'>'+v4Details(s,id)+'</div>'+v4TripBtn(v,key)+'</li>';
   }
   // An event on the plan is a card like any stop: photo, time, name, "View details" and Remove; once removed it is the
   // same "Removed … Undo" row as a venue (it used to vanish with no word, and the count stayed).

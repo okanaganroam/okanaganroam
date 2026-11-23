@@ -340,7 +340,15 @@ function accessEntry(stops, ctx, need) {
     const a = (typeof ctx.accessOf === 'function' ? ctx.accessOf(x.v.id) : null) || { has: null };
     const level = a.level || (a.has === true ? 'wheelchair' : a.has === false ? 'no' : 'unknown');
     const r = { id: x.v.id, name: x.v.name, has: level === 'wheelchair' ? true : level === 'no' ? false : null, level, ...(a.part ? { part: a.part } : {}), ...(a.amenity ? { amenity: true } : {}), ...(a.says ? { says: a.says } : {}) };
-    if (level === 'wheelchair_part' || level === 'mobility') { r.note = tripAccess.accessStopNote(r, false); r.noteFr = tripAccess.accessStopNote(r, true); }
+    // (2026-11-23) Every stop gets its short note (trip-access-needs.js accessShort: the one place these words are
+    // made), so a card never shows only a generic line when the wheelchair need is on the plan; unknown is "check ahead".
+    r.note = tripAccess.accessShort(r, false); r.noteFr = tripAccess.accessShort(r, true);
+    r.noteShort = tripAccess.accessShort(r, false, true); r.noteShortFr = tripAccess.accessShort(r, true, true);
+    if (tripAccess.accessOpen(r)) r.check = true; // still to confirm (not a plain yes)
+    // Directions for a stop listed for one entrance or section: the listing's own entrance pin when its data holds
+    // one (ctx.entranceOf), else the line that the map link is not necessarily that entrance.
+    const dir = tripAccess.accessDirections(r, typeof ctx.entranceOf === 'function' ? ctx.entranceOf(x.v.id, r.part || '') : null);
+    if (dir) r.dir = dir;
     r.more = tripAccess.accessStopMore(r, false); r.moreFr = tripAccess.accessStopMore(r, true);
     return r;
   });
@@ -372,6 +380,9 @@ function dogEntry(stops, ctx, cold) {
     const where = has !== true ? null : d.has === true ? (d.where || null) : (tripAccess.OPEN_AIR_TYPES.includes(x.v.type) ? null : 'unsaid');
     const r = { id: x.v.id, name: x.v.name, has, ...(where ? { where } : {}), ...(d.says ? { says: d.says } : {}), ...(['outdoor', 'beach'].includes(x.v.type) ? { open: true } : {}) };
     r.more = tripAccess.dogStopMore(r, false, cold); r.moreFr = tripAccess.dogStopMore(r, true, cold);
+    r.note = tripAccess.dogShort(r, false); r.noteFr = tripAccess.dogShort(r, true);
+    r.noteShort = tripAccess.dogShort(r, false, true); r.noteShortFr = tripAccess.dogShort(r, true, true);
+    if (tripAccess.dogOpen(r)) r.check = true;
     return r;
   });
   const base = { ask: 'dog_friendly', label: F.en, labelFr: F.fr, stops: rows };
