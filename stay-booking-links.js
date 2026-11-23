@@ -297,6 +297,97 @@ function stay22MapUrl(stay, trip, opts = {}) {
   return { url, urlFr: `${url}&ljs=fr` };
 }
 
+// ---- The handoff (2026-11-24, Dayton: "the checklist said booking links carry them, but the Quality Inn link was a
+// general hotel page with no dates visible in its URL... If dates or other details cannot be passed, tell the traveller
+// what they'll need to enter rather than claiming they were passed"). ----
+// What each stay button's own URL hands to the site it opens, read from the URL itself (never from what we meant to
+// send), and one short note per button worded from it. These three functions are also sent to the page as they are (the
+// page changes the party in the links, so it reads the links it actually shows): plain ES5, no outside names.
+//   Booking.com: checkin + checkout, group_adults, group_children (+ one age= per child), no_rooms.
+//   Expedia: chkin + chkout, rmN=a<adults>[:c<age>...]. Expedia shows the party and the rooms only once the link has
+//     dates (seen again 2026-11-24): with no dates, nothing counts as carried.
+//   Stay22 Allez: it builds the provider's page from its OWN checkin / checkout / adults / children / childrenAges /
+//     rooms (what is inside link= is dropped; seen again 2026-11-24), so those are what is read.
+//   The place's own site (own) and the "Check rates" website (search): nothing can be pre-filled.
+//   Pets and an accessible room are never passed to any provider (no such parameter on a property's page): pets is
+//   always false here, and the page says to tell the hotel.
+// -> { dates, adults, children, ages, rooms, pets }
+function stayLinkCarries(key, url) {
+  var out = { dates: false, adults: false, children: false, ages: false, rooms: false, pets: false };
+  var u, q, h, n = function (v) { return /^\d{1,2}$/.test(String(v == null ? '' : v)); }, d = function (v) { return /^\d{4}-\d{2}-\d{2}$/.test(String(v || '')); };
+  try { u = new URL(String(url || '')); } catch (e) { return out; }
+  if (key === 'own' || key === 'search' && !/(^|\.)(?:stay22|booking)\.com$/.test(u.hostname)) return out;
+  q = u.searchParams; h = u.hostname.replace(/^www\./, '');
+  if (/(^|\.)stay22\.com$/.test(h)) {
+    var inner = String(q.get('link') || ''), exp = /expedia\./.test(inner) || /\/allez\/expedia/.test(u.pathname);
+    out.dates = d(q.get('checkin')) && d(q.get('checkout')) && q.get('checkout') > q.get('checkin');
+    if (exp && !out.dates) return out;
+    out.adults = n(q.get('adults')); out.children = n(q.get('children')) && Number(q.get('children')) > 0;
+    out.ages = out.children && String(q.get('childrenAges') || '').split(',').filter(function (a) { return n(a); }).length === Number(q.get('children'));
+    out.rooms = n(q.get('rooms'));
+  } else if (/(^|\.)booking\.com$/.test(h)) {
+    out.dates = d(q.get('checkin')) && d(q.get('checkout')) && q.get('checkout') > q.get('checkin');
+    out.adults = n(q.get('group_adults')); out.children = n(q.get('group_children')) && Number(q.get('group_children')) > 0;
+    out.ages = out.children && q.getAll('age').filter(function (a) { return n(a); }).length === Number(q.get('group_children'));
+    out.rooms = n(q.get('no_rooms'));
+  } else if (/(^|\.)expedia\.(?:ca|com)$/.test(h)) {
+    out.dates = d(q.get('chkin')) && d(q.get('chkout')) && q.get('chkout') > q.get('chkin');
+    if (!out.dates) return out;
+    var rm = [], kids = 0; q.forEach(function (v, k) { if (/^rm\d+$/.test(k) && /^a\d+/.test(v)) { rm.push(v); kids += v.split(':c').length - 1; } });
+    out.adults = rm.length > 0; out.rooms = rm.length > 0; out.children = kids > 0; out.ages = kids > 0;
+  }
+  return out;
+}
+// The words for one button. link: { key, short, shortFr }; c: stayLinkCarries' result; t: the stay's trip
+// ({ arrive, leave, adults, kids, rooms, dog, stayStatus, datesPast }). Dates are named only once the visitor confirmed
+// them (stayStatus 'confirmed'); before that the links carry none, and the note says so.
+function stayHandoffNote(link, c, t, fr) {
+  t = t || {};
+  var name = (link && (fr ? link.shortFr || link.short : link.short)) || (fr ? 'Le site de réservation' : 'The booking site');
+  var own = !link || link.key === 'own' || link.key === 'search';
+  if (own) name = fr ? 'Le site de l’hôtel' : 'The hotel’s own site';
+  var day = function (iso) { return new Date(iso + 'T12:00:00Z').toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }); };
+  var set = t.stayStatus === 'confirmed' && !t.datesPast && /^\d{4}-\d{2}-\d{2}$/.test(t.arrive || '') && /^\d{4}-\d{2}-\d{2}$/.test(t.leave || '');
+  var ad = t.adults >= 1 ? (fr ? t.adults + (t.adults > 1 ? ' adultes' : ' adulte') : t.adults + (t.adults > 1 ? ' adults' : ' adult')) : '';
+  var kd = t.kids >= 1 ? (fr ? t.kids + (t.kids > 1 ? ' enfants' : ' enfant') : t.kids + (t.kids > 1 ? ' kids' : ' kid')) : '';
+  var rm = t.rooms >= 1 ? (fr ? t.rooms + (t.rooms > 1 ? ' chambres' : ' chambre') : t.rooms + (t.rooms > 1 ? ' rooms' : ' room')) : '';
+  var and = fr ? ' et ' : ' and ', join = function (a) { a = a.filter(Boolean); return a.length > 1 ? a.slice(0, -1).join(', ') + and + a[a.length - 1] : a[0] || ''; };
+  var has = [], todo = [];
+  if (c.dates && set) has.push(fr ? 'vos dates' : 'your dates'); else todo.push(set ? day(t.arrive) + ' → ' + day(t.leave) : (fr ? 'vos dates' : 'your dates'));
+  if (ad) (c.adults ? has : todo).push(ad);
+  if (kd) { if (c.children) { has.push(kd); if (!c.ages) todo.push(fr ? 'l’âge des enfants' : 'the kids’ ages'); } else todo.push(kd); }
+  if (rm) (c.rooms ? has : todo).push(rm);
+  if (own && t.dog) todo.push(fr ? 'votre chien' : 'your dog');
+  if (!has.length) return own ? (fr ? name + ' ne peut pas être prérempli : entrez-y ' + join(todo) + '.' : name + ' can’t be pre-filled: enter ' + join(todo) + ' there.')
+    : (fr ? name + ' ouvre la page de l’hôtel sans vos dates ni vos voyageurs : entrez-y ' + join(todo) + '.' : name + ' opens the hotel’s page without your dates or guests: enter ' + join(todo) + ' there.');
+  return (fr ? name + ' s’ouvre avec ' + join(has) + '.' : name + ' opens with ' + join(has) + '.') + (todo.length ? (fr ? ' Entrez-y ' + join(todo) + '.' : ' Enter ' + join(todo) + ' there.') : '');
+}
+// Every visible stay button of a card: [{ key, label, carries, note, noteFr }], and the one line for what no provider
+// takes (needs: { dog, wheelchair }): { text, textFr } or null.
+function stayHandoff(links, t) {
+  return (links || []).filter(function (l) { return l && l.url; }).map(function (l) {
+    var c = stayLinkCarries(l.key, l.url);
+    return { key: l.key, label: l.short || l.label || l.key, carries: c, note: stayHandoffNote(l, c, t, false), noteFr: stayHandoffNote(l, c, t, true) };
+  });
+}
+function stayHandoffAsk(needs) {
+  var n = needs || {};
+  if (n.dog && n.wheelchair) return { text: 'Tell the hotel about your dog and ask for an accessible room when you book.', textFr: 'Avisez l’hôtel de votre chien et demandez une chambre accessible en réservant.' };
+  if (n.wheelchair) return { text: 'Ask the hotel for an accessible room when you book: booking sites don’t pass that on.', textFr: 'Demandez une chambre accessible à l’hôtel en réservant : les sites de réservation ne le transmettent pas.' };
+  if (n.dog) return { text: 'Tell the hotel about your dog when you book: booking sites don’t pass that on.', textFr: 'Avisez l’hôtel de votre chien en réservant : les sites de réservation ne le transmettent pas.' };
+  return null;
+}
+// True only when every visible stay link carries the dates (the one case "booking links carry these dates" is true).
+function stayAllCarryDates(handoff) { return !!(handoff && handoff.length) && handoff.every(function (h) { return h && h.carries && h.carries.dates; }); }
+const HANDOFF_CLIENT_SRC = [stayLinkCarries, stayHandoffNote, stayHandoff, stayHandoffAsk, stayAllCarryDates].map((f) => '  ' + f.toString()).join('\n');
+// Adds handoff (and handoffAsk) to the block's pick and alternatives, from the links each card shows.
+function withHandoff(block, needs) {
+  if (!block || !block.pick) return block;
+  const ask = stayHandoffAsk(needs);
+  const add = (card) => ({ ...card, handoff: stayHandoff(card.bookingLinks || [], block.trip || {}), ...(ask ? { handoffAsk: ask } : {}) });
+  return { ...block, pick: add(block.pick), alternatives: (block.alternatives || []).map(add) };
+}
+
 // "Pets in some rooms -- check when booking": a dog trip and a stay whose pets answer is "some".
 function stayPetsNote(info, trip) {
   return !!(trip && trip.dog && info && info.pets === 'some');
@@ -328,4 +419,5 @@ module.exports = {
   httpsOn, tripParams, bookingComUrl, expediaUrl, stay22Wrap, exactStayLinks, stayBookingLinks, stayPetsNote, withBookingLinks,
   STAY22_MAP, MAP_BOX, stay22MapUrl,
   MAX_ROOMS, stayDefaultRooms, stayRoomsFor, stayRoomsMatter, stayRoomSplit, ROOMS_CLIENT_SRC,
+  stayLinkCarries, stayHandoffNote, stayHandoff, stayHandoffAsk, stayAllCarryDates, withHandoff, HANDOFF_CLIENT_SRC,
 };

@@ -37,6 +37,21 @@ function tripSummaryFacts(plan, fr, ctx) {
       flags.push({ kind: 'flag', status: yes ? 'partial' : 'unknown', ask: e.ask, text: nl + sep + t });
       return;
     }
+    // A wheelchair user (2026-11-24): its own item, counted from each listing's own data. "Lists it" is kept apart from
+    // "doesn't say" (has: null) and from a listing whose own line says no (has: false); never "accessible" on its own.
+    if (e.ask === 'accessible' && stops.length) {
+      var au = e.unit || {}, ap = fr ? (au.fr || 'arrêts') : (au.en || 'stops'), an = stops.filter(function (x) { return x && x.has === false; }).length, aq = stops.length - yes - an;
+      if (!aq && !an) { ok.push({ kind: 'ok', ask: e.ask, text: label + (fr ? ' : indiqué partout (' + stops.length + ') ✓' : ': listed at all ' + stops.length + ' ✓') }); return; }
+      var bits = [];
+      if (yes) bits.push(fr ? yes + ' des ' + stops.length + ' ' + ap + (yes > 1 ? ' l’indiquent' : ' l’indique') : yes + ' of ' + stops.length + ' ' + ap + (yes > 1 ? ' list it' : ' lists it'));
+      else if (aq) bits.push(fr ? 'non précisé (' + stops.length + ' ' + ap + ')' : 'none of the ' + stops.length + ' ' + ap + (stops.length > 1 ? ' say' : ' says'));
+      if (yes && aq) bits.push(fr ? aq + (aq > 1 ? ' ne le précisent pas' : ' ne le précise pas') : aq + (aq > 1 ? ' don’t say' : ' doesn’t say'));
+      if (an) bits.push(fr ? an + (an > 1 ? ' disent non' : ' dit non') : an + (an > 1 ? ' say no' : ' says no'));
+      flags.push({ kind: 'flag', status: yes ? 'partial' : an && !aq ? 'unmet' : 'unknown', ask: e.ask, text: label + sep + bits.join(' · ') });
+      return;
+    }
+    // An entry that words its own short item (the place to stay for a need: "Stay lists accessible rooms ✓").
+    if (e.short) { var st = (fr && e.shortFr) || e.short; if (status === 'verified') ok.push({ kind: 'ok', ask: e.ask, text: st }); else flags.push({ kind: 'flag', status: status, ask: e.ask, text: st }); return; }
     if (status === 'verified') { ok.push({ kind: 'ok', ask: e.ask, text: label + (e.asked > 0 && count > 0 ? sep + count : '') + ' ✓' }); return; }
     if (status === 'unmet') t = fr ? 'pas dans ce plan' : 'not in this plan';
     else if (e.needsDates) t = fr ? 'selon vos dates' : 'needs dates';

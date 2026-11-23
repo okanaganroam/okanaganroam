@@ -124,9 +124,13 @@ test('1. the exact request: Dec 5 and 6 on the days, a proposed one-night stay, 
   assert.match(V4, /out \+= '&td=' \+ td\.start/);
   assert.match(V4, /tt\.stayStatus === 'confirmed' && !tt\.datesPast[^\n]*'&sa=' \+ tt\.arrive \+ '&sl=' \+ tt\.leave \+ '&sc=1'/);
   // The page's words, EN + FR.
-  for (const s of ['Stay proposed: ', 'Use these dates', 'Dates go to the booking site after you confirm them.', 'Booking links carry these dates.', 'Change dates', 'Séjour proposé : ', 'Utiliser ces dates', 'Les dates vont au site de réservation une fois confirmées.', 'Les liens de réservation portent ces dates.', 'Modifier les dates']) assert.ok(V3.includes(s), s);
-  assert.match(V4, /html \+= t3StayDatesHtml\(t, fr\);/, 'the Book my trip sheet shows the stay dates');
-  assert.match(CHAT, /t3StayDatesHtml\(tripIn, fr\) : ''\) \+ roomsRow/, 'the stay card shows the stay dates');
+  for (const s of ['Stay proposed: ', 'Use these dates', 'Dates go to the booking site after you confirm them.', 'Change dates', 'Séjour proposé : ', 'Utiliser ces dates', 'Les dates vont au site de réservation une fois confirmées.', 'Modifier les dates']) assert.ok(V3.includes(s), s);
+  // (2026-11-24, trip-access-needs) The confirmed line is worded from what each button's own URL carries: the blanket
+  // "Booking links carry these dates." is gone from the page (a hotel's own site was never pre-filled).
+  assert.ok(!V3.includes('Booking links carry these dates.') && !V3.includes('Les liens de réservation portent ces dates.'));
+  assert.ok(V3.includes('t3HandoffText(s, t, fr)'));
+  assert.match(V4, /html \+= t3StayDatesHtml\(t, fr, s\);/, 'the Book my trip sheet shows the stay dates');
+  assert.match(CHAT, /t3StayDatesHtml\(tripIn, fr, s\) : ''\) \+ roomsRow/, 'the stay card shows the stay dates');
 });
 
 test('2. a trip without dates is unchanged, and an old shared link reads as it did', () => {

@@ -372,6 +372,8 @@ function tripStayContext(plan, input, today, opts = {}) {
     arrive, leave, nights, months, adults, ...(adultsAssumed ? { adultsAssumed: true } : {}), kids, guests, withKids, dog: i.dog === true || !!party.dog, budget: budgetOf(plan.intent),
     centre, primaryRegion: regions[0], regions, datesGiven: !!(i.arrive && i.leave), camping: wantsCamping(plan),
     ...(opts.v4 ? stayDateState(i, arrive, leave, opts.tripDates, today) : {}),
+    // Trip needs (2026-11-24): a wheelchair user on the trip (the request's own words; server.js).
+    ...(opts.wheelchair ? { wheelchair: true } : {}),
     ...(opts.v4 ? { v4: true, couple: V4_COUPLE_RE.test(v4Words(plan, opts.text)), budgetStay: V4_BUDGET_STAY_RE.test(v4Words(plan, opts.text)) } : {}),
   };
 }
@@ -438,6 +440,12 @@ function scoreStay(stay, ctx) {
   if (ctx.dog && (f.pets === 'yes' || f.pets === 'some')) {
     score -= f.pets === 'yes' ? 1.5 : 1;
     matches.push(f.pets === 'yes' ? { key: 'pets', text: 'Pets welcome', textFr: 'Animaux acceptés' } : { key: 'pets', text: 'Pets welcome in some units', textFr: 'Animaux acceptés dans certaines unités' });
+  }
+  // A wheelchair user: a stay whose own facts list accessible rooms comes first (and says so); one that says it has none
+  // comes last. A stay that doesn't say is neither.
+  if (ctx.wheelchair) {
+    if (f.accessible === true) { score -= 4; matches.unshift({ key: 'accessible', text: 'Accessible rooms listed', textFr: 'Chambres accessibles indiquées' }); }
+    else if (f.accessible === false) score += 8;
   }
   if (ctx.withKids && f.kid_friendly === true) { score -= 1.5; matches.push({ key: 'kids', text: 'Family-friendly', textFr: 'Pour les familles' }); }
   if (ctx.budget && intIn(f.price_level, 1, 4)) {
