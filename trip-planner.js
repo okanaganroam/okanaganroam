@@ -8601,7 +8601,7 @@ function v4PartySomeNote(result, input) {
   const list = (a, and) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} ${and} ${a[a.length - 1]}` : a[0]);
   result.partyNote = names.length
     ? { concept: 'alcohol', venueIds: withBadge.map((s) => s.venue.id), text: `For your non-drinker: ${list(names, 'and')} ${names.length > 1 ? 'list' : 'lists'} non-alcoholic options.`, textFr: `Pour la personne qui ne boit pas : ${list(names, 'et')} ${names.length > 1 ? 'proposent' : 'propose'} des options sans alcool.` }
-    : { concept: 'alcohol', venueIds: [], text: 'One of you doesn’t drink: none of these tasting stops lists non-alcoholic options on Okanagan Roam, so ask when you book.', textFr: 'Une personne ne boit pas : aucun de ces arrêts n’indique d’options sans alcool; demandez en réservant.' };
+    : { concept: 'alcohol', venueIds: [], text: 'One of you doesn’t drink: none of these tasting stops lists non-alcoholic options on its listing, so ask when you book.', textFr: 'Une personne ne boit pas : aucun de ces arrêts n’indique d’options sans alcool; demandez en réservant.' };
   return result;
 }
 function planStopsOf(result) { return (result.days || []).flatMap((d) => d.stops || []).concat((result.itinerary && result.itinerary.stops) || [], (result.outing && result.outing.stops) || []); }
