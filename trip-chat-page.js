@@ -18,6 +18,13 @@ const CHAT_STYLES = `<style>
   .t3-v4 .v4-bar.has-chat .v4-disc { display: none; }
   .t3-v4 .v4-bar.has-chat [data-v4-confirm] { min-height: 44px; }
   .t3-v4 .v4-chat-reply { margin: 0 0 8px; font-size: 0.86rem; line-height: 1.35; max-height: 7em; overflow-y: auto; }
+  /* Round 6 (2026-11-22: the reply and the box took ~180 px of a phone screen): the reply is two lines; a tap shows all of it. */
+  .t3-v4 .v4-chat-reply .v4-chat-agent span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+  .t3-v4 .v4-chat-reply.is-open .v4-chat-agent span { display: inline; -webkit-line-clamp: unset; }
+  .t3-v4 .v4-chat-reply.is-long:not(.is-open) { cursor: pointer; }
+  .t3-v4 .v4-chat-reply .v4-chat-you { font-size: 0.78rem; }
+  .t3-v4 .v4-chat-reply .v4-chat-agent { display: flex; gap: 6px; align-items: flex-end; }
+  .t3-v4 .v4-chat-reply .v4-chat-agent span { flex: 1; min-width: 0; }
   .t3-v4 .v4-chat-reply[hidden] { display: none; }
   .t3-v4 .v4-chat-you { margin: 0; font-weight: 700; color: var(--ref-navy-muted, #56636E); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .t3-v4 .v4-chat-agent { margin: 2px 0 0; font-weight: 700; color: var(--ref-navy); overflow-wrap: anywhere; }
@@ -160,7 +167,13 @@ function chatClientSrc(d) {
     var u = box.querySelector('[data-v4-chat-undo]'); if (u) u.hidden = !opts.undo;
     var chips = document.getElementById('v4Chips'); if (chips && chat.used) chips.hidden = true;
     var c = document.getElementById('v4Chat'); if (c) c.classList.toggle('is-busy', !!opts.busy);
+    // Round 6: two lines, a tap shows the rest; an old "… was removed" status line goes; on a wide screen the latest
+    // reply is scrolled into view (it was below the fold in the sidebar).
+    box.classList.remove('is-open');
+    var sp = box.querySelector('.v4-chat-agent span'); box.classList.toggle('is-long', !!(sp && sp.scrollHeight > sp.clientHeight + 2));
+    if (!opts.busy) { var st = document.getElementById('t3PlanStatus'); if (st) st.textContent = ''; }
     chatPad();
+    if (!opts.busy && window.matchMedia && window.matchMedia('(min-width: 900px)').matches) { try { box.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { box.scrollIntoView(false); } }
   }
   function chatStart(day, id){
     var rows = (state.last && state.last.schedule) || [];
@@ -297,6 +310,7 @@ function chatClientSrc(d) {
     var t = e.target && e.target.closest ? e.target : null; if (!t) return;
     var b;
     if ((b = t.closest('[data-v4-chip]'))) { chatSend(null, b.getAttribute('data-v4-chip'), b.textContent); return; }
+    if ((b = t.closest('#v4ChatReply.is-long')) && !t.closest('[data-v4-chat-undo]')) { b.classList.add('is-open'); chatPad(); return; }
     if ((b = t.closest('[data-v4-chat-undo]')) && chat.undo) { var snap = chat.undo; chat.undo = null; chatRestore(snap); chatShow('', ct('undone'), {}); track('trip_chat', { chat_source: 'undo', changed: 'yes' }); }
   });
 
