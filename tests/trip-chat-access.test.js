@@ -367,3 +367,22 @@ test('end to end: the questions are answers and change nothing', async () => {
   nothingChanged(fr, 'fr');
   assert.match(fr.reply, /^Chien : Access Test Bistro indique que les chiens sont admis\.$/, fr.reply);
 });
+
+// ---------- 4b. The itinerary's buttons under a light day (plan.thinDays[].next[].message) ----------
+test('the light-day buttons: “Keep day 2 light” changes nothing; “Add an easy walk in <town> on day 2” is an add on that day, never a new base town', async () => {
+  const keep = R('Keep day 2 light');
+  assert.deepEqual([keep.ops[0].o, keep.ops[0].value, keep.ops[0].day, keep.ops[0].keep], ['ask', 'q_thin', 2, true]);
+  for (const m of [`Add an easy walk in ${TOWN} on day 2`, 'Add an easy walk in Coldstream on day 2', 'Add a stop in Oliver on day 2']) {
+    const r = R(m);
+    assert.deepEqual(r.ops.map((o) => [o.o, o.day]), [['add', 2]], m);
+    assert.ok(!r.ops.some((o) => o.o === 'town'), `${m}: the trip is not moved to that town`);
+  }
+  assert.deepEqual(R('Add an indoor stop on day 2').ops.map((o) => [o.o, o.kind, o.day]), [['add', 'indoor', 2]]);
+  const page0 = pageOf(REQ, LIVE_ROWS, F.H_OLD.id);
+  const j = await say(page0, 'Keep day 2 light');
+  nothingChanged(j, 'keep light');
+  assert.equal(j.reply, 'OK, day 2 stays as it is. Nothing changed.');
+  // Asked why, with the planner's own line when the plan has one (plan.thinDays), else what is known: one or two lines.
+  const why = await say(page0, 'Why is day 2 so empty?');
+  nothingChanged(why, 'why');
+});

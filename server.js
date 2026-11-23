@@ -9279,6 +9279,9 @@ const TRIP_ACCESS_NOT_RE = /\bnot (?:fully |wheelchair[- ])?accessible\b|\binacc
 const TRIP_ACCESS_PART_RE = /\b(?:toilets?|washrooms?|playground|facilities|parking)\b[^.;]*\bwheelchair|\bwheelchair[- ]accessible (?:playground|facilities|toilets?|washrooms?|parking)\b/i;
 function tripChatAccessOf(id) {
   try {
+    // The planner's own reading of a listing's access data, when this build has it (trip-access-needs.js), so the chat
+    // and the itinerary never disagree.
+    if (typeof tripAccessOf === 'function') { const a = tripAccessOf(id); return a && (a.has === true || a.has === false) ? a.has : null; }
     if (venueOwnerFeatures(id).wheelchair_accessible) return true;
     const texts = [];
     const f = OUTDOOR_FACTS[String(id)];
@@ -9301,19 +9304,20 @@ function tripChatNeedHas(need, s, ev) {
   if (m && m.has(s.id)) return m.get(s.id);
   if (need === 'accessible') return tripChatAccessOf(s.id);
   if (['gluten_free', 'vegan', 'vegetarian'].includes(need) && Array.isArray(s.feats)) return s.feats.includes(need) ? true : null;
+  // A dog: the listing's own Dogs line or badge, as the planner reads it ("no dogs" only when its own line says so).
+  if (need === 'dog' && typeof tripDogOf === 'function') { try { const d = tripDogOf(s.id); return d && (d.has === true || d.has === false) ? d.has : null; } catch (e) { /* the badge below */ } }
   return tripChatHasBadge(s.id, N.feat) ? true : null;
 }
 // The plan's evidence as maps, for the stops shown. strict: the planner says what "false" means (plan.needs is there).
 function tripChatNeedEvidence(core, shown) {
   const ev = {};
   if (!core || !Array.isArray(core.evidence)) return ev;
-  // The planner's access fields (plan.needs with who, plan.thinDays, an 'accessible' line) mean its false is "the
-  // listing says not"; before them a false was only a badge that is not set.
-  const strict = (Array.isArray(core.needs) && core.needs.some((n) => n && typeof n === 'object' && typeof n.key === 'string' && n.who !== undefined)) || Array.isArray(core.thinDays) || core.evidence.some((e) => e && e.ask === 'accessible');
   for (const [need, N] of Object.entries(tripChat.access.NEEDS)) {
     const m = tripChat.access.evidenceMap(core.evidence, N.ev, shown);
     if (!m) continue;
-    if (!(strict || need === 'accessible')) for (const [id, v] of m) if (v === false) m.set(id, null);
+    // A badge that is not set comes back as false in the plan's lines: that is "doesn't say". "No dogs" is said only
+    // when the listing's own Dogs line says so.
+    if (need !== 'accessible') for (const [id, v] of m) if (v === false) { let no = false; if (need === 'dog' && typeof tripDogOf === 'function') { try { no = tripDogOf(id).has === false; } catch (e) { no = false; } } if (!no) m.set(id, null); }
     ev[need] = m;
   }
   return ev;
@@ -9345,6 +9349,7 @@ function tripChatAccessCore(v, shown, stops, runCore) {
 }
 // What a place to stay's own facts say (stay_info): accessible true | false | null; pets 'yes' | 'some' | false | null.
 function tripChatStayFact(c, k) {
+  if (typeof tripStayNeedFacts === 'function' && c && c.id) { try { const f = tripStayNeedFacts(c.id) || {}; if (k === 'pets' && f.pets !== undefined) return f.pets === 'yes' || f.pets === 'some' ? f.pets : f.pets === 'no' ? false : null; if (k === 'accessible' && f.accessible !== undefined) return f.accessible === true ? true : f.accessible === false ? false : null; } catch (e) { /* stay_info below */ } }
   const info = c && c.info && typeof c.info === 'object' ? c.info : {};
   if (k === 'pets') return info.pets === 'yes' || info.pets === true ? 'yes' : info.pets === 'some' ? 'some' : tripStays.stayHasNot(c, 'pets') ? false : null;
   return tripStays.stayHas(c, k) ? true : tripStays.stayHasNot(c, k) ? false : null;
@@ -9504,6 +9509,7 @@ function tripChatAccessAnswer(op, ctx) {
   const L = lang === 'fr' ? 'fr' : 'en', A = tripChat.access, t = A.TX[L];
   const shown = stops.filter((s) => !v.removed.includes(s.key));
   const core = tripChatAccessCore(v, shown, stops, runCore);
+  if (op.value === 'q_thin' && op.keep) return { reply: A.fillT(t.thinKeep, { d: op.day }) };
   if (op.value === 'q_thin') {
     const thin = core && Array.isArray(core.thinDays) ? core.thinDays.filter((d) => d && Number.isInteger(d.day)) : null;
     const d = op.day || (thin && thin[0] ? thin[0].day : [...new Set(shown.map((s) => s.day))].sort((a, b) => shown.filter((s) => s.day === a).length - shown.filter((s) => s.day === b).length)[0] || 1);

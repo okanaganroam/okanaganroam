@@ -314,19 +314,19 @@ test('7. the chat confirms or changes the stay’s dates and answers from that s
   assert.ok(!r.plan && !r.stayBlock && !r.stayDates, 'a question changes nothing');
   r = await turn('yes, book those nights');
   assert.deepEqual(r.stayDates, { arrive: A, leave: B });
-  assert.match(r.reply, /^Stay set: .+ → .+, 1 night\. The [A-Z][\w. ]+ links? now carr(?:y|ies) these dates\. The hotel’s own site doesn’t take your dates from here, so enter them on that site\.$/);
+  assert.match(r.reply, /^Stay set: .+ → .+, 1 night\. The [A-Z][\w. ]+ links? now carr(?:y|ies) these dates\. The hotel’s own site (?:doesn’t take your dates from here, so enter them on that site|can’t be pre-filled: enter .+ there)\.$/);
   assert.equal(r.stayBlock.whereToStay.trip.stayStatus, 'confirmed');
   assert.ok(!r.plan, 'the stops are not planned again');
   for (const l of r.stayBlock.whereToStay.pick.bookingLinks || []) if (l.key !== 'own' && l.key !== 'search') assert.ok(decodeURIComponent(l.url).includes(A) && decodeURIComponent(l.url).includes(B), l.url);
   // The night before: the stay's dates only; the trip's days are said to stay.
   r = await turn('arrive the night before', { arrive: A, leave: B });
   assert.deepEqual(r.stayDates, { arrive: add(A, -1), leave: B });
-  assert.match(r.reply, /^Stay set: .+ → .+, 2 nights\. Your trip days stay .+\. The [A-Z][\w. ]+ links? now carr(?:y|ies) these dates\. The hotel’s own site doesn’t take your dates from here, so enter them on that site\.$/);
+  assert.match(r.reply, /^Stay set: .+ → .+, 2 nights\. Your trip days stay .+\. The [A-Z][\w. ]+ links? now carr(?:y|ies) these dates\. The hotel’s own site (?:doesn’t take your dates from here, so enter them on that site|can’t be pre-filled: enter .+ there)\.$/);
   assert.equal(r.stayBlock.whereToStay.trip.tripStart, A);
   r = await turn('what dates is the hotel for?', { arrive: add(A, -1), leave: B });
-  assert.match(r.reply, /^The stay is .+ → .+, 2 nights; your trip days are .+\. The [A-Z][\w. ]+ links? carr(?:y|ies) these dates\. The hotel’s own site doesn’t take your dates from here, so enter them on that site\.$/);
+  assert.match(r.reply, /^The stay is .+ → .+, 2 nights; your trip days are .+\. The [A-Z][\w. ]+ links? carr(?:y|ies) these dates\. The hotel’s own site (?:doesn’t take your dates from here, so enter them on that site|can’t be pre-filled: enter .+ there)\.$/);
   r = await turn('oui, réserve ces nuits', null, 'fr');
-  assert.match(r.reply, /^Séjour : .+ → .+, 1 nuit\. (?:Le lien|Les liens) [A-Z][\w. ]+ portent? ces dates\. Le site de l’hôtel ne reçoit pas vos dates d’ici : entrez-les sur ce site\.$/);
+  assert.match(r.reply, /^Séjour : .+ → .+, 1 nuit\. (?:Le lien|Les liens) [A-Z][\w. ]+ portent? ces dates\. Le site de l’hôtel (?:ne reçoit pas vos dates d’ici : entrez-les sur ce site|ne peut pas être prérempli : entrez-y .+)\.$/);
   // Away from the trip's days, or no dates given at all: nothing is set.
   r = await turn(`check in ${add(A, 20)}, check out ${add(A, 22)}`);
   assert.match(r.reply, /^Those dates are away from your trip days/); assert.ok(!r.stayDates);

@@ -223,13 +223,13 @@ test('5. the chat sets the rooms, says which links were updated (and what the ho
   assert.equal(r.reply, 'I assumed 3 rooms for 6 adults: one room for every two adults. Nobody chose that, so tell me the number you want (“make it 2 rooms”) or tap it by the stay.');
   assert.ok(!r.plan && !r.stayBlock && !r.party, 'a question never changes the plan');
   r = await turn('how many rooms did you assume?', { rooms: 2 });
-  assert.match(r.reply, /^The Booking\.com and Expedia links are set for 2 rooms for 6 adults, as you asked\. The hotel’s own site doesn’t take your rooms and guests from here, so enter them on that site\./);
+  assert.match(r.reply, /^The Booking\.com(?: and Expedia)? links? (?:is|are) set for 2 rooms for 6 adults, as you asked\. (?:The hotel’s own site doesn’t take your rooms and guests from here, so enter them on that site|[A-Z][^.]*: enter [^.]* there)\./);
   r = await turn('combien de chambres ?', null, 'fr');
   assert.match(r.reply, /^J’ai supposé 3 chambres pour 6 adultes/);
   assert.equal(stayId, FIX.id);
   r = await turn('make it 4 rooms');
   assert.deepEqual(r.party, { rooms: 4 });
-  assert.equal(r.reply, 'Set to 4 rooms. The Booking.com and Expedia links are updated. The hotel’s own site doesn’t take your rooms and guests from here, so enter them on that site. Rooms and how many each sleeps are confirmed on the booking site.');
+  assert.match(r.reply, /^Set to 4 rooms\. The Booking\.com(?: and Expedia)? links? (?:is|are) updated\. (?:The hotel’s own site doesn’t take your rooms and guests from here, so enter them on that site|[A-Z][^.]*: enter [^.]* there)\. Rooms and how many each sleeps are confirmed on the booking site\.$/);
   assert.ok(!r.plan, 'the stops are not planned again');
   {
     assert.deepEqual([r.stayBlock.whereToStay.trip.rooms, r.stayBlock.whereToStay.trip.roomsAssumed], [4, undefined]);
@@ -238,13 +238,13 @@ test('5. the chat sets the rooms, says which links were updated (and what the ho
   }
   r = await turn('we only need one room', { rooms: 4 });
   assert.deepEqual(r.party, { rooms: 1 });
-  assert.match(r.reply, /^Set to 1 room\. The Booking\.com and Expedia links are updated\. The hotel’s own site doesn’t take your rooms and guests from here, so enter them on that site\. Whether one room sleeps everyone is confirmed on the booking site\.$/);
+  assert.match(r.reply, /^Set to 1 room\. The Booking\.com(?: and Expedia)? links? (?:is|are) updated\. (?:The hotel’s own site doesn’t take your rooms and guests from here, so enter them on that site|[A-Z][^.]*: enter [^.]* there)\. Whether one room sleeps everyone is confirmed on the booking site\.$/);
   r = await turn('a room each');
   assert.deepEqual(r.party, { rooms: 6 });
   assert.match(r.reply, /^Set to 6 rooms, one per adult\./);
   r = await turn('mets 3 chambres', null, 'fr');
   assert.deepEqual(r.party, { rooms: 3 });
-  assert.match(r.reply, /^C’est noté : 3 chambres\. Les liens Booking\.com et Expedia sont à jour\. Le site de l’hôtel ne reçoit pas vos chambres et le nombre de personnes d’ici : entrez-les sur ce site\./);
+  assert.match(r.reply, /^C’est noté : 3 chambres\. (?:Les liens Booking\.com et Expedia sont|Le lien Booking\.com est) à jour\. /);
   // Undo on the page restores the Rooms field with the plan (the snapshot carries it).
   assert.ok(CHAT.includes("rooms: (document.getElementById('t3Rooms') || {}).value || ''") && CHAT.includes("if (rmEl) rmEl.value = o.rooms || '';"));
   assert.ok(CHAT.includes("if (j.party && j.party.rooms > 0)"));

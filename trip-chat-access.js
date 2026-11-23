@@ -86,6 +86,15 @@ function read(message, stops, h) {
   const isQ = (Q_START_RE.test(t1) || /\?\s*$/.test(t0)) && !CAN_YOU_RE.test(t1);
   const ask = (value, extra = {}) => ({ ops: [op('ask', { value, ...extra })], cant: null, exact: true, access: true, explain: true });
   if (CHECK_Q_RE.test(t)) return ask('q_check');
+  // The itinerary's buttons under a light day (plan.thinDays[].next[].message): "Keep day 2 light" changes nothing;
+  // "Add an easy walk in Oliver on day 2" is an ordinary add on that day (never a new base town for the whole trip).
+  const keep = /^(?:keep|leave|garde[rz]?|laisse[rz]?) (?:day|le jour) (\d) (?:light|as it is|leger|tel quel)$/.exec(t.replace(/[.!]+$/, ''));
+  if (keep) return ask('q_thin', { day: Number(keep[1]), keep: true });
+  const near = /^(?:add|ajoute[rz]?) (?:an? |une? |some |the )?(.+?) (?:in|near|a|pres de) ([a-z' .-]+?) (?:on day|au jour|le jour) (\d)$/.exec(t.replace(/[.!]+$/, ''));
+  if (near && typeof h.kindsNamed === 'function' && !/\b(?:dinner|lunch|supper|souper|diner|dejeuner|hotel|stay|night|nuit)\b/.test(near[1])) {
+    const kind = h.kindsNamed(near[1])[0] || (/\b(?:walks?|trails?|parks?|hikes?|strolls?|promenades?|sentiers?|parcs?)\b/.test(near[1]) ? 'outdoor' : /\b(?:indoor|inside|interieur)\b/.test(near[1]) ? 'indoor' : /\b(?:stops?|things?|activit\w+|arrets?)\b/.test(near[1]) ? 'activity' : null);
+    if (kind) return { ops: [op('add', { kind, day: Number(near[3]) })], cant: null, exact: true, access: true };
+  }
   if (THIN_Q_RE.test(t) && (dayIn(t) || /\b(?:days?|jours?|journees?|plan|trip|itinerary|morning|afternoon|evening|matin|apres-midi|soir)\b/.test(t))) return ask('q_thin', { day: dayIn(t) });
   const needs = needsIn(t).filter((k) => !NEEDS[k].meals);
   const byName = () => { try { const n = h.stopsNamed(t, stops || []); return n.byName || []; } catch (e) { return []; } };
@@ -156,7 +165,7 @@ const TX = {
     ask: '{n} stops don’t say {say}: {names}. Swap them for places {whose}, where I can find them? Go ahead?',
     qNone: 'Your request doesn’t mention a need I check on listings, such as a wheelchair or a dog.', qDay: 'Day {d}: ',
     sessions: 'session times at {names}', handoff: '{note}', handoffOwn: 'your dates and guests on the booking site ({label} doesn’t take them from here)', dates: 'your stay dates (not confirmed yet)',
-    noneFound: 'I found no replacement whose listing does, so nothing changed.',
+    noneFound: 'I found no replacement whose listing does, so nothing changed.', thinKeep: 'OK, day {d} stays as it is. Nothing changed.',
     thinNone: 'No day on this plan is marked as light.', thinUnknown: 'Day {d} has {n} {noun}. I don’t know more than that; say “add something on day {d}” and I’ll look.', thinFull: 'Day {d} has {n} stops, so it isn’t marked as light.',
     needKept: 'Its listing notes {what}.', needUnknown: 'Its listing doesn’t say {say}, so call ahead.', needSwapped: 'I picked {fresh} instead of {old} because its listing {lists}.',
   },
@@ -180,7 +189,7 @@ const TX = {
     ask: 'Les fiches de {n} arrêts ne disent pas {say} : {names}. Je les remplace par des endroits {whose}, là où j’en trouve? J’y vais?',
     qNone: 'Votre demande ne mentionne pas de besoin que je vérifie sur les fiches, comme un fauteuil roulant ou un chien.', qDay: 'Jour {d} : ',
     sessions: 'les heures des séances à {names}', handoff: '{note}', handoffOwn: 'vos dates et le nombre de personnes sur le site de réservation ({label} ne les reçoit pas d’ici)', dates: 'les dates de votre séjour (pas encore confirmées)',
-    noneFound: 'Je n’ai trouvé aucun remplacement dont la fiche le dit; rien n’a changé.',
+    noneFound: 'Je n’ai trouvé aucun remplacement dont la fiche le dit; rien n’a changé.', thinKeep: 'D’accord, le jour {d} reste tel quel. Rien n’a changé.',
     thinNone: 'Aucun jour de ce plan n’est marqué comme léger.', thinUnknown: 'Le jour {d} a {n} {noun}. Je n’en sais pas plus; dites « ajoute quelque chose au jour {d} » et je regarde.', thinFull: 'Le jour {d} a {n} arrêts; il n’est donc pas marqué comme léger.',
     needKept: 'Sa fiche indique {what}.', needUnknown: 'Sa fiche ne dit pas {say}; appelez avant d’y aller.', needSwapped: 'J’ai choisi {fresh} plutôt que {old} parce que sa fiche {lists}.',
   },

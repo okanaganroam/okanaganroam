@@ -485,7 +485,7 @@ function kindsNamed(t, exceptTypes = new Set()) {
 // dog can come with us" is ONE verify-and-fix request with a part per need (never cut at "and", never a stay change
 // alone), and a question about a need is an answer.
 const ACCESS_BASE = { stops: [], kind: null, time: null, day: null, value: null, n: null, ages: [], region: null, date: null };
-function rulesRead(message, stops, opts = {}) { return access.read(message, stops, { op: (o, extra = {}) => ({ ...ACCESS_BASE, o, ...extra }), stopsNamed }) || groupRead(message, stops, opts) || agent.readAll(message, (m) => rulesReadOne(m, stops, opts)); }
+function rulesRead(message, stops, opts = {}) { return access.read(message, stops, { op: (o, extra = {}) => ({ ...ACCESS_BASE, o, ...extra }), stopsNamed, kindsNamed }) || groupRead(message, stops, opts) || agent.readAll(message, (m) => rulesReadOne(m, stops, opts)); }
 // One of the party does not drink (2026-11-22, Dayton: "one non-drinker must not remove wineries for everyone"): the
 // message is about that person, never a rule for the whole trip. "Only one person does not drink; the rest want
 // wineries. Can you add a winery on day 2 with a non-alcoholic option?" -> party_some (whose need it is) and ONE winery
