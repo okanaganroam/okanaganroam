@@ -5,8 +5,8 @@
   "goals": [
     { "key": "nonbrand_impressions", "label": "Search impressions that don't use our name, per day", "unit": "a day", "baseline": 55, "target": 300, "source": "gsc_nonbrand" },
     { "key": "chatgpt_sessions", "label": "Visits from chatgpt.com, last 28 days", "unit": "visits", "baseline": 99, "target": 300, "source": "ga_chatgpt" },
-    { "key": "linking_sites", "label": "Real websites linking to us", "unit": "sites", "baseline": 12, "target": 30, "source": "manual", "manual": { "value": 12, "as_of": "2026-10-23", "note": "Oct 23 re-scan; badge adoption re-scan was planned for about Nov 5" } },
-    { "key": "venues_linking", "label": "Venues that link to us (badge)", "unit": "venues", "baseline": 1, "target": 15, "source": "manual", "manual": { "value": 2, "as_of": "2026-10-23", "note": "Armstrong museum and Copper Brewing" } },
+    { "key": "linking_sites", "label": "Real websites linking to us", "unit": "sites", "baseline": 12, "target": 30, "source": "manual", "manual": { "value": 16, "as_of": "2026-11-23", "note": "Nov 23 re-scan: +South Okanagan Chamber (Nov 16), +Kelowna Grapevine (Nov 18), +Tourism Peachland article and +Sandy Beach Suites guest-page link (both new this week, followed). Product Hunt and Indie Hackers listings are nofollow, not counted." } },
+    { "key": "venues_linking", "label": "Venues that link to us (badge)", "unit": "venues", "baseline": 1, "target": 15, "source": "manual", "manual": { "value": 2, "as_of": "2026-11-23", "note": "Armstrong museum and Copper Brewing. Nov 23: none of the 15 happy hour badge emails (sent Nov 20) show the badge yet; 57 more badge emails go out Nov 23-24." } },
     { "key": "ai_citations", "label": "Test questions (of 30) where an AI answer cites us", "unit": "of 30", "baseline": 3, "target": 5, "source": "manual", "manual": { "value": 3, "as_of": "2026-11-03", "note": "Nov 3 baseline: Google 3 of 30. Re-run monthly with memory off." } }
   ]
 }
