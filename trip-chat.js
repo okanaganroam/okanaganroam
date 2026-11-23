@@ -99,6 +99,9 @@ const WORD_KINDS = {
   climbing: { en: 'climbing', fr: 'de l’escalade', types: ['indoor', 'sport'], words: ['climb', 'escalade'], re: /\b(?:climbing|bouldering|escalade)\b/ },
   skating: { en: 'skating', fr: 'du patin', types: ['indoor', 'outdoor', 'sport'], words: ['skat', 'rink', 'patin'], re: /\b(?:skating|skate|rinks?|patin\w*)\b/ },
   mini_golf: { en: 'mini golf', fr: 'du mini-golf', types: ['indoor', 'outdoor', 'golf', 'sport'], words: ['mini golf', 'minigolf', 'mini-golf', 'putt'], re: /\b(?:mini[- ]?golf|minigolf|mini putt)\b/ },
+  // (2026-11-23, Dayton: "replace the splash park with a cycling activity suitable for a 15-year-old") A bike trail,
+  // path, park or rental, by the listing's own words (its name or first sentence). "A bike tour" stays the tour kind.
+  cycling: { en: 'a cycling stop', fr: 'un arrêt vélo', types: ['outdoor', 'sport', 'tour'], words: ['bike', 'biking', 'bicycl', 'cycl', 'e-bike', 'ebike', 'velo'], re: /\b(?:cycling|cyclisme|biking|bicycl\w*|(?:e-?)?bikes?(?! ?(?:tours?|rentals?)\b)|velos?|pistes? cyclables?)\b/ },
   escape_room: { en: 'an escape room', fr: 'un jeu d’évasion', types: ['indoor'], words: ['escape'], night: true, re: /\b(?:escape rooms?|jeux? d'evasion)\b/ },
 };
 // Tours and bookable activities (trip-chat-agent.js): kinds of stop like the rest, picked by the planner from the
@@ -430,6 +433,7 @@ function weekdayDays(firstDate, days) {
   for (let i = Math.min(7, days) - 1; i >= 0; i--) for (const n of WEEKDAY_NAMES[new Date(d0 + i * 86400000).getUTCDay()]) out[n] = i + 1;
   return out;
 }
+const WATER_PLAY_RE = /\b(?:spray|splash|water) ?(?:parks?|pads?|play ?grounds?)\b|\bjeux d'eau\b|\bparcs? aquatiques?\b/;
 // The stops a message points at: names (a distinctive word of the name), meals (lunch, dinner) and kinds of place.
 function stopsNamed(t, stops) {
   const found = new Set();
@@ -437,6 +441,9 @@ function stopsNamed(t, stops) {
     const words = fold(s.name).split(/[^a-z0-9']+/).filter((w) => w.length >= 4 && !GENERIC_NAME_WORDS.has(w));
     if (words.some((w) => { const re = new RegExp(`\\b${w.replace(/[^a-z0-9]/g, '')}\\b`); return re.test(t) || (w.includes("'") && re.test(t.replace(/'/g, ''))); })) found.add(s);
   }
+  // (2026-11-23: "the splash park" did not find Kinsmen Spray Park) A spray park, splash park / pad or water park is
+  // one kind of place, whichever of those words its own name uses.
+  if (WATER_PLAY_RE.test(t)) for (const s of stops) if (WATER_PLAY_RE.test(fold(s.name))) found.add(s);
   const lunch = /\b(?:lunch|diner|dejeuner)\b/.test(t), dinner = /\b(?:dinner|supper|souper)\b/.test(t);
   const byName = new Set(found);
   // Round 6 (« le premier restaurant » was dinner, "the first restaurant" lunch): "restaurant" names the meals, in plan order.
@@ -478,7 +485,7 @@ function kindsNamed(t, exceptTypes = new Set()) {
   tk = tk.replace(/\b(?:something|somewhere) relaxing\b|\bquelque chose de relaxant\b/g, 'something_relaxing');
   const out = KIND_WORDS.filter(([kind, re]) => re.test(WORD_KINDS[kind] ? t : tk) && !(KINDS[kind].type && exceptTypes.has(KINDS[kind].type))).map(([kind]) => kind);
   // "a snowmobile tour" is the snowmobile tour, not also "a tour".
-  return out.some((k) => agent.TOUR_KINDS[k]) ? out.filter((k) => k !== 'tour' && !(k === 'winery' && out.includes('wine_tour')) && !(k === 'brewery' && out.includes('brewery_tour'))) : out;
+  return out.some((k) => agent.TOUR_KINDS[k]) ? out.filter((k) => k !== 'tour' && !(k === 'winery' && out.includes('wine_tour')) && !(k === 'brewery' && out.includes('brewery_tour')) && !(k === 'cycling' && out.includes('bike_tour'))) : out;
 }
 // -> { ops, cant }. Several asks in one message are each read and carried out in order (trip-chat-agent.js readAll).
 // Access needs first (trip-chat-access.js): "make sure every activity and the hotel are wheelchair accessible, and the
@@ -750,9 +757,15 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
     // The kind wanted comes after "for / with / to" ("swap the brewery for something outdoors"); "a different winery" names none.
     const forPart = /\b(?:for|with|to|par|pour|avec)\b/.test(t) ? t.replace(/^.*?\b(?:for|with|to|par|pour|avec)\b/, '') : '';
     // The stop named by its name (or its own kind of food) comes before one named by a broad kind.
-    const first = (named.byName || [])[0] || named[0];
+    // (2026-11-23) "replace the splash park with a cycling activity" on a plan that already has a bike trail: the stop
+    // to replace is the one named BEFORE "for / with / to" (the kind asked for after it named the bike trail too).
+    const head = forPart ? stopsNamed(t.replace(/\b(?:for|with|to|par|pour|avec)\b.*$/, ''), stops) : [];
+    const headOn = head.filter((s) => named.includes(s)), headBy = (head.byName || []).filter((s) => named.includes(s));
+    const first = headBy[0] || headOn[0] || (named.byName || [])[0] || named[0];
     const wanted = forPart ? kindsNamed(forPart, new Set([first.type]))[0] || null : null;
-    ops.push(op('replace', { stops: [first], kind: wanted }));
+    // "…suitable for a 15-year-old": the age rides on the swap (the listing's own words decide; never a guess).
+    const forAge = ages.length === 1 && ages[0] >= 1 && ages[0] <= 99 && new RegExp(`\\b${ages[0]}\\s*(?:-|\\s)?(?:year|yr|ans)`).test(forPart || '') ? ages[0] : null;
+    ops.push(op('replace', { stops: [first], kind: wanted, ...(forAge ? { age: forAge } : {}) }));
   } else if (/\b(?:easier|easy|shorter|gentler|beginners?|debutants?|plus facile)\b/.test(t) && /\b(?:hikes?|trails?|walks?|randonnees?|sentiers?)\b/.test(t) && named.some((s) => s.type === 'outdoor')) {
     // "an easier hike, we are beginners": that hike only.
     ops.splice(0, ops.length, op('replace', { stops: [named.find((s) => s.type === 'outdoor')], kind: 'hike' }));
@@ -1656,7 +1669,11 @@ function planTurnCore(ops, ctx) {
         const sun = op.sunset && typeof ctx.sunsetStart === 'function' ? ctx.sunsetStart(old.day, old.region || null) : null;
         const kindOk = (f) => wantMatches(op.kind, f) && mealOk(f) && (!op.toId || !!op.kind || f.type === old.type);
         const ownAsked = feats.filter((x) => OWN_FEATS.includes(x));
-        const lack = ownAsked.length && typeof ctx.lacking === 'function' ? ctx.lacking(feats, swap.types || [swap.type], old) : [];
+        let lack = ownAsked.length && typeof ctx.lacking === 'function' ? ctx.lacking(feats, swap.types || [swap.type], old) : [];
+        // (2026-11-23) Places of that kind the trip's own rules keep out of this swap (server.js tripChatUnfit): a winery
+        // bike tour on a no-alcohol trip or for someone under 19, a listing whose own words give other ages.
+        if (lack !== null && op.o === 'replace' && typeof ctx.unfit === 'function') { try { const u = ctx.unfit({ kind: op.kind || null, age: op.age || null, types: swap.types || [swap.type] }, old) || []; if (u.length) lack = [...(lack || []), ...u]; } catch (e) { /* the swap goes on as before */ } }
+        if (op.age) rr.age = op.age;
         const spec = { slot: old.key, slotStart: Number.isInteger(sun) ? sun : old.start, ...(Number.isInteger(sun) ? { stopStart: sun } : {}), shifts: {}, swap, kind: op.kind || null, exclude: [old.id, ...(lack || [])], oldId: old.id, check: (f) => kindOk(f) && (!feats.length || typeof ctx.hasFeature !== 'function' || feats.every((x) => ctx.hasFeature(f.id, x))) };
         // No place of that kind has the access data asked (lack === null): nothing to try.
         let res = lack === null ? { why: 'no_fit' } : slotEdit(cur, spec, ctx);
@@ -1690,6 +1707,7 @@ function planTurnCore(ops, ctx) {
           continue;
         }
         rr.ok = true; rr.fresh = res.fresh;
+        if (op.age && typeof ctx.ageNote === 'function') { try { rr.ageSays = ctx.ageNote(res.fresh.id, op.age) || null; } catch (e) { rr.ageSays = null; } }
         if (op._featAsked) rr.featOffered = true;
         // A badge asked as the kind of meal ("a dinner with a lake view") is said with its source too.
         if (op.o === 'replace' && !rr.featAsked && ['lake_view', 'patio', 'live_music'].includes(op.kind) && (res.fresh.badges || []).includes(op.kind)) { rr.featAsked = [op.kind]; rr.featCited = true; }
@@ -1903,7 +1921,7 @@ const T = {
     whyHas: 'Your plan does have {what}: {list}.', whyHasAsked: 'You asked for {n} {plural}: {list}.', onDay: '{name} on day {d}', whyDry: 'Your request said the group doesn’t drink, so I left {plural} out. If only one of you doesn’t, say so and I’ll add them.', whyNotIncluded: '{text} Say “add {add}” and I’ll try again.', whyNotAsked: 'Your request didn’t ask for {what}, so there isn’t one. Say “add {add}” if you’d like one.', whyNoFit: 'I didn’t find {what} that fit these days. Say “add {add}” and I’ll try again.',
     lastChange: 'Last change: I {what}.', lastIn: 'added {names}', lastOut: 'took out {names}', lastMoved: 'moved {names}', lastNone: 'I haven’t changed anything in this plan yet.', lastFailed: 'Last time I couldn’t add {kinds}.', nothingMissing: 'Nothing is missing: everything you asked for is in the plan.',
     qNone: 'There’s no {what} in your plan. Say “add {add}” if you’d like one.', qMissingAsked: 'The {what} you asked for isn’t in your plan: none I list fit there on these dates. Say “add {add}” and I’ll find the nearest.',
-    alreadyHas: '{name} already has {what}, so I kept it.', swapped: 'Swapped {old} for {new}{at}.', swapFail: 'I couldn’t find {kind} that fits there, so {old} stays.', swapFailSame: 'Nothing else nearby fits there, so {old} stays.',
+    alreadyHas: '{name} already has {what}, so I kept it.', swapped: 'Swapped {old} for {new}{at}.', swapFail: 'I couldn’t find {kind} that fits there, so {old} stays.', swapFailSame: 'Nothing else nearby fits there, so {old} stays.', swapNearest: 'The nearest one I list is {name} in {town}.', ageSays: 'Its listing says “{says}”.', ageCheck: 'Its listing gives no ages: check it suits a {n}-year-old.',
     addOnPlan: '{name} is already on your plan (day {d}); I didn’t find another one to add.', addNoneListed: 'There’s no {noun} listed in {town}, so I couldn’t add one.',
     added: 'Added {new}{at}.', addedFor: 'Added {new}{at} in place of {old}.', info: 'I can’t answer questions about a place here. Tap the stop’s name for its hours, prices and details.', moved: '{name} moves to {time}.', noRoom: 'There’s no free spot for {kind} {where} without dropping a stop. Remove or swap one first.', addFailWhere: 'I couldn’t find {kind} open nearby {where}.', afterW: 'after {x}', beforeW: 'before {x}', thereW: 'at that time', lunchW: 'lunch', dinnerW: 'dinner', addedClose: 'Added {new}{at}, the closest fit I found.', addFail: 'I couldn’t fit {kind} into this plan.', more: 'Added {new}{at}, more like {liked}.', moreFail: 'I kept {liked}, but couldn’t fit another like it.',
     cheaperPick: 'Swapped {old} for {new}, a cheaper pick.', fancierPick: 'Swapped {old} for {new}, a fancier pick.', cheaperFail: 'I couldn’t find a cheaper pick than {old} there.', fancierFail: 'I couldn’t find a fancier pick than {old} there.',
@@ -1963,7 +1981,7 @@ const T = {
     whyHas: 'Votre plan comprend bien {what} : {list}.', whyHasAsked: 'Vous avez demandé {n} {plural} : {list}.', onDay: '{name} au jour {d}', whyDry: 'Votre demande disait que le groupe ne boit pas, donc j’ai laissé de côté les {plural}. Si une seule personne ne boit pas, dites-le et je les ajouterai.', whyNotIncluded: '{text} Dites « ajoute {add} » et je réessaierai.', whyNotAsked: 'Votre demande ne mentionnait pas {what}, donc il n’y en a pas. Dites « ajoute {add} » si vous en voulez.', whyNoFit: 'Je n’ai pas trouvé {what} qui convienne à ces journées. Dites « ajoute {add} » et je réessaierai.',
     lastChange: 'Dernier changement : j’ai {what}.', lastIn: 'ajouté {names}', lastOut: 'retiré {names}', lastMoved: 'déplacé {names}', lastNone: 'Je n’ai encore rien changé à ce plan.', lastFailed: 'La dernière fois, je n’ai pas pu ajouter {kinds}.', nothingMissing: 'Rien ne manque : tout ce que vous avez demandé est dans le plan.',
     qNone: 'Il n’y a pas de {what} dans votre plan. Dites « ajoute {add} » si vous en voulez un.', qMissingAsked: 'Le {what} demandé n’est pas dans votre plan : aucun de ceux que nous listons ne convenait à ces dates. Dites « ajoute {add} » et je trouverai le plus proche.',
-    alreadyHas: '{name} a déjà {what}, donc je l’ai gardé.', swapped: 'J’ai remplacé {old} par {new}{at}.', swapFail: 'Je n’ai pas trouvé {kind} qui convienne à ce moment, donc {old} reste.', swapFailSame: 'Rien d’autre à proximité ne convient à ce moment, donc {old} reste.',
+    alreadyHas: '{name} a déjà {what}, donc je l’ai gardé.', swapped: 'J’ai remplacé {old} par {new}{at}.', swapFail: 'Je n’ai pas trouvé {kind} qui convienne à ce moment, donc {old} reste.', swapFailSame: 'Rien d’autre à proximité ne convient à ce moment, donc {old} reste.', swapNearest: 'Le plus proche que je répertorie : {name}, à {town}.', ageSays: 'Sa fiche indique « {says} ».', ageCheck: 'Sa fiche ne donne pas d’âges : vérifiez que cela convient à {n} ans.',
     addOnPlan: '{name} est déjà dans votre plan (jour {d}); je n’en ai pas trouvé d’autre à ajouter.', addNoneListed: 'Aucun lieu « {noun} » n’est répertorié à {town} : je n’ai rien ajouté.',
     added: 'J’ai ajouté {new}{at}.', addedFor: 'J’ai ajouté {new}{at} à la place de {old}.', info: 'Je ne peux pas répondre aux questions sur un lieu ici. Touchez le nom de l’arrêt pour ses heures, ses prix et ses détails.', moved: '{name} passe à {time}.', noRoom: 'Pas de place libre pour {kind} {where} sans retirer un arrêt. Retirez-en ou remplacez-en un d’abord.', addFailWhere: 'Je n’ai pas trouvé {kind} ouvert à proximité {where}.', afterW: 'après {x}', beforeW: 'avant {x}', thereW: 'à ce moment', lunchW: 'le dîner', dinnerW: 'le souper', addedClose: 'J’ai ajouté {new}{at}, le meilleur moment que j’ai trouvé.', addFail: 'Je n’ai pas pu ajouter {kind} à ce plan.', more: 'J’ai ajouté {new}{at}, dans le même esprit que {liked}.', moreFail: 'J’ai gardé {liked}, mais je n’ai pas pu en ajouter un autre du même genre.',
     cheaperPick: 'J’ai remplacé {old} par {new}, moins cher.', fancierPick: 'J’ai remplacé {old} par {new}, plus chic.', cheaperFail: 'Je n’ai pas trouvé moins cher que {old} à ce moment.', fancierFail: 'Je n’ai pas trouvé plus chic que {old} à ce moment.',
@@ -2147,9 +2165,17 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
         if (r.featAsked && !r.ok && r.old) { parts.push(fill(t.featNone, { old: r.old.name, badge: t.featBadge[r.featAsked[0]] || r.featAsked[0] })); break; }
         if (r.ok && r.fresh && r.featAsked) featLine = r.feat ? plural(fill(t.featHas, { site: agent.AREA.site, badge: badges(r.featAsked) }), r.featAsked) : r.featOffered ? fill(t.featUnsure, { site: agent.AREA.site, say: r.featAsked.map((f) => t.featSay[f] || f).join(t.featOr) }) : fill(t.featUnknown, { site: agent.AREA.site, badge: t.featBadge[r.featAsked[0]] || r.featAsked[0] });
         if (r.ok && r.already) parts.push(fill(t.alreadyHas, { name: r.old.name, what: kindLabel(r.kind) }));
-        else if (r.ok && r.fresh) { parts.push(fill(t.swapped, { old: r.old.name, new: r.fresh.name, at: at(r.fresh) })); described.add(r.fresh.id); described.add(r.old.id); } else if (r.ok) parts.push(t.refine);
+        else if (r.ok && r.fresh) {
+          parts.push(fill(t.swapped, { old: r.old.name, new: r.fresh.name, at: at(r.fresh) })); described.add(r.fresh.id); described.add(r.old.id);
+          // An age asked of the new stop: what its own listing says, else "check" (never our own claim).
+          if (r.age) parts.push(fill(r.ageSays ? t.ageSays : t.ageCheck, { n: r.age, says: r.ageSays || '' }));
+        } else if (r.ok) parts.push(t.refine);
         else if (!r.old) parts.push(fill(t.notFound, { what: L === 'fr' ? 'cet arrêt' : 'that stop' })); // no stop was named
-        else parts.push(r.kind ? fill(t.swapFail, { kind: kindLabel(r.kind), old: r.old.name }) : fill(t.swapFailSame, { old: r.old.name }));
+        else {
+          parts.push(r.kind ? fill(t.swapFail, { kind: kindLabel(r.kind), old: r.old.name }) : fill(t.swapFailSame, { old: r.old.name }));
+          // The nearest one we do list, in another town (named only; nothing changes).
+          if (r.nearest && r.nearest.name) parts.push(fill(t.swapNearest, { name: r.nearest.name, town: r.nearest.town || '' }));
+        }
         break;
       case 'add':
         if (r.tour) {
@@ -2363,7 +2389,7 @@ module.exports = {
   MODEL, PRICE_PER_TOKEN, DEFAULT_TIMEOUT_MS, DEFAULT_DAILY_USD, MAX_MESSAGE, MAX_STOPS, RATE, OPS, TIMES, VALUES, CANT, KINDS, KIND_KEYS, CHIPS, T,
   enabled, apiKey, wireSchema, systemPrompt, stopsForModel, stripPII, validateWire, readChatMessage, rulesRead, chipOps,
   rulesConfident, reconcileReads, eventsNamed, eventAtAlcoholPlace, partyKnown, AVOID_TEXT,
-  planStops, planTurn, broadTurn, placeAdd, buildReply, cantReply, plannerCanRead, kindMatches, joinText, clock, isDayPlan, isShortPlan,
+  stopsNamed, kindsNamed, planStops, planTurn, broadTurn, placeAdd, buildReply, cantReply, plannerCanRead, kindMatches, joinText, clock, isDayPlan, isShortPlan,
   rulesReadOne, agent, explain, kindNoun, TYPE_PLURAL, fold, joinList, raiseCount, KIND_WORDS, guardTurn, guardReply, explainReply, onePersonText, groupRead, TARGETED_OPS,
   dailyCapUsd, spentToday, addSpend, resetSpend, costOf, pacificDay, EXPLICIT_DATE_RE, rateLimited, rateWaitMinutes, busyReply, resetRate, WORD_KINDS, weekdayDays,
 };

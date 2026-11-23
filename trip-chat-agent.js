@@ -43,7 +43,9 @@ const tourKindOf = (k) => TOUR_KINDS[k] || null;
 // "drop the museum, add a wine tour Saturday and find us a hotel with a hot tub": cut at a comma, "and", "then", "also"
 // (et, puis, aussi) only where the next part starts a new ask (its own verb), so "wineries and a brewery" stays whole.
 const ASK_START = "(?:please |can you |could you |svp |s'il vous plait |pouvez-vous |peux-tu )?(?:remove|drop|skip|delete|cut|take (?:out|off)|get rid of|add|include|find|get|book|reserve|swap|replace|switch|change|move|put|make|keep|we need|we want|we'd like|we would like|i need|i want|i'd like|we are|we're|we have|we don't|we do not|no more|is |are |does |do |what |when |why |how |where |enleve[rz]?|retire[rz]?|supprime[rz]?|ajoute[rz]?|trouve[rz]?|reserve[rz]?|remplace[rz]?|change[rz]?|deplace[rz]?|mets|garde[rz]?|on a besoin|on veut|nous voulons|il nous faut|on arrive|nous arrivons|est-ce|pourquoi|combien)\\b";
-const SPLIT_RE = new RegExp(`\\s*(?:[,;]\\s*(?:and then|and also|and|then|also|plus|et aussi|et puis|et|puis|aussi)?|\\.\\s+|\\s(?:and then|and also|and|then|also|plus|et aussi|et puis|et|puis)\\s)\\s*(?=${ASK_START})`, 'g');
+// (2026-11-23, Dayton: "Does this stay within our total $600 budget…? Please replace the splash park…" dropped the
+// request) A question mark ends an ask too: the question keeps its "?" and the next sentence is read on its own.
+const SPLIT_RE = new RegExp(`\\s*(?:[,;]\\s*(?:and then|and also|and|then|also|plus|et aussi|et puis|et|puis|aussi)?|\\.\\s+|(?<=\\?)\\s+|\\s(?:and then|and also|and|then|also|plus|et aussi|et puis|et|puis)\\s)\\s*(?=${ASK_START})`, 'g');
 function splitAsks(message) {
   const m = String(message || '').replace(/\s+/g, ' ').trim();
   // Folded only to find the cut points; the parts keep the visitor's own letters.
@@ -122,8 +124,9 @@ const Q_TOPICS = [
   ['q_vegan', /\b(?:vegan|vegetalien\w*|vegetarian|vegetarien\w*|gluten)\b/],
   ['q_view', /\b(?:lake ?view|view|vue)\b/],
 ];
-const Q_VALUES = [...Q_TOPICS.map(([k]) => k), 'q_where', 'q_why_not', 'q_dry', 'q_changed', 'q_couldnt', 'q_evidence', 'q_warning', 'q_allergy', 'q_why_event', 'q_why_count'];
+const Q_VALUES = [...Q_TOPICS.map(([k]) => k), 'q_where', 'q_why_not', 'q_dry', 'q_changed', 'q_couldnt', 'q_evidence', 'q_warning', 'q_allergy', 'q_why_event', 'q_why_count', 'q_budget'];
 const explain = require('./trip-chat-explain.js');
+const budget = require('./trip-budget.js');
 const MEAL_RE = /\b(?:restaurants?|dinner|supper|lunch|souper|diner|dejeuner|meal|repas)\b/;
 const SKI_ASK_RE = /\b(?:lifts?|gondolas?|chairlifts?|ski hill|remontees?|telecabines?)\b/;
 const SKI_NAME_RE = /\b(?:ski|resort|blackcomb|big white|silverstar|silver star|apex mountain|baldy|gondola|sun peaks)\b/;
@@ -161,6 +164,10 @@ function agentRules(t, stops, ctx, h) {
   const day = dayM ? Number(dayM[1]) : wdM ? weekdays[wdM[1]] : null;
   const regionIn = (s) => regions.find((x) => new RegExp(`\\b${fold(regionLabels[x] || x).replace(/[^a-z0-9 ]/g, '.')}\\b`).test(s)) || null;
   const editVerb = EDIT_VERB_RE.test(t);
+  // (2026-11-23) What the trip costs, or whether it fits the budget: a question, answered from the same estimate as
+  // "Book my trip" (trip-budget.js). Never a change to the stay or the stops ("hotel", "budget" and "$600" in it used
+  // to be read as "a cheaper hotel").
+  if (budget.isBudgetQuestion(t)) return { ops: [op('ask', { value: 'q_budget' })], cant: null, exact: true, explain: true };
   const explained = explainRules(t, h, stops);
   if (explained) return explained;
 

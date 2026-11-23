@@ -688,6 +688,10 @@ function parseShareContext(query) {
     if (ni.length && typeof q.nt === 'string' && /^[a-z][a-z0-9-]{1,30}(?:,[a-z][a-z0-9-]{1,30}){0,2}$/.test(q.nt)) out.niTowns = q.nt.split(',');
   }
   if (typeof q.wt === 'string' && /^[A-Za-z0-9]{3,20}$/.test(q.wt)) out.wineTour = q.wt;
+  // The traveller's budget (2026-11-23, trip-budget.js): bg=600t the limit (t total, p per person, n a night) and
+  // be=570.920.2.0.2.12.0.0 the estimate's own figures (low.high.people.assumed.nights.stops.unpriced.stayMissing; x =
+  // no figure). Values only; the copy's two lines are worded again on the server. No bg: as before.
+  { const b = require('./trip-budget.js').fromShare(q); if (b) { out.budget = b; out.budgetQ = { bg: String(q.bg), be: /^[0-9x.]{1,60}$/.test(String(q.be || '')) ? String(q.be) : '' }; } }
   if (typeof q.asks === 'string' && q.asks) { const k = [...new Set(q.asks.split(',').filter((a) => ASK_RE.test(a)))].slice(0, 12); if (k.length) out.asks = k; }
   return Object.keys(out).length ? out : null;
 }
@@ -715,6 +719,7 @@ function shareContextQuery(c) {
   if (c.notIncluded && c.notIncluded.length) p.push(`ni=${c.notIncluded.map(shareNiToken).join(',')}`);
   if (c.notIncluded && c.notIncluded.length && c.niTowns && c.niTowns.length) p.push(`nt=${c.niTowns.join(',')}`);
   if (c.wineTour) p.push(`wt=${c.wineTour}`);
+  if (c.budgetQ && c.budgetQ.bg) { p.push(`bg=${c.budgetQ.bg}`); if (c.budgetQ.be) p.push(`be=${c.budgetQ.be}`); }
   return p.join('&');
 }
 const shareNiToken = (x) => `${x.kind}:${x.reason === 'none_listed' ? 'n' : 'f'}${x.nearestId ? `:${x.nearestId}` : ''}`;

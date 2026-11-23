@@ -21,6 +21,7 @@
 //   id and by URL).
 
 const SITE = require('./trip-site.js');
+const tripBudget = require('./trip-budget.js');
 
 const CONFIG = SITE.tripEstimate;
 const TASTING_TYPES = ['winery', 'brewery', 'distillery'];
@@ -186,11 +187,17 @@ function tripBookingSteps(card, checklist) {
 
 // Adds estimate and bookingSteps to the whereToStay block (for the pick) and to every card (so the box can follow a
 // Change of stay without any maths in the browser).
-function withTripBooking(block, plan) {
+// budget (2026-11-23, trip-budget.js readBudget): the traveller's own limit, set beside each card's estimate (the same
+// numbers), so the sheet, the summary and the shared copy say one thing. No budget: nothing is added.
+function withTripBooking(block, plan, budget = null) {
   if (!block || !block.pick) return block;
-  const add = (card) => ({ ...card, estimate: tripEstimate(plan, card, block.trip), bookingSteps: tripBookingSteps(card, block.checklist) });
+  const add = (card) => {
+    const estimate = tripEstimate(plan, card, block.trip);
+    const b = budget ? tripBudget.worded(tripBudget.facts(estimate, budget, { hasStay: true, stayName: card.name })) : null;
+    return { ...card, estimate, ...(b ? { budget: b } : {}), bookingSteps: tripBookingSteps(card, block.checklist) };
+  };
   const pick = add(block.pick);
-  return { ...block, pick, alternatives: (block.alternatives || []).map(add), estimate: pick.estimate, bookingSteps: pick.bookingSteps };
+  return { ...block, pick, alternatives: (block.alternatives || []).map(add), estimate: pick.estimate, ...(pick.budget ? { budget: pick.budget } : {}), bookingSteps: pick.bookingSteps };
 }
 
 module.exports = { PARTS, tripEstimate, tripBookingSteps, withTripBooking, stayPart, stopPerPerson, nightMonths };
