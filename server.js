@@ -9509,6 +9509,7 @@ const V4_WHEN_DAYS = { 'this-weekend': 2, 'next-weekend': 2, weekend: 2, today: 
 // asked for), on the quarter hour and never before 4 PM, so the kitchens open then are the ones planned; the plan says
 // when the sun sets. A dinner time the request gives itself wins. With a lake view only where the site reads a sunset dinner
 // that way (TRIP_SITE.sunsetDinner). -> { text, note } or null.
+const V4_SUNSET_DINNER_RE = /\b(?:a\s+)?sunset dinners?\b|\bdinner (?:at|with|during|around|watching) (?:the |a )?sunset(?: view)?\b/i;
 // Round 5 (2026-11-22: a Swap to "sunset dinner with a lake view" put Palmer Kitchen at 6:15 PM, after the ~5:05 PM
 // sunset): the start of a sunset dinner on a date in a town (a region key; null = the whole site), for the chat's Swap /
 // overrides.stopStarts path too: about 30 minutes before that day's real sunset, on the quarter hour, 4 PM to 9 PM.
@@ -9522,7 +9523,6 @@ function sunsetDinnerStart(date, town = null) {
   if (!light || !Number.isFinite(light.sunsetMinutes)) return null;
   return { startMinutes: Math.max(960, Math.min(1260, Math.floor((light.sunsetMinutes - 30) / 15) * 15)), sunsetMinutes: Math.round(light.sunsetMinutes) };
 }
-const V4_SUNSET_DINNER_RE = /\b(?:a\s+)?sunset dinners?\b|\bdinner (?:at|with|during|around|watching) (?:the |a )?sunset(?: view)?\b/i;
 function v4SunsetDinner(a, now = new Date()) {
   const text = String((a && a.text) || '');
   const m = V4_SUNSET_DINNER_RE.exec(text);
