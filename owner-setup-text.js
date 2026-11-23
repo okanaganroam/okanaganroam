@@ -2383,7 +2383,7 @@ en.indoor = {
   bringClash: 'Found online, may not match your answers: check it. Type your own line below, or skip to leave it as it is.',
   // Your story and Known for
   storyQ: 'Tell visitors about your place', storyLabel: 'About your place', storyEx: 'A family-run escape room since 2016, with six themed rooms for 2 to 8 players.',
-  knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows under “Plan your visit” on your page.', knownEx: 'Six themed rooms, great for birthdays',
+  knownQ: 'What are you known for?', knownLead: 'One line is perfect. It shows under “Your visit” on your page.', knownEx: 'Six themed rooms, great for birthdays',
   knownGuess: 'We found this online. Check it, and change any words that aren’t right.',
   storyKnownSaved: 'Your Known for line is on your page now. Your story will show within a day.',
   // Groups and parties
@@ -3162,6 +3162,11 @@ fr.outdoor = sportStrings(fr.sport, {
   noSetHoursHint: '',
   quick: { good_to_know: fr.indoor.quick.good_to_know_kinds.outdoorgen.slice(), groups: ['Fêtes d’anniversaire', 'Groupes scolaires bienvenus', 'Réservations privées sur demande'] },
 });
+// Outdoor retest (2026-11-23; Codex): an outdoor page's section is “Plan your visit” (only indoor pages have a “Your visit” tab).
+(function outdoorVisitWord() {
+  const walk = (o) => { for (const k of Object.keys(o)) { const v = o[k]; if (typeof v === 'string') o[k] = v.replace(/“Your visit”/g, '“Plan your visit”').replace(/« Votre visite »/g, '« Planifiez votre visite »'); else if (Array.isArray(v)) o[k] = v.map((x) => (typeof x === 'string' ? x.replace(/“Your visit”/g, '“Plan your visit”').replace(/« Votre visite »/g, '« Planifiez votre visite »') : x)); else if (v && typeof v === 'object') walk(v); } };
+  walk(en.outdoor); walk(fr.outdoor);
+})();
 // An outdoor listing with no kind yet reads in the "Something else outdoors" words.
 for (const T of [en.outdoor, fr.outdoor]) if (T.kindText && T.kindText.outdoorother) T.kindText.other = T.kindText.outdoorother;
 (function frSpacesOutdoor(o) {

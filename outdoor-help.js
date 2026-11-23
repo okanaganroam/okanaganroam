@@ -514,6 +514,8 @@ const FOREIGN = [/\bgolf/i, /\btee times?\b/i, /\bgreen fees?\b/i, /\blessons?\b
   /\bhappy hour\b/i, /\btrivia\b/i, /\bkaraoke\b/i, /\bmen’s night\b/i, /\bgrip socks\b/i, /\binstructors?\b/i, /\brink\b/i, /\bskate\b/i, /\bbays?\b/i, /\bcourts\b/,
   /\bcours\b/, /\bgolf\b/i, /(?<!(Book|Réserver)\s+(and|et)\s+|☰\s*|dans le )\bmenus?\b(?!\s*☰)/i, /\bcasse-croûte\b/i, /\bjournées? pédagogiques?\b/i, /\bmenus? de nourriture\b/i, /\bligues?\b/i, /\btournois?\b/i, /\bplats\b/];
 const SWAPS = [
+  // Outdoor retest (2026-11-23; Codex): an outdoor page's section is “Plan your visit” (indoor pages have a “Your visit” tab).
+  [/“Your visit”/g, '“Plan your visit”'], [/« Votre visite »/g, '« Planifiez votre visite »'],
   // Outdoor fresh test (2026-11-23; Codex): no class or party examples in an outdoor place's booking answers.
   [/Booking always required \(classes fill up\)\?/g, 'Booking always required?'], [/La réservation est toujours obligatoire \(les cours sont pleins\)\?/g, 'La réservation est toujours obligatoire?'],
   [/ \(<strong>Book a party<\/strong> when the link is your party page\)/g, ''], [/ \(<strong>Réserver une fête<\/strong> si le lien est votre page de fêtes\)/g, ''],
