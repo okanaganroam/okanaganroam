@@ -208,6 +208,16 @@ function tripStayContext(plan, input, today, opts = {}) {
   const firstDate = ((plan.schedule || []).find((r) => r && validDate(r.date)) || {}).date || (validDate(plan.listDate) ? plan.listDate : null);
   let arrive = i.arrive || firstDate || (validDate(today) ? today : null);
   if (opts.v4 && !i.arrive && validDate(opts.minArrive) && (!arrive || arrive < opts.minArrive)) arrive = opts.minArrive;
+  // Round 5 (2026-11-22): no dates given -- never before a stop reopens for the season (opts.notBefore), and a
+  // "weekend" starts on the coming Saturday (Friday for a 3-day weekend).
+  if (opts.v4 && !i.arrive && !firstDate) {
+    if (validDate(opts.notBefore) && (!arrive || arrive < opts.notBefore)) arrive = opts.notBefore;
+    if (arrive && /\b(?:week-?ends?|fin de semaine|fins de semaine)\b/i.test(String(opts.text || ''))) {
+      const want = planDays >= 3 ? 5 : 6; // 5 = Friday, 6 = Saturday (getUTCDay)
+      const wd = new Date(`${arrive}T12:00:00Z`).getUTCDay();
+      arrive = addDays(arrive, (want - wd + 7) % 7);
+    }
+  }
   const nights = i.arrive && i.leave ? daysBetween(i.arrive, i.leave) : Math.max(planDays - 1, i.force ? 1 : 0);
   if (!(nights >= 1) || !arrive) return null;
   const leave = i.leave || addDays(arrive, nights);
@@ -220,13 +230,16 @@ function tripStayContext(plan, input, today, opts = {}) {
   const located = stops.filter((s) => s.lat !== null);
   const centre = located.length ? { lat: located.reduce((t, s) => t + s.lat, 0) / located.length, lng: located.reduce((t, s) => t + s.lng, 0) / located.length } : null;
   const party = partyOf(plan);
-  const adults = Number.isInteger(i.adults) ? i.adults : null;
   const kids = Number.isInteger(i.kids) ? i.kids : null;
+  // Round 5 (2026-11-22: "two kids" showed "2 kids" with no adults): kids with no adult count are 2 adults plus the kids,
+  // said as "2 adults, 2 kids" (adultsAssumed: the visitor can change it under Dates and guests).
+  const adultsAssumed = !Number.isInteger(i.adults) && kids > 0;
+  const adults = Number.isInteger(i.adults) ? i.adults : adultsAssumed ? 2 : null;
   // Kids: the party size when given, else the request's own words ("with kids").
   const withKids = kids !== null ? kids > 0 : !!party.kids;
   const guests = adults !== null ? adults + (kids || 0) : null;
   return {
-    arrive, leave, nights, months, adults, kids, guests, withKids, dog: i.dog === true || !!party.dog, budget: budgetOf(plan.intent),
+    arrive, leave, nights, months, adults, ...(adultsAssumed ? { adultsAssumed: true } : {}), kids, guests, withKids, dog: i.dog === true || !!party.dog, budget: budgetOf(plan.intent),
     centre, primaryRegion: regions[0], regions, datesGiven: !!(i.arrive && i.leave), camping: wantsCamping(plan),
     ...(opts.v4 ? { v4: true, couple: V4_COUPLE_RE.test(v4Words(plan, opts.text)), budgetStay: V4_BUDGET_STAY_RE.test(v4Words(plan, opts.text)) } : {}),
   };
@@ -319,6 +332,13 @@ function scoreStay(stay, ctx) {
       const k = v4StayKindKey(stay);
       if (V4_COUPLE_KINDS.includes(k)) { score -= k === 'b&b' || k === 'inn' || k === 'resort' ? 3 : 2; }
       else score += 3;
+      // Round 5 (2026-11-22: a couple's Penticton wine weekend got Tiki Shores, "Sleeps 8"): a family resort and big
+      // multi-bedroom suites come after the places made for two, unless kids are coming.
+      if (!ctx.withKids) {
+        const words = `${stay.name || ''} ${stay.description || ''}`.toLowerCase();
+        if (/\b(?:family|families|kids?|children|waterslides?|water ?park|playground|mini golf|arcade)\b/.test(words)) score += 3;
+        if ((intIn(f.max_guests, 6, 1000)) || intIn(f.bedrooms_max, 3, 100)) score += 2.5;
+      }
     }
   }
   // A camping trip: campgrounds and RV parks first.
@@ -420,7 +440,7 @@ function whereToStay(plan, input, stays, today, opts = {}) {
   const pick = tag(picked.pick);
   return {
     stayId: picked.pick.id,
-    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, kids: ctx.kids, ...(input && Array.isArray(input.kidAges) && input.kidAges.length === ctx.kids ? { kidAges: input.kidAges.slice() } : {}), dog: !!ctx.dog, datesGiven: ctx.datesGiven },
+    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, ...(ctx.adultsAssumed ? { adultsAssumed: true } : {}), kids: ctx.kids, ...(input && Array.isArray(input.kidAges) && input.kidAges.length === ctx.kids ? { kidAges: input.kidAges.slice() } : {}), dog: !!ctx.dog, datesGiven: ctx.datesGiven },
     pick,
     alternatives: picked.alternatives.map(tag),
     ...(amenity ? { amenity } : {}),

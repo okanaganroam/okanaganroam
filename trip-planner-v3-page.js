@@ -118,7 +118,7 @@ function t3PlanNextSteps(p) {
     return '/'+(region?region+'/':'')+slug;
   }
   (p.requirementResults||[]).forEach(function(i){
-    if(i.status!=='unmet'||['type','type_count','venue_kind','venue','activity','event','rainy','feature'].indexOf(i.kind)===-1)return;
+    if(i.status!=='unmet'||i.silent||['type','type_count','venue_kind','venue','activity','event','rainy','feature'].indexOf(i.kind)===-1)return;
     var key=i.kind+':'+i.value;if(seen[key])return;seen[key]=true;
     var eventLabels={hockey:'hockey game','live-music':'live music',festival:'festival',market:'market',comedy:'comedy show',show:'show',concert:'concert'};
     var requestLabels={pottery:'pottery class'};
@@ -1133,7 +1133,7 @@ const T3_STAY_CLIENT_SRC = `
     var more = e.showTotal ? '<p class="t3-book-parts">' + esc(parts) + '</p>' : '';
     if (e.unknown && e.unknown.length) more += '<p class="t3-book-note">' + esc((fr ? 'Prix non indiqué, non compté : ' : 'Price not listed, not counted: ') + e.unknown.join(', ')) + '</p>';
     (e.notes || []).forEach(function(n){ more += '<p class="t3-book-note">' + esc(fr ? n.textFr : n.text) + '</p>'; });
-    if (e.peopleAssumed) more += '<p class="t3-book-note">' + esc(fr ? 'Pour 2 personnes : changez le nombre sous « Dates et voyageurs ».' : 'Counted for 2 people: change it under “Dates and guests”.') + '</p>';
+    if (e.peopleAssumed) more += '<p class="t3-book-note">' + esc(e.kids > 0 ? (fr ? 'Pour 2 adultes et ' + e.kids + (e.kids > 1 ? ' enfants' : ' enfant') + ' : changez le nombre sous « Dates et voyageurs ».' : 'Counted for 2 adults and ' + e.kids + (e.kids > 1 ? ' kids' : ' kid') + ': change it under “Dates and guests”.') : (fr ? 'Pour 2 personnes : changez le nombre sous « Dates et voyageurs ».' : 'Counted for 2 people: change it under “Dates and guests”.')) + '</p>';
     more += '<p class="t3-book-note">' + esc(fr ? 'Estimation seulement, en dollars canadiens : taxes, pourboires et frais en sus; les prix changent.' : 'Estimate only, in CAD: taxes, tips and fees extra; prices change.') + '</p>';
     return '<div class="t3-book-est"><button type="button" class="t3-book-est-btn" data-t3-est aria-expanded="false" aria-controls="t3BookEst"><strong>' + esc(head.amount) + '</strong> <span class="t3-book-tag">' + esc(head.tag) + '</span> <span aria-hidden="true" class="t3-book-caret">▾</span></button>'
       + (e.showTotal ? '' : '<p class="t3-book-parts">' + esc(parts) + '</p>' + t3EstimateStayHtml(e, s, fr))

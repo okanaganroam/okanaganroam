@@ -103,7 +103,7 @@ const roundUp = (n) => Math.ceil(n / 10) * 10;
 // plan: the planner's result; card: the stay card (or null); trip: whereToStay.trip.
 function tripEstimate(plan, card, trip, cfg = CONFIG) {
   const t = trip || {};
-  const known = Number.isInteger(t.adults) && t.adults > 0;
+  const known = Number.isInteger(t.adults) && t.adults > 0 && !t.adultsAssumed;
   const kids = Number.isInteger(t.kids) && t.kids > 0 ? t.kids : 0;
   // Party not given: two people, said on the box ("for 2 people") -- the same default the booking sites use.
   // Round 3: kids named with no adult count ("two kids, 7 and 10") are 2 adults plus the kids, never "for 2 people".
