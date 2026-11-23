@@ -9345,7 +9345,8 @@ function tripDatesOf(plan, stay, now = new Date()) {
   const src = typeof plan.dateSourceText === 'string' ? plan.dateSourceText : '';
   const when = (plan.intent && plan.intent.when) || {};
   let source = 'assumed';
-  if (src === 'Date control') source = stay && stay.via === 'chat' ? 'chat' : 'picked';
+  // (The Dates fields send stay.arrive; a start date with none came from the chat: "make it December 12".)
+  if (src === 'Date control') source = !stay || !stay.arrive || stay.via === 'chat' ? 'chat' : 'picked';
   else if (/\d/.test(src) || /^(?:tomorrow|today|tonight)$/i.test(src) || when.relative === 'tomorrow' || when.preset === 'today') source = 'request';
   const out = { start: dates[0], end: dates[dates.length - 1], source };
   if (source === 'assumed') { out.assumed = true; if (src) out.basis = src; }
