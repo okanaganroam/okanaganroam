@@ -100,12 +100,16 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-sheet-x { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; border: 0; border-radius: 999px; background: rgba(27,43,58,0.06); font-size: 1.3rem; cursor: pointer; color: var(--ref-navy); z-index: 1; }
   .t3-v4 .v4-sheet .t3-stay { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; }
   .t3-v4 .v4-sheet h3 { margin: 4px 48px 10px 0; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.3rem; }
-  /* Rooms (2026-11-22): "3 rooms (assumed)  1 2 3 4+" by the stay. One short row; each button's tap area is 44px. */
-  .t3-v4 .v4-rooms { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 0.82rem; font-weight: 700; color: var(--ref-navy); }
-  .t3-v4 .v4-rooms-btns { display: inline-flex; gap: 2px; margin-left: auto; }
-  .t3-v4 .v4-rooms button { position: relative; min-width: 44px; height: 32px; padding: 0 6px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.22); background: #fff; color: var(--ref-navy); font: inherit; font-weight: 800; cursor: pointer; }
-  .t3-v4 .v4-rooms button::after { content: ''; position: absolute; inset: -7px -1px; }
-  .t3-v4 .v4-rooms button[aria-pressed="true"] { background: var(--ref-navy); border-color: var(--ref-navy); color: #fff; }
+  /* Rooms (2026-11-22): "Rooms  [−]  3 (assumed)  [+]" by the stay. One short row; each button's tap area is 44px
+     (the card's buttons are drawn shorter and reach 44px with ::after; the sheet's are 44px themselves). */
+  .t3-v4 .v4-rooms { position: relative; display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 0.82rem; font-weight: 700; color: var(--ref-navy); }
+  .t3-v4 .v4-rooms-step { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+  .t3-v4 .v4-rooms-now { min-width: 5.8em; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .t3-v4 .v4-rooms button { position: relative; flex: none; width: 44px; height: 32px; padding: 0; border-radius: 999px; border: 1px solid rgba(27,43,58,0.45); background: #fff; color: var(--ref-navy); font: inherit; font-size: 1.15rem; font-weight: 800; line-height: 1; cursor: pointer; }
+  .t3-v4 .v4-rooms button::after { content: ''; position: absolute; inset: -7px 0; }
+  .t3-v4 .v4-rooms button:focus-visible { outline: 3px solid #2f6f8f; outline-offset: 2px; }
+  .t3-v4 .v4-rooms button[disabled] { opacity: 0.38; cursor: not-allowed; }
+  .t3-v4 .v4-rooms-say { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
   .t3-v4 .v4-book .v4-rooms button { height: 44px; }
   .t3-v4 .v4-book .v4-rooms button::after { content: none; }
   .t3-v4 .v4-check { list-style: none; margin: 10px 0; padding: 0; border: 1px solid rgba(27,43,58,0.1); border-radius: 14px; }
@@ -576,20 +580,21 @@ const V4_CLIENT_SRC = String.raw`
       return u.toString();
     } catch (e) { return raw; }
   }
-  // "3 rooms (assumed)  1 2 3 4+": the rooms, said and changed in one short row by the stay (the plan's card and the
-  // Book my trip sheet). Shown when it matters (stayRoomsMatter) or once a number was picked or said. "4+" is 4, then
-  // one more with each tap, up to one room per adult (8 at most).
+  // "Rooms  [−]  3 (assumed)  [+]": the rooms, said and changed in one short row by the stay (the plan's card and the
+  // Book my trip sheet). Shown when it matters (stayRoomsMatter) or once a number was picked or said. A minus and a
+  // plus button, one room a tap, from 1 up to one room per adult (8 at most); a button at its limit is disabled.
+  // "(assumed)" stays until the first tap (or a number said in the chat or set in Dates and guests). The empty status
+  // line is filled after a tap ("4 rooms"), so a screen reader hears the new number: the row itself is drawn again.
   function v4RoomsHtml(fr){
     var st = v4RoomsState();
     if (!st || !(stayRoomsMatter(st.adults, st.kids, st.rooms) || !st.assumed || st.rooms > 1)) return '';
-    var max = Math.min(8, st.adults), n = Math.min(4, max), html = '', i;
-    var label = (fr ? st.rooms + (st.rooms > 1 ? ' chambres' : ' chambre') : st.rooms + (st.rooms > 1 ? ' rooms' : ' room')) + (st.assumed ? vt('assumed') : '');
-    for (i = 1; i <= n; i++) {
-      var more = i === 4 && max > 4, on = more ? st.rooms >= 4 : st.rooms === i, txt = more ? (st.rooms > 4 ? String(st.rooms) : '4+') : String(i);
-      var say = more ? (fr ? (st.rooms >= 4 ? st.rooms + ' chambres; touchez pour en ajouter une' : '4 chambres ou plus') : (st.rooms >= 4 ? st.rooms + ' rooms; tap to add one' : '4 rooms or more')) : (fr ? i + (i > 1 ? ' chambres' : ' chambre') : i + (i > 1 ? ' rooms' : ' room'));
-      html += '<button type="button" data-v4-rooms="' + (more ? 'more' : i) + '" aria-pressed="' + (on ? 'true' : 'false') + '" aria-label="' + esc(say) + '">' + esc(txt) + '</button>';
-    }
-    return '<div class="v4-rooms" role="group" aria-label="' + esc(fr ? 'Combien de chambres ?' : 'How many rooms?') + '"><span class="v4-rooms-now" data-v4-rooms-now>' + esc(label) + '</span><span class="v4-rooms-btns">' + html + '</span></div>';
+    var max = Math.min(8, st.adults);
+    var btn = function(dir, off, say, glyph){ return '<button type="button" data-v4-rooms="' + dir + '" aria-label="' + esc(say) + '"' + (off ? ' disabled aria-disabled="true"' : '') + '>' + glyph + '</button>'; };
+    return '<div class="v4-rooms" role="group" aria-label="' + esc(fr ? 'Combien de chambres ?' : 'How many rooms?') + '"><span class="v4-rooms-label">' + esc(fr ? 'Chambres' : 'Rooms') + '</span><span class="v4-rooms-step">'
+      + btn('less', st.rooms <= 1, fr ? 'Une chambre de moins' : 'One fewer room', '−')
+      + '<span class="v4-rooms-now" data-v4-rooms-now>' + esc(st.rooms + (st.assumed ? vt('assumed') : '')) + '</span>'
+      + btn('more', st.rooms >= max, fr ? 'Une chambre de plus' : 'One more room', '+')
+      + '</span><span class="v4-rooms-say" data-v4-rooms-say role="status" aria-live="polite" aria-atomic="true"></span></div>';
   }
   // The one line by the stay's button for a party of three or more (and what to do on a hotel's own site, which we
   // cannot pre-fill). Never a word about availability or how many a room sleeps.
@@ -624,8 +629,9 @@ const V4_CLIENT_SRC = String.raw`
     var b = e.target && e.target.closest ? e.target.closest('[data-v4-rooms]') : null;
     if (!b) return;
     var st = v4RoomsState(); if (!st) return;
-    var v = b.getAttribute('data-v4-rooms'), max = Math.min(8, st.adults);
-    var n = v === 'more' ? (st.rooms < 4 || st.assumed ? 4 : st.rooms >= max ? 4 : st.rooms + 1) : Number(v);
+    if (b.disabled) return;
+    var v = b.getAttribute('data-v4-rooms') === 'less' ? 'less' : 'more', max = Math.min(8, st.adults);
+    var n = Math.max(1, Math.min(max, st.rooms + (v === 'less' ? -1 : 1)));
     var inSheet = !!b.closest('#v4Sheet');
     v4SetRooms(n);
     if (typeof chat !== 'undefined' && chat) { chat.rendering = true; try { render(false); } finally { chat.rendering = false; } } else { try { render(false); } catch (err) {} }
@@ -634,8 +640,14 @@ const V4_CLIENT_SRC = String.raw`
     if (card) card.outerHTML = t3StayCardHtml();
     if (inSheet && dlg && !dlg.open) { if (typeof dlg.showModal === 'function') { try { dlg.showModal(); } catch (err) { dlg.setAttribute('open', ''); } } else dlg.setAttribute('open', ''); }
     syncUrl();
-    var back = (inSheet ? document.getElementById('v4Sheet') : resultEl).querySelector('[data-v4-rooms="' + (v === 'more' ? 'more' : n) + '"]');
-    if (back) { try { back.focus({ preventScroll: true }); } catch (err) {} }
+    // Focus goes back to the same button (the other one when this one just reached its limit and is disabled), and
+    // the new number is said: the status line is filled a moment after it is drawn, which is what gets announced.
+    var box = inSheet ? document.getElementById('v4Sheet') : resultEl;
+    var back = box && box.querySelector('[data-v4-rooms="' + v + '"]');
+    if (back && back.disabled) back = box.querySelector('[data-v4-rooms="' + (v === 'more' ? 'less' : 'more') + '"]');
+    if (back && !back.disabled) { try { back.focus({ preventScroll: true }); } catch (err) {} }
+    var said = lang() === 'fr' ? n + (n > 1 ? ' chambres' : ' chambre') : n + (n > 1 ? ' rooms' : ' room');
+    setTimeout(function(){ var say = box && box.querySelector('[data-v4-rooms-say]'); if (say) say.textContent = said; }, 150);
   });
   function v4RemovedIds(){ var ids = {}, p = state.last || {}; (p.days || []).forEach(function(d){ (d.stops || []).forEach(function(s){ if (s.venue && state.removed[d.day + '-' + s.daypart]) ids[s.venue.id] = 1; }); }); Object.keys(v4.gone || {}).forEach(function(id){ if (v4.gone[id]) ids[id] = 1; }); return ids; }
   function v4CanBook(){ return t3BookSteps().length > 0 || v4ReserveRows([]).length > 0 || !!t3StayData(); }

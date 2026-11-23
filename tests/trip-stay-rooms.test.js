@@ -311,12 +311,20 @@ test('7. the page: the stay line, the rooms row, the notes, the sheet and the li
   assert.equal(line({ adults: 2, adultsAssumed: true, kids: 2, rooms: 1, roomsAssumed: true, nights: 1, datesGiven: false }), 'Dates not set · 1 night · 2 adults (assumed), 2 kids');
   assert.equal(line({ adults: 2, kids: 3, rooms: 1, roomsAssumed: true, nights: 1, datesGiven: false }), 'Dates not set · 1 night · 2 adults, 3 kids · 1 room (assumed)');
   assert.equal(line({ adults: 6, rooms: 3, roomsAssumed: true, nights: 2, arrive: '2026-12-11', leave: '2026-12-13', datesGiven: true }), 'Dec 11–13 · 2 nights · 6 adults · 3 rooms (assumed)');
-  // The rooms row: a labelled group, the number now, the current one marked, "4+" when there can be more.
+  // The rooms row (2026-11-22, Dayton: "use an obvious, accessible way to increase and decrease the room count, such as
+  // labeled minus and plus buttons"): a named group, a visible label, a minus button, the number as text with
+  // "(assumed)" until it is changed, a plus button, and an empty status line that says the new number after a tap.
+  const stepper = (html) => {
+    const m = html.match(/^<div class="v4-rooms" role="group" aria-label="([^"]+)"><span class="v4-rooms-label">([^<]+)<\/span><span class="v4-rooms-step">(<button [^>]+>[^<]+<\/button>)<span class="v4-rooms-now" data-v4-rooms-now>([^<]+)<\/span>(<button [^>]+>[^<]+<\/button>)<\/span><span class="v4-rooms-say" data-v4-rooms-say role="status" aria-live="polite" aria-atomic="true"><\/span><\/div>$/);
+    assert.ok(m, html);
+    const b = (t) => { const x = t.match(/^<button type="button" data-v4-rooms="(less|more)" aria-label="([^"]+)"( disabled aria-disabled="true")?>([^<]+)<\/button>$/); assert.ok(x, t); return { dir: x[1], label: x[2], off: !!x[3], glyph: x[4] }; };
+    return { group: m[1], label: m[2], less: b(m[3]), now: m[4], more: b(m[5]) };
+  };
   let row = box.v4RoomsHtml(false);
-  assert.match(row, /^<div class="v4-rooms" role="group" aria-label="How many rooms\?"><span class="v4-rooms-now" data-v4-rooms-now>3 rooms \(assumed\)<\/span>/);
-  assert.deepEqual([...row.matchAll(/data-v4-rooms="(\w+)" aria-pressed="(\w+)" aria-label="([^"]+)">([^<]+)</g)].map((m) => m.slice(1).join('|')), ['1|false|1 room|1', '2|false|2 rooms|2', '3|true|3 rooms|3', 'more|false|4 rooms or more|4+']);
+  assert.deepEqual(stepper(row), { group: 'How many rooms?', label: 'Rooms', less: { dir: 'less', label: 'One fewer room', off: false, glyph: '−' }, now: '3 (assumed)', more: { dir: 'more', label: 'One more room', off: false, glyph: '+' } });
+  assert.doesNotMatch(row, /aria-pressed|4\+|rooms or more|tap to add/, 'no 1 / 2 / 3 / 4+ buttons');
   box.FR = true;
-  assert.match(box.v4RoomsHtml(true), /aria-label="Combien de chambres \?"><span class="v4-rooms-now" data-v4-rooms-now>3 chambres \(supposé\)</);
+  assert.deepEqual(stepper(box.v4RoomsHtml(true)), { group: 'Combien de chambres ?', label: 'Chambres', less: { dir: 'less', label: 'Une chambre de moins', off: false, glyph: '−' }, now: '3 (supposé)', more: { dir: 'more', label: 'Une chambre de plus', off: false, glyph: '+' } });
   box.FR = false;
   // The link on the page before any pick is the server's own.
   const BC = 'https://www.booking.com/hotel/ca/fixture-hotel.html?group_adults=6&no_rooms=3';
@@ -328,18 +336,38 @@ test('7. the page: the stay line, the rooms row, the notes, the sheet and the li
   assert.equal(fields.t3Rooms, '2');
   assert.deepEqual([state.trip.rooms, state.trip.roomsAssumed], [2, undefined]);
   row = box.v4RoomsHtml(false);
-  assert.match(row, /data-v4-rooms-now>2 rooms<\/span>/);
-  assert.match(row, /data-v4-rooms="2" aria-pressed="true"/);
+  assert.equal(stepper(row).now, '2', '"(assumed)" is gone once a number is picked');
+  assert.deepEqual([stepper(row).less.off, stepper(row).more.off], [false, false]);
+  box.FR = true;
+  assert.equal(stepper(box.v4RoomsHtml(true)).now, '2');
+  box.FR = false;
   assert.equal(box.v4PartyUrl(BC), 'https://www.booking.com/hotel/ca/fixture-hotel.html?group_adults=6&no_rooms=2');
   assert.equal(box.v4PartyUrl(EX), 'https://www.expedia.ca/Kelowna-Hotels-Fixture-Hotel.h123.Hotel-Information?rm1=a3&rm2=a3');
   let w = new URL(box.v4PartyUrl(WR)).searchParams;
   assert.deepEqual([w.get('adults'), w.get('rooms'), w.get('link')], ['6', '2', 'https://www.booking.com/hotel/ca/fixture-hotel.html?group_adults=6&no_rooms=2']);
   assert.equal(box.v4PartyUrl('https://fixture-hotel.example.com/book'), 'https://fixture-hotel.example.com/book', 'the hotel’s own link is left as it is');
-  // 4+, then one more with each tap up to one room per adult.
+  // The limits: at 1 the minus button is disabled, at one room per adult (8 at most) the plus button is.
+  box.v4SetRooms(1);
+  assert.deepEqual([stepper(box.v4RoomsHtml(false)).now, stepper(box.v4RoomsHtml(false)).less.off, stepper(box.v4RoomsHtml(false)).more.off], ['1', true, false]);
   box.v4SetRooms(5);
-  assert.match(box.v4RoomsHtml(false), /data-v4-rooms="more" aria-pressed="true" aria-label="5 rooms; tap to add one">5</);
+  assert.deepEqual([stepper(box.v4RoomsHtml(false)).now, stepper(box.v4RoomsHtml(false)).less.off, stepper(box.v4RoomsHtml(false)).more.off], ['5', false, false]);
   box.v4SetRooms(9);
   assert.equal(fields.t3Rooms, '6', 'never more rooms than adults');
+  assert.deepEqual([stepper(box.v4RoomsHtml(false)).now, stepper(box.v4RoomsHtml(false)).less.off, stepper(box.v4RoomsHtml(false)).more.off], ['6', false, true]);
+  { // Ten adults: the cap is 8 rooms; the assumption (5) is labelled and neither button is disabled.
+    const keep = [state.trip, fields.t3Rooms];
+    fields.t3Rooms = ''; state.trip = { adults: 10, rooms: 5, roomsAssumed: true, datesGiven: false };
+    assert.deepEqual([stepper(box.v4RoomsHtml(false)).now, stepper(box.v4RoomsHtml(false)).less.off, stepper(box.v4RoomsHtml(false)).more.off], ['5 (assumed)', false, false]);
+    box.v4SetRooms(12);
+    assert.deepEqual([fields.t3Rooms, stepper(box.v4RoomsHtml(false)).now, stepper(box.v4RoomsHtml(false)).more.off], ['8', '8', true]);
+    [state.trip, fields.t3Rooms] = keep;
+  }
+  // The tap: one room fewer or more, never past a limit; focus returns to the same button (the other one when this
+  // one just became disabled); the new number is put in the status line.
+  assert.ok(V4.includes("var n = Math.max(1, Math.min(max, st.rooms + (v === 'less' ? -1 : 1)));") && V4.includes('if (b.disabled) return;'));
+  assert.ok(V4.includes("if (back && back.disabled) back = box.querySelector('[data-v4-rooms=\"' + (v === 'more' ? 'less' : 'more') + '\"]');"));
+  assert.ok(V4.includes("var say = box && box.querySelector('[data-v4-rooms-say]'); if (say) say.textContent = said;"));
+  assert.ok(V4.includes("var said = lang() === 'fr' ? n + (n > 1 ? ' chambres' : ' chambre') : n + (n > 1 ? ' rooms' : ' room');"));
   // "we are 4 adults" (the Adults field): a picked 6 becomes 4; with nothing picked, the assumption follows the party.
   fields.t3Adults = '4';
   assert.equal(box.v4RoomsState().rooms, 4);
@@ -377,7 +405,11 @@ test('7. the page: the stay line, the rooms row, the notes, the sheet and the li
   assert.ok(V3.includes('<select id="t3Rooms">') && V3.includes("var rm = g('t3Rooms'); if (/^[1-8]$/.test(rm)) o.rooms = Number(rm);"));
   assert.ok(V3.includes('<span class="t3-en">Rooms</span><span class="t3-fr" lang="fr">Chambres</span>'));
   assert.ok(V4.includes("if (o.rooms) p.push('rooms=' + o.rooms);") && V4.includes("any = set('t3Rooms', q.rooms) || any;"));
-  assert.ok(V4.includes('.t3-v4 .v4-book .v4-rooms button { height: 44px; }') && V4.includes('min-width: 44px') && LAYOUT.includes('.v4-stay-card .v4-rooms button::after {inset:-9px -1px;}'));
+  // Tap targets: 44px wide; 44px tall in the sheet; on the card a 28px button whose tap area reaches 46px. A disabled
+  // button is dimmed; the keyboard focus ring is drawn.
+  assert.ok(V4.includes('.t3-v4 .v4-book .v4-rooms button { height: 44px; }') && /\.t3-v4 \.v4-rooms button \{[^}]*flex: none; width: 44px;/.test(V4) && LAYOUT.includes('.v4-stay-card .v4-rooms button {height:28px;font-size:16px;}') && LAYOUT.includes('.v4-stay-card .v4-rooms button::after {inset:-9px 0;}'));
+  assert.ok(V4.includes('.t3-v4 .v4-rooms button[disabled] { opacity: 0.38; cursor: not-allowed; }') && V4.includes('.t3-v4 .v4-rooms button:focus-visible { outline: 3px solid #2f6f8f; outline-offset: 2px; }'));
+  assert.ok(V4.includes('.t3-v4 .v4-rooms-now { min-width: 5.8em; text-align: center; white-space: nowrap;'), 'the number keeps its width, so the buttons do not move when "(assumed)" goes');
   // The sheet's stay notes say the same (t3StayNotesHtml).
   assert.ok(V3.includes("'Rooms and how many each sleeps are confirmed on the booking site.'") && V3.includes("'Hotel’s own site: enter ' + t.rooms + ' rooms there.'"));
 });
