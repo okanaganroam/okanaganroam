@@ -165,7 +165,7 @@ test('2. gluten-free evidence: verified / partial / unknown / unmet from the lis
 test('(b) and 3. the chat explains its own warnings and choices from the plan and the evidence; a wrong line is called wrong; an unknown cause is said so', () => {
   const A = (m, f = facts(), lang = 'en', stops = PLAN) => { const r = R(m, stops); assert.ok(r.ops.length && r.ops.every((o) => o.o === 'ask'), `${m}: read as a question`); return ex.answer(r.ops[0], f, lang); };
   const b = A(MSG_B);
-  assert.equal(b.reply, 'That line was wrong: every meal stop here has the Gluten-Free-Friendly badge on its listing. They are Frankie We Salute You!, Dawett Fine Indian Cuisine, Table Nineteen Kelowna and 3 more. The plan’s note “Not every stop is listed as gluten-free friendly.” is about Meadow Vista Honey Wines and Blue Gator Bar, which don’t have the badge.');
+  assert.equal(b.reply, 'That line was wrong: every meal stop here has the Gluten-Free-Friendly badge on its listing. They are Frankie We Salute You!, Dawett Fine Indian Cuisine, Table Nineteen Kelowna and 3 more. It came from the planner’s note “Not every stop is listed as gluten-free friendly.”, which is about Meadow Vista Honey Wines and Blue Gator Bar: they don’t have the badge.');
   assert.equal(b.note, CAVEAT);
   assert.doesNotMatch(b.reply, /Which stop do you mean/);
   assert.match(A('why does it say I couldn’t fit gluten free?').reply, /^That line was wrong: every meal stop here has the Gluten-Free-Friendly badge/);
@@ -199,10 +199,11 @@ test('(b) and 3. the chat explains its own warnings and choices from the plan an
   assert.equal(al.note, CAVEAT);
   assert.match(A('is there anything for a peanut allergy?').reply, /^I can’t confirm that\./);
   // "what does the warning mean?": the note is quoted and explained as far as the facts go.
-  assert.equal(A('what does the warning mean?').reply, 'The note says: “Not every stop is listed as gluten-free friendly.” That is about Meadow Vista Honey Wines and Blue Gator Bar, which don’t have the badge. Every meal stop here has the Gluten-Free-Friendly badge on its listing.');
+  assert.equal(A('what does the warning mean?').reply, 'There’s no warning on this plan right now. Every meal stop here has the Gluten-Free-Friendly badge on its listing.');
+  assert.equal(A('what does the warning mean?', facts({ stops: PLAN.map((s) => ([170, 256].includes(s.id) ? { ...s, feats: [] } : s)) })).reply, 'The line about gluten-free food means this: 4 of 6 meal stops have the Gluten-Free-Friendly badge; Dawett Fine Indian Cuisine and HUMO Kelowna don’t say. Want me to swap those two?');
   assert.equal(A('what does the warning mean?', facts({ warnings: [], missing: [] })).reply, 'There’s no warning on this plan right now. Everything you asked for that I can check is in it.');
-  assert.equal(A('what does the warning mean?', facts({ warnings: ['Kettle Valley Station is closed on Mondays.'], missing: [] })).reply, 'The note says: “Kettle Valley Station is closed on Mondays.” I don’t know more about its cause than that. Tell me what you’d like instead and I’ll change it.');
-  assert.match(A('que veut dire l’avertissement?', facts(), 'fr').reply, /^La note dit : « Not every stop is listed as gluten-free friendly\. » Elle concerne Meadow Vista Honey Wines et Blue Gator Bar, qui n’ont pas le badge\./);
+  assert.equal(A('what does the warning mean?', facts({ warnings: ['A note the page never shows.'], missing: [{ kind: 'type', value: 'brewery', label: 'brewery' }] })).reply, 'The plan says it could not include brewery. I don’t know the exact reason. Say “add brewery” and I’ll try again.');
+  assert.equal(A('que veut dire l’avertissement?', facts(), 'fr').reply, 'Il n’y a aucun avertissement sur ce plan en ce moment. Chaque arrêt repas ici a le badge « Sans gluten » sur sa fiche.');
   // "why does it say you couldn't fit a winery?" with wineries on the plan: wrong, said plainly.
   assert.equal(A('why does it say you couldn’t fit a winery?').reply, 'That line was wrong: your plan has a winery: Meadow Vista Honey Wines on day 1 and Azhadi Vineyards on day 2.');
   // "why two wineries?"

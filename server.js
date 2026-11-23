@@ -8572,6 +8572,8 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     asks = Math.max(asks, (ops || []).length ? new Set(ops.map((o) => o.o + ((o.stops || [])[0] ? (o.stops[0].id) : ''))).size : 1);
     // A question's weekday comes from the visitor's own words ("open Sunday?").
     for (const o of ops || []) if (o.o === 'ask' && !o.wd) o.wd = tripChat.agent.weekdayIn(v.message);
+    // A question about a diet read by the AI (which names no badge): the badge is the one the visitor's words name.
+    for (const o of ops || []) if (o.o === 'ask' && ['q_evidence', 'q_warning', 'q_allergy'].includes(o.value) && !o.feature) o.feature = tripChat.explain.featureIn(tripChat.fold(v.message)) || null;
     if (ai && !ai.ok && ai.reason === 'slow') source = 'ai_slow';
     // Words no rule read go to the planner as typed when it can read them (a kind of food, an occasion...); else "Sorry,
     // I didn't catch that". Never words that say no / not (the planner could read "no brewery" as "a brewery").

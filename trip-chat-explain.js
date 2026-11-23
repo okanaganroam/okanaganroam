@@ -138,8 +138,8 @@ function explainRules(t, h, stops) {
 const TX = {
   en: {
     wrong: 'That line was wrong: {line}', partly: 'That line was only partly right: {line}', stands: 'Here’s what it was based on: {line}',
-    noteAbout: 'That is about {names}, which {v} have the badge.', names: 'They are {names}.', noteQuote: 'The plan’s note “{w}” is about {names}, which {v} have the badge.', noteQuoteBare: 'The plan also notes: “{w}”', dont: 'don’t', doesnt: 'doesn’t',
-    warnNone: 'There’s no warning on this plan right now. Everything you asked for that I can check is in it.', warnQuote: 'The note says: “{w}”', warnUnknown: 'I don’t know more about its cause than that. Tell me what you’d like instead and I’ll change it.',
+    noteAbout: 'That is about {names}, which {v} have the badge.', names: 'They are {names}.', noteQuote: 'It came from the planner’s note “{w}”, which is about {names}: {v} have the badge.', noteQuoteBare: 'It came from the planner’s note “{w}”', dont: 'they don’t', doesnt: 'it doesn’t',
+    warnNone: 'There’s no warning on this plan right now. Everything you asked for that I can check is in it.', warnQuote: 'The note says: “{w}”', warnUnknown: 'I don’t know the exact reason. Say “add {what}” and I’ll try again.', warnNoneShort: 'There’s no warning on this plan right now.', warnAbout: 'The line about {word} food means this:',
     warnMissing: 'The plan says it could not include {what}.', warnKindHas: 'That line was wrong: your plan has {what}: {list}.', warnMore: 'Other notes on this plan: {rest}', is: 'is', are: 'are',
     allergy: 'I can’t confirm that. Listings only carry badges such as Gluten-Free-Friendly; they don’t list allergens or how food is prepared, so tell the restaurant about the allergy when you book.',
     evNone: 'There’s no event on your plan right now.', evWhy: '{name}{at} is there because you asked for {asked}, and it’s a What’s On listing for {cat}{date}.', evWhyBare: 'I don’t know exactly why the planner chose {name}{at}; it’s a What’s On listing{date}. Say “remove the event” and I’ll take it out.',
@@ -154,8 +154,8 @@ const TX = {
   },
   fr: {
     wrong: 'Cette ligne était fausse : {line}', partly: 'Cette ligne n’était qu’en partie juste : {line}', stands: 'Voici sur quoi elle reposait : {line}',
-    noteAbout: 'Elle concerne {names}, qui {v} le badge.', names: 'Ce sont {names}.', noteQuote: 'La note du plan « {w} » concerne {names}, qui {v} le badge.', noteQuoteBare: 'Le plan indique aussi : « {w} »', dont: 'n’ont pas', doesnt: 'n’a pas',
-    warnNone: 'Il n’y a aucun avertissement sur ce plan en ce moment. Tout ce que vous avez demandé et que je peux vérifier y est.', warnQuote: 'La note dit : « {w} »', warnUnknown: 'Je n’en sais pas plus sur sa cause. Dites-moi ce que vous préférez et je le change.',
+    noteAbout: 'Elle concerne {names}, qui {v} le badge.', names: 'Ce sont {names}.', noteQuote: 'Elle venait de la note du planificateur « {w} », qui concerne {names} : {v} le badge.', noteQuoteBare: 'Elle venait de la note du planificateur « {w} »', dont: 'ils n’ont pas', doesnt: 'il n’a pas',
+    warnNone: 'Il n’y a aucun avertissement sur ce plan en ce moment. Tout ce que vous avez demandé et que je peux vérifier y est.', warnQuote: 'La note dit : « {w} »', warnUnknown: 'Je n’en connais pas la raison exacte. Dites « ajoute {what} » et j’essaie encore.', warnNoneShort: 'Il n’y a aucun avertissement sur ce plan en ce moment.', warnAbout: 'La ligne sur les options {word} veut dire ceci :',
     warnMissing: 'Le plan dit qu’il n’a pas pu inclure {what}.', warnKindHas: 'Cette ligne était fausse : votre plan a {what} : {list}.', warnMore: 'Autres notes du plan : {rest}', is: '', are: '',
     allergy: 'Je ne peux pas le confirmer. Les fiches n’ont que des badges comme « Sans gluten »; elles n’indiquent ni les allergènes ni la préparation, alors parlez de l’allergie au restaurant en réservant.',
     evNone: 'Il n’y a aucun événement dans votre plan en ce moment.', evWhy: '{name}{at} est là parce que vous avez demandé {asked}, et c’est une fiche Quoi faire pour {cat}{date}.', evWhyBare: 'Je ne sais pas exactement pourquoi le planificateur a choisi {name}{at}; c’est une fiche Quoi faire{date}. Dites « enlève l’événement » et je le retire.',
@@ -235,28 +235,19 @@ function answer(op, facts, lang) {
       if (on.length) return { reply: fillT(t.warnKindHas, { what: facts.KINDS[op.kind][L], list: join(on.slice(0, 4).map((s) => fillT(t.onDay, { name: s.name, d: s.day }))) }) };
       return { reply: facts.legacy({ value: 'q_why_not', kind: op.kind }) };
     }
-    // "what does the warning mean?": the notes the plan carries, quoted; each explained only as far as the facts go.
+    // "what does the warning mean?": only what the page itself shows (the agent's first line): a diet asked for, said from
+    // the evidence, and a kind of place the plan could not include. Notes the visitor never saw are not quoted.
     const feats = [...new Set(missing.filter((m) => m.kind === 'feature' && FEAT_RES[m.value]).map((m) => m.value))];
-    const warns = (facts.warnings || []).filter((w) => typeof w === 'string' && w);
-    for (const f of Object.keys(FEAT_RES)) if (!feats.includes(f) && warns.some((w) => FEAT_RES[f].test(facts.fold(w)))) feats.push(f);
+    for (const e of facts.evidence || []) if (e && FEAT_RES[e.ask] && !feats.includes(e.ask)) feats.push(e.ask);
+    for (const f of Object.keys(FEAT_RES)) if (!feats.includes(f) && (facts.warnings || []).some((w) => FEAT_RES[f].test(facts.fold(w)))) feats.push(f);
+    const kindMiss = missing.find((m) => m.kind !== 'feature' && m.label);
+    const missLine = kindMiss ? fillT(t.warnMissing, { what: kindMiss.label }) + ' ' + fillT(t.warnUnknown, { what: kindMiss.label }) : '';
     if (feats.length) {
       const ev = gf(feats[0]);
-      const w = warns.find((x) => FEAT_RES[feats[0]].test(facts.fold(x)));
-      const lead = ev.status === 'verified' ? t.wrong : ev.status === 'partial' ? t.partly : t.stands;
-      const lineLc = ev.line.charAt(0).toLowerCase() + ev.line.slice(1);
-      // A note that is true as written ("Not every stop…") is explained, not called wrong: which stops it is about.
-      const hasIds = new Set(ev.has.map((s) => s.id));
-      const lacking = stops.filter((s) => DRINK_FOOD_TYPES.includes(s.type) && !(s.feats || []).includes(feats[0]) && !hasIds.has(s.id));
-      const head = w ? `${fillT(t.warnQuote, { w })}${lacking.length && ev.source === 'badges' ? ` ${fillT(t.noteAbout, { names: join(lacking.slice(0, 4).map((s) => s.name)), v: lacking.length === 1 ? t.doesnt : t.dont })}` : ''}` : fillT(t.warnMissing, { what: ev.word });
-      const rest = warns.filter((x) => x !== w);
-      const more = rest.length ? ` ${fillT(t.warnMore, { v: rest.length === 1 ? t.is : t.are, n: rest.length, rest: rest.slice(0, 2).map((x) => (L === 'fr' ? `« ${x} »` : `“${x}”`)).join(' ') })}` : '';
-      return { reply: `${head} ${w ? ev.line : fillT(lead, { line: lineLc })}${more}`, note: ev.caveat, noteKey: feats[0], offer: offerOf(ev) };
+      const head = ev.status === 'verified' ? (kindMiss ? '' : t.warnNoneShort) : fillT(t.warnAbout, { word: ev.word });
+      return { reply: [missLine, head, ev.line].filter(Boolean).join(' '), note: ev.caveat, noteKey: feats[0], offer: offerOf(ev) };
     }
-    const kindMiss = missing.find((m) => m.kind !== 'feature' && m.label);
-    if (!warns.length && !kindMiss) return { reply: t.warnNone };
-    if (!warns.length) return { reply: `${fillT(t.warnMissing, { what: kindMiss.label })} ${t.warnUnknown}` };
-    const rest = warns.slice(1);
-    return { reply: `${fillT(t.warnQuote, { w: warns[0] })} ${t.warnUnknown}${rest.length ? ` ${fillT(t.warnMore, { v: rest.length === 1 ? t.is : t.are, n: rest.length, rest: rest.slice(0, 2).map((x) => (L === 'fr' ? `« ${x} »` : `“${x}”`)).join(' ') })}` : ''}` };
+    return { reply: missLine || t.warnNone };
   }
   if (op.value === 'q_why_event') {
     const evs = facts.events || [];
