@@ -562,7 +562,33 @@ const V4_CLIENT_SRC = String.raw`
   function v4ShareLink(list){
     var u = location.origin + (lang() === 'fr' ? '/fr' : '') + '/my-trip?stops=' + list.map(function(x){ return x.ref; }).join(',');
     if (list.length && list.every(function(x){ return x.day > 0; })) u += '&days=' + list.map(function(x){ return x.day; }).join(',');
-    return u;
+    return u + v4ShareContext(list);
+  }
+  // Honest plan (2026-11-22: the shared link opened the stops by day with no hotel and no times): the link also carries
+  // the trip's context, all optional and read again from the listings by the shared page (trip-honest-plan.js
+  // parseShareContext): chosen dates only (start), each stop's time (t), the stay, the party as given (aa=1 when the
+  // number of adults is assumed), date-dependent suggestions (sug) and what was asked for (asks). No free text.
+  function v4ShareContext(list){
+    var p = state.last || {}, out = '', rows = p.schedule || [], sug = {};
+    try {
+      var d0 = (p.days || [])[0];
+      if (p.datesGiven && d0 && /^\d{4}-\d{2}-\d{2}$/.test(d0.date || '')) out += '&start=' + d0.date;
+      var times = list.map(function(x){
+        var m = /^(venue|event):(\d+)$/.exec(x.ref), id = m ? Number(m[2]) : 0;
+        var r = rows.filter(function(q){ return (!x.day || q.day === x.day || q.day === undefined) && (m && m[1] === 'venue' ? q.venueId === id : q.eventId === id); })[0];
+        return r && Number.isInteger(r.startMinutes) && r.startMinutes >= 0 && r.startMinutes < 1440 ? r.startMinutes : '';
+      });
+      if (times.some(function(t){ return t !== ''; })) out += '&t=' + times.join(',');
+      var sd = typeof t3StayData === 'function' ? t3StayData() : null, t = (sd && sd.w && sd.w.trip) || {};
+      if (sd && sd.chosen && sd.chosen.id > 0) out += '&stay=' + sd.chosen.id + (t.nights > 0 ? '&nights=' + t.nights : '');
+      if (t.adults > 0) out += '&ad=' + t.adults + (t.adultsAssumed ? '&aa=1' : '');
+      if (t.kids > 0) out += '&kids=' + t.kids;
+      (p.dateSuggestions || []).slice(0, 2).forEach(function(x){ if (x && x.id > 0) sug['event:' + x.id] = 1; });
+      if (Object.keys(sug).length) out += '&sug=' + Object.keys(sug).join(',');
+      var asks = (p.evidence || []).map(function(e){ return e && /^count:/.test(e.ask || '') && e.asked > 0 ? e.ask + ':' + e.asked : e && e.ask; }).filter(function(a){ return a && /^[a-z_:0-9]+$/.test(a); }).slice(0, 12);
+      if (asks.length) out += '&asks=' + asks.join(',');
+    } catch (e) {}
+    return out;
   }
   // The group-chat message (round 1, 2026-11-21: "Day 1: A, B, C +2 more" hid the dinner and had no times or dates):
   // the title, then each day with its date and every stop with its time, then the stay. Read from the plan on screen,

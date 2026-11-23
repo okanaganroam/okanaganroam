@@ -420,12 +420,94 @@ function checkBookingLinks(plan, stored) {
     const okUrl = (rec.urls || []).some((u) => { const k = urlKey(innerUrl(u)); return k && (tKey === k || tKey.startsWith(`${k}/`) || tKey.startsWith(`${k}?`) || urlKey(target.split('?')[0]) === urlKey(String(innerUrl(u)).split('?')[0])); });
     const okName = (rec.names || []).some((n) => n && path.includes(String(n).toLowerCase()));
     const okHost = (rec.hosts || []).some((h) => h && (tHost === h || tHost.endsWith(`.${h}`)));
-    if (!(okUrl || okName || okHost)) problems.push({ code: 'not_this_listing', link: l, why: 'target does not match the stored link' });
+    if (!(okUrl || okName || okHost)) { problems.push({ code: 'not_this_listing', link: l, why: 'target does not match the stored link' }); continue; }
+    // A warning, not a failure: a provider page (Booking.com, Expedia) whose address shares no word with the listing's
+    // name. The stored link may be right (a hotel that changed its name), but a person should look at it.
+    if (l.name && /(^|\.)(?:booking\.com|expedia\.(?:ca|com))$/.test(tHost)) {
+      const words = String(l.name).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !GENERIC_NAME_WORDS.has(w));
+      if (words.length && !words.some((w) => path.replace(/[^a-z0-9]+/g, ' ').includes(w))) problems.push({ code: 'name_differs', link: l, why: 'the provider page’s address shares no word with the listing’s name', warning: true });
+    }
   }
   return problems;
 }
+const GENERIC_NAME_WORDS = new Set(['hotel', 'hotels', 'motel', 'inn', 'inns', 'suites', 'suite', 'resort', 'resorts', 'lodge', 'lodging', 'guest', 'house', 'cabins', 'cottages', 'the', 'and', 'with', 'kelowna', 'penticton', 'vernon', 'osoyoos', 'oliver', 'summerland', 'peachland', 'naramata', 'whistler', 'squamish', 'pemberton', 'okanagan', 'west', 'lake', 'country', 'british', 'columbia', 'canada', 'wyndham', 'radisson', 'marriott', 'hilton', 'best', 'western', 'plus']);
+
+// ---- the shared trip link ----
+// The link is the trip ("/my-trip?stops=venue:1,event:2&days=1,1": nothing is stored). Older links carry only stops and
+// days and keep working as they are. A link made from a plan may also carry, all optional:
+//   start=YYYY-MM-DD   day 1's date, only when the visitor chose dates
+//   t=615,690,,1080    each stop's start time (minutes after midnight), in the stops' order
+//   stay=1970          the place to stay (a listing id)      nights=2
+//   ad=6  aa=1  kids=2 the party as given; aa=1 marks an assumed number of adults
+//   sug=event:213      date-dependent suggestions (never stops)
+//   asks=count:winery:2,kind:easy_walk,gluten_free,stay:pool,live_music,nonalcoholic   what the request asked for;
+//                      the page works the evidence out again from the listings as they are now
+const ASK_RE = /^(?:count:[a-z_]{2,20}:\d{1,2}|type:[a-z_]{2,20}|kind:[a-z_]{2,30}|stay:[a-z_]{2,20}|[a-z_]{2,20})$/;
+function parseShareContext(query) {
+  const q = query || {};
+  const int = (v, lo, hi) => { const n = /^\d{1,4}$/.test(String(v || '')) ? Number(v) : NaN; return n >= lo && n <= hi ? n : null; };
+  const out = {};
+  if (isDate(q.start)) out.start = q.start;
+  if (typeof q.t === 'string' && q.t) out.times = q.t.split(',').slice(0, 60).map((x) => int(x, 0, 1439));
+  const stay = int(q.stay, 1, 9999); if (stay) out.stayId = stay;
+  const nights = int(q.nights, 1, 30); if (nights) out.nights = nights;
+  const ad = int(q.ad, 1, 16); if (ad) out.adults = ad;
+  if (q.aa === '1' && ad) out.adultsAssumed = true;
+  const kids = int(q.kids, 1, 12); if (kids) out.kids = kids;
+  if (typeof q.sug === 'string' && q.sug) out.suggestions = q.sug.split(',').filter((r) => /^event:[1-9][0-9]*$/.test(r)).slice(0, 3);
+  if (typeof q.asks === 'string' && q.asks) out.asks = [...new Set(q.asks.split(',').filter((a) => ASK_RE.test(a)))].slice(0, 12);
+  return Object.keys(out).length ? out : null;
+}
+// The same parameters back as a query string (validated values only), for the EN / FR switch and the canonical link.
+function shareContextQuery(c) {
+  if (!c) return '';
+  const p = [];
+  if (c.start) p.push(`start=${c.start}`);
+  if (c.times) p.push(`t=${c.times.map((x) => (x == null ? '' : x)).join(',')}`);
+  if (c.stayId) p.push(`stay=${c.stayId}`);
+  if (c.nights) p.push(`nights=${c.nights}`);
+  if (c.adults) p.push(`ad=${c.adults}`);
+  if (c.adultsAssumed) p.push('aa=1');
+  if (c.kids) p.push(`kids=${c.kids}`);
+  if (c.suggestions && c.suggestions.length) p.push(`sug=${c.suggestions.join(',')}`);
+  if (c.asks && c.asks.length) p.push(`asks=${c.asks.join(',')}`);
+  return p.join('&');
+}
+// The asks a plan's evidence carries, as the link's asks= list.
+function shareAsks(plan) {
+  return ((plan && plan.evidence) || []).map((e) => (e && /^count:/.test(e.ask || '') && Number.isInteger(e.asked) ? `${e.ask}:${e.asked}` : e && e.ask)).filter((a) => a && ASK_RE.test(a)).slice(0, 12);
+}
+// A plan-shaped object from a shared link's stops, so the evidence is worked out the same way as on the plan.
+//   stops: [{ id, name, type, badges?, day, start }]   events: [{ id, name, day, startDate, dateLabel }]
+//   stay: { id, name, regionLabel, has: [amenity keys] } or null
+function sharedPlan(c, stops, events, stay) {
+  const part = (m) => (m == null ? 'midday' : m < 660 ? 'morning' : m < 900 ? 'midday' : m < 1020 ? 'late' : m < 1185 ? 'evening' : 'night');
+  const days = new Map();
+  for (const x of stops) { const d = x.day || 0; if (!days.has(d)) days.set(d, { day: d, stops: [] }); days.get(d).stops.push({ daypart: part(x.start), reasons: x.start != null && x.start >= 1185 && x.type !== 'restaurant' ? [{ code: 'night' }] : [], venue: { id: x.id, name: x.name, type: x.type, region: x.region, ...(x.badges ? { badges: x.badges } : {}) } }); }
+  for (const e of events || []) { const d = e.day || 0; if (!days.has(d)) days.set(d, { day: d, stops: [] }); days.get(d).stops.push({ kind: 'event', daypart: 'night', event: { id: e.id, name: e.name, startDate: e.startDate || null, dateLabel: e.dateLabel || e.startDate || '', dateLabelFr: e.dateLabelFr, time: e.time || null, categories: e.categories || [] } }); }
+  const reqs = [], asks = (c && c.asks) || [];
+  let stayKeys = [], some = false, none = false;
+  for (const a of asks) {
+    const m = a.split(':');
+    if (m[0] === 'count') reqs.push({ kind: 'type_count', value: m[1], count: Number(m[2]), strength: 'must' });
+    else if (m[0] === 'type') reqs.push({ kind: 'type', value: m[1], strength: 'must', status: stops.some((x) => x.type === m[1]) ? 'satisfied' : 'unmet' });
+    else if (m[0] === 'kind') reqs.push({ kind: 'venue_kind', value: m[1], strength: 'must', status: stops.some((x) => (x.kinds || []).includes(m[1])) ? 'satisfied' : 'unmet' });
+    else if (m[0] === 'stay') stayKeys.push(m[1]);
+    else if (a === 'live_music') reqs.push({ kind: 'event', value: 'live-music', strength: 'must' });
+    else if (a === 'event') reqs.push({ kind: 'event', value: 'any', strength: 'must' });
+    else if (a === 'nonalcoholic') some = true;
+    else if (a === 'no_alcohol') none = true;
+    else if (FEATURES[a]) reqs.push({ kind: 'feature', value: a, strength: 'must' });
+  }
+  const plan = { kind: 'multi_day', days: [...days.values()].sort((a, b) => a.day - b.day), requirementResults: reqs, datesGiven: !!(c && c.start), warnings: [] };
+  if (some) plan.partySome = [{ concept: 'alcohol' }];
+  if (none) plan.noAlcohol = true;
+  if (stayKeys.length) plan.whereToStay = { pick: stay ? { id: stay.id, name: stay.name, regionLabel: stay.regionLabel, has: stay.has || [] } : null, amenity: { keys: stayKeys, ...(stay && stay.winterCheck ? { winterCheck: true } : {}) } };
+  return plan;
+}
 
 module.exports = {
+  parseShareContext, shareContextQuery, shareAsks, sharedPlan,
   DIET, DRINK_TYPES, FEATURES, venueStops, eventStops, isMealStop, badgeOf, datesGiven, takeUndatedEvents, suggestionOf,
   applyEvidence, planBookingLinks, checkBookingLinks, linkHasDate, innerUrl,
 };
