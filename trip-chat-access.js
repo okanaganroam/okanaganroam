@@ -94,6 +94,9 @@ function read(message, stops, h) {
     // "something for the kids" keep their own answers.
     const acc = needs.filter((k) => k === 'accessible' || k === 'dog');
     if (!acc.length || byName().length) return null;
+    // One stop named as a kind ("the second winery", "the brewery") keeps its own answer; a meal, a day, "which" and
+    // "every" are about the plan.
+    if (!mealIn(t) && !dayIn(t) && !EVERY_RE.test(t) && !/\b(?:which|quels?|quelles?|lesquels|lesquelles)\b/.test(t) && !scopesIn(t).length) { let nm = []; try { nm = h.stopsNamed(t, stops || []); } catch (e) { nm = []; } if (nm.length) return null; }
     if (/^(?:why|how come|pourquoi)\b/.test(t)) return null;
     const scopes = scopesIn(t), day = dayIn(t), meal = mealIn(t);
     if (acc.length === 1 && acc[0] === 'dog' && !DOG_COME_RE.test(t) && !/\b(?:dog|pet)[- ]friendly\b|\b(?:allow\w*|welcome|accept\w*|ok|okay|admis|acceptes?|bienvenus?)\b/.test(t)) return null;
