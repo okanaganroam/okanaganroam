@@ -9328,7 +9328,7 @@ function tripChatLacking(feats, types, old) {
     if (old) ok.delete(old.id);
     if (!ok.size) return null;
     const o = old ? db.prepare('SELECT region, latitude, longitude FROM venues WHERE id = ?').get(old.id) : null;
-    const far = (r) => (o && Number.isFinite(o.latitude) && Number.isFinite(r.latitude) ? tripStays.km(o.latitude, o.longitude, r.latitude, r.longitude) : o && r.region === o.region ? 0 : 9999);
+    const far = (r) => (o && Number.isFinite(o.latitude) && Number.isFinite(r.latitude) ? tripStays.km({ lat: o.latitude, lng: o.longitude }, { lat: r.latitude, lng: r.longitude }) : o && r.region === o.region ? 0 : 9999);
     return rows.filter((r) => !ok.has(r.id) && !(old && r.id === old.id)).sort((a, b) => far(b) - far(a)).map((r) => r.id).slice(-180);
   } catch (e) { return []; }
 }
@@ -9443,7 +9443,9 @@ function tripChatEnsureTurn(op, ctx) {
   checks = A.check(stopParts, after, has, { day: op.day || null });
   // A swap is said once, under the need its old stop's listing did not have.
   for (const c of checks) c.swaps = swaps.filter((x) => (lackOf.get(x.old.id) || []).includes(c.need) && c.list.some((y) => y.stop.id === x.fresh.id && y.has === true));
-  return { ...out, reply: A.ensureReply({ stay: st.stay || null, stayAsked: amenities.length > 0, checks, lang: L }) };
+  // A yes to "swap them?" that found nothing to swap to is said first.
+  const lead = v.confirmed && lack.length && !swaps.length ? `${A.TX[L].noneFound} ` : '';
+  return { ...out, reply: lead + A.ensureReply({ stay: st.stay || null, stayAsked: amenities.length > 0, checks, lang: L }) };
 }
 // The booking links of the stay on screen that take the visitor's dates (or rooms) with them, from the planner's
 // hand-off (pick.handoff) when it gives one, else from the link itself (its own date and room parameters).

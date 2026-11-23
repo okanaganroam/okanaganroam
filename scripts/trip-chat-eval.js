@@ -173,6 +173,20 @@ const CASES = [
   { plan: 'fr', msg: 'remplace le premier vignoble par un autre vignoble avec des options sans alcool', lang: 'fr', ops: [{ o: 'replace', features: ['nonalcoholic'], sel: { type: 'winery', nth: 1 } }] },
   { plan: 'fr', msg: 'remplace le premier vignoble par un autre avec une terrasse', lang: 'fr', ops: [{ o: 'replace', features: ['patio'], sel: { type: 'winery', nth: 1 } }] },
   { plan: 'fr', msg: 'remplace le premier vignoble par un autre vignoble', lang: 'fr', ops: [{ o: 'replace', features: null, sel: { type: 'winery', nth: 1 } }] },
+  // Access needs (2026-11-22, Dayton's report): one verify-and-fix request with a part per need, never a stay change
+  // alone; the questions are answers.
+  { plan: 'beer', msg: 'Please make sure every activity and the hotel are wheelchair accessible, and the dog can come with us.', ops: [{ o: 'ensure' }] },
+  { plan: 'beer', msg: 'make sure every stop is dog friendly', ops: [{ o: 'ensure' }] },
+  { plan: 'wine', msg: 'can you make sure all the restaurants are gluten-free?', ops: [{ o: 'ensure' }] },
+  { plan: 'beer', msg: 'is day 2 wheelchair accessible?', ops: [{ o: 'ask', value: 'q_access' }] },
+  { plan: 'beer', msg: 'can the dog come to lunch?', ops: [{ o: 'ask', value: 'q_access' }] },
+  { plan: 'beer', msg: 'which stops are accessible?', ops: [{ o: 'ask', value: 'q_access' }] },
+  { plan: 'beer', msg: 'what do I still need to check?', ops: [{ o: 'ask', value: 'q_check' }] },
+  { plan: 'beer', msg: 'why is day 2 so empty?', ops: [{ o: 'ask', value: 'q_thin' }] },
+  { plan: 'fr', msg: 'Assurez-vous que chaque activité et l’hôtel sont accessibles en fauteuil roulant, et que le chien peut venir avec nous.', lang: 'fr', ops: [{ o: 'ensure' }] },
+  { plan: 'fr', msg: 'Est-ce que le chien peut venir au dîner?', lang: 'fr', ops: [{ o: 'ask', value: 'q_access' }] },
+  { plan: 'fr', msg: 'Que dois-je encore vérifier?', lang: 'fr', ops: [{ o: 'ask', value: 'q_check' }] },
+  { plan: 'fr', msg: 'Quels arrêts sont accessibles en fauteuil roulant?', lang: 'fr', ops: [{ o: 'ask', value: 'q_access' }] },
 ];
 
 function pick(stops, sel) {
