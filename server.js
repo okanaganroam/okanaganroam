@@ -62321,6 +62321,7 @@ async function findMenuOnWebsite(rawUrl, kind = 'menu') {
   return files.length ? { type: 'pdf', files } : { error: 'not_found' };
 }
 
+const menuSaveRevs = new Map(); // menu id -> the highest save number stored (tour pre-launch 2)
 async function handleMenuApi(req, res, ctx, action, arg) {
   const generic = 'Sorry, something went wrong. Please try again, or tap "Can you do it for me?".';
   const { venue } = ctx.found;
@@ -62447,6 +62448,15 @@ async function handleMenuApi(req, res, ctx, action, arg) {
   if (action === 'save' || action === 'publish') {
     if (!menu || !['draft', 'ready', 'help', 'pending'].includes(menu.status) || (menu.status === 'pending' && !ctx.menuId)) {
       return send(409, { ok: false, error: 'This menu was already sent. Reload the page to see where it is.' });
+    }
+    // Tour pre-launch 2 (2026-11-22): saves carry a rising number; one older than the last stored for this list is
+    // ignored (a slow early save must never land on top of newer work). Publishing always uses what it was sent.
+    const rev = Number.isFinite(body.rev) ? Number(body.rev) : null;
+    if (action === 'save' && rev != null) {
+      const last = menuSaveRevs.get(menu.id);
+      if (last != null && rev < last) return send(200, { ok: true, saved: false, stale: true });
+      menuSaveRevs.set(menu.id, rev);
+      if (menuSaveRevs.size > 5000) menuSaveRevs.delete(menuSaveRevs.keys().next().value);
     }
     const data = normalizeMenuData(body.data);
     // Tour test 10 (Whistler, 2026-11-18; Gord typed "pony rides", "overnite pack trip (summer)"): an operator's typed tour
@@ -62610,6 +62620,7 @@ const MENU_APP_STRINGS = {
     draftSend: '<strong>Looks good, send it!</strong> sends it to us for a quick check. It shows on your page once we approve it, usually within a day.',
     draftReplaces: 'Until then, your page keeps the list it shows now.', draftReplacesNow: 'It replaces the list your page shows now.',
     saved: 'Saved', saving: 'Saving&hellip;',
+    saveFailed: 'That didn&rsquo;t save. What you typed is still here.', saveRetry: 'Try again',
     dishName: 'Dish name', price: 'Price', description: 'Description (optional)', done: 'Done', deleteDish: 'Delete this dish',
     nameFirst: 'Give this line a name first, so people know what the price is for. Or tap Delete if you don’t need it.',
     addDish: '+ Add a dish', sectionName: 'Section name', addSection: '+ Add a section', deleteSection: 'Delete this section',
@@ -62676,6 +62687,7 @@ const MENU_APP_STRINGS = {
     draftPublish: '<strong>C&rsquo;est bon, publier&nbsp;!</strong> le met sur votre page tout de suite, parce que vous &ecirc;tes connect&eacute;.',
     draftSend: '<strong>C&rsquo;est bon, envoyer&nbsp;!</strong> nous l&rsquo;envoie pour une v&eacute;rification rapide. Il para&icirc;t sur votre page une fois approuv&eacute;, habituellement en moins d&rsquo;une journ&eacute;e.',
     draftReplaces: 'D&rsquo;ici l&agrave;, votre page garde la liste qu&rsquo;elle affiche maintenant.', draftReplacesNow: 'Il remplace la liste que votre page affiche maintenant.',
+    saveFailed: 'L&rsquo;enregistrement n&rsquo;a pas fonctionn&eacute;. Ce que vous avez &eacute;crit est toujours ici.', saveRetry: 'R&eacute;essayer',
     saved: 'Enregistr&eacute;', saving: 'Enregistrement&hellip;',
     dishName: 'Nom du plat', price: 'Prix', description: 'Description (facultatif)', done: 'Termin&eacute;', deleteDish: 'Supprimer ce plat',
     nameFirst: 'Donnez d’abord un nom à cette ligne, pour que les gens sachent à quoi sert le prix. Ou touchez Supprimer si vous n’en avez pas besoin.',
@@ -62863,6 +62875,10 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     // Tour pre-launch (2026-11-22): a list already here when the page opens is a draft saved on an earlier visit.
     var opening = firstRender; firstRender = false;
     if (opening && st === 'ready' && C.mode !== 'admin' && m && m.data && (m.data.sections || []).some(function(sec){ return (sec.items || []).length > 0; })) resumed = true;
+    if (opening && st === 'ready' && C.mode !== 'admin' && m && !pages().length && !((m.data && m.data.sections) || []).length) {
+      typing = true; data = { sections: [{ name: T.firstSectionText, note: '', items: [C.firstItem ? { name: String(C.firstItem.name || ''), description: '', price: String(C.firstItem.price || ''), dietary: [], check: false } : blankItem()] }] };
+      return openAndShow('0:0', true);
+    }
     if (st === 'ready' || (C.mode === 'admin' && m)) { data = (m && m.data) || { sections: [] }; return reviewScreen(m && m.read_error && C.mode === 'admin' ? 'Reading did not work: ' + h(m.read_error) : message); }
     if (m && pages().length) return pagesScreen(message);
     if (S.published && !message) return publishedScreen();
@@ -62989,7 +63005,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     var email = C.mode === 'token' ? '<label class="mn-email">' + T.email + '<input type="email" id="mnEmail" maxlength="254" autocomplete="email" value="' + h(C.email || '') + '"></label>' : '';
     setScreen(head + photos + admin + notes + err(message) + '<div class="mn-menu">' + secs + '</div>'
       + (C.mode === 'admin' ? '' : '<p class="mn-row"><button type="button" class="mn-link" data-act="add-sec">' + T.addSection + '</button></p>')
-      + email + '<p class="mn-saved" id="mnSaved" aria-live="polite"></p>'
+      + email + '<p class="mn-saved" id="mnSaved" aria-live="polite">' + saveStateHtml() + '</p>'
       + (draftDoes && !n ? '<p class="mn-sub" id="mnDraftDoes">' + draftDoes + '</p>' : '')
       + publishButton(n)
       + (C.mode === 'admin' ? '' : '<p class="mn-help"><button type="button" class="mn-link" data-act="restart">' + (pages().length ? T.startOver : T.startFresh) + '</button></p>') + helpBtn() + backLink());
@@ -63019,13 +63035,52 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   }
   function blankItem(){ return { name: '', description: '', price: '', dietary: [], check: false }; }
   function rerender(){ var y = window.scrollY; reviewScreen(); window.scrollTo(0, y); }
+  // Tour pre-launch 2 (2026-11-22; a tour typed, Done, then "Back to my listing" at once came back empty: the save was
+  // only scheduled 0.8 s later and leaving dropped it). Now:
+  //  - Done (and delete, move, add) saves at once; typing still waits 0.8 s between keystrokes;
+  //  - every save is sent "keepalive", so it finishes even if the page is left or reloaded right after;
+  //  - anything still unsaved is sent when the page is left, and a link out of the editor waits for the save;
+  //  - each save carries a rising number (rev); the server ignores one older than the last it stored, so a slow early
+  //    save can never land on top of newer work;
+  //  - a save that fails keeps what was typed on the screen, says so, and offers "Try again" (leaving then asks first).
+  var saveRev = Date.now(), unsaved = false, saveFailed = false;
+  function saveStateHtml(){
+    return saveFailed ? '<span class="mn-error" role="alert">' + T.saveFailed + '</span> <button type="button" class="mn-link" data-act="retry-save">' + T.saveRetry + '</button>' : unsaved ? T.saving : '';
+  }
+  function postSave(){
+    clearTimeout(saveTimer);
+    if (!data) return Promise.resolve({ ok: true });
+    var mine = ++saveRev, body = JSON.stringify({ data: data, rev: mine });
+    return fetch(base + '/save', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', keepalive: body.length < 60000, body: body })
+      .then(function(r){ return r.json().catch(function(){ return { ok: false }; }); }, function(){ return { ok: false, error: T.networkText }; })
+      .then(function(r){
+        if (mine !== saveRev) return r; // a newer save is on its way; it decides what the screen says
+        unsaved = !(r && r.ok); saveFailed = !(r && r.ok);
+        var s2 = el('mnSaved'); if (s2) s2.innerHTML = r && r.ok ? T.saved + ' &#10003;' : saveStateHtml();
+        return r;
+      });
+  }
   function save(now){
     clearTimeout(saveTimer);
+    unsaved = true; saveFailed = false;
     var s = el('mnSaved'); if (s) s.innerHTML = T.saving;
-    var go = function(){ return api('/save', { data: data }).then(function(r){ var s2 = el('mnSaved'); if (s2) s2.innerHTML = r && r.ok ? T.saved + ' &#10003;' : ''; return r; }); };
-    if (now) return go();
-    saveTimer = setTimeout(go, 800);
+    if (now) return postSave();
+    saveTimer = setTimeout(postSave, 800);
   }
+  // Leaving: send what is unsaved (keepalive lets it finish), and ask first only when a save has failed.
+  window.addEventListener('pagehide', function(){ if (unsaved && !saveFailed) postSave(); });
+  window.addEventListener('beforeunload', function(e){ if (saveFailed) { e.preventDefault(); e.returnValue = ''; } });
+  // A link out of the editor ("Back to my listing", the header) waits for the save; if it fails the owner stays, with
+  // their values and "Try again".
+  document.addEventListener('click', function(e){
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a || !unsaved || a.target === '_blank' || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    e.preventDefault();
+    postSave().then(function(r){
+      if (r && r.ok) { location.href = a.href; return; }
+      var s3 = el('mnSaved'); if (s3) { s3.innerHTML = saveStateHtml(); if (s3.scrollIntoView) s3.scrollIntoView({ block: 'center' }); }
+    });
+  }, true);
   // ----- Adding pages -----
   function toJpeg(file){
     return new Promise(function(resolve, reject){
@@ -64033,7 +64088,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         if (nm) try { nm.focus(); } catch (e2) {}
         return;
       }
-      if (ci) ci.check = false; openItem = null; pruneBlank(); save(); return rerender(); }
+      if (ci) ci.check = false; openItem = null; pruneBlank(); save(true); return rerender(); }
     if (act === 'next-check') { var nk = firstCheck(); if (nk) { var msgN = countChecks(); openAndShow(nk); var top = app.querySelector('.mn-open'); if (top) top.insertAdjacentHTML('beforebegin', '<p class="mn-error mn-block" role="alert">' + (msgN === 1 ? T.checkOne : f(T.checkCount, { n: msgN })) + ' ' + T.checkHow + '</p>'); } else rerender(); return; }
     if (act === 'type') {
       // "Type it in myself" (2026-10-18): an empty menu to fill in, one section to start, its first line open.
@@ -64054,14 +64109,15 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       else if (act === 'down' && qs < data.sections.length - 1) { list.splice(qi, 1); data.sections[qs + 1].items.unshift(moving); openItem = (qs + 1) + ':0'; }
       save(); return rerender();
     }
-    if (act === 'del-item') { var p = openItem.split(':'); data.sections[+p[0]].items.splice(+p[1], 1); openItem = null; save(); return rerender(); }
+    if (act === 'del-item') { var p = openItem.split(':'); data.sections[+p[0]].items.splice(+p[1], 1); openItem = null; save(true); return rerender(); }
     if (act === 'add-item') { var si = +t.getAttribute('data-s'); var cur0 = currentItem(); if (cur0) cur0.check = false; pruneBlank(); data.sections[si].items.push(blankItem()); return openAndShow(si + ':' + (data.sections[si].items.length - 1)); }
     if (act === 'add-sec') {
       pruneBlank(); data.sections.push({ name: '', note: '', items: [blankItem()] }); openItem = (data.sections.length - 1) + ':0'; reviewScreen();
       var sn = app.querySelector('[data-sec-name="' + (data.sections.length - 1) + '"]'); if (sn) { if (sn.scrollIntoView) sn.scrollIntoView({ block: 'center' }); sn.focus(); }
       return;
     }
-    if (act === 'del-sec') { data.sections.splice(+t.getAttribute('data-s'), 1); save(); return rerender(); }
+    if (act === 'del-sec') { data.sections.splice(+t.getAttribute('data-s'), 1); save(true); return rerender(); }
+    if (act === 'retry-save') { save(true); return; }
     if (act === 'read' && S.scan === 'device') { if (S.menu) S.menu.read_error = null; return deviceRead(); }
     if (act === 'read') { t.disabled = true; return api('/read', {}).then(function(r){ if (r && r.ok) { S = r; readStart = Date.now(); render(); } else { t.disabled = false; render(r && r.error ? h(r.error) : T.failed); } }); }
     if (act === 'restart' || act === 'restart-take' || act === 'replace') { resumed = false;
@@ -64092,7 +64148,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       var left = countChecks();
       if (left && C.mode !== 'admin') return openAndShow(firstCheck());
       if (left && !window.confirm(left + ' line' + (left === 1 ? '' : 's') + ' still need checking. Publish anyway?')) return;
-      openItem = null; clearTimeout(saveTimer); t.disabled = true; t.innerHTML = T.publishing;
+      openItem = null; clearTimeout(saveTimer); unsaved = false; saveFailed = false; t.disabled = true; t.innerHTML = T.publishing;
       var pb = { data: data, allow_unchecked: left > 0 }; if (el('mnEmail')) pb.contact_email = el('mnEmail').value;
       return api('/publish', pb).then(function(r){
         if (!r || !r.ok) { t.disabled = false; return reviewScreen(r && r.errors && r.errors.contact_email ? h(r.errors.contact_email) : r && r.error ? h(r.error) : T.failed); }
