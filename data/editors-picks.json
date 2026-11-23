@@ -3,12 +3,6 @@
   "updated": "2026-11-23",
   "picks": [
     {
-      "id": 216,
-      "why": "Traditional-method sparkling wine with Okanagan Lake views",
-      "why_fr": "Mousseux de méthode traditionnelle avec vue sur le lac Okanagan",
-      "photo": "/images/owner/6578b5d947b2a9d463e0a7a5.jpg"
-    },
-    {
       "id": 97,
       "why": "A family-friendly Lake Country brewery with a full kitchen",
       "why_fr": "Une microbrasserie familiale de Lake Country avec cuisine complète",
@@ -25,9 +19,14 @@
       "why_fr": "Le spectacle de Noël des Celtic Tenors, dimanche 29 novembre"
     },
     {
-      "id": 1699,
-      "why": "Small-batch spirits distilled in Summerland",
-      "why_fr": "Spiritueux artisanaux distillés à Summerland"
+      "id": 1540,
+      "why": "Immersive sound installations by Cardiff and Bures Miller",
+      "why_fr": "Installations sonores immersives de Cardiff et Bures Miller"
+    },
+    {
+      "id": 743,
+      "why": "Small-batch coffee roasted right here in Kelowna",
+      "why_fr": "Café torréfié en petits lots ici même à Kelowna"
     },
     {
       "id": 784,
