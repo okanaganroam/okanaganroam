@@ -656,7 +656,9 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
     if (fillKinds && /\b(?:lunch|diner|dejeuner)\b/.test(t) && !stops.some((x) => x.role === 'lunch' && x.day === (day || 1))) ops.push(op('add', { kind: 'restaurant', time: 'midday', day }));
     // "a winery on each day": one on each day of the plan (fix round 2026-11-22).
     const eachDay = !day && !afterStops.length && /\b(?:each|every) day\b|\bchaque jour\b|\btous les jours\b/.test(t) && days > 1;
-    for (const k of want.slice(0, fillKinds ? 3 : 2)) {
+    const either = want.length >= 2 && !fillKinds && !eachDay && /\b(?:or|ou|either|soit)\b/.test(t);
+    if (either) ops.push(op('add', { kind: want[0], alt: want.slice(1, 3), time, day, stops: afterStops.slice(0, 1), ...(before && afterStops.length ? { value: 'earlier' } : {}) }));
+    else for (const k of want.slice(0, fillKinds ? 3 : 2)) {
       if (eachDay) for (let d = 1; d <= days; d++) ops.push(op('add', { kind: k, time, day: d }));
       else ops.push(op('add', { kind: k, time, day, stops: afterStops.slice(0, 1), ...(before && afterStops.length ? { value: 'earlier' } : {}) }));
     }
@@ -1225,11 +1227,6 @@ function slotEdit(cur, spec, ctx) {
   return slotEditOnce(cur, spec, ctx);
 }
 function slotEditOnce(cur, spec, ctx) {
-  const r0 = slotEditOnce0(cur, spec, ctx);
-  if (process.env.CHAT_DEBUG) console.log('DBG', spec.slot, spec.slotStart, JSON.stringify(spec.shifts), r0.why || (r0.fresh && r0.fresh.name), r0.dbg || '');
-  return r0;
-}
-function slotEditOnce0(cur, spec, ctx) {
   const pinned = {}, times = {};
   for (const s of cur.stops) {
     if (cur.removed.has(s.key) || !/^\d-/.test(s.key)) continue;
@@ -1247,14 +1244,14 @@ function slotEditOnce0(cur, spec, ctx) {
   // in which another stop moved or changed.
   let plan = null;
   try { plan = ctx.run(args); } catch (e) { return { why: 'conflict' }; }
-  if (!plan || !isDayPlan(plan) || plan.swapMissed || (plan.swapKept && plan.swapKept.key === spec.slot)) return { why: 'no_fit', dbg: JSON.stringify(plan && (plan.swapMissed || plan.swapKept)) };
+  if (!plan || !isDayPlan(plan) || plan.swapMissed || (plan.swapKept && plan.swapKept.key === spec.slot)) return { why: 'no_fit' };
   // Only that one stop changes: a place the planner put into another free part of a day is taken out again.
   { const f0 = planStops(plan).find((s) => s.key === spec.slot); agent.stripExtras(plan, new Set([...cur.stops.map((s) => s.id), ...(f0 ? [f0.id] : [])])); }
   const nw = planStops(plan);
   const fresh = nw.find((s) => s.key === spec.slot);
   if (!fresh || (spec.oldId && fresh.id === spec.oldId) || !spec.check(fresh)) return { why: 'no_fit' };
   // Only that one stop changes: every other stop is still there, in its (or its moved-to) slot.
-  for (const [k, id] of Object.entries(pinned)) if (!nw.some((s) => s.key === k && s.id === id)) return { why: 'disturbed', dbg: `${k}:${id} -> ${JSON.stringify(nw.filter((x) => x.day === Number(k[0])).map((x) => [x.key, x.id, x.start]))}` };
+  for (const [k, id] of Object.entries(pinned)) if (!nw.some((s) => s.key === k && s.id === id)) return { why: 'disturbed' };
   // Only the stops whose time really changed are "moved" (a stop that keeps its time only changed slot name).
   const moved = Object.entries(spec.shifts).map(([from, to]) => { const was = cur.stops.find((s) => s.key === from), now = nw.find((s) => s.key === to); return now && was && now.start !== was.start ? now : null; }).filter(Boolean);
   // An added stop asked for after another one starts after it (and before the next one, when there was room).
@@ -1353,8 +1350,21 @@ function planTurnCore(ops, ctx) {
     : { ...ctx.args, excludeVenueIds: [...new Set([...(ctx.args.excludeVenueIds || []), ...(ctx.stops || []).filter((s) => removed.has(s.key)).map((s) => s.id)])] };
   let cur = { plan: base && base.plan ? base.plan : null, stops: base && base.plan ? planStops(base.plan) : (ctx.stops || []), args: startArgs, locks, removed: base && base.plan ? new Set() : removed };
   const results = base ? base.results.slice() : [];
-  for (const op of locals) {
-    const r = { op: op.o, ok: false, local: true };
+  // Round 6 (« quilles ou cinéma après le souper » added a pottery studio): "bowling or a movie" is one stop, the first
+  // kind that fits; the next kind is tried only when the one before it could not be added.
+  const queue = locals.slice();
+  const altNext = (i) => {
+    const p = queue[i];
+    if (!p || !(p.alt || []).length || !p._r || p._r.ok) return;
+    results.splice(results.indexOf(p._r), 1);
+    queue.splice(i + 1, 0, { ...p, kind: p.alt[0], alt: p.alt.slice(1), _r: null, _kinds: [...(p._kinds || [p.kind]), p.alt[0]] });
+  };
+  for (let qi = 0; qi <= queue.length; qi++) {
+    if (qi > 0) altNext(qi - 1);
+    if (qi >= queue.length) break;
+    const op = queue[qi];
+    const r = { op: op.o, ok: false, local: true, ...(op._kinds ? { kinds: op._kinds } : {}) };
+    op._r = r;
     results.push(r);
     // The stop the op names, as it is now (an earlier edit in the same message may have moved it).
     const now = (s) => (s ? cur.stops.find((x) => x.id === s.id) || null : null);
@@ -1373,6 +1383,10 @@ function planTurnCore(ops, ctx) {
           const p = Number(old.price) || (op.value === 'budget' ? 3 : 2);
           if ((op.value === 'budget' && p <= 1) || (op.value === 'upscale' && p >= 4)) { rr.why = 'no_fit'; continue; }
           swap = { type: old.type, id: old.id, ...(op.value === 'budget' ? { priceMax: p - 1 } : { priceMin: p + 1 }) };
+          // Round 6 ("swap Saturday dinner for pizza", then "something cheaper for dinner on Saturday" gave a non-pizza
+          // place): a stop the chat changed keeps the kind of food it is (its name or cuisine), with the price asked.
+          const keepKind = old.soft ? Object.keys(WORD_KINDS).find((k) => WORD_KINDS[k].meal && WORD_KINDS[k].words.some((w) => fold(`${old.name} ${old.cuisine || ''}`).includes(w))) : null;
+          if (keepKind) { swap = { ...swap, types: WORD_KINDS[keepKind].types, words: WORD_KINDS[keepKind].words }; rr.keptKind = keepKind; }
         } else swap = op.kind ? { ...KIND_SWAP[op.kind], id: old.id } : { type: old.type, id: old.id };
         // A meal swapped for a kind of meal stays somewhere to eat (never a winery or a beach with a lake view).
         const mealOk = (f) => !old.role || ['restaurant', 'pub'].includes(f.type) || (old.role === 'lunch' && f.type === 'cafe');
@@ -1434,6 +1448,14 @@ function planTurnCore(ops, ctx) {
     }
     const where = placeAdd(op.o === 'more_like' ? { ...op, stops: [], day: (now(op.stops[0]) || op.stops[0]).day, value: null } : { ...op, stops: (op.stops || []).map((s) => now(s) || s) }, kind, cur);
     r.anchor = (op.stops || [])[0] || null; r.before = op.value === 'earlier';
+    // Round 6 ("something fun" on an Osoyoos day replaced the winery): with no day, time or stop named, a free part of
+    // another day is used before any stop gives way.
+    if (where.why === 'no_room' && !op.day && !op.time && !(op.stops || []).length && op.o === 'add') {
+      for (const d of [...new Set(cur.stops.map((x) => x.day))].sort((a, b) => a - b)) {
+        const w2 = placeAdd({ ...op, day: d }, kind, cur);
+        if (!w2.why) { Object.assign(where, w2); delete where.why; op.day = d; break; }
+      }
+    }
     if (where.why === 'no_room') {
       // Round 5 ("add ice cream after lunch" on a full day said "no free spot" though it is listed and open): the new
       // stop takes the place of the stop in that part of the day (never a meal or a stop the visitor kept or added),
@@ -1442,7 +1464,8 @@ function planTurnCore(ops, ctx) {
       const dayN = where.day || op.day || (anchor && anchor.day) || 1;
       const first = anchor ? DAYPARTS[DAYPARTS.indexOf(partOf(anchor.key)) + (r.before ? -1 : 1)] : ({ morning: 'morning', midday: 'afternoon', afternoon: 'afternoon', evening: 'late' }[op.time] || 'afternoon');
       const parts = anchor ? [first] : [...new Set([first, 'afternoon', 'late', 'morning'])];
-      const there = parts.map((p2) => cur.stops.find((x) => x.key === `${dayN}-${p2}` && !x.role && !cur.removed.has(x.key) && cur.locks[x.key] !== x.id)).find(Boolean);
+      const asked = new Set(kindsNamed(fold((ctx.args && ctx.args.text) || '')).map((k) => KINDS[k] && KINDS[k].type).filter(Boolean));
+      const there = parts.map((p2) => cur.stops.find((x) => x.key === `${dayN}-${p2}` && !x.role && !cur.removed.has(x.key) && cur.locks[x.key] !== x.id && !asked.has(x.type) && !x.soft)).find(Boolean);
       const res2 = there ? slotEdit(cur, { slot: there.key, slotStart: there.start, shifts: {}, kind, swap: { ...KIND_SWAP[kind] }, exclude: [there.id], oldId: there.id, check: (f) => wantMatches(kind, f) && !cur.stops.some((o) => o.id === f.id) }, ctx) : null;
       if (res2 && !res2.why) {
         r.ok = true; r.fresh = res2.fresh; r.inPlaceOf = there; r.moved = [];
@@ -1479,6 +1502,7 @@ function planTurnCore(ops, ctx) {
     r.ok = true; r.fresh = res.fresh; r.moved = res.moved;
     // A part of the day asked for that was full: the reply says where it went instead.
     if (op.time && !r.nearMiss && !(TIME_PARTS[op.time] || []).includes(partOf(where.slot))) r.partFull = op.time;
+    if (!r.nearMiss && t0 && Number.isInteger(r.fresh.start) && r.fresh.start - t0.start >= 60) r.later = true;
     cur.locks[where.slot] = res.fresh.id; // what the visitor added stays through later re-plans
     cur = { plan: res.plan, stops: res.nw, args: { ...res.args, swap: null }, locks: cur.locks, removed: new Set() };
     if (tk && ctx.hooks && ctx.hooks.tourStops) {
@@ -1524,7 +1548,8 @@ const T = {
     wineTour: 'Here’s a wine tour with a driver for {town}. It’s under “Getting here & tours”, with its Book button.', wineTourNone: 'I don’t have a wine tour to offer for {town} right now.',
     poolWinter: ' (check it’s open in winter)',
     done: 'Done.', took: 'Took out {names}.', kept: 'Kept {names}.', keptStays: 'Kept {names}. {it} when you change other things.', itStays: 'It stays', theyStay: 'They stay',
-    addedNear: 'No {kind} was open {where}, so I added {new}{at}.', addedPartFull: 'The {part} was full, so I added {new}{at}.', partN: { morning: 'morning', midday: 'midday', afternoon: 'afternoon', evening: 'evening' }, partW: { morning: 'in the morning', midday: 'at midday', afternoon: 'in the afternoon', evening: 'in the evening' },
+    addedLater: 'Nothing that fits opens earlier, so I added {new}{at}.', addedNear: 'No {kind} was open {where}, so I added {new}{at}.', addedPartFull: 'The {part} was full, so I added {new}{at}.', partN: { morning: 'morning', midday: 'midday', afternoon: 'afternoon', evening: 'evening' }, partW: { morning: 'in the morning', midday: 'at midday', afternoon: 'in the afternoon', evening: 'in the evening' },
+    elsewhere: '{site} only covers {area}, so I can’t plan {town} here. I can keep changing this plan, or start a new one in the Okanagan.', elsewhereSister: 'Our sister site {sister} ({url}) plans {covers}, so try {town} there. Here I can keep changing this plan.',
     tourCoversMoved: 'It covers that part of the day, so I took out {names}.', timeAfternoon: 'Day {d} starts in the afternoon, so I left it as it is.', timeNow: 'Day {d} now starts with {name} at {time}.',
     qNone: 'There’s no {what} in your plan. Say “add {add}” if you’d like one.', qMissingAsked: 'The {what} you asked for isn’t in your plan: none I list fit there on these dates. Say “add {add}” and I’ll find the nearest.',
     alreadyHas: '{name} already has {what}, so I kept it.', swapped: 'Swapped {old} for {new}{at}.', swapFail: 'I couldn’t find {kind} that fits there, so {old} stays.', swapFailSame: 'Nothing else nearby fits there, so {old} stays.',
@@ -1558,7 +1583,8 @@ const T = {
     wineTour: 'Voici un tour des vignobles avec chauffeur pour {town}. Il est sous « Pour venir et excursions », avec son bouton Réserver.', wineTourNone: 'Je n’ai pas de tour des vignobles à proposer pour {town} en ce moment.',
     poolWinter: ' (vérifiez qu’elle est ouverte en hiver)',
     done: 'C’est fait.', took: 'J’ai retiré {names}.', kept: 'J’ai gardé {names}.', keptStays: 'J’ai gardé {names}. {it} si vous changez autre chose.', itStays: 'Il reste', theyStay: 'Ils restent',
-    addedNear: 'Aucun lieu pour {kind} n’était ouvert {where}, donc j’ai ajouté {new}{at}.', addedPartFull: 'Le {part} était complet, donc j’ai ajouté {new}{at}.', partN: { morning: 'matin', midday: 'midi', afternoon: 'après-midi', evening: 'soir' }, partW: { morning: 'le matin', midday: 'à midi', afternoon: 'l’après-midi', evening: 'le soir' },
+    addedLater: 'Rien qui convienne n’ouvre plus tôt, donc j’ai ajouté {new}{at}.', addedNear: 'Aucun lieu pour {kind} n’était ouvert {where}, donc j’ai ajouté {new}{at}.', addedPartFull: 'Le {part} était complet, donc j’ai ajouté {new}{at}.', partN: { morning: 'matin', midday: 'midi', afternoon: 'après-midi', evening: 'soir' }, partW: { morning: 'le matin', midday: 'à midi', afternoon: 'l’après-midi', evening: 'le soir' },
+    elsewhere: '{site} couvre seulement {area}, donc je ne peux pas planifier {town} ici. Je peux continuer à modifier ce plan, ou en commencer un nouveau dans l’Okanagan.', elsewhereSister: 'Notre site jumeau {sister} ({url}) planifie {covers}; essayez {town} là-bas. Ici, je peux continuer à modifier ce plan.',
     tourCoversMoved: 'Il couvre ce moment de la journée, donc j’ai retiré {names}.', timeAfternoon: 'Le jour {d} commence l’après-midi, donc je l’ai laissé tel quel.', timeNow: 'Le jour {d} commence maintenant avec {name} à {time}.',
     qNone: 'Il n’y a pas de {what} dans votre plan. Dites « ajoute {add} » si vous en voulez un.', qMissingAsked: 'Le {what} demandé n’est pas dans votre plan : aucun de ceux que nous listons ne convenait à ces dates. Dites « ajoute {add} » et je trouverai le plus proche.',
     alreadyHas: '{name} a déjà {what}, donc je l’ai gardé.', swapped: 'J’ai remplacé {old} par {new}{at}.', swapFail: 'Je n’ai pas trouvé {kind} qui convienne à ce moment, donc {old} reste.', swapFailSame: 'Rien d’autre à proximité ne convient à ce moment, donc {old} reste.',
@@ -1599,6 +1625,11 @@ function kindNoun(what, L) {
 function cantReply(cant, lang, what = null, stops = null, opts = {}) {
   const L = lang === 'fr' ? 'fr' : 'en';
   const t = T[L];
+  if (cant === 'elsewhere') {
+    const A = agent.AREA, town = String(what || '').replace(/\b\w/g, (c) => c.toUpperCase());
+    if (A.sister.towns.includes(what)) return fill(t.elsewhereSister, { town, sister: A.sister.name, url: A.sister.url, covers: A.sister[L] });
+    return fill(t.elsewhere, { town, site: A.site, area: A[L] });
+  }
   // Round 6: a question about a kind of place that is not on the plan (and, when the request asked for it, why).
   if (cant === 'q_none' || cant === 'q_missing') {
     const noun = kindNoun(what, L);
@@ -1620,11 +1651,14 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
   if (cant && !(out && out.results && out.results.length)) return cantReply(cant, L);
   if (!out || !out.results || !out.results.length) return t.unclear;
   const at = (s) => (s && Number.isInteger(s.start) ? (L === 'fr' ? ` à ${clock(s.start, L)}` : ` at ${clock(s.start, L)}`) : '');
-  const kindLabel = (k) => (k && KINDS[k] ? KINDS[k][L] : (L === 'fr' ? 'autre chose' : 'something else'));
+  const kindLabel0 = (k) => (k && KINDS[k] ? KINDS[k][L] : (L === 'fr' ? 'autre chose' : 'something else'));
+  const orW = L === 'fr' ? ' ou ' : ' or ';
+  let kindLabel = kindLabel0;
   const parts = [];
   const described = new Set();
   let allOk = true;
   for (const r of out.results) {
+    kindLabel = (k) => ((r.kinds || []).length > 1 ? r.kinds.map(kindLabel0).join(orW) : kindLabel0(k));
     if (r.ok === false && !r.benign) allOk = false;
     // A change the planner could not make at all (a conflict): one honest line, not "Busier days.".
     if (!out.plan && out.failed && ['pace', 'party', 'days', 'date', 'town', 'redo_day', 'start_over', 'refine'].includes(r.op)) { if (!parts.includes(t.cantChange)) parts.push(t.cantChange); continue; }
@@ -1653,7 +1687,8 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
         else if (r.ok && r.fresh && r.nearMiss) {
           const a = r.anchor ? (r.anchor.role === 'lunch' ? t.lunchW : r.anchor.role === 'dinner' ? t.dinnerW : r.anchor.name) : null;
           parts.push(fill(t.addedNear, { kind: kindNoun(r.kind, L), where: a ? fill(r.before ? t.beforeW : t.afterW, { x: a }) : (t.partW[r.op === 'add' && r.time] || t.thereW), new: r.fresh.name, at: at(r.fresh) })); described.add(r.fresh.id);
-        } else if (r.ok && r.fresh && r.partFull) { parts.push(fill(t.addedPartFull, { part: t.partN[r.partFull] || r.partFull, new: r.fresh.name, at: at(r.fresh) })); described.add(r.fresh.id); }
+        } else if (r.ok && r.fresh && r.later && !r.partFull) { parts.push(fill(t.addedLater, { new: r.fresh.name, at: at(r.fresh) })); described.add(r.fresh.id); }
+        else if (r.ok && r.fresh && r.partFull) { parts.push(fill(t.addedPartFull, { part: t.partN[r.partFull] || r.partFull, new: r.fresh.name, at: at(r.fresh) })); described.add(r.fresh.id); }
         else if (r.ok && r.fresh) { parts.push(fill(r.closest ? t.addedClose : t.added, { new: r.fresh.name, at: at(r.fresh) })); described.add(r.fresh.id); }
         else if (r.local) {
           const a = r.anchor ? (r.anchor.role === 'lunch' ? t.lunchW : r.anchor.role === 'dinner' ? t.dinnerW : r.anchor.name) : null;

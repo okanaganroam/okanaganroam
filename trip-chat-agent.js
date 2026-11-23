@@ -89,6 +89,12 @@ function readAll(message, read) {
 const WD_KEYS = { sunday: 'sun', dimanche: 'sun', monday: 'mon', lundi: 'mon', tuesday: 'tue', mardi: 'tue', wednesday: 'wed', mercredi: 'wed', thursday: 'thu', jeudi: 'thu', friday: 'fri', vendredi: 'fri', saturday: 'sat', samedi: 'sat' };
 const WD_RE = new RegExp(`\\b(${Object.keys(WD_KEYS).join('|')})s?\\b`);
 function weekdayIn(message) { const m = WD_RE.exec(fold(message)); return m ? WD_KEYS[m[1]] : null; }
+// The area this site covers, and its sister site (round 6: "a trip to Vancouver" got "I can only change this plan").
+const AREA = {
+  en: 'the Okanagan, from Vernon to Osoyoos', fr: 'l’Okanagan, de Vernon à Osoyoos', site: 'Okanagan Roam',
+  sister: { name: 'Whistler Roam', url: 'whistlerroam.com', en: 'Whistler, Squamish, Pemberton and the Sea to Sky', fr: 'Whistler, Squamish, Pemberton et le Sea to Sky', towns: ['whistler', 'squamish', 'pemberton', 'sea to sky', 'brackendale', 'britannia beach', 'blackcomb'] },
+  outside: ['vancouver', 'victoria', 'vancouver island', 'tofino', 'banff', 'jasper', 'calgary', 'edmonton', 'seattle', 'portland', 'toronto', 'montreal', 'kamloops', 'revelstoke', 'nelson', 'golden', 'sun peaks', 'harrison', 'hope', 'chilliwack', 'abbotsford', 'nanaimo', 'lake louise', 'rossland', 'fernie', 'prince george', 'salmon arm', 'keremeos', 'princeton', 'osoyoos lake'],
+};
 const NUMS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, sept: 7, huit: 8 };
 const numOf = (w) => (w === undefined || w === null ? null : (Number(w) || NUMS[w] || null));
 
@@ -132,6 +138,9 @@ function agentRules(t, stops, ctx, h) {
   const regionIn = (s) => regions.find((x) => new RegExp(`\\b${fold(regionLabels[x] || x).replace(/[^a-z0-9 ]/g, '.')}\\b`).test(s)) || null;
   const editVerb = EDIT_VERB_RE.test(t);
 
+  // 00. A trip somewhere this site does not cover: said, with the sister site where it covers that place.
+  const away = [...AREA.sister.towns, ...AREA.outside].filter((x) => !regions.some((r) => fold(regionLabels[r] || r) === x)).find((x) => new RegExp(`\\b(?:to|in|at|around|visit|visiting|a|au|en|vers|pour|dans)\\s+${x.replace(/ /g, '\\s+')}\\b`).test(t) || new RegExp(`^${x.replace(/ /g, '\\s+')}\\b`).test(t));
+  if (away && /\b(?:trip|travel|go|going|head(?:ing)?|visit\w*|plan|weekend|day|days|night|nights|instead|voyage|aller|allons|fin de semaine|journee|sejour|plutot)\b/.test(t) && !h.stopsNamed(t, stops).length) return { ops: [], cant: 'elsewhere', what: away };
   // 0. "add a spa on Saturday afternoon instead of the park": the stop named after "instead of" is the one replaced.
   const inst = /\b(?:instead of|in place of|rather than|au lieu d[eu]|a la place d[eu])\s+(?:the\s+|our\s+|that\s+|la\s+|le\s+|l')?([a-z' -]+?)(?:\s+(?:on|le|du)\s+.*)?[.!]*$/.exec(t);
   if (inst) {
@@ -554,5 +563,5 @@ const PROMPT_LINES = [
 
 module.exports = {
   TOUR_KINDS, TOUR_TYPES, tourKindOf, runSteady, startsOf, stripExtras, splitAsks, readAll, agentRules, weekdayIn, wdOfDate, moveStop, answerQuestion, parseWeek, AGENT_T, PROMPT_LINES, Q_VALUES,
-  STAY_REMOVE_RE, STAY_ADD_RE, NIGHT_ADD_RE, fold, km,
+  STAY_REMOVE_RE, STAY_ADD_RE, NIGHT_ADD_RE, fold, km, AREA,
 };

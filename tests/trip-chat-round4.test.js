@@ -45,7 +45,8 @@ test('rules: the listings\' own words (pizza, ramen, bowling, hot chocolate, a w
   assert.deepEqual(brief(R('swap the brewery for a wine bar')), [['replace', 'wine_bar', [14], null, null, null]], 'a wine bar is not a cocktail bar or a winery');
   assert.deepEqual(brief(R('add hot chocolate on Saturday afternoon')), [['add', 'hot_chocolate', [], 'afternoon', 1, null]]);
   assert.deepEqual(brief(R('add hot chocolate after lunch')), [['add', 'hot_chocolate', [12], null, null, null]]);
-  assert.deepEqual(brief(R('quilles ou cinéma après le souper')), [['add', 'bowling', [15], null, null, null], ['add', 'cinema', [15], null, null, null]]);
+  assert.deepEqual(brief(R('quilles ou cinéma après le souper')), [['add', 'bowling', [15], null, null, null]], 'round 6: one stop (bowling, else the cinema: alt)');
+  assert.deepEqual(R('quilles ou cinéma après le souper').ops[0].alt, ['cinema']);
   assert.deepEqual(brief(R('quelque chose à faire après le souper')), [['add', 'activity', [15], null, null, null]]);
   assert.deepEqual(brief(R('swap Sunday lunch for sushi')), [['replace', 'sushi', [22], null, null, null]]);
   for (const k of Object.keys(tc.WORD_KINDS)) assert.ok(tc.KIND_KEYS.includes(k), `${k} is a kind the AI can answer with too`);
