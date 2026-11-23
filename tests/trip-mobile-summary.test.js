@@ -175,3 +175,8 @@ test('the whole page script still parses, and the layout keeps Save, Share, day 
   assert.match(src, /data-v4-save aria-pressed="false"/); assert.match(src, /data-v4-share/);
   assert.match(src, /role="tab" data-tw-day="/); assert.match(src, /data-v4-book/);
 });
+
+test('a chat reply that ends with a question opens in full on a phone (the question is not under the two-line cut)', () => {
+  const src = require('node:fs').readFileSync(require.resolve('../trip-chat-page.js'), 'utf8');
+  assert.match(src, /box\.classList\.contains\('is-long'\) && \/\[\?\\uFF1F\]\\s\*\$\/\.test\(String\(agent \|\| ''\)\)\) box\.classList\.add\('is-open'\)/);
+});

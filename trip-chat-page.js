@@ -175,6 +175,9 @@ function chatClientSrc(d) {
     // reply is scrolled into view (it was below the fold in the sidebar).
     box.classList.remove('is-open');
     var sp = box.querySelector('.v4-chat-agent span'); box.classList.toggle('is-long', !!(sp && sp.scrollHeight > sp.clientHeight + 2));
+    // A reply that ends by asking something ("Want that?", "Go ahead?", "Which?") opens in full: the question sat
+    // under the two-line cut, so the visitor never saw what they were being asked.
+    if (box.classList.contains('is-long') && /[?\uFF1F]\s*$/.test(String(agent || ''))) box.classList.add('is-open');
     if (!opts.busy) { var st = document.getElementById('t3PlanStatus'); if (st) st.textContent = ''; }
     chatPad();
     if (!opts.busy && window.matchMedia && window.matchMedia('(min-width: 900px)').matches) { try { box.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { box.scrollIntoView(false); } }
