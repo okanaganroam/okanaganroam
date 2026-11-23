@@ -34,7 +34,7 @@ test('1. no car: every stop is near the middle of its town, and the rental car i
   assert.ok(/if \(v4 && gettingHere\.enabled\(\) && !drivingIn && !noCarTrip\b[^\n]*\) gettingHere\.withTripStep\(plan, stay\);/.test(SRC), 'no "Rent a car" step');
   assert.ok(/if \(gh && noCarTrip\) \{ gh\.noCar = true; gh\.car = null; gh\.carLabel = null; \}/.test(SRC), 'no rental on the Getting here card');
   const p = fx.plan('3 days in Kelowna, good food, no car', { extra: { v4: true } });
-  assert.equal(p.notes[0], 'No car: every stop is in town, a walk or a short taxi or bus ride apart.');
+  assert.equal(p.notes[0], 'No car: every stop is in town; rides between stops aren’t checked.');
 });
 
 // ---- 2. Vague, impossible and out-of-area requests ----

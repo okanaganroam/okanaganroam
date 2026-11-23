@@ -359,6 +359,8 @@ function stopNeedNotes(plan, id, fr) {
   if (hasNeed(needs, 'dog')) out.dog = row('dog_friendly');
   if (out.access) { const n = accessShort(out.access, fr); out.notes.push(n); out.compact.push(accessShort(out.access, fr, true)); if (accessOpen(out.access)) out.open.push(n); if (out.access.dir) out.dir = out.access.dir; }
   if (out.dog) { const n = dogShort(out.dog, fr); out.notes.push(n); out.compact.push(dogShort(out.dog, fr, true)); if (dogOpen(out.dog)) out.open.push(n); out.chipOff = out.dog.has === true && out.dog.where === 'unsaid'; }
+  // No car (2026-11-23, trip-transport-need.js): the hop that reaches this stop, when it is more than a short walk.
+  if (hasNeed(needs, 'no_car')) { const r = row('no_car'); if (r && r.check && r.note) { const n = (fr && r.noteFr) || r.note; out.notes.push(n); out.compact.push((fr && r.noteShortFr) || r.noteShort || n); } }
   out.text = out.notes.join(' · ');
   return out;
 }

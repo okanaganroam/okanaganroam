@@ -312,6 +312,15 @@ function chatClientSrc(d) {
         if (j.card && j.card.kind === 'wine_tour') { chat.wineTour = j.card; touched = true; changed.push('gh'); }
         var planTouched = before && (planOnly || !acts.transport || j.stayBlock || j.stayPref !== undefined || (acts.removeEvents || []).length > 0);
         if (typeof j.text === 'string' && j.text && !(j.plan && j.req)) { state.text = j.text; }
+        // No car said in the chat (2026-11-23): the plan on screen gains the need and its line (the summary, the cards,
+        // the sheet and the shared copy then say it); the stops do not change.
+        if (j.needPatch && j.needPatch.need && j.needPatch.evidence && state.last && !(j.plan && j.req)) {
+          var np = j.needPatch, nds = Array.isArray(state.last.needs) ? state.last.needs.filter(function(n){ return !(n && n.key === np.need.key); }) : [];
+          nds.push(np.need); state.last.needs = nds;
+          var evs = (state.last.evidence || []).filter(function(e){ return !(e && e.ask === np.evidence.ask); }), at = evs.findIndex(function(e){ return e && /^stay:/.test(e.ask || ''); });
+          np.evidence.line = true; if (at < 0) evs.push(np.evidence); else evs.splice(at, 0, np.evidence);
+          state.last.evidence = evs; touched = true;
+        }
         // Round 4: a change asked for in the chat keeps a confirmed plan confirmed (Book, Share and Save stay, for the plan
         // as it is now); only Save is offered again.
         if (touched) { v4.confirmed = wasConfirmed; v4.saved = false; chat.rendering = true; try { render(false); } finally { chat.rendering = false; } syncUrl(); }
@@ -360,8 +369,8 @@ function chatClientSrc(d) {
       stayH: 'Where you’ll stay', stayShort: 'Your stay', rates: 'Check rates', seeMore: 'See {n} more', fewer: 'Hide', choose: 'Choose', ghH: 'Getting here', seeCars: 'See cars', book: 'Book', confirm: 'Confirm plan', sleeps: 'Sleeps {n}' },
     fr: { who: 'Agent de voyage', hi: 'Bonjour! Où allez-vous, et qu’aimez-vous faire?', day: 'Voici une journée à {town}{for}.', days: 'Voici un plan de {n} jours à {town}{for}{stay}.', plan: 'Voici votre plan{for}.', more: ' Voulez-vous changer quelque chose?',
       fam: ' pour votre famille', dog: ' pour vous et votre chien', stay: ', avec un logement', stayWith: ', avec un logement qui a {what}', stayUnsure: ', avec un logement ({what} non confirmé)', and: 'et', notConfirmed: '{what} non confirmé',
-      amen: { pool: 'une piscine', hot_tub: 'un spa', kitchen: 'une cuisine', pets: 'des chambres où les animaux sont acceptés', parking: 'un stationnement gratuit', accessible: 'des chambres accessibles' },
-      chip: { pool: 'Piscine', hot_tub: 'Spa', kitchen: 'Cuisine', pets: 'Animaux acceptés', parking: 'Stationnement gratuit', accessible: 'Accessible' }, when: 'Quand venez-vous?', whenShort: 'Quand?', weekend: 'Ce week-end', pick: 'Choisir les dates', notSure: 'Pas encore sûr', done: 'OK', from: 'Arrivée', to: 'Départ',
+      amen: { pool: 'une piscine', hot_tub: 'un bain à remous', kitchen: 'une cuisine', pets: 'des chambres où les animaux sont acceptés', parking: 'un stationnement gratuit', accessible: 'des chambres accessibles' },
+      chip: { pool: 'Piscine', hot_tub: 'Bain à remous', kitchen: 'Cuisine', pets: 'Animaux acceptés', parking: 'Stationnement gratuit', accessible: 'Accessible' }, when: 'Quand venez-vous?', whenShort: 'Quand?', weekend: 'Ce week-end', pick: 'Choisir les dates', notSure: 'Pas encore sûr', done: 'OK', from: 'Arrivée', to: 'Départ',
       datesFail: 'Je n’ai pas pu planifier ces dates. Votre plan n’a pas changé.', missing: 'Je n’ai pas pu inclure {what} à ces dates; dites-moi si vous voulez que j’essaie un autre jour.', missingNoDates: 'Je n’ai pas pu inclure {what} dans ce plan; dites « ajoute {what} » et j’essaie encore.', removeEvent: 'Retirer {name}', poolWinter: 'vérifiez qu’elle est ouverte en hiver',
       datesSet: 'Plan pour le {a} – {b}.', stayDatesSet: 'Séjour : {a} → {b}, {n}. La note près de l’hébergement dit ce que chaque lien de réservation transmet.', ready: 'Votre voyage est prêt. Réservez-le, partagez-le ou dites-moi quoi changer.', noCarNone: 'Aucune navette pour ce voyage.', wine: 'Tour des vignobles (sans conduire)',
       stayH: 'Où vous logerez', stayShort: 'Votre séjour', rates: 'Voir les tarifs', seeMore: 'Voir {n} autres', fewer: 'Masquer', choose: 'Choisir', ghH: 'Pour venir', seeCars: 'Voir les voitures', book: 'Réserver', confirm: 'Confirmer le plan', sleeps: 'Jusqu’à {n} pers.' }

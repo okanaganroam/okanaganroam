@@ -25,6 +25,14 @@ function tripSummaryFacts(plan, fr, ctx) {
       if (e.asked > 0) { count = yes; if (count < e.asked) status = count ? 'partial' : 'unmet'; }
       else if (!yes) status = 'unmet';
     }
+    // No car (2026-11-23, trip-transport-need.js): how many hops between the stops still on the plan are more than a
+    // short walk. Never a tick: no ride or route is checked.
+    if (e.ask === 'no_car') {
+      var rides = stops.filter(function (x) { return x && x.check; }).length;
+      if (rides) flags.push({ kind: 'flag', status: 'unknown', ask: e.ask, text: label + sep + (fr ? rides + (rides > 1 ? ' trajets à vérifier' : ' trajet à vérifier') : rides + (rides > 1 ? ' rides to check' : ' ride to check')) });
+      else flags.push({ kind: 'flag', status: 'partial', ask: e.ask, text: label + sep + (fr ? (stops.length ? 'courtes marches (approx.)' : 'transports non vérifiés') : (stops.length ? 'short walks (approx.)' : 'rides not checked')) });
+      return;
+    }
     // One person does not drink (2026-11-23; the summary said "Non-drinker: 1 of 4 stops"): say what the four are (the
     // plan's wineries and bars) and keep "options listed" apart from "the listing doesn't say". A listing without the
     // badge is unknown (has: null), never "has none".

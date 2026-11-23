@@ -40,6 +40,11 @@
 //                        its own Dogs line says no dogs (stops[].says); null = it doesn't say.
 //     'stay:pets'        the place to stay, from stay_info.pets only ('yes' verified, 'some' partial, null unknown).
 //
+//     'no_car'           (2026-11-23, trip-transport-need.js) the hops between the stops, by straight-line distance
+//                        between stored map locations only: stops[] has one row per stop reached ({ km, from, walk,
+//                        check, note… }); status is always 'unknown' (no ride, route or transit is ever checked).
+//     'stay:sauna'       a sauna asked of the place to stay: stay listings carry no sauna fact, so always 'unknown'.
+//
 //   plan.thinDays = [{ day, stops, reason: [codes], text, textFr, next: [{ label, labelFr, message, detail? }] }]
 //     a day of a multi-day plan with no stop or one stop that the planner could not fill (trip-access-needs.js
 //     thinDays). reason codes: 'no_match', 'last_day', 'dog', 'wheelchair', 'used'. next[].message is a plain chat
@@ -84,8 +89,9 @@ const TYPE_WORDS = {
   golf: ['golf course', 'golf courses', 'terrain de golf', 'terrains de golf'], outdoor: ['outdoor stop', 'outdoor stops', 'arrêt en plein air', 'arrêts en plein air'],
   indoor: ['indoor stop', 'indoor stops', 'activité intérieure', 'activités intérieures'], tour: ['tour', 'tours', 'visite guidée', 'visites guidées'], breakfast: ['breakfast spot', 'breakfast spots', 'déjeuner', 'déjeuners'],
 };
-const STAY_AMENITY = { pool: ['Pool', 'Piscine', 'a pool', 'une piscine'], hot_tub: ['Hot tub', 'Spa', 'a hot tub', 'un spa'], kitchen: ['Kitchen', 'Cuisine', 'a kitchen', 'une cuisine'], accessible: ['Accessible rooms', 'Chambres accessibles', 'accessible rooms', 'des chambres accessibles'] };
+const STAY_AMENITY = { pool: ['Pool', 'Piscine', 'a pool', 'une piscine'], hot_tub: ['Hot tub', 'Bain à remous', 'a hot tub', 'un bain à remous'], kitchen: ['Kitchen', 'Cuisine', 'a kitchen', 'une cuisine'], accessible: ['Accessible rooms', 'Chambres accessibles', 'accessible rooms', 'des chambres accessibles'] };
 const tripAccess = require('./trip-access-needs');
+const tripTransport = require('./trip-transport-need');
 
 const cap = (t) => String(t || '').replace(/^./, (c) => c.toUpperCase());
 const listEn = (a) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : a[0] || '');
@@ -274,10 +280,17 @@ function kindEntry(req, plan, stops, ctx) {
 }
 function stayEntries(plan) {
   const w = plan.whereToStay, out = [];
-  const keys = (w && w.amenity && w.amenity.keys) || (w && w.pref && w.pref.amenities) || [];
+  const keys = ((w && w.amenity && w.amenity.keys) || (w && w.pref && w.pref.amenities) || []).concat((plan.stayAlso || []).filter((k) => k === 'sauna'));
   if (!w || !keys.length) return out;
   const pick = w.pick || null;
-  for (const k of keys) {
+  for (const k of [...new Set(keys)]) {
+    // A sauna asked of the place to stay: the stay listings carry no sauna fact, so it is never shown as there or not.
+    if (k === 'sauna') {
+      out.push({ ask: 'stay:sauna', label: 'Sauna at the stay', labelFr: 'Sauna à l’hébergement', stops: pick ? [{ id: pick.id, name: pick.name, has: null }] : [], status: 'unknown',
+        text: pick ? `Sauna at the stay: ${pick.name}’s listing doesn’t say whether it has a sauna. Ask when you book.` : 'Sauna at the stay: no place to stay is suggested for this plan.',
+        textFr: pick ? `Sauna à l’hébergement : la fiche de ${pick.name} ne dit pas s’il y a un sauna. Demandez en réservant.` : 'Sauna à l’hébergement : aucun hébergement n’est suggéré pour ce plan.' });
+      continue;
+    }
     if ((k === 'accessible' && tripAccess.hasNeed(plan.needs, 'wheelchair')) || (k === 'pets' && tripAccess.hasNeed(plan.needs, 'dog'))) continue; // said by the needs' own entries
     const A = STAY_AMENITY[k] || [cap(String(k).replace(/_/g, ' ')), cap(String(k).replace(/_/g, ' ')), String(k).replace(/_/g, ' '), String(k).replace(/_/g, ' ')];
     const has = !!(pick && (pick.has || []).includes(k));
@@ -503,6 +516,12 @@ function applyEvidence(plan, ctx = {}) {
     for (const r of reqs) if (r && r.kind === 'unsupported' && r.value === 'accessibility') { r.status = e.status === 'verified' ? 'satisfied' : 'unverified'; r.reason = e.text; }
   }
   if (tripAccess.hasNeed(needs, 'dog') && !ev.some((x) => x.ask === 'dog_friendly') && stops.length) ev.push(typeof ctx.dogOf === 'function' ? dogEntry(stops, ctx, cold) : featureEntry('dog_friendly', stops, ctx));
+  // No car (2026-11-23): which hops between the stops are a short walk and which need a ride, from stored map locations
+  // only. Nothing about taxis, shuttles or transit is ever verified.
+  if (tripAccess.hasNeed(needs, 'no_car') && stops.length) {
+    const pick = plan.whereToStay && plan.whereToStay.pick;
+    ev.push(tripTransport.entry(stops.map((x) => ({ id: x.v.id, name: x.v.name, day: x.day, latitude: x.v.latitude, longitude: x.v.longitude })), pick && pick.id > 0 ? { id: pick.id, name: pick.name } : null, ctx.coordsOf));
+  }
   ev.push(...stayEntries(plan));
   if (needs.length) ev.push(...stayNeedEntries(plan, ctx, needs));
   // A day the planner could not fill is said, with what could be tried next (never shown as a finished day).
@@ -686,8 +705,8 @@ function sharedPlan(c, stops, events, stay) {
   const days = new Map();
   for (const x of stops) { const d = x.day || 0; if (!days.has(d)) days.set(d, { day: d, stops: [] }); days.get(d).stops.push({ daypart: part(x.start), reasons: x.start != null && x.start >= 1185 && x.type !== 'restaurant' ? [{ code: 'night' }] : [], venue: { id: x.id, name: x.name, type: x.type, region: x.region, ...(x.badges ? { badges: x.badges } : {}) } }); }
   for (const e of events || []) { const d = e.day || 0; if (!days.has(d)) days.set(d, { day: d, stops: [] }); days.get(d).stops.push({ kind: 'event', daypart: 'night', event: { id: e.id, name: e.name, startDate: e.startDate || null, dateLabel: e.dateLabel || e.startDate || '', dateLabelFr: e.dateLabelFr, time: e.time || null, categories: e.categories || [] } }); }
-  const reqs = [], asks = (c && c.asks) || [];
-  let stayKeys = [], some = false, none = false, wheel = false, dog = false;
+  const reqs = [], asks = (c && c.asks) || [], plan0 = {};
+  let stayKeys = [], some = false, none = false, wheel = false, dog = false, noCar = false;
   for (const a of asks) {
     const m = a.split(':');
     if (m[0] === 'count') reqs.push({ kind: 'type_count', value: m[1], count: Number(m[2]), strength: 'must' });
@@ -695,6 +714,8 @@ function sharedPlan(c, stops, events, stay) {
     else if (m[0] === 'kind') reqs.push({ kind: 'venue_kind', value: m[1], strength: 'must', status: stops.some((x) => (x.kinds || []).includes(m[1])) ? 'satisfied' : 'unmet' });
     else if (a === 'stay:accessible') wheel = true;
     else if (a === 'stay:pets') dog = true;
+    else if (a === 'no_car') noCar = true;
+    else if (a === 'stay:sauna') plan0.stayAlso = ['sauna'];
     else if (m[0] === 'stay') stayKeys.push(m[1]);
     else if (a === 'accessible') wheel = true;
     else if (a === 'live_music') reqs.push({ kind: 'event', value: 'live-music', strength: 'must' });
@@ -712,10 +733,13 @@ function sharedPlan(c, stops, events, stay) {
   const needs = [];
   if (wheel) needs.push({ key: 'wheelchair', who: c && c.wheelOne ? 'one' : 'all', phrase: '' });
   if (dog) needs.push({ key: 'dog', who: 'all', phrase: '' });
+  if (noCar) needs.push({ key: 'no_car', who: 'all', phrase: '' });
   if (needs.length) plan.needs = needs;
+  if (plan0.stayAlso) plan.stayAlso = plan0.stayAlso;
   for (const n of (c && c.thin) || []) { const d = plan.days.find((x) => x.day === n); if (d) d.stops.push({ daypart: 'morning', venue: null, reasons: [], caveats: [] }); else plan.days.push({ day: n, stops: [{ daypart: 'morning', venue: null, reasons: [], caveats: [] }] }); }
   plan.days.sort((a, b) => a.day - b.day);
   if (needs.length && stay && !stayKeys.length) plan.whereToStay = { pick: { id: stay.id, name: stay.name, regionLabel: stay.regionLabel, has: stay.has || [], ...(stay.needFacts ? { needFacts: stay.needFacts } : {}) } };
+  if (plan0.stayAlso && stay && !plan.whereToStay && !stayKeys.length) plan.whereToStay = { pick: { id: stay.id, name: stay.name, regionLabel: stay.regionLabel, has: stay.has || [] } };
   if (stayKeys.length) plan.whereToStay = { pick: stay ? { id: stay.id, name: stay.name, regionLabel: stay.regionLabel, has: stay.has || [], ...(stay.needFacts ? { needFacts: stay.needFacts } : {}) } : null, amenity: { keys: stayKeys, ...(stay && stay.winterCheck ? { winterCheck: true } : {}) } };
   return plan;
 }
