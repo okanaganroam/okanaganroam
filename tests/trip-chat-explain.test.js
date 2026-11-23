@@ -173,7 +173,7 @@ test('(b) and 3. the chat explains its own warnings and choices from the plan an
   // With plan.evidence (the planner's own words) the answer follows it.
   const given = [{ ask: 'gluten_free', status: 'partial', text: '4 of 6 meal stops have the Gluten-Free-Friendly badge; Gulfstream and HUMO Kelowna don’t say.', stops: PLAN.filter((s) => s.type === 'restaurant').map((s) => ({ id: s.id, name: s.name, has: [255, 256].includes(s.id) ? null : true })) }];
   const pe = A(MSG_B, facts({ evidence: given }));
-  assert.match(pe.reply, /^That line was only partly right: 4 of 6 meal stops have the Gluten-Free-Friendly badge; Gulfstream and HUMO Kelowna don’t say\. Want me to swap them\?/);
+  assert.match(pe.reply, /^That line was only partly right\. 4 of 6 meal stops have the Gluten-Free-Friendly badge; Gulfstream and HUMO Kelowna don’t say\. Want me to swap them\?/);
   assert.deepEqual(pe.offer, [{ say: 'swap Gulfstream and HUMO Kelowna for gluten-free places' }]);
   // "is everything gluten-free?", "which restaurants are gluten-free?"
   assert.equal(A('is everything gluten-free?').reply, 'Every meal stop here has the Gluten-Free-Friendly badge on its listing.');
@@ -267,7 +267,8 @@ test('3. an explanation question NEVER modifies the itinerary: plan, stops, time
   const turn = await app.runTripChatTurn(parsed.value, { staysOn: true, lang: 'en' });
   assert.match(turn.response.reply, /Gluten-Free-Friendly badge|meal stop/);
   assert.doesNotMatch(turn.response.reply, /Which stop do you mean|on these dates/);
-  assert.equal(turn.response.note.text, CAVEAT);
+  // The cross-contamination caveat is said: in the planner's own evidence sentence, or as the chat's note.
+  assert.match(turn.response.reply + ' ' + ((turn.response.note || {}).text || ''), /cross-contamination/);
 });
 
 test('the whole group does not drink: no wineries are planned, and "add a winery" is read as before', () => {
@@ -282,11 +283,32 @@ test('the whole group does not drink: no wineries are planned, and "add a winery
   assert.equal(tc.explainReply({ value: 'q_why_not', kind: 'winery' }, { stops: PLAN.filter((s) => s.type !== 'winery'), request: TEXT, wholeDry: true }, 'en'), 'Your request said the group doesn’t drink, so I left wineries out. If only one of you doesn’t, say so and I’ll add them.');
 });
 
+test('plan.evidence as the planner writes it (trip-honest-plan.js): its own sentence is said whole, its caveat is not doubled, evidence for other stops is not used, and its live-music line answers the event question', () => {
+  const meals = PLAN.filter((s) => s.type === 'restaurant');
+  const text = 'Gluten-free: all 6 meal stops list gluten-free options. A badge means the place lists gluten-free options, not a guarantee against cross-contamination: tell the kitchen.';
+  const given = [{ ask: 'gluten_free', status: 'verified', text, stops: meals.map((s) => ({ id: s.id, name: s.name, has: true })) }, { ask: 'live_music', status: 'unknown', line: true, needsDates: true, text: 'Live music depends on the night: pick your dates and I’ll add what’s on.', stops: [] }];
+  const ev = ex.tripEvidenceFor('gluten_free', PLAN, given, 'en');
+  assert.deepEqual([ev.source, ev.status, ev.line, ev.caveat], ['plan', 'verified', text, '']);
+  const b = ex.answer(R(MSG_B).ops[0], facts({ evidence: given, warnings: [] }), 'en');
+  assert.equal(b.reply, 'That line was wrong. ' + text);
+  assert.ok(!b.note);
+  // A stop was removed on the page since: the evidence was built for other stops, so the badges shown are read.
+  const fewer = PLAN.filter((s) => s.id !== 256);
+  const e2 = ex.tripEvidenceFor('gluten_free', fewer, given, 'en');
+  assert.deepEqual([e2.source, e2.total, e2.line], ['badges', 5, 'Every meal stop here has the Gluten-Free-Friendly badge on its listing.']);
+  // Events are offered with their own date, not placed, on a plan without dates.
+  const sug = [{ kind: 'event', id: 320, name: 'Adventure Club', dateLabel: 'Fri Nov 27' }];
+  assert.equal(ex.answer(R('why is there an event on day 3?').ops[0], facts({ evidence: given, suggestions: sug }), 'en').reply, 'Live music depends on the night: pick your dates and I’ll add what’s on. One that is listed: Adventure Club (Fri Nov 27). It isn’t on your plan until you pick dates.');
+  assert.equal(ex.answer(R('what does the warning mean?').ops[0], facts({ evidence: given, warnings: [], missing: [] }), 'en').reply, 'Here’s what the plan notes: Live music depends on the night: pick your dates and I’ll add what’s on.');
+  const page = app.renderTripPlannerV3Page({ v4: 'preview', stays: 'preview', chat: 'preview' });
+  assert.match(page, /p\.datesGiven === true\) \? 'missing' : 'missingNoDates'/);
+  assert.match(page, /e\.status === 'unmet' && e\.line !== true/);
+});
+
 test('2. the page: the agent’s first line reads the same evidence (never "couldn’t fit gluten free", never "on these dates" without dates); the caveat once; offers ride along', () => {
   const page = app.renderTripPlannerV3Page({ v4: 'preview', stays: 'preview', chat: 'preview' });
   assert.match(page, /function tripEvidenceFor\(ask, stops, planEvidence, lang\)/);
   assert.match(page, /missingNoDates: 'I couldn’t fit \{what\} into this plan/);
-  assert.match(page, /chatHasDates\(\) \|\| \(t3StayInputBase\(\) \|\| \{\}\)\.arrive \? 'missing' : 'missingNoDates'/);
   assert.match(page, /!diet\(x\.label\)/);
   assert.match(page, /body\.offer = chat\.offer\.slice\(0, 3\)/);
   assert.match(page, /chat\.notes\[j\.note\.key\]/);

@@ -27,6 +27,9 @@ function tripEvidenceFor(ask, stops, planEvidence, lang) {
   var f = F[ask]; if (!f) return null;
   var fr = lang === 'fr', list = [], status = null, source = 'badges', given = null, i;
   for (i = 0; i < (planEvidence || []).length; i++) { var e = planEvidence[i]; if (e && e.ask === ask && !given) given = e; }
+  // Evidence built for another set of stops (one was removed or swapped on the page since) is not used: the badges of
+  // the stops shown are read instead.
+  if (given && Array.isArray(given.stops) && (stops || []).length) { for (i = 0; i < given.stops.length; i++) { var gi = given.stops[i], on = false; for (var q = 0; q < stops.length; q++) if (gi && stops[q] && stops[q].id === gi.id) on = true; if (gi && gi.id && !on) { given = null; break; } } }
   if (given && Array.isArray(given.stops) && /^(verified|partial|unknown|unmet)$/.test(String(given.status))) {
     source = 'plan'; status = given.status;
     for (i = 0; i < given.stops.length; i++) { var g = given.stops[i]; if (g && g.name) list.push({ id: g.id, name: String(g.name), has: g.has === true ? true : g.has === false ? false : null }); }
@@ -65,10 +68,11 @@ function tripEvidenceFor(ask, stops, planEvidence, lang) {
   // The planner's own sentence, when it gives one, is the one said (the itinerary shows the same words).
   var own = given && source === 'plan' ? (fr && typeof given.textFr === 'string' && given.textFr ? given.textFr : typeof given.text === 'string' ? given.text : '') : '';
   if (own) line = status === 'partial' && offer.length ? own.replace(/\s+$/, '') + ' ' + (not.length === 1 ? (fr ? 'Voulez-vous que je le remplace?' : 'Want me to swap it?') : (fr ? 'Voulez-vous que je les remplace?' : 'Want me to swap them?')) : own;
-  var caveat = ask === 'gluten_free'
+  var ownCaveat = !!own && /cross-contamination|contamination crois/i.test(own);
+  var caveat = ownCaveat ? '' : ask === 'gluten_free'
     ? (fr ? 'Un badge veut dire que l’endroit indique des options sans gluten; ce n’est pas une garantie contre la contamination croisée, alors dites-le au restaurant en réservant.' : 'A badge means the place lists gluten-free options; it isn’t a guarantee against cross-contamination, so tell the restaurant when you book.')
     : (fr ? 'Un badge veut dire que l’endroit indique des options ' + word + '; confirmez avec le restaurant en réservant.' : 'A badge means the place lists ' + word + ' options; confirm with the restaurant when you book.');
-  return { ask: ask, status: status, source: source, total: total, has: has, not: not, line: line, caveat: caveat, offer: offer, badge: badge, word: word };
+  return { ask: ask, status: status, source: source, total: total, has: has, not: not, line: line, caveat: caveat, offer: offer, badge: badge, word: word, own: !!own };
 }
 
 // ---- 2. The questions ----
@@ -142,7 +146,7 @@ const TX = {
     warnNone: 'There’s no warning on this plan right now. Everything you asked for that I can check is in it.', warnQuote: 'The note says: “{w}”', warnUnknown: 'I don’t know the exact reason. Say “add {what}” and I’ll try again.', warnNoneShort: 'There’s no warning on this plan right now.', warnAbout: 'The line about {word} food means this:',
     warnMissing: 'The plan says it could not include {what}.', warnKindHas: 'That line was wrong: your plan has {what}: {list}.', warnMore: 'Other notes on this plan: {rest}', is: 'is', are: 'are',
     allergy: 'I can’t confirm that. Listings only carry badges such as Gluten-Free-Friendly; they don’t list allergens or how food is prepared, so tell the restaurant about the allergy when you book.',
-    evNone: 'There’s no event on your plan right now.', evWhy: '{name}{at} is there because you asked for {asked}, and it’s a What’s On listing for {cat}{date}.', evWhyBare: 'I don’t know exactly why the planner chose {name}{at}; it’s a What’s On listing{date}. Say “remove the event” and I’ll take it out.',
+    warnPrinted: 'Here’s what the plan notes: {lines}', evSuggest: 'One that is listed: {name} ({date}). It isn’t on your plan until you pick dates.', evNone: 'There’s no event on your plan right now.', evWhy: '{name}{at} is there because you asked for {asked}, and it’s a What’s On listing for {cat}{date}.', evWhyBare: 'I don’t know exactly why the planner chose {name}{at}; it’s a What’s On listing{date}. Say “remove the event” and I’ll take it out.',
     evNoDates: 'You haven’t given dates, so tell me when you’re coming and I’ll check what’s on then.', evOn: ' on {date}', evAt: ' at {place}',
     cats: { 'live-music': 'live music', festival: 'a festival', market: 'a market', hockey: 'a hockey game', comedy: 'comedy', 'sports-recreation': 'sports', 'arts-culture': 'arts and culture', family: 'family events', 'food-drink': 'food and drink' }, catEvent: 'an event',
     cntAsked: 'You asked for {n} {plural}, so the plan has {m}: {list}.', cntMore: 'You asked for {n} {plural}, but the plan has {m}: {list}. Say “remove {last}” and I’ll take one out.', cntFewer: 'You asked for {n} {plural}, but the plan has only {m}: {list}. I don’t know why the planner found no more; say “add another {what}” and I’ll try.',
@@ -158,7 +162,7 @@ const TX = {
     warnNone: 'Il n’y a aucun avertissement sur ce plan en ce moment. Tout ce que vous avez demandé et que je peux vérifier y est.', warnQuote: 'La note dit : « {w} »', warnUnknown: 'Je n’en connais pas la raison exacte. Dites « ajoute {what} » et j’essaie encore.', warnNoneShort: 'Il n’y a aucun avertissement sur ce plan en ce moment.', warnAbout: 'La ligne sur les options {word} veut dire ceci :',
     warnMissing: 'Le plan dit qu’il n’a pas pu inclure {what}.', warnKindHas: 'Cette ligne était fausse : votre plan a {what} : {list}.', warnMore: 'Autres notes du plan : {rest}', is: '', are: '',
     allergy: 'Je ne peux pas le confirmer. Les fiches n’ont que des badges comme « Sans gluten »; elles n’indiquent ni les allergènes ni la préparation, alors parlez de l’allergie au restaurant en réservant.',
-    evNone: 'Il n’y a aucun événement dans votre plan en ce moment.', evWhy: '{name}{at} est là parce que vous avez demandé {asked}, et c’est une fiche Quoi faire pour {cat}{date}.', evWhyBare: 'Je ne sais pas exactement pourquoi le planificateur a choisi {name}{at}; c’est une fiche Quoi faire{date}. Dites « enlève l’événement » et je le retire.',
+    warnPrinted: 'Voici ce que le plan indique : {lines}', evSuggest: 'Un événement à l’affiche : {name} ({date}). Il n’est pas dans votre plan tant que vous n’avez pas choisi de dates.', evNone: 'Il n’y a aucun événement dans votre plan en ce moment.', evWhy: '{name}{at} est là parce que vous avez demandé {asked}, et c’est une fiche Quoi faire pour {cat}{date}.', evWhyBare: 'Je ne sais pas exactement pourquoi le planificateur a choisi {name}{at}; c’est une fiche Quoi faire{date}. Dites « enlève l’événement » et je le retire.',
     evNoDates: 'Vous n’avez pas donné de dates; dites-moi quand vous venez et je vérifie ce qu’il y a à ce moment-là.', evOn: ' le {date}', evAt: ' ({place})',
     cats: { 'live-music': 'de la musique en direct', festival: 'un festival', market: 'un marché', hockey: 'un match de hockey', comedy: 'de l’humour', 'sports-recreation': 'du sport', 'arts-culture': 'des arts et de la culture', family: 'des événements en famille', 'food-drink': 'de la gastronomie' }, catEvent: 'un événement',
     cntAsked: 'Vous avez demandé {n} {plural}, donc le plan en a {m} : {list}.', cntMore: 'Vous avez demandé {n} {plural}, mais le plan en a {m} : {list}. Dites « enlève {last} » et j’en retire un.', cntFewer: 'Vous avez demandé {n} {plural}, mais le plan n’en a que {m} : {list}. Je ne sais pas pourquoi le planificateur n’en a pas trouvé plus; dites « ajoute {another} » et j’essaie.',
@@ -227,8 +231,9 @@ function answer(op, facts, lang) {
       const ev = gf(op.feature);
       const lead = ev.status === 'verified' ? t.wrong : ev.status === 'partial' ? t.partly : t.stands;
       const named = ev.status === 'verified' && ev.has.length > 1 ? ` ${fillT(t.names, { names: join(ev.has.slice(0, 8).map((s) => s.name)) })}` : '';
-      const lineLc = L === 'en' ? ev.line.charAt(0).toLowerCase() + ev.line.slice(1) : ev.line.charAt(0).toLowerCase() + ev.line.slice(1);
-      return { reply: [fillT(lead, { line: lineLc }) + named, noteFor(op.feature, ev)].filter(Boolean).join(' '), note: ev.caveat, noteKey: op.feature, offer: offerOf(ev) };
+      const lineLc = ev.line.charAt(0).toLowerCase() + ev.line.slice(1);
+      const said = ev.own ? `${lead.replace(/\s*:\s*\{line\}$/, '.')} ${ev.line}` : fillT(lead, { line: lineLc }) + named;
+      return { reply: [said, noteFor(op.feature, ev)].filter(Boolean).join(' '), note: ev.caveat, noteKey: op.feature, offer: offerOf(ev) };
     }
     if (op.kind && facts.KINDS[op.kind]) {
       const on = stops.filter((s) => facts.kindMatches(op.kind, s));
@@ -240,6 +245,9 @@ function answer(op, facts, lang) {
     const feats = [...new Set(missing.filter((m) => m.kind === 'feature' && FEAT_RES[m.value]).map((m) => m.value))];
     for (const e of facts.evidence || []) if (e && FEAT_RES[e.ask] && !feats.includes(e.ask)) feats.push(e.ask);
     for (const f of Object.keys(FEAT_RES)) if (!feats.includes(f) && (facts.warnings || []).some((w) => FEAT_RES[f].test(facts.fold(w)))) feats.push(f);
+    // The planner's own lines (plan.evidence entries the page prints, and the ones it could not meet), as written.
+    const printed = (facts.evidence || []).filter((e) => e && typeof e.text === 'string' && e.text && (e.line === true || e.status === 'unmet') && !FEAT_RES[e.ask]).slice(0, 2).map((e) => (L === 'fr' && e.textFr ? e.textFr : e.text));
+    if (printed.length) { const ev0 = feats.length ? gf(feats[0]) : null; return { reply: [fillT(t.warnPrinted, { lines: printed.join(' ') }), ev0 && ev0.status !== 'verified' ? ev0.line : ''].filter(Boolean).join(' '), ...(ev0 && ev0.status !== 'verified' ? { note: ev0.caveat, noteKey: feats[0], offer: offerOf(ev0) } : {}) }; }
     const kindMiss = missing.find((m) => m.kind !== 'feature' && m.label);
     const missLine = kindMiss ? fillT(t.warnMissing, { what: kindMiss.label }) + ' ' + fillT(t.warnUnknown, { what: kindMiss.label }) : '';
     if (feats.length) {
@@ -251,6 +259,10 @@ function answer(op, facts, lang) {
   }
   if (op.value === 'q_why_event') {
     const evs = facts.events || [];
+    // The planner's own word on events and live music (plan.evidence), and the dated suggestions it holds back until
+    // the visitor picks dates.
+    const evLine = (facts.evidence || []).find((e) => e && ['live_music', 'event'].includes(e.ask) && typeof e.text === 'string' && e.text);
+    if (!evs.length && evLine) { const sg = (facts.suggestions || [])[0]; return { reply: [L === 'fr' && evLine.textFr ? evLine.textFr : evLine.text, sg && sg.name ? fillT(t.evSuggest, { name: sg.name, date: (L === 'fr' && sg.dateLabelFr) || sg.dateLabel || '' }) : ''].filter(Boolean).join(' ') }; }
     if (!evs.length) return { reply: t.evNone };
     const req = facts.fold(facts.request || '');
     const out = evs.slice(0, 2).map((e) => {

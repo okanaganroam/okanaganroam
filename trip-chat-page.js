@@ -420,12 +420,17 @@ function chatClientSrc(d) {
     (p.requirementResults || []).forEach(function(i){ if (i && i.kind === 'feature' && CHAT_FEATS[i.value] && asks.indexOf(i.value) === -1) asks.push(i.value); });
     if (!asks.length || !days().length) return out;
     var stops = chatEvidenceStops();
+    // An entry the plan view prints itself (line: true) is not said twice.
+    asks = asks.filter(function(a){ return !(Array.isArray(p.evidence) ? p.evidence : []).some(function(e){ return e && e.ask === a && e.line === true; }); });
     asks.slice(0, 2).forEach(function(a){ var ev = tripEvidenceFor(a, stops, Array.isArray(p.evidence) ? p.evidence : null, lang() === 'fr' ? 'fr' : 'en'); if (ev) out.push(ev); });
     return out;
   }
   function chatMissing(){
     // A pool, hot tub or kitchen asked of the place to stay is not a missing stop.
     var out = [], stayAsk = !!(state.last && state.last.whereToStay && state.last.whereToStay.amenity);
+    // With plan.evidence (trip-honest-plan.js) the plan view prints what could not be met in the planner's own words,
+    // so the first line adds no "couldn't fit" of its own.
+    if (state.last && Array.isArray(state.last.evidence)) return out;
     // A diet asked for is said from the evidence (chatEvidence), never as "couldn't fit".
     var diet = function(l){ return Object.keys(CHAT_FEATS).some(function(k){ return CHAT_FEATS[k].test(String(l).replace(/_/g, ' ')); }); };
     try { t3PlanNextSteps(state.last || {}).forEach(function(x){ if (x && x.kind === 'missing' && !x.venue && x.label && !diet(x.label) && out.indexOf(x.label) === -1 && !(stayAsk && /pool|piscine|hot tub|kitchen|spa\b/i.test(x.label))) out.push(lang() === 'fr' && x.labelFr ? x.labelFr : x.label); }); } catch (e) {}
@@ -438,11 +443,13 @@ function chatClientSrc(d) {
     var stay = chatOvernight() && !chat.noStay && t3StayData() ? chatStayWords() : '';
     var line = n > 1 ? ag('days', { n: n, town: town, for: chatPartyFor(), stay: stay }) : n === 1 && town ? ag('day', { town: town, for: chatPartyFor() }) : ag('plan', { for: chatPartyFor() });
     // "on these dates" only when there are dates.
-    var miss = chatMissing(), missLine = miss.length ? ' ' + ag(chatHasDates() || (t3StayInputBase() || {}).arrive ? 'missing' : 'missingNoDates', { what: miss.join(' ' + ag('and') + ' ') }) : '';
+    var miss = chatMissing(), missLine = miss.length ? ' ' + ag((p.datesGiven === undefined ? (chatHasDates() || (t3StayInputBase() || {}).arrive) : p.datesGiven === true) ? 'missing' : 'missingNoDates', { what: miss.join(' ' + ag('and') + ' ') }) : '';
     var evs = [], evLine = '', evNote = '';
     try { evs = chatEvidence(); } catch (e) { evs = []; }
     evs.forEach(function(ev){ evLine += ' ' + ev.line; if (!evNote) evNote = ev.caveat; });
     // Planner round 5: the plan's own "not included" line (why, and the nearest) comes before "on these dates".
+    // What the plan could not meet, in the planner's own words (plan.evidence, status unmet), unless the plan view prints it.
+    (Array.isArray(p.evidence) ? p.evidence : []).forEach(function(e){ if (e && e.status === 'unmet' && e.line !== true && e.text && !CHAT_FEATS[e.ask] && missLine.length < 240) missLine += ' ' + (lang() === 'fr' && e.textFr ? e.textFr : e.text); });
     var ni = Array.isArray(p.notIncluded) ? p.notIncluded[0] : null;
     if (ni && ni.text) missLine = ' ' + (lang() === 'fr' && ni.textFr ? ni.textFr : ni.text);
     var html = '<div class="v4-agent" id="v4Agent"><span class="v4-agent-who">' + esc(ag('who')) + '</span><p>' + esc(v4.confirmed ? ag('ready') : line + evLine + missLine + (missLine || evLine ? '' : ag('more'))) + '</p>' + (evNote && !v4.confirmed ? '<p class="v4-agent-note">' + esc(evNote) + '</p>' : '');

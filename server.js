@@ -8935,6 +8935,8 @@ function tripChatHonestTurn(op, { v, stops, lang, runCore, planEvents }) {
       const pinned = Object.fromEntries(shown.filter((s) => /^\d-/.test(s.key)).map((s) => [s.key, s.id]));
       core = runCore({ ...v.args, pinned: Object.keys(pinned).length ? pinned : null, trustedPins: Object.keys(pinned) });
       if (core) tripChatOnScreenOnly(core, stops);
+      // The plan's evidence, worked out for the stops on screen now (trip-honest-plan.js, when this build has it).
+      if (core && typeof tripHonestEvidence === 'function') tripHonestEvidence(core);
     } catch (e) { core = null; }
   }
   const missing = ((core && core.requirementResults) || []).filter((i) => i && i.status === 'unmet' && !i.silent && ['type', 'type_count', 'venue_kind', 'venue', 'activity', 'event', 'rainy', 'feature'].includes(i.kind)).map((i) => ({ kind: i.kind, value: i.value, label: String(i.kind === 'venue' ? (i.venueName || i.sourceText || i.value) : i.value).replace(/_/g, ' ') }));
@@ -8949,7 +8951,7 @@ function tripChatHonestTurn(op, { v, stops, lang, runCore, planEvents }) {
   }
   const dated = !!((v.args.overrides && v.args.overrides.startDate) || (v.args.stay && v.args.stay.arrive) || (core && core.understood && core.understood.when));
   const legacy = (o) => tripChatExplainTurn(o, { v, stops, lang: L, runCore }).reply;
-  return tripChat.explain.answer(op, { stops: shown, request: v.args.text, evidence: core && Array.isArray(core.evidence) ? core.evidence : null, warnings: (core && Array.isArray(core.warnings) ? core.warnings : []).filter((w) => typeof w === 'string'), missing, events, dated,
+  return tripChat.explain.answer(op, { stops: shown, request: v.args.text, evidence: core && Array.isArray(core.evidence) ? core.evidence : null, warnings: (core && Array.isArray(core.warnings) ? core.warnings : []).filter((w) => typeof w === 'string'), missing, events, suggestions: core && Array.isArray(core.dateSuggestions) ? core.dateSuggestions : [], dated: dated || !!(core && core.datesGiven === true),
     KINDS: tripChat.KINDS, kindMatches: tripChat.kindMatches, kindRe: (k) => (tripChat.KIND_WORDS.find(([kk]) => kk === k) || [])[1] || null, plural: (k, l) => { const kd = tripChat.KINDS[k] || {}; return l === 'en' && tripChat.TYPE_PLURAL[kd.type] ? tripChat.TYPE_PLURAL[kd.type] : `${tripChat.kindNoun(k, l)}s`; }, noun: tripChat.kindNoun, joinList: tripChat.joinList, fold: tripChat.fold, legacy }, L);
 }
 function tripChatAskTurn(op, { v, stops, lang, runCore, planEvents }) {
