@@ -5466,6 +5466,33 @@ function searchTypoFix(text) {
   });
   return corrections.length ? { text: out.join(' '), corrections } : { text: raw, corrections };
 }
+// Business-name typos (2026-11-22; the dashboard showed "barriqure" searched 3 times, finding nothing): the last try when a
+// search still finds nothing. A word of 5 letters or more that the site doesn't know is read as the word of a place's
+// name it nearly spells (same first letter, one edit away, two for 8 letters or more, and only one such word), so
+// "barriqure" finds Barrique & Java. Only names: kinds of place and activities are searchTypoFix's job. -> { text, corrections }.
+let searchNameTypoIndex = null;
+function searchNameTypoTargets() {
+  const base = searchTypoTargets();
+  if (searchNameTypoIndex && searchNameTypoIndex.base === base) return searchNameTypoIndex;
+  const words = new Set();
+  for (const v of base.venues) for (const w of frSearchFold(v.name).split(' ')) if (w.length >= 5 && /^[a-z]+$/.test(w)) words.add(w);
+  searchNameTypoIndex = { base, targets: [...words], known: base.known };
+  return searchNameTypoIndex;
+}
+function searchNameTypoFix(text) {
+  const raw = String(text || '');
+  const parts = raw.split(/\s+/).filter(Boolean);
+  if (!parts.length) return { text: raw, corrections: [] };
+  const { targets, known } = searchNameTypoTargets();
+  const corrections = [];
+  const out = parts.map((p) => {
+    const t = searchTypoWord(frSearchFold(p), targets, (w) => known.has(w));
+    if (!t) return p;
+    corrections.push({ from: p, to: t });
+    return t;
+  });
+  return corrections.length ? { text: out.join(' '), corrections } : { text: raw, corrections };
+}
 // Round 12 (2026-10-20): the words a partial last word can grow into (searchShortWord): the typo targets above plus
 // every one-word phrase the search reads (kinds of place, cuisines and dishes, badges, towns), at any length.
 // Everyday food words the listings use (a cuisine only when some place has it filed as one).
@@ -7637,9 +7664,9 @@ function searchSkiLessonsNearest(run, text) {
   return out;
 }
 const SITE_FOR_SKI = (() => { try { return require('./trip-site.js'); } catch (e) { return {}; } })();
-function searchRunEmpty(run) {
+function searchRunEmpty(run, { fuzzyCounts = true } = {}) {
   if (!run || run.intent.mode === 'events' || run.results.total || (run.events && run.events.total)) return false;
-  try { const m = searchPageModel(run); return !m.venues.length && !m.events.total && !(m.plan && m.plan.url) && !m.guides.length && !m.fuzzy.length; } catch (e) { return false; }
+  try { const m = searchPageModel(run); return !m.venues.length && !m.events.total && !(m.plan && m.plan.url) && !m.guides.length && (!fuzzyCounts || !m.fuzzy.length); } catch (e) { return false; }
 }
 // French words for the page's own text (the cards and filters are translated with every French page).
 const SEARCH_PAGE_TEXT = {
@@ -78505,6 +78532,19 @@ const server = http.createServer(async (req, res) => {
           if (!searchRunEmpty(run2)) { run = run2; shortFix = short.corrections; }
         }
       }
+      // Business-name typos (2026-11-22): still nothing (at most a "Did you mean"), so a misspelled word of a place's
+      // name ("barriqure"): the place's own results, not a link to it.
+      if (searchRunEmpty(run, { fuzzyCounts: false })) {
+        try {
+          const named = searchNameTypoFix(q);
+          if (named.corrections.length) {
+            const text3 = discoverySearchText(named.text, res.twinLang);
+            const run3 = runDiscovery(text3, { limit: SEARCH_PAGE_MAX_RESULTS, lang: res.twinLang === 'fr' ? 'fr' : 'en' });
+            run3.query = q; run3.searchText = text3;
+            if (!searchRunEmpty(run3)) { run = run3; shortFix = [...shortFix, ...named.corrections]; }
+          }
+        } catch (e) { /* as found */ }
+      }
       // Search typos (round 8): "We read “winary” as “winery”."
       try {
         const typo = [...searchTypoFix(q).corrections, ...shortFix];
@@ -83269,6 +83309,7 @@ module.exports = {
   frTidy,
   // French and tools (2026-10-19, round 8)
   searchTypoFix,
+  searchNameTypoFix,
   frSearchTermLabel,
   discoveryInterpretedTextFr,
   discoveryNoteTextFr,
