@@ -8680,12 +8680,18 @@ function tripChatStayDatesTurn(op, { v, plan, req, stops, lang, staysOn, runCore
 // "what time is the movie?": no showtimes are held; the plan's time is a suggestion, with where to check.
 function tripChatShowtimeAnswer(v, stops, lang) {
   const L = lang === 'fr' ? 'fr' : 'en', T = TRIP_CHAT_STAY_DATES_T[L], tt = require('./trip-timing');
+  // The kind the question names (a movie is showtimes, a class is class times); else the first such stop.
+  const m = tripChat.fold(String(v.message || ''));
+  const want = /\b(?:movies?|films?|cinema|screening|show(?:ing|time)?s?)\b/.test(m) ? 'showtimes' : /\b(?:class(?:es)?|lessons?|cours)\b/.test(m) ? 'classes' : /\b(?:swim\w*|skat\w*|sessions?|seances?)\b/.test(m) ? 'sessions' : null;
+  const found = [];
   for (const s of v.stops || []) {
     if ((v.removed || []).includes(s.key)) continue;
     let row = null; try { row = getVenue(s.id); } catch (e) { row = null; }
     if (!row) continue;
     const kind = tt.scheduleKind({ name: row.name, type: row.type }, venueIndoorInfo(row.id).kinds || []);
-    if (!kind) continue;
+    if (kind) found.push({ s, row, kind });
+  }
+  for (const { s, row, kind } of found.filter((x) => !want || x.kind === want).concat(want ? [] : [])) {
     const day = Number(String(s.key).split('-')[0]) || 0, date = (v.dayDates || [])[day - 1] || null;
     const on = date ? tripChat.fill(T.on, { date: tripChatNiceDate(date, L) }) : '';
     return { reply: Number.isInteger(s.start) ? tripChat.fill(T.noTimes, { what: T.what[kind], time: tt.clock(s.start, L === 'fr'), name: row.name, on }) : tripChat.fill(T.noTimesBare, { what: T.what[kind], name: row.name, on }) };
@@ -84342,7 +84348,7 @@ module.exports = {
   sportTimesChange, searchWithoutNegated,
   // Sport test 2 (2026-11-20): the golf winter rule.
   golfWinterSeasonMap, GOLF_WINTER_RULE_ON, golfCardBasis, sportMainKind, sportPartSeasons, priceListWordsFor,
-  runTripPlanWithStay, withTripStays, tripStayCandidates, isTripStaysEnabled, tripStaysEnabledFor, isTripV4Enabled, tripV4EnabledFor,
+  runTripPlanWithStay, tripDatesOf, withTripStays, tripStayCandidates, isTripStaysEnabled, tripStaysEnabledFor, isTripV4Enabled, tripV4EnabledFor,
   tripBookingChecklist,
   // Planner (2026-10-27): the happy hour crawl.
   tripHappyHourAsk,

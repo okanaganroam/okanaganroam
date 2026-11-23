@@ -1137,7 +1137,11 @@ ${require('./stay-booking-links').ROOMS_CLIENT_SRC}` + String.raw`
   function t3StaySetDates(a, b){
     var ok = function(x){ return typeof x === 'string' && x.length === 10 && !isNaN(Date.parse(x + 'T12:00:00Z')); };
     if (!ok(a) || !ok(b) || b <= a) return false;
-    if (typeof chatSetDates === 'function') return chatSetDates(a, b, true);
+    // The chat page: the stay's dates only, through the chat's own stay turn (the stops, swaps and Undo stay as they
+    // are); dates away from the trip's days move the trip, as picking dates always did.
+    var d = t3StayData(), tr = (d && d.w && d.w.trip) || {}, near = ok(tr.tripStart) && tr.tripSource !== 'assumed' && !tr.datesPast && a <= (tr.tripEnd || tr.tripStart) && b >= tr.tripStart;
+    if (near && typeof chatSend === 'function') { chatSend('check in ' + a + ', check out ' + b, null, lang() === 'fr' ? 'Dates du séjour : ' + t3NiceDate(a, true) + ' → ' + t3NiceDate(b, true) : 'Stay dates: ' + t3NiceDate(a, false) + ' → ' + t3NiceDate(b, false), true); return true; }
+    if (typeof chatSetDates === 'function') return chatSetDates(a, b, false);
     var ea = document.getElementById('t3Arrive'), eb = document.getElementById('t3Leave');
     if (!ea || !eb) return false;
     ea.value = a; eb.value = b;
