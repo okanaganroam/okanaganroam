@@ -255,7 +255,11 @@ function withBookingLinks(block, byId, opts = {}) {
   const add = (card) => {
     const stay = byId.get(card.id);
     if (!stay) return { ...card, bookingLinks: [] };
-    const out = { ...card, bookingLinks: stayBookingLinks(stay, block.trip, { env: opts.env, regionLabel: card.regionLabel }) };
+    // Group-preferences round (2026-11-22; a hotel link carried Nov 23-25 though no dates were given): dates the visitor
+    // did not give are never sent to a booking site. The link opens the place's own page with the party only; the dates
+    // go in once the visitor picks them (block.trip.datesGiven).
+    const linkTrip = block.trip && block.trip.datesGiven === false ? { ...block.trip, arrive: null, leave: null } : block.trip;
+    const out = { ...card, bookingLinks: stayBookingLinks(stay, linkTrip, { env: opts.env, regionLabel: card.regionLabel }) };
     // "See live prices" (Stay22's map of the stay's block) is off since 2026-11-21: it showed other places too, and
     // every booking button must open this place's own page (Dayton). stay22MapUrl stays for the check script.
     if (stayPetsNote(stay.info, block.trip)) out.petsSome = true;

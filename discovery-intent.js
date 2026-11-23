@@ -816,6 +816,22 @@ function withoutConceptStrays(terms, excluded) {
 // "we don't drink coffee" is not a refusal of alcohol.
 const NON_ALCOHOLIC_DRINK_WORDS = new Set(['coffee', 'coffees', 'tea', 'teas', 'water', 'milk', 'soda', 'sodas', 'pop', 'juice', 'juices', 'smoothie', 'smoothies', 'caffeine', 'coke']);
 
+// Is this refusal ("does not drink") said of only some of the party? The words just before it name one or a few people
+// ("one person", "only one of us", "two of the guys", "my wife", "our friend Sam", "he"), or it is "a / one / our / the
+// non drinker". "We", "none of us", "nobody" and a bare refusal stay the whole trip's.
+const PART_OF_PARTY_BEFORE_RE = /(?:^| )(?:(?:only |just |but )?(?:one|1|two|2|three|3|four|4|a couple|a few|some|half)(?: (?:of (?:us|them|the \w+|our \w+|my \w+)|persons?|people|friends?|guests?|adults?|members?|guys?|girls?|ladies|women|men|travell?ers?|kids?))?(?: in (?:our|the) (?:group|party))?|(?:my|our|his|her) (?:wife|husband|partner|spouse|friend|buddy|mom|mother|dad|father|sister|brother|son|daughter|boyfriend|girlfriend|fiance|fiancee|colleague|coworker|boss|driver|uncle|aunt|cousin|grandma|grandpa|grandmother|grandfather)(?: \w+)?|he|she|who|that|the driver|designated driver|une? (?:personne|ami|amie)|une? de nous|l une? de nous|ma femme|mon mari|mon ami|mon amie)$/;
+const PART_OF_PARTY_NOUN_BEFORE_RE = /(?:^| )(?:one|1|a|an|our|the|for the|for our|two|2|three|3)$/;
+function isPartOfParty(tokens, m) {
+  if (!Number.isInteger(m.start)) return false;
+  const before = tokens.slice(Math.max(0, m.start - 7), m.start).filter((w) => w && w !== '\u0000').join(' ').replace(/ (?:is|are|was|were|will be|stays?|remains?|est|sont)(?: an?| the| une?)?$/, '');
+  if (/^non ?drinkers?|^nondrinkers?|^teetotal/.test(m.phrase)) return PART_OF_PARTY_NOUN_BEFORE_RE.test(before) || PART_OF_PARTY_BEFORE_RE.test(before);
+  // The trip planner rewrites "my wife" to "my partner and I" before reading; a singular verb ("does not drink") after
+  // it is still about the one person.
+  if (/^does(?:nt)?\b/.test(m.phrase) && /(?:^| )(?:my|our) partner and i$/.test(before)) return true;
+  if (/\b(?:we|none of us|nobody|no one|all of us|everyone|everybody)$/.test(before)) return false;
+  return PART_OF_PARTY_BEFORE_RE.test(before);
+}
+
 function emptyExcluded() {
   return { regions: [], types: [], features: [], collections: [], activities: [], cuisines: [], textTerms: [], budget: null, phrases: [] };
 }
@@ -1508,12 +1524,12 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
         case 'type': intent.types.push(value); orderedTypes.push({ type: value, start: hit.start }); break;
         case 'feature':
           // "alcohol free, Whistler" is the visitor's trip, not a venue badge.
-          if (value === 'nonalcoholic' && isTripLevelAlcoholFree(hit, tokens)) { conceptMentions.push({ value: 'alcohol', end: hit.end, phrase: hit.phrase }); continue; }
+          if (value === 'nonalcoholic' && isTripLevelAlcoholFree(hit, tokens)) { conceptMentions.push({ value: 'alcohol', start: hit.start, end: hit.end, phrase: hit.phrase }); continue; }
           intent.features.push(value); break;
         case 'collection': intent.collections.push(value); break;
         case 'activity': intent.activities.push(value); break;
         case 'cuisine': intent.cuisines.push(value); break;
-        case 'concept': conceptMentions.push({ value, end: hit.end, phrase: hit.phrase }); break;
+        case 'concept': conceptMentions.push({ value, start: hit.start, end: hit.end, phrase: hit.phrase }); break;
         case 'budget': budgetMentions.push({ value, start: hit.start, phrase: hit.phrase }); break;
         case 'pace': paceMentions.push({ value, start: hit.start, phrase: hit.phrase }); break;
         case 'occasion': occasionMentions.push({ value, start: hit.start, phrase: hit.phrase }); break;
@@ -1683,6 +1699,15 @@ function interpretDiscoveryQuery(text, taxonomy, options) {
   // present, so every other intent keeps exactly the excluded shape it had.
   for (const m of conceptMentions) {
     if (NON_ALCOHOLIC_DRINK_WORDS.has(tokens[m.end])) continue;
+    // Group preferences (2026-11-22; "6 friends: two wineries... One person does not drink" planned no wineries for all
+    // six): a refusal said of SOME of the party (one person, my wife, two of us) is that person's need, not the trip's.
+    // It is recorded as intent.partySome (the planner looks for a non-alcoholic option) and rules nothing out.
+    if (m.value === 'alcohol' && isPartOfParty(tokens, m)) {
+      if (!intent.partySome) intent.partySome = [];
+      if (!intent.partySome.some((x) => x.concept === 'alcohol')) intent.partySome.push({ concept: 'alcohol', phrase: m.phrase });
+      intent.matched.push({ phrase: m.phrase, field: 'party.some', value: 'alcohol' });
+      continue;
+    }
     if (!ex.concepts) ex.concepts = [];
     if (!ex.concepts.includes(m.value)) ex.concepts.push(m.value);
     intent.matched.push({ phrase: m.phrase, field: 'excluded.concept', value: m.value });

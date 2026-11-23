@@ -337,8 +337,8 @@ test('Book your trip box: trip line, estimate, Book my trip steps, See all, note
   assert.match(f.t3BookAllHtml({ id: 5, bookingLinks: [] }, steps.slice(0, 1), true), /<summary>Voir la réservation<\/summary>/);
   // Notes and the commission line (only with an affiliate link).
   const notes = f.t3StayNotesHtml({ bookingLinks: [steps[0]].map((x) => ({ ...x, key: 'booking_com' })), petsSome: true }, { ...t, datesGiven: false }, false);
-  assert.match(notes, /Dates follow your plan.*kids’ ages.*Pets in some rooms/);
-  assert.match(f.t3StayNotesHtml({ bookingLinks: [{ key: 'booking_com', url: 'https://www.booking.com/hotel/ca/x.html' }] }, { ...t, datesGiven: false, kids: 0 }, true), /Dates selon votre plan/);
+  assert.match(notes, /No dates yet.*kids’ ages.*Pets in some rooms/);
+  assert.match(f.t3StayNotesHtml({ bookingLinks: [{ key: 'booking_com', url: 'https://www.booking.com/hotel/ca/x.html' }] }, { ...t, datesGiven: false, kids: 0 }, true), /Pas encore de dates/);
   assert.equal(f.t3StayDisclosureHtml({ bookingLinks: [] }, [steps[1]], false), '');
   assert.match(f.t3StayDisclosureHtml({ bookingLinks: [] }, steps, false), /data-stay-disclosure>We may earn a commission/);
   assert.match(f.t3StayDisclosureHtml({ bookingLinks: [] }, steps, true), /Nous pouvons toucher une commission/);
