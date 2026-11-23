@@ -140,6 +140,8 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-check-name small .t3-book-link { min-height: 32px; padding: 4px 0; font-size: 0.82rem; font-weight: 800; text-decoration: underline; background: none; border: 0; color: var(--ref-navy); cursor: pointer; }
   .t3-v4 .v4-check-name small.v4-aff { font-weight: 600; font-size: 0.74rem; }
   .t3-v4 .v4-book-honest { margin: 10px 0 0; font-size: 0.8rem; color: var(--ref-navy-muted, #56636E); }
+  .t3-v4 ul.v4-book-needs { margin: 4px 0 0; padding: 0 0 0 16px; }
+  .t3-v4 ul.v4-book-needs li { margin: 2px 0; overflow-wrap: anywhere; }
   .t3-v4 .v4-sugg { margin: 14px 0 6px; padding: 12px 14px; border: 1px dashed rgba(27,43,58,0.28); border-radius: 14px; background: #FFFBF1; }
   .t3-v4 .v4-sugg-h { margin: 0 0 2px; font-size: 0.95rem; color: var(--ref-navy); }
   .t3-v4 .v4-sugg-note { margin: 0 0 8px; font-size: 0.82rem; color: var(--ref-navy-muted, #56636E); }
@@ -290,19 +292,49 @@ const V4_CLIENT_SRC = String.raw`
     return { url: url, html: '<p class="v4-note">' + ttNote(tm, s.venue.name, lang() === 'fr', url, !!cu, esc, attrs) + '</p>' };
   }
   // Trip needs (2026-11-23): what this stop's own listing says for a wheelchair user and a dog, from the plan's evidence
-  // (the same words as Details and the chat). note: one short line for the collapsed card, only for a stop whose
-  // listing covers one section or feature or has only a mobility note; more: the lines for the opened card.
+  // (the same words as Details, the chat, the Book my trip sheet and the shared copy: each row's note is made in
+  // trip-access-needs.js). Only for a need the plan carries (plan.needs); a plan without one gets nothing here.
+  //   notes / compact: the short notes for the collapsed card, one per need ("Wheelchair access: check ahead",
+  //   "Dogs: check indoor or patio access"); compact is the shorter form for a card that also has a suggested time
+  //   open: the notes still to confirm (not a plain yes), for the Book my trip sheet
+  //   chipOff: the plain Dog-Friendly chip would read as settled next to "check indoor or patio access": the note
+  //   stands in for the chip on that card
+  //   more: the full sentences for the opened card; dir: the directions line for a stop listed for one entrance
   function v4NeedLines(s){
-    var out = { note: '', more: [] }, id = s && s.venue && s.venue.id, fr = lang() === 'fr';
+    var out = { note: '', notes: [], compact: [], open: [], more: [], chipOff: false, dir: null }, id = s && s.venue && s.venue.id, fr = lang() === 'fr';
+    var p = state.last || {}, needs = Array.isArray(p.needs) ? p.needs : [];
+    var hasNeed = function(k){ return needs.some(function(n){ return n && typeof n === 'object' && n.key === k; }); };
     if (!id) return out;
-    ((state.last && state.last.evidence) || []).forEach(function(e){
+    (p.evidence || []).forEach(function(e){
       if (!e || (e.ask !== 'accessible' && e.ask !== 'dog_friendly') || !Array.isArray(e.stops)) return;
       var r = e.stops.filter(function(x){ return x && x.id === id; })[0];
       if (!r) return;
-      if (e.ask === 'accessible' && r.note) out.note = (fr && r.noteFr) || r.note;
       if (r.more) out.more.push((fr && r.moreFr) || r.more);
+      if (!hasNeed(e.ask === 'accessible' ? 'wheelchair' : 'dog') || !r.note) return;
+      var full = (fr && r.noteFr) || r.note, wheel = e.ask === 'accessible', short = (fr && r.noteShortFr) || r.noteShort || full;
+      (wheel ? out.notes.unshift(full) : out.notes.push(full)); (wheel ? out.compact.unshift(short) : out.compact.push(short));
+      if (r.check) (wheel ? out.open.unshift(full) : out.open.push(full));
+      if (!wheel && r.has === true && r.where === 'unsaid') out.chipOff = true;
+      if (wheel && r.dir) out.dir = r.dir;
     });
+    out.note = out.notes.join(' · ');
     return out;
+  }
+  // The collapsed card's need notes: one small line per need. With a suggested-time note on the card (timed), the
+  // shorter forms side by side on one line under it, so the card stays at two small lines.
+  function v4NeedHtml(s, timed){
+    var n = v4NeedLines(s), list = timed ? n.compact : n.notes;
+    if (!list.length) return '';
+    if (timed) return '<p class="tw-fit tw-need v4-need-note" data-tw-need="' + esc(list.join(' · ')) + '">' + esc(list.join(' · ')) + '</p>';
+    return '<p class="tw-fit tw-need v4-need-note" data-tw-need="' + esc(list.join(' · ')) + '">' + list.map(function(t){ return '<span>' + esc(t) + '</span>'; }).join('') + '</p>';
+  }
+  // The directions line of a stop whose listing covers one named entrance or section: the entrance's own pin when the
+  // site holds one (a labelled link), else that the map link goes to the listing's map location: check the entrance.
+  function v4DirHtml(s){
+    var d = v4NeedLines(s).dir, fr = lang() === 'fr';
+    if (!d) return '';
+    if (d.pin && /^https:\/\/www\.google\.com\/maps\//.test(d.url || '')) return '<p class="v4-need v4-dir" data-v4-dir="pin"><a ' + hrefAttr(d.url) + ' target="_blank" rel="noopener">' + esc((fr && d.labelFr) || d.label) + ' <span aria-hidden="true">↗</span></a></p>';
+    return '<p class="v4-need v4-dir" data-v4-dir="listing">' + esc((fr && d.textFr) || d.text) + '</p>';
   }
   // The expanded card's time: always the planner's suggestion, never a verified slot. A stop on showtimes, classes,
   // sessions, lanes or booked slots gets no end time (a film is not an hour long) and the step to check them, with the
@@ -342,19 +374,21 @@ const V4_CLIENT_SRC = String.raw`
     if (v.price >= 1 && v.price <= 4) return new Array(v.price + 1).join('$');
     return '';
   }
-  function v4Badges(v){
+  // chipOff (2026-11-23): on a dog trip a place with only the Dog-Friendly badge shows "Dogs: check indoor or patio
+  // access" under its name; the plain chip beside it would read as a settled yes, so the note stands in for it.
+  function v4Badges(v, chipOff){
     var p = state.last || {}, party = ((p.understood && p.understood.party) || []).join(' '), want = {};
     if (/dog/.test(party)) want.dog_friendly = 1;
     if (/kid/.test(party)) want.kid_friendly = 1;
     ((p.intent && p.intent.features) || []).forEach(function(f){ want[f] = 1; });
-    var out = (v.badges || []).filter(function(b){ return b && want[b.key]; }).slice(0, 2).map(function(b){
+    var out = (v.badges || []).filter(function(b){ return b && want[b.key] && !(chipOff && b.key === 'dog_friendly' && !v.dogsPatioOnly); }).slice(0, 2).map(function(b){
       return b.key === 'dog_friendly' && v.dogsPatioOnly ? (lang() === 'fr' ? 'Chiens sur la terrasse' : 'Dogs on patio') : frLabel(BADGE_KEYS[b.key], b.label);
     });
     // Round 2 (2026-11-21): a walk, park or beach on the official dog list says so on a dog trip, like a patio does.
     if (want.dog_friendly && !(v.badges || []).some(function(b){ return b && b.key === 'dog_friendly'; }) && (v.collections || []).some(function(c){ return c && c.key === 'dog_friendly'; })) out.unshift(vt('dogsOk'));
     return out.slice(0, 2);
   }
-  function v4Line(s){ return [v4Kind(s), v4Price(s.venue)].concat(v4Badges(s.venue)).filter(Boolean).join(' · '); }
+  function v4Line(s){ return [v4Kind(s), v4Price(s.venue)].concat(v4Badges(s.venue, v4NeedLines(s).chipOff)).filter(Boolean).join(' · '); }
   function v4Thumb(v){
     var u = v ? stopPhotoUrl(v) : null;
     return u ? '<img class="v4-thumb" src="' + esc(u) + '" alt="" width="72" height="72" loading="lazy" decoding="async">' : '<span class="v4-thumb v4-thumb--none" aria-hidden="true">•</span>';
@@ -369,6 +403,7 @@ const V4_CLIENT_SRC = String.raw`
     var v = s.venue, url = placeUrl(v), fr = lang() === 'fr', out = '';
     out += v4TimingHtml(s, id);
     v4NeedLines(s).more.forEach(function(m){ out += '<p class="v4-need">' + esc(m) + '</p>'; });
+    out += v4DirHtml(s);
     if (v.listedHours) out += '<p class="v4-quiet">' + esc(vt('hours')) + ' · ' + esc(v.listedHours) + '</p>';
     if (v.yearlyClosure) out += '<p>' + esc(fr ? v.yearlyClosure.fr : v.yearlyClosure.en) + '</p>';
     if (s.happyHourLine) out += '<p>' + esc(fr && s.happyHourDealsFr ? '5 à 7 : ' + s.happyHourDealsFr : s.happyHourLine) + '</p>';
@@ -422,7 +457,7 @@ const V4_CLIENT_SRC = String.raw`
       + '<div class="v4-acts">'
       + (key ? (s.noSwap ? '' : '<button type="button" class="v4-icon" data-t3-swap="' + esc(key) + '" aria-label="' + esc(vt('swap', { name: v.name })) + '" title="' + esc(vt('swap', { name: v.name })) + '">⇄</button>') + '<button type="button" class="v4-icon" data-t3-remove="' + esc(key) + '" aria-label="' + esc(vt('remove', { name: v.name })) + '" title="' + esc(vt('remove', { name: v.name })) + '">✕</button>'
         : '<button type="button" class="v4-icon" data-t3-swap-id="' + esc(v.id) + '" aria-label="' + esc(vt('swap', { name: v.name })) + '" title="' + esc(vt('swap', { name: v.name })) + '">⇄</button><button type="button" class="v4-icon" data-v4-remove-id="' + esc(v.id) + '" aria-label="' + esc(vt('remove', { name: v.name })) + '" title="' + esc(vt('remove', { name: v.name })) + '">✕</button>')
-      + '</div></div>' + (v4Note(s, key) || { html: '' }).html
+      + '</div></div>' + (v4Note(s, key) || { html: '' }).html + v4NeedHtml(s, !!v4Note(s, key)).replace('class="tw-fit tw-need v4-need-note"', 'class="v4-note v4-need-note"')
       + '<div class="v4-more" id="' + did + '"' + (v4.open[id] ? '' : ' hidden') + '>' + v4Details(s, id) + '</div>'
       + v4TripBtn(v, key) + '</li>';
     return html;
@@ -538,6 +573,13 @@ const V4_CLIENT_SRC = String.raw`
     try {
       var needFacts = (typeof tripSummaryFacts === 'function' ? tripSummaryFacts(state.last, lang() === 'fr', { removed: typeof v4RemovedIds === 'function' ? v4RemovedIds() : {} }) : []).filter(function(f){ return f && f.kind === 'flag' && (f.ask === 'accessible' || f.ask === 'dog_friendly'); });
       if (needFacts.length) html += '<p class="t3-book-note v4-book-honest" data-v4-book-needs>' + esc((lang() === 'fr' ? 'À confirmer auprès de chaque endroit : ' : 'To confirm with each place: ') + needFacts.map(function(f){ return f.text; }).join('. ') + '.') + '</p>';
+      // (2026-11-23) Then each stop with something still to confirm, in the words of its own card (v4NeedLines: the
+      // same short notes), so the checklist, the cards and the shared copy say one thing.
+      var goneIds = typeof v4RemovedIds === 'function' ? v4RemovedIds() : {}, seenIds = {}, needRows = [];
+      var eachStop = function(st){ if (!st || !st.venue || goneIds[st.venue.id] || seenIds[st.venue.id]) return; seenIds[st.venue.id] = 1; var nl = v4NeedLines(st); if (nl.open.length) needRows.push('<li data-v4-book-need="' + esc(st.venue.id) + '"><strong>' + esc(st.venue.name) + '</strong>: ' + esc(nl.open.join(' · ')) + '</li>'); };
+      ((state.last && state.last.days) || []).forEach(function(d){ (d.stops || []).forEach(eachStop); });
+      ((state.last && ((state.last.outing && state.last.outing.stops) || (state.last.itinerary && state.last.itinerary.stops))) || []).forEach(eachStop);
+      if (needRows.length) html += '<ul class="t3-book-note v4-book-honest v4-book-needs" data-v4-book-need-list>' + needRows.join('') + '</ul>';
     } catch (e) { /* the sheet stands without the line */ }
     if (steps.length || v4ReserveRows(steps).length) html += '<p class="t3-book-note v4-book-honest" data-v4-book-note>' + esc(vt('bookNote')) + '</p>';
     var reserve = v4ReserveRows(steps);
@@ -820,6 +862,9 @@ const V4_CLIENT_SRC = String.raw`
         var time = li.querySelector('.v4-time'), name = li.querySelector('.v4-name');
         if (!name || !name.textContent.trim()) return;
         rows.push(((time && time.textContent.trim()) ? time.textContent.trim() + ' ' : '') + name.textContent.trim());
+        // (2026-11-23) The stop's need notes, as on its card ("Wheelchair access: check ahead · Dogs: on leash").
+        var nn = li.querySelector('[data-tw-need]');
+        if (nn && nn.getAttribute('data-tw-need')) rows.push('  ' + nn.getAttribute('data-tw-need'));
       });
       if (!rows.length) return;
       if (t && t.textContent.trim()) { lines.push(''); lines.push(t.textContent.replace(/\s+/g, ' ').trim()); }

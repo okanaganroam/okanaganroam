@@ -372,7 +372,8 @@ test('11. the Vernon plan: nothing is "confirmed" from a section, a feature or a
   assert.match(a.textFr, /Aucun n’est entièrement confirmé\. Polson Park : « Wheelchair-accessible playground; flat park trails »\. Seul ceci est couvert : playground; vérifiez le reste\./);
   assert.match(a.textFr, /BX Creek Wetland Boardwalk : « Deleenheer Rd access suits limited mobility »\. Aucune mention des fauteuils roulants : vérifiez la surface et la largeur\./);
   // The cards: a short note for the collapsed card (only the affected stops), and the opened card's line for every stop.
-  assert.deepEqual(a.stops.map((s) => s.note || null), ['Wheelchair: playground only', null, 'Wheelchair: Turtle Mtn Blvd to Davison Rd section only', null, 'Access: Deleenheer Rd access · check ahead', null]);
+  // (2026-11-23, card caveats: every stop has its note now; a stop whose listing says nothing is "check ahead".)
+  assert.deepEqual(a.stops.map((s) => s.note || null), ['Wheelchair: playground only', 'Wheelchair access: check ahead', 'Wheelchair: Turtle Mtn Blvd to Davison Rd section only', 'Wheelchair access: check ahead', 'Access: Deleenheer Rd access · check ahead', 'Wheelchair access: check ahead']);
   assert.equal(a.stops[4].noteFr, 'Accès : Deleenheer Rd access · à vérifier');
   assert.equal(a.stops[4].more, 'Wheelchair access: “Deleenheer Rd access suits limited mobility”. No mention of wheelchairs: check the surface and width.');
   assert.equal(a.stops[1].more, 'Wheelchair access: its listing doesn’t say: ask before you go.');
@@ -434,4 +435,254 @@ test('12. a dog: the badge at a place with an indoors is not "dogs welcome"; the
   const allYes = plan([{ day: 1, stops: [stop('morning', 1, 'Paved Lake Path', 'outdoor', ['dog_friendly'])] }], { needs: [needs[1]] });
   H.applyEvidence(allYes, ctx);
   assert.equal(ev(allYes, 'dog_friendly').status, 'verified');
+});
+
+// ---- 2026-11-23: short caveats on every card (the owner's third report on the same Vernon trip) ----
+// "The individual BX Ranch Trail card says 'A good walk with your dog' without indicating that wheelchair access is
+// unknown. Restaurant cards show 'Dog-Friendly' without saying that indoor versus patio access is unconfirmed."
+// The page's own functions, run here with small stand-ins for the page around them.
+const WS_SRC = L.WORKSPACE_CLIENT_SRC;
+const between = (src, from, to) => { const i = src.indexOf(from), j = src.indexOf(to, i + from.length); assert.ok(i >= 0 && j > i, `${from} … ${to}`); return src.slice(i, j); };
+const escH = (x) => String(x == null ? '' : x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// -> the card functions of the plan page, bound to one plan and language. timed: venue id -> a suggested-time note.
+function cardKit(p, fr = false, timed = {}) {
+  const src = [between(V4, '  function v4NeedLines(s){', '  // The expanded card\'s time:'), between(V4, '  function v4Badges(v, chipOff){', '  function v4Thumb(v){'), between(WS_SRC, '  function tripWorkspaceStopHtml(s,key,counts){', '  // An event on the plan is a card like any stop')].join('\n');
+  const stubs = {
+    state: { last: p, removed: {} }, lang: () => (fr ? 'fr' : 'en'), esc: escH, hrefAttr: (u) => `href="${escH(u)}"`,
+    frLabel: (k, label) => (fr && label === 'Dog-Friendly' ? 'Chiens admis' : label), BADGE_KEYS: {}, vt: (k) => (k === 'dogsOk' ? 'Dogs OK' : k), v4Kind: (s) => (s.venue.type === 'restaurant' ? 'Lunch' : 'Outdoor Destination'), v4Price: () => '',
+    v4Note: (s) => (timed[s.venue.id] ? { url: 'https://example.com/', html: `<p class="v4-note">${timed[s.venue.id]}</p>` } : null),
+    t3WhyLines: (s) => s.why || [], placeUrl: () => '/x', t3BookSteps: () => [], v4Fallback: () => null, tripWorkspaceBooking: () => null, twText: (en, f) => (fr ? f : en), t3StepLinkHtml: () => '', t3StayExt: () => '',
+    v4Thumb: () => '', v4Start: () => '10:15 AM', v4: { open: {} }, v4Details: () => '', v4TripBtn: () => '',
+  };
+  const names = Object.keys(stubs);
+  return new Function(...names, `${src}\nreturn { v4NeedLines, v4NeedHtml, v4DirHtml, v4Badges, v4Line, tripWorkspaceStopHtml };`)(...names.map((n) => stubs[n]));
+}
+// The words of a card's own column (time, name, type line, notes, links), " | " between its parts.
+const text = (html) => { const i = html.indexOf('<div class="tw-card-info">'), j = html.indexOf('<div class="v4-acts">'); return html.slice(i, j).replace(/<\/(?:p|span|button)>/g, ' | ').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/\s+/g, ' ').replace(/(?:\| )+/g, '| ').replace(/\s*\|\s*$/, '').trim(); };
+
+test('13. the short note: one function for every access level and every dog case (EN + FR), short enough for a phone', () => {
+  const acc = (r, fr, c) => A.accessShort(r, fr, c);
+  // Wheelchair, by level: never upgraded; unknown is "check ahead".
+  const ACC = [
+    [{ level: 'wheelchair' }, 'Wheelchair accessible per its listing', 'Accessible en fauteuil selon sa fiche'],
+    [{ level: 'wheelchair_part', part: 'playground' }, 'Wheelchair: playground only', 'Fauteuil roulant : playground seulement'],
+    [{ level: 'wheelchair_part', part: 'Turtle Mtn Blvd to Davison Rd section' }, 'Wheelchair: Turtle Mtn Blvd to Davison Rd section only', 'Fauteuil roulant : Turtle Mtn Blvd to Davison Rd section seulement'],
+    [{ level: 'wheelchair_part' }, 'Wheelchair: in part only', 'Fauteuil roulant : en partie seulement'],
+    [{ level: 'mobility', part: 'Deleenheer Rd access' }, 'Access: Deleenheer Rd access · check ahead', 'Accès : Deleenheer Rd access · à vérifier'],
+    [{ level: 'mobility' }, 'Mobility note only · check ahead', 'Note de mobilité seulement · à vérifier'],
+    [{ level: 'mobility', amenity: true }, 'Access: facilities only · check ahead', 'Accès : installations seulement · à vérifier'],
+    [{ level: 'no' }, 'Not wheelchair accessible per its listing', 'Non accessible en fauteuil selon sa fiche'],
+    [{ level: 'unknown' }, 'Wheelchair access: check ahead', 'Accès en fauteuil : à vérifier'],
+    [{ has: null }, 'Wheelchair access: check ahead', 'Accès en fauteuil : à vérifier'],
+  ];
+  for (const [r, en, fr] of ACC) { assert.equal(acc(r, false), en); assert.equal(acc(r, true), fr); }
+  assert.deepEqual([acc({ level: 'unknown' }, false, true), acc({ level: 'unknown' }, true, true), acc({ level: 'wheelchair' }, false, true), acc({ level: 'no' }, false, true)], ['Wheelchair: check ahead', 'Fauteuil : à vérifier', 'Wheelchair: yes per listing', 'Wheelchair: no per listing']);
+  // Only a listing's own wheelchair words are a yes; everything else is still to check.
+  assert.deepEqual(ACC.map(([r]) => A.accessOpen(r)), [false, true, true, true, true, true, true, true, true, true]);
+  // The old name still answers for the two partial levels only.
+  assert.deepEqual([A.accessStopNote({ level: 'mobility', part: 'Deleenheer Rd access' }, false), A.accessStopNote({ level: 'unknown' }, false)], ['Access: Deleenheer Rd access · check ahead', '']);
+  // A dog: the listing's own condition, short; the badge alone at a place with an indoors; nothing; a no.
+  const dog = (d, fr, c) => A.dogShort(A.dogOf(d), fr, c);
+  const DOG = [
+    [{ dogLine: 'Dogs allowed, on leash only', type: 'outdoor' }, 'Dogs: on leash only', 'Chiens : en laisse seulement'],
+    [{ dogLine: 'Dogs allowed on leash', type: 'outdoor' }, 'Dogs: on leash', 'Chiens : en laisse'],
+    [{ dogLine: 'Dogs allowed on leash only (Deleenheer Rd section)', type: 'outdoor' }, 'Dogs: on leash only, Deleenheer Rd section', 'Chiens : on leash only, Deleenheer Rd section'],
+    [{ dogLine: 'Dogs allowed on all sections, on leash', type: 'outdoor' }, 'Dogs: on all sections, on leash', 'Chiens : on all sections, on leash'],
+    [{ dogLine: 'No dogs on the boardwalk', type: 'outdoor' }, 'No dogs on the boardwalk', 'No dogs on the boardwalk'],
+    [{ dogLine: 'On leash Oct 1 to Mar 31; no dogs Apr 1 to Sep 30', badge: true, type: 'beach' }, 'Dogs: on leash Oct 1 to Mar 31 · limits apply', 'Chiens : on leash Oct 1 to Mar 31 · avec limites'],
+    [{ dogLine: 'Leashed dogs OK, but not on bike trails or in jump, skills, drop or pump zones', type: 'outdoor' }, 'Dogs: on leash · limits apply', 'Chiens : en laisse · avec limites'],
+    [{ badge: true, type: 'pub', ownLine: 'Dogs welcome on the patio only. Water bowls at the door.' }, 'Dogs: patio only', 'Chiens : terrasse seulement'],
+    [{ badge: true, type: 'cafe', ownLine: 'Dogs outside only' }, 'Dogs: outside only', 'Chiens : dehors seulement'],
+    [{ badge: true, type: 'brewery', ownLine: 'Dogs welcome inside and on the patio' }, 'Dogs: inside and on the patio', 'Chiens : inside and on the patio'],
+    [{ badge: true, type: 'brewery', ownLine: 'Well-behaved dogs are welcome inside the taproom and out on the big covered patio all year' }, 'Dogs: welcome inside', 'Chiens : admis à l’intérieur'],
+    [{ badge: true, type: 'tour', ownLine: 'Dogs on some trips', someTrips: true }, 'Dogs: some trips only', 'Chiens : certaines sorties seulement'],
+    [{ badge: true, type: 'restaurant' }, 'Dogs: check indoor or patio access', 'Chiens : vérifier intérieur ou terrasse'],
+    [{ badge: true, type: 'winery' }, 'Dogs: check indoor or patio access', 'Chiens : vérifier intérieur ou terrasse'],
+    [{ badge: true, type: 'outdoor' }, 'Dogs: listed as dog-friendly', 'Chiens : indiqué comme admis'],
+    [{ type: 'restaurant' }, 'Dogs: check ahead', 'Chiens : à vérifier'],
+    [{ dogLine: 'Dogs are not permitted', badge: true, type: 'outdoor' }, 'No dogs per its listing', 'Chiens non admis selon sa fiche'],
+  ];
+  for (const [d, en, fr] of DOG) { assert.equal(dog(d, false), en, JSON.stringify(d)); assert.equal(dog(d, true), fr, JSON.stringify(d)); }
+  assert.deepEqual([dog({ badge: true, type: 'restaurant' }, false, true), dog({ badge: true, type: 'restaurant' }, true, true)], ['Dogs: check inside or patio', 'Chiens : intérieur ou terrasse à vérifier']);
+  // The badge alone is never said as a yes, and never as "dogs welcome".
+  for (const [d, en] of DOG) { const r = A.dogOf(d); if (r.has !== true || r.where === 'unsaid') assert.doesNotMatch(en, /welcome|allowed|friendly/i, en); }
+  assert.deepEqual(DOG.map(([d]) => A.dogOpen(A.dogOf(d))), [false, false, false, false, true, true, false, true, true, false, false, true, true, true, false, true, true]);
+  // Short: the fixed notes fit about 40 characters; a note that carries a listing's own section name may be longer.
+  for (const [r, en, fr] of ACC) if (!r.part) { assert.ok(en.length <= 41, en); assert.ok(fr.length <= 46, fr); }
+  for (const [d, en, fr] of DOG) { assert.ok(en.length <= 46, en); assert.ok(fr.length <= 50, fr); }
+  for (const c of [true]) for (const fr of [false, true]) assert.ok(`${acc({ level: 'unknown' }, fr, c)} · ${dog({ type: 'restaurant' }, fr, c)}`.length <= 44);
+  // Every Dogs line and Access line in this site's data makes a note; a long line is cut at a clause, never mid-word.
+  const facts = JSON.parse(fs.readFileSync(require.resolve('../data/outdoor-facts.json'), 'utf8'));
+  for (const f of Object.values(facts)) {
+    if (!f) continue;
+    if (typeof f.dogs === 'string' && f.dogs.trim()) { const r = A.dogOf({ dogLine: f.dogs, type: 'outdoor' }), n = A.dogShort(r, false); assert.ok(n && n.length <= 66, `${f.dogs} -> ${n}`); if (r.has === false) assert.equal(n, 'No dogs per its listing'); if (r.has === null) assert.doesNotMatch(n, /^Dogs: (?:allowed|welcome|listed)/, n); }
+    if (typeof f.accessibility === 'string') { const g = A.accessOf({ accessLine: f.accessibility }), n = A.accessShort(g, false); assert.equal(/^Wheelchair accessible per its listing$/.test(n), g.level === 'wheelchair', f.accessibility); }
+  }
+});
+
+test('14. the cards: a note for each need the trip carries, on every stop; none without the need; the Dog-Friendly chip gives way to "check indoor or patio access"', () => {
+  // The owner's plan, with BX Ranch Trail (no Access line; "Dogs allowed, on leash only") on day 2.
+  const AC = { 11: { accessLine: VERNON.polson }, 13: { accessLine: VERNON.bx }, 17: {}, 14: {}, 16: {}, 18: { accessLine: 'Wide, flat, paved 6.8 km path; wheelchair accessible' } };
+  const DG = { 11: { badge: true, type: 'outdoor' }, 13: { dogLine: 'Dogs allowed on leash only (Deleenheer Rd section)', badge: true, type: 'outdoor' }, 17: { dogLine: 'Dogs allowed, on leash only', type: 'outdoor' }, 14: { badge: true, type: 'restaurant' }, 16: { badge: true, type: 'restaurant' }, 18: { dogLine: 'Dogs are not permitted', type: 'outdoor' } };
+  const c2 = { accessOf: (id) => A.accessOf(AC[id] || {}), dogOf: (id) => A.dogOf(DG[id] || {}), kindsOf: (id) => (id <= 13 || id === 17 ? ['walk', 'easy_walk'] : []) };
+  const mk = (extra = {}) => {
+    const walk = { ...stop('morning', 17, 'BX Ranch Trail', 'outdoor'), why: ['A good walk with your dog'] };
+    const p = plan([{ day: 1, date: '2027-01-16', stops: [stop('morning', 13, 'BX Creek Wetland Boardwalk', 'outdoor'), { ...stop('midday', 14, 'Roster Sports Club', 'restaurant', ['dog_friendly', 'gluten_free']), why: ['Matches your request for restaurants'] }, stop('afternoon', 11, 'Polson Park', 'outdoor'), stop('evening', 18, 'Paved Lake Path', 'outdoor')] },
+      { day: 2, date: '2027-01-17', stops: [walk, stop('midday', 16, 'MR MIKES', 'restaurant', ['dog_friendly'])] }], extra);
+    for (const d of p.days) for (const s of d.stops) for (const b of s.venue.badges) b.label = b.key === 'dog_friendly' ? 'Dog-Friendly' : 'Gluten-Free-Friendly';
+    p.intent = { features: ['dog_friendly', 'gluten_free'] };
+    H.applyEvidence(p, c2);
+    return p;
+  };
+  const p = mk(), all = (q) => q.days.flatMap((d) => d.stops);
+  const K = cardKit(p), byId = (q, id) => all(q).find((s) => s.venue.id === id);
+  // Every stop: the wheelchair note first, then the dog note; the same words as the evidence rows.
+  assert.deepEqual(all(p).map((s) => K.v4NeedLines(s).notes), [
+    ['Access: Deleenheer Rd access · check ahead', 'Dogs: on leash only, Deleenheer Rd section'],
+    ['Wheelchair access: check ahead', 'Dogs: check indoor or patio access'],
+    ['Wheelchair: playground only', 'Dogs: listed as dog-friendly'],
+    ['Wheelchair accessible per its listing', 'No dogs per its listing'],
+    ['Wheelchair access: check ahead', 'Dogs: on leash only'],
+    ['Wheelchair access: check ahead', 'Dogs: check indoor or patio access'],
+  ]);
+  for (const s of all(p)) assert.deepEqual(K.v4NeedLines(s).notes, A.stopNeedNotes(p, s.venue.id, false).notes, s.venue.name);
+  // "A good walk with your dog" never stands alone on a walk whose wheelchair access is unknown: the notes take its place.
+  const ranch = K.tripWorkspaceStopHtml(byId(p, 17), '2-morning');
+  assert.equal(text(ranch), '10:15 AM | BX Ranch Trail | Outdoor Destination | Wheelchair access: check ahead | Dogs: on leash only | View details');
+  assert.doesNotMatch(ranch, /A good walk with your dog/);
+  assert.match(ranch, /<li class="v4-stop tw-needs" /);
+  assert.match(ranch, /<p class="tw-fit tw-need v4-need-note" data-tw-need="Wheelchair access: check ahead · Dogs: on leash only"><span>Wheelchair access: check ahead<\/span><span>Dogs: on leash only<\/span><\/p>/);
+  // The badge-only restaurant: the plain chip is gone from the line (its other chips stay); the note says what to check.
+  const roster = K.tripWorkspaceStopHtml(byId(p, 14), '1-midday');
+  assert.equal(text(roster), '10:15 AM | Roster Sports Club | Lunch · Gluten-Free-Friendly | Wheelchair access: check ahead | Dogs: check indoor or patio access | View details');
+  assert.doesNotMatch(roster, /Dog-Friendly|Matches your request/);
+  assert.equal(K.v4NeedLines(byId(p, 14)).chipOff, true);
+  // A listing that says where dogs go keeps its own chip ("Dogs on patio"); a confirmed stop is a plain yes.
+  assert.deepEqual(K.v4Badges({ badges: [{ key: 'dog_friendly', label: 'Dog-Friendly' }], dogsPatioOnly: true }, true), ['Dogs on patio']);
+  assert.deepEqual(K.v4NeedLines(byId(p, 18)).open, ['No dogs per its listing']);
+  assert.deepEqual(K.v4NeedLines(byId(p, 13)).open, ['Access: Deleenheer Rd access · check ahead']);
+  // French.
+  const KF = cardKit(p, true);
+  assert.deepEqual(KF.v4NeedLines(byId(p, 14)).notes, ['Accès en fauteuil : à vérifier', 'Chiens : vérifier intérieur ou terrasse']);
+  assert.doesNotMatch(KF.tripWorkspaceStopHtml(byId(p, 14), '1-midday'), /Chiens admis</);
+  // With a suggested time on the same card: the time note first, then both needs in their shorter forms on ONE more line.
+  const KT = cardKit(p, false, { 14: 'Suggested time · Check sessions ↗' });
+  const timed = KT.tripWorkspaceStopHtml(byId(p, 14), '1-midday');
+  assert.equal(text(timed), '10:15 AM | Roster Sports Club | Lunch · Gluten-Free-Friendly | Suggested time · Check sessions ↗ | Wheelchair: check ahead · Dogs: check inside or patio | View details');
+  assert.match(timed, /<li class="v4-stop tw-timed tw-needs" /);
+  assert.equal((timed.match(/<p class="/g) || []).length, 2, 'two small lines, not three');
+  // Only the needs the trip carries: a dog trip says nothing of wheelchairs, a wheelchair trip nothing of dogs (and
+  // keeps the Dog-Friendly chip); a plan with neither is as it was: the generic line, the chip, no note.
+  const dogOnly = mk({ needs: [needs[1]] }), KD = cardKit(dogOnly);
+  assert.deepEqual(KD.v4NeedLines(byId(dogOnly, 17)).notes, ['Dogs: on leash only']);
+  assert.doesNotMatch(all(dogOnly).map((s) => KD.tripWorkspaceStopHtml(s, '1-x')).join(''), /Wheelchair|Access:/);
+  const wheelOnly = mk({ needs: [needs[0]] }), KW = cardKit(wheelOnly);
+  assert.deepEqual(KW.v4NeedLines(byId(wheelOnly, 14)).notes, ['Wheelchair access: check ahead']);
+  assert.match(KW.tripWorkspaceStopHtml(byId(wheelOnly, 14), '1-midday'), /Lunch · Dog-Friendly · Gluten-Free-Friendly/);
+  assert.doesNotMatch(all(wheelOnly).map((s) => KW.tripWorkspaceStopHtml(s, '1-x')).join(''), /Dogs:|No dogs/);
+  const none = mk({ needs: [] }), KN = cardKit(none);
+  for (const s of all(none)) assert.deepEqual(KN.v4NeedLines(s).notes, [], s.venue.name);
+  assert.equal(text(KN.tripWorkspaceStopHtml(byId(none, 17), '2-morning')), '10:15 AM | BX Ranch Trail | Outdoor Destination | A good walk with your dog | View details');
+  assert.equal(text(KN.tripWorkspaceStopHtml(byId(none, 14), '1-midday')), '10:15 AM | Roster Sports Club | Lunch · Dog-Friendly · Gluten-Free-Friendly | Matches your request for restaurants | View details');
+  assert.doesNotMatch(all(none).map((s) => KN.tripWorkspaceStopHtml(s, '1-x')).join(''), /tw-needs|data-tw-need/);
+  for (const s of all(none)) assert.equal(A.stopNeedNotes(none, s.venue.id, false).text, '');
+  // The Book my trip sheet lists each stop's notes that are still to confirm, from the same function; the copied
+  // itinerary prints the card's own note under the stop.
+  assert.ok(V4.includes("var nl = v4NeedLines(st); if (nl.open.length) needRows.push("));
+  assert.ok(V4.includes("if (nn && nn.getAttribute('data-tw-need')) rows.push('  ' + nn.getAttribute('data-tw-need'));"));
+  // One small line per need on a phone, wrapping inside the card.
+  assert.ok(L.WORKSPACE_STYLES.includes('.t3-v4.tw-workspace .tw-need span {display:block;}'));
+  assert.ok(L.WORKSPACE_STYLES.includes('.t3-v4.tw-workspace .tw-needs .tw-need {width:max-content;max-width:calc(100vw - 58px);max-width:calc(100cqw - 24px);font-size:12.5px;}'));
+});
+
+test('15. directions for a stop listed for one entrance or section: the entrance’s own pin when on file, else "check the entrance"; never "accessible"', () => {
+  // No pin on file: the line says the map link is the listing's location, not necessarily the entrance.
+  const bx = A.accessDirections({ level: 'mobility', part: 'Deleenheer Rd access' }, null);
+  assert.deepEqual(bx, { pin: null, text: 'Directions go to the listing’s map location, not necessarily the Deleenheer Rd access: check the entrance.', textFr: 'L’itinéraire mène à l’emplacement de la fiche, pas forcément à : Deleenheer Rd access. Vérifiez l’entrée.' });
+  assert.equal(A.accessDirections({ level: 'wheelchair_part', part: 'Turtle Mtn Blvd to Davison Rd section' }, null).text, 'Directions go to the listing’s map location, not necessarily the Turtle Mtn Blvd to Davison Rd section: check the entrance.');
+  // A pin from the site's own entrance data: the link goes there, named.
+  const pin = A.accessDirections({ level: 'mobility', part: 'Juniper Trail' }, { name: 'Twin Bays / Yellow Gate parking', lat: 50.20386581, lng: -119.2805426 });
+  assert.equal(pin.label, 'Directions to Twin Bays / Yellow Gate parking');
+  assert.equal(pin.labelFr, 'Itinéraire vers Twin Bays / Yellow Gate parking');
+  assert.equal(pin.url, 'https://www.google.com/maps/search/?api=1&query=50.20386581,-119.2805426');
+  assert.equal(pin.text, 'Directions go to Twin Bays / Yellow Gate parking, the entrance on file for the Juniper Trail.');
+  // Not a route matter: a feature (a playground, a building), an amenity, "some portions", a whole-place yes, nothing said.
+  for (const r of [{ level: 'wheelchair_part', part: 'playground' }, { level: 'wheelchair_part', part: 'building' }, { level: 'mobility', amenity: true, part: 'parking' }, { level: 'wheelchair_part', part: 'some portions' }, { level: 'wheelchair_part' }, { level: 'wheelchair' }, { level: 'unknown' }, { level: 'no' }]) assert.equal(A.accessDirections(r, null), null, JSON.stringify(r));
+  // A broken pin is no pin.
+  assert.equal(A.accessDirections({ level: 'mobility', part: 'Juniper Trail' }, { name: 'X', lat: 'a', lng: 2 }).pin, null);
+  // Nothing here calls a route or a whole trail accessible.
+  for (const d of [bx, pin]) for (const t of [d.text, d.textFr, d.label || '']) assert.doesNotMatch(t, /accessible/i, t);
+  // The evidence row carries it (ctx.entranceOf), and the card prints it once opened: a link for a pin, a line without.
+  const AC = { 13: { accessLine: VERNON.bx }, 19: { accessLine: 'Juniper Trail is paved to the twin bays, then gravel to Rattlesnake Point' }, 11: { accessLine: VERNON.polson } };
+  const c2 = { accessOf: (id) => A.accessOf(AC[id] || {}), dogOf: () => A.dogOf({}), kindsOf: () => ['walk'], entranceOf: (id, part) => (id === 19 && part === 'Juniper Trail' ? { name: 'Twin Bays / Yellow Gate parking', lat: 50.20386581, lng: -119.2805426 } : null) };
+  const p = plan([{ day: 1, date: '2027-01-16', stops: [stop('morning', 13, 'BX Creek Wetland Boardwalk', 'outdoor'), stop('midday', 19, 'Kalamalka Lake Park Trails', 'outdoor'), stop('afternoon', 11, 'Polson Park', 'outdoor')] }], { needs: [needs[0]] });
+  H.applyEvidence(p, c2);
+  const rows = ev(p, 'accessible').stops;
+  assert.deepEqual(rows.map((r) => (r.dir ? (r.dir.pin ? 'pin' : 'listing') : null)), ['listing', 'pin', null]);
+  const K = cardKit(p), st = p.days[0].stops;
+  assert.equal(K.v4DirHtml(st[0]), '<p class="v4-need v4-dir" data-v4-dir="listing">Directions go to the listing’s map location, not necessarily the Deleenheer Rd access: check the entrance.</p>');
+  assert.equal(K.v4DirHtml(st[1]), '<p class="v4-need v4-dir" data-v4-dir="pin"><a href="https://www.google.com/maps/search/?api=1&amp;query=50.20386581,-119.2805426" target="_blank" rel="noopener">Directions to Twin Bays / Yellow Gate parking <span aria-hidden="true">↗</span></a></p>');
+  assert.equal(K.v4DirHtml(st[2]), '');
+  assert.equal(A.stopNeedNotes(p, 13, false).dir.text, bx.text);
+  // The day's route link on the shared copy is worded as before: it names no access.
+  const app = require('../server.js');
+  const page = app.renderMyTripPage({ lang: 'en' });
+  assert.match(page, /Directions for Day \{d\} in Google Maps/);
+  assert.doesNotMatch(page, /accessible route|accessible directions/i);
+  // The site's own entrance data: a pin only where an entrance's own words name the part; nothing is guessed.
+  if (!WR) {
+    const kal = app.tripAccessEntrance(1825, 'Juniper Trail');
+    if (kal) { assert.equal(kal.name, 'Twin Bays / Yellow Gate parking'); assert.ok(Math.abs(kal.lat - 50.2039) < 0.001 && Math.abs(kal.lng + 119.2805) < 0.001); }
+  }
+  assert.equal(app.tripAccessEntrance(1, 'Deleenheer Rd access'), null);
+  assert.equal(app.tripAccessEntrance(999999, 'Juniper Trail'), null);
+});
+
+test('16. through the planner and the shared copy: the plan’s rows, the sheet’s list and the copy’s stop lines are the same strings; no need, no notes', () => {
+  const app = require('../server.js');
+  const run = (t) => app.runTripPlanRequest({ ...app.parseTripPlanBody({ text: t }, { v4: true, stays: true }).value, v4: true }, true);
+  // (The repo's seed database has stops for this request; the owner's dated Vernon request needs the live listings.)
+  const p = run(`A relaxed 2-day trip in ${WR ? 'Whistler' : 'Kelowna'} with our dog. One of us uses a wheelchair.`);
+  const stops = (p.days || []).flatMap((d) => d.stops.filter((s) => s.venue).map((s) => ({ ...s, day: d.day })));
+  assert.ok(stops.length, 'the request plans');
+  const a = ev(p, 'accessible'), d = ev(p, 'dog_friendly');
+  // Every stop of the plan has both notes, made by the one function from its own row.
+  for (const s of stops) {
+    const ra = a.stops.find((x) => x.id === s.venue.id), rd = d.stops.find((x) => x.id === s.venue.id);
+    assert.ok(ra && rd, s.venue.name);
+    assert.deepEqual([ra.note, ra.noteFr, ra.noteShort], [A.accessShort(ra, false), A.accessShort(ra, true), A.accessShort(ra, false, true)], s.venue.name);
+    assert.deepEqual([rd.note, rd.noteFr, rd.noteShort], [A.dogShort(rd, false), A.dogShort(rd, true), A.dogShort(rd, false, true)], s.venue.name);
+    // Never upgraded: "accessible" only from the listing's own wheelchair words; a badge alone is never "allowed".
+    assert.equal(ra.note === 'Wheelchair accessible per its listing', app.tripAccessOf(s.venue.id).level === 'wheelchair', s.venue.name);
+    if (app.tripAccessOf(s.venue.id).level === 'unknown') assert.equal(ra.note, 'Wheelchair access: check ahead', s.venue.name);
+    if (rd.where === 'unsaid') assert.equal(rd.note, 'Dogs: check indoor or patio access', s.venue.name);
+    assert.equal(!!ra.check, ra.level !== 'wheelchair');
+  }
+  // The shared copy: the same text under each stop, worked out again from the listings.
+  const K = cardKit(p);
+  const q = { stops: stops.map((s) => `venue:${s.venue.id}`).join(','), days: stops.map((s) => s.day).join(','), asks: H.shareAsks(p).join(','), nw: '1', ad: '2' };
+  for (const lang of ['en', 'fr']) {
+    const ctxS = app.tripShareContext(q, lang);
+    assert.ok(ctxS && ctxS.stopNotes, 'the copy carries the notes');
+    for (const s of stops) {
+      const n = A.stopNeedNotes(p, s.venue.id, lang === 'fr');
+      assert.equal(ctxS.stopNotes[`venue:${s.venue.id}`].text, n.text, s.venue.name);
+      if (lang === 'en') assert.equal(n.text, K.v4NeedLines(s).note, s.venue.name);
+      assert.equal(ctxS.stopNotes[`venue:${s.venue.id}`].dir || null, n.dir ? (lang === 'fr' ? n.dir.textFr : n.dir.text) : null, s.venue.name);
+    }
+    const html = app.renderMyTripPage({ lang, context: ctxS });
+    assert.match(html, /var NEED_NOTES = \{"venue:\d+":\{"text":"/);
+    assert.ok(html.includes("needHtml = nn && nn.text ? '<p class=\"mt-meta mt-need\" data-mt-need>' + esc(nn.text) + '</p>'"));
+  }
+  // An older link (no need in its asks) and your own saved trip: no notes, the page as before.
+  const old = app.tripShareContext({ stops: q.stops, days: q.days, asks: 'gluten_free', ad: '2' }, 'en');
+  assert.equal(old.stopNotes, undefined);
+  assert.match(app.renderMyTripPage({ lang: 'en', context: old }), /var NEED_NOTES = \{\};/);
+  assert.match(app.renderMyTripPage({ lang: 'en' }), /var NEED_NOTES = \{\};/);
+  // Plans without these needs: no note on any row's card, the chip and the generic line as before.
+  for (const t of [`Plan a 3-day ${WR ? 'Whistler' : 'Kelowna'} weekend for 6 friends: two ${WR ? 'breweries' : 'wineries'}, gluten-free dining, easy walks, a hotel with a pool, and live music. One person does not drink.`,
+    `Plan 2 days in ${WR ? 'Whistler' : 'Penticton'} on December 5–6, 2026 for two adults and kids aged 6 and 9. We want indoor activities, a kid-friendly lunch, a hotel with a pool and a relaxed pace.`]) {
+    const o = run(t), KO = cardKit(o);
+    for (const dd of o.days || []) for (const s of dd.stops) if (s.venue) { const nl = KO.v4NeedLines(s); assert.deepEqual([nl.notes, nl.compact, nl.open, nl.chipOff, nl.dir, nl.more], [[], [], [], false, null, []], `${t.slice(0, 30)} ${s.venue.name}`); assert.equal(A.stopNeedNotes(o, s.venue.id, false).text, ''); assert.doesNotMatch(KO.tripWorkspaceStopHtml(s, `${dd.day}-${s.daypart}`), /tw-needs|data-tw-need/); }
+  }
 });

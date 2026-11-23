@@ -284,9 +284,10 @@ test('7. the collapsed card shows one short note with the kind’s link label, a
   // the same link; the expanded line no longer repeats the link; the pill is as it was.
   const C = WS.WORKSPACE_CLIENT_SRC, CSS = WS.WORKSPACE_STYLES;
   assert.ok(C.includes('var note=v4Note(s,key);'));
-  // (2026-11-23: a trip need's short note, e.g. "Access: Deleenheer Rd access · check ahead", comes after the timing note
-  // and before the generic reason; a card shows one of the three.)
-  assert.ok(C.includes(`'</span></button>'+(note?note.html:need?'<p class="tw-fit tw-need" data-tw-need>'+esc(need)+'</p>':reason?'<p class="tw-fit">'+esc(reason)+'</p>':'')+'<div class="tw-links">'`));
+  // (2026-11-23: a trip's need notes, e.g. "Wheelchair access: check ahead", follow the timing note on one more small
+  // line, in their shorter forms; the generic reason shows only when a card has neither. tests/trip-access-needs 14.)
+  assert.ok(C.includes(`'</span></button>'+(note||need?(note?note.html:'')+need:reason?'<p class="tw-fit">'+esc(reason)+'</p>':'')+'<div class="tw-links">'`));
+  assert.ok(C.includes("var need=typeof v4NeedHtml==='function'?v4NeedHtml(s,!!note):'';"));
   assert.ok(C.includes('!(note&&note.url===t3StayExt(v.website))'));
   assert.ok(V4.includes("(v4Note(s, key) || { html: '' }).html"), 'the plain list layout too');
   assert.ok(!V4.includes("' data-v4-check-times>' + esc(fr ? 'Voir la fiche' : 'View details')"), 'one link in each state');
