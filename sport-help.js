@@ -244,7 +244,11 @@ const WORDS = {
     swim: ['No towel or swimsuit rentals: bring your own', 'Pas de location de serviettes ni de maillots : apportez les vôtres'],
   },
 };
-const word = (field, kind) => { const f = WORDS[field] || {}; return f[kind] || f._ || ['', '']; };
+// Outdoor businesses (2026-11-23): each outdoor kind's own words (outdoor-help.js WORDS; '_outdoor' for the outdoor kinds
+// without their own), so a campground's shared answers never say "Lessons and camps".
+const OH = require('./outdoor-help.js');
+for (const [f, m] of Object.entries(OH.WORDS)) WORDS[f] = { ...(WORDS[f] || {}), ...m };
+const word = (field, kind) => { const f = WORDS[field] || {}; return f[kind] || (OH.isOutdoorKind(kind) && f._outdoor) || f._ || ['', '']; };
 const WINTER = (kind) => (SK.K[kind] || {}).season === 'winter';
 const SUMMER = (kind) => (SK.K[kind] || {}).season === 'summer';
 
