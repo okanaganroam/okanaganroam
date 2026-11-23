@@ -193,13 +193,15 @@ test('one non-drinker: the summary says what is counted and keeps "listed" apart
   assert.ok(!/\bno options\b|\bwithout\b|\bnot available\b|: 0 of/.test(none.join(' ')));
   assert.equal(tripSummaryFacts(ev(four.map((x) => ({ ...x, has: null }))), false, {})[0].status, 'unknown');
   // Every one lists them: met.
-  assert.deepEqual(one(ev(four.map((x) => ({ ...x, has: true }))), false), ['Non-alcoholic options: every winery & bar lists them ✓']);
+  assert.deepEqual(one(ev(four.map((x) => ({ ...x, has: true }))), false), ['Non-alcoholic options: listed at all 4 ✓']);
+  // The plan's own kinds of place are named (a plan with no winery, as on Whistler Roam).
+  assert.deepEqual(tripSummaryFacts({ evidence: [{ ...ev(four).evidence[0], unit: { en: 'breweries & bars', fr: 'brasseries et bars' } }] }, false, {}).map((x) => x.text), ['Non-alcoholic options: 1 of 4 breweries & bars lists them · 3 don’t say']);
   // A removed stop is not counted.
   assert.deepEqual(tripSummaryFacts(ev(four), false, { removed: { 4: 1 } }).map((x) => x.text), ['Non-alcoholic options: 1 of 3 wineries & bars lists them · 2 don’t say']);
   // The Details sentence names every counted place and never says a place has none.
   const hp = require('../trip-honest-plan.js');
   const src = require('node:fs').readFileSync(require.resolve('../trip-honest-plan.js'), 'utf8');
-  assert.match(src, /of the \$\{rows\.length\} wineries and bars in this plan/);
+  assert.match(src, /of the \$\{rows\.length\} \$\{unit\.long\} in this plan/);
   assert.match(src, /say either way, so ask there/);
   assert.ok(hp);
 });

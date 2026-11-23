@@ -30,9 +30,9 @@ function tripSummaryFacts(plan, fr, ctx) {
     // badge is unknown (has: null), never "has none".
     if (e.ask === 'nonalcoholic' && stops.length) {
       var un = stops.length - yes, nl = label;
-      var place = fr ? (stops.length > 1 ? 'vignobles et bars' : 'vignoble ou bar') : (stops.length > 1 ? 'wineries & bars' : 'winery or bar');
-      if (!un) { ok.push({ kind: 'ok', ask: e.ask, text: nl + (fr ? ' : indiquées partout ✓' : ': every winery & bar lists them ✓') }); return; }
-      if (!yes) t = fr ? (stops.length > 1 ? 'aucun des ' + stops.length + ' ' + place + ' ne le précise' : 'le ' + place + ' ne le précise pas') : (stops.length > 1 ? 'none of the ' + stops.length + ' ' + place + ' say' : 'the ' + place + ' doesn’t say');
+      var u = e.unit || {}, place = fr ? (u.fr || 'vignobles et bars') : (u.en || 'wineries & bars');
+      if (!un) { ok.push({ kind: 'ok', ask: e.ask, text: nl + (fr ? ' : indiquées partout ✓' : ': listed at all ' + stops.length + ' ✓') }); return; }
+      if (!yes) t = fr ? 'non précisé (' + stops.length + ' ' + place + ')' : 'none of the ' + stops.length + ' ' + place + (stops.length > 1 ? ' say' : ' says');
       else t = fr ? yes + ' des ' + stops.length + ' ' + place + (yes > 1 ? ' en indiquent' : ' en indique') + ' · ' + un + (un > 1 ? ' ne le précisent pas' : ' ne le précise pas') : yes + ' of ' + stops.length + ' ' + place + (yes > 1 ? ' list them' : ' lists them') + ' · ' + un + (un > 1 ? ' don’t say' : ' doesn’t say');
       flags.push({ kind: 'flag', status: yes ? 'partial' : 'unknown', ask: e.ask, text: nl + sep + t });
       return;

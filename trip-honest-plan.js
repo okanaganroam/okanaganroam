@@ -261,7 +261,13 @@ function stayEntries(plan) {
 function nonDrinkerEntry(stops, ctx) {
   const rows = stops.filter((x) => DRINK_TYPES.includes(x.v.type)).map((x) => ({ id: x.v.id, name: x.v.name, has: badgeOf(x.v, 'nonalcoholic', ctx.flags) === true ? true : null }));
   const yes = rows.filter((r) => r.has), no = rows.filter((r) => !r.has);
-  const base = { ask: 'nonalcoholic', label: 'Non-alcoholic options', labelFr: 'Options sans alcool', stops: rows, who: 'one' };
+  // What is counted, in the plan's own kinds of place ("wineries & bars" in the Okanagan, "breweries & bars" where the
+  // plan has no winery): the summary and the Details sentence both say it.
+  const kinds = stops.filter((x) => DRINK_TYPES.includes(x.v.type)).map((x) => x.v.type);
+  const wine = kinds.includes('winery'), brew = kinds.some((t) => ['brewery', 'cidery', 'distillery'].includes(t)), bar = kinds.some((t) => ['pub', 'cocktail'].includes(t));
+  const unit = wine && (brew || bar) ? { en: 'wineries & bars', fr: 'vignobles et bars', long: 'wineries and bars' } : wine ? { en: 'wineries', fr: 'vignobles', long: 'wineries' }
+    : brew && bar ? { en: 'breweries & bars', fr: 'brasseries et bars', long: 'breweries and bars' } : brew ? { en: 'breweries', fr: 'brasseries', long: 'breweries' } : { en: 'bars', fr: 'bars', long: 'bars' };
+  const base = { ask: 'nonalcoholic', label: 'Non-alcoholic options', labelFr: 'Options sans alcool', stops: rows, who: 'one', unit: { en: unit.en, fr: unit.fr } };
   if (!rows.length) return { ...base, status: 'verified', text: 'For your non-drinker: this plan has no winery, brewery or bar stops.', textFr: 'Pour la personne qui ne boit pas : ce plan n’a aucun arrêt dans un vignoble, une brasserie ou un bar.' };
   if (!yes.length) return { ...base, status: 'unknown', text: 'One of you doesn’t drink: none of these tasting stops lists non-alcoholic options on its listing, so ask when you book.', textFr: 'Une personne ne boit pas : aucun de ces arrêts n’indique d’options sans alcool; demandez en réservant.' };
   const en = `For your non-drinker: ${listEn(names(yes))} ${yes.length > 1 ? 'list' : 'lists'} non-alcoholic options`;
@@ -269,8 +275,8 @@ function nonDrinkerEntry(stops, ctx) {
   if (!no.length) return { ...base, status: 'verified', text: `${en}.`, textFr: `${fr}.` };
   // (2026-11-23) The count is of the plan's wineries and bars; a listing without the badge doesn't say either way.
   return { ...base, status: 'partial',
-    text: `For your non-drinker, of the ${rows.length} wineries and bars in this plan: ${listEn(names(yes))} ${yes.length > 1 ? 'list' : 'lists'} non-alcoholic options on ${yes.length > 1 ? 'their listings' : 'its listing'}. ${listEn(names(no))} ${no.length > 1 ? 'don’t' : 'doesn’t'} say either way, so ask there.`,
-    textFr: `Pour la personne qui ne boit pas, parmi les ${rows.length} vignobles et bars de ce plan : ${listFr(names(yes))} ${yes.length > 1 ? 'indiquent' : 'indique'} des options sans alcool sur ${yes.length > 1 ? 'leurs fiches' : 'sa fiche'}. ${listFr(names(no))} ne le ${no.length > 1 ? 'précisent' : 'précise'} pas : demandez sur place.` };
+    text: `For your non-drinker, of the ${rows.length} ${unit.long} in this plan: ${listEn(names(yes))} ${yes.length > 1 ? 'list' : 'lists'} non-alcoholic options on ${yes.length > 1 ? 'their listings' : 'its listing'}. ${listEn(names(no))} ${no.length > 1 ? 'don’t' : 'doesn’t'} say either way, so ask there.`,
+    textFr: `Pour la personne qui ne boit pas, parmi les ${rows.length} ${unit.fr} de ce plan : ${listFr(names(yes))} ${yes.length > 1 ? 'indiquent' : 'indique'} des options sans alcool sur ${yes.length > 1 ? 'leurs fiches' : 'sa fiche'}. ${listFr(names(no))} ne le ${no.length > 1 ? 'précisent' : 'précise'} pas : demandez sur place.` };
 }
 // Nobody drinks: no winery, brewery, distillery, pub or bar is planned.
 function noAlcoholEntry(stops) {
