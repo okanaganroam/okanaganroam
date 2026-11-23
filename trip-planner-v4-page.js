@@ -40,6 +40,8 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-day { margin: 0 0 18px; }
   .t3-v4 .v4-day-title { margin: 0 0 6px; font-size: 1rem; font-weight: 800; color: var(--ref-navy); }
   .t3-v4 .v4-day-title span { font-weight: 700; color: var(--ref-navy-muted, #56636E); }
+  .t3-v4 .v4-thin { margin: 0 0 8px; padding: 6px 10px; border-radius: 10px; background: #fff0cc; color: #6b4a12; font-size: 13px; line-height: 1.45; font-weight: 700; }
+  .t3-v4 .v4-thin-btn { display: inline-flex; align-items: center; min-height: 44px; margin: 2px 0 2px 4px; padding: 0 12px; border: 1px solid #6b4a12; border-radius: 10px; background: #fffdf8; color: #1b303c; font: 800 13px Nunito, sans-serif; cursor: pointer; }
   .t3-v4 .v4-stops { list-style: none; margin: 0; padding: 0; background: #fff; border-radius: 16px; box-shadow: 0 1px 0 rgba(27,43,58,0.06), 0 8px 24px -18px rgba(16,27,36,0.35); overflow: hidden; }
   .t3-v4 .v4-stop { border-top: 1px solid rgba(27,43,58,0.08); }
   .t3-v4 .v4-stop:first-child { border-top: 0; }
@@ -491,7 +493,7 @@ const V4_CLIENT_SRC = String.raw`
         + '<p class="t3-stay-name">' + (u ? '<a ' + hrefAttr(u) + '>' + esc(s.name) + '</a>' : esc(s.name)) + '</p>' + (facts ? '<p class="t3-stay-facts">' + esc(facts) + '</p>' : '') + t3LiveHtml(s, fr) + '</div>'
         + (d.others.length ? '<button type="button" class="t3-book-link t3-book-change" data-t3-stay-change aria-expanded="false" aria-controls="t3StayAlts">' + esc(fr ? 'Changer' : 'Change') + '</button>' : '') + '</div>' + v4RoomsHtml(fr);
       // Trip dates (2026-11-23): the stay's own dates (proposed until a yes; then what the links carry).
-      html += t3StayDatesHtml(t, fr);
+      html += t3StayDatesHtml(t, fr, s);
       if (d.others.length) html += '<ul class="t3-stay-alts" id="t3StayAlts" hidden>' + d.others.map(function(o){
         var ou = safeUrl((fr && o.urlFr) || o.url), of = t3StayFacts(o, fr), why = (o.reasons || [])[0];
         return '<li class="t3-stay-alt"><div><p><strong>' + (ou ? '<a ' + hrefAttr(ou) + '>' + esc(o.name) + '</a>' : esc(o.name)) + '</strong></p><p>' + esc([o.regionLabel, of, why ? (fr ? why.textFr : why.text) : ''].filter(Boolean).join(' · ')) + '</p></div><button type="button" class="t3-btn t3-btn-ghost" data-t3-stay-choose="' + esc(o.id) + '">' + esc(fr ? 'Choisir' : 'Choose') + '</button></li>';
@@ -726,6 +728,15 @@ const V4_CLIENT_SRC = String.raw`
     });
     return out.slice(0, TRIP_MAX_STOPS);
   }
+  // A day the planner could not fill (plan.thinDays, 2026-11-24): one short line on that day saying so and why, with at
+  // most two one-tap next steps that go through the chat. Never shown as a finished day.
+  function v4ThinHtml(p, day, fr){
+    var x = ((p && p.thinDays) || []).filter(function(q){ return q && q.day === day && q.text; })[0];
+    if (!x) return '';
+    var say = typeof chatSend === 'function' ? (x.next || []).slice(0, 2).filter(function(n){ return n && n.message && n.label; }) : [];
+    return '<p class="v4-thin" data-v4-thin="' + esc(day) + '"><span>' + esc((fr && x.textFr) || x.text) + '</span>'
+      + say.map(function(n){ return ' <button type="button" class="v4-thin-btn" data-v4-say="' + esc(n.message) + '"' + (n.detail ? ' title="' + esc(n.detail) + '"' : '') + '>' + esc((fr && n.labelFr) || n.label) + '</button>'; }).join('') + '</p>';
+  }
   function v4ShareLink(list){
     var u = location.origin + (lang() === 'fr' ? '/fr' : '') + '/my-trip?stops=' + list.map(function(x){ return x.ref; }).join(',');
     if (list.length && list.every(function(x){ return x.day > 0; })) u += '&days=' + list.map(function(x){ return x.day; }).join(',');
@@ -767,6 +778,11 @@ const V4_CLIENT_SRC = String.raw`
       if (Object.keys(sug).length) out += '&sug=' + Object.keys(sug).join(',');
       var asks = (p.evidence || []).map(function(e){ return e && /^count:/.test(e.ask || '') && e.asked > 0 ? e.ask + ':' + e.asked : e && e.ask; }).filter(function(a){ return a && /^[a-z_:0-9]+$/.test(a); }).slice(0, 12);
       if (asks.length) out += '&asks=' + asks.join(',');
+      // Trip needs (2026-11-24): one person's wheelchair (nw=1) and the days the plan could not fill (thin=2), so the
+      // copy says the same; both optional.
+      if ((p.needs || []).some(function(n){ return n && n.key === 'wheelchair' && n.who === 'one'; })) out += '&nw=1';
+      var thin = (p.thinDays || []).map(function(x){ return x && x.day; }).filter(function(n){ return n > 0 && n < 31; });
+      if (thin.length) out += '&thin=' + thin.join(',');
     } catch (e) {}
     return out;
   }
@@ -879,6 +895,7 @@ const V4_CLIENT_SRC = String.raw`
         var label = [date, d.regionLabel].filter(Boolean).join(' · ');
         html += '<section class="v4-day" id="t3-day-' + d.day + '" aria-labelledby="v4-day-' + d.day + '">' + (nd > 1 || label ? '<h3 class="v4-day-title" id="v4-day-' + d.day + '">' + (nd > 1 ? esc(vt('day') + ' ' + d.day) : '') + (label ? ' <span>' + (nd > 1 ? '· ' : '') + esc(label) + '</span>' : '') + '</h3>' : '')
           + (d.driveIn ? '<p class="v4-leg" style="margin:0 0 6px;border-radius:10px;padding-left:12px">' + esc(t3DriveText(d.driveIn, lang())) + '</p>' : '')
+          + v4ThinHtml(p, d.day, fr)
           + v4ListHtml(d.stops, function(s){ return d.day + '-' + s.daypart; }, counts) + '</section>';
       });
     } else {

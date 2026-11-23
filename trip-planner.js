@@ -1723,6 +1723,9 @@ function scoreVenue(v, ctx) {
 
   // A place the visitor named (2026-10-25: "lunch at Araxi" got another restaurant) wins its slot in every kind of plan.
   if (namedInRequest(v, ctx)) add('named', 60, 'You asked for this place');
+  // Trip needs (2026-11-24): with a wheelchair user, a place whose own data says it is accessible comes first (the
+  // server marks those listings; a listing that doesn't say gets nothing).
+  if (v.accessBoost) add('access', v.accessBoost, v.accessSays ? `Its listing says: ${v.accessSays}` : 'Its listing says it is wheelchair accessible');
   // Tour test 13 (Whistler, 2026-11-18; Matthias): a plain "scenic flight" puts the planes and helicopters before a tandem
   // paragliding operator (a scenic flight too, labelled paragliding on its stop).
   if (paraglideForScenic(v, ctx) && !namedInRequest(v, ctx)) add('air_sport', -45, null);
@@ -6702,7 +6705,10 @@ function idleGapWalk(input, g, fromMinutes) {
   const regions = g.regions.length ? g.regions : [...new Set(g.stops.map((s) => s.venue && s.venue.region).filter(Boolean))];
   const used = new Set(g.stops.map((s) => s.venue && s.venue.id).filter(Boolean));
   const ctx = buildContext(input.intent || {}, input.labels || {}, input);
-  const picks = facts.filter((v) => ['outdoor', 'beach'].includes(v.type) && !used.has(v.id) && hasCoords(v) && (!regions.length || regions.includes(v.region))
+  // Trip needs (2026-11-24): with a wheelchair user (the server marks the listings whose own data says accessible), the
+  // walk suggested for free time is one of those, never a park that doesn't say.
+  const wheel = facts.some((v) => v.accessBoost);
+  const picks = facts.filter((v) => ['outdoor', 'beach'].includes(v.type) && !used.has(v.id) && hasCoords(v) && (!regions.length || regions.includes(v.region)) && (!wheel || v.accessBoost)
     && (IDLE_WALK_RE.test(`${v.textName || ''} ${v.textDesc || ''}`) || (v.plannerKinds || []).some((k) => ['walk', 'easy_walk', 'park'].includes(k)))
     && !roughAccess(v) && !dogOnlyPlace(v) && !bookedOutfitter(v) && !winterOnly(v) && !SHOULDER_CLOSED_RE.test(v.textName || normWords(v.name)) && !ctx.exclude.has(v.id)
     && !(date && seasonClosedOnTrip(v, { date })) && !advisoryUnavailable(v.advisory && v.advisory.note))
