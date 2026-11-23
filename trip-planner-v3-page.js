@@ -924,8 +924,9 @@ const T3_STAY_STYLES = `<style>
   .t3-stayd[data-t3-stayd="confirmed"] .t3-stayd-btn { border: 0; background: none; padding: 0; text-decoration: underline; }
   .t3-stayd-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin-top: 8px; flex-basis: 100%; }
   .t3-stayd-form[hidden] { display: none; }
-  .t3-stayd-form label { display: flex; flex-direction: column; gap: 2px; font-weight: 700; font-size: 0.8rem; }
-  .t3-stayd-form input { min-height: 44px; font: inherit; font-size: 16px; border: 1px solid rgba(27,43,58,0.25); border-radius: 10px; padding: 0 8px; max-width: 100%; }
+  .t3-stayd-form label { display: flex; flex-direction: column; gap: 2px; font-weight: 700; font-size: 0.8rem; flex: 1 1 128px; min-width: 0; }
+  .t3-stayd-form input { min-height: 44px; font: inherit; font-size: 16px; border: 1px solid rgba(27,43,58,0.25); border-radius: 10px; padding: 0 6px; width: 100%; max-width: 100%; box-sizing: border-box; background: #fff; }
+  .t3-stayd-form .t3-stayd-btn { min-height: 44px; height: 44px; }
   .t3-stayd-err { flex-basis: 100%; color: #8a1f11; font-weight: 700; }
   .t3-stayd-err:empty { display: none; }
   .t3-stayd-note { margin: 6px 0 0; font-size: 0.8rem; color: rgba(27,43,58,0.75); }
