@@ -118,6 +118,18 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-ask { margin: 0 0 8px; font-size: 0.86rem; font-weight: 700; color: var(--ref-navy); }
   .t3-v4 .v4-bar-btns.v4-ask-btns { grid-template-columns: 1fr 1fr auto; }
   .t3-v4 .v4-check .v4-call { white-space: nowrap; }
+  /* Honest plan (2026-11-22): "I booked this" (the traveller's own note), the commission label, dated suggestions. */
+  .t3-v4 .v4-check-name small .t3-book-link { min-height: 32px; padding: 4px 0; font-size: 0.82rem; font-weight: 800; text-decoration: underline; background: none; border: 0; color: var(--ref-navy); cursor: pointer; }
+  .t3-v4 .v4-check-name small.v4-aff { font-weight: 600; font-size: 0.74rem; }
+  .t3-v4 .v4-book-honest { margin: 10px 0 0; font-size: 0.8rem; color: var(--ref-navy-muted, #56636E); }
+  .t3-v4 .v4-sugg { margin: 14px 0 6px; padding: 12px 14px; border: 1px dashed rgba(27,43,58,0.28); border-radius: 14px; background: #FFFBF1; }
+  .t3-v4 .v4-sugg-h { margin: 0 0 2px; font-size: 0.95rem; color: var(--ref-navy); }
+  .t3-v4 .v4-sugg-note { margin: 0 0 8px; font-size: 0.82rem; color: var(--ref-navy-muted, #56636E); }
+  .t3-v4 .v4-sugg ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .t3-v4 .v4-sugg li { display: grid; gap: 2px; min-width: 0; }
+  .t3-v4 .v4-sugg li a, .t3-v4 .v4-sugg li strong { font-weight: 800; color: var(--ref-navy); overflow-wrap: anywhere; }
+  .t3-v4 .v4-sugg li small { color: var(--ref-navy-muted, #56636E); font-size: 0.82rem; }
+  .t3-v4 .v4-sugg-tag { justify-self: start; padding: 2px 8px; border-radius: 999px; background: #F3E3B5; font-size: 0.74rem; font-weight: 800; color: #5A4300; }
   .t3-v4 .v4-book-unpriced { margin: 4px 0 0; font-size: 0.82rem; color: var(--ref-navy-muted, #56636E); }
   @media (min-width: 721px) {
     .t3-v4 .v4-row { grid-template-columns: 72px minmax(0, 1fr) auto; padding: 12px 10px 12px 14px; }
@@ -132,22 +144,28 @@ const V4_STYLES = `<style>
 const V4_CLIENT_SRC = String.raw`
   // ---------- V4: the simple plan view ----------
   var V4_TEXT = {
-    en: { yourPlan: 'Your plan', edit: 'Edit request', tip: 'Tap a stop for details. Swap ⇄ or remove ✕ anything, then confirm.', tipDone: 'Plan confirmed. Book it in one go, then share it with your group.',
+    en: { yourPlan: 'Your plan', edit: 'Edit request', tip: 'Tap a stop for details. Swap ⇄ or remove ✕ anything, then confirm.', tipDone: 'Plan confirmed. Nothing is booked yet: book each part, then share it with your group.',
       confirm: 'Confirm plan', confirmNote: 'You can still change it with Edit plan.', picked: 'We picked {town}. Name a town in your request to change it.', book: 'Book my trip', share: 'Share', save: 'Save', saved: 'Saved ✓', editPlan: 'Edit plan',
       note: 'Times are suggestions. Check hours before you go.', options: 'More options and notes', day: 'Day', stops1: '1 stop', stopsN: '{n} stops', days1: '1 day', daysN: '{n} days',
       swap: 'Swap {name}', remove: 'Remove {name}', removed: 'Removed', undo: 'Undo', another: 'Suggest another', details: 'See the place', why: 'Why it fits', hours: 'Hours',
       lunch: 'Lunch', dinner: 'Dinner', free: 'Free time', freeEve: 'Free evening', event: 'Event', noDinner: 'Dinner not scheduled', close: 'Close',
-      sheet: 'Book your trip', next: 'Open next booking', nextOf: 'Next: {name}', allSet: 'All booked ✓', progress: '{d} of {n} booked', reserve: 'Reserve by phone or on their site', noOnline: 'No online booking listed',
+      sheet: 'Book your trip', next: 'Open next booking', nextOf: 'Next: {name}', allSet: 'All marked as booked ✓', progress: '{d} of {n} marked as booked', iBooked: 'I booked this', markedByYou: 'Marked by you as booked', undoBooked: 'Undo', commission: 'We may earn a commission',
+      bookNote: 'You book and pay on the business’s or provider’s own site. “I booked this” is your own note: __ROAM_BRAND__ can’t see or confirm bookings.', markedNote: 'Marked by you. __ROAM_BRAND__ can’t see or confirm bookings.',
+      notCounted: 'Not counted: {names}', assumed: ' (assumed)', stayOf: 'the stay ({name})', carEtc: 'getting there and a rental car', taxesEtc: 'taxes, tips and fees', tickets: 'event tickets',
+      sugHead: 'Depends on your dates', sugNote: 'Not part of the plan or its bookings. Pick your dates and I’ll add what’s on.', reserve: 'Reserve by phone or on their site', noOnline: 'No online booking listed',
       toBook: 'To book', copied: 'Trip copied. Paste it into your group chat.', copyThis: 'Copy this link: ', shareTitle: 'Our trip', estFor: 'for {n}', est: 'estimate', more: '+{n} more',
       startOver: 'Start over', stay: 'Stay', addBookings: 'Add to bookings', added: 'Added', call: 'Call', contact: 'Contact', byPhone: 'Reserve by phone',
       savedReplaced: 'Saved ✓ Your trip is in My Trip.', notPriced: 'Not priced yet: {names}', freeLabel: 'Free', dogsOk: 'Dogs allowed',
       tipNoBook: 'Plan confirmed. Share it with your group or save it.' },
-    fr: { yourPlan: 'Votre plan', edit: 'Modifier la demande', tip: 'Touchez un arrêt pour les détails. Remplacez ⇄ ou retirez ✕ ce que vous voulez, puis confirmez.', tipDone: 'Plan confirmé. Réservez tout d’un coup, puis partagez-le avec votre groupe.',
+    fr: { yourPlan: 'Votre plan', edit: 'Modifier la demande', tip: 'Touchez un arrêt pour les détails. Remplacez ⇄ ou retirez ✕ ce que vous voulez, puis confirmez.', tipDone: 'Plan confirmé. Rien n’est encore réservé : réservez chaque partie, puis partagez-le avec votre groupe.',
       confirm: 'Confirmer le plan', confirmNote: 'Vous pourrez encore le modifier avec « Modifier le plan ».', picked: 'Nous avons choisi {town}. Nommez une ville dans votre demande pour la changer.', book: 'Tout réserver', share: 'Partager', save: 'Enregistrer', saved: 'Enregistré ✓', editPlan: 'Modifier le plan',
       note: 'Heures suggérées. Vérifiez les horaires avant de partir.', options: 'Plus d’options et notes', day: 'Jour', stops1: '1 arrêt', stopsN: '{n} arrêts', days1: '1 jour', daysN: '{n} jours',
       swap: 'Remplacer {name}', remove: 'Retirer {name}', removed: 'Retiré', undo: 'Annuler', another: 'Autre suggestion', details: 'Voir le lieu', why: 'Pourquoi ce choix', hours: 'Heures',
       lunch: 'Dîner', dinner: 'Souper', free: 'Temps libre', freeEve: 'Soirée libre', event: 'Événement', noDinner: 'Souper non planifié', close: 'Fermer',
-      sheet: 'Réserver votre voyage', next: 'Ouvrir la prochaine réservation', nextOf: 'Ensuite : {name}', allSet: 'Tout est réservé ✓', progress: '{d} sur {n} réservés', reserve: 'Réservez par téléphone ou sur leur site', noOnline: 'Pas de réservation en ligne indiquée',
+      sheet: 'Réserver votre voyage', next: 'Ouvrir la prochaine réservation', nextOf: 'Ensuite : {name}', allSet: 'Tout est marqué comme réservé ✓', progress: '{d} sur {n} marqués comme réservés', iBooked: 'J’ai réservé', markedByYou: 'Marqué par vous comme réservé', undoBooked: 'Annuler', commission: 'Nous pouvons toucher une commission',
+      bookNote: 'Vous réservez et payez sur le site de l’entreprise ou du fournisseur. « J’ai réservé » est votre propre note : __ROAM_BRAND__ ne peut ni voir ni confirmer les réservations.', markedNote: 'Marqué par vous. __ROAM_BRAND__ ne peut ni voir ni confirmer les réservations.',
+      notCounted: 'Non compté : {names}', assumed: ' (supposé)', stayOf: 'l’hébergement ({name})', carEtc: 'le transport et la location d’auto', taxesEtc: 'taxes, pourboires et frais', tickets: 'billets d’événements',
+      sugHead: 'Selon vos dates', sugNote: 'Hors du plan et de ses réservations. Choisissez vos dates et j’ajouterai ce qui est à l’affiche.', reserve: 'Réservez par téléphone ou sur leur site', noOnline: 'Pas de réservation en ligne indiquée',
       toBook: 'À réserver', copied: 'Voyage copié. Collez-le dans la discussion de votre groupe.', copyThis: 'Copiez ce lien : ', shareTitle: 'Notre voyage', estFor: 'pour {n}', est: 'estimation', more: '+{n} autres',
       startOver: 'Recommencer', stay: 'Hébergement', addBookings: 'Ajouter aux réservations', added: 'Ajouté', call: 'Appeler', contact: 'Coordonnées', byPhone: 'Réserver par téléphone',
       savedReplaced: 'Enregistré ✓ Votre voyage est dans Mon voyage.', notPriced: 'Prix pas encore indiqué : {names}', freeLabel: 'Gratuit', dogsOk: 'Chiens admis',
@@ -351,6 +369,16 @@ const V4_CLIENT_SRC = String.raw`
     });
     return html + '</ol>';
   }
+  // Honest plan (2026-11-22): with no dates chosen an event is not a stop of "day 3". It is offered here with its own real
+  // date ("Suggestion · Tue Nov 24 only"), outside the days, the booking steps and the shared stops.
+  function v4SuggestionsHtml(p, fr){
+    var list = (p.dateSuggestions || []).filter(function(x){ return x && x.name; }).slice(0, 2);
+    if (!list.length) return '';
+    return '<section class="v4-sugg" aria-labelledby="v4SuggHead"><h3 class="v4-sugg-h" id="v4SuggHead">' + esc(vt('sugHead')) + '</h3><p class="v4-sugg-note">' + esc(vt('sugNote')) + '</p><ul>' + list.map(function(x){
+      var u = safeUrl((fr && x.urlFr) || x.url), meta = [(fr && x.timeFr) || x.time, x.venueName].filter(Boolean).join(' · ');
+      return '<li data-v4-suggestion="' + esc(x.id) + '"><span class="v4-sugg-tag">' + esc((fr && x.labelFr) || x.label) + '</span>' + (u ? '<a ' + hrefAttr(u) + '>' + esc(x.name) + '</a>' : '<strong>' + esc(x.name) + '</strong>') + (meta ? '<small>' + esc(meta) + '</small>' : '') + '</li>';
+    }).join('') + '</ul></section>';
+  }
   function v4DayDate(day){
     var rows = (state.last && state.last.schedule) || [];
     var r = rows.filter(function(x){ return x.day === day.day && /^\d{4}-\d{2}-\d{2}$/.test(x.date || ''); })[0];
@@ -376,7 +404,7 @@ const V4_CLIENT_SRC = String.raw`
     var lo = 0, hi = 0, ok = true;
     e.parts.forEach(function(x){ if (x.low === null || x.high === null) ok = false; else { lo += x.low; hi += x.high; } });
     if (!ok || !hi) return '';
-    return '<strong>' + esc((fr ? 'Environ ' : 'About ') + t3Range(lo, hi, fr) + ' ' + vt('estFor', { n: e.people })) + '</strong> <small>' + esc(t3EstimateHead(e, fr).tag) + '</small>';
+    return '<strong>' + esc((fr ? 'Environ ' : 'About ') + t3Range(lo, hi, fr) + ' ' + vt('estFor', { n: e.people }) + (e.peopleAssumed ? vt('assumed') : '')) + '</strong> <small>' + esc(t3EstimateHead(e, fr).tag) + '</small>';
   }
   // Meals in the plan with no online booking (a dinner the restaurant takes by phone): listed under the steps with a link to
   // the place's page (its phone and website), so a dinner is never missing from "Book my trip".
@@ -421,13 +449,17 @@ const V4_CLIENT_SRC = String.raw`
       html += '<p class="v4-sheet-h4">' + esc(done ? vt('progress', { d: done, n: steps.length }) : vt('toBook')) + '</p><ol class="v4-check">' + steps.map(function(x, n){
         var mark = st[n], name = x.kind === 'stay' ? vt('stay') + ' · ' + x.name : ((fr && x.nameFr) || x.name);
         var verb = x.kind === 'stay' ? (fr ? ((d && d.chosen.bookingLinks[0]) || {}).shortFr || 'Réserver' : ((d && d.chosen.bookingLinks[0]) || {}).short || 'Book') : t3StepVerb(x, fr);
-        return '<li class="' + (mark === 'done' ? 'is-done' : n === next ? 'is-next' : '') + '"><button type="button" class="t3-book-tick" data-t3-bk-toggle="' + n + '" aria-pressed="' + (mark === 'done' ? 'true' : 'false') + '" aria-label="' + esc((fr ? 'Fait : ' : 'Done: ') + name) + '">' + (mark === 'done' ? '✓' : mark === 'skipped' ? '–' : '') + '</button>'
-          + '<span class="v4-check-name">' + esc(name) + '</span>' + t3StepLinkHtml(x, '', verb, n) + '</li>';
+        return '<li class="' + (mark === 'done' ? 'is-done' : n === next ? 'is-next' : '') + '"><button type="button" class="t3-book-tick" data-t3-bk-toggle="' + n + '" aria-pressed="' + (mark === 'done' ? 'true' : 'false') + '" aria-label="' + esc(vt('iBooked') + (fr ? ' : ' : ': ') + name) + '">' + (mark === 'done' ? '✓' : mark === 'skipped' ? '–' : '') + '</button>'
+          + '<span class="v4-check-name">' + esc(name)
+          + '<small class="v4-mine">' + (mark === 'done' ? esc(vt('markedByYou')) + ' · <button type="button" class="t3-book-link" data-t3-bk-toggle="' + n + '" data-v4-unbook>' + esc(vt('undoBooked')) + '</button>' : '<button type="button" class="t3-book-link" data-t3-bk-toggle="' + n + '" data-v4-booked>' + esc(vt('iBooked')) + '</button>') + '</small>'
+          + (x.affiliate ? '<small class="v4-aff">' + esc(vt('commission')) + '</small>' : '') + '</span>' + t3StepLinkHtml(x, '', verb, n) + '</li>';
       }).join('') + '</ol>';
       html += next >= 0 ? '<div class="v4-next">' + t3StepLinkHtml(steps[next], 't3-btn t3-book-main', done ? vt('nextOf', { name: steps[next].kind === 'stay' ? vt('stay') : ((fr && steps[next].nameFr) || steps[next].name) }) : vt('next'), next) + '</div>'
         : '<p class="v4-sheet-h4">' + esc(vt('allSet')) + ' <button type="button" class="t3-book-link" data-t3-bk-restart>' + esc(vt('startOver')) + '</button></p>';
       if (d) html += t3StayNotesHtml(d.chosen, d.w.trip || {}, fr);
     }
+    // Honest plan (2026-11-22): said once in the sheet. Nothing here is a confirmed booking.
+    if (steps.length || v4ReserveRows(steps).length) html += '<p class="t3-book-note v4-book-honest" data-v4-book-note>' + esc(vt('bookNote')) + '</p>';
     var reserve = v4ReserveRows(steps);
     if (reserve.length) html += '<p class="v4-sheet-h4">' + esc(vt('reserve')) + '</p><ol class="v4-check">' + reserve.map(function(r){
       var u = placeUrl(r.s.venue), tel = v4Tel(r.s.venue.phone);
@@ -454,6 +486,17 @@ const V4_CLIENT_SRC = String.raw`
     e2.parts = parts; e2.unknown = [];
     var html = t3EstimateHtml(e2, fr, chosen) || (unknown.length ? '<div class="t3-book-est"></div>' : '');
     if (unknown.length) html = html.replace(/<\/div>$/, '') + '<p class="v4-book-unpriced">' + esc(vt('notPriced', { names: unknown.slice(0, 6).join(', ') + (unknown.length > 6 ? ' ' + vt('more', { n: unknown.length - 6 }) : '') })) + '</p></div>';
+    // Honest plan (2026-11-22): never a bare total. What the figure leaves out, by name.
+    if (html) {
+      var out = [], hasStay = (e.parts || []).some(function(x){ return x && x.key === 'stay'; });
+      if (!hasStay && chosen && chosen.name) out.push(vt('stayOf', { name: chosen.name }));
+      if ((state.last && state.last.days || []).some(function(d){ return (d.stops || []).some(function(s){ return s && s.kind === 'event'; }); })) out.push(vt('tickets'));
+      out.push(vt('carEtc')); out.push(vt('taxesEtc'));
+      html = html.replace(/<\/div>$/, '') + '<p class="v4-book-unpriced" data-v4-not-counted>' + esc(vt('notCounted', { names: out.join(', ') })) + '</p></div>';
+      // A partial estimate says who it is for too ("Known costs so far for 6 people").
+      if (!e.showTotal) html = html.replace(/(<strong>)(Known costs so far|Coût connu jusqu’ici)(<\/strong>)/, function(m, a, b, c){ return a + b + (fr ? ' pour ' + e.people + (e.people > 1 ? ' personnes' : ' personne') : ' for ' + e.people + (e.people > 1 ? ' people' : ' person')) + c; });
+      if (e.peopleAssumed) html = html.replace(/( (?:for|pour) \d+ (?:people|person|personnes?))(<\/strong>)/, '$1' + esc(vt('assumed')) + '$2');
+    }
     return html;
   }
   // Agent hooks (2026-11-22; House of Lager was in the Book sheet right after it was removed): a stop the visitor took
@@ -519,7 +562,33 @@ const V4_CLIENT_SRC = String.raw`
   function v4ShareLink(list){
     var u = location.origin + (lang() === 'fr' ? '/fr' : '') + '/my-trip?stops=' + list.map(function(x){ return x.ref; }).join(',');
     if (list.length && list.every(function(x){ return x.day > 0; })) u += '&days=' + list.map(function(x){ return x.day; }).join(',');
-    return u;
+    return u + v4ShareContext(list);
+  }
+  // Honest plan (2026-11-22: the shared link opened the stops by day with no hotel and no times): the link also carries
+  // the trip's context, all optional and read again from the listings by the shared page (trip-honest-plan.js
+  // parseShareContext): chosen dates only (start), each stop's time (t), the stay, the party as given (aa=1 when the
+  // number of adults is assumed), date-dependent suggestions (sug) and what was asked for (asks). No free text.
+  function v4ShareContext(list){
+    var p = state.last || {}, out = '', rows = p.schedule || [], sug = {};
+    try {
+      var d0 = (p.days || [])[0];
+      if (p.datesGiven && d0 && /^\d{4}-\d{2}-\d{2}$/.test(d0.date || '')) out += '&start=' + d0.date;
+      var times = list.map(function(x){
+        var m = /^(venue|event):(\d+)$/.exec(x.ref), id = m ? Number(m[2]) : 0;
+        var r = rows.filter(function(q){ return (!x.day || q.day === x.day || q.day === undefined) && (m && m[1] === 'venue' ? q.venueId === id : q.eventId === id); })[0];
+        return r && Number.isInteger(r.startMinutes) && r.startMinutes >= 0 && r.startMinutes < 1440 ? r.startMinutes : '';
+      });
+      if (times.some(function(t){ return t !== ''; })) out += '&t=' + times.join(',');
+      var sd = typeof t3StayData === 'function' ? t3StayData() : null, t = (sd && sd.w && sd.w.trip) || {};
+      if (sd && sd.chosen && sd.chosen.id > 0) out += '&stay=' + sd.chosen.id + (t.nights > 0 ? '&nights=' + t.nights : '');
+      if (t.adults > 0) out += '&ad=' + t.adults + (t.adultsAssumed ? '&aa=1' : '');
+      if (t.kids > 0) out += '&kids=' + t.kids;
+      (p.dateSuggestions || []).slice(0, 2).forEach(function(x){ if (x && x.id > 0) sug['event:' + x.id] = 1; });
+      if (Object.keys(sug).length) out += '&sug=' + Object.keys(sug).join(',');
+      var asks = (p.evidence || []).map(function(e){ return e && /^count:/.test(e.ask || '') && e.asked > 0 ? e.ask + ':' + e.asked : e && e.ask; }).filter(function(a){ return a && /^[a-z_:0-9]+$/.test(a); }).slice(0, 12);
+      if (asks.length) out += '&asks=' + asks.join(',');
+    } catch (e) {}
+    return out;
   }
   // The group-chat message (round 1, 2026-11-21: "Day 1: A, B, C +2 more" hid the dinner and had no times or dates):
   // the title, then each day with its date and every stop with its time, then the stay. Read from the plan on screen,
@@ -616,6 +685,8 @@ const V4_CLIENT_SRC = String.raw`
       + ((p.notIncluded || []).slice(0, 3).map(function(x){ var t = (fr && x.textFr) || x.text; return t ? '<p class="v4-tip v4-picked v4-notinc">' + esc(t) + '</p>' : ''; }).join(''))
       // Group preferences (2026-11-22): one person's need ("one of us doesn't drink") and what the listings say about it.
       + (p.partyNote && ((fr && p.partyNote.textFr) || p.partyNote.text) ? '<p class="v4-tip v4-picked v4-partynote">' + esc((fr && p.partyNote.textFr) || p.partyNote.text) + '</p>' : '')
+      // Honest plan (2026-11-22): one short line per ask the listings only partly support or cannot show (plan.evidence).
+      + ((p.evidence || []).filter(function(x){ return x && x.line && x.text; }).slice(0, 3).map(function(x){ return '<p class="v4-tip v4-picked v4-evidence" data-ev-status="' + esc(x.status) + '">' + esc((fr && x.textFr) || x.text) + '</p>'; }).join(''))
       + (p.noDrive && p.noDrive.text ? '<p class="v4-tip v4-picked v4-nodrive">' + esc((fr && p.noDrive.textFr) || p.noDrive.text) + '</p>' : '')
       + (picked ? '<p class="v4-tip v4-picked">' + esc(picked) + '</p>' : '')
       + '<p class="v4-tip">' + esc(v4.confirmed ? (v4CanBook() ? vt('tipDone') : vt('tipNoBook')) : vt('tip')) + '</p>'
@@ -631,7 +702,7 @@ const V4_CLIENT_SRC = String.raw`
       var list = (p.outing && p.outing.stops) || (p.itinerary && p.itinerary.stops) || [];
       html += '<section class="v4-day">' + v4ListHtml(list, null, counts) + '</section>';
     }
-    html += '</div><p class="v4-tip" style="margin-top:4px">' + esc(vt('note')) + '</p>';
+    html += '</div>' + v4SuggestionsHtml(p, fr) + '<p class="v4-tip" style="margin-top:4px">' + esc(vt('note')) + '</p>';
     // Everything else the planner says (the length, town and pace controls, dates, notes, what wasn't used): one tap away.
     var det = t3PlanDetails(p), extra = understoodHtml(p) + (det.schedHtml || '') + det.html + t3ShowPlacesHtml(p, fr, esc, hrefAttr);
     if (extra) html += '<details class="v4-options"><summary>' + esc(vt('options')) + '</summary>' + extra + '</details>';
@@ -738,4 +809,6 @@ function v4StaySrc(staySrc) {
   return require('./getting-here').v4ClientSwaps(staySrc);
 }
 
-module.exports = { V4_STYLES, V4_CLIENT_SRC, v4StaySrc };
+// "__ROAM_BRAND__" in the browser text is this site's name (trip-site.js), so the Whistler Roam copy says its own.
+const V4_CLIENT = V4_CLIENT_SRC.replace(/__ROAM_BRAND__/g, String(require('./trip-site').brand || 'This site'));
+module.exports = { V4_STYLES, V4_CLIENT_SRC: V4_CLIENT, v4StaySrc };

@@ -165,7 +165,7 @@ test('6. the estimate counts the kids, the ages note goes when the link has them
   assert.equal(tb.tripEstimate(plan, null, {}).people, 2);
   const v3 = fs.readFileSync(require.resolve('../trip-planner-v3-page.js'), 'utf8');
   assert.ok(v3.includes('if (prefilled && t.kids && !(t.kidAges && t.kidAges.length === t.kids)) bits.push('));
-  assert.ok(/const adultProduct = !!\(vm && \/\\badults\?\\b\/i\.test/.test(SRC) && /if \(!url && \(adultProduct \|\| !viator\.venueBooking\(id\)\)\) continue;/.test(SRC));
+  assert.ok(/const adultProduct = !!\(vm && \/\\badults\?\\b\/i\.test/.test(SRC) && /if \(!url && \(adultProduct \|\| !viator\.venueBooking\(id\)\)\) (?:continue|return null);/.test(SRC));
   assert.ok(/\\b\(\?:waivers\?\|d\[ée\]charge\)\\b/.test(SRC), 'a waiver link is not a booking step');
   assert.equal(typeof require('../viator.js').venueMatch, 'function');
   // Events carry their own photo; the headline has no trailing full stop; each town is named once.

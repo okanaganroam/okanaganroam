@@ -50,6 +50,7 @@ const placesToStay = require('./places-to-stay');
 const tripStays = require('./trip-stays');
 const stayBookingLinks = require('./stay-booking-links');
 const tripBooking = require('./trip-booking');
+const tripHonestPlan = require('./trip-honest-plan');
 // Viator tours (2026-11-20, viator.js): off unless VIATOR_API_KEY and VIATOR_PARTNER_ID are both set.
 const viator = require('./viator');
 const tourPicks = require('./tour-picks');
@@ -9070,7 +9071,27 @@ const tripPlanDecorated = (a, n) => withTripWeeklyNights(withTripSpecials(withTr
 function runTripPlanRequest(value, staysOn) {
   return staysOn
     ? runTripPlanWithStay(value, (a, n) => withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(a, n))))))
-    : withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(value)))));
+    : tripHonestEvidence(withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(value))))), !!(value && value.v4));
+}
+// Honest plan (2026-11-22, trip-honest-plan.js): plan.evidence, one entry per thing the request asked for that the
+// listings can show, built from the stops' own badges and facts; the other lines of the plan are kept in step with it.
+function tripHonestEvidence(plan, on = true) {
+  if (!on || !plan || typeof plan !== 'object') return plan;
+  try {
+    const TR = require('./trip-requirements');
+    const regions = [...new Set(tripHonestPlan.venueStops(plan).map((x) => x.v.region).filter(Boolean))];
+    const towns = ((plan.overview && plan.overview.regions) || []).map((r) => r && r.label).filter(Boolean);
+    tripHonestPlan.applyEvidence(plan, {
+      town: towns.length === 1 ? towns[0] : (regions.length === 1 ? REGION_LABELS[regions[0]] : null),
+      // A place to go (a park, a beach) shows no badges on its plan card; its stored flags say what its listing has.
+      flags: (id) => { try { return getVenue(id); } catch (e) { return null; } },
+      kindsOf: (id) => { try { const v = getVenue(id); if (!v) return []; const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; return TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); } catch (e) { return []; } },
+      kindLabel: (k) => TR.LABELS[k] || String(k).replace(/_/g, ' '),
+      kindLabelFr: (k) => { try { return require('./trip-french-copy').t3FrenchText(TR.LABELS[k] || String(k).replace(/_/g, ' ')); } catch (e) { return null; } },
+      countDining: (f) => { try { return /^[a-z_]+$/.test(f) && regions.length ? db.prepare(`SELECT COUNT(*) AS n FROM venues WHERE ${f} = 1 AND redirect_to IS NULL AND type IN ('restaurant','cafe','pub','brewery','cocktail') AND region IN (${regions.map(() => '?').join(',')})`).get(...regions).n : null; } catch (e) { return null; } },
+    });
+  } catch (e) { console.error(`[trip] evidence: ${e.message}`); }
+  return plan;
 }
 function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
   return withTripStays(tripPlanBeforeStays(args, run, now), args.stay || null, now, args.text, !!args.v4);
@@ -9162,6 +9183,8 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
       // party (affiliate links only when STAY_AFFILIATE_PROVIDER and STAY_AFFILIATE_ID are set), and the plan's stops
       // that already have a booking link, for the card's "Your trip checklist".
       block = stayBookingLinks.withBookingLinks(block, new Map(candidates.map((c) => [c.id, c])));
+      // Honest plan (2026-11-22): a stay's button opens that stay's own stored page (or its affiliate wrapper), or is dropped.
+      try { for (const card of [block.pick, ...(block.alternatives || [])]) if (card && Array.isArray(card.bookingLinks)) card.bookingLinks = card.bookingLinks.filter((l) => l && tripBookingLinkBelongs('stay', card.id, l.url)); } catch (e) { /* keep the links */ }
       block.checklist = tripBookingChecklist(plan);
       // "Book your trip" (2026-11-20, trip-booking.js): the estimated total and the "Book my trip" steps, per stay card.
       block = tripBooking.withTripBooking(block, plan);
@@ -9223,6 +9246,7 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
     }
     delete plan.__wineTour;
   } catch (e) { console.error(`[trip] where to stay: ${e.message}`); }
+  if (v4) tripHonestEvidence(plan);
   return plan;
 }
 // The plan's stops that already have a booking link, in plan order, once each (at most 6): the venue page's own Book
@@ -9234,35 +9258,84 @@ function tripBookingChecklist(plan) {
     : ((plan.itinerary && plan.itinerary.stops) || (plan.outing && plan.outing.stops) || []);
   const out = [], seen = new Set();
   const kidsTrip = !!(plan && ((plan.intent && ((plan.intent.party && plan.intent.party.kids) || plan.intent.occasion === 'family')) || ((plan.understood && plan.understood.party) || []).some((x) => /kid|child|famil/i.test(String(x)))));
-  const key = (u) => String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#]+$/, '');
   for (const s of stops) {
     const id = s && s.venue && s.venue.id;
     if (!Number.isInteger(id) || seen.has(id) || out.length >= TRIP_CHECKLIST_MAX) continue;
     seen.add(id);
-    try {
-      const v = db.prepare('SELECT id, name, type, website, redirect_to FROM venues WHERE id = ?').get(id);
-      if (!v || v.redirect_to || v.type === placesToStay.STAY_TYPE) continue;
-      const own = String((venueLinks(id) || {}).booking_url || '').trim();
-      const visit = venueVisitInfo(id) || {};
-      // The same rule as the venue page: a booking link that is just the website is not a booking page.
-      const url = /^https:\/\/[^\s"'<>]+$/i.test(own) && !(v.website && key(own) === key(v.website)) ? own
-        : /^https:\/\/[^\s"'<>]+$/i.test(String(visit.booking_url || '').trim()) ? String(visit.booking_url).trim() : null;
-      // Viator (2026-11-20, owner decision): a venue with an approved Viator match books through Viator (its own link or
-      // not); viator.checklistItem leaves every other venue as it was.
-      // Round 3 (2026-11-22; "Adult Kart Drop In Race" on a plan with kids 6 and 9): with kids, a Viator product that says
-      // it is for adults is not offered; the place's own booking link stays when it has one.
-      const vm = kidsTrip ? viator.venueMatch(id) : null;
-      const adultProduct = !!(vm && /\badults?\b/i.test(`${vm.title || ''} ${String(vm.url || '').split('?')[0].replace(/[-_/]+/g, ' ')}`) && !/\b(?:kids?|child\w*|famil\w*|junior|youth|all ages)\b/i.test(String(vm.title || '')));
-      if (!url && (adultProduct || !viator.venueBooking(id))) continue;
-      const [en, fr] = !url ? ['', ''] : url === own ? indoorBookButton(v, own) : [visit.booking_label || VISIT_BOOK_LABELS[v.type] || 'Book', visitBookLabelFr(visit, v.type)];
-      // Round 3: a waiver is not a booking ("Sign the waiver" was the climbing gym's Book step).
-      if (url && /\b(?:waivers?|d[ée]charge)\b/i.test(`${en} ${url}`) && !viator.venueBooking(id)) continue;
-      const item = { venueId: id, name: v.name, url, label: en, labelFr: fr };
-      out.push(adultProduct ? item : viator.checklistItem(item));
-    } catch (e) { /* skip this stop */ }
+    try { const item = tripVenueBookingItem(id, kidsTrip); if (item) out.push(item); } catch (e) { /* skip this stop */ }
   }
-  return out;
+  // Honest plan (2026-11-22): every link is checked against the listing it is shown for; one that is not that listing's
+  // own stored link (or its approved provider product) is not offered.
+  return out.filter((c) => tripBookingLinkBelongs('venue', c.venueId, c.url));
 }
+// One stop's booking link from the listing's own stored data: { venueId, name, url, label, labelFr[, affiliate, rel, link] }
+// or null. The link is the listing's booking_url (venue_links, else its visit info), or its approved Viator product.
+function tripVenueBookingItem(id, kidsTrip = false) {
+  const key = (u) => String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#]+$/, '');
+  const v = db.prepare('SELECT id, name, type, website, redirect_to FROM venues WHERE id = ?').get(id);
+  if (!v || v.redirect_to || v.type === placesToStay.STAY_TYPE) return null;
+  const own = String((venueLinks(id) || {}).booking_url || '').trim();
+  const visit = venueVisitInfo(id) || {};
+  // The same rule as the venue page: a booking link that is just the website is not a booking page.
+  const url = /^https:\/\/[^\s"'<>]+$/i.test(own) && !(v.website && key(own) === key(v.website)) ? own
+    : /^https:\/\/[^\s"'<>]+$/i.test(String(visit.booking_url || '').trim()) ? String(visit.booking_url).trim() : null;
+  // Viator (2026-11-20, owner decision): a venue with an approved Viator match books through Viator (its own link or
+  // not); viator.checklistItem leaves every other venue as it was.
+  // Round 3 (2026-11-22; "Adult Kart Drop In Race" on a plan with kids 6 and 9): with kids, a Viator product that says
+  // it is for adults is not offered; the place's own booking link stays when it has one.
+  const vm = kidsTrip ? viator.venueMatch(id) : null;
+  const adultProduct = !!(vm && /\badults?\b/i.test(`${vm.title || ''} ${String(vm.url || '').split('?')[0].replace(/[-_/]+/g, ' ')}`) && !/\b(?:kids?|child\w*|famil\w*|junior|youth|all ages)\b/i.test(String(vm.title || '')));
+  if (!url && (adultProduct || !viator.venueBooking(id))) return null;
+  const [en, fr] = !url ? ['', ''] : url === own ? indoorBookButton(v, own) : [visit.booking_label || VISIT_BOOK_LABELS[v.type] || 'Book', visitBookLabelFr(visit, v.type)];
+  // Round 3: a waiver is not a booking ("Sign the waiver" was the climbing gym's Book step).
+  if (url && /\b(?:waivers?|d[ée]charge)\b/i.test(`${en} ${url}`) && !viator.venueBooking(id)) return null;
+  const item = { venueId: id, name: v.name, url, label: en, labelFr: fr };
+  return adultProduct ? item : viator.checklistItem(item);
+}
+// What the site's own data stores for a listing's booking links (no live fetch): the links a booking button for that
+// listing may open. kind 'venue': its booking_url (venue_links, visit info), its website, its approved Viator product.
+// kind 'stay': the stay's Booking.com / Expedia / own booking pages (stay_info), the owner's booking link, its website.
+// kind 'event': the event's own ticket link. -> { urls, names, hosts } or null when the listing is not found.
+function tripStoredBookingLinks(kind, id) {
+  try {
+    if (kind === 'venue' || kind === 'stay') {
+      const v = db.prepare('SELECT id, name, type, website, redirect_to FROM venues WHERE id = ?').get(id);
+      if (!v) return null;
+      const urls = [];
+      const links = venueLinks(v.id) || {};
+      if (links.booking_url) urls.push(String(links.booking_url));
+      if (v.website) urls.push(String(v.website));
+      if (v.type === placesToStay.STAY_TYPE) {
+        let info = null;
+        try { info = JSON.parse((db.prepare('SELECT info_json FROM stay_info WHERE venue_id = ?').get(v.id) || {}).info_json || 'null'); } catch (e) { info = null; }
+        const b = info && info.booking && typeof info.booking === 'object' ? info.booking : {};
+        for (const k of ['booking_com', 'expedia', 'own']) if (typeof b[k] === 'string' && b[k]) urls.push(b[k]);
+      } else {
+        const visit = venueVisitInfo(v.id) || {};
+        if (visit.booking_url) urls.push(String(visit.booking_url));
+        try { const vb = viator.venueBooking(v.id); if (vb && vb.url) urls.push(String(vb.url)); } catch (e) { /* no Viator match */ }
+        try { const vm = viator.venueMatch(v.id); if (vm && vm.url) urls.push(String(vm.url)); } catch (e) { /* no Viator match */ }
+      }
+      return { urls: urls.filter((u) => /^https?:\/\//i.test(u)), names: [], hosts: [] };
+    }
+    if (kind === 'event') {
+      const e = db.prepare('SELECT * FROM events WHERE id = ?').get(id);
+      if (!e) return null;
+      const urls = [e.ticket_url, e.tickets_url, e.url, e.source_url, e.website].filter((u) => typeof u === 'string' && /^https?:\/\//i.test(u));
+      // Fever's ticket step is built from the event's own Fever match (fever.js); its host is the provider's.
+      return { urls, names: [], hosts: ['feverup.com', 'fever.com'] };
+    }
+  } catch (e) { return null; }
+  return null;
+}
+// true when a booking link shown for a listing opens that listing's own stored link (or its affiliate wrapper of it).
+function tripBookingLinkBelongs(kind, id, url) {
+  const fake = { whereToStay: kind === 'stay' ? { trip: { datesGiven: true }, pick: { id, name: '', bookingLinks: [{ url }] } } : { trip: { datesGiven: true }, checklist: [{ venueId: id, name: '', url }] }, datesGiven: true };
+  return tripHonestPlan.checkBookingLinks(fake, tripStoredBookingLinks).filter((p) => p.code === 'not_this_listing').length === 0;
+}
+// The whole plan's booking links against the stored data: [] when every link belongs to its listing, carries no date
+// the visitor did not choose, and no link is shown for two different listings.
+function tripPlanLinkProblems(plan) { return tripHonestPlan.checkBookingLinks(plan, tripStoredBookingLinks); }
 
 // The weekday of day 1, only when the request names a date ("tonight",
 // "tomorrow", "Saturday", "this weekend"); computed in the site's local civil
@@ -9587,9 +9660,38 @@ function runTripPlan(args, now = new Date()) {
     }
   } catch (e) { /* the weekday stays in the notes */ }
   try { v4DropAfterDark(plan); } catch (e) { /* keep the plan as planned */ }
+  // Honest plan (2026-11-22): a dietary ask ("gluten-free dining") wants every meal stop to have the listing's badge.
+  // A meal stop without it is replaced when a place with the badge fits (the plan again without those places, kept only
+  // when it has fewer such stops and no fewer stops); when none fits the stop stays and plan.evidence names it.
+  try { plan = v4DietRetry(plan, a, now); } catch (e) { /* keep the plan as planned */ }
+  // With no dates chosen, an event is never a timed stop of a day: it becomes a dated suggestion.
+  try { tripHonestPlan.takeUndatedEvents(plan); } catch (e) { /* keep the plan as planned */ }
   try { v4AddStopPhones(plan); } catch (e) { /* phones are a convenience */ }
   try { v4TourStopLinks(plan); } catch (e) { /* the stop still shows */ }
   return plan;
+}
+function v4DietMisses(plan) {
+  if (!plan || !['multi_day', 'day_plan'].includes(plan.kind)) return null;
+  const asked = (plan.requirementResults || []).filter((r) => r && r.kind === 'feature' && r.strength !== 'prefer' && tripHonestPlan.DIET.includes(r.value)).map((r) => r.value);
+  if (!asked.length) return null;
+  return tripHonestPlan.venueStops(plan).filter((x) => tripHonestPlan.isMealStop(x.s) && asked.some((f) => tripHonestPlan.badgeOf(x.v, f) !== true));
+}
+function v4DietRetry(plan, a, now) {
+  let misses = v4DietMisses(plan);
+  if (!misses || !misses.length || a.swap || a.pinned || a.tourStops || a.moves || typeof a.text !== 'string') return plan;
+  let best = plan;
+  const avoid = new Set((a.excludeVenueIds || []).map(Number));
+  for (let round = 0; round < 2 && misses.length; round++) {
+    for (const x of misses) avoid.add(x.v.id);
+    let retry = null;
+    try { retry = a.v4DayAsked ? v4DayPlanFirst({ ...a, excludeVenueIds: [...avoid] }, now) : runTripPlanBase({ ...a, excludeVenueIds: [...avoid] }, now); } catch (e) { retry = null; }
+    if (!retry || retry.kind !== best.kind) break;
+    try { v4TidyDays(retry); v4NotIncluded(retry); v4UpFront(retry); v4DropAfterDark(retry); } catch (e) { break; }
+    const m2 = v4DietMisses(retry) || [];
+    if (m2.length < misses.length && v4StopCount(retry) >= v4StopCount(best)) { if (best.notIncluded && !retry.notIncluded) retry.notIncluded = best.notIncluded; retry.query = best.query; (retry.days || []).forEach((d, i) => { const o = (best.days || [])[i]; if (o && o.date && !d.date) d.date = o.date; }); if (best.plannedFrom && !retry.plannedFrom) retry.plannedFrom = best.plannedFrom; best = retry; misses = m2; } else break;
+  }
+  best.dietRetried = true;
+  return best;
 }
 const V4_DAY_ASKED_RE = /\b(?:one|a|1|full|whole|single)[ -]day\b(?! (?:trip|tour|pass|ticket|hike|spa)s?\b)|\bday in\b|\b(?:une|1) journ[ée]e\b/i;
 const V4_PART_OF_DAY_RE = /\b(?:tonight|evenings?|nights?|afternoons?|mornings?|ce soir|soir[ée]e|apr[èe]s-midi|matin[ée]?e?)\b/i;
@@ -9700,10 +9802,13 @@ function v4NotIncluded(plan) {
   // Round 5 (2026-11-22: "I couldn't fit vegetarian" with every restaurant Vegetarian-Friendly): a food feature asked for
   // is met when every meal stop on the plan has it.
   try {
-    const meals = (plan.days || []).flatMap((d) => d.stops || []).filter((x) => x && x.venue && ['restaurant', 'cafe', 'pub'].includes(x.venue.type));
+    // Honest plan (2026-11-22: "couldn't fit gluten free" with every restaurant Gluten-Free-Friendly): the rule read
+    // venue.features, which a plan stop never carries (its badges are venue.badges), and counted a pub after dinner as a
+    // meal. A meal stop is where the group eats (tripHonestPlan.isMealStop); its badge is the listing's own.
+    const meals = tripHonestPlan.venueStops(plan).filter((x) => tripHonestPlan.isMealStop(x.s));
     for (const r of plan.requirementResults) {
       if (!r || r.status !== 'unmet' || r.kind !== 'feature' || !['vegetarian', 'vegan', 'gluten_free'].includes(r.value) || !meals.length) continue;
-      if (meals.every((x) => (x.venue.features || []).some((f) => f && (f.key === r.value || f === r.value)))) { r.status = 'satisfied'; r.reason = 'Every meal stop has it.'; }
+      if (meals.every((x) => tripHonestPlan.badgeOf(x.v, r.value) === true)) { r.status = 'satisfied'; r.reason = 'Every meal stop has the listing’s badge.'; }
     }
   } catch (e) { /* the planner's own results stand */ }
   for (const r of plan.requirementResults) {
@@ -11994,7 +12099,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     const alternatives = requirementModule.nearbyEventAlternatives({plan, events, from, to, today, regions: trip.route ? tripPlannerModule().routeRegions(trip.route.from, trip.route.to) : (intent.regions?.length ? intent.regions : trip.regions || []), suitsKind: tripPlannerModule().eventSuitsKind});
     if (alternatives.length) plan.eventAlternatives = alternatives;
   };
-  let itineraryEvents = null;
+  let itineraryEvents = null, undatedEventOffer = null;
   if (requirements && (!trip.multi || requirements.items.some(i => i.kind === 'days' && i.value > 1)) && requirements.items.some(i => i.kind === 'event') && requirements.items.some(i => i.kind === 'days')) {
     const venueText = interpretationText.replace(/\b(?:concerts?|live music|hockey|events?|festivals?|markets?)\b/gi, '');
     Object.assign(intent, discoveryIntentModule().interpretDiscoveryQuery(venueText, taxonomy));
@@ -12015,6 +12120,16 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     // about 30 minutes away. (Only the named towns were read: a Squamish-to-Pemberton road trip never saw the live music
     // in Whistler on the way, and a weekend event was only ever on its first day.)
     itineraryEvents = withoutEndedOccurrenceItems(tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), [], categories), intent.excluded), window.from, window.to), now);
+    // Honest plan (2026-11-22; a no-date "3-day Kelowna weekend" had a Tuesday, Nov 24 concert as a stop of "day 3": with no
+    // dates the plan was dated from today): with no dates chosen (V4) no event is placed on a day. The next matching
+    // events (the coming 30 days) are kept as dated suggestions instead (plan.dateSuggestions).
+    if (v4 && !requirements.startDate && !intent.when && !selectedNamedEvent) {
+      try {
+        const today = todayLocal(now), wide = resolveWhatsOnWindow({ from: addLocalDays(today, 1), to: addLocalDays(today, 30) }, now);
+        undatedEventOffer = withoutEndedOccurrenceItems(tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(wide), [], categories), intent.excluded), wide.from, wide.to), now);
+      } catch (e) { undatedEventOffer = itineraryEvents; }
+      itineraryEvents = [];
+    }
   }
   // Family trips (2026-10-18): the family events on What's On in the trip's dates (a heritage ranch's fall weekends, a
   // corn maze, a kids' haunted house), offered as one stop a day. An undated "family weekend" is the coming weekend.
@@ -12147,6 +12262,8 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   plan.understood = understood(plan);
     addEventRecovery(plan);
     tripWindowClockNote(plan, requirements);
+    // Honest plan (2026-11-22): did the visitor choose dates (the Dates control, a date or a day in the request)?
+    if (v4) plan.datesGiven = !!((requirements && requirements.startDate) || trip.when || intent.when);
     if (openingNote && Array.isArray(plan.notes)) plan.notes.unshift(openingNote);
     if (askedWineries && Array.isArray(plan.notes)) plan.notes.unshift(`There are no wineries in ${TRIP_SITE.area}, so these are wine bars and lounges instead.`);
     return plan;
@@ -12219,6 +12336,25 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   plan.understood = understood(plan);
   addEventRecovery(plan);
   tripWindowClockNote(plan, requirements);
+  // Honest plan (2026-11-22): did the visitor choose dates (the Dates control, a date or a day in the request)? With
+  // none, the events found for "the next few days from today" are offered as dated suggestions, never as stops.
+  if (v4) {
+    plan.datesGiven = !!((requirements && requirements.startDate) || intent.when);
+    // Nobody in the party drinks ("we don't drink"): said on the plan, so its evidence can show no drink stop is planned.
+    if (intent.excluded && Array.isArray(intent.excluded.concepts) && intent.excluded.concepts.includes('alcohol') && !(intent.partySome || []).some((x) => x && x.concept === 'alcohol')) plan.noAlcohol = true;
+    if (undatedEventOffer && undatedEventOffer.length && ['multi_day', 'day_plan'].includes(plan.kind)) {
+      try {
+        const regions = intent.regions && intent.regions.length ? intent.regions : [...new Set((plan.days || []).map((d) => d.region).filter(Boolean))];
+        const wanted = requirements.items.filter((i) => i.kind === 'event');
+        const seen = new Set();
+        const picks = undatedEventOffer.filter((e) => (!regions.length || regions.includes(e.region)) && wanted.some((i) => requirementModule.eventMatches(e, i) && tripPlannerModule().eventSuitsKind(e, i.eventKind)))
+          // "a weekend": Friday to Sunday events first; then the soonest.
+          .sort((a, b) => (/\bweek-?ends?\b|fin de semaine/i.test(String(text || '')) ? ([5, 6, 0].includes(localWeekday(a.startDate)) ? 0 : 1) - ([5, 6, 0].includes(localWeekday(b.startDate)) ? 0 : 1) : 0) || String(a.startDate || '').localeCompare(String(b.startDate || '')) || String(a.time || '').localeCompare(String(b.time || '')))
+          .filter((e) => (seen.has(e.id) ? false : seen.add(e.id))).slice(0, 2);
+        if (picks.length) plan.dateSuggestions = picks.map((e) => tripHonestPlan.suggestionOf({ ...(tripPlannerModule().eventOnDay ? tripPlannerModule().eventOnDay(e, e.startDate) : e), ...(undatedEventOffer.filter((o) => o.id === e.id).length > 1 ? { otherDates: true } : {}) }));
+      } catch (e) { /* no suggestion */ }
+    }
+  }
   return plan;
 }
 // Round 13 (2026-10-21): a morning, afternoon or evening asked for after it started says what the plan did -- moved to
@@ -54034,7 +54170,105 @@ function tripShareParams(query) {
 function tripShareSearch(query) {
   const { refs, days } = tripShareParams(query);
   if (!refs.length) return '';
-  return `?stops=${refs.join(',')}` + (refs.some((_, i) => days[i] > 0) ? `&days=${refs.map((_, i) => days[i] || 0).join(',')}` : '');
+  const more = tripHonestPlan.shareContextQuery(tripHonestPlan.parseShareContext(query));
+  return `?stops=${refs.join(',')}` + (refs.some((_, i) => days[i] > 0) ? `&days=${refs.map((_, i) => days[i] || 0).join(',')}` : '') + (more ? `&${more}` : '');
+}
+// Honest plan (2026-11-22): what a shared link says about the trip besides its stops (trip-honest-plan.js
+// parseShareContext): who, the dates when they were chosen, each stop's time, the place to stay with its own booking
+// links, what the listings show for the things asked for, and date-dependent suggestions. Everything is read again from
+// the listings; nothing is stored and nothing in the link is shown as text. null for an older link (stops and days only).
+function tripShareContext(query, lang = 'en', now = new Date()) {
+  const c = tripHonestPlan.parseShareContext(query);
+  const { refs, days } = tripShareParams(query);
+  if (!c || !refs.length) return null;
+  const fr = lang === 'fr';
+  const out = { ...c, datesSet: !!c.start, lines: [], suggestions: [], stay: null };
+  const dayCount = Math.max(0, ...days.filter((d) => d > 0));
+  const nights = c.nights || (dayCount > 1 ? dayCount - 1 : null);
+  // The place to stay: its own page and its own booking links (dates only when the link carries chosen dates).
+  let stayFacts = null;
+  if (c.stayId) {
+    try {
+      const cand = tripStayCandidates().find((x) => x.id === c.stayId);
+      if (cand) {
+        const trip = { arrive: c.start || null, leave: c.start && nights ? addLocalDays(c.start, nights) : null, nights, adults: c.adults || null, kids: c.kids || null, dog: false, datesGiven: !!(c.start && nights) };
+        const links = stayBookingLinks.stayBookingLinks(cand, trip.datesGiven ? trip : { ...trip, arrive: null, leave: null }, { regionLabel: cand.regionLabel }).filter((l) => l && tripBookingLinkBelongs('stay', cand.id, l.url));
+        const has = tripStays.STAY_AMENITIES.filter((a) => tripStays.stayHas(cand, a));
+        const m = Number(String(c.start || todayLocal(now)).slice(5, 7));
+        stayFacts = { id: cand.id, name: cand.name, regionLabel: cand.regionLabel, has, winterCheck: has.includes('pool') && (m >= 10 || m <= 5) };
+        out.stay = { id: cand.id, name: cand.name, kind: fr ? (cand.kindFr || cand.kind) : cand.kind, regionLabel: cand.regionLabel, photo: cand.photo, url: fr ? (cand.urlFr || cand.url) : cand.url,
+          links: links.map((l) => ({ label: fr ? l.labelFr : l.label, url: l.url, affiliate: !!l.affiliate, rel: l.rel || 'nofollow noopener', key: l.key })) };
+      }
+    } catch (e) { out.stay = null; }
+  }
+  // Date-dependent suggestions: each with its own next date, never a stop.
+  for (const ref of c.suggestions || []) {
+    try {
+      const e = db.prepare('SELECT * FROM events WHERE id = ?').get(Number(ref.split(':')[1]));
+      if (!e || !REGION_LABELS[e.region] || !e.slug) continue;
+      const occs = tripEventOccurrences(e.id, now), occ = occs[0];
+      if (!occ) continue;
+      const dl = new Date(`${occ.d}T12:00:00Z`).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+      const clock = Number.isFinite(occ.s) ? (fr ? `${Math.floor(occ.s / 60)} h${occ.s % 60 ? ` ${String(occ.s % 60).padStart(2, '0')}` : ''}` : `${(Math.floor(occ.s / 60) % 12) || 12}${occ.s % 60 ? `:${String(occ.s % 60).padStart(2, '0')}` : ''} ${occ.s >= 720 ? 'PM' : 'AM'}`) : '';
+      out.suggestions.push({ ref, name: e.name, url: fr ? frHref(`/${e.region}/events/${e.slug}`) : `/${e.region}/events/${e.slug}`, label: fr ? `Suggestion · ${dl}${occs.length > 1 ? ' et d’autres dates' : ' seulement'}` : `Suggestion · ${dl}${occs.length > 1 ? ' and other dates' : ' only'}`, meta: [clock, REGION_LABELS[e.region]].filter(Boolean).join(' · ') });
+    } catch (e) { /* skip */ }
+  }
+  // The evidence, worked out again from the listings as they are now.
+  if (c.asks && c.asks.length) {
+    try {
+      const TR = require('./trip-requirements');
+      const stops = [], events = [];
+      refs.forEach((ref, i) => {
+        const m = /^(venue|event):([1-9][0-9]*)$/.exec(ref);
+        if (m[1] === 'venue') {
+          let v = getVenue(Number(m[2])); if (v && v.redirect_to) v = getVenue(v.redirect_to);
+          if (!v) return;
+          let kinds = []; try { const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; kinds = TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); } catch (e) { kinds = []; }
+          stops.push({ id: v.id, name: v.name, type: v.type, region: v.region, day: days[i] || 0, start: (c.times || [])[i] == null ? null : c.times[i], kinds });
+        } else if (c.start && days[i]) {
+          const e = db.prepare('SELECT id, name FROM events WHERE id = ?').get(Number(m[2]));
+          const date = addLocalDays(c.start, days[i] - 1);
+          if (e && tripEventOccurrences(e.id, now).some((o) => o.d === date || (o.u && o.d <= date && o.u >= date))) events.push({ id: e.id, name: e.name, day: days[i], startDate: date, dateLabel: new Date(`${date}T12:00:00Z`).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }), dateLabelFr: new Date(`${date}T12:00:00Z`).toLocaleDateString('fr-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) });
+        }
+      });
+      const plan = tripHonestPlan.sharedPlan(c, stops, events, stayFacts);
+      const regions = [...new Set(stops.map((x) => x.region).filter(Boolean))];
+      tripHonestPlan.applyEvidence(plan, {
+        town: regions.length === 1 ? REGION_LABELS[regions[0]] : null, flags: (id) => getVenue(id),
+        kindsOf: (id) => (stops.find((x) => x.id === id) || {}).kinds || [],
+        kindLabel: (k) => TR.LABELS[k] || String(k).replace(/_/g, ' '),
+        kindLabelFr: (k) => { try { return require('./trip-french-copy').t3FrenchText(TR.LABELS[k] || String(k).replace(/_/g, ' ')); } catch (e) { return null; } },
+      });
+      out.evidence = plan.evidence || [];
+      // The lines the page prints: anything not fully shown by the listings, and who drinks; at most four.
+      out.lines = out.evidence.filter((e) => e.status !== 'verified' || ['nonalcoholic', 'no_alcohol'].includes(e.ask) || /^stay:/.test(e.ask) || tripHonestPlan.DIET.includes(e.ask)).slice(0, 5).map((e) => ({ ask: e.ask, status: e.status,
+        // (A copy can't add events: the line says the plan has no dates, not "I'll add what's on".)
+        text: (fr ? e.textFr : e.text).replace(': pick your dates and I’ll add what’s on.', ', and this plan has no dates yet.').replace(' Choisissez vos dates et j’ajouterai ce qui est à l’affiche.', ' Ce plan n’a pas encore de dates.') }));
+    } catch (e) { out.lines = []; }
+  }
+  return out;
+}
+// The context block of a shared trip, server-rendered (plain text and the site's own links only).
+function tripShareContextHtml(ctx, lang = 'en') {
+  if (!ctx) return '';
+  const fr = lang === 'fr';
+  const L = (en, f) => (fr ? f : en);
+  const who = [];
+  if (ctx.adults) who.push(fr ? `${ctx.adults} adulte${ctx.adults > 1 ? 's' : ''}${ctx.adultsAssumed ? ' (supposé)' : ''}` : `${ctx.adults} adult${ctx.adults > 1 ? 's' : ''}${ctx.adultsAssumed ? ' (assumed)' : ''}`);
+  if (ctx.kids) who.push(fr ? `${ctx.kids} enfant${ctx.kids > 1 ? 's' : ''}` : `${ctx.kids} kid${ctx.kids > 1 ? 's' : ''}`);
+  const when = ctx.start ? new Date(`${ctx.start}T12:00:00Z`).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) : L('Dates not set', 'Dates à choisir');
+  const facts = [who.join(', ') || L('Group size not given', 'Taille du groupe non précisée'), ctx.start ? L(`From ${when}`, `À partir du ${when}`) : when].join(' · ');
+  let html = `<div class="mt-ctx" id="mtContext"><p class="mt-ctx-copy"><strong>${L('A copy of this plan.', 'Une copie de ce plan.')}</strong> ${L('It can’t be edited here and it doesn’t update if the original changes. Nothing in it is booked.', 'Elle ne se modifie pas ici et ne suit pas les changements de l’original. Rien n’y est réservé.')}</p><p class="mt-ctx-facts" data-mt-facts>${escapeHtml(facts)}</p>`;
+  if (ctx.stay) {
+    const st = ctx.stay;
+    html += `<div class="mt-ctx-stay" data-mt-stay="${st.id}">${st.photo ? `<img src="${escapeHtml(st.photo)}" alt="" loading="lazy" width="96" height="96">` : ''}<div><p class="mt-ctx-k">${escapeHtml([L('Where to stay', 'Où dormir'), st.kind, st.regionLabel].filter(Boolean).join(' · '))}</p><p class="mt-ctx-name">${st.url ? `<a href="${escapeHtml(st.url)}">${escapeHtml(st.name)}</a>` : escapeHtml(st.name)}</p>`
+      + (st.links.length ? `<p class="mt-ctx-links">${st.links.map((l) => `<a class="mt-btn" href="${escapeHtml(l.url)}" target="_blank" rel="${escapeHtml(l.rel)}" data-track="stay_click" data-stay-id="${st.id}" data-link="${escapeHtml(l.key || '')}"${l.affiliate ? ' data-affiliate="1"' : ''}>${escapeHtml(l.label)} <span aria-hidden="true">↗</span></a>${l.affiliate ? `<small>${L('We may earn a commission', 'Nous pouvons toucher une commission')}</small>` : ''}`).join('')}</p>` : '')
+      + (!ctx.start ? `<p class="mt-ctx-note">${L('No dates in these links: pick them on the booking site.', 'Aucune date dans ces liens : choisissez-les sur le site de réservation.')}</p>` : '') + '</div></div>';
+  }
+  if (ctx.lines && ctx.lines.length) html += `<ul class="mt-ctx-lines">${ctx.lines.map((l) => `<li data-ev-status="${escapeHtml(l.status)}">${escapeHtml(l.text)}</li>`).join('')}</ul>`;
+  if (ctx.suggestions && ctx.suggestions.length) html += `<div class="mt-ctx-sugg"><p class="mt-ctx-k">${L('Depends on your dates (not part of the plan)', 'Selon vos dates (hors du plan)')}</p><ul>${ctx.suggestions.map((x) => `<li><span class="mt-ctx-tag">${escapeHtml(x.label)}</span> <a href="${escapeHtml(x.url)}">${escapeHtml(x.name)}</a>${x.meta ? ` <small>${escapeHtml(x.meta)}</small>` : ''}</li>`).join('')}</ul></div>`;
+  html += `<p class="mt-ctx-note">${L(`You book and pay on each business’s or provider’s own site. ${TRIP_SITE.brand} can’t see or confirm bookings.`, `Vous réservez et payez sur le site de chaque entreprise ou fournisseur. ${TRIP_SITE.brand} ne peut ni voir ni confirmer les réservations.`)}</p></div>`;
+  return html;
 }
 function tripShareTowns(towns, fr) {
   if (towns.length <= 1) return towns[0] || '';
@@ -54213,6 +54447,7 @@ function myTripPinSpread(xy, gap) {
 function renderMyTripPage(opts = {}) {
   const lang = opts.lang === 'fr' ? 'fr' : 'en';
   const share = opts.share || null;
+  const shareContext = opts.context || null;
   const L = (en, fr) => (lang === 'fr' ? fr : en);
   // The words the page script uses; {name}, {n} and {d} are filled in there.
   const T = {
@@ -54262,6 +54497,21 @@ ${renderAnalyticsHeadHtml('my_trip')}
   body.my-trip-page .mt-btn { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.2); background: #fff; color: var(--ink); font: inherit; font-weight: 800; font-size: 0.92rem; cursor: pointer; text-decoration: none; }
   body.my-trip-page .mt-btn.primary { background: var(--teal-deep, #1F5450); border-color: transparent; color: #fff; }
   body.my-trip-page .mt-shared { margin: 0 0 18px; padding: 14px 18px; border-radius: 14px; background: #FFF4DA; }
+  /* Honest plan (2026-11-22): what the shared link says about the trip (who, dates, the stay, the evidence lines). */
+  body.my-trip-page .mt-ctx { margin: 10px 0 0; display: grid; gap: 8px; font-size: 0.92rem; }
+  body.my-trip-page .mt-ctx p { margin: 0; }
+  body.my-trip-page .mt-ctx-facts { font-weight: 800; }
+  body.my-trip-page .mt-ctx-stay { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px; border-radius: 14px; background: var(--paper, #fffaf2); }
+  body.my-trip-page .mt-ctx-stay img { width: 96px; height: 96px; object-fit: cover; border-radius: 10px; display: block; }
+  body.my-trip-page .mt-ctx-k { font-size: 0.74rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.75; }
+  body.my-trip-page .mt-ctx-name a, body.my-trip-page .mt-ctx-name { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.05rem; color: var(--ink); }
+  body.my-trip-page .mt-ctx-links { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-top: 6px !important; }
+  body.my-trip-page .mt-ctx-links small, body.my-trip-page .mt-ctx-note { font-size: 0.8rem; opacity: 0.8; }
+  body.my-trip-page .mt-ctx-lines, body.my-trip-page .mt-ctx-sugg ul { margin: 0; padding: 0 0 0 18px; display: grid; gap: 4px; }
+  body.my-trip-page .mt-ctx-sugg ul { list-style: none; padding: 0; }
+  body.my-trip-page .mt-ctx-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #F3E3B5; font-size: 0.74rem; font-weight: 800; color: #5A4300; }
+  body.my-trip-page .mt-book { display: inline-flex; align-items: center; min-height: 36px; margin-top: 4px; font-weight: 800; font-size: 0.86rem; color: var(--ink); }
+  body.my-trip-page .mt-book + small { display: block; font-size: 0.74rem; opacity: 0.75; }
   body.my-trip-page .mt-status { min-height: 1.2em; margin: 0 0 10px; font-weight: 700; color: var(--teal-deep, #1F5450); }
   body.my-trip-page #mtMap { height: 320px; border-radius: 16px; margin: 0 0 22px; background: #dfe9e6; z-index: 0; }
   /* Map tap targets (2026-10-19, round 9): each numbered pin takes taps over a 44px circle, as on /map, and the zoom
@@ -54322,6 +54572,7 @@ ${renderGolfHeaderHtml()}
     </div>
     <div class="mt-shared" id="mtShared" hidden>
       <strong>${L('Someone shared this trip with you.', 'Quelqu’un a partagé ce voyage avec vous.')}</strong> <span id="mtSharedText"></span>
+      ${tripShareContextHtml(shareContext, lang)}
       <div class="mt-actions" style="margin-top:10px"><button type="button" class="mt-btn primary" id="mtSave">${L('Save to My Trip', 'Enregistrer dans Mon voyage')}</button><a class="mt-btn" id="mtOwn" href="/trip">${L('Plan your own trip in one sentence', 'Planifiez votre propre voyage en une phrase')}</a></div>
     </div>
     <p class="mt-status" id="mtStatus" role="status" aria-live="polite"></p>
@@ -54362,6 +54613,9 @@ ${renderGolfHeaderHtml()}
   var sharedDays = (params.get('days') || '').split(',').map(function(n){ return parseInt(n, 10) || 0; });
   // A shared plan carries its first day's date (start=YYYY-MM-DD), so the days keep their dates.
   var sharedStart = /^\\d{4}-\\d{2}-\\d{2}$/.test(params.get('start') || '') ? params.get('start') : null;
+  // Honest plan (2026-11-22): a link made from a plan carries each stop's start time (t=615,690,...), in the stops' order.
+  var sharedTimes = (params.get('t') || '').split(',').map(function(n){ return /^\\d{1,4}$/.test(n) && Number(n) < 1440 ? Number(n) : null; });
+  var sharedKids = /^[1-9]\\d?$/.test(params.get('kids') || '');
   var isFr = document.documentElement.lang === 'fr';
   function addDays(iso, n){ var t = new Date(iso + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
   function dateText(iso){
@@ -54392,7 +54646,7 @@ ${renderGolfHeaderHtml()}
   var el = function(id){ return document.getElementById(id); };
   function status(t){ var s = el('mtStatus'); s.textContent = ''; setTimeout(function(){ s.textContent = t; }, 30); }
   function list(){
-    if (viewing === 'shared') return shared.map(function(r, i){ var x = info[r] || {}; var dd = sharedStart && sharedDays[i] ? addDays(sharedStart, sharedDays[i] - 1) : ''; return { ref: r, name: x.name || r, query: x.query, region: x.region, day: sharedDays[i] || 0, time: (x.occ && x.occ.length ? eventPick(x.occ, dd ? [dd] : []).o : null) || (dd ? { d: dd } : null) }; });
+    if (viewing === 'shared') return shared.map(function(r, i){ var x = info[r] || {}; var dd = sharedStart && sharedDays[i] ? addDays(sharedStart, sharedDays[i] - 1) : ''; return { ref: r, name: x.name || r, query: x.query, region: x.region, day: sharedDays[i] || 0, time: (x.occ && x.occ.length ? eventPick(x.occ, dd ? [dd] : []).o : null) || (sharedTimes[i] != null ? (dd ? { d: dd, s: sharedTimes[i] } : { s: sharedTimes[i] }) : (dd ? { d: dd } : null)) }; });
     return trip.map(function(t){ var k = keyOf(t); return { ref: t.ref, name: t.name, query: t.query, region: t.region, day: (k && days[k]) || 0, time: k && times[k] || null, raw: t }; });
   }
   // Round 9 (2026-10-19): each stop's planned date (or the middle of its planned month) goes with it, so a season
@@ -54404,7 +54658,7 @@ ${renderGolfHeaderHtml()}
     var when = {};
     list().forEach(function(s){ var d = plannedDate(s.time); if (d && !when[s.ref]) when[s.ref] = d; });
     var on = need.map(function(r){ return when[r] || ''; });
-    return fetch('/api/trip-stops?refs=' + encodeURIComponent(need.join(',')) + (on.some(Boolean) ? '&on=' + encodeURIComponent(on.join(',')) : '')).then(function(r){ return r.json(); }).then(function(d){ (d.stops || []).forEach(function(x){ info[x.ref] = x; }); }).catch(function(){});
+    return fetch('/api/trip-stops?refs=' + encodeURIComponent(need.join(',')) + (on.some(Boolean) ? '&on=' + encodeURIComponent(on.join(',')) : '') + (viewing === 'shared' ? '&book=1' + (sharedKids ? '&kids=1' : '') : '')).then(function(r){ return r.json(); }).then(function(d){ (d.stops || []).forEach(function(x){ info[x.ref] = x; }); }).catch(function(){});
   }
   // Events on My Trip (2026-10-19, round 10): an event added from What's On or its own page is saved with its date and
   // start and end time (the API's occ list, its upcoming dates): the date of a planned day when it is on then (and it
@@ -54496,7 +54750,9 @@ ${renderGolfHeaderHtml()}
           var nt = d.notice && (fr && d.notice.textFr || d.notice.text);
           var notice = nt ? '<p class="mt-notice mt-notice-' + esc(d.notice.kind) + '"><span aria-hidden="true">' + (d.notice.kind === 'advisory' ? '⚠️' : d.notice.kind === 'open_until' ? '⏳' : d.notice.kind === 'reopening' ? '🌱' : d.notice.kind === 'seasonal' ? '🗓️' : '📅') + '</span> ' + (d.notice.kind === 'advisory' ? '<strong>' + esc(T.checkFirst) + '</strong> ' : '') + esc(nt) + '</p>' : '';
           var noPin = d.kind === 'event' && !d.missing && d.lat == null ? '<p class="mt-meta mt-nopin">' + esc(T.noPin) + '</p>' : '';
-          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p>' + notice + noPin + '</div>' + tools + '</li>';
+          // A shared plan's stop keeps its own booking link (the listing's stored link; the business's or provider's site).
+          var bk = !mine && d.book && /^https:\\/\\//.test(d.book.url || '') ? '<a class="mt-book" ' + hrefAttr(d.book.url) + ' target="_blank" rel="' + esc(d.book.rel || 'nofollow noopener') + '" data-track="booking" data-venue-id="' + esc(String(x.s.ref).split(':')[1]) + '"' + (d.book.affiliate ? ' data-affiliate="1"' : '') + '>' + esc((fr && d.book.labelFr) || d.book.label || (fr ? 'Réserver' : 'Book')) + ' <span aria-hidden="true">↗</span></a>' + (d.book.affiliate ? '<small>' + (fr ? 'Nous pouvons toucher une commission' : 'We may earn a commission') + '</small>' : '') : '';
+          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p>' + notice + noPin + bk + '</div>' + tools + '</li>';
         }).join('') + '</ol></section>';
     }).join('');
     drawMap(shown);
@@ -81051,7 +81307,7 @@ const server = http.createServer(async (req, res) => {
     if ((pathname === '/my-trip' || pathname === '/my-trip/') && method === 'GET') {
       const tripLang = res.twinLang === 'fr' ? 'fr' : 'en';
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      return res.end(renderMyTripPage({ lang: tripLang, share: tripShareSummary(query, tripLang) }));
+      return res.end(renderMyTripPage({ lang: tripLang, share: tripShareSummary(query, tripLang), context: tripShareContext(query, tripLang) }));
     }
     // GET /api/trip-stops?refs=venue:1,event:2 (2026-10-14): name, type, town,
     // page link, photo, map position and directions query for My Trip.
@@ -81061,7 +81317,15 @@ const server = http.createServer(async (req, res) => {
       const on = String(query.on || '').split(',').slice(0, MY_TRIP_MAX_REFS);
       const onDates = {};
       refs.forEach((r, i) => { const dt = (on[i] || '').trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(dt) && parseLocalDate(dt) && !onDates[r]) onDates[r] = dt; });
-      return sendJSON(res, 200, { stops: tripStopsFor(refs, new Date(), onDates) });
+      const stopsOut = tripStopsFor(refs, new Date(), onDates);
+      // Honest plan (2026-11-22): a shared plan's stops with each listing's own booking link (book=1), checked as its own.
+      if (query.book === '1') {
+        for (const st of stopsOut) {
+          if (!st || st.missing || st.kind !== 'venue') continue;
+          try { const id = Number(String(st.ref).split(':')[1]); const item = tripVenueBookingItem(id, query.kids === '1'); if (item && item.url && tripBookingLinkBelongs('venue', id, item.url)) st.book = { url: item.url, label: item.label || 'Book', labelFr: item.labelFr || 'Réserver', affiliate: !!item.affiliate, rel: item.affiliate ? (item.rel || 'sponsored nofollow noopener') : 'nofollow noopener' }; } catch (e) { /* no link */ }
+        }
+      }
+      return sendJSON(res, 200, { stops: stopsOut });
     }
     if (pathname === '/site.webmanifest' && method === 'GET') {
       res.writeHead(200, { 'Content-Type': 'application/manifest+json; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
@@ -83424,6 +83688,8 @@ module.exports = {
   withTripFrenchUrls,
   tripShareSummary,
   tripShareSearch,
+  tripShareContext, tripShareContextHtml,
+  tripPlanLinkProblems, tripStoredBookingLinks, tripVenueBookingItem, tripBookingLinkBelongs, tripHonestEvidence,
   tripCardPhotoKey,
   TRIP_CARD_RATE,
   tripCardRateAllow,
