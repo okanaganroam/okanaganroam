@@ -8880,6 +8880,9 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
     // V4 (2026-11-21): with no dates given the stay starts today before noon (site time), else tomorrow, never a past day;
     // and the stay type fits the request (tripStays V4 rules). The current page passes nothing new.
     const v4Stay = v4 ? { v4: true, text, minArrive: okanaganClock(now).minutes < 720 ? todayLocal(now) : addLocalDays(todayLocal(now), 1) } : {};
+    // Round 5 (2026-11-22: an undated "fin de semaine" ski trip was booked Mon Nov 23, before the hill opens): with no
+    // dates, a stay is never before a plan stop reopens for the season (venue_seasons reopens_date).
+    if (v4) { try { const ids = [...new Set((plan.days || []).flatMap((d) => (d.stops || []).map((s) => s && s.venue && s.venue.id)).filter(Boolean))]; let nb = null; for (const id of ids) { const r = db.prepare("SELECT status, reopens_date FROM venue_seasons WHERE venue_id = ? AND status = 'closed'").get(id); if (r && /^\d{4}-\d{2}-\d{2}$/.test(r.reopens_date || '') && r.reopens_date > (nb || '')) nb = r.reopens_date; } if (nb) v4Stay.notBefore = nb; } catch (e) { /* no season facts */ } }
     // Fix round (2026-11-22): the request's own words count for the stay. Kids' ages typed in the request ("kids 6 and
     // 9") go to the booking links (Expedia rm1=a2:c6:c9; Booking.com and Stay22 children=2), and "a place with a pool"
     // (hot tub, kitchen) is the stay preference until the chat changes it. Only what the visitor left empty.
@@ -8965,6 +8968,18 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
       // Planner round 4: "no driving after wineries" with a wine tour on offer: no rental car next to it, and the plan
       // says how the no-driving is handled.
       if (gh && TRIP_NO_DRIVE_RE.test(String(text || '')) && plan.__wineTour) { gh.car = null; gh.carLabel = null; const line = 'No driving after the wineries: a wine tour with a driver covers the winery day (see Getting around), or take a taxi between them.'; if (Array.isArray(plan.notes) && !plan.notes.includes(line)) plan.notes.unshift(line); plan.noDrive = { wineTour: true, text: line, textFr: 'Pas de conduite après les vignobles : une visite guidée avec chauffeur couvre la journée des vignobles (voir Se déplacer), ou prenez un taxi entre eux.' }; }
+      // Round 5 (2026-11-22: "no driving after wineries" still offered "Rent a car at Penticton airport" first): with no
+      // wine tour on offer the plan says in one line how it is handled, and the rental car comes after every other step.
+      if (TRIP_NO_DRIVE_RE.test(String(text || '')) && !plan.noDrive) {
+        const line = 'No driving after the wineries: take a taxi or a wine tour with a driver between them; the rental car is for getting here and the other stops.';
+        if (Array.isArray(plan.notes) && !plan.notes.includes(line)) plan.notes.unshift(line);
+        plan.noDrive = { wineTour: false, text: line, textFr: 'Pas de conduite après les vignobles : prenez un taxi ou une visite des vignobles avec chauffeur; la voiture de location sert à venir et aux autres arrêts.' };
+      }
+      if (TRIP_NO_DRIVE_RE.test(String(text || ''))) {
+        const last = (list) => (Array.isArray(list) ? list.filter((x) => !(x && x.kind === 'transport')).concat(list.filter((x) => x && x.kind === 'transport')) : list);
+        if (plan.whereToStay) { plan.whereToStay.bookingSteps = last(plan.whereToStay.bookingSteps); if (plan.whereToStay.pick) plan.whereToStay.pick.bookingSteps = last(plan.whereToStay.pick.bookingSteps); for (const c of plan.whereToStay.alternatives || []) c.bookingSteps = last(c.bookingSteps); }
+        if (plan.v4Booking) plan.v4Booking.steps = last(plan.v4Booking.steps);
+      }
       if (gh) {
         // No driving (wine days): the wine tour first, the rental car after it.
         if (TRIP_NO_DRIVE_RE.test(String(text || ''))) { gh.noDrive = true; if (plan.__wineTour) gh.wineTour = { name: plan.__wineTour.name, nameFr: plan.__wineTour.nameFr, url: plan.__wineTour.url, label: plan.__wineTour.label, labelFr: plan.__wineTour.labelFr }; }
@@ -9266,6 +9281,19 @@ function runTripPlan(args, now = new Date()) {
   if (typeof a.text === 'string') { const n = v4NightsText(a.text); if (n) a = { ...a, text: n.text, departureLast: true }; }
   let sunsetDinner = null;
   try { sunsetDinner = v4SunsetDinner(a, now); if (sunsetDinner) a = { ...a, text: sunsetDinner.text }; } catch (e) { sunsetDinner = null; }
+  // Round 5: a Swap of a dinner asked as a sunset dinner (the chat's Swap words) starts ~30 minutes before that day's
+  // sunset in that town, through overrides.stopStarts (a start the chat sent itself wins).
+  try {
+    const w = a.swap;
+    const m = w && /^([1-7])-(evening|night)$/.exec(w.key || '');
+    if (m && /\bsunset|coucher (?:du|de) soleil/i.test(JSON.stringify([w.words || null, w.want || null]))) {
+      const start0 = (a.overrides && a.overrides.startDate) || (a.stay && a.stay.arrive) || null;
+      const date = start0 ? addLocalDays(start0, Number(m[1]) - 1) : null;
+      const v0 = w.id ? getVenue(w.id) : null;
+      const sd = date ? sunsetDinnerStart(date, v0 && v0.region) : null;
+      if (sd && !(a.overrides && a.overrides.stopStarts && a.overrides.stopStarts[w.key] !== undefined)) a = { ...a, swap: { ...w, ...(w.times ? { times: { ...w.times, [w.key]: sd.startMinutes } } : {}) }, overrides: { ...(a.overrides || {}), stopStarts: { ...((a.overrides && a.overrides.stopStarts) || {}), [w.key]: sd.startMinutes } } };
+    }
+  } catch (e) { /* the swap keeps its usual time */ }
   // Round 3 (2026-11-22): "one day in Osoyoos with a spa and a nice dinner" was one stop (dinner) and "one day in Squamish,
   // hiking and a brewery" two stops ending at noon: a request for a day is a day plan (lunch, dinner, the day filled),
   // not only the stops it names. An evening, an afternoon or a morning stays a short outing.
@@ -9425,17 +9453,29 @@ function v4NotIncluded(plan) {
       const rows = stops.map((x) => { const v = getVenue(x.venue.id); if (!v) return null; let kinds = []; try { const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; kinds = TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); } catch (e) { kinds = []; } return { type: v.type, planType: x.venue.type, kinds }; }).filter(Boolean);
       for (const r of plan.requirementResults) {
         if (!r || r.status !== 'satisfied' || r.strength !== 'must' || r.dayIndex) continue;
-        const has = r.kind === 'type' ? rows.some((x) => x.type === r.value || x.planType === r.value || (r.value === 'restaurant' && ['restaurant', 'pub', 'cafe'].includes(x.type)) || (['outdoor', 'tour', 'indoor', 'breakfast'].includes(r.value)))
+        // Round 5 (2026-11-22: a wine tour replaced Moraine and Poplar Grove, then "I couldn't fit winery"): a tour that
+        // covers that kind of place (a wine tour visits wineries) counts as it.
+        const toured = r.kind === 'type' && stops.some((x) => x.tourStop && ((x.tourCovers || []).includes(r.value) || (r.value === 'winery' && /\bwine|winery|wineries|vineyard/i.test(String(x.venue.name || ''))) || (r.value === 'brewery' && /\b(?:brew|beer|craft)/i.test(String(x.venue.name || '')))));
+        const has = toured || r.kind === 'type' ? toured || rows.some((x) => x.type === r.value || x.planType === r.value || (r.value === 'restaurant' && ['restaurant', 'pub', 'cafe'].includes(x.type)) || (['outdoor', 'tour', 'indoor', 'breakfast'].includes(r.value)))
           : r.kind === 'venue_kind' ? rows.some((x) => (r.value === 'shopping' ? x.type === 'shop' : x.kinds.includes(r.value))) || !['spa', 'shopping', 'bowling', 'cinema', 'museum', 'gallery', 'escape', 'arcade', 'climbing', 'pool', 'casino', 'evening_fun'].includes(r.value) : true;
         if (!has) { r.status = 'unmet'; r.reason = 'Not in this plan.'; }
       }
+    }
+  } catch (e) { /* the planner's own results stand */ }
+  // Round 5 (2026-11-22: "I couldn't fit vegetarian" with every restaurant Vegetarian-Friendly): a food feature asked for
+  // is met when every meal stop on the plan has it.
+  try {
+    const meals = (plan.days || []).flatMap((d) => d.stops || []).filter((x) => x && x.venue && ['restaurant', 'cafe', 'pub'].includes(x.venue.type));
+    for (const r of plan.requirementResults) {
+      if (!r || r.status !== 'unmet' || r.kind !== 'feature' || !['vegetarian', 'vegan', 'gluten_free'].includes(r.value) || !meals.length) continue;
+      if (meals.every((x) => (x.venue.features || []).some((f) => f && (f.key === r.value || f === r.value)))) { r.status = 'satisfied'; r.reason = 'Every meal stop has it.'; }
     }
   } catch (e) { /* the planner's own results stand */ }
   for (const r of plan.requirementResults) {
     if (!r || r.status !== 'unmet' || r.strength !== 'must' || r.kidsSki || !['venue_kind', 'type'].includes(r.kind)) continue;
     // Planner round 4 ("I couldn't fit ski lessons" on a trip that never asked for lessons): only what the visitor's own
     // words ask for is listed.
-    if (r.kind === 'venue_kind' && r.value === 'ski_lessons' && !/\b(?:lessons?|ski school|snow school|instructors?|learn\w*|camps?|clinics?|cours|le[cç]ons?|moniteurs?)\b/i.test(String(plan.query || ''))) continue;
+    if (r.kind === 'venue_kind' && r.value === 'ski_lessons' && !/\b(?:lessons?|ski school|snow school|instructors?|learn\w*|camps?|clinics?|cours|le[cç]ons?|moniteurs?)\b/i.test(String(plan.query || ''))) { r.silent = true; continue; }
     const label = r.kind === 'venue_kind' ? (TR.LABELS[r.value] || String(r.value).replace(/_/g, ' ')) : (V4_TYPE_WORDS[r.value] || String(r.value));
     if (out.some((x) => x.label === label)) continue;
     const lre = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -9449,7 +9489,10 @@ function v4NotIncluded(plan) {
     try { const byKm = r.kind === 'venue_kind' && r.value !== 'shopping' ? v4NearestOfKind(plan, r.value) : null; if (byKm) nearest = byKm; } catch (e) { /* keep the planner's own alternative */ }
     const an = /(?:ing|s)$/.test(label) ? '' : /^[aeiou]/i.test(label) ? 'an ' : 'a ';
     const text = (noneListed && town ? `There’s no ${label} listed in ${town}, so this plan has none.` : `I couldn’t fit ${an}${label} into this plan.`) + (nearest ? ` The nearest is ${nearest.name} in ${nearest.regionLabel}.` : '');
-    out.push({ kind: r.value, label, reason: noneListed ? 'none_listed' : 'not_fitted', town, nearest, text });
+    // Round 5: the French line too (the label through the French copy).
+    let lf = label; try { lf = require('./trip-french-copy').t3FrenchText(label) || label; } catch (e) { lf = label; }
+    const textFr = (noneListed && town ? `Aucun lieu « ${lf} » n’est répertorié à ${town} : ce plan n’en a pas.` : `Je n’ai pas pu inclure « ${lf} » dans ce plan.`) + (nearest ? ` Le plus proche : ${nearest.name}, à ${nearest.regionLabel}.` : '');
+    out.push({ kind: r.value, label, reason: noneListed ? 'none_listed' : 'not_fitted', town, nearest, text, textFr });
   }
   if (out.length) plan.notIncluded = out;
 }
@@ -9494,6 +9537,19 @@ const V4_WHEN_DAYS = { 'this-weekend': 2, 'next-weekend': 2, weekend: 2, today: 
 // when the sun sets. A dinner time the request gives itself wins. With a lake view only where the site reads a sunset dinner
 // that way (TRIP_SITE.sunsetDinner). -> { text, note } or null.
 const V4_SUNSET_DINNER_RE = /\b(?:a\s+)?sunset dinners?\b|\bdinner (?:at|with|during|around|watching) (?:the |a )?sunset(?: view)?\b/i;
+// Round 5 (2026-11-22: a Swap to "sunset dinner with a lake view" put Palmer Kitchen at 6:15 PM, after the ~5:05 PM
+// sunset): the start of a sunset dinner on a date in a town (a region key; null = the whole site), for the chat's Swap /
+// overrides.stopStarts path too: about 30 minutes before that day's real sunset, on the quarter hour, 4 PM to 9 PM.
+// -> { startMinutes, sunsetMinutes } or null.
+function sunsetDinnerStart(date, town = null) {
+  if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const TR = require('./trip-requirements');
+  const r = town && REGION_LABELS[town] ? town : null;
+  const row = db.prepare(`SELECT AVG(latitude) AS lat, AVG(longitude) AS lng FROM venues WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND redirect_to IS NULL${r ? ' AND region = ?' : ''}`).get(...(r ? [r] : []));
+  const light = row && row.lat != null ? TR.estimateDaylight(date, { lat: Number(row.lat), lng: Number(row.lng) }) : null;
+  if (!light || !Number.isFinite(light.sunsetMinutes)) return null;
+  return { startMinutes: Math.max(960, Math.min(1260, Math.floor((light.sunsetMinutes - 30) / 15) * 15)), sunsetMinutes: Math.round(light.sunsetMinutes) };
+}
 function v4SunsetDinner(a, now = new Date()) {
   const text = String((a && a.text) || '');
   const m = V4_SUNSET_DINNER_RE.exec(text);
@@ -9504,10 +9560,9 @@ function v4SunsetDinner(a, now = new Date()) {
   if (!date) date = todayLocal(now);
   const lower = text.toLowerCase();
   const town = Object.keys(REGION_LABELS).sort((x, y) => REGION_LABELS[y].length - REGION_LABELS[x].length).find((r) => lower.includes(REGION_LABELS[r].toLowerCase()));
-  const row = db.prepare(`SELECT AVG(latitude) AS lat, AVG(longitude) AS lng FROM venues WHERE latitude IS NOT NULL AND longitude IS NOT NULL AND redirect_to IS NULL${town ? ' AND region = ?' : ''}`).get(...(town ? [town] : []));
-  const light = row && row.lat != null ? TR.estimateDaylight(date, { lat: Number(row.lat), lng: Number(row.lng) }) : null;
-  if (!light) return null;
-  const start = Math.max(960, Math.min(1260, Math.floor((light.sunsetMinutes - 30) / 15) * 15));
+  const sd = sunsetDinnerStart(date, town);
+  if (!sd) return null;
+  const light = { sunsetMinutes: sd.sunsetMinutes }, start = sd.startMinutes;
   const clock = (x) => `${(Math.floor(x / 60) % 12) || 12}:${String(x % 60).padStart(2, '0')} ${x >= 720 ? 'pm' : 'am'}`;
   const sun = clock(light.sunsetMinutes).replace(/ (am|pm)$/, (s, p) => ` ${p.toUpperCase()}`);
   return { text: text.replace(m[0], `dinner at ${clock(start)}${/lake view/.test(TRIP_SITE.sunsetDinner.reading) && !/\blake ?views?\b/i.test(text) ? ' with a lake view' : ''}`), note: `Sunset is about ${sun} that day, so the sunset dinner starts at ${clock(start).replace(/ (am|pm)$/, (s, p) => ` ${p.toUpperCase()}`)}.`, start, sunset: light.sunsetMinutes };
@@ -9575,6 +9630,18 @@ function v4DropAfterDark(plan) {
   const V4_DARK_MIN_VISIT = 45;
   const v4DarkLimit = (r) => r.daylight.sunsetMinutes - (Number(r.daylight.marginMinutes) || 0);
   const rows = (plan && plan.schedule) || [];
+  // Round 5 (Whistler, 2026-11-22: Florence Petersen Park and Rebagliati Park at 3:45-5:15 PM in January, after dark, as
+  // filler): a park, trail or beach timed with no daylight check gets one from its own map spot and the date.
+  try {
+    const TR = require('./trip-requirements');
+    for (const r of rows) {
+      if (!r || r.daylight || !Number.isInteger(r.venueId) || !/^\d{4}-\d{2}-\d{2}$/.test(String(r.date || '')) || !Number.isFinite(r.startMinutes) || !Number.isFinite(r.endMinutes)) continue;
+      const v = getVenue(r.venueId);
+      if (!v || !['outdoor', 'beach'].includes(v.type) || v.latitude == null || /\b(?:ski|skiing|snowboard|tube|tubing|rink|skating|snowshoe\w*|nordic|sleigh|lit|lights?|illuminat\w*|hot springs?|resort|blackcomb|mountain)\b/i.test(v.name || '')) continue;
+      const light = TR.estimateDaylight(r.date, { lat: Number(v.latitude), lng: Number(v.longitude) });
+      if (light && Number.isFinite(light.sunsetMinutes) && r.endMinutes > light.sunsetMinutes) r.daylight = { status: 'conflict', sunsetMinutes: light.sunsetMinutes, sunriseMinutes: light.sunriseMinutes || 0, marginMinutes: 0, added: true };
+    }
+  } catch (e) { /* the plan's own daylight checks stand */ }
   const conflict = (r) => r && r.daylight && r.daylight.status === 'conflict' && Number.isFinite(r.startMinutes) && Number.isFinite(r.daylight.sunsetMinutes) && Number.isInteger(r.venueId);
   const endOf = (r) => (Number.isFinite(r.endMinutes) ? r.endMinutes : Infinity);
   const named = (r) => { for (const d of plan.days || []) for (const s of d.stops || []) if (s && s.venue && s.venue.id === r.venueId) return s.venue.name; return null; };
@@ -82515,6 +82582,7 @@ if (require.main === module) {
 // Sprint 1 brief actually calls for (routes, slugs, JSON-LD, sitemap,
 // database reads), not a blanket re-export of the whole module.
 module.exports = {
+  sunsetDinnerStart,
   // Travel agent chat (2026-11-22), for tests/trip-chat-api.test.js.
   parseTripChatBody, tripChatStops, setTripChatReader, runTripChatTurn, runTripPlanRequest, tripChatEnabledFor,
   tripChatSafeRun,

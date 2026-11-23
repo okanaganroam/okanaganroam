@@ -1621,6 +1621,8 @@ const REQUEST_SYNONYMS=[...SHORTHAND,[/\b(?:drop[- ]?in|pick[- ]?up|adult rec) h
   // mean galleries ("art walk downtown Kelowna" planned hiking parks; "art in Kelowna on Friday" a trail and laser tag).
   [/\bart (?:walks?|crawls?|tours?)\b/gi,'art galleries'],[/\bfirst fridays?(?: art\b| art walks?\b| openings?\b)?/gi,'art galleries'],[/\b(?:sculptures?|sculptors?|paintings|painters)\b/gi,'art galleries'],
   [/(?<!\b(?:martial|street|body|nail|latte|pop|digital|kids?|children'?s?) )\bart\b(?! (?:galler|museum|class|classes|camps?|studios?|workshops?|lessons?|centre|center|deco|supplies|supply|party|parties))/gi,'art galleries'],
+  // Planner round 5 (2026-11-22: "ski weekend for 4 adults" had no lunch on any day: the mountain huts have no group
+  // badge): "for N people / adults" is a big group from 6; any table takes 4 or 5.
   // Indoor test 16 (2026-11-19; "rainy day for a group of 6" searched for the word "group" and left out Tyler's escape room,
   // Great for Groups with a Groups line): a group, a group of N, N people (4 or more), a big group or a team is the
   // Great for Groups badge ("big group"), never a word to find. "Group of friends", "team building" and "team trip" keep
@@ -1628,7 +1630,7 @@ const REQUEST_SYNONYMS=[...SHORTHAND,[/\b(?:drop[- ]?in|pick[- ]?up|adult rec) h
   // With food or drink asked for ("craft beer tour for 6 people", "brewery for a group of 8"), the head count is not a filter
   // on the places (a brewery without the badge still takes 6): it is left out instead.
   [/\b(?:a |our |my )?(?:big |large )?group of (?:\d{1,3}|three|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty)(?: (?:people|adults|guests|players|of us|coworkers|colleagues|teens|teenagers|kids|students))?\b/gi,(m,...a)=>(GROUP_FOOD_RE.test(a[a.length-1])?'':'a big group')],
-  [/\bfor (?:a )?(?:party of |team of )?(\d{1,3}|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty)(?: (?:people|adults|guests|players|of us|persons))\b/gi,(m,n,off,str)=>{const k={four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,twelve:12,fifteen:15,twenty:20}[String(n).toLowerCase()]||Number(n);return k>=4?(GROUP_FOOD_RE.test(str)?'':'for a big group'):m;}],
+  [/\bfor (?:a )?(?:party of |team of )?(\d{1,3}|four|five|six|seven|eight|nine|ten|twelve|fifteen|twenty)(?: (?:people|adults|guests|players|of us|persons))\b/gi,(m,n,off,str)=>{const k={four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,twelve:12,fifteen:15,twenty:20}[String(n).toLowerCase()]||Number(n);return k>=6?(GROUP_FOOD_RE.test(str)?'':'for a big group'):m;}],
   [/(?<!\b(?:big|large|good for|great for|for big|for large) )\b(?:groups?|teams?)\b(?! (?:of friends|getaway|building|dinner|dinners|trip|trips|of \d))/gi,(m,off,str)=>(GROUP_FOOD_RE.test(str)?m:'big group')]];
 const GROUP_FOOD_RE=/\b(?:dinners?|lunch(?:es)?|brunch|breakfast|suppers?|meals?|eat|food|restaurants?|cafes?|cafés?|coffee|beers?|brewer(?:y|ies)|breweries|wines?|winer(?:y|ies)|tastings?|pubs?|bars?|drinks?|cocktails?|distiller(?:y|ies)|cider(?:y|ies)?)\b/i;
 // 2026-10-25 (tools audit): "retired couple, no hiking" became "relaxed easy walks, no hiking", a walks part that "no

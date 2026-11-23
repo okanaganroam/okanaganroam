@@ -124,7 +124,7 @@ test('9. the request body accepts the hooks, and a removed stop is not a booking
   assert.ok(SRC.includes("const allowed = ['text', 'seed', 'excludeVenueIds', 'avoidVenueIds', 'pinned', 'overrides', 'swap', 'tourStops', 'moves', 'trustedPins', 'keepOnDateChange'];"));
   assert.ok(SRC.includes("'eventId', 'stopStarts'].includes(k))"));
   assert.ok(SRC.includes('...(tourStops ? { tourStops } : {}), ...(moves ? { moves } : {}), ...(trustedPins ? { trustedPins } : {}), ...(keepOnDateChange ? { keepOnDateChange: true } : {}), ...(overrides && overrides.stopStarts ? { stopStarts: overrides.stopStarts } : {})'));
-  assert.ok(PAGE.includes('function v4RemovedIds()') && PAGE.includes("return t3BookStepsAll().filter(function(x){ return !(x && x.kind === \\'venue\\' && gone[x.id]); });"));
+  assert.ok(PAGE.includes('function v4RemovedIds()') && PAGE.includes("return t3BookStepsAll().filter(function(x){ return !(x && x.kind === \\'venue\\' && (gone[x.id] || (shown && !shown[x.id]))); });"));
   const plain = fx.plan(Q, { extra: { v4: true } });
   for (const k of ['moved', 'moveConflicts', 'droppedPins', 'tourReplaced', 'tourStopErrors', 'stopStartRefused']) assert.equal(plain[k], undefined, `${k} only when asked`);
 });
