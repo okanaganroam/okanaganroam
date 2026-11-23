@@ -93,6 +93,8 @@ function isMealStop(s) {
 function badgeOf(v, key, flags) {
   if (Array.isArray(v.badges)) { if (v.badges.some((b) => b && (b.key === key || b === key))) return true; }
   else if (v.features && typeof v.features === 'object' && !Array.isArray(v.features)) { if (v.features[key]) return true; }
+  // A curated list the listing is on (the site's dog-friendly places) counts like its badge.
+  if (Array.isArray(v.collections) && v.collections.includes(key)) return true;
   const f = flags ? flags(v.id) : null;
   if (f && f[key]) return true;
   return BADGE_TYPES.includes(v.type) ? false : null;
@@ -231,7 +233,7 @@ function kindEntry(req, plan, stops, ctx) {
     return { ...base, stops: [], status: 'unmet', text: ni ? ni.text : `${label}: not in this plan. The reason isn’t known from the listings.`, textFr: ni ? (ni.textFr || ni.text) : `${labelFr} : pas dans ce plan. La raison n’est pas connue d’après les fiches.` };
   }
   if (req.status !== 'satisfied') return null;
-  return { ...base, status: 'verified', text: rows.length ? `${label}: ${listEn(names(rows.slice(0, 4)))}${rows.length > 4 ? ` and ${rows.length - 4} more` : ''}.` : `${label}: in this plan.`, textFr: rows.length ? `${labelFr} : ${listFr(names(rows.slice(0, 4)))}${rows.length > 4 ? ` et ${rows.length - 4} autres` : ''}.` : `${labelFr} : dans ce plan.` };
+  return { ...base, status: 'verified', text: rows.length ? `${label}: ${rows.length > 4 ? `${names(rows.slice(0, 4)).join(', ')} and ${rows.length - 4} more` : listEn(names(rows))}.` : `${label}: in this plan.`, textFr: rows.length ? `${labelFr} : ${rows.length > 4 ? `${names(rows.slice(0, 4)).join(', ')} et ${rows.length - 4} ${rows.length - 4 > 1 ? 'autres' : 'autre'}` : listFr(names(rows))}.` : `${labelFr} : dans ce plan.` };
 }
 function stayEntries(plan) {
   const w = plan.whereToStay, out = [];

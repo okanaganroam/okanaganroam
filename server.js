@@ -8848,6 +8848,8 @@ function tripHonestEvidence(plan, on = true) {
     const towns = ((plan.overview && plan.overview.regions) || []).map((r) => r && r.label).filter(Boolean);
     tripHonestPlan.applyEvidence(plan, {
       town: towns.length === 1 ? towns[0] : (regions.length === 1 ? REGION_LABELS[regions[0]] : null),
+      // A place to go (a park, a beach) shows no badges on its plan card; its stored flags say what its listing has.
+      flags: (id) => { try { return getVenue(id); } catch (e) { return null; } },
       kindsOf: (id) => { try { const v = getVenue(id); if (!v) return []; const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; return TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); } catch (e) { return []; } },
       kindLabel: (k) => TR.LABELS[k] || String(k).replace(/_/g, ' '),
       kindLabelFr: (k) => { try { return require('./trip-french-copy').t3FrenchText(TR.LABELS[k] || String(k).replace(/_/g, ' ')); } catch (e) { return null; } },
