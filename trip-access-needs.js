@@ -65,9 +65,11 @@ const ACCESS_PAVED_RE = /\bpaved\b|\bboardwalk\b|\bwheel ?chairs?[- ]accessible\
 // true / false / null from one Access (or Accessibility) line of a listing. Its explicit words (wheelchair, accessible,
 // step-free, limited mobility) win; a surface word alone (paved, flat, boardwalk) counts unless the line also says
 // stairs, steep or rough; "not accessible" is always a no.
+// "Accessible" said only of the parking, a washroom, a picnic table or a playground is not access to the place itself.
+const ACCESS_FACILITY_RE = /\b(?:\d+ )?(?:wheel ?chair[- ])?accessible (?:parking stalls?|parking|stalls?|toilets?|washrooms?|picnic tables?|playgrounds?|water park)\b|\b(?:universal|accessible) washrooms?\b|\b(?:toilets?|washrooms?) (?:is|are) (?:wheel ?chair[- ])?accessible\b|\b(?:disabled|handicapped) parking\b/ig;
 function accessFromText(line) {
-  const t = String(line || '').trim();
-  if (!t) return null;
+  const t = String(line || '').replace(ACCESS_FACILITY_RE, ' ').replace(/\s+/g, ' ').trim();
+  if (!t || !/[a-z]{3}/i.test(t)) return null;
   if (/\bnot (?:fully |wheelchair |stroller )?(?:accessible|suitable|suited)\b|\binaccessible\b|\bno (?:wheelchair|ramp|elevator|lift)s?\b|\bnot all\b/i.test(t)) return false;
   // "No stairs" is the listing saying step-free, not a staircase.
   if (/\b(?:no|without) (?:stairs|steps)\b/i.test(t) && !ACCESS_NO_RE.test(t.replace(/\b(?:no|without) (?:stairs|steps)\b/ig, ' '))) return true;
@@ -85,7 +87,12 @@ const DOG_YES_RE = /\b(?:dogs?|pets?) (?:are |is )?(?:allowed|welcome|permitted|
 function dogFromText(line) {
   const t = String(line || '').trim();
   if (!t) return null;
-  const no = DOG_NO_RE.test(t), yes = DOG_YES_RE.test(t.replace(DOG_NO_RE, ' '));
+  // Clause by clause: "No dogs or other pets allowed" is a no; "On leash; no dogs on the main beach" says both.
+  let no = false, yes = false;
+  for (const c of t.split(/[;.]/)) {
+    if (DOG_NO_RE.test(c) || /\bnot suitable for (?:dogs?|pets?)\b|\bleave your dog at home\b|\b(?:dogs?|pets?)(?: and [a-z-]+)? (?:are )?not permitted\b/i.test(c)) no = true;
+    else if (DOG_YES_RE.test(c)) yes = true;
+  }
   if (no && yes) return null;
   return no ? false : yes ? true : null;
 }
