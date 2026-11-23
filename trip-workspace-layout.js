@@ -6,6 +6,48 @@ function tripWorkspaceBooking(id, steps) {
   const valid=(steps||[]).filter(s=>s && s.kind==='venue' && Number(s.id)===Number(id) && /^https?:\/\//i.test(s.url||''));
   return valid.find(s=>!s.affiliate)||valid[0]||null;
 }
+// The short facts under the plan's title (2026-11-22, Dayton: "make the itinerary quicker to reach… a concise summary and
+// expandable details"). Every fact is read from the plan's own data: the party as given (ctx.party), the dates when none
+// are set, and one short item per ask in plan.evidence. An ask that is unmet, partial or unknown is a flagged item here,
+// in the summary itself; the full sentences are under "Details". Asks that are met come last (at most four, then "+N").
+function tripSummaryFacts(plan, fr, ctx) {
+  var p = plan || {}, c = ctx || {}, out = [], flags = [], ok = [], sep = fr ? ' : ' : ': ', said = {}, gone = c.removed || {};
+  if (c.party) out.push({ kind: 'party', text: String(c.party) });
+  if (c.datesUnset) out.push({ kind: 'dates', text: fr ? 'Dates à choisir' : 'Dates not set' });
+  (Array.isArray(p.evidence) ? p.evidence : []).forEach(function (e) {
+    var label = e && ((fr && e.labelFr) || e.label);
+    if (!e || !label || !e.status) return;
+    if (e.text) said[e.text] = 1;
+    var all = Array.isArray(e.stops) ? e.stops : [], t, status = e.status, count = e.count;
+    // A stop the visitor removed no longer counts (ctx.removed: venue ids): "Wineries: 2 ✓" is not said of one winery.
+    var stops = /^stay:/.test(e.ask || '') ? all : all.filter(function (x) { return x && !gone[x.id]; }), yes = stops.filter(function (x) { return x && x.has === true; }).length;
+    if (stops.length < all.length && status === 'verified') {
+      if (e.asked > 0) { count = yes; if (count < e.asked) status = count ? 'partial' : 'unmet'; }
+      else if (!yes) status = 'unmet';
+    }
+    if (status === 'verified') { ok.push({ kind: 'ok', ask: e.ask, text: label + (e.asked > 0 && count > 0 ? sep + count : '') + ' ✓' }); return; }
+    if (status === 'unmet') t = fr ? 'pas dans ce plan' : 'not in this plan';
+    else if (e.needsDates) t = fr ? 'selon vos dates' : 'needs dates';
+    else if (status === 'partial' && e.asked > 0 && count >= 0) t = fr ? count + ' sur ' + e.asked : count + ' of ' + e.asked;
+    else if (status === 'partial' && stops.length) t = fr ? yes + ' sur ' + stops.length + (stops.length > 1 ? ' arrêts' : ' arrêt') : yes + ' of ' + stops.length + (stops.length > 1 ? ' stops' : ' stop');
+    else if (status === 'partial') t = fr ? 'en partie' : 'partly';
+    else t = fr ? 'non confirmé' : 'not confirmed';
+    flags.push({ kind: 'flag', status: status, ask: e.ask, text: label + sep + t });
+  });
+  // What the plan says it left out, or a note for one person, that no evidence entry already covers: still flagged.
+  // In English the kind left out is named ("Spa: not in this plan"); the kinds have no French word here, so a count.
+  var left = 0;
+  (Array.isArray(p.notIncluded) ? p.notIncluded : []).forEach(function (x) {
+    if (!x || !x.text || said[x.text]) return;
+    var k = typeof x.kind === 'string' && /^[a-z][a-z_ ]{1,30}$/.test(x.kind) ? x.kind.replace(/_/g, ' ') : '';
+    if (k && !fr) flags.push({ kind: 'flag', status: 'unmet', ask: 'not_included:' + x.kind, text: k.charAt(0).toUpperCase() + k.slice(1) + ': not in this plan' });
+    else left++;
+  });
+  if (left) flags.push({ kind: 'flag', status: 'unmet', ask: 'not_included', text: fr ? left + (left > 1 ? ' demandes non incluses' : ' demande non incluse') : left + (left > 1 ? ' asks not included' : ' ask not included') });
+  if (p.partyNote && p.partyNote.text && !said[p.partyNote.text]) flags.push({ kind: 'flag', status: 'partial', ask: 'party_note', text: fr ? 'Note pour une personne du groupe' : 'Note for one of you' });
+  if (ok.length > 4) { var more = ok.length - 3; ok = ok.slice(0, 3); ok.push({ kind: 'ok', ask: 'more', text: fr ? '+' + more + ' autres ✓' : '+' + more + ' more ✓' }); }
+  return out.concat(flags, ok);
+}
 const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
 .t3-v4.tw-workspace.has-plan {display:grid;grid-template-columns:minmax(0,1fr) 350px;gap:26px;max-width:1320px;margin:0 auto;padding:26px 32px 48px;box-sizing:border-box;align-items:start;}
 .t3-v4.tw-workspace.has-plan .t3-result {grid-column:1;min-width:0;width:100%;max-width:none;padding:0;}
@@ -44,6 +86,23 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
 .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts {margin-top:8px;}
 .t3-v4.tw-workspace .tw-book {margin:16px 0 10px;}
 .t3-v4.tw-workspace .tw-book-btn {width:100%;max-width:360px;min-height:50px;border:0;border-radius:14px;background:#1b303c;color:#fff;font:800 16px Nunito,sans-serif;cursor:pointer;}
+.t3-v4.tw-workspace .tw-sum {margin:0 0 12px;}
+.t3-v4.tw-workspace .tw-facts {list-style:none;margin:0;padding:0;font-size:13px;line-height:22px;font-weight:700;color:#3d4c57;}
+.t3-v4.tw-workspace .tw-facts li {display:inline;}
+.t3-v4.tw-workspace .tw-facts li>span {white-space:nowrap;}
+.t3-v4.tw-workspace .tw-facts li+li::before {content:"· ";color:#8a949b;}
+.t3-v4.tw-workspace .tw-facts .tw-fact-flag span {background:#fff0cc;color:#6b4a12;border-radius:8px;padding:2px 7px;font-weight:800;white-space:nowrap;}
+.t3-v4.tw-workspace .tw-facts .tw-fact-more::before {content:"";}
+.t3-v4.tw-workspace .tw-sum-toggle {position:relative;z-index:1;display:inline-flex;align-items:center;gap:4px;min-height:44px;min-width:44px;margin:-10px 0 -10px 2px;padding:0 6px;border:0;background:none;color:#1b303c;font:800 13px Nunito,sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer;vertical-align:middle;}
+.t3-v4.tw-workspace .tw-sum-toggle::after {content:"▾";text-decoration:none;display:inline-block;}
+.t3-v4.tw-workspace .tw-sum-toggle[aria-expanded="true"]::after {transform:rotate(180deg);}
+.t3-v4.tw-workspace .tw-sum-toggle:focus-visible {outline:2px solid #1b303c;outline-offset:-6px;border-radius:10px;}
+.t3-v4.tw-workspace .tw-sum-more {margin:8px 0 0;padding:12px 14px 4px;border-radius:14px;background:#f3f0e7;}
+.t3-v4.tw-workspace .tw-sum-more[hidden] {display:none;}
+.t3-v4.tw-workspace .tw-sum-more p {margin:0 0 8px;font-size:13px;line-height:1.5;color:#1b303c;font-weight:600;}
+.t3-v4.tw-workspace .tw-sum-agent:empty,.t3-v4.tw-workspace .tw-sum-stay:empty {display:none;}
+.t3-v4.tw-workspace .tw-sum-stay {display:flex;align-items:center;gap:6px;margin:-4px 0 4px;font-size:13px;font-weight:600;color:#1b303c;}
+.t3-v4.tw-workspace .tw-sum-stay .v4-link {min-height:44px;}
 .t3-v4.tw-workspace .v4-thumb--none {display:none;}
 .t3-v4.tw-workspace .v4-row:has(.v4-thumb--none) {grid-template-columns:minmax(0,1fr) auto;}
 .t3-v4.tw-workspace .v4-gone .v4-row {align-items:center;}
@@ -76,13 +135,52 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
  .t3-v4.tw-workspace.has-plan {display:block;padding:12px 16px 30px;}
  .t3-v4.tw-workspace .v4-head {padding:6px 0 14px;gap:10px;}
  .t3-v4.tw-workspace .v4-head h2 {font-size:28px;}
- .t3-v4.tw-workspace .tw-plan-actions {width:100%;}
- .t3-v4.tw-workspace .tw-plan-actions button {flex:1;}
  .t3-v4.tw-workspace .tw-day-tabs button {min-width:88px;}
  .t3-v4.tw-workspace .v4-row {grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:0 12px 12px;}
- .t3-v4.tw-workspace .v4-thumb {grid-column:1/-1;width:calc(100% + 24px);max-width:none;margin:0 -12px;height:155px;border-radius:0;}
+ .t3-v4.tw-workspace .v4-thumb {grid-column:1/-1;width:calc(100% + 24px);max-width:none;margin:0 -12px;height:clamp(112px,33vw,128px);border-radius:0;}
  .t3-v4.tw-workspace .v4-row:has(.v4-thumb--none) {padding-top:12px;}
+ .t3-v4.tw-workspace .v4-head {padding:4px 0 8px;margin-bottom:8px;gap:6px 8px;}
+ .t3-v4.tw-workspace .v4-head h2 {font-size:clamp(20px,5.9vw,24px);line-height:1.2;}
+ .t3-v4.tw-workspace .v4-sub {flex:1 1 0;min-width:110px;font-size:13px;line-height:1.35;}
+ .t3-v4.tw-workspace .v4-head .tw-plan-actions {width:auto;flex:0 0 auto;flex-wrap:nowrap;gap:6px;}
+ .t3-v4.tw-workspace .v4-head .tw-plan-actions button {flex:0 0 auto;padding:9px 12px;font-size:13px;}
+ /* The summary first, then the dates question as one row, then the place to stay as one row: the days start sooner. */
+ .t3-v4.tw-workspace .tw-sum {margin:0 0 6px;}
  .t3-v4.tw-workspace .v4-agent {margin:0 0 12px;}
+ .t3-v4.tw-workspace .tw-has-sum .v4-agent {margin:0 0 6px;padding:0;background:none;border-radius:0;}
+ .t3-v4.tw-workspace .v4-agent.tw-agent-empty,.t3-v4.tw-workspace .tw-has-sum .v4-agent>.v4-agent-who {display:none;}
+ .t3-v4.tw-workspace .tw-has-sum .v4-ask {display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:0;}
+ .t3-v4.tw-workspace .tw-has-sum .v4-ask-q {margin:0;font:800 13px Nunito,sans-serif;color:#1b303c;}
+ .t3-v4.tw-workspace .tw-has-sum .v4-ask-full {position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;}
+ .t3-v4.tw-workspace .tw-has-sum .v4-ask-short {display:inline;}
+ .t3-v4.tw-workspace .tw-has-sum .v4-ask-btns {flex:1;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}
+ .t3-v4.tw-workspace .tw-has-sum .v4-ask-btns::-webkit-scrollbar {display:none;}
+ .t3-v4.tw-workspace .tw-has-sum .v4-ask-btns button {flex:none;min-height:44px;padding:0 10px;font-size:13px;}
+ @media(max-width:379px){.t3-v4.tw-workspace .tw-has-sum .v4-ask-btns button {padding:0 8px;font-size:12.5px;}}
+ .t3-v4.tw-workspace .tw-has-sum .v4-ask-dates {flex:1 1 100%;margin:2px 0 0;}
+ .t3-v4.tw-workspace .tw-has-sum .v4-ask-dates input {min-height:44px;}
+ .t3-v4.tw-workspace .tw-has-sum .v4-ask-dates .v4-link {min-height:44px;min-width:44px;}
+ .t3-v4.tw-workspace .v4-stay-card {display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:0 8px;align-items:center;margin:0 0 8px;padding:8px;border-radius:14px;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-row {display:contents;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-card-h {grid-column:2;grid-row:1;margin:0;font-size:10.5px;line-height:14px;letter-spacing:0.03em;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-img {grid-column:1;grid-row:1/3;width:44px;height:44px;border-radius:10px;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-row>div {grid-column:2;grid-row:2;min-width:0;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-name {font-size:14px;line-height:1.25;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-h-full {position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-h-short {display:inline;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-facts {display:inline;margin:0 6px 0 0;font-size:12px;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-chips {display:inline-flex;margin:2px 0 0;vertical-align:middle;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-chip {min-height:20px;padding:0 7px;font-size:11px;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-chip-extra {display:none;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts {grid-column:3;grid-row:1/3;margin:0;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts .v4-btn {min-height:44px;padding:0 10px;font-size:13px;white-space:nowrap;gap:4px;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts .v4-btn>span[aria-hidden] {display:none;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts:empty {display:none;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-alts,.t3-v4.tw-workspace .v4-stay-card .v4-disc-line {grid-column:1/-1;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-alts .v4-link {min-height:44px;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-disc-line {margin:5px 0 0;font-size:10.5px;line-height:1.3;}
+ .t3-v4.tw-workspace .tw-day-tabs {padding:2px 1px 5px;margin-bottom:2px;}
+ .t3-v4.tw-workspace .tw-day-tabs+.v4-days .v4-day-title {font:800 14px/1.3 Nunito,sans-serif;margin:0 0 6px;color:#3d4c57;}
  .t3-v4.tw-workspace .tw-book-btn {max-width:none;}
  .t3-v4.tw-workspace .v4-name {font-size:21px;}
  .t3-v4.tw-workspace .tw-links {margin-top:4px;gap:0 12px;}
@@ -102,7 +200,8 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
 const WORKSPACE_CLIENT_SRC=String.raw`
   ${tripWorkspaceDay.toString()}
   ${tripWorkspaceBooking.toString()}
-  var twSelectedDay=1,twOptionsOpen=false;
+  ${tripSummaryFacts.toString()}
+  var twSelectedDay=1,twOptionsOpen=false,twSumOpen=false;
   function twText(en,fr){return lang()==='fr'?fr:en;}
   function tripWorkspaceStopHtml(s,key,counts){
     var v=s.venue,id=key||('s'+v.id),did='v4d-'+id,url=placeUrl(v);
@@ -139,8 +238,11 @@ const WORKSPACE_CLIENT_SRC=String.raw`
     var root=resultEl.querySelector('.v4'),main=v4Main(),bar=document.getElementById('v4Bar');if(!root||!main||!bar)return;
     main.classList.add('tw-workspace');bar.setAttribute('aria-label',twText('Trip helper','Assistant voyage'));
     var head=root.querySelector('.v4-head');
-    if(head&&!head.querySelector('.tw-plan-actions')){var actions=document.createElement('div');actions.className='tw-plan-actions';actions.innerHTML='<button type="button" data-v4-save aria-pressed="false"></button><button type="button" data-v4-share>'+esc(twText('Share trip','Partager'))+'</button>';head.appendChild(actions);}
-    var save=root.querySelector('[data-v4-save]');if(save){save.textContent=twText(v4.saved?'Saved ✓':'Save trip',v4.saved?'Enregistré ✓':'Enregistrer');save.setAttribute('aria-pressed',String(!!v4.saved));}
+    if(head&&!head.querySelector('.tw-plan-actions')){var actions=document.createElement('div');actions.className='tw-plan-actions';actions.innerHTML='<button type="button" data-v4-save aria-pressed="false"></button><button type="button" data-v4-share></button>';head.appendChild(actions);}
+    // On a phone Save and Share sit on the line under the title ("3 days · Kelowna · 12 stops"), with short labels.
+    var phone=!window.matchMedia('(min-width:900px)').matches;
+    var save=root.querySelector('[data-v4-save]');if(save){save.textContent=twText(v4.saved?'Saved ✓':(phone?'Save':'Save trip'),v4.saved?'Enregistré ✓':'Enregistrer');save.setAttribute('aria-label',twText('Save trip','Enregistrer le voyage'));save.setAttribute('aria-pressed',String(!!v4.saved));}
+    var share=head&&head.querySelector('[data-v4-share]');if(share){share.textContent=twText(phone?'Share':'Share trip','Partager');share.setAttribute('aria-label',twText('Share trip','Partager le voyage'));}
     root.querySelectorAll('.v4-confirm,.v4-tip:not(.v4-picked)').forEach(function(el){el.remove();});
     var sections=Array.from(root.querySelectorAll('.v4-day[id]')),dayNumbers=sections.map(function(s){return Number(s.id.replace('t3-day-',''));});
     twSelectedDay=tripWorkspaceDay(dayNumbers,twSelectedDay);
@@ -158,16 +260,85 @@ const WORKSPACE_CLIENT_SRC=String.raw`
     var stayCard=root.querySelector('.v4-stay-card'),stayAt=root.querySelector('.tw-day-tabs')||daysEl;
     if(stayCard&&stayCard.nextElementSibling!==stayAt)stayAt.before(stayCard);
     if(!bar.querySelector('.tw-chat-title')){var heading=document.createElement('h2');heading.className='tw-chat-title';heading.textContent=twText('✨ Your trip helper','✨ Votre assistant voyage');var hint=document.createElement('p');hint.className='tw-chat-hint';hint.textContent=twText('Tell me what to change. Your plan stays right here.','Dites-moi quoi changer. Votre plan reste ici.');bar.prepend(hint);bar.prepend(heading);}
+    twSummary(root,head);
     var agent=resultEl.querySelector('#v4Agent');if(agent){var old=bar.querySelector('#v4Agent');if(old)old.remove();}
     else agent=bar.querySelector('#v4Agent');
     // The agent's first line and "When are you coming?": in the chat sidebar on a wide screen, at the top of the plan on a phone.
     if(agent){if(window.matchMedia('(min-width:900px)').matches)bar.querySelector('.tw-chat-hint').after(agent);else if(head)head.after(agent);}
+    twSummaryPlace(root,agent);
     var input=document.getElementById('v4ChatIn');if(input)input.placeholder=twText('Ask for a change…','Demandez un changement…');
     twPad();
   }
+  // The summary under the title: one line of short facts from the plan's own data (tripSummaryFacts) and a "Details"
+  // button. The sentences the plan view prints (what was left out, the note for one person, the asks the listings only
+  // partly support, no driving, the town we picked) move under Details, closed until asked for; on a phone the agent's
+  // first line, its caveat and "See N more" places to stay are there too. Nothing is dropped; an ask that is not fully
+  // met stays flagged in the line itself.
+  function twSummaryFacts(){
+    var fr=lang()==='fr',party='',unset=false;
+    try{var d=typeof t3StayData==='function'?t3StayData():null,t=(d&&d.w&&d.w.trip)||null;// The party is on the stay card ("Where you’ll stay · 6 adults"); said here only when that card is not shown.
+      if(t&&(!chatOvernight()||chat.noStay))party=t3StayTripLine({adults:t.adults,adultsAssumed:t.adultsAssumed,kids:t.kids,dog:t.dog},fr);
+      // "Dates not set" only once the dates question is gone ("Not sure yet"); while it is asked, the question says it.
+      unset=chatOvernight()&&!chatHasDates()&&!((t3StayInputBase()||{}).arrive)&&!!chat.askedWhen;}catch(e){}
+    var gone={};try{gone=v4RemovedIds();}catch(e){}
+    return tripSummaryFacts(state.last,fr,{party:party,datesUnset:unset,removed:gone});
+  }
+  function twSummary(root,head){
+    if(!head||root.querySelector('.tw-sum'))return;
+    var facts=[];try{facts=twSummaryFacts();}catch(e){facts=[];}
+    if(!facts.length)return;
+    var notes=Array.from(root.children).filter(function(el){return el.matches('p.v4-tip.v4-picked');});
+    var sum=document.createElement('section');sum.className='tw-sum';sum.setAttribute('aria-label',twText('Trip summary','Résumé du voyage'));
+    sum.innerHTML='<ul class="tw-facts">'+facts.map(function(f){return '<li class="tw-fact-'+esc(f.kind)+'"'+(f.status?' data-status="'+esc(f.status)+'"':'')+'><span>'+esc(f.text)+'</span></li>';}).join('')
+      +'<li class="tw-fact-more"><button type="button" class="tw-sum-toggle" id="twSumToggle" aria-expanded="'+(twSumOpen?'true':'false')+'" aria-controls="twSumMore">'+esc(twText('Details','Détails'))+'</button></li></ul>'
+      +'<div class="tw-sum-more" id="twSumMore"'+(twSumOpen?'':' hidden')+'><div class="tw-sum-agent"></div><div class="tw-sum-notes"></div><div class="tw-sum-stay"></div></div>';
+    head.after(sum);
+    var box=sum.querySelector('.tw-sum-notes');notes.forEach(function(el){box.appendChild(el);});
+    root.classList.add('tw-has-sum');
+  }
+  // Where the agent's first line and "See N more" sit: under Details on a phone (the dates question stays in the plan,
+  // as one row); in the chat sidebar and on the stay card on a wide screen. Run again on resize.
+  function twSummaryPlace(root,agent){
+    var sum=root.querySelector('.tw-sum');if(!sum)return;
+    var mobile=!window.matchMedia('(min-width:900px)').matches,slot=sum.querySelector('.tw-sum-agent'),staySlot=sum.querySelector('.tw-sum-stay');
+    if(agent){
+      if(mobile){
+        var said=Array.from(agent.children).filter(function(el){return el.tagName==='P';});said.forEach(function(el){slot.appendChild(el);});
+        // A sentence the agent's line already says is not printed twice under Details.
+        var text=slot.textContent.replace(/\s+/g,' ');Array.from(sum.querySelectorAll('.tw-sum-notes p')).forEach(function(el){var t=el.textContent.replace(/\s+/g,' ').trim();el.hidden=!!t&&text.indexOf(t)!==-1;});
+        sum.after(agent);
+      }else{
+        var ask=agent.querySelector('.v4-ask');Array.from(slot.children).forEach(function(el){if(ask)ask.before(el);else agent.appendChild(el);});
+        Array.from(sum.querySelectorAll('.tw-sum-notes p')).forEach(function(el){el.hidden=false;});
+      }
+      agent.classList.toggle('tw-agent-empty',mobile&&!agent.querySelector('.v4-ask'));
+    }
+    var card=root.querySelector('.v4-stay-card'),acts=card&&card.querySelector('.v4-stay-acts'),more=root.querySelector('[data-v4-stay-more]');
+    if(more&&acts){if(mobile&&more.parentNode!==staySlot){staySlot.innerHTML='<span>'+esc(twText('Place to stay:','Hébergement :'))+'</span>';staySlot.appendChild(more);}else if(!mobile&&more.parentNode!==acts){acts.appendChild(more);staySlot.innerHTML='';}}
+    // Nothing to open (a wide screen with no notes): no Details button.
+    var any=Array.from(sum.querySelectorAll('.tw-sum-more p, .tw-sum-more button')).some(function(el){return !el.hidden;}),li=sum.querySelector('.tw-fact-more');
+    if(li)li.hidden=!any;if(!any)sum.querySelector('.tw-sum-more').hidden=true;
+  }
+  function twSumSet(open){
+    twSumOpen=!!open;var b=document.getElementById('twSumToggle'),box=document.getElementById('twSumMore');if(!b||!box)return;
+    b.setAttribute('aria-expanded',twSumOpen?'true':'false');box.hidden=!twSumOpen;twPad();
+  }
+  // Keyboard focus survives a redraw of the plan (a chat change, Swap, "See N more"): the same control is focused again.
+  function twFocusKey(){
+    var a=document.activeElement;if(!a||!resultEl.contains(a))return null;
+    if(a.id)return '#'+a.id;
+    if(a.hasAttribute('data-tw-day'))return '[data-tw-day="'+a.getAttribute('data-tw-day')+'"]';
+    if(a.hasAttribute('data-v4-stay-more'))return '[data-v4-stay-more]';
+    return null;
+  }
+  function twFocusBack(sel){
+    if(!sel||(document.activeElement&&document.activeElement!==document.body&&document.contains(document.activeElement)))return;
+    var el=null;try{el=resultEl.querySelector(sel);}catch(e){}
+    if(el){try{el.focus({preventScroll:true});}catch(e){el.focus();}}
+  }
   function twPad(){var bar=document.getElementById('v4Bar');if(!bar)return;var mobile=window.matchMedia('(max-width:899px)').matches;document.body.style.paddingBottom=mobile?bar.offsetHeight+'px':'';document.documentElement.style.setProperty('--v4-bar-h',mobile?bar.offsetHeight+'px':'0px');}
   var twBaseRender=v4Render;
-  v4Render=function(focus){v4.confirmed=false;v4.saved=false;var old=resultEl.querySelector('.tw-options');if(old)twOptionsOpen=old.open;twBaseRender(focus);tripWorkspaceChrome();};
+  v4Render=function(focus){v4.confirmed=false;v4.saved=false;var old=resultEl.querySelector('.tw-options');if(old)twOptionsOpen=old.open;var at=focus?null:twFocusKey();twBaseRender(focus);tripWorkspaceChrome();twFocusBack(at);};
   var twBaseUpdate=v4UpdateBar;
   v4UpdateBar=function(){v4.confirmed=false;twBaseUpdate();tripWorkspaceChrome();};
   v4Share=function(){
@@ -184,7 +355,8 @@ const WORKSPACE_CLIENT_SRC=String.raw`
   var twBaseGlow=chatGlow;
   chatGlow=function(keys){if(keys.indexOf('gh')!==-1){var opt=resultEl.querySelector('.tw-options');if(opt){opt.open=true;twOptionsOpen=true;}}for(var i=0;i<keys.length;i++){var row=chatRow(keys[i]),sec=row&&row.closest('.v4-day[id]');if(sec){twShowDay(sec.id.replace('t3-day-',''));break;}}twBaseGlow(keys);keys.forEach(function(k){var row=chatRow(k),info=row&&row.querySelector('.tw-card-info');if(info&&!info.querySelector('.tw-updated')){var badge=document.createElement('span');badge.className='tw-updated';badge.textContent=twText('Updated','Modifié');info.prepend(badge);}});};
   document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('[data-tw-day]');if(b){twShowDay(b.dataset.twDay);}});
+  document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('#twSumToggle');if(b)twSumSet(b.getAttribute('aria-expanded')!=='true');});
   document.addEventListener('keydown',function(e){var b=e.target.closest&&e.target.closest('[data-tw-day]');if(!b||!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;var buttons=Array.from(resultEl.querySelectorAll('[data-tw-day]')),i=buttons.indexOf(b);i=e.key==='Home'?0:e.key==='End'?buttons.length-1:(i+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;e.preventDefault();twShowDay(buttons[i].dataset.twDay);buttons[i].focus();});
   window.addEventListener('resize',function(){if(state.last)tripWorkspaceChrome();});
 `;
-module.exports={tripWorkspaceDay,tripWorkspaceBooking,WORKSPACE_STYLES,WORKSPACE_CLIENT_SRC};
+module.exports={tripWorkspaceDay,tripWorkspaceBooking,tripSummaryFacts,WORKSPACE_STYLES,WORKSPACE_CLIENT_SRC};

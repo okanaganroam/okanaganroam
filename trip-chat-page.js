@@ -63,6 +63,7 @@ const CHAT_STYLES = `<style>
   .t3-v4 .v4-agent p { margin: 0; }
   .t3-v4 .v4-ask { margin: 10px 0 0; }
   .t3-v4 .v4-ask-q { margin: 0 0 6px; }
+  .t3-v4 .v4-ask-short, .t3-v4 .v4-h-short { display: none; }
   .t3-v4 .v4-ask-btns { display: flex; flex-wrap: wrap; gap: 6px; }
   .t3-v4 .v4-ask-btns button { min-height: 38px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.22); background: var(--ref-cream, #F5F3ED); color: var(--ref-navy); font-weight: 800; font-size: 0.84rem; cursor: pointer; }
   .t3-v4 .v4-ask-dates { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 0; }
@@ -174,6 +175,9 @@ function chatClientSrc(d) {
     // reply is scrolled into view (it was below the fold in the sidebar).
     box.classList.remove('is-open');
     var sp = box.querySelector('.v4-chat-agent span'); box.classList.toggle('is-long', !!(sp && sp.scrollHeight > sp.clientHeight + 2));
+    // A reply that ends by asking something ("Want that?", "Go ahead?", "Which?") opens in full: the question sat
+    // under the two-line cut, so the visitor never saw what they were being asked.
+    if (box.classList.contains('is-long') && /[?\uFF1F]\s*$/.test(String(agent || ''))) box.classList.add('is-open');
     if (!opts.busy) { var st = document.getElementById('t3PlanStatus'); if (st) st.textContent = ''; }
     chatPad();
     if (!opts.busy && window.matchMedia && window.matchMedia('(min-width: 900px)').matches) { try { box.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { box.scrollIntoView(false); } }
@@ -340,17 +344,17 @@ function chatClientSrc(d) {
     en: { who: 'Trip agent', hi: 'Hi! Where are you headed, and what do you love doing?', day: 'Here’s a day in {town}{for}.', days: 'Here’s a {n}-day {town} plan{for}{stay}.', plan: 'Here’s your plan{for}.', more: ' Want me to change anything?',
       fam: ' for your family', dog: ' for you and your dog', stay: ', with a place to stay', stayWith: ', with a place to stay with {what}', stayUnsure: ', with a place to stay ({what} not confirmed)', and: 'and', notConfirmed: '{what} not confirmed',
       amen: { pool: 'a pool', hot_tub: 'a hot tub', kitchen: 'a kitchen', pets: 'pet-friendly rooms', parking: 'free parking', accessible: 'accessible rooms' },
-      chip: { pool: 'Pool', hot_tub: 'Hot tub', kitchen: 'Kitchen', pets: 'Pets welcome', parking: 'Free parking', accessible: 'Accessible' }, when: 'When are you coming?', weekend: 'This weekend', pick: 'Pick dates', notSure: 'Not sure yet', done: 'Done', from: 'Arrive', to: 'Leave',
+      chip: { pool: 'Pool', hot_tub: 'Hot tub', kitchen: 'Kitchen', pets: 'Pets welcome', parking: 'Free parking', accessible: 'Accessible' }, when: 'When are you coming?', whenShort: 'When?', weekend: 'This weekend', pick: 'Pick dates', notSure: 'Not sure yet', done: 'Done', from: 'Arrive', to: 'Leave',
       datesFail: 'I couldn’t plan those dates. Your plan is unchanged.', missing: 'I couldn’t fit {what} on these dates; tell me if you’d like me to try another day.', missingNoDates: 'I couldn’t fit {what} into this plan; say “add {what}” and I’ll try again.', removeEvent: 'Remove {name}', poolWinter: 'check it’s open in winter',
       datesSet: 'Planned for {a} – {b}.', ready: 'Your trip is ready. Book it, share it, or tell me what to change.', noCarNone: 'No shuttle listed for this trip.', wine: 'Wine tour (no driving)',
-      stayH: 'Where you’ll stay', rates: 'Check rates', seeMore: 'See {n} more', fewer: 'Hide', choose: 'Choose', ghH: 'Getting here', seeCars: 'See cars', book: 'Book', confirm: 'Confirm plan', sleeps: 'Sleeps {n}' },
+      stayH: 'Where you’ll stay', stayShort: 'Your stay', rates: 'Check rates', seeMore: 'See {n} more', fewer: 'Hide', choose: 'Choose', ghH: 'Getting here', seeCars: 'See cars', book: 'Book', confirm: 'Confirm plan', sleeps: 'Sleeps {n}' },
     fr: { who: 'Agent de voyage', hi: 'Bonjour! Où allez-vous, et qu’aimez-vous faire?', day: 'Voici une journée à {town}{for}.', days: 'Voici un plan de {n} jours à {town}{for}{stay}.', plan: 'Voici votre plan{for}.', more: ' Voulez-vous changer quelque chose?',
       fam: ' pour votre famille', dog: ' pour vous et votre chien', stay: ', avec un logement', stayWith: ', avec un logement qui a {what}', stayUnsure: ', avec un logement ({what} non confirmé)', and: 'et', notConfirmed: '{what} non confirmé',
       amen: { pool: 'une piscine', hot_tub: 'un spa', kitchen: 'une cuisine', pets: 'des chambres où les animaux sont acceptés', parking: 'un stationnement gratuit', accessible: 'des chambres accessibles' },
-      chip: { pool: 'Piscine', hot_tub: 'Spa', kitchen: 'Cuisine', pets: 'Animaux acceptés', parking: 'Stationnement gratuit', accessible: 'Accessible' }, when: 'Quand venez-vous?', weekend: 'Ce week-end', pick: 'Choisir les dates', notSure: 'Pas encore sûr', done: 'OK', from: 'Arrivée', to: 'Départ',
+      chip: { pool: 'Piscine', hot_tub: 'Spa', kitchen: 'Cuisine', pets: 'Animaux acceptés', parking: 'Stationnement gratuit', accessible: 'Accessible' }, when: 'Quand venez-vous?', whenShort: 'Quand?', weekend: 'Ce week-end', pick: 'Choisir les dates', notSure: 'Pas encore sûr', done: 'OK', from: 'Arrivée', to: 'Départ',
       datesFail: 'Je n’ai pas pu planifier ces dates. Votre plan n’a pas changé.', missing: 'Je n’ai pas pu inclure {what} à ces dates; dites-moi si vous voulez que j’essaie un autre jour.', missingNoDates: 'Je n’ai pas pu inclure {what} dans ce plan; dites « ajoute {what} » et j’essaie encore.', removeEvent: 'Retirer {name}', poolWinter: 'vérifiez qu’elle est ouverte en hiver',
       datesSet: 'Plan pour le {a} – {b}.', ready: 'Votre voyage est prêt. Réservez-le, partagez-le ou dites-moi quoi changer.', noCarNone: 'Aucune navette pour ce voyage.', wine: 'Tour des vignobles (sans conduire)',
-      stayH: 'Où vous logerez', rates: 'Voir les tarifs', seeMore: 'Voir {n} autres', fewer: 'Masquer', choose: 'Choisir', ghH: 'Pour venir', seeCars: 'Voir les voitures', book: 'Réserver', confirm: 'Confirmer le plan', sleeps: 'Jusqu’à {n} pers.' }
+      stayH: 'Où vous logerez', stayShort: 'Votre séjour', rates: 'Voir les tarifs', seeMore: 'Voir {n} autres', fewer: 'Masquer', choose: 'Choisir', ghH: 'Pour venir', seeCars: 'Voir les voitures', book: 'Réserver', confirm: 'Confirmer le plan', sleeps: 'Jusqu’à {n} pers.' }
   };
   function ag(k, vars){ var x = (AG[lang()] || AG.en)[k]; if (vars) Object.keys(vars).forEach(function(v){ x = x.split('{' + v + '}').join(String(vars[v])); }); return x; }
   var chatMain = document.getElementById('tripV3'); if (chatMain) chatMain.classList.add('v4-chat-mode');
@@ -391,7 +395,7 @@ function chatClientSrc(d) {
   function chatStayChips(card, w){
     var am = w && w.amenity; if (!am || !(am.keys || []).length) return '';
     var chips = AG[lang()] ? AG[lang()].chip : AG.en.chip, has = card.has || [];
-    return '<span class="v4-stay-chips">' + am.keys.slice(0, 2).map(function(k){ return has.indexOf(k) !== -1 ? '<span class="v4-stay-chip">' + esc((chips[k] || k) + (k === 'pool' && am.winterCheck ? ' · ' + ag('poolWinter') : '')) + '</span>' : '<span class="v4-stay-chip is-unsure">' + esc(ag('notConfirmed', { what: chips[k] || k })) + '</span>'; }).join('') + '</span>';
+    return '<span class="v4-stay-chips">' + am.keys.slice(0, 2).map(function(k){ return has.indexOf(k) !== -1 ? '<span class="v4-stay-chip">' + esc(chips[k] || k) + (k === 'pool' && am.winterCheck ? '<span class="v4-chip-extra"> · ' + esc(ag('poolWinter')) + '</span>' : '') + '</span>' : '<span class="v4-stay-chip is-unsure">' + esc(ag('notConfirmed', { what: chips[k] || k })) + '</span>'; }).join('') + '</span>';
   }
   // The request itself gave dates ("next Friday", "Dec 5"): no "When are you coming?", and the stay card may show them.
   function chatHasDates(){
@@ -456,7 +460,7 @@ function chatClientSrc(d) {
     // One short follow-up, with tap answers: the dates of an overnight trip, when none were given.
     var st = t3StayInputBase() || {};
     if (chatOvernight() && !st.arrive && !chat.askedWhen && !v4.confirmed && !chatHasDates()) {
-      html += '<div class="v4-ask"><p class="v4-ask-q">' + esc(ag('when')) + '</p><div class="v4-ask-btns"><button type="button" data-v4-when="weekend">' + esc(ag('weekend')) + '</button><button type="button" data-v4-when="pick">' + esc(ag('pick')) + '</button><button type="button" data-v4-when="later">' + esc(ag('notSure')) + '</button></div>'
+      html += '<div class="v4-ask"><p class="v4-ask-q" id="v4AskQ"><span class="v4-ask-full">' + esc(ag('when')) + '</span><span class="v4-ask-short" aria-hidden="true">' + esc(ag('whenShort')) + '</span></p><div class="v4-ask-btns" role="group" aria-labelledby="v4AskQ"><button type="button" data-v4-when="weekend">' + esc(ag('weekend')) + '</button><button type="button" data-v4-when="pick">' + esc(ag('pick')) + '</button><button type="button" data-v4-when="later">' + esc(ag('notSure')) + '</button></div>'
         + (chat.pickDates ? '<div class="v4-ask-dates"><label>' + esc(ag('from')) + ' <input type="date" id="v4WhenA"></label><label>' + esc(ag('to')) + ' <input type="date" id="v4WhenB"></label><button type="button" class="v4-link" data-v4-when="set">' + esc(ag('done')) + '</button></div>' : '') + '</div>';
     }
     return html + '</div>';
@@ -472,7 +476,7 @@ function chatClientSrc(d) {
     // No dates on the card until the visitor has given them (it showed tonight's date before "When are you coming?").
     var tripIn = d.w.trip || {}, known = chatHasDates() || !!((t3StayInputBase() || {}).arrive);
     var trip = t3StayTripLine(known ? tripIn : { adults: tripIn.adults, kids: tripIn.kids, dog: tripIn.dog }, fr), img = chatImg(s.photo);
-    var html = '<section class="v4-card v4-stay-card t3-stay" aria-label="' + esc(ag('stayH')) + '"><p class="v4-card-h">' + esc(ag('stayH')) + (trip ? ' · ' + esc(trip) : '') + '</p>'
+    var html = '<section class="v4-card v4-stay-card t3-stay" aria-label="' + esc(ag('stayH')) + '"><p class="v4-card-h"><span class="v4-h-full">' + esc(ag('stayH')) + '</span><span class="v4-h-short" aria-hidden="true">' + esc(ag('stayShort')) + '</span>' + (trip ? ' · ' + esc(trip) : '') + '</p>'
       + '<div class="v4-stay-row">' + (img ? '<img class="v4-stay-img" src="' + esc(img) + '" alt="" width="64" height="64" loading="lazy">' : '<span class="v4-stay-img" aria-hidden="true"></span>')
       + '<div><span class="v4-stay-name">' + esc(s.name) + '</span><span class="v4-stay-facts">' + esc(facts) + '</span>' + chatStayChips(s, d.w) + '</div></div>'
       + '<div class="v4-stay-acts">' + (step ? t3StayLinkHtml(s, { url: step.url, rel: step.rel, key: step.link, affiliate: step.affiliate }, 'v4-btn', ag('rates')) : '')
