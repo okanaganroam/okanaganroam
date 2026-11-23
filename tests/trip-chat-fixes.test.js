@@ -84,7 +84,7 @@ test('2. "This weekend": Friday or Saturday count from today; on a Sunday (or an
 
 test('3. the chat box is cleared as soon as a message is sent', () => {
   const html = app.renderTripPlannerV3Page({ v4: 'preview', stays: 'preview', chat: 'preview' });
-  assert.match(html, /if \(inEl\) inEl\.value = '';\s*chatSend\(text\.slice\(0, 400\), null\);/);
+  assert.match(html, /if \(inEl\) inEl\.value = '';[\s\S]{0,400}chatSend\(text\.slice\(0, 400\), null\);/);
 });
 
 test('4. replies say exactly what changed, once; "each day", "the second day is too busy", "an activity after dinner"', () => {

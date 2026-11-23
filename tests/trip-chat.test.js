@@ -368,14 +368,14 @@ test('mapping: pace, party, budget, days, time, town, redo and start over use th
 test('replies: a broad change names what changed (or counts it), and says when nothing changed', () => {
   const swapped = [STOPS[0], STOPS[1], { key: '1-afternoon', id: 90, name: 'Gyro Beach', type: 'beach', start: 870 }, STOPS[3]];
   let out = tc.planTurn(ops({ o: 'pace', value: 'packed' }), ctx(fakeRun(() => dayPlan(swapped))));
-  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Busier days. Changed 1 stop.');
-  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. Journées plus remplies. 1 arrêt a changé.');
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Busier days. Took out Tree Brewing. Added Gyro Beach.');
+  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. Journées plus remplies. J’ai retiré Tree Brewing. J’ai ajouté Gyro Beach.');
   out = tc.planTurn(ops({ o: 'pace', value: 'packed' }), ctx(fakeRun(() => dayPlan(STOPS))));
   assert.equal(tc.buildReply(out, { lang: 'en' }), 'Busier days. The plan already fits that, so nothing changed.');
   const all = STOPS.map((s, i) => ({ ...s, id: 100 + i, name: `New ${i}` }));
   out = tc.planTurn(ops({ o: 'party', value: 'dog' }), ctx(fakeRun(() => dayPlan(all))));
-  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Planned for your dog. Changed 4 stops.');
-  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. Plan adapté à votre chien. 4 arrêts ont changé.');
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Planned for your dog. Changed 4 stops on day 1.');
+  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. Plan adapté à votre chien. 4 arrêts ont changé (jour 1).');
   assert.equal(tc.buildReply(null, { lang: 'en', cant: 'booking' }), 'I can’t book things in this chat, but confirm the plan and “Book my trip” opens each booking.');
   assert.equal(tc.buildReply(null, { lang: 'fr', cant: 'transport' }), 'Je ne peux pas réserver de vols ni de transport, mais je peux adapter le plan à votre arrivée.');
   // A conflict from the planner (it throws) leaves the plan unchanged.

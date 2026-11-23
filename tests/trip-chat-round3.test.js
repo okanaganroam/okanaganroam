@@ -309,9 +309,9 @@ test('a wine tour with a driver is offered (or said plainly when we have none); 
 
 test('page: a message typed while waiting is queued; no "When are you coming?" when the request had dates; no dates on the stay card before they are known; the plan\'s "not included" is in the first line; button results show in the chat line', () => {
   const html = pageHtml();
-  assert.match(html, /if \(chat\.busy\) \{ chat\.queue = \{ message: message, chip: chip, label: label \};/);
+  assert.match(html, /if \(chat\.busy\) \{ chat\.queue = \{ message: message, chip: chip, label: label, confirmed: confirmed \};/);
   assert.doesNotMatch(html, /inEl\.disabled = true/, 'the box stays usable while waiting');
-  assert.match(html, /if \(q\) setTimeout\(function\(\)\{ chatSend\(q\.message, q\.chip, q\.label\); \}, 0\);/);
+  assert.match(html, /if \(q\) setTimeout\(function\(\)\{ chatSend\(q\.message, q\.chip, q\.label, q\.confirmed\); \}, 0\);/);
   assert.match(html, /!chat\.askedWhen && !v4\.confirmed && !chatHasDates\(\)/);
   assert.match(html, /known \? tripIn : \{ adults: tripIn\.adults, kids: tripIn\.kids, dog: tripIn\.dog \}/);
   assert.match(html, /I couldn’t fit \{what\} on these dates; tell me if you’d like me to try another day\./);

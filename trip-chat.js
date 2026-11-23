@@ -478,7 +478,41 @@ function kindsNamed(t, exceptTypes = new Set()) {
   return out.some((k) => agent.TOUR_KINDS[k]) ? out.filter((k) => k !== 'tour' && !(k === 'winery' && out.includes('wine_tour')) && !(k === 'brewery' && out.includes('brewery_tour'))) : out;
 }
 // -> { ops, cant }. Several asks in one message are each read and carried out in order (trip-chat-agent.js readAll).
-function rulesRead(message, stops, opts = {}) { return agent.readAll(message, (m) => rulesReadOne(m, stops, opts)); }
+function rulesRead(message, stops, opts = {}) { return groupRead(message, stops, opts) || agent.readAll(message, (m) => rulesReadOne(m, stops, opts)); }
+// One of the party does not drink (2026-11-22, Dayton: "one non-drinker must not remove wineries for everyone"): the
+// message is about that person, never a rule for the whole trip. "Only one person does not drink; the rest want
+// wineries. Can you add a winery on day 2 with a non-alcoholic option?" -> party_some (whose need it is) and ONE winery
+// on day 2 asked with the non-alcoholic badge. The clauses that only say who drinks add nothing.
+const NA_OPTION_RE = /\b(?:non[- ]alcoholic|alcohol[- ]free|zero[- ]proof|mocktails?|sans alcool)\b/;
+const DRINK_WORD_RE = /\b(?:drinks?|drinking|drinkers?|alcohol\w*|boit|boivent|alcool|winer\w+|wines?|brewer\w+|beers?|vignobles?|vins?)\b/;
+const ADD_VERB_RE = /\b(?:add|include|put in|fit in|book|ajoute[rz]?|inclure|incluez|inclus)\b/;
+function groupRead(message, stops, opts = {}) {
+  const t = fold(message).replace(/\s+/g, ' ').trim();
+  if (!(opts.partySome || (ONE_PERSON_RE.test(t) && DRINK_WORD_RE.test(t)))) return null;
+  const base = { stops: [], kind: null, time: null, day: null, value: null, n: null, ages: [], region: null, date: null };
+  const h = { op: (o, extra = {}) => ({ ...base, o, ...extra }), kindsNamed };
+  const explained = agent.explainRules(t, h);
+  if (explained) return explained;
+  if (/\b(?:remove|take (?:out|off)|drop|skip|swap|replace|instead|enleve[rz]?|retire[rz]?|remplace[rz]?)\b/.test(t)) return null;
+  const ops = [{ ...base, o: 'party_some', value: 'alcohol' }];
+  const rest = String(message).split(/(?<=[.;!?])\s+/).filter((c) => ADD_VERB_RE.test(fold(c))).join(' ');
+  if (rest) {
+    const r = agent.readAll(rest, (m) => rulesReadOne(m, stops, opts));
+    for (const o of r.ops || []) {
+      if (o.o === 'party' || o.o === 'refine') continue;
+      if (o.o === 'add' && NA_OPTION_RE.test(t) && KINDS[o.kind] && DRINK_TYPES.has(KINDS[o.kind].type || (KINDS[o.kind].types || [])[0])) o.features = ['nonalcoholic'];
+      ops.push(o);
+    }
+  }
+  return { ops, cant: null, exact: true, group: true };
+}
+// "we don't drink" said of the whole group, then "only one of us doesn't": the stored request so that it is that
+// person's (the planner then reads partySome and rules nothing out). -> the new text, or null.
+function onePersonText(text) {
+  const out = String(text || '').replace(/[,;.]?\s*(?:and\s+)?(?:(?:we|the group|all of us|none of us|nobody|no one)\s+)?(?:don[’']?t|do not|doesn[’']?t|does not)\s+drink(?:\s+alcohol)?\b|[,;.]?\s*(?:and\s+)?no\s+(?:alcohol|drinking|booze)\b|[,;.]?\s*(?:and\s+)?(?:alcohol[- ]free|sober|sans alcool|pas d[’']alcool|(?:on|nous) ne (?:boit|buvons) pas)(?![\w-])/gi, '').replace(/\s+/g, ' ').replace(/[\s,;.]+$/, '').trim();
+  const next = out ? `${out}. One person does not drink.` : '';
+  return next && next.length <= MAX_TEXT ? next : null;
+}
 function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 1, weekdays = {}, recent = [], request = '' } = {}) {
   const t = fold(message).replace(/\s+/g, ' ').trim();
   const base = { stops: [], kind: null, time: null, day: null, value: null, n: null, ages: [], region: null, date: null };
@@ -732,6 +766,9 @@ function reconcileReads(ai, rules, message) {
     ai = { ...ai, ops: ai.ops.filter((o) => !(o.o === 'party' && o.value === 'no_alcohol')) };
     if (!ai.ops.length) return { ops: rules.ops, cant: rules.ops.length ? null : (rules.cant || 'unclear'), source: 'rules_over_ai', fixes: ['one_person'] };
   }
+  // One of the party does not drink, and explain questions: the word rules' reading stands (never an edit, never a rule
+  // for the whole trip).
+  if (rules.group || rules.explain) return { ops: rules.ops, cant: null, source: 'rules_over_ai', fixes: [rules.group ? 'group' : 'explain'] };
   const rops = rules.ops || [];
   // Round 6 (Whistler: "something cheaper for dinner on Friday" changed Saturday's dinner): when the message names a day,
   // the rules' reading of which day stands over an AI reading of another day.
@@ -1344,6 +1381,7 @@ function planTurn(ops, ctx) {
   const softLocks = { ...(out.locks || ctx.locks || {}) };
   for (const op of moves) {
     const res = ctx.short ? { result: { op: op.o, ok: false, local: true, why: 'no_fit', stop: op.stops[0] } } : agent.moveStop(op, state, { run: ctx.run, hooks: ctx.hooks || {}, planStops, isDayPlan });
+    if (op.sunsetTime) res.result.sunset = true;
     out.results.push(res.result);
     if (!res.plan) continue;
     plan = res.plan;
@@ -1405,6 +1443,9 @@ function planTurnCore(ops, ctx) {
   const queue = locals.slice();
   const altNext = (i) => {
     const p = queue[i];
+    // A badge asked of the new stop ("with a non-alcoholic option") that no place within reach has: the best place of
+    // that kind instead, and the reply says its listing does not say (never claimed).
+    if (p && p._r && !p._r.ok && (p.features || []).length && !(p.alt || []).length) { results.splice(results.indexOf(p._r), 1); queue.splice(i + 1, 0, { ...p, features: null, _featAsked: p.features, _r: null }); return; }
     if (!p || !(p.alt || []).length || !p._r || p._r.ok) return;
     results.splice(results.indexOf(p._r), 1);
     queue.splice(i + 1, 0, { ...p, kind: p.alt[0], alt: p.alt.slice(1), _r: null, _kinds: [...(p._kinds || [p.kind]), p.alt[0]] });
@@ -1413,7 +1454,7 @@ function planTurnCore(ops, ctx) {
     if (qi > 0) altNext(qi - 1);
     if (qi >= queue.length) break;
     const op = queue[qi];
-    const r = { op: op.o, ok: false, local: true, ...(op._kinds ? { kinds: op._kinds } : {}) };
+    const r = { op: op.o, ok: false, local: true, ...(op._kinds ? { kinds: op._kinds } : {}), ...((op.features || op._featAsked || []).length ? { featAsked: op.features || op._featAsked } : {}) };
     op._r = r;
     results.push(r);
     // The stop the op names, as it is now (an earlier edit in the same message may have moved it).
@@ -1458,6 +1499,12 @@ function planTurnCore(ops, ctx) {
     const tk = op.o === 'add' ? agent.tourKindOf(kind) : null;
     // Round 6 (Whistler: "add a snowmobile tour on Saturday afternoon" with one already on the plan said "we don't list one"):
     // that kind already on the plan is said.
+    const swapK = () => ({ ...KIND_SWAP[kind], ...((op.features || []).length ? { types: KIND_SWAP[kind].types || [KIND_SWAP[kind].type], features: op.features } : {}) });
+    // That day already has one whose listing has the badge asked: said, nothing changes.
+    if (op.o === 'add' && r.featAsked && typeof ctx.hasFeature === 'function') {
+      const haveF = cur.stops.find((x) => kindMatches(kind, x) && !cur.removed.has(x.key) && (!op.day || x.day === op.day) && r.featAsked.every((f) => ctx.hasFeature(x.id, f)));
+      if (haveF) { r.ok = true; r.alreadyFeat = haveF; continue; }
+    }
     const have = tk && op.o === 'add' ? cur.stops.find((x) => kindMatches(kind, x) && !cur.removed.has(x.key) && (!op.day || x.day === op.day)) : null;
     if (have) { r.ok = true; r.already = have; r.tour = true; continue; }
     let tourHook = null;
@@ -1525,7 +1572,7 @@ function planTurnCore(ops, ctx) {
       const parts = anchor ? [first] : [...new Set([first, 'afternoon', 'late', 'morning'])];
       const asked = new Set(kindsNamed(fold((ctx.args && ctx.args.text) || '')).map((k) => KINDS[k] && KINDS[k].type).filter(Boolean));
       const there = parts.map((p2) => cur.stops.find((x) => x.key === `${dayN}-${p2}` && !x.role && !cur.removed.has(x.key) && cur.locks[x.key] !== x.id && !asked.has(x.type) && !x.soft)).find(Boolean);
-      const res2 = there ? slotEdit(cur, { slot: there.key, slotStart: there.start, shifts: {}, kind, swap: { ...KIND_SWAP[kind] }, exclude: [there.id], oldId: there.id, check: (f) => wantMatches(kind, f) && !cur.stops.some((o) => o.id === f.id) }, ctx) : null;
+      const res2 = there ? slotEdit(cur, { slot: there.key, slotStart: there.start, shifts: {}, kind, swap: swapK(), exclude: [there.id], oldId: there.id, check: (f) => wantMatches(kind, f) && !cur.stops.some((o) => o.id === f.id) }, ctx) : null;
       if (res2 && !res2.why) {
         r.ok = true; r.fresh = res2.fresh; r.inPlaceOf = there; r.moved = [];
         cur.locks[there.key] = res2.fresh.id;
@@ -1547,7 +1594,7 @@ function planTurnCore(ops, ctx) {
     const tries = t0 ? [t0.start, t0.start + 60, t0.start + 120].filter((m) => m === t0.start || m + 45 <= t0.until) : [where.slotStart];
     let res = null;
     for (const at0 of tries) {
-      res = slotEdit(cur, { slot: where.slot, shifts: where.shifts, keep: !!where.keep, slotStart: Number.isInteger(at0) ? at0 : undefined, after: !r.before && (where.keep || t0) ? (op.stops || [])[0] : null, kind, swap: { ...KIND_SWAP[kind] }, exclude: [], check: (f) => wantMatches(kind, f) && !cur.stops.some((o) => o.id === f.id) }, ctx);
+      res = slotEdit(cur, { slot: where.slot, shifts: where.shifts, keep: !!where.keep, slotStart: Number.isInteger(at0) ? at0 : undefined, after: !r.before && (where.keep || t0) ? (op.stops || [])[0] : null, kind, swap: swapK(), exclude: [], check: (f) => wantMatches(kind, f) && !cur.stops.some((o) => o.id === f.id) }, ctx);
       if (!res.why || res.why === 'conflict') break;
     }
     // A near miss (round 6): nothing of that kind open at the time asked, but later the same day: put there, and said.
@@ -1555,7 +1602,7 @@ function planTurnCore(ops, ctx) {
       const w2 = placeAdd({ ...op, time: null, stops: [], value: null, day: where.day || op.day || null }, kind, cur);
       const t2 = w2.slot && w2.slot !== where.slot && !Object.keys(w2.shifts || {}).length ? addStart(cur, w2.slot, null) : null;
       if (t2) {
-        const res3 = slotEdit(cur, { slot: w2.slot, shifts: {}, slotStart: t2.start, kind, swap: { ...KIND_SWAP[kind] }, exclude: [], check: (f) => wantMatches(kind, f) && !cur.stops.some((o) => o.id === f.id) }, ctx);
+        const res3 = slotEdit(cur, { slot: w2.slot, shifts: {}, slotStart: t2.start, kind, swap: swapK(), exclude: [], check: (f) => wantMatches(kind, f) && !cur.stops.some((o) => o.id === f.id) }, ctx);
         if (!res3.why) { res = res3; r.nearMiss = true; where.slot = w2.slot; }
       }
     }
@@ -1578,6 +1625,8 @@ function planTurnCore(ops, ctx) {
       if (f2 && tourRunSteady(cur.stops, nw2, ids2, r.fresh.day, tk.covers || [])) { const ids = ids2; r.tourAdjust = (p2.tourAdjust || []).map((x) => ({ ...x, name: (cur.stops.find((y) => y.id === x.id) || {}).name || '' })).filter((x) => x.name); r.covered = cur.stops.filter((x) => ids.includes(x.id) && !r.tourAdjust.some((y) => y.id === x.id)); r.coveredGone = true; r.coverType = (tk.covers || [])[0]; r.fresh = f2; cur = { plan: p2, stops: nw2, args: { ...a2, overrides: cur.args.overrides || null, trustedPins: undefined }, locks: cur.locks, removed: new Set() }; }
     }
   }
+  // A badge asked of an added stop is claimed only when the listing itself has it.
+  for (const r of results) if (r.featAsked && r.ok && r.fresh) r.feat = typeof ctx.hasFeature === 'function' && r.featAsked.every((f) => ctx.hasFeature(r.fresh.id, f));
   if (!cur.plan) {
     // Nothing could be re-planned: the plan on screen stays exactly as it was (removes and keeps still apply).
     return { plan: null, req: null, actions, results, changed: [], locks: ctx.locks || {}, failed: true };
@@ -1614,6 +1663,12 @@ const T = {
     tourCoversMoved: 'It covers that part of the day, so I took out {names}.', timeAfternoon: 'Day {d} starts in the afternoon, so I left it as it is.', timeNow: 'Day {d} now starts with {name} at {time}.',
     ends_lunch: 'That day already ends with lunch, so I left it as it is.', meals_lunch: 'Each day already has lunch, so nothing changed.', meals_dinner: 'Each day already has dinner, so nothing changed.', getting_here: 'The Getting here card under your plan shows the drive, shuttles and rental cars. Tell me when you arrive and I’ll plan around it.', alreadyOn: '{name} is already on your plan{at}.',
     tourAfterLunch: '{name} moves to {time} and the tour starts after it.', tourHasLunch: 'Lunch is part of the tour, so I took out {name}.', tourNoLunch: 'There was no room for {name} around the tour, so I took it out.', setTimeOverlap: '{name} can’t start at {time}: {other} is on then.', setTimeFree: 'The earliest it can start is {time}.', setTimeShifted: '{name} now ends at {time}.', setTimeGaveWay: 'To make room I took out {names}.',
+    featHas: 'Its listing has non-alcoholic options.', featUnknown: 'Its listing doesn’t say if it has non-alcoholic options, so ask when you book.', featAlready: '{name} on day {d} already lists non-alcoholic options, so I left the day as it is.',
+    diffDays: 'Changed {n} stops on {days}.', dayW: 'day', daysW: 'days', diffAll: 'Changed {n} stops in all.', moreNot: 'I couldn’t do {n} other things you asked.', moreNotOne: 'I couldn’t do one other thing you asked.',
+    guardBroad: 'That would change {n} other stops: {names}. Go ahead?', guardMore: '{names} and {n} more', guardSunset: 'A sunset dinner at {time} would mean dropping {names}. Go ahead?',
+    someRewrote: 'Got it: only one of you doesn’t drink, so wineries and breweries are fine for the rest. Nothing has changed yet: say “add a winery” and I’ll add one.', someNoted: 'I’ve noted that only one of you doesn’t drink.', someHas: 'For your non-drinker: {names} {v} non-alcoholic options.', someHasV1: 'lists', someHasVn: 'list', someNone: 'None of your tasting stops lists non-alcoholic options on its listing, so ask when you book.', someOffer: 'Want me to add a café near the winery? Say “add a café”.', someNoDrink: 'Noted: one of you doesn’t drink. Your plan has no winery or brewery stop right now.',
+    whyHas: 'Your plan does have {what}: {list}.', whyHasAsked: 'You asked for {n} {plural}: {list}.', onDay: '{name} on day {d}', whyDry: 'Your request said the group doesn’t drink, so I left {plural} out. If only one of you doesn’t, say so and I’ll add them.', whyNotIncluded: '{text} Say “add {add}” and I’ll try again.', whyNotAsked: 'Your request didn’t ask for {what}, so there isn’t one. Say “add {add}” if you’d like one.', whyNoFit: 'I didn’t find {what} that fit these days. Say “add {add}” and I’ll try again.',
+    lastChange: 'Last change: I {what}.', lastIn: 'added {names}', lastOut: 'took out {names}', lastMoved: 'moved {names}', lastNone: 'I haven’t changed anything in this plan yet.', lastFailed: 'Last time I couldn’t add {kinds}.', nothingMissing: 'Nothing is missing: everything you asked for is in the plan.',
     qNone: 'There’s no {what} in your plan. Say “add {add}” if you’d like one.', qMissingAsked: 'The {what} you asked for isn’t in your plan: none I list fit there on these dates. Say “add {add}” and I’ll find the nearest.',
     alreadyHas: '{name} already has {what}, so I kept it.', swapped: 'Swapped {old} for {new}{at}.', swapFail: 'I couldn’t find {kind} that fits there, so {old} stays.', swapFailSame: 'Nothing else nearby fits there, so {old} stays.',
     added: 'Added {new}{at}.', addedFor: 'Added {new}{at} in place of {old}.', info: 'I can’t answer questions about a place here. Tap the stop’s name for its hours, prices and details.', moved: '{name} moves to {time}.', noRoom: 'There’s no free spot for {kind} {where} without dropping a stop. Remove or swap one first.', addFailWhere: 'I couldn’t find {kind} open nearby {where}.', afterW: 'after {x}', beforeW: 'before {x}', thereW: 'at that time', lunchW: 'lunch', dinnerW: 'dinner', addedClose: 'Added {new}{at}, the closest fit I found.', addFail: 'I couldn’t fit {kind} into this plan.', more: 'Added {new}{at}, more like {liked}.', moreFail: 'I kept {liked}, but couldn’t fit another like it.',
@@ -1651,6 +1706,12 @@ const T = {
     tourCoversMoved: 'Il couvre ce moment de la journée, donc j’ai retiré {names}.', timeAfternoon: 'Le jour {d} commence l’après-midi, donc je l’ai laissé tel quel.', timeNow: 'Le jour {d} commence maintenant avec {name} à {time}.',
     ends_lunch: 'Cette journée se termine déjà avec le dîner, donc je l’ai laissée telle quelle.', meals_lunch: 'Chaque jour a déjà un dîner, donc rien n’a changé.', meals_dinner: 'Chaque jour a déjà un souper, donc rien n’a changé.', getting_here: 'La carte Pour venir sous votre plan montre la route, les navettes et les voitures de location. Dites-moi quand vous arrivez et j’adapterai le plan.', alreadyOn: '{name} est déjà dans votre plan{at}.',
     tourAfterLunch: '{name} passe à {time} et le tour commence après.', tourHasLunch: 'Le dîner fait partie du tour, donc j’ai retiré {name}.', tourNoLunch: 'Il n’y avait pas de place pour {name} autour du tour, donc je l’ai retiré.', setTimeOverlap: '{name} ne peut pas commencer à {time} : {other} est prévu à ce moment.', setTimeFree: 'Au plus tôt : {time}.', setTimeShifted: '{name} se termine maintenant à {time}.', setTimeGaveWay: 'Pour faire de la place, j’ai retiré {names}.',
+    featHas: 'Sa fiche indique des options sans alcool.', featUnknown: 'Sa fiche ne dit pas s’il y a des options sans alcool; demandez en réservant.', featAlready: '{name}, au jour {d}, indique déjà des options sans alcool, donc je n’ai rien changé à cette journée.',
+    diffDays: '{n} arrêts ont changé ({days}).', dayW: 'jour', daysW: 'jours', diffAll: '{n} arrêts ont changé en tout.', moreNot: 'Je n’ai pas pu faire {n} autres choses demandées.', moreNotOne: 'Je n’ai pas pu faire une autre chose demandée.',
+    guardBroad: 'Cela changerait {n} autres arrêts : {names}. On y va?', guardMore: '{names} et {n} autres', guardSunset: 'Un souper au coucher du soleil à {time} ferait retirer {names}. On y va?',
+    someRewrote: 'Compris : une seule personne ne boit pas, donc les vignobles et les microbrasseries conviennent aux autres. Rien n’a changé pour l’instant : dites « ajoute un vignoble » et j’en ajouterai un.', someNoted: 'J’ai noté qu’une seule personne ne boit pas.', someHas: 'Pour la personne qui ne boit pas : {names} {v} des options sans alcool.', someHasV1: 'indique', someHasVn: 'indiquent', someNone: 'Aucun de vos arrêts de dégustation n’indique d’options sans alcool; demandez en réservant.', someOffer: 'Voulez-vous un café près du vignoble? Dites « ajoute un café ».', someNoDrink: 'Noté : une personne ne boit pas. Votre plan n’a ni vignoble ni microbrasserie pour l’instant.',
+    whyHas: 'Votre plan comprend bien {what} : {list}.', whyHasAsked: 'Vous avez demandé {n} {plural} : {list}.', onDay: '{name} au jour {d}', whyDry: 'Votre demande disait que le groupe ne boit pas, donc j’ai laissé de côté les {plural}. Si une seule personne ne boit pas, dites-le et je les ajouterai.', whyNotIncluded: '{text} Dites « ajoute {add} » et je réessaierai.', whyNotAsked: 'Votre demande ne mentionnait pas {what}, donc il n’y en a pas. Dites « ajoute {add} » si vous en voulez.', whyNoFit: 'Je n’ai pas trouvé {what} qui convienne à ces journées. Dites « ajoute {add} » et je réessaierai.',
+    lastChange: 'Dernier changement : j’ai {what}.', lastIn: 'ajouté {names}', lastOut: 'retiré {names}', lastMoved: 'déplacé {names}', lastNone: 'Je n’ai encore rien changé à ce plan.', lastFailed: 'La dernière fois, je n’ai pas pu ajouter {kinds}.', nothingMissing: 'Rien ne manque : tout ce que vous avez demandé est dans le plan.',
     qNone: 'Il n’y a pas de {what} dans votre plan. Dites « ajoute {add} » si vous en voulez un.', qMissingAsked: 'Le {what} demandé n’est pas dans votre plan : aucun de ceux que nous listons ne convenait à ces dates. Dites « ajoute {add} » et je trouverai le plus proche.',
     alreadyHas: '{name} a déjà {what}, donc je l’ai gardé.', swapped: 'J’ai remplacé {old} par {new}{at}.', swapFail: 'Je n’ai pas trouvé {kind} qui convienne à ce moment, donc {old} reste.', swapFailSame: 'Rien d’autre à proximité ne convient à ce moment, donc {old} reste.',
     added: 'J’ai ajouté {new}{at}.', addedFor: 'J’ai ajouté {new}{at} à la place de {old}.', info: 'Je ne peux pas répondre aux questions sur un lieu ici. Touchez le nom de l’arrêt pour ses heures, ses prix et ses détails.', moved: '{name} passe à {time}.', noRoom: 'Pas de place libre pour {kind} {where} sans retirer un arrêt. Retirez-en ou remplacez-en un d’abord.', addFailWhere: 'Je n’ai pas trouvé {kind} ouvert à proximité {where}.', afterW: 'après {x}', beforeW: 'avant {x}', thereW: 'à ce moment', lunchW: 'le dîner', dinnerW: 'le souper', addedClose: 'J’ai ajouté {new}{at}, le meilleur moment que j’ai trouvé.', addFail: 'Je n’ai pas pu ajouter {kind} à ce plan.', more: 'J’ai ajouté {new}{at}, dans le même esprit que {liked}.', moreFail: 'J’ai gardé {liked}, mais je n’ai pas pu en ajouter un autre du même genre.',
@@ -1680,6 +1741,85 @@ const T = {
 for (const L of ['en', 'fr']) Object.assign(T[L], agent.AGENT_T[L]);
 // A name that ends with a period ("Cannery Brewing Co.") does not get a second one.
 function fill(s, vars) { return String(s).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m)).replace(/\.\./g, '.'); }
+// ---------- The broad-change guard, and the answers to explain questions ----------
+// 2026-11-22 (Dayton: "for a targeted edit, preserve unrelated stops and their times unless changing them is necessary.
+// Before a broad change, explain what would change and let the user choose"). out: planTurn's result; stops: the stops on
+// screen; ops: what was read. -> null (apply it), { kind: 'broad', stops } (more than two other stops would change) or
+// { kind: 'sunset', time, stops } (a sunset time would drop a stop nobody mentioned).
+const TARGETED_OPS = ['add', 'replace', 'more_like', 'remove', 'keep', 'move', 'set_time', 'refine'];
+function guardTurn(out, stops, ops) {
+  if (!out || !out.plan) return null;
+  const sun = (out.results || []).find((r) => r.sunset && r.ok && (r.gaveWay || []).length);
+  if (sun) return { kind: 'sunset', time: sun.fresh && sun.fresh.start, stops: sun.gaveWay };
+  // "add a ski day" asks for a whole day: an explicit broad ask (the reply counts what changed and on which days).
+  if (!(ops || []).length || !ops.every((o) => (TARGETED_OPS.includes(o.o) && !(o.o === 'add' && o.kind === 'ski')) || (o.o === 'budget' && (o.stops || []).length))) return null;
+  const named = new Set();
+  for (const o of ops) for (const s of o.stops || []) named.add(s.id);
+  for (const r of out.results || []) {
+    for (const k of ['fresh', 'old', 'inPlaceOf', 'liked', 'already', 'alreadyFeat', 'stop', 'other', 'anchor']) if (r[k] && r[k].id) named.add(r[k].id);
+    for (const k of ['covered', 'moved', 'gaveWay', 'tourAdjust', 'names']) for (const x of r[k] || []) if (x && x.id) named.add(x.id);
+    for (const p of r.pairs || []) { if (p.old) named.add(p.old.id); if (p.fresh) named.add(p.fresh.id); }
+    if (r.op === 'remove') for (const s of r.stops || []) named.add(s.id);
+  }
+  const after = planStops(out.plan);
+  const others = (stops || []).filter((b) => { if (named.has(b.id)) return false; const a = after.find((x) => x.id === b.id); return !a || a.day !== b.day || (Number.isInteger(a.start) && Number.isInteger(b.start) && Math.abs(a.start - b.start) >= 30); });
+  return others.length > 2 ? { kind: 'broad', stops: others } : null;
+}
+function guardReply(g, lang) {
+  const L = lang === 'fr' ? 'fr' : 'en';
+  const t = T[L];
+  const names = g.stops.map((s) => s.name);
+  if (g.kind === 'sunset') return fill(t.guardSunset, { time: clock(g.time, L), names: joinList(names, L) });
+  return fill(t.guardBroad, { n: names.length, names: names.length > 3 ? fill(t.guardMore, { names: names.slice(0, 3).join(', '), n: names.length - 3 }) : joinList(names, L) });
+}
+// facts: { stops, request, wholeDry, notIncluded: [{ kind, text, textFr }], naIds, last: { in, out, moved (names), failed (kinds) } }.
+const NUM_ASKED_RE = /\b(two|2|three|3|four|4|a couple of|deux|trois|quatre)\s+(?:\w+\s+)?$/;
+function explainReply(op, facts, lang) {
+  const L = lang === 'fr' ? 'fr' : 'en';
+  const t = T[L];
+  const stops = facts.stops || [];
+  if (op.value === 'q_why_not') {
+    const k = KINDS[op.kind];
+    if (!k) return t.ask_whichNone;
+    const what = k[L], add = op.kind === 'arts' ? (L === 'fr' ? 'un musée' : 'a museum') : what;
+    const on = stops.filter((s) => kindMatches(op.kind, s));
+    const req = fold(facts.request || '');
+    const re = (KIND_WORDS.find(([kk]) => kk === op.kind) || [])[1] || null;
+    const hit = re ? re.exec(req) : null;
+    const plural = TYPE_PLURAL[k.type] && L === 'en' ? TYPE_PLURAL[k.type] : (L === 'fr' && t.avoidWhat[op.kind] ? `${t.avoidWhat[op.kind]}s` : kindNoun(op.kind, L));
+    if (on.length) {
+      const list = joinList(on.slice(0, 4).map((s) => fill(t.onDay, { name: s.name, d: s.day })), L);
+      const num = hit ? NUM_ASKED_RE.exec(req.slice(0, hit.index)) : null;
+      const N = num ? ({ two: 2, 2: 2, three: 3, 3: 3, four: 4, 4: 4, 'a couple of': 2, deux: 2, trois: 3, quatre: 4 }[num[1]] || 0) : 0;
+      return N && on.length >= N ? fill(t.whyHasAsked, { n: num[1], plural, list }) : fill(t.whyHas, { what, list });
+    }
+    const type = k.type || (k.types || [])[0];
+    if (facts.wholeDry && DRINK_TYPES.has(type)) return fill(t.whyDry, { plural });
+    const ni = (facts.notIncluded || []).find((x) => x && (x.kind === op.kind || x.kind === k.type || x.kind === k.badge));
+    if (ni && ni.text) return fill(t.whyNotIncluded, { text: L === 'fr' && ni.textFr ? ni.textFr : ni.text, add });
+    return fill(hit ? t.whyNoFit : t.whyNotAsked, { what, add });
+  }
+  if (op.value === 'q_dry') {
+    const drink = stops.filter((s) => DRINK_TYPES.has(s.type));
+    const na = drink.filter((s) => (facts.naIds || []).includes(s.id));
+    if (na.length) return fill(t.someHas, { names: joinList(na.map((s) => s.name), L), v: na.length > 1 ? t.someHasVn : t.someHasV1 });
+    return drink.length ? `${t.someNone} ${t.someOffer}` : t.someNoDrink;
+  }
+  const last = facts.last || null;
+  if (op.value === 'q_changed') {
+    const bits = last ? [[t.lastIn, last.in], [t.lastOut, last.out], [t.lastMoved, last.moved]].filter(([, a]) => (a || []).length).map(([tpl, a]) => fill(tpl, { names: joinList(a.slice(0, 4), L) })) : [];
+    return bits.length ? fill(t.lastChange, { what: joinList(bits, L) }) : t.lastNone;
+  }
+  if (op.value === 'q_couldnt') {
+    const out = [];
+    const failed = last ? (last.failed || []).filter((x) => KINDS[x]) : [];
+    if (failed.length) out.push(fill(t.lastFailed, { kinds: joinList(failed.map((x) => KINDS[x][L]), L) }));
+    const ni = (facts.notIncluded || [])[0];
+    if (ni && ni.text) out.push(L === 'fr' && ni.textFr ? ni.textFr : ni.text);
+    return out.length ? out.join(' ') : t.nothingMissing;
+  }
+  return t.ask_whichNone;
+}
 // A kind as a bare noun ("winery", « musée »), for "There's no winery in your plan."
 function kindNoun(what, L) {
   const t = T[L];
@@ -1721,8 +1861,11 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
   let kindLabel = kindLabel0;
   const parts = [];
   const described = new Set();
-  let allOk = true;
+  let allOk = true, featLine = '';
+  const marks = [];
   for (const r of out.results) {
+    if (featLine) { parts.push(featLine); featLine = ''; }
+    marks.push([parts.length, r]);
     kindLabel = (k) => ((r.kinds || []).length > 1 ? r.kinds.map(kindLabel0).join(orW) : kindLabel0(k));
     if (r.ok === false && !r.benign) allOk = false;
     // A change the planner could not make at all (a conflict): one honest line, not "Busier days.".
@@ -1756,6 +1899,8 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
           else parts.push(r.offer ? fill(t.tourNoneOffer, { kind: kindLabel(r.kind), near: r.offer.name, nearShort: r.offer.short }) : fill(t.tourNone, { kind: kindLabel(r.kind) }));
           break;
         }
+        if (r.ok && r.alreadyFeat) { parts.push(fill(t.featAlready, { name: r.alreadyFeat.name, d: r.alreadyFeat.day })); break; }
+        if (r.ok && r.fresh && r.featAsked) featLine = r.feat ? t.featHas : t.featUnknown;
         if (r.ok && r.fresh && r.inPlaceOf) { parts.push(fill(t.addedFor, { new: r.fresh.name, at: at(r.fresh), old: r.inPlaceOf.name })); described.add(r.fresh.id); described.add(r.inPlaceOf.id); }
         else if (r.ok && r.fresh && r.nearMiss) {
           const a = r.anchor ? (r.anchor.role === 'lunch' ? t.lunchW : r.anchor.role === 'dinner' ? t.dinnerW : r.anchor.name) : null;
@@ -1825,6 +1970,10 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
       default: break;
     }
   }
+  if (featLine) { parts.push(featLine); featLine = ''; }
+  // Which lines say what could not be done (kept when a long reply is shortened).
+  const failText = [];
+  marks.forEach(([from, r], i) => { if (r.ok === false && !r.benign) failText.push(...parts.slice(from, i + 1 < marks.length ? marks[i + 1][0] : parts.length)); });
   // A stop moved one slot later to make room for an added one: said, with its new time.
   for (const r of out.results) for (const m of (r.ok && r.moved) || []) if (Number.isInteger(m.start)) parts.push(fill(t.moved, { name: m.name, time: clock(m.start, L) }));
   if (out.textTooLong) parts.push(t.tooLong);
@@ -1833,7 +1982,12 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
     const ins = (out.added || []).filter((s) => !described.has(s.id)).map((s) => s.name);
     const outs = (out.gone || []).filter((s) => !described.has(s.id)).map((s) => s.name);
     // More than two changes: a count (the changed stops glow on the page) instead of a list of names.
-    if (ins.length + outs.length > 3) parts.push(fill(t.diff, { n: Math.max(ins.length, outs.length) }));
+    if (ins.length + outs.length > 3) {
+      // A broad change: the count and the days it touched.
+      const ds = [...new Set((out.changed || []).map((k) => /^(\d)-/.exec(String(k))).filter(Boolean).map((m) => Number(m[1])))].sort((a, b) => a - b);
+      const n = Math.max(ins.length, outs.length);
+      parts.push(ds.length ? fill(t.diffDays, { n, days: `${ds.length > 1 ? t.daysW : t.dayW} ${joinList(ds.map(String), L)}` }) : fill(t.diff, { n }));
+    }
     else if (ins.length && outs.length) parts.push(fill(t.diffOut, { out: joinList(outs, L) }), fill(t.diffIn, { in: joinList(ins, L) }));
     else if (ins.length) parts.push(fill(t.diffIn, { in: joinList(ins, L) }));
     else if (outs.length) parts.push(fill(t.diffOut, { out: joinList(outs, L) }));
@@ -1857,12 +2011,16 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
   const lean = split(full).filter((x) => x !== t.unchanged && !x.startsWith(t.itStays) && !x.startsWith(t.theyStay));
   if (!over(lean)) return lean.join(' ');
   const n = out.plan ? (out.changed || []).length : (out.actions ? out.actions.remove.length : 0);
-  const anyFail = out.results.some((r) => r.ok === false);
-  if (!n) return t.noneFit;
-  // What was done first (its own first sentence), then a count, or a plain word when part of it could not be done.
-  const head = lean.filter((x) => x !== t.done)[0];
-  const count = fill(n === 1 ? t.diffOne : t.diff, { n });
-  return anyFail ? `${t.done} ${count} ${t.restNot}` : `${t.done} ${head} ${count}`;
+  // 2026-11-22 ("Done. Changed 5 stops. I couldn't find a fit for the rest." said nothing): what was done, by name
+  // (every changed stop when there are three or fewer), then what could not be done, in its own words.
+  const body = lean.filter((x) => x !== t.done);
+  const isFail = (x) => failText.some((p) => p.includes(x));
+  const fails = body.filter(isFail), oks = body.filter((x) => !isFail(x));
+  if (!n && !oks.length) return fails.length && fails.length <= maxLines ? fails.join(' ') : t.noneFit;
+  const keepOk = n <= 3 ? oks.slice(0, 4) : oks.slice(0, Math.max(1, maxLines - (fails.length ? 1 : 0)));
+  const count = oks.length > keepOk.length ? [fill(t.diffAll, { n })] : [];
+  const notDone = fails.length <= 2 ? fails : [fails[0], fails[1], fill(fails.length === 3 ? t.moreNotOne : t.moreNot, { n: fails.length - 2 })];
+  return [...(n ? [t.done] : []), ...keepOk, ...count, ...notDone].join(' ');
 }
 
 module.exports = {
@@ -1871,6 +2029,6 @@ module.exports = {
   enabled, apiKey, wireSchema, systemPrompt, stopsForModel, stripPII, validateWire, readChatMessage, rulesRead, chipOps,
   rulesConfident, reconcileReads, eventsNamed, eventAtAlcoholPlace, partyKnown, AVOID_TEXT,
   planStops, planTurn, broadTurn, placeAdd, buildReply, cantReply, plannerCanRead, kindMatches, joinText, clock, isDayPlan, isShortPlan,
-  rulesReadOne, agent, KIND_WORDS,
+  rulesReadOne, agent, KIND_WORDS, guardTurn, guardReply, explainReply, onePersonText, groupRead, TARGETED_OPS,
   dailyCapUsd, spentToday, addSpend, resetSpend, costOf, pacificDay, EXPLICIT_DATE_RE, rateLimited, rateWaitMinutes, busyReply, resetRate, WORD_KINDS, weekdayDays,
 };

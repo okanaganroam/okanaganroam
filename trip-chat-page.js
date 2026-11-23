@@ -114,9 +114,9 @@ function chatClientSrc(d) {
   // ---------- Travel agent chat (trip-chat-page.js) ----------
   var CHAT_URL = '/api/trip/chat${qs ? `?${qs}` : ''}';
   var CHAT_T = {
-    en: { label: 'Tell us what to change', ph: 'Tell me what to change…', send: 'Send', thinking: 'Thinking…', undo: 'Undo', undone: 'Undone. Your plan is back.', err: 'Something went wrong. Your plan is unchanged.', you: 'You: ',
+    en: { label: 'Tell us what to change', ph: 'Tell me what to change…', send: 'Send', thinking: 'Thinking…', undo: 'Undo', undone: 'Undone. Your plan is back.', kept: 'OK, your plan stays as it is.', err: 'Something went wrong. Your plan is unchanged.', you: 'You: ',
       chips: [['cheaper', 'Cheaper'], ['kids', 'More for kids'], ['slower', 'Slower pace']] },
-    fr: { label: 'Dites-nous quoi changer', ph: 'Dites-moi quoi changer…', send: 'Envoyer', thinking: 'Je regarde…', undo: 'Annuler', undone: 'Annulé. Votre plan est revenu.', err: 'Un problème est survenu. Votre plan n’a pas changé.', you: 'Vous : ',
+    fr: { label: 'Dites-nous quoi changer', ph: 'Dites-moi quoi changer…', send: 'Envoyer', thinking: 'Je regarde…', undo: 'Annuler', undone: 'Annulé. Votre plan est revenu.', kept: 'D’accord, votre plan reste tel quel.', err: 'Un problème est survenu. Votre plan n’a pas changé.', you: 'Vous : ',
       chips: [['cheaper', 'Moins cher'], ['kids', 'Plus pour les enfants'], ['slower', 'Plus relax']] }
   };
   var chat = { busy: false, undo: null, used: false, goneEvents: {}, queue: null, wineTour: null };
@@ -220,11 +220,14 @@ function chatClientSrc(d) {
     rows.forEach(function(r){ r.classList.remove('v4-glow'); void r.offsetWidth; r.classList.add('v4-glow'); setTimeout(function(){ r.classList.remove('v4-glow'); }, 2400); });
     if (rows[0]) { try { rows[0].scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { rows[0].scrollIntoView(); } }
   }
-  function chatSend(message, chip, label){
+  // The broad-change guard: the chat asked before a change; "yes" sends that message again, confirmed.
+  var CHAT_YES = /^\s*(?:yes|yep|yeah|yup|ok|okay|sure|go ahead|go for it|do it|please do|fine|oui|ouais|d[’']accord|vas-y|allez-y|fais-le|faites-le|parfait)\b/i;
+  var CHAT_NO = /^\s*(?:no|nope|nah|don[’']t|never ?mind|cancel|stop|keep it|leave it|non|laisse|laissez|annule[rz]?)\b/i;
+  function chatSend(message, chip, label, confirmed){
     if (!state.last) return;
     // Second fresh-eyes round (2026-11-22: a message typed while waiting was dropped): it waits its turn.
-    if (chat.busy) { chat.queue = { message: message, chip: chip, label: label }; var qb = document.getElementById('v4Chat'); if (qb) qb.classList.add('has-queue'); return; }
-    var snap = chatSnapshot(), you = message || label || '';
+    if (chat.busy) { chat.queue = { message: message, chip: chip, label: label, confirmed: confirmed }; var qb = document.getElementById('v4Chat'); if (qb) qb.classList.add('has-queue'); return; }
+    var snap = chatSnapshot(), you = confirmed ? (label || '') : (message || label || '');
     chat.busy = true; chat.used = true;
     if (window.__roamTripFunnel) window.__roamTripFunnel.step('chat');
     chatShow(you, ct('thinking'), { busy: true });
@@ -237,10 +240,12 @@ function chatClientSrc(d) {
     if (chat.soft && Object.keys(chat.soft).length) body.soft = chat.soft;
     var sd = typeof t3StayData === 'function' && !chat.noStay ? t3StayData() : null; if (sd && sd.chosen && sd.chosen.region) body.stayTown = sd.chosen.region; if (sd && sd.chosen && sd.chosen.id > 0) body.stayId = sd.chosen.id;
     if (chip) body.chip = chip; else body.message = message;
+    if (confirmed) body.confirmed = true;
+    if (chat.lastDiff) body.last = chat.lastDiff;
     function done(){
       chat.busy = false; resultEl.removeAttribute('aria-busy');
       var q = chat.queue; chat.queue = null; var qb = document.getElementById('v4Chat'); if (qb) qb.classList.remove('has-queue');
-      if (q) setTimeout(function(){ chatSend(q.message, q.chip, q.label); }, 0);
+      if (q) setTimeout(function(){ chatSend(q.message, q.chip, q.label, q.confirmed); }, 0);
     }
     return fetch(CHAT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       .then(function(r){ return r.json().catch(function(){ return {}; }); })
@@ -249,6 +254,8 @@ function chatClientSrc(d) {
         done();
         j = j || {};
         var acts = j.actions || {}, changed = (j.changed || []).slice(), touched = false;
+        chat.pending = j.confirm ? { message: message, chip: chip } : null;
+        if (j.diff) chat.lastDiff = j.diff;
         // Fix round (2026-11-22): a new plan only when a stop changed ("The plan already fits that" changes nothing and
         // shows no Undo); the place to stay alone comes back as stayBlock and never touches the stops.
         if (j.plan && j.req && changed.length) {
@@ -304,6 +311,12 @@ function chatClientSrc(d) {
     if (!text) { if (inEl) inEl.focus(); return; }
     // Fix round (2026-11-22: the next message was typed onto the last one): cleared as soon as it is sent.
     if (inEl) inEl.value = '';
+    var pend = chat.pending;
+    if (pend) {
+      chat.pending = null;
+      if (CHAT_YES.test(text)) { chatSend(pend.message, pend.chip, text, true); return; }
+      if (CHAT_NO.test(text)) { chatShow(text, ct('kept'), {}); return; }
+    }
     chatSend(text.slice(0, 400), null);
   });
   document.addEventListener('click', function(e){
@@ -311,7 +324,7 @@ function chatClientSrc(d) {
     var b;
     if ((b = t.closest('[data-v4-chip]'))) { chatSend(null, b.getAttribute('data-v4-chip'), b.textContent); return; }
     if ((b = t.closest('#v4ChatReply.is-long')) && !t.closest('[data-v4-chat-undo]')) { b.classList.add('is-open'); chatPad(); return; }
-    if ((b = t.closest('[data-v4-chat-undo]')) && chat.undo) { var snap = chat.undo; chat.undo = null; chatRestore(snap); chatShow('', ct('undone'), {}); track('trip_chat', { chat_source: 'undo', changed: 'yes' }); }
+    if ((b = t.closest('[data-v4-chat-undo]')) && chat.undo) { var snap = chat.undo; chat.undo = null; chat.lastDiff = null; chat.pending = null; chatRestore(snap); chatShow('', ct('undone'), {}); track('trip_chat', { chat_source: 'undo', changed: 'yes' }); }
   });
 
   // ---------- Agent round (2026-11-22): the agent speaks; stay and getting here in the plan; Confirm at the end ----------

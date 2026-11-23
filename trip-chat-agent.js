@@ -122,11 +122,31 @@ const Q_TOPICS = [
   ['q_vegan', /\b(?:vegan|vegetalien\w*|vegetarian|vegetarien\w*|gluten)\b/],
   ['q_view', /\b(?:lake ?view|view|vue)\b/],
 ];
-const Q_VALUES = [...Q_TOPICS.map(([k]) => k), 'q_where'];
+const Q_VALUES = [...Q_TOPICS.map(([k]) => k), 'q_where', 'q_why_not', 'q_dry', 'q_changed', 'q_couldnt'];
 const MEAL_RE = /\b(?:restaurants?|dinner|supper|lunch|souper|diner|dejeuner|meal|repas)\b/;
 const SKI_ASK_RE = /\b(?:lifts?|gondolas?|chairlifts?|ski hill|remontees?|telecabines?)\b/;
 const SKI_NAME_RE = /\b(?:ski|resort|blackcomb|big white|silverstar|silver star|apex mountain|baldy|gondola|sun peaks)\b/;
 
+// Explain questions (2026-11-22, Dayton: "answer questions about the itinerary and why a recommendation was made; do not
+// treat every question as a request to edit"): why a kind of place is not on the plan, what changed last, what could not
+// be done, an option for the one who does not drink. -> { ops: [ask...] } or null. Never an edit.
+const Q_CHANGED_RE = /\bwhat (?:did|have) you (?:just )?chang\w*|\bwhat(?:'s| has| is)? ?(?:changed|different)\b|\bqu'est-ce (?:que tu as|que vous avez|qui a) change\b|\bqu'(?:as-tu|avez-vous) change\b/;
+const Q_COULDNT_RE = /\bwhat (?:couldn'?t|could not|can'?t|cannot|didn'?t|did not) you (?:do|add|fit|find|include|manage)\b|\bwhat(?:'s| is| was) (?:missing|left out|not included)\b|\bqu'est-ce que (?:tu n'as|vous n'avez) pas pu\b|\bqu'est-ce qui manque\b/;
+const Q_DRY_RE = /\b(?:suggest\w*|recommend\w*|options?|ideas?|what about|what can|anything for|something for|propose[rz]?|suggere[rz]?|quelque chose pour)\b[^?]*\b(?:non[- ]drink\w*|doesn'?t drink|does not drink|not drinking|sober|designated driver|ne boit pas|qui ne boit)\b/;
+const Q_WHY_RE = /\b(?:why|how come|pourquoi|explain|expliqu\w+)\b/;
+const Q_NEG_RE = /\b(?:no|not|none|without|left out|leave out|leaving out|skipp?ed|missing|didn'?t|did not|don'?t|isn'?t|aren'?t|wasn'?t|weren'?t|aucun\w*|pas|sans|manque\w*|oublie\w*)\b/;
+const Q_WHY_NOT_EDIT_RE = /\bwhy (?:not|don'?t (?:you|we)) (?:add|swap|try|include|put|do|book|go)\b|\bpourquoi (?:ne )?pas (?:ajouter|essayer|mettre)\b/;
+function explainRules(t, h) {
+  const op = h.op, ops = [];
+  if (Q_WHY_RE.test(t) && Q_NEG_RE.test(t) && !Q_WHY_NOT_EDIT_RE.test(t)) {
+    const kind = h.kindsNamed(t.replace(/\bnon[- ]drink\w*/g, ' ')).filter((k) => k !== 'kids' && k !== 'activity')[0] || null;
+    if (kind) ops.push(op('ask', { value: 'q_why_not', kind }));
+  }
+  if (Q_DRY_RE.test(t) && !/\b(?:add|ajoute[rz]?)\b/.test(t)) ops.push(op('ask', { value: 'q_dry' }));
+  if (Q_CHANGED_RE.test(t)) ops.push(op('ask', { value: 'q_changed' }));
+  if (Q_COULDNT_RE.test(t)) ops.push(op('ask', { value: 'q_couldnt' }));
+  return ops.length ? { ops, cant: null, exact: true, explain: true } : null;
+}
 // The asks only this file reads. h: helpers from trip-chat.js { op, stopsNamed, ordinalPick, kindsNamed, stayAmenitiesIn }.
 // -> { ops, cant } or null (the older rules read the message).
 function agentRules(t, stops, ctx, h) {
@@ -137,6 +157,8 @@ function agentRules(t, stops, ctx, h) {
   const day = dayM ? Number(dayM[1]) : wdM ? weekdays[wdM[1]] : null;
   const regionIn = (s) => regions.find((x) => new RegExp(`\\b${fold(regionLabels[x] || x).replace(/[^a-z0-9 ]/g, '.')}\\b`).test(s)) || null;
   const editVerb = EDIT_VERB_RE.test(t);
+  const explained = explainRules(t, h);
+  if (explained) return explained;
 
   // Round 6: "how do we get here from Vancouver?" is the Getting here card; "something fun" is a thing to do added.
   if (/\bhow (?:do|can|should|would) (?:we|i) get (?:here|there|to)\b|\bgetting (?:here|there)\b|\bcomment (?:venir|se rendre|aller)\b/.test(t)) return { ops: [], cant: 'getting_here' };
@@ -579,5 +601,5 @@ const PROMPT_LINES = [
 
 module.exports = {
   TOUR_KINDS, TOUR_TYPES, tourKindOf, runSteady, startsOf, stripExtras, splitAsks, readAll, agentRules, weekdayIn, wdOfDate, moveStop, answerQuestion, parseWeek, AGENT_T, PROMPT_LINES, Q_VALUES,
-  STAY_REMOVE_RE, STAY_ADD_RE, NIGHT_ADD_RE, fold, km, AREA, firstSentence,
+  STAY_REMOVE_RE, STAY_ADD_RE, NIGHT_ADD_RE, fold, km, AREA, firstSentence, explainRules,
 };

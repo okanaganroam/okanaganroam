@@ -127,6 +127,19 @@ const CASES = [
   { plan: 'family', msg: 'un voyage à Vancouver', lang: 'fr', cant: ['elsewhere'] },
   { plan: 'family', msg: 'something fun', ops: [{ o: 'add', kind: 'activity' }] },
   { plan: 'beer', msg: 'book us a wine tour', ops: [{ o: 'add', kind: 'wine_tour' }] },
+  // Group preferences, explain questions (2026-11-22, Dayton's brief): never an edit, never "no alcohol" for everyone.
+  { plan: 'family', msg: 'Only one person does not drink; the rest want wineries. Can you add a winery on day 2 with a non-alcoholic option?', ops: [{ o: 'party_some' }, { o: 'add', kind: 'winery' }] },
+  { plan: 'family', msg: 'Une seule personne ne boit pas; les autres veulent des vignobles. Ajoute un vignoble au jour 2 avec une option sans alcool.', lang: 'fr', ops: [{ o: 'party_some' }, { o: 'add', kind: 'winery' }] },
+  { plan: 'family', msg: 'only one of us doesn’t drink', ops: [{ o: 'party_some' }] },
+  { plan: 'family', msg: 'Can you explain why you left out the wineries and suggest an option for our non-drinking friend?', ops: [{ o: 'ask', value: 'q_why_not' }, { o: 'ask', value: 'q_dry' }] },
+  { plan: 'family', msg: 'why are there no wineries?', ops: [{ o: 'ask', value: 'q_why_not' }] },
+  { plan: 'family', msg: 'why no brewery?', ops: [{ o: 'ask', value: 'q_why_not' }] },
+  { plan: 'family', msg: 'why didn’t you include live music?', ops: [{ o: 'ask', value: 'q_why_not' }] },
+  { plan: 'family', msg: 'what did you change?', ops: [{ o: 'ask', value: 'q_changed' }] },
+  { plan: 'family', msg: 'what couldn’t you do?', ops: [{ o: 'ask', value: 'q_couldnt' }] },
+  { plan: 'family', msg: 'pourquoi il n’y a pas de vignobles?', lang: 'fr', ops: [{ o: 'ask', value: 'q_why_not' }] },
+  { plan: 'family', msg: 'qu’est-ce que tu as changé?', lang: 'fr', ops: [{ o: 'ask', value: 'q_changed' }] },
+  { plan: 'family', msg: 'qu’est-ce que tu n’as pas pu faire?', lang: 'fr', ops: [{ o: 'ask', value: 'q_couldnt' }] },
 ];
 
 function pick(stops, sel) {
