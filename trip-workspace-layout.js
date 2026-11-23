@@ -25,6 +25,18 @@ function tripSummaryFacts(plan, fr, ctx) {
       if (e.asked > 0) { count = yes; if (count < e.asked) status = count ? 'partial' : 'unmet'; }
       else if (!yes) status = 'unmet';
     }
+    // One person does not drink (2026-11-23; the summary said "Non-drinker: 1 of 4 stops"): say what the four are (the
+    // plan's wineries and bars) and keep "options listed" apart from "the listing doesn't say". A listing without the
+    // badge is unknown (has: null), never "has none".
+    if (e.ask === 'nonalcoholic' && stops.length) {
+      var un = stops.length - yes, nl = label;
+      var place = fr ? (stops.length > 1 ? 'vignobles et bars' : 'vignoble ou bar') : (stops.length > 1 ? 'wineries & bars' : 'winery or bar');
+      if (!un) { ok.push({ kind: 'ok', ask: e.ask, text: nl + (fr ? ' : indiquées partout ✓' : ': every winery & bar lists them ✓') }); return; }
+      if (!yes) t = fr ? (stops.length > 1 ? 'aucun des ' + stops.length + ' ' + place + ' ne le précise' : 'le ' + place + ' ne le précise pas') : (stops.length > 1 ? 'none of the ' + stops.length + ' ' + place + ' say' : 'the ' + place + ' doesn’t say');
+      else t = fr ? yes + ' des ' + stops.length + ' ' + place + (yes > 1 ? ' en indiquent' : ' en indique') + ' · ' + un + (un > 1 ? ' ne le précisent pas' : ' ne le précise pas') : yes + ' of ' + stops.length + ' ' + place + (yes > 1 ? ' list them' : ' lists them') + ' · ' + un + (un > 1 ? ' don’t say' : ' doesn’t say');
+      flags.push({ kind: 'flag', status: yes ? 'partial' : 'unknown', ask: e.ask, text: nl + sep + t });
+      return;
+    }
     if (status === 'verified') { ok.push({ kind: 'ok', ask: e.ask, text: label + (e.asked > 0 && count > 0 ? sep + count : '') + ' ✓' }); return; }
     if (status === 'unmet') t = fr ? 'pas dans ce plan' : 'not in this plan';
     else if (e.needsDates) t = fr ? 'selon vos dates' : 'needs dates';
@@ -91,7 +103,7 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
 .t3-v4.tw-workspace .tw-facts li {display:inline;}
 .t3-v4.tw-workspace .tw-facts li>span {white-space:nowrap;}
 .t3-v4.tw-workspace .tw-facts li+li::before {content:"· ";color:#8a949b;}
-.t3-v4.tw-workspace .tw-facts .tw-fact-flag span {background:#fff0cc;color:#6b4a12;border-radius:8px;padding:2px 7px;font-weight:800;white-space:nowrap;}
+.t3-v4.tw-workspace .tw-facts .tw-fact-flag span {background:#fff0cc;color:#6b4a12;border-radius:8px;padding:2px 7px;font-weight:800;white-space:normal;-webkit-box-decoration-break:clone;box-decoration-break:clone;}
 .t3-v4.tw-workspace .tw-facts .tw-fact-more::before {content:"";}
 .t3-v4.tw-workspace .tw-sum-toggle {position:relative;z-index:1;display:inline-flex;align-items:center;gap:4px;min-height:44px;min-width:44px;margin:-10px 0 -10px 2px;padding:0 6px;border:0;background:none;color:#1b303c;font:800 13px Nunito,sans-serif;text-decoration:underline;text-underline-offset:3px;cursor:pointer;vertical-align:middle;}
 .t3-v4.tw-workspace .tw-sum-toggle::after {content:"▾";text-decoration:none;display:inline-block;}
