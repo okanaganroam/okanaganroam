@@ -391,6 +391,9 @@ function chatClientSrc(d) {
     var stay = chatOvernight() && !chat.noStay && t3StayData() ? chatStayWords() : '';
     var line = n > 1 ? ag('days', { n: n, town: town, for: chatPartyFor(), stay: stay }) : n === 1 && town ? ag('day', { town: town, for: chatPartyFor() }) : ag('plan', { for: chatPartyFor() });
     var miss = chatMissing(), missLine = miss.length ? ' ' + ag('missing', { what: miss.join(' ' + ag('and') + ' ') }) : '';
+    // Planner round 5: the plan's own "not included" line (why, and the nearest) comes before "on these dates".
+    var ni = Array.isArray(p.notIncluded) ? p.notIncluded[0] : null;
+    if (ni && ni.text) missLine = ' ' + (lang() === 'fr' && ni.textFr ? ni.textFr : ni.text);
     var html = '<div class="v4-agent" id="v4Agent"><span class="v4-agent-who">' + esc(ag('who')) + '</span><p>' + esc(v4.confirmed ? ag('ready') : line + missLine + (missLine ? '' : ag('more'))) + '</p>';
     // One short follow-up, with tap answers: the dates of an overnight trip, when none were given.
     var st = t3StayInputBase() || {};

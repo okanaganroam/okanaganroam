@@ -8477,7 +8477,31 @@ function tripChatToursCover(plan, req) {
     for (const k of Object.values(tk)) if ((k.covers || []).length && k.words.some((w) => name.includes(w.split(' ')[0]))) for (const c of k.covers) covers.add(c);
   }
   if (!covers.size) return;
-  plan.requirementResults = plan.requirementResults.map((i) => (i && i.status === 'unmet' && ['type', 'type_count', 'venue_kind'].includes(i.kind) && covers.has(i.value) ? { ...i, status: 'met', metBy: 'tour' } : i));
+  plan.requirementResults = plan.requirementResults.map((i) => (i && i.status === 'unmet' && ['type', 'type_count', 'venue_kind'].includes(i.kind) && covers.has(i.value) ? { ...i, status: 'satisfied', metBy: 'tour' } : i));
+  if (Array.isArray(plan.notIncluded)) plan.notIncluded = plan.notIncluded.filter((x) => !(x && covers.has(x.kind)));
+}
+function tripChatOnScreenOnly(core, stops) {
+  try {
+    if (tripChat.agent.stripExtras(core, new Set(stops.map((s) => s.id)))) tripPlannerModule().v4DayTownLabels(core, { v4: true, labels: { regions: REGION_LABELS } });
+  } catch (e) { /* the plan stands */ }
+}
+// "we are 4 adults": the party, and (planner round 5) the stay part again for that many adults (rooms, sleeps, the estimate).
+function tripChatAdultsTurn(op, { v, plan, req, stops, lang, staysOn, runCore }) {
+  const out = { party: { adults: op.n }, reply: tripChat.fill(tripChat.T[lang === 'fr' ? 'fr' : 'en'][op.n === 1 ? 'adult1' : 'adults'], { n: op.n }) };
+  if (!staysOn || !(v.stayId || (plan && plan.whereToStay))) return out;
+  try {
+    const stayIn = { ...(v.args.stay || {}), adults: op.n };
+    const base = req ? { ...v.args, text: req.text, seed: req.seed, overrides: Object.keys(req.overrides || {}).length ? req.overrides : null, excludeVenueIds: req.excludeVenueIds, avoidVenueIds: req.avoidVenueIds, pinned: req.pinned }
+      : { ...v.args, pinned: Object.fromEntries(stops.filter((s) => /^\d-/.test(s.key) && !v.removed.includes(s.key)).map((s) => [s.key, s.id])) };
+    if (base.pinned && !Object.keys(base.pinned).length) base.pinned = null;
+    const core = plan || runCore({ ...base, stay: stayIn });
+    if (!core) return out;
+    if (!plan) tripChatOnScreenOnly(core, stops);
+    const c = JSON.parse(JSON.stringify(core)); delete c.whereToStay; delete c.v4Booking; delete c.gettingHere;
+    const p = withTripStays(c, stayIn, new Date(), base.text, true, tripStayCandidates());
+    if (p && p.whereToStay && p.whereToStay.pick) out.stayBlock = tripChatStayBlock(p);
+  } catch (e) { /* the party still changes */ }
+  return out;
 }
 // Whether the visitor's own request asked for that kind of place ("a weekend with a spa"): its words are in the text.
 function tripChatAsked(kind, text) {
@@ -8574,7 +8598,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // Round 4: a change to the stops keeps the place to stay the visitor sees (it changed with unrelated messages).
   tripChatKeepStayId = extra.some((o) => o.o === 'stay') ? null : v.stayId || null;
   let out;
-  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run, hooks, weakFor: tripChatWeakFor })
+  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run, hooks, weakFor: tripChatWeakFor, sunsetStart: (day, region) => { try { const d = (v.dayDates || [])[day - 1] || null; const sd = d && typeof sunsetDinnerStart === 'function' ? sunsetDinnerStart(d, region) : null; return sd ? sd.startMinutes : null; } catch (e) { return null; } } })
     : { plan: null, req: null, actions: { remove: [], keep: [] }, results: [], changed: [] }; } finally { tripChatKeepStayId = null; }
   // What the chat added or changed goes back as "soft" (the chat keeps it; the Swap button sends it as an ordinary stop,
   // never a hard lock: "A locked stop cannot be kept: Forged Axe Throwing..."). Only the visitor's own kept stops are locks.
@@ -8614,7 +8638,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     const r = Array.isArray(op) ? tripChatStayTurn(op, { v, plan, req, stops, lang, staysOn, runCore, timing, days, short })
       : op.o === 'avoid' ? tripChatAvoidTurn(op, { v, req, lang })
         : op.o === 'ask' ? tripChatAskTurn(op, { v, stops, lang })
-          : op.o === 'party' ? { party: { adults: op.n }, reply: tripChat.fill(tripChat.T[lang === 'fr' ? 'fr' : 'en'][op.n === 1 ? 'adult1' : 'adults'], { n: op.n }) }
+          : op.o === 'party' ? tripChatAdultsTurn(op, { v, plan, req, stops, lang, staysOn, runCore })
             : tripChatTransportTurn(op, { stops, lang, stayTown: v.stayTown, dayDates: v.dayDates });
     if (r.stayForce !== undefined) { stayForce = r.stayForce; stayArrive = r.stayArrive || null; }
     if (r.party) party = r.party;
@@ -8639,6 +8663,8 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // Round 6 (Penticton wine weekend: after "book us a wine tour" the agent line read "I couldn't fit winery on these
   // dates"): the wineries a wine tour on the plan covers are not "not included".
   if (plan) tripChatToursCover(plan, req);
+  // Planner round 5: the day labels follow the stops shown (the chat takes out places a pinned re-run adds).
+  if (plan) { try { tripPlannerModule().v4DayTownLabels(plan, { v4: true, labels: { regions: REGION_LABELS } }); } catch (e) { /* cosmetic */ } }
   logTiming();
   return {
     timing: { ...timing, total: Date.now() - timing.start },
@@ -8676,6 +8702,9 @@ function tripChatStayTurn(stayOps, { v, plan, req, stops, lang, staysOn, runCore
   const old = stayIn.pref ? { ...stayIn.pref } : { ...(tripChat.stayTextPref(v.args.text) || {}) };
   const core = plan || runCore({ ...base, stay: stayIn });
   if (!core) return { reply: T.stayOff };
+  // Planner round 5 (ghost stops in Book my trip and the meal totals): a place the pinned re-run added that is not on
+  // screen is taken out before the stay part is built, and the day labels follow the stops shown.
+  if (!plan) tripChatOnScreenOnly(core, stops);
   const t0 = Date.now();
   const candidates = tripStayCandidates();
   const fresh = () => { const c = JSON.parse(JSON.stringify(core)); delete c.whereToStay; delete c.v4Booking; delete c.gettingHere; return c; };

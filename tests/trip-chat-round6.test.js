@@ -222,3 +222,22 @@ test('Whistler 6: a day named in the message stands over an AI reading of anothe
   assert.deepEqual(m.fixes, ['rules_day']);
   assert.equal(m.ops[0].stops[0].key, '1-evening');
 });
+
+// Planner round 5 wiring (okanaganroam #1018 / whistlerroam #270).
+test('planner round 5: "no alcohol" only for the whole group; the planner\'s tourStops ride along; set-time overlap, shifted and gave-way are said', () => {
+  const msg = 'Only one person does not drink; the rest want wineries. Can you add a winery on day 2 with a non-alcoholic option?';
+  const r = tc.rulesRead(msg, PLAN, { regions: [], regionLabels: {}, days: 2 });
+  assert.ok(!r.ops.some((o) => o.o === 'party' && o.value === 'no_alcohol'), 'the rules never make the trip alcohol-free for one person');
+  const m = tc.reconcileReads({ ok: true, cant: null, ops: [OP({ o: 'party', value: 'no_alcohol' }), OP({ o: 'add', kind: 'winery', day: 2 })] }, r, msg);
+  assert.ok(!m.ops.some((o) => o.o === 'party' && o.value === 'no_alcohol'), 'nor the AI\'s reading');
+  for (const one of ['my husband doesn’t drink, is there a non-alcoholic option?', 'une personne ne boit pas']) assert.ok(!tc.rulesRead(one, PLAN, { days: 2 }).ops.some((o) => o.value === 'no_alcohol'), one);
+  for (const all of ['we don’t drink', 'no alcohol please', 'on ne boit pas, sans alcool']) assert.ok(tc.rulesRead(all, PLAN, { days: 2 }).ops.some((o) => o.value === 'no_alcohol'), all);
+  // set-time: the planner's reasons.
+  const dinner = PLAN[4], laser = PLAN[3];
+  const st = (extra) => tc.planTurn([OP({ o: 'set_time', stops: [dinner], n: 1020 })], ctxFor(() => ({ ...dayPlan(PLAN.map((s) => (s.id === 15 ? { ...s, start: 1020 } : s)).filter((s) => !(extra.stopStartGaveWay || []).some((g) => g.id === s.id))), ...extra }), { hooks: { stopStarts: true } }));
+  assert.equal(tc.buildReply(st({ stopStartRefused: [{ key: '1-evening', id: 15, reason: 'overlap', withId: laser.id, freeFromMinutes: 1050 }] }), { lang: 'en' }), 'Frankie We Salute You! can’t start at 5 PM: Planet Lazer Kelowna is on then. The earliest it can start is 5:30 PM.');
+  const gw = tc.buildReply(st({ stopStartGaveWay: [{ key: '1-late', id: laser.id }] }), { lang: 'en' });
+  assert.match(gw, /To make room I took out Planet Lazer Kelowna\./);
+  assert.doesNotMatch(gw, /Took out Planet Lazer/);
+  assert.match(tc.buildReply(st({ stopStartShifted: [{ key: '1-late', id: laser.id, endMinutes: 1010 }] }), { lang: 'en' }), /Planet Lazer Kelowna now ends at 4:50 PM\./);
+});

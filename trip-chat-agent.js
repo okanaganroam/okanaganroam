@@ -331,9 +331,13 @@ function moveStop(op, state, ctx) {
     const at = nw && nw.find((x) => x.key === s.key && x.id === s.id);
     // The planner says why it refused (closed then, or no room): stopStartRefused [{ key, reason, opensMinutes, closesMinutes }].
     const refused = plan && Array.isArray(plan.stopStartRefused) ? plan.stopStartRefused.find((x) => x.key === s.key) : null;
-    if (refused) { r.why = 'refused'; r.refused = refused; return { result: r }; }
-    if (!at || at.start !== op.n || !state.stops.every((x) => nw.some((y) => y.id === x.id)) || !nw.every((y) => state.stops.some((x) => x.id === y.id))) { r.why = 'no_fit'; return { result: r }; }
+    if (refused) { r.why = 'refused'; r.refused = refused; if (refused.withId) r.withName = (state.stops.find((x) => x.id === refused.withId) || {}).name || null; return { result: r }; }
+    // Planner round 5: a stop in the way gives way (stopStartGaveWay) or ends earlier (stopStartShifted); both are said.
+    const gave = plan && Array.isArray(plan.stopStartGaveWay) ? plan.stopStartGaveWay.map((g) => g.id) : [];
+    if (!at || at.start !== op.n || !state.stops.every((x) => gave.includes(x.id) || nw.some((y) => y.id === x.id)) || !nw.every((y) => state.stops.some((x) => x.id === y.id))) { r.why = 'no_fit'; return { result: r }; }
     r.ok = true; r.fresh = at;
+    r.gaveWay = state.stops.filter((x) => gave.includes(x.id) && !nw.some((y) => y.id === x.id));
+    r.shifted = (plan.stopStartShifted || []).map((x) => ({ name: (state.stops.find((y) => y.id === x.id) || {}).name || '', endMinutes: x.endMinutes })).filter((x) => x.name && Number.isInteger(x.endMinutes));
     return { plan, nw, args: ran.args, result: r };
   }
   const anchor = now(op.stops[1]);
