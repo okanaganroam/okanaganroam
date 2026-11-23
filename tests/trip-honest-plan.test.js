@@ -17,6 +17,10 @@ const sbl = require('../stay-booking-links.js');
 const fx = require('./fixtures/trip-v4-kelowna.js');
 const d = require('../discovery-intent.js');
 const SITE = require('../trip-site.js');
+// The same file runs on Whistler Roam: its own town, and breweries where the Okanagan has wineries.
+const WR = SITE.brand === 'Whistler Roam';
+const TOWN = WR ? 'whistler' : 'kelowna', TOWN_LABEL = WR ? 'Whistler' : 'Kelowna', DRINK = WR ? 'brewery' : 'winery', DRINKS = WR ? 'breweries' : 'wineries';
+const ASK_HERE = `Plan a 3-day ${TOWN_LABEL} weekend for 6 friends: two ${DRINKS}, gluten-free dining, easy walks, a hotel with a pool, and live music. One person does not drink.`;
 
 const ASK = 'Plan a 3-day Kelowna weekend for 6 friends: two wineries, gluten-free dining, easy walks, a hotel with a pool, and live music. One person does not drink.';
 const V4 = fs.readFileSync(require.resolve('../trip-planner-v4-page.js'), 'utf8');
@@ -240,13 +244,13 @@ test('8. the shared link: a round trip keeps the stay, the times, the links and 
   const db = require('../db.js');
   const made = [];
   try {
-    const stay = app.createVenue({ region: 'kelowna', type: 'stay', cuisine: 'hotel', slug: 'honest-plan-test-inn', name: 'Honest Plan Test Inn', address: '101 Water Street, Kelowna, BC', latitude: 49.887, longitude: -119.496, description: 'A fixture used only by the honest plan tests.', image_url: '/images/trip-v3/hero.webp' });
+    const stay = app.createVenue({ region: TOWN, type: 'stay', cuisine: 'hotel', slug: 'honest-plan-test-inn', name: 'Honest Plan Test Inn', address: `101 Main Street, ${TOWN_LABEL}, BC`, latitude: WR ? 50.1163 : 49.887, longitude: WR ? -122.9574 : -119.496, description: 'A fixture used only by the honest plan tests.', image_url: '/images/trip-v3/hero.webp' });
     made.push(stay.id);
     db.prepare('INSERT INTO stay_info (venue_id, info_json, updated_at, batch_id) VALUES (?, ?, ?, ?)').run(stay.id, JSON.stringify({ pool: true, amenities: { pool: true }, booking: { booking_com: 'https://www.booking.com/hotel/ca/honest-plan-test-inn.html' } }), '2026-11-22T00:00:00Z', 'test');
-    const gf = db.prepare("SELECT id, name FROM venues WHERE region = 'kelowna' AND type = 'restaurant' AND gluten_free = 1 AND redirect_to IS NULL AND slug IS NOT NULL ORDER BY id LIMIT 2").all();
-    const winery = db.prepare("SELECT id, name FROM venues WHERE region = 'kelowna' AND type = 'winery' AND redirect_to IS NULL AND slug IS NOT NULL ORDER BY id LIMIT 1").get();
+    const gf = db.prepare("SELECT id, name FROM venues WHERE region = ? AND type = 'restaurant' AND gluten_free = 1 AND redirect_to IS NULL AND slug IS NOT NULL ORDER BY id LIMIT 2").all(TOWN);
+    const winery = db.prepare("SELECT id, name FROM venues WHERE region = ? AND type = ? AND redirect_to IS NULL AND slug IS NOT NULL ORDER BY id LIMIT 1").get(TOWN, DRINK);
     assert.ok(gf.length === 2 && winery, 'the seed database has these listings');
-    const q = { stops: `venue:${gf[0].id},venue:${winery.id},venue:${gf[1].id}`, days: '1,1,2', t: '690,795,1080', stay: String(stay.id), nights: '1', ad: '6', asks: 'count:winery:1,gluten_free,stay:pool,live_music,nonalcoholic' };
+    const q = { stops: `venue:${gf[0].id},venue:${winery.id},venue:${gf[1].id}`, days: '1,1,2', t: '690,795,1080', stay: String(stay.id), nights: '1', ad: '6', asks: `count:${DRINK}:1,gluten_free,stay:pool,live_music,nonalcoholic` };
     // The link's own grammar: parse -> query -> parse is the same; junk is dropped.
     const c = H.parseShareContext(q);
     assert.deepEqual(H.parseShareContext(Object.fromEntries(new URLSearchParams(H.shareContextQuery(c)))), c);
@@ -258,7 +262,7 @@ test('8. the shared link: a round trip keeps the stay, the times, the links and 
     assert.equal(ctx.datesSet, false);
     assert.ok(ctx.stay.links.length >= 1 && ctx.stay.links.every((l) => /honest-plan-test-inn/.test(decodeURIComponent(l.url)) && !H.linkHasDate(l.url)), JSON.stringify(ctx.stay.links));
     assert.equal(ctx.evidence.find((e) => e.ask === 'gluten_free').status, 'verified');
-    assert.equal(ctx.evidence.find((e) => e.ask === 'count:winery').status, 'verified');
+    assert.equal(ctx.evidence.find((e) => e.ask === `count:${DRINK}`).status, 'verified');
     assert.equal(ctx.evidence.find((e) => e.ask === 'live_music').status, 'unknown');
     assert.ok(ctx.lines.some((l) => l.ask === 'nonalcoholic'), 'the non-drinker line is shown');
     for (const l of ctx.lines) assert.doesNotMatch(l.text, /on these dates|I’ll add/);
@@ -276,7 +280,7 @@ test('8. the shared link: a round trip keeps the stay, the times, the links and 
     assert.ok(dated.stay.links.some((l) => H.linkHasDate(l.url)));
     assert.match(app.tripShareContextHtml(dated, 'fr'), /Une copie de ce plan\./);
     // The EN / FR switch keeps the context.
-    assert.match(app.tripShareSearch(q), /&t=690,795,1080&stay=\d+&nights=1&ad=6&asks=count:winery:1,gluten_free,stay:pool,live_music,nonalcoholic$/);
+    assert.match(app.tripShareSearch(q), new RegExp(`&t=690,795,1080&stay=\\d+&nights=1&ad=6&asks=count:${DRINK}:1,gluten_free,stay:pool,live_music,nonalcoholic$`));
     // An OLD link (stops and days only) renders exactly as before: no context block, the same stops script.
     const old = { stops: `venue:${gf[0].id},venue:${winery.id}`, days: '1,2' };
     assert.equal(app.tripShareContext(old, 'en'), null);
@@ -293,15 +297,18 @@ test('8. the shared link: a round trip keeps the stay, the times, the links and 
 
 test('9. the six-person request through the planner: the plan, its lines and its evidence agree', () => {
   const app = require('../server.js');
-  const parsed = app.parseTripPlanBody({ text: ASK }, { stays: true, v4: true });
+  const parsed = app.parseTripPlanBody({ text: ASK_HERE }, { stays: true, v4: true });
   const p = app.runTripPlanRequest({ ...parsed.value, v4: true }, true);
   assert.ok(['multi_day', 'day_plan'].includes(p.kind));
   assert.equal(p.datesGiven, false);
   assert.ok(Array.isArray(p.evidence) && p.evidence.length > 0);
   assert.ok(!p.days.some((day) => day.date), 'no dates were chosen, so the days have none');
   assert.ok(!p.days.some((day) => day.stops.some((s) => s.kind === 'event')), 'and no event is a stop');
-  const wineries = H.venueStops(p).filter((x) => x.v.type === 'winery');
-  assert.ok(wineries.length <= 2, 'two wineries asked: at most two planned');
+  const drinkStops = H.venueStops(p).filter((x) => x.v.type === DRINK);
+  assert.ok(drinkStops.length <= 2, `two ${DRINKS} asked: at most two planned`);
+  const count = ev(p, `count:${DRINK}`);
+  assert.equal(count.count, drinkStops.length, 'the count in the evidence is the count in the plan');
+  assert.equal(count.status === 'verified', drinkStops.length === 2);
   const gf = ev(p, 'gluten_free');
   assert.ok(gf, 'gluten-free is judged');
   const meals = H.venueStops(p).filter((x) => H.isMealStop(x.s));
@@ -322,7 +329,7 @@ test('9. the six-person request through the planner: the plan, its lines and its
 
 test('10. "we don’t drink" for the whole group: no winery, brewery or bar is planned, and the evidence says so', () => {
   const app = require('../server.js');
-  const parsed = app.parseTripPlanBody({ text: '3 days in Kelowna for 4 friends: wineries, good food and easy walks. We don’t drink.' }, { stays: true, v4: true });
+  const parsed = app.parseTripPlanBody({ text: `3 days in ${TOWN_LABEL} for 4 friends: ${DRINKS}, good food and easy walks. We don’t drink.` }, { stays: true, v4: true });
   const p = app.runTripPlanRequest({ ...parsed.value, v4: true }, true);
   assert.equal(p.noAlcohol, true);
   const drink = H.venueStops(p).filter((x) => H.DRINK_TYPES.includes(x.v.type));
