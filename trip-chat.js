@@ -17,6 +17,7 @@
 // reads in plain words.
 
 const agent = require('./trip-chat-agent');
+const access = require('./trip-chat-access');
 const explain = require('./trip-chat-explain.js');
 const MODEL = 'claude-haiku-5-5';
 // Claude Haiku 5.5 list price (claude-api skill, cached 2026-10-06): $0.10 / $0.50 per million input / output tokens.
@@ -480,7 +481,11 @@ function kindsNamed(t, exceptTypes = new Set()) {
   return out.some((k) => agent.TOUR_KINDS[k]) ? out.filter((k) => k !== 'tour' && !(k === 'winery' && out.includes('wine_tour')) && !(k === 'brewery' && out.includes('brewery_tour'))) : out;
 }
 // -> { ops, cant }. Several asks in one message are each read and carried out in order (trip-chat-agent.js readAll).
-function rulesRead(message, stops, opts = {}) { return groupRead(message, stops, opts) || agent.readAll(message, (m) => rulesReadOne(m, stops, opts)); }
+// Access needs first (trip-chat-access.js): "make sure every activity and the hotel are wheelchair accessible, and the
+// dog can come with us" is ONE verify-and-fix request with a part per need (never cut at "and", never a stay change
+// alone), and a question about a need is an answer.
+const ACCESS_BASE = { stops: [], kind: null, time: null, day: null, value: null, n: null, ages: [], region: null, date: null };
+function rulesRead(message, stops, opts = {}) { return access.read(message, stops, { op: (o, extra = {}) => ({ ...ACCESS_BASE, o, ...extra }), stopsNamed }) || groupRead(message, stops, opts) || agent.readAll(message, (m) => rulesReadOne(m, stops, opts)); }
 // One of the party does not drink (2026-11-22, Dayton: "one non-drinker must not remove wineries for everyone"): the
 // message is about that person, never a rule for the whole trip. "Only one person does not drink; the rest want
 // wineries. Can you add a winery on day 2 with a non-alcoholic option?" -> party_some (whose need it is) and ONE winery
@@ -504,6 +509,8 @@ const SWAP_FEAT_RES = {
   kid_friendly: /\b(?:kid[- ]friendly|child[- ]friendly|family[- ]friendly|good for kids|adapte aux enfants)\b/,
 };
 const SWAP_FEATS = Object.keys(SWAP_FEAT_RES);
+// A listing's own data that is not a public badge column (checked by the server, never sent to the planner's Swap).
+const OWN_FEATS = ['wheelchair_accessible'];
 // "Who is coming" ops the same words would also read ("gluten-free" -> the whole trip gluten-free): a badge asked of
 // one replacement changes that stop only.
 const FEAT_PARTY = { gluten_free: 'gluten_free', vegan: 'vegan', vegetarian: 'vegetarian', nonalcoholic: 'no_alcohol', dog_friendly: 'dog', kid_friendly: 'kids' };
@@ -826,6 +833,9 @@ const EDIT_OPS = ['add', 'replace', 'budget', 'remove'];
 // key for a badge): the rules' swap of that stop stands, and an AI swap the rules did not read gets the badge from the
 // message's own words.
 function reconcileReads(ai, rules, message) {
+  // An access request or question (trip-chat-access.js) is read by fixed rules: the AI's reading of it (often only the
+  // stay part) never stands in for it.
+  if (rules && rules.access) return { ops: rules.ops, cant: null, source: ai && ai.ok ? 'rules_over_ai' : 'rules', fixes: ai && ai.ok ? ['access'] : [] };
   const r = reconcileCore(ai, rules, message);
   if (r.source === 'rules' || !(r.ops || []).length || r.ops === (rules && rules.ops)) return r;
   const withF = ((rules && rules.ops) || []).filter((o) => o.o === 'replace' && (o.features || []).length && !o.featSwap);
@@ -1587,15 +1597,25 @@ function planTurnCore(ops, ctx) {
           // place): a stop the chat changed keeps the kind of food it is (its name or cuisine), with the price asked.
           const keepKind = old.soft ? Object.keys(WORD_KINDS).find((k) => WORD_KINDS[k].meal && WORD_KINDS[k].words.some((w) => fold(`${old.name} ${old.cuisine || ''}`).includes(w))) : null;
           if (keepKind) { swap = { ...swap, types: WORD_KINDS[keepKind].types, words: WORD_KINDS[keepKind].words }; rr.keptKind = keepKind; }
-        } else swap = op.kind ? { ...KIND_SWAP[op.kind], id: old.id, ...(feats.length ? { types: KIND_SWAP[op.kind].types || [KIND_SWAP[op.kind].type], features: feats } : {}) } : { type: old.type, id: old.id, ...(feats.length ? { types: [old.type], features: feats } : op.toId ? { types: [old.type] } : {}) };
+        } else {
+          // The listing's own access data (wheelchair_accessible) is not a badge the planner's Swap filters on: it is
+          // checked here (ctx.hasFeature), and the places of that kind known to lack it are kept out (ctx.lacking).
+          const pf = feats.filter((x) => !OWN_FEATS.includes(x)), fk = feats.length ? (pf.length ? { features: pf } : {}) : null;
+          swap = op.kind ? { ...KIND_SWAP[op.kind], id: old.id, ...(fk ? { types: KIND_SWAP[op.kind].types || [KIND_SWAP[op.kind].type], ...fk } : {}) } : { type: old.type, id: old.id, ...(fk ? { types: [old.type], ...fk } : op.toId ? { types: [old.type] } : {}) };
+        }
         if (feats.length) rr.featAsked = feats;
         if (op.o === 'replace') raiseCount(cur, op.kind, old);
         // A meal swapped for a kind of meal stays somewhere to eat (never a winery or a beach with a lake view).
         const mealOk = (f) => !old.role || ['restaurant', 'pub'].includes(f.type) || (old.role === 'lunch' && f.type === 'cafe');
         const sun = op.sunset && typeof ctx.sunsetStart === 'function' ? ctx.sunsetStart(old.day, old.region || null) : null;
         const kindOk = (f) => wantMatches(op.kind, f) && mealOk(f) && (!op.toId || !!op.kind || f.type === old.type);
-        const spec = { slot: old.key, slotStart: Number.isInteger(sun) ? sun : old.start, ...(Number.isInteger(sun) ? { stopStart: sun } : {}), shifts: {}, swap, kind: op.kind || null, exclude: [old.id], oldId: old.id, check: (f) => kindOk(f) && (!feats.length || typeof ctx.hasFeature !== 'function' || feats.every((x) => ctx.hasFeature(f.id, x))) };
-        let res = slotEdit(cur, spec, ctx);
+        const ownAsked = feats.filter((x) => OWN_FEATS.includes(x));
+        const lack = ownAsked.length && typeof ctx.lacking === 'function' ? ctx.lacking(feats, swap.types || [swap.type], old) : [];
+        const spec = { slot: old.key, slotStart: Number.isInteger(sun) ? sun : old.start, ...(Number.isInteger(sun) ? { stopStart: sun } : {}), shifts: {}, swap, kind: op.kind || null, exclude: [old.id, ...(lack || [])], oldId: old.id, check: (f) => kindOk(f) && (!feats.length || typeof ctx.hasFeature !== 'function' || feats.every((x) => ctx.hasFeature(f.id, x))) };
+        // No place of that kind has the access data asked (lack === null): nothing to try.
+        let res = lack === null ? { why: 'no_fit' } : slotEdit(cur, spec, ctx);
+        // The places kept out for this one swap do not stay kept out of the trip.
+        if (!res.why && (lack || []).length) { const had = new Set(cur.args.excludeVenueIds || []); res.args = { ...res.args, excludeVenueIds: (res.args.excludeVenueIds || []).filter((id) => had.has(id) || !lack.includes(id)) }; }
         // The visitor said yes to the place the chat offered by name (toId): that place, when the planner's first pick
         // is another one.
         if (op.toId && !feats.length) { const tried = []; while (!res.why && res.fresh.id !== op.toId && tried.length < 3) { tried.push(res.fresh.id); const again = slotEdit(cur, { ...spec, exclude: [old.id, ...tried] }, ctx); if (again.why) break; res = again; } }
@@ -1604,7 +1624,7 @@ function planTurnCore(ops, ctx) {
           // No place with the badge fits there: the stop stays, and what could be done instead is worked out (never
           // applied): a place with the badge that fits on another day, else the place a plain swap would give, which
           // the reply names as unknown.
-          if (feats.length && res.why !== 'conflict' && !ctx.probe) {
+          if (feats.length && res.why !== 'conflict' && !ctx.probe && !op.ensure) {
             const miss = { hasOld: typeof ctx.hasFeature === 'function' ? feats.every((x) => ctx.hasFeature(old.id, x)) : feats.every((x) => (old.badges || []).includes(x) || (old.feats || []).includes(x)), other: null, alt: null };
             const addKind = op.kind || TYPE_KIND[old.type] || null;
             if (!old.role && addKind && KIND_SWAP[addKind] && typeof ctx.hasFeature === 'function') {
@@ -2238,7 +2258,7 @@ function offerOps(message, stops) {
 }
 
 module.exports = {
-  featOffers, offerOps, swapFeatsFor, SWAP_FEATS,
+  featOffers, offerOps, swapFeatsFor, SWAP_FEATS, OWN_FEATS, access,
   STAY_VALUES, STAY_AMENITY_VALUES, TRANSPORT_VALUES, fill, stayAmenitiesIn, stayTextPref,
   MODEL, PRICE_PER_TOKEN, DEFAULT_TIMEOUT_MS, DEFAULT_DAILY_USD, MAX_MESSAGE, MAX_STOPS, RATE, OPS, TIMES, VALUES, CANT, KINDS, KIND_KEYS, CHIPS, T,
   enabled, apiKey, wireSchema, systemPrompt, stopsForModel, stripPII, validateWire, readChatMessage, rulesRead, chipOps,
