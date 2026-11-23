@@ -51,6 +51,7 @@ const tripStays = require('./trip-stays');
 const stayBookingLinks = require('./stay-booking-links');
 const tripBooking = require('./trip-booking');
 const tripHonestPlan = require('./trip-honest-plan');
+const tripAccess = require('./trip-access-needs');
 // Viator tours (2026-11-20, viator.js): off unless VIATOR_API_KEY and VIATOR_PARTNER_ID are both set.
 const viator = require('./viator');
 const tourPicks = require('./tour-picks');
@@ -9687,17 +9688,139 @@ function tripHonestEvidence(plan, on = true) {
     const TR = require('./trip-requirements');
     const regions = [...new Set(tripHonestPlan.venueStops(plan).map((x) => x.v.region).filter(Boolean))];
     const towns = ((plan.overview && plan.overview.regions) || []).map((r) => r && r.label).filter(Boolean);
+    // Trip needs (2026-11-24, trip-access-needs.js): a wheelchair user, a dog. Read from the request's own words, so
+    // every re-plan of the same request carries them; the evidence then says what each listing's own data says.
+    if (['multi_day', 'day_plan', 'itinerary', 'outing'].includes(plan.kind)) plan.needs = tripPlanNeeds(plan);
+    const wheel = tripAccess.hasNeed(plan.needs, 'wheelchair');
     tripHonestPlan.applyEvidence(plan, {
       town: towns.length === 1 ? towns[0] : (regions.length === 1 ? REGION_LABELS[regions[0]] : null),
       // A place to go (a park, a beach) shows no badges on its plan card; its stored flags say what its listing has.
       flags: (id) => { try { return getVenue(id); } catch (e) { return null; } },
-      kindsOf: (id) => { try { const v = getVenue(id); if (!v) return []; const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; return TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); } catch (e) { return []; } },
+      accessOf: tripAccessOf, dogOf: tripDogOf, stayNeedFacts: tripStayNeedFacts, thin: tripThinInfo,
+      kindsOf: (id) => { try { const v = getVenue(id); if (!v) return []; const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; const kinds = TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); return wheel ? tripNeedKinds(v, kinds, tripAccessOf(v.id), tripAccess.needOf(plan.needs, 'wheelchair')) : kinds; } catch (e) { return []; } },
       kindLabel: (k) => TR.LABELS[k] || String(k).replace(/_/g, ' '),
       kindLabelFr: (k) => { try { return require('./trip-french-copy').t3FrenchText(TR.LABELS[k] || String(k).replace(/_/g, ' ')); } catch (e) { return null; } },
       countDining: (f) => { try { return /^[a-z_]+$/.test(f) && regions.length ? db.prepare(`SELECT COUNT(*) AS n FROM venues WHERE ${f} = 1 AND redirect_to IS NULL AND type IN ('restaurant','cafe','pub','brewery','cocktail') AND region IN (${regions.map(() => '?').join(',')})`).get(...regions).n : null; } catch (e) { return null; } },
     });
+    // A walk asked for and planned (an accessible park or boardwalk counts for a wheelchair user) is not also "Nothing
+    // matching Hiking & Trails".
+    if (wheel && Array.isArray(plan.warnings) && (plan.evidence || []).some((e) => /^kind:(?:easy_walk|walk)$/.test(e.ask) && e.status === 'verified')) plan.warnings = plan.warnings.filter((w) => !/^Nothing matching Hiking & Trails /.test(String(w)));
   } catch (e) { console.error(`[trip] evidence: ${e.message}`); }
   return plan;
+}
+// ---- Trip needs (2026-11-24, trip-access-needs.js) ----
+// What a listing's own data says about wheelchair access: the owner's own Wheelchair accessible answer
+// (venue_owner_features), an outdoor place's Access line (data/outdoor-facts.json), a Plan your visit row labelled
+// Accessibility / Wheelchair access (venue_visit_info), and for a place to stay stay_info.accessible. Nothing else.
+// -> { has: true | false | null, says, source, paved? }
+function tripAccessOf(id) {
+  try {
+    const v = getVenue(id);
+    if (!v) return { has: null, says: null, source: null };
+    if (v.type === 'stay') { const f = tripStayNeedFacts(id); return tripAccess.accessOf({ stayAccessible: f.accessible }); }
+    let line = '';
+    const of = OUTDOOR_FACTS[String(v.id)];
+    if (of && typeof of.accessibility === 'string') line = of.accessibility;
+    if (!line) { const vi = venueVisitInfo(v.id); const row = vi && Array.isArray(vi.rows) ? vi.rows.find((r) => r && typeof r.text === 'string' && /^(?:access|accessibility|wheelchair access)$/i.test(String(r.label || '').trim())) : null; if (row) line = row.text; }
+    let owner = false;
+    try { owner = !!venueOwnerFeatures(v.id).wheelchair_accessible; } catch (e) { owner = false; }
+    return tripAccess.accessOf({ ownerAccessible: owner, accessLine: line });
+  } catch (e) { return { has: null, says: null, source: null }; }
+}
+// What a listing's own data says about dogs: its Dogs line (outdoor facts) when it says yes or no, else its Dog-Friendly
+// badge or its place on the site's dog-friendly list. -> { has, says, source }
+function tripDogOf(id) {
+  try {
+    const v = getVenue(id);
+    if (!v) return { has: null, says: null, source: null };
+    const of = OUTDOOR_FACTS[String(v.id)];
+    let listed = false;
+    try { listed = getCollectionVenueIds('dog_friendly').includes(v.id); } catch (e) { listed = false; }
+    return tripAccess.dogOf({ dogLine: of && typeof of.dogs === 'string' ? of.dogs : '', badge: Number(v.dog_friendly) === 1 || listed });
+  } catch (e) { return { has: null, says: null, source: null }; }
+}
+// A place to stay's own facts for the trip's needs (stay_info only): { accessible: true | false | null, pets: 'yes' | 'some' | 'no' | null }.
+function tripStayNeedFacts(id) {
+  try {
+    const r = db.prepare('SELECT info_json FROM stay_info WHERE venue_id = ?').get(id);
+    const f = r ? JSON.parse(r.info_json) : null;
+    if (!f || typeof f !== 'object') return { accessible: null, pets: null };
+    return { accessible: f.accessible === true ? true : f.accessible === false ? false : null, pets: f.pets === true ? 'yes' : f.pets === false ? 'no' : ['yes', 'some', 'no'].includes(f.pets) ? f.pets : null };
+  } catch (e) { return { accessible: null, pets: null }; }
+}
+// The needs of a plan, from its request's words (plan.query); a dog trip the planner read another way (the Dates and
+// guests tick) is a dog need too.
+function tripPlanNeeds(plan) {
+  const needs = tripAccess.readNeeds(plan && plan.query);
+  const dogTrip = !!(plan && ((plan.intent && Array.isArray(plan.intent.features) && plan.intent.features.includes('dog_friendly')) || (plan.whereToStay && plan.whereToStay.trip && plan.whereToStay.trip.dog)));
+  if (dogTrip && !tripAccess.hasNeed(needs, 'dog')) needs.push({ key: 'dog', who: 'all', phrase: '' });
+  return needs;
+}
+// With a wheelchair user, a walk or a park whose own Access line says wheelchair, accessible, paved or flat is an easy
+// walk for this party (and only then: "easy" in a description is never access).
+function tripNeedKinds(v, kinds, access, need) {
+  const k = Array.isArray(kinds) ? kinds : [];
+  if (!['outdoor', 'beach'].includes(v.type) || !access || access.has !== true || (need && need.surface === 'paved' && !access.paved)) return k;
+  return k.some((x) => ['walk', 'park', 'easy_walk'].includes(x)) && !k.includes('easy_walk') ? k.concat('easy_walk') : k;
+}
+// The planner's listings for a trip with needs. A wheelchair user: an outdoor place whose own Access line says stairs,
+// steep or rough is left out; one whose line says it is accessible comes first (and counts as an easy walk). A dog: a
+// place whose own Dogs line says no dogs is left out, whatever its badge. Listings that don't say stay as they are.
+// Affiliate links play no part.
+function tripNeedFacts(facts, needs, text = '') {
+  const wheel = tripAccess.needOf(needs, 'wheelchair'), dog = tripAccess.hasNeed(needs, 'dog');
+  if (!wheel && !dog) return facts;
+  const TR = require('./trip-requirements');
+  const named = (f) => { const n = String(f.name || '').toLowerCase(); return n.length > 5 && String(text || '').toLowerCase().includes(n); };
+  const out = [];
+  for (const f of facts) {
+    if (dog && ['outdoor', 'beach'].includes(f.type) && !named(f) && tripDogOf(f.id).has === false) continue;
+    if (!wheel) { out.push(f); continue; }
+    const a = tripAccessOf(f.id);
+    if (['outdoor', 'beach'].includes(f.type) && a.has === false && !named(f)) continue;
+    if (a.has !== true || (wheel.surface === 'paved' && ['outdoor', 'beach'].includes(f.type) && !a.paved)) { out.push(f); continue; }
+    const kinds = f.plannerKinds || TR.inferPlannerKinds(f);
+    out.push({ ...f, plannerKinds: tripNeedKinds(f, kinds, a, wheel), accessBoost: ['outdoor', 'beach'].includes(f.type) ? 30 : 14, accessSays: a.says || null });
+  }
+  return out;
+}
+// What the listings can add to a thin day's line (trip-access-needs.js thinDays): the kind of place asked for, how many
+// listings in the day's town fit it, how many of those are already in the plan, how many other walks there don't say if
+// they are accessible, and one named place nearby or indoors that fits by its own data.
+const tripNeedFactsFor = (v4, text, facts) => (v4 ? tripNeedFacts(facts, tripAccess.readNeeds(text), text) : facts);
+function tripThinInfo(plan, day) {
+  try {
+    const TR = require('./trip-requirements'), planner = tripPlannerModule();
+    const needs = plan.needs || [], wheel = tripAccess.needOf(needs, 'wheelchair'), dog = tripAccess.hasNeed(needs, 'dog');
+    const region = day.region || ((day.regions || [])[0]) || null;
+    if (!region) return null;
+    const asked = (plan.requirementResults || []).filter((r) => r && r.kind === 'venue_kind' && r.strength === 'must' && !r.dayIndex).map((r) => r.value);
+    const kind = asked[0] || null;
+    const facts = tripNeedFacts(buildTripPlannerFacts(true, day.date || null), needs, plan.query);
+    const inPlan = new Set(tripHonestPlan.venueStops(plan).map((x) => x.v.id));
+    const dogOk = (f) => !dog || !!(f.features && f.features.dog_friendly) || (f.collections || []).includes('dog_friendly');
+    const open = (f) => !planner.seasonClosedOnTrip(f, { date: day.date || null });
+    const fits = (f) => (kind ? TR.matches(f, { kind: 'venue_kind', value: kind }) : ['outdoor', 'beach', 'indoor'].includes(f.type)) && dogOk(f) && open(f);
+    const here = facts.filter((f) => f.region === region && fits(f));
+    const walkKind = ['walk', 'easy_walk', 'park'].includes(kind);
+    const unknown = wheel && walkKind ? facts.filter((f) => f.region === region && ['outdoor', 'beach'].includes(f.type) && !inPlan.has(f.id) && dogOk(f) && open(f) && (f.plannerKinds || TR.inferPlannerKinds(f)).some((k) => ['walk', 'easy_walk'].includes(k)) && tripAccessOf(f.id).has === null).length : 0;
+    const label = kind ? `${TR.LABELS[kind] || String(kind).replace(/_/g, ' ')}s` : 'stops';
+    let labelFr = 'arrêts';
+    try { if (kind) labelFr = require('./trip-french-copy').t3FrenchText(label) || labelFr; } catch (e) { /* the general word */ }
+    const centre = (() => { const pts = tripHonestPlan.venueStops(plan).filter((x) => x.v.region === region && Number.isFinite(Number(x.v.latitude)) && Number(x.v.latitude)).map((x) => x.v); return pts.length ? { lat: pts.reduce((t, v) => t + Number(v.latitude), 0) / pts.length, lng: pts.reduce((t, v) => t + Number(v.longitude), 0) / pts.length } : null; })();
+    const km = (f) => (centre && Number.isFinite(f.lat) && Number.isFinite(f.lng) ? haversineKm(centre.lat, centre.lng, f.lat, f.lng) : null);
+    // Nearby: a listing of the asked kind in another town within about 20 km of the day's stops (with a wheelchair user,
+    // only one whose own Access line says so).
+    const near = facts.filter((f) => f.region !== region && !inPlan.has(f.id) && fits(f) && (!wheel || tripAccessOf(f.id).has === true) && km(f) !== null && km(f) <= 20).sort((a, b) => km(a) - km(b))[0] || null;
+    // Indoors: only without a dog (no indoor place lists dogs), and with a wheelchair user only one that lists access.
+    const indoor = dog ? null : facts.filter((f) => f.region === region && f.type === 'indoor' && !inPlan.has(f.id) && open(f) && (!wheel || tripAccessOf(f.id).has === true)).sort((a, b) => (b.rating || 0) - (a.rating || 0) || a.id - b.id)[0] || null;
+    return {
+      kindLabel: label, kindLabelFr: labelFr, kindOne: kind ? `${/^[aeiou]/i.test(TR.LABELS[kind] || kind) ? 'an' : 'a'} ${TR.LABELS[kind] || String(kind).replace(/_/g, ' ')}` : 'a stop', kind, town: day.regionLabel || REGION_LABELS[region] || null,
+      fit: here.length, used: here.filter((f) => inPlan.has(f.id)).length, accessUnknown: unknown,
+      ...(near ? { nearby: { name: near.name, town: REGION_LABELS[near.region] || near.region, km: Math.max(1, Math.round(km(near))) } } : {}),
+      ...(indoor ? { indoor: { name: indoor.name } } : {}),
+    };
+  } catch (e) { if (process.env.TRIP_DEBUG) console.error(`[trip] thin: ${e.stack}`); return null; }
 }
 // Trip dates, one source of truth (2026-11-23, Dayton: "keep explicit trip dates consistent across the itinerary, stay
 // card, booking checklist and shared copy"). The dates on the plan's days and where they came from:
@@ -9810,7 +9933,8 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
     const candidates = stayList || tripStayCandidates();
     // V4 (2026-11-21): with no dates given the stay starts today before noon (site time), else tomorrow, never a past day;
     // and the stay type fits the request (tripStays V4 rules). The current page passes nothing new.
-    const v4Stay = v4 ? { v4: true, text, minArrive: okanaganClock(now).minutes < 720 ? todayLocal(now) : addLocalDays(todayLocal(now), 1) } : {};
+    const stayNeeds = v4 ? tripPlanNeeds({ ...plan, query: plan.query || text }) : [];
+    const v4Stay = v4 ? { v4: true, text, ...(tripAccess.hasNeed(stayNeeds, 'wheelchair') ? { wheelchair: true } : {}), minArrive: okanaganClock(now).minutes < 720 ? todayLocal(now) : addLocalDays(todayLocal(now), 1) } : {};
     // Round 5 (2026-11-22: an undated "fin de semaine" ski trip was booked Mon Nov 23, before the hill opens): with no
     // dates, a stay is never before a plan stop reopens for the season (venue_seasons reopens_date).
     if (v4) { try { const ids = [...new Set((plan.days || []).flatMap((d) => (d.stops || []).map((s) => s && s.venue && s.venue.id)).filter(Boolean))]; let nb = null; for (const id of ids) { const r = db.prepare("SELECT status, reopens_date FROM venue_seasons WHERE venue_id = ? AND status = 'closed'").get(id); if (r && /^\d{4}-\d{2}-\d{2}$/.test(r.reopens_date || '') && r.reopens_date > (nb || '')) nb = r.reopens_date; } if (nb) v4Stay.notBefore = nb; } catch (e) { /* no season facts */ } }
@@ -9872,6 +9996,12 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
       block = stayBookingLinks.withBookingLinks(block, new Map(candidates.map((c) => [c.id, c])));
       // Honest plan (2026-11-22): a stay's button opens that stay's own stored page (or its affiliate wrapper), or is dropped.
       try { for (const card of [block.pick, ...(block.alternatives || [])]) if (card && Array.isArray(card.bookingLinks)) card.bookingLinks = card.bookingLinks.filter((l) => l && tripBookingLinkBelongs('stay', card.id, l.url)); } catch (e) { /* keep the links */ }
+      // The handoff (2026-11-24): what each visible button's own URL carries, the note worded from it, what no provider
+      // takes (the dog, an accessible room), and each stay's own facts for the trip's needs.
+      if (v4) {
+        block = stayBookingLinks.withHandoff(block, { dog: !!(block.trip && block.trip.dog) || tripAccess.hasNeed(stayNeeds, 'dog'), wheelchair: tripAccess.hasNeed(stayNeeds, 'wheelchair') });
+        if (stayNeeds.length) for (const card of [block.pick, ...(block.alternatives || [])]) if (card) card.needFacts = tripStayNeedFacts(card.id);
+      }
       block.checklist = tripBookingChecklist(plan);
       // "Book your trip" (2026-11-20, trip-booking.js): the estimated total and the "Book my trip" steps, per stay card.
       block = tripBooking.withTripBooking(block, plan);
@@ -12918,7 +13048,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     const hhParts = new Map();
     const plan = planner.planTrip({
       intent, trip, tripEvents, requirements, askedMinutes, text: requirementsText, ownTourAsked: OWN_TOUR_WORDS_RE.test(planText), budgetMode: overrides?.budgetMode,
-      facts: tripHappyHourPartFacts(buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now)), intent, rolledWindow ? requirements.startDate : (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now), now, hhParts),
+      facts: tripHappyHourPartFacts(tripNeedFactsFor(v4, text, buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now))), intent, rolledWindow ? requirements.startDate : (!trip.when && tripRequestedMonthDate(intent, now)) || tripPlanDate(trip.when, now), now, hhParts),
       labels: tripPlannerLabels(),
       seed,
       excludeIds: excludeVenueIds,
@@ -12972,7 +13102,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   const hhParts = new Map();
   const plan = tripPlannerModule().planTrip({
     intent, requirements, askedMinutes, text: requirementsText, ownTourAsked: OWN_TOUR_WORDS_RE.test(planText), budgetMode: overrides?.budgetMode, nearAnchor, niceDinnerOnce, lengthOverride: Number.isInteger(overrides?.days) ? overrides.days : null,
-    facts: tripHappyHourPartFacts(buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now)), intent, requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now) || tripPlanDate(intent.when, now), now, hhParts),
+    facts: tripHappyHourPartFacts(tripNeedFactsFor(v4, text, buildTripPlannerFacts((intent.types || []).some(t => t === 'indoor' || t === 'tour' || t === 'sport') || !!requirements?.items.some(i => i.kind === 'venue_kind' || i.kind === 'excluded_kind' || i.kind === 'activity'), requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now))), intent, requirements?.startDate || tripRequestedMonthDate(intent, now) || tripMonthWeekdayDate(intent, now) || tripPlanDate(intent.when, now), now, hhParts),
     labels: tripPlannerLabels(),
     seed,
     excludeIds: excludeVenueIds,
@@ -13025,6 +13155,14 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   tripWindowClockNote(plan, requirements);
   // Honest plan (2026-11-22): did the visitor choose dates (the Dates control, a date or a day in the request)? With
   // none, the events found for "the next few days from today" are offered as dated suggestions, never as stops.
+  // Trip needs (2026-11-24): a wheelchair need is read and answered by the plan's evidence (what each listing's own data
+  // says), so it is no longer "not used", and the blanket "isn't listed on the site" line goes.
+  if (v4 && tripAccess.hasNeed(tripAccess.readNeeds(text), 'wheelchair')) {
+    const wheelWord = (u) => /\b(?:wheel ?chairs?|accessib\w+|mobility|step[- ]?free|fauteuils?|mobilit[ée])\b/i.test(String(u));
+    if (Array.isArray(plan.unsupported)) plan.unsupported = plan.unsupported.filter((u) => !wheelWord(u));
+    if (plan.understood && Array.isArray(plan.understood.notUsed)) plan.understood.notUsed = plan.understood.notUsed.filter((u) => !wheelWord(u));
+    if (Array.isArray(plan.warnings)) plan.warnings = plan.warnings.filter((w) => !/^Wheelchair access isn’t listed on /.test(String(w)));
+  }
   if (v4) {
     plan.datesGiven = !!((requirements && requirements.startDate) || intent.when);
     if (requirements && requirements.startDate) plan.dateSourceText = String(requirements.dateSource || '');
@@ -54907,9 +55045,15 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
         const links = stayBookingLinks.stayBookingLinks(cand, trip.datesGiven ? trip : { ...trip, arrive: null, leave: null }, { regionLabel: cand.regionLabel }).filter((l) => l && tripBookingLinkBelongs('stay', cand.id, l.url));
         const has = tripStays.STAY_AMENITIES.filter((a) => tripStays.stayHas(cand, a));
         const m = Number(String(dayOne || todayLocal(now)).slice(5, 7));
-        stayFacts = { id: cand.id, name: cand.name, regionLabel: cand.regionLabel, has, winterCheck: has.includes('pool') && (m >= 10 || m <= 5) };
+        // Trip needs (2026-11-24): the link's asks say a wheelchair user or a dog is on the trip; the copy then says
+        // what each button hands over and what to tell the hotel (a link without them reads as before).
+        const askSet = new Set(c.asks || []), shareNeeds = { dog: askSet.has('dog_friendly') || askSet.has('stay:pets'), wheelchair: askSet.has('accessible') || askSet.has('stay:accessible') };
+        stayFacts = { id: cand.id, name: cand.name, regionLabel: cand.regionLabel, has, winterCheck: has.includes('pool') && (m >= 10 || m <= 5), ...(shareNeeds.dog || shareNeeds.wheelchair ? { needFacts: tripStayNeedFacts(cand.id) } : {}) };
+        const handoff = dated2 || shareNeeds.dog || shareNeeds.wheelchair ? stayBookingLinks.stayHandoff(links, { ...trip, dog: shareNeeds.dog, rooms: c.rooms || null, stayStatus: trip.datesGiven ? 'confirmed' : null }) : null;
+        const handoffAsk = stayBookingLinks.stayHandoffAsk(shareNeeds);
         out.stay = { id: cand.id, name: cand.name, kind: fr ? (cand.kindFr || cand.kind) : cand.kind, regionLabel: cand.regionLabel, photo: cand.photo, url: fr ? (cand.urlFr || cand.url) : cand.url,
-          links: links.map((l) => ({ label: fr ? l.labelFr : l.label, url: l.url, affiliate: !!l.affiliate, rel: l.rel || 'nofollow noopener', key: l.key })) };
+          links: links.map((l) => ({ label: fr ? l.labelFr : l.label, url: l.url, affiliate: !!l.affiliate, rel: l.rel || 'nofollow noopener', key: l.key })),
+          ...(handoff && handoff.length ? { handoff } : {}), ...(handoffAsk ? { handoffAsk } : {}) };
       }
     } catch (e) { out.stay = null; }
   }
@@ -54943,19 +55087,29 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
           if (e && tripEventOccurrences(e.id, now).some((o) => o.d === date || (o.u && o.d <= date && o.u >= date))) events.push({ id: e.id, name: e.name, day: days[i], startDate: date, dateLabel: new Date(`${date}T12:00:00Z`).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }), dateLabelFr: new Date(`${date}T12:00:00Z`).toLocaleDateString('fr-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) });
         }
       });
+      // A wheelchair user's copy: an accessible walk or park counts as the easy walk asked for, as on the plan.
+      if (c.asks.includes('accessible')) for (const x of stops) x.kinds = tripNeedKinds(x, x.kinds, tripAccessOf(x.id), null);
       const plan = tripHonestPlan.sharedPlan(c, stops, events, stayFacts);
       const regions = [...new Set(stops.map((x) => x.region).filter(Boolean))];
+      const wheelNeed = tripAccess.needOf(plan.needs, 'wheelchair');
+      for (const d of plan.days) { const r = (stops.find((x) => (x.day || 0) === d.day) || {}).region; if (r) { d.region = r; d.regionLabel = REGION_LABELS[r] || null; } }
       tripHonestPlan.applyEvidence(plan, {
         town: regions.length === 1 ? REGION_LABELS[regions[0]] : null, flags: (id) => getVenue(id),
-        kindsOf: (id) => (stops.find((x) => x.id === id) || {}).kinds || [],
+        accessOf: tripAccessOf, dogOf: tripDogOf, stayNeedFacts: tripStayNeedFacts, thin: tripThinInfo,
+        kindsOf: (id) => { const k = (stops.find((x) => x.id === id) || {}).kinds || []; return wheelNeed ? tripNeedKinds(getVenue(id) || {}, k, tripAccessOf(id), wheelNeed) : k; },
         kindLabel: (k) => TR.LABELS[k] || String(k).replace(/_/g, ' '),
         kindLabelFr: (k) => { try { return require('./trip-french-copy').t3FrenchText(TR.LABELS[k] || String(k).replace(/_/g, ' ')); } catch (e) { return null; } },
       });
       out.evidence = plan.evidence || [];
       // The lines the page prints: anything not fully shown by the listings, and who drinks; at most four.
-      out.lines = out.evidence.filter((e) => e.status !== 'verified' || ['nonalcoholic', 'no_alcohol'].includes(e.ask) || /^stay:/.test(e.ask) || tripHonestPlan.DIET.includes(e.ask)).slice(0, 5).map((e) => ({ ask: e.ask, status: e.status,
+      if (plan.needs) out.needs = plan.needs;
+      if (plan.thinDays) out.thinDays = plan.thinDays;
+      // (A need's own entries are always printed, with their caveats: a copy never drops them.)
+      out.lines = out.evidence.filter((e) => e.status !== 'verified' || ['nonalcoholic', 'no_alcohol', 'accessible'].includes(e.ask) || /^stay:/.test(e.ask) || tripHonestPlan.DIET.includes(e.ask) || (e.ask === 'dog_friendly' && plan.needs)).slice(0, plan.needs ? 8 : 5).map((e) => ({ ask: e.ask, status: e.status,
         // (A copy can't add events: the line says the plan has no dates, not "I'll add what's on".)
         text: (fr ? e.textFr : e.text).replace(': pick your dates and I’ll add what’s on.', ', and this plan has no dates yet.').replace(' Choisissez vos dates et j’ajouterai ce qui est à l’affiche.', ' Ce plan n’a pas encore de dates.') }));
+      // A day the plan could not fill: its line (no buttons on a copy).
+      for (const t of out.thinDays || []) out.lines.push({ ask: `thin:${t.day}`, status: 'unknown', text: fr ? t.textFr : t.text });
     } catch (e) { out.lines = []; }
   }
   return out;
@@ -54993,6 +55147,9 @@ function tripShareContextHtml(ctx, lang = 'en') {
     html += `<div class="mt-ctx-stay" data-mt-stay="${st.id}">${st.photo ? `<img src="${escapeHtml(st.photo)}" alt="" loading="lazy" width="96" height="96">` : ''}<div><p class="mt-ctx-k">${escapeHtml([L('Where to stay', 'Où dormir'), st.kind, st.regionLabel].filter(Boolean).join(' · '))}</p><p class="mt-ctx-name">${st.url ? `<a href="${escapeHtml(st.url)}">${escapeHtml(st.name)}</a>` : escapeHtml(st.name)}</p>`
       + (st.links.length ? `<p class="mt-ctx-links">${st.links.map((l) => `<a class="mt-btn" href="${escapeHtml(l.url)}" target="_blank" rel="${escapeHtml(l.rel)}" data-track="stay_click" data-stay-id="${st.id}" data-link="${escapeHtml(l.key || '')}"${l.affiliate ? ' data-affiliate="1"' : ''}>${escapeHtml(l.label)} <span aria-hidden="true">↗</span></a>${l.affiliate ? `<small>${L('We may earn a commission', 'Nous pouvons toucher une commission')}</small>` : ''}`).join('')}</p>` : '')
       + (roomsNote ? `<p class="mt-ctx-note" data-mt-rooms-note>${escapeHtml(roomsNote)}</p>` : '')
+      // The handoff (2026-11-24): what each button really opens with, and what to tell the hotel yourself.
+      + (st.handoff && st.handoff.length ? `<p class="mt-ctx-note" data-mt-handoff>${escapeHtml(st.handoff.map((h) => (fr ? h.noteFr : h.note)).join(' '))}</p>` : '')
+      + (st.handoffAsk ? `<p class="mt-ctx-note" data-mt-handoff-ask>${escapeHtml(fr ? st.handoffAsk.textFr : st.handoffAsk.text)}</p>` : '')
       + (stayWhen ? `<p class="mt-ctx-note" data-mt-stay-dates>${escapeHtml(stayWhen)}</p>` : !ctx.start ? `<p class="mt-ctx-note">${L('No dates in these links: pick them on the booking site.', 'Aucune date dans ces liens : choisissez-les sur le site de réservation.')}</p>` : '') + '</div></div>';
   }
   if (ctx.lines && ctx.lines.length) html += `<ul class="mt-ctx-lines">${ctx.lines.map((l) => `<li data-ev-status="${escapeHtml(l.status)}">${escapeHtml(l.text)}</li>`).join('')}</ul>`;
@@ -84890,6 +85047,7 @@ module.exports = {
   sportTimesChange, searchWithoutNegated,
   // Sport test 2 (2026-11-20): the golf winter rule.
   golfWinterSeasonMap, GOLF_WINTER_RULE_ON, golfCardBasis, sportMainKind, sportPartSeasons, priceListWordsFor,
+  tripAccessOf, tripDogOf, tripStayNeedFacts, tripNeedFacts, tripThinInfo,
   runTripPlanWithStay, tripTimingVenue, tripTimingParty, tripDatesOf, withTripStays, tripStayCandidates, isTripStaysEnabled, tripStaysEnabledFor, isTripV4Enabled, tripV4EnabledFor,
   tripBookingChecklist,
   // Planner (2026-10-27): the happy hour crawl.

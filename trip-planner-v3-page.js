@@ -1042,7 +1042,8 @@ function t3StayInputsHtml() {
 // plan (state.last.whereToStay), never the copy with times and dates rewritten for display.
 const T3_STAY_CLIENT_SRC = `
   var T3_STAY_DISCLOSURE = ${JSON.stringify(require('./places-to-stay').DISCLOSURE)};
-${require('./stay-booking-links').ROOMS_CLIENT_SRC}` + String.raw`
+${require('./stay-booking-links').ROOMS_CLIENT_SRC}
+${require('./stay-booking-links').HANDOFF_CLIENT_SRC}` + String.raw`
   var stayChoice = null;
   function t3StayInput(){
     var g = function(id){ var el = document.getElementById(id); return el ? el.value : ''; };
@@ -1114,7 +1115,23 @@ ${require('./stay-booking-links').ROOMS_CLIENT_SRC}` + String.raw`
   // The stay's dates, one short block by the stay: a stay proposed from the trip's dates waits for a yes ("Use these
   // dates") before any booking link carries a date; "Change" opens check-in and check-out, which may differ from the
   // trip's days (arriving the night before, leaving a day later). Nothing here when no dates were given.
-  function t3StayDatesHtml(t, fr){
+  // The handoff (2026-11-24): what each stay button on screen hands to the site it opens, read from the button's own
+  // URL (the same functions the server uses), so nothing is claimed that the link does not carry.
+  function t3HandoffUrl(u){ return typeof v4PartyUrl === 'function' ? v4PartyUrl(u) : u; }
+  function t3Handoff(s, t){
+    var links = ((s && s.bookingLinks) || []).filter(function(l){ return l && t3StayExt(l.url); }).map(function(l){ return { key: l.key, short: l.short, shortFr: l.shortFr, label: l.label, url: t3HandoffUrl(l.url) }; });
+    var tt = t || {}, st = typeof v4RoomsState === 'function' ? v4RoomsState() : null;
+    if (st) tt = Object.assign({}, tt, { adults: st.adults, kids: st.kids, rooms: st.rooms });
+    return stayHandoff(links, tt);
+  }
+  function t3HandoffText(s, t, fr){
+    var h = t3Handoff(s, t);
+    // The travel agent page shows one stay button (the first link) on the card and in the Book my trip sheet: the
+    // note is about that button only. Where every link is a button, each gets its line.
+    if (typeof v4RoomsState === 'function') h = h.slice(0, 1);
+    return h.map(function(x){ return fr ? x.noteFr : x.note; }).join(' ');
+  }
+  function t3StayDatesHtml(t, fr, s){
     if (!t || !(t.stayStatus || t.datesPast)) return '';
     var today = new Date(); today = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
     var line, btns, note = '', a = t.datesPast ? '' : (t.arrive || ''), l = t.datesPast ? '' : (t.leave || '');
@@ -1123,10 +1140,15 @@ ${require('./stay-booking-links').ROOMS_CLIENT_SRC}` + String.raw`
     else if (t.stayStatus === 'proposed') {
       line = (fr ? 'Séjour proposé : ' : 'Stay proposed: ') + t3NightsLabel(t.nights, fr) + ', ' + t3NiceDate(t.arrive, fr) + ' → ' + t3NiceDate(t.leave, fr);
       btns = '<button type="button" class="t3-stayd-btn t3-stayd-ok" data-t3-stay-ok>' + esc(fr ? 'Utiliser ces dates' : 'Use these dates') + '</button>' + edit(fr ? 'Modifier' : 'Change');
-      note = fr ? 'Les dates vont au site de réservation une fois confirmées.' : 'Dates go to the booking site after you confirm them.';
+      // (2026-11-24) Only said of a link that can take dates: a hotel's own site is never pre-filled.
+      var canCarry = !s || (s.bookingLinks || []).some(function(l){ return l && l.key !== 'own' && l.key !== 'search' && t3StayExt(l.url); });
+      note = canCarry ? (fr ? 'Les dates vont au site de réservation une fois confirmées.' : 'Dates go to the booking site after you confirm them.')
+        : (fr ? 'Le site de l’hôtel ne peut pas être prérempli : vous y entrerez ces dates.' : 'The hotel’s own site can’t be pre-filled: you’ll enter these dates there.');
     } else {
       // (The stay's dates are in the line above the stay; here only that the links carry them, and the way to change.)
-      line = fr ? 'Les liens de réservation portent ces dates.' : 'Booking links carry these dates.';
+      // Only what the buttons on screen really carry (2026-11-24: the old blanket line was said of a hotel’s
+      // own page, which can't be pre-filled). With no stay to read, nothing is claimed.
+      line = (s && t3HandoffText(s, t, fr)) || (fr ? 'Dates du séjour confirmées.' : 'Stay dates confirmed.');
       btns = edit(fr ? 'Modifier les dates' : 'Change dates');
     }
     return '<div class="t3-stayd" data-t3-stayd="' + esc(t.datesPast ? 'past' : t.stayStatus) + '" role="group" aria-label="' + esc(fr ? 'Dates du séjour' : 'Stay dates') + '"><p class="t3-stayd-line">' + esc(line) + '</p><div class="t3-stayd-btns">' + btns + '</div>'
@@ -1287,6 +1309,11 @@ ${require('./stay-booking-links').ROOMS_CLIENT_SRC}` + String.raw`
     if (!t.datesGiven && !t.stayStatus && !t.datesPast) bits.push(fr ? 'Pas encore de dates : choisissez-les ici ou sur le site de réservation.' : 'No dates yet: pick them here or on the booking site.');
     if (prefilled && t.kids && !(t.kidAges && t.kidAges.length === t.kids)) bits.push(fr ? 'Le site demande l’âge des enfants.' : 'The booking site asks for the kids’ ages.');
     if (s.petsSome) bits.push(fr ? 'Animaux dans certaines chambres : à vérifier.' : 'Pets in some rooms: check when booking.');
+    // What no booking site takes (the dog, an accessible room): said here, by the stay's step.
+    if (s.handoffAsk) bits.push(fr ? s.handoffAsk.textFr : s.handoffAsk.text);
+    // Each button's own handoff, once the stay's dates are confirmed (before that, the stay's own block says the dates
+    // are not sent yet).
+    if (t.stayStatus === 'confirmed' && !t.datesPast) { var ho = t3HandoffText(s, t, fr); if (ho) bits.unshift(ho); }
     // Rooms (2026-11-22): nothing here says the place can sleep the group, in one room or in several.
     var first = (s.bookingLinks || [])[0];
     if (t.rooms > 1 && first && (first.key === 'own' || first.key === 'search')) bits.push(fr ? 'Site de l’hôtel : indiquez ' + t.rooms + ' chambres sur place.' : 'Hotel’s own site: enter ' + t.rooms + ' rooms there.');
