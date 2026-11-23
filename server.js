@@ -52,6 +52,7 @@ const stayBookingLinks = require('./stay-booking-links');
 const tripBooking = require('./trip-booking');
 const tripHonestPlan = require('./trip-honest-plan');
 const tripAccess = require('./trip-access-needs');
+const tripTransport = require('./trip-transport-need');
 // Viator tours (2026-11-20, viator.js): off unless VIATOR_API_KEY and VIATOR_PARTNER_ID are both set.
 const viator = require('./viator');
 const tourPicks = require('./tour-picks');
@@ -8879,6 +8880,13 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     const nt = d.whole ? tripChat.onePersonText(v.args.text) : !d.some ? tripChat.joinText(String(v.args.text || '').replace(/[\s.]+$/, ''), ['one person does not drink']) : null;
     if (nt && !tripChatDryRead(nt).whole) { someRewrote = d.whole; someText = nt; v.args = { ...v.args, text: nt }; }
   }
+  // No car said in the chat (2026-11-23): the request gains the words, so every later re-plan, the summary and the
+  // shared copy carry the need. The stops are not planned again for it.
+  let noCarText = null;
+  if (ops.some((o) => o.o === 'transport' && o.value === 'no_car') && !tripTransport.readNoCar(v.args.text)) {
+    const nt = tripChat.joinText(String(v.args.text || '').replace(/[\s.]+$/, ''), [lang === 'fr' ? 'sans voiture' : 'no car']);
+    if (nt && tripTransport.readNoCar(nt)) { noCarText = nt; v.args = { ...v.args, text: nt }; }
+  }
   const extra = ops.filter(isExtra);
   const planOps = ops.filter((o) => !isExtra(o));
   // Round 4: a change to the stops keeps the place to stay the visitor sees (it changed with unrelated messages).
@@ -8913,7 +8921,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   if (planOps.length && out && out.plan && !v.chip) { try { const nn = tripChat.access.needsOfText((out.req && out.req.text) || v.args.text); if (nn.length) needLine = tripChatHonourNeeds(out, nn, { v, stops, lang, run, hooks, days, short }); } catch (e) { needLine = ''; } }
   let reply = planOps.length ? tripChat.buildReply(out, { lang, regionLabels: REGION_LABELS, cant, asks }) : '';
   if (needLine) reply = [reply, needLine].filter(Boolean).join(' ');
-  let plan = out.plan || null, req = out.req || null, stayPref, transport, stayBlock, newText = null, card = null, stayForce, stayArrive, party, stayDates = null, note = null, offer = [], askFirst = false;
+  let plan = out.plan || null, req = out.req || null, stayPref, transport, stayBlock, newText = null, card = null, stayForce, stayArrive, party, stayDates = null, note = null, offer = [], askFirst = false, needPatch = null;
   // A full day said with choices ("swap X, or day 3 at 1:15 PM. Which?"): the choices go back as plain messages.
   // A swap that asked for a badge no replacement has: the place offered instead, by name (a "yes" swaps to it).
   if (!offer.length) offer = tripChat.featOffers((out && out.results) || []);
@@ -8944,7 +8952,8 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
           : op.o === 'party' && op.value === 'stay_dates' ? tripChatStayDatesTurn(op, { v, plan, req, stops, lang, staysOn, runCore })
           : op.o === 'party' && op.value === 'rooms' ? tripChatRoomsTurn(op, { v, plan, req, stops, lang, staysOn, runCore })
           : op.o === 'party' ? tripChatAdultsTurn(op, { v, plan, req, stops, lang, staysOn, runCore })
-            : tripChatTransportTurn(op, { stops, lang, stayTown: v.stayTown, dayDates: v.dayDates });
+            : tripChatTransportTurn(op, { stops, lang, stayTown: v.stayTown, dayDates: v.dayDates, v, plan });
+    if (r.needPatch) needPatch = r.needPatch;
     if (r.stayForce !== undefined) { stayForce = r.stayForce; stayArrive = r.stayArrive || null; }
     if (r.stayDates) stayDates = r.stayDates;
     if (r.party) party = r.party;
@@ -8984,7 +8993,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   return {
     timing: { ...timing, total: Date.now() - timing.start },
     source, cant: null, plan, actions,
-    response: { reply, source, plan, req, changed: out.changed || [], actions, ...tripChatDiff(stops, v.removed, plan, actions, out), ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(stayForce !== undefined ? { stayForce } : {}), ...(stayArrive ? { stayArrive } : {}), ...(party ? { party } : {}), ...(stayDates ? { stayDates } : {}), ...(newText && !plan ? { text: newText } : {}), ...(askFirst ? { confirm: true } : {}), ...(card ? { card } : {}), ...(note ? { note } : {}), ...(offer.length ? { offer } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
+    response: { reply, source, plan, req, changed: out.changed || [], actions, ...tripChatDiff(stops, v.removed, plan, actions, out), ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(stayForce !== undefined ? { stayForce } : {}), ...(stayArrive ? { stayArrive } : {}), ...(party ? { party } : {}), ...(stayDates ? { stayDates } : {}), ...((newText || noCarText) && !plan ? { text: newText || noCarText } : {}), ...(needPatch && noCarText && !plan && !answerOnly ? { needPatch } : {}), ...(askFirst ? { confirm: true } : {}), ...(card ? { card } : {}), ...(note ? { note } : {}), ...(offer.length ? { offer } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
   };
 }
 // "somewhere cheaper to stay", "a hotel with a pool", "stay in Naramata", "we already have a place": the same plan (every
@@ -9665,7 +9674,7 @@ function tripChatTourOffer(kind, stops, lang, reqText = '') {
   }
   return null;
 }
-function tripChatTransportTurn(op, { stops, lang, stayTown = null, dayDates = [] }) {
+function tripChatTransportTurn(op, { stops, lang, stayTown = null, dayDates = [], v = null, plan = null }) {
   const L = lang === 'fr' ? 'fr' : 'en';
   const T = tripChat.T[L];
   if (op.value === 'wine_tour') {
@@ -9675,7 +9684,10 @@ function tripChatTransportTurn(op, { stops, lang, stayTown = null, dayDates = []
     try { tour = town && typeof wineTours !== 'undefined' ? wineTours.tourFor(town) : null; } catch (e) { tour = null; }
     const label = REGION_LABELS[town] || (L === 'fr' ? 'votre plan' : 'your plan');
     if (!tour) return { reply: tripChat.fill(T.wineTourNone, { town: label }) };
-    return { transport: 'wine_tour', card: { kind: 'wine_tour', name: wineTours.TEXT.step.en, nameFr: wineTours.TEXT.step.fr, url: tour.url, label: viator.TEXT.book.en, labelFr: viator.TEXT.book.fr }, reply: tripChat.fill(T.wineTour, { town: label }) };
+    // Asked for with pickup (the no-car offer): said only when the tour's own stored note says it picks up.
+    let pickup = false;
+    try { pickup = !!op.pickup && /\bpick ?up\b/i.test(String(((wineTours.loadData().areas || {})[tour.area] || {}).why || '')); } catch (e) { pickup = false; }
+    return { transport: 'wine_tour', card: { kind: 'wine_tour', name: wineTours.TEXT.step.en, nameFr: wineTours.TEXT.step.fr, url: tour.url, label: viator.TEXT.book.en, labelFr: viator.TEXT.book.fr }, reply: tripChat.fill(pickup ? T.wineTourPickup : T.wineTour, { town: label }) };
   }
   const region = (stops.find((s) => gettingHere.airportFor(s.region)) || {}).region || null;
   const key = region ? gettingHere.airportFor(region) : null;
@@ -9694,7 +9706,32 @@ function tripChatTransportTurn(op, { stops, lang, stayTown = null, dayDates = []
   }
   if (op.value === 'rental') return { transport: 'rental', reply: tripChat.fill(gettingHere.enabled() && key ? T.carYes : T.carNo, { airport }) };
   const shuttles = region ? gettingHere.regionShuttles(region) : [];
-  return { transport: 'no_car', reply: shuttles.length ? T.noCarShuttle : tripChat.fill(T.noCar, { town: REGION_LABELS[stayTown] || REGION_LABELS[region] || (L === 'fr' ? 'la ville' : 'town') }) };
+  // No car (2026-11-23, trip-transport-need.js): the trips between the stops as they are now, by the straight-line
+  // distance between stored map locations; a short walk only where that supports it, worded as approximate. No taxi,
+  // shuttle or bus is checked or named. The one follow-up offered is one the data can deliver: the stored wine tour
+  // for the plan's wine area, when its own note says it picks up (data/viator-wine-tours.json).
+  const on = (plan ? tripChat.planStops(plan) : stops.filter((s) => !((v && v.removed) || []).includes(s.key)).slice().sort((a, b) => (a.day - b.day) || ((a.start == null ? 1e9 : a.start) - (b.start == null ? 1e9 : b.start))));
+  let stay = null;
+  try { const sv = v && v.stayId ? getVenue(v.stayId) : null; if (sv) stay = { id: sv.id, name: sv.name }; } catch (e) { stay = null; }
+  const entry = tripTransport.entry(on.map((s) => ({ id: s.id, name: s.name, day: s.day })), stay, tripCoordsOf);
+  const legs = tripTransport.legsOf(on.map((s) => ({ id: s.id, name: s.name, day: s.day })), stay, tripCoordsOf);
+  const far = legs.filter((l) => !l.walk), longest = far.filter((l) => l.km != null).sort((a, b) => b.km - a.km)[0] || null;
+  const arrange = /\b(?:arrange|rearrange|re-?plan|organi[sz]e|make (?:it|this|the plan) work|so (?:that )?we can (?:get|walk)|get (?:between|around|from)|walkable|walking distance|closer together|a pied|organise[rz]?|reorganise[rz]?)\b/.test(tripChat.fold((v && v.message) || ''));
+  const parts = [];
+  if (!legs.length) parts.push(T.noCarPlain);
+  else if (!far.length) parts.push(T.noCarWalk);
+  else if (longest) parts.push(tripChat.fill(arrange ? T.noCarArrange : T.noCarRides, { rides: far.length, n: legs.length, hop: L === 'fr' ? tripTransport.hopFr(longest) : tripTransport.hopEn(longest) }));
+  else parts.push(T.noCarPlain);
+  if (shuttles.length) parts.push(T.noCarAirport);
+  const offer = [];
+  if (far.length && on.some((s) => s.type === 'winery') && !tripChatDryRead((v && v.args && v.args.text) || '').whole) {
+    try {
+      const town = (stops.find((x) => x.type === 'winery') || {}).region || null, t = town ? wineTours.tourFor(town) : null;
+      const why = t ? String(((wineTours.loadData().areas || {})[t.area] || {}).why || '') : '';
+      if (t && /\bpick ?up\b/i.test(why)) { parts.push(T.noCarTourAsk); offer.push({ say: T.noCarTourSay }); }
+    } catch (e) { /* no offer */ }
+  }
+  return { transport: 'no_car', reply: parts.join(' '), ...(offer.length ? { offer } : {}), needPatch: { need: { key: 'no_car', who: 'all', phrase: '' }, evidence: entry } };
 }
 
 // Every place to stay with a map location, its stay_info facts and what the "Where to stay" card shows.
@@ -9748,12 +9785,14 @@ function tripHonestEvidence(plan, on = true) {
     // Trip needs (2026-11-24, trip-access-needs.js): a wheelchair user, a dog. Read from the request's own words, so
     // every re-plan of the same request carries them; the evidence then says what each listing's own data says.
     if (['multi_day', 'day_plan', 'itinerary', 'outing'].includes(plan.kind)) plan.needs = tripPlanNeeds(plan);
+    // A sauna asked of the place to stay ("a hotel with a sauna"): stay listings carry no sauna fact; said as unknown.
+    try { const st = TR.stayTubAsked(plan.query); if (st && st.sauna && plan.whereToStay) plan.stayAlso = ['sauna']; else delete plan.stayAlso; } catch (e) { /* no line */ }
     const wheel = tripAccess.hasNeed(plan.needs, 'wheelchair');
     tripHonestPlan.applyEvidence(plan, {
       town: towns.length === 1 ? towns[0] : (regions.length === 1 ? REGION_LABELS[regions[0]] : null),
       // A place to go (a park, a beach) shows no badges on its plan card; its stored flags say what its listing has.
       flags: (id) => { try { return getVenue(id); } catch (e) { return null; } },
-      accessOf: tripAccessOf, dogOf: tripDogOf, entranceOf: tripAccessEntrance, stayNeedFacts: tripStayNeedFacts, thin: tripThinInfo,
+      accessOf: tripAccessOf, dogOf: tripDogOf, entranceOf: tripAccessEntrance, stayNeedFacts: tripStayNeedFacts, thin: tripThinInfo, coordsOf: tripCoordsOf,
       kindsOf: (id) => { try { const v = getVenue(id); if (!v) return []; const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; const kinds = TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); return wheel ? tripNeedKinds(v, kinds, tripAccessOf(v.id), tripAccess.needOf(plan.needs, 'wheelchair')) : kinds; } catch (e) { return []; } },
       kindLabel: (k) => TR.LABELS[k] || String(k).replace(/_/g, ' '),
       kindLabelFr: (k) => { try { return require('./trip-french-copy').t3FrenchText(TR.LABELS[k] || String(k).replace(/_/g, ' ')); } catch (e) { return null; } },
@@ -9850,12 +9889,19 @@ function tripStayNeedFacts(id) {
     return { accessible: f.accessible === true ? true : f.accessible === false ? false : null, pets: f.pets === true ? 'yes' : f.pets === false ? 'no' : ['yes', 'some', 'no'].includes(f.pets) ? f.pets : null };
   } catch (e) { return { accessible: null, pets: null }; }
 }
+// A listing's stored map location (stops and places to stay), for the no-car hops. -> { lat, lng } or null
+function tripCoordsOf(id) {
+  try { const v = getVenue(id); return v && Number.isFinite(v.latitude) && Number.isFinite(v.longitude) ? { lat: v.latitude, lng: v.longitude } : null; } catch (e) { return null; }
+}
 // The needs of a plan, from its request's words (plan.query); a dog trip the planner read another way (the Dates and
 // guests tick) is a dog need too.
 function tripPlanNeeds(plan) {
   const needs = tripAccess.readNeeds(plan && plan.query);
   const dogTrip = !!(plan && ((plan.intent && Array.isArray(plan.intent.features) && plan.intent.features.includes('dog_friendly')) || (plan.whereToStay && plan.whereToStay.trip && plan.whereToStay.trip.dog)));
   if (dogTrip && !tripAccess.hasNeed(needs, 'dog')) needs.push({ key: 'dog', who: 'all', phrase: '' });
+  // No car (2026-11-23, trip-transport-need.js): said in the request, or the plan was made for one (plan.noCar).
+  const noCar = tripTransport.readNoCar(plan && plan.query) || (plan && plan.noCar ? { key: 'no_car', who: 'all', phrase: '' } : null);
+  if (noCar) needs.push(noCar);
   return needs;
 }
 // With a wheelchair user, a walk or a park whose own Access line says wheelchair, accessible, paved or flat is an easy
@@ -12747,6 +12793,9 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   // "A weekend in Squamish, we like markets, cafes and easy hikes": markets among other interests on a trip of days are
   // its events to look for (the requirement text keeps the word), not an events-only answer.
   if (/\b(?:weekend|[2-7] days|[2-7] nights)\b/i.test(interpretationText) && /\bmarkets?\b/i.test(interpretationText) && /\b(?:cafes?|hikes?|hiking|walks?|restaurants?|beaches?|food|breweries)\b/i.test(interpretationText)) interpretationText = interpretationText.replace(/,?\s*\b(?:farmers'? )?markets?\b,?/gi, ' ');
+  // No-car / hot tub round (2026-11-23): a hot tub or sauna said of the place to stay ("a hotel with a hot tub") is the
+  // stay's amenity (trip-stays.js reads it from the request's own words), never "indoor places" to plan as stops.
+  try { interpretationText = requirementModule.stripStayTub(interpretationText); } catch (e) { /* as typed */ }
   const intent = discoveryIntentModule().interpretDiscoveryQuery(interpretationText, taxonomy, { tripPlanner: true });
   // "A weekend in Whistler with a nice dinner" (2026-10-25) is a weekend whose dinner is special, not a restaurants-only
   // weekend (it left every afternoon empty); every day already ends with dinner.
@@ -55203,7 +55252,7 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
       for (const d of plan.days) { const r = (stops.find((x) => (x.day || 0) === d.day) || {}).region; if (r) { d.region = r; d.regionLabel = REGION_LABELS[r] || null; } }
       tripHonestPlan.applyEvidence(plan, {
         town: regions.length === 1 ? REGION_LABELS[regions[0]] : null, flags: (id) => getVenue(id),
-        accessOf: tripAccessOf, dogOf: tripDogOf, entranceOf: tripAccessEntrance, stayNeedFacts: tripStayNeedFacts, thin: tripThinInfo,
+        accessOf: tripAccessOf, dogOf: tripDogOf, entranceOf: tripAccessEntrance, stayNeedFacts: tripStayNeedFacts, thin: tripThinInfo, coordsOf: tripCoordsOf,
         kindsOf: (id) => { const k = (stops.find((x) => x.id === id) || {}).kinds || []; return wheelNeed ? tripNeedKinds(getVenue(id) || {}, k, tripAccessOf(id), wheelNeed) : k; },
         kindLabel: (k) => TR.LABELS[k] || String(k).replace(/_/g, ' '),
         kindLabelFr: (k) => { try { return require('./trip-french-copy').t3FrenchText(TR.LABELS[k] || String(k).replace(/_/g, ' ')); } catch (e) { return null; } },

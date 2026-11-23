@@ -108,7 +108,7 @@ test('chat: "a hotel with a pool" filters, prefers a hotel over a motel, and the
   assert.match(r.j.reply, /^(?:Now staying at R3 Pool Hotel \(Hotel · Penticton · \$\$\$\), which has a pool|R3 Pool Hotel \(Hotel · Penticton · \$\$\$\) has a pool) \(check it’s open in winter\)/);
   r = await chat({ ...bodyFor(plan, 'un logement avec piscine et spa', text), lang: 'fr' });
   assert.equal(r.j.stayBlock.whereToStay.pick.name, 'R3 Pool Hotel');
-  assert.match(r.j.reply, /qui a une piscine et un spa|a une piscine et un spa/);
+  assert.match(r.j.reply, /qui a une piscine et un bain à remous|a une piscine et un bain à remous/);
   r = await chat(bodyFor(plan, 'a pet-friendly place to stay with a kitchen', text));
   assert.deepEqual(r.j.stayPref.amenities.slice().sort(), ['kitchen', 'pets']);
   assert.equal(r.j.stayBlock.whereToStay.pick.name, 'R3 Pool Hotel');
@@ -282,7 +282,8 @@ test('a clock time for one stop is said plainly (no day shift); "afternoon" is n
   const text = '2 days in Summerland with the kids';
   const plan = planNow(text);
   const r = await chat(bodyFor(plan, "we don't have a car", text, { body: { stayTown: 'penticton' } }));
-  assert.match(r.j.reply, /Staying central in Penticton helps/, 'the town of the place to stay, not of the first stop');
+  assert.match(r.j.reply, /^Noted: no car\. /); // (2026-11-23) no advice about a town or taxis: only what the stored locations say
+  assert.ok(!/Summerland|taxis are limited/.test(r.j.reply));
 });
 
 test('a wine tour with a driver is offered (or said plainly when we have none); "coming from Vancouver" in the first request hides Rent a car', async () => {

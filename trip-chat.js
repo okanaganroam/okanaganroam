@@ -588,6 +588,8 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
   const op = (o, extra = {}) => ({ ...base, o, ...extra });
   if (!t || !/[a-z]{2}/.test(t)) return { ops: [], cant: 'unclear' };
   if (/\b(?:ignore|disregard|system prompt|instructions|jailbreak|pretend you)\b/.test(t)) return { ops: [], cant: 'other' };
+  // No car (2026-11-23): "show a wine tour with pickup" (the chat's own offer) is the wine tour card, not a stop to add.
+  if (/\bwine tours? with (?:a |an |hotel |accommodation )?pick ?up\b|\btour des vignobles avec (?:prise en charge|cueillette)\b/.test(t)) return { ops: [op('transport', { value: 'wine_tour', pickup: true })], cant: null };
   // Getting here and the place to stay (2026-11-22, agent round), read before "flights" (a rental car is ours to show).
   // Second fresh-eyes round (2026-11-22). A wine tour with a driver is ours to offer (Viator, wine-tours.js), not "I can't
   // book things in this chat".
@@ -603,7 +605,7 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
   const clockM = /\b(?:to|at|for|vers)\s+(\d{1,2})(?:[:h](\d{2}))?\s*(am|pm|h)?(?![\w-])/.exec(t) || /\b(?:make it|it)\s+(\d{1,2})(?:[:h](\d{2}))\s*(am|pm|h)?(?![\w-])/.exec(t);
   if (clockM && /\b(?:move|change|make|set|shift|push|have|deplace[rz]?|mets|mettre)\b/.test(t) && !/\b\d+\s*(?:days?|jours?|nights?|people|adults?|kids?|stops?)\b/.test(t) && (clockM[2] || clockM[3] || /\b(?:lunch|dinner|supper|souper|breakfast|brunch|it)\b/.test(t))) return { ops: [], cant: 'time_at' };
   if (/\b(?:rent(?:al)? (?:a )?cars?|car rentals?|need a car|louer une voiture|location de voiture)\b/.test(t)) return { ops: [op('transport', { value: 'rental' })], cant: null };
-  if (/\b(?:no car|don'?t have a car|do not have a car|without a car|sans voiture|pas de voiture|tak(?:e|ing) the (?:bus|shuttle)|by (?:bus|shuttle)|en autobus|en navette)\b/.test(t)) return { ops: [op('transport', { value: 'no_car' })], cant: null };
+  if (/\b(?:no car|don'?t have a car|do not have a car|without a car|sans voiture|sans auto|pas de voiture|pas d'auto|n'avons pas de voiture|n'ai pas de voiture|tak(?:e|ing) the (?:bus|shuttle)|by (?:bus|shuttle)|en autobus|en navette)\b/.test(t)) return { ops: [op('transport', { value: 'no_car' })], cant: null };
   if (/\b(?:driving (?:from|up|in|down|over)|we'?ll drive|we are driving|we'?re driving|our own car|bringing (?:our|the) car|en voiture depuis|on arrive en voiture)\b/.test(t)) return { ops: [op('transport', { value: 'driving' })], cant: null };
   const stayWord = /\b(?:stay|staying|hotel|motel|place (?:to stay|with|that has)|somewhere (?:to stay|to sleep|with|that has)|accommodations?|lodging|room|rooms|airbnb|cabin|condo|resort|b&b|inn|logement|hebergement|hotel|dormir|loger)\b/.test(t);
   if (/\b(?:already have (?:a|our|an) (?:place|hotel|airbnb|room|cabin|condo|rental)|staying with (?:friends|family)|we have (?:a|an) (?:place|airbnb|cabin|condo)|deja (?:un|notre) logement|chez des amis)\b/.test(t)) return { ops: [op('stay', { value: 'have_place' })], cant: null };
@@ -964,7 +966,7 @@ function reconcileCore(ai, rules, message) {
 function stayAmenitiesIn(t, all = false) {
   const out = [];
   if (/\b(?:pool|piscine)\b/.test(t)) out.push('pool');
-  if (/\b(?:hot ?tub|jacuzzi|bain a remous)\b/.test(t) || (all && /\b(?:avec|et) (?:un )?spa\b/.test(t))) out.push('hot_tub');
+  if (/\b(?:hot ?tubs?|jacuzzis?|whirlpool|bains? a remous|bains? tourbillons?)\b/.test(t) || (all && /\b(?:avec|et) (?:un )?spa\b/.test(t))) out.push('hot_tub');
   if (/\b(?:kitchen|kitchenette|cuisine equipee|cuisinette)\b/.test(t) || (all && /\bcuisine\b/.test(t))) out.push('kitchen');
   if (all && /\b(?:pets?|dogs?)[- ]friendly\b|\bpets? (?:allowed|welcome|ok)\b|\b(?:takes?|allows?|accepts?) (?:dogs|pets)\b|\banimaux (?:acceptes|admis)\b/.test(t)) out.push('pets');
   if (all && /\b(?:parking|stationnement)\b/.test(t)) out.push('parking');
@@ -973,7 +975,7 @@ function stayAmenitiesIn(t, all = false) {
 }
 // What a first request says about the place to stay ("need a place with a pool", "a hotel with a hot tub"):
 // -> { amenities: [...], kind: 'hotel' } (either key may be missing) or null.
-const FIRST_STAY_WORD_RE = /\b(?:place|stay|staying|hotels?|motels?|resort|condo|rooms?|accommodations?|airbnb|cabin|lodging|logement|hebergement)\b/;
+const FIRST_STAY_WORD_RE = /\b(?:place|stay|staying|hotels?|motels?|resort|condo|suites?|rooms?|accommodations?|airbnb|cabin|lodging|logement|hebergement)\b/;
 function stayTextPref(text) {
   const t = fold(text);
   if (!FIRST_STAY_WORD_RE.test(t)) return null;
@@ -1874,6 +1876,14 @@ const T = {
     amenShort: { pool: 'pool', hot_tub: 'hot tub', kitchen: 'kitchen', pets: 'pets', parking: 'free parking', accessible: 'accessible rooms' }, stayNone: 'Got it, you have a place. I took the stay off the plan.', stayFail: 'I couldn’t find {what} near your plan, so {name} stays.', stayOff: 'This plan is a single day, so it has no place to stay yet. Say “make it 2 days” and I’ll add a night and a place to stay.',
     stayWhat: { budget: 'a cheaper place', upscale: 'a nicer place', pool: 'a place with a pool', hot_tub: 'a place with a hot tub', kitchen: 'a place with a kitchen', pets: 'a pet-friendly place', parking: 'a place with free parking', accessible: 'an accessible place', hotel: 'a hotel', region: 'a place in {town}' },
     carYes: 'Rental cars at {airport}: tap See cars on the Getting here card.', carNo: 'I can’t book rental cars here yet. {airport} has rental desks.', driving: 'Got it, you’re driving. I took the rental car off.',
+    // No car (2026-11-23, trip-transport-need.js): what the stored map locations say about the trips between the stops;
+    // never a taxi, a shuttle or a bus we have not checked.
+    noCarRides: 'Noted: no car. By straight-line distance, {rides} of {n} trips between your stops are more than a short walk; the longest is {hop}. I can’t check taxis, shuttles or buses here, so confirm a ride for those before you go.',
+    noCarArrange: 'I can’t make this plan walkable from the listings: by straight-line distance, {rides} of {n} trips between your stops are more than a short walk; the longest is {hop}. I can’t check taxis, shuttles or buses here, so I left the stops as they are.',
+    noCarWalk: 'Noted: no car. By straight-line distance, every trip between your stops is under about 1 km, a short walk. Walking routes aren’t checked.',
+    noCarPlain: 'Noted: no car. I can’t check taxis, shuttles or buses here, so confirm how you’ll get between stops before you go.',
+    noCarAirport: 'The Getting here card has an airport shuttle.', noCarTourAsk: 'Want me to show a wine tour with pickup for the wineries?', noCarTourSay: 'Show a wine tour with pickup',
+    wineTourPickup: 'Here’s a wine tour for {town} that picks up at your accommodation, per its listing. It’s under “Getting here & tours”, with its Book button; check the pickup details when you book.',
     noCarShuttle: 'Without a car: the Getting here card has an airport shuttle. Most other stops need a car or a taxi.', noCar: 'Most of these stops need a car. Staying central in {town} helps; taxis are limited, so book rides ahead.',
     unclear: 'Sorry, I didn’t catch that. Try “remove the brewery” or “more for kids”.', unclearFrom: 'Sorry, I didn’t catch that. Try “remove {name}”, “cheaper dinner” or “more for kids”.', busy: 'Too many messages in a short time. Try again in a few minutes.', busyIn: 'That’s a lot of messages in a short time. Try again in about {n} minutes.', busyOne: 'That’s a lot of messages in a short time. Try again in about a minute.', error: 'Something went wrong. Your plan is unchanged.',
   },
@@ -1917,10 +1927,16 @@ const T = {
     stayNoAmenity: 'Je n’ai pas trouvé de logement avec {what} à {town} dans notre liste. Voici le plus proche : {name} ({short} non confirmé).',
     stayElsewhere: 'Je n’ai pas trouvé de logement avec {what} à {town} dans notre liste. Le plus proche qui en a : {name} ({facts}).',
     stayKindMiss: ' Je n’ai pas trouvé d’hôtel qui convienne; celui-ci est de type : {kind}.', and: 'et',
-    amen: { pool: 'une piscine', hot_tub: 'un spa', kitchen: 'une cuisine', pets: 'des chambres où les animaux sont acceptés', parking: 'un stationnement gratuit', accessible: 'des chambres accessibles' },
-    amenShort: { pool: 'piscine', hot_tub: 'spa', kitchen: 'cuisine', pets: 'animaux', parking: 'stationnement gratuit', accessible: 'chambres accessibles' }, stayNone: 'Parfait, vous avez déjà un logement. Je l’ai retiré du plan.', stayFail: 'Je n’ai pas trouvé {what} près de votre plan, donc {name} reste.', stayOff: 'Ce plan tient en une journée, donc sans logement pour l’instant. Dites « sur 2 jours » et j’ajouterai une nuit et un logement.',
-    stayWhat: { budget: 'un logement moins cher', upscale: 'un logement plus chic', pool: 'un logement avec piscine', hot_tub: 'un logement avec spa', kitchen: 'un logement avec cuisine', pets: 'un logement qui accepte les animaux', parking: 'un logement avec stationnement gratuit', accessible: 'un logement accessible', hotel: 'un hôtel', region: 'un logement à {town}' },
+    amen: { pool: 'une piscine', hot_tub: 'un bain à remous', kitchen: 'une cuisine', pets: 'des chambres où les animaux sont acceptés', parking: 'un stationnement gratuit', accessible: 'des chambres accessibles' },
+    amenShort: { pool: 'piscine', hot_tub: 'bain à remous', kitchen: 'cuisine', pets: 'animaux', parking: 'stationnement gratuit', accessible: 'chambres accessibles' }, stayNone: 'Parfait, vous avez déjà un logement. Je l’ai retiré du plan.', stayFail: 'Je n’ai pas trouvé {what} près de votre plan, donc {name} reste.', stayOff: 'Ce plan tient en une journée, donc sans logement pour l’instant. Dites « sur 2 jours » et j’ajouterai une nuit et un logement.',
+    stayWhat: { budget: 'un logement moins cher', upscale: 'un logement plus chic', pool: 'un logement avec piscine', hot_tub: 'un logement avec bain à remous', kitchen: 'un logement avec cuisine', pets: 'un logement qui accepte les animaux', parking: 'un logement avec stationnement gratuit', accessible: 'un logement accessible', hotel: 'un hôtel', region: 'un logement à {town}' },
     carYes: 'Location de voitures à {airport} : touchez Voir les voitures dans la carte Pour venir.', carNo: 'Je ne peux pas encore réserver de voiture ici. {airport} a des comptoirs de location.', driving: 'Parfait, vous venez en voiture. J’ai retiré la location.',
+    noCarRides: 'C’est noté : sans voiture. À vol d’oiseau, {rides} des {n} trajets entre vos arrêts dépassent une courte marche; le plus long : {hop}. Je ne peux pas vérifier les taxis, navettes ou autobus ici : confirmez un transport pour ces trajets avant de partir.',
+    noCarArrange: 'Je ne peux pas rendre ce plan faisable à pied d’après les fiches : à vol d’oiseau, {rides} des {n} trajets entre vos arrêts dépassent une courte marche; le plus long : {hop}. Je ne peux pas vérifier les taxis, navettes ou autobus ici; j’ai donc laissé les arrêts tels quels.',
+    noCarWalk: 'C’est noté : sans voiture. À vol d’oiseau, chaque trajet entre vos arrêts fait moins d’environ 1 km, une courte marche. Les itinéraires à pied ne sont pas vérifiés.',
+    noCarPlain: 'C’est noté : sans voiture. Je ne peux pas vérifier les taxis, navettes ou autobus ici : confirmez comment vous irez d’un arrêt à l’autre avant de partir.',
+    noCarAirport: 'La carte Pour venir propose une navette depuis l’aéroport.', noCarTourAsk: 'Voulez-vous voir un tour des vignobles avec prise en charge?', noCarTourSay: 'Montre un tour des vignobles avec prise en charge',
+    wineTourPickup: 'Voici un tour des vignobles pour {town} avec prise en charge à votre hébergement, selon sa fiche. Il est sous « Pour venir et excursions », avec son bouton Réserver; vérifiez la prise en charge en réservant.',
     noCarShuttle: 'Sans voiture : la carte Pour venir propose une navette depuis l’aéroport. La plupart des autres arrêts demandent une voiture ou un taxi.', noCar: 'La plupart de ces arrêts demandent une voiture. Loger au centre de {town} aide; les taxis sont rares, réservez vos trajets à l’avance.',
     unclear: 'Désolé, je n’ai pas compris. Essayez « enlève la microbrasserie » ou « plus pour les enfants ».', unclearFrom: 'Désolé, je n’ai pas compris. Essayez « enlève {name} », « souper moins cher » ou « plus pour les enfants ».', busy: 'Trop de messages en peu de temps. Réessayez dans quelques minutes.', busyIn: 'Ça fait beaucoup de messages en peu de temps. Réessayez dans environ {n} minutes.', busyOne: 'Ça fait beaucoup de messages en peu de temps. Réessayez dans environ une minute.', error: 'Un problème est survenu. Votre plan n’a pas changé.',
   },

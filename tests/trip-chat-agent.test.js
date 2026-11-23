@@ -146,7 +146,8 @@ test('POST /api/trip/chat: rental car, driving and no car answer from the Gettin
   assert.equal(r.j.plan, null);
   r = await chat(bodyFor(plan, "we don't have a car"));
   assert.equal(r.j.actions.transport, 'no_car');
-  assert.match(r.j.reply, /^Most of these stops need a car\. Staying central in Penticton helps/);
+  assert.match(r.j.reply, /^Noted: no car\. /); // (2026-11-23) what the stored locations say; never "taxis are limited"
+  assert.ok(!/taxis are limited|need a car/.test(r.j.reply));
 });
 
 test('page: chat mode has the agent\'s first message, no Edit request and Confirm at the end; the default V4 page has none of it', async () => {

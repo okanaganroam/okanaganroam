@@ -306,6 +306,12 @@ const V4_CLIENT_SRC = String.raw`
     var hasNeed = function(k){ return needs.some(function(n){ return n && typeof n === 'object' && n.key === k; }); };
     if (!id) return out;
     (p.evidence || []).forEach(function(e){
+      // No car (2026-11-23, trip-transport-need.js): the hop that reaches this stop, when it is more than a short walk.
+      if (e && e.ask === 'no_car' && Array.isArray(e.stops) && hasNeed('no_car')) {
+        var h = e.stops.filter(function(x){ return x && x.id === id; })[0];
+        if (h && h.check && h.note) { var hn = (fr && h.noteFr) || h.note; out.notes.push(hn); out.compact.push((fr && h.noteShortFr) || h.noteShort || hn); } // (the sheet says it once, in its own line)
+        return;
+      }
       if (!e || (e.ask !== 'accessible' && e.ask !== 'dog_friendly') || !Array.isArray(e.stops)) return;
       var r = e.stops.filter(function(x){ return x && x.id === id; })[0];
       if (!r) return;
@@ -572,6 +578,9 @@ const V4_CLIENT_SRC = String.raw`
     // short words (the full sentences are under Details and on each stop), so the checklist says the same thing.
     try {
       var needFacts = (typeof tripSummaryFacts === 'function' ? tripSummaryFacts(state.last, lang() === 'fr', { removed: typeof v4RemovedIds === 'function' ? v4RemovedIds() : {} }) : []).filter(function(f){ return f && f.kind === 'flag' && (f.ask === 'accessible' || f.ask === 'dog_friendly'); });
+      // No car (2026-11-23): one line, in the plan's own words; the stops whose hop needs a ride are listed below.
+      var ncE = ((state.last && state.last.evidence) || []).filter(function(e){ return e && e.ask === 'no_car' && e.short; })[0];
+      if (ncE && (state.last.needs || []).some(function(n){ return n && n.key === 'no_car'; })) html += '<p class="t3-book-note v4-book-honest" data-v4-book-nocar>' + esc(((lang() === 'fr' && ncE.shortFr) || ncE.short) + '.') + '</p>';
       if (needFacts.length) html += '<p class="t3-book-note v4-book-honest" data-v4-book-needs>' + esc((lang() === 'fr' ? 'À confirmer auprès de chaque endroit : ' : 'To confirm with each place: ') + needFacts.map(function(f){ return f.text; }).join('. ') + '.') + '</p>';
       // (2026-11-23) Then each stop with something still to confirm, in the words of its own card (v4NeedLines: the
       // same short notes), so the checklist, the cards and the shared copy say one thing.

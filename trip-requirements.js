@@ -200,6 +200,33 @@ const REQUEST_KINDS = {
 };
 // Indoor test 17: a plain "paint" asks for a painting class too.
 REQUEST_KINDS.pottery = new RegExp(`${REQUEST_KINDS.pottery.source}|(?<!\\b(?:face|body|paintball|spray|car|house|wall) )\\b(?:paint|painting|peindre|peinture)\\b(?! ?(?:ball|balls|ballers?|shops?|stores?|supplies|store)\\b)`);
+// No-car / hot tub round (2026-11-23; "a spa and a hotel with a hot tub" picked a hotel marked Hot tub and also said
+// "Hot tub or sauna: not in this plan"): a hot tub or sauna said of the place to stay ("a hotel with a hot tub", "a hot tub
+// at the hotel", "hot tub suite", « un hôtel avec bain à remous ») is the stay's amenity, not an outing. Its words are
+// blanked before the sauna and spa kinds are read; a separate ask in the same breath ("a hotel with a hot tub and also a
+// sauna visit", "a spa and a hotel with a hot tub") stays an outing.
+const STAY_TUB_WORDS='(?:(?:private |outdoor |indoor |rooftop |shared |prive |privee |exterieur |interieur )?(?:hot ?tubs?|jacuzzis?|saunas?|steam rooms?|whirlpools?|bains? a remous|bains? tourbillons?)(?: (?:prive|privee|exterieur|interieur))?)';
+const STAY_PLACE_WORDS='(?:hotels?|motels?|resorts?|inns?|lodges?|condos?|cabins?|chalets?|suites?|rooms?|accommodations?|lodgings?|airbnbs?|vrbos?|(?:place|somewhere|where) to stay|stay|hebergements?|logements?|chambres?|auberges?|gites?)';
+const STAY_TUB_OUTING='(?! (?:visit|visits|session|sessions|outing|outings|experience|day|trip|tour|circuit|seance|seances|sortie|flottants?)\\b)';
+const STAY_TUB_GAP='(?:(?!\\b(?:also|then|plus|as well as|aussi|puis|ainsi que)\\b)[^.;:!?]){0,40}?';
+const STAY_TUB_RES=[
+  new RegExp(`\\b${STAY_PLACE_WORDS}\\b${STAY_TUB_GAP}\\b(?:with|w|that has|which has|that have|which have|has|have|having|offering|featuring|avec|qui a|qui ont|ayant|offrant)\\b${STAY_TUB_GAP}${STAY_TUB_WORDS}(?:(?: and| or| et| ou)?(?: an?| une?)? ${STAY_TUB_WORDS})*${STAY_TUB_OUTING}`,'g'),
+  new RegExp(`${STAY_TUB_WORDS} (?:at|in|inside|on site at|au|a|dans|de) (?:the |our |my |an? |l |la |le |notre |une? )?${STAY_PLACE_WORDS}\\b`,'g'),
+  new RegExp(`${STAY_TUB_WORDS} (?:hotels?|motels?|resorts?|inns?|lodges?|condos?|cabins?|chalets?|suites?|rooms?)\\b`,'g'),
+  new RegExp(`\\b(?:hotels?|motels?|resorts?|inns?|lodges?) ${STAY_TUB_WORDS}${STAY_TUB_OUTING}`,'g'),
+];
+// -> the text with a stay's hot tub / sauna words blanked (same length, so match positions stand).
+function withoutStayTub(text){let out=String(text||'');for(const re of STAY_TUB_RES)out=out.replace(re,x=>' '.repeat(x.length));return out;}
+// The request as typed, without the stay's hot tub / sauna words ("a hotel with a hot tub" -> "a hotel with"), for the
+// reader that turns "hot tub" into indoor places to go. Other words are untouched.
+const STAY_TUB_WORD_RE=new RegExp(`(?:\\b(?:an?|une?) )?${STAY_TUB_WORDS}`,'gi');
+function stripStayTub(text){let out=String(text||'');for(const re of STAY_TUB_RES)out=out.replace(new RegExp(re.source,'gi'),x=>x.replace(STAY_TUB_WORD_RE,'').replace(/\s+(?:and|or|with|w|that has|which has|has|have|having|offering|featuring)\s*$/i,''));return out.replace(/[ \t]{2,}/g,' ');}
+// What the request asks of the place to stay this way: { hotTub, sauna } (either may be false), or null for neither.
+function stayTubAsked(text){
+  const t=norm(text);let hotTub=false,sauna=false;
+  for(const re of STAY_TUB_RES){re.lastIndex=0;for(const m of t.matchAll(re)){if(/\b(?:hot ?tubs?|jacuzzis?|whirlpools?|bains? a remous|bains? tourbillons?)\b/.test(m[0]))hotTub=true;if(/\b(?:saunas?|steam rooms?)\b/.test(m[0]))sauna=true;}}
+  return hotTub||sauna?{hotTub,sauna}:null;
+}
 const HELI_SKI_LISTING_RE=/\b(?:heli ?ski(?:ing|s)?|heliski\w*|heli ?board\w*|cat ?ski(?:ing|s)?|catski\w*|snowcat skiing)\b/;
 // Every tour kind (2026-11-17): the setup's tour kinds (venue_tour_info.kinds) -> the planner kinds they are.
 const TOUR_KIND_PLANNER = { fishing: ['fishing_tour'], boat: ['boat_tour'], jetboat: ['boat_tour'], raft: ['rafting'], wildlife: ['wildlife_tour'], zipline: ['zipline'],
@@ -682,6 +709,8 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
       // Indoor test 5 (2026-11-19; "trampoline park Vernon on Christmas Day" planned a bike park): a trampoline, bike, water
       // or skate park is one phrase, never a park.
       if(kind==='park')matchText=matchText.replace(/\b(?:trampoline|bike|water|skate) ?parks?\b/g,x=>' '.repeat(x.length));
+      // A hot tub or sauna said of the place to stay is the stay's amenity (withoutStayTub above), not an outing.
+      if(kind==='sauna'||kind==='spa')matchText=withoutStayTub(matchText);
       let m=kind==='evening_fun'?null:re.exec(matchText);
       // Tour test 4: the "walk" in "ghost walk" / "lights walk" / "history walk" is the walking tour, not a trail.
       if(m&&['walk','easy_walk'].includes(kind)){const wt=KINDS.walking_tour.exec(matchText)||REQUEST_KINDS.walking_tour.exec(matchText);if(wt&&m.index>=wt.index&&m.index+m[0].length<=wt.index+wt[0].length)m=null;}
@@ -704,7 +733,7 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
     if(!items.some(i=>i.kind==='venue_kind'&&i.value==='ski_lessons'&&i.sourceText===scopeText)&&/\b(?:skiing|ski|skis|snow ?board\w*)\b/.test(c)&&/\b(?:kids?|children|child|toddlers?|son|daughter|[1-9]|1[0-2]) ?(?:year olds?|yr olds?|years? old)?\b/.test(c)&&/\b(?:kids?|children|child|toddlers?|son|daughter|year olds?|yr olds?|years? old)\b/.test(c)&&!/\b(?:no|without|skip)\b[^.]*\blessons?\b|\bski (?:hill|resort) only\b|\b(?:cross country|nordic|heli|cat|backcountry|touring)\b|\bski (?:shop|rentals?|swap)\b/.test(c)&&!/\b(?:no|not|without|avoid|skip)\b(?:(?!\b(?:but|include|with)\b).)*\b(?:skiing|ski)\b/.test(c))add('venue_kind','ski_lessons',scopeText,{kidsSki:true});
     // Indoor test 10 (2026-11-19): "hot tub and sauna Vernon" asks for a hot tub or sauna (a pool's counts), not a spa day:
     // the spa kind its sauna word also read is dropped unless the clause says spa, massage or the like too.
-    if(KINDS.sauna.test(c)&&!/\b(?:spas?|massages?|facials?|hydrotherap\w*|wellness|nordic|thermal|treatments?|soins?)\b/.test(c)){
+    if(KINDS.sauna.test(withoutStayTub(c))&&!/\b(?:spas?|massages?|facials?|hydrotherap\w*|wellness|nordic|thermal|treatments?|soins?)\b/.test(c)){
       for(let k=items.length-1;k>=0;k--)if(items[k].kind==='venue_kind'&&items[k].value==='spa'&&items[k].sourceText===scopeText)items.splice(k,1);
     }
     for(const [value,re] of Object.entries({restaurant:/\b(?:dinner|lunch|restaurants?|meals?)\b/,cafe:/\b(?:cafes?|coffee)\b/,breakfast:/\b(?:breakfast|brunch)\b/,winery:/\b(?:wineries|winery|vineyards?|wine tasting)\b/,golf:/\bgolf\b/,beach:SITE.beachWordRe,outdoor:/\b(?:hiking|skiing|ski|snowshoeing|outdoor)\b/,tour:/\b(?:tours?|cruise|guided)\b/,brewery:/\b(?:brewery|breweries|brewpubs?|taprooms?|craft beer)\b/,distillery:/\b(?:distillery|distilleries|craft spirits|spirits|gin|whisk(?:e)?y|vodka|rum|liqueurs?)\b/,cocktail:/\b(?:cocktails?|cocktail (?:bars?|lounges?))\b/})) {
@@ -1658,4 +1687,4 @@ function tripRequestSynonyms(text){let out=String(text||'');const walksNegated=W
  if(/\b(?:ski|skiing|snowboard\w*)\b/i.test(out)&&!/\b(?:cross.country|nordic)\b/i.test(out)&&!/\b(?:don.?t|do not|won.?t|not|no|never|without)\s+(?:\w+\s+){0,2}(?:ski|skiing|snowboard\w*)\b/i.test(out))out=out.replace(/\b(?:a )?night out\b|\bgoing out(?: at night)?\b/gi,'nightlife').replace(/\s*\b(?:in the morning|in the afternoon|in the evening)\b/gi,'').replace(/\b(?:morning|afternoon|evening)\s+(?=(?:ski|skiing|snowboard\w*|spa|apres|après|dinner|lunch|drinks)\b)/gi,'').replace(/\s{2,}/g,' ');
  return out;}
 
-module.exports={kidsSkiLesson,golfPartKind,SPORT_KIND_PLANNER,indoorSlotOf,morningOfOneStop,KINDS,REQUEST_KINDS,TOUR_PLANNER_KINDS,TOUR_KIND_PLANNER,INDOOR_KIND_PLANNER,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
+module.exports={withoutStayTub,stayTubAsked,stripStayTub,kidsSkiLesson,golfPartKind,SPORT_KIND_PLANNER,indoorSlotOf,morningOfOneStop,KINDS,REQUEST_KINDS,TOUR_PLANNER_KINDS,TOUR_KIND_PLANNER,INDOOR_KIND_PLANNER,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
