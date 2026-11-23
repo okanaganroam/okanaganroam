@@ -8939,9 +8939,52 @@ function v4AgentHooks(result, input) {
   if (stopStartGaveWay.length) result.stopStartGaveWay = stopStartGaveWay;
   return result;
 }
+// Round 5 (2026-11-22: Diner On Six 9:45 AM then The Roxy Cafe 11:30; Barn Owl 9:30 then The Ridge 11:30): a morning
+// meal and lunch start at least 2.5 hours apart. Lunch moves later when the next stop and its hours allow, else the
+// morning meal moves earlier (not before 8 AM), else a morning café is said to be a coffee stop (stop.coffeeStop and a
+// caveat). -> result.mealPacing [{ day, how: 'lunch_later' | 'breakfast_earlier' | 'coffee_stop', id }]
+const V4_MEAL_GAP = 150;
+function v4MealPacing(result, input) {
+  if (!input || !input.v4 || !result || !['multi_day', 'day_plan'].includes(result.kind) || !(result.schedule || []).length) return result;
+  const byId = new Map((input.facts || []).map((v) => [v.id, v]));
+  const out = [];
+  for (const day of result.days || []) {
+    const rowOf = (s) => (result.schedule || []).find((r) => r.day === day.day && s.venue && r.venueId === s.venue.id && Number.isFinite(r.startMinutes));
+    const stops = (day.stops || []).filter((s) => s && s.venue && rowOf(s));
+    const m = stops.find((s) => s.daypart === 'morning' && v4MealStop(s));
+    const l = stops.find((s) => s.daypart === 'midday' && v4MealStop(s));
+    if (!m || !l || m.tourStop || l.tourStop) continue;
+    const rm = rowOf(m), rl = rowOf(l);
+    if (rl.startMinutes - rm.startMinutes >= V4_MEAL_GAP) continue;
+    const wd = day.date ? WEEKDAYS[(new Date(`${day.date}T12:00:00Z`).getUTCDay() + 6) % 7] : null;
+    const opens = (s, a, b) => { const fv = byId.get(s.venue.id); const h = fv && wd ? (fv._hours || (fv._hours = parseVenueHours(fv.hours))) : null; return !h || !h.known || !h.days[wd] ? true : h.days[wd].status === 'open' && h.days[wd].ranges.some(([x, y]) => a >= x && b <= y); };
+    const len = (r) => (Number.isFinite(r.endMinutes) ? r.endMinutes - r.startMinutes : 60);
+    const after = stops.filter((s) => V4_DAYPARTS.indexOf(s.daypart) > V4_DAYPARTS.indexOf('midday')).map(rowOf).sort((x, y) => x.startMinutes - y.startMinutes)[0];
+    const before = stops.filter((s) => V4_DAYPARTS.indexOf(s.daypart) < V4_DAYPARTS.indexOf('morning')).map(rowOf).sort((x, y) => y.startMinutes - x.startMinutes)[0];
+    const ls = Math.ceil((rm.startMinutes + V4_MEAL_GAP) / 15) * 15, ll = Math.min(len(rl), 75);
+    if (ls <= 810 && (!after || ls + ll + 10 <= after.startMinutes) && opens(l, ls, ls + ll)) {
+      rl.startMinutes = ls; rl.endMinutes = ls + ll; l.keepStart = ls; out.push({ day: day.day, how: 'lunch_later', id: l.venue.id, startMinutes: ls });
+      continue;
+    }
+    const ms = Math.floor((rl.startMinutes - V4_MEAL_GAP) / 15) * 15, ml = Math.min(len(rm), 60);
+    if (ms >= 480 && (!before || before.endMinutes + 10 <= ms) && opens(m, ms, ms + ml)) {
+      rm.startMinutes = ms; rm.endMinutes = ms + ml; m.keepStart = ms; out.push({ day: day.day, how: 'breakfast_earlier', id: m.venue.id, startMinutes: ms });
+      continue;
+    }
+    if (m.venue.type === 'cafe') {
+      m.coffeeStop = true;
+      rm.endMinutes = Math.min(rm.endMinutes || rm.startMinutes + 45, rm.startMinutes + 45);
+      m.caveats = [...(m.caveats || []), 'A coffee stop: lunch follows soon after.'];
+      out.push({ day: day.day, how: 'coffee_stop', id: m.venue.id });
+    }
+  }
+  if (out.length) result.mealPacing = out;
+  return result;
+}
 function planTrip(input) {
   let result = planTripOnce(input);
   try { result = v4AgentHooks(result, input); } catch (e) { /* the plan stands as planned */ }
+  try { result = v4MealPacing(result, input); } catch (e) { /* the times stand */ }
   if (input && input.v4 && input.swap && input.swap.times) {
     let tries = 0, steady = v4SwapSteady(result, input), cur = input;
     while (!steady.ok && steady.id && tries < 4) {

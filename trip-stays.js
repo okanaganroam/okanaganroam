@@ -322,6 +322,13 @@ function scoreStay(stay, ctx) {
       const k = v4StayKindKey(stay);
       if (V4_COUPLE_KINDS.includes(k)) { score -= k === 'b&b' || k === 'inn' || k === 'resort' ? 3 : 2; }
       else score += 3;
+      // Round 5 (2026-11-22: a couple's Penticton wine weekend got Tiki Shores, "Sleeps 8"): a family resort and big
+      // multi-bedroom suites come after the places made for two, unless kids are coming.
+      if (!ctx.withKids) {
+        const words = `${stay.name || ''} ${stay.description || ''}`.toLowerCase();
+        if (/\b(?:family|families|kids?|children|waterslides?|water ?park|playground|mini golf|arcade)\b/.test(words)) score += 3;
+        if ((intIn(f.max_guests, 6, 1000)) || intIn(f.bedrooms_max, 3, 100)) score += 2.5;
+      }
     }
   }
   // A camping trip: campgrounds and RV parks first.

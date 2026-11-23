@@ -614,6 +614,7 @@ const V4_CLIENT_SRC = String.raw`
       + '<p class="v4-sub">' + esc(sub) + '</p><button type="button" class="v4-edit" data-v4-edit>✎ ' + esc(vt('edit')) + '</button></header>'
       + (p.eventAmbiguity ? '<section class="t3-warnings" role="alert"><p>' + esc(fr ? 'Plusieurs événements correspondent à «' + p.eventAmbiguity.phrase + '». Choisissez :' : 'More than one listed event matches “' + p.eventAmbiguity.phrase + '”. Choose one:') + '</p><div class="t3-event-choices">' + p.eventAmbiguity.candidates.map(function(name, i){ var cid = p.eventAmbiguity.candidateIds && p.eventAmbiguity.candidateIds[i]; return Number.isSafeInteger(cid) && cid > 0 ? '<button type="button" class="t3-btn t3-btn-ghost" data-t3-event-choice="' + cid + '">' + esc(name) + '</button>' : ''; }).join('') + '</div></section>' : '')
       + ((p.notIncluded || []).slice(0, 3).map(function(x){ var t = (fr && x.textFr) || x.text; return t ? '<p class="v4-tip v4-picked v4-notinc">' + esc(t) + '</p>' : ''; }).join(''))
+      + (p.noDrive && p.noDrive.text ? '<p class="v4-tip v4-picked v4-nodrive">' + esc((fr && p.noDrive.textFr) || p.noDrive.text) + '</p>' : '')
       + (picked ? '<p class="v4-tip v4-picked">' + esc(picked) + '</p>' : '')
       + '<p class="v4-tip">' + esc(v4.confirmed ? (v4CanBook() ? vt('tipDone') : vt('tipNoBook')) : vt('tip')) + '</p>'
       + '<p class="t3-plan-status" id="t3PlanStatus" role="status" aria-live="polite"></p><div class="v4-days">';

@@ -8965,6 +8965,18 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
       // Planner round 4: "no driving after wineries" with a wine tour on offer: no rental car next to it, and the plan
       // says how the no-driving is handled.
       if (gh && TRIP_NO_DRIVE_RE.test(String(text || '')) && plan.__wineTour) { gh.car = null; gh.carLabel = null; const line = 'No driving after the wineries: a wine tour with a driver covers the winery day (see Getting around), or take a taxi between them.'; if (Array.isArray(plan.notes) && !plan.notes.includes(line)) plan.notes.unshift(line); plan.noDrive = { wineTour: true, text: line, textFr: 'Pas de conduite après les vignobles : une visite guidée avec chauffeur couvre la journée des vignobles (voir Se déplacer), ou prenez un taxi entre eux.' }; }
+      // Round 5 (2026-11-22: "no driving after wineries" still offered "Rent a car at Penticton airport" first): with no
+      // wine tour on offer the plan says in one line how it is handled, and the rental car comes after every other step.
+      if (TRIP_NO_DRIVE_RE.test(String(text || '')) && !plan.noDrive) {
+        const line = 'No driving after the wineries: take a taxi or a wine tour with a driver between them; the rental car is for getting here and the other stops.';
+        if (Array.isArray(plan.notes) && !plan.notes.includes(line)) plan.notes.unshift(line);
+        plan.noDrive = { wineTour: false, text: line, textFr: 'Pas de conduite après les vignobles : prenez un taxi ou une visite des vignobles avec chauffeur; la voiture de location sert à venir et aux autres arrêts.' };
+      }
+      if (TRIP_NO_DRIVE_RE.test(String(text || ''))) {
+        const last = (list) => (Array.isArray(list) ? list.filter((x) => !(x && x.kind === 'transport')).concat(list.filter((x) => x && x.kind === 'transport')) : list);
+        if (plan.whereToStay) { plan.whereToStay.bookingSteps = last(plan.whereToStay.bookingSteps); if (plan.whereToStay.pick) plan.whereToStay.pick.bookingSteps = last(plan.whereToStay.pick.bookingSteps); for (const c of plan.whereToStay.alternatives || []) c.bookingSteps = last(c.bookingSteps); }
+        if (plan.v4Booking) plan.v4Booking.steps = last(plan.v4Booking.steps);
+      }
       if (gh) {
         // No driving (wine days): the wine tour first, the rental car after it.
         if (TRIP_NO_DRIVE_RE.test(String(text || ''))) { gh.noDrive = true; if (plan.__wineTour) gh.wineTour = { name: plan.__wineTour.name, nameFr: plan.__wineTour.nameFr, url: plan.__wineTour.url, label: plan.__wineTour.label, labelFr: plan.__wineTour.labelFr }; }
@@ -9465,7 +9477,10 @@ function v4NotIncluded(plan) {
     try { const byKm = r.kind === 'venue_kind' && r.value !== 'shopping' ? v4NearestOfKind(plan, r.value) : null; if (byKm) nearest = byKm; } catch (e) { /* keep the planner's own alternative */ }
     const an = /(?:ing|s)$/.test(label) ? '' : /^[aeiou]/i.test(label) ? 'an ' : 'a ';
     const text = (noneListed && town ? `There’s no ${label} listed in ${town}, so this plan has none.` : `I couldn’t fit ${an}${label} into this plan.`) + (nearest ? ` The nearest is ${nearest.name} in ${nearest.regionLabel}.` : '');
-    out.push({ kind: r.value, label, reason: noneListed ? 'none_listed' : 'not_fitted', town, nearest, text });
+    // Round 5: the French line too (the label through the French copy).
+    let lf = label; try { lf = require('./trip-french-copy').t3FrenchText(label) || label; } catch (e) { lf = label; }
+    const textFr = (noneListed && town ? `Aucun lieu « ${lf} » n’est répertorié à ${town} : ce plan n’en a pas.` : `Je n’ai pas pu inclure « ${lf} » dans ce plan.`) + (nearest ? ` Le plus proche : ${nearest.name}, à ${nearest.regionLabel}.` : '');
+    out.push({ kind: r.value, label, reason: noneListed ? 'none_listed' : 'not_fitted', town, nearest, text, textFr });
   }
   if (out.length) plan.notIncluded = out;
 }
