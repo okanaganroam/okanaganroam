@@ -9451,7 +9451,19 @@ function tripChatEnsureTurn(op, ctx) {
   for (const c of checks) c.swaps = swaps.filter((x) => (lackOf.get(x.old.id) || []).includes(c.need) && c.list.some((y) => y.stop.id === x.fresh.id && y.has === true));
   // A yes to "swap them?" that found nothing to swap to is said first.
   const lead = v.confirmed && lack.length && !swaps.length ? `${A.TX[L].noneFound} ` : '';
-  return { ...out, reply: lead + A.ensureReply({ stay: st.stay || null, stayAsked: amenities.length > 0, checks, lang: L }) };
+  // A wheelchair user eats where the group eats: when the message asked about "every activity" only, the meal stops whose
+  // listings don't say are still named under "still to check" (never swapped: the visitor did not ask for that).
+  const extra = [];
+  try {
+    const tx = A.TX[L];
+    for (const p of op.parts || []) {
+      if (p.need !== 'accessible' || !p.scopes.includes('activities') || p.scopes.includes('meals')) continue;
+      const mc = A.check([{ need: 'accessible', scopes: ['meals'] }], after, has, { day: op.day || null })[0];
+      const u = mc ? [...mc.unk, ...mc.no] : [];
+      if (u.length) extra.push(A.fillT(tx.at.accessible, { names: u.length > 3 ? A.fillT(tx.count, { n: u.length }) : A.joinNames(u.map((x) => x.name), tx) }));
+    }
+  } catch (e) { /* the reply stands without the extra line */ }
+  return { ...out, reply: lead + A.ensureReply({ stay: st.stay || null, stayAsked: amenities.length > 0, checks, lang: L, extra }) };
 }
 // The booking links of the stay on screen that take the visitor's dates (or rooms) with them, from the planner's
 // hand-off (pick.handoff) when it gives one, else from the link itself (its own date and room parameters).

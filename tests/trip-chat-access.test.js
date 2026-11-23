@@ -285,7 +285,7 @@ test('end to end: a request that never said the needs gains each one once, and t
   assert.match(j.reply, /^Hotel: Access Test Hotel stays; its listing has accessible rooms and allows pets in some rooms\./);
   assert.match(j.reply, /Wheelchair access: Access Test Lookout Loop lists wheelchair access\./);
   assert.match(j.reply, /Dog: both stops list dogs welcome\./);
-  assert.match(j.reply, /Still to check: a pet-friendly room at Access Test Hotel \(pets in some rooms only\)\. Call ahead\.$/);
+  assert.match(j.reply, /Still to check: a pet-friendly room at Access Test Hotel \(pets in some rooms only\); wheelchair access at Access Test Bistro\. Call ahead\.$/);
   // Said again: the text does not gain it twice.
   const j2 = await say(page1, MSG);
   const page2 = apply(page1, j2);
@@ -297,7 +297,7 @@ test('end to end: a request that never said the needs gains each one once, and t
   const fr = await say(pageOf(REQ_PLAIN, [LIVE[0], LIVE[1]], F.H_NEW.id), MSG_FR, 'fr');
   assert.match(fr.reply, /^Hôtel : Access Test Hotel reste; sa fiche indique des chambres accessibles et accepte les animaux dans certaines chambres\./);
   assert.match(fr.reply, /Accès en fauteuil roulant : Access Test Lookout Loop indique un accès en fauteuil roulant\./);
-  assert.match(fr.reply, /À vérifier : une chambre où les animaux sont acceptés à Access Test Hotel \(certaines chambres seulement\)\./);
+  assert.match(fr.reply, /À vérifier : une chambre où les animaux sont acceptés à Access Test Hotel \(certaines chambres seulement\); l’accès en fauteuil roulant à Access Test Bistro\./);
 });
 
 test('end to end: more than two stops would change, so the chat asks first; yes swaps where it can, the rest is “still to check”', async () => {
@@ -385,4 +385,16 @@ test('the light-day buttons: “Keep day 2 light” changes nothing; “Add an e
   // Asked why, with the planner's own line when the plan has one (plan.thinDays), else what is known: one or two lines.
   const why = await say(page0, 'Why is day 2 so empty?');
   nothingChanged(why, 'why');
+});
+
+test('"every activity" for a wheelchair user still names the meal stops whose listings don’t say (never swapped)', () => {
+  const A = require('../trip-chat-access.js');
+  const src = require('node:fs').readFileSync(require.resolve('../server.js'), 'utf8');
+  // The ensure turn checks the meal stops too when the message named only the activities.
+  assert.match(src, /p\.need !== 'accessible' \|\| !p\.scopes\.includes\('activities'\) \|\| p\.scopes\.includes\('meals'\)/);
+  assert.match(src, /A\.check\(\[\{ need: 'accessible', scopes: \['meals'\] \}\], after, has/);
+  // The reply lists them under "still to check" beside the rest.
+  const en = A.stillLine([], null, 'en', ['wheelchair access at Roster Sports Club and MR MIKES']);
+  assert.match(en, /Still to check: wheelchair access at Roster Sports Club and MR MIKES/);
+  assert.ok(!/Nothing else to check/.test(en));
 });
