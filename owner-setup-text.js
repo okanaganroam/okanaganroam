@@ -3028,4 +3028,39 @@ Object.assign(fr.tour, {
   }
 })(fr);
 
+// Outdoor businesses (2026-11-23): the sport words, with these over them (campgrounds, rentals, farms and parks, not
+// lessons and leagues). The kind tables (outdoor-kinds.js) give each kind its own price, booking and photo words.
+en.outdoor = sportStrings(en.sport, {
+  tpriceMore: 'Your other prices (kids, passes, rentals, weekly rates) go in “Your prices”, the first of the extra details.',
+  photosLead: 'Your place, the view, and people having fun. Three photos is perfect.',
+  seaClosuresHint: 'Closed for a long weekend or a special event? Add it under Closures in More about your place.',
+  noSetHours: 'We don’t have set hours (by booking only)', noSetHoursNow: 'No set hours: by booking only ✓',
+  storyEx: 'A family-run place on the lake since 1985, with something for every age.', knownEx: 'The view, and friendly local staff',
+  bringEx: 'Bring sunscreen and water. Free parking on site.',
+  groupsLead: 'Tap a size, then add parties, school groups or private bookings in your own words.',
+  menuLead: 'Every pass, rental, site or ticket and what it costs. A photo of your price list or a link to your prices page is perfect. It’s optional.',
+  menuFreeSub: 'Anything that costs extra, like rentals or tours? Optional',
+  menuLeadFree: 'It’s free, so you can skip this. Anything that costs extra, like rentals or tours? A photo of the price list or a link is perfect.',
+  menuTypeSub: 'Each pass, rental, site or ticket and its price, one line at a time',
+});
+fr.outdoor = sportStrings(fr.sport, {
+  tpriceMore: 'Vos autres prix (enfants, laissez-passer, location, tarifs à la semaine) vont dans « Vos tarifs », le premier des détails facultatifs.',
+  photosLead: 'Votre endroit, la vue, et des gens qui s’amusent. Trois photos, c’est parfait.',
+  seaClosuresHint: 'Fermé pour une longue fin de semaine ou un événement spécial? Ajoutez-le dans Fermetures, sous Plus sur votre endroit.',
+  noSetHours: 'Nous n’avons pas d’heures fixes (sur réservation seulement)', noSetHoursNow: 'Pas d’heures fixes : sur réservation seulement ✓',
+  storyEx: 'Un endroit familial au bord du lac depuis 1985, avec quelque chose pour tous les âges.', knownEx: 'La vue, et une équipe locale accueillante',
+  bringEx: 'Apportez de la crème solaire et de l’eau. Stationnement gratuit sur place.',
+  groupsLead: 'Touchez une taille, puis ajoutez les fêtes, les groupes scolaires ou les réservations privées dans vos mots.',
+  menuLead: 'Chaque laissez-passer, location, emplacement ou billet et son prix. Une photo de votre liste de prix ou un lien vers votre page de prix, c’est parfait. C’est facultatif.',
+  menuFreeSub: 'Quelque chose coûte en plus, comme la location ou les visites? Facultatif',
+  menuLeadFree: 'C’est gratuit, vous pouvez donc passer. Quelque chose coûte en plus, comme la location ou les visites? Une photo de la liste de prix ou un lien, c’est parfait.',
+  menuTypeSub: 'Chaque laissez-passer, location, emplacement ou billet et son prix, une ligne à la fois',
+});
+(function frSpacesOutdoor(o) {
+  for (const k of Object.keys(o)) {
+    if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);
+    else if (Array.isArray(o[k])) o[k] = o[k].map((x) => (typeof x === 'string' ? frSpacing(x) : x));
+    else if (o[k] && typeof o[k] === 'object') frSpacesOutdoor(o[k]);
+  }
+})(fr.outdoor);
 module.exports = { en, fr, frSpacing };

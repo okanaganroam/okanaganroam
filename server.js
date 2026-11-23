@@ -408,7 +408,11 @@ const INDOOR_SETUP_ON = true;
 // types 'sport' and 'golf', with the sport kinds (sport-kinds.js). Answers are stored in venue_sport_info. Off: the classic
 // edit page only, as before. kindSetupType(t): a type the indoor engine runs for (indoor, sport, golf).
 const SPORT_SETUP_ON = true;
-const SPORT_SETUP_TYPES = ['sport', 'golf'];
+// Outdoor businesses (2026-11-23; Dayton chose "Outdoor businesses" after tours, reuse the indoor engine): type 'outdoor'
+// runs the same engine with the outdoor kinds (outdoor-kinds.js, merged into sport-kinds.js). Only owners open the setup,
+// so public parks and trails (no owner, no answers) read exactly as before. Off: the classic edit page for outdoor.
+const OUTDOOR_SETUP_ON = process.env.OUTDOOR_SETUP !== 'off';
+const SPORT_SETUP_TYPES = ['sport', 'golf', ...(OUTDOOR_SETUP_ON ? ['outdoor'] : [])];
 function sportSetupType(t) { return SPORT_SETUP_ON && SPORT_SETUP_TYPES.includes(t); }
 function kindSetupType(t) { return (t === 'indoor' && INDOOR_SETUP_ON) || sportSetupType(t); }
 const portalFields = (type) => (Object.hasOwn(PORTAL_FIELDS_BY_TYPE, type) ? PORTAL_FIELDS_BY_TYPE[type] : PORTAL_FIELDS_DEFAULT);
@@ -28725,10 +28729,14 @@ const INDOOR_KINDS_TOP = 12;
 const SPORT_KINDS_MOD = indoorKindsModule.SPORT;
 const SPORT_KINDS = SPORT_KINDS_MOD.SPORT_KINDS.slice();
 const SPORT_KINDS_SHOWN = SPORT_KINDS_MOD.SPORT_KIND_ORDER.slice();
+const OUTDOOR_KINDS_SHOWN = SPORT_KINDS_MOD.OUTDOOR_KIND_ORDER.slice();
+// The chips a sport-engine listing picks from: an outdoor business's own, else sport and golf's.
+function sportKindsShownFor(type) { return type === 'outdoor' ? OUTDOOR_KINDS_SHOWN : SPORT_KINDS_SHOWN; }
+function sportOtherKind(type) { return type === 'outdoor' ? 'outdoorother' : 'sportother'; }
 Object.assign(INDOOR_KIND_LABELS_OWNER, SPORT_KINDS_MOD.SPORT_KIND_LABELS_OWNER);
 Object.assign(INDOOR_KIND_WORDS, SPORT_KINDS_MOD.SPORT_KIND_WORDS);
 // The kinds a listing of this type may pick.
-function kindListFor(type) { return sportSetupType(type) ? SPORT_KINDS : INDOOR_KINDS; }
+function kindListFor(type) { return type === 'outdoor' && OUTDOOR_SETUP_ON ? OUTDOOR_KINDS_SHOWN : sportSetupType(type) ? SPORT_KINDS : INDOOR_KINDS; }
 // The Indoor & Rainy Day hub's experience chips each kind puts a place under (indoorExperiencesOf), as well as its name.
 const INDOOR_KIND_EXPERIENCE = { gallery: ['arts'], museum: ['arts'], theatre: ['theatre'], cinema: ['theatre'], spa: ['spas'], pool: ['family'], climbing: ['family'],
   games: ['games', 'family'], escape: ['games'], bowling: ['games', 'family'], kids: ['family'] };
@@ -63800,14 +63808,14 @@ function indoorFirstItemName(venue, lang) {
 }
 function indoorMenuAppStrings(venue, lang) {
   const t = venueIndoorInfo(venue.id);
-  const kinds = (t.kinds || []).length ? t.kinds : sportSetupType(venue.type) ? [sportMainKind(venue) || 'sportother'] : indoorKindSuggestion(venue);
+  const kinds = (t.kinds || []).length ? t.kinds : sportSetupType(venue.type) ? [sportMainKind(venue) || sportOtherKind(venue.type)] : indoorKindSuggestion(venue);
   const own = indoorOwnWords(venue.id);
   const w = indoorKindsModule.indoorTyperWords(kinds, lang, { per: t.per, own });
   if (!w) return {};
   const E = escapeHtml;
   // Sport test 3 (2026-11-20; Gord's range: "like 18 holes, weekday", "like 75"): a sport kind's own example line and price,
   // and a range whose own words say mini golf too names both ("like Small bucket, or Mini golf, adults").
-  const sk = sportSetupType(venue.type) ? indoorKindsModule.sportKindKey(kinds) : '';
+  const sk = sportSetupType(venue.type) ? indoorKindsModule.sportKindKey(kinds, venue.type) : '';
   const both = sk === 'range' && (indoorKindsModule.indoorKindLabel('range', own) || [])[0] === indoorKindsModule.SPORT.LABEL_PARTS.range.both[0];
   const item = both ? (lang === 'fr' ? 'Petit seau, ou Mini-golf, adulte' : 'Small bucket, or Mini golf, adults') : w.item;
   const px = sk ? indoorKindsModule.SPORT.EX_PRICE[sk] : null;
@@ -65886,7 +65894,7 @@ function renderOwnerSetupPage(found, opts) {
   // Sport and golf (2026-11-20): the indoor screens with sport words (owner-setup-text.js .sport) and the sport kinds.
   const sport = sportSetupType(venue.type);
   const indoor = venue.type === 'indoor' || sport;
-  const over = pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : brewery ? 'brewery' : tour ? 'tour' : sport ? 'sport' : indoor ? 'indoor' : '';
+  const over = pub ? 'pub' : cafe ? 'cafe' : winery ? 'winery' : brewery ? 'brewery' : tour ? 'tour' : venue.type === 'outdoor' && OUTDOOR_SETUP_ON ? 'outdoor' : sport ? 'sport' : indoor ? 'indoor' : '';
   const S0 = OWNER_SETUP_STRINGS[lang];
   const t0 = over ? { ...S0, ...S0[over], labels: { ...S0.labels, ...(S0[over].labels || {}) }, offers: { ...S0.offers, ...(S0[over].offers || {}) }, noLabels: { ...S0.noLabels, ...(S0[over].noLabels || {}) }, kinds: { ...S0.kinds, ...(S0[over].kinds || {}) } } : S0;
   const CK = cocktail ? S0.pub.cocktail : null;
@@ -66009,7 +66017,7 @@ function renderOwnerSetupPage(found, opts) {
   if (tour) { offerLabels.dog_friendly = fr ? 'Les chiens des clients peuvent venir' : 'Guests’ own dogs can come along'; offerLabels.wheelchair_accessible = fr ? 'Accessible en fauteuil roulant' : 'Wheelchair accessible'; }
   if (indoor) { offerLabels.dog_friendly = fr ? 'Les chiens sont les bienvenus à l’intérieur' : 'Dogs welcome inside'; offerLabels.wheelchair_accessible = fr ? 'Accessible en fauteuil roulant' : 'Wheelchair accessible'; }
   // Sport test 1 (2026-11-20; "Dogs welcome inside" on a golf course): a kind played outdoors never says "inside".
-  if (sport && indoorKindsModule.SPORT.OUTDOOR_KINDS.includes((venueIndoorInfo(venue.id).kinds || indoorKindSuggestion(venue) || [])[0] || 'sportother')) offerLabels.dog_friendly = fr ? 'Les chiens sont les bienvenus' : 'Dogs welcome';
+  if (sport && indoorKindsModule.SPORT.OUTDOOR_KINDS.includes((venueIndoorInfo(venue.id).kinds || indoorKindSuggestion(venue) || [])[0] || sportOtherKind(venue.type))) offerLabels.dog_friendly = fr ? 'Les chiens sont les bienvenus' : 'Dogs welcome';
   if (cafe) { offerLabels.laptop = fr ? 'Ordinateurs portables bienvenus' : 'Laptop friendly'; offerLabels.dog_treats = fr ? 'Gâteries pour chiens (p. ex. un puppuccino ou une coupe pour chien)' : 'Dog treats (e.g. a puppuccino or pup cup)'; }
   const dayNames = fr ? { mon: 'Lundi', tue: 'Mardi', wed: 'Mercredi', thu: 'Jeudi', fri: 'Vendredi', sat: 'Samedi', sun: 'Dimanche' } : { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
   const shortDays = fr ? { mon: 'Lun', tue: 'Mar', wed: 'Mer', thu: 'Jeu', fri: 'Ven', sat: 'Sam', sun: 'Dim' } : { mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat', sun: 'Sun' };
@@ -66075,9 +66083,9 @@ function renderOwnerSetupPage(found, opts) {
     // suggestions ("We picked this for you: check it") and saved only with the screen.
     ...(indoor ? {
       allSteps: INDOOR_SETUP_PART1.concat(INDOOR_SETUP_PART2), feeLiveMax: INDOOR_PRICE_LIVE_MAX, bringMax: TOUR_GOOD_TO_KNOW_MAX, groupsMax: sportSetupType(venue.type) ? KIND_GROUPS_MAX : 180,
-      indoorKinds: (sport ? SPORT_KINDS_SHOWN : INDOOR_KINDS_SHOWN).map((k) => ({ k, t: INDOOR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), indoorKindsTop: sport ? SPORT_KINDS_SHOWN.length : INDOOR_KINDS_TOP, sportMain: sport ? (() => { try { return sportMainKind(venue) || indoorKindsModule.sportKindSuggestion(venue)[0] || ''; } catch (e) { return ''; } })() : '',
+      indoorKinds: (sport ? sportKindsShownFor(venue.type) : INDOOR_KINDS_SHOWN).map((k) => ({ k, t: INDOOR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), indoorKindsTop: sport ? sportKindsShownFor(venue.type).length : INDOOR_KINDS_TOP, sportMain: sport ? (() => { try { return sportMainKind(venue) || indoorKindsModule.sportKindSuggestion(venue)[0] || ''; } catch (e) { return ''; } })() : '',
       // Sport and golf (2026-11-20): the sport words, each kind's usual season (the Hours step's hint) and its fallback kind.
-      sport, kindSeasons: sport ? Object.fromEntries(SPORT_KINDS.map((k) => [k, indoorKindsModule.indoorKindText([k], 'en').season || ''])) : {}, otherKind: sport ? 'sportother' : 'other',
+      sport, kindSeasons: sport ? Object.fromEntries(SPORT_KINDS.map((k) => [k, indoorKindsModule.indoorKindText([k], 'en').season || ''])) : {}, otherKind: sport ? sportOtherKind(venue.type) : 'other',
       // Indoor test 2: the card's short words for each kind, for the preview ("Escape room · arcade, VR & laser tag").
       indoorKindWords: Object.fromEntries(Object.entries(INDOOR_KIND_WORDS).map(([k, w]) => [k, (indoorKindsModule.indoorKindLabel(k, indoorOwnWords(venue.id)) || w)[fr ? 1 : 0]])),
       // Indoor test 17: the waiver chip's verb for her kind ("before you climb").
@@ -66327,7 +66335,7 @@ const CAFE_SETUP_HELP_TOPICS = [
 // The closure screen's words for one setup type (its step name, the add button, Change an answer).
 function setupClosureWords(type, lang) {
   // Indoor test 1 (2026-11-19): an indoor place's screens are "Closures and holidays" in "More about your place".
-  const over = type === 'pub' || type === 'cocktail' ? 'pub' : type === 'cafe' ? 'cafe' : type === 'winery' ? 'winery' : brewSetupType(type) ? 'brewery' : type === 'tour' ? 'tour' : sportSetupType(type) ? 'sport' : type === 'indoor' ? 'indoor' : '';
+  const over = type === 'pub' || type === 'cocktail' ? 'pub' : type === 'cafe' ? 'cafe' : type === 'winery' ? 'winery' : brewSetupType(type) ? 'brewery' : type === 'tour' ? 'tour' : type === 'outdoor' && OUTDOOR_SETUP_ON ? 'outdoor' : sportSetupType(type) ? 'sport' : type === 'indoor' ? 'indoor' : '';
   const S0 = OWNER_SETUP_STRINGS[lang], o = over ? S0[over] || {} : {}, ck = type === 'cocktail' ? (S0.pub.cocktail || {}) : {};
   const labels = { ...S0.labels, ...(o.labels || {}), ...(ck.labels || {}) };
   // Tour simplify (2026-11-18): a tour's closures are their own optional tile ("Closures and holidays"), not part of the Hours step.
@@ -68277,7 +68285,7 @@ function sportMenuImportTopic(venue) {
   try {
     if (!venue || !sportSetupType(venue.type) || sportMainKind(venue) === 'golf') return [];
     const base = OWNER_HELP_TOPICS.find((t) => t.id === 'menu-import');
-    return base ? [sportKindHelpWords(base, sportMainKind(venue) || 'sportother')] : [];
+    return base ? [sportKindHelpWords(base, sportMainKind(venue) || sportOtherKind(venue.type))] : [];
   } catch (e) { return []; }
 }
 function kindSetupHelpBase(venue) {
@@ -68285,7 +68293,7 @@ function kindSetupHelpBase(venue) {
   if (!(venue && sportSetupType(venue.type))) return INDOOR_SETUP_HELP_TOPICS.concat(sport5HelpModule.TOPICS.filter((t) => t.id === 'setup-missing'));
   const happy = happyHourAllowed(venue);
   // Sport test 1: the topics for the main kind only (kinds), in the kind's own words.
-  const kind = indoorKindsModule.sportKindKey((venueIndoorInfo(venue.id).kinds || []).length ? venueIndoorInfo(venue.id).kinds : indoorKindSuggestion(venue));
+  const kind = indoorKindsModule.sportKindKey((venueIndoorInfo(venue.id).kinds || []).length ? venueIndoorInfo(venue.id).kinds : indoorKindSuggestion(venue), venue.type);
   const tok = sportHelpTokens(kind, happy);
   const ctx5 = sport5HelpCtx(venue, kind), tok5 = sport5HelpModule.tokens(kind, ctx5);
   { const t2 = sportTest2Tokens(kind, venue); tok5.t2 = t2; }
@@ -68411,7 +68419,7 @@ function sport5HelpCtx(venue, kind) {
 function sportMenuHelpTopics(venue) {
   if (!(venue && sportSetupType(venue.type))) return INDOOR_MENU_HELP_TOPICS;
   try {
-    const kind = indoorKindsModule.sportKindKey((venueIndoorInfo(venue.id).kinds || []).length ? venueIndoorInfo(venue.id).kinds : indoorKindSuggestion(venue));
+    const kind = indoorKindsModule.sportKindKey((venueIndoorInfo(venue.id).kinds || []).length ? venueIndoorInfo(venue.id).kinds : indoorKindSuggestion(venue), venue.type);
     const ctx = sport5HelpCtx(venue, kind), tok = sport5HelpModule.tokens(kind, ctx);
     return INDOOR_MENU_HELP_TOPICS.map((t) => sport5KindHelp(t, kind, ctx, tok));
   } catch (e) { return INDOOR_MENU_HELP_TOPICS; }
@@ -68431,7 +68439,7 @@ const INDOOR_HELP_PARENTS_FREE_KEYS_FR = ['parents gratuits', 'parents gratuit',
 const INDOOR_HELP_ADULT_KEYS = ['it says adults', 'says adults', 'says adult', 'adult price is wrong', 'not an adult price'];
 const INDOOR_HELP_ADULT_KEYS_FR = ['ca dit adultes', 'indique adultes', 'prix adulte est faux'];
 function indoorHelpKinds(venue) {
-  const k = (venueIndoorInfo(venue.id).kinds || [])[0] || indoorKindSuggestion(venue)[0] || (sportSetupType(venue.type) ? 'sportother' : 'other');
+  const k = (venueIndoorInfo(venue.id).kinds || [])[0] || indoorKindSuggestion(venue)[0] || (sportSetupType(venue.type) ? sportOtherKind(venue.type) : 'other');
   return [k];
 }
 // Indoor test 5 (2026-11-19; Chris: "memberships?" said “Day pass from $25” on a page whose price is $20): the price the
@@ -69212,7 +69220,7 @@ function helpHereInSetup(t) {
 // base ones, as the setup page lays them), so a help answer names the step as the owner sees it.
 function setupLabelsFor(venue, lang) {
   const S0 = OWNER_SETUP_STRINGS[lang === 'fr' ? 'fr' : 'en'];
-  const type = venue.type, over = type === 'pub' || type === 'cocktail' ? 'pub' : type === 'cafe' ? 'cafe' : type === 'winery' ? 'winery' : brewSetupType(type) ? 'brewery' : type === 'tour' ? 'tour' : sportSetupType(type) ? 'sport' : type === 'indoor' ? 'indoor' : '';
+  const type = venue.type, over = type === 'pub' || type === 'cocktail' ? 'pub' : type === 'cafe' ? 'cafe' : type === 'winery' ? 'winery' : brewSetupType(type) ? 'brewery' : type === 'tour' ? 'tour' : type === 'outdoor' && OUTDOOR_SETUP_ON ? 'outdoor' : sportSetupType(type) ? 'sport' : type === 'indoor' ? 'indoor' : '';
   const o = over ? S0[over] || {} : {}, ck = type === 'cocktail' ? (S0.pub.cocktail || {}) : {};
   let kind = {};
   try { const bk = brewSetupType(type) ? brewSetupKind(venue) : ''; kind = (bk === 'Distillery' ? o.kindDistillery : bk === 'Cidery' ? o.kindCidery : null) || {}; } catch (e) { kind = {}; }
@@ -84560,7 +84568,7 @@ module.exports = {
   COCKTAIL_SETUP_PART1, COCKTAIL_SETUP_PART2, COCKTAIL_SETUP_HELP_TOPICS, COCKTAIL_OWNER_BADGES, COCKTAIL_PRICE_LIVE_MAX, cocktailKidsWelcome, cocktailPriceOf, cocktailPriceGuess, pubSetupType, visitSlotsFor,
   websiteIsInstagramLink, BREWERY_SETUP_PART1, BREWERY_SETUP_PART2, BREWERY_SETUP_HELP_TOPICS, DISTILLERY_SETUP_HELP_TOPICS, brewHelpTopics, brewSetupType, brewSetupKind, plannerKidsUntil, breweryListTile, BREWERY_OWNER_BADGES, BREWERY_MANAGED_LABELS, FLIGHT_FEE_LIVE_MAX, websiteIsFacebookLink, breweryMinorsNote, venueBreweryInfo, breweryInfoAnswers, breweryFlightFee, writeBreweryVisitRows, breweryVisitLines, breweryKidsWelcome, breweryKindOf, breweryCfg, kidsChipLabel, breweryKidsUntil, setupWaitingSteps, setupDoneNow, dogsChipSentences, KID_FRIENDLY_SQL, dogsPatioOnly, dogsOutsideOnly, dogsPatioOnly, dogsFrLineEnglish, tripMonthWeekdayDate, kitchenSeasonsClean, setupHereHelpTopics, breweryFoodRowOn, breweryVisitLines, pubKitchenOn, ownerFrLineText, researchKidsUntil, happyHourOnClosedDay, plannerOwnKitchen, usualWeekSeasonOn,
   descriptionShrank, tourInActivity, TOUR_KIND_ACTIVITY, ownerTextFlagsHtml, ownerTextClean, ownerFrDescState, tourTripItems, tourTextMonths, tourWaterMonths, tourKindSeasons, tourKindSeasonsEach, tourKindSeasonWords, tourKindSeasonGuess, tourTwoSeasons, tourKindSeasonsAsked, tourPriceWhy, tourYearlyBreaksText, tourStoryWords, tourLengthRange, dogsSomeTrips, tourPriceWhy, TOUR_ADDON_LINE_RE, TOUR_KIND_ORDER, dogsChipSentences,
-  SPORT_SETUP_ON, SPORT_SETUP_TYPES, sportSetupType, kindSetupType, SPORT_SETUP_HELP_TOPICS, SPORT_KINDS_SHOWN, kindSetupHelpBase, indoorBookButton, tripSportPlannerType, ownerAgeRange, ownerAgePrices, ownerTextClean, sportHubOwnerLine, ownerSetBookingLink,
+  SPORT_SETUP_ON, SPORT_SETUP_TYPES, OUTDOOR_SETUP_ON, OUTDOOR_KINDS_SHOWN, sportSetupType, kindSetupType, SPORT_SETUP_HELP_TOPICS, SPORT_KINDS_SHOWN, kindSetupHelpBase, indoorBookButton, tripSportPlannerType, ownerAgeRange, ownerAgePrices, ownerTextClean, sportHubOwnerLine, ownerSetBookingLink,
   sendFrLinesEmailNow, smartStripHoliday, INDOOR_SETUP_ON, INDOOR_SETUP_PART1, INDOOR_SETUP_PART2, INDOOR_SETUP_HELP_TOPICS, INDOOR_KIND_LABELS_OWNER, INDOOR_KINDS_SHOWN, indoorCardPrice, venueIndoorInfo, clearVenueIndoorInfoCache, writeVenueIndoorInfo, indoorInfoAnswers, indoorPrice, indoorPriceValue, writeIndoorVisitRows, indoorVisitLines, indoorPlannerFacts, indoorKindsText, indoorKindSuggestion, cleanIndoorPrice, indoorSuggested, indoorDonationLine,
   TOUR_SETUP_PART1, TOUR_SETUP_PART2, TOUR_SETUP_HELP_TOPICS, TOUR_OWNER_BADGES, TOUR_PRICE_LIVE_MAX, TOUR_KIND_LABELS_OWNER, TOUR_KIND_PUBLIC, TOUR_KINDS_SHOWN, tourKindsText, tourCuisineFr, tourCardKind, openSeasonStretches, openStretchesText, venueTapListWords, ownerVisitResearchKeys, cardSeasonOnce, statusSaysClosureToday, venueMenuPreviewHtml, venueTourInfo, tourInfoAnswers, tourPrice, writeTourVisitRows, tourVisitLines, ownerTourPriceWaiting, tourResearchPrice, tourResearchLength, tourKindSuggestion, tourPlannerFacts, cleanTourPrice, apptLineFor,
   WINERY_SETUP_PART1, WINERY_SETUP_PART2, WINERY_SETUP_HELP_TOPICS, WINERY_OWNER_BADGES, venueWineryInfo, wineryInfoAnswers, wineryTastingFee, writeWineryVisitRows, wineryVisitLines, wineryAppointmentOn, wineryRestaurantPage, TASTING_FEE_LIVE_MAX,   CAFE_SETUP_PART1, CAFE_SETUP_PART2, CAFE_SUB_STEPS, setupStepsFor, CAFE_OWNER_BADGES, CAFE_PLACE_TYPES, CAFE_SERVE_LABELS, venueCafeInfo, writeVenueCafeInfo, clearVenueCafeInfoCache, cafeKindSuggestion,
