@@ -76814,6 +76814,34 @@ function completeVerifiedIds(now = new Date()) {
   return ids;
 }
 function resetCompleteVerifiedCache() { completeVerifiedCache = { key: '', at: 0, ids: new Set() }; }
+// Dashboard (2026-11-23): how many managed listings have Complete & Verified, and the ones close to it with what is still
+// missing, so Dayton can send a friendly nudge. Same score as the portal and the badge (live data only); only listings a
+// business manages (claimedVenueIds), since only those can earn the badge. `near` = 1 to NEAR_MAX items left.
+const COMPLETENESS_NEAR_MAX = 5;
+function claimHasEmail(venueId) {
+  try { return !!db.prepare("SELECT 1 FROM venue_claims WHERE venue_id = ? AND status = 'approved' AND email LIKE '%@%'").get(venueId); } catch (e) { return false; }
+}
+function completenessReport(now = new Date()) {
+  const today = todayLocal(now), rows = [];
+  for (const id of claimedVenueIds()) {
+    const v = getVenue(id);
+    if (!v || v.redirect_to || !COMPLETENESS_TYPES.has(v.type)) continue;
+    let hh = null;
+    try { hh = (db.prepare('SELECT happy_hour_times FROM venues WHERE id = ?').get(id) || {}).happy_hour_times || null; } catch (e) { hh = null; }
+    let r;
+    try { r = portalCompleteness.scoreCompleteness(gatherCompletenessInput(v, ownerVenueSnapshot(v, hh), hh), { today }); } catch (e) { continue; }
+    const left = (r.missing || []).filter((it) => !it.waiting);
+    let hasLogin = false;
+    try { hasLogin = !!db.prepare('SELECT 1 FROM owner_account_venues WHERE venue_id = ?').get(id); } catch (e) { hasLogin = false; }
+    rows.push({ id, name: v.name, type: v.type, url: venuePagePath(v),
+      pct: r.pct, badge: portalCompleteness.badgeState(r, true), left: left.length, missing: left.map((it) => it.en || it.key),
+      waiting: (r.missing || []).length - left.length, minutes: r.minutes || 0, has_login: hasLogin, has_email: badgeReminderEmails(id).length > 0 || claimHasEmail(id) });
+  }
+  const verified = rows.filter((x) => x.badge === 'earned');
+  const near = rows.filter((x) => x.badge !== 'earned' && x.left >= 1 && x.left <= COMPLETENESS_NEAR_MAX).sort((a, b) => a.left - b.left || b.pct - a.pct);
+  return { managed: rows.length, verified: verified.length, verified_list: verified.map((x) => ({ name: x.name, url: x.url, type: x.type })),
+    paused: rows.filter((x) => x.badge === 'paused').length, near_max: COMPLETENESS_NEAR_MAX, near };
+}
 // Tests only: stand in for the badge (Complete & Verified needs a whole finished setup to earn).
 function setCompleteVerifiedIdsForTest(ids, now = new Date()) { completeVerifiedCache = { key: todayLocal(now), at: Date.now() + 365 * 86400000, ids: new Set(ids) }; }
 
@@ -83510,7 +83538,7 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/api/admin/portal-activity' && method === 'GET') {
       if (!requireAdminToken(req, res)) return;
       res.setHeader('Cache-Control', 'no-store');
-      return sendJSON(res, 200, portalCounter.report(query.days));
+      return sendJSON(res, 200, { ...portalCounter.report(query.days), completeness: completenessReport() });
     }
     // The page: /admin/dashboard/portal (both sites side by side).
     if ((pathname === '/admin/dashboard/portal' || pathname === '/admin/dashboard/portal/') && (method === 'GET' || method === 'HEAD')) {
@@ -83530,7 +83558,7 @@ const server = http.createServer(async (req, res) => {
             : { key: 'whistler', name: 'Whistler Roam', error: r.status === 404 ? 'Whistler Roam doesn’t have the portal report yet.' : `Whistler Roam answered ${r.status}.` };
         } catch (e) { whistler = { key: 'whistler', name: 'Whistler Roam', error: 'Couldn’t reach Whistler Roam right now.' }; }
       }
-      return res.end(renderPortalPage({ days, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: portalCounter.report(days) }, whistler] }));
+      return res.end(renderPortalPage({ days, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: { ...portalCounter.report(days), completeness: completenessReport() } }, whistler] }));
     }
     // The page: /admin/dashboard/business?q=name (search both sites) and &site=okanagan|whistler&id=123 (one business).
     if ((pathname === '/admin/dashboard/business' || pathname === '/admin/dashboard/business/') && (method === 'GET' || method === 'HEAD')) {
@@ -84746,7 +84774,7 @@ module.exports = {
   // Verified mark (2026-10-27)
   guardedVenueLinkUpdate, RESEARCH_LINK_FIELDS, venueLinks, ownerLastUpdatedAt,
   venueIsClaimed, claimedVenueIds, venueConfirmedHtml, ownerUpdatedDate,
-  venueBadgeState, completeVerifiedIds, resetCompleteVerifiedCache, setCompleteVerifiedIdsForTest, listEventChecks, decideEventCheck, queueIndoorEventChecks, indoorEventChecksFor, eventSubmissionReviewFlags, stripVerifiedRepeats, badgeRemindersDue, badgeReminderTick, badgeReminderByToken, confirmHoursFromReminder, BADGE_REMINDER_PATH,
+  venueBadgeState, completeVerifiedIds, completenessReport, resetCompleteVerifiedCache, setCompleteVerifiedIdsForTest, listEventChecks, decideEventCheck, queueIndoorEventChecks, indoorEventChecksFor, eventSubmissionReviewFlags, stripVerifiedRepeats, badgeRemindersDue, badgeReminderTick, badgeReminderByToken, confirmHoursFromReminder, BADGE_REMINDER_PATH,
   guardedCuisineUpdate, guardedCuisinesUpdate, venueCuisineList, venuePlaceType, venueCuisinesState, writeVenueCuisines, clearVenueCuisinesCache,
   placeTypeDisplay, placeTypeBesideCuisines, PLACE_TYPE_DISPLAY, PLACE_TYPE_DISPLAY_FR, MAP_OWNER_FEATURES, mapDataVersion, MAP_DATA_FORMAT, MAP_MUST_HAVES, writeVenueOwnerFeatures, badgeReminderOptedOut,
   OWNER_CUISINES_POPULAR, OWNER_CUISINES_MAX, RESTAURANT_PLACE_TYPES, frPlaceType,

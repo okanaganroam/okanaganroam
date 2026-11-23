@@ -138,3 +138,12 @@ test('reset and new-link form posts without Accept-Language (scripts, not the pa
   answer(c, req(undefined, '', ''), 'POST', '/owner/login', 401, '7.7.7.5');
   assert.equal(n('portal:login_failed'), 1);
 });
+
+test('page (2026-11-23): Complete & Verified count and the almost-there list with what is missing', () => {
+  const db = memDb(); const c = pa.createPortalCounter(db);
+  const completeness = { managed: 9, verified: 2, paused: 1, near_max: 5,
+    verified_list: [{ name: 'Origin Wines', url: '/naramata/wineries/origin-wines', type: 'winery' }],
+    near: [{ id: 7, name: 'Cafe & Co', url: '/kelowna/cafes/cafe-co', type: 'cafe', pct: 92, left: 2, missing: ['Add your hours', 'Link to your menu, or snap a photo of it'], has_login: true, has_email: false }] };
+  const html = renderPortalPage({ days: 30, sites: [{ key: 'okanagan', name: 'Okanagan Roam', data: { ...c.report(30, NOW), completeness } }, { key: 'whistler', name: 'Whistler Roam', data: c.report(30, NOW) }] });
+  for (const s of ['Complete &amp; Verified', 'Almost there', '92%', 'Add your hours', 'Link to your menu', 'has a login', 'https://okanaganroam.com/naramata/wineries/origin-wines', 'Cafe &amp; Co', 'doesn’t send the Complete &amp; Verified numbers yet']) assert.ok(html.includes(s), s);
+});

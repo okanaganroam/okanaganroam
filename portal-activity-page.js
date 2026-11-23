@@ -25,9 +25,27 @@ function siteCard(g, days) {
     <p class="empty">Counting started ${d.counting_since ? esc(d.counting_since) : 'today'}, so earlier days show zero. Totals only: no email, no business and nothing typed is kept, and your own visits (internal cookie) are left out. “Asked to fix something” counts tries the form sent back, nearly always a box left empty or too short, which the owner then fixed. A real fault shows in the server logs, not here.</p></div></section>`;
 }
 
+// Complete & Verified (2026-11-23): how many listings have the badge, and the ones a few items away with what's missing,
+// so a friendly nudge can name exactly what to add. `base` is the site's address, for the listing links.
+const SITE_BASE = { okanagan: 'https://okanaganroam.com', whistler: 'https://whistlerroam.com' };
+function completenessCard(g) {
+  const c = g.data && g.data.completeness;
+  if (!c) return `<section class="col"><h2>${esc(g.name)}</h2><p class="warn">${esc(g.error || 'This site doesn’t send the Complete & Verified numbers yet.')}</p></section>`;
+  const base = SITE_BASE[g.key] || '';
+  const link = (x) => `<a href="${esc(base + x.url)}" target="_blank" rel="noopener">${esc(x.name)}</a>`;
+  const reach = (x) => [x.has_login ? 'has a login' : '', x.has_email ? 'email on file' : ''].filter(Boolean).join(', ') || 'Instagram / DM only';
+  const rows = c.near.map((x) => [link(x), `${num(x.pct)}%`, `<b>${num(x.left)}</b>`, `<small>${x.missing.map(esc).join('<br>')}</small>`, `<small>${esc(reach(x))}</small>`]);
+  return `<section class="col"><h2>${esc(g.name)} <small>Complete &amp; Verified</small></h2><div class="card">
+    <div class="stats">${stat(c.verified, 'Complete & Verified')}${stat(c.near.length, `${c.near_max} or fewer things left`)}${stat(c.managed, 'listings a business manages')}${c.paused ? stat(c.paused, 'paused (hours need a check)') : ''}</div>
+    ${c.verified_list.length ? `<p><b>Verified:</b> ${c.verified_list.map(link).join(', ')}</p>` : ''}
+    <h4>Almost there: send a friendly nudge</h4>
+    ${rows.length ? table(['Business', 'Done', 'Left', 'What’s missing', 'How to reach them'], rows) : '<p class="empty">No managed listing is within a few items of 100% right now.</p>'}
+    <p class="empty">The same checklist the business sees in its portal, from live data only (anything waiting for our review doesn’t count yet). Only listings a business manages can earn the badge, so only those are listed. Fewest items left first.</p></div></section>`;
+}
+
 function renderPortalPage({ days = 30, sites = [] }) {
   const range = [7, 30, 90].map((n) => `<a class="tab${days === n ? ' on' : ''}" href="/admin/dashboard/portal?days=${n}">${n}d</a>`).join('');
-  return layout({ active: 'portal', title: 'Business portal', ask: askFor('portal'), tells: 'How often people try to log in, whether they get in, and what owners do once inside. Totals only.', use: 'If many people click login but few get in, the sign-in step needs fixing.', range, body: sites.map((g) => siteCard(g, days)).join('') });
+  return layout({ active: 'portal', title: 'Business portal', ask: askFor('portal'), tells: 'How often people try to log in, whether they get in, and what owners do once inside. Totals only.', use: 'If many people click login but few get in, the sign-in step needs fixing.', range, body: sites.map(completenessCard).join('') + sites.map((g) => siteCard(g, days)).join('') });
 }
 
 module.exports = { renderPortalPage };
