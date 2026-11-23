@@ -21,6 +21,8 @@ const PLANS = {
   wine: 'a day in Kelowna with wineries and a brewery',
   beer: '2 days in Penticton with a brewery and a beach',
   fr: 'une journée à Kelowna avec des vignobles',
+  // Round 6 (fresh-eyes test 6, live Okanagan, Nov 22): the tester's family weekend.
+  family: 'a family weekend in Kelowna with our kids',
 };
 // sel: which stop(s) of the plan: { type, role, day, nth } (nth 1-based among matches)
 const CASES = [
@@ -109,6 +111,54 @@ const CASES = [
   { plan: 'fr', msg: 'pourquoi le premier vignoble?', lang: 'fr', ops: [{ o: 'ask', value: 'q_why', sel: { type: 'winery', nth: 1 } }] },
   { plan: 'fr', msg: 'nous sommes 4 adultes', lang: 'fr', ops: [{ o: 'party', value: 'adults', n: 4 }] },
   { plan: 'fr', msg: 'enlève le deuxième vignoble et ajoute un tour des vignobles', lang: 'fr', ops: [{ o: 'remove', sel: { type: 'winery', nth: 2 } }, { o: 'add', kind: 'wine_tour' }] },
+  // Round 6: every input that failed in fresh-eyes test 6 (EN + FR).
+  { plan: 'family', msg: 'add ice cream after lunch', ops: [{ o: 'add', kind: 'ice_cream', sel: { role: 'lunch', nth: 1 } }] },
+  { plan: 'family', msg: 'ajoute de la crème glacée après le dîner', lang: 'fr', ops: [{ o: 'add', kind: 'ice_cream', sel: { role: 'lunch', nth: 1 } }] },
+  { plan: 'family', msg: 'add bowling on day 2 in the morning', ops: [{ o: 'add', kind: 'bowling' }] },
+  { plan: 'family', msg: 'add a dinner with a lake view on day 2', ops: [{ o: 'replace', kind: 'lake_view', sel: { role: 'dinner', day: 2, nth: 1 } }], orOps: [{ o: 'add', kind: 'lake_view' }] },
+  { plan: 'family', msg: 'is the first winery open Sunday?', cant: ['q_none'] },
+  { plan: 'family', msg: 'why this restaurant?', ops: [{ o: 'ask', value: 'q_why' }] },
+  { plan: 'family', msg: 'est-ce que le musée est ouvert dimanche?', lang: 'fr', cant: ['q_none'], orOps: [{ o: 'ask', value: 'q_open' }] },
+  { plan: 'family', msg: 'where\'s the spa?', cant: ['q_missing', 'q_none'] },
+  { plan: 'family', msg: 'start the days at 10:30', ops: [{ o: 'time', value: 'later' }, { o: 'time', value: 'later' }] },
+  { plan: 'family', msg: 'quilles ou cinéma après le souper', lang: 'fr', ops: [{ o: 'add', kind: 'bowling', sel: { role: 'dinner', nth: 1 } }] },
+  { plan: 'family', msg: 'bowling or a movie after dinner', ops: [{ o: 'add', kind: 'bowling', sel: { role: 'dinner', nth: 1 } }] },
+  { plan: 'family', msg: 'a trip to Vancouver', cant: ['elsewhere'] },
+  { plan: 'family', msg: 'un voyage à Vancouver', lang: 'fr', cant: ['elsewhere'] },
+  { plan: 'family', msg: 'something fun', ops: [{ o: 'add', kind: 'activity' }] },
+  { plan: 'beer', msg: 'book us a wine tour', ops: [{ o: 'add', kind: 'wine_tour' }] },
+  // Group preferences, explain questions (2026-11-22, Dayton's brief): never an edit, never "no alcohol" for everyone.
+  { plan: 'family', msg: 'Only one person does not drink; the rest want wineries. Can you add a winery on day 2 with a non-alcoholic option?', ops: [{ o: 'party_some' }, { o: 'add', kind: 'winery' }] },
+  { plan: 'family', msg: 'Une seule personne ne boit pas; les autres veulent des vignobles. Ajoute un vignoble au jour 2 avec une option sans alcool.', lang: 'fr', ops: [{ o: 'party_some' }, { o: 'add', kind: 'winery' }] },
+  { plan: 'family', msg: 'only one of us doesn’t drink', ops: [{ o: 'party_some' }] },
+  { plan: 'family', msg: 'Can you explain why you left out the wineries and suggest an option for our non-drinking friend?', ops: [{ o: 'ask', value: 'q_why_not' }, { o: 'ask', value: 'q_dry' }] },
+  { plan: 'family', msg: 'why are there no wineries?', ops: [{ o: 'ask', value: 'q_why_not' }] },
+  { plan: 'family', msg: 'why no brewery?', ops: [{ o: 'ask', value: 'q_why_not' }] },
+  { plan: 'family', msg: 'why didn’t you include live music?', ops: [{ o: 'ask', value: 'q_why_not' }] },
+  { plan: 'family', msg: 'what did you change?', ops: [{ o: 'ask', value: 'q_changed' }] },
+  // Targeted clarification, honest gluten-free wording, explained decisions (2026-11-22, Dayton's live report).
+  { plan: 'family', msg: 'Why did you say you could not fit gluten free when the restaurants are marked gluten-free-friendly?', ops: [{ o: 'ask', value: 'q_warning' }] },
+  { plan: 'family', msg: 'why does it say I couldn’t fit gluten free?', ops: [{ o: 'ask', value: 'q_warning' }] },
+  { plan: 'family', msg: 'is everything gluten-free?', ops: [{ o: 'ask', value: 'q_evidence' }] },
+  { plan: 'family', msg: 'which restaurants are gluten-free?', ops: [{ o: 'ask', value: 'q_evidence' }] },
+  { plan: 'family', msg: 'is this safe for someone with celiac disease?', ops: [{ o: 'ask', value: 'q_allergy' }] },
+  { plan: 'family', msg: 'why is there an event on day 3?', ops: [{ o: 'ask', value: 'q_why_event' }] },
+  { plan: 'wine', msg: 'why two wineries?', ops: [{ o: 'ask', value: 'q_why_count', kind: 'winery' }] },
+  { plan: 'family', msg: 'what does the warning mean?', ops: [{ o: 'ask', value: 'q_warning' }] },
+  { plan: 'family', msg: 'why this hotel?', ops: [{ o: 'ask', value: 'q_why' }] },
+  { plan: 'wine', msg: 'add another winery on day 2', ops: [{ o: 'add', kind: 'winery', day: 2 }] },
+  { plan: 'family', msg: 'pourquoi as-tu dit que tu n’as pas pu inclure le sans gluten?', lang: 'fr', ops: [{ o: 'ask', value: 'q_warning' }] },
+  { plan: 'family', msg: 'est-ce que tout est sans gluten?', lang: 'fr', ops: [{ o: 'ask', value: 'q_evidence' }] },
+  { plan: 'family', msg: 'quels restaurants sont sans gluten?', lang: 'fr', ops: [{ o: 'ask', value: 'q_evidence' }] },
+  { plan: 'family', msg: 'pourquoi y a-t-il un événement au jour 3?', lang: 'fr', ops: [{ o: 'ask', value: 'q_why_event' }] },
+  { plan: 'wine', msg: 'pourquoi deux vignobles?', lang: 'fr', ops: [{ o: 'ask', value: 'q_why_count', kind: 'winery' }] },
+  { plan: 'family', msg: 'que veut dire l’avertissement?', lang: 'fr', ops: [{ o: 'ask', value: 'q_warning' }] },
+  { plan: 'family', msg: 'pourquoi cet hôtel?', lang: 'fr', ops: [{ o: 'ask', value: 'q_why' }] },
+  { plan: 'wine', msg: 'ajoute un autre vignoble au jour 2', lang: 'fr', ops: [{ o: 'add', kind: 'winery', day: 2 }] },
+  { plan: 'family', msg: 'what couldn’t you do?', ops: [{ o: 'ask', value: 'q_couldnt' }] },
+  { plan: 'family', msg: 'pourquoi il n’y a pas de vignobles?', lang: 'fr', ops: [{ o: 'ask', value: 'q_why_not' }] },
+  { plan: 'family', msg: 'qu’est-ce que tu as changé?', lang: 'fr', ops: [{ o: 'ask', value: 'q_changed' }] },
+  { plan: 'family', msg: 'qu’est-ce que tu n’as pas pu faire?', lang: 'fr', ops: [{ o: 'ask', value: 'q_couldnt' }] },
 ];
 
 function pick(stops, sel) {
@@ -185,7 +235,7 @@ const pct = (a, q) => { if (!a.length) return null; const s = a.slice().sort((x,
     const out = turnOps.length ? tc.planTurn(turnOps, { args: app.parseTripPlanBody({ text: P.text }, { v4: true }).value, locks: {}, removed: [], stops: P.stops, days: Math.max(...P.stops.map((s) => s.day)), regionLabels: app.REGION_LABELS, lang,
       run: (a) => app.runTripPlanRequest({ text: a.text, seed: a.seed || 0, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: a.pinned || null, overrides: a.overrides || null, swap: a.swap || null, v4: true }, false) }) : null;
     const planMs = Date.now() - t0;
-    const reply = out ? tc.buildReply(out, { lang, regionLabels: app.REGION_LABELS }) : tc.cantReply((ai && ai.ok && ai.cant) || (c.cant && c.cant[0]) || 'unclear', lang);
+    const reply = out ? tc.buildReply(out, { lang, regionLabels: app.REGION_LABELS }) : tc.cantReply((ai && ai.ok && ai.cant) || (c.cant && c.cant[0]) || 'unclear', lang, rules.what || null, P.stops);
     const fulfilled = c.cant || !turnOps.length ? null : !!out && out.results.every((r) => r.ok !== false);
     rows.push({ c, rulesOk, aiOk, ai, planMs, reply, fulfilled, merged, mergedOk, answerMs });
     console.log(`${rulesOk ? '✓' : '✗'} rules${live ? `  ${aiOk ? '✓' : '✗'} ai ${ai.ms}ms $${(ai.costUsd || 0).toFixed(5)}${ai.ok ? '' : ` (${ai.reason})`}` : ''}  [${c.plan}] ${c.msg}\n      -> ${reply}  (planner ${planMs} ms${fulfilled === false ? ', not fully done' : ''})`);

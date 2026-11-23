@@ -67,7 +67,8 @@ test('an add into a full part of the day takes the place of the stop there and s
   const run = (a) => { calls.push(a); return dayPlan(PLAN.map((s) => (s.key === a.swap.key ? { ...scoop, key: a.swap.key, start: s.start } : s))); };
   let out = tc.planTurn(R('add ice cream after lunch').ops, ctxFor(run));
   assert.equal(calls[calls.length - 1].swap.key, '1-afternoon');
-  assert.equal(calls[calls.length - 1].swap.id, 13, 'the gallery after lunch gives way');
+  assert.equal(calls[calls.length - 1].swap.id, undefined, 'round 6: the stop that gives way is not the model for the new one');
+  assert.ok(calls[calls.length - 1].excludeVenueIds.includes(13), 'the gallery after lunch gives way');
   assert.deepEqual(out.changed, ['1-afternoon']);
   assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Added MOO-LIX Ice Cream Shop at 1:15 PM in place of Kelowna Art Gallery.');
   assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. J’ai ajouté MOO-LIX Ice Cream Shop à 13 h 15 à la place de Kelowna Art Gallery.');
@@ -82,7 +83,7 @@ test('the word rules stand where they read a specific edit: bowling or a movie, 
   const AI = (ops) => ({ ok: true, cant: null, ops });
   let msg = 'quilles ou cinéma après le souper';
   let m = tc.reconcileReads(AI([OP({ o: 'add', kind: 'arts', stops: [PLAN[4]] })]), R(msg), msg);
-  assert.deepEqual(m.ops.map((o) => o.kind), ['bowling', 'cinema']);
+  assert.deepEqual(m.ops.map((o) => [o.kind, o.alt]), [['bowling', ['cinema']]], 'round 6: one stop, bowling or else a cinema');
   msg = 'more indoor things';
   m = tc.reconcileReads(AI([OP({ o: 'add', kind: 'indoor' })]), R(msg), msg);
   assert.deepEqual(brief(m), [['replace', 'indoor', [11], null], ['replace', 'indoor', [21], null]], 'the outdoor stops are swapped; nothing is "added at that time"');

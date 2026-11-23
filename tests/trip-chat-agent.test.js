@@ -159,3 +159,25 @@ test('page: chat mode has the agent\'s first message, no Edit request and Confir
   const v4 = await (await fetch(`${base}/trip?v=4`, { headers: { 'User-Agent': UA } })).text();
   assert.doesNotMatch(v4, /v4AgentHi|v4-chat-mode|Where you’ll stay|v4-confirm-end/);
 });
+
+// Round 6 + planner round 5: the adults turn sends the stay part again for that many adults; "why this hotel?" is answered
+// from the stay's own listing; the stay part is built for the stops on screen only (no ghost stops).
+test('POST /api/trip/chat: "we are 4 adults" returns the stay part for 4 adults; "why this hotel?" names the stay; the stay part lists only stops on screen', async () => {
+  const plan = planNow();
+  const pick = plan.whereToStay.pick;
+  const onScreen = new Set(tc.planStops(plan).map((s) => s.id));
+  const withStay = (m) => ({ ...bodyFor(plan, m), ...(pick.id > 0 ? { stayId: pick.id } : {}) });
+  const four = await chat(withStay('we are 4 adults'));
+  assert.equal(four.status, 200);
+  assert.deepEqual(four.j.party, { adults: 4 });
+  assert.ok(pick.id > 0, 'the test plan has a listed stay');
+  {
+    assert.ok(four.j.stayBlock && four.j.stayBlock.whereToStay && four.j.stayBlock.whereToStay.pick, 'the stay part comes back');
+    assert.equal((four.j.stayBlock.whereToStay.trip || {}).adults, 4);
+    const steps = JSON.stringify((four.j.stayBlock.v4Booking || {}).steps || []);
+    for (const m of steps.matchAll(/"venueId":(\d+)/g)) assert.ok(onScreen.has(Number(m[1])) || Number(m[1]) === four.j.stayBlock.whereToStay.pick.id, `booking step for a stop on screen (${m[1]})`);
+    const why = await chat(withStay('why this hotel?'));
+    assert.match(why.j.reply, new RegExp(`^${pick.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} is on your plan as the place to stay`));
+    assert.equal(why.j.plan, null);
+  }
+});

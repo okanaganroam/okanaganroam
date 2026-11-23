@@ -270,7 +270,8 @@ test('mapping: "add a beach after lunch" with no free slot before dinner says so
   const full = [STOPS[0], STOPS[1], STOPS[2], { key: '1-late', id: 15, name: 'Red Rooster', type: 'winery', start: 960, badges: [], price: 2, role: '', day: 1, ref: 's5' }, STOPS[3]];
   const run = fakeRun(() => { throw new Error('should not plan'); });
   const out = tc.planTurn(ops({ o: 'add', kind: 'beach', stops: [STOPS[1]] }), ctx(run, { stops: full }));
-  assert.equal(run.calls.length, 1, 'round 5: it tries the place of the stop there (the afternoon winery) first; that fails here');
+  // Round 6: on a trip that asked for wineries, the winery there never gives way to an added stop.
+  assert.equal(run.calls.length, 0, 'the afternoon winery is what the trip asked for');
   assert.equal(out.plan, null);
   assert.equal(tc.buildReply(out, { lang: 'en' }), 'There’s no free spot for a beach after lunch without dropping a stop. Remove or swap one first.');
   assert.match(tc.buildReply(out, { lang: 'fr' }), /^Pas de place libre pour une plage après le dîner/);
@@ -367,14 +368,14 @@ test('mapping: pace, party, budget, days, time, town, redo and start over use th
 test('replies: a broad change names what changed (or counts it), and says when nothing changed', () => {
   const swapped = [STOPS[0], STOPS[1], { key: '1-afternoon', id: 90, name: 'Gyro Beach', type: 'beach', start: 870 }, STOPS[3]];
   let out = tc.planTurn(ops({ o: 'pace', value: 'packed' }), ctx(fakeRun(() => dayPlan(swapped))));
-  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Busier days. Changed 1 stop.');
-  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. Journées plus remplies. 1 arrêt a changé.');
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Busier days. Took out Tree Brewing. Added Gyro Beach.');
+  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. Journées plus remplies. J’ai retiré Tree Brewing. J’ai ajouté Gyro Beach.');
   out = tc.planTurn(ops({ o: 'pace', value: 'packed' }), ctx(fakeRun(() => dayPlan(STOPS))));
   assert.equal(tc.buildReply(out, { lang: 'en' }), 'Busier days. The plan already fits that, so nothing changed.');
   const all = STOPS.map((s, i) => ({ ...s, id: 100 + i, name: `New ${i}` }));
   out = tc.planTurn(ops({ o: 'party', value: 'dog' }), ctx(fakeRun(() => dayPlan(all))));
-  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Planned for your dog. Changed 4 stops.');
-  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. Plan adapté à votre chien. 4 arrêts ont changé.');
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Planned for your dog. Changed 4 stops on day 1.');
+  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. Plan adapté à votre chien. 4 arrêts ont changé (jour 1).');
   assert.equal(tc.buildReply(null, { lang: 'en', cant: 'booking' }), 'I can’t book things in this chat, but confirm the plan and “Book my trip” opens each booking.');
   assert.equal(tc.buildReply(null, { lang: 'fr', cant: 'transport' }), 'Je ne peux pas réserver de vols ni de transport, mais je peux adapter le plan à votre arrivée.');
   // A conflict from the planner (it throws) leaves the plan unchanged.
