@@ -1126,6 +1126,9 @@ ${require('./stay-booking-links').HANDOFF_CLIENT_SRC}` + String.raw`
   }
   function t3HandoffText(s, t, fr){
     var h = t3Handoff(s, t);
+    // The travel agent page shows one stay button (the first link) on the card and in the Book my trip sheet: the
+    // note is about that button only. Where every link is a button, each gets its line.
+    if (typeof v4RoomsState === 'function') h = h.slice(0, 1);
     return h.map(function(x){ return fr ? x.noteFr : x.note; }).join(' ');
   }
   function t3StayDatesHtml(t, fr, s){

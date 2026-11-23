@@ -497,7 +497,9 @@ function chatClientSrc(d) {
     if (chat.stayMore && d.others.length) html += '<ul class="v4-stay-alts">' + d.others.map(function(o){ return '<li><span><b>' + esc(o.name) + '</b>' + esc([fr ? (o.kindFr || o.kind) : o.kind, o.regionLabel, o.priceBand].concat((o.has || []).map(function(k){ return (AG[lang()] ? AG[lang()].chip : AG.en.chip)[k] || k; })).filter(Boolean).join(' · ')) + '</span><button type="button" class="v4-link" data-v4-stay-choose="' + esc(o.id) + '">' + esc(ag('choose')) + '</button></li>'; }).join('') + '</ul>';
     html += (typeof t3StayDatesHtml === 'function' ? t3StayDatesHtml(tripIn, fr, s) : '') + roomsRow;
     // Trip needs (2026-11-24): what no booking site takes (the dog, an accessible room), said by the stay.
-    if (s.handoffAsk) html += '<p class="v4-disc-line v4-handoff-ask" data-v4-handoff-ask>' + esc(fr ? s.handoffAsk.textFr : s.handoffAsk.text) + '</p>';
+    // (Not while the stay's dates are only proposed: the card stays short until there is something to book; the Book my
+    // trip sheet and Details say it throughout.)
+    if (s.handoffAsk && tripIn.stayStatus !== 'proposed') html += '<p class="v4-disc-line v4-handoff-ask" data-v4-handoff-ask>' + esc(fr ? s.handoffAsk.textFr : s.handoffAsk.text) + '</p>';
     // One small paragraph under the card: the rooms line first, then the commission line (one block, so a phone's card stays short).
     if (roomsNote || (step && step.affiliate)) html += '<p class="v4-disc-line">' + (roomsNote ? '<span data-v4-rooms-note>' + esc(roomsNote) + '</span> ' : '') + (step && step.affiliate ? esc(T3_STAY_DISCLOSURE[fr ? 'fr' : 'en'] || T3_STAY_DISCLOSURE.en) : '') + '</p>';
     if (step && step.affiliate) chatDiscShown = true;
