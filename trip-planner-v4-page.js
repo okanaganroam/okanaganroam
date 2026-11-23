@@ -508,6 +508,10 @@ const V4_CLIENT_SRC = String.raw`
       if (e.peopleAssumed) html = html.replace(/( (?:for|pour) \d+ (?:people|person|personnes?))(<\/strong>)/, '$1' + esc(vt('assumed')) + '$2');
       // Rooms (2026-11-22): the rooms the links carry, said with the party. The figures are not changed by it.
       var rl = d0 ? t3RoomsLabel(d0.w.trip || {}, fr) : '';
+      // A priced stay is priced by the listing's own "sleeps" (trip-booking.js), never by the rooms picked here: when
+      // the two differ, the figure says which it is for.
+      var sp = (e.parts || []).filter(function(x){ return x && x.key === 'stay'; })[0], rs = v4RoomsState();
+      if (sp && rs && sp.rooms >= 1 && sp.rooms !== rs.rooms) html = html.replace(/<\/div>$/, '') + '<p class="v4-book-unpriced" data-v4-est-rooms>' + esc(fr ? 'Le montant de l’hébergement vaut pour ' + sp.rooms + (sp.rooms > 1 ? ' chambres ou unités' : ' chambre ou unité') + ', pas les ' + rs.rooms + ' de vos liens : le site de réservation donne le vrai prix.' : 'The stay figure is for ' + sp.rooms + (sp.rooms > 1 ? ' rooms or units' : ' room or unit') + ', not the ' + rs.rooms + ' in your links: the booking site has the real price.') + '</p></div>';
       if (rl && !e.showTotal) html = html.replace(/((?:Known costs so far|Coût connu jusqu’ici) (?:for|pour) \d+ (?:people|person|personnes?)(?: \((?:assumed|supposé)\))?)(<\/strong>)/, '$1 · ' + esc(rl) + '$2');
     }
     return html;

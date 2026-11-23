@@ -373,6 +373,7 @@ test('7. the page: the stay line, the rooms row, the notes, the sheet and the li
   assert.ok(CHAT.includes("var roomsRow = typeof v4RoomsHtml === 'function' ? v4RoomsHtml(fr) : ''") && CHAT.includes('data-v4-rooms-note'));
   assert.ok(V4.includes("esc(fr ? 'Changer' : 'Change') + '</button>' : '') + '</div>' + v4RoomsHtml(fr);"), 'the sheet has the row under the stay');
   assert.ok(V4.includes("'$1 · ' + esc(rl) + '$2'"), 'the estimate says the rooms with the party');
+  assert.ok(V4.includes('data-v4-est-rooms') && V4.includes("'The stay figure is for ' + sp.rooms"), 'a priced stay says how many rooms its figure is for when the links carry another number');
   assert.ok(V3.includes('<select id="t3Rooms">') && V3.includes("var rm = g('t3Rooms'); if (/^[1-8]$/.test(rm)) o.rooms = Number(rm);"));
   assert.ok(V3.includes('<span class="t3-en">Rooms</span><span class="t3-fr" lang="fr">Chambres</span>'));
   assert.ok(V4.includes("if (o.rooms) p.push('rooms=' + o.rooms);") && V4.includes("any = set('t3Rooms', q.rooms) || any;"));
