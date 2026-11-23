@@ -1999,7 +1999,7 @@
   // is a show place (live theatre, music or comedy): it is asked about tickets, and its price is its lowest regular ticket.
   // Sport and golf (2026-11-20): the main kind's usual season's hint on the Hours step ('' for none).
   function winterKindOnly(){ return !!C.sport && (C.kindSeasons || {})[indoorMainKind()] === 'winter'; }
-  function sportSeasonHint(){ if (!C.sport) return ''; if (T.seasonHintKind) return T.seasonHintKind; var se = (C.kindSeasons || {})[indoorMainKind()] || ''; return se === 'summer' ? (T.seasonHintSummer || '') : se === 'winter' ? (T.seasonHintWinter || '') : ''; }
+  function sportSeasonHint(){ if (!C.sport || C.yearRoundResearch) return ''; if (T.seasonHintKind) return T.seasonHintKind; var se = (C.kindSeasons || {})[indoorMainKind()] || ''; return se === 'summer' ? (T.seasonHintSummer || '') : se === 'winter' ? (T.seasonHintWinter || '') : ''; }
   function indoorMainKind(){ if (!C.indoor) return ''; return ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0] || ''; }
   function indoorShow(){ return indoorMainKind() === 'theatre' && !!T.ibookQShow; }
   // The story and Known for examples by the main kind (owner-setup-text.js storyExKinds / knownExKinds).
@@ -2928,7 +2928,7 @@
       x = doneLine('price') + '<h1 id="suQ">' + h(T.tpriceQ) + '</h1><p class="su-lead" id="suTpriceLead">' + h(tourPriceLead()) + '</p>'
         + (ip.priceGuessed && (ip.free || (ip.price != null && !isNaN(ip.price))) && T.tpriceGuess ? '<p class="su-sent su-research" id="suFeeGuess">' + h(T.tpriceGuess) + '</p>' : '')
         + (CUR.indoor_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.indoor_price_waiting) })) + '</p>' : '') + msgs()
-        + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suFreeChips">' + (C.sport && ip.free !== 'donation' ? ['free'] : ['free', 'donation']).map(function(f){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ip.free === f ? 'true' : 'false') + '" data-ifree="' + f + '">' + h(tourFreeWord(f)) + '</button>'; }).join('') + '</div>'
+        + (T.noFree && !ip.free ? '' : '<div class="su-chips" role="group" aria-labelledby="suQ" id="suFreeChips">' + (C.sport && ip.free !== 'donation' ? ['free'] : ['free', 'donation']).map(function(f){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ip.free === f ? 'true' : 'false') + '" data-ifree="' + f + '">' + h(tourFreeWord(f)) + '</button>'; }).join('') + '</div>')
         // Indoor test 1: By donation keeps the box, as "Suggested amount (optional)".
         + (ip.free === 'donation' && T.tsuggLabel ? field('suTsugg', T.tsuggLabel, ip.suggText != null ? ip.suggText : ip.sugg != null ? String(ip.sugg) : '', { max: 12, mode: 'decimal' }) + '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>'
           : ip.free ? '' : field('suTprice', ip.per && T.iperOne ? T.iperOne[ip.per] : T.tpriceLabel, ip.ptext != null ? ip.ptext : ip.per && indoorPerBox() ? indoorPerBox() : indoorMinSize() && typeof ip.price === 'number' ? boxVal('suTprice', ip.price) + indoorMinSize() : boxVal('suTprice', ip.price), { max: 60, ph: T.tpricePh || '' })

@@ -396,7 +396,9 @@ const PORTAL_FIELDS_BY_TYPE = Object.freeze({
   indoor: portalRow({ menu: true, bookingFirst: true, activityBadges: true, foodBadgesHidden: true }),
   sport: portalRow({ menu: true, bookingFirst: true, activityBadges: true, foodBadgesHidden: true }),
   // Nothing to find a door for, and no kitchen: no storefront tile, no dietary / patio badges (2026-11-08).
-  outdoor: portalRow({ bookingFirst: true, activityBadges: true, foodBadgesHidden: true, arrivalTile: false }),
+  // Outdoor test 1 (2026-11-23): with the outdoor setup on, Your prices (menu) is the setup's price list. (The edit page
+  // hides the restaurant price range for outdoor; the public Price row stays as it was.)
+  outdoor: portalRow({ bookingFirst: true, activityBadges: true, foodBadgesHidden: true, arrivalTile: false, ...(process.env.OUTDOOR_SETUP !== 'off' ? { menu: true } : {}) }),
   beach: portalRow({ activityBadges: true, foodBadgesHidden: true, hiddenBadges: Object.freeze(['patio']), arrivalTile: false }),
   shop: portalRow({ price: false, foodBadgesHidden: true, hiddenBadges: Object.freeze(['patio']), arrivalTile: false }),
 });
@@ -11949,7 +11951,8 @@ function ownerAgePrices(venueId) {
 }
 function sportPlannerCardWords(v) {
   try {
-    if (!v || v.type !== 'sport') return {};
+    // Outdoor test 1 (2026-11-23): an outdoor business's planner card says its kind ("Campground"), not "Outdoor Destination".
+    if (!v || !(v.type === 'sport' || (v.type === 'outdoor' && OUTDOOR_SETUP_ON))) return {};
     const k = (venueIndoorInfo(v.id).kinds || [])[0];
     if (!k || !indoorKindsModule.SPORT.K[k]) return {};
     const words = indoorKindsModule.SPORT.SPORT_KIND_WORDS[k] || indoorKindsModule.SPORT.SPORT_KIND_LABELS_OWNER[k];
@@ -28899,7 +28902,7 @@ function indoorCuisineFr(text) {
   if (!indoorCuisineFrMap) {
     indoorCuisineFrMap = new Map();
     try {
-      for (const r of db.prepare("SELECT v.id AS id, v.cuisine AS c, t.info AS info FROM venue_indoor_info t JOIN venues v ON v.id = t.venue_id WHERE v.type = 'indoor' AND v.cuisine IS NOT NULL AND v.cuisine != '' UNION ALL SELECT v.id AS id, v.cuisine AS c, t.info AS info FROM venue_sport_info t JOIN venues v ON v.id = t.venue_id WHERE v.type IN ('sport', 'golf') AND v.cuisine IS NOT NULL AND v.cuisine != ''").all()) {
+      for (const r of db.prepare("SELECT v.id AS id, v.cuisine AS c, t.info AS info FROM venue_indoor_info t JOIN venues v ON v.id = t.venue_id WHERE v.type = 'indoor' AND v.cuisine IS NOT NULL AND v.cuisine != '' UNION ALL SELECT v.id AS id, v.cuisine AS c, t.info AS info FROM venue_sport_info t JOIN venues v ON v.id = t.venue_id WHERE v.type IN ('sport', 'golf', 'outdoor') AND v.cuisine IS NOT NULL AND v.cuisine != ''").all()) {
         let o = null; try { o = JSON.parse(r.info); } catch (e) { o = null; }
         const en = o && Array.isArray(o.kinds) ? indoorKindsText(o.kinds) : '';
         if (en && en === r.c) indoorCuisineFrMap.set(String(r.c), indoorKindsText(o.kinds, true));
@@ -39751,8 +39754,15 @@ function outdoorFactRows(venue) {
   if (!f) return [];
   // No researched cost but the listing is marked free: the row says so (the Free to Visit badge already does on the page).
   const facts = !f.cost && venue.free_entry ? { ...f, cost: 'Free to visit' } : f;
-  const rows = OUTDOOR_FACT_ROWS.filter(([k]) => facts[k]).map(([k, label]) => [label, escapeHtml(facts[k])]);
-  for (const x of f.extras || []) if (x && x.label && x.text) rows.push([x.label, escapeHtml(x.text)]);
+  // Outdoor test 1 (2026-11-23; Rae's own Dogs line was hidden behind research's): a row the owner wrote themself in Plan
+  // your visit (owner_labels) wins; research's row of the same name is left out.
+  let mine = new Set();
+  try { if (OUTDOOR_SETUP_ON) mine = new Set(((venueVisitInfo(venue.id) || {}).owner_labels) || []); } catch (e) { mine = new Set(); }
+  // Her Prices line answers research's Cost; a campground has no Time needed.
+  if (mine.has('Prices')) mine.add('Cost');
+  try { if (OUTDOOR_SETUP_ON && (venueIndoorInfo(venue.id).kinds || [])[0] === 'camp') mine.add('Time needed'); } catch (e) { /* no kinds */ }
+  const rows = OUTDOOR_FACT_ROWS.filter(([k, label]) => facts[k] && !mine.has(label)).map(([k, label]) => [label, escapeHtml(facts[k])]);
+  for (const x of f.extras || []) if (x && x.label && x.text && !mine.has(x.label)) rows.push([x.label, escapeHtml(x.text)]);
   if (rows.length && f.source_url && f.checked_at) {
     let host = '';
     try { host = new URL(f.source_url).hostname.replace(/^www\./, ''); } catch (e) { /* no host */ }
@@ -47388,7 +47398,7 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   // facts that were previously only available further down the page.
   const atAGlanceParts = [
     // Café test 2 (2026-11-11): a café says its kind ("Ice cream & gelato shop · Penticton"), not "Cafe". Text only.
-    venue.type === 'golf' ? escapeHtml(golfKindLabel) : (venue.type === 'cafe' || venue.type === 'brewery') && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : fr && indoorFrTopLabel(venue) ? escapeHtml(indoorFrTopLabel(venue)) : label.singular,
+    venue.type === 'golf' || (venue.type === 'outdoor' && OUTDOOR_SETUP_ON && (venueIndoorInfo(venue.id).kinds || []).length && sportKindSingular(venue, fr)) ? escapeHtml(golfKindLabel) : (venue.type === 'cafe' || venue.type === 'brewery') && !venue.redirect_to && venuePlaceType(venue) ? escapeHtml(placeTypeDisplay(venue, fr)) : fr && indoorFrTopLabel(venue) ? escapeHtml(indoorFrTopLabel(venue)) : label.singular,
     `<a href="/${venue.region}">${escapeHtml(regionLabel)}</a>`,
     venueShowsPrice(venue) ? '$'.repeat(venue.price) : null,
     venue.rating ? `${num(venue.rating)}\u2605${venue.reviews ? ` (${venue.reviews})` : ''}` : null,
@@ -66097,6 +66107,8 @@ function renderOwnerSetupPage(found, opts) {
       allSteps: INDOOR_SETUP_PART1.concat(INDOOR_SETUP_PART2), feeLiveMax: INDOOR_PRICE_LIVE_MAX, bringMax: TOUR_GOOD_TO_KNOW_MAX, groupsMax: sportSetupType(venue.type) ? KIND_GROUPS_MAX : 180,
       indoorKinds: (sport ? sportKindsShownFor(venue.type) : INDOOR_KINDS_SHOWN).map((k) => ({ k, t: INDOOR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), indoorKindsTop: sport ? sportKindsShownFor(venue.type).length : INDOOR_KINDS_TOP, sportMain: sport ? (() => { try { return sportMainKind(venue) || indoorKindsModule.sportKindSuggestion(venue)[0] || ''; } catch (e) { return ''; } })() : '',
       // Sport and golf (2026-11-20): the sport words, each kind's usual season (the Hours step's hint) and its fallback kind.
+      // Outdoor test 1 (2026-11-23): research says it's open all year ("Open year-round"), so no "most places like yours close" hint.
+      ...(venue.type === 'outdoor' && /\b(?:year[- ]round|all year|open all year)\b/i.test(String((OUTDOOR_FACTS[String(venue.id)] || {}).season || '')) ? { yearRoundResearch: true } : {}),
       sport, kindSeasons: sport ? Object.fromEntries(SPORT_KINDS_MOD.ENGINE_KINDS.map((k) => [k, indoorKindsModule.indoorKindText([k], 'en').season || ''])) : {}, otherKind: sport ? sportOtherKind(venue.type) : 'other',
       // Indoor test 2: the card's short words for each kind, for the preview ("Escape room · arcade, VR & laser tag").
       indoorKindWords: Object.fromEntries(Object.entries(INDOOR_KIND_WORDS).map(([k, w]) => [k, (indoorKindsModule.indoorKindLabel(k, indoorOwnWords(venue.id)) || w)[fr ? 1 : 0]])),
@@ -76879,7 +76891,7 @@ function ownerBadgeCardHtml(venue, lang = 'en') {
         <label for="opBadgeCode" class="op-hint" style="display:block;margin:10px 0 4px">${L('Code for your website', 'Code pour votre site Web')}</label>
         <textarea id="opBadgeCode" readonly rows="4" spellcheck="false" style="width:100%;box-sizing:border-box;font:0.8rem/1.4 ui-monospace,Menlo,Consolas,monospace;padding:8px 10px;border-radius:10px;border:1px solid rgba(42,32,25,0.25);background:#fff;resize:vertical">${escapeHtml(code).replace(/https:\/\//g, 'https&#58;//')}</textarea>
         <p style="margin:8px 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px"><button type="button" class="op-btn" id="opBadgeCopy" data-done="${escapeHtml(L('Copied', 'Copié'))}" data-select="${escapeHtml(L('Selected: press Ctrl+C (or ⌘+C) to copy', 'Sélectionné : appuyez sur Ctrl+C (ou ⌘+C) pour copier'))}">${L('Copy code', 'Copier le code')}</button><span class="op-hint" id="opBadgeDone" role="status" style="margin:0"></span></p>
-        <p class="op-hint" style="margin:8px 0 0">${venue.type === 'tour' ? L('Paste it in your website footer or on your tours page; it links to your page here.', 'Collez-le dans le pied de page de votre site Web ou sur votre page de sorties; il mène à votre fiche ici.') : L('Paste it in your website footer or your happy hour page; it links to your page here.', 'Collez-le dans le pied de page de votre site Web ou sur votre page 5 à 7; il mène à votre fiche ici.')}</p>
+        <p class="op-hint" style="margin:8px 0 0">${venue.type === 'tour' ? L('Paste it in your website footer or on your tours page; it links to your page here.', 'Collez-le dans le pied de page de votre site Web ou sur votre page de sorties; il mène à votre fiche ici.') : !happyHourAllowed(venue) ? L('Paste it in your website footer; it links to your page here.', 'Collez-le dans le pied de page de votre site Web; il mène à votre fiche ici.') : L('Paste it in your website footer or your happy hour page; it links to your page here.', 'Collez-le dans le pied de page de votre site Web ou sur votre page 5 à 7; il mène à votre fiche ici.')}</p>
         <script>
         (function(){
           var b = document.getElementById('opBadgeCopy'), ta = document.getElementById('opBadgeCode'), out = document.getElementById('opBadgeDone');
@@ -77075,7 +77087,10 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
       const box = venueVisitInfo(venue.id) || {};
       const rows = (box.rows || []).concat((Array.isArray(box.owner_dropped) ? box.owner_dropped : []).filter((r) => r && r.owned));
       const mine = new Set(box.winery_labels || []);
-      return INDOOR_MANAGED_LABELS.filter((l) => mine.has(l)).map((l) => { const r = rows.find((x) => x && x.label === l && x.text); return { label: fr ? visitLabelFr(l) : l, text: r ? ((fr && ownerFrLineText(box, r)) || r.text) : '' }; });
+      // Outdoor test 1 (2026-11-23; Rae answered "all year" and read "Season: Not answered yet"): open all year has no
+      // Season line on the page, so this says it.
+      const allYear = (() => { try { return venueIndoorInfo(venue.id).year === 'all'; } catch (e) { return false; } })();
+      return INDOOR_MANAGED_LABELS.filter((l) => mine.has(l)).map((l) => { const r = rows.find((x) => x && x.label === l && x.text); return { label: fr ? visitLabelFr(l) : l, text: r ? ((fr && ownerFrLineText(box, r)) || r.text) : l === 'Season' && allYear ? L('Open all year', 'Ouvert toute l’année') : '' }; });
     })() : venue.type === 'tour' ? (() => {
       const box = venueVisitInfo(venue.id) || {};
       const rows = (box.rows || []).concat((Array.isArray(box.owner_dropped) ? box.owner_dropped : []).filter((r) => r && r.owned));
@@ -77787,7 +77802,7 @@ ${cuisineHtml()}${visitRowsHtml()}      <details class="op-fold op-sec" id="badg
       </div>
       <p class="lyv-error" id="opBadgesError" hidden></p>
       </details>
-      ${!portalFields(venue.type).price || priceInSpend ? '' : `
+      ${!portalFields(venue.type).price || priceInSpend || (venue.type === 'outdoor' && OUTDOOR_SETUP_ON) ? '' : `
       <details class="op-fold op-sec" id="price" data-task="more"${waitingFields.has('price_range') ? ' open' : ''}>
       <summary><span class="lyv-section-label" id="opPriceLabel">${L('Price range', 'Gamme de prix')}${waitChip('price_range')}</span> <span class="op-fold-hint">${priceHint}</span></summary>
 ${priceFieldHtml}      </details>`}${!avgSpendOn ? '' : `
