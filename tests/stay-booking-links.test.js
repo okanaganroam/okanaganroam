@@ -37,7 +37,7 @@ test('unknown party and dates: only what is known is added; Booking.com keeps no
   assert.equal(r[0].url, `${BC}?no_rooms=1`);
   assert.equal(r[1].url, EX);
   const r2 = L.stayBookingLinks(stay({ booking_com: BC }), { arrive: '2026-12-21', leave: '2026-12-18', adults: 3, kids: 0 }, NONE);
-  assert.deepEqual(q(r2[0].url), { group_adults: '3', group_children: '0', no_rooms: '1' }, 'dates out of order are left off');
+  assert.deepEqual(q(r2[0].url), { group_adults: '3', group_children: '0', no_rooms: '2' }, 'dates out of order are left off');
 });
 
 test('stay22: Booking.com and Expedia go through Allez with link= (the pre-filled property URL) and the trip params; own site never', () => {
@@ -45,7 +45,7 @@ test('stay22: Booking.com and Expedia go through Allez with link= (the pre-fille
   assert.deepEqual(r.map((x) => [x.key, x.affiliate, x.rel]), [['booking_com', true, 'sponsored nofollow noopener'], ['expedia', true, 'sponsored nofollow noopener'], ['own', false, 'nofollow noopener']]);
   const b = new URL(r[0].url);
   assert.equal(`${b.origin}${b.pathname}`, 'https://www.stay22.com/allez/booking');
-  assert.deepEqual(q(r[0].url), { aid: 'test123', link: `${BC}?checkin=2026-12-18&checkout=2026-12-21&group_adults=2&group_children=2&no_rooms=1`, checkin: '2026-12-18', checkout: '2026-12-21', adults: '2', children: '2', campaign: 'trip_plan' });
+  assert.deepEqual(q(r[0].url), { aid: 'test123', link: `${BC}?checkin=2026-12-18&checkout=2026-12-21&group_adults=2&group_children=2&no_rooms=1`, checkin: '2026-12-18', checkout: '2026-12-21', adults: '2', children: '2', rooms: '1', campaign: 'trip_plan' });
   assert.equal(new URL(r[1].url).pathname, '/allez/expedia');
   assert.equal(q(r[1].url).link, `${EX}?chkin=2026-12-18&chkout=2026-12-21&rm1=a2`);
   assert.equal(r[2].url, OWN);

@@ -100,6 +100,14 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-sheet-x { position: absolute; top: 8px; right: 8px; width: 44px; height: 44px; border: 0; border-radius: 999px; background: rgba(27,43,58,0.06); font-size: 1.3rem; cursor: pointer; color: var(--ref-navy); z-index: 1; }
   .t3-v4 .v4-sheet .t3-stay { margin: 0; padding: 0; border: 0; box-shadow: none; background: transparent; }
   .t3-v4 .v4-sheet h3 { margin: 4px 48px 10px 0; font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 1.3rem; }
+  /* Rooms (2026-11-22): "3 rooms (assumed)  1 2 3 4+" by the stay. One short row; each button's tap area is 44px. */
+  .t3-v4 .v4-rooms { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; font-size: 0.82rem; font-weight: 700; color: var(--ref-navy); }
+  .t3-v4 .v4-rooms-btns { display: inline-flex; gap: 2px; margin-left: auto; }
+  .t3-v4 .v4-rooms button { position: relative; min-width: 44px; height: 32px; padding: 0 6px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.22); background: #fff; color: var(--ref-navy); font: inherit; font-weight: 800; cursor: pointer; }
+  .t3-v4 .v4-rooms button::after { content: ''; position: absolute; inset: -7px -1px; }
+  .t3-v4 .v4-rooms button[aria-pressed="true"] { background: var(--ref-navy); border-color: var(--ref-navy); color: #fff; }
+  .t3-v4 .v4-book .v4-rooms button { height: 44px; }
+  .t3-v4 .v4-book .v4-rooms button::after { content: none; }
   .t3-v4 .v4-check { list-style: none; margin: 10px 0; padding: 0; border: 1px solid rgba(27,43,58,0.1); border-radius: 14px; }
   .t3-v4 .v4-check li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 6px 10px 6px 6px; border-top: 1px solid rgba(27,43,58,0.08); }
   .t3-v4 .v4-check li:first-child { border-top: 0; }
@@ -194,6 +202,7 @@ const V4_CLIENT_SRC = String.raw`
     if (o.arrive && o.leave) p.push('leave=' + o.leave);
     if (o.adults) p.push('adults=' + o.adults);
     if (o.kids) p.push('kids=' + o.kids);
+    if (o.rooms) p.push('rooms=' + o.rooms);
     if (o.dog) p.push('dog=1');
     if (v4.confirmed) p.push('ok=1');
     return p.length ? (qs ? '&' : '?') + p.join('&') : '';
@@ -225,6 +234,7 @@ const V4_CLIENT_SRC = String.raw`
     if (/^\d{4}-\d{2}-\d{2}$/.test(q.arrive || '')) { any = set('t3Arrive', q.arrive) || any; if (/^\d{4}-\d{2}-\d{2}$/.test(q.leave || '') && q.leave > q.arrive) set('t3Leave', q.leave); }
     if (/^([1-9]|1[0-6])$/.test(q.adults || '')) any = set('t3Adults', q.adults) || any;
     if (/^([0-9]|1[0-2])$/.test(q.kids || '')) any = set('t3Kids', q.kids) || any;
+    if (/^[1-8]$/.test(q.rooms || '')) any = set('t3Rooms', q.rooms) || any;
     if (q.dog === '1') { var dg = document.getElementById('t3Dog'); if (dg) { dg.checked = true; any = true; } }
     if (any) { var box = document.getElementById('t3StayIn'); if (box) box.open = true; }
     if (q.ok === '1') v4.restoreConfirm = true;
@@ -435,7 +445,7 @@ const V4_CLIENT_SRC = String.raw`
       html += '<div class="t3-book-stay">' + (s.photo ? '<img src="' + esc(s.photo) + '" alt="" loading="lazy" width="96" height="96">' : '<span class="t3-stay-nophoto" aria-hidden="true"></span>')
         + '<div class="t3-book-stay-txt"><p class="t3-stay-kicker">' + esc((fr ? 'Où dormir · ' : 'Where to stay · ') + [fr ? (s.kindFr || s.kind) : s.kind, s.regionLabel].filter(Boolean).join(' · ')) + '</p>'
         + '<p class="t3-stay-name">' + (u ? '<a ' + hrefAttr(u) + '>' + esc(s.name) + '</a>' : esc(s.name)) + '</p>' + (facts ? '<p class="t3-stay-facts">' + esc(facts) + '</p>' : '') + t3LiveHtml(s, fr) + '</div>'
-        + (d.others.length ? '<button type="button" class="t3-book-link t3-book-change" data-t3-stay-change aria-expanded="false" aria-controls="t3StayAlts">' + esc(fr ? 'Changer' : 'Change') + '</button>' : '') + '</div>';
+        + (d.others.length ? '<button type="button" class="t3-book-link t3-book-change" data-t3-stay-change aria-expanded="false" aria-controls="t3StayAlts">' + esc(fr ? 'Changer' : 'Change') + '</button>' : '') + '</div>' + v4RoomsHtml(fr);
       if (d.others.length) html += '<ul class="t3-stay-alts" id="t3StayAlts" hidden>' + d.others.map(function(o){
         var ou = safeUrl((fr && o.urlFr) || o.url), of = t3StayFacts(o, fr), why = (o.reasons || [])[0];
         return '<li class="t3-stay-alt"><div><p><strong>' + (ou ? '<a ' + hrefAttr(ou) + '>' + esc(o.name) + '</a>' : esc(o.name)) + '</strong></p><p>' + esc([o.regionLabel, of, why ? (fr ? why.textFr : why.text) : ''].filter(Boolean).join(' · ')) + '</p></div><button type="button" class="t3-btn t3-btn-ghost" data-t3-stay-choose="' + esc(o.id) + '">' + esc(fr ? 'Choisir' : 'Choose') + '</button></li>';
@@ -488,7 +498,7 @@ const V4_CLIENT_SRC = String.raw`
     if (unknown.length) html = html.replace(/<\/div>$/, '') + '<p class="v4-book-unpriced">' + esc(vt('notPriced', { names: unknown.slice(0, 6).join(', ') + (unknown.length > 6 ? ' ' + vt('more', { n: unknown.length - 6 }) : '') })) + '</p></div>';
     // Honest plan (2026-11-22): never a bare total. What the figure leaves out, by name.
     if (html) {
-      var out = [], hasStay = (e.parts || []).some(function(x){ return x && x.key === 'stay'; });
+      var out = [], hasStay = (e.parts || []).some(function(x){ return x && x.key === 'stay'; }), d0 = t3StayData();
       if (!hasStay && chosen && chosen.name) out.push(vt('stayOf', { name: chosen.name }));
       if ((state.last && state.last.days || []).some(function(d){ return (d.stops || []).some(function(s){ return s && s.kind === 'event'; }); })) out.push(vt('tickets'));
       out.push(vt('carEtc')); out.push(vt('taxesEtc'));
@@ -496,6 +506,9 @@ const V4_CLIENT_SRC = String.raw`
       // A partial estimate says who it is for too ("Known costs so far for 6 people").
       if (!e.showTotal) html = html.replace(/(<strong>)(Known costs so far|Coût connu jusqu’ici)(<\/strong>)/, function(m, a, b, c){ return a + b + (fr ? ' pour ' + e.people + (e.people > 1 ? ' personnes' : ' personne') : ' for ' + e.people + (e.people > 1 ? ' people' : ' person')) + c; });
       if (e.peopleAssumed) html = html.replace(/( (?:for|pour) \d+ (?:people|person|personnes?))(<\/strong>)/, '$1' + esc(vt('assumed')) + '$2');
+      // Rooms (2026-11-22): the rooms the links carry, said with the party. The figures are not changed by it.
+      var rl = d0 ? t3RoomsLabel(d0.w.trip || {}, fr) : '';
+      if (rl && !e.showTotal) html = html.replace(/((?:Known costs so far|Coût connu jusqu’ici) (?:for|pour) \d+ (?:people|person|personnes?)(?: \((?:assumed|supposé)\))?)(<\/strong>)/, '$1 · ' + esc(rl) + '$2');
     }
     return html;
   }
@@ -517,27 +530,109 @@ const V4_CLIENT_SRC = String.raw`
     ((p.itinerary && p.itinerary.stops) || (p.outing && p.outing.stops) || []).forEach(function(s){ if (s && s.venue && shown[s.venue.id]) names[s.venue.name] = 1; });
     return names;
   }
+  // Rooms (2026-11-22): the party and the rooms as they stand now: the Dates and guests fields first (Adults, Kids,
+  // Rooms: the room buttons by the stay set the Rooms field), else the plan's own trip. -> { adults, kids, rooms,
+  // assumed, ages } or null when no adult count is known.
+  function v4RoomsState(){
+    var d = typeof t3StayData === 'function' ? t3StayData() : null, t = (d && d.w && d.w.trip) || {};
+    var g = function(id){ var el = document.getElementById(id); return el && /^\d+$/.test(el.value) ? Number(el.value) : null; };
+    var ad = g('t3Adults'), kd = g('t3Kids'), picked = g('t3Rooms');
+    if (kd === null) kd = t.kids || 0;
+    if (ad === null) ad = t.adults || (kd > 0 ? 2 : null);
+    var r = stayRoomsFor(ad, picked !== null ? picked : (t.rooms && !t.roomsAssumed ? t.rooms : null));
+    if (!r) return null;
+    return { adults: ad, kids: kd, rooms: r.rooms, assumed: r.assumed, ages: t.kidAges && t.kidAges.length === kd ? t.kidAges : null };
+  }
   function v4PartyUrl(raw){
     try {
       var g = function(id){ var el = document.getElementById(id); return el && /^\d+$/.test(el.value) ? Number(el.value) : null; };
-      var ad = g('t3Adults'), kd = g('t3Kids');
-      if (ad === null && kd === null) return raw;
-      if (ad === null && kd > 0) ad = 2;
+      // Nothing set on the page: the link is the server's own (built with the same rule).
+      if (g('t3Adults') === null && g('t3Kids') === null && g('t3Rooms') === null) return raw;
+      var st = v4RoomsState();
+      if (!st) return raw;
+      var ad = st.adults, kd = g('t3Kids') !== null ? st.kids : null, rooms = st.rooms;
       var u = new URL(raw), h = u.hostname.replace(/^www\./, ''), q = u.searchParams;
       if (/(^|\.)booking\.com$/.test(h) && /^\/hotel\//.test(u.pathname)) {
-        if (ad) q.set('group_adults', String(ad));
+        q.set('group_adults', String(ad));
         if (kd !== null) { if (Number(q.get('group_children') || 0) !== kd) q.delete('age'); q.set('group_children', String(kd)); }
+        q.set('no_rooms', String(rooms));
       } else if (/(^|\.)expedia\.(ca|com)$/.test(h)) {
-        var rm = q.get('rm1') || '', ages = rm.indexOf(':c') !== -1 ? rm.slice(rm.indexOf(':c')) : '';
-        if (ad && (!ages || ages.split(':c').length - 1 === kd)) q.set('rm1', 'a' + ad + ages);
+        // One rmN per room; the children only with their ages (as typed in the request), else the adults alone.
+        var had = 0, keys = [];
+        q.forEach(function(v, k){ if (/^rm\d+$/.test(k)) { keys.push(k); had += v.split(':c').length - 1; } });
+        var ages = st.ages && (kd === null || kd === st.ages.length) && (had === st.ages.length || kd !== null) ? st.ages : [];
+        keys.forEach(function(k){ q.delete(k); });
+        stayRoomSplit(ad, ages, rooms).forEach(function(r, i){ q.set('rm' + (i + 1), 'a' + r.adults + r.ages.map(function(a){ return ':c' + a; }).join('')); });
       } else if (/(^|\.)stay22\.com$/.test(h)) {
-        if (ad) q.set('adults', String(ad));
-        if (kd !== null) q.set('children', String(kd));
+        q.set('adults', String(ad));
+        if (kd !== null) { if (Number(q.get('children') || 0) !== kd) q.delete('childrenAges'); q.set('children', String(kd)); }
+        q.set('rooms', String(rooms));
         if (q.get('link')) q.set('link', v4PartyUrl(q.get('link')));
       } else return raw;
       return u.toString();
     } catch (e) { return raw; }
   }
+  // "3 rooms (assumed)  1 2 3 4+": the rooms, said and changed in one short row by the stay (the plan's card and the
+  // Book my trip sheet). Shown when it matters (stayRoomsMatter) or once a number was picked or said. "4+" is 4, then
+  // one more with each tap, up to one room per adult (8 at most).
+  function v4RoomsHtml(fr){
+    var st = v4RoomsState();
+    if (!st || !(stayRoomsMatter(st.adults, st.kids, st.rooms) || !st.assumed || st.rooms > 1)) return '';
+    var max = Math.min(8, st.adults), n = Math.min(4, max), html = '', i;
+    var label = (fr ? st.rooms + (st.rooms > 1 ? ' chambres' : ' chambre') : st.rooms + (st.rooms > 1 ? ' rooms' : ' room')) + (st.assumed ? vt('assumed') : '');
+    for (i = 1; i <= n; i++) {
+      var more = i === 4 && max > 4, on = more ? st.rooms >= 4 : st.rooms === i, txt = more ? (st.rooms > 4 ? String(st.rooms) : '4+') : String(i);
+      var say = more ? (fr ? (st.rooms >= 4 ? st.rooms + ' chambres; touchez pour en ajouter une' : '4 chambres ou plus') : (st.rooms >= 4 ? st.rooms + ' rooms; tap to add one' : '4 rooms or more')) : (fr ? i + (i > 1 ? ' chambres' : ' chambre') : i + (i > 1 ? ' rooms' : ' room'));
+      html += '<button type="button" data-v4-rooms="' + (more ? 'more' : i) + '" aria-pressed="' + (on ? 'true' : 'false') + '" aria-label="' + esc(say) + '">' + esc(txt) + '</button>';
+    }
+    return '<div class="v4-rooms" role="group" aria-label="' + esc(fr ? 'Combien de chambres ?' : 'How many rooms?') + '"><span class="v4-rooms-now" data-v4-rooms-now>' + esc(label) + '</span><span class="v4-rooms-btns">' + html + '</span></div>';
+  }
+  // The one line by the stay's button for a party of three or more (and what to do on a hotel's own site, which we
+  // cannot pre-fill). Never a word about availability or how many a room sleeps.
+  function v4RoomsNote(s, fr){
+    var st = v4RoomsState(), first = ((s && s.bookingLinks) || [])[0];
+    if (!st || !first) return '';
+    var out = [];
+    if (st.rooms > 1 && (first.key === 'own' || first.key === 'search')) out.push(fr ? 'Site de l’hôtel : indiquez ' + st.rooms + ' chambres sur place.' : 'Hotel’s own site: enter ' + st.rooms + ' rooms there.');
+    var d = t3StayData(), dated = !!(d && d.w && d.w.trip && d.w.trip.datesGiven);
+    if (first.key === 'expedia' && !dated && st.adults + st.kids !== 2) out.push(fr ? 'Expedia n’affiche vos voyageurs et vos chambres qu’une fois les dates choisies : entrez-les sur place.' : 'Expedia shows your guests and rooms only once dates are picked: enter them there.');
+    if (st.adults + st.kids >= 3) out.push(fr ? 'Les chambres et leur capacité sont confirmées sur le site de réservation.' : 'Rooms and how many each sleeps are confirmed on the booking site.');
+    return out.join(' ');
+  }
+  function v4SetRooms(n){
+    var st = v4RoomsState(); if (!st) return;
+    n = Math.max(1, Math.min(n, Math.min(8, st.adults)));
+    var el = document.getElementById('t3Rooms'); if (el) { el.value = String(n); el.setAttribute('data-v4-auto', '1'); }
+    var d = t3StayData(); if (d && d.w && d.w.trip) { d.w.trip.rooms = n; delete d.w.trip.roomsAssumed; }
+  }
+  // A number picked by the room buttons or the chat belongs to that trip: a NEW request starts without it (the Rooms
+  // field is not on screen in the chat layout). A number the visitor set in the field itself stays, like Adults.
+  document.addEventListener('change', function(e){ if (e.target && (e.target.id === 't3Rooms' || e.target.id === 't3Adults')) e.target.removeAttribute('data-v4-auto'); });
+  document.addEventListener('submit', function(e){
+    if (!e.target || e.target.id !== 't3Form') return;
+    var el = document.getElementById('t3Rooms');
+    if (el && el.getAttribute('data-v4-auto')) { el.value = ''; el.removeAttribute('data-v4-auto'); }
+    // The same for a number of adults the chat set ("we are 4 adults" stayed on a later "weekend for two").
+    var ad = document.getElementById('t3Adults');
+    if (ad && ad.getAttribute('data-v4-auto')) { ad.value = ''; ad.removeAttribute('data-v4-auto'); if (typeof chat !== 'undefined' && chat) chat.adults = null; }
+  }, true);
+  document.addEventListener('click', function(e){
+    var b = e.target && e.target.closest ? e.target.closest('[data-v4-rooms]') : null;
+    if (!b) return;
+    var st = v4RoomsState(); if (!st) return;
+    var v = b.getAttribute('data-v4-rooms'), max = Math.min(8, st.adults);
+    var n = v === 'more' ? (st.rooms < 4 || st.assumed ? 4 : st.rooms >= max ? 4 : st.rooms + 1) : Number(v);
+    var inSheet = !!b.closest('#v4Sheet');
+    v4SetRooms(n);
+    if (typeof chat !== 'undefined' && chat) { chat.rendering = true; try { render(false); } finally { chat.rendering = false; } } else { try { render(false); } catch (err) {} }
+    // The plan was drawn again (and the sheet with it): a pick made in the sheet leaves the sheet open, on the same row.
+    var dlg = document.getElementById('v4Sheet'), card = dlg && dlg.querySelector('[data-t3-stay]');
+    if (card) card.outerHTML = t3StayCardHtml();
+    if (inSheet && dlg && !dlg.open) { if (typeof dlg.showModal === 'function') { try { dlg.showModal(); } catch (err) { dlg.setAttribute('open', ''); } } else dlg.setAttribute('open', ''); }
+    syncUrl();
+    var back = (inSheet ? document.getElementById('v4Sheet') : resultEl).querySelector('[data-v4-rooms="' + (v === 'more' ? 'more' : n) + '"]');
+    if (back) { try { back.focus({ preventScroll: true }); } catch (err) {} }
+  });
   function v4RemovedIds(){ var ids = {}, p = state.last || {}; (p.days || []).forEach(function(d){ (d.stops || []).forEach(function(s){ if (s.venue && state.removed[d.day + '-' + s.daypart]) ids[s.venue.id] = 1; }); }); Object.keys(v4.gone || {}).forEach(function(id){ if (v4.gone[id]) ids[id] = 1; }); return ids; }
   function v4CanBook(){ return t3BookSteps().length > 0 || v4ReserveRows([]).length > 0 || !!t3StayData(); }
   function v4OpenSheet(){
@@ -572,7 +667,10 @@ const V4_CLIENT_SRC = String.raw`
     var p = state.last || {}, out = '', rows = p.schedule || [], sug = {};
     try {
       var d0 = (p.days || [])[0];
-      if (p.datesGiven && d0 && /^\d{4}-\d{2}-\d{2}$/.test(d0.date || '')) out += '&start=' + d0.date;
+      // Rooms round (2026-11-22: "Family weekend…" shared its stay links with Nov 28-29 though the stay said "Dates not
+      // set"): a "weekend" the planner dated by itself is not the visitor's dates, so the copy carries none either.
+      var sd0 = typeof t3StayData === 'function' ? t3StayData() : null, stayNoDates = !!(sd0 && sd0.w && sd0.w.trip && sd0.w.trip.datesGiven === false);
+      if (p.datesGiven && !stayNoDates && d0 && /^\d{4}-\d{2}-\d{2}$/.test(d0.date || '')) out += '&start=' + d0.date;
       var times = list.map(function(x){
         var m = /^(venue|event):(\d+)$/.exec(x.ref), id = m ? Number(m[2]) : 0;
         var r = rows.filter(function(q){ return (!x.day || q.day === x.day || q.day === undefined) && (m && m[1] === 'venue' ? q.venueId === id : q.eventId === id); })[0];
@@ -583,6 +681,10 @@ const V4_CLIENT_SRC = String.raw`
       if (sd && sd.chosen && sd.chosen.id > 0) out += '&stay=' + sd.chosen.id + (t.nights > 0 ? '&nights=' + t.nights : '');
       if (t.adults > 0) out += '&ad=' + t.adults + (t.adultsAssumed ? '&aa=1' : '');
       if (t.kids > 0) out += '&kids=' + t.kids;
+      // The children's ages as typed (ka=6,9), so the copy's stay links ask for the same party; never a guessed age.
+      if (t.kids > 0 && t.kidAges && t.kidAges.length === t.kids) out += '&ka=' + t.kidAges.join(',');
+      // Rooms (2026-11-22): rm=3, with ra=1 while the number is our assumption.
+      if (t.rooms > 0 && t.adults > 0) out += '&rm=' + t.rooms + (t.roomsAssumed ? '&ra=1' : '');
       (p.dateSuggestions || []).slice(0, 2).forEach(function(x){ if (x && x.id > 0) sug['event:' + x.id] = 1; });
       if (Object.keys(sug).length) out += '&sug=' + Object.keys(sug).join(',');
       var asks = (p.evidence || []).map(function(e){ return e && /^count:/.test(e.ask || '') && e.asked > 0 ? e.ask + ':' + e.asked : e && e.ask; }).filter(function(a){ return a && /^[a-z_:0-9]+$/.test(a); }).slice(0, 12);

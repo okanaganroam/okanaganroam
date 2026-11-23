@@ -1015,6 +1015,7 @@ function t3StayInputsHtml() {
             <label><span><span class="t3-en">Leave</span><span class="t3-fr" lang="fr">Départ</span></span><input type="date" id="t3Leave"></label>
             <label><span><span class="t3-en">Adults</span><span class="t3-fr" lang="fr">Adultes</span></span><select id="t3Adults">${opts(1, 16)}</select></label>
             <label><span><span class="t3-en">Kids</span><span class="t3-fr" lang="fr">Enfants</span></span><select id="t3Kids">${opts(0, 12)}</select></label>
+            <label><span><span class="t3-en">Rooms</span><span class="t3-fr" lang="fr">Chambres</span></span><select id="t3Rooms">${opts(1, 8)}</select></label>
             <label class="t3-stay-dog"><input type="checkbox" id="t3Dog"><span><span class="t3-en">Bringing a dog</span><span class="t3-fr" lang="fr">Avec un chien</span></span></label>
           </div>
         </details>
@@ -1023,7 +1024,8 @@ function t3StayInputsHtml() {
 // Browser code for the row and the "Where to stay" card (shipped only while the flag is on). The card reads the raw
 // plan (state.last.whereToStay), never the copy with times and dates rewritten for display.
 const T3_STAY_CLIENT_SRC = `
-  var T3_STAY_DISCLOSURE = ${JSON.stringify(require('./places-to-stay').DISCLOSURE)};` + String.raw`
+  var T3_STAY_DISCLOSURE = ${JSON.stringify(require('./places-to-stay').DISCLOSURE)};
+${require('./stay-booking-links').ROOMS_CLIENT_SRC}` + String.raw`
   var stayChoice = null;
   function t3StayInput(){
     var g = function(id){ var el = document.getElementById(id); return el ? el.value : ''; };
@@ -1032,6 +1034,7 @@ const T3_STAY_CLIENT_SRC = `
     if (o.arrive && /^\d{4}-\d{2}-\d{2}$/.test(l)) o.leave = l;
     if (/^\d+$/.test(ad)) o.adults = Number(ad);
     if (/^\d+$/.test(k)) o.kids = Number(k);
+    var rm = g('t3Rooms'); if (/^[1-8]$/.test(rm)) o.rooms = Number(rm);
     var dg = document.getElementById('t3Dog'); if (dg && dg.checked) o.dog = true;
     return Object.keys(o).length ? o : null;
   }
@@ -1074,8 +1077,16 @@ const T3_STAY_CLIENT_SRC = `
     if (t.adults) who.push((fr ? t.adults + (t.adults > 1 ? ' adultes' : ' adulte') : t.adults + (t.adults > 1 ? ' adults' : ' adult')) + (t.adultsAssumed ? (fr ? ' (supposé)' : ' (assumed)') : ''));
     if (t.kids) who.push(fr ? t.kids + (t.kids > 1 ? ' enfants' : ' enfant') : t.kids + (t.kids > 1 ? ' kids' : ' kid'));
     if (who.length) parts.push(who.join(', '));
+    var rl = t3RoomsLabel(t, fr); if (rl) parts.push(rl);
     if (t.dog) parts.push(fr ? 'chien' : 'dog');
     return parts.join(' · ');
+  }
+  // Rooms (2026-11-22): "3 rooms (assumed)" until the visitor picks or says a number; "2 rooms" after. Said only when
+  // it matters (3 or more adults, more than 4 people to a room), when it was picked or said, or when it is more than one.
+  function t3RoomsLabel(t, fr){
+    if (!t || !(t.rooms >= 1)) return '';
+    if (t.roomsAssumed && t.rooms === 1 && !stayRoomsMatter(t.adults, t.kids, t.rooms)) return '';
+    return (fr ? t.rooms + (t.rooms > 1 ? ' chambres' : ' chambre') : t.rooms + (t.rooms > 1 ? ' rooms' : ' room')) + (t.roomsAssumed ? (fr ? ' (supposé)' : ' (assumed)') : '');
   }
   function t3StayExt(u){ return typeof u === 'string' && /^https:\/\/[^\s"'<>]+$/.test(u) ? u : null; }
   function t3StayLinkHtml(s, l, cls, text){
@@ -1194,6 +1205,12 @@ const T3_STAY_CLIENT_SRC = `
     if (!t.datesGiven) bits.push(fr ? 'Pas encore de dates : choisissez-les ici ou sur le site de réservation.' : 'No dates yet: pick them here or on the booking site.');
     if (prefilled && t.kids && !(t.kidAges && t.kidAges.length === t.kids)) bits.push(fr ? 'Le site demande l’âge des enfants.' : 'The booking site asks for the kids’ ages.');
     if (s.petsSome) bits.push(fr ? 'Animaux dans certaines chambres : à vérifier.' : 'Pets in some rooms: check when booking.');
+    // Rooms (2026-11-22): nothing here says the place can sleep the group, in one room or in several.
+    var first = (s.bookingLinks || [])[0];
+    if (t.rooms > 1 && first && (first.key === 'own' || first.key === 'search')) bits.push(fr ? 'Site de l’hôtel : indiquez ' + t.rooms + ' chambres sur place.' : 'Hotel’s own site: enter ' + t.rooms + ' rooms there.');
+    // Expedia with no dates opens with its own default party (seen 2026-11-22), whatever the link says.
+    if (first && first.key === 'expedia' && !t.datesGiven && (t.adults || 0) + (t.kids || 0) !== 2) bits.push(fr ? 'Expedia n’affiche vos voyageurs et vos chambres qu’une fois les dates choisies : entrez-les sur place.' : 'Expedia shows your guests and rooms only once dates are picked: enter them there.');
+    if ((t.adults || 0) + (t.kids || 0) >= 3 && first) bits.push(fr ? 'Les chambres et leur capacité sont confirmées sur le site de réservation.' : 'Rooms and how many each sleeps are confirmed on the booking site.');
     if (bits.length) html = '<p class="t3-book-note">' + esc(bits.join(' ')) + '</p>';
     return html;
   }

@@ -313,7 +313,7 @@ test('page: a message typed while waiting is queued; no "When are you coming?" w
   assert.doesNotMatch(html, /inEl\.disabled = true/, 'the box stays usable while waiting');
   assert.match(html, /if \(q\) setTimeout\(function\(\)\{ chatSend\(q\.message, q\.chip, q\.label, q\.confirmed\); \}, 0\);/);
   assert.match(html, /!chat\.askedWhen && !v4\.confirmed && !chatHasDates\(\)/);
-  assert.match(html, /known \? tripIn : \{ adults: tripIn\.adults, kids: tripIn\.kids, dog: tripIn\.dog \}/);
+  assert.match(html, /known \? tripNoRooms : \{ adults: tripIn\.adults, adultsAssumed: tripIn\.adultsAssumed, kids: tripIn\.kids, dog: tripIn\.dog \}/);
   assert.match(html, /I couldn’t fit \{what\} on these dates; tell me if you’d like me to try another day\./);
   assert.match(html, /announce = function\(text\)\{ announceBase\(text\); if \(text && !chat\.busy\) \{ chatShow\('', text, \{\}\);/);
   assert.match(html, /I couldn’t plan those dates\. Your plan is unchanged\./);

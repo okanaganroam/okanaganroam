@@ -188,7 +188,7 @@ test('the card: sleeps, price band, links, reasons in English and French; whereT
   const s = stay({ id: 7, km: 2.14, photo: '/images/venues/a.jpg', info: { max_guests: 6, price_level: 3, kid_friendly: true } });
   const w = ts.whereToStay(plan(), { arrive: '2026-07-10', leave: '2026-07-13', adults: 2, kids: 2 }, [s], '2026-07-01');
   assert.equal(w.stayId, 7);
-  assert.deepEqual(w.trip, { arrive: '2026-07-10', leave: '2026-07-13', nights: 3, adults: 2, kids: 2, dog: false, datesGiven: true });
+  assert.deepEqual(w.trip, { arrive: '2026-07-10', leave: '2026-07-13', nights: 3, adults: 2, kids: 2, rooms: 1, roomsAssumed: true, dog: false, datesGiven: true });
   assert.equal(w.pick.sleeps, 6);
   assert.equal(w.pick.priceBand, '$$$');
   assert.equal(w.pick.photo, '/images/venues/a.jpg');
