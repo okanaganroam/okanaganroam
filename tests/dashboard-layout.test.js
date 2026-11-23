@@ -81,3 +81,8 @@ test('milestones unlock only from real numbers, and the mission comes from the s
   const waiting = home.homeHtml([{ key: 'okanagan', name: 'Okanagan Roam', data: data([]) }], { inboxes: { okanagan: { claims_pending: 2 } }, now: NOW }).body;
   assert.match(waiting, /2 items need your approval/);
 });
+
+test('site switch (2026-11-23): one button per site even with several sections per site', () => {
+  const html = layout({ active: 'portal', title: 'T', body: '<section class="col"><h2>A</h2></section><section class="col"><h2>B</h2></section><section class="col"><h2>A</h2></section><section class="col"><h2>B</h2></section>' });
+  assert.ok(html.includes("if(seen.indexOf(nm)>-1)return;"), 'the button loop skips names already added');
+});

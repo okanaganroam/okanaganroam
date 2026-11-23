@@ -150,7 +150,8 @@ const SCRIPT = `<script>(function(){
   function name(c){var h=c.querySelector('h2');return h?h.firstChild.textContent.trim():'Site';}
   var saved=null;try{saved=localStorage.getItem('dashSite');}catch(e){}
   function show(n){cols.forEach(function(c){c.hidden=name(c)!==n;});[].forEach.call(host.children,function(b){b.setAttribute('aria-pressed',b.textContent===n?'true':'false');});try{localStorage.setItem('dashSite',n);}catch(e){}}
-  cols.forEach(function(c){var b=document.createElement('button');b.type='button';b.textContent=name(c);b.addEventListener('click',function(){show(b.textContent);});host.appendChild(b);});
+  // One button per site, even when a page has several sections for the same site (Business portal, 2026-11-23).
+  var seen=[];cols.forEach(function(c){var nm=name(c);if(seen.indexOf(nm)>-1)return;seen.push(nm);var b=document.createElement('button');b.type='button';b.textContent=nm;b.addEventListener('click',function(){show(b.textContent);});host.appendChild(b);});
   var names=cols.map(name);show(names.indexOf(saved)>-1?saved:names[0]);
 })();</script>`;
 
