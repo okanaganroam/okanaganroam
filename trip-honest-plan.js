@@ -135,15 +135,16 @@ function suggestionOf(e) {
     kind: 'event', id: e.id, name: e.name, venueName: e.venueName || null, region: e.region || null, regionLabel: e.regionLabel || null,
     url: e.url || null, ...(e.urlFr ? { urlFr: e.urlFr } : {}), startDate: e.startDate || null, endDate: e.endDate || null,
     dateLabel: e.dateLabel || e.startDate || '', ...(e.dateLabelFr ? { dateLabelFr: e.dateLabelFr } : {}), time: e.time || null, ...(e.timeFr ? { timeFr: e.timeFr } : {}),
-    categories: e.categories || [], ...(e.photo ? { photo: e.photo } : {}),
+    categories: e.categories || [], ...(e.photo ? { photo: e.photo } : {}), ...(e.otherDates ? { otherDates: true } : {}),
   };
   return labelSuggestion(out);
 }
 // "Suggestion · Tue Nov 24 only": the event's own date, never a day of the plan.
 function labelSuggestion(x) {
   const dl = x.dateLabel || x.startDate || '', dlFr = x.dateLabelFr || dl;
-  x.label = dl ? `Suggestion · ${dl} only` : 'Suggestion · check the date';
-  x.labelFr = dlFr ? `Suggestion · ${dlFr} seulement` : 'Suggestion · vérifiez la date';
+  // "only" is said of an event with one date; one that repeats says so (otherDates).
+  x.label = dl ? `Suggestion · ${dl}${x.otherDates ? ' and other dates' : ' only'}` : 'Suggestion · check the date';
+  x.labelFr = dlFr ? `Suggestion · ${dlFr}${x.otherDates ? ' et d’autres dates' : ' seulement'}` : 'Suggestion · vérifiez la date';
   return x;
 }
 

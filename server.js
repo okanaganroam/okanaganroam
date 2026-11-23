@@ -11890,7 +11890,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     // events (the coming 30 days) are kept as dated suggestions instead (plan.dateSuggestions).
     if (v4 && !requirements.startDate && !intent.when && !selectedNamedEvent) {
       try {
-        const today = todayLocal(now), wide = resolveWhatsOnWindow({ from: today, to: addLocalDays(today, 30) }, now);
+        const today = todayLocal(now), wide = resolveWhatsOnWindow({ from: addLocalDays(today, 1), to: addLocalDays(today, 30) }, now);
         undatedEventOffer = withoutEndedOccurrenceItems(tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(wide), [], categories), intent.excluded), wide.from, wide.to), now);
       } catch (e) { undatedEventOffer = itineraryEvents; }
       itineraryEvents = [];
@@ -12116,7 +12116,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
           // "a weekend": Friday to Sunday events first; then the soonest.
           .sort((a, b) => (/\bweek-?ends?\b|fin de semaine/i.test(String(text || '')) ? ([5, 6, 0].includes(localWeekday(a.startDate)) ? 0 : 1) - ([5, 6, 0].includes(localWeekday(b.startDate)) ? 0 : 1) : 0) || String(a.startDate || '').localeCompare(String(b.startDate || '')) || String(a.time || '').localeCompare(String(b.time || '')))
           .filter((e) => (seen.has(e.id) ? false : seen.add(e.id))).slice(0, 2);
-        if (picks.length) plan.dateSuggestions = picks.map((e) => tripHonestPlan.suggestionOf(tripPlannerModule().eventOnDay ? tripPlannerModule().eventOnDay(e, e.startDate) : e));
+        if (picks.length) plan.dateSuggestions = picks.map((e) => tripHonestPlan.suggestionOf({ ...(tripPlannerModule().eventOnDay ? tripPlannerModule().eventOnDay(e, e.startDate) : e), ...(undatedEventOffer.filter((o) => o.id === e.id).length > 1 ? { otherDates: true } : {}) }));
       } catch (e) { /* no suggestion */ }
     }
   }
@@ -53971,11 +53971,11 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
     try {
       const e = db.prepare('SELECT * FROM events WHERE id = ?').get(Number(ref.split(':')[1]));
       if (!e || !REGION_LABELS[e.region] || !e.slug) continue;
-      const occ = tripEventOccurrences(e.id, now)[0];
+      const occs = tripEventOccurrences(e.id, now), occ = occs[0];
       if (!occ) continue;
       const dl = new Date(`${occ.d}T12:00:00Z`).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
       const clock = Number.isFinite(occ.s) ? (fr ? `${Math.floor(occ.s / 60)} h${occ.s % 60 ? ` ${String(occ.s % 60).padStart(2, '0')}` : ''}` : `${(Math.floor(occ.s / 60) % 12) || 12}${occ.s % 60 ? `:${String(occ.s % 60).padStart(2, '0')}` : ''} ${occ.s >= 720 ? 'PM' : 'AM'}`) : '';
-      out.suggestions.push({ ref, name: e.name, url: fr ? frHref(`/${e.region}/events/${e.slug}`) : `/${e.region}/events/${e.slug}`, label: fr ? `Suggestion · ${dl} seulement` : `Suggestion · ${dl} only`, meta: [clock, REGION_LABELS[e.region]].filter(Boolean).join(' · ') });
+      out.suggestions.push({ ref, name: e.name, url: fr ? frHref(`/${e.region}/events/${e.slug}`) : `/${e.region}/events/${e.slug}`, label: fr ? `Suggestion · ${dl}${occs.length > 1 ? ' et d’autres dates' : ' seulement'}` : `Suggestion · ${dl}${occs.length > 1 ? ' and other dates' : ' only'}`, meta: [clock, REGION_LABELS[e.region]].filter(Boolean).join(' · ') });
     } catch (e) { /* skip */ }
   }
   // The evidence, worked out again from the listings as they are now.
