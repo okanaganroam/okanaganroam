@@ -3042,6 +3042,9 @@ en.outdoor = sportStrings(en.sport, {
   menuFreeSub: 'Anything that costs extra, like rentals or tours? Optional',
   menuLeadFree: 'It’s free, so you can skip this. Anything that costs extra, like rentals or tours? A photo of the price list or a link is perfect.',
   menuTypeSub: 'Each pass, rental, site or ticket and its price, one line at a time',
+  // A campground's or a ski hill's guests stay the day or the night: the longest answer says so.
+  tlengthQ: 'How long do most visits last?', tlengths: { '1h': 'Up to 1 hour', '1-2h': '1 to 2 hours', '2-3h': '2 to 3 hours', half: 'Half a day or more, or overnight' },
+  tlengthNeed: 'Please tap how long most visits last.',
 });
 fr.outdoor = sportStrings(fr.sport, {
   tpriceMore: 'Vos autres prix (enfants, laissez-passer, location, tarifs à la semaine) vont dans « Vos tarifs », le premier des détails facultatifs.',
@@ -3055,6 +3058,8 @@ fr.outdoor = sportStrings(fr.sport, {
   menuFreeSub: 'Quelque chose coûte en plus, comme la location ou les visites? Facultatif',
   menuLeadFree: 'C’est gratuit, vous pouvez donc passer. Quelque chose coûte en plus, comme la location ou les visites? Une photo de la liste de prix ou un lien, c’est parfait.',
   menuTypeSub: 'Chaque laissez-passer, location, emplacement ou billet et son prix, une ligne à la fois',
+  tlengthQ: 'Combien de temps dure la plupart des visites?', tlengths: { '1h': 'Jusqu’à 1 heure', '1-2h': '1 à 2 heures', '2-3h': '2 à 3 heures', half: 'Une demi-journée ou plus, ou une nuit' },
+  tlengthNeed: 'Touchez combien de temps dure la plupart des visites.',
 });
 (function frSpacesOutdoor(o) {
   for (const k of Object.keys(o)) {

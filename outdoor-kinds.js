@@ -51,7 +51,7 @@ K.waterpark = kind({ bookBtn: ['Buy passes', 'Acheter des laissez-passer'], day:
     prices: { noun: 'liste de prix', page: PRICES_PAGE[1], lead: 'Les laissez-passer à l’heure, à la journée, pour enfants, familiaux et de saison, avec leurs prix. Une photo de votre tableau des prix ou un lien vers celui-ci, c’est parfait. C’est facultatif.' },
     help: { walkin: 'Réservez une heure en ligne les jours achalandés; sans réservation s’il y a de la place', ages: '6 ans et plus; moins de 12 ans avec un adulte; gilet de sauvetage pour tous', gift: 'Cartes-cadeaux en ligne', prices: 'Une heure 25 $, journée 55 $' },
     groups: { chips: ['Fêtes d’anniversaire', 'Groupes de camp et scolaires', 'Réservation privée du parc'], lead: 'Touchez une taille, puis ajoutez les fêtes, les camps ou les réservations privées dans vos mots.', ex: 'Fêtes d’anniversaire jusqu’à 15 personnes' },
-    search: ['parc aquatique', 'parc aquatique flottant', 'glissades d’eau', 'jeux d’eau'] } });
+    search: ['parc aquatique', 'parc aquatique flottant', 'jeux d’eau'] } });
 
 K.adventurepark = kind({ bookBtn: ['Book now', 'Réserver'], day: true, gtk: 'adventurepark', ex: 'adventurepark', season: 'summer', planner: 'outdoor',
   en: { price: { page: 'From {x}.', basis: 'One person', label: 'Your lowest price for one person, in dollars', ph: '', lead: 'Your lowest price for one person: one zipline, one course or a kids’ pass. Combos and family rates go in your price list. It shows on your card.' },

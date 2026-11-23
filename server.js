@@ -29023,7 +29023,8 @@ function indoorVisitLines(venue, info) {
     out.Season = '';
     if (shut.length) out.Season = { en: `All year except ${shut.map((c) => indoorMdRange(c.from, c.to, false)).join(' and ')}.`, fr: `Toute l’année, sauf ${shut.map((c) => indoorMdRange(c.from, c.to, true)).join(' et ')}.` };
   }
-  if (INDOOR_LENGTHS.includes(t.length)) out['Time needed'] = { en: INDOOR_LENGTH_LINES[t.length][0], fr: INDOOR_LENGTH_LINES[t.length][1] };
+  // Outdoor businesses (2026-11-23): a campground's guests stay the night, so its page has no Time needed line.
+  if (INDOOR_LENGTHS.includes(t.length) && !((t.kinds || [])[0] === 'camp' && venue.type === 'outdoor')) out['Time needed'] = { en: INDOOR_LENGTH_LINES[t.length][0], fr: INDOOR_LENGTH_LINES[t.length][1] };
   // Sport test 7: a sport or golf owner who skipped the Price step: her lowest plain regular line (THE SPORT HEADLINE RULE).
   const free = tourFreeOf(t), price = typeof t.price === 'number' && t.price > 0 ? t.price : (venue && sportSetupType(venue.type) ? sportSkippedPrice(venue.id) : null);
   if (free === 'donation') out.Prices = { en: indoorDonationLine(t.suggested, false), fr: indoorDonationLine(t.suggested, true) };
@@ -47183,6 +47184,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
   const golfKindsLine = (() => { try { if (venue.type !== 'golf' || (venueIndoorInfo(venue.id).kinds || []).length < 2 || !/&/.test(String(venue.cuisine || ''))) return null; const c = venueCuisineList(venue)[0]; return c ? (fr ? frCuisineShown(c) || null : c) : null; } catch (e) { return null; } })();
   const golfKindLabel = golfKindsLine ? golfKindsLine
     : venue.type === 'golf' && sportKindSingular(venue, fr) && (venueIndoorInfo(venue.id).kinds || []).length ? sportKindSingular(venue, fr)
+    // Outdoor businesses (2026-11-23): an owner's kind names the place ("Campground", "Water rentals"), not "Outdoor Destination".
+    : venue.type === 'outdoor' && OUTDOOR_SETUP_ON && (venueIndoorInfo(venue.id).kinds || []).length && sportKindSingular(venue, fr) ? sportKindSingular(venue, fr)
     : (venue.type === 'golf' && isIndoorGolfVenue(venue)) ? L('Indoor Golf', 'Golf int\u00e9rieur')
     : (golfData && golfData.isPracticeFacility(golfDetail)) ? L('Driving Range & Practice', 'Champ de pratique')
     // Indoor test 9: a French indoor page's hero says its category (« Aire de jeux intérieure »), as its top line does.
@@ -66085,7 +66088,7 @@ function renderOwnerSetupPage(found, opts) {
       allSteps: INDOOR_SETUP_PART1.concat(INDOOR_SETUP_PART2), feeLiveMax: INDOOR_PRICE_LIVE_MAX, bringMax: TOUR_GOOD_TO_KNOW_MAX, groupsMax: sportSetupType(venue.type) ? KIND_GROUPS_MAX : 180,
       indoorKinds: (sport ? sportKindsShownFor(venue.type) : INDOOR_KINDS_SHOWN).map((k) => ({ k, t: INDOOR_KIND_LABELS_OWNER[k][fr ? 1 : 0] })), indoorKindsTop: sport ? sportKindsShownFor(venue.type).length : INDOOR_KINDS_TOP, sportMain: sport ? (() => { try { return sportMainKind(venue) || indoorKindsModule.sportKindSuggestion(venue)[0] || ''; } catch (e) { return ''; } })() : '',
       // Sport and golf (2026-11-20): the sport words, each kind's usual season (the Hours step's hint) and its fallback kind.
-      sport, kindSeasons: sport ? Object.fromEntries(SPORT_KINDS.map((k) => [k, indoorKindsModule.indoorKindText([k], 'en').season || ''])) : {}, otherKind: sport ? sportOtherKind(venue.type) : 'other',
+      sport, kindSeasons: sport ? Object.fromEntries(SPORT_KINDS_MOD.ENGINE_KINDS.map((k) => [k, indoorKindsModule.indoorKindText([k], 'en').season || ''])) : {}, otherKind: sport ? sportOtherKind(venue.type) : 'other',
       // Indoor test 2: the card's short words for each kind, for the preview ("Escape room · arcade, VR & laser tag").
       indoorKindWords: Object.fromEntries(Object.entries(INDOOR_KIND_WORDS).map(([k, w]) => [k, (indoorKindsModule.indoorKindLabel(k, indoorOwnWords(venue.id)) || w)[fr ? 1 : 0]])),
       // Indoor test 17: the waiver chip's verb for her kind ("before you climb").
@@ -66113,7 +66116,7 @@ function renderOwnerSetupPage(found, opts) {
       bookShows: { waiver: INDOOR_WAIVER_URL_RE.source, party: INDOOR_PARTY_WORDS_RE.source,
         words: Object.fromEntries(Object.entries(indoorKindsModule.INDOOR_BOOK_BUTTONS).map(([k, w]) => [k, w[fr ? 1 : 0]])),
         // Sport (2026-11-20): each kind's own button ("Book a tee time") when people book ahead.
-        kindBtn: sport ? Object.fromEntries(SPORT_KINDS.map((k) => [k, (indoorKindsModule.indoorKindText([k], 'en').bookBtn || [])[fr ? 1 : 0] || ''])) : {},
+        kindBtn: sport ? Object.fromEntries(SPORT_KINDS_MOD.ENGINE_KINDS.map((k) => [k, (indoorKindsModule.indoorKindText([k], 'en').bookBtn || [])[fr ? 1 : 0] || ''])) : {},
         // Sport test 3: a bay booking link (Trackman, an AlleyTrak page) of a place with simulators among its kinds says "Book a bay".
         bay: sport ? { re: SPORT_BAY_URL_RE.source, word: indoorKindsModule.SPORT.K.simgolf.bookBtn[fr ? 1 : 0] } : null,
         kind: (() => { const k = indoorKindsModule.indoorKindText(venueIndoorInfo(venue.id).kinds || indoorKindSuggestion(venue), 'en'); return k.ticketed ? 'shows' : k.classKind ? 'classes' : k.kind === 'kids' ? 'kids' : ''; })(),
@@ -68632,7 +68635,7 @@ function indoorKindHelpTopics(topics, kinds, price = null, low = null, free = nu
     // Sport test 3 (2026-11-20; Gord: the price screen said "When one of them is lower, your card shows that one" while the
     // price list's Help said kids' prices never become the card's price, which is what the card does): a sport kind's
     // price answer says the rule its card keeps.
-    .map((t) => (t && t.id === 'indoor-price' && indoorKindsModule.SPORT.SPORT_KINDS.includes(en.kind) && typeof t.a === 'string' ? { ...t,
+    .map((t) => (t && t.id === 'indoor-price' && indoorKindsModule.SPORT.ENGINE_KINDS.includes(en.kind) && typeof t.a === 'string' ? { ...t,
       a: t.a.replace('When one of them is lower, your card shows that one, from your lowest.', 'Kids’, seniors’, family, rental and lesson prices never become your card’s price.'),
       aFr: String(t.aFr).replace('Si l’un d’eux est plus bas, votre fiche montre celui-là, à partir de votre prix le plus bas.', 'Les prix pour enfants, aînés, familles, la location et les cours ne deviennent jamais le prix de votre fiche.') } : t));
 }
@@ -76541,7 +76544,7 @@ function gatherCompletenessInput(venue, live, happyHourTimes) {
       ...(sportSetupType(venue.type) && ((live.indoor_info || indoorInfoAnswers(venue.id) || {}).kinds || [])[0] ? { kindWhy: sportKindWhyOf(((live.indoor_info || indoorInfoAnswers(venue.id)).kinds)[0]) } : {}),
       // Sport test 12 (2026-11-21): an untouched suggested All ages counts toward 100% on a golf course, range, rink, skate
       // park or disc golf course (portal-completeness.js indoor_ages).
-      ...(sportSetupType(venue.type) ? (() => { const k0 = (((live.indoor_info || indoorInfoAnswers(venue.id) || {}).kinds) || [])[0]; return k0 && SPORT_KINDS_MOD.SPORT_UNTAPPED_AGE_OK_KINDS.includes(k0) && indoorKindAgeFor(venue)[k0] === 'all' ? { ageDefaultAll: true } : {}; })() : {}), indoorPrice: 'indoor_price' in live ? live.indoor_price : indoorPriceValue(venue.id),
+      ...(sportSetupType(venue.type) ? (() => { const k0 = (((live.indoor_info || indoorInfoAnswers(venue.id) || {}).kinds) || [])[0]; return k0 && SPORT_KINDS_MOD.ENGINE_UNTAPPED_AGE_OK_KINDS.includes(k0) && indoorKindAgeFor(venue)[k0] === 'all' ? { ageDefaultAll: true } : {}; })() : {}), indoorPrice: 'indoor_price' in live ? live.indoor_price : indoorPriceValue(venue.id),
       offerAnswered: (() => { try { return ['live', 'day'].includes(setupProgress(venue.id).done.offer); } catch (e) { return false; } })() } : {}),
     ownerFeatures: Object.entries(venueOwnerFeaturesFor(venue)).filter(([, on]) => on).map(([k]) => k),
   };

@@ -589,7 +589,7 @@ const SPORT_KIND_TEXT_KINDS = SK.SPORT_KINDS.slice();
 function indoorKindKey(kinds) { const k = Array.isArray(kinds) ? kinds[0] : kinds; return k && K[k] ? k : 'other'; }
 // Sport (2026-11-20): a sport or golf listing's main kind, else 'sportother'.
 // Outdoor businesses (2026-11-23): an outdoor kind is a main kind too; an outdoor listing with none reads 'outdoorother'.
-function sportKindKey(kinds, type) { const k = Array.isArray(kinds) ? kinds[0] : kinds; return k && K[k] && SK.SPORT_KINDS.includes(k) ? k : type === 'outdoor' ? 'outdoorother' : 'sportother'; }
+function sportKindKey(kinds, type) { const k = Array.isArray(kinds) ? kinds[0] : kinds; return k && K[k] && SK.ENGINE_KINDS.includes(k) ? k : type === 'outdoor' ? 'outdoorother' : 'sportother'; }
 // The kinds research's words name for a sport or golf listing (the name first, then the story), up to 3, as the starting
 // picks of "What kind of place are you?". A golf listing always starts on one of the three golf kinds: a simulator when its
 // words say so, a range or mini golf when they say that and not a course, else a golf course.
