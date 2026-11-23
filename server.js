@@ -50,6 +50,7 @@ const placesToStay = require('./places-to-stay');
 const tripStays = require('./trip-stays');
 const stayBookingLinks = require('./stay-booking-links');
 const tripBooking = require('./trip-booking');
+const tripHonestPlan = require('./trip-honest-plan');
 // Viator tours (2026-11-20, viator.js): off unless VIATOR_API_KEY and VIATOR_PARTNER_ID are both set.
 const viator = require('./viator');
 const tourPicks = require('./tour-picks');
@@ -8835,7 +8836,25 @@ const tripPlanDecorated = (a, n) => withTripWeeklyNights(withTripSpecials(withTr
 function runTripPlanRequest(value, staysOn) {
   return staysOn
     ? runTripPlanWithStay(value, (a, n) => withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(a, n))))))
-    : withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(value)))));
+    : tripHonestEvidence(withTripWeeklyNights(withTripSpecials(withTripFrenchUrls(withTripHappyHourDeals(runTripPlan(value))))), !!(value && value.v4));
+}
+// Honest plan (2026-11-22, trip-honest-plan.js): plan.evidence, one entry per thing the request asked for that the
+// listings can show, built from the stops' own badges and facts; the other lines of the plan are kept in step with it.
+function tripHonestEvidence(plan, on = true) {
+  if (!on || !plan || typeof plan !== 'object') return plan;
+  try {
+    const TR = require('./trip-requirements');
+    const regions = [...new Set(tripHonestPlan.venueStops(plan).map((x) => x.v.region).filter(Boolean))];
+    const towns = ((plan.overview && plan.overview.regions) || []).map((r) => r && r.label).filter(Boolean);
+    tripHonestPlan.applyEvidence(plan, {
+      town: towns.length === 1 ? towns[0] : (regions.length === 1 ? REGION_LABELS[regions[0]] : null),
+      kindsOf: (id) => { try { const v = getVenue(id); if (!v) return []; const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; return TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); } catch (e) { return []; } },
+      kindLabel: (k) => TR.LABELS[k] || String(k).replace(/_/g, ' '),
+      kindLabelFr: (k) => { try { return require('./trip-french-copy').t3FrenchText(TR.LABELS[k] || String(k).replace(/_/g, ' ')); } catch (e) { return null; } },
+      countDining: (f) => { try { return /^[a-z_]+$/.test(f) && regions.length ? db.prepare(`SELECT COUNT(*) AS n FROM venues WHERE ${f} = 1 AND redirect_to IS NULL AND type IN ('restaurant','cafe','pub','brewery','cocktail') AND region IN (${regions.map(() => '?').join(',')})`).get(...regions).n : null; } catch (e) { return null; } },
+    });
+  } catch (e) { console.error(`[trip] evidence: ${e.message}`); }
+  return plan;
 }
 function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
   return withTripStays(tripPlanBeforeStays(args, run, now), args.stay || null, now, args.text, !!args.v4);
@@ -8988,6 +9007,7 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
     }
     delete plan.__wineTour;
   } catch (e) { console.error(`[trip] where to stay: ${e.message}`); }
+  if (v4) tripHonestEvidence(plan);
   return plan;
 }
 // The plan's stops that already have a booking link, in plan order, once each (at most 6): the venue page's own Book
@@ -9352,9 +9372,38 @@ function runTripPlan(args, now = new Date()) {
     }
   } catch (e) { /* the weekday stays in the notes */ }
   try { v4DropAfterDark(plan); } catch (e) { /* keep the plan as planned */ }
+  // Honest plan (2026-11-22): a dietary ask ("gluten-free dining") wants every meal stop to have the listing's badge.
+  // A meal stop without it is replaced when a place with the badge fits (the plan again without those places, kept only
+  // when it has fewer such stops and no fewer stops); when none fits the stop stays and plan.evidence names it.
+  try { plan = v4DietRetry(plan, a, now); } catch (e) { /* keep the plan as planned */ }
+  // With no dates chosen, an event is never a timed stop of a day: it becomes a dated suggestion.
+  try { tripHonestPlan.takeUndatedEvents(plan); } catch (e) { /* keep the plan as planned */ }
   try { v4AddStopPhones(plan); } catch (e) { /* phones are a convenience */ }
   try { v4TourStopLinks(plan); } catch (e) { /* the stop still shows */ }
   return plan;
+}
+function v4DietMisses(plan) {
+  if (!plan || !['multi_day', 'day_plan'].includes(plan.kind)) return null;
+  const asked = (plan.requirementResults || []).filter((r) => r && r.kind === 'feature' && r.strength !== 'prefer' && tripHonestPlan.DIET.includes(r.value)).map((r) => r.value);
+  if (!asked.length) return null;
+  return tripHonestPlan.venueStops(plan).filter((x) => tripHonestPlan.isMealStop(x.s) && asked.some((f) => tripHonestPlan.badgeOf(x.v, f) !== true));
+}
+function v4DietRetry(plan, a, now) {
+  let misses = v4DietMisses(plan);
+  if (!misses || !misses.length || a.swap || a.pinned || a.tourStops || a.moves || typeof a.text !== 'string') return plan;
+  let best = plan;
+  const avoid = new Set((a.excludeVenueIds || []).map(Number));
+  for (let round = 0; round < 2 && misses.length; round++) {
+    for (const x of misses) avoid.add(x.v.id);
+    let retry = null;
+    try { retry = a.v4DayAsked ? v4DayPlanFirst({ ...a, excludeVenueIds: [...avoid] }, now) : runTripPlanBase({ ...a, excludeVenueIds: [...avoid] }, now); } catch (e) { retry = null; }
+    if (!retry || retry.kind !== best.kind) break;
+    try { v4TidyDays(retry); v4NotIncluded(retry); v4UpFront(retry); v4DropAfterDark(retry); } catch (e) { break; }
+    const m2 = v4DietMisses(retry) || [];
+    if (m2.length < misses.length && v4StopCount(retry) >= v4StopCount(best)) { if (best.notIncluded && !retry.notIncluded) retry.notIncluded = best.notIncluded; retry.query = best.query; (retry.days || []).forEach((d, i) => { const o = (best.days || [])[i]; if (o && o.date && !d.date) d.date = o.date; }); if (best.plannedFrom && !retry.plannedFrom) retry.plannedFrom = best.plannedFrom; best = retry; misses = m2; } else break;
+  }
+  best.dietRetried = true;
+  return best;
 }
 const V4_DAY_ASKED_RE = /\b(?:one|a|1|full|whole|single)[ -]day\b(?! (?:trip|tour|pass|ticket|hike|spa)s?\b)|\bday in\b|\b(?:une|1) journ[ée]e\b/i;
 const V4_PART_OF_DAY_RE = /\b(?:tonight|evenings?|nights?|afternoons?|mornings?|ce soir|soir[ée]e|apr[èe]s-midi|matin[ée]?e?)\b/i;
@@ -9465,10 +9514,13 @@ function v4NotIncluded(plan) {
   // Round 5 (2026-11-22: "I couldn't fit vegetarian" with every restaurant Vegetarian-Friendly): a food feature asked for
   // is met when every meal stop on the plan has it.
   try {
-    const meals = (plan.days || []).flatMap((d) => d.stops || []).filter((x) => x && x.venue && ['restaurant', 'cafe', 'pub'].includes(x.venue.type));
+    // Honest plan (2026-11-22: "couldn't fit gluten free" with every restaurant Gluten-Free-Friendly): the rule read
+    // venue.features, which a plan stop never carries (its badges are venue.badges), and counted a pub after dinner as a
+    // meal. A meal stop is where the group eats (tripHonestPlan.isMealStop); its badge is the listing's own.
+    const meals = tripHonestPlan.venueStops(plan).filter((x) => tripHonestPlan.isMealStop(x.s));
     for (const r of plan.requirementResults) {
       if (!r || r.status !== 'unmet' || r.kind !== 'feature' || !['vegetarian', 'vegan', 'gluten_free'].includes(r.value) || !meals.length) continue;
-      if (meals.every((x) => (x.venue.features || []).some((f) => f && (f.key === r.value || f === r.value)))) { r.status = 'satisfied'; r.reason = 'Every meal stop has it.'; }
+      if (meals.every((x) => tripHonestPlan.badgeOf(x.v, r.value) === true)) { r.status = 'satisfied'; r.reason = 'Every meal stop has the listing’s badge.'; }
     }
   } catch (e) { /* the planner's own results stand */ }
   for (const r of plan.requirementResults) {
@@ -11759,7 +11811,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     const alternatives = requirementModule.nearbyEventAlternatives({plan, events, from, to, today, regions: trip.route ? tripPlannerModule().routeRegions(trip.route.from, trip.route.to) : (intent.regions?.length ? intent.regions : trip.regions || []), suitsKind: tripPlannerModule().eventSuitsKind});
     if (alternatives.length) plan.eventAlternatives = alternatives;
   };
-  let itineraryEvents = null;
+  let itineraryEvents = null, undatedEventOffer = null;
   if (requirements && (!trip.multi || requirements.items.some(i => i.kind === 'days' && i.value > 1)) && requirements.items.some(i => i.kind === 'event') && requirements.items.some(i => i.kind === 'days')) {
     const venueText = interpretationText.replace(/\b(?:concerts?|live music|hockey|events?|festivals?|markets?)\b/gi, '');
     Object.assign(intent, discoveryIntentModule().interpretDiscoveryQuery(venueText, taxonomy));
@@ -11780,6 +11832,16 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     // about 30 minutes away. (Only the named towns were read: a Squamish-to-Pemberton road trip never saw the live music
     // in Whistler on the way, and a weekend event was only ever on its first day.)
     itineraryEvents = withoutEndedOccurrenceItems(tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(window), [], categories), intent.excluded), window.from, window.to), now);
+    // Honest plan (2026-11-22; a no-date "3-day Kelowna weekend" had a Tuesday, Nov 24 concert as a stop of "day 3": with no
+    // dates the plan was dated from today): with no dates chosen (V4) no event is placed on a day. The next matching
+    // events (the coming 30 days) are kept as dated suggestions instead (plan.dateSuggestions).
+    if (v4 && !requirements.startDate && !intent.when && !selectedNamedEvent) {
+      try {
+        const today = todayLocal(now), wide = resolveWhatsOnWindow({ from: today, to: addLocalDays(today, 30) }, now);
+        undatedEventOffer = withoutEndedOccurrenceItems(tripEventOccurrenceItems(eventsAllowedByExclusions(filterWhatsOnEvents(getWhatsOnEvents(wide), [], categories), intent.excluded), wide.from, wide.to), now);
+      } catch (e) { undatedEventOffer = itineraryEvents; }
+      itineraryEvents = [];
+    }
   }
   // Family trips (2026-10-18): the family events on What's On in the trip's dates (a heritage ranch's fall weekends, a
   // corn maze, a kids' haunted house), offered as one stop a day. An undated "family weekend" is the coming weekend.
@@ -11912,6 +11974,8 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   plan.understood = understood(plan);
     addEventRecovery(plan);
     tripWindowClockNote(plan, requirements);
+    // Honest plan (2026-11-22): did the visitor choose dates (the Dates control, a date or a day in the request)?
+    if (v4) plan.datesGiven = !!((requirements && requirements.startDate) || trip.when || intent.when);
     if (openingNote && Array.isArray(plan.notes)) plan.notes.unshift(openingNote);
     if (askedWineries && Array.isArray(plan.notes)) plan.notes.unshift(`There are no wineries in ${TRIP_SITE.area}, so these are wine bars and lounges instead.`);
     return plan;
@@ -11984,6 +12048,25 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   plan.understood = understood(plan);
   addEventRecovery(plan);
   tripWindowClockNote(plan, requirements);
+  // Honest plan (2026-11-22): did the visitor choose dates (the Dates control, a date or a day in the request)? With
+  // none, the events found for "the next few days from today" are offered as dated suggestions, never as stops.
+  if (v4) {
+    plan.datesGiven = !!((requirements && requirements.startDate) || intent.when);
+    // Nobody in the party drinks ("we don't drink"): said on the plan, so its evidence can show no drink stop is planned.
+    if (intent.excluded && Array.isArray(intent.excluded.concepts) && intent.excluded.concepts.includes('alcohol') && !(intent.partySome || []).some((x) => x && x.concept === 'alcohol')) plan.noAlcohol = true;
+    if (undatedEventOffer && undatedEventOffer.length && ['multi_day', 'day_plan'].includes(plan.kind)) {
+      try {
+        const regions = intent.regions && intent.regions.length ? intent.regions : [...new Set((plan.days || []).map((d) => d.region).filter(Boolean))];
+        const wanted = requirements.items.filter((i) => i.kind === 'event');
+        const seen = new Set();
+        const picks = undatedEventOffer.filter((e) => (!regions.length || regions.includes(e.region)) && wanted.some((i) => requirementModule.eventMatches(e, i) && tripPlannerModule().eventSuitsKind(e, i.eventKind)))
+          // "a weekend": Friday to Sunday events first; then the soonest.
+          .sort((a, b) => (/\bweek-?ends?\b|fin de semaine/i.test(String(text || '')) ? ([5, 6, 0].includes(localWeekday(a.startDate)) ? 0 : 1) - ([5, 6, 0].includes(localWeekday(b.startDate)) ? 0 : 1) : 0) || String(a.startDate || '').localeCompare(String(b.startDate || '')) || String(a.time || '').localeCompare(String(b.time || '')))
+          .filter((e) => (seen.has(e.id) ? false : seen.add(e.id))).slice(0, 2);
+        if (picks.length) plan.dateSuggestions = picks.map((e) => tripHonestPlan.suggestionOf(tripPlannerModule().eventOnDay ? tripPlannerModule().eventOnDay(e, e.startDate) : e));
+      } catch (e) { /* no suggestion */ }
+    }
+  }
   return plan;
 }
 // Round 13 (2026-10-21): a morning, afternoon or evening asked for after it started says what the plan did -- moved to
