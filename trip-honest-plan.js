@@ -107,7 +107,8 @@ function datesGiven(plan) {
 
 // No dates chosen: event stops leave the days and become dated suggestions. Returns the plan (changed in place).
 function takeUndatedEvents(plan) {
-  if (!plan || datesGiven(plan)) return plan;
+  // Day-by-day plans only: a short outing built around an event ("dinner and a show") is for that event's own date.
+  if (!plan || datesGiven(plan) || !['multi_day', 'day_plan'].includes(plan.kind)) return plan;
   const taken = [];
   const strip = (list, day) => (list || []).filter((s) => {
     if (!(s && s.kind === 'event' && s.event)) return true;
@@ -115,7 +116,6 @@ function takeUndatedEvents(plan) {
     return false;
   });
   for (const d of plan.days || []) if (d && Array.isArray(d.stops)) d.stops = strip(d.stops, d.day);
-  for (const k of ['itinerary', 'outing']) if (plan[k] && Array.isArray(plan[k].stops)) plan[k].stops = strip(plan[k].stops, 0);
   if (!taken.length) return plan;
   const ids = new Set(taken.map((x) => x.e.id));
   for (const k of ['schedule', 'suggestedTimes']) if (Array.isArray(plan[k])) plan[k] = plan[k].filter((r) => !(r && r.eventId != null && ids.has(r.eventId)));
@@ -190,7 +190,8 @@ function eventEntry(req, plan, stops, ctx) {
   const music = req.value === 'live-music' || req.eventKind === 'live-music';
   const label = music ? 'Live music' : 'Events', labelFr = music ? 'Musique en direct' : 'Événements';
   const what = music ? 'live music event' : 'matching event', whatFr = music ? 'événement de musique en direct' : 'événement correspondant';
-  const dated = datesGiven(plan);
+  // A short outing built around an event ("dinner and a show") is for that event's own date.
+  const dated = datesGiven(plan) || (!['multi_day', 'day_plan'].includes(plan.kind) && eventStops(plan).length > 0);
   const evs = dated ? eventStops(plan).filter((x) => !music || !(x.e.categories || []).length || (x.e.categories || []).includes('live-music')) : [];
   const badge = music ? stops.filter((x) => badgeOf(x.v, 'live_music', ctx.flags) === true).map((x) => ({ id: x.v.id, name: x.v.name, has: true })) : [];
   const base = { ask: music ? 'live_music' : 'event', label, labelFr };
@@ -337,7 +338,7 @@ function applyEvidence(plan, ctx = {}) {
   for (const r of reqs) {
     if (!r || r.kind !== 'event' || r.strength === 'prefer') continue;
     const e = eventEntry(r, plan, stops, ctx);
-    if (!dated) { r.status = 'unverified'; r.reason = 'Depends on the dates: none are chosen yet.'; }
+    if (e.needsDates) { r.status = 'unverified'; r.reason = 'Depends on the dates: none are chosen yet.'; }
     else if (e.status === 'verified') { r.status = 'satisfied'; }
     if (seenEvent.has(e.ask)) continue;
     seenEvent.add(e.ask);
