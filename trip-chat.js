@@ -219,6 +219,7 @@ function systemPrompt(regions, regionLabels) {
     '"we\'re taking the bus from Kelowna airport", "by shuttle", "we don\'t have a car" -> transport no_car; "we\'re driving" -> transport driving. Never cant for these.',
     '"we want to stay in Penticton", "a hotel in Naramata" -> stay (r), never town; town is only for basing the whole trip somewhere else ("plan it in Kelowna instead").',
     '"ice cream for the kids", "something for the kids to do" -> add only (k ice_cream / k kids), no party op: the kids are already in the plan.',
+    '"swap the day 2 winery for another with non-alcoholic options", "a different brewery that has a patio", "replace lunch with one that is gluten-free", "one that is dog friendly" -> replace only, s [that stop], k "" (the same kind of place). What is asked of the new place (a badge) is read by our own rules: never a party op, never an add, never cant for these.',
     ...agent.PROMPT_LINES,
     'Several ops can come from one message ("remove the brewery and add a beach" -> remove, add). Use as few ops as cover the message.',
     'cant (with no ops) when the message is not an edit we can make: booking (pay, buy tickets, reserve a table or a room for us), transport (book flights or rides), weather (a forecast), other (a question that is not about a stop on the plan, a request for something we do not do, anything off topic), unclear (nonsense, or you cannot tell what they want). Otherwise cant "".',
@@ -486,6 +487,63 @@ function rulesRead(message, stops, opts = {}) { return groupRead(message, stops,
 // on day 2 asked with the non-alcoholic badge. The clauses that only say who drinks add nothing.
 const NA_OPTION_RE = /\b(?:non[- ]alcoholic|alcohol[- ]free|zero[- ]proof|mocktails?|sans alcool)\b/;
 const DRINK_WORD_RE = /\b(?:drinks?|drinking|drinkers?|alcohol\w*|boit|boivent|alcool|winer\w+|wines?|brewer\w+|beers?|vignobles?|vins?)\b/;
+// A badge asked of a REPLACEMENT (2026-11-22, Dayton's report: "Can you swap the day 2 winery for another with
+// non-alcoholic options?" swapped Azhadi Vineyards, whose listing has the Non-Alcoholic Options badge, for a winery
+// whose listing does not). What the message asks of the new place ("with a patio", "that's dog friendly", "gluten-free",
+// "with a lake view", « avec des options sans alcool ») is a requirement of the swap: it rides on the replace op as
+// features (the planner's swap.features, the listing's own badges), and a place without it is never accepted.
+const SWAP_FEAT_RES = {
+  nonalcoholic: /\b(?:non[- ]?alcoholic|alcohol[- ]free|zero[- ]proof|mocktails?|sans alcool|non alcoolisee?s?|n\/?a (?:options?|drinks?|beers?|wines?|choices?|pairings?|tastings?))(?![\w-])/,
+  gluten_free: /\b(?:sans gluten|(?:no|without) gluten|gluten|celiac|coeliac|coeliaque)\b/,
+  vegan: /\b(?:vegan\w*|vegetalien\w*|veganes?)\b/,
+  vegetarian: /\b(?:vegetarian\w*|vegetarien\w*|veggie)\b/,
+  patio: /\b(?:patios?|terrasses?)\b/,
+  lake_view: /\b(?:lake ?views?|views? of the lake|lakeside|lakefront|vue sur le lac|bord du lac)\b/,
+  live_music: /\b(?:live music|live bands?|musique (?:live|en direct))\b/,
+  dog_friendly: /\b(?:dog[- ]friendly|pet[- ]friendly|dogs? (?:are )?(?:allowed|welcome)|(?:allows?|takes?|welcomes?) dogs|chiens? (?:admis|acceptes|bienvenus|permis)|accepte(?:nt)? les chiens)\b/,
+  kid_friendly: /\b(?:kid[- ]friendly|child[- ]friendly|family[- ]friendly|good for kids|adapte aux enfants)\b/,
+};
+const SWAP_FEATS = Object.keys(SWAP_FEAT_RES);
+// "Who is coming" ops the same words would also read ("gluten-free" -> the whole trip gluten-free): a badge asked of
+// one replacement changes that stop only.
+const FEAT_PARTY = { gluten_free: 'gluten_free', vegan: 'vegan', vegetarian: 'vegetarian', nonalcoholic: 'no_alcohol', dog_friendly: 'dog', kid_friendly: 'kids' };
+const SAME_KIND_RE = /\b(?:another|a different|some other|other|one|ones|un autre|une autre|d'autres?|autres?)\b/;
+// t: the folded message. o: a replace op. -> the op, with features (and the kind set right) when the message asks a
+// badge of the replacement.
+function swapFeatsFor(t, o) {
+  if (!o || o.o !== 'replace' || (o.features || []).length || o.featSwap) return o;
+  const old = (o.stops || [])[0];
+  if (!old) return o;
+  // The old stop's own name is not what is asked of the new one ("swap The Patio Grill for another").
+  let tt = ` ${t} `;
+  const nm = fold(old.name || '').replace(/\s+/g, ' ').trim();
+  if (nm.length >= 3) tt = tt.split(nm).join(' ');
+  // What is wanted comes after "for / with / that / which" when the message has one.
+  const sep = /\b(?:for|with|to|that|which|whose|par|pour|avec|qui|contre|dont)\b/.exec(tt);
+  const found = (text) => SWAP_FEATS.filter((f) => { const m = SWAP_FEAT_RES[f].exec(text); return !!m && !/\b(?:without|no|not|sans|pas de|pas d')\s+(?:an?\s+|any\s+|une?\s+|de\s+|la\s+|le\s+)?$/.test(text.slice(0, m.index)); });
+  const want = sep ? tt.slice(sep.index) : tt;
+  let feats = found(want);
+  if (!feats.length && sep) feats = found(tt);
+  if (!feats.length) return o;
+  const out = { ...o };
+  // "another with a lake view", "a different one that's kid friendly": the same kind of place with that badge (the kind
+  // "a lake view" alone is a restaurant with one, "kids" a thing for children to do).
+  const k = out.kind && KINDS[out.kind] && !WORD_KINDS[out.kind] ? KINDS[out.kind] : null;
+  const badgeKind = k && k.badge && !k.type && feats.includes(k.badge) ? k.badge : null;
+  if (badgeKind) {
+    const ownRe = (KIND_WORDS.find(([kk]) => kk === TYPE_KIND[old.type]) || [])[1];
+    if (!old.role && (SAME_KIND_RE.test(want) || (ownRe && ownRe.test(want)))) out.kind = null;
+    else feats = feats.filter((f) => f !== badgeKind);
+  }
+  if (!feats.length && out.kind === o.kind) return o;
+  if (feats.length) out.features = feats.slice(0, 3);
+  return out;
+}
+function applySwapFeats(ops, t) {
+  const out = (ops || []).map((o) => swapFeatsFor(t, o));
+  const got = new Set(out.filter((o, i) => o !== ops[i]).flatMap((o) => o.features || []).map((f) => FEAT_PARTY[f]).filter(Boolean));
+  return got.size ? out.filter((o) => !(o.o === 'party' && got.has(o.value))) : out;
+}
 const ADD_VERB_RE = /\b(?:add|include|put in|fit in|book|ajoute[rz]?|inclure|incluez|inclus)\b/;
 function groupRead(message, stops, opts = {}) {
   const t = fold(message).replace(/\s+/g, ' ').trim();
@@ -495,6 +553,9 @@ function groupRead(message, stops, opts = {}) {
   const explained = agent.explainRules(t, h, stops);
   if (explained) return explained;
   if (/\b(?:remove|take (?:out|off)|drop|skip|swap|replace|instead|enleve[rz]?|retire[rz]?|remplace[rz]?)\b/.test(t)) return null;
+  // "a different winery for day 2 that has non-alcoholic options", « change le vignoble pour un autre avec des boissons
+  // sans alcool »: a swap that asks a badge of the new place is that swap (read below), not a note about who drinks.
+  try { if (rulesReadOne(message, stops, opts).ops.some((o) => o.o === 'replace' && (o.features || []).length)) return null; } catch (e) { /* read as before */ }
   const ops = [{ ...base, o: 'party_some', value: 'alcohol' }];
   const rest = String(message).split(/(?<=[.;!?])\s+/).filter((c) => ADD_VERB_RE.test(fold(c))).join(' ');
   if (rest) {
@@ -564,7 +625,12 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
   const wdM = Object.keys(weekdays).length ? new RegExp(`\\b(${Object.keys(weekdays).join('|')})s?\\b`).exec(t) : null;
   const day = dayM ? Number(dayM[1]) : wdM ? weekdays[wdM[1]] : null;
   // "the brewery on day 2": only day 2's.
-  let named = stopsNamed(t, stops);
+  // What is asked of a replacement ("with a lake view", "with a patio") never names a stop (it named "Eagle View
+  // Trail", and the swap was of the wrong stop).
+  const tNF = /\b(?:swap|replace|switch|change|different|another|instead|autre|remplace[rz]?|change[rz]?)\b/.test(t) ? Object.values(SWAP_FEAT_RES).reduce((x, re) => x.replace(new RegExp(re.source, 'g'), ' '), t) : t;
+  let named = tNF !== t ? stopsNamed(tNF, stops) : [];
+  // A stop whose own name has such a word ("swap The Patio Grill for another") is named before "for / with / that".
+  if (!named.length) named = stopsNamed(tNF !== t ? t.replace(/\b(?:for|with|to|that|which|par|pour|avec|qui|contre)\b.*$/, '') : t, stops);
   // A day named: only that day's stops (with none of that kind on it, nothing is named; it used to take another day's).
   // A stop named by its own name stands whatever day is mentioned ("La Frenz is closed on Sunday").
   if (day) { const by = named.byName || []; const on = named.filter((s) => s.day === day); named = by.length && !by.some((s) => s.day === day) ? by.slice() : on; named.byName = by.filter((s) => named.includes(s)); }
@@ -581,7 +647,7 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
   const mealKind = /\b(?:lake ?view|view of the lake|on the lake|lakeside|lakefront|vue sur le lac|bord du lac)\b/.test(t) || (sunset && mealWord === 'dinner') ? 'lake_view' : /\b(?:patio|terrasse)\b/.test(t) ? 'patio' : /\b(?:live music|musique live)\b/.test(t) ? 'live_music' : foodKind;
   if (mealWord && mealKind && !/\b(?:remove|take (?:out|off)|drop|skip|no more|cut|delete|enleve[rz]?|retire[rz]?|supprime[rz]?)\b/.test(t) && !/\b(?:after|before|apres|avant)\s+(?:the\s+|le\s+|la\s+)?(?:lunch|dinner|supper|souper|diner|dejeuner)\b/.test(t)) {
     const meals = stops.filter((x) => x.role === mealWord && (!day || x.day === day));
-    if (meals.length) return { ops: [op('replace', { stops: [meals[0]], kind: mealKind, ...(sunset ? { sunset: true } : {}) })], cant: null };
+    if (meals.length) return { ops: applySwapFeats([op('replace', { stops: [meals[0]], kind: mealKind, ...(sunset ? { sunset: true } : {}) })], t), cant: null };
     // Round 6 ("add a dinner with a lake view on day 2" added a ramen shop): the kind of meal asked rides on the add.
     return { ops: [op('add', { kind: mealKind || 'restaurant', time: mealWord === 'dinner' ? 'evening' : 'midday', day })], cant: null };
   }
@@ -679,6 +745,12 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
     ops.splice(0, ops.length, op('replace', { stops: [named.find((s) => s.type === 'outdoor')], kind: 'hike' }));
   } else if (/\b(?:more like|more of|similar|another one like|plus comme|plus de ce genre|un autre comme)\b/.test(t) && named.length) ops.push(op('more_like', { stops: named.slice(0, 1) }));
   else if (/\b(?:love[ds]?|liked?|keep|great|perfect|awesome|adore[sz]?|garde[rz]?|j'aime|parfait|super)\b/.test(t) && named.length && !cheaper && !fancier) ops.push(op('keep', { stops: named }));
+  // "swap the park for another that's dog friendly" with no such stop on the plan: said (the badge asked of a
+  // replacement never re-plans the trip "for your dog").
+  if (!named.length && tNF !== t && /\b(?:swap|replace|switch|remplace[rz]?)\b/.test(t) && ops.length && ops.every((o) => o.o === 'party')) {
+    const asked = new Set(SWAP_FEATS.filter((f) => SWAP_FEAT_RES[f].test(t)).map((f) => FEAT_PARTY[f]).filter(Boolean));
+    for (let i = ops.length - 1; i >= 0; i--) if (asked.has(ops[i].value)) ops.splice(i, 1);
+  }
   if (!ops.length && !named.length && /\b(?:swap|replace|switch|remplace[rz]?|change[rz]?)\b/.test(t) && /\b(?:for|with|par|pour|avec)\b/.test(t)) {
     const k = kindsNamed(t.replace(/\b(?:for|with|par|pour|avec)\b.*$/, ''))[0] || null;
     return { ops: [], cant: 'not_found', what: k };
@@ -716,7 +788,8 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
   }
   // "add dinner in Squamish": the stop asked for, not a new base town for the whole trip.
   if (ops.some((o) => o.o === 'add') && /\b(?:add|ajoute[rz]?)\b/.test(t)) { const i = ops.findIndex((o) => o.o === 'town'); if (i >= 0) ops.splice(i, 1); }
-  return { ops, cant: null };
+  // A badge asked of the replacement ("for another with non-alcoholic options") is a requirement of that swap.
+  return { ops: applySwapFeats(ops, t), cant: null };
 }
 
 // Words the planner itself reads (kinds of food, occasions, places). Only a message with one of these, and no "no" /
@@ -749,7 +822,30 @@ function wholeGroupDry(t) { return DRY_RE.test(t) && !ONE_PERSON_RE.test(t); }
 // Words that really give a date for the trip ("we're coming December 5 and 6", "move it to next weekend", "2026-12-05").
 const EXPLICIT_DATE_RE = /\b(?:jan|feb|fev|mar|apr|avr|may|mai|jun|juin|jul|juil|aug|aou|sep|oct|nov|dec)[a-z]*\.?\s+\d{1,2}\b|\b\d{1,2}(?:st|nd|rd|th|er)?\s+(?:of\s+)?(?:jan|feb|fev|mar|apr|avr|may|mai|jun|juin|jul|juil|aug|aou|sep|oct|nov|dec)[a-z]*\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}\b|\b(?:tomorrow|demain|next (?:week|weekend|month)|this weekend|la fin de semaine prochaine|la semaine prochaine)\b|\b(?:we(?:'re| are)? (?:coming|arriving)|coming on|arriving on|arrive on|move the (?:trip|dates)|change the dates?|on arrive|nous arrivons|on vient)\b/;
 const EDIT_OPS = ['add', 'replace', 'budget', 'remove'];
+// The badge asked of a replacement is read by the word rules, whatever the AI made of the message (its schema has no
+// key for a badge): the rules' swap of that stop stands, and an AI swap the rules did not read gets the badge from the
+// message's own words.
 function reconcileReads(ai, rules, message) {
+  const r = reconcileCore(ai, rules, message);
+  if (r.source === 'rules' || !(r.ops || []).length || r.ops === (rules && rules.ops)) return r;
+  const withF = ((rules && rules.ops) || []).filter((o) => o.o === 'replace' && (o.features || []).length && !o.featSwap);
+  let ops = r.ops, fixed = false;
+  for (const f of withF) {
+    const i = ops.findIndex((o) => o.o === 'replace' && stopIds(o) === stopIds(f));
+    if (i < 0) return { ops: rules.ops, cant: null, source: 'rules_over_ai', fixes: [...(r.fixes || []), 'swap_feature'] };
+    if (ops[i] !== f && !(ops[i].features || []).length) { ops = ops.slice(); ops[i] = { ...f }; fixed = true; }
+  }
+  if (!withF.length && ops.filter((o) => o.o === 'replace').length === 1 && !(rules && rules.multi)) {
+    const next = applySwapFeats(ops, fold(message).replace(/\s+/g, ' ').trim());
+    if (next.length !== ops.length || next.some((o, i) => o !== ops[i])) { ops = next; fixed = true; }
+  }
+  if (!fixed) return r;
+  // The same words read as a need of the whole party ("gluten-free", "dog friendly") change only that stop.
+  const got = new Set(ops.filter((o) => o.o === 'replace').flatMap((o) => o.features || []).map((x) => FEAT_PARTY[x]).filter(Boolean));
+  ops = ops.filter((o) => !(o.o === 'party' && got.has(o.value)));
+  return { ...r, ops, cant: null, source: r.source === 'ai' ? 'ai_fixed' : r.source, fixes: [...(r.fixes || []), 'swap_feature'] };
+}
+function reconcileCore(ai, rules, message) {
   if (!ai || !ai.ok) return { ops: rules.ops, cant: rules.cant, source: 'rules', fixes: [] };
   const t0 = fold(message);
   // Round 5 ("add a spa on Saturday afternoon instead of the park" moved the trip to another date and changed 12 stops):
@@ -1455,7 +1551,9 @@ function planTurnCore(ops, ctx) {
     const p = queue[i];
     // A badge asked of the new stop ("with a non-alcoholic option") that no place within reach has: the best place of
     // that kind instead, and the reply says its listing does not say (never claimed).
-    if (p && p._r && !p._r.ok && (p.features || []).length && !(p.alt || []).length) { results.splice(results.indexOf(p._r), 1); queue.splice(i + 1, 0, { ...p, features: null, _featAsked: p.features, _r: null }); return; }
+    // A SWAP never does (2026-11-22, Dayton: a badge asked of a replacement is a requirement): the stop stays, and the
+    // reply offers that place by name, labelled as unknown (featMiss below).
+    if (p && p.o === 'add' && !p.strict && p._r && !p._r.ok && (p.features || []).length && !(p.alt || []).length) { results.splice(results.indexOf(p._r), 1); queue.splice(i + 1, 0, { ...p, features: null, _featAsked: p.features, _r: null }); return; }
     if (!p || !(p.alt || []).length || !p._r || p._r.ok) return;
     results.splice(results.indexOf(p._r), 1);
     queue.splice(i + 1, 0, { ...p, kind: p.alt[0], alt: p.alt.slice(1), _r: null, _kinds: [...(p._kinds || [p.kind]), p.alt[0]] });
@@ -1475,10 +1573,11 @@ function planTurnCore(ops, ctx) {
         const rr = op.o === 'budget' && target !== op.stops[0] ? { op: 'budget', ok: false, local: true } : r;
         if (rr !== r) results.push(rr);
         rr.old = old || target; rr.kind = op.kind || null; rr.value = op.value || null;
+        const feats = op.o === 'replace' ? (op.features || []).filter((x) => typeof x === 'string') : [];
         if (op.o === 'budget') rr.pairs = [{ old: old || target, fresh: null }];
         if (!old) { rr.why = 'no_fit'; continue; }
         // Round 6: a dinner asked "with a lake view" that already has one is said, and nothing changes.
-        if (op.o === 'replace' && ['lake_view', 'patio', 'live_music'].includes(op.kind) && (old.badges || []).includes(op.kind)) { rr.ok = true; rr.already = true; continue; }
+        if (op.o === 'replace' && ['lake_view', 'patio', 'live_music'].includes(op.kind) && (old.badges || []).includes(op.kind) && feats.every((x) => (typeof ctx.hasFeature === 'function' ? ctx.hasFeature(old.id, x) : (old.badges || []).includes(x) || (old.feats || []).includes(x)))) { rr.ok = true; rr.already = true; continue; }
         let swap;
         if (op.o === 'budget') {
           const p = Number(old.price) || (op.value === 'budget' ? 3 : 2);
@@ -1488,15 +1587,46 @@ function planTurnCore(ops, ctx) {
           // place): a stop the chat changed keeps the kind of food it is (its name or cuisine), with the price asked.
           const keepKind = old.soft ? Object.keys(WORD_KINDS).find((k) => WORD_KINDS[k].meal && WORD_KINDS[k].words.some((w) => fold(`${old.name} ${old.cuisine || ''}`).includes(w))) : null;
           if (keepKind) { swap = { ...swap, types: WORD_KINDS[keepKind].types, words: WORD_KINDS[keepKind].words }; rr.keptKind = keepKind; }
-        } else swap = op.kind ? { ...KIND_SWAP[op.kind], id: old.id } : { type: old.type, id: old.id, ...((op.features || []).length ? { types: [old.type], features: op.features } : {}) };
-        if ((op.features || []).length) rr.featAsked = op.features;
+        } else swap = op.kind ? { ...KIND_SWAP[op.kind], id: old.id, ...(feats.length ? { types: KIND_SWAP[op.kind].types || [KIND_SWAP[op.kind].type], features: feats } : {}) } : { type: old.type, id: old.id, ...(feats.length ? { types: [old.type], features: feats } : op.toId ? { types: [old.type] } : {}) };
+        if (feats.length) rr.featAsked = feats;
         if (op.o === 'replace') raiseCount(cur, op.kind, old);
         // A meal swapped for a kind of meal stays somewhere to eat (never a winery or a beach with a lake view).
         const mealOk = (f) => !old.role || ['restaurant', 'pub'].includes(f.type) || (old.role === 'lunch' && f.type === 'cafe');
         const sun = op.sunset && typeof ctx.sunsetStart === 'function' ? ctx.sunsetStart(old.day, old.region || null) : null;
-        const res = slotEdit(cur, { slot: old.key, slotStart: Number.isInteger(sun) ? sun : old.start, ...(Number.isInteger(sun) ? { stopStart: sun } : {}), shifts: {}, swap, kind: op.kind || null, exclude: [old.id], oldId: old.id, check: (f) => wantMatches(op.kind, f) && mealOk(f) && (!(op.features || []).length || typeof ctx.hasFeature !== 'function' || op.features.every((x) => ctx.hasFeature(f.id, x))) }, ctx);
-        if (res.why) { rr.why = res.why; continue; }
+        const kindOk = (f) => wantMatches(op.kind, f) && mealOk(f) && (!op.toId || !!op.kind || f.type === old.type);
+        const spec = { slot: old.key, slotStart: Number.isInteger(sun) ? sun : old.start, ...(Number.isInteger(sun) ? { stopStart: sun } : {}), shifts: {}, swap, kind: op.kind || null, exclude: [old.id], oldId: old.id, check: (f) => kindOk(f) && (!feats.length || typeof ctx.hasFeature !== 'function' || feats.every((x) => ctx.hasFeature(f.id, x))) };
+        let res = slotEdit(cur, spec, ctx);
+        // The visitor said yes to the place the chat offered by name (toId): that place, when the planner's first pick
+        // is another one.
+        if (op.toId && !feats.length) { const tried = []; while (!res.why && res.fresh.id !== op.toId && tried.length < 3) { tried.push(res.fresh.id); const again = slotEdit(cur, { ...spec, exclude: [old.id, ...tried] }, ctx); if (again.why) break; res = again; } }
+        if (res.why) {
+          rr.why = res.why;
+          // No place with the badge fits there: the stop stays, and what could be done instead is worked out (never
+          // applied): a place with the badge that fits on another day, else the place a plain swap would give, which
+          // the reply names as unknown.
+          if (feats.length && res.why !== 'conflict' && !ctx.probe) {
+            const miss = { hasOld: typeof ctx.hasFeature === 'function' ? feats.every((x) => ctx.hasFeature(old.id, x)) : feats.every((x) => (old.badges || []).includes(x) || (old.feats || []).includes(x)), other: null, alt: null };
+            const addKind = op.kind || TYPE_KIND[old.type] || null;
+            if (!old.role && addKind && KIND_SWAP[addKind] && typeof ctx.hasFeature === 'function') {
+              const others = [...new Set(cur.stops.map((x) => x.day))].filter((d) => d !== old.day).sort((a, b) => Math.abs(a - old.day) - Math.abs(b - old.day) || a - b).slice(0, 2);
+              for (const d of others) {
+                let sub = null;
+                try { sub = planTurnCore([{ stops: [], time: null, value: null, n: null, ages: [], region: null, date: null, o: 'add', kind: addKind, day: d, features: feats, strict: true }], { ...ctx, args: { ...cur.args }, stops: cur.stops, removed: [...cur.removed], locks: { ...cur.locks }, probe: true }); } catch (e) { sub = null; }
+                const hit = sub && sub.plan ? (sub.results || []).find((x) => x.op === 'add' && x.ok && x.fresh && x.feat && !x.inPlaceOf) : null;
+                if (hit && hit.fresh.day === d) { miss.other = { day: d, fresh: hit.fresh, kind: addKind }; break; }
+              }
+            }
+            // The place offered instead is the same kind of place (a brewery for a brewery, never the trail the planner's
+            // plain Swap may pick for that part of the day).
+            if (!miss.other) { const plain = slotEdit(cur, { ...spec, swap: op.kind ? { ...KIND_SWAP[op.kind], id: old.id } : { type: old.type, id: old.id, types: [old.type] }, check: (f) => kindOk(f) && (!!op.kind || f.type === old.type) }, ctx); if (!plain.why) miss.alt = plain.fresh; }
+            rr.featMiss = miss;
+          }
+          continue;
+        }
         rr.ok = true; rr.fresh = res.fresh;
+        if (op._featAsked) rr.featOffered = true;
+        // A badge asked as the kind of meal ("a dinner with a lake view") is said with its source too.
+        if (op.o === 'replace' && !rr.featAsked && ['lake_view', 'patio', 'live_music'].includes(op.kind) && (res.fresh.badges || []).includes(op.kind)) { rr.featAsked = [op.kind]; rr.featCited = true; }
         cur.locks[old.key] = res.fresh.id; // what the visitor changed stays through later re-plans
         if (op.o === 'budget') rr.pairs = [{ old, fresh: res.fresh }];
         cur = { plan: res.plan, stops: res.nw, args: { ...res.args, swap: null }, locks: cur.locks, removed: new Set() };
@@ -1654,7 +1784,7 @@ function planTurnCore(ops, ctx) {
     }
   }
   // A badge asked of an added stop is claimed only when the listing itself has it.
-  for (const r of results) if (r.featAsked && r.ok && r.fresh) r.feat = typeof ctx.hasFeature === 'function' && r.featAsked.every((f) => ctx.hasFeature(r.fresh.id, f));
+  for (const r of results) if (r.featAsked && r.ok && r.fresh) r.feat = r.featCited || (typeof ctx.hasFeature === 'function' && r.featAsked.every((f) => ctx.hasFeature(r.fresh.id, f)));
   if (!cur.plan) {
     // Nothing could be re-planned: the plan on screen stays exactly as it was (removes and keeps still apply).
     return { plan: null, req: null, actions, results, changed: [], locks: ctx.locks || {}, failed: true };
@@ -1692,7 +1822,11 @@ const T = {
     ends_lunch: 'That day already ends with lunch, so I left it as it is.', meals_lunch: 'Each day already has lunch, so nothing changed.', meals_dinner: 'Each day already has dinner, so nothing changed.', getting_here: 'The Getting here card under your plan shows the drive, shuttles and rental cars. Tell me when you arrive and I’ll plan around it.', alreadyOn: '{name} is already on your plan{at}.',
     tourAfterLunch: '{name} moves to {time} and the tour starts after it.', tourHasLunch: 'Lunch is part of the tour, so I took out {name}.', tourNoLunch: 'There was no room for {name} around the tour, so I took it out.', setTimeOverlap: '{name} can’t start at {time}: {other} is on then.', setTimeFree: 'The earliest it can start is {time}.', setTimeShifted: '{name} now ends at {time}.', setTimeGaveWay: 'To make room I took out {names}.',
     featHas: 'Its {site} listing has the {badge} badge.', featUnknown: 'Its listing doesn’t have the {badge} badge, so ask when you book.', featAlready: 'Day {d} already has {what} for that: {name}{at}. Its {site} listing has the {badge} badge, so I left your plan as it is.',
-    featBadge: { nonalcoholic: 'Non-Alcoholic Options', gluten_free: 'Gluten-Free-Friendly', vegan: 'Vegan-Friendly', vegetarian: 'Vegetarian-Friendly' }, featNone: 'I couldn’t find a place with the {badge} badge to swap {old} for, so it stays.',
+    featBadge: { nonalcoholic: 'Non-Alcoholic Options', gluten_free: 'Gluten-Free-Friendly', vegan: 'Vegan-Friendly', vegetarian: 'Vegetarian-Friendly', patio: 'Patio', lake_view: 'Lake View', live_music: 'Live Music', dog_friendly: 'Dog-Friendly', kid_friendly: 'Kid Friendly' },
+    // A badge asked of a replacement (2026-11-22): the stop stays when no place with the badge fits; the place a plain swap would give is offered by name, as unknown.
+    featSay: { nonalcoholic: 'if it has non-alcoholic options', gluten_free: 'if it has gluten-free options', vegan: 'if it has vegan options', vegetarian: 'if it has vegetarian options', patio: 'if it has a patio', lake_view: 'if it has a lake view', live_music: 'if it has live music', dog_friendly: 'if dogs are welcome', kid_friendly: 'if it’s kid-friendly' }, featOr: ' or ',
+    featUnsure: 'Its {site} listing doesn’t say {say}, so ask when you book.', featOnly: '{old} has the {badge} badge on its {site} listing, and I couldn’t find another {noun} for day {d} that does, so I kept it.', featKept: 'I couldn’t find {a} for day {d} whose {site} listing has the {badge} badge, so I kept {old}.',
+    featAlt: 'I can swap it for {alt} instead, but its listing doesn’t say {say}. Want that?', featOther: '{name} has that badge and fits on day {d}{at}. Want me to add it there?', featPlace: 'another place', featPlaceN: 'place', offerKept: 'OK, I left your plan as it is.', featNone: 'I couldn’t find a place with the {badge} badge to swap {old} for, so it stays.',
     diffDays: 'Changed {n} stops on {days}.', dayW: 'day', daysW: 'days', diffAll: 'Changed {n} stops in all.', moreNot: 'I couldn’t do {n} other things you asked.', moreNotOne: 'I couldn’t do one other thing you asked.',
     guardBroad: 'That would change {n} other stops: {names}. Go ahead?', guardMore: '{names} and {n} more', guardSunset: 'A sunset dinner at {time} would mean dropping {names}. Go ahead?',
     someRewrote: 'Got it: only one of you doesn’t drink, so wineries and breweries are fine for the rest. Nothing has changed yet: say “add a winery” and I’ll add one.', someNoted: 'I’ve noted that only one of you doesn’t drink.', someHas: 'For your non-drinker: {names} {v} non-alcoholic options.', someHasV1: 'lists', someHasVn: 'list', someNone: 'None of your tasting stops lists non-alcoholic options on its listing, so ask when you book.', someOffer: 'Want me to add a café near the winery? Say “add a café”.', someNoDrink: 'Noted: one of you doesn’t drink. Your plan has no winery or brewery stop right now.',
@@ -1736,7 +1870,10 @@ const T = {
     ends_lunch: 'Cette journée se termine déjà avec le dîner, donc je l’ai laissée telle quelle.', meals_lunch: 'Chaque jour a déjà un dîner, donc rien n’a changé.', meals_dinner: 'Chaque jour a déjà un souper, donc rien n’a changé.', getting_here: 'La carte Pour venir sous votre plan montre la route, les navettes et les voitures de location. Dites-moi quand vous arrivez et j’adapterai le plan.', alreadyOn: '{name} est déjà dans votre plan{at}.',
     tourAfterLunch: '{name} passe à {time} et le tour commence après.', tourHasLunch: 'Le dîner fait partie du tour, donc j’ai retiré {name}.', tourNoLunch: 'Il n’y avait pas de place pour {name} autour du tour, donc je l’ai retiré.', setTimeOverlap: '{name} ne peut pas commencer à {time} : {other} est prévu à ce moment.', setTimeFree: 'Au plus tôt : {time}.', setTimeShifted: '{name} se termine maintenant à {time}.', setTimeGaveWay: 'Pour faire de la place, j’ai retiré {names}.',
     featHas: 'Sa fiche {site} a le badge « {badge} ».', featUnknown: 'Sa fiche n’a pas le badge « {badge} »; demandez en réservant.', featAlready: 'Le jour {d} a déjà {what} pour ça : {name}{at}. Sa fiche {site} a le badge « {badge} », donc je n’ai rien changé à votre plan.',
-    featBadge: { nonalcoholic: 'Options sans alcool', gluten_free: 'Sans gluten', vegan: 'Options véganes', vegetarian: 'Options végétariennes' }, featNone: 'Je n’ai pas trouvé d’endroit avec le badge « {badge} » pour remplacer {old}, donc il reste.',
+    featBadge: { nonalcoholic: 'Options sans alcool', gluten_free: 'Sans gluten', vegan: 'Options véganes', vegetarian: 'Options végétariennes', patio: 'Terrasse', lake_view: 'Vue sur le lac ou le vignoble', live_music: 'Musique en direct', dog_friendly: 'Accepte les chiens', kid_friendly: 'Adapté aux enfants' },
+    featSay: { nonalcoholic: 's’il y a des options sans alcool', gluten_free: 's’il y a des options sans gluten', vegan: 's’il y a des options véganes', vegetarian: 's’il y a des options végétariennes', patio: 's’il y a une terrasse', lake_view: 's’il y a une vue sur le lac', live_music: 's’il y a de la musique en direct', dog_friendly: 'si les chiens sont admis', kid_friendly: 'si l’endroit convient aux enfants' }, featOr: ' ni ',
+    featUnsure: 'Sa fiche {site} ne dit pas {say}; demandez en réservant.', featOnly: 'La fiche {site} de {old} a le badge « {badge} », et je n’ai trouvé {aucun} autre {noun} pour le jour {d} qui l’a aussi, donc je n’ai rien changé.', featKept: 'Je n’ai trouvé {aucun} {noun} pour le jour {d} dont la fiche {site} a le badge « {badge} », donc {old} reste.',
+    featAlt: 'Je peux le remplacer par {alt}, mais sa fiche ne dit pas {say}. Ça vous va?', featOther: '{name} a ce badge et convient au jour {d}{at}. Voulez-vous que je l’ajoute là?', featPlace: 'un autre endroit', featPlaceN: 'endroit', offerKept: 'D’accord, je n’ai rien changé à votre plan.', featNone: 'Je n’ai pas trouvé d’endroit avec le badge « {badge} » pour remplacer {old}, donc il reste.',
     diffDays: '{n} arrêts ont changé ({days}).', dayW: 'jour', daysW: 'jours', diffAll: '{n} arrêts ont changé en tout.', moreNot: 'Je n’ai pas pu faire {n} autres choses demandées.', moreNotOne: 'Je n’ai pas pu faire une autre chose demandée.',
     guardBroad: 'Cela changerait {n} autres arrêts : {names}. On y va?', guardMore: '{names} et {n} autres', guardSunset: 'Un souper au coucher du soleil à {time} ferait retirer {names}. On y va?',
     someRewrote: 'Compris : une seule personne ne boit pas, donc les vignobles et les microbrasseries conviennent aux autres. Rien n’a changé pour l’instant : dites « ajoute un vignoble » et j’en ajouterai un.', someNoted: 'J’ai noté qu’une seule personne ne boit pas.', someHas: 'Pour la personne qui ne boit pas : {names} {v} des options sans alcool.', someHasV1: 'indique', someHasVn: 'indiquent', someNone: 'Aucun de vos arrêts de dégustation n’indique d’options sans alcool; demandez en réservant.', someOffer: 'Voulez-vous un café près du vignoble? Dites « ajoute un café ».', someNoDrink: 'Noté : une personne ne boit pas. Votre plan n’a ni vignoble ni microbrasserie pour l’instant.',
@@ -1892,6 +2029,8 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
   const parts = [];
   const described = new Set();
   let allOk = true, featLine = '';
+  const badges = (feats) => joinList(feats.map((f) => t.featBadge[f] || f), L);
+  const plural = (text, feats) => (feats.length > 1 ? text.replace(L === 'fr' ? 'le badge' : ' badge', L === 'fr' ? 'les badges' : ' badges') : text);
   const marks = [];
   for (const r of out.results) {
     if (featLine) { parts.push(featLine); featLine = ''; }
@@ -1905,8 +2044,17 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
       case 'remove': parts.push(fill(t.took, { names: joinList(r.names, L) })); break;
       case 'keep': parts.push(out.plan ? fill(t.kept, { names: joinList(r.names, L) }) : fill(t.keptStays, { names: joinList(r.names, L), it: r.names.length > 1 ? t.theyStay : t.itStays })); break;
       case 'replace':
+        if (r.featAsked && !r.ok && r.old && r.featMiss) {
+          // No place with the badge fits: the stop stays; what could be done instead is offered by name.
+          const m = r.featMiss, kk = r.kind || TYPE_KIND[r.old.type] || null, K = kk && KINDS[kk] ? KINDS[kk] : null;
+          const v = { old: r.old.name, d: r.old.day, site: agent.AREA.site, badge: badges(r.featAsked), say: r.featAsked.map((f) => t.featSay[f] || f).join(t.featOr), noun: K ? kindNoun(kk, L) : t.featPlaceN, a: K ? K[L] : t.featPlace, aucun: K && /^une\b/i.test(K.fr) ? 'aucune' : 'aucun' };
+          parts.push(plural(fill(m.hasOld ? t.featOnly : t.featKept, v), r.featAsked));
+          if (m.other) parts.push(fill(t.featOther, { name: m.other.fresh.name, d: m.other.day, at: at(m.other.fresh) }));
+          else if (m.alt) parts.push(fill(t.featAlt, { ...v, alt: m.alt.name }));
+          break;
+        }
         if (r.featAsked && !r.ok && r.old) { parts.push(fill(t.featNone, { old: r.old.name, badge: t.featBadge[r.featAsked[0]] || r.featAsked[0] })); break; }
-        if (r.ok && r.fresh && r.featAsked) featLine = fill(r.feat ? t.featHas : t.featUnknown, { site: agent.AREA.site, badge: t.featBadge[r.featAsked[0]] || r.featAsked[0] });
+        if (r.ok && r.fresh && r.featAsked) featLine = r.feat ? plural(fill(t.featHas, { site: agent.AREA.site, badge: badges(r.featAsked) }), r.featAsked) : r.featOffered ? fill(t.featUnsure, { site: agent.AREA.site, say: r.featAsked.map((f) => t.featSay[f] || f).join(t.featOr) }) : fill(t.featUnknown, { site: agent.AREA.site, badge: t.featBadge[r.featAsked[0]] || r.featAsked[0] });
         if (r.ok && r.already) parts.push(fill(t.alreadyHas, { name: r.old.name, what: kindLabel(r.kind) }));
         else if (r.ok && r.fresh) { parts.push(fill(t.swapped, { old: r.old.name, new: r.fresh.name, at: at(r.fresh) })); described.add(r.fresh.id); described.add(r.old.id); } else if (r.ok) parts.push(t.refine);
         else if (!r.old) parts.push(fill(t.notFound, { what: L === 'fr' ? 'cet arrêt' : 'that stop' })); // no stop was named
@@ -2026,7 +2174,7 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
     else if (outs.length) parts.push(fill(t.diffOut, { out: joinList(outs, L) }));
     else if (!(out.changed || []).length && !described.size && out.results.every((r) => r.broad && r.op !== 'refine')) parts.push(t.same);
   }
-  if (!out.plan && out.failed && !(out.actions && (out.actions.remove.length || out.actions.keep.length)) && out.results.some((r) => r.ok === false)) parts.push(t.unchanged);
+  if (!out.plan && out.failed && !(out.actions && (out.actions.remove.length || out.actions.keep.length)) && out.results.some((r) => r.ok === false) && !out.results.some((r) => r.featMiss)) parts.push(t.unchanged);
   // Words only the planner read (no AI, no rule): honest when they changed nothing.
   if (out.results.length === 1 && out.results[0].op === 'refine' && (!out.plan || (!(out.added || []).length && !(out.gone || []).length))) return t.refineSame;
   // Each sentence once ("I couldn't find a winery…" for each of three days is said once).
@@ -2037,7 +2185,8 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
   // plain word when part of it could not be done.
   const split = (x) => x.split(/(?<=[.!?])\s+(?=[A-ZÀ-Ý“«])/).filter(Boolean);
   // What the planner did around a tour (lunch moved, wineries it covers) is always said, up to four short lines.
-  const maxLines = out.results.some((r) => r.tour && r.ok && ((r.tourAdjust || []).length || (r.covered || []).length)) ? 4 : Math.max(2, Math.min(4, asks || 1));
+  // So is a badge that no replacement has: why the stop stayed, what is offered instead, and the question.
+  const maxLines = out.results.some((r) => (r.tour && r.ok && ((r.tourAdjust || []).length || (r.covered || []).length)) || r.featMiss) ? 4 : Math.max(2, Math.min(4, asks || 1));
   const over = (list) => list.filter((x) => x !== t.done).length > maxLines;
   if (!over(split(full))) return full;
   // First without the lines that only explain ("Your plan is unchanged." after a reason, "It stays when you change...").
@@ -2056,7 +2205,40 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
   return [...(n ? [t.done] : []), ...keepOk, ...count, ...notDone].join(' ');
 }
 
+// What a kept swap offers instead, as the message a "yes" stands for (the page sends it back as body.offer; it is never
+// shown). The ids ride in a tag the rules read exactly (offerOps), so the place named in the reply is the one swapped in.
+function featOffers(results) {
+  const clean = (x) => String(x || '').replace(/[\[\]\n\r]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 60);
+  for (const r of results || []) {
+    const m = r && r.featMiss;
+    if (!m || !r.old || !(r.featAsked || []).length) continue;
+    if (m.other) return [`add ${clean(m.other.fresh.name)} on day ${m.other.day} [verified ${m.other.kind} d${m.other.day} ${r.featAsked.join(',')} ${m.other.fresh.id}]`];
+    if (m.alt) return [`swap ${clean(r.old.name)} for ${clean(m.alt.name)} [unverified ${r.old.id}>${m.alt.id} ${r.featAsked.join(',')}${r.kind ? ` ${r.kind}` : ''}]`];
+  }
+  return [];
+}
+// message: an offer the visitor said yes to. -> the ops it stands for, or null (any other message is read as usual).
+function offerOps(message, stops) {
+  const base = { stops: [], kind: null, time: null, day: null, value: null, n: null, ages: [], region: null, date: null };
+  const feats = (x) => String(x).split(',').filter((f) => SWAP_FEATS.includes(f)).slice(0, 3);
+  const u = /\[unverified (\d{1,9})>(\d{1,9}) ([a-z_,]{1,80})(?: ([a-z_]{1,24}))?\]\s*$/.exec(String(message || ''));
+  if (u) {
+    const old = (stops || []).find((x) => x.id === Number(u[1]));
+    const f = feats(u[3]);
+    if (!old || !f.length || (u[4] && !KIND_SWAP[u[4]])) return null;
+    return [{ ...base, o: 'replace', stops: [old], kind: u[4] || null, features: null, _featAsked: f, toId: Number(u[2]) }];
+  }
+  const v = /\[verified ([a-z_]{1,24}) d(\d) ([a-z_,]{1,80}) (\d{1,9})\]\s*$/.exec(String(message || ''));
+  if (v) {
+    const f = feats(v[3]);
+    if (!KIND_SWAP[v[1]] || !f.length || !(Number(v[2]) >= 1)) return null;
+    return [{ ...base, o: 'add', kind: v[1], day: Number(v[2]), features: f, strict: true }];
+  }
+  return null;
+}
+
 module.exports = {
+  featOffers, offerOps, swapFeatsFor, SWAP_FEATS,
   STAY_VALUES, STAY_AMENITY_VALUES, TRANSPORT_VALUES, fill, stayAmenitiesIn, stayTextPref,
   MODEL, PRICE_PER_TOKEN, DEFAULT_TIMEOUT_MS, DEFAULT_DAILY_USD, MAX_MESSAGE, MAX_STOPS, RATE, OPS, TIMES, VALUES, CANT, KINDS, KIND_KEYS, CHIPS, T,
   enabled, apiKey, wireSchema, systemPrompt, stopsForModel, stripPII, validateWire, readChatMessage, rulesRead, chipOps,

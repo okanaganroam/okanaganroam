@@ -8419,6 +8419,15 @@ function parseTripChatBody(body, opts = {}) {
 // The stops on screen, named from our own database (the page sends only slots and ids): what the model and the
 // templates see. Stops whose place is gone are left out.
 const TRIP_CHAT_FEATS = ['gluten_free', 'vegan', 'vegetarian', 'nonalcoholic'];
+// A badge asked of a replacement or an added stop (2026-11-22): only what the listing itself shows (the public badge),
+// never a guess. The planner's Swap filters on the same badges (swap.features).
+function tripChatHasBadge(id, f) {
+  try {
+    if (!tripChat.SWAP_FEATS.includes(f) || !BOOL_FIELDS.includes(f)) return false;
+    const row = db.prepare('SELECT * FROM venues WHERE id = ? AND redirect_to IS NULL').get(id);
+    return !!row && !!badgeOnPublic(row, f);
+  } catch (e) { return false; }
+}
 function tripChatStops(list) {
   const ids = [...new Set(list.map((x) => x.id))];
   if (!ids.length) return [];
@@ -8542,11 +8551,22 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   if (v.args.overrides && v.args.overrides.stopStarts) { const ss = Object.fromEntries(Object.entries(v.args.overrides.stopStarts).filter(([k]) => stops.some((s) => s.key === k && !v.removed.includes(k)))); if (Object.keys(ss).length) v.args.overrides.stopStarts = ss; else delete v.args.overrides.stopStarts; }
   let ops = null, cant = null, source = 'rules', ai = null, what = null, fixes = [], missed = [], asks = 1;
   // The visitor's answer to choices the chat offered ("day 3", "swap the park", "yes"): the offered message itself.
-  if (!v.chip && (v.offer || []).length) { const picked = tripChat.explain.pickOffer(v.message, v.offer, tripChat.fold); if (picked) v.message = picked.slice(0, tripChat.MAX_MESSAGE); }
+  // An offer of a named place (a swap whose badge is unknown, or a place with the badge on another day) carries its ids:
+  // a yes is carried out exactly as offered, by fixed rules. A plain "no" keeps the plan and says so.
+  let offered = null;
+  if (!v.chip && (v.offer || []).length) {
+    const picked = tripChat.explain.pickOffer(v.message, v.offer, tripChat.fold);
+    if (picked) { v.message = picked.slice(0, tripChat.MAX_MESSAGE); offered = tripChat.offerOps(picked, stops.filter((s) => !v.removed.includes(s.key))); }
+    else if (tripChat.explain.declinesOffer(v.message, tripChat.fold)) {
+      const none0 = { remove: [], keep: [] };
+      return { source: 'rules', cant: null, plan: null, actions: none0, response: { reply: tripChat.T[lang === 'fr' ? 'fr' : 'en'].offerKept, source: 'rules', plan: null, req: null, changed: [], actions: none0 } };
+    }
+  }
   // A question about the plan ("why did you say…", "what does the warning mean?") is answered and NEVER changes the
   // plan, whatever the rules or the AI made of it: only its ask ops are kept, and the response is stripped below.
   const explainOnly = !v.chip && tripChat.explain.isExplainQuestion(tripChat.fold(v.message).replace(/\s+/g, ' ').trim());
   if (v.chip) { ops = tripChat.chipOps(v.chip); source = 'chip'; }
+  else if (offered) ops = offered;
   else {
     // The word rules first (instant), then the AI (live eval 2026-11-22: p50 1.1 s, some 3 s timeouts). When the rules
     // read the message confidently, the AI gets a short grace (TRIP_CHAT_GRACE_MS, default 1500 ms) and the rules answer
@@ -8631,7 +8651,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // Round 4: a change to the stops keeps the place to stay the visitor sees (it changed with unrelated messages).
   tripChatKeepStayId = extra.some((o) => o.o === 'stay') ? null : v.stayId || null;
   let out;
-  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run, hooks, weakFor: tripChatWeakFor, hasFeature: (id, f) => { try { return TRIP_CHAT_FEATS.includes(f) && !!db.prepare(`SELECT 1 FROM venues WHERE id = ? AND ${f} = 1 AND redirect_to IS NULL`).get(id); } catch (e) { return false; } }, sunsetStart: (day, region) => { try { const d = (v.dayDates || [])[day - 1] || null; const sd = d && typeof sunsetDinnerStart === 'function' ? sunsetDinnerStart(d, region) : null; return sd ? sd.startMinutes : null; } catch (e) { return null; } } })
+  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run, hooks, weakFor: tripChatWeakFor, hasFeature: tripChatHasBadge, sunsetStart: (day, region) => { try { const d = (v.dayDates || [])[day - 1] || null; const sd = d && typeof sunsetDinnerStart === 'function' ? sunsetDinnerStart(d, region) : null; return sd ? sd.startMinutes : null; } catch (e) { return null; } } })
     : { plan: null, req: null, actions: { remove: [], keep: [] }, results: [], changed: [] }; } finally { tripChatKeepStayId = null; }
   // The broad-change guard: a targeted edit that would change more than two other stops, or a sunset time that would drop
   // a stop nobody mentioned, is said first and applied only on a clear yes (the page sends the message again, confirmed).
@@ -8657,6 +8677,8 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   let reply = planOps.length ? tripChat.buildReply(out, { lang, regionLabels: REGION_LABELS, cant, asks }) : '';
   let plan = out.plan || null, req = out.req || null, stayPref, transport, stayBlock, newText = null, card = null, stayForce, stayArrive, party, note = null, offer = [];
   // A full day said with choices ("swap X, or day 3 at 1:15 PM. Which?"): the choices go back as plain messages.
+  // A swap that asked for a badge no replacement has: the place offered instead, by name (a "yes" swaps to it).
+  if (!offer.length) offer = tripChat.featOffers((out && out.results) || []);
   for (const r of (out && out.results) || []) if (r.why === 'full' && r.full && !offer.length) offer = tripChat.explain.fullReply(r.full, { KINDS: tripChat.KINDS, noun: tripChat.kindNoun, clock: tripChat.clock }, lang).offer.map((o) => o.say);
   if (tourCard) {
     const TT = tripChat.T[lang === 'fr' ? 'fr' : 'en'];
@@ -8707,6 +8729,9 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // Round 6 (Penticton wine weekend: after "book us a wine tour" the agent line read "I couldn't fit winery on these
   // dates"): the wineries a wine tour on the plan covers are not "not included".
   if (plan) tripChatToursCover(plan, req);
+  // The plan's evidence lines (the non-drinker's line, gluten-free, what was not included) are worked out again for the
+  // stops the chat returns (it takes out places a pinned re-run adds), so the page and the reply never disagree.
+  if (plan && typeof tripHonestEvidence === 'function') { try { tripHonestEvidence(plan); } catch (e) { /* the planner's lines stand */ } }
   // Planner round 5: the day labels follow the stops shown (the chat takes out places a pinned re-run adds).
   if (plan) { try { tripPlannerModule().v4DayTownLabels(plan, { v4: true, labels: { regions: REGION_LABELS } }); } catch (e) { /* cosmetic */ } }
   logTiming();
@@ -83085,7 +83110,7 @@ if (require.main === module) {
 module.exports = {
   sunsetDinnerStart,
   // Travel agent chat (2026-11-22), for tests/trip-chat-api.test.js.
-  parseTripChatBody, tripChatStops, setTripChatReader, runTripChatTurn, runTripPlanRequest, tripChatEnabledFor,
+  parseTripChatBody, tripChatStops, tripChatHasBadge, setTripChatReader, runTripChatTurn, runTripPlanRequest, tripChatEnabledFor,
   tripChatSafeRun,
   clearVenueOwnerFeaturesCache, sportPriceLineCounts, happyHourHiddenNow, venueHappyHourForTest: (v, now, fr = false) => venueHappyHour(v, null, fr, now), happyHourStatesForTest: happyHourStatesFor, setupSisterNamesForTest: setupSisterNames, sisterListingsOf, partHhWhen, happyHourPartOf, happyHourPartOn, happyHourAtText, indoorLowestTyped, sportPracticeKept, golfOnSiteFood, tripOwnerClosureNotes,
   // Places to stay (2026-11-19), for tests/stays.test.js.
