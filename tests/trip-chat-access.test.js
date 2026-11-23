@@ -108,7 +108,7 @@ test('without plan.evidence: the stops’ own data decides; true is verified, mi
   assert.match(reply, /^Hotel: now Quality Inn & Suites Vernon; its listing has accessible rooms and allows pets in some rooms\./);
   assert.match(reply, /Wheelchair access: Kal Lake Lookout lists wheelchair access; Davison Orchards says it isn’t wheelchair accessible; Grey Canal Trail doesn’t say\./);
   assert.match(reply, /Dog: Kal Lake Lookout, Roster Sports Club and Polson Bistro list dogs welcome; Grey Canal Trail, Station BBQ and Davison Orchards don’t say\./);
-  assert.match(reply, /Still to check: wheelchair access at Grey Canal Trail and Davison Orchards; dogs at Grey Canal Trail, Station BBQ and Davison Orchards\. Call ahead\.$/);
+  assert.match(reply, /Still to check: wheelchair access at Grey Canal Trail and Davison Orchards; dogs at Grey Canal Trail, Station BBQ and Davison Orchards; a pet-friendly room at Quality Inn & Suites Vernon \(pets in some rooms only\)\. Call ahead\.$/);
   assert.ok(sentences(reply).length <= 5 && reply.split('. ').length <= 5, reply);
   // Never "not accessible" for a stop whose data does not say.
   assert.ok(!/Grey Canal Trail says it isn’t/.test(reply));
