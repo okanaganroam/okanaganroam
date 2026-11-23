@@ -68175,6 +68175,7 @@ function sport4KindHelp(t, kind, venue, happy) {
   return t;
 }
 const sport5HelpModule = require('./sport-help');
+const outdoorHelpModule = require('./outdoor-help');
 const SPORT_SETUP_HELP_TOPICS = sport5HelpModule.TOPICS.concat(SPORT4_HELP_TOPICS).concat(SPORT_TEST3_HELP_TOPICS).concat(SPORT_TEST2_HELP_TOPICS).concat(SPORT_TEST1_HELP_TOPICS).concat(SPORT_OWN_HELP_TOPICS).concat(INDOOR_SETUP_HELP_TOPICS.filter((t) => t && !SPORT_HELP_SKIP.has(t.id)).map((t) => ({ ...t, q: sportHelpWords(t.q), qFr: sportHelpWords(t.qFr), a: sportHelpWords(t.a), aFr: sportHelpWords(t.aFr),
   // The kinds topic's "several things" examples in sport words.
   ...(t.id === 'indoor-kinds-many' ? { keys: t.keys.concat(['golf and mini golf', 'range and mini golf', 'arena and pool', 'skate park and courts', 'course and range', 'simulators and lessons']) } : {}),
@@ -71781,7 +71782,18 @@ const OWNER_HELP_SCRIPT = String.raw`
     for (var j = 0; j < scored.length; j++) if (S.own.indexOf(scored[j]) >= 0 && can(scored[j])) return take(scored[j], 'own');
     return S.go && can(S.go) ? take(S.go, 'go') : null;
   }
+  // Outdoor businesses (2026-11-23): cfg.first (outdoor-help.js FIRST), the question's intent read first: the first rule
+  // whose every pattern is in the question (and none of its nots) answers, before any word scoring.
+  var FIRSTRE = (cfg.first || []).map(function(r){ var mk = function(a){ return (a || []).map(function(x){ return new RegExp(x); }); }; return { r: r, all: mk(r.all), not: mk(r.not) }; });
+  function firstRule(q){
+    if (!FIRSTRE.length) return null;
+    var qs = ' ' + toks(q).join(' ') + ' ';
+    for (var i = 0; i < FIRSTRE.length; i++) { var f = FIRSTRE[i]; if (byIdM[f.r.to] && f.all.every(function(x){ return x.test(qs); }) && !f.not.some(function(x){ return x.test(qs); })) return f.r; }
+    return null;
+  }
   function best(q, screen){
+    var f0 = firstRule(q);
+    if (f0) { var rf = best0(q); return { id: f0.to, hits: [f0.to].concat(rf.hits.filter(function(x){ return x !== f0.to; })), lang: rf.lang, why: [{ first: f0.id }] }; }
     var r0 = bestFit(q), sc = onScreen(q, r0, screen);
     if (sc) return sc;
     var r = sure0(q, r0);
@@ -72282,6 +72294,17 @@ function ownerHelpWidgetHtml(page, opts = {}) {
     // Indoor test 2: an answer that says happy hour isn't offered (keepHappy) keeps those words.
     cfg.topics = cfg.topics.map((t) => (isHh(t) || t.keepHappy ? t : { ...t, a: helpWithoutHappyHour(t.a), aFr: helpWithoutHappyHour(t.aFr) }));
   }
+  // Outdoor businesses (2026-11-23; outdoor test 1, a campground: 7 of 31 Help answers good, the rest in golf, sport,
+  // indoor or food words): an outdoor listing's Help is its own (outdoor-help.js): its topics in its kind's words, without
+  // the golf, sport, indoor and food ones, and its intent rules (cfg.first), read before any word scoring.
+  try {
+    const pvO = opts.venueId ? getVenue(opts.venueId) : null;
+    if (pvO && pvO.type === 'outdoor' && OUTDOOR_SETUP_ON) {
+      let kO = indoorKindsModule.sportKindKey((venueIndoorInfo(pvO.id).kinds || []).length ? venueIndoorInfo(pvO.id).kinds : indoorKindSuggestion(pvO), pvO.type);
+      if (!outdoorHelpModule.isOutdoorKind(kO)) kO = 'outdoorother';
+      outdoorHelpModule.apply(cfg, kO, { html: frSpacingHtml, text: OWNER_SETUP_STRINGS.frSpacing });
+    }
+  } catch (e) { /* as they are */ }
   const u = OWNER_HELP_UI[lang];
   return `<style>${OWNER_HELP_CSS}</style>
 <button type="button" class="ohb-btn" id="ohbBtn" aria-controls="ohbPanel" aria-expanded="false"><span class="ohb-q" aria-hidden="true">?</span>${escapeHtml(u.button)}</button>
