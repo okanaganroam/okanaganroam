@@ -191,3 +191,18 @@ test('SEO: display only. Sitemap and robots identical with and without the badge
   const json = page(v).match(/<script type="application\/ld\+json">[\s\S]*?<\/script>/g) || [];
   assert.ok(json.every((j) => !/award|Review|AggregateRating.*Complete/.test(j)), 'no award or review markup');
 });
+
+test('dashboard report (2026-11-23): verified count, and listings a few items short with what is missing', () => {
+  const done = full();
+  const close = full(); db.prepare('DELETE FROM venue_arrival_points WHERE venue_id = ?').run(close.id); app.resetCompleteVerifiedCache();
+  const r = app.completenessReport();
+  assert.ok(r.verified >= 1 && r.verified_list.some((x) => x.name === done.name), 'the finished one is counted and listed');
+  assert.equal(r.verified, app.completeVerifiedIds().size, 'same rule as the badge');
+  const near = r.near.find((x) => x.id === close.id);
+  assert.ok(near, 'one item short is listed as almost there');
+  assert.equal(near.left, 1); assert.equal(near.missing.length, 1); assert.ok(near.pct < 100 && near.pct >= 90);
+  assert.equal(near.url, `/penticton/restaurants/${close.slug}`);
+  assert.equal(near.has_email, true, 'the approved claim gave us an email');
+  assert.ok(!r.near.some((x) => x.id === done.id), 'a verified listing is not in the nudge list');
+  assert.ok(r.near.every((x) => x.left >= 1 && x.left <= r.near_max));
+});
