@@ -285,7 +285,7 @@ test('end to end: a request that never said the needs gains each one once, and t
   assert.match(j.reply, /^Hotel: Access Test Hotel stays; its listing has accessible rooms and allows pets in some rooms\./);
   assert.match(j.reply, /Wheelchair access: Access Test Lookout Loop lists wheelchair access\./);
   assert.match(j.reply, /Dog: both stops list dogs welcome\./);
-  assert.match(j.reply, /Nothing else to check from the listings\.$/);
+  assert.match(j.reply, /Still to check: a pet-friendly room at Access Test Hotel \(pets in some rooms only\)\. Call ahead\.$/);
   // Said again: the text does not gain it twice.
   const j2 = await say(page1, MSG);
   const page2 = apply(page1, j2);
@@ -297,7 +297,7 @@ test('end to end: a request that never said the needs gains each one once, and t
   const fr = await say(pageOf(REQ_PLAIN, [LIVE[0], LIVE[1]], F.H_NEW.id), MSG_FR, 'fr');
   assert.match(fr.reply, /^Hôtel : Access Test Hotel reste; sa fiche indique des chambres accessibles et accepte les animaux dans certaines chambres\./);
   assert.match(fr.reply, /Accès en fauteuil roulant : Access Test Lookout Loop indique un accès en fauteuil roulant\./);
-  assert.match(fr.reply, /Rien d’autre à vérifier d’après les fiches\.$/);
+  assert.match(fr.reply, /À vérifier : une chambre où les animaux sont acceptés à Access Test Hotel \(certaines chambres seulement\)\./);
 });
 
 test('end to end: more than two stops would change, so the chat asks first; yes swaps where it can, the rest is “still to check”', async () => {

@@ -160,7 +160,7 @@ const TX = {
     swapped: 'I swapped {old} for {fresh}, {whose}', noSwap: 'I found no listed replacement for {names}', says: ['says', 'say'],
     hotel: 'Hotel', stayNow: 'now {name}; its listing {has}', stayKeeps: '{name} stays; its listing {has}', stayNo: '{name}’s listing doesn’t say {miss}, and I found no place nearby whose listing does', stayNone: 'there’s no place to stay on this plan',
     stayHas: { accessible: 'has accessible rooms', pets: 'allows pets', petsSome: 'allows pets in some rooms' }, stayMiss: { accessible: 'if it has accessible rooms', pets: 'if pets are allowed' }, stayNot: { accessible: 'says it has no accessible rooms', pets: 'says no pets' }, butNot: ' but doesn’t say {miss}',
-    stayAt: { accessible: 'accessible rooms at {name}', pets: 'pets at {name}' },
+    stayAt: { accessible: 'accessible rooms at {name}', pets: 'pets at {name}' }, stayPetsSome: 'a pet-friendly room at {name} (pets in some rooms only)',
     still: 'Still to check: {list}.', call: ' Call ahead.', nothingLeft: 'Nothing else to check from the listings.', details: ' Details has the full list.', count: '{n} stops',
     ask: '{n} stops don’t say {say}: {names}. Swap them for places {whose}, where I can find them? Go ahead?',
     qNone: 'Your request doesn’t mention a need I check on listings, such as a wheelchair or a dog.', qDay: 'Day {d}: ',
@@ -184,7 +184,7 @@ const TX = {
     swapped: 'j’ai remplacé {old} par {fresh}, {whose}', noSwap: 'je n’ai trouvé aucun remplacement indiqué pour {names}', says: ['dit', 'disent'],
     hotel: 'Hôtel', stayNow: 'maintenant {name}; sa fiche {has}', stayKeeps: '{name} reste; sa fiche {has}', stayNo: 'la fiche de {name} ne dit pas {miss}, et je n’ai trouvé aucun logement proche dont la fiche le dit', stayNone: 'il n’y a pas de logement dans ce plan',
     stayHas: { accessible: 'indique des chambres accessibles', pets: 'accepte les animaux', petsSome: 'accepte les animaux dans certaines chambres' }, stayMiss: { accessible: 's’il a des chambres accessibles', pets: 'si les animaux sont acceptés' }, stayNot: { accessible: 'indique qu’il n’a pas de chambres accessibles', pets: 'indique que les animaux ne sont pas acceptés' }, butNot: ' mais ne dit pas {miss}',
-    stayAt: { accessible: 'les chambres accessibles à {name}', pets: 'les animaux à {name}' },
+    stayAt: { accessible: 'les chambres accessibles à {name}', pets: 'les animaux à {name}' }, stayPetsSome: 'une chambre où les animaux sont acceptés à {name} (certaines chambres seulement)',
     still: 'À vérifier : {list}.', call: ' Appelez avant d’y aller.', nothingLeft: 'Rien d’autre à vérifier d’après les fiches.', details: ' La liste complète est dans Détails.', count: '{n} arrêts',
     ask: 'Les fiches de {n} arrêts ne disent pas {say} : {names}. Je les remplace par des endroits {whose}, là où j’en trouve? J’y vais?',
     qNone: 'Votre demande ne mentionne pas de besoin que je vérifie sur les fiches, comme un fauteuil roulant ou un chien.', qDay: 'Jour {d} : ',
@@ -248,7 +248,8 @@ function stillLine(checks, stay, lang, extra = []) {
     if (u.length > 3) long = true;
     items.push(fillT(t.at[c.need], { names: u.length > 3 ? fillT(t.count, { n: u.length }) : joinNames(u.map((s) => s.name), t) }));
   }
-  if (stay) for (const k of stay.asked) { const v = stay.has[k]; if (!(v === true || v === 'yes' || v === 'some')) items.push(fillT(t.stayAt[k], { name: stay.name })); }
+  // Pets in some rooms only is still something to ask for when booking.
+  if (stay) for (const k of stay.asked) { const v = stay.has[k]; if (v === 'some') items.push(fillT(t.stayPetsSome, { name: stay.name })); else if (!(v === true || v === 'yes')) items.push(fillT(t.stayAt[k], { name: stay.name })); }
   for (const x of extra) if (x) items.push(x);
   if (!items.length) return t.nothingLeft;
   return `${fillT(t.still, { list: items.join('; ') })}${long ? t.details : (checks || []).some((c) => c.unk.length || c.no.length) || (stay && items.length) ? t.call : ''}`;
