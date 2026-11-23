@@ -29,7 +29,15 @@ function tripEvidenceFor(ask, stops, planEvidence, lang) {
   for (i = 0; i < (planEvidence || []).length; i++) { var e = planEvidence[i]; if (e && e.ask === ask && !given) given = e; }
   // Evidence built for another set of stops (one was removed or swapped on the page since) is not used: the badges of
   // the stops shown are read instead.
-  if (given && Array.isArray(given.stops) && (stops || []).length) { for (i = 0; i < given.stops.length; i++) { var gi = given.stops[i], on = false; for (var q = 0; q < stops.length; q++) if (gi && stops[q] && stops[q].id === gi.id) on = true; if (gi && gi.id && !on) { given = null; break; } } }
+  // (2026-11-23) A meal stop taken off the page since: the plan's own meal stops that are still shown are the ones
+  // counted (the same stops the summary and a shared copy count), unless a restaurant the evidence never saw is shown.
+  if (given && Array.isArray(given.stops) && (stops || []).length) {
+    var kept = [], lost = false, unseen = false, q;
+    for (i = 0; i < given.stops.length; i++) { var gi = given.stops[i], on = false; for (q = 0; q < stops.length; q++) if (gi && stops[q] && stops[q].id === gi.id) on = true; if (gi && gi.id && !on) lost = true; else kept.push(gi); }
+    for (q = 0; q < stops.length; q++) { var known = false; for (i = 0; i < given.stops.length; i++) if (stops[q] && given.stops[i] && given.stops[i].id === stops[q].id) known = true; if (stops[q] && stops[q].type === 'restaurant' && !known) unseen = true; }
+    if (lost && unseen) given = null;
+    else if (lost) { var ny = 0; for (i = 0; i < kept.length; i++) if (kept[i] && kept[i].has === true) ny++; given = { ask: ask, stops: kept, status: !kept.length ? 'unknown' : ny === kept.length ? 'verified' : ny > 0 ? 'partial' : 'unmet' }; }
+  }
   if (given && Array.isArray(given.stops) && /^(verified|partial|unknown|unmet)$/.test(String(given.status))) {
     source = 'plan'; status = given.status;
     for (i = 0; i < given.stops.length; i++) { var g = given.stops[i]; if (g && g.name) list.push({ id: g.id, name: String(g.name), has: g.has === true ? true : g.has === false ? false : null }); }

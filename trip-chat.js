@@ -679,13 +679,17 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
     if (lunchStop) return { ops: [], cant: 'ends_lunch', what: null, exact: true };
   }
   if (day && /\b(?:lighter|light|easy|easier|allege[rz]?|plus leger|plus legere|moins charge)\b/.test(t) && !/\b(?:hikes?|trails?|walks?|randonnees?)\b/.test(t)) return { ops: [op('pace', { value: 'relaxed', day })], cant: null };
+  // (2026-11-23, Dayton: "Please make the second day less busy" took a stop off day 1) A day named by its number or
+  // as "the second day", asked to be lighter in any of the usual words: that day only.
+  const dayWord = /\b(?:first|1st|premier|premiere)\s+(?:day|jour|journee)\b/.test(t) ? 1 : /\b(?:second|2nd|deuxieme)\s+(?:day|jour|journee)\b/.test(t) ? 2 : /\b(?:third|3rd|troisieme)\s+(?:day|jour|journee)\b/.test(t) ? 3 : /\b(?:last|dernier|derniere)\s+(?:day|jour|journee)\b/.test(t) ? days : null;
+  if ((day || dayWord) && !/\b(?:hikes?|trails?|walks?|randonnees?)\b/.test(t) && !/\b(?:something|somewhere|quelque chose de) relax\w*/.test(t)
+    && /\b(?:lighter|less (?:busy|packed|full|rushed|hectic)|not (?:so|as) (?:busy|packed|full|rushed)|slow(?:er)? down|slower|more relax(?:ed|ing)|fewer (?:stops|things)|allege[rz]?|plus leger|plus legere|moins (?:charge|rempli)e?|plus (?:relax|tranquille)|moins d'arrets)\b/.test(t)) return { ops: [op('pace', { value: 'relaxed', day: day || dayWord })], cant: null };
   // Days
   const nd = /\b(?:make it|for|en|sur|plan)\s+(\d|one|two|three|four|five|six|seven|un|une|deux|trois|quatre|cinq|sept)\s*(?:days?|jours?)\b/.exec(t);
   if (nd) ops.push(op('days', { n: Math.min(7, Number(nd[1]) || NUM_WORDS[nd[1]] || 1) }));
   else if (/\b(?:add (?:a|one|another) day|one more day|extra day|un jour de plus|une journee de plus)\b/.test(t)) ops.push(op('days', { n: Math.min(7, days + 1) }));
   else if (/\b(?:one day less|one less day|shorter trip|un jour de moins)\b/.test(t) && days > 1) ops.push(op('days', { n: days - 1 }));
   // "the second day is too busy" (fix round 2026-11-22): that day only, lighter (pace with a day).
-  const dayWord = /\b(?:first|1st|premier|premiere)\s+(?:day|jour)\b/.test(t) ? 1 : /\b(?:second|2nd|deuxieme)\s+(?:day|jour)\b/.test(t) ? 2 : /\b(?:third|3rd|troisieme)\s+(?:day|jour)\b/.test(t) ? 3 : /\b(?:last|dernier)\s+(?:day|jour)\b/.test(t) ? days : null;
   if (/\b(?:too (?:busy|much|packed|full|long)|trop (?:charge|rempli|long))\b/.test(t) && (day || dayWord)) return { ops: [op('pace', { value: 'relaxed', day: day || dayWord })], cant: null };
   // Pace
   // "something relaxing" is a kind of stop and "an easier hike" a swap, not the pace; "fill the day: a winery, lunch..."
@@ -1094,6 +1098,10 @@ function broadTurn(ops, ctx) {
         for (const s of op.stops) { actions.keep.push(s.key); locks[s.key] = s.id; }
         r.ok = true; r.names = op.stops.map((s) => s.name);
         break;
+      case 'light_kept':
+        // A day already down to its meals and what the request asked for: nothing comes off, and the reply says so.
+        r.ok = true; r.benign = true; r.day = op.day; r.names = op.stops.map((s) => s.name);
+        break;
       case 'more_like': {
         const liked = op.stops[0];
         locks[liked.key] = liked.id; actions.keep.push(liked.key);
@@ -1470,11 +1478,32 @@ function wantMatches(kind, v) {
 
 // A lighter day: the last non-meal stop(s) of that day come off (one; two when it has four or more), never a meal or a kept
 // stop; every other day is untouched.
+// (2026-11-23) One day asked to be lighter (not ctx.one, the whole trip's "slower pace"): a stop of a kind the request
+// asked for stays while it is the plan's last one of its kind ("breweries": the trip's one brewery; "lake activities":
+// its last beach), and a café comes off only when nothing else can. When nothing can come off, the day stays and the
+// reply says why (light_kept); the trip is never re-planned for it.
+function askedStop(request) {
+  const main = mainAsked(request), lake = /\b(?:lakes?|lac|on the water|sur l'eau|waterfront)\b/.test(fold(request || ''));
+  return (s) => main(s) || (lake && s.type === 'beach');
+}
 function lighterDayOps(op, ctx) {
-  const pool = (ctx.stops || []).filter((s) => s.day === op.day && !s.role && !(ctx.locks || {})[s.key] && !(ctx.removed || []).includes(s.key));
-  if (!pool.length) return null;
-  const n = pool.length >= 4 && !ctx.one ? 2 : 1;
-  return { ...op, o: 'remove', stops: pool.slice(-n), value: null, lighterDay: op.day };
+  const on = (ctx.stops || []).filter((s) => s.day === op.day && !(ctx.removed || []).includes(s.key));
+  const pool = on.filter((s) => !s.role && !(ctx.locks || {})[s.key]);
+  if (ctx.one) return pool.length ? { ...op, o: 'remove', stops: pool.slice(-1), value: null, lighterDay: op.day } : null;
+  const asked = askedStop(ctx.args && ctx.args.text), n = pool.length >= 4 ? 2 : 1, take = [];
+  const left = (s) => (ctx.stops || []).some((x) => x !== s && !take.includes(x) && x.type === s.type && !(ctx.removed || []).includes(x.key));
+  const food = (s) => ['restaurant', 'cafe'].includes(s.type);
+  for (const pass of [(s) => !food(s), food]) {
+    for (let i = pool.length - 1; i >= 0 && take.length < n; i--) {
+      const s = pool[i];
+      if (!pass(s) || take.includes(s) || (asked(s) && !left(s))) continue;
+      take.push(s);
+    }
+    if (take.length) break;
+  }
+  take.sort((a, b) => pool.indexOf(a) - pool.indexOf(b));
+  if (take.length) return { ...op, o: 'remove', stops: take, value: null, lighterDay: op.day };
+  return { ...op, o: 'light_kept', stops: on, value: null };
 }
 // Travel agent abilities (trip-chat-agent.js): a stop moved to another day or part of the day, and one stop's own time,
 // are applied after the message's other edits, on the plan as it then is. Every other stop stays on the plan.
@@ -1837,6 +1866,7 @@ const T = {
     time_at: 'I can’t set an exact time for one stop yet. I can start the day earlier or later, or swap that stop.',
     wineTour: 'Here’s a wine tour with a driver for {town}. It’s under “Getting here & tours”, with its Book button.', wineTourNone: 'I don’t have a wine tour to offer for {town} right now.',
     poolWinter: ' (check it’s open in winter)',
+    lightKept: 'I left day {d} as is: it only has {names} (meals and what you asked for).', lightNone: 'Day {d} has nothing left to take out.',
     done: 'Done.', took: 'Took out {names}.', kept: 'Kept {names}.', keptStays: 'Kept {names}. {it} when you change other things.', itStays: 'It stays', theyStay: 'They stay',
     addedLater: 'Nothing that fits opens earlier, so I added {new}{at}.', addedNear: 'No {kind} was open {where}, so I added {new}{at}.', addedPartFull: 'The {part} was full, so I added {new}{at}.', partN: { morning: 'morning', midday: 'midday', afternoon: 'afternoon', evening: 'evening' }, partW: { morning: 'in the morning', midday: 'at midday', afternoon: 'in the afternoon', evening: 'in the evening' },
     elsewhere: '{site} only covers {area}, so I can’t plan {town} here. I can keep changing this plan, or start a new one {home}.', elsewhereSister: 'Our sister site {sister} ({url}) plans {covers}, so try {town} there. Here I can keep changing this plan.',
@@ -1894,6 +1924,7 @@ const T = {
     time_at: 'Je ne peux pas encore fixer l’heure exacte d’un seul arrêt. Je peux commencer la journée plus tôt ou plus tard, ou remplacer cet arrêt.',
     wineTour: 'Voici un tour des vignobles avec chauffeur pour {town}. Il est sous « Pour venir et excursions », avec son bouton Réserver.', wineTourNone: 'Je n’ai pas de tour des vignobles à proposer pour {town} en ce moment.',
     poolWinter: ' (vérifiez qu’elle est ouverte en hiver)',
+    lightKept: 'J’ai laissé le jour {d} tel quel : il n’a que {names} (les repas et ce que vous avez demandé).', lightNone: 'Il n’y a plus rien à retirer au jour {d}.',
     done: 'C’est fait.', took: 'J’ai retiré {names}.', kept: 'J’ai gardé {names}.', keptStays: 'J’ai gardé {names}. {it} si vous changez autre chose.', itStays: 'Il reste', theyStay: 'Ils restent',
     addedLater: 'Rien qui convienne n’ouvre plus tôt, donc j’ai ajouté {new}{at}.', addedNear: 'Aucun lieu pour {kind} n’était ouvert {where}, donc j’ai ajouté {new}{at}.', addedPartFull: 'Le {part} était complet, donc j’ai ajouté {new}{at}.', partN: { morning: 'matin', midday: 'midi', afternoon: 'après-midi', evening: 'soir' }, partW: { morning: 'le matin', midday: 'à midi', afternoon: 'l’après-midi', evening: 'le soir' },
     elsewhere: '{site} couvre seulement {area}, donc je ne peux pas planifier {town} ici. Je peux continuer à modifier ce plan, ou en commencer un nouveau {home}.', elsewhereSister: 'Notre site jumeau {sister} ({url}) planifie {covers}; essayez {town} là-bas. Ici, je peux continuer à modifier ce plan.',
@@ -2080,6 +2111,7 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
     if (!out.plan && out.failed && r.op === 'budget' && !r.pairs) { if (!parts.includes(t.cantChange)) parts.push(t.cantChange); continue; }
     switch (r.op) {
       case 'remove': parts.push(fill(t.took, { names: joinList(r.names, L) })); break;
+      case 'light_kept': parts.push(r.names.length ? fill(t.lightKept, { d: r.day, names: joinList(r.names, L) }) : fill(t.lightNone, { d: r.day })); break;
       case 'keep': parts.push(out.plan ? fill(t.kept, { names: joinList(r.names, L) }) : fill(t.keptStays, { names: joinList(r.names, L), it: r.names.length > 1 ? t.theyStay : t.itStays })); break;
       case 'replace':
         if (r.featAsked && !r.ok && r.old && r.featMiss) {

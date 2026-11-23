@@ -8570,7 +8570,7 @@ function tripChatRoomsNow(v) {
   try { const p = tripPlannerModule().requestParty(String(v.args.text || '')); if (adults === null && p.adults) adults = Math.min(16, p.adults); if (kids === null && p.kids) kids = p.kids; } catch (e) { /* as given */ }
   if (adults === null && kids > 0) adults = 2;
   let given = Number.isInteger(st.rooms) ? st.rooms : null;
-  if (given === null) { const said = tripStays.roomsInText(String(v.args.text || '')); if (said && said.rooms) given = said.rooms; else if (said && said.each && adults) given = Math.min(tripStays.MAX_ROOMS, adults); }
+  if (given === null) given = tripStays.roomsGiven(tripStays.roomsInText(String(v.args.text || '')), adults);
   const r = tripStays.tripRooms(adults, given);
   return r.rooms ? { adults, kids: kids || 0, rooms: r.rooms, assumed: !!r.roomsAssumed } : null;
 }
@@ -8579,6 +8579,7 @@ const TRIP_CHAT_ROOMS_T = {
     set: 'Set to {n} rooms. The stay links are updated; rooms and how many each sleeps are confirmed on the booking site.',
     set1: 'Set to 1 room. The stay links are updated; whether one room sleeps everyone is confirmed on the booking site.',
     capped: 'Set to {n} rooms, one per adult. The stay links are updated; rooms and how many each sleeps are confirmed on the booking site.',
+    same: 'Rooms are already set to {n}.', same1: 'It’s already set to 1 room.', short: 'Rooms set to {n}; the booking site confirms them.', short1: 'Set to 1 room; the booking site confirms it sleeps everyone.',
     noParty: 'How many adults are coming? Tell me (“we are 6 adults”) and I’ll set the rooms.',
     noStay: 'There is no place to stay on this plan yet, so there are no rooms to set.',
     assumed: 'I assumed {n} rooms for {a} adults: one room for every two adults. Nobody chose that, so tell me the number you want (“make it 2 rooms”) or tap it by the stay.',
@@ -8590,6 +8591,7 @@ const TRIP_CHAT_ROOMS_T = {
     set: 'C’est noté : {n} chambres. Les liens d’hébergement sont à jour; les chambres et leur capacité sont confirmées sur le site de réservation.',
     set1: 'C’est noté : 1 chambre. Les liens d’hébergement sont à jour; le site de réservation confirme si une chambre suffit pour tout le monde.',
     capped: 'C’est noté : {n} chambres, une par adulte. Les liens d’hébergement sont à jour; les chambres et leur capacité sont confirmées sur le site de réservation.',
+    same: 'Les chambres sont déjà réglées à {n}.', same1: 'C’est déjà réglé à 1 chambre.', short: 'Chambres réglées à {n}; le site de réservation les confirme.', short1: 'Réglé à 1 chambre; le site de réservation confirme qu’elle suffit pour tous.',
     noParty: 'Combien d’adultes viennent? Dites-le-moi (« nous sommes 6 adultes ») et je règle les chambres.',
     noStay: 'Ce plan n’a pas encore d’hébergement : aucune chambre à régler.',
     assumed: 'J’ai supposé {n} chambres pour {a} adultes : une chambre pour deux adultes. Personne ne l’a choisi : dites-moi le nombre voulu (« mets 2 chambres ») ou touchez-le près de l’hébergement.',
@@ -8734,9 +8736,12 @@ function tripChatRoomsTurn(op, { v, plan, req, stops, lang, staysOn, runCore }) 
   const now = tripChatRoomsNow(v);
   if (!now) return { reply: T.noParty };
   const max = Math.min(tripStays.MAX_ROOMS, now.adults);
-  const want = op.each ? max : op.n;
+  const want = op.each ? max : op.couple ? Math.ceil(now.adults / 2) : op.n;
   const n = Math.max(1, Math.min(want, max));
-  const out = { party: { rooms: n }, reply: n === 1 ? T.set1 : tripChat.fill(n < want || op.each ? T.capped : T.set, { n }) };
+  // (2026-11-23) The number the plan already carries because the visitor said or picked it: said so, never "set" again.
+  if (!now.assumed && now.rooms === n) return { reply: tripChat.fill(n === 1 ? T.same1 : T.same, { n }) };
+  // One part of a several-part message (op.short): a few words; the stay card keeps the full hand-off note.
+  const out = { party: { rooms: n }, reply: op.short ? tripChat.fill(n === 1 ? T.short1 : T.short, { n }) : n === 1 ? T.set1 : tripChat.fill(n < want || op.each ? T.capped : T.set, { n }) };
   try {
     const stayIn = { ...(v.args.stay || {}), rooms: n };
     const base = req ? { ...v.args, text: req.text, seed: req.seed, overrides: Object.keys(req.overrides || {}).length ? req.overrides : null, excludeVenueIds: req.excludeVenueIds, avoidVenueIds: req.avoidVenueIds, pinned: req.pinned }
@@ -8752,6 +8757,45 @@ function tripChatRoomsTurn(op, { v, plan, req, stops, lang, staysOn, runCore }) 
     if (p && p.whereToStay && p.whereToStay.pick) { out.stayBlock = tripChatStayBlock(p); out.reply = tripChatLinkClaims(out.reply, p.whereToStay, lang === 'fr' ? 'fr' : 'en'); }
   } catch (e) { /* the rooms still change on the page */ }
   return out;
+}
+// Several asks in one message, one of them about the rooms or the stay's dates (2026-11-23, Dayton: "We need two hotel
+// rooms, one for each couple. Please make the second day less busy." set the rooms and dropped the day). Those two
+// parts are read by their own fixed rules, which used to answer for the whole message; here each ask is read on its
+// own, so the rooms part becomes its op and the REST of the message goes on to the word rules and the AI.
+// -> { ops, rest, first } (first: the rooms / dates part came before the rest) or null (one ask, or nothing else said).
+function tripChatSideParts(v, canRead) {
+  const msg = String(v.message || '').replace(/\s+/g, ' ').trim();
+  let parts = tripChat.agent.splitAsks(msg), first = false;
+  // Accented letters: the splitter works on plain letters only (the word rules fold the message the same way).
+  if (parts.length < 2 && tripChat.fold(msg).length !== msg.length) parts = tripChat.agent.splitAsks(tripChat.fold(msg));
+  // Sentences whose second one starts with a verb the splitter does not know (« Rends la deuxième journée… »).
+  if (parts.length < 2) parts = msg.split(/[.!?;]+\s+/).map((p) => p.replace(/[\s.!;]+$/, '').trim()).filter((p) => /[a-zA-Z]{2}/.test(p)).slice(0, 5);
+  const ops = [], rest = [];
+  for (const p of parts.length > 1 ? parts : []) {
+    const rm = ops.some((o) => o.value === 'rooms') ? null : tripStays.roomsChat(p);
+    if (rm && !rm.ask) { if (!rest.length) first = true; ops.push({ o: 'party', value: 'rooms', n: rm.rooms || null, each: !!rm.each, couple: !!rm.couple, short: true, stops: [], ages: [] }); continue; }
+    const sd = rm || ops.some((o) => o.value === 'stay_dates') ? null : tripStays.stayDatesChat(p, tripChatStayDatesCtx(v));
+    if (sd && !sd.ask) { if (!rest.length) first = true; ops.push({ o: 'party', value: 'stay_dates', read: sd, stops: [], ages: [] }); continue; }
+    rest.push(p);
+  }
+  // One sentence with the rooms and something else the splitter did not cut ("2 rooms and a lighter day 2"): the
+  // clauses that are not about the rooms go on only when the word rules can read them (never "please" or "for us").
+  if (!ops.length && parts.length === 1 && typeof canRead === 'function') {
+    const rm = tripStays.roomsChat(msg);
+    const clauses = rm && !rm.ask ? msg.split(/\s*[,;]\s*(?:and |et |then |puis |also |plus )?|\s+(?:and|et|then|puis|also|plus)\s+/i).map((c) => c.trim()).filter(Boolean) : [];
+    const other = clauses.filter((c) => !tripStays.roomsInText(c, { chat: true }) && !/\b(?:rooms?|chambres?|couples?)\b/i.test(c));
+    if (clauses.length > 1 && other.length && other.length < clauses.length && canRead(other.join('. '))) {
+      first = !tripStays.roomsInText(clauses[clauses.length - 1], { chat: true });
+      ops.push({ o: 'party', value: 'rooms', n: rm.rooms || null, each: !!rm.each, couple: !!rm.couple, short: true, stops: [], ages: [] });
+      rest.push(...other);
+    }
+  }
+  if (!ops.length || !rest.length) return null;
+  // A message the rooms / dates rule reads whole ("yes, book those nights") is split only when the word rules can read
+  // the rest: a "yes" or a "please" is not another ask.
+  const whole = tripStays.roomsChat(msg) || tripStays.stayDatesChat(msg, tripChatStayDatesCtx(v));
+  if (whole && typeof canRead === 'function' && !canRead(rest.join('. '))) return null;
+  return { ops, rest: rest.map((p) => (/[?]$/.test(p) ? p : `${p}.`)).join(' ').replace(/\.$/, ''), first };
 }
 // Whether the visitor's own request asked for that kind of place ("a weekend with a spa"): its words are in the text.
 function tripChatAsked(kind, text) {
@@ -8790,17 +8834,20 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   }
   // A question about the plan ("why did you say…", "what does the warning mean?") is answered and NEVER changes the
   // plan, whatever the rules or the AI made of it: only its ask ops are kept, and the response is stripped below.
+  // (2026-11-23) A rooms or stay-dates part beside other asks: read apart, so the turn does every part (tripChatSideParts).
+  const side = !v.chip && !offered ? tripChatSideParts(v, (text) => { try { const r = tripChat.rulesRead(text, stops, { regions, regionLabels: REGION_LABELS, days, request: v.args.text }); return (r.ops || []).length > 0 ? r.ops.every((o) => o.o !== 'refine') : tripChat.rulesConfident(r); } catch (e) { return false; } }) : null;
+  if (side) v.message = side.rest.slice(0, tripChat.MAX_MESSAGE);
   const explainOnly = !v.chip && tripChat.explain.isExplainQuestion(tripChat.fold(v.message).replace(/\s+/g, ' ').trim());
   // Rooms (2026-11-22): a short message about the rooms and nothing else ("make it 3 rooms", "how many rooms did you
   // assume?") is read by fixed rules and never waits for the AI.
-  const roomsMsg = !v.chip && !offered ? tripStays.roomsChat(v.message) : null;
+  const roomsMsg = !v.chip && !offered && !side ? tripStays.roomsChat(v.message) : null;
   // Trip dates (2026-11-23): a short message about the stay's own dates ("yes, book those nights", "we arrive Friday
   // the 4th", "what dates is the hotel for?") on a trip whose dates the visitor gave; fixed rules, never the AI.
-  const stayDatesMsg = !v.chip && !offered && !roomsMsg ? tripStays.stayDatesChat(v.message, tripChatStayDatesCtx(v)) : null;
+  const stayDatesMsg = !v.chip && !offered && !roomsMsg && !side ? tripStays.stayDatesChat(v.message, tripChatStayDatesCtx(v)) : null;
   if (v.chip) { ops = tripChat.chipOps(v.chip); source = 'chip'; }
   else if (offered) ops = offered;
   else if (stayDatesMsg) ops = [stayDatesMsg.ask ? { o: 'ask', value: 'q_stay_dates', stops: [] } : { o: 'party', value: 'stay_dates', read: stayDatesMsg, stops: [], ages: [] }];
-  else if (roomsMsg) ops = [roomsMsg.ask ? { o: 'ask', value: 'q_rooms', stops: [] } : { o: 'party', value: 'rooms', n: roomsMsg.rooms || null, each: !!roomsMsg.each, stops: [], ages: [] }];
+  else if (roomsMsg) ops = [roomsMsg.ask ? { o: 'ask', value: 'q_rooms', stops: [] } : { o: 'party', value: 'rooms', n: roomsMsg.rooms || null, each: !!roomsMsg.each, couple: !!roomsMsg.couple, stops: [], ages: [] }];
   else {
     // The word rules first (instant), then the AI (live eval 2026-11-22: p50 1.1 s, some 3 s timeouts). When the rules
     // read the message confidently, the AI gets a short grace (TRIP_CHAT_GRACE_MS, default 1500 ms) and the rules answer
@@ -8835,7 +8882,15 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     if (explainOnly || r.explain) { ops = (ops || []).filter((o) => o.o === 'ask'); if (!ops.length) cant = 'q_unknown'; }
     if (!ops.length && !cant) { if (short && tripChat.plannerCanRead(v.message)) ops = [{ o: 'refine', text: v.message, stops: [] }]; else cant = 'unclear'; }
   }
-  const answerOnly = explainOnly || (!v.chip && (ops || []).length > 0 && ops.every((o) => o.o === 'ask'));
+  // The rooms / dates part of a several-part message joins the turn. A rest that could not be read is said in the
+  // reply (never dropped): the part that was read is still done.
+  if (side) {
+    if (!(ops || []).length && cant) { missed = [{ cant, what }, ...missed]; cant = null; }
+    ops = [...(ops || []), ...side.ops.map((o) => ({ ...o, sideFirst: side.first }))];
+    asks = Math.max(asks, 1) + side.ops.length;
+  }
+  // (A question beside a rooms part is answered and changes nothing itself; the rooms part is its own fixed rule.)
+  const answerOnly = (explainOnly && !side) || (!v.chip && (ops || []).length > 0 && ops.every((o) => o.o === 'ask'));
   timing.read = Date.now() - timing.start;
   // Events (rows of the plan the planner adds, with no Swap or Remove): a message that takes one out, and "we don't
   // drink" for an event at a brewery, winery or bar. The page hides them (actions.removeEvents).
@@ -8973,10 +9028,11 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     }
     if (r.stayPref !== undefined) stayPref = r.stayPref;
     if (r.transport) transport = r.transport;
-    reply = [reply, r.reply].filter(Boolean).join(' ');
+    // The parts are answered in the order they were asked (the rooms first when they were said first).
+    reply = (!Array.isArray(op) && op.sideFirst ? [r.reply, reply] : [reply, r.reply]).filter(Boolean).join(' ');
   }
   // A part of a several-ask message that could not be done (no such stop on the plan...) is said, once.
-  if (missed.length) { const line = tripChat.cantReply(missed[0].cant, lang, missed[0].what, stops, { asked: tripChatAsked(missed[0].what, v.args.text) }); if (!reply.includes(line)) reply = [reply, line].filter(Boolean).join(' '); }
+  if (missed.length) { const line = missed[0].cant === 'q_unknown' ? tripChat.explain.TX[lang === 'fr' ? 'fr' : 'en'].unknownQ : tripChat.cantReply(missed[0].cant, lang, missed[0].what, stops, { asked: tripChatAsked(missed[0].what, v.args.text) }); if (!reply.includes(line)) reply = [reply, line].filter(Boolean).join(' '); }
   const actions = { ...out.actions, ...(transport ? { transport } : {}), ...(goneEvents.length ? { removeEvents: goneEvents.map((e) => e.id) } : {}) };
   // Round 6 (a several-ask reply said "Your plan is unchanged." and then "Now staying at Coast Capri"): "unchanged" only
   // when nothing changed at all.
@@ -10132,9 +10188,10 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
       // Rooms (2026-11-22): "3 rooms", "a room each", "we'll share a room" in the request, where the visitor has not
       // picked a number; otherwise whereToStay labels its own assumption (never silently one room for a group).
       if (stayIn.rooms === undefined) {
-        const said = tripStays.roomsInText(String(text || ''));
-        if (said && said.rooms) stayIn.rooms = said.rooms;
-        else if (said && said.each && Number.isInteger(stayIn.adults)) stayIn.rooms = Math.min(tripStays.MAX_ROOMS, stayIn.adults);
+        // (2026-11-23) A number said with the rooms wins ("two separate hotel rooms" is 2, not a room per adult); "a room
+        // for each couple" is one for every two adults (trip-stays.js roomsInText / roomsGiven).
+        const given = tripStays.roomsGiven(tripStays.roomsInText(String(text || '')), Number.isInteger(stayIn.adults) ? stayIn.adults : null);
+        if (given) stayIn.rooms = given;
       }
       const asked = tripChat.stayTextPref(words);
       if (asked && !stayIn.pref) stayIn.pref = asked;
@@ -55291,7 +55348,8 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
           let v = getVenue(Number(m[2])); if (v && v.redirect_to) v = getVenue(v.redirect_to);
           if (!v) return;
           let kinds = []; try { const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; kinds = TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); } catch (e) { kinds = []; }
-          stops.push({ id: v.id, name: v.name, type: v.type, region: v.region, day: days[i] || 0, start: (c.times || [])[i] == null ? null : c.times[i], kinds });
+          // (2026-11-23) ml=: whether the plan counted this stop as a meal stop (only a link that names every stop).
+          stops.push({ id: v.id, name: v.name, type: v.type, region: v.region, day: days[i] || 0, start: (c.times || [])[i] == null ? null : c.times[i], kinds, ...(c.meals && c.meals.length === refs.length ? { meal: c.meals[i] === '1' } : {}) });
         } else if (dayOne && days[i]) {
           const e = db.prepare('SELECT id, name FROM events WHERE id = ?').get(Number(m[2]));
           const date = addLocalDays(dayOne, days[i] - 1);
@@ -55320,7 +55378,9 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
       const stayBothSaid = !!(out.stay && out.stay.handoffAsk && out.stay.handoffAsk.both);
       out.lines = out.evidence.filter((e) => !(e.both && stayBothSaid)).filter((e) => e.status !== 'verified' || ['nonalcoholic', 'no_alcohol', 'accessible'].includes(e.ask) || /^stay:/.test(e.ask) || tripHonestPlan.DIET.includes(e.ask) || (e.ask === 'dog_friendly' && plan.needs)).slice(0, plan.needs ? 8 : 5).map((e) => ({ ask: e.ask, status: e.status,
         // (A copy can't add events: the line says the plan has no dates, not "I'll add what's on".)
-        text: (fr ? e.textFr : e.text).replace(': pick your dates and I’ll add what’s on.', ', and this plan has no dates yet.').replace(' Choisissez vos dates et j’ajouterai ce qui est à l’affiche.', ' Ce plan n’a pas encore de dates.') }));
+        text: (fr ? e.textFr : e.text).replace(': pick your dates and I’ll add what’s on.', ', and this plan has no dates yet.').replace(' Choisissez vos dates et j’ajouterai ce qui est à l’affiche.', ' Ce plan n’a pas encore de dates.')
+          // (2026-11-23) A copy keeps the plan's caution for vegan and vegetarian badges (gluten-free words its own).
+          + (['vegan', 'vegetarian'].includes(e.ask) && (e.stops || []).length ? (fr ? ' Confirmez auprès de chaque endroit en réservant.' : ' Confirm with each place when you book.') : '') }));
       // A day the plan could not fill: its line (no buttons on a copy).
       for (const t of out.thinDays || []) out.lines.push({ ask: `thin:${t.day}`, status: 'unknown', text: fr ? t.textFr : t.text });
       // (2026-11-23) Each stop's short need note, as on the plan's card (trip-access-needs.js stopNeedNotes: the same

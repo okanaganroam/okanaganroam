@@ -120,6 +120,10 @@ function isMealStop(s) {
   if (s.wineryLunch) return true;
   if (MEAL_TYPES.includes(v.type)) return true;
   if (!FOOD_DRINK_TYPES.includes(v.type)) return false;
+  // A shared copy (2026-11-23: the plan said "all 4 meal stops", its copy "5"; the copy counted a brewery planned
+  // after lunch as a meal by its clock time): a pub or brewery is a meal stop there exactly when the plan counted it
+  // (the link's ml=), and on an older link never beside a restaurant or café at the same meal (sharedPlan).
+  if (typeof s.mealSaid === 'boolean') return s.mealSaid;
   if ((s.reasons || []).some((r) => r && r.code === 'meal')) return true;
   if ((s.reasons || []).some((r) => r && r.code === 'night')) return false;
   return ['midday', 'evening'].includes(s.daypart) || /lunch|dinner|supper|brunch|breakfast/i.test(String(s.label || ''));
@@ -642,6 +646,8 @@ const GENERIC_NAME_WORDS = new Set(['hotel', 'hotels', 'motel', 'inn', 'inns', '
 //   sug=event:213      date-dependent suggestions (never stops)
 //   asks=count:winery:2,kind:easy_walk,gluten_free,stay:pool,live_music,nonalcoholic   what the request asked for;
 //                      the page works the evidence out again from the listings as they are now
+//   ml=1100101         which stops the plan counted as meal stops (one 0/1 per stop, in the stops' order; 2026-11-23),
+//                      so a dietary line counts the same stops as the plan. No ml: as before
 const NI_RE = /^([a-z][a-z_]{1,29}):([nf])(?::([1-9]\d{0,6}))?$/;
 const ASK_RE = /^(?:count:[a-z_]{2,20}:\d{1,2}|type:[a-z_]{2,20}|kind:[a-z_]{2,30}|stay:[a-z_]{2,20}|[a-z_]{2,20})$/;
 function parseShareContext(query) {
@@ -668,6 +674,7 @@ function parseShareContext(query) {
   if (typeof q.sug === 'string' && q.sug) { const g = q.sug.split(',').filter((r) => /^event:[1-9][0-9]*$/.test(r)).slice(0, 3); if (g.length) out.suggestions = g; }
   // Trip needs (2026-11-24): nw=1 the wheelchair need is one person's; thin=2,3 the days the plan could not fill.
   if (q.nw === '1') out.wheelOne = true;
+  if (typeof q.ml === 'string' && /^[01]{1,60}$/.test(q.ml)) out.meals = q.ml;
   if (typeof q.thin === 'string' && /^\d{1,2}(?:,\d{1,2}){0,6}$/.test(q.thin)) { const th = [...new Set(q.thin.split(',').map(Number).filter((n) => n >= 1 && n <= 30))]; if (th.length) out.thin = th; }
   // Share suggestions (2026-11-23): what the plan said it could not include, and a tour the traveller asked the chat to
   // show. Keys and ids only; the shared page rebuilds the words from the listings as they are now.
@@ -703,6 +710,7 @@ function shareContextQuery(c) {
   if (c.suggestions && c.suggestions.length) p.push(`sug=${c.suggestions.join(',')}`);
   if (c.asks && c.asks.length) p.push(`asks=${c.asks.join(',')}`);
   if (c.wheelOne) p.push('nw=1');
+  if (c.meals) p.push(`ml=${c.meals}`);
   if (c.thin && c.thin.length) p.push(`thin=${c.thin.join(',')}`);
   if (c.notIncluded && c.notIncluded.length) p.push(`ni=${c.notIncluded.map(shareNiToken).join(',')}`);
   if (c.notIncluded && c.notIncluded.length && c.niTowns && c.niTowns.length) p.push(`nt=${c.niTowns.join(',')}`);
@@ -732,7 +740,14 @@ function shareAsks(plan) {
 function sharedPlan(c, stops, events, stay) {
   const part = (m) => (m == null ? 'midday' : m < 660 ? 'morning' : m < 900 ? 'midday' : m < 1020 ? 'late' : m < 1185 ? 'evening' : 'night');
   const days = new Map();
-  for (const x of stops) { const d = x.day || 0; if (!days.has(d)) days.set(d, { day: d, stops: [] }); days.get(d).stops.push({ daypart: part(x.start), reasons: x.start != null && x.start >= 1185 && x.type !== 'restaurant' ? [{ code: 'night' }] : [], venue: { id: x.id, name: x.name, type: x.type, region: x.region, ...(x.badges ? { badges: x.badges } : {}) } }); }
+  // The plan's own meal stops (x.meal, from the link's ml=). An older link has none: a pub or brewery whose clock time
+  // falls in a meal that a restaurant or café of the same day already is, is not a second meal (a day has one lunch).
+  const mealOf = (x) => {
+    if (typeof x.meal === 'boolean') return { mealSaid: x.meal };
+    if (MEAL_TYPES.includes(x.type) || !FOOD_DRINK_TYPES.includes(x.type) || !['midday', 'evening'].includes(part(x.start))) return {};
+    return stops.some((o) => o !== x && (o.day || 0) === (x.day || 0) && MEAL_TYPES.includes(o.type) && part(o.start) === part(x.start)) ? { mealSaid: false } : {};
+  };
+  for (const x of stops) { const d = x.day || 0; if (!days.has(d)) days.set(d, { day: d, stops: [] }); days.get(d).stops.push({ daypart: part(x.start), ...mealOf(x), reasons: x.start != null && x.start >= 1185 && x.type !== 'restaurant' ? [{ code: 'night' }] : [], venue: { id: x.id, name: x.name, type: x.type, region: x.region, ...(x.badges ? { badges: x.badges } : {}) } }); }
   for (const e of events || []) { const d = e.day || 0; if (!days.has(d)) days.set(d, { day: d, stops: [] }); days.get(d).stops.push({ kind: 'event', daypart: 'night', event: { id: e.id, name: e.name, startDate: e.startDate || null, dateLabel: e.dateLabel || e.startDate || '', dateLabelFr: e.dateLabelFr, time: e.time || null, categories: e.categories || [] } }); }
   const reqs = [], asks = (c && c.asks) || [], plan0 = {};
   let stayKeys = [], some = false, none = false, wheel = false, dog = false, noCar = false;

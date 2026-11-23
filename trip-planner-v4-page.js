@@ -851,6 +851,12 @@ const V4_CLIENT_SRC = String.raw`
       if (Object.keys(sug).length) out += '&sug=' + Object.keys(sug).join(',');
       var asks = []; (p.evidence || []).forEach(function(e){ asks.push(e && /^count:/.test(e.ask || '') && e.asked > 0 ? e.ask + ':' + e.asked : e && e.ask); if (e && e.also) asks.push(e.also); }); asks = asks.filter(function(a){ return a && /^[a-z_:0-9]+$/.test(a); }).slice(0, 12);
       if (asks.length) out += '&asks=' + asks.join(',');
+      // Meal stops (2026-11-23: the plan said "all 4 meal stops list vegan options", its copy "5"): the stops the
+      // plan's own dietary evidence counted as meals, one 0/1 per stop in the link's order (ml=), so the copy counts
+      // the same ones. Only with a dietary ask; a link without it reads as before.
+      var mealIds = null;
+      (p.evidence || []).forEach(function(e){ if (e && /^(?:vegan|vegetarian|gluten_free)$/.test(e.ask || '') && e.stops && e.stops.length) { mealIds = mealIds || {}; e.stops.forEach(function(x){ if (x && x.id > 0) mealIds[x.id] = 1; }); } });
+      if (mealIds) out += '&ml=' + list.map(function(x){ var mm = /^venue:(\d+)$/.exec(x.ref); return mm && mealIds[mm[1]] ? 1 : 0; }).join('');
       // Trip needs (2026-11-24): one person's wheelchair (nw=1) and the days the plan could not fill (thin=2), so the
       // copy says the same; both optional.
       if ((p.needs || []).some(function(n){ return n && n.key === 'wheelchair' && n.who === 'one'; })) out += '&nw=1';
@@ -892,7 +898,9 @@ const V4_CLIENT_SRC = String.raw`
       rows.forEach(function(r){ lines.push(r); });
     });
     var d = typeof t3StayData === 'function' ? t3StayData() : null;
-    if (d && d.chosen && d.chosen.name) { lines.push(''); lines.push((fr ? 'Hébergement : ' : 'Stay: ') + d.chosen.name); }
+    // (2026-11-23) The rooms the plan carries, as the stay line says them ("2 rooms", "3 rooms (assumed)").
+    var rmTxt = d && d.w && d.w.trip && typeof t3RoomsLabel === 'function' ? t3RoomsLabel(d.w.trip, fr) : '';
+    if (d && d.chosen && d.chosen.name) { lines.push(''); lines.push((fr ? 'Hébergement : ' : 'Stay: ') + d.chosen.name + (rmTxt ? ' · ' + rmTxt : '')); }
     var est = v4EstimateText().replace(/<small>[\s\S]*?<\/small>/g, '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
     if (est) lines.push(est);
     // Share suggestions (2026-11-23): what the plan could not include, in its own words (at most three lines).

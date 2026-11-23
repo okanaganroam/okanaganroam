@@ -23,11 +23,20 @@ const { MAX_ROOMS, stayRoomsFor } = require('./stay-booking-links');
 // "3 rooms", "two rooms", "2 rooms for the 6 of us", « 3 chambres » -> { rooms: n }; "a room each", "separate rooms",
 // "our own rooms", « une chambre chacun » -> { each: true } (one room per adult); "one room", "share a room", "we'll
 // share" (the chat only) -> { rooms: 1 }. Never "2 bedrooms" (a kind of unit) or "room for two". -> null when not said.
+// (2026-11-23, Dayton: "two couples and need two separate hotel rooms" was read as a room per adult, four rooms.) A
+// number said with the rooms always wins: "two separate hotel rooms", « deux chambres séparées » -> { rooms: 2 }.
+// "a room for each couple", "one per couple", « une chambre par couple » -> { rooms: n } when the text says how many
+// couples, else { couple: true } (one room for every two adults). "separate rooms" with couples named and no number
+// is not a room per adult: null, so the labelled assumption stands (two couples -> 2 rooms, assumed).
 const ROOM_NUM = { a: 1, one: 1, single: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, un: 1, une: 1, seule: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, sept: 7, huit: 8 };
 const foldRooms = (text) => String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim();
-const ROOMS_EACH_RE = /\b(?:a|one|1|une|un)\s+(?:room|chambre)\s+(?:each|apiece|per person|per adult|chacune?|par personne|par adulte)\b|\b(?:separate|individual|our own|their own|own)\s+(?:hotel\s+)?rooms\b|\bchambres\s+(?:separees|individuelles)\b|\bchacune?\s+(?:sa|leur)\s+(?:propre\s+)?chambre\b|\beach\s+(?:want|wants|need|needs|get|gets|have|has)\s+(?:a|our|their|his|her)\s+(?:own\s+)?room\b/;
+const ROOMS_EACH_RE = /\b(?:a|one|1|une|un)\s+(?:room|chambre)\s+(?:each|apiece|per person|per adult|chacune?|par personne|par adulte)\b|\bchacune?\s+(?:sa|leur)\s+(?:propre\s+)?chambre\b|\beach\s+(?:want|wants|need|needs|get|gets|have|has)\s+(?:a|our|their|his|her)\s+(?:own\s+)?room\b/;
+const ROOMS_SEPARATE_RE = /\b(?:separate|individual|our own|their own|own)\s+(?:hotel\s+)?rooms\b|\bchambres\s+(?:separees|individuelles)\b/;
+const ROOMS_COUPLE_RE = /\b(?:a|one|1|une|un)\s+(?:(?:hotel\s+)?room\s+|chambre\s+)?(?:for|per|pour|par)\s+(?:each\s+|every\s+|chaque\s+)?couple\b|\b(?:each|every|chaque)\s+couple\b[^.;]{0,30}\b(?:its|their|a|sa|leur|une)\s+(?:own\s+|propre\s+)?(?:room|chambre)\b/;
+const COUPLES_N_RE = /\b(\d|two|three|four|deux|trois|quatre)\s+couples\b/;
+const couplesIn = (t) => { const m = COUPLES_N_RE.exec(t); const n = m ? (/^\d$/.test(m[1]) ? Number(m[1]) : ROOM_NUM[m[1]]) : null; return Number.isInteger(n) && n >= 1 ? n : null; };
 const ROOMS_ONE_RE = /\b(?:shar(?:e|ing)|partage(?:r|ra|rons|ons)?)\b[^.,;]{0,24}\b(?:a|one|1|the same|une|la meme)\s+(?:room|chambre)\b|\b(?:all|everyone|tous|toutes)\s+(?:in|dans)\s+(?:one|1|the same|une|la meme)\s+(?:room|chambre)\b|\b(?:just|only|seulement|juste)\s+(?:need\s+)?(?:one|1|a|une)\s+(?:room|chambre)\b/;
-const ROOMS_N_RE = /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|un|une|deux|trois|quatre|cinq|six|sept|huit)\s+(?:(?:separate|hotel|double|twin|queen|king|standard)\s+)?(?:rooms?|chambres?)\b(?!\s+(?:condo|suite|apartment|appartement|house|cabin|chalet))/;
+const ROOMS_N_RE = /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|un|une|deux|trois|quatre|cinq|six|sept|huit)\s+(?:(?:separate|hotel|double|twin|queen|king|standard)\s+){0,2}(?:rooms?|chambres?)\b(?!\s+(?:condo|suite|apartment|appartement|house|cabin|chalet))/;
 const ROOMS_SHARE_ONLY_RE = /^(?:(?:no|non|nope),?\s+)?(?:we(?:'ll| will| can)?\s+(?:all\s+)?share|we're sharing|on partage|on va partager|nous partagerons)[.!]*$/;
 function roomsInText(text, opts = {}) {
   const t = foldRooms(text);
@@ -35,12 +44,23 @@ function roomsInText(text, opts = {}) {
   if (ROOMS_EACH_RE.test(t)) return { each: true };
   if (ROOMS_ONE_RE.test(t)) return { rooms: 1 };
   const m = ROOMS_N_RE.exec(t);
-  if (m) {
-    const n = /^\d+$/.test(m[1]) ? Number(m[1]) : ROOM_NUM[m[1]];
-    if (Number.isInteger(n) && n >= 1) return { rooms: Math.min(MAX_ROOMS, n) };
-  }
+  const n = m ? (/^\d+$/.test(m[1]) ? Number(m[1]) : ROOM_NUM[m[1]]) : null;
+  // A room for each couple: the number of rooms said beside it wins ("two rooms, one for each couple").
+  if (ROOMS_COUPLE_RE.test(t) && /\b(?:rooms?|chambres?)\b/.test(t) && !(n >= 2)) { const c = couplesIn(t); return c ? { rooms: Math.min(MAX_ROOMS, c) } : { couple: true }; }
+  if (Number.isInteger(n) && n >= 1) return { rooms: Math.min(MAX_ROOMS, n) };
+  if (ROOMS_SEPARATE_RE.test(t)) return couplesIn(t) ? null : { each: true };
   if (/\b(?:a|une)\s+single\s+room\b|\bune\s+seule\s+chambre\b/.test(t)) return { rooms: 1 };
   if (opts.chat && ROOMS_SHARE_ONLY_RE.test(t)) return { rooms: 1 };
+  return null;
+}
+// What was said as a number of rooms for this many adults: { rooms } as it is, a room each -> one per adult, a room
+// for each couple -> one for every two adults. null when nothing was said (or the adults are not known).
+function roomsGiven(said, adults) {
+  if (!said) return null;
+  if (said.rooms) return said.rooms;
+  if (!(Number.isInteger(adults) && adults >= 1)) return null;
+  if (said.each) return Math.min(MAX_ROOMS, adults);
+  if (said.couple) return Math.min(MAX_ROOMS, Math.ceil(adults / 2));
   return null;
 }
 // The chat: a short message about the rooms and nothing else. -> { ask: true } ("how many rooms did you assume?"),
@@ -597,7 +617,7 @@ const ELSEWHERE_KM = 60;
 
 module.exports = {
   MAX_NIGHTS, MAX_ADULTS, MAX_KIDS, NEAR_KM, MIN_IN_TOWN,
-  roomsInText, roomsChat, tripRooms, MAX_ROOMS,
+  roomsInText, roomsGiven, roomsChat, tripRooms, MAX_ROOMS,
   stayDatesChat, stayDateState,
   parseTripStayInput, parseStayPref, staysForPref, STAY_AMENITIES, stayHas, stayHasNot, prefAmenities, STAY_KIND_SETS, tripStayContext, partyOf, stayFails, scoreStay, pickTripStays, whereToStay, planStops, km, addDays, daysBetween,
   wantsCamping, isCampingStay, CAMPING_RE,
