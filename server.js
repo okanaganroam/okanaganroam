@@ -9252,6 +9252,9 @@ function tripChatAskTurn(op, { v, stops, lang, runCore, planEvents, staysOn = fa
     return { reply: tripChat.fill(line ? T.qStayWhy : T.qStayWhyBare, { name: row.name, line: String(line || '').replace(/[.!?]+$/, '') }) };
   }
   if (!s) return { reply: tripChat.cantReply('ask_which', L, null, stops) };
+  // (2026-11-23) "is <stop> dog friendly?": where the dog can go is said from the listing's own words, as on the plan
+  // (a Dog-Friendly badge at a place with an indoors doesn't say inside or patio only).
+  if (op.value === 'q_dog' && typeof tripDogOf === 'function') { try { const dd = tripDogOf(s.id); if (dd && dd.has === true && dd.where && dd.where !== 'outdoors') return tripChatAccessAnswer({ value: 'q_access', needs: ['dog'], scopes: ['activities', 'meals'], ids: [s.id], day: null, meal: null }, { v, stops, lang: L, runCore, staysOn, days, short }); } catch (e) { /* the plain answer below */ } }
   const factOf = (id) => {
     let row = null;
     try { row = db.prepare('SELECT * FROM venues WHERE id = ? AND redirect_to IS NULL').get(id); } catch (e) { row = null; }
@@ -9307,6 +9310,22 @@ function tripChatNeedHas(need, s, ev) {
   // A dog: the listing's own Dogs line or badge, as the planner reads it ("no dogs" only when its own line says so).
   if (need === 'dog' && typeof tripDogOf === 'function') { try { const d = tripDogOf(s.id); return d && (d.has === true || d.has === false) ? d.has : null; } catch (e) { /* the badge below */ } }
   return tripChatHasBadge(s.id, N.feat) ? true : null;
+}
+// (2026-11-23) What a stop's listing says in full, for the chat's wording: its graded access (level, part, says) or
+// where its dog line or badge lets a dog go. The same readers the plan's evidence uses, so the two never disagree.
+function tripChatNeedDetail(need, s) {
+  try {
+    if (need === 'accessible' && typeof tripAccessOf === 'function') { const a = tripAccessOf(s.id); return a ? { level: a.level || (a.has === true ? 'wheelchair' : a.has === false ? 'no' : 'unknown'), part: a.part || null, says: a.says || null, amenity: !!a.amenity } : null; }
+    if (need === 'dog' && typeof tripDogOf === 'function') { const d = tripDogOf(s.id); return d ? { where: d.where || null, says: d.says || null } : null; }
+  } catch (e) { /* the plain yes / doesn't say */ }
+  return null;
+}
+// The cold-months word for the trip on screen (its first dated day, else a request that says winter): a patio may be closed.
+function tripChatCold(v, core) {
+  try {
+    const day1 = (v.dayDates || []).find((d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ''))) || ((core && core.days) || []).map((d) => d && d.date).find((d) => /^\d{4}-\d{2}-\d{2}$/.test(String(d || ''))) || null;
+    return tripAccess.coldSeason(day1, day1 ? '' : (v.args && v.args.text) || '');
+  } catch (e) { return null; }
 }
 // The plan's evidence as maps, for the stops shown. strict: the planner says what "false" means (plan.needs is there).
 function tripChatNeedEvidence(core, shown) {
@@ -9405,11 +9424,19 @@ function tripChatEnsureTurn(op, ctx) {
   const amenities = [...new Set(op.parts.filter((p) => p.scopes.includes('stay') && A.NEEDS[p.need].amenity).map((p) => A.NEEDS[p.need].amenity))].slice(0, 2);
   const st = amenities.length ? tripChatEnsureStay(amenities, ctx) : {};
   if (st.stayBlock) { out.stayBlock = st.stayBlock; out.stayPref = st.stayPref; }
-  let checks = A.check(stopParts, shown, has, { day: op.day || null });
+  const detail = tripChatNeedDetail;
+  let checks = A.check(stopParts, shown, has, { day: op.day || null, detail });
   // The stops that would change: the ones whose listing doesn't say (or says not) for a part that covers them. A stop
   // the visitor kept is never swapped.
   const lack = [], lackOf = new Map();
   for (const c of checks) for (const s of [...c.unk, ...c.no]) { lackOf.set(s.id, [...(lackOf.get(s.id) || []), c.need]); if ((v.locks || {})[s.key] !== s.id && !lack.some((x) => x.id === s.id)) lack.push(s); }
+  // (2026-11-23) A stop whose listing covers one section or feature, or has only a mobility note, is not
+  // wheelchair-confirmed. It gives way only to a place whose own words say wheelchair access for the place itself, and
+  // only when that keeps the turn to two swaps at most; otherwise it stays, and is listed under "still to check" with
+  // what its listing does cover.
+  const soft = [];
+  for (const c of checks) if (c.need === 'accessible') for (const s of [...c.part, ...c.mob]) if ((v.locks || {})[s.key] !== s.id && !lack.some((x) => x.id === s.id) && !soft.some((x) => x.id === s.id)) soft.push(s);
+  if (soft.length && lack.length + soft.length <= 2) for (const s of soft) { lackOf.set(s.id, [...(lackOf.get(s.id) || []), 'accessible']); lack.push(s); }
   if (lack.length > 2 && !v.confirmed) {
     const needs = [...new Set(checks.filter((c) => c.unk.length || c.no.length).map((c) => c.need))];
     return { ...out, confirm: true, reply: [amenities.length ? A.stayClause(st.stay || null, L) : '', A.askReply(lack, needs, L)].filter(Boolean).join(' ') };
@@ -9446,7 +9473,7 @@ function tripChatEnsureTurn(op, ctx) {
       }
     } catch (e) { /* the text alone goes back */ }
   }
-  checks = A.check(stopParts, after, has, { day: op.day || null });
+  checks = A.check(stopParts, after, has, { day: op.day || null, detail });
   // A swap is said once, under the need its old stop's listing did not have.
   for (const c of checks) c.swaps = swaps.filter((x) => (lackOf.get(x.old.id) || []).includes(c.need) && c.list.some((y) => y.stop.id === x.fresh.id && y.has === true));
   // A yes to "swap them?" that found nothing to swap to is said first.
@@ -9458,9 +9485,11 @@ function tripChatEnsureTurn(op, ctx) {
     const tx = A.TX[L];
     for (const p of op.parts || []) {
       if (p.need !== 'accessible' || !p.scopes.includes('activities') || p.scopes.includes('meals')) continue;
-      const mc = A.check([{ need: 'accessible', scopes: ['meals'] }], after, has, { day: op.day || null })[0];
-      const u = mc ? [...mc.unk, ...mc.no] : [];
-      if (u.length) extra.push(A.fillT(tx.at.accessible, { names: u.length > 3 ? A.fillT(tx.count, { n: u.length }) : A.joinNames(u.map((x) => x.name), tx) }));
+      const mc = A.check([{ need: 'accessible', scopes: ['meals'] }], after, has, { day: op.day || null, detail })[0];
+      const u = mc ? [...mc.unk, ...mc.no, ...mc.part, ...mc.mob] : [];
+      // (With partly listed activities already named, three or more meal stops are a count: the reply stays short.)
+      const partly = checks.some((c) => c.need === 'accessible' && (c.part.length || c.mob.length));
+      if (u.length) extra.push(A.fillT(tx.at.accessible, { names: u.length > 3 ? A.fillT(tx.count, { n: u.length }) : u.length > 2 && partly ? A.fillT(tx.countOf, { n: u.length, noun: tx.noun.meals[1] }) : A.joinNames(u.map((x) => x.name), tx) }));
     }
   } catch (e) { /* the reply stands without the extra line */ }
   return { ...out, reply: lead + A.ensureReply({ stay: st.stay || null, stayAsked: amenities.length > 0, checks, lang: L, extra }) };
@@ -9544,16 +9573,18 @@ function tripChatAccessAnswer(op, ctx) {
   if (op.value === 'q_access') {
     const scopes = (op.scopes || []).filter((s) => s !== 'stay');
     const amenities = (op.scopes || []).includes('stay') ? (op.needs || []).map((n) => A.NEEDS[n].amenity).filter(Boolean) : [];
-    const checks = scopes.length ? A.check((op.needs || []).map((need) => ({ need, scopes })), shown, has, { day: op.day || null, meal: op.meal || null }) : [];
+    // (A question that names stops by name is about those stops only.)
+    const asked = Array.isArray(op.ids) && op.ids.length ? shown.filter((s) => op.ids.includes(s.id)) : shown;
+    const checks = scopes.length ? A.check((op.needs || []).map((need) => ({ need, scopes })), asked, has, { day: op.day || null, meal: op.meal || null, detail: tripChatNeedDetail }) : [];
     // "is the hotel pet friendly?" alone: the stay only. Asked with the stops, the stay is said when there is one.
     const stay = stayOf(amenities);
-    return { reply: A.answerReply({ checks, stay, stayAsked: amenities.length > 0 && (!!stay || !scopes.length), day: op.day || null, lang: L }) };
+    return { reply: A.answerReply({ checks, stay, stayAsked: amenities.length > 0 && (!!stay || !scopes.length), day: op.day || null, lang: L, cold: tripChatCold(v, core) }) };
   }
   // q_check: every need the request carries, on every stop and the stay; stops whose times are sessions we do not hold;
   // stay dates not yet confirmed; what the stay's booking link does not take with it.
   const needs = [...A.needsOfText(v.args.text), ...['gluten_free', 'vegan', 'vegetarian'].filter((n) => A.textHas(v.args.text, n))];
   for (const nd of (core && Array.isArray(core.needs) ? core.needs : [])) { const k = nd && nd.key === 'wheelchair' ? 'accessible' : nd && nd.key === 'dog' ? 'dog' : null; if (k && !needs.includes(k)) needs.push(k); }
-  const checks = A.check(needs.map((need) => ({ need, scopes: A.NEEDS[need].meals ? ['meals'] : ['activities', 'meals'] })), shown, has);
+  const checks = A.check(needs.map((need) => ({ need, scopes: A.NEEDS[need].meals ? ['meals'] : ['activities', 'meals'] })), shown, has, { detail: tripChatNeedDetail });
   const amenities = needs.map((n) => A.NEEDS[n].amenity).filter(Boolean);
   const stay = stayOf(amenities);
   const extra = [];
@@ -9754,7 +9785,19 @@ function tripDogOf(id) {
     const of = OUTDOOR_FACTS[String(v.id)];
     let listed = false;
     try { listed = getCollectionVenueIds('dog_friendly').includes(v.id); } catch (e) { listed = false; }
-    return tripAccess.dogOf({ dogLine: of && typeof of.dogs === 'string' ? of.dogs : '', badge: Number(v.dog_friendly) === 1 || listed });
+    // (2026-11-23) Where the dog can go, when the listing's own Dogs line says (the owner's answer, or its Plan your
+    // visit row): inside, patio only, outside only, some trips. The badge alone doesn't say.
+    let ownLine = '', patioOnly = false, outsideOnly = false, someTrips = false;
+    if (!['outdoor', 'beach', 'stay'].includes(v.type)) {
+      try {
+        const info = venueVisitInfo(v.id);
+        const row = info && Array.isArray(info.rows) ? info.rows.find((r) => r && typeof r.text === 'string' && r.text.trim() && /^(?:dogs|pets)$/i.test(String(r.label || '').trim())) : null;
+        if (row) ownLine = row.text.trim();
+        if (!ownLine && info) { const frLine = ownerVisitFrLines(info).dogs; if (frLine) ownLine = dogsFrLineEnglish(frLine) || ''; }
+        patioOnly = dogsPatioOnly(v); outsideOnly = dogsOutsideOnly(v); someTrips = dogsSomeTrips(v);
+      } catch (e) { /* the badge alone */ }
+    }
+    return tripAccess.dogOf({ dogLine: of && typeof of.dogs === 'string' ? of.dogs : '', badge: Number(v.dog_friendly) === 1 || listed, type: v.type, ownLine, patioOnly, outsideOnly, someTrips });
   } catch (e) { return { has: null, says: null, source: null }; }
 }
 // A place to stay's own facts for the trip's needs (stay_info only): { accessible: true | false | null, pets: 'yes' | 'some' | 'no' | null }.
@@ -9778,7 +9821,9 @@ function tripPlanNeeds(plan) {
 // walk for this party (and only then: "easy" in a description is never access).
 function tripNeedKinds(v, kinds, access, need) {
   const k = Array.isArray(kinds) ? kinds : [];
-  if (!['outdoor', 'beach'].includes(v.type) || !access || access.has !== true || (need && need.surface === 'paved' && !access.paved)) return k;
+  // (2026-11-23) A walk whose line is a mobility note or covers one section still counts as the easy walk asked for; it
+  // is never said to be confirmed.
+  if (!['outdoor', 'beach'].includes(v.type) || !access || tripAccess.accessRank(access) < 1 || (need && need.surface === 'paved' && !access.paved)) return k;
   return k.some((x) => ['walk', 'park', 'easy_walk'].includes(x)) && !k.includes('easy_walk') ? k.concat('easy_walk') : k;
 }
 // The planner's listings for a trip with needs. A wheelchair user: an outdoor place whose own Access line says stairs,
@@ -9796,9 +9841,13 @@ function tripNeedFacts(facts, needs, text = '') {
     if (!wheel) { out.push(f); continue; }
     const a = tripAccessOf(f.id);
     if (['outdoor', 'beach'].includes(f.type) && a.has === false && !named(f)) continue;
-    if (a.has !== true || (wheel.surface === 'paved' && ['outdoor', 'beach'].includes(f.type) && !a.paved)) { out.push(f); continue; }
+    // (2026-11-23) Graded: a listing that says wheelchair access for the place comes first, then one that says it for a
+    // section or feature, then a mobility note; a listing that says nothing stays as it is.
+    const rank = tripAccess.accessRank(a);
+    if (rank < 1 || (wheel.surface === 'paved' && ['outdoor', 'beach'].includes(f.type) && !a.paved)) { out.push(f); continue; }
     const kinds = f.plannerKinds || TR.inferPlannerKinds(f);
-    out.push({ ...f, plannerKinds: tripNeedKinds(f, kinds, a, wheel), accessBoost: ['outdoor', 'beach'].includes(f.type) ? 30 : 14, accessSays: a.says || null });
+    const open = ['outdoor', 'beach'].includes(f.type);
+    out.push({ ...f, plannerKinds: tripNeedKinds(f, kinds, a, wheel), accessBoost: open ? [0, 18, 24, 30][rank] : [0, 6, 10, 14][rank], accessSays: a.says || null, accessLevel: a.level });
   }
   return out;
 }
@@ -10018,7 +10067,7 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
       // takes (the dog, an accessible room), and each stay's own facts for the trip's needs.
       if (v4) {
         block = stayBookingLinks.withHandoff(block, { dog: !!(block.trip && block.trip.dog) || tripAccess.hasNeed(stayNeeds, 'dog'), wheelchair: tripAccess.hasNeed(stayNeeds, 'wheelchair') });
-        if (stayNeeds.length) for (const card of [block.pick, ...(block.alternatives || [])]) if (card) card.needFacts = tripStayNeedFacts(card.id);
+        if (stayNeeds.length) for (const card of [block.pick, ...(block.alternatives || [])]) if (card) { card.needFacts = tripStayNeedFacts(card.id); if (tripAccess.stayBoth(stayNeeds, card.needFacts)) card.handoffAsk = { ...tripAccess.STAY_BOTH.its, both: true }; }
       }
       block.checklist = tripBookingChecklist(plan);
       // "Book your trip" (2026-11-20, trip-booking.js): the estimated total and the "Book my trip" steps, per stay card.
@@ -55068,7 +55117,7 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
         const askSet = new Set(c.asks || []), shareNeeds = { dog: askSet.has('dog_friendly') || askSet.has('stay:pets'), wheelchair: askSet.has('accessible') || askSet.has('stay:accessible') };
         stayFacts = { id: cand.id, name: cand.name, regionLabel: cand.regionLabel, has, winterCheck: has.includes('pool') && (m >= 10 || m <= 5), ...(shareNeeds.dog || shareNeeds.wheelchair ? { needFacts: tripStayNeedFacts(cand.id) } : {}) };
         const handoff = dated2 || shareNeeds.dog || shareNeeds.wheelchair ? stayBookingLinks.stayHandoff(links, { ...trip, dog: shareNeeds.dog, rooms: c.rooms || null, stayStatus: trip.datesGiven ? 'confirmed' : null }) : null;
-        const handoffAsk = stayBookingLinks.stayHandoffAsk(shareNeeds);
+        const handoffAsk = shareNeeds.dog && shareNeeds.wheelchair && tripAccess.stayBoth([{ key: 'wheelchair' }, { key: 'dog' }], stayFacts.needFacts) ? { ...tripAccess.STAY_BOTH.its, both: true } : stayBookingLinks.stayHandoffAsk(shareNeeds);
         out.stay = { id: cand.id, name: cand.name, kind: fr ? (cand.kindFr || cand.kind) : cand.kind, regionLabel: cand.regionLabel, photo: cand.photo, url: fr ? (cand.urlFr || cand.url) : cand.url,
           links: links.map((l) => ({ label: fr ? l.labelFr : l.label, url: l.url, affiliate: !!l.affiliate, rel: l.rel || 'nofollow noopener', key: l.key })),
           ...(handoff && handoff.length ? { handoff } : {}), ...(handoffAsk ? { handoffAsk } : {}) };

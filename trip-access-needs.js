@@ -96,25 +96,218 @@ function dogFromText(line) {
   if (no && yes) return null;
   return no ? false : yes ? true : null;
 }
+// ---- graded access (2026-11-23) ----
+// The owner's report: the chat said "all 3 activities list wheelchair access" when BX Creek's line only said its
+// Deleenheer Rd access "suits limited mobility". A line is graded from its own words, never upgraded:
+//   'wheelchair'       it says wheelchair (or accessible in the formal sense, barrier-free, universally accessible) of
+//                      the place itself: no subject, or the place's own unnamed trail / path / pathway
+//   'wheelchair_part'  the same words, but of a named section, entrance, loop, building or feature -> part
+//   'mobility'         broader or incomplete words that are not a wheelchair statement (suits limited mobility, flat,
+//                      paved, level, gentle, easy grade, stroller friendly, boardwalk, no stairs), and accessible said
+//                      only of parking, washrooms or picnic tables (amenity: true), and "designed for accessibility" on
+//                      gravel with no wheelchair word. Never counted as wheelchair-confirmed. part: the named entrance
+//                      or section when the line names one
+//   'no'               stairs, steep, rough, "not accessible"
+//   'unknown'          nothing said ("easy" alone says nothing)
+// When in doubt a line is 'mobility', not 'wheelchair'.
+const WHEEL_WORD_RE = /\bwheel ?chairs?\b|\bbarrier[- ]free\b|\buniversally accessible\b|\baccessib(?:le|ility)\b|\bstep[- ]?free\b/i;
+const WHEEL_ONLY_RE = /\bwheel ?chairs?\b|\bbarrier[- ]free\b|\buniversally accessible\b/i;
+const AMENITY_RE = /^(?:(?:\d+|one|two|a|an|the) )?(?:flush |universal |accessible |disabled |handicapped )*(?:parking(?: stalls?| spots?| area)?|stalls?|toilets?|washrooms?|picnic tables?|facilities)\b/i;
+const MOBILITY_RE = /\b(?:limited|reduced) mobility\b|\buniversal mobility\b|\bpaved\b|\bboardwalk\b|\bflat\b|\bminimal[- ]grade\b|\blevel (?:path|trail|ground|loop|walk|paved)\b|\bgentle\b|\beasy grade\b|\blittle elevation change\b|\bminimal elevation change\b|\bstrollers?[- ](?:friendly|accessible|ok)\b|\bstroller\b(?=[^;]*\b(?:friendly|ok)\b)|\bpopular with strollers\b|\bhard[- ]surface\b|\b(?:disabled|handicapped) parking\b|\b(?:no|without) (?:stairs|steps)\b|\bramps?\b|\bsit ski(?:ing)?\b|\bdesigned for accessibility\b|\baccessibility certified\b/i;
+const GRAVEL_RE = /\bgravel\b|\bunpaved\b|\baggregate\b|\bcrushed[- ]stone\b|\bdirt\b/i;
+const GENERIC_SUBJECT_RE = /^(?:(?:about |over )?\d+(?:\.\d+)? ?k?m |(?:easy|flat|paved|wide|short|level|lit|gravel|and|,|\s)+)*(?:trails?|paths?|pathways?|loop|route|walk)(?:,? (?:and )?(?:washrooms?|toilets?|picnic shelter|playground|parking))*$/i;
+const tidyPart = (p) => {
+  let t = String(p || '').replace(/\s+/g, ' ').replace(/^[\s,;:]+|[\s,;:.]+$/g, '').replace(/^(?:and|with|has an?|the|an?) /i, '').trim();
+  if (!t) return null;
+  if (/^(?:portions|parts)$/i.test(t)) return 'some portions';
+  // "Viewing platform" -> "viewing platform"; "Turtle Mtn Blvd to Davison Rd section" keeps its names.
+  const w = t.split(' ');
+  if (/^[A-Z][a-z]+$/.test(w[0]) && (w.length === 1 || /^[a-z]/.test(w[1]))) t = t.charAt(0).toLowerCase() + t.slice(1);
+  return t.slice(0, 90);
+};
+// The subject of a predicate ("<subject> is wheelchair accessible", "<subject> suits limited mobility").
+function subjectOf(clause, at) {
+  const head = clause.slice(0, at);
+  const m = /^(.*?)(?:\b(?:is|are|suits?|take|takes|has|have)\b[^,]*|,\s*|\bfully\b\s*)$/i.exec(head.trimEnd() + (/[a-z]$/i.test(head.trimEnd()) ? '' : ''));
+  let subj = m ? m[1] : head;
+  subj = subj.replace(/\b(?:is|are|suits?|take|takes|has|have)\b.*$/i, '').replace(/,\s*$/, '').trim();
+  return subj;
+}
+// -> { level, part, amenity?, surface? } from one Access (or Accessibility) line.
+function accessGrade(line) {
+  const raw = String(line || '').replace(/\s+/g, ' ').trim();
+  if (!raw || !/[a-z]{3}/i.test(raw)) return { level: 'unknown', part: null };
+  const surface = GRAVEL_RE.test(raw) ? { surface: 'gravel' } : {};
+  const NOT_RE = /\bnot (?:fully |wheelchair |stroller )?(?:accessible|suitable|suited|friendly)\b|\binaccessible\b|\bno (?:wheelchair|ramp|elevator|lift)s?\b|\bnot all\b/i;
+  const clauses = raw.split(/\s*;\s*/).filter(Boolean);
+  const parts = [], mobParts = [];
+  let whole = false, wheelWord = false, amenity = false, mobility = false, no = false;
+  for (const c0 of clauses) {
+    // "Stroller accessible" is about strollers.
+    const c = c0.replace(/\bstrollers?[- ]accessible\b/ig, 'stroller friendly');
+    if (NOT_RE.test(c)) { no = true; continue; }
+    const cNoStairs = c.replace(/\b(?:no|without) (?:stairs|steps)\b/ig, ' ');
+    const neg = ACCESS_NO_RE.test(cNoStairs);
+    const m = WHEEL_WORD_RE.exec(c);
+    if (m && !/\b(?:restricted|shared|public)[- ]access\b/i.test(c) && !/\badaptive\b/i.test(c)) {
+      // Every "accessible <thing>" / "<subject> is accessible" in the clause.
+      let found = false;
+      const adj = /\b(?:(\d+(?:\.\d+)? ?k?m) )?(?:(?:fully|universally) )?(?:wheel ?chair[- ])?(?:accessible|universal) ((?!from\b|for\b|to\b|and\b|by\b|via\b)[a-z][a-z' -]*?)(?=\s*(?:,|$|\band (?:\d|an? |wheel ?chair|accessible|universal)))/ig;
+      let x;
+      while ((x = adj.exec(c))) {
+        found = true;
+        const thing = x[2].trim();
+        if (AMENITY_RE.test(thing)) { amenity = true; continue; }
+        parts.push({ text: tidyPart(`${x[1] ? `${x[1]} ` : ''}${thing}`) });
+      }
+      const rest = c.replace(adj, ' ');
+      const p = /\bwheel ?chairs?\b|\bbarrier[- ]free\b|\buniversally accessible\b|\baccessible\b|\baccessibility certified\b|\bstep[- ]?free\b/i.exec(rest);
+      if (p) {
+        found = true;
+        const ramp = /\bwheel ?chair ramp\b(.*)$/i.exec(rest), to = /\bwheel ?chair access to (.+)$/i.exec(rest), users = /\bwheel ?chair users\b(.*)$/i.exec(rest);
+        if (ramp) parts.push({ text: tidyPart(`ramp${ramp[1]}`) });
+        else if (to) parts.push({ text: tidyPart(to[1]) });
+        else if (users) parts.push({ text: tidyPart(users[1].replace(/^ can ride /, 'riding ')) });
+        else {
+          const subj = subjectOf(rest, p.index), tail = /\b(?:accessible|friendly|ok)\b\s+((?:from|at|via|by) .+)$/i.exec(rest);
+          if (/^(?:\d+ )?(?:flush |one )*(?:toilets?|washrooms?|parking|facilities)\b/i.test(subj.replace(/^(?:one|a|the) /i, '')) || AMENITY_RE.test(subj)) amenity = true;
+          else if (!subj || (GENERIC_SUBJECT_RE.test(subj) && !tail && !/\b(?:section|portion|part|main|upper|lower|first|second)\b/i.test(subj))) { if (neg) parts.push({ text: tidyPart(subj) || 'part' }); else whole = true; }
+          else parts.push({ text: tidyPart(`${subj}${tail ? ` ${tail[1]}` : ''}`) });
+        }
+      }
+      if (found) { if (WHEEL_ONLY_RE.test(c) || /\baccessible\b/i.test(c)) wheelWord = true; if (neg && !whole) no = no || false; continue; }
+    }
+    if (neg) { no = true; continue; }
+    if (/\b(?:disabled|handicapped) parking\b/i.test(c) && !MOBILITY_RE.test(c.replace(/\b(?:disabled|handicapped) parking\b/ig, ' '))) { amenity = true; continue; }
+    const mm = MOBILITY_RE.exec(c);
+    if (mm && !(/\broads?\b/i.test(c) && !/\b(?:path|trail|loop)\b/i.test(c) && !/\bmobility\b/i.test(c))) {
+      mobility = true;
+      const subj = subjectOf(c, mm.index);
+      if (subj && /\b(?:is|are|suits?)\b/i.test(c.slice(0, mm.index)) && !GENERIC_SUBJECT_RE.test(subj) && /[A-Z]/.test(subj.slice(1))) mobParts.push(tidyPart(subj));
+      else { const end = /\bpaved (?:at|to) (the [a-z ]+?)(?:,|$)/i.exec(c); if (end) mobParts.push(tidyPart(end[1])); }
+    }
+  }
+  const real = parts.filter((p) => p.text);
+  const formalOnly = !WHEEL_ONLY_RE.test(raw);
+  // "… designed for accessibility" / "accessible path" on gravel, with no wheelchair word: the surface leaves a doubt.
+  if (whole && !no && !(formalOnly && surface.surface)) return { level: 'wheelchair', part: null, ...surface };
+  if (whole && !no) return { level: 'mobility', part: null, ...surface };
+  if (whole && no) return { level: 'wheelchair_part', part: null, ...surface };
+  if (real.length) return { level: 'wheelchair_part', part: real.map((p) => p.text).join('; '), ...surface };
+  if (no) return { level: 'no', part: null, ...surface };
+  if (mobility) return { level: 'mobility', part: mobParts[0] || null, ...surface };
+  if (amenity) return { level: 'mobility', part: null, amenity: true, ...surface };
+  return { level: 'unknown', part: null, ...surface };
+}
+const LEVEL_RANK = { wheelchair: 3, wheelchair_part: 2, mobility: 1, unknown: 0, no: -1 };
+// How strongly a listing's access suits a wheelchair pick: 3 confirmed, 2 in part, 1 a mobility note (not an
+// amenity-only line), 0 nothing said, -1 its own words say no.
+const accessRank = (a) => (!a ? 0 : a.level === 'mobility' && a.amenity ? 0 : LEVEL_RANK[a.level] == null ? (a.has === true ? 3 : a.has === false ? -1 : 0) : LEVEL_RANK[a.level]);
 // A listing's access, from its own data only. d: { ownerAccessible (the owner's own Wheelchair accessible answer),
 // accessLine (an outdoor place's Access line or a Plan your visit row labelled Accessibility), stayAccessible (stay_info) }
-// -> { has: true | false | null, says: the line itself or null, source: 'owner' | 'line' | 'stay' | null, paved? }
+// -> { level, part, has, says, source: 'owner' | 'line' | 'stay' | null, paved?, amenity?, surface? }
+// has (kept for older readers): true only for 'wheelchair'; false for 'no'; null for the rest.
 function accessOf(d) {
   const x = d || {};
-  if (x.stayAccessible === true || x.stayAccessible === false) return { has: x.stayAccessible, says: null, source: 'stay' };
-  const line = String(x.accessLine || '').trim(), fromLine = accessFromText(line);
-  if (x.ownerAccessible === true && fromLine !== false) return { has: true, says: line || null, source: 'owner', ...(ACCESS_PAVED_RE.test(line) ? { paved: true } : {}) };
-  if (fromLine !== null) return { has: fromLine, says: line, source: 'line', ...(fromLine && ACCESS_PAVED_RE.test(line) ? { paved: true } : {}) };
-  return { has: null, says: line || null, source: null };
+  if (x.stayAccessible === true || x.stayAccessible === false) return { level: x.stayAccessible ? 'wheelchair' : 'no', part: null, has: x.stayAccessible, says: null, source: 'stay' };
+  const line = String(x.accessLine || '').trim(), g = accessGrade(line);
+  const paved = g.level !== 'no' && !g.amenity && (/\bpaved\b|\bboardwalk\b|\bstep[- ]?free\b/i.test(line) || (g.level === 'wheelchair' && ACCESS_PAVED_RE.test(line))) ? { paved: true } : {};
+  if (x.ownerAccessible === true && g.level !== 'no') return { level: 'wheelchair', part: null, has: true, says: line || null, source: 'owner', ...paved };
+  const extra = { ...(g.amenity ? { amenity: true } : {}), ...(g.surface ? { surface: g.surface } : {}) };
+  if (g.level !== 'unknown') return { level: g.level, part: g.part || null, has: g.level === 'wheelchair' ? true : g.level === 'no' ? false : null, says: line, source: 'line', ...paved, ...extra };
+  return { level: 'unknown', part: null, has: null, says: line || null, source: null };
 }
-// A listing's word on dogs: its Dogs line when it says yes or no, else its Dog-Friendly badge (true), else null.
+// A listing's word on dogs (2026-11-23: where the dog can go is said, or said to be unknown; never guessed).
+// d: { dogLine (an outdoor place's Dogs line), badge (its Dog-Friendly badge or place on the dog-friendly list),
+//      type (the listing's type), ownLine (the listing's own Dogs line: the owner's answer or its Plan your visit row),
+//      patioOnly / outsideOnly / someTrips (the site's own reading of the owner's answer) }
+// -> { has: true | false | null, says, source: 'line' | 'owner' | 'badge' | null, where }
+// where (only when has is true):
+//   'outdoors'    an outdoor place's own Dogs line, with its condition (on leash, a section, a season) in says
+//   'inside'      its own line says dogs can come inside
+//   'patio' / 'outside' / 'some_trips'   its own line says patio only, outside only, some trips only
+//   'stated'      its own line says something else (quoted)
+//   'unsaid'      the Dog-Friendly badge and nothing more, at a place with an indoors (a restaurant, a café, a pub, a
+//                 winery, a brewery, an indoor attraction, a shop): the badge doesn't say inside or patio only
+//   null          the badge at an open-air place (a park, a trail, a beach, a tour)
+const OPEN_AIR_TYPES = ['outdoor', 'beach', 'tour', 'sport', 'golf', 'ski', 'stay'];
+const DOG_PATIO_RE = /\b(?:patio|terrace|deck|terrasse)\b[^.;]{0,24}\b(?:only|seulement|uniquement)\b|\b(?:only|seulement|uniquement)\b[^.;]{0,24}\b(?:patio|terrace|deck|terrasse)\b|\bdogs? (?:are )?(?:welcome |allowed |ok )?on (?:the |our )?(?:patio|terrace|deck)\b(?![^.;]*\binside\b)/i;
+const DOG_OUTSIDE_RE = /\b(?:outside|outdoors?) only\b|\bonly (?:outside|outdoors)\b|\bnot (?:allowed |permitted |welcome )?(?:inside|indoors)\b|\bno dogs (?:allowed |permitted )?(?:inside|indoors)\b|(?:à l[’']extérieur|dehors) seulement|pas (?:de chiens? )?à l[’']intérieur/i;
+const DOG_INSIDE_RE = /\b(?:inside|indoors|in the (?:taproom|tasting room|shop|store|lounge))\b|à l[’']intérieur/i;
 function dogOf(d) {
-  const x = d || {}, line = String(x.dogLine || '').trim(), fromLine = dogFromText(line);
-  if (fromLine === false) return { has: false, says: line, source: 'line' };
-  if (x.badge === true) return { has: true, says: line || null, source: 'badge' };
-  if (fromLine === true) return { has: true, says: line, source: 'line' };
-  return { has: null, says: line || null, source: null };
+  const x = d || {}, line = String(x.dogLine || '').trim(), own = String(x.ownLine || '').trim();
+  const fromLine = dogFromText(line), fromOwn = own ? dogFromText(own) : null;
+  if (fromLine === false) return { has: false, says: line, source: 'line', where: null };
+  if (fromOwn === false && !x.patioOnly && !x.outsideOnly && !DOG_PATIO_RE.test(own) && !DOG_OUTSIDE_RE.test(own)) return { has: false, says: own, source: 'owner', where: null };
+  const yes = x.badge === true || fromLine === true || fromOwn === true || !!x.patioOnly || !!x.outsideOnly;
+  if (!yes) return { has: null, says: line || own || null, source: null, where: null };
+  if (own) {
+    const where = x.outsideOnly || DOG_OUTSIDE_RE.test(own) ? 'outside' : x.patioOnly || DOG_PATIO_RE.test(own) ? 'patio' : x.someTrips ? 'some_trips' : DOG_INSIDE_RE.test(own) ? 'inside' : 'stated';
+    return { has: true, says: own, source: 'owner', where };
+  }
+  if (fromLine === true) return { has: true, says: line, source: 'line', where: 'outdoors' };
+  return { has: true, says: line || null, source: 'badge', where: OPEN_AIR_TYPES.includes(String(x.type || 'outdoor')) ? null : 'unsaid' };
 }
+
+// ---- the words, shared by the plan's evidence, the chat and the shared copy ----
+const WINTER_MONTHS = [11, 12, 1, 2, 3];
+const MONTHS_EN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const MONTHS_FR = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+// The cold-months word for a trip: its month when it is dated in November to March ("January"), "winter" when it has
+// no dates and its request says winter, else null (nothing is said about patios).
+function coldSeason(date, text) {
+  const m = /^\d{4}-(\d{2})-\d{2}$/.exec(String(date || ''));
+  if (m) { const n = Number(m[1]); return WINTER_MONTHS.includes(n) ? { en: MONTHS_EN[n - 1], fr: MONTHS_FR[n - 1] } : null; }
+  const t = fold(text);
+  const named = /\b(january|february|march|november|december|janvier|fevrier|mars|novembre|decembre)\b/.exec(t);
+  if (named) { const i = ['january', 'february', 'march', 'november', 'december'].indexOf(named[1]), j = ['janvier', 'fevrier', 'mars', 'novembre', 'decembre'].indexOf(named[1]); const n = [1, 2, 3, 11, 12][i >= 0 ? i : j]; return { en: MONTHS_EN[n - 1], fr: MONTHS_FR[n - 1] }; }
+  if (/\b(?:winter|snow|ski(?:ing)?|christmas|new year'?s|hiver|neige|noel)\b/.test(t)) return { en: 'winter', fr: 'hiver' };
+  return null;
+}
+const withThe = (part) => (/^(?:some|riding|one|two|the|\d+ accessible)\b/i.test(part) ? part : `the ${part}`);
+// One stop's access, in one short clause for Details (the listing's own line, quoted; what it covers; what is left).
+function accessStopText(r, fr) {
+  const q = r.says ? (fr ? `« ${r.says} »` : `“${String(r.says).replace(/[“”"]/g, '')}”`) : '';
+  if (r.level === 'wheelchair_part') {
+    if (fr) return `${r.name} : ${q}. ${r.part ? `Seul ceci est couvert : ${r.part}` : 'Une partie seulement est couverte'}; vérifiez le reste.`;
+    return `${r.name}: ${q}. ${r.part ? `Only ${withThe(r.part)} is covered` : 'Only part of it is covered'}: check the rest.`;
+  }
+  if (r.level === 'mobility' && r.amenity) return fr ? `${r.name} : ${q}. Cela vise les installations, pas le parcours : demandez avant d’y aller.` : `${r.name}: ${q}. That covers facilities, not the route: ask before you go.`;
+  if (r.level === 'mobility') return fr ? `${r.name} : ${q}. Aucune mention des fauteuils roulants : vérifiez la surface et la largeur.` : `${r.name}: ${q}. No mention of wheelchairs: check the surface and width.`;
+  return '';
+}
+// The short note for a stop's card ("Wheelchair: playground only", "Access: Deleenheer Rd access · check ahead").
+function accessStopNote(r, fr) {
+  if (r.level === 'wheelchair_part') return fr ? `Fauteuil roulant : ${r.part ? `${r.part} seulement` : 'en partie seulement'}` : `Wheelchair: ${r.part ? `${r.part} only` : 'in part only'}`;
+  if (r.level === 'mobility') return fr ? `Accès : ${r.amenity ? 'installations seulement' : r.part || 'note de mobilité'} · à vérifier` : `Access: ${r.amenity ? 'facilities only' : r.part || 'mobility note'} · check ahead`;
+  return '';
+}
+// The expanded card's line for one stop (no name: the card is the stop's own).
+function accessStopMore(r, fr) {
+  const q = r.says ? (fr ? `« ${r.says} »` : `“${String(r.says).replace(/[“”"]/g, '')}”`) : '';
+  const head = fr ? 'Accès en fauteuil roulant : ' : 'Wheelchair access: ';
+  if (r.level === 'wheelchair_part' || r.level === 'mobility') return head + accessStopText({ ...r, name: '' }, fr).replace(/^\s*:\s*/, '');
+  if (r.level === 'wheelchair') return head + (fr ? `indiqué sur la fiche${q ? ` (${q})` : ''}.` : `listed${q ? ` (${q})` : ' on its listing'}.`);
+  if (r.level === 'no') return head + (fr ? `la fiche indique ${q}; pas adapté à un fauteuil roulant d’après la fiche.` : `its listing says ${q}, so it doesn’t suit a wheelchair as listed.`);
+  return head + (fr ? 'la fiche ne le précise pas : demandez avant d’y aller.' : 'its listing doesn’t say: ask before you go.');
+}
+// r: { has, where, says }; cold: { en, fr } | null.
+function dogStopMore(r, fr, cold) {
+  const head = fr ? 'Chien : ' : 'Dog: ', says = String(r.says || '').replace(/[“”"]/g, '').replace(/\.$/, '');
+  const patio = cold ? (fr ? ` (une terrasse peut être fermée en ${cold.fr})` : ` (a patio may be closed in ${cold.en})`) : '';
+  if (r.has === false) return head + (says ? (fr ? `la fiche indique « ${says} ».` : `its listing says “${says}”.`) : (fr ? 'non indiqué comme acceptant les chiens.' : 'not listed as dog-friendly.'));
+  if (r.has !== true) return head + (fr ? 'la fiche ne le précise pas : demandez avant d’y aller.' : 'its listing doesn’t say: ask before you go.');
+  if (r.where === 'unsaid') return head + (fr ? `a le badge Chiens admis; la fiche ne dit pas si les chiens peuvent entrer ou seulement aller sur une terrasse${patio} : demandez avant d’y aller.` : `has the Dog-Friendly badge; its listing doesn’t say if dogs can come inside or only on a patio${patio}: ask before you go.`);
+  if (says) return head + (fr ? `la fiche indique « ${says} »${r.where === 'patio' ? patio : ''}.` : `its listing says “${says}”${r.where === 'patio' ? patio : ''}.`);
+  return head + (fr ? 'a le badge Chiens admis.' : 'has the Dog-Friendly badge.');
+}
+// Both needs at one stay whose listing has accessible rooms and takes pets: one room with both is not confirmed.
+const STAY_BOTH = {
+  its: { text: 'Its listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both: ask the hotel to confirm an accessible, dog-friendly room.', textFr: 'Sa fiche indique des chambres accessibles et des chambres où les animaux sont acceptés, mais ne dit pas qu’une même chambre offre les deux : demandez à l’hôtel de confirmer une chambre accessible qui accepte les chiens.' },
+  named: (name) => ({ text: `Place to stay: ${name}’s listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both: ask the hotel to confirm an accessible, dog-friendly room.`, textFr: `Hébergement : la fiche de ${name} indique des chambres accessibles et des chambres où les animaux sont acceptés, mais ne dit pas qu’une même chambre offre les deux : demandez à l’hôtel de confirmer une chambre accessible qui accepte les chiens.` }),
+  short: 'Stay: accessible + dog-friendly room to confirm', shortFr: 'Hébergement : chambre accessible + chien à confirmer',
+};
+const stayBoth = (needs, facts) => hasNeed(needs, 'wheelchair') && hasNeed(needs, 'dog') && !!facts && facts.accessible === true && (facts.pets === 'yes' || facts.pets === 'some');
 
 // ---- thin days ----
 // A day of a multi-day plan that ended up with no stop, or one stop: said, never shown as a finished day.
@@ -173,4 +366,4 @@ function thinDays(plan, ctx = {}) {
   return out;
 }
 
-module.exports = { readNeeds, hasNeed, needOf, accessFromText, dogFromText, accessOf, dogOf, thinDays, ACCESS_PAVED_RE };
+module.exports = { readNeeds, hasNeed, needOf, accessFromText, accessGrade, accessRank, dogFromText, accessOf, dogOf, thinDays, ACCESS_PAVED_RE, coldSeason, accessStopText, accessStopNote, accessStopMore, dogStopMore, STAY_BOTH, stayBoth, OPEN_AIR_TYPES };
