@@ -148,7 +148,7 @@ const TX = {
     cntAsked: 'You asked for {n} {plural}, so the plan has {m}: {list}.', cntMore: 'You asked for {n} {plural}, but the plan has {m}: {list}. Say “remove {last}” and I’ll take one out.', cntFewer: 'You asked for {n} {plural}, but the plan has only {m}: {list}. I don’t know why the planner found no more; say “add another {what}” and I’ll try.',
     cntNoNum: 'Your request asked for {plural} without a number; the plan has {m}: {list}.', cntNotAsked: 'Your request didn’t ask for {plural}; the planner added {list}, and I don’t know more than that. Say “remove {last}” if you’d rather not.', cntNone: 'There’s no {what} in your plan. Say “add {add}” if you’d like one.',
     onDay: '{name} on day {d}', num: ['no', 'one', 'two', 'three', 'four', 'five', 'six'],
-    unknownQ: 'I’m not sure what that question is about. I can explain a stop (“why Frankie’s?”), a note on the plan (“what does the warning mean?”) or what I last changed.',
+    unknownQ: 'I’m not sure what that question is about. I can explain a stop (“why this restaurant?”), a note on the plan (“what does the warning mean?”) or what I last changed.',
     full: 'Day {d} has no free spot for another {what}.', fullSwap: 'I can swap {name}{at} for {a}', fullOther: 'add one on day {d} at {time}', fullOr: ', or ', fullWhich: '. Which?', fullOne: '. Shall I?', fullI: 'I can ', fullNone: 'Every other stop that day is a meal or one you kept, and the other days are full too, so I left the plan as it is.',
     saySwap: 'swap {name} for {a}', sayOther: 'add another {what} on day {d}', sayFeat: 'swap {names} for {word} places',
   },
