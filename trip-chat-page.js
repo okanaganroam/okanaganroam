@@ -245,6 +245,8 @@ function chatClientSrc(d) {
     var evs = chatEventIds(); if (evs.length) body.events = evs;
     // Round 5: each day's own date (so "Friday" is the right day) and the stops the chat added or changed earlier.
     try { var dd = ((state.last && state.last.days) || []).map(function(d){ return /^\d{4}-\d{2}-\d{2}$/.test(String(d && d.date || '')) ? d.date : null; }).slice(0, 7); if (dd.some(Boolean)) body.dayDates = dd; } catch (e) { /* none */ }
+    // Trip dates (2026-11-23): where the days' dates came from, so "yes, book those nights" is read against given dates only.
+    try { var tds = state.last && state.last.tripDates; if (tds && tds.source) body.tripSource = tds.source; } catch (e) { /* none */ }
     if (chat.soft && Object.keys(chat.soft).length) body.soft = chat.soft;
     var sd = typeof t3StayData === 'function' && !chat.noStay ? t3StayData() : null; if (sd && sd.chosen && sd.chosen.region) body.stayTown = sd.chosen.region; if (sd && sd.chosen && sd.chosen.id > 0) body.stayId = sd.chosen.id;
     if (chip) body.chip = chip; else body.message = message;
@@ -295,6 +297,9 @@ function chatClientSrc(d) {
         if (j.stayPref !== undefined) { chat.stayPref = j.stayPref; chat.noStay = !!(j.stayPref && j.stayPref.none); touched = true; if (changed.indexOf('stay') === -1) changed.push('stay'); }
         // Travel agent abilities: a stay added to a plan with no night (stay.force rides along with later requests), and the number of adults.
         if (j.stayForce !== undefined) { chat.stayForce = !!j.stayForce; chat.stayArrive = j.stayForce && j.stayArrive ? j.stayArrive : null; touched = true; }
+        // The stay's dates set or confirmed in the chat: the Dates fields, so every stay link, the shared copy and a
+        // later request carry them.
+        if (j.stayDates && j.stayDates.arrive && j.stayDates.leave) { var sdA = document.getElementById('t3Arrive'), sdB = document.getElementById('t3Leave'); if (sdA && sdB) { sdA.value = j.stayDates.arrive; sdB.value = j.stayDates.leave; chat.askedWhen = true; } touched = true; if (changed.indexOf('stay') === -1) changed.push('stay'); }
         // Rooms set in the chat ("make it 3 rooms"): the Rooms field, so every stay link and a later request carry it.
         if (j.party && j.party.rooms > 0) { var rmSet = document.getElementById('t3Rooms'); if (rmSet) { rmSet.value = String(j.party.rooms); rmSet.setAttribute('data-v4-auto', '1'); } touched = true; }
         if (j.party && j.party.adults > 0) { var adEl = document.getElementById('t3Adults'); if (adEl) { adEl.value = String(j.party.adults); adEl.setAttribute('data-v4-auto', '1'); } chat.adults = j.party.adults; }
@@ -349,14 +354,14 @@ function chatClientSrc(d) {
       amen: { pool: 'a pool', hot_tub: 'a hot tub', kitchen: 'a kitchen', pets: 'pet-friendly rooms', parking: 'free parking', accessible: 'accessible rooms' },
       chip: { pool: 'Pool', hot_tub: 'Hot tub', kitchen: 'Kitchen', pets: 'Pets welcome', parking: 'Free parking', accessible: 'Accessible' }, when: 'When are you coming?', whenShort: 'When?', weekend: 'This weekend', pick: 'Pick dates', notSure: 'Not sure yet', done: 'Done', from: 'Arrive', to: 'Leave',
       datesFail: 'I couldn’t plan those dates. Your plan is unchanged.', missing: 'I couldn’t fit {what} on these dates; tell me if you’d like me to try another day.', missingNoDates: 'I couldn’t fit {what} into this plan; say “add {what}” and I’ll try again.', removeEvent: 'Remove {name}', poolWinter: 'check it’s open in winter',
-      datesSet: 'Planned for {a} – {b}.', ready: 'Your trip is ready. Book it, share it, or tell me what to change.', noCarNone: 'No shuttle listed for this trip.', wine: 'Wine tour (no driving)',
+      datesSet: 'Planned for {a} – {b}.', stayDatesSet: 'Stay set: {a} → {b}, {n}. The booking links now carry these dates.', ready: 'Your trip is ready. Book it, share it, or tell me what to change.', noCarNone: 'No shuttle listed for this trip.', wine: 'Wine tour (no driving)',
       stayH: 'Where you’ll stay', stayShort: 'Your stay', rates: 'Check rates', seeMore: 'See {n} more', fewer: 'Hide', choose: 'Choose', ghH: 'Getting here', seeCars: 'See cars', book: 'Book', confirm: 'Confirm plan', sleeps: 'Sleeps {n}' },
     fr: { who: 'Agent de voyage', hi: 'Bonjour! Où allez-vous, et qu’aimez-vous faire?', day: 'Voici une journée à {town}{for}.', days: 'Voici un plan de {n} jours à {town}{for}{stay}.', plan: 'Voici votre plan{for}.', more: ' Voulez-vous changer quelque chose?',
       fam: ' pour votre famille', dog: ' pour vous et votre chien', stay: ', avec un logement', stayWith: ', avec un logement qui a {what}', stayUnsure: ', avec un logement ({what} non confirmé)', and: 'et', notConfirmed: '{what} non confirmé',
       amen: { pool: 'une piscine', hot_tub: 'un spa', kitchen: 'une cuisine', pets: 'des chambres où les animaux sont acceptés', parking: 'un stationnement gratuit', accessible: 'des chambres accessibles' },
       chip: { pool: 'Piscine', hot_tub: 'Spa', kitchen: 'Cuisine', pets: 'Animaux acceptés', parking: 'Stationnement gratuit', accessible: 'Accessible' }, when: 'Quand venez-vous?', whenShort: 'Quand?', weekend: 'Ce week-end', pick: 'Choisir les dates', notSure: 'Pas encore sûr', done: 'OK', from: 'Arrivée', to: 'Départ',
       datesFail: 'Je n’ai pas pu planifier ces dates. Votre plan n’a pas changé.', missing: 'Je n’ai pas pu inclure {what} à ces dates; dites-moi si vous voulez que j’essaie un autre jour.', missingNoDates: 'Je n’ai pas pu inclure {what} dans ce plan; dites « ajoute {what} » et j’essaie encore.', removeEvent: 'Retirer {name}', poolWinter: 'vérifiez qu’elle est ouverte en hiver',
-      datesSet: 'Plan pour le {a} – {b}.', ready: 'Votre voyage est prêt. Réservez-le, partagez-le ou dites-moi quoi changer.', noCarNone: 'Aucune navette pour ce voyage.', wine: 'Tour des vignobles (sans conduire)',
+      datesSet: 'Plan pour le {a} – {b}.', stayDatesSet: 'Séjour : {a} → {b}, {n}. Les liens de réservation portent ces dates.', ready: 'Votre voyage est prêt. Réservez-le, partagez-le ou dites-moi quoi changer.', noCarNone: 'Aucune navette pour ce voyage.', wine: 'Tour des vignobles (sans conduire)',
       stayH: 'Où vous logerez', stayShort: 'Votre séjour', rates: 'Voir les tarifs', seeMore: 'Voir {n} autres', fewer: 'Masquer', choose: 'Choisir', ghH: 'Pour venir', seeCars: 'Voir les voitures', book: 'Réserver', confirm: 'Confirmer le plan', sleeps: 'Jusqu’à {n} pers.' }
   };
   function ag(k, vars){ var x = (AG[lang()] || AG.en)[k]; if (vars) Object.keys(vars).forEach(function(v){ x = x.split('{' + v + '}').join(String(vars[v])); }); return x; }
@@ -488,7 +493,7 @@ function chatClientSrc(d) {
       + '<div class="v4-stay-acts">' + (step ? t3StayLinkHtml(s, { url: step.url, rel: step.rel, key: step.link, affiliate: step.affiliate }, 'v4-btn', ag('rates')) : '')
       + (d.others.length ? '<button type="button" class="v4-link" data-v4-stay-more aria-expanded="' + (chat.stayMore ? 'true' : 'false') + '">' + esc(chat.stayMore ? ag('fewer') : ag('seeMore', { n: d.others.length })) + '</button>' : '') + '</div>';
     if (chat.stayMore && d.others.length) html += '<ul class="v4-stay-alts">' + d.others.map(function(o){ return '<li><span><b>' + esc(o.name) + '</b>' + esc([fr ? (o.kindFr || o.kind) : o.kind, o.regionLabel, o.priceBand].concat((o.has || []).map(function(k){ return (AG[lang()] ? AG[lang()].chip : AG.en.chip)[k] || k; })).filter(Boolean).join(' · ')) + '</span><button type="button" class="v4-link" data-v4-stay-choose="' + esc(o.id) + '">' + esc(ag('choose')) + '</button></li>'; }).join('') + '</ul>';
-    html += roomsRow;
+    html += (typeof t3StayDatesHtml === 'function' ? t3StayDatesHtml(tripIn, fr) : '') + roomsRow;
     // One small paragraph under the card: the rooms line first, then the commission line (one block, so a phone's card stays short).
     if (roomsNote || (step && step.affiliate)) html += '<p class="v4-disc-line">' + (roomsNote ? '<span data-v4-rooms-note>' + esc(roomsNote) + '</span> ' : '') + (step && step.affiliate ? esc(T3_STAY_DISCLOSURE[fr ? 'fr' : 'en'] || T3_STAY_DISCLOSURE.en) : '') + '</p>';
     if (step && step.affiliate) chatDiscShown = true;
@@ -557,14 +562,16 @@ function chatClientSrc(d) {
   ${chatWeekendDates.toString()}
   ${tripEvidenceFor.toString()}
   function chatWeekend(){ return chatWeekendDates(new Date(), days().length); }
-  function chatSetDates(a, b){
+  function chatSetDates(a, b, stayOnly){
     var ea = document.getElementById('t3Arrive'), eb = document.getElementById('t3Leave');
     if (!ea || !eb || !/^\d{4}-\d{2}-\d{2}$/.test(a) || !/^\d{4}-\d{2}-\d{2}$/.test(b) || b <= a) return false;
     ea.value = a; eb.value = b; chat.askedWhen = true; chat.pickDates = false;
     // The same stops (and kept stops), planned for those days (hours and the place to stay follow the dates); the agent
     // says which dates (fix round 2026-11-22: "This weekend" rebuilt the plan with no word).
     var fmt = function(x){ return new Date(x + 'T12:00:00Z').toLocaleDateString(lang() === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }); };
-    chat.pendingNote = ag('datesSet', { a: fmt(a), b: fmt(b) });
+    // Trip dates (2026-11-23): a yes to the proposed stay (or new check-in / check-out) says the stay's dates.
+    var nn = Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / 86400000);
+    chat.pendingNote = stayOnly ? ag('stayDatesSet', { a: fmt(a), b: fmt(b), n: t3NightsLabel(nn, lang() === 'fr') }) : ag('datesSet', { a: fmt(a), b: fmt(b) });
     var pins = currentPins([]); Object.keys(state.locks || {}).forEach(function(k){ pins[k] = state.locks[k]; });
     var req = request({ pinned: pins }, { requestType: 'refine', focus: false });
     // The plan didn't come back for those dates (a kept stop that is closed then): once more without the pins; if that

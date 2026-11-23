@@ -55,6 +55,68 @@ function roomsChat(message) {
   if (/\b(?:kitchen|pool|view|vue|cuisine|piscine|balcon\w*|accessible|pet|dog|chien)\b/.test(t)) return null;
   return roomsInText(t, { chat: true });
 }
+// ---- The stay's dates, said in the chat (2026-11-23) ----
+// Only on a trip whose dates the visitor gave (ctx.given): "what dates is the hotel for?" -> { ask: true };
+// "yes, book those nights", "use those dates" -> { confirm: true }; "we arrive Friday the 4th", "check out Monday",
+// "arrive the night before", "stay an extra night" -> { arrive, leave } (worked out against the trip's days), or
+// { error: 'past' | 'apart' | 'order' }. null: not about the stay's dates (the other chat rules read the message).
+//   ctx: { given, tripStart, tripEnd, arrive, leave, today }  (arrive / leave: the stay's dates now, confirmed or proposed)
+const SD_ASK_RE = /\b(?:what|which) (?:dates?|nights?|days?) (?:is|are|did you (?:book|pick|use) for) (?:the |our |my )?(?:hotel|stay|rooms?|booking|accommodation)\b|\b(?:hotel|stay|room|booking)\b[^.?!]{0,30}\bfor (?:what|which) (?:dates?|nights?)\b|\bwhen (?:do|would|will|are) we check(?:ing)?[- ]?(?:in|out)\b|\bwhat(?:'s| is| are) (?:the |our )?(?:hotel|stay|check[- ]?in|check[- ]?out|booking) dates?\b|\bquelles? (?:dates?|nuits?)\b[^.?!]{0,30}\b(?:hotel|sejour|hebergement|chambre)\b|\b(?:hotel|sejour|hebergement)\b[^.?!]{0,30}\bquelles? (?:dates?|nuits?)\b/;
+const SD_CONFIRM_RE = /\b(?:book|use|confirm|keep|go with|reserve|take)\b[^.?!]{0,20}\b(?:those|these|the proposed|the suggested|the same) (?:nights?|dates?|stay dates?)\b|\b(?:those|these|the) (?:stay )?(?:dates?|nights?) (?:are|look|work|is|sound)s? (?:right|good|fine|correct|ok|okay|great)\b|\b(?:utilise[rz]?|confirme[rz]?|reserve[rz]?|garde[rz]?|prends|prenez)\b[^.?!]{0,20}\bces (?:dates?|nuits?)\b|\bces (?:dates?|nuits?) (?:sont bonnes|conviennent|me vont|nous vont)\b/;
+const SD_ARRIVE_RE = /\b(?:arriv\w*|check(?:ing)?[- ]?in|get(?:ting)? (?:in|there)|com(?:e|ing) (?:in|up))\b/;
+const SD_LEAVE_RE = /\b(?:check(?:ing)?[- ]?out|leav\w*|depart\w*|(?:head|go|driv)(?:ing)? (?:back )?home|part(?:ons|ir|ira|irons)?|repart\w*|quitt\w*)\b/;
+const SD_WD = ['sun(?:day)?|dimanche', 'mon(?:day)?|lundi', 'tues?(?:day)?|mardi', 'wed(?:nesday)?|mercredi', 'thu(?:rs?(?:day)?)?|jeudi', 'fri(?:day)?|vendredi', 'sat(?:urday)?|samedi'];
+const SD_MONTHS = ['jan(?:uary|vier)?', 'feb(?:ruary)?|fev(?:rier)?', 'mar(?:ch|s)?', 'apr(?:il)?|avr(?:il)?', 'may|mai', 'june?|juin', 'july?|juil(?:let)?', 'aug(?:ust)?|aout', 'sep(?:t|tember|tembre)?', 'oct(?:ober|obre)?', 'nov(?:ember|embre)?', 'dec(?:ember|embre)?'];
+// The date a clause names, for the stay's start ('arrive') or end ('leave'), near the trip's own days. -> ISO or null.
+function stayDateIn(clause, role, ctx) {
+  const iso = /\b(20\d{2}-\d{2}-\d{2})\b/.exec(clause);
+  if (iso && validDate(iso[1])) return iso[1];
+  const anchor = role === 'arrive' ? ctx.tripStart : ctx.tripEnd;
+  const y = Number(anchor.slice(0, 4)), mo = Number(anchor.slice(5, 7));
+  const real = (yy, mm, dd) => { const v = `${yy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`; return validDate(v) && new Date(`${v}T12:00:00Z`).getUTCDate() === dd ? v : null; };
+  for (let m = 0; m < 12; m++) {
+    const a = new RegExp(`\\b(?:${SD_MONTHS[m]})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`).exec(clause) || new RegExp(`\\b(\\d{1,2})(?:st|nd|rd|th|er)?\\s+(?:of\\s+)?(?:${SD_MONTHS[m]})\\b`).exec(clause);
+    if (a) return real(m + 1 < mo - 6 ? y + 1 : y, m + 1, Number(a[1]));
+  }
+  const nth = /\b(?:the|le)\s+(\d{1,2})(?:st|nd|rd|th|er)?\b(?!\s*(?:h\b|:|am\b|pm\b|heures?\b))/.exec(clause) || /\b(\d{1,2})(?:st|nd|rd|th)\b/.exec(clause);
+  if (nth) { const d = real(y, mo, Number(nth[1])); if (d) return d; }
+  if (role === 'arrive' && /\b(?:(?:the )?(?:night|day|evening) before|a (?:day|night) (?:early|earlier)|la veille|un jour plus tot|une nuit plus tot)\b/.test(clause)) return addDays(ctx.tripStart, -1);
+  if (role === 'leave' && /\b(?:(?:the|a|one) (?:day|night) (?:after|later)|(?:the )?next (?:day|morning)|le lendemain|un jour plus tard)\b/.test(clause)) return addDays(ctx.leave || ctx.tripEnd, 1);
+  for (let w = 0; w < 7; w++) {
+    if (!new RegExp(`\\b(?:${SD_WD[w]})\\b`).test(clause)) continue;
+    const wd = new Date(`${anchor}T12:00:00Z`).getUTCDay();
+    return role === 'arrive' ? addDays(anchor, -((wd - w + 7) % 7)) : addDays(anchor, (w - wd + 7) % 7);
+  }
+  return null;
+}
+function stayDatesChat(message, ctx) {
+  const t = foldRooms(message), c = ctx || {};
+  if (!t || t.length > 140 || !c.given || !validDate(c.tripStart) || !validDate(c.tripEnd)) return null;
+  if (SD_ASK_RE.test(t)) return { ask: true };
+  const check = (arrive, leave) => {
+    if (!validDate(arrive) || !validDate(leave)) return { error: 'order' };
+    if (validDate(c.today) && arrive < c.today) return { error: 'past' };
+    if (arrive > c.tripEnd || leave < c.tripStart) return { error: 'apart' };
+    if (leave <= arrive || daysBetween(arrive, leave) > MAX_NIGHTS) return { error: 'order' };
+    return { arrive, leave };
+  };
+  if (SD_CONFIRM_RE.test(t)) return validDate(c.arrive) && validDate(c.leave) ? { confirm: true, ...check(c.arrive, c.leave) } : null;
+  // "stay an extra night", "add a night": one more night at the end.
+  if (/\b(?:stay|add|book)\b[^.?!]{0,16}\b(?:an?|one) (?:extra|more|additional) night\b|\b(?:une|1) nuit de plus\b|\b(?:an?|one) (?:extra|more) night\b/.test(t) && validDate(c.arrive) && validDate(c.leave)) return check(c.arrive, addDays(c.leave, 1));
+  // A time of day is not a date ("we arrive at 3 pm" belongs to the planner).
+  const hasA = SD_ARRIVE_RE.test(t), hasL = SD_LEAVE_RE.test(t);
+  if (!hasA && !hasL) return null;
+  let a = null, l = null;
+  if (hasA && hasL) {
+    const ia = t.search(SD_ARRIVE_RE), il = t.search(SD_LEAVE_RE);
+    const first = t.slice(0, Math.max(ia, il)), second = t.slice(Math.max(ia, il));
+    a = stayDateIn(ia < il ? first : second, 'arrive', c); l = stayDateIn(ia < il ? second : first, 'leave', { ...c, leave: null });
+  } else if (hasA) a = stayDateIn(t, 'arrive', c);
+  else l = stayDateIn(t, 'leave', { ...c, leave: null });
+  if (!a && !l) return null;
+  const base = validDate(c.arrive) && validDate(c.leave) ? c : { arrive: c.tripStart, leave: c.tripEnd > c.tripStart ? c.tripEnd : addDays(c.tripStart, 1) };
+  return check(a || base.arrive, l || base.leave);
+}
 // Other towns' stays join only when the plan's own towns give fewer than this many, and only within NEAR_KM.
 const MIN_IN_TOWN = 3;
 const NEAR_KM = 35;
@@ -87,7 +149,7 @@ function daysBetween(a, b) { return Math.round((Date.parse(`${b}T12:00:00Z`) - D
 function parseTripStayInput(raw) {
   if (raw === undefined || raw === null) return { value: null };
   if (!isObj(raw)) return { error: 'stay must be an object with arrive, leave, adults, kids and dog.' };
-  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog', 'pref', 'force', 'none', 'kidAges', 'rooms'].includes(k));
+  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog', 'pref', 'force', 'none', 'kidAges', 'rooms', 'via'].includes(k));
   if (extra.length) return { error: `stay may only contain arrive, leave, adults, kids and dog (not ${extra.join(', ')}).` };
   const out = {};
   for (const k of ['arrive', 'leave']) {
@@ -96,6 +158,11 @@ function parseTripStayInput(raw) {
     out[k] = raw[k];
   }
   if (out.leave && !out.arrive) return { error: 'stay.leave needs stay.arrive.' };
+  // Trip dates (2026-11-23): how the dates were given ('chat': said in the chat; else picked in a date field).
+  if (raw.via !== undefined && raw.via !== null && raw.via !== '') {
+    if (raw.via !== 'chat' && raw.via !== 'picked') return { error: 'stay.via must be "chat" or "picked".' };
+    if (out.arrive) out.via = raw.via;
+  }
   if (out.arrive && out.leave) {
     const nights = daysBetween(out.arrive, out.leave);
     if (nights < 1) return { error: 'stay.leave must be after stay.arrive.' };
@@ -235,6 +302,26 @@ function budgetOf(intent) {
   return ['budget', 'upscale', 'moderate'].find((x) => list.includes(x)) || null;
 }
 
+// Trip dates and lodging dates are two things (2026-11-23, Dayton: the days said Dec 5 and 6, the stay said "Dates not
+// set" and its link had no dates). The trip's dates (opts.tripDates: { start, end, source, assumed? }, server.js
+// tripDatesOf) are what the visitor gave for the days. The lodging dates are the check-in and check-out:
+//   stayStatus 'confirmed'  the visitor entered or confirmed them (stay.arrive + stay.leave): the only dates a booking
+//                           link ever carries;
+//   stayStatus 'proposed'   the trip has given dates and the stay is worked out from them (day 1 to the last day), shown
+//                           for a yes before any provider gets a date;
+//   none                    no dates given, or only dates the planner assumed ("a weekend", a month): "Dates not set".
+// A date already past (before `today`, the site's own day) is never sent: datesPast.
+function stayDateState(i, arrive, leave, tripDates, today) {
+  const td = tripDates && validDate(tripDates.start) ? tripDates : null;
+  const out = {};
+  if (td) { out.tripStart = td.start; out.tripEnd = validDate(td.end) && td.end >= td.start ? td.end : td.start; out.tripSource = td.assumed ? 'assumed' : td.source || 'request'; }
+  const confirmed = !!(i.arrive && i.leave);
+  const past = validDate(today) && (confirmed ? validDate(arrive) && arrive < today : !!td && td.start < today);
+  if (confirmed) { out.stayStatus = 'confirmed'; if (past) out.datesPast = true; }
+  else if (td && !td.assumed) { if (past) out.datesPast = true; else out.stayStatus = 'proposed'; }
+  return out;
+}
+
 // What the plan and the inputs say about the trip, or null when no base is needed (a plan of one day with no night, a
 // plan with no venue stops, or not a plan at all). centre: the middle of the stops that have a map location (null when
 // none has one; the stays are then ranked without distance, in the plan's towns only).
@@ -284,6 +371,7 @@ function tripStayContext(plan, input, today, opts = {}) {
   return {
     arrive, leave, nights, months, adults, ...(adultsAssumed ? { adultsAssumed: true } : {}), kids, guests, withKids, dog: i.dog === true || !!party.dog, budget: budgetOf(plan.intent),
     centre, primaryRegion: regions[0], regions, datesGiven: !!(i.arrive && i.leave), camping: wantsCamping(plan),
+    ...(opts.v4 ? stayDateState(i, arrive, leave, opts.tripDates, today) : {}),
     ...(opts.v4 ? { v4: true, couple: V4_COUPLE_RE.test(v4Words(plan, opts.text)), budgetStay: V4_BUDGET_STAY_RE.test(v4Words(plan, opts.text)) } : {}),
   };
 }
@@ -488,7 +576,8 @@ function whereToStay(plan, input, stays, today, opts = {}) {
   const pick = tag(picked.pick);
   return {
     stayId: picked.pick.id,
-    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, ...(ctx.adultsAssumed ? { adultsAssumed: true } : {}), kids: ctx.kids, ...(input && Array.isArray(input.kidAges) && input.kidAges.length === ctx.kids ? { kidAges: input.kidAges.slice() } : {}), ...tripRooms(ctx.adults, input && input.rooms), dog: !!ctx.dog, datesGiven: ctx.datesGiven },
+    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, ...(ctx.adultsAssumed ? { adultsAssumed: true } : {}), kids: ctx.kids, ...(input && Array.isArray(input.kidAges) && input.kidAges.length === ctx.kids ? { kidAges: input.kidAges.slice() } : {}), ...tripRooms(ctx.adults, input && input.rooms), dog: !!ctx.dog, datesGiven: ctx.datesGiven,
+      ...(ctx.stayStatus ? { stayStatus: ctx.stayStatus } : {}), ...(ctx.datesPast ? { datesPast: true } : {}), ...(ctx.tripStart ? { tripStart: ctx.tripStart, tripEnd: ctx.tripEnd, tripSource: ctx.tripSource } : {}) },
     pick,
     alternatives: picked.alternatives.map(tag),
     ...(amenity ? { amenity } : {}),
@@ -501,6 +590,7 @@ const ELSEWHERE_KM = 60;
 module.exports = {
   MAX_NIGHTS, MAX_ADULTS, MAX_KIDS, NEAR_KM, MIN_IN_TOWN,
   roomsInText, roomsChat, tripRooms, MAX_ROOMS,
+  stayDatesChat, stayDateState,
   parseTripStayInput, parseStayPref, staysForPref, STAY_AMENITIES, stayHas, stayHasNot, prefAmenities, STAY_KIND_SETS, tripStayContext, partyOf, stayFails, scoreStay, pickTripStays, whereToStay, planStops, km, addDays, daysBetween,
   wantsCamping, isCampingStay, CAMPING_RE,
   v4DormStay, V4_COUPLE_RE, V4_BUDGET_STAY_RE,

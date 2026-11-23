@@ -124,6 +124,8 @@ function explainRules(t, h, stops) {
   }
   if (!isQ && !WHY_RE.test(t)) return null;
   if (EDIT_START_RE.test(t)) return null;
+  // "what time is the movie?", "when does the film start?", "how long is the class?": no showtimes are held (2026-11-23).
+  if (isQ && /\b(?:what time|when|how long|a quelle heure|quand|combien de temps|quelle heure)\b/.test(t) && /\b(?:movies?|films?|show(?:ing|time)?s?|cinema|screening|class(?:es)?|lessons?|sessions?|public swim|seances?|cours)\b/.test(t)) return ask('q_showtime');
   // The plan's own warnings: "why did you say you could not fit gluten free…", "what does the warning mean?".
   if (SAID_RE.test(t) || (WARN_WORD_RE.test(t) && isQ)) return ask('q_warning', { feature: feat, kind: feat ? null : kinds()[0] || null });
   // An allergy: only what a badge supports, never a promise.
