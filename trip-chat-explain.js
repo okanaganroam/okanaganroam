@@ -310,19 +310,32 @@ function pickOffer(message, offers, fold) {
   const t = fold(String(message || '')).replace(/\s+/g, ' ').trim();
   const list = (offers || []).filter((o) => typeof o === 'string' && o);
   if (!t || !list.length || t.length > 80) return null;
-  if (/^(?:no|nope|non|never mind|leave it|neither|aucun|laisse|rien)\b/.test(t)) return null;
-  const yes = /^(?:yes|yep|yeah|sure|ok|okay|please|do it|go ahead|oui|d'accord|vas-y|allez-y)\b/.test(t);
+  if (/^(?:no|nope|nah|non|never ?mind|leave it|keep it|don't|neither|aucun|laisse|rien)\b/.test(t)) return null;
+  const yes = /^(?:yes|yep|yeah|yup|sure|ok|okay|please|do it|do that|go ahead|go for it|sounds good|that works|fine|oui|ouais|d'accord|vas-y|allez-y|parfait|ca marche|ca me va)\b/.test(t);
   const dayM = /\b(?:day|jour)\s*(\d)\b/.exec(t);
   if (dayM) { const hit = list.find((o) => new RegExp(`\\b(?:day|jour)\\s*${dayM[1]}\\b`).test(fold(o))); if (hit) return hit; }
   if (/\b(?:second|2nd|latter|last|other day|deuxieme|dernier|l'autre jour)\b/.test(t) && list.length > 1) return list[1];
-  if (/\b(?:first|1st|former|swap|replace|premier|remplace[rz]?|echange[rz]?)\b/.test(t)) return list[0];
+  if (/\b(?:first|1st|former|premier)\b/.test(t)) return list[0];
+  // "swap it", "swap the park": the offered swap. A whole new request that only has the word in it ("can you swap the
+  // day 2 winery for another with…") is not an answer, and is read as any other message.
+  if (/\b(?:swap|replace|remplace[rz]?|echange[rz]?)\b/.test(t) && (t.split(' ').length <= 4 || !/\[(?:un)?verified [^\]]*\]\s*$/.test(list[0]))) return list[0];
   if (/\b(?:those|them|both|it|that|these|ceux|les deux|celui)\b/.test(t) && list.length === 1) return list[0];
   // A word of a place named in an offer ("the park", "Mill Creek").
   const words = t.split(/[^a-z0-9']+/).filter((w) => w.length >= 4 && !/^(?:swap|replace|with|pour|that|this|then|please|winery|brewery|sure)$/.test(w));
-  const byWord = list.filter((o) => words.some((w) => fold(o).split(/[^a-z0-9']+/).includes(w)));
+  // Another instruction or a question that happens to name a place in an offer ("remove Azhadi", "is Summerhill open?")
+  // is not an answer to it. The tag at the end of an offer (ids, for the server) is never matched.
+  const other = /^(?:remove|drop|skip|delete|add|keep|move|why|what|when|where|how|is|are|does|do|tell|enleve[rz]?|retire[rz]?|ajoute[rz]?|garde[rz]?|pourquoi|quand|est-ce)\b/.test(t) || /\?\s*$/.test(t);
+  // Of a swap offered by name, only the new place's name counts ("Peak Cellars is fine" keeps Peak Cellars).
+  const named = (o) => { const b = fold(o).replace(/\[[^\]]*\]\s*$/, ''); return /\[unverified [^\]]*\]\s*$/.test(o) ? b.replace(/^.*\bfor\b/, '') : b; };
+  const byWord = other ? [] : list.filter((o) => words.some((w) => named(o).split(/[^a-z0-9']+/).includes(w)));
   if (byWord.length === 1) return byWord[0];
   if (yes && list.length === 1) return list[0];
   return null;
 }
 
-module.exports = { tripEvidenceFor, explainRules, isExplainQuestion, answer, fullReply, pickOffer, raiseCountText, countAsked, featureIn, FEAT_RES, TX };
+// "no", "leave it" said to an offer: the plan stays as it is.
+function declinesOffer(message, fold) {
+  const t = fold(String(message || '')).replace(/\s+/g, ' ').trim();
+  return /^(?:no|nope|nah|no thanks?|no thank you|never ?mind|leave it|keep it|neither|don't|non|non merci|laisse(?:z)?(?: faire| tomber)?|aucun|rien)(?:[\s,.!]+(?:thanks?|thank you|merci|please|leave it|keep it|as it is|for now))*[\s.!]*$/.test(t);
+}
+module.exports = { declinesOffer, tripEvidenceFor, explainRules, isExplainQuestion, answer, fullReply, pickOffer, raiseCountText, countAsked, featureIn, FEAT_RES, TX };

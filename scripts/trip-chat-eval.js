@@ -159,6 +159,20 @@ const CASES = [
   { plan: 'family', msg: 'pourquoi il n’y a pas de vignobles?', lang: 'fr', ops: [{ o: 'ask', value: 'q_why_not' }] },
   { plan: 'family', msg: 'qu’est-ce que tu as changé?', lang: 'fr', ops: [{ o: 'ask', value: 'q_changed' }] },
   { plan: 'family', msg: 'qu’est-ce que tu n’as pas pu faire?', lang: 'fr', ops: [{ o: 'ask', value: 'q_couldnt' }] },
+  // A badge asked of a replacement (2026-11-22, Dayton's report: "swap the day 2 winery for another with non-alcoholic
+  // options" swapped to a winery without the badge). The model's answer has no key for a badge (scored on the swap of
+  // the right stop); the word rules and the site's reading must carry it (features).
+  { plan: 'wine', msg: 'Can you swap the first winery for another with non-alcoholic options?', ops: [{ o: 'replace', features: ['nonalcoholic'], sel: { type: 'winery', nth: 1 } }] },
+  { plan: 'beer', msg: 'find a different brewery for day 1 that has NA options', ops: [{ o: 'replace', features: ['nonalcoholic'], sel: { type: 'brewery', day: 1 } }] },
+  { plan: 'beer', msg: 'swap the day 1 brewery for one with alcohol-free drinks', ops: [{ o: 'replace', features: ['nonalcoholic'], sel: { type: 'brewery', day: 1 } }] },
+  { plan: 'beer', msg: 'swap the day 1 brewery for another with a patio', ops: [{ o: 'replace', features: ['patio'], sel: { type: 'brewery', day: 1 } }] },
+  { plan: 'wine', msg: 'swap the first winery for another with a lake view', ops: [{ o: 'replace', features: ['lake_view'], sel: { type: 'winery', nth: 1 } }] },
+  { plan: 'beer', msg: 'swap the day 1 brewery for one that’s dog friendly', ops: [{ o: 'replace', features: ['dog_friendly'], sel: { type: 'brewery', day: 1 } }] },
+  { plan: 'wine', msg: 'swap lunch for one with gluten-free options', ops: [{ o: 'replace', features: ['gluten_free'], sel: { role: 'lunch', nth: 1 } }] },
+  { plan: 'wine', msg: 'swap the first winery for another', ops: [{ o: 'replace', features: null, sel: { type: 'winery', nth: 1 } }] },
+  { plan: 'fr', msg: 'remplace le premier vignoble par un autre vignoble avec des options sans alcool', lang: 'fr', ops: [{ o: 'replace', features: ['nonalcoholic'], sel: { type: 'winery', nth: 1 } }] },
+  { plan: 'fr', msg: 'remplace le premier vignoble par un autre avec une terrasse', lang: 'fr', ops: [{ o: 'replace', features: ['patio'], sel: { type: 'winery', nth: 1 } }] },
+  { plan: 'fr', msg: 'remplace le premier vignoble par un autre vignoble', lang: 'fr', ops: [{ o: 'replace', features: null, sel: { type: 'winery', nth: 1 } }] },
 ];
 
 function pick(stops, sel) {
@@ -167,8 +181,10 @@ function pick(stops, sel) {
   if (sel.nth) m = m[sel.nth - 1] ? [m[sel.nth - 1]] : [];
   return m.map((s) => s.id);
 }
-function opMatches(got, want, stops) {
+function opMatches(got, want, stops, noFeats = false) {
   if (got.o !== want.o) return false;
+  // features: the badges asked of a replacement (null = none may be asked). Not scored on the model's own answer.
+  if (want.features !== undefined && !noFeats && JSON.stringify((got.features || []).slice().sort()) !== JSON.stringify((want.features || []).slice().sort())) return false;
   for (const k of ['value', 'kind', 'n', 'region']) if (want[k] !== undefined && got[k] !== want[k]) return false;
   if (want.day !== undefined && (got.day || null) !== want.day && !(got.stops || []).some((s) => s.day === want.day)) return false;
   if (want.ages && JSON.stringify((got.ages || []).slice().sort((a, b) => a - b)) !== JSON.stringify(want.ages)) return false;
@@ -179,18 +195,18 @@ function opMatches(got, want, stops) {
   }
   return true;
 }
-function scoreCase(c, ops, cant, stops) {
+function scoreCase(c, ops, cant, stops, noFeats = false) {
   if (c.cant) {
     if (c.orOps && ops.length && c.orOps.every((w) => ops.some((g) => opMatches(g, w, stops)))) return true;
     return !ops.length && c.cant.includes(cant || 'unclear');
   }
   if (ops.length !== c.ops.length) return false;
-  return c.ops.every((w) => ops.some((g) => opMatches(g, w, stops)));
+  return c.ops.every((w) => ops.some((g) => opMatches(g, w, stops, noFeats)));
 }
 // The expected operations as a validated answer (what an ideal model would return).
 function idealOps(c, stops) {
   if (c.cant) return [];
-  return c.ops.map((w) => ({ o: w.o, stops: w.sel ? stops.filter((s) => pick(stops, w.sel).includes(s.id)) : [], kind: w.kind || null, time: null, day: w.day || null, value: w.value || null, n: w.n || null, ages: w.ages || [], region: w.region || null, date: null }));
+  return c.ops.map((w) => ({ ...(w.features ? { features: w.features } : {}), o: w.o, stops: w.sel ? stops.filter((s) => pick(stops, w.sel).includes(s.id)) : [], kind: w.kind || null, time: null, day: w.day || null, value: w.value || null, n: w.n || null, ages: w.ages || [], region: w.region || null, date: null }));
 }
 const pct = (a, q) => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(q * s.length))]; };
 
@@ -220,7 +236,7 @@ const pct = (a, q) => { if (!a.length) return null; const s = a.slice().sort((x,
     const rulesOk = scoreCase(c, rules.ops, rules.cant, P.stops);
     let ai = null;
     if (live) ai = await tc.readChatMessage(c.msg, { stops: P.stops, regions, regionLabels: app.REGION_LABELS, lang });
-    const aiOk = ai ? (ai.ok ? scoreCase(c, ai.ops, ai.cant, P.stops) : false) : null;
+    const aiOk = ai ? (ai.ok ? scoreCase(c, ai.ops, ai.cant, P.stops, true) : false) : null;
     // What the site uses (2026-11-22): the AI and the word rules reconciled; a confident rules reading answers when the
     // AI takes longer than the grace (TRIP_CHAT_GRACE_MS, default 1500 ms).
     const grace = Number(process.env.TRIP_CHAT_GRACE_MS) > 0 ? Number(process.env.TRIP_CHAT_GRACE_MS) : 1500;
@@ -230,15 +246,17 @@ const pct = (a, q) => { if (!a.length) return null; const s = a.slice().sort((x,
     const answerMs = ai ? (tc.rulesConfident(rules) ? Math.min(ai.ms, grace) : ai.ms) : 0;
     // The whole turn (planner + reply) with the model's answer (live) or the ideal answer (mocked).
     // The planner's part: the place to stay, getting there, questions and the number of adults are answered by the server, not planTurn.
-    const turnOps = (ai && ai.ok ? ai.ops : idealOps(c, P.stops)).filter((o) => !['stay', 'transport', 'ask', 'avoid'].includes(o.o) && !(o.o === 'party' && o.value === 'adults'));
+    // A badge asked of a replacement rides on the site's reading (AI + rules), never on the model's answer alone.
+    const featCase = !c.cant && c.ops.some((w) => w.features !== undefined);
+    const turnOps = (featCase && merged && merged.ops.length ? merged.ops : ai && ai.ok ? ai.ops : idealOps(c, P.stops)).filter((o) => !['stay', 'transport', 'ask', 'avoid'].includes(o.o) && !(o.o === 'party' && o.value === 'adults'));
     const t0 = Date.now();
-    const out = turnOps.length ? tc.planTurn(turnOps, { args: app.parseTripPlanBody({ text: P.text }, { v4: true }).value, locks: {}, removed: [], stops: P.stops, days: Math.max(...P.stops.map((s) => s.day)), regionLabels: app.REGION_LABELS, lang,
+    const out = turnOps.length ? tc.planTurn(turnOps, { args: app.parseTripPlanBody({ text: P.text }, { v4: true }).value, locks: {}, removed: [], stops: P.stops, days: Math.max(...P.stops.map((s) => s.day)), regionLabels: app.REGION_LABELS, lang, hasFeature: app.tripChatHasBadge,
       run: (a) => app.runTripPlanRequest({ text: a.text, seed: a.seed || 0, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: a.pinned || null, overrides: a.overrides || null, swap: a.swap || null, v4: true }, false) }) : null;
     const planMs = Date.now() - t0;
     const reply = out ? tc.buildReply(out, { lang, regionLabels: app.REGION_LABELS }) : tc.cantReply((ai && ai.ok && ai.cant) || (c.cant && c.cant[0]) || 'unclear', lang, rules.what || null, P.stops);
     const fulfilled = c.cant || !turnOps.length ? null : !!out && out.results.every((r) => r.ok !== false);
     rows.push({ c, rulesOk, aiOk, ai, planMs, reply, fulfilled, merged, mergedOk, answerMs });
-    console.log(`${rulesOk ? '✓' : '✗'} rules${live ? `  ${aiOk ? '✓' : '✗'} ai ${ai.ms}ms $${(ai.costUsd || 0).toFixed(5)}${ai.ok ? '' : ` (${ai.reason})`}` : ''}  [${c.plan}] ${c.msg}\n      -> ${reply}  (planner ${planMs} ms${fulfilled === false ? ', not fully done' : ''})`);
+    console.log(`${rulesOk ? '✓' : '✗'} rules${live ? `  ${aiOk ? '✓' : '✗'} ai ${ai.ms}ms $${(ai.costUsd || 0).toFixed(5)}${ai.ok ? '' : ` (${ai.reason})`}${mergedOk === false ? '  ✗ site' : ''}` : ''}  [${c.plan}] ${c.msg}\n      -> ${reply}  (planner ${planMs} ms${fulfilled === false ? ', not fully done' : ''})`);
   }
   const n = rows.length;
   const rulesAcc = rows.filter((r) => r.rulesOk).length;
