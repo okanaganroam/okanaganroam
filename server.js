@@ -8919,6 +8919,10 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // that fits exists; otherwise the reply says its listing doesn't say.
   let needLine = '';
   if (planOps.length && out && out.plan && !v.chip) { try { const nn = tripChat.access.needsOfText((out.req && out.req.text) || v.args.text); if (nn.length) needLine = tripChatHonourNeeds(out, nn, { v, stops, lang, run, hooks, days, short }); } catch (e) { needLine = ''; } }
+  // Share suggestions round (2026-11-23; "add a couples spa" answered "I couldn't find a spa open nearby at that time"
+  // in a town with no spa listed, and on a plan that already had one): an add that found nothing says the real reason
+  // when the listings give one. Only for a kind of place the planner knows by its own facts.
+  try { for (const r of (out && out.results) || []) { if (r && r.op === 'add' && !r.ok && !r.fresh && r.kind && !r.tour && r.why !== 'no_room') Object.assign(r, tripChatAddWhy(r.kind, stops.filter((s) => !v.removed.includes(s.key)))); } } catch (e) { /* the plain line stands */ }
   let reply = planOps.length ? tripChat.buildReply(out, { lang, regionLabels: REGION_LABELS, cant, asks }) : '';
   if (needLine) reply = [reply, needLine].filter(Boolean).join(' ');
   let plan = out.plan || null, req = out.req || null, stayPref, transport, stayBlock, newText = null, card = null, stayForce, stayArrive, party, stayDates = null, note = null, offer = [], askFirst = false, needPatch = null;
@@ -9674,6 +9678,20 @@ function tripChatTourOffer(kind, stops, lang, reqText = '') {
   }
   return null;
 }
+// Why an "add a <kind>" found nothing, from the listings: a stop of that kind is already on the plan ({ onPlan }), or
+// no listing of that kind is in the plan's towns ({ noneIn: town }). {} when neither is known.
+function tripChatAddWhy(kind, stops) {
+  const TR = require('./trip-requirements');
+  if (!TR.KINDS[kind] || !stops.length) return {};
+  const kindsOf = (v) => { try { const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; return TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); } catch (e) { return []; } };
+  for (const s of stops) { const v = getVenue(s.id); if (v && !['restaurant', 'cafe', 'pub'].includes(v.type) && kindsOf(v).includes(kind)) return { onPlan: { name: v.name, day: s.day } }; }
+  const regions = [...new Set(stops.map((s) => s.region).filter((r) => REGION_LABELS[r]))];
+  if (!regions.length) return {};
+  const rows = db.prepare(`SELECT * FROM venues WHERE redirect_to IS NULL AND type IN ('indoor', 'outdoor', 'tour', 'sport', 'golf', 'beach') AND region IN (${regions.map(() => '?').join(',')})`).all(...regions);
+  if (rows.some((v) => kindsOf(v).includes(kind))) return {};
+  const towns = regions.map((r) => REGION_LABELS[r]);
+  return { noneIn: towns.length > 1 ? `${towns.slice(0, -1).join(', ')} or ${towns[towns.length - 1]}` : towns[0] };
+}
 function tripChatTransportTurn(op, { stops, lang, stayTown = null, dayDates = [], v = null, plan = null }) {
   const L = lang === 'fr' ? 'fr' : 'en';
   const T = tripChat.T[L];
@@ -9687,7 +9705,7 @@ function tripChatTransportTurn(op, { stops, lang, stayTown = null, dayDates = []
     // Asked for with pickup (the no-car offer): said only when the tour's own stored note says it picks up.
     let pickup = false;
     try { pickup = !!op.pickup && /\bpick ?up\b/i.test(String(((wineTours.loadData().areas || {})[tour.area] || {}).why || '')); } catch (e) { pickup = false; }
-    return { transport: 'wine_tour', card: { kind: 'wine_tour', name: wineTours.TEXT.step.en, nameFr: wineTours.TEXT.step.fr, url: tour.url, label: viator.TEXT.book.en, labelFr: viator.TEXT.book.fr }, reply: tripChat.fill(pickup ? T.wineTourPickup : T.wineTour, { town: label }) };
+    return { transport: 'wine_tour', card: { kind: 'wine_tour', name: wineTours.TEXT.step.en, nameFr: wineTours.TEXT.step.fr, url: tour.url, label: viator.TEXT.book.en, labelFr: viator.TEXT.book.fr, ...(tour.productCode ? { code: tour.productCode } : {}), ...(tour.title ? { title: tour.title } : {}), ...(pickup ? { pickup: true } : {}) }, reply: tripChat.fill(pickup ? T.wineTourPickup : T.wineTour, { town: label }) };
   }
   const region = (stops.find((s) => gettingHere.airportFor(s.region)) || {}).region || null;
   const key = region ? gettingHere.airportFor(region) : null;
@@ -10746,6 +10764,46 @@ function v4NearestOfKind(plan, kind) {
   const v = best.v;
   return { id: v.id, name: v.name, region: v.region, regionLabel: REGION_LABELS[v.region] || v.region, url: `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`, km: Math.round(best.d) };
 }
+// The sentence for a kind of place the plan does not have (the plan's Details line; the shared copy says the same):
+// none listed in the town, or not fitted, with the nearest listing of that kind when there is one.
+function tripNotIncludedText(label, noneListed, town, nearest) {
+  const an = /(?:ing|s)$/.test(label) ? '' : /^[aeiou]/i.test(label) ? 'an ' : 'a ';
+  const text = (noneListed && town ? `There’s no ${label} listed in ${town}, so this plan has none.` : `I couldn’t fit ${an}${label} into this plan.`) + (nearest ? ` The nearest is ${nearest.name} in ${nearest.regionLabel}.` : '');
+  // Round 5: the French line too (the label through the French copy).
+  let lf = label; try { lf = require('./trip-french-copy').t3FrenchText(label) || label; } catch (e) { lf = label; }
+  const textFr = (noneListed && town ? `Aucun lieu « ${lf} » n’est répertorié à ${town} : ce plan n’en a pas.` : `Je n’ai pas pu inclure « ${lf} » dans ce plan.`) + (nearest ? ` Le plus proche : ${nearest.name}, à ${nearest.regionLabel}.` : '');
+  return { text, textFr };
+}
+// A shared link's ni= entries as lines, rebuilt from the listings as they are now (never from text in the link).
+// regions: the copy's stops' towns. A kind the copy has a stop of, or one we have no word for, is left out.
+function tripShareNotIncluded(list, regions, stopTypes, fr) {
+  const TR = require('./trip-requirements'), out = [];
+  const towns = [...new Set(regions.map((r) => REGION_LABELS[r]).filter(Boolean))];
+  const town = towns.length ? (towns.length > 1 ? `${towns.slice(0, -1).join(', ')} or ${towns[towns.length - 1]}` : towns[0]) : null;
+  for (const x of list || []) {
+    const label = TR.KINDS[x.kind] ? (TR.LABELS[x.kind] || x.kind.replace(/_/g, ' ')) : V4_TYPE_WORDS[x.kind] || null;
+    if (!label || stopTypes.includes(x.kind)) continue;
+    let nearest = null;
+    try { let v = x.nearestId ? getVenue(x.nearestId) : null; if (v && v.redirect_to) v = getVenue(v.redirect_to); if (v && REGION_LABELS[v.region]) nearest = { name: v.name, regionLabel: REGION_LABELS[v.region] }; } catch (e) { nearest = null; }
+    const t = tripNotIncludedText(label, x.reason === 'none_listed', town, nearest);
+    out.push({ ask: `not_included:${x.kind}`, status: 'unmet', text: fr ? t.textFr : t.text });
+  }
+  return out;
+}
+// A shared link's wt= (the wine tour the traveller asked the chat to show), rebuilt from the stored tour data: its
+// name, who runs it, whether its stored note says it picks up, and its one stored booking link. null when the code is
+// not a stored tour or its link cannot be made (the copy then shows nothing).
+function tripShareTour(code) {
+  try {
+    const data = wineTours.loadData();
+    const area = Object.keys(data.areas || {}).find((k) => String(data.areas[k].productCode || '') === String(code));
+    const it = area && data.areas[area];
+    const cfg = viator.config();
+    const url = it && cfg.enabled && viator.isViatorUrl(it.url) ? viator.affiliateUrl(it.url, cfg, 'api') : null;
+    if (!url || !it.title) return null;
+    return { code: String(it.productCode), name: String(it.title), supplier: String(it.supplier || ''), pickup: /\bpick ?up\b/i.test(String(it.why || '')), url, label: viator.TEXT.book.en, labelFr: viator.TEXT.book.fr };
+  } catch (e) { return null; }
+}
 function v4NotIncluded(plan) {
   if (!plan || !Array.isArray(plan.requirementResults)) return;
   const TR = require('./trip-requirements');
@@ -10798,11 +10856,7 @@ function v4NotIncluded(plan) {
     // Planner round 4 (the nearest spa to Osoyoos was said to be in Kelowna; Shelter Floating Sauna in Penticton is
     // closer): the nearest is by distance from the plan's stops, among every listing of that kind (a sauna is a spa kind).
     try { const byKm = r.kind === 'venue_kind' && r.value !== 'shopping' ? v4NearestOfKind(plan, r.value) : null; if (byKm) nearest = byKm; } catch (e) { /* keep the planner's own alternative */ }
-    const an = /(?:ing|s)$/.test(label) ? '' : /^[aeiou]/i.test(label) ? 'an ' : 'a ';
-    const text = (noneListed && town ? `There’s no ${label} listed in ${town}, so this plan has none.` : `I couldn’t fit ${an}${label} into this plan.`) + (nearest ? ` The nearest is ${nearest.name} in ${nearest.regionLabel}.` : '');
-    // Round 5: the French line too (the label through the French copy).
-    let lf = label; try { lf = require('./trip-french-copy').t3FrenchText(label) || label; } catch (e) { lf = label; }
-    const textFr = (noneListed && town ? `Aucun lieu « ${lf} » n’est répertorié à ${town} : ce plan n’en a pas.` : `Je n’ai pas pu inclure « ${lf} » dans ce plan.`) + (nearest ? ` Le plus proche : ${nearest.name}, à ${nearest.regionLabel}.` : '');
+    const { text, textFr } = tripNotIncludedText(label, noneListed, town, nearest);
     out.push({ kind: r.value, label, reason: noneListed ? 'none_listed' : 'not_fitted', town, nearest, text, textFr });
   }
   if (out.length) plan.notIncluded = out;
@@ -55284,6 +55338,17 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
       }
     } catch (e) { out.lines = []; }
   }
+  // Share suggestions (2026-11-23): what the plan said it could not include (ni=), in the plan's own words, and the
+  // wine tour the traveller asked to see (wt=), as a suggestion: never a stop, never booked.
+  if (c.notIncluded && c.notIncluded.length) {
+    try {
+      const vs = refs.map((ref) => { const m = /^venue:([1-9][0-9]*)$/.exec(ref); let v = m ? getVenue(Number(m[1])) : null; if (v && v.redirect_to) v = getVenue(v.redirect_to); return v; }).filter(Boolean);
+      const said = new Set(out.lines.map((l) => l.ask));
+      const towns = (c.niTowns || []).filter((r) => REGION_LABELS[r]);
+      for (const l of tripShareNotIncluded(c.notIncluded, towns.length ? towns : vs.map((v) => v.region), vs.map((v) => v.type), fr)) { const k = l.ask.split(':')[1]; if (!said.has(`kind:${k}`) && !said.has(`type:${k}`)) out.lines.push(l); }
+    } catch (e) { /* the copy stands without the lines */ }
+  }
+  if (c.wineTour) { const t = tripShareTour(c.wineTour); if (t) out.tour = t; }
   return out;
 }
 // The context block of a shared trip, server-rendered (plain text and the site's own links only).
@@ -55325,6 +55390,13 @@ function tripShareContextHtml(ctx, lang = 'en') {
       + (stayWhen ? `<p class="mt-ctx-note" data-mt-stay-dates>${escapeHtml(stayWhen)}</p>` : !ctx.start ? `<p class="mt-ctx-note">${L('No dates in these links: pick them on the booking site.', 'Aucune date dans ces liens : choisissez-les sur le site de réservation.')}</p>` : '') + '</div></div>';
   }
   if (ctx.lines && ctx.lines.length) html += `<ul class="mt-ctx-lines">${ctx.lines.map((l) => `<li data-ev-status="${escapeHtml(l.status)}">${escapeHtml(l.text)}</li>`).join('')}</ul>`;
+  // A tour the traveller asked to see: a suggestion only. Nothing here says it, or its pickup, is available on the dates.
+  if (ctx.tour && ctx.tour.url) {
+    const t = ctx.tour;
+    html += `<div class="mt-ctx-sugg mt-ctx-tour" data-mt-tour="${escapeHtml(t.code)}"><p class="mt-ctx-k">${L('Suggested, not booked', 'Suggestion, non réservée')}</p><p class="mt-ctx-tour-name"><strong>${escapeHtml(t.name)}</strong>${t.supplier ? ` · ${escapeHtml(t.supplier)}` : ''}</p>`
+      + `<p class="mt-ctx-note">${escapeHtml(L('A wine tour you asked to see. It is not in the itinerary.', 'Un tour des vignobles que vous avez demandé à voir. Il ne fait pas partie de l’itinéraire.') + ' ' + (t.pickup ? L('Its listing says it picks up at your accommodation; check pickup details and dates when you book.', 'Sa fiche indique une prise en charge à votre hébergement; vérifiez la prise en charge et les dates en réservant.') : L('Check the details and dates when you book.', 'Vérifiez les détails et les dates en réservant.')))}</p>`
+      + `<p class="mt-ctx-links"><a class="mt-btn" href="${escapeHtml(t.url)}" target="_blank" rel="sponsored noopener" data-track="booking" data-link="viator">${escapeHtml(fr ? t.labelFr : t.label)} <span aria-hidden="true">↗</span></a><small>${L('We may earn a commission', 'Nous pouvons toucher une commission')}</small></p></div>`;
+  }
   if (ctx.suggestions && ctx.suggestions.length) html += `<div class="mt-ctx-sugg"><p class="mt-ctx-k">${L('Depends on your dates (not part of the plan)', 'Selon vos dates (hors du plan)')}</p><ul>${ctx.suggestions.map((x) => `<li><span class="mt-ctx-tag">${escapeHtml(x.label)}</span> <a href="${escapeHtml(x.url)}">${escapeHtml(x.name)}</a>${x.meta ? ` <small>${escapeHtml(x.meta)}</small>` : ''}</li>`).join('')}</ul></div>`;
   html += `<p class="mt-ctx-note">${L(`You book and pay on each business’s or provider’s own site. ${TRIP_SITE.brand} can’t see or confirm bookings.`, `Vous réservez et payez sur le site de chaque entreprise ou fournisseur. ${TRIP_SITE.brand} ne peut ni voir ni confirmer les réservations.`)}</p></div>`;
   return html;
@@ -84912,7 +84984,7 @@ module.exports = {
   withTripFrenchUrls,
   tripShareSummary,
   tripShareSearch,
-  tripShareContext, tripShareContextHtml,
+  tripShareContext, tripShareContextHtml, tripShareNotIncluded, tripShareTour, tripNotIncludedText, tripChatAddWhy,
   tripPlanLinkProblems, tripStoredBookingLinks, tripVenueBookingItem, tripBookingLinkBelongs, tripHonestEvidence,
   tripCardPhotoKey,
   TRIP_CARD_RATE,
