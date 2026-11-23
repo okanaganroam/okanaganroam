@@ -91,7 +91,7 @@ const WD_RE = new RegExp(`\\b(${Object.keys(WD_KEYS).join('|')})s?\\b`);
 function weekdayIn(message) { const m = WD_RE.exec(fold(message)); return m ? WD_KEYS[m[1]] : null; }
 // The area this site covers, and its sister site (round 6: "a trip to Vancouver" got "I can only change this plan").
 const AREA = {
-  en: 'the Okanagan, from Vernon to Osoyoos', fr: 'l’Okanagan, de Vernon à Osoyoos', site: 'Okanagan Roam',
+  en: 'the Okanagan, from Vernon to Osoyoos', fr: 'l’Okanagan, de Vernon à Osoyoos', site: 'Okanagan Roam', homeEn: 'in the Okanagan', homeFr: 'dans l’Okanagan',
   sister: { name: 'Whistler Roam', url: 'whistlerroam.com', en: 'Whistler, Squamish, Pemberton and the Sea to Sky', fr: 'Whistler, Squamish, Pemberton et le Sea to Sky', towns: ['whistler', 'squamish', 'pemberton', 'sea to sky', 'brackendale', 'britannia beach', 'blackcomb'] },
   outside: ['vancouver', 'victoria', 'vancouver island', 'tofino', 'banff', 'jasper', 'calgary', 'edmonton', 'seattle', 'portland', 'toronto', 'montreal', 'kamloops', 'revelstoke', 'nelson', 'golden', 'sun peaks', 'harrison', 'hope', 'chilliwack', 'abbotsford', 'nanaimo', 'lake louise', 'rossland', 'fernie', 'prince george', 'salmon arm', 'keremeos', 'princeton', 'osoyoos lake'],
 };
@@ -138,6 +138,9 @@ function agentRules(t, stops, ctx, h) {
   const regionIn = (s) => regions.find((x) => new RegExp(`\\b${fold(regionLabels[x] || x).replace(/[^a-z0-9 ]/g, '.')}\\b`).test(s)) || null;
   const editVerb = EDIT_VERB_RE.test(t);
 
+  // Round 6: "how do we get here from Vancouver?" is the Getting here card; "something fun" is a thing to do added.
+  if (/\bhow (?:do|can|should|would) (?:we|i) get (?:here|there|to)\b|\bgetting (?:here|there)\b|\bcomment (?:venir|se rendre|aller)\b/.test(t)) return { ops: [], cant: 'getting_here' };
+  if (/^(?:(?:add|want|need|give us|ajoute[rz]?)\s+)?(?:something|anything|quelque chose)\s+(?:fun|to do|cool|different|amusant|d'amusant|a faire|de fun)\b/.test(t) && !/\b(?:instead|swap|replace|remplace|after|before|apres|avant)\b/.test(t)) return { ops: [op('add', { kind: 'activity', day })], cant: null };
   // 00. A trip somewhere this site does not cover: said, with the sister site where it covers that place.
   const away = [...AREA.sister.towns, ...AREA.outside].filter((x) => !regions.some((r) => fold(regionLabels[r] || r) === x)).find((x) => new RegExp(`\\b(?:to|in|at|around|visit|visiting|a|au|en|vers|pour|dans)\\s+${x.replace(/ /g, '\\s+')}\\b`).test(t) || new RegExp(`^${x.replace(/ /g, '\\s+')}\\b`).test(t));
   if (away && /\b(?:trip|travel|go|going|head(?:ing)?|visit\w*|plan|weekend|day|days|night|nights|instead|voyage|aller|allons|fin de semaine|journee|sejour|plutot)\b/.test(t) && !h.stopsNamed(t, stops).length) return { ops: [], cant: 'elsewhere', what: away };
@@ -161,6 +164,11 @@ function agentRules(t, stops, ctx, h) {
   }
   // 1. A question about a stop, answered from its listing's stored facts (never a guess).
   const asksQ = (/\?\s*$/.test(t) || QUESTION_START_RE.test(t)) && !editVerb && !(/^(?:can|could|would|will|may|peux|pouvez|peut-on|pourrait-on)\b/.test(t) && !/\b(?:bring|allowed|welcome|go in|amener|acceptes?)\b/.test(t));
+  // Round 6 ("why this hotel?" got "Which stop do you mean?"): the place to stay on the plan.
+  if (asksQ && /\b(?:hotel|motel|stay|place to stay|lodging|condo|logement|hebergement)\b/.test(t) && !h.stopsNamed(t, stops).length) {
+    const topic = (Q_TOPICS.find(([, re]) => re.test(t)) || [])[0] || 'q_why';
+    return { ops: [op('ask', { value: topic, stops: [], stay: true })], cant: null };
+  }
   if (asksQ) {
     const topic = (Q_TOPICS.find(([, re]) => re.test(t)) || [])[0] || null;
     if (topic) {
@@ -176,10 +184,12 @@ function agentRules(t, stops, ctx, h) {
       // Round 6 (2026-11-22; "is the first winery open Sunday?" with no winery, "why this restaurant?", « le musée »): a
       // kind of place named is looked for on the plan. None there: said plainly. "This restaurant": the day's (or the
       // plan's only) meal, else the one the chat changed last, else the first.
+      if (!by.length && MEAL_RE.test(t) && !/\b(?:first|1st|second|2nd|third|3rd|last|premier|premiere|deuxieme|troisieme|dernier|derniere)\b/.test(t)) named = [];
       if (!named.length) {
         const kind = MEAL_RE.test(t) ? 'meal' : (h.kindsNamed(t).filter((k) => k !== 'kids' && k !== 'activity')[0] || null);
         if (kind) {
-          let pool = stops.filter((s) => (kind === 'meal' ? !!s.role || ['restaurant', 'pub'].includes(s.type) : h.kindMatches(kind, s) || (kind === 'arts' && /\b(?:museum|musee|gallery|galerie|art)\b/.test(fold(s.name)))));
+          const mealW = /\b(?:dinner|supper|souper)\b/.test(t) ? 'dinner' : /\b(?:lunch|dejeuner|diner)\b/.test(t) ? 'lunch' : null;
+          let pool = stops.filter((s) => (kind === 'meal' ? (mealW ? s.role === mealW : !!s.role || ['restaurant', 'pub'].includes(s.type)) : h.kindMatches(kind, s) || (kind === 'arts' && /\b(?:museum|musee|gallery|galerie|art)\b/.test(fold(s.name)))));
           if (!pool.length) return { ops: [], cant: 'q_none', what: kind === 'meal' ? 'restaurant' : kind };
           if (day && pool.some((s) => s.day === day) && topic !== 'q_open') pool = pool.filter((s) => s.day === day);
           pool = h.ordinalPick(t, pool);
@@ -504,6 +514,7 @@ const AGENT_T = {
     ask_which: 'Which stop do you mean? Ask with its name, like “is {name} open Sunday?”', ask_whichNone: 'Which stop do you mean? Ask with its name.',
     qDetails: 'Tap {name} for its details.', qCheck: ' Check before you go.', qSeason: ' It is seasonal, so check before you go.',
     qNoHours: 'We don’t have hours on file for {name}.', qOpenDay: '{name} is listed as open {day}, {from} to {to}.', qClosedDay: '{name} is listed as closed on {day}.', qOpenDaily: '{name} is listed as open every day, {from} to {to}.', qOpenDays: '{name} is listed as open {days}.',
+    qStayNone: 'There’s no place to stay on this plan yet. Say “find us a place to stay” and I’ll add one.', qStayWhy: '{name} is on your plan as the place to stay closest to your stops that fits what you asked. Its listing says: {line}.', qStayWhyBare: '{name} is on your plan as the place to stay closest to your stops that fits what you asked.',
     qWhy: 'I picked {name} because it fits what you asked for: {line}.', qWhyMatch: 'I picked {name} because you asked for {what}. Its listing says: {line}.', qWhyMatchOnly: 'I picked {name} because you asked for {what}.', qWhyPlain: '{name} is close to your other stops. Its listing says: {line}.', qWhere: '{name} is on day {d}{at}.', qNoWhy: 'I picked {name} because it fits what you asked for and is near your other stops.',
     qFar: '{name} is about {km} km from {to} in a straight line; the drive is a little longer.', qFarNoStay: 'There’s no place to stay on this plan to measure from. Ask “how far is {name} from” another stop.', qFarUnknown: 'I don’t have a map point for both {name} and {to}.',
     qKidsYes: '{name} is listed as kid-friendly.', qKidsUnknown: 'The listing for {name} doesn’t say if it suits kids.', qDogYes: '{name} is listed as dog-friendly.', qDogUnknown: 'The listing for {name} doesn’t say if dogs are welcome.',
@@ -530,6 +541,7 @@ const AGENT_T = {
     ask_which: 'De quel arrêt parlez-vous? Demandez avec son nom, par exemple « est-ce que {name} est ouvert dimanche? »', ask_whichNone: 'De quel arrêt parlez-vous? Demandez avec son nom.',
     qDetails: 'Touchez {name} pour ses détails.', qCheck: ' Vérifiez avant d’y aller.', qSeason: ' C’est saisonnier : vérifiez avant d’y aller.',
     qNoHours: 'Nous n’avons pas les heures de {name}.', qOpenDay: 'Selon sa fiche, {name} est ouvert {day}, de {from} à {to}.', qClosedDay: 'Selon sa fiche, {name} est fermé le {day}.', qOpenDaily: 'Selon sa fiche, {name} est ouvert tous les jours, de {from} à {to}.', qOpenDays: 'Selon sa fiche, {name} est ouvert : {days}.',
+    qStayNone: 'Il n’y a pas encore de logement dans ce plan. Dites « trouve-nous un logement » et j’en ajouterai un.', qStayWhy: '{name} est le logement le plus proche de vos arrêts qui correspond à votre demande. Sa fiche dit : {line}.', qStayWhyBare: '{name} est le logement le plus proche de vos arrêts qui correspond à votre demande.',
     qWhy: 'J’ai choisi {name} parce qu’il correspond à votre demande : {line}.', qWhyMatch: 'J’ai choisi {name} parce que vous avez demandé {what}. Sa fiche dit : {line}.', qWhyMatchOnly: 'J’ai choisi {name} parce que vous avez demandé {what}.', qWhyPlain: '{name} est près de vos autres arrêts. Sa fiche dit : {line}.', qWhere: '{name} est au jour {d}{at}.', qNoWhy: 'J’ai choisi {name} parce qu’il correspond à votre demande et qu’il est près de vos autres arrêts.',
     qFar: '{name} est à environ {km} km de {to} à vol d’oiseau; la route est un peu plus longue.', qFarNoStay: 'Il n’y a pas de logement dans ce plan pour mesurer. Demandez « à quelle distance est {name} de » un autre arrêt.', qFarUnknown: 'Je n’ai pas de point sur la carte pour {name} et {to}.',
     qKidsYes: 'Selon sa fiche, {name} convient aux enfants.', qKidsUnknown: 'La fiche de {name} ne dit pas si ça convient aux enfants.', qDogYes: 'Selon sa fiche, {name} accepte les chiens.', qDogUnknown: 'La fiche de {name} ne dit pas si les chiens sont acceptés.',
@@ -563,5 +575,5 @@ const PROMPT_LINES = [
 
 module.exports = {
   TOUR_KINDS, TOUR_TYPES, tourKindOf, runSteady, startsOf, stripExtras, splitAsks, readAll, agentRules, weekdayIn, wdOfDate, moveStop, answerQuestion, parseWeek, AGENT_T, PROMPT_LINES, Q_VALUES,
-  STAY_REMOVE_RE, STAY_ADD_RE, NIGHT_ADD_RE, fold, km, AREA,
+  STAY_REMOVE_RE, STAY_ADD_RE, NIGHT_ADD_RE, fold, km, AREA, firstSentence,
 };

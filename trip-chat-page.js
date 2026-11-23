@@ -386,6 +386,8 @@ function chatClientSrc(d) {
   }
   function chatAgentHtml(){
     var p = state.last || {}, n = days().length, town = n ? (days()[0].regionLabel || '') : '';
+    // Round 6 (Whistler: « à Whistler and Whistler Blackcomb »): the town list in French.
+    if (lang() === 'fr') town = town.replace(/ and /g, ' et ');
     var stay = chatOvernight() && !chat.noStay && t3StayData() ? chatStayWords() : '';
     var line = n > 1 ? ag('days', { n: n, town: town, for: chatPartyFor(), stay: stay }) : n === 1 && town ? ag('day', { town: town, for: chatPartyFor() }) : ag('plan', { for: chatPartyFor() });
     var miss = chatMissing(), missLine = miss.length ? ' ' + ag('missing', { what: miss.join(' ' + ag('and') + ' ') }) : '';

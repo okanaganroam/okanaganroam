@@ -8507,7 +8507,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     // The word rules first (instant), then the AI (live eval 2026-11-22: p50 1.1 s, some 3 s timeouts). When the rules
     // read the message confidently, the AI gets a short grace (TRIP_CHAT_GRACE_MS, default 1500 ms) and the rules answer
     // if it is slower; otherwise it gets the full timeout. Both readings are then reconciled (tripChat.reconcileReads).
-    const r = tripChat.rulesRead(v.message, stops, { regions, regionLabels: REGION_LABELS, days, recent: Object.keys(v.soft || {}), weekdays: tripChat.weekdayDays((v.dayDates || []).some(Boolean) ? v.dayDates : (v.args.overrides && v.args.overrides.startDate) || (v.args.stay && v.args.stay.arrive) || null, days) });
+    const r = tripChat.rulesRead(v.message, stops, { regions, regionLabels: REGION_LABELS, days, recent: Object.keys(v.soft || {}), request: v.args.text, weekdays: tripChat.weekdayDays((v.dayDates || []).some(Boolean) ? v.dayDates : (v.args.overrides && v.args.overrides.startDate) || (v.args.stay && v.args.stay.arrive) || null, days) });
     what = r.what || null;
     // A stay or getting-here message the rules read confidently is answered by fixed server logic, so the AI is not
     // waited for (2026-11-22: a stay change took 6-14 s on the live site).
@@ -8802,6 +8802,14 @@ function tripChatAskTurn(op, { v, stops, lang }) {
   const L = lang === 'fr' ? 'fr' : 'en';
   const T = tripChat.T[L];
   const s = (op.stops || [])[0];
+  // Round 6 ("why this hotel?"): the place to stay on the plan, from its own listing.
+  if (op.stay) {
+    let row = null;
+    try { row = v.stayId ? db.prepare("SELECT * FROM venues WHERE id = ? AND redirect_to IS NULL").get(v.stayId) : null; } catch (e) { row = null; }
+    if (!row) return { reply: T.qStayNone };
+    const line = tripChat.agent.firstSentence ? tripChat.agent.firstSentence(L === 'fr' ? (row.description_fr || row.description || '') : (row.description || '')) : '';
+    return { reply: tripChat.fill(line ? T.qStayWhy : T.qStayWhyBare, { name: row.name, line: String(line || '').replace(/[.!?]+$/, '') }) };
+  }
   if (!s) return { reply: tripChat.cantReply('ask_which', L, null, stops) };
   const factOf = (id) => {
     let row = null;

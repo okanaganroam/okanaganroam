@@ -178,3 +178,47 @@ test('7. "something cheaper" on a stop the chat changed to pizza keeps it pizza'
   assert.equal(seen.swap.priceMax, 1);
   assert.deepEqual(seen.swap.words, ['pizza', 'pizzeria']);
 });
+
+// Whistler fresh-eyes test 6 (live, Nov 22): the chat-side items, on a ski weekend like the tester's (Dec 11-13, kids 7 and 10, no alcohol).
+const SKI = [
+  S({ key: '1-morning', id: 346, name: 'Whistler Blackcomb', type: 'outdoor', day: 1, start: 540 }),
+  S({ key: '1-midday', id: 448, name: 'Chic Pea', type: 'restaurant', day: 1, start: 720, role: 'lunch' }),
+  S({ key: '1-afternoon', id: 655, name: 'bubly Tube Park', type: 'outdoor', day: 1, start: 945 }),
+  S({ key: '1-evening', id: 422, name: 'Splitz Grill', type: 'restaurant', day: 1, start: 1080, role: 'dinner' }),
+  S({ key: '2-morning', id: 346, name: 'Whistler Blackcomb', type: 'outdoor', day: 2, start: 540 }),
+  S({ key: '2-midday', id: 446, name: 'Crystal Hut', type: 'restaurant', day: 2, start: 720, role: 'lunch' }),
+  S({ key: '2-afternoon', id: 700, name: 'Blackcomb Snowmobile', type: 'tour', day: 2, start: 945 }),
+  S({ key: '3-morning', id: 346, name: 'Whistler Blackcomb', type: 'outdoor', day: 3, start: 540 }),
+  S({ key: '3-midday', id: 444, name: 'Steeps Grill', type: 'restaurant', day: 3, start: 720, role: 'lunch' }),
+];
+const SKI_REQ = 'ski weekend in Whistler Dec 11-13 with our kids aged 7 and 10, no alcohol';
+const RS = (m) => tc.rulesRead(m, SKI, { regions: [], regionLabels: {}, days: 3, weekdays: tc.weekdayDays(['2026-12-11', '2026-12-12', '2026-12-13'], 3), request: SKI_REQ });
+test('Whistler 1-3, 7-8: skiing never gives way to "more indoor things"; a day that ends with lunch keeps it; a tour on the plan is said; lunch on each day; questions', () => {
+  const more = RS('more indoor things');
+  assert.ok(!more.ops.some((o) => (o.stops || []).some((s) => s.id === 346)), 'the skiing stays');
+  assert.deepEqual(more.ops.map((o) => [o.o, o.kind, (o.stops || []).map((s) => s.id)]), [['replace', 'indoor', [655]]]);
+  const light = RS('make Sunday lighter, we drive home after lunch');
+  assert.deepEqual([light.ops.length, light.cant], [0, 'ends_lunch'], 'nothing comes off; lunch stays');
+  const snow = RS('add a snowmobile tour on Saturday afternoon');
+  const out = tc.planTurn(snow.ops, { args: { text: SKI_REQ, seed: 0 }, locks: {}, removed: [], stops: SKI, days: 3, run: () => { throw new Error('no run'); }, lang: 'en' });
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Blackcomb Snowmobile is already on your plan at 3:45 PM.');
+  assert.equal(RS('add lunch on each ski day').cant, 'meals_lunch');
+  const noLunch = SKI.filter((s) => s.key !== '3-midday');
+  assert.deepEqual(tc.rulesRead('add lunch on each ski day', noLunch, { days: 3 }).ops.map((o) => [o.o, o.kind, o.time, o.day]), [['add', 'restaurant', 'midday', 3]]);
+  assert.equal(RS('how do we get here from Vancouver?').cant, 'getting_here');
+  assert.deepEqual(RS('why this hotel?').ops.map((o) => [o.o, o.value, o.stay]), [['ask', 'q_why', true]]);
+  assert.deepEqual(RS('something fun').ops.map((o) => [o.o, o.kind]), [['add', 'activity']]);
+  // « le premier restaurant » and "the first restaurant": the same stop, the earliest meal (of the day named).
+  assert.deepEqual(RS('le premier restaurant est ouvert dimanche?').ops.map((o) => o.stops.map((s) => s.id)), [[444]]);
+  assert.deepEqual(RS('is the first restaurant open Sunday?').ops.map((o) => o.stops.map((s) => s.id)), [[444]]);
+  assert.deepEqual(RS('is the first restaurant open?').ops.map((o) => o.stops.map((s) => s.id)), [[448]]);
+  // A spa is a spa: never "Nordic Trails".
+  assert.ok(!tc.KINDS.spa.words.includes('nordic'));
+});
+test('Whistler 6: a day named in the message stands over an AI reading of another day', () => {
+  const r = RS('something cheaper for dinner on Friday');
+  assert.deepEqual(r.ops.map((o) => [o.o, o.stops.map((s) => s.key)]), [['budget', ['1-evening']]]);
+  const m = tc.reconcileReads({ ok: true, cant: null, ops: [OP({ o: 'budget', value: 'budget', stops: [SKI[3]].map((s) => ({ ...s, day: 2, key: '2-evening' })) })] }, r, 'something cheaper for dinner on Friday');
+  assert.deepEqual(m.fixes, ['rules_day']);
+  assert.equal(m.ops[0].stops[0].key, '1-evening');
+});
