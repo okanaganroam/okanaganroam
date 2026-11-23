@@ -2918,7 +2918,7 @@
         + (iRest.length ? '<details class="su-kinds" id="suKindsMore"' + (S.tourMoreOpen || iRest.some(function(o){ return S.tour.kinds.indexOf(o.k) >= 0; }) ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + iRest.map(ichip).join('') + '</div></details>' : '')
         + (S.tour.kinds.length ? '<p class="su-sent" id="suTourPicked">' + h(fill(T.picked, { list: S.tour.kinds.map(tourKindName).join(', ') })) + '</p>' : '') + '</div>'
         // Outdoor test 1 (2026-11-23; Rae: "up to 1 hour… overnight" for a campground): a kind whose stay is always long
-        // (T.lengthAuto, a campground) isn't asked; Save stores that length.
+        // (T.lengthAuto, a campground) isn't asked; Save stores half a day or more.
         + (T.lengthAuto ? '' : '<h2 class="su-h2" id="suLenQ">' + h(T.tlengthQ) + '</h2>' + (S.tour.lengthGuessed && S.tour.length && T.guessCheck ? '<p class="su-sent su-research" id="suLengthGuess">' + h(T.guessCheck) + '</p>' : '')
         + tchips('length', ['1h', '1-2h', '2-3h', 'half'], T.tlengths, T.tlengthQ, 'suLenQ'))
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'indoorSave') + '</div>' + skip('indoor');
@@ -5050,7 +5050,7 @@
     // ---------- Indoor places (2026-11-19) ----------
     if (k === 'indoorSave') {
       var ik0 = S.tour.kinds.slice();
-      if (ik0.length) { var Tk = INDOOR && T0.kindText ? T0.kindText[ik0[0]] : null; if (Tk && Tk.lengthAuto) S.tour.length = Tk.lengthAuto; }
+      if (ik0.length) { var Tk = INDOOR && T0.kindText ? T0.kindText[ik0[0]] : null; if (Tk && Tk.lengthAuto) S.tour.length = 'half'; }
       var il0 = S.tour.length;
       if (!ik0.length) { S.nudge = T.tkindNeed; return render(); }
       if (!il0) { S.nudge = T.tlengthNeed; return render(); }

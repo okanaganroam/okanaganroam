@@ -271,7 +271,7 @@ const PHOTOS = (en, fr) => [`${en} Three photos is perfect.`, `${fr} Trois photo
 const LINK = (unitEn, unitFr) => ({ bookLinkLabel: ['Booking link', 'Lien de réservation'], bookLinkEx: [`your ${unitEn || ''}booking page`.replace('  ', ' '), `votre page de réservation${unitFr ? ` ${unitFr}` : ''}`], tbookQ: ['Your booking link (optional)', 'Votre lien de réservation (facultatif)'] });
 const KIND_SETUP_WORDS = {
   // Outdoor test 1 (2026-11-23): a campground is open around the clock; its office hours go in Good to know.
-  camp: { lengthAuto: ['half', 'half'], noFree: ['1', '1'], hours24Btn: ['Open 24 hours (campers come and go any time)', 'Ouvert 24 h sur 24 (les campeurs vont et viennent quand ils veulent)'],
+  camp: { lengthAuto: [1, 1], noFree: ['1', '1'], hours24Btn: ['Open 24 hours (campers come and go any time)', 'Ouvert 24 h sur 24 (les campeurs vont et viennent quand ils veulent)'],
     hours24Hint: ['Your page shows the campground as open. Put your office hours in Good to know, like “Office 9–5, check-in from 1 PM”.', 'Votre page indique que le camping est ouvert. Mettez les heures du bureau dans Bon à savoir, comme « Bureau de 9 h à 17 h, arrivée dès 13 h ».'],
     tpriceMore: MORE('RV sites with hookups, cabins, weekly and seasonal rates', 'emplacements de VR avec services, chalets, tarifs à la semaine et à la saison'), photosLead: PHOTOS('Your sites, the lake or the view, and people camping.', 'Vos emplacements, le lac ou la vue, et des gens qui campent.'),
     allYearShutHint: SHUT('spring opening work', 'les travaux d’ouverture au printemps'), ...LINK('site ', 'des emplacements') },

@@ -396,9 +396,9 @@ const PORTAL_FIELDS_BY_TYPE = Object.freeze({
   indoor: portalRow({ menu: true, bookingFirst: true, activityBadges: true, foodBadgesHidden: true }),
   sport: portalRow({ menu: true, bookingFirst: true, activityBadges: true, foodBadgesHidden: true }),
   // Nothing to find a door for, and no kitchen: no storefront tile, no dietary / patio badges (2026-11-08).
-  // Outdoor test 1 (2026-11-23): with the outdoor setup on, Your prices (menu) is the setup's price list. (The edit page
-  // hides the restaurant price range for outdoor; the public Price row stays as it was.)
-  outdoor: portalRow({ bookingFirst: true, activityBadges: true, foodBadgesHidden: true, arrivalTile: false, ...(process.env.OUTDOOR_SETUP !== 'off' ? { menu: true } : {}) }),
+  // Outdoor test 1 (2026-11-23): the edit page hides the restaurant price range for outdoor (renderOwnerEdit); the public
+  // Price row stays as it was.
+  outdoor: portalRow({ bookingFirst: true, activityBadges: true, foodBadgesHidden: true, arrivalTile: false }),
   beach: portalRow({ activityBadges: true, foodBadgesHidden: true, hiddenBadges: Object.freeze(['patio']), arrivalTile: false }),
   shop: portalRow({ price: false, foodBadgesHidden: true, hiddenBadges: Object.freeze(['patio']), arrivalTile: false }),
 });
