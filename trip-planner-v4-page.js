@@ -476,7 +476,9 @@ const V4_CLIENT_SRC = String.raw`
       html += '<div class="t3-book-stay">' + (s.photo ? '<img src="' + esc(s.photo) + '" alt="" loading="lazy" width="96" height="96">' : '<span class="t3-stay-nophoto" aria-hidden="true"></span>')
         + '<div class="t3-book-stay-txt"><p class="t3-stay-kicker">' + esc((fr ? 'Où dormir · ' : 'Where to stay · ') + [fr ? (s.kindFr || s.kind) : s.kind, s.regionLabel].filter(Boolean).join(' · ')) + '</p>'
         + '<p class="t3-stay-name">' + (u ? '<a ' + hrefAttr(u) + '>' + esc(s.name) + '</a>' : esc(s.name)) + '</p>' + (facts ? '<p class="t3-stay-facts">' + esc(facts) + '</p>' : '') + t3LiveHtml(s, fr) + '</div>'
-        + (d.others.length ? '<button type="button" class="t3-book-link t3-book-change" data-t3-stay-change aria-expanded="false" aria-controls="t3StayAlts">' + esc(fr ? 'Changer' : 'Change') + '</button>' : '') + '</div>' + t3StayDatesHtml(t, fr) + v4RoomsHtml(fr);
+        + (d.others.length ? '<button type="button" class="t3-book-link t3-book-change" data-t3-stay-change aria-expanded="false" aria-controls="t3StayAlts">' + esc(fr ? 'Changer' : 'Change') + '</button>' : '') + '</div>' + v4RoomsHtml(fr);
+      // Trip dates (2026-11-23): the stay's own dates (proposed until a yes; then what the links carry).
+      html += t3StayDatesHtml(t, fr);
       if (d.others.length) html += '<ul class="t3-stay-alts" id="t3StayAlts" hidden>' + d.others.map(function(o){
         var ou = safeUrl((fr && o.urlFr) || o.url), of = t3StayFacts(o, fr), why = (o.reasons || [])[0];
         return '<li class="t3-stay-alt"><div><p><strong>' + (ou ? '<a ' + hrefAttr(ou) + '>' + esc(o.name) + '</a>' : esc(o.name)) + '</strong></p><p>' + esc([o.regionLabel, of, why ? (fr ? why.textFr : why.text) : ''].filter(Boolean).join(' · ')) + '</p></div><button type="button" class="t3-btn t3-btn-ghost" data-t3-stay-choose="' + esc(o.id) + '">' + esc(fr ? 'Choisir' : 'Choose') + '</button></li>';
@@ -507,6 +509,19 @@ const V4_CLIENT_SRC = String.raw`
       // Round 1 (2026-11-21): a Call link straight from the sheet when the place lists a phone, else its page.
       return '<li><span aria-hidden="true" style="text-align:center">☎</span><span class="v4-check-name">' + esc(r.s.venue.name) + '<small>' + esc((r.day ? vt('day') + ' ' + r.day + ' · ' : '') + (tel ? vt('byPhone') + ' · ' + r.s.venue.phone : vt('noOnline'))) + '</small></span>'
         + (tel ? '<a class="v4-call" href="' + esc(tel) + '" data-track="booking" data-venue-id="' + esc(r.s.venue.id) + '">' + esc(vt('call')) + '</a>' : u ? '<a ' + hrefAttr(u) + '>' + esc(vt('contact')) + '</a>' : '<span></span>') + '</li>';
+    }).join('') + '</ol>';
+    // Suggested times (2026-11-23): the stops that run on showtimes, classes or sessions we do not hold, each with
+    // its suggested time and the step to check it (never shown as a booked slot).
+    var timed = [];
+    days().forEach(function(dd){ dd.stops.forEach(function(s){
+      if (!s.venue || state.removed[dd.day + '-' + s.daypart]) return;
+      var r = v4Row(s, dd.day + '-' + s.daypart);
+      if (r && r.timing && r.timing.schedule && typeof r.startMinutes === 'number') timed.push({ s: s, r: r, day: dd.day });
+    }); });
+    if (timed.length) html += '<p class="v4-sheet-h4" data-v4-times-h>' + esc(fr ? 'Horaires à vérifier' : 'Times to check') + '</p><ol class="v4-check" data-v4-times>' + timed.map(function(x){
+      var w = (fr ? V4_SCHED.fr : V4_SCHED.en)[x.r.timing.schedule], cu = x.r.timing.checkUrl && t3StayExt(x.r.timing.checkUrl), pu = placeUrl(x.s.venue);
+      return '<li><span aria-hidden="true" style="text-align:center">◷</span><span class="v4-check-name">' + esc(x.s.venue.name) + '<small>' + esc(vt('day') + ' ' + x.day + ' · ' + (fr ? 'suggéré vers ' : 'suggested around ') + clockLabel(x.r.startMinutes) + ' · ' + w[0].toLowerCase()) + '</small></span>'
+        + (cu ? '<a ' + hrefAttr(cu) + ' target="_blank" rel="nofollow noopener">' + esc(w[2]) + ' <span aria-hidden="true">↗</span></a>' : pu ? '<a ' + hrefAttr(pu) + '>' + esc(vt('details')) + '</a>' : '<span></span>') + '</li>';
     }).join('') + '</ol>';
     if (typeof t3ViatorBlockHtml === 'function') html += t3ViatorBlockHtml(fr, true);
     var aff = steps.some(function(x){ return x.affiliate; }) || (typeof t3ViatorShown === 'function' && t3ViatorShown()) || !!(d && ((d.chosen.bookingLinks || []).some(function(l){ return l && l.affiliate; }) || (d.chosen.livePrices && t3StayExt(d.chosen.livePrices.url))));

@@ -371,7 +371,7 @@ function tripStayContext(plan, input, today, opts = {}) {
   return {
     arrive, leave, nights, months, adults, ...(adultsAssumed ? { adultsAssumed: true } : {}), kids, guests, withKids, dog: i.dog === true || !!party.dog, budget: budgetOf(plan.intent),
     centre, primaryRegion: regions[0], regions, datesGiven: !!(i.arrive && i.leave), camping: wantsCamping(plan),
-    ...stayDateState(i, arrive, leave, opts.tripDates, today),
+    ...(opts.v4 ? stayDateState(i, arrive, leave, opts.tripDates, today) : {}),
     ...(opts.v4 ? { v4: true, couple: V4_COUPLE_RE.test(v4Words(plan, opts.text)), budgetStay: V4_BUDGET_STAY_RE.test(v4Words(plan, opts.text)) } : {}),
   };
 }

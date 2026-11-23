@@ -1089,7 +1089,7 @@ ${require('./stay-booking-links').ROOMS_CLIENT_SRC}` + String.raw`
     var differ = given && t.stayStatus === 'confirmed' && ok(t.arrive) && ok(t.leave) && !(t.arrive === t.tripStart && (t.leave === t.tripEnd || t.tripStart === t.tripEnd));
     if (given && t.stayStatus === 'proposed') { parts.push(tripTxt); t = Object.assign({}, t, { nights: 0 }); }
     else if (differ) { parts.push((fr ? 'Voyage : ' : 'Trip: ') + tripTxt); parts.push((fr ? 'Séjour : ' : 'Stay: ') + t3NiceDate(t.arrive, fr) + ' → ' + t3NiceDate(t.leave, fr)); }
-    else if (t.datesGiven === false || t.datesPast) parts.push(fr ? 'Dates à choisir' : 'Dates not set');
+    else if (t.datesPast || t.datesGiven === false) parts.push(fr ? 'Dates à choisir' : 'Dates not set');
     else if (ok(t.arrive) && ok(t.leave)) {
       var am = Number(t.arrive.slice(5, 7)) - 1, ad = Number(t.arrive.slice(8)), lm = Number(t.leave.slice(5, 7)) - 1, ld = Number(t.leave.slice(8));
       parts.push(fr ? (am === lm ? ad + '–' + ld + ' ' + MO[am] : ad + ' ' + MO[am] + '–' + ld + ' ' + MO[lm]) : (am === lm ? MO[am] + ' ' + ad + '–' + ld : MO[am] + ' ' + ad + '–' + MO[lm] + ' ' + ld));
@@ -1148,7 +1148,7 @@ ${require('./stay-booking-links').ROOMS_CLIENT_SRC}` + String.raw`
     try { request({}, { requestType: 'refine', focus: false }); } catch (e) { return false; }
     return true;
   }
-  document.addEventListener('click', function(e){
+  if (typeof document !== 'undefined') document.addEventListener('click', function(e){
     var t = e.target && e.target.closest ? e.target : null, b, box; if (!t) return;
     if ((b = t.closest('[data-t3-stay-ok]'))) { var d = t3StayData(), tr = d && d.w && d.w.trip; if (tr && tr.stayStatus === 'proposed') t3StaySetDates(tr.arrive, tr.leave); return; }
     if ((b = t.closest('[data-t3-stay-edit]'))) { box = b.closest('[data-t3-stayd]'); var f = box && box.querySelector('.t3-stayd-form'); if (f) { f.hidden = !f.hidden; b.setAttribute('aria-expanded', f.hidden ? 'false' : 'true'); if (!f.hidden) { var i1 = f.querySelector('[data-t3-stay-a]'); if (i1) i1.focus(); } } return; }

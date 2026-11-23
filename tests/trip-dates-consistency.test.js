@@ -125,8 +125,8 @@ test('1. the exact request: Dec 5 and 6 on the days, a proposed one-night stay, 
   assert.match(V4, /tt\.stayStatus === 'confirmed' && !tt\.datesPast[^\n]*'&sa=' \+ tt\.arrive \+ '&sl=' \+ tt\.leave \+ '&sc=1'/);
   // The page's words, EN + FR.
   for (const s of ['Stay proposed: ', 'Use these dates', 'Dates go to the booking site after you confirm them.', 'Booking links carry these dates.', 'Change dates', 'Séjour proposé : ', 'Utiliser ces dates', 'Les dates vont au site de réservation une fois confirmées.', 'Les liens de réservation portent ces dates.', 'Modifier les dates']) assert.ok(V3.includes(s), s);
-  assert.match(V4, /t3StayDatesHtml\(t, fr\) \+ v4RoomsHtml\(fr\)/, 'the Book my trip sheet shows the stay dates');
-  assert.match(CHAT, /t3StayDatesHtml\(tripIn, fr\) \+ roomsRow/, 'the stay card shows the stay dates');
+  assert.match(V4, /html \+= t3StayDatesHtml\(t, fr\);/, 'the Book my trip sheet shows the stay dates');
+  assert.match(CHAT, /t3StayDatesHtml\(tripIn, fr\) : ''\) \+ roomsRow/, 'the stay card shows the stay dates');
 });
 
 test('2. a trip without dates is unchanged, and an old shared link reads as it did', () => {
@@ -141,7 +141,7 @@ test('2. a trip without dates is unchanged, and an old shared link reads as it d
   noDates(links); family(links);
   for (const l of p.whereToStay.pick.bookingLinks || []) assert.doesNotMatch(decodeURIComponent(l.url), /checkin|checkout|chkin|chkout/);
   // "Dates not set" and the no-dates note are still the page's words for it; no proposal is drawn.
-  assert.match(V3, /else if \(t\.datesGiven === false \|\| t\.datesPast\) parts\.push\(fr \? 'Dates à choisir' : 'Dates not set'\);/);
+  assert.match(V3, /else if \(t\.datesPast \|\| t\.datesGiven === false\) parts\.push\(fr \? 'Dates à choisir' : 'Dates not set'\);/);
   assert.match(V3, /if \(!t \|\| !\(t\.stayStatus \|\| t\.datesPast\)\) return '';/);
   assert.ok(V3.includes('No dates yet: pick them here or on the booking site.'));
   // An old link (stops, days, stay, nights, party; no td / sa / sl / sc): parsed and printed as before.
@@ -278,6 +278,8 @@ test('6. a cinema’s time is a suggestion with the step to check showtimes; a s
   assert.match(V4, /out \+= v4TimingHtml\(s, id\);/);
   assert.doesNotMatch(V4, /if \(t\) out \+= '<p><strong>' \+ esc\(t\) \+ '<\/strong><\/p>';/);
   for (const s of ['Suggested: around ', ', allow about ', 'Showtimes vary', 'Check showtimes', 'Class times vary', 'Session times vary', 'Within its listed hours.', 'Hours not verified: check before you go.', 'Heure suggérée : vers ', ', prévoyez environ ', 'Les séances varient', 'Voir les séances', 'Dans ses heures indiquées.', 'Heures non vérifiées : à confirmer.']) assert.ok(V4.includes(s), s);
+  // The Book my trip sheet lists them under "Times to check", with the same step.
+  assert.ok(V4.includes("fr ? 'Horaires à vérifier' : 'Times to check'") && V4.includes("fr ? 'suggéré vers ' : 'suggested around '"));
   // The shared copy marks the same stops (the listing is read again there).
   const SERVER = fs.readFileSync(require.resolve('../server.js'), 'utf8');
   assert.match(SERVER, /if \(sk\) tx = \(fr \? 'vers ' : 'around '\) \+ tx;/);
