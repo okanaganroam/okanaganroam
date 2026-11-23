@@ -105,10 +105,10 @@ test('without plan.evidence: the stops’ own data decides; true is verified, mi
   assert.deepEqual(names(d.ok), ['Kal Lake Lookout', 'Roster Sports Club', 'Polson Bistro']);
   assert.deepEqual(names(d.unk), ['Grey Canal Trail', 'Station BBQ', 'Davison Orchards']);
   const reply = ac.ensureReply({ stay: { name: 'Quality Inn & Suites Vernon', changed: true, has: { accessible: true, pets: 'some' }, asked: ['accessible', 'pets'] }, stayAsked: true, checks: [a, d], lang: 'en' });
-  assert.match(reply, /^Hotel: now Quality Inn & Suites Vernon; its listing has accessible rooms and allows pets in some rooms\./);
+  assert.match(reply, /^Hotel: now Quality Inn & Suites Vernon; its listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both: ask the hotel to confirm one\./);
   assert.match(reply, /Wheelchair access: Kal Lake Lookout lists wheelchair access; Davison Orchards says it isn’t wheelchair accessible; Grey Canal Trail doesn’t say\./);
   assert.match(reply, /Dog: Kal Lake Lookout, Roster Sports Club and Polson Bistro list dogs welcome; Grey Canal Trail, Station BBQ and Davison Orchards don’t say\./);
-  assert.match(reply, /Still to check: wheelchair access at Grey Canal Trail and Davison Orchards; dogs at Grey Canal Trail, Station BBQ and Davison Orchards; a pet-friendly room at Quality Inn & Suites Vernon \(pets in some rooms only\)\. Call ahead\.$/);
+  assert.match(reply, /Still to check: wheelchair access at Grey Canal Trail and Davison Orchards; dogs at Grey Canal Trail, Station BBQ and Davison Orchards\. Call ahead\.$/);
   assert.ok(sentences(reply).length <= 5 && reply.split('. ').length <= 5, reply);
   // Never "not accessible" for a stop whose data does not say.
   assert.ok(!/Grey Canal Trail says it isn’t/.test(reply));
@@ -140,6 +140,73 @@ test('a long list is a count with a pointer to Details; the ask-first line names
   const fr = ac.ensureReply({ stay: { name: 'Hôtel Test', changed: false, has: { accessible: true, pets: null }, asked: ['accessible', 'pets'] }, stayAsked: true, checks: [{ ...c, list: many.slice(0, 1), unk: PLAN.slice(0, 1) }], lang: 'fr' });
   assert.match(fr, /^Hôtel : Hôtel Test reste; sa fiche indique des chambres accessibles mais ne dit pas si les animaux sont acceptés\./);
   assert.match(fr, /À vérifier : l’accès en fauteuil roulant à Kal Lake Lookout; les animaux à Hôtel Test\./);
+});
+
+// ---------- 6b. Graded evidence (2026-11-23): the owner's second report on the same Vernon trip ----------
+// "The chat said 'all 3 activities list wheelchair access,' even though the explanation for BX Creek Wetland Boardwalk
+// only said its Deleenheer Road access 'suits limited mobility.'"
+const A2 = require('../trip-access-needs.js');
+const VPLAN = [
+  S({ key: '1-morning', id: 9101, name: 'Polson Park', type: 'outdoor', day: 1, start: 615 }),
+  S({ key: '1-midday', id: 9102, name: 'Roster Sports Club', type: 'restaurant', day: 1, start: 690, role: 'lunch' }),
+  S({ key: '1-afternoon', id: 9103, name: 'Grey Canal Trail', type: 'outdoor', day: 1, start: 810 }),
+  S({ key: '1-evening', id: 9104, name: 'Kelly O’Bryan’s', type: 'restaurant', day: 1, start: 1080, role: 'dinner' }),
+  S({ key: '2-morning', id: 9105, name: 'BX Creek Wetland Boardwalk', type: 'outdoor', day: 2, start: 615 }),
+  S({ key: '2-midday', id: 9106, name: 'MR MIKES', type: 'restaurant', day: 2, start: 690, role: 'lunch' }),
+];
+const VLINES = { 9101: 'Wheelchair-accessible playground; flat park trails', 9103: 'Turtle Mtn Blvd to Davison Rd section is flat gravel, stroller and wheelchair OK', 9105: 'Deleenheer Rd access suits limited mobility' };
+const VDOGS = { 9101: { badge: true, type: 'outdoor' }, 9103: { dogLine: 'Dogs allowed on all sections, on leash', badge: true, type: 'outdoor' }, 9105: { dogLine: 'Dogs allowed on leash only (Deleenheer Rd section)', badge: true, type: 'outdoor' }, 9102: { badge: true, type: 'restaurant' }, 9104: { badge: true, type: 'restaurant' }, 9106: { badge: true, type: 'restaurant' } };
+const vAccess = (s) => A2.accessOf({ accessLine: VLINES[s.id] || '' }), vDog = (s) => A2.dogOf(VDOGS[s.id] || {});
+const vHas = (need, s) => { const x = need === 'accessible' ? vAccess(s) : vDog(s); return x.has === true ? true : x.has === false ? false : null; };
+const vDetail = (need, s) => (need === 'accessible' ? vAccess(s) : vDog(s));
+const VSTAY = { name: 'Quality Inn & Suites Vernon', changed: false, has: { accessible: true, pets: 'some' }, asked: ['accessible', 'pets'] };
+
+test('the Vernon follow-up: a section, a feature and a mobility note are never “list wheelchair access”; a badge is not “dogs welcome” (EN + FR)', () => {
+  const [a, d] = ac.check([{ need: 'accessible', scopes: ['activities'] }, { need: 'dog', scopes: ['activities', 'meals'] }], VPLAN, vHas, { detail: vDetail });
+  assert.deepEqual([names(a.ok), names(a.part), names(a.mob), names(a.unk)], [[], ['Polson Park', 'Grey Canal Trail'], ['BX Creek Wetland Boardwalk'], []]);
+  assert.deepEqual([names(d.ok), names(d.badge), names(d.unk)], [['Polson Park', 'Grey Canal Trail', 'BX Creek Wetland Boardwalk'], ['Roster Sports Club', 'Kelly O’Bryan’s', 'MR MIKES'], []]);
+  const reply = ac.ensureReply({ stay: VSTAY, stayAsked: true, checks: [a, d], lang: 'en', extra: ['wheelchair access at the 3 meal stops'] });
+  assert.equal(reply, 'Hotel: Quality Inn & Suites Vernon stays; its listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both: ask the hotel to confirm one. '
+    + 'Wheelchair access: none of the 3 activities is fully confirmed. Polson Park and Grey Canal Trail list it for one section or feature; BX Creek Wetland Boardwalk only says its Deleenheer Rd access suits limited mobility. '
+    + 'Dog: the 3 walks allow dogs (on leash where their listings say so); the 3 restaurants have the Dog-Friendly badge, which doesn’t say indoors or patio: ask before you go. '
+    + 'Still to check: wheelchair access at Polson Park (playground only), Grey Canal Trail (Turtle Mtn Blvd to Davison Rd section only) and BX Creek Wetland Boardwalk (mobility note only); wheelchair access at the 3 meal stops. Call ahead.');
+  assert.doesNotMatch(reply, /all 3 activities list wheelchair access|list dogs welcome|allows pets in some rooms/);
+  assert.ok(sentences(reply).length <= 6, reply);
+  const fr = ac.ensureReply({ stay: VSTAY, stayAsked: true, checks: [a, d], lang: 'fr' });
+  assert.match(fr, /^Hôtel : Quality Inn & Suites Vernon reste; sa fiche indique des chambres accessibles et des chambres où les animaux sont acceptés, mais ne dit pas qu’une même chambre offre les deux : demandez à l’hôtel d’en confirmer une\./);
+  assert.match(fr, /Accès en fauteuil roulant : aucune des 3 activités n’est entièrement confirmée\. Polson Park et Grey Canal Trail : indiqué pour une section ou un élément seulement; BX Creek Wetland Boardwalk indique seulement « Deleenheer Rd access suits limited mobility »\./);
+  assert.match(fr, /Chien : les 3 sorties acceptent les chiens \(en laisse lorsque la fiche le précise\); les 3 restaurants ont le badge Chiens admis, qui ne dit pas si c’est à l’intérieur ou sur la terrasse : demandez avant d’y aller\./);
+  // "what do I still need to check?": every item, with what each listing does cover.
+  assert.equal(ac.stillLine([a, d], VSTAY, 'en'), 'Still to check: wheelchair access at Polson Park (playground only), Grey Canal Trail (Turtle Mtn Blvd to Davison Rd section only) and BX Creek Wetland Boardwalk (mobility note only: Deleenheer Rd access); whether dogs can come inside at the 3 restaurants; one accessible, dog-friendly room at Quality Inn & Suites Vernon (ask the hotel). Call ahead.');
+  // "which stops are wheelchair accessible?" / one stop: the level and the part, never upgraded.
+  const [all] = ac.check([{ need: 'accessible', scopes: ['activities', 'meals'] }], VPLAN, vHas, { detail: vDetail });
+  assert.equal(ac.answerReply({ checks: [all], lang: 'en' }), 'Wheelchair access: none of the 6 stops is fully confirmed. Polson Park lists it for the playground only; Grey Canal Trail lists it for the Turtle Mtn Blvd to Davison Rd section only; BX Creek Wetland Boardwalk only says its Deleenheer Rd access suits limited mobility; Roster Sports Club, Kelly O’Bryan’s and MR MIKES don’t say.');
+  const [bx] = ac.check([{ need: 'accessible', scopes: ['activities', 'meals'] }], VPLAN.filter((s) => s.id === 9105), vHas, { detail: vDetail });
+  assert.equal(ac.answerReply({ checks: [bx], lang: 'en' }), 'Wheelchair access: BX Creek Wetland Boardwalk only says its Deleenheer Rd access suits limited mobility.');
+  const [pp] = ac.check([{ need: 'accessible', scopes: ['activities', 'meals'] }], VPLAN.filter((s) => s.id === 9101), vHas, { detail: vDetail });
+  assert.equal(ac.answerReply({ checks: [pp], lang: 'en' }), 'Wheelchair access: Polson Park lists it for the playground only.');
+  // The dog at lunch in January: the badge, what it doesn't say, the patio.
+  const [lunch] = ac.check([{ need: 'dog', scopes: ['meals'] }], VPLAN.filter((s) => s.day === 1), vHas, { detail: vDetail, meal: 'lunch' });
+  assert.equal(ac.answerReply({ checks: [lunch], lang: 'en', cold: { en: 'January', fr: 'janvier' } }), 'Dog: Roster Sports Club has the Dog-Friendly badge, which doesn’t say indoors or patio (a patio may be closed in January): ask before you go.');
+  // The hotel alone, asked as a question; one need only keeps the single-need wording.
+  assert.equal(ac.stayClause(VSTAY, 'en', true), 'Hotel: Quality Inn & Suites Vernon: its listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both: ask the hotel to confirm one.');
+  assert.equal(ac.stayClause({ ...VSTAY, asked: ['accessible'] }, 'en'), 'Hotel: Quality Inn & Suites Vernon stays; its listing has accessible rooms.');
+  assert.equal(ac.stayClause({ ...VSTAY, asked: ['pets'] }, 'en'), 'Hotel: Quality Inn & Suites Vernon stays; its listing allows pets in some rooms.');
+  // A stop whose listing says wheelchair access for the place itself is still "lists wheelchair access"; an owner's
+  // "patio only" is said as that.
+  const mixed = [S({ key: '1-morning', id: 1, name: 'Paved Path', type: 'outdoor', day: 1 }), S({ key: '1-afternoon', id: 2, name: 'Snowberry Park', type: 'outdoor', day: 1 }), S({ key: '1-evening', id: 3, name: 'Patio Pub', type: 'pub', day: 1, role: 'dinner' })];
+  const ML = { 1: 'Flat, paved trail; wheelchair and scooter accessible', 2: 'Snowberry Loop is paved' };
+  const mAcc = (s) => A2.accessOf({ accessLine: ML[s.id] || '' }), mDog = (s) => A2.dogOf(s.id === 3 ? { badge: true, type: 'pub', ownLine: 'Dogs welcome on the patio only' } : { badge: true, type: 'outdoor' });
+  const [ma, md] = ac.check([{ need: 'accessible', scopes: ['activities'] }, { need: 'dog', scopes: ['activities', 'meals'] }], mixed, (n, s) => (n === 'accessible' ? (mAcc(s).has === true ? true : null) : true), { detail: (n, s) => (n === 'accessible' ? mAcc(s) : mDog(s)) });
+  assert.equal(ac.needClause(ma, 'en'), 'Wheelchair access: Paved Path lists wheelchair access. Snowberry Park only says its Snowberry Loop is paved.');
+  assert.equal(ac.needClause(md, 'en', { cold: { en: 'January', fr: 'janvier' } }), 'Dog: Paved Path and Snowberry Park allow dogs; Patio Pub allows dogs on the patio only (a patio may be closed in January).');
+});
+
+test('“is <stop> wheelchair accessible?” is a question about that stop (never an edit); a dog question about one stop keeps its own reader', () => {
+  const r = tc.rulesRead('is BX Creek wheelchair accessible?', VPLAN, { regions: [REGION], regionLabels: { [REGION]: TOWN }, days: 2, request: REQ });
+  assert.equal(r.ops.length, 1);
+  assert.deepEqual([r.ops[0].o, r.ops[0].value, r.ops[0].ids], ['ask', 'q_access', [9105]]);
+  assert.equal(R('is Roster Sports Club dog friendly?').ops[0].value, 'q_dog');
 });
 
 // ---------- 7. The stay hand-off wording ----------
@@ -246,7 +313,7 @@ for (const [tag, reader] of [['rules', null], ['AI reader that returns only a st
       const j = await say(page0, MSG);
       const reply = j.reply;
       // (b) + (d) the hotel: changed to the one whose listing has accessible rooms, said from its listing only.
-      assert.match(reply, /^Hotel: now Access Test Hotel; its listing has accessible rooms and allows pets in some rooms\./, reply);
+      assert.match(reply, /^Hotel: now Access Test Hotel; its listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both: ask the hotel to confirm one\./, reply);
       assert.equal((j.stayBlock || j.plan).whereToStay.pick.id, F.H_NEW.id, 'the stay part goes back with the plan');
       assert.deepEqual(j.stayPref.amenities, ['accessible', 'pets']);
       // (a) every activity: the verified one is kept, the one that doesn't say is swapped for the same kind, named.
@@ -282,10 +349,11 @@ test('end to end: a request that never said the needs gains each one once, and t
   const page1 = apply(page0, j);
   assert.equal(page1.text, `${REQ_PLAIN}, wheelchair accessible, with our dog`);
   assert.deepEqual(at(page1), at(page0), 'every stop and time as before');
-  assert.match(j.reply, /^Hotel: Access Test Hotel stays; its listing has accessible rooms and allows pets in some rooms\./);
+  assert.match(j.reply, /^Hotel: Access Test Hotel stays; its listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both: ask the hotel to confirm one\./);
   assert.match(j.reply, /Wheelchair access: Access Test Lookout Loop lists wheelchair access\./);
-  assert.match(j.reply, /Dog: both stops list dogs welcome\./);
-  assert.match(j.reply, /Still to check: a pet-friendly room at Access Test Hotel \(pets in some rooms only\); wheelchair access at Access Test Bistro\. Call ahead\.$/);
+  // (2026-11-23) The trail's badge is a yes; the restaurant's badge doesn't say inside or patio.
+  assert.match(j.reply, /Dog: Access Test Lookout Loop allows dogs; Access Test Bistro has the Dog-Friendly badge, which doesn’t say indoors or patio: ask before you go\./);
+  assert.match(j.reply, /Still to check: wheelchair access at Access Test Bistro\. Call ahead\.$/);
   // Said again: the text does not gain it twice.
   const j2 = await say(page1, MSG);
   const page2 = apply(page1, j2);
@@ -295,9 +363,10 @@ test('end to end: a request that never said the needs gains each one once, and t
   assert.deepEqual(at(page2), at(page0));
   // French.
   const fr = await say(pageOf(REQ_PLAIN, [LIVE[0], LIVE[1]], F.H_NEW.id), MSG_FR, 'fr');
-  assert.match(fr.reply, /^Hôtel : Access Test Hotel reste; sa fiche indique des chambres accessibles et accepte les animaux dans certaines chambres\./);
+  assert.match(fr.reply, /^Hôtel : Access Test Hotel reste; sa fiche indique des chambres accessibles et des chambres où les animaux sont acceptés, mais ne dit pas qu’une même chambre offre les deux : demandez à l’hôtel d’en confirmer une\./);
   assert.match(fr.reply, /Accès en fauteuil roulant : Access Test Lookout Loop indique un accès en fauteuil roulant\./);
-  assert.match(fr.reply, /À vérifier : une chambre où les animaux sont acceptés à Access Test Hotel \(certaines chambres seulement\); l’accès en fauteuil roulant à Access Test Bistro\./);
+  assert.match(fr.reply, /Chien : Access Test Lookout Loop accepte les chiens; Access Test Bistro a le badge Chiens admis, qui ne dit pas si c’est à l’intérieur ou sur la terrasse : demandez avant d’y aller\./);
+  assert.match(fr.reply, /À vérifier : l’accès en fauteuil roulant à Access Test Bistro\./);
 });
 
 test('end to end: more than two stops would change, so the chat asks first; yes swaps where it can, the rest is “still to check”', async () => {
@@ -347,7 +416,7 @@ test('end to end: the questions are answers and change nothing', async () => {
   assert.match(q1.reply, /^Day 1: Wheelchair access: Access Test Lookout Loop lists wheelchair access; Access Test Bistro, Access Test Ridge Trail and Access Test Grill don’t say\./, q1.reply);
   const q2 = await say(page0, 'can the dog come to lunch?');
   nothingChanged(q2, 'lunch');
-  assert.match(q2.reply, /^Dog: Access Test Bistro lists dogs welcome\.$/, q2.reply);
+  assert.match(q2.reply, /^Dog: Access Test Bistro has the Dog-Friendly badge, which doesn’t say indoors or patio \(a patio may be closed in January\): ask before you go\.$/, q2.reply);
   const q2b = await say(page0, 'can the dog come to dinner?');
   assert.match(q2b.reply, /^Dog: Access Test Grill doesn’t say if dogs are welcome\./, q2b.reply);
   assert.ok(!/no dogs|not allowed/.test(q2b.reply), 'never “no dogs” without data');
@@ -356,7 +425,7 @@ test('end to end: the questions are answers and change nothing', async () => {
   assert.match(q3.reply, /Access Test Lookout Loop lists wheelchair access/);
   const q4 = await say(page0, 'what do I still need to check?');
   nothingChanged(q4, 'check');
-  assert.match(q4.reply, /^Still to check: wheelchair access at Access Test Bistro, Access Test Ridge Trail and Access Test Grill; dogs at Access Test Grill; accessible rooms at Access Test Motor Inn/, q4.reply);
+  assert.match(q4.reply, /^Still to check: wheelchair access at Access Test Bistro, Access Test Ridge Trail and Access Test Grill; dogs at Access Test Grill; whether dogs can come inside at Access Test Bistro; accessible rooms at Access Test Motor Inn/, q4.reply);
   const q5 = await say(page0, 'is the hotel wheelchair accessible?');
   nothingChanged(q5, 'hotel');
   assert.match(q5.reply, /^Hotel: Access Test Motor Inn’s listing doesn’t say if it has accessible rooms/, q5.reply);
@@ -365,7 +434,7 @@ test('end to end: the questions are answers and change nothing', async () => {
   assert.ok(q6.reply.length > 10 && sentences(q6.reply).length <= 2, q6.reply);
   const fr = await say(page0, 'Est-ce que le chien peut venir au dîner?', 'fr');
   nothingChanged(fr, 'fr');
-  assert.match(fr.reply, /^Chien : Access Test Bistro indique que les chiens sont admis\.$/, fr.reply);
+  assert.match(fr.reply, /^Chien : Access Test Bistro a le badge Chiens admis, qui ne dit pas si c’est à l’intérieur ou sur la terrasse \(une terrasse peut être fermée en janvier\) : demandez avant d’y aller\.$/, fr.reply);
 });
 
 // ---------- 4b. The itinerary's buttons under a light day (plan.thinDays[].next[].message) ----------

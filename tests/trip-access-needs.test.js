@@ -104,11 +104,27 @@ test('3. the evidence is built only from listing data: listed, doesn’t say, sa
 test('4. the place to stay: from stay_info only (accessible true / false / null; pets yes / some / null)', () => {
   const stay = (needFacts) => ({ pick: { id: 9, name: 'Test Inn', needFacts } });
   const run = (needFacts) => { const p = plan([{ day: 1, stops: DAY1() }], { whereToStay: stay(needFacts) }); H.applyEvidence(p, ctx); return p; };
+  // (2026-11-23) Both needs, accessible rooms and pet-friendly rooms: one flagged entry that asks the hotel to confirm
+  // one room with both; never "accessible rooms ✓" beside a separate pets item.
   let p = run({ accessible: true, pets: 'some' });
+  assert.equal(ev(p, 'stay:accessible').status, 'partial');
+  assert.equal(ev(p, 'stay:accessible').both, true);
+  assert.equal(ev(p, 'stay:accessible').text, 'Place to stay: Test Inn’s listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both: ask the hotel to confirm an accessible, dog-friendly room.');
+  assert.match(ev(p, 'stay:accessible').textFr, /^Hébergement : la fiche de Test Inn indique des chambres accessibles et des chambres où les animaux sont acceptés, mais ne dit pas qu’une même chambre offre les deux : demandez à l’hôtel de confirmer une chambre accessible qui accepte les chiens\.$/);
+  assert.equal(ev(p, 'stay:pets'), undefined, 'one entry, not two');
+  assert.ok(H.shareAsks(p).includes('stay:accessible') && H.shareAsks(p).includes('stay:pets'), 'the shared link still carries both asks');
+  p = run({ accessible: true, pets: 'yes' });
+  assert.equal(ev(p, 'stay:accessible').both, true, 'pets welcome is not "this accessible room takes a dog" either');
+  // One need only: the wording of that need, as before.
+  const one = (needFacts, nd) => { const q = plan([{ day: 1, stops: DAY1() }], { whereToStay: stay(needFacts), needs: nd }); H.applyEvidence(q, ctx); return q; };
+  p = one({ accessible: true, pets: 'some' }, [needs[0]]);
   assert.equal(ev(p, 'stay:accessible').status, 'verified');
   assert.match(ev(p, 'stay:accessible').text, /^Place to stay: Test Inn’s listing says it has accessible rooms\. It doesn’t say which rooms .*ask for an accessible room when you book\.$/);
+  assert.equal(ev(p, 'stay:pets'), undefined);
+  p = one({ accessible: true, pets: 'some' }, [needs[1]]);
   assert.equal(ev(p, 'stay:pets').status, 'partial');
   assert.match(ev(p, 'stay:pets').text, /pets are welcome in some rooms only: ask for a pet-friendly room when you book\.$/);
+  assert.equal(ev(p, 'stay:accessible'), undefined);
   p = run({ accessible: null, pets: null });
   assert.equal(ev(p, 'stay:accessible').status, 'unknown');
   assert.match(ev(p, 'stay:accessible').text, /doesn’t say whether it has accessible rooms: ask before you book\.$/);
@@ -210,8 +226,8 @@ test('7. a thin day is said with a true reason and next steps; the summary carri
   assert.ok(!L.tripSummaryFacts(noWalk, false, {}).some((f) => /^Easy walk ✓/.test(f.text)));
   // The summary: the need is its own flagged item, counted from the listings.
   const facts = L.tripSummaryFacts(p, false, {}).map((f) => `${f.kind}|${f.text}`);
-  assert.ok(facts.includes('flag|Wheelchair access: 3 of 5 stops list it · 2 don’t say'), facts.join('\n'));
-  assert.ok(L.tripSummaryFacts(p, true, {}).some((f) => f.kind === 'flag' && f.text === 'Accès en fauteuil roulant : 3 des 5 arrêts l’indiquent · 2 ne le précisent pas'));
+  assert.ok(facts.includes('flag|Wheelchair access: 3 of 5 confirmed · 2 don’t say'), facts.join('\n'));
+  assert.ok(L.tripSummaryFacts(p, true, {}).some((f) => f.kind === 'flag' && f.text === 'Accès en fauteuil roulant : 3 sur 5 confirmés · 2 non précisés'));
   const none = plan([{ day: 1, stops: [stop('morning', 2, 'Easy Meadow Trail', 'outdoor'), stop('midday', 5, 'Quiet Diner', 'restaurant')] }]);
   H.applyEvidence(none, ctx);
   assert.ok(L.tripSummaryFacts(none, false, {}).some((f) => f.kind === 'flag' && f.text === 'Wheelchair access: none of the 2 stops say'));
@@ -222,7 +238,10 @@ test('7. a thin day is said with a true reason and next steps; the summary carri
   const st = plan([{ day: 1, stops: DAY1() }], { whereToStay: { pick: { id: 9, name: 'Test Inn', needFacts: { accessible: true, pets: 'some' } } } });
   H.applyEvidence(st, ctx);
   const sf = L.tripSummaryFacts(st, false, {}).map((f) => `${f.kind}|${f.text}`);
-  assert.ok(sf.includes('ok|Stay lists accessible rooms ✓') && sf.includes('flag|Dog at the stay: some rooms only'), sf.join('\n'));
+  assert.ok(sf.includes('flag|Stay: accessible + dog-friendly room to confirm') && !sf.some((x) => /Stay lists accessible rooms ✓|Dog at the stay/.test(x)), sf.join('\n'));
+  const stW = plan([{ day: 1, stops: DAY1() }], { needs: [needs[0]], whereToStay: { pick: { id: 9, name: 'Test Inn', needFacts: { accessible: true, pets: 'some' } } } });
+  H.applyEvidence(stW, ctx);
+  assert.ok(L.tripSummaryFacts(stW, false, {}).some((f) => f.kind === 'ok' && f.text === 'Stay lists accessible rooms ✓'), 'a wheelchair need alone keeps its own item');
 });
 
 test('8. the shared link: the needs, their caveats, the handoff note and the thin-day line travel; an old link reads as before', () => {
@@ -236,8 +255,9 @@ test('8. the shared link: the needs, their caveats, the handoff note and the thi
   assert.deepEqual(sp.needs.map((n) => [n.key, n.who]), [['wheelchair', 'one'], ['dog', 'all']]);
   H.applyEvidence(sp, ctx);
   assert.deepEqual(ev(sp, 'accessible').stops.map((s) => s.has), [true, null]);
-  assert.equal(ev(sp, 'stay:accessible').status, 'verified');
-  assert.equal(ev(sp, 'stay:pets').status, 'partial');
+  assert.equal(ev(sp, 'stay:accessible').status, 'partial');
+  assert.match(ev(sp, 'stay:accessible').text, /doesn’t say one room is both: ask the hotel to confirm an accessible, dog-friendly room\.$/);
+  assert.equal(ev(sp, 'stay:pets'), undefined);
   assert.equal(sp.thinDays[0].day, 2);
   assert.match(sp.thinDays[0].text, /^Only lunch is planned on day 2 for now: /);
   assert.deepEqual(H.shareAsks(sp).filter((a) => /access|pets|dog/.test(a)).sort(), ['accessible', 'dog_friendly', 'stay:accessible', 'stay:pets']);
@@ -265,14 +285,20 @@ test('9. through the planner: the exact request carries its needs and says what 
   assert.ok(ev(p, 'dog_friendly'));
   const w = p.whereToStay;
   if (w && w.pick) {
-    assert.ok(ev(p, 'stay:accessible') && ev(p, 'stay:pets'));
     assert.deepEqual(w.pick.needFacts, app.tripStayNeedFacts(w.pick.id));
-    assert.equal(ev(p, 'stay:accessible').status, w.pick.needFacts.accessible === true ? 'verified' : w.pick.needFacts.accessible === false ? 'unmet' : 'unknown');
+    const both = A.stayBoth(p.needs, w.pick.needFacts);
+    assert.ok(ev(p, 'stay:accessible') && (both || ev(p, 'stay:pets')));
+    assert.equal(ev(p, 'stay:accessible').status, both ? 'partial' : w.pick.needFacts.accessible === true ? 'verified' : w.pick.needFacts.accessible === false ? 'unmet' : 'unknown');
     assert.equal(w.pick.handoff.length, (w.pick.bookingLinks || []).length);
     for (const [i, h] of w.pick.handoff.entries()) assert.deepEqual(h.carries, sbl.stayLinkCarries(w.pick.bookingLinks[i].key, w.pick.bookingLinks[i].url));
     // The dates are only proposed: no link carries one, and no note says it does.
     assert.ok(w.pick.handoff.every((h) => !h.carries.dates && !/opens with your dates/.test(h.note)));
-    assert.equal(w.pick.handoffAsk.text, 'Tell the hotel about your dog and ask for an accessible room when you book.');
+    assert.equal(w.pick.handoffAsk.text, both ? 'Its listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both: ask the hotel to confirm an accessible, dog-friendly room.' : 'Tell the hotel about your dog and ask for an accessible room when you book.');
+    // The manual-entry note for the hotel's own site stays, per link.
+    for (const h of w.pick.handoff.filter((x) => x.key === 'own')) assert.match(h.note, /^The hotel’s own site can’t be pre-filled: enter .* and your dog there\.$/);
+    // No stop is called confirmed unless its own words say wheelchair access for the place itself.
+    for (const s of a.stops) { const lv = app.tripAccessOf(s.id).level; assert.equal(s.level, lv, s.name); assert.equal(s.has === true, lv === 'wheelchair', s.name); }
+    if (a.stops.some((s) => s.level !== 'wheelchair')) { assert.notEqual(a.status, 'verified'); assert.ok(!L.tripSummaryFacts(p, false, {}).some((f) => /^Wheelchair access: .*✓/.test(f.text))); }
   }
   // A re-plan of the same request (a confirmed stay) keeps the needs.
   const again = run(ASK, { arrive: '2027-01-16', leave: '2027-01-17' });
@@ -288,4 +314,124 @@ test('9. through the planner: the exact request carries its needs and says what 
     if (pick) { assert.equal(pick.handoffAsk, undefined); assert.equal(pick.needFacts, undefined); assert.equal(pick.handoff.length, (pick.bookingLinks || []).length); }
     assert.ok(!L.tripSummaryFacts(q, false, {}).some((f) => /Wheelchair|Dog at the stay|accessible rooms/.test(f.text)));
   }
+});
+
+// ---- 2026-11-23: graded evidence (the owner's second report on the same Vernon trip) ----
+// "The chat said 'all 3 activities list wheelchair access,' even though the explanation for BX Creek Wetland Boardwalk
+// only said its Deleenheer Road access 'suits limited mobility.'"
+const VERNON = {
+  polson: 'Wheelchair-accessible playground; flat park trails',
+  grey: 'Turtle Mtn Blvd to Davison Rd section is flat gravel, stroller and wheelchair OK',
+  bx: 'Deleenheer Rd access suits limited mobility',
+};
+test('10. an Access line is graded from its own words: wheelchair, one section or feature, a mobility note, no, unknown', () => {
+  const g = (line) => { const x = A.accessGrade(line); return [x.level, x.part || null]; };
+  // The three Vernon notes.
+  assert.deepEqual(g(VERNON.polson), ['wheelchair_part', 'playground']);
+  assert.deepEqual(g(VERNON.grey), ['wheelchair_part', 'Turtle Mtn Blvd to Davison Rd section']);
+  assert.equal(A.accessGrade(VERNON.grey).surface, 'gravel');
+  assert.deepEqual(g(VERNON.bx), ['mobility', 'Deleenheer Rd access']);
+  // Wheelchair for the place itself: no subject, or the place's own unnamed trail or path.
+  for (const line of ['Wide, flat, paved 6.8 km path; wheelchair accessible', 'Flat, paved trail; wheelchair and scooter accessible', 'Flat; wheelchair, pram and bike friendly', '850 m paved pathway, wheelchair accessible; accessible playground', '1.8 km pathway is Rick Hansen accessibility certified', 'Easy, flat trail and washrooms are accessible']) assert.deepEqual(g(line), ['wheelchair', null], line);
+  // A named section, entrance, building or feature: the part is kept.
+  for (const [line, part] of [['Main trail is wheelchair accessible from the south lot', 'main trail from the south lot'], ['4th Street Beach Park to Lake Country Museum section is wheelchair and stroller friendly', '4th Street Beach Park to Lake Country Museum section'],
+    ['Viewing platform is wheelchair accessible', 'viewing platform'], ['Trail has an accessible viewpoint over Okanagan Lake', 'viewpoint over Okanagan Lake'], ['600 m accessible path; with the Ditch Trail about 1.8 km', '600 m path'], ['Portions are wheelchair and stroller friendly', 'some portions'],
+    ['Building fully wheelchair accessible; steeper upper trail rough for scooters', 'building'], ['Accessible parking stalls and wheelchair access to the dugouts', 'dugouts'], ['Rainbow Park has accessible paths to the lake and dock, with a swim lift', 'paths to the lake and dock']]) assert.deepEqual(g(line), ['wheelchair_part', part], line);
+  // Broader or incomplete words: a mobility note, never wheelchair-confirmed.
+  for (const line of ['Flat, easy trail', 'Paved shared-use path', 'Snowberry Loop is paved', 'Flat and popular with strollers', 'Wide, easy 400 m trail; stroller accessible', 'Packed gravel, mostly gentle grades', 'Mostly gravel, easy grade; paved at the north end', 'Continuous, minimal-grade corridor; gravel surface',
+    'Over 3 km of gravel trails designed for accessibility', 'Finished surface is compacted aggregate, planned for universal mobility access', 'Forest trail then a boardwalk around the lake; 40 m gain']) { assert.equal(A.accessGrade(line).level, 'mobility', line); assert.equal(A.accessOf({ accessLine: line }).has, null, line); }
+  assert.equal(A.accessGrade('Snowberry Loop is paved').part, 'Snowberry Loop');
+  // Accessible said only of parking, a washroom or a picnic table is about the facilities, not the place.
+  for (const line of ['2 accessible parking stalls and a universal washroom', 'Wheelchair accessible toilet on site', 'Wheelchair accessible facilities', 'Level paved roads; one flush toilet is wheelchair accessible', 'Handicapped parking spots at the lodge']) { const x = A.accessGrade(line); assert.deepEqual([x.level, !!x.amenity], ['mobility', true], line); assert.equal(A.accessRank(A.accessOf({ accessLine: line })), 0, line); }
+  // Its own words say no.
+  for (const line of ['Not wheelchair accessible', 'Boardwalk is not wheelchair accessible; alternate route to the lounge', 'Steep stairs up to the summit', 'Gravel, dirt and grass paths; not all mobility scooters manage', 'Gentle old road, then steeper single-track; not stroller friendly', 'Flat and wide from the lake; stairs and gains through Scenic Canyon']) assert.equal(A.accessGrade(line).level, 'no', line);
+  // Nothing said: "easy" alone is not access; an adaptive bike trail and a paved road are not a path for a wheelchair.
+  for (const line of ['', 'Easy trails, 860 m total', 'Gravel-surfaced path, rated easy', 'Includes an adaptive mountain bike trail', 'Road paved to the upper lot, then 500 m unpaved to the summit', 'Restricted-access road to Divide Lake, listed as easy', 'Wide gravel path, unpaved, slight elevation change']) assert.equal(A.accessGrade(line).level, 'unknown', line);
+  // accessOf: has is true only for 'wheelchair'; the owner's own answer is a yes unless the line says no.
+  assert.deepEqual([A.accessOf({ accessLine: VERNON.polson }).has, A.accessOf({ accessLine: VERNON.bx }).has, A.accessOf({ ownerAccessible: true, accessLine: VERNON.bx }).level, A.accessOf({ ownerAccessible: true, accessLine: 'Stairs only' }).level], [null, null, 'wheelchair', 'no']);
+  // Picking: confirmed, then a part, then a mobility note, then nothing said; a "no" is below all.
+  assert.deepEqual([ACCESS[1], { accessLine: VERNON.grey }, { accessLine: VERNON.bx }, {}, ACCESS[3]].map((d) => A.accessRank(A.accessOf(d))), [3, 2, 1, 0, -1]);
+  // Every distinct Access line in this site's data gets one of the five levels, and a part only with a partial level.
+  const facts = JSON.parse(fs.readFileSync(require.resolve('../data/outdoor-facts.json'), 'utf8'));
+  for (const f of Object.values(facts)) { if (!f || typeof f.accessibility !== 'string') continue; const x = A.accessGrade(f.accessibility); assert.ok(['wheelchair', 'wheelchair_part', 'mobility', 'no', 'unknown'].includes(x.level), f.accessibility); if (x.part) assert.ok(['wheelchair_part', 'mobility'].includes(x.level), f.accessibility); if (/limited mobility|stroller/i.test(f.accessibility) && !/wheel ?chair/i.test(f.accessibility)) assert.notEqual(x.level, 'wheelchair', f.accessibility); }
+});
+
+test('11. the Vernon plan: nothing is "confirmed" from a section, a feature or a mobility note (summary, Details, cards; EN + FR)', () => {
+  const AC = { 11: { accessLine: VERNON.polson }, 12: { accessLine: VERNON.grey }, 13: { accessLine: VERNON.bx }, 14: {}, 15: {}, 16: {} };
+  const DG = { 11: { badge: true, type: 'outdoor' }, 12: { dogLine: 'Dogs allowed on all sections, on leash', badge: true, type: 'outdoor' }, 13: { dogLine: 'Dogs allowed on leash only (Deleenheer Rd section)', badge: true, type: 'outdoor' }, 14: { badge: true, type: 'restaurant' }, 15: { badge: true, type: 'restaurant' }, 16: { badge: true, type: 'restaurant' } };
+  const c2 = { accessOf: (id) => A.accessOf(AC[id] || {}), dogOf: (id) => A.dogOf(DG[id] || {}), kindsOf: (id) => (id <= 13 ? ['walk', 'easy_walk'] : []) };
+  const days = () => [{ day: 1, date: '2027-01-16', stops: [stop('morning', 11, 'Polson Park', 'outdoor', ['dog_friendly']), stop('midday', 14, 'Roster Sports Club', 'restaurant', ['dog_friendly']), stop('afternoon', 12, 'Grey Canal Trail', 'outdoor', ['dog_friendly']), stop('evening', 15, 'Kelly O’Bryan’s', 'restaurant', ['dog_friendly'])] },
+    { day: 2, date: '2027-01-17', stops: [stop('morning', 13, 'BX Creek Wetland Boardwalk', 'outdoor', ['dog_friendly']), stop('midday', 16, 'MR MIKES', 'restaurant', ['dog_friendly'])] }];
+  const p = plan(days(), { whereToStay: { pick: { id: 9, name: 'Quality Inn', needFacts: { accessible: true, pets: 'some' } } } });
+  H.applyEvidence(p, c2);
+  const a = ev(p, 'accessible');
+  assert.deepEqual(a.stops.map((s) => [s.id, s.level, s.has, s.part || null]), [[11, 'wheelchair_part', null, 'playground'], [14, 'unknown', null, null], [12, 'wheelchair_part', null, 'Turtle Mtn Blvd to Davison Rd section'], [15, 'unknown', null, null], [13, 'mobility', null, 'Deleenheer Rd access'], [16, 'unknown', null, null]]);
+  assert.equal(a.status, 'partial');
+  assert.doesNotMatch(a.text, /list it\.|lists it\./, 'no stop "lists it"');
+  assert.equal(a.text, 'For your wheelchair user, from each listing’s own notes: None is fully confirmed. Polson Park: “Wheelchair-accessible playground; flat park trails”. Only the playground is covered: check the rest. Grey Canal Trail: “Turtle Mtn Blvd to Davison Rd section is flat gravel, stroller and wheelchair OK”. Only the Turtle Mtn Blvd to Davison Rd section is covered: check the rest. BX Creek Wetland Boardwalk: “Deleenheer Rd access suits limited mobility”. No mention of wheelchairs: check the surface and width. Roster Sports Club, Kelly O’Bryan’s and MR MIKES don’t say: ask before you go. An “easy” walk isn’t counted as accessible unless its listing says so.');
+  assert.match(a.textFr, /Aucun n’est entièrement confirmé\. Polson Park : « Wheelchair-accessible playground; flat park trails »\. Seul ceci est couvert : playground; vérifiez le reste\./);
+  assert.match(a.textFr, /BX Creek Wetland Boardwalk : « Deleenheer Rd access suits limited mobility »\. Aucune mention des fauteuils roulants : vérifiez la surface et la largeur\./);
+  // The cards: a short note for the collapsed card (only the affected stops), and the opened card's line for every stop.
+  assert.deepEqual(a.stops.map((s) => s.note || null), ['Wheelchair: playground only', null, 'Wheelchair: Turtle Mtn Blvd to Davison Rd section only', null, 'Access: Deleenheer Rd access · check ahead', null]);
+  assert.equal(a.stops[4].noteFr, 'Accès : Deleenheer Rd access · à vérifier');
+  assert.equal(a.stops[4].more, 'Wheelchair access: “Deleenheer Rd access suits limited mobility”. No mention of wheelchairs: check the surface and width.');
+  assert.equal(a.stops[1].more, 'Wheelchair access: its listing doesn’t say: ask before you go.');
+  // The dog: a trail's own line with its condition; a restaurant's badge says neither inside nor patio; a January trip
+  // says a patio may be closed.
+  const d = ev(p, 'dog_friendly');
+  assert.deepEqual(d.stops.map((s) => s.where || null), [null, 'unsaid', 'outdoors', 'unsaid', 'outdoors', 'unsaid']);
+  assert.equal(d.status, 'partial');
+  assert.equal(d.text, 'Dog: Polson Park, Grey Canal Trail (“Dogs allowed on all sections, on leash”) and BX Creek Wetland Boardwalk (“Dogs allowed on leash only (Deleenheer Rd section)”) are listed as allowing dogs. Roster Sports Club, Kelly O’Bryan’s and MR MIKES have the Dog-Friendly badge; their listings don’t say if dogs can come inside or only on a patio (a patio may be closed in January): ask before you go.');
+  assert.match(d.textFr, /ont le badge Chiens admis; leurs fiches ne disent pas si les chiens peuvent entrer ou seulement aller sur une terrasse \(une terrasse peut être fermée en janvier\) : demandez avant d’y aller\.$/);
+  assert.doesNotMatch(d.text, /dogs welcome/i);
+  assert.equal(d.stops[1].more, 'Dog: has the Dog-Friendly badge; its listing doesn’t say if dogs can come inside or only on a patio (a patio may be closed in January): ask before you go.');
+  // The summary: short flagged items, never a ✓ for the access or the dog.
+  const facts = L.tripSummaryFacts(p, false, {}).map((f) => `${f.kind}|${f.text}`);
+  assert.deepEqual(facts.filter((f) => /Wheelchair|Dog|Stay/.test(f)), ['flag|Dog-friendly: 3 walks yes · 3 badges to confirm', 'flag|Wheelchair access: none fully confirmed · 3 partial notes · 3 don’t say', 'flag|Stay: accessible + dog-friendly room to confirm']);
+  const factsFr = L.tripSummaryFacts(p, true, {}).map((f) => f.text);
+  assert.ok(factsFr.includes('Chiens admis : 3 sorties oui · 3 badges à confirmer') && factsFr.includes('Accès en fauteuil roulant : aucun confirmé · 3 notes partielles · 3 non précisés') && factsFr.includes('Hébergement : chambre accessible + chien à confirmer'), factsFr.join('\n'));
+  for (const f of facts) assert.ok(f.length <= 80, f);
+  // A removed stop no longer counts.
+  assert.ok(L.tripSummaryFacts(p, false, { removed: { 13: 1 } }).some((f) => f.text === 'Wheelchair access: none fully confirmed · 2 partial notes · 3 don’t say'));
+  // A summer trip says nothing about patios; an undated one whose request says winter says "in winter".
+  const july = plan(days().map((x) => ({ ...x, date: x.date.replace('2027-01', '2027-07') })));
+  H.applyEvidence(july, c2);
+  assert.doesNotMatch(ev(july, 'dog_friendly').text, /patio may be closed/);
+  const undated = plan(days().map((x) => ({ day: x.day, stops: x.stops })), { query: 'a winter weekend in Vernon with our dog' });
+  H.applyEvidence(undated, c2);
+  assert.match(ev(undated, 'dog_friendly').text, /\(a patio may be closed in winter\)/);
+  assert.deepEqual([A.coldSeason('2027-01-16'), A.coldSeason('2026-11-30').en, A.coldSeason('2027-04-01'), A.coldSeason(null, 'two days in July')], [{ en: 'January', fr: 'janvier' }, 'November', null, null]);
+  // The shared copy works the same things out again from the listings.
+  const c = H.parseShareContext({ asks: H.shareAsks(p).join(','), nw: '1', ad: '2', td: '2027-01-16_2027-01-17', ts: 'r' });
+  const sp = H.sharedPlan(c, [[11, 'Polson Park', 'outdoor', 1], [14, 'Roster Sports Club', 'restaurant', 1], [12, 'Grey Canal Trail', 'outdoor', 1], [15, 'Kelly O’Bryan’s', 'restaurant', 1], [13, 'BX Creek Wetland Boardwalk', 'outdoor', 2], [16, 'MR MIKES', 'restaurant', 2]].map(([id, name, type, day]) => ({ id, name, type, day, start: 600, kinds: id <= 13 ? ['walk', 'easy_walk'] : [], badges: [{ key: 'dog_friendly' }] })), [], { id: 9, name: 'Quality Inn', regionLabel: 'Vernon', has: [], needFacts: { accessible: true, pets: 'some' } });
+  H.applyEvidence(sp, c2);
+  assert.equal(ev(sp, 'accessible').text, a.text);
+  assert.equal(ev(sp, 'dog_friendly').text, d.text);
+  assert.equal(ev(sp, 'stay:accessible').text, ev(p, 'stay:accessible').text);
+});
+
+test('12. a dog: the badge at a place with an indoors is not "dogs welcome"; the listing’s own words are', () => {
+  assert.deepEqual(A.dogOf({ badge: true, type: 'restaurant' }), { has: true, says: null, source: 'badge', where: 'unsaid' });
+  assert.equal(A.dogOf({ badge: true, type: 'winery' }).where, 'unsaid');
+  assert.equal(A.dogOf({ badge: true, type: 'outdoor' }).where, null, 'a park’s badge needs no "inside or patio"');
+  assert.deepEqual(A.dogOf({ badge: true, type: 'pub', ownLine: 'Dogs welcome on the patio only. Water bowls at the door.' }), { has: true, says: 'Dogs welcome on the patio only. Water bowls at the door.', source: 'owner', where: 'patio' });
+  assert.equal(A.dogOf({ badge: true, type: 'brewery', ownLine: 'Dogs welcome inside and on the patio' }).where, 'inside');
+  assert.equal(A.dogOf({ badge: true, type: 'cafe', ownLine: 'Dogs outside only' }).where, 'outside');
+  assert.equal(A.dogOf({ badge: true, type: 'cafe', patioOnly: true, ownLine: 'Terrasse seulement' }).where, 'patio');
+  assert.equal(A.dogOf({ badge: true, type: 'restaurant', ownLine: 'Leashed dogs welcome' }).where, 'stated');
+  assert.deepEqual(A.dogOf({ dogLine: 'Dogs allowed on leash', badge: true, type: 'outdoor' }), { has: true, says: 'Dogs allowed on leash', source: 'line', where: 'outdoors' });
+  assert.equal(A.dogOf({ dogLine: 'Dogs are not permitted', badge: true, type: 'outdoor' }).has, false);
+  assert.equal(A.dogOf({ type: 'restaurant' }).has, null);
+  // The plan's sentences for each.
+  const DG = { 21: { badge: true, type: 'pub', ownLine: 'Dogs welcome on the patio only' }, 22: { badge: true, type: 'brewery', ownLine: 'Dogs welcome inside and on the patio' }, 23: { badge: true, type: 'restaurant' } };
+  const c3 = { accessOf: () => A.accessOf({}), dogOf: (id) => A.dogOf(DG[id] || {}), kindsOf: () => [] };
+  const p = plan([{ day: 1, date: '2027-01-16', stops: [stop('midday', 21, 'Patio Pub', 'pub', ['dog_friendly']), stop('afternoon', 22, 'Taproom', 'brewery', ['dog_friendly']), stop('evening', 23, 'Badge Bistro', 'restaurant', ['dog_friendly'])] }], { needs: [needs[1]] });
+  H.applyEvidence(p, c3);
+  const d = ev(p, 'dog_friendly');
+  assert.equal(d.text, 'Dog: Taproom (“Dogs welcome inside and on the patio”) is listed as allowing dogs. Patio Pub: its listing says “Dogs welcome on the patio only” (a patio may be closed in January). Badge Bistro has the Dog-Friendly badge; its listing doesn’t say if dogs can come inside or only on a patio (a patio may be closed in January): ask before you go.');
+  assert.ok(L.tripSummaryFacts(p, false, {}).some((f) => f.kind === 'flag' && f.text === 'Dog-friendly: 1 stop yes · 1 with limits · 1 badge to confirm'));
+  // Every stop's own line says dogs can come: verified, and the summary's ✓.
+  const allYes = plan([{ day: 1, stops: [stop('morning', 1, 'Paved Lake Path', 'outdoor', ['dog_friendly'])] }], { needs: [needs[1]] });
+  H.applyEvidence(allYes, ctx);
+  assert.equal(ev(allYes, 'dog_friendly').status, 'verified');
 });

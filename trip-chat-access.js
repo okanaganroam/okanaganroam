@@ -195,7 +195,7 @@ const TX = {
     dogOut: ['{names} allows dogs', '{names} allow dogs'], dogLeash: ' (on leash where their listings say so)', dogLeash1: ' (on leash)', walks: ['walk', 'walks'], restaurants: ['restaurant', 'restaurants'], eats: ['place to eat', 'places to eat'],
     dogBadge: ['{names} has the Dog-Friendly badge, which doesn’t say indoors or patio', '{names} have the Dog-Friendly badge, which doesn’t say indoors or patio'], dogAsk: ': ask before you go',
     dogCond: { patio: '{name} allows dogs on the patio only', outside: '{name} allows dogs outside only', some_trips: '{name} takes dogs on some trips only', stated: '{name} says “{says}”' }, patioCold: ' (a patio may be closed in {month})',
-    stillDog: 'whether dogs can come inside at {names}', stayBoth: 'its listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both', stayBothAt: 'one accessible, dog-friendly room at {name} (ask the hotel)', theN: 'the {n} {noun}',
+    stillDog: 'whether dogs can come inside at {names}', stayBoth: 'its listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both: ask the hotel to confirm one', stayBothAt: 'one accessible, dog-friendly room at {name} (ask the hotel)', theN: 'the {n} {noun}',
   },
   fr: {
     and: ' et ', more: '{n} de plus', head: { accessible: 'Accès en fauteuil roulant', dog: 'Chien', gluten_free: 'Sans gluten', vegan: 'Végane', vegetarian: 'Végétarien', kid_friendly: 'Enfants' },
@@ -220,13 +220,13 @@ const TX = {
     noneFound: 'Je n’ai trouvé aucun remplacement dont la fiche le dit; rien n’a changé.', thinKeep: 'D’accord, le jour {d} reste tel quel. Rien n’a changé.',
     thinNone: 'Aucun jour de ce plan n’est marqué comme léger.', thinUnknown: 'Le jour {d} a {n} {noun}. Je n’en sais pas plus; dites « ajoute quelque chose au jour {d} » et je regarde.', thinFull: 'Le jour {d} a {n} arrêts; il n’est donc pas marqué comme léger.',
     needKept: 'Sa fiche indique {what}.', needUnknown: 'Sa fiche ne dit pas {say}; appelez avant d’y aller.', needSwapped: 'J’ai choisi {fresh} plutôt que {old} parce que sa fiche {lists}.',
-    noneFull: 'aucun des {n} {noun} n’est entièrement confirmé', noneFull1: '{name} n’est pas entièrement confirmé', partN: '{names} : indiqué pour une section ou un élément seulement', part1: '{name} : indiqué seulement pour « {part} »', part1x: '{name} : indiqué en partie seulement',
+    noneFull: 'aucun des {n} {noun} n’est entièrement confirmé', noneFullF: 'aucune des {n} {noun} n’est entièrement confirmée', noneFull1: '{name} n’est pas entièrement confirmé', partN: '{names} : indiqué pour une section ou un élément seulement', part1: '{name} : indiqué seulement pour « {part} »', part1x: '{name} : indiqué en partie seulement',
     mobSays: '{name} indique seulement « {says} »', mobNote: '{name} n’a qu’une note de mobilité (« {says} »)', mobAmenity: '{name} n’indique que des installations accessibles', mobN: '{names} n’ont qu’une note de mobilité',
     stillPart: '{name} (« {part} » seulement)', stillPartX: '{name} (en partie seulement)', stillMob: '{name} (note de mobilité seulement{part})', stillAccess: 'l’accès en fauteuil roulant à {names}', countOf: 'les {n} {noun}',
     dogOut: ['{names} accepte les chiens', '{names} acceptent les chiens'], dogLeash: ' (en laisse lorsque la fiche le précise)', dogLeash1: ' (en laisse)', walks: ['sortie', 'sorties'], restaurants: ['restaurant', 'restaurants'], eats: ['endroit où manger', 'endroits où manger'],
     dogBadge: ['{names} a le badge Chiens admis, qui ne dit pas si c’est à l’intérieur ou sur la terrasse', '{names} ont le badge Chiens admis, qui ne dit pas si c’est à l’intérieur ou sur la terrasse'], dogAsk: ' : demandez avant d’y aller',
     dogCond: { patio: '{name} accepte les chiens sur la terrasse seulement', outside: '{name} accepte les chiens à l’extérieur seulement', some_trips: '{name} accepte les chiens à certaines sorties seulement', stated: '{name} indique « {says} »' }, patioCold: ' (une terrasse peut être fermée en {month})',
-    stillDog: 'si les chiens peuvent entrer à {names}', stayBoth: 'sa fiche indique des chambres accessibles et des chambres où les animaux sont acceptés, mais ne dit pas qu’une même chambre offre les deux', stayBothAt: 'une chambre accessible qui accepte les chiens à {name} (demandez à l’hôtel)', theN: 'les {n} {noun}',
+    stillDog: 'si les chiens peuvent entrer à {names}', stayBoth: 'sa fiche indique des chambres accessibles et des chambres où les animaux sont acceptés, mais ne dit pas qu’une même chambre offre les deux : demandez à l’hôtel d’en confirmer une', stayBothAt: 'une chambre accessible qui accepte les chiens à {name} (demandez à l’hôtel)', theN: 'les {n} {noun}',
   },
 };
 const fillT = (s, vars) => String(s).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m));
@@ -249,7 +249,7 @@ function accessClause(c, lang, full) {
   const swapped = (c.swaps || []).map((x) => x.fresh.id), ok = c.ok.filter((s) => !swapped.includes(s.id));
   const head = [], rest = [];
   if (ok.length) head.push(`${joinNames(ok.map((s) => s.name), t)} ${ok.length === 1 ? t.lists1.accessible : t.listsN.accessible}`);
-  else if (!(c.swaps || []).length && n > 1) head.push(fillT(t.noneFull, { n, noun: scopeNoun(c.scopes, n, t) }));
+  else if (!(c.swaps || []).length && n > 1) head.push(fillT(fr && scopeNoun(c.scopes, n, t) === t.noun.activities[1] ? t.noneFullF : t.noneFull, { n, noun: scopeNoun(c.scopes, n, t) }));
   for (const x of c.swaps || []) head.push(fillT(t.swapped, { old: x.old.name, fresh: x.fresh.name, whose: t.whose.accessible }));
   if (c.part.length && (full || c.part.length === 1)) for (const s of c.part) { const p = D(s).part; rest.push(p ? fillT(t.part1, { name: s.name, part: fr ? p : withThe(p) }) : fillT(t.part1x, { name: s.name })); }
   else if (c.part.length) rest.push(fillT(t.partN, { names: joinNames(c.part.map((s) => s.name), t) }));
@@ -318,7 +318,9 @@ function stayClause(stay, lang, answer = false) {
 }
 // What still needs checking, in one sentence: the unknowns of each need (names, or a count with a pointer to Details
 // when there are many), the stay's unknowns, and any extra items (session times, the stay hand-off).
-function stillLine(checks, stay, lang, extra = []) {
+// said: the reply's own clauses already say to ask (the dog badge, the one room with both needs) and name a mobility
+// note's entrance, so the line does not say them twice (the reply stays short on a phone).
+function stillLine(checks, stay, lang, extra = [], said = false) {
   const fr = lang === 'fr', t = TX[fr ? 'fr' : 'en'];
   const items = [];
   let long = false;
@@ -327,7 +329,7 @@ function stillLine(checks, stay, lang, extra = []) {
     // A stop listed in part, or with only a mobility note, is named with what its listing does cover.
     const some = [...(c.part || []), ...(c.mob || [])];
     if (c.need === 'accessible' && some.length) {
-      const one = (s) => { const d = D(s); return d.level === 'wheelchair_part' ? (d.part ? fillT(t.stillPart, { name: s.name, part: d.part }) : fillT(t.stillPartX, { name: s.name })) : fillT(t.stillMob, { name: s.name, part: d.part && !d.amenity ? `${fr ? ' : ' : ': '}${d.part}` : '' }); };
+      const one = (s) => { const d = D(s); return d.level === 'wheelchair_part' ? (d.part ? fillT(t.stillPart, { name: s.name, part: d.part }) : fillT(t.stillPartX, { name: s.name })) : fillT(t.stillMob, { name: s.name, part: d.part && !d.amenity && !said ? `${fr ? ' : ' : ': '}${d.part}` : '' }); };
       if (some.length > 3) long = true;
       items.push(fillT(t.stillAccess, { names: some.length > 3 ? fillT(t.count, { n: some.length }) : joinNames(some.map(one), t) }));
     }
@@ -336,10 +338,10 @@ function stillLine(checks, stay, lang, extra = []) {
       if (u.length > 3) long = true;
       items.push(fillT(t.at[c.need], { names: u.length > 3 ? fillT(t.count, { n: u.length }) : u.length > 2 && some.length ? fillT(t.countOf, { n: u.length, noun: scopeNoun(u.every((s) => isMeal(s)) ? ['meals'] : c.scopes, u.length, t) }) : joinNames(u.map((s) => s.name), t) }));
     }
-    if (c.need === 'dog' && (c.badge || []).length) { const b = c.badge; items.push(fillT(t.stillDog, { names: b.length > 2 ? fillT(t.countOf, { n: b.length, noun: (b.every((s) => s.type === 'restaurant') ? t.restaurants : b.every((s) => isMeal(s)) ? t.eats : t.noun.stops)[1] }) : joinNames(b.map((s) => s.name), t) })); }
+    if (c.need === 'dog' && (c.badge || []).length && !said) { const b = c.badge; items.push(fillT(t.stillDog, { names: b.length > 2 ? fillT(t.countOf, { n: b.length, noun: (b.every((s) => s.type === 'restaurant') ? t.restaurants : b.every((s) => isMeal(s)) ? t.eats : t.noun.stops)[1] }) : joinNames(b.map((s) => s.name), t) })); }
   }
   // Pets in some rooms only is still something to ask for when booking; one room with both needs is asked of the hotel.
-  if (stay && stayBothOf(stay)) items.push(fillT(t.stayBothAt, { name: stay.name }));
+  if (stay && stayBothOf(stay)) { if (!said) items.push(fillT(t.stayBothAt, { name: stay.name })); }
   else if (stay) for (const k of stay.asked) { const v = stay.has[k]; if (v === 'some') items.push(fillT(t.stayPetsSome, { name: stay.name })); else if (!(v === true || v === 'yes')) items.push(fillT(t.stayAt[k], { name: stay.name })); }
   for (const x of extra) if (x) items.push(x);
   if (!items.length) return t.nothingLeft;
@@ -353,7 +355,7 @@ function ensureReply({ stay, stayAsked, checks, lang, extra = [] }) {
   const clauses = (checks || []).map((c) => needClause(c, lang));
   const room = 3 - parts.length;
   parts.push(...(clauses.length <= room ? clauses : clauses.filter((x, i) => (checks[i].swaps || []).length || checks[i].ok.length || (checks[i].part || []).length || (checks[i].mob || []).length || (checks[i].badge || []).length).slice(0, room)));
-  parts.push(stillLine(checks, stayAsked ? stay : null, lang, extra));
+  parts.push(stillLine(checks, stayAsked ? stay : null, lang, extra, true));
   return parts.join(' ');
 }
 // "3 stops don't say if they're wheelchair accessible: A, B and C. Swap them for places whose listings do, where I can

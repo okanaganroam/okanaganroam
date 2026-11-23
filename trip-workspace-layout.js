@@ -49,7 +49,7 @@ function tripSummaryFacts(plan, fr, ctx) {
       var bits = [];
       if (aw) bits.push(fr ? aw + ' sur ' + stops.length + (aw > 1 ? ' confirmés' : ' confirmé') : aw + ' of ' + stops.length + ' confirmed');
       else if (ap) bits.push(fr ? 'aucun confirmé' : 'none fully confirmed');
-      else if (aq) bits.push(fr ? 'non précisé (' + stops.length + ')' : 'none of the ' + stops.length + (stops.length > 1 ? ' say' : ' says'));
+      else if (aq) { var au = e.unit || {}, aun = fr ? (au.fr || 'arrêts') : (au.en || 'stops'); bits.push(fr ? 'non précisé (' + stops.length + ' ' + aun + ')' : 'none of the ' + stops.length + ' ' + aun + (stops.length > 1 ? ' say' : ' says')); }
       if (ap) bits.push(fr ? ap + (ap > 1 ? ' notes partielles' : ' note partielle') : ap + (ap > 1 ? ' partial notes' : ' partial note'));
       if (aq && (aw || ap)) bits.push(fr ? aq + (aq > 1 ? ' non précisés' : ' non précisé') : aq + (aq > 1 ? ' don’t say' : ' doesn’t say'));
       if (an) bits.push(fr ? an + (an > 1 ? ' disent non' : ' dit non') : an + (an > 1 ? ' say no' : ' says no'));
