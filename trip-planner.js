@@ -8764,9 +8764,10 @@ function v4AgentHooks(result, input) {
     if (!t0) continue;
     const i = tours.findIndex((x) => x.listingId === t0.listingId);
     if (i >= 0) tours.splice(i, 1);
-    tours.push({ ...t0 });
+    tours.push({ ...t0, ...(i >= 0 ? { movedByEntry: true } : {}) });
   }
   for (const t0 of tours) {
+    if (t0.movedByEntry) { delete t0.movedByEntry; continue; }
     const pk = Object.keys(pinned).find((k) => pinned[k] === t0.listingId);
     const m = pk && /^([1-7])-(morning|midday|afternoon|late|evening|night)$/.exec(pk);
     if (m && Number(m[1]) !== t0.day) { const keepTime = m[2] === t0.part; t0.day = Number(m[1]); t0.part = m[2]; if (!keepTime) delete t0.startMinutes; }
@@ -11542,7 +11543,7 @@ module.exports = {
   SWAP_WANTS, swapWantOk,
   // Build My Trip V4 (2026-11-20)
   outdoorFactsSeasonOff, ADULT_VENUE_RE, EASY_HIKE_ASK_RE, HARD_TRAIL_RE,
-  v4AgentHooks, advisoryClosingFrom, WINTER_NO_WALK_RE, CHAIN_NAME_RE, ERRAND_SHOP_RE, v4SwapSteady, eventKeyMoment, v4Input, v4NoCarInput, v4NoCarFacts, V4_NO_CAR_CORE_KM, v4MealDaypartInput, V4_NO_CAR_KM, v4Polish, v4SaneDays, eventAtDrinkPlace, v4DayTownLabels, v4CasualDinner, v4FillerSkip, v4OffTheme, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
+  v4AgentHooks, v4MealStop, tourIncludesMeal, v4MealPacing, v4ClearTourWindow, advisoryClosingFrom, WINTER_NO_WALK_RE, CHAIN_NAME_RE, ERRAND_SHOP_RE, v4SwapSteady, eventKeyMoment, v4Input, v4NoCarInput, v4NoCarFacts, V4_NO_CAR_CORE_KM, v4MealDaypartInput, V4_NO_CAR_KM, v4Polish, v4SaneDays, eventAtDrinkPlace, v4DayTownLabels, v4CasualDinner, v4FillerSkip, v4OffTheme, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
   // Tour test 17 (Whistler, 2026-11-18)
   regionMinutes, PICKUP_ASK_RE, KIND_SEASON_ASK_WORDS, kindSeasonOff, tourTripFor, normWords,
   dropNameOnlyTypes,
