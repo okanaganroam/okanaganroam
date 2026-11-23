@@ -1308,7 +1308,7 @@ ${require('./stay-booking-links').HANDOFF_CLIENT_SRC}` + String.raw`
     // (A stay proposed from the trip's dates, or dates already past, says its own line by the stay: t3StayDatesHtml.)
     if (!t.datesGiven && !t.stayStatus && !t.datesPast) bits.push(fr ? 'Pas encore de dates : choisissez-les ici ou sur le site de réservation.' : 'No dates yet: pick them here or on the booking site.');
     if (prefilled && t.kids && !(t.kidAges && t.kidAges.length === t.kids)) bits.push(fr ? 'Le site demande l’âge des enfants.' : 'The booking site asks for the kids’ ages.');
-    if (s.petsSome) bits.push(fr ? 'Animaux dans certaines chambres : à vérifier.' : 'Pets in some rooms: check when booking.');
+    if (s.petsSome && !(s.handoffAsk && s.handoffAsk.both)) bits.push(fr ? 'Animaux dans certaines chambres : à vérifier.' : 'Pets in some rooms: check when booking.');
     // What no booking site takes (the dog, an accessible room): said here, by the stay's step.
     if (s.handoffAsk) bits.push(fr ? s.handoffAsk.textFr : s.handoffAsk.text);
     // Each button's own handoff, once the stay's dates are confirmed (before that, the stay's own block says the dates

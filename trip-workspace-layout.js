@@ -40,14 +40,36 @@ function tripSummaryFacts(plan, fr, ctx) {
     // A wheelchair user (2026-11-24): its own item, counted from each listing's own data. "Lists it" is kept apart from
     // "doesn't say" (has: null) and from a listing whose own line says no (has: false); never "accessible" on its own.
     if (e.ask === 'accessible' && stops.length) {
-      var au = e.unit || {}, ap = fr ? (au.fr || 'arrêts') : (au.en || 'stops'), an = stops.filter(function (x) { return x && x.has === false; }).length, aq = stops.length - yes - an;
-      if (!aq && !an) { ok.push({ kind: 'ok', ask: e.ask, text: label + (fr ? ' : indiqué partout (' + stops.length + ') ✓' : ': listed at all ' + stops.length + ' ✓') }); return; }
+      // (2026-11-23) Graded: "confirmed" is only a listing whose own words say wheelchair access for the place itself
+      // (level 'wheelchair'); a section or feature, or a mobility note, is a "partial note"; never a ✓ unless all are.
+      var lv = function (x) { return x.level || (x.has === true ? 'wheelchair' : x.has === false ? 'no' : 'unknown'); };
+      var aw = stops.filter(function (x) { return x && lv(x) === 'wheelchair'; }).length, an = stops.filter(function (x) { return x && lv(x) === 'no'; }).length;
+      var ap = stops.filter(function (x) { return x && (lv(x) === 'wheelchair_part' || lv(x) === 'mobility'); }).length, aq = stops.length - aw - an - ap;
+      if (aw === stops.length) { ok.push({ kind: 'ok', ask: e.ask, text: label + (fr ? ' : indiqué partout (' + stops.length + ') ✓' : ': listed at all ' + stops.length + ' ✓') }); return; }
       var bits = [];
-      if (yes) bits.push(fr ? yes + ' des ' + stops.length + ' ' + ap + (yes > 1 ? ' l’indiquent' : ' l’indique') : yes + ' of ' + stops.length + ' ' + ap + (yes > 1 ? ' list it' : ' lists it'));
-      else if (aq) bits.push(fr ? 'non précisé (' + stops.length + ' ' + ap + ')' : 'none of the ' + stops.length + ' ' + ap + (stops.length > 1 ? ' say' : ' says'));
-      if (yes && aq) bits.push(fr ? aq + (aq > 1 ? ' ne le précisent pas' : ' ne le précise pas') : aq + (aq > 1 ? ' don’t say' : ' doesn’t say'));
+      if (aw) bits.push(fr ? aw + ' sur ' + stops.length + (aw > 1 ? ' confirmés' : ' confirmé') : aw + ' of ' + stops.length + ' confirmed');
+      else if (ap) bits.push(fr ? 'aucun confirmé' : 'none fully confirmed');
+      else if (aq) { var au = e.unit || {}, aun = fr ? (au.fr || 'arrêts') : (au.en || 'stops'); bits.push(fr ? 'non précisé (' + stops.length + ' ' + aun + ')' : 'none of the ' + stops.length + ' ' + aun + (stops.length > 1 ? ' say' : ' says')); }
+      if (ap) bits.push(fr ? ap + (ap > 1 ? ' notes partielles' : ' note partielle') : ap + (ap > 1 ? ' partial notes' : ' partial note'));
+      if (aq && (aw || ap)) bits.push(fr ? aq + (aq > 1 ? ' non précisés' : ' non précisé') : aq + (aq > 1 ? ' don’t say' : ' doesn’t say'));
       if (an) bits.push(fr ? an + (an > 1 ? ' disent non' : ' dit non') : an + (an > 1 ? ' say no' : ' says no'));
-      flags.push({ kind: 'flag', status: yes ? 'partial' : an && !aq ? 'unmet' : 'unknown', ask: e.ask, text: label + sep + bits.join(' · ') });
+      flags.push({ kind: 'flag', status: aw || ap ? 'partial' : an && !aq ? 'unmet' : 'unknown', ask: e.ask, text: label + sep + bits.join(' · ') });
+      return;
+    }
+    // A dog (2026-11-23): "yes" is a listing that says where the dog can go (a trail's own Dogs line, "inside"); a
+    // Dog-Friendly badge at a place with an indoors doesn't say inside or patio only: "badges to confirm".
+    if (e.ask === 'dog_friendly' && stops.some(function (x) { return x && (x.where || x.open); })) {
+      var dy = stops.filter(function (x) { return x && x.has === true && (!x.where || x.where === 'outdoors' || x.where === 'inside'); });
+      var db = stops.filter(function (x) { return x && x.has === true && x.where === 'unsaid'; }).length, dn = stops.filter(function (x) { return x && x.has === false; }).length;
+      var dc = stops.filter(function (x) { return x && x.has === true; }).length - dy.length - db, du = stops.length - dy.length - db - dc - dn;
+      if (dy.length === stops.length) { ok.push({ kind: 'ok', ask: e.ask, text: label + ' ✓' }); return; }
+      var walks = dy.length && dy.every(function (x) { return x.open; }), dbits = [];
+      if (dy.length) dbits.push(fr ? dy.length + (walks ? (dy.length > 1 ? ' sorties' : ' sortie') : (dy.length > 1 ? ' arrêts' : ' arrêt')) + ' oui' : dy.length + (walks ? (dy.length > 1 ? ' walks' : ' walk') : (dy.length > 1 ? ' stops' : ' stop')) + ' yes');
+      if (dc) dbits.push(fr ? dc + ' avec limites' : dc + ' with limits');
+      if (db) dbits.push(fr ? db + (db > 1 ? ' badges à confirmer' : ' badge à confirmer') : db + (db > 1 ? ' badges to confirm' : ' badge to confirm'));
+      if (du) dbits.push(fr ? du + (du > 1 ? ' non précisés' : ' non précisé') : du + (du > 1 ? ' don’t say' : ' doesn’t say'));
+      if (dn) dbits.push(fr ? dn + (dn > 1 ? ' disent non' : ' dit non') : dn + (dn > 1 ? ' say no' : ' says no'));
+      flags.push({ kind: 'flag', status: dy.length || dc || db ? 'partial' : dn ? 'unmet' : 'unknown', ask: e.ask, text: label + sep + dbits.join(' · ') });
       return;
     }
     // An entry that words its own short item (the place to stay for a need: "Stay lists accessible rooms ✓").
@@ -99,6 +121,7 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
 .t3-v4.tw-workspace .v4-line {white-space:normal;font-size:13px;}
 .t3-v4.tw-workspace .v4-time {display:inline-block;padding:3px 8px;border-radius:12px;background:#fff0cc;color:#745319;}
 .t3-v4.tw-workspace .tw-fit {font-size:13px;line-height:1.45;color:#52665e;margin:7px 0;}
+.t3-v4.tw-workspace .tw-need {font-weight:700;overflow-wrap:anywhere;}
 .t3-v4.tw-workspace .v4-note {font-size:13px;line-height:1.45;font-weight:700;color:#52665e;margin:7px 0;padding:0;}
 .t3-v4.tw-workspace .v4-note a {color:#1b303c;}
 .t3-v4.tw-workspace .v4-acts {display:flex;flex-direction:column;gap:6px;}
@@ -255,13 +278,17 @@ const WORKSPACE_CLIENT_SRC=String.raw`
     var reason=t3WhyLines(s).filter(function(w){return !/straight line|ligne droite|listed on|répertorié/i.test(w);})[0]||'';
     var actions=key?(s.noSwap?'':'<button type="button" class="v4-icon" data-t3-swap="'+esc(key)+'" aria-label="'+esc(vt('swap',{name:v.name}))+'">⇄ '+esc(twText('Swap','Changer'))+'</button>')+'<button type="button" class="v4-icon" data-t3-remove="'+esc(key)+'" aria-label="'+esc(vt('remove',{name:v.name}))+'">× '+esc(twText('Remove','Retirer'))+'</button>':'<button type="button" class="v4-icon" data-t3-swap-id="'+esc(v.id)+'" aria-label="'+esc(vt('swap',{name:v.name}))+'">⇄ '+esc(twText('Swap','Changer'))+'</button><button type="button" class="v4-icon" data-v4-remove-id="'+esc(v.id)+'" aria-label="'+esc(vt('remove',{name:v.name}))+'">× '+esc(twText('Remove','Retirer'))+'</button>';
     var note=v4Note(s,key);
+    // Trip needs (2026-11-23): a stop whose listing covers one section or feature for a wheelchair, or has only a
+    // mobility note, says so in one short line ("Access: Deleenheer Rd access · check ahead") in place of the generic
+    // "Matches your request…" line (still under "Why it fits" once opened), so the card does not grow.
+    var need=typeof v4NeedLines==='function'?v4NeedLines(s).note:'';
     var links=(url?'<a '+hrefAttr(url)+'>'+esc(twText('View details','Voir les détails'))+'</a>':'');
     if(booking)links+=t3StepLinkHtml(booking,'tw-book-link',twText(booking.affiliate?'Book with provider':'Book with business',booking.affiliate?'Réserver chez le prestataire':'Réserver auprès du lieu'),steps.indexOf(booking));
     // A suggested time (a session, showtime, lane or booked slot we do not hold) says so in one short line under the
     // name, with the step to check it: "Suggested time · Check sessions ↗". It stands in for the generic "Matches your
     // request…" line (still under "Why it fits" once opened), and for "Venue website" when that is the same link.
     else if(v.website&&t3StayExt(v.website)&&!(note&&note.url===t3StayExt(v.website)))links+='<a '+hrefAttr(t3StayExt(v.website))+' target="_blank" rel="noopener">'+esc(twText('Venue website','Site du lieu'))+' ↗</a>';
-    return '<li class="v4-stop'+(note?' tw-timed':'')+'" data-venue-id="'+esc(v.id)+'"><div class="v4-row">'+v4Thumb(v)+'<div class="tw-card-info"><button type="button" class="v4-main" aria-expanded="'+(v4.open[id]?'true':'false')+'" aria-controls="'+esc(did)+'" data-v4-toggle="'+esc(did)+'" data-v4-id="'+esc(id)+'"><span class="v4-time">'+esc(v4Start(s,key))+'</span><span class="v4-name">'+esc(v.name)+'</span><span class="v4-line">'+esc(v4Line(s))+'</span></button>'+(note?note.html:reason?'<p class="tw-fit">'+esc(reason)+'</p>':'')+'<div class="tw-links">'+links+'</div></div><div class="v4-acts">'+actions+'</div></div><div class="v4-more" id="'+esc(did)+'"'+(v4.open[id]?'':' hidden')+'>'+v4Details(s,id)+'</div>'+v4TripBtn(v,key)+'</li>';
+    return '<li class="v4-stop'+(note?' tw-timed':'')+'" data-venue-id="'+esc(v.id)+'"><div class="v4-row">'+v4Thumb(v)+'<div class="tw-card-info"><button type="button" class="v4-main" aria-expanded="'+(v4.open[id]?'true':'false')+'" aria-controls="'+esc(did)+'" data-v4-toggle="'+esc(did)+'" data-v4-id="'+esc(id)+'"><span class="v4-time">'+esc(v4Start(s,key))+'</span><span class="v4-name">'+esc(v.name)+'</span><span class="v4-line">'+esc(v4Line(s))+'</span></button>'+(note?note.html:need?'<p class="tw-fit tw-need" data-tw-need>'+esc(need)+'</p>':reason?'<p class="tw-fit">'+esc(reason)+'</p>':'')+'<div class="tw-links">'+links+'</div></div><div class="v4-acts">'+actions+'</div></div><div class="v4-more" id="'+esc(did)+'"'+(v4.open[id]?'':' hidden')+'>'+v4Details(s,id)+'</div>'+v4TripBtn(v,key)+'</li>';
   }
   // An event on the plan is a card like any stop: photo, time, name, "View details" and Remove; once removed it is the
   // same "Removed … Undo" row as a venue (it used to vanish with no word, and the count stayed).

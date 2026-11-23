@@ -333,19 +333,68 @@ function accessUnit(stops) {
 // Wheelchair access at every activity and meal stop, from each listing's own data. Never "accessible" without it, and
 // never "not accessible" unless the listing's own line says so.
 function accessEntry(stops, ctx, need) {
-  const rows = stops.map((x) => { const a = (typeof ctx.accessOf === 'function' ? ctx.accessOf(x.v.id) : null) || { has: null }; return { id: x.v.id, name: x.v.name, has: a.has === true ? true : a.has === false ? false : null, ...(a.says ? { says: a.says } : {}) }; });
-  const yes = rows.filter((r) => r.has === true), no = rows.filter((r) => r.has === false), unk = rows.filter((r) => r.has === null);
+  // (2026-11-23) Graded: 'wheelchair' (the listing says so of the place), 'wheelchair_part' (of a named section or
+  // feature: part), 'mobility' (a broader note, never counted as confirmed), 'no', 'unknown'. has stays for older
+  // readers: true only for 'wheelchair'.
+  const rows = stops.map((x) => {
+    const a = (typeof ctx.accessOf === 'function' ? ctx.accessOf(x.v.id) : null) || { has: null };
+    const level = a.level || (a.has === true ? 'wheelchair' : a.has === false ? 'no' : 'unknown');
+    const r = { id: x.v.id, name: x.v.name, has: level === 'wheelchair' ? true : level === 'no' ? false : null, level, ...(a.part ? { part: a.part } : {}), ...(a.amenity ? { amenity: true } : {}), ...(a.says ? { says: a.says } : {}) };
+    if (level === 'wheelchair_part' || level === 'mobility') { r.note = tripAccess.accessStopNote(r, false); r.noteFr = tripAccess.accessStopNote(r, true); }
+    r.more = tripAccess.accessStopMore(r, false); r.moreFr = tripAccess.accessStopMore(r, true);
+    return r;
+  });
+  const yes = rows.filter((r) => r.level === 'wheelchair'), no = rows.filter((r) => r.level === 'no'), unk = rows.filter((r) => r.level === 'unknown');
+  const some = rows.filter((r) => r.level === 'wheelchair_part' || r.level === 'mobility');
   const unit = accessUnit(stops), one = need && need.who === 'one';
   const base = { ask: 'accessible', label: 'Wheelchair access', labelFr: 'Accès en fauteuil roulant', stops: rows, unit, who: one ? 'one' : 'all' };
   if (!rows.length) return { ...base, status: 'unknown', text: 'Wheelchair access: this plan has no stops to check yet.', textFr: 'Accès en fauteuil roulant : ce plan n’a encore aucun arrêt à vérifier.' };
   const named = (list, fr) => (fr ? listFr : listEn)(list.map((r) => `${r.name}${quote(r.says)}`));
   const en = [], fr = [];
   if (yes.length) { en.push(`${named(yes, false)} ${yes.length > 1 ? 'list' : 'lists'} it.`); fr.push(`${named(yes, true)} ${yes.length > 1 ? 'l’indiquent' : 'l’indique'}.`); }
+  else if (some.length) { en.push('None is fully confirmed.'); fr.push('Aucun n’est entièrement confirmé.'); }
+  for (const r of some) { en.push(tripAccess.accessStopText(r, false)); fr.push(tripAccess.accessStopText(r, true)); }
   if (no.length) { en.push(`${named(no, false)}: ${no.length > 1 ? 'their listings say' : 'its listing says'} that, so ${no.length > 1 ? 'they don’t' : 'it doesn’t'} suit a wheelchair as listed.`); fr.push(`${named(no, true)} : ${no.length > 1 ? 'leurs fiches le disent' : 'sa fiche le dit'}, donc pas ${no.length > 1 ? 'adaptés' : 'adapté'} à un fauteuil roulant d’après la fiche.`); }
   if (unk.length) { en.push(`${listEn(names(unk))} ${unk.length > 1 ? 'don’t' : 'doesn’t'} say: ask before you go.`); fr.push(`${listFr(names(unk))} ne le ${unk.length > 1 ? 'précisent' : 'précise'} pas : demandez avant d’y aller.`); }
   const lead = one ? ['For your wheelchair user, from each listing’s own notes:', 'Pour la personne en fauteuil roulant, d’après les notes de chaque fiche :'] : ['Wheelchair access, from each listing’s own notes:', 'Accès en fauteuil roulant, d’après les notes de chaque fiche :'];
   const tail = [' An “easy” walk isn’t counted as accessible unless its listing says so.', ' Une marche « facile » n’est pas comptée comme accessible à moins que sa fiche le dise.'];
-  return { ...base, status: !no.length && !unk.length ? 'verified' : yes.length ? 'partial' : no.length ? 'unmet' : 'unknown', text: `${lead[0]} ${en.join(' ')}${tail[0]}`, textFr: `${lead[1]} ${fr.join(' ')}${tail[1]}` };
+  // Verified only when every stop's own words say wheelchair access for the place itself.
+  return { ...base, status: yes.length === rows.length ? 'verified' : yes.length || some.length ? 'partial' : no.length && !unk.length ? 'unmet' : 'unknown', text: `${lead[0]} ${en.join(' ')}${tail[0]}`, textFr: `${lead[1]} ${fr.join(' ')}${tail[1]}` };
+}
+// "The dog can come" (2026-11-23), from each listing's own data, with where the dog can go when the listing says:
+// an outdoor place's Dogs line with its condition; the owner's own answer (inside, patio only, outside only); or the
+// Dog-Friendly badge alone, which at a place with an indoors doesn't say inside or patio only (where: 'unsaid').
+function dogEntry(stops, ctx, cold) {
+  const F = FEATURES.dog_friendly;
+  const rows = stops.map((x) => {
+    const d = ctx.dogOf(x.v.id) || { has: null }, b = badgeOf(x.v, 'dog_friendly', ctx.flags);
+    const has = d.has === false ? false : d.has === true || b === true ? true : null;
+    const where = has !== true ? null : d.has === true ? (d.where || null) : (tripAccess.OPEN_AIR_TYPES.includes(x.v.type) ? null : 'unsaid');
+    const r = { id: x.v.id, name: x.v.name, has, ...(where ? { where } : {}), ...(d.says ? { says: d.says } : {}), ...(['outdoor', 'beach'].includes(x.v.type) ? { open: true } : {}) };
+    r.more = tripAccess.dogStopMore(r, false, cold); r.moreFr = tripAccess.dogStopMore(r, true, cold);
+    return r;
+  });
+  const base = { ask: 'dog_friendly', label: F.en, labelFr: F.fr, stops: rows };
+  const plain = rows.filter((r) => r.has === true && (!r.where || r.where === 'outdoors' || r.where === 'inside'));
+  const cond = rows.filter((r) => r.has === true && ['patio', 'outside', 'some_trips', 'stated'].includes(r.where));
+  const badge = rows.filter((r) => r.has === true && r.where === 'unsaid'), no = rows.filter((r) => r.has === false), unk = rows.filter((r) => r.has === null);
+  if (!rows.some((r) => r.has !== null)) return { ...base, status: 'unknown', text: `${F.en}: the listings of these stops don’t say.`, textFr: `${F.fr} : les fiches de ces arrêts ne le précisent pas.` };
+  const q = (r, fr) => `${r.name}${r.says ? (fr ? ` (« ${r.says} »)` : quote(r.says)) : ''}`;
+  const en = [], fr = [];
+  if (plain.length) { en.push(`${listEn(plain.map((r) => q(r, false)))} ${plain.length > 1 ? 'are' : 'is'} listed as allowing dogs.`); fr.push(`${listFr(plain.map((r) => q(r, true)))} : chiens admis d’après ${plain.length > 1 ? 'leurs fiches' : 'la fiche'}.`); }
+  const patioCold = cold ? [` (a patio may be closed in ${cold.en})`, ` (une terrasse peut être fermée en ${cold.fr})`] : ['', ''];
+  for (const r of cond) {
+    const p = r.where === 'patio' ? patioCold : ['', ''];
+    en.push(`${r.name}: its listing says “${String(r.says || '').replace(/[“”"]/g, '').replace(/\.$/, '')}”${p[0]}.`); fr.push(`${r.name} : sa fiche indique « ${String(r.says || '').replace(/\.$/, '')} »${p[1]}.`);
+  }
+  if (badge.length) {
+    en.push(`${listEn(names(badge))} ${badge.length > 1 ? 'have' : 'has'} the Dog-Friendly badge; ${badge.length > 1 ? 'their listings don’t' : 'its listing doesn’t'} say if dogs can come inside or only on a patio${patioCold[0]}: ask before you go.`);
+    fr.push(`${listFr(names(badge))} ${badge.length > 1 ? 'ont' : 'a'} le badge Chiens admis; ${badge.length > 1 ? 'leurs fiches ne disent' : 'sa fiche ne dit'} pas si les chiens peuvent entrer ou seulement aller sur une terrasse${patioCold[1]} : demandez avant d’y aller.`);
+  }
+  for (const r of no) { en.push(r.says ? `${r.name}’s listing says “${String(r.says).replace(/[“”"]/g, '')}”.` : `${r.name} isn’t listed as dog-friendly.`); fr.push(r.says ? `La fiche de ${r.name} indique « ${r.says} ».` : `${r.name} n’est pas indiqué comme acceptant les chiens.`); }
+  if (unk.length) { en.push(`${listEn(names(unk))} ${unk.length > 1 ? 'don’t' : 'doesn’t'} say: ask before you go.`); fr.push(`${listFr(names(unk))} ne le ${unk.length > 1 ? 'précisent' : 'précise'} pas : demandez avant d’y aller.`); }
+  const status = plain.length === rows.length ? 'verified' : plain.length || cond.length || badge.length ? 'partial' : 'unmet';
+  return { ...base, status, text: `Dog: ${en.join(' ')}`, textFr: `Chien : ${fr.join(' ')}` };
 }
 // The place to stay for the needs, from its stay_info facts only (pick.needFacts: { accessible, pets }).
 function stayNeedEntries(plan, ctx, needs) {
@@ -353,6 +402,12 @@ function stayNeedEntries(plan, ctx, needs) {
   if (!pick) return out;
   const f = pick.needFacts || (typeof ctx.stayNeedFacts === 'function' ? ctx.stayNeedFacts(pick.id) : null) || { accessible: null, pets: null };
   const stop = (has) => [{ id: pick.id, name: pick.name, has }];
+  // (2026-11-23) Both needs, and a listing with accessible rooms and pet-friendly rooms: that does not confirm one room
+  // with both. One flagged entry (it stands for stay:pets too), never two settled ones.
+  if (tripAccess.stayBoth(needs, f)) {
+    const t = tripAccess.STAY_BOTH.named(pick.name);
+    return [{ ask: 'stay:accessible', also: 'stay:pets', both: true, label: 'Accessible, dog-friendly room', labelFr: 'Chambre accessible qui accepte les chiens', stops: [{ id: pick.id, name: pick.name, has: null, accessible: true, pets: f.pets }], status: 'partial', short: tripAccess.STAY_BOTH.short, shortFr: tripAccess.STAY_BOTH.shortFr, text: t.text, textFr: t.textFr }];
+  }
   if (tripAccess.hasNeed(needs, 'wheelchair')) {
     const b = { ask: 'stay:accessible', label: 'Accessible room', labelFr: 'Chambre accessible' };
     if (f.accessible === true) out.push({ ...b, stops: stop(true), status: 'verified', short: 'Stay lists accessible rooms ✓', shortFr: 'L’hébergement indique des chambres accessibles ✓', text: `Place to stay: ${pick.name}’s listing says it has accessible rooms. It doesn’t say which rooms or what they include (a roll-in shower, an elevator): ask for an accessible room when you book.`, textFr: `Hébergement : la fiche de ${pick.name} indique des chambres accessibles. Elle ne précise pas lesquelles ni ce qu’elles comprennent (douche sans seuil, ascenseur) : demandez une chambre accessible en réservant.` });
@@ -409,11 +464,15 @@ function applyEvidence(plan, ctx = {}) {
     const e = kindEntry(r, plan, stops, ctx);
     if (e && !ev.some((x) => x.ask === e.ask)) ev.push(e);
   }
+  // The cold months (a trip dated November to March, or an undated one whose request says winter): a patio may be
+  // closed. Nothing is said about patios otherwise.
+  const day1 = ((plan.days || []).find((d) => d && /^\d{4}-\d{2}-\d{2}$/.test(String(d.date || ''))) || {}).date || (plan.whereToStay && plan.whereToStay.trip && (plan.whereToStay.trip.tripStart || (plan.whereToStay.trip.datesGiven ? plan.whereToStay.trip.arrive : null))) || plan.startDate || null;
+  const cold = tripAccess.coldSeason(day1, day1 ? '' : plan.query || '');
   // Dietary badges on the meal stops, then the other badges asked for.
   for (const f of askedFeatures(plan)) {
     if (f === 'live_music' && reqs.some((r) => r && r.kind === 'event')) continue;
     if (f === 'nonalcoholic' && (plan.partySome || []).some((x) => x && x.concept === 'alcohol')) continue;
-    const e = DIET.includes(f) ? dietEntry(f, stops, ctx, plan) : featureEntry(f, stops, ctx);
+    const e = DIET.includes(f) ? dietEntry(f, stops, ctx, plan) : f === 'dog_friendly' && typeof ctx.dogOf === 'function' ? dogEntry(stops, ctx, cold) : featureEntry(f, stops, ctx);
     ev.push(e);
     for (const r of reqs) {
       if (!r || r.kind !== 'feature' || r.value !== f) continue;
@@ -432,7 +491,7 @@ function applyEvidence(plan, ctx = {}) {
     ev.push(e);
     for (const r of reqs) if (r && r.kind === 'unsupported' && r.value === 'accessibility') { r.status = e.status === 'verified' ? 'satisfied' : 'unverified'; r.reason = e.text; }
   }
-  if (tripAccess.hasNeed(needs, 'dog') && !ev.some((x) => x.ask === 'dog_friendly') && stops.length) ev.push(featureEntry('dog_friendly', stops, ctx));
+  if (tripAccess.hasNeed(needs, 'dog') && !ev.some((x) => x.ask === 'dog_friendly') && stops.length) ev.push(typeof ctx.dogOf === 'function' ? dogEntry(stops, ctx, cold) : featureEntry('dog_friendly', stops, ctx));
   ev.push(...stayEntries(plan));
   if (needs.length) ev.push(...stayNeedEntries(plan, ctx, needs));
   // A day the planner could not fill is said, with what could be tried next (never shown as a finished day).
@@ -606,7 +665,7 @@ function shareContextQuery(c) {
 }
 // The asks a plan's evidence carries, as the link's asks= list.
 function shareAsks(plan) {
-  return ((plan && plan.evidence) || []).map((e) => (e && /^count:/.test(e.ask || '') && Number.isInteger(e.asked) ? `${e.ask}:${e.asked}` : e && e.ask)).filter((a) => a && ASK_RE.test(a)).slice(0, 12);
+  return ((plan && plan.evidence) || []).flatMap((e) => [e && /^count:/.test(e.ask || '') && Number.isInteger(e.asked) ? `${e.ask}:${e.asked}` : e && e.ask, e && e.also]).filter((a) => a && ASK_RE.test(a)).slice(0, 12);
 }
 // A plan-shaped object from a shared link's stops, so the evidence is worked out the same way as on the plan.
 //   stops: [{ id, name, type, badges?, day, start }]   events: [{ id, name, day, startDate, dateLabel }]
@@ -633,7 +692,7 @@ function sharedPlan(c, stops, events, stay) {
     else if (a === 'no_alcohol') none = true;
     else if (FEATURES[a]) reqs.push({ kind: 'feature', value: a, strength: 'must' });
   }
-  const plan = { kind: 'multi_day', days: [...days.values()].sort((a, b) => a.day - b.day), requirementResults: reqs, datesGiven: !!(c && (c.start || c.tripDates)), warnings: [] };
+  const plan = { kind: 'multi_day', days: [...days.values()].sort((a, b) => a.day - b.day), requirementResults: reqs, datesGiven: !!(c && (c.start || c.tripDates)), warnings: [], ...(c && (c.tripDates || c.start) ? { startDate: c.tripDates ? c.tripDates.start : c.start } : {}) };
   if (some) plan.partySome = [{ concept: 'alcohol' }];
   if (none) plan.noAlcohol = true;
   // The needs the link carries (asks accessible / stay:accessible / dog_friendly / stay:pets): the copy says the same

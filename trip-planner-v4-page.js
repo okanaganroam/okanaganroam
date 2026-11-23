@@ -289,6 +289,21 @@ const V4_CLIENT_SRC = String.raw`
     var attrs = ' data-v4-check-times' + (cu && tm.checkVia === 'booking' ? ' data-track="booking" data-venue-id="' + esc(s.venue.id) + '"' : '');
     return { url: url, html: '<p class="v4-note">' + ttNote(tm, s.venue.name, lang() === 'fr', url, !!cu, esc, attrs) + '</p>' };
   }
+  // Trip needs (2026-11-23): what this stop's own listing says for a wheelchair user and a dog, from the plan's evidence
+  // (the same words as Details and the chat). note: one short line for the collapsed card, only for a stop whose
+  // listing covers one section or feature or has only a mobility note; more: the lines for the opened card.
+  function v4NeedLines(s){
+    var out = { note: '', more: [] }, id = s && s.venue && s.venue.id, fr = lang() === 'fr';
+    if (!id) return out;
+    ((state.last && state.last.evidence) || []).forEach(function(e){
+      if (!e || (e.ask !== 'accessible' && e.ask !== 'dog_friendly') || !Array.isArray(e.stops)) return;
+      var r = e.stops.filter(function(x){ return x && x.id === id; })[0];
+      if (!r) return;
+      if (e.ask === 'accessible' && r.note) out.note = (fr && r.noteFr) || r.note;
+      if (r.more) out.more.push((fr && r.moreFr) || r.more);
+    });
+    return out;
+  }
   // The expanded card's time: always the planner's suggestion, never a verified slot. A stop on showtimes, classes,
   // sessions, lanes or booked slots gets no end time (a film is not an hour long) and the step to check them, with the
   // children's ages when the plan knows them (or what the listing says about ages); its listed hours that day are still
@@ -353,6 +368,7 @@ const V4_CLIENT_SRC = String.raw`
   function v4Details(s, id){
     var v = s.venue, url = placeUrl(v), fr = lang() === 'fr', out = '';
     out += v4TimingHtml(s, id);
+    v4NeedLines(s).more.forEach(function(m){ out += '<p class="v4-need">' + esc(m) + '</p>'; });
     if (v.listedHours) out += '<p class="v4-quiet">' + esc(vt('hours')) + ' · ' + esc(v.listedHours) + '</p>';
     if (v.yearlyClosure) out += '<p>' + esc(fr ? v.yearlyClosure.fr : v.yearlyClosure.en) + '</p>';
     if (s.happyHourLine) out += '<p>' + esc(fr && s.happyHourDealsFr ? '5 à 7 : ' + s.happyHourDealsFr : s.happyHourLine) + '</p>';
@@ -517,6 +533,12 @@ const V4_CLIENT_SRC = String.raw`
       if (d) html += t3StayNotesHtml(d.chosen, d.w.trip || {}, fr);
     }
     // Honest plan (2026-11-22): said once in the sheet. Nothing here is a confirmed booking.
+    // Trip needs (2026-11-23): what the listings leave to confirm for a wheelchair user and a dog, in the summary's own
+    // short words (the full sentences are under Details and on each stop), so the checklist says the same thing.
+    try {
+      var needFacts = (typeof tripSummaryFacts === 'function' ? tripSummaryFacts(state.last, lang() === 'fr', { removed: typeof v4RemovedIds === 'function' ? v4RemovedIds() : {} }) : []).filter(function(f){ return f && f.kind === 'flag' && (f.ask === 'accessible' || f.ask === 'dog_friendly'); });
+      if (needFacts.length) html += '<p class="t3-book-note v4-book-honest" data-v4-book-needs>' + esc((lang() === 'fr' ? 'À confirmer auprès de chaque endroit : ' : 'To confirm with each place: ') + needFacts.map(function(f){ return f.text; }).join('. ') + '.') + '</p>';
+    } catch (e) { /* the sheet stands without the line */ }
     if (steps.length || v4ReserveRows(steps).length) html += '<p class="t3-book-note v4-book-honest" data-v4-book-note>' + esc(vt('bookNote')) + '</p>';
     var reserve = v4ReserveRows(steps);
     if (reserve.length) html += '<p class="v4-sheet-h4">' + esc(vt('reserve')) + '</p><ol class="v4-check">' + reserve.map(function(r){
@@ -776,7 +798,7 @@ const V4_CLIENT_SRC = String.raw`
       if (t.rooms > 0 && t.adults > 0) out += '&rm=' + t.rooms + (t.roomsAssumed ? '&ra=1' : '');
       (p.dateSuggestions || []).slice(0, 2).forEach(function(x){ if (x && x.id > 0) sug['event:' + x.id] = 1; });
       if (Object.keys(sug).length) out += '&sug=' + Object.keys(sug).join(',');
-      var asks = (p.evidence || []).map(function(e){ return e && /^count:/.test(e.ask || '') && e.asked > 0 ? e.ask + ':' + e.asked : e && e.ask; }).filter(function(a){ return a && /^[a-z_:0-9]+$/.test(a); }).slice(0, 12);
+      var asks = []; (p.evidence || []).forEach(function(e){ asks.push(e && /^count:/.test(e.ask || '') && e.asked > 0 ? e.ask + ':' + e.asked : e && e.ask); if (e && e.also) asks.push(e.also); }); asks = asks.filter(function(a){ return a && /^[a-z_:0-9]+$/.test(a); }).slice(0, 12);
       if (asks.length) out += '&asks=' + asks.join(',');
       // Trip needs (2026-11-24): one person's wheelchair (nw=1) and the days the plan could not fill (thin=2), so the
       // copy says the same; both optional.

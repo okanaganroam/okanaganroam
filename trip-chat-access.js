@@ -102,7 +102,12 @@ function read(message, stops, h) {
     // A question about a need across the plan, a day, a meal or the stay. One stop named by its name, a diet and
     // "something for the kids" keep their own answers.
     const acc = needs.filter((k) => k === 'accessible' || k === 'dog');
-    if (!acc.length || byName().length) return null;
+    if (!acc.length) return null;
+    // (2026-11-23) "is BX Creek wheelchair accessible?": a stop named by its own name is answered from its listing's
+    // own words (the level and the part), never as an edit.
+    const namedStops = byName();
+    if (namedStops.length && namedStops.length <= 3 && acc.includes('accessible') && !/^(?:why|how come|pourquoi)\b/.test(t)) return ask('q_access', { needs: acc, scopes: STOP_SCOPES, ids: namedStops.map((s) => s.id), day: null, meal: null, which: true });
+    if (namedStops.length) return null;
     // One stop named as a kind ("the second winery", "the brewery") keeps its own answer; a meal, a day, "which" and
     // "every" are about the plan.
     if (!mealIn(t) && !dayIn(t) && !EVERY_RE.test(t) && !/\b(?:which|quels?|quelles?|lesquels|lesquelles)\b/.test(t) && !scopesIn(t).length) { let nm = []; try { nm = h.stopsNamed(t, stops || []); } catch (e) { nm = []; } if (nm.length) return null; }
@@ -126,10 +131,25 @@ function read(message, stops, h) {
 const isMeal = (s) => !!s && (!!s.role || s.type === 'restaurant' || ((s.type === 'cafe' || s.type === 'pub') && /-(?:midday|evening)$/.test(String(s.key || ''))));
 const inScope = (s, scopes) => (isMeal(s) ? scopes.includes('meals') : scopes.includes('activities'));
 // has(need, stop) -> true | null | false. -> [{ need, scopes, list: [{ stop, has }], ok, unk, no }]
-function check(parts, stops, has, { day = null, meal = null } = {}) {
+// (2026-11-23) detail(need, stop) -> what the listing's own data says in full, when the caller has it:
+//   accessible: { level: 'wheelchair' | 'wheelchair_part' | 'mobility' | 'no' | 'unknown', part, says, amenity }
+//   dog:        { where: 'outdoors' | 'inside' | 'patio' | 'outside' | 'some_trips' | 'stated' | 'unsaid' | null, says }
+// A stop whose line covers one section or feature (part), or is only a mobility note (mob), is never in ok: it is
+// not wheelchair-confirmed. A Dog-Friendly badge that doesn't say inside or patio (badge) and a line with a limit
+// (cond) are kept apart from a plain yes. unk is only "says nothing".
+function check(parts, stops, has, { day = null, meal = null, detail = null } = {}) {
   return (parts || []).map((p) => {
-    const list = (stops || []).filter((s) => inScope(s, p.scopes) && (!day || s.day === day) && (!meal || s.role === meal)).map((s) => { const v = has(p.need, s); return { stop: s, has: v === true ? true : v === false ? false : null }; });
-    return { need: p.need, scopes: p.scopes, list, ok: list.filter((x) => x.has === true).map((x) => x.stop), unk: list.filter((x) => x.has === null).map((x) => x.stop), no: list.filter((x) => x.has === false).map((x) => x.stop) };
+    const list = (stops || []).filter((s) => inScope(s, p.scopes) && (!day || s.day === day) && (!meal || s.role === meal)).map((s) => {
+      const v = has(p.need, s), d = (typeof detail === 'function' && ['accessible', 'dog'].includes(p.need) ? detail(p.need, s) : null) || null;
+      let h = v === true ? true : v === false ? false : null, grp = null;
+      if (p.need === 'accessible' && d && h !== false) { if (d.level === 'wheelchair_part') { h = null; grp = 'part'; } else if (d.level === 'mobility') { h = null; grp = 'mob'; } else if (d.level !== 'wheelchair' && h === true && d.level) h = null; }
+      if (p.need === 'dog' && d && h === true) { if (d.where === 'unsaid') grp = 'badge'; else if (['patio', 'outside', 'some_trips', 'stated'].includes(d.where)) grp = 'cond'; }
+      return { stop: s, has: h, grp, d };
+    });
+    const of = (g) => list.filter((x) => x.grp === g).map((x) => x.stop);
+    return { need: p.need, scopes: p.scopes, list, d: new Map(list.filter((x) => x.d).map((x) => [x.stop.id, x.d])),
+      ok: list.filter((x) => x.has === true && !x.grp).map((x) => x.stop), unk: list.filter((x) => x.has === null && !x.grp).map((x) => x.stop), no: list.filter((x) => x.has === false).map((x) => x.stop),
+      part: of('part'), mob: of('mob'), badge: of('badge'), cond: of('cond') };
   });
 }
 // The plan's own evidence for a need, when the planner gives it for exactly these stops: id -> true | null | false.
@@ -168,6 +188,14 @@ const TX = {
     noneFound: 'I found no replacement whose listing does, so nothing changed.', thinKeep: 'OK, day {d} stays as it is. Nothing changed.',
     thinNone: 'No day on this plan is marked as light.', thinUnknown: 'Day {d} has {n} {noun}. I don’t know more than that; say “add something on day {d}” and I’ll look.', thinFull: 'Day {d} has {n} stops, so it isn’t marked as light.',
     needKept: 'Its listing notes {what}.', needUnknown: 'Its listing doesn’t say {say}, so call ahead.', needSwapped: 'I picked {fresh} instead of {old} because its listing {lists}.',
+    // (2026-11-23) graded access and where a dog can go
+    noneFull: 'none of the {n} {noun} is fully confirmed', noneFull1: '{name} isn’t fully confirmed', partN: '{names} list it for one section or feature', part1: '{name} lists it for {part} only', part1x: '{name} lists it in part only',
+    mobSays: '{name} only says its {says}', mobNote: '{name} only has a mobility note (“{says}”)', mobAmenity: '{name} only lists accessible facilities', mobN: '{names} only have mobility notes',
+    stillPart: '{name} ({part} only)', stillPartX: '{name} (in part only)', stillMob: '{name} (mobility note only{part})', stillAccess: 'wheelchair access at {names}', countOf: 'the {n} {noun}',
+    dogOut: ['{names} allows dogs', '{names} allow dogs'], dogLeash: ' (on leash where their listings say so)', dogLeash1: ' (on leash)', walks: ['walk', 'walks'], restaurants: ['restaurant', 'restaurants'], eats: ['place to eat', 'places to eat'],
+    dogBadge: ['{names} has the Dog-Friendly badge, which doesn’t say indoors or patio', '{names} have the Dog-Friendly badge, which doesn’t say indoors or patio'], dogAsk: ': ask before you go',
+    dogCond: { patio: '{name} allows dogs on the patio only', outside: '{name} allows dogs outside only', some_trips: '{name} takes dogs on some trips only', stated: '{name} says “{says}”' }, patioCold: ' (a patio may be closed in {month})',
+    stillDog: 'whether dogs can come inside at {names}', stayBoth: 'its listing has accessible rooms and pet-friendly rooms, but doesn’t say one room is both: ask the hotel to confirm one', stayBothAt: 'one accessible, dog-friendly room at {name} (ask the hotel)', theN: 'the {n} {noun}',
   },
   fr: {
     and: ' et ', more: '{n} de plus', head: { accessible: 'Accès en fauteuil roulant', dog: 'Chien', gluten_free: 'Sans gluten', vegan: 'Végane', vegetarian: 'Végétarien', kid_friendly: 'Enfants' },
@@ -192,6 +220,13 @@ const TX = {
     noneFound: 'Je n’ai trouvé aucun remplacement dont la fiche le dit; rien n’a changé.', thinKeep: 'D’accord, le jour {d} reste tel quel. Rien n’a changé.',
     thinNone: 'Aucun jour de ce plan n’est marqué comme léger.', thinUnknown: 'Le jour {d} a {n} {noun}. Je n’en sais pas plus; dites « ajoute quelque chose au jour {d} » et je regarde.', thinFull: 'Le jour {d} a {n} arrêts; il n’est donc pas marqué comme léger.',
     needKept: 'Sa fiche indique {what}.', needUnknown: 'Sa fiche ne dit pas {say}; appelez avant d’y aller.', needSwapped: 'J’ai choisi {fresh} plutôt que {old} parce que sa fiche {lists}.',
+    noneFull: 'aucun des {n} {noun} n’est entièrement confirmé', noneFullF: 'aucune des {n} {noun} n’est entièrement confirmée', noneFull1: '{name} n’est pas entièrement confirmé', partN: '{names} : indiqué pour une section ou un élément seulement', part1: '{name} : indiqué seulement pour « {part} »', part1x: '{name} : indiqué en partie seulement',
+    mobSays: '{name} indique seulement « {says} »', mobNote: '{name} n’a qu’une note de mobilité (« {says} »)', mobAmenity: '{name} n’indique que des installations accessibles', mobN: '{names} n’ont qu’une note de mobilité',
+    stillPart: '{name} (« {part} » seulement)', stillPartX: '{name} (en partie seulement)', stillMob: '{name} (note de mobilité seulement{part})', stillAccess: 'l’accès en fauteuil roulant à {names}', countOf: 'les {n} {noun}',
+    dogOut: ['{names} accepte les chiens', '{names} acceptent les chiens'], dogLeash: ' (en laisse lorsque la fiche le précise)', dogLeash1: ' (en laisse)', walks: ['sortie', 'sorties'], restaurants: ['restaurant', 'restaurants'], eats: ['endroit où manger', 'endroits où manger'],
+    dogBadge: ['{names} a le badge Chiens admis, qui ne dit pas si c’est à l’intérieur ou sur la terrasse', '{names} ont le badge Chiens admis, qui ne dit pas si c’est à l’intérieur ou sur la terrasse'], dogAsk: ' : demandez avant d’y aller',
+    dogCond: { patio: '{name} accepte les chiens sur la terrasse seulement', outside: '{name} accepte les chiens à l’extérieur seulement', some_trips: '{name} accepte les chiens à certaines sorties seulement', stated: '{name} indique « {says} »' }, patioCold: ' (une terrasse peut être fermée en {month})',
+    stillDog: 'si les chiens peuvent entrer à {names}', stayBoth: 'sa fiche indique des chambres accessibles et des chambres où les animaux sont acceptés, mais ne dit pas qu’une même chambre offre les deux : demandez à l’hôtel d’en confirmer une', stayBothAt: 'une chambre accessible qui accepte les chiens à {name} (demandez à l’hôtel)', theN: 'les {n} {noun}',
   },
 };
 const fillT = (s, vars) => String(s).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m));
@@ -205,8 +240,49 @@ const scopeNoun = (scopes, n, t) => { const k = scopes.includes('activities') &&
 
 // One clause for a need: who is verified, what was swapped, who doesn't say. c: a check() entry after the swaps
 // (c.swaps: [{ old, fresh }], c.kept: stops with no replacement found).
-function needClause(c, lang) {
+const withThe = (part) => (/^(?:some|riding|one|two|the|\d+ accessible)\b/i.test(part) ? part : `the ${part}`);
+const sayOf = (d) => String((d && d.says) || '').replace(/[“”"«»]/g, '').replace(/\.$/, '').trim();
+// Wheelchair access with a stop that is listed in part or has only a mobility note: never "all N list wheelchair access".
+// full: a question's answer names each stop's part.
+function accessClause(c, lang, full) {
+  const fr = lang === 'fr', t = TX[fr ? 'fr' : 'en'], sep = fr ? ' : ' : ': ', n = c.list.length, D = (s) => (c.d && c.d.get(s.id)) || {};
+  const swapped = (c.swaps || []).map((x) => x.fresh.id), ok = c.ok.filter((s) => !swapped.includes(s.id));
+  const head = [], rest = [];
+  if (ok.length) head.push(`${joinNames(ok.map((s) => s.name), t)} ${ok.length === 1 ? t.lists1.accessible : t.listsN.accessible}`);
+  else if (!(c.swaps || []).length && n > 1) head.push(fillT(fr && scopeNoun(c.scopes, n, t) === t.noun.activities[1] ? t.noneFullF : t.noneFull, { n, noun: scopeNoun(c.scopes, n, t) }));
+  for (const x of c.swaps || []) head.push(fillT(t.swapped, { old: x.old.name, fresh: x.fresh.name, whose: t.whose.accessible }));
+  if (c.part.length && (full || c.part.length === 1)) for (const s of c.part) { const p = D(s).part; rest.push(p ? fillT(t.part1, { name: s.name, part: fr ? p : withThe(p) }) : fillT(t.part1x, { name: s.name })); }
+  else if (c.part.length) rest.push(fillT(t.partN, { names: joinNames(c.part.map((s) => s.name), t) }));
+  if (c.mob.length > 2 && !full) rest.push(fillT(t.mobN, { names: joinNames(c.mob.map((s) => s.name), t) }));
+  else for (const s of c.mob) { const d = D(s), says = sayOf(d); rest.push(d.amenity || !says ? fillT(t.mobAmenity, { name: s.name }) : !fr && d.part && says.toLowerCase().startsWith(String(d.part).toLowerCase()) ? fillT(t.mobSays, { name: s.name, says }) : fillT(fr ? t.mobSays : t.mobNote, { name: s.name, says })); }
+  for (const s of c.no) rest.push(`${s.name} ${t.notSays.accessible}`);
+  if (c.unk.length) rest.push(`${joinNames(c.unk.map((s) => s.name), t)}${c.unk.length === 1 ? t.doesnt : t.dont}`);
+  if (!head.length) return `${t.head.accessible}${sep}${rest.join('; ')}.`;
+  return `${t.head.accessible}${sep}${head.join('; ')}.${rest.length ? ` ${cap(rest.join('; '))}.` : ''}`;
+}
+// A dog: where it can go is said only from the listing's own words; a badge at a place with an indoors is "doesn't say
+// indoors or patio". cold: { en, fr } (the trip's cold month) for a question's answer.
+function dogClause(c, lang, cold) {
+  const fr = lang === 'fr', t = TX[fr ? 'fr' : 'en'], sep = fr ? ' : ' : ': ', D = (s) => (c.d && c.d.get(s.id)) || {};
+  const swapped = (c.swaps || []).map((x) => x.fresh.id), ok = c.ok.filter((s) => !swapped.includes(s.id));
+  const group = (list, nouns) => (list.length <= 2 ? joinNames(list.map((s) => s.name), t) : fillT(t.theN, { n: list.length, noun: nouns[1] }));
+  const bits = [];
+  if (ok.length) {
+    const leash = ok.filter((s) => /leash|laisse/i.test(sayOf(D(s)))).length;
+    bits.push(fillT(t.dogOut[ok.length === 1 ? 0 : 1], { names: group(ok, ok.every((s) => s.type === 'outdoor') ? t.walks : t.noun.stops) }) + (leash ? (ok.length === 1 ? t.dogLeash1 : t.dogLeash) : ''));
+  }
+  for (const x of c.swaps || []) bits.push(fillT(t.swapped, { old: x.old.name, fresh: x.fresh.name, whose: t.whose.dog }));
+  for (const s of c.cond) { const d = D(s); bits.push(fillT(t.dogCond[d.where] || t.dogCond.stated, { name: s.name, says: sayOf(d) }) + (d.where === 'patio' && cold ? fillT(t.patioCold, { month: fr ? cold.fr : cold.en }) : '')); }
+  for (const s of c.no) bits.push(`${s.name} ${t.notSays.dog}`);
+  if (c.unk.length) bits.push(`${joinNames(c.unk.map((s) => s.name), t)}${c.unk.length === 1 ? t.doesnt : t.dont}`);
+  // (Last, so "ask before you go" ends the sentence.)
+  if (c.badge.length) bits.push(fillT(t.dogBadge[c.badge.length === 1 ? 0 : 1], { names: group(c.badge, c.badge.every((s) => s.type === 'restaurant') ? t.restaurants : c.badge.every((s) => isMeal(s)) ? t.eats : t.noun.stops) }) + (cold ? fillT(t.patioCold, { month: fr ? cold.fr : cold.en }) : '') + t.dogAsk);
+  return `${t.head.dog}${sep}${bits.join('; ')}.`;
+}
+function needClause(c, lang, opts = {}) {
   const t = TX[lang === 'fr' ? 'fr' : 'en'];
+  if (c.need === 'accessible' && c.list.length && ((c.part || []).length || (c.mob || []).length)) return accessClause(c, lang, !!opts.full);
+  if (c.need === 'dog' && c.list.length && ((c.badge || []).length || (c.cond || []).length)) return dogClause(c, lang, opts.cold || null);
   const n = c.list.length, bits = [];
   const swapped = (c.swaps || []).map((x) => x.fresh.id);
   const ok = c.ok.filter((s) => !swapped.includes(s.id));
@@ -221,11 +297,15 @@ function needClause(c, lang) {
   }
   return `${t.head[c.need]}${lang === 'fr' ? ' : ' : ': '}${bits.join('; ')}.`;
 }
+const fr0 = (lang) => lang === 'fr';
+const stayBothOf = (stay) => !!stay && stay.asked.includes('accessible') && stay.asked.includes('pets') && stay.has.accessible === true && (stay.has.pets === 'yes' || stay.has.pets === 'some');
 // stay: { name, changed, has: { accessible: true|null|false, pets: 'yes'|'some'|null|false }, asked: [amenity] } | null.
 function stayClause(stay, lang, answer = false) {
   const t = TX[lang === 'fr' ? 'fr' : 'en'];
   const sep = lang === 'fr' ? ' : ' : ': ';
   if (!stay) return `${t.hotel}${sep}${t.stayNone}.`;
+  // (2026-11-23) Accessible rooms and pet-friendly rooms do not confirm one room with both.
+  if (stayBothOf(stay)) return `${t.hotel}${sep}${answer ? `${stay.name}${fr0(lang) ? ' : ' : ': '}${t.stayBoth}` : fillT(stay.changed ? t.stayNow : t.stayKeeps, { name: stay.name, has: '' }).replace(/; (?:its listing|sa fiche) $/, `; ${t.stayBoth}`)}.`;
   const yes = [], miss = [], not = [];
   for (const k of stay.asked) {
     const v = stay.has[k];
@@ -238,21 +318,34 @@ function stayClause(stay, lang, answer = false) {
 }
 // What still needs checking, in one sentence: the unknowns of each need (names, or a count with a pointer to Details
 // when there are many), the stay's unknowns, and any extra items (session times, the stay hand-off).
-function stillLine(checks, stay, lang, extra = []) {
-  const t = TX[lang === 'fr' ? 'fr' : 'en'];
+// said: the reply's own clauses already say to ask (the dog badge, the one room with both needs) and name a mobility
+// note's entrance, so the line does not say them twice (the reply stays short on a phone).
+function stillLine(checks, stay, lang, extra = [], said = false) {
+  const fr = lang === 'fr', t = TX[fr ? 'fr' : 'en'];
   const items = [];
   let long = false;
   for (const c of checks || []) {
+    const D = (s) => (c.d && c.d.get(s.id)) || {};
+    // A stop listed in part, or with only a mobility note, is named with what its listing does cover.
+    const some = [...(c.part || []), ...(c.mob || [])];
+    if (c.need === 'accessible' && some.length) {
+      const one = (s) => { const d = D(s); return d.level === 'wheelchair_part' ? (d.part ? fillT(t.stillPart, { name: s.name, part: d.part }) : fillT(t.stillPartX, { name: s.name })) : fillT(t.stillMob, { name: s.name, part: d.part && !d.amenity && !said ? `${fr ? ' : ' : ': '}${d.part}` : '' }); };
+      if (some.length > 3) long = true;
+      items.push(fillT(t.stillAccess, { names: some.length > 3 ? fillT(t.count, { n: some.length }) : joinNames(some.map(one), t) }));
+    }
     const u = [...c.unk, ...c.no];
-    if (!u.length) continue;
-    if (u.length > 3) long = true;
-    items.push(fillT(t.at[c.need], { names: u.length > 3 ? fillT(t.count, { n: u.length }) : joinNames(u.map((s) => s.name), t) }));
+    if (u.length) {
+      if (u.length > 3) long = true;
+      items.push(fillT(t.at[c.need], { names: u.length > 3 ? fillT(t.count, { n: u.length }) : u.length > 2 && some.length ? fillT(t.countOf, { n: u.length, noun: scopeNoun(u.every((s) => isMeal(s)) ? ['meals'] : c.scopes, u.length, t) }) : joinNames(u.map((s) => s.name), t) }));
+    }
+    if (c.need === 'dog' && (c.badge || []).length && !said) { const b = c.badge; items.push(fillT(t.stillDog, { names: b.length > 2 ? fillT(t.countOf, { n: b.length, noun: (b.every((s) => s.type === 'restaurant') ? t.restaurants : b.every((s) => isMeal(s)) ? t.eats : t.noun.stops)[1] }) : joinNames(b.map((s) => s.name), t) })); }
   }
-  // Pets in some rooms only is still something to ask for when booking.
-  if (stay) for (const k of stay.asked) { const v = stay.has[k]; if (v === 'some') items.push(fillT(t.stayPetsSome, { name: stay.name })); else if (!(v === true || v === 'yes')) items.push(fillT(t.stayAt[k], { name: stay.name })); }
+  // Pets in some rooms only is still something to ask for when booking; one room with both needs is asked of the hotel.
+  if (stay && stayBothOf(stay)) { if (!said) items.push(fillT(t.stayBothAt, { name: stay.name })); }
+  else if (stay) for (const k of stay.asked) { const v = stay.has[k]; if (v === 'some') items.push(fillT(t.stayPetsSome, { name: stay.name })); else if (!(v === true || v === 'yes')) items.push(fillT(t.stayAt[k], { name: stay.name })); }
   for (const x of extra) if (x) items.push(x);
   if (!items.length) return t.nothingLeft;
-  return `${fillT(t.still, { list: items.join('; ') })}${long ? t.details : (checks || []).some((c) => c.unk.length || c.no.length) || (stay && items.length) ? t.call : ''}`;
+  return `${fillT(t.still, { list: items.join('; ') })}${long ? t.details : (checks || []).some((c) => c.unk.length || c.no.length || (c.part || []).length || (c.mob || []).length || (c.badge || []).length) || (stay && items.length) ? t.call : ''}`;
 }
 // The whole reply to "make sure …": the stay, one clause per need, what is left. At most four sentences: with more
 // parts than that, the needs' clauses give way to the "still to check" line (which names or counts every unknown).
@@ -261,8 +354,8 @@ function ensureReply({ stay, stayAsked, checks, lang, extra = [] }) {
   if (stayAsked) parts.push(stayClause(stay, lang));
   const clauses = (checks || []).map((c) => needClause(c, lang));
   const room = 3 - parts.length;
-  parts.push(...(clauses.length <= room ? clauses : clauses.filter((x, i) => (checks[i].swaps || []).length || checks[i].ok.length).slice(0, room)));
-  parts.push(stillLine(checks, stayAsked ? stay : null, lang, extra));
+  parts.push(...(clauses.length <= room ? clauses : clauses.filter((x, i) => (checks[i].swaps || []).length || checks[i].ok.length || (checks[i].part || []).length || (checks[i].mob || []).length || (checks[i].badge || []).length).slice(0, room)));
+  parts.push(stillLine(checks, stayAsked ? stay : null, lang, extra, true));
   return parts.join(' ');
 }
 // "3 stops don't say if they're wheelchair accessible: A, B and C. Swap them for places whose listings do, where I can
@@ -273,13 +366,13 @@ function askReply(stops, needs, lang) {
   return fillT(t.ask, { n: stops.length, say: needs.map((k) => t.say[k]).join(j), names: joinNames(stops.map((s) => s.name), t, 4), whose: needs.map((k) => t.whose[k]).join(t.and) });
 }
 // A question: the same clauses, never an edit. checks: check() entries; stay: as above or undefined (not asked).
-function answerReply({ checks, stay, stayAsked, day, lang }) {
+function answerReply({ checks, stay, stayAsked, day, lang, cold = null }) {
   const t = TX[lang === 'fr' ? 'fr' : 'en'];
   const parts = [];
   if (stayAsked) parts.push(stayClause(stay, lang, true));
-  for (const c of (checks || []).slice(0, 3 - parts.length)) parts.push(needClause(c, lang));
+  for (const c of (checks || []).slice(0, 3 - parts.length)) parts.push(needClause(c, lang, { full: true, cold }));
   const out = parts.join(' ');
   return day ? fillT(t.qDay, { d: day }) + out : out;
 }
 
-module.exports = { NEEDS, NEED_KEYS, read, partsOf, needsIn, needsOfText, textHas, check, evidenceMap, isMeal, inScope, needClause, stayClause, stillLine, ensureReply, askReply, answerReply, joinNames, fillT, cap, TX, fold };
+module.exports = { NEEDS, NEED_KEYS, read, partsOf, needsIn, needsOfText, textHas, check, evidenceMap, isMeal, inScope, needClause, accessClause, dogClause, stayClause, stayBothOf, stillLine, ensureReply, askReply, answerReply, joinNames, fillT, cap, TX, fold };
