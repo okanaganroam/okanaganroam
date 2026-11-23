@@ -8359,7 +8359,7 @@ function parseTripPlanBody(body, opts = {}) {
 const TRIP_CHAT_KEY_RE = /^(?:[1-7]-(?:early|morning|midday|afternoon|late|evening|night)|it-\d{1,2})$/;
 function parseTripChatBody(body, opts = {}) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: 'Body must be an object.' };
-  const unexpected = Object.keys(body).filter((k) => !['message', 'chip', 'lang', 'plan', 'locks', 'removed', 'stops', 'events', 'stayTown', 'stayId', 'dayDates', 'soft', 'confirmed', 'last'].includes(k));
+  const unexpected = Object.keys(body).filter((k) => !['message', 'chip', 'lang', 'plan', 'locks', 'removed', 'stops', 'events', 'stayTown', 'stayId', 'dayDates', 'soft', 'confirmed', 'last', 'offer'].includes(k));
   if (unexpected.length) return { error: `Unexpected field(s): ${unexpected.join(', ')}` };
   const message = typeof body.message === 'string' ? body.message.replace(/\s+/g, ' ').trim() : '';
   const chip = body.chip === undefined || body.chip === null ? null : body.chip;
@@ -8411,14 +8411,17 @@ function parseTripChatBody(body, opts = {}) {
       || !(l.failed === undefined || (Array.isArray(l.failed) && l.failed.length <= 8 && l.failed.every((k) => typeof k === 'string' && tripChat.KIND_KEYS.includes(k))))) return { error: 'last must list stop ids.' };
     last = { in: l.in || [], out: l.out || [], moved: l.moved || [], failed: l.failed || [] };
   }
-  return { value: { message, chip, confirmed: body.confirmed === true, last, lang: body.lang === 'fr' ? 'fr' : 'en', args: plan.value, locks, removed: [...new Set(removed)], stops, events: [...new Set(events)], stayTown, stayId, dayDates, soft } };
+  const offer = body.offer === undefined || body.offer === null ? [] : body.offer;
+  if (!Array.isArray(offer) || offer.length > 3 || !offer.every((x) => typeof x === 'string' && x.trim() && x.length <= 240)) return { error: 'offer must list messages.' };
+  return { value: { message, chip, offer: offer.map((x) => x.replace(/\s+/g, ' ').trim()), confirmed: body.confirmed === true, last, lang: body.lang === 'fr' ? 'fr' : 'en', args: plan.value, locks, removed: [...new Set(removed)], stops, events: [...new Set(events)], stayTown, stayId, dayDates, soft } };
 }
 // The stops on screen, named from our own database (the page sends only slots and ids): what the model and the
 // templates see. Stops whose place is gone are left out.
+const TRIP_CHAT_FEATS = ['gluten_free', 'vegan', 'vegetarian', 'nonalcoholic'];
 function tripChatStops(list) {
   const ids = [...new Set(list.map((x) => x.id))];
   if (!ids.length) return [];
-  const rows = db.prepare(`SELECT id, name, type, region, price, cuisine, kid_friendly, lake_view, patio, live_music, arts_culture, dog_friendly, nonalcoholic FROM venues WHERE redirect_to IS NULL AND id IN (${ids.map(() => '?').join(',')})`).all(...ids);
+  const rows = db.prepare(`SELECT id, name, type, region, price, cuisine, kid_friendly, lake_view, patio, live_music, arts_culture, dog_friendly, nonalcoholic, gluten_free, vegan, vegetarian FROM venues WHERE redirect_to IS NULL AND id IN (${ids.map(() => '?').join(',')})`).all(...ids);
   const byId = new Map(rows.map((r) => [r.id, r]));
   const out = [];
   for (const x of list) {
@@ -8431,7 +8434,7 @@ function tripChatStops(list) {
     const role = m ? (daypart === 'midday' && meal ? 'lunch' : ['evening', 'night'].includes(daypart) && v.type !== 'cafe' && meal ? 'dinner' : '')
       : (meal && start !== null && start >= 660 && start <= 870 ? 'lunch' : meal && v.type !== 'cafe' && start !== null && start >= 1020 ? 'dinner' : '');
     out.push({ key: x.key, ref: `s${out.length + 1}`, id: v.id, name: v.name, type: v.type, price: Number(v.price) || null,
-      badges: ['kid_friendly', 'lake_view', 'patio', 'live_music', 'arts_culture', 'dog_friendly', 'nonalcoholic'].filter((b) => v[b] === 1), day: m ? Number(m[1]) : 1, start, role, region: v.region, cuisine: v.cuisine || '' });
+      badges: ['kid_friendly', 'lake_view', 'patio', 'live_music', 'arts_culture', 'dog_friendly', 'nonalcoholic'].filter((b) => v[b] === 1), day: m ? Number(m[1]) : 1, start, role, region: v.region, cuisine: v.cuisine || '', feats: TRIP_CHAT_FEATS.filter((b) => v[b] === 1) });
   }
   return out;
 }
@@ -8537,6 +8540,11 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // One stop's own time (stopStarts) rides along only while a stop is in that slot.
   if (v.args.overrides && v.args.overrides.stopStarts) { const ss = Object.fromEntries(Object.entries(v.args.overrides.stopStarts).filter(([k]) => stops.some((s) => s.key === k && !v.removed.includes(k)))); if (Object.keys(ss).length) v.args.overrides.stopStarts = ss; else delete v.args.overrides.stopStarts; }
   let ops = null, cant = null, source = 'rules', ai = null, what = null, fixes = [], missed = [], asks = 1;
+  // The visitor's answer to choices the chat offered ("day 3", "swap the park", "yes"): the offered message itself.
+  if (!v.chip && (v.offer || []).length) { const picked = tripChat.explain.pickOffer(v.message, v.offer, tripChat.fold); if (picked) v.message = picked.slice(0, tripChat.MAX_MESSAGE); }
+  // A question about the plan ("why did you say…", "what does the warning mean?") is answered and NEVER changes the
+  // plan, whatever the rules or the AI made of it: only its ask ops are kept, and the response is stripped below.
+  const explainOnly = !v.chip && tripChat.explain.isExplainQuestion(tripChat.fold(v.message).replace(/\s+/g, ' ').trim());
   if (v.chip) { ops = tripChat.chipOps(v.chip); source = 'chip'; }
   else {
     // The word rules first (instant), then the AI (live eval 2026-11-22: p50 1.1 s, some 3 s timeouts). When the rules
@@ -8567,8 +8575,10 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     if (ai && !ai.ok && ai.reason === 'slow') source = 'ai_slow';
     // Words no rule read go to the planner as typed when it can read them (a kind of food, an occasion...); else "Sorry,
     // I didn't catch that". Never words that say no / not (the planner could read "no brewery" as "a brewery").
+    if (explainOnly || r.explain) { ops = (ops || []).filter((o) => o.o === 'ask'); if (!ops.length) cant = 'q_unknown'; }
     if (!ops.length && !cant) { if (short && tripChat.plannerCanRead(v.message)) ops = [{ o: 'refine', text: v.message, stops: [] }]; else cant = 'unclear'; }
   }
+  const answerOnly = explainOnly || (!v.chip && (ops || []).length > 0 && ops.every((o) => o.o === 'ask'));
   timing.read = Date.now() - timing.start;
   // Events (rows of the plan the planner adds, with no Swap or Remove): a message that takes one out, and "we don't
   // drink" for an event at a brewery, winery or bar. The page hides them (actions.removeEvents).
@@ -8592,7 +8602,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   if (!ops.length) {
     logTiming();
     const c = cant || 'unclear';
-    return { source, cant: c, plan: null, actions: none, response: { reply: tripChat.cantReply(c, lang, what, stops, { asked: tripChatAsked(what, v.args.text) }), source, cant: c, plan: null, req: null, changed: [], actions: none, ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) } };
+    return { source, cant: c, plan: null, actions: none, response: { reply: c === 'q_unknown' ? tripChat.explain.TX[lang === 'fr' ? 'fr' : 'en'].unknownQ : tripChat.cantReply(c, lang, what, stops, { asked: tripChatAsked(what, v.args.text) }), source, cant: c, plan: null, req: null, changed: [], actions: none, ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) } };
   }
   const timed = (fn) => (a) => { const t0 = Date.now(); try { return fn(a); } finally { timing.plans += 1; timing.planMs += Date.now() - t0; } };
   const planValue = (a) => ({ text: a.text, seed: a.seed || 0, excludeVenueIds: a.excludeVenueIds || [], avoidVenueIds: a.avoidVenueIds || [], pinned: a.pinned || null, overrides: a.overrides || null, swap: a.swap || null, ...(a.stay ? { stay: a.stay } : {}), v4: true,
@@ -8618,7 +8628,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // Round 4: a change to the stops keeps the place to stay the visitor sees (it changed with unrelated messages).
   tripChatKeepStayId = extra.some((o) => o.o === 'stay') ? null : v.stayId || null;
   let out;
-  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run, hooks, weakFor: tripChatWeakFor, hasFeature: (id, f) => { try { return f === 'nonalcoholic' && !!db.prepare('SELECT 1 FROM venues WHERE id = ? AND nonalcoholic = 1 AND redirect_to IS NULL').get(id); } catch (e) { return false; } }, sunsetStart: (day, region) => { try { const d = (v.dayDates || [])[day - 1] || null; const sd = d && typeof sunsetDinnerStart === 'function' ? sunsetDinnerStart(d, region) : null; return sd ? sd.startMinutes : null; } catch (e) { return null; } } })
+  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run, hooks, weakFor: tripChatWeakFor, hasFeature: (id, f) => { try { return TRIP_CHAT_FEATS.includes(f) && !!db.prepare(`SELECT 1 FROM venues WHERE id = ? AND ${f} = 1 AND redirect_to IS NULL`).get(id); } catch (e) { return false; } }, sunsetStart: (day, region) => { try { const d = (v.dayDates || [])[day - 1] || null; const sd = d && typeof sunsetDinnerStart === 'function' ? sunsetDinnerStart(d, region) : null; return sd ? sd.startMinutes : null; } catch (e) { return null; } } })
     : { plan: null, req: null, actions: { remove: [], keep: [] }, results: [], changed: [] }; } finally { tripChatKeepStayId = null; }
   // The broad-change guard: a targeted edit that would change more than two other stops, or a sunset time that would drop
   // a stop nobody mentioned, is said first and applied only on a clear yes (the page sends the message again, confirmed).
@@ -8642,7 +8652,9 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     r.offer = tripChatTourOffer(r.kind, stops, lang, v.args.text);
   }
   let reply = planOps.length ? tripChat.buildReply(out, { lang, regionLabels: REGION_LABELS, cant, asks }) : '';
-  let plan = out.plan || null, req = out.req || null, stayPref, transport, stayBlock, newText = null, card = null, stayForce, stayArrive, party;
+  let plan = out.plan || null, req = out.req || null, stayPref, transport, stayBlock, newText = null, card = null, stayForce, stayArrive, party, note = null, offer = [];
+  // A full day said with choices ("swap X, or day 3 at 1:15 PM. Which?"): the choices go back as plain messages.
+  for (const r of (out && out.results) || []) if (r.why === 'full' && r.full && !offer.length) offer = tripChat.explain.fullReply(r.full, { KINDS: tripChat.KINDS, noun: tripChat.kindNoun, clock: tripChat.clock }, lang).offer.map((o) => o.say);
   if (tourCard) {
     const TT = tripChat.T[lang === 'fr' ? 'fr' : 'en'];
     const town = REGION_LABELS[(stops.find((x) => x.type === 'winery') || stops[0] || {}).region] || '';
@@ -8664,11 +8676,13 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     const r = Array.isArray(op) ? tripChatStayTurn(op, { v, plan, req, stops, lang, staysOn, runCore, timing, days, short })
       : op.o === 'avoid' ? tripChatAvoidTurn(op, { v, req, lang })
         : op.o === 'party_some' ? tripChatPartySomeTurn({ stops: plan ? tripChatStops(tripChat.planStops(plan).map((s) => ({ key: s.key, id: s.id }))) : stops, lang, rewrote: someRewrote, text: someText, alone: !planOps.length, changed: !!plan })
-        : op.o === 'ask' ? tripChatAskTurn(op, { v, stops, lang, runCore })
+        : op.o === 'ask' ? tripChatAskTurn(op, { v, stops, lang, runCore, planEvents })
           : op.o === 'party' ? tripChatAdultsTurn(op, { v, plan, req, stops, lang, staysOn, runCore })
             : tripChatTransportTurn(op, { stops, lang, stayTown: v.stayTown, dayDates: v.dayDates });
     if (r.stayForce !== undefined) { stayForce = r.stayForce; stayArrive = r.stayArrive || null; }
     if (r.party) party = r.party;
+    if (r.note && !note) note = { key: r.noteKey || 'note', text: r.note };
+    if ((r.offer || []).length && !offer.length) offer = r.offer.map((o) => o.say);
     if (r.text) newText = r.text;
     if (r.card) card = r.card;
     if (r.plan) { plan = r.plan; req = r.req; }
@@ -8693,10 +8707,13 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // Planner round 5: the day labels follow the stops shown (the chat takes out places a pinned re-run adds).
   if (plan) { try { tripPlannerModule().v4DayTownLabels(plan, { v4: true, labels: { regions: REGION_LABELS } }); } catch (e) { /* cosmetic */ } }
   logTiming();
+  // The structural guard: a turn read as a question returns an answer and nothing that changes the plan, the stops, the
+  // times, the place to stay or the request text.
+  if (answerOnly) return { timing: { ...timing, total: Date.now() - timing.start }, source, cant: null, plan: null, actions: none, response: { reply, source, plan: null, req: null, changed: [], actions: none, ...(note ? { note } : {}), ...(offer.length ? { offer } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) } };
   return {
     timing: { ...timing, total: Date.now() - timing.start },
     source, cant: null, plan, actions,
-    response: { reply, source, plan, req, changed: out.changed || [], actions, ...tripChatDiff(stops, v.removed, plan, actions, out), ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(stayForce !== undefined ? { stayForce } : {}), ...(stayArrive ? { stayArrive } : {}), ...(party ? { party } : {}), ...(newText && !plan ? { text: newText } : {}), ...(card ? { card } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
+    response: { reply, source, plan, req, changed: out.changed || [], actions, ...tripChatDiff(stops, v.removed, plan, actions, out), ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(stayForce !== undefined ? { stayForce } : {}), ...(stayArrive ? { stayArrive } : {}), ...(party ? { party } : {}), ...(newText && !plan ? { text: newText } : {}), ...(card ? { card } : {}), ...(note ? { note } : {}), ...(offer.length ? { offer } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
   };
 }
 // "somewhere cheaper to stay", "a hotel with a pool", "stay in Naramata", "we already have a place": the same plan (every
@@ -8903,9 +8920,39 @@ function tripChatExplainTurn(op, { v, stops, lang, runCore }) {
   }
   return { reply: tripChat.explainReply(op, { stops: stops.filter((s) => !v.removed.includes(s.key)), request: v.args.text, wholeDry: dry.whole, notIncluded, naIds: stops.filter((s) => (s.badges || []).includes('nonalcoholic')).map((s) => s.id), last }, lang) };
 }
-function tripChatAskTurn(op, { v, stops, lang, runCore }) {
+// The plan's own warnings and choices (trip-chat-explain.js): answered from the plan run once more with every stop
+// pinned (its evidence, warnings and unmet requirements), the stops on screen with their listings' badges, and the
+// events on the plan from What's On. Never an edit.
+function tripChatHonestTurn(op, { v, stops, lang, runCore, planEvents }) {
+  const L = lang === 'fr' ? 'fr' : 'en';
+  const shown = stops.filter((s) => !v.removed.includes(s.key));
+  let core = null;
+  if (['q_evidence', 'q_warning', 'q_allergy', 'q_why_event'].includes(op.value) && typeof runCore === 'function') {
+    try {
+      const pinned = Object.fromEntries(shown.filter((s) => /^\d-/.test(s.key)).map((s) => [s.key, s.id]));
+      core = runCore({ ...v.args, pinned: Object.keys(pinned).length ? pinned : null, trustedPins: Object.keys(pinned) });
+      if (core) tripChatOnScreenOnly(core, stops);
+    } catch (e) { core = null; }
+  }
+  const missing = ((core && core.requirementResults) || []).filter((i) => i && i.status === 'unmet' && !i.silent && ['type', 'type_count', 'venue_kind', 'venue', 'activity', 'event', 'rainy', 'feature'].includes(i.kind)).map((i) => ({ kind: i.kind, value: i.value, label: String(i.kind === 'venue' ? (i.venueName || i.sourceText || i.value) : i.value).replace(/_/g, ' ') }));
+  let events = [];
+  if (op.value === 'q_why_event' && (planEvents || []).length) {
+    try {
+      const ids = planEvents.map((e) => e.id);
+      const cats = db.prepare(`SELECT event_id, category_key AS category FROM event_categories WHERE event_id IN (${ids.map(() => '?').join(',')})`).all(...ids);
+      const rows = db.prepare(`SELECT id, start_datetime FROM events WHERE id IN (${ids.map(() => '?').join(',')})`).all(...ids);
+      events = planEvents.map((e) => { const iso = String((rows.find((r) => r.id === e.id) || {}).start_datetime || '').slice(0, 10); let dateLabel = ''; try { dateLabel = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(`${iso}T12:00:00Z`).toLocaleDateString(L === 'fr' ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) : ''; } catch (e2) { dateLabel = ''; } return { name: e.name, place: e.place, categories: cats.filter((c) => c.event_id === e.id).map((c) => c.category), dateLabel }; });
+    } catch (e) { events = planEvents.map((x) => ({ name: x.name, place: x.place, categories: [], dateLabel: '' })); }
+  }
+  const dated = !!((v.args.overrides && v.args.overrides.startDate) || (v.args.stay && v.args.stay.arrive) || (core && core.understood && core.understood.when));
+  const legacy = (o) => tripChatExplainTurn(o, { v, stops, lang: L, runCore }).reply;
+  return tripChat.explain.answer(op, { stops: shown, request: v.args.text, evidence: core && Array.isArray(core.evidence) ? core.evidence : null, warnings: (core && Array.isArray(core.warnings) ? core.warnings : []).filter((w) => typeof w === 'string'), missing, events, dated,
+    KINDS: tripChat.KINDS, kindMatches: tripChat.kindMatches, kindRe: (k) => (tripChat.KIND_WORDS.find(([kk]) => kk === k) || [])[1] || null, plural: (k, l) => { const kd = tripChat.KINDS[k] || {}; return l === 'en' && tripChat.TYPE_PLURAL[kd.type] ? tripChat.TYPE_PLURAL[kd.type] : `${tripChat.kindNoun(k, l)}s`; }, noun: tripChat.kindNoun, joinList: tripChat.joinList, fold: tripChat.fold, legacy }, L);
+}
+function tripChatAskTurn(op, { v, stops, lang, runCore, planEvents }) {
   const L = lang === 'fr' ? 'fr' : 'en';
   const T = tripChat.T[L];
+  if (['q_evidence', 'q_warning', 'q_allergy', 'q_why_event', 'q_why_count'].includes(op.value)) return tripChatHonestTurn(op, { v, stops, lang: L, runCore, planEvents });
   if (['q_why_not', 'q_dry', 'q_changed', 'q_couldnt'].includes(op.value)) return tripChatExplainTurn(op, { v, stops, lang: L, runCore });
   const s = (op.stops || [])[0];
   // Round 6 ("why this hotel?"): the place to stay on the plan, from its own listing.

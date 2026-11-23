@@ -47,21 +47,21 @@ test('1. one non-drinker: ONE winery on day 2 asked with the non-alcoholic badge
   assert.deepEqual(calls[0].swap.types, ['winery']);
   assert.equal(calls[0].swap.wide, true);
   assert.deepEqual(out.changed, ['2-afternoon']);
-  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Added Azhadi Vineyards at 1:15 PM. Its listing has non-alcoholic options.');
-  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. J’ai ajouté Azhadi Vineyards à 13 h 15. Sa fiche indique des options sans alcool.');
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Done. Added Azhadi Vineyards at 1:15 PM. Its Okanagan Roam listing has the Non-Alcoholic Options badge.');
+  assert.equal(tc.buildReply(out, { lang: 'fr' }), 'C’est fait. J’ai ajouté Azhadi Vineyards à 13 h 15. Sa fiche Okanagan Roam a le badge « Options sans alcool ».');
   // No winery with the badge within reach: the best winery, and plainly that its listing does not say.
   const run2 = (a) => (a.swap.features ? { ...dayPlan(PLAN), swapMissed: { key: a.swap.key } } : dayPlan([...PLAN, AZ]));
   out = tc.planTurn(ops, ctxFor(run2, { hasFeature: () => false }));
   const rep = tc.buildReply(out, { lang: 'en' });
-  assert.equal(rep, 'Done. Added Azhadi Vineyards at 1:15 PM. Its listing doesn’t say if it has non-alcoholic options, so ask when you book.');
+  assert.equal(rep, 'Done. Added Azhadi Vineyards at 1:15 PM. Its listing doesn’t have the Non-Alcoholic Options badge, so ask when you book.');
   // A planner that came back with a winery without the badge is never described as having it.
   out = tc.planTurn(ops, ctxFor(run, { hasFeature: () => false }));
-  assert.doesNotMatch(tc.buildReply(out, { lang: 'en' }), /listing has non-alcoholic/);
+  assert.doesNotMatch(tc.buildReply(out, { lang: 'en' }), /listing has the Non-Alcoholic/);
   // The day already has a winery whose listing has it: said, nothing changes.
   const with2 = [...PLAN, AZ];
   out = tc.planTurn(tc.rulesRead(MSG1, with2, { days: 2, request: REQ }).ops.filter((o) => o.o !== 'party_some'), ctxFor(() => { throw new Error('no run'); }, { stops: with2, hasFeature: (id) => id === 812 }));
   assert.equal(out.plan, null);
-  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Azhadi Vineyards on day 2 already lists non-alcoholic options, so I left the day as it is.');
+  assert.equal(tc.buildReply(out, { lang: 'en' }), 'Day 2 already has a winery for that: Azhadi Vineyards at 1:15 PM. Its Okanagan Roam listing has the Non-Alcoholic Options badge, so I left your plan as it is.');
   // "we don't drink" said of the whole group, then "only one of us doesn't": the stored request is rewritten.
   assert.equal(tc.onePersonText('a weekend in Kelowna with friends, no alcohol'), 'a weekend in Kelowna with friends. One person does not drink.');
   assert.equal(tc.onePersonText('3 days in Kelowna, we do not drink'), '3 days in Kelowna. One person does not drink.');

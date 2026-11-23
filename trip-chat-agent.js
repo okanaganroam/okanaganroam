@@ -122,7 +122,8 @@ const Q_TOPICS = [
   ['q_vegan', /\b(?:vegan|vegetalien\w*|vegetarian|vegetarien\w*|gluten)\b/],
   ['q_view', /\b(?:lake ?view|view|vue)\b/],
 ];
-const Q_VALUES = [...Q_TOPICS.map(([k]) => k), 'q_where', 'q_why_not', 'q_dry', 'q_changed', 'q_couldnt'];
+const Q_VALUES = [...Q_TOPICS.map(([k]) => k), 'q_where', 'q_why_not', 'q_dry', 'q_changed', 'q_couldnt', 'q_evidence', 'q_warning', 'q_allergy', 'q_why_event', 'q_why_count'];
+const explain = require('./trip-chat-explain.js');
 const MEAL_RE = /\b(?:restaurants?|dinner|supper|lunch|souper|diner|dejeuner|meal|repas)\b/;
 const SKI_ASK_RE = /\b(?:lifts?|gondolas?|chairlifts?|ski hill|remontees?|telecabines?)\b/;
 const SKI_NAME_RE = /\b(?:ski|resort|blackcomb|big white|silverstar|silver star|apex mountain|baldy|gondola|sun peaks)\b/;
@@ -136,7 +137,10 @@ const Q_DRY_RE = /\b(?:suggest\w*|recommend\w*|options?|ideas?|what about|what c
 const Q_WHY_RE = /\b(?:why|how come|pourquoi|explain|expliqu\w+)\b/;
 const Q_NEG_RE = /\b(?:no|not|none|without|left out|leave out|leaving out|skipp?ed|missing|didn'?t|did not|don'?t|isn'?t|aren'?t|wasn'?t|weren'?t|aucun\w*|pas|sans|manque\w*|oublie\w*)\b/;
 const Q_WHY_NOT_EDIT_RE = /\bwhy (?:not|don'?t (?:you|we)) (?:add|swap|try|include|put|do|book|go)\b|\bpourquoi (?:ne )?pas (?:ajouter|essayer|mettre)\b/;
-function explainRules(t, h) {
+function explainRules(t, h, stops) {
+  // The plan's own warnings and choices, an allergy, one more of a kind (trip-chat-explain.js) come first.
+  const first = explain.explainRules(t, h, stops || []);
+  if (first) return first;
   const op = h.op, ops = [];
   if (Q_WHY_RE.test(t) && Q_NEG_RE.test(t) && !Q_WHY_NOT_EDIT_RE.test(t)) {
     const kind = h.kindsNamed(t.replace(/\bnon[- ]drink\w*/g, ' ')).filter((k) => k !== 'kids' && k !== 'activity')[0] || null;
@@ -157,7 +161,7 @@ function agentRules(t, stops, ctx, h) {
   const day = dayM ? Number(dayM[1]) : wdM ? weekdays[wdM[1]] : null;
   const regionIn = (s) => regions.find((x) => new RegExp(`\\b${fold(regionLabels[x] || x).replace(/[^a-z0-9 ]/g, '.')}\\b`).test(s)) || null;
   const editVerb = EDIT_VERB_RE.test(t);
-  const explained = explainRules(t, h);
+  const explained = explainRules(t, h, stops);
   if (explained) return explained;
 
   // Round 6: "how do we get here from Vancouver?" is the Getting here card; "something fun" is a thing to do added.

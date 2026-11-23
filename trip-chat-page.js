@@ -9,7 +9,10 @@
 // The chat stays open after Confirm too (Dayton, 2026-11-22: "there is no ai chat box now"): a slim box above Book /
 // Share / Save, no chips; a change sent then un-confirms the plan as before. Only Save's Replace / Add question hides it.
 
+const { tripEvidenceFor } = require('./trip-chat-explain.js');
+
 const CHAT_STYLES = `<style>
+  .t3-v4 .v4-agent .v4-agent-note { margin: 4px 0 0; font-size: 0.8rem; font-weight: 600; color: var(--ref-navy-muted, #56636E); }
   /* Travel agent chat (2026-11-22), inside the V4 sticky bar. */
   .t3-v4 .v4-chat { margin: 0 0 8px; }
   .t3-v4 .v4-bar.v4-chat-off .v4-chat { display: none; }
@@ -242,6 +245,8 @@ function chatClientSrc(d) {
     if (chip) body.chip = chip; else body.message = message;
     if (confirmed) body.confirmed = true;
     if (chat.lastDiff) body.last = chat.lastDiff;
+    if (!chip && chat.offer && chat.offer.length) body.offer = chat.offer.slice(0, 3);
+    chat.offer = null;
     function done(){
       chat.busy = false; resultEl.removeAttribute('aria-busy');
       var q = chat.queue; chat.queue = null; var qb = document.getElementById('v4Chat'); if (qb) qb.classList.remove('has-queue');
@@ -256,6 +261,9 @@ function chatClientSrc(d) {
         var acts = j.actions || {}, changed = (j.changed || []).slice(), touched = false;
         chat.pending = j.confirm ? { message: message, chip: chip } : null;
         if (j.diff) chat.lastDiff = j.diff;
+        chat.offer = Array.isArray(j.offer) && j.offer.length ? j.offer : null;
+        // The badge caveat ("it isn't a guarantee against cross-contamination…") is said once, the first time it comes up.
+        if (j.note && j.note.text && j.reply) { chat.notes = chat.notes || {}; if (!chat.notes[j.note.key]) { chat.notes[j.note.key] = 1; j.reply = j.reply + ' ' + j.note.text; } }
         // Fix round (2026-11-22): a new plan only when a stop changed ("The plan already fits that" changes nothing and
         // shows no Undo); the place to stay alone comes back as stayBlock and never touches the stops.
         if (j.plan && j.req && changed.length) {
@@ -324,7 +332,7 @@ function chatClientSrc(d) {
     var b;
     if ((b = t.closest('[data-v4-chip]'))) { chatSend(null, b.getAttribute('data-v4-chip'), b.textContent); return; }
     if ((b = t.closest('#v4ChatReply.is-long')) && !t.closest('[data-v4-chat-undo]')) { b.classList.add('is-open'); chatPad(); return; }
-    if ((b = t.closest('[data-v4-chat-undo]')) && chat.undo) { var snap = chat.undo; chat.undo = null; chat.lastDiff = null; chat.pending = null; chatRestore(snap); chatShow('', ct('undone'), {}); track('trip_chat', { chat_source: 'undo', changed: 'yes' }); }
+    if ((b = t.closest('[data-v4-chat-undo]')) && chat.undo) { var snap = chat.undo; chat.undo = null; chat.lastDiff = null; chat.pending = null; chat.offer = null; chatRestore(snap); chatShow('', ct('undone'), {}); track('trip_chat', { chat_source: 'undo', changed: 'yes' }); }
   });
 
   // ---------- Agent round (2026-11-22): the agent speaks; stay and getting here in the plan; Confirm at the end ----------
@@ -333,14 +341,14 @@ function chatClientSrc(d) {
       fam: ' for your family', dog: ' for you and your dog', stay: ', with a place to stay', stayWith: ', with a place to stay with {what}', stayUnsure: ', with a place to stay ({what} not confirmed)', and: 'and', notConfirmed: '{what} not confirmed',
       amen: { pool: 'a pool', hot_tub: 'a hot tub', kitchen: 'a kitchen', pets: 'pet-friendly rooms', parking: 'free parking', accessible: 'accessible rooms' },
       chip: { pool: 'Pool', hot_tub: 'Hot tub', kitchen: 'Kitchen', pets: 'Pets welcome', parking: 'Free parking', accessible: 'Accessible' }, when: 'When are you coming?', weekend: 'This weekend', pick: 'Pick dates', notSure: 'Not sure yet', done: 'Done', from: 'Arrive', to: 'Leave',
-      datesFail: 'I couldn’t plan those dates. Your plan is unchanged.', missing: 'I couldn’t fit {what} on these dates; tell me if you’d like me to try another day.', removeEvent: 'Remove {name}', poolWinter: 'check it’s open in winter',
+      datesFail: 'I couldn’t plan those dates. Your plan is unchanged.', missing: 'I couldn’t fit {what} on these dates; tell me if you’d like me to try another day.', missingNoDates: 'I couldn’t fit {what} into this plan; say “add {what}” and I’ll try again.', removeEvent: 'Remove {name}', poolWinter: 'check it’s open in winter',
       datesSet: 'Planned for {a} – {b}.', ready: 'Your trip is ready. Book it, share it, or tell me what to change.', noCarNone: 'No shuttle listed for this trip.', wine: 'Wine tour (no driving)',
       stayH: 'Where you’ll stay', rates: 'Check rates', seeMore: 'See {n} more', fewer: 'Hide', choose: 'Choose', ghH: 'Getting here', seeCars: 'See cars', book: 'Book', confirm: 'Confirm plan', sleeps: 'Sleeps {n}' },
     fr: { who: 'Agent de voyage', hi: 'Bonjour! Où allez-vous, et qu’aimez-vous faire?', day: 'Voici une journée à {town}{for}.', days: 'Voici un plan de {n} jours à {town}{for}{stay}.', plan: 'Voici votre plan{for}.', more: ' Voulez-vous changer quelque chose?',
       fam: ' pour votre famille', dog: ' pour vous et votre chien', stay: ', avec un logement', stayWith: ', avec un logement qui a {what}', stayUnsure: ', avec un logement ({what} non confirmé)', and: 'et', notConfirmed: '{what} non confirmé',
       amen: { pool: 'une piscine', hot_tub: 'un spa', kitchen: 'une cuisine', pets: 'des chambres où les animaux sont acceptés', parking: 'un stationnement gratuit', accessible: 'des chambres accessibles' },
       chip: { pool: 'Piscine', hot_tub: 'Spa', kitchen: 'Cuisine', pets: 'Animaux acceptés', parking: 'Stationnement gratuit', accessible: 'Accessible' }, when: 'Quand venez-vous?', weekend: 'Ce week-end', pick: 'Choisir les dates', notSure: 'Pas encore sûr', done: 'OK', from: 'Arrivée', to: 'Départ',
-      datesFail: 'Je n’ai pas pu planifier ces dates. Votre plan n’a pas changé.', missing: 'Je n’ai pas pu inclure {what} à ces dates; dites-moi si vous voulez que j’essaie un autre jour.', removeEvent: 'Retirer {name}', poolWinter: 'vérifiez qu’elle est ouverte en hiver',
+      datesFail: 'Je n’ai pas pu planifier ces dates. Votre plan n’a pas changé.', missing: 'Je n’ai pas pu inclure {what} à ces dates; dites-moi si vous voulez que j’essaie un autre jour.', missingNoDates: 'Je n’ai pas pu inclure {what} dans ce plan; dites « ajoute {what} » et j’essaie encore.', removeEvent: 'Retirer {name}', poolWinter: 'vérifiez qu’elle est ouverte en hiver',
       datesSet: 'Plan pour le {a} – {b}.', ready: 'Votre voyage est prêt. Réservez-le, partagez-le ou dites-moi quoi changer.', noCarNone: 'Aucune navette pour ce voyage.', wine: 'Tour des vignobles (sans conduire)',
       stayH: 'Où vous logerez', rates: 'Voir les tarifs', seeMore: 'Voir {n} autres', fewer: 'Masquer', choose: 'Choisir', ghH: 'Pour venir', seeCars: 'Voir les voitures', book: 'Réserver', confirm: 'Confirmer le plan', sleeps: 'Jusqu’à {n} pers.' }
   };
@@ -391,10 +399,36 @@ function chatClientSrc(d) {
     return !!(u.when || state.overrides.startDate || (p.whereToStay && p.whereToStay.trip && p.whereToStay.trip.datesGiven));
   }
   // A kind the request asked for that the plan could not include (the plan's own notes): said in the first line.
+  // What the plan on screen supports for a diet the request asked for (gluten-free, vegan, vegetarian): from the plan's
+  // own evidence when it has it, else the badges of the listings shown (trip-chat-explain.js tripEvidenceFor, the same
+  // function the chat's answers use). So the first line never says "couldn't fit gluten free" above stops that have the badge.
+  var CHAT_FEATS = { gluten_free: /gluten/i, vegan: /vegan|v[ée]g[ée]tali|végane/i, vegetarian: /vegetarian|v[ée]g[ée]tarien/i };
+  function chatEvidenceStops(){
+    var out = [];
+    days().forEach(function(d){ (d.stops || []).forEach(function(s){
+      if (!s || !s.venue || !s.venue.id || state.removed[d.day + '-' + s.daypart] || (v4.gone && v4.gone[s.venue.id])) return;
+      var feats = [], f = s.venue.features;
+      if (Array.isArray(f)) f.forEach(function(k){ if (typeof k === 'string') feats.push(k); }); else if (f && typeof f === 'object') Object.keys(f).forEach(function(k){ if (f[k]) feats.push(k); });
+      (s.venue.badges || []).forEach(function(b){ var k = b && typeof b === 'object' ? b.key : b; if (typeof k === 'string' && feats.indexOf(k) === -1) feats.push(k); });
+      out.push({ id: s.venue.id, name: s.venue.name, type: s.venue.type, key: d.day + '-' + s.daypart, feats: feats });
+    }); });
+    return out;
+  }
+  function chatEvidence(){
+    var p = state.last || {}, asks = [], out = [];
+    (Array.isArray(p.evidence) ? p.evidence : []).forEach(function(e){ if (e && CHAT_FEATS[e.ask] && asks.indexOf(e.ask) === -1) asks.push(e.ask); });
+    (p.requirementResults || []).forEach(function(i){ if (i && i.kind === 'feature' && CHAT_FEATS[i.value] && asks.indexOf(i.value) === -1) asks.push(i.value); });
+    if (!asks.length || !days().length) return out;
+    var stops = chatEvidenceStops();
+    asks.slice(0, 2).forEach(function(a){ var ev = tripEvidenceFor(a, stops, Array.isArray(p.evidence) ? p.evidence : null, lang() === 'fr' ? 'fr' : 'en'); if (ev) out.push(ev); });
+    return out;
+  }
   function chatMissing(){
     // A pool, hot tub or kitchen asked of the place to stay is not a missing stop.
     var out = [], stayAsk = !!(state.last && state.last.whereToStay && state.last.whereToStay.amenity);
-    try { t3PlanNextSteps(state.last || {}).forEach(function(x){ if (x && x.kind === 'missing' && !x.venue && x.label && out.indexOf(x.label) === -1 && !(stayAsk && /pool|piscine|hot tub|kitchen|spa\b/i.test(x.label))) out.push(lang() === 'fr' && x.labelFr ? x.labelFr : x.label); }); } catch (e) {}
+    // A diet asked for is said from the evidence (chatEvidence), never as "couldn't fit".
+    var diet = function(l){ return Object.keys(CHAT_FEATS).some(function(k){ return CHAT_FEATS[k].test(String(l).replace(/_/g, ' ')); }); };
+    try { t3PlanNextSteps(state.last || {}).forEach(function(x){ if (x && x.kind === 'missing' && !x.venue && x.label && !diet(x.label) && out.indexOf(x.label) === -1 && !(stayAsk && /pool|piscine|hot tub|kitchen|spa\b/i.test(x.label))) out.push(lang() === 'fr' && x.labelFr ? x.labelFr : x.label); }); } catch (e) {}
     return out.slice(0, 2);
   }
   function chatAgentHtml(){
@@ -403,11 +437,15 @@ function chatClientSrc(d) {
     if (lang() === 'fr') town = town.replace(/ and /g, ' et ');
     var stay = chatOvernight() && !chat.noStay && t3StayData() ? chatStayWords() : '';
     var line = n > 1 ? ag('days', { n: n, town: town, for: chatPartyFor(), stay: stay }) : n === 1 && town ? ag('day', { town: town, for: chatPartyFor() }) : ag('plan', { for: chatPartyFor() });
-    var miss = chatMissing(), missLine = miss.length ? ' ' + ag('missing', { what: miss.join(' ' + ag('and') + ' ') }) : '';
+    // "on these dates" only when there are dates.
+    var miss = chatMissing(), missLine = miss.length ? ' ' + ag(chatHasDates() || (t3StayInputBase() || {}).arrive ? 'missing' : 'missingNoDates', { what: miss.join(' ' + ag('and') + ' ') }) : '';
+    var evs = [], evLine = '', evNote = '';
+    try { evs = chatEvidence(); } catch (e) { evs = []; }
+    evs.forEach(function(ev){ evLine += ' ' + ev.line; if (!evNote) evNote = ev.caveat; });
     // Planner round 5: the plan's own "not included" line (why, and the nearest) comes before "on these dates".
     var ni = Array.isArray(p.notIncluded) ? p.notIncluded[0] : null;
     if (ni && ni.text) missLine = ' ' + (lang() === 'fr' && ni.textFr ? ni.textFr : ni.text);
-    var html = '<div class="v4-agent" id="v4Agent"><span class="v4-agent-who">' + esc(ag('who')) + '</span><p>' + esc(v4.confirmed ? ag('ready') : line + missLine + (missLine ? '' : ag('more'))) + '</p>';
+    var html = '<div class="v4-agent" id="v4Agent"><span class="v4-agent-who">' + esc(ag('who')) + '</span><p>' + esc(v4.confirmed ? ag('ready') : line + evLine + missLine + (missLine || evLine ? '' : ag('more'))) + '</p>' + (evNote && !v4.confirmed ? '<p class="v4-agent-note">' + esc(evNote) + '</p>' : '');
     // One short follow-up, with tap answers: the dates of an overnight trip, when none were given.
     var st = t3StayInputBase() || {};
     if (chatOvernight() && !st.arrive && !chat.askedWhen && !v4.confirmed && !chatHasDates()) {
@@ -497,6 +535,7 @@ function chatClientSrc(d) {
   };
   // "This weekend": Friday or Saturday counts from today; any other day (Sunday too) is the coming Saturday.
   ${chatWeekendDates.toString()}
+  ${tripEvidenceFor.toString()}
   function chatWeekend(){ return chatWeekendDates(new Date(), days().length); }
   function chatSetDates(a, b){
     var ea = document.getElementById('t3Arrive'), eb = document.getElementById('t3Leave');
