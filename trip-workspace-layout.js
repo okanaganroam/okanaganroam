@@ -102,6 +102,9 @@ function tripSummaryFacts(plan, fr, ctx) {
   });
   if (left) flags.push({ kind: 'flag', status: 'unmet', ask: 'not_included', text: fr ? left + (left > 1 ? ' demandes non incluses' : ' demande non incluse') : left + (left > 1 ? ' asks not included' : ' ask not included') });
   if (p.partyNote && p.partyNote.text && !said[p.partyNote.text]) flags.push({ kind: 'flag', status: 'partial', ask: 'party_note', text: fr ? 'Note pour une personne du groupe' : 'Note for one of you' });
+  // The traveller's budget (2026-11-23, trip-budget.js): the limit beside the estimate, in the server's own words
+  // (ctx.budget: the chosen stay's). Never a tick: the figures are estimates. A plan with no budget has no such fact.
+  if (c.budget && (fr ? c.budget.textFr : c.budget.text) && (fr ? c.budget.textFr : c.budget.text).summary) flags.unshift({ kind: 'flag', status: c.budget.status === 'over' ? 'unmet' : c.budget.status === 'under' || c.budget.status === 'under_priced' ? 'partial' : 'unknown', ask: 'budget', text: (fr ? c.budget.textFr : c.budget.text).summary });
   if (ok.length > 4) { var more = ok.length - 3; ok = ok.slice(0, 3); ok.push({ kind: 'ok', ask: 'more', text: fr ? '+' + more + ' autres ✓' : '+' + more + ' more ✓' }); }
   return out.concat(flags, ok);
 }
@@ -375,7 +378,8 @@ const WORKSPACE_CLIENT_SRC=String.raw`
       // "Dates not set" only once the dates question is gone ("Not sure yet"); while it is asked, the question says it.
       unset=chatOvernight()&&!chatHasDates()&&!((t3StayInputBase()||{}).arrive)&&!!chat.askedWhen;}catch(e){}
     var gone={};try{gone=v4RemovedIds();}catch(e){}
-    return tripSummaryFacts(state.last,fr,{party:party,datesUnset:unset,removed:gone});
+    var bg=null;try{bg=typeof v4Budget==='function'?v4Budget():null;}catch(e){bg=null;}
+    return tripSummaryFacts(state.last,fr,{party:party,datesUnset:unset,removed:gone,budget:bg});
   }
   function twSummary(root,head){
     if(!head||root.querySelector('.tw-sum'))return;
