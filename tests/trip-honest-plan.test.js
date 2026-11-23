@@ -103,7 +103,8 @@ test('1. the six-person request: what the listings show for each thing asked', (
   // One non-drinker: which drink stops list non-alcoholic options, which do not say; the note under the title is the same line.
   const na = ev(p, 'nonalcoholic');
   assert.deepEqual(na.stops.map((s) => [s.id, s.has]), [[401, null], [83, null], [812, true]]);
-  assert.match(na.text, /Azhadi Vineyards lists non-alcoholic options; Meadow Vista Honey Wines and Blue Gator Bar don’t say/);
+  assert.match(na.text, /of the 3 wineries and bars in this plan: Azhadi Vineyards lists non-alcoholic options on its listing\. Meadow Vista Honey Wines and Blue Gator Bar don’t say either way/);
+  assert.equal(na.label, 'Non-alcoholic options');
   assert.equal(p.partyNote.text, na.text);
   assert.equal(p.partyNote.textFr, na.textFr);
   assert.ok(!na.line, 'said once (the party note), not twice');

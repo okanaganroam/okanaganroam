@@ -16,14 +16,14 @@ const EVIDENCE = [
   { ask: 'gluten_free', label: 'Gluten-free', labelFr: 'Sans gluten', stops: [{ id: 222, name: 'C', has: true }], status: 'verified', text: 'Gluten-free: all 1 meal stops list gluten-free options.' },
   { ask: 'stay:pool', label: 'Pool', labelFr: 'Piscine', stops: [{ id: 401, name: 'Hotel', has: true }], status: 'verified', text: 'Pool: the listing says it has a pool.' },
   { ask: 'live_music', label: 'Live music', labelFr: 'Musique en direct', status: 'unknown', needsDates: true, stops: [{ id: 83, name: 'D', has: true }], text: 'Live music depends on the night.', line: true },
-  { ask: 'nonalcoholic', label: 'Non-drinker', labelFr: 'Personne qui ne boit pas', stops: [{ id: 401, name: 'A', has: null }, { id: 83, name: 'D', has: null }, { id: 812, name: 'B', has: true }], who: 'one', status: 'partial', text: 'For your non-drinker: B lists non-alcoholic options; A and D don’t say, so ask there.' },
+  { ask: 'nonalcoholic', label: 'Non-alcoholic options', labelFr: 'Options sans alcool', stops: [{ id: 401, name: 'A', has: null }, { id: 83, name: 'D', has: null }, { id: 812, name: 'B', has: true }], who: 'one', status: 'partial', text: 'For your non-drinker: B lists non-alcoholic options; A and D don’t say, so ask there.' },
 ];
 const PLAN = { evidence: EVIDENCE, partyNote: { concept: 'alcohol', text: EVIDENCE[4].text } };
 const texts = (list) => list.map((x) => x.text);
 
 test('the summary facts come from the plan’s own data, nothing else', () => {
   const facts = tripSummaryFacts(PLAN, false, {});
-  assert.deepEqual(texts(facts), ['Live music: needs dates', 'Non-drinker: 1 of 3 stops', 'Wineries: 2 ✓', 'Gluten-free ✓', 'Pool ✓']);
+  assert.deepEqual(texts(facts), ['Live music: needs dates', 'Non-alcoholic options: 1 of 3 wineries & bars lists them · 2 don’t say', 'Wineries: 2 ✓', 'Gluten-free ✓', 'Pool ✓']);
   // Every item is an evidence entry of the plan (its label and its status); a plan with no evidence has no facts.
   for (const f of facts) assert.ok(EVIDENCE.some((e) => e.ask === f.ask && f.text.startsWith(e.label)), f.text);
   assert.deepEqual(tripSummaryFacts({}, false, {}), []);
@@ -53,7 +53,7 @@ test('an unmet, partial or unknown ask is flagged in the summary itself, ahead o
 
 test('a stop the visitor removed no longer counts: no "Wineries: 2 ✓" above one winery', () => {
   const facts = tripSummaryFacts(PLAN, false, { removed: { 401: 1 } });
-  assert.deepEqual(texts(facts), ['Wineries: 1 of 2', 'Live music: needs dates', 'Non-drinker: 1 of 2 stops', 'Gluten-free ✓', 'Pool ✓']);
+  assert.deepEqual(texts(facts), ['Wineries: 1 of 2', 'Live music: needs dates', 'Non-alcoholic options: 1 of 2 wineries & bars lists them · 1 doesn’t say', 'Gluten-free ✓', 'Pool ✓']);
   assert.equal(facts[0].kind, 'flag');
   // The place to stay is not a stop: its pool stays (the same id as a removed venue is another table's row).
   assert.ok(texts(facts).includes('Pool ✓'));
@@ -62,7 +62,7 @@ test('a stop the visitor removed no longer counts: no "Wineries: 2 ✓" above on
 });
 
 test('French: the same facts in French, and the new page strings exist in both languages', () => {
-  assert.deepEqual(texts(tripSummaryFacts(PLAN, true, {})), ['Musique en direct : selon vos dates', 'Personne qui ne boit pas : 1 sur 3 arrêts', 'Vignobles : 2 ✓', 'Sans gluten ✓', 'Piscine ✓']);
+  assert.deepEqual(texts(tripSummaryFacts(PLAN, true, {})), ['Musique en direct : selon vos dates', 'Options sans alcool : 1 des 3 vignobles et bars en indique · 2 ne le précisent pas', 'Vignobles : 2 ✓', 'Sans gluten ✓', 'Piscine ✓']);
   const src = ws.WORKSPACE_CLIENT_SRC;
   for (const [en, fr] of [['Details', 'Détails'], ['Trip summary', 'Résumé du voyage'], ['Place to stay:', 'Hébergement :'], ['Save trip', 'Enregistrer le voyage'], ['Share trip', 'Partager le voyage']]) {
     assert.ok(src.includes(`twText('${en}','${fr}')`), `${en} / ${fr}`);
@@ -179,4 +179,29 @@ test('the whole page script still parses, and the layout keeps Save, Share, day 
 test('a chat reply that ends with a question opens in full on a phone (the question is not under the two-line cut)', () => {
   const src = require('node:fs').readFileSync(require.resolve('../trip-chat-page.js'), 'utf8');
   assert.match(src, /box\.classList\.contains\('is-long'\) && \/\[\?\\uFF1F\]\\s\*\$\/\.test\(String\(agent \|\| ''\)\)\) box\.classList\.add\('is-open'\)/);
+});
+
+test('one non-drinker: the summary says what is counted and keeps "listed" apart from "doesn’t say"', () => {
+  const ev = (stops) => ({ evidence: [{ ask: 'nonalcoholic', label: 'Non-alcoholic options', labelFr: 'Options sans alcool', status: 'partial', who: 'one', stops }] });
+  const one = (p, fr) => tripSummaryFacts(p, fr, {}).map((x) => x.text);
+  const four = [{ id: 1, name: 'A', has: true }, { id: 2, name: 'B', has: null }, { id: 3, name: 'C', has: null }, { id: 4, name: 'D', has: null }];
+  assert.deepEqual(one(ev(four), false), ['Non-alcoholic options: 1 of 4 wineries & bars lists them · 3 don’t say']);
+  assert.deepEqual(one(ev(four), true), ['Options sans alcool : 1 des 4 vignobles et bars en indique · 3 ne le précisent pas']);
+  // No listing says: unknown, never "has none".
+  const none = one(ev(four.map((x) => ({ ...x, has: null }))), false);
+  assert.deepEqual(none, ['Non-alcoholic options: none of the 4 wineries & bars say']);
+  assert.ok(!/\bno options\b|\bwithout\b|\bnot available\b|: 0 of/.test(none.join(' ')));
+  assert.equal(tripSummaryFacts(ev(four.map((x) => ({ ...x, has: null }))), false, {})[0].status, 'unknown');
+  // Every one lists them: met.
+  assert.deepEqual(one(ev(four.map((x) => ({ ...x, has: true }))), false), ['Non-alcoholic options: listed at all 4 ✓']);
+  // The plan's own kinds of place are named (a plan with no winery, as on Whistler Roam).
+  assert.deepEqual(tripSummaryFacts({ evidence: [{ ...ev(four).evidence[0], unit: { en: 'breweries & bars', fr: 'brasseries et bars' } }] }, false, {}).map((x) => x.text), ['Non-alcoholic options: 1 of 4 breweries & bars lists them · 3 don’t say']);
+  // A removed stop is not counted.
+  assert.deepEqual(tripSummaryFacts(ev(four), false, { removed: { 4: 1 } }).map((x) => x.text), ['Non-alcoholic options: 1 of 3 wineries & bars lists them · 2 don’t say']);
+  // The Details sentence names every counted place and never says a place has none.
+  const hp = require('../trip-honest-plan.js');
+  const src = require('node:fs').readFileSync(require.resolve('../trip-honest-plan.js'), 'utf8');
+  assert.match(src, /of the \$\{rows\.length\} \$\{unit\.long\} in this plan/);
+  assert.match(src, /say either way, so ask there/);
+  assert.ok(hp);
 });
