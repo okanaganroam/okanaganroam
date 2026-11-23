@@ -165,7 +165,7 @@ test('4. "a night in", an anniversary night: one overnight; chains are a mild ti
 
 // ---- 5. Honest "not included" ----
 test('5. only what the visitor asked for is listed as not included; the nearest is by distance', () => {
-  assert.ok(SRC.includes("if (r.kind === 'venue_kind' && r.value === 'ski_lessons' && !/\\b(?:lessons?|ski school|snow school|instructors?|learn\\w*|camps?|clinics?|cours|le[cç]ons?|moniteurs?)\\b/i.test(String(plan.query || ''))) continue;"));
+  assert.ok(SRC.includes("if (r.kind === 'venue_kind' && r.value === 'ski_lessons' && !/\\b(?:lessons?|ski school|snow school|instructors?|learn\\w*|camps?|clinics?|cours|le[cç]ons?|moniteurs?)\\b/i.test(String(plan.query || ''))) { r.silent = true; continue; }"));
   assert.ok(/function v4NearestOfKind\(plan, kind\)/.test(SRC) && /const byKm = r\.kind === 'venue_kind'/.test(SRC));
 });
 
