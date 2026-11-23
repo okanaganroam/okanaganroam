@@ -8139,6 +8139,9 @@ function v4Polish(result, input) {
   for (const i of (ctx.requirements && ctx.requirements.items) || []) if (i.kind === 'venue' && Number.isInteger(i.value)) kept.add(i.value);
   const niceAsked = v4NiceDinnerAsked(text);
   const wineCountAsked = ((ctx.requirements && ctx.requirements.items) || []).some((i) => i.kind === 'type_count' && i.value === 'winery');
+  // Group-preferences round (2026-11-22; "two wineries" on a 3-day trip planned five): a number of wineries asked for the
+  // whole trip is the most the trip visits (v4WineTotalCap, at the end of planning); the afternoon filler adds none.
+  const wineTotalAsked = ((ctx.requirements && ctx.requirements.items) || []).find((i) => i.kind === 'type_count' && i.value === 'winery' && !i.perDay && !i.dayIndex && !i.weekday);
   let changed = false;
   for (const day of result.days) {
     const d = day.day, stops = day.stops || (day.stops = []);
@@ -8304,7 +8307,7 @@ function v4Polish(result, input) {
     const regionList = [].concat(day.regions || day.region || []).filter(Boolean);
     const date = dayDate(ctx, day.day);
     const wd = date ? WEEKDAYS[(new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7] : ctx.startWeekday || null;
-    const types = ['winery', 'outdoor', 'indoor', 'beach'].filter((t) => !(t === 'winery' && (ctx.alcoholFree || ctx.kids)));
+    const types = ['winery', 'outdoor', 'indoor', 'beach'].filter((t) => !(t === 'winery' && (ctx.alcoholFree || ctx.kids || wineTotalAsked)));
     const openOk = (v) => { const f = hoursFit(v, 'afternoon', wd).status; return f === 'verified' || (f === 'unknown' && ['outdoor', 'beach'].includes(v.type)); };
     const pool = facts.filter((v) => types.includes(v.type) && !used.has(v.id) && (!regionList.length || regionList.includes(v.region)) && eligible(v, { ...ctx, types: new Set(), plannerKinds: [] }, false) && !v4FillerSkip(v, ctx)
       && !offSeasonSkip(v, { ...ctx, tripDate: date || ctx.tripDate }) && !seasonClosedOnTrip(v, { date }) && openOk(v) && tripRequirements.venueAllowed(v, { ...(ctx.requirements || {}), items: ((ctx.requirements && ctx.requirements.items) || []).filter((i) => !['type', 'venue_kind', 'type_count'].includes(i.kind)) }, day.day, ctx.tripDate))
@@ -8504,7 +8507,7 @@ function v4SaneDays(result, input, opts = {}) {
   try { refreshPlanCounts(result, input); } catch (e) { /* counts are cosmetic */ }
   return result;
 }
-function planTripOnce(input) { const anchor = input && input.nearAnchor; input = withNearAnchor(withTownMountain(v4Input(input))); const result = dedupeNotes(withoutRepeatedAlternates(planTripUnchecked(input))); if (input && input.v4) { v4Polish(result, input); v4SaneDays(result, input); v4DayTownLabels(result, input); if (input.noCar) { result.noCar = { maxKm: V4_NO_CAR_KM }; if (Array.isArray(result.notes)) result.notes.unshift('No car: every stop is in town, a walk or a short taxi or bus ride apart.'); } } addSuggestedTimes(result, input || {}); if (input && input.v4 && result && result.suggestedTimes) v4SaneDays(result, input, { suggested: true }); labelLateLunches(result); relabelDayparts(result, input || {}); labelSkiEveningStops(result); addBeachSeasonNotes(result, input || {}); if (anchor && anchor.name && Array.isArray(result.notes)) result.notes.unshift(`Places within about ${anchor.km || NEAR_ANCHOR_KM} km of ${anchor.name}.`); namedLeftOutNotes(result, input || {}); tooYoungNotes(result, input || {}); withdrawMetFocusWarnings(result, input || {}); coldWaterNote(result, input || {}); kidsUntilFlags(result, input || {}); return addStory(result, input || {}); }
+function planTripOnce(input) { const anchor = input && input.nearAnchor; input = withNearAnchor(withTownMountain(v4Input(input))); const result = dedupeNotes(withoutRepeatedAlternates(planTripUnchecked(input))); if (input && input.v4) { v4Polish(result, input); v4SaneDays(result, input); v4DayTownLabels(result, input); if (input.noCar) { result.noCar = { maxKm: V4_NO_CAR_KM }; if (Array.isArray(result.notes)) result.notes.unshift('No car: every stop is in town, a walk or a short taxi or bus ride apart.'); } } addSuggestedTimes(result, input || {}); if (input && input.v4 && result && result.suggestedTimes) v4SaneDays(result, input, { suggested: true }); labelLateLunches(result); relabelDayparts(result, input || {}); labelSkiEveningStops(result); addBeachSeasonNotes(result, input || {}); if (anchor && anchor.name && Array.isArray(result.notes)) result.notes.unshift(`Places within about ${anchor.km || NEAR_ANCHOR_KM} km of ${anchor.name}.`); namedLeftOutNotes(result, input || {}); tooYoungNotes(result, input || {}); withdrawMetFocusWarnings(result, input || {}); coldWaterNote(result, input || {}); kidsUntilFlags(result, input || {}); if (input && input.v4) { try { v4WineTotalCap(result, input); v4PartySomeNote(result, input); } catch (e) { /* the plan stands as planned */ } } return addStory(result, input || {}); }
 // Planner (2026-10-27): a short outing's stop is called by the part of the day it is timed in (the audit saw Railside
 // Brewing at 7:45 PM as "afternoon", Barley Mill at 11 AM as "late" and CedarCreek at noon as "morning"). Itineraries and
 // outings only (a day plan's parts are its slots); meal stops keep theirs, and a label that was the old part's name
@@ -8540,6 +8543,67 @@ function afterMidnightTonight(input) {
   return !!(c && WEEKDAYS.includes(c.weekday) && Number.isInteger(c.minutes) && c.minutes >= 0 && c.minutes < NIGHT_ENDS_AT && w && w.preset === 'today' && !w.now && w.daypart === 'evening');
 }
 function afterMidnightNote(weekday) { return `It’s after midnight, so this plan is for ${WEEKDAY_NAMES[weekday]} evening.`; }
+// Group preferences (2026-11-22). "6 friends: two wineries ... One person does not drink":
+// 1. a number of wineries asked for the whole trip is the most the trip visits (five were planned for "two wineries"),
+//    one a day from the first day on; when someone in the party does not drink, a winery whose listing has the
+//    Non-Alcoholic Options badge is kept first. Kept (pinned) stops, tour stops and a winery lunch always stay.
+// 2. result.partySome says whose need it is, and result.partyNote says in one line what the listings support: which of
+//    the plan's wineries, breweries and bars list non-alcoholic options (the listing's own badge, never a guess), or that
+//    none of them says so.
+const DRINK_STOP_TYPES = ['winery', 'brewery', 'cidery', 'distillery', 'pub', 'cocktail'];
+function v4WineTotalCap(result, input) {
+  if (!result || !['multi_day', 'day_plan'].includes(result.kind) || !(result.days || []).length) return result;
+  const items = (input.requirements && input.requirements.items) || [];
+  const asked = items.find((i) => i.kind === 'type_count' && i.value === 'winery' && !i.perDay && !i.dayIndex && !i.weekday);
+  if (!asked || !(asked.count >= 1)) return result;
+  const byId = new Map((input.facts || []).map((v) => [v.id, v]));
+  const kept = new Set(Object.values(input.pinned || {}));
+  const someDry = ((input.intent && input.intent.partySome) || []).some((x) => x.concept === 'alcohol');
+  const badge = (s) => { const f = byId.get(s.venue.id); return !!(f && f.features && f.features.nonalcoholic); };
+  const wines = [];
+  for (const day of result.days) for (const s of day.stops || []) if (s && s.venue && !s.event && s.venue.type === 'winery' && !s.wineryLunch && !s.tourStop) wines.push({ day, s, fixed: kept.has(s.venue.id) });
+  if (wines.length <= asked.count) return result;
+  const keep = new Set(wines.filter((w) => w.fixed).map((w) => w.s));
+  const perDay = new Map();
+  const take = (w) => { keep.add(w.s); perDay.set(w.day, (perDay.get(w.day) || 0) + 1); };
+  for (const w of wines) if (w.fixed) perDay.set(w.day, (perDay.get(w.day) || 0) + 1);
+  // One a day first (the badge first when someone does not drink), then a second on a day, in plan order.
+  for (const round of [1, 2, 3, 4]) {
+    for (const day of result.days) {
+      if (keep.size >= asked.count) break;
+      if ((perDay.get(day) || 0) >= round) continue;
+      const free = wines.filter((w) => w.day === day && !keep.has(w.s));
+      const pick = (someDry && free.find((w) => badge(w.s))) || free[0];
+      if (pick) take(pick);
+    }
+  }
+  const gone = new Set(wines.filter((w) => !keep.has(w.s)).map((w) => w.s));
+  if (!gone.size) return result;
+  for (const day of result.days) {
+    const ids = (day.stops || []).filter((s) => gone.has(s)).map((s) => s.venue.id);
+    if (!ids.length) continue;
+    day.stops = day.stops.filter((s) => !gone.has(s));
+    for (const k of ['schedule', 'suggestedTimes']) if (Array.isArray(result[k])) result[k] = result[k].filter((r) => !(r && (r.day === day.day || r.day === undefined) && ids.includes(r.venueId)));
+    for (const leg of ['legs', 'travel']) if (Array.isArray(day[leg])) day[leg] = day[leg].filter((l) => !(l && (ids.includes(l.fromId) || ids.includes(l.toId))));
+  }
+  try { refreshPlanCounts(result, input); } catch (e) { /* counts are cosmetic */ }
+  return result;
+}
+function v4PartySomeNote(result, input) {
+  const some = ((input.intent && input.intent.partySome) || []).filter((x) => x && x.concept === 'alcohol');
+  if (!result || !some.length) return result;
+  result.partySome = some.map((x) => ({ concept: x.concept }));
+  const byId = new Map((input.facts || []).map((v) => [v.id, v]));
+  const drink = planStopsOf(result).filter((s) => s && s.venue && !s.event && DRINK_STOP_TYPES.includes(s.venue.type));
+  if (!drink.length) return result;
+  const withBadge = drink.filter((s) => { const f = byId.get(s.venue.id); return !!(f && f.features && f.features.nonalcoholic); });
+  const names = withBadge.map((s) => s.venue.name);
+  const list = (a, and) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} ${and} ${a[a.length - 1]}` : a[0]);
+  result.partyNote = names.length
+    ? { concept: 'alcohol', venueIds: withBadge.map((s) => s.venue.id), text: `For your non-drinker: ${list(names, 'and')} ${names.length > 1 ? 'list' : 'lists'} non-alcoholic options.`, textFr: `Pour la personne qui ne boit pas : ${list(names, 'et')} ${names.length > 1 ? 'proposent' : 'propose'} des options sans alcool.` }
+    : { concept: 'alcohol', venueIds: [], text: 'One of you doesn’t drink: none of these tasting stops lists non-alcoholic options on its listing, so ask when you book.', textFr: 'Une personne ne boit pas : aucun de ces arrêts n’indique d’options sans alcool; demandez en réservant.' };
+  return result;
+}
 function planStopsOf(result) { return (result.days || []).flatMap((d) => d.stops || []).concat((result.itinerary && result.itinerary.stops) || [], (result.outing && result.outing.stops) || []); }
 // Planner round 4 (2026-11-22; ⇄ on the tube park moved the rink to 6 PM and changed that night's dinner; adding one stop
 // after dinner moved lunch on both days by half an hour): a one-stop change (input.swap with the times of the stops on
@@ -11543,7 +11607,7 @@ module.exports = {
   SWAP_WANTS, swapWantOk,
   // Build My Trip V4 (2026-11-20)
   outdoorFactsSeasonOff, ADULT_VENUE_RE, EASY_HIKE_ASK_RE, HARD_TRAIL_RE,
-  v4AgentHooks, v4MealStop, tourIncludesMeal, v4MealPacing, v4ClearTourWindow, advisoryClosingFrom, WINTER_NO_WALK_RE, CHAIN_NAME_RE, ERRAND_SHOP_RE, v4SwapSteady, eventKeyMoment, v4Input, v4NoCarInput, v4NoCarFacts, V4_NO_CAR_CORE_KM, v4MealDaypartInput, V4_NO_CAR_KM, v4Polish, v4SaneDays, eventAtDrinkPlace, v4DayTownLabels, v4CasualDinner, v4FillerSkip, v4OffTheme, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
+  v4WineTotalCap, v4PartySomeNote, DRINK_STOP_TYPES, v4AgentHooks, v4MealStop, tourIncludesMeal, v4MealPacing, v4ClearTourWindow, advisoryClosingFrom, WINTER_NO_WALK_RE, CHAIN_NAME_RE, ERRAND_SHOP_RE, v4SwapSteady, eventKeyMoment, v4Input, v4NoCarInput, v4NoCarFacts, V4_NO_CAR_CORE_KM, v4MealDaypartInput, V4_NO_CAR_KM, v4Polish, v4SaneDays, eventAtDrinkPlace, v4DayTownLabels, v4CasualDinner, v4FillerSkip, v4OffTheme, v4NiceDinnerAsked, v4WineDayMax, V4_WINERY_DAY_MAX,
   // Tour test 17 (Whistler, 2026-11-18)
   regionMinutes, PICKUP_ASK_RE, KIND_SEASON_ASK_WORDS, kindSeasonOff, tourTripFor, normWords,
   dropNameOnlyTypes,
