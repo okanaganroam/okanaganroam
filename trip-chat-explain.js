@@ -149,7 +149,7 @@ const TX = {
     cntNoNum: 'Your request asked for {plural} without a number; the plan has {m}: {list}.', cntNotAsked: 'Your request didn’t ask for {plural}; the planner added {list}, and I don’t know more than that. Say “remove {last}” if you’d rather not.', cntNone: 'There’s no {what} in your plan. Say “add {add}” if you’d like one.',
     onDay: '{name} on day {d}', num: ['no', 'one', 'two', 'three', 'four', 'five', 'six'],
     unknownQ: 'I’m not sure what that question is about. I can explain a stop (“why this restaurant?”), a note on the plan (“what does the warning mean?”) or what I last changed.',
-    full: 'Day {d} has no free spot for another {what}.', fullSwap: 'I can swap {name}{at} for {a}', fullOther: 'add one on day {d} at {time}', fullOr: ', or ', fullWhich: '. Which?', fullOne: '. Shall I?', fullI: 'I can ', fullNone: 'Every other stop that day is a meal or one you kept, and the other days are full too, so I left the plan as it is.',
+    full: 'Day {d} has no free spot for another {what}.', fullSwap: 'I can swap {name}{at} for {a}', fullOther: 'add one on day {d} at {time}', fullOr: ', or ', fullWhich: '. Which?', fullWhichF: '. Which?', fullOne: '. Shall I?', fullI: 'I can ', fullNone: 'Every other stop that day is a meal or one you kept, and the other days are full too, so I left the plan as it is.',
     saySwap: 'swap {name} for {a}', sayOther: 'add another {what} on day {d}', sayFeat: 'swap {names} for {word} places',
   },
   fr: {
@@ -165,7 +165,7 @@ const TX = {
     cntNoNum: 'Votre demande parlait de {plural} sans nombre; le plan en a {m} : {list}.', cntNotAsked: 'Votre demande ne parlait pas de {plural}; le planificateur a ajouté {list}, et je n’en sais pas plus. Dites « enlève {last} » si vous préférez.', cntNone: 'Il n’y a pas de {what} dans votre plan. Dites « ajoute {add} » si vous en voulez.',
     onDay: '{name} au jour {d}', num: ['aucun', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six'],
     unknownQ: 'Je ne suis pas sûr de comprendre la question. Je peux expliquer un arrêt (« pourquoi ce restaurant? »), une note du plan (« que veut dire l’avertissement? ») ou mon dernier changement.',
-    full: 'Le jour {d} n’a pas de place libre pour {another}.', fullSwap: 'Je peux remplacer {name}{at} par {a}', fullOther: 'en ajouter un au jour {d} à {time}', fullOr: ', ou ', fullWhich: '. Lequel?', fullOne: '. Je le fais?', fullI: 'Je peux ', fullNone: 'Les autres arrêts de ce jour sont des repas ou des arrêts que vous avez gardés, et les autres jours sont pleins aussi, donc je n’ai rien changé.',
+    full: 'Le jour {d} n’a pas de place libre pour {another}.', fullSwap: 'Je peux remplacer {name}{at} par {a}', fullOther: 'en ajouter {un} au jour {d} à {time}', fullOr: ', ou ', fullWhich: '. Lequel?', fullWhichF: '. Laquelle?', fullOne: '. Je le fais?', fullI: 'Je peux ', fullNone: 'Les autres arrêts de ce jour sont des repas ou des arrêts que vous avez gardés, et les autres jours sont pleins aussi, donc je n’ai rien changé.',
     saySwap: 'remplace {name} par {a}', sayOther: 'ajoute {another} au jour {d}', sayFeat: 'remplace {names} par des endroits {word}',
   },
 };
@@ -271,7 +271,7 @@ function answer(op, facts, lang) {
     if (!on.length) return { reply: fillT(t.cntNone, { what, add: k[L] }) };
     const c = countAsked(facts.fold(facts.request || ''), facts.kindRe(op.kind));
     const list = join(on.slice(0, 5).map((s) => fillT(t.onDay, { name: s.name, d: s.day })));
-    const v = { n: c.n ? (t.num[c.n] || c.n) : '', m: t.num[on.length] || on.length, plural, list, last: on[on.length - 1].name, what, another: L === 'fr' ? `un autre ${what}` : `another ${what}` };
+    const v = { n: c.n ? (t.num[c.n] || c.n) : '', m: t.num[on.length] || on.length, plural, list, last: on[on.length - 1].name, what, another: L === 'fr' ? `${/^une\b/i.test(k.fr) ? 'une' : 'un'} autre ${what}` : `another ${what}` };
     if (!c.asked) return { reply: fillT(t.cntNotAsked, v) };
     if (!c.n) return { reply: fillT(t.cntNoNum, v) };
     return { reply: fillT(on.length === c.n ? t.cntAsked : on.length > c.n ? t.cntMore : t.cntFewer, v) };
@@ -284,13 +284,13 @@ function answer(op, facts, lang) {
 function fullReply(full, h, lang) {
   const L = lang === 'fr' ? 'fr' : 'en';
   const t = TX[L];
-  const what = h.noun(full.kind, L), a = h.KINDS[full.kind][L], another = L === 'fr' ? `un autre ${what}` : `another ${what}`;
+  const what = h.noun(full.kind, L), a = h.KINDS[full.kind][L], fem = L === 'fr' && /^une\b/i.test(a), another = L === 'fr' ? `${fem ? 'une' : 'un'} autre ${what}` : `another ${what}`;
   const head = fillT(t.full, { d: full.day, what, another });
   const offer = [], bits = [];
   if (full.swap) { bits.push(fillT(t.fullSwap, { name: full.swap.name, at: Number.isInteger(full.swap.start) ? ` (${h.clock(full.swap.start, L)})` : '', a })); offer.push({ say: fillT(t.saySwap, { name: full.swap.name, a }), words: [full.swap.name] }); }
-  if (full.other) { bits.push((bits.length ? '' : t.fullI) + fillT(t.fullOther, { d: full.other.day, time: h.clock(full.other.start, L) })); offer.push({ say: fillT(t.sayOther, { what, another, d: full.other.day }), day: full.other.day }); }
+  if (full.other) { bits.push((bits.length ? '' : t.fullI) + fillT(t.fullOther, { d: full.other.day, time: h.clock(full.other.start, L), un: fem ? 'une' : 'un' })); offer.push({ say: fillT(t.sayOther, { what, another, d: full.other.day }), day: full.other.day }); }
   if (!bits.length) return { reply: `${head} ${t.fullNone}`, offer: [] };
-  return { reply: `${head} ${bits.join(t.fullOr)}${bits.length > 1 ? t.fullWhich : t.fullOne}`, offer };
+  return { reply: `${head} ${bits.join(t.fullOr)}${bits.length > 1 ? (fem ? t.fullWhichF : t.fullWhich) : t.fullOne}`, offer };
 }
 // The visitor's answer to an offer ("the first one", "day 3", "swap the park", "yes" when there is one choice): the
 // offered message it stands for, or null (the answer is then read as any other message).
