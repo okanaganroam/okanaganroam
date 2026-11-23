@@ -271,23 +271,24 @@ const V4_CLIENT_SRC = String.raw`
     for (var i = 0; i < rows.length; i++) { var r = rows[i]; if (day != null && r.day !== day) continue; if (s.venue && r.venueId === s.venue.id) return r; }
     return null;
   }
-  var V4_SCHED = {
-    en: { showtimes: ['Showtimes vary', 'showtimes', 'Check showtimes'], classes: ['Class times vary', 'class times', 'Check class times'], sessions: ['Session times vary', 'session times', 'Check session times'] },
-    fr: { showtimes: ['Les séances varient', 'l’horaire des séances', 'Voir les séances'], classes: ['L’horaire des cours varie', 'l’horaire des cours', 'Voir l’horaire des cours'], sessions: ['L’horaire des séances varie', 'l’horaire des séances', 'Voir l’horaire des séances'] }
-  };
-  // The expanded card's time: always the planner's suggestion, never a verified slot. A stop on showtimes, classes or
-  // sessions gets no end time (a film is not an hour long) and the step to check them; any other stop says whether the
-  // suggested time fits its listed hours or the hours are not on file.
+  // The words for a stop that runs on a schedule we do not hold are trip-timing.js's (the one table, put here as it is).
+  __TRIP_TIMING_CLIENT__
+  // The expanded card's time: always the planner's suggestion, never a verified slot. A stop on showtimes, classes,
+  // sessions, lanes or booked slots gets no end time (a film is not an hour long) and the step to check them, with the
+  // children's ages when the plan knows them (or what the listing says about ages); its listed hours that day are still
+  // said, since being open is not a session being on. Any other stop says whether the suggested time fits its listed
+  // hours or the hours are not on file.
   function v4TimingHtml(s, id){
     var key = id && /^\d/.test(id) ? id : null, r = v4Row(s, key), fr = lang() === 'fr', t = stopTime(s, key);
     if (!r || !r.timing || typeof r.startMinutes !== 'number') return t ? '<p><strong>' + esc(t) + '</strong></p>' : '';
     var tm = r.timing, name = s.venue.name;
-    if (tm.schedule) {
-      var w = (fr ? V4_SCHED.fr : V4_SCHED.en)[tm.schedule], h = tm.allowMinutes ? tm.allowMinutes / 60 : 0;
+    if (tm.schedule && TT_WORDS[tm.schedule]) {
+      var h = tm.allowMinutes ? tm.allowMinutes / 60 : 0;
       var head = (fr ? 'Heure suggérée : vers ' : 'Suggested: around ') + clockLabel(r.startMinutes) + (h ? (fr ? ', prévoyez environ ' + String(h).replace('.', ',') + ' h' : ', allow about ' + h + ' h') : '') + '.';
-      var tail = fr ? w[0] + ' : vérifiez ' + w[1] + ' de ' + name + '.' : w[0] + ': check ' + name + '’s ' + w[1] + '.';
-      var link = tm.checkUrl && t3StayExt(tm.checkUrl) ? ' <a ' + hrefAttr(t3StayExt(tm.checkUrl)) + ' target="_blank" rel="nofollow noopener" data-v4-check-times>' + esc(w[2]) + ' <span aria-hidden="true">↗</span></a>' : '';
-      return '<p data-v4-timing="' + esc(tm.schedule) + '"><strong>' + esc(head) + '</strong> ' + esc(tail) + link + '</p>';
+      var cu = tm.checkUrl && t3StayExt(tm.checkUrl), pu = placeUrl(s.venue), open = ttOpen(tm, fr);
+      var link = cu ? ' <a ' + hrefAttr(cu) + ' target="_blank" rel="nofollow noopener" data-v4-check-times' + (tm.checkVia === 'booking' ? ' data-track="booking" data-venue-id="' + esc(s.venue.id) + '"' : '') + '>' + esc(ttLink(tm.schedule, fr)) + ' <span aria-hidden="true">↗</span></a>'
+        : tm.schedule !== 'showtimes' && pu ? ' <a ' + hrefAttr(pu) + ' data-v4-check-times>' + esc(fr ? 'Voir la fiche' : 'View details') + '</a>' : '';
+      return '<p data-v4-timing="' + esc(tm.schedule) + '"><strong>' + esc(head) + '</strong> ' + esc(ttCheck(tm, name, fr)) + link + (open ? ' <span class="v4-quiet" data-v4-open>' + esc(open) + '</span>' : '') + '</p>';
     }
     var known = tm.hours === 'listed';
     return '<p data-v4-timing="' + (known ? 'hours' : 'unknown') + '"><strong>' + esc((fr ? 'Heure suggérée : ' : 'Suggested: ') + t) + '</strong> <span class="v4-quiet">' + esc(known ? (fr ? 'Dans ses heures indiquées.' : 'Within its listed hours.') : (fr ? 'Heures non vérifiées : à confirmer.' : 'Hours not verified: check before you go.')) + '</span></p>';
@@ -516,12 +517,13 @@ const V4_CLIENT_SRC = String.raw`
     days().forEach(function(dd){ dd.stops.forEach(function(s){
       if (!s.venue || state.removed[dd.day + '-' + s.daypart]) return;
       var r = v4Row(s, dd.day + '-' + s.daypart);
-      if (r && r.timing && r.timing.schedule && typeof r.startMinutes === 'number') timed.push({ s: s, r: r, day: dd.day });
+      if (r && r.timing && r.timing.schedule && TT_WORDS[r.timing.schedule] && typeof r.startMinutes === 'number') timed.push({ s: s, r: r, day: dd.day });
     }); });
     if (timed.length) html += '<p class="v4-sheet-h4" data-v4-times-h>' + esc(fr ? 'Horaires à vérifier' : 'Times to check') + '</p><ol class="v4-check" data-v4-times>' + timed.map(function(x){
-      var w = (fr ? V4_SCHED.fr : V4_SCHED.en)[x.r.timing.schedule], cu = x.r.timing.checkUrl && t3StayExt(x.r.timing.checkUrl), pu = placeUrl(x.s.venue);
-      return '<li><span aria-hidden="true" style="text-align:center">◷</span><span class="v4-check-name">' + esc(x.s.venue.name) + '<small>' + esc(vt('day') + ' ' + x.day + ' · ' + (fr ? 'suggéré vers ' : 'suggested around ') + clockLabel(x.r.startMinutes) + ' · ' + w[0].toLowerCase()) + '</small></span>'
-        + (cu ? '<a ' + hrefAttr(cu) + ' target="_blank" rel="nofollow noopener">' + esc(w[2]) + ' <span aria-hidden="true">↗</span></a>' : pu ? '<a ' + hrefAttr(pu) + '>' + esc(vt('details')) + '</a>' : '<span></span>') + '</li>';
+      var tm = x.r.timing, cu = tm.checkUrl && t3StayExt(tm.checkUrl), pu = placeUrl(x.s.venue), why = ttWhy(tm.schedule, fr), ages = ttAgeShort(tm, fr);
+      // One short line: the day, the suggested time, why it must be checked, and the age line when there are children.
+      return '<li><span aria-hidden="true" style="text-align:center">◷</span><span class="v4-check-name">' + esc(x.s.venue.name) + '<small>' + esc(vt('day') + ' ' + x.day + ' · ' + (fr ? 'suggéré vers ' : 'suggested around ') + clockLabel(x.r.startMinutes) + ' · ' + why.charAt(0).toLowerCase() + why.slice(1) + (ages ? ' · ' + ages : '')) + '</small></span>'
+        + (cu ? '<a ' + hrefAttr(cu) + ' target="_blank" rel="nofollow noopener"' + (tm.checkVia === 'booking' ? ' data-track="booking" data-venue-id="' + esc(x.s.venue.id) + '"' : '') + '>' + esc(ttLink(tm.schedule, fr)) + ' <span aria-hidden="true">↗</span></a>' : pu ? '<a ' + hrefAttr(pu) + '>' + esc(vt('details')) + '</a>' : '<span></span>') + '</li>';
     }).join('') + '</ol>';
     if (typeof t3ViatorBlockHtml === 'function') html += t3ViatorBlockHtml(fr, true);
     var aff = steps.some(function(x){ return x.affiliate; }) || (typeof t3ViatorShown === 'function' && t3ViatorShown()) || !!(d && ((d.chosen.bookingLinks || []).some(function(l){ return l && l.affiliate; }) || (d.chosen.livePrices && t3StayExt(d.chosen.livePrices.url))));
@@ -979,5 +981,5 @@ function v4StaySrc(staySrc) {
 }
 
 // "__ROAM_BRAND__" in the browser text is this site's name (trip-site.js), so the Whistler Roam copy says its own.
-const V4_CLIENT = V4_CLIENT_SRC.replace(/__ROAM_BRAND__/g, String(require('./trip-site').brand || 'This site'));
+const V4_CLIENT = V4_CLIENT_SRC.replace(/__ROAM_BRAND__/g, String(require('./trip-site').brand || 'This site')).replace('__TRIP_TIMING_CLIENT__', () => require('./trip-timing').clientSource());
 module.exports = { V4_STYLES, V4_CLIENT_SRC: V4_CLIENT, v4StaySrc };

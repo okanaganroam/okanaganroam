@@ -92,6 +92,20 @@ const MORE_RE = /\b(?:another|a second|a 2nd|one more|an extra|an additional|a t
 const MORE_VERB_RE = /\b(?:add|include|fit in|put in|squeeze in|want|need|ajoute[rz]?|inclure|incluez|veux|voulons|aimerais|aimerions)\b/;
 const FEAT_SWAP_RE = /\b(?:swap|replace|change|switch|remplace[rz]?|change[rz]?|echange[rz]?)\b.*\b(?:for|with|to|pour|par|contre)\b[^.]*\b(?:gluten|vegan\w*|vegetarian\w*|vegetalien\w*|vegetarien\w*|veganes?)\b/;
 
+// Questions about a stop that runs on a schedule we do not hold (its time, the children's ages, booking).
+const SESSION_TIME_RE = /\b(?:what time|when|how long|a quelle heure|quand|combien de temps|quelle heure)\b/;
+const SESSION_AGE_RE = /\b\d{1,2}[- ]?(?:year|yr)s?[- ]?olds?\b|\b(?:ages?|aged)\b|\bold enough\b|\btoo young\b|\b(?:ok|okay|suitable|good|safe|fine|allowed|appropriate) for (?:a |an |my |our |the )?(?:kids?|child(?:ren)?|toddlers?|little ones?|\d)|\b\d{1,2} ans\b|\bconvient\b|\bassez (?:grande?s?|vieux|vieille)\b|\btrop jeunes?\b/;
+const SESSION_BOOK_RE = /\b(?:need|have|should|must) (?:to |we |i )?(?:pre-?book|book|reserve)\b|\breservations?\b|\bbook(?:ing)? (?:ahead|in advance|required|needed)\b|\bfaut-il reserver\b|\bdoit-on reserver\b/;
+// The stop the question is about: a marked stop it names, else the first one of the kind its words name.
+function sessionStop(t, stops, named) {
+  const list = (stops || []).filter((s) => s && s.sched);
+  if (!list.length) return null;
+  const by = (named || []).filter((s) => s && s.sched);
+  if (by.length) return by[0];
+  const k = require('./trip-timing.js').askKind(t);
+  return k ? list.find((s) => s.sched === k) || null : /\b(?:sessions?|seances?)\b/.test(t) ? list[0] : null;
+}
+
 // A message that is a question about the plan (never a request to change it): the turn that answers it may not change
 // the plan, whatever the reader made of it (server.js runTripChatTurn).
 function isExplainQuestion(t) {
@@ -124,6 +138,14 @@ function explainRules(t, h, stops) {
   }
   if (!isQ && !WHY_RE.test(t)) return null;
   if (EDIT_START_RE.test(t)) return null;
+  // A stop that runs on sessions, lanes or booked slots we do not hold (trip-timing.js; server.js marks it s.sched):
+  // "what time is parkour?", "is the parkour gym ok for a 6 year old?", "do we need to book bowling?". Its opening
+  // hours stay the q_open answer.
+  if (isQ) {
+    const topic = SESSION_AGE_RE.test(t) ? 'ages' : SESSION_BOOK_RE.test(t) ? 'book' : SESSION_TIME_RE.test(t) && !/\b(?:open\w*|clos\w*|ouvr\w*|ferm\w*|hours|heures)\b/.test(t) ? 'time' : null;
+    const target = topic ? sessionStop(t, stops, named()) : null;
+    if (target) return ask('q_session', { topic, stops: [target] });
+  }
   // "what time is the movie?", "when does the film start?", "how long is the class?": no showtimes are held (2026-11-23).
   if (isQ && /\b(?:what time|when|how long|a quelle heure|quand|combien de temps|quelle heure)\b/.test(t) && /\b(?:movies?|films?|show(?:ing|time)?s?|cinema|screening|class(?:es)?|lessons?|sessions?|public swim|seances?|cours)\b/.test(t)) return ask('q_showtime');
   // The plan's own warnings: "why did you say you could not fit gluten free…", "what does the warning mean?".

@@ -8473,7 +8473,9 @@ function tripChatStops(list) {
     const role = m ? (daypart === 'midday' && meal ? 'lunch' : ['evening', 'night'].includes(daypart) && v.type !== 'cafe' && meal ? 'dinner' : '')
       : (meal && start !== null && start >= 660 && start <= 870 ? 'lunch' : meal && v.type !== 'cafe' && start !== null && start >= 1020 ? 'dinner' : '');
     out.push({ key: x.key, ref: `s${out.length + 1}`, id: v.id, name: v.name, type: v.type, price: Number(v.price) || null,
-      badges: ['kid_friendly', 'lake_view', 'patio', 'live_music', 'arts_culture', 'dog_friendly', 'nonalcoholic'].filter((b) => v[b] === 1), day: m ? Number(m[1]) : 1, start, role, region: v.region, cuisine: v.cuisine || '', feats: TRIP_CHAT_FEATS.filter((b) => v[b] === 1) });
+      badges: ['kid_friendly', 'lake_view', 'patio', 'live_music', 'arts_culture', 'dog_friendly', 'nonalcoholic'].filter((b) => v[b] === 1), day: m ? Number(m[1]) : 1, start, role, region: v.region, cuisine: v.cuisine || '', feats: TRIP_CHAT_FEATS.filter((b) => v[b] === 1),
+      // A stop that runs on a schedule we do not hold (trip-timing.js), for questions about its time, ages and booking.
+      ...(() => { try { const k = require('./trip-timing').scheduleKind(tripTimingVenue(v.id), venueIndoorInfo(v.id).kinds || []); return k ? { sched: k } : {}; } catch (e) { return {}; } })() });
   }
   return out;
 }
@@ -8613,7 +8615,9 @@ const TRIP_CHAT_STAY_DATES_T = {
     qProposed: 'Your trip is {trip}, so I’d propose {a} → {b}, {n}. Nothing is sent to a booking site until you confirm: say “yes, book those nights” or tell me your check-in and check-out.',
     qNone: 'No dates are set, so the booking links carry none. Tell me when you’re coming.', qPast: 'Those dates have passed, so the booking links carry none. Tell me new dates.',
     night: 'night', nights: 'nights',
-    noTimes: 'I don’t have {what}. The plan allows around {time}; check {name}’s {what}{on}.', noTimesBare: 'I don’t have {what} for {name}; check with them{on}.', noTimed: 'No stop on your plan runs on showtimes or class times that I can see. Every time on the plan is my suggestion, not a booked slot.',
+    noTimes: 'I don’t have {what}. The plan allows around {time}; check {name}’s {what}{on}.', noTimes2: 'I don’t have {has}. The plan allows around {time}; check {name}’s {what}{on}.',
+    agesSaid: '{said} I can’t confirm it suits {who}: check with {name} before you go.', agesNone: '{name}’s listing doesn’t state an age range, so I can’t confirm it suits {who}. Check with them before you go.',
+    sessBook: '{why}, and I can’t see what’s free: check {name}’s {what} before you go.', noTimesBare: 'I don’t have {what} for {name}; check with them{on}.', noTimed: 'No stop on your plan runs on showtimes or class times that I can see. Every time on the plan is my suggestion, not a booked slot.',
     what: { showtimes: 'showtimes', classes: 'class times', sessions: 'session times' }, on: ' for {date}',
   },
   fr: {
@@ -8624,7 +8628,9 @@ const TRIP_CHAT_STAY_DATES_T = {
     qProposed: 'Votre voyage est {trip}; je propose donc {a} → {b}, {n}. Rien n’est envoyé à un site de réservation avant votre accord : dites « oui, réserve ces nuits » ou donnez-moi l’arrivée et le départ.',
     qNone: 'Aucune date n’est choisie; les liens de réservation n’en portent donc aucune. Dites-moi quand vous venez.', qPast: 'Ces dates sont passées; les liens de réservation n’en portent aucune. Donnez-moi de nouvelles dates.',
     night: 'nuit', nights: 'nuits',
-    noTimes: 'Je n’ai pas {what}. Le plan prévoit vers {time}; vérifiez {what} de {name}{on}.', noTimesBare: 'Je n’ai pas {what} de {name}; vérifiez auprès d’eux{on}.', noTimed: 'Aucun arrêt de votre plan ne suit un horaire de séances ou de cours que je connaisse. Chaque heure du plan est ma suggestion, pas une réservation.',
+    noTimes: 'Je n’ai pas {what}. Le plan prévoit vers {time}; vérifiez {what} de {name}{on}.', noTimes2: 'Je n’ai pas {has}. Le plan prévoit vers {time}; vérifiez {what} de {name}{on}.',
+    agesSaid: '{said} Je ne peux pas confirmer que ça convient {who} : vérifiez auprès de {name} avant d’y aller.', agesNone: 'La fiche de {name} n’indique pas de tranche d’âge, donc je ne peux pas confirmer que ça convient {who}. Vérifiez auprès d’eux avant d’y aller.',
+    sessBook: '{why}, et je ne vois pas ce qui est libre : vérifiez {what} de {name} avant d’y aller.', noTimesBare: 'Je n’ai pas {what} de {name}; vérifiez auprès d’eux{on}.', noTimed: 'Aucun arrêt de votre plan ne suit un horaire de séances ou de cours que je connaisse. Chaque heure du plan est ma suggestion, pas une réservation.',
     what: { showtimes: 'l’horaire des séances', classes: 'l’horaire des cours', sessions: 'l’horaire des séances' }, on: ' pour le {date}',
   },
 };
@@ -8682,21 +8688,40 @@ function tripChatShowtimeAnswer(v, stops, lang) {
   const L = lang === 'fr' ? 'fr' : 'en', T = TRIP_CHAT_STAY_DATES_T[L], tt = require('./trip-timing');
   // The kind the question names (a movie is showtimes, a class is class times); else the first such stop.
   const m = tripChat.fold(String(v.message || ''));
-  const want = /\b(?:movies?|films?|cinema|screening|show(?:ing|time)?s?)\b/.test(m) ? 'showtimes' : /\b(?:class(?:es)?|lessons?|cours)\b/.test(m) ? 'classes' : /\b(?:swim\w*|skat\w*|sessions?|seances?)\b/.test(m) ? 'sessions' : null;
+  const want = tt.askKind(m);
   const found = [];
   for (const s of v.stops || []) {
     if ((v.removed || []).includes(s.key)) continue;
-    let row = null; try { row = getVenue(s.id); } catch (e) { row = null; }
-    if (!row) continue;
-    const kind = tt.scheduleKind({ name: row.name, type: row.type }, venueIndoorInfo(row.id).kinds || []);
-    if (kind) found.push({ s, row, kind });
+    let kind = null; try { kind = tt.scheduleKind(tripTimingVenue(s.id), venueIndoorInfo(s.id).kinds || []); } catch (e) { kind = null; }
+    if (kind) found.push({ s, kind });
   }
-  for (const { s, row, kind } of found.filter((x) => !want || x.kind === want).concat(want ? [] : [])) {
-    const day = Number(String(s.key).split('-')[0]) || 0, date = (v.dayDates || [])[day - 1] || null;
-    const on = date ? tripChat.fill(T.on, { date: tripChatNiceDate(date, L) }) : '';
-    return { reply: Number.isInteger(s.start) ? tripChat.fill(T.noTimes, { what: T.what[kind], time: tt.clock(s.start, L === 'fr'), name: row.name, on }) : tripChat.fill(T.noTimesBare, { what: T.what[kind], name: row.name, on }) };
+  const hit = found.find((x) => !want || x.kind === want);
+  return hit ? tripChatSessionAnswer({ topic: 'time', stops: [{ id: hit.s.id, key: hit.s.key, start: hit.s.start }] }, v, L) : { reply: T.noTimed };
+}
+// A stop that runs on sessions, lanes or booked slots we do not hold (trip-timing.js): "what time is parkour?", "is the
+// parkour gym ok for a 6 year old?", "do we need to book bowling?". One honest line from the listing's own data: the
+// plan's time is a suggestion, ages are only what the listing states (never the Kid-Friendly badge), and what is free
+// is never known here.
+function tripChatSessionAnswer(op, v, lang) {
+  const L = lang === 'fr' ? 'fr' : 'en', fr = L === 'fr', T = TRIP_CHAT_STAY_DATES_T[L], tt = require('./trip-timing');
+  const s = (op.stops || [])[0] || {};
+  const day = Number(String(s.key || '').split('-')[0]) || s.day || 0, date = (v.dayDates || [])[day - 1] || null;
+  let tv = null, kind = null;
+  try { tv = tripTimingVenue(s.id, date, Number.isInteger(s.start) ? s.start : null); kind = tv ? tt.scheduleKind(tv, venueIndoorInfo(s.id).kinds || []) : null; } catch (e) { tv = null; }
+  if (!tv || !kind) return { reply: T.noTimed };
+  const on = date ? tripChat.fill(T.on, { date: tripChatNiceDate(date, L) }) : '';
+  const name = tv.name, what = tt.ttWhat(kind, fr), why = tt.ttWhy(kind, fr);
+  if (op.topic === 'ages') {
+    // Who is asked about: the age in the question, else the children's ages the plan knows, else "your kids".
+    const m = /\b(\d{1,2})[- ]?(?:year|yr)s?[- ]?olds?\b|\b(\d{1,2}) ans\b/.exec(tripChat.fold(String(v.message || '')));
+    const n = m ? Number(m[1] || m[2]) : null;
+    let party = null; try { party = tripTimingParty({ ...(v.args && v.args.stay ? v.args.stay : {}), ...(() => { const a = tripPlannerModule().requestKidAgeList(String((v.args && v.args.text) || '').toLowerCase().replace(/-/g, ' ')); return a.length && !((v.args && v.args.stay && v.args.stay.kidAges) || []).length ? { kidAges: a, kids: a.length } : {}; })() }); } catch (e) { party = null; }
+    const who = n !== null && n <= 17 ? (fr ? `à un enfant de ${n} ans` : `a ${n}-year-old`) : tt.ttKids(party || {}, fr) || (fr ? 'à vos enfants' : 'your kids');
+    return { reply: tripChat.fill(tv.ages ? T.agesSaid : T.agesNone, { name, said: tv.ages ? (fr ? tv.ages.fr : tv.ages.en) : '', who }) };
   }
-  return { reply: T.noTimed };
+  if (op.topic === 'book') return { reply: tripChat.fill(T.sessBook, { why, name, what }) };
+  const has = tt.hasNoun(kind, fr);
+  return { reply: Number.isInteger(s.start) ? tripChat.fill(T.noTimes2, { has, what, time: tt.clock(s.start, fr), name, on }) : tripChat.fill(T.noTimesBare, { what: has, name, on }) };
 }
 // "make it 3 rooms", "a room each", "we only need one room": the rooms, and the stay part again so its links carry them.
 function tripChatRoomsTurn(op, { v, plan, req, stops, lang, staysOn, runCore }) {
@@ -9193,6 +9218,7 @@ function tripChatAskTurn(op, { v, stops, lang, runCore, planEvents }) {
   if (op.value === 'q_rooms') return tripChatRoomsAnswer(v, L);
   if (op.value === 'q_stay_dates') return tripChatStayDatesAnswer(v, L);
   if (op.value === 'q_showtime') return tripChatShowtimeAnswer(v, stops, L);
+  if (op.value === 'q_session') return tripChatSessionAnswer(op, v, L);
   if (['q_evidence', 'q_warning', 'q_allergy', 'q_why_event', 'q_why_count'].includes(op.value)) return tripChatHonestTurn(op, { v, stops, lang: L, runCore, planEvents });
   if (['q_why_not', 'q_dry', 'q_changed', 'q_couldnt'].includes(op.value)) return tripChatExplainTurn(op, { v, stops, lang: L, runCore });
   const s = (op.stops || [])[0];
@@ -9401,6 +9427,41 @@ const TRIP_NO_DRIVE_RE = /\b(?:no driving|not driving|don'?t (?:want to )?drive|
 // "coming from Vancouver", "driving up from Calgary", "road trip": they have a car, so no "Rent a car" (2026-11-22).
 const TRIP_NO_CAR_RE = /\b(?:no car|without (?:a |our |my )?car|(?:don['’]?t|do not) (?:have|own) (?:a |our |my )?car|car[- ]free|no vehicle|(?:don['’]?t|do not) drive|(?:coming|arriving|travell?ing|getting there|going) by (?:bus|coach|shuttle|train)|sans (?:voiture|auto)|pas de voiture|pas d['’]auto|en autobus|en autocar)\b/i;
 const TRIP_DRIVING_IN_RE = /\b(?:(?:driving|drive|road ?trip(?:ping)?|coming|travell?ing|heading)\s+(?:up |in |down |over |out )?from|our own car|bringing (?:our|the) car|road ?trip|en voiture|on arrive de|venant de)\b/i;
+// Suggested times (trip-timing.js): the listing's own data a stop's timing is read from. Its name, type and words (its
+// story and its Plan your visit lines), its stored website and booking link (the page's own rule: a booking link that is
+// just the website, or a waiver, is not one), a tasting room's own by-appointment answer, what it states about ages (its
+// owner's Who can come answer, its Ages line, its own words; never the Kid-Friendly badge) and, with a date, its listed
+// hours that day around the suggested time. Nothing is fetched and nothing is guessed.
+function tripTimingVenue(id, date = null, startMinutes = null) {
+  const v = getVenue(id);
+  if (!v) return null;
+  const tt = require('./trip-timing');
+  const key = (u) => String(u || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/[/?#]+$/, '');
+  let visit = {}, own = '', indoor = {};
+  try { visit = venueVisitInfo(id) || {}; } catch (e) { visit = {}; }
+  try { own = String((venueLinks(id) || {}).booking_url || '').trim(); } catch (e) { own = ''; }
+  try { indoor = venueIndoorInfo(id) || {}; } catch (e) { indoor = {}; }
+  const rows = Array.isArray(visit.rows) ? visit.rows.filter((r) => r && typeof r.text === 'string') : [];
+  const book = [own && !(v.website && key(own) === key(v.website)) ? own : '', String(visit.booking_url || '').trim()].find((u) => u && !/\b(?:waivers?|d[ée]charge)\b/i.test(`${u} ${visit.booking_label || ''}`)) || null;
+  const out = { name: v.name, type: v.type, website: v.website, bookingUrl: book, description: v.description || '', text: rows.map((r) => r.text).join(' ') };
+  try { if (['winery', 'brewery', 'distillery'].includes(v.type) && apptType(v.type)) { const a = wineryAppointmentOn(id, date || todayLocal(), v.type); if (a !== null) out.appointment = a; } } catch (e) { /* its words decide */ }
+  try { const line = indoor.age != null && INDOOR_AGE_LINES[indoor.age] ? INDOOR_AGE_LINES[indoor.age][0] : null; const ages = tt.agesStated({ ownerLine: line, rows, description: v.description || '' }); if (ages) out.ages = ages; } catch (e) { /* no age line */ }
+  try {
+    if (hoursModule && v.hours && /^\d{4}-\d{2}-\d{2}$/.test(date || '') && Number.isInteger(startMinutes)) {
+      const day = hoursModule.dayOnDate(hoursModule.parseHours(hoursWithExtras(v)), date);
+      const r = day && day.status === 'open' && Array.isArray(day.ranges) ? day.ranges.find(([a, b]) => a <= startMinutes && startMinutes < b) : null;
+      if (r && r[1] <= 1440 && !(r[0] === 0 && r[1] >= 1440)) out.open = { a: r[0], b: r[1], wd: hoursModule.dateWeekday(date) };
+    }
+  } catch (e) { /* no hours line */ }
+  return out;
+}
+// The children on the trip, for "check it suits ages 6 and 9": their ages as given, else only that there are kids.
+function tripTimingParty(stay) {
+  const s = stay || {};
+  const ages = Array.isArray(s.kidAges) ? s.kidAges.filter((a) => Number.isInteger(a) && a >= 0 && a <= 17) : [];
+  if (ages.length && (!Number.isInteger(s.kids) || s.kids === ages.length)) return { kidAges: ages };
+  return Number.isInteger(s.kids) && s.kids > 0 ? { kids: s.kids } : null;
+}
 function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stayList = null) {
   if (!plan || typeof plan !== 'object') return plan;
   try {
@@ -9415,8 +9476,6 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
     // 9") go to the booking links (Expedia rm1=a2:c6:c9; Booking.com and Stay22 children=2), and "a place with a pool"
     // (hot tub, kitchen) is the stay preference until the chat changes it. Only what the visitor left empty.
     const stayIn = v4 ? { ...(stay || {}) } : stay;
-    // Suggested times (2026-11-23, trip-timing.js): which stops run on showtimes, classes or sessions we do not hold.
-    if (v4) { try { require('./trip-timing').applyTiming(plan, (id) => venueIndoorInfo(id).kinds || [], (id) => { const v = getVenue(id); return v ? { name: v.name, type: v.type, website: v.website } : null; }); } catch (e) { /* times stay as they are */ } }
     // Trip dates (2026-11-23): what the days say and where it came from, for the page, the stay and the shared copy.
     if (v4) { const td = tripDatesOf(plan, stay, now); if (td) { plan.tripDates = td; v4Stay.tripDates = td; } else delete plan.tripDates; }
     if (v4) {
@@ -9442,6 +9501,9 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
       const asked = tripChat.stayTextPref(words);
       if (asked && !stayIn.pref) stayIn.pref = asked;
     }
+    // Suggested times (2026-11-23, trip-timing.js): which stops run on showtimes, classes, sessions, lanes or booked
+    // slots we do not hold, with the children's ages the request or the party control gave (never a guessed age).
+    if (v4) { try { require('./trip-timing').applyTiming(plan, (id) => venueIndoorInfo(id).kinds || [], (id, row) => tripTimingVenue(id, row && row.date, row && row.startMinutes), tripTimingParty(stayIn)); } catch (e) { /* times stay as they are */ } }
     let block = tripStays.whereToStay(plan, stayIn && Object.keys(stayIn).length ? stayIn : null, candidates, todayLocal(now), v4Stay);
     // Travel agent chat: the stay on screen stays through a change to the stops (the other places stay as alternatives).
     if (block && block.pick && tripChatKeepStayId && block.pick.id !== tripChatKeepStayId) {
@@ -54394,7 +54456,7 @@ function tripEventOccurrences(eventId, now = new Date()) {
   return out;
 }
 // onDates (round 9): ref -> 'YYYY-MM-DD', each stop's planned date, for its notice.
-function tripStopsFor(refs, now = new Date(), onDates = {}) {
+function tripStopsFor(refs, now = new Date(), onDates = {}, party = null) {
   const out = [];
   const venueQ = db.prepare('SELECT * FROM venues WHERE id = ?');
   let seasons = new Map(), advisories = new Map();
@@ -54418,8 +54480,16 @@ function tripStopsFor(refs, now = new Date(), onDates = {}) {
         lat: Number.isFinite(Number(row.latitude)) && row.latitude !== null ? Number(row.latitude) : null,
         lng: Number.isFinite(Number(row.longitude)) && row.longitude !== null ? Number(row.longitude) : null,
         query: `${v.name}, ${REGION_LABELS[v.region]}, Okanagan Valley, BC`,
-        // Suggested times (2026-11-23, trip-timing.js): a stop that runs on showtimes, classes or sessions we do not hold.
-        ...(() => { try { const tt = require('./trip-timing'); const k = tt.scheduleKind({ name: v.name, type: v.type }, venueIndoorInfo(v.id).kinds || []); if (!k) return {}; const u = tt.httpsUrl(v.website); return { sched: k, ...(u ? { schedUrl: u } : {}) }; } catch (e) { return {}; } })(),
+        // Suggested times (2026-11-23, trip-timing.js): a stop that runs on showtimes, classes, sessions, lanes or booked
+        // slots we do not hold, read again from the listing: its kind, its own stored link, and its age line (schedAges:
+        // what the listing states, else the children's ages the link carries, for "Check it suits ages 6 and 9.").
+        ...(() => { try {
+          const tt = require('./trip-timing'), tv = tripTimingVenue(v.id);
+          const t = tv ? tt.rowTiming({ startMinutes: 0 }, tv, venueIndoorInfo(v.id).kinds || [], null, party) : null;
+          if (!t || !t.schedule) return {};
+          const ages = t.agesSaid ? { agesSaid: t.agesSaid } : t.kidAges ? { kidAges: t.kidAges } : t.kids ? { kids: true } : null;
+          return { sched: t.schedule, ...(t.checkUrl ? { schedUrl: t.checkUrl } : {}), ...(ages ? { schedAges: ages } : {}) };
+        } catch (e) { return {}; } })(),
         notice: tripStopNotice(v.id, seasons, advisories, parseLocalDate(onDates[ref]) && onDates[ref] !== todayLocal(now) ? onDates[ref] : null, v),
       });
     } else {
@@ -54915,6 +54985,8 @@ ${renderGolfHeaderHtml()}
   function store(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   function esc(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, function(c){ return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function hrefAttr(u){ return ['href', '"' + esc(u) + '"'].join('='); } // round 8: no glued href text for crawlers
+  // Suggested times: the words for a stop that runs on a schedule we do not hold (trip-timing.js, the one table).
+  ${require('./trip-timing').clientSource()}
   var trip = (load(KEY, []) || []).filter(function(x){ return x && typeof x === 'object' && typeof x.name === 'string' && x.name; });
   var days = load(DAYS, {}) || {};
   // The planner's dates and times (2026-10-19): ref -> { d: 'YYYY-MM-DD', s: start minutes, e: end minutes }.
@@ -54937,6 +55009,8 @@ ${renderGolfHeaderHtml()}
   // Honest plan (2026-11-22): a link made from a plan carries each stop's start time (t=615,690,...), in the stops' order.
   var sharedTimes = (params.get('t') || '').split(',').map(function(n){ return /^\\d{1,4}$/.test(n) && Number(n) < 1440 ? Number(n) : null; });
   var sharedKids = /^[1-9]\\d?$/.test(params.get('kids') || '');
+  // The children's ages the link carries (ka=6,9), for a scheduled stop's age line.
+  var sharedKa = /^\\d{1,2}(?:,\\d{1,2}){0,11}$/.test(params.get('ka') || '') ? params.get('ka') : '';
   var isFr = document.documentElement.lang === 'fr';
   function addDays(iso, n){ var t = new Date(iso + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
   function dateText(iso){
@@ -54979,7 +55053,7 @@ ${renderGolfHeaderHtml()}
     var when = {};
     list().forEach(function(s){ var d = plannedDate(s.time); if (d && !when[s.ref]) when[s.ref] = d; });
     var on = need.map(function(r){ return when[r] || ''; });
-    return fetch('/api/trip-stops?refs=' + encodeURIComponent(need.join(',')) + (on.some(Boolean) ? '&on=' + encodeURIComponent(on.join(',')) : '') + (viewing === 'shared' ? '&book=1' + (sharedKids ? '&kids=1' : '') : '')).then(function(r){ return r.json(); }).then(function(d){ (d.stops || []).forEach(function(x){ info[x.ref] = x; }); }).catch(function(){});
+    return fetch('/api/trip-stops?refs=' + encodeURIComponent(need.join(',')) + (on.some(Boolean) ? '&on=' + encodeURIComponent(on.join(',')) : '') + (viewing === 'shared' ? '&book=1' + (sharedKids ? '&kids=1' + (sharedKa ? '&ka=' + sharedKa : '') : '') : '')).then(function(r){ return r.json(); }).then(function(d){ (d.stops || []).forEach(function(x){ info[x.ref] = x; }); }).catch(function(){});
   }
   // Events on My Trip (2026-10-19, round 10): an event added from What's On or its own page is saved with its date and
   // start and end time (the API's occ list, its upcoming dates): the date of a planned day when it is on then (and it
@@ -55069,8 +55143,9 @@ ${renderGolfHeaderHtml()}
           var tx = timeText(x.s.time), sk = d.sched && tx && !(x.s.time && Number.isFinite(x.s.time.e)) && /^venue:/.test(x.s.ref || '') ? d.sched : '';
           if (sk) tx = (fr ? 'vers ' : 'around ') + tx;
           var meta = d.missing ? T.gone : [ownDate, tx, (fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' · ');
-          var skWords = sk ? (fr ? { showtimes: ['Les séances varient', 'Voir les séances'], classes: ['L’horaire des cours varie', 'Voir l’horaire des cours'], sessions: ['L’horaire des séances varie', 'Voir l’horaire des séances'] } : { showtimes: ['Showtimes vary', 'Check showtimes'], classes: ['Class times vary', 'Check class times'], sessions: ['Session times vary', 'Check session times'] })[sk] : null;
-          var skHtml = skWords ? '<span class="mt-sched" data-mt-sched="' + esc(sk) + '">' + esc(skWords[0]) + (d.schedUrl ? (fr ? ' : ' : ': ') + '<a ' + hrefAttr(d.schedUrl) + ' target="_blank" rel="nofollow noopener">' + esc(skWords[1]) + ' <span aria-hidden="true">↗</span></a>' : (fr ? ' : vérifiez avant d’y aller.' : ': check before you go.')) + '</span>' : '';
+          // The words are trip-timing.js's (one table): why it varies, the link in the kind's words, and the age line.
+          var skWords = sk && TT_WORDS[sk] ? [ttWhy(sk, fr), ttLink(sk, fr)] : null, skAges = skWords && d.schedAges ? ttAgeNote({ schedule: sk, agesSaid: d.schedAges.agesSaid, kidAges: d.schedAges.kidAges, kids: d.schedAges.kids }, fr) : '';
+          var skHtml = skWords ? '<span class="mt-sched" data-mt-sched="' + esc(sk) + '">' + esc(skWords[0]) + (d.schedUrl ? (fr ? ' : ' : ': ') + '<a ' + hrefAttr(d.schedUrl) + ' target="_blank" rel="nofollow noopener">' + esc(skWords[1]) + ' <span aria-hidden="true">↗</span></a>' : (fr ? ' : vérifiez avant d’y aller.' : ': check before you go.')) + (skAges ? ' <span data-mt-sched-ages>' + esc(skAges) + '</span>' : '') + '</span>' : '';
           var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="' + esc(T.moveUp.replace('{name}', x.s.name)) + '"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="' + esc(T.moveDown.replace('{name}', x.s.name)) + '"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="' + esc(T.remove.replace('{name}', x.s.name)) + '">✕</button></div>' : '';
           // A closure or advisory on the stop (round 8, 2026-10-19), as on its card.
           var nt = d.notice && (fr && d.notice.textFr || d.notice.text);
@@ -81778,7 +81853,9 @@ const server = http.createServer(async (req, res) => {
       const on = String(query.on || '').split(',').slice(0, MY_TRIP_MAX_REFS);
       const onDates = {};
       refs.forEach((r, i) => { const dt = (on[i] || '').trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(dt) && parseLocalDate(dt) && !onDates[r]) onDates[r] = dt; });
-      const stopsOut = tripStopsFor(refs, new Date(), onDates);
+      // ka= (suggested times): the children's ages a shared link carries (ka=6,9), for a scheduled stop's age line.
+      const ka = /^\d{1,2}(?:,\d{1,2}){0,11}$/.test(String(query.ka || '')) ? String(query.ka).split(',').map(Number).filter((a) => a >= 0 && a <= 17) : [];
+      const stopsOut = tripStopsFor(refs, new Date(), onDates, ka.length ? { kidAges: ka } : query.kids === '1' ? { kids: 1 } : null);
       // Honest plan (2026-11-22): a shared plan's stops with each listing's own booking link (book=1), checked as its own.
       if (query.book === '1') {
         for (const st of stopsOut) {
@@ -84466,7 +84543,7 @@ module.exports = {
   sportTimesChange, searchWithoutNegated,
   // Sport test 2 (2026-11-20): the golf winter rule.
   golfWinterSeasonMap, GOLF_WINTER_RULE_ON, golfCardBasis, sportMainKind, sportPartSeasons, priceListWordsFor,
-  runTripPlanWithStay, tripDatesOf, withTripStays, tripStayCandidates, isTripStaysEnabled, tripStaysEnabledFor, isTripV4Enabled, tripV4EnabledFor,
+  runTripPlanWithStay, tripTimingVenue, tripTimingParty, tripDatesOf, withTripStays, tripStayCandidates, isTripStaysEnabled, tripStaysEnabledFor, isTripV4Enabled, tripV4EnabledFor,
   tripBookingChecklist,
   // Planner (2026-10-27): the happy hour crawl.
   tripHappyHourAsk,

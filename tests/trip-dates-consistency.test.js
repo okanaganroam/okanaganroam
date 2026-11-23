@@ -254,7 +254,7 @@ test('6. a cinema’s time is a suggestion with the step to check showtimes; a s
   assert.equal(tt.scheduleKind({ name: 'Any Name', type: 'indoor' }, ['classes']), 'classes');
   assert.equal(tt.scheduleKind({ name: 'Community Centre (Pool & Lazy River)', type: 'indoor' }, []), 'sessions');
   assert.equal(tt.scheduleKind({ name: 'The Cinema Bistro', type: 'restaurant' }, []), null, 'only indoor and sport listings are read by name');
-  assert.equal(tt.scheduleKind({ name: 'Bowling Lanes', type: 'indoor' }, ['bowling']), null);
+  assert.equal(tt.scheduleKind({ name: 'Bowling Lanes', type: 'indoor' }, ['bowling']), 'lanes', 'bowling is booked by the lane (tests/trip-session-timing.test.js)');
   const p = { schedule: [
     { day: 1, venueId: 1, status: 'estimated', startMinutes: 1080, endMinutes: 1170 },
     { day: 1, venueId: 2, status: 'provisional', startMinutes: 1185, endMinutes: 1245, confirmationReasons: ['hours', 'visit_duration', 'travel'] },
@@ -277,7 +277,10 @@ test('6. a cinema’s time is a suggestion with the step to check showtimes; a s
   assert.match(V4, /r\.timing && r\.timing\.schedule \? \(lang\(\) === 'fr' \? 'vers ' : 'around '\) : ''/);
   assert.match(V4, /out \+= v4TimingHtml\(s, id\);/);
   assert.doesNotMatch(V4, /if \(t\) out \+= '<p><strong>' \+ esc\(t\) \+ '<\/strong><\/p>';/);
-  for (const s of ['Suggested: around ', ', allow about ', 'Showtimes vary', 'Check showtimes', 'Class times vary', 'Session times vary', 'Within its listed hours.', 'Hours not verified: check before you go.', 'Heure suggérée : vers ', ', prévoyez environ ', 'Les séances varient', 'Voir les séances', 'Dans ses heures indiquées.', 'Heures non vérifiées : à confirmer.']) assert.ok(V4.includes(s), s);
+  // The words for showtimes, classes and sessions are trip-timing.js's one table, put into the page's script as it is.
+  const V4C = require('../trip-planner-v4-page.js').V4_CLIENT_SRC;
+  assert.ok(V4.includes('__TRIP_TIMING_CLIENT__') && !V4C.includes('__TRIP_TIMING_CLIENT__'));
+  for (const s of ['Suggested: around ', ', allow about ', 'Showtimes vary', 'Check showtimes', 'Class times vary', 'Session times vary', 'Within its listed hours.', 'Hours not verified: check before you go.', 'Heure suggérée : vers ', ', prévoyez environ ', 'Les séances varient', 'Voir les séances', 'Dans ses heures indiquées.', 'Heures non vérifiées : à confirmer.']) assert.ok(V4C.includes(s), s);
   // The Book my trip sheet lists them under "Times to check", with the same step.
   assert.ok(V4.includes("fr ? 'Horaires à vérifier' : 'Times to check'") && V4.includes("fr ? 'suggéré vers ' : 'suggested around '"));
   // The shared copy marks the same stops (the listing is read again there).
