@@ -239,9 +239,24 @@ function ttAgeShort(t, fr) {
   var list = a.length === 1 ? String(a[0]) : a.slice(0, -1).join(', ') + (fr ? ' et ' : ' and ') + a[a.length - 1];
   return fr ? 'vérifiez l’âge (' + list + ' ans)' : 'check ' + (a.length === 1 ? 'age ' : 'ages ') + list;
 }
+// The short note a collapsed stop card and the shared copy show for a suggested time (2026-11-22, Dayton: on a phone
+// the card only said "around 9:45 AM"; why, and where to check, was one tap away): "Suggested time · Check sessions ↗",
+// « Heure suggérée · Voir les séances ↗ ». The second part is the kind's own link label and a real link: url is the
+// listing's stored link (ext: true, a new tab) or its own page on this site (ext: false). The link's accessible name
+// says the place: "Check sessions for Ethos Parkour & Movement, opens in a new tab". esc: the page's own HTML escape;
+// attrs: the page's own extra attributes for the link. With no link at all the words are plain text.
+function ttNote(t, name, fr, url, ext, esc, attrs) {
+  var w = t && TT_WORDS[t.schedule];
+  if (!w) return '';
+  var head = fr ? 'Heure suggérée' : 'Suggested time', label = fr ? w.fr[2] : w.en[2];
+  if (!url) return '<span class="tt-note" data-tt-note="' + esc(t.schedule) + '">' + esc(head + ' · ' + label) + '</span>';
+  var say = label + (fr ? ' chez ' : ' for ') + name + (ext ? (fr ? ', s’ouvre dans un nouvel onglet' : ', opens in a new tab') : '');
+  return '<span class="tt-note" data-tt-note="' + esc(t.schedule) + '">' + esc(head) + ' · <a ' + ['href', '"' + esc(url) + '"'].join('=') + (ext ? ' target="_blank" rel="nofollow noopener"' : '') + (attrs || '')
+    + ' aria-label="' + esc(say) + '">' + esc(label) + (ext ? ' <span aria-hidden="true">↗</span>' : '') + '</a></span>';
+}
 // The words and the functions above, for a page's own script.
 function clientSource() {
-  return 'var TT_WORDS = ' + JSON.stringify(TT_WORDS).replace(/</g, '\\u003c') + ';\n' + [ttClock, ttKids, ttCheck, ttOpen, ttLink, ttWhy, ttWhat, ttAgeNote, ttAgeShort].map((f) => f.toString()).join('\n');
+  return 'var TT_WORDS = ' + JSON.stringify(TT_WORDS).replace(/</g, '\\u003c') + ';\n' + [ttClock, ttKids, ttCheck, ttOpen, ttLink, ttWhy, ttWhat, ttAgeNote, ttAgeShort, ttNote].map((f) => f.toString()).join('\n');
 }
 
 const clock = ttClock;
@@ -282,4 +297,4 @@ const WORDS = { en: { around: 'around', check: {}, none: {} }, fr: { around: 've
 for (const k of Object.keys(TT_WORDS)) for (const l of ['en', 'fr']) { WORDS[l][k] = TT_WORDS[k][l][0]; WORDS[l].none[k] = TT_WORDS[k][l][1]; WORDS[l].check[k] = TT_WORDS[k][l][2]; }
 
 module.exports = { TT_WORDS, SCHEDULE_OF, scheduleKind, askKind, hasNoun, checkLink, agePhrase, agesStated, rowTiming, applyTiming, WORDS, clock, allowText, suggestedLine, httpsUrl,
-  ttClock, ttKids, ttCheck, ttOpen, ttLink, ttWhy, ttWhat, ttAgeNote, ttAgeShort, clientSource };
+  ttClock, ttKids, ttCheck, ttOpen, ttLink, ttWhy, ttWhat, ttAgeNote, ttAgeShort, ttNote, clientSource };

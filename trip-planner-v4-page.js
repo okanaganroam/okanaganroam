@@ -61,6 +61,10 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-more ul { margin: 0 0 6px; padding-left: 18px; }
   .t3-v4 .v4-more a { color: var(--ref-navy); font-weight: 800; }
   .t3-v4 .v4-quiet { color: var(--ref-navy-muted, #56636E); }
+  /* A suggested time's note on the collapsed card: one small line, the link's hit area 44px tall without adding height. */
+  .t3-v4 .v4-note { margin: -6px 0 6px; padding: 0 14px 0 80px; font-size: 0.8rem; line-height: 1.45; font-weight: 700; color: var(--ref-navy-muted, #56636E); }
+  .t3-v4 .v4-note a { position: relative; white-space: nowrap; color: var(--ref-navy, #1B303C); font-weight: 800; text-decoration: underline; text-underline-offset: 3px; }
+  .t3-v4 .v4-note a::after { content: ""; position: absolute; inset: -14px -6px; }
   .t3-v4 .v4-leg { list-style: none; padding: 4px 12px 4px 80px; font-size: 0.78rem; font-weight: 700; color: var(--ref-navy-muted, #56636E); background: rgba(27,43,58,0.03); }
   .t3-v4 .v4-free .v4-name, .t3-v4 .v4-gone .v4-name { font-weight: 700; color: var(--ref-navy-muted, #56636E); }
   .t3-v4 .v4-gone .v4-name { text-decoration: line-through; }
@@ -147,7 +151,7 @@ const V4_STYLES = `<style>
     .t3-v4 .v4-row { grid-template-columns: 72px minmax(0, 1fr) auto; padding: 12px 10px 12px 14px; }
     .t3-v4 .v4-thumb { width: 72px; height: 72px; }
     .t3-v4 .v4-confirmed .v4-row { grid-template-columns: 72px minmax(0, 1fr); }
-    .t3-v4 .v4-more, .t3-v4 .v4-leg, .t3-v4 .t3-swap-note, .t3-v4 .t3-edit-error { padding-left: 100px; }
+    .t3-v4 .v4-more, .t3-v4 .v4-note, .t3-v4 .v4-leg, .t3-v4 .t3-swap-note, .t3-v4 .t3-edit-error { padding-left: 100px; }
     .t3-v4 .v4-sheet { margin: auto; border-radius: 20px; }
   }
 </style>`;
@@ -273,11 +277,21 @@ const V4_CLIENT_SRC = String.raw`
   }
   // The words for a stop that runs on a schedule we do not hold are trip-timing.js's (the one table, put here as it is).
   __TRIP_TIMING_CLIENT__
+  // The collapsed card's short note for a suggested time (2026-11-22): "Suggested time · Check sessions ↗", the kind's
+  // own link label as a real link to the listing's stored link (its booking link or website), else to its own page.
+  // -> { html, url } | null (a walk-in place, an event and a tour with a departure get none).
+  function v4Note(s, key){
+    var r = s && s.venue ? v4Row(s, key) : null, tm = r && r.timing;
+    if (!tm || !tm.schedule || !TT_WORDS[tm.schedule] || typeof r.startMinutes !== 'number') return null;
+    var cu = tm.checkUrl && t3StayExt(tm.checkUrl), url = cu || placeUrl(s.venue) || '';
+    var attrs = ' data-v4-check-times' + (cu && tm.checkVia === 'booking' ? ' data-track="booking" data-venue-id="' + esc(s.venue.id) + '"' : '');
+    return { url: url, html: '<p class="v4-note">' + ttNote(tm, s.venue.name, lang() === 'fr', url, !!cu, esc, attrs) + '</p>' };
+  }
   // The expanded card's time: always the planner's suggestion, never a verified slot. A stop on showtimes, classes,
   // sessions, lanes or booked slots gets no end time (a film is not an hour long) and the step to check them, with the
   // children's ages when the plan knows them (or what the listing says about ages); its listed hours that day are still
-  // said, since being open is not a session being on. Any other stop says whether the suggested time fits its listed
-  // hours or the hours are not on file.
+  // said, since being open is not a session being on. The link for that step is the card's note, right above (one link,
+  // not two in a row). Any other stop says whether the suggested time fits its listed hours or the hours are not on file.
   function v4TimingHtml(s, id){
     var key = id && /^\d/.test(id) ? id : null, r = v4Row(s, key), fr = lang() === 'fr', t = stopTime(s, key);
     if (!r || !r.timing || typeof r.startMinutes !== 'number') return t ? '<p><strong>' + esc(t) + '</strong></p>' : '';
@@ -285,10 +299,8 @@ const V4_CLIENT_SRC = String.raw`
     if (tm.schedule && TT_WORDS[tm.schedule]) {
       var h = tm.allowMinutes ? tm.allowMinutes / 60 : 0;
       var head = (fr ? 'Heure suggérée : vers ' : 'Suggested: around ') + clockLabel(r.startMinutes) + (h ? (fr ? ', prévoyez environ ' + String(h).replace('.', ',') + ' h' : ', allow about ' + h + ' h') : '') + '.';
-      var cu = tm.checkUrl && t3StayExt(tm.checkUrl), pu = placeUrl(s.venue), open = ttOpen(tm, fr);
-      var link = cu ? ' <a ' + hrefAttr(cu) + ' target="_blank" rel="nofollow noopener" data-v4-check-times' + (tm.checkVia === 'booking' ? ' data-track="booking" data-venue-id="' + esc(s.venue.id) + '"' : '') + '>' + esc(ttLink(tm.schedule, fr)) + ' <span aria-hidden="true">↗</span></a>'
-        : tm.schedule !== 'showtimes' && pu ? ' <a ' + hrefAttr(pu) + ' data-v4-check-times>' + esc(fr ? 'Voir la fiche' : 'View details') + '</a>' : '';
-      return '<p data-v4-timing="' + esc(tm.schedule) + '"><strong>' + esc(head) + '</strong> ' + esc(ttCheck(tm, name, fr)) + link + (open ? ' <span class="v4-quiet" data-v4-open>' + esc(open) + '</span>' : '') + '</p>';
+      var open = ttOpen(tm, fr);
+      return '<p data-v4-timing="' + esc(tm.schedule) + '"><strong>' + esc(head) + '</strong> ' + esc(ttCheck(tm, name, fr)) + (open ? ' <span class="v4-quiet" data-v4-open>' + esc(open) + '</span>' : '') + '</p>';
     }
     var known = tm.hours === 'listed';
     return '<p data-v4-timing="' + (known ? 'hours' : 'unknown') + '"><strong>' + esc((fr ? 'Heure suggérée : ' : 'Suggested: ') + t) + '</strong> <span class="v4-quiet">' + esc(known ? (fr ? 'Dans ses heures indiquées.' : 'Within its listed hours.') : (fr ? 'Heures non vérifiées : à confirmer.' : 'Hours not verified: check before you go.')) + '</span></p>';
@@ -392,7 +404,7 @@ const V4_CLIENT_SRC = String.raw`
       + '<div class="v4-acts">'
       + (key ? (s.noSwap ? '' : '<button type="button" class="v4-icon" data-t3-swap="' + esc(key) + '" aria-label="' + esc(vt('swap', { name: v.name })) + '" title="' + esc(vt('swap', { name: v.name })) + '">⇄</button>') + '<button type="button" class="v4-icon" data-t3-remove="' + esc(key) + '" aria-label="' + esc(vt('remove', { name: v.name })) + '" title="' + esc(vt('remove', { name: v.name })) + '">✕</button>'
         : '<button type="button" class="v4-icon" data-t3-swap-id="' + esc(v.id) + '" aria-label="' + esc(vt('swap', { name: v.name })) + '" title="' + esc(vt('swap', { name: v.name })) + '">⇄</button><button type="button" class="v4-icon" data-v4-remove-id="' + esc(v.id) + '" aria-label="' + esc(vt('remove', { name: v.name })) + '" title="' + esc(vt('remove', { name: v.name })) + '">✕</button>')
-      + '</div></div>'
+      + '</div></div>' + (v4Note(s, key) || { html: '' }).html
       + '<div class="v4-more" id="' + did + '"' + (v4.open[id] ? '' : ' hidden') + '>' + v4Details(s, id) + '</div>'
       + v4TripBtn(v, key) + '</li>';
     return html;

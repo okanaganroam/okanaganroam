@@ -9,6 +9,7 @@
 //      with ages 6 and 9, the listing's stored link     3. a listing that states ages is quoted, never guessed; a badge
 //      is not an age statement         4. a walk-in place, an event and a tour keep their own lines; the cinema is as
 //      it was                          5. the Book my trip sheet and the shared copy carry the stop   6. the chat
+//   7. the collapsed card and the shared copy say it in one short line: "Suggested time · Check sessions ↗"
 // No network.
 require('../test-network-guard').install();
 const test = require('node:test');
@@ -117,8 +118,7 @@ test('2. the exact request with a parkour gym: a suggested time, the check-sessi
   // The card: "around" on the pill; the expanded line is the table's sentence with one link to the stored link (the
   // listing's own page, "View details", when it stores none); its listed hours are still said when it has them.
   assert.match(V4, /r\.timing && r\.timing\.schedule \? \(lang\(\) === 'fr' \? 'vers ' : 'around '\) : ''/);
-  assert.match(V4, /esc\(ttCheck\(tm, name, fr\)\) \+ link \+ \(open \? /);
-  assert.ok(V4.includes("fr ? 'Voir la fiche' : 'View details'"));
+  assert.match(V4, /esc\(ttCheck\(tm, name, fr\)\) \+ \(open \? /, 'the sentence, then its listed hours; the link is the card’s note above (test 7)');
   // A party with children but no ages given: "your kids". One child: "age 6". No children: no age line at all.
   const t = (party) => tt.rowTiming({ startMinutes: 540, confirmationReasons: ['hours'] }, app.tripTimingVenue(FIX.parkour.id), [], null, party);
   assert.equal(tt.ttCheck(t({ kids: 2 }), 'X', false), 'Sessions and drop-in times vary: check X’s schedule and that it suits your kids.');
@@ -197,7 +197,7 @@ test('5. the Book my trip sheet and the shared copy carry the parkour stop', () 
   // The page asks for the stops with the link's ages (ka=6,9), and prints "around", why, the link and the age line.
   assert.ok(SERVER.includes("(sharedKa ? '&ka=' + sharedKa : '')"));
   assert.match(SERVER, /if \(sk\) tx = \(fr \? 'vers ' : 'around '\) \+ tx;/);
-  assert.ok(SERVER.includes('[ttWhy(sk, fr), ttLink(sk, fr)]') && SERVER.includes('data-mt-sched-ages'));
+  assert.ok(SERVER.includes("ttNote({ schedule: sk }, d.name || x.s.name, fr, skTo, skTo === d.schedUrl && !!skTo, esc, '')") && SERVER.includes('data-mt-sched-ages'));
 });
 
 test('6. the chat answers about the time, the ages and booking from the same data', async () => {
@@ -222,4 +222,80 @@ test('6. the chat answers about the time, the ages and booking from the same dat
   assert.deepEqual(marked.map((s) => s.sched), ['lanes', 'dropin', 'dropin']);
   assert.doesNotMatch(await turn('is the gymnastics gym open Sunday?'), /session and drop-in times/);
   assert.equal(tt.askKind(tc.fold('what time is the movie?')), 'showtimes');
+});
+
+// ---- 7. the short note (2026-11-22, Dayton: "show a short, visible note on scheduled-activity cards when the time is
+// only a suggestion, for example 'Suggested time · Check sessions'") ----
+const WS = require('../trip-workspace-layout.js');
+const escHtml = (x) => String(x).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// The page's own v4Row and v4Note, run here as they are sent, over a plan's schedule rows.
+function cardNote(rows, fr) {
+  const fn = (name) => { const a = V4.indexOf(`  function ${name}(`); assert.ok(a !== -1, name); return V4.slice(a, V4.indexOf('\n  }\n', a) + 5); };
+  const make = new Function('state', 'lang', 'esc', 't3StayExt', 'placeUrl', `${tt.clientSource()}\n${fn('v4Row')}\n${fn('v4Note')}\nreturn v4Note;`);
+  return make({ last: { schedule: rows } }, () => (fr ? 'fr' : 'en'), escHtml, (u) => (typeof u === 'string' && /^https:\/\/[^\s"'<>]+$/.test(u) ? u : null), (v) => (v && v.slug ? `${fr ? '/fr' : ''}/penticton/indoor/${v.slug}` : null));
+}
+test('7. the collapsed card shows one short note with the kind’s link label, a real link and an accessible name; the shared copy prints it', () => {
+  const party = { kidAges: [6, 9] };
+  const cinema = { id: 900001, name: 'Landmark Cinemas 7 Penticton', type: 'indoor', website: 'https://www.landmarkcinemas.com/penticton', slug: 'landmark-cinemas-7-penticton' };
+  const plain = { id: 900002, name: 'No Link Escape Rooms', type: 'indoor', slug: 'no-link-escape-rooms' };
+  const rows = [
+    { day: 1, venueId: FIX.parkour.id, startMinutes: 585, confirmationReasons: ['hours'] },
+    { day: 1, venueId: cinema.id, startMinutes: 1185, confirmationReasons: ['hours'] },
+    { day: 2, venueId: FIX.bowl.id, startMinutes: 600, confirmationReasons: ['hours'] },
+    { day: 2, venueId: FIX.museum.id, date: '2026-12-06', startMinutes: 780, status: 'estimated' },
+    { day: 2, eventId: 7, startMinutes: 840 },
+    { day: 2, venueId: 900003, startMinutes: 990, departure: true },
+    { day: 2, venueId: 900004, startMinutes: 1060, bookDeparture: true },
+    { day: 2, venueId: plain.id, startMinutes: 1140, confirmationReasons: ['hours'] },
+  ];
+  tt.applyTiming({ schedule: rows }, () => [], (id, row) => (id === cinema.id ? cinema : id === plain.id ? plain : id >= 900003 ? { name: 'Tour', type: 'tour' } : app.tripTimingVenue(id, row.date, row.startMinutes)), party);
+  const stop = (v) => ({ venue: { id: v.id, name: v.name, slug: v.slug } });
+  const pk = { id: FIX.parkour.id, name: FIX.parkour.name, slug: 'session-fixture-parkour' }, bowl = { id: FIX.bowl.id, name: FIX.bowl.name, slug: 'session-fixture-lanes' }, museum = { id: FIX.museum.id, name: FIX.museum.name, slug: 'session-fixture-museum' };
+  const en = cardNote(rows, false), fr = cardNote(rows, true);
+  const link = (label, href, say, more = '') => `<a href="${href}" target="_blank" rel="nofollow noopener" data-v4-check-times${more} aria-label="${say}">${label} <span aria-hidden="true">↗</span></a>`;
+  // Parkour (sessions and drop-in times): the listing's stored website.
+  assert.deepEqual(en(stop(pk), '1-morning'), { url: 'https://fixture-parkour.example.com/', html: `<p class="v4-note"><span class="tt-note" data-tt-note="dropin">Suggested time · ${link('Check sessions', 'https://fixture-parkour.example.com/', 'Check sessions for Fixture Parkour &amp; Movement, opens in a new tab')}</span></p>` });
+  assert.equal(fr(stop(pk), '1-morning').html, `<p class="v4-note"><span class="tt-note" data-tt-note="dropin">Heure suggérée · ${link('Voir les séances', 'https://fixture-parkour.example.com/', 'Voir les séances chez Fixture Parkour &amp; Movement, s’ouvre dans un nouvel onglet')}</span></p>`);
+  // The cinema (showtimes).
+  assert.equal(en(stop(cinema), '1-night').html, `<p class="v4-note"><span class="tt-note" data-tt-note="showtimes">Suggested time · ${link('Check showtimes', 'https://www.landmarkcinemas.com/penticton', 'Check showtimes for Landmark Cinemas 7 Penticton, opens in a new tab')}</span></p>`);
+  assert.equal(fr(stop(cinema), '1-night').html, `<p class="v4-note"><span class="tt-note" data-tt-note="showtimes">Heure suggérée · ${link('Voir les séances', 'https://www.landmarkcinemas.com/penticton', 'Voir les séances chez Landmark Cinemas 7 Penticton, s’ouvre dans un nouvel onglet')}</span></p>`);
+  // Bowling (a lane is booked): its stored booking link, counted as a booking click.
+  const track = ` data-track="booking" data-venue-id="${FIX.bowl.id}"`;
+  assert.equal(en(stop(bowl), '2-morning').html, `<p class="v4-note"><span class="tt-note" data-tt-note="lanes">Suggested time · ${link('Book a lane', 'https://fixture-lanes.example.com/book-a-lane', 'Book a lane for Fixture Lanes, opens in a new tab', track)}</span></p>`);
+  assert.equal(fr(stop(bowl), '2-morning').html, `<p class="v4-note"><span class="tt-note" data-tt-note="lanes">Heure suggérée · ${link('Réserver une allée', 'https://fixture-lanes.example.com/book-a-lane', 'Réserver une allée chez Fixture Lanes, s’ouvre dans un nouvel onglet', track)}</span></p>`);
+  // No stored link: the listing's own page, in the same tab (nothing is invented, and no "new tab" is promised).
+  assert.equal(en(stop(plain), '2-night').html, '<p class="v4-note"><span class="tt-note" data-tt-note="rooms">Suggested time · <a href="/penticton/indoor/no-link-escape-rooms" data-v4-check-times aria-label="Book a room for No Link Escape Rooms">Book a room</a></span></p>');
+  assert.match(fr(stop(plain), '2-night').html, /Heure suggérée · <a href="\/fr\/penticton\/indoor\/no-link-escape-rooms" data-v4-check-times aria-label="Réserver une salle chez No Link Escape Rooms">Réserver une salle<\/a>/);
+  // A walk-in place, an event and a tour (a stored departure, or one to book) get no note.
+  assert.equal(en(stop(museum), '2-midday'), null, 'a museum within its listed hours');
+  assert.equal(en({ event: { id: 7, name: 'An Event' } }, '2-afternoon'), null, 'an event keeps its own start time');
+  assert.equal(en(stop({ id: 900003, name: 'Tour', slug: 't' }), '2-afternoon'), null, 'a tour with a departure');
+  assert.equal(en(stop({ id: 900004, name: 'Tour', slug: 't' }), '2-evening'), null, 'a tour whose departure is booked');
+  // Every kind's note is its own link label, in both languages; a kind that is not on the table says nothing.
+  for (const k of Object.keys(tt.TT_WORDS)) for (const f of [false, true]) {
+    const h = tt.ttNote({ schedule: k }, 'A Place', f, 'https://example.com/', true, escHtml, '');
+    assert.ok(h.includes(`${f ? 'Heure suggérée' : 'Suggested time'} · <a `) && h.includes(`>${escHtml(tt.ttLink(k, f))} <span aria-hidden="true">↗</span></a>`), `${k} ${f ? 'fr' : 'en'}`);
+    assert.ok(h.includes(`aria-label="${escHtml(tt.ttLink(k, f))}${f ? ' chez ' : ' for '}A Place${f ? ', s’ouvre dans un nouvel onglet' : ', opens in a new tab'}"`), `${k}: the link names the place`);
+  }
+  assert.equal(tt.ttNote({ schedule: 'nope' }, 'X', false, 'https://example.com/', true, escHtml, ''), '');
+  assert.equal(tt.ttNote({ schedule: 'dropin' }, 'X', false, '', false, escHtml, ''), '<span class="tt-note" data-tt-note="dropin">Suggested time · Check sessions</span>', 'no link on file anywhere: plain words');
+  assert.doesNotMatch(tt.ttNote({ schedule: 'dropin' }, '"><b>x', false, 'https://example.com/', true, escHtml, ''), /<b>/, 'the name is escaped');
+  // The card: the note is under the name in place of the generic reason line; "Venue website" is left out when it is
+  // the same link; the expanded line no longer repeats the link; the pill is as it was.
+  const C = WS.WORKSPACE_CLIENT_SRC, CSS = WS.WORKSPACE_STYLES;
+  assert.ok(C.includes('var note=v4Note(s,key);'));
+  assert.ok(C.includes(`'</span></button>'+(note?note.html:reason?'<p class="tw-fit">'+esc(reason)+'</p>':'')+'<div class="tw-links">'`));
+  assert.ok(C.includes('!(note&&note.url===t3StayExt(v.website))'));
+  assert.ok(V4.includes("(v4Note(s, key) || { html: '' }).html"), 'the plain list layout too');
+  assert.ok(!V4.includes("' data-v4-check-times>' + esc(fr ? 'Voir la fiche' : 'View details')"), 'one link in each state');
+  // One small line; the link's hit area is 44px tall (the line + 14px above and below) without adding height.
+  assert.ok(CSS.includes('.t3-v4.tw-workspace .v4-note {font-size:13px;line-height:1.45;'));
+  assert.ok(require('../trip-planner-v4-page.js').V4_STYLES.includes('.t3-v4 .v4-note a::after { content: ""; position: absolute; inset: -14px -6px; }'));
+  // The shared copy: the same note first, then the age line; a link that is not https falls back to the listing's page.
+  assert.ok(SERVER.includes("var skTo = skOn ? (/^https:\\\\/\\\\//.test(d.schedUrl || '') ? d.schedUrl : (fr && d.urlFr) || d.url || '') : '';"));
+  assert.ok(SERVER.includes("+ (skAges ? ' <span data-mt-sched-ages>' + esc(skAges) + '</span>' : '') + '</span>' : '';"));
+  assert.ok(SERVER.includes('body.my-trip-page .mt-sched a::after { content: ""; position: absolute; inset: -14px -6px; }'));
+  const [spk] = app.tripStopsFor([`venue:${FIX.parkour.id}`], NOW, {}, party);
+  assert.equal(`${tt.ttNote({ schedule: spk.sched }, spk.name, false, spk.schedUrl, true, escHtml, '')} ${tt.ttAgeNote({ schedule: spk.sched, ...spk.schedAges }, false)}`.replace(/<[^>]+>/g, ''), 'Suggested time · Check sessions ↗ Check it suits ages 6 and 9.');
+  assert.equal(`${tt.ttNote({ schedule: spk.sched }, spk.name, true, spk.schedUrl, true, escHtml, '')} ${tt.ttAgeNote({ schedule: spk.sched, ...spk.schedAges }, true)}`.replace(/<[^>]+>/g, ''), 'Heure suggérée · Voir les séances ↗ Vérifiez qu’il convient aux enfants de 6 et 9 ans.');
 });
