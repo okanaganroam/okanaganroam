@@ -334,7 +334,7 @@ function applyEvidence(plan, ctx = {}) {
   for (const r of reqs) {
     if (!r || r.kind !== 'event' || r.strength === 'prefer') continue;
     const e = eventEntry(r, plan, stops, ctx);
-    if (!dated) { r.status = 'unverified'; r.reason = 'Depends on your dates: none are chosen yet.'; }
+    if (!dated) { r.status = 'unverified'; r.reason = 'Depends on the dates: none are chosen yet.'; }
     else if (e.status === 'verified') { r.status = 'satisfied'; }
     if (seenEvent.has(e.ask)) continue;
     seenEvent.add(e.ask);
@@ -448,14 +448,14 @@ function parseShareContext(query) {
   const int = (v, lo, hi) => { const n = /^\d{1,4}$/.test(String(v || '')) ? Number(v) : NaN; return n >= lo && n <= hi ? n : null; };
   const out = {};
   if (isDate(q.start)) out.start = q.start;
-  if (typeof q.t === 'string' && q.t) out.times = q.t.split(',').slice(0, 60).map((x) => int(x, 0, 1439));
+  if (typeof q.t === 'string' && q.t) { const tt = q.t.split(',').slice(0, 60).map((x) => int(x, 0, 1439)); if (tt.some((x) => x != null)) out.times = tt; }
   const stay = int(q.stay, 1, 9999); if (stay) out.stayId = stay;
   const nights = int(q.nights, 1, 30); if (nights) out.nights = nights;
   const ad = int(q.ad, 1, 16); if (ad) out.adults = ad;
   if (q.aa === '1' && ad) out.adultsAssumed = true;
   const kids = int(q.kids, 1, 12); if (kids) out.kids = kids;
-  if (typeof q.sug === 'string' && q.sug) out.suggestions = q.sug.split(',').filter((r) => /^event:[1-9][0-9]*$/.test(r)).slice(0, 3);
-  if (typeof q.asks === 'string' && q.asks) out.asks = [...new Set(q.asks.split(',').filter((a) => ASK_RE.test(a)))].slice(0, 12);
+  if (typeof q.sug === 'string' && q.sug) { const g = q.sug.split(',').filter((r) => /^event:[1-9][0-9]*$/.test(r)).slice(0, 3); if (g.length) out.suggestions = g; }
+  if (typeof q.asks === 'string' && q.asks) { const k = [...new Set(q.asks.split(',').filter((a) => ASK_RE.test(a)))].slice(0, 12); if (k.length) out.asks = k; }
   return Object.keys(out).length ? out : null;
 }
 // The same parameters back as a query string (validated values only), for the EN / FR switch and the canonical link.
