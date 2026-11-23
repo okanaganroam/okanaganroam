@@ -260,9 +260,37 @@ const V4_CLIENT_SRC = String.raw`
       var hit = s.event ? r.eventId === s.event.id : (s.venue && r.venueId === s.venue.id);
       // Round 3: a tour with no departure times of its own shows the planned time and says the departure is booked.
       if (hit && r.bookDeparture) return (typeof r.startMinutes === 'number' ? clockLabel(r.startMinutes) + ' · ' : '') + (lang() === 'fr' ? 'départ à réserver' : 'book a departure time');
-      if (hit && typeof r.startMinutes === 'number') return clockLabel(r.startMinutes);
+      // Suggested times (2026-11-23): a cinema, a class or a session runs at set times we do not hold: "around 7:45 PM".
+      if (hit && typeof r.startMinutes === 'number') return (r.timing && r.timing.schedule ? (lang() === 'fr' ? 'vers ' : 'around ') : '') + clockLabel(r.startMinutes);
     }
     return '';
+  }
+  // The stop's schedule row (its suggested time and what is known about it: trip-timing.js).
+  function v4Row(s, key){
+    var rows = (state.last && state.last.schedule) || [], m = key ? /^(\d+)-/.exec(key) : null, day = m ? Number(m[1]) : null;
+    for (var i = 0; i < rows.length; i++) { var r = rows[i]; if (day != null && r.day !== day) continue; if (s.venue && r.venueId === s.venue.id) return r; }
+    return null;
+  }
+  var V4_SCHED = {
+    en: { showtimes: ['Showtimes vary', 'showtimes', 'Check showtimes'], classes: ['Class times vary', 'class times', 'Check class times'], sessions: ['Session times vary', 'session times', 'Check session times'] },
+    fr: { showtimes: ['Les séances varient', 'l’horaire des séances', 'Voir les séances'], classes: ['L’horaire des cours varie', 'l’horaire des cours', 'Voir l’horaire des cours'], sessions: ['L’horaire des séances varie', 'l’horaire des séances', 'Voir l’horaire des séances'] }
+  };
+  // The expanded card's time: always the planner's suggestion, never a verified slot. A stop on showtimes, classes or
+  // sessions gets no end time (a film is not an hour long) and the step to check them; any other stop says whether the
+  // suggested time fits its listed hours or the hours are not on file.
+  function v4TimingHtml(s, id){
+    var key = id && /^\d/.test(id) ? id : null, r = v4Row(s, key), fr = lang() === 'fr', t = stopTime(s, key);
+    if (!r || !r.timing || typeof r.startMinutes !== 'number') return t ? '<p><strong>' + esc(t) + '</strong></p>' : '';
+    var tm = r.timing, name = s.venue.name;
+    if (tm.schedule) {
+      var w = (fr ? V4_SCHED.fr : V4_SCHED.en)[tm.schedule], h = tm.allowMinutes ? tm.allowMinutes / 60 : 0;
+      var head = (fr ? 'Heure suggérée : vers ' : 'Suggested: around ') + clockLabel(r.startMinutes) + (h ? (fr ? ', prévoyez environ ' + String(h).replace('.', ',') + ' h' : ', allow about ' + h + ' h') : '') + '.';
+      var tail = fr ? w[0] + ' : vérifiez ' + w[1] + ' de ' + name + '.' : w[0] + ': check ' + name + '’s ' + w[1] + '.';
+      var link = tm.checkUrl && t3StayExt(tm.checkUrl) ? ' <a ' + hrefAttr(t3StayExt(tm.checkUrl)) + ' target="_blank" rel="nofollow noopener" data-v4-check-times>' + esc(w[2]) + ' <span aria-hidden="true">↗</span></a>' : '';
+      return '<p data-v4-timing="' + esc(tm.schedule) + '"><strong>' + esc(head) + '</strong> ' + esc(tail) + link + '</p>';
+    }
+    var known = tm.hours === 'listed';
+    return '<p data-v4-timing="' + (known ? 'hours' : 'unknown') + '"><strong>' + esc((fr ? 'Heure suggérée : ' : 'Suggested: ') + t) + '</strong> <span class="v4-quiet">' + esc(known ? (fr ? 'Dans ses heures indiquées.' : 'Within its listed hours.') : (fr ? 'Heures non vérifiées : à confirmer.' : 'Hours not verified: check before you go.')) + '</span></p>';
   }
   // A stop's short line: what it is (Lunch, Dinner, Winery...), its price, and at most two badges that answer the request.
   function v4Kind(s){
@@ -309,8 +337,7 @@ const V4_CLIENT_SRC = String.raw`
   }
   function v4Details(s, id){
     var v = s.venue, url = placeUrl(v), fr = lang() === 'fr', out = '';
-    var t = stopTime(s, id && /^\d/.test(id) ? id : null);
-    if (t) out += '<p><strong>' + esc(t) + '</strong></p>';
+    out += v4TimingHtml(s, id);
     if (v.listedHours) out += '<p class="v4-quiet">' + esc(vt('hours')) + ' · ' + esc(v.listedHours) + '</p>';
     if (v.yearlyClosure) out += '<p>' + esc(fr ? v.yearlyClosure.fr : v.yearlyClosure.en) + '</p>';
     if (s.happyHourLine) out += '<p>' + esc(fr && s.happyHourDealsFr ? '5 à 7 : ' + s.happyHourDealsFr : s.happyHourLine) + '</p>';
@@ -449,7 +476,7 @@ const V4_CLIENT_SRC = String.raw`
       html += '<div class="t3-book-stay">' + (s.photo ? '<img src="' + esc(s.photo) + '" alt="" loading="lazy" width="96" height="96">' : '<span class="t3-stay-nophoto" aria-hidden="true"></span>')
         + '<div class="t3-book-stay-txt"><p class="t3-stay-kicker">' + esc((fr ? 'Où dormir · ' : 'Where to stay · ') + [fr ? (s.kindFr || s.kind) : s.kind, s.regionLabel].filter(Boolean).join(' · ')) + '</p>'
         + '<p class="t3-stay-name">' + (u ? '<a ' + hrefAttr(u) + '>' + esc(s.name) + '</a>' : esc(s.name)) + '</p>' + (facts ? '<p class="t3-stay-facts">' + esc(facts) + '</p>' : '') + t3LiveHtml(s, fr) + '</div>'
-        + (d.others.length ? '<button type="button" class="t3-book-link t3-book-change" data-t3-stay-change aria-expanded="false" aria-controls="t3StayAlts">' + esc(fr ? 'Changer' : 'Change') + '</button>' : '') + '</div>' + v4RoomsHtml(fr);
+        + (d.others.length ? '<button type="button" class="t3-book-link t3-book-change" data-t3-stay-change aria-expanded="false" aria-controls="t3StayAlts">' + esc(fr ? 'Changer' : 'Change') + '</button>' : '') + '</div>' + t3StayDatesHtml(t, fr) + v4RoomsHtml(fr);
       if (d.others.length) html += '<ul class="t3-stay-alts" id="t3StayAlts" hidden>' + d.others.map(function(o){
         var ou = safeUrl((fr && o.urlFr) || o.url), of = t3StayFacts(o, fr), why = (o.reasons || [])[0];
         return '<li class="t3-stay-alt"><div><p><strong>' + (ou ? '<a ' + hrefAttr(ou) + '>' + esc(o.name) + '</a>' : esc(o.name)) + '</strong></p><p>' + esc([o.regionLabel, of, why ? (fr ? why.textFr : why.text) : ''].filter(Boolean).join(' · ')) + '</p></div><button type="button" class="t3-btn t3-btn-ghost" data-t3-stay-choose="' + esc(o.id) + '">' + esc(fr ? 'Choisir' : 'Choose') + '</button></li>';
@@ -686,7 +713,13 @@ const V4_CLIENT_SRC = String.raw`
       // Rooms round (2026-11-22: "Family weekend…" shared its stay links with Nov 28-29 though the stay said "Dates not
       // set"): a "weekend" the planner dated by itself is not the visitor's dates, so the copy carries none either.
       var sd0 = typeof t3StayData === 'function' ? t3StayData() : null, stayNoDates = !!(sd0 && sd0.w && sd0.w.trip && sd0.w.trip.datesGiven === false);
-      if (p.datesGiven && !stayNoDates && d0 && /^\d{4}-\d{2}-\d{2}$/.test(d0.date || '')) out += '&start=' + d0.date;
+      // Trip dates (2026-11-23): dates the visitor gave travel as the trip's own dates (td, ts), and the stay's
+      // check-in and check-out only once confirmed (sa, sl, sc=1). Assumed or past dates are never carried.
+      var td = p.tripDates, tt = (sd0 && sd0.w && sd0.w.trip) || {}, isoOk = function(x){ return /^\d{4}-\d{2}-\d{2}$/.test(x || ''); };
+      if (td && !td.assumed && !td.past && isoOk(td.start)) {
+        out += '&td=' + td.start + '_' + (isoOk(td.end) ? td.end : td.start) + '&ts=' + ({ request: 'r', picked: 'p', chat: 'c' }[td.source] || 'r');
+        if (tt.stayStatus === 'confirmed' && !tt.datesPast && isoOk(tt.arrive) && isoOk(tt.leave)) out += '&sa=' + tt.arrive + '&sl=' + tt.leave + '&sc=1';
+      } else if (!td && p.datesGiven && !stayNoDates && d0 && isoOk(d0.date)) out += '&start=' + d0.date;
       var times = list.map(function(x){
         var m = /^(venue|event):(\d+)$/.exec(x.ref), id = m ? Number(m[2]) : 0;
         var r = rows.filter(function(q){ return (!x.day || q.day === x.day || q.day === undefined) && (m && m[1] === 'venue' ? q.venueId === id : q.eventId === id); })[0];
@@ -811,7 +844,10 @@ const V4_CLIENT_SRC = String.raw`
       + '<p class="t3-plan-status" id="t3PlanStatus" role="status" aria-live="polite"></p><div class="v4-days">';
     if (planKinds) {
       (p.days || []).forEach(function(d){
-        var date = v4DayDate(d), label = [date, d.regionLabel].filter(Boolean).join(' · ');
+        // Trip dates (2026-11-23): a date the planner worked out by itself ("a weekend", a month) says so.
+        var date = v4DayDate(d), tdd = (state.last && state.last.tripDates) || null;
+        if (date && tdd && tdd.assumed) date += vt('assumed');
+        var label = [date, d.regionLabel].filter(Boolean).join(' · ');
         html += '<section class="v4-day" id="t3-day-' + d.day + '" aria-labelledby="v4-day-' + d.day + '">' + (nd > 1 || label ? '<h3 class="v4-day-title" id="v4-day-' + d.day + '">' + (nd > 1 ? esc(vt('day') + ' ' + d.day) : '') + (label ? ' <span>' + (nd > 1 ? '· ' : '') + esc(label) + '</span>' : '') + '</h3>' : '')
           + (d.driveIn ? '<p class="v4-leg" style="margin:0 0 6px;border-radius:10px;padding-left:12px">' + esc(t3DriveText(d.driveIn, lang())) + '</p>' : '')
           + v4ListHtml(d.stops, function(s){ return d.day + '-' + s.daypart; }, counts) + '</section>';

@@ -192,6 +192,14 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
  .t3-v4.tw-workspace .v4-stay-card .v4-stay-alts .v4-link {min-height:44px;}
  .t3-v4.tw-workspace .v4-stay-card .v4-disc-line {margin:5px 0 0;font-size:10.5px;line-height:1.3;}
  .t3-v4.tw-workspace .v4-stay-card .v4-rooms {grid-column:1/-1;margin:3px 0 0;font-size:12px;}
+ .t3-v4.tw-workspace .v4-stay-card .t3-stayd {grid-column:1/-1;margin:5px 0 0;padding:6px 8px;border-radius:10px;font-size:12px;line-height:1.3;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;}
+ .t3-v4.tw-workspace .v4-stay-card .t3-stayd[data-t3-stayd="confirmed"] {padding:0;}
+ .t3-v4.tw-workspace .v4-stay-card .t3-stayd-line {flex:1 1 100%;}
+ .t3-v4.tw-workspace .v4-stay-card .t3-stayd[data-t3-stayd="confirmed"] .t3-stayd-line {flex:0 1 auto;}
+ .t3-v4.tw-workspace .v4-stay-card .t3-stayd-btns {margin:0;gap:6px;}
+ .t3-v4.tw-workspace .v4-stay-card .t3-stayd-btn {position:relative;min-height:32px;height:32px;padding:0 12px;font-size:12.5px;}
+ .t3-v4.tw-workspace .v4-stay-card .t3-stayd-btn::after {content:"";position:absolute;inset:-6px 0;}
+ .t3-v4.tw-workspace .v4-stay-card .t3-stayd-note {flex:1 1 90px;margin:0;font-size:10.5px;line-height:1.3;}
  .t3-v4.tw-workspace .v4-stay-card .v4-rooms button {height:28px;font-size:16px;}
  .t3-v4.tw-workspace .v4-stay-card .v4-rooms button::after {inset:-9px 0;}
  .t3-v4.tw-workspace .tw-day-tabs {padding:2px 1px 5px;margin-bottom:2px;}

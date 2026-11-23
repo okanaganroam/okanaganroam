@@ -9226,6 +9226,27 @@ function tripHonestEvidence(plan, on = true) {
   } catch (e) { console.error(`[trip] evidence: ${e.message}`); }
   return plan;
 }
+// Trip dates, one source of truth (2026-11-23, Dayton: "keep explicit trip dates consistent across the itinerary, stay
+// card, booking checklist and shared copy"). The dates on the plan's days and where they came from:
+//   source 'request'  a calendar date typed in the request ("December 5–6, 2026", "2026-12-05", "tomorrow", "today");
+//   source 'picked'   picked in a date field (When? / Dates and guests);   source 'chat': said in the chat;
+//   source 'assumed'  (assumed: true) worked out by the planner from "a weekend", "this weekend", a weekday, a month, a
+//                     holiday or an opening day: shown labelled, and never sent to a booking site.
+// null when the plan's days carry no dates. past: day 1 is before today (the site's own day): never sent anywhere.
+function tripDatesOf(plan, stay, now = new Date()) {
+  if (!plan || typeof plan !== 'object' || !['multi_day', 'day_plan'].includes(plan.kind)) return null;
+  const dates = (plan.days || []).map((d) => d && d.date).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d || '')).sort();
+  if (!dates.length) return null;
+  const src = typeof plan.dateSourceText === 'string' ? plan.dateSourceText : '';
+  const when = (plan.intent && plan.intent.when) || {};
+  let source = 'assumed';
+  if (src === 'Date control') source = stay && stay.via === 'chat' ? 'chat' : 'picked';
+  else if (/\d/.test(src) || /^(?:tomorrow|today|tonight)$/i.test(src) || when.relative === 'tomorrow' || when.preset === 'today') source = 'request';
+  const out = { start: dates[0], end: dates[dates.length - 1], source };
+  if (source === 'assumed') { out.assumed = true; if (src) out.basis = src; }
+  if (out.start < todayLocal(now)) out.past = true;
+  return out;
+}
 function runTripPlanWithStay(args, run = runTripPlan, now = new Date()) {
   return withTripStays(tripPlanBeforeStays(args, run, now), args.stay || null, now, args.text, !!args.v4);
 }
@@ -9238,6 +9259,18 @@ function tripPlanBeforeStays(args, run = runTripPlan, now = new Date()) {
   // "Bringing a dog" ticked: the plan is a dog trip as if the request said so (dog-friendly stops, "with a dog" shown),
   // unless the request already names a dog.
   if (stay && stay.dog && typeof base.text === 'string' && !TRIP_DOG_WORDS_RE.test(base.text) && base.text.trim().length + 13 <= discoveryIntentModule().DISCOVERY_MAX_TEXT_LENGTH) base.text = `${base.text.trim()} with our dog`;
+  // Lodging dates that differ from the trip's dates (2026-11-23: "arriving Friday night Dec 4" for a Dec 5–6 trip): when
+  // the request itself names calendar dates and the stay covers or touches them, the check-in and check-out are the
+  // stay's only -- the days keep the request's dates. A stay away from those dates still moves the trip, as before.
+  if (args.v4 && stay && stay.arrive && stay.leave && !stay.force && !(base.overrides && base.overrides.startDate) && !args.swap) {
+    try {
+      const cal = require('./trip-requirements').tripCalendar(String(args.text || ''), todayLocal(now));
+      if (cal && cal.startDate && !cal.conflict && /\d/.test(String(cal.source || ''))) {
+        const own = run(base, now), td = tripDatesOf(own, null, now);
+        if (td && !td.assumed && stay.arrive <= td.end && stay.leave >= td.start) return own;
+      }
+    } catch (e) { /* the dates move the trip, as before */ }
+  }
   if (stay && stay.arrive && !(base.overrides && base.overrides.startDate)) base.overrides = { ...(base.overrides || {}), startDate: stay.arrive };
   // Round 2 fresh eyes (V4): the day the visitor leaves is known, so its plan ends early (trip-planner.js v4SaneDays).
   if (args.v4 && stay && !stay.force && stay.arrive && stay.leave && stay.leave > stay.arrive) base.departureDate = stay.leave;
@@ -9276,6 +9309,10 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
     // 9") go to the booking links (Expedia rm1=a2:c6:c9; Booking.com and Stay22 children=2), and "a place with a pool"
     // (hot tub, kitchen) is the stay preference until the chat changes it. Only what the visitor left empty.
     const stayIn = v4 ? { ...(stay || {}) } : stay;
+    // Suggested times (2026-11-23, trip-timing.js): which stops run on showtimes, classes or sessions we do not hold.
+    if (v4) { try { require('./trip-timing').applyTiming(plan, (id) => venueIndoorInfo(id).kinds || [], (id) => { const v = getVenue(id); return v ? { name: v.name, type: v.type, website: v.website } : null; }); } catch (e) { /* times stay as they are */ } }
+    // Trip dates (2026-11-23): what the days say and where it came from, for the page, the stay and the shared copy.
+    if (v4) { const td = tripDatesOf(plan, stay, now); if (td) { plan.tripDates = td; v4Stay.tripDates = td; } else delete plan.tripDates; }
     if (v4) {
       const words = String(text || '').toLowerCase();
       // Round 2 fresh eyes: one age per child as typed (twins twice), also when the party control already says how many
@@ -12403,7 +12440,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
     addEventRecovery(plan);
     tripWindowClockNote(plan, requirements);
     // Honest plan (2026-11-22): did the visitor choose dates (the Dates control, a date or a day in the request)?
-    if (v4) plan.datesGiven = !!((requirements && requirements.startDate) || trip.when || intent.when);
+    if (v4) { plan.datesGiven = !!((requirements && requirements.startDate) || trip.when || intent.when); if (requirements && requirements.startDate) plan.dateSourceText = String(requirements.dateSource || ''); }
     if (openingNote && Array.isArray(plan.notes)) plan.notes.unshift(openingNote);
     if (askedWineries && Array.isArray(plan.notes)) plan.notes.unshift(`There are no wineries in ${TRIP_SITE.area}, so these are wine bars and lounges instead.`);
     return plan;
@@ -12480,6 +12517,7 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   // none, the events found for "the next few days from today" are offered as dated suggestions, never as stops.
   if (v4) {
     plan.datesGiven = !!((requirements && requirements.startDate) || intent.when);
+    if (requirements && requirements.startDate) plan.dateSourceText = String(requirements.dateSource || '');
     // Nobody in the party drinks ("we don't drink"): said on the plan, so its evidence can show no drink stop is planned.
     if (intent.excluded && Array.isArray(intent.excluded.concepts) && intent.excluded.concepts.includes('alcohol') && !(intent.partySome || []).some((x) => x && x.concept === 'alcohol')) plan.noAlcohol = true;
     if (undatedEventOffer && undatedEventOffer.length && ['multi_day', 'day_plan'].includes(plan.kind)) {
@@ -54269,6 +54307,8 @@ function tripStopsFor(refs, now = new Date(), onDates = {}) {
         lat: Number.isFinite(Number(row.latitude)) && row.latitude !== null ? Number(row.latitude) : null,
         lng: Number.isFinite(Number(row.longitude)) && row.longitude !== null ? Number(row.longitude) : null,
         query: `${v.name}, ${REGION_LABELS[v.region]}, Okanagan Valley, BC`,
+        // Suggested times (2026-11-23, trip-timing.js): a stop that runs on showtimes, classes or sessions we do not hold.
+        ...(() => { try { const tt = require('./trip-timing'); const k = tt.scheduleKind({ name: v.name, type: v.type }, venueIndoorInfo(v.id).kinds || []); if (!k) return {}; const u = tt.httpsUrl(v.website); return { sched: k, ...(u ? { schedUrl: u } : {}) }; } catch (e) { return {}; } })(),
         notice: tripStopNotice(v.id, seasons, advisories, parseLocalDate(onDates[ref]) && onDates[ref] !== todayLocal(now) ? onDates[ref] : null, v),
       });
     } else {
@@ -54322,7 +54362,13 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
   const { refs, days } = tripShareParams(query);
   if (!c || !refs.length) return null;
   const fr = lang === 'fr';
-  const out = { ...c, datesSet: !!c.start, lines: [], suggestions: [], stay: null };
+  // Trip dates (2026-11-23): a link with td= carries the trip's own dates; the stay's dates are its own (sa/sl/sc) and
+  // go to a booking link only when confirmed and not already past. A link with neither reads start/nights as before.
+  const dated2 = !!(c.tripDates || c.stayDates);
+  const dayOne = c.tripDates ? c.tripDates.start : c.start || null;
+  // A date already past is never sent to a booking site (an older link's start= too).
+  const stayPast = dated2 ? !!(c.stayDates && c.stayDates.arrive < todayLocal(now)) : !!(c.start && c.stayId && c.start < todayLocal(now));
+  const out = { ...c, datesSet: !!dayOne, lines: [], suggestions: [], stay: null, ...(dated2 ? { dated2: true } : {}), ...(stayPast ? { stayPast: true } : {}) };
   const dayCount = Math.max(0, ...days.filter((d) => d > 0));
   const nights = c.nights || (dayCount > 1 ? dayCount - 1 : null);
   // The place to stay: its own page and its own booking links (dates only when the link carries chosen dates).
@@ -54331,12 +54377,13 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
     try {
       const cand = tripStayCandidates().find((x) => x.id === c.stayId);
       if (cand) {
-        const trip = { arrive: c.start || null, leave: c.start && nights ? addLocalDays(c.start, nights) : null, nights, adults: c.adults || null, kids: c.kids || null, ...(c.kidAges ? { kidAges: c.kidAges } : {}), dog: false, datesGiven: !!(c.start && nights),
+        const sd = dated2 ? (c.stayDates && !stayPast ? c.stayDates : null) : (c.start && nights && !stayPast ? { arrive: c.start, leave: addLocalDays(c.start, nights) } : null);
+        const trip = { arrive: sd ? sd.arrive : dated2 ? null : c.start || null, leave: sd ? sd.leave : null, nights: dated2 && c.stayDates ? tripStays.daysBetween(c.stayDates.arrive, c.stayDates.leave) : nights, adults: c.adults || null, kids: c.kids || null, ...(c.kidAges ? { kidAges: c.kidAges } : {}), dog: false, datesGiven: !!sd,
           // Rooms (2026-11-22): the link's own rm / ra; a link from before carries none and opens as it always did.
           ...(c.rooms ? { rooms: c.rooms } : { roomsLegacy: true }) };
         const links = stayBookingLinks.stayBookingLinks(cand, trip.datesGiven ? trip : { ...trip, arrive: null, leave: null }, { regionLabel: cand.regionLabel }).filter((l) => l && tripBookingLinkBelongs('stay', cand.id, l.url));
         const has = tripStays.STAY_AMENITIES.filter((a) => tripStays.stayHas(cand, a));
-        const m = Number(String(c.start || todayLocal(now)).slice(5, 7));
+        const m = Number(String(dayOne || todayLocal(now)).slice(5, 7));
         stayFacts = { id: cand.id, name: cand.name, regionLabel: cand.regionLabel, has, winterCheck: has.includes('pool') && (m >= 10 || m <= 5) };
         out.stay = { id: cand.id, name: cand.name, kind: fr ? (cand.kindFr || cand.kind) : cand.kind, regionLabel: cand.regionLabel, photo: cand.photo, url: fr ? (cand.urlFr || cand.url) : cand.url,
           links: links.map((l) => ({ label: fr ? l.labelFr : l.label, url: l.url, affiliate: !!l.affiliate, rel: l.rel || 'nofollow noopener', key: l.key })) };
@@ -54367,9 +54414,9 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
           if (!v) return;
           let kinds = []; try { const k = v.type === 'indoor' ? venueIndoorInfo(v.id).kinds : v.type === 'tour' ? venueTourInfo(v.id).kinds : null; kinds = TR.inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }); } catch (e) { kinds = []; }
           stops.push({ id: v.id, name: v.name, type: v.type, region: v.region, day: days[i] || 0, start: (c.times || [])[i] == null ? null : c.times[i], kinds });
-        } else if (c.start && days[i]) {
+        } else if (dayOne && days[i]) {
           const e = db.prepare('SELECT id, name FROM events WHERE id = ?').get(Number(m[2]));
-          const date = addLocalDays(c.start, days[i] - 1);
+          const date = addLocalDays(dayOne, days[i] - 1);
           if (e && tripEventOccurrences(e.id, now).some((o) => o.d === date || (o.u && o.d <= date && o.u >= date))) events.push({ id: e.id, name: e.name, day: days[i], startDate: date, dateLabel: new Date(`${date}T12:00:00Z`).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }), dateLabelFr: new Date(`${date}T12:00:00Z`).toLocaleDateString('fr-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) });
         }
       });
@@ -54403,19 +54450,27 @@ function tripShareContextHtml(ctx, lang = 'en') {
   // picked, or when more than one).
   const roomsShown = ctx.rooms && !(ctx.roomsAssumed && ctx.rooms === 1 && !stayBookingLinks.stayRoomsMatter(ctx.adults, ctx.kids, ctx.rooms));
   const roomsLabel = roomsShown ? `${ctx.rooms} ${fr ? (ctx.rooms > 1 ? 'chambres' : 'chambre') : (ctx.rooms > 1 ? 'rooms' : 'room')}${ctx.roomsAssumed ? L(' (assumed)', ' (supposé)') : ''}` : '';
+  const linksDated = ctx.dated2 ? !!(ctx.stayDates && !ctx.stayPast) : !!ctx.start && !ctx.stayPast;
   const roomsNote = !ctx.rooms || !ctx.stay || !ctx.stay.links.length ? '' : [
     ctx.rooms > 1 && ctx.stay.links.some((l) => ['own', 'search'].includes(l.key)) ? L(`Hotel’s own site: enter ${ctx.rooms} rooms there.`, `Site de l’hôtel : indiquez ${ctx.rooms} chambres sur place.`) : '',
-    !ctx.start && ctx.stay.links.some((l) => l.key === 'expedia') && (ctx.adults || 0) + (ctx.kids || 0) !== 2 ? L('Expedia shows your guests and rooms only once dates are picked: enter them there.', 'Expedia n’affiche vos voyageurs et vos chambres qu’une fois les dates choisies : entrez-les sur place.') : '',
+    !linksDated && ctx.stay.links.some((l) => l.key === 'expedia') && (ctx.adults || 0) + (ctx.kids || 0) !== 2 ? L('Expedia shows your guests and rooms only once dates are picked: enter them there.', 'Expedia n’affiche vos voyageurs et vos chambres qu’une fois les dates choisies : entrez-les sur place.') : '',
     (ctx.adults || 0) + (ctx.kids || 0) >= 3 ? L('Rooms and how many each sleeps are confirmed on the booking site.', 'Les chambres et leur capacité sont confirmées sur le site de réservation.') : '',
   ].filter(Boolean).join(' ');
-  const facts = [who.join(', ') || L('Group size not given', 'Taille du groupe non précisée'), ...(roomsLabel ? [roomsLabel] : []), ctx.start ? L(`From ${when}`, `À partir du ${when}`) : when].join(' · ');
+  // Trip dates (2026-11-23): "Sat, Dec 5 – Sun, Dec 6" for a link that carries the trip's own dates; the stay's dates
+  // on their own line, only when confirmed.
+  const nice = (iso) => new Date(`${iso}T12:00:00Z`).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+  const tripWhen = ctx.tripDates ? (ctx.tripDates.end > ctx.tripDates.start ? `${nice(ctx.tripDates.start)} – ${nice(ctx.tripDates.end)}` : nice(ctx.tripDates.start)) : null;
+  const stayNights = ctx.stayDates ? tripStays.daysBetween(ctx.stayDates.arrive, ctx.stayDates.leave) : 0;
+  const stayWhen = !ctx.dated2 ? (ctx.stayPast ? L('Those stay dates have passed: no dates in these links.', 'Ces dates de séjour sont passées : aucune date dans ces liens.') : '') : ctx.stayDates && !ctx.stayPast ? L(`Stay: ${nice(ctx.stayDates.arrive)} → ${nice(ctx.stayDates.leave)} · ${stayNights} night${stayNights > 1 ? 's' : ''}`, `Séjour : ${nice(ctx.stayDates.arrive)} → ${nice(ctx.stayDates.leave)} · ${stayNights} nuit${stayNights > 1 ? 's' : ''}`)
+    : ctx.stayPast ? L('Those stay dates have passed: no dates in these links.', 'Ces dates de séjour sont passées : aucune date dans ces liens.') : L('Stay dates not confirmed: no dates in these links.', 'Dates du séjour non confirmées : aucune date dans ces liens.');
+  const facts = [who.join(', ') || L('Group size not given', 'Taille du groupe non précisée'), ...(roomsLabel ? [roomsLabel] : []), tripWhen ? tripWhen : ctx.start ? L(`From ${when}`, `À partir du ${when}`) : when].join(' · ');
   let html = `<div class="mt-ctx" id="mtContext"><p class="mt-ctx-copy"><strong>${L('A copy of this plan.', 'Une copie de ce plan.')}</strong> ${L('It can’t be edited here and it doesn’t update if the original changes. Nothing in it is booked.', 'Elle ne se modifie pas ici et ne suit pas les changements de l’original. Rien n’y est réservé.')}</p><p class="mt-ctx-facts" data-mt-facts>${escapeHtml(facts)}</p>`;
   if (ctx.stay) {
     const st = ctx.stay;
     html += `<div class="mt-ctx-stay" data-mt-stay="${st.id}">${st.photo ? `<img src="${escapeHtml(st.photo)}" alt="" loading="lazy" width="96" height="96">` : ''}<div><p class="mt-ctx-k">${escapeHtml([L('Where to stay', 'Où dormir'), st.kind, st.regionLabel].filter(Boolean).join(' · '))}</p><p class="mt-ctx-name">${st.url ? `<a href="${escapeHtml(st.url)}">${escapeHtml(st.name)}</a>` : escapeHtml(st.name)}</p>`
       + (st.links.length ? `<p class="mt-ctx-links">${st.links.map((l) => `<a class="mt-btn" href="${escapeHtml(l.url)}" target="_blank" rel="${escapeHtml(l.rel)}" data-track="stay_click" data-stay-id="${st.id}" data-link="${escapeHtml(l.key || '')}"${l.affiliate ? ' data-affiliate="1"' : ''}>${escapeHtml(l.label)} <span aria-hidden="true">↗</span></a>${l.affiliate ? `<small>${L('We may earn a commission', 'Nous pouvons toucher une commission')}</small>` : ''}`).join('')}</p>` : '')
       + (roomsNote ? `<p class="mt-ctx-note" data-mt-rooms-note>${escapeHtml(roomsNote)}</p>` : '')
-      + (!ctx.start ? `<p class="mt-ctx-note">${L('No dates in these links: pick them on the booking site.', 'Aucune date dans ces liens : choisissez-les sur le site de réservation.')}</p>` : '') + '</div></div>';
+      + (stayWhen ? `<p class="mt-ctx-note" data-mt-stay-dates>${escapeHtml(stayWhen)}</p>` : !ctx.start ? `<p class="mt-ctx-note">${L('No dates in these links: pick them on the booking site.', 'Aucune date dans ces liens : choisissez-les sur le site de réservation.')}</p>` : '') + '</div></div>';
   }
   if (ctx.lines && ctx.lines.length) html += `<ul class="mt-ctx-lines">${ctx.lines.map((l) => `<li data-ev-status="${escapeHtml(l.status)}">${escapeHtml(l.text)}</li>`).join('')}</ul>`;
   if (ctx.suggestions && ctx.suggestions.length) html += `<div class="mt-ctx-sugg"><p class="mt-ctx-k">${L('Depends on your dates (not part of the plan)', 'Selon vos dates (hors du plan)')}</p><ul>${ctx.suggestions.map((x) => `<li><span class="mt-ctx-tag">${escapeHtml(x.label)}</span> <a href="${escapeHtml(x.url)}">${escapeHtml(x.name)}</a>${x.meta ? ` <small>${escapeHtml(x.meta)}</small>` : ''}</li>`).join('')}</ul></div>`;
@@ -54765,6 +54820,9 @@ ${renderGolfHeaderHtml()}
   var sharedDays = (params.get('days') || '').split(',').map(function(n){ return parseInt(n, 10) || 0; });
   // A shared plan carries its first day's date (start=YYYY-MM-DD), so the days keep their dates.
   var sharedStart = /^\\d{4}-\\d{2}-\\d{2}$/.test(params.get('start') || '') ? params.get('start') : null;
+  // Trip dates (2026-11-23): a newer link carries the trip's own dates (td=day1_lastday); they date the days.
+  var sharedTd = /^(\\d{4}-\\d{2}-\\d{2})_\\d{4}-\\d{2}-\\d{2}$/.exec(params.get('td') || '');
+  if (sharedTd) sharedStart = sharedTd[1];
   // Honest plan (2026-11-22): a link made from a plan carries each stop's start time (t=615,690,...), in the stops' order.
   var sharedTimes = (params.get('t') || '').split(',').map(function(n){ return /^\\d{1,4}$/.test(n) && Number(n) < 1440 ? Number(n) : null; });
   var sharedKids = /^[1-9]\\d?$/.test(params.get('kids') || '');
@@ -54896,7 +54954,12 @@ ${renderGolfHeaderHtml()}
           var fr = document.documentElement.lang === 'fr';
           // A dated stop outside a day with that date (an event saved with its next date, round 10) shows its date too.
           var ownDate = x.s.time && x.s.time.d && x.s.time.d !== gDate ? dateText(x.s.time.d) : '';
-          var meta = d.missing ? T.gone : [ownDate, timeText(x.s.time), (fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' · ');
+          // Suggested times (2026-11-23): a cinema's, class's or session's time is "around", with the step to check it.
+          var tx = timeText(x.s.time), sk = d.sched && tx && !(x.s.time && Number.isFinite(x.s.time.e)) && /^venue:/.test(x.s.ref || '') ? d.sched : '';
+          if (sk) tx = (fr ? 'vers ' : 'around ') + tx;
+          var meta = d.missing ? T.gone : [ownDate, tx, (fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' · ');
+          var skWords = sk ? (fr ? { showtimes: ['Les séances varient', 'Voir les séances'], classes: ['L’horaire des cours varie', 'Voir l’horaire des cours'], sessions: ['L’horaire des séances varie', 'Voir l’horaire des séances'] } : { showtimes: ['Showtimes vary', 'Check showtimes'], classes: ['Class times vary', 'Check class times'], sessions: ['Session times vary', 'Check session times'] })[sk] : null;
+          var skHtml = skWords ? '<span class="mt-sched" data-mt-sched="' + esc(sk) + '">' + esc(skWords[0]) + (d.schedUrl ? (fr ? ' : ' : ': ') + '<a ' + hrefAttr(d.schedUrl) + ' target="_blank" rel="nofollow noopener">' + esc(skWords[1]) + ' <span aria-hidden="true">↗</span></a>' : (fr ? ' : vérifiez avant d’y aller.' : ': check before you go.')) + '</span>' : '';
           var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="' + esc(T.moveUp.replace('{name}', x.s.name)) + '"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="' + esc(T.moveDown.replace('{name}', x.s.name)) + '"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="' + esc(T.remove.replace('{name}', x.s.name)) + '">✕</button></div>' : '';
           // A closure or advisory on the stop (round 8, 2026-10-19), as on its card.
           var nt = d.notice && (fr && d.notice.textFr || d.notice.text);
@@ -54904,7 +54967,7 @@ ${renderGolfHeaderHtml()}
           var noPin = d.kind === 'event' && !d.missing && d.lat == null ? '<p class="mt-meta mt-nopin">' + esc(T.noPin) + '</p>' : '';
           // A shared plan's stop keeps its own booking link (the listing's stored link; the business's or provider's site).
           var bk = !mine && d.book && /^https:\\/\\//.test(d.book.url || '') ? '<a class="mt-book" ' + hrefAttr(d.book.url) + ' target="_blank" rel="' + esc(d.book.rel || 'nofollow noopener') + '" data-track="booking" data-venue-id="' + esc(String(x.s.ref).split(':')[1]) + '"' + (d.book.affiliate ? ' data-affiliate="1"' : '') + '>' + esc((fr && d.book.labelFr) || d.book.label || (fr ? 'Réserver' : 'Book')) + ' <span aria-hidden="true">↗</span></a>' + (d.book.affiliate ? '<small>' + (fr ? 'Nous pouvons toucher une commission' : 'We may earn a commission') + '</small>' : '') : '';
-          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p>' + notice + noPin + bk + '</div>' + tools + '</li>';
+          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p>' + (skHtml ? '<p class="mt-meta">' + skHtml + '</p>' : '') + notice + noPin + bk + '</div>' + tools + '</li>';
         }).join('') + '</ol></section>';
     }).join('');
     drawMap(shown);

@@ -87,7 +87,7 @@ function daysBetween(a, b) { return Math.round((Date.parse(`${b}T12:00:00Z`) - D
 function parseTripStayInput(raw) {
   if (raw === undefined || raw === null) return { value: null };
   if (!isObj(raw)) return { error: 'stay must be an object with arrive, leave, adults, kids and dog.' };
-  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog', 'pref', 'force', 'none', 'kidAges', 'rooms'].includes(k));
+  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog', 'pref', 'force', 'none', 'kidAges', 'rooms', 'via'].includes(k));
   if (extra.length) return { error: `stay may only contain arrive, leave, adults, kids and dog (not ${extra.join(', ')}).` };
   const out = {};
   for (const k of ['arrive', 'leave']) {
@@ -96,6 +96,11 @@ function parseTripStayInput(raw) {
     out[k] = raw[k];
   }
   if (out.leave && !out.arrive) return { error: 'stay.leave needs stay.arrive.' };
+  // Trip dates (2026-11-23): how the dates were given ('chat': said in the chat; else picked in a date field).
+  if (raw.via !== undefined && raw.via !== null && raw.via !== '') {
+    if (raw.via !== 'chat' && raw.via !== 'picked') return { error: 'stay.via must be "chat" or "picked".' };
+    if (out.arrive) out.via = raw.via;
+  }
   if (out.arrive && out.leave) {
     const nights = daysBetween(out.arrive, out.leave);
     if (nights < 1) return { error: 'stay.leave must be after stay.arrive.' };
@@ -235,6 +240,26 @@ function budgetOf(intent) {
   return ['budget', 'upscale', 'moderate'].find((x) => list.includes(x)) || null;
 }
 
+// Trip dates and lodging dates are two things (2026-11-23, Dayton: the days said Dec 5 and 6, the stay said "Dates not
+// set" and its link had no dates). The trip's dates (opts.tripDates: { start, end, source, assumed? }, server.js
+// tripDatesOf) are what the visitor gave for the days. The lodging dates are the check-in and check-out:
+//   stayStatus 'confirmed'  the visitor entered or confirmed them (stay.arrive + stay.leave): the only dates a booking
+//                           link ever carries;
+//   stayStatus 'proposed'   the trip has given dates and the stay is worked out from them (day 1 to the last day), shown
+//                           for a yes before any provider gets a date;
+//   none                    no dates given, or only dates the planner assumed ("a weekend", a month): "Dates not set".
+// A date already past (before `today`, the site's own day) is never sent: datesPast.
+function stayDateState(i, arrive, leave, tripDates, today) {
+  const td = tripDates && validDate(tripDates.start) ? tripDates : null;
+  const out = {};
+  if (td) { out.tripStart = td.start; out.tripEnd = validDate(td.end) && td.end >= td.start ? td.end : td.start; out.tripSource = td.assumed ? 'assumed' : td.source || 'request'; }
+  const confirmed = !!(i.arrive && i.leave);
+  const past = validDate(today) && (confirmed ? validDate(arrive) && arrive < today : !!td && td.start < today);
+  if (confirmed) { out.stayStatus = 'confirmed'; if (past) out.datesPast = true; }
+  else if (td && !td.assumed) { if (past) out.datesPast = true; else out.stayStatus = 'proposed'; }
+  return out;
+}
+
 // What the plan and the inputs say about the trip, or null when no base is needed (a plan of one day with no night, a
 // plan with no venue stops, or not a plan at all). centre: the middle of the stops that have a map location (null when
 // none has one; the stays are then ranked without distance, in the plan's towns only).
@@ -284,6 +309,7 @@ function tripStayContext(plan, input, today, opts = {}) {
   return {
     arrive, leave, nights, months, adults, ...(adultsAssumed ? { adultsAssumed: true } : {}), kids, guests, withKids, dog: i.dog === true || !!party.dog, budget: budgetOf(plan.intent),
     centre, primaryRegion: regions[0], regions, datesGiven: !!(i.arrive && i.leave), camping: wantsCamping(plan),
+    ...stayDateState(i, arrive, leave, opts.tripDates, today),
     ...(opts.v4 ? { v4: true, couple: V4_COUPLE_RE.test(v4Words(plan, opts.text)), budgetStay: V4_BUDGET_STAY_RE.test(v4Words(plan, opts.text)) } : {}),
   };
 }
@@ -488,7 +514,8 @@ function whereToStay(plan, input, stays, today, opts = {}) {
   const pick = tag(picked.pick);
   return {
     stayId: picked.pick.id,
-    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, ...(ctx.adultsAssumed ? { adultsAssumed: true } : {}), kids: ctx.kids, ...(input && Array.isArray(input.kidAges) && input.kidAges.length === ctx.kids ? { kidAges: input.kidAges.slice() } : {}), ...tripRooms(ctx.adults, input && input.rooms), dog: !!ctx.dog, datesGiven: ctx.datesGiven },
+    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, ...(ctx.adultsAssumed ? { adultsAssumed: true } : {}), kids: ctx.kids, ...(input && Array.isArray(input.kidAges) && input.kidAges.length === ctx.kids ? { kidAges: input.kidAges.slice() } : {}), ...tripRooms(ctx.adults, input && input.rooms), dog: !!ctx.dog, datesGiven: ctx.datesGiven,
+      ...(ctx.stayStatus ? { stayStatus: ctx.stayStatus } : {}), ...(ctx.datesPast ? { datesPast: true } : {}), ...(ctx.tripStart ? { tripStart: ctx.tripStart, tripEnd: ctx.tripEnd, tripSource: ctx.tripSource } : {}) },
     pick,
     alternatives: picked.alternatives.map(tag),
     ...(amenity ? { amenity } : {}),

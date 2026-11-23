@@ -913,6 +913,22 @@ function t3AboutHtml(d) {
 // The optional Dates and Guests row under the request box (folded until opened), and its styles. Nothing here is on
 // the page while the flag is off.
 const T3_STAY_STYLES = `<style>
+  .t3-stayd { margin: 8px 0 2px; padding: 8px 10px; border-radius: 12px; background: rgba(27,43,58,0.05); font-size: 0.86rem; color: var(--ref-navy, #1B2B3A); }
+  .t3-stayd[data-t3-stayd="confirmed"] { background: none; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 10px; }
+  .t3-stayd-line { margin: 0; font-weight: 800; }
+  .t3-stayd[data-t3-stayd="confirmed"] .t3-stayd-line { font-weight: 600; }
+  .t3-stayd-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .t3-stayd[data-t3-stayd="confirmed"] .t3-stayd-btns { margin-top: 0; }
+  .t3-stayd-btn { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.3); background: #fff; color: var(--ref-navy, #1B2B3A); font: inherit; font-weight: 800; font-size: 0.86rem; cursor: pointer; }
+  .t3-stayd-btn.t3-stayd-ok { background: var(--ref-navy, #1B2B3A); border-color: var(--ref-navy, #1B2B3A); color: #fff; }
+  .t3-stayd[data-t3-stayd="confirmed"] .t3-stayd-btn { border: 0; background: none; padding: 0; text-decoration: underline; }
+  .t3-stayd-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; margin-top: 8px; flex-basis: 100%; }
+  .t3-stayd-form[hidden] { display: none; }
+  .t3-stayd-form label { display: flex; flex-direction: column; gap: 2px; font-weight: 700; font-size: 0.8rem; }
+  .t3-stayd-form input { min-height: 44px; font: inherit; font-size: 16px; border: 1px solid rgba(27,43,58,0.25); border-radius: 10px; padding: 0 8px; max-width: 100%; }
+  .t3-stayd-err { flex-basis: 100%; color: #8a1f11; font-weight: 700; }
+  .t3-stayd-err:empty { display: none; }
+  .t3-stayd-note { margin: 6px 0 0; font-size: 0.8rem; color: rgba(27,43,58,0.75); }
   .t3-stay-in { margin: 6px 0 2px; border-top: 1px solid rgba(27,43,58,0.12); padding-top: 8px; }
   .t3-stay-in summary { cursor: pointer; font-weight: 800; font-size: 0.88rem; color: var(--ref-navy); min-height: 32px; display: flex; align-items: center; gap: 6px; }
   .t3-stay-in summary small { font-weight: 600; color: rgba(27,43,58,0.6); }
@@ -1067,7 +1083,13 @@ ${require('./stay-booking-links').ROOMS_CLIENT_SRC}` + String.raw`
     var ok = function(x){ return typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x); };
     var parts = [];
     // Dates the visitor did not give are not shown as the trip's dates (2026-11-22): "Dates not set".
-    if (t.datesGiven === false) parts.push(fr ? 'Dates à choisir' : 'Dates not set');
+    // Trip dates (2026-11-23): dates the visitor gave are the trip's dates here too ("Sat, Dec 5 – Sun, Dec 6"), with
+    // the stay's own dates beside them once confirmed and different ("Stay: Fri, Dec 4 → Sun, Dec 6").
+    var given = ok(t.tripStart) && t.tripSource !== 'assumed' && !t.datesPast, tripTxt = given ? t3TripDatesLabel(t, fr) : '';
+    var differ = given && t.stayStatus === 'confirmed' && ok(t.arrive) && ok(t.leave) && !(t.arrive === t.tripStart && (t.leave === t.tripEnd || t.tripStart === t.tripEnd));
+    if (given && t.stayStatus === 'proposed') { parts.push(tripTxt); t = Object.assign({}, t, { nights: 0 }); }
+    else if (differ) { parts.push((fr ? 'Voyage : ' : 'Trip: ') + tripTxt); parts.push((fr ? 'Séjour : ' : 'Stay: ') + t3NiceDate(t.arrive, fr) + ' → ' + t3NiceDate(t.leave, fr)); }
+    else if (t.datesGiven === false || t.datesPast) parts.push(fr ? 'Dates à choisir' : 'Dates not set');
     else if (ok(t.arrive) && ok(t.leave)) {
       var am = Number(t.arrive.slice(5, 7)) - 1, ad = Number(t.arrive.slice(8)), lm = Number(t.leave.slice(5, 7)) - 1, ld = Number(t.leave.slice(8));
       parts.push(fr ? (am === lm ? ad + '–' + ld + ' ' + MO[am] : ad + ' ' + MO[am] + '–' + ld + ' ' + MO[lm]) : (am === lm ? MO[am] + ' ' + ad + '–' + ld : MO[am] + ' ' + ad + '–' + MO[lm] + ' ' + ld));
@@ -1081,6 +1103,60 @@ ${require('./stay-booking-links').ROOMS_CLIENT_SRC}` + String.raw`
     if (t.dog) parts.push(fr ? 'chien' : 'dog');
     return parts.join(' · ');
   }
+  // ---- Trip dates and stay dates (2026-11-23) ----
+  function t3NiceDate(iso, fr){ return new Date(iso + 'T12:00:00Z').toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }); }
+  function t3TripDatesLabel(t, fr){
+    if (!t || !t.tripStart) return '';
+    return t3NiceDate(t.tripStart, fr) + (t.tripEnd && t.tripEnd > t.tripStart ? ' – ' + t3NiceDate(t.tripEnd, fr) : '') + (t.tripSource === 'assumed' ? (fr ? ' (supposé)' : ' (assumed)') : '');
+  }
+  function t3NightsLabel(n, fr){ return fr ? n + (n > 1 ? ' nuits' : ' nuit') : n + (n > 1 ? ' nights' : ' night'); }
+  // The stay's dates, one short block by the stay: a stay proposed from the trip's dates waits for a yes ("Use these
+  // dates") before any booking link carries a date; "Change" opens check-in and check-out, which may differ from the
+  // trip's days (arriving the night before, leaving a day later). Nothing here when no dates were given.
+  function t3StayDatesHtml(t, fr){
+    if (!t || !(t.stayStatus || t.datesPast)) return '';
+    var today = new Date(); today = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+    var line, btns, note = '', a = t.datesPast ? '' : (t.arrive || ''), l = t.datesPast ? '' : (t.leave || '');
+    var edit = function(label){ return '<button type="button" class="t3-stayd-btn" data-t3-stay-edit aria-expanded="false">' + esc(label) + '</button>'; };
+    if (t.datesPast) { line = fr ? 'Ces dates sont passées : aucune date n’est envoyée.' : 'Those dates have passed, so no dates are sent.'; btns = edit(fr ? 'Choisir des dates' : 'Pick dates'); }
+    else if (t.stayStatus === 'proposed') {
+      line = (fr ? 'Séjour proposé : ' : 'Stay proposed: ') + t3NightsLabel(t.nights, fr) + ', ' + t3NiceDate(t.arrive, fr) + ' → ' + t3NiceDate(t.leave, fr);
+      btns = '<button type="button" class="t3-stayd-btn t3-stayd-ok" data-t3-stay-ok>' + esc(fr ? 'Utiliser ces dates' : 'Use these dates') + '</button>' + edit(fr ? 'Modifier' : 'Change');
+      note = fr ? 'Les dates vont au site de réservation une fois confirmées.' : 'Dates go to the booking site after you confirm them.';
+    } else {
+      // (The stay's dates are in the line above the stay; here only that the links carry them, and the way to change.)
+      line = fr ? 'Les liens de réservation portent ces dates.' : 'Booking links carry these dates.';
+      btns = edit(fr ? 'Modifier les dates' : 'Change dates');
+    }
+    return '<div class="t3-stayd" data-t3-stayd="' + esc(t.datesPast ? 'past' : t.stayStatus) + '" role="group" aria-label="' + esc(fr ? 'Dates du séjour' : 'Stay dates') + '"><p class="t3-stayd-line">' + esc(line) + '</p><div class="t3-stayd-btns">' + btns + '</div>'
+      + '<div class="t3-stayd-form" hidden><label>' + esc(fr ? 'Arrivée' : 'Check-in') + ' <input type="date" data-t3-stay-a min="' + today + '" value="' + esc(a) + '"></label><label>' + esc(fr ? 'Départ' : 'Check-out') + ' <input type="date" data-t3-stay-b min="' + today + '" value="' + esc(l) + '"></label><button type="button" class="t3-stayd-btn t3-stayd-ok" data-t3-stay-set>' + esc(fr ? 'OK' : 'Done') + '</button><span class="t3-stayd-err" role="status" aria-live="polite"></span></div>'
+      + (note ? '<p class="t3-stayd-note">' + esc(note) + '</p>' : '') + '</div>';
+  }
+  // The visitor's yes: the check-in and check-out become the stay's dates (the Dates and guests fields), and the plan
+  // comes back with them in its booking links. The stops stay as they are.
+  function t3StaySetDates(a, b){
+    var ok = function(x){ return typeof x === 'string' && x.length === 10 && !isNaN(Date.parse(x + 'T12:00:00Z')); };
+    if (!ok(a) || !ok(b) || b <= a) return false;
+    if (typeof chatSetDates === 'function') return chatSetDates(a, b, true);
+    var ea = document.getElementById('t3Arrive'), eb = document.getElementById('t3Leave');
+    if (!ea || !eb) return false;
+    ea.value = a; eb.value = b;
+    try { request({}, { requestType: 'refine', focus: false }); } catch (e) { return false; }
+    return true;
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target && e.target.closest ? e.target : null, b, box; if (!t) return;
+    if ((b = t.closest('[data-t3-stay-ok]'))) { var d = t3StayData(), tr = d && d.w && d.w.trip; if (tr && tr.stayStatus === 'proposed') t3StaySetDates(tr.arrive, tr.leave); return; }
+    if ((b = t.closest('[data-t3-stay-edit]'))) { box = b.closest('[data-t3-stayd]'); var f = box && box.querySelector('.t3-stayd-form'); if (f) { f.hidden = !f.hidden; b.setAttribute('aria-expanded', f.hidden ? 'false' : 'true'); if (!f.hidden) { var i1 = f.querySelector('[data-t3-stay-a]'); if (i1) i1.focus(); } } return; }
+    if ((b = t.closest('[data-t3-stay-set]'))) {
+      box = b.closest('.t3-stayd-form'); if (!box) return;
+      var A = box.querySelector('[data-t3-stay-a]'), B = box.querySelector('[data-t3-stay-b]'), err = box.querySelector('.t3-stayd-err'), fr = lang() === 'fr';
+      var now = new Date(), today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+      var msg = !A.value || !B.value ? (fr ? 'Choisissez les deux dates.' : 'Pick both dates.') : A.value < today ? (fr ? 'Cette date est passée.' : 'That date has passed.') : B.value <= A.value ? (fr ? 'Le départ vient après l’arrivée.' : 'Check-out comes after check-in.') : '';
+      if (err) err.textContent = msg;
+      if (!msg) t3StaySetDates(A.value, B.value);
+    }
+  });
   // Rooms (2026-11-22): "3 rooms (assumed)" until the visitor picks or says a number; "2 rooms" after. Said only when
   // it matters (3 or more adults, more than 4 people to a room), when it was picked or said, or when it is more than one.
   function t3RoomsLabel(t, fr){
@@ -1202,7 +1278,8 @@ ${require('./stay-booking-links').ROOMS_CLIENT_SRC}` + String.raw`
     var html = '';
     var prefilled = (s.bookingLinks || []).some(function(l){ return l && l.key !== 'own' && t3StayExt(l.url); });
     var bits = [];
-    if (!t.datesGiven) bits.push(fr ? 'Pas encore de dates : choisissez-les ici ou sur le site de réservation.' : 'No dates yet: pick them here or on the booking site.');
+    // (A stay proposed from the trip's dates, or dates already past, says its own line by the stay: t3StayDatesHtml.)
+    if (!t.datesGiven && !t.stayStatus && !t.datesPast) bits.push(fr ? 'Pas encore de dates : choisissez-les ici ou sur le site de réservation.' : 'No dates yet: pick them here or on the booking site.');
     if (prefilled && t.kids && !(t.kidAges && t.kidAges.length === t.kids)) bits.push(fr ? 'Le site demande l’âge des enfants.' : 'The booking site asks for the kids’ ages.');
     if (s.petsSome) bits.push(fr ? 'Animaux dans certaines chambres : à vérifier.' : 'Pets in some rooms: check when booking.');
     // Rooms (2026-11-22): nothing here says the place can sleep the group, in one room or in several.

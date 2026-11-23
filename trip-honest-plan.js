@@ -472,6 +472,13 @@ function parseShareContext(query) {
   if (kids && typeof q.ka === 'string' && /^\d{1,2}(?:,\d{1,2}){0,11}$/.test(q.ka)) { const ages = q.ka.split(',').map(Number); if (ages.length === kids && ages.every((a) => a >= 0 && a <= 17)) out.kidAges = ages; }
   // Rooms only with an adult count, and never more rooms than adults (each room needs one).
   const rm = int(q.rm, 1, 8); if (rm && ad) { out.rooms = Math.min(rm, ad); if (q.ra === '1') out.roomsAssumed = true; }
+  // Trip dates and lodging dates (2026-11-23), each optional and validated; a link without them reads as it always did.
+  //   td=2026-12-05_2026-12-06  the trip's own dates, as the visitor gave them (day 1 _ last day)
+  //   ts=r|p|c                  where they came from: the request, a date field, the chat
+  //   sa=2026-12-04 sl=2026-12-06 sc=1   the stay's check-in and check-out, only once the visitor confirmed them
+  const td = typeof q.td === 'string' ? /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/.exec(q.td) : null;
+  if (td && isDate(td[1]) && isDate(td[2]) && td[2] >= td[1] && (Date.parse(`${td[2]}T12:00:00Z`) - Date.parse(`${td[1]}T12:00:00Z`)) / 86400000 <= 30) out.tripDates = { start: td[1], end: td[2], source: { r: 'request', p: 'picked', c: 'chat' }[q.ts] || 'request' };
+  if (q.sc === '1' && isDate(q.sa) && isDate(q.sl) && q.sl > q.sa && (Date.parse(`${q.sl}T12:00:00Z`) - Date.parse(`${q.sa}T12:00:00Z`)) / 86400000 <= 30) out.stayDates = { arrive: q.sa, leave: q.sl };
   if (typeof q.sug === 'string' && q.sug) { const g = q.sug.split(',').filter((r) => /^event:[1-9][0-9]*$/.test(r)).slice(0, 3); if (g.length) out.suggestions = g; }
   if (typeof q.asks === 'string' && q.asks) { const k = [...new Set(q.asks.split(',').filter((a) => ASK_RE.test(a)))].slice(0, 12); if (k.length) out.asks = k; }
   return Object.keys(out).length ? out : null;
@@ -490,6 +497,8 @@ function shareContextQuery(c) {
   if (c.kidAges) p.push(`ka=${c.kidAges.join(',')}`);
   if (c.rooms) p.push(`rm=${c.rooms}`);
   if (c.rooms && c.roomsAssumed) p.push('ra=1');
+  if (c.tripDates) p.push(`td=${c.tripDates.start}_${c.tripDates.end}`, `ts=${{ request: 'r', picked: 'p', chat: 'c' }[c.tripDates.source] || 'r'}`);
+  if (c.stayDates) p.push(`sa=${c.stayDates.arrive}`, `sl=${c.stayDates.leave}`, 'sc=1');
   if (c.suggestions && c.suggestions.length) p.push(`sug=${c.suggestions.join(',')}`);
   if (c.asks && c.asks.length) p.push(`asks=${c.asks.join(',')}`);
   return p.join('&');
@@ -520,7 +529,7 @@ function sharedPlan(c, stops, events, stay) {
     else if (a === 'no_alcohol') none = true;
     else if (FEATURES[a]) reqs.push({ kind: 'feature', value: a, strength: 'must' });
   }
-  const plan = { kind: 'multi_day', days: [...days.values()].sort((a, b) => a.day - b.day), requirementResults: reqs, datesGiven: !!(c && c.start), warnings: [] };
+  const plan = { kind: 'multi_day', days: [...days.values()].sort((a, b) => a.day - b.day), requirementResults: reqs, datesGiven: !!(c && (c.start || c.tripDates)), warnings: [] };
   if (some) plan.partySome = [{ concept: 'alcohol' }];
   if (none) plan.noAlcohol = true;
   if (stayKeys.length) plan.whereToStay = { pick: stay ? { id: stay.id, name: stay.name, regionLabel: stay.regionLabel, has: stay.has || [] } : null, amenity: { keys: stayKeys, ...(stay && stay.winterCheck ? { winterCheck: true } : {}) } };
