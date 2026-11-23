@@ -323,7 +323,7 @@ const TOUR_ITEMS = [
   { key: 'tour_length', group: 'tour', w: 4, fix: true, target: { setup: 'tour' }, fields: ['tour_info'],
     en: 'How long it takes', fr: 'La durée', whyEn: 'An hour, half a day, a full day or several days.', whyFr: 'Une heure, une demi-journée, une journée ou plusieurs jours.', btnEn: 'Answer', btnFr: 'Répondre', icon: '⏱️' },
   { key: 'tour_price', group: 'tour', w: 8, fix: true, target: { setup: 'price' }, fields: ['tour_price'],
-    en: 'Price per person', fr: 'Prix par personne', whyEn: 'Your lowest price for one person. It shows on your card as “From $X”. Free or by donation? Type free.', whyFr: 'Votre prix le plus bas pour une personne. Il paraît sur votre fiche : « À partir de X $ ». Gratuit ou contribution volontaire? Écrivez gratuit.', btnEn: 'Answer', btnFr: 'Répondre', icon: '💵' },
+    en: 'Price', fr: 'Prix', whyEn: 'Your lowest adult price per person, a price for a private group, free, or by donation: pick the one that fits. It shows on your card.', whyFr: 'Votre prix adulte le plus bas par personne, un prix pour un groupe privé, gratuit ou contribution volontaire : choisissez ce qui convient. Il paraît sur votre fiche.', btnEn: 'Answer', btnFr: 'Répondre', icon: '💵' },
   { key: 'booking_link', noneEn: 'We don’t take bookings online', noneFr: 'Nous ne prenons pas de réservations en ligne', group: 'tour', w: 5, fix: true, target: { setup: 'booking' }, fields: ['booking_url'],
     en: 'Booking link', fr: 'Lien de réservation', whyEn: 'The page where people book a trip.', whyFr: 'La page où l’on réserve une sortie.', btnEn: 'Add it', btnFr: 'Ajouter', icon: '📅' },
   { key: 'book_ahead', group: 'tour', w: 4, fix: true, target: { setup: 'booking' }, fields: ['tour_info'],
@@ -1304,7 +1304,7 @@ const COMPLETENESS_SCRIPT = `
           row.querySelector('.op-second').hidden = !two; row.querySelector('.op-add').hidden = !!two;
           if (typeof syncRow === 'function') syncRow(row);
         });
-        if (typeof setListingDirty === 'function') setListingDirty(true);
+        if (typeof refreshListingDirty === 'function') refreshListingDirty();
         var note = b.parentNode.querySelector('.op-copy-done') || b.parentNode.appendChild(document.createElement('span'));
         note.className = 'op-copy-done'; note.textContent = (typeof T !== 'undefined' && T.copied) || 'Copied.';
       });

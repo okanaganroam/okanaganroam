@@ -2978,6 +2978,48 @@ Object.assign(fr, {
   sisterMsgUs: 'Écrivez-nous', sisterMsg: 'Pouvez-vous m’envoyer le lien de configuration de {a}?',
 });
 
+// Tour pre-launch (2026-11-22): the Price step asks how the operator charges first (per person, private groups only, free,
+// by donation), so nobody has to type "free" in a dollar box; every price box and review line says CAD and the unit
+// (per person / for the whole group / per hour). A by-donation tour says "By donation" (it said "Free").
+Object.assign(en.tour, {
+  tpriceQ: 'What does it cost?',
+  tmodeQ: 'How do you charge?', tmodes: { person: 'Per person', private: 'Private groups only', free: 'Free', donation: 'By donation' },
+  tpriceLabel: 'Lowest adult price, per person (CAD $)', tprivLabel: 'Private tours from, for the whole group (CAD $)', tprivLabelLessons: 'Private lessons from, for the whole group (CAD $)',
+  tprivLabelHour: 'Private tours from, per hour (CAD $)', tprivLabelLessonsHour: 'Private lessons from, per hour (CAD $)',
+  tpriceLead: 'Your lowest paid price for one adult, in Canadian dollars. It shows on your card as “From $X a person”.',
+  tpriceLeadPriv: 'One price for the whole group, in Canadian dollars, like a charter or a day rate. It shows on your card as “From $X / group”.',
+  tpriceLeadPrivPick: 'Your card will say “From {x} / group”, and your page “Private tours from {x} for the group”.',
+  tpriceLeadPrivHour: 'Your page will say “Private tours from {x}/hour”.',
+  tpriceLeadFree: 'Your card and your page will say “Free”.',
+  tpriceLeadDonation: 'Your card will say “By donation”, and your page “By donation (pay what you want)”.',
+  tpriceSavedDonation: 'Your page and your card say “By donation” now.', tdonationCard: 'By donation',
+  tpriceSavedPriv: 'Your private price is on your page and your card now: {x} for the group.', tpriceSavedPrivHour: 'Your private price is on your page now: {x} per hour.',
+  tprivQOnly: 'Your private group price', tprivNeedOnly: 'Please type the price for the whole group in dollars, like 450.',
+  tprivQFree: 'Private tours too? (optional)',
+  tpriceFreeTip: 'Free or by donation? Tap Free or By donation above.', tpriceFreeHint: 'Your page says by donation. Tap By donation above if that’s right.',
+  tpriceNeed: 'Just the number, like 189. Free, by donation or private groups only? Tap it above.',
+  tpriceCardPerson: 'From {x} a person', tpriceCardGroup: 'From {x} / group', tfreeWords: { free: 'Free', donation: 'By donation' },
+});
+Object.assign(fr.tour, {
+  tpriceQ: 'Combien ça coûte?',
+  tmodeQ: 'Comment facturez-vous?', tmodes: { person: 'Par personne', private: 'Groupes privés seulement', free: 'Gratuit', donation: 'Contribution volontaire' },
+  tpriceLabel: 'Prix adulte le plus bas, par personne ($ CA)', tprivLabel: 'Sorties privées à partir de, pour tout le groupe ($ CA)', tprivLabelLessons: 'Cours privés à partir de, pour tout le groupe ($ CA)',
+  tprivLabelHour: 'Sorties privées à partir de, à l’heure ($ CA)', tprivLabelLessonsHour: 'Cours privés à partir de, à l’heure ($ CA)',
+  tpriceLead: 'Votre prix payant le plus bas pour un adulte, en dollars canadiens. Il paraît sur votre fiche : « À partir de X $ par personne ».',
+  tpriceLeadPriv: 'Un seul prix pour tout le groupe, en dollars canadiens, comme un nolisement ou un tarif à la journée. Il paraît sur votre fiche : « À partir de X $ / groupe ».',
+  tpriceLeadPrivPick: 'Votre fiche indiquera « À partir de {x} / groupe », et votre page « Sorties privées à partir de {x} pour le groupe ».',
+  tpriceLeadPrivHour: 'Votre page indiquera « Sorties privées à partir de {x} l’heure ».',
+  tpriceLeadFree: 'Votre fiche et votre page indiqueront « Gratuit ».',
+  tpriceLeadDonation: 'Votre fiche indiquera « Contribution volontaire », et votre page « Contribution volontaire (payez ce que vous voulez) ».',
+  tpriceSavedDonation: 'Votre page et votre fiche indiquent « Contribution volontaire » maintenant.', tdonationCard: 'Contribution volontaire',
+  tpriceSavedPriv: 'Votre prix privé est sur votre page et votre fiche maintenant : {x} pour le groupe.', tpriceSavedPrivHour: 'Votre prix privé est sur votre page maintenant : {x} l’heure.',
+  tprivQOnly: 'Votre prix pour un groupe privé', tprivNeedOnly: 'Écrivez le prix pour tout le groupe en dollars, par exemple 450.',
+  tprivQFree: 'Des sorties privées aussi? (facultatif)',
+  tpriceFreeTip: 'Gratuit ou contribution volontaire? Touchez Gratuit ou Contribution volontaire ci-dessus.', tpriceFreeHint: 'Votre page parle d’une contribution volontaire. Touchez Contribution volontaire ci-dessus si c’est exact.',
+  tpriceNeed: 'Seulement le chiffre, par exemple 189. Gratuit, contribution volontaire ou groupes privés seulement? Touchez-le ci-dessus.',
+  tpriceCardPerson: 'À partir de {x} par personne', tpriceCardGroup: 'À partir de {x} / groupe', tfreeWords: { free: 'Gratuit', donation: 'Contribution volontaire' },
+});
+
 (function frSpaces(o) {
   for (const k of Object.keys(o)) {
     if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);

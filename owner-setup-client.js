@@ -750,6 +750,10 @@
   if (CUR.tour_price === 'free' || CUR.tour_price === 'donation') { S.tour.free = CUR.tour_price; S.tour.price = 0; }
   if (INDOOR && (CUR.indoor_price === 'free' || CUR.indoor_price === 'donation')) { S.tour.free = CUR.indoor_price; S.tour.price = 0; }
   S.savedTourPrice = CUR[PRICE_F] == null ? null : CUR[PRICE_F];
+  // Tour pre-launch (2026-11-22): "How do you charge?" on the tour Price step. Per person, Free and By donation follow the
+  // stored price; Private groups only is a private price with no price per person (tour test 7's private-only guide).
+  S.tour.privOnly = !INDOOR && CUR.tour_price == null && typeof TI.private === 'number' && TI.private > 0;
+  function tourMode(){ return S.tour.free || (S.tour.privOnly ? 'private' : 'person'); }
   // Indoor places (2026-11-19): research's price, or its Free badge, pre-picked as a suggestion (saved only with the screen);
   // the kinds research's words name pre-picked the same way; and each kind's usual visit, walk-ins answer and age.
   // Indoor test 1 (2026-11-19; Margaret): By donation keeps a suggested amount in the price box's place ("Suggested amount
@@ -1003,7 +1007,9 @@
   // Indoor test 14 (2026-11-19; Helen typed 5 under By donation; the lead kept "By donation"): the lead says the
   // suggested amount as she types it, as her page will ("By donation (suggested $5)").
   function suggNow(){ var t0 = S.tour.suggText, n0 = t0 != null ? (String(t0).trim() ? tourPriceNumber(t0) : null) : S.tour.sugg; return typeof n0 === 'number' && !isNaN(n0) && n0 > 0 && n0 <= (C.feeLiveMax || 300) ? n0 : null; }
-  function tourPriceLead0(){ var n = S.tour.price; if (S.tour.free === 'donation' && T.tpriceLeadDonation) return INDOOR && T.tpriceLeadDonationSugg && suggNow() != null ? fill(T.tpriceLeadDonationSugg, { x: tourMoney(suggNow()) }) : T.tpriceLeadDonation;
+  function tourPriceLead0(){ var n = S.tour.price;
+    if (!INDOOR && T.tpriceLeadPriv && tourMode() === 'private') { var pv0 = S.tour.priv; return pv0 != null && !isNaN(pv0) && pv0 > 0 ? fill(S.tour.privPer === 'hour' ? T.tpriceLeadPrivHour : T.tpriceLeadPrivPick, { x: tourMoney(pv0) }) : T.tpriceLeadPriv; }
+    if (S.tour.free === 'donation' && T.tpriceLeadDonation) return INDOOR && T.tpriceLeadDonationSugg && suggNow() != null ? fill(T.tpriceLeadDonationSugg, { x: tourMoney(suggNow()) }) : T.tpriceLeadDonation;
     // Indoor test 3: a range typed ("$25 - $55") says what we'll show. Indoor test 4: every kind's lead is its own (kindWords).
     if (INDOOR && !S.tour.free && !S.tour.per && S.tour.range && n > 0 && T.tpriceRangeLead) return fill(T.tpriceRangeLead, { x: tourMoney(n), line: indoorShowLine(n) });
     if (INDOOR && S.tour.per && !S.tour.free && T.tpriceLeadPer) return n == null || isNaN(n) ? T.tpriceLead : fill(T.tpriceLeadPer, { page: indoorPerPage(n), x: tourMoney(n), u: (T.iperWords || {})[S.tour.per] || S.tour.per }); return S.tour.free && T.tpriceLeadFree ? T.tpriceLeadFree : n == null || isNaN(n) ? T.tpriceLead : fill(tourRentalsOnly() && T.tpriceLeadPickUnit ? T.tpriceLeadPickUnit : INDOOR && T.tpriceLeadPickLow && indoorLowered(n) ? T.tpriceLeadPickLow : T.tpriceLeadPick, { x: tourMoney(n), line: INDOOR ? indoorShowLine(n) : '' }); }
@@ -2146,7 +2152,7 @@
     if (C.indoor) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([indoorKindsShort(TI.kinds) || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' && TI.per && T.tpriceCardPer ? fill(T.tpriceCardPer, { x: tourMoney(S.savedTourPrice), u: (T.iperWords || {})[TI.per] || TI.per }) : typeof S.savedTourPrice === 'number' ? indoorShowLine(S.savedTourPrice) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? T.tfreeCard : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     if (C.tour) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
-      + h([S.tourWords || C.tourWords || (TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? (T.tfreeCard || 'Free') : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
+      + h([S.tourWords || C.tourWords || (TI.kinds || []).filter(function(k){ return k !== 'other'; }).map(tourKindName).join(', ') || C.typeLabel, C.regionLabel, typeof S.savedTourPrice === 'number' ? fill(T.tpriceCardPerson || T.tpriceCard, { x: tourMoney(S.savedTourPrice) }) : S.savedTourPrice === 'donation' && T.tdonationCard ? T.tdonationCard : S.savedTourPrice === 'free' || S.savedTourPrice === 'donation' ? (T.tfreeCard || 'Free') : S.savedTourPrice == null && typeof TI.private === 'number' && TI.private > 0 && TI.private_per !== 'hour' && T.tpriceCardGroup ? fill(T.tpriceCardGroup, { x: tourMoney(TI.private) }) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
     // Breweries (2026-11-12): the kind, the town and the flight price as the card shows it ("From $12").
     if (C.brewery) return '<p class="su-lead" style="margin-top:20px">' + h(T.howLooks) + '</p><div class="su-preview">' + (S.mainSrc || C.image ? '<img src="' + h(S.mainSrc || C.image) + '" alt="">' : '') + '<div><strong>' + h(C.name) + '</strong><p>'
       + h([S.place && CUR.place_type ? (C.placeShow || {})[S.place] || S.place : C.typeLabel, C.regionLabel, S.savedFlight === 0 ? T.feeCardFree : S.savedFlight != null ? fill(T.feeCard, { x: flightText(S.savedFlight) }) : ''].filter(Boolean).join(' · ')) + '</p></div></div>';
@@ -2958,8 +2964,13 @@
     } else if (s === 'price') {
       // Tours (2026-11-16): "From $__ per person" in one box ("$129", "129 $" or "1,500" all work), and private tours.
       var tp = S.tour;
-      x = doneLine('price') + '<h1>' + h(T.tpriceQ) + '</h1><p class="su-lead" id="suTpriceLead">' + h(tourPriceLead()) + '</p>'
-        + (tp.priceGuessed && tp.price != null && !isNaN(tp.price) && T.tpriceGuess ? '<p class="su-sent su-research" id="suFeeGuess">' + h(T.tpriceGuess) + '</p>' : '')
+      // Tour pre-launch (2026-11-22): "How do you charge?" first: Per person, Private groups only, Free or By donation. Only
+      // Per person shows the dollar box; every box says CAD and its unit.
+      var tmode = tourMode();
+      x = doneLine('price') + '<h1>' + h(T.tpriceQ) + '</h1>'
+        + (T.tmodes ? '<p class="su-q" id="suTmodeQ">' + h(T.tmodeQ) + '</p><div class="su-chips" role="group" aria-labelledby="suTmodeQ" id="suTmodes">' + ['person', 'private', 'free', 'donation'].map(function(m){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (tmode === m ? 'true' : 'false') + '" data-tmode="' + m + '">' + h(T.tmodes[m]) + '</button>'; }).join('') + '</div>' : '')
+        + '<p class="su-lead" id="suTpriceLead">' + h(tourPriceLead()) + '</p>'
+        + (tmode === 'person' && tp.priceGuessed && tp.price != null && !isNaN(tp.price) && T.tpriceGuess ? '<p class="su-sent su-research" id="suFeeGuess">' + h(T.tpriceGuess) + '</p>' : '')
         // Tour test 4: research's "by donation" / "free" pre-picks no price; it only says what to type (her answer, her tap).
         + (C.researchFreeHint && S.savedTourPrice == null && !tp.free && T.tpriceFreeHint ? '<p class="su-sent su-research" id="suFreeHint">' + h(T.tpriceFreeHint) + '</p>' : '')
         + (CUR.tour_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.tour_price_waiting) })) + '</p>' : '') + msgs()
@@ -2968,9 +2979,10 @@
         // The per-person box takes words too ("free", "by donation"), so it opens the letters keyboard (no number pad).
         // Tour test 16 (Whistler, 2026-11-18; Tom): one short line under the box ("The adult price…"); free tours, the
         // checked-first limit and per-boat prices are in Help (the limit is also said after a save over it).
-        + field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { max: 40 }) + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(tourRentalKinds() && T.tpriceMoreRentals ? T.tpriceMoreRentals : T.tpriceMore) + '</p>' : '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>')
+        + (tmode !== 'person' ? '' : field('suTprice', T.tpriceLabel, boxVal('suTprice', tp.price), { max: 40 }) + (T.tpriceMore && STEPS.indexOf('menu') >= 0 ? '<p class="su-hint" id="suTpriceMore">' + h(tourRentalKinds() && T.tpriceMoreRentals ? T.tpriceMoreRentals : T.tpriceMore) + '</p>' : '<p class="su-hint" id="suFeeOver">' + h(fill(T.tpriceOver, { n: tourMoney(C.feeLiveMax || 1000) })) + '</p>'))
         // Tour test 14 (Lucía): a lesson company's box says "Private lessons" (her page says "Private lessons from $599").
-        + '<h2 class="su-h2">' + h(tourLessonsKind() && T.tprivQLessons ? T.tprivQLessons : T.tprivQ) + '</h2><p class="su-hint">' + h(T.tprivLead) + '</p>' + field('suTpriv', tourLessonsKind() && T.tprivLabelLessons ? T.tprivLabelLessons : T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 40 })
+        + '<h2 class="su-h2">' + h(tmode === 'private' && T.tprivQOnly ? T.tprivQOnly : tmode !== 'person' && T.tprivQFree && !tourLessonsKind() ? T.tprivQFree : tourLessonsKind() && T.tprivQLessons ? T.tprivQLessons : T.tprivQ) + '</h2>' + (tmode === 'private' ? '' : '<p class="su-hint">' + h(T.tprivLead) + '</p>')
+        + field('suTpriv', tp.privPer === 'hour' && T.tprivLabelHour ? (tourLessonsKind() && T.tprivLabelLessonsHour ? T.tprivLabelLessonsHour : T.tprivLabelHour) : tourLessonsKind() && T.tprivLabelLessons ? T.tprivLabelLessons : T.tprivLabel, boxVal('suTpriv', tp.priv), { mode: 'decimal', max: 40 })
         // Tour test 11: whole trip or per hour, and the minimum hours of an hourly price.
         + (T.tprivPers ? '<p class="su-q" id="suPrivPerQ">' + h(T.tprivPerQ) + '</p>' + tchips('privPer', ['trip', 'hour'], T.tprivPers, T.tprivPerQ, 'suPrivPerQ')
           + (tp.privPer === 'hour' ? '<p class="su-q" id="suPrivMinQ">' + h(T.tprivMinQ) + '</p>' + tchips('privMin', ['2', '3', '4', '5', '6', '8'], T.tprivMins, T.tprivMinQ, 'suPrivMinQ') : '') : '')
@@ -5118,6 +5130,8 @@
       };
       // Tour test 7 (Whistler, 2026-11-17): a private-only guide may leave the per-person box empty when the private box
       // has a price (the card then says "From $750 / group").
+      // Tour pre-launch (2026-11-22): "Private groups only" needs the group price (and never keeps a price per person).
+      if (S.tour.privOnly && !pfree) { pp = null; if (pv == null || isNaN(pv)) { S.nudge = pv == null ? T.tprivNeedOnly || T.tprivNeed : T.tprivNeed; S.badField = 'suTpriv'; return render(); } }
       var privOnly = !pfree && pp == null && pv != null && !isNaN(pv);
       if (!pfree && !privOnly && (pp == null || isNaN(pp))) {
         // Tour test 5: say why ("per boat" -> Private tours; a trip length first; two prices) instead of trimming.
@@ -5133,7 +5147,7 @@
         if (pfree !== S.savedTourPrice || CUR.tour_price_waiting != null) pl.push({ tour_price: pfree });
         if ((pv == null ? null : pv) !== (typeof TI.private === 'number' ? TI.private : null)) pl.push({ tour_info: { private: pv == null ? null : pv } });
         var px1 = privExtra(pl);
-        S.savedLine.price = T.tpriceSavedFree || T.tpriceSavedLive;
+        S.savedLine.price = pfree === 'donation' && T.tpriceSavedDonation ? T.tpriceSavedDonation : T.tpriceSavedFree || T.tpriceSavedLive;
         return saveAll('price', pl, null, null, function(){ px1(); S.savedTourPrice = pfree; CUR.tour_price = pfree; CUR.tour_price_waiting = null; S.tour.priceGuessed = false; if (pv == null) delete TI.private; else TI.private = pv; });
       }
       // Tour test 7 (Whistler, 2026-11-17): the right price saved again over a held one ($2,600 waiting, then $395, the live
@@ -5141,7 +5155,7 @@
       if (pp !== S.savedTourPrice || (CUR.tour_price_waiting != null && pp !== CUR.tour_price_waiting)) pl.push({ tour_price: pp });
       if ((pv == null ? null : pv) !== (typeof TI.private === 'number' ? TI.private : null)) pl.push({ tour_info: { private: pv == null ? null : pv } });
       var px2 = privExtra(pl);
-      S.savedLine.price = pp > (C.feeLiveMax || 1000) && pp !== S.savedTourPrice ? fill(T.tpriceSavedDay, { x: tourMoney(pp), n: tourMoney(C.feeLiveMax || 1000) }) : T.tpriceSavedLive;
+      S.savedLine.price = pp > (C.feeLiveMax || 1000) && pp !== S.savedTourPrice ? fill(T.tpriceSavedDay, { x: tourMoney(pp), n: tourMoney(C.feeLiveMax || 1000) }) : privOnly && T.tpriceSavedPriv ? fill(S.tour.privPer === 'hour' ? T.tpriceSavedPrivHour : T.tpriceSavedPriv, { x: tourMoney(pv) }) : T.tpriceSavedLive;
       return saveAll('price', pl, null, null, function(){ px2(); if (pp == null || pp <= (C.feeLiveMax || 1000)) { S.savedTourPrice = pp; CUR.tour_price = pp; CUR.tour_price_waiting = null; } else if (pp !== S.savedTourPrice) CUR.tour_price_waiting = pp; S.tour.priceGuessed = false; if (pv == null) delete TI.private; else TI.private = pv; });
     }
     if (k === 'bookingSave') {
@@ -5531,6 +5545,14 @@
       if (kt === 'privMin') S.tour.privMinTapped = true;
       if (kt === 'bookYes' && vt === 'no') S.tour.book = '';
       redraw(); }; });
+    // Tour pre-launch (2026-11-22): "How do you charge?" (a tap never saves; Save does).
+    Array.prototype.forEach.call(screen.querySelectorAll('[data-tmode]'), function(b){ b.onclick = function(){
+      readTour(); var tm = b.getAttribute('data-tmode');
+      S.nudge = ''; S.badField = ''; S.groupMove = null; S.rawBox.suTprice = ''; S.tour.priceGuessed = false; S.tour.priceFirst = false;
+      if (tm === 'free' || tm === 'donation') { S.tour.free = tm; S.tour.price = 0; S.tour.privOnly = false; }
+      else if (tm === 'private') { S.tour.free = ''; S.tour.price = null; S.tour.privOnly = true; }
+      else { S.tour.free = ''; if (!(S.tour.price > 0)) S.tour.price = null; S.tour.privOnly = false; }
+      mark(); redraw(); var again = screen.querySelector('[data-tmode="' + tm + '"]'); if (again) again.focus(); }; });
     Array.prototype.forEach.call(screen.querySelectorAll('[data-tkind]'), function(b){ b.onclick = function(){
       var kk = b.getAttribute('data-tkind'), i = S.tour.kinds.indexOf(kk);
       S.tour.kindsGuessed = false; S.kindsOpen = true;
@@ -5575,6 +5597,7 @@
     // Indoor test 17: the button's words follow the link as it is typed or pasted.
     var bsx = el('suBookUrl'), bsl = el('suBookShows'); if (bsx && bsl && INDOOR) bsx.addEventListener('input', function(){ var w = bookShowsWord(bsx.value, S.tour && S.tour.book); bsl.textContent = w ? fill(T.bookShows, { x: w }) : ''; bsl.hidden = !w; });
     var tsg = el('suTsugg'); if (tsg && INDOOR) tsg.addEventListener('input', function(){ S.tour.suggText = tsg.value; var ld = el('suTpriceLead'); if (ld) ld.textContent = tourPriceLead(); });
+    var tpv = el('suTpriv'); if (tpv && TL && !INDOOR) tpv.addEventListener('input', function(){ if (tourMode() !== 'private') return; readTour(); var ldv = el('suTpriceLead'); if (ldv) ldv.textContent = tourPriceLead(); });
     var tpi = el('suTprice'); if (tpi && TL) tpi.addEventListener('input', function(){ readTour(); var ld = el('suTpriceLead'); if (ld) ld.textContent = tourPriceLead();
       // Indoor test 2: per room words pick Per room or group as she types (the box keeps her focus).
       if (INDOOR && el('suPerChips')) { Array.prototype.forEach.call(screen.querySelectorAll('[data-iper]'), function(b){ var u = b.getAttribute('data-iper'); b.setAttribute('aria-pressed', (u === 'group' ? !!S.tour.per : !S.tour.per) ? 'true' : 'false'); });

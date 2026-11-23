@@ -99,7 +99,7 @@ test('1. price box: "$750/day" is a day rate for the group (Private tours, with 
   assert.match(app.cleanTourPrice('$750/day', true).error, /^A day rate for your group\?/);
   assert.match(app.cleanTourPrice('1450 for 3 days', true).error, /^That’s a trip length\./);
   ok(await change(t, { tour_price: 395, tour_info: { private: 750 } }));
-  assert.match(plain(page(v)), /From \$395 a person\. Private tours from \$750\./);
+  assert.match(plain(page(v)), /From \$395 a person\. Private tours from \$750 for the group\./);
 });
 
 test('2. category words: a pre-picked kind he unticks takes its research words off the category (EN + FR); only words no pre-picked chip covered stay', async () => {
@@ -213,8 +213,8 @@ test('8. private only: no per-person price with a private day rate works; the ca
   assert.equal(app.tourPrice(v.id), null);
   const card = plain(cardOf((await get('/penticton/tours')).text, v.name));
   assert.match(card, /From \$750 \/ group/); assert.doesNotMatch(card, /\$195/);
-  assert.match(plain(page(v)), /Private tours from \$750\./);
-  assert.match(plain(page(v, 'fr')), /Sorties privées à partir de 750 \$\./);
+  assert.match(plain(page(v)), /Private tours from \$750 for the group\./);
+  assert.match(plain(page(v, 'fr')), /Sorties privées à partir de 750 \$ pour le groupe\./);
   const s = completeness.scoreCompleteness({ type: 'tour', tourInfo: app.tourInfoAnswers(v.id), tourPrice: null });
   assert.ok(s && JSON.stringify(s).length, 'scored');
   assert.match(CLIENT, /var privOnly = !pfree && pp == null && pv != null && !isNaN\(pv\);/);

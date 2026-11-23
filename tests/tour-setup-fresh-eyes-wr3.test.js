@@ -427,7 +427,7 @@ test('8. every price box takes words after the number', async () => {
   assert.equal((CLIENT.match(/mode: 'decimal', max: 40 \}/g) || []).length, 4);
   assert.doesNotMatch(CLIENT, /mode: 'decimal', max: (?:8|10) \}/);
   // Tour test 4 (2026-11-17): the nudge also says what to type for a free tour.
-  assert.equal(text.en.tour.tpriceNeed, 'Just the number, like 189. Free or by donation? Type free.');
+  assert.equal(text.en.tour.tpriceNeed, 'Just the number, like 189. Free, by donation or private groups only? Tap it above.');
   assert.match(text.fr.tour.tpriceNeed, /^Seulement le chiffre, par exemple 189\. /);
 });
 
@@ -442,7 +442,7 @@ test('9. the price note says "per person" with the limit from the config; a held
   // The message on the next screen, with the amount.
   assert.match(text.en.tour.tpriceSavedDay, /^We’re checking \{x\}\. A price per person over \{n\} is checked first/);
   assert.match(text.fr.tour.tpriceSavedDay, /^Nous vérifions \{x\}\./);
-  assert.match(CLIENT, /S\.savedLine\.price = pp > \(C\.feeLiveMax \|\| 1000\) && pp !== S\.savedTourPrice \? fill\(T\.tpriceSavedDay, \{ x: tourMoney\(pp\), n: tourMoney\(C\.feeLiveMax \|\| 1000\) \}\) : T\.tpriceSavedLive;/);
+  assert.match(CLIENT, /S\.savedLine\.price = pp > \(C\.feeLiveMax \|\| 1000\) && pp !== S\.savedTourPrice \? fill\(T\.tpriceSavedDay, \{ x: tourMoney\(pp\), n: tourMoney\(C\.feeLiveMax \|\| 1000\) \}\) : privOnly && T\.tpriceSavedPriv \? fill\(S\.tour\.privPer === 'hour' \? T\.tpriceSavedPrivHour : T\.tpriceSavedPriv, \{ x: tourMoney\(pv\) \}\) : T\.tpriceSavedLive;/);
   // 3900 in the per-person box waits; the same number as a private price is live at once (Dayton's decision).
   ok(await change(t, { tour_price: 189 }));
   const held = ok(await change(t, { tour_price: 3900 }));
@@ -452,7 +452,7 @@ test('9. the price note says "per person" with the limit from the config; a held
   ok(await change(t, { tour_price: 189 }));
   const priv = ok(await change(t, { tour_info: { private: 3900 } }));
   assert.deepEqual(priv.body.live, ['tour_info']);
-  assert.match(plain(page(v, 'en')), /From \$189 a person\. Private tours from \$3,900\./);
+  assert.match(plain(page(v, 'en')), /From \$189 a person\. Private tours from \$3,900 for the group\./);
   // Tour test 16 (2026-11-18): the price screen's small print is one short line; "shows right away" is in Help.
   assert.match(text.en.tour.tprivLead, /^One price for the whole group/);
   assert.match(text.fr.tour.tprivLead, /^Un seul prix pour tout le groupe/);

@@ -13220,6 +13220,8 @@ function openMonthsText(value, lang = 'en') {
   if (ex && ex.exact) {
     const names = MONTH_NAMES[lang === 'fr' ? 'fr' : 'en'];
     const day = (md) => (lang === 'fr' ? `${Number(md.slice(3)) === 1 ? '1er' : Number(md.slice(3))} ${names[Number(md.slice(0, 2)) - 1]}` : `${names[Number(md.slice(0, 2)) - 1]} ${Number(md.slice(3))}`);
+    // Tour pre-launch (2026-11-22): a season stored to Feb 29 runs to the end of February every year (never "February 29").
+    if (ex.to === '02-29') return lang === 'fr' ? `${day(ex.from)} ${frAuDay(febEndText(true))}` : `${day(ex.from)} \u2013 ${febEndText(false)}`;
     return lang === 'fr' ? `${day(ex.from)} au ${day(ex.to)}` : `${day(ex.from)} \u2013 ${day(ex.to)}`;
   }
   if (!m) return '';
@@ -27061,7 +27063,9 @@ const TOUR_BOOK_LINES = { same_day: ['Same-day bookings are often fine.', 'Rése
   // Tour test 16 (Whistler, 2026-11-18): "Yes" with no how-far-ahead chip.
   ahead: ['Book ahead.', 'Réservez à l’avance.'] };
 // Tour test 4 (Whistler, 2026-11-17): the Prices line of a free tour, and the card's word.
-const TOUR_FREE_LINES = { free: ['Free.', 'Gratuit.'], donation: ['Free (pay what you want).', 'Gratuit (contribution volontaire).'] };
+const TOUR_FREE_LINES = { free: ['Free.', 'Gratuit.'], donation: ['By donation (pay what you want).', 'Contribution volontaire (payez ce que vous voulez).'] };
+// Tour pre-launch (2026-11-22): a by-donation tour says so on its page and its card (it said "Free"), like a by-donation museum.
+const TOUR_DONATION_CARD_LABEL = 'By donation';
 const TOUR_FREE_CARD_LABEL = 'Free';
 const TOUR_AGE_LINES = { all: ['All ages.', 'Tous les âges.'], 5: ['Ages 5 and up.', 'À partir de 5 ans.'], 6: ['Ages 6 and up.', 'À partir de 6 ans.'], 8: ['Ages 8 and up.', 'À partir de 8 ans.'], 10: ['Ages 10 and up.', 'À partir de 10 ans.'], 12: ['Ages 12 and up.', 'À partir de 12 ans.'], 14: ['Ages 14 and up.', 'À partir de 14 ans.'], 16: ['Ages 16 and up.', 'À partir de 16 ans.'], 19: ['19 and over.', '19 ans et plus.'] };
 let venueTourInfoCache = null;
@@ -27554,7 +27558,8 @@ function tourPrivateLine(venue, t, priv, fr) {
   // Tour test 14 (Whistler, 2026-11-18; Lucía): a lesson company's line says "Private lessons from $599." (« Cours privés »).
   const lessons = !!(t && Array.isArray(t.kinds) && t.kinds.includes('lessons'));
   const what = fr ? (van ? 'Van privé' : lessons ? 'Cours privés' : 'Sorties privées') : (van ? 'Private van' : lessons ? 'Private lessons' : 'Private tours');
-  if (!hourly) return fr ? `${what} à partir de ${tourMoney(priv, true)}.` : `${what} from ${tourMoney(priv, false)}.`;
+  // Tour pre-launch (2026-11-22): the unit is said ("Private tours from $450 for the group."), so a charter's price never reads as per person.
+  if (!hourly) return fr ? `${what} à partir de ${tourMoney(priv, true)} pour le groupe.` : `${what} from ${tourMoney(priv, false)} for the group.`;
   return fr ? `${what} à partir de ${tourMoney(priv, true)} l’heure${min ? ` (minimum de ${min} heures)` : ''}.`
     : `${what} from ${tourMoney(priv, false)}/hour${min ? ` (${min}-hour minimum)` : ''}.`;
 }
@@ -27783,7 +27788,7 @@ function tourCardPrice(venueId) {
   // Tour test 7 (Whistler, 2026-11-17): no price per person but a private (day) rate: the card says "From $750 / group"
   // (it showed research's old per-person price).
   const priv = venueTourInfo(venueId).private, privN = typeof priv === 'number' && Number.isFinite(priv) && priv > 0 ? priv : null;
-  try { if (free) priceCheck.setOwnerPrice(venueId, 0, TOUR_FREE_CARD_LABEL); else if (p == null && privN != null) priceCheck.setOwnerPrice(venueId, privN, 'Private tours', 'group'); else priceCheck.setOwnerPrice(venueId, p, p == null ? null : 'Per person'); } catch (e) { console.error(`[owner-portal] card price for tour #${venueId} failed: ${e.message}`); }
+  try { if (free) priceCheck.setOwnerPrice(venueId, 0, free === 'donation' ? TOUR_DONATION_CARD_LABEL : TOUR_FREE_CARD_LABEL); else if (p == null && privN != null) priceCheck.setOwnerPrice(venueId, privN, 'Private tours', 'group'); else priceCheck.setOwnerPrice(venueId, p, p == null ? null : 'Per person'); } catch (e) { console.error(`[owner-portal] card price for tour #${venueId} failed: ${e.message}`); }
 }
 // The card's duration chip (tourCardFacts reads "Time needed"); and Build My Trip's facts: the minimum age, how far ahead
 // to book and how long a trip takes, from the operator's own answers (null when not answered).
@@ -58894,7 +58899,13 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
     const m = /^(1[0-2]|[1-9])-(1[0-2]|[1-9])$/.exec(raw);
     // Café test 2 (2026-11-11): or exact days every year, "04-25:10-12" (open Apr 25 to Oct 12; may wrap New Year).
     const exact = !m && hoursModule ? hoursModule.parseOpenSeason(raw) : null;
-    if (raw && exact && exact.exact) { if (raw !== (current.open_months || '')) changes.open_months = raw; }
+    // Tour pre-launch (2026-11-22): the dates repeat every year. A day that month never has ("02-31", "04-31") is
+    // refused by parseOpenSeason; an opening day of Feb 29 is refused too (most years have none); a closing day of
+    // Feb 28 means "to the end of February" and is stored 02-29 like the setup stores it (covers the leap day).
+    const exactShape = /^\d{2}-\d{2}:\d{2}-\d{2}$/.test(raw);
+    if (raw && exact && exact.exact && exact.from === '02-29' && raw !== (current.open_months || '')) errors.open_months = 'February 29 only comes every four years. Please pick February 28 or March 1 as your first day.';
+    else if (raw && exact && exact.exact) { const norm = exact.to === '02-28' ? `${exact.from}:02-29` : raw; if (norm !== (current.open_months || '') && raw !== (current.open_months || '')) changes.open_months = norm; }
+    else if (raw && exactShape) errors.open_months = 'One of those dates isn\u2019t on the calendar. Please pick the first and last day again.';
     else if (raw && (!m || m[1] === m[2])) errors.open_months = 'Please pick the first and last month you\u2019re open.';
     else if (raw !== (current.open_months || '')) changes.open_months = raw || null;
   }
@@ -59531,7 +59542,7 @@ function ownerValueText(field, value) {
     return parts.length ? parts.join(' · ') : '(none)';
   }
   if (field === 'tasting_fee') return value == null ? '(none)' : Number(value) === 0 ? 'Free tastings' : `${wineryMoney(Number(value), false)} a person`;
-  if (field === 'tour_price') return value == null ? '(none)' : value === 'free' ? 'Free' : value === 'donation' ? 'Free (pay what you want)' : `From ${tourMoney(Number(value), false)} a person`;
+  if (field === 'tour_price') return value == null ? '(none)' : value === 'free' ? 'Free' : value === 'donation' ? 'By donation (pay what you want)' : `From ${tourMoney(Number(value), false)} a person`;
   if (field === 'tour_info') {
     const o = value && typeof value === 'object' ? value : {};
     const parts = [];
@@ -62604,6 +62615,7 @@ async function findMenuOnWebsite(rawUrl, kind = 'menu') {
   return files.length ? { type: 'pdf', files } : { error: 'not_found' };
 }
 
+const menuSaveRevs = new Map(); // menu id -> the highest save number stored (tour pre-launch 2)
 async function handleMenuApi(req, res, ctx, action, arg) {
   const generic = 'Sorry, something went wrong. Please try again, or tap "Can you do it for me?".';
   const { venue } = ctx.found;
@@ -62730,6 +62742,15 @@ async function handleMenuApi(req, res, ctx, action, arg) {
   if (action === 'save' || action === 'publish') {
     if (!menu || !['draft', 'ready', 'help', 'pending'].includes(menu.status) || (menu.status === 'pending' && !ctx.menuId)) {
       return send(409, { ok: false, error: 'This menu was already sent. Reload the page to see where it is.' });
+    }
+    // Tour pre-launch 2 (2026-11-22): saves carry a rising number; one older than the last stored for this list is
+    // ignored (a slow early save must never land on top of newer work). Publishing always uses what it was sent.
+    const rev = Number.isFinite(body.rev) ? Number(body.rev) : null;
+    if (action === 'save' && rev != null) {
+      const last = menuSaveRevs.get(menu.id);
+      if (last != null && rev < last) return send(200, { ok: true, saved: false, stale: true });
+      menuSaveRevs.set(menu.id, rev);
+      if (menuSaveRevs.size > 5000) menuSaveRevs.delete(menuSaveRevs.keys().next().value);
     }
     const data = normalizeMenuData(body.data);
     // Tour test 10 (Whistler, 2026-11-18; Gord typed "pony rides", "overnite pack trip (summer)"): an operator's typed tour
@@ -62886,7 +62907,14 @@ const MENU_APP_STRINGS = {
     partial: 'Some parts were hard to read. Please check the yellow ones, and add anything that&rsquo;s missing.',
     yourPhotos: 'Your photos (tap to see them big)',
     publish: 'Looks good, publish!', send: 'Looks good, send it!', publishing: 'Publishing&hellip;',
+    // Tour pre-launch (2026-11-22): a list reopened later is labelled a saved draft, and says what the big button does for
+    // this person (signed in: live at once; on the emailed link: checked first) and whether a list is on the page now.
+    draftTitle: 'Saved draft', draftLead: 'This is what you entered last time. It&rsquo;s saved here, and it isn&rsquo;t on your page yet.',
+    draftPublish: '<strong>Looks good, publish!</strong> puts it on your page right away, because you&rsquo;re signed in.',
+    draftSend: '<strong>Looks good, send it!</strong> sends it to us for a quick check. It shows on your page once we approve it, usually within a day.',
+    draftReplaces: 'Until then, your page keeps the list it shows now.', draftReplacesNow: 'It replaces the list your page shows now.',
     saved: 'Saved', saving: 'Saving&hellip;',
+    saveFailed: 'That didn&rsquo;t save. What you typed is still here.', saveRetry: 'Try again',
     dishName: 'Dish name', price: 'Price', description: 'Description (optional)', done: 'Done', deleteDish: 'Delete this dish',
     nameFirst: 'Give this line a name first, so people know what the price is for. Or tap Delete if you don’t need it.',
     addDish: '+ Add a dish', sectionName: 'Section name', addSection: '+ Add a section', deleteSection: 'Delete this section',
@@ -62949,6 +62977,11 @@ const MENU_APP_STRINGS = {
     partial: 'Certaines parties &eacute;taient difficiles &agrave; lire. V&eacute;rifiez celles en jaune et ajoutez ce qui manque.',
     yourPhotos: 'Vos photos (touchez pour agrandir)',
     publish: 'C&rsquo;est bon, publier&nbsp;!', send: 'C&rsquo;est bon, envoyer&nbsp;!', publishing: 'Publication&hellip;',
+    draftTitle: 'Brouillon enregistr&eacute;', draftLead: 'Voici ce que vous avez inscrit la derni&egrave;re fois. C&rsquo;est enregistr&eacute; ici, mais pas encore sur votre page.',
+    draftPublish: '<strong>C&rsquo;est bon, publier&nbsp;!</strong> le met sur votre page tout de suite, parce que vous &ecirc;tes connect&eacute;.',
+    draftSend: '<strong>C&rsquo;est bon, envoyer&nbsp;!</strong> nous l&rsquo;envoie pour une v&eacute;rification rapide. Il para&icirc;t sur votre page une fois approuv&eacute;, habituellement en moins d&rsquo;une journ&eacute;e.',
+    draftReplaces: 'D&rsquo;ici l&agrave;, votre page garde la liste qu&rsquo;elle affiche maintenant.', draftReplacesNow: 'Il remplace la liste que votre page affiche maintenant.',
+    saveFailed: 'L&rsquo;enregistrement n&rsquo;a pas fonctionn&eacute;. Ce que vous avez &eacute;crit est toujours ici.', saveRetry: 'R&eacute;essayer',
     saved: 'Enregistr&eacute;', saving: 'Enregistrement&hellip;',
     dishName: 'Nom du plat', price: 'Prix', description: 'Description (facultatif)', done: 'Termin&eacute;', deleteDish: 'Supprimer ce plat',
     nameFirst: 'Donnez d’abord un nom à cette ligne, pour que les gens sachent à quoi sert le prix. Ou touchez Supprimer si vous n’en avez pas besoin.',
@@ -63102,7 +63135,7 @@ function priceListAppStrings(kind, lang, words = null) {
 // The page's client code (ES5 so older phones run it). Config comes from window.MENU_CFG.
 const MENU_APP_SCRIPT = String.raw`(function(){
   var C = window.MENU_CFG, T = C.t, S = C.state, base = C.base, app = document.getElementById('mnApp');
-  var data = null, openItem = null, saveTimer = null, pollTimer = null, readStart = 0, busyUpload = false, typing = false;
+  var data = null, openItem = null, saveTimer = null, pollTimer = null, readStart = 0, busyUpload = false, typing = false, resumed = false, firstRender = true;
   function h(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function f(s, o){ return String(s).replace(/\{(\w+)\}/g, function(m, k){ return o[k]; }); }
   function api(path, body){
@@ -63133,6 +63166,13 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     if (C.mode !== 'admin' && st === 'pending') return setScreen('<div class="mn-card mn-ok"><p>' + T.waiting + '</p></div>' + backLink());
     if (C.mode !== 'admin' && st === 'help') return setScreen('<div class="mn-card mn-ok"><p>' + T.helpWaiting + '</p></div>' + backLink());
     if (st === 'reading') return readingScreen();
+    // Tour pre-launch (2026-11-22): a list already here when the page opens is a draft saved on an earlier visit.
+    var opening = firstRender; firstRender = false;
+    if (opening && st === 'ready' && C.mode !== 'admin' && m && m.data && (m.data.sections || []).some(function(sec){ return (sec.items || []).length > 0; })) resumed = true;
+    if (opening && st === 'ready' && C.mode !== 'admin' && m && !pages().length && !((m.data && m.data.sections) || []).length) {
+      typing = true; data = { sections: [{ name: T.firstSectionText, note: '', items: [C.firstItem ? { name: String(C.firstItem.name || ''), description: '', price: String(C.firstItem.price || ''), dietary: [], check: false } : blankItem()] }] };
+      return openAndShow('0:0', true);
+    }
     if (st === 'ready' || (C.mode === 'admin' && m)) { data = (m && m.data) || { sections: [] }; return reviewScreen(m && m.read_error && C.mode === 'admin' ? 'Reading did not work: ' + h(m.read_error) : message); }
     if (m && pages().length) return pagesScreen(message);
     if (S.published && !message) return publishedScreen();
@@ -63202,7 +63242,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         + '<label>' + T.description + '<textarea data-f="description" maxlength="500" rows="2">' + h(it.description) + '</textarea></label>'
         + '<div class="mn-chips">' + diets + '</div>'
         + '<div class="mn-move"><button type="button" class="mn-link" data-act="up"' + (si === 0 && ii === 0 ? ' disabled' : '') + '>&uarr; ' + T.moveUp + '</button>'
-        + '<button type="button" class="mn-link" data-act="down">&darr; ' + T.moveDown + '</button>'
+        + '<button type="button" class="mn-link" data-act="down"' + (si === data.sections.length - 1 && ii === data.sections[si].items.length - 1 ? ' disabled' : '') + '>&darr; ' + T.moveDown + '</button>'
         + (data.sections.length > 1 ? '<label class="mn-moveto">' + T.moveTo + ' <select data-moveto>' + data.sections.map(function(sec, k){ return '<option value="' + k + '"' + (k === si ? ' selected' : '') + '>' + h(sec.name || '-') + '</option>'; }).join('') + '</select></label>' : '') + '</div>'
         + '<div class="mn-row"><button type="button" class="mn-btn mn-small" data-act="close">' + T.done + '</button>'
         + '<button type="button" class="mn-link mn-danger" data-act="del-item">' + T.deleteDish + '</button></div></div>';
@@ -63239,7 +63279,9 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       + (C.adminNote ? '<div class="mn-card mn-warn"><p>' + h(C.adminNote) + '</p></div>' : '')
       : typing ? '<h1>' + T.typeTitle + '</h1><p class="mn-lead">' + T.typeIntro + '</p>'
       : '<h1>' + T.reviewTitle + '</h1><p class="mn-lead">' + T.reviewIntro + '</p>';
-    var notes = (notice ? '<div class="mn-card mn-ok"><p>' + notice + '</p></div>' : '') + (data.partial && n && !notice ? '<div class="mn-card mn-warn"><p>' + T.partial + '</p></div>' : n ? '<div class="mn-card mn-warn"><p>' + (n === 1 ? T.checkOne : f(T.checkCount, { n: n })) + ' ' + T.checkHow + '</p></div>' : '')
+    var draftDoes = resumed && T.draftTitle ? (C.mode === 'token' ? T.draftSend : T.draftPublish) + (S.published ? ' ' + (C.mode === 'token' ? T.draftReplaces : T.draftReplacesNow) : '') : '';
+    var notes = (draftDoes ? '<div class="mn-card mn-ok" id="mnDraft"><p><strong>' + T.draftTitle + '.</strong> ' + T.draftLead + '</p><p>' + draftDoes + '</p></div>' : '')
+      + (notice ? '<div class="mn-card mn-ok"><p>' + notice + '</p></div>' : '') + (data.partial && n && !notice ? '<div class="mn-card mn-warn"><p>' + T.partial + '</p></div>' : n ? '<div class="mn-card mn-warn"><p>' + (n === 1 ? T.checkOne : f(T.checkCount, { n: n })) + ' ' + T.checkHow + '</p></div>' : '')
       + (hasStrips() ? '<p class="mn-sub">' + T.stripHint + '</p>' : '');
     notice = null;
     var secs = data.sections.map(function(s, si){
@@ -63257,7 +63299,8 @@ const MENU_APP_SCRIPT = String.raw`(function(){
     var email = C.mode === 'token' ? '<label class="mn-email">' + T.email + '<input type="email" id="mnEmail" maxlength="254" autocomplete="email" value="' + h(C.email || '') + '"></label>' : '';
     setScreen(head + photos + admin + notes + err(message) + '<div class="mn-menu">' + secs + '</div>'
       + (C.mode === 'admin' ? '' : '<p class="mn-row"><button type="button" class="mn-link" data-act="add-sec">' + T.addSection + '</button></p>')
-      + email + '<p class="mn-saved" id="mnSaved" aria-live="polite"></p>'
+      + email + '<p class="mn-saved" id="mnSaved" aria-live="polite">' + saveStateHtml() + '</p>'
+      + (draftDoes && !n ? '<p class="mn-sub" id="mnDraftDoes">' + draftDoes + '</p>' : '')
       + publishButton(n)
       + (C.mode === 'admin' ? '' : '<p class="mn-help"><button type="button" class="mn-link" data-act="restart">' + (pages().length ? T.startOver : T.startFresh) + '</button></p>') + helpBtn() + backLink());
   }
@@ -63286,13 +63329,52 @@ const MENU_APP_SCRIPT = String.raw`(function(){
   }
   function blankItem(){ return { name: '', description: '', price: '', dietary: [], check: false }; }
   function rerender(){ var y = window.scrollY; reviewScreen(); window.scrollTo(0, y); }
+  // Tour pre-launch 2 (2026-11-22; a tour typed, Done, then "Back to my listing" at once came back empty: the save was
+  // only scheduled 0.8 s later and leaving dropped it). Now:
+  //  - Done (and delete, move, add) saves at once; typing still waits 0.8 s between keystrokes;
+  //  - every save is sent "keepalive", so it finishes even if the page is left or reloaded right after;
+  //  - anything still unsaved is sent when the page is left, and a link out of the editor waits for the save;
+  //  - each save carries a rising number (rev); the server ignores one older than the last it stored, so a slow early
+  //    save can never land on top of newer work;
+  //  - a save that fails keeps what was typed on the screen, says so, and offers "Try again" (leaving then asks first).
+  var saveRev = Date.now(), unsaved = false, saveFailed = false;
+  function saveStateHtml(){
+    return saveFailed ? '<span class="mn-error" role="alert">' + T.saveFailed + '</span> <button type="button" class="mn-link" data-act="retry-save">' + T.saveRetry + '</button>' : unsaved ? T.saving : '';
+  }
+  function postSave(){
+    clearTimeout(saveTimer);
+    if (!data) return Promise.resolve({ ok: true });
+    var mine = ++saveRev, body = JSON.stringify({ data: data, rev: mine });
+    return fetch(base + '/save', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }, credentials: 'same-origin', keepalive: body.length < 60000, body: body })
+      .then(function(r){ return r.json().catch(function(){ return { ok: false }; }); }, function(){ return { ok: false, error: T.networkText }; })
+      .then(function(r){
+        if (mine !== saveRev) return r; // a newer save is on its way; it decides what the screen says
+        unsaved = !(r && r.ok); saveFailed = !(r && r.ok);
+        var s2 = el('mnSaved'); if (s2) s2.innerHTML = r && r.ok ? T.saved + ' &#10003;' : saveStateHtml();
+        return r;
+      });
+  }
   function save(now){
     clearTimeout(saveTimer);
+    unsaved = true; saveFailed = false;
     var s = el('mnSaved'); if (s) s.innerHTML = T.saving;
-    var go = function(){ return api('/save', { data: data }).then(function(r){ var s2 = el('mnSaved'); if (s2) s2.innerHTML = r && r.ok ? T.saved + ' &#10003;' : ''; return r; }); };
-    if (now) return go();
-    saveTimer = setTimeout(go, 800);
+    if (now) return postSave();
+    saveTimer = setTimeout(postSave, 800);
   }
+  // Leaving: send what is unsaved (keepalive lets it finish), and ask first only when a save has failed.
+  window.addEventListener('pagehide', function(){ if (unsaved && !saveFailed) postSave(); });
+  window.addEventListener('beforeunload', function(e){ if (saveFailed) { e.preventDefault(); e.returnValue = ''; } });
+  // A link out of the editor ("Back to my listing", the header) waits for the save; if it fails the owner stays, with
+  // their values and "Try again".
+  document.addEventListener('click', function(e){
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a || !unsaved || a.target === '_blank' || e.defaultPrevented || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    e.preventDefault();
+    postSave().then(function(r){
+      if (r && r.ok) { location.href = a.href; return; }
+      var s3 = el('mnSaved'); if (s3) { s3.innerHTML = saveStateHtml(); if (s3.scrollIntoView) s3.scrollIntoView({ block: 'center' }); }
+    });
+  }, true);
   // ----- Adding pages -----
   function toJpeg(file){
     return new Promise(function(resolve, reject){
@@ -64300,7 +64382,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         if (nm) try { nm.focus(); } catch (e2) {}
         return;
       }
-      if (ci) ci.check = false; openItem = null; pruneBlank(); save(); return rerender(); }
+      if (ci) ci.check = false; openItem = null; pruneBlank(); save(true); return rerender(); }
     if (act === 'next-check') { var nk = firstCheck(); if (nk) { var msgN = countChecks(); openAndShow(nk); var top = app.querySelector('.mn-open'); if (top) top.insertAdjacentHTML('beforebegin', '<p class="mn-error mn-block" role="alert">' + (msgN === 1 ? T.checkOne : f(T.checkCount, { n: msgN })) + ' ' + T.checkHow + '</p>'); } else rerender(); return; }
     if (act === 'type') {
       // "Type it in myself" (2026-10-18): an empty menu to fill in, one section to start, its first line open.
@@ -64309,7 +64391,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
         // Indoor test 10 (2026-11-19; Sandra typed her $7.50 adult drop-in again): the main price from the Price screen is the
         // first line, ready to keep or change.
         var first = C.firstItem ? { name: String(C.firstItem.name || ''), description: '', price: String(C.firstItem.price || ''), dietary: [], check: false } : blankItem();
-        S = r; typing = true; data = { sections: [{ name: T.firstSectionText, note: '', items: [first] }] };
+        S = r; typing = true; resumed = false; data = { sections: [{ name: T.firstSectionText, note: '', items: [first] }] };
         openAndShow('0:0', true);
       });
     }
@@ -64321,17 +64403,18 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       else if (act === 'down' && qs < data.sections.length - 1) { list.splice(qi, 1); data.sections[qs + 1].items.unshift(moving); openItem = (qs + 1) + ':0'; }
       save(); return rerender();
     }
-    if (act === 'del-item') { var p = openItem.split(':'); data.sections[+p[0]].items.splice(+p[1], 1); openItem = null; save(); return rerender(); }
+    if (act === 'del-item') { var p = openItem.split(':'); data.sections[+p[0]].items.splice(+p[1], 1); openItem = null; save(true); return rerender(); }
     if (act === 'add-item') { var si = +t.getAttribute('data-s'); var cur0 = currentItem(); if (cur0) cur0.check = false; pruneBlank(); data.sections[si].items.push(blankItem()); return openAndShow(si + ':' + (data.sections[si].items.length - 1)); }
     if (act === 'add-sec') {
       pruneBlank(); data.sections.push({ name: '', note: '', items: [blankItem()] }); openItem = (data.sections.length - 1) + ':0'; reviewScreen();
       var sn = app.querySelector('[data-sec-name="' + (data.sections.length - 1) + '"]'); if (sn) { if (sn.scrollIntoView) sn.scrollIntoView({ block: 'center' }); sn.focus(); }
       return;
     }
-    if (act === 'del-sec') { data.sections.splice(+t.getAttribute('data-s'), 1); save(); return rerender(); }
+    if (act === 'del-sec') { data.sections.splice(+t.getAttribute('data-s'), 1); save(true); return rerender(); }
+    if (act === 'retry-save') { save(true); return; }
     if (act === 'read' && S.scan === 'device') { if (S.menu) S.menu.read_error = null; return deviceRead(); }
     if (act === 'read') { t.disabled = true; return api('/read', {}).then(function(r){ if (r && r.ok) { S = r; readStart = Date.now(); render(); } else { t.disabled = false; render(r && r.error ? h(r.error) : T.failed); } }); }
-    if (act === 'restart' || act === 'restart-take' || act === 'replace') {
+    if (act === 'restart' || act === 'restart-take' || act === 'replace') { resumed = false;
       return api('/restart', {}).then(function(r){ if (r && r.ok) { S = r; S.published = act === 'replace' ? null : S.published; } startScreen(); });
     }
     if (act === 'edit') { return api('/edit', {}).then(function(r){ if (r && r.ok) { S = r; render(); } else render(r && r.error ? h(r.error) : T.failed); }); }
@@ -64359,7 +64442,7 @@ const MENU_APP_SCRIPT = String.raw`(function(){
       var left = countChecks();
       if (left && C.mode !== 'admin') return openAndShow(firstCheck());
       if (left && !window.confirm(left + ' line' + (left === 1 ? '' : 's') + ' still need checking. Publish anyway?')) return;
-      openItem = null; clearTimeout(saveTimer); t.disabled = true; t.innerHTML = T.publishing;
+      openItem = null; clearTimeout(saveTimer); unsaved = false; saveFailed = false; t.disabled = true; t.innerHTML = T.publishing;
       var pb = { data: data, allow_unchecked: left > 0 }; if (el('mnEmail')) pb.contact_email = el('mnEmail').value;
       return api('/publish', pb).then(function(r){
         if (!r || !r.ok) { t.disabled = false; return reviewScreen(r && r.errors && r.errors.contact_email ? h(r.errors.contact_email) : r && r.error ? h(r.error) : T.failed); }
@@ -66049,8 +66132,8 @@ const TOUR_SETUP_HELP_TOPICS = [
     q: 'A free or pay-what-you-want trip', qFr: 'Une sortie gratuite ou à contribution volontaire',
     keys: ['walk is free', 'tour is free', 'trip is free', 'my tour is free', 'my walk is free', 'our tours are free', 'tours are free', 'free tour', 'free walk', 'free walking tour', 'free trip', 'is free what do i put', 'free what do i put', 'by donation', 'donation', 'donations', 'pay what you want', 'pay what you can', 'pay what they like', 'pay what they want', 'people pay what they like', 'tips only', 'tip based', 'tips welcome', 'can i put 0', 'put 0', 'put zero', 'type 0', 'price is 0', 'zero dollars', '$0', 'no charge', 'costs nothing', 'doesn t cost anything', 'but my walk is free', 'but my tour is free', 'says from but', 'just the number'],
     keysFr: ['marche est gratuite', 'visite est gratuite', 'sortie est gratuite', 'sorties sont gratuites', 'visite gratuite', 'sortie gratuite', 'marche gratuite', 'contribution volontaire', 'don', 'dons', 'par don', 'payez ce que vous voulez', 'prix libre', 'pourboire seulement', 'pourboires', 'puis je mettre 0', 'mettre 0', 'mettre zero', 'ecrire 0', 'zero dollar', '0 $', 'sans frais pour les clients', 'ne coute rien', 'seulement le chiffre'],
-    a: '<p>In <strong>Price</strong>, type the word <strong>free</strong> in the price box (or <strong>0</strong>, or <strong>by donation</strong> / <strong>pay what you want</strong>). Your card then says “Free”, and your page says “Free.” or “Free (pay what you want).”</p><p>Some trips free and some paid? Type <strong>free</strong> if the trip most people take is free, and put every trip with its price in <strong>Your tours and prices</strong>. Private tours keep their own box under it. A paid price typed later replaces free.</p>',
-    aFr: '<p>Dans <strong>Prix</strong>, écrivez le mot <strong>gratuit</strong> dans la case du prix (ou <strong>0</strong>, ou <strong>contribution volontaire</strong>). Votre fiche indique alors « Gratuit », et votre page « Gratuit. » ou « Gratuit (contribution volontaire). »</p><p>Des sorties gratuites et d’autres payantes? Écrivez <strong>gratuit</strong> si la sortie la plus populaire est gratuite, et mettez chaque sortie avec son prix dans <strong>Vos sorties et tarifs</strong>. Les sorties privées gardent leur propre case en dessous. Un prix payant écrit plus tard remplace gratuit.</p>' },
+    a: '<p>In <strong>Price</strong>, under <strong>How do you charge?</strong>, tap <strong>Free</strong> or <strong>By donation</strong>. No dollar amount is needed. A free tour’s card and page say “Free”. A by-donation tour’s card says “By donation”, and its page “By donation (pay what you want).”</p><p>Some trips free and some paid? Tap <strong>Free</strong> if the trip most people take is free, and put every trip with its price in <strong>Your tours and prices</strong>. Private tours keep their own box under it. A paid price typed later replaces free.</p>',
+    aFr: '<p>Dans <strong>Prix</strong>, sous <strong>Comment facturez-vous?</strong>, touchez <strong>Gratuit</strong> ou <strong>Contribution volontaire</strong>. Aucun montant n’est nécessaire. Pour une sortie gratuite, la fiche et la page indiquent « Gratuit ». Pour une contribution volontaire, la fiche indique « Contribution volontaire », et la page « Contribution volontaire (payez ce que vous voulez). »</p><p>Des sorties gratuites et d’autres payantes? Touchez <strong>Gratuit</strong> si la sortie la plus populaire est gratuite, et mettez chaque sortie avec son prix dans <strong>Vos sorties et tarifs</strong>. Les sorties privées gardent leur propre case en dessous. Un prix payant écrit plus tard remplace gratuit.</p>' },
   // Dogs on some trips ("On your edit page, open Badges…"), and "it asks about a patio".
   { id: 'tour-dogs', pages: ['setup', 'edit'], over: ['features', 'badge-wrong', 'tour-one-trip-season', 'plan-visit', 'tour-age', 'tour-ages-per-trip', 'tour-booking-only', 'tour-private-price', 'tour-price', 'tour-groups'],
     q: 'Dogs can come on some trips', qFr: 'Les chiens peuvent venir à certaines sorties',
@@ -66168,8 +66251,8 @@ const TOUR_SETUP_HELP_TOPICS = [
     q: 'Price per person or private tour price?', qFr: 'Prix par personne ou prix d’une sortie privée?',
     keys: ['price', 'prices', 'price per person', 'per person', 'how much', 'cost', 'rates', 'private tour', 'private price', 'private tours', 'private charter', 'group price', 'family price', 'kids price', 'child price', 'change my price', 'wrong price', 'from price', 'taxes', 'gst', 'card say', 'should the card say', 'should my card say', 'card show', 'card shows', 'what will my card say', 'which price', 'lowest price', 'card price'],
     keysFr: ['prix', 'prix par personne', 'par personne', 'combien', 'tarif', 'tarifs', 'visite privee', 'sortie privee', 'sorties privees', 'prix prive', 'prix de groupe', 'prix enfant', 'changer mon prix', 'mauvais prix', 'taxes'],
-    a: `<p>In <strong>Price</strong>, put your lowest price for one adult on your regular trip. Your card shows it as “From $129”. A price per person over $${TOUR_LIVE_EN} is checked first and shows within a day. Free or by donation? Type <strong>free</strong>.</p><p>Private tours have their own box under it (“Private tours from $900”), for the whole group; that price shows on your page as soon as you save it. Kids’ prices, family rates, several trips or a winter and a summer price? Put them all in <strong>Your tours and prices</strong> (a photo of your rates sheet is fine); the card keeps the one lowest price.</p>`,
-    aFr: `<p>Dans <strong>Prix</strong>, indiquez votre prix le plus bas pour un adulte, pour votre sortie habituelle. Votre fiche l’affiche : « À partir de 129 $ ». Un prix par personne de plus de ${TOUR_LIVE_FR} $ est vérifié d’abord et s’affiche d’ici un jour. Gratuit ou contribution volontaire? Écrivez <strong>gratuit</strong>.</p><p>Les sorties privées ont leur propre case en dessous (« Sorties privées à partir de 900 $ »), pour tout le groupe; ce prix s’affiche sur votre page dès que vous l’enregistrez. Prix pour enfants, tarif familial, plusieurs sorties ou un prix d’hiver et un prix d’été? Mettez-les tous dans <strong>Vos sorties et tarifs</strong> (une photo de votre grille tarifaire suffit); la fiche garde le prix le plus bas.</p>` },
+    a: `<p>In <strong>Price</strong>, put your lowest price for one adult on your regular trip. Your card shows it as “From $129 a person”, in Canadian dollars. A price per person over $${TOUR_LIVE_EN} is checked first and shows within a day. Free, by donation, or private groups only? Tap it under <strong>How do you charge?</strong>.</p><p>Private tours have their own box under it (“Private tours from $900 for the group”), for the whole group; that price shows on your page as soon as you save it. Kids’ prices, family rates, several trips or a winter and a summer price? Put them all in <strong>Your tours and prices</strong> (a photo of your rates sheet is fine); the card keeps the one lowest price.</p>`,
+    aFr: `<p>Dans <strong>Prix</strong>, indiquez votre prix le plus bas pour un adulte, pour votre sortie habituelle. Votre fiche l’affiche : « À partir de 129 $ par personne », en dollars canadiens. Un prix par personne de plus de ${TOUR_LIVE_FR} $ est vérifié d’abord et s’affiche d’ici un jour. Gratuit, contribution volontaire ou groupes privés seulement? Touchez-le sous <strong>Comment facturez-vous?</strong>.</p><p>Les sorties privées ont leur propre case en dessous (« Sorties privées à partir de 900 $ pour le groupe »), pour tout le groupe; ce prix s’affiche sur votre page dès que vous l’enregistrez. Prix pour enfants, tarif familial, plusieurs sorties ou un prix d’hiver et un prix d’été? Mettez-les tous dans <strong>Vos sorties et tarifs</strong> (une photo de votre grille tarifaire suffit); la fiche garde le prix le plus bas.</p>` },
   { id: 'tour-age', pages: ['setup', 'edit'], q: 'Minimum age, and kids', qFr: 'Âge minimum, et les enfants',
     keys: ['age', 'ages', 'minimum age', 'min age', 'how old', 'kids', 'children', 'child', 'family', 'families', 'teens', 'adults only', '19+', '18+', 'under 18', 'with an adult', '5+', '6+', '12+', '8+', '10+', 'theres no 8', 'there s no 8', 'there is no 8', 'no 8', 'no 10', '8 and up', '10 and up', '14+', 'no 14', 'theres no 14', 'there s no 14', 'there is no 14', 'no 14 option', '14 and up', 'age 14', 'under 19', 'under 19s', 'needs parent', 'need a parent', 'parent or guardian', 'needs a parent'],
     keysFr: ['age', 'ages', 'age minimum', 'quel age', 'enfants', 'enfant', 'famille', 'familles', 'ados', 'adultes seulement', '19 ans', 'moins de 18', 'avec un adulte', '5 ans', '6 ans', '12 ans', '8 ans', '10 ans', 'pas de 8', 'il n y a pas de 8', 'pas de 10', '14 ans', 'pas de 14', 'il n y a pas de 14', 'moins de 19', 'parent ou tuteur', 'un parent'],
@@ -76016,7 +76099,7 @@ function ownerBadgeCardHtml(venue, lang = 'en') {
         <label for="opBadgeCode" class="op-hint" style="display:block;margin:10px 0 4px">${L('Code for your website', 'Code pour votre site Web')}</label>
         <textarea id="opBadgeCode" readonly rows="4" spellcheck="false" style="width:100%;box-sizing:border-box;font:0.8rem/1.4 ui-monospace,Menlo,Consolas,monospace;padding:8px 10px;border-radius:10px;border:1px solid rgba(42,32,25,0.25);background:#fff;resize:vertical">${escapeHtml(code).replace(/https:\/\//g, 'https&#58;//')}</textarea>
         <p style="margin:8px 0 0;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px"><button type="button" class="op-btn" id="opBadgeCopy" data-done="${escapeHtml(L('Copied', 'Copié'))}" data-select="${escapeHtml(L('Selected: press Ctrl+C (or ⌘+C) to copy', 'Sélectionné : appuyez sur Ctrl+C (ou ⌘+C) pour copier'))}">${L('Copy code', 'Copier le code')}</button><span class="op-hint" id="opBadgeDone" role="status" style="margin:0"></span></p>
-        <p class="op-hint" style="margin:8px 0 0">${L('Paste it in your website footer or your happy hour page; it links to your page here.', 'Collez-le dans le pied de page de votre site Web ou sur votre page 5 à 7; il mène à votre fiche ici.')}</p>
+        <p class="op-hint" style="margin:8px 0 0">${venue.type === 'tour' ? L('Paste it in your website footer or on your tours page; it links to your page here.', 'Collez-le dans le pied de page de votre site Web ou sur votre page de sorties; il mène à votre fiche ici.') : L('Paste it in your website footer or your happy hour page; it links to your page here.', 'Collez-le dans le pied de page de votre site Web ou sur votre page 5 à 7; il mène à votre fiche ici.')}</p>
         <script>
         (function(){
           var b = document.getElementById('opBadgeCopy'), ta = document.getElementById('opBadgeCode'), out = document.getElementById('opBadgeDone');
@@ -76095,7 +76178,8 @@ function renderOwnerPageHtml(found, token, pending, lang = 'en') {
   // personne »), never the restaurant range (« $$$ : 30 à 60 $ par personne ») beside it.
   const tourFrom = venue.type === 'tour' ? tourPrice(venue.id) : null;
   const tourFreeNow = venue.type === 'tour' ? tourFree(venue.id) : '';
-  const priceHint = tourFreeNow ? escapeHtml(L(TOUR_FREE_LINES[tourFreeNow][0], TOUR_FREE_LINES[tourFreeNow][1]).replace(/\.$/, '')) : tourFrom != null ? escapeHtml(L(`From ${tourMoney(tourFrom, false)} a person`, `À partir de ${tourMoney(tourFrom, true)} par personne`)) : snap.price_range ? `${'$'.repeat(Number(snap.price_range))}${fr ? ' ' : ''}: ${escapeHtml((fr ? OWNER_PRICE_SCALE_FR : OWNER_PRICE_SCALE)[Number(snap.price_range)])} ${L('per person', 'par personne')}` : L('Not set: what one person usually spends', 'Non indiquée : ce qu’une personne dépense habituellement');
+  const tourPrivNow = venue.type === 'tour' ? (() => { const pv = venueTourInfo(venue.id).private; return typeof pv === 'number' && pv > 0 ? pv : null; })() : null;
+  const priceHint = tourFreeNow ? escapeHtml(L(TOUR_FREE_LINES[tourFreeNow][0], TOUR_FREE_LINES[tourFreeNow][1]).replace(/\.$/, '')) : tourFrom != null ? escapeHtml(L(`From ${tourMoney(tourFrom, false)} a person`, `À partir de ${tourMoney(tourFrom, true)} par personne`)) : tourPrivNow != null ? escapeHtml(L(`From ${tourMoney(tourPrivNow, false)} for the group (private tours)`, `À partir de ${tourMoney(tourPrivNow, true)} pour le groupe (sorties privées)`)) : snap.price_range ? `${'$'.repeat(Number(snap.price_range))}${fr ? ' ' : ''}: ${escapeHtml((fr ? OWNER_PRICE_SCALE_FR : OWNER_PRICE_SCALE)[Number(snap.price_range)])} ${L('per person', 'par personne')}` : L('Not set: what one person usually spends', 'Non indiquée : ce qu’une personne dépense habituellement');
   const priceFieldHtml = `      <div class="form-row full"><div class="form-field">
         <select id="opPrice" aria-labelledby="opPriceLabel" aria-describedby="opPriceScale">
           <option value="">${L('Not set', 'Non indiquée')}</option>${[1, 2, 3, 4].map((n) => `<option value="${n}"${snap.price_range === String(n) ? ' selected' : ''}>${'$'.repeat(n)} &mdash; ${escapeHtml((fr ? OWNER_PRICE_SCALE_FR : OWNER_PRICE_SCALE)[n])} ${L('per person', 'par personne')}</option>`).join('')}
@@ -76863,13 +76947,17 @@ ${renderGolfHeaderHtml()}
         const os = hoursModule ? hoursModule.parseOpenSeason(snap.open_months || '') : null;
         const om = os ? [null, String(os.months[0]), String(os.months[1])] : null;
         const opts = (sel) => MONTH_NAMES[fr ? 'fr' : 'en'].map((n, i) => `<option value="${i + 1}"${sel === i + 1 ? ' selected' : ''}>${n}</option>`).join('');
-        const dopts = (sel) => Array.from({ length: 31 }, (_, i) => `<option value="${i + 1}"${sel === i + 1 ? ' selected' : ''}>${i + 1}</option>`).join('');
+        // Tour pre-launch (2026-11-22): only the days that month has (no "February 31"). The dates repeat every year, so
+        // February offers 1 to 28; its last day as a closing date means "to the end of February" (stored 02-29).
+        const SEASON_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        const fromM = om ? Number(om[1]) : 5, toM = om ? Number(om[2]) : 10;
+        const dopts = (sel, month) => Array.from({ length: SEASON_DAYS[month - 1] }, (_, i) => `<option value="${i + 1}"${Math.min(sel, SEASON_DAYS[month - 1]) === i + 1 ? ' selected' : ''}>${i + 1}</option>`).join('');
         const fromD = os ? Number(os.from.slice(3)) : 1, toD = os ? Number(os.to.slice(3)) : 31;
         return `<div class="op-season">
         <label for="opSeasonMode"><strong>${L('Season', 'Saison')}</strong>${waitChip('open_months')}</label>
         <select id="opSeasonMode" onchange="document.getElementById('opSeasonMonths').hidden = !this.value"><option value="">${L('Open all year', 'Ouvert toute l’année')}</option><option value="season"${om ? ' selected' : ''}>${L('Open some months only', 'Ouvert certains mois seulement')}</option></select>
-        <span id="opSeasonMonths"${om ? '' : ' hidden'}>${L('from', 'du')} ${fr ? `<select id="opSeasonFromD" aria-label="Premier jour d’ouverture">${dopts(fromD)}</select> ` : ''}<select id="opSeasonFrom" aria-label="${L('First month open', 'Premier mois d’ouverture')}">${opts(om ? Number(om[1]) : 5)}</select>${fr ? '' : ` <select id="opSeasonFromD" aria-label="First day open">${dopts(fromD)}</select>`}
-        ${L('to', 'au')} ${fr ? `<select id="opSeasonToD" aria-label="Dernier jour d’ouverture">${dopts(toD)}</select> ` : ''}<select id="opSeasonTo" aria-label="${L('Last month open', 'Dernier mois d’ouverture')}">${opts(om ? Number(om[2]) : 10)}</select>${fr ? '' : ` <select id="opSeasonToD" aria-label="Last day open">${dopts(toD)}</select>`}
+        <span id="opSeasonMonths"${om ? '' : ' hidden'}>${L('from', 'du')} ${fr ? `<select id="opSeasonFromD" aria-label="Premier jour d’ouverture">${dopts(fromD, fromM)}</select> ` : ''}<select id="opSeasonFrom" aria-label="${L('First month open', 'Premier mois d’ouverture')}">${opts(om ? Number(om[1]) : 5)}</select>${fr ? '' : ` <select id="opSeasonFromD" aria-label="First day open">${dopts(fromD, fromM)}</select>`}
+        ${L('to', 'au')} ${fr ? `<select id="opSeasonToD" aria-label="Dernier jour d’ouverture">${dopts(toD, toM)}</select> ` : ''}<select id="opSeasonTo" aria-label="${L('Last month open', 'Dernier mois d’ouverture')}">${opts(om ? Number(om[2]) : 10)}</select>${fr ? '' : ` <select id="opSeasonToD" aria-label="Last day open">${dopts(toD, toM)}</select>`}
         <small class="op-hint" style="display:block">${L('Every year. Leave the days at the 1st and the last day of the month for whole months.', 'Chaque année. Laissez le 1er et le dernier jour du mois pour des mois entiers.')}</small></span>
         <p class="lyv-error" id="opSeasonError" hidden></p>
         <p class="op-hint">${L('Out of season, your page says &ldquo;Closed for the season&rdquo; and when you reopen, instead of &ldquo;Open now&rdquo;.', 'Hors saison, votre page indique « Fermé pour la saison » et la date de réouverture, au lieu de « Ouvert maintenant ».')}</p>
@@ -76986,7 +77074,7 @@ ${priceFieldHtml}      </details>` : ''}
       </div>
       <div class="form-row full" data-task="hours contact happy more all"><div class="form-field">
         <label for="opNote">${L('Note for us (optional)', 'Note pour nous (facultatif)')}</label>
-        <textarea id="opNote" rows="3" maxlength="1000" placeholder="${L('Seasonal closures, new menu, anything we should know.', 'Fermetures saisonnières, nouveau menu, tout ce que nous devrions savoir.')}"></textarea>
+        <textarea id="opNote" rows="3" maxlength="1000" placeholder="${venue.type === 'tour' ? L('Seasonal closures, a new tour, anything we should know.', 'Fermetures saisonnières, une nouvelle sortie, tout ce que nous devrions savoir.') : L('Seasonal closures, new menu, anything we should know.', 'Fermetures saisonnières, nouveau menu, tout ce que nous devrions savoir.')}"></textarea>
       </div></div>
       <div class="lyv-hp" aria-hidden="true"><label>${L('Company website', 'Site de l’entreprise')} <input type="text" id="opHp" tabindex="-1" autocomplete="off"></label></div>
       <p class="lyv-error" id="opFormError" hidden></p>
@@ -77120,6 +77208,20 @@ ${ownerFooterHtml(fr)}
   var startedAt = Date.now();
   var T = ${JSON.stringify(scriptText).replace(/</g, '\\u003c')};
   var initial = ${initial};
+  // Tour pre-launch (2026-11-22): the season's day lists follow their month (no "February 31"); a day that was the
+  // month's last stays the last day of the new month. Yearly dates, so February has 28 (see the submit below).
+  var SEASON_DAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  [['opSeasonFrom', 'opSeasonFromD'], ['opSeasonTo', 'opSeasonToD']].forEach(function(ids){
+    var mEl = document.getElementById(ids[0]), dEl = document.getElementById(ids[1]);
+    if (!mEl || !dEl) return;
+    var was = SEASON_DAYS[+mEl.value - 1];
+    function fit(){
+      var max = SEASON_DAYS[+mEl.value - 1], cur = +dEl.value || 1, day = ids[0] === 'opSeasonTo' && cur >= was ? max : Math.min(cur, max), html = '';
+      for (var i = 1; i <= max; i++) html += '<option value="' + i + '">' + i + '</option>';
+      dEl.innerHTML = html; dEl.value = String(day); was = max;
+    }
+    mEl.addEventListener('change', fit);
+  });
   function dayName(d){ return T.dayLc ? String(d).toLowerCase() : d; }
   var ownerEvents = ${editableEventsJson};
   var form = document.getElementById('opForm');
@@ -77144,7 +77246,7 @@ ${ownerFooterHtml(fr)}
         row.querySelector('.op-add').hidden = !!two;
         syncRow(row);
       });
-      setListingDirty(true);
+      refreshListingDirty();
       var note = b.parentNode.querySelector('.op-copy-done') || b.parentNode.appendChild(document.createElement('span'));
       note.className = 'op-copy-done'; note.textContent = T.copied;
     });
@@ -77247,11 +77349,11 @@ ${ownerFooterHtml(fr)}
   var clAdd = document.getElementById('opClosureAdd');
   if (clAdd) clAdd.addEventListener('click', function(){
     var wrap = document.createElement('div'); wrap.innerHTML = clTpl.innerHTML;
-    var row = wrap.firstElementChild; clBox.appendChild(row); row.querySelector('.op-cl-from').focus(); setListingDirty(true);
+    var row = wrap.firstElementChild; clBox.appendChild(row); row.querySelector('.op-cl-from').focus(); refreshListingDirty();
   });
   if (clBox) clBox.addEventListener('click', function(e){
     var b = e.target.closest ? e.target.closest('.op-cl-remove') : null; if (!b) return;
-    b.closest('.op-closure').parentNode.removeChild(b.closest('.op-closure')); setListingDirty(true);
+    b.closest('.op-closure').parentNode.removeChild(b.closest('.op-closure')); refreshListingDirty();
   });
   function seasonalValue(){
     if (!seasonalOn) return { list: undefined };
@@ -77395,15 +77497,16 @@ ${ownerFooterHtml(fr)}
       description: document.getElementById('opDescription').value,
       open_months: document.getElementById('opSeasonMode').value ? (function(){
         // Café test 2 (2026-11-11): exact days ("04-25:10-12") unless they are whole months ("4-10", as always).
-        var fm = +document.getElementById('opSeasonFrom').value, tm = +document.getElementById('opSeasonTo').value, last = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        var fm = +document.getElementById('opSeasonFrom').value, tm = +document.getElementById('opSeasonTo').value, last = SEASON_DAYS;
         var fdEl = document.getElementById('opSeasonFromD'), tdEl = document.getElementById('opSeasonToD');
         var fd = fdEl ? Math.min(+fdEl.value, last[fm - 1]) : 1, td = tdEl ? Math.min(+tdEl.value, last[tm - 1]) : last[tm - 1];
         var p2 = function(n){ return ('0' + n).slice(-2); };
-        return fd === 1 && (td === last[tm - 1] || (tm === 2 && td === 28)) ? fm + '-' + tm : p2(fm) + '-' + p2(fd) + ':' + p2(tm) + '-' + p2(td);
+        // Closing on February's last day is "to the end of February" every year: stored 02-29, which covers a leap day too.
+        return fd === 1 && td === last[tm - 1] ? fm + '-' + tm : p2(fm) + '-' + p2(fd) + ':' + p2(tm) + '-' + p2(tm === 2 && td === 28 ? 29 : td);
       })() : '',
       badges: {}
     };
-    if (changes.open_months && changes.open_months.split('-')[0] === changes.open_months.split('-')[1]) { show('opSeasonError', T.seasonMonths); jumpToError(form); return; }
+    if (changes.open_months && changes.open_months.indexOf(':') < 0 && changes.open_months.split('-')[0] === changes.open_months.split('-')[1]) { show('opSeasonError', T.seasonMonths); jumpToError(form); return; }
     Array.prototype.forEach.call(document.querySelectorAll('#opBadges input'), function(b){ changes.badges[b.value] = b.checked; });
     var sv = seasonalValue();
     if (sv.error) { show('opSeasonalError', sv.error); var sb = document.getElementById('opSeasonalBox'); if (sb) sb.open = true; jumpToError(form); return; }
@@ -77487,7 +77590,7 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
           }
           Object.keys(changes).forEach(function(k){ initial[k] = k === 'hours' || k === 'happy_hour' ? JSON.stringify(changes[k]) : changes[k]; });${avgSpendOn ? `
           if (changes.avg_spend) { initial.avg_spend = { amount: Number(changes.avg_spend), source: 'owner' }; avgSaved(changes.avg_spend); document.getElementById('opAvgDone').hidden = true; }` : ''}
-          setListingDirty(false);${completeOn ? `
+          listingBase = listingState(); setListingDirty(false);${completeOn ? `
           // Final fresh-eyes (2026-11-09): what was just sent moves to "Waiting for our check" on the card right away.
           if (window.opCbRefresh) window.opCbRefresh('');
           // Fresh-eyes 3 (2026-11-09): each block just sent says so ("Sent Nov 9 · waiting for our check"), and the thanks
@@ -77840,13 +77943,27 @@ ${completeOn ? `    var cuEl = document.getElementById('opCuisine');
   // bottom says so (with its own Send button), and leaving the page with anything unsent
   // -- listing edits, a half-filled event or chosen photos -- asks first.
   var listingDirty = false, eventDirty = false;
+  // Tour pre-launch (2026-11-22): the warning compares what the form would send with what it held when the page opened
+  // (or was last saved), so undoing the only edit clears it. The season's months and days don't count while the
+  // business is "Open all year" (they are hidden and not sent).
+  function listingState(){
+    var out = [], mode = document.getElementById('opSeasonMode');
+    Array.prototype.forEach.call(form.querySelectorAll('input, select, textarea'), function(c){
+      if (c.id === 'opHp' || c.type === 'file' || c.type === 'button' || c.type === 'submit') return;
+      if (mode && !mode.value && /^opSeason(From|To)D?$/.test(c.id)) return;
+      out.push((c.id || c.name || c.className) + '=' + (c.type === 'checkbox' || c.type === 'radio' ? (c.checked ? '1' : '0') : c.value));
+    });
+    return out.join('|');
+  }
+  var listingBase = listingState();
+  function refreshListingDirty(){ setListingDirty(listingState() !== listingBase); }
   function setListingDirty(v){
     listingDirty = v;
     var bar = document.getElementById('opUnsent'); if (bar) bar.hidden = !v || form.style.display === 'none';${completeOn && !instantOn ? `
     document.body.classList.toggle('op-dirty', !!v);` : ''}
   }
-  form.addEventListener('input', function(e){ if (e.target.id !== 'opHp') setListingDirty(true); });
-  form.addEventListener('change', function(){ setListingDirty(true); });
+  form.addEventListener('input', function(e){ if (e.target.id !== 'opHp') refreshListingDirty(); });
+  form.addEventListener('change', function(){ refreshListingDirty(); });
   document.getElementById('opUnsentSend').addEventListener('click', function(){ document.getElementById('opSubmit').click(); });
   ev.addEventListener('input', function(){ eventDirty = true; });
   window.addEventListener('beforeunload', function(e){

@@ -292,7 +292,7 @@ test('13. polish: "Private lessons from $599", Booking without "Varies by tour" 
   const { v, t } = await lucia();
   ok(await change(t, { tour_info: { private: 599 } })); approveAll(v.id);
   const en = plain(page(v)), fr = plain(page(v, 'fr'));
-  assert.match(en, /Private lessons from \$599\./); assert.match(fr, /Cours privés à partir de 599/);
+  assert.match(en, /Private lessons from \$599 for the group\./); assert.match(fr, /Cours privés à partir de 599/);
   // Her typed lessons have no booking rule of their own ("on request" is a meeting place, "when you book" an aside).
   assert.match(en, /Booking Book at least a day ahead\.(?! Varies)/);
   const sp = (x) => String(x).replace(/[\u00a0\u202f]/g, ' ');
