@@ -72210,6 +72210,8 @@ async function handleOwnerForgot(req, res) {
     }
   } else if (!account) {
     hashOwnerPassword('timing-padding');
+    // No login with this email: if it's a business's email on file, send its edit link instead (2026-11-22).
+    await sendOwnerEditLinks(email, res.ownerLang === 'fr', { fromForgot: true });
   }
   return sendSubmissionResponse(res, 200, { ok: true, direct: !!ownerDirectEmail() });
 }
@@ -72225,9 +72227,9 @@ async function handleOwnerForgot(req, res) {
 const OWNER_NEW_LINK_PATH = '/owner/link';
 const ownerNewLinkRecent = new Map();
 
-function ownerNewLinkEmailText(items, lang = 'en') {
+function ownerNewLinkEmailText(items, lang = 'en', { fromForgot = false } = {}) {
   if (lang === 'fr') {
-    return ['Bonjour,', '', items.length === 1
+    return ['Bonjour,', '', ...(fromForgot ? ['Vous avez demandé à réinitialiser votre mot de passe Okanagan Roam, mais aucun compte n’utilise ce courriel : vous n’avez donc pas de mot de passe à réinitialiser. Votre fiche se met à jour avec un lien privé.', ''] : []), items.length === 1
       ? `Voici un nouveau lien privé pour mettre à jour ${items[0].name} sur Okanagan Roam :`
       : 'Voici de nouveaux liens privés pour mettre à jour vos entreprises sur Okanagan Roam :',
     '', ...items.map((it) => (items.length === 1 ? it.url : `${it.name} : ${it.url}`)), '',
@@ -72235,7 +72237,7 @@ function ownerNewLinkEmailText(items, lang = 'en') {
     '', 'Astuce : sur cette page, vous pouvez créer un compte pour vous connecter la prochaine fois à https://okanaganroam.com/fr/owner/login.',
     '', 'Si vous n’avez rien demandé, vous pouvez ignorer ce courriel.', '', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n');
   }
-  return ['Hi,', '', items.length === 1
+  return ['Hi,', '', ...(fromForgot ? ['You asked to reset your Okanagan Roam password, but there’s no login with this email, so there’s no password to reset. Your listing is updated with a private link instead.', ''] : []), items.length === 1
     ? `Here's a new private link to update ${items[0].name} on Okanagan Roam:`
     : 'Here are new private links to update your businesses on Okanagan Roam:',
   '', ...items.map((it) => (items.length === 1 ? it.url : `${it.name}: ${it.url}`)), '',
@@ -72244,37 +72246,45 @@ function ownerNewLinkEmailText(items, lang = 'en') {
   '', 'If you didn’t ask for this, you can ignore this email.', '', 'Okanagan Roam', 'info@okanaganroam.com'].join('\n');
 }
 
+// Emails fresh edit links for every business whose contact email on file is `email` (at most 3 requests an hour per
+// email, shared by "Email me a new link" and the reset form). Used by /owner/link, and by /owner/forgot when the email
+// has no login (2026-11-22): most owners never made a login, so "Forgot password?" with their business email used to
+// say "check your inbox" and send nothing. Sends only to the email on file, like /owner/link, so it gives nothing away.
+async function sendOwnerEditLinks(email, fr, { fromForgot = false } = {}) {
+  const now = Date.now();
+  const recent = (ownerNewLinkRecent.get(email) || []).filter((t) => now - t < 3600000);
+  const venues = db.prepare(`SELECT v.id, v.name FROM venue_owner_links l JOIN venues v ON v.id = l.venue_id
+    WHERE LOWER(l.contact_email) = ? AND v.redirect_to IS NULL ORDER BY v.name LIMIT 10`).all(email);
+  if (!venues.length || recent.length >= 3) return 0;
+  recent.push(now); ownerNewLinkRecent.set(email, recent);
+  const items = [];
+  // From the French page (2026-10-18): French email, French edit links.
+  for (const v of venues) {
+    const r = createOwnerLink(v.id, { reset: true, keepOld: true });
+    if (r.ok) items.push({ name: v.name, url: fr ? r.url.replace('https://okanaganroam.com/owner/', 'https://okanaganroam.com/fr/owner/') : r.url });
+  }
+  const text = ownerNewLinkEmailText(items, fr ? 'fr' : 'en', { fromForgot });
+  const direct = ownerDirectEmail();
+  try {
+    if (items.length && direct) {
+      await direct({ to: email, subject: fr ? (items.length === 1 ? `Votre lien de modification pour ${items[0].name}` : 'Vos liens de modification Okanagan Roam') : items.length === 1 ? `Your edit link for ${items[0].name}` : 'Your Okanagan Roam edit links', text });
+    } else if (items.length) {
+      await venueSubmissionTransport({ _subject: `[ACTION] Edit link request: ${email}`, _template: 'table', _captcha: 'false',
+        'What to do': `Forward the email below to ${email} from info@okanaganroam.com.${fromForgot ? ' They asked to reset a password but have no login, so they get their edit link.' : ''}`, 'Email to forward': text,
+        ...(fr ? { 'Language': 'French (asked from the French page; the email to forward is in French)' } : {}) });
+    }
+  } catch (err) {
+    console.error(`[owner-portal] new edit link email failed: ${String((err && err.message) || err).slice(0, 200)}`);
+  }
+  return items.length;
+}
+
 async function handleOwnerNewLink(req, res) {
   const body = await readOwnerJson(req, res, ['email']);
   if (!body) return;
   const email = validOwnerEmail(body.email);
   if (!email) return sendSubmissionResponse(res, 400, { ok: false, errors: { email: 'Please enter the email we have for your business.' } });
-  const now = Date.now();
-  const recent = (ownerNewLinkRecent.get(email) || []).filter((t) => now - t < 3600000);
-  const venues = db.prepare(`SELECT v.id, v.name FROM venue_owner_links l JOIN venues v ON v.id = l.venue_id
-    WHERE LOWER(l.contact_email) = ? AND v.redirect_to IS NULL ORDER BY v.name LIMIT 10`).all(email);
-  if (venues.length && recent.length < 3) {
-    recent.push(now); ownerNewLinkRecent.set(email, recent);
-    const items = [];
-    // From the French page (2026-10-18): French email, French edit links.
-    const fr = res.ownerLang === 'fr';
-    for (const v of venues) {
-      const r = createOwnerLink(v.id, { reset: true, keepOld: true });
-      if (r.ok) items.push({ name: v.name, url: fr ? r.url.replace('https://okanaganroam.com/owner/', 'https://okanaganroam.com/fr/owner/') : r.url });
-    }
-    const direct = ownerDirectEmail();
-    try {
-      if (items.length && direct) {
-        await direct({ to: email, subject: fr ? (items.length === 1 ? `Votre lien de modification pour ${items[0].name}` : 'Vos liens de modification Okanagan Roam') : items.length === 1 ? `Your edit link for ${items[0].name}` : 'Your Okanagan Roam edit links', text: ownerNewLinkEmailText(items, fr ? 'fr' : 'en') });
-      } else if (items.length) {
-        await venueSubmissionTransport({ _subject: `[ACTION] Edit link request: ${email}`, _template: 'table', _captcha: 'false',
-          'What to do': `Forward the email below to ${email} from info@okanaganroam.com.`, 'Email to forward': ownerNewLinkEmailText(items, fr ? 'fr' : 'en'),
-          ...(fr ? { 'Language': 'French (asked from the French page; the email to forward is in French)' } : {}) });
-      }
-    } catch (err) {
-      console.error(`[owner-portal] new edit link email failed: ${String((err && err.message) || err).slice(0, 200)}`);
-    }
-  }
+  await sendOwnerEditLinks(email, res.ownerLang === 'fr');
   return sendSubmissionResponse(res, 200, { ok: true });
 }
 
@@ -72774,7 +72784,7 @@ function renderOwnerForgotPage({ lang = 'en' } = {}) {
       <p class="lyv-error" id="ofgError" hidden></p>
       <button type="submit" class="venue-form-submit" id="ofgSubmit">${L('Send reset link', 'Envoyer le lien de réinitialisation')}</button>
     </form>
-    <p class="op-done" id="ofgDone" hidden>${L('If that email has a login, a reset link is on its way. Check your inbox (and spam folder).', 'Si ce courriel est associé à un compte, un lien de réinitialisation est en route. Vérifiez votre boîte de réception (et vos courriels indésirables).')} <span id="ofgSlow" hidden>${L('It can take a few hours to arrive.', 'Ça peut prendre quelques heures.')}</span></p>
+    <p class="op-done" id="ofgDone" hidden>${L('If that email has a login, a reset link is on its way. Never made a login? If it’s the email we have for your business, we’ll send your edit link instead. Check your inbox (and spam folder).', 'Si ce courriel est associé à un compte, un lien de réinitialisation est en route. Jamais créé de compte? Si c’est le courriel que nous avons pour votre entreprise, nous vous enverrons plutôt votre lien de modification. Vérifiez votre boîte de réception (et vos courriels indésirables).')} <span id="ofgSlow" hidden>${L('It can take a few hours to arrive.', 'Ça peut prendre quelques heures.')}</span></p>
     ${fr ? `<p class="op-hint" style="margin-top:20px"><a href="/owner/login">Retour à la connexion</a>
     <br><strong>Pas encore de compte?</strong> Ouvrez le lien de modification privé que nous vous avons envoyé et choisissez-y un mot de passe, ou <a href="${OWNER_NEW_LINK_PATH}">recevez un nouveau lien</a>.</p>
     ${ownerEntryHelpFr()}` : `<p class="op-hint" style="margin-top:20px"><a href="/owner/login">Back to sign in</a>

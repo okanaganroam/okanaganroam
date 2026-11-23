@@ -22023,6 +22023,57 @@ test('Email me my edit link (2026-10-15): a fresh link to the email on file, the
   }
 });
 
+test('Forgot password with no login (2026-11-22): the email on file for a business gets its edit link instead; others get nothing', async () => {
+  const http = require('node:http');
+  seasonInsert.run({ name: 'Reset No Login Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'reset-no-login-fixture' });
+  const v = app.findVenueBySlug('kelowna', 'cafe', 'reset-no-login-fixture');
+  const oldToken = app.createOwnerLink(v.id, { contact_email: 'NoLogin@Reset.example' }).url.split('/owner/')[1];
+  const handler = app.server.listeners('request')[0];
+  const srv = http.createServer(handler);
+  await new Promise((resolve) => srv.listen(0, resolve));
+  const base = `http://localhost:${srv.address().port}`;
+  let ip = 1;
+  const post = (path, body) => fetch(`${base}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: base, 'X-Real-IP': `10.23.0.${ip++}` }, body: JSON.stringify(body) })
+    .then(async (r) => ({ status: r.status, body: await r.json() }));
+  const sent = [];
+  try {
+    app.setOwnerEmailTransport(async (m) => { sent.push(m); });
+    // An email that is neither a login nor on file: same answer, nothing sent.
+    assert.deepEqual((await post('/owner/forgot', { email: 'stranger@reset.example' })).body, { ok: true, direct: true });
+    assert.equal(sent.length, 0);
+    // The business's email on file, no login: the edit link comes, with a line saying why.
+    assert.deepEqual((await post('/owner/forgot', { email: 'nologin@reset.example' })).body, { ok: true, direct: true }, 'same answer as any other email');
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].to, 'nologin@reset.example');
+    assert.equal(sent[0].subject, 'Your edit link for Reset No Login Fixture');
+    assert.match(sent[0].text, /^Hi,\n\nYou asked to reset your Okanagan Roam password, but there’s no login with this email/);
+    assert.match(sent[0].text, /you can create a login/);
+    const url = (sent[0].text.match(/https:\/\/okanaganroam\.com\/owner\/[A-Za-z0-9_-]{20,}/) || [])[0];
+    assert.ok(url);
+    assert.doesNotMatch(sent[0].text, /owner\/reset\//, 'no password reset link');
+    assert.equal((await fetch(`${base}/owner/${oldToken}`)).status, 200, 'the old link keeps working until the new one is opened');
+    assert.equal((await fetch(`${base}/owner/${url.split('/owner/')[1]}`)).status, 200);
+    // From the French page: French email and French link.
+    await post('/fr/owner/forgot', { email: 'nologin@reset.example' });
+    assert.equal(sent.length, 2);
+    assert.equal(sent[1].subject, 'Votre lien de modification pour Reset No Login Fixture');
+    assert.match(sent[1].text, /Vous avez demandé à réinitialiser votre mot de passe Okanagan Roam, mais aucun compte n’utilise ce courriel/);
+    assert.match(sent[1].text, /https:\/\/okanaganroam\.com\/fr\/owner\//);
+    // Shares the 3-an-hour limit with "Email me a new link".
+    await post('/owner/link', { email: 'nologin@reset.example' });
+    assert.equal(sent.length, 3);
+    await post('/owner/forgot', { email: 'nologin@reset.example' });
+    assert.equal(sent.length, 3, 'the 4th request in an hour sends nothing');
+    // The page says so.
+    const page = await fetch(`${base}/owner/forgot`).then((r) => r.text());
+    assert.match(page, /Never made a login\? If it’s the email we have for your business, we’ll send your edit link instead\./);
+    assert.match(await fetch(`${base}/fr/owner/forgot`).then((r) => r.text()), /Jamais créé de compte\? Si c’est le courriel que nous avons pour votre entreprise/);
+  } finally {
+    app.setOwnerEmailTransport(null);
+    await new Promise((resolve) => srv.close(resolve));
+  }
+});
+
 test('Edit link re-sends (2026-10-18): repeated requests never push out the working link; admin reset still kills it at once', () => {
   seasonInsert.run({ name: 'Keep Old Link Fixture', type: 'cafe', hours: SEASON_WEEK, slug: 'keep-old-link-fixture' });
   const v = app.findVenueBySlug('kelowna', 'cafe', 'keep-old-link-fixture');
