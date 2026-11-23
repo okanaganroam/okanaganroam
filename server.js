@@ -8809,6 +8809,22 @@ let tripChatKeepStayId = null;
 function setTripChatReader(fn) { tripChatReader = typeof fn === 'function' ? fn : null; }
 async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   const regions = VALID_REGIONS.filter((r) => REGION_LABELS[r]);
+  // A day the chat left mostly free offers a gentler way (2026-11-24: "keep it, start later"). Taken, the stop it
+  // took out is put back in its slot and that day starts later, by the ordinary "start day N later" rule. The offer is
+  // only ever read here (never by the general offer rules, where "day 2" in any message would pick it).
+  let back = null;
+  { const b = tripChat.backOffer(v.offer);
+    if (b) {
+      // (A plain "no" keeps the plan as it is, by the general rule for an offer.)
+      if (!tripChat.explain.declinesOffer(v.message, tripChat.fold)) v.offer = (v.offer || []).filter((o) => !tripChat.BACK_RE.test(o));
+      if (!v.chip && tripChat.takesBack(v.message) && v.removed.includes(b.key) && !v.stops.some((x) => x.key === b.key || x.id === b.id)) {
+        v.removed = v.removed.filter((k) => k !== b.key);
+        v.stops = [...v.stops, { key: b.key, id: b.id, ...(Number.isInteger(b.start) ? { start: b.start } : {}) }];
+        v.args = { ...v.args, excludeVenueIds: (v.args.excludeVenueIds || []).filter((x) => x !== b.id) };
+        v.message = `start day ${b.day} later`;
+        back = b;
+      }
+    } }
   const stops = tripChatStops(v.stops);
   for (const s of stops) if ((v.soft || {})[s.key] === s.id) s.soft = true;
   const planEvents = tripChatEvents(v.events || []);
@@ -8947,7 +8963,8 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // Round 4: a change to the stops keeps the place to stay the visitor sees (it changed with unrelated messages).
   tripChatKeepStayId = extra.some((o) => o.o === 'stay') ? null : v.stayId || null;
   let out;
-  try { out = planOps.length ? tripChat.planTurn(planOps, { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run, hooks, weakFor: tripChatWeakFor, hasFeature: tripChatHasBadge, sunsetStart: (day, region) => { try { const d = (v.dayDates || [])[day - 1] || null; const sd = d && typeof sunsetDinnerStart === 'function' ? sunsetDinnerStart(d, region) : null; return sd ? sd.startMinutes : null; } catch (e) { return null; } } })
+  const turnCtx = { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run, hooks, weakFor: tripChatWeakFor, hasFeature: tripChatHasBadge, sunsetStart: (day, region) => { try { const d = (v.dayDates || [])[day - 1] || null; const sd = d && typeof sunsetDinnerStart === 'function' ? sunsetDinnerStart(d, region) : null; return sd ? sd.startMinutes : null; } catch (e) { return null; } } };
+  try { out = planOps.length ? tripChat.planTurn(planOps, turnCtx)
     : { plan: null, req: null, actions: { remove: [], keep: [] }, results: [], changed: [] }; } finally { tripChatKeepStayId = null; }
   // The broad-change guard: a targeted edit that would change more than two other stops, or a sunset time that would drop
   // a stop nobody mentioned, is said first and applied only on a clear yes (the page sends the message again, confirmed).
@@ -8979,11 +8996,33 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // when the listings give one. Only for a kind of place the planner knows by its own facts.
   try { for (const r of (out && out.results) || []) { if (r && r.op === 'add' && !r.ok && !r.fresh && r.kind && !r.tour && r.why !== 'no_room') Object.assign(r, tripChatAddWhy(r.kind, stops.filter((s) => !v.removed.includes(s.key)))); } } catch (e) { /* the plain line stands */ }
   let reply = planOps.length ? tripChat.buildReply(out, { lang, regionLabels: REGION_LABELS, cant, asks }) : '';
+  // (2026-11-24) A lighter-day removal that leaves the day with no activity: said plainly, with the way back. The
+  // gentler way is offered only when it works on this plan (the day, with the stop still on it, can start later).
+  let freeOffer = null;
+  if (planOps.length && out && !out.plan && !v.chip) {
+    try {
+      const probe = tripChat.mostlyFreeLine(out.results, lang, false);
+      if (probe) {
+        let works = false;
+        if (!short && Number.isInteger(probe.took.start)) { try { const dry = tripChat.planTurn([{ o: 'time', stops: [], kind: null, time: null, day: probe.day, value: 'later', n: null, ages: [], region: null, date: null }], turnCtx); works = !!(dry && dry.plan && (dry.results || []).some((r) => r.op === 'time' && r.ok)); } catch (e) { works = false; } }
+        const said = tripChat.mostlyFreeLine(out.results, lang, works);
+        reply = [reply, said.line].filter(Boolean).join(' ');
+        if (works) freeOffer = said.say;
+      }
+    } catch (e) { /* the short reply stands */ }
+  }
+  // The gentler way taken: the stop is back (the new plan carries it); when the day could not start later, said.
+  if (back) {
+    const TB = tripChat.T[lang === 'fr' ? 'fr' : 'en'], bs = stops.find((x) => x.id === back.id);
+    if (out && out.plan && bs) reply = [tripChat.fill(TB.backPut, { name: bs.name }), reply].join(' ');
+    else if (bs) reply = tripChat.fill(TB.backFail, { d: back.day, name: bs.name });
+  }
   if (needLine) reply = [reply, needLine].filter(Boolean).join(' ');
   let plan = out.plan || null, req = out.req || null, stayPref, transport, stayBlock, newText = null, card = null, stayForce, stayArrive, party, stayDates = null, note = null, offer = [], askFirst = false, needPatch = null;
   // A full day said with choices ("swap X, or day 3 at 1:15 PM. Which?"): the choices go back as plain messages.
   // A swap that asked for a badge no replacement has: the place offered instead, by name (a "yes" swaps to it).
   if (!offer.length) offer = tripChat.featOffers((out && out.results) || []);
+  if (!offer.length && freeOffer) offer = [freeOffer];
   for (const r of (out && out.results) || []) if (r.why === 'full' && r.full && !offer.length) offer = tripChat.explain.fullReply(r.full, { KINDS: tripChat.KINDS, noun: tripChat.kindNoun, clock: tripChat.clock }, lang).offer.map((o) => o.say);
   if (tourCard) {
     const TT = tripChat.T[lang === 'fr' ? 'fr' : 'en'];

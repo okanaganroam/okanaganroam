@@ -1093,6 +1093,7 @@ function broadTurn(ops, ctx) {
       case 'remove':
         for (const s of op.stops) { actions.remove.push(s.key); excl(s.id); delete locks[s.key]; }
         r.ok = true; r.names = op.stops.map((s) => s.name);
+        if (op.mostlyFree) r.mostlyFree = { ...op.mostlyFree, took: op.stops[0] };
         break;
       case 'keep':
         for (const s of op.stops) { actions.keep.push(s.key); locks[s.key] = s.id; }
@@ -1486,24 +1487,34 @@ function askedStop(request) {
   const main = mainAsked(request), lake = /\b(?:lakes?|lac|on the water|sur l'eau|waterfront)\b/.test(fold(request || ''));
   return (s) => main(s) || (lake && s.type === 'beach');
 }
-function lighterDayOps(op, ctx) {
-  const on = (ctx.stops || []).filter((s) => s.day === op.day && !(ctx.removed || []).includes(s.key));
+// (2026-11-24, Dayton: "consider how many stops are already on that day") What the day keeps is looked at before a
+// stop comes off. A removal that leaves the day with no activity (only its meal stops, or nothing) is still made for a
+// day the visitor named, and is marked mostlyFree: the reply then says the day is mostly free and offers the way back
+// (server.js). The whole trip's "slower pace" (ctx.one) takes one stop a day with the same care: never a café or a
+// meal, never the plan's last stop of a kind asked for, and it skips a day it would leave mostly free.
+// taken: stops this message already takes off other days.
+function lighterDayOps(op, ctx, taken = []) {
+  const gone = (s) => (ctx.removed || []).includes(s.key) || taken.includes(s);
+  const on = (ctx.stops || []).filter((s) => s.day === op.day && !gone(s));
   const pool = on.filter((s) => !s.role && !(ctx.locks || {})[s.key]);
-  if (ctx.one) return pool.length ? { ...op, o: 'remove', stops: pool.slice(-1), value: null, lighterDay: op.day } : null;
-  const asked = askedStop(ctx.args && ctx.args.text), n = pool.length >= 4 ? 2 : 1, take = [];
-  const left = (s) => (ctx.stops || []).some((x) => x !== s && !take.includes(x) && x.type === s.type && !(ctx.removed || []).includes(x.key));
+  const asked = askedStop(ctx.args && ctx.args.text), n = !ctx.one && pool.length >= 4 ? 2 : 1, take = [];
+  const other = (s) => (ctx.stops || []).find((x) => x !== s && !take.includes(x) && x.type === s.type && !gone(x)) || null;
   const food = (s) => ['restaurant', 'cafe'].includes(s.type);
-  for (const pass of [(s) => !food(s), food]) {
+  for (const pass of ctx.one ? [(s) => !food(s)] : [(s) => !food(s), food]) {
     for (let i = pool.length - 1; i >= 0 && take.length < n; i--) {
       const s = pool[i];
-      if (!pass(s) || take.includes(s) || (asked(s) && !left(s))) continue;
+      if (!pass(s) || take.includes(s) || (asked(s) && !other(s))) continue;
       take.push(s);
     }
     if (take.length) break;
   }
   take.sort((a, b) => pool.indexOf(a) - pool.indexOf(b));
-  if (take.length) return { ...op, o: 'remove', stops: take, value: null, lighterDay: op.day };
-  return { ...op, o: 'light_kept', stops: on, value: null };
+  if (!take.length) return ctx.one ? null : { ...op, o: 'light_kept', stops: on, value: null };
+  const rest = on.filter((s) => !take.includes(s));
+  const free = !rest.some((s) => !s.role && !food(s));
+  // A kind the request asked for that gets thinner: where it still is on the plan (said with the mostly-free line).
+  const still = take.length === 1 && asked(take[0]) ? other(take[0]) : null;
+  return { ...op, o: 'remove', stops: take, value: null, lighterDay: op.day, ...(free ? { mostlyFree: { day: op.day, left: rest, ...(still ? { still } : {}) } } : {}) };
 }
 // Travel agent abilities (trip-chat-agent.js): a stop moved to another day or part of the day, and one stop's own time,
 // are applied after the message's other edits, on the plan as it then is. Every other stop stays on the plan.
@@ -1566,10 +1577,14 @@ function planTurnCore(ops, ctx) {
   ops = ops.flatMap((o) => {
     if (o.o !== 'pace' || o.value !== 'relaxed' || ctx.short) return [o];
     if (o.day) return [lighterDayOps(o, ctx) || o];
-    const per = [...new Set((ctx.stops || []).map((s) => s.day))].map((d) => ((ctx.stops || []).filter((s) => s.day === d && !s.role && !(ctx.removed || []).includes(s.key)).length >= 2 ? lighterDayOps({ ...o, day: d }, { ...ctx, one: true }) : null)).filter(Boolean);
+    // One stop off each day that keeps an activity after it; when no day does, the last day that has one to give,
+    // said as mostly free.
+    const dayNums = [...new Set((ctx.stops || []).map((s) => s.day))], per = [], taken = [];
+    for (const d of dayNums) { const x = lighterDayOps({ ...o, day: d }, { ...ctx, one: true }, taken); if (x && !x.mostlyFree) { per.push(x); taken.push(...x.stops); } }
     if (per.length) return per;
-    const byDay = [...new Set((ctx.stops || []).map((x) => x.day))].map((d) => lighterDayOps({ ...o, day: d }, { ...ctx, one: true })).filter(Boolean);
-    return byDay.length ? [byDay[byDay.length - 1]] : [o];
+    for (const d of dayNums.slice().reverse()) { const x = lighterDayOps({ ...o, day: d }, { ...ctx, one: true }); if (x) return [x]; }
+    // Nothing can come off any day (meals and what was asked for): said, and the trip is not planned again for it.
+    return dayNums.length ? [{ ...o, o: 'light_kept', stops: [], value: null, day: null }] : [o];
   });
   if (ctx.short) return broadTurn(ops, ctx);
   const days = ctx.days || 1;
@@ -1866,6 +1881,9 @@ const T = {
     time_at: 'I can’t set an exact time for one stop yet. I can start the day earlier or later, or swap that stop.',
     wineTour: 'Here’s a wine tour with a driver for {town}. It’s under “Getting here & tours”, with its Book button.', wineTourNone: 'I don’t have a wine tour to offer for {town} right now.',
     poolWinter: ' (check it’s open in winter)',
+    lightKeptAll: 'Every day is already down to meals and what you asked for, so I left the plan as is.',
+    lightFree: 'Day {d} is now mostly free: only {left}.', lightEmpty: 'Day {d} is now free.', lightStill: 'You still have {name} on day {n}.', lightUndo: 'Undo puts it back.', lightUndoOr: 'Undo puts it back. Or keep it and start later?',
+    lightMeal: { lunch: 'lunch at {name}', dinner: 'dinner at {name}' }, lightSay: 'keep it and start day {d} later', backPut: 'Put {name} back.', backFail: 'I couldn’t start day {d} later, so {name} is still out.',
     lightKept: 'I left day {d} as is: it only has {names} (meals and what you asked for).', lightNone: 'Day {d} has nothing left to take out.',
     done: 'Done.', took: 'Took out {names}.', kept: 'Kept {names}.', keptStays: 'Kept {names}. {it} when you change other things.', itStays: 'It stays', theyStay: 'They stay',
     addedLater: 'Nothing that fits opens earlier, so I added {new}{at}.', addedNear: 'No {kind} was open {where}, so I added {new}{at}.', addedPartFull: 'The {part} was full, so I added {new}{at}.', partN: { morning: 'morning', midday: 'midday', afternoon: 'afternoon', evening: 'evening' }, partW: { morning: 'in the morning', midday: 'at midday', afternoon: 'in the afternoon', evening: 'in the evening' },
@@ -1924,6 +1942,9 @@ const T = {
     time_at: 'Je ne peux pas encore fixer l’heure exacte d’un seul arrêt. Je peux commencer la journée plus tôt ou plus tard, ou remplacer cet arrêt.',
     wineTour: 'Voici un tour des vignobles avec chauffeur pour {town}. Il est sous « Pour venir et excursions », avec son bouton Réserver.', wineTourNone: 'Je n’ai pas de tour des vignobles à proposer pour {town} en ce moment.',
     poolWinter: ' (vérifiez qu’elle est ouverte en hiver)',
+    lightKeptAll: 'Chaque jour ne compte déjà que les repas et ce que vous avez demandé; je n’ai rien changé.',
+    lightFree: 'Le jour {d} est maintenant presque libre : il ne reste que {left}.', lightEmpty: 'Le jour {d} est maintenant libre.', lightStill: 'Il vous reste {name} le jour {n}.', lightUndo: 'Annuler le remet.', lightUndoOr: 'Annuler le remet. Ou le garder et commencer plus tard ?',
+    lightMeal: { lunch: 'le dîner ({name})', dinner: 'le souper ({name})' }, lightSay: 'garde-le et commence le jour {d} plus tard', backPut: 'J’ai remis {name}.', backFail: 'Je n’ai pas pu commencer le jour {d} plus tard; {name} reste retiré.',
     lightKept: 'J’ai laissé le jour {d} tel quel : il n’a que {names} (les repas et ce que vous avez demandé).', lightNone: 'Il n’y a plus rien à retirer au jour {d}.',
     done: 'C’est fait.', took: 'J’ai retiré {names}.', kept: 'J’ai gardé {names}.', keptStays: 'J’ai gardé {names}. {it} si vous changez autre chose.', itStays: 'Il reste', theyStay: 'Ils restent',
     addedLater: 'Rien qui convienne n’ouvre plus tôt, donc j’ai ajouté {new}{at}.', addedNear: 'Aucun lieu pour {kind} n’était ouvert {where}, donc j’ai ajouté {new}{at}.', addedPartFull: 'Le {part} était complet, donc j’ai ajouté {new}{at}.', partN: { morning: 'matin', midday: 'midi', afternoon: 'après-midi', evening: 'soir' }, partW: { morning: 'le matin', midday: 'à midi', afternoon: 'l’après-midi', evening: 'le soir' },
@@ -2111,7 +2132,7 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
     if (!out.plan && out.failed && r.op === 'budget' && !r.pairs) { if (!parts.includes(t.cantChange)) parts.push(t.cantChange); continue; }
     switch (r.op) {
       case 'remove': parts.push(fill(t.took, { names: joinList(r.names, L) })); break;
-      case 'light_kept': parts.push(r.names.length ? fill(t.lightKept, { d: r.day, names: joinList(r.names, L) }) : fill(t.lightNone, { d: r.day })); break;
+      case 'light_kept': parts.push(!r.day ? t.lightKeptAll : r.names.length ? fill(t.lightKept, { d: r.day, names: joinList(r.names, L) }) : fill(t.lightNone, { d: r.day })); break;
       case 'keep': parts.push(out.plan ? fill(t.kept, { names: joinList(r.names, L) }) : fill(t.keptStays, { names: joinList(r.names, L), it: r.names.length > 1 ? t.theyStay : t.itStays })); break;
       case 'replace':
         if (r.featAsked && !r.ok && r.old && r.featMiss) {
@@ -2278,6 +2299,32 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
   return [...(n ? [t.done] : []), ...keepOk, ...count, ...notDone].join(' ');
 }
 
+// A day left mostly free by a lighter-day removal (lighterDayOps mostlyFree): what is left, where a kind asked for
+// still is, and the way back. withOffer: the gentler way ("keep it, start later") was checked to work.
+// -> { line, say (the offer's own message, tagged with the stop to put back) } or null.
+function mostlyFreeLine(results, lang, withOffer) {
+  const r = (results || []).find((x) => x && x.op === 'remove' && x.ok && x.mostlyFree && x.mostlyFree.took);
+  if (!r) return null;
+  const L = lang === 'fr' ? 'fr' : 'en', t = T[L], m = r.mostlyFree, clean = (x) => String(x || '').replace(/[\[\]\n\r]/g, ' ').replace(/\s+/g, ' ').trim();
+  const left = (m.left || []).map((s) => (t.lightMeal[s.role] ? fill(t.lightMeal[s.role], { name: s.name }) : s.name));
+  const parts = [left.length ? fill(t.lightFree, { d: m.day, left: joinList(left, L) }) : fill(t.lightEmpty, { d: m.day })];
+  if (m.still) parts.push(fill(t.lightStill, { name: m.still.name, n: m.still.day }));
+  parts.push(withOffer ? t.lightUndoOr : t.lightUndo);
+  return { line: parts.join(' '), day: m.day, took: m.took, say: `${fill(t.lightSay, { d: m.day })} [back ${m.took.key} ${m.took.id}${Number.isInteger(m.took.start) ? ` ${m.took.start}` : ''}]`, name: clean(m.took.name) };
+}
+// The gentler way, as the page sends it back (body.offer): -> { key, id, start } of the stop to put back, or null.
+const BACK_RE = /\[back (\d-[a-z]{3,12}) (\d{1,9})(?: (\d{1,4}))?\]\s*$/;
+function backOffer(offers) {
+  const hit = (offers || []).find((o) => typeof o === 'string' && BACK_RE.test(o));
+  const m = hit ? BACK_RE.exec(hit) : null;
+  return m ? { key: m[1], id: Number(m[2]), day: Number(m[1][0]), ...(m[3] !== undefined && Number(m[3]) < 1440 ? { start: Number(m[3]) } : {}) } : null;
+}
+// Whether a short message takes it ("yes", "keep it", "start day 2 later", « plus tard »), and is not another ask.
+// (The reply ends with the question, so the page shows it whole: trip-chat-page.js opens a reply that ends with "?".)
+function takesBack(message) {
+  const t = fold(message).replace(/\s+/g, ' ').trim();
+  return t.length <= 80 && (/\b(?:later|plus tard)\b|\bkeep it\b|\bgarde[rz]?[- ]le\b/.test(t) || /^(?:yes|yep|yeah|yup|sure|ok|okay|please|oui|ouais|d'accord)\b/.test(t)) && !/\b(?:add|remove|swap|replace|move|ajoute[rz]?|enleve[rz]?|remplace[rz]?|deplace[rz]?)\b/.test(t);
+}
 // What a kept swap offers instead, as the message a "yes" stands for (the page sends it back as body.offer; it is never
 // shown). The ids ride in a tag the rules read exactly (offerOps), so the place named in the reply is the one swapped in.
 function featOffers(results) {
@@ -2311,7 +2358,7 @@ function offerOps(message, stops) {
 }
 
 module.exports = {
-  featOffers, offerOps, swapFeatsFor, SWAP_FEATS, OWN_FEATS, access,
+  featOffers, offerOps, mostlyFreeLine, backOffer, takesBack, BACK_RE, swapFeatsFor, SWAP_FEATS, OWN_FEATS, access,
   STAY_VALUES, STAY_AMENITY_VALUES, TRANSPORT_VALUES, fill, stayAmenitiesIn, stayTextPref,
   MODEL, PRICE_PER_TOKEN, DEFAULT_TIMEOUT_MS, DEFAULT_DAILY_USD, MAX_MESSAGE, MAX_STOPS, RATE, OPS, TIMES, VALUES, CANT, KINDS, KIND_KEYS, CHIPS, T,
   enabled, apiKey, wireSchema, systemPrompt, stopsForModel, stripPII, validateWire, readChatMessage, rulesRead, chipOps,
