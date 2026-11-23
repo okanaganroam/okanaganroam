@@ -856,6 +856,18 @@ const V4_CLIENT_SRC = String.raw`
       if ((p.needs || []).some(function(n){ return n && n.key === 'wheelchair' && n.who === 'one'; })) out += '&nw=1';
       var thin = (p.thinDays || []).map(function(x){ return x && x.day; }).filter(function(n){ return n > 0 && n < 31; });
       if (thin.length) out += '&thin=' + thin.join(',');
+      // Share suggestions (2026-11-23): what the plan said it could not include (ni=spa:n:1563: the kind, none listed
+      // or not fitted, the nearest listing's id), so the copy says the same line; an ask already in asks= is not repeated.
+      var ni = [];
+      (p.notIncluded || []).forEach(function(x){
+        if (!x || typeof x.kind !== 'string' || !/^[a-z][a-z_]{1,29}$/.test(x.kind) || (x.reason !== 'none_listed' && x.reason !== 'not_fitted')) return;
+        if (asks.indexOf('kind:' + x.kind) !== -1 || asks.indexOf('type:' + x.kind) !== -1 || ni.some(function(t){ return t.split(':')[0] === x.kind; })) return;
+        var nid = x.nearest && x.nearest.id > 0 && x.nearest.id < 1e7 ? ':' + x.nearest.id : '';
+        ni.push(x.kind + ':' + (x.reason === 'none_listed' ? 'n' : 'f') + nid);
+      });
+      if (ni.length) out += '&ni=' + ni.slice(0, 3).join(',');
+      var nt = ((p.overview && p.overview.regions) || []).map(function(r){ return r && r.slug; }).filter(function(x){ return /^[a-z][a-z0-9-]{1,30}$/.test(x || ''); }).slice(0, 3);
+      if (ni.length && nt.length) out += '&nt=' + nt.join(',');
     } catch (e) {}
     return out;
   }
@@ -883,6 +895,9 @@ const V4_CLIENT_SRC = String.raw`
     if (d && d.chosen && d.chosen.name) { lines.push(''); lines.push((fr ? 'Hébergement : ' : 'Stay: ') + d.chosen.name); }
     var est = v4EstimateText().replace(/<small>[\s\S]*?<\/small>/g, '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
     if (est) lines.push(est);
+    // Share suggestions (2026-11-23): what the plan could not include, in its own words (at most three lines).
+    var left = ((state.last && state.last.notIncluded) || []).filter(function(x){ return x && x.text && (x.reason === 'none_listed' || x.reason === 'not_fitted'); }).slice(0, 3);
+    if (left.length) { lines.push(''); left.forEach(function(x){ lines.push((fr && x.textFr) || x.text); }); }
     return lines.join('\n');
   }
   function v4Toast(text){

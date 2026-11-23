@@ -642,6 +642,7 @@ const GENERIC_NAME_WORDS = new Set(['hotel', 'hotels', 'motel', 'inn', 'inns', '
 //   sug=event:213      date-dependent suggestions (never stops)
 //   asks=count:winery:2,kind:easy_walk,gluten_free,stay:pool,live_music,nonalcoholic   what the request asked for;
 //                      the page works the evidence out again from the listings as they are now
+const NI_RE = /^([a-z][a-z_]{1,29}):([nf])(?::([1-9]\d{0,6}))?$/;
 const ASK_RE = /^(?:count:[a-z_]{2,20}:\d{1,2}|type:[a-z_]{2,20}|kind:[a-z_]{2,30}|stay:[a-z_]{2,20}|[a-z_]{2,20})$/;
 function parseShareContext(query) {
   const q = query || {};
@@ -668,6 +669,18 @@ function parseShareContext(query) {
   // Trip needs (2026-11-24): nw=1 the wheelchair need is one person's; thin=2,3 the days the plan could not fill.
   if (q.nw === '1') out.wheelOne = true;
   if (typeof q.thin === 'string' && /^\d{1,2}(?:,\d{1,2}){0,6}$/.test(q.thin)) { const th = [...new Set(q.thin.split(',').map(Number).filter((n) => n >= 1 && n <= 30))]; if (th.length) out.thin = th; }
+  // Share suggestions (2026-11-23): what the plan said it could not include, and a tour the traveller asked the chat to
+  // show. Keys and ids only; the shared page rebuilds the words from the listings as they are now.
+  //   ni=spa:n:1563,museum:f   kind : n (none listed in town) | f (not fitted) : the nearest listing's id (optional)
+  //   wt=325656P14             the suggested wine tour's stored product code (never a stop, never booked)
+  if (typeof q.ni === 'string' && q.ni) {
+    const seen = new Set(), ni = [];
+    for (const tok of q.ni.split(',').slice(0, 6)) { const m = NI_RE.exec(tok); if (!m || seen.has(m[1])) continue; seen.add(m[1]); ni.push({ kind: m[1], reason: m[2] === 'n' ? 'none_listed' : 'not_fitted', ...(m[3] ? { nearestId: Number(m[3]) } : {}) }); }
+    if (ni.length) out.notIncluded = ni.slice(0, 3);
+    // nt=pemberton: the plan's own town(s), so "none listed in …" names the town the plan named (not every stop's).
+    if (ni.length && typeof q.nt === 'string' && /^[a-z][a-z0-9-]{1,30}(?:,[a-z][a-z0-9-]{1,30}){0,2}$/.test(q.nt)) out.niTowns = q.nt.split(',');
+  }
+  if (typeof q.wt === 'string' && /^[A-Za-z0-9]{3,20}$/.test(q.wt)) out.wineTour = q.wt;
   if (typeof q.asks === 'string' && q.asks) { const k = [...new Set(q.asks.split(',').filter((a) => ASK_RE.test(a)))].slice(0, 12); if (k.length) out.asks = k; }
   return Object.keys(out).length ? out : null;
 }
@@ -691,7 +704,23 @@ function shareContextQuery(c) {
   if (c.asks && c.asks.length) p.push(`asks=${c.asks.join(',')}`);
   if (c.wheelOne) p.push('nw=1');
   if (c.thin && c.thin.length) p.push(`thin=${c.thin.join(',')}`);
+  if (c.notIncluded && c.notIncluded.length) p.push(`ni=${c.notIncluded.map(shareNiToken).join(',')}`);
+  if (c.notIncluded && c.notIncluded.length && c.niTowns && c.niTowns.length) p.push(`nt=${c.niTowns.join(',')}`);
+  if (c.wineTour) p.push(`wt=${c.wineTour}`);
   return p.join('&');
+}
+const shareNiToken = (x) => `${x.kind}:${x.reason === 'none_listed' ? 'n' : 'f'}${x.nearestId ? `:${x.nearestId}` : ''}`;
+// What a plan said it could not include, as the link's ni= tokens (at most three). Only a kind of place with a reason
+// the shared page can say again from the listings; an ask the evidence already carries (asks=kind:spa) is not repeated.
+function shareNotIncluded(plan) {
+  const asks = new Set(shareAsks(plan)), out = [];
+  for (const x of (plan && plan.notIncluded) || []) {
+    if (!x || typeof x.kind !== 'string' || !/^[a-z][a-z_]{1,29}$/.test(x.kind) || !['none_listed', 'not_fitted'].includes(x.reason)) continue;
+    if (asks.has(`kind:${x.kind}`) || asks.has(`type:${x.kind}`) || out.some((t) => t.split(':')[0] === x.kind)) continue;
+    const id = x.nearest && Number.isInteger(x.nearest.id) && x.nearest.id > 0 && x.nearest.id < 1e7 ? x.nearest.id : null;
+    out.push(shareNiToken({ kind: x.kind, reason: x.reason, nearestId: id }));
+  }
+  return out.slice(0, 3);
 }
 // The asks a plan's evidence carries, as the link's asks= list.
 function shareAsks(plan) {
@@ -745,7 +774,7 @@ function sharedPlan(c, stops, events, stay) {
 }
 
 module.exports = {
-  parseShareContext, shareContextQuery, shareAsks, sharedPlan,
+  parseShareContext, shareContextQuery, shareAsks, shareNotIncluded, sharedPlan,
   DIET, DRINK_TYPES, FEATURES, venueStops, eventStops, isMealStop, badgeOf, datesGiven, takeUndatedEvents, suggestionOf,
   applyEvidence, planBookingLinks, checkBookingLinks, linkHasDate, innerUrl,
 };
