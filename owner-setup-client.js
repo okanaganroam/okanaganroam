@@ -3221,7 +3221,7 @@
       if (ownDogsBiz() && !S.done.offer && !S.dogResearchOff && S.badges.dog_friendly && (C.researchTicks || []).indexOf('dog_friendly') >= 0) { S.dogResearchOff = true; S.badges.dog_friendly = false; }
       // Tours (2026-11-16): "Who can come" asks the minimum age first, then dogs and access.
       // Indoor places (2026-11-19): the youngest age first (All ages, 5+, 8+, 12+, 16+, 19+), "Under 18s come with an adult".
-      var tourAges = INDOOR ? '<h2 class="su-h2" style="margin-top:6px" id="suAgeQ">' + h(T.tageQ) + '</h2>' + (S.tour.ageGuessed && S.tour.age && (T.ageSuggest || T.guessKind) ? '<p class="su-sent su-research" id="suAgeGuess">' + h(T.ageSuggest ? fill(T.ageSuggest, { age: (T.tages || {})[S.tour.age] || S.tour.age }) : T.guessKind) + '</p>' : '') + tchips('age', ['all', '5', '8', '12', '16', '19'], T.tages, T.tageQ, 'suAgeQ')
+      var tourAges = INDOOR ? '<h2 class="su-h2" style="margin-top:6px" id="suAgeQ">' + h(T.tageQ) + '</h2>' + (S.tour.ageGuessed && S.tour.age && (T.ageSuggest || T.guessKind) ? '<p class="su-sent su-research" id="suAgeGuess">' + h(T.ageSuggest ? fill(T.ageSuggestSaves && S.tour.age === 'all' && (C.ageSaveKinds || []).indexOf(indoorMainKind()) >= 0 ? T.ageSuggestSaves : T.ageSuggest, { age: (T.tages || {})[S.tour.age] || S.tour.age }) : T.guessKind) + '</p>' : '') + tchips('age', ['all', '5', '8', '12', '16', '19'], T.tages, T.tageQ, 'suAgeQ')
           // Indoor test 19: a kids' place's one hint line (its range is said in its story, not picked here).
           + ((S.tour.kinds || []).indexOf('kids') >= 0 && T.tageKidsHint ? '<p class="su-sent" id="suAgeKidsHint">' + h(T.tageKidsHint) + '</p>' : '')
         + (S.tour.age && S.tour.age !== '19' && S.tour.age !== 'all' ? '<div class="su-chips" role="group" style="margin-top:8px"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (S.tour.adult ? 'true' : 'false') + '" data-tadult="1" id="suAdultRule">' + h(T.tadult) + '</button></div>' : '')
@@ -3812,8 +3812,8 @@
     S.seaList.splice(si + 1, 0, o2); S.seaTouched = true;
     return true;
   }
-  function hoursSave(noRead){
-    if (!noRead) readTimes();
+  function hoursSave(){
+    readTimes();
     if (!windowsOk(S.week)) { S.nudge = T.needOpenDay; return render(); }
     var week = {}; DAYS.forEach(function(d){ week[d] = S.week[d] || []; });
     var ch = { hours: week, hours_checked: true };
@@ -4619,7 +4619,7 @@
       return saveAll('offer', [{ pub_info: { minors: mv } }], null, null, function(){ S.pubInfo.minors = mv; });
     }
     if (k === 'hoursSave') return hoursSave();
-    if (k === 'hours24') { DAYS.forEach(function(d){ S.week[d] = [['00:00', '23:59']]; }); return hoursSave(true); }
+    if (k === 'hours24') { if (S.step !== 'hours:edit') go('hours:edit'); DAYS.forEach(function(d){ S.week[d] = [['00:00', '23:59']]; }); var ys24 = window.scrollY; render(); window.scrollTo(0, ys24); return; } // the week reads Open 24 hours; Next saves it and asks the season
     // "Until close" on a happy hour (pub test 9): on or off; the end-time box comes back when it is off.
     if (k === 'hhClose') { readEntries(); var ec = S.happy[+v]; if (!ec) return; ec.close = !ec.close; if (S.nudge && /close|ferm/i.test(S.nudge)) S.nudge = ''; render(); return; }
     // The same for a weekly special (its end is stored as 'close', the way it always was).
@@ -5551,7 +5551,10 @@
       readTour(); var qt = b.getAttribute('data-tpick').split(':'), kt = qt[0], vt = qt[1];
       // Sport test 12: a tap on the suggested age confirms it (it used to take it off).
       var confirmAge = kt === 'age' && S.tour.ageGuessed && String(S.tour.age) === vt;
-      S.tour[kt] = String(S.tour[kt]) === vt && kt !== 'bookYes' && kt !== 'adultAge' && kt !== 'adultHow' && !confirmAge ? '' : vt;
+      // Outdoor fresh test (2026-11-23): a tap on the suggested booking answer confirms it too (it took it off, and Save then
+      // kept no answer).
+      var confirmBook = kt === 'book' && INDOOR && String(S.tour.book) === vt;
+      S.tour[kt] = String(S.tour[kt]) === vt && kt !== 'bookYes' && kt !== 'adultAge' && kt !== 'adultHow' && !confirmAge && !confirmBook ? '' : vt;
       if (kt === 'length') S.tour.lengthGuessed = false;
       if (kt === 'book') S.tour.bookGuessed = false;
       if (kt === 'age') S.tour.ageGuessed = false;

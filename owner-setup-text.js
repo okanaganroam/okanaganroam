@@ -3139,6 +3139,8 @@ en.outdoor = sportStrings(en.sport, {
   // A campground's or a ski hill's guests stay the day or the night: the longest answer says so.
   tlengthQ: 'How long do most visits last?', tlengths: { '1h': 'Up to 1 hour', '1-2h': '1 to 2 hours', '2-3h': '2 to 3 hours', half: 'Half a day or more, or overnight' },
   tlengthNeed: 'Please tap how long most visits last.',
+  // Outdoor fresh test (2026-11-23): on a campground, nature centre, farm or market the suggested age is saved with the screen.
+  ageSuggestSaves: 'Suggested: {age}. It’s saved with this screen; tap another age if it’s different.',
   noSetHoursHint: '',
   quick: { good_to_know: en.indoor.quick.good_to_know_kinds.outdoorgen.slice(), groups: ['Birthday parties', 'School groups welcome', 'Private bookings on request'] },
 });
@@ -3156,6 +3158,7 @@ fr.outdoor = sportStrings(fr.sport, {
   menuTypeSub: 'Chaque laissez-passer, location, emplacement ou billet et son prix, une ligne à la fois',
   tlengthQ: 'Combien de temps dure la plupart des visites?', tlengths: { '1h': 'Jusqu’à 1 heure', '1-2h': '1 à 2 heures', '2-3h': '2 à 3 heures', half: 'Une demi-journée ou plus, ou une nuit' },
   tlengthNeed: 'Touchez combien de temps dure la plupart des visites.',
+  ageSuggestSaves: 'Suggéré : {age}. Il est enregistré avec cet écran; touchez un autre âge si ce n’est pas le bon.',
   noSetHoursHint: '',
   quick: { good_to_know: fr.indoor.quick.good_to_know_kinds.outdoorgen.slice(), groups: ['Fêtes d’anniversaire', 'Groupes scolaires bienvenus', 'Réservations privées sur demande'] },
 });
