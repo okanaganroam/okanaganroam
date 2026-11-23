@@ -122,3 +122,19 @@ test('why a step failed (2026-11-14): a fixed code from the status and the flagg
   assert.match(html, /a form field needed fixing \(contact name\) ×2/);
   assert.doesNotMatch(html, /sneaky|a@b\.com/);
 });
+
+test('reset and new-link form posts without Accept-Language (scripts, not the page) are not counted (2026-11-22)', () => {
+  const db = memDb(); const c = pa.createPortalCounter(db);
+  const n = (name) => (db.prepare('SELECT SUM(n) AS n FROM site_event_counts WHERE name = ?').get(name).n || 0);
+  answer(c, req(undefined, '', ''), 'POST', '/owner/forgot', 200, '7.7.7.1');
+  answer(c, req(undefined, '', ''), 'POST', '/fr/owner/link', 200, '7.7.7.2');
+  assert.equal(n('portal:forgot_submit'), 0, 'a scripted reset post is not counted');
+  assert.equal(n('portal:new_link_submit'), 0, 'a scripted new-link post is not counted');
+  answer(c, req(), 'POST', '/owner/forgot', 200, '7.7.7.3');
+  answer(c, req(), 'POST', '/owner/link', 200, '7.7.7.4');
+  assert.equal(n('portal:forgot_submit'), 1, 'a post from the page is counted');
+  assert.equal(n('portal:new_link_submit'), 1);
+  // Other posts are unchanged: sign-in without Accept-Language still counts.
+  answer(c, req(undefined, '', ''), 'POST', '/owner/login', 401, '7.7.7.5');
+  assert.equal(n('portal:login_failed'), 1);
+});

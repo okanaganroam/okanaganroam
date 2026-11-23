@@ -106,6 +106,11 @@ function classify(method, rawPath) {
 // links in six hours is a scanner, not one owner. Only those two views are checked; the memory is a short-lived
 // in-process map of a hash and a few path hashes, never written to the database.
 const SCAN_STEPS = new Set(['claim_page_view', 'edit_link_view']);
+// Email forms (2026-11-22): the reset and "email me a new link" forms only send from a page, and every real browser sends
+// Accept-Language with that fetch. Scripted posts straight to the address (31 "reset requests" against 14 page views in
+// Nov 2026, and not one reset email) skip it, so they are not counted.
+const FORM_POST_STEPS = new Set(['forgot_submit', 'new_link_submit']);
+const scriptedPost = (req) => !String(req.headers['accept-language'] || '').trim();
 const SCAN_WINDOW_MS = 6 * 3600000, SCAN_MAX_DISTINCT = 2;
 const scanSeen = new Map();
 function scannerLike(req, ip, pathname, now = Date.now()) {
@@ -141,6 +146,7 @@ function createPortalCounter(db) {
           return counted;
         }
         if (method === 'GET') return code === 200 && !(SCAN_STEPS.has(key) && scannerLike(req, ip, pathname)) ? bump(req, storedName(key), ip) : false;
+        if (FORM_POST_STEPS.has(key) && scriptedPost(req)) return false;
         const counted = bump(req, storedName(code < 400 ? key : `${key}_failed`), ip);
         if (counted && code >= 400) bump(req, `portal:why:${key}_failed:${why()}`, ip);
         return counted;
