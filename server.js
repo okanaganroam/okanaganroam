@@ -54930,6 +54930,9 @@ ${renderAnalyticsHeadHtml('my_trip')}
   body.my-trip-page .leaflet-popup-content { min-width: 0; }
   body.my-trip-page .leaflet-popup-content a { display: inline-flex; align-items: center; min-height: 44px; }
   body.my-trip-page .mt-meta { margin: 2px 0 0; font-size: 0.86rem; opacity: 0.75; }
+  /* A suggested time's note ("Suggested time · Check sessions ↗"): the link's hit area is 44px tall without adding height. */
+  body.my-trip-page .mt-sched a { position: relative; white-space: nowrap; font-weight: 800; color: inherit; }
+  body.my-trip-page .mt-sched a::after { content: ""; position: absolute; inset: -14px -6px; }
   body.my-trip-page .mt-num { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; border-radius: 999px; background: var(--ref-gold, #E0A94E); color: #16233a; font-weight: 800; font-size: 0.8rem; margin-right: 6px; }
   body.my-trip-page .mt-tools { display: flex; gap: 6px; }
   /* Tap targets (2026-10-19, round 7): the move and remove buttons are 44px, the size a thumb can hit. */
@@ -55143,9 +55146,11 @@ ${renderGolfHeaderHtml()}
           var tx = timeText(x.s.time), sk = d.sched && tx && !(x.s.time && Number.isFinite(x.s.time.e)) && /^venue:/.test(x.s.ref || '') ? d.sched : '';
           if (sk) tx = (fr ? 'vers ' : 'around ') + tx;
           var meta = d.missing ? T.gone : [ownDate, tx, (fr && d.typeFr) || d.type, d.regionLabel].filter(Boolean).join(' · ');
-          // The words are trip-timing.js's (one table): why it varies, the link in the kind's words, and the age line.
-          var skWords = sk && TT_WORDS[sk] ? [ttWhy(sk, fr), ttLink(sk, fr)] : null, skAges = skWords && d.schedAges ? ttAgeNote({ schedule: sk, agesSaid: d.schedAges.agesSaid, kidAges: d.schedAges.kidAges, kids: d.schedAges.kids }, fr) : '';
-          var skHtml = skWords ? '<span class="mt-sched" data-mt-sched="' + esc(sk) + '">' + esc(skWords[0]) + (d.schedUrl ? (fr ? ' : ' : ': ') + '<a ' + hrefAttr(d.schedUrl) + ' target="_blank" rel="nofollow noopener">' + esc(skWords[1]) + ' <span aria-hidden="true">↗</span></a>' : (fr ? ' : vérifiez avant d’y aller.' : ': check before you go.')) + (skAges ? ' <span data-mt-sched-ages>' + esc(skAges) + '</span>' : '') + '</span>' : '';
+          // The words are trip-timing.js's (one table). The short note first, as on the plan's card: "Suggested time ·
+          // Check sessions ↗" (the listing's stored link; its own page when it stores none), then the age line.
+          var skOn = sk && TT_WORDS[sk], skAges = skOn && d.schedAges ? ttAgeNote({ schedule: sk, agesSaid: d.schedAges.agesSaid, kidAges: d.schedAges.kidAges, kids: d.schedAges.kids }, fr) : '';
+          var skTo = skOn ? (/^https:\\/\\//.test(d.schedUrl || '') ? d.schedUrl : (fr && d.urlFr) || d.url || '') : '';
+          var skHtml = skOn ? '<span class="mt-sched" data-mt-sched="' + esc(sk) + '">' + ttNote({ schedule: sk }, d.name || x.s.name, fr, skTo, skTo === d.schedUrl && !!skTo, esc, '') + (skAges ? ' <span data-mt-sched-ages>' + esc(skAges) + '</span>' : '') + '</span>' : '';
           var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="' + esc(T.moveUp.replace('{name}', x.s.name)) + '"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="' + esc(T.moveDown.replace('{name}', x.s.name)) + '"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="' + esc(T.remove.replace('{name}', x.s.name)) + '">✕</button></div>' : '';
           // A closure or advisory on the stop (round 8, 2026-10-19), as on its card.
           var nt = d.notice && (fr && d.notice.textFr || d.notice.text);
