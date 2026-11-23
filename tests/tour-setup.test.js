@@ -163,7 +163,7 @@ test('saving the tour answers: kinds and length, price per person, booking, who 
   const rows = app.venueVisitInfo(v.id).rows;
   const row = (l) => (rows.find((r) => r.label === l) || {}).text;
   assert.equal(row('Time needed'), 'Half a day (about 4 hours).');
-  assert.equal(row('Prices'), 'From $129 a person. Private tours from $900.');
+  assert.equal(row('Prices'), 'From $129 a person. Private tours from $900 for the group.');
   assert.equal(row('Ages'), 'Ages 12 and up. Under 18s come with an adult.');
   assert.equal(row('Booking'), 'Book at least a day ahead.');
   assert.equal(row('Good to know'), 'Dress warm: we supply helmets and gloves');

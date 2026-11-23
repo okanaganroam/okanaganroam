@@ -126,13 +126,13 @@ test('1. a free or by-donation tour: typed in the same price box, stored with th
   const c0 = cfgOf((await get(`/owner/${t}/setup`)).text);
   assert.equal(c0.researchFee, null);
   assert.equal(c0.researchFreeHint, true);
-  assert.equal(c0.t.tpriceFreeHint, 'Your page says by donation. Type free if that’s right.');
-  assert.equal(c0.t.tpriceFreeTip, 'Free or by donation? Type free.');
-  assert.equal(c0.t.tpriceLead, 'Your lowest paid price for one adult. It shows on your card as “From $X”.');
-  assert.equal(c0.t.tpriceLeadFree, 'Your card will say “Free”.');
-  assert.match(c0.t.tpriceNeed, /^Just the number, like 189\. Free or by donation\? Type free\.$/);
+  assert.equal(c0.t.tpriceFreeHint, 'Your page says by donation. Tap By donation above if that’s right.');
+  assert.equal(c0.t.tpriceFreeTip, 'Free or by donation? Tap Free or By donation above.');
+  assert.equal(c0.t.tpriceLead, 'Your lowest paid price for one adult, in Canadian dollars. It shows on your card as “From $X a person”.');
+  assert.equal(c0.t.tpriceLeadFree, 'Your card and your page will say “Free”.');
+  assert.match(c0.t.tpriceNeed, /^Just the number, like 189\. Free, by donation or private groups only\? Tap it above\.$/);
   const f0 = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
-  assert.match(f0.t.tpriceFreeTip, /^Gratuit ou contribution volontaire\s?\? Écrivez gratuit\.$/);
+  assert.match(f0.t.tpriceFreeTip, /^Gratuit ou contribution volontaire\s?\? Touchez Gratuit ou Contribution volontaire ci-dessus\.$/);
   assert.match(f0.t.tpriceLeadFree, /Gratuit/);
   assert.equal(f0.t.tfreeCard, 'Gratuit');
   // A listing with a paid research price and no free words keeps its pre-pick.
@@ -146,16 +146,16 @@ test('1. a free or by-donation tour: typed in the same price box, stored with th
   assert.deepEqual(r.body.live.sort(), ['tour_info', 'tour_price']);
   assert.deepEqual({ price: tourInfo(v.id).price, free: tourInfo(v.id).free, private: tourInfo(v.id).private }, { price: 0, free: 'donation', private: 400 });
   assert.equal(app.tourPrice(v.id), null); assert.equal(app.tourFree(v.id), 'donation'); assert.equal(app.tourPriceValue(v.id), 'donation');
-  assert.equal(box(v.id).rows.find((x) => x.label === 'Prices').text, 'Free (pay what you want). Private tours from $400.');
-  assert.match(plain(page(v, 'en')), /Prices Free \(pay what you want\)\. Private tours from \$400\./);
-  assert.match(plain(page(v, 'fr')), /Tarifs Gratuit \(contribution volontaire\)\. Sorties privées à partir de 400 \$\./);
-  assert.equal(app.ownerValueText('tour_price', 'donation'), 'Free (pay what you want)');
+  assert.equal(box(v.id).rows.find((x) => x.label === 'Prices').text, 'By donation (pay what you want). Private tours from $400 for the group.');
+  assert.match(plain(page(v, 'en')), /Prices By donation \(pay what you want\)\. Private tours from \$400 for the group\./);
+  assert.match(plain(page(v, 'fr')), /Tarifs Contribution volontaire \(payez ce que vous voulez\)\. Sorties privées à partir de 400 \$ pour le groupe\./);
+  assert.equal(app.ownerValueText('tour_price', 'donation'), 'By donation (pay what you want)');
   assert.equal(app.ownerValueText('tour_price', 'free'), 'Free');
   // "free" (or 0): "Free." / « Gratuit. »
   ok(await change(t, { tour_price: '0' }));
   assert.equal(tourInfo(v.id).free, 'free');
-  assert.match(plain(page(v, 'en')), /Prices Free\. Private tours from \$400\./);
-  assert.match(plain(page(v, 'fr')), /Tarifs Gratuit\. Sorties privées à partir de 400 \$\./);
+  assert.match(plain(page(v, 'en')), /Prices Free\. Private tours from \$400 for the group\./);
+  assert.match(plain(page(v, 'fr')), /Tarifs Gratuit\. Sorties privées à partir de 400 \$ pour le groupe\./);
   // The setup opens on the saved answer; the checklist counts the price as answered.
   const c1 = cfgOf((await get(`/owner/${t}/setup`)).text);
   assert.equal(c1.cur.tour_price, 'free');
@@ -193,7 +193,7 @@ test('1. a free or by-donation tour: typed in the same price box, stored with th
   ok(await change(t, { tour_price: 35 }));
   assert.deepEqual({ price: tourInfo(v.id).price, free: tourInfo(v.id).free }, { price: 35, free: undefined });
   assert.equal(app.cardPriceFor(v.id), 'From $35');
-  assert.match(plain(page(v, 'en')), /Prices From \$35 a person\. Private tours from \$400\./);
+  assert.match(plain(page(v, 'en')), /Prices From \$35 a person\. Private tours from \$400 for the group\./);
   ok(await change(t, { tour_price: 'gratuit' }, true));
   assert.equal(app.tourPriceValue(v.id), 'free'); assert.equal(app.cardPriceFor(v.id), 'Free');
   // Saving other tour answers keeps it; taking the price back clears it.
@@ -429,8 +429,8 @@ test('8. Help for tours (EN + FR): times, free, dogs, lengths, strollers, allerg
   assert.match(a('tour-times'), /from your first departure to when the last trip gets back/);
   assert.match(a('tour-times'), /The time of each trip goes in Your tours and prices/);
   for (const id of ['tour-times', 'hours']) { assert.doesNotMatch(a(id), /lunch|dinner|midnight/i, id); assert.doesNotMatch(aFr(id), /midi et soir|minuit/i, id); }
-  assert.match(a('tour-free-trip'), /type the word free in the price box \(or 0 , or by donation \/ pay what you want \)/);
-  assert.match(aFr('tour-free-trip'), /écrivez le mot gratuit dans la case du prix/);
+  assert.match(a('tour-free-trip'), /under How do you charge\? , tap Free or By donation/);
+  assert.match(aFr('tour-free-trip'), /touchez Gratuit ou Contribution volontaire/);
   assert.match(a('tour-dogs'), /tick Guests’ own dogs can come along/); assert.doesNotMatch(a('tour-dogs'), /edit page|Badges/);
   assert.match(a('tour-lengths'), /tap your shortest trip.*Your tours and prices/);
   for (const id of ['tour-strollers', 'tour-allergies', 'tour-languages']) { assert.match(a(id), /Good to know \(in “More about your tours”\)/, id); assert.match(aFr(id), /Bon à savoir/, id); }

@@ -367,7 +367,7 @@ test('B10 + B11: the booking link is asked once, and the French wording table', 
   const f = cfgOf((await get(`/fr/owner/${t}/setup`)).text);
   assert.equal(f.t.labels.hours, 'Vos heures et votre saison');
   assert.match(f.t.allYearClosed, /^Nous offrons des sorties une partie de l’année seulement$/);
-  assert.match(f.t.tpriceQ, /^Combien coûte une sortie par personne[  ]\?$/);
+  assert.match(f.t.tpriceQ, /^Combien ça coûte[  ]\?$/);
   assert.match(f.t.knownQ, /^Pour quoi êtes-vous connus[  ]\?$/);
   const ft = require('../french-text.js');
   const pat = ft.FR_PATTERNS.find(([re]) => re.test('Tours and experiences in and from Vernon, booked with local operators.'));

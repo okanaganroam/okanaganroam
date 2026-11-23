@@ -263,7 +263,7 @@ test('6. private price per hour with a minimum: "Private van from $150/hour (3-h
   assert.ok(!('private_per' in ti) && !('private_min' in ti), JSON.stringify(ti));
   // A whole-trip private price reads as before.
   ok(await change(t, { tour_info: { private: 900 } }));
-  assert.match(plain(page(v)), /Private tours from \$900\./);
+  assert.match(plain(page(v)), /Private tours from \$900 for the group\./);
   // The setup: whole trip / per hour chips and the minimum hours, read from "per hour … minimum 3 hours" too.
   // Tour test 16: this source-only check is now a behaviour test (tour-test16-fixes.test.js, test 13).
   assert.equal(text.en.tour.tprivPers.hour, 'Per hour'); assert.equal(text.fr.tour.tprivPers.hour, 'À l’heure');

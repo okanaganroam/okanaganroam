@@ -306,7 +306,7 @@ test('1: the edit page shows an exact season with its days, and saves whole mont
   const html = (await get(`/owner/${tokenFor(v.id)}`)).text;
   assert.match(html, /<select id="opSeasonFromD"[^>]*>[\s\S]*?<option value="25" selected>25<\/option>/);
   assert.match(html, /<select id="opSeasonToD"[^>]*>[\s\S]*?<option value="12" selected>12<\/option>/);
-  assert.match(html, /fd === 1 && \(td === last\[tm - 1\]/);
+  assert.match(html, /fd === 1 && td === last\[tm - 1\] \? fm \+ '-' \+ tm/);
   // Yearly closures show as one row there too.
   ok(await change(tokenFor(v.id), { closures: [{ from: '04-01', to: '04-24', note: '', yearly: true }] }));
   const h2 = (await get(`/owner/${tokenFor(v.id)}`)).text;
