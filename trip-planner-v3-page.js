@@ -1063,13 +1063,15 @@ const T3_STAY_CLIENT_SRC = `
     var MO = fr ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'] : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var ok = function(x){ return typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x); };
     var parts = [];
-    if (ok(t.arrive) && ok(t.leave)) {
+    // Dates the visitor did not give are not shown as the trip's dates (2026-11-22): "Dates not set".
+    if (t.datesGiven === false) parts.push(fr ? 'Dates à choisir' : 'Dates not set');
+    else if (ok(t.arrive) && ok(t.leave)) {
       var am = Number(t.arrive.slice(5, 7)) - 1, ad = Number(t.arrive.slice(8)), lm = Number(t.leave.slice(5, 7)) - 1, ld = Number(t.leave.slice(8));
       parts.push(fr ? (am === lm ? ad + '–' + ld + ' ' + MO[am] : ad + ' ' + MO[am] + '–' + ld + ' ' + MO[lm]) : (am === lm ? MO[am] + ' ' + ad + '–' + ld : MO[am] + ' ' + ad + '–' + MO[lm] + ' ' + ld));
     }
     if (t.nights) parts.push(fr ? t.nights + (t.nights > 1 ? ' nuits' : ' nuit') : t.nights + (t.nights > 1 ? ' nights' : ' night'));
     var who = [];
-    if (t.adults) who.push(fr ? t.adults + (t.adults > 1 ? ' adultes' : ' adulte') : t.adults + (t.adults > 1 ? ' adults' : ' adult'));
+    if (t.adults) who.push((fr ? t.adults + (t.adults > 1 ? ' adultes' : ' adulte') : t.adults + (t.adults > 1 ? ' adults' : ' adult')) + (t.adultsAssumed ? (fr ? ' (supposé)' : ' (assumed)') : ''));
     if (t.kids) who.push(fr ? t.kids + (t.kids > 1 ? ' enfants' : ' enfant') : t.kids + (t.kids > 1 ? ' kids' : ' kid'));
     if (who.length) parts.push(who.join(', '));
     if (t.dog) parts.push(fr ? 'chien' : 'dog');
@@ -1189,7 +1191,7 @@ const T3_STAY_CLIENT_SRC = `
     var html = '';
     var prefilled = (s.bookingLinks || []).some(function(l){ return l && l.key !== 'own' && t3StayExt(l.url); });
     var bits = [];
-    if (prefilled && !t.datesGiven) bits.push(fr ? 'Dates selon votre plan; modifiables sur le site de réservation.' : 'Dates follow your plan; change them on the booking site.');
+    if (!t.datesGiven) bits.push(fr ? 'Pas encore de dates : choisissez-les ici ou sur le site de réservation.' : 'No dates yet: pick them here or on the booking site.');
     if (prefilled && t.kids && !(t.kidAges && t.kidAges.length === t.kids)) bits.push(fr ? 'Le site demande l’âge des enfants.' : 'The booking site asks for the kids’ ages.');
     if (s.petsSome) bits.push(fr ? 'Animaux dans certaines chambres : à vérifier.' : 'Pets in some rooms: check when booking.');
     if (bits.length) html = '<p class="t3-book-note">' + esc(bits.join(' ')) + '</p>';

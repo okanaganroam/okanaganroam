@@ -193,7 +193,9 @@ const REQUEST_KINDS = {
   bowling: /(?<!\b(?:poke|acai|buddha|rice|grain|smoothie|salad|noodle|soup|burrito|super|ramen|power|protein|sushi|fruit|a|the|one|cereal|chili|chilli|bread|sugar|punch|mixing) )\bbowl\b(?! (?:of|food|restaurant|bistro|bar|cafe|place|places|spot|spots|shop)\b)/,
   skating: /\b(?:skate|go skating|patiner|patinage)\b(?! ?(?:parks?|boards?|boarding|shops?)\b)/,
   evening_fun: /\b(?:something (?:fun |else |more )?to do|somewhere (?:fun )?to go|an? (?:fun |evening |indoor )?activity|some(?:thing)? fun|evening activity|une activite|things to do|activities)\b/,
-  pool: /\b(?<!(?:car|outdoor|infinity|hotel|tide|rock|plunge) )pools?\b(?! (?:tables?|halls?|cues?|league|sharks?|party|parties))/,
+  // Group-preferences round (2026-11-22; "a hotel with a pool" planned a recreation centre and warned "no pool listed"
+  // beside a hotel marked Pool): a pool said of the place to stay is the stay's amenity, not a swimming outing.
+  pool: /\b(?<!(?:car|outdoor|infinity|hotel|tide|rock|plunge) )(?<!\b(?:hotels?|motels?|resorts?|inns?|lodges?|condos?|cabins?|suites?|rooms?|accommodations?|airbnbs?|(?:place|somewhere|where) to stay|hebergement|logement)\b[^.,;:!?]{0,40})pools?\b(?! (?:tables?|halls?|cues?|league|sharks?|party|parties))/,
   scenic_flight: /\b(?:float ?planes?|seaplanes?|scenic (?:(?:helicopter|heli|plane|air) (?:flights?|tours?)|flights?)|scenic (?:or|and) helicopter flights?|helicopter (?:tours?|flights?|rides?|sightseeing|trips?)|heli (?:tours?|flights?|rides?)|helicopters?|flightseeing|glacier landings?)\b/,
 };
 // Indoor test 17: a plain "paint" asks for a painting class too.
