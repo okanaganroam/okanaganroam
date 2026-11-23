@@ -3657,7 +3657,7 @@ const OUTDOOR_FACTS_RANGE_RE = /\b(jan\w*|feb\w*|mar\w*|apr\w*|may|jun\w*|jul\w*
 const OUTDOOR_FACTS_ASK_RE =/\b(?:rent\w*|snowshoe\w*|bikes?|biking|e ?bikes?|cycling|shuttles?|outfitters?)\b/;
 function outdoorFactsSeasonOff(v, ctx, month) {
   const s = v && v.outdoorSeason;
-  if (!s || !COLD_MONTHS.includes(month) || (v.ownerSetUp && v.openMonths)) return false;
+  if (!s || !COLD_MONTHS.includes(month) || (v.ownerSetUp && v.openMonths) || v.sportYearAll) return false;
   const asked = normWords((ctx.requirements && ctx.requirements.text) || ctx.queryText || '');
   if ((v.textName || '').split(' ').length >= 2 && asked.includes((v.textName || '').split(' ').slice(0, 2).join(' '))) return false;
   const season = normWords(s.season || ''), winter = normWords(s.winter || '');
@@ -3732,7 +3732,9 @@ function offSeasonSkip(v, ctx) {
   // 2026-10-25: an outdoor place or tour whose description gives its season ("high-clearance vehicle, July to
   // September" for a Monashee backcountry trail) is not planned outside it unless the request names it.
   // (Sport test 13: a sport place planned as an outdoor stop reads its description alone, and its owner's season wins.)
-  if (month && ['outdoor', 'tour'].includes(v.type) && !(v.ownerSetUp && v.openMonths)) {
+  // Outdoor test 1 (2026-11-23; Rae's campground, "open all year", left out of every October-April plan): an owner's
+  // "open all year" (v.sportYearAll) wins over research's words too.
+  if (month && ['outdoor', 'tour'].includes(v.type) && !(v.ownerSetUp && v.openMonths) && !v.sportYearAll) {
     const desc = v.textSeason != null ? v.textSeason : v.textDesc || '';
     const w = DESC_SEASON_RE.exec(desc);
     if (w && DESC_SEASON_CUE_RE.test(desc.slice(Math.max(0, w.index - 70), w.index + w[0].length + 25))) {
@@ -4739,7 +4741,7 @@ const SKI_REST_DAY_RE = /\b(?:spa|rest|recovery|off|non ski|chill|relaxing|lazy|
 // A camping trip (2026-10-25: "camping weekend near Squamish" had a different campground each morning, then none) has one
 // drive-in campground as its base: set up on day 1 in the late afternoon, back there each night. Boat-in and backcountry
 // sites only when the request asks for them.
-const CAMP_ASKED_RE = /\b(?:camping|camp|campground|campgrounds|campsite|campsites|tenting|rv)\b/;
+const CAMP_ASKED_RE = /\b(?:camping|camp|campground|campgrounds|campsite|campsites|tenting|rv|rvs|trailer|motorhome|motorhomes|camper|campervan)\b/;
 const CAMP_SUB_RE = /\b(?:campground|campsite|campsites|camping)\b/;
 function pickCampBase(facts, ctx) {
   if (!CAMP_ASKED_RE.test(ctx.queryText || '')) return null;
@@ -10852,7 +10854,7 @@ function seasonFit(v, c, season, ctx) {
       if (it.snow) { out.caveats.push(SEASON_CAVEATS.snow(m)); out.flags.snowOff = true; } else if (snowOnly) add(-12, null);
     }
   }
-  if (acts.includes('camping') && season.camping === 'off') {
+  if (acts.includes('camping') && season.camping === 'off' && !v.sportYearAll && !(v.ownerSetUp && v.openMonths && season.date && !seasonClosedOnTripRaw({ ...v, ownerClosures: undefined }, { date: season.date }))) {
     if (it.camping) { out.caveats.push(SEASON_CAVEATS.camping(m)); out.flags.campingOff = true; } else if (acts.every((a) => a === 'camping')) add(-8, null);
   }
   if (v.type === 'golf') {

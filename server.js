@@ -8073,7 +8073,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       price: v.price == null ? null : Number(v.price), address: v.address || null, website: v.website || null,
       ...(cvIds.has(v.id) ? { completeVerified: true } : {}),
       // Sport test 10: a sport or golf place its owner has set up (kinds and own hours) is picked before one nobody has.
-      ...((v.type === 'golf' || v.type === 'sport') && ownerSetUpRank(v) === 0 ? { ownerSetUp: true } : {}),
+      ...((v.type === 'golf' || v.type === 'sport' || (v.type === 'outdoor' && OUTDOOR_SETUP_ON)) && ownerSetUpRank(v) === 0 ? { ownerSetUp: true } : {}),
       lat: v.latitude == null ? null : Number(v.latitude), lng: v.longitude == null ? null : Number(v.longitude),
       // Sport test 4 (2026-11-20; Ryan's "Golf course & driving range" read as a range, a disc golf course with a skate park
       // as its second kind as a skate park): the planner reads a sport or golf listing's category words from its owner's
@@ -8094,7 +8094,7 @@ function buildTripPlannerFacts(preparePlannerKinds = true, onDate = null) {
       ...(dateNightById.has(v.id) ? { dateNightLine: dateNightById.get(v.id) } : {}),
       // Indoor test 2: an indoor place open past 11 PM (on the trip's day, when there is one) is a late-night stop.
       ...(v.type === 'indoor' && !features.open_late && indoorLateClose(weekJsonOn(v, hoursDate), parseLocalDate(onDate) ? onDate : null) != null ? (features.open_late = true, { lateClose: lateCloseText(indoorLateClose(weekJsonOn(v, hoursDate), parseLocalDate(onDate) ? onDate : null)) }) : {}),
-      features, collections: m.collections, activities: [...new Set([...(preparePlannerKinds ? [...m.activities, ...requirementModule.inferPlannerActivities(v)] : m.activities), ...(preparePlannerKinds && requirementModule.inferPlannerKinds(v).includes('skating') ? ['winter'] : []), ...(v.type === 'sport' && /\b(?:bike|pump track|dirt jumps|bmx)\b/i.test(v.cuisine || '') ? ['cycling'] : []), ...(v.type === 'tour' && /\b(?:adventure|adventures|aventure|tree ?top|ropes? course\w*|zip ?lin\w*|bungee|bungy|raft\w*|atv|rzr|via ferrata|snowmobil\w*|heli\w*|flight\w*|floatplane|kayak\w*|canoe\w*|climb\w*|canyoning|paraglid\w*|jet ?boat)/i.test(v.cuisine || '') ? ['adventure'] : []), ...(v.type === 'sport' && /\b(?:adventure parks?|aerial parks?|tree ?top|ropes? courses?|obstacle courses?)\b/i.test(v.cuisine || '') ? ['adventure'] : []), ...(v.type === 'tour' && /\b(?:bear|wildlife|eagle|whale|birding|nature walk|salmon)/i.test(v.cuisine || '') ? ['nature'] : []), ...(/\bski resort\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(/\b(?:skating rink|arena|curling)\b/i.test(v.cuisine || '') ? ['winter'] : []), ...(/\bnordic\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(v.type === 'tour' && /\b(?:kayak\w*|canoe\w*|sup|paddle\w*|rafting|sailing|boat tours?|wing foil|kite\w*|river floats?)/i.test(v.cuisine || '') ? ['water'] : [])])], fdTypes: [...m.fdTypes, ...tripSecondKindTypes(v, plannerType)],
+      features, collections: m.collections, activities: [...new Set([...(preparePlannerKinds ? [...m.activities, ...requirementModule.inferPlannerActivities(v)] : m.activities), ...plannerCampActivity(v), ...(preparePlannerKinds && requirementModule.inferPlannerKinds(v).includes('skating') ? ['winter'] : []), ...(v.type === 'sport' && /\b(?:bike|pump track|dirt jumps|bmx)\b/i.test(v.cuisine || '') ? ['cycling'] : []), ...(v.type === 'tour' && /\b(?:adventure|adventures|aventure|tree ?top|ropes? course\w*|zip ?lin\w*|bungee|bungy|raft\w*|atv|rzr|via ferrata|snowmobil\w*|heli\w*|flight\w*|floatplane|kayak\w*|canoe\w*|climb\w*|canyoning|paraglid\w*|jet ?boat)/i.test(v.cuisine || '') ? ['adventure'] : []), ...(v.type === 'sport' && /\b(?:adventure parks?|aerial parks?|tree ?top|ropes? courses?|obstacle courses?)\b/i.test(v.cuisine || '') ? ['adventure'] : []), ...(v.type === 'tour' && /\b(?:bear|wildlife|eagle|whale|birding|nature walk|salmon)/i.test(v.cuisine || '') ? ['nature'] : []), ...(/\bski resort\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(/\b(?:skating rink|arena|curling)\b/i.test(v.cuisine || '') ? ['winter'] : []), ...(/\bnordic\b/i.test(v.cuisine || '') ? ['skiing', 'winter'] : []), ...(v.type === 'tour' && /\b(?:kayak\w*|canoe\w*|sup|paddle\w*|rafting|sailing|boat tours?|wing foil|kite\w*|river floats?)/i.test(v.cuisine || '') ? ['water'] : [])])], fdTypes: [...m.fdTypes, ...tripSecondKindTypes(v, plannerType)],
       ...(acclaimed.has(v.id) ? { acclaim: acclaimed.get(v.id) } : {}),
       // Hours checked after the place's closure was recorded are its season's hours (2026-10-25: on-mountain dining).
       ...(v.hours_checked_at && seasons.has(v.id) && seasons.get(v.id).checked_at && String(v.hours_checked_at).slice(0, 10) >= String(seasons.get(v.id).checked_at).slice(0, 10) ? { seasonHours: true } : {}),
@@ -14290,6 +14290,15 @@ function seasonOnlyStates(now = new Date()) {
 // Sport test 10 (2026-11-21): 0 for a sport or golf place its owner has set up (the kinds they picked and their own hours),
 // else 1. Search (round 8), the golf and sports hubs and Build My Trip put these first.
 // (A hub's list rows may not carry hours_source: then it is read from the listing.)
+// Outdoor test 1 (2026-11-23; "camping in Osoyoos on Saturday" found no campground where the camping collection wasn't
+// filled in): a campground its owner set up (main kind camp), or one named a campground or RV park, is a camping place.
+function plannerCampActivity(v) {
+  if (!v || v.type !== 'outdoor') return [];
+  try {
+    if (OUTDOOR_SETUP_ON && (venueIndoorInfo(v.id).kinds || [])[0] === 'camp') return ['camping'];
+  } catch (e) { /* no answers */ }
+  return /\b(?:campground|campgrounds|campsites?|rv park|rv resort)\b/i.test(String(v.name || '')) ? ['camping'] : [];
+}
 function ownerSetUpRank(v) {
   try {
     if (!v || !(venueIndoorInfo(v.id).kinds || []).length) return 1;

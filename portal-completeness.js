@@ -403,12 +403,28 @@ const SPORT_WORDS = {
   pyv_groups: { en: 'Groups and events', fr: 'Groupes et événements', whyEn: 'Tournaments, parties, school groups, leagues: from what size should groups book?', whyFr: 'Tournois, fêtes, groupes scolaires, ligues : à partir de quelle taille réserver?' },
 };
 const SPORT_ITEMS = INDOOR_ITEMS.map((i) => (SPORT_WORDS[i.key] ? { ...i, ...SPORT_WORDS[i.key] } : i));
+// Outdoor businesses (2026-11-23; outdoor test 1: a campground got the restaurant checklist, every item a dead end): the
+// indoor items and 100 points, in outdoor words. The kinds are outdoor-kinds.js's (sport-kinds.js OUTDOOR_KIND_ORDER).
+const OUTDOOR_KINDS = ['camp', 'waterrent', 'skihill', 'nature', 'adventurepark', 'waterpark', 'airsport', 'horse', 'farm', 'market', 'outdoorother'];
+const OUTDOOR_WORDS = {
+  indoor_kind: { whyEn: 'Campground, rentals, ski hill, farm, zipline and so on. Pick up to 3.', whyFr: 'Camping, location, station de ski, ferme, tyrolienne, etc. Choisissez-en jusqu’à 3.', icon: '🌲' },
+  visit_length: { whyEn: 'How long most people stay, so trip plans leave enough time.', whyFr: 'Combien de temps la plupart des gens restent, pour que les plans de voyage prévoient assez de temps.' },
+  season: { whyEn: 'Open all year, or only in summer or winter? Say so, so nobody comes when you’re closed.', whyFr: 'Ouvert toute l’année, ou seulement l’été ou l’hiver? Dites-le, pour que personne ne vienne quand c’est fermé.' },
+  photo_main: { whyEn: 'Real photos only, taken by you. Your place, the view, and people having fun.', whyFr: 'De vraies photos seulement, prises par vous. Votre endroit, la vue, et des gens qui s’amusent.' },
+  indoor_price: { whyEn: 'Your main price (like a site a night, a rental or a ticket), or Free. It shows on your card.', whyFr: 'Votre prix principal (comme un emplacement pour une nuit, une location ou un billet), ou Gratuit. Il paraît sur votre fiche.' },
+  indoor_booking: { en: 'Walk in or book ahead', fr: 'Sans réservation ou réserver', whyEn: 'Walk-ins welcome, or book ahead (sites, rentals, tickets).', whyFr: 'Sans réservation, ou réserver à l’avance (emplacements, location, billets).' },
+  booking_link: { en: 'Booking or tickets link', fr: 'Lien de réservation ou de billets', whyEn: 'The page where people book a site, a rental or tickets.', whyFr: 'La page où l’on réserve un emplacement, une location ou des billets.' },
+  menu: { whyEn: 'Sites, passes, rentals and tickets, with their prices. A photo of your price list or a link to your prices page is fine.', whyFr: 'Emplacements, laissez-passer, location et billets, avec leurs prix. Une photo de votre liste de prix ou un lien vers votre page de prix, c’est parfait.' },
+  pyv_known: { whyEn: 'One line, e.g. Lakefront sites and a sandy beach.', whyFr: 'Une ligne, p. ex. Les emplacements au bord du lac et la plage de sable.' },
+  pyv_groups: { en: 'Groups and events', fr: 'Groupes et événements', whyEn: 'Reunions, parties, school groups, private bookings: from what size should groups book?', whyFr: 'Réunions, fêtes, groupes scolaires, réservations privées : à partir de quelle taille réserver?' },
+};
+const OUTDOOR_ITEMS = INDOOR_ITEMS.map((i) => (OUTDOOR_WORDS[i.key] ? { ...i, ...OUTDOOR_WORDS[i.key] } : i));
 // Sport test 3 (2026-11-20; Gord's driving range: "Your main price (like a green fee…)", "Green fees, passes…"): once the
 // owner has picked his kinds, the checklist's words are his main kind's (input.kindWhy: { itemKey: { whyEn, whyFr, … } },
 // built by server.js sportKindWhy from sport-kinds.js; this module stays pure).
 // Distilleries (Dayton, 2026-11-13; SPEC-distilleries.md "Decided"): the brewery items and 100 points, with spirits words
 // (each item's `distillery` words, laid over for a distillery only). "What kind of place" counts as done (Decided 1).
-const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS, winery: WINERY_ITEMS, brewery: BREWERY_ITEMS, distillery: BREWERY_ITEMS, cocktail: COCKTAIL_ITEMS, tour: TOUR_ITEMS, indoor: INDOOR_ITEMS, sport: SPORT_ITEMS, golf: SPORT_ITEMS };
+const ITEMS_BY_TYPE = { restaurant: ITEMS, pub: PUB_ITEMS, cafe: CAFE_ITEMS, winery: WINERY_ITEMS, brewery: BREWERY_ITEMS, distillery: BREWERY_ITEMS, cocktail: COCKTAIL_ITEMS, tour: TOUR_ITEMS, indoor: INDOOR_ITEMS, sport: SPORT_ITEMS, golf: SPORT_ITEMS, outdoor: OUTDOOR_ITEMS };
 const itemsFor = (type) => ITEMS_BY_TYPE[type] || ITEMS;
 // "We don't have one" (2026-11-08): the items a restaurant may genuinely not offer. Never the core of a page (address,
 // phone, hours, photos, menu, average spend, description, storefront spot): those are always worth adding.
@@ -503,6 +519,7 @@ QUICK_FIELD_BY_TYPE.tour = { tour_kind: 'tour_info', tour_length: 'tour_info', t
 QUICK_FIELD_BY_TYPE.indoor = { indoor_kind: 'indoor_info', visit_length: 'indoor_info', indoor_price: 'indoor_price', indoor_booking: 'indoor_info', indoor_ages: 'indoor_info', season: 'indoor_info' };
 QUICK_FIELD_BY_TYPE.sport = { ...QUICK_FIELD_BY_TYPE.indoor };
 QUICK_FIELD_BY_TYPE.golf = { ...QUICK_FIELD_BY_TYPE.indoor };
+QUICK_FIELD_BY_TYPE.outdoor = { ...QUICK_FIELD_BY_TYPE.indoor };
 const quickFieldFor = (type, key) => ((QUICK_FIELD_BY_TYPE[type] || {})[key]) || QUICK_FIELD[key];
 function minutesLeft(missing) {
   const keys = new Set(missing.filter((it) => !it.waiting).map((it) => it.key));
@@ -675,12 +692,12 @@ function doneMap(input, today) {
     // Indoor places (2026-11-19): venue_indoor_info (owner-only, never researched) and the owner's price ('free' and
     // 'donation' are answers). No set hours (shows, classes or by appointment) answers the hours, their check and the season.
     // Sport and golf (2026-11-20): the same answers (their kinds are sport-kinds.js's).
-    ...(i.type === 'indoor' || i.type === 'sport' || i.type === 'golf' ? (() => {
+    ...(i.type === 'indoor' || i.type === 'sport' || i.type === 'golf' || i.type === 'outdoor' ? (() => {
       const t = i.indoorInfo && typeof i.indoorInfo === 'object' ? i.indoorInfo : {};
       const apptOnly = t.visit === 'appointment';
       return {
         ...(apptOnly ? { hours: true, hours_fresh: true } : {}),
-        indoor_kind: Array.isArray(t.kinds) && t.kinds.some((k) => (i.type === 'indoor' ? INDOOR_KINDS : SPORT_KINDS).includes(k)),
+        indoor_kind: Array.isArray(t.kinds) && t.kinds.some((k) => (i.type === 'indoor' ? INDOOR_KINDS : i.type === 'outdoor' ? OUTDOOR_KINDS : SPORT_KINDS).includes(k)),
         visit_length: INDOOR_LENGTHS.includes(t.length),
         season: nonBlank(i.openMonths) || !!i.hasSeasons || t.year === 'all' || apptOnly,
         indoor_price: (typeof i.indoorPrice === 'number' && Number.isFinite(i.indoorPrice) && i.indoorPrice > 0) || i.indoorPrice === 'free' || i.indoorPrice === 'donation',
@@ -760,7 +777,7 @@ function scoreCompleteness(input, opts) {
   const unsure = new Set(((input && input.unsureKeys) || []).filter((k) => k === 'instagram' || k === 'facebook'));
   // Tour test 17 (Whistler, 2026-11-18; Sarah: Instagram set, Facebook blank, held at 97%): for tours, Instagram or Facebook
   // is done; the other one isn't asked for. Tours only (the other types keep both items as they were).
-  if (input && ['tour', 'indoor', 'sport', 'golf'].includes(input.type) && (done.instagram || done.facebook)) { unsure.add('instagram'); unsure.add('facebook'); }
+  if (input && ['tour', 'indoor', 'sport', 'golf', 'outdoor'].includes(input.type) && (done.instagram || done.facebook)) { unsure.add('instagram'); unsure.add('facebook'); }
   const pending = o.pending || new Set();
   const photosWaiting = Math.max(0, Number(input && input.pendingPhotos) || 0);
   const na = {};
@@ -790,7 +807,7 @@ function scoreCompleteness(input, opts) {
     // Distilleries (2026-11-13): spirits words over the brewery ones.
     if (base.distillery && input && input.type === 'distillery') it = { ...it, ...base.distillery };
     // Sport test 3: the owner's main sport kind's words.
-    if (input && (input.type === 'golf' || input.type === 'sport') && input.kindWhy && input.kindWhy[base.key]) it = { ...it, ...input.kindWhy[base.key] };
+    if (input && (input.type === 'golf' || input.type === 'sport' || input.type === 'outdoor') && input.kindWhy && input.kindWhy[base.key]) it = { ...it, ...input.kindWhy[base.key] };
     const ok = done[it.key] || none.has(it.key) || unsure.has(it.key);
     // No hours at all (live check 2026-11-08, 42 restaurants): "Are your hours still right?" has nothing to confirm.
     // It is part of "Add your hours" until there are hours (saving hours from the portal marks them checked too).
@@ -1429,4 +1446,4 @@ const COMPLETENESS_SCRIPT = `
     });
   })();`;
 
-module.exports = { SPORT_ITEMS, SPORT_KINDS, INDOOR_ITEMS, INDOOR_KINDS, INDOOR_LENGTHS, INDOOR_BOOK, INDOOR_AGES, TOUR_ITEMS, TOUR_KINDS, TOUR_LENGTHS, TOUR_BOOK, TOUR_AGES, COCKTAIL_ITEMS, BREWERY_ITEMS, BREWERY_KINDS, BREWERY_FOOD, BREWERY_TO_GO, BREWERY_YEAR, QUICK_FIELD_BY_TYPE, quickFieldFor, WINERY_ITEMS, WINERY_KINDS, WINERY_FOOD, WINERY_VISIT, WINERY_YEAR, OPTIONAL_NONE_KEYS, CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };
+module.exports = { OUTDOOR_ITEMS, OUTDOOR_KINDS, SPORT_ITEMS, SPORT_KINDS, INDOOR_ITEMS, INDOOR_KINDS, INDOOR_LENGTHS, INDOOR_BOOK, INDOOR_AGES, TOUR_ITEMS, TOUR_KINDS, TOUR_LENGTHS, TOUR_BOOK, TOUR_AGES, COCKTAIL_ITEMS, BREWERY_ITEMS, BREWERY_KINDS, BREWERY_FOOD, BREWERY_TO_GO, BREWERY_YEAR, QUICK_FIELD_BY_TYPE, quickFieldFor, WINERY_ITEMS, WINERY_KINDS, WINERY_FOOD, WINERY_VISIT, WINERY_YEAR, OPTIONAL_NONE_KEYS, CAFE_ITEMS, CAFE_KINDS, CAFE_SERVES, CAFE_LAPTOPS, CAFE_SEATS, ALL_NONE_KEYS, PUB_ITEMS, itemsFor, noneKeysFor, PUB_KITCHEN_MODES, PUB_MINORS_POLICIES, PUB_GAME_KEYS, badgeState, badgeChipHtml, BADGE_LABEL, BADGE_CSS, QUICK_FIELD, GOT_TEXT, sameAddress, MENU_SAME_SITE_COPY, LATER_SHOWN, HAPPY_HOUR_BADGE_COPY, CEILING_KEYS, ITEMS, GROUPS, NONE_KEYS, NONE_MAX, SECONDS, minutesLeft, hoursLine, QUICK_SECONDS, QUICK_CAP_SECONDS, isQuick, doneMap, HOURS_FRESH_DAYS, DESCRIPTION_MIN, PHOTOS_MIN, scoreCompleteness, renderCompleteness, COMPLETENESS_CSS, COMPLETENESS_SCRIPT };

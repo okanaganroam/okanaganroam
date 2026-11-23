@@ -2011,6 +2011,9 @@
   function indoorDayKinds(){ if (!C.indoor) return false; var st = typeof S !== 'undefined' && S.tour, ks = (st && st.kinds && st.kinds.length ? st.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || []; return ks.length > 0 && ks.every(function(k){ return !!((T0.kindGroups || {})[k] || [])[3]; }); }
   // Indoor test 6 (2026-11-19; Priya): a classes place's hours screens say, in one line, that evening classes go in Good to
   // know (she stretched her open hours to 9 PM for them).
+  // Outdoor test 1 (2026-11-23; Rae's campground read "Closed" every evening after the office shut): a campground is open
+  // around the clock. One tap sets every day to 24 hours; the office hours go in Good to know (T.hours24Hint says so).
+  function hours24Btn(){ return C.indoor && T.hours24Btn ? '<div class="su-stack" id="suHours24">' + big('🌙', T.hours24Btn, T.hours24Hint || '', true, 'hours24') + '</div>' : ''; }
   function classNightsHint(){ return C.indoor && T.classNightsHint ? '<p class="su-hint" id="suClassNightsHint">' + h(T.classNightsHint) + '</p>' : ''; }
   function lateBtns(d, j, y){
     // Café test 1 (Whistler, 2026-11-15): no "Open after midnight?" row on a café's day card.
@@ -2609,7 +2612,7 @@
       // Winery test 4 (2026-11-12): a winery says "We don't have set hours. Visits are by appointment" here (and on the
       // day list); once it has, the screen says so and "Yes, that's right" keeps it.
       var anyOpen = S.week && DAYS.some(function(d){ return S.week[d]; }), noneNow = APPT && AI.visit === 'appointment' && !anyOpen && !!CUR.hours;
-      x = doneLine('hours') + q(anyOpen || noneNow || !T.hoursQNone ? T.hoursQ : T.hoursQNone) + (anyOpen ? classNightsHint() : '') + msgs() + (anyOpen ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit')
+      x = doneLine('hours') + q(anyOpen || noneNow || !T.hoursQNone ? T.hoursQ : T.hoursQNone) + (anyOpen ? classNightsHint() : '') + (anyOpen ? '' : hours24Btn()) + msgs() + (anyOpen ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit')
         // Distillery test 2 (Whistler, 2026-11-16): a stretch of other hours is changed from here in one tap (« Modifier mes
         // heures du 15 juin au 7 sept. »); it took four screens (the week, Next, the year question, then this button).
         + storedSeas().map(function(st){ return big('✎', fill(T.seaChange, st), '', true, 'yearSeasonEdit:' + st.i); }).join('') + noSetBtn() + '</div>'
@@ -2715,7 +2718,7 @@
           + (seaOtherAB && T.seaCopy ? '<div class="su-samerow" style="margin:0 0 10px"><button type="button" class="su-toggle" id="suSeaCopy" data-act="seaCopy">' + h(fill(T.seaCopy, seaOtherAB)) + '</button></div>' : '')
           // Café test 4 (2026-11-11): "Open after midnight?" is said once, beside each day's Midnight / 1 AM / 2 AM buttons
           // (it was also a paragraph at the top).
-          : q(T.hoursEditQ, T.hoursEditLead)) + (TOUR && T.departHint ? '<p class="su-hint" id="suDepartHint">' + h(T.departHint) + '</p>' : '') + (!seas ? classNightsHint() : '') + (!seas && S.weekBack && T.hoursBack ? '<p class="su-sent" id="suHoursBack">' + h(T.hoursBack) + '</p>' : '') + msgs() + '<div class="su-hdays">' + DAYS.map(function(d, i){
+          : q(T.hoursEditQ, T.hoursEditLead)) + (TOUR && T.departHint ? '<p class="su-hint" id="suDepartHint">' + h(T.departHint) + '</p>' : '') + (!seas ? classNightsHint() + hours24Btn() : '') + (!seas && S.weekBack && T.hoursBack ? '<p class="su-sent" id="suHoursBack">' + h(T.hoursBack) + '</p>' : '') + msgs() + '<div class="su-hdays">' + DAYS.map(function(d, i){
         var w = wk[d], prev = i > 0 ? wk[DAYS[i - 1]] : null, mon = i > 1 ? wk.mon : null;
         var sameH = function(a, b){ return JSON.stringify(a || null) === JSON.stringify(b || null); }, sameP = !!prev && !sameH(w, prev), sameM = !!mon && !sameH(w, mon) && !(prev && sameH(prev, mon));
         if (!hop[d]) return '<div class="su-day su-hrow" id="suRow' + d + '"><div class="su-hsum"><b>' + h(dayName(d)) + '</b><span>' + (w ? h(w.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ')) : h(T.closed)) + '</span>'
@@ -2914,8 +2917,10 @@
         + '<div id="suKindsAll"' + (iFold ? ' hidden' : '') + '><div class="su-chips su-kinds" role="group" aria-labelledby="suQ" id="suIndoorKinds">' + iTop.map(ichip).join('') + '</div>'
         + (iRest.length ? '<details class="su-kinds" id="suKindsMore"' + (S.tourMoreOpen || iRest.some(function(o){ return S.tour.kinds.indexOf(o.k) >= 0; }) ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + iRest.map(ichip).join('') + '</div></details>' : '')
         + (S.tour.kinds.length ? '<p class="su-sent" id="suTourPicked">' + h(fill(T.picked, { list: S.tour.kinds.map(tourKindName).join(', ') })) + '</p>' : '') + '</div>'
-        + '<h2 class="su-h2" id="suLenQ">' + h(T.tlengthQ) + '</h2>' + (S.tour.lengthGuessed && S.tour.length && T.guessCheck ? '<p class="su-sent su-research" id="suLengthGuess">' + h(T.guessCheck) + '</p>' : '')
-        + tchips('length', ['1h', '1-2h', '2-3h', 'half'], T.tlengths, T.tlengthQ, 'suLenQ')
+        // Outdoor test 1 (2026-11-23; Rae: "up to 1 hour… overnight" for a campground): a kind whose stay is always long
+        // (T.lengthAuto, a campground) isn't asked; Save stores that length.
+        + (T.lengthAuto ? '' : '<h2 class="su-h2" id="suLenQ">' + h(T.tlengthQ) + '</h2>' + (S.tour.lengthGuessed && S.tour.length && T.guessCheck ? '<p class="su-sent su-research" id="suLengthGuess">' + h(T.guessCheck) + '</p>' : '')
+        + tchips('length', ['1h', '1-2h', '2-3h', 'half'], T.tlengths, T.tlengthQ, 'suLenQ'))
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'indoorSave') + '</div>' + skip('indoor');
     } else if (s === 'price' && INDOOR) {
       // Indoor places (2026-11-19): the adult price in one box, or one tap for Free entry / By donation.
@@ -3804,8 +3809,8 @@
     S.seaList.splice(si + 1, 0, o2); S.seaTouched = true;
     return true;
   }
-  function hoursSave(){
-    readTimes();
+  function hoursSave(noRead){
+    if (!noRead) readTimes();
     if (!windowsOk(S.week)) { S.nudge = T.needOpenDay; return render(); }
     var week = {}; DAYS.forEach(function(d){ week[d] = S.week[d] || []; });
     var ch = { hours: week, hours_checked: true };
@@ -4611,6 +4616,7 @@
       return saveAll('offer', [{ pub_info: { minors: mv } }], null, null, function(){ S.pubInfo.minors = mv; });
     }
     if (k === 'hoursSave') return hoursSave();
+    if (k === 'hours24') { DAYS.forEach(function(d){ S.week[d] = [['00:00', '24:00']]; }); return hoursSave(true); }
     // "Until close" on a happy hour (pub test 9): on or off; the end-time box comes back when it is off.
     if (k === 'hhClose') { readEntries(); var ec = S.happy[+v]; if (!ec) return; ec.close = !ec.close; if (S.nudge && /close|ferm/i.test(S.nudge)) S.nudge = ''; render(); return; }
     // The same for a weekly special (its end is stored as 'close', the way it always was).
@@ -5043,7 +5049,9 @@
     // ---------- Tours (2026-11-16) ----------
     // ---------- Indoor places (2026-11-19) ----------
     if (k === 'indoorSave') {
-      var ik0 = S.tour.kinds.slice(), il0 = S.tour.length;
+      var ik0 = S.tour.kinds.slice();
+      if (ik0.length) { var Tk = INDOOR && T0.kindText ? T0.kindText[ik0[0]] : null; if (Tk && Tk.lengthAuto) S.tour.length = Tk.lengthAuto; }
+      var il0 = S.tour.length;
       if (!ik0.length) { S.nudge = T.tkindNeed; return render(); }
       if (!il0) { S.nudge = T.tlengthNeed; return render(); }
       var ii0 = {};
