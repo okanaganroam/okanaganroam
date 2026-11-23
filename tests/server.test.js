@@ -30805,6 +30805,19 @@ test('Round 8 /search pages: "pluie" leaves for Indoor, a typo is named, and the
   for (const english of ['See this on its own page', 'Plan it with Build My Trip']) assert.ok(!frTypo.includes(english), english);
 }))));
 
+test('Search name typos (2026-11-22): "barriqure" finds Barrique & Java, and the page says how it read it', () => withDiscoveryFlag('on', () => r8Fixtures([
+  { name: 'Barriqure Fixture Java', region: 'kelowna', type: 'cafe', description: 'Coffee and pastries.' },
+].map((v) => ({ ...v, name: 'Barrique Fixture Java' })), () => withDiscoveryServer(async (base) => {
+  assert.deepEqual(app.searchNameTypoFix('barriqure').corrections, [{ from: 'barriqure', to: 'barrique' }]);
+  assert.equal(app.searchNameTypoFix('barrique').corrections.length, 0, 'the right spelling is never touched');
+  assert.equal(app.searchNameTypoFix('wineries').corrections.length, 0, 'a real word is never touched');
+  assert.equal(app.searchNameTypoFix('carrique').corrections.length, 0, 'the first letter must match');
+  const page = await (await fetch(`${base}/search?q=barriqure`)).text();
+  assert.match(page, /Barrique Fixture Java/);
+  assert.match(page, /We read “barriqure” as “barrique”/);
+  assert.ok(!page.includes('We couldn’t find any places'), 'the place itself, not a "Did you mean"');
+}))));
+
 test('Round 8 help bot: words the same in both languages answer in the page\'s language, and the new keywords', () => {
   const frEdit = ohbMatcher('edit', { lang: 'fr' }), enEdit = ohbMatcher('edit'), frAccount = ohbMatcher('account', { lang: 'fr' });
   for (const [q, id] of [['photos', 'photo-add'], ['photo', 'photo-add'], ['menu', 'menu-add']]) {
