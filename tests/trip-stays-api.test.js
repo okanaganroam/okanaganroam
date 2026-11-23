@@ -72,7 +72,7 @@ test('flag on: whereToStay with the trip dates, party and chosen stay; the dates
     const p = JSON.parse(r.text);
     const w = p.whereToStay;
     assert.ok(w, 'a base for a 3-night family trip');
-    assert.deepEqual(w.trip, { arrive: '2027-07-09', leave: '2027-07-12', nights: 3, adults: 2, kids: 2, dog: false, datesGiven: true });
+    assert.deepEqual(w.trip, { arrive: '2027-07-09', leave: '2027-07-12', nights: 3, adults: 2, kids: 2, rooms: 1, roomsAssumed: true, dog: false, datesGiven: true });
     assert.equal(w.stayId, w.pick.id);
     assert.ok(made.includes(w.pick.id));
     const shown = [w.pick, ...w.alternatives].map((s) => s.name);

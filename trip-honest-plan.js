@@ -452,6 +452,8 @@ const GENERIC_NAME_WORDS = new Set(['hotel', 'hotels', 'motel', 'inn', 'inns', '
 //   t=615,690,,1080    each stop's start time (minutes after midnight), in the stops' order
 //   stay=1970          the place to stay (a listing id)      nights=2
 //   ad=6  aa=1  kids=2 the party as given; aa=1 marks an assumed number of adults
+//   ka=6,9             the children's ages as typed (one per child; 2026-11-22)
+//   rm=3  ra=1         the rooms the stay links carry; ra=1 marks our assumption (2026-11-22). No rm: as before
 //   sug=event:213      date-dependent suggestions (never stops)
 //   asks=count:winery:2,kind:easy_walk,gluten_free,stay:pool,live_music,nonalcoholic   what the request asked for;
 //                      the page works the evidence out again from the listings as they are now
@@ -467,6 +469,9 @@ function parseShareContext(query) {
   const ad = int(q.ad, 1, 16); if (ad) out.adults = ad;
   if (q.aa === '1' && ad) out.adultsAssumed = true;
   const kids = int(q.kids, 1, 12); if (kids) out.kids = kids;
+  if (kids && typeof q.ka === 'string' && /^\d{1,2}(?:,\d{1,2}){0,11}$/.test(q.ka)) { const ages = q.ka.split(',').map(Number); if (ages.length === kids && ages.every((a) => a >= 0 && a <= 17)) out.kidAges = ages; }
+  // Rooms only with an adult count, and never more rooms than adults (each room needs one).
+  const rm = int(q.rm, 1, 8); if (rm && ad) { out.rooms = Math.min(rm, ad); if (q.ra === '1') out.roomsAssumed = true; }
   if (typeof q.sug === 'string' && q.sug) { const g = q.sug.split(',').filter((r) => /^event:[1-9][0-9]*$/.test(r)).slice(0, 3); if (g.length) out.suggestions = g; }
   if (typeof q.asks === 'string' && q.asks) { const k = [...new Set(q.asks.split(',').filter((a) => ASK_RE.test(a)))].slice(0, 12); if (k.length) out.asks = k; }
   return Object.keys(out).length ? out : null;
@@ -482,6 +487,9 @@ function shareContextQuery(c) {
   if (c.adults) p.push(`ad=${c.adults}`);
   if (c.adultsAssumed) p.push('aa=1');
   if (c.kids) p.push(`kids=${c.kids}`);
+  if (c.kidAges) p.push(`ka=${c.kidAges.join(',')}`);
+  if (c.rooms) p.push(`rm=${c.rooms}`);
+  if (c.rooms && c.roomsAssumed) p.push('ra=1');
   if (c.suggestions && c.suggestions.length) p.push(`sug=${c.suggestions.join(',')}`);
   if (c.asks && c.asks.length) p.push(`asks=${c.asks.join(',')}`);
   return p.join('&');

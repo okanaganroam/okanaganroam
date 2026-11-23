@@ -8527,6 +8527,79 @@ function tripChatAdultsTurn(op, { v, plan, req, stops, lang, staysOn, runCore })
   } catch (e) { /* the party still changes */ }
   return out;
 }
+// Rooms in the chat (2026-11-22). The party and the rooms as the plan has them now: the Dates and guests fields the
+// page sent (stay.adults, stay.kids, stay.rooms), else the request's own words. -> { adults, kids, rooms, assumed } or null.
+function tripChatRoomsNow(v) {
+  const st = (v.args && v.args.stay) || {};
+  let adults = Number.isInteger(st.adults) ? st.adults : null, kids = Number.isInteger(st.kids) ? st.kids : null;
+  try { const p = tripPlannerModule().requestParty(String(v.args.text || '')); if (adults === null && p.adults) adults = Math.min(16, p.adults); if (kids === null && p.kids) kids = p.kids; } catch (e) { /* as given */ }
+  if (adults === null && kids > 0) adults = 2;
+  let given = Number.isInteger(st.rooms) ? st.rooms : null;
+  if (given === null) { const said = tripStays.roomsInText(String(v.args.text || '')); if (said && said.rooms) given = said.rooms; else if (said && said.each && adults) given = Math.min(tripStays.MAX_ROOMS, adults); }
+  const r = tripStays.tripRooms(adults, given);
+  return r.rooms ? { adults, kids: kids || 0, rooms: r.rooms, assumed: !!r.roomsAssumed } : null;
+}
+const TRIP_CHAT_ROOMS_T = {
+  en: {
+    set: 'Set to {n} rooms. The stay links are updated; rooms and how many each sleeps are confirmed on the booking site.',
+    set1: 'Set to 1 room. The stay links are updated; whether one room sleeps everyone is confirmed on the booking site.',
+    capped: 'Set to {n} rooms, one per adult. The stay links are updated; rooms and how many each sleeps are confirmed on the booking site.',
+    noParty: 'How many adults are coming? Tell me (“we are 6 adults”) and I’ll set the rooms.',
+    noStay: 'There is no place to stay on this plan yet, so there are no rooms to set.',
+    assumed: 'I assumed {n} rooms for {a} adults: one room for every two adults. Nobody chose that, so tell me the number you want (“make it 2 rooms”) or tap it by the stay.',
+    assumed1: 'I assumed 1 room for {who}. Tell me if you want more (“make it 2 rooms”).',
+    picked: 'The stay links are set for {n} for {a}, as you asked. The booking site confirms the rooms and how many each sleeps.',
+    unknown: 'I have no number of adults yet, so the stay links carry no rooms. Tell me who is coming (“we are 6 adults”).',
+  },
+  fr: {
+    set: 'C’est noté : {n} chambres. Les liens d’hébergement sont à jour; les chambres et leur capacité sont confirmées sur le site de réservation.',
+    set1: 'C’est noté : 1 chambre. Les liens d’hébergement sont à jour; le site de réservation confirme si une chambre suffit pour tout le monde.',
+    capped: 'C’est noté : {n} chambres, une par adulte. Les liens d’hébergement sont à jour; les chambres et leur capacité sont confirmées sur le site de réservation.',
+    noParty: 'Combien d’adultes viennent? Dites-le-moi (« nous sommes 6 adultes ») et je règle les chambres.',
+    noStay: 'Ce plan n’a pas encore d’hébergement : aucune chambre à régler.',
+    assumed: 'J’ai supposé {n} chambres pour {a} adultes : une chambre pour deux adultes. Personne ne l’a choisi : dites-moi le nombre voulu (« mets 2 chambres ») ou touchez-le près de l’hébergement.',
+    assumed1: 'J’ai supposé 1 chambre pour {who}. Dites-moi s’il en faut plus (« mets 2 chambres »).',
+    picked: 'Les liens d’hébergement sont réglés pour {n} pour {a}, comme demandé. Le site de réservation confirme les chambres et leur capacité.',
+    unknown: 'Je n’ai pas encore le nombre d’adultes : les liens d’hébergement n’indiquent aucune chambre. Dites-moi qui vient (« nous sommes 6 adultes »).',
+  },
+};
+// "how many rooms did you assume?": the number the links carry and whether anyone chose it. Never changes the plan.
+function tripChatRoomsAnswer(v, lang) {
+  const fr = lang === 'fr', T = TRIP_CHAT_ROOMS_T[fr ? 'fr' : 'en'];
+  const now = tripChatRoomsNow(v);
+  if (!now) return { reply: T.unknown };
+  const ad = fr ? `${now.adults} adulte${now.adults > 1 ? 's' : ''}` : `${now.adults} adult${now.adults > 1 ? 's' : ''}`;
+  const kd = now.kids ? (fr ? ` et ${now.kids} enfant${now.kids > 1 ? 's' : ''}` : ` and ${now.kids} kid${now.kids > 1 ? 's' : ''}`) : '';
+  const rm = fr ? `${now.rooms} chambre${now.rooms > 1 ? 's' : ''}` : `${now.rooms} room${now.rooms > 1 ? 's' : ''}`;
+  if (!now.assumed) return { reply: tripChat.fill(T.picked, { n: rm, a: ad + kd }) };
+  return { reply: now.rooms === 1 ? tripChat.fill(T.assumed1, { who: ad + kd }) : tripChat.fill(T.assumed, { n: now.rooms, a: now.adults }) };
+}
+// "make it 3 rooms", "a room each", "we only need one room": the rooms, and the stay part again so its links carry them.
+function tripChatRoomsTurn(op, { v, plan, req, stops, lang, staysOn, runCore }) {
+  const T = TRIP_CHAT_ROOMS_T[lang === 'fr' ? 'fr' : 'en'];
+  if (!staysOn || !(v.stayId || (plan && plan.whereToStay))) return { reply: T.noStay };
+  const now = tripChatRoomsNow(v);
+  if (!now) return { reply: T.noParty };
+  const max = Math.min(tripStays.MAX_ROOMS, now.adults);
+  const want = op.each ? max : op.n;
+  const n = Math.max(1, Math.min(want, max));
+  const out = { party: { rooms: n }, reply: n === 1 ? T.set1 : tripChat.fill(n < want || op.each ? T.capped : T.set, { n }) };
+  try {
+    const stayIn = { ...(v.args.stay || {}), rooms: n };
+    const base = req ? { ...v.args, text: req.text, seed: req.seed, overrides: Object.keys(req.overrides || {}).length ? req.overrides : null, excludeVenueIds: req.excludeVenueIds, avoidVenueIds: req.avoidVenueIds, pinned: req.pinned }
+      : { ...v.args, pinned: Object.fromEntries(stops.filter((s) => /^\d-/.test(s.key) && !v.removed.includes(s.key)).map((s) => [s.key, s.id])) };
+    if (base.pinned && !Object.keys(base.pinned).length) base.pinned = null;
+    const core = plan || runCore({ ...base, stay: stayIn });
+    if (!core) return out;
+    if (!plan) tripChatOnScreenOnly(core, stops);
+    const c = JSON.parse(JSON.stringify(core)); delete c.whereToStay; delete c.v4Booking; delete c.gettingHere;
+    // The stay on screen stays (only its rooms change).
+    const keep = tripChatKeepStayId; tripChatKeepStayId = v.stayId || null;
+    let p; try { p = withTripStays(c, stayIn, new Date(), base.text, true, tripStayCandidates()); } finally { tripChatKeepStayId = keep; }
+    if (p && p.whereToStay && p.whereToStay.pick) out.stayBlock = tripChatStayBlock(p);
+  } catch (e) { /* the rooms still change on the page */ }
+  return out;
+}
 // Whether the visitor's own request asked for that kind of place ("a weekend with a spa"): its words are in the text.
 function tripChatAsked(kind, text) {
   if (!kind || !text) return false;
@@ -8565,8 +8638,12 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // A question about the plan ("why did you say…", "what does the warning mean?") is answered and NEVER changes the
   // plan, whatever the rules or the AI made of it: only its ask ops are kept, and the response is stripped below.
   const explainOnly = !v.chip && tripChat.explain.isExplainQuestion(tripChat.fold(v.message).replace(/\s+/g, ' ').trim());
+  // Rooms (2026-11-22): a short message about the rooms and nothing else ("make it 3 rooms", "how many rooms did you
+  // assume?") is read by fixed rules and never waits for the AI.
+  const roomsMsg = !v.chip && !offered ? tripStays.roomsChat(v.message) : null;
   if (v.chip) { ops = tripChat.chipOps(v.chip); source = 'chip'; }
   else if (offered) ops = offered;
+  else if (roomsMsg) ops = [roomsMsg.ask ? { o: 'ask', value: 'q_rooms', stops: [] } : { o: 'party', value: 'rooms', n: roomsMsg.rooms || null, each: !!roomsMsg.each, stops: [], ages: [] }];
   else {
     // The word rules first (instant), then the AI (live eval 2026-11-22: p50 1.1 s, some 3 s timeouts). When the rules
     // read the message confidently, the AI gets a short grace (TRIP_CHAT_GRACE_MS, default 1500 ms) and the rules answer
@@ -8636,7 +8713,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // The plan before its "where to stay" part (one planner run; the stay turn then works out the stay for each preference).
   const runCore = tripChatSafeRun(timed((a) => tripPlanBeforeStays(planValue(a), tripPlanDecorated)));
   // The place to stay and getting here (2026-11-22, agent round) are answered here; every other op goes to the planner.
-  const isExtra = (o) => o.o === 'stay' || o.o === 'transport' || o.o === 'avoid' || o.o === 'ask' || o.o === 'party_some' || (o.o === 'party' && o.value === 'adults');
+  const isExtra = (o) => o.o === 'stay' || o.o === 'transport' || o.o === 'avoid' || o.o === 'ask' || o.o === 'party_some' || (o.o === 'party' && (o.value === 'adults' || o.value === 'rooms'));
   // One of the party does not drink: a request that ruled alcohol out for the whole group is rewritten so that it is
   // that person's (the planner then reads partySome); a request that said nothing of it gains the line. The stops are
   // never re-planned for this: only what the same message asks for changes.
@@ -8702,6 +8779,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
       : op.o === 'avoid' ? tripChatAvoidTurn(op, { v, req, lang })
         : op.o === 'party_some' ? tripChatPartySomeTurn({ stops: plan ? tripChatStops(tripChat.planStops(plan).map((s) => ({ key: s.key, id: s.id }))) : stops, lang, rewrote: someRewrote, text: someText, alone: !planOps.length, changed: !!plan })
         : op.o === 'ask' ? tripChatAskTurn(op, { v, stops, lang, runCore, planEvents })
+          : op.o === 'party' && op.value === 'rooms' ? tripChatRoomsTurn(op, { v, plan, req, stops, lang, staysOn, runCore })
           : op.o === 'party' ? tripChatAdultsTurn(op, { v, plan, req, stops, lang, staysOn, runCore })
             : tripChatTransportTurn(op, { stops, lang, stayTown: v.stayTown, dayDates: v.dayDates });
     if (r.stayForce !== undefined) { stayForce = r.stayForce; stayArrive = r.stayArrive || null; }
@@ -8982,6 +9060,7 @@ function tripChatHonestTurn(op, { v, stops, lang, runCore, planEvents }) {
 function tripChatAskTurn(op, { v, stops, lang, runCore, planEvents }) {
   const L = lang === 'fr' ? 'fr' : 'en';
   const T = tripChat.T[L];
+  if (op.value === 'q_rooms') return tripChatRoomsAnswer(v, L);
   if (['q_evidence', 'q_warning', 'q_allergy', 'q_why_event', 'q_why_count'].includes(op.value)) return tripChatHonestTurn(op, { v, stops, lang: L, runCore, planEvents });
   if (['q_why_not', 'q_dry', 'q_changed', 'q_couldnt'].includes(op.value)) return tripChatExplainTurn(op, { v, stops, lang: L, runCore });
   const s = (op.stops || [])[0];
@@ -9183,6 +9262,13 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
         if (stayIn.adults === undefined && party.adults) stayIn.adults = Math.min(16, party.adults);
         if (stayIn.kids === undefined && party.kids) stayIn.kids = party.kids;
       } catch (e) { /* the party stays as given */ }
+      // Rooms (2026-11-22): "3 rooms", "a room each", "we'll share a room" in the request, where the visitor has not
+      // picked a number; otherwise whereToStay labels its own assumption (never silently one room for a group).
+      if (stayIn.rooms === undefined) {
+        const said = tripStays.roomsInText(String(text || ''));
+        if (said && said.rooms) stayIn.rooms = said.rooms;
+        else if (said && said.each && Number.isInteger(stayIn.adults)) stayIn.rooms = Math.min(tripStays.MAX_ROOMS, stayIn.adults);
+      }
       const asked = tripChat.stayTextPref(words);
       if (asked && !stayIn.pref) stayIn.pref = asked;
     }
@@ -54218,7 +54304,9 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
     try {
       const cand = tripStayCandidates().find((x) => x.id === c.stayId);
       if (cand) {
-        const trip = { arrive: c.start || null, leave: c.start && nights ? addLocalDays(c.start, nights) : null, nights, adults: c.adults || null, kids: c.kids || null, dog: false, datesGiven: !!(c.start && nights) };
+        const trip = { arrive: c.start || null, leave: c.start && nights ? addLocalDays(c.start, nights) : null, nights, adults: c.adults || null, kids: c.kids || null, ...(c.kidAges ? { kidAges: c.kidAges } : {}), dog: false, datesGiven: !!(c.start && nights),
+          // Rooms (2026-11-22): the link's own rm / ra; a link from before carries none and opens as it always did.
+          ...(c.rooms ? { rooms: c.rooms } : { roomsLegacy: true }) };
         const links = stayBookingLinks.stayBookingLinks(cand, trip.datesGiven ? trip : { ...trip, arrive: null, leave: null }, { regionLabel: cand.regionLabel }).filter((l) => l && tripBookingLinkBelongs('stay', cand.id, l.url));
         const has = tripStays.STAY_AMENITIES.filter((a) => tripStays.stayHas(cand, a));
         const m = Number(String(c.start || todayLocal(now)).slice(5, 7));
@@ -54284,12 +54372,22 @@ function tripShareContextHtml(ctx, lang = 'en') {
   if (ctx.adults) who.push(fr ? `${ctx.adults} adulte${ctx.adults > 1 ? 's' : ''}${ctx.adultsAssumed ? ' (supposé)' : ''}` : `${ctx.adults} adult${ctx.adults > 1 ? 's' : ''}${ctx.adultsAssumed ? ' (assumed)' : ''}`);
   if (ctx.kids) who.push(fr ? `${ctx.kids} enfant${ctx.kids > 1 ? 's' : ''}` : `${ctx.kids} kid${ctx.kids > 1 ? 's' : ''}`);
   const when = ctx.start ? new Date(`${ctx.start}T12:00:00Z`).toLocaleDateString(fr ? 'fr-CA' : 'en-CA', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }) : L('Dates not set', 'Dates à choisir');
-  const facts = [who.join(', ') || L('Group size not given', 'Taille du groupe non précisée'), ctx.start ? L(`From ${when}`, `À partir du ${when}`) : when].join(' · ');
+  // "6 adults · 3 rooms (assumed) · Dates not set": the rooms as the stay line says them (said when it matters, when
+  // picked, or when more than one).
+  const roomsShown = ctx.rooms && !(ctx.roomsAssumed && ctx.rooms === 1 && !stayBookingLinks.stayRoomsMatter(ctx.adults, ctx.kids, ctx.rooms));
+  const roomsLabel = roomsShown ? `${ctx.rooms} ${fr ? (ctx.rooms > 1 ? 'chambres' : 'chambre') : (ctx.rooms > 1 ? 'rooms' : 'room')}${ctx.roomsAssumed ? L(' (assumed)', ' (supposé)') : ''}` : '';
+  const roomsNote = !ctx.rooms || !ctx.stay || !ctx.stay.links.length ? '' : [
+    ctx.rooms > 1 && ctx.stay.links.some((l) => ['own', 'search'].includes(l.key)) ? L(`Hotel’s own site: enter ${ctx.rooms} rooms there.`, `Site de l’hôtel : indiquez ${ctx.rooms} chambres sur place.`) : '',
+    !ctx.start && ctx.stay.links.some((l) => l.key === 'expedia') && (ctx.adults || 0) + (ctx.kids || 0) !== 2 ? L('Expedia shows your guests and rooms only once dates are picked: enter them there.', 'Expedia n’affiche vos voyageurs et vos chambres qu’une fois les dates choisies : entrez-les sur place.') : '',
+    (ctx.adults || 0) + (ctx.kids || 0) >= 3 ? L('Rooms and how many each sleeps are confirmed on the booking site.', 'Les chambres et leur capacité sont confirmées sur le site de réservation.') : '',
+  ].filter(Boolean).join(' ');
+  const facts = [who.join(', ') || L('Group size not given', 'Taille du groupe non précisée'), ...(roomsLabel ? [roomsLabel] : []), ctx.start ? L(`From ${when}`, `À partir du ${when}`) : when].join(' · ');
   let html = `<div class="mt-ctx" id="mtContext"><p class="mt-ctx-copy"><strong>${L('A copy of this plan.', 'Une copie de ce plan.')}</strong> ${L('It can’t be edited here and it doesn’t update if the original changes. Nothing in it is booked.', 'Elle ne se modifie pas ici et ne suit pas les changements de l’original. Rien n’y est réservé.')}</p><p class="mt-ctx-facts" data-mt-facts>${escapeHtml(facts)}</p>`;
   if (ctx.stay) {
     const st = ctx.stay;
     html += `<div class="mt-ctx-stay" data-mt-stay="${st.id}">${st.photo ? `<img src="${escapeHtml(st.photo)}" alt="" loading="lazy" width="96" height="96">` : ''}<div><p class="mt-ctx-k">${escapeHtml([L('Where to stay', 'Où dormir'), st.kind, st.regionLabel].filter(Boolean).join(' · '))}</p><p class="mt-ctx-name">${st.url ? `<a href="${escapeHtml(st.url)}">${escapeHtml(st.name)}</a>` : escapeHtml(st.name)}</p>`
       + (st.links.length ? `<p class="mt-ctx-links">${st.links.map((l) => `<a class="mt-btn" href="${escapeHtml(l.url)}" target="_blank" rel="${escapeHtml(l.rel)}" data-track="stay_click" data-stay-id="${st.id}" data-link="${escapeHtml(l.key || '')}"${l.affiliate ? ' data-affiliate="1"' : ''}>${escapeHtml(l.label)} <span aria-hidden="true">↗</span></a>${l.affiliate ? `<small>${L('We may earn a commission', 'Nous pouvons toucher une commission')}</small>` : ''}`).join('')}</p>` : '')
+      + (roomsNote ? `<p class="mt-ctx-note" data-mt-rooms-note>${escapeHtml(roomsNote)}</p>` : '')
       + (!ctx.start ? `<p class="mt-ctx-note">${L('No dates in these links: pick them on the booking site.', 'Aucune date dans ces liens : choisissez-les sur le site de réservation.')}</p>` : '') + '</div></div>';
   }
   if (ctx.lines && ctx.lines.length) html += `<ul class="mt-ctx-lines">${ctx.lines.map((l) => `<li data-ev-status="${escapeHtml(l.status)}">${escapeHtml(l.text)}</li>`).join('')}</ul>`;

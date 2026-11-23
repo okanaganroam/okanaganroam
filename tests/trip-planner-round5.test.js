@@ -60,7 +60,7 @@ test('4. party size: kids alone are 2 adults plus the kids; the stay links follo
   const e = tb.tripEstimate({ days: [{ day: 1, stops: [{ venue: { id: 1, name: 'Bistro', type: 'restaurant', price: 2 } }] }] }, null, { adults: 2, adultsAssumed: true, kids: 2 });
   assert.deepEqual([e.people, e.peopleAssumed, e.kids], [4, true, 2]);
   assert.ok(V3.includes("'Counted for 2 adults and ' + e.kids"));
-  assert.ok(PAGE.includes('function v4PartyUrl(raw)') && PAGE.includes("q.set('group_adults', String(ad))") && PAGE.includes("q.set('rm1', 'a' + ad + ages)"));
+  assert.ok(PAGE.includes('function v4PartyUrl(raw)') && PAGE.includes("q.set('group_adults', String(ad))") && PAGE.includes("q.set('rm' + (i + 1), 'a' + r.adults + r.ages.map("));
 });
 
 test('5. meal pacing: breakfast and lunch start 2.5 hours apart, else the café is a coffee stop', () => {

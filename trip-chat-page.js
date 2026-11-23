@@ -206,11 +206,12 @@ function chatClientSrc(d) {
     if ((chat.tourStops || []).length) body.tourStops = chat.tourStops;
     return body;
   }
-  function chatSnapshot(){ return JSON.stringify({ last: state.last, lastReq: state.lastReq, text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude, removed: state.removed, gone: v4.gone, stayPref: chat.stayPref, noStay: chat.noStay, transport: chat.transport, goneEvents: chat.goneEvents, wineTour: chat.wineTour, stayForce: chat.stayForce, stayArrive: chat.stayArrive, tourStops: chat.tourStops }); }
+  function chatSnapshot(){ return JSON.stringify({ last: state.last, lastReq: state.lastReq, text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude, removed: state.removed, gone: v4.gone, stayPref: chat.stayPref, noStay: chat.noStay, transport: chat.transport, goneEvents: chat.goneEvents, wineTour: chat.wineTour, stayForce: chat.stayForce, stayArrive: chat.stayArrive, tourStops: chat.tourStops, rooms: (document.getElementById('t3Rooms') || {}).value || '' }); }
   function chatRestore(snap){
     var o = JSON.parse(snap);
     state.last = o.last; state.lastReq = o.lastReq; state.text = o.text; state.seed = o.seed; state.overrides = o.overrides || {}; state.locks = o.locks || {}; state.exclude = o.exclude || []; state.removed = o.removed || {}; v4.gone = o.gone || {};
     chat.stayPref = o.stayPref; chat.noStay = !!o.noStay; chat.transport = o.transport || null; chat.goneEvents = o.goneEvents || {}; chat.wineTour = o.wineTour || null; chat.stayForce = !!o.stayForce; chat.stayArrive = o.stayArrive || null; chat.tourStops = o.tourStops || [];
+    var rmEl = document.getElementById('t3Rooms'); if (rmEl) rmEl.value = o.rooms || '';
     v4.confirmed = false; v4.saved = false;
     chat.rendering = true; try { render(false); } finally { chat.rendering = false; } syncUrl();
   }
@@ -294,7 +295,9 @@ function chatClientSrc(d) {
         if (j.stayPref !== undefined) { chat.stayPref = j.stayPref; chat.noStay = !!(j.stayPref && j.stayPref.none); touched = true; if (changed.indexOf('stay') === -1) changed.push('stay'); }
         // Travel agent abilities: a stay added to a plan with no night (stay.force rides along with later requests), and the number of adults.
         if (j.stayForce !== undefined) { chat.stayForce = !!j.stayForce; chat.stayArrive = j.stayForce && j.stayArrive ? j.stayArrive : null; touched = true; }
-        if (j.party && j.party.adults > 0) { var adEl = document.getElementById('t3Adults'); if (adEl) adEl.value = String(j.party.adults); chat.adults = j.party.adults; }
+        // Rooms set in the chat ("make it 3 rooms"): the Rooms field, so every stay link and a later request carry it.
+        if (j.party && j.party.rooms > 0) { var rmSet = document.getElementById('t3Rooms'); if (rmSet) { rmSet.value = String(j.party.rooms); rmSet.setAttribute('data-v4-auto', '1'); } touched = true; }
+        if (j.party && j.party.adults > 0) { var adEl = document.getElementById('t3Adults'); if (adEl) { adEl.value = String(j.party.adults); adEl.setAttribute('data-v4-auto', '1'); } chat.adults = j.party.adults; }
         var planOnly = touched;
         if (acts.transport) { chat.transport = acts.transport; touched = true; if (acts.transport === 'rental' || acts.transport === 'no_car') changed.push('gh'); }
         // Events taken out by chat, a wine tour offered as a card, and words added to the request ("no museums").
@@ -475,14 +478,20 @@ function chatClientSrc(d) {
     var facts = [fr ? (s.kindFr || s.kind) : s.kind, s.regionLabel, s.priceBand, s.sleeps ? ag('sleeps', { n: s.sleeps }) : ''].filter(Boolean).join(' · ');
     // No dates on the card until the visitor has given them (it showed tonight's date before "When are you coming?").
     var tripIn = d.w.trip || {}, known = chatHasDates() || !!((t3StayInputBase() || {}).arrive);
-    var trip = t3StayTripLine(known ? tripIn : { adults: tripIn.adults, kids: tripIn.kids, dog: tripIn.dog }, fr), img = chatImg(s.photo);
+    // Rooms (2026-11-22): the rooms row under the stay says the number ("3 rooms (assumed)") and changes it; not twice.
+    var tripNoRooms = {}; Object.keys(tripIn).forEach(function(k){ if (k !== 'rooms' && k !== 'roomsAssumed') tripNoRooms[k] = tripIn[k]; });
+    var trip = t3StayTripLine(known ? tripNoRooms : { adults: tripIn.adults, adultsAssumed: tripIn.adultsAssumed, kids: tripIn.kids, dog: tripIn.dog }, fr), img = chatImg(s.photo);
+    var roomsRow = typeof v4RoomsHtml === 'function' ? v4RoomsHtml(fr) : '', roomsNote = step && typeof v4RoomsNote === 'function' ? v4RoomsNote(s, fr) : '';
     var html = '<section class="v4-card v4-stay-card t3-stay" aria-label="' + esc(ag('stayH')) + '"><p class="v4-card-h"><span class="v4-h-full">' + esc(ag('stayH')) + '</span><span class="v4-h-short" aria-hidden="true">' + esc(ag('stayShort')) + '</span>' + (trip ? ' · ' + esc(trip) : '') + '</p>'
       + '<div class="v4-stay-row">' + (img ? '<img class="v4-stay-img" src="' + esc(img) + '" alt="" width="64" height="64" loading="lazy">' : '<span class="v4-stay-img" aria-hidden="true"></span>')
       + '<div><span class="v4-stay-name">' + esc(s.name) + '</span><span class="v4-stay-facts">' + esc(facts) + '</span>' + chatStayChips(s, d.w) + '</div></div>'
       + '<div class="v4-stay-acts">' + (step ? t3StayLinkHtml(s, { url: step.url, rel: step.rel, key: step.link, affiliate: step.affiliate }, 'v4-btn', ag('rates')) : '')
       + (d.others.length ? '<button type="button" class="v4-link" data-v4-stay-more aria-expanded="' + (chat.stayMore ? 'true' : 'false') + '">' + esc(chat.stayMore ? ag('fewer') : ag('seeMore', { n: d.others.length })) + '</button>' : '') + '</div>';
     if (chat.stayMore && d.others.length) html += '<ul class="v4-stay-alts">' + d.others.map(function(o){ return '<li><span><b>' + esc(o.name) + '</b>' + esc([fr ? (o.kindFr || o.kind) : o.kind, o.regionLabel, o.priceBand].concat((o.has || []).map(function(k){ return (AG[lang()] ? AG[lang()].chip : AG.en.chip)[k] || k; })).filter(Boolean).join(' · ')) + '</span><button type="button" class="v4-link" data-v4-stay-choose="' + esc(o.id) + '">' + esc(ag('choose')) + '</button></li>'; }).join('') + '</ul>';
-    if (step && step.affiliate) { html += '<p class="v4-disc-line">' + esc(T3_STAY_DISCLOSURE[fr ? 'fr' : 'en'] || T3_STAY_DISCLOSURE.en) + '</p>'; chatDiscShown = true; }
+    html += roomsRow;
+    // One small paragraph under the card: the rooms line first, then the commission line (one block, so a phone's card stays short).
+    if (roomsNote || (step && step.affiliate)) html += '<p class="v4-disc-line">' + (roomsNote ? '<span data-v4-rooms-note>' + esc(roomsNote) + '</span> ' : '') + (step && step.affiliate ? esc(T3_STAY_DISCLOSURE[fr ? 'fr' : 'en'] || T3_STAY_DISCLOSURE.en) : '') + '</p>';
+    if (step && step.affiliate) chatDiscShown = true;
     return html + '</section>';
   }
   function chatGhHtml(){

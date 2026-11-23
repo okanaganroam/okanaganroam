@@ -17,6 +17,44 @@
 const MAX_NIGHTS = 30;
 const MAX_ADULTS = 16;
 const MAX_KIDS = 12;
+const { MAX_ROOMS, stayRoomsFor } = require('./stay-booking-links');
+
+// ---- Rooms, as the visitor says them (2026-11-22) ----
+// "3 rooms", "two rooms", "2 rooms for the 6 of us", « 3 chambres » -> { rooms: n }; "a room each", "separate rooms",
+// "our own rooms", « une chambre chacun » -> { each: true } (one room per adult); "one room", "share a room", "we'll
+// share" (the chat only) -> { rooms: 1 }. Never "2 bedrooms" (a kind of unit) or "room for two". -> null when not said.
+const ROOM_NUM = { a: 1, one: 1, single: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, un: 1, une: 1, seule: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, sept: 7, huit: 8 };
+const foldRooms = (text) => String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim();
+const ROOMS_EACH_RE = /\b(?:a|one|1|une|un)\s+(?:room|chambre)\s+(?:each|apiece|per person|per adult|chacune?|par personne|par adulte)\b|\b(?:separate|individual|our own|their own|own)\s+(?:hotel\s+)?rooms\b|\bchambres\s+(?:separees|individuelles)\b|\bchacune?\s+(?:sa|leur)\s+(?:propre\s+)?chambre\b|\beach\s+(?:want|wants|need|needs|get|gets|have|has)\s+(?:a|our|their|his|her)\s+(?:own\s+)?room\b/;
+const ROOMS_ONE_RE = /\b(?:shar(?:e|ing)|partage(?:r|ra|rons|ons)?)\b[^.,;]{0,24}\b(?:a|one|1|the same|une|la meme)\s+(?:room|chambre)\b|\b(?:all|everyone|tous|toutes)\s+(?:in|dans)\s+(?:one|1|the same|une|la meme)\s+(?:room|chambre)\b|\b(?:just|only|seulement|juste)\s+(?:need\s+)?(?:one|1|a|une)\s+(?:room|chambre)\b/;
+const ROOMS_N_RE = /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|un|une|deux|trois|quatre|cinq|six|sept|huit)\s+(?:(?:separate|hotel|double|twin|queen|king|standard)\s+)?(?:rooms?|chambres?)\b(?!\s+(?:condo|suite|apartment|appartement|house|cabin|chalet))/;
+const ROOMS_SHARE_ONLY_RE = /^(?:(?:no|non|nope),?\s+)?(?:we(?:'ll| will| can)?\s+(?:all\s+)?share|we're sharing|on partage|on va partager|nous partagerons)[.!]*$/;
+function roomsInText(text, opts = {}) {
+  const t = foldRooms(text);
+  if (!t || !/\b(?:rooms?|chambres?|share|sharing|partage)\b/.test(t)) return null;
+  if (ROOMS_EACH_RE.test(t)) return { each: true };
+  if (ROOMS_ONE_RE.test(t)) return { rooms: 1 };
+  const m = ROOMS_N_RE.exec(t);
+  if (m) {
+    const n = /^\d+$/.test(m[1]) ? Number(m[1]) : ROOM_NUM[m[1]];
+    if (Number.isInteger(n) && n >= 1) return { rooms: Math.min(MAX_ROOMS, n) };
+  }
+  if (/\b(?:a|une)\s+single\s+room\b|\bune\s+seule\s+chambre\b/.test(t)) return { rooms: 1 };
+  if (opts.chat && ROOMS_SHARE_ONLY_RE.test(t)) return { rooms: 1 };
+  return null;
+}
+// The chat: a short message about the rooms and nothing else. -> { ask: true } ("how many rooms did you assume?"),
+// { rooms: n }, { each: true } or null (the other chat rules read the message).
+const ROOMS_ASK_RE = /\bhow many (?:hotel )?rooms\b|\bcombien de chambres\b|\b(?:what|which) (?:number of )?rooms? (?:did|do|have) you\b|\brooms? (?:did|do|have) you (?:assume|pick|book|plan|count)\b/;
+function roomsChat(message) {
+  const t = foldRooms(message);
+  if (!t || t.length > 90) return null;
+  if (ROOMS_ASK_RE.test(t) && !/\b\d+\s+(?:rooms?|chambres?)\b/.test(t)) return { ask: true };
+  // A question about something else ("does the hotel have rooms with a kitchen?") is not a change.
+  if (/\?\s*$/.test(t) && !/^(?:can|could|peux|pouvez|peut-on)\b/.test(t)) return null;
+  if (/\b(?:kitchen|pool|view|vue|cuisine|piscine|balcon\w*|accessible|pet|dog|chien)\b/.test(t)) return null;
+  return roomsInText(t, { chat: true });
+}
 // Other towns' stays join only when the plan's own towns give fewer than this many, and only within NEAR_KM.
 const MIN_IN_TOWN = 3;
 const NEAR_KM = 35;
@@ -49,7 +87,7 @@ function daysBetween(a, b) { return Math.round((Date.parse(`${b}T12:00:00Z`) - D
 function parseTripStayInput(raw) {
   if (raw === undefined || raw === null) return { value: null };
   if (!isObj(raw)) return { error: 'stay must be an object with arrive, leave, adults, kids and dog.' };
-  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog', 'pref', 'force', 'none', 'kidAges'].includes(k));
+  const extra = Object.keys(raw).filter((k) => !['arrive', 'leave', 'adults', 'kids', 'dog', 'pref', 'force', 'none', 'kidAges', 'rooms'].includes(k));
   if (extra.length) return { error: `stay may only contain arrive, leave, adults, kids and dog (not ${extra.join(', ')}).` };
   const out = {};
   for (const k of ['arrive', 'leave']) {
@@ -70,6 +108,11 @@ function parseTripStayInput(raw) {
   if (raw.kids !== undefined && raw.kids !== null) {
     if (!intIn(raw.kids, 0, MAX_KIDS)) return { error: `stay.kids must be a whole number from 0 to ${MAX_KIDS}.` };
     out.kids = raw.kids;
+  }
+  // Rooms (2026-11-22): the number the visitor picked or said; absent = the labelled assumption (stay-booking-links.js).
+  if (raw.rooms !== undefined && raw.rooms !== null) {
+    if (!intIn(raw.rooms, 1, MAX_ROOMS)) return { error: `stay.rooms must be a whole number from 1 to ${MAX_ROOMS}.` };
+    out.rooms = raw.rooms;
   }
   if (raw.dog !== undefined && raw.dog !== null) {
     if (typeof raw.dog !== 'boolean') return { error: 'stay.dog must be true or false.' };
@@ -387,6 +430,11 @@ function pickTripStays(ctx, stays) {
   return { pick: cards[0], alternatives: cards.slice(1) };
 }
 
+// The trip's rooms: { rooms, roomsAssumed? } (said or picked, else the labelled assumption), {} when no adult count.
+function tripRooms(adults, given) {
+  const r = stayRoomsFor(Number.isInteger(adults) ? adults : null, Number.isInteger(given) ? given : null);
+  return r ? { rooms: r.rooms, ...(r.assumed ? { roomsAssumed: true } : {}) } : {};
+}
 // The plan's "whereToStay" block, or null. The trip's dates and party (for booking links later) and the chosen stay.
 function whereToStay(plan, input, stays, today, opts = {}) {
   const ctx = tripStayContext(plan, input, today, opts);
@@ -440,7 +488,7 @@ function whereToStay(plan, input, stays, today, opts = {}) {
   const pick = tag(picked.pick);
   return {
     stayId: picked.pick.id,
-    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, ...(ctx.adultsAssumed ? { adultsAssumed: true } : {}), kids: ctx.kids, ...(input && Array.isArray(input.kidAges) && input.kidAges.length === ctx.kids ? { kidAges: input.kidAges.slice() } : {}), dog: !!ctx.dog, datesGiven: ctx.datesGiven },
+    trip: { arrive: ctx.arrive, leave: ctx.leave, nights: ctx.nights, adults: ctx.adults, ...(ctx.adultsAssumed ? { adultsAssumed: true } : {}), kids: ctx.kids, ...(input && Array.isArray(input.kidAges) && input.kidAges.length === ctx.kids ? { kidAges: input.kidAges.slice() } : {}), ...tripRooms(ctx.adults, input && input.rooms), dog: !!ctx.dog, datesGiven: ctx.datesGiven },
     pick,
     alternatives: picked.alternatives.map(tag),
     ...(amenity ? { amenity } : {}),
@@ -452,6 +500,7 @@ const ELSEWHERE_KM = 60;
 
 module.exports = {
   MAX_NIGHTS, MAX_ADULTS, MAX_KIDS, NEAR_KM, MIN_IN_TOWN,
+  roomsInText, roomsChat, tripRooms, MAX_ROOMS,
   parseTripStayInput, parseStayPref, staysForPref, STAY_AMENITIES, stayHas, stayHasNot, prefAmenities, STAY_KIND_SETS, tripStayContext, partyOf, stayFails, scoreStay, pickTripStays, whereToStay, planStops, km, addDays, daysBetween,
   wantsCamping, isCampingStay, CAMPING_RE,
   v4DormStay, V4_COUPLE_RE, V4_BUDGET_STAY_RE,

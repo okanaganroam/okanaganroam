@@ -50,6 +50,12 @@ const EXPEDIA_HOSTS = ['expedia.ca', 'expedia.com'];
 //   underscores, lang) and https://dev.stay22.com/docs/allez/providers (/allez/booking, /allez/expedia).
 //   The docs don't say whether the dates inside link= are kept, so the dates and head counts go both inside the wrapped
 //   URL and as Allez's own parameters.
+//   Rooms (2026-11-22): the docs list no rooms parameter, but Allez reads rooms=N (seen in its redirects, 2026-11-22):
+//   Booking.com gets no_rooms=N, Expedia gets numRoom=N with the adults split by Stay22 itself (6 adults, rooms=3 ->
+//   adults=2,2,2; rooms=2 -> 3,3). Allez builds the provider URL from its OWN parameters and drops the party inside
+//   link= (no_rooms inside link= was dropped; with no rooms= Expedia got 2 adults a room), so rooms= goes on the
+//   wrapper as well as inside the wrapped URL. childrenAges=6,9 is documented (one age per child; without it Stay22
+//   fills in an age of its own).
 const STAY22_HOSTS = ['stay22.com'];
 const STAY22_ALLEZ = 'https://www.stay22.com/allez/';
 
@@ -61,6 +67,39 @@ const LABELS = {
 };
 const REL_AFFILIATE = 'sponsored nofollow noopener';
 const REL_PLAIN = 'nofollow noopener';
+
+// ---- Rooms (2026-11-22, Dayton: six adults were sent to Booking.com as one room and nobody was asked) ----
+// The rule, in one place (these four functions are also sent to the page as they are, so they stay plain ES5):
+//   said or picked rooms win (1 to MAX_ROOMS, never more rooms than adults: each room needs an adult);
+//   else an ASSUMED number, always labelled: 1 room for 1 or 2 adults (with or without kids); for 3 or more adults one
+//   room for every two adults, rounded up (3-4 -> 2, 5-6 -> 3, 7-8 -> 4...). Kids travel with the adults and add no room.
+//   A party with no adult count has no rooms value.
+// The question is shown when it matters: 3 or more adults, or more than 4 people to a room.
+var MAX_ROOMS = 8;
+function stayDefaultRooms(adults) {
+  if (!(adults >= 1)) return null;
+  return adults <= 2 ? 1 : Math.min(8, Math.ceil(adults / 2));
+}
+// -> { rooms, assumed } or null. given: the rooms said or picked (or null).
+function stayRoomsFor(adults, given) {
+  var a = adults >= 1 ? adults : null;
+  if (given >= 1 && given <= 8 && Math.floor(given) === given) return { rooms: a ? Math.min(given, a) : given, assumed: false };
+  return a ? { rooms: stayDefaultRooms(a), assumed: true } : null;
+}
+function stayRoomsMatter(adults, kids, rooms) {
+  var a = adults >= 1 ? adults : 0, k = kids >= 1 ? kids : 0;
+  return a >= 3 || (a + k) > 4 * (rooms >= 1 ? rooms : 1);
+}
+// The adults (and the children, by age) spread over the rooms, evenly and always the same way: the first rooms get the
+// extra adult; the children go one at a time to room 1, 2, 3... -> [{ adults, ages: [] }, ...]
+function stayRoomSplit(adults, kidAges, rooms) {
+  var n = Math.max(1, Math.min(rooms || 1, adults || 1)), out = [], i;
+  for (i = 0; i < n; i++) out.push({ adults: Math.floor(adults / n) + (i < adults % n ? 1 : 0), ages: [] });
+  for (i = 0; i < (kidAges || []).length; i++) out[i % n].ages.push(kidAges[i]);
+  return out;
+}
+// The four functions as browser text (trip-planner-v4-page.js builds the same links when the visitor changes the party).
+const ROOMS_CLIENT_SRC = [stayDefaultRooms, stayRoomsFor, stayRoomsMatter, stayRoomSplit].map((f) => '  ' + f.toString()).join('\n');
 
 const isDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 const count = (n, lo, hi) => (Number.isInteger(n) && n >= lo && n <= hi ? n : null);
@@ -87,7 +126,11 @@ function tripParams(trip) {
   const kids = count(t.kids, 0, 12);
   // Fix round (2026-11-22): the children's ages, when the visitor typed them ("kids 6 and 9"); never guessed.
   const kidAges = kids && Array.isArray(t.kidAges) && t.kidAges.length === kids && t.kidAges.every((a) => Number.isInteger(a) && a >= 0 && a <= 17) ? t.kidAges.slice() : null;
-  return { dates, adults: count(t.adults, 1, 16), kids, kidAges };
+  const adults = count(t.adults, 1, 16);
+  // rooms: said or picked, else the labelled assumption for this many adults; null when the party is not known.
+  // roomsLegacy: a shared trip link made before rooms existed (no rm=): it opens exactly as it did then.
+  const rm = t.roomsLegacy === true ? null : stayRoomsFor(adults, count(t.rooms, 1, MAX_ROOMS));
+  return { dates, adults, kids, kidAges, rooms: rm ? rm.rooms : null };
 }
 
 function bookingComUrl(raw, p) {
@@ -98,7 +141,9 @@ function bookingComUrl(raw, p) {
   if (p.adults !== null) q.set('group_adults', String(p.adults));
   if (p.kids !== null) q.set('group_children', String(p.kids));
   if (p.kidAges) for (const a of p.kidAges) q.append('age', String(a));
-  q.set('no_rooms', '1');
+  // no_rooms with group_adults is the whole party over that many rooms (Booking.com shows "6 adults · 0 children ·
+  // 3 rooms" and offers a mix of rooms; seen on its pages 2026-11-22). A party we do not know: 1, as before.
+  q.set('no_rooms', String(p.rooms || 1));
   return u;
 }
 function expediaUrl(raw, p) {
@@ -108,8 +153,12 @@ function expediaUrl(raw, p) {
   if (p.dates) { q.set('chkin', p.dates.arrive); q.set('chkout', p.dates.leave); }
   // Children need their ages (rm1=a2:c8:c10): only when the visitor typed them. Kids with no adult count: 2 adults (the
   // room needs one; Expedia's own default), so a family of four is not booked as two travellers.
-  if (p.kidAges) q.set('rm1', `a${p.adults !== null ? p.adults : 2}${p.kidAges.map((a) => `:c${a}`).join('')}`);
-  else if (p.adults !== null) q.set('rm1', `a${p.adults}`);
+  // Rooms (2026-11-22): one rmN per room (rm1=a2&rm2=a2&rm3=a2), the adults and the children split by stayRoomSplit.
+  const adults = p.adults !== null ? p.adults : p.kidAges ? 2 : null;
+  if (adults !== null) {
+    for (const k of [...q.keys()]) if (/^rm\d+$/.test(k)) q.delete(k);
+    stayRoomSplit(adults, p.kidAges || [], p.rooms || 1).forEach((r, i) => q.set(`rm${i + 1}`, `a${r.adults}${r.ages.map((a) => `:c${a}`).join('')}`));
+  }
   return u;
 }
 // Stay22 Allez around a Booking.com or Expedia property URL.
@@ -120,6 +169,8 @@ function stay22Wrap(provider, target, p, cfg) {
   if (p.dates) { q.set('checkin', p.dates.arrive); q.set('checkout', p.dates.leave); }
   if (p.adults !== null) q.set('adults', String(p.adults));
   if (p.kids !== null) q.set('children', String(p.kids));
+  if (p.kidAges && p.kidAges.length) q.set('childrenAges', p.kidAges.join(','));
+  if (p.rooms !== null && p.rooms !== undefined) q.set('rooms', String(p.rooms));
   if (cfg.campaign) q.set('campaign', cfg.campaign.replace(/-/g, '_'));
   const u = httpsOn(`${STAY22_ALLEZ}${provider}?${q.toString()}`, STAY22_HOSTS, true);
   return u ? u.toString() : null;
@@ -142,11 +193,13 @@ function fallbackButton(venue, p, opts) {
     if (p.dates) { u.searchParams.set('checkin', p.dates.arrive); u.searchParams.set('checkout', p.dates.leave); }
     if (p.adults !== null) u.searchParams.set('adults', String(p.adults));
     if (p.kids !== null) u.searchParams.set('children', String(p.kids));
+    if (p.kidAges && p.kidAges.length) u.searchParams.set('childrenAges', p.kidAges.join(','));
+    if (p.rooms !== null) u.searchParams.set('rooms', String(p.rooms));
   } else if (link.source === 'booking') {
     if (p.dates) { u.searchParams.set('checkin', p.dates.arrive); u.searchParams.set('checkout', p.dates.leave); }
     if (p.adults !== null) u.searchParams.set('group_adults', String(p.adults));
     if (p.kids !== null) u.searchParams.set('group_children', String(p.kids));
-    u.searchParams.set('no_rooms', '1');
+    u.searchParams.set('no_rooms', String(p.rooms || 1));
   }
   return button('search', u.toString(), link.affiliate);
 }
@@ -272,4 +325,5 @@ module.exports = {
   BOOKING_HOSTS, EXPEDIA_HOSTS, STAY22_HOSTS, STAY22_ALLEZ, LABELS, REL_AFFILIATE, REL_PLAIN,
   httpsOn, tripParams, bookingComUrl, expediaUrl, stay22Wrap, exactStayLinks, stayBookingLinks, stayPetsNote, withBookingLinks,
   STAY22_MAP, MAP_BOX, stay22MapUrl,
+  MAX_ROOMS, stayDefaultRooms, stayRoomsFor, stayRoomsMatter, stayRoomSplit, ROOMS_CLIENT_SRC,
 };
