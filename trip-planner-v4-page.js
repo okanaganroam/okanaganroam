@@ -510,6 +510,10 @@ const V4_CLIENT_SRC = String.raw`
   // ---- booking: the same steps as the stays box ("Book my trip"), in a sheet ----
   function v4Fallback(){ var b = state.last && state.last.v4Booking; return b && !t3StayData() ? b : null; }
   function v4Estimate(){ var d = t3StayData(); if (d) return d.chosen.estimate || d.w.estimate || null; var b = v4Fallback(); return b ? b.estimate : null; }
+  // The traveller's own budget beside that estimate (2026-11-23; trip-budget.js, worded on the server): the chosen
+  // stay's, so a Change of stay changes both together. null on a plan with no budget.
+  function v4Budget(){ var d = t3StayData(); if (d) return d.chosen.budget || null; var b = v4Fallback(); return (b && b.budget) || null; }
+  function v4BudgetText(){ var b = v4Budget(); return b ? ((lang() === 'fr' && b.textFr) || b.text || null) : null; }
   function v4EstimateText(){
     var e = v4Estimate(), fr = lang() === 'fr';
     if (!e || !e.parts || !e.parts.length) return '';
@@ -558,6 +562,9 @@ const V4_CLIENT_SRC = String.raw`
     }
     var e = v4Estimate();
     if (e) html += v4EstimateHtml(e, fr, d ? d.chosen : null);
+    // The budget the traveller gave, beside the estimate above (same numbers). Shown only when the request has one.
+    var bgT = v4BudgetText(), bg0 = v4Budget();
+    if (bgT && bgT.sheet) html += '<p class="t3-book-note v4-book-honest v4-book-budget" data-v4-budget data-status="' + esc(bg0.status || '') + '"><strong>' + esc(bgT.sheet) + '</strong></p>';
     var st = bookState.st || {}, next = -1, done = 0;
     steps.forEach(function(x, n){ if (st[n] === 'done') done++; if (next < 0 && !st[n]) next = n; });
     if (steps.length) {
@@ -851,11 +858,36 @@ const V4_CLIENT_SRC = String.raw`
       if (Object.keys(sug).length) out += '&sug=' + Object.keys(sug).join(',');
       var asks = []; (p.evidence || []).forEach(function(e){ asks.push(e && /^count:/.test(e.ask || '') && e.asked > 0 ? e.ask + ':' + e.asked : e && e.ask); if (e && e.also) asks.push(e.also); }); asks = asks.filter(function(a){ return a && /^[a-z_:0-9]+$/.test(a); }).slice(0, 12);
       if (asks.length) out += '&asks=' + asks.join(',');
+      // Meal stops (2026-11-23: the plan said "all 4 meal stops list vegan options", its copy "5"): the stops the
+      // plan's own dietary evidence counted as meals, one 0/1 per stop in the link's order (ml=), so the copy counts
+      // the same ones. Only with a dietary ask; a link without it reads as before.
+      var mealIds = null;
+      (p.evidence || []).forEach(function(e){ if (e && /^(?:vegan|vegetarian|gluten_free)$/.test(e.ask || '') && e.stops && e.stops.length) { mealIds = mealIds || {}; e.stops.forEach(function(x){ if (x && x.id > 0) mealIds[x.id] = 1; }); } });
+      if (mealIds) out += '&ml=' + list.map(function(x){ var mm = /^venue:(\d+)$/.exec(x.ref); return mm && mealIds[mm[1]] ? 1 : 0; }).join('');
       // Trip needs (2026-11-24): one person's wheelchair (nw=1) and the days the plan could not fill (thin=2), so the
       // copy says the same; both optional.
       if ((p.needs || []).some(function(n){ return n && n.key === 'wheelchair' && n.who === 'one'; })) out += '&nw=1';
       var thin = (p.thinDays || []).map(function(x){ return x && x.day; }).filter(function(n){ return n > 0 && n < 31; });
       if (thin.length) out += '&thin=' + thin.join(',');
+      // Share suggestions (2026-11-23): what the plan said it could not include (ni=spa:n:1563: the kind, none listed
+      // or not fitted, the nearest listing's id), so the copy says the same line; an ask already in asks= is not repeated.
+      var ni = [];
+      (p.notIncluded || []).forEach(function(x){
+        if (!x || typeof x.kind !== 'string' || !/^[a-z][a-z_]{1,29}$/.test(x.kind) || (x.reason !== 'none_listed' && x.reason !== 'not_fitted')) return;
+        if (asks.indexOf('kind:' + x.kind) !== -1 || asks.indexOf('type:' + x.kind) !== -1 || ni.some(function(t){ return t.split(':')[0] === x.kind; })) return;
+        var nid = x.nearest && x.nearest.id > 0 && x.nearest.id < 1e7 ? ':' + x.nearest.id : '';
+        ni.push(x.kind + ':' + (x.reason === 'none_listed' ? 'n' : 'f') + nid);
+      });
+      if (ni.length) out += '&ni=' + ni.slice(0, 3).join(',');
+      var nt = ((p.overview && p.overview.regions) || []).map(function(r){ return r && r.slug; }).filter(function(x){ return /^[a-z][a-z0-9-]{1,30}$/.test(x || ''); }).slice(0, 3);
+      if (ni.length && nt.length) out += '&nt=' + nt.join(',');
+      // The budget (2026-11-23): the limit and the estimate's own figures (bg=600t, be=low.high.people.assumed.nights.
+      // stops.unpriced.stayMissing; x = no figure). Values only: the copy's wording is rebuilt on the server.
+      var bg = v4Budget();
+      if (bg && bg.limit > 0 && { total: 1, per_person: 1, per_night: 1 }[bg.scope]) {
+        var bx = function(n){ return typeof n === 'number' && n >= 0 && n === Math.floor(n) ? String(n) : 'x'; };
+        out += '&bg=' + bg.limit + { total: 't', per_person: 'p', per_night: 'n' }[bg.scope] + '&be=' + [bx(bg.low), bx(bg.high), bx(bg.people), bg.peopleAssumed ? 1 : 0, bx(bg.nights), bx(bg.stops), bx(bg.unpriced), bg.stayMissing ? 1 : 0].join('.');
+      }
     } catch (e) {}
     return out;
   }
@@ -880,9 +912,17 @@ const V4_CLIENT_SRC = String.raw`
       rows.forEach(function(r){ lines.push(r); });
     });
     var d = typeof t3StayData === 'function' ? t3StayData() : null;
-    if (d && d.chosen && d.chosen.name) { lines.push(''); lines.push((fr ? 'Hébergement : ' : 'Stay: ') + d.chosen.name); }
+    // (2026-11-23) The rooms the plan carries, as the stay line says them ("2 rooms", "3 rooms (assumed)").
+    var rmTxt = d && d.w && d.w.trip && typeof t3RoomsLabel === 'function' ? t3RoomsLabel(d.w.trip, fr) : '';
+    if (d && d.chosen && d.chosen.name) { lines.push(''); lines.push((fr ? 'Hébergement : ' : 'Stay: ') + d.chosen.name + (rmTxt ? ' · ' + rmTxt : '')); }
     var est = v4EstimateText().replace(/<small>[\s\S]*?<\/small>/g, '').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-    if (est) lines.push(est);
+    // The budget (2026-11-23): the limit, the estimate and what it leaves out, in two short lines; else the estimate.
+    var bgT = v4BudgetText();
+    if (bgT && bgT.copy && bgT.copy.length) bgT.copy.forEach(function(l){ lines.push(l); });
+    else if (est) lines.push(est);
+    // Share suggestions (2026-11-23): what the plan could not include, in its own words (at most three lines).
+    var left = ((state.last && state.last.notIncluded) || []).filter(function(x){ return x && x.text && (x.reason === 'none_listed' || x.reason === 'not_fitted'); }).slice(0, 3);
+    if (left.length) { lines.push(''); left.forEach(function(x){ lines.push((fr && x.textFr) || x.text); }); }
     return lines.join('\n');
   }
   function v4Toast(text){

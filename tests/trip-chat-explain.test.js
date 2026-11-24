@@ -292,10 +292,11 @@ test('plan.evidence as the planner writes it (trip-honest-plan.js): its own sent
   const b = ex.answer(R(MSG_B).ops[0], facts({ evidence: given, warnings: [] }), 'en');
   assert.equal(b.reply, 'That line was wrong. ' + text);
   assert.ok(!b.note);
-  // A stop was removed on the page since: the evidence was built for other stops, so the badges shown are read.
+  // A stop was removed on the page since: the plan's other meal stops are the ones counted (2026-11-23: the same stops
+  // the summary and a shared copy count), in the chat's own words.
   const fewer = PLAN.filter((s) => s.id !== 256);
   const e2 = ex.tripEvidenceFor('gluten_free', fewer, given, 'en');
-  assert.deepEqual([e2.source, e2.total, e2.line], ['badges', 5, 'Every meal stop here has the Gluten-Free-Friendly badge on its listing.']);
+  assert.deepEqual([e2.source, e2.total, e2.line], ['plan', 5, 'Every meal stop here has the Gluten-Free-Friendly badge on its listing.']);
   // Events are offered with their own date, not placed, on a plan without dates.
   const sug = [{ kind: 'event', id: 320, name: 'Adventure Club', dateLabel: 'Fri Nov 27' }];
   assert.equal(ex.answer(R('why is there an event on day 3?').ops[0], facts({ evidence: given, suggestions: sug }), 'en').reply, 'Live music depends on the night: pick your dates and I’ll add what’s on. One that is listed: Adventure Club (Fri Nov 27). It isn’t on your plan until you pick dates.');

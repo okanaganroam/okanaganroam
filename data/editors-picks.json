@@ -1,36 +1,37 @@
 {
   "_about": "Homepage Editor's Picks (2026-10-27). Chosen by Okanagan Roam, never paid: a paid spot would be a separate row labelled Sponsored. The first 4 usable picks show (four a week since 2026-11-09); the rest are backups that step in, in order, when a pick is skipped (closed for the season or by a dated closure, not operating, or without its own photo). The row always shows 4 cards and hides with fewer than 4. 'why' is one short line (EN + FR). A pick can set 'photo' to another of the place's own photos (one that suits the season); it must be a wide (landscape) photo with the subject in the middle, since the card shows a wide strip.",
-  "updated": "2026-11-18",
+  "updated": "2026-11-23",
   "picks": [
     {
-      "id": 1554,
-      "why": "A cedar sauna floating on Okanagan Lake, with a cold plunge",
-      "why_fr": "Un sauna en cèdre flottant sur le lac Okanagan, avec bain froid"
+      "id": 97,
+      "why": "A family-friendly Lake Country brewery with a full kitchen",
+      "why_fr": "Une microbrasserie familiale de Lake Country avec cuisine complète",
+      "photo": "/images/owner/4a7d22909cb92fed0ded5710.jpg"
     },
     {
-      "id": 234,
-      "why": "Proper schnitzel at a cozy German spot in Penticton",
-      "why_fr": "Un vrai schnitzel dans un chaleureux restaurant allemand de Penticton"
+      "id": 123,
+      "why": "Mexican dinners in a warm room full of Frida Kahlo art",
+      "why_fr": "Souper mexicain dans une salle chaleureuse ornée d’œuvres de Frida Kahlo"
     },
     {
-      "id": 1502,
-      "why": "Square One: original local art, all under $500",
-      "why_fr": "Square One : des œuvres originales d’artistes locaux, toutes à moins de 500 $"
+      "id": 1519,
+      "why": "The Celtic Tenors’ Christmas show here Sunday, Nov 29",
+      "why_fr": "Le spectacle de Noël des Celtic Tenors, dimanche 29 novembre"
     },
     {
-      "id": 735,
-      "why": "Stone-milled organic bread and a holiday stollen",
-      "why_fr": "Pain bio moulu sur pierre et stollen des fêtes"
+      "id": 1540,
+      "why": "Immersive sound installations by Cardiff and Bures Miller",
+      "why_fr": "Installations sonores immersives de Cardiff et Bures Miller"
     },
     {
-      "id": 789,
-      "why": "A Kelowna bakery and café with German breads and baking",
-      "why_fr": "Une boulangerie-café de Kelowna aux pains et pâtisseries allemands"
+      "id": 743,
+      "why": "Small-batch coffee roasted right here in Kelowna",
+      "why_fr": "Café torréfié en petits lots ici même à Kelowna"
     },
     {
-      "id": 950,
-      "why": "German sausages, deli and borscht in Vernon",
-      "why_fr": "Saucisses allemandes, épicerie fine et bortsch à Vernon"
+      "id": 784,
+      "why": "A family-run winery in Okanagan Falls",
+      "why_fr": "Un vignoble familial à Okanagan Falls"
     }
   ]
 }

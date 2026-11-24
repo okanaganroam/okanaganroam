@@ -147,6 +147,8 @@ function requestParty(text) {
   if (m && num(m[1])) out.adults = /couples/.test(m[0]) ? num(m[1]) * 2 : num(m[1]);
   if (out.adults === undefined) { m = new RegExp(`\\b(?:group|party|groupe) (?:of|de) ${PARTY_N}\\b|\\b(?:the|we are|we re|nous sommes|on est) ${PARTY_N}(?: of us)?\\b|\\b(?:for|pour) ${PARTY_N}(?= (?:people|personnes|adults|adultes)|[,.]|$)`).exec(t); const n = m && num(m[1] || m[2] || m[3]); if (n) out.adults = n; }
   if (out.adults === undefined) { m = new RegExp(`\\bfamil(?:y|le) (?:of|de) ${PARTY_N}\\b`).exec(t); const n = m && num(m[1]); if (n && n >= 3) { out.adults = 2; if (out.kids === undefined) out.kids = n - 2; } }
+  // (2026-11-23: "for one adult and a 15-year-old" was 2 adults (assumed) plus the child) One adult, said in the singular.
+  if (out.adults === undefined && /\b(?:one|1|un|une) adulte?\b/.test(t)) out.adults = 1;
   if (out.adults === undefined && /\b(?:a couple(?! of)|couples? (?:trip|getaway|weekend)|for two|pour deux|two of us|just the two|my (?:wife|husband|partner|girlfriend|boyfriend|fiancee?|spouse)|ma (?:femme|blonde|conjointe)|mon (?:mari|chum|conjoint)|anniversary|honeymoon|romantic|romantique|en couple|en amoureux|date night)\b/.test(t)) out.adults = 2;
   if (out.adults === undefined && /\b(?:solo|just me|by myself|on my own|alone|seule?|en solo)\b/.test(t)) out.adults = 1;
   // "the six of us" with kids named is six people in all.
