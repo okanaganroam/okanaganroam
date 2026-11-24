@@ -591,10 +591,11 @@ const V4_CLIENT_SRC = String.raw`
     steps.forEach(function(x, n){ if (st[n] === 'done') done++; if (next < 0 && !st[n]) next = n; });
     if (steps.length) {
       html += '<p class="v4-sheet-h4">' + esc(done ? vt('progress', { d: done, n: steps.length }) : vt('toBook')) + '</p><ol class="v4-check">' + steps.map(function(x, n){
-        var mark = st[n], name = x.kind === 'stay' ? vt('stay') + ' · ' + x.name : ((fr && x.nameFr) || x.name);
+        // (A split stay: "Stay · booking 1 · <name>" with that booking's own guests, room and dates under it.)
+        var mark = st[n], name = x.kind === 'stay' ? vt('stay') + (x.part ? ' · ' + (fr ? 'réservation ' : 'booking ') + x.part : '') + ' · ' + x.name : ((fr && x.nameFr) || x.name);
         var verb = x.kind === 'stay' ? (fr ? ((d && d.chosen.bookingLinks[0]) || {}).shortFr || 'Réserver' : ((d && d.chosen.bookingLinks[0]) || {}).short || 'Book') : t3StepVerb(x, fr);
         return '<li class="' + (mark === 'done' ? 'is-done' : n === next ? 'is-next' : '') + '"><button type="button" class="t3-book-tick" data-t3-bk-toggle="' + n + '" aria-pressed="' + (mark === 'done' ? 'true' : 'false') + '" aria-label="' + esc(vt('iBooked') + (fr ? ' : ' : ': ') + name) + '">' + (mark === 'done' ? '✓' : mark === 'skipped' ? '–' : '') + '</button>'
-          + '<span class="v4-check-name">' + esc(name)
+          + '<span class="v4-check-name">' + esc(name) + (x.kind === 'stay' && x.part && x.sub ? '<small data-v4-book-part="' + esc(x.part) + '">' + esc((fr && x.subFr) || x.sub) + '</small>' : '')
           + '<small class="v4-mine">' + (mark === 'done' ? esc(vt('markedByYou')) + ' · <button type="button" class="t3-book-link" data-t3-bk-toggle="' + n + '" data-v4-unbook>' + esc(vt('undoBooked')) + '</button>' : '<button type="button" class="t3-book-link" data-t3-bk-toggle="' + n + '" data-v4-booked>' + esc(vt('iBooked')) + '</button>') + '</small>'
           + (x.affiliate ? '<small class="v4-aff">' + esc(vt('commission')) + '</small>' : '') + '</span>' + t3StepLinkHtml(x, '', verb, n) + '</li>';
       }).join('') + '</ol>';
@@ -610,6 +611,9 @@ const V4_CLIENT_SRC = String.raw`
       // No car (2026-11-23): one line, in the plan's own words; the stops whose hop needs a ride are listed below.
       var ncE = ((state.last && state.last.evidence) || []).filter(function(e){ return e && e.ask === 'no_car' && e.short; })[0];
       if (ncE && (state.last.needs || []).some(function(n){ return n && n.key === 'no_car'; })) html += '<p class="t3-book-note v4-book-honest" data-v4-book-nocar>' + esc(((lang() === 'fr' && ncE.shortFr) || ncE.short) + '.') + '</p>';
+      // Someone arrives later (2026-11-23): who is there which nights, and each day's head count. The bookings are by the stay.
+      var laS = v4LateEntry();
+      if (laS && laS.short) html += '<p class="t3-book-note v4-book-honest" data-v4-book-late><strong>' + esc(((lang() === 'fr' && laS.shortFr) || laS.short) + '.') + '</strong>' + (laS.act ? ' ' + esc((lang() === 'fr' && laS.actFr) || laS.act) : '') + '</p>';
       // A food allergy (2026-11-23): one line; each meal stop is then listed below. No booking link carries it.
       var alS = v4AllergyEntry();
       if (alS && alS.sheet) html += '<p class="t3-book-note v4-book-honest" data-v4-book-allergy><strong>' + esc((lang() === 'fr' && alS.sheetFr) || alS.sheet) + '</strong></p>';
@@ -678,7 +682,7 @@ const V4_CLIENT_SRC = String.raw`
       // A priced stay is priced by the listing's own "sleeps" (trip-booking.js), never by the rooms picked here: when
       // the two differ, the figure says which it is for.
       var sp = (e.parts || []).filter(function(x){ return x && x.key === 'stay'; })[0], rs = v4RoomsState();
-      if (sp && rs && sp.rooms >= 1 && sp.rooms !== rs.rooms) html = html.replace(/<\/div>$/, '') + '<p class="v4-book-unpriced" data-v4-est-rooms>' + esc(fr ? 'Le montant de l’hébergement vaut pour ' + sp.rooms + (sp.rooms > 1 ? ' chambres ou unités' : ' chambre ou unité') + ', pas les ' + rs.rooms + ' de vos liens : le site de réservation donne le vrai prix.' : 'The stay figure is for ' + sp.rooms + (sp.rooms > 1 ? ' rooms or units' : ' room or unit') + ', not the ' + rs.rooms + ' in your links: the booking site has the real price.') + '</p></div>';
+      if (sp && rs && sp.rooms >= 1 && sp.rooms !== rs.rooms && !v4LateSplit()) html = html.replace(/<\/div>$/, '') + '<p class="v4-book-unpriced" data-v4-est-rooms>' + esc(fr ? 'Le montant de l’hébergement vaut pour ' + sp.rooms + (sp.rooms > 1 ? ' chambres ou unités' : ' chambre ou unité') + ', pas les ' + rs.rooms + ' de vos liens : le site de réservation donne le vrai prix.' : 'The stay figure is for ' + sp.rooms + (sp.rooms > 1 ? ' rooms or units' : ' room or unit') + ', not the ' + rs.rooms + ' in your links: the booking site has the real price.') + '</p></div>';
       if (rl && !e.showTotal) html = html.replace(/((?:Known costs so far|Coût connu jusqu’ici) (?:for|pour) \d+ (?:people|person|personnes?)(?: \((?:assumed|supposé)\))?)(<\/strong>)/, '$1 · ' + esc(rl) + '$2');
     }
     return html;
@@ -714,8 +718,13 @@ const V4_CLIENT_SRC = String.raw`
     if (!r) return null;
     return { adults: ad, kids: kd, rooms: r.rooms, assumed: r.assumed, ages: t.kidAges && t.kidAges.length === kd ? t.kidAges : null };
   }
+  // Someone arrives later or leaves earlier (2026-11-23, trip-late-arrival.js): the stay's split, the plan's own entry.
+  function v4LateSplit(){ var d = typeof t3StayData === 'function' ? t3StayData() : null; return (d && d.w && d.w.trip && d.w.trip.split) || null; }
+  function v4LateEntry(){ var p = state.last || {}; if (!p.lateArrival) return null; return (p.evidence || []).filter(function(e){ return e && e.ask === 'late_arrival'; })[0] || null; }
   function v4PartyUrl(raw){
     try {
+      // A split stay's links are each booking's own (its dates, adults and rooms), built on the server: never rewritten.
+      if (typeof v4LateSplit === 'function' && v4LateSplit()) return raw;
       var g = function(id){ var el = document.getElementById(id); return el && /^\d+$/.test(el.value) ? Number(el.value) : null; };
       // Nothing set on the page: the link is the server's own (built with the same rule).
       if (g('t3Adults') === null && g('t3Kids') === null && g('t3Rooms') === null) return raw;
@@ -750,6 +759,8 @@ const V4_CLIENT_SRC = String.raw`
   // line is filled after a tap ("4 rooms"), so a screen reader hears the new number: the row itself is drawn again.
   function v4RoomsHtml(fr){
     var st = v4RoomsState();
+    // (A split stay has each booking's rooms by the bookings; one number of rooms would not be the arrangement.)
+    if (typeof v4LateSplit === 'function' && v4LateSplit()) return '';
     if (!st || !(stayRoomsMatter(st.adults, st.kids, st.rooms) || !st.assumed || st.rooms > 1)) return '';
     var max = Math.min(8, st.adults);
     var btn = function(dir, off, say, glyph){ return '<button type="button" data-v4-rooms="' + dir + '" aria-label="' + esc(say) + '"' + (off ? ' disabled aria-disabled="true"' : '') + '>' + glyph + '</button>'; };
@@ -763,7 +774,7 @@ const V4_CLIENT_SRC = String.raw`
   // cannot pre-fill). Never a word about availability or how many a room sleeps.
   function v4RoomsNote(s, fr){
     var st = v4RoomsState(), first = ((s && s.bookingLinks) || [])[0];
-    if (!st || !first) return '';
+    if (!st || !first || (typeof v4LateSplit === 'function' && v4LateSplit())) return '';
     var out = [];
     if (st.rooms > 1 && (first.key === 'own' || first.key === 'search')) out.push(fr ? 'Site de l’hôtel : indiquez ' + st.rooms + ' chambres sur place.' : 'Hotel’s own site: enter ' + st.rooms + ' rooms there.');
     var d = t3StayData(), dated = !!(d && d.w && d.w.trip && d.w.trip.datesGiven);
@@ -915,6 +926,9 @@ const V4_CLIENT_SRC = String.raw`
       // without it the link's asks carry "allergy" alone and the copy names none.
       var alOn = v4ShareAllergyOn();
       if (alOn && /^(?:x\.)?[a-z_,]{2,80}$/.test(alOn.share)) out += '&al=' + alOn.share;
+      // Someone arrives later (2026-11-23): la=j1d2o (join or leave, how many, which day, own room said). Values only.
+      var laOn = v4LateEntry();
+      if (laOn && /^[jl][1-9]d[1-9][0-9]?[ox]$/.test(laOn.share || '')) out += '&la=' + laOn.share;
       // The budget (2026-11-23): the limit and the estimate's own figures (bg=600t, be=low.high.people.assumed.nights.
       // stops.unpriced.stayMissing; x = no figure). Values only: the copy's wording is rebuilt on the server.
       var bg = v4Budget();
@@ -934,6 +948,9 @@ const V4_CLIENT_SRC = String.raw`
     // A food allergy (2026-11-23): said first. Named only with "Include allergy details" ticked; else the general line.
     var alE = v4AllergyEntry(), alOn = v4ShareAllergyOn(), alAnon = alE && !alOn ? (alE.anon || {}) : null;
     if (alE) lines.push(alOn ? ((fr && alE.copyFr) || alE.copy) : ((fr && alAnon.copyFr) || alAnon.copy || ''));
+    // Someone arrives later (2026-11-23): who is there which nights, the bookings the stay takes, each day's head count.
+    var laT = v4LateEntry();
+    if (laT && laT.text) lines.push((fr && laT.textFr) || laT.text);
     var alHide = function(txt){
       if (!alAnon) return txt;
       [[(fr && alE.noteRestFr) || alE.noteRest, (fr && alAnon.noteRestFr) || alAnon.noteRest], [(fr && alE.noteOtherFr) || alE.noteOther, (fr && alAnon.noteOtherFr) || alAnon.noteOther]].forEach(function(pair){ if (pair[0] && pair[1]) txt = txt.split(pair[0]).join(pair[1]); });
@@ -1054,7 +1071,9 @@ const V4_CLIENT_SRC = String.raw`
         // Trip dates (2026-11-23): a date the planner worked out by itself ("a weekend", a month) says so.
         var date = v4DayDate(d), tdd = (state.last && state.last.tripDates) || null;
         if (date && tdd && tdd.assumed) date += vt('assumed');
-        var label = [date, d.regionLabel].filter(Boolean).join(' · ');
+        // Someone arrives later (2026-11-23): each day says who it is planned for ("for 2", "for all 3").
+        var laD = v4LateEntry(), laDay = laD && ((fr && laD.daysFr) || laD.days) ? ((fr && laD.daysFr) || laD.days)[d.day] : '';
+        var label = [date, d.regionLabel, laDay].filter(Boolean).join(' · ');
         html += '<section class="v4-day" id="t3-day-' + d.day + '" aria-labelledby="v4-day-' + d.day + '">' + (nd > 1 || label ? '<h3 class="v4-day-title" id="v4-day-' + d.day + '">' + (nd > 1 ? esc(vt('day') + ' ' + d.day) : '') + (label ? ' <span>' + (nd > 1 ? '· ' : '') + esc(label) + '</span>' : '') + '</h3>' : '')
           + (d.driveIn ? '<p class="v4-leg" style="margin:0 0 6px;border-radius:10px;padding-left:12px">' + esc(t3DriveText(d.driveIn, lang())) + '</p>' : '')
           + v4ThinHtml(p, d.day, fr)

@@ -19,6 +19,7 @@
 const agent = require('./trip-chat-agent');
 const access = require('./trip-chat-access');
 const allergy = require('./trip-allergy-need');
+const late = require('./trip-late-arrival');
 const explain = require('./trip-chat-explain.js');
 const MODEL = 'claude-haiku-5-5';
 // Claude Haiku 5.5 list price (claude-api skill, cached 2026-10-06): $0.10 / $0.50 per million input / output tokens.
@@ -498,7 +499,24 @@ function rulesReadBase(message, stops, opts = {}) { return access.read(message, 
 // chat is recorded, and a swap or an add that asks for a place free of the allergen is explained and never carried out
 // as asked (no listing has allergen data, so no place can be offered as fitting). The rest of the message is read as
 // usual. Fixed rules: the AI's reading never stands in for them (access: true).
+// One of the party arrives later or leaves earlier (2026-11-23, trip-late-arrival.js): the statement, "make sure the
+// hotel booking reflects this" and "only include her for activities from October 9" are about WHO is there, never a
+// stop to add (the last one used to add an activity: "include" + "activities"). Read before everything else; the rest
+// of the message goes to the usual rules. Fixed rules: the AI's reading never stands in for them (access: true).
 function rulesRead(message, stops, opts = {}) {
+  let la = null;
+  try { la = late.chatRead(message, stops, { op: (o, extra = {}) => ({ ...ACCESS_BASE, o, ...extra }) }, { request: opts.request || '' }); } catch (e) { la = null; }
+  if (!la) return rulesReadNeeds(message, stops, opts);
+  if (la.rest) {
+    let r = null;
+    try { r = rulesReadNeeds(la.rest, stops, opts); } catch (e) { r = null; }
+    if (r && (r.ops || []).length) la.ops = [...r.ops.filter((o) => o.o !== 'refine'), ...la.ops];
+    else if (r && r.cant) la.missed = [{ cant: r.cant, what: r.what || null }];
+    delete la.rest;
+  }
+  return la;
+}
+function rulesReadNeeds(message, stops, opts = {}) {
   let al = null;
   try { al = allergy.chatRead(message, stops, { op: (o, extra = {}) => ({ ...ACCESS_BASE, o, ...extra }), stopsNamed }, { request: opts.request || '' }); } catch (e) { al = null; }
   if (!al) return rulesReadBase(message, stops, opts);
@@ -800,7 +818,8 @@ function rulesReadOne(message, stops, { regions = [], regionLabels = {}, days = 
     const k = kindsNamed(t.replace(/\b(?:for|with|par|pour|avec)\b.*$/, ''))[0] || null;
     return { ops: [], cant: 'not_found', what: k };
   }
-  const addWord = /\b(?:add|include|also|fit in|squeeze in|want|would like|some|fill|ajoute[rz]?|aussi|inclure|veux|voudrions)\b/.test(t) || tourToAdd || /\b(?:after|before|apres|avant)\b/.test(t) || (!ops.length && !named.length && Object.values(WORD_KINDS).some((w) => w.re.test(t)));
+  // (2026-11-23) "include her for activities from October 9" is about a person of the party, not a stop to add.
+  const addWord = /\b(?:add|include(?! (?:her|him|them)\b)|also|fit in|squeeze in|want|would like|some|fill|ajoute[rz]?|aussi|inclure|veux|voudrions)\b/.test(t) || tourToAdd || /\b(?:after|before|apres|avant)\b/.test(t) || (!ops.length && !named.length && Object.values(WORD_KINDS).some((w) => w.re.test(t)));
   // "more indoor things": the outdoor stops become indoor ones, one by one (up to three); never a re-plan.
   const moreKind = /\b(?:more|plus d[e']?)\s*(?:indoor|inside|(?:choses |activites )?(?:a l')?interieur)/.test(t) ? 'indoor' : /\b(?:more|plus d[e']?)\s*(?:outdoor|outside|(?:choses |activites )?(?:en |de )?plein air)/.test(t) ? 'outdoor' : null;
   if (!removeWord && moreKind && !ops.length) {

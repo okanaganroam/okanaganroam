@@ -247,6 +247,9 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
  .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts .v4-btn {min-height:44px;padding:0 10px;font-size:13px;white-space:nowrap;gap:4px;}
  .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts .v4-btn>span[aria-hidden] {display:none;}
  .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts:empty {display:none;}
+ /* A split stay (trip-late-arrival.js): its two booking buttons on a row of their own, side by side. */
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts.v4-stay-two {grid-column:1/-1;grid-row:auto;margin:8px 0 0;gap:8px;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts.v4-stay-two .v4-btn {flex:1 1 0;justify-content:center;}
  .t3-v4.tw-workspace .v4-stay-card .v4-stay-alts,.t3-v4.tw-workspace .v4-stay-card .v4-disc-line {grid-column:1/-1;}
  .t3-v4.tw-workspace .v4-stay-card .v4-stay-alts .v4-link {min-height:44px;}
  .t3-v4.tw-workspace .v4-stay-card .v4-disc-line {margin:5px 0 0;font-size:10.5px;line-height:1.3;}
@@ -379,7 +382,7 @@ const WORKSPACE_CLIENT_SRC=String.raw`
   function twSummaryFacts(){
     var fr=lang()==='fr',party='',unset=false;
     try{var d=typeof t3StayData==='function'?t3StayData():null,t=(d&&d.w&&d.w.trip)||null;// The party is on the stay card ("Where you’ll stay · 6 adults"); said here only when that card is not shown.
-      if(t&&(!chatOvernight()||chat.noStay))party=t3StayTripLine({adults:t.adults,adultsAssumed:t.adultsAssumed,kids:t.kids,dog:t.dog},fr);
+      if(t&&(!chatOvernight()||chat.noStay))party=t3StayTripLine({adults:t.adults,adultsAssumed:t.adultsAssumed,kids:t.kids,dog:t.dog,split:t.split},fr);
       // "Dates not set" only once the dates question is gone ("Not sure yet"); while it is asked, the question says it.
       unset=chatOvernight()&&!chatHasDates()&&!((t3StayInputBase()||{}).arrive)&&!!chat.askedWhen;}catch(e){}
     var gone={};try{gone=v4RemovedIds();}catch(e){}

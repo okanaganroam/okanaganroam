@@ -93,6 +93,7 @@ const STAY_AMENITY = { pool: ['Pool', 'Piscine', 'a pool', 'une piscine'], hot_t
 const tripAccess = require('./trip-access-needs');
 const tripTransport = require('./trip-transport-need');
 const tripAllergy = require('./trip-allergy-need');
+const tripLate = require('./trip-late-arrival');
 
 const cap = (t) => String(t || '').replace(/^./, (c) => c.toUpperCase());
 const listEn = (a) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : a[0] || '');
@@ -532,6 +533,10 @@ function applyEvidence(plan, ctx = {}) {
   // Never worked out from a badge, a cuisine or a description.
   const allergy = tripAccess.needOf(needs, 'allergy');
   if (allergy) ev.unshift(tripAllergy.entry(stops.map((x) => ({ id: x.v.id, name: x.v.name, type: x.v.type, meal: isMealStop(x.s) })), allergy));
+  // One of the party arrives later or leaves earlier (2026-11-23, trip-late-arrival.js: plan.lateArrival): who is there
+  // which nights, the stay as the bookings it takes, and each day's head count. Said right after an allergy, before
+  // everything else; never 'verified' (nothing here is booked or checked for availability).
+  if (plan.lateArrival) { const e = tripLate.entry(plan.lateArrival, tripLate.stayTextOf(plan)); if (e) ev.splice(allergy ? 1 : 0, 0, e); }
   ev.push(...stayEntries(plan));
   if (needs.length) ev.push(...stayNeedEntries(plan, ctx, needs));
   // A day the planner could not fill is said, with what could be tried next (never shown as a finished day).
@@ -711,6 +716,9 @@ function parseShareContext(query) {
   // A food allergy (2026-11-23, trip-allergy-need.js): asks=allergy alone says only that allergies are not checked.
   // al=peanut,shellfish names the allergens, and is in a link only when the traveller ticked "Include allergy details".
   if (out.asks && out.asks.includes('allergy')) { const al = tripAllergy.fromShare(q.al); if (al) out.allergy = al; }
+  // A later arrival (2026-11-23, trip-late-arrival.js): la=j1d2o -- join or leave, how many, which day of the trip,
+  // and whether a room of their own was said. Values only; the copy words it again. No la: as before.
+  if (typeof q.la === 'string') { const la = tripLate.fromShare(q.la); if (la) { out.late = la; out.lateQ = q.la; } }
   return Object.keys(out).length ? out : null;
 }
 // The same parameters back as a query string (validated values only), for the EN / FR switch and the canonical link.
@@ -740,6 +748,7 @@ function shareContextQuery(c) {
   if (c.ageChecks && c.ageChecks.length) p.push(`ac=${c.ageChecks.map((a) => `${a.id}:${a.age}`).join(',')}`);
   if (c.budgetQ && c.budgetQ.bg) { p.push(`bg=${c.budgetQ.bg}`); if (c.budgetQ.be) p.push(`be=${c.budgetQ.be}`); }
   if (c.allergy && tripAllergy.toShare(c.allergy)) p.push(`al=${tripAllergy.toShare(c.allergy)}`);
+  if (c.late && c.lateQ) p.push(`la=${c.lateQ}`);
   return p.join('&');
 }
 const shareNiToken = (x) => `${x.kind}:${x.reason === 'none_listed' ? 'n' : 'f'}${x.nearestId ? `:${x.nearestId}` : ''}`;
