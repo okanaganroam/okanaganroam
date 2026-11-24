@@ -306,6 +306,10 @@ const WORKSPACE_CLIENT_SRC=String.raw`
     var reason=t3WhyLines(s).filter(function(w){return !/straight line|ligne droite|listed on|répertorié/i.test(w);})[0]||'';
     var actions=key?(s.noSwap?'':'<button type="button" class="v4-icon" data-t3-swap="'+esc(key)+'" aria-label="'+esc(vt('swap',{name:v.name}))+'">⇄ '+esc(twText('Swap','Changer'))+'</button>')+'<button type="button" class="v4-icon" data-t3-remove="'+esc(key)+'" aria-label="'+esc(vt('remove',{name:v.name}))+'">× '+esc(twText('Remove','Retirer'))+'</button>':'<button type="button" class="v4-icon" data-t3-swap-id="'+esc(v.id)+'" aria-label="'+esc(vt('swap',{name:v.name}))+'">⇄ '+esc(twText('Swap','Changer'))+'</button><button type="button" class="v4-icon" data-v4-remove-id="'+esc(v.id)+'" aria-label="'+esc(vt('remove',{name:v.name}))+'">× '+esc(twText('Remove','Retirer'))+'</button>';
     var note=v4Note(s,key);
+    // (2026-11-24, trip-activity-notes.js) A tour stop's own note is one of the card's short notes, after the
+    // suggested-time one: what to pick and what to check ("Also runs wine tours: … Check your date with the operator.").
+    var act=typeof v4Act==='function'?v4Act(s,key):null;
+    if(act&&act.html)note={url:note?note.url:'',html:(note?note.html:'')+act.html};
     // Trip needs (2026-11-23): a stop whose listing covers one section or feature for a wheelchair, or has only a
     // mobility note, says so in one short line ("Access: Deleenheer Rd access · check ahead") in place of the generic
     // "Matches your request…" line (still under "Why it fits" once opened), so the card does not grow.
