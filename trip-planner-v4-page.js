@@ -269,7 +269,8 @@ const V4_CLIENT_SRC = String.raw`
       if (day != null && r.day !== day) continue;
       var hit = s.event ? r.eventId === s.event.id : (s.venue && r.venueId === s.venue.id);
       // Round 3: a tour with no departure times of its own shows the planned time and says the departure is booked.
-      if (hit && r.bookDeparture) return (typeof r.startMinutes === 'number' ? clockLabel(r.startMinutes) + ' · ' : '') + (lang() === 'fr' ? 'départ à réserver' : 'book a departure time');
+      // (2026-11-24, trip-activity-notes.js: the same words whenever the stop's own note says the time is a suggestion.)
+      if (hit && (r.bookDeparture || (r.activity && r.activity.suggested))) return (typeof r.startMinutes === 'number' ? clockLabel(r.startMinutes) + ' · ' : '') + (lang() === 'fr' ? 'départ à réserver' : 'book a departure time');
       // Suggested times (2026-11-23): a cinema, a class or a session runs at set times we do not hold: "around 7:45 PM".
       if (hit && typeof r.startMinutes === 'number') return (r.timing && r.timing.schedule ? (lang() === 'fr' ? 'vers ' : 'around ') : '') + clockLabel(r.startMinutes);
     }
@@ -292,6 +293,18 @@ const V4_CLIENT_SRC = String.raw`
     var cu = tm.checkUrl && t3StayExt(tm.checkUrl), url = cu || placeUrl(s.venue) || '';
     var attrs = ' data-v4-check-times' + (cu && tm.checkVia === 'booking' ? ' data-track="booking" data-venue-id="' + esc(s.venue.id) + '"' : '');
     return { url: url, html: '<p class="v4-note">' + ttNote(tm, s.venue.name, lang() === 'fr', url, !!cu, esc, attrs) + '</p>' };
+  }
+  // A tour stop's own notes (2026-11-24, trip-activity-notes.js; the words are the server's, on the stop's schedule
+  // row): the card's one short line under the time ("Also runs wine tours: pick an outing with no winery stop. Check
+  // your date with the operator."), every line for Details, and the Book my trip sheet's line. They are the stop's:
+  // on every load, after every chat turn, and gone when the stop goes. -> { note, lines, sheet, html } | null
+  function v4Act(s, key){
+    var r = s && s.venue ? v4Row(s, key) : null, a = r && r.activity, fr = lang() === 'fr';
+    if (!a) return null;
+    var note = (fr && a.noteFr) || a.note || '', lines = (fr && a.linesFr) || a.lines || [];
+    var book = a.suggested ? ((fr && a.bookFr) || a.book || '') : '';
+    var sheet = [a.suggested && typeof r.startMinutes === 'number' ? (fr ? 'suggéré à ' : 'suggested ') + clockLabel(r.startMinutes) : '', book, note].filter(Boolean).join(' · ');
+    return { note: note, lines: lines, sheet: sheet, row: r, html: note ? '<p class="v4-note v4-act-note" data-v4-act="' + esc(note) + '">' + esc(note) + '</p>' : '' };
   }
   // Trip needs (2026-11-23): what this stop's own listing says for a wheelchair user and a dog, from the plan's evidence
   // (the same words as Details, the chat, the Book my trip sheet and the shared copy: each row's note is made in
@@ -435,6 +448,8 @@ const V4_CLIENT_SRC = String.raw`
   function v4Details(s, id){
     var v = s.venue, url = placeUrl(v), fr = lang() === 'fr', out = '';
     out += v4TimingHtml(s, id);
+    var act = v4Act(s, id && /^\d/.test(id) ? id : null);
+    if (act && act.lines.length) out += '<p class="v4-need" data-v4-act-more>' + act.lines.map(function(l){ return esc(/[.!?]$/.test(l) ? l : l + '.'); }).join(' ') + '</p>';
     v4NeedLines(s).more.forEach(function(m){ out += '<p class="v4-need">' + esc(m) + '</p>'; });
     out += v4DirHtml(s);
     if (v.listedHours) out += '<p class="v4-quiet">' + esc(vt('hours')) + ' · ' + esc(v.listedHours) + '</p>';
@@ -490,7 +505,7 @@ const V4_CLIENT_SRC = String.raw`
       + '<div class="v4-acts">'
       + (key ? (s.noSwap ? '' : '<button type="button" class="v4-icon" data-t3-swap="' + esc(key) + '" aria-label="' + esc(vt('swap', { name: v.name })) + '" title="' + esc(vt('swap', { name: v.name })) + '">⇄</button>') + '<button type="button" class="v4-icon" data-t3-remove="' + esc(key) + '" aria-label="' + esc(vt('remove', { name: v.name })) + '" title="' + esc(vt('remove', { name: v.name })) + '">✕</button>'
         : '<button type="button" class="v4-icon" data-t3-swap-id="' + esc(v.id) + '" aria-label="' + esc(vt('swap', { name: v.name })) + '" title="' + esc(vt('swap', { name: v.name })) + '">⇄</button><button type="button" class="v4-icon" data-v4-remove-id="' + esc(v.id) + '" aria-label="' + esc(vt('remove', { name: v.name })) + '" title="' + esc(vt('remove', { name: v.name })) + '">✕</button>')
-      + '</div></div>' + (v4Note(s, key) || { html: '' }).html + v4NeedHtml(s, !!v4Note(s, key)).replace('class="tw-fit tw-need v4-need-note"', 'class="v4-note v4-need-note"')
+      + '</div></div>' + (v4Note(s, key) || { html: '' }).html + (v4Act(s, key) || { html: '' }).html + v4NeedHtml(s, !!v4Note(s, key)).replace('class="tw-fit tw-need v4-need-note"', 'class="v4-note v4-need-note"')
       + '<div class="v4-more" id="' + did + '"' + (v4.open[id] ? '' : ' hidden') + '>' + v4Details(s, id) + '</div>'
       + v4TripBtn(v, key) + '</li>';
     return html;
@@ -651,7 +666,21 @@ const V4_CLIENT_SRC = String.raw`
       var r = v4Row(s, dd.day + '-' + s.daypart);
       if (r && r.timing && r.timing.schedule && TT_WORDS[r.timing.schedule] && typeof r.startMinutes === 'number') timed.push({ s: s, r: r, day: dd.day });
     }); });
-    if (timed.length) html += '<p class="v4-sheet-h4" data-v4-times-h>' + esc(fr ? 'Horaires à vérifier' : 'Times to check') + '</p><ol class="v4-check" data-v4-times>' + timed.map(function(x){
+    // (2026-11-24) ...and the tour stops: a suggested time to book as a departure with the operator, an operator that
+    // also runs tours of a kind the trip rules out, the date to check. The stop's own words; no second booking button
+    // (its booking step, when its listing stores a link, is in the list above).
+    var acts = [];
+    days().forEach(function(dd){ dd.stops.forEach(function(s){
+      if (!s.venue || state.removed[dd.day + '-' + s.daypart]) return;
+      var a = v4Act(s, dd.day + '-' + s.daypart);
+      if (a && a.sheet) acts.push({ s: s, a: a, day: dd.day });
+    }); });
+    var actRows = acts.map(function(x){
+      var pu = placeUrl(x.s.venue);
+      return '<li data-v4-act-row="' + esc(x.s.venue.id) + '"><span aria-hidden="true" style="text-align:center">◷</span><span class="v4-check-name">' + esc(x.s.venue.name) + '<small>' + esc(vt('day') + ' ' + x.day + ' · ' + x.a.sheet) + '</small></span>'
+        + (pu ? '<a ' + hrefAttr(pu) + '>' + esc(vt('details')) + '</a>' : '<span></span>') + '</li>';
+    }).join('');
+    if (timed.length || acts.length) html += '<p class="v4-sheet-h4" data-v4-times-h>' + esc(fr ? 'Horaires à vérifier' : 'Times to check') + '</p><ol class="v4-check" data-v4-times>' + actRows + timed.map(function(x){
       var tm = x.r.timing, cu = tm.checkUrl && t3StayExt(tm.checkUrl), pu = placeUrl(x.s.venue), why = ttWhy(tm.schedule, fr), ages = ttAgeShort(tm, fr);
       // One short line: the day, the suggested time, why it must be checked, and the age line when there are children.
       return '<li><span aria-hidden="true" style="text-align:center">◷</span><span class="v4-check-name">' + esc(x.s.venue.name) + '<small>' + esc(vt('day') + ' ' + x.day + ' · ' + (fr ? 'suggéré vers ' : 'suggested around ') + clockLabel(x.r.startMinutes) + ' · ' + why.charAt(0).toLowerCase() + why.slice(1) + (ages ? ' · ' + ages : '')) + '</small></span>'
@@ -1009,6 +1038,9 @@ const V4_CLIENT_SRC = String.raw`
         if (!name || !name.textContent.trim()) return;
         rows.push(((time && time.textContent.trim()) ? time.textContent.trim() + ' ' : '') + name.textContent.trim());
         // (2026-11-23) The stop's need notes, as on its card ("Wheelchair access: check ahead · Dogs: on leash").
+        // (2026-11-24) A tour stop's own note, as on its card ("Also runs wine tours: … Check your date with the operator.").
+        var an = li.querySelector('[data-v4-act]');
+        if (an && an.getAttribute('data-v4-act')) rows.push('  ' + an.getAttribute('data-v4-act'));
         var nn = li.querySelector('[data-tw-need]');
         if (nn && nn.getAttribute('data-tw-need')) rows.push('  ' + nn.getAttribute('data-tw-need'));
       });

@@ -56,6 +56,8 @@ const tripTransport = require('./trip-transport-need');
 const tripAllergy = require('./trip-allergy-need');
 const tripLate = require('./trip-late-arrival');
 const tripExclusions = require('./trip-exclusions');
+// A tour stop's own notes (2026-11-24): suggested time, an operator that also runs tours of a kind ruled out, the date.
+const tripActivityNotes = require('./trip-activity-notes');
 const tripBudget = require('./trip-budget');
 // Viator tours (2026-11-20, viator.js): off unless VIATOR_API_KEY and VIATOR_PARTNER_ID are both set.
 const viator = require('./viator');
@@ -10139,6 +10141,18 @@ function tripChatClosedOn(id, date) {
   } catch (e) { /* not known */ }
   return null;
 }
+// A tour stop's own notes (2026-11-24, trip-activity-notes.js): the listing's facts they are worked out from. Its type,
+// its planner kinds by its own facts, a Tours listing's own kinds and stored departure times, and its own name and
+// words. Stored data only. -> null when the listing is gone.
+function tripActivityFacts(id) {
+  let v = getVenue(id);
+  if (v && v.redirect_to) v = getVenue(v.redirect_to);
+  if (!v) return null;
+  let tourKinds = null, departures = [];
+  if (v.type === 'tour') { try { tourKinds = venueTourInfo(v.id).kinds || null; } catch (e) { tourKinds = null; } try { departures = tourDepartureTimes(v.id); } catch (e) { departures = []; } }
+  return { type: v.type, kinds: tripChatFactKinds(v.id), tourKinds, departures, text: `${v.name || ''}. ${v.description || ''}` };
+}
+const tripActivityTourKinds = () => require('./trip-requirements').TOUR_PLANNER_KINDS;
 // Why a listing is not added on this trip, in the trip's own rules: a kind the request rules out (it is one, it is at
 // one, or it is only a tour of them), or alcohol on a trip with none. -> a sentence, or null.
 // A boat operator whose listing also mentions wine tours is not a wine tour: it is added, with one line saying so.
@@ -10166,7 +10180,7 @@ function tripChatAddBarred(row, v, L) {
     if (['winery', 'brewery', 'distillery', 'cocktail', 'pub'].includes(row.type) || drinkTour) return { line: tripChat.fill(A.dry, { name: row.name, what: drinkTour ? (L === 'fr' ? 'une sortie autour de l’alcool' : 'a drinks tour') : W ? tripChat.fill(A.isA, { one: L === 'fr' ? W.oneFr : W.one }) : (L === 'fr' ? 'un bar' : 'a bar') }) };
   }
   // Not barred. A listing that also runs tours of the kind ruled out says so in one line.
-  for (const k of tripExclusions.readExclusions(v.args.text)) { const W = tripExclusions.TYPES[k]; if (W && TRIP_ADD_TOUR_OF[k] && kinds.includes(TRIP_ADD_TOUR_OF[k]) && A.tourWords[k]) return { note: tripChat.fill(A.alsoTours, { what: A.tourWords[k], one: L === 'fr' ? W.oneFr : W.one }) }; }
+  for (const k of tripExclusions.readExclusions(v.args.text)) { const W = tripExclusions.TYPES[k]; if (W && A.tourWords[k] && tripActivityNotes.alsoRuns(k, kinds, `${row.name || ''}. ${row.description || ''}`)) return { note: tripChat.fill(A.alsoTours, { what: A.tourWords[k], one: L === 'fr' ? W.oneFr : W.one }) }; }
   return null;
 }
 // The plan with one listing put into a free part of a day; every stop on screen pinned to its slot and its time.
@@ -11379,6 +11393,16 @@ function withTripStays(plan, stay, now = new Date(), text = '', v4 = false, stay
     // Suggested times (2026-11-23, trip-timing.js): which stops run on showtimes, classes, sessions, lanes or booked
     // slots we do not hold, with the children's ages the request or the party control gave (never a guessed age).
     if (v4) { try { require('./trip-timing').applyTiming(plan, (id) => venueIndoorInfo(id).kinds || [], (id, row) => tripTimingVenue(id, row && row.date, row && row.startMinutes), tripTimingParty(stayIn)); } catch (e) { /* times stay as they are */ } }
+    // A tour stop's own notes (2026-11-24, trip-activity-notes.js): the time is a suggestion and a departure is booked
+    // with the operator; an operator that also runs tours of a kind the trip rules out; the date to check. They sit on
+    // the stop's schedule row (row.activity), so the card, Details, the Book my trip sheet and the copied text say them
+    // on every load and after every chat turn, and go when the stop goes.
+    if (v4) {
+      try {
+        tripActivityNotes.applyNotes(plan, tripActivityFacts, { exclusions: tripExclusions.readExclusions(String(text || plan.query || '')), tourKindSet: tripActivityTourKinds(),
+          dated: !!(plan.tripDates ? (!plan.tripDates.assumed && !plan.tripDates.past) : plan.datesGiven) });
+      } catch (e) { for (const r of plan.schedule || []) delete r.activity; }
+    }
     let block = tripStays.whereToStay(plan, stayIn && Object.keys(stayIn).length ? stayIn : null, candidates, todayLocal(now), v4Stay);
     // Travel agent chat: the stay on screen stays through a change to the stops (the other places stay as alternatives).
     if (block && block.pick && tripChatKeepStayId && block.pick.id !== tripChatKeepStayId) {
@@ -56714,6 +56738,25 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
       if (Object.keys(notes).length) out.stopNotes = notes;
     } catch (e) { /* the copy stands without the note */ }
   }
+  // A tour stop's own notes (2026-11-24, trip-activity-notes.js), worked out again from the link's stops, times, dates
+  // and asks and the listings as they are now (nothing is carried for them): the time is a suggestion and a departure
+  // is booked with the operator; the operator also runs tours of a kind the trip rules out; the date to check.
+  try {
+    const no = (c.asks || []).map((a) => (/^no:([a-z_]+)$/.exec(a) || [])[1]).filter(Boolean);
+    const act = {};
+    refs.forEach((ref, i) => {
+      const m = /^venue:([1-9][0-9]*)$/.exec(ref);
+      if (!m || act[ref]) return;
+      const f = tripActivityFacts(Number(m[1]));
+      if (!f) return;
+      const t0 = (c.times || [])[i];
+      let scheduled = false;
+      try { scheduled = !!require('./trip-timing').scheduleKind(tripTimingVenue(Number(m[1])), venueIndoorInfo(Number(m[1])).kinds || []); } catch (e) { scheduled = false; }
+      const n = tripActivityNotes.notes({ ...f, tourKindSet: tripActivityTourKinds(), start: Number.isInteger(t0) ? t0 : null, scheduled, exclusions: no, dated: !!dayOne });
+      if (n) act[ref] = { lines: fr ? n.linesFr : n.lines, ...(n.suggested ? { suggested: true } : {}) };
+    });
+    if (Object.keys(act).length) out.actNotes = act;
+  } catch (e) { delete out.actNotes; }
   // The traveller's budget (2026-11-23, trip-budget.js): the limit, the estimate the plan showed and what it leaves
   // out, in two short lines worded here from the link's values. A link with no budget prints nothing new.
   if (c.budget) { try { const bl = tripBudget.lines(c.budget, fr ? 'fr' : 'en'); if (bl && bl.share.length) out.budgetLines = bl.share; } catch (e) { /* the copy stands without them */ } }
@@ -57054,6 +57097,8 @@ ${renderAnalyticsHeadHtml('my_trip')}
   /* A suggested time's note ("Suggested time · Check sessions ↗"): the link's hit area is 44px tall without adding height. */
   body.my-trip-page .mt-need { font-weight: 700; opacity: 0.85; overflow-wrap: anywhere; }
   body.my-trip-page .mt-need-dir { overflow-wrap: anywhere; }
+  body.my-trip-page .mt-act { overflow-wrap: anywhere; margin-top: 2px; }
+  body.my-trip-page .mt-act[data-mt-act="time"] { font-weight: 700; opacity: 0.85; }
   body.my-trip-page .mt-sched a { position: relative; white-space: nowrap; font-weight: 800; color: inherit; }
   body.my-trip-page .mt-sched a::after { content: ""; position: absolute; inset: -14px -6px; }
   body.my-trip-page .mt-num { display: inline-flex; width: 24px; height: 24px; align-items: center; justify-content: center; border-radius: 999px; background: var(--ref-gold, #E0A94E); color: #16233a; font-weight: 800; font-size: 0.8rem; margin-right: 6px; }
@@ -57116,6 +57161,9 @@ ${renderGolfHeaderHtml()}
   // Trip needs (2026-11-23): a shared plan's short note per stop, as on the plan's own cards, worked out again from the
   // listings by the server (tripShareContext). Empty for a link without a wheelchair or dog need, and for your own trip.
   var NEED_NOTES = ${JSON.stringify((shareContext && shareContext.stopNotes) || {}).replace(/</g, '\\u003c')};
+  // A tour stop's own notes (trip-activity-notes.js): "Suggested time · book a departure time with the operator" and
+  // what to check, worked out by the server from the link and the listings. Empty for your own trip.
+  var ACT_NOTES = ${JSON.stringify((shareContext && shareContext.actNotes) || {}).replace(/</g, '\\u003c')};
   // Someone arrives later (trip-late-arrival.js): each day's head count ("for 2", "for all 3"), by the day's title.
   var DAY_FOR = ${JSON.stringify((shareContext && shareContext.late && shareContext.late.days) || {}).replace(/</g, '\\u003c')};
   // (2026-11-24) With an arrival time on the link: each stop of that day says who it is for, by when it starts.
@@ -57297,6 +57345,7 @@ ${renderGolfHeaderHtml()}
           // The stop's need note, under the suggested-time note, in the plan card's own words; then the directions
           // line when its listing covers one entrance or section (the day's map link goes to the listing's location).
           var nn = !mine && NEED_NOTES[x.s.ref], needHtml = nn && nn.text ? '<p class="mt-meta mt-need" data-mt-need>' + esc(nn.text) + '</p>' + (nn.dir ? '<p class="mt-meta mt-need-dir" data-mt-need-dir' + (nn.q ? '="pin"' : '="listing"') + '>' + esc(nn.dir) + '</p>' : '') : '';
+          var an = !mine && ACT_NOTES[x.s.ref], actHtml = an && an.lines ? an.lines.map(function(l, i){ return '<p class="mt-meta mt-act" data-mt-act="' + (an.suggested && i === 0 ? 'time' : 'note') + '">' + esc(l) + '</p>'; }).join('') : '';
           var lateSt = !mine && LATE.win && String(g.key) === String(LATE.day) && x.s.time && typeof x.s.time.s === 'number' ? lateStopState(LATE.win, LATE.kind, x.s.time.s) : '';
           if (lateSt && LATE.stop && LATE.stop[lateSt]) needHtml += '<p class="mt-meta mt-need" data-mt-late-stop="' + lateSt + '">' + esc(LATE.stop[lateSt]) + '</p>';
           var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="' + esc(T.moveUp.replace('{name}', x.s.name)) + '"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="' + esc(T.moveDown.replace('{name}', x.s.name)) + '"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="' + esc(T.remove.replace('{name}', x.s.name)) + '">✕</button></div>' : '';
@@ -57306,7 +57355,7 @@ ${renderGolfHeaderHtml()}
           var noPin = d.kind === 'event' && !d.missing && d.lat == null ? '<p class="mt-meta mt-nopin">' + esc(T.noPin) + '</p>' : '';
           // A shared plan's stop keeps its own booking link (the listing's stored link; the business's or provider's site).
           var bk = !mine && d.book && /^https:\\/\\//.test(d.book.url || '') ? '<a class="mt-book" ' + hrefAttr(d.book.url) + ' target="_blank" rel="' + esc(d.book.rel || 'nofollow noopener') + '" data-track="booking" data-venue-id="' + esc(String(x.s.ref).split(':')[1]) + '"' + (d.book.affiliate ? ' data-affiliate="1"' : '') + '>' + esc((fr && d.book.labelFr) || d.book.label || (fr ? 'Réserver' : 'Book')) + ' <span aria-hidden="true">↗</span></a>' + (d.book.affiliate ? '<small>' + (fr ? 'Nous pouvons toucher une commission' : 'We may earn a commission') + '</small>' : '') : '';
-          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p>' + (skHtml ? '<p class="mt-meta">' + skHtml + '</p>' : '') + needHtml + notice + noPin + bk + '</div>' + tools + '</li>';
+          return '<li class="mt-stop"><div class="mt-photo">' + (d.photo ? '<img src="' + esc(d.photo) + '" alt="" loading="lazy" width="240" height="160">' : '') + '</div><div><span class="mt-num">' + x.n + '</span>' + name + '<p class="mt-meta">' + esc(meta) + '</p>' + (skHtml ? '<p class="mt-meta">' + skHtml + '</p>' : '') + actHtml + needHtml + notice + noPin + bk + '</div>' + tools + '</li>';
         }).join('') + '</ol></section>';
     }).join('');
     drawMap(shown);
@@ -86452,7 +86501,7 @@ module.exports = {
   withTripFrenchUrls,
   tripShareSummary,
   tripShareSearch,
-  tripShareContext, tripShareContextHtml, tripShareNotIncluded, tripShareTour, tripNotIncludedText, tripChatAddWhy,
+  tripActivityFacts, tripShareContext, tripShareContextHtml, tripShareNotIncluded, tripShareTour, tripNotIncludedText, tripChatAddWhy,
   tripAgeCheck, tripChatSwapBack, tripChatUnfit, tripChatAgeNote, tripListingAges, tripChatNearestOfKind, tripChatPickTagged, tripChatSwapNoFit, tripChatKindRows,
   tripPlanLinkProblems, tripStoredBookingLinks, tripVenueBookingItem, tripBookingLinkBelongs, tripHonestEvidence,
   tripCardPhotoKey,
