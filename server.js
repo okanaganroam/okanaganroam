@@ -1704,6 +1704,14 @@ const VENUE_DELETE_CHILDREN = [
   ['owner_event_changes', 'venue_id = ?'], ['venue_links', 'venue_id = ?'], ['visitor_contributions', 'venue_id = ?'],
   ['venue_claims', 'venue_id = ?'], ['venue_hours_extra', 'venue_id = ?'], ['event_partner_venues', 'venue_id = ?'],
   ['venue_visit_info', 'venue_id = ?'], ['venue_avg_spend', 'venue_id = ?'], ['venue_not_offered', 'venue_id = ?'],
+  // Delete fix (2026-11-23; removing the live TEST campground #2171 failed with "FOREIGN KEY constraint failed"): every
+  // table added since with a venue_id that REFERENCES venues(id) (the setups' answers and progress, owner features,
+  // cuisines, specials, weekly nights, photo positions, badge reminders, stay facts). tests/venue-delete-children.test.js
+  // checks this list against the schema, so a new table can't be missed again.
+  ['owner_setup_progress', 'venue_id = ?'], ['venue_owner_features', 'venue_id = ?'], ['venue_cuisines', 'venue_id = ?'],
+  ['venue_specials', 'venue_id = ?'], ['venue_weekly_nights', 'venue_id = ?'], ['venue_photo_positions', 'venue_id = ?'], ['badge_reminders', 'venue_id = ?'],
+  ['venue_pub_info', 'venue_id = ?'], ['venue_cafe_info', 'venue_id = ?'], ['venue_winery_info', 'venue_id = ?'], ['venue_brewery_info', 'venue_id = ?'],
+  ['venue_tour_info', 'venue_id = ?'], ['venue_indoor_info', 'venue_id = ?'], ['venue_sport_info', 'venue_id = ?'], ['stay_info', 'venue_id = ?'],
 ];
 const VENUE_DELETE_UNLINK = [['events', 'venue_id'], ['venue_submissions', 'venue_id'], ['venues', 'redirect_to']];
 function deleteVenue(id) {
