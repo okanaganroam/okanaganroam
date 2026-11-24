@@ -227,7 +227,7 @@ test('nothing public changes: the venue page, the API and the Verified tick stay
 });
 
 test('other types: no buttons, no data, no field word, no help topic (EN + FR)', async () => {
-  for (const t of ['beach', 'shop', 'outdoor']) { // indoor places since 2026-11-19; distilleries have the setup since 2026-11-13; tours since 2026-11-16; golf and sport have the setup since 2026-11-20
+  for (const t of ['beach', 'shop']) { // outdoor businesses have the setup since 2026-11-23; indoor places since 2026-11-19; distilleries have the setup since 2026-11-13; tours since 2026-11-16; golf and sport have the setup since 2026-11-20
     const v = mk(t);
     for (const lang of ['', '/fr']) {
       const html = await get(`${lang}/owner/${tokenFor(v.id)}`);

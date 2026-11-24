@@ -588,16 +588,20 @@ const SPORT_KIND_TEXT_KINDS = SK.SPORT_KINDS.slice();
 // The kind a place reads in: its main kind (the first the owner picked), else 'other'.
 function indoorKindKey(kinds) { const k = Array.isArray(kinds) ? kinds[0] : kinds; return k && K[k] ? k : 'other'; }
 // Sport (2026-11-20): a sport or golf listing's main kind, else 'sportother'.
-function sportKindKey(kinds) { const k = Array.isArray(kinds) ? kinds[0] : kinds; return k && K[k] && SK.SPORT_KINDS.includes(k) ? k : 'sportother'; }
+// Outdoor businesses (2026-11-23): an outdoor kind is a main kind too; an outdoor listing with none reads 'outdoorother'.
+function sportKindKey(kinds, type) { const k = Array.isArray(kinds) ? kinds[0] : kinds; return k && K[k] && SK.ENGINE_KINDS.includes(k) ? k : type === 'outdoor' ? 'outdoorother' : 'sportother'; }
 // The kinds research's words name for a sport or golf listing (the name first, then the story), up to 3, as the starting
 // picks of "What kind of place are you?". A golf listing always starts on one of the three golf kinds: a simulator when its
 // words say so, a range or mini golf when they say that and not a course, else a golf course.
 function sportKindSuggestion(venue) {
   const name = String(venue.name || '').toLowerCase(), all = `${name} ${String(venue.cuisine || '').toLowerCase()}`;
   let out = [];
-  for (const [k, re] of SK.SPORT_KIND_HINTS) if (re.test(all) && !out.includes(k)) out.push(k);
+  // Outdoor businesses (2026-11-23): an outdoor listing only starts on outdoor kinds, a sport or golf listing on theirs.
+  const mine = venue.type === 'outdoor' ? SK.OUTDOOR_KIND_ORDER : SK.SPORT_KIND_ORDER;
+  const HINTS = SK.SPORT_KIND_HINTS.filter(([k]) => mine.includes(k));
+  for (const [k, re] of HINTS) if (re.test(all) && !out.includes(k)) out.push(k);
   const desc = String(venue.description || '').toLowerCase().slice(0, 240);
-  if (!out.length || (venue.type === 'golf' && !out.some((k) => k !== 'golf'))) for (const [k, re] of SK.SPORT_KIND_HINTS) if (re.test(desc) && !out.includes(k) && (venue.type !== 'golf' || ['simgolf', 'range'].includes(k) || !out.length)) out.push(k);
+  if (!out.length || (venue.type === 'golf' && !out.some((k) => k !== 'golf'))) for (const [k, re] of HINTS) if (re.test(desc) && !out.includes(k) && (venue.type !== 'golf' || ['simgolf', 'range'].includes(k) || !out.length)) out.push(k);
   if (venue.type === 'golf') {
     const course = /\bgolf (?:club|course|resort|& country|and country)|country club|\b(?:9|18|nine|eighteen|27)[- ]holes?\b/.test(`${all} ${desc}`.replace(/\b(?:\d+[- ]holes? )?mini[- ]?(?:golf|putt)(?: course)?\b/g, ' '));
     const first = out.includes('simgolf') && !/\b18[- ]holes?\b/.test(all) ? 'simgolf' : out.includes('range') && !course ? 'range' : 'golf';

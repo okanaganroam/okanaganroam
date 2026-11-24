@@ -386,6 +386,21 @@ const GOLF_COURSE_ONLY_RE = /(?<![\p{L}\p{N}])(?:twilight|carts?|aeration|green 
 // Kinds played outdoors: the dog tile says "Dogs welcome", never "inside" (sport test 1).
 const OUTDOOR_KINDS = ['golf', 'range', 'skatepark', 'discgolf', 'bike', 'swim', 'courts', 'skischool', 'sportother'];
 
+// Outdoor businesses (2026-11-23): their kinds (outdoor-kinds.js) join every table here, so the indoor engine's sport branch
+// reads them the same way. SPORT_KIND_ORDER stays the sport and golf chips; OUTDOOR_KIND_ORDER is an outdoor listing's.
+const OK_ = require('./outdoor-kinds');
+Object.assign(K, OK_.K);
+for (const [mine, theirs] of [[PRICE_PH, OK_.PRICE_PH], [TYPER, OK_.TYPER], [TYPER_TRUE, OK_.TYPER_TRUE], [TYPE_SUB, OK_.TYPE_SUB], [BUSY_THEME, OK_.BUSY_THEME], [EX_PRICE, OK_.EX_PRICE],
+  [EXACT, OK_.EXACT], [PREFILL, OK_.PREFILL], [SLOT, OK_.SLOT], [EVENTS, OK_.EVENTS], [BOOK_AHEAD_UNIT, OK_.BOOK_AHEAD_UNIT], [LABEL_PARTS, OK_.LABEL_PARTS], [BOOK_WORDS, OK_.BOOK_WORDS],
+  [KIND_SETUP_WORDS, OK_.KIND_SETUP_WORDS], [SPORT_KIND_LABELS_OWNER, OK_.OUTDOOR_KIND_LABELS_OWNER], [SPORT_KIND_WORDS, OK_.OUTDOOR_KIND_WORDS], [SPORT_KIND_LENGTH, OK_.OUTDOOR_KIND_LENGTH],
+  [SPORT_KIND_BOOK, OK_.OUTDOOR_KIND_BOOK]]) Object.assign(mine, theirs);
+SPORT_ALL_AGES_KINDS.push(...OK_.OUTDOOR_ALL_AGES_KINDS);
+const ENGINE_UNTAPPED_AGE_OK_KINDS = SPORT_UNTAPPED_AGE_OK_KINDS.concat(OK_.OUTDOOR_UNTAPPED_AGE_OK_KINDS);
+SPORT_KIND_HINTS.push(...OK_.OUTDOOR_KIND_HINTS);
+OUTDOOR_KINDS.push(...OK_.OUTDOOR_TYPE_KINDS);
+const OUTDOOR_KIND_ORDER = OK_.OUTDOOR_KIND_ORDER.slice();
+// Sport and golf's kinds (unchanged); every kind the engine's sport branch runs adds the outdoor businesses'.
 const SPORT_KINDS = SPORT_KIND_ORDER.slice();
-module.exports = { K, KIND_SETUP_WORDS, GOLF_COURSE_ONLY_RE, PRICE_PH, BOOK_WORDS, OUTDOOR_KINDS, TYPER, TYPER_TRUE, TYPE_SUB, BUSY_THEME, EX_PRICE, EXACT, PREFILL, SLOT, EVENTS, BOOK_AHEAD_UNIT, LABEL_PARTS,
+const ENGINE_KINDS = SPORT_KINDS.concat(OUTDOOR_KIND_ORDER);
+module.exports = { OUTDOOR_KIND_ORDER, ENGINE_KINDS, ENGINE_UNTAPPED_AGE_OK_KINDS, K, KIND_SETUP_WORDS, GOLF_COURSE_ONLY_RE, PRICE_PH, BOOK_WORDS, OUTDOOR_KINDS, TYPER, TYPER_TRUE, TYPE_SUB, BUSY_THEME, EX_PRICE, EXACT, PREFILL, SLOT, EVENTS, BOOK_AHEAD_UNIT, LABEL_PARTS,
   SPORT_KINDS, SPORT_KIND_ORDER, SPORT_KIND_LABELS_OWNER, SPORT_KIND_WORDS, SPORT_KIND_LENGTH, SPORT_KIND_BOOK, SPORT_ALL_AGES_KINDS, SPORT_UNTAPPED_AGE_OK_KINDS, SPORT_KIND_HINTS };

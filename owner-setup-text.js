@@ -2561,9 +2561,9 @@ Object.assign(fr.indoor, { bringExKinds: { gallery: 'La plupart des œuvres sont
 // Sport test 9 (2026-11-21; Gord's "My prices are on my website" was filled with his Chronogolf tee-time link): a rates
 // page only, never a booking link; with none found, the box starts empty with a hint.
 Object.assign(en.indoor, { partTimesQ: 'Part of the place with its own times? (optional)', partTimesOpen: 'Part of the place has its own times? Add it', partTimesPh: 'e.g. Range: April–October\nFitting bay: open all winter by appointment', partTimesHint: 'One line each, up to 3. Your season and hours stay as they are: this shows beside them as that part’s times. Then tap your answer above.', partTimesKeep: 'Add: “{line}”' });
-Object.assign(en.indoor, { webWhatShows: 'Your page will link to your rates page (your prices aren’t copied).', webSavedLink: 'Your page will link to your rates page, usually within a day (we check the link first).', webLeadRates: 'We filled in the rates page we found on your website. Check it’s the right one.', webLeadRatesEmpty: 'Type your rates page’s address, like yourclub.com/rates (not your booking page). Or use your website’s home page.' });
+Object.assign(en.indoor, { webWhatShows: 'Your page will link to your rates page (your prices aren’t copied).', webSavedLink: 'Your page will link to your rates page, usually within a day (we check the link first).', webLeadRates: 'We filled in the rates page we found on your website. Check it’s the right one.', webLeadRatesEmpty: 'Type your rates page’s address, like yoursite.com/rates (not your booking page). Or use your website’s home page.' });
 Object.assign(fr.indoor, { partTimesQ: 'Une partie de l’endroit a ses propres heures? (facultatif)', partTimesOpen: 'Une partie de l’endroit a ses propres heures? Ajoutez-la', partTimesPh: 'p. ex. Champ de pratique : d’avril à octobre\nBaie d’ajustement : ouverte tout l’hiver sur rendez-vous', partTimesHint: 'Une ligne chacune, jusqu’à 3. Votre saison et vos heures restent les mêmes : ceci paraît à côté, comme les heures de cette partie. Puis touchez votre réponse plus haut.', partTimesKeep: 'Ajouter : « {line} »' });
-Object.assign(fr.indoor, { webWhatShows: 'Votre page renverra à votre page des tarifs (vos prix ne sont pas copiés).', webSavedLink: 'Votre page renverra à votre page des tarifs, en général d’ici un jour (nous vérifions le lien d’abord).', webLeadRates: 'Nous avons inscrit la page des tarifs trouvée sur votre site. Vérifiez que c’est la bonne.', webLeadRatesEmpty: 'Inscrivez l’adresse de votre page des tarifs, comme votreclub.com/tarifs (pas votre page de réservation). Ou prenez la page d’accueil de votre site.' });
+Object.assign(fr.indoor, { webWhatShows: 'Votre page renverra à votre page des tarifs (vos prix ne sont pas copiés).', webSavedLink: 'Votre page renverra à votre page des tarifs, en général d’ici un jour (nous vérifions le lien d’abord).', webLeadRates: 'Nous avons inscrit la page des tarifs trouvée sur votre site. Vérifiez que c’est la bonne.', webLeadRatesEmpty: 'Inscrivez l’adresse de votre page des tarifs, comme votresite.com/tarifs (pas votre page de réservation). Ou prenez la page d’accueil de votre site.' });
 // Sport test 8 (2026-11-21; Dayton approved): a walk-on or 9-hole course's Good to know chips. The big-course chips that
 // don't fit it ("Pro shop", "Dress code: collared shirts", "Driving range on site") make room, so the count stays the same.
 // Sport test 8 (2026-11-21; Marg's golf course was asked "Patio only / Inside and patio / Water bowls at the door"): the
@@ -2785,6 +2785,100 @@ const SPORT_TIMES_HINTS = {
     rink: 'Le patinage familial le dimanche après-midi', swim: 'La glissade d’eau et les jeux d’eau', skatepark: 'Le bol et la section de rue', bike: 'Les soirées de course du jeudi l’été', courts: 'Le pickleball libre chaque matin de semaine',
     discgolf: '18 trous dans les pins', sportsctr: 'Des sports libres pour tous les âges', sportgen: 'Accueillant, local et amusant pour toute la famille' });
 })();
+// Outdoor businesses (2026-11-23): each outdoor kind's own chips and examples, in the indoor tables like the sport kinds'
+// (their keys never repeat an indoor or sport one), so the setup screens and Help read them the same way.
+(function outdoorWords() {
+  Object.assign(en.indoor.quick.good_to_know_kinds, {
+    camp: ['Book sites ahead for summer weekends', 'Check-in after 2 PM', 'Quiet hours 10 PM to 7 AM', 'Dogs on a leash', 'Firewood for sale', 'Showers and laundry', 'Lake access'],
+    waterrent: ['Life jackets included', 'Boat licence needed for motorboats', 'Deposit and ID needed', 'Book ahead on weekends', 'Free parking on site'],
+    skihill: ['Buy lift tickets online to save', 'Rentals and lessons on site', 'Night skiing on some evenings', 'Check the snow report', 'Free parking on site'],
+    nature: ['Gift shop', 'Wheelchair-friendly paths', 'Bring water and a hat', 'Guided walks at set times', 'Free parking on site'],
+    adventurepark: ['Waiver to sign before you start', 'Closed-toe shoes required', 'Minimum age and height', 'Book ahead on weekends', 'Free parking on site'],
+    waterpark: ['Bring a swimsuit and a towel', 'Lifeguards on duty', 'Lockers available', 'Food and drinks on site', 'Free parking on site'],
+    airsport: ['Weather can move your booking', 'Weight limits apply', 'Book ahead', 'Arrive 30 minutes early', 'Photos and video to buy'],
+    horse: ['Closed-toe shoes or boots', 'Helmets provided', 'Weight limit applies', 'Book ahead', 'Minimum age applies'],
+    farm: ['U-pick in season', 'Farm market on site', 'Petting animals', 'Café or snack bar on site', 'Free parking on site'],
+    market: ['Rain or shine', 'Bring your own bags', 'Cash and cards', 'Dogs on a leash', 'Free parking nearby'],
+    outdoorgen: ['Book ahead on weekends', 'Free parking on site', 'Bring sunscreen and water', 'Washrooms on site', 'Dress for the weather'],
+  });
+  Object.assign(fr.indoor.quick.good_to_know_kinds, {
+    camp: ['Réservez votre emplacement pour les fins de semaine d’été', 'Arrivée après 14 h', 'Heures de silence de 22 h à 7 h', 'Chiens en laisse', 'Bois de chauffage en vente', 'Douches et buanderie', 'Accès au lac'],
+    waterrent: ['Gilets de sauvetage inclus', 'Permis de bateau requis pour les bateaux à moteur', 'Dépôt et pièce d’identité requis', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place'],
+    skihill: ['Achetez vos billets en ligne pour économiser', 'Location et cours sur place', 'Ski de soirée certains soirs', 'Consultez le bulletin de neige', 'Stationnement gratuit sur place'],
+    nature: ['Boutique', 'Sentiers accessibles en fauteuil roulant', 'Apportez de l’eau et un chapeau', 'Visites guidées à heures fixes', 'Stationnement gratuit sur place'],
+    adventurepark: ['Décharge à signer avant de commencer', 'Chaussures fermées obligatoires', 'Âge et taille minimums', 'Réservez pour les fins de semaine', 'Stationnement gratuit sur place'],
+    waterpark: ['Apportez votre maillot et une serviette', 'Sauveteurs en service', 'Casiers offerts', 'À manger et à boire sur place', 'Stationnement gratuit sur place'],
+    airsport: ['La météo peut déplacer votre réservation', 'Limites de poids', 'Réservez à l’avance', 'Arrivez 30 minutes d’avance', 'Photos et vidéos en vente'],
+    horse: ['Chaussures fermées ou bottes', 'Casques fournis', 'Limite de poids', 'Réservez à l’avance', 'Âge minimum'],
+    farm: ['Autocueillette en saison', 'Marché à la ferme', 'Animaux à caresser', 'Café ou casse-croûte sur place', 'Stationnement gratuit sur place'],
+    market: ['Beau temps, mauvais temps', 'Apportez vos sacs', 'Comptant et cartes', 'Chiens en laisse', 'Stationnement gratuit à proximité'],
+    outdoorgen: ['Réservez pour les fins de semaine', 'Stationnement gratuit sur place', 'Apportez de la crème solaire et de l’eau', 'Toilettes sur place', 'Habillez-vous selon la météo'],
+  });
+  Object.assign(en.indoor.bringExKinds, {
+    camp: 'Book summer weekends ahead. Check-in after 2 PM, checkout by 11 AM. Firewood for sale at the office.',
+    waterrent: 'Life jackets included. Bring ID and a card for the deposit. A boat licence is needed for motorboats.',
+    skihill: 'Buy lift tickets online to save. Rentals and lessons at the base. Check the snow report before you drive up.',
+    nature: 'Bring water and a hat in summer. Guided walks at 10 AM and 2 PM. The gift shop takes cards.',
+    adventurepark: 'Closed-toe shoes required. Sign the waiver online before you come. Kids must be 7 or older.',
+    waterpark: 'Bring a swimsuit and a towel. Lockers by the entrance. Lifeguards on duty all day.',
+    airsport: 'Weather can move your booking: we’ll call you. Weight limit 230 lb. Arrive 30 minutes early.',
+    horse: 'Wear long pants and closed-toe shoes. Helmets provided. Riders must be 8 or older.',
+    farm: 'U-pick cherries in July, apples in September. Bring a hat. The farm market is open every day.',
+    market: 'Rain or shine. Bring your own bags. Most vendors take cards.',
+    outdoorgen: 'Bring sunscreen and water. Free parking on site.',
+  });
+  Object.assign(fr.indoor.bringExKinds, {
+    camp: 'Réservez les fins de semaine d’été à l’avance. Arrivée après 14 h, départ avant 11 h. Bois de chauffage en vente au bureau.',
+    waterrent: 'Gilets de sauvetage inclus. Apportez une pièce d’identité et une carte pour le dépôt. Permis requis pour les bateaux à moteur.',
+    skihill: 'Achetez vos billets en ligne pour économiser. Location et cours au pied des pentes. Consultez le bulletin de neige avant de monter.',
+    nature: 'Apportez de l’eau et un chapeau l’été. Visites guidées à 10 h et 14 h. La boutique accepte les cartes.',
+    adventurepark: 'Chaussures fermées obligatoires. Signez la décharge en ligne avant de venir. Les enfants doivent avoir 7 ans ou plus.',
+    waterpark: 'Apportez votre maillot et une serviette. Casiers à l’entrée. Sauveteurs en service toute la journée.',
+    airsport: 'La météo peut déplacer votre réservation : nous vous appellerons. Limite de poids de 230 lb. Arrivez 30 minutes d’avance.',
+    horse: 'Portez un pantalon long et des chaussures fermées. Casques fournis. Les cavaliers doivent avoir 8 ans ou plus.',
+    farm: 'Autocueillette de cerises en juillet, de pommes en septembre. Apportez un chapeau. Le marché à la ferme est ouvert tous les jours.',
+    market: 'Beau temps, mauvais temps. Apportez vos sacs. La plupart des marchands acceptent les cartes.',
+    outdoorgen: 'Apportez de la crème solaire et de l’eau. Stationnement gratuit sur place.',
+  });
+  Object.assign(en.indoor.storyExKinds, {
+    camp: 'A family-run campground on the lake since 1972, with tent and RV sites, a sandy beach and a boat launch.',
+    waterrent: 'Paddleboards, kayaks and boats to rent right on the beach, with a quick lesson before you head out.',
+    skihill: 'A family ski hill with 40 runs, night skiing on Fridays and a ski school for first-timers.',
+    nature: 'A desert nature centre with a boardwalk trail, live animals and guided walks every day in summer.',
+    adventurepark: 'Ziplines and treetop rope courses in the forest, for kids 7 and up and their grown-ups.',
+    waterpark: 'A waterpark with eight slides, a lazy river and a splash zone for little ones, open all summer.',
+    airsport: 'Tandem skydives over the valley with instructors who have made thousands of jumps. No experience needed.',
+    horse: 'Trail rides through the hills on calm, well-trained horses, for beginners and experienced riders.',
+    farm: 'A fourth-generation family farm with u-pick fruit, a farm market and a petting zoo for the kids.',
+    market: 'More than 100 local farmers, bakers and makers every Saturday morning from April to October.',
+    outdoorgen: 'A local, family-run place outdoors, with something for every age.',
+  });
+  Object.assign(fr.indoor.storyExKinds, {
+    camp: 'Un camping familial au bord du lac depuis 1972, avec des emplacements pour tentes et VR, une plage de sable et une rampe de mise à l’eau.',
+    waterrent: 'Des planches à pagaie, des kayaks et des bateaux à louer directement sur la plage, avec une petite leçon avant de partir.',
+    skihill: 'Une station de ski familiale avec 40 pistes, du ski de soirée le vendredi et une école de ski pour les débutants.',
+    nature: 'Un centre de la nature dans le désert, avec un sentier sur trottoir de bois, des animaux vivants et des visites guidées tous les jours l’été.',
+    adventurepark: 'Des tyroliennes et des parcours d’hébertisme dans les arbres, pour les enfants de 7 ans et plus et leurs parents.',
+    waterpark: 'Un parc aquatique avec huit glissades, une rivière tranquille et une zone de jeux d’eau pour les petits, ouvert tout l’été.',
+    airsport: 'Des sauts en parachute en tandem au-dessus de la vallée, avec des instructeurs qui ont fait des milliers de sauts. Aucune expérience requise.',
+    horse: 'Des randonnées à cheval dans les collines sur des chevaux calmes et bien dressés, pour débutants et cavaliers d’expérience.',
+    farm: 'Une ferme familiale de quatrième génération avec autocueillette, marché à la ferme et mini-ferme pour les enfants.',
+    market: 'Plus de 100 fermiers, boulangers et artisans d’ici chaque samedi matin, d’avril à octobre.',
+    outdoorgen: 'Un endroit familial en plein air, avec quelque chose pour tous les âges.',
+  });
+  Object.assign(en.indoor.knownExKinds, {
+    camp: 'Lakefront sites and a sandy beach', waterrent: 'Sunset paddles on calm water', skihill: 'Night skiing and friendly lift lines',
+    nature: 'The boardwalk trail and the rattlesnakes', adventurepark: 'The longest zipline in the valley', waterpark: 'The lazy river and the big slides',
+    airsport: 'Views of the whole valley from 10,000 feet', horse: 'Sunset trail rides', farm: 'Cherry picking and the petting zoo',
+    market: 'Fresh fruit, baking and live music', outdoorgen: 'Friendly, local and fun for the whole family',
+  });
+  Object.assign(fr.indoor.knownExKinds, {
+    camp: 'Les emplacements au bord du lac et la plage de sable', waterrent: 'Les sorties au coucher du soleil sur l’eau calme', skihill: 'Le ski de soirée et les files d’attente courtes',
+    nature: 'Le sentier sur trottoir de bois et les serpents à sonnette', adventurepark: 'La plus longue tyrolienne de la vallée', waterpark: 'La rivière tranquille et les grandes glissades',
+    airsport: 'La vue sur toute la vallée à 10 000 pieds', horse: 'Les randonnées au coucher du soleil', farm: 'La cueillette de cerises et la mini-ferme',
+    market: 'Les fruits frais, les pâtisseries et la musique', outdoorgen: 'Accueillant, local et amusant pour toute la famille',
+  });
+})();
 (function indoorKindWords() {
   const IK = require('./indoor-kinds');
   const noPeriod = (x) => String(x).replace(/\.$/, '');
@@ -2794,7 +2888,7 @@ const SPORT_TIMES_HINTS = {
     // Codes, not words: [Good to know chip group, story example group, quiet kind, daytime kind] (an array, so the French
     // check skips it). Daytime (indoor test 5): no "Open after midnight?" row.
     T.kindGroups = {};
-    for (const k of IK.INDOOR_KIND_TEXT_KINDS.concat(IK.SPORT_KIND_TEXT_KINDS)) {
+    for (const k of IK.INDOOR_KIND_TEXT_KINDS.concat(IK.SPORT_KIND_TEXT_KINDS, IK.SPORT.OUTDOOR_KIND_ORDER)) {
       const w = IK.indoorKindText([k], lang), line = noPeriod(w.price.page);
       T.kindText[k] = {
         tpriceLabel: w.price.label, tpricePh: w.price.ph, tpriceLead: w.price.lead,
@@ -3028,4 +3122,58 @@ Object.assign(fr.tour, {
   }
 })(fr);
 
+// Outdoor businesses (2026-11-23): the sport words, with these over them (campgrounds, rentals, farms and parks, not
+// lessons and leagues). The kind tables (outdoor-kinds.js) give each kind its own price, booking and photo words.
+en.outdoor = sportStrings(en.sport, {
+  tpriceMore: 'Your other prices (kids, passes, rentals, weekly rates) go in “Your prices”, the first of the extra details.',
+  photosLead: 'Your place, the view, and people having fun. Three photos is perfect.',
+  seaClosuresHint: 'Closed for a long weekend or a special event? Add it under Closures in More about your place.',
+  noSetHours: 'We don’t have set hours (by booking only)', noSetHoursNow: 'No set hours: by booking only ✓',
+  storyEx: 'A family-run place on the lake since 1985, with something for every age.', knownEx: 'The view, and friendly local staff',
+  bringEx: 'Bring sunscreen and water. Free parking on site.',
+  groupsLead: 'Tap a size, then add parties, school groups or private bookings in your own words.',
+  menuLead: 'Every pass, rental, site or ticket and what it costs. A photo of your price list or a link to your prices page is perfect. It’s optional.',
+  menuFreeSub: 'Anything that costs extra, like rentals or tours? Optional',
+  menuLeadFree: 'It’s free, so you can skip this. Anything that costs extra, like rentals or tours? A photo of the price list or a link is perfect.',
+  menuTypeSub: 'Each pass, rental, site or ticket and its price, one line at a time',
+  // A campground's or a ski hill's guests stay the day or the night: the longest answer says so.
+  tlengthQ: 'How long do most visits last?', tlengths: { '1h': 'Up to 1 hour', '1-2h': '1 to 2 hours', '2-3h': '2 to 3 hours', half: 'Half a day or more, or overnight' },
+  tlengthNeed: 'Please tap how long most visits last.',
+  // Outdoor fresh test (2026-11-23): on a campground, nature centre, farm or market the suggested age is saved with the screen.
+  ageSuggestSaves: 'Suggested: {age}. It’s saved with this screen; tap another age if it’s different.',
+  noSetHoursHint: '',
+  quick: { good_to_know: en.indoor.quick.good_to_know_kinds.outdoorgen.slice(), groups: ['Birthday parties', 'School groups welcome', 'Private bookings on request'] },
+});
+fr.outdoor = sportStrings(fr.sport, {
+  tpriceMore: 'Vos autres prix (enfants, laissez-passer, location, tarifs à la semaine) vont dans « Vos tarifs », le premier des détails facultatifs.',
+  photosLead: 'Votre endroit, la vue, et des gens qui s’amusent. Trois photos, c’est parfait.',
+  seaClosuresHint: 'Fermé pour une longue fin de semaine ou un événement spécial? Ajoutez-le dans Fermetures, sous Plus sur votre endroit.',
+  noSetHours: 'Nous n’avons pas d’heures fixes (sur réservation seulement)', noSetHoursNow: 'Pas d’heures fixes : sur réservation seulement ✓',
+  storyEx: 'Un endroit familial au bord du lac depuis 1985, avec quelque chose pour tous les âges.', knownEx: 'La vue, et une équipe locale accueillante',
+  bringEx: 'Apportez de la crème solaire et de l’eau. Stationnement gratuit sur place.',
+  groupsLead: 'Touchez une taille, puis ajoutez les fêtes, les groupes scolaires ou les réservations privées dans vos mots.',
+  menuLead: 'Chaque laissez-passer, location, emplacement ou billet et son prix. Une photo de votre liste de prix ou un lien vers votre page de prix, c’est parfait. C’est facultatif.',
+  menuFreeSub: 'Quelque chose coûte en plus, comme la location ou les visites? Facultatif',
+  menuLeadFree: 'C’est gratuit, vous pouvez donc passer. Quelque chose coûte en plus, comme la location ou les visites? Une photo de la liste de prix ou un lien, c’est parfait.',
+  menuTypeSub: 'Chaque laissez-passer, location, emplacement ou billet et son prix, une ligne à la fois',
+  tlengthQ: 'Combien de temps dure la plupart des visites?', tlengths: { '1h': 'Jusqu’à 1 heure', '1-2h': '1 à 2 heures', '2-3h': '2 à 3 heures', half: 'Une demi-journée ou plus, ou une nuit' },
+  tlengthNeed: 'Touchez combien de temps dure la plupart des visites.',
+  ageSuggestSaves: 'Suggéré : {age}. Il est enregistré avec cet écran; touchez un autre âge si ce n’est pas le bon.',
+  noSetHoursHint: '',
+  quick: { good_to_know: fr.indoor.quick.good_to_know_kinds.outdoorgen.slice(), groups: ['Fêtes d’anniversaire', 'Groupes scolaires bienvenus', 'Réservations privées sur demande'] },
+});
+// Outdoor retest (2026-11-23; Codex): an outdoor page's section is “Plan your visit” (only indoor pages have a “Your visit” tab).
+(function outdoorVisitWord() {
+  const walk = (o) => { for (const k of Object.keys(o)) { const v = o[k]; if (typeof v === 'string') o[k] = v.replace(/“Your visit”/g, '“Plan your visit”').replace(/« Votre visite »/g, '« Planifiez votre visite »'); else if (Array.isArray(v)) o[k] = v.map((x) => (typeof x === 'string' ? x.replace(/“Your visit”/g, '“Plan your visit”').replace(/« Votre visite »/g, '« Planifiez votre visite »') : x)); else if (v && typeof v === 'object') walk(v); } };
+  walk(en.outdoor); walk(fr.outdoor);
+})();
+// An outdoor listing with no kind yet reads in the "Something else outdoors" words.
+for (const T of [en.outdoor, fr.outdoor]) if (T.kindText && T.kindText.outdoorother) T.kindText.other = T.kindText.outdoorother;
+(function frSpacesOutdoor(o) {
+  for (const k of Object.keys(o)) {
+    if (typeof o[k] === 'string') o[k] = frSpacing(o[k]);
+    else if (Array.isArray(o[k])) o[k] = o[k].map((x) => (typeof x === 'string' ? frSpacing(x) : x));
+    else if (o[k] && typeof o[k] === 'object') frSpacesOutdoor(o[k]);
+  }
+})(fr.outdoor);
 module.exports = { en, fr, frSpacing };

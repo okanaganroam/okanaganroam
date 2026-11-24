@@ -239,7 +239,7 @@ test('edit page: French restaurant page has the bar and the French help topic', 
 
 test('edit page: every other type (pubs, cafes, wineries, breweries, beaches, shops...) has no bar, no CSS, no script, no help topic; English and French', async () => {
   // Cafés have their own checklist since 2026-11-10 (tests/owner-cafes.test.js).
-  for (const t of ['beach', 'shop', 'outdoor']) { // distilleries have the setup since 2026-11-13; tours since 2026-11-16; indoor places since 2026-11-19; golf and sport since 2026-11-20
+  for (const t of ['beach', 'shop']) { // outdoor businesses have the setup since 2026-11-23; distilleries have the setup since 2026-11-13; tours since 2026-11-16; indoor places since 2026-11-19; golf and sport since 2026-11-20
     const v = mk(t);
     for (const prefix of ['/owner/', '/fr/owner/']) {
       const html = await get(`${prefix}${tokenFor(v.id)}`);

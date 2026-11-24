@@ -252,9 +252,12 @@ test('6–7, 9. the setup client: French lines queued (no switch to English), no
   assert.match(text.fr.frOnlyQueued, /Nous écrivons la version anglaise/);
   assert.doesNotMatch(text.fr.frOnlyQueued, /Ajouter la version anglaise/);
   // A pre-picked age (from the kind) that she didn't touch is not her answer.
-  assert.match(client, /var iGuess = !!S\.tour\.ageGuessed && !TI\.age;/);
+  // (Outdoor retest 2026-11-23: only a campground, nature centre, farm or market saves the suggested All ages with the
+  // screen, C.ageSaveKinds; a sport or golf kind never does, and a suggested age never ticks Kids welcome.)
+  assert.match(client, /var wasGuess = !!S\.tour\.ageGuessed && !TI\.age, ageSaves = wasGuess && S\.tour\.age === 'all' && \(C\.ageSaveKinds \|\| \[\]\)\.indexOf\(indoorMainKind\(\)\) >= 0;/);
+  assert.match(client, /var iGuess = wasGuess && !ageSaves;/);
   assert.match(client, /if \(!iGuess && S\.tour\.age !== \(TI\.age \|\| ''\)\) ia\.age = S\.tour\.age;/);
-  assert.match(client, /if \(iGuess\) ikids = !!S\.savedBadges\.kid_friendly;/);
+  assert.match(client, /if \(wasGuess\) ikids = !!S\.savedBadges\.kid_friendly;/);
   assert.match(client, /if \(tGuess\) kidsOn = !!S\.savedBadges\.kid_friendly;/);
   // Book ahead: the example doesn't say tee times are recommended.
   assert.match(client, /bk0 === 'ahead' && T\.bringExKinds\.golfahead\) return T\.bringExKinds\.golfahead;/);

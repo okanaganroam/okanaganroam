@@ -98,6 +98,9 @@
   // "Midnight", never "12 AM" (pub fresh-eyes, 2026-11-10). Brewery test 1 (2026-11-12): noon is "12 PM" (« 12 h »), as
   // the public page's hours and open-now line say it; the setup said "Noon" while the page said "12 PM".
   function t12(v){ var m = /^(\d{1,2}):(\d{2})$/.exec(v || ''); if (!m) return v || ''; var hh = +m[1], mi = m[2]; if ((hh === 0 || hh === 24) && mi === '00') return C.lang === 'fr' ? 'minuit' : 'Midnight'; if (C.lang === 'fr') return hh + ' h' + (mi === '00' ? '' : ' ' + mi); var ap = hh >= 12 && hh < 24 ? 'PM' : 'AM'; hh = hh % 12 || 12; return hh + (mi === '00' ? '' : ':' + mi) + ' ' + ap; }
+  // Outdoor fresh test (2026-11-23): a day open around the clock (00:00–23:59, how the hours are stored) reads "Open 24 hours".
+  function is24(y){ return !!y && y[0] === '00:00' && (y[1] === '23:59' || y[1] === '24:00'); }
+  function rng(y){ return is24(y) ? (C.lang === 'fr' ? 'Ouvert 24 h sur 24' : 'Open 24 hours') : t12(y[0]) + ' – ' + t12(y[1]); }
   // A happy hour's "until close" windows (pub test 9): { sun: ['21:00'] } from the stored week's "_close", or {}.
   function happyCloseOf(w){ try { var o = typeof w === 'string' ? JSON.parse(w) : w; return o && o._close && typeof o._close === 'object' ? o._close : {}; } catch (e) { return {}; } }
   // Distillery test 3 (2026-11-13): a kitchen-close or kids-until time starts an hour before the earliest closing time of
@@ -1999,7 +2002,7 @@
   // is a show place (live theatre, music or comedy): it is asked about tickets, and its price is its lowest regular ticket.
   // Sport and golf (2026-11-20): the main kind's usual season's hint on the Hours step ('' for none).
   function winterKindOnly(){ return !!C.sport && (C.kindSeasons || {})[indoorMainKind()] === 'winter'; }
-  function sportSeasonHint(){ if (!C.sport) return ''; if (T.seasonHintKind) return T.seasonHintKind; var se = (C.kindSeasons || {})[indoorMainKind()] || ''; return se === 'summer' ? (T.seasonHintSummer || '') : se === 'winter' ? (T.seasonHintWinter || '') : ''; }
+  function sportSeasonHint(){ if (!C.sport || C.yearRoundResearch) return ''; if (T.seasonHintKind) return T.seasonHintKind; var se = (C.kindSeasons || {})[indoorMainKind()] || ''; return se === 'summer' ? (T.seasonHintSummer || '') : se === 'winter' ? (T.seasonHintWinter || '') : ''; }
   function indoorMainKind(){ if (!C.indoor) return ''; return ((S.tour && S.tour.kinds && S.tour.kinds.length ? S.tour.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || [])[0] || ''; }
   function indoorShow(){ return indoorMainKind() === 'theatre' && !!T.ibookQShow; }
   // The story and Known for examples by the main kind (owner-setup-text.js storyExKinds / knownExKinds).
@@ -2011,6 +2014,9 @@
   function indoorDayKinds(){ if (!C.indoor) return false; var st = typeof S !== 'undefined' && S.tour, ks = (st && st.kinds && st.kinds.length ? st.kinds : typeof TI !== 'undefined' && TI ? TI.kinds : null) || []; return ks.length > 0 && ks.every(function(k){ return !!((T0.kindGroups || {})[k] || [])[3]; }); }
   // Indoor test 6 (2026-11-19; Priya): a classes place's hours screens say, in one line, that evening classes go in Good to
   // know (she stretched her open hours to 9 PM for them).
+  // Outdoor test 1 (2026-11-23; Rae's campground read "Closed" every evening after the office shut): a campground is open
+  // around the clock. One tap sets every day to 24 hours; the office hours go in Good to know (T.hours24Hint says so).
+  function hours24Btn(){ return C.indoor && T.hours24Btn ? '<div class="su-stack" id="suHours24">' + big('🌙', T.hours24Btn, T.hours24Hint || '', true, 'hours24') + '</div>' : ''; }
   function classNightsHint(){ return C.indoor && T.classNightsHint ? '<p class="su-hint" id="suClassNightsHint">' + h(T.classNightsHint) + '</p>' : ''; }
   function lateBtns(d, j, y){
     // Café test 1 (Whistler, 2026-11-15): no "Open after midnight?" row on a café's day card.
@@ -2170,7 +2176,7 @@
   // Café test 6 (2026-11-12): reopening the Hours step showed only the usual week, and an owner with summer hours
   // feared they were lost. One line per saved season: "Summer (Jun–Sep): 7 AM – 3 PM every day ✓". No new question.
   function weekShort(w, sep){
-    var txt = DAYS.map(function(d){ var x = w && w[d]; return x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : ''; });
+    var txt = DAYS.map(function(d){ var x = w && w[d]; return x ? x.map(function(y){ return rng(y); }).join(', ') : ''; });
     if (txt.every(function(t){ return t === txt[0]; })) return txt[0] ? fill(T.everyDayHours, { t: txt[0] }) : T.closed;
     // Tour test 6 (Whistler, 2026-11-17): days with the same hours go together, open ones first, closed last: « Lun, jeu–dim
     // 9 h – 17 h ; mar–mer fermé » (it read « Lun 9 h – 17 h, Mar–Mer fermé, Jeu–Dim 9 h – 17 h »).
@@ -2232,7 +2238,7 @@
       return '<p class="su-sent su-seasonnow su-seahours">' + h(x.kind ? fill(T.seasonHoursLine, { kind: x.kw, range: x.range, hours: weekShort(x.w) }) : fill(T.seasonHoursLineSpan, { span: x.head, hours: weekShort(x.w) })) + '</p>';
     }).join('');
   }
-  function weekRows(w){ return '<div class="su-box">' + DAYS.map(function(d){ var x = w && w[d]; return '<div><span>' + h(dayName(d)) + '</span><span>' + (x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : h(T.closed)) + '</span></div>'; }).join('') + '</div>'; }
+  function weekRows(w){ return '<div class="su-box">' + DAYS.map(function(d){ var x = w && w[d]; return '<div><span>' + h(dayName(d)) + '</span><span>' + (x ? x.map(function(y){ return rng(y); }).join(', ') : h(T.closed)) + '</span></div>'; }).join('') + '</div>'; }
 
   // What is left to reach 100%: the setup's own open steps, plus anything the portal's checklist still asks for (so the
   // two always agree). Each is a button that opens the step that answers it.
@@ -2609,7 +2615,7 @@
       // Winery test 4 (2026-11-12): a winery says "We don't have set hours. Visits are by appointment" here (and on the
       // day list); once it has, the screen says so and "Yes, that's right" keeps it.
       var anyOpen = S.week && DAYS.some(function(d){ return S.week[d]; }), noneNow = APPT && AI.visit === 'appointment' && !anyOpen && !!CUR.hours;
-      x = doneLine('hours') + q(anyOpen || noneNow || !T.hoursQNone ? T.hoursQ : T.hoursQNone) + (anyOpen ? classNightsHint() : '') + msgs() + (anyOpen ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit')
+      x = doneLine('hours') + q(anyOpen || noneNow || !T.hoursQNone ? T.hoursQ : T.hoursQNone) + (anyOpen ? classNightsHint() : '') + (anyOpen ? '' : hours24Btn()) + msgs() + (anyOpen ? weekRows(S.week) + seasonLines() + '<div class="su-stack">' + big('✓', T.yesRight, '', false, 'hoursOk') + big('✎', T.changeThem, '', true, 'go:hours:edit')
         // Distillery test 2 (Whistler, 2026-11-16): a stretch of other hours is changed from here in one tap (« Modifier mes
         // heures du 15 juin au 7 sept. »); it took four screens (the week, Next, the year question, then this button).
         + storedSeas().map(function(st){ return big('✎', fill(T.seaChange, st), '', true, 'yearSeasonEdit:' + st.i); }).join('') + noSetBtn() + '</div>'
@@ -2715,10 +2721,10 @@
           + (seaOtherAB && T.seaCopy ? '<div class="su-samerow" style="margin:0 0 10px"><button type="button" class="su-toggle" id="suSeaCopy" data-act="seaCopy">' + h(fill(T.seaCopy, seaOtherAB)) + '</button></div>' : '')
           // Café test 4 (2026-11-11): "Open after midnight?" is said once, beside each day's Midnight / 1 AM / 2 AM buttons
           // (it was also a paragraph at the top).
-          : q(T.hoursEditQ, T.hoursEditLead)) + (TOUR && T.departHint ? '<p class="su-hint" id="suDepartHint">' + h(T.departHint) + '</p>' : '') + (!seas ? classNightsHint() : '') + (!seas && S.weekBack && T.hoursBack ? '<p class="su-sent" id="suHoursBack">' + h(T.hoursBack) + '</p>' : '') + msgs() + '<div class="su-hdays">' + DAYS.map(function(d, i){
+          : q(T.hoursEditQ, T.hoursEditLead)) + (TOUR && T.departHint ? '<p class="su-hint" id="suDepartHint">' + h(T.departHint) + '</p>' : '') + (!seas ? classNightsHint() + hours24Btn() : '') + (!seas && S.weekBack && T.hoursBack ? '<p class="su-sent" id="suHoursBack">' + h(T.hoursBack) + '</p>' : '') + msgs() + '<div class="su-hdays">' + DAYS.map(function(d, i){
         var w = wk[d], prev = i > 0 ? wk[DAYS[i - 1]] : null, mon = i > 1 ? wk.mon : null;
         var sameH = function(a, b){ return JSON.stringify(a || null) === JSON.stringify(b || null); }, sameP = !!prev && !sameH(w, prev), sameM = !!mon && !sameH(w, mon) && !(prev && sameH(prev, mon));
-        if (!hop[d]) return '<div class="su-day su-hrow" id="suRow' + d + '"><div class="su-hsum"><b>' + h(dayName(d)) + '</b><span>' + (w ? h(w.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ')) : h(T.closed)) + '</span>'
+        if (!hop[d]) return '<div class="su-day su-hrow" id="suRow' + d + '"><div class="su-hsum"><b>' + h(dayName(d)) + '</b><span>' + (w ? h(w.map(function(y){ return rng(y); }).join(', ')) : h(T.closed)) + '</span>'
           + (w && lateNote(d, w[w.length - 1]) && w[w.length - 1][1] !== '00:00' && w[w.length - 1][1] !== '24:00' ? '<small>' + h(lateNote(d, w[w.length - 1])) + '</small>' : '') + '</div>'
           // Pub test 7 (2026-11-10): one tap marks a day Closed (or opens it again) right from the list; Change is for times.
           // Pub test 8 (2026-11-10): "Closed" sat right beside "✎ Change", one thumb-width away. Change keeps its place on
@@ -2735,7 +2741,7 @@
             : hoffUndo(d) ? '<button type="button" class="su-hoff su-hoff-undo" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.dayClosedNow, { day: longDay(d) }) + '. ' + fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.reopenDay || T.undo) + '</button>'
             : '<button type="button" class="su-hoff" data-hoff="' + d + '" aria-pressed="true" aria-label="' + h(fill(T.openDayAria, { day: longDay(d) })) + '">' + h(T.openDayBtn) + '</button>') + '</div></div>';
         return '<div class="su-day su-hopen" id="suRow' + d + '"><div class="su-dh"><span>' + h(dayName(d)) + '</span><span class="su-switch" role="group" aria-label="' + h(dayName(d)) + '"><button type="button" class="su-on" aria-pressed="' + (w ? 'true' : 'false') + '" data-dayopen="' + d + '">' + h(w ? T.openOn : T.open) + '</button><button type="button" class="su-off" aria-pressed="' + (w || autoMonUnset(d) ? 'false' : 'true') + '" data-dayclosed="' + d + '">' + h(T.closedOff) + '</button></span></div>'
-          + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '">' + (w.length > 1 ? '<button type="button" class="su-toggle su-rmtime" data-rmtime="' + d + ':' + j + '" aria-label="' + h(T.removeSecond + (C.lang === 'fr' ? '\u00a0: ' : ': ') + t12(y[0]) + ' – ' + t12(y[1])) + '"><span aria-hidden="true">✕</span> ' + h(T.removeSecond) + '</button>' : '') + '</div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + brewQuick(d, j, y, w.length - 1) + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
+          + (w ? w.map(function(y, j){ return '<div class="su-times"><label class="su-sr" for="o' + d + j + '">' + h(fill(T.opens, { day: dayName(d) })) + '</label><input type="time" id="o' + d + j + '" data-h="' + d + ':' + j + ':0" value="' + y[0] + '"> ' + h(T.to) + ' <label class="su-sr" for="c' + d + j + '">' + h(fill(T.closes, { day: dayName(d) })) + '</label><input type="time" id="c' + d + j + '" data-h="' + d + ':' + j + ':1" value="' + (y[1] === '24:00' ? '00:00' : y[1]) + '">' + (w.length > 1 ? '<button type="button" class="su-toggle su-rmtime" data-rmtime="' + d + ':' + j + '" aria-label="' + h(T.removeSecond + (C.lang === 'fr' ? '\u00a0: ' : ': ') + rng(y)) + '"><span aria-hidden="true">✕</span> ' + h(T.removeSecond) + '</button>' : '') + '</div><p class="su-hint su-late" id="suLate' + d + j + '" aria-live="polite"' + (lateNote(d, y) ? '' : ' hidden') + '>' + h(lateNote(d, y)) + '</p>' + brewQuick(d, j, y, w.length - 1) + (j === w.length - 1 ? lateBtns(d, j, y) : ''); }).join('')
             // Restaurant test 1 (Whistler, 2026-11-14): lunch and dinner on one day, as the edit page's "+ second time" (two
             // ranges at most, the server's rule). With two, "✕ Remove this time" on each (the one added may be the first).
             + (indoorQuietKinds() ? '' : (w.length < 2 && T.addSecond ? '<div class="su-samerow"><button type="button" class="su-toggle su-addtime" data-addtime="' + d + '">' + h(T.addSecond) + '</button></div>' : ''))
@@ -2914,8 +2920,10 @@
         + '<div id="suKindsAll"' + (iFold ? ' hidden' : '') + '><div class="su-chips su-kinds" role="group" aria-labelledby="suQ" id="suIndoorKinds">' + iTop.map(ichip).join('') + '</div>'
         + (iRest.length ? '<details class="su-kinds" id="suKindsMore"' + (S.tourMoreOpen || iRest.some(function(o){ return S.tour.kinds.indexOf(o.k) >= 0; }) ? ' open' : '') + '><summary>' + h(T.moreKinds) + '</summary><div class="su-chips">' + iRest.map(ichip).join('') + '</div></details>' : '')
         + (S.tour.kinds.length ? '<p class="su-sent" id="suTourPicked">' + h(fill(T.picked, { list: S.tour.kinds.map(tourKindName).join(', ') })) + '</p>' : '') + '</div>'
-        + '<h2 class="su-h2" id="suLenQ">' + h(T.tlengthQ) + '</h2>' + (S.tour.lengthGuessed && S.tour.length && T.guessCheck ? '<p class="su-sent su-research" id="suLengthGuess">' + h(T.guessCheck) + '</p>' : '')
-        + tchips('length', ['1h', '1-2h', '2-3h', 'half'], T.tlengths, T.tlengthQ, 'suLenQ')
+        // Outdoor test 1 (2026-11-23; Rae: "up to 1 hour… overnight" for a campground): a kind whose stay is always long
+        // (T.lengthAuto, a campground) isn't asked; Save stores half a day or more.
+        + (T.lengthAuto ? '' : '<h2 class="su-h2" id="suLenQ">' + h(T.tlengthQ) + '</h2>' + (S.tour.lengthGuessed && S.tour.length && T.guessCheck ? '<p class="su-sent su-research" id="suLengthGuess">' + h(T.guessCheck) + '</p>' : '')
+        + tchips('length', ['1h', '1-2h', '2-3h', 'half'], T.tlengths, T.tlengthQ, 'suLenQ'))
         + '<div class="su-stack" style="margin-top:18px">' + big('✓', T.saveThese, '', false, 'indoorSave') + '</div>' + skip('indoor');
     } else if (s === 'price' && INDOOR) {
       // Indoor places (2026-11-19): the adult price in one box, or one tap for Free entry / By donation.
@@ -2923,7 +2931,7 @@
       x = doneLine('price') + '<h1 id="suQ">' + h(T.tpriceQ) + '</h1><p class="su-lead" id="suTpriceLead">' + h(tourPriceLead()) + '</p>'
         + (ip.priceGuessed && (ip.free || (ip.price != null && !isNaN(ip.price))) && T.tpriceGuess ? '<p class="su-sent su-research" id="suFeeGuess">' + h(T.tpriceGuess) + '</p>' : '')
         + (CUR.indoor_price_waiting != null ? '<p class="su-sent" id="suFeeWaiting">' + h(fill(T.tpriceWaiting, { x: tourMoney(CUR.indoor_price_waiting) })) + '</p>' : '') + msgs()
-        + '<div class="su-chips" role="group" aria-labelledby="suQ" id="suFreeChips">' + (C.sport && ip.free !== 'donation' ? ['free'] : ['free', 'donation']).map(function(f){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ip.free === f ? 'true' : 'false') + '" data-ifree="' + f + '">' + h(tourFreeWord(f)) + '</button>'; }).join('') + '</div>'
+        + (T.noFree && !ip.free ? '' : '<div class="su-chips" role="group" aria-labelledby="suQ" id="suFreeChips">' + (C.sport && ip.free !== 'donation' ? ['free'] : ['free', 'donation']).map(function(f){ return '<button type="button" class="su-chip su-chip-wide" aria-pressed="' + (ip.free === f ? 'true' : 'false') + '" data-ifree="' + f + '">' + h(tourFreeWord(f)) + '</button>'; }).join('') + '</div>')
         // Indoor test 1: By donation keeps the box, as "Suggested amount (optional)".
         + (ip.free === 'donation' && T.tsuggLabel ? field('suTsugg', T.tsuggLabel, ip.suggText != null ? ip.suggText : ip.sugg != null ? String(ip.sugg) : '', { max: 12, mode: 'decimal' }) + '<p class="su-hint" id="suTpriceMore">' + h(T.tpriceMore) + '</p>'
           : ip.free ? '' : field('suTprice', ip.per && T.iperOne ? T.iperOne[ip.per] : T.tpriceLabel, ip.ptext != null ? ip.ptext : ip.per && indoorPerBox() ? indoorPerBox() : indoorMinSize() && typeof ip.price === 'number' ? boxVal('suTprice', ip.price) + indoorMinSize() : boxVal('suTprice', ip.price), { max: 60, ph: T.tpricePh || '' })
@@ -3213,7 +3221,7 @@
       if (ownDogsBiz() && !S.done.offer && !S.dogResearchOff && S.badges.dog_friendly && (C.researchTicks || []).indexOf('dog_friendly') >= 0) { S.dogResearchOff = true; S.badges.dog_friendly = false; }
       // Tours (2026-11-16): "Who can come" asks the minimum age first, then dogs and access.
       // Indoor places (2026-11-19): the youngest age first (All ages, 5+, 8+, 12+, 16+, 19+), "Under 18s come with an adult".
-      var tourAges = INDOOR ? '<h2 class="su-h2" style="margin-top:6px" id="suAgeQ">' + h(T.tageQ) + '</h2>' + (S.tour.ageGuessed && S.tour.age && (T.ageSuggest || T.guessKind) ? '<p class="su-sent su-research" id="suAgeGuess">' + h(T.ageSuggest ? fill(T.ageSuggest, { age: (T.tages || {})[S.tour.age] || S.tour.age }) : T.guessKind) + '</p>' : '') + tchips('age', ['all', '5', '8', '12', '16', '19'], T.tages, T.tageQ, 'suAgeQ')
+      var tourAges = INDOOR ? '<h2 class="su-h2" style="margin-top:6px" id="suAgeQ">' + h(T.tageQ) + '</h2>' + (S.tour.ageGuessed && S.tour.age && (T.ageSuggest || T.guessKind) ? '<p class="su-sent su-research" id="suAgeGuess">' + h(T.ageSuggest ? fill(T.ageSuggestSaves && S.tour.age === 'all' && (C.ageSaveKinds || []).indexOf(indoorMainKind()) >= 0 ? T.ageSuggestSaves : T.ageSuggest, { age: (T.tages || {})[S.tour.age] || S.tour.age }) : T.guessKind) + '</p>' : '') + tchips('age', ['all', '5', '8', '12', '16', '19'], T.tages, T.tageQ, 'suAgeQ')
           // Indoor test 19: a kids' place's one hint line (its range is said in its story, not picked here).
           + ((S.tour.kinds || []).indexOf('kids') >= 0 && T.tageKidsHint ? '<p class="su-sent" id="suAgeKidsHint">' + h(T.tageKidsHint) + '</p>' : '')
         + (S.tour.age && S.tour.age !== '19' && S.tour.age !== 'all' ? '<div class="su-chips" role="group" style="margin-top:8px"><button type="button" class="su-chip su-chip-wide" aria-pressed="' + (S.tour.adult ? 'true' : 'false') + '" data-tadult="1" id="suAdultRule">' + h(T.tadult) + '</button></div>' : '')
@@ -3932,7 +3940,7 @@
   // -> [{ i, days: ['sun'], text: 'Sun 12 PM – 10 PM' }] for each stored period that still has a day's old usual time.
   function seaStaleOf(seasons){
     var old = parseWeek(CUR.hours), out = []; if (!old || !S.week) return out;
-    var key = function(x){ return JSON.stringify(x || null); }, txt = function(x){ return x ? x.map(function(y){ return t12(y[0]) + ' – ' + t12(y[1]); }).join(', ') : ''; };
+    var key = function(x){ return JSON.stringify(x || null); }, txt = function(x){ return x ? x.map(function(y){ return rng(y); }).join(', ') : ''; };
     var changed = DAYS.filter(function(d){ return old[d] && S.week[d] && key(old[d]) !== key(S.week[d]); });
     if (!changed.length) return out;
     (seasons || []).slice(0, 3).forEach(function(sz, i){ // SEA_MAX (written out: the tests run this function alone)
@@ -4611,6 +4619,7 @@
       return saveAll('offer', [{ pub_info: { minors: mv } }], null, null, function(){ S.pubInfo.minors = mv; });
     }
     if (k === 'hoursSave') return hoursSave();
+    if (k === 'hours24') { if (S.step !== 'hours:edit') go('hours:edit'); DAYS.forEach(function(d){ S.week[d] = [['00:00', '23:59']]; }); var ys24 = window.scrollY; render(); window.scrollTo(0, ys24); return; } // the week reads Open 24 hours; Next saves it and asks the season
     // "Until close" on a happy hour (pub test 9): on or off; the end-time box comes back when it is off.
     if (k === 'hhClose') { readEntries(); var ec = S.happy[+v]; if (!ec) return; ec.close = !ec.close; if (S.nudge && /close|ferm/i.test(S.nudge)) S.nudge = ''; render(); return; }
     // The same for a weekly special (its end is stored as 'close', the way it always was).
@@ -4831,7 +4840,10 @@
         // Sport test 11 (2026-11-21; « Tous les âges » was pre-picked from the golf kind, Geneviève never touched it, and her
         // semi-private course got Kid-Friendly): an age we pre-picked from the kind and she left as it was is not her
         // answer. Neither the age nor Kids welcome is saved from it; only a tap on an age is.
-        var iGuess = !!S.tour.ageGuessed && !TI.age;
+        // Outdoor fresh test (2026-11-23): on a campground, nature centre, farm or market the suggested All ages shown selected
+        // is saved with the screen (C.ageSaveKinds), so the screen, the count and the summary agree; Kids welcome still isn't.
+        var wasGuess = !!S.tour.ageGuessed && !TI.age, ageSaves = wasGuess && S.tour.age === 'all' && (C.ageSaveKinds || []).indexOf(indoorMainKind()) >= 0;
+        var iGuess = wasGuess && !ageSaves;
         var ia = {}; if (!iGuess && S.tour.age !== (TI.age || '')) ia.age = S.tour.age;
         var iad = S.tour.age !== '19' && S.tour.age !== 'all' && S.tour.adult; if (iad !== (TI.adult === true)) ia.adult = iad ? true : null;
         if (Object.keys(ia).length) list.unshift(tinfo(ia));
@@ -4839,7 +4851,7 @@
         // Indoor test 7 (2026-11-19; Robert's commercial gallery showed Kid-Friendly first): All ages never ticks Kids welcome
         // for a gallery, casino, library or theatre (unless it has kids' shows); the badge stays as it was there.
         if (ikids && !indoorFamilyKinds()) ikids = !!S.savedBadges.kid_friendly;
-        if (iGuess) ikids = !!S.savedBadges.kid_friendly;
+        if (wasGuess) ikids = !!S.savedBadges.kid_friendly;
         if (ikids !== !!S.savedBadges.kid_friendly) list.push({ badges: { kid_friendly: ikids } });
         return saveAll('offer', list, null, offerNext('offer'), function(){ if (ia.age) TI.age = ia.age; if ('adult' in ia) { if (ia.adult) TI.adult = true; else delete TI.adult; } S.badges.kid_friendly = ikids; S.tour.ageGuessed = iGuess; });
       }
@@ -5043,7 +5055,9 @@
     // ---------- Tours (2026-11-16) ----------
     // ---------- Indoor places (2026-11-19) ----------
     if (k === 'indoorSave') {
-      var ik0 = S.tour.kinds.slice(), il0 = S.tour.length;
+      var ik0 = S.tour.kinds.slice();
+      if (ik0.length) { var Tk = INDOOR && T0.kindText ? T0.kindText[ik0[0]] : null; if (Tk && Tk.lengthAuto) S.tour.length = 'half'; }
+      var il0 = S.tour.length;
       if (!ik0.length) { S.nudge = T.tkindNeed; return render(); }
       if (!il0) { S.nudge = T.tlengthNeed; return render(); }
       var ii0 = {};
@@ -5057,6 +5071,12 @@
       if (artsAdd && il.length) il[0].badges = { arts_culture: true };
       // Indoor test 5: the server takes the kind's own badge off when no arts kind is left (C.artsAuto); the screens follow.
       var artsOff = !artsNow && C.artsAuto && il.length;
+      // Campgrounds only (2026-11-23): an outdoor listing whose first kind answer leaves out Campground isn't a campground
+      // after all: the answer is saved and the owner goes back to their edit page (this setup is for campgrounds for now).
+      if (C.outdoorSetupKinds && !ik0.some(function(k){ return C.outdoorSetupKinds.indexOf(k) >= 0; })) {
+        S.busy = true; render();
+        return il.reduce(function(p, x){ return p.then(function(ok){ return ok ? change(x) : ok; }); }, Promise.resolve(true)).then(function(ok){ if (!ok) { S.busy = false; return render(); } S.leaving = true; location.href = C.back; });
+      }
       return saveAll('indoor', il, null, null, function(){ Object.keys(ii0).forEach(function(kk){ TI[kk] = ii0[kk]; }); S.tour.lengthGuessed = false; S.tour.kindsGuessed = false;
         if (artsAdd && il.length) C.artsAuto = true;
         if (artsOff) { C.artsAuto = false; CUR.badges = CUR.badges || {}; CUR.badges.arts_culture = false; if (S.badges) S.badges.arts_culture = false; if (S.savedBadges) S.savedBadges.arts_culture = false; } });
@@ -5537,7 +5557,10 @@
       readTour(); var qt = b.getAttribute('data-tpick').split(':'), kt = qt[0], vt = qt[1];
       // Sport test 12: a tap on the suggested age confirms it (it used to take it off).
       var confirmAge = kt === 'age' && S.tour.ageGuessed && String(S.tour.age) === vt;
-      S.tour[kt] = String(S.tour[kt]) === vt && kt !== 'bookYes' && kt !== 'adultAge' && kt !== 'adultHow' && !confirmAge ? '' : vt;
+      // Outdoor fresh test (2026-11-23): a tap on the suggested booking answer confirms it too (it took it off, and Save then
+      // kept no answer).
+      var confirmBook = kt === 'book' && INDOOR && String(S.tour.book) === vt;
+      S.tour[kt] = String(S.tour[kt]) === vt && kt !== 'bookYes' && kt !== 'adultAge' && kt !== 'adultHow' && !confirmAge && !confirmBook ? '' : vt;
       if (kt === 'length') S.tour.lengthGuessed = false;
       if (kt === 'book') S.tour.bookGuessed = false;
       if (kt === 'age') S.tour.ageGuessed = false;

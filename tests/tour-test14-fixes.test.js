@@ -285,7 +285,7 @@ test('12. finish screen: no "update the French description" when its translation
   assert.match(cfg, /"frStoryQueued":true/);
   // Tour test 15: the client rule itself is run in tour-test15-fixes.test.js (storyWaiting sets storySentNow; frDescOld).
   assert.equal((CLIENT.match(/\+ \(frOnlyNamed\(\) \|\| frOnlyFinish\(\)\) \+ frDescOld\(true\)/g) || []).length, 2);
-  assert.match(SERVER, /frStoryQueues: COMPLETENESS_TYPES\.has\(venue\.type\)/);
+  assert.match(SERVER, /frStoryQueues: completenessListing\(venue\)/); // campgrounds only (2026-11-23): per listing
 });
 
 test('13. polish: "Private lessons from $599", Booking without "Varies by tour" for her list, French unit words, the admin email counts tours like the page, one desktop photo button', async () => {
