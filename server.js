@@ -9173,7 +9173,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   for (const op of [...(stayOps.length ? [stayOps] : []), ...extra.filter((o) => o.o !== 'stay')]) {
     const r = Array.isArray(op) ? tripChatStayTurn(op, { v, plan, req, stops, lang, staysOn, runCore, timing, days, short })
       : op.o === 'allergy' ? tripChatAllergyTurn(op, { v, stops, lang, need: allergyNeed, recorded: allergyRecorded })
-      : op.o === 'ask' && (op.value === 'q_allergy_swap' || (op.value === 'q_allergy' && op.al)) ? tripChatAllergyAnswer(op, { stops, lang, need: tripAllergy.merge(allergyNeed, op.al) })
+      : op.o === 'ask' && (op.value === 'q_allergy_swap' || (op.value === 'q_allergy' && op.al)) ? tripChatAllergyAnswer(op, { stops, lang, need: tripAllergy.merge(allergyNeed, op.al), recorded: allergyRecorded })
       : op.o === 'ensure' ? tripChatEnsureTurn(op, { v, stops, lang, staysOn, runCore, run, hooks, timing, days, short })
       : op.o === 'avoid' ? tripChatAvoidTurn(op, { v, req, lang })
         : op.o === 'party_some' ? tripChatPartySomeTurn({ stops: plan ? tripChatStops(tripChat.planStops(plan).map((s) => ({ key: s.key, id: s.id }))) : stops, lang, rewrote: someRewrote, text: someText, alone: !planOps.length, changed: !!plan })
@@ -9841,8 +9841,14 @@ function tripChatAllergyTurn(op, { v, stops, lang, need, recorded }) {
 }
 //   a question ("are these safe for a peanut allergy?"), or a swap / add that asks for a place free of the allergen:
 //   the swap is not made; the same change without that promise is offered (a clear yes takes it).
-function tripChatAllergyAnswer(op, { stops, lang, need }) {
+//   (2026-11-23) a message that asks both, or says the allergy and asks for a swap (op.both): ONE answer, the warning
+//   once, and the swap answered by name: no verified replacement, the stop stays.
+function tripChatAllergyAnswer(op, { stops, lang, need, recorded = false }) {
   if (op.value !== 'q_allergy_swap') return { reply: tripAllergy.chatReply(op.keep ? 'keep' : 'q', need, lang) };
+  if (op.both) {
+    const kept = (op.stops || []).map((s, i) => ({ name: (stops.find((x) => x.id === s.id) || s).name || '', ...(((op.where || [])[i]) || {}) }));
+    return { reply: tripAllergy.chatReply('both', need, lang, { kept, add: !!op.add, noted: !!op.noted, recorded, offer: !!op.say }), ...(op.say ? { offer: [{ say: op.say }] } : {}) };
+  }
   const s = (op.stops || [])[0], name = s ? ((stops.find((x) => x.id === s.id) || s).name || '') : '';
   return { reply: tripAllergy.chatReply('swap', need, lang, { name, offer: !!op.say }), ...(op.say ? { offer: [{ say: op.say }] } : {}) };
 }
