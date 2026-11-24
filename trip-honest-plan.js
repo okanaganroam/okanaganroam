@@ -692,6 +692,13 @@ function parseShareContext(query) {
   // be=570.920.2.0.2.12.0.0 the estimate's own figures (low.high.people.assumed.nights.stops.unpriced.stayMissing; x =
   // no figure). Values only; the copy's two lines are worded again on the server. No bg: as before.
   { const b = require('./trip-budget.js').fromShare(q); if (b) { out.budget = b; out.budgetQ = { bg: String(q.bg), be: /^[0-9x.]{1,60}$/.test(String(q.be || '')) ? String(q.be) : '' }; } }
+  // (2026-11-24) ac=1892:15,703:9  a stop chosen for an age the traveller gave (listing id : age). Ids and ages only;
+  // the shared page words the note again from the listing as it is now. No ac: as before.
+  if (typeof q.ac === 'string' && /^[1-9]\d{0,7}:\d{1,2}(?:,[1-9]\d{0,7}:\d{1,2}){0,5}$/.test(q.ac)) {
+    const seen = new Set(), ac = [];
+    for (const tok of q.ac.split(',')) { const [id, age] = tok.split(':').map(Number); if (age >= 1 && age <= 99 && !seen.has(id)) { seen.add(id); ac.push({ id, age }); } }
+    if (ac.length) out.ageChecks = ac;
+  }
   if (typeof q.asks === 'string' && q.asks) { const k = [...new Set(q.asks.split(',').filter((a) => ASK_RE.test(a)))].slice(0, 12); if (k.length) out.asks = k; }
   return Object.keys(out).length ? out : null;
 }
@@ -719,6 +726,7 @@ function shareContextQuery(c) {
   if (c.notIncluded && c.notIncluded.length) p.push(`ni=${c.notIncluded.map(shareNiToken).join(',')}`);
   if (c.notIncluded && c.notIncluded.length && c.niTowns && c.niTowns.length) p.push(`nt=${c.niTowns.join(',')}`);
   if (c.wineTour) p.push(`wt=${c.wineTour}`);
+  if (c.ageChecks && c.ageChecks.length) p.push(`ac=${c.ageChecks.map((a) => `${a.id}:${a.age}`).join(',')}`);
   if (c.budgetQ && c.budgetQ.bg) { p.push(`bg=${c.budgetQ.bg}`); if (c.budgetQ.be) p.push(`be=${c.budgetQ.be}`); }
   return p.join('&');
 }

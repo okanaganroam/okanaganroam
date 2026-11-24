@@ -323,6 +323,9 @@ const V4_CLIENT_SRC = String.raw`
       if (!wheel && r.has === true && r.where === 'unsaid') out.chipOff = true;
       if (wheel && r.dir) out.dir = r.dir;
     });
+    // (2026-11-24) A stop chosen in the chat for an age the traveller gave, whose listing gives no ages: one short
+    // note ("Age 15: check it suits"), the full sentence under the opened card, and a line in the Book my trip list.
+    try { var ag = typeof v4AgeAsk === 'function' ? v4AgeAsk(id) : null; if (ag && ag.short) { var as = (fr && ag.shortFr) || ag.short; out.notes.push(as); out.compact.push(as); out.open.push(as); out.more.push((fr && ag.noteFr) || ag.note || as); out.age = ag.age; } } catch (e) { /* no note */ }
     out.note = out.notes.join(' · ');
     return out;
   }
@@ -881,6 +884,11 @@ const V4_CLIENT_SRC = String.raw`
       if (ni.length) out += '&ni=' + ni.slice(0, 3).join(',');
       var nt = ((p.overview && p.overview.regions) || []).map(function(r){ return r && r.slug; }).filter(function(x){ return /^[a-z][a-z0-9-]{1,30}$/.test(x || ''); }).slice(0, 3);
       if (ni.length && nt.length) out += '&nt=' + nt.join(',');
+      // (2026-11-24) ac=1892:15: the stops chosen for an age whose listing gives no ages (id:age), so the copy says so
+      // under that stop; worded again on the server.
+      var ac = [];
+      list.forEach(function(x){ var am = /^venue:(\d+)$/.exec(x.ref), ag = am && typeof v4AgeAsk === 'function' ? v4AgeAsk(Number(am[1])) : null; if (ag && ag.age > 0 && ag.age < 100 && ac.length < 6) ac.push(am[1] + ':' + ag.age); });
+      if (ac.length) out += '&ac=' + ac.join(',');
       // The budget (2026-11-23): the limit and the estimate's own figures (bg=600t, be=low.high.people.assumed.nights.
       // stops.unpriced.stayMissing; x = no figure). Values only: the copy's wording is rebuilt on the server.
       var bg = v4Budget();
