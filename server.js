@@ -8878,6 +8878,10 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // A day the chat left mostly free offers a gentler way (2026-11-24: "keep it, start later"). Taken, the stop it
   // took out is put back in its slot and that day starts later, by the ordinary "start day N later" rule. The offer is
   // only ever read here (never by the general offer rules, where "day 2" in any message would pick it).
+  // (2026-11-24) The arrival-time question (trip-late-arrival.js) rides back as a tag, never as an offer to pick: a
+  // bare "2 pm" is the arrival time only while that question is the open one.
+  const pendingTime = !v.chip && (v.offer || []).includes(tripLate.ASK_TAG);
+  if ((v.offer || []).includes(tripLate.ASK_TAG)) v.offer = v.offer.filter((o) => o !== tripLate.ASK_TAG);
   let back = null;
   { const b = tripChat.backOffer(v.offer);
     if (b) {
@@ -8930,7 +8934,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // Someone arriving later or leaving earlier (2026-11-23, trip-late-arrival.js) is read by its own rule before the
   // rooms and stay-dates rules: "our friend arrives October 9" is not the stay's check-in, and "her own room" is not
   // the trip's number of rooms. The rest of such a message goes to the word rules as usual.
-  const lateMsg = !v.chip && !offered && (() => { try { return !!tripLate.chatRead(v.message, stops, { op: (o, x = {}) => ({ o, ...x }) }, { request: v.args.text }); } catch (e) { return false; } })();
+  const lateMsg = !v.chip && !offered && (() => { try { return !!tripLate.chatRead(v.message, stops, { op: (o, x = {}) => ({ o, ...x }) }, { request: v.args.text, pendingTime }); } catch (e) { return false; } })();
   const side = !v.chip && !offered && !lateMsg ? tripChatSideParts(v, (text) => { try { const r = tripChat.rulesRead(text, stops, { regions, regionLabels: REGION_LABELS, days, request: v.args.text }); return (r.ops || []).length > 0 ? r.ops.every((o) => o.o !== 'refine') : tripChat.rulesConfident(r); } catch (e) { return false; } }) : null;
   v.rawMessage = v.message;
   if (side) v.message = side.rest.slice(0, tripChat.MAX_MESSAGE);
@@ -8959,7 +8963,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     // The word rules first (instant), then the AI (live eval 2026-11-22: p50 1.1 s, some 3 s timeouts). When the rules
     // read the message confidently, the AI gets a short grace (TRIP_CHAT_GRACE_MS, default 1500 ms) and the rules answer
     // if it is slower; otherwise it gets the full timeout. Both readings are then reconciled (tripChat.reconcileReads).
-    const r = tripChat.rulesRead(v.message, stops, { regions, regionLabels: REGION_LABELS, days, recent: Object.keys(v.soft || {}), request: v.args.text, partySome: tripChatDryRead(v.message).some, weekdays: tripChat.weekdayDays((v.dayDates || []).some(Boolean) ? v.dayDates : (v.args.overrides && v.args.overrides.startDate) || (v.args.stay && v.args.stay.arrive) || null, days) });
+    const r = tripChat.rulesRead(v.message, stops, { regions, regionLabels: REGION_LABELS, days, recent: Object.keys(v.soft || {}), request: v.args.text, pendingTime, partySome: tripChatDryRead(v.message).some, weekdays: tripChat.weekdayDays((v.dayDates || []).some(Boolean) ? v.dayDates : (v.args.overrides && v.args.overrides.startDate) || (v.args.stay && v.args.stay.arrive) || null, days) });
     what = r.what || null;
     // A stay or getting-here message the rules read confidently is answered by fixed server logic, so the AI is not
     // waited for (2026-11-22: a stay change took 6-14 s on the live site).
@@ -9073,7 +9077,12 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
       // The same thing said another way ("arrives October 9", then "she'll skip day 1") is not a new statement: the
       // plan keeps what it has (and gains the room of their own, when that is new).
       const dd = (v.dayDates || []).slice(0, days);
-      if (had && tripLate.sameOnTrip(had, said.late, days, dd)) said.late = said.late.ownRoom && !had.ownRoom ? { ...had, ownRoom: true } : null;
+      // (2026-11-24) The time of day is the one thing such a restatement can change: "she arrives at 2 pm".
+      if (had && tripLate.sameOnTrip(had, said.late, days, dd)) {
+        const t2 = tripLate.validAt(said.late.at) && !tripLate.sameAt(had.at, said.late.at) ? said.late.at : null;
+        if (t2) said.timeSet = had.at ? 'changed' : 'set';
+        said.late = (said.late.ownRoom && !had.ownRoom) || t2 ? { ...had, ownRoom: !!(had.ownRoom || said.late.ownRoom), ...(t2 ? { at: t2 } : {}) } : null;
+      }
       // Arriving on day 1 (or leaving on the last day) with nothing on the plan to correct: nothing to record.
       else {
         const k = tripLate.dayIn(said.late, days, dd);
@@ -9089,7 +9098,8 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
       const base = (had ? tripLate.stripLate(String(v.args.text || '')) : String(v.args.text || '')).replace(/[\s.]+$/, '');
       const nt = tripChat.joinText(base, [tripLate.requestWords(said.late, lang)]);
       const got = nt ? tripLate.readLate(nt) : null;
-      if (got && got.kind === said.late.kind && !!got.ownRoom === !!said.late.ownRoom) { lateText = nt; v.args = { ...v.args, text: nt }; lateRecorded = true; }
+      if (got && got.kind === said.late.kind && !!got.ownRoom === !!said.late.ownRoom && tripLate.sameAt(got.at, said.late.at)) { lateText = nt; v.args = { ...v.args, text: nt }; lateRecorded = true; }
+      else if (said.timeSet) delete said.timeSet;
     } }
   const extra = ops.filter(isExtra);
   const planOps = ops.filter((o) => !isExtra(o));
@@ -9179,7 +9189,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     else if (bs) reply = tripChat.fill(TB.backFail, { d: back.day, name: bs.name });
   }
   if (needLine) reply = [reply, needLine].filter(Boolean).join(' ');
-  let plan = out.plan || null, req = out.req || null, stayPref, transport, stayBlock, newText = null, card = null, stayForce, stayArrive, party, stayDates = null, note = null, offer = [], askFirst = false, needPatch = null, lateOut = false;
+  let plan = out.plan || null, req = out.req || null, stayPref, transport, stayBlock, newText = null, card = null, stayForce, stayArrive, party, stayDates = null, note = null, offer = [], askFirst = false, needPatch = null, lateOut = false, lateTimeOut = null;
   // A full day said with choices ("swap X, or day 3 at 1:15 PM. Which?"): the choices go back as plain messages.
   // A swap that asked for a badge no replacement has: the place offered instead, by name (a "yes" swaps to it).
   if (!offer.length) offer = tripChat.featOffers((out && out.results) || []);
@@ -9229,6 +9239,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
             : tripChatTransportTurn(op, { stops, lang, stayTown: v.stayTown, dayDates: v.dayDates, v, plan });
     if (r.needPatch) needPatch = r.needPatch;
     if (r.late) lateOut = true;
+    if (r.lateTime) lateTimeOut = r.lateTime;
     // Beside a swap question, the cheaper stay is named right after the budget answer it belongs to (no question).
     if (r.swapBack) swapBack = r.swapBack;
     if (r.back) wentBack = true;
@@ -9291,7 +9302,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   return {
     timing: { ...timing, total: Date.now() - timing.start },
     source, cant: null, plan, actions,
-    response: { reply, source, plan, req, changed: out.changed || [], actions, ...tripChatDiff(stops, v.removed, plan, actions, out), ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(stayForce !== undefined ? { stayForce } : {}), ...(stayArrive ? { stayArrive } : {}), ...(party ? { party } : {}), ...(stayDates ? { stayDates } : {}), ...((newText || noCarText || allergyText || lateText) && !plan ? { text: newText || noCarText || allergyText || lateText } : {}), ...(needPatch && (noCarText || allergyText) && !plan && !answerOnly ? { needPatch } : {}), ...(lateOut ? { late: true } : {}), ...(askFirst ? { confirm: true } : {}), ...(card ? { card } : {}), ...(note ? { note } : {}), ...(offer.length ? { offer } : {}), ...(swapAsk ? { choices: swapAsk.choices } : {}), ...(swapBack && plan ? { swapBack } : {}), ...(wentBack ? { back: true } : {}), ...(ageAsk.length && plan ? { ageAsk } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
+    response: { reply, source, plan, req, changed: out.changed || [], actions, ...tripChatDiff(stops, v.removed, plan, actions, out), ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(stayForce !== undefined ? { stayForce } : {}), ...(stayArrive ? { stayArrive } : {}), ...(party ? { party } : {}), ...(stayDates ? { stayDates } : {}), ...((newText || noCarText || allergyText || lateText) && !plan ? { text: newText || noCarText || allergyText || lateText } : {}), ...(needPatch && (noCarText || allergyText) && !plan && !answerOnly ? { needPatch } : {}), ...(lateOut ? { late: true } : {}), ...(lateTimeOut ? { lateTime: lateTimeOut } : {}), ...(askFirst ? { confirm: true } : {}), ...(card ? { card } : {}), ...(note ? { note } : {}), ...(offer.length ? { offer } : {}), ...(swapAsk ? { choices: swapAsk.choices } : {}), ...(swapBack && plan ? { swapBack } : {}), ...(wentBack ? { back: true } : {}), ...(ageAsk.length && plan ? { ageAsk } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
   };
 }
 // "somewhere cheaper to stay", "a hotel with a pool", "stay in Naramata", "we already have a place": the same plan (every
@@ -9899,8 +9910,20 @@ function tripChatLateTurn(op, { v, plan, req, stops, lang, staysOn, runCore, rec
   } catch (e) { p = null; }
   const arr = p ? p.lateArrival || null : null;
   const card = p && p.whereToStay && p.whereToStay.pick ? p.whereToStay.pick : null;
-  const reply = tripLate.chatReply(op.orphan ? null : arr, card, lang, { recorded: recorded && !!arr && !arr.unresolved, cleared: recorded && !arr, start: !!op.start, orphan: !!op.orphan, alone });
+  // (2026-11-24) The time of day: answered ("she arrives at 2 pm") the reply says who each stop of that day is for, by
+  // the stops on screen and their start times; not known yet, the reply ends with the one question (and its tag rides
+  // back with the next message, so a bare "2 pm" is read as the answer). No stop is moved, and nothing says anyone can
+  // make a stop.
+  const dayStops = arr && !arr.unresolved ? stops.filter((s) => s.day === arr.day && !v.removed.includes(s.key) && Number.isInteger(s.start)).map((s) => ({ name: s.name, start: s.start })) : [];
+  const timeSet = op.timeSet && recorded && arr && !arr.unresolved && tripLate.validAt(arr.at) ? op.timeSet : null;
+  // (The same time said again: the reply says who each stop is for again; nothing is recorded.)
+  const timeSame = !timeSet && op.time && !op.late && arr && !arr.unresolved && tripLate.validAt(arr.at);
+  const reply = tripLate.chatReply(op.orphan ? null : arr, card, lang, { recorded: recorded && !!arr && !arr.unresolved, cleared: recorded && !arr, start: !!op.start, orphan: !!op.orphan, alone, ...(timeSet || timeSame ? { time: timeSet || 'set', stops: dayStops } : {}), ...(op.unsure ? { unsure: true } : {}) });
   const out = { reply };
+  const ask = op.orphan || op.unsure ? '' : tripLate.chatAsk(arr, lang);
+  if (ask) { out.tail = ask; out.offer = [{ say: tripLate.ASK_TAG }]; }
+  else if (op.unsure && tripLate.chatAsk(arr, lang)) out.offer = [{ say: tripLate.ASK_TAG }];
+  if (timeSet) out.lateTime = arr.kind;
   // (An arrangement that could not be placed is recorded too -- the plan's line then asks the same question.)
   if (recorded && p) { out.stayBlock = { ...tripChatStayBlock(p), ...(p.lateArrival ? {} : { lateArrival: null }) }; out.late = true; }
   return out;
@@ -56005,7 +56028,10 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
       if (la && !la.unresolved) lateArr = la;
     } catch (e) { lateArr = null; }
   }
-  if (lateArr) { const w = tripLate.words(lateArr, fr), e = tripLate.entry(lateArr, null); out.late = { line: w.line, act: w.act, days: fr ? e.daysFr : e.days }; } else delete out.late;
+  if (lateArr) { const w = tripLate.words(lateArr, fr), e = tripLate.entry(lateArr, null); out.late = { line: w.line, act: w.act, days: fr ? e.daysFr : e.days,
+    // (2026-11-24) The time of day, when the link carries one: who each stop of that day is for, by its start time.
+    // Without it (every link made before) that day reads "for 2 + 1 arriving" and the line says the time is not set.
+    ...(e.win ? { kind: e.kind, day: e.day, win: e.win, stop: fr ? e.stopFr : e.stop } : {}) }; } else delete out.late;
   // The place to stay: its own page and its own booking links (dates only when the link carries chosen dates).
   let stayFacts = null;
   if (c.stayId) {
@@ -56546,6 +56572,9 @@ ${renderGolfHeaderHtml()}
   var NEED_NOTES = ${JSON.stringify((shareContext && shareContext.stopNotes) || {}).replace(/</g, '\\u003c')};
   // Someone arrives later (trip-late-arrival.js): each day's head count ("for 2", "for all 3"), by the day's title.
   var DAY_FOR = ${JSON.stringify((shareContext && shareContext.late && shareContext.late.days) || {}).replace(/</g, '\\u003c')};
+  // (2026-11-24) With an arrival time on the link: each stop of that day says who it is for, by when it starts.
+  var LATE = ${JSON.stringify((shareContext && shareContext.late && shareContext.late.win) ? { kind: shareContext.late.kind, day: shareContext.late.day, win: shareContext.late.win, stop: shareContext.late.stop } : {}).replace(/</g, '\\u003c')};
+  ${tripLate.CLIENT_SRC}
   var trip = (load(KEY, []) || []).filter(function(x){ return x && typeof x === 'object' && typeof x.name === 'string' && x.name; });
   var days = load(DAYS, {}) || {};
   // The planner's dates and times (2026-10-19): ref -> { d: 'YYYY-MM-DD', s: start minutes, e: end minutes }.
@@ -56711,6 +56740,8 @@ ${renderGolfHeaderHtml()}
           // The stop's need note, under the suggested-time note, in the plan card's own words; then the directions
           // line when its listing covers one entrance or section (the day's map link goes to the listing's location).
           var nn = !mine && NEED_NOTES[x.s.ref], needHtml = nn && nn.text ? '<p class="mt-meta mt-need" data-mt-need>' + esc(nn.text) + '</p>' + (nn.dir ? '<p class="mt-meta mt-need-dir" data-mt-need-dir' + (nn.q ? '="pin"' : '="listing"') + '>' + esc(nn.dir) + '</p>' : '') : '';
+          var lateSt = !mine && LATE.win && String(g.key) === String(LATE.day) && x.s.time && typeof x.s.time.s === 'number' ? lateStopState(LATE.win, LATE.kind, x.s.time.s) : '';
+          if (lateSt && LATE.stop && LATE.stop[lateSt]) needHtml += '<p class="mt-meta mt-need" data-mt-late-stop="' + lateSt + '">' + esc(LATE.stop[lateSt]) + '</p>';
           var tools = mine ? '<div class="mt-tools"><button type="button" data-mt-up="' + x.i + '" aria-label="' + esc(T.moveUp.replace('{name}', x.s.name)) + '"' + (x.i === 0 ? ' disabled' : '') + '>↑</button><button type="button" data-mt-down="' + x.i + '" aria-label="' + esc(T.moveDown.replace('{name}', x.s.name)) + '"' + (x.i === stops.length - 1 ? ' disabled' : '') + '>↓</button><button type="button" data-mt-remove="' + x.i + '" aria-label="' + esc(T.remove.replace('{name}', x.s.name)) + '">✕</button></div>' : '';
           // A closure or advisory on the stop (round 8, 2026-10-19), as on its card.
           var nt = d.notice && (fr && d.notice.textFr || d.notice.text);

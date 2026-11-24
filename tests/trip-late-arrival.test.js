@@ -130,19 +130,19 @@ test('3. worked out against the trip: 2 travellers both nights + 1 joining Oct 9
 
 test('4. the words: who is there which nights, each day’s head count; English and French; nothing claims a room is available', () => {
   const a = LA.resolve(LA.readLate(OWNER), CTX), w = LA.words(a, false), f = LA.words(a, true);
-  assert.equal(w.line, '2 adults Oct 8–10 · 1 more from Oct 9, own room, 1 night');
-  assert.equal(f.line, '2 adultes 8–10 oct. · 1 de plus dès le 9 oct., chambre à part, 1 nuit');
+  assert.equal(w.line, '2 adults Oct 8–10 · 1 more from Oct 9 (time not set), own room, 1 night');
+  assert.equal(f.line, '2 adultes 8–10 oct. · 1 de plus dès le 9 oct. (heure à préciser), chambre à part, 1 nuit');
   assert.equal(w.who, '2 adults + 1 from Oct 9');
   assert.equal(f.who, '2 adultes + 1 dès le 9 oct.');
-  assert.deepEqual(w.days, { 1: 'for 2', 2: 'for all 3', 3: 'for all 3' });
-  assert.deepEqual(f.days, { 1: 'pour 2', 2: 'pour les 3', 3: 'pour les 3' });
-  assert.equal(w.act, 'Day 1 is planned for 2; all 3 from Oct 9 (Day 2).');
-  assert.equal(f.act, 'Le jour 1 est prévu pour 2; les 3 dès le 9 oct. (jour 2).');
+  assert.deepEqual(w.days, { 1: 'for 2', 2: 'for 2 + 1 arriving', 3: 'for all 3' });
+  assert.deepEqual(f.days, { 1: 'pour 2', 2: 'pour 2 + 1 qui arrive', 3: 'pour les 3' });
+  assert.equal(w.act, 'Day 1 is planned for 2. Oct 9 (Day 2): for 2 until they arrive (time not set). All 3 from Day 3.');
+  assert.equal(f.act, 'Le jour 1 est prévu pour 2. 9 oct. (jour 2) : pour 2 jusqu’à son arrivée (heure à préciser). Les 3 dès le jour 3.');
   // Without the visitor's own dates the days are named, never a date.
   const u = LA.words(LA.resolve(LA.readLate('our friend arrives on day 2 and needs her own room'), { ...CTX, dated: false }), false);
-  assert.equal(u.line, '2 adults, all 3 days · 1 more from day 2, own room, 1 night');
+  assert.equal(u.line, '2 adults, all 3 days · 1 more from day 2 (time not set), own room, 1 night');
   // Leaving early, and the assumed room.
-  assert.equal(LA.words(LA.resolve(LA.readLate('my sister leaves a day early'), CTX), false).line, '2 adults Oct 8–10 · 1 more until Oct 9, own room (assumed), 1 night');
+  assert.equal(LA.words(LA.resolve(LA.readLate('my sister leaves a day early'), CTX), false).line, '2 adults Oct 8–10 · 1 more until Oct 9 (time not set), own room (assumed), 1 night');
   const e = LA.entry(a, null);
   assert.deepEqual([e.ask, e.status, e.short, e.share], ['late_arrival', 'partial', w.line, 'j1d2o']);
   for (const s of [w.line, f.line, w.act, f.act, e.text, e.textFr, LA.CANT.en, LA.CANT.fr, LA.CONFIRM.en, LA.CONFIRM.fr]) assert.ok(!CLAIM_RE.test(s), s);
@@ -181,9 +181,9 @@ test('5. the stay is two separate bookings, each link built for its own dates, a
   for (const l of [...s.links, ...s.links2]) assert.ok(!/(?:adults|group_adults)=3\b|(?:rooms|no_rooms)=2\b|rm2=|rm1=a3/.test(decodeURIComponent(l.url)), l.url);
   assert.equal(s.text.note, 'One booking link can’t hold different dates per room, so these are two separate bookings. Booking 1: 2 adults, 1 room, Oct 8–10. Booking 2: 1 adult, 1 room, Oct 9–10. Each link opens with its own dates, guests and rooms.');
   assert.equal(s.text.card, 'Two bookings, since one link can’t hold both. 1: 2 adults, 1 room, Oct 8–10. 2: 1 adult, 1 room, Oct 9–10.');
-  assert.deepEqual(s.text.btn, ['Booking 1', 'Booking 2']);
+  assert.deepEqual(s.text.btn, ['2 adults · Oct 8–10', '1 adult · Oct 9–10']);
   assert.equal(s.textFr.card, 'Deux réservations, car un lien ne peut pas contenir les deux. 1 : 2 adultes, 1 chambre, 8–10 oct. 2 : 1 adulte, 1 chambre, 9–10 oct.');
-  assert.deepEqual(s.textFr.btn, ['Réservation 1', 'Réservation 2']);
+  assert.deepEqual(s.textFr.btn, ['2 adultes · 8–10 oct.', '1 adulte · 9–10 oct.']);
   // Dates not confirmed yet (proposed from the trip's dates): no link carries a date, as for every stay link.
   const p = LA.cardSplit(HOTEL, TRIP({ datesGiven: false, stayStatus: 'proposed' }), a, {});
   for (const l of [...p.links, ...p.links2]) assert.ok(!/2027-10/.test(decodeURIComponent(l.url)), l.url);
@@ -209,7 +209,7 @@ test('5. the stay is two separate bookings, each link built for its own dates, a
   for (const t of [s.text, s.textFr, m.text, m.textFr, px.text]) for (const v of [t.note, t.card, t.chat, t.confirm]) assert.ok(!CLAIM_RE.test(v), v);
   // On the block: the trip's split, each card's links (booking 1's), the second booking's links, the card's own words.
   const block = LA.applyToStay({ trip: TRIP(), pick: { id: 9101, name: HOTEL.name, bookingLinks: [] }, alternatives: [{ id: 9102, name: MOTEL.name, bookingLinks: [] }] }, a, new Map([[9101, HOTEL], [9102, MOTEL]]), {});
-  assert.equal(block.trip.split.line, '2 adults Oct 8–10 · 1 more from Oct 9, own room, 1 night');
+  assert.equal(block.trip.split.line, '2 adults Oct 8–10 · 1 more from Oct 9 (time not set), own room, 1 night');
   assert.equal(block.trip.split.who, '2 adults + 1 from Oct 9');
   assert.equal(block.pick.split.distinct, true);
   assert.equal(block.pick.bookingLinks2.length, 3);
@@ -262,8 +262,8 @@ test('7. sharing: la= carries known values only and reads back; an older link is
   assert.ok(!/la=/.test(H.shareContextQuery(old)));
   assert.equal(H.parseShareContext({ ad: '3', la: 'Our friend Sarah' }).late, undefined); // no free text
   // The page: the link gains la= only from the plan's own entry, and the copied text says its sentence.
-  assert.match(V4, /if \(laOn && \/\^\[jl\]\[1-9\]d\[1-9\]\[0-9\]\?\[ox\]\$\/\.test\(laOn\.share \|\| ''\)\) out \+= '&la=' \+ laOn\.share;/);
-  assert.match(V4, /if \(laT && laT\.text\) lines\.push\(\(fr && laT\.textFr\) \|\| laT\.text\);/);
+  assert.ok(V4.includes("if (laOn && /^[jl][1-9]d[1-9][0-9]?[ox](?:\\.(?:t[0-2][0-9][0-5][0-9]|w[a-z]{1,2}))?$/.test(laOn.share || '')) out += '&la=' + laOn.share;"));
+  assert.ok(V4.includes("if (laT && (laT.copy || laT.text)) lines.push((fr && (laT.copyFr || laT.textFr)) || laT.copy || laT.text);"));
 });
 
 const STOPS = [{ key: '1-morning', id: 11, name: 'Manitou Park', type: 'beach', day: 1 }, { key: '1-midday', id: 12, name: 'Lake Bistro', type: 'restaurant', day: 1 }, { key: '2-late', id: 13, name: 'Paddle Shop', type: 'outdoor', day: 2 }, { key: '3-afternoon', id: 14, name: 'Hill Winery', type: 'winery', day: 3 }];
@@ -307,16 +307,16 @@ test('9. the chat’s reply: one short answer -- the stay’s bookings, why they
   const a = LA.resolve(LA.readLate(OWNER), CTX);
   const hotel = { split: (({ text, textFr }) => ({ text, textFr }))(LA.cardSplit(HOTEL, TRIP(), a, {})) };
   const motel = { split: (({ text, textFr }) => ({ text, textFr }))(LA.cardSplit(MOTEL, TRIP(), a, {})) };
-  assert.equal(LA.chatReply(a, motel, 'en', {}), 'Already on your plan. Stay: two separate bookings, since one booking link can’t hold different dates per room. 1: 2 adults, 1 room, Oct 8–10. 2: 1 adult, 1 room, Oct 9–10. Make both on the hotel’s own site. Activities: Day 1 is planned for 2; all 3 from Oct 9 (Day 2). No stops changed.');
-  assert.equal(LA.chatReply(a, hotel, 'en', { recorded: true }), 'Noted, it’s on your plan. Stay: two separate bookings, since one booking link can’t hold different dates per room. 1: 2 adults, 1 room, Oct 8–10. 2: 1 adult, 1 room, Oct 9–10. Each has its own button on the stay card. Activities: Day 1 is planned for 2; all 3 from Oct 9 (Day 2). No stops changed.');
-  assert.match(LA.chatReply(a, hotel, 'fr', {}), /^Déjà sur votre plan\. Hébergement : deux réservations distinctes, car un lien de réservation ne peut pas avoir des dates différentes par chambre\. 1 : 2 adultes, 1 chambre, 8–10 oct\. 2 : 1 adulte, 1 chambre, 9–10 oct\. .*Activités : Le jour 1 est prévu pour 2; les 3 dès le 9 oct\. \(jour 2\)\. Aucun arrêt n’a changé\.$/);
+  assert.equal(LA.chatReply(a, motel, 'en', {}), 'Already on your plan. Stay: two separate bookings, since one booking link can’t hold different dates per room. 1: 2 adults, 1 room, Oct 8–10. 2: 1 adult, 1 room, Oct 9–10. Make both on the hotel’s own site. Activities: Day 1 is planned for 2. Oct 9 (Day 2): for 2 until they arrive (time not set). All 3 from Day 3. No stops changed.');
+  assert.equal(LA.chatReply(a, hotel, 'en', { recorded: true }), 'Noted, it’s on your plan. Stay: two separate bookings, since one booking link can’t hold different dates per room. 1: 2 adults, 1 room, Oct 8–10. 2: 1 adult, 1 room, Oct 9–10. Each has its own button on the stay card. Activities: Day 1 is planned for 2. Oct 9 (Day 2): for 2 until they arrive (time not set). All 3 from Day 3. No stops changed.');
+  assert.match(LA.chatReply(a, hotel, 'fr', {}), /^Déjà sur votre plan\. Hébergement : deux réservations distinctes, car un lien de réservation ne peut pas avoir des dates différentes par chambre\. 1 : 2 adultes, 1 chambre, 8–10 oct\. 2 : 1 adulte, 1 chambre, 9–10 oct\. .*Activités : Le jour 1 est prévu pour 2\. 9 oct\. \(jour 2\) : pour 2 jusqu’à son arrivée \(heure à préciser\)\. Les 3 dès le jour 3\. Aucun arrêt n’a changé\.$/);
   // Beside another change in the same message it does not say "No stops changed".
   assert.ok(!/No stops changed/.test(LA.chatReply(a, hotel, 'en', { recorded: true, alone: false })));
   // No place to stay on the plan; a date that cannot be placed (one concise question); nobody arriving later.
   assert.match(LA.chatReply(a, null, 'en', {}), /Stay: none on this plan, so there’s nothing to book here for the rooms\. Activities: Day 1 is planned for 2/);
   assert.equal(LA.chatReply({ unresolved: 'outside' }, null, 'en', {}), 'That date isn’t one of this trip’s days. Which day do they join or leave? No stops changed.');
   assert.match(LA.chatReply(null, null, 'en', { orphan: true }), /^I don’t have anyone arriving later on this plan\. Which day do they arrive\?/);
-  for (const s of [LA.chatReply(a, motel, 'en', {}), LA.chatReply(a, hotel, 'fr', { recorded: true })]) { assert.ok(!CLAIM_RE.test(s), s); assert.ok(s.split(/\s+/).length < 75, s); }
+  for (const s of [LA.chatReply(a, motel, 'en', {}), LA.chatReply(a, hotel, 'fr', { recorded: true })]) { assert.ok(!CLAIM_RE.test(s), s); assert.ok(s.split(/\s+/).length < 85, s); }
 });
 
 // ---------- End to end: the planner and the chat handler on the repo's seed database ----------
@@ -366,10 +366,10 @@ test('10. the owner’s request: the same stops as without the sentence; the arr
   assert.equal(p.evidence[0].ask, 'late_arrival');
   assert.equal(p.evidence[0].status, 'partial');
   assert.equal(p.evidence[0].line, true);
-  assert.match(p.evidence[0].text, /^2 adults Oct 8–10 · 1 more from Oct 9, own room, 1 night\. .*Day 1 is planned for 2; all 3 from Oct 9 \(Day 2\)\.$/);
+  assert.match(p.evidence[0].text, /^2 adults Oct 8–10 · 1 more from Oct 9 \(time not set\), own room, 1 night\. .*Day 1 is planned for 2\. Oct 9 \(Day 2\): for 2 until they arrive \(time not set\)\. All 3 from Day 3\. What time do they arrive on Oct 9\?$/);
   const facts = L.tripSummaryFacts(p, false, {});
-  assert.deepEqual([facts[0].kind, facts[0].text], ['flag', '2 adults Oct 8–10 · 1 more from Oct 9, own room, 1 night']);
-  assert.equal(L.tripSummaryFacts(p, true, {})[0].text, '2 adultes 8–10 oct. · 1 de plus dès le 9 oct., chambre à part, 1 nuit');
+  assert.deepEqual([facts[0].kind, facts[0].text], ['flag', '2 adults Oct 8–10 · 1 more from Oct 9 (time not set), own room, 1 night']);
+  assert.equal(L.tripSummaryFacts(p, true, {})[0].text, '2 adultes 8–10 oct. · 1 de plus dès le 9 oct. (heure à préciser), chambre à part, 1 nuit');
   assert.ok(p.whereToStay && p.whereToStay.pick, 'the plan has a place to stay');
   {
     const w = p.whereToStay, t = w.trip;
@@ -417,7 +417,7 @@ test('12. the chat, the owner’s follow-up: ONE reply, no stop added or changed
   assert.equal(r.plan, null);
   assert.deepEqual(r.changed, []);
   assert.deepEqual([r.text, r.stayBlock, r.late], [undefined, undefined, undefined]); // the plan already has it
-  assert.match(r.reply, /^Already on your plan\. Stay: two separate bookings, since one booking link can’t hold different dates per room\. 1: 2 adults, 1 room, Oct 8–10\. 2: 1 adult, 1 room, Oct 9–10\. .*Activities: Day 1 is planned for 2; all 3 from Oct 9 \(Day 2\)\. No stops changed\.$/);
+  assert.match(r.reply, /^Already on your plan\. Stay: two separate bookings, since one booking link can’t hold different dates per room\. 1: 2 adults, 1 room, Oct 8–10\. 2: 1 adult, 1 room, Oct 9–10\. .*Activities: Day 1 is planned for 2\. Oct 9 \(Day 2\): for 2 until they arrive \(time not set\)\. All 3 from Day 3\. No stops changed\. What time do they arrive on Oct 9\?$/);
   assert.ok(!/Added|Swapped|Done\./.test(r.reply), r.reply);
   assert.ok(!CLAIM_RE.test(r.reply), r.reply);
   // Nearby phrasings change nothing either.
@@ -442,14 +442,14 @@ test('13. the chat introduces it: recorded on the request, the stay and the plan
   assert.deepEqual(r.changed, []);
   assert.equal(r.late, true);
   assert.match(r.reply, /^Noted, it’s on your plan\. Stay: two separate bookings/);
-  assert.match(r.reply, /Activities: Day 1 is planned for 2; all 3 from Oct 9 \(Day 2\)\. No stops changed\.$/);
+  assert.match(r.reply, /Activities: Day 1 is planned for 2\. Oct 9 \(Day 2\): for 2 until they arrive \(time not set\)\. All 3 from Day 3\. No stops changed\. What time do they arrive on Oct 9\?$/);
   // The request keeps its own words and gains the statement.
   assert.ok(r.text.startsWith(BASE.replace(/\.$/, '')), r.text);
   assert.deepEqual(shape(LA.readLate(r.text)), ['join', 1, { md: [10, 9] }, true]);
   assert.equal(LA.stripLate(r.text).replace(/\.$/, ''), BASE.replace(/\.$/, ''));
   // The stay part and the plan's line, for the page to swap in.
   assert.equal(r.stayBlock.lateArrival.day, 2);
-  assert.equal(r.stayBlock.lateEvidence.short, '2 adults Oct 8–10 · 1 more from Oct 9, own room, 1 night');
+  assert.equal(r.stayBlock.lateEvidence.short, '2 adults Oct 8–10 · 1 more from Oct 9 (time not set), own room, 1 night');
   assert.ok(r.stayBlock.whereToStay, 'the stay part comes back');
   {
     assert.equal(r.stayBlock.whereToStay.trip.split.who, '2 adults + 1 from Oct 9');
@@ -481,7 +481,7 @@ test('13. the chat introduces it: recorded on the request, the stay and the plan
   assert.match(orphan.reply, /^I don’t have anyone arriving later on this plan\. Which day do they arrive\?/);
   // The variants: leaving a day early, two who come later.
   const early = await say(page, 'my sister leaves a day early');
-  assert.match(early.reply, /2: 1 adult, 1 room \(assumed\), Oct 8–9\..*Activities: All 3 until Oct 9 \(Day 2\); day 3 is planned for 2\./);
+  assert.match(early.reply, /2: 1 adult, 1 room \(assumed\), Oct 8–9\..*Activities: Day 1 is for all 3\. Oct 9 \(Day 2\): for all 3 until they leave \(time not set\)\. Day 3 is planned for 2\./);
   assert.equal(early.plan, null);
   const two = await say(page, 'two friends join us on day 2');
   assert.match(two.reply, /1: 1 adult, 1 room, Oct 8–10\. 2: 2 adults, 1 room \(assumed\), Oct 9–10\./);
@@ -494,20 +494,20 @@ test('14. the shared copy (a link opened fresh): who is there which nights, the 
   const q = { stops: refs.join(','), days: days.join(','), td: '2027-10-08_2027-10-10', ts: 'r', sa: '2027-10-08', sl: '2027-10-10', sc: '1', ad: '3', rm: '2', ra: '1', la: p.evidence[0].share, ...(stayId ? { stay: stayId, nights: '2' } : {}) };
   assert.equal(q.la, 'j1d2o');
   const c = app.tripShareContext(q, 'en', NOW), html = app.tripShareContextHtml(c, 'en');
-  assert.equal(c.late.line, '2 adults Oct 8–10 · 1 more from Oct 9, own room, 1 night');
-  assert.deepEqual(c.late.days, { 1: 'for 2', 2: 'for all 3', 3: 'for all 3' });
-  assert.match(html, /data-mt-facts>2 adults Oct 8–10 · 1 more from Oct 9, own room, 1 night · /);
+  assert.equal(c.late.line, '2 adults Oct 8–10 · 1 more from Oct 9 (time not set), own room, 1 night');
+  assert.deepEqual(c.late.days, { 1: 'for 2', 2: 'for 2 + 1 arriving', 3: 'for all 3' });
+  assert.match(html, /data-mt-facts>2 adults Oct 8–10 · 1 more from Oct 9 \(time not set\), own room, 1 night · /);
   assert.ok(!/3 adults/.test(html), 'the copy never says the stay is for 3 adults');
-  assert.match(html, /data-mt-late>Day 1 is planned for 2; all 3 from Oct 9 \(Day 2\)\./);
+  assert.match(html, /data-mt-late>Day 1 is planned for 2\. Oct 9 \(Day 2\): for 2 until they arrive \(time not set\)\. All 3 from Day 3\./);
   assert.ok(c.stay, 'the copy has the place to stay');
   {
     assert.match(html, /data-mt-late-stay>Two bookings, since one link can’t hold both\. 1: 2 adults, 1 room, Oct 8–10\. 2: 1 adult, 1 room, Oct 9–10\./);
     for (const l of c.stay.links) assert.ok(!whole(l.url), l.url);
-    if (c.stay.split.distinct) { assert.deepEqual(c.stay.links.map((l) => l.label), ['Booking 1', 'Booking 2']); assert.match(decodeURIComponent(c.stay.links[1].url), /2027-10-09/); }
+    if (c.stay.split.distinct) { assert.deepEqual(c.stay.links.map((l) => l.label), ['2 adults · Oct 8–10', '1 adult · Oct 9–10']); assert.match(decodeURIComponent(c.stay.links[1].url), /2027-10-09/); }
     else assert.equal(c.stay.links.length, 1);
   }
   const fr = app.tripShareContextHtml(app.tripShareContext(q, 'fr', NOW), 'fr');
-  assert.match(fr, /2 adultes 8–10 oct\. · 1 de plus dès le 9 oct\., chambre à part, 1 nuit/);
+  assert.match(fr, /2 adultes 8–10 oct\. · 1 de plus dès le 9 oct\. \(heure à préciser\), chambre à part, 1 nuit/);
   assert.ok(!CLAIM_RE.test(JSON.stringify([c.late, c.stay && c.stay.split])));
   // The same link without la= is the copy main made: the whole party, no such line.
   const { la, ...rest } = q;
@@ -560,7 +560,7 @@ test('16. the chat beside the other fixed rules: never the stay’s check-in, ne
   assert.ok(!/The booking links (?:now )?carry these dates/.test(thu.reply), thu.reply);
   // The rooms: asked, the answer is the arrangement (never "2 rooms for 3 adults"); a number said is the explicit count.
   const q = await say(page, 'how many rooms did you assume?');
-  assert.equal(q.reply, '2 adults Oct 8–10 · 1 more from Oct 9, own room, 1 night. One booking link can’t hold different dates per room, so these are two separate bookings.');
+  assert.equal(q.reply, '2 adults Oct 8–10 · 1 more from Oct 9 (time not set), own room, 1 night. One booking link can’t hold different dates per room, so these are two separate bookings.');
   const three = await say(page, 'make it 3 rooms');
   assert.deepEqual(stayOf(three).trip.split.parts.map((x) => [x.adults, x.rooms]), [[2, 2], [1, 1]]);
   // A correction: she comes for the whole trip after all. The statement leaves the request; the stay is one booking again.
@@ -580,4 +580,347 @@ test('16. the chat beside the other fixed rules: never the stay’s check-in, ne
   // "remove the winery on day 1" is still a removal.
   const rm = await say(page, 'remove the late fixture winery stop');
   assert.ok(!/everyone is there from start to finish/.test(rm.reply), rm.reply);
+});
+
+// ---------- The time of day they arrive (2026-11-24) ----------
+// The owner, same request: "it assumes the third traveller can join the 9:45 a.m. activity on her arrival day without
+// asking when she arrives. Ask for the arrival time when it affects planned activities, or clearly mark participation on
+// that day as unconfirmed until the traveller specifies it. […] Make the two hotel buttons self-explanatory—for
+// example, '2 adults · Oct 8–10' and '1 adult · Oct 9–10'—in both the planner and shared itinerary."
+const ARR = (at, o = {}) => LA.resolve({ ...LA.readLate(OWNER), ...(at ? { at } : {}), ...o }, CTX);
+
+test('17. the time of day is read with the statement, English and French, a clock time or a part of the day; nothing else is', () => {
+  const cases = [
+    ['Our friend arrives only on October 9 at 3 pm and needs a separate room for one night.', { m: 900 }, true],
+    ['Our friend arrives at 3:30 p.m. on October 9. She needs her own room.', { m: 930 }, true],
+    ['our friend gets in around 15h on the 9th', { m: 900 }, false],
+    ['our friend lands at 2:30 on October 9', { m: 870 }, false],
+    ['our friend arrives on October 9 around 3', { m: 900 }, false],
+    ['our friend arrives on October 9 at noon', { m: 720 }, false],
+    ['our friend arrives on October 9 at 10', { m: 600 }, false],
+    ['my sister arrives Saturday afternoon', { part: 'afternoon' }, false],
+    ['my sister arrives Saturday morning', { part: 'morning' }, false],
+    ['two of us arrive on day 2 in the evening', { part: 'evening' }, false],
+    ['our friend arrives October 9 after lunch', { part: 'after_lunch' }, false],
+    ['one of us arrives on Oct 9 in time for dinner', { part: 'dinner' }, false],
+    ['our friend arrives mid-afternoon on October 9', { part: 'mid_afternoon' }, false],
+    ['our friend arrives October 9 late at night', { part: 'night' }, false],
+    ['Notre amie arrive le 9 octobre vers 15 h 30 et a besoin d’une chambre séparée', { m: 930 }, true],
+    ['notre amie arrive samedi en fin d’après-midi', { part: 'late_afternoon' }, false],
+    ['notre amie arrive le 9 octobre en soirée', { part: 'evening' }, false],
+    ['notre amie arrive le 9 octobre à midi', { m: 720 }, false],
+    ['one of us leaves at noon on the 10th', { m: 720 }, false],
+    ['my mom has to leave on October 9 in the morning', { part: 'morning' }, false],
+  ];
+  for (const [t, at, own] of cases) { const r = LA.readLate(`Three days in ${TOWN} for 3 adults. ${t}`); assert.ok(r, t); assert.deepEqual(r.at, at, t); assert.equal(r.ownRoom, own, t); }
+  // No time said: none read. "for one night" and "that night" are about the room, a date is not a time.
+  for (const t of [LATE, 'Our friend joins only on October 9 and needs her own room that night.', 'our friend arrives on October 9 for one night', 'our friend arrives on the 9th', 'two friends join us on day 2',
+    'our friend arrives October 9 and wants a room for the evening', 'Notre amie arrive seulement le 9 octobre et a besoin d’une chambre séparée pour une nuit.']) assert.equal(LA.readLate(t).at, undefined, t);
+  // The request without the statement is the same whether or not it gave a time (the planner reads the same words).
+  for (const t of ['Our friend arrives only on October 9 at 3 pm and needs a separate room for one night.', 'Our friend arrives on October 9, around 3 pm, and needs her own room.', 'Our friend arrives at 3 p.m. on October 9.']) assert.equal(LA.stripLate(`${BASE} ${t}`), BASE, t);
+  // The words a request gains read back to the same time, both languages.
+  const have = LA.readLate(OWNER);
+  for (const at of [{ m: 840 }, { m: 870 }, { m: 720 }, { m: 570 }, ...Object.keys(LA.DAYPARTS).map((part) => ({ part }))]) for (const lang of ['en', 'fr']) {
+    const got = LA.readLate(LA.requestWords({ ...have, at }, lang));
+    assert.deepEqual([got.kind, got.n, got.when, got.ownRoom, got.at], ['join', 1, { md: [10, 9] }, true, at], `${JSON.stringify(at)} ${lang}`);
+  }
+  assert.equal(LA.requestWords({ ...have, at: { m: 840 } }, 'en'), 'one of us arrives on Oct 9 at 2 PM and needs a separate room');
+  assert.equal(LA.requestWords({ ...have, at: { m: 870 } }, 'fr'), '1 d’entre nous arrive le 9 octobre à 14 h 30 et a besoin d’une chambre séparée');
+});
+
+test('18. no time known: the arrival day is never "for all 3"; it is marked, and the plan asks once', () => {
+  const a = ARR(null), w = LA.words(a, false), f = LA.words(a, true), e = LA.entry(a, null);
+  assert.equal(a.at, undefined);
+  assert.equal(w.days[2], 'for 2 + 1 arriving');
+  assert.equal(f.days[2], 'pour 2 + 1 qui arrive');
+  assert.deepEqual([w.days[1], w.days[3]], ['for 2', 'for all 3']);
+  assert.equal(w.ask, 'What time do they arrive on Oct 9? Until I know, Day 2 stops are for 2, plus 1 once they’re there.');
+  assert.equal(f.ask, 'À quelle heure arrive cette personne le 9 oct.? D’ici là, les arrêts du jour 2 sont pour 2, plus 1 dès son arrivée.');
+  assert.equal(e.askTime, w.ask);
+  assert.equal(e.askTimeFr, f.ask);
+  assert.deepEqual([e.win, e.stop], [undefined, undefined]);
+  // The plan's own line ends with the question; what a copied itinerary says does not carry it.
+  assert.match(e.text, /for 2 until they arrive \(time not set\)\. All 3 from Day 3\. What time do they arrive on Oct 9\?$/);
+  assert.match(e.copy, /All 3 from Day 3\.$/);
+  assert.ok(!/\?/.test(e.copy) && !/\?/.test(e.copyFr));
+  assert.equal(LA.chatAsk(a, 'en'), 'What time do they arrive on Oct 9?');
+  assert.equal(LA.chatAsk(ARR({ m: 840 }), 'en'), '');
+  // The last day, with no night (mode 'day'), and someone leaving early: the same rule on the day it is about.
+  const last = LA.resolve(LA.readLate('our friend joins us on the last day'), CTX);
+  assert.deepEqual([last.mode, last.day, LA.words(last, false).days[3]], ['day', 3, 'for 2 + 1 arriving']);
+  assert.equal(LA.words(last, false).act, 'Days 1–2 are planned for 2. Oct 10 (Day 3): for 2 until they arrive (time not set).');
+  const leave = LA.resolve(LA.readLate('my mom has to leave on October 9'), CTX), lw = LA.words(leave, false);
+  assert.deepEqual(lw.days, { 1: 'for all 3', 2: 'for 2 + 1 leaving', 3: 'for 2' });
+  assert.equal(lw.act, 'Day 1 is for all 3. Oct 9 (Day 2): for all 3 until they leave (time not set). Day 3 is planned for 2.');
+  assert.equal(lw.ask, 'What time do they leave on Oct 9? Until I know, Day 2 stops are for all 3, less 1 once they’ve left.');
+  // No dates on the plan: by the day's number.
+  const und = LA.resolve(LA.readLate('two friends join us on day 2'), { ...CTX, dayDates: [null, null, null], dated: false, adults: 4 });
+  assert.equal(LA.words(und, false).ask, 'What time do they arrive on day 2? Until I know, Day 2 stops are for 2, plus 2 once they’re there.');
+  for (const s of [w.ask, f.ask, w.act, f.act, lw.act, lw.ask, e.text, e.textFr]) assert.ok(!CLAIM_RE.test(s) && !/\b(?:can make|will make|minutes? away|drive from)\b/i.test(s), s);
+});
+
+test('19. a time known: each stop of that day is for 2, not confirmed, or for everyone, by when it starts; no travel time is claimed', () => {
+  const a = ARR({ m: 840 }), w = LA.words(a, false), f = LA.words(a, true), e = LA.entry(a, null);
+  assert.equal(w.line, '2 adults Oct 8–10 · 1 more from Oct 9, 2 PM, own room, 1 night');
+  assert.equal(f.line, '2 adultes 8–10 oct. · 1 de plus dès le 9 oct., 14 h, chambre à part, 1 nuit');
+  assert.deepEqual(w.days, { 1: 'for 2', 2: '2 until 2 PM, then all 3', 3: 'for all 3' });
+  assert.equal(f.days[2], '2 jusqu’à l’arrivée (14 h), puis les 3');
+  assert.equal(w.act, 'Day 1 is planned for 2. Oct 9 (Day 2): 2 until 2 PM, then all 3.');
+  assert.deepEqual(w.stop, { few: 'Before the 2 PM arrival: for 2', near: 'Close to the 2 PM arrival: not confirmed for all 3' });
+  assert.deepEqual(f.stop, { few: 'Avant l’arrivée (14 h) : pour 2', near: 'Près de l’arrivée (14 h) : non confirmé pour les 3' });
+  assert.equal(w.ask, '');
+  assert.deepEqual([e.askTime, e.kind, e.day], [undefined, 'join', 2]);
+  assert.deepEqual(e.win, { from: 840, to: 840, pad: 60, before: 120 });
+  // A stop that starts before 2 PM is for 2; within the hour after, not confirmed; from 3 PM, everyone.
+  const st = (m) => LA.lateStopState(e.win, 'join', m);
+  assert.deepEqual([540, 825, 839, 840, 885, 899, 900, 1065].map(st), ['few', 'few', 'few', 'near', 'near', 'near', 'all', 'all']);
+  assert.equal(LA.lateStopState(e.win, 'join', null), '');
+  // A part of the day is a window: nobody is counted in before it opens, nor as surely there until an hour after it.
+  const ev = ARR({ part: 'evening' }), ew = LA.words(ev, false), win = LA.atWindow(ev.at);
+  assert.deepEqual(win, { from: 1020, to: 1260, pad: 60, before: 120 });
+  assert.equal(ew.days[2], '2 until the evening arrival, then all 3');
+  assert.equal(ew.stop.near, 'Close to the evening arrival: not confirmed for all 3');
+  assert.deepEqual([945, 1019, 1020, 1065, 1319, 1320].map((m) => LA.lateStopState(win, 'join', m)), ['few', 'few', 'near', 'near', 'near', 'all']);
+  assert.deepEqual(Object.fromEntries(Object.entries(LA.DAYPARTS).map(([k, p]) => [k, [p.from, p.to]])), { early_morning: [360, 540], morning: [480, 720], midday: [690, 780], after_lunch: [780, 900], early_afternoon: [720, 840],
+    mid_afternoon: [840, 960], late_afternoon: [960, 1080], afternoon: [720, 1020], dinner: [1020, 1020], evening: [1020, 1260], night: [1260, 1439] });
+  // "in time for dinner": the traveller said they are at dinner, so a stop from 5 PM is for everyone.
+  const dn = LA.atWindow({ part: 'dinner' });
+  assert.deepEqual([1019, 1020, 1065].map((m) => LA.lateStopState(dn, 'join', m)), ['few', 'all', 'all']);
+  // Leaving at noon: a stop that starts from noon is for 2; within two hours before, not confirmed (it may not be over).
+  const lv = LA.resolve(LA.readLate('my mom has to leave at noon on October 9'), CTX), lw = LA.words(lv, false), lwin = LA.atWindow(lv.at);
+  assert.equal(lw.days[2], 'all 3 until 12 PM, then 2');
+  assert.deepEqual(lw.stop, { few: 'After the 12 PM departure: for 2', near: 'Close to the 12 PM departure: not confirmed for all 3' });
+  assert.equal(lw.act, 'Day 1 is for all 3. Oct 9 (Day 2): all 3 until 12 PM, then 2. Day 3 is planned for 2.');
+  assert.deepEqual([540, 599, 600, 719, 720, 825].map((m) => LA.lateStopState(lwin, 'leave', m)), ['all', 'all', 'near', 'near', 'few', 'few']);
+  // The source the pages run is that same function, and stands alone.
+  assert.equal(new Function(`${LA.CLIENT_SRC}; return lateStopState;`)()(e.win, 'join', 885), 'near');
+  assert.ok(V4.includes("${require('./trip-late-arrival').CLIENT_SRC}"));
+  // The chat's reply to a time: who each stop is for, by name and start; never that anyone can make a stop.
+  const stops = [{ name: 'Tour', start: 540 }, { name: 'Lunch', start: 720 }, { name: 'Winery', start: 825 }, { name: 'Paddle', start: 885 }, { name: 'Dinner', start: 1065 }];
+  assert.equal(LA.chatReply(a, null, 'en', { time: 'set', stops }), 'Noted: arrival on Oct 9 at 2 PM. Day 2 before the arrival is for 2: Tour (9 AM), Lunch (12 PM), Winery (1:45 PM). Close to the arrival, so not confirmed for all 3: Paddle (2:45 PM). After that, all 3. No stops changed.');
+  assert.equal(LA.chatReply(ev, null, 'en', { time: 'changed', stops }), 'Updated: arrival on Oct 9 in the evening (taken as 5–9 PM). Day 2 before the arrival is for 2: Tour (9 AM), Lunch (12 PM), Winery (1:45 PM), Paddle (2:45 PM). Close to the arrival, so not confirmed for all 3: Dinner (5:45 PM). No stops changed.');
+  assert.equal(LA.chatReply(a, null, 'fr', { time: 'set', stops: stops.slice(0, 1) }), 'Noté : arrivée le 9 oct. à 14 h. Au jour 2, avant l’arrivée, pour 2 : Tour (9 h). Aucun arrêt n’a changé.');
+  assert.equal(LA.chatReply(ARR({ m: 480 }), null, 'en', { time: 'set', stops }), 'Noted: arrival on Oct 9 at 8 AM. Every Day 2 stop starts later: all 3. No stops changed.');
+  assert.equal(LA.chatReply(ARR(null), null, 'en', { unsure: true }), 'No problem. Until then, Day 2 stays for 2 + 1 arriving. Tell me the time when you know it. No stops changed.');
+  for (const s of [w.act, f.act, ew.act, lw.act, ...Object.values(w.stop), ...Object.values(f.stop), LA.chatReply(a, null, 'en', { time: 'set', stops })]) assert.ok(!CLAIM_RE.test(s) && !/\b(?:can make|will make|can join|minutes? away|drive from)\b/i.test(s), s);
+});
+
+test('20. the chat reads a time only as the arrival time when it is about the arrival, or answers the open question', () => {
+  const have = LA.readLate(OWNER);
+  // About the person arriving: read whether or not the question is open.
+  for (const [m, at] of [['She arrives at 2 pm', { m: 840 }], ['her flight lands at 2:30', { m: 870 }], ['she gets in around 3', { m: 900 }], ['arrival time is 4pm', { m: 960 }], ['change her arrival to 4 pm', { m: 960 }],
+    ['elle arrive vers 15 h', { m: 900 }], ['our friend arrives mid-afternoon', { part: 'mid_afternoon' }], ['actually she gets in in the evening', { part: 'evening' }], ['they land in the morning', { part: 'morning' }]]) {
+    assert.deepEqual(LA.timeChat(m, have, false), { at }, m);
+    assert.deepEqual(LA.timeChat(m, have, true), { at }, m);
+  }
+  // A bare answer: only while the question is the open one.
+  for (const [m, at] of [['2 pm', { m: 840 }], ['around 3', { m: 900 }], ['2', { m: 840 }], ['at 10', { m: 600 }], ['14h30', { m: 870 }], ['3 p.m.', { m: 900 }], ['noon', { m: 720 }], ['vers 15 h', { m: 900 }], ['mid-afternoon', { part: 'mid_afternoon' }],
+    ['in the morning', { part: 'morning' }], ['in the evening', { part: 'evening' }], ['after lunch', { part: 'after_lunch' }], ['probably around 5ish', { m: 1020 }], ['en soirée', { part: 'evening' }], ['late afternoon I think', { part: 'late_afternoon' }]]) {
+    assert.deepEqual(LA.timeChat(m, have, true), { at }, m);
+    assert.equal(LA.timeChat(m, have, false), null, m);
+  }
+  assert.deepEqual(LA.timeChat('not sure yet', have, true), { unsure: true });
+  assert.deepEqual(LA.timeChat('je ne sais pas encore', have, true), { unsure: true });
+  assert.equal(LA.timeChat('not sure yet', have, false), null);
+  // Never: a change to the stops or their times, a question, another number, someone leaving on a plan about an arrival.
+  for (const m of ['start day 2 at 2 pm', 'move dinner to 7 pm', 'what time is dinner?', 'we want dinner at 6 pm', 'add a winery in the afternoon', 'something in the evening', '2 adults', '2 rooms', 'day 2', 'she arrives tomorrow',
+    'She leaves at 3 pm', 'book the tour for 2 pm', 'what time does she arrive?', 'yes', 'cheaper dinner']) { assert.equal(LA.timeChat(m, have, true), null, m); assert.equal(LA.timeChat(m, have, false), null, m); }
+  // A plan about someone leaving reads a leaving time, not an arriving one.
+  const lv = LA.readLate('my mom has to leave on October 9');
+  assert.deepEqual(LA.timeChat('she leaves at noon', lv, false), { at: { m: 720 } });
+  assert.equal(LA.timeChat('she arrives at noon', lv, false), null);
+  // Through the chat's reader: the op carries the request's own statement with the time; the same time again records nothing.
+  const h = { op: (o, x = {}) => ({ o, ...x }) };
+  const r = LA.chatRead('She arrives at 2 pm', [], h, { request: OWNER });
+  assert.deepEqual([r.ops.length, r.ops[0].o, r.ops[0].time, r.ops[0].late.at, r.ops[0].late.when, r.ops[0].late.ownRoom, r.access, r.rest], [1, 'late', true, { m: 840 }, { md: [10, 9] }, true, true, undefined]);
+  assert.equal(LA.chatRead('2 pm', [], h, { request: OWNER }), null);
+  assert.deepEqual(LA.chatRead('2 pm', [], h, { request: OWNER, pendingTime: true }).ops[0].late.at, { m: 840 });
+  assert.equal(LA.chatRead('2 pm', [], h, { request: BASE, pendingTime: true }), null); // no arrangement on the plan
+  assert.equal(LA.chatRead('She arrives at 2 pm', [], h, { request: BASE }), null);
+  const timed = `${BASE} ${LA.requestWords({ ...LA.readLate(OWNER), at: { m: 840 } }, 'en')}.`;
+  assert.equal(LA.chatRead('she arrives at 2 pm', [], h, { request: timed }).ops[0].late, null);
+  assert.deepEqual(LA.chatRead('she arrives at 4 pm', [], h, { request: timed }).ops[0].late.at, { m: 960 });
+  // The whole statement again with a new time changes the time only; without one it changes nothing.
+  assert.deepEqual(LA.chatRead('Our friend arrives on October 9 at 5 pm', [], h, { request: timed }).ops[0].late.at, { m: 1020 });
+  assert.equal(LA.chatRead('Our friend arrives on October 9', [], h, { request: timed }).ops[0].late, null);
+  // The word rules hand it over the same way (the AI's reading never stands in for it).
+  const viaRules = tc.rulesRead('She arrives at 2 pm', [], { request: OWNER });
+  assert.deepEqual([viaRules.access, viaRules.ops[0].o, viaRules.ops[0].late.at], [true, 'late', { m: 840 }]);
+  assert.ok(!tc.rulesRead('2 pm', [], { request: OWNER }).ops.some((o) => o.o === 'late'));
+  assert.deepEqual(tc.rulesRead('2 pm', [], { request: OWNER, pendingTime: true }).ops[0].late.at, { m: 840 });
+});
+
+test('21. sharing: la= carries the time only when known; a link from before reads as "time not set"', () => {
+  assert.equal(LA.toShare(ARR(null)), 'j1d2o');
+  assert.equal(LA.toShare(ARR({ m: 840 })), 'j1d2o.t1400');
+  assert.equal(LA.toShare(ARR({ m: 570 })), 'j1d2o.t0930');
+  assert.equal(LA.toShare(ARR({ part: 'evening' })), 'j1d2o.we');
+  for (const at of [{ m: 0 }, { m: 840 }, { m: 1439 }, ...Object.keys(LA.DAYPARTS).map((part) => ({ part }))]) assert.deepEqual(LA.fromShare(LA.toShare(ARR(at))).at, at, JSON.stringify(at));
+  assert.deepEqual(LA.fromShare('j1d2o'), { key: 'late_arrival', kind: 'join', n: 1, when: { day: 2 }, ownRoom: true, phrase: '' });
+  for (const bad of ['j1d2o.t2400', 'j1d2o.t1260', 'j1d2o.wzz', 'j1d2o.', 'j1d2o.t14', 'j1d2ot1400', 'j1d2o.t1400x', 'j1d2o.w']) assert.equal(LA.fromShare(bad), null, bad);
+  const codes = Object.values(LA.DAYPARTS).map((p) => p.c);
+  assert.equal(new Set(codes).size, codes.length);
+  // The link's reader and its way back (EN / FR switch): values only.
+  for (const la of ['j1d2o', 'j1d2o.t1400', 'j1d2o.wa']) { const c = H.parseShareContext({ la }); assert.equal(c.lateQ, la); assert.match(H.shareContextQuery(c), new RegExp(`(?:^|&)la=${la.replace('.', '\\.')}$`)); }
+  assert.equal(H.parseShareContext({ la: 'j1d2o.t9999' }), null);
+});
+
+test('22. the stay’s two buttons say the booking each link opens with, in both languages, and never more than the link carries', () => {
+  const a = LA.resolve(LA.readLate(OWNER), CTX);
+  const s = LA.cardSplit(HOTEL, TRIP(), a, {});
+  assert.deepEqual(s.text.btn, ['2 adults · Oct 8–10', '1 adult · Oct 9–10']);
+  assert.deepEqual(s.textFr.btn, ['2 adultes · 8–10 oct.', '1 adulte · 9–10 oct.']);
+  // Each label against its own link's parameters (Booking.com is the first link).
+  const first = s.links[0], second = s.links2.find((l) => l.key === first.key);
+  assert.deepEqual(['checkin', 'checkout', 'adults', 'rooms'].map((k) => wrap(first.url).get(k)), ['2027-10-08', '2027-10-10', '2', '1']);
+  assert.deepEqual(['checkin', 'checkout', 'adults', 'rooms'].map((k) => wrap(second.url).get(k)), ['2027-10-09', '2027-10-10', '1', '1']);
+  for (const [l, label] of [[first, s.text.btn[0]], [second, s.text.btn[1]]]) { const c = SBL.stayLinkCarries(l.key, l.url); assert.equal(c.adults && c.dates, true); assert.match(label, /^\d adults? · Oct \d+–10$/); }
+  // Dates not confirmed yet: the Booking.com links carry the guests and no dates, so the buttons say the guests only;
+  // the dates stay in the note beside them.
+  const p = LA.cardSplit(HOTEL, TRIP({ datesGiven: false, stayStatus: 'proposed' }), a, {});
+  assert.equal(p.distinct, true);
+  assert.deepEqual(p.text.btn, ['2 adults', '1 adult']);
+  assert.deepEqual(p.textFr.btn, ['2 adultes', '1 adulte']);
+  for (const l of [p.links[0], p.links2[0]]) { const c = SBL.stayLinkCarries(l.key, l.url); assert.deepEqual([c.adults, c.dates], [true, false]); assert.ok(!/2027-10/.test(l.url), l.url); }
+  assert.match(p.text.card, /1: 2 adults, 1 room, Oct 8–10\. 2: 1 adult, 1 room, Oct 9–10\./);
+  // Two bookings whose links would be the very same link (1 adult each, no dates in them yet) are one button, as before.
+  const two = LA.cardSplit(HOTEL, TRIP({ adults: 2, datesGiven: false, stayStatus: 'proposed' }), LA.resolve(LA.readLate(OWNER), { ...CTX, adults: 2 }), {});
+  assert.deepEqual([two.distinct, two.text.btn], [false, []]);
+  // The hotel's own site only: one button, and the note still lists both bookings.
+  const m = LA.cardSplit(MOTEL, TRIP(), a, {});
+  assert.deepEqual([m.distinct, m.text.btn], [false, []]);
+  assert.equal(m.text.card, 'Two bookings, since one link can’t hold both. 1: 2 adults, 1 room, Oct 8–10. 2: 1 adult, 1 room, Oct 9–10. Make both on the hotel’s own site.');
+  // Said beside the buttons, on the plan and on the shared copy: the booking site confirms; nothing here does.
+  assert.equal(s.text.confirm, 'Availability, rooms and the booking itself are confirmed on the booking site.');
+  assert.equal(s.textFr.confirm, 'La disponibilité, les chambres et la réservation elle-même se confirment sur le site de réservation.');
+  assert.match(CHATPAGE, /data-v4-late-confirm/);
+  assert.match(V3, /if \(sp && sp\.confirm && first\) bits\.push\(sp\.confirm\);/);
+  // Book my trip: each stay row and the "next" button are named by the same words; "see live prices" says which booking.
+  const steps = TB.tripBookingSteps({ id: 9101, name: HOTEL.name, bookingLinks: s.links, bookingLinks2: s.links2, split: { distinct: true, text: s.text, textFr: s.textFr } }, []);
+  assert.deepEqual(steps.map((x) => [x.part, x.btn, x.btnFr, x.sub]), [[1, '2 adults · Oct 8–10', '2 adultes · 8–10 oct.', '2 adults, 1 room, Oct 8–10'], [2, '1 adult · Oct 9–10', '1 adulte · 9–10 oct.', '1 adult, 1 room, Oct 9–10']]);
+  assert.match(V4, /var partName = x\.part \? \(\(fr && x\.btnFr\) \|\| x\.btn \|\|/);
+  assert.match(V4, /\(fr \? 'Ouvrir : ' : 'Open: '\) \+ vt\('stay'\) \+ ' · ' \+ nxPart/);
+  assert.match(V3, /label \+ \(sp1 \? ' \(' \+ sp1 \+ '\)' : ''\)/);
+});
+
+const sayWith = async (page, message, o = {}) => {
+  const parsed = app.parseTripChatBody({ message, lang: o.lang || 'en', plan: { text: page.text, seed: 0, excludeVenueIds: [] }, locks: {}, removed: [], stops: page.stops, dayDates: DATES, tripSource: 'request', ...(page.stayId ? { stayId: page.stayId } : {}), ...(o.offer ? { offer: o.offer } : {}) }, { stays: true });
+  assert.ok(!parsed.error, parsed.error);
+  return (await app.runTripChatTurn(parsed.value, { staysOn: true, lang: o.lang || 'en' })).response;
+};
+
+test('23. the plan and the chat: asked once, answered, changed, undone by its own Undo, cleared with the arrangement', async () => {
+  const p = run(OWNER), page = pageOf(p, OWNER), e = p.evidence[0];
+  // The plan: day 2 is not "for all 3", and carries the one question; nothing is moved for it.
+  assert.deepEqual(e.days, { 1: 'for 2', 2: 'for 2 + 1 arriving', 3: 'for all 3' });
+  assert.equal(e.askTime, 'What time do they arrive on Oct 9? Until I know, Day 2 stops are for 2, plus 1 once they’re there.');
+  assert.equal(e.share, 'j1d2o');
+  assert.match(V4, /data-v4-late-ask/);
+  // The follow-up restated: the reply ends with the question, and the question's tag rides back.
+  const f = await sayWith(page, FOLLOW);
+  assert.match(f.reply, /No stops changed\. What time do they arrive on Oct 9\?$/);
+  assert.deepEqual(f.offer, [LA.ASK_TAG]);
+  assert.equal((f.reply.match(/What time/g) || []).length, 1);
+  // A bare "2 pm" with no question open is not the arrival time; as the answer to it, it is.
+  const stray = await sayWith(page, '2 pm');
+  assert.ok(!stray.late && !stray.lateTime && !/arrival/.test(stray.reply), stray.reply);
+  const day2 = page.stops.filter((s) => /^2-/.test(s.key) && Number.isInteger(s.start));
+  for (const [msg, offer] of [['2 pm', [LA.ASK_TAG]], ['She arrives at 2 pm', undefined]]) {
+    const r = await sayWith(page, msg, { offer });
+    assert.equal(r.lateTime, 'join', msg);
+    assert.equal(r.late, true, msg);
+    assert.deepEqual([r.plan, r.changed], [null, []], msg);
+    assert.match(r.reply, /^Noted: arrival on Oct 9 at 2 PM\. /, msg);
+    assert.match(r.reply, / No stops changed\.$/, msg);
+    assert.equal(r.offer, undefined, msg); // nothing more to ask
+    assert.deepEqual(LA.readLate(r.text).at, { m: 840 }, msg);
+    assert.equal(LA.stripLate(r.text), BASE, msg);
+    const le = r.stayBlock.lateEvidence;
+    assert.deepEqual([le.days[2], le.askTime, le.share, le.win.from], ['2 until 2 PM, then all 3', undefined, 'j1d2o.t1400', 840], msg);
+    assert.deepEqual(r.stayBlock.lateArrival.at, { m: 840 }, msg);
+    // The stay is as it was: the same two bookings.
+    assert.deepEqual(r.stayBlock.whereToStay.trip.split.parts.map((x) => [x.adults, x.rooms, x.arrive, x.leave]), [[2, 1, '2027-10-08', '2027-10-10'], [1, 1, '2027-10-09', '2027-10-10']], msg);
+    // Every stop of day 2 that starts before 2 PM is named as for 2; none of the others is.
+    for (const s of day2) { const name = app.getVenue(s.id).name; const part = r.reply.split('Close to the arrival')[0]; assert.equal(part.includes(name), s.start < 840, `${name} ${s.start}`); }
+  }
+  // Later turns keep it: a part of the day replaces the time; the same time again changes nothing; "not sure" neither.
+  const t2 = (await sayWith(page, 'She arrives at 2 pm')).text, page2 = { ...page, text: t2 };
+  const ev = await sayWith(page2, 'actually she gets in in the evening');
+  assert.match(ev.reply, /^Updated: arrival on Oct 9 in the evening \(taken as 5–9 PM\)\. /);
+  assert.deepEqual([LA.readLate(ev.text).at, ev.lateTime, ev.stayBlock.lateEvidence.share], [{ part: 'evening' }, 'join', 'j1d2o.we']);
+  const same = await sayWith(page2, 'she arrives at 2 pm');
+  assert.deepEqual([same.text, same.stayBlock, same.lateTime], [undefined, undefined, undefined]);
+  assert.match(same.reply, /^Noted: arrival on Oct 9 at 2 PM\./);
+  const fr = await sayWith(page2, 'Elle arrive vers 15 h 30', { lang: 'fr' });
+  assert.match(fr.reply, /^Modifié : arrivée le 9 oct\. à 15 h 30\. /);
+  assert.deepEqual(LA.readLate(fr.text).at, { m: 930 });
+  const unsure = await sayWith(page, 'not sure yet', { offer: [LA.ASK_TAG] });
+  assert.equal(unsure.reply, 'No problem. Until then, Day 2 stays for 2 + 1 arriving. Tell me the time when you know it. No stops changed.');
+  assert.deepEqual([unsure.text, unsure.stayBlock, unsure.offer], [undefined, undefined, [LA.ASK_TAG]]);
+  // The other fixed rules still read their own messages on a plan with a time (stay dates, rooms), and keep the time.
+  const thu = await sayWith(page2, 'we arrive Thursday night');
+  assert.deepEqual(thu.stayDates, { arrive: '2027-10-07', leave: '2027-10-10' });
+  const rooms = await sayWith(page2, 'how many rooms did you assume?');
+  assert.match(rooms.reply, /^2 adults Oct 8–10 · 1 more from Oct 9, 2 PM, own room, 1 night\./);
+  // Taking the arrangement off takes its time with it.
+  const gone = await sayWith(page2, 'remove the late arrival');
+  assert.equal(gone.text, BASE);
+  assert.equal(gone.stayBlock.lateArrival, null);
+  // The page: the time's own Undo, and the bare-answer tag only while the plan shows the question.
+  assert.match(CHATPAGE, /undoArrTime: 'Undo arrival time'/);
+  assert.match(CHATPAGE, /undoArrTime: 'Annuler l’heure d’arrivée'/);
+  assert.match(CHATPAGE, /j\.lateTime && !\(j\.plan && j\.req && changed\.length\) \? 'arrtime:'/);
+  assert.match(CHATPAGE, /if \(laQ && laQ\.askTime\) body\.offer = \['\[arrival time\]'\];/);
+});
+
+test('24. the time said in the request: the same stops, each stop of that day marked, the estimate counted by who is there', () => {
+  const timed = run(`${BASE} Our friend arrives only on October 9 at 3 pm and needs a separate room for one night.`), plain = run(BASE), untimed = run(OWNER);
+  assert.deepEqual(stopIds(timed), stopIds(plain));
+  assert.deepEqual((timed.schedule || []).map((r) => [r.day, r.venueId, r.startMinutes]), (plain.schedule || []).map((r) => [r.day, r.venueId, r.startMinutes]));
+  const e = timed.evidence[0];
+  assert.deepEqual([timed.lateArrival.at, e.days[2], e.share, e.askTime], [{ m: 900 }, '2 until 3 PM, then all 3', 'j1d2o.t1500', undefined]);
+  assert.equal(e.short, '2 adults Oct 8–10 · 1 more from Oct 9, 3 PM, own room, 1 night');
+  // The stay and every link are the same as without the time.
+  assert.deepEqual(allLinks(timed).map((l) => l.url), allLinks(untimed).map((l) => l.url));
+  // The estimate: stops of day 2 that start before 3 PM are counted for 2, so it is never more than with no time.
+  const est = (p) => (p.whereToStay && p.whereToStay.pick && p.whereToStay.pick.estimate) || (p.v4Booking && p.v4Booking.estimate) || null;
+  const a = est(timed), b = est(untimed);
+  if (a && b && a.high !== null && b.high !== null) assert.ok(a.high <= b.high && a.low <= b.low, `${a.low}-${a.high} vs ${b.low}-${b.high}`);
+  const paid = (timed.days[1].stops || []).filter((s) => s.venue).length;
+  if (a && paid) { const n = (a.notes || []).find((x) => x.key === 'late'); if (n && /stops before/.test(n.text)) assert.equal(n.text, 'Day 1 and Day 2 stops before the 3 PM arrival counted for 2, the rest for 3.'); }
+  // A plan with no later arrival has none of this.
+  assert.ok(!/late_arrival|lateArrival|arriving|askTime/.test(JSON.stringify(plain)));
+});
+
+test('25. the shared copy: the time and each stop’s note when the link carries it; the unconfirmed day when it does not', () => {
+  const p = run(OWNER, { arrive: '2027-10-08', leave: '2027-10-10' });
+  const refs = stopIds(p).map((s) => `venue:${s.split(':')[1]}`), days = stopIds(p).map((s) => s.split('-')[0]);
+  const stayId = p.whereToStay ? String(p.whereToStay.pick.id) : null;
+  const base = { stops: refs.join(','), days: days.join(','), td: '2027-10-08_2027-10-10', ts: 'r', sa: '2027-10-08', sl: '2027-10-10', sc: '1', ad: '3', rm: '2', ra: '1', ...(stayId ? { stay: stayId, nights: '2' } : {}) };
+  // A link from before (no time): the honest state.
+  const old = app.tripShareContext({ ...base, la: 'j1d2o' }, 'en', NOW), oldHtml = app.tripShareContextHtml(old, 'en');
+  assert.deepEqual(old.late.days, { 1: 'for 2', 2: 'for 2 + 1 arriving', 3: 'for all 3' });
+  assert.equal(old.late.win, undefined);
+  assert.match(oldHtml, /data-mt-late>Day 1 is planned for 2\. Oct 9 \(Day 2\): for 2 until they arrive \(time not set\)\. All 3 from Day 3\./);
+  assert.ok(!/What time/.test(oldHtml), 'no question on the shared copy');
+  // With the time.
+  const c = app.tripShareContext({ ...base, la: 'j1d2o.t1400' }, 'en', NOW), html = app.tripShareContextHtml(c, 'en');
+  assert.equal(c.late.line, '2 adults Oct 8–10 · 1 more from Oct 9, 2 PM, own room, 1 night');
+  assert.deepEqual(c.late.days, { 1: 'for 2', 2: '2 until 2 PM, then all 3', 3: 'for all 3' });
+  assert.deepEqual([c.late.kind, c.late.day, c.late.win.from], ['join', 2, 840]);
+  assert.deepEqual(c.late.stop, { few: 'Before the 2 PM arrival: for 2', near: 'Close to the 2 PM arrival: not confirmed for all 3' });
+  assert.match(html, /data-mt-late>Day 1 is planned for 2\. Oct 9 \(Day 2\): 2 until 2 PM, then all 3\./);
+  const frc = app.tripShareContext({ ...base, la: 'j1d2o.wa' }, 'fr', NOW);
+  assert.equal(frc.late.days[2], '2 jusqu’à l’arrivée (après-midi), puis les 3');
+  assert.equal(frc.late.stop.few, 'Avant l’arrivée (après-midi) : pour 2');
+  // The stay: the same two bookings and links with or without the time; the buttons say each booking.
+  if (c.stay) {
+    assert.deepEqual(c.stay.links.map((l) => l.url), old.stay.links.map((l) => l.url));
+    assert.match(html, /data-mt-late-stay>Two bookings, since one link can’t hold both\. 1: 2 adults, 1 room, Oct 8–10\. 2: 1 adult, 1 room, Oct 9–10\.[^<]* Availability, rooms and the booking itself are confirmed on the booking site\./);
+    if (c.stay.split.distinct) assert.deepEqual(c.stay.links.map((l) => l.label), ['2 adults · Oct 8–10', '1 adult · Oct 9–10']);
+  }
+  assert.ok(!CLAIM_RE.test(JSON.stringify([c.late, old.late, frc.late])));
+  // A link with no la= is the copy as it always was.
+  const none = app.tripShareContext(base, 'en', NOW);
+  assert.equal(none.late, undefined);
 });

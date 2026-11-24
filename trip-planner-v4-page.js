@@ -44,6 +44,7 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-thin-btn { display: inline-flex; align-items: center; min-height: 44px; margin: 2px 0 2px 4px; padding: 0 12px; border: 1px solid #6b4a12; border-radius: 10px; background: #fffdf8; color: #1b303c; font: 800 13px Nunito, sans-serif; cursor: pointer; }
   .t3-v4 .v4-stops { list-style: none; margin: 0; padding: 0; background: #fff; border-radius: 16px; box-shadow: 0 1px 0 rgba(27,43,58,0.06), 0 8px 24px -18px rgba(16,27,36,0.35); overflow: hidden; }
   .t3-v4 .v4-stop { border-top: 1px solid rgba(27,43,58,0.08); }
+  .t3-v4 .v4-late-ask { margin: 0 0 8px; padding: 8px 10px; border-radius: 10px; background: #fff0cc; color: #6b4a12; font-size: 13px; line-height: 1.35; font-weight: 700; }
   .t3-v4 .v4-stop:first-child { border-top: 0; }
   .t3-v4 .v4-row { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 8px 10px 12px; }
   .t3-v4 .v4-thumb { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; display: block; background: var(--ref-cream-deep, #EAE6D9); }
@@ -345,6 +346,9 @@ const V4_CLIENT_SRC = String.raw`
     // note ("Age 15: check it suits"), the full sentence under the opened card, and a line in the Book my trip list.
     try { var ag = typeof v4AgeAsk === 'function' ? v4AgeAsk(id) : null; if (ag && ag.short) { var as = (fr && ag.shortFr) || ag.short; out.notes.push(as); out.compact.push(as); out.open.push(as); out.more.push((fr && ag.noteFr) || ag.note || as); out.age = ag.age; } } catch (e) { /* no note */ }
     if (alNote) { out.notes.unshift(alNote); out.compact.unshift(alNote); out.open.unshift(alNote); out.allergy = alNote; }
+    // (2026-11-24) Someone arrives part-way through this day, at a known time (trip-late-arrival.js): a stop that starts
+    // before it is "for 2", one that starts close to it is "not confirmed for all 3". Nothing is said of the rest.
+    try { var ln = typeof v4LateStopNote === 'function' ? v4LateStopNote(id) : ''; if (ln) { out.notes.push(ln); out.compact.push(ln); out.open.push(ln); out.late = ln; } } catch (e) { /* no note */ }
     out.note = out.notes.join(' · ');
     return out;
   }
@@ -592,14 +596,18 @@ const V4_CLIENT_SRC = String.raw`
     if (steps.length) {
       html += '<p class="v4-sheet-h4">' + esc(done ? vt('progress', { d: done, n: steps.length }) : vt('toBook')) + '</p><ol class="v4-check">' + steps.map(function(x, n){
         // (A split stay: "Stay · booking 1 · <name>" with that booking's own guests, room and dates under it.)
-        var mark = st[n], name = x.kind === 'stay' ? vt('stay') + (x.part ? ' · ' + (fr ? 'réservation ' : 'booking ') + x.part : '') + ' · ' + x.name : ((fr && x.nameFr) || x.name);
+        // (2026-11-24) ...named by what its link opens with: "Stay · 2 adults · Oct 8–10 · <name>".
+        var partName = x.part ? ((fr && x.btnFr) || x.btn || ((fr ? 'réservation ' : 'booking ') + x.part)) : '';
+        var mark = st[n], name = x.kind === 'stay' ? vt('stay') + (partName ? ' · ' + partName : '') + ' · ' + x.name : ((fr && x.nameFr) || x.name);
         var verb = x.kind === 'stay' ? (fr ? ((d && d.chosen.bookingLinks[0]) || {}).shortFr || 'Réserver' : ((d && d.chosen.bookingLinks[0]) || {}).short || 'Book') : t3StepVerb(x, fr);
         return '<li class="' + (mark === 'done' ? 'is-done' : n === next ? 'is-next' : '') + '"><button type="button" class="t3-book-tick" data-t3-bk-toggle="' + n + '" aria-pressed="' + (mark === 'done' ? 'true' : 'false') + '" aria-label="' + esc(vt('iBooked') + (fr ? ' : ' : ': ') + name) + '">' + (mark === 'done' ? '✓' : mark === 'skipped' ? '–' : '') + '</button>'
           + '<span class="v4-check-name">' + esc(name) + (x.kind === 'stay' && x.part && x.sub ? '<small data-v4-book-part="' + esc(x.part) + '">' + esc((fr && x.subFr) || x.sub) + '</small>' : '')
           + '<small class="v4-mine">' + (mark === 'done' ? esc(vt('markedByYou')) + ' · <button type="button" class="t3-book-link" data-t3-bk-toggle="' + n + '" data-v4-unbook>' + esc(vt('undoBooked')) + '</button>' : '<button type="button" class="t3-book-link" data-t3-bk-toggle="' + n + '" data-v4-booked>' + esc(vt('iBooked')) + '</button>') + '</small>'
           + (x.affiliate ? '<small class="v4-aff">' + esc(vt('commission')) + '</small>' : '') + '</span>' + t3StepLinkHtml(x, '', verb, n) + '</li>';
       }).join('') + '</ol>';
-      html += next >= 0 ? '<div class="v4-next">' + t3StepLinkHtml(steps[next], 't3-btn t3-book-main', done ? vt('nextOf', { name: steps[next].kind === 'stay' ? vt('stay') : ((fr && steps[next].nameFr) || steps[next].name) }) : vt('next'), next) + '</div>'
+      // (2026-11-24) A split stay's "next" button says which of the two bookings it opens.
+      var nx = next >= 0 ? steps[next] : null, nxPart = nx && nx.kind === 'stay' && nx.part ? ((fr && nx.btnFr) || nx.btn || '') : '';
+      html += next >= 0 ? '<div class="v4-next">' + t3StepLinkHtml(steps[next], 't3-btn t3-book-main', nxPart ? (done ? vt('nextOf', { name: vt('stay') + ' · ' + nxPart }) : (fr ? 'Ouvrir : ' : 'Open: ') + vt('stay') + ' · ' + nxPart) : done ? vt('nextOf', { name: steps[next].kind === 'stay' ? vt('stay') : ((fr && steps[next].nameFr) || steps[next].name) }) : vt('next'), next) + '</div>'
         : '<p class="v4-sheet-h4">' + esc(vt('allSet')) + ' <button type="button" class="t3-book-link" data-t3-bk-restart>' + esc(vt('startOver')) + '</button></p>';
       if (d) html += t3StayNotesHtml(d.chosen, d.w.trip || {}, fr);
     }
@@ -721,6 +729,15 @@ const V4_CLIENT_SRC = String.raw`
   // Someone arrives later or leaves earlier (2026-11-23, trip-late-arrival.js): the stay's split, the plan's own entry.
   function v4LateSplit(){ var d = typeof t3StayData === 'function' ? t3StayData() : null; return (d && d.w && d.w.trip && d.w.trip.split) || null; }
   function v4LateEntry(){ var p = state.last || {}; if (!p.lateArrival) return null; return (p.evidence || []).filter(function(e){ return e && e.ask === 'late_arrival'; })[0] || null; }
+  // (2026-11-24) Who a stop of the arrival (or departure) day is for, once the time is known: by the stop's own start.
+  ${require('./trip-late-arrival').CLIENT_SRC}
+  function v4LateStopNote(id){
+    var e = v4LateEntry(); if (!e || !e.win || !e.stop) return '';
+    var day = ((state.last && state.last.days) || []).filter(function(d){ return d && d.day === e.day && (d.stops || []).some(function(s){ return s && s.venue && s.venue.id === id; }); })[0];
+    if (!day) return '';
+    var st = typeof chatStart === 'function' ? lateStopState(e.win, e.kind, chatStart(e.day, id)) : '';
+    return st ? (((lang() === 'fr' && e.stopFr) || e.stop)[st] || '') : '';
+  }
   function v4PartyUrl(raw){
     try {
       // A split stay's links are each booking's own (its dates, adults and rooms), built on the server: never rewritten.
@@ -928,7 +945,8 @@ const V4_CLIENT_SRC = String.raw`
       if (alOn && /^(?:x\.)?[a-z_,]{2,80}$/.test(alOn.share)) out += '&al=' + alOn.share;
       // Someone arrives later (2026-11-23): la=j1d2o (join or leave, how many, which day, own room said). Values only.
       var laOn = v4LateEntry();
-      if (laOn && /^[jl][1-9]d[1-9][0-9]?[ox]$/.test(laOn.share || '')) out += '&la=' + laOn.share;
+      // (2026-11-24) ...and the time of day when known: la=j1d2o.t1400, or a part of the day by its code (la=j1d2o.wa).
+      if (laOn && /^[jl][1-9]d[1-9][0-9]?[ox](?:\.(?:t[0-2][0-9][0-5][0-9]|w[a-z]{1,2}))?$/.test(laOn.share || '')) out += '&la=' + laOn.share;
       // The budget (2026-11-23): the limit and the estimate's own figures (bg=600t, be=low.high.people.assumed.nights.
       // stops.unpriced.stayMissing; x = no figure). Values only: the copy's wording is rebuilt on the server.
       var bg = v4Budget();
@@ -950,7 +968,8 @@ const V4_CLIENT_SRC = String.raw`
     if (alE) lines.push(alOn ? ((fr && alE.copyFr) || alE.copy) : ((fr && alAnon.copyFr) || alAnon.copy || ''));
     // Someone arrives later (2026-11-23): who is there which nights, the bookings the stay takes, each day's head count.
     var laT = v4LateEntry();
-    if (laT && laT.text) lines.push((fr && laT.textFr) || laT.text);
+    // (2026-11-24: the copied text states it -- "arrival time not set" -- and never carries the question.)
+    if (laT && (laT.copy || laT.text)) lines.push((fr && (laT.copyFr || laT.textFr)) || laT.copy || laT.text);
     var alHide = function(txt){
       if (!alAnon) return txt;
       [[(fr && alE.noteRestFr) || alE.noteRest, (fr && alAnon.noteRestFr) || alAnon.noteRest], [(fr && alE.noteOtherFr) || alE.noteOther, (fr && alAnon.noteOtherFr) || alAnon.noteOther]].forEach(function(pair){ if (pair[0] && pair[1]) txt = txt.split(pair[0]).join(pair[1]); });
@@ -1075,6 +1094,8 @@ const V4_CLIENT_SRC = String.raw`
         var laD = v4LateEntry(), laDay = laD && ((fr && laD.daysFr) || laD.days) ? ((fr && laD.daysFr) || laD.days)[d.day] : '';
         var label = [date, d.regionLabel, laDay].filter(Boolean).join(' · ');
         html += '<section class="v4-day" id="t3-day-' + d.day + '" aria-labelledby="v4-day-' + d.day + '">' + (nd > 1 || label ? '<h3 class="v4-day-title" id="v4-day-' + d.day + '">' + (nd > 1 ? esc(vt('day') + ' ' + d.day) : '') + (label ? ' <span>' + (nd > 1 ? '· ' : '') + esc(label) + '</span>' : '') + '</h3>' : '')
+          // (2026-11-24) The one question, under the day it is about, while the arrival time is not known.
+          + (laD && laD.askTime && laD.day === d.day ? '<p class="v4-late-ask" data-v4-late-ask>' + esc((fr && laD.askTimeFr) || laD.askTime) + '</p>' : '')
           + (d.driveIn ? '<p class="v4-leg" style="margin:0 0 6px;border-radius:10px;padding-left:12px">' + esc(t3DriveText(d.driveIn, lang())) + '</p>' : '')
           + v4ThinHtml(p, d.day, fr)
           + v4ListHtml(d.stops, function(s){ return d.day + '-' + s.daypart; }, counts) + '</section>';

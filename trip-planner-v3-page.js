@@ -1242,7 +1242,9 @@ ${require('./stay-booking-links').HANDOFF_CLIENT_SRC}` + String.raw`
     if (lu) a = '<a ' + hrefAttr(lu) + ' target="_blank" rel="sponsored nofollow noopener" data-track="stay_click" data-stay-id="' + esc(s.id) + '" data-link="live_prices" data-affiliate="1" data-t3-live data-t3-live-name="' + esc(s.name) + '">' + esc(label) + ' <span aria-hidden="true">↗</span></a>';
     else {
       var b = (s.bookingLinks || []).filter(function(x){ return x && t3StayExt(x.url); })[0];
-      if (b) a = t3StayLinkHtml(s, b, '', label);
+      // (2026-11-24) A split stay (trip-late-arrival.js): this link is the first booking's, and says so.
+      var sp1 = s.split && s.split.distinct ? (((fr ? s.split.textFr : s.split.text) || {}).btn || [])[0] : '';
+      if (b) a = t3StayLinkHtml(s, b, '', label + (sp1 ? ' (' + sp1 + ')' : ''));
     }
     return a ? '<p class="t3-book-parts t3-book-est-stay">' + esc(fr ? 'Hébergement : ' : 'Stay: ') + a + '</p>' : '';
   }
@@ -1327,7 +1329,9 @@ ${require('./stay-booking-links').HANDOFF_CLIENT_SRC}` + String.raw`
     if (!sp && t.rooms > 1 && first && (first.key === 'own' || first.key === 'search')) bits.push(fr ? 'Site de l’hôtel : indiquez ' + t.rooms + ' chambres sur place.' : 'Hotel’s own site: enter ' + t.rooms + ' rooms there.');
     // Expedia with no dates opens with its own default party (seen 2026-11-22), whatever the link says.
     if (first && first.key === 'expedia' && !t.datesGiven && (t.adults || 0) + (t.kids || 0) !== 2) bits.push(fr ? 'Expedia n’affiche vos voyageurs et vos chambres qu’une fois les dates choisies : entrez-les sur place.' : 'Expedia shows your guests and rooms only once dates are picked: enter them there.');
-    if ((t.adults || 0) + (t.kids || 0) >= 3 && first) bits.push(fr ? 'Les chambres et leur capacité sont confirmées sur le site de réservation.' : 'Rooms and how many each sleeps are confirmed on the booking site.');
+    // (2026-11-24) A split stay says it in its own words: availability and the booking itself are the booking site's.
+    if (sp && sp.confirm && first) bits.push(sp.confirm);
+    else if ((t.adults || 0) + (t.kids || 0) >= 3 && first) bits.push(fr ? 'Les chambres et leur capacité sont confirmées sur le site de réservation.' : 'Rooms and how many each sleeps are confirmed on the booking site.');
     if (bits.length) html = '<p class="t3-book-note">' + esc(bits.join(' ')) + '</p>';
     return html;
   }
