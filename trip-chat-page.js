@@ -123,9 +123,9 @@ function chatClientSrc(d) {
   // ---------- Travel agent chat (trip-chat-page.js) ----------
   var CHAT_URL = '/api/trip/chat${qs ? `?${qs}` : ''}';
   var CHAT_T = {
-    en: { label: 'Tell us what to change', ph: 'Tell me what to change…', send: 'Send', thinking: 'Thinking…', undo: 'Undo', undoDates: 'Undo dates', undoStay: 'Undo stay change', undoRooms: 'Undo rooms', undoSwap: 'Undo swap: {name} back', undoneDates: 'Undone: your stay dates are as they were before. Your stops are unchanged.', undoneStay: 'Undone: your stay is as it was before. Your stops are unchanged.', undoneRooms: 'Undone: your rooms are as they were before. Your stops are unchanged.', undoneSwap: 'Undone: {name} is back.', noUndo: 'There’s nothing to undo right now.', undone: 'Undone. Your plan is back.', kept: 'OK, your plan stays as it is.', err: 'Something went wrong. Your plan is unchanged.', you: 'You: ',
+    en: { label: 'Tell us what to change', ph: 'Tell me what to change…', send: 'Send', thinking: 'Thinking…', undo: 'Undo', undoDates: 'Undo dates', undoStay: 'Undo stay change', undoArrival: 'Undo arrival change', undoneArrival: 'Undone: the later arrival is off your plan, and the stay is one booking for everyone again. Your stops are unchanged.', undoRooms: 'Undo rooms', undoSwap: 'Undo swap: {name} back', undoneDates: 'Undone: your stay dates are as they were before. Your stops are unchanged.', undoneStay: 'Undone: your stay is as it was before. Your stops are unchanged.', undoneRooms: 'Undone: your rooms are as they were before. Your stops are unchanged.', undoneSwap: 'Undone: {name} is back.', noUndo: 'There’s nothing to undo right now.', undone: 'Undone. Your plan is back.', kept: 'OK, your plan stays as it is.', err: 'Something went wrong. Your plan is unchanged.', you: 'You: ',
       chips: [['cheaper', 'Cheaper'], ['kids', 'More for kids'], ['slower', 'Slower pace']] },
-    fr: { label: 'Dites-nous quoi changer', ph: 'Dites-moi quoi changer…', send: 'Envoyer', thinking: 'Je regarde…', undo: 'Annuler', undoDates: 'Annuler les dates', undoStay: 'Annuler le changement d’hébergement', undoRooms: 'Annuler les chambres', undoSwap: 'Annuler l’échange : remettre {name}', undoneDates: 'Annulé : vos dates de séjour sont comme avant. Vos arrêts n’ont pas changé.', undoneStay: 'Annulé : votre hébergement est comme avant. Vos arrêts n’ont pas changé.', undoneRooms: 'Annulé : vos chambres sont comme avant. Vos arrêts n’ont pas changé.', undoneSwap: 'Annulé : {name} est de retour.', noUndo: 'Il n’y a rien à annuler pour l’instant.', undone: 'Annulé. Votre plan est revenu.', kept: 'D’accord, votre plan reste tel quel.', err: 'Un problème est survenu. Votre plan n’a pas changé.', you: 'Vous : ',
+    fr: { label: 'Dites-nous quoi changer', ph: 'Dites-moi quoi changer…', send: 'Envoyer', thinking: 'Je regarde…', undo: 'Annuler', undoDates: 'Annuler les dates', undoStay: 'Annuler le changement d’hébergement', undoArrival: 'Annuler le changement d’arrivée', undoneArrival: 'Annulé : l’arrivée décalée n’est plus sur votre plan, et l’hébergement redevient une seule réservation pour tout le monde. Vos arrêts n’ont pas changé.', undoRooms: 'Annuler les chambres', undoSwap: 'Annuler l’échange : remettre {name}', undoneDates: 'Annulé : vos dates de séjour sont comme avant. Vos arrêts n’ont pas changé.', undoneStay: 'Annulé : votre hébergement est comme avant. Vos arrêts n’ont pas changé.', undoneRooms: 'Annulé : vos chambres sont comme avant. Vos arrêts n’ont pas changé.', undoneSwap: 'Annulé : {name} est de retour.', noUndo: 'Il n’y a rien à annuler pour l’instant.', undone: 'Annulé. Votre plan est revenu.', kept: 'D’accord, votre plan reste tel quel.', err: 'Un problème est survenu. Votre plan n’a pas changé.', you: 'Vous : ',
       chips: [['cheaper', 'Moins cher'], ['kids', 'Plus pour les enfants'], ['slower', 'Plus relax']] }
   };
   var chat = { busy: false, undo: null, used: false, goneEvents: {}, queue: null, wineTour: null, ageAsk: {}, swapBacks: [], undoKind: '' };
@@ -143,7 +143,7 @@ function chatClientSrc(d) {
     return null;
   }
   // The Undo beside the last reply undoes that reply's change; its label says which when it is not a change of stops.
-  function chatUndoLabel(){ return chat.undoKind === 'dates' ? ct('undoDates') : chat.undoKind === 'stay' ? ct('undoStay') : chat.undoKind === 'rooms' ? ct('undoRooms') : ct('undo'); }
+  function chatUndoLabel(){ return chat.undoKind === 'arrival' ? ct('undoArrival') : chat.undoKind === 'dates' ? ct('undoDates') : chat.undoKind === 'stay' ? ct('undoStay') : chat.undoKind === 'rooms' ? ct('undoRooms') : ct('undo'); }
   // An earlier swap, when the Undo beside the reply is not for it (or is gone): its own button, named.
   function chatBackButton(){
     var sb = chatSwapBack();
@@ -170,7 +170,7 @@ function chatClientSrc(d) {
     var snap = chat.undo, kind = chat.undoKind, sb = chatSwapBack();
     chat.undo = null; chat.undoKind = ''; chat.lastDiff = null; chat.pending = null; chat.offer = null;
     chatRestore(snap);
-    var said = kind === 'dates' ? ct('undoneDates') : kind === 'stay' ? ct('undoneStay') : kind === 'rooms' ? ct('undoneRooms') : kind && sb && kind === 'swap:' + sb.newId ? ct('undoneSwap').replace('{name}', sb.oldName) : ct('undone');
+    var said = kind === 'arrival' ? ct('undoneArrival') : kind === 'dates' ? ct('undoneDates') : kind === 'stay' ? ct('undoneStay') : kind === 'rooms' ? ct('undoneRooms') : kind && sb && kind === 'swap:' + sb.newId ? ct('undoneSwap').replace('{name}', sb.oldName) : ct('undone');
     chatShow(typed || '', said, {});
     track('trip_chat', { chat_source: 'undo', changed: 'yes' });
     return true;
@@ -355,6 +355,13 @@ function chatClientSrc(d) {
         if (j.stayBlock && state.last) {
           ['whereToStay', 'v4Booking', 'gettingHere'].forEach(function(k){ if (j.stayBlock[k]) state.last[k] = j.stayBlock[k]; else delete state.last[k]; });
           stayChoice = null; touched = true; changed.push('stay');
+          // Someone arriving later travels with the stay part: the plan's own line and the day labels follow it.
+          if (Object.prototype.hasOwnProperty.call(j.stayBlock, 'lateArrival')) {
+            if (j.stayBlock.lateArrival) state.last.lateArrival = j.stayBlock.lateArrival; else delete state.last.lateArrival;
+            var evL = (state.last.evidence || []).filter(function(e){ return !(e && e.ask === 'late_arrival'); });
+            if (j.stayBlock.lateEvidence) { j.stayBlock.lateEvidence.line = true; evL.splice(evL[0] && evL[0].ask === 'allergy' ? 1 : 0, 0, j.stayBlock.lateEvidence); }
+            state.last.evidence = evL;
+          }
         }
         if (j.stayPref !== undefined) { chat.stayPref = j.stayPref; chat.noStay = !!(j.stayPref && j.stayPref.none); touched = true; if (changed.indexOf('stay') === -1) changed.push('stay'); }
         // Travel agent abilities: a stay added to a plan with no night (stay.force rides along with later requests), and the number of adults.
@@ -390,7 +397,7 @@ function chatClientSrc(d) {
         // An "Undone" turn has no Undo of its own.
         if (j.back) chat.undo = null;
         // (2026-11-24) What this reply's Undo undoes: the stay's dates, the stay, the rooms, or a change of stops.
-        chat.undoKind = !chat.undo ? '' : j.stayDates ? 'dates' : (j.party && j.party.rooms && !(j.plan && j.req && changed.length)) ? 'rooms' : (!(j.plan && j.req && changed.length) && (j.stayBlock || j.stayPref !== undefined)) ? 'stay' : j.swapBack ? 'swap:' + j.swapBack.newId : 'stops';
+        chat.undoKind = !chat.undo ? '' : j.stayDates ? 'dates' : j.late && !(j.plan && j.req && changed.length) ? 'arrival' : (j.party && j.party.rooms && !(j.plan && j.req && changed.length)) ? 'rooms' : (!(j.plan && j.req && changed.length) && (j.stayBlock || j.stayPref !== undefined)) ? 'stay' : j.swapBack ? 'swap:' + j.swapBack.newId : 'stops';
         if (j.swapBack && j.swapBack.say && j.plan) { chat.swapBacks = (chat.swapBacks || []).filter(function(x){ return x.key !== j.swapBack.key; }).concat([j.swapBack]).slice(-6); }
         (Array.isArray(j.ageAsk) ? j.ageAsk : []).forEach(function(a){ if (a && a.id > 0 && a.short) { chat.ageAsk[a.id] = a; touched = true; } });
         if (Array.isArray(j.ageAsk) && j.ageAsk.length && j.plan) { chat.rendering = true; try { render(false); } finally { chat.rendering = false; } }
@@ -591,14 +598,22 @@ function chatClientSrc(d) {
     // Rooms (2026-11-22): the rooms row under the stay says the number ("3 rooms (assumed)") and changes it; not twice.
     var tripNoRooms = {}; Object.keys(tripIn).forEach(function(k){ if (k !== 'rooms' && k !== 'roomsAssumed') tripNoRooms[k] = tripIn[k]; });
     var trip = t3StayTripLine(known ? tripNoRooms : { adults: tripIn.adults, adultsAssumed: tripIn.adultsAssumed, kids: tripIn.kids, dog: tripIn.dog }, fr), img = chatImg(s.photo);
+    // (Someone arrives later: the party line says so before the dates are known too.)
+    if (!known && tripIn.split) trip = t3StayTripLine({ adults: tripIn.adults, kids: tripIn.kids, dog: tripIn.dog, split: tripIn.split }, fr);
+    // Someone arrives later (2026-11-23, trip-late-arrival.js): the stay as the bookings it takes. Two buttons, each
+    // opening its own booking, only when each link carries its own booking; else one button and the two said beside it.
+    var sp = s.split ? (fr ? s.split.textFr : s.split.text) : null;
+    var step2 = sp && s.split.distinct && (sp.btn || []).length === 2 ? (s.bookingSteps || d.w.bookingSteps || []).filter(function(x){ return x && x.kind === 'stay' && x.part === 2 && t3StayExt(x.url); })[0] : null;
     var roomsRow = typeof v4RoomsHtml === 'function' ? v4RoomsHtml(fr) : '', roomsNote = step && typeof v4RoomsNote === 'function' ? v4RoomsNote(s, fr) : '';
     var html = '<section class="v4-card v4-stay-card t3-stay" aria-label="' + esc(ag('stayH')) + '"><p class="v4-card-h"><span class="v4-h-full">' + esc(ag('stayH')) + '</span><span class="v4-h-short" aria-hidden="true">' + esc(ag('stayShort')) + '</span>' + (trip ? ' · ' + esc(trip) : '') + '</p>'
       + '<div class="v4-stay-row">' + (img ? '<img class="v4-stay-img" src="' + esc(img) + '" alt="" width="64" height="64" loading="lazy">' : '<span class="v4-stay-img" aria-hidden="true"></span>')
       + '<div><span class="v4-stay-name">' + esc(s.name) + '</span><span class="v4-stay-facts">' + esc(facts) + '</span>' + chatStayChips(s, d.w) + '</div></div>'
-      + '<div class="v4-stay-acts">' + (step ? t3StayLinkHtml(s, { url: step.url, rel: step.rel, key: step.link, affiliate: step.affiliate }, 'v4-btn', ag('rates')) : '')
+      + '<div class="v4-stay-acts' + (step2 ? ' v4-stay-two' : '') + '">' + (step ? t3StayLinkHtml(s, { url: step.url, rel: step.rel, key: step.link, affiliate: step.affiliate }, 'v4-btn', step2 ? sp.btn[0] : ag('rates')) : '')
+      + (step2 ? t3StayLinkHtml(s, { url: step2.url, rel: step2.rel, key: step2.link, affiliate: step2.affiliate }, 'v4-btn', sp.btn[1]) : '')
       + (d.others.length ? '<button type="button" class="v4-link" data-v4-stay-more aria-expanded="' + (chat.stayMore ? 'true' : 'false') + '">' + esc(chat.stayMore ? ag('fewer') : ag('seeMore', { n: d.others.length })) + '</button>' : '') + '</div>';
     if (chat.stayMore && d.others.length) html += '<ul class="v4-stay-alts">' + d.others.map(function(o){ return '<li><span><b>' + esc(o.name) + '</b>' + esc([fr ? (o.kindFr || o.kind) : o.kind, o.regionLabel, o.priceBand].concat((o.has || []).map(function(k){ return (AG[lang()] ? AG[lang()].chip : AG.en.chip)[k] || k; })).filter(Boolean).join(' · ')) + '</span><button type="button" class="v4-link" data-v4-stay-choose="' + esc(o.id) + '">' + esc(ag('choose')) + '</button></li>'; }).join('') + '</ul>';
     html += (typeof t3StayDatesHtml === 'function' ? t3StayDatesHtml(tripIn, fr, s) : '') + roomsRow;
+    if (sp && sp.card) html += '<p class="v4-disc-line v4-late-note" data-v4-late>' + esc(sp.card) + '</p>';
     // Trip needs (2026-11-24): what no booking site takes (the dog, an accessible room), said by the stay.
     // (Not while the stay's dates are only proposed: the card stays short until there is something to book; the Book my
     // trip sheet and Details say it throughout.)

@@ -89,6 +89,14 @@ function stayPart(card, trip, people, cfg = CONFIG) {
   if (!level || !nights) return null;
   const band = cfg.stayNight[level];
   const sleeps = intIn(card.sleeps, 1, 1000) ? card.sleeps : null;
+  // A split stay (2026-11-23, trip-late-arrival.js): each booking's own rooms for its own nights (1 room x 2 nights +
+  // 1 room x 1 night), by the same Sleeps rule. Said in the estimate's notes.
+  const sp = trip.split && trip.split.mode === 'split' && Array.isArray(trip.split.parts) && trip.split.parts.length === 2 ? trip.split.parts : null;
+  if (sp && sp.every((p) => intIn(p.nights, 1, 60) && intIn(p.adults, 1, 16))) {
+    const each = sp.map((p) => ({ nights: p.nights, rooms: sleeps ? Math.max(1, Math.ceil((p.adults + (p.kids || 0)) / sleeps)) : 1 }));
+    const rn = each.reduce((t, x) => t + x.nights * x.rooms, 0);
+    return { key: 'stay', ...PARTS.stay, low: band[0] === null ? null : band[0] * rn, high: band[1] === null ? null : band[1] * rn, count: nights, nights, rooms: Math.max(...each.map((x) => x.rooms)), roomsUnknown: !sleeps, split: each };
+  }
   const rooms = sleeps ? Math.max(1, Math.ceil(people / sleeps)) : 1;
   return {
     key: 'stay', ...PARTS.stay,
@@ -113,6 +121,12 @@ function tripEstimate(plan, card, trip, cfg = CONFIG) {
   const unknown = [];
   let pricedPaid = 0, unpricedPaid = 0;
   const seen = new Set();
+  // A later arrival (2026-11-23, trip-late-arrival.js: t.late): each day's stops are counted for the people there that
+  // day (Day 1 for 2, from Day 2 for 3). Without it every stop is for the whole party, as before.
+  const late = t.late && !t.late.unresolved && Number.isInteger(t.late.day) && Array.isArray(plan && plan.days) ? t.late : null;
+  const dayOf = new Map();
+  if (late) for (const d of plan.days) for (const s of (d && d.stops) || []) if (s && !dayOf.has(s)) dayOf.set(s, d.day);
+  const peopleFor = (s) => { if (!late || !dayOf.has(s)) return people; const there = late.kind === 'join' ? dayOf.get(s) >= late.day : dayOf.get(s) <= late.day; return there ? people : Math.max(1, people - late.n); };
   for (const s of planStopList(plan)) {
     const v = s && s.venue;
     if (!v || !v.name) continue;
@@ -131,8 +145,8 @@ function tripEstimate(plan, card, trip, cfg = CONFIG) {
     const p = sums[key] || (sums[key] = { low: 0, high: 0, count: 0, mapped: 0 });
     p.count++;
     if (pp.free) continue;
-    p.low += pp.low * people;
-    p.high += pp.high * people;
+    p.low += pp.low * peopleFor(s);
+    p.high += pp.high * peopleFor(s);
     if (pp.mapped) p.mapped++;
   }
   const parts = [];
@@ -151,9 +165,11 @@ function tripEstimate(plan, card, trip, cfg = CONFIG) {
   if (stay && t.nights) {
     const months = nightMonths(t);
     if (months.length && months.some((m) => !cfg.stayBandMonths.includes(m))) notes.push({ key: 'band', text: cfg.stayBandNote.en, textFr: cfg.stayBandNote.fr });
-    if (stay.rooms > 1) notes.push({ key: 'rooms', text: `${stay.rooms} rooms or units for ${people} people (sleeps ${card.sleeps} each).`, textFr: `${stay.rooms} chambres ou unités pour ${people} personnes (${card.sleeps} pers. chacune).` });
+    if (stay.split) notes.push({ key: 'rooms', text: `Stay counted as ${stay.split.map((x) => `${x.rooms} room${x.rooms > 1 ? 's' : ''} × ${x.nights} night${x.nights > 1 ? 's' : ''}`).join(' + ')} (two bookings).`, textFr: `Hébergement compté : ${stay.split.map((x) => `${x.rooms} chambre${x.rooms > 1 ? 's' : ''} × ${x.nights} nuit${x.nights > 1 ? 's' : ''}`).join(' + ')} (deux réservations).` });
+    else if (stay.rooms > 1) notes.push({ key: 'rooms', text: `${stay.rooms} rooms or units for ${people} people (sleeps ${card.sleeps} each).`, textFr: `${stay.rooms} chambres ou unités pour ${people} personnes (${card.sleeps} pers. chacune).` });
     else if (stay.roomsUnknown && people > 2) notes.push({ key: 'rooms', text: `Priced for one room or unit; ${people} people may need more.`, textFr: `Prix pour une chambre ou unité; ${people} personnes pourraient en avoir besoin de plus.` });
   }
+  if (late && parts.some((p) => p.key !== 'stay')) { const few = Math.max(1, people - late.n), a = late.kind === 'join' ? [1, late.day - 1] : [late.day + 1, plan.days.length]; const dl = a[0] === a[1] ? `${a[0]}` : `${a[0]}–${a[1]}`; notes.push({ key: 'late', text: `Day${a[0] === a[1] ? '' : 's'} ${dl} counted for ${few}, the other days for ${people}.`, textFr: `Jour${a[0] === a[1] ? '' : 's'} ${dl} compté${a[0] === a[1] ? '' : 's'} pour ${few}, les autres pour ${people}.` }); }
   if (kids && parts.some((p) => p.key !== 'stay')) notes.push({ key: 'kids', text: 'Kids are counted at adult prices; theirs are often lower.', textFr: 'Les enfants sont comptés au prix adulte; le leur est souvent plus bas.' });
   return {
     low: low === null ? null : roundDown(low), high: high === null ? null : roundUp(high), currency: 'CAD',
@@ -171,8 +187,13 @@ function tripBookingSteps(card, checklist) {
   const out = [], ids = new Set(), urls = new Set();
   const first = card && Array.isArray(card.bookingLinks) ? card.bookingLinks.find((l) => l && httpsUrl(l.url)) : null;
   if (first) {
-    out.push({ kind: 'stay', id: card.id, name: card.name, label: first.label, labelFr: first.labelFr, url: first.url, affiliate: !!first.affiliate, rel: first.rel || 'nofollow noopener', link: first.key });
+    // A split stay (2026-11-23, trip-late-arrival.js): two bookings, each a step with its own link, when each link
+    // carries its own booking (card.split.distinct). Otherwise one step, and the page says the two bookings beside it.
+    const sp = card.split && card.split.distinct && Array.isArray(card.bookingLinks2) ? card.split : null;
+    const second = sp ? (card.bookingLinks2.find((l) => l && l.key === first.key && httpsUrl(l.url)) || card.bookingLinks2.find((l) => l && httpsUrl(l.url))) : null;
+    out.push({ kind: 'stay', id: card.id, name: card.name, label: first.label, labelFr: first.labelFr, url: first.url, affiliate: !!first.affiliate, rel: first.rel || 'nofollow noopener', link: first.key, ...(second ? { part: 1, sub: sp.text.parts[0], subFr: sp.textFr.parts[0] } : {}) });
     urls.add(urlKey(first.url));
+    if (second) { out.push({ kind: 'stay', id: card.id, name: card.name, label: second.label, labelFr: second.labelFr, url: second.url, affiliate: !!second.affiliate, rel: second.rel || 'nofollow noopener', link: second.key, part: 2, sub: sp.text.parts[1], subFr: sp.textFr.parts[1] }); urls.add(urlKey(second.url)); }
   }
   for (const c of Array.isArray(checklist) ? checklist : []) {
     if (!c || !Number.isInteger(c.venueId) || !httpsUrl(c.url) || ids.has(c.venueId) || urls.has(urlKey(c.url))) continue;

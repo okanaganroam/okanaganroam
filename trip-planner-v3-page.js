@@ -1100,6 +1100,9 @@ ${require('./stay-booking-links').HANDOFF_CLIENT_SRC}` + String.raw`
     var who = [];
     if (t.adults) who.push((fr ? t.adults + (t.adults > 1 ? ' adultes' : ' adulte') : t.adults + (t.adults > 1 ? ' adults' : ' adult')) + (t.adultsAssumed ? (fr ? ' (supposé)' : ' (assumed)') : ''));
     if (t.kids) who.push(fr ? t.kids + (t.kids > 1 ? ' enfants' : ' enfant') : t.kids + (t.kids > 1 ? ' kids' : ' kid'));
+    // Someone arrives later or leaves earlier (2026-11-23, trip-late-arrival.js): "2 adults + 1 from Oct 9"; the rooms
+    // are each booking's own, said by the stay.
+    if (t.split && (fr ? t.split.whoFr : t.split.who)) who = [fr ? t.split.whoFr : t.split.who].concat(t.kids ? [who[who.length - 1]] : []);
     if (who.length) parts.push(who.join(', '));
     var rl = t3RoomsLabel(t, fr); if (rl) parts.push(rl);
     if (t.dog) parts.push(fr ? 'chien' : 'dog');
@@ -1125,6 +1128,8 @@ ${require('./stay-booking-links').HANDOFF_CLIENT_SRC}` + String.raw`
     return stayHandoff(links, tt);
   }
   function t3HandoffText(s, t, fr){
+    // (A split stay, trip-late-arrival.js, says what each booking's link opens with beside the bookings themselves.)
+    if (s && s.split) return '';
     var h = t3Handoff(s, t);
     // The travel agent page shows one stay button (the first link) on the card and in the Book my trip sheet: the
     // note is about that button only. Where every link is a button, each gets its line.
@@ -1187,7 +1192,7 @@ ${require('./stay-booking-links').HANDOFF_CLIENT_SRC}` + String.raw`
   // Rooms (2026-11-22): "3 rooms (assumed)" until the visitor picks or says a number; "2 rooms" after. Said only when
   // it matters (3 or more adults, more than 4 people to a room), when it was picked or said, or when it is more than one.
   function t3RoomsLabel(t, fr){
-    if (!t || !(t.rooms >= 1)) return '';
+    if (!t || !(t.rooms >= 1) || t.split) return '';
     if (t.roomsAssumed && t.rooms === 1 && !stayRoomsMatter(t.adults, t.kids, t.rooms)) return '';
     return (fr ? t.rooms + (t.rooms > 1 ? ' chambres' : ' chambre') : t.rooms + (t.rooms > 1 ? ' rooms' : ' room')) + (t.roomsAssumed ? (fr ? ' (supposé)' : ' (assumed)') : '');
   }
@@ -1313,10 +1318,13 @@ ${require('./stay-booking-links').HANDOFF_CLIENT_SRC}` + String.raw`
     if (s.handoffAsk) bits.push(fr ? s.handoffAsk.textFr : s.handoffAsk.text);
     // Each button's own handoff, once the stay's dates are confirmed (before that, the stay's own block says the dates
     // are not sent yet).
+    // A split stay (2026-11-23, trip-late-arrival.js): the bookings it takes, in the stay's own words, first.
+    var sp = s.split ? (fr ? s.split.textFr : s.split.text) : null;
     if (t.stayStatus === 'confirmed' && !t.datesPast) { var ho = t3HandoffText(s, t, fr); if (ho) bits.unshift(ho); }
+    if (sp && sp.note) bits.unshift(sp.note);
     // Rooms (2026-11-22): nothing here says the place can sleep the group, in one room or in several.
     var first = (s.bookingLinks || [])[0];
-    if (t.rooms > 1 && first && (first.key === 'own' || first.key === 'search')) bits.push(fr ? 'Site de l’hôtel : indiquez ' + t.rooms + ' chambres sur place.' : 'Hotel’s own site: enter ' + t.rooms + ' rooms there.');
+    if (!sp && t.rooms > 1 && first && (first.key === 'own' || first.key === 'search')) bits.push(fr ? 'Site de l’hôtel : indiquez ' + t.rooms + ' chambres sur place.' : 'Hotel’s own site: enter ' + t.rooms + ' rooms there.');
     // Expedia with no dates opens with its own default party (seen 2026-11-22), whatever the link says.
     if (first && first.key === 'expedia' && !t.datesGiven && (t.adults || 0) + (t.kids || 0) !== 2) bits.push(fr ? 'Expedia n’affiche vos voyageurs et vos chambres qu’une fois les dates choisies : entrez-les sur place.' : 'Expedia shows your guests and rooms only once dates are picked: enter them there.');
     if ((t.adults || 0) + (t.kids || 0) >= 3 && first) bits.push(fr ? 'Les chambres et leur capacité sont confirmées sur le site de réservation.' : 'Rooms and how many each sleeps are confirmed on the booking site.');
