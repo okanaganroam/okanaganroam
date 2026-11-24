@@ -20463,6 +20463,7 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
     outdoors: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 10 8l4 6 2-3 4 9z"/></svg>',
     'ski-snow': '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M4.5 6.5l15 11"/><path d="M19.5 6.5l-15 11"/><path d="M9.5 3.5 12 6l2.5-2.5"/><path d="M9.5 20.5 12 18l2.5 2.5"/></svg>',
     sports: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="17" r="3.5"/><circle cx="18.5" cy="17" r="3.5"/><path d="M5.5 17 9 9h6l3.5 8"/><path d="M9 9 12 17l3-8"/><path d="M8 6h3"/></svg>',
+    tours: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>',
     indoor: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>',
   };
 
@@ -20504,7 +20505,8 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
     // back to true to bring Ski & Snow back; its photo, icon and FR/EN titles are all still in place.
     cards[2] = SHOW_SKI_SNOW_MOOD_TILE
       ? { key: 'ski-snow', href: SKI_SNOW_PATH, filter: null, img: '/images/mood/ski-snow-powder.jpg', titleKey: 'mood.skiSnow.title', title: 'Ski & Snow' }
-      : { key: 'sports', href: `/${CATEGORY_SLUGS.sport}`, filter: null, img: '/images/mood/sports-recreation.jpg', titleKey: 'mood.sports.title', title: 'Sports & Recreation' };
+      // Tours & Experiences (Dayton, 2026-11-24) takes Sports & Recreation's place; /tours's own banner photo (a cellar tour).
+      : { key: 'tours', href: `/${CATEGORY_SLUGS.tour}`, filter: null, img: '/images/mood/tours-experiences.jpg', titleKey: 'tripv3.type.tour', title: 'Tours & Experiences' };
     cards[3] = { key: 'indoor', href: `/${CATEGORY_SLUGS.indoor}`, filter: null, img: '/images/mood/indoor.jpg', imgHeight: 400, titleKey: 'mood.indoor.title', title: 'Indoor & Rainy Day' };
   }
 
@@ -21759,7 +21761,7 @@ function renderHomepageDiscoveryStyles() {
   }
   /* Indoor & Rainy Day winter tile (2026-10-11): a dusk-blue to warm-amber
      fill behind its photo, shown while the image loads or if it is missing. */
-  .mood-card-sports { background: var(--ref-navy); }
+  .mood-card-sports, .mood-card-tours { background: var(--ref-navy); }
   .mood-card-indoor { background: linear-gradient(140deg, #2E3B5B 0%, #5A4A6A 52%, #C8874A 100%); }
   .mood-card-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .25s ease; }
   .mood-card:hover .mood-card-img { transform: scale(1.045); }
@@ -21772,7 +21774,7 @@ function renderHomepageDiscoveryStyles() {
   .mood-card-title { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-size: 0.92rem; font-weight: 700; display: block; line-height: 1.15; text-wrap: balance; }
   /* The longest tile title (Indoor & Rainy Day / Intérieur et pluie, 2026-10-13) is a step smaller and wraps as two even lines,
      so it covers less of the photo. */
-  .mood-card-indoor .mood-card-title, .mood-card-sports .mood-card-title { font-size: 0.84rem; }
+  .mood-card-indoor .mood-card-title, .mood-card-sports .mood-card-title, .mood-card-tours .mood-card-title { font-size: 0.84rem; }
 
   @media (min-width: 720px) {
     .mood-card-grid { grid-template-columns: repeat(6, 1fr); }
