@@ -16,8 +16,9 @@ const db = require('../db.js');
 
 test('ski season: the season line follows the date', () => {
   const bw = app.SKI_RESORT_SEASON['big-white'];
-  assert.match(app.skiSeasonLine(bw, '2026-10-29'), /^Opens Thursday, November 26/);
-  assert.equal(app.skiSeasonLine(bw, '2026-11-26'), 'Open for the season until Sunday, April 4, 2027.');
+  assert.match(app.skiSeasonLine(bw, '2026-10-29'), /^Opening day is now targeted for Thursday, December 3/);
+  assert.match(app.skiSeasonLine(bw, '2026-11-26'), /December 3/, 'still before the new target day');
+  assert.equal(app.skiSeasonLine(bw, '2026-12-03'), 'Open for the season until Sunday, April 4, 2027.');
   assert.equal(app.skiSeasonLine(bw, '2027-04-05'), null, 'past the season, no stale line');
   const apex = app.SKI_RESORT_SEASON.apex;
   assert.match(app.skiSeasonLine(apex, '2026-12-20'), /hasn’t been announced/);
