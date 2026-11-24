@@ -536,7 +536,7 @@ function applyEvidence(plan, ctx = {}) {
   // One of the party arrives later or leaves earlier (2026-11-23, trip-late-arrival.js: plan.lateArrival): who is there
   // which nights, the stay as the bookings it takes, and each day's head count. Said right after an allergy, before
   // everything else; never 'verified' (nothing here is booked or checked for availability).
-  if (plan.lateArrival) { const e = tripLate.entry(plan.lateArrival, tripLate.stayTextOf(plan)); if (e) ev.splice(allergy ? 1 : 0, 0, e); }
+  if (plan.lateArrival) { const e = tripLate.entry(plan.lateArrival, tripLate.stayTextOf(plan), tripLate.planDayStops(plan, plan.lateArrival)); if (e) ev.splice(allergy ? 1 : 0, 0, e); }
   ev.push(...stayEntries(plan));
   if (needs.length) ev.push(...stayNeedEntries(plan, ctx, needs));
   // A day the planner could not fill is said, with what could be tried next (never shown as a finished day).

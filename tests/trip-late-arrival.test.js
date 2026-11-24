@@ -134,8 +134,8 @@ test('4. the words: who is there which nights, each day’s head count; English 
   assert.equal(f.line, '2 adultes 8–10 oct. · 1 de plus dès le 9 oct. (heure à préciser), chambre à part, 1 nuit');
   assert.equal(w.who, '2 adults + 1 from Oct 9');
   assert.equal(f.who, '2 adultes + 1 dès le 9 oct.');
-  assert.deepEqual(w.days, { 1: 'for 2', 2: 'for 2 + 1 arriving', 3: 'for all 3' });
-  assert.deepEqual(f.days, { 1: 'pour 2', 2: 'pour 2 + 1 qui arrive', 3: 'pour les 3' });
+  assert.deepEqual(w.days, { 1: 'for 2', 2: 'for 2 + 1 arriving (time not set)', 3: 'for all 3' });
+  assert.deepEqual(f.days, { 1: 'pour 2', 2: 'pour 2 + 1 qui arrive (heure à préciser)', 3: 'pour les 3' });
   assert.equal(w.act, 'Day 1 is planned for 2. Oct 9 (Day 2): for 2 until they arrive (time not set). All 3 from Day 3.');
   assert.equal(f.act, 'Le jour 1 est prévu pour 2. 9 oct. (jour 2) : pour 2 jusqu’à son arrivée (heure à préciser). Les 3 dès le jour 3.');
   // Without the visitor's own dates the days are named, never a date.
@@ -495,10 +495,10 @@ test('14. the shared copy (a link opened fresh): who is there which nights, the 
   assert.equal(q.la, 'j1d2o');
   const c = app.tripShareContext(q, 'en', NOW), html = app.tripShareContextHtml(c, 'en');
   assert.equal(c.late.line, '2 adults Oct 8–10 · 1 more from Oct 9 (time not set), own room, 1 night');
-  assert.deepEqual(c.late.days, { 1: 'for 2', 2: 'for 2 + 1 arriving', 3: 'for all 3' });
+  assert.deepEqual(c.late.days, { 1: 'for 2', 2: 'for 2 + 1 arriving (time not set)', 3: 'for all 3' });
   assert.match(html, /data-mt-facts>2 adults Oct 8–10 · 1 more from Oct 9 \(time not set\), own room, 1 night · /);
   assert.ok(!/3 adults/.test(html), 'the copy never says the stay is for 3 adults');
-  assert.match(html, /data-mt-late>Day 1 is planned for 2\. Oct 9 \(Day 2\): for 2 until they arrive \(time not set\)\. All 3 from Day 3\./);
+  assert.match(html, /data-mt-late><span data-mt-late-act>Day 1 is planned for 2\. Oct 9 \(Day 2\): for 2 until they arrive \(time not set\)\. All 3 from Day 3\./);
   assert.ok(c.stay, 'the copy has the place to stay');
   {
     assert.match(html, /data-mt-late-stay>Two bookings, since one link can’t hold both\. 1: 2 adults, 1 room, Oct 8–10\. 2: 1 adult, 1 room, Oct 9–10\./);
@@ -631,8 +631,8 @@ test('17. the time of day is read with the statement, English and French, a cloc
 test('18. no time known: the arrival day is never "for all 3"; it is marked, and the plan asks once', () => {
   const a = ARR(null), w = LA.words(a, false), f = LA.words(a, true), e = LA.entry(a, null);
   assert.equal(a.at, undefined);
-  assert.equal(w.days[2], 'for 2 + 1 arriving');
-  assert.equal(f.days[2], 'pour 2 + 1 qui arrive');
+  assert.equal(w.days[2], 'for 2 + 1 arriving (time not set)');
+  assert.equal(f.days[2], 'pour 2 + 1 qui arrive (heure à préciser)');
   assert.deepEqual([w.days[1], w.days[3]], ['for 2', 'for all 3']);
   assert.equal(w.ask, 'What time do they arrive on Oct 9? Until I know, Day 2 stops are for 2, plus 1 once they’re there.');
   assert.equal(f.ask, 'À quelle heure arrive cette personne le 9 oct.? D’ici là, les arrêts du jour 2 sont pour 2, plus 1 dès son arrivée.');
@@ -647,10 +647,10 @@ test('18. no time known: the arrival day is never "for all 3"; it is marked, and
   assert.equal(LA.chatAsk(ARR({ m: 840 }), 'en'), '');
   // The last day, with no night (mode 'day'), and someone leaving early: the same rule on the day it is about.
   const last = LA.resolve(LA.readLate('our friend joins us on the last day'), CTX);
-  assert.deepEqual([last.mode, last.day, LA.words(last, false).days[3]], ['day', 3, 'for 2 + 1 arriving']);
+  assert.deepEqual([last.mode, last.day, LA.words(last, false).days[3]], ['day', 3, 'for 2 + 1 arriving (time not set)']);
   assert.equal(LA.words(last, false).act, 'Days 1–2 are planned for 2. Oct 10 (Day 3): for 2 until they arrive (time not set).');
   const leave = LA.resolve(LA.readLate('my mom has to leave on October 9'), CTX), lw = LA.words(leave, false);
-  assert.deepEqual(lw.days, { 1: 'for all 3', 2: 'for 2 + 1 leaving', 3: 'for 2' });
+  assert.deepEqual(lw.days, { 1: 'for all 3', 2: 'for 2 + 1 leaving (time not set)', 3: 'for 2' });
   assert.equal(lw.act, 'Day 1 is for all 3. Oct 9 (Day 2): for all 3 until they leave (time not set). Day 3 is planned for 2.');
   assert.equal(lw.ask, 'What time do they leave on Oct 9? Until I know, Day 2 stops are for all 3, less 1 once they’ve left.');
   // No dates on the plan: by the day's number.
@@ -663,9 +663,10 @@ test('19. a time known: each stop of that day is for 2, not confirmed, or for ev
   const a = ARR({ m: 840 }), w = LA.words(a, false), f = LA.words(a, true), e = LA.entry(a, null);
   assert.equal(w.line, '2 adults Oct 8–10 · 1 more from Oct 9, 2 PM, own room, 1 night');
   assert.equal(f.line, '2 adultes 8–10 oct. · 1 de plus dès le 9 oct., 14 h, chambre à part, 1 nuit');
-  assert.deepEqual(w.days, { 1: 'for 2', 2: '2 until 2 PM, then all 3', 3: 'for all 3' });
-  assert.equal(f.days[2], '2 jusqu’à l’arrivée (14 h), puis les 3');
-  assert.equal(w.act, 'Day 1 is planned for 2. Oct 9 (Day 2): 2 until 2 PM, then all 3.');
+  // (With no stops given, only what is known is said: the time. The stops' own states word it further: test 26.)
+  assert.deepEqual(w.days, { 1: 'for 2', 2: 'for 2 · 1 arrives 2 PM', 3: 'for all 3' });
+  assert.equal(f.days[2], 'pour 2 · 1 arrive à 14 h');
+  assert.equal(w.act, 'Day 1 is planned for 2. Oct 9 (Day 2): for 2; 1 arrives at 2 PM.');
   assert.deepEqual(w.stop, { few: 'Before the 2 PM arrival: for 2', near: 'Close to the 2 PM arrival: not confirmed for all 3' });
   assert.deepEqual(f.stop, { few: 'Avant l’arrivée (14 h) : pour 2', near: 'Près de l’arrivée (14 h) : non confirmé pour les 3' });
   assert.equal(w.ask, '');
@@ -678,7 +679,7 @@ test('19. a time known: each stop of that day is for 2, not confirmed, or for ev
   // A part of the day is a window: nobody is counted in before it opens, nor as surely there until an hour after it.
   const ev = ARR({ part: 'evening' }), ew = LA.words(ev, false), win = LA.atWindow(ev.at);
   assert.deepEqual(win, { from: 1020, to: 1260, pad: 60, before: 120 });
-  assert.equal(ew.days[2], '2 until the evening arrival, then all 3');
+  assert.equal(ew.days[2], 'for 2 · 1 arrives in the evening');
   assert.equal(ew.stop.near, 'Close to the evening arrival: not confirmed for all 3');
   assert.deepEqual([945, 1019, 1020, 1065, 1319, 1320].map((m) => LA.lateStopState(win, 'join', m)), ['few', 'few', 'near', 'near', 'near', 'all']);
   assert.deepEqual(Object.fromEntries(Object.entries(LA.DAYPARTS).map(([k, p]) => [k, [p.from, p.to]])), { early_morning: [360, 540], morning: [480, 720], midday: [690, 780], after_lunch: [780, 900], early_afternoon: [720, 840],
@@ -688,20 +689,20 @@ test('19. a time known: each stop of that day is for 2, not confirmed, or for ev
   assert.deepEqual([1019, 1020, 1065].map((m) => LA.lateStopState(dn, 'join', m)), ['few', 'all', 'all']);
   // Leaving at noon: a stop that starts from noon is for 2; within two hours before, not confirmed (it may not be over).
   const lv = LA.resolve(LA.readLate('my mom has to leave at noon on October 9'), CTX), lw = LA.words(lv, false), lwin = LA.atWindow(lv.at);
-  assert.equal(lw.days[2], 'all 3 until 12 PM, then 2');
+  assert.equal(lw.days[2], 'all 3 before 12 PM · 2 after');
   assert.deepEqual(lw.stop, { few: 'After the 12 PM departure: for 2', near: 'Close to the 12 PM departure: not confirmed for all 3' });
-  assert.equal(lw.act, 'Day 1 is for all 3. Oct 9 (Day 2): all 3 until 12 PM, then 2. Day 3 is planned for 2.');
+  assert.equal(lw.act, 'Day 1 is for all 3. Oct 9 (Day 2): all 3 before 12 PM, 2 after. Day 3 is planned for 2.');
   assert.deepEqual([540, 599, 600, 719, 720, 825].map((m) => LA.lateStopState(lwin, 'leave', m)), ['all', 'all', 'near', 'near', 'few', 'few']);
   // The source the pages run is that same function, and stands alone.
   assert.equal(new Function(`${LA.CLIENT_SRC}; return lateStopState;`)()(e.win, 'join', 885), 'near');
   assert.ok(V4.includes("${require('./trip-late-arrival').CLIENT_SRC}"));
   // The chat's reply to a time: who each stop is for, by name and start; never that anyone can make a stop.
   const stops = [{ name: 'Tour', start: 540 }, { name: 'Lunch', start: 720 }, { name: 'Winery', start: 825 }, { name: 'Paddle', start: 885 }, { name: 'Dinner', start: 1065 }];
-  assert.equal(LA.chatReply(a, null, 'en', { time: 'set', stops }), 'Noted: arrival on Oct 9 at 2 PM. Day 2 before the arrival is for 2: Tour (9 AM), Lunch (12 PM), Winery (1:45 PM). Close to the arrival, so not confirmed for all 3: Paddle (2:45 PM). After that, all 3. No stops changed.');
+  assert.equal(LA.chatReply(a, null, 'en', { time: 'set', stops }), 'Noted: arrival on Oct 9 at 2 PM. Day 2 before the arrival is for 2: Tour (9 AM), Lunch (12 PM), Winery (1:45 PM). Close to the arrival, so not confirmed for all 3: Paddle (2:45 PM). Later stops are planned for all 3. No stops changed.');
   assert.equal(LA.chatReply(ev, null, 'en', { time: 'changed', stops }), 'Updated: arrival on Oct 9 in the evening (taken as 5–9 PM). Day 2 before the arrival is for 2: Tour (9 AM), Lunch (12 PM), Winery (1:45 PM), Paddle (2:45 PM). Close to the arrival, so not confirmed for all 3: Dinner (5:45 PM). No stops changed.');
   assert.equal(LA.chatReply(a, null, 'fr', { time: 'set', stops: stops.slice(0, 1) }), 'Noté : arrivée le 9 oct. à 14 h. Au jour 2, avant l’arrivée, pour 2 : Tour (9 h). Aucun arrêt n’a changé.');
-  assert.equal(LA.chatReply(ARR({ m: 480 }), null, 'en', { time: 'set', stops }), 'Noted: arrival on Oct 9 at 8 AM. Every Day 2 stop starts later: all 3. No stops changed.');
-  assert.equal(LA.chatReply(ARR(null), null, 'en', { unsure: true }), 'No problem. Until then, Day 2 stays for 2 + 1 arriving. Tell me the time when you know it. No stops changed.');
+  assert.equal(LA.chatReply(ARR({ m: 480 }), null, 'en', { time: 'set', stops }), 'Noted: arrival on Oct 9 at 8 AM. Every Day 2 stop starts later: planned for all 3. No stops changed.');
+  assert.equal(LA.chatReply(ARR(null), null, 'en', { unsure: true }), 'No problem. Until then, Day 2 stays for 2 + 1 arriving (time not set). Tell me the time when you know it. No stops changed.');
   for (const s of [w.act, f.act, ew.act, lw.act, ...Object.values(w.stop), ...Object.values(f.stop), LA.chatReply(a, null, 'en', { time: 'set', stops })]) assert.ok(!CLAIM_RE.test(s) && !/\b(?:can make|will make|can join|minutes? away|drive from)\b/i.test(s), s);
 });
 
@@ -812,7 +813,7 @@ const sayWith = async (page, message, o = {}) => {
 test('23. the plan and the chat: asked once, answered, changed, undone by its own Undo, cleared with the arrangement', async () => {
   const p = run(OWNER), page = pageOf(p, OWNER), e = p.evidence[0];
   // The plan: day 2 is not "for all 3", and carries the one question; nothing is moved for it.
-  assert.deepEqual(e.days, { 1: 'for 2', 2: 'for 2 + 1 arriving', 3: 'for all 3' });
+  assert.deepEqual(e.days, { 1: 'for 2', 2: 'for 2 + 1 arriving (time not set)', 3: 'for all 3' });
   assert.equal(e.askTime, 'What time do they arrive on Oct 9? Until I know, Day 2 stops are for 2, plus 1 once they’re there.');
   assert.equal(e.share, 'j1d2o');
   assert.match(V4, /data-v4-late-ask/);
@@ -836,7 +837,11 @@ test('23. the plan and the chat: asked once, answered, changed, undone by its ow
     assert.deepEqual(LA.readLate(r.text).at, { m: 840 }, msg);
     assert.equal(LA.stripLate(r.text), BASE, msg);
     const le = r.stayBlock.lateEvidence;
-    assert.deepEqual([le.days[2], le.askTime, le.share, le.win.from], ['2 until 2 PM, then all 3', undefined, 'j1d2o.t1400', 840], msg);
+    assert.deepEqual([le.askTime, le.share, le.win.from], [undefined, 'j1d2o.t1400', 840], msg);
+    // The day's title is worded from the stops of that day, as the reply and the notes are; never "then all 3".
+    assert.equal(le.days[2], LA.lateDaySay(le.say.L, day2.map((x) => ({ name: x.name, start: x.start }))).head, msg);
+    assert.match(le.days[2], /^(?:2 before 2 PM · (?:check activities close to arrival|planned for 3 after)|for 2 · 1 arrives 2 PM)$/, msg);
+    assert.ok(!/then all|After that, all/.test(JSON.stringify([le, r.reply])), msg);
     assert.deepEqual(r.stayBlock.lateArrival.at, { m: 840 }, msg);
     // The stay is as it was: the same two bookings.
     assert.deepEqual(r.stayBlock.whereToStay.trip.split.parts.map((x) => [x.adults, x.rooms, x.arrive, x.leave]), [[2, 1, '2027-10-08', '2027-10-10'], [1, 1, '2027-10-09', '2027-10-10']], msg);
@@ -855,7 +860,7 @@ test('23. the plan and the chat: asked once, answered, changed, undone by its ow
   assert.match(fr.reply, /^Modifié : arrivée le 9 oct\. à 15 h 30\. /);
   assert.deepEqual(LA.readLate(fr.text).at, { m: 930 });
   const unsure = await sayWith(page, 'not sure yet', { offer: [LA.ASK_TAG] });
-  assert.equal(unsure.reply, 'No problem. Until then, Day 2 stays for 2 + 1 arriving. Tell me the time when you know it. No stops changed.');
+  assert.equal(unsure.reply, 'No problem. Until then, Day 2 stays for 2 + 1 arriving (time not set). Tell me the time when you know it. No stops changed.');
   assert.deepEqual([unsure.text, unsure.stayBlock, unsure.offer], [undefined, undefined, [LA.ASK_TAG]]);
   // The other fixed rules still read their own messages on a plan with a time (stay dates, rooms), and keep the time.
   const thu = await sayWith(page2, 'we arrive Thursday night');
@@ -878,7 +883,13 @@ test('24. the time said in the request: the same stops, each stop of that day ma
   assert.deepEqual(stopIds(timed), stopIds(plain));
   assert.deepEqual((timed.schedule || []).map((r) => [r.day, r.venueId, r.startMinutes]), (plain.schedule || []).map((r) => [r.day, r.venueId, r.startMinutes]));
   const e = timed.evidence[0];
-  assert.deepEqual([timed.lateArrival.at, e.days[2], e.share, e.askTime], [{ m: 900 }, '2 until 3 PM, then all 3', 'j1d2o.t1500', undefined]);
+  assert.deepEqual([timed.lateArrival.at, e.share, e.askTime], [{ m: 900 }, 'j1d2o.t1500', undefined]);
+  // The title of day 2 follows that day's stops (the same states as the notes): "check" only with a stop close to 3 PM.
+  const d2 = LA.planDayStops(timed, timed.lateArrival), near2 = d2.filter((x) => LA.lateStopState(e.win, 'join', x.start) === 'near'), all2 = d2.filter((x) => LA.lateStopState(e.win, 'join', x.start) === 'all');
+  assert.ok(d2.length > 0);
+  assert.equal(e.days[2], near2.length ? '2 before 3 PM · check activities close to arrival' : all2.length ? '2 before 3 PM · planned for 3 after' : 'for 2 · 1 arrives 3 PM');
+  for (const x of near2) assert.ok(e.act.includes(`${x.name} (`), e.act);
+  assert.ok(!/then all 3|puis les 3/.test(JSON.stringify(timed)));
   assert.equal(e.short, '2 adults Oct 8–10 · 1 more from Oct 9, 3 PM, own room, 1 night');
   // The stay and every link are the same as without the time.
   assert.deepEqual(allLinks(timed).map((l) => l.url), allLinks(untimed).map((l) => l.url));
@@ -899,19 +910,19 @@ test('25. the shared copy: the time and each stop’s note when the link carries
   const base = { stops: refs.join(','), days: days.join(','), td: '2027-10-08_2027-10-10', ts: 'r', sa: '2027-10-08', sl: '2027-10-10', sc: '1', ad: '3', rm: '2', ra: '1', ...(stayId ? { stay: stayId, nights: '2' } : {}) };
   // A link from before (no time): the honest state.
   const old = app.tripShareContext({ ...base, la: 'j1d2o' }, 'en', NOW), oldHtml = app.tripShareContextHtml(old, 'en');
-  assert.deepEqual(old.late.days, { 1: 'for 2', 2: 'for 2 + 1 arriving', 3: 'for all 3' });
+  assert.deepEqual(old.late.days, { 1: 'for 2', 2: 'for 2 + 1 arriving (time not set)', 3: 'for all 3' });
   assert.equal(old.late.win, undefined);
-  assert.match(oldHtml, /data-mt-late>Day 1 is planned for 2\. Oct 9 \(Day 2\): for 2 until they arrive \(time not set\)\. All 3 from Day 3\./);
+  assert.match(oldHtml, /data-mt-late><span data-mt-late-act>Day 1 is planned for 2\. Oct 9 \(Day 2\): for 2 until they arrive \(time not set\)\. All 3 from Day 3\./);
   assert.ok(!/What time/.test(oldHtml), 'no question on the shared copy');
   // With the time.
   const c = app.tripShareContext({ ...base, la: 'j1d2o.t1400' }, 'en', NOW), html = app.tripShareContextHtml(c, 'en');
   assert.equal(c.late.line, '2 adults Oct 8–10 · 1 more from Oct 9, 2 PM, own room, 1 night');
-  assert.deepEqual(c.late.days, { 1: 'for 2', 2: '2 until 2 PM, then all 3', 3: 'for all 3' });
+  assert.deepEqual(c.late.days, { 1: 'for 2', 2: 'for 2 · 1 arrives 2 PM', 3: 'for all 3' });
   assert.deepEqual([c.late.kind, c.late.day, c.late.win.from], ['join', 2, 840]);
   assert.deepEqual(c.late.stop, { few: 'Before the 2 PM arrival: for 2', near: 'Close to the 2 PM arrival: not confirmed for all 3' });
-  assert.match(html, /data-mt-late>Day 1 is planned for 2\. Oct 9 \(Day 2\): 2 until 2 PM, then all 3\./);
+  assert.match(html, /data-mt-late><span data-mt-late-act>Day 1 is planned for 2\. Oct 9 \(Day 2\): for 2; 1 arrives at 2 PM\.<\/span>/);
   const frc = app.tripShareContext({ ...base, la: 'j1d2o.wa' }, 'fr', NOW);
-  assert.equal(frc.late.days[2], '2 jusqu’à l’arrivée (après-midi), puis les 3');
+  assert.equal(frc.late.days[2], 'pour 2 · 1 arrive dans l’après-midi');
   assert.equal(frc.late.stop.few, 'Avant l’arrivée (après-midi) : pour 2');
   // The stay: the same two bookings and links with or without the time; the buttons say each booking.
   if (c.stay) {
@@ -923,4 +934,133 @@ test('25. the shared copy: the time and each stop’s note when the link carries
   // A link with no la= is the copy as it always was.
   const none = app.tripShareContext(base, 'en', NOW);
   assert.equal(none.late, undefined);
+});
+
+// ---------- The arrival day's title never says more than its stops' notes (2026-11-24) ----------
+// The owner, 390px, the same Naramata trip, in the chat: "Our friend arrives at 3 PM on October 9." Day 2's heading said
+// "2 until 3 PM, then all 3" while the 3:45 PM trail under it said "Close to the 3 PM arrival: not confirmed for all 3";
+// the heading is in the shared itinerary too. "Please make the day heading and summary reflect the uncertainty—for
+// example, '2 before 3 PM · check activities close to arrival'—while keeping the per-activity notes."
+const D2 = { close: [{ name: 'Tour', start: 540 }, { name: 'Trail', start: 945 }, { name: 'Dinner', start: 1110 }], clear: [{ name: 'Tour', start: 540 }, { name: 'Dinner', start: 1110 }], before: [{ name: 'Tour', start: 540 }, { name: 'Lunch', start: 720 }] };
+const SERVER_SRC = fs.readFileSync(require.resolve('../server.js'), 'utf8');
+const NEVER_RE = /then all|puis les|until \d|After that, all|Ensuite, les/;
+
+test('26. the day title follows the stops’ own states: "check" only with a stop close to the arrival', () => {
+  const a = ARR({ m: 900 });
+  const t = (stops, fr) => { const w = LA.words(a, !!fr, stops); return [w.days[2], w.act]; };
+  assert.deepEqual(t(D2.close), ['2 before 3 PM · check activities close to arrival', 'Day 1 is planned for 2. Oct 9 (Day 2): for 2 before 3 PM. Close to the arrival, not confirmed for all 3: Trail (3:45 PM). Later stops are planned for all 3.']);
+  assert.deepEqual(t(D2.clear), ['2 before 3 PM · planned for 3 after', 'Day 1 is planned for 2. Oct 9 (Day 2): for 2 before 3 PM. Later stops are planned for all 3.']);
+  assert.deepEqual(t(D2.before), ['for 2 · 1 arrives 3 PM', 'Day 1 is planned for 2. Oct 9 (Day 2): for 2; 1 arrives at 3 PM.']);
+  assert.deepEqual(t([]), t(D2.before));
+  assert.deepEqual(t(D2.close, true), ['2 avant 15 h · vérifier les activités près de l’arrivée', 'Le jour 1 est prévu pour 2. 9 oct. (jour 2) : pour 2 avant 15 h. Près de l’arrivée, non confirmé pour les 3 : Trail (15 h 45). Les arrêts suivants sont prévus pour les 3.']);
+  assert.deepEqual(t(D2.clear, true), ['2 avant 15 h · prévu pour 3 ensuite', 'Le jour 1 est prévu pour 2. 9 oct. (jour 2) : pour 2 avant 15 h. Les arrêts suivants sont prévus pour les 3.']);
+  assert.deepEqual(t(D2.before, true), ['pour 2 · 1 arrive à 15 h', 'Le jour 1 est prévu pour 2. 9 oct. (jour 2) : pour 2; 1 arrive à 15 h.']);
+  // The days after are as they were: she is there.
+  assert.deepEqual([LA.words(a, false, D2.close).days[1], LA.words(a, false, D2.close).days[3]], ['for 2', 'for all 3']);
+  // A part of the day (a window), the same shapes.
+  const ev = ARR({ part: 'evening' });
+  assert.equal(LA.words(ev, false, D2.close).days[2], '2 before the evening arrival · check activities close to arrival');
+  assert.equal(LA.words(ev, false, D2.close).act, 'Day 1 is planned for 2. Oct 9 (Day 2): for 2 before the evening arrival. Close to the arrival, not confirmed for all 3: Dinner (6:30 PM).');
+  assert.equal(LA.words(ev, false, D2.before).days[2], 'for 2 · 1 arrives in the evening');
+  assert.equal(LA.words(ev, true, D2.close).days[2], '2 avant l’arrivée (soir) · vérifier les activités près de l’arrivée');
+  assert.equal(LA.words(ARR({ part: 'morning' }), false, D2.close).days[2], '2 before the morning arrival · check activities close to arrival');
+  assert.equal(LA.words(ARR({ part: 'early_morning' }), false, [{ name: 'Lunch', start: 720 }]).days[2], '2 before the early-morning arrival · planned for 3 after');
+  // Time not known: the same on every surface, and no stop changes it.
+  const un = ARR(null);
+  assert.deepEqual([LA.words(un, false, D2.close).days[2], LA.words(un, true, D2.close).days[2]], ['for 2 + 1 arriving (time not set)', 'pour 2 + 1 qui arrive (heure à préciser)']);
+  assert.equal(LA.words(un, false, D2.close).act, LA.words(un, false).act);
+  assert.equal(LA.entry(un, null, D2.close).say, undefined);
+  // A departure, turned round.
+  const lv = LA.resolve(LA.readLate('my mom has to leave at 1 pm on October 9'), CTX);
+  const lt = (stops, fr) => { const w = LA.words(lv, !!fr, stops); return [w.days[2], w.act]; };
+  assert.deepEqual(lt([{ name: 'Tour', start: 540 }, { name: 'Lunch', start: 720 }, { name: 'Paddle', start: 885 }]), ['all 3 before 1 PM · check activities close to departure', 'Day 1 is for all 3. Oct 9 (Day 2): all 3 before 1 PM, 2 after. Close to the departure, not confirmed for all 3: Lunch (12 PM). Day 3 is planned for 2.']);
+  assert.deepEqual(lt([{ name: 'Tour', start: 540 }, { name: 'Paddle', start: 885 }]), ['all 3 before 1 PM · 2 after', 'Day 1 is for all 3. Oct 9 (Day 2): all 3 before 1 PM, 2 after. Day 3 is planned for 2.']);
+  assert.deepEqual(lt([{ name: 'Lunch', start: 720 }], true), ['les 3 avant 13 h · vérifier les activités près du départ', 'Le jour 1 est pour les 3. 9 oct. (jour 2) : les 3 avant 13 h, 2 ensuite. Près du départ, non confirmé pour les 3 : Lunch (12 h). Le jour 3 est prévu pour 2.']);
+  assert.equal(LA.words(LA.resolve(LA.readLate('my mom leaves in the evening on October 9'), CTX), false, D2.close).days[2], 'all 3 before the evening departure · check activities close to departure');
+  // No arrival-day wording, on any surface or in either language, says "then all 3" or claims anyone can make a stop.
+  for (const at of [{ m: 900 }, { m: 480 }, { part: 'evening' }, { part: 'dinner' }, null]) for (const stops of [D2.close, D2.clear, D2.before, []]) for (const fr of [false, true]) {
+    const x = ARR(at), w = LA.words(x, fr, stops), e = LA.entry(x, null, stops);
+    const all = JSON.stringify([w.days, w.act, w.stop, e, at ? LA.chatReply(x, null, fr ? 'fr' : 'en', { time: 'set', stops }) : LA.chatReply(x, null, fr ? 'fr' : 'en', { unsure: true }), LA.chatReply(x, null, fr ? 'fr' : 'en', { recorded: true, stops })]);
+    assert.ok(!NEVER_RE.test(all), all);
+    assert.ok(!CLAIM_RE.test(all) && !/\b(?:can make|will make|can join|minutes? away|drive from)\b/i.test(all), all);
+  }
+});
+
+test('27. the title is worded by the same function, from the same states, on the server, the plan page and the shared page', () => {
+  const a = ARR({ m: 900 }), e = LA.entry(a, { en: 'STAY.', fr: 'SÉJOUR.' }, D2.close);
+  // What the pages run stands alone, and gives the server's own words for the same stops.
+  const run2 = new Function(`${LA.CLIENT_SRC}; return lateDaySay;`)();
+  for (const [key, stops] of Object.entries(D2)) for (const [say, fr] of [[e.say, false], [e.sayFr, true]]) {
+    const r = run2(JSON.parse(JSON.stringify(say.L)), stops), w = LA.words(a, fr, stops);
+    assert.equal(r.head, w.days[2], key);
+    assert.equal(say.pre + r.mid + say.post, w.act, key);
+    assert.equal(say.lead + say.pre + r.mid + say.post, LA.entry(a, { en: 'STAY.', fr: 'SÉJOUR.' }, stops)[fr ? 'copyFr' : 'copy'], key);
+    // The title says "check" exactly when a stop of that day carries the "close to the arrival" note.
+    const near = stops.some((x) => LA.lateStopState(e.win, 'join', x.start) === 'near');
+    assert.equal(/check activities|vérifier les activités/.test(r.head), near, key);
+    assert.equal(r.state, near ? 'near' : stops.some((x) => LA.lateStopState(e.win, 'join', x.start) === 'all') ? 'plan' : 'few', key);
+  }
+  assert.equal(e.copy, '2 adults Oct 8–10 · 1 more from Oct 9, 3 PM, own room, 1 night. STAY. Day 1 is planned for 2. Oct 9 (Day 2): for 2 before 3 PM. Close to the arrival, not confirmed for all 3: Trail (3:45 PM). Later stops are planned for all 3.');
+  assert.equal(e.text, e.copy);
+  // The per-stop notes are as they were.
+  assert.deepEqual(e.stop, { few: 'Before the 3 PM arrival: for 2', near: 'Close to the 3 PM arrival: not confirmed for all 3' });
+  assert.deepEqual(e.stopFr, { few: 'Avant l’arrivée (15 h) : pour 2', near: 'Près de l’arrivée (15 h) : non confirmé pour les 3' });
+  // The plan page words the entry again from the stops on screen each time it is read (swap, add, remove, a new time).
+  assert.match(V4, /function v4LateEntry\(\)\{[^\n]*if \(e && e\.win && e\.say\) \{ try \{ v4LateSync\(e\); \}/);
+  assert.match(V4, /state\.removed\[d\.day \+ '-' \+ s\.daypart\] \|\| \(v4\.gone && v4\.gone\[s\.venue\.id\]\)\) return;\s+var st = typeof chatStart === 'function' \? chatStart\(day, s\.venue\.id\) : null;/);
+  assert.match(V4, /var r = lateDaySay\(t\.L, list\), act = t\.pre \+ r\.mid \+ t\.post;\s+e\[k\[1\]\]\[e\.day\] = r\.head; e\[k\[2\]\] = act; e\[k\[3\]\] = t\.lead \+ act; e\[k\[4\]\] = e\[k\[3\]\];/);
+  // The plan's stops as the server reads them.
+  assert.deepEqual(LA.planDayStops({ days: [{ day: 1, stops: [] }, { day: 2, stops: [{ venue: { id: 7, name: 'Trail' } }, { venue: { id: 8, name: 'No time' } }, {}] }], schedule: [{ day: 2, venueId: 7, startMinutes: 945 }, { day: 1, venueId: 8, startMinutes: 600 }] }, a), [{ name: 'Trail', start: 945 }]);
+  assert.deepEqual(LA.planDayStops(null, a), []);
+});
+
+test('28. the owner’s flow: "Our friend arrives at 3 PM on October 9." in the chat; the title, the reply, the copy and the shared page agree with the notes', async () => {
+  const p = run(OWNER, { arrive: '2027-10-08', leave: '2027-10-10' }), page = pageOf(p, OWNER);
+  const r = await sayWith(page, 'Our friend arrives at 3 PM on October 9.');
+  assert.equal(r.lateTime, 'join');
+  assert.deepEqual([r.plan, r.changed], [null, []]);
+  const le = r.stayBlock.lateEvidence, day2 = page.stops.filter((s) => /^2-/.test(s.key) && Number.isInteger(s.start));
+  const st = (x) => LA.lateStopState(le.win, 'join', x.start), near = day2.filter((x) => st(x) === 'near'), later = day2.filter((x) => st(x) === 'all');
+  assert.equal(le.days[2], near.length ? '2 before 3 PM · check activities close to arrival' : later.length ? '2 before 3 PM · planned for 3 after' : 'for 2 · 1 arrives 3 PM');
+  assert.deepEqual([le.days[1], le.days[3]], ['for 2', 'for all 3']);
+  const nameOf = new Map((p.days || []).flatMap((d) => (d.stops || []).filter((s) => s.venue).map((s) => [s.venue.id, s.venue.name])));
+  for (const x of near) { assert.ok(le.act.includes(`${nameOf.get(x.id)} (`), le.act); assert.ok(r.reply.includes(`${nameOf.get(x.id)} (`), r.reply); }
+  assert.equal(/Close to the arrival, not confirmed for all 3: /.test(le.act), near.length > 0);
+  assert.equal(/Later stops are planned for all 3\./.test(le.act), later.length > 0);
+  assert.equal(/Later stops are planned for all 3\./.test(r.reply), later.length > 0 && (near.length > 0 || day2.some((x) => st(x) === 'few')));
+  assert.ok(!NEVER_RE.test(JSON.stringify([le, r.reply])), r.reply);
+  assert.equal(le.short, '2 adults Oct 8–10 · 1 more from Oct 9, 3 PM, own room, 1 night');
+  // The stay: the same two bookings, the same links and labels as before the time was said.
+  const p0 = run(OWNER), before = p0.whereToStay.pick, after = r.stayBlock.whereToStay.pick;
+  assert.equal(before.id, p.whereToStay.pick.id);
+  assert.deepEqual([after.bookingLinks, after.bookingLinks2, after.split.text.btn], [before.bookingLinks, before.bookingLinks2, before.split.text.btn]);
+  assert.deepEqual(r.stayBlock.whereToStay.trip.split.parts.map((x) => [x.adults, x.rooms, x.arrive, x.leave]), [[2, 1, '2027-10-08', '2027-10-10'], [1, 1, '2027-10-09', '2027-10-10']]);
+  // A fresh shared link (la=j1d2o.t1500, with each stop's time): the same title and sentence, from the link's own times.
+  const ids = stopIds(p), refs = ids.map((s) => `venue:${s.split(':')[1]}`), days = ids.map((s) => s.split('-')[0]);
+  const startOf = new Map(page.stops.map((s) => [s.key, s.start]));
+  const times = ids.map((s) => { const v = startOf.get(s.split(':')[0]); return Number.isInteger(v) ? v : ''; });
+  const base = { stops: refs.join(','), days: days.join(','), t: times.join(','), td: '2027-10-08_2027-10-10', ts: 'r', sa: '2027-10-08', sl: '2027-10-10', sc: '1', ad: '3', rm: '2', ra: '1', stay: String(before.id), nights: '2' };
+  assert.equal(le.share, 'j1d2o.t1500');
+  const c = app.tripShareContext({ ...base, la: le.share }, 'en', NOW), html = app.tripShareContextHtml(c, 'en');
+  assert.equal(c.late.days[2], le.days[2]);
+  assert.equal(c.late.act, le.act);
+  assert.ok(html.includes(`data-mt-late><span data-mt-late-act>${le.act.replace(/&/g, '&amp;')}</span>`), html.slice(html.indexOf('data-mt-late'), html.indexOf('data-mt-late') + 400));
+  assert.deepEqual(c.late.say.L, le.say.L);
+  assert.deepEqual(c.late.stop, le.stop);
+  const frc = app.tripShareContext({ ...base, la: le.share }, 'fr', NOW);
+  assert.equal(frc.late.days[2], le.daysFr[2]);
+  assert.ok(!NEVER_RE.test(JSON.stringify([c.late, frc.late])) && !NEVER_RE.test(html));
+  // A link made before this change (the same la=) reads with the new wording; one with no time is the honest state.
+  const old = app.tripShareContext({ ...base, la: 'j1d2o' }, 'en', NOW);
+  assert.equal(old.late.days[2], 'for 2 + 1 arriving (time not set)');
+  assert.match(old.late.act, /Oct 9 \(Day 2\): for 2 until they arrive \(time not set\)\. All 3 from Day 3\.$/);
+  if (c.stay && c.stay.split && c.stay.split.distinct) assert.deepEqual(c.stay.links.map((l) => l.label), ['2 adults · Oct 8–10', '1 adult · Oct 9–10']);
+  if (c.stay) assert.deepEqual(c.stay.links.map((l) => l.url), old.stay.links.map((l) => l.url));
+  // The shared page's own script words the title from the stops it shows.
+  assert.match(SERVER_SRC, /var lateSay = lateDaySay\(LATE\.say\.L, g\.stops\.filter\(function\(x\)\{ return x\.s\.time && typeof x\.s\.time\.s === 'number'; \}\)/);
+  assert.match(SERVER_SRC, /dayFor = lateSay\.head;/);
+  // A plan with no later arrival has none of this.
+  const plain = run(BASE, { arrive: '2027-10-08', leave: '2027-10-10' });
+  assert.ok(!/late_arrival|lateArrival|arriving|askTime|lateDay/.test(JSON.stringify(plain)));
+  assert.equal(app.tripShareContext(base, 'en', NOW).late, undefined);
 });
