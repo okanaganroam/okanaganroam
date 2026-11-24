@@ -20667,7 +20667,7 @@ function renderMoodCardsHTML({ now = new Date() } = {}) {
     cards[2] = SHOW_SKI_SNOW_MOOD_TILE
       ? { key: 'ski-snow', href: SKI_SNOW_PATH, filter: null, img: '/images/mood/ski-snow-powder.jpg', titleKey: 'mood.skiSnow.title', title: 'Ski & Snow' }
       // Tours & Experiences (Dayton, 2026-11-24) takes Sports & Recreation's place; /tours's own banner photo (a cellar tour).
-      : { key: 'tours', href: `/${CATEGORY_SLUGS.tour}`, filter: null, img: '/images/mood/tours-experiences.jpg', titleKey: 'tripv3.type.tour', title: 'Tours & Experiences' };
+      : { key: 'tours', href: `/${CATEGORY_SLUGS.tour}`, filter: null, img: '/images/mood/tours-experiences-2611.jpg', titleKey: 'tripv3.type.tour', title: 'Tours & Experiences' };
     cards[3] = { key: 'indoor', href: `/${CATEGORY_SLUGS.indoor}`, filter: null, img: '/images/mood/indoor.jpg', imgHeight: 400, titleKey: 'mood.indoor.title', title: 'Indoor & Rainy Day' };
   }
 
