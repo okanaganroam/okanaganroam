@@ -317,12 +317,16 @@ const EDIT_RE = /\b(?:swap|replace|switch|change|add|find|book|include|instead|a
 const SAFE_Q_RE = /\b(?:safe|safer|allerg\w+|cross[- ]contact|cross[- ]contaminat\w+|contamination croisee|securitaires?|sans danger)\b/;
 const OTHER_SAFE_RE = /\b(?:walk\w*|trails?|hik\w+|driv\w+|swim\w*|night|dark|kids?|children|toddlers?|dogs?|water|lake|ski\w*|roads?|bears?|bik\w+|cycl\w+|neighbou?rhood|downtown|parking|alone|solo|march\w*|sentiers?|enfants?|chiens?|nuit|baignade|velo)\b/;
 const FORGET_RE = /\b(?:remove|forget|ignore|delete|cancel|take off|take away|no longer|not anymore|never mind|enleve[rz]?|retire[rz]?|oublie[rz]?|supprime[rz]?|annule[rz]?)\b/;
-const PARTS_RE = /(?<=[.;!?\n])\s+|\s+(?:and|et)\s+(?=(?:then\s+|also\s+|aussi\s+)?(?:add|remove|swap|replace|make|move|change|book|find|ajoute|enleve|remplace|deplace|change)\b)/;
+// (2026-11-23) "…, and can you replace lunch…" is a part of its own too: one sentence that asked whether the places are
+// safe AND for a swap was read as the question alone.
+const PARTS_RE = /(?<=[.;!?\n])\s+|(?:\s*,)?\s+(?:and|et)\s+(?=(?:(?:then|also|aussi|please|svp|can you|could you|would you|will you|peux-tu|pouvez-vous|pourriez-vous|pourrais-tu)\s+)*(?:add|remove|swap|replace|make|move|change|book|find|ajoute[rz]?|enleve[rz]?|remplace[rz]?|deplace[rz]?|change[rz]?|trouve[rz]?)\b)/;
+// « Les restaurants sont-ils sécuritaires » (a French question that does not start with a question word).
+const FR_INV_RE = /\b(?:sont|est|seront|serait|seraient|convient|conviennent)-(?:ils?|elles?|ce)\b/;
 const dayIn = (t) => { const m = /\b(?:day|jour)\s*(\d)\b/.exec(t); return m ? Number(m[1]) : null; };
 const partIn = (t) => (/\b(?:dinner|supper|souper)\b/.test(t) ? 'evening' : /\b(?:lunch|diner)\b/.test(t) ? 'midday' : /\b(?:breakfast|brunch|dejeuner)\b/.test(t) ? 'morning' : null);
 // The message without its allergy words, when what is left still reads as a request ("Swap the day 1 dinner").
 function restOf(part) {
-  const s = stripAllergy(part).replace(/\s+(?:that(?:'s|’s| is| are)?|which (?:is|are)|qui (?:est|soit|sont))?\s*(?:safe|safer|ok|okay|fine|good|suitable|securitaire|sécuritaire|sans danger)\s*$/i, '').replace(/\s+(?:for|with|to|by|at|pour|par|contre|avec|a)\s+(?:(?:somewhere|something|someplace|a|an|another|one|some|un|une|un autre|une autre|quelque part)\s*)?(?:that(?:'s| is| has)?|which is|qui (?:est|soit|a))?\s*$/i, '').replace(/\s+(?:that(?:'s| is| has)?|which is|qui (?:est|soit|a))\s*$/i, '').replace(/[\s,;:]+$/, '').trim();
+  const s = stripAllergy(part).replace(/\s+(?:that(?:'s|’s| is| are)?|which (?:is|are)|qui (?:est|soit|sont))?\s*(?:safe|safer|ok|okay|fine|good|suitable|securitaire|sécuritaire|sans danger)\s*$/i, '').replace(/\s+(?:for|with|to|by|at|pour|par|contre|avec|a)\s+(?:(?:somewhere|something|someplace|a|an|another|one|some|un|une|un autre|une autre|quelque part)\s*)?(?:(?:options?|choix)\s*)?(?:that(?:'s| is| has)?|which is|qui (?:est|soit|a))?\s*$/i, '').replace(/\s+(?:that(?:'s| is| has)?|which is|qui (?:est|soit|a))\s*$/i, '').replace(/[\s,;:]+$/, '').trim();
   return s;
 }
 // A chat message about an allergy. h: { op(o, extra), stopsNamed(t, stops) }; ctx: { request } (the stored request).
@@ -340,7 +344,7 @@ function chatRead(message, stops, h, ctx = {}) {
   for (const part of parts) {
     const t = fold(part).replace(/\s+/g, ' ').trim();
     const said = readAllergy(part);
-    const isQ = (Q_START_RE.test(t) && !CAN_YOU_RE.test(t)) || (/\?\s*$/.test(t) && !CAN_YOU_RE.test(t) && !EDIT_RE.test(t));
+    const isQ = ((Q_START_RE.test(t) || FR_INV_RE.test(t)) && !CAN_YOU_RE.test(t)) || (/\?\s*$/.test(t) && !CAN_YOU_RE.test(t) && !EDIT_RE.test(t));
     if (!said) {
       // With an allergy on the plan: "are these safe?", "swap dinner for somewhere safer".
       // (Never a question about something else: "is the trail safe for kids?")
@@ -358,6 +362,7 @@ function chatRead(message, stops, h, ctx = {}) {
     else if (covers(known, said)) ops.push(h.op('ask', { value: 'q_allergy', al: need }));
   }
   if (!ops.length) return null;
+  oneAnswer(ops, stops);
   const out = { ops, cant: null, exact: true, access: true, allergy: true };
   if (ops.every((o) => o.o === 'ask') && !rest.length) out.explain = true;
   if (rest.length) out.rest = rest.join(' ');
@@ -366,15 +371,74 @@ function chatRead(message, stops, h, ctx = {}) {
 function swapOp(part, t, stops, h, need) {
   let target = null;
   try { const n = typeof h.stopsNamed === 'function' ? h.stopsNamed(t, stops || []) : null; target = n && n.byName && n.byName.length ? n.byName[0] : null; } catch (e) { target = null; }
+  let fit = null;
   if (!target && !/\b(?:add|ajoute[rz]?)\b/.test(t)) {
     const day = dayIn(t), dp = partIn(t);
     const food = (stops || []).filter((s) => s && isFoodStop(s));
-    const fit = food.filter((s) => (!day || s.day === day) && (!dp || new RegExp(`-${dp}$`).test(String(s.key || ''))));
+    fit = food.filter((s) => (!day || s.day === day) && (!dp || new RegExp(`-${dp}$`).test(String(s.key || ''))));
     if (dp && fit.length === 1) target = fit[0];
+    if (!dp) fit = null;
   }
   const say = restOf(part);
   const stillEdit = say && EDIT_RE.test(fold(say)) && fold(say) !== t && !readAllergy(say);
-  return h.op('ask', { value: 'q_allergy_swap', al: need, stops: target ? [target] : [], ...(stillEdit ? { say: say.slice(0, 300) } : {}) });
+  const op = h.op('ask', { value: 'q_allergy_swap', al: need, stops: target ? [target] : [], ...(stillEdit ? { say: say.slice(0, 300) } : {}) });
+  // What the one answer needs (oneAnswer): the meal asked for, the stops it could mean, whether it was an add.
+  SWAP_INFO.set(op, { fit, dp: fit ? partIn(t) : null, day: dayIn(t), add: /\b(?:add|ajoute[rz]?)\b/.test(t) });
+  return op;
+}
+// One message, one answer (2026-11-23, the owner's report: "One person has a severe peanut allergy. Are the suggested
+// restaurants safe, and can you replace lunch with a peanut-free option?" got the same warning twice and no word on the
+// replacement). A message that says the allergy, asks whether the places are safe and asks for a swap, in any mix, is
+// answered once: the warning one time, and each swap answered by name. A single ask is left exactly as it was read.
+const SWAP_INFO = new WeakMap();
+const dayOf = (s) => (s && Number(s.day)) || Number(String((s && s.key) || '').split('-')[0]) || null;
+const dpOf = (s) => { const m = /-(morning|midday|evening)$/.exec(String((s && s.key) || '')); return m ? m[1] : null; };
+const LEAD_ASK_RE = /^(?:(?:and|et|also|aussi|then|please|svp|can you|could you|would you|will you|peux-tu|pouvez-vous|pourriez-vous|pourrais-tu)\b[\s,]*)+/i;
+const FR_SAY_RE = /\b(?:le|la|les|du|par|jour|remplace[rz]?|ajoute[rz]?|trouve[rz]?|echange[rz]?)\b/;
+function oneAnswer(ops, stops) {
+  const isQ = (o) => o.o === 'ask' && o.value === 'q_allergy' && !o.keep;
+  const isSwap = (o) => o.o === 'ask' && o.value === 'q_allergy_swap';
+  const qs = ops.filter(isQ), swaps = ops.filter(isSwap), recs = ops.filter((o) => o.o === 'allergy');
+  const loud = recs.filter((o) => !o.quiet);
+  const drop = (list) => { for (const o of list) { const i = ops.indexOf(o); if (i >= 0) ops.splice(i, 1); } };
+  if (!swaps.length) {
+    // The need said and recorded: its "Noted" line carries the warning, so a question beside it adds nothing.
+    if (loud.length) { drop(qs); for (const o of loud.slice(1)) o.quiet = true; return; }
+    // Said again and asked about: one answer, naming every allergen that was asked about.
+    if (qs.length > 1) { qs[0].al = qs.slice(1).reduce((a, o) => merge(a, o.al), qs[0].al); drop(qs.slice(1)); }
+    return;
+  }
+  const stated = loud.length > 0 || qs.length > 0;
+  if (!stated && swaps.length < 2) return;
+  // The swap(s) and everything said beside them: one op, answered in one reply (chatReply 'both').
+  const first = swaps[0], targets = [], where = [];
+  let add = false;
+  for (const o of swaps) {
+    const info = SWAP_INFO.get(o) || {};
+    if (o.say) o.say = restOf(o.say.replace(/[\s.?!,]+$/, '')) || o.say;
+    let s = (o.stops || [])[0] || null, amb = false;
+    // "lunch" on a plan with a lunch on each day: the first one is the one meant (the one a plain "replace lunch"
+    // changes), and it is named with its day.
+    if (!s && (info.fit || []).length > 1) { s = info.fit[0]; amb = true; }
+    if (!s) { if (info.add) add = true; continue; }
+    if (targets.some((x) => x.id === s.id)) continue;
+    targets.push(s);
+    const dp = info.dp || dpOf(s), day = dayOf(s);
+    const several = amb || (dp && (stops || []).filter((x) => x && isFoodStop(x) && dpOf(x) === dp).length > 1);
+    where.push(several && day ? { day, dp: dp || null } : null);
+    if (amb && o.say && !info.day && day) o.say = `${o.say.replace(/[\s.?!,]+$/, '')} ${FR_SAY_RE.test(fold(o.say)) ? 'du jour' : 'on day'} ${day}`;
+  }
+  const says = swaps.filter((o) => o.say).map((o) => o.say.replace(LEAD_ASK_RE, '').replace(/[\s.?!,]+$/, '').trim()).filter(Boolean);
+  const say = says.length === 1 && swaps.length === 1 ? says[0].charAt(0).toUpperCase() + says[0].slice(1) : '';
+  first.stops = targets;
+  first.al = [...recs, ...qs, ...swaps.slice(1)].reduce((a, o) => merge(a, o.al), first.al);
+  first.both = true;
+  if (where.some(Boolean)) first.where = where;
+  if (add && !targets.length) first.add = true;
+  if (loud.length) first.noted = true;
+  if (say) first.say = say.slice(0, 300); else delete first.say;
+  for (const o of loud) o.quiet = true;
+  drop([...qs, ...swaps.slice(1)]);
 }
 const CHAT = {
   en: {
@@ -386,6 +450,17 @@ const CHAT = {
     onCards: 'It’s now on your plan and each meal card.',
     fresh: '{label}: not confirmed for {names} either. Ask before you go.',
     keep: 'I’ve kept the note ({labelLower}): I can’t take it off this plan. To plan without it, start a new request.',
+    // One answer to a message that asks whether the places are safe AND for a swap (chatReply 'both').
+    both: '{label}: safety and cross-contact practices aren’t confirmed for any meal stop; listings have no allergen data. Ask each restaurant.',
+    bothNoted: 'Noted: {labelLower}{onPlan}. Safety and cross-contact practices aren’t confirmed for any meal stop; listings have no allergen data. Ask each restaurant.',
+    onPlan: ', now on your plan and meal cards',
+    kept: 'No verified replacement is available, so I’ve kept {names} unchanged.',
+    keptNone: 'No verified replacement is available, so nothing has changed.',
+    keptAdd: 'No verified place is available to add, so nothing has changed.',
+    offerBoth: 'I can change it anyway, just as unconfirmed. Want that?',
+    offerAdd: 'I can add one anyway, just as unconfirmed. Want that?',
+    at: { day: 'day {day}', morning: 'day {day} breakfast', midday: 'day {day} lunch', evening: 'day {day} dinner' },
+    and: 'and',
   },
   fr: {
     q: '{label} : je ne peux le confirmer pour aucun repas. Les fiches n’indiquent ni les allergènes ni la préparation des aliments; parlez de {it} avec chaque restaurant avant d’y aller.',
@@ -396,14 +471,30 @@ const CHAT = {
     onCards: 'C’est maintenant indiqué sur votre plan et sur chaque repas.',
     fresh: '{label} : non confirmé pour {names} non plus. Demandez avant d’y aller.',
     keep: 'J’ai gardé la note ({labelLower}) : je ne peux pas la retirer de ce plan. Pour planifier sans elle, faites une nouvelle demande.',
+    both: '{label} : ni la sécurité ni les pratiques contre la contamination croisée ne sont confirmées pour aucun repas; les fiches n’indiquent pas les allergènes. Demandez à chaque restaurant.',
+    bothNoted: 'C’est noté : {labelLower}{onPlan}. Ni la sécurité ni les pratiques contre la contamination croisée ne sont confirmées pour aucun repas; les fiches n’indiquent pas les allergènes. Demandez à chaque restaurant.',
+    onPlan: ', maintenant sur votre plan et sur chaque repas',
+    kept: 'Aucun remplacement vérifié n’est disponible : j’ai gardé {names}, sans rien changer.',
+    keptNone: 'Aucun remplacement vérifié n’est disponible : rien n’a changé.',
+    keptAdd: 'Aucun endroit vérifié n’est disponible à ajouter : rien n’a changé.',
+    offerBoth: 'Je peux le changer quand même, sans plus de confirmation. Voulez-vous?',
+    offerAdd: 'Je peux en ajouter un quand même, sans plus de confirmation. Voulez-vous?',
+    at: { day: 'jour {day}', morning: 'déjeuner du jour {day}', midday: 'dîner du jour {day}', evening: 'souper du jour {day}' },
+    and: 'et',
   },
 };
 const fill = (s, vars) => String(s).replace(/\{(\w+)\}/g, (m, k) => (vars[k] !== undefined ? String(vars[k]) : m));
-// The chat's words. what: 'q' | 'swap' | 'noted' | 'fresh'; x: { name, names, recorded, offer }.
+// The chat's words. what: 'q' | 'swap' | 'both' | 'noted' | 'fresh'; x: { name, names, recorded, offer, kept, noted, add }.
 function chatReply(what, need, lang, x = {}) {
   const fr = lang === 'fr', T = CHAT[fr ? 'fr' : 'en'], L = label(need, fr);
   const vars = { label: L, labelLower: L.charAt(0).toLowerCase() + L.slice(1), it: it(need, fr), name: x.name || '', names: x.names || '' };
   if (what === 'swap') return [fill(x.name ? T.swap : T.swapAny, vars), x.offer ? T.offer : ''].filter(Boolean).join(' ');
+  // x.kept: [{ name, day?, dp? }] the stops asked about (each stays); x.add: a place was asked to be added.
+  if (what === 'both') {
+    const kept = (x.kept || []).filter((k) => k && k.name).map((k) => (k.day ? `${k.name} (${fill(T.at[k.dp] || T.at.day, { day: k.day })})` : k.name));
+    const line = kept.length ? fill(T.kept, { names: joinEn(kept, T.and) }) : x.add ? T.keptAdd : T.keptNone;
+    return [fill(x.noted ? T.bothNoted : T.both, { ...vars, onPlan: x.recorded ? T.onPlan : '' }), line, x.offer ? (x.add && !kept.length ? T.offerAdd : T.offerBoth) : ''].filter(Boolean).join(' ');
+  }
   if (what === 'noted') return [fill(T.noted, vars), x.recorded ? T.onCards : ''].filter(Boolean).join(' ');
   if (what === 'fresh') return fill(T.fresh, vars);
   if (what === 'keep') return fill(T.keep, vars);
