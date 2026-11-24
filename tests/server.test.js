@@ -17591,10 +17591,10 @@ const WINTER_GET = async (base, p) => { const r = await fetch(`${base}${p}`); re
 const winterMood = (iso) => app.renderMoodCardsHTML({ now: new Date(`${iso}T19:00:00Z`) });
 const moodKeys = (html) => Array.from(html.matchAll(/class="mood-card mood-card-([a-z-]+)"/g)).map((m) => m[1]);
 
-test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Sports & Recreation (Ski & Snow is off for now) and Golf -> Indoor in place; Apr-Sep is the summer set', () => {
+test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Tours & Experiences (2026-11-24; Ski & Snow is off for now) and Golf -> Indoor in place; Apr-Sep is the summer set', () => {
   for (const iso of ['2026-10-01', '2026-10-31', '2026-11-15', '2027-02-01', '2027-03-31', '2026-12-31', '2027-01-01']) {
     assert.equal(app.isWinterMoodSeason(new Date(`${iso}T19:00:00Z`)), true, iso);
-    assert.deepEqual(moodKeys(winterMood(iso)), ['food-drink', 'wine', 'sports', 'indoor', 'whats-on', 'outdoors'], iso);
+    assert.deepEqual(moodKeys(winterMood(iso)), ['food-drink', 'wine', 'tours', 'indoor', 'whats-on', 'outdoors'], iso);
   }
   for (const iso of ['2027-04-01', '2026-09-30', '2026-07-15']) {
     assert.equal(app.isWinterMoodSeason(new Date(`${iso}T19:00:00Z`)), false, iso);
@@ -17618,9 +17618,11 @@ test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Sports & Recreation (Ski & S
 
 test('Seasonal mood tiles: winter hrefs, images, titles and i18n keys', () => {
   const html = winterMood('2027-02-01');
-  assert.match(html, /<a class="mood-card mood-card-sports" href="\/sports">\s*<img class="mood-card-img" src="\/images\/mood\/sports-recreation\.jpg" width="640" height="403" alt="" loading="lazy">/);
+  // Tours & Experiences took Sports & Recreation's tile (Dayton, 2026-11-24), with /tours's own banner photo.
+  assert.match(html, /<a class="mood-card mood-card-tours" href="\/tours">\s*<img class="mood-card-img" src="\/images\/mood\/tours-experiences\.jpg" width="640" height="403" alt="" loading="lazy">/);
+  assert.doesNotMatch(html, /mood-card-sports/);
   assert.match(html, /<a class="mood-card mood-card-indoor" href="\/indoor">\s*<img class="mood-card-img" src="\/images\/mood\/indoor\.jpg" width="640" height="400" alt="" loading="lazy">/);
-  assert.match(html, /class="mood-card-title" data-i18n="mood\.sports\.title">Sports &amp; Recreation</);
+  assert.match(html, /class="mood-card-title" data-i18n="tripv3\.type\.tour">Tours &amp; Experiences</);
   assert.doesNotMatch(html, /mood-card-ski-snow/, 'Ski & Snow is off the homepage for now');
   assert.match(html, /class="mood-card-title" data-i18n="mood\.indoor\.title">Indoor &amp; Rainy Day</);
   assert.doesNotMatch(html, /mood-card-beaches|mood-card-golf/);
@@ -17658,15 +17660,15 @@ test('Seasonal mood tiles: "/" honours OKR_TODAY_OVERRIDE (test-only), never in 
       assert.equal(summer.status, 200);
       // The simplified homepage (home-simple.js) wraps the same tiles as <a class="photo"> in #moodCards.
       assert.match(summer.text, /<a class="photo" href="\/beaches">/);
-      assert.doesNotMatch(summer.text, /<a class="photo" href="\/sports">/);
+      assert.doesNotMatch(summer.text, /<a class="photo" href="\/tours">/);
       // Dec 15: winter tiles, and past the Sep-Nov fall hero text, so only the tiles (and season link) differ.
       process.env.OKR_TODAY_OVERRIDE = '2026-12-15';
       const winter = await WINTER_GET(base, '/');
-      assert.match(winter.text, /<a class="photo" href="\/sports">/);
+      assert.match(winter.text, /<a class="photo" href="\/tours">/);
       assert.match(winter.text, /<a class="photo" href="\/indoor">/);
       assert.doesNotMatch(winter.text, /<a class="photo" href="\/beaches">|<a class="photo" href="\/golf">/);
       // Only the two swapped cards differ between the seasons.
-      const strip = (h) => h.replace(/<a class="photo" href="\/(?:beaches|golf|sports|indoor)">[\s\S]*?<\/a>/g, '').replace(/\n\s*<a class="discover-heading-link home-see-all mood-season-link"[^>]*>(?:<span[^>]*>[^<]*<\/span>)+<\/a>/, '');
+      const strip = (h) => h.replace(/<a class="photo" href="\/(?:beaches|golf|tours|indoor)">[\s\S]*?<\/a>/g, '').replace(/\n\s*<a class="discover-heading-link home-see-all mood-season-link"[^>]*>(?:<span[^>]*>[^<]*<\/span>)+<\/a>/, '');
       assert.equal(strip(winter.text), strip(summer.text));
     });
     process.env.OKR_TODAY_OVERRIDE = '2027-02-30';
@@ -19510,7 +19512,7 @@ test('Fall tile photos (2026-10-13): Sep-Nov the Food & Drink, Wine, What\'s On 
     }
   }
   // October and November keep the winter swaps (Ski & Snow, Indoor) alongside the fall photos.
-  assert.deepEqual(moodKeys(winterMood('2026-10-13')), ['food-drink', 'wine', 'sports', 'indoor', 'whats-on', 'outdoors']);
+  assert.deepEqual(moodKeys(winterMood('2026-10-13')), ['food-drink', 'wine', 'tours', 'indoor', 'whats-on', 'outdoors']);
   const summer = { 'food-drink': '/images/mood/eat.webp', wine: '/images/mood/drink.webp', 'whats-on': '/images/mood/whats-on.webp', outdoors: '/images/mood/explore.webp' };
   for (const iso of ['2026-07-15', '2026-08-31', '2026-12-01', '2027-03-01']) {
     for (const [key, src] of Object.entries(summer)) assert.equal(srcOf(winterMood(iso), key), src, `${iso} ${key}`);
