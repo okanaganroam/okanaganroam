@@ -32,10 +32,12 @@ const post = (token, changes) => fetch(`${base}/owner/${token}/changes?from=setu
 test('a campground runs the outdoor setup; a rental shop and a park keep the classic edit page', async () => {
   const camp = mk('Test Lakeside Campground', 'A family campground with tent and RV sites on the lake.');
   const rent = mk('Test Paddle Rentals', 'Paddleboards and kayaks to rent by the hour on the beach.');
-  const park = mk('Test Ridge Trail', 'A steep hiking trail with views over the valley.');
+  const park = mk('Test Ridge Trail', 'A steep hiking trail next to the campground, with views over the valley.');
+  const lodge = mk('Test Lake Lodge Rentals', 'Boats and paddleboards to rent next to the RV park and the campground.');
   assert.equal(app.sportSetupType({ type: 'outdoor', id: camp.id }), true);
   assert.equal(app.sportSetupType({ type: 'outdoor', id: rent.id }), false);
-  assert.equal(app.sportSetupType({ type: 'outdoor', id: park.id }), false);
+  assert.equal(app.sportSetupType({ type: 'outdoor', id: park.id }), false, '"next to the campground" in a description is not a campground');
+  assert.equal(app.sportSetupType({ type: 'outdoor', id: lodge.id }), false, 'a lodge or rental shop by an RV park is not a campground');
   // The campground: setup, checklist, outdoor Help, Update my prices.
   const cs = await get(`/owner/${camp.token}/setup`);
   assert.equal(cs.status, 200);
@@ -54,12 +56,22 @@ test('a campground runs the outdoor setup; a rental shop and a park keep the cla
   assert.doesNotMatch(pe, /\/setup"/);
 });
 
-test('a campground owner keeps Campground among their kinds (else they would leave the setup half-way)', async () => {
+test('a misread listing can clear Campground on its first answer (classic page after); a real campground keeps its access', async () => {
+  // Our words took it for a campground (its name says campground), but it rents bikes: its first answer leaves Campground out.
+  const misread = mk('Test Campground Road Bike Rentals', 'E-bikes to rent by the day.');
+  assert.equal(app.sportSetupType({ type: 'outdoor', id: misread.id }), true);
+  const first = await post(misread.token, { indoor_info: { kinds: ['outdoorother'], length: '2-3h', book: 'busy', age: 'all' } });
+  assert.ok([200, 201].includes(first.status), `first answer without Campground: ${first.status}`);
+  assert.equal(app.sportSetupType({ type: 'outdoor', id: misread.id }), false, 'back to the classic edit page');
+  assert.equal((await get(`/owner/${misread.token}/setup`)).status, 302);
+  // A real campground: Campground saved, the setup stays, and a later save can't drop Campground.
   const camp = mk('Test Pines Campground', 'Tent and RV sites under the pines.');
+  const ok = await post(camp.token, { indoor_info: { kinds: ['camp', 'waterrent'], length: 'half', book: 'busy', age: 'all' } });
+  assert.ok([200, 201].includes(ok.status), `campground save: ${ok.status}`);
+  assert.equal(app.sportSetupType({ type: 'outdoor', id: camp.id }), true);
+  assert.equal((await get(`/owner/${camp.token}/setup`)).status, 200);
   const bad = await post(camp.token, { indoor_info: { kinds: ['waterrent'] } });
   assert.equal(bad.status, 400);
   assert.match(JSON.stringify(await bad.json()), /keep Campground ticked/);
-  const ok = await post(camp.token, { indoor_info: { kinds: ['camp', 'waterrent'], length: 'half', book: 'busy', age: 'all' } });
-  assert.ok([200, 201].includes(ok.status), `campground save: ${ok.status}`);
   assert.equal(app.sportSetupType({ type: 'outdoor', id: camp.id }), true);
 });

@@ -426,33 +426,34 @@ const SPORT_SETUP_TYPES = ['sport', 'golf', ...(OUTDOOR_SETUP_ON ? ['outdoor'] :
 // for the practice rounds still to come (rentals, farms, ziplines…).
 const OUTDOOR_ALL_KINDS_ON = process.env.OUTDOOR_SETUP_KINDS === 'all';
 const OUTDOOR_SETUP_KINDS = OUTDOOR_ALL_KINDS_ON ? require('./outdoor-kinds').OUTDOOR_KIND_ORDER.slice() : ['camp'];
+const OUTDOOR_CAMP_NAME_RE = /\b(?:campgrounds?|campsites?|camping|rv parks?|rv resorts?|glamping)\b/i;
 const OUTDOOR_CAMP_ONLY_ERROR = 'For now this setup is for campgrounds: keep Campground ticked. Not a campground? Email us at info@okanaganroam.com and we’ll set up your page.';
 const outdoorCampCache = new Map();
 let outdoorGateBusy = false;
 function outdoorSetupListing(v) {
   if (OUTDOOR_ALL_KINDS_ON) return true;
-  if (!v || v.id == null || outdoorGateBusy) return false;
-  const key = String(v.id), hit = outdoorCampCache.get(key);
-  if (hit && Date.now() - hit.at < 5000) return hit.on;
+  if (!v || outdoorGateBusy) return false;
   outdoorGateBusy = true;
-  let on = false;
   try {
-    // Straight from the tables (the helpers that read them ask this gate themselves).
+    // Straight from the tables (the helpers that read them ask this gate themselves). The owner's kinds, read every time.
     const row = db.prepare('SELECT info FROM venue_sport_info WHERE venue_id = ?').get(v.id);
     let kinds = [];
     try { kinds = row ? (JSON.parse(row.info).kinds || []) : []; } catch (e) { kinds = []; }
-    if (kinds.length) on = kinds.some((k) => OUTDOOR_SETUP_KINDS.includes(k));
-    else {
-      const full = db.prepare('SELECT name, cuisine, description FROM venues WHERE id = ?').get(v.id);
-      on = !!full && OUTDOOR_SETUP_KINDS.includes(indoorKindsModule.sportKindSuggestion({ ...full, type: 'outdoor' })[0]);
-    }
-  } catch (e) { on = false; } finally { outdoorGateBusy = false; }
-  outdoorCampCache.set(key, { on, at: Date.now() });
-  if (outdoorCampCache.size > 5000) outdoorCampCache.delete(outdoorCampCache.keys().next().value);
-  return on;
+    if (kinds.length) return kinds.some((k) => OUTDOOR_SETUP_KINDS.includes(k));
+    // Before any answer: the listing's own name or category says it is a campground. Never its description ("a trail
+    // next to the campground"), and never the looser kind hints ("lodge", "RV") the setup uses to pre-pick a kind.
+    const key = String(v.id), hit = outdoorCampCache.get(key);
+    if (hit && Date.now() - hit.at < 60000) return hit.on;
+    const full = db.prepare('SELECT name, cuisine FROM venues WHERE id = ?').get(v.id);
+    const on = !!full && OUTDOOR_CAMP_NAME_RE.test(`${full.name || ''} | ${full.cuisine || ''}`);
+    outdoorCampCache.set(key, { on, at: Date.now() });
+    if (outdoorCampCache.size > 5000) outdoorCampCache.delete(outdoorCampCache.keys().next().value);
+    return on;
+  } catch (e) { return false; } finally { outdoorGateBusy = false; }
 }
 function sportSetupType(t) {
-  if (t && typeof t === 'object') return SPORT_SETUP_ON && SPORT_SETUP_TYPES.includes(t.type) && (t.type !== 'outdoor' || outdoorSetupListing(t));
+  // A listing with its id: this listing. A row without one (a type and a few columns): its type, as before.
+  if (t && typeof t === 'object') return SPORT_SETUP_ON && SPORT_SETUP_TYPES.includes(t.type) && (t.type !== 'outdoor' || t.id == null || outdoorSetupListing(t));
   return SPORT_SETUP_ON && SPORT_SETUP_TYPES.includes(t);
 }
 function kindSetupType(t) { return ((t && typeof t === 'object' ? t.type : t) === 'indoor' && INDOOR_SETUP_ON) || sportSetupType(t); }
@@ -28993,7 +28994,7 @@ function sportSkippedPrice(venueId) {
   try {
     const t = venueIndoorInfo(venueId);
     if (!t || t.free || INDOOR_PER_UNITS.includes(t.per) || !(t.kinds || []).length || !indoorKindsModule.SPORT_KIND_TEXT_KINDS.includes(t.kinds[0])) return null;
-    const v = db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId);
+    const v = db.prepare('SELECT id, type FROM venues WHERE id = ?').get(venueId);
     return v && sportSetupType(v) ? indoorLowestTyped(venueId) : null;
   } catch (e) { return null; }
 }
@@ -29021,12 +29022,14 @@ function cleanIndoorPrice(x) {
   if (!Number.isFinite(t) || t <= 0 || t > INDOOR_PRICE_MAX) return { error: INDOOR_PRICE_ERROR };
   return { value: Math.round(t * 100) / 100 };
 }
-function cleanIndoorInfoPart(key, x, type = 'indoor') {
+// hadKinds: the kinds saved before. An outdoor listing's FIRST kind answer may leave out Campground (a listing our words took
+// for a campground: it then keeps the classic edit page); once Campground was saved, it stays (else the setup ends half-way).
+function cleanIndoorInfoPart(key, x, type = 'indoor', hadKinds = null) {
   if (x === null) return { value: null };
   if (key === 'kinds') {
     if (!Array.isArray(x) || x.length > INDOOR_KINDS_MAX || x.some((k) => !kindListFor(type).includes(k)) || new Set(x).size !== x.length) return { error: 'Please pick up to 3 kinds of place from the list.' };
     // Campgrounds only (2026-11-23): an outdoor listing's kinds keep Campground, or it would leave the setup half-way.
-    if (type === 'outdoor' && x.length && !x.some((k) => OUTDOOR_SETUP_KINDS.includes(k))) return { error: OUTDOOR_CAMP_ONLY_ERROR };
+    if (type === 'outdoor' && x.length && !x.some((k) => OUTDOOR_SETUP_KINDS.includes(k)) && hadKinds && hadKinds.some((k) => OUTDOOR_SETUP_KINDS.includes(k))) return { error: OUTDOOR_CAMP_ONLY_ERROR };
     return { value: x.slice() };
   }
   if (key === 'length') return INDOOR_LENGTHS.includes(x) ? { value: x } : { error: TOUR_INFO_ERROR };
@@ -29603,7 +29606,7 @@ function sportTypedPriceHolds(venueId) {
   try {
     const t = venueIndoorInfo(venueId);
     if (!t || !(t.kinds || []).length || !indoorKindsModule.SPORT_KIND_TEXT_KINDS.includes(t.kinds[0])) return false;
-    const v = db.prepare('SELECT type FROM venues WHERE id = ?').get(venueId);
+    const v = db.prepare('SELECT id, type FROM venues WHERE id = ?').get(venueId);
     return !!(v && sportSetupType(v));
   } catch (e) { return false; }
 }
@@ -29978,7 +29981,7 @@ function cardPriceFor(venueId) {
   return `${exact ? '' : 'From '}$${Number.isInteger(n) ? n.toLocaleString('en-CA') : n.toFixed(2)}${e.per ? ` / ${e.per}` : ''}`;
 }
 function indoorCardExact(venueId) {
-  try { const v = db.prepare('SELECT type FROM venues WHERE id = ?').get(Number(venueId)); return !!(v && kindSetupType(v) && indoorPriceExact(Number(venueId))); } catch (e) { return false; }
+  try { const v = db.prepare('SELECT id, type FROM venues WHERE id = ?').get(Number(venueId)); return !!(v && kindSetupType(v) && indoorPriceExact(Number(venueId))); } catch (e) { return false; }
 }
 // Weekly price check (price-check.js, 2026-11-07): re-reads each price's source page once a week; anything that no
 // longer matches waits on /admin/review. Approved changes are saved in the database and laid over CARD_PRICES here.
@@ -60213,7 +60216,7 @@ function validateOwnerChanges(venue, happyHourTimes, body) {
       const cur = current.indoor_info || {};
       const next = { ...cur };
       for (const k of Object.keys(x)) {
-        const c = cleanIndoorInfoPart(k, x[k], venue.type);
+        const c = cleanIndoorInfoPart(k, x[k], venue.type, Array.isArray(cur.kinds) ? cur.kinds : []);
         if (c.error) { errors.indoor_info = c.error; break; }
         if (c.value != null && !(Array.isArray(c.value) && !c.value.length)) next[k] = c.value; else delete next[k];
       }
@@ -66157,6 +66160,8 @@ function renderOwnerSetupPage(found, opts) {
       // Outdoor test 1 (2026-11-23): research says it's open all year ("Open year-round"), so no "most places like yours close" hint.
       ...(venue.type === 'outdoor' && /\b(?:year[- ]round|all year|open all year)\b/i.test(String((OUTDOOR_FACTS[String(venue.id)] || {}).season || '')) ? { yearRoundResearch: true } : {}),
       // Outdoor fresh test (2026-11-23): kinds whose suggested All ages is saved with the screen (control, count and summary agree).
+      // Campgrounds only: the kinds that keep an outdoor listing in this setup (a first answer without them goes back to the edit page).
+      outdoorSetupKinds: venue.type === 'outdoor' ? OUTDOOR_SETUP_KINDS.slice() : null,
       ageSaveKinds: venue.type === 'outdoor' && sportSetupType(venue) ? require('./outdoor-kinds').OUTDOOR_UNTAPPED_AGE_OK_KINDS.slice() : [],
       sport, kindSeasons: sport ? Object.fromEntries(SPORT_KINDS_MOD.ENGINE_KINDS.map((k) => [k, indoorKindsModule.indoorKindText([k], 'en').season || ''])) : {}, otherKind: sport ? sportOtherKind(venue.type) : 'other',
       // Indoor test 2: the card's short words for each kind, for the preview ("Escape room · arcade, VR & laser tag").
@@ -76348,11 +76353,11 @@ function ownerMainPhotoPositionHtml(venue, signedIn, lang = 'en') {
 // Pubs since 2026-11-10 (their own item list, portal-completeness.js PUB_ITEMS).
 // Tours (Dayton, 2026-11-16: "build the tours setup"): tour operators get the easy setup and the % checklist too.
 // Indoor places (2026-11-19, the indoor easy setup; INDOOR_SETUP_ON).
-// A listing with the % checklist and setup: its type has one, and an outdoor listing only when it runs the setup.
 // A listing with a price list (Your prices): its type has one, or it is a campground running the outdoor setup.
 function menuListing(v) { return !!v && (!!portalFields(v.type).menu || (v.type === 'outdoor' && sportSetupType(v))); }
-function completenessListing(v) { return !!v && COMPLETENESS_TYPES.has(v.type) && (v.type !== 'outdoor' || sportSetupType(v)); }
 const COMPLETENESS_TYPES = new Set(['restaurant', 'pub', 'cafe', 'winery', 'brewery', 'distillery', 'cocktail', 'tour', ...(INDOOR_SETUP_ON ? ['indoor'] : []), ...(SPORT_SETUP_ON ? SPORT_SETUP_TYPES : [])]);
+// A listing with the % checklist and setup: its type has one, and an outdoor listing only when it runs the setup.
+function completenessListing(v) { return !!v && COMPLETENESS_TYPES.has(v.type) && (v.type !== 'outdoor' || sportSetupType(v)); }
 // The menu page's "Just add a link to your menu" (final fresh-eyes 2026-11-09): the same types as the completeness bar.
 // Tours keep their price-list page without the "Just add a link to your menu" button (its words are the menu's); the
 // setup's "My tours and prices are on my website" saves that link (tour test 1, 2026-11-16).

@@ -5071,6 +5071,12 @@
       if (artsAdd && il.length) il[0].badges = { arts_culture: true };
       // Indoor test 5: the server takes the kind's own badge off when no arts kind is left (C.artsAuto); the screens follow.
       var artsOff = !artsNow && C.artsAuto && il.length;
+      // Campgrounds only (2026-11-23): an outdoor listing whose first kind answer leaves out Campground isn't a campground
+      // after all: the answer is saved and the owner goes back to their edit page (this setup is for campgrounds for now).
+      if (C.outdoorSetupKinds && !ik0.some(function(k){ return C.outdoorSetupKinds.indexOf(k) >= 0; })) {
+        S.busy = true; render();
+        return il.reduce(function(p, x){ return p.then(function(ok){ return ok ? change(x) : ok; }); }, Promise.resolve(true)).then(function(ok){ if (!ok) { S.busy = false; return render(); } S.leaving = true; location.href = C.back; });
+      }
       return saveAll('indoor', il, null, null, function(){ Object.keys(ii0).forEach(function(kk){ TI[kk] = ii0[kk]; }); S.tour.lengthGuessed = false; S.tour.kindsGuessed = false;
         if (artsAdd && il.length) C.artsAuto = true;
         if (artsOff) { C.artsAuto = false; CUR.badges = CUR.badges || {}; CUR.badges.arts_culture = false; if (S.badges) S.badges.arts_culture = false; if (S.savedBadges) S.savedBadges.arts_culture = false; } });
