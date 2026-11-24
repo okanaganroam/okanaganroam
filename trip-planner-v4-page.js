@@ -35,6 +35,7 @@ const V4_STYLES = `<style>
   .t3-v4 .v4-sub { grid-column: 1; margin: 0; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy-muted, #56636E); }
   .t3-v4 .v4-edit { grid-column: 2; grid-row: 1 / span 2; align-self: start; min-height: 40px; padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.22); background: #fff; color: var(--ref-navy); font-weight: 800; font-size: 0.8rem; cursor: pointer; white-space: nowrap; }
   .t3-v4 .v4-tip { margin: 0 0 12px; font-size: 0.84rem; color: var(--ref-navy-muted, #56636E); }
+  .t3-v4 .v4-notinc-add { border: 0; background: none; padding: 10px 6px; margin: -10px 0; min-height: 0; font: inherit; font-weight: 800; color: var(--ref-navy); text-decoration: underline; cursor: pointer; white-space: nowrap; }
   .t3-v4 .t3-plan-status { margin: 0 0 8px; font-size: 0.88rem; font-weight: 700; color: var(--ref-navy); }
   .t3-v4 .t3-plan-status:empty { display: none; }
   .t3-v4 .v4-day { margin: 0 0 18px; }
@@ -1105,7 +1106,9 @@ const V4_CLIENT_SRC = String.raw`
     var html = '<div class="t3-plan v4' + (v4.confirmed ? ' v4-confirmed' : '') + '"><header class="v4-head"><h2 class="t3-headline" id="t3Headline" tabindex="-1">' + esc(String(p.headline || p.summary || vt('yourPlan')).replace(/\.$/, '')) + '</h2>'
       + '<p class="v4-sub">' + esc(sub) + '</p><button type="button" class="v4-edit" data-v4-edit>✎ ' + esc(vt('edit')) + '</button></header>'
       + (p.eventAmbiguity ? '<section class="t3-warnings" role="alert"><p>' + esc(fr ? 'Plusieurs événements correspondent à «' + p.eventAmbiguity.phrase + '». Choisissez :' : 'More than one listed event matches “' + p.eventAmbiguity.phrase + '”. Choose one:') + '</p><div class="t3-event-choices">' + p.eventAmbiguity.candidates.map(function(name, i){ var cid = p.eventAmbiguity.candidateIds && p.eventAmbiguity.candidateIds[i]; return Number.isSafeInteger(cid) && cid > 0 ? '<button type="button" class="t3-btn t3-btn-ghost" data-t3-event-choice="' + cid + '">' + esc(name) + '</button>' : ''; }).join('') + '</div></section>' : '')
-      + ((p.notIncluded || []).slice(0, 3).map(function(x){ var t = (fr && x.textFr) || x.text; return t ? '<p class="v4-tip v4-picked v4-notinc">' + esc(t) + '</p>' : ''; }).join(''))
+      // (2026-11-24) The place it names as nearest can be added from here: one small button, which asks the chat for
+      // exactly that listing (its id). Only with the chat on the page; the chat does the same when asked in words.
+      + ((p.notIncluded || []).slice(0, 3).map(function(x){ var t = (fr && x.textFr) || x.text; var nid = x.nearest && Number(x.nearest.id) > 0 && typeof chatSend === 'function' && planKinds ? Number(x.nearest.id) : 0; return t ? '<p class="v4-tip v4-picked v4-notinc">' + esc(t) + (nid ? ' <button type="button" class="v4-notinc-add" data-v4-offer="' + esc(String(x.nearest.name || '').replace(/[\[\]]/g, ' ') + ' [add ' + nid + ']') + '" aria-label="' + esc((fr ? 'Ajouter ' : 'Add ') + String(x.nearest.name || '')) + '">' + (fr ? 'L’ajouter' : 'Add it') + '</button>' : '') + '</p>' : ''; }).join(''))
       // Group preferences (2026-11-22): one person's need ("one of us doesn't drink") and what the listings say about it.
       + (p.partyNote && ((fr && p.partyNote.textFr) || p.partyNote.text) ? '<p class="v4-tip v4-picked v4-partynote">' + esc((fr && p.partyNote.textFr) || p.partyNote.text) + '</p>' : '')
       // Honest plan (2026-11-22): one short line per ask the listings only partly support or cannot show (plan.evidence).

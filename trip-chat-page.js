@@ -314,6 +314,9 @@ function chatClientSrc(d) {
     if (chip) body.chip = chip; else body.message = message;
     if (confirmed) body.confirmed = true;
     if (chat.lastDiff) body.last = chat.lastDiff;
+    // (2026-11-24) The places the plan on screen itself names as nearest (kind and listing id): "add the one you
+    // suggested" is then exactly the place the summary shows.
+    try { body.suggested = ((state.last && state.last.notIncluded) || []).filter(function(x){ return x && x.nearest && Number(x.nearest.id) > 0 && /^[a-z_]{2,24}$/.test(String(x.kind || '')); }).slice(0, 3).map(function(x){ return x.kind + ':' + Number(x.nearest.id); }); } catch (e) { /* worked out by the server */ }
     if (!chip && chat.offer && chat.offer.length) body.offer = chat.offer.slice(0, 3);
     // (2026-11-24) The arrival-time question the plan itself shows under that day (trip-late-arrival.js) is the open
     // question when the chat is asking nothing else: a bare "2 pm" is then read as its answer.
@@ -339,6 +342,8 @@ function chatClientSrc(d) {
         // Fix round (2026-11-22): a new plan only when a stop changed ("The plan already fits that" changes nothing and
         // shows no Undo); the place to stay alone comes back as stayBlock and never touches the stops.
         if (j.plan && j.req && changed.length) {
+          // (2026-11-24) One stop added or swapped in from the next town: the trip keeps the name it had (keepHead).
+          if (j.keepHead && state.last && typeof state.last.headline === 'string' && state.last.headline) j.plan.headline = state.last.headline;
           state.text = j.req.text; state.seed = j.req.seed; state.overrides = j.req.overrides || {}; state.exclude = (j.req.excludeVenueIds || []).slice(); state.locks = j.req.locks || {}; chat.soft = j.req.soft || {}; chat.tourStops = j.req.tourStops || [];
           state.removed = {}; v4.gone = {}; state.last = j.plan;
           state.lastReq = { seed: j.req.seed, overrides: j.req.overrides || {}, exclude: (j.req.excludeVenueIds || []).slice(), pinned: j.req.pinned || null, avoid: j.req.avoidVenueIds || [] };
