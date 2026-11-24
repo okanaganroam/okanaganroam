@@ -23664,7 +23664,7 @@ function withMobileLanguageItem(html) {
 const BMT_TRACK_SCRIPT = `<script>
 (function(){
   // Where on the page each Build My Trip link sits, read from the link itself.
-  var PLACEMENTS = [['#navTripBtn', 'header'], ['.nav-links-trip a', 'menu'], ['#tripCtaOpenTrip', 'homepage_section']];
+  var PLACEMENTS = [['#navTripBtn', 'header'], ['.nav-links-trip a', 'menu'], ['#tripCtaOpenTrip', 'homepage_section'], ['#heroTripCard', 'hero']];
   document.addEventListener('click', function(e){
     try {
       var t = e.target;

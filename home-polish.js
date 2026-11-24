@@ -28,6 +28,11 @@ const css = `
 /* ---- live blocks: Roam Now and Happy Hour Now ---- */
 #homeSimple .hero-actions{gap:14px}
 #homeSimple .hero-action{position:relative;min-width:290px;padding:16px 20px;gap:14px;border-radius:18px;color:#fff;background:#ffffff24;border:1px solid #ffffff47;box-shadow:0 14px 34px -18px #0e1f28cc;-webkit-backdrop-filter:blur(16px) saturate(150%);backdrop-filter:blur(16px) saturate(150%);transition:transform .35s ${EASE},background-color .35s,border-color .35s,box-shadow .35s ${EASE};will-change:transform}
+/* Build My Trip card: one wide card under the two live cards, exactly as wide as the pair. width:0 +
+   min-width:100% keeps its long line from widening the two columns above it. */
+#homeSimple .hero-actions{display:grid;grid-template-columns:repeat(2,minmax(290px,max-content))}
+#homeSimple .hero-action.wide{grid-column:1/-1;width:0;min-width:100%}
+#homeSimple .hero-action.wide small{line-height:1.45;text-wrap:pretty}
 #homeSimple .hero-action.gold{background:#e6c56b38;border-color:#f1dda180}
 #homeSimple .hero-action:hover{transform:translateY(-3px);background:#ffffff38;border-color:#ffffff8c;box-shadow:0 22px 44px -18px #0e1f28e6}
 #homeSimple .hero-action.gold:hover{background:#e6c56b57;border-color:#f1dda1cc}
@@ -236,6 +241,8 @@ const css = `
 #homeSimple .hero-action b{font-size:15px;gap:8px}
 #homeSimple .hero-action .symbol,#homeSimple .hero-action .go{display:none}
 #homeSimple .hero-action small{font-size:12px;line-height:1.4;margin-top:6px}
+#homeSimple .hero-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+#homeSimple .hero-action.wide{width:auto;min-width:0}
 #homeSimple .hero-note{font-size:12px!important;margin-top:16px!important}
 #homeSimple .proof{padding:14px 10px}
 #homeSimple .home-stats li{padding:0 16px}

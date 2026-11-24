@@ -15901,7 +15901,7 @@ test('Build My Trip is a permanent header button (no strip under the header), fi
   for (const bit of STRIP_LEFTOVERS) assert.ok(!home.includes(bit), `the strip is gone from the homepage (${bit})`);
   // One listener reports through the page's own trackEvent, with the three placements.
   assert.equal(count(home, "window.trackEvent('build_my_trip_click'"), 1);
-  assert.ok(home.includes("[['#navTripBtn', 'header'], ['.nav-links-trip a', 'menu'], ['#tripCtaOpenTrip', 'homepage_section']]"));
+  assert.ok(home.includes("[['#navTripBtn', 'header'], ['.nav-links-trip a', 'menu'], ['#tripCtaOpenTrip', 'homepage_section'], ['#heroTripCard', 'hero']]"));
   assert.ok(home.includes("destination: '/trip'"));
   // Shell pages carry the same header style and listener, and no strip.
   for (const p of ['/browse', '/food-drink', '/hidden-gems', '/kelowna']) {
@@ -20784,6 +20784,12 @@ test('Near-me map: patio, dogs and the rest ship as feature bits; plain words be
   assert.match(src, /navigator\.permissions\.query\(\{ name: 'geolocation' \}\)/, 'Near me starts by itself only when already allowed');
   const home = await (await fetch(`${base}/`)).text();
   assert.match(home, /<a class="hero-action" href="\/map#near-me">/);
+  // Build My Trip hero card (2026-11-24): one wide card under Roam Now and Happy Hour Now, both languages, straight to /trip.
+  assert.match(home, /<a class="hero-action wide" id="heroTripCard" href="\/trip">/);
+  assert.ok(home.includes('<b><span class="home-en">Build My Trip</span><span class="home-fr" lang="fr">Planifier mon voyage</span></b>'));
+  assert.ok(home.includes('Chat with our AI travel agent to build a custom itinerary') && home.includes('Discutez avec notre agent de voyage IA'));
+  assert.ok(home.indexOf('id="heroTripCard"') > home.indexOf('href="/map?show=happy-hour"') && home.indexOf('id="heroTripCard"') < home.indexOf('class="hero-note"'), 'after the two live cards, before the note');
+  assert.match(home, /#homeSimple \.hero-action\.wide\{grid-column:1\/-1;width:0;min-width:100%\}/);
   const manifest = await (await fetch(`${base}/site.webmanifest`)).json();
   assert.equal(manifest.shortcuts[0].url, '/map#near-me');
 }));
