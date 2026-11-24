@@ -20,7 +20,9 @@ const TOUR_KINDS = {
   wine_tour: { en: 'a wine tour', fr: 'un tour des vignobles', types: ['tour'], words: ['wine tour', 'wine tours', 'winery tour', 'wine country tour'], covers: ['winery'], minutes: 240, re: /\b(?:wine|winery|vineyard) tours?\b|\b(?:tours?|tournees?|visites?) (?:de|des|du) (?:vignobles?|vins?)\b/ },
   brewery_tour: { en: 'a brewery tour', fr: 'un tour des microbrasseries', types: ['tour'], words: ['brewery tour', 'craft tour', 'beer tour', 'craft beer'], covers: ['brewery'], minutes: 210, re: /\b(?:brewery|beer|craft beer) tours?\b|\btours? (?:de|des) (?:microbrasseries|bieres?)\b/ },
   food_tour: { en: 'a food tour', fr: 'un tour gourmand', types: ['tour'], words: ['food tour', 'tasting tour', 'culinary'], minutes: 180, re: /\b(?:food|foodie|culinary|tasting) tours?\b|\btours? (?:gourmands?|culinaires?)\b/ },
-  boat_tour: { en: 'a boat cruise', fr: 'une croisière', types: ['tour'], words: ['cruise', 'boat', 'charter', 'pontoon', 'yacht'], minutes: 120, re: /\bboat (?:cruises?|tours?|rides?|rentals?|charters?|trips?)\b|\b(?:lake )?cruises?\b|\bcroisieres?\b|\bpontoons?\b|\btours? (?:de|en) bateau\b/ },
+  // (2026-11-24) A guided boat tour: a crewed tour, cruise or charter by the listing's own facts (trip-requirements.js
+  // boatTourListing; listed under tours or outdoors). A boat rental is not one, and asking for a rental is not asking for one.
+  boat_tour: { en: 'a guided boat tour', fr: 'une excursion guidée en bateau', types: ['tour', 'outdoor'], words: ['cruise', 'boat', 'charter', 'pontoon', 'yacht', 'sail'], minutes: 120, re: /\b(?:guided )?boat (?:cruises?|tours?|rides?|charters?|trips?)\b|\b(?:lake |sunset |pontoon )?cruises?\b|\bcroisieres?\b|\bpontoon (?:tours?|rides?)\b|\b(?:tours?|excursions?|balades?) (?:guidees? )?(?:de|en) bateau\b/ },
   kayak: { en: 'kayaking or paddling', fr: 'du kayak ou de la planche à pagaie', types: TOUR_TYPES, words: ['kayak', 'paddle', 'canoe'], minutes: 120, re: /\b(?:kayak\w*|paddle ?board\w*|canoe\w*|canot)\b/ },
   snowmobile: { en: 'a snowmobile tour', fr: 'une excursion en motoneige', types: TOUR_TYPES, words: ['snowmobil', 'motoneige'], minutes: 180, re: /\b(?:snowmobil\w*|sledding tours?|motoneiges?)\b/ },
   zipline: { en: 'ziplining', fr: 'de la tyrolienne', types: TOUR_TYPES, words: ['zip'], minutes: 150, re: /\b(?:zip ?lin\w*|zip tours?|tyroliennes?)\b/ },
@@ -73,18 +75,18 @@ function readAll(message, read) {
   if (!reads.every((r) => (r.ops || []).length && !(r.ops || []).some((o) => o.o === 'refine'))) {
     // One part is a clear "can't" or was not read: the whole message's reading stands, unless it read less.
     const some = reads.filter((r) => (r.ops || []).length && !(r.ops || []).some((o) => o.o === 'refine'));
-    const missed = reads.filter((r) => !(r.ops || []).length && ['not_found', 'booking', 'ask_which', 'time_at', 'weather', 'days_max', 'days_min', 'q_none', 'q_missing'].includes(r.cant)).map((r) => ({ cant: r.cant, what: r.what || null }));
+    const missed = reads.filter((r) => !(r.ops || []).length && ['not_found', 'booking', 'ask_which', 'time_at', 'weather', 'days_max', 'days_min', 'q_none', 'q_missing', 'at_none', 'at_which', 'excluded_kind'].includes(r.cant)).map((r) => ({ cant: r.cant, what: r.what || null, ...(r.said ? { said: r.said } : {}) }));
     // Every part read (some as a plain "can't"): the parts stand. A part not read at all: the whole message's reading, unless the parts read more.
     const allRead = some.length + missed.length === reads.length;
     if (!some.length || (some.length + missed.length < 2) || (!allRead && (whole.ops || []).length >= some.reduce((n, r) => n + r.ops.length, 0))) return whole;
     const ops2 = [];
     for (const r of some) for (const o of r.ops) if (!ops2.some((x) => opSig(x) === opSig(o))) ops2.push(o);
     // Every part was read (some as a plain "can't", said in the reply): the rules stand. A part not read at all: the AI may know better.
-    return { ops: ops2.slice(0, 8), cant: null, multi: some.length + missed.length, missed, ...(some.length + missed.length < reads.length ? { partial: true } : {}) };
+    return { ops: ops2.slice(0, 8), cant: null, multi: some.length + missed.length, missed, ...(some.length + missed.length < reads.length ? { partial: true } : {}), ...(reads.some((r) => r.access) && allRead ? { exact: true, access: true } : {}) };
   }
   const ops = [];
   for (const r of reads) for (const o of r.ops) if (!ops.some((x) => opSig(x) === opSig(o))) ops.push(o);
-  return { ops: ops.slice(0, 8), cant: null, multi: reads.length, exact: reads.some((r) => r.exact) };
+  return { ops: ops.slice(0, 8), cant: null, multi: reads.length, exact: reads.some((r) => r.exact), ...(reads.some((r) => r.access) ? { access: true } : {}) };
 }
 
 // ---------- Word rules for the new abilities (English and French; t is the folded message) ----------

@@ -950,7 +950,10 @@ const V4_CLIENT_SRC = String.raw`
       var ni = [];
       (p.notIncluded || []).forEach(function(x){
         if (!x || typeof x.kind !== 'string' || !/^[a-z][a-z_]{1,29}$/.test(x.kind) || (x.reason !== 'none_listed' && x.reason !== 'not_fitted')) return;
-        if (asks.indexOf('kind:' + x.kind) !== -1 || asks.indexOf('type:' + x.kind) !== -1 || ni.some(function(t){ return t.split(':')[0] === x.kind; })) return;
+        // (2026-11-24) A kind the evidence carries as NOT in the plan (asks=kind:boat_tour) keeps its own line too, so the
+        // copy says the same sentence as the plan ("There’s no guided boat tour listed in Peachland… The nearest is…").
+        var unmetAsk = (p.evidence || []).some(function(e){ return e && e.ask === 'kind:' + x.kind && e.status === 'unmet'; });
+        if ((asks.indexOf('kind:' + x.kind) !== -1 && !unmetAsk) || asks.indexOf('type:' + x.kind) !== -1 || ni.some(function(t){ return t.split(':')[0] === x.kind; })) return;
         var nid = x.nearest && x.nearest.id > 0 && x.nearest.id < 1e7 ? ':' + x.nearest.id : '';
         ni.push(x.kind + ':' + (x.reason === 'none_listed' ? 'n' : 'f') + nid);
       });
@@ -1024,6 +1027,9 @@ const V4_CLIENT_SRC = String.raw`
     // Share suggestions (2026-11-23): what the plan could not include, in its own words (at most three lines).
     var left = ((state.last && state.last.notIncluded) || []).filter(function(x){ return x && x.text && (x.reason === 'none_listed' || x.reason === 'not_fitted'); }).slice(0, 3);
     if (left.length) { lines.push(''); left.forEach(function(x){ lines.push((fr && x.textFr) || x.text); }); }
+    // (2026-11-24, trip-exclusions.js) A kind of place the traveller ruled out ("Avoiding wineries: …"), in the plan's own words.
+    var ruled = ((state.last && state.last.evidence) || []).filter(function(e){ return e && /^no:[a-z_]+$/.test(e.ask || '') && e.text; }).slice(0, 2);
+    if (ruled.length) { if (!left.length) lines.push(''); ruled.forEach(function(e){ lines.push((fr && e.textFr) || e.text); }); }
     // (Without the tick, each stop's allergy note is the general one: no allergen is named in the copied text.)
     if (alAnon) lines = lines.map(alHide);
     return lines.join('\n');
