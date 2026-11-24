@@ -211,6 +211,14 @@ const css = `
 #homeSimple .wrap>.section,#homeSimple .trip-banner{animation:homeFadeUp linear both;animation-timeline:view();animation-range:entry 0% entry 32%}
 }
 
+/* Shorter laptop screens (2026-11-24): the hero carries three cards now, so it gives back some padding and the stats bar stays in view. */
+@media(min-width:701px) and (max-height:900px){
+#homeSimple .hero{padding:56px 24px 36px}
+#homeSimple .hero h1{margin:14px auto 12px}
+#homeSimple .quick-search{margin:24px auto 18px}
+#homeSimple .hero-note{margin-top:14px!important}
+}
+
 /* ---- tablet ---- */
 @media(max-width:1023px){
 #homeSimple .bento{grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:220px}
