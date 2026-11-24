@@ -123,12 +123,58 @@ function chatClientSrc(d) {
   // ---------- Travel agent chat (trip-chat-page.js) ----------
   var CHAT_URL = '/api/trip/chat${qs ? `?${qs}` : ''}';
   var CHAT_T = {
-    en: { label: 'Tell us what to change', ph: 'Tell me what to change…', send: 'Send', thinking: 'Thinking…', undo: 'Undo', undone: 'Undone. Your plan is back.', kept: 'OK, your plan stays as it is.', err: 'Something went wrong. Your plan is unchanged.', you: 'You: ',
+    en: { label: 'Tell us what to change', ph: 'Tell me what to change…', send: 'Send', thinking: 'Thinking…', undo: 'Undo', undoDates: 'Undo dates', undoStay: 'Undo stay change', undoRooms: 'Undo rooms', undoSwap: 'Undo swap: {name} back', undoneDates: 'Undone: your stay dates are as they were before. Your stops are unchanged.', undoneStay: 'Undone: your stay is as it was before. Your stops are unchanged.', undoneRooms: 'Undone: your rooms are as they were before. Your stops are unchanged.', undoneSwap: 'Undone: {name} is back.', noUndo: 'There’s nothing to undo right now.', undone: 'Undone. Your plan is back.', kept: 'OK, your plan stays as it is.', err: 'Something went wrong. Your plan is unchanged.', you: 'You: ',
       chips: [['cheaper', 'Cheaper'], ['kids', 'More for kids'], ['slower', 'Slower pace']] },
-    fr: { label: 'Dites-nous quoi changer', ph: 'Dites-moi quoi changer…', send: 'Envoyer', thinking: 'Je regarde…', undo: 'Annuler', undone: 'Annulé. Votre plan est revenu.', kept: 'D’accord, votre plan reste tel quel.', err: 'Un problème est survenu. Votre plan n’a pas changé.', you: 'Vous : ',
+    fr: { label: 'Dites-nous quoi changer', ph: 'Dites-moi quoi changer…', send: 'Envoyer', thinking: 'Je regarde…', undo: 'Annuler', undoDates: 'Annuler les dates', undoStay: 'Annuler le changement d’hébergement', undoRooms: 'Annuler les chambres', undoSwap: 'Annuler l’échange : remettre {name}', undoneDates: 'Annulé : vos dates de séjour sont comme avant. Vos arrêts n’ont pas changé.', undoneStay: 'Annulé : votre hébergement est comme avant. Vos arrêts n’ont pas changé.', undoneRooms: 'Annulé : vos chambres sont comme avant. Vos arrêts n’ont pas changé.', undoneSwap: 'Annulé : {name} est de retour.', noUndo: 'Il n’y a rien à annuler pour l’instant.', undone: 'Annulé. Votre plan est revenu.', kept: 'D’accord, votre plan reste tel quel.', err: 'Un problème est survenu. Votre plan n’a pas changé.', you: 'Vous : ',
       chips: [['cheaper', 'Moins cher'], ['kids', 'Plus pour les enfants'], ['slower', 'Plus relax']] }
   };
-  var chat = { busy: false, undo: null, used: false, goneEvents: {}, queue: null, wineTour: null };
+  var chat = { busy: false, undo: null, used: false, goneEvents: {}, queue: null, wineTour: null, ageAsk: {}, swapBacks: [], undoKind: '' };
+  // (2026-11-24) A stop chosen in the chat for an age the traveller gave, whose listing gives no ages: the note the
+  // server worded, kept by listing id for as long as that stop is on the plan (cards, Book my trip, share link, copy).
+  function v4AgeAsk(id){ return (chat.ageAsk && chat.ageAsk[id]) || null; }
+  // A swap made earlier that can still be undone on the plan as it is now: its new stop is still in its slot and the
+  // stop it replaced is not on the plan. The newest such swap, or null.
+  function chatSwapBack(){
+    for (var i = (chat.swapBacks || []).length - 1; i >= 0; i--) {
+      var sb = chat.swapBacks[i], at = null, oldOn = false;
+      try { at = stopAt(sb.key); days().forEach(function(d){ d.stops.forEach(function(s){ if (s.venue && s.venue.id === sb.oldId && !state.removed[d.day + '-' + s.daypart]) oldOn = true; }); }); } catch (e) { at = null; }
+      if (at && at.venue && at.venue.id === sb.newId && !state.removed[sb.key] && !oldOn) return sb;
+    }
+    return null;
+  }
+  // The Undo beside the last reply undoes that reply's change; its label says which when it is not a change of stops.
+  function chatUndoLabel(){ return chat.undoKind === 'dates' ? ct('undoDates') : chat.undoKind === 'stay' ? ct('undoStay') : chat.undoKind === 'rooms' ? ct('undoRooms') : ct('undo'); }
+  // An earlier swap, when the Undo beside the reply is not for it (or is gone): its own button, named.
+  function chatBackButton(){
+    var sb = chatSwapBack();
+    if (!sb || (chat.undo && chat.undoKind === 'swap:' + sb.newId)) return '';
+    return '<button type="button" class="v4-chat-act" data-v4-swap-back>' + esc(ct('undoSwap').replace('{name}', sb.oldName)) + '</button>';
+  }
+  function chatActsShow(choices){
+    var actsEl = document.getElementById('v4ChatActs'); if (!actsEl) return;
+    var ch = (choices || []).filter(function(c){ return c && c.label && ((c.kind === 'view' && typeof c.url === 'string' && /^\/(?!\/)/.test(c.url)) || (c.kind === 'say' && typeof c.say === 'string' && c.say)); }).slice(0, 2);
+    var html = ch.map(function(c){
+      return c.kind === 'view' ? '<a class="v4-chat-act" href="' + esc(c.url) + '" target="_blank" rel="noopener" data-v4-chat-view>' + esc(c.label) + ' <span aria-hidden="true">&nbsp;↗</span></a>'
+        : '<button type="button" class="v4-chat-act is-main" data-v4-offer="' + esc(c.say) + '">' + esc(c.label) + '</button>';
+    }).join('') + (chat.busy ? '' : chatBackButton());
+    actsEl.innerHTML = html; actsEl.hidden = !html;
+  }
+  function chatUndoSwapBack(typed){
+    var sb = chatSwapBack(); if (!sb) return false;
+    chat.offer = [sb.say];
+    chatSend(sb.say, null, typed || ct('undoSwap').replace('{name}', sb.oldName), false, true);
+    return true;
+  }
+  function chatUndoTop(typed){
+    if (!chat.undo) return false;
+    var snap = chat.undo, kind = chat.undoKind, sb = chatSwapBack();
+    chat.undo = null; chat.undoKind = ''; chat.lastDiff = null; chat.pending = null; chat.offer = null;
+    chatRestore(snap);
+    var said = kind === 'dates' ? ct('undoneDates') : kind === 'stay' ? ct('undoneStay') : kind === 'rooms' ? ct('undoneRooms') : kind && sb && kind === 'swap:' + sb.newId ? ct('undoneSwap').replace('{name}', sb.oldName) : ct('undone');
+    chatShow(typed || '', said, {});
+    track('trip_chat', { chat_source: 'undo', changed: 'yes' });
+    return true;
+  }
   // The events on the plan (rows the planner adds; they have no Swap): ids only.
   function chatEventIds(){
     var out = [];
@@ -174,18 +220,10 @@ function chatClientSrc(d) {
     box.hidden = false;
     box.querySelector('.v4-chat-you').textContent = you ? ct('you') + you : '';
     box.querySelector('.v4-chat-agent span').textContent = agent || '';
-    var u = box.querySelector('[data-v4-chat-undo]'); if (u) u.hidden = !opts.undo;
+    var u = box.querySelector('[data-v4-chat-undo]'); if (u) { u.hidden = !opts.undo; u.textContent = opts.undo ? chatUndoLabel() : ct('undo'); }
     // The reply's own buttons (server: choices): the place's listing page in a new tab (the plan stays open), and the
-    // offer itself as one tap. Gone with the next reply.
-    var actsEl = document.getElementById('v4ChatActs');
-    if (actsEl) {
-      var ch = (opts.choices || []).filter(function(c){ return c && c.label && ((c.kind === 'view' && typeof c.url === 'string' && /^\/(?!\/)/.test(c.url)) || (c.kind === 'say' && typeof c.say === 'string' && c.say)); }).slice(0, 2);
-      actsEl.innerHTML = ch.map(function(c){
-        return c.kind === 'view' ? '<a class="v4-chat-act" href="' + esc(c.url) + '" target="_blank" rel="noopener" data-v4-chat-view>' + esc(c.label) + ' <span aria-hidden="true">&nbsp;↗</span></a>'
-          : '<button type="button" class="v4-chat-act is-main" data-v4-offer="' + esc(c.say) + '">' + esc(c.label) + '</button>';
-      }).join('');
-      actsEl.hidden = !ch.length;
-    }
+    // offer itself as one tap. Gone with the next reply. (2026-11-24) And an earlier swap that can still be undone.
+    chatActsShow(opts.choices);
     var chips = document.getElementById('v4Chips'); if (chips && chat.used) chips.hidden = true;
     var c = document.getElementById('v4Chat'); if (c) c.classList.toggle('is-busy', !!opts.busy);
     // Round 6: two lines, a tap shows the rest; an old "… was removed" status line goes; on a wide screen the latest
@@ -223,12 +261,16 @@ function chatClientSrc(d) {
     if ((chat.tourStops || []).length) body.tourStops = chat.tourStops;
     return body;
   }
-  function chatSnapshot(){ return JSON.stringify({ last: state.last, lastReq: state.lastReq, text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude, removed: state.removed, gone: v4.gone, stayPref: chat.stayPref, noStay: chat.noStay, transport: chat.transport, goneEvents: chat.goneEvents, wineTour: chat.wineTour, stayForce: chat.stayForce, stayArrive: chat.stayArrive, tourStops: chat.tourStops, rooms: (document.getElementById('t3Rooms') || {}).value || '' }); }
+  function chatSnapshot(){ return JSON.stringify({ last: state.last, lastReq: state.lastReq, text: state.text, seed: state.seed, overrides: state.overrides, locks: state.locks, exclude: state.exclude, removed: state.removed, gone: v4.gone, stayPref: chat.stayPref, noStay: chat.noStay, transport: chat.transport, goneEvents: chat.goneEvents, wineTour: chat.wineTour, stayForce: chat.stayForce, stayArrive: chat.stayArrive, tourStops: chat.tourStops, ageAsk: chat.ageAsk, swapBacks: chat.swapBacks, rooms: (document.getElementById('t3Rooms') || {}).value || '',
+    // (2026-11-24) The stay's own dates as the page holds them: an Undo of "Use these dates" left them in the date fields,
+    // so the next message confirmed them again.
+    arrive: (document.getElementById('t3Arrive') || {}).value || '', leave: (document.getElementById('t3Leave') || {}).value || '' }); }
   function chatRestore(snap){
     var o = JSON.parse(snap);
     state.last = o.last; state.lastReq = o.lastReq; state.text = o.text; state.seed = o.seed; state.overrides = o.overrides || {}; state.locks = o.locks || {}; state.exclude = o.exclude || []; state.removed = o.removed || {}; v4.gone = o.gone || {};
-    chat.stayPref = o.stayPref; chat.noStay = !!o.noStay; chat.transport = o.transport || null; chat.goneEvents = o.goneEvents || {}; chat.wineTour = o.wineTour || null; chat.stayForce = !!o.stayForce; chat.stayArrive = o.stayArrive || null; chat.tourStops = o.tourStops || [];
+    chat.stayPref = o.stayPref; chat.noStay = !!o.noStay; chat.transport = o.transport || null; chat.goneEvents = o.goneEvents || {}; chat.wineTour = o.wineTour || null; chat.stayForce = !!o.stayForce; chat.stayArrive = o.stayArrive || null; chat.tourStops = o.tourStops || []; chat.ageAsk = o.ageAsk || {}; chat.swapBacks = o.swapBacks || [];
     var rmEl = document.getElementById('t3Rooms'); if (rmEl) rmEl.value = o.rooms || '';
+    var arEl = document.getElementById('t3Arrive'), lvEl = document.getElementById('t3Leave'); if (arEl && lvEl && o.arrive !== undefined) { arEl.value = o.arrive || ''; lvEl.value = o.leave || ''; }
     v4.confirmed = false; v4.saved = false;
     chat.rendering = true; try { render(false); } finally { chat.rendering = false; } syncUrl();
   }
@@ -345,9 +387,16 @@ function chatClientSrc(d) {
         // as it is now); only Save is offered again.
         if (touched) { v4.confirmed = wasConfirmed; v4.saved = false; chat.rendering = true; try { render(false); } finally { chat.rendering = false; } syncUrl(); }
         chat.undo = planTouched ? snap : null;
+        // An "Undone" turn has no Undo of its own.
+        if (j.back) chat.undo = null;
+        // (2026-11-24) What this reply's Undo undoes: the stay's dates, the stay, the rooms, or a change of stops.
+        chat.undoKind = !chat.undo ? '' : j.stayDates ? 'dates' : (j.party && j.party.rooms && !(j.plan && j.req && changed.length)) ? 'rooms' : (!(j.plan && j.req && changed.length) && (j.stayBlock || j.stayPref !== undefined)) ? 'stay' : j.swapBack ? 'swap:' + j.swapBack.newId : 'stops';
+        if (j.swapBack && j.swapBack.say && j.plan) { chat.swapBacks = (chat.swapBacks || []).filter(function(x){ return x.key !== j.swapBack.key; }).concat([j.swapBack]).slice(-6); }
+        (Array.isArray(j.ageAsk) ? j.ageAsk : []).forEach(function(a){ if (a && a.id > 0 && a.short) { chat.ageAsk[a.id] = a; touched = true; } });
+        if (Array.isArray(j.ageAsk) && j.ageAsk.length && j.plan) { chat.rendering = true; try { render(false); } finally { chat.rendering = false; } }
         // Round 4: the answer to a message sent while this one was loading is shown after this one's (it vanished).
         var said = (chat.carry ? chat.carry + ' ' : '') + (j.reply || ct('err')); chat.carry = hadQueue ? said : null;
-        chatShow(you, said, { undo: planTouched, choices: Array.isArray(j.choices) ? j.choices : null });
+        chatShow(you, said, { undo: !!chat.undo, choices: Array.isArray(j.choices) ? j.choices : null });
         if (touched) chatGlow(changed);
         track('trip_chat', { chat_source: /^(ai|rules|chip)$/.test(j.source || '') ? j.source : 'other', changed: touched ? 'yes' : 'no' });
       })
@@ -359,6 +408,17 @@ function chatClientSrc(d) {
     var inEl = document.getElementById('v4ChatIn'), text = inEl ? inEl.value.replace(/\s+/g, ' ').trim() : '';
     if (!text) { if (inEl) inEl.focus(); return; }
     // Fix round (2026-11-22: the next message was typed onto the last one): cleared as soon as it is sent.
+    // (2026-11-24) "undo" typed: the change beside the last reply (said by name); "undo the swap": the swap, on the plan
+    // as it is now. With nothing to undo, said.
+    var undoM = /^(?:undo|annuler?|annule[rz]?)(?:\s+(?:the\s+|that\s+|my\s+|le\s+|la\s+|l['’]\s*)?(swap|[eé]change|change|last change|changement|that|it|dates?|stay|rooms?))?[\s.!]*$/i.exec(text);
+    if (undoM && !chat.busy) {
+      if (inEl) inEl.value = '';
+      var wantSwap = /^(?:swap|[eé]change)$/i.test(undoM[1] || '');
+      if (wantSwap && chatSwapBack() && !(chat.undo && chat.undoKind === 'swap:' + chatSwapBack().newId)) { chatUndoSwapBack(text); return; }
+      if (chatUndoTop(text)) return;
+      if (chatUndoSwapBack(text)) return;
+      chatShow(text, ct('noUndo'), {}); return;
+    }
     if (inEl) inEl.value = '';
     var pend = chat.pending;
     if (pend) {
@@ -377,7 +437,8 @@ function chatClientSrc(d) {
     if ((b = t.closest('[data-v4-offer]'))) { chatSend(String(b.getAttribute('data-v4-offer') || '').slice(0, 400), null, b.textContent, false, true); return; }
     if ((b = t.closest('[data-v4-say]'))) { chatSend(String(b.getAttribute('data-v4-say') || '').slice(0, 400), null, b.textContent); return; }
     if ((b = t.closest('#v4ChatReply.is-long')) && !t.closest('[data-v4-chat-undo]')) { b.classList.add('is-open'); chatPad(); return; }
-    if ((b = t.closest('[data-v4-chat-undo]')) && chat.undo) { var snap = chat.undo; chat.undo = null; chat.lastDiff = null; chat.pending = null; chat.offer = null; chatRestore(snap); chatShow('', ct('undone'), {}); track('trip_chat', { chat_source: 'undo', changed: 'yes' }); }
+    if ((b = t.closest('[data-v4-swap-back]'))) { chatUndoSwapBack(''); return; }
+    if ((b = t.closest('[data-v4-chat-undo]')) && chat.undo) { chatUndoTop(''); }
   });
 
   // ---------- Agent round (2026-11-22): the agent speaks; stay and getting here in the plan; Confirm at the end ----------
@@ -601,7 +662,8 @@ function chatClientSrc(d) {
     if (!chat.rendering && !chat.busy) {
       chat.undo = null;
       var box = document.getElementById('v4ChatReply');
-      if (box) { if (chat.pendingNote) chatShow('', chat.pendingNote, {}); else box.hidden = true; }
+      chat.undoKind = '';
+      if (box) { if (chat.pendingNote) chatShow('', chat.pendingNote, {}); else { box.hidden = true; chatActsShow(null); } }
       chat.pendingNote = null;
       chatPad();
     }

@@ -9027,6 +9027,26 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // trip's rules really ruled out (r.nofit, worded by trip-chat.js), and the nearest one in another town as an offer
   // that is asked first (swapAsk: one per turn).
   let swapAsk = null;
+  // (2026-11-24) The planner's own pick was in another town while the town still has a listing of that kind that is
+  // not on the plan: that one is tried in the slot first (nothing else moving), and used when it fits. Only then is a
+  // place elsewhere offered.
+  try {
+    const rs = (out && out.results) || [];
+    const r0 = rs.length === 1 && !out.plan && !v.chip ? rs[0] : null;
+    if (r0 && r0.op === 'replace' && !r0.ok && r0.elsewhere && r0.kind && r0.old && !r0.featAsked) {
+      const hit = tripChatInTownSwap(r0, { v, stops, run, short });
+      if (hit) {
+        const shown0 = stops.filter((s) => !v.removed.includes(s.key));
+        const Lk = {}, Sk = {};
+        for (const s of shown0) { if (s.id === r0.old.id) continue; if ((v.locks || {})[s.key] === s.id) Lk[s.key] = s.id; else if ((v.soft || {})[s.key] === s.id) Sk[s.key] = s.id; }
+        Sk[r0.old.key] = hit.x.id;
+        out.plan = hit.done.plan; out.changed = [r0.old.key];
+        out.req = { text: v.args.text, seed: v.args.seed || 0, overrides: hit.done.args.overrides || {}, excludeVenueIds: hit.done.args.excludeVenueIds || [], avoidVenueIds: v.args.avoidVenueIds || [], pinned: hit.done.pinned, locks: Lk, soft: Sk, ...((v.args.tourStops || []).length ? { tourStops: v.args.tourStops } : {}) };
+        r0.ok = true; r0.fresh = hit.done.nw.find((s) => s.key === r0.old.key); delete r0.why; delete r0.elsewhere;
+        if (r0.age) r0.ageSays = tripChatAgeNote(hit.x.id, r0.age, lang === 'fr' ? 'fr' : 'en');
+      }
+    }
+  } catch (e) { /* the offer below stands */ }
   try { for (const r of (out && out.results) || []) { if (r && r.op === 'replace' && !r.ok && !r.already && (r.kind || r.elsewhere) && r.old && !r.featAsked && r.why !== 'conflict') { const nf = tripChatSwapNoFit(r, { v, stops, lang, run, short, canOffer: !swapAsk && !v.chip }); if (nf) { if (nf.nofit) r.nofit = nf.nofit; if (nf.ask) swapAsk = nf.ask; } } } } catch (e) { /* the plain line stands */ }
   let reply = planOps.length ? tripChat.buildReply(out, { lang, regionLabels: REGION_LABELS, cant, asks }) : '';
   // (2026-11-24) A lighter-day removal that leaves the day with no activity: said plainly, with the way back. The
@@ -9075,6 +9095,15 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // Every stay op of the message is one change to the place to stay (one reply, one look-up).
   const stayOps = extra.filter((o) => o.o === 'stay');
   const tails = [];
+  // (2026-11-24) A swap made this turn: what the page needs to undo it later (swapBack), and the stops chosen for an
+  // age whose listing gives no ages (ageAsk), so the caveat stays on the card and the shared copy.
+  let swapBack = null, wentBack = false;
+  const ageAsk = [];
+  try {
+    const done = ((out && out.results) || []).filter((r) => r && r.op === 'replace' && r.ok && r.fresh && r.old && !r.already && r.fresh.id !== r.old.id);
+    if (done.length === 1 && out.plan) swapBack = tripChatSwapBack(done[0].old, done[0].fresh);
+    for (const r of done) if (r.age && !r.ageSays) ageAsk.push(tripAgeCheck(r.fresh.id, r.age));
+  } catch (e) { /* the swap stands without them */ }
   for (const op of [...(stayOps.length ? [stayOps] : []), ...extra.filter((o) => o.o !== 'stay')]) {
     const r = Array.isArray(op) ? tripChatStayTurn(op, { v, plan, req, stops, lang, staysOn, runCore, timing, days, short })
       : op.o === 'ensure' ? tripChatEnsureTurn(op, { v, stops, lang, staysOn, runCore, run, hooks, timing, days, short })
@@ -9089,6 +9118,9 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
             : tripChatTransportTurn(op, { stops, lang, stayTown: v.stayTown, dayDates: v.dayDates, v, plan });
     if (r.needPatch) needPatch = r.needPatch;
     // Beside a swap question, the cheaper stay is named right after the budget answer it belongs to (no question).
+    if (r.swapBack) swapBack = r.swapBack;
+    if (r.back) wentBack = true;
+    if (Array.isArray(r.ageAsk)) ageAsk.push(...r.ageAsk);
     if (r.tail) { if (swapAsk && r.tailPlain) r.reply = [r.reply, r.tailPlain].filter(Boolean).join(' '); else tails.push(r.tail); }
     if (r.stayForce !== undefined) { stayForce = r.stayForce; stayArrive = r.stayArrive || null; }
     if (r.stayDates) stayDates = r.stayDates;
@@ -9137,7 +9169,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   return {
     timing: { ...timing, total: Date.now() - timing.start },
     source, cant: null, plan, actions,
-    response: { reply, source, plan, req, changed: out.changed || [], actions, ...tripChatDiff(stops, v.removed, plan, actions, out), ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(stayForce !== undefined ? { stayForce } : {}), ...(stayArrive ? { stayArrive } : {}), ...(party ? { party } : {}), ...(stayDates ? { stayDates } : {}), ...((newText || noCarText) && !plan ? { text: newText || noCarText } : {}), ...(needPatch && noCarText && !plan && !answerOnly ? { needPatch } : {}), ...(askFirst ? { confirm: true } : {}), ...(card ? { card } : {}), ...(note ? { note } : {}), ...(offer.length ? { offer } : {}), ...(swapAsk ? { choices: swapAsk.choices } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
+    response: { reply, source, plan, req, changed: out.changed || [], actions, ...tripChatDiff(stops, v.removed, plan, actions, out), ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(stayForce !== undefined ? { stayForce } : {}), ...(stayArrive ? { stayArrive } : {}), ...(party ? { party } : {}), ...(stayDates ? { stayDates } : {}), ...((newText || noCarText) && !plan ? { text: newText || noCarText } : {}), ...(needPatch && noCarText && !plan && !answerOnly ? { needPatch } : {}), ...(askFirst ? { confirm: true } : {}), ...(card ? { card } : {}), ...(note ? { note } : {}), ...(offer.length ? { offer } : {}), ...(swapAsk ? { choices: swapAsk.choices } : {}), ...(swapBack && plan ? { swapBack } : {}), ...(wentBack ? { back: true } : {}), ...(ageAsk.length && plan ? { ageAsk } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
   };
 }
 // "somewhere cheaper to stay", "a hotel with a pool", "stay in Naramata", "we already have a place": the same plan (every
@@ -9552,7 +9584,7 @@ function tripChatPinSwap(old, toId, { v, stops, run }) {
   const shown = stops.filter((s) => !v.removed.includes(s.key));
   if (!shown.length || !shown.every((s) => /^\d-/.test(s.key)) || !shown.some((s) => s.id === old.id) || shown.some((s) => s.id === toId)) return null;
   const pinned = Object.fromEntries(shown.map((s) => [s.key, s.id === old.id ? toId : s.id]));
-  const args = { ...v.args, pinned, trustedPins: Object.keys(pinned), swap: null, excludeVenueIds: [...new Set([...(v.args.excludeVenueIds || []), old.id])].slice(-200), overrides: { ...(v.args.overrides || {}), stopStarts: { ...tripChat.agent.startsOf(shown), ...((v.args.overrides || {}).stopStarts || {}) } } };
+  const args = { ...v.args, pinned, trustedPins: Object.keys(pinned), swap: null, excludeVenueIds: [...new Set([...(v.args.excludeVenueIds || []), old.id])].filter((x) => x !== toId).slice(-200), overrides: { ...(v.args.overrides || {}), stopStarts: { ...tripChat.agent.startsOf(shown), ...((v.args.overrides || {}).stopStarts || {}) } } };
   const keep = tripChatKeepStayId; tripChatKeepStayId = v.stayId || null;
   let p = null;
   try { p = run(args); } catch (e) { p = null; } finally { tripChatKeepStayId = keep; }
@@ -9564,6 +9596,22 @@ function tripChatPinSwap(old, toId, { v, stops, run }) {
   // The stay on screen stays.
   if (v.stayId && p.whereToStay && p.whereToStay.pick && p.whereToStay.pick.id !== v.stayId) return null;
   return { plan: p, nw, args, pinned };
+}
+// A listing of the kind asked, in the stop's own town and not on the plan, that the planner can put in that slot with
+// nothing else moving (nearest first; up to three tried). -> { x, done } or null.
+function tripChatInTownSwap(r, { v, stops, run, short }) {
+  const rows = tripChatKindRows(r.kind), old = r.old;
+  if (!rows || short) return null;
+  const shown = stops.filter((s) => !v.removed.includes(s.key));
+  const noDrink = tripChatNoDrink(v.args.text);
+  const gone = new Set([...(v.args.excludeVenueIds || []), ...(v.args.avoidVenueIds || [])]);
+  const from = tripCoordsOf(old.id);
+  const km = (x) => (from && Number.isFinite(x.latitude) && Number.isFinite(x.longitude) ? tripTransport.kmBetween(from, { lat: x.latitude, lng: x.longitude }) : 1e9);
+  const cands = rows.filter((x) => x.region === old.region && x.id !== old.id && !gone.has(x.id) && !shown.some((s) => s.id === x.id)
+    && !(noDrink && (['winery', 'brewery', 'distillery', 'cocktail', 'pub'].includes(x.type) || (x.type === 'tour' && TRIP_DRINK_TOUR_RE.test(`${x.name}. ${x.description || ''}`))))
+    && !tripChatUnfitRow(x, { kind: r.kind, age: r.age || null }, noDrink)).sort((a, b) => km(a) - km(b)).slice(0, 3);
+  for (const x of cands) { const done = tripChatPinSwap(old, x.id, { v, stops, run }); if (done) return { x, done }; }
+  return null;
 }
 // r: a replace result that found nothing (r.old, r.kind, r.age). -> { nofit, ask? } or null (a kind judged another way:
 // the plain line stands).
@@ -9628,6 +9676,15 @@ function tripChatSwapNoFit(r, { v, stops, lang, run, short, canOffer = true }) {
   }
   return only;
 }
+// What the page needs to undo one swap later, on the plan as it then is: the stop that was taken out, as a tagged
+// offer the page sends back ("<old name> [swap <new id>><old id> back]").
+const tripChatSwapBack = (old, fresh) => ({ say: `${old.name} [swap ${fresh.id}>${old.id} back]`.slice(0, 240), key: old.key, newId: fresh.id, oldId: old.id, oldName: old.name, newName: fresh.name });
+// A stop chosen for an age the traveller gave, whose own listing gives no ages: it needs checking. Worded here once,
+// for the card, the Book my trip list, the shared copy and the copied text. Never "not suitable".
+function tripAgeCheck(id, age) {
+  const n = Number(age);
+  return { id, age: n, short: `Age ${n}: check it suits`, shortFr: `${n} ans : à vérifier`, note: `Ages not listed: check it suits a ${n}-year-old.`, noteFr: `Âges non indiqués : vérifiez que cela convient à ${n} ans.` };
+}
 const tripChatOutside = (town, L) => (L === 'fr' ? (/^[aeiouyhéèêâîôû]/i.test(town) ? `hors d’${town}` : `hors de ${town}`) : `outside ${town}`);
 // The visitor said yes to a place offered in another town: that stop out, the place in, in the same slot; nothing else.
 function tripChatSwapToTurn(op, { v, stops, lang, run, short }) {
@@ -9637,6 +9694,21 @@ function tripChatSwapToTurn(op, { v, stops, lang, run, short }) {
   let alt = null;
   try { alt = db.prepare('SELECT id, name, type, region, slug, description, latitude, longitude FROM venues WHERE id = ? AND redirect_to IS NULL').get(op.toId); } catch (e) { alt = null; }
   if (!old || !alt || short) return { reply: N.gone };
+  // (2026-11-24) Undo of a swap after something else was done (dates confirmed, rooms, a new stay): the stop that was
+  // swapped out goes back into its slot on the plan as it is NOW, so the stay, its dates and rooms and every other
+  // stop stay as they are. Never a snapshot of an earlier state.
+  if (op.kind === 'back') {
+    const b = tripChatPinSwap(old, alt.id, { v, stops, run });
+    if (!b) return { reply: tripChat.fill(N.backFailed, { name: alt.name, old: old.name }) };
+    const f2 = b.nw.find((s) => s.key === old.key);
+    const Lk2 = {}, Sk2 = {};
+    for (const s of shown) { if (s.id === old.id) continue; if ((v.locks || {})[s.key] === s.id) Lk2[s.key] = s.id; else if ((v.soft || {})[s.key] === s.id) Sk2[s.key] = s.id; }
+    const at2 = f2 && Number.isInteger(f2.start) ? (L === 'fr' ? ` à ${tripChat.clock(f2.start, L)}` : ` at ${tripChat.clock(f2.start, L)}`) : '';
+    const st = (v.args && v.args.stay) || {};
+    const dates = st.arrive && st.leave ? N.backDates : '';
+    return { plan: b.plan, back: true, changed: [old.key], req: { text: v.args.text, seed: v.args.seed || 0, overrides: b.args.overrides || {}, excludeVenueIds: b.args.excludeVenueIds || [], avoidVenueIds: v.args.avoidVenueIds || [], pinned: b.pinned, locks: Lk2, soft: Sk2, ...((v.args.tourStops || []).length ? { tourStops: v.args.tourStops } : {}) },
+      reply: `${tripChat.fill(N.back, { name: alt.name, at: at2, old: old.name })}${dates ? ` ${dates}` : ''}` };
+  }
   // The trip's own rules still hold at the moment of the yes (no alcohol, the age asked).
   const noDrink = tripChatNoDrink(v.args.text);
   const drinkOut = noDrink && (['winery', 'brewery', 'distillery', 'cocktail', 'pub'].includes(alt.type) || (alt.type === 'tour' && TRIP_DRINK_TOUR_RE.test(`${alt.name}. ${alt.description || ''}`)));
@@ -9651,7 +9723,7 @@ function tripChatSwapToTurn(op, { v, stops, lang, run, short }) {
   const kmText = km === null ? '' : L === 'fr' ? ` (environ ${tripTransport.kmText(km, true)} à vol d’oiseau)` : ` (about ${tripTransport.kmText(km, false)} in a straight line)`;
   const at = fresh && Number.isInteger(fresh.start) ? (L === 'fr' ? ` à ${tripChat.clock(fresh.start, L)}` : ` at ${tripChat.clock(fresh.start, L)}`) : '';
   const req = { text: v.args.text, seed: v.args.seed || 0, overrides: done.args.overrides || {}, excludeVenueIds: done.args.excludeVenueIds || [], avoidVenueIds: v.args.avoidVenueIds || [], pinned: done.pinned, locks: Lk, soft: Sk, ...((v.args.tourStops || []).length ? { tourStops: v.args.tourStops } : {}) };
-  return { plan: done.plan, req, changed: [old.key], reply: `${T.done} ${tripChat.fill(N.swapped, { old: old.name, new: alt.name, at, altTown: REGION_LABELS[alt.region] || alt.region, out: tripChatOutside(REGION_LABELS[old.region] || old.region, L), km: kmText })}` };
+  return { plan: done.plan, req, changed: [old.key], swapBack: tripChatSwapBack(old, alt), ...(op.age && !tripChatAgeNote(alt.id, op.age, L) ? { ageAsk: [tripAgeCheck(alt.id, op.age)] } : {}), reply: `${T.done} ${tripChat.fill(N.swapped, { old: old.name, new: alt.name, at, altTown: REGION_LABELS[alt.region] || alt.region, out: tripChatOutside(REGION_LABELS[old.region] || old.region, L), km: kmText })}` };
 }
 // The nearest listing of a word kind in another town (by straight-line distance from the stop it would have replaced).
 function tripChatNearestOfKind(kind, old, { age = null, text = '' } = {}) {
@@ -55796,6 +55868,19 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
     } catch (e) { /* the copy stands without the lines */ }
   }
   if (c.wineTour) { const t = tripShareTour(c.wineTour); if (t) out.tour = t; }
+  // (2026-11-24) ac=1892:15: a stop chosen for an age the traveller gave. The note is worded again here from the
+  // listing as it is now: only when its own words still give no ages that cover that age (never "not suitable").
+  if (c.ageChecks && c.ageChecks.length) {
+    try {
+      const notes = { ...(out.stopNotes || {}) };
+      for (const a of c.ageChecks) {
+        if (!refs.includes(`venue:${a.id}`) || tripChatAgeNote(a.id, a.age, fr ? 'fr' : 'en')) continue;
+        const n = tripAgeCheck(a.id, a.age), text = fr ? n.noteFr : n.note, k = `venue:${a.id}`;
+        notes[k] = notes[k] && notes[k].text ? { ...notes[k], text: `${notes[k].text} · ${text}` } : { text };
+      }
+      if (Object.keys(notes).length) out.stopNotes = notes;
+    } catch (e) { /* the copy stands without the note */ }
+  }
   // The traveller's budget (2026-11-23, trip-budget.js): the limit, the estimate the plan showed and what it leaves
   // out, in two short lines worded here from the link's values. A link with no budget prints nothing new.
   if (c.budget) { try { const bl = tripBudget.lines(c.budget, fr ? 'fr' : 'en'); if (bl && bl.share.length) out.budgetLines = bl.share; } catch (e) { /* the copy stands without them */ } }
@@ -85464,7 +85549,7 @@ module.exports = {
   tripShareSummary,
   tripShareSearch,
   tripShareContext, tripShareContextHtml, tripShareNotIncluded, tripShareTour, tripNotIncludedText, tripChatAddWhy,
-  tripChatUnfit, tripChatAgeNote, tripListingAges, tripChatNearestOfKind, tripChatPickTagged, tripChatSwapNoFit, tripChatKindRows,
+  tripAgeCheck, tripChatSwapBack, tripChatUnfit, tripChatAgeNote, tripListingAges, tripChatNearestOfKind, tripChatPickTagged, tripChatSwapNoFit, tripChatKindRows,
   tripPlanLinkProblems, tripStoredBookingLinks, tripVenueBookingItem, tripBookingLinkBelongs, tripHonestEvidence,
   tripCardPhotoKey,
   TRIP_CARD_RATE,
