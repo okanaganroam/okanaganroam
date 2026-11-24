@@ -519,6 +519,9 @@ function applyEvidence(plan, ctx = {}) {
     // (2026-11-24) "a relaxed boat tour" with no guided boat tour in the plan: the plain "Tours ✓" (a water-bike
     // rental is listed under tours) is not shown beside it, as if the tour asked for were there.
     if (r.kind === 'type' && r.value === 'tour' && reqs.some((x) => x && x !== r && x.kind === 'venue_kind' && x.strength === 'must' && /_tour$|^(?:rafting|zipline|scenic_flight|heli_hike|atv|snowmobile_tour)$/.test(String(x.value)) && (x.sourceText === r.sourceText || !r.sourceText) && (x.status === 'unmet' || (typeof ctx.kindsOf === 'function' && stops.length && !stops.some((y) => (ctx.kindsOf(y.v.id) || []).includes(x.value)))))) continue;
+    // (2026-11-24) …and with that tour in the plan, its own tick ("Guided boat tour ✓") is the tour asked for: a second
+    // "Tours ✓" for the same words says nothing more (on a phone it pushed "No wineries ✓" out of the summary).
+    if (r.kind === 'type' && r.value === 'tour' && typeof ctx.kindsOf === 'function' && reqs.some((x) => x && x !== r && x.kind === 'venue_kind' && x.strength === 'must' && /_tour$|^(?:rafting|zipline|scenic_flight|heli_hike|atv|snowmobile_tour)$/.test(String(x.value)) && (x.sourceText === r.sourceText || !r.sourceText) && stops.some((y) => (ctx.kindsOf(y.v.id) || []).includes(x.value)))) continue;
     const e = kindEntry(r, plan, stops, ctx);
     if (e && !ev.some((x) => x.ask === e.ask)) ev.push(e);
   }
@@ -847,6 +850,13 @@ function sharedPlan(c, stops, events, stay) {
     else if (a === 'no_alcohol') none = true;
     else if (FEATURES[a]) reqs.push({ kind: 'feature', value: a, strength: 'must' });
   }
+  // (2026-11-24: a guided boat tour added from the next town is listed under Outdoors, and the copy said "Tours: not in
+  // this plan") The same words' plain "tour" is met by a stop that is the kind of tour asked for, as on the plan itself
+  // (server.js v4NotIncluded).
+  try {
+    const TOURS = require('./trip-requirements').TOUR_PLANNER_KINDS || [];
+    for (const r of reqs) if (r.kind === 'type' && r.value === 'tour' && r.status === 'unmet' && reqs.some((x) => x.kind === 'venue_kind' && x.status === 'satisfied' && TOURS.includes(x.value))) r.status = 'satisfied';
+  } catch (e) { /* as read */ }
   const plan = { kind: 'multi_day', days: [...days.values()].sort((a, b) => a.day - b.day), requirementResults: reqs, datesGiven: !!(c && (c.start || c.tripDates)), warnings: [], ...(c && (c.tripDates || c.start) ? { startDate: c.tripDates ? c.tripDates.start : c.start } : {}) };
   if (some) plan.partySome = [{ concept: 'alcohol' }];
   if (none) plan.noAlcohol = true;

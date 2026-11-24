@@ -506,7 +506,20 @@ function kindsNamed(t, exceptTypes = new Set()) {
 // dog can come with us" is ONE verify-and-fix request with a part per need (never cut at "and", never a stay change
 // alone), and a question about a need is an answer.
 const ACCESS_BASE = { stops: [], kind: null, time: null, day: null, value: null, n: null, ages: [], region: null, date: null };
-function rulesReadBase(message, stops, opts = {}) { return access.read(message, stops, { op: (o, extra = {}) => ({ ...ACCESS_BASE, o, ...extra }), stopsNamed, kindsNamed }) || groupRead(message, stops, opts) || agent.readAll(message, (m) => rulesReadOne(m, stops, opts)); }
+// One stop to add that the message identifies (trip-add-venue.js). -> the reading (fixed rules), or null.
+function addRead(message, stops, opts = {}) {
+  if (!opts.add) return null;
+  let a = null;
+  try { a = addVenue.read(message, { ...opts.add, regions: opts.regions || [], regionLabels: opts.regionLabels || {}, stops, kindsNamed: (x) => kindsNamed(x), days: opts.days || 1, weekdays: opts.weekdays || {} }); } catch (e) { a = null; }
+  if (!a) return null;
+  // A kind of place ruled out in the same breath ("…and avoid wineries") is noted with it, as when said on its own.
+  let no = [];
+  try { no = excl.readExclusions(fold(message)).filter((k) => AVOID_TEXT[k] && a.kind !== k); } catch (e) { no = []; }
+  return { ops: [{ ...ACCESS_BASE, o: 'add_to', ...a, value: a.toId ? String(a.toId) : (a.which || []).join('-') || a.said || null }, ...no.map((k) => ({ ...ACCESS_BASE, o: 'avoid', kind: k, noted: true }))], cant: null, exact: true, access: true };
+}
+// (A one-ask message of that sort is read before the access rules: their "add … in <town> on day N" is the plan's own
+// light-day button, for a kind of stop, and reads the town as nothing.)
+function rulesReadBase(message, stops, opts = {}) { { const a = opts.add && agent.splitAsks(message).length < 2 ? addRead(message, stops, opts) : null; if (a) return a; } return access.read(message, stops, { op: (o, extra = {}) => ({ ...ACCESS_BASE, o, ...extra }), stopsNamed, kindsNamed }) || groupRead(message, stops, opts) || agent.readAll(message, (m) => rulesReadOne(m, stops, opts)); }
 // A food allergy first of all (2026-11-23, trip-allergy-need.js): a question about it is answered, the need said in the
 // chat is recorded, and a swap or an add that asks for a place free of the allergen is explained and never carried out
 // as asked (no listing has allergen data, so no place can be offered as fitting). The rest of the message is read as
@@ -515,7 +528,9 @@ function rulesReadBase(message, stops, opts = {}) { return access.read(message, 
 // hotel booking reflects this" and "only include her for activities from October 9" are about WHO is there, never a
 // stop to add (the last one used to add an activity: "include" + "activities"). Read before everything else; the rest
 // of the message goes to the usual rules. Fixed rules: the AI's reading never stands in for them (access: true).
-function rulesRead(message, stops, opts = {}) {
+function rulesRead(message0, stops, opts = {}) {
+  // "Keep all the other stops" asks for what every change here already does: its words are not read as an ask.
+  const message = addVenue.stripKeepRest(message0);
   let la = null;
   try { la = late.chatRead(message, stops, { op: (o, extra = {}) => ({ ...ACCESS_BASE, o, ...extra }) }, { request: opts.request || '', pendingTime: !!opts.pendingTime }); } catch (e) { la = null; }
   if (!la) return rulesReadNeeds(message, stops, opts);
@@ -607,6 +622,9 @@ function applySwapFeats(ops, t) {
   const got = new Set(out.filter((o, i) => o !== ops[i]).flatMap((o) => o.features || []).map((f) => FEAT_PARTY[f]).filter(Boolean));
   return got.size ? out.filter((o) => !(o.o === 'party' && got.has(o.value))) : out;
 }
+// (2026-11-24) One stop to add that the message itself identifies: a listing by its name, the place the plan suggested,
+// a kind of place in another town (trip-add-venue.js). The town says where the place is; it never moves the trip.
+const addVenue = require('./trip-add-venue');
 const ADD_VERB_RE = /\b(?:add|include|put in|fit in|book|ajoute[rz]?|inclure|incluez|inclus)\b/;
 function groupRead(message, stops, opts = {}) {
   const t = fold(message).replace(/\s+/g, ' ').trim();
@@ -662,6 +680,9 @@ function rulesReadOne(message, stops, opts = {}) {
     const allowed = excl.readAllowed(t0).filter((k) => AVOID_TEXT[k]);
     if (allowed.length) return fixed({ ops: allowed.map((k) => op('allow', { kind: k })), cant: null });
   }
+  // One stop to add that the message identifies (a listing's name, "the one you suggested", a kind in another town):
+  // fixed rules, carried out by the server on the plan as it is (add_to). The AI's reading never stands in for it.
+  { const a = addRead(message, stops, opts); if (a) return a; }
   if (!swapMsg && !addMsg && EXCL_SAID_RE.test(t0)) {
     const ex = excl.readExclusions(t0).filter((k) => AVOID_TEXT[k]);
     if (ex.length && !(stopsNamed(t0, stops).byName || []).length) return fixed({ ops: ex.map((k) => op('avoid', { kind: k, noted: true })), cant: null });
@@ -698,7 +719,7 @@ function rulesReadOne(message, stops, opts = {}) {
   }
   return atType ? fixed(r) : r;
 }
-function rulesReadOneBase(message, stops, { regions = [], regionLabels = {}, days = 1, weekdays = {}, recent = [], request = '' } = {}) {
+function rulesReadOneBase(message, stops, { regions = [], regionLabels = {}, days = 1, weekdays = {}, recent = [], request = '', add = null } = {}) {
   const t = fold(message).replace(/\s+/g, ' ').trim().replace(/\b(lake|ocean|mountain|river|vineyard)-(views?)\b/g, '$1 $2');
   const base = { stops: [], kind: null, time: null, day: null, value: null, n: null, ages: [], region: null, date: null };
   const op = (o, extra = {}) => ({ ...base, o, ...extra });
@@ -841,16 +862,24 @@ function rulesReadOneBase(message, stops, { regions = [], regionLabels = {}, day
   else if (/\bvegetarian|vegetarien/.test(t)) ops.push(op('party', { value: 'vegetarian' }));
   if (/\bgluten/.test(t)) ops.push(op('party', { value: 'gluten_free' }));
   // Town
+  // (2026-11-24: "Luxury Lake Tours in Kelowna" moved the trip to Kelowna) A town said right after a listing's own name
+  // says where that listing is, never a new base.
+  let located = [];
+  try { located = add && add.index ? addVenue.locatingTowns(t, { index: add.index, regions, regionLabels }) : []; } catch (e) { located = []; }
   for (const r of regions) {
     const label = fold(regionLabels[r] || r);
+    if (located.includes(r)) continue;
     if (new RegExp(`\\b(?:in|to|at|from|a|en|au|dans|based in|stay in)\\s+${label.replace(/[^a-z0-9 ]/g, '.')}\\b`).test(t) && !named.some((s) => fold(s.name).includes(label))) { ops.push(op('town', { region: r })); break; }
   }
   // Time
   if (/\b(?:later|sleep in|plus tard)\b/.test(t)) ops.push(op('time', { value: 'later', stops: named.slice(0, 1), day }));
   else if (/\b(?:earlier|plus tot)\b/.test(t)) ops.push(op('time', { value: 'earlier', stops: named.slice(0, 1), day }));
   // Budget
-  const cheaper = /\b(?:cheap(?:er)?|budget|less expensive|affordable|save money|moins chere?s?|pas chere?s?|economique)\b/.test(t);
-  const fancier = /\b(?:fancier|upscale|splurge|luxur\w*|fine dining|nicer|more romantic|plus chic|plus romantique|haut de gamme)\b/.test(t);
+  // (2026-11-24: "Luxury Lake Tours" asked for fancier meals) A word of a listing's own name is not a wish.
+  let tB = t;
+  try { if (add && add.index) for (const n of addVenue.namesIn(t, add.index)) tB = `${tB.slice(0, n.at)}${' '.repeat(n.end - n.at)}${tB.slice(n.end)}`; } catch (e) { tB = t; }
+  const cheaper = /\b(?:cheap(?:er)?|budget|less expensive|affordable|save money|moins chere?s?|pas chere?s?|economique)\b/.test(tB);
+  const fancier = /\b(?:fancier|upscale|splurge|luxur\w*|fine dining|nicer|more romantic|plus chic|plus romantique|haut de gamme)\b/.test(tB);
   if (cheaper || fancier) {
     // With no stop named, every meal is tried one by one (it used to re-plan the whole trip, and drop chat additions).
     const meals = named.filter((s) => s.role || s.type === 'restaurant');
@@ -2583,6 +2612,6 @@ module.exports = {
   enabled, apiKey, wireSchema, systemPrompt, stopsForModel, stripPII, validateWire, readChatMessage, rulesRead, chipOps,
   rulesConfident, reconcileReads, eventsNamed, eventAtAlcoholPlace, partyKnown, AVOID_TEXT, KIND_FACT, excl,
   stopsNamed, kindsNamed, swapNoFitLine, planStops, planTurn, broadTurn, placeAdd, buildReply, cantReply, plannerCanRead, kindMatches, joinText, clock, isDayPlan, isShortPlan,
-  rulesReadOne, agent, explain, kindNoun, TYPE_PLURAL, fold, joinList, raiseCount, KIND_WORDS, guardTurn, guardReply, explainReply, onePersonText, groupRead, TARGETED_OPS,
+  rulesReadOne, addVenue, agent, explain, kindNoun, TYPE_PLURAL, fold, joinList, raiseCount, KIND_WORDS, guardTurn, guardReply, explainReply, onePersonText, groupRead, TARGETED_OPS,
   dailyCapUsd, spentToday, addSpend, resetSpend, costOf, pacificDay, EXPLICIT_DATE_RE, rateLimited, rateWaitMinutes, busyReply, resetRate, WORD_KINDS, weekdayDays,
 };
