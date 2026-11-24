@@ -94,6 +94,7 @@ const tripAccess = require('./trip-access-needs');
 const tripTransport = require('./trip-transport-need');
 const tripAllergy = require('./trip-allergy-need');
 const tripLate = require('./trip-late-arrival');
+const tripExclusions = require('./trip-exclusions');
 
 const cap = (t) => String(t || '').replace(/^./, (c) => c.toUpperCase());
 const listEn = (a) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : a[0] || '');
@@ -342,6 +343,30 @@ function noAlcoholEntry(stops) {
 }
 
 // ---- the needs: a wheelchair user, a dog ----
+// A kind of place the traveller ruled out ("avoid wineries"; 2026-11-24, trip-exclusions.js): no stop of that kind, and
+// no place to eat that is AT one by stored data (ctx.atOf). A stop the traveller put there anyway is named, never
+// hidden. ctx.atCount(type): how many places to eat in the plan's towns are at one (so the line says they were skipped
+// only when there were some to skip). Nothing here says a stop is "not at a winery": a listing with no such data is
+// simply not known to be at one.
+function exclusionEntry(type, stops, ctx) {
+  const W = tripExclusions.TYPES[type];
+  if (!W) return null;
+  const at = (x) => { try { return typeof ctx.atOf === 'function' ? ctx.atOf(x.v.id, type) : null; } catch (e) { return null; } };
+  const rows = stops.map((x) => (x.v.type === type ? { id: x.v.id, name: x.v.name, has: false, is: true } : at(x) ? { id: x.v.id, name: x.v.name, has: false, at: (at(x) || {}).name || null } : null)).filter(Boolean);
+  const base = { ask: `no:${type}`, label: W.en, labelFr: W.fr, stops: rows, who: 'all' };
+  if (rows.length) {
+    const say = (r, fr) => (r.is ? (fr ? `${r.name} est un ${W.oneFr}` : `${r.name} is a ${W.one}`) : (fr ? `${r.name} se trouve dans un ${W.oneFr}` : `${r.name} is at a ${W.one}`));
+    return { ...base, status: 'partial', short: `${W.en}: ${rows.length} on the plan`, shortFr: `${W.fr} : ${rows.length} dans le plan`,
+      text: `Avoiding ${W.many}: ${listEn(rows.map((r) => say(r, false)))}. Say “remove ${rows[0].name}” to take it out.`,
+      textFr: `${W.fr} : ${listFr(rows.map((r) => say(r, true)))}. Dites « enlève ${rows[0].name} » pour le retirer.` };
+  }
+  let skipped = 0;
+  try { skipped = typeof ctx.atCount === 'function' ? Number(ctx.atCount(type)) || 0 : 0; } catch (e) { skipped = 0; }
+  const hostType = tripExclusions.HOST_TYPES.includes(type);
+  return { ...base, status: 'verified', short: `${W.en} ✓`, shortFr: `${W.fr} ✓`, ...(hostType && skipped ? { said: true } : {}),
+    text: hostType && skipped ? `Avoiding ${W.many}: restaurants at a ${W.one} are left out too.` : `Avoiding ${W.many}: none is in this plan.`,
+    textFr: hostType && skipped ? `${W.fr} : les restaurants situés dans un ${W.oneFr} sont écartés aussi.` : `${W.fr} : aucun dans ce plan.` };
+}
 const quote = (t) => (t ? ` (“${String(t).replace(/[“”"]/g, '')}”)` : '');
 function accessUnit(stops) {
   const types = [...new Set(stops.map((x) => x.v.type))];
@@ -491,6 +516,9 @@ function applyEvidence(plan, ctx = {}) {
   for (const r of reqs) {
     if (!r || r.strength !== 'must' || r.dayIndex || r.silent || !['type', 'venue_kind'].includes(r.kind) || (r.kind === 'type' && counted.has(r.value))) continue;
     if (r.kind === 'type' && ['restaurant', 'outdoor', 'indoor'].includes(r.value) && r.status === 'satisfied') continue;
+    // (2026-11-24) "a relaxed boat tour" with no guided boat tour in the plan: the plain "Tours ✓" (a water-bike
+    // rental is listed under tours) is not shown beside it, as if the tour asked for were there.
+    if (r.kind === 'type' && r.value === 'tour' && reqs.some((x) => x && x !== r && x.kind === 'venue_kind' && x.strength === 'must' && /_tour$|^(?:rafting|zipline|scenic_flight|heli_hike|atv|snowmobile_tour)$/.test(String(x.value)) && (x.sourceText === r.sourceText || !r.sourceText) && (x.status === 'unmet' || (typeof ctx.kindsOf === 'function' && stops.length && !stops.some((y) => (ctx.kindsOf(y.v.id) || []).includes(x.value)))))) continue;
     const e = kindEntry(r, plan, stops, ctx);
     if (e && !ev.some((x) => x.ask === e.ask)) ev.push(e);
   }
@@ -561,6 +589,18 @@ function applyEvidence(plan, ctx = {}) {
     if (stops.some((x) => DRINK_TYPES.includes(x.v.type))) plan.partyNote = { concept: 'alcohol', venueIds: e.stops.filter((s) => s.has).map((s) => s.id), text: e.text, textFr: e.textFr };
     else delete plan.partyNote;
   } else if (groupNoAlcohol(plan)) ev.push(noAlcoholEntry(stops));
+  // Kinds of place the traveller ruled out ("avoid wineries"): said once each, right after what could not be included.
+  { const seenNo = new Set();
+    for (const r of reqs) {
+      if (!r || r.kind !== 'excluded_type' || r.strength === 'prefer' || seenNo.has(r.value)) continue;
+      seenNo.add(r.value);
+      const e = exclusionEntry(r.value, stops, ctx);
+      if (!e) continue;
+      // (Beside "No alcohol", which already says no winery, brewery or bar is planned, the rule keeps its chip only.)
+      if (e.said && groupNoAlcohol(plan)) delete e.said;
+      ev.push(e);
+      r.status = e.status === 'verified' ? 'satisfied' : 'unmet'; r.reason = e.text;
+    } }
   // The one short line per ask the page prints: partial, unknown and unmet asks that no other line already says.
   const said = new Set((plan.notIncluded || []).map((x) => x && x.text).concat(plan.partyNote ? [plan.partyNote.text] : []));
   let lines = 0;
@@ -568,7 +608,8 @@ function applyEvidence(plan, ctx = {}) {
     delete e.line;
     // (An allergy is printed by the page on its own, first: it takes none of the three lines the other asks share.)
     if (e.ask === 'allergy') continue;
-    if (e.status === 'verified' || said.has(e.text) || lines >= 3) continue;
+    // (An exclusion that left restaurants out says so in its one line, though it is met.)
+    if ((e.status === 'verified' && !e.said) || said.has(e.text) || lines >= 3) continue;
     e.line = true; lines++;
   }
   plan.evidence = ev;
@@ -662,7 +703,8 @@ const GENERIC_NAME_WORDS = new Set(['hotel', 'hotels', 'motel', 'inn', 'inns', '
 //   ml=1100101         which stops the plan counted as meal stops (one 0/1 per stop, in the stops' order; 2026-11-23),
 //                      so a dietary line counts the same stops as the plan. No ml: as before
 const NI_RE = /^([a-z][a-z_]{1,29}):([nf])(?::([1-9]\d{0,6}))?$/;
-const ASK_RE = /^(?:count:[a-z_]{2,20}:\d{1,2}|type:[a-z_]{2,20}|kind:[a-z_]{2,30}|stay:[a-z_]{2,20}|[a-z_]{2,20})$/;
+// (2026-11-24) no:winery -- a kind of place the traveller ruled out (known kinds only: trip-exclusions.js TYPES).
+const ASK_RE = /^(?:count:[a-z_]{2,20}:\d{1,2}|type:[a-z_]{2,20}|kind:[a-z_]{2,30}|stay:[a-z_]{2,20}|no:[a-z_]{2,20}|[a-z_]{2,20})$/;
 function parseShareContext(query) {
   const q = query || {};
   const int = (v, lo, hi) => { const n = /^\d{1,4}$/.test(String(v || '')) ? Number(v) : NaN; return n >= lo && n <= hi ? n : null; };
@@ -712,7 +754,7 @@ function parseShareContext(query) {
     for (const tok of q.ac.split(',')) { const [id, age] = tok.split(':').map(Number); if (age >= 1 && age <= 99 && !seen.has(id)) { seen.add(id); ac.push({ id, age }); } }
     if (ac.length) out.ageChecks = ac;
   }
-  if (typeof q.asks === 'string' && q.asks) { const k = [...new Set(q.asks.split(',').filter((a) => ASK_RE.test(a)))].slice(0, 12); if (k.length) out.asks = k; }
+  if (typeof q.asks === 'string' && q.asks) { const k = [...new Set(q.asks.split(',').filter((a) => ASK_RE.test(a) && (!/^no:/.test(a) || !!tripExclusions.TYPES[a.slice(3)])))].slice(0, 12); if (k.length) out.asks = k; }
   // A food allergy (2026-11-23, trip-allergy-need.js): asks=allergy alone says only that allergies are not checked.
   // al=peanut,shellfish names the allergens, and is in a link only when the traveller ticked "Include allergy details".
   if (out.asks && out.asks.includes('allergy')) { const al = tripAllergy.fromShare(q.al); if (al) out.allergy = al; }
@@ -758,7 +800,9 @@ function shareNotIncluded(plan) {
   const asks = new Set(shareAsks(plan)), out = [];
   for (const x of (plan && plan.notIncluded) || []) {
     if (!x || typeof x.kind !== 'string' || !/^[a-z][a-z_]{1,29}$/.test(x.kind) || !['none_listed', 'not_fitted'].includes(x.reason)) continue;
-    if (asks.has(`kind:${x.kind}`) || asks.has(`type:${x.kind}`) || out.some((t) => t.split(':')[0] === x.kind)) continue;
+    // (2026-11-24) A kind the evidence carries as not in the plan keeps its line (the copy says the plan's sentence).
+    const unmetAsk = ((plan && plan.evidence) || []).some((e) => e && e.ask === `kind:${x.kind}` && e.status === 'unmet');
+    if ((asks.has(`kind:${x.kind}`) && !unmetAsk) || asks.has(`type:${x.kind}`) || out.some((t) => t.split(':')[0] === x.kind)) continue;
     const id = x.nearest && Number.isInteger(x.nearest.id) && x.nearest.id > 0 && x.nearest.id < 1e7 ? x.nearest.id : null;
     out.push(shareNiToken({ kind: x.kind, reason: x.reason, nearestId: id }));
   }
@@ -789,6 +833,7 @@ function sharedPlan(c, stops, events, stay) {
     const m = a.split(':');
     if (m[0] === 'count') reqs.push({ kind: 'type_count', value: m[1], count: Number(m[2]), strength: 'must' });
     else if (m[0] === 'type') reqs.push({ kind: 'type', value: m[1], strength: 'must', status: stops.some((x) => x.type === m[1]) ? 'satisfied' : 'unmet' });
+    else if (m[0] === 'no') { if (tripExclusions.TYPES[m[1]]) reqs.push({ kind: 'excluded_type', value: m[1], strength: 'must' }); }
     else if (m[0] === 'kind') reqs.push({ kind: 'venue_kind', value: m[1], strength: 'must', status: stops.some((x) => (x.kinds || []).includes(m[1])) ? 'satisfied' : 'unmet' });
     else if (a === 'stay:accessible') wheel = true;
     else if (a === 'stay:pets') dog = true;
@@ -827,5 +872,5 @@ function sharedPlan(c, stops, events, stay) {
 module.exports = {
   parseShareContext, shareContextQuery, shareAsks, shareNotIncluded, sharedPlan,
   DIET, DRINK_TYPES, FEATURES, venueStops, eventStops, isMealStop, badgeOf, datesGiven, takeUndatedEvents, suggestionOf,
-  applyEvidence, planBookingLinks, checkBookingLinks, linkHasDate, innerUrl,
+  applyEvidence, exclusionEntry, planBookingLinks, checkBookingLinks, linkHasDate, innerUrl,
 };

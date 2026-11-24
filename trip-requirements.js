@@ -1,6 +1,7 @@
 'use strict';
 const SITE=require('./trip-site.js');
 // Pure planner-only interpretation and verification. No writes, network or AI.
+const tripExclusions = require('./trip-exclusions');
 const norm = s => String(s || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 const DINING = new Set(['restaurant','cafe','pub','cocktail','brewery']);
 const SPORT_KINDS = {bmx:/\bbmx\b/,skatepark:/\bskate ?parks?\b/,disc_golf:/\bdisc golf\b/,tennis:/\btennis\b/,pickleball:/\bpickleball\b/};
@@ -383,6 +384,28 @@ function golfPartKind(v,kind,text,name){
   if(kind==='mini_golf'&&['indoor','outdoor','sport'].includes(v.type))return MINI_GOLF_WORDS.test(norm([v.name,v.textName,v.cuisine,v.knownFor,v.description||v.textDesc].filter(Boolean).join(' ')));
   return false;
 }
+// A guided boat tour (2026-11-24, Dayton's Peachland report: a fishing camp whose story says "boating" and a water-bike
+// rental whose story says "a fun way to cruise along the shoreline" were both "Boat tour" matches, and a boat rental was
+// swapped in as "a boat cruise"). A listing is a boat tour only when its stored data supports a crewed or guided trip:
+//   - the operator picked Boat tours or Jet boat in the setup (read before this), or
+//   - it is listed under tours or outdoors and its own words NAME a tour, cruise, charter or sailing trip as a thing it
+//     runs ("pontoon cruises", "boat tours", "a sunset sail"; never the verb "to cruise", never "boating", a sailing
+//     lesson, a fishing charter or a channel float), and
+//   - when its words also say it rents ("rents", "rentals", "no licence needed"), they say who drives too: a captain, a
+//     skipper, a guide, a coach-driver, or that it "runs" the cruises or charters.
+// A boat, pontoon, jet-ski, kayak, SUP or water-bike rental, a camp, a lesson and a beach are never boat tours; nor is
+// a listing whose own NAME says rentals, camp or resort, whatever its story adds ("the shop also runs charters").
+const BOAT_TOUR_NOUN=/\b(?:boat (?:tours?|trips?|rides?|cruises?|charters?)|(?:yacht|sailing|sailboat|pontoon|houseboat|catamaran) (?:tours?|trips?|rides?|cruises?|charters?|excursions?)|(?:sunset|private|shared|daytime|evening|guided) sails?|jet ?boat(?:ing|s)?(?: tours?| rides?| trips?)?|jetboat\w*|(?:sunset|sightseeing|scenic|daytime|evening|afternoon|morning|night|dinner|lunch|brunch|lake|harbou?r|river|private|public|guided|narrated|hour|bachelorette|party|tiki|a|an|the|our|and|or) cruises?|cruises (?:on|around|aboard|depart\w*|leave|run))\b/;
+const BOAT_RENTAL_WORDS=/\b(?:rents?|rentals?|renting|rented|hire|self drive|drive (?:it )?yourself|no (?:boating |boat |boater s )?licen[cs]e (?:is )?(?:needed|required))\b/;
+const BOAT_CREW_WORDS=/\b(?:captain(?:ed|s)?|skipper(?:ed|s)?|crew(?:ed)?|guided|guides?|narrated|coach driver|(?:runs?|offers?|operates?) (?:\w+ ){0,4}(?:cruises?|charters?|boat tours?|sails?))\b/;
+function boatTourListing(v,text){
+  if(!['tour','outdoor'].includes(v.type))return false;
+  const own=norm([text,...(Array.isArray(v.tourItems)?v.tourItems.map(it=>it&&it.name):[])].filter(Boolean).join(' '));
+  if(/\b(?:camps?|campground|rv|resort|rentals?|location de)\b/.test(norm(v.name)))return false;
+  if(!BOAT_TOUR_NOUN.test(own))return false;
+  if(BOAT_RENTAL_WORDS.test(own)&&!BOAT_CREW_WORDS.test(own))return false;
+  return true;
+}
 function inferPlannerKinds(v) {
   // Tour test 1 (Whistler, 2026-11-16): a tour's own kind words too ("Snowmobile & ATV tours", kept when the operator's kinds
   // are saved), so an ATV request finds it.
@@ -409,6 +432,7 @@ function inferPlannerKinds(v) {
     // else instead (a zipline and treetop park picked it for its ropes course: "We have no ATVs").
     if (kind==='atv'&&v.type==='tour'&&Array.isArray(v.tourKinds)&&v.tourKinds.includes('adventure')&&!re.test(text)&&/\b(?:tree ?top|ropes?|adventure parks?|bungee|bungy|climb\w*|canyon\w*|via ferrata|paraglid\w*|skydiv\w*|zip ?lines?)\b/.test(text)) return false;
     if (v.type==='tour'&&Array.isArray(v.tourKinds)&&v.tourKinds.some(k=>(TOUR_KIND_PLANNER[k]||[]).includes(kind))) return true;
+    if (kind==='boat_tour') return boatTourListing(v,text);
     if (v.type==='indoor'&&Array.isArray(v.indoorKinds)&&v.indoorKinds.some(k=>(INDOOR_KIND_PLANNER[k]||[]).includes(kind))) return true;
     // Sport setup (2026-11-20): a sports listing is the kind its owner picked (an arena is skating, a skate park a skatepark).
     // Sport test 8 (2026-11-21; Marg's golf course with disc golf as her second kind): every owner kind, whatever the type.
@@ -810,6 +834,9 @@ function extractTripRequirements({text,intent={},trip={},taxonomy={},referenceDa
       const re=new RegExp(`\\b(?:no|not|without|avoid|skip|exclude)\\b(?:(?!\\b(?:but|include|with)\\b).)*\\b${type==='winery'?'(?:wine|wineries|winery|vineyards?)':type==='beach'?'beaches?':type+'s?'}\\b`);
       if(re.test(c))add('excluded_type',type,scopeText);
     }
+    // (2026-11-24, trip-exclusions.js) "we would like to avoid wineries", "stay away from breweries", "no distilleries":
+    // the kinds of place ruled out in plain words, read the same way for the request, the chat and the shared copy.
+    for(const type of tripExclusions.readExclusions(c))if(!items.some(i=>i.kind==='excluded_type'&&i.value===type&&i.sourceText===scopeText))add('excluded_type',type,scopeText);
   }
   // Only full stored names mentioned as destinations are accepted. Ambiguous
   // names are explained; don't guess using substring "cores".
@@ -1178,6 +1205,9 @@ function matches(v,i){
   // Distillery test 2 (Whistler, 2026-11-16): a place with its own kitchen that lists a brunch (« Brunch jazz » on Sundays) is a brunch spot too.
   if(i.kind==='type'&&i.value==='restaurant'&&i.kids&&kidsKitchenOk(v,i.sourceText))return true;
   if(i.kind==='type'&&i.value==='breakfast'&&v.ownKitchen&&(v.nights||[]).some(n=>/\b(?:brunch|breakfast)\b/i.test(`${n.title||''} ${n.titleFr||''}`)))return true;
+  // (2026-11-24) "No wineries" rules out a place AT a winery too (its restaurant, by stored data: trip-exclusions.js)
+  // and a wine tour.
+  if(i.kind==='excluded_type'&&tripExclusions.ruledOut(v.plannerKinds?v:{...v,plannerKinds:inferPlannerKinds(v)},i.value))return true;
   if(i.kind==='type'||i.kind==='type_count'||i.kind==='excluded_type')return i.value==='breakfast'?['cafe','restaurant'].includes(v.type):v.type===i.value||(v.fdTypes||[]).includes(i.value)||i.value==='tour'&&(v.plannerKinds||inferPlannerKinds(v)).some(k=>['boat_tour','wine_tour','guided_hike','snow_tour','sleigh_ride','cooking'].includes(k));
   if(i.kind==='activity')return (v.activities||[]).includes(i.value);
   if(i.kind==='excluded_activity')return i.value==='hiking'&&hikingPlace(v);

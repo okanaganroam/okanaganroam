@@ -388,10 +388,17 @@ function chatClientSrc(d) {
         // the sheet and the shared copy then say it); the stops do not change.
         if (j.needPatch && j.needPatch.need && j.needPatch.evidence && state.last && !(j.plan && j.req)) {
           var np = j.needPatch, nds = Array.isArray(state.last.needs) ? state.last.needs.filter(function(n){ return !(n && n.key === np.need.key); }) : [];
-          nds.push(np.need); state.last.needs = nds;
+          // (A kind of place ruled out is an evidence entry only, never one of the trip's needs.)
+          if (!/^no:/.test(np.evidence.ask || '')) { nds.push(np.need); state.last.needs = nds; }
           var evs = (state.last.evidence || []).filter(function(e){ return !(e && e.ask === np.evidence.ask); }), at = evs.findIndex(function(e){ return e && /^stay:/.test(e.ask || ''); });
-          np.evidence.line = np.evidence.ask !== 'allergy'; if (np.evidence.ask === 'allergy') evs.unshift(np.evidence); else if (at < 0) evs.push(np.evidence); else evs.splice(at, 0, np.evidence);
+          np.evidence.line = np.evidence.ask !== 'allergy' && !(/^no:/.test(np.evidence.ask) && !np.evidence.said); if (np.evidence.ask === 'allergy') evs.unshift(np.evidence); else if (at < 0) evs.push(np.evidence); else evs.splice(at, 0, np.evidence);
           state.last.evidence = evs; touched = true;
+        }
+        // (2026-11-24, trip-exclusions.js) A rule lifted in the chat ("wineries are fine now"): its chip and line leave the plan on screen.
+        if (typeof j.needDrop === 'string' && /^no:[a-z_]{2,20}$/.test(j.needDrop) && state.last && !(j.plan && j.req)) {
+          state.last.evidence = (state.last.evidence || []).filter(function(e){ return !(e && e.ask === j.needDrop); });
+          if (Array.isArray(state.last.needs)) state.last.needs = state.last.needs.filter(function(n){ return !(n && n.key === j.needDrop.replace(':', '_')); });
+          touched = true;
         }
         // Round 4: a change asked for in the chat keeps a confirmed plan confirmed (Book, Share and Save stay, for the plan
         // as it is now); only Save is offered again.

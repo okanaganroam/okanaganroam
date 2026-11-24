@@ -7005,6 +7005,9 @@ function swapWantOk(v, swap) {
   // for the listings' own words. swap.types bounds the kind of place; swap.words (plain lowercase words) must be in the
   // place's name or cuisine, or in the first sentence of its own description.
   if (Array.isArray(swap.types) && swap.types.length && !swap.types.includes(v.type)) return false;
+  // (2026-11-24) A kind judged by the listing's own facts (a guided boat tour: trip-requirements.js inferPlannerKinds),
+  // never by a word of its name or story (a boat rental's "pontoons").
+  if (Array.isArray(swap.kinds) && swap.kinds.length && !swap.kinds.some((k) => (v.plannerKinds || []).includes(k))) return false;
   if (Array.isArray(swap.words) && swap.words.length) {
     const head = `${v.name || ''} ${v.cuisine || ''} ${v.textCuisine || ''}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const first = (v.plannerDescription || v.description ? String(v.plannerDescription || v.description).split(/(?<=[.!?])\s/)[0].slice(0, 160) : String(v.textDesc || '').split(' ').slice(0, 14).join(' ')).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -7019,7 +7022,7 @@ function swapWantOk(v, swap) {
   return true;
 }
 const swapAsksKind = (swap) => !!(swap && (swap.want || swapAsksWords(swap) || (Array.isArray(swap.features) && swap.features.length) || swap.priceMax !== undefined || swap.priceMin !== undefined));
-const swapAsksWords = (swap) => !!(swap && ((Array.isArray(swap.words) && swap.words.length) || (Array.isArray(swap.types) && swap.types.length)));
+const swapAsksWords = (swap) => !!(swap && ((Array.isArray(swap.words) && swap.words.length) || (Array.isArray(swap.types) && swap.types.length) || (Array.isArray(swap.kinds) && swap.kinds.length)));
 const SWAP_TYPE_WORDS = { restaurant: 'restaurant', cafe: 'café', pub: 'pub', cocktail: 'lounge', brewery: 'brewery', distillery: 'distillery', winery: 'winery', beach: 'beach', golf: 'golf course', outdoor: 'outdoor stop', indoor: 'indoor attraction', tour: 'tour', sport: 'activity' };
 // Round 8 (2026-10-19): the slot keeps its purpose. A winery lunch is swapped for another winery that serves food, a
 // vegan lunch for another vegan spot, a romantic dinner for another sit-down dinner (never pizza), dinner "in Brackendale"

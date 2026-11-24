@@ -96,7 +96,8 @@ function tripSummaryFacts(plan, fr, ctx) {
   var left = 0;
   (Array.isArray(p.notIncluded) ? p.notIncluded : []).forEach(function (x) {
     if (!x || !x.text || said[x.text]) return;
-    var k = typeof x.kind === 'string' && /^[a-z][a-z_ ]{1,30}$/.test(x.kind) ? x.kind.replace(/_/g, ' ') : '';
+    // (2026-11-24) A kind said in its own words (x.chip: "guided boat tour"), else its key.
+    var k = typeof x.chip === 'string' && /^[a-z][a-z ]{1,30}$/.test(x.chip) ? x.chip : typeof x.kind === 'string' && /^[a-z][a-z_ ]{1,30}$/.test(x.kind) ? x.kind.replace(/_/g, ' ') : '';
     if (k && !fr) flags.push({ kind: 'flag', status: 'unmet', ask: 'not_included:' + x.kind, text: k.charAt(0).toUpperCase() + k.slice(1) + ': not in this plan' });
     else left++;
   });

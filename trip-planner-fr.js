@@ -506,6 +506,7 @@ const PHRASES = [
   ['grande table', 'fine dining'], ['gastronomique', 'fine dining'], ['luxe', 'luxury'], ['luxueux', 'luxurious'],
   ['chic', 'fancy'], ['cher', 'expensive'], ['chere', 'expensive'],
   // negation
+  ['eviter', 'avoid'], ['evitons', 'avoid'], ['evitez', 'avoid'], ['on evite', 'avoid'],
   ['pas de', 'no'], ['pas d', 'no'], ['sans', 'without'], ['aucun', 'no'], ['aucune', 'no'], ['sauf', 'except'], ['a part', 'except'],
   ['excepte', 'except'], ['pas', 'not'], ['ni', 'or'], ['ne', ''],
   // joining words

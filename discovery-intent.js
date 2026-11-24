@@ -745,7 +745,11 @@ const STOPWORDS = new Set(('a an the and or but of to in on at around near by fo
 // list ("no breweries or pubs"). "not only" / "not just" is not a negation.
 // Phrases that contain a negation word are matched first and keep their own
 // meaning ("no kids", "can't miss" -> "can not miss", "non alcoholic").
-const NEGATION_TRIGGERS = [['anything', 'but'], ['other', 'than'], ['not'], ['no'], ['nothing'], ['without'], ['except'], ['excluding']];
+const NEGATION_TRIGGERS = [['anything', 'but'], ['other', 'than'], ['not'], ['no'], ['nothing'], ['without'], ['except'], ['excluding'], ['avoid'], ['avoiding'], ['skip'], ['skipping']];
+// "avoid" and "skip" (2026-11-24: "we would like to avoid wineries" planned "wineries" and searched for the word
+// "avoid"): they rule out only what the site knows by name (a kind of place, a badge, a town...), never a leftover word
+// ("avoid long drives" reads as it always did).
+const NEGATION_SOFT = new Set(['avoid', 'avoiding', 'skip', 'skipping']);
 const NEGATION_SKIP_AFTER = new Set(['only', 'just']);
 const NEGATION_CONTINUE = new Set(['or', 'nor']);
 const NEGATION_BREAKS = new Set(['but', 'and', 'plus', 'also', 'then', 'though', 'however', 'yet', 'so', 'because', 'while', 'instead', 'rather']);
@@ -854,6 +858,7 @@ function findNegations(tokens, accepted, claimed) {
   for (let i = 0; i < tokens.length; i++) {
     const n = triggerAt(i);
     if (!n || NEGATION_SKIP_AFTER.has(tokens[i + n])) continue;
+    const soft = n === 1 && NEGATION_SOFT.has(tokens[i]);
     let k = i + n;
     let last = -1;
     // After the first negated item the clause only continues across an
@@ -877,7 +882,7 @@ function findNegations(tokens, accepted, claimed) {
         continue;
       }
       if (STOPWORDS.has(tok) || /^\d+(?:st|nd|rd|th)?$/.test(tok) || tok.length < 2) { k++; continue; }
-      if (listOpen) { out.negatedTokens.add(k); last = k; }
+      if (listOpen && !soft) { out.negatedTokens.add(k); last = k; }
       break;
     }
     if (last < 0) continue;
