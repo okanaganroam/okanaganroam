@@ -1,0 +1,68 @@
+[
+ {
+  "name": "Red Dog Wine Tours",
+  "region": "kelowna",
+  "slug": "red-dog-wine-tours",
+  "file": "/images/venues/red-dog-wine-tours-2610.jpg",
+  "dimensions": "1080x540 (+ -w960, -w480); source 1200x540 (owner photo, native 1200x540)",
+  "source_page": "Google Maps: Red Dog Wine Tours, 470 Curlew Dr, Kelowna, BC V1W 4L1 (fid 0x41734ed479b09853:0x4f0888bc3674f828), photo 1 (owner)",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLfoF3lN2GDqJxEB27fPRNXnqkyHLneMTohkB1hErYdyEebwU32Hu-NjNuKHOBIu5dOw5H0RClPx4w7X7LW6sIqsToSpQ-DerU9terv2zMShRhonZJkl9jRlTvTi5FHACnQwJUnPZ9SgxkBS=w2400",
+  "source_kind": "google_maps",
+  "note": "Their white Red Dog Wine Tours van (red dog logo, RedDogWineTours.com on the side) at a hotel entrance; Y=0.55. Own site blocks our user agent (403); the other Google photos are wineries (other businesses)."
+ },
+ {
+  "name": "Okanagan Wine Country Tours",
+  "region": "kelowna",
+  "slug": "okanagan-wine-country-tours",
+  "file": "/images/venues/okanagan-wine-country-tours-2610.jpg",
+  "dimensions": "1536x768 (+ -w960, -w480); source 1536x1024",
+  "source_page": "https://okwinetours.com/ (Shuttle Services section)",
+  "image_url": "https://okwinetours.com/wp-content/uploads/2026/09/shuttle-services-compressed-image.jpg",
+  "source_kind": "website",
+  "note": "Their black Okanagan Wine Country Tours Sprinter van (name, phone and okwinetours.com on it) on a snowy road; Y=0.6. Other site photos are Unsplash stock or tourism-board images (not used)."
+ },
+ {
+  "name": "Vines & Views Wine Tours",
+  "region": "kelowna",
+  "slug": "vines-and-views-wine-tours",
+  "file": "/images/venues/vines-and-views-wine-tours-2610.jpg",
+  "dimensions": "1800x900 (+ -w960, -w480); source 2560x1920",
+  "source_page": "https://www.vinesandviews.com/photo-gallery/",
+  "image_url": "https://www.vinesandviews.com/wp-content/uploads/2023/04/vines-and-views-gallery-20-scaled.webp",
+  "source_kind": "website",
+  "note": "Two guests beside their white 'Vines & Views Wine Tours' van (778-755-3007, vinesandviews.com); Y=0.3."
+ },
+ {
+  "name": "Sagebrush Tours",
+  "region": "penticton",
+  "slug": "sagebrush-tours",
+  "file": "/images/venues/sagebrush-tours-2610.jpg",
+  "dimensions": "1800x900 (+ -w960, -w480); source 2560x2299",
+  "source_page": "https://www.sagebrushtours.ca/wine-tours/naramata-wine-tour/",
+  "image_url": "https://www.sagebrushtours.ca/wp-content/uploads/2022/05/Four-Shadows-Outdoor-Tasting-2-scaled.jpg",
+  "source_kind": "website",
+  "note": "A Sagebrush tour group at an outdoor tasting table in the vineyard, guide holding the wine; Y=0.2. Their branded vans are on the site only at 913 px (too small)."
+ },
+ {
+  "name": "Carpe Diem Tours",
+  "region": "kelowna",
+  "slug": "carpe-diem-tours",
+  "file": "/images/venues/carpe-diem-tours-2610.jpg",
+  "dimensions": "1800x900 (+ -w960, -w480); source 1800x1200 (owner photo)",
+  "source_page": "Google Maps: Carpe Diem Tours - Kelowna Wine Tours, 687 Devonian Ave, Kelowna, BC V1W 5C2 (fid 0x537d8b5b07ae2539:0xb7686707c1ff017e), photo 1 (owner)",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLdQxXTy25BJZS2Bu758RHPhwenhcZnqRo_J2e6bb-n6_QFWnWTfZ-Eh8RBM1J8PyPT3yTBfhdd7XA8Pbldofnahm80YMnyJELy31wzR-xj_waFL1RjngOMFoZOcPRuKcogpquQ7De970fok=w2400",
+  "source_kind": "google_maps",
+  "note": "Their wrapped Carpe Diem Tours van in front of vineyards and Okanagan Lake at sunset; Y=0.75. The same van is on their own site only at 900 px; other site photos are stock-style (skiers, golf cart)."
+ },
+ {
+  "name": "Msurf Okanagan",
+  "region": "kelowna",
+  "slug": "msurf-okanagan",
+  "file": "/images/venues/msurf-okanagan-2610.jpg",
+  "dimensions": "1440x720 (+ -w960, -w480); source 1440x859 (owner photo)",
+  "source_page": "Google Maps: Msurf Okanagan - Wakesurf Lessons, 1110 Harvey Ave #201c, Kelowna, BC V1Y 6E7 (fid 0x270e331a1acf0a87:0x9c264009899625ba), photo 1 (owner)",
+  "image_url": "https://lh3.googleusercontent.com/grass-cs/AABkmLeCgN_EF8yo0O576ztMAfoKHQej_mWNHKh959ETLIVLxBQhHjK2sObg-IWHRIehrp3HV5QkPa6a4kReHTJTRVQ8AlmUDx4qKlSHmrfUc02R41mvtTwPhGq9tIZSR1Zq5ZpKse0Fcw=w2400",
+  "source_kind": "google_maps",
+  "note": "Owner-uploaded photo: a rider wakesurfing on Okanagan Lake with the hills behind; Y=0 (top kept). The 3:1 strip cuts the top of the rider's head; the activity and the lake are clear. The photographer's mark 'TAMI QUAN PHOTOGRAPHY' sits on the bottom edge and falls outside the crop, so the photographer is named in the credit. Own-site photos are Nautique manufacturer/press images (not used); no larger owner photo of the boat in use exists."
+ }
+]
