@@ -11,8 +11,7 @@ const LEGACY = {
   happyHour: new Set(['restaurant', 'pub', 'cocktail', 'brewery', 'winery', 'distillery', 'golf']),
   specials: new Set(['restaurant', 'pub', 'cocktail', 'brewery', 'winery', 'distillery', 'golf', 'cafe']),
   nights: new Set(['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery', 'winery']),
-  // Outdoor businesses have a price list since 2026-11-23 (the outdoor setup).
-  menu: new Set(['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery', 'winery', 'tour', 'golf', 'indoor', 'sport', 'outdoor']),
+  menu: new Set(['restaurant', 'cafe', 'pub', 'cocktail', 'brewery', 'distillery', 'winery', 'tour', 'golf', 'indoor', 'sport']),
   bookingFirst: new Set(['tour', 'golf', 'indoor', 'sport', 'outdoor']),
   noPrice: new Set(['golf', 'shop']),
   activityBadges: new Set(['outdoor', 'indoor', 'beach', 'tour', 'sport']),

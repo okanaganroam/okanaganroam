@@ -16,6 +16,8 @@ const vm = require('node:vm');
 const DB_FILE = path.join(__dirname, '..', 'okanagan.db');
 for (const s of ['', '-wal', '-shm', '-journal']) { try { fs.unlinkSync(DB_FILE + s); } catch (e) { /* not there */ } }
 process.env.ENRICHMENT_ADMIN_TOKEN = 'outdoor-help-matrix-admin-token';
+// Every outdoor kind's Help (live runs the setup for campgrounds only; the other kinds wait for their practice rounds).
+process.env.OUTDOOR_SETUP_KINDS = 'all';
 delete process.env.BREVO_API_KEY;
 const app = require('../server.js');
 const OH = require('../outdoor-help.js');
