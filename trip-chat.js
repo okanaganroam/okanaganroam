@@ -1682,6 +1682,14 @@ function planTurnCore(ops, ctx) {
         // The visitor said yes to the place the chat offered by name (toId): that place, when the planner's first pick
         // is another one.
         if (op.toId && !feats.length) { const tried = []; while (!res.why && res.fresh.id !== op.toId && tried.length < 3) { tried.push(res.fresh.id); const again = slotEdit(cur, { ...spec, exclude: [old.id, ...tried] }, ctx); if (again.why) break; res = again; } }
+        // (2026-11-24, Dayton: "If it would require leaving Oliver, say so and ask before changing the trip.") The
+        // planner's own pick in a town the trip is not in yet (ctx.newTown) is not swapped in: the stop stays, and the
+        // place is offered by name, with its town (server.js tripChatSwapNoFit). A yes to that offer comes back as its
+        // own op (swap_to), so it is never asked twice.
+        if (!res.why && op.o === 'replace' && !op.toId && !op.ensure && !ctx.probe && !feats.length && typeof ctx.newTown === 'function') {
+          let away = false; try { away = !!ctx.newTown(res.fresh, old); } catch (e) { away = false; }
+          if (away) { rr.why = 'elsewhere'; rr.elsewhere = { id: res.fresh.id, name: res.fresh.name }; continue; }
+        }
         if (res.why) {
           rr.why = res.why;
           // No place with the badge fits there: the stop stays, and what could be done instead is worked out (never
@@ -1921,7 +1929,10 @@ const T = {
     whyHas: 'Your plan does have {what}: {list}.', whyHasAsked: 'You asked for {n} {plural}: {list}.', onDay: '{name} on day {d}', whyDry: 'Your request said the group doesn’t drink, so I left {plural} out. If only one of you doesn’t, say so and I’ll add them.', whyNotIncluded: '{text} Say “add {add}” and I’ll try again.', whyNotAsked: 'Your request didn’t ask for {what}, so there isn’t one. Say “add {add}” if you’d like one.', whyNoFit: 'I didn’t find {what} that fit these days. Say “add {add}” and I’ll try again.',
     lastChange: 'Last change: I {what}.', lastIn: 'added {names}', lastOut: 'took out {names}', lastMoved: 'moved {names}', lastNone: 'I haven’t changed anything in this plan yet.', lastFailed: 'Last time I couldn’t add {kinds}.', nothingMissing: 'Nothing is missing: everything you asked for is in the plan.',
     qNone: 'There’s no {what} in your plan. Say “add {add}” if you’d like one.', qMissingAsked: 'The {what} you asked for isn’t in your plan: none I list fit there on these dates. Say “add {add}” and I’ll find the nearest.',
-    alreadyHas: '{name} already has {what}, so I kept it.', swapped: 'Swapped {old} for {new}{at}.', swapFail: 'I couldn’t find {kind} that fits there, so {old} stays.', swapFailSame: 'Nothing else nearby fits there, so {old} stays.', swapNearest: 'The nearest one I list is {name} in {town}.', ageSays: 'Its listing says “{says}”.', ageCheck: 'Its listing gives no ages: check it suits a {n}-year-old.',
+    alreadyHas: '{name} already has {what}, so I kept it.', swapped: 'Swapped {old} for {new}{at}.', swapFail: 'I couldn’t find {kind} that fits there, so {old} stays.', swapFailSame: 'Nothing else nearby fits there, so {old} stays.', swapNearest: 'The nearest one I list is {name} in {town}.',
+    nf: { only: '{town}’s only {noun} I list, {name}, is already on day {d}.', on_plan: '{name} is already on day {d}.', on_plan_many: 'Every {noun} I list in {town} is already on your plan.', none_listed: 'I list no {noun} in {town}.',
+      alcohol: 'What else {town} has is ruled out by your no-alcohol request.', age: 'What else {town} has gives ages that leave out a {n}-year-old.', slot: 'Nothing I list in {town} for that fits that slot.', slot_else: 'What else {town} has doesn’t fit that slot.', stays: '{old} stays.',
+      swapped: 'Swapped {old} for {new}{at}. It’s in {altTown}, {out}{km}. Nothing else changed.', gone: 'That stop isn’t on your plan any more, so I left the plan as it is.', failed: 'I couldn’t fit {new} there after all, so {old} stays.' }, ageSays: 'Its listing says “{says}”.', ageCheck: 'Its listing gives no ages: check it suits a {n}-year-old.',
     addOnPlan: '{name} is already on your plan (day {d}); I didn’t find another one to add.', addNoneListed: 'There’s no {noun} listed in {town}, so I couldn’t add one.',
     added: 'Added {new}{at}.', addedFor: 'Added {new}{at} in place of {old}.', info: 'I can’t answer questions about a place here. Tap the stop’s name for its hours, prices and details.', moved: '{name} moves to {time}.', noRoom: 'There’s no free spot for {kind} {where} without dropping a stop. Remove or swap one first.', addFailWhere: 'I couldn’t find {kind} open nearby {where}.', afterW: 'after {x}', beforeW: 'before {x}', thereW: 'at that time', lunchW: 'lunch', dinnerW: 'dinner', addedClose: 'Added {new}{at}, the closest fit I found.', addFail: 'I couldn’t fit {kind} into this plan.', more: 'Added {new}{at}, more like {liked}.', moreFail: 'I kept {liked}, but couldn’t fit another like it.',
     cheaperPick: 'Swapped {old} for {new}, a cheaper pick.', fancierPick: 'Swapped {old} for {new}, a fancier pick.', cheaperFail: 'I couldn’t find a cheaper pick than {old} there.', fancierFail: 'I couldn’t find a fancier pick than {old} there.',
@@ -1981,7 +1992,10 @@ const T = {
     whyHas: 'Votre plan comprend bien {what} : {list}.', whyHasAsked: 'Vous avez demandé {n} {plural} : {list}.', onDay: '{name} au jour {d}', whyDry: 'Votre demande disait que le groupe ne boit pas, donc j’ai laissé de côté les {plural}. Si une seule personne ne boit pas, dites-le et je les ajouterai.', whyNotIncluded: '{text} Dites « ajoute {add} » et je réessaierai.', whyNotAsked: 'Votre demande ne mentionnait pas {what}, donc il n’y en a pas. Dites « ajoute {add} » si vous en voulez.', whyNoFit: 'Je n’ai pas trouvé {what} qui convienne à ces journées. Dites « ajoute {add} » et je réessaierai.',
     lastChange: 'Dernier changement : j’ai {what}.', lastIn: 'ajouté {names}', lastOut: 'retiré {names}', lastMoved: 'déplacé {names}', lastNone: 'Je n’ai encore rien changé à ce plan.', lastFailed: 'La dernière fois, je n’ai pas pu ajouter {kinds}.', nothingMissing: 'Rien ne manque : tout ce que vous avez demandé est dans le plan.',
     qNone: 'Il n’y a pas de {what} dans votre plan. Dites « ajoute {add} » si vous en voulez un.', qMissingAsked: 'Le {what} demandé n’est pas dans votre plan : aucun de ceux que nous listons ne convenait à ces dates. Dites « ajoute {add} » et je trouverai le plus proche.',
-    alreadyHas: '{name} a déjà {what}, donc je l’ai gardé.', swapped: 'J’ai remplacé {old} par {new}{at}.', swapFail: 'Je n’ai pas trouvé {kind} qui convienne à ce moment, donc {old} reste.', swapFailSame: 'Rien d’autre à proximité ne convient à ce moment, donc {old} reste.', swapNearest: 'Le plus proche que je répertorie : {name}, à {town}.', ageSays: 'Sa fiche indique « {says} ».', ageCheck: 'Sa fiche ne donne pas d’âges : vérifiez que cela convient à {n} ans.',
+    alreadyHas: '{name} a déjà {what}, donc je l’ai gardé.', swapped: 'J’ai remplacé {old} par {new}{at}.', swapFail: 'Je n’ai pas trouvé {kind} qui convienne à ce moment, donc {old} reste.', swapFailSame: 'Rien d’autre à proximité ne convient à ce moment, donc {old} reste.', swapNearest: 'Le plus proche que je répertorie : {name}, à {town}.',
+    nf: { only: 'Le seul choix « {noun} » que je répertorie à {town}, {name}, est déjà au jour {d}.', on_plan: '{name} est déjà au jour {d}.', on_plan_many: 'Tous les choix « {noun} » que je répertorie à {town} sont déjà dans votre plan.', none_listed: 'Je ne répertorie aucun choix « {noun} » à {town}.',
+      alcohol: 'Le reste à {town} est exclu par votre demande sans alcool.', age: 'Le reste à {town} indique des âges qui excluent {n} ans.', slot: 'Rien de ce que je répertorie à {town} dans ce genre ne convient à ce moment.', slot_else: 'Le reste à {town} ne convient pas à ce moment.', stays: '{old} reste.',
+      swapped: 'J’ai remplacé {old} par {new}{at}. C’est à {altTown}, {out}{km}. Rien d’autre n’a changé.', gone: 'Cet arrêt n’est plus dans votre plan : je n’ai rien changé.', failed: 'Finalement, {new} ne convient pas à ce moment, donc {old} reste.' }, ageSays: 'Sa fiche indique « {says} ».', ageCheck: 'Sa fiche ne donne pas d’âges : vérifiez que cela convient à {n} ans.',
     addOnPlan: '{name} est déjà dans votre plan (jour {d}); je n’en ai pas trouvé d’autre à ajouter.', addNoneListed: 'Aucun lieu « {noun} » n’est répertorié à {town} : je n’ai rien ajouté.',
     added: 'J’ai ajouté {new}{at}.', addedFor: 'J’ai ajouté {new}{at} à la place de {old}.', info: 'Je ne peux pas répondre aux questions sur un lieu ici. Touchez le nom de l’arrêt pour ses heures, ses prix et ses détails.', moved: '{name} passe à {time}.', noRoom: 'Pas de place libre pour {kind} {where} sans retirer un arrêt. Retirez-en ou remplacez-en un d’abord.', addFailWhere: 'Je n’ai pas trouvé {kind} ouvert à proximité {where}.', afterW: 'après {x}', beforeW: 'avant {x}', thereW: 'à ce moment', lunchW: 'le dîner', dinnerW: 'le souper', addedClose: 'J’ai ajouté {new}{at}, le meilleur moment que j’ai trouvé.', addFail: 'Je n’ai pas pu ajouter {kind} à ce plan.', more: 'J’ai ajouté {new}{at}, dans le même esprit que {liked}.', moreFail: 'J’ai gardé {liked}, mais je n’ai pas pu en ajouter un autre du même genre.',
     cheaperPick: 'J’ai remplacé {old} par {new}, moins cher.', fancierPick: 'J’ai remplacé {old} par {new}, plus chic.', cheaperFail: 'Je n’ai pas trouvé moins cher que {old} à ce moment.', fancierFail: 'Je n’ai pas trouvé plus chic que {old} à ce moment.',
@@ -2102,6 +2116,18 @@ function kindNoun(what, L) {
   if (t.avoidWhat[what]) return t.avoidWhat[what];
   return KINDS[what] ? KINDS[what][L].replace(/^(?:an?|the|some|une?|du|de la|de l’|des|le|la|les)\s+/i, '') : (L === 'fr' ? 'arrêt' : 'stop');
 }
+// A swap that found nothing of the kind asked: the reasons known, in a few words, then that the stop stays.
+// r.nofit: { town, noun, reasons: ['only' | 'on_plan' | 'on_plan_many' | 'none_listed' | 'alcohol' | 'age' | 'slot' | 'slot_else'],
+//            name, day, age } (server.js tripChatSwapNoFit). A reason is said only when the code really excluded for it;
+// 'slot' is the honest "none of the others fit there" (no cause is made up).
+function swapNoFitLine(r, L) {
+  const n = r.nofit, t = T[L] && T[L].nf;
+  if (!n || !t || !n.town || !(n.reasons || []).length || !r.old) return '';
+  const v = { town: n.town, noun: n.noun || (L === 'fr' ? 'arrêt' : 'stop'), name: n.name || '', d: n.day || '', n: n.age || '', old: r.old.name };
+  const said = n.reasons.map((k) => (t[k] ? fill(t[k], v) : '')).filter(Boolean);
+  if (!said.length) return '';
+  return `${said.join(' ')} ${fill(t.stays, v)}`;
+}
 function cantReply(cant, lang, what = null, stops = null, opts = {}) {
   const L = lang === 'fr' ? 'fr' : 'en';
   const t = T[L];
@@ -2171,7 +2197,12 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
           if (r.age) parts.push(fill(r.ageSays ? t.ageSays : t.ageCheck, { n: r.age, says: r.ageSays || '' }));
         } else if (r.ok) parts.push(t.refine);
         else if (!r.old) parts.push(fill(t.notFound, { what: L === 'fr' ? 'cet arrêt' : 'that stop' })); // no stop was named
-        else {
+        else if (r.nofit && swapNoFitLine(r, L)) {
+          // (2026-11-24) Why nothing of that kind could go there, from what the listings and the trip's own rules
+          // really ruled out (server.js tripChatSwapNoFit); the way forward (a place in another town, asked first) is
+          // said after it by the server.
+          parts.push(swapNoFitLine(r, L));
+        } else {
           parts.push(r.kind ? fill(t.swapFail, { kind: kindLabel(r.kind), old: r.old.name }) : fill(t.swapFailSame, { old: r.old.name }));
           // The nearest one we do list, in another town (named only; nothing changes).
           if (r.nearest && r.nearest.name) parts.push(fill(t.swapNearest, { name: r.nearest.name, town: r.nearest.town || '' }));
@@ -2306,7 +2337,7 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
   const split = (x) => x.split(/(?<=[.!?])\s+(?=[A-ZÀ-Ý“«])/).filter(Boolean);
   // What the planner did around a tour (lunch moved, wineries it covers) is always said, up to four short lines.
   // So is a badge that no replacement has: why the stop stayed, what is offered instead, and the question.
-  const maxLines = out.results.some((r) => (r.tour && r.ok && ((r.tourAdjust || []).length || (r.covered || []).length)) || r.featMiss) ? 4 : Math.max(2, Math.min(4, asks || 1));
+  const maxLines = out.results.some((r) => (r.tour && r.ok && ((r.tourAdjust || []).length || (r.covered || []).length)) || r.featMiss || r.nofit) ? 4 : Math.max(2, Math.min(4, asks || 1));
   const over = (list) => list.filter((x) => x !== t.done).length > maxLines;
   if (!over(split(full))) return full;
   // First without the lines that only explain ("Your plan is unchanged." after a reason, "It stays when you change...").
@@ -2389,7 +2420,7 @@ module.exports = {
   MODEL, PRICE_PER_TOKEN, DEFAULT_TIMEOUT_MS, DEFAULT_DAILY_USD, MAX_MESSAGE, MAX_STOPS, RATE, OPS, TIMES, VALUES, CANT, KINDS, KIND_KEYS, CHIPS, T,
   enabled, apiKey, wireSchema, systemPrompt, stopsForModel, stripPII, validateWire, readChatMessage, rulesRead, chipOps,
   rulesConfident, reconcileReads, eventsNamed, eventAtAlcoholPlace, partyKnown, AVOID_TEXT,
-  stopsNamed, kindsNamed, planStops, planTurn, broadTurn, placeAdd, buildReply, cantReply, plannerCanRead, kindMatches, joinText, clock, isDayPlan, isShortPlan,
+  stopsNamed, kindsNamed, swapNoFitLine, planStops, planTurn, broadTurn, placeAdd, buildReply, cantReply, plannerCanRead, kindMatches, joinText, clock, isDayPlan, isShortPlan,
   rulesReadOne, agent, explain, kindNoun, TYPE_PLURAL, fold, joinList, raiseCount, KIND_WORDS, guardTurn, guardReply, explainReply, onePersonText, groupRead, TARGETED_OPS,
   dailyCapUsd, spentToday, addSpend, resetSpend, costOf, pacificDay, EXPLICIT_DATE_RE, rateLimited, rateWaitMinutes, busyReply, resetRate, WORD_KINDS, weekdayDays,
 };

@@ -33,6 +33,11 @@ const CHAT_STYLES = `<style>
   .t3-v4 .v4-chat-agent { margin: 2px 0 0; font-weight: 700; color: var(--ref-navy); overflow-wrap: anywhere; }
   .t3-v4 .v4-chat.is-busy .v4-chat-agent { color: var(--ref-navy-muted, #56636E); font-style: italic; }
   .t3-v4 .v4-chat-undo { border: 0; background: none; padding: 6px 4px; margin: -6px 0; min-height: 0; font: inherit; font-weight: 800; color: var(--ref-navy); text-decoration: underline; cursor: pointer; }
+  /* (2026-11-24) The reply's own next steps: "View <place>" (its listing, in a new tab) and one button that says yes. */
+  .t3-v4 .v4-chat-acts { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 8px; }
+  .t3-v4 .v4-chat-acts[hidden] { display: none; }
+  .t3-v4 .v4-chat-act { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 14px; border: 1px solid var(--ref-navy, #1b303c); border-radius: 12px; background: #fff; color: var(--ref-navy, #1b303c); font: inherit; font-size: 0.86rem; font-weight: 800; text-decoration: none; cursor: pointer; max-width: 100%; overflow-wrap: anywhere; }
+  .t3-v4 .v4-chat-act.is-main { background: var(--ref-navy, #1b303c); color: #fff; }
   .t3-v4 .v4-chat-form { display: flex; gap: 8px; margin: 0; }
   .t3-v4 .v4-chat-form input { flex: 1; min-width: 0; min-height: 46px; box-sizing: border-box; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.28); background: #fff; color: var(--ref-navy); font: inherit; font-size: 16px; }
   .t3-v4 .v4-chat-form input:focus { outline: 2px solid var(--ref-navy); outline-offset: 1px; }
@@ -133,6 +138,7 @@ function chatClientSrc(d) {
   function ct(k){ return (CHAT_T[lang()] || CHAT_T.en)[k]; }
   function v4ChatHtml(){
     return '<div class="v4-chat-reply" id="v4ChatReply" role="status" aria-live="polite" hidden><p class="v4-chat-you"></p><p class="v4-chat-agent"><span></span> <button type="button" class="v4-chat-undo" data-v4-chat-undo hidden>' + esc(ct('undo')) + '</button></p></div>'
+      + '<div class="v4-chat-acts" id="v4ChatActs" hidden></div>'
       + '<form class="v4-chat-form" id="v4ChatForm" autocomplete="off"><label class="v4-sr" for="v4ChatIn">' + esc(ct('label')) + '</label>'
       + '<input id="v4ChatIn" type="text" maxlength="400" enterkeyhint="send" placeholder="' + esc(ct('ph')) + '">'
       + '<button type="submit" class="v4-chat-send" aria-label="' + esc(ct('send')) + '">↑</button></form>'
@@ -169,6 +175,17 @@ function chatClientSrc(d) {
     box.querySelector('.v4-chat-you').textContent = you ? ct('you') + you : '';
     box.querySelector('.v4-chat-agent span').textContent = agent || '';
     var u = box.querySelector('[data-v4-chat-undo]'); if (u) u.hidden = !opts.undo;
+    // The reply's own buttons (server: choices): the place's listing page in a new tab (the plan stays open), and the
+    // offer itself as one tap. Gone with the next reply.
+    var actsEl = document.getElementById('v4ChatActs');
+    if (actsEl) {
+      var ch = (opts.choices || []).filter(function(c){ return c && c.label && ((c.kind === 'view' && typeof c.url === 'string' && /^\/(?!\/)/.test(c.url)) || (c.kind === 'say' && typeof c.say === 'string' && c.say)); }).slice(0, 2);
+      actsEl.innerHTML = ch.map(function(c){
+        return c.kind === 'view' ? '<a class="v4-chat-act" href="' + esc(c.url) + '" target="_blank" rel="noopener" data-v4-chat-view>' + esc(c.label) + ' <span aria-hidden="true">&nbsp;↗</span></a>'
+          : '<button type="button" class="v4-chat-act is-main" data-v4-offer="' + esc(c.say) + '">' + esc(c.label) + '</button>';
+      }).join('');
+      actsEl.hidden = !ch.length;
+    }
     var chips = document.getElementById('v4Chips'); if (chips && chat.used) chips.hidden = true;
     var c = document.getElementById('v4Chat'); if (c) c.classList.toggle('is-busy', !!opts.busy);
     // Round 6: two lines, a tap shows the rest; an old "… was removed" status line goes; on a wide screen the latest
@@ -231,11 +248,14 @@ function chatClientSrc(d) {
   // The broad-change guard: the chat asked before a change; "yes" sends that message again, confirmed.
   var CHAT_YES = /^\s*(?:yes|yep|yeah|yup|ok|okay|sure|go ahead|go for it|do it|please do|fine|oui|ouais|d[’']accord|vas-y|allez-y|fais-le|faites-le|parfait)\b/i;
   var CHAT_NO = /^\s*(?:no|nope|nah|don[’']t|never ?mind|cancel|stop|keep it|leave it|non|laisse|laissez|annule[rz]?)\b/i;
-  function chatSend(message, chip, label, confirmed){
+  function chatSend(message, chip, label, confirmed, asLabel){
     if (!state.last) return;
     // Second fresh-eyes round (2026-11-22: a message typed while waiting was dropped): it waits its turn.
-    if (chat.busy) { chat.queue = { message: message, chip: chip, label: label, confirmed: confirmed }; var qb = document.getElementById('v4Chat'); if (qb) qb.classList.add('has-queue'); return; }
-    var snap = chatSnapshot(), you = confirmed ? (label || '') : (message || label || '');
+    if (chat.busy) { chat.queue = { message: message, chip: chip, label: label, confirmed: confirmed }; chat.sayAs = asLabel ? { message: message, label: label } : null; var qb = document.getElementById('v4Chat'); if (qb) qb.classList.add('has-queue'); return; }
+    // An offer's button tapped while another message was loading keeps its own words when its turn comes.
+    if (!asLabel && chat.sayAs && chat.sayAs.message === message) { asLabel = true; label = chat.sayAs.label; }
+    chat.sayAs = null;
+    var snap = chatSnapshot(), you = confirmed || asLabel ? (label || '') : (message || label || '');
     chat.busy = true; chat.used = true;
     if (window.__roamTripFunnel) window.__roamTripFunnel.step('chat');
     chatShow(you, ct('thinking'), { busy: true });
@@ -327,7 +347,7 @@ function chatClientSrc(d) {
         chat.undo = planTouched ? snap : null;
         // Round 4: the answer to a message sent while this one was loading is shown after this one's (it vanished).
         var said = (chat.carry ? chat.carry + ' ' : '') + (j.reply || ct('err')); chat.carry = hadQueue ? said : null;
-        chatShow(you, said, { undo: planTouched });
+        chatShow(you, said, { undo: planTouched, choices: Array.isArray(j.choices) ? j.choices : null });
         if (touched) chatGlow(changed);
         track('trip_chat', { chat_source: /^(ai|rules|chip)$/.test(j.source || '') ? j.source : 'other', changed: touched ? 'yes' : 'no' });
       })
@@ -353,6 +373,8 @@ function chatClientSrc(d) {
     var b;
     if ((b = t.closest('[data-v4-chip]'))) { chatSend(null, b.getAttribute('data-v4-chip'), b.textContent); return; }
     // A thin day's one-tap next step (plan.thinDays[].next): its message goes through the chat as if typed.
+    // An offer's own button: the offer goes back exactly as the server worded it; the chat shows the button's words.
+    if ((b = t.closest('[data-v4-offer]'))) { chatSend(String(b.getAttribute('data-v4-offer') || '').slice(0, 400), null, b.textContent, false, true); return; }
     if ((b = t.closest('[data-v4-say]'))) { chatSend(String(b.getAttribute('data-v4-say') || '').slice(0, 400), null, b.textContent); return; }
     if ((b = t.closest('#v4ChatReply.is-long')) && !t.closest('[data-v4-chat-undo]')) { b.classList.add('is-open'); chatPad(); return; }
     if ((b = t.closest('[data-v4-chat-undo]')) && chat.undo) { var snap = chat.undo; chat.undo = null; chat.lastDiff = null; chat.pending = null; chat.offer = null; chatRestore(snap); chatShow('', ct('undone'), {}); track('trip_chat', { chat_source: 'undo', changed: 'yes' }); }
