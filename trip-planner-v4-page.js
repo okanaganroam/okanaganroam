@@ -300,11 +300,29 @@ const V4_CLIENT_SRC = String.raw`
   //   chipOff: the plain Dog-Friendly chip would read as settled next to "check indoor or patio access": the note
   //   stands in for the chip on that card
   //   more: the full sentences for the opened card; dir: the directions line for a stop listed for one entrance
+  // The plan's allergy entry (trip-allergy-need.js), only while the plan carries the need.
+  function v4AllergyEntry(){
+    var p = state.last || {};
+    if (!(Array.isArray(p.needs) ? p.needs : []).some(function(n){ return n && typeof n === 'object' && n.key === 'allergy'; })) return null;
+    return (p.evidence || []).filter(function(e){ return e && e.ask === 'allergy' && e.noteRest; })[0] || null;
+  }
+  // Sharing an allergy (2026-11-23): health details go into a link or a copied itinerary only when the traveller ticks
+  // "Include allergy details" in the share box (off each time a plan is shared from a fresh page). Without it the copy
+  // says only that allergies are not checked and names no allergen. -> the allergy entry when the details go along.
+  function v4ShareAllergyOn(){ var e = v4AllergyEntry(); return e && e.share && v4.shareAllergy === e.share ? e : null; }
   function v4NeedLines(s){
     var out = { note: '', notes: [], compact: [], open: [], more: [], chipOff: false, dir: null }, id = s && s.venue && s.venue.id, fr = lang() === 'fr';
     var p = state.last || {}, needs = Array.isArray(p.needs) ? p.needs : [];
     var hasNeed = function(k){ return needs.some(function(n){ return n && typeof n === 'object' && n.key === k; }); };
     if (!id) return out;
+    // A food allergy (2026-11-23, trip-allergy-need.js): every stop that serves food says to ask (never a yes: no
+    // listing carries allergen data). By the stop's type, so a place swapped in on the page says it too.
+    var alE = hasNeed('allergy') ? (p.evidence || []).filter(function(e){ return e && e.ask === 'allergy' && e.noteRest; })[0] : null, alNote = '';
+    if (alE && s.venue && ((alE.foodTypes || []).indexOf(s.venue.type) !== -1 || (alE.stops || []).some(function(x){ return x && x.id === id; }))) {
+      var alRest = s.venue.type === 'restaurant';
+      alNote = alRest ? ((fr && alE.noteRestFr) || alE.noteRest) : ((fr && alE.noteOtherFr) || alE.noteOther);
+      out.more.push((fr && alE.moreFr) || alE.more);
+    }
     (p.evidence || []).forEach(function(e){
       // No car (2026-11-23, trip-transport-need.js): the hop that reaches this stop, when it is more than a short walk.
       if (e && e.ask === 'no_car' && Array.isArray(e.stops) && hasNeed('no_car')) {
@@ -326,6 +344,7 @@ const V4_CLIENT_SRC = String.raw`
     // (2026-11-24) A stop chosen in the chat for an age the traveller gave, whose listing gives no ages: one short
     // note ("Age 15: check it suits"), the full sentence under the opened card, and a line in the Book my trip list.
     try { var ag = typeof v4AgeAsk === 'function' ? v4AgeAsk(id) : null; if (ag && ag.short) { var as = (fr && ag.shortFr) || ag.short; out.notes.push(as); out.compact.push(as); out.open.push(as); out.more.push((fr && ag.noteFr) || ag.note || as); out.age = ag.age; } } catch (e) { /* no note */ }
+    if (alNote) { out.notes.unshift(alNote); out.compact.unshift(alNote); out.open.unshift(alNote); out.allergy = alNote; }
     out.note = out.notes.join(' · ');
     return out;
   }
@@ -591,6 +610,9 @@ const V4_CLIENT_SRC = String.raw`
       // No car (2026-11-23): one line, in the plan's own words; the stops whose hop needs a ride are listed below.
       var ncE = ((state.last && state.last.evidence) || []).filter(function(e){ return e && e.ask === 'no_car' && e.short; })[0];
       if (ncE && (state.last.needs || []).some(function(n){ return n && n.key === 'no_car'; })) html += '<p class="t3-book-note v4-book-honest" data-v4-book-nocar>' + esc(((lang() === 'fr' && ncE.shortFr) || ncE.short) + '.') + '</p>';
+      // A food allergy (2026-11-23): one line; each meal stop is then listed below. No booking link carries it.
+      var alS = v4AllergyEntry();
+      if (alS && alS.sheet) html += '<p class="t3-book-note v4-book-honest" data-v4-book-allergy><strong>' + esc((lang() === 'fr' && alS.sheetFr) || alS.sheet) + '</strong></p>';
       if (needFacts.length) html += '<p class="t3-book-note v4-book-honest" data-v4-book-needs>' + esc((lang() === 'fr' ? 'À confirmer auprès de chaque endroit : ' : 'To confirm with each place: ') + needFacts.map(function(f){ return f.text; }).join('. ') + '.') + '</p>';
       // (2026-11-23) Then each stop with something still to confirm, in the words of its own card (v4NeedLines: the
       // same short notes), so the checklist, the cards and the shared copy say one thing.
@@ -889,6 +911,10 @@ const V4_CLIENT_SRC = String.raw`
       var ac = [];
       list.forEach(function(x){ var am = /^venue:(\d+)$/.exec(x.ref), ag = am && typeof v4AgeAsk === 'function' ? v4AgeAsk(Number(am[1])) : null; if (ag && ag.age > 0 && ag.age < 100 && ac.length < 6) ac.push(am[1] + ':' + ag.age); });
       if (ac.length) out += '&ac=' + ac.join(',');
+      // A food allergy (2026-11-23): al= names the allergens only when the traveller ticked "Include allergy details";
+      // without it the link's asks carry "allergy" alone and the copy names none.
+      var alOn = v4ShareAllergyOn();
+      if (alOn && /^(?:x\.)?[a-z_,]{2,80}$/.test(alOn.share)) out += '&al=' + alOn.share;
       // The budget (2026-11-23): the limit and the estimate's own figures (bg=600t, be=low.high.people.assumed.nights.
       // stops.unpriced.stayMissing; x = no figure). Values only: the copy's wording is rebuilt on the server.
       var bg = v4Budget();
@@ -905,6 +931,14 @@ const V4_CLIENT_SRC = String.raw`
   function v4ShareText(){
     var fr = lang() === 'fr', lines = [], head = document.getElementById('t3Headline');
     lines.push((head && head.textContent) || vt('shareTitle'));
+    // A food allergy (2026-11-23): said first. Named only with "Include allergy details" ticked; else the general line.
+    var alE = v4AllergyEntry(), alOn = v4ShareAllergyOn(), alAnon = alE && !alOn ? (alE.anon || {}) : null;
+    if (alE) lines.push(alOn ? ((fr && alE.copyFr) || alE.copy) : ((fr && alAnon.copyFr) || alAnon.copy || ''));
+    var alHide = function(txt){
+      if (!alAnon) return txt;
+      [[(fr && alE.noteRestFr) || alE.noteRest, (fr && alAnon.noteRestFr) || alAnon.noteRest], [(fr && alE.noteOtherFr) || alE.noteOther, (fr && alAnon.noteOtherFr) || alAnon.noteOther]].forEach(function(pair){ if (pair[0] && pair[1]) txt = txt.split(pair[0]).join(pair[1]); });
+      return txt;
+    };
     Array.prototype.forEach.call(resultEl.querySelectorAll('.v4-day'), function(sec){
       var t = sec.querySelector('.v4-day-title'), rows = [];
       Array.prototype.forEach.call(sec.querySelectorAll('.v4-stop:not(.v4-gone):not(.v4-free)'), function(li){
@@ -931,6 +965,8 @@ const V4_CLIENT_SRC = String.raw`
     // Share suggestions (2026-11-23): what the plan could not include, in its own words (at most three lines).
     var left = ((state.last && state.last.notIncluded) || []).filter(function(x){ return x && x.text && (x.reason === 'none_listed' || x.reason === 'not_fitted'); }).slice(0, 3);
     if (left.length) { lines.push(''); left.forEach(function(x){ lines.push((fr && x.textFr) || x.text); }); }
+    // (Without the tick, each stop's allergy note is the general one: no allergen is named in the copied text.)
+    if (alAnon) lines = lines.map(alHide);
     return lines.join('\n');
   }
   function v4Toast(text){
@@ -1006,6 +1042,8 @@ const V4_CLIENT_SRC = String.raw`
       // Group preferences (2026-11-22): one person's need ("one of us doesn't drink") and what the listings say about it.
       + (p.partyNote && ((fr && p.partyNote.textFr) || p.partyNote.text) ? '<p class="v4-tip v4-picked v4-partynote">' + esc((fr && p.partyNote.textFr) || p.partyNote.text) + '</p>' : '')
       // Honest plan (2026-11-22): one short line per ask the listings only partly support or cannot show (plan.evidence).
+      // A food allergy (2026-11-23): its sentence first, on its own (under Details on a phone, beside the summary item).
+      + (function(){ var a = v4AllergyEntry(); return a && a.text ? '<p class="v4-tip v4-picked v4-evidence v4-allergy-line" data-ev-status="unknown">' + esc((fr && a.textFr) || a.text) + '</p>' : ''; })()
       + ((p.evidence || []).filter(function(x){ return x && x.line && x.text; }).slice(0, 3).map(function(x){ return '<p class="v4-tip v4-picked v4-evidence" data-ev-status="' + esc(x.status) + '">' + esc((fr && x.textFr) || x.text) + '</p>'; }).join(''))
       + (p.noDrive && p.noDrive.text ? '<p class="v4-tip v4-picked v4-nodrive">' + esc((fr && p.noDrive.textFr) || p.noDrive.text) + '</p>' : '')
       + (picked ? '<p class="v4-tip v4-picked">' + esc(picked) + '</p>' : '')

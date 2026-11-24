@@ -18,6 +18,7 @@
 
 const agent = require('./trip-chat-agent');
 const access = require('./trip-chat-access');
+const allergy = require('./trip-allergy-need');
 const explain = require('./trip-chat-explain.js');
 const MODEL = 'claude-haiku-5-5';
 // Claude Haiku 5.5 list price (claude-api skill, cached 2026-10-06): $0.10 / $0.50 per million input / output tokens.
@@ -492,7 +493,25 @@ function kindsNamed(t, exceptTypes = new Set()) {
 // dog can come with us" is ONE verify-and-fix request with a part per need (never cut at "and", never a stay change
 // alone), and a question about a need is an answer.
 const ACCESS_BASE = { stops: [], kind: null, time: null, day: null, value: null, n: null, ages: [], region: null, date: null };
-function rulesRead(message, stops, opts = {}) { return access.read(message, stops, { op: (o, extra = {}) => ({ ...ACCESS_BASE, o, ...extra }), stopsNamed, kindsNamed }) || groupRead(message, stops, opts) || agent.readAll(message, (m) => rulesReadOne(m, stops, opts)); }
+function rulesReadBase(message, stops, opts = {}) { return access.read(message, stops, { op: (o, extra = {}) => ({ ...ACCESS_BASE, o, ...extra }), stopsNamed, kindsNamed }) || groupRead(message, stops, opts) || agent.readAll(message, (m) => rulesReadOne(m, stops, opts)); }
+// A food allergy first of all (2026-11-23, trip-allergy-need.js): a question about it is answered, the need said in the
+// chat is recorded, and a swap or an add that asks for a place free of the allergen is explained and never carried out
+// as asked (no listing has allergen data, so no place can be offered as fitting). The rest of the message is read as
+// usual. Fixed rules: the AI's reading never stands in for them (access: true).
+function rulesRead(message, stops, opts = {}) {
+  let al = null;
+  try { al = allergy.chatRead(message, stops, { op: (o, extra = {}) => ({ ...ACCESS_BASE, o, ...extra }), stopsNamed }, { request: opts.request || '' }); } catch (e) { al = null; }
+  if (!al) return rulesReadBase(message, stops, opts);
+  if (al.rest) {
+    let r = null;
+    try { r = rulesReadBase(al.rest, stops, opts); } catch (e) { r = null; }
+    // (The rest is done first, so the allergy answer and its question end the reply.)
+    if (r && (r.ops || []).length) al.ops = [...r.ops.filter((o) => o.o !== 'refine'), ...al.ops];
+    else if (r && r.cant) al.missed = [{ cant: r.cant, what: r.what || null }];
+    delete al.rest;
+  }
+  return al;
+}
 // One of the party does not drink (2026-11-22, Dayton: "one non-drinker must not remove wineries for everyone"): the
 // message is about that person, never a rule for the whole trip. "Only one person does not drink; the rest want
 // wineries. Can you add a winery on day 2 with a non-alcoholic option?" -> party_some (whose need it is) and ONE winery

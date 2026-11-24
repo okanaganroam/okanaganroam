@@ -105,6 +105,8 @@ function tripSummaryFacts(plan, fr, ctx) {
   // The traveller's budget (2026-11-23, trip-budget.js): the limit beside the estimate, in the server's own words
   // (ctx.budget: the chosen stay's). Never a tick: the figures are estimates. A plan with no budget has no such fact.
   if (c.budget && (fr ? c.budget.textFr : c.budget.text) && (fr ? c.budget.textFr : c.budget.text).summary) flags.unshift({ kind: 'flag', status: c.budget.status === 'over' ? 'unmet' : c.budget.status === 'under' || c.budget.status === 'under_priced' ? 'partial' : 'unknown', ask: 'budget', text: (fr ? c.budget.textFr : c.budget.text).summary });
+  // A food allergy leads the summary (2026-11-23, trip-allergy-need.js): said before anything else about the plan.
+  flags.sort(function (a, b) { return (b.ask === 'allergy' ? 1 : 0) - (a.ask === 'allergy' ? 1 : 0); });
   if (ok.length > 4) { var more = ok.length - 3; ok = ok.slice(0, 3); ok.push({ kind: 'ok', ask: 'more', text: fr ? '+' + more + ' autres ✓' : '+' + more + ' more ✓' }); }
   return out.concat(flags, ok);
 }
@@ -196,6 +198,9 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
 .tw-share h2 {font:600 26px Fraunces,serif;margin:0 0 12px;}
 .tw-share input {width:100%;box-sizing:border-box;padding:12px;border:1px solid #ccc;border-radius:10px;margin:8px 0;font-size:16px;}
 .tw-share-actions {display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.tw-share .tw-share-al {display:flex;gap:10px;align-items:center;min-height:44px;margin:4px 0 0;font-weight:800;cursor:pointer;}
+.tw-share .tw-share-al input {width:22px;height:22px;flex:0 0 auto;margin:0;padding:0;}
+.tw-share .tw-share-al-note {margin:0 0 10px;font-size:13px;line-height:1.4;color:#52665e;}
 .tw-share button {min-height:44px;padding:8px 14px;border-radius:10px;border:1px solid #1b303c;background:#1b303c;color:white;font:800 14px Nunito,sans-serif;cursor:pointer;}
 @media(max-width:899px){
  .t3-v4.tw-workspace.has-plan {display:block;padding:12px 16px 30px;}
@@ -443,7 +448,13 @@ const WORKSPACE_CLIENT_SRC=String.raw`
     var list=v4ShareStops();if(!list.length)return;
     var url=v4ShareLink(list),text=v4ShareText(),dlg=document.getElementById('twShare');
     if(!dlg){dlg=document.createElement('dialog');dlg.id='twShare';dlg.className='tw-share';document.body.appendChild(dlg);}
-    dlg.innerHTML='<h2>'+esc(twText('Share your trip','Partager votre voyage'))+'</h2><p>'+esc(twText('Send this link to your group chat. It opens a copy of this plan to view: the stops and times, the place to stay and the booking links. It doesn’t change if you edit your plan later, and nothing in it is booked.','Envoyez ce lien à votre groupe. Il ouvre une copie de ce plan à consulter : les étapes et les heures, l’hébergement et les liens de réservation. Elle ne change pas si vous modifiez votre plan, et rien n’y est réservé.'))+'</p><label for="twShareUrl">'+esc(twText('Trip link','Lien du voyage'))+'</label><input id="twShareUrl" readonly value="'+esc(url)+'"><div class="tw-share-actions"><button type="button" data-tw-copy="link">'+esc(twText('Copy link','Copier le lien'))+'</button><button type="button" data-tw-copy="itinerary">'+esc(twText('Copy itinerary','Copier le programme'))+'</button>'+(navigator.share?'<button type="button" data-tw-native>'+esc(twText('Share via…','Partager via…'))+'</button>':'')+'<button type="button" data-tw-close>'+esc(twText('Close','Fermer'))+'</button></div><p role="status" id="twShareStatus"></p>';
+    // A food allergy (2026-11-23, trip-allergy-need.js): health details are the traveller's to share. One tick, off by
+    // default: off, the link and the copied itinerary say only that allergies are not checked (no allergen is named,
+    // none is in the link); on, they name it. Shown only on a plan that names an allergen.
+    var alE=typeof v4AllergyEntry==='function'?v4AllergyEntry():null,alRow='';
+    if(alE&&alE.share){var alName=(lang()==='fr'&&alE.labelFr)||alE.label;alRow='<label class="tw-share-al" for="twShareAl"><input type="checkbox" id="twShareAl"'+(v4.shareAllergy===alE.share?' checked':'')+'><span>'+esc(twText('Include “'+alName+'”','Inclure « '+alName+' »'))+'</span></label><p class="tw-share-al-note">'+esc(twText('Off: the link and itinerary only say allergies aren’t checked.','Décoché : le lien et le programme disent seulement que les allergies ne sont pas vérifiées.'))+'</p>';}
+    dlg.onchange=function(e){if(!e.target||e.target.id!=='twShareAl'||!alE)return;v4.shareAllergy=e.target.checked?alE.share:null;url=v4ShareLink(list);text=v4ShareText();var box=document.getElementById('twShareUrl');if(box)box.value=url;document.getElementById('twShareStatus').textContent='';};
+    dlg.innerHTML='<h2>'+esc(twText('Share your trip','Partager votre voyage'))+'</h2><p>'+esc(twText('Send this link to your group chat. It opens a copy of this plan to view: the stops and times, the place to stay and the booking links. It doesn’t change if you edit your plan later, and nothing in it is booked.','Envoyez ce lien à votre groupe. Il ouvre une copie de ce plan à consulter : les étapes et les heures, l’hébergement et les liens de réservation. Elle ne change pas si vous modifiez votre plan, et rien n’y est réservé.'))+'</p>'+alRow+'<label for="twShareUrl">'+esc(twText('Trip link','Lien du voyage'))+'</label><input id="twShareUrl" readonly value="'+esc(url)+'"><div class="tw-share-actions"><button type="button" data-tw-copy="link">'+esc(twText('Copy link','Copier le lien'))+'</button><button type="button" data-tw-copy="itinerary">'+esc(twText('Copy itinerary','Copier le programme'))+'</button>'+(navigator.share?'<button type="button" data-tw-native>'+esc(twText('Share via…','Partager via…'))+'</button>':'')+'<button type="button" data-tw-close>'+esc(twText('Close','Fermer'))+'</button></div><p role="status" id="twShareStatus"></p>';
     dlg.showModal();
     dlg.onclick=function(e){var b=e.target.closest('button');if(!b)return;if(b.hasAttribute('data-tw-close')){dlg.close();return;}if(b.hasAttribute('data-tw-native')){navigator.share({title:text.split('\n')[0],text:text,url:url}).catch(function(){});return;}if(b.hasAttribute('data-tw-copy')){var value=b.dataset.twCopy==='link'?url:text+'\n'+url;var done=function(){document.getElementById('twShareStatus').textContent=twText('Copied — ready to paste into your group chat.','Copié — prêt à envoyer à votre groupe.');track('trip_share',{method:'copy',stop_count:list.length,source:'plan_v4'});};if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(value).then(done,function(){document.getElementById('twShareStatus').textContent=twText('Select the link above to copy it.','Sélectionnez le lien pour le copier.');});}};
   };

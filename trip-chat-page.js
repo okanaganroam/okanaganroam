@@ -380,7 +380,7 @@ function chatClientSrc(d) {
           var np = j.needPatch, nds = Array.isArray(state.last.needs) ? state.last.needs.filter(function(n){ return !(n && n.key === np.need.key); }) : [];
           nds.push(np.need); state.last.needs = nds;
           var evs = (state.last.evidence || []).filter(function(e){ return !(e && e.ask === np.evidence.ask); }), at = evs.findIndex(function(e){ return e && /^stay:/.test(e.ask || ''); });
-          np.evidence.line = true; if (at < 0) evs.push(np.evidence); else evs.splice(at, 0, np.evidence);
+          np.evidence.line = np.evidence.ask !== 'allergy'; if (np.evidence.ask === 'allergy') evs.unshift(np.evidence); else if (at < 0) evs.push(np.evidence); else evs.splice(at, 0, np.evidence);
           state.last.evidence = evs; touched = true;
         }
         // Round 4: a change asked for in the chat keeps a confirmed plan confirmed (Book, Share and Save stay, for the plan

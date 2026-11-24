@@ -361,6 +361,8 @@ function stopNeedNotes(plan, id, fr) {
   if (out.dog) { const n = dogShort(out.dog, fr); out.notes.push(n); out.compact.push(dogShort(out.dog, fr, true)); if (dogOpen(out.dog)) out.open.push(n); out.chipOff = out.dog.has === true && out.dog.where === 'unsaid'; }
   // No car (2026-11-23, trip-transport-need.js): the hop that reaches this stop, when it is more than a short walk.
   if (hasNeed(needs, 'no_car')) { const r = row('no_car'); if (r && r.check && r.note) { const n = (fr && r.noteFr) || r.note; out.notes.push(n); out.compact.push((fr && r.noteShortFr) || r.noteShort || n); } }
+  // A food allergy (2026-11-23, trip-allergy-need.js): every stop that serves food says to ask; never a yes.
+  if (hasNeed(needs, 'allergy')) { const r = row('allergy'); if (r && r.note) { const n = (fr && r.noteFr) || r.note; out.notes.unshift(n); out.compact.unshift(n); out.open.unshift(n); out.allergy = n; } }
   out.text = out.notes.join(' · ');
   return out;
 }
