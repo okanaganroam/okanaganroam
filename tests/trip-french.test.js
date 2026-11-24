@@ -282,7 +282,8 @@ test('French module: loads, exports its two functions, and server.js loads it wi
 test('English: runTripPlan() reads the French layer’s text; the request shown and shared stays the visitor’s own', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
   const fn = src.slice(src.indexOf('function runTripPlan('), src.indexOf('// ---------- Temporary-condition advisories'));
-  assert.ok(fn.includes('const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);'));
+  // (2026-11-23: with the allergy words taken out first, trip-allergy-need.js; the request itself is unchanged.)
+  assert.ok(fn.includes('const planText = tripPlannerFrModule().tripPlannerText(v4 ? tripAllergy.stripAllergy(text) : text, taxonomy);'));
   assert.ok(fn.includes('interpretDiscoveryQuery(interpretationText, taxonomy)') && fn.includes('interpretTripComponents(interpretationText, taxonomy, intent)'));
   assert.equal((fn.match(/plan\.query = text;/g) || []).length, 2, 'plan.query is the visitor’s own text');
   // Site search does not use it.

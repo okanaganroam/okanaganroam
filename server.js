@@ -53,6 +53,7 @@ const tripBooking = require('./trip-booking');
 const tripHonestPlan = require('./trip-honest-plan');
 const tripAccess = require('./trip-access-needs');
 const tripTransport = require('./trip-transport-need');
+const tripAllergy = require('./trip-allergy-need');
 const tripBudget = require('./trip-budget');
 // Viator tours (2026-11-20, viator.js): off unless VIATOR_API_KEY and VIATOR_PARTNER_ID are both set.
 const viator = require('./viator');
@@ -9020,7 +9021,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // The plan before its "where to stay" part (one planner run; the stay turn then works out the stay for each preference).
   const runCore = tripChatSafeRun(timed((a) => tripPlanBeforeStays(planValue(a), tripPlanDecorated)));
   // The place to stay and getting here (2026-11-22, agent round) are answered here; every other op goes to the planner.
-  const isExtra = (o) => o.o === 'ensure' || o.o === 'stay' || o.o === 'transport' || o.o === 'avoid' || o.o === 'ask' || o.o === 'party_some' || o.o === 'swap_to' || (o.o === 'party' && (o.value === 'adults' || o.value === 'rooms' || o.value === 'stay_dates' || o.value === 'budget'));
+  const isExtra = (o) => o.o === 'allergy' || o.o === 'ensure' || o.o === 'stay' || o.o === 'transport' || o.o === 'avoid' || o.o === 'ask' || o.o === 'party_some' || o.o === 'swap_to' || (o.o === 'party' && (o.value === 'adults' || o.value === 'rooms' || o.value === 'stay_dates' || o.value === 'budget'));
   // One of the party does not drink: a request that ruled alcohol out for the whole group is rewritten so that it is
   // that person's (the planner then reads partySome); a request that said nothing of it gains the line. The stops are
   // never re-planned for this: only what the same message asks for changes.
@@ -9037,6 +9038,17 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     const nt = tripChat.joinText(String(v.args.text || '').replace(/[\s.]+$/, ''), [lang === 'fr' ? 'sans voiture' : 'no car']);
     if (nt && tripTransport.readNoCar(nt)) { noCarText = nt; v.args = { ...v.args, text: nt }; }
   }
+  // A food allergy said in the chat (2026-11-23, trip-allergy-need.js): the request gains the words, so every later
+  // re-plan, the summary, the cards and the shared copy carry the need. No stop is planned again or swapped for it.
+  let allergyText = null, allergyNeed = tripAllergy.readAllergy(v.args.text), allergyRecorded = false;
+  { const said = ops.filter((o) => o.o === 'allergy' && o.al);
+    if (said.length) {
+      let want = allergyNeed;
+      for (const o of said) want = tripAllergy.merge(want, o.al);
+      const nt = tripChat.joinText(String(v.args.text || '').replace(/[\s.]+$/, ''), said.map((o) => tripAllergy.requestWords(o.al)));
+      const got = nt ? tripAllergy.readAllergy(nt) : null;
+      if (got && tripAllergy.covers(got, want)) { allergyText = nt; v.args = { ...v.args, text: nt }; allergyNeed = got; allergyRecorded = true; } else allergyNeed = want;
+    } }
   const extra = ops.filter(isExtra);
   const planOps = ops.filter((o) => !isExtra(o));
   // Round 4: a change to the stops keeps the place to stay the visitor sees (it changed with unrelated messages).
@@ -9160,6 +9172,8 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   } catch (e) { /* the swap stands without them */ }
   for (const op of [...(stayOps.length ? [stayOps] : []), ...extra.filter((o) => o.o !== 'stay')]) {
     const r = Array.isArray(op) ? tripChatStayTurn(op, { v, plan, req, stops, lang, staysOn, runCore, timing, days, short })
+      : op.o === 'allergy' ? tripChatAllergyTurn(op, { v, stops, lang, need: allergyNeed, recorded: allergyRecorded })
+      : op.o === 'ask' && (op.value === 'q_allergy_swap' || (op.value === 'q_allergy' && op.al)) ? tripChatAllergyAnswer(op, { stops, lang, need: tripAllergy.merge(allergyNeed, op.al) })
       : op.o === 'ensure' ? tripChatEnsureTurn(op, { v, stops, lang, staysOn, runCore, run, hooks, timing, days, short })
       : op.o === 'avoid' ? tripChatAvoidTurn(op, { v, req, lang })
         : op.o === 'party_some' ? tripChatPartySomeTurn({ stops: plan ? tripChatStops(tripChat.planStops(plan).map((s) => ({ key: s.key, id: s.id }))) : stops, lang, rewrote: someRewrote, text: someText, alone: !planOps.length, changed: !!plan })
@@ -9214,6 +9228,16 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // The plan's evidence lines (the non-drinker's line, gluten-free, what was not included) are worked out again for the
   // stops the chat returns (it takes out places a pinned re-run adds), so the page and the reply never disagree.
   if (plan && typeof tripHonestEvidence === 'function') { try { tripHonestEvidence(plan); } catch (e) { /* the planner's lines stand */ } }
+  // A food allergy on the plan (2026-11-23): a place to eat that this turn brought in is said to be unconfirmed too, in
+  // the reply itself (a swap's "Done" must never read as if the new place had been checked). Not for an Undo: the place
+  // that comes back was already on the plan, with its note.
+  if (plan && allergyNeed && !wentBack) {
+    try {
+      const had = new Set(stops.map((s) => s.id));
+      const fresh = tripChat.planStops(plan).filter((s) => !had.has(s.id) && tripAllergy.isFoodStop(s));
+      if (fresh.length) reply = [reply, tripAllergy.chatReply('fresh', allergyNeed, lang, { names: tripChat.joinList(fresh.slice(0, 3).map((s) => s.name), lang === 'fr' ? 'fr' : 'en') })].filter(Boolean).join(' ');
+    } catch (e) { /* the reply stands */ }
+  }
   // Planner round 5: the day labels follow the stops shown (the chat takes out places a pinned re-run adds).
   if (plan) { try { tripPlannerModule().v4DayTownLabels(plan, { v4: true, labels: { regions: REGION_LABELS } }); } catch (e) { /* cosmetic */ } }
   logTiming();
@@ -9223,7 +9247,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   return {
     timing: { ...timing, total: Date.now() - timing.start },
     source, cant: null, plan, actions,
-    response: { reply, source, plan, req, changed: out.changed || [], actions, ...tripChatDiff(stops, v.removed, plan, actions, out), ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(stayForce !== undefined ? { stayForce } : {}), ...(stayArrive ? { stayArrive } : {}), ...(party ? { party } : {}), ...(stayDates ? { stayDates } : {}), ...((newText || noCarText) && !plan ? { text: newText || noCarText } : {}), ...(needPatch && noCarText && !plan && !answerOnly ? { needPatch } : {}), ...(askFirst ? { confirm: true } : {}), ...(card ? { card } : {}), ...(note ? { note } : {}), ...(offer.length ? { offer } : {}), ...(swapAsk ? { choices: swapAsk.choices } : {}), ...(swapBack && plan ? { swapBack } : {}), ...(wentBack ? { back: true } : {}), ...(ageAsk.length && plan ? { ageAsk } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
+    response: { reply, source, plan, req, changed: out.changed || [], actions, ...tripChatDiff(stops, v.removed, plan, actions, out), ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(stayForce !== undefined ? { stayForce } : {}), ...(stayArrive ? { stayArrive } : {}), ...(party ? { party } : {}), ...(stayDates ? { stayDates } : {}), ...((newText || noCarText || allergyText) && !plan ? { text: newText || noCarText || allergyText } : {}), ...(needPatch && (noCarText || allergyText) && !plan && !answerOnly ? { needPatch } : {}), ...(askFirst ? { confirm: true } : {}), ...(card ? { card } : {}), ...(note ? { note } : {}), ...(offer.length ? { offer } : {}), ...(swapAsk ? { choices: swapAsk.choices } : {}), ...(swapBack && plan ? { swapBack } : {}), ...(wentBack ? { back: true } : {}), ...(ageAsk.length && plan ? { ageAsk } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
   };
 }
 // "somewhere cheaper to stay", "a hotel with a pool", "stay in Naramata", "we already have a place": the same plan (every
@@ -9807,6 +9831,20 @@ function tripChatLinkAnswer(r, ctx) {
     const raw = tripChatStayRaw([], ctx, true);
     return raw && raw.p && raw.p.whereToStay ? { ...r, reply: tripChatLinkClaims(r.reply, raw.p.whereToStay, ctx.lang) } : r;
   } catch (e) { return r; }
+}
+// A food allergy in the chat (2026-11-23, trip-allergy-need.js). No listing carries allergen or cross-contact data, so
+// every answer is the same honest one, and nothing is ever offered as fitting the allergy.
+//   the need said ("one of us is allergic to shellfish"): noted, and put on the plan (needPatch) when the request took it
+function tripChatAllergyTurn(op, { v, stops, lang, need, recorded }) {
+  const on = stops.filter((s) => !((v && v.removed) || []).includes(s.key));
+  return { reply: op.quiet ? '' : tripAllergy.chatReply('noted', need, lang, { recorded }), ...(recorded ? { needPatch: { need, evidence: tripAllergy.entry(on.map((s) => ({ id: s.id, name: s.name, type: s.type })), need) } } : {}) };
+}
+//   a question ("are these safe for a peanut allergy?"), or a swap / add that asks for a place free of the allergen:
+//   the swap is not made; the same change without that promise is offered (a clear yes takes it).
+function tripChatAllergyAnswer(op, { stops, lang, need }) {
+  if (op.value !== 'q_allergy_swap') return { reply: tripAllergy.chatReply(op.keep ? 'keep' : 'q', need, lang) };
+  const s = (op.stops || [])[0], name = s ? ((stops.find((x) => x.id === s.id) || s).name || '') : '';
+  return { reply: tripAllergy.chatReply('swap', need, lang, { name, offer: !!op.say }), ...(op.say ? { offer: [{ say: op.say }] } : {}) };
 }
 function tripChatAskTurn(op, { v, stops, lang, runCore, planEvents, staysOn = false, days = 1, short = false, plan = null, timing = {} }) {
   const L = lang === 'fr' ? 'fr' : 'en';
@@ -10484,6 +10522,9 @@ function tripPlanNeeds(plan) {
   // No car (2026-11-23, trip-transport-need.js): said in the request, or the plan was made for one (plan.noCar).
   const noCar = tripTransport.readNoCar(plan && plan.query) || (plan && plan.noCar ? { key: 'no_car', who: 'all', phrase: '' } : null);
   if (noCar) needs.push(noCar);
+  // A food allergy (2026-11-23, trip-allergy-need.js): read from the request's own words; never checked against a listing.
+  const allergy = tripAllergy.readAllergy(plan && plan.query);
+  if (allergy) needs.push(allergy);
   return needs;
 }
 // With a wheelchair user, a walk or a park whose own Access line says wheelchair, accessible, paved or flat is an easy
@@ -13254,7 +13295,9 @@ function runTripPlanCore({ text, seed = 0, excludeVenueIds = [], avoidVenueIds =
   const taxonomy = buildTripPlannerTaxonomy();
   // 2026-11-05: trip-length, clock-time, holiday-weekend and tour wording made plain; a beer, cider or distillery "tour" is a run of
   // breweries, cideries or distilleries. (planText is the French layer's own text; planTextPlain is what the planner reads.)
-  const planText = tripPlannerFrModule().tripPlannerText(text, taxonomy);
+  // A food allergy (2026-11-23, trip-allergy-need.js): its words are a need of the trip (plan.needs), never something to
+  // search listings for ("peanut", "allergy", "free" were matched against descriptions). The request itself is unchanged.
+  const planText = tripPlannerFrModule().tripPlannerText(v4 ? tripAllergy.stripAllergy(text) : text, taxonomy);
   let planTextPlain = (discoveryIntentModule().fixedHolidayDates || ((x) => x))((discoveryIntentModule().plainClockTimes || ((x) => x))((discoveryIntentModule().plainRelativeDates || ((x) => x))(discoveryIntentModule().mergeSegmentStays(planText)).replace(new RegExp(TRIP_SITE.sunsetDinner.re.source, 'gi'), TRIP_SITE.sunsetDinner.reading)))
     .replace(/\bsunrise (hikes?|walks?|runs?|trails?|strolls?|bike rides?|rides?)\b/gi, 'morning $1')
     .replace(/\b(canada day|thanksgiving|labou?r day|victoria day|easter|family day|remembrance day)(?: long)? weekend\b/gi, (m, h) => (discoveryIntentModule().holidayWeekendDates || (() => null))(h.toLowerCase().replace('labor', 'labour'), now) || m)
@@ -55998,6 +56041,10 @@ function tripShareContextHtml(ctx, lang = 'en') {
     : ctx.stayPast ? L('Those stay dates have passed: no dates in these links.', 'Ces dates de séjour sont passées : aucune date dans ces liens.') : L('Stay dates not confirmed: no dates in these links.', 'Dates du séjour non confirmées : aucune date dans ces liens.');
   const facts = [who.join(', ') || L('Group size not given', 'Taille du groupe non précisée'), ...(roomsLabel ? [roomsLabel] : []), tripWhen ? tripWhen : ctx.start ? L(`From ${when}`, `À partir du ${when}`) : when].join(' · ');
   let html = `<div class="mt-ctx" id="mtContext"><p class="mt-ctx-copy"><strong>${L('A copy of this plan.', 'Une copie de ce plan.')}</strong> ${L('It can’t be edited here and it doesn’t update if the original changes. Nothing in it is booked.', 'Elle ne se modifie pas ici et ne suit pas les changements de l’original. Rien n’y est réservé.')}</p><p class="mt-ctx-facts" data-mt-facts>${escapeHtml(facts)}</p>`;
+  // A food allergy (2026-11-23, trip-allergy-need.js): said first, before the place to stay and the stops. It names the
+  // allergen only when the link carries it (the traveller's tick in the share box).
+  const allergyLine = (ctx.lines || []).find((l) => l.ask === 'allergy');
+  if (allergyLine) html += `<p class="mt-ctx-note mt-ctx-allergy" data-mt-allergy><strong>${escapeHtml(allergyLine.text)}</strong></p>`;
   if (ctx.stay) {
     const st = ctx.stay;
     html += `<div class="mt-ctx-stay" data-mt-stay="${st.id}">${st.photo ? `<img src="${escapeHtml(st.photo)}" alt="" loading="lazy" width="96" height="96">` : ''}<div><p class="mt-ctx-k">${escapeHtml([L('Where to stay', 'Où dormir'), st.kind, st.regionLabel].filter(Boolean).join(' · '))}</p><p class="mt-ctx-name">${st.url ? `<a href="${escapeHtml(st.url)}">${escapeHtml(st.name)}</a>` : escapeHtml(st.name)}</p>`
@@ -56009,7 +56056,8 @@ function tripShareContextHtml(ctx, lang = 'en') {
       + (stayWhen ? `<p class="mt-ctx-note" data-mt-stay-dates>${escapeHtml(stayWhen)}</p>` : !ctx.start ? `<p class="mt-ctx-note">${L('No dates in these links: pick them on the booking site.', 'Aucune date dans ces liens : choisissez-les sur le site de réservation.')}</p>` : '') + '</div></div>';
   }
   if (ctx.budgetLines && ctx.budgetLines.length) html += `<p class="mt-ctx-note mt-ctx-budget" data-mt-budget data-status="${escapeHtml(ctx.budget.status || '')}"><strong>${escapeHtml(ctx.budgetLines[0])}</strong>${ctx.budgetLines[1] ? ` ${escapeHtml(ctx.budgetLines[1])}` : ''}</p>`;
-  if (ctx.lines && ctx.lines.length) html += `<ul class="mt-ctx-lines">${ctx.lines.map((l) => `<li data-ev-status="${escapeHtml(l.status)}">${escapeHtml(l.text)}</li>`).join('')}</ul>`;
+  const ctxLines = (ctx.lines || []).filter((l) => l !== allergyLine);
+  if (ctxLines.length) html += `<ul class="mt-ctx-lines">${ctxLines.map((l) => `<li data-ev-status="${escapeHtml(l.status)}">${escapeHtml(l.text)}</li>`).join('')}</ul>`;
   // A tour the traveller asked to see: a suggestion only. Nothing here says it, or its pickup, is available on the dates.
   if (ctx.tour && ctx.tour.url) {
     const t = ctx.tour;
@@ -56258,6 +56306,7 @@ ${renderAnalyticsHeadHtml('my_trip')}
   body.my-trip-page .mt-ctx-name a, body.my-trip-page .mt-ctx-name { font-family: 'Fraunces', 'Fraunces Fallback', serif; font-weight: 600; font-size: 1.05rem; color: var(--ink); }
   body.my-trip-page .mt-ctx-links { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; margin-top: 6px !important; }
   body.my-trip-page .mt-ctx-links small, body.my-trip-page .mt-ctx-note { font-size: 0.8rem; opacity: 0.8; }
+  body.my-trip-page .mt-ctx-allergy { font-size: 0.92rem; line-height: 1.45; opacity: 1; margin: 8px 0 10px; }
   body.my-trip-page .mt-ctx-lines, body.my-trip-page .mt-ctx-sugg ul { margin: 0; padding: 0 0 0 18px; display: grid; gap: 4px; }
   body.my-trip-page .mt-ctx-sugg ul { list-style: none; padding: 0; }
   body.my-trip-page .mt-ctx-tag { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #F3E3B5; font-size: 0.74rem; font-weight: 800; color: #5A4300; }

@@ -92,6 +92,7 @@ const TYPE_WORDS = {
 const STAY_AMENITY = { pool: ['Pool', 'Piscine', 'a pool', 'une piscine'], hot_tub: ['Hot tub', 'Bain à remous', 'a hot tub', 'un bain à remous'], kitchen: ['Kitchen', 'Cuisine', 'a kitchen', 'une cuisine'], accessible: ['Accessible rooms', 'Chambres accessibles', 'accessible rooms', 'des chambres accessibles'] };
 const tripAccess = require('./trip-access-needs');
 const tripTransport = require('./trip-transport-need');
+const tripAllergy = require('./trip-allergy-need');
 
 const cap = (t) => String(t || '').replace(/^./, (c) => c.toUpperCase());
 const listEn = (a) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}` : a[0] || '');
@@ -526,6 +527,11 @@ function applyEvidence(plan, ctx = {}) {
     const pick = plan.whereToStay && plan.whereToStay.pick;
     ev.push(tripTransport.entry(stops.map((x) => ({ id: x.v.id, name: x.v.name, day: x.day, latitude: x.v.latitude, longitude: x.v.longitude })), pick && pick.id > 0 ? { id: pick.id, name: pick.name } : null, ctx.coordsOf));
   }
+  // A food allergy (2026-11-23, trip-allergy-need.js): no listing carries allergen or cross-contact data, so the entry is
+  // always 'unknown', for every stop that serves food. It comes first: it is said before anything else about the meals.
+  // Never worked out from a badge, a cuisine or a description.
+  const allergy = tripAccess.needOf(needs, 'allergy');
+  if (allergy) ev.unshift(tripAllergy.entry(stops.map((x) => ({ id: x.v.id, name: x.v.name, type: x.v.type, meal: isMealStop(x.s) })), allergy));
   ev.push(...stayEntries(plan));
   if (needs.length) ev.push(...stayNeedEntries(plan, ctx, needs));
   // A day the planner could not fill is said, with what could be tried next (never shown as a finished day).
@@ -555,6 +561,8 @@ function applyEvidence(plan, ctx = {}) {
   let lines = 0;
   for (const e of ev) {
     delete e.line;
+    // (An allergy is printed by the page on its own, first: it takes none of the three lines the other asks share.)
+    if (e.ask === 'allergy') continue;
     if (e.status === 'verified' || said.has(e.text) || lines >= 3) continue;
     e.line = true; lines++;
   }
@@ -700,6 +708,9 @@ function parseShareContext(query) {
     if (ac.length) out.ageChecks = ac;
   }
   if (typeof q.asks === 'string' && q.asks) { const k = [...new Set(q.asks.split(',').filter((a) => ASK_RE.test(a)))].slice(0, 12); if (k.length) out.asks = k; }
+  // A food allergy (2026-11-23, trip-allergy-need.js): asks=allergy alone says only that allergies are not checked.
+  // al=peanut,shellfish names the allergens, and is in a link only when the traveller ticked "Include allergy details".
+  if (out.asks && out.asks.includes('allergy')) { const al = tripAllergy.fromShare(q.al); if (al) out.allergy = al; }
   return Object.keys(out).length ? out : null;
 }
 // The same parameters back as a query string (validated values only), for the EN / FR switch and the canonical link.
@@ -728,6 +739,7 @@ function shareContextQuery(c) {
   if (c.wineTour) p.push(`wt=${c.wineTour}`);
   if (c.ageChecks && c.ageChecks.length) p.push(`ac=${c.ageChecks.map((a) => `${a.id}:${a.age}`).join(',')}`);
   if (c.budgetQ && c.budgetQ.bg) { p.push(`bg=${c.budgetQ.bg}`); if (c.budgetQ.be) p.push(`be=${c.budgetQ.be}`); }
+  if (c.allergy && tripAllergy.toShare(c.allergy)) p.push(`al=${tripAllergy.toShare(c.allergy)}`);
   return p.join('&');
 }
 const shareNiToken = (x) => `${x.kind}:${x.reason === 'none_listed' ? 'n' : 'f'}${x.nearestId ? `:${x.nearestId}` : ''}`;
@@ -791,6 +803,8 @@ function sharedPlan(c, stops, events, stay) {
   if (wheel) needs.push({ key: 'wheelchair', who: c && c.wheelOne ? 'one' : 'all', phrase: '' });
   if (dog) needs.push({ key: 'dog', who: 'all', phrase: '' });
   if (noCar) needs.push({ key: 'no_car', who: 'all', phrase: '' });
+  // An allergy: named only when the link carries the allergens (the traveller's choice); else the general line.
+  if (asks.includes('allergy')) needs.push(c && c.allergy ? { key: 'allergy', kind: c.allergy.kind, allergens: c.allergy.allergens, severe: false, phrase: '' } : { key: 'allergy', kind: 'allergy', allergens: [], severe: false, phrase: '', anon: true });
   if (needs.length) plan.needs = needs;
   if (plan0.stayAlso) plan.stayAlso = plan0.stayAlso;
   for (const n of (c && c.thin) || []) { const d = plan.days.find((x) => x.day === n); if (d) d.stops.push({ daypart: 'morning', venue: null, reasons: [], caveats: [] }); else plan.days.push({ day: n, stops: [{ daypart: 'morning', venue: null, reasons: [], caveats: [] }] }); }
