@@ -123,9 +123,9 @@ function chatClientSrc(d) {
   // ---------- Travel agent chat (trip-chat-page.js) ----------
   var CHAT_URL = '/api/trip/chat${qs ? `?${qs}` : ''}';
   var CHAT_T = {
-    en: { label: 'Tell us what to change', ph: 'Tell me what to change…', send: 'Send', thinking: 'Thinking…', undo: 'Undo', undoDates: 'Undo dates', undoStay: 'Undo stay change', undoArrival: 'Undo arrival change', undoneArrival: 'Undone: the later arrival is off your plan, and the stay is one booking for everyone again. Your stops are unchanged.', undoRooms: 'Undo rooms', undoSwap: 'Undo swap: {name} back', undoneDates: 'Undone: your stay dates are as they were before. Your stops are unchanged.', undoneStay: 'Undone: your stay is as it was before. Your stops are unchanged.', undoneRooms: 'Undone: your rooms are as they were before. Your stops are unchanged.', undoneSwap: 'Undone: {name} is back.', noUndo: 'There’s nothing to undo right now.', undone: 'Undone. Your plan is back.', kept: 'OK, your plan stays as it is.', err: 'Something went wrong. Your plan is unchanged.', you: 'You: ',
+    en: { label: 'Tell us what to change', ph: 'Tell me what to change…', send: 'Send', thinking: 'Thinking…', undo: 'Undo', undoDates: 'Undo dates', undoStay: 'Undo stay change', undoArrTime: 'Undo arrival time', undoDepTime: 'Undo departure time', undoneArrTime: 'Undone: the arrival time is as it was before. Your stops are unchanged.', undoneDepTime: 'Undone: the departure time is as it was before. Your stops are unchanged.', undoArrival: 'Undo arrival change', undoneArrival: 'Undone: the later arrival is off your plan, and the stay is one booking for everyone again. Your stops are unchanged.', undoRooms: 'Undo rooms', undoSwap: 'Undo swap: {name} back', undoneDates: 'Undone: your stay dates are as they were before. Your stops are unchanged.', undoneStay: 'Undone: your stay is as it was before. Your stops are unchanged.', undoneRooms: 'Undone: your rooms are as they were before. Your stops are unchanged.', undoneSwap: 'Undone: {name} is back.', noUndo: 'There’s nothing to undo right now.', undone: 'Undone. Your plan is back.', kept: 'OK, your plan stays as it is.', err: 'Something went wrong. Your plan is unchanged.', you: 'You: ',
       chips: [['cheaper', 'Cheaper'], ['kids', 'More for kids'], ['slower', 'Slower pace']] },
-    fr: { label: 'Dites-nous quoi changer', ph: 'Dites-moi quoi changer…', send: 'Envoyer', thinking: 'Je regarde…', undo: 'Annuler', undoDates: 'Annuler les dates', undoStay: 'Annuler le changement d’hébergement', undoArrival: 'Annuler le changement d’arrivée', undoneArrival: 'Annulé : l’arrivée décalée n’est plus sur votre plan, et l’hébergement redevient une seule réservation pour tout le monde. Vos arrêts n’ont pas changé.', undoRooms: 'Annuler les chambres', undoSwap: 'Annuler l’échange : remettre {name}', undoneDates: 'Annulé : vos dates de séjour sont comme avant. Vos arrêts n’ont pas changé.', undoneStay: 'Annulé : votre hébergement est comme avant. Vos arrêts n’ont pas changé.', undoneRooms: 'Annulé : vos chambres sont comme avant. Vos arrêts n’ont pas changé.', undoneSwap: 'Annulé : {name} est de retour.', noUndo: 'Il n’y a rien à annuler pour l’instant.', undone: 'Annulé. Votre plan est revenu.', kept: 'D’accord, votre plan reste tel quel.', err: 'Un problème est survenu. Votre plan n’a pas changé.', you: 'Vous : ',
+    fr: { label: 'Dites-nous quoi changer', ph: 'Dites-moi quoi changer…', send: 'Envoyer', thinking: 'Je regarde…', undo: 'Annuler', undoDates: 'Annuler les dates', undoStay: 'Annuler le changement d’hébergement', undoArrTime: 'Annuler l’heure d’arrivée', undoDepTime: 'Annuler l’heure de départ', undoneArrTime: 'Annulé : l’heure d’arrivée est comme avant. Vos arrêts n’ont pas changé.', undoneDepTime: 'Annulé : l’heure de départ est comme avant. Vos arrêts n’ont pas changé.', undoArrival: 'Annuler le changement d’arrivée', undoneArrival: 'Annulé : l’arrivée décalée n’est plus sur votre plan, et l’hébergement redevient une seule réservation pour tout le monde. Vos arrêts n’ont pas changé.', undoRooms: 'Annuler les chambres', undoSwap: 'Annuler l’échange : remettre {name}', undoneDates: 'Annulé : vos dates de séjour sont comme avant. Vos arrêts n’ont pas changé.', undoneStay: 'Annulé : votre hébergement est comme avant. Vos arrêts n’ont pas changé.', undoneRooms: 'Annulé : vos chambres sont comme avant. Vos arrêts n’ont pas changé.', undoneSwap: 'Annulé : {name} est de retour.', noUndo: 'Il n’y a rien à annuler pour l’instant.', undone: 'Annulé. Votre plan est revenu.', kept: 'D’accord, votre plan reste tel quel.', err: 'Un problème est survenu. Votre plan n’a pas changé.', you: 'Vous : ',
       chips: [['cheaper', 'Moins cher'], ['kids', 'Plus pour les enfants'], ['slower', 'Plus relax']] }
   };
   var chat = { busy: false, undo: null, used: false, goneEvents: {}, queue: null, wineTour: null, ageAsk: {}, swapBacks: [], undoKind: '' };
@@ -143,7 +143,7 @@ function chatClientSrc(d) {
     return null;
   }
   // The Undo beside the last reply undoes that reply's change; its label says which when it is not a change of stops.
-  function chatUndoLabel(){ return chat.undoKind === 'arrival' ? ct('undoArrival') : chat.undoKind === 'dates' ? ct('undoDates') : chat.undoKind === 'stay' ? ct('undoStay') : chat.undoKind === 'rooms' ? ct('undoRooms') : ct('undo'); }
+  function chatUndoLabel(){ return chat.undoKind === 'arrtime:join' ? ct('undoArrTime') : chat.undoKind === 'arrtime:leave' ? ct('undoDepTime') : chat.undoKind === 'arrival' ? ct('undoArrival') : chat.undoKind === 'dates' ? ct('undoDates') : chat.undoKind === 'stay' ? ct('undoStay') : chat.undoKind === 'rooms' ? ct('undoRooms') : ct('undo'); }
   // An earlier swap, when the Undo beside the reply is not for it (or is gone): its own button, named.
   function chatBackButton(){
     var sb = chatSwapBack();
@@ -170,7 +170,7 @@ function chatClientSrc(d) {
     var snap = chat.undo, kind = chat.undoKind, sb = chatSwapBack();
     chat.undo = null; chat.undoKind = ''; chat.lastDiff = null; chat.pending = null; chat.offer = null;
     chatRestore(snap);
-    var said = kind === 'arrival' ? ct('undoneArrival') : kind === 'dates' ? ct('undoneDates') : kind === 'stay' ? ct('undoneStay') : kind === 'rooms' ? ct('undoneRooms') : kind && sb && kind === 'swap:' + sb.newId ? ct('undoneSwap').replace('{name}', sb.oldName) : ct('undone');
+    var said = kind === 'arrtime:join' ? ct('undoneArrTime') : kind === 'arrtime:leave' ? ct('undoneDepTime') : kind === 'arrival' ? ct('undoneArrival') : kind === 'dates' ? ct('undoneDates') : kind === 'stay' ? ct('undoneStay') : kind === 'rooms' ? ct('undoneRooms') : kind && sb && kind === 'swap:' + sb.newId ? ct('undoneSwap').replace('{name}', sb.oldName) : ct('undone');
     chatShow(typed || '', said, {});
     track('trip_chat', { chat_source: 'undo', changed: 'yes' });
     return true;
@@ -315,6 +315,9 @@ function chatClientSrc(d) {
     if (confirmed) body.confirmed = true;
     if (chat.lastDiff) body.last = chat.lastDiff;
     if (!chip && chat.offer && chat.offer.length) body.offer = chat.offer.slice(0, 3);
+    // (2026-11-24) The arrival-time question the plan itself shows under that day (trip-late-arrival.js) is the open
+    // question when the chat is asking nothing else: a bare "2 pm" is then read as its answer.
+    else if (!chip) { try { var laQ = typeof v4LateEntry === 'function' ? v4LateEntry() : null; if (laQ && laQ.askTime) body.offer = ['[arrival time]']; } catch (e) { /* no question open */ } }
     chat.offer = null;
     function done(){
       chat.busy = false; resultEl.removeAttribute('aria-busy');
@@ -397,7 +400,7 @@ function chatClientSrc(d) {
         // An "Undone" turn has no Undo of its own.
         if (j.back) chat.undo = null;
         // (2026-11-24) What this reply's Undo undoes: the stay's dates, the stay, the rooms, or a change of stops.
-        chat.undoKind = !chat.undo ? '' : j.stayDates ? 'dates' : j.late && !(j.plan && j.req && changed.length) ? 'arrival' : (j.party && j.party.rooms && !(j.plan && j.req && changed.length)) ? 'rooms' : (!(j.plan && j.req && changed.length) && (j.stayBlock || j.stayPref !== undefined)) ? 'stay' : j.swapBack ? 'swap:' + j.swapBack.newId : 'stops';
+        chat.undoKind = !chat.undo ? '' : j.stayDates ? 'dates' : j.lateTime && !(j.plan && j.req && changed.length) ? 'arrtime:' + (j.lateTime === 'leave' ? 'leave' : 'join') : j.late && !(j.plan && j.req && changed.length) ? 'arrival' : (j.party && j.party.rooms && !(j.plan && j.req && changed.length)) ? 'rooms' : (!(j.plan && j.req && changed.length) && (j.stayBlock || j.stayPref !== undefined)) ? 'stay' : j.swapBack ? 'swap:' + j.swapBack.newId : 'stops';
         if (j.swapBack && j.swapBack.say && j.plan) { chat.swapBacks = (chat.swapBacks || []).filter(function(x){ return x.key !== j.swapBack.key; }).concat([j.swapBack]).slice(-6); }
         (Array.isArray(j.ageAsk) ? j.ageAsk : []).forEach(function(a){ if (a && a.id > 0 && a.short) { chat.ageAsk[a.id] = a; touched = true; } });
         if (Array.isArray(j.ageAsk) && j.ageAsk.length && j.plan) { chat.rendering = true; try { render(false); } finally { chat.rendering = false; } }
@@ -613,7 +616,8 @@ function chatClientSrc(d) {
       + (d.others.length ? '<button type="button" class="v4-link" data-v4-stay-more aria-expanded="' + (chat.stayMore ? 'true' : 'false') + '">' + esc(chat.stayMore ? ag('fewer') : ag('seeMore', { n: d.others.length })) + '</button>' : '') + '</div>';
     if (chat.stayMore && d.others.length) html += '<ul class="v4-stay-alts">' + d.others.map(function(o){ return '<li><span><b>' + esc(o.name) + '</b>' + esc([fr ? (o.kindFr || o.kind) : o.kind, o.regionLabel, o.priceBand].concat((o.has || []).map(function(k){ return (AG[lang()] ? AG[lang()].chip : AG.en.chip)[k] || k; })).filter(Boolean).join(' · ')) + '</span><button type="button" class="v4-link" data-v4-stay-choose="' + esc(o.id) + '">' + esc(ag('choose')) + '</button></li>'; }).join('') + '</ul>';
     html += (typeof t3StayDatesHtml === 'function' ? t3StayDatesHtml(tripIn, fr, s) : '') + roomsRow;
-    if (sp && sp.card) html += '<p class="v4-disc-line v4-late-note" data-v4-late>' + esc(sp.card) + '</p>';
+    // (2026-11-24) ...and, right there, that availability and the booking itself are the booking site's to confirm.
+    if (sp && sp.card) html += '<p class="v4-disc-line v4-late-note" data-v4-late>' + esc(sp.card) + (sp.confirm ? ' <span data-v4-late-confirm>' + esc(sp.confirm) + '</span>' : '') + '</p>';
     // Trip needs (2026-11-24): what no booking site takes (the dog, an accessible room), said by the stay.
     // (Not while the stay's dates are only proposed: the card stays short until there is something to book; the Book my
     // trip sheet and Details say it throughout.)

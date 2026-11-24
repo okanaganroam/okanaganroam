@@ -248,8 +248,9 @@ const WORKSPACE_STYLES=`<style id="trip-workspace-layout">
  .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts .v4-btn>span[aria-hidden] {display:none;}
  .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts:empty {display:none;}
  /* A split stay (trip-late-arrival.js): its two booking buttons on a row of their own, side by side. */
- .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts.v4-stay-two {grid-column:1/-1;grid-row:auto;margin:8px 0 0;gap:8px;}
- .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts.v4-stay-two .v4-btn {flex:1 1 0;justify-content:center;}
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts.v4-stay-two {grid-column:1/-1;grid-row:auto;margin:8px 0 0;gap:8px;flex-wrap:wrap;}
+ /* (2026-11-24) Each button says its own booking ("2 adults · Oct 8–10"): side by side when both fit, stacked when not. */
+ .t3-v4.tw-workspace .v4-stay-card .v4-stay-acts.v4-stay-two .v4-btn {flex:1 1 auto;justify-content:center;min-width:0;}
  .t3-v4.tw-workspace .v4-stay-card .v4-stay-alts,.t3-v4.tw-workspace .v4-stay-card .v4-disc-line {grid-column:1/-1;}
  .t3-v4.tw-workspace .v4-stay-card .v4-stay-alts .v4-link {min-height:44px;}
  .t3-v4.tw-workspace .v4-stay-card .v4-disc-line {margin:5px 0 0;font-size:10.5px;line-height:1.3;}

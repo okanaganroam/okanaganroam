@@ -22,6 +22,7 @@
 
 const SITE = require('./trip-site.js');
 const tripBudget = require('./trip-budget.js');
+const tripLate = require('./trip-late-arrival');
 
 const CONFIG = SITE.tripEstimate;
 const TASTING_TYPES = ['winery', 'brewery', 'distillery'];
@@ -126,7 +127,14 @@ function tripEstimate(plan, card, trip, cfg = CONFIG) {
   const late = t.late && !t.late.unresolved && Number.isInteger(t.late.day) && Array.isArray(plan && plan.days) ? t.late : null;
   const dayOf = new Map();
   if (late) for (const d of plan.days) for (const s of (d && d.stops) || []) if (s && !dayOf.has(s)) dayOf.set(s, d.day);
-  const peopleFor = (s) => { if (!late || !dayOf.has(s)) return people; const there = late.kind === 'join' ? dayOf.get(s) >= late.day : dayOf.get(s) <= late.day; return there ? people : Math.max(1, people - late.n); };
+  // (2026-11-24) On the day they arrive, with the time known: a stop that starts before the arrival (after a departure)
+  // is counted for the ones there. With no time, or no start time, that day's stops are counted for everyone, as before.
+  const lateWin = late && late.at ? tripLate.atWindow(late.at) : null;
+  const startOf = (s) => { const r = lateWin && s && s.venue ? ((plan && plan.schedule) || []).find((x) => x && x.day === dayOf.get(s) && x.venueId === s.venue.id && typeof x.startMinutes === 'number') : null; return r ? Math.round(r.startMinutes) : null; };
+  let lateFew = 0;
+  const peopleFor = (s) => { if (!late || !dayOf.has(s)) return people; const there = late.kind === 'join' ? dayOf.get(s) >= late.day : dayOf.get(s) <= late.day;
+    if (there && lateWin && dayOf.get(s) === late.day && tripLate.lateStopState(lateWin, late.kind, startOf(s)) === 'few') { lateFew++; return Math.max(1, people - late.n); }
+    return there ? people : Math.max(1, people - late.n); };
   for (const s of planStopList(plan)) {
     const v = s && s.venue;
     if (!v || !v.name) continue;
@@ -169,7 +177,8 @@ function tripEstimate(plan, card, trip, cfg = CONFIG) {
     else if (stay.rooms > 1) notes.push({ key: 'rooms', text: `${stay.rooms} rooms or units for ${people} people (sleeps ${card.sleeps} each).`, textFr: `${stay.rooms} chambres ou unités pour ${people} personnes (${card.sleeps} pers. chacune).` });
     else if (stay.roomsUnknown && people > 2) notes.push({ key: 'rooms', text: `Priced for one room or unit; ${people} people may need more.`, textFr: `Prix pour une chambre ou unité; ${people} personnes pourraient en avoir besoin de plus.` });
   }
-  if (late && parts.some((p) => p.key !== 'stay')) { const few = Math.max(1, people - late.n), a = late.kind === 'join' ? [1, late.day - 1] : [late.day + 1, plan.days.length]; const dl = a[0] === a[1] ? `${a[0]}` : `${a[0]}–${a[1]}`; notes.push({ key: 'late', text: `Day${a[0] === a[1] ? '' : 's'} ${dl} counted for ${few}, the other days for ${people}.`, textFr: `Jour${a[0] === a[1] ? '' : 's'} ${dl} compté${a[0] === a[1] ? '' : 's'} pour ${few}, les autres pour ${people}.` }); }
+  if (late && parts.some((p) => p.key !== 'stay')) { const few = Math.max(1, people - late.n), a = late.kind === 'join' ? [1, late.day - 1] : [late.day + 1, plan.days.length]; const dl = a[0] === a[1] ? `${a[0]}` : `${a[0]}–${a[1]}`; const tagE = lateFew ? tripLate.atTag(late.at, false) : '', tagF = lateFew ? tripLate.atTag(late.at, true) : '', arrE = late.kind === 'join' ? `before the ${tagE} arrival` : `after the ${tagE} departure`, arrF = late.kind === 'join' ? `avant l’arrivée (${tagF})` : `après le départ (${tagF})`;
+    notes.push({ key: 'late', text: lateFew ? `Day${a[0] === a[1] ? '' : 's'} ${dl} and Day ${late.day} stops ${arrE} counted for ${few}, the rest for ${people}.` : `Day${a[0] === a[1] ? '' : 's'} ${dl} counted for ${few}, the other days for ${people}.`, textFr: lateFew ? `Jour${a[0] === a[1] ? '' : 's'} ${dl} et arrêts du jour ${late.day} ${arrF} comptés pour ${few}, le reste pour ${people}.` : `Jour${a[0] === a[1] ? '' : 's'} ${dl} compté${a[0] === a[1] ? '' : 's'} pour ${few}, les autres pour ${people}.` }); }
   if (kids && parts.some((p) => p.key !== 'stay')) notes.push({ key: 'kids', text: 'Kids are counted at adult prices; theirs are often lower.', textFr: 'Les enfants sont comptés au prix adulte; le leur est souvent plus bas.' });
   return {
     low: low === null ? null : roundDown(low), high: high === null ? null : roundUp(high), currency: 'CAD',
@@ -191,9 +200,9 @@ function tripBookingSteps(card, checklist) {
     // carries its own booking (card.split.distinct). Otherwise one step, and the page says the two bookings beside it.
     const sp = card.split && card.split.distinct && Array.isArray(card.bookingLinks2) ? card.split : null;
     const second = sp ? (card.bookingLinks2.find((l) => l && l.key === first.key && httpsUrl(l.url)) || card.bookingLinks2.find((l) => l && httpsUrl(l.url))) : null;
-    out.push({ kind: 'stay', id: card.id, name: card.name, label: first.label, labelFr: first.labelFr, url: first.url, affiliate: !!first.affiliate, rel: first.rel || 'nofollow noopener', link: first.key, ...(second ? { part: 1, sub: sp.text.parts[0], subFr: sp.textFr.parts[0] } : {}) });
+    out.push({ kind: 'stay', id: card.id, name: card.name, label: first.label, labelFr: first.labelFr, url: first.url, affiliate: !!first.affiliate, rel: first.rel || 'nofollow noopener', link: first.key, ...(second ? { part: 1, sub: sp.text.parts[0], subFr: sp.textFr.parts[0], btn: (sp.text.btn || [])[0] || '', btnFr: (sp.textFr.btn || [])[0] || '' } : {}) });
     urls.add(urlKey(first.url));
-    if (second) { out.push({ kind: 'stay', id: card.id, name: card.name, label: second.label, labelFr: second.labelFr, url: second.url, affiliate: !!second.affiliate, rel: second.rel || 'nofollow noopener', link: second.key, part: 2, sub: sp.text.parts[1], subFr: sp.textFr.parts[1] }); urls.add(urlKey(second.url)); }
+    if (second) { out.push({ kind: 'stay', id: card.id, name: card.name, label: second.label, labelFr: second.labelFr, url: second.url, affiliate: !!second.affiliate, rel: second.rel || 'nofollow noopener', link: second.key, part: 2, sub: sp.text.parts[1], subFr: sp.textFr.parts[1], btn: (sp.text.btn || [])[1] || '', btnFr: (sp.textFr.btn || [])[1] || '' }); urls.add(urlKey(second.url)); }
   }
   for (const c of Array.isArray(checklist) ? checklist : []) {
     if (!c || !Number.isInteger(c.venueId) || !httpsUrl(c.url) || ids.has(c.venueId) || urls.has(urlKey(c.url))) continue;

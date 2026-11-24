@@ -17,6 +17,17 @@
 //   - each day's head count (Day 1 for 2, from Day 2 for all 3), which the estimate uses too.
 // Conservative: only a clear statement about one (or a counted few) of the party, with a date, weekday or day that
 // falls inside the trip. Anything else leaves the plan exactly as it was. Room availability is never claimed.
+//
+// The time of day they arrive (2026-11-24). The owner, same request: the plan marked Day 2 "for all 3" and so assumed the
+// friend could join the 9 AM activity on the day she arrives, without asking when she arrives. Now:
+//   - a time said with the statement or answered in the chat is read (need.at: { m: minutes } for a clock time,
+//     { part: 'afternoon' } for a part of the day, each part a window: DAYPARTS);
+//   - with no time, the arrival day is never "for all 3": it is "for 2 + 1 arriving", the plan asks once
+//     ("What time do they arrive on Oct 9?") and says the day's stops are for 2 until then;
+//   - with a time, each stop of that day is for 2 when it starts before the arrival, "not confirmed for all 3" when it
+//     starts within an hour after it (how long it takes to get there from wherever they arrive is not known, and is
+//     never claimed), and for everyone after that. No stop is moved for it.
+// A departure time ("leaves at noon on the 10th") is the same rule turned round.
 
 const SBL = require('./stay-booking-links');
 
@@ -84,6 +95,111 @@ function whenIn(r) {
   if (dom && Number(dom[1]) >= 1 && Number(dom[1]) <= 31) return { dom: Number(dom[1]) };
   return null;
 }
+// ---------- The time of day ----------
+// A part of the day is a window, not a time: nobody is counted in before it opens, and nobody is counted as surely
+// there until an hour after it closes. c: the code a shared link carries; pad: minutes after the window before a stop
+// is "for everyone" (0 for "in time for dinner": the traveller said they are at dinner).
+const DAYPARTS = {
+  early_morning: { c: 'em', from: 360, to: 540, en: 'early-morning', fr: 'tôt le matin', say: 'early in the morning', sayFr: 'tôt le matin' },
+  morning: { c: 'm', from: 480, to: 720, en: 'morning', fr: 'matin', say: 'in the morning', sayFr: 'en matinée' },
+  midday: { c: 'n', from: 690, to: 780, en: 'midday', fr: 'midi', say: 'around lunchtime', sayFr: 'à l’heure du lunch' },
+  after_lunch: { c: 'al', from: 780, to: 900, en: 'after-lunch', fr: 'après le lunch', say: 'after lunch', sayFr: 'après le lunch' },
+  early_afternoon: { c: 'ea', from: 720, to: 840, en: 'early-afternoon', fr: 'début d’après-midi', say: 'in the early afternoon', sayFr: 'en début d’après-midi' },
+  mid_afternoon: { c: 'ma', from: 840, to: 960, en: 'mid-afternoon', fr: 'milieu d’après-midi', say: 'in the mid-afternoon', sayFr: 'en milieu d’après-midi' },
+  late_afternoon: { c: 'la', from: 960, to: 1080, en: 'late-afternoon', fr: 'fin d’après-midi', say: 'in the late afternoon', sayFr: 'en fin d’après-midi' },
+  afternoon: { c: 'a', from: 720, to: 1020, en: 'afternoon', fr: 'après-midi', say: 'in the afternoon', sayFr: 'dans l’après-midi' },
+  dinner: { c: 'd', from: 1020, to: 1020, pad: 0, en: 'dinner-time', fr: 'souper', say: 'in time for dinner', sayFr: 'à temps pour le souper' },
+  evening: { c: 'e', from: 1020, to: 1260, en: 'evening', fr: 'soir', say: 'in the evening', sayFr: 'en soirée' },
+  night: { c: 'nt', from: 1260, to: 1439, en: 'late-night', fr: 'fin de soirée', say: 'late at night', sayFr: 'tard le soir' },
+};
+const NEAR_MIN = 60;        // after an arrival: a stop starting this soon after it is "not confirmed for everyone"
+const LEAVE_NEAR_MIN = 120; // before a departure: a stop starting this close to it may not be over in time
+const PART_RES = [
+  ['night', /\b(?:late at night|at night|late in the evening|late evening|in the night|overnight|tard le soir|tard en soiree|en fin de soiree|dans la nuit|de nuit)\b/],
+  ['dinner', /\b(?:in time for|for|by|before|just before|a temps pour|pour|avant) (?:the |le |un )?(?:dinner|supper|souper)\b|\b(?:dinner ?time|supper ?time|a l'heure du souper)\b/],
+  ['evening', /\b(?:evening|tonight|after work|soir|soiree|apres le travail|late in the day|end of the day|(?:en )?fin de journee|tard)\b/],
+  ['after_lunch', /\b(?:after lunch|apres le lunch)\b/],
+  ['early_afternoon', /\bearly(?: in the)? afternoon\b|\b(?:en )?debut d(?:'| l')apres-midi\b|\btot (?:dans|en) l'apres-midi\b/],
+  ['mid_afternoon', /\bmid[- ]?afternoon\b|\bmiddle of the afternoon\b|\bmilieu d(?:'| l')apres-midi\b/],
+  ['late_afternoon', /\blate(?: in the)? afternoon\b|\bend of the afternoon\b|\bfin d(?:'| l')apres-midi\b/],
+  ['afternoon', /\b(?:afternoon|apres-midi|aprem)\b/],
+  ['midday', /\b(?:midday|mid-day|lunch ?time|(?:around|for|by|before) lunch|l'heure du lunch|pour le lunch|(?:en )?milieu de journee)\b/],
+  ['early_morning', /\b(?:early(?: in the)? morning|first thing|at dawn|tot le matin|de bon matin|a l'aube|tres tot)\b/],
+  ['morning', /\b(?:morning|matin|matinee|avant-midi)\b/],
+];
+const MONTH_WORD = 'jan|feb|fev|mar|apr|avr|may|mai|jun|jui|jul|aug|aou|sep|oct|nov|dec';
+// A bare hour with no am / pm: 1 to 7 is the afternoon, 8 to 11 the morning, 12 noon. The reply always says the
+// time back ("2 PM"), so a wrong guess is seen and corrected.
+const bareHour = (h) => (h >= 1 && h <= 7 ? h + 12 : h);
+// The time of day a clause names (folded text). -> { m: minutes } | { part } | null.
+//   bare: a number alone counts ("2", "around 3") -- only for an answer to the question, never inside a request.
+function timeIn(text, opts = {}) {
+  const t = String(text || '');
+  let m;
+  if ((m = /(?:^|[^\d:.])(\d{1,2})(?:[:.h](\d{2}))?\s*(a|p)\.?m\b\.?/.exec(t))) {
+    const h = Number(m[1]), mm = m[2] ? Number(m[2]) : 0;
+    if (h >= 1 && h <= 12 && mm < 60) return { m: ((h % 12) + (m[3] === 'p' ? 12 : 0)) * 60 + mm };
+  }
+  if ((m = /(?:^|[^\d:.])(\d{1,2})\s*h\s*(\d{2})?\b/.exec(t))) {
+    const h = Number(m[1]), mm = m[2] ? Number(m[2]) : 0;
+    if (h <= 23 && mm < 60) return { m: h * 60 + mm };
+  }
+  if ((m = /(?:^|[^\d:.-])(\d{1,2}):([0-5]\d)(?![\d:])/.exec(t))) { const h = Number(m[1]); if (h <= 23) return { m: bareHour(h) * 60 + Number(m[2]) }; }
+  if ((m = /\b(\d{1,2})\s*o'? ?clock\b/.exec(t))) { const h = Number(m[1]); if (h >= 1 && h <= 12) return { m: bareHour(h) * 60 }; }
+  if (/\b(?:noon|midi)\b/.test(t.replace(/\b(?:apres|avant)-midi\b/g, ''))) return { m: 720 };
+  if ((m = new RegExp(`\\b(?:at|around|about|by|circa|vers)\\s+(\\d{1,2})(?:\\s*ish)?\\b(?!\\s*(?:[:.\\d]|st\\b|nd\\b|rd\\b|th\\b|er\\b|e\\b|nights?|nuits?|days?|jours?|adults?|adultes?|people|personnes?|rooms?|chambres?|of\\b|(?:${MONTH_WORD})))`).exec(t))) {
+    const h = Number(m[1]);
+    if (h >= 1 && h <= 12) return { m: bareHour(h) * 60 };
+    if (h >= 13 && h <= 23) return { m: h * 60 };
+  }
+  for (const [part, re] of PART_RES) if (re.test(t)) return { part };
+  if (opts.bare && (m = /^(?:(?:at|around|about|by|maybe|probably|vers|environ)\s+)*(\d{1,2})(?:\s*ish)?$/.exec(t.trim()))) {
+    const h = Number(m[1]);
+    if (h >= 1 && h <= 12) return { m: bareHour(h) * 60 };
+    if (h >= 13 && h <= 23) return { m: h * 60 };
+  }
+  return null;
+}
+const sameAt = (a, b) => (!a && !b) || (!!a && !!b && ((Number.isInteger(a.m) && a.m === b.m) || (!!a.part && a.part === b.part)));
+const validAt = (a) => !!a && ((Number.isInteger(a.m) && a.m >= 0 && a.m < 1440) || (typeof a.part === 'string' && !!DAYPARTS[a.part]));
+// The window a time stands for: { from, to, pad } in minutes of the day.
+function atWindow(at) {
+  if (!validAt(at)) return null;
+  if (Number.isInteger(at.m)) return { from: at.m, to: at.m, pad: NEAR_MIN, before: LEAVE_NEAR_MIN };
+  const p = DAYPARTS[at.part];
+  return { from: p.from, to: p.to, pad: p.pad === 0 ? 0 : NEAR_MIN, before: LEAVE_NEAR_MIN };
+}
+// Who a stop of the arrival (or departure) day is for, by when it starts. Used by the server, the plan page and the
+// shared page (its source is sent to both: it must stay self-contained).
+//   'few': before they arrive / after they leave; 'near': too close to say; 'all': everyone; '': no start time known.
+function lateStopState(win, kind, start) {
+  if (!win || typeof start !== 'number' || !(start >= 0)) return '';
+  if (kind === 'leave') return start >= win.to ? 'few' : start >= win.from - (win.before || 120) ? 'near' : 'all';
+  return start < win.from ? 'few' : start < win.to + win.pad ? 'near' : 'all';
+}
+const CLIENT_SRC = String(lateStopState);
+const clock = (m, fr) => { const h = Math.floor(m / 60), mm = m % 60; if (fr) return `${h} h${mm ? ` ${String(mm).padStart(2, '0')}` : ''}`; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12}${mm ? `:${String(mm).padStart(2, '0')}` : ''} ${h < 12 ? 'AM' : 'PM'}`; };
+// "2 PM" / "afternoon" (what a title and a note call the time), and "12–5 PM" (what a part of the day was taken as).
+const atTag = (at, fr) => (Number.isInteger(at.m) ? clock(at.m, fr) : (fr ? DAYPARTS[at.part].fr : DAYPARTS[at.part].en));
+function atSpan(at, fr) {
+  if (!at || !at.part) return '';
+  const p = DAYPARTS[at.part];
+  if (p.from === p.to) return clock(p.from, fr);
+  if (fr) return `${clock(p.from, true)}–${clock(p.to, true)}`;
+  const a = clock(p.from, false), b = clock(p.to, false);
+  return a.slice(-2) === b.slice(-2) ? `${a.slice(0, -3)}–${b}` : `${a}–${b}`;
+}
+// The clause of a statement a time is read from: up to where it turns to what they need ("…and needs a separate room
+// for one night" is about the room, never "at night").
+function timeClause(rest) {
+  let r = String(rest || '');
+  const cut = /\b(?:and|et|but|mais|so|donc|,)?\s*(?:(?:she|he|they|elle|il|ils|elles) )?(?:needs?|wants?|will need|would like|has to have|a besoin|aura besoin|veut|voudrait|ont besoin)\b/.exec(r);
+  if (cut) r = r.slice(0, cut.index);
+  const room = ROOM_RE.exec(r);
+  if (room) r = r.slice(0, room.index);
+  return r;
+}
+
 // A room of their own for the one who comes later (singular: "separate rooms" for everyone is trip-stays.js's rule).
 const ROOM_RE = /\b(?:(?:her|his|their|an?|one|the|sa|leur|une) )?(?:own|separate|private|single|second|extra|additional|another|different)(?: hotel| single| private)? (?:room|bedroom)\b(?!s)|\broom (?:of|to) (?:her|his|their) own\b|\broom (?:to|for) (?:herself|himself|themselves|just her|just him)\b|\b(?:sa|leur) propre chambre\b|\b(?:une |sa |leur )?chambre (?:separee|a part|individuelle|seule|privee|supplementaire|de plus|pour elle(?: seule)?|pour lui(?: seul)?|pour eux|pour elles|a elle|a lui)\b|\bune (?:autre|deuxieme|seconde) chambre\b/;
 const NOT_ROOM_RE = /\b(?:no|not|without|doesn't need|does not need|don't need|pas besoin d'|sans) (?:(?:a|an|her|his|their|une|de) )?(?:own |separate |private |extra |second )?(?:room|chambre)\b|\bshar(?:e|es|ing) (?:a |our |the |one |my )?(?:room|bed)\b|\bpartage(?:r|ra)? (?:la |notre |une |ma )?chambre\b/;
@@ -94,6 +210,8 @@ function sentences(raw) {
   while ((m = re.exec(raw))) {
     const before = raw.slice(Math.max(0, m.index - 5), m.index).toLowerCase();
     if (m[0][0] === '.' && /(?:^|[^a-z])(?:jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec|janv|fevr|févr|avr|juil|déc)$/.test(before)) continue;
+    // ("3 p.m. on October 9": the dot of a.m. / p.m. does not end a sentence either.)
+    if (m[0][0] === '.' && /(?:^|[^a-z])[ap]\.m$/.test(before)) continue;
     out.push({ at: last, end: m.index + m[0].length, text: raw.slice(last, m.index + m[0].length) });
     last = m.index + m[0].length;
   }
@@ -141,6 +259,9 @@ function readSentence(sentence) {
   else n = NUM[det] || null;
   const out = { kind, n, when, at: m.index + (/^[\s,(:]/.test(m[0]) ? 1 : 0) };
   if (pron) out.pronoun = true;
+  // The time of day, when the statement gives one ("…on October 9 at 3 pm", "…Saturday afternoon").
+  const time = timeIn(timeClause(rest));
+  if (time) out.time = time;
   return out;
 }
 // The need, from a whole request. -> { key: 'late_arrival', kind: 'join' | 'leave', n, when, ownRoom, phrase } or null.
@@ -154,7 +275,7 @@ function readLate(text) {
     if (!r) continue;
     const t = fold(ss[i].text), next = ss[i + 1] ? fold(ss[i + 1].text) : '';
     const own = (ROOM_RE.test(t.slice(r.at)) && !NOT_ROOM_RE.test(t)) || (!!next && /^\s*(?:she|he|they|and|elle|il|ils|elles|et)\b/.test(next) && ROOM_RE.test(next) && !NOT_ROOM_RE.test(next) && !readSentence(ss[i + 1].text));
-    return { key: 'late_arrival', kind: r.kind, n: r.n, when: r.when, ownRoom: !!own, ...(r.pronoun ? { pronoun: true } : {}), phrase: ss[i].text.replace(/\s+/g, ' ').trim().slice(0, 160) };
+    return { key: 'late_arrival', kind: r.kind, n: r.n, when: r.when, ownRoom: !!own, ...(r.time ? { at: r.time } : {}), ...(r.pronoun ? { pronoun: true } : {}), phrase: ss[i].text.replace(/\s+/g, ' ').trim().slice(0, 160) };
   }
   return null;
 }
@@ -177,7 +298,7 @@ function stripLate(text) {
     // ("October 9, 2027") and the room said after a comma belong to the statement.
     const tail = sameLen ? ss[i].text.slice(r.at).split(/,\s+/) : [];
     let k = 1;
-    while (k < tail.length && (/^\s*20\d{2}\b/.test(tail[k]) || (ROOM_RE.test(fold(tail[k])) && fold(tail[k]).length < 70))) k++;
+    while (k < tail.length && (/^\s*20\d{2}\b/.test(tail[k]) || (ROOM_RE.test(fold(tail[k])) && fold(tail[k]).length < 70) || (fold(tail[k]).length < 40 && !!timeIn(fold(tail[k]))))) k++;
     const after = tail.slice(k).join(', ').replace(/[\s.!?;]+$/, '');
     const kept = [head.replace(/[\s,;:]+$/, ''), after].filter((x) => /[a-z0-9]{2}/i.test(x)).join(', ');
     if (kept) out += `${kept}. `;
@@ -244,9 +365,10 @@ function resolve(need, ctx = {}) {
   else if (def(adults) > def(base)) { mode = 'split'; rooms = { a: def(base), b: def(adults) - def(base), aAssumed: base >= 3, bAssumed: true }; }
   else { mode = 'shared'; rooms = { a: def(adults), b: 0, aAssumed: adults >= 3 }; }
   const dated = !!(dates && ctx.dated);
-  return { key: 'late_arrival', kind: need.kind, n, day: k, days, adults, kids, base, ownRoom: !!need.ownRoom, mode, rooms, nightsA, nightsB, dated, ...(dated ? { start: dates[0], end: dates[days - 1], date: dates[k - 1] } : {}) };
+  return { key: 'late_arrival', kind: need.kind, n, day: k, days, adults, kids, base, ownRoom: !!need.ownRoom, mode, rooms, nightsA, nightsB, dated, ...(dated ? { start: dates[0], end: dates[days - 1], date: dates[k - 1] } : {}), ...(validAt(need.at) ? { at: need.at } : {}) };
 }
 // How many are there on a day (adults and kids; the kids travel with the ones who are there throughout).
+// (On the day they arrive or leave, the count is the whole party only for the stops they are there for: stopFor.)
 function peopleOn(arr, day) {
   if (!arr || arr.unresolved) return null;
   const there = arr.kind === 'join' ? day >= arr.day : day <= arr.day;
@@ -283,17 +405,50 @@ function words(arr, fr) {
   if (arr.mode === 'split') tail = `, ${fr ? 'chambre à part' : 'own room'}${arr.rooms.bAssumed ? ASSUMED[fr ? 'fr' : 'en'] : ''}, ${nightsOf(arr.nightsB, fr)}`;
   else if (arr.mode === 'shared') tail = `, ${nightsOf(arr.nightsB, fr)}`;
   else tail = fr ? ', sans nuitée' : ', no night';
-  const line = `${adultsOf(arr.base, fr)}${arr.dated ? ' ' : ', '}${range} · ${more} ${from}${tail}`;
+  // The time of day: said beside the day when known ("from Oct 9, 2 PM"); "time not set" when not.
+  const at = validAt(arr.at) ? arr.at : null, tag = at ? atTag(at, fr) : '';
+  const timed = at ? `, ${tag}` : (fr ? ' (heure à préciser)' : ' (time not set)');
+  const line = `${adultsOf(arr.base, fr)}${arr.dated ? ' ' : ', '}${range} · ${more} ${from}${timed}${tail}`;
   const who = `${adultsOf(arr.base, fr)} + ${arr.n} ${from}`;
   const days = {};
   for (let i = 1; i <= arr.days; i++) { const p = peopleOn(arr, i); days[i] = p === all ? (fr ? `pour les ${all}` : `for all ${all}`) : (fr ? `pour ${few}` : `for ${few}`); }
-  // "Day 1 is planned for 2; all 3 from Oct 9 (Day 2)."
+  // The day they arrive (or leave) is never "for all 3" by itself: "for 2 + 1 arriving" until the time is known, then
+  // "2 until 2 PM, then all 3" (each stop of that day says which it is: stop.few / stop.near).
+  const allW = fr ? `les ${all}` : `all ${all}`;
+  const exact = !!(at && Number.isInteger(at.m));
+  if (!at) days[d] = join ? (fr ? `pour ${few} + ${arr.n} qui arrive${arr.n > 1 ? 'nt' : ''}` : `for ${few} + ${arr.n} arriving`) : (fr ? `pour ${few} + ${arr.n} qui part${arr.n > 1 ? 'ent' : ''}` : `for ${few} + ${arr.n} leaving`);
+  else if (join) days[d] = fr ? `${few} jusqu’à l’arrivée (${tag}), puis ${allW}` : (exact ? `${few} until ${tag}, then ${allW}` : `${few} until the ${tag} arrival, then ${allW}`);
+  else days[d] = fr ? `${allW} jusqu’au départ (${tag}), puis ${few}` : (exact ? `${allW} until ${tag}, then ${few}` : `${allW} until the ${tag} departure, then ${few}`);
+  const stop = !at ? null : join
+    ? (fr ? { few: `Avant l’arrivée (${tag}) : pour ${few}`, near: `Près de l’arrivée (${tag}) : non confirmé pour ${allW}` } : { few: `Before the ${tag} arrival: for ${few}`, near: `Close to the ${tag} arrival: not confirmed for ${allW}` })
+    : (fr ? { few: `Après le départ (${tag}) : pour ${few}`, near: `Près du départ (${tag}) : non confirmé pour ${allW}` } : { few: `After the ${tag} departure: for ${few}`, near: `Close to the ${tag} departure: not confirmed for ${allW}` });
+  // "Day 1 is planned for 2. Oct 9 (Day 2): 2 until 2 PM, then all 3."
   const dayList = (a, b) => (a === b ? (fr ? `Le jour ${a} est prévu` : `Day ${a} is planned`) : (fr ? `Les jours ${a} à ${b} sont prévus` : `Days ${a}–${b} are planned`));
-  const act = join
-    ? (fr ? `${dayList(1, d - 1)} pour ${few}; ${all === 2 ? 'les 2' : `les ${all}`} dès ${whenFr}${arr.dated ? ` (jour ${d})` : ''}.` : `${dayList(1, d - 1)} for ${few}; all ${all} from ${whenDay}${arr.dated ? ` (Day ${d})` : ''}.`)
-    : (fr ? `Les ${all} jusqu’au ${whenDay}${arr.dated ? ` (jour ${d})` : ''}; ${dayList(d + 1, arr.days).replace(/^L/, 'l')} pour ${few}.` : `All ${all} until ${whenDay}${arr.dated ? ` (Day ${d})` : ''}; ${dayList(d + 1, arr.days).replace(/^D/, 'd')} for ${few}.`);
-  return { line, who, days, act, range, from };
+  const dayName = arr.dated ? (fr ? `${cap(whenDay)} (jour ${d})` : `${whenDay} (Day ${d})`) : (fr ? `Jour ${d}` : `Day ${d}`);
+  const they = arr.n > 1;
+  let act;
+  if (join) {
+    const pre = fr ? `${dayList(1, d - 1)} pour ${few}.` : `${dayList(1, d - 1)} for ${few}.`;
+    const mid = at ? `${dayName}${fr ? ' : ' : ': '}${days[d]}.`
+      : (fr ? `${dayName} : pour ${few} jusqu’à ${they ? 'leur' : 'son'} arrivée (heure à préciser).` : `${dayName}: for ${few} until they arrive (time not set).`);
+    const post = !at && d < arr.days ? (fr ? ` ${cap(allW)} dès le jour ${d + 1}.` : ` All ${all} from Day ${d + 1}.`) : '';
+    act = `${pre} ${mid}${post}`;
+  } else {
+    const pre = d === 2 ? (fr ? `Le jour 1 est pour ${allW}. ` : `Day 1 is for all ${all}. `) : d > 2 ? (fr ? `Les jours 1 à ${d - 1} sont pour ${allW}. ` : `Days 1–${d - 1} are for all ${all}. `) : '';
+    const mid = at ? `${dayName}${fr ? ' : ' : ': '}${days[d]}.`
+      : (fr ? `${dayName} : pour ${allW} jusqu’à ${they ? 'leur' : 'son'} départ (heure à préciser).` : `${dayName}: for all ${all} until they leave (time not set).`);
+    const post = fr ? ` ${dayList(d + 1, arr.days)} pour ${few}.` : ` ${dayList(d + 1, arr.days)} for ${few}.`;
+    act = `${pre}${mid}${post}`;
+  }
+  // The one question, while the time is not known (the plan under that day, Details, and the chat's reply).
+  const ask = at ? '' : join
+    ? (fr ? `À quelle heure ${they ? 'arrivent-ils' : 'arrive cette personne'} ${whenFr}? D’ici là, les arrêts du jour ${d} sont pour ${few}, plus ${arr.n} dès ${they ? 'leur' : 'son'} arrivée.` : `What time do they arrive on ${whenDay}? Until I know, Day ${d} stops are for ${few}, plus ${arr.n} once they’re there.`)
+    : (fr ? `À quelle heure ${they ? 'partent-ils' : 'part cette personne'} ${whenFr}? D’ici là, les arrêts du jour ${d} sont pour ${allW}, moins ${arr.n} après ${they ? 'leur' : 'son'} départ.` : `What time do they leave on ${whenDay}? Until I know, Day ${d} stops are for all ${all}, less ${arr.n} once they’ve left.`);
+  // (Beside the plan's own line, which already says the day is for 2 until they arrive, only the question itself.)
+  const askShort = ask ? ask.slice(0, ask.indexOf('?') + 1) : '';
+  return { line, who, days, act, range, from, stop, ask, askShort, tag, dayName };
 }
+const cap = (x) => String(x || '').replace(/^./, (c) => c.toUpperCase());
 
 // ---------- The stay ----------
 // The bookings the stay takes, against the stay's own dates (trip: whereToStay.trip: arrive, leave, nights, adults,
@@ -320,7 +475,8 @@ function partText(p, dated, fr) {
   return [adultsOf(p.adults, fr) + (p.kids ? (fr ? ` + ${plural(p.kids, 'enfant', 'enfants')}` : ` + ${plural(p.kids, 'kid', 'kids')}`) : ''), roomsOf(p.rooms, fr) + (p.roomsAssumed ? ASSUMED[fr ? 'fr' : 'en'] : ''), dated ? rangeOf(p.arrive, p.leave, fr) : nightsOf(p.nights, fr)].join(', ');
 }
 const CANT = { en: 'One booking link can’t hold different dates per room, so these are two separate bookings.', fr: 'Un lien de réservation ne peut pas avoir des dates différentes par chambre : ce sont deux réservations distinctes.' };
-const CONFIRM = { en: 'Rooms and how many each sleeps are confirmed on the booking site.', fr: 'Les chambres et leur capacité sont confirmées sur le site de réservation.' };
+// (2026-11-24) Said beside the buttons on the plan and on the shared copy: nothing here checks or holds a room.
+const CONFIRM = { en: 'Availability, rooms and the booking itself are confirmed on the booking site.', fr: 'La disponibilité, les chambres et la réservation elle-même se confirment sur le site de réservation.' };
 // Does a link carry anything of its booking (its own URL, read by the handoff's reader)?
 const carriesAny = (l) => { const c = SBL.stayLinkCarries(l.key, l.url); return !!(c.dates || c.adults || c.rooms); };
 // One stay card's bookings. stay: the stay as the link builder takes it; trip: whereToStay.trip.
@@ -347,12 +503,18 @@ function cardSplit(stay, trip, arr, opts = {}) {
     const L = fr ? 'fr' : 'en', w = words(arr, fr) || {};
     const pt = parts.map((p) => partText(p, dated, fr));
     const label = (i) => (fr ? `Réservation ${i + 1}` : `Booking ${i + 1}`);
+    // (2026-11-24) A button says the booking its own link opens with: "2 adults · Oct 8–10". Only what the link's URL
+    // really carries is said (stayLinkCarries): a link with the guests but no dates yet is "2 adults", and the dates
+    // stay in the note beside it. Two buttons that would read the same keep their number.
+    const says = (p, l) => { const c = l ? SBL.stayLinkCarries(l.key, l.url) : {}; return [c.adults ? adultsOf(p.adults, fr) + (p.kids && c.children ? (fr ? ` + ${plural(p.kids, 'enfant', 'enfants')}` : ` + ${plural(p.kids, 'kid', 'kids')}`) : '') : '', c.dates ? rangeOf(p.arrive, p.leave, fr) : ''].filter(Boolean).join(' · '); };
+    const names = parts[1] ? [says(parts[0], first), says(parts[1], second)] : [];
+    const named = names.length === 2 && names[0] && names[1] && names[0] !== names[1] ? names : names.map((x, i) => [label(i), x].filter(Boolean).join(' · '));
     const ho = (h) => ((h && h[0]) ? (fr ? h[0].noteFr : h[0].note) : '');
     const dot = (x) => (/[.!?]$/.test(x) ? x : `${x}.`);
     let head, note, card, chat, btn = [];
     if (arr.mode === 'split' && parts[1]) {
       head = fr ? 'Deux réservations distinctes' : 'Two separate bookings';
-      btn = distinct ? [label(0), label(1)] : [];
+      btn = distinct ? named : [];
       const each = pt.map((x, i) => dot(`${label(i)}${fr ? ' : ' : ': '}${x}`)).join(' ');
       // The stay card's own short line, and the chat's.
       // One button: the hotel's own site takes nothing from here; another site's link takes guests only with dates.
@@ -418,9 +580,14 @@ function entry(arr, stayText) {
   const w = words(arr, false), wf = words(arr, true);
   const st = stayText || {};
   const dot = (x) => (/[.!?]$/.test(x) ? x : `${x}.`);
-  const text = [dot(w.line), st.en || '', w.act].filter(Boolean).join(' ');
-  const textFr = [dot(wf.line), st.fr || '', wf.act].filter(Boolean).join(' ');
-  return { ask: 'late_arrival', label: arr.kind === 'join' ? 'Later arrival' : 'Earlier departure', labelFr: arr.kind === 'join' ? 'Arrivée décalée' : 'Départ anticipé', status: 'partial', stops: [], short: w.line, shortFr: wf.line, text, textFr, days: w.days, daysFr: wf.days, act: w.act, actFr: wf.act, mode: arr.mode, share: toShare(arr) };
+  // copy: what a copied itinerary says (no question in it); text: the plan's own line (the question last, while open).
+  const copy = [dot(w.line), st.en || '', w.act].filter(Boolean).join(' ');
+  const copyFr = [dot(wf.line), st.fr || '', wf.act].filter(Boolean).join(' ');
+  const text = [copy, w.askShort].filter(Boolean).join(' '), textFr = [copyFr, wf.askShort].filter(Boolean).join(' ');
+  // day, kind, win and stop: what the page needs to say who each stop of that day is for (lateStopState).
+  const win = atWindow(arr.at);
+  return { ask: 'late_arrival', label: arr.kind === 'join' ? 'Later arrival' : 'Earlier departure', labelFr: arr.kind === 'join' ? 'Arrivée décalée' : 'Départ anticipé', status: 'partial', stops: [], short: w.line, shortFr: wf.line, text, textFr, copy, copyFr, days: w.days, daysFr: wf.days, act: w.act, actFr: wf.act, mode: arr.mode, share: toShare(arr),
+    kind: arr.kind, day: arr.day, ...(win ? { win, stop: w.stop, stopFr: wf.stop } : { askTime: w.ask, askTimeFr: wf.ask }) };
 }
 // The stay sentence of the entry, from the chosen card's own words.
 function stayTextOf(plan) {
@@ -431,23 +598,35 @@ function stayTextOf(plan) {
 }
 
 // ---------- Sharing: la=j1d2o (join | leave, how many, which day, a room of their own said or not) ----------
+// (2026-11-24) The time of day, only when known: la=j1d2o.t1400 (a clock time) or la=j1d2o.wa (a part of the day, by
+// its code). A link without it -- every link made before -- reads as "time not set", which is the honest state.
+const SHARE_RE = /^([jl])([1-9])d([1-9]\d?)([ox])(?:\.(?:t([01]\d|2[0-3])([0-5]\d)|w([a-z]{1,2})))?$/;
 function toShare(arr) {
   if (!arr || arr.unresolved) return '';
-  return `${arr.kind === 'leave' ? 'l' : 'j'}${arr.n}d${arr.day}${arr.ownRoom ? 'o' : 'x'}`;
+  const at = validAt(arr.at) ? arr.at : null;
+  const t = !at ? '' : Number.isInteger(at.m) ? `.t${String(Math.floor(at.m / 60)).padStart(2, '0')}${String(at.m % 60).padStart(2, '0')}` : `.w${DAYPARTS[at.part].c}`;
+  return `${arr.kind === 'leave' ? 'l' : 'j'}${arr.n}d${arr.day}${arr.ownRoom ? 'o' : 'x'}${t}`;
 }
 function fromShare(v) {
-  const m = /^([jl])([1-9])d([1-9]\d?)([ox])$/.exec(String(v || ''));
+  const m = SHARE_RE.exec(String(v || ''));
   if (!m || Number(m[3]) > 31) return null;
-  return { key: 'late_arrival', kind: m[1] === 'l' ? 'leave' : 'join', n: Number(m[2]), when: { day: Number(m[3]) }, ownRoom: m[4] === 'o', phrase: '' };
+  let at = null;
+  if (m[5]) at = { m: Number(m[5]) * 60 + Number(m[6]) };
+  else if (m[7]) { const part = Object.keys(DAYPARTS).find((k) => DAYPARTS[k].c === m[7]); if (!part) return null; at = { part }; }
+  return { key: 'late_arrival', kind: m[1] === 'l' ? 'leave' : 'join', n: Number(m[2]), when: { day: Number(m[3]) }, ownRoom: m[4] === 'o', ...(at ? { at } : {}), phrase: '' };
 }
 // The words a request gains when the arrangement is said in the chat (so every later turn reads it again).
 function requestWords(need, lang) {
   const fr = lang === 'fr', n = need.n || 1, w = need.when || {};
   const whenEn = w.iso ? `on ${w.iso}` : w.md ? `on ${MO_EN[w.md[0] - 1]} ${w.md[1]}` : w.dom ? `on the ${w.dom}th` : Number.isInteger(w.wd) ? `on ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][w.wd]}` : w.day ? `on day ${w.day}` : w.last ? 'on the last day' : w.night ? `for night ${w.night}` : w.lastNight ? 'for the last night' : w.late ? `${w.late} day${w.late > 1 ? 's' : ''} late` : w.early ? `${w.early} day${w.early > 1 ? 's' : ''} early` : w.nights ? `after ${w.nights} night${w.nights > 1 ? 's' : ''}` : '';
   const whenFr = w.iso ? `le ${w.iso}` : w.md ? `le ${w.md[1]} ${['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'][w.md[0] - 1]}` : w.dom ? `le ${w.dom}` : Number.isInteger(w.wd) ? ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'][w.wd] : w.day ? `le jour ${w.day}` : w.last ? 'le dernier jour' : w.night ? `pour la nuit ${w.night}` : w.lastNight ? 'pour la dernière nuit' : w.late ? `${w.late} jour${w.late > 1 ? 's' : ''} plus tard` : w.early ? `${w.early} jour${w.early > 1 ? 's' : ''} plus tôt` : w.nights ? `après ${w.nights} nuit${w.nights > 1 ? 's' : ''}` : '';
-  if (fr) return `${n} d’entre nous ${need.kind === 'leave' ? (n > 1 ? 'partent' : 'part') : (n > 1 ? 'arrivent' : 'arrive')} ${whenFr}${need.ownRoom ? ' et a besoin d’une chambre séparée' : ''}`;
+  // The time of day, in words the reader above reads back the same ("at 2:30 PM", "in the afternoon"; « à 14 h 30 »).
+  const at = validAt(need.at) ? need.at : null;
+  const atEn = !at ? '' : Number.isInteger(at.m) ? ` at ${clock(at.m, false)}` : ` ${DAYPARTS[at.part].say}`;
+  const atFr = !at ? '' : Number.isInteger(at.m) ? ` à ${clock(at.m, true)}` : ` ${DAYPARTS[at.part].sayFr}`;
+  if (fr) return `${n} d’entre nous ${need.kind === 'leave' ? (n > 1 ? 'partent' : 'part') : (n > 1 ? 'arrivent' : 'arrive')} ${whenFr}${atFr}${need.ownRoom ? ' et a besoin d’une chambre séparée' : ''}`;
   const nw = ['', 'one', 'two', 'three', 'four', 'five', 'six'][n] || String(n);
-  return `${nw} of us ${need.kind === 'leave' ? (n > 1 ? 'leave' : 'leaves') : (n > 1 ? 'arrive' : 'arrives')} ${whenEn}${need.ownRoom ? ' and needs a separate room' : ''}`;
+  return `${nw} of us ${need.kind === 'leave' ? (n > 1 ? 'leave' : 'leaves') : (n > 1 ? 'arrive' : 'arrives')} ${whenEn}${atEn}${need.ownRoom ? ' and needs a separate room' : ''}`;
 }
 // Does a request that says `have` already say what `said` says (same kind, same day words, the same room)?
 const whenKey = (w) => JSON.stringify(Object.keys(w || {}).sort().map((k) => [k, w[k]]));
@@ -492,12 +671,48 @@ function clausesOf(raw) {
 }
 // "forget the late arrival", "she's coming for the whole trip after all": the arrangement comes off the plan.
 const FORGET_RE = new RegExp(`\\b(?:remove|forget|cancel|drop|delete|scrap|ignore|never mind|enleve[rz]?|oublie[rz]?|annule[rz]?|retire[rz]?|supprime[rz]?)\\b[^.;!?]{0,30}\\b(?:late(?:r)? arrival|early departure|earlier departure|arrival change|staggered arrival|separate bookings?|second booking|two bookings|arrivee decalee|depart anticipe|deux reservations)\\b|\\b${PERSON_REF}\\b[^.;!?]{0,20}\\b(?:no longer|not|isn't|is not|won't be|n'arrive plus|ne part plus)\\b[^.;!?]{0,20}\\b(?:late|later|early|earlier|plus tard|plus tot)\\b|\\b${PERSON_REF}\\b[^.;!?]{0,30}\\b(?:the whole (?:trip|time|stay)|the full (?:trip|stay)|all (?:three|3|the) (?:days|nights)|from the start|with us after all|tout le (?:voyage|sejour)|des le debut)\\b`);
+// The time they arrive (or leave), said in the chat on a plan that already has the arrangement (2026-11-24):
+//   "she arrives at 2 pm", "her flight lands at 2:30", "they get in mid-afternoon", "arrival time is 3", « elle arrive
+//   vers 15 h », "change her arrival to 4 pm": a person of the party (or "arrival") with an arriving word and a time;
+//   "2 pm", "around 3", "in the evening", "not sure yet": a bare answer, ONLY while the question is the open one
+//   (pending: the chat's last reply asked it, or the plan is showing it and nothing else is being asked).
+// Never a message that edits stops or times ("start day 2 at 2 pm", "move dinner to 7"), and never a question.
+// -> { at } | { unsure: true } | null
+const TIME_WHO = "(?:she|he|they|her|his|their|our friend|my friend|the friend|our (?:other |third )?(?:friend|guest|sister|brother|mom|mother|dad|father|daughter|son|cousin)|the (?:third|other|late|last) (?:person|guest|friend|adult|one)|elle|il|ils|elles|notre amie?|mon amie?|la troisieme personne|cette personne)";
+const TIME_JOIN = "(?:arriv\\w+|land\\w*|get(?:s|ting)? (?:in|here|there)|com(?:es|ing) in|show(?:s|ing) up|join\\w*|touch(?:es)? down|atterri\\w*|sera la|seront la|nous rejoi\\w+)";
+const TIME_LEAVE = "(?:leav\\w+|head(?:s|ing)? (?:home|back|out|off)|depart\\w*|fl(?:y|ies|ying) (?:home|out|back)|go(?:es|ing)? (?:home|back)|check(?:s|ing)? out|takes? off|part(?:ent|ira|iront)?|repart\\w*|quitt\\w+|s'en va|rentre\\w*)";
+const TIME_OTHER_RE = /\b(?:start|begin|move|push|shift|swap|replace|remove|drop|delete|add|book|reserve|find|skip|dinner at|lunch at|breakfast at|commence[rz]?|debute[rz]?|deplace[rz]?|remplace[rz]?|enleve[rz]?|ajoute[rz]?|reserve[rz]?)\b/;
+const UNSURE_RE = /^(?:(?:i'?m |we'?re |i am |we are )?not sure(?: yet)?|(?:i |we )?(?:don't|do not) know(?: yet)?|no idea(?: yet)?|not yet|unknown|tbd|tba|(?:je |on |nous )?ne sai[st] pas(?: encore)?|(?:je |on )?sais pas|aucune idee|pas encore|pas sure?)[\s.!]*$/;
+function timeChat(message, have, pending) {
+  const raw = String(message || '').replace(/\s+/g, ' ').trim();
+  if (!have || !Number.isInteger(have.n) || !raw || raw.length > 120 || /\?\s*$/.test(raw)) return null;
+  const t = fold(raw).replace(/[.!]+$/, '').trim();
+  if (pending && UNSURE_RE.test(t)) return { unsure: true };
+  if (TIME_OTHER_RE.test(t)) return null;
+  const verb = have.kind === 'leave' ? TIME_LEAVE : TIME_JOIN, noun = have.kind === 'leave' ? '(?:departure|depart|leaving|flight|vol)' : '(?:arrival|arrivee|arriving|flight|vol)';
+  const about = new RegExp(`\\b${TIME_WHO}\\b[^.;!?]{0,30}\\b${verb}`).test(t) || new RegExp(`\\b${TIME_WHO} (?:flight|plane|bus|train|ride|vol|avion|autobus)\\b[^.;!?]{0,20}\\b${verb}`).test(t)
+    || new RegExp(`\\b${noun}\\b(?: time)?(?: is| est| will be| sera|:| to| a| at| now)?\\b`).test(t) || new RegExp(`^(?:make|change|set|update|mets|change[rz]?|mettez)\\b[^.;!?]{0,25}\\b${noun}\\b`).test(t);
+  if (about) { const at = timeIn(t) || timeIn(t.replace(/^.*\b(?:at|to|a|vers|around|about|by)\s+(?=\d)/, ''), { bare: true }); return at ? { at } : null; }
+  if (!pending) return null;
+  // A bare answer: nothing but the time and its small words.
+  const at = timeIn(t, { bare: true });
+  if (!at) return null;
+  const left = t.replace(/o'? ?clock/g, ' ').replace(/[\d:.,'-]+/g, ' ').replace(/\b(?:am|pm|a m|p m|ish|noon|midi|h)\b/g, ' ')
+    .replace(/\b(?:at|around|about|by|maybe|probably|i think|we think|i guess|roughly|approximately|sometime|some time|in|the|on|that|day|early|late|mid|middle|end|of|time|for|before|just|after|first thing|morning|afternoon|evening|night|tonight|lunch|lunchtime|midday|dinner|supper|work|or so|sharp|vers|environ|a|le|la|en|dans|de|du|d|l|fin|debut|milieu|tot|tard|matin|matinee|apres|midi|soir|soiree|souper|temps|pour|heures?|aprem|journee|nuit|peut-etre|probablement|je pense|bon)\b/g, ' ').replace(/\s+/g, '');
+  return left ? null : { at };
+}
 function chatRead(message, stops, h, ctx = {}) {
   const raw = String(message || '').replace(/\s+/g, ' ').trim();
   if (!raw || raw.length > 600) return null;
   const have = readLate(ctx.request || '');
   if (have && raw.length < 160 && !readLate(raw) && FORGET_RE.test(fold(raw)) && !STOP_EDIT_RE.test(fold(raw).replace(/\b(?:remove|drop|delete|enleve[rz]?|retire[rz]?|supprime[rz]?)\b/, ''))) return { ops: [h.op('late', { late: null, forget: true })], cant: null, exact: true, access: true, late: true };
   const said = readLate(raw);
+  // The time alone, on a plan that has the arrangement: recorded with it (the request's statement gains the time).
+  if (have && !said) {
+    const tm = timeChat(raw, have, !!ctx.pendingTime);
+    if (tm && tm.unsure) return { ops: [h.op('late', { late: null, said: false, unsure: true })], cant: null, exact: true, access: true, late: true };
+    if (tm && tm.at) return { ops: [h.op('late', { late: sameAt(have.at, tm.at) ? null : { ...have, at: tm.at }, said: true, time: true })], cant: null, exact: true, access: true, late: true };
+  }
   const parts = clausesOf(raw);
   const rest = [];
   let about = false, room = false, book = false, part = false, question = false, forget = false;
@@ -519,7 +734,8 @@ function chatRead(message, stops, h, ctx = {}) {
   if (!about) return null;
   // What is recorded: a statement the request does not already make (with the room, when said beside it).
   let need = said ? { ...said, ownRoom: said.ownRoom || room } : null;
-  if (need && have && same(have, need)) { if (need.ownRoom && !have.ownRoom) need = { ...have, ownRoom: true, addRoom: true }; else need = null; }
+  // (The same statement with a new time of day -- "our friend arrives October 9 at 4 pm" -- changes the time only.)
+  if (need && have && same(have, need)) { const t2 = need.at && !sameAt(have.at, need.at) ? need.at : null; if (need.ownRoom && !have.ownRoom) need = { ...have, ownRoom: true, addRoom: true, ...(t2 ? { at: t2 } : {}) }; else need = t2 ? { ...have, at: t2 } : null; }
   if (!need && have && room && !have.ownRoom) need = { ...have, ownRoom: true, addRoom: true };
   const op = h.op('late', { late: need, said: !!said, room, book, part, question, ...(forget ? { forget: true } : {}), ...(!have && !said ? { orphan: true } : {}) });
   const out = { ops: [op], cant: null, exact: true, access: true, late: true };
@@ -533,8 +749,50 @@ function chatReply(arr, card, lang, o = {}) {
   const out = chatReplyText(arr, card, lang, o);
   return o.alone === false ? out.replace(/ (?:No stops changed|Aucun arrêt n’a changé)\.$/, '') : out;
 }
+// "9 AM" beside a stop's name in a reply.
+const stopList = (list, fr) => list.map((x) => `${x.name} (${clock(x.start, fr)})`).join(', ');
+// The reply to a time of day (o.time: 'set' | 'changed'; o.stops: that day's stops on screen, [{ name, start }]).
+function timeReply(arr, lang, o = {}) {
+  const fr = lang === 'fr', at = arr.at, w = words(arr, fr), win = atWindow(at), join = arr.kind === 'join';
+  const few = arr.base + arr.kids, all = few + arr.n, allW = fr ? `les ${all}` : `all ${all}`;
+  const day = arr.dated ? dayOf(arr.date, fr) : (fr ? `jour ${arr.day}` : `day ${arr.day}`);
+  const span = at.part ? atSpan(at, fr) : '';
+  const when = Number.isInteger(at.m) ? (fr ? `à ${clock(at.m, true)}` : `at ${clock(at.m, false)}`) : `${fr ? DAYPARTS[at.part].sayFr : DAYPARTS[at.part].say}${fr ? ` (compté comme ${span})` : ` (taken as ${span})`}`;
+  const what = join ? (fr ? 'arrivée' : 'arrival') : (fr ? 'départ' : 'departure');
+  const open = o.time === 'changed'
+    ? (fr ? `Modifié : ${what} le ${day} ${when}.` : `Updated: ${what} on ${day} ${when}.`)
+    : (fr ? `Noté : ${what} le ${day} ${when}.` : `Noted: ${what} on ${day} ${when}.`);
+  const list = (o.stops || []).filter((x) => x && x.name && Number.isInteger(x.start)).sort((a, b) => a.start - b.start);
+  const by = { few: [], near: [], all: [] };
+  for (const x of list) { const st = lateStopState(win, arr.kind, x.start); if (by[st]) by[st].push(x); }
+  const bits = [];
+  if (!list.length) bits.push(`${fr ? `Jour ${arr.day}` : `Day ${arr.day}`}${fr ? ' : ' : ': '}${w.days[arr.day]}.`);
+  else {
+    const D = fr ? `jour ${arr.day}` : `Day ${arr.day}`;
+    if (by.few.length) bits.push(join
+      ? (fr ? `Au ${D}, avant l’arrivée, pour ${few} : ${stopList(by.few, fr)}.` : `${D} before the arrival is for ${few}: ${stopList(by.few, fr)}.`)
+      : (fr ? `Au ${D}, après le départ, pour ${few} : ${stopList(by.few, fr)}.` : `${D} after the departure is for ${few}: ${stopList(by.few, fr)}.`));
+    if (by.near.length) bits.push(join
+      ? (fr ? `Près de l’arrivée, donc non confirmé pour ${allW} : ${stopList(by.near, fr)}.` : `Close to the arrival, so not confirmed for ${allW}: ${stopList(by.near, fr)}.`)
+      : (fr ? `Près du départ, donc non confirmé pour ${allW} : ${stopList(by.near, fr)}.` : `Close to the departure, so not confirmed for ${allW}: ${stopList(by.near, fr)}.`));
+    if (by.all.length) bits.push(by.few.length || by.near.length
+      ? (join ? (fr ? `Ensuite, ${allW}.` : `After that, ${allW}.`) : (fr ? `Avant cela, ${allW}.` : `Before that, ${allW}.`))
+      : (join ? (fr ? `Tous les arrêts du ${D} commencent après : ${allW}.` : `Every ${D} stop starts later: ${allW}.`) : (fr ? `Tous les arrêts du ${D} commencent bien avant : ${allW}.` : `Every ${D} stop starts well before: ${allW}.`)));
+  }
+  return [open, ...bits, o.alone === false ? '' : (fr ? 'Aucun arrêt n’a changé.' : 'No stops changed.')].filter(Boolean).join(' ');
+}
+// The question a reply about the arrangement ends with, while the time is not known ('' once it is).
+function chatAsk(arr, lang) {
+  if (!arr || arr.unresolved || validAt(arr.at)) return '';
+  return words(arr, lang === 'fr').askShort;
+}
+// The tag the chat's open question rides back on (a client sends it with the next message, never shown).
+const ASK_TAG = '[arrival time]';
 function chatReplyText(arr, card, lang, o = {}) {
   const fr = lang === 'fr';
+  // "not sure yet": nothing changes, and the day stays as it is said.
+  if (o.unsure && arr && !arr.unresolved) { const w0 = words(arr, fr); return fr ? `Pas de souci. D’ici là : ${w0.days[arr.day]} au jour ${arr.day}. Dites-moi l’heure quand vous la saurez. Aucun arrêt n’a changé.` : `No problem. Until then, Day ${arr.day} stays ${w0.days[arr.day]}. Tell me the time when you know it. No stops changed.`; }
+  if (o.time && arr && !arr.unresolved && validAt(arr.at)) return timeReply(arr, lang, o);
   if (o.orphan || (!arr && !o.recorded && !o.cleared && !o.start)) return fr
     ? 'Je n’ai personne qui arrive plus tard sur ce plan. Quel jour arrive-t-elle ou arrive-t-il? Dites-le-moi (« notre amie arrive le jour 2 ») et j’ajusterai l’hébergement et les journées. Aucun arrêt n’a changé.'
     : 'I don’t have anyone arriving later on this plan. Which day do they arrive? Tell me (“our friend arrives on day 2”) and I’ll set the stay and the days. No stops changed.';
@@ -560,4 +818,5 @@ function chatReplyText(arr, card, lang, o = {}) {
 module.exports = {
   readLate, readSentence, stripLate, whenIn, resolve, peopleOn, words, stayParts, partText, cardSplit, applyToStay, entry, stayTextOf,
   toShare, fromShare, requestWords, same, sameOnTrip, dayIn, chatRead, chatReply, clausesOf, CANT, CONFIRM, ROOM_RE,
+  timeIn, timeChat, sameAt, validAt, atWindow, atTag, lateStopState, chatAsk, ASK_TAG, DAYPARTS, CLIENT_SRC, SHARE_RE,
 };

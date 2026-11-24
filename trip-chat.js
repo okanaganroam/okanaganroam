@@ -505,7 +505,7 @@ function rulesReadBase(message, stops, opts = {}) { return access.read(message, 
 // of the message goes to the usual rules. Fixed rules: the AI's reading never stands in for them (access: true).
 function rulesRead(message, stops, opts = {}) {
   let la = null;
-  try { la = late.chatRead(message, stops, { op: (o, extra = {}) => ({ ...ACCESS_BASE, o, ...extra }) }, { request: opts.request || '' }); } catch (e) { la = null; }
+  try { la = late.chatRead(message, stops, { op: (o, extra = {}) => ({ ...ACCESS_BASE, o, ...extra }) }, { request: opts.request || '', pendingTime: !!opts.pendingTime }); } catch (e) { la = null; }
   if (!la) return rulesReadNeeds(message, stops, opts);
   if (la.rest) {
     let r = null;
