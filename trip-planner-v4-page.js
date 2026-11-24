@@ -728,7 +728,30 @@ const V4_CLIENT_SRC = String.raw`
   }
   // Someone arrives later or leaves earlier (2026-11-23, trip-late-arrival.js): the stay's split, the plan's own entry.
   function v4LateSplit(){ var d = typeof t3StayData === 'function' ? t3StayData() : null; return (d && d.w && d.w.trip && d.w.trip.split) || null; }
-  function v4LateEntry(){ var p = state.last || {}; if (!p.lateArrival) return null; return (p.evidence || []).filter(function(e){ return e && e.ask === 'late_arrival'; })[0] || null; }
+  // (2026-11-24) With the arrival time known, the entry's day title and sentences are worded again, each time it is
+  // read, from that day's stops on screen and the same start times as the notes under them (v4LateStopNote): the
+  // title can never say more than the notes, also after a stop is swapped, added or removed, or the time changes.
+  function v4LateEntry(){ var p = state.last || {}; if (!p.lateArrival) return null; var e = (p.evidence || []).filter(function(e){ return e && e.ask === 'late_arrival'; })[0] || null; if (e && e.win && e.say) { try { v4LateSync(e); } catch (x) { /* the server's wording stands */ } } return e; }
+  function v4LateDayStops(day){
+    var out = [];
+    ((state.last && state.last.days) || []).forEach(function(d){
+      if (!d || d.day !== day) return;
+      (d.stops || []).forEach(function(s){
+        if (!s || !s.venue || state.removed[d.day + '-' + s.daypart] || (v4.gone && v4.gone[s.venue.id])) return;
+        var st = typeof chatStart === 'function' ? chatStart(day, s.venue.id) : null;
+        if (typeof st === 'number') out.push({ name: s.venue.name, start: st });
+      });
+    });
+    return out;
+  }
+  function v4LateSync(e){
+    var list = v4LateDayStops(e.day);
+    [['say', 'days', 'act', 'copy', 'text'], ['sayFr', 'daysFr', 'actFr', 'copyFr', 'textFr']].forEach(function(k){
+      var t = e[k[0]]; if (!t || !t.L || !e[k[1]]) return;
+      var r = lateDaySay(t.L, list), act = t.pre + r.mid + t.post;
+      e[k[1]][e.day] = r.head; e[k[2]] = act; e[k[3]] = t.lead + act; e[k[4]] = e[k[3]];
+    });
+  }
   // (2026-11-24) Who a stop of the arrival (or departure) day is for, once the time is known: by the stop's own start.
   ${require('./trip-late-arrival').CLIENT_SRC}
   function v4LateStopNote(id){
@@ -1060,6 +1083,8 @@ const V4_CLIENT_SRC = String.raw`
     document.body.style.paddingBottom = bar.offsetHeight ? bar.offsetHeight + 'px' : '';
   }
   function v4Render(focus){
+    // (2026-11-24) The later-arrival entry is worded from the stops on screen before anything reads it (v4LateEntry).
+    try { v4LateEntry(); } catch (e) { /* the server's wording stands */ }
     var p = t3LocalTimes(lang() === 'fr' ? t3FrenchPlan(state.last) : state.last, lang());
     renderedVenueCardAnchors = {}; renderedPhotos = {};
     var fr = lang() === 'fr', counts = nameCounts(), planKinds = p.kind === 'multi_day' || p.kind === 'day_plan';

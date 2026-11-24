@@ -9317,7 +9317,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
 function tripChatStayBlock(p) {
   if (!p) return null;
   // (A later arrival travels with the stay part: the bookings, the day labels and the plan's line change together.)
-  return { whereToStay: p.whereToStay || null, v4Booking: p.v4Booking || null, gettingHere: p.gettingHere || null, ...(p.lateArrival ? { lateArrival: p.lateArrival, lateEvidence: tripLate.entry(p.lateArrival, tripLate.stayTextOf(p)) } : {}) };
+  return { whereToStay: p.whereToStay || null, v4Booking: p.v4Booking || null, gettingHere: p.gettingHere || null, ...(p.lateArrival ? { lateArrival: p.lateArrival, lateEvidence: tripLate.entry(p.lateArrival, tripLate.stayTextOf(p), tripLate.planDayStops(p, p.lateArrival)) } : {}) };
 }
 // 2026-11-22 (live: "we want to stay in Penticton, at a hotel with a pool" took 6-14 s and the reply never said whether
 // the place has a pool). Speed: the plan is planned ONCE (it was planned twice, four times after a pin conflict), the
@@ -9918,7 +9918,7 @@ function tripChatLateTurn(op, { v, plan, req, stops, lang, staysOn, runCore, rec
   const timeSet = op.timeSet && recorded && arr && !arr.unresolved && tripLate.validAt(arr.at) ? op.timeSet : null;
   // (The same time said again: the reply says who each stop is for again; nothing is recorded.)
   const timeSame = !timeSet && op.time && !op.late && arr && !arr.unresolved && tripLate.validAt(arr.at);
-  const reply = tripLate.chatReply(op.orphan ? null : arr, card, lang, { recorded: recorded && !!arr && !arr.unresolved, cleared: recorded && !arr, start: !!op.start, orphan: !!op.orphan, alone, ...(timeSet || timeSame ? { time: timeSet || 'set', stops: dayStops } : {}), ...(op.unsure ? { unsure: true } : {}) });
+  const reply = tripLate.chatReply(op.orphan ? null : arr, card, lang, { recorded: recorded && !!arr && !arr.unresolved, cleared: recorded && !arr, start: !!op.start, orphan: !!op.orphan, alone, stops: dayStops, ...(timeSet || timeSame ? { time: timeSet || 'set' } : {}), ...(op.unsure ? { unsure: true } : {}) });
   const out = { reply };
   const ask = op.orphan || op.unsure ? '' : tripLate.chatAsk(arr, lang);
   if (ask) { out.tail = ask; out.offer = [{ say: tripLate.ASK_TAG }]; }
@@ -56028,10 +56028,15 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
       if (la && !la.unresolved) lateArr = la;
     } catch (e) { lateArr = null; }
   }
-  if (lateArr) { const w = tripLate.words(lateArr, fr), e = tripLate.entry(lateArr, null); out.late = { line: w.line, act: w.act, days: fr ? e.daysFr : e.days,
+  if (lateArr) {
+    // (2026-11-24) That day's title and sentence are worded from the same stops and times as the notes under its stops
+    // (the link's own t=), and again by the page from the stops it shows: never "then all 3".
+    let lateStops = [];
+    try { const nameOf = new Map(tripStopsFor(refs).filter((x) => x && !x.missing).map((x) => [x.ref, x.name])); refs.forEach((ref, i) => { const t0 = (c.times || [])[i]; if (days[i] === lateArr.day && Number.isInteger(t0) && nameOf.has(ref)) lateStops.push({ name: nameOf.get(ref), start: t0 }); }); } catch (e) { lateStops = []; }
+    const w = tripLate.words(lateArr, fr, lateStops), e = tripLate.entry(lateArr, null, lateStops); out.late = { line: w.line, act: w.act, days: fr ? e.daysFr : e.days,
     // (2026-11-24) The time of day, when the link carries one: who each stop of that day is for, by its start time.
     // Without it (every link made before) that day reads "for 2 + 1 arriving" and the line says the time is not set.
-    ...(e.win ? { kind: e.kind, day: e.day, win: e.win, stop: fr ? e.stopFr : e.stop } : {}) }; } else delete out.late;
+    ...(e.win ? { kind: e.kind, day: e.day, win: e.win, stop: fr ? e.stopFr : e.stop, say: fr ? e.sayFr : e.say } : {}) }; } else delete out.late;
   // The place to stay: its own page and its own booking links (dates only when the link carries chosen dates).
   let stayFacts = null;
   if (c.stayId) {
@@ -56207,7 +56212,7 @@ function tripShareContextHtml(ctx, lang = 'en') {
   const allergyLine = (ctx.lines || []).find((l) => l.ask === 'allergy');
   if (allergyLine) html += `<p class="mt-ctx-note mt-ctx-allergy" data-mt-allergy><strong>${escapeHtml(allergyLine.text)}</strong></p>`;
   // Someone arrives later: each day's head count, before the stay (the bookings are said by the stay's buttons).
-  if (ctx.late) html += `<p class="mt-ctx-note mt-ctx-late" data-mt-late>${escapeHtml(ctx.late.act)}${ctx.stay && ctx.stay.split ? '' : ` ${escapeHtml(L('No place to stay is on this copy.', 'Aucun hébergement sur cette copie.'))}`}</p>`;
+  if (ctx.late) html += `<p class="mt-ctx-note mt-ctx-late" data-mt-late><span data-mt-late-act>${escapeHtml(ctx.late.act)}</span>${ctx.stay && ctx.stay.split ? '' : ` ${escapeHtml(L('No place to stay is on this copy.', 'Aucun hébergement sur cette copie.'))}`}</p>`;
   if (ctx.stay) {
     const st = ctx.stay;
     html += `<div class="mt-ctx-stay" data-mt-stay="${st.id}">${st.photo ? `<img src="${escapeHtml(st.photo)}" alt="" loading="lazy" width="96" height="96">` : ''}<div><p class="mt-ctx-k">${escapeHtml([L('Where to stay', 'Où dormir'), st.kind, st.regionLabel].filter(Boolean).join(' · '))}</p><p class="mt-ctx-name">${st.url ? `<a href="${escapeHtml(st.url)}">${escapeHtml(st.name)}</a>` : escapeHtml(st.name)}</p>`
@@ -56573,7 +56578,7 @@ ${renderGolfHeaderHtml()}
   // Someone arrives later (trip-late-arrival.js): each day's head count ("for 2", "for all 3"), by the day's title.
   var DAY_FOR = ${JSON.stringify((shareContext && shareContext.late && shareContext.late.days) || {}).replace(/</g, '\\u003c')};
   // (2026-11-24) With an arrival time on the link: each stop of that day says who it is for, by when it starts.
-  var LATE = ${JSON.stringify((shareContext && shareContext.late && shareContext.late.win) ? { kind: shareContext.late.kind, day: shareContext.late.day, win: shareContext.late.win, stop: shareContext.late.stop } : {}).replace(/</g, '\\u003c')};
+  var LATE = ${JSON.stringify((shareContext && shareContext.late && shareContext.late.win) ? { kind: shareContext.late.kind, day: shareContext.late.day, win: shareContext.late.win, stop: shareContext.late.stop, say: shareContext.late.say || null } : {}).replace(/</g, '\\u003c')};
   ${tripLate.CLIENT_SRC}
   var trip = (load(KEY, []) || []).filter(function(x){ return x && typeof x === 'object' && typeof x.name === 'string' && x.name; });
   var days = load(DAYS, {}) || {};
@@ -56720,7 +56725,18 @@ ${renderGolfHeaderHtml()}
       var gDate = g.key ? g.stops.map(function(x){ return x.s.time && x.s.time.d; }).filter(Boolean)[0] : null;
       // An undated plan for a month ("skiing in January") keeps its month (round 9).
       var gMonth = g.key && !gDate ? g.stops.map(function(x){ return x.s.time && x.s.time.m; }).filter(Boolean)[0] : null;
-      return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? T.day + ' ' + g.key + (gDate ? ' · ' + esc(dateText(gDate)) : gMonth ? ' · ' + esc(monthText(gMonth)) : '') + (!mine && DAY_FOR[g.key] ? ' · ' + esc(DAY_FOR[g.key]) : '') : (byDay ? T.otherStops : T.yourStops)) + '</h2>' +
+      // (2026-11-24) The arrival day's title, from the same stops and times as the notes under them (lateDaySay); the
+      // copy's sentence above follows it.
+      var dayFor = !mine && DAY_FOR[g.key] ? DAY_FOR[g.key] : '';
+      if (dayFor && LATE.win && LATE.say && String(g.key) === String(LATE.day)) {
+        try {
+          var lateSay = lateDaySay(LATE.say.L, g.stops.filter(function(x){ return x.s.time && typeof x.s.time.s === 'number'; }).map(function(x){ return { name: (info[x.s.ref] || {}).name || x.s.name, start: x.s.time.s }; }));
+          dayFor = lateSay.head;
+          var lateAct = document.querySelector('[data-mt-late-act]');
+          if (lateAct) lateAct.textContent = LATE.say.pre + lateSay.mid + LATE.say.post;
+        } catch (e) {}
+      }
+      return '<section class="mt-day"><div class="mt-day-head"><h2>' + (g.key ? T.day + ' ' + g.key + (gDate ? ' · ' + esc(dateText(gDate)) : gMonth ? ' · ' + esc(monthText(gMonth)) : '') + (dayFor ? ' · ' + esc(dayFor) : '') : (byDay ? T.otherStops : T.yourStops)) + '</h2>' +
         '<a class="mt-btn" ' + hrefAttr(dirUrl(g.stops.map(function(x){ return x.s; }))) + ' target="_blank" rel="noopener">' + (g.key ? T.dirDay.replace('{d}', g.key) : (byDay ? T.dirOther : T.dirAll)) + '</a></div>' +
         '<ol class="mt-list">' + (g.key && mine && drives[g.key] && drives[g.key].f && drives[g.key].t ? '<li class="mt-drive">' + esc(driveText(drives[g.key])) + '</li>' : '') + g.stops.map(function(x){
           var d = info[x.s.ref] || {};
