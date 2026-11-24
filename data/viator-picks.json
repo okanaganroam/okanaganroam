@@ -1,5 +1,5 @@
 {
- "updated": "2026-11-21",
+ "updated": "2026-11-22",
  "how": "Each new Viator match (viator-matches.json, or a wine tour in viator-wine-tours.json) needs a row here (rating, reviews, months, group) so it can show on guest pages and in the weekend email; without a row it never shows. Rows for tour-picks.js (the 'Book a tour' row on hotel guest pages and the weekend email's one bookable pick). Ratings and review counts are Viator's own, from drafts/viator-2026-11/viator-products.csv (Viator Partner API, 2026-11-20); they only order the picks and are never shown. months: the months the product runs (1-12; 'ski' = the ski hill's own season). group: at most one product per group on a page. Months for products we could not confirm are the conservative summer season; widen them once checked. The email only picks products whose business has its own photo on our site.",
  "minRating": 4.6,
  "minReviews": 5,
@@ -8,7 +8,7 @@
  "products": {
   "394086P13": {
    "venue": "Meadow Vista Honey Wines",
-   "rating": 5.0,
+   "rating": 5,
    "reviews": 9,
    "months": [
     11,
@@ -22,7 +22,7 @@
   },
   "393825P1": {
    "venue": "Okanagan Spirits Craft Distillery (Vernon)",
-   "rating": 5.0,
+   "rating": 5,
    "reviews": 33,
    "months": [
     1,
@@ -43,7 +43,7 @@
   },
   "5574063P2": {
    "venue": "Kelowna Karting & Entertainment",
-   "rating": 5.0,
+   "rating": 5,
    "reviews": 9,
    "months": [
     1,
@@ -64,7 +64,7 @@
   },
   "5501052P1": {
    "venue": "Toast the Okanagan Wine Tours",
-   "rating": 5.0,
+   "rating": 5,
    "reviews": 1,
    "months": [
     1,
@@ -85,7 +85,7 @@
   },
   "235533P20": {
    "venue": "Vivid Tours",
-   "rating": 5.0,
+   "rating": 5,
    "reviews": 6,
    "months": [
     4,
@@ -138,7 +138,7 @@
   },
   "31847P10": {
    "venue": "Canadian Craft Tours (Kelowna)",
-   "rating": 5.0,
+   "rating": 5,
    "reviews": 1,
    "months": [
     1,
@@ -159,7 +159,7 @@
   },
   "128006P4": {
    "venue": "Okanagan Life Private Boat Charters",
-   "rating": 5.0,
+   "rating": 5,
    "reviews": 3,
    "months": [
     5,
@@ -173,7 +173,7 @@
   },
   "5585501P5": {
    "venue": "SunWave Boat Rentals",
-   "rating": 5.0,
+   "rating": 5,
    "reviews": 1,
    "months": [
     5,
@@ -208,7 +208,7 @@
   },
   "152062P1": {
    "venue": "Western Canyoning Adventure – Okanagan",
-   "rating": 5.0,
+   "rating": 5,
    "reviews": 118,
    "months": [
     6,
@@ -234,7 +234,7 @@
   },
   "404271P1": {
    "venue": "Winds of Change Experiences",
-   "rating": 5.0,
+   "rating": 5,
    "reviews": 52,
    "months": [
     5,
@@ -290,7 +290,7 @@
   },
   "325656P7": {
    "venue": "Sip Happens Wine Tours (Penticton & Naramata)",
-   "rating": 5.0,
+   "rating": 5,
    "reviews": 32,
    "months": [
     1,
@@ -329,6 +329,21 @@
    ],
    "group": "wine",
    "why": "The site's Osoyoos wine tour (wine-tours.js), currently sold"
+  },
+  "111512P2": {
+   "venue": "Myra Canyon Bicycle Rental & Tours",
+   "rating": 5,
+   "reviews": 27,
+   "months": [
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+   ],
+   "group": "bike",
+   "why": "Tours batch 5 (existing listing #1443). Own site: open Apr 25 to Oct 14 2026, reopens May 7 2027"
   }
  }
 }

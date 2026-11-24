@@ -1,0 +1,73 @@
+{
+ "reason": "Tours batch 4 (Viator operators, pickup tours): real photo of each new tour listing, credited",
+ "batch_id": "photos-tours-viator-b4-2026-11-21",
+ "note": "Keyed by region + slug: the venues are created by drafts/tours-viator-2026-11-batch4/run.sh; drafts/tours-viator-2026-11-batch4/apply-photos.js looks up their ids at run time and applies with scripts/apply-venue-updates.js.",
+ "venues": [
+  {
+   "name": "Red Dog Wine Tours",
+   "region": "kelowna",
+   "slug": "red-dog-wine-tours",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/red-dog-wine-tours-2610.jpg?v=20261121"
+   }
+  },
+  {
+   "name": "Okanagan Wine Country Tours",
+   "region": "kelowna",
+   "slug": "okanagan-wine-country-tours",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/okanagan-wine-country-tours-2610.jpg?v=20261121"
+   }
+  },
+  {
+   "name": "Vines & Views Wine Tours",
+   "region": "kelowna",
+   "slug": "vines-and-views-wine-tours",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/vines-and-views-wine-tours-2610.jpg?v=20261121"
+   }
+  },
+  {
+   "name": "Sagebrush Tours",
+   "region": "penticton",
+   "slug": "sagebrush-tours",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/sagebrush-tours-2610.jpg?v=20261121"
+   }
+  },
+  {
+   "name": "Carpe Diem Tours",
+   "region": "kelowna",
+   "slug": "carpe-diem-tours",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/carpe-diem-tours-2610.jpg?v=20261121"
+   }
+  },
+  {
+   "name": "Msurf Okanagan",
+   "region": "kelowna",
+   "slug": "msurf-okanagan",
+   "expect": {
+    "image_url": null
+   },
+   "set": {
+    "image_url": "/images/venues/msurf-okanagan-2610.jpg?v=20261121"
+   }
+  }
+ ]
+}
