@@ -25,12 +25,15 @@ function tripSummaryFacts(plan, fr, ctx) {
       if (e.asked > 0) { count = yes; if (count < e.asked) status = count ? 'partial' : 'unmet'; }
       else if (!yes) status = 'unmet';
     }
-    // No car (2026-11-23, trip-transport-need.js): how many hops between the stops still on the plan are more than a
-    // short walk. Never a tick: no ride or route is checked.
+    // No car (trip-transport-need.js): the one count of the trips between the stops as they are now, "8 of 11 trips over
+    // 1 km" (the entry's own chip, from describe(): the same numbers as its line and as the shared copy). Never a tick:
+    // no ride or route is checked. The planner page works the entry out again from the stops on screen before this runs
+    // (v4NoCarSync); an entry that still has a row for a stop that was taken out is older than the screen, and then
+    // only what is still true of it is said (no number).
     if (e.ask === 'no_car') {
-      var rides = stops.filter(function (x) { return x && x.check; }).length;
-      if (rides) flags.push({ kind: 'flag', status: 'unknown', ask: e.ask, text: label + sep + (fr ? rides + (rides > 1 ? ' trajets à vérifier' : ' trajet à vérifier') : rides + (rides > 1 ? ' rides to check' : ' ride to check')) });
-      else flags.push({ kind: 'flag', status: 'partial', ask: e.ask, text: label + sep + (fr ? (stops.length ? 'courtes marches (approx.)' : 'transports non vérifiés') : (stops.length ? 'short walks (approx.)' : 'rides not checked')) });
+      var stale = stops.length < all.length, chip = (fr && e.chipFr) || e.chip;
+      if (!stale && chip) flags.push({ kind: 'flag', status: e.rides ? 'unknown' : 'partial', ask: e.ask, text: label + sep + chip });
+      else flags.push({ kind: 'flag', status: 'unknown', ask: e.ask, text: label + sep + (fr ? 'transports non vérifiés' : 'rides not checked') });
       return;
     }
     // One person does not drink (2026-11-23; the summary said "Non-drinker: 1 of 4 stops"): say what the four are (the

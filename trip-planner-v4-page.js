@@ -518,7 +518,10 @@ const V4_CLIENT_SRC = String.raw`
       // in the same village (you ski down or walk).
       var near = prev && prev.venue && typeof t3Km === 'function' ? t3Km(prev.venue, s.venue) : null;
       var skiLeg = !!(prev && (prev.skiDay || prev.onHill)) || !!(s.skiDay || s.onHill);
-      if (s.venue && prev && s.driveFrom && !(key && state.removed[key]) && !skiLeg && !(near !== null && near < 2.5)) html += '<li class="v4-leg">' + esc(t3DriveText(s.driveFrom, lang())) + '</li>';
+      // (2026-11-24) The line was worded for the stop that was before this one when the plan was made: once that stop is
+      // removed, it is said only while the stop now before it is still in the town the line names.
+      var legFits = !prev || !prev.venue || !s.driveFrom || !s.driveFrom.from || prev.venue.region === s.driveFrom.from;
+      if (s.venue && prev && s.driveFrom && legFits && !(key && state.removed[key]) && !skiLeg && !(near !== null && near < 2.5)) html += '<li class="v4-leg">' + esc(t3DriveText(s.driveFrom, lang())) + '</li>';
       html += v4StopHtml(s, key, counts);
       if (s.venue && !(key && state.removed[key])) prev = s;
     });
@@ -784,6 +787,32 @@ const V4_CLIENT_SRC = String.raw`
   }
   // (2026-11-24) Who a stop of the arrival (or departure) day is for, once the time is known: by the stop's own start.
   ${require('./trip-late-arrival').CLIENT_SRC}
+  // No car (2026-11-24, trip-transport-need.js; Dayton: after the chat took a stop off, the next card still said "about
+  // 2 km from <the stop that was removed>", and the summary said "9 rides to check" where a fresh shared copy said "8 of
+  // 11"). The plan's no-car entry is worked out again HERE, by the same code as the server's (tripNoCarApi), from the
+  // stops as they are on screen (never a removed one) and the place to stay the page shows, before anything reads it:
+  // each card's note, the summary, Details, Book my trip, the copied text and the share link's own stops then agree.
+  ${require('./trip-transport-need').CLIENT_SRC}
+  function v4NoCarStops(){
+    var out = [], p = state.last || {};
+    if (days().length) days().forEach(function(d){ (d.stops || []).forEach(function(s){ if (s && s.venue && s.venue.id != null && !state.removed[d.day + '-' + s.daypart]) out.push({ id: s.venue.id, name: s.venue.name, day: d.day || 0, latitude: s.venue.latitude, longitude: s.venue.longitude }); }); });
+    else ((p.itinerary && p.itinerary.stops) || (p.outing && p.outing.stops) || []).forEach(function(s){ if (s && s.venue && s.venue.id != null && s.kind !== 'event' && !(v4.gone && v4.gone[s.venue.id])) out.push({ id: s.venue.id, name: s.venue.name, day: 0, latitude: s.venue.latitude, longitude: s.venue.longitude }); });
+    return out;
+  }
+  function v4NoCarSync(){
+    var p = state.last, ev = p && p.evidence, at = -1;
+    if (!p || !Array.isArray(ev)) return null;
+    ev.forEach(function(e, i){ if (e && e.ask === 'no_car' && at < 0) at = i; });
+    if (at < 0) return null;
+    var sd = typeof t3StayData === 'function' ? t3StayData() : null, c = sd && sd.chosen;
+    // (A stay card with no stored location on it -- a plan cached before this -- keeps the server's own entry.)
+    if (c && c.id > 0 && !tripNoCarApi.point(c)) return ev[at];
+    var fresh = tripNoCarApi.entry(v4NoCarStops(), c && c.id > 0 ? { id: c.id, name: c.name, lat: c.lat, lng: c.lng } : null), old = ev[at];
+    if (old.line !== undefined) fresh.line = old.line;
+    if (old.said !== undefined) fresh.said = old.said;
+    ev[at] = fresh;
+    return fresh;
+  }
   function v4LateStopNote(id){
     var e = v4LateEntry(); if (!e || !e.win || !e.stop) return '';
     var day = ((state.last && state.last.days) || []).filter(function(d){ return d && d.day === e.day && (d.stops || []).some(function(s){ return s && s.venue && s.venue.id === id; }); })[0];
@@ -1057,6 +1086,9 @@ const V4_CLIENT_SRC = String.raw`
     var bgT = v4BudgetText();
     if (bgT && bgT.copy && bgT.copy.length) bgT.copy.forEach(function(l){ lines.push(l); });
     else if (est) lines.push(est);
+    // No car (2026-11-24): the same count and definition as the summary and the shared copy, in one line.
+    var ncT = ((state.last && state.last.evidence) || []).filter(function(e){ return e && e.ask === 'no_car' && e.short; })[0];
+    if (ncT && ((state.last && state.last.needs) || []).some(function(n){ return n && n.key === 'no_car'; })) { lines.push(''); lines.push(((fr && ncT.shortFr) || ncT.short) + '.'); }
     // Share suggestions (2026-11-23): what the plan could not include, in its own words (at most three lines).
     var left = ((state.last && state.last.notIncluded) || []).filter(function(x){ return x && x.text && (x.reason === 'none_listed' || x.reason === 'not_fitted'); }).slice(0, 3);
     if (left.length) { lines.push(''); left.forEach(function(x){ lines.push((fr && x.textFr) || x.text); }); }
@@ -1124,6 +1156,8 @@ const V4_CLIENT_SRC = String.raw`
   function v4Render(focus){
     // (2026-11-24) The later-arrival entry is worded from the stops on screen before anything reads it (v4LateEntry).
     try { v4LateEntry(); } catch (e) { /* the server's wording stands */ }
+    // No car: the trips between the stops as they are now (v4NoCarSync), before the cards, the summary and the sheet read them.
+    try { v4NoCarSync(); } catch (e) { /* the server's entry stands */ }
     var p = t3LocalTimes(lang() === 'fr' ? t3FrenchPlan(state.last) : state.last, lang());
     renderedVenueCardAnchors = {}; renderedPhotos = {};
     var fr = lang() === 'fr', counts = nameCounts(), planKinds = p.kind === 'multi_day' || p.kind === 'day_plan';

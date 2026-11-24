@@ -358,6 +358,9 @@ function chatClientSrc(d) {
           touched = true; changed.push(k);
         });
         (acts.keep || []).forEach(function(k){ var ks = /^it-/.test(k) ? null : stopAt(k); if (ks) { state.locks[k] = ks.venue.id; touched = true; changed.push(k); } });
+        // (2026-11-24, trip-keep-only.js) A meal put back after "only the beach and lunch on day 1" took it off with the
+        // rest: the same as that stop's own Undo (its slot, its time; nothing else changes).
+        (acts.restore || []).forEach(function(k){ if (!/^[1-7]-[a-z]+$/.test(k) || !state.removed[k]) return; var rid = state.removed[k]; delete state.removed[k]; state.exclude = state.exclude.filter(function(x){ return x !== rid; }); touched = true; changed.push(k); });
         // The place to stay and getting here (agent round): the visitor's stay preference rides along with every later
         // request (t3StayInput below); the Getting here card follows "rental car" / "driving" / "no car".
         if (j.stayBlock && state.last) {

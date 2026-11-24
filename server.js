@@ -53,6 +53,7 @@ const tripBooking = require('./trip-booking');
 const tripHonestPlan = require('./trip-honest-plan');
 const tripAccess = require('./trip-access-needs');
 const tripTransport = require('./trip-transport-need');
+const tripKeepOnly = require('./trip-keep-only');
 const tripAllergy = require('./trip-allergy-need');
 const tripLate = require('./trip-late-arrival');
 const tripExclusions = require('./trip-exclusions');
@@ -8909,6 +8910,20 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
         back = b;
       }
     } }
+  // (2026-11-24, trip-keep-only.js) "Only the beach and lunch on day 1" took the dinner off with the rest and offered
+  // it back: taken ("yes", "put dinner back", the button), the meal returns to its own slot at its own time, and
+  // nothing else changes (the page un-removes it: actions.restore). The offer is only ever read here.
+  { const kb = tripKeepOnly.backTag(v.offer);
+    if (kb) {
+      v.offer = (v.offer || []).filter((o) => !tripKeepOnly.PUTBACK_RE.test(o));
+      if (!v.chip && tripKeepOnly.takesBack(v.message, kb.say, tripChat.fold)) {
+        const still = kb.stops.filter((x) => v.removed.includes(x.key) && !v.stops.some((y) => y.key === x.key || y.id === x.id));
+        const names = still.map((x) => { try { return (getVenue(x.id) || {}).name || ''; } catch (e) { return ''; } }).filter(Boolean);
+        const acts = { remove: [], keep: [], ...(names.length === still.length && still.length ? { restore: still.map((x) => x.key) } : {}) };
+        const reply = tripKeepOnly.backReply(acts.restore ? names : [], (kb.stops[0] || {}).day || 1, lang);
+        return { source: 'rules', cant: null, plan: null, actions: acts, response: { reply, source: 'rules', plan: null, req: null, changed: acts.restore || [], actions: acts } };
+      }
+    } }
   const stops = tripChatStops(v.stops);
   for (const s of stops) if ((v.soft || {})[s.key] === s.id) s.soft = true;
   const planEvents = tripChatEvents(v.events || []);
@@ -8919,7 +8934,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   if ((v.args.tourStops || []).length) v.args.tourStops = v.args.tourStops.filter((t) => stops.some((s) => s.id === t.listingId && !v.removed.includes(s.key)));
   // One stop's own time (stopStarts) rides along only while a stop is in that slot.
   if (v.args.overrides && v.args.overrides.stopStarts) { const ss = Object.fromEntries(Object.entries(v.args.overrides.stopStarts).filter(([k]) => stops.some((s) => s.key === k && !v.removed.includes(k)))); if (Object.keys(ss).length) v.args.overrides.stopStarts = ss; else delete v.args.overrides.stopStarts; }
-  let ops = null, cant = null, source = 'rules', ai = null, what = null, whatSaid = null, fixes = [], missed = [], asks = 1;
+  let ops = null, cant = null, source = 'rules', ai = null, what = null, whatSaid = null, fixes = [], missed = [], asks = 1, keepAsk = null;
   // The visitor's answer to choices the chat offered ("day 3", "swap the park", "yes"): the offered message itself.
   // An offer of a named place (a swap whose badge is unknown, or a place with the badge on another day) carries its ids:
   // a yes is carried out exactly as offered, by fixed rules. A plain "no" keeps the plan and says so.
@@ -8987,6 +9002,9 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
     // if it is slower; otherwise it gets the full timeout. Both readings are then reconciled (tripChat.reconcileReads).
     const r = tripChat.rulesRead(v.message, stops, { regions, regionLabels: REGION_LABELS, days, recent: Object.keys(v.soft || {}), request: v.args.text, add: addCtx, pendingTime, partySome: tripChatDryRead(v.message).some, weekdays: tripChat.weekdayDays((v.dayDates || []).some(Boolean) ? v.dayDates : (v.args.overrides && v.args.overrides.startDate) || (v.args.stay && v.args.stay.arrive) || null, days) });
     what = r.what || null; whatSaid = r.said || null;
+    // (2026-11-24, trip-keep-only.js) "Only the beach, lunch and splash park on day 1" with no splash park that day, or
+    // with no day said: nothing changes, and the one question (with its one-tap answers) is the reply.
+    keepAsk = r.keepOnly || null;
     // A stay or getting-here message the rules read confidently is answered by fixed server logic, so the AI is not
     // waited for (2026-11-22: a stay change took 6-14 s on the live site).
     const direct = tripChat.rulesConfident(r) && r.ops.length > 0 && (r.group || r.explain || r.access || r.ops.every((o) => o.o === 'stay' || o.o === 'transport' || o.o === 'avoid' || o.o === 'ask' || (o.o === 'party' && o.value === 'adults')));
@@ -9058,6 +9076,10 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   if (!ops.length) {
     logTiming();
     const c = cant || 'unclear';
+    if (c === 'keep_only' && keepAsk) {
+      const KL = lang === 'fr' ? 'fr' : 'en', ch = keepAsk.choices ? keepAsk.choices[KL] : null;
+      return { source, cant: c, plan: null, actions: none, response: { reply: keepAsk.reply[KL], source, cant: c, plan: null, req: null, changed: [], actions: none, ...((keepAsk.offer || []).length ? { offer: keepAsk.offer.slice(0, 3) } : {}), ...(ch && ch.length ? { choices: ch } : {}) } };
+    }
     return { source, cant: c, plan: null, actions: none, response: { reply: c === 'q_unknown' ? tripChat.explain.TX[lang === 'fr' ? 'fr' : 'en'].unknownQ : tripChat.cantReply(c, lang, what, stops, { asked: tripChatAsked(what, v.args.text), said: whatSaid }), source, cant: c, plan: null, req: null, changed: [], actions: none, ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) } };
   }
   const timed = (fn) => (a) => { const t0 = Date.now(); try { return fn(a); } finally { timing.plans += 1; timing.planMs += Date.now() - t0; } };
@@ -9283,6 +9305,10 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   // A full day said with choices ("swap X, or day 3 at 1:15 PM. Which?"): the choices go back as plain messages.
   // A swap that asked for a badge no replacement has: the place offered instead, by name (a "yes" swaps to it).
   if (!offer.length) offer = tripChat.featOffers((out && out.results) || []);
+  // (2026-11-24, trip-keep-only.js) A meal that came off with a day's other stops: the reply says so and asks once; a
+  // yes (or its button) puts it back.
+  let keepBack = null;
+  if (!offer.length && !v.chip) { const kr = ((out && out.results) || []).find((r) => r && r.op === 'remove' && r.ok && r.keepOnly); keepBack = kr ? tripKeepOnly.backOffer(kr.keepOnly, lang) : null; if (keepBack) offer = [keepBack.say]; }
   if (!offer.length && freeOffer) offer = [freeOffer];
   for (const r of (out && out.results) || []) if (r.why === 'full' && r.full && !offer.length) offer = tripChat.explain.fullReply(r.full, { KINDS: tripChat.KINDS, noun: tripChat.kindNoun, clock: tripChat.clock }, lang).offer.map((o) => o.say);
   if (tourCard) {
@@ -9402,7 +9428,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   return {
     timing: { ...timing, total: Date.now() - timing.start },
     source, cant: null, plan, actions,
-    response: { reply, source, plan, req, changed: out.changed || [], actions, ...tripChatDiff(stops, v.removed, plan, actions, out), ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(stayForce !== undefined ? { stayForce } : {}), ...(stayArrive ? { stayArrive } : {}), ...(party ? { party } : {}), ...(stayDates ? { stayDates } : {}), ...((newText || noCarText || allergyText || lateText || avoidText) && !plan ? { text: newText || noCarText || allergyText || lateText || avoidText } : {}), ...(needPatch && (noCarText || allergyText || avoidText) && !plan && !answerOnly ? { needPatch } : {}), ...(needDrop && !plan && !answerOnly ? { needDrop } : {}), ...(lateOut ? { late: true } : {}), ...(lateTimeOut ? { lateTime: lateTimeOut } : {}), ...(askFirst ? { confirm: true } : {}), ...(card ? { card } : {}), ...(note ? { note } : {}), ...(offer.length ? { offer } : {}), ...(swapAsk ? { choices: swapAsk.choices } : {}), ...(swapBack && plan ? { swapBack } : {}), ...(keepHead && plan ? { keepHead: true } : {}), ...(wentBack ? { back: true } : {}), ...(ageAsk.length && plan ? { ageAsk } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
+    response: { reply, source, plan, req, changed: out.changed || [], actions, ...tripChatDiff(stops, v.removed, plan, actions, out), ...(stayPref !== undefined ? { stayPref } : {}), ...(stayBlock ? { stayBlock } : {}), ...(stayForce !== undefined ? { stayForce } : {}), ...(stayArrive ? { stayArrive } : {}), ...(party ? { party } : {}), ...(stayDates ? { stayDates } : {}), ...((newText || noCarText || allergyText || lateText || avoidText) && !plan ? { text: newText || noCarText || allergyText || lateText || avoidText } : {}), ...(needPatch && (noCarText || allergyText || avoidText) && !plan && !answerOnly ? { needPatch } : {}), ...(needDrop && !plan && !answerOnly ? { needDrop } : {}), ...(lateOut ? { late: true } : {}), ...(lateTimeOut ? { lateTime: lateTimeOut } : {}), ...(askFirst ? { confirm: true } : {}), ...(card ? { card } : {}), ...(note ? { note } : {}), ...(offer.length ? { offer } : {}), ...(swapAsk ? { choices: swapAsk.choices } : keepBack && !plan ? { choices: [{ kind: 'say', label: keepBack.label, say: keepBack.say }] } : {}), ...(swapBack && plan ? { swapBack } : {}), ...(keepHead && plan ? { keepHead: true } : {}), ...(wentBack ? { back: true } : {}), ...(ageAsk.length && plan ? { ageAsk } : {}), ...(fixes.length ? { fixes } : {}), ...(ai && !ai.ok ? { fallback: ai.reason } : {}) },
   };
 }
 // "somewhere cheaper to stay", "a hotel with a pool", "stay in Naramata", "we already have a place": the same plan (every
