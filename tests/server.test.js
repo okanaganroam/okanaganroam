@@ -17619,7 +17619,7 @@ test('Seasonal mood tiles: Oct-Mar swaps Beaches -> Tours & Experiences (2026-11
 test('Seasonal mood tiles: winter hrefs, images, titles and i18n keys', () => {
   const html = winterMood('2027-02-01');
   // Tours & Experiences took Sports & Recreation's tile (Dayton, 2026-11-24), with /tours's own banner photo.
-  assert.match(html, /<a class="mood-card mood-card-tours" href="\/tours">\s*<img class="mood-card-img" src="\/images\/mood\/tours-experiences\.jpg" width="640" height="403" alt="" loading="lazy">/);
+  assert.match(html, /<a class="mood-card mood-card-tours" href="\/tours">\s*<img class="mood-card-img" src="\/images\/mood\/tours-experiences-2611\.jpg" width="640" height="403" alt="" loading="lazy">/);
   assert.doesNotMatch(html, /mood-card-sports/);
   assert.match(html, /<a class="mood-card mood-card-indoor" href="\/indoor">\s*<img class="mood-card-img" src="\/images\/mood\/indoor\.jpg" width="640" height="400" alt="" loading="lazy">/);
   assert.match(html, /class="mood-card-title" data-i18n="tripv3\.type\.tour">Tours &amp; Experiences</);
