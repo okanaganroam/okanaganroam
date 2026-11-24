@@ -78,19 +78,20 @@ test('3. the trips between stops: a short walk only where the stored locations s
   assert.equal(e.ask, 'no_car');
   assert.equal(e.status, 'unknown'); // transport is never "verified"
   assert.equal(e.rides, 2);
-  assert.match(e.text, /^No car: 2 of 4 trips between stops are more than a short walk \(over about 1 km in a straight line\); the longest is Lake Café to Hill Winery \(about 3 km\)\. Taxis, shuttles and buses aren’t checked here: confirm a ride before you go\.$/);
-  assert.match(e.textFr, /^Sans voiture : 2 des 4 trajets entre les arrêts dépassent une courte marche .*Lake Café à Hill Winery \(env\. 3 km\)\. Les taxis, navettes et autobus ne sont pas vérifiés ici/);
+  // (2026-11-24) One count and its definition, in the line itself: what a trip is, the threshold, straight line.
+  assert.equal(e.text, 'No car: 2 of 4 trips between stops are longer than a short walk (over 1 km in a straight line). Check a taxi, shuttle or bus for each; none is checked here. Counted from your stay to each day’s first stop, then from stop to stop.');
+  assert.match(e.textFr, /^Sans voiture : 2 trajets sur 4 entre les arrêts dépassent une courte marche \(plus de 1 km à vol d’oiseau\)\. Vérifiez un taxi, une navette ou un autobus pour chacun; aucun n’est vérifié ici\./);
   const row = (id) => e.stops.find((r) => r.id === id);
   assert.equal(row(1).check, false);
   assert.equal(row(1).note, undefined);
-  assert.equal(row(3).note, 'No car: about 3 km from Lake Café · check a ride');
-  assert.equal(row(3).noteFr, 'Sans voiture : env. 3 km depuis Lake Café · prévoyez un transport');
+  assert.equal(row(3).note, 'No car: about 3 km in a straight line from Lake Café · check a ride');
+  assert.equal(row(3).noteFr, 'Sans voiture : env. 3 km à vol d’oiseau depuis Lake Café · prévoyez un transport');
   assert.equal(row(4).note, 'No car: no map location to measure from your stay · check a ride');
   // Every trip short: said as approximate, never as checked.
   const near = T.entry(LIST.slice(0, 2), STAY, coordsOf);
   assert.equal(near.rides, 0);
   assert.equal(near.status, 'unknown');
-  assert.match(near.text, /under about 1 km in a straight line, a short walk\. Walking routes aren’t checked\.$/);
+  assert.match(near.text, /^No car: both trips between stops are a short walk \(1 km or less in a straight line\)\. Walking routes aren’t checked\. /);
   // No wording anywhere names or promises a taxi, a bus or a shuttle.
   for (const s of [e.text, e.textFr, e.short, e.shortFr, near.text, near.textFr, ...e.stops.flatMap((r) => [r.note, r.noteFr, r.noteShort, r.noteShortFr])].filter(Boolean)) assert.ok(!/\b(?:taxis? (?:are|is) available|short taxi|bus ride|book rides ahead|verified ✓)\b/i.test(s), s);
 });
@@ -119,15 +120,16 @@ test('4. the plan’s evidence: one hot tub line (the hotel’s listing), no "ho
   assert.equal(nc.rides, 1);
   // The summary: the need is there, flagged; the hot tub is said once, and nothing says it is missing.
   const facts = L.tripSummaryFacts(p, false, {}).map((f) => f.text);
-  assert.ok(facts.includes('No car: 1 ride to check'), facts.join(' | '));
+  assert.ok(facts.includes('No car: 1 of 3 trips over 1 km'), facts.join(' | '));
   assert.ok(facts.includes('Hot tub ✓'));
   assert.ok(facts.includes('Spa: not in this plan'));
   assert.equal(facts.filter((t) => /hot tub/i.test(t)).length, 1);
   const fr = L.tripSummaryFacts(p, true, {}).map((f) => f.text);
-  assert.ok(fr.includes('Sans voiture : 1 trajet à vérifier'), fr.join(' | '));
+  assert.ok(fr.includes('Sans voiture : 1 trajet sur 3 de plus de 1 km'), fr.join(' | '));
   assert.ok(fr.includes('Bain à remous ✓'));
-  // A stop taken off the page no longer counts.
-  assert.ok(L.tripSummaryFacts(p, false, { removed: { 3: 1 } }).map((f) => f.text).includes('No car: short walks (approx.)'));
+  // (2026-11-24) An entry that still has a row for a stop taken off the page is older than the screen: no number is
+  // said from it (the page works the entry out again from the stops on screen: tests/trip-keep-only-nocar.test.js).
+  assert.ok(L.tripSummaryFacts(p, false, { removed: { 3: 1 } }).map((f) => f.text).includes('No car: rides not checked'));
   // The hotel picked doesn't list one: said honestly, still one line.
   const q = H.applyEvidence(planOf({ whereToStay: { pick: { id: 9, name: 'Beach Hotel', regionLabel: 'Osoyoos', has: [] }, amenity: { keys: ['hot_tub'] } } }), { coordsOf });
   assert.equal(ev(q, 'stay:hot_tub').status, 'unmet');
@@ -142,11 +144,11 @@ test('4. the plan’s evidence: one hot tub line (the hotel’s listing), no "ho
 test('5. each card’s note, the booking sheet and the shared copy read the same rows', () => {
   const p = H.applyEvidence(planOf(), { coordsOf });
   const n = A.stopNeedNotes(p, 3, false);
-  assert.deepEqual(n.notes, ['No car: about 3 km from Corner Bistro · check a ride']);
-  assert.deepEqual(n.compact, ['About 3 km away · check a ride']);
+  assert.deepEqual(n.notes, ['No car: about 3 km in a straight line from Corner Bistro · check a ride']);
+  assert.deepEqual(n.compact, ['About 3 km (straight line) · check a ride']);
   assert.deepEqual(n.open, []); // the Book my trip sheet says it once, in its own line, not once per stop
   assert.deepEqual(A.stopNeedNotes(p, 1, false).notes, []); // a short walk from the hotel: nothing on the card
-  assert.deepEqual(A.stopNeedNotes(p, 3, true).notes, ['Sans voiture : env. 3 km depuis Corner Bistro · prévoyez un transport']);
+  assert.deepEqual(A.stopNeedNotes(p, 3, true).notes, ['Sans voiture : env. 3 km à vol d’oiseau depuis Corner Bistro · prévoyez un transport']);
   // The page reads the same rows (the card note and the Book my trip sheet).
   assert.match(V4, /e\.ask === 'no_car' && Array\.isArray\(e\.stops\) && hasNeed\('no_car'\)/);
   assert.match(V4, /data-v4-book-nocar/);
@@ -167,7 +169,7 @@ test('6. the share link carries both asks; the shared copy works the same lines 
   assert.equal(ev(sp, 'no_car').text, ev(p, 'no_car').text.replace('1 of 3', '1 of 2'));
   assert.equal(ev(sp, 'stay:hot_tub').text, 'Hot tub: Beach Hotel’s listing says it has a hot tub.');
   assert.ok(!sp.evidence.some((e) => /not in this plan/.test(e.text) && /hot tub|sauna/i.test(e.text)));
-  assert.equal(A.stopNeedNotes(sp, 3, false).text, 'No car: about 3 km from Corner Bistro · check a ride');
+  assert.equal(A.stopNeedNotes(sp, 3, false).text, 'No car: about 3 km in a straight line from Corner Bistro · check a ride');
   // A sauna asked of the stay rides along too.
   const c2 = H.parseShareContext({ asks: 'stay:sauna', stay: '9' });
   const sp2 = H.applyEvidence(H.sharedPlan(c2, stops, [], { id: 9, name: 'Beach Hotel', has: [] }), { coordsOf });

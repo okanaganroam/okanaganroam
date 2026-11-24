@@ -520,6 +520,9 @@ function stayCard(stay, scored) {
     priceBand: intIn(f.price_level, 1, 4) ? '$'.repeat(f.price_level) : null,
     distanceKm: scored.distanceKm === null ? null : Math.round(scored.distanceKm * 10) / 10,
     reasons,
+    // The stored map location (trip-transport-need.js: a no-car plan measures each day's first hop from the stay the
+    // page shows, also after the traveller picks another one of these cards).
+    ...(Number.isFinite(stay.latitude) && Number.isFinite(stay.longitude) ? { lat: stay.latitude, lng: stay.longitude } : {}),
   };
 }
 

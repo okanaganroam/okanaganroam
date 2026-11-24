@@ -22,6 +22,7 @@ const allergy = require('./trip-allergy-need');
 const late = require('./trip-late-arrival');
 const excl = require('./trip-exclusions');
 const explain = require('./trip-chat-explain.js');
+const keepOnly = require('./trip-keep-only.js');
 const MODEL = 'claude-haiku-5-5';
 // Claude Haiku 5.5 list price (claude-api skill, cached 2026-10-06): $0.10 / $0.50 per million input / output tokens.
 const PRICE_PER_TOKEN = { input: 0.10 / 1e6, output: 0.50 / 1e6 };
@@ -528,7 +529,29 @@ function rulesReadBase(message, stops, opts = {}) { { const a = opts.add && agen
 // hotel booking reflects this" and "only include her for activities from October 9" are about WHO is there, never a
 // stop to add (the last one used to add an activity: "include" + "activities"). Read before everything else; the rest
 // of the message goes to the usual rules. Fixed rules: the AI's reading never stands in for them (access: true).
+// "Only the beach, lunch and splash park" on a day (2026-11-24, trip-keep-only.js): the stops that day keeps; the rest
+// of that day comes off, and nothing else changes. Read before everything else, by fixed rules (access: the AI's
+// reading never stands in for it): the same sentence's "slower for the kids" is explained by the list and is never the
+// pace of the day or the trip. Any other sentence of the message is read as usual and done with it.
+const KEEP_ONLY_H = { fold, kindsNamed: (x) => kindsNamed(x), kindMatches, kindRe: (k) => (KIND_WORDS.find(([kk]) => kk === k) || [])[1] || null, KINDS, WATER_PLAY_RE };
 function rulesRead(message0, stops, opts = {}) {
+  let ko = null;
+  try { ko = keepOnly.read(message0, stops, KEEP_ONLY_H, { days: opts.days || 1, weekdays: opts.weekdays || {} }); } catch (e) { ko = null; }
+  if (ko) {
+    const out = { ops: ko.ops, cant: ko.cant || null, exact: true, access: true, ...(ko.keepOnly ? { keepOnly: ko.keepOnly } : {}) };
+    if (ko.rest && ko.ops.length) {
+      let r = null;
+      try { r = rulesReadPlain(ko.rest, stops, opts); } catch (e) { r = null; }
+      const going = new Set(ko.ops.flatMap((o) => (o.stops || []).map((x) => x.id)));
+      // (An edit of a stop this change takes off is not made too.)
+      if (r && (r.ops || []).length) out.ops = [...out.ops, ...r.ops.filter((o) => o.o !== 'refine' && !(o.stops || []).some((x) => going.has(x.id)))];
+      else if (r && r.cant) out.missed = [{ cant: r.cant, what: r.what || null }];
+    }
+    return out;
+  }
+  return rulesReadPlain(message0, stops, opts);
+}
+function rulesReadPlain(message0, stops, opts = {}) {
   // "Keep all the other stops" asks for what every change here already does: its words are not read as an ask.
   const message = addVenue.stripKeepRest(message0);
   let la = null;
@@ -987,7 +1010,7 @@ const KIDS_ACTIVITY_RE = /\b(?:lessons?|school|camp|cours|lecons?|activit(?:y|ie
 const AVOID_TEXT = { arts: 'no museums', winery: 'no wineries', brewery: 'no breweries', distillery: 'no distilleries', pub: 'no pubs', cocktail: 'no cocktail lounges', golf: 'no golf', beach: 'no beaches', hike: 'no hiking', tour: 'no tours', indoor: 'no indoor attractions', spa: 'no spa', cafe: 'no cafes' };
 function rulesConfident(r) {
   if (!r) return false;
-  if (!(r.ops || []).length) return ['booking', 'transport', 'weather', 'other', 'not_found', 'time_at', 'info', 'ask_which', 'days_max', 'days_min', 'q_none', 'q_missing', 'elsewhere', 'ends_lunch', 'meals_lunch', 'meals_dinner', 'getting_here'].includes(r.cant);
+  if (!(r.ops || []).length) return ['keep_only', 'booking', 'transport', 'weather', 'other', 'not_found', 'time_at', 'info', 'ask_which', 'days_max', 'days_min', 'q_none', 'q_missing', 'elsewhere', 'ends_lunch', 'meals_lunch', 'meals_dinner', 'getting_here'].includes(r.cant);
   return r.ops.every((o) => o.o !== 'refine');
 }
 const stopIds = (o) => (o.stops || []).map((s) => s.id).sort((a, b) => a - b).join(',');
@@ -1258,6 +1281,7 @@ function broadTurn(ops, ctx) {
       case 'remove':
         for (const s of op.stops) { actions.remove.push(s.key); excl(s.id); delete locks[s.key]; }
         r.ok = true; r.names = op.stops.map((s) => s.name);
+        if (op.keepOnly) r.keepOnly = op.keepOnly;
         if (op.mostlyFree) r.mostlyFree = { ...op.mostlyFree, took: op.stops[0] };
         break;
       case 'keep':
@@ -2361,7 +2385,9 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
     if (!out.plan && out.failed && ['pace', 'party', 'days', 'date', 'town', 'redo_day', 'start_over', 'refine'].includes(r.op)) { if (!parts.includes(t.cantChange)) parts.push(t.cantChange); continue; }
     if (!out.plan && out.failed && r.op === 'budget' && !r.pairs) { if (!parts.includes(t.cantChange)) parts.push(t.cantChange); continue; }
     switch (r.op) {
-      case 'remove': parts.push(fill(t.took, { names: joinList(r.names, L) })); break;
+      // (2026-11-24, trip-keep-only.js) "Only the beach and lunch on day 1": what the day keeps and what came off, each
+      // by name, and a meal that came off with them. Never just "Done."
+      case 'remove': parts.push(r.keepOnly ? keepOnly.doneLine(r.keepOnly, L) : fill(t.took, { names: joinList(r.names, L) })); break;
       case 'light_kept': parts.push(!r.day ? t.lightKeptAll : r.names.length ? fill(t.lightKept, { d: r.day, names: joinList(r.names, L) }) : fill(t.lightNone, { d: r.day })); break;
       case 'keep': parts.push(out.plan ? fill(t.kept, { names: joinList(r.names, L) }) : fill(t.keptStays, { names: joinList(r.names, L), it: r.names.length > 1 ? t.theyStay : t.itStays })); break;
       case 'replace':
@@ -2522,13 +2548,14 @@ function buildReply(out, { lang = 'en', regionLabels = {}, cant = null, asks = 1
   // Each sentence once ("I couldn't find a winery…" for each of three days is said once).
   const text = parts.filter((x, i) => x && parts.indexOf(x) === i).join(' ');
   const didSomething = out.plan ? (out.changed || []).length > 0 : !!(out.actions && (out.actions.remove.length || out.actions.keep.length));
-  const full = (allOk && didSomething ? `${t.done} ` : '') + text;
+  const saysAll = out.results.some((r) => r.keepOnly);
+  const full = (allOk && didSomething && !saysAll ? `${t.done} ` : '') + text;
   // Round 4: one or two short sentences. A longer answer becomes a count (the changed stops glow on the page), with a
   // plain word when part of it could not be done.
   const split = (x) => x.split(/(?<=[.!?])\s+(?=[A-ZÀ-Ý“«])/).filter(Boolean);
   // What the planner did around a tour (lunch moved, wineries it covers) is always said, up to four short lines.
   // So is a badge that no replacement has: why the stop stayed, what is offered instead, and the question.
-  const maxLines = out.results.some((r) => (r.tour && r.ok && ((r.tourAdjust || []).length || (r.covered || []).length)) || r.featMiss || r.nofit) ? 4 : Math.max(2, Math.min(4, asks || 1));
+  const maxLines = out.results.some((r) => (r.tour && r.ok && ((r.tourAdjust || []).length || (r.covered || []).length)) || r.featMiss || r.nofit || r.keepOnly) ? 4 : Math.max(2, Math.min(4, asks || 1));
   const over = (list) => list.filter((x) => x !== t.done).length > maxLines;
   if (!over(split(full))) return full;
   // First without the lines that only explain ("Your plan is unchanged." after a reason, "It stays when you change...").
@@ -2606,7 +2633,7 @@ function offerOps(message, stops) {
 }
 
 module.exports = {
-  featOffers, offerOps, mostlyFreeLine, backOffer, takesBack, BACK_RE, swapFeatsFor, SWAP_FEATS, OWN_FEATS, access,
+  keepOnly, featOffers, offerOps, mostlyFreeLine, backOffer, takesBack, BACK_RE, swapFeatsFor, SWAP_FEATS, OWN_FEATS, access,
   STAY_VALUES, STAY_AMENITY_VALUES, TRANSPORT_VALUES, fill, stayAmenitiesIn, stayTextPref,
   MODEL, PRICE_PER_TOKEN, DEFAULT_TIMEOUT_MS, DEFAULT_DAILY_USD, MAX_MESSAGE, MAX_STOPS, RATE, OPS, TIMES, VALUES, CANT, KINDS, KIND_KEYS, CHIPS, T,
   enabled, apiKey, wireSchema, systemPrompt, stopsForModel, stripPII, validateWire, readChatMessage, rulesRead, chipOps,
