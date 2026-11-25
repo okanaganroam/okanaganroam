@@ -57,7 +57,9 @@ test('goals: the data file is valid and evaluate mixes live and typed-in numbers
   const by = Object.fromEntries(ev.goals.map((x) => [x.key, x]));
   assert.equal(by.nonbrand_impressions.current, 56.1); assert.match(by.nonbrand_impressions.extra, /11.4/);
   assert.equal(by.chatgpt_sessions.current, 83); assert.equal(by.chatgpt_sessions.status, 'below the starting point');
-  assert.equal(by.linking_sites.current, 12); assert.match(by.linking_sites.measured, /2026-10-23/);
+  // The typed-in number changes with every re-scan: read it from the file rather than pinning it.
+  const ls = cfg.goals.find((g) => g.key === 'linking_sites').manual;
+  assert.equal(by.linking_sites.current, ls.value); assert.ok(by.linking_sites.measured.includes(ls.as_of));
   const off = goals.evaluate(cfg, {}, NOW);
   assert.equal(off.goals[0].current, null); assert.match(off.goals[0].note, /not connected/);
   assert.equal(goals.load('/nonexistent.json'), null);
