@@ -73271,7 +73271,24 @@ const OWNER_HELP_CSS = `
 // topics) and cfg; the tests run that part on its own in a VM with the real page config.
 const OWNER_HELP_SCRIPT = String.raw`
 (function(){
-  var cfg = {}; try { cfg = JSON.parse(document.getElementById('ohbCfg').textContent); } catch (e) {}
+  // Portal speed (2026-11-25): the Help answers (about 200 KB of text) are no longer written into every portal page; the page
+  // carries a small config with topicsUrl and fetches them (a year-long cached file) a moment after it loads, or on the first
+  // tap of the Help button if that comes first. Old inline-topics configs (tests, anything cached) boot straight away.
+  var cfg0 = {}; try { cfg0 = JSON.parse(document.getElementById('ohbCfg').textContent); } catch (e) {}
+  if ((cfg0.topics && cfg0.topics.length) || !cfg0.topicsUrl) { ohbBoot(cfg0); return; }
+  var booted = false, loading = false, pending = false, bootBtn = document.getElementById('ohbBtn');
+  function failed(){ loading = false; pending = false; if (bootBtn) bootBtn.disabled = false; }
+  function load(){
+    if (booted || loading) return; loading = true;
+    fetch(cfg0.topicsUrl, { credentials: 'omit' }).then(function(r){ if (!r.ok) throw new Error('topics ' + r.status); return r.json(); }).then(function(topics){
+      cfg0.topics = topics; booted = true; ohbBoot(cfg0);
+      if (pending && bootBtn) { pending = false; bootBtn.click(); }
+    }).catch(failed);
+  }
+  if (bootBtn) bootBtn.addEventListener('click', function early(){ if (booted) return; pending = true; load(); }, false);
+  function later(){ setTimeout(load, 1200); }
+  if (document.readyState === 'complete') later(); else window.addEventListener('load', later);
+  function ohbBoot(cfg){
   var T = cfg.topics || []; var byId = {}; T.forEach(function(t){ byId[t.id] = t; });
   var btn = document.getElementById('ohbBtn'), panel = document.getElementById('ohbPanel'), log = document.getElementById('ohbLog');
   var form = document.getElementById('ohbForm'), input = document.getElementById('ohbInput');
@@ -73811,6 +73828,7 @@ const OWNER_HELP_SCRIPT = String.raw`
     var a = e.target && e.target.closest ? e.target.closest('[data-ohb-contact]') : null; if (!a) return;
     e.preventDefault(); open(); contact(); var n = document.getElementById('ohbNote'); if (n && !n.value) n.value = a.getAttribute('data-ohb-contact') || '';
   });
+  }
 })();
 `;
 // One answer for how the owner got here (mode 'in' signed in, 'link' the emailed edit link, 'out' signed out), with
@@ -73865,6 +73883,23 @@ function tourHelpKindExamples(t, kinds) {
     a = swap(a, en, sw[0]); q = swap(q, en, sw[0]); aFr = swap(aFr, fr, sw[1]); qFr = swap(qFr, fr, sw[1]);
   }
   return { ...t, a, aFr, q, qFr };
+}
+// Portal speed (2026-11-25): the Help answers are served as a content-addressed, year-long cached file instead of being
+// written into every portal page (about 200 KB of each edit and setup page). The page keeps the small rest of the config
+// plus topicsUrl. A restart empties the store, so a page left open across a deploy answers 404 and just keeps its button
+// working after a refresh; every freshly rendered page re-registers its topics.
+const ownerHelpTopicStore = new Map();
+function ownerHelpSlimCfg(cfg) {
+  if (!cfg || !Array.isArray(cfg.topics) || !cfg.topics.length) return cfg;
+  // The tests read the topics straight out of the page, so under test they stay inline unless OWNER_HELP_LAZY=1.
+  if (process.env.ROAM_NO_NETWORK === '1' && process.env.OWNER_HELP_LAZY !== '1') return cfg;
+  const json = JSON.stringify(cfg.topics);
+  const hash = crypto.createHash('sha1').update(json).digest('hex').slice(0, 16);
+  if (!ownerHelpTopicStore.has(hash)) {
+    ownerHelpTopicStore.set(hash, json);
+    if (ownerHelpTopicStore.size > 300) ownerHelpTopicStore.delete(ownerHelpTopicStore.keys().next().value);
+  }
+  return { ...cfg, topics: [], topicsUrl: `/owner-help/${hash}.json` };
 }
 function ownerHelpWidgetHtml(page, opts = {}) {
   if (!OWNER_HELP_START[page]) return '';
@@ -74016,7 +74051,7 @@ function ownerHelpWidgetHtml(page, opts = {}) {
   <div class="ohb-log" id="ohbLog" aria-live="polite"></div>
   <form class="ohb-form" id="ohbForm"><label for="ohbInput" class="sr-only" style="position:absolute;left:-9999px">${escapeHtml(u.inputLabel)}</label><input id="ohbInput" type="text" maxlength="300" placeholder="${escapeHtml(u.placeholder)}" autocomplete="off"><button type="submit">${escapeHtml(u.ask)}</button></form>
 </section>
-<script type="application/json" id="ohbCfg">${JSON.stringify(cfg).replace(/</g, '\\u003c')}</script>
+<script type="application/json" id="ohbCfg">${JSON.stringify(ownerHelpSlimCfg(cfg)).replace(/</g, '\\u003c')}</script>
 <script>${OWNER_HELP_SCRIPT}</script>`;
 }
 
@@ -84530,6 +84565,15 @@ const server = http.createServer(async (req, res) => {
     // and handleEventSubmission above.
     // Owner logins (2026-10-15): checked before the /owner/<token> routes.
     if (pathname === '/owner/help' && method === 'POST') return await handleOwnerHelpMessage(req, res);
+    {
+      const mHelp = /^\/owner-help\/([0-9a-f]{16})\.json$/.exec(pathname);
+      if (mHelp && (method === 'GET' || method === 'HEAD')) {
+        const body = ownerHelpTopicStore.get(mHelp[1]);
+        if (!body) { res.writeHead(404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end('{}'); }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Robots-Tag': 'noindex' });
+        return res.end(method === 'HEAD' ? undefined : body);
+      }
+    }
     // Portal root (2026-10-19, round 8): /owner and /fr/owner were 404s; they go to the business login page, which
     // itself sends a signed-in owner on to their account.
     if (/^(?:\/fr)?\/owner\/?$/.test(pathname) && (method === 'GET' || method === 'HEAD')) {
