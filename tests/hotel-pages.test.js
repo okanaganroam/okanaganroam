@@ -143,3 +143,18 @@ test('rental managers (2026-10-22): "Things to do around <Town>", for guests of 
   assert.ok(card.includes(`Compliments of ${rental.name}`));
   if (town) assert.ok(card.includes(town));
 });
+
+test('ski hill guest pages (2026-11-25): before opening day a note says when the lifts open; the map opens on the town', () => {
+  const hill = app.hotelList().find((h) => h.region === 'big-white');
+  assert.ok(hill, 'a Big White hotel exists');
+  const before = app.renderHotelPage(hill, new Date('2026-11-25T19:00:00Z'));
+  assert.match(before, /class="ht-season"/);
+  assert.match(before, /Big White lifts: Targeting Thursday, December 3\./);
+  assert.ok(before.includes('href="/map?f=in.big-white"'));
+  const during = app.renderHotelPage(hill, new Date('2026-12-10T19:00:00Z'));
+  assert.doesNotMatch(during, /class="ht-season"/, 'no note once the lifts are running');
+  const town = app.hotelList().find((h) => h.region === 'kelowna');
+  const k = app.renderHotelPage(town, new Date('2026-11-25T19:00:00Z'));
+  assert.doesNotMatch(k, /class="ht-season"/, 'no ski note off the hill');
+  assert.ok(k.includes('href="/map?f=in.kelowna"'));
+});

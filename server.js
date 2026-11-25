@@ -35973,6 +35973,16 @@ function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map()) 
     return { ...g, items: picked };
   }).filter((g) => g.items.length);
 }
+// Ski hill guest pages before opening day (2026-11-25, Dayton): most places on the hill say "Opens Dec 3", which can
+// read like a broken page to a guest who scans the QR card before the season. One line says when the lifts open and
+// that the village is open meanwhile. Only for a hotel on a ski hill with a season in SKI_RESORT_SEASON, only while
+// the season is 'soon'; nothing once the lifts are running.
+function hotelSeasonNoteHtml(hotel, now = new Date()) {
+  const f = SKI_RESORT_SEASON[hotel && hotel.region];
+  if (!f || skiSeasonState(f, todayLocal(now)) !== 'soon' || !f.statusSoon) return '';
+  const town = REGION_LABELS[hotel.region] || hotel.region;
+  return `<p class="ht-season" role="note"><strong>${escapeHtml(town)} lifts: ${escapeHtml(f.statusSoon)}.</strong> ${escapeHtml(f.noteSoon || '')} The places marked "Open now" below are open today.</p>`;
+}
 function hotelAwayText(km) {
   return km <= 1.2 ? `${Math.max(1, Math.round(km * 12))} min walk` : `${Math.round(km * 1.6 + 2)} min drive`;
 }
@@ -36254,6 +36264,7 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-kicker { margin: 0 0 4px; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.7; }
   body.hotel-page h1 { margin: 0 0 8px; }
   body.hotel-page .ht-intro { margin: 0 0 18px; max-width: 640px; opacity: 0.85; }
+  body.hotel-page .ht-season { margin: 0 0 14px; max-width: 640px; padding: 10px 14px; border-radius: 12px; background: #eef2f7; color: var(--ref-navy, #1B2B3A); font-size: 0.95rem; }
   body.hotel-page .ht-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 8px; }
   body.hotel-page .ht-actions a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; font-weight: 800; text-decoration: none; border: 1px solid var(--ref-navy, #1B2B3A); color: var(--ref-navy, #1B2B3A); }
   body.hotel-page .ht-actions a.ht-primary { background: var(--ref-navy, #1B2B3A); color: #fff; }
@@ -36285,10 +36296,11 @@ ${renderGolfHeaderHtml()}
   <div class="ht-wrap">
   <p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p>
   <h1>${escapeHtml(hotelTitleLine(hotel))}</h1>
+  ${hotelSeasonNoteHtml(hotel, now)}
   <p class="ht-intro">Places to eat and drink, wineries and things to do ${hotelIsRental(hotel) ? `around ${escapeHtml(town)}` : `close to ${escapeHtml(hotel.name)}, closest first`}, with what's open right now. Tap Add to trip to save a place, then Build My Trip turns it into a plan.</p>
   <div class="ht-actions">
     <a class="ht-primary" href="/trip" data-ht-cta="trip">Build My Trip</a>
-    <a href="/map" data-ht-cta="map">Map of what's open</a>
+    <a href="/map?f=in.${hotel.region}" data-ht-cta="map">Map of what's open</a>
     <a href="/${hotel.region}/events" data-ht-cta="whats-on">What's On in ${escapeHtml(town)}</a>
   </div>
   ${groups.map((g) => `<section class="ht-section" aria-labelledby="ht-${g.key}">
