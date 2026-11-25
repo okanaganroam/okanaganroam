@@ -406,6 +406,35 @@ function boatTourListing(v,text){
   if(BOAT_RENTAL_WORDS.test(own)&&!BOAT_CREW_WORDS.test(own))return false;
   return true;
 }
+// Is this listing a spa? (2026-11-24, Dayton's live test: "Gostlin Keefer Lake Lodge – Catskiing" was named as the
+// nearest spa for the adult who does not ski. It is a cat-skiing lodge whose description ends "unwind in the hot tub
+// or sauna": an amenity for its own guests.) A listing is a spa only by what it IS in its stored data:
+//   - its owner picked the Spa kind (an Indoor listing's own kinds), or
+//   - its own NAME or category line says spa, sauna, thermal, massage, bathhouse, hydrotherapy or hammam
+//     ("Scandinave Spa", "Löyly Floating Sauna", a Tours listing whose category line is "Sauna"), or
+//   - an Indoor listing named "… Wellness" whose description's FIRST sentence says what it is: a spa, a sauna, a
+//     bathhouse ("Tality Wellness Kelowna is a downtown social bathhouse…").
+// Words further down a description never make one (a lodge's sauna, a hotel's spa, a water park's hot tub). A lodge,
+// hotel, resort, cat- or heli-ski operator, outfitter, pool, gym, studio or water park is one only when its own name
+// says spa or sauna ("The Spa at Nita Lake Lodge"); so an adventure company whose category line lists a floating
+// sauna beside its sailing is not one. Listed under Indoor or Tours only, as before.
+const SPA_OWN_RE=/\b(?:spas?|saunas?|thermal|massages?|bath ?houses?|hydrotherap\w*|hammams?|scandinave)\b/;
+const SPA_NAME_RE=/\b(?:spas?|saunas?|bath ?houses?|hammams?)\b/;
+const SPA_NOT_NAME_RE=/\b(?:lodges?|hotels?|motels?|inns?|resorts?|chalets?|cabins?|cottages?|suites?|b b|campgrounds?|camping|rv|cat ?ski\w*|heli\w*|snowcats?|outfitters?|adventures?|water ?parks?|waterslides?|aquatic|pools?|ymca|community cent(?:re|er)|recreation cent(?:re|er)|rec cent(?:re|er)|arenas?|gym|fitness|yoga|pilates|barre|crossfit)\b/;
+function spaListing(v){
+  if(!v||!['indoor','tour'].includes(v.type))return false;
+  const name=norm(v.name),own=norm([v.name,v.cuisine].filter(Boolean).join(' '));
+  if(SPA_NOT_NAME_RE.test(name)&&!SPA_NAME_RE.test(name))return false;
+  if(v.type==='indoor'&&Array.isArray(v.indoorKinds)&&v.indoorKinds.includes('spa'))return true;
+  if(SPA_OWN_RE.test(own))return true;
+  return v.type==='indoor'&&/\bwellness\b/.test(own)&&SPA_OWN_RE.test(norm(String(v.description||v.textDesc||'').split(/(?<=[.!?])\s/)[0]));
+}
+// What its own name or category line calls it: a sauna when they say sauna and never spa, thermal, massage or bathhouse.
+function spaWhat(v){const own=norm([v&&v.name,v&&v.cuisine].filter(Boolean).join(' '));return /\bsaunas?\b/.test(own)&&!/\b(?:spas?|thermal|massages?|bath ?houses?|hydrotherap\w*|hammams?|scandinave)\b/.test(own)?'sauna':'spa';}
+// Does its stored data say a visit can be booked by itself (a day spa, sessions, a drop-in, by appointment, open to
+// visitors)? Nothing else is taken as that; a spa without such words is named with "day visits aren't confirmed here".
+const SPA_DAY_RE=/\b(?:day spa|day pass(?:es)?|day use|drop ins?|walk ins?|sessions?|by (?:appointment|reservation|booking)|book(?:s|ed|able|ings?)?|reserv(?:e|ed|ations?)|open to (?:visitors|non guests|the public|everyone))\b/;
+function spaDayVisit(v){return !!v&&SPA_DAY_RE.test(norm([v.cuisine,v.description||v.textDesc].filter(Boolean).join(' ')));}
 function inferPlannerKinds(v) {
   // Tour test 1 (Whistler, 2026-11-16): a tour's own kind words too ("Snowmobile & ATV tours", kept when the operator's kinds
   // are saved), so an ATV request finds it.
@@ -418,7 +447,8 @@ function inferPlannerKinds(v) {
     if (INDOOR_ONLY_PLANNER_KINDS.has(kind)&&v.type&&v.type!=='indoor') return false;
     // Planner round 4 (a yoga class was "Matches your request for spas"): a yoga, pilates or fitness studio is a spa only
     // when its own name or kind says spa, sauna, massage or thermal.
-    if (kind==='spa'&&/\b(?:yoga|pilates|fitness|gym|barre|crossfit)\b/.test(norm([v.name,v.cuisine].filter(Boolean).join(' ')))&&!/\b(?:spas?|saunas?|massages?|thermal|hydrotherap\w*)\b/.test(norm([v.name,v.cuisine].filter(Boolean).join(' '))))return false;
+    // (2026-11-24) A spa by what the listing is (spaListing), never by a word of its description.
+    if (kind==='spa') return spaListing(v);
     if (kind==='challenging_hike') {
       if(v.type!=='outdoor')return false;
       return String(v.description||v.textDesc||'').split(/[.;!]/).map(norm).some(c=>re.test(c)&&! /\b(?:near|nearby|no|not|without)\b/.test(c));
@@ -1717,4 +1747,4 @@ function tripRequestSynonyms(text){let out=String(text||'');const walksNegated=W
  if(/\b(?:ski|skiing|snowboard\w*)\b/i.test(out)&&!/\b(?:cross.country|nordic)\b/i.test(out)&&!/\b(?:don.?t|do not|won.?t|not|no|never|without)\s+(?:\w+\s+){0,2}(?:ski|skiing|snowboard\w*)\b/i.test(out))out=out.replace(/\b(?:a )?night out\b|\bgoing out(?: at night)?\b/gi,'nightlife').replace(/\s*\b(?:in the morning|in the afternoon|in the evening)\b/gi,'').replace(/\b(?:morning|afternoon|evening)\s+(?=(?:ski|skiing|snowboard\w*|spa|apres|après|dinner|lunch|drinks)\b)/gi,'').replace(/\s{2,}/g,' ');
  return out;}
 
-module.exports={withoutStayTub,stayTubAsked,stripStayTub,kidsSkiLesson,golfPartKind,SPORT_KIND_PLANNER,indoorSlotOf,morningOfOneStop,KINDS,REQUEST_KINDS,TOUR_PLANNER_KINDS,TOUR_KIND_PLANNER,INDOOR_KIND_PLANNER,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};
+module.exports={spaListing,spaWhat,spaDayVisit,withoutStayTub,stayTubAsked,stripStayTub,kidsSkiLesson,golfPartKind,SPORT_KIND_PLANNER,indoorSlotOf,morningOfOneStop,KINDS,REQUEST_KINDS,TOUR_PLANNER_KINDS,TOUR_KIND_PLANNER,INDOOR_KIND_PLANNER,tripRequestSynonyms,holidayDateText,lakesidePlace,hikingPlace,lakeWalk,rollPastTimeWindow,listedWeekdays,listedDayConflict,travelKm,lakeDetour,onceFoods,namedEventInterpretationText,sparseDayRecovery,sportsVenueInterpretationText,isOutdoorSport,listedAccessConflict,listedAccessNotes,isSportKind:k=>!!SPORT_KINDS[k],nearbyEventAlternatives,listedOutdoorTiming,estimateDaylight,estimateTransfer,estimateTripTiming,tripCalendar,expandTripComponents,inferPlannerKinds,inferPlannerActivities,consumedTerms,eventMatches,eventSearchTermMatches,extractTripRequirements,evaluateTripRequirements,requirementDay,venueAllowed,requirementScore,matches,LABELS,selectedStops};

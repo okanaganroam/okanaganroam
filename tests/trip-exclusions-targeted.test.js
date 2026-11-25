@@ -191,7 +191,7 @@ test('3. a guided boat tour is one by the listing’s own facts: never a rental,
   assert.ok(fact(F.BOAT).includes('boat_tour'));
   for (const k of ['BIKES', 'RENTAL', 'CAMP', 'TRAIL']) assert.ok(!fact(F[k]).includes('boat_tour'), k);
   // The chat's swap asks the planner for that kind by fact (never by a word of a name), and a request for one names it.
-  assert.deepEqual(tc.KIND_FACT, { boat_tour: 'boat_tour' });
+  assert.equal(tc.KIND_FACT.boat_tour, 'boat_tour'); // (2026-11-24: a spa is judged by the listing's facts too)
   assert.match('a relaxing guided boat tour', tc.KINDS.boat_tour ? tc.agent.TOUR_KINDS.boat_tour.re : /x/);
   assert.doesNotMatch('boat rentals', tc.agent.TOUR_KINDS.boat_tour.re);
 });

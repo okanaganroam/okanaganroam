@@ -113,7 +113,9 @@ const WORD_KINDS = {
 for (const [k, w] of Object.entries(agent.TOUR_KINDS)) WORD_KINDS[k] = { en: w.en, fr: w.fr, types: w.types, words: w.words, re: w.re, tour: true };
 for (const [k, w] of Object.entries(WORD_KINDS)) KINDS[k] = { text: w.en, en: w.en, fr: w.fr, types: w.types, words: w.words };
 // "something relaxing": a spa, a sauna, a float.
-KINDS.spa = { ...KINDS.spa, types: ['indoor', 'outdoor', 'sport'], words: ['spa', 'sauna', 'thermal', 'hot spring', 'float', 'nordic spa', 'scandinave'] }; // round 6: "nordic" alone was a cross-country ski trail
+KINDS.spa = { ...KINDS.spa, types: ['indoor', 'tour'], words: ['spa', 'sauna', 'thermal', 'nordic spa', 'scandinave'] }; // round 6: "nordic" alone was a cross-country ski trail
+// (2026-11-24) "float" and "hot spring" are gone from these words (a floating water park was a spa), and a spa is
+// judged by what the listing is (KIND_FACT below; trip-requirements.js spaListing) wherever its facts are at hand.
 const KIND_KEYS = Object.keys(KINDS);
 // A kind for each venue type, for "more like the winery".
 const TYPE_KIND = { winery: 'winery', brewery: 'brewery', distillery: 'distillery', cafe: 'cafe', restaurant: 'restaurant', pub: 'pub', cocktail: 'cocktail', golf: 'golf', beach: 'beach', outdoor: 'outdoor', indoor: 'indoor', tour: 'tour' };
@@ -1520,9 +1522,10 @@ for (const [k, w] of Object.entries(WORD_KINDS)) KIND_SWAP[k] = { type: w.types[
 // (2026-11-24: "a relaxing guided boat tour" swapped a water-bike rental for a boat rental) Kinds judged by the listing's
 // own facts (trip-requirements.js inferPlannerKinds), never by a word of its name: the planner's Swap gets the planner
 // kind (swap.kinds) and the place it comes back with is checked again (ctx.isKind).
-const KIND_FACT = { boat_tour: 'boat_tour' };
+// (2026-11-24, second live test: a cat-skiing lodge with a sauna for its guests was "the nearest spa") A spa too.
+const KIND_FACT = { boat_tour: 'boat_tour', spa: 'spa' };
+KIND_SWAP.spa = { type: 'indoor', types: KINDS.spa.types };
 for (const [k, pk] of Object.entries(KIND_FACT)) if (KIND_SWAP[k]) { KIND_SWAP[k] = { type: KIND_SWAP[k].type, types: KIND_SWAP[k].types, kinds: [pk] }; }
-KIND_SWAP.spa = { type: 'indoor', types: KINDS.spa.types, words: KINDS.spa.words };
 for (const [k, w] of Object.entries(WORD_KINDS)) { if (w.night) NIGHT_KINDS.add(k); if (w.evening) EVENING_KINDS.add(k); }
 const TIGHT_ADDS = true;
 const partOf = (key) => String(key).split('-')[1];

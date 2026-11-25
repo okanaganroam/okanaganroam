@@ -15,10 +15,13 @@
 //   - the non-skier's own wish ("a spa") is planned as a plain wish of the trip (never as a thing to avoid);
 //   - the plan carries one short note (plan.partySplit) saying it is one schedule, and what the listings show for the
 //     one who is not skiing: the spa stop(s) on the plan with their day and time, or that no spa is listed in the town
-//     and which listed spa is nearest. "Spa" is the listing's own kind; nothing here says a place is relaxing,
-//     suitable, open or bookable;
-//   - the chat answers "what can the non-skier do?" from the same facts, offers to add the nearest listed spa, and
-//     changes nothing by itself.
+//     and which listed spa is nearest (its town, the straight-line distance, "far" beyond FAR_KM), and what else is
+//     listed in the plan's own town that is not skiing, named by what it is. "Spa" is what the listing IS by its
+//     stored data (trip-requirements.js spaListing); nothing here says a place is relaxing, suitable, open or that
+//     a day visit can be had unless the listing's own words say so;
+//   - the chat answers "what can the non-skier do?" from the same facts, says what adding a stop does to the one
+//     shared schedule, offers to add a listed spa that is not far or something listed in town, and changes nothing
+//     by itself.
 //
 // This file is the same on okanaganroam.com and whistlerroam.com. Pure functions: server.js passes the listings' facts.
 
@@ -125,72 +128,109 @@ function planText(text) {
 const clock = (m, fr) => { const h = Math.floor(m / 60), mm = m % 60; if (fr) return `${h} h${mm ? ` ${String(mm).padStart(2, '0')}` : ''}`; const h12 = h % 12 === 0 ? 12 : h % 12; return `${h12}${mm ? `:${String(mm).padStart(2, '0')}` : ''} ${h < 12 ? 'AM' : 'PM'}`; };
 const list = (a, and) => (a.length > 1 ? `${a.slice(0, -1).join(', ')} ${and} ${a[a.length - 1]}` : a[0] || '');
 const whoOf = (ns, fr) => (ns.n > 1 ? (fr ? `les ${ns.n} qui ne skient pas` : `the ${ns.n} who aren’t skiing`) : ns.adult ? (fr ? 'l’adulte qui ne skie pas' : 'the adult who isn’t skiing') : (fr ? 'la personne qui ne skie pas' : 'the one who isn’t skiing'));
+// (2026-11-24, second live test) A spa is named only when the listing IS one by its stored data (trip-requirements.js
+// spaListing: never a lodge, hotel or cat-ski operator whose description mentions a sauna). Naming one says its town,
+// how far it is from the plan's stops in a straight line (no travel time), and that the date is not checked; when the
+// listing's own words don't say a visit can be booked by itself, that day visits aren't confirmed. Beyond FAR_KM it is
+// said to be far and is never the "Add it" of the note. Things listed in the plan's own town that are not skiing are
+// named by what they are (a gallery, skating): never called relaxing or suitable.
+const FAR_KM = 40;
 const T = {
   en: {
     lead: 'This plan is one schedule for everyone.',
-    has: 'For {who}: {stops} {is} listed as a spa.',
+    has: 'For {who}: {stops} {is} listed as {what}.{check}',
+    what: { spa: 'a spa', sauna: 'a sauna', both: 'a spa or sauna' },
     stop: '{name} (day {day}{at})', stopNoDay: '{name}{at}', at: ', {time}',
-    nearest: 'For {who}: no spa is listed in {town}; the nearest is {name} in {where}.',
-    nearestNoTown: 'For {who}: no spa is in this plan; the nearest listed is {name} in {where}.',
-    inTown: 'For {who}: {name} in {where} is listed as a spa but isn’t in this plan.',
-    none: 'For {who}: no spa is listed in {town}.', noneNoTown: 'For {who}: no spa is in this plan.',
+    noSpa: 'no spa is listed in {town}.', noSpaNoTown: 'no spa is in this plan.', noSpaAny: 'no spa is listed in {town}, and none nearby.',
+    near: 'The nearest listed is {name} in {where}{out}.', far: 'The nearest listed spa is far: {name} in {where}{out}.',
+    out: ', outside {town}', km: ' (about {km} in a straight line)',
+    inTown: 'For {who}: {name} in {where} is listed as {what} but isn’t in this plan.{check}',
+    alts: 'Listed in {town}, not skiing: {alts}.', alt: '{name} ({label})',
+    check: ' Check your date with them.', checkDay: ' Day visits and your date aren’t checked here: book directly with them.',
     cant: 'It can’t plan a separate activity at the same time for {who}.',
     chip: 'One schedule for everyone', stopNote: 'For {who}',
     // The chat's answer to "what can the non-skier do?" (nothing changes).
-    qHas: '{stops} {is} listed as a spa on your plan.',
-    qNearest: 'No spa is listed in {town}. The nearest is {name} in {where}.',
-    qNearestNoTown: 'There’s no spa on your plan. The nearest listed is {name} in {where}.',
-    qInTown: '{name} in {where} is listed as a spa and isn’t on your plan.',
-    qNone: 'No spa is listed in {town}, and no other listing says it is a place to relax. Name a kind of place (a café, a gallery, a snowshoe trail) and I’ll look.',
-    qNoneNoTown: 'I have no spa listed near your plan. Name a kind of place (a café, a gallery, a snowshoe trail) and I’ll look.',
-    qTail: 'Your plan is one schedule for everyone, and nothing changed.', qAdd: 'Add it to the plan?', add: 'Add it',
-    guests: 'Hotel guests: {who}.', same: 'The itinerary is unchanged.',
+    qHas: '{stops} {is} listed as {what} on your plan, at that time for the whole group.{check}',
+    qNoSpa: 'No spa is listed in {town}.', qNoSpaNoTown: 'There’s no spa on your plan.', qNoSpaAny: 'I don’t list a spa near {town}.', qNoSpaAnyNoTown: 'I don’t list a spa near your plan.',
+    qInTown: '{name} in {where} is listed as {what} and isn’t on your plan.{check}',
+    qNoAlts: 'Name a kind of place (a café, a gallery, a snowshoe trail) and I’ll look.',
+    effectAt: 'One schedule for everyone: it would go on day {day} at {time} for the whole group, so the others can’t be shown skiing then.',
+    effectAt1: 'One schedule for everyone: it would go at {time} for the whole group, so the others can’t be shown skiing then.',
+    effect: 'One schedule for everyone: an added stop takes a day and time for the whole group, so the others can’t be shown skiing then.',
+    qTail: 'Your plan is one schedule for everyone, and nothing changed.', qAdd: 'Add it?', qAddName: 'Add {name}?', qAddFar: 'Add it anyway?',
+    add: 'Add it', addFar: 'Add it anyway',
+    shared: 'It’s on the one shared schedule, for the whole group.',
+    guests: 'Hotel guests: {who}.', same0: 'The itinerary is unchanged.',
   },
   fr: {
     lead: 'Ce plan est un seul horaire pour tout le monde.',
-    has: 'Pour {who} : {stops} {is} comme spa.',
+    has: 'Pour {who} : {stops} {is} comme {what}.{check}',
+    what: { spa: 'spa', sauna: 'sauna', both: 'spa ou sauna' },
     stop: '{name} (jour {day}{at})', stopNoDay: '{name}{at}', at: ', {time}',
-    nearest: 'Pour {who} : aucun spa n’est répertorié à {town}; le plus proche est {name}, à {where}.',
-    nearestNoTown: 'Pour {who} : aucun spa dans ce plan; le plus proche répertorié est {name}, à {where}.',
-    inTown: 'Pour {who} : {name}, à {where}, est répertorié comme spa mais n’est pas dans ce plan.',
-    none: 'Pour {who} : aucun spa n’est répertorié à {town}.', noneNoTown: 'Pour {who} : aucun spa dans ce plan.',
+    noSpa: 'aucun spa n’est répertorié à {town}.', noSpaNoTown: 'aucun spa dans ce plan.', noSpaAny: 'aucun spa n’est répertorié à {town}, ni à proximité.',
+    near: 'Le plus proche répertorié est {name}, à {where}{out}.', far: 'Le spa répertorié le plus proche est loin : {name}, à {where}{out}.',
+    out: ', hors de {town}', km: ' (environ {km} à vol d’oiseau)',
+    inTown: 'Pour {who} : {name}, à {where}, est répertorié comme {what} mais n’est pas dans ce plan.{check}',
+    alts: 'À {town}, sans ski : {alts}.', alt: '{name} ({label})',
+    check: ' Vérifiez votre date auprès d’eux.', checkDay: ' Les visites à la journée et votre date ne sont pas vérifiées ici : réservez directement auprès d’eux.',
     cant: 'Il ne peut pas prévoir une activité séparée au même moment pour {who}.',
     chip: 'Un seul horaire pour tous', stopNote: 'Pour {who}',
-    qHas: '{stops} {is} comme spa dans votre plan.',
-    qNearest: 'Aucun spa n’est répertorié à {town}. Le plus proche est {name}, à {where}.',
-    qNearestNoTown: 'Il n’y a pas de spa dans votre plan. Le plus proche répertorié est {name}, à {where}.',
-    qInTown: '{name}, à {where}, est répertorié comme spa et n’est pas dans votre plan.',
-    qNone: 'Aucun spa n’est répertorié à {town}, et aucune autre fiche ne dit que c’est un endroit pour se reposer. Nommez un genre d’endroit (un café, une galerie, un sentier de raquette) et je regarde.',
-    qNoneNoTown: 'Je n’ai aucun spa répertorié près de votre plan. Nommez un genre d’endroit (un café, une galerie, un sentier de raquette) et je regarde.',
-    qTail: 'Votre plan est un seul horaire pour tout le monde, et rien n’a changé.', qAdd: 'L’ajouter au plan?', add: 'L’ajouter',
-    guests: 'Clients de l’hôtel : {who}.', same: 'L’itinéraire est inchangé.',
+    qHas: '{stops} {is} comme {what} dans votre plan, à cette heure pour tout le groupe.{check}',
+    qNoSpa: 'Aucun spa n’est répertorié à {town}.', qNoSpaNoTown: 'Il n’y a pas de spa dans votre plan.', qNoSpaAny: 'Je ne répertorie aucun spa près de {town}.', qNoSpaAnyNoTown: 'Je ne répertorie aucun spa près de votre plan.',
+    qInTown: '{name}, à {where}, est répertorié comme {what} et n’est pas dans votre plan.{check}',
+    qNoAlts: 'Nommez un genre d’endroit (un café, une galerie, un sentier de raquette) et je regarde.',
+    effectAt: 'Un seul horaire pour tous : cet arrêt irait au jour {day} à {time} pour tout le groupe; les autres ne peuvent donc pas être montrés en train de skier à ce moment.',
+    effectAt1: 'Un seul horaire pour tous : cet arrêt irait à {time} pour tout le groupe; les autres ne peuvent donc pas être montrés en train de skier à ce moment.',
+    effect: 'Un seul horaire pour tous : tout arrêt ajouté prend un jour et une heure pour tout le groupe; les autres ne peuvent donc pas être montrés en train de skier à ce moment.',
+    qTail: 'Votre plan est un seul horaire pour tout le monde, et rien n’a changé.', qAdd: 'L’ajouter?', qAddName: 'Ajouter {name}?', qAddFar: 'L’ajouter quand même?',
+    add: 'L’ajouter', addFar: 'L’ajouter quand même',
+    shared: 'Il est dans l’horaire commun, pour tout le groupe.',
+    guests: 'Clients de l’hôtel : {who}.', same0: 'L’itinéraire est inchangé.',
   },
 };
 const fill = (s, o) => String(s).replace(/\{(\w+)\}/g, (_, k) => (o[k] == null ? '' : String(o[k])));
 const stopsSaid = (stops, fr) => { const L = T[fr ? 'fr' : 'en']; return list(stops.map((s) => fill(s.day > 0 ? L.stop : L.stopNoDay, { name: s.name, day: s.day, at: Number.isInteger(s.start) ? fill(L.at, { time: clock(s.start, fr) }) : '' })), fr ? 'et' : 'and'); };
 const isSaid = (n, fr) => (fr ? (n > 1 ? 'sont répertoriés' : 'est répertorié') : (n > 1 ? 'are' : 'is'));
+// "a spa", "a sauna", or both: what the stops' own names and category lines call them.
+const whatSaid = (xs, fr) => { const w = new Set(xs.map((x) => (x && x.what === 'sauna' ? 'sauna' : 'spa'))); return T[fr ? 'fr' : 'en'].what[w.size > 1 ? 'both' : [...w][0] || 'spa']; };
+// "12 km" / « 12 km »; under 2 km to one decimal (as trip-transport-need.js kmText).
+const kmSaid = (km, fr) => { const v = km < 2 ? Math.max(0.1, Math.round(km * 10) / 10) : Math.round(km); return `${fr ? String(v).replace('.', ',') : v} km`; };
+const hasKm = (n) => !!n && Number.isFinite(n.km) && n.km >= 0;
+const isFar = (n) => hasKm(n) && n.km > FAR_KM;
+// ", outside SilverStar (about 62 km in a straight line)": only for a place in another town; the distance when known.
+const outSaid = (n, f, fr) => { const L = T[fr ? 'fr' : 'en']; if (!n || f.inTown) return ''; const out = !f.town ? '' : fr ? (/^[aeiouyhéèêâîôû]/i.test(f.town) ? `, hors d’${f.town}` : fill(L.out, { town: f.town })) : fill(L.out, { town: f.town }); return `${out}${hasKm(n) ? fill(L.km, { km: kmSaid(n.km, fr) }) : ''}`; };
+const checkSaid = (xs, fr) => { const L = T[fr ? 'fr' : 'en']; return xs.every((x) => x && x.dayVisit) ? L.check : L.checkDay; };
+const altsOf = (f) => (f.alts || []).filter((x) => x && x.name && x.id > 0).slice(0, 2);
+const altsSaid = (f, fr) => { const L = T[fr ? 'fr' : 'en'], a = altsOf(f); return a.length && f.town ? fill(L.alts, { town: f.town, alts: list(a.map((x) => fill(L.alt, { name: x.name, label: (fr && x.labelFr) || x.label || '' }).replace(/ \(\)$/, '')), fr ? 'et' : 'and') }) : ''; };
 
 // The plan's one note. split: readSplit(); f:
-//   spaStops   the plan's stops that are a spa by their own listing: [{ id, name, day, start }]
-//   nearest    the nearest listed spa when the plan has none: { id, name, region, regionLabel } | null
+//   spaStops   the plan's stops that are a spa by their own listing: [{ id, name, day, start, what, dayVisit }]
+//   nearest    the nearest listed spa when the plan has none: { id, name, region, regionLabel, km, what, dayVisit } | null
 //   inTown     that nearest spa is in one of the plan's own towns
 //   town       the plan's town(s), as said ("SilverStar")
+//   alts       listed in the plan's own towns, not skiing and not in the plan: [{ id, name, label, labelFr }]
 // -> { key, n, adult, spa, text, textFr, base, baseFr, chip, chipFr, stopIds, nearest?, stopNote, stopNoteFr } | null
 // base is what stands when a stop the note names is taken off the page (the page then shows base alone).
+// nearest (the note's "Add it") is there only for a listed spa that is not far.
 function note(split, f = {}) {
   const ns = split && split.nonSkier;
   if (!ns) return null;
   const spaStops = (f.spaStops || []).filter((s) => s && s.name);
   const say = (fr) => {
-    const L = T[fr ? 'fr' : 'en'], who = whoOf(ns, fr), n = f.nearest;
-    if (spaStops.length) return `${L.lead} ${fill(L.has, { who, stops: stopsSaid(spaStops, fr), is: isSaid(spaStops.length, fr) })}`;
+    const L = T[fr ? 'fr' : 'en'], who = whoOf(ns, fr), n = f.nearest && f.nearest.name ? f.nearest : null;
+    if (spaStops.length) return `${L.lead} ${fill(L.has, { who, stops: stopsSaid(spaStops, fr), is: isSaid(spaStops.length, fr), what: whatSaid(spaStops, fr), check: checkSaid(spaStops, fr) })}`;
     if (!ns.spa) return `${L.lead} ${fill(L.cant, { who })}`;
-    if (n && n.name && f.inTown) return `${L.lead} ${fill(L.inTown, { who, name: n.name, where: n.regionLabel })}`;
-    if (n && n.name) return `${L.lead} ${fill(f.town ? L.nearest : L.nearestNoTown, { who, town: f.town, name: n.name, where: n.regionLabel })}`;
-    return `${L.lead} ${fill(f.town ? L.none : L.noneNoTown, { who, town: f.town })}`;
+    if (n && f.inTown) return `${L.lead} ${fill(L.inTown, { who, name: n.name, where: n.regionLabel, what: whatSaid([n], fr), check: checkSaid([n], fr) })}`;
+    const head = fr ? `Pour ${who} : ` : `For ${who}: `, alts = altsSaid(f, fr);
+    const spa = n ? fill(isFar(n) ? L.far : L.near, { name: n.name, where: n.regionLabel, out: outSaid(n, f, fr) }) : '';
+    // One closing sentence for the places named: the date is never checked; a spa's day visits only by its own words.
+    const check = (n && !(isFar(n) && alts) ? checkSaid([n], fr) : n || alts ? L.check : '').trim();
+    const none = fill(n ? (f.town ? L.noSpa : L.noSpaNoTown) : (f.town ? L.noSpaAny : L.noSpaNoTown), { town: f.town });
+    // Something at the plan's own town comes before a spa that is far; a spa that is near comes first.
+    return [L.lead, head + none, ...(n && !isFar(n) ? [spa, alts] : [alts, spa]), check].filter(Boolean).join(' ');
   };
   const base = (fr) => `${T[fr ? 'fr' : 'en'].lead} ${fill(T[fr ? 'fr' : 'en'].cant, { who: whoOf(ns, fr) })}`;
-  const offer = !spaStops.length && ns.spa && f.nearest && f.nearest.id > 0 ? { id: f.nearest.id, name: f.nearest.name, region: f.nearest.region || null, regionLabel: f.nearest.regionLabel || null } : null;
+  const offer = !spaStops.length && ns.spa && f.nearest && f.nearest.id > 0 && !isFar(f.nearest) ? { id: f.nearest.id, name: f.nearest.name, region: f.nearest.region || null, regionLabel: f.nearest.regionLabel || null } : null;
   return {
     key: 'party_split', n: ns.n, adult: !!ns.adult, spa: !!ns.spa, ...(split.lessons ? { lessons: split.lessons.n } : {}),
     text: say(false), textFr: say(true), base: base(false), baseFr: base(true), chip: T.en.chip, chipFr: T.fr.chip,
@@ -217,15 +257,44 @@ function chatRead(t) {
   if (!s || !CHAT_NOSKI_RE.test(s) || !CHAT_ASK_RE.test(s) || CHAT_EDIT_RE.test(s)) return null;
   return { value: 'q_split' };
 }
-// The answer. f as note(): { spaStops, nearest, inTown, town }.
-// -> { reply, ask: the one question | '', add: { id, name } | null, label }
-function chatReply(f = {}, lang = 'en') {
-  const fr = lang === 'fr', L = T[fr ? 'fr' : 'en'];
-  const spaStops = (f.spaStops || []).filter((s) => s && s.name), n = f.nearest;
-  if (spaStops.length) return { reply: `${fill(L.qHas, { stops: stopsSaid(spaStops, fr), is: isSaid(spaStops.length, fr) })} ${L.qTail}`, ask: '', add: null };
-  if (n && n.name && n.id > 0) return { reply: `${fill(f.inTown ? L.qInTown : f.town ? L.qNearest : L.qNearestNoTown, { town: f.town, name: n.name, where: n.regionLabel })} ${L.qTail}`, ask: L.qAdd, add: { id: n.id, name: n.name }, label: L.add };
-  return { reply: `${fill(f.town ? L.qNone : L.qNoneNoTown, { town: f.town })} ${L.qTail}`, ask: '', add: null };
+// The one place the answer offers to add (one question at most): a listed spa in the plan's own town or not far;
+// else the nearest thing listed in town that is not skiing; else a far spa, asked with its distance.
+// -> { id, name, kind: 'spa' | 'alt' | 'far' } | null
+function chatOffer(f = {}) {
+  if ((f.spaStops || []).some((s) => s && s.name)) return null;
+  const n = f.nearest && f.nearest.name && f.nearest.id > 0 ? f.nearest : null, alts = altsOf(f);
+  if (n && (f.inTown || !isFar(n))) return { id: n.id, name: n.name, kind: 'spa' };
+  if (alts.length) return { id: alts[0].id, name: alts[0].name, kind: 'alt' };
+  return n ? { id: n.id, name: n.name, kind: 'far' } : null;
 }
+// The answer. f as note(): { spaStops, nearest, inTown, town, alts }; slot: where the place offered would go if added
+// ({ id, day, start, days }, worked out by the same rules as the add itself) or null.
+// -> { reply, ask: the one question | '', add: { id, name } | null, label }
+// The reply names a spa only from f (a listing that is one), with its town, the straight-line distance, that the date
+// is not checked, and what adding a stop does to the one shared schedule: in few words (a phone shows six lines of
+// a reply before it scrolls), what can be done first. A spa that is far is said to be far and is not offered when
+// something is listed in the plan's own town; alone, it is asked as "Add it anyway?" after its distance.
+function chatReply(f = {}, lang = 'en', slot = null) {
+  const fr = lang === 'fr', L = T[fr ? 'fr' : 'en'];
+  const spaStops = (f.spaStops || []).filter((s) => s && s.name), n = f.nearest && f.nearest.name && f.nearest.id > 0 ? f.nearest : null;
+  if (spaStops.length) return { reply: `${fill(L.qHas, { stops: stopsSaid(spaStops, fr), is: isSaid(spaStops.length, fr), what: whatSaid(spaStops, fr), check: checkSaid(spaStops, fr) })} ${L.qTail}`, ask: '', add: null };
+  const o = chatOffer(f);
+  // A name as it is said a second time: without what follows a dash or a colon ("Brewer's Pond Skating – SilverStar").
+  const short = (x) => String(x.name).split(/\s[–—-]\s|:\s/)[0].trim() || x.name;
+  const effect = o && slot && slot.id === o.id && Number.isInteger(slot.start) ? fill(slot.days > 1 ? L.effectAt : L.effectAt1, { day: slot.day, time: clock(slot.start, fr) }) : L.effect;
+  const add = o ? { id: o.id, name: o.name } : null;
+  if (n && f.inTown) return { reply: [fill(L.qInTown, { name: n.name, where: n.regionLabel, what: whatSaid([n], fr), check: '' }), effect, checkSaid([n], fr).trim()].join(' '), ask: L.qAdd, add, label: L.add };
+  const none = fill(n ? (f.town ? L.qNoSpa : L.qNoSpaNoTown) : (f.town ? L.qNoSpaAny : L.qNoSpaAnyNoTown), { town: f.town });
+  if (!o) return { reply: `${none} ${L.qNoAlts} ${L.qTail}`, ask: '', add: null };
+  if (o.kind === 'spa') return { reply: [none, fill(L.near, { name: n.name, where: n.regionLabel, out: outSaid(n, f, fr) }), effect, checkSaid([n], fr).trim()].join(' '), ask: L.qAdd, add, label: L.add };
+  // Something listed in the plan's own town comes first (the one offered, by what it is); a far spa is named after
+  // it, as far, and is not the offer.
+  if (o.kind === 'alt') return { reply: [none, altsSaid({ ...f, alts: altsOf(f).slice(0, 1) }, fr), effect, n ? fill(L.far, { name: n.name, where: n.regionLabel, out: outSaid(n, f, fr) }) : '', L.check.trim()].filter(Boolean).join(' '), ask: n ? fill(L.qAddName, { name: short(o) }) : L.qAdd, add, label: L.add };
+  return { reply: [none, fill(L.far, { name: n.name, where: n.regionLabel, out: outSaid(n, f, fr) }), effect, checkSaid([n], fr).trim()].join(' '), ask: L.qAddFar, add, label: L.addFar };
+}
+// After an add on a trip where someone is not skiing: what to check, and that the stop is in the one shared schedule.
+// spa: { dayVisit } when the place added is a listed spa, else null.
+function addedLines(spa, lang) { const L = T[lang === 'fr' ? 'fr' : 'en']; return [...(spa ? [(spa.dayVisit ? L.check : L.checkDay).trim()] : []), L.shared]; }
 // In a chat message, "one adult doesn't ski" / "two of us won't ski" is about some of the party: never the party's size.
 // t: the message folded by trip-chat.js; at: where the count ("one adult") starts.
 const CHAT_NEG_AFTER_RE = /^\s+(?:who |that |qui )?(?:does not|doesn'?t|doesn t|do not|don'?t|don t|will not|won'?t|won t|can'?t|can t|cannot|is not|isn'?t|isn t|are not|aren'?t|aren t|never|ne )\b/;
@@ -243,6 +312,6 @@ function partyWords(adults, kids, fr) {
   if (kids > 0) p.push(fr ? `${kids} enfant${kids > 1 ? 's' : ''}` : `${kids} kid${kids > 1 ? 's' : ''}`);
   return p.join(', ');
 }
-const guestsReply = (adults, kids, lang, same) => { const fr = lang === 'fr', L = T[fr ? 'fr' : 'en']; return `${fill(L.guests, { who: partyWords(adults, kids, fr) })}${same ? ` ${L.same}` : ''}`; };
+const guestsReply = (adults, kids, lang, same) => { const fr = lang === 'fr', L = T[fr ? 'fr' : 'en']; return `${fill(L.guests, { who: partyWords(adults, kids, fr) })}${same ? ` ${L.same0}` : ''}`; };
 
-module.exports = { fold, numOf, subgroupSpans, stripSubgroups, hasSubgroup, readSplit, planText, note, whoOf, toShare, fromShare, SHARE_RE, chatRead, chatReply, chatCountIsSubgroup, someOfParty, partyWords, guestsReply, T };
+module.exports = { fold, numOf, subgroupSpans, stripSubgroups, hasSubgroup, readSplit, planText, note, whoOf, toShare, fromShare, SHARE_RE, chatRead, chatReply, chatOffer, addedLines, FAR_KM, kmSaid, chatCountIsSubgroup, someOfParty, partyWords, guestsReply, T };

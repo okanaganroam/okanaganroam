@@ -184,22 +184,23 @@ test('2. "one adult does not ski and would prefer a spa": that person’s wish, 
 test('3. the plan’s one note: one schedule for everyone, and only what the listings show for the one not skiing', () => {
   const sp = S.readSplit(REQ), near = { id: 77, name: 'Cedar Thermal Spa', region: 'vernon', regionLabel: 'Vernon' };
   const none = S.note(sp, { spaStops: [], nearest: near, inTown: false, town: 'SilverStar' });
-  assert.equal(none.text, 'This plan is one schedule for everyone. For the adult who isn’t skiing: no spa is listed in SilverStar; the nearest is Cedar Thermal Spa in Vernon.');
-  assert.equal(none.textFr, 'Ce plan est un seul horaire pour tout le monde. Pour l’adulte qui ne skie pas : aucun spa n’est répertorié à SilverStar; le plus proche est Cedar Thermal Spa, à Vernon.');
+  // (2026-11-24, trip-nonskier-verified.test.js: the spa's town, that it is outside the plan's town, and what is not checked.)
+  assert.equal(none.text, 'This plan is one schedule for everyone. For the adult who isn’t skiing: no spa is listed in SilverStar. The nearest listed is Cedar Thermal Spa in Vernon, outside SilverStar. Day visits and your date aren’t checked here: book directly with them.');
+  assert.equal(none.textFr, 'Ce plan est un seul horaire pour tout le monde. Pour l’adulte qui ne skie pas : aucun spa n’est répertorié à SilverStar. Le plus proche répertorié est Cedar Thermal Spa, à Vernon, hors de SilverStar. Les visites à la journée et votre date ne sont pas vérifiées ici : réservez directement auprès d’eux.');
   assert.deepEqual([none.key, none.n, none.adult, none.spa, none.lessons, none.chip, none.chipFr, none.nearest.id, none.stopIds], ['party_split', 1, true, true, 2, 'One schedule for everyone', 'Un seul horaire pour tous', 77, []]);
   // A spa on the plan: named with its day and time, and its stop says who it is for.
   const has = S.note(sp, { spaStops: [{ id: 5, name: 'Cedar Thermal Spa', day: 2, start: 14 * 60 }], nearest: null, town: 'SilverStar' });
-  assert.equal(has.text, 'This plan is one schedule for everyone. For the adult who isn’t skiing: Cedar Thermal Spa (day 2, 2 PM) is listed as a spa.');
-  assert.equal(has.textFr, 'Ce plan est un seul horaire pour tout le monde. Pour l’adulte qui ne skie pas : Cedar Thermal Spa (jour 2, 14 h) est répertorié comme spa.');
+  assert.equal(has.text, 'This plan is one schedule for everyone. For the adult who isn’t skiing: Cedar Thermal Spa (day 2, 2 PM) is listed as a spa. Day visits and your date aren’t checked here: book directly with them.');
+  assert.equal(has.textFr, 'Ce plan est un seul horaire pour tout le monde. Pour l’adulte qui ne skie pas : Cedar Thermal Spa (jour 2, 14 h) est répertorié comme spa. Les visites à la journée et votre date ne sont pas vérifiées ici : réservez directement auprès d’eux.');
   assert.deepEqual([has.stopIds, has.nearest, has.stopNote, has.stopNoteFr], [[5], undefined, 'For the adult who isn’t skiing.', 'Pour l’adulte qui ne skie pas.']);
-  assert.equal(S.note(sp, { spaStops: [{ id: 5, name: 'A Spa', day: 1, start: 990 }, { id: 6, name: 'B Sauna', day: 3, start: 600 }], town: 'X' }).text, 'This plan is one schedule for everyone. For the adult who isn’t skiing: A Spa (day 1, 4:30 PM) and B Sauna (day 3, 10 AM) are listed as a spa.');
+  assert.equal(S.note(sp, { spaStops: [{ id: 5, name: 'A Spa', day: 1, start: 990 }, { id: 6, name: 'B Sauna', day: 3, start: 600 }], town: 'X' }).text, 'This plan is one schedule for everyone. For the adult who isn’t skiing: A Spa (day 1, 4:30 PM) and B Sauna (day 3, 10 AM) are listed as a spa. Day visits and your date aren’t checked here: book directly with them.');
   // A spa listed in the plan's own town but not planned; none listed anywhere; no wish said.
-  assert.equal(S.note(sp, { spaStops: [], nearest: { ...near, regionLabel: 'SilverStar' }, inTown: true, town: 'SilverStar' }).text, 'This plan is one schedule for everyone. For the adult who isn’t skiing: Cedar Thermal Spa in SilverStar is listed as a spa but isn’t in this plan.');
-  assert.equal(S.note(sp, { spaStops: [], nearest: null, town: 'SilverStar' }).text, 'This plan is one schedule for everyone. For the adult who isn’t skiing: no spa is listed in SilverStar.');
+  assert.equal(S.note(sp, { spaStops: [], nearest: { ...near, regionLabel: 'SilverStar' }, inTown: true, town: 'SilverStar' }).text, 'This plan is one schedule for everyone. For the adult who isn’t skiing: Cedar Thermal Spa in SilverStar is listed as a spa but isn’t in this plan. Day visits and your date aren’t checked here: book directly with them.');
+  assert.equal(S.note(sp, { spaStops: [], nearest: null, town: 'SilverStar' }).text, 'This plan is one schedule for everyone. For the adult who isn’t skiing: no spa is listed in SilverStar, and none nearby.');
   const bare = S.note(S.readSplit('Ski weekend, 3 adults. One of the adults doesn’t ski.'), { spaStops: [], nearest: near, town: 'SilverStar' });
   assert.equal(bare.text, 'This plan is one schedule for everyone. It can’t plan a separate activity at the same time for the adult who isn’t skiing.');
   assert.equal(bare.nearest, undefined, 'no spa was wished for: none is offered');
-  assert.equal(S.note(S.readSplit('Ski weekend for 5. Two of us won’t ski and would like a spa.'), { spaStops: [], nearest: null, town: 'X' }).text, 'This plan is one schedule for everyone. For the 2 who aren’t skiing: no spa is listed in X.');
+  assert.equal(S.note(S.readSplit('Ski weekend for 5. Two of us won’t ski and would like a spa.'), { spaStops: [], nearest: null, town: 'X' }).text, 'This plan is one schedule for everyone. For the 2 who aren’t skiing: no spa is listed in X, and none nearby.');
   for (const n of [none, has, bare]) { HONEST(n.text); HONEST(n.textFr); assert.equal(n.base, 'This plan is one schedule for everyone. It can’t plan a separate activity at the same time for the adult who isn’t skiing.'); }
   assert.equal(S.note(null, {}), null);
   // The summary's chip, flagged (never a tick).
@@ -254,12 +255,12 @@ test('4. the exact request, planned: the hotel is for 2 adults and 1 kid (10) fo
   if (ps.stopIds.length) {
     // (Whistler lists spas in the village.) Each spa named is a stop of the plan, with its own day, and says who it is for.
     for (const id of ps.stopIds) { const v = visits.find((x) => x.id === id); assert.ok(v, 'a named spa is on the plan'); assert.ok(ps.text.includes(`${v.name} (day ${v.day}, `), ps.text); }
-    assert.match(ps.text, / (?:is|are) listed as a spa\.$/);
+    assert.match(ps.text, / (?:is|are) listed as a (?:spa|sauna|spa or sauna)\. (?:Check your date with them|Day visits and your date aren’t checked here: book directly with them)\.$/);
     assert.ok((p.schedule || []).some((r) => ps.stopIds.includes(r.venueId) && r.forSome && r.forSome.note === 'For the adult who isn’t skiing.'));
     assert.equal(ps.nearest, undefined);
   } else {
     // (SilverStar lists none: the fixture spa in the next town is the nearest.)
-    assert.equal(ps.text, `This plan is one schedule for everyone. For the adult who isn’t skiing: no spa is listed in ${TRIP_TOWN}; the nearest is ${F.SPA.name} in ${OTHER_TOWN}.`);
+    assert.match(ps.text, new RegExp(`^This plan is one schedule for everyone\\. For the adult who isn’t skiing: no spa is listed in ${TRIP_TOWN}\\. The nearest listed is ${F.SPA.name} in ${OTHER_TOWN}, outside ${TRIP_TOWN} \\(about [0-9.]+ km in a straight line\\)\\.(?: Listed in ${TRIP_TOWN}, not skiing: [^.]+\\.)? Day visits and your date aren’t checked here: book directly with them\\.$`));
     assert.deepEqual([ps.nearest.id, ps.nearest.name], [F.SPA.id, F.SPA.name]);
     assert.ok(!visits.some((x) => x.id === F.SPA.id));
     // The plan's own "couldn't fit a spa" line is the note's to say (once); the summary still flags the spa.
@@ -321,7 +322,7 @@ test('6. "What can the adult who does not ski do while the other two are skiing?
   app.setTripChatReader(async () => { asked += 1; return { ok: true, ops: [{ o: 'ask', value: 'q_why', stops: [], kind: null, time: null, day: null, n: null, ages: [], region: null, date: null }], cant: null }; });
   const r = await say(ASK_MSG);
   assert.equal(asked, 0, 'the AI reader is not asked');
-  assert.equal(r.reply, `No spa is listed in ${TOWN}. The nearest is ${F.SPA.name} in ${OTHER_TOWN}. Your plan is one schedule for everyone, and nothing changed. Add it to the plan?`);
+  assert.match(r.reply, new RegExp(`^No spa is listed in ${TOWN}\\. The nearest listed is ${F.SPA.name} in ${OTHER_TOWN}, outside ${TOWN} \\(about [0-9.]+ km in a straight line\\)\\. One schedule for everyone: (?:it would go on day [1-3] at [0-9:]+ [AP]M|an added stop takes a day and time) for the whole group, so the others can’t be shown skiing then\\. Day visits and your date aren’t checked here: book directly with them\\. Add it\\?$`));
   HONEST(r.reply);
   assert.doesNotMatch(r.reply, /Which stop do you mean/);
   NOTHING_ELSE(r, ['party', 'stayBlock']);
@@ -331,7 +332,7 @@ test('6. "What can the adult who does not ski do while the other two are skiing?
   assert.deepEqual(r.offer, [sayAdd]);
   for (const m of ['what can the non-skier do', 'something for the one who doesn’t ski']) { const x = await say(m); assert.equal(x.reply, r.reply, m); NOTHING_ELSE(x, ['party', 'stayBlock']); }
   const fr = await say('Que peut faire l’adulte qui ne skie pas pendant que les autres skient?', { lang: 'fr' });
-  assert.equal(fr.reply, `Aucun spa n’est répertorié à ${TOWN}. Le plus proche est ${F.SPA.name}, à ${OTHER_TOWN}. Votre plan est un seul horaire pour tout le monde, et rien n’a changé. L’ajouter au plan?`);
+  assert.match(fr.reply, new RegExp(`^Aucun spa n’est répertorié à ${TOWN}\\. Le plus proche répertorié est ${F.SPA.name}, à ${OTHER_TOWN}, hors de ${TOWN} \\(environ [0-9,]+ km à vol d’oiseau\\)\\. Un seul horaire pour tous : (?:cet arrêt irait au jour [1-3] à [0-9]+ h(?: [0-9]+)?|tout arrêt ajouté prend un jour et une heure) pour tout le groupe; les autres ne peuvent donc pas être montrés en train de skier à ce moment\\. Les visites à la journée et votre date ne sont pas vérifiées ici : réservez directement auprès d’eux\\. L’ajouter\\?$`));
   app.setTripChatReader(null);
   assert.equal(asked, 0);
   // A statement about the one who does not ski that the AI reads as "1 adult": the party stays as it is.
@@ -343,8 +344,8 @@ test('6. "What can the adult who does not ski do while the other two are skiing?
   assert.deepEqual((await say('Actually we will be 3 adults in all')).party, { adults: 3 });
   app.setTripChatReader(null);
   // With a spa on the plan it is named with its day and time, and nothing is offered.
-  const f = { spaStops: [{ id: 5, name: 'Cedar Thermal Spa', day: 2, start: 870 }], nearest: null, town: TOWN };
-  assert.deepEqual(S.chatReply(f, 'en'), { reply: 'Cedar Thermal Spa (day 2, 2:30 PM) is listed as a spa on your plan. Your plan is one schedule for everyone, and nothing changed.', ask: '', add: null });
+  const f = { spaStops: [{ id: 5, name: 'Cedar Thermal Spa', day: 2, start: 870, what: 'spa', dayVisit: true }], nearest: null, town: TOWN };
+  assert.deepEqual(S.chatReply(f, 'en'), { reply: 'Cedar Thermal Spa (day 2, 2:30 PM) is listed as a spa on your plan, at that time for the whole group. Check your date with them. Your plan is one schedule for everyone, and nothing changed.', ask: '', add: null });
   assert.equal(S.chatReply({ spaStops: [], nearest: null, town: TOWN }, 'en').add, null);
 });
 
@@ -379,10 +380,10 @@ test('7. every visit is a stop of the share link: the same place on two days and
   // The copy's lines: the lesson is not in the plan (as the plan said), and the one note for the adult not skiing.
   const texts = c.lines.map((l) => l.text);
   assert.ok(texts.includes('I couldn’t fit a ski or snowboard lesson into this plan.'), JSON.stringify(texts));
-  assert.ok(texts.includes(`This plan is one schedule for everyone. For the adult who isn’t skiing: no spa is listed in ${TOWN}; the nearest is ${F.SPA.name} in ${OTHER_TOWN}.`), JSON.stringify(texts));
+  assert.ok(texts.some((x) => new RegExp(`^This plan is one schedule for everyone\\. For the adult who isn’t skiing: no spa is listed in ${TOWN}\\. The nearest listed is ${F.SPA.name} in ${OTHER_TOWN}, outside ${TOWN} \\(about [0-9.]+ km in a straight line\\)\\.(?: Listed in ${TOWN}, not skiing: [^.]+\\.)? Day visits and your date aren’t checked here: book directly with them\\.$`).test(x)), JSON.stringify(texts));
   assert.ok(!texts.some((x) => /couldn’t fit a spa|Spa: not in this plan/.test(x)), 'the spa is said once, by the note');
   for (const x of texts) HONEST(x);
-  assert.equal(app.tripShareContext(q, 'fr', new Date('2026-11-24T18:00:00Z')).lines.filter((l) => l.ask === 'party_split')[0].text, `Ce plan est un seul horaire pour tout le monde. Pour l’adulte qui ne skie pas : aucun spa n’est répertorié à ${TOWN}; le plus proche est ${F.SPA.name}, à ${OTHER_TOWN}.`);
+  assert.equal(app.tripShareContext(q, 'fr', new Date('2026-11-24T18:00:00Z')).lines.filter((l) => l.ask === 'party_split')[0].text.replace(/ \(environ [0-9,]+ km à vol d’oiseau\)/, '').replace(/ À [^.]+, sans ski : [^.]+\./, ''), `Ce plan est un seul horaire pour tout le monde. Pour l’adulte qui ne skie pas : aucun spa n’est répertorié à ${TOWN}. Le plus proche répertorié est ${F.SPA.name}, à ${OTHER_TOWN}, hors de ${TOWN}. Les visites à la journée et votre date ne sont pas vérifiées ici : réservez directement auprès d’eux.`);
   // The kid-friendly count is of the copy's own visits, as on the plan (8, not 4).
   assert.match((c.lines.concat(c.evidence || []).find((l) => l.ask === 'kid_friendly') || {}).text || '', /8 stops have the badge/);
   // The shared page lists the link's stops as they are (no listing is dropped for being there twice), and the copied
@@ -393,7 +394,7 @@ test('7. every visit is a stop of the share link: the same place on two days and
   // The spa added to the plan: the copy names it with its day and time, and its stop says who it is for.
   const withSpa = { ...q, stops: `${q.stops},venue:${F.SPA.id}`, days: `${q.days},3`, t: `${q.t},1005`, asks: 'kind:ski_lessons,kind:spa,kid_friendly', ni: 'ski_lessons:f' };
   const c2 = app.tripShareContext(withSpa, 'en', new Date('2026-11-24T18:00:00Z'));
-  assert.ok(c2.lines.some((l) => l.text === `This plan is one schedule for everyone. For the adult who isn’t skiing: ${F.SPA.name} (day 3, 4:45 PM) is listed as a spa.`), JSON.stringify(c2.lines));
+  assert.ok(c2.lines.some((l) => l.text === `This plan is one schedule for everyone. For the adult who isn’t skiing: ${F.SPA.name} (day 3, 4:45 PM) is listed as a spa. Day visits and your date aren’t checked here: book directly with them.`), JSON.stringify(c2.lines));
   assert.deepEqual(c2.actNotes[`venue:${F.SPA.id}`].lines.slice(-1), ['For the adult who isn’t skiing.']);
   // A link without ps= says nothing of it.
   const { ps, ...noPs } = q;
