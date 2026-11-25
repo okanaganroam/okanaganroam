@@ -8539,7 +8539,7 @@ function tripChatStops(list) {
   // (2026-11-24, trip-exclusions.js) What a stop is AT (a winery's restaurant) and, for a tour or an outdoor place, its
   // kinds by its own facts (a guided boat tour), so a message can name a stop by what it is.
   const atPlaces = rows.some((r) => tripExclusions.AT_TYPES.includes(r.type)) ? tripAtPlaces() : null;
-  const kindsOf = (r) => { if (!['tour', 'outdoor'].includes(r.type)) return null; try { const fv = getVenue(r.id); const k = r.type === 'tour' ? venueTourInfo(r.id).kinds : null; return require('./trip-requirements').inferPlannerKinds({ ...fv, ...(Array.isArray(k) ? { tourKinds: k } : {}) }); } catch (e) { return null; } };
+  const kindsOf = (r) => { if (!['tour', 'outdoor', 'indoor'].includes(r.type)) return null; try { return tripChatFactKinds(r.id); } catch (e) { return null; } };
   for (const x of list) {
     const v = byId.get(x.id);
     if (!v || out.some((o) => o.key === x.key)) continue;
@@ -9215,7 +9215,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
   const turnCtx = { args: v.args, locks: { ...(v.soft || {}), ...v.locks }, removed: v.removed, stops, days, short, lang, regionLabels: REGION_LABELS, run, hooks, weakFor: tripChatWeakFor, hasFeature: tripChatHasBadge, unfit: (spec, old) => tripChatUnfit(spec, old, v.args.text),
     // (2026-11-24, trip-exclusions.js) What a place is at, and its kinds by its own facts, for the swap's own checks.
     atTypes: (id) => { try { return chatAt.types(id); } catch (e) { return []; } },
-    isKind: (id, kind) => { try { const fv = getVenue(id); if (!fv) return false; const tk = fv.type === 'tour' ? venueTourInfo(id).kinds : null; return require('./trip-requirements').inferPlannerKinds({ ...fv, ...(Array.isArray(tk) ? { tourKinds: tk } : {}) }).includes(kind); } catch (e) { return false; } },
+    isKind: (id, kind) => { try { return tripChatFactKinds(id).includes(kind); } catch (e) { return false; } },
     // A swap never takes the trip into a town it is not in yet without asking (the towns of the stops on screen and of the stay).
     newTown: (fresh, old) => { if (v.chip || !fresh || !old || !old.region) return false; let reg = null; try { reg = (db.prepare('SELECT region FROM venues WHERE id = ?').get(fresh.id) || {}).region || null; } catch (e) { reg = null; } return !!reg && reg !== old.region && reg !== v.stayTown && !stops.some((s) => !v.removed.includes(s.key) && s.region === reg); }, ageNote: (id, age) => tripChatAgeNote(id, age, lang), sunsetStart: (day, region) => { try { const d = (v.dayDates || [])[day - 1] || null; const sd = d && typeof sunsetDinnerStart === 'function' ? sunsetDinnerStart(d, region) : null; return sd ? sd.startMinutes : null; } catch (e) { return null; } } };
   try { out = planOps.length ? tripChat.planTurn(planOps, turnCtx)
@@ -9363,7 +9363,7 @@ async function runTripChatTurn(v, { staysOn = false, lang = 'en' } = {}) {
         : op.o === 'party_some' ? tripChatPartySomeTurn({ stops: plan ? tripChatStops(tripChat.planStops(plan).map((s) => ({ key: s.key, id: s.id }))) : stops, lang, rewrote: someRewrote, text: someText, alone: !planOps.length, changed: !!plan })
         : op.o === 'swap_to' ? tripChatSwapToTurn(op, { v, stops, lang, run, short })
         : op.o === 'add_to' ? tripChatAddToTurn(op, { v, stops, lang, run, short, alone: !planOps.length && extra.filter((x) => x.o !== 'avoid').length === 1 })
-        : op.o === 'ask' ? tripChatAskTurn(op, { v, stops, lang, runCore, planEvents, staysOn, days, short, plan, timing })
+        : op.o === 'ask' ? tripChatAskTurn(op, { v, stops, lang, runCore, run, planEvents, staysOn, days, short, plan, timing })
           : op.o === 'party' && op.value === 'stay_dates' ? tripChatStayDatesTurn(op, { v, plan, req, stops, lang, staysOn, runCore })
           : op.o === 'party' && op.value === 'rooms' ? tripChatRoomsTurn(op, { v, plan, req, stops, lang, staysOn, runCore })
           : op.o === 'party' && op.value === 'budget' ? tripChatBudgetSetTurn(op, { v, stops, lang, runCore, staysOn, days, short, plan, timing })
@@ -9650,15 +9650,27 @@ function tripChatPartySomeTurn({ stops, lang, rewrote, text, alone, changed }) {
   return { ...out, reply: tripChat.explainReply({ value: 'q_dry' }, { stops, naIds: stops.filter((s) => (s.badges || []).includes('nonalcoholic')).map((s) => s.id) }, L) };
 }
 // "What can the adult who does not ski do?" (2026-11-24, trip-party-split.js): the spa stops on the plan with their day
-// and time, else the nearest listed spa with an offer to add it (the "Add it" the plan's own line makes). A listing
-// being a spa is the only fact used; nothing is added, moved or changed, and the party stays as it is.
-function tripChatSplitAnswer({ v, stops, lang }) {
+// and time; else a listed spa (its town, the straight-line distance, that the date is not checked) and what is listed
+// in the plan's own town that is not skiing, with ONE offer to add a place. Where that place would go is worked out
+// by the add's own rules (nothing is kept from that run), so the answer can say the day and time it would take in the
+// one shared schedule. A listing being what it is, is the only fact used; nothing is added, moved or changed.
+function tripChatSplitAnswer({ v, stops, lang, run = null, short = false }) {
   const shown = stops.filter((s) => !v.removed.includes(s.key));
-  const f = tripPartySplitFacts(shown.map((s) => ({ id: s.id, name: s.name, day: s.day || 0, start: Number.isInteger(s.start) ? s.start : null })), [...new Set(shown.map((s) => s.region).filter(Boolean))]);
-  const a = tripSplit.chatReply(f, lang);
+  // The trip's own town, as the plan's note has it: where it stays and where most of its stops are (a lesson or a
+  // dinner in the next town does not make that town the trip's own: "no spa is listed in <town>" is about the base).
+  const towns = [...new Set([tripChatBaseRegion(shown, v.stayTown), v.stayTown].filter(Boolean))];
+  const f = tripPartySplitFacts(shown.map((s) => ({ id: s.id, name: s.name, day: s.day || 0, start: Number.isInteger(s.start) ? s.start : null })), towns.length ? towns : [...new Set(shown.map((s) => s.region).filter(Boolean))], v.dayDates || []);
+  const o = tripSplit.chatOffer(f);
+  let slot = null;
+  if (o && typeof run === 'function' && !short) {
+    try { const r = tripChatAddToTurn({ o: 'add_to', toId: o.id }, { v, stops, lang, run, short }); if (r && r.plan && r.at) slot = { id: o.id, day: r.at.day, start: r.at.start, days: r.at.days }; } catch (e) { slot = null; }
+  }
+  const a = tripSplit.chatReply(f, lang, slot);
   if (!a.add) return { reply: a.reply };
   const say = tripAddVenue.addTag(a.add.name, a.add.id);
-  return { reply: a.reply, ask: { line: a.ask, say, alt: { id: a.add.id, name: a.add.name, town: (f.nearest && f.nearest.regionLabel) || '' }, choices: [{ kind: 'say', say, label: a.label }] } };
+  let town = '';
+  try { const r = tripChatAddRow(a.add.id); town = r ? REGION_LABELS[r.region] || '' : ''; } catch (e) { town = ''; }
+  return { reply: a.reply, ask: { line: a.ask, say, alt: { id: a.add.id, name: a.add.name, town }, choices: [{ kind: 'say', say, label: a.label }] } };
 }
 // The last change, for "what did you change?": ids only (the page sends them back; the server names them).
 function tripChatDiff(stops, removed, plan, actions, out) {
@@ -9902,7 +9914,7 @@ function tripChatKindRows(kind) {
   if (tripChat.KIND_FACT[kind] && (k.types || []).length) {
     const TR = require('./trip-requirements');
     return db.prepare(`SELECT ${cols} FROM venues WHERE redirect_to IS NULL AND type IN (${k.types.map(() => '?').join(',')})`).all(...k.types)
-      .filter((r) => { try { const fv = getVenue(r.id); const tk = r.type === 'tour' ? venueTourInfo(r.id).kinds : null; return TR.inferPlannerKinds({ ...fv, ...(Array.isArray(tk) ? { tourKinds: tk } : {}) }).includes(tripChat.KIND_FACT[kind]); } catch (e) { return false; } });
+      .filter((r) => { try { return tripChatFactKinds(r.id).includes(tripChat.KIND_FACT[kind]); } catch (e) { return false; } });
   }
   if ((k.words || []).length && (k.types || []).length) {
     const says = (t) => k.words.some((w) => new RegExp(`(?:^|[^a-z])${w.trim().replace(/[^a-z0-9 ]/g, '.')}`).test(t));
@@ -10414,10 +10426,13 @@ function tripChatAddToTurn(op, { v, stops, lang, run, short, alone = true }) {
     if (row.region !== baseRegion && base) lines.push(tripChat.fill(A.where, { town: townOf(row), out: tripChatOutside(base, L), km: kmWords(row) }));
     if (tourLike) lines.push(A.operator);
     if (barred && barred.note) lines.push(barred.note);
+    // (2026-11-24, trip-party-split.js) On a trip where someone is not skiing: a listed spa says what is not checked
+    // (the date; day visits unless its own words say so), and any stop added is in the one shared schedule.
+    try { if (tripSplit.readSplit(String(v.args.text || ''))) lines.push(...tripSplit.addedLines(factKinds.includes('spa') ? tripSpaInfo(row.id) : null, L).filter((x) => !(tourLike && x === tripSplit.T[L].check.trim()))); } catch (e) { /* the reply stands */ }
     if (alone) lines.push(A.nothingElse);
     // (keepHead: the trip keeps its own name on the page. One stop added in the next town does not make "a Peachland
     // vegetarian food getaway" into "an Okanagan outdoors getaway", which is what the planner would call these stops.)
-    return { plan: done.plan, req, changed: [slot], keepHead: true, reply: lines.join(' ') };
+    return { plan: done.plan, req, changed: [slot], keepHead: true, at: { day: hit.day, start: done.fresh.start, days }, reply: lines.join(' ') };
   }
   // ---- no free part of a day long enough: one question, nothing changed ----
   const timeOf = (s) => (Number.isInteger(s.start) ? tripChat.clock(s.start, L) : '');
@@ -10513,7 +10528,7 @@ function tripChatAllergyAnswer(op, { stops, lang, need, recorded = false }) {
   const s = (op.stops || [])[0], name = s ? ((stops.find((x) => x.id === s.id) || s).name || '') : '';
   return { reply: tripAllergy.chatReply('swap', need, lang, { name, offer: !!op.say }), ...(op.say ? { offer: [{ say: op.say }] } : {}) };
 }
-function tripChatAskTurn(op, { v, stops, lang, runCore, planEvents, staysOn = false, days = 1, short = false, plan = null, timing = {} }) {
+function tripChatAskTurn(op, { v, stops, lang, runCore, run = null, planEvents, staysOn = false, days = 1, short = false, plan = null, timing = {} }) {
   const L = lang === 'fr' ? 'fr' : 'en';
   const T = tripChat.T[L];
   if (op.value === 'q_budget') return tripChatBudgetAnswer({ v, stops, lang: L, runCore, staysOn, days, short, plan, timing });
@@ -10523,7 +10538,7 @@ function tripChatAskTurn(op, { v, stops, lang, runCore, planEvents, staysOn = fa
   if (op.value === 'q_showtime') return tripChatShowtimeAnswer(v, stops, L);
   if (op.value === 'q_session') return tripChatSessionAnswer(op, v, L);
   if (['q_evidence', 'q_warning', 'q_allergy', 'q_why_event', 'q_why_count'].includes(op.value)) return tripChatHonestTurn(op, { v, stops, lang: L, runCore, planEvents });
-  if (op.value === 'q_split') return tripChatSplitAnswer({ v, stops, lang: L });
+  if (op.value === 'q_split') return tripChatSplitAnswer({ v, stops, lang: L, run, short });
   if (['q_why_not', 'q_dry', 'q_changed', 'q_couldnt'].includes(op.value)) return tripChatExplainTurn(op, { v, stops, lang: L, runCore });
   const s = (op.stops || [])[0];
   // Round 6 ("why this hotel?"): the place to stay on the plan, from its own listing.
@@ -11119,25 +11134,69 @@ function tripIsSpa(id) {
     return require('./trip-requirements').inferPlannerKinds({ ...v, ...(Array.isArray(k) && v.type === 'indoor' ? { indoorKinds: k } : {}), ...(Array.isArray(k) && v.type === 'tour' ? { tourKinds: k } : {}) }).includes('spa');
   } catch (e) { return false; }
 }
+// What a listed spa's own stored words say: what it calls itself (a spa or a sauna), and whether a visit can be booked
+// by itself (a day spa, sessions, by appointment…). Stored data only.
+function tripSpaInfo(id) {
+  try { const TR = require('./trip-requirements'), v = getVenue(id); return v ? { what: TR.spaWhat(v), dayVisit: TR.spaDayVisit(v) } : { what: 'spa', dayVisit: false }; } catch (e) { return { what: 'spa', dayVisit: false }; }
+}
+// Closed on every one of these dates by the listing's own stored data (a season, a closure, its weekly hours).
+const tripClosedAll = (id, dates) => { const d = (dates || []).filter((x) => /^\d{4}-\d{2}-\d{2}$/.test(String(x || ''))); return d.length > 0 && d.every((x) => tripChatClosedOn(id, x)); };
+// Things that are not skiing, by the kind the listing IS (its owner's kind, or its own name or category line; never
+// a word of its description: a community centre that mentions its library is not a library): named by that kind,
+// never as "relaxing". Not cafés or restaurants: stored data does not say whether one at
+// a ski resort is in the village or up the hill (a mid-mountain hut is listed as a café like any other).
+const TRIP_NOT_SKI_KINDS = ['gallery', 'museum', 'cinema', 'theatre', 'pottery', 'cooking', 'yoga', 'pool', 'skating', 'sleigh_ride'];
+const TRIP_NOT_SKI_FR = { gallery: 'galerie', museum: 'musée', cinema: 'cinéma', theatre: 'théâtre', pottery: 'cours de poterie', cooking: 'cours de cuisine', yoga: 'cours de yoga', pool: 'piscine', skating: 'patinage', sleigh_ride: 'promenade en traîneau' };
+const TRIP_SKI_NAME_RE = /\b(?:ski\w*|snowboard\w*|nordic|cross[- ]country|snowmobil\w*|cat[- ]?ski\w*|heli\w*|biathlon)\b/i;
+function tripNotSkiKind(row) {
+  if (TRIP_SKI_NAME_RE.test(String(row.name || ''))) return null;
+  const TR = require('./trip-requirements');
+  const kinds = tripChatFactKinds(row.id);
+  const fold = (x) => String(x || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+  const own = fold(`${row.name} ${row.cuisine || ''}`);
+  let picked = [];
+  try { picked = row.type === 'indoor' ? (venueIndoorInfo(row.id).kinds || []).flatMap((k) => TR.INDOOR_KIND_PLANNER[k] || []) : []; } catch (e) { picked = []; }
+  const kind = TRIP_NOT_SKI_KINDS.find((k) => kinds.includes(k) && (picked.includes(k) || (TR.KINDS[k] && TR.KINDS[k].test(own))));
+  if (!kind) return null;
+  return { kind, label: TR.LABELS[kind] || kind.replace(/_/g, ' '), labelFr: TRIP_NOT_SKI_FR[kind] || TR.LABELS[kind] || kind };
+}
 // What the listings show for the one who is not skiing. visits: the plan's stops in order [{ id, name, day, start }];
-// regions: the plan's own towns. -> { spaStops, nearest, inTown, town }
-function tripPartySplitFacts(visits, regions) {
-  const spaStops = visits.filter((x) => tripIsSpa(x.id));
-  let nearest = null, inTown = false;
+// regions: the plan's own towns; dates: the trip's dates when it has them.
+// -> { spaStops, nearest, inTown, town, alts }
+//   spaStops  the stops that are a spa by what the listing is (trip-requirements.js spaListing)
+//   nearest   with none on the plan: a listed spa in the plan's own town, else the nearest listed one, with the
+//             straight-line distance from the middle of the plan's stops (km), what it calls itself and whether its
+//             own words say a visit can be booked by itself. Never one its stored data shows closed on every date.
+//   alts      with no spa on the plan or in its town: up to two things listed in the plan's own towns that are not
+//             skiing and not on the plan (nearest first), each by its kind. Never one shown closed on
+//             every date.
+function tripPartySplitFacts(visits, regions, dates = []) {
+  const spaStops = visits.filter((x) => tripIsSpa(x.id)).map((x) => ({ ...x, ...tripSpaInfo(x.id) }));
+  let nearest = null, inTown = false, alts = [];
+  const pts = visits.map((x) => tripCoordsOf(x.id)).filter(Boolean);
+  const centre = pts.length ? { lat: pts.reduce((t, p) => t + p.lat, 0) / pts.length, lng: pts.reduce((t, p) => t + p.lng, 0) / pts.length } : null;
+  const kmOf = (r) => (centre && Number.isFinite(r.latitude) && Number.isFinite(r.longitude) ? tripTransport.kmBetween(centre, { lat: r.latitude, lng: r.longitude }) : null);
+  const byKm = (a, b) => (a.km === null ? 1e9 : a.km) - (b.km === null ? 1e9 : b.km) || a.r.id - b.r.id;
+  const onPlan = new Set(visits.map((x) => x.id));
   if (!spaStops.length && visits.length) {
-    try { nearest = v4NearestOfKind({ days: [{ stops: visits.map((x) => ({ venue: { id: x.id } })) }] }, 'spa'); } catch (e) { nearest = null; }
-    inTown = !!(nearest && regions.includes(nearest.region));
-    // "No spa is listed in <town>" is said only when none is: the nearest listed spa may be in the next town while the
-    // plan's own town lists one further off. That one is then the spa named (listed in town, not in this plan).
+    try {
+      const spas = db.prepare("SELECT id, name, type, region, latitude, longitude FROM venues WHERE redirect_to IS NULL AND type IN ('indoor', 'tour')").all()
+        .filter((r) => REGION_LABELS[r.region] && CATEGORY_SLUGS[r.type] && !onPlan.has(r.id) && tripIsSpa(r.id)).map((r) => ({ r, km: kmOf(r) })).sort(byKm);
+      // "No spa is listed in <town>" is said only when none is: one in the plan's own town is the one named.
+      const pick = [...spas.filter((c) => regions.includes(c.r.region)), ...spas.filter((c) => !regions.includes(c.r.region) && c.km !== null)].slice(0, 8).find((c) => !tripClosedAll(c.r.id, dates));
+      if (pick) { nearest = { id: pick.r.id, name: pick.r.name, region: pick.r.region, regionLabel: REGION_LABELS[pick.r.region] || pick.r.region, km: pick.km, ...tripSpaInfo(pick.r.id) }; inTown = regions.includes(pick.r.region); }
+    } catch (e) { nearest = null; inTown = false; }
     if (!inTown && regions.length) {
       try {
-        const local = db.prepare(`SELECT id, name, region FROM venues WHERE redirect_to IS NULL AND type IN ('indoor', 'outdoor', 'tour', 'sport') AND region IN (${regions.map(() => '?').join(',')}) ORDER BY id`).all(...regions).find((r) => tripIsSpa(r.id));
-        if (local) { nearest = { id: local.id, name: local.name, region: local.region, regionLabel: REGION_LABELS[local.region] || local.region }; inTown = true; }
-      } catch (e) { /* the nearest stands */ }
+        const rows = db.prepare(`SELECT id, name, type, region, cuisine, description, latitude, longitude FROM venues WHERE redirect_to IS NULL AND type IN ('indoor', 'outdoor', 'sport', 'tour') AND region IN (${regions.map(() => '?').join(',')})`).all(...regions)
+          .filter((r) => REGION_LABELS[r.region] && CATEGORY_SLUGS[r.type] && !onPlan.has(r.id)).map((r) => ({ r, km: kmOf(r), k: tripNotSkiKind(r) })).filter((c) => c.k)
+          .sort(byKm);
+        for (const c of rows.slice(0, 8)) { if (alts.length >= 2) break; if (tripClosedAll(c.r.id, dates)) continue; alts.push({ id: c.r.id, name: c.r.name, kind: c.k.kind, label: c.k.label, labelFr: c.k.labelFr }); }
+      } catch (e) { alts = []; }
     }
   }
   const towns = [...new Set(regions.map((r) => REGION_LABELS[r]).filter(Boolean))];
-  return { spaStops, nearest, inTown, town: towns.length ? (towns.length > 1 ? `${towns.slice(0, -1).join(', ')} or ${towns[towns.length - 1]}` : towns[0]) : null };
+  return { spaStops, nearest, inTown, alts, town: towns.length ? (towns.length > 1 ? `${towns.slice(0, -1).join(', ')} or ${towns[towns.length - 1]}` : towns[0]) : null };
 }
 // plan.partySplit: the one note of a plan whose request says someone is not skiing; the spa stops it names carry a
 // short note of their own (row.forSome); the plan's "couldn't fit a spa" line is the note's to say (x.split).
@@ -11159,7 +11218,7 @@ function tripPartySplitApply(plan) {
   }
   const regions = [...new Set(((plan.overview && plan.overview.regions) || []).map((r) => r && r.slug).filter(Boolean))];
   const stopRegions = [...new Set(tripHonestPlan.venueStops(plan).map((x) => x.v.region).filter(Boolean))];
-  const f = tripPartySplitFacts(visits, regions.length ? regions : stopRegions);
+  const f = tripPartySplitFacts(visits, regions.length ? regions : stopRegions, (plan.days || []).map((d) => d && d.date));
   const note = tripSplit.note(sp, f);
   if (!note) return;
   plan.partySplit = note;
@@ -12177,7 +12236,11 @@ function tripShareNotIncluded(list, regions, stopTypes, fr) {
     const label = TR.KINDS[x.kind] ? (TR.LABELS[x.kind] || x.kind.replace(/_/g, ' ')) : V4_TYPE_WORDS[x.kind] || null;
     if (!label || stopTypes.includes(x.kind)) continue;
     let nearest = null;
-    try { let v = x.nearestId ? getVenue(x.nearestId) : null; if (v && v.redirect_to) v = getVenue(v.redirect_to); if (v && REGION_LABELS[v.region]) nearest = { name: v.name, regionLabel: REGION_LABELS[v.region] }; } catch (e) { nearest = null; }
+    try { let v = x.nearestId ? getVenue(x.nearestId) : null; if (v && v.redirect_to) v = getVenue(v.redirect_to); if (v && REGION_LABELS[v.region]) nearest = { name: v.name, regionLabel: REGION_LABELS[v.region] };
+      // (2026-11-24) A link made before the strict spa test may carry a lodge as "the nearest spa": it is named only
+      // while the listing is a spa by its own facts.
+      if (nearest && x.kind === 'spa' && !tripIsSpa(v.id)) nearest = null;
+    } catch (e) { nearest = null; }
     const t = tripNotIncludedText(label, x.reason === 'none_listed', town, nearest, x.kind);
     out.push({ ask: `not_included:${x.kind}`, status: 'unmet', text: fr ? t.textFr : t.text });
   }
@@ -56877,7 +56940,8 @@ function tripShareContext(query, lang = 'en', now = new Date()) {
       const visits = [];
       refs.forEach((ref, i) => { const m = /^venue:([1-9][0-9]*)$/.exec(ref); if (!m) return; let v = getVenue(Number(m[1])); if (v && v.redirect_to) v = getVenue(v.redirect_to); if (!v) return; visits.push({ id: v.id, name: v.name, day: days[i] || 0, start: Number.isInteger((c.times || [])[i]) ? c.times[i] : null, region: v.region, ref }); });
       const towns = (c.niTowns || []).filter((r) => REGION_LABELS[r]);
-      const f = tripPartySplitFacts(visits, towns.length ? towns : [...new Set(visits.map((x) => x.region).filter(Boolean))]);
+      const dayN = Math.max(1, ...visits.map((x) => x.day || 1));
+      const f = tripPartySplitFacts(visits, towns.length ? towns : [...new Set(visits.map((x) => x.region).filter(Boolean))], dayOne ? Array.from({ length: dayN }, (_, i) => addLocalDays(dayOne, i)) : []);
       const note = tripSplit.note(c.split, f);
       if (note) {
         // (The note says the spa line itself: "no spa is listed in …; the nearest is …" is not printed twice.)
@@ -86633,7 +86697,7 @@ module.exports = {
   withTripFrenchUrls,
   tripShareSummary,
   tripShareSearch,
-  tripActivityFacts, tripShareContext, tripShareContextHtml, tripShareNotIncluded, tripShareTour, tripNotIncludedText, tripChatAddWhy,
+  tripActivityFacts, tripPartySplitFacts, tripIsSpa, tripShareContext, tripShareContextHtml, tripShareNotIncluded, tripShareTour, tripNotIncludedText, tripChatAddWhy,
   tripAgeCheck, tripChatSwapBack, tripChatUnfit, tripChatAgeNote, tripListingAges, tripChatNearestOfKind, tripChatPickTagged, tripChatSwapNoFit, tripChatKindRows,
   tripPlanLinkProblems, tripStoredBookingLinks, tripVenueBookingItem, tripBookingLinkBelongs, tripHonestEvidence,
   tripCardPhotoKey,
