@@ -106,6 +106,8 @@ function tripSummaryFacts(plan, fr, ctx) {
   });
   if (left) flags.push({ kind: 'flag', status: 'unmet', ask: 'not_included', text: fr ? left + (left > 1 ? ' demandes non incluses' : ' demande non incluse') : left + (left > 1 ? ' asks not included' : ' ask not included') });
   if (p.partyNote && p.partyNote.text && !said[p.partyNote.text]) flags.push({ kind: 'flag', status: 'partial', ask: 'party_note', text: fr ? 'Note pour une personne du groupe' : 'Note for one of you' });
+  // Who does what (2026-11-24, trip-party-split.js): someone is not skiing, and the plan is one schedule for everyone.
+  if (p.partySplit && p.partySplit.chip) flags.push({ kind: 'flag', status: 'partial', ask: 'party_split', text: (fr && p.partySplit.chipFr) || p.partySplit.chip });
   // The traveller's budget (2026-11-23, trip-budget.js): the limit beside the estimate, in the server's own words
   // (ctx.budget: the chosen stay's). Never a tick: the figures are estimates. A plan with no budget has no such fact.
   if (c.budget && (fr ? c.budget.textFr : c.budget.text) && (fr ? c.budget.textFr : c.budget.text).summary) flags.unshift({ kind: 'flag', status: c.budget.status === 'over' ? 'unmet' : c.budget.status === 'under' || c.budget.status === 'under_priced' ? 'partial' : 'unknown', ask: 'budget', text: (fr ? c.budget.textFr : c.budget.text).summary });

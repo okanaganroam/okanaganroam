@@ -383,6 +383,8 @@ function chatClientSrc(d) {
         // Rooms set in the chat ("make it 3 rooms"): the Rooms field, so every stay link and a later request carry it.
         if (j.party && j.party.rooms > 0) { var rmSet = document.getElementById('t3Rooms'); if (rmSet) { rmSet.value = String(j.party.rooms); rmSet.setAttribute('data-v4-auto', '1'); } touched = true; }
         if (j.party && j.party.adults > 0) { var adEl = document.getElementById('t3Adults'); if (adEl) { adEl.value = String(j.party.adults); adEl.setAttribute('data-v4-auto', '1'); } chat.adults = j.party.adults; }
+        // (2026-11-24) …and the children said with them ("2 adults and 1 child"): the Kids field, for the same reason.
+        if (j.party && typeof j.party.kids === 'number' && j.party.kids >= 0 && j.party.kids <= 12) { var kdEl = document.getElementById('t3Kids'); if (kdEl) { kdEl.value = String(j.party.kids); kdEl.setAttribute('data-v4-auto', '1'); } touched = true; }
         var planOnly = touched;
         if (acts.transport) { chat.transport = acts.transport; touched = true; if (acts.transport === 'rental' || acts.transport === 'no_car') changed.push('gh'); }
         // Events taken out by chat, a wine tour offered as a card, and words added to the request ("no museums").

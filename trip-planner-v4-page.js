@@ -262,12 +262,20 @@ const V4_CLIENT_SRC = String.raw`
   }
   function v4Main(){ return document.getElementById('tripV3'); }
   function v4Leave(){ var m = v4Main(); if (m) m.classList.remove('has-plan', 'v4-editing'); var bar = document.getElementById('v4Bar'); if (bar) bar.parentNode.removeChild(bar); document.body.style.paddingBottom = ''; }
+  // (2026-11-24, trip-visits.js) The same place twice on one day (lunch and dinner at the one restaurant) is two
+  // visits, each with its own schedule row: the nth visit of a place on its day reads that day's nth row for it.
+  function v4Nth(s, key){
+    var m = key ? /^(\d+)-(.+)$/.exec(key) : null;
+    if (!m || !s || !s.venue) return 0;
+    return tripVisitNth((((state.last && state.last.days) || []).filter(function(x){ return x.day === Number(m[1]); })[0] || {}).stops, m[2], s.venue.id);
+  }
   function v4Start(s, key){
-    var rows = (state.last && state.last.schedule) || [], m = key ? /^(\d+)-/.exec(key) : null, day = m ? Number(m[1]) : null;
+    var rows = (state.last && state.last.schedule) || [], m = key ? /^(\d+)-/.exec(key) : null, day = m ? Number(m[1]) : null, skip = v4Nth(s, key);
     for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       if (day != null && r.day !== day) continue;
       var hit = s.event ? r.eventId === s.event.id : (s.venue && r.venueId === s.venue.id);
+      if (hit && !s.event && skip > 0) { skip--; continue; }
       // Round 3: a tour with no departure times of its own shows the planned time and says the departure is booked.
       // (2026-11-24, trip-activity-notes.js: the same words whenever the stop's own note says the time is a suggestion.)
       if (hit && (r.bookDeparture || (r.activity && r.activity.suggested))) return (typeof r.startMinutes === 'number' ? clockLabel(r.startMinutes) + ' · ' : '') + (lang() === 'fr' ? 'départ à réserver' : 'book a departure time');
@@ -278,8 +286,10 @@ const V4_CLIENT_SRC = String.raw`
   }
   // The stop's schedule row (its suggested time and what is known about it: trip-timing.js).
   function v4Row(s, key){
-    var rows = (state.last && state.last.schedule) || [], m = key ? /^(\d+)-/.exec(key) : null, day = m ? Number(m[1]) : null;
-    for (var i = 0; i < rows.length; i++) { var r = rows[i]; if (day != null && r.day !== day) continue; if (s.venue && r.venueId === s.venue.id) return r; }
+    var rows = (state.last && state.last.schedule) || [], m = key ? /^(\d+)-(.+)$/.exec(key) : null, day = m ? Number(m[1]) : null, skip = 0;
+    // (2026-11-24, trip-visits.js) The nth visit of a place on its day reads that day's nth row for it.
+    if (m && s.venue) { var ds = ((((state.last && state.last.days) || []).filter(function(x){ return x.day === day; })[0] || {}).stops) || []; for (var j = 0; j < ds.length; j++) { if (ds[j].daypart === m[2]) break; if (ds[j].venue && ds[j].venue.id === s.venue.id) skip++; } }
+    for (var i = 0; i < rows.length; i++) { var r = rows[i]; if (day != null && r.day !== day) continue; if (s.venue && r.venueId === s.venue.id) { if (skip > 0) { skip--; continue; } return r; } }
     return null;
   }
   // The words for a stop that runs on a schedule we do not hold are trip-timing.js's (the one table, put here as it is).
@@ -300,10 +310,13 @@ const V4_CLIENT_SRC = String.raw`
   // on every load, after every chat turn, and gone when the stop goes. -> { note, lines, sheet, html } | null
   function v4Act(s, key){
     var r = s && s.venue ? v4Row(s, key) : null, a = r && r.activity, fr = lang() === 'fr';
-    if (!a) return null;
-    var note = (fr && a.noteFr) || a.note || '', lines = (fr && a.linesFr) || a.lines || [];
+    // (2026-11-24, trip-party-split.js) A stop that is there for one of the party ("For the adult who isn't skiing.").
+    var some = r && r.forSome ? ((fr && r.forSome.noteFr) || r.forSome.note || '') : '';
+    if (!a && !some) return null;
+    a = a || {};
+    var note = [(fr && a.noteFr) || a.note || '', some].filter(Boolean).join(' '), lines = ((fr && a.linesFr) || a.lines || []).concat(some ? [some] : []);
     var book = a.suggested ? ((fr && a.bookFr) || a.book || '') : '';
-    var sheet = [a.suggested && typeof r.startMinutes === 'number' ? (fr ? 'suggéré à ' : 'suggested ') + clockLabel(r.startMinutes) : '', book, note].filter(Boolean).join(' · ');
+    var sheet = [a.suggested && typeof r.startMinutes === 'number' ? (fr ? 'suggéré à ' : 'suggested ') + clockLabel(r.startMinutes) : '', book, (fr && a.noteFr) || a.note || ''].filter(Boolean).join(' · ');
     return { note: note, lines: lines, sheet: sheet, row: r, html: note ? '<p class="v4-note v4-act-note" data-v4-act="' + esc(note) + '">' + esc(note) + '</p>' : '' };
   }
   // Trip needs (2026-11-23): what this stop's own listing says for a wheelchair user and a dog, from the plan's evidence
@@ -442,8 +455,8 @@ const V4_CLIENT_SRC = String.raw`
   // The planner's own hidden "Add to trip" button, one per stop: "Save" and "Share" read the plan's stops from them, and
   // app.js stores them in My Trip exactly as before.
   function v4TripBtn(v, key){
-    return '<button type="button" class="trip-btn" hidden data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + (key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot="' + esc(key.split('-')[0]) + '"' : '')
-      + ' data-trip-name="' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region || '') + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + ' aria-pressed="false">+</button>';
+    return '<button type="button" class="trip-btn" hidden data-plan-stop' + (key ? ' data-plan-day="' + esc(key.split('-')[0]) + '"' : datedOneDay() ? ' data-plan-day="1"' : '') + (key && v.id && repeatDay(v.id, Number(key.split('-')[0])) ? ' data-trip-slot="' + esc(key.split('-')[0]) + '"' : '') + (key ? ' data-plan-key="' + esc(key) + '"' : '')
+      + ' data-trip-name=""' + esc(v.name) + '" data-trip-query="' + esc(tripQuery(v)) + '" data-trip-region="' + esc(v.region || '') + '"' + (v.id ? ' data-trip-ref="venue:' + esc(v.id) + '"' : '') + ' aria-pressed="false">+</button>';
   }
   function v4Details(s, id){
     var v = s.venue, url = placeUrl(v), fr = lang() === 'fr', out = '';
@@ -621,6 +634,8 @@ const V4_CLIENT_SRC = String.raw`
         var verb = x.kind === 'stay' ? (fr ? ((d && d.chosen.bookingLinks[0]) || {}).shortFr || 'Réserver' : ((d && d.chosen.bookingLinks[0]) || {}).short || 'Book') : t3StepVerb(x, fr);
         return '<li class="' + (mark === 'done' ? 'is-done' : n === next ? 'is-next' : '') + '"><button type="button" class="t3-book-tick" data-t3-bk-toggle="' + n + '" aria-pressed="' + (mark === 'done' ? 'true' : 'false') + '" aria-label="' + esc(vt('iBooked') + (fr ? ' : ' : ': ') + name) + '">' + (mark === 'done' ? '✓' : mark === 'skipped' ? '–' : '') + '</button>'
           + '<span class="v4-check-name">' + esc(name) + (x.kind === 'stay' && x.part && x.sub ? '<small data-v4-book-part="' + esc(x.part) + '">' + esc((fr && x.subFr) || x.sub) + '</small>' : '')
+          // (2026-11-24) A place the plan visits more than once: one row and one booking button, each visit said.
+          + (x.kind === 'venue' && x.id && v4VisitsText(x.id) ? '<small data-v4-visits="' + esc(x.id) + '">' + esc(v4VisitsText(x.id)) + '</small>' : '')
           + '<small class="v4-mine">' + (mark === 'done' ? esc(vt('markedByYou')) + ' · <button type="button" class="t3-book-link" data-t3-bk-toggle="' + n + '" data-v4-unbook>' + esc(vt('undoBooked')) + '</button>' : '<button type="button" class="t3-book-link" data-t3-bk-toggle="' + n + '" data-v4-booked>' + esc(vt('iBooked')) + '</button>') + '</small>'
           + (x.affiliate ? '<small class="v4-aff">' + esc(vt('commission')) + '</small>' : '') + '</span>' + t3StepLinkHtml(x, '', verb, n) + '</li>';
       }).join('') + '</ol>';
@@ -658,7 +673,8 @@ const V4_CLIENT_SRC = String.raw`
     if (reserve.length) html += '<p class="v4-sheet-h4">' + esc(vt('reserve')) + '</p><ol class="v4-check">' + reserve.map(function(r){
       var u = placeUrl(r.s.venue), tel = v4Tel(r.s.venue.phone);
       // Round 1 (2026-11-21): a Call link straight from the sheet when the place lists a phone, else its page.
-      return '<li><span aria-hidden="true" style="text-align:center">☎</span><span class="v4-check-name">' + esc(r.s.venue.name) + '<small>' + esc((r.day ? vt('day') + ' ' + r.day + ' · ' : '') + (tel ? vt('byPhone') + ' · ' + r.s.venue.phone : vt('noOnline'))) + '</small></span>'
+      var many = r.day ? v4VisitsText(r.s.venue.id) : '';
+      return '<li' + (many ? ' data-v4-visits="' + esc(r.s.venue.id) + '"' : '') + '><span aria-hidden="true" style="text-align:center">☎</span><span class="v4-check-name">' + esc(r.s.venue.name) + '<small>' + esc((many ? many + ' · ' : r.day ? vt('day') + ' ' + r.day + ' · ' : '') + (tel ? vt('byPhone') + ' · ' + r.s.venue.phone : vt('noOnline'))) + '</small></span>'
         + (tel ? '<a class="v4-call" href="' + esc(tel) + '" data-track="booking" data-venue-id="' + esc(r.s.venue.id) + '">' + esc(vt('call')) + '</a>' : u ? '<a ' + hrefAttr(u) + '>' + esc(vt('contact')) + '</a>' : '<span></span>') + '</li>';
     }).join('') + '</ol>';
     // Suggested times (2026-11-23): the stops that run on showtimes, classes or sessions we do not hold, each with
@@ -764,6 +780,16 @@ const V4_CLIENT_SRC = String.raw`
   // (2026-11-24) With the arrival time known, the entry's day title and sentences are worded again, each time it is
   // read, from that day's stops on screen and the same start times as the notes under them (v4LateStopNote): the
   // title can never say more than the notes, also after a stop is swapped, added or removed, or the time changes.
+  // Who does what (2026-11-24, trip-party-split.js): the plan's one note, in the page's language. A stop the note names
+  // that has been taken off the page takes its sentence with it (the note then says only that the plan is one schedule).
+  // -> { text, add: { id, name } | null } | null
+  function v4SplitNote(){
+    var ps = (state.last || {}).partySplit, fr = lang() === 'fr';
+    if (!ps || !ps.text) return null;
+    var shown = (ps.stopIds || []).every(function(id){ return v4Visits(id).length > 0; });
+    if (!shown) return { text: (fr && ps.baseFr) || ps.base || '', add: null };
+    return { text: (fr && ps.textFr) || ps.text, add: ps.nearest && ps.nearest.id > 0 ? ps.nearest : null };
+  }
   function v4LateEntry(){ var p = state.last || {}; if (!p.lateArrival) return null; var e = (p.evidence || []).filter(function(e){ return e && e.ask === 'late_arrival'; })[0] || null; if (e && e.win && e.say) { try { v4LateSync(e); } catch (x) { /* the server's wording stands */ } } return e; }
   function v4LateDayStops(day){
     var out = [];
@@ -793,6 +819,8 @@ const V4_CLIENT_SRC = String.raw`
   // stops as they are on screen (never a removed one) and the place to stay the page shows, before anything reads it:
   // each card's note, the summary, Details, Book my trip, the copied text and the share link's own stops then agree.
   ${require('./trip-transport-need').CLIENT_SRC}
+  // Every visit is a stop (2026-11-24, trip-visits.js): the share link's stops, a visit's own time, what counts as removed.
+  ${require('./trip-visits').CLIENT_SRC}
   function v4NoCarStops(){
     var out = [], p = state.last || {};
     if (days().length) days().forEach(function(d){ (d.stops || []).forEach(function(s){ if (s && s.venue && s.venue.id != null && !state.removed[d.day + '-' + s.daypart]) out.push({ id: s.venue.id, name: s.venue.name, day: d.day || 0, latitude: s.venue.latitude, longitude: s.venue.longitude }); }); });
@@ -889,7 +917,7 @@ const V4_CLIENT_SRC = String.raw`
   }
   // A number picked by the room buttons or the chat belongs to that trip: a NEW request starts without it (the Rooms
   // field is not on screen in the chat layout). A number the visitor set in the field itself stays, like Adults.
-  document.addEventListener('change', function(e){ if (e.target && (e.target.id === 't3Rooms' || e.target.id === 't3Adults')) e.target.removeAttribute('data-v4-auto'); });
+  document.addEventListener('change', function(e){ if (e.target && (e.target.id === 't3Rooms' || e.target.id === 't3Adults' || e.target.id === 't3Kids')) e.target.removeAttribute('data-v4-auto'); });
   document.addEventListener('submit', function(e){
     if (!e.target || e.target.id !== 't3Form') return;
     var el = document.getElementById('t3Rooms');
@@ -897,6 +925,8 @@ const V4_CLIENT_SRC = String.raw`
     // The same for a number of adults the chat set ("we are 4 adults" stayed on a later "weekend for two").
     var ad = document.getElementById('t3Adults');
     if (ad && ad.getAttribute('data-v4-auto')) { ad.value = ''; ad.removeAttribute('data-v4-auto'); if (typeof chat !== 'undefined' && chat) chat.adults = null; }
+    var kd = document.getElementById('t3Kids');
+    if (kd && kd.getAttribute('data-v4-auto')) { kd.value = ''; kd.removeAttribute('data-v4-auto'); }
   }, true);
   document.addEventListener('click', function(e){
     var b = e.target && e.target.closest ? e.target.closest('[data-v4-rooms]') : null;
@@ -922,7 +952,9 @@ const V4_CLIENT_SRC = String.raw`
     var said = lang() === 'fr' ? n + (n > 1 ? ' chambres' : ' chambre') : n + (n > 1 ? ' rooms' : ' room');
     setTimeout(function(){ var say = box && box.querySelector('[data-v4-rooms-say]'); if (say) say.textContent = said; }, 150);
   });
-  function v4RemovedIds(){ var ids = {}, p = state.last || {}; (p.days || []).forEach(function(d){ (d.stops || []).forEach(function(s){ if (s.venue && state.removed[d.day + '-' + s.daypart]) ids[s.venue.id] = 1; }); }); Object.keys(v4.gone || {}).forEach(function(id){ if (v4.gone[id]) ids[id] = 1; }); return ids; }
+  // (2026-11-24) A place visited twice with one visit removed is still on the plan: an id is "removed" only when no
+  // visit of it is left (its booking row, its notes and its count in the summary stay for the visit that remains).
+  function v4RemovedIds(){ var ids = tripVisitGone((state.last || {}).days, state.removed); Object.keys(v4.gone || {}).forEach(function(id){ if (v4.gone[id]) ids[id] = 1; }); return ids; }
   function v4CanBook(){ return t3BookSteps().length > 0 || v4ReserveRows([]).length > 0 || !!t3StayData(); }
   function v4OpenSheet(){
     var dlg = document.getElementById('v4Sheet');
@@ -934,14 +966,24 @@ const V4_CLIENT_SRC = String.raw`
     var h = document.getElementById('t3StayHead'); if (h) { try { h.focus({ preventScroll: true }); } catch (e) {} }
   }
   // ---- share: the phone's share sheet with a short summary, else copy ----
+  // (2026-11-24: the planner showed 8 stops and its shared copy 5: the ski hill and the dinner place, planned again on
+  // days 2 and 3, were sent once) Every VISIT on the plan is a stop of the link, in the plan's order: the same place on
+  // another day, or twice in one day, is sent each time with its own day and time (the link's stops= may repeat a
+  // place; nothing new is needed to read it). A stop is counted once by its place in the plan (day and part of day);
+  // one with no such place (an evening out's stops) is counted once by its listing, as before.
   function v4ShareStops(){
-    var seen = {}, out = [], REF = /^(venue|event):[1-9][0-9]*$/;
-    Array.prototype.forEach.call(resultEl.querySelectorAll('.trip-btn[data-plan-stop]'), function(b){
-      var r = b.getAttribute('data-trip-ref');
-      if (!r || !REF.test(r) || seen[r]) return;
-      seen[r] = 1; out.push({ ref: r, day: parseInt(b.getAttribute('data-plan-day'), 10) || 0, name: b.getAttribute('data-trip-name') || '' });
-    });
-    return out.slice(0, TRIP_MAX_STOPS);
+    return tripVisitList(Array.prototype.map.call(resultEl.querySelectorAll('.trip-btn[data-plan-stop]'), function(b){
+      return { ref: b.getAttribute('data-trip-ref'), key: b.getAttribute('data-plan-key') || '', day: parseInt(b.getAttribute('data-plan-day'), 10) || 0, name: b.getAttribute('data-trip-name') || '' };
+    }), TRIP_MAX_STOPS);
+  }
+  // The visits of one place on the plan now, with their day and time: [{ day, start }] in plan order.
+  function v4Visits(id){ return tripVisitsOf((state.last && state.last.days) || [], (state.last && state.last.schedule) || [], state.removed, id); }
+  // "Day 1 6:00 PM · Day 2 6:00 PM" for a place the plan visits more than once ('' for one visit): Book my trip keeps
+  // ONE row and one booking button per place, and says each visit under it.
+  function v4VisitsText(id){
+    var v = v4Visits(id);
+    if (v.length < 2) return '';
+    return v.map(function(x){ return vt('day') + ' ' + x.day + (x.start != null ? ' ' + clockLabel(x.start) : ''); }).join(' · ');
   }
   // A day the planner could not fill (plan.thinDays, 2026-11-24): one short line on that day saying so and why, with at
   // most two one-tap next steps that go through the chat. Never shown as a finished day.
@@ -977,7 +1019,9 @@ const V4_CLIENT_SRC = String.raw`
       } else if (!td && p.datesGiven && !stayNoDates && d0 && isoOk(d0.date)) out += '&start=' + d0.date;
       var times = list.map(function(x){
         var m = /^(venue|event):(\d+)$/.exec(x.ref), id = m ? Number(m[2]) : 0;
-        var r = rows.filter(function(q){ return (!x.day || q.day === x.day || q.day === undefined) && (m && m[1] === 'venue' ? q.venueId === id : q.eventId === id); })[0];
+        // (2026-11-24) A visit's own time: the row of ITS place in the plan (the second visit of a day has its own).
+        var km = x.key ? /^(\d+)-(.+)$/.exec(x.key) : null, ks = km ? ((((p.days || []).filter(function(d){ return d.day === Number(km[1]); })[0] || {}).stops || []).filter(function(q){ return q.daypart === km[2] && q.venue && q.venue.id === id; })[0] || null) : null;
+        var r = ks ? v4Row(ks, x.key) : rows.filter(function(q){ return (!x.day || q.day === x.day || q.day === undefined) && (m && m[1] === 'venue' ? q.venueId === id : q.eventId === id); })[0];
         return r && Number.isInteger(r.startMinutes) && r.startMinutes >= 0 && r.startMinutes < 1440 ? r.startMinutes : '';
       });
       if (times.some(function(t){ return t !== ''; })) out += '&t=' + times.join(',');
@@ -1028,6 +1072,10 @@ const V4_CLIENT_SRC = String.raw`
       // without it the link's asks carry "allergy" alone and the copy names none.
       var alOn = v4ShareAllergyOn();
       if (alOn && /^(?:x\.)?[a-z_,]{2,80}$/.test(alOn.share)) out += '&al=' + alOn.share;
+      // Who does what (2026-11-24, trip-party-split.js): ps=1a.s, one adult is not skiing and wished for a spa. Values
+      // only: the copy words its line again from the link's stops and the listings.
+      var psOn = p.partySplit;
+      if (psOn && psOn.n >= 1 && psOn.n <= 9) out += '&ps=' + psOn.n + (psOn.adult ? 'a' : 'x') + (psOn.spa ? '.s' : '');
       // Someone arrives later (2026-11-23): la=j1d2o (join or leave, how many, which day, own room said). Values only.
       var laOn = v4LateEntry();
       // (2026-11-24) ...and the time of day when known: la=j1d2o.t1400, or a part of the day by its code (la=j1d2o.wa).
@@ -1090,11 +1138,13 @@ const V4_CLIENT_SRC = String.raw`
     var ncT = ((state.last && state.last.evidence) || []).filter(function(e){ return e && e.ask === 'no_car' && e.short; })[0];
     if (ncT && ((state.last && state.last.needs) || []).some(function(n){ return n && n.key === 'no_car'; })) { lines.push(''); lines.push(((fr && ncT.shortFr) || ncT.short) + '.'); }
     // Share suggestions (2026-11-23): what the plan could not include, in its own words (at most three lines).
-    var left = ((state.last && state.last.notIncluded) || []).filter(function(x){ return x && x.text && (x.reason === 'none_listed' || x.reason === 'not_fitted'); }).slice(0, 3);
-    if (left.length) { lines.push(''); left.forEach(function(x){ lines.push((fr && x.textFr) || x.text); }); }
+    var left = ((state.last && state.last.notIncluded) || []).filter(function(x){ return x && x.text && !x.split && (x.reason === 'none_listed' || x.reason === 'not_fitted'); }).slice(0, 3);
+    // (2026-11-24, trip-party-split.js) One schedule for everyone, and what the listings show for the one not skiing.
+    var psT = v4SplitNote();
+    if (left.length || psT) { lines.push(''); left.forEach(function(x){ lines.push((fr && x.textFr) || x.text); }); if (psT) lines.push(psT.text); }
     // (2026-11-24, trip-exclusions.js) A kind of place the traveller ruled out ("Avoiding wineries: …"), in the plan's own words.
     var ruled = ((state.last && state.last.evidence) || []).filter(function(e){ return e && /^no:[a-z_]+$/.test(e.ask || '') && e.text; }).slice(0, 2);
-    if (ruled.length) { if (!left.length) lines.push(''); ruled.forEach(function(e){ lines.push((fr && e.textFr) || e.text); }); }
+    if (ruled.length) { if (!left.length && !psT) lines.push(''); ruled.forEach(function(e){ lines.push((fr && e.textFr) || e.text); }); }
     // (Without the tick, each stop's allergy note is the general one: no allergen is named in the copied text.)
     if (alAnon) lines = lines.map(alHide);
     return lines.join('\n');
@@ -1174,9 +1224,13 @@ const V4_CLIENT_SRC = String.raw`
       + (p.eventAmbiguity ? '<section class="t3-warnings" role="alert"><p>' + esc(fr ? 'Plusieurs événements correspondent à «' + p.eventAmbiguity.phrase + '». Choisissez :' : 'More than one listed event matches “' + p.eventAmbiguity.phrase + '”. Choose one:') + '</p><div class="t3-event-choices">' + p.eventAmbiguity.candidates.map(function(name, i){ var cid = p.eventAmbiguity.candidateIds && p.eventAmbiguity.candidateIds[i]; return Number.isSafeInteger(cid) && cid > 0 ? '<button type="button" class="t3-btn t3-btn-ghost" data-t3-event-choice="' + cid + '">' + esc(name) + '</button>' : ''; }).join('') + '</div></section>' : '')
       // (2026-11-24) The place it names as nearest can be added from here: one small button, which asks the chat for
       // exactly that listing (its id). Only with the chat on the page; the chat does the same when asked in words.
-      + ((p.notIncluded || []).slice(0, 3).map(function(x){ var t = (fr && x.textFr) || x.text; var nid = x.nearest && Number(x.nearest.id) > 0 && typeof chatSend === 'function' && planKinds ? Number(x.nearest.id) : 0; return t ? '<p class="v4-tip v4-picked v4-notinc">' + esc(t) + (nid ? ' <button type="button" class="v4-notinc-add" data-v4-offer="' + esc(String(x.nearest.name || '').replace(/[\[\]]/g, ' ') + ' [add ' + nid + ']') + '" aria-label="' + esc((fr ? 'Ajouter ' : 'Add ') + String(x.nearest.name || '')) + '">' + (fr ? 'L’ajouter' : 'Add it') + '</button>' : '') + '</p>' : ''; }).join(''))
+      // (2026-11-24, trip-party-split.js) …except the spa line the note for the one not skiing says itself, just below.
+      + ((p.notIncluded || []).slice(0, 3).map(function(x){ var t = (fr && x.textFr) || x.text; if (x && x.split && v4SplitNote()) t = ''; var nid = x.nearest && Number(x.nearest.id) > 0 && typeof chatSend === 'function' && planKinds ? Number(x.nearest.id) : 0; return t ? '<p class="v4-tip v4-picked v4-notinc">' + esc(t) + (nid ? ' <button type="button" class="v4-notinc-add" data-v4-offer="' + esc(String(x.nearest.name || '').replace(/[\[\]]/g, ' ') + ' [add ' + nid + ']') + '" aria-label="' + esc((fr ? 'Ajouter ' : 'Add ') + String(x.nearest.name || '')) + '">' + (fr ? 'L’ajouter' : 'Add it') + '</button>' : '') + '</p>' : ''; }).join(''))
       // Group preferences (2026-11-22): one person's need ("one of us doesn't drink") and what the listings say about it.
       + (p.partyNote && ((fr && p.partyNote.textFr) || p.partyNote.text) ? '<p class="v4-tip v4-picked v4-partynote">' + esc((fr && p.partyNote.textFr) || p.partyNote.text) + '</p>' : '')
+      // Who does what (2026-11-24, trip-party-split.js): the plan is one schedule for everyone; what the listings show for
+      // the one who is not skiing, and the nearest listed spa with the same "Add it" as the lines above.
+      + (function(){ var ps = v4SplitNote(); if (!ps) return ''; var nid = ps.add && typeof chatSend === 'function' && planKinds ? Number(ps.add.id) : 0; return '<p class="v4-tip v4-picked v4-partynote v4-split" data-v4-split>' + esc(ps.text) + (nid ? ' <button type="button" class="v4-notinc-add" data-v4-offer="' + esc(String(ps.add.name || '').replace(/[\[\]]/g, ' ') + ' [add ' + nid + ']') + '" aria-label="' + esc((fr ? 'Ajouter ' : 'Add ') + String(ps.add.name || '')) + '">' + (fr ? 'L’ajouter' : 'Add it') + '</button>' : '') + '</p>'; })()
       // Honest plan (2026-11-22): one short line per ask the listings only partly support or cannot show (plan.evidence).
       // A food allergy (2026-11-23): its sentence first, on its own (under Details on a phone, beside the summary item).
       + (function(){ var a = v4AllergyEntry(); return a && a.text ? '<p class="v4-tip v4-picked v4-evidence v4-allergy-line" data-ev-status="unknown">' + esc((fr && a.textFr) || a.text) + '</p>' : ''; })()

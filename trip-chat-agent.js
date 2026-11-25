@@ -126,9 +126,10 @@ const Q_TOPICS = [
   ['q_vegan', /\b(?:vegan|vegetalien\w*|vegetarian|vegetarien\w*|gluten)\b/],
   ['q_view', /\b(?:lake ?view|view|vue)\b/],
 ];
-const Q_VALUES = [...Q_TOPICS.map(([k]) => k), 'q_where', 'q_why_not', 'q_dry', 'q_changed', 'q_couldnt', 'q_evidence', 'q_warning', 'q_allergy', 'q_why_event', 'q_why_count', 'q_budget'];
+const Q_VALUES = [...Q_TOPICS.map(([k]) => k), 'q_where', 'q_why_not', 'q_dry', 'q_changed', 'q_couldnt', 'q_evidence', 'q_warning', 'q_allergy', 'q_why_event', 'q_why_count', 'q_budget', 'q_split'];
 const explain = require('./trip-chat-explain.js');
 const budget = require('./trip-budget.js');
+const split = require('./trip-party-split.js');
 const MEAL_RE = /\b(?:restaurants?|dinner|supper|lunch|souper|diner|dejeuner|meal|repas)\b/;
 const SKI_ASK_RE = /\b(?:lifts?|gondolas?|chairlifts?|ski hill|remontees?|telecabines?)\b/;
 const SKI_NAME_RE = /\b(?:ski|resort|blackcomb|big white|silverstar|silver star|apex mountain|baldy|gondola|sun peaks)\b/;
@@ -169,6 +170,10 @@ function agentRules(t, stops, ctx, h) {
   // (2026-11-23) What the trip costs, or whether it fits the budget: a question, answered from the same estimate as
   // "Book my trip" (trip-budget.js). Never a change to the stay or the stops ("hotel", "budget" and "$600" in it used
   // to be read as "a cheaper hotel").
+  // (2026-11-24, trip-party-split.js) "What can the adult who does not ski do while the other two are skiing?": a
+  // question about one of the party, answered from the listings (it got "Which stop do you mean?"). Never an edit, and
+  // never the size of the party.
+  if (split.chatRead(t)) return { ops: [op('ask', { value: 'q_split' })], cant: null, exact: true, explain: true, access: true };
   if (budget.isBudgetQuestion(t)) return { ops: [op('ask', { value: 'q_budget' })], cant: null, exact: true, explain: true };
   const explained = explainRules(t, h, stops);
   if (explained) return explained;
@@ -276,7 +281,8 @@ function agentRules(t, stops, ctx, h) {
 
   // 4. Who is coming: the number of adults.
   const ad = /\b(\d{1,2}|one|two|three|four|five|six|seven|eight|un|une|deux|trois|quatre|cinq|six|sept|huit)\s+(?:adults?|adultes?|grown[- ]?ups)\b/.exec(t) || /\b(?:we are|we're|there are|there will be|nous sommes|on est|on sera)\s+(\d{1,2}|two|three|four|five|six|seven|eight|deux|trois|quatre|cinq|six|sept|huit)(?:\s+(?:people|of us|personnes|now|maintenant))?\b(?!\s*(?:days?|jours?|nights?|nuits?|kids?|enfants?|year|ans))/.exec(t);
-  if (ad && numOf(ad[1]) && !editVerb) {
+  // (2026-11-24) "one adult doesn't ski", "two of us are beginners": some of the party, never how many are coming.
+  if (ad && numOf(ad[1]) && !editVerb && !split.chatCountIsSubgroup(t, ad.index, ad[0].length)) {
     const ops = [op('party', { value: 'adults', n: Math.min(12, numOf(ad[1])) })];
     return { ops, cant: null, more: true };
   }
