@@ -94,6 +94,7 @@ const tripAccess = require('./trip-access-needs');
 const tripTransport = require('./trip-transport-need');
 const tripAllergy = require('./trip-allergy-need');
 const tripLate = require('./trip-late-arrival');
+const tripSplit = require('./trip-party-split');
 const tripExclusions = require('./trip-exclusions');
 
 const cap = (t) => String(t || '').replace(/^./, (c) => c.toUpperCase());
@@ -764,6 +765,8 @@ function parseShareContext(query) {
   // A later arrival (2026-11-23, trip-late-arrival.js): la=j1d2o -- join or leave, how many, which day of the trip,
   // and whether a room of their own was said. Values only; the copy words it again. No la: as before.
   if (typeof q.la === 'string') { const la = tripLate.fromShare(q.la); if (la) { out.late = la; out.lateQ = q.la; } }
+  // Who does what (2026-11-24, trip-party-split.js): ps=1a.s, one adult does not ski and a spa was wished for. Values only.
+  if (typeof q.ps === 'string') { const ps = tripSplit.fromShare(q.ps); if (ps) { out.split = ps; out.splitQ = q.ps; } }
   return Object.keys(out).length ? out : null;
 }
 // The same parameters back as a query string (validated values only), for the EN / FR switch and the canonical link.
@@ -794,6 +797,7 @@ function shareContextQuery(c) {
   if (c.budgetQ && c.budgetQ.bg) { p.push(`bg=${c.budgetQ.bg}`); if (c.budgetQ.be) p.push(`be=${c.budgetQ.be}`); }
   if (c.allergy && tripAllergy.toShare(c.allergy)) p.push(`al=${tripAllergy.toShare(c.allergy)}`);
   if (c.late && c.lateQ) p.push(`la=${c.lateQ}`);
+  if (c.split && c.splitQ) p.push(`ps=${c.splitQ}`);
   return p.join('&');
 }
 const shareNiToken = (x) => `${x.kind}:${x.reason === 'none_listed' ? 'n' : 'f'}${x.nearestId ? `:${x.nearestId}` : ''}`;

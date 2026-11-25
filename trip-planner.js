@@ -137,22 +137,29 @@ function requestKidAges(text) { return [...new Set(requestKidAgeList(text))].sor
 const PARTY_NUM = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, sept: 7, huit: 8, neuf: 9, dix: 10 };
 const PARTY_N = '(\\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|un|une|deux|trois|quatre|cinq|sept|huit|neuf|dix)';
 function requestParty(text) {
-  const t = String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’']/g, ' ').replace(/-/g, ' ');
+  const t0 = String(text || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’']/g, ' ').replace(/-/g, ' ');
+  // (2026-11-24: "2 adults and a 10-year-old … Two of us are beginners…; one adult does not ski" was a hotel for 1 adult
+  // and 1 kid) Words about SOME of the party ("two of us are beginners", "one of the adults", "the other two") say who
+  // does what, never how many are coming: they are blanked before the party is read (trip-party-split.js).
+  let t = t0; try { t = require('./trip-party-split').stripSubgroups(t0); } catch (e) { t = t0; }
   const num = (x) => { const n = PARTY_NUM[x] || Number(x); return Number.isInteger(n) && n >= 1 && n <= 16 ? n : null; };
   const out = {};
+  // Whether the count that was read is everyone, kids included ("the six of us", "6 people", « nous sommes 6 »).
+  let everyone = false;
   let m = new RegExp(`\\b${PARTY_N} (?:kids|children|child|kid|enfants?|boys|girls(?! (?:trip|weekend|getaway|night))|sons|daughters|toddlers|teens|teenagers|ados)\\b`).exec(t);
   if (m && num(m[1])) out.kids = Math.min(12, num(m[1]));
-  if (out.kids === undefined) { const ages = requestKidAgeList(t); if (ages.length) out.kids = Math.min(12, ages.length); else if (/\b(?:twins|jumeaux|jumelles)\b/.test(t)) out.kids = 2; }
+  if (out.kids === undefined) { const ages = requestKidAgeList(t0); if (ages.length) out.kids = Math.min(12, ages.length); else if (/\b(?:twins|jumeaux|jumelles)\b/.test(t)) out.kids = 2; }
   m = new RegExp(`\\b${PARTY_N} (?:adults|adultes|grown ups|friends|amis|amies|girls(?= (?:trip|weekend|getaway))|girlfriends|guys|ladies|women|men|couples|people|personnes|persons|of us|golfers|skiers|riders|buddies|colleagues|coworkers|collegues|seniors)\\b`).exec(t);
-  if (m && num(m[1])) out.adults = /couples/.test(m[0]) ? num(m[1]) * 2 : num(m[1]);
-  if (out.adults === undefined) { m = new RegExp(`\\b(?:group|party|groupe) (?:of|de) ${PARTY_N}\\b|\\b(?:the|we are|we re|nous sommes|on est) ${PARTY_N}(?: of us)?\\b|\\b(?:for|pour) ${PARTY_N}(?= (?:people|personnes|adults|adultes)|[,.]|$)`).exec(t); const n = m && num(m[1] || m[2] || m[3]); if (n) out.adults = n; }
+  if (m && num(m[1])) { out.adults = /couples/.test(m[0]) ? num(m[1]) * 2 : num(m[1]); everyone = /\b(?:of us|people|personnes)\b/.test(m[0]); }
+  if (out.adults === undefined) { m = new RegExp(`\\b(?:group|party|groupe) (?:of|de) ${PARTY_N}\\b|\\b(?:the|we are|we re|nous sommes|on est) ${PARTY_N}(?: of us)?\\b|\\b(?:for|pour) ${PARTY_N}(?= (?:people|personnes|adults|adultes)|[,.]|$)`).exec(t); const n = m && num(m[1] || m[2] || m[3]); if (n) { out.adults = n; everyone = /\b(?:of us|nous sommes|on est)\b/.test(m[0]); } }
   if (out.adults === undefined) { m = new RegExp(`\\bfamil(?:y|le) (?:of|de) ${PARTY_N}\\b`).exec(t); const n = m && num(m[1]); if (n && n >= 3) { out.adults = 2; if (out.kids === undefined) out.kids = n - 2; } }
   // (2026-11-23: "for one adult and a 15-year-old" was 2 adults (assumed) plus the child) One adult, said in the singular.
   if (out.adults === undefined && /\b(?:one|1|un|une) adulte?\b/.test(t)) out.adults = 1;
   if (out.adults === undefined && /\b(?:a couple(?! of)|couples? (?:trip|getaway|weekend)|for two|pour deux|two of us|just the two|my (?:wife|husband|partner|girlfriend|boyfriend|fiancee?|spouse)|ma (?:femme|blonde|conjointe)|mon (?:mari|chum|conjoint)|anniversary|honeymoon|romantic|romantique|en couple|en amoureux|date night)\b/.test(t)) out.adults = 2;
   if (out.adults === undefined && /\b(?:solo|just me|by myself|on my own|alone|seule?|en solo)\b/.test(t)) out.adults = 1;
   // "the six of us" with kids named is six people in all.
-  if (out.adults !== undefined && out.kids !== undefined && /\bof us\b|\bnous sommes\b|\bon est\b|\bpeople\b|\bpersonnes\b/.test(t) && out.adults > out.kids) out.adults -= out.kids;
+  // (2026-11-24) …only when the count read IS that phrase: "2 adults and a 10-year-old. Two of us are beginners" is 2 adults.
+  if (out.adults !== undefined && out.kids !== undefined && everyone && out.adults > out.kids) out.adults -= out.kids;
   return out;
 }
 // Every age as typed, twins twice ("kids 7 and 7"), youngest first: one per child, for a stay's booking link.
