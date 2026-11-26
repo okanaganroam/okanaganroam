@@ -86355,7 +86355,7 @@ module.exports = {
   cardBadgeChipsHtml, cardBadgeExpected, guideDatesFor, guideBylineHtml,
   // Hotel QR pages (2026-10-20)
   hotelTourRowHtml, weekendBookingPick, renderWeekendBookHop, tourPickContext,
-  hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelTitleLine, hotelPageGroups, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
+  hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelTitleLine, hotelPageGroups, hotelDayTrips, hotelVenueFlags, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
   // IndexNow (2026-10-20, IndexNow)
   INDEXNOW_KEY, INDEXNOW_MAX_URLS, buildSitemapXml, listSitemapUrls, indexNowSubmit, createIndexNowQueue, indexNowQueue, indexNowQueueUrls,
   indexNowEnabled, indexNowIsProductionRequest, indexNowCleanUrls, indexNowVenueUrl, indexNowVenueChanged, indexNowEventChanged,
