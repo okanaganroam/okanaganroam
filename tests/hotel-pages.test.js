@@ -158,3 +158,11 @@ test('ski hill guest pages (2026-11-25): before opening day a note says when the
   assert.doesNotMatch(k, /class="ht-season"/, 'no ski note off the hill');
   assert.ok(k.includes('href="/map?f=in.kelowna"'));
 });
+
+test('hotel groups (2026-11-25): indoor places get their own rainy-day row, apart from outdoor things to do', () => {
+  const venues = [at(1, 'indoor', 0.002), at(2, 'outdoor', 0.002), at(3, 'beach', 0.003)];
+  const groups = app.hotelPageGroups(HOTEL, venues, NO_INFO, new Set());
+  assert.deepEqual(groups.map((g) => g.key), ['do', 'indoor']);
+  assert.deepEqual(groups[0].items.map((x) => x.v.id).sort(), [2, 3]);
+  assert.deepEqual(groups[1].items.map((x) => x.v.id), [1]);
+});
