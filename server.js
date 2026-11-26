@@ -35949,10 +35949,11 @@ function findHotel(slug) {
 const HOTEL_PAGE_GROUPS = [
   { key: 'eat', title: 'Eat and drink nearby', types: ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery'], maxKm: 8, limit: 8 },
   { key: 'wine', title: 'Wineries nearby', types: ['winery'], maxKm: 25, limit: 6 },
-  { key: 'do', title: 'Things to do nearby', types: ['outdoor', 'beach', 'tour', 'sport', 'golf'], maxKm: 20, limit: 8 },
+  { key: 'do', title: 'Beaches, parks and outdoors', types: ['outdoor', 'beach'], maxKm: 25, limit: 8 },
   // Indoor and rainy-day places get their own row (2026-11-25, Dayton): a guest scanning on a cold or wet day should not
   // have to hunt for them among the beaches and trails.
   { key: 'indoor', title: 'Indoors and rainy-day ideas', types: ['indoor'], maxKm: 30, limit: 6 },
+  { key: 'tours', title: 'Tours, sports and golf', types: ['tour', 'sport', 'golf'], maxKm: 25, limit: 6 },
 ];
 const HOTEL_OPENS_SOON_DAYS = 75;
 const HOTEL_QR_UTM = (slug) => `utm_source=${slug}&utm_medium=hotel_qr`;
@@ -36210,6 +36211,88 @@ function handleStaysRoute(req, res, pathname, method, search) {
   res.end(placesToStay.renderStayVenuePage({ venue, regionLabel: REGION_LABELS[region], lang, closeBy: getStayCloseBy(venue) }, staysPageDeps()));
   return true;
 }
+
+// What a guest can filter a hotel page by (2026-11-25, Dayton: "put yourself in their shoes"): the badge a place carries.
+const HOTEL_FILTERS = [
+  { key: 'open', label: 'Open now' },
+  { key: 'hh', label: 'Happy hour' },
+  { key: 'kids', label: 'Kid-friendly' },
+  { key: 'dogs', label: 'Dog-friendly' },
+  { key: 'patio', label: 'Patio' },
+  { key: 'free', label: 'Free' },
+  { key: 'music', label: 'Live music' },
+];
+function hotelVenueFlags(v, open) {
+  const f = [];
+  if (open) f.push('open');
+  if (v.happy_hour) f.push('hh');
+  if (v.kid_friendly) f.push('kids');
+  if (v.dog_friendly) f.push('dogs');
+  if (v.patio) f.push('patio');
+  if (v.free_entry) f.push('free');
+  if (v.live_music) f.push('music');
+  return f;
+}
+// The small badge pills on a card (at most three, most useful first).
+function hotelVenueTags(v) {
+  const t = [];
+  if (v.free_entry) t.push('Free');
+  if (v.kid_friendly) t.push('Kid-friendly');
+  if (v.dog_friendly) t.push('Dog-friendly');
+  if (v.patio) t.push('Patio');
+  if (v.lake_view) t.push('Lake view');
+  if (v.live_music) t.push('Live music');
+  return t.slice(0, 3);
+}
+// A line about each nearby town for the "Day trips" row. Facts only.
+const HOTEL_TOWN_LINES = {
+  osoyoos: 'Canada’s warmest lake, wineries and desert scenery',
+  oliver: 'Wine country, the Golden Mile and the Okanagan River',
+  'okanagan-falls': 'Wineries and breweries around Skaha Lake',
+  kaleden: 'A quiet lakeside village on Skaha Lake',
+  penticton: 'Two lakes, Okanagan and Skaha, with beaches and a busy downtown',
+  naramata: 'Winery-lined benches above Okanagan Lake',
+  summerland: 'Orchards, wineries and lake views',
+  peachland: 'A small lakeside town with a waterfront walk',
+  'west-kelowna': 'Wineries and lake views across the bridge from Kelowna',
+  kelowna: 'The valley’s biggest city: restaurants, wineries, beaches and events',
+  'lake-country': 'Wineries, lakes and rail trail cycling',
+  vernon: 'Three lakes, Silver Star nearby and a lively downtown',
+  coldstream: 'Farms and views south of Vernon',
+  armstrong: 'Farm country, cheese and small-town charm',
+  enderby: 'Quiet river town on the Shuswap River',
+  lumby: 'Valley village with trails and a creek',
+};
+// The nearest other towns with places to see: [{ region, label, km, drive, count }], nearest first.
+function hotelDayTrips(hotel, venues, maxKm = 80, limit = 6) {
+  const sums = new Map();
+  for (const v of venues) {
+    if (!v.region || SKI_RESORT_REGIONS.has(v.region) || !Number.isFinite(v.latitude) || !Number.isFinite(v.longitude)) continue;
+    const s = sums.get(v.region) || { lat: 0, lng: 0, n: 0 };
+    s.lat += v.latitude; s.lng += v.longitude; s.n += 1;
+    sums.set(v.region, s);
+  }
+  const out = [];
+  for (const [region, s] of sums) {
+    if (region === hotel.region || !REGION_LABELS[region] || s.n < 5) continue;
+    const km = venueDistanceKm(hotel, { latitude: s.lat / s.n, longitude: s.lng / s.n });
+    if (km === null || km > maxKm) continue;
+    out.push({ region, label: REGION_LABELS[region], km, drive: Math.round(km * 0.9 + 4), count: s.n });
+  }
+  return out.sort((a, b) => a.km - b.km).slice(0, limit);
+}
+// Guides that feature places in this town or the towns around it, most places first: [{ path, heading }].
+function hotelGuides(regions, limit = 4) {
+  const set = new Set(regions);
+  try {
+    return liveGuides()
+      .map((g) => ({ g, n: g.refs.filter((r) => typeof r === 'string' && set.has(r.split('/')[0])).length }))
+      .filter((x) => x.n >= 2 && x.g.path && x.g.heading)
+      .sort((a, b) => b.n - a.n)
+      .slice(0, limit)
+      .map((x) => ({ path: x.g.path, heading: x.g.heading }));
+  } catch (err) { return []; }
+}
 function renderHotelPage(hotel, now = new Date()) {
   const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all().map(rowToVenue);
   const notOperating = advisoryNotOperatingIds();
@@ -36247,6 +36330,11 @@ function renderHotelPage(hotel, now = new Date()) {
       if (more.length > events.length) { events = more; eventsTitle = `Coming up in ${town}`; }
     }
   } catch (err) { events = []; }
+  const dayTrips = hotelDayTrips(hotel, venues);
+  const guides = hotelGuides([hotel.region, ...dayTrips.slice(0, 4).map((t) => t.region)]);
+  const filterKeys = new Set();
+  for (const g of groups) for (const { v } of g.items) for (const f of hotelVenueFlags(v, info.byId.get(v.id) && info.byId.get(v.id).state === 'open')) filterKeys.add(f);
+  const filters = HOTEL_FILTERS.filter((f) => filterKeys.has(f.key));
   const photosUsed = new Set();
   const card = (v, km) => {
     const status = info.byId.get(v.id);
@@ -36254,8 +36342,15 @@ function renderHotelPage(hotel, now = new Date()) {
     const typeLabel = (CATEGORY_LABELS[v.type] || {}).singular || v.type;
     const photo = venueThumbPhoto(v, photosUsed);
     const tripQuery = `${v.name}, ${town}, Okanagan Valley, BC`;
-    return `<li class="ht-card" data-venue-id="${v.id}">
-      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(typeLabel)}${hotelIsRental(hotel) ? '' : ` · ${escapeHtml(hotelAwayText(km))}`}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : ''}</a>
+    const flags = hotelVenueFlags(v, open);
+    const tags = hotelVenueTags(v);
+    let hh = '';
+    if (v.happy_hour) {
+      const d = venueHappyHourDeals(v.id, now);
+      hh = d && d.en && d.en.length ? happyHourDealsCompact(d.en, 2) : '';
+    }
+    return `<li class="ht-card" data-venue-id="${v.id}" data-flags="${flags.join(' ')}">
+      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(typeLabel)}${hotelIsRental(hotel) ? '' : ` · ${escapeHtml(hotelAwayText(km))}`}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : ''}${hh ? `<span class="ht-hh">Happy hour: ${escapeHtml(hh)}</span>` : ''}${tags.length ? `<span class="ht-tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}</a>
       <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(`Add ${v.name} to trip`)}">${APP_TRIP_LABEL_HTML}</button>
     </li>`;
   };
@@ -36296,8 +36391,26 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-events { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   body.hotel-page .ht-event { display: flex; flex-direction: column; gap: 3px; min-height: 44px; padding: 12px 0; border-radius: 14px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: var(--ref-navy, #1B2B3A); text-decoration: none; }
   body.hotel-page .ht-more { margin: 10px 0 0; }
-  @media (max-width: 860px) { body.hotel-page .ht-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } body.hotel-page .ht-events { grid-template-columns: 1fr; } }
+  body.hotel-page .ht-hh { margin: 4px 12px 0; font-size: 0.8rem; font-weight: 700; color: #7a4b00; }
+  body.hotel-page .ht-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 12px 0; }
+  body.hotel-page .ht-tags span { padding: 1px 7px; border-radius: 999px; background: #f3efe6; font-size: 0.72rem; font-weight: 700; }
+  body.hotel-page .ht-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
+  body.hotel-page .ht-filters button { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--ref-navy, #1B2B3A); background: #fff; color: var(--ref-navy, #1B2B3A); font: inherit; font-weight: 800; cursor: pointer; }
+  body.hotel-page .ht-filters button[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; }
+  body.hotel-page .ht-none { margin: 14px 0 0; font-weight: 700; }
+  body.hotel-page .ht-card[hidden], body.hotel-page .ht-group[hidden], body.hotel-page .ht-none[hidden] { display: none; }
+  body.hotel-page .ht-trips { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  body.hotel-page .ht-trip { display: flex; flex-direction: column; gap: 3px; min-height: 44px; padding: 12px 14px; border-radius: 14px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: var(--ref-navy, #1B2B3A); text-decoration: none; }
+  body.hotel-page .ht-trip .ht-name { padding: 0; }
+  body.hotel-page .ht-trip .ht-meta { padding: 0; }
+  body.hotel-page .ht-guides { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  body.hotel-page .ht-guides a { font-weight: 800; }
+  body.hotel-page .ht-towns { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
+  body.hotel-page .ht-towns a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 999px; background: #fff; border: 1px solid rgba(27,43,58,0.2); font-weight: 700; text-decoration: none; color: var(--ref-navy, #1B2B3A); }
+  @media (max-width: 860px) { body.hotel-page .ht-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } body.hotel-page .ht-events, body.hotel-page .ht-trips { grid-template-columns: 1fr; } }
   @media (max-width: 640px) {
+    body.hotel-page .ht-filters { flex-wrap: nowrap; overflow-x: auto; margin-right: -16px; padding-right: 16px; scrollbar-width: none; }
+    body.hotel-page .ht-filters button { flex: 0 0 auto; }
     body.hotel-page .ht-list { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; margin: 0 -16px; padding: 0 16px 6px; }
     body.hotel-page .ht-card { flex: 0 0 62%; scroll-snap-align: start; }
     body.hotel-page .ht-link img { height: 104px; }
@@ -36311,13 +36424,14 @@ ${renderGolfHeaderHtml()}
   <p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p>
   <h1>${escapeHtml(hotelTitleLine(hotel))}</h1>
   ${hotelSeasonNoteHtml(hotel, now)}
-  <p class="ht-intro">Places to eat and drink, wineries and things to do ${hotelIsRental(hotel) ? `around ${escapeHtml(town)}` : `close to ${escapeHtml(hotel.name)}, closest first`}, with what's open right now. Tap Add to trip to save a place, then Build My Trip turns it into a plan.</p>
+  <p class="ht-intro">Places to eat and drink, wineries and things to do ${hotelIsRental(hotel) ? `around ${escapeHtml(town)}` : `close to ${escapeHtml(hotel.name)}, closest first`}, with what's open right now. Use the buttons to narrow it down, and tap Add to trip to save a place; Build My Trip turns your saved places into a plan.</p>
   <div class="ht-actions">
     <a class="ht-primary" href="/trip" data-ht-cta="trip">Build My Trip</a>
     <a href="/map?f=in.${hotel.region}" data-ht-cta="map">Map of what's open</a>
     <a href="/${hotel.region}/events" data-ht-cta="whats-on">What's On in ${escapeHtml(town)}</a>
   </div>
-  ${groups.map((g) => `<section class="ht-section" aria-labelledby="ht-${g.key}">
+  ${filters.length ? `<div class="ht-filters" role="group" aria-label="Show only"><button type="button" data-ht-filter="all" aria-pressed="true">Everything</button>${filters.map((f) => `<button type="button" data-ht-filter="${f.key}" aria-pressed="false">${escapeHtml(f.label)}</button>`).join('')}</div><p class="ht-none" id="htNone" hidden>Nothing nearby matches that right now. Try another filter.</p>` : ''}
+  ${groups.map((g) => `<section class="ht-section ht-group" aria-labelledby="ht-${g.key}">
     <h2 id="ht-${g.key}">${escapeHtml(g.title)}</h2>
     <ul class="ht-list">${g.items.map(({ v, km }) => card(v, km)).join('')}</ul>
   </section>`).join('\n  ')}
@@ -36327,21 +36441,55 @@ ${renderGolfHeaderHtml()}
     <p class="ht-more"><a href="/${hotel.region}/events">All events in ${escapeHtml(town)}</a></p>
   </section>` : ''}
   ${hotelTourRowHtml(hotel, venues, closedIds, now)}
+  ${dayTrips.length ? `<section class="ht-section" aria-labelledby="ht-trips">
+    <h2 id="ht-trips">Day trips from ${escapeHtml(town)}</h2>
+    <ul class="ht-trips">${dayTrips.map((t) => `<li><a class="ht-trip" href="/${t.region}" data-ht-cta="day-trip"><span class="ht-meta">About ${t.drive} min drive</span><span class="ht-name">${escapeHtml(t.label)}</span><span>${escapeHtml(HOTEL_TOWN_LINES[t.region] || '')}${HOTEL_TOWN_LINES[t.region] ? ' \u00b7 ' : ''}${t.count} places</span></a></li>`).join('')}</ul>
+  </section>` : ''}
+  ${guides.length ? `<section class="ht-section" aria-labelledby="ht-guides">
+    <h2 id="ht-guides">Our guides for this part of the valley</h2>
+    <ul class="ht-guides">${guides.map((g) => `<li><a href="${escapeHtml(g.path)}" data-ht-cta="guide">${escapeHtml(g.heading)}</a></li>`).join('')}</ul>
+    <p class="ht-more"><a href="/guides" data-ht-cta="all-guides">All our guides</a></p>
+  </section>` : ''}
   <section class="ht-section ht-valley" aria-labelledby="ht-valley">
-    <h2 id="ht-valley">Heading somewhere else in the Okanagan?</h2>
-    <p class="ht-intro">Okanagan Roam covers the whole valley, from Vernon down to Osoyoos. Use it for the rest of your trip, free, with nothing to sign up for.</p>
+    <h2 id="ht-valley">The whole Okanagan, in your pocket</h2>
+    <p class="ht-intro">Okanagan Roam covers the valley from Osoyoos up to Vernon and beyond, with the same open-now times, events and trip planner everywhere. It is free and there is nothing to sign up for. Save this page to your home screen and use it for the rest of your trip.</p>
     <div class="ht-actions">
       <a class="ht-primary" href="/trip" data-ht-cta="valley-trip">Plan a trip anywhere in the Okanagan</a>
       <a href="/map" data-ht-cta="valley-map">Roam Now: what's open near me</a>
-      <a href="/destinations" data-ht-cta="valley-destinations">Browse every town</a>
       <a href="/whats-on" data-ht-cta="valley-whats-on">What's On, valley-wide</a>
+      <a href="/map?show=happy-hour" data-ht-cta="valley-hh">Happy hours on the map</a>
+      <a href="/hidden-gems" data-ht-cta="valley-gems">Hidden gems</a>
+      <a href="/destinations" data-ht-cta="valley-destinations">Browse every town</a>
     </div>
+    <ul class="ht-towns" aria-label="Browse by town">${Object.keys(REGION_LABELS).filter((r) => !SKI_RESORT_REGIONS.has(r)).map((r) => `<li><a href="/${r}" data-ht-cta="town">${escapeHtml(REGION_LABELS[r])}</a></li>`).join('')}</ul>
   </section>
   </div>
   </main>
   ${renderHomeFooterHTML(true)}
   ${GOLF_APP_SCRIPT_TAG}
 <script>
+(function(){
+  var bar = document.querySelector('.ht-filters');
+  if (!bar) return;
+  var none = document.getElementById('htNone');
+  bar.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('button[data-ht-filter]') : null;
+    if (!b) return;
+    var key = b.getAttribute('data-ht-filter');
+    Array.prototype.forEach.call(bar.querySelectorAll('button'), function(x){ x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    var shown = 0;
+    Array.prototype.forEach.call(document.querySelectorAll('.ht-group'), function(sec){
+      var n = 0;
+      Array.prototype.forEach.call(sec.querySelectorAll('.ht-card'), function(c){
+        var ok = key === 'all' || (' ' + (c.getAttribute('data-flags') || '') + ' ').indexOf(' ' + key + ' ') !== -1;
+        c.hidden = !ok; if (ok) n++;
+      });
+      sec.hidden = n === 0; shown += n;
+    });
+    if (none) none.hidden = shown !== 0;
+    if (window.trackEvent) window.trackEvent('hotel_page_click', { hotel: document.body.getAttribute('data-hotel'), link_url: null, link_type: 'filter_' + key });
+  });
+})();
 document.addEventListener('click', function(e){
   if (!window.trackEvent || !e.target.closest) return;
   var hotel = document.body.getAttribute('data-hotel');
@@ -86207,7 +86355,7 @@ module.exports = {
   cardBadgeChipsHtml, cardBadgeExpected, guideDatesFor, guideBylineHtml,
   // Hotel QR pages (2026-10-20)
   hotelTourRowHtml, weekendBookingPick, renderWeekendBookHop, tourPickContext,
-  hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelTitleLine, hotelPageGroups, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
+  hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelTitleLine, hotelPageGroups, hotelDayTrips, hotelVenueFlags, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
   // IndexNow (2026-10-20, IndexNow)
   INDEXNOW_KEY, INDEXNOW_MAX_URLS, buildSitemapXml, listSitemapUrls, indexNowSubmit, createIndexNowQueue, indexNowQueue, indexNowQueueUrls,
   indexNowEnabled, indexNowIsProductionRequest, indexNowCleanUrls, indexNowVenueUrl, indexNowVenueChanged, indexNowEventChanged,
