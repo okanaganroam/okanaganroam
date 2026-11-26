@@ -171,7 +171,7 @@ test('hotel page (2026-11-25): filter flags, day trips from the nearest other to
   assert.deepEqual(app.hotelVenueFlags({ kid_friendly: true, dog_friendly: true, patio: true, happy_hour: true }, true), ['open', 'hh', 'kids', 'dogs', 'patio']);
   assert.deepEqual(app.hotelVenueFlags({}, false), []);
   const towns = (region, lat, n) => Array.from({ length: n }, (_, i) => ({ region, latitude: lat + i * 0.0001, longitude: HOTEL.longitude }));
-  const venues = [...towns('kelowna', HOTEL.latitude, 6), ...towns('vernon', HOTEL.latitude + 0.2, 6), ...towns('oliver', HOTEL.latitude + 0.6, 6), ...towns('penticton', HOTEL.latitude + 0.1, 2)];
+  const venues = [...towns('kelowna', HOTEL.latitude, 6), ...towns('vernon', HOTEL.latitude + 0.2, 6), ...towns('oliver', HOTEL.latitude + 0.9, 6), ...towns('penticton', HOTEL.latitude + 0.1, 2)];
   const trips = app.hotelDayTrips(HOTEL, venues, 80);
   assert.deepEqual(trips.map((t) => t.region), ['vernon'], 'own town, a town with under 5 places and a town past 80 km are left out');
   assert.ok(trips[0].drive > 0);
