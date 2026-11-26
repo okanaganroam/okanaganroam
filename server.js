@@ -35953,7 +35953,7 @@ const HOTEL_PAGE_GROUPS = [
   // Indoor and rainy-day places get their own row (2026-11-25, Dayton): a guest scanning on a cold or wet day should not
   // have to hunt for them among the beaches and trails.
   { key: 'indoor', title: 'Indoors and rainy-day ideas', types: ['indoor'], maxKm: 30, limit: 6 },
-  { key: 'tours', title: 'Tours, sports and golf', types: ['tour', 'sport', 'golf'], maxKm: 25, limit: 6 },
+  { key: 'activities', title: 'Tours, sports and golf', types: ['tour', 'sport', 'golf'], maxKm: 25, limit: 6 },
 ];
 const HOTEL_OPENS_SOON_DAYS = 75;
 const HOTEL_QR_UTM = (slug) => `utm_source=${slug}&utm_medium=hotel_qr`;
@@ -84567,6 +84567,14 @@ const server = http.createServer(async (req, res) => {
       const cu = method === 'GET' || method === 'HEAD' ? /^(\/fr)?\/(?:contact-us|contactus|contact_us|contact-us\.html)\/?$/i.exec(pathname) : null;
       if (cu) {
         res.writeHead(301, { Location: `${cu[1] || ''}/contact${parsed.search || ''}`, 'Cache-Control': 'public, max-age=86400' });
+        return res.end();
+      }
+    }
+    // The same for the About page (2026-11-26, dashboard: 11 visitors tried /about-us).
+    {
+      const au = method === 'GET' || method === 'HEAD' ? /^(\/fr)?\/(?:about-us|aboutus|about_us|about-us\.html)\/?$/i.exec(pathname) : null;
+      if (au) {
+        res.writeHead(301, { Location: `${au[1] || ''}/about${parsed.search || ''}`, 'Cache-Control': 'public, max-age=86400' });
         return res.end();
       }
     }
