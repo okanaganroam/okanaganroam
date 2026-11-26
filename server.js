@@ -35949,7 +35949,10 @@ function findHotel(slug) {
 const HOTEL_PAGE_GROUPS = [
   { key: 'eat', title: 'Eat and drink nearby', types: ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery'], maxKm: 8, limit: 8 },
   { key: 'wine', title: 'Wineries nearby', types: ['winery'], maxKm: 25, limit: 6 },
-  { key: 'do', title: 'Things to do nearby', types: ['outdoor', 'indoor', 'beach', 'tour', 'sport', 'golf'], maxKm: 20, limit: 8 },
+  { key: 'do', title: 'Things to do nearby', types: ['outdoor', 'beach', 'tour', 'sport', 'golf'], maxKm: 20, limit: 8 },
+  // Indoor and rainy-day places get their own row (2026-11-25, Dayton): a guest scanning on a cold or wet day should not
+  // have to hunt for them among the beaches and trails.
+  { key: 'indoor', title: 'Indoors and rainy-day ideas', types: ['indoor'], maxKm: 30, limit: 6 },
 ];
 const HOTEL_OPENS_SOON_DAYS = 75;
 const HOTEL_QR_UTM = (slug) => `utm_source=${slug}&utm_medium=hotel_qr`;
@@ -36232,7 +36235,18 @@ function renderHotelPage(hotel, now = new Date()) {
   const weekEnd = new Date(`${today}T12:00:00Z`); weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
   const weekEndStr = weekEnd.toISOString().slice(0, 10);
   let events = [];
-  try { events = regionEventsStillOn(listUpcomingEventsForRegion(hotel.region, { limit: 30, now }), now).filter((e) => e.nextDate && e.nextDate <= weekEndStr).slice(0, 6); } catch (err) { events = []; }
+  // This week's events (up to 8). In a quiet week, the next three weeks instead, so the section is never empty or thin.
+  let eventsTitle = `This week in ${town}`;
+  try {
+    const upcoming = regionEventsStillOn(listUpcomingEventsForRegion(hotel.region, { limit: 40, now }), now).filter((e) => e.nextDate);
+    events = upcoming.filter((e) => e.nextDate <= weekEndStr).slice(0, 8);
+    if (events.length < 3) {
+      const farEnd = new Date(`${today}T12:00:00Z`); farEnd.setUTCDate(farEnd.getUTCDate() + 21);
+      const farStr = farEnd.toISOString().slice(0, 10);
+      const more = upcoming.filter((e) => e.nextDate <= farStr).slice(0, 8);
+      if (more.length > events.length) { events = more; eventsTitle = `Coming up in ${town}`; }
+    }
+  } catch (err) { events = []; }
   const photosUsed = new Set();
   const card = (v, km) => {
     const status = info.byId.get(v.id);
@@ -36308,11 +36322,21 @@ ${renderGolfHeaderHtml()}
     <ul class="ht-list">${g.items.map(({ v, km }) => card(v, km)).join('')}</ul>
   </section>`).join('\n  ')}
   ${events.length ? `<section class="ht-section" aria-labelledby="ht-events">
-    <h2 id="ht-events">This week in ${escapeHtml(town)}</h2>
+    <h2 id="ht-events">${escapeHtml(eventsTitle)}</h2>
     <ul class="ht-events">${events.map(eventItem).join('')}</ul>
     <p class="ht-more"><a href="/${hotel.region}/events">All events in ${escapeHtml(town)}</a></p>
   </section>` : ''}
   ${hotelTourRowHtml(hotel, venues, closedIds, now)}
+  <section class="ht-section ht-valley" aria-labelledby="ht-valley">
+    <h2 id="ht-valley">Heading somewhere else in the Okanagan?</h2>
+    <p class="ht-intro">Okanagan Roam covers the whole valley, from Vernon down to Osoyoos. Use it for the rest of your trip, free, with nothing to sign up for.</p>
+    <div class="ht-actions">
+      <a class="ht-primary" href="/trip" data-ht-cta="valley-trip">Plan a trip anywhere in the Okanagan</a>
+      <a href="/map" data-ht-cta="valley-map">Roam Now: what's open near me</a>
+      <a href="/destinations" data-ht-cta="valley-destinations">Browse every town</a>
+      <a href="/whats-on" data-ht-cta="valley-whats-on">What's On, valley-wide</a>
+    </div>
+  </section>
   </div>
   </main>
   ${renderHomeFooterHTML(true)}
@@ -36365,9 +36389,12 @@ function renderHotelCard(hotel) {
   .hc-url { font-size: 11px; opacity: 0.75; overflow-wrap: normal; word-break: normal; }
   .hc-list { list-style: none; margin: 12px auto 0; padding: 0; font-size: 12px; line-height: 1.65; font-weight: 700; display: inline-block; text-align: left; }
   .hc-list li::before { content: '\\2713'; color: #A6782F; margin-right: 6px; }
+  .hc-valley { font-size: 11.5px; line-height: 1.35; margin: 9px 0 0; opacity: 0.9; }
   .hc-has-logo { padding-bottom: 0.22in; }
   .hc-has-logo .hc-qr { width: 1.7in; height: 1.7in; }
-  .hc-has-logo .hc-list { margin-top: 8px; line-height: 1.5; }
+  .hc-has-logo .hc-list { margin-top: 6px; line-height: 1.4; font-size: 11.5px; }
+  .hc-has-logo .hc-sub { margin-bottom: 8px; }
+  .hc-has-logo .hc-valley { margin-top: 6px; font-size: 11px; }
   .hc-has-logo .hc-scan { margin-top: 8px; }
   .hc-foot-logo { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; padding-top: 8px; }
   .hc-logo { display: block; max-height: 0.38in; max-width: 1.8in; object-fit: contain; }
@@ -36381,11 +36408,12 @@ function renderHotelCard(hotel) {
   <div class="hc-brand">OKANAGAN <span>ROAM</span></div>
   <div class="hc-rule"></div>
   <h1 class="hc-h${hotelTitleLine(hotel).length > 48 ? ' hc-h-xl' : hotelTitleLine(hotel).length > 40 ? ' hc-h-l' : ''}">${escapeHtml(hotelTitleLine(hotel))}</h1>
-  <p class="hc-sub">${hotelIsRental(hotel) ? 'Places to eat, things to do and this week\'s events, updated live.' : `Restaurants, wineries and things to do around ${escapeHtml(town)}, with what's open right now and this week's events.`}</p>
+  <p class="hc-sub">${hotelIsRental(hotel) ? 'Places to eat, things to do and this week\'s events, updated live.' : `Everything near ${escapeHtml(hotel.name)} in ${escapeHtml(town)}, updated live.`}</p>
   <div class="hc-qr" id="hcQr" data-target="${escapeHtml(target)}" role="img" aria-label="QR code for ${escapeHtml(shown)}"></div>
   <div class="hc-scan">Scan with your phone camera</div>
   <div class="hc-url">okanaganroam.com/near/<wbr>${escapeHtml(hotel.slug)}</div>
-  <ul class="hc-list"><li>${hotelIsRental(hotel) ? 'Map of what\'s near you' : "What's open right now"}</li><li>Restaurants, wineries &amp; things to do</li><li>Events this week · Build My Trip</li></ul>
+  <ul class="hc-list"><li>${hotelIsRental(hotel) ? 'Map of what\'s near you' : "What's open right now"}</li><li>Events happening this week</li><li>Restaurants, wineries &amp; beaches</li><li>Indoor &amp; rainy-day ideas</li></ul>
+  <p class="hc-valley">Free trip planner for the <strong>whole Okanagan</strong>: tap Build My Trip on the page.</p>
   <div class="hc-foot${hotelLogo(hotel) ? ' hc-foot-logo' : ''}">${hotelLogo(hotel) ? `<span>Compliments of</span><img class="hc-logo" src="${escapeHtml(hotelLogo(hotel))}" alt="${escapeHtml(hotel.name)}">` : `Compliments of ${escapeHtml(hotel.name)}`}</div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
