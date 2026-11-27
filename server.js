@@ -35949,11 +35949,11 @@ function findHotel(slug) {
 const HOTEL_PAGE_GROUPS = [
   { key: 'eat', title: 'Eat and drink nearby', types: ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery'], maxKm: 8, limit: 8 },
   { key: 'wine', title: 'Wineries nearby', types: ['winery'], maxKm: 25, limit: 6 },
-  { key: 'do', title: 'Beaches, parks and outdoors', types: ['outdoor', 'beach'], maxKm: 25, limit: 8 },
+  { key: 'do', title: 'Beaches, parks and outdoors', types: ['outdoor', 'beach'], maxKm: 25, limit: 8, skipName: /\b(campground|camping|campsite|rv (park|resort|site))\b/i },
   // Indoor and rainy-day places get their own row (2026-11-25, Dayton): a guest scanning on a cold or wet day should not
   // have to hunt for them among the beaches and trails.
   { key: 'indoor', title: 'Indoors and rainy-day ideas', types: ['indoor'], maxKm: 30, limit: 6 },
-  { key: 'activities', title: 'Tours, sports and golf', types: ['tour', 'sport', 'golf'], maxKm: 25, limit: 6 },
+  { key: 'activities', title: 'Tours, sports and golf', types: ['tour', 'sport', 'golf'], maxKm: 25, limit: 6, firstTypes: ['tour'] },
 ];
 const HOTEL_OPENS_SOON_DAYS = 75;
 const HOTEL_QR_UTM = (slug) => `utm_source=${slug}&utm_medium=hotel_qr`;
@@ -35966,13 +35966,15 @@ function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map()) 
   const used = new Set();
   return HOTEL_PAGE_GROUPS.map((g) => {
     const rows = venues
-      .filter((v) => g.types.includes(v.type) && v.slug && CATEGORY_SLUGS[v.type] && (!closedIds.has(v.id) || opensSoon.has(v.id)))
+      .filter((v) => g.types.includes(v.type) && v.slug && CATEGORY_SLUGS[v.type] && (!closedIds.has(v.id) || opensSoon.has(v.id)) && !(g.skipName && g.skipName.test(v.name || '')))
       .map((v) => ({ v, km: venueDistanceKm(hotel, v) }))
       .filter((x) => x.km !== null && x.km <= g.maxKm)
       .sort((a, b) => a.km - b.km);
     const isOpen = (x) => info.openIds.has(x.v.id);
     const near = rows.slice(0, g.limit * 3);
-    const picked = [...near.filter(isOpen), ...near.filter((x) => !isOpen(x))].slice(0, g.limit)
+    // A guest looking for something to book wants the tours first (2026-11-26): they lead their row, then open places, then the rest.
+    const isFirst = (x) => !!(g.firstTypes && g.firstTypes.includes(x.v.type));
+    const picked = [...near.filter(isFirst), ...near.filter((x) => !isFirst(x) && isOpen(x)), ...near.filter((x) => !isFirst(x) && !isOpen(x))].slice(0, g.limit)
       .filter((x) => !used.has(x.v.id) && used.add(x.v.id));
     return { ...g, items: picked };
   }).filter((g) => g.items.length);
@@ -36332,6 +36334,7 @@ function renderHotelPage(hotel, now = new Date()) {
       if (more.length > events.length) { events = more; eventsTitle = `Coming up in ${town}`; }
     }
   } catch (err) { events = []; }
+  const tourRow = hotelTourRowHtml(hotel, venues, closedIds, now);
   const dayTrips = hotelDayTrips(hotel, venues);
   const guides = hotelGuides([hotel.region, ...dayTrips.slice(0, 4).map((t) => t.region)]);
   const filterKeys = new Set();
@@ -36439,13 +36442,13 @@ ${renderGolfHeaderHtml()}
   ${groups.map((g) => `<section class="ht-section ht-group" aria-labelledby="ht-${g.key}">
     <h2 id="ht-${g.key}">${escapeHtml(g.title)}</h2>
     <ul class="ht-list">${g.items.map(({ v, km }) => card(v, km)).join('')}</ul>
-  </section>`).join('\n  ')}
+  </section>${g.key === 'activities' ? tourRow : ''}`).join('\n  ')}
+  ${groups.some((g) => g.key === 'activities') ? '' : tourRow}
   ${events.length ? `<section class="ht-section" aria-labelledby="ht-events">
     <h2 id="ht-events">${escapeHtml(eventsTitle)}</h2>
     <ul class="ht-events">${events.map(eventItem).join('')}</ul>
     <p class="ht-more"><a href="/${hotel.region}/events">All events in ${escapeHtml(town)}</a></p>
   </section>` : ''}
-  ${hotelTourRowHtml(hotel, venues, closedIds, now)}
   ${dayTrips.length ? `<section class="ht-section" aria-labelledby="ht-trips">
     <h2 id="ht-trips">Day trips from ${escapeHtml(town)}</h2>
     <ul class="ht-trips">${dayTrips.map((t) => `<li><a class="ht-trip" href="/${t.region}" data-ht-cta="day-trip"><span class="ht-meta">About ${t.drive} min drive</span><span class="ht-name">${escapeHtml(t.label)}</span><span>${escapeHtml(HOTEL_TOWN_LINES[t.region] || '')}${HOTEL_TOWN_LINES[t.region] ? ' \u00b7 ' : ''}${t.count} places</span></a></li>`).join('')}</ul>
