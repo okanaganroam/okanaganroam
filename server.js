@@ -36539,6 +36539,7 @@ function renderHotelCard(hotel) {
   .hc-qr { width: 2.2in; height: 2.2in; background: #fff; border-radius: 10px; }
   .hc-qr svg { width: 100%; height: 100%; display: block; }
   .hc-scan { font-weight: 800; font-size: 14px; margin: 12px 0 2px; }
+  .hc-free { display: block; font-weight: 600; font-size: 12px; opacity: 0.85; margin-top: 1px; }
   .hc-url { font-size: 12.5px; font-weight: 700; opacity: 0.9; overflow-wrap: normal; word-break: normal; }
   .hc-list { list-style: none; margin: 12px auto 0; padding: 0; font-size: 12px; line-height: 1.65; font-weight: 700; display: inline-block; text-align: left; }
   .hc-list li::before { content: '\\2713'; color: #A6782F; margin-right: 6px; }
@@ -36565,7 +36566,7 @@ function renderHotelCard(hotel) {
   <h1 class="hc-h${hotelTitleLine(hotel).length > 48 ? ' hc-h-xl' : hotelTitleLine(hotel).length > 40 ? ' hc-h-l' : ''}">${escapeHtml(hotelTitleLine(hotel))}</h1>
   <p class="hc-sub">${hotelIsRental(hotel) ? 'What\'s open, what\'s on and where to go, across the whole Okanagan, updated live.' : `What\'s open near ${escapeHtml(hotel.name)} right now, plus events and ideas valley-wide, updated live.`}</p>
   <div class="hc-qr" id="hcQr" data-target="${escapeHtml(target)}" role="img" aria-label="QR code for ${escapeHtml(shown)}"></div>
-  <div class="hc-scan">Scan with your phone camera</div>
+  <div class="hc-scan">Scan with your phone camera <span class="hc-free">Free, no app.</span></div>
   <div class="hc-url">okanaganroam.com/near/<wbr>${escapeHtml(hotel.slug)}</div>
   <ul class="hc-list"><li>${hotelIsRental(hotel) ? 'Map of what\'s near you' : "What's open near you right now"}</li><li>Happy hours &amp; drink deals</li><li>Events, indoor &amp; rainy-day ideas</li><li>Wineries, beaches &amp; day trips, valley-wide</li><li>Free <strong>Build My Trip</strong> planner</li></ul>
   <div class="hc-foot${hotelLogo(hotel) ? ' hc-foot-logo' : ''}">${hotelLogo(hotel) ? `<span>Compliments of</span><img class="hc-logo" src="${escapeHtml(hotelLogo(hotel))}" alt="${escapeHtml(hotel.name)}">` : `Compliments of ${escapeHtml(hotel.name)}`}</div>
