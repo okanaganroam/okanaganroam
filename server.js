@@ -35955,6 +35955,9 @@ const HOTEL_PAGE_GROUPS = [
   { key: 'indoor', title: 'Indoors and rainy-day ideas', types: ['indoor'], maxKm: 30, limit: 6 },
   { key: 'activities', title: 'Tours, sports and golf', types: ['tour', 'sport', 'golf'], maxKm: 25, limit: 6, firstTypes: ['tour'] },
 ];
+// Season-long fixture series (junior hockey "Home Games 2026-27", university "Season" rows) belong on the events page for
+// fans, not on a hotel guest's short "this week" list (2026-11-26).
+const HOTEL_EVENT_SKIP = /\b(home games|schedule 20\d\d|20\d\d[\u2013-]\d{2,4} season)\b/i;
 const HOTEL_OPENS_SOON_DAYS = 75;
 const HOTEL_QR_UTM = (slug) => `utm_source=${slug}&utm_medium=hotel_qr`;
 const HOTEL_EMAIL_UTM = (slug) => `utm_source=hotel_email&utm_medium=email&utm_content=${slug}`;
@@ -36325,7 +36328,7 @@ function renderHotelPage(hotel, now = new Date()) {
   // This week's events (up to 8). In a quiet week, the next three weeks instead, so the section is never empty or thin.
   let eventsTitle = `This week in ${town}`;
   try {
-    const upcoming = regionEventsStillOn(listUpcomingEventsForRegion(hotel.region, { limit: 40, now }), now).filter((e) => e.nextDate);
+    const upcoming = regionEventsStillOn(listUpcomingEventsForRegion(hotel.region, { limit: 60, now }), now).filter((e) => e.nextDate && !HOTEL_EVENT_SKIP.test(e.name || ''));
     events = upcoming.filter((e) => e.nextDate <= weekEndStr).slice(0, 8);
     if (events.length < 3) {
       const farEnd = new Date(`${today}T12:00:00Z`); farEnd.setUTCDate(farEnd.getUTCDate() + 21);
@@ -86373,7 +86376,7 @@ module.exports = {
   cardBadgeChipsHtml, cardBadgeExpected, guideDatesFor, guideBylineHtml,
   // Hotel QR pages (2026-10-20)
   hotelTourRowHtml, weekendBookingPick, renderWeekendBookHop, tourPickContext,
-  hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelTitleLine, hotelPageGroups, hotelDayTrips, hotelVenueFlags, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
+  HOTEL_EVENT_SKIP, hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelTitleLine, hotelPageGroups, hotelDayTrips, hotelVenueFlags, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
   // IndexNow (2026-10-20, IndexNow)
   INDEXNOW_KEY, INDEXNOW_MAX_URLS, buildSitemapXml, listSitemapUrls, indexNowSubmit, createIndexNowQueue, indexNowQueue, indexNowQueueUrls,
   indexNowEnabled, indexNowIsProductionRequest, indexNowCleanUrls, indexNowVenueUrl, indexNowVenueChanged, indexNowEventChanged,
