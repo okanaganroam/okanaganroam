@@ -35998,7 +35998,11 @@ function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map(), 
     const isFirst = (x) => !!(g.firstTypes && g.firstTypes.includes(x.v.type));
     const picked = [...near.filter(isFirst), ...near.filter((x) => !isFirst(x) && isOpen(x)), ...near.filter((x) => !isFirst(x) && !isOpen(x))].slice(0, g.limit)
       .filter((x) => !used.has(x.v.id) && used.add(x.v.id));
-    return { ...g, items: picked };
+    // Everything else in range sits behind "Show all" (2026-11-27, Dayton: Snowshoe Sam's, a main Big White bar, was cut by the limit).
+    const shown = new Set(picked.map((x) => x.v.id));
+    const rest = rows.filter((x) => !shown.has(x.v.id) && !used.has(x.v.id) && !isFirst(x));
+    const more = [...rest.filter(isOpen), ...rest.filter((x) => !isOpen(x))].slice(0, 40);
+    return { ...g, items: picked, more };
   }).filter((g) => g.items.length).sort((a, b) => (ski ? (b.key === 'activities') - (a.key === 'activities') : 0));
 }
 // Ski hill guest pages before opening day (2026-11-25, Dayton): most places on the hill say "Opens Dec 3", which can
@@ -36451,6 +36455,8 @@ ${renderAnalyticsHeadHtml('hotel')}
     body.hotel-page .ht-actions a[data-ht-cta="trip"] { display: none; }
     body.hotel-page .ht-list { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; margin: 0 -16px; padding: 0 16px 6px; }
     body.hotel-page .ht-card { flex: 0 0 62%; scroll-snap-align: start; }
+    body.hotel-page .ht-list.ht-list-more { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; margin: 0; padding: 0; }
+    body.hotel-page .ht-list-more .ht-card { flex: none; }
     body.hotel-page .ht-events, body.hotel-page .ht-trips { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 0 16px 6px; scrollbar-width: none; }
     body.hotel-page .ht-events > li, body.hotel-page .ht-trips > li { flex: 0 0 62%; scroll-snap-align: start; display: flex; }
     body.hotel-page .ht-events .ht-event, body.hotel-page .ht-trips .ht-trip { width: 100%; }
@@ -36476,6 +36482,7 @@ ${renderGolfHeaderHtml()}
   ${groups.map((g) => `<section class="ht-section ht-group" aria-labelledby="ht-${g.key}">
     <h2 id="ht-${g.key}">${escapeHtml(g.title)}</h2>
     <ul class="ht-list">${g.items.map(({ v, km }) => card(v, km)).join('')}</ul>
+    ${g.more && g.more.length ? `<details class="ht-events-more ht-places-more"><summary>View all ${g.more.length + g.items.length} ${escapeHtml(g.key === 'eat' ? 'places to eat and drink' : g.title.toLowerCase())}</summary><ul class="ht-list ht-list-more">${g.more.map(({ v, km }) => card(v, km)).join('')}</ul></details>` : ''}
   </section>`).join('\n  ')}
   ${events.length ? `<section class="ht-section" aria-labelledby="ht-events">
     <h2 id="ht-events">${escapeHtml(eventsTitle)}</h2>

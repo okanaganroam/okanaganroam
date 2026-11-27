@@ -256,3 +256,11 @@ test('season rule (2026-11-27): only what suits the season is offered, on every 
   assert.deepEqual(ids(HOTEL, SUMMER, 'do'), [1, 2, 4, 9], 'summer: no sleigh rides (campgrounds were already left out)');
   assert.deepEqual(ids(HOTEL, SUMMER, 'activities'), [6, 8, 10, 11], 'summer: no snowmobile tours');
 });
+
+test('guest page (2026-11-27): places past the row limit sit behind "View all", none are lost', () => {
+  const venues = Array.from({ length: 12 }, (_, i) => at(i + 1, 'restaurant', 0.001 * (i + 1)));
+  const eat = app.hotelPageGroups(HOTEL, venues, NO_INFO, new Set(), new Map(), new Date('2026-07-10T18:00:00Z')).find((g) => g.key === 'eat');
+  assert.equal(eat.items.length, 8);
+  assert.equal(eat.more.length, 4);
+  assert.deepEqual([...eat.items, ...eat.more].map((x) => x.v.id).sort((a, b) => a - b), venues.map((v) => v.id));
+});
