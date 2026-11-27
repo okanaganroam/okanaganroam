@@ -36060,8 +36060,8 @@ function hotelConditions(region) {
 function hotelConditionsHtml(hotel, now = new Date(), part = 'all') {
   const c = hotelConditions(hotel.region);
   if (!c) return '';
-  const tile = (big, small) => `<div class="ht-cond"><strong>${escapeHtml(big)}</strong><span>${escapeHtml(small)}</span></div>`;
-  const tiles = `<div class="ht-conds" role="group" aria-label="${escapeHtml(c.name)} conditions now">${tile(`${c.tempC}\u00b0C`, 'At the village')}${tile(`${c.baseCm} cm`, 'Snow base')}${tile(`${c.newCm} cm`, 'New snow, 24 h')}${(() => { const f = SKI_RESORT_SEASON[hotel.region]; return f && skiSeasonState(f, todayLocal(now)) === 'soon' ? tile(formatLocalDateShort(f.opens, { weekday: false }), 'Lifts open') : tile(String(c.lifts), c.lifts === 1 ? 'Lift running' : 'Lifts running'); })()}</div>`;
+  const tile = (big, small, icon = '') => `<div class="ht-cond">${icon ? `<i aria-hidden="true">${icon}</i>` : ''}<strong>${escapeHtml(big)}</strong><span>${escapeHtml(small)}</span></div>`;
+  const tiles = `<div class="ht-conds" role="group" aria-label="${escapeHtml(c.name)} conditions now">${tile(`${c.tempC}\u00b0C`, 'At the village', '\ud83c\udf21\ufe0f')}${tile(`${c.baseCm} cm`, 'Snow base', '\u2744\ufe0f')}${tile(`${c.newCm} cm`, 'Fresh, 24 h', '\ud83c\udf28\ufe0f')}${(() => { const f = SKI_RESORT_SEASON[hotel.region]; return f && skiSeasonState(f, todayLocal(now)) === 'soon' ? tile(formatLocalDateShort(f.opens, { weekday: false }), 'Lifts open', '\ud83d\udea1') : tile(String(c.lifts), c.lifts === 1 ? 'Lift running' : 'Lifts running', '\ud83d\udea1'); })()}</div>`;
   const src = `<p class="ht-credits ht-conds-src">Reported by <a href="${escapeHtml(c.url)}" rel="noopener">${escapeHtml(c.name)}</a>, updated through the day.</p>`;
   return part === 'tiles' ? tiles : part === 'src' ? src : tiles + src;
 }
@@ -36484,6 +36484,42 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-cond { background: #fff; border: 1px solid rgba(27,43,58,0.14); border-radius: 12px; padding: 10px 4px; text-align: center; display: flex; flex-direction: column; gap: 2px; }
   body.hotel-page .ht-cond strong { font-size: 1.2rem; line-height: 1.1; color: var(--ref-navy, #1B2B3A); }
   body.hotel-page .ht-cond span { font-size: 0.68rem; font-weight: 700; opacity: 0.75; }
+
+  /* Polish pass (2026-11-27, Dayton): sharper cards, icon tiles, friendly section headings. */
+  body.hotel-page .ht-section h2 { font-size: 1.5rem; letter-spacing: -0.01em; margin: 0 0 14px; }
+  body.hotel-page #ht-eat::before, body.hotel-page #ht-wine::before, body.hotel-page #ht-do::before, body.hotel-page #ht-indoor::before, body.hotel-page #ht-activities::before, body.hotel-page #ht-events::before, body.hotel-page #ht-trips::before, body.hotel-page #ht-guides::before, body.hotel-page #ht-valley::before { margin-right: 8px; font-family: system-ui, sans-serif; }
+  body.hotel-page #ht-eat::before { content: '\\1F37D\\FE0F'; }
+  body.hotel-page #ht-wine::before { content: '\\1F377'; }
+  body.hotel-page #ht-do::before { content: '\\1F3D4\\FE0F'; }
+  body.hotel-page #ht-indoor::before { content: '\\1F3AF'; }
+  body.hotel-page #ht-activities::before { content: '\\1F6F7'; }
+  body.hotel-page #ht-events::before { content: '\\1F389'; }
+  body.hotel-page #ht-trips::before { content: '\\1F697'; }
+  body.hotel-page #ht-valley::before { content: '\\1F30E'; }
+  body.hotel-page .ht-card, body.hotel-page .ht-event, body.hotel-page .ht-trip { border: 0; border-radius: 18px; box-shadow: 0 1px 2px rgba(27,43,58,0.08), 0 6px 18px rgba(27,43,58,0.08); transition: transform .18s ease, box-shadow .18s ease; }
+  @media (hover: hover) { body.hotel-page .ht-card:hover, body.hotel-page .ht-event:hover, body.hotel-page .ht-trip:hover { transform: translateY(-3px); box-shadow: 0 2px 4px rgba(27,43,58,0.1), 0 12px 26px rgba(27,43,58,0.14); } }
+  @media (prefers-reduced-motion: reduce) { body.hotel-page .ht-card, body.hotel-page .ht-event, body.hotel-page .ht-trip { transition: none; } body.hotel-page .ht-card:hover, body.hotel-page .ht-event:hover, body.hotel-page .ht-trip:hover { transform: none; } }
+  body.hotel-page .ht-name { font-size: 1.02rem; line-height: 1.25; }
+  body.hotel-page .ht-link img, body.hotel-page .ht-event img, body.hotel-page .ht-trip img { height: 132px; margin: 0 0 10px; }
+  body.hotel-page .ht-hero { border-radius: 22px; box-shadow: 0 10px 30px rgba(14,24,34,0.25); }
+  body.hotel-page .ht-cond i { font-style: normal; font-size: 1.05rem; line-height: 1; margin-bottom: 1px; }
+  body.hotel-page .ht-actions a { transition: transform .15s ease, background .15s ease; }
+  body.hotel-page .ht-actions a i { font-style: normal; margin-right: 8px; font-size: 1.1rem; }
+  body.hotel-page .ht-actions a:active { transform: scale(0.97); }
+  body.hotel-page .ht-filters button { transition: background .15s ease, color .15s ease; border-color: rgba(27,43,58,0.25); }
+  body.hotel-page .ht-events-more summary { background: #fff; border-color: rgba(27,43,58,0.25); }
+  body.hotel-page .ht-valley { background: #1B2B3A; color: #fff; border-radius: 22px; padding: 22px 18px; }
+  body.hotel-page .ht-valley h2, body.hotel-page .ht-valley .ht-intro { color: #fff; opacity: 1; }
+  body.hotel-page .ht-valley .ht-actions a { background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.3); }
+  body.hotel-page .ht-valley .ht-actions a.ht-primary { background: #E3B341; color: #1B2B3A; border-color: #E3B341; }
+  body.hotel-page .ht-valley .ht-towns a { background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.25); }
+  @media (max-width: 860px) {
+    body.hotel-page .ht-actions.ht-quick { display: grid; grid-template-columns: 1fr 1fr; overflow: visible; gap: 10px; }
+    body.hotel-page .ht-actions.ht-quick a i { display: block; margin: 0 0 2px; }
+    body.hotel-page .ht-actions.ht-quick a { flex: none; flex-direction: column; justify-content: center; padding-top: 8px; padding-bottom: 8px; line-height: 1.15; min-height: 52px; padding: 0 8px; border-radius: 16px; background: #fff; border: 0; box-shadow: 0 1px 2px rgba(27,43,58,0.08), 0 6px 16px rgba(27,43,58,0.09); font-size: 0.9rem; text-align: center; }
+    body.hotel-page .ht-valley .ht-actions { flex-wrap: wrap; overflow: visible; }
+    body.hotel-page .ht-valley .ht-actions a { flex: 0 1 auto; }
+  }
   body.hotel-page .ht-conds-src { margin: 0 0 12px; }
   body.hotel-page .ht-credits-fold { margin: 6px 0 0; font-size: 0.7rem; opacity: 0.55; }
   body.hotel-page .ht-credits-fold summary { cursor: pointer; }
@@ -36557,10 +36593,10 @@ ${renderGolfHeaderHtml()}
   ${(() => { const hh = HOTEL_HERO_PHOTOS[hotel.region]; const hp = hotelIsSkiHill(hotel) && hotelIsSkiMonth(now) ? (hh ? { src800: hh.src, alt: hh.alt, pos: hh.pos, credit: hh.credit } : regionPhoto(hotel.region)) : null; return hp ? `<div class="ht-hero"><img src="${escapeHtml(hp.src800)}" alt="${escapeHtml(hp.alt || '')}" width="1500" height="600"${hp.pos ? ` style="object-position:${escapeHtml(hp.pos)}"` : ''}><div class="ht-hero-text"><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>${hotelConditionsHtml(hotel, now, 'tiles')}</div></div>` : `<p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>${hotelConditionsHtml(hotel, now)}`; })()}
     ${hotelConditionsHtml(hotel, now, 'tiles') ? '' : hotelSeasonNoteHtml(hotel, now)}
   ${hotelIsSkiHill(hotel) && hotelIsSkiMonth(now) ? '' : `<p class="ht-intro">${hotelIsRental(hotel) ? `What's open around ${escapeHtml(town)} right now` : `What's open near ${escapeHtml(hotel.name)} right now, closest first`}.</p>`}
-  <div class="ht-actions">
-    <a class="ht-primary" href="/trip" data-ht-cta="trip">Build My Trip</a>
-    <a href="/map?f=in.${hotel.region}" data-ht-cta="map">Map of what's open</a>
-    <a href="/${hotel.region}/events" data-ht-cta="whats-on">What's On in ${escapeHtml(town)}</a>
+  <div class="ht-actions ht-quick">
+    <a class="ht-primary" href="/trip" data-ht-cta="trip"><i aria-hidden="true">\u2728</i>Build My Trip</a>
+    <a href="/map?f=in.${hotel.region}" data-ht-cta="map"><i aria-hidden="true">\ud83d\uddfa\ufe0f</i>Map of what's open</a>
+    <a href="/${hotel.region}/events" data-ht-cta="whats-on"><i aria-hidden="true">\ud83c\udf89</i>What's On in ${escapeHtml(town)}</a>
   </div>
   ${tourRow}
   ${filters.length ? `<div class="ht-filters" role="group" aria-label="Show only"><button type="button" data-ht-filter="all" aria-pressed="true">Everything</button>${filters.map((f) => `<button type="button" data-ht-filter="${f.key}" aria-pressed="false">${escapeHtml(f.label)}</button>`).join('')}</div><p class="ht-none" id="htNone" hidden>Nothing nearby matches that right now. Try another filter.</p>` : ''}
@@ -36587,7 +36623,7 @@ ${renderGolfHeaderHtml()}
   </section>` : ''}
   <section class="ht-section ht-valley" aria-labelledby="ht-valley">
     <h2 id="ht-valley">The whole Okanagan, in your pocket</h2>
-    <p class="ht-intro">Okanagan Roam covers the valley from Osoyoos up to Vernon and beyond, with the same open-now times, events and trip planner everywhere. It is free and there is nothing to sign up for. Save this page to your home screen and use it for the rest of your trip.</p>
+    <p class="ht-intro">Open-now times, events and the trip planner for every town from Osoyoos to Vernon. Free, nothing to sign up for. Save this page to your home screen for the rest of your trip.</p>
     <div class="ht-actions">
       <a class="ht-primary" href="/trip" data-ht-cta="valley-trip">Plan a trip anywhere in the Okanagan</a>
       <a href="/map" data-ht-cta="valley-map">Roam Now: what's open near me</a>
