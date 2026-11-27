@@ -36378,14 +36378,17 @@ function hotelDayTrips(hotel, venues, maxKm = 80, limit = 6) {
 }
 // Guides that feature places in this town or the towns around it, most places first: [{ path, heading }].
 function hotelGuides(regions, limit = 4) {
+  // The hotel's own town first (2026-11-27, Dayton: Big White guides before Kelowna ones), then the day-trip towns.
+  const own = regions[0];
   const set = new Set(regions);
   try {
-    return liveGuides()
-      .map((g) => ({ g, n: g.refs.filter((r) => typeof r === 'string' && set.has(r.split('/')[0])).length }))
-      .filter((x) => x.n >= 2 && x.g.path && x.g.heading)
-      .sort((a, b) => b.n - a.n)
-      .slice(0, limit)
-      .map((x) => ({ path: x.g.path, heading: x.g.heading }));
+    const rows = liveGuides()
+      .map((g) => ({ g, n: g.refs.filter((r) => typeof r === 'string' && set.has(r.split('/')[0])).length, o: g.refs.filter((r) => typeof r === 'string' && r.split('/')[0] === own).length }))
+      .filter((x) => x.g.path && x.g.heading);
+    const ownRows = rows.filter((x) => x.o >= 1 || (x.g.heading || '').toLowerCase().includes((REGION_LABELS[own] || own).toLowerCase())).sort((a, b) => b.o - a.o);
+    const used = new Set(ownRows.map((x) => x.g.path));
+    const rest = rows.filter((x) => !used.has(x.g.path) && x.n >= 2).sort((a, b) => b.n - a.n);
+    return [...ownRows, ...rest].slice(0, limit).map((x) => ({ path: x.g.path, heading: x.g.heading }));
   } catch (err) { return []; }
 }
 function renderHotelPage(hotel, now = new Date()) {
