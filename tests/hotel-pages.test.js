@@ -252,6 +252,6 @@ test('season rule (2026-11-27): only what suits the season is offered, on every 
   assert.deepEqual(ids(SKI, WINTER, 'activities'), [7, 10], 'ski hill in winter: no boat tour, no golf course');
   assert.deepEqual(ids(HOTEL, WINTER, 'do'), [2, 3, 9], 'a lake town in winter: no beach, lake site or campground');
   assert.deepEqual(ids(HOTEL, WINTER, 'activities'), [7, 8, 10], 'a lake town in winter: no boat tour');
-  assert.deepEqual(ids(HOTEL, SUMMER, 'do'), [1, 2, 4, 5, 9], 'summer: no sleigh rides');
+  assert.deepEqual(ids(HOTEL, SUMMER, 'do'), [1, 2, 4, 9], 'summer: no sleigh rides (campgrounds were already left out)');
   assert.deepEqual(ids(HOTEL, SUMMER, 'activities'), [6, 8, 10], 'summer: no snowmobile tours');
 });
