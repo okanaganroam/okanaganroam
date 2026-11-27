@@ -176,3 +176,14 @@ test('hotel page (2026-11-25): filter flags, day trips from the nearest other to
   assert.deepEqual(trips.map((t) => t.region), ['vernon'], 'own town, a town with under 5 places and a town past 80 km are left out');
   assert.ok(trips[0].drive > 0);
 });
+
+test('QR card + page polish (2026-11-26): open-late chip flag, shorter intro, card promises the whole valley', async () => {
+  assert.ok(app.hotelVenueFlags({ open_late: 1 }, false).includes('late'));
+  assert.ok(!app.hotelVenueFlags({}, false).includes('late'));
+  const hotel = app.hotelList().find((h) => !app.hotelIsRental(h));
+  const page = app.renderHotelPage(hotel, new Date('2026-11-25T19:00:00Z'));
+  assert.match(page, /class="ht-intro">What(&#39;|')s open near [^<]+ right now, closest first\./);
+  const card = app.renderHotelCard(hotel);
+  assert.ok(card.includes('valley-wide'));
+  assert.ok(card.includes('Build My Trip</strong> planner'));
+});

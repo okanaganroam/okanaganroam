@@ -36221,6 +36221,7 @@ const HOTEL_FILTERS = [
   { key: 'patio', label: 'Patio' },
   { key: 'free', label: 'Free' },
   { key: 'music', label: 'Live music' },
+  { key: 'late', label: 'Open late' },
 ];
 function hotelVenueFlags(v, open) {
   const f = [];
@@ -36231,6 +36232,7 @@ function hotelVenueFlags(v, open) {
   if (v.patio) f.push('patio');
   if (v.free_entry) f.push('free');
   if (v.live_music) f.push('music');
+  if (v.open_late) f.push('late');
   return f;
 }
 // The small badge pills on a card (at most three, most useful first).
@@ -36411,6 +36413,9 @@ ${renderAnalyticsHeadHtml('hotel')}
   @media (max-width: 640px) {
     body.hotel-page .ht-filters { flex-wrap: nowrap; overflow-x: auto; margin-right: -16px; padding-right: 16px; scrollbar-width: none; }
     body.hotel-page .ht-filters button { flex: 0 0 auto; }
+    body.hotel-page .ht-intro + .ht-actions { flex-wrap: nowrap; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+    body.hotel-page .ht-intro + .ht-actions a { flex: 0 0 auto; min-height: 42px; padding: 0 14px; font-size: 0.92rem; }
+    body.hotel-page .ht-actions a[data-ht-cta="trip"] { display: none; }
     body.hotel-page .ht-list { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; margin: 0 -16px; padding: 0 16px 6px; }
     body.hotel-page .ht-card { flex: 0 0 62%; scroll-snap-align: start; }
     body.hotel-page .ht-link img { height: 104px; }
@@ -36424,7 +36429,7 @@ ${renderGolfHeaderHtml()}
   <p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p>
   <h1>${escapeHtml(hotelTitleLine(hotel))}</h1>
   ${hotelSeasonNoteHtml(hotel, now)}
-  <p class="ht-intro">Places to eat and drink, wineries and things to do ${hotelIsRental(hotel) ? `around ${escapeHtml(town)}` : `close to ${escapeHtml(hotel.name)}, closest first`}, with what's open right now. Use the buttons to narrow it down, and tap Add to trip to save a place; Build My Trip turns your saved places into a plan.</p>
+  <p class="ht-intro">${hotelIsRental(hotel) ? `What's open around ${escapeHtml(town)} right now` : `What's open near ${escapeHtml(hotel.name)} right now, closest first`}. Tap <strong>Add to trip</strong> on anything you like and Build My Trip turns it into a plan.</p>
   <div class="ht-actions">
     <a class="ht-primary" href="/trip" data-ht-cta="trip">Build My Trip</a>
     <a href="/map?f=in.${hotel.region}" data-ht-cta="map">Map of what's open</a>
@@ -36531,17 +36536,19 @@ function renderHotelCard(hotel) {
   .hc-h-l { font-size: 21px; }
   .hc-h-xl { font-size: 18px; }
   .hc-sub { font-size: 12.5px; line-height: 1.4; margin: 0 0 12px; opacity: 0.85; }
-  .hc-qr { width: 1.95in; height: 1.95in; background: #fff; border-radius: 10px; }
+  .hc-qr { width: 2.2in; height: 2.2in; background: #fff; border-radius: 10px; }
   .hc-qr svg { width: 100%; height: 100%; display: block; }
   .hc-scan { font-weight: 800; font-size: 14px; margin: 12px 0 2px; }
-  .hc-url { font-size: 11px; opacity: 0.75; overflow-wrap: normal; word-break: normal; }
+  .hc-url { font-size: 12.5px; font-weight: 700; opacity: 0.9; overflow-wrap: normal; word-break: normal; }
   .hc-list { list-style: none; margin: 12px auto 0; padding: 0; font-size: 12px; line-height: 1.65; font-weight: 700; display: inline-block; text-align: left; }
   .hc-list li::before { content: '\\2713'; color: #A6782F; margin-right: 6px; }
+  .hc-list { margin-bottom: 10px; }
   .hc-valley { font-size: 11.5px; line-height: 1.35; margin: 9px 0 0; opacity: 0.9; }
   .hc-has-logo { padding-bottom: 0.22in; }
-  .hc-has-logo .hc-qr { width: 1.7in; height: 1.7in; }
+  .hc-has-logo .hc-qr { width: 1.8in; height: 1.8in; }
   .hc-has-logo .hc-list { margin-top: 6px; line-height: 1.4; font-size: 11.5px; }
-  .hc-has-logo .hc-sub { margin-bottom: 8px; }
+  .hc-has-logo .hc-sub { margin-bottom: 8px; font-size: 12px; line-height: 1.3; }
+  .hc-has-logo .hc-foot { padding-top: 8px; }
   .hc-has-logo .hc-valley { margin-top: 6px; font-size: 11px; }
   .hc-has-logo .hc-scan { margin-top: 8px; }
   .hc-foot-logo { display: flex; flex-direction: column; align-items: center; gap: 5px; font-size: 11px; padding-top: 8px; }
@@ -36556,12 +36563,11 @@ function renderHotelCard(hotel) {
   <div class="hc-brand">OKANAGAN <span>ROAM</span></div>
   <div class="hc-rule"></div>
   <h1 class="hc-h${hotelTitleLine(hotel).length > 48 ? ' hc-h-xl' : hotelTitleLine(hotel).length > 40 ? ' hc-h-l' : ''}">${escapeHtml(hotelTitleLine(hotel))}</h1>
-  <p class="hc-sub">${hotelIsRental(hotel) ? 'Places to eat, things to do and this week\'s events, updated live.' : `Everything near ${escapeHtml(hotel.name)} in ${escapeHtml(town)}, updated live.`}</p>
+  <p class="hc-sub">${hotelIsRental(hotel) ? 'What\'s open, what\'s on and where to go, across the whole Okanagan, updated live.' : `What\'s open near ${escapeHtml(hotel.name)} right now, plus events and ideas valley-wide, updated live.`}</p>
   <div class="hc-qr" id="hcQr" data-target="${escapeHtml(target)}" role="img" aria-label="QR code for ${escapeHtml(shown)}"></div>
   <div class="hc-scan">Scan with your phone camera</div>
   <div class="hc-url">okanaganroam.com/near/<wbr>${escapeHtml(hotel.slug)}</div>
-  <ul class="hc-list"><li>${hotelIsRental(hotel) ? 'Map of what\'s near you' : "What's open right now"}</li><li>Events happening this week</li><li>Restaurants, wineries &amp; beaches</li><li>Indoor &amp; rainy-day ideas</li></ul>
-  <p class="hc-valley">Free trip planner for the <strong>whole Okanagan</strong>: tap Build My Trip on the page.</p>
+  <ul class="hc-list"><li>${hotelIsRental(hotel) ? 'Map of what\'s near you' : "What's open near you right now"}</li><li>Events, indoor &amp; rainy-day ideas</li><li>Wineries, beaches &amp; day trips, valley-wide</li><li>Free <strong>Build My Trip</strong> planner</li></ul>
   <div class="hc-foot${hotelLogo(hotel) ? ' hc-foot-logo' : ''}">${hotelLogo(hotel) ? `<span>Compliments of</span><img class="hc-logo" src="${escapeHtml(hotelLogo(hotel))}" alt="${escapeHtml(hotel.name)}">` : `Compliments of ${escapeHtml(hotel.name)}`}</div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
