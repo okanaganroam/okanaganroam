@@ -35989,11 +35989,18 @@ const HOTEL_WINTER_PHOTOS = Object.freeze({
   penticton: { src: '/images/regions/winter/penticton-2711.jpg', credit: 'Penticton: BCHL / Gord Goble', url: 'https://explore-mag.com/pentictons-winter-playground-is-the-best-for-snowy-adventures/' },
   summerland: { src: '/images/regions/winter/summerland-2711.jpg', credit: 'Summerland: Kettle Valley Steam Railway', url: 'https://infotel.ca/newsitem/summerlands-christmas-express-the-ultimate-holiday-experience/it101423' },
   naramata: { src: '/images/regions/winter/naramata.jpg', credit: 'Naramata: Ben Cappellacci, CC BY 2.0', url: 'https://commons.wikimedia.org/wiki/File:Winter_view_from_Lock_%26_Worth_Winery.jpg' },
+  vernon: { src: '/images/regions/winter/vernon-2711.jpg', credit: 'Vernon: Jack Borno, CC BY-SA 3.0', url: 'https://commons.wikimedia.org/wiki/File:Vernon_-_panoramio.jpg' },
+  enderby: { src: '/images/regions/winter/enderby-2711.jpg', credit: 'Enderby: Shawn Roberts, CC BY-SA 2.0', url: 'https://commons.wikimedia.org/wiki/File:Enderby,_BC_(5509577763).jpg' },
+  osoyoos: { src: '/images/regions/winter/osoyoos-2711.jpg', credit: 'Osoyoos: Kenton Gilchrist', url: 'https://destinationosoyoos.com/photo-roundup-17-stunning-captures-of-the-2022-winter-season-in-osoyoos/' },
+  lumby: { src: '/images/regions/winter/lumby-2711.jpg', credit: 'Lumby: Brian Krog', url: 'https://infotel.ca/newsitem/in-photos-outhouse-races-in-north-okanagan-flushed-with-success/it102793' },
+  oliver: { src: '/images/regions/winter/oliver-2711.jpg', credit: 'Oliver: Visit Oliver', url: 'https://visitoliver.com/featured-events/light-up-in-oliver-2025/' },
+  kaleden: { src: '/images/regions/winter/kaleden-2711.jpg', credit: 'Kaleden: Carol Stathers', url: 'https://www.travel-british-columbia.com/blog/winter-fun-skating-in-the-south-okanagan-british-columbia/' },
   'lake-country': { src: '/images/regions/winter/lake-country-2711.jpg', credit: 'Lake Country: Okanagan Rail Trail', url: 'https://okanaganrailtrail.ca/?p=807' },
 });
 // Header photo for a ski hill guest page (2026-11-27, Dayton): the Big White village clock tower in its new blue-grey paint on a sunny winter day (2026-11 upload on
 // bigwhite.com, Big White's own photo; Dayton has permission to use it).
 const HOTEL_HERO_PHOTOS = Object.freeze({
+  apex: { src: '/images/regions/winter/apex-village-2711.jpg', alt: 'A skier in fresh powder under a blue sky above the Apex village', credit: 'Apex Mountain Resort / Destination Penticton', url: 'https://www.visitpenticton.com/apex-mountain-resort', pos: '50% 50%' },
   silverstar: { src: '/images/regions/winter/silverstar-village-2711.jpg', alt: 'The colourful buildings and banners of Silver Star village on a snowy winter day', credit: 'Silver Star: Jodie Wilson, CC BY 2.0', url: 'https://commons.wikimedia.org/wiki/File:Silver_star_village_(420837006).jpg', pos: '50% 50%' },
   baldy: { src: '/images/regions/winter/baldy-village-2711.jpg', alt: 'A frosted chairlift above the clouds at sunrise at Baldy Mountain Resort', credit: 'Baldy Mountain Resort', pos: '50% 50%' },
   'big-white': { src: '/images/regions/winter/big-white-village.jpg', alt: 'The Big White village clock tower and plaza on a sunny winter day, with snowy mountains behind', credit: 'Big White Ski Resort', pos: '42% 0%' },
