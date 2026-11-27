@@ -83117,6 +83117,40 @@ const server = http.createServer(async (req, res) => {
 
     // POST /admin/set-visit-info (2026-10-29): { id, expected_current, visit: { rows, booking_url?, source_url,
     // checked_at } | null, reason, batch_id } -> guardedVisitInfoUpdate. visit null clears the box.
+    // POST /admin/set-visit-fr -- the French for a "Plan your visit" line the owner wrote in English (the [TRANSLATE] emails).
+    // Body { id, owner_fr: { "<row label>": { en, fr } }, reason }. Each en must equal that row's current English text, so a
+    // line the owner has since changed is refused rather than shown with the wrong French. Bearer token; changes owner_fr only.
+    if (pathname === '/admin/set-visit-fr' && method === 'POST') {
+      if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Set-visit-fr endpoint is not configured.' });
+      const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
+      if (!match || !safeTokenEquals(match[1], ENRICHMENT_ADMIN_TOKEN)) return sendJSON(res, 401, { error: 'Unauthorized.' });
+      let body;
+      try { body = await readBody(req); } catch (err) { return sendJSON(res, 400, { error: 'Malformed JSON body.' }); }
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return sendJSON(res, 400, { error: 'Body must be a JSON object.' });
+      const bad = Object.keys(body).filter((k) => !['id', 'owner_fr', 'reason'].includes(k));
+      if (bad.length) return sendJSON(res, 400, { error: `Unexpected field(s): ${bad.join(', ')}` });
+      if (!Number.isInteger(body.id) || body.id <= 0) return sendJSON(res, 400, { error: 'id must be a positive integer.' });
+      if (typeof body.reason !== 'string' || !body.reason.trim()) return sendJSON(res, 400, { error: 'reason is required.' });
+      const wanted = body.owner_fr;
+      if (!wanted || typeof wanted !== 'object' || Array.isArray(wanted) || !Object.keys(wanted).length) return sendJSON(res, 400, { error: 'owner_fr must be an object of labels.' });
+      const row = db.prepare('SELECT info FROM venue_visit_info WHERE venue_id = ?').get(body.id);
+      let info = null;
+      try { info = row ? JSON.parse(row.info) : null; } catch (e) { info = null; }
+      if (!info || !Array.isArray(info.rows)) return sendJSON(res, 404, { error: 'no_visit_info' });
+      const frMap = { ...(info.owner_fr || {}) };
+      for (const [label, v] of Object.entries(wanted)) {
+        const r = info.rows.find((x) => x.label === label);
+        if (!r) return sendJSON(res, 409, { error: 'no_such_row', detail: label });
+        if (!v || typeof v.en !== 'string' || typeof v.fr !== 'string' || !v.fr.trim() || v.fr.length > 400 || /[<>]/.test(v.fr)) return sendJSON(res, 400, { error: 'invalid_fr', detail: label });
+        if (v.en !== r.text) return sendJSON(res, 409, { error: 'english_changed', detail: label, live: r.text });
+        frMap[label] = { en: v.en, fr: v.fr.trim().replace(/\s+/g, ' ') };
+      }
+      info.owner_fr = frMap;
+      db.prepare('UPDATE venue_visit_info SET info = ?, updated_at = CURRENT_TIMESTAMP WHERE venue_id = ?').run(JSON.stringify(info), body.id);
+      indexNowVenueChanged(req, body.id);
+      return sendJSON(res, 200, { id: body.id, owner_fr_labels: Object.keys(frMap) });
+    }
+
     if (pathname === '/admin/set-visit-info' && method === 'POST') {
       if (!ENRICHMENT_ADMIN_TOKEN) return sendJSON(res, 503, { error: 'Set-visit-info endpoint is not configured.' });
       const match = /^Bearer (.+)$/.exec(req.headers['authorization'] || '');
