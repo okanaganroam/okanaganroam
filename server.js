@@ -36005,18 +36005,20 @@ function hotelIsSkiMonth(now = new Date()) { const m = Number(new Date(now).toLo
 // camping or lake recreation sites; at a ski hill a lake is left out too.
 const HOTEL_SUMMER_ONLY = /\b(summer|beach(es)?|swim(ming)?|boat(ing)?|cruises?|tiki|kayak(s|ing)?|paddle(board(ing)?)?|sup|reservoir|lake ?shore|waterfront|marina|splash|water ?(park|slide|sports?)|jet ?ski|wake ?board(ing)?|camp(ground|ing|site)s?|recreation site|lake tours?|lake cruises?)\b/i;
 // At a ski hill in the ski months, warm-weather activities go too: golf and disc golf, hiking, mountain biking, rafting, lakes.
-const HOTEL_SKI_SUMMER = /\b(lake|golf|disc golf|hik(e|es|ing)|mountain bik(e|es|ing)|bike park|zip ?lines?|rafting|canoe(ing)?)\b/i;
+const HOTEL_SKI_SUMMER = /\b(lake|golf|disc golf|hik(e|es|ing)|mountain bik(e|es|ing)|bike park|zip ?lines?|rafting|canoe(ing)?|skate ?parks?|skatepark|pickleball|tennis|bmx|kart(plex)?|pump ?track|rock garden|rose garden|channel walk)\b/i;
+// At a ski hill in the ski months the outdoors row keeps only the places that make sense in snow (2026-11-27, Dayton: Apex was offering summer parks and trails).
+const HOTEL_SKI_WINTER_OK = /\b(ski|skiing|snow\w*|nordic|skat(e|es|ing)|tube|tubing|sleigh|sled(ding)?|toboggan\w*|cross[- ]country|ice|winter|fat ?bike|resort|mountain|provincial park)\b/i;
 // And the other way round (May-Oct): snow and ice activities are not offered in the warm months.
 const HOTEL_WINTER_ONLY = /\b(ski(s|ing)?|snow\w*|sleigh|sled(ding)?|nordic|tube park|toboggan\w*|ice[- ]skating|skating rink|outdoor rink|curling)\b/i;
 function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map(), now = new Date()) {
   const used = new Set();
   const ski = hotelIsSkiHill(hotel), winter = hotelIsSkiMonth(now);
   // The right season only (2026-11-27 rule, Dayton): nothing for the wrong season is offered on a guest page.
-  const outOfSeason = (v) => (winter ? (HOTEL_SUMMER_ONLY.test(v.name || '') || (ski && (HOTEL_SKI_SUMMER.test(v.name || '') || v.type === 'golf'))) : HOTEL_WINTER_ONLY.test(v.name || ''));
+  const outOfSeason = (v, key) => (winter ? (HOTEL_SUMMER_ONLY.test(v.name || '') || (ski && (HOTEL_SKI_SUMMER.test(v.name || '') || v.type === 'golf' || (key === 'do' && !HOTEL_SKI_WINTER_OK.test(v.name || ''))))) : HOTEL_WINTER_ONLY.test(v.name || ''));
   return HOTEL_PAGE_GROUPS.map((g0) => {
     const g = g0.key === 'do' && (ski || winter) ? { ...g0, title: ski ? 'Outdoors and things to do' : 'Parks, trails and outdoors', types: ['outdoor'] } : ski && g0.key === 'activities' ? { ...g0, title: 'Tours and activities' } : g0;
     const rows = venues
-      .filter((v) => g.types.includes(v.type) && !((g.key === 'do' || g.key === 'activities') && outOfSeason(v)) && v.slug && CATEGORY_SLUGS[v.type] && (!closedIds.has(v.id) || opensSoon.has(v.id)) && !(g.skipName && g.skipName.test(v.name || '')))
+      .filter((v) => g.types.includes(v.type) && !((g.key === 'do' || g.key === 'activities') && outOfSeason(v, g.key)) && v.slug && CATEGORY_SLUGS[v.type] && (!closedIds.has(v.id) || opensSoon.has(v.id)) && !(g.skipName && g.skipName.test(v.name || '')))
       .map((v) => ({ v, km: venueDistanceKm(hotel, v) }))
       .filter((x) => x.km !== null && x.km <= g.maxKm)
       .sort((a, b) => a.km - b.km);
@@ -36031,17 +36033,62 @@ function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map(), 
     const rest = rows.filter((x) => !shown.has(x.v.id) && !used.has(x.v.id) && !isFirst(x));
     const more = [...rest.filter(isOpen), ...rest.filter((x) => !isOpen(x))].slice(0, 40);
     return { ...g, items: picked, more };
-  }).filter((g) => g.items.length).sort((a, b) => (ski ? ['eat', 'activities'].concat(['wine', 'do', 'indoor']).indexOf(a.key) - ['eat', 'activities'].concat(['wine', 'do', 'indoor']).indexOf(b.key) : 0));
+  }).filter((g) => g.items.length >= (ski && g.key === 'wine' ? 3 : 1)).sort((a, b) => (ski ? ['eat', 'activities'].concat(['wine', 'do', 'indoor']).indexOf(a.key) - ['eat', 'activities'].concat(['wine', 'do', 'indoor']).indexOf(b.key) : 0));
 }
 // Live mountain conditions for a ski hill guest page (2026-11-27, Dayton): temperature, snow base, 24 h snowfall and lifts
 // running, read from the resort's own public snow report page and kept for 15 minutes. The page never waits on it: a
 // stale or missing reading simply hides the strip. Big White only for now.
-const HOTEL_CONDITIONS = { 'big-white': { url: 'https://www.bigwhite.com/mountain-conditions', name: 'Big White' } };
+const HOTEL_CONDITIONS = {
+  'big-white': { url: 'https://www.bigwhite.com/mountain-conditions', name: 'Big White', kind: 'bigwhite' },
+  // 2026-11-27 (Dayton): the other three hills get the same strip. Snow and lifts from each resort's own public report where we can
+  // read it (SilverStar's snow-report feed, Baldy's snow report page); temperature at the village from MET Norway's open forecast.
+  // Apex's site blocks automated reads, so Apex shows the temperature and a link to its own snow report.
+  silverstar: { url: 'https://www.skisilverstar.com/the-mountain/weather-conditions/snow-report-forecast/', name: 'SilverStar', kind: 'silverstar', lat: 50.36, lon: -119.06, alt: 1600 },
+  apex: { url: 'https://apexresort.com/weather/', name: 'Apex', kind: 'apex', lat: 49.386, lon: -119.903, alt: 1610 },
+  baldy: { url: 'https://baldyresort.com/baldy-weather-cams/', name: 'Baldy', kind: 'baldy', lat: 49.145, lon: -119.224, alt: 1400 },
+};
 const hotelConditionsCache = new Map();
 function parseBigWhiteConditions(html) {
   const t = String(html || '').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
   const m = t.match(/Winter Summer\s*(-?\d+)\s*\u00b0C\s*-?\d+\s*\u00b0C\s*Weather[\s\S]{0,40}?(\d+)\s*CM\s*\d+\s*CM\s*Snow Base[\s\S]{0,40}?(\d+)\s*CM\s*\d+\s*CM\s*24hr Snowfall[\s\S]{0,40}?(\d+)\s+\d+\s*Runs Open[\s\S]{0,40}?(\d+)\s+\d+\s*Lifts Running/i);
   return m ? { tempC: Number(m[1]), baseCm: Number(m[2]), newCm: Number(m[3]), runs: Number(m[4]), lifts: Number(m[5]) } : null;
+}
+async function hotelFetchJson(url, ms = 8000) {
+  const r = await fetch(url, { headers: { 'User-Agent': 'okanaganroam.com guest-page' }, signal: AbortSignal.timeout(ms) });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+async function hotelFetchTempC(cfg) {
+  const j = await hotelFetchJson(`https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${cfg.lat}&lon=${cfg.lon}&altitude=${cfg.alt}`);
+  const t = j && j.properties && j.properties.timeseries && j.properties.timeseries[0];
+  const v = t && t.data && t.data.instant && t.data.instant.details && t.data.instant.details.air_temperature;
+  return Number.isFinite(v) ? Math.round(v) : null;
+}
+async function hotelFetchConditions(region, cfg) {
+  if (cfg.kind === 'bigwhite') {
+    const r = await fetch(cfg.url, { headers: { 'User-Agent': 'okanaganroam-guest-page' }, signal: AbortSignal.timeout(8000) });
+    return r.ok ? parseBigWhiteConditions(await r.text()) : null;
+  }
+  const out = { tempC: null, baseCm: null, newCm: null, lifts: null };
+  const jobs = [hotelFetchTempC(cfg).then((v) => { out.tempC = v; })];
+  if (cfg.kind === 'silverstar') {
+    jobs.push(hotelFetchJson('https://cms.skisilverstar.com/jsonapi/dor_snow_report/dor_snow_report?sort=-date&page%5Blimit%5D=1').then((j) => {
+      const a = j.data && j.data[0] && j.data[0].attributes;
+      if (a && Date.now() - Date.parse(a.date) < 2 * 86400000) { out.baseCm = Math.round(Number(a.base_depth)); out.newCm = Math.round(Number(a.amount)); }
+    }));
+    jobs.push(hotelFetchJson('https://cms.skisilverstar.com/jsonapi/dor_lift/dor_lift?page%5Blimit%5D=50').then((j) => {
+      const ls = (j.data || []).map((x) => x.attributes).filter((x) => x && x.status);
+      if (ls.length) { out.lifts = ls.filter((x) => x.status === 'open').length; out.liftsOf = ls.length; }
+    }));
+  } else if (cfg.kind === 'baldy') {
+    jobs.push(fetch(cfg.url, { headers: { 'User-Agent': 'okanaganroam-guest-page' }, signal: AbortSignal.timeout(8000) }).then((r) => (r.ok ? r.text() : '')).then((h) => {
+      const t = String(h).replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+      const m = t.match(/Snow Report\s*(\d+)\s*cm\s*(\d+)\s*cm\s*(\d+)\s*cm\s*24 Hour\s*7 Days\s*Base/i);
+      if (m) { out.newCm = Number(m[1]); out.baseCm = Number(m[3]); }
+    }));
+  }
+  await Promise.allSettled(jobs);
+  return out.tempC !== null || out.baseCm !== null ? out : null;
 }
 function hotelConditions(region) {
   const cfg = HOTEL_CONDITIONS[region];
@@ -36051,19 +36098,28 @@ function hotelConditions(region) {
   const age = Date.now() - c.at;
   if (age > 15 * 60 * 1000 && !c.busy && !process.env.NODE_TEST_CONTEXT) {
     c.busy = true;
-    fetch(cfg.url, { headers: { 'User-Agent': 'okanaganroam-guest-page' }, signal: AbortSignal.timeout(8000) })
-      .then((r) => (r.ok ? r.text() : ''))
-      .then((h) => { const d = parseBigWhiteConditions(h); c.at = d ? Date.now() : Date.now() - 10 * 60 * 1000; if (d) c.data = d; })
+    hotelFetchConditions(region, cfg)
+      .then((d) => { c.at = d ? Date.now() : Date.now() - 10 * 60 * 1000; if (d) c.data = d; })
       .catch(() => { c.at = Date.now() - 10 * 60 * 1000; })
       .finally(() => { c.busy = false; });
   }
-  return c.data && Date.now() - (c.at || 0) < 3 * 60 * 60 * 1000 ? { ...c.data, url: cfg.url, name: cfg.name } : null;
+  return c.data && Date.now() - (c.at || 0) < 3 * 60 * 60 * 1000 ? { ...c.data, url: cfg.url, name: cfg.name, kind: cfg.kind } : null;
 }
 function hotelConditionsHtml(hotel, now = new Date(), part = 'all') {
   const c = hotelConditions(hotel.region);
   if (!c) return '';
   const tile = (big, small, icon = '') => `<div class="ht-cond">${icon ? `<i aria-hidden="true">${icon}</i>` : ''}<strong>${escapeHtml(big)}</strong><span>${escapeHtml(small)}</span></div>`;
-  const tiles = `<div class="ht-conds" role="group" aria-label="${escapeHtml(c.name)} conditions now">${tile(`${c.tempC}\u00b0C`, 'At the village', '\ud83c\udf21\ufe0f')}${tile(`${c.baseCm} cm`, 'Snow base', '\u2744\ufe0f')}${tile(`${c.newCm} cm`, 'Fresh, 24 h', '\ud83c\udf28\ufe0f')}${(() => { const f = SKI_RESORT_SEASON[hotel.region]; return f && skiSeasonState(f, todayLocal(now)) === 'soon' ? tile(formatLocalDateShort(f.opens, { weekday: false }), 'Lifts open', '\ud83d\udea1') : tile(String(c.lifts), c.lifts === 1 ? 'Lift running' : 'Lifts running', '\ud83d\udea1'); })()}</div>`;
+  const sf = SKI_RESORT_SEASON[hotel.region];
+  const soon = !!(sf && skiSeasonState(sf, todayLocal(now)) === 'soon');
+  const parts = [];
+  if (c.tempC !== null && c.tempC !== undefined) parts.push(tile(`${c.tempC}\u00b0C`, 'At the village', '\ud83c\udf21\ufe0f'));
+  const snowOn = Number.isFinite(c.baseCm) && c.baseCm > 0;
+  if (snowOn) parts.push(tile(`${c.baseCm} cm`, 'Snow base', '\u2744\ufe0f'));
+  if (snowOn && Number.isFinite(c.newCm)) parts.push(tile(`${c.newCm} cm`, 'Fresh, 24 h', '\ud83c\udf28\ufe0f'));
+  if (soon && sf.opens) parts.push(tile(formatLocalDateShort(sf.opens, { weekday: false }), 'Lifts open', '\ud83d\udea1'));
+  else if (Number.isFinite(c.lifts)) parts.push(tile(c.liftsOf ? `${c.lifts} of ${c.liftsOf}` : String(c.lifts), c.liftsOf ? 'Lifts running' : (c.lifts === 1 ? 'Lift running' : 'Lifts running'), '\ud83d\udea1'));
+  if (parts.length < 4) parts.push(`<a class="ht-cond ht-cond-link" href="${escapeHtml(c.url)}" rel="noopener" target="_blank"><i aria-hidden="true">\ud83d\udcca</i><strong>Live</strong><span>Snow report \u2192</span></a>`);
+  const tiles = `<div class="ht-conds" role="group" aria-label="${escapeHtml(c.name)} conditions now">${parts.join('')}</div>`;
   const src = `<p class="ht-credits ht-conds-src">Reported by <a href="${escapeHtml(c.url)}" rel="noopener">${escapeHtml(c.name)}</a>, updated through the day.</p>`;
   return part === 'tiles' ? tiles : part === 'src' ? src : tiles + src;
 }
@@ -36079,8 +36135,8 @@ function hotelSeasonNoteHtml(hotel, now = new Date()) {
 }
 if (!process.env.NODE_TEST_CONTEXT) {
   // Keep the reading warm so the first scan after a restart already shows it (2026-11-27, Dayton saw no strip).
-  setTimeout(() => { try { hotelConditions('big-white'); } catch (e) {} }, 5000).unref();
-  setInterval(() => { try { hotelConditions('big-white'); } catch (e) {} }, 10 * 60 * 1000).unref();
+  setTimeout(() => { try { Object.keys(HOTEL_CONDITIONS).forEach((r) => hotelConditions(r)); } catch (e) {} }, 5000).unref();
+  setInterval(() => { try { Object.keys(HOTEL_CONDITIONS).forEach((r) => hotelConditions(r)); } catch (e) {} }, 10 * 60 * 1000).unref();
 }
 // Travel times read like a person said them (2026-11-27, Dayton: "42 min" sounds like a machine): 10 minutes and over round
 // up to the next 5 (42 -> 45, 49 -> 50); under 10 stay as they are.
@@ -36502,6 +36558,7 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-hero-text h1 { color: #fff; margin: 0; font-size: clamp(1.5rem, 6vw, 2.3rem); text-shadow: 0 1px 8px rgba(0,0,0,0.35); }
   body.hotel-page .ht-conds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0 0 6px; }
   body.hotel-page .ht-cond { background: #fff; border: 1px solid rgba(27,43,58,0.14); border-radius: 12px; padding: 10px 4px; text-align: center; display: flex; flex-direction: column; gap: 2px; }
+  body.hotel-page a.ht-cond-link { text-decoration: none; color: inherit; }
   body.hotel-page .ht-cond strong { font-size: 1.2rem; line-height: 1.1; color: var(--ref-navy, #1B2B3A); }
   body.hotel-page .ht-cond span { font-size: 0.68rem; font-weight: 700; opacity: 0.75; }
 
