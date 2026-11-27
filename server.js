@@ -35958,6 +35958,9 @@ const HOTEL_PAGE_GROUPS = [
 // Season-long fixture series (junior hockey "Home Games 2026-27", university "Season" rows) belong on the events page for
 // fans, not on a hotel guest's short "this week" list (2026-11-26).
 const HOTEL_EVENT_SKIP = /\b(home games|schedule 20\d\d|20\d\d[\u2013-]\d{2,4} season)\b/i;
+// This week's events on a guest page: the first HOTEL_EVENTS_SHOWN show, the rest sit behind "Show all" (2026-11-26).
+const HOTEL_EVENTS_SHOWN = 8;
+const HOTEL_EVENTS_MAX = 40;
 const HOTEL_OPENS_SOON_DAYS = 75;
 const HOTEL_QR_UTM = (slug) => `utm_source=${slug}&utm_medium=hotel_qr`;
 const HOTEL_EMAIL_UTM = (slug) => `utm_source=hotel_email&utm_medium=email&utm_content=${slug}`;
@@ -36329,11 +36332,11 @@ function renderHotelPage(hotel, now = new Date()) {
   let eventsTitle = `This week in ${town}`;
   try {
     const upcoming = regionEventsStillOn(listUpcomingEventsForRegion(hotel.region, { limit: 60, now }), now).filter((e) => e.nextDate && !HOTEL_EVENT_SKIP.test(e.name || ''));
-    events = upcoming.filter((e) => e.nextDate <= weekEndStr).slice(0, 8);
+    events = upcoming.filter((e) => e.nextDate <= weekEndStr).slice(0, HOTEL_EVENTS_MAX);
     if (events.length < 3) {
       const farEnd = new Date(`${today}T12:00:00Z`); farEnd.setUTCDate(farEnd.getUTCDate() + 21);
       const farStr = farEnd.toISOString().slice(0, 10);
-      const more = upcoming.filter((e) => e.nextDate <= farStr).slice(0, 8);
+      const more = upcoming.filter((e) => e.nextDate <= farStr).slice(0, HOTEL_EVENTS_MAX);
       if (more.length > events.length) { events = more; eventsTitle = `Coming up in ${town}`; }
     }
   } catch (err) { events = []; }
@@ -36396,6 +36399,10 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-open { align-self: flex-start; margin: 4px 12px 0; padding: 2px 8px; border-radius: 999px; background: #e6f4ea; color: #1e6b34; font-size: 0.78rem; font-weight: 800; }
   body.hotel-page .ht-soon { align-self: flex-start; margin: 4px 12px 0; padding: 2px 8px; border-radius: 999px; background: #eef2f7; color: #1B2B3A; font-size: 0.78rem; font-weight: 800; }
   body.hotel-page .ht-card .trip-btn { margin: 6px 12px 12px; align-self: flex-start; }
+  body.hotel-page .ht-events-more { margin: 12px 0 0; }
+  body.hotel-page .ht-events-more summary { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--ref-navy, #1B2B3A); font-weight: 800; cursor: pointer; list-style: none; }
+  body.hotel-page .ht-events-more summary::-webkit-details-marker { display: none; }
+  body.hotel-page .ht-events-more[open] summary { margin-bottom: 10px; }
   body.hotel-page .ht-events { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   body.hotel-page .ht-event { display: flex; flex-direction: column; gap: 3px; min-height: 44px; padding: 12px 0; border-radius: 14px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: var(--ref-navy, #1B2B3A); text-decoration: none; }
   body.hotel-page .ht-more { margin: 10px 0 0; }
@@ -36449,8 +36456,9 @@ ${renderGolfHeaderHtml()}
   ${groups.some((g) => g.key === 'activities') ? '' : tourRow}
   ${events.length ? `<section class="ht-section" aria-labelledby="ht-events">
     <h2 id="ht-events">${escapeHtml(eventsTitle)}</h2>
-    <ul class="ht-events">${events.map(eventItem).join('')}</ul>
-    <p class="ht-more"><a href="/${hotel.region}/events">All events in ${escapeHtml(town)}</a></p>
+    <ul class="ht-events">${events.slice(0, HOTEL_EVENTS_SHOWN).map(eventItem).join('')}</ul>
+    ${events.length > HOTEL_EVENTS_SHOWN ? `<details class="ht-events-more"><summary>Show all ${events.length} events</summary><ul class="ht-events">${events.slice(HOTEL_EVENTS_SHOWN).map(eventItem).join('')}</ul></details>` : ''}
+    <p class="ht-more"><a href="/${hotel.region}/events">View all events in ${escapeHtml(town)}</a></p>
   </section>` : ''}
   ${dayTrips.length ? `<section class="ht-section" aria-labelledby="ht-trips">
     <h2 id="ht-trips">Day trips from ${escapeHtml(town)}</h2>
