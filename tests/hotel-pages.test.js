@@ -185,5 +185,6 @@ test('QR card + page polish (2026-11-26): open-late chip flag, shorter intro, ca
   assert.match(page, /class="ht-intro">What(&#39;|')s open near [^<]+ right now, closest first\./);
   const card = app.renderHotelCard(hotel);
   assert.ok(card.includes('valley-wide'));
+  assert.ok(card.includes('Happy hours &amp; drink deals'));
   assert.ok(card.includes('Build My Trip</strong> planner'));
 });

@@ -36546,7 +36546,7 @@ function renderHotelCard(hotel) {
   .hc-valley { font-size: 11.5px; line-height: 1.35; margin: 9px 0 0; opacity: 0.9; }
   .hc-has-logo { padding-bottom: 0.22in; }
   .hc-has-logo .hc-qr { width: 1.8in; height: 1.8in; }
-  .hc-has-logo .hc-list { margin-top: 6px; line-height: 1.4; font-size: 11.5px; }
+  .hc-has-logo .hc-list { margin-top: 5px; line-height: 1.3; font-size: 11.5px; }
   .hc-has-logo .hc-sub { margin-bottom: 8px; font-size: 12px; line-height: 1.3; }
   .hc-has-logo .hc-foot { padding-top: 8px; }
   .hc-has-logo .hc-valley { margin-top: 6px; font-size: 11px; }
@@ -36567,7 +36567,7 @@ function renderHotelCard(hotel) {
   <div class="hc-qr" id="hcQr" data-target="${escapeHtml(target)}" role="img" aria-label="QR code for ${escapeHtml(shown)}"></div>
   <div class="hc-scan">Scan with your phone camera</div>
   <div class="hc-url">okanaganroam.com/near/<wbr>${escapeHtml(hotel.slug)}</div>
-  <ul class="hc-list"><li>${hotelIsRental(hotel) ? 'Map of what\'s near you' : "What's open near you right now"}</li><li>Events, indoor &amp; rainy-day ideas</li><li>Wineries, beaches &amp; day trips, valley-wide</li><li>Free <strong>Build My Trip</strong> planner</li></ul>
+  <ul class="hc-list"><li>${hotelIsRental(hotel) ? 'Map of what\'s near you' : "What's open near you right now"}</li><li>Happy hours &amp; drink deals</li><li>Events, indoor &amp; rainy-day ideas</li><li>Wineries, beaches &amp; day trips, valley-wide</li><li>Free <strong>Build My Trip</strong> planner</li></ul>
   <div class="hc-foot${hotelLogo(hotel) ? ' hc-foot-logo' : ''}">${hotelLogo(hotel) ? `<span>Compliments of</span><img class="hc-logo" src="${escapeHtml(hotelLogo(hotel))}" alt="${escapeHtml(hotel.name)}">` : `Compliments of ${escapeHtml(hotel.name)}`}</div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
