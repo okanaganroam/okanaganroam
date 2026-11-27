@@ -36611,7 +36611,7 @@ ${renderAnalyticsHeadHtml('hotel')}
     body.hotel-page .ht-card { flex: 0 0 62%; scroll-snap-align: start; }
     body.hotel-page .ht-list.ht-list-more { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: visible; margin: 0; padding: 0; }
     body.hotel-page .ht-list-more .ht-card { flex: none; }
-    body.hotel-page .ht-events, body.hotel-page .ht-trips { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 0 16px 6px; scrollbar-width: none; }
+    body.hotel-page .ht-events, body.hotel-page .ht-trips { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; margin: 0 -16px; padding: 0 16px 6px; scrollbar-width: none; }
     body.hotel-page .ht-events > li, body.hotel-page .ht-trips > li { flex: 0 0 62%; scroll-snap-align: start; display: flex; }
     body.hotel-page .ht-events .ht-event, body.hotel-page .ht-trips .ht-trip { width: 100%; }
     body.hotel-page .ht-link img { height: 104px; }
