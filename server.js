@@ -2246,7 +2246,18 @@ const REGION_PHOTOS = Object.freeze({
   apex: { alt: 'Apex Mountain’s village below the ski runs at golden hour', pos: 50, credit: { by: 'Murray Foubister', license: 'CC BY-SA 2.0', url: 'https://www.flickr.com/photos/mfoubister/28658736018/' } },
   baldy: { alt: 'Snow-plastered rock near the top of Mt. Baldy', pos: 50, small: true, credit: { by: 'Brent Sisson', license: 'CC BY-SA 4.0', url: 'https://commons.wikimedia.org/w/index.php?curid=99455022' } },
 });
-function regionPhoto(region) {
+// Winter town photos (2026-11-27, Dayton): in the ski months (Nov-Apr) a town listed here shows its winter photo everywhere its
+// photo appears; the rest of the year it keeps the year-round one above. Big White: the village clock tower on a sunny winter
+// day, Big White's own photo (Nov 2026 upload on bigwhite.com, used with their permission).
+const REGION_WINTER_PHOTOS = Object.freeze({
+  'big-white': { alt: 'The Big White village clock tower and plaza on a sunny winter day, with snowy mountains behind', pos: 50, credit: { by: 'Big White Ski Resort', license: 'used with permission', url: 'https://www.bigwhite.com/resort-photos' } },
+});
+function regionPhoto(region, now = new Date()) {
+  const w = REGION_WINTER_PHOTOS[region];
+  if (w && REGION_PHOTOS[region] && hotelIsSkiMonth(now)) {
+    const wb = `/images/regions/photos/${region}-winter-2611`;
+    return { ...w, src: `${wb}.jpg`, src800: `${wb}-800.jpg`, card: `${wb}-card.jpg`, small: false };
+  }
   const p = REGION_PHOTOS[region];
   if (!p) return null;
   const base = `/images/regions/photos/${region}-${REGION_PHOTO_STAMP}`;
@@ -32358,7 +32369,7 @@ ${GOLF_APP_SCRIPT_TAG}</body></html>`;
     return `<!DOCTYPE html><html lang="en"><head>
 ${pageHead(title, description, canonical, [breadcrumb, ...regionPageSchemas(region, regionLabel, description, canonical, categories)], { golfTheme: true, shareImage })}
 ${renderOutdoorThemeStyles()}
-${bigWhitePage.styles}
+${hotelIsSkiMonth() ? bigWhitePage.styles.replace('/images/regions/photos/big-white-2610.jpg', regionPhoto('big-white').src) : bigWhitePage.styles}
 ${golfEngagementHeadHtml('fd', true, 'region')}
 </head><body class="golf-page outdoor-page big-white-page">
 ${renderGolfTripTrayHtml()}<div id="floatingTooltip"></div>${renderGolfHeaderHtml()}
