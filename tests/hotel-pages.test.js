@@ -189,3 +189,15 @@ test('QR card + page polish (2026-11-26): open-late chip flag, shorter intro, ca
   assert.ok(card.includes('Happy hours &amp; drink deals'));
   assert.ok(card.includes('Build My Trip</strong> planner'));
 });
+
+test('guest page rows (2026-11-26): campgrounds and RV resorts are not "outdoors" for a hotel guest; tours lead their row', () => {
+  const venues = [
+    at(1, 'outdoor', 0.001, { name: 'Lakeview Campground & RV Resort' }), at(2, 'outdoor', 0.002, { name: 'River Walk Park' }),
+    at(3, 'sport', 0.001), at(4, 'tour', 0.004),
+  ];
+  const groups = app.hotelPageGroups(HOTEL, venues, NO_INFO, new Set());
+  const doG = groups.find((g) => g.key === 'do');
+  assert.deepEqual(doG.items.map((x) => x.v.id), [2], 'the campground is left out');
+  const act = groups.find((g) => g.key === 'activities');
+  assert.deepEqual(act.items.map((x) => x.v.id), [4, 3], 'the tour leads even though the sport place is closer');
+});
