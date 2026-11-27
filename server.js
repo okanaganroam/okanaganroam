@@ -36394,6 +36394,18 @@ function hotelGuides(regions, limit = 4) {
     return [...ownRows, ...rest].slice(0, limit).map((x) => ({ path: x.g.path, heading: x.g.heading }));
   } catch (err) { return []; }
 }
+function hotelGuideIcon(heading) {
+  const h = String(heading || '').toLowerCase();
+  if (/sleigh|sled|snowmobile|snowshoe|ski|snow|winter/.test(h)) return '\u{1F6F7}';
+  if (/wine|winery|vineyard/.test(h)) return '\u{1F377}';
+  if (/beer|brew|cider|distill/.test(h)) return '\u{1F37B}';
+  if (/eat|food|restaurant|brunch|dining|apr\u00e8s|apres|cheap/.test(h)) return '\u{1F37D}\uFE0F';
+  if (/family|kid/.test(h)) return '\u{1F9D2}';
+  if (/hike|trail|bike|outdoor/.test(h)) return '\u{1F97E}';
+  if (/gem|secret|hidden/.test(h)) return '\u{1F48E}';
+  if (/things to do|month|january|february|december|weekend|rainy/.test(h)) return '\u{1F4C5}';
+  return '\u2728';
+}
 function renderHotelPage(hotel, now = new Date()) {
   const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all().map(rowToVenue);
   const notOperating = advisoryNotOperatingIds();
@@ -36581,7 +36593,11 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-event img, body.hotel-page .ht-trip img { display: block; width: 100%; height: 120px; object-fit: cover; background: #2A6B67; margin-bottom: 6px; }
   body.hotel-page .ht-event .ht-meta, body.hotel-page .ht-event .ht-name, body.hotel-page .ht-trip .ht-meta, body.hotel-page .ht-trip .ht-name { padding: 0 12px; }
   body.hotel-page .ht-guides { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  body.hotel-page .ht-guides a { font-weight: 800; }
+  body.hotel-page .ht-guides a { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 10px 14px; background: #fff; border: 1px solid rgba(27,43,58,0.12); border-radius: 14px; box-shadow: 0 2px 8px rgba(27,43,58,0.07); color: var(--ref-navy, #1B2B3A); font-weight: 800; line-height: 1.3; text-decoration: none; transition: transform .15s, box-shadow .15s; }
+  body.hotel-page .ht-guides a:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(27,43,58,0.14); }
+  body.hotel-page .ht-guides .ht-gicon { flex: none; width: 40px; height: 40px; border-radius: 12px; background: #FBF1D3; display: grid; place-items: center; font-size: 22px; font-family: system-ui, sans-serif; }
+  body.hotel-page .ht-guides .ht-gtext { flex: 1; }
+  body.hotel-page .ht-guides .ht-garrow { flex: none; color: #C9A227; font-size: 20px; }
   body.hotel-page .ht-towns { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
   body.hotel-page .ht-towns a { display: inline-flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: 999px; background: #fff; border: 1px solid rgba(27,43,58,0.2); font-weight: 700; text-decoration: none; color: var(--ref-navy, #1B2B3A); }
   @media (max-width: 860px) { body.hotel-page .ht-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } body.hotel-page .ht-events, body.hotel-page .ht-trips { grid-template-columns: 1fr; } }
@@ -36634,8 +36650,8 @@ ${renderGolfHeaderHtml()}
   </section>` : ''}
   ${guides.length ? `<section class="ht-section" aria-labelledby="ht-guides">
     <h2 id="ht-guides">Our guides for this part of the valley</h2>
-    <ul class="ht-guides">${guides.map((g) => `<li><a href="${escapeHtml(g.path)}" data-ht-cta="guide">${escapeHtml(g.heading)}</a></li>`).join('')}</ul>
-    <p class="ht-more"><a href="/guides" data-ht-cta="all-guides">All our guides</a></p>
+    <ul class="ht-guides">${guides.map((g) => `<li><a href="${escapeHtml(g.path)}" data-ht-cta="guide"><span class="ht-gicon" aria-hidden="true">${hotelGuideIcon(g.heading)}</span><span class="ht-gtext">${escapeHtml(g.heading)}</span><span class="ht-garrow" aria-hidden="true">\u2192</span></a></li>`).join('')}</ul>
+    <p class="ht-more"><a class="ht-pill" href="/guides" data-ht-cta="all-guides">See all our guides</a></p>
   </section>` : ''}
   <section class="ht-section ht-valley" aria-labelledby="ht-valley">
     <h2 id="ht-valley">The whole Okanagan, in your pocket</h2>
