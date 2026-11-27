@@ -36448,12 +36448,12 @@ ${renderGolfHeaderHtml()}
     <a href="/map?f=in.${hotel.region}" data-ht-cta="map">Map of what's open</a>
     <a href="/${hotel.region}/events" data-ht-cta="whats-on">What's On in ${escapeHtml(town)}</a>
   </div>
+  ${tourRow}
   ${filters.length ? `<div class="ht-filters" role="group" aria-label="Show only"><button type="button" data-ht-filter="all" aria-pressed="true">Everything</button>${filters.map((f) => `<button type="button" data-ht-filter="${f.key}" aria-pressed="false">${escapeHtml(f.label)}</button>`).join('')}</div><p class="ht-none" id="htNone" hidden>Nothing nearby matches that right now. Try another filter.</p>` : ''}
   ${groups.map((g) => `<section class="ht-section ht-group" aria-labelledby="ht-${g.key}">
     <h2 id="ht-${g.key}">${escapeHtml(g.title)}</h2>
     <ul class="ht-list">${g.items.map(({ v, km }) => card(v, km)).join('')}</ul>
-  </section>${g.key === 'activities' ? tourRow : ''}`).join('\n  ')}
-  ${groups.some((g) => g.key === 'activities') ? '' : tourRow}
+  </section>`).join('\n  ')}
   ${events.length ? `<section class="ht-section" aria-labelledby="ht-events">
     <h2 id="ht-events">${escapeHtml(eventsTitle)}</h2>
     <ul class="ht-events">${events.slice(0, HOTEL_EVENTS_SHOWN).map(eventItem).join('')}</ul>
