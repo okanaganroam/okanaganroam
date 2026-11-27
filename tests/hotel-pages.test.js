@@ -229,12 +229,12 @@ test('ski hill guest pages (2026-11-27): no beaches promised at Big White; summe
   assert.ok(app.renderHotelCard(HOTEL).includes('Wineries, outdoors &amp; day trips'));
 });
 
-test('ski hill guest pages (2026-11-27): tours and activities lead; other pages keep their order', () => {
+test('ski hill guest pages (2026-11-27): eat and drink first, then tours and activities; other pages keep their order', () => {
   const SKI = { slug: 'ski-test', name: 'Ski Test', region: 'big-white', kind: 'rental', latitude: HOTEL.latitude, longitude: HOTEL.longitude };
   const venues = [at(1, 'cafe', 0.001), at(2, 'tour', 0.002), at(3, 'outdoor', 0.003, { name: 'Ice Rink' })];
   const ski = app.hotelPageGroups(SKI, venues, NO_INFO, new Set(), new Map(), new Date('2026-12-10T18:00:00Z'));
-  assert.deepEqual(ski.map((g) => g.key), ['activities', 'eat', 'do']);
-  assert.equal(ski[0].title, 'Tours and activities');
+  assert.deepEqual(ski.map((g) => g.key), ['eat', 'activities', 'do']);
+  assert.equal(ski[1].title, 'Tours and activities');
   assert.deepEqual(app.hotelPageGroups(HOTEL, venues, NO_INFO, new Set()).map((g) => g.key), ['eat', 'do', 'activities']);
 });
 

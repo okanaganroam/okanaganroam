@@ -36029,7 +36029,7 @@ function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map(), 
     const rest = rows.filter((x) => !shown.has(x.v.id) && !used.has(x.v.id) && !isFirst(x));
     const more = [...rest.filter(isOpen), ...rest.filter((x) => !isOpen(x))].slice(0, 40);
     return { ...g, items: picked, more };
-  }).filter((g) => g.items.length).sort((a, b) => (ski ? (b.key === 'activities') - (a.key === 'activities') : 0));
+  }).filter((g) => g.items.length).sort((a, b) => (ski ? ['eat', 'activities'].concat(['wine', 'do', 'indoor']).indexOf(a.key) - ['eat', 'activities'].concat(['wine', 'do', 'indoor']).indexOf(b.key) : 0));
 }
 // Live mountain conditions for a ski hill guest page (2026-11-27, Dayton): temperature, snow base, 24 h snowfall and lifts
 // running, read from the resort's own public snow report page and kept for 15 minutes. The page never waits on it: a
@@ -36556,7 +36556,8 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-events-more[open] summary { margin-bottom: 10px; }
   body.hotel-page .ht-events { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   body.hotel-page .ht-event { display: flex; flex-direction: column; gap: 3px; min-height: 44px; padding: 0 0 12px; overflow: hidden; border-radius: 14px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: var(--ref-navy, #1B2B3A); text-decoration: none; }
-  body.hotel-page .ht-more { margin: 10px 0 0; }
+  body.hotel-page .ht-more { margin: 12px 0 0; }
+  body.hotel-page .ht-more a.ht-pill { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(27,43,58,0.25); background: #fff; color: var(--ref-navy, #1B2B3A); font-weight: 800; text-decoration: none; }
   body.hotel-page .ht-credits { margin: 8px 0 0; font-size: 0.72rem; opacity: 0.7; }
   body.hotel-page .ht-hh { margin: 4px 12px 0; font-size: 0.8rem; font-weight: 700; color: #7a4b00; }
   body.hotel-page .ht-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 12px 0; }
@@ -36615,7 +36616,7 @@ ${renderGolfHeaderHtml()}
     <h2 id="ht-events">${escapeHtml(eventsTitle)}</h2>
     <ul class="ht-events">${events.slice(0, HOTEL_EVENTS_SHOWN).map(eventItem).join('')}</ul>
     ${events.length > HOTEL_EVENTS_SHOWN ? `<details class="ht-events-more"><summary>Show all ${events.length} events</summary><ul class="ht-events">${events.slice(HOTEL_EVENTS_SHOWN).map(eventItem).join('')}</ul></details>` : ''}
-    <p class="ht-more"><a href="/${hotel.region}/events">View all events in ${escapeHtml(town)}</a></p>
+    <p class="ht-more"><a class="ht-pill" href="/${hotel.region}/events">View all events in ${escapeHtml(town)}</a></p>
   </section>` : ''}
   ${dayTrips.length ? `<section class="ht-section" aria-labelledby="ht-trips">
     <h2 id="ht-trips">Day trips from ${escapeHtml(town)}</h2>
