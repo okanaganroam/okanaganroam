@@ -35984,13 +35984,16 @@ const HOTEL_EMAIL_UTM = (slug) => `utm_source=hotel_email&utm_medium=email&utm_c
 // Winter day-trip photos (2026-11-27, Dayton): in the ski months a day-trip card shows a real winter photo of the town, never the
 // summer valley or marina. A town with no winter photo shows no picture rather than a summer one. All from Wikimedia Commons.
 const HOTEL_WINTER_PHOTOS = Object.freeze({
+  'okanagan-falls': { src: '/images/regions/winter/okanagan-falls-2711.jpg', credit: 'Okanagan Falls: Vaseux Lake, Richard McGuire, via Flickr', url: 'https://www.flickr.com/photos/richardmcguire/8733437991/' },
+  coldstream: { src: '/images/regions/winter/coldstream-2711.jpg', credit: 'Coldstream: Kalamalka Lake, Extemporalist, CC0', url: 'https://commons.wikimedia.org/wiki/File:Looking_across_frozen_Kalamalka_Lake_from_Kaloya_Regional_Park.png' },
+  armstrong: { src: '/images/regions/winter/armstrong-2711.jpg', credit: 'Armstrong: silasdavid, from Mount Rose Swanson', url: 'https://steemit.com/travel/@silasdavid/mount-rose-swanson-winter-hiking-adventure-armstrong-bc-canada' },
   kelowna: { src: '/images/regions/winter/kelowna-2711.jpg', credit: 'Kelowna: Russ Dionne, CC BY-SA 3.0', url: 'https://commons.wikimedia.org/wiki/File:Outdoor_skate_rink_Kelowna_002.jpg' },
   'west-kelowna': { src: '/images/regions/winter/west-kelowna-2711.jpg', credit: 'West Kelowna: Visit Westside', url: 'https://www.visitwestside.com/five-picks-for-winter-in-west-kelowna' },
   penticton: { src: '/images/regions/winter/penticton-2711.jpg', credit: 'Penticton: BCHL / Gord Goble', url: 'https://explore-mag.com/pentictons-winter-playground-is-the-best-for-snowy-adventures/' },
   summerland: { src: '/images/regions/winter/summerland-2711.jpg', credit: 'Summerland: Kettle Valley Steam Railway', url: 'https://infotel.ca/newsitem/summerlands-christmas-express-the-ultimate-holiday-experience/it101423' },
   naramata: { src: '/images/regions/winter/naramata.jpg', credit: 'Naramata: Ben Cappellacci, CC BY 2.0', url: 'https://commons.wikimedia.org/wiki/File:Winter_view_from_Lock_%26_Worth_Winery.jpg' },
-  vernon: { src: '/images/regions/winter/vernon-2711.jpg', credit: 'Vernon: Jack Borno, CC BY-SA 3.0', url: 'https://commons.wikimedia.org/wiki/File:Vernon_-_panoramio.jpg' },
-  enderby: { src: '/images/regions/winter/enderby-2711.jpg', credit: 'Enderby: Shawn Roberts, CC BY-SA 2.0', url: 'https://commons.wikimedia.org/wiki/File:Enderby,_BC_(5509577763).jpg' },
+  vernon: { src: '/images/regions/winter/vernon-b-2711.jpg', credit: 'Vernon: Out-of-Doors Photos, via Flickr', url: 'https://www.flickr.com/photos/out-of-doors-photos/38200951602/' },
+  enderby: { src: '/images/regions/winter/enderby-b-2711.jpg', credit: 'Enderby: Tad McIlwraith, via Flickr', url: 'https://www.flickr.com/photos/tfm/3274897504/' },
   osoyoos: { src: '/images/regions/winter/osoyoos-2711.jpg', credit: 'Osoyoos: Kenton Gilchrist', url: 'https://destinationosoyoos.com/photo-roundup-17-stunning-captures-of-the-2022-winter-season-in-osoyoos/' },
   lumby: { src: '/images/regions/winter/lumby-2711.jpg', credit: 'Lumby: Brian Krog', url: 'https://infotel.ca/newsitem/in-photos-outhouse-races-in-north-okanagan-flushed-with-success/it102793' },
   oliver: { src: '/images/regions/winter/oliver-2711.jpg', credit: 'Oliver: Visit Oliver', url: 'https://visitoliver.com/featured-events/light-up-in-oliver-2025/' },
