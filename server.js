@@ -36386,7 +36386,9 @@ function renderHotelPage(hotel, now = new Date()) {
   const eventItem = (e) => {
     const href = discoveryEventUrl(e);
     const label = upcomingEventDateLabel(e.nextDate, e.nextEndDate, now);
-    return href ? `<li><a class="ht-event" href="${href}"><span class="ht-meta">${escapeHtml(label)}</span><span class="ht-name">${escapeHtml(e.name)}</span></a></li>` : '';
+    let pic = '';
+    try { pic = eventImagePath({ ...e, image_url: e.image_url || e.image || null }, e.categories || []); } catch (err) { pic = ''; }
+    return href ? `<li><a class="ht-event" href="${href}">${pic ? `<img src="${escapeHtml(pic)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(label)}</span><span class="ht-name">${escapeHtml(e.name)}</span></a></li>` : '';
   };
   const title = hotelIsRental(hotel) ? `Things to Do Around ${town} for ${hotel.name} Guests | Okanagan Roam` : `Things to Do Near ${hotel.name}, ${town} | Okanagan Roam`;
   const description = hotelIsRental(hotel)
@@ -36422,7 +36424,7 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-events-more summary::-webkit-details-marker { display: none; }
   body.hotel-page .ht-events-more[open] summary { margin-bottom: 10px; }
   body.hotel-page .ht-events { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-  body.hotel-page .ht-event { display: flex; flex-direction: column; gap: 3px; min-height: 44px; padding: 12px 0; border-radius: 14px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: var(--ref-navy, #1B2B3A); text-decoration: none; }
+  body.hotel-page .ht-event { display: flex; flex-direction: column; gap: 3px; min-height: 44px; padding: 0 0 12px; overflow: hidden; border-radius: 14px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: var(--ref-navy, #1B2B3A); text-decoration: none; }
   body.hotel-page .ht-more { margin: 10px 0 0; }
   body.hotel-page .ht-hh { margin: 4px 12px 0; font-size: 0.8rem; font-weight: 700; color: #7a4b00; }
   body.hotel-page .ht-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 12px 0; }
@@ -36433,9 +36435,9 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-none { margin: 14px 0 0; font-weight: 700; }
   body.hotel-page .ht-card[hidden], body.hotel-page .ht-group[hidden], body.hotel-page .ht-none[hidden] { display: none; }
   body.hotel-page .ht-trips { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-  body.hotel-page .ht-trip { display: flex; flex-direction: column; gap: 3px; min-height: 44px; padding: 12px 14px; border-radius: 14px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: var(--ref-navy, #1B2B3A); text-decoration: none; }
-  body.hotel-page .ht-trip .ht-name { padding: 0; }
-  body.hotel-page .ht-trip .ht-meta { padding: 0; }
+  body.hotel-page .ht-trip { display: flex; flex-direction: column; gap: 3px; min-height: 44px; padding: 0 0 12px; overflow: hidden; border-radius: 14px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: var(--ref-navy, #1B2B3A); text-decoration: none; }
+  body.hotel-page .ht-event img, body.hotel-page .ht-trip img { display: block; width: 100%; height: 120px; object-fit: cover; background: #2A6B67; margin-bottom: 6px; }
+  body.hotel-page .ht-event .ht-meta, body.hotel-page .ht-event .ht-name, body.hotel-page .ht-trip .ht-meta, body.hotel-page .ht-trip .ht-name { padding: 0 12px; }
   body.hotel-page .ht-guides { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
   body.hotel-page .ht-guides a { font-weight: 800; }
   body.hotel-page .ht-towns { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; padding: 0; list-style: none; }
@@ -36449,6 +36451,9 @@ ${renderAnalyticsHeadHtml('hotel')}
     body.hotel-page .ht-actions a[data-ht-cta="trip"] { display: none; }
     body.hotel-page .ht-list { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; margin: 0 -16px; padding: 0 16px 6px; }
     body.hotel-page .ht-card { flex: 0 0 62%; scroll-snap-align: start; }
+    body.hotel-page .ht-events, body.hotel-page .ht-trips { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 0 16px 6px; scrollbar-width: none; }
+    body.hotel-page .ht-events > li, body.hotel-page .ht-trips > li { flex: 0 0 62%; scroll-snap-align: start; display: flex; }
+    body.hotel-page .ht-events .ht-event, body.hotel-page .ht-trips .ht-trip { width: 100%; }
     body.hotel-page .ht-link img { height: 104px; }
   }
 </style>
@@ -36480,7 +36485,7 @@ ${renderGolfHeaderHtml()}
   </section>` : ''}
   ${dayTrips.length ? `<section class="ht-section" aria-labelledby="ht-trips">
     <h2 id="ht-trips">Day trips from ${escapeHtml(town)}</h2>
-    <ul class="ht-trips">${dayTrips.map((t) => `<li><a class="ht-trip" href="/${t.region}" data-ht-cta="day-trip"><span class="ht-meta">About ${t.drive} min drive</span><span class="ht-name">${escapeHtml(t.label)}</span><span>${escapeHtml(townLine(t.region))}${townLine(t.region) ? ' \u00b7 ' : ''}${t.count} places</span></a></li>`).join('')}</ul>
+    <ul class="ht-trips">${dayTrips.map((t) => { const rp = regionPhoto(t.region); return `<li><a class="ht-trip" href="/${t.region}" data-ht-cta="day-trip">${rp ? `<img src="${escapeHtml(rp.card)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">About ${t.drive} min drive</span><span class="ht-name">${escapeHtml(t.label)}</span></a></li>`; }).join('')}</ul>
   </section>` : ''}
   ${guides.length ? `<section class="ht-section" aria-labelledby="ht-guides">
     <h2 id="ht-guides">Our guides for this part of the valley</h2>
@@ -36563,19 +36568,19 @@ function renderHotelCard(hotel) {
   .hc-card { width: 4in; height: 6in; margin: 0 auto 24px; background: #FBF8F2; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 0.38in 0.34in 0.3in; border-radius: 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.12); }
   .hc-brand { font-family: Fraunces, Georgia, serif; font-weight: 700; font-size: 18px; letter-spacing: 0.08em; }
   .hc-brand span { color: #A6782F; }
-  .hc-rule { width: 44px; height: 2px; background: #A6782F; margin: 10px 0 14px; }
-  .hc-h { font-family: Fraunces, Georgia, serif; font-size: 25px; line-height: 1.12; margin: 0 0 8px; }
+  .hc-rule { width: 44px; height: 2px; background: #A6782F; margin: 8px 0 10px; }
+  .hc-h { font-family: Fraunces, Georgia, serif; font-size: 23px; line-height: 1.1; margin: 0 0 6px; }
   .hc-h-l { font-size: 21px; }
   .hc-h-xl { font-size: 18px; }
-  .hc-sub { font-size: 12.5px; line-height: 1.4; margin: 0 0 12px; opacity: 0.85; }
-  .hc-qr { width: 2.2in; height: 2.2in; background: #fff; border-radius: 10px; }
+  .hc-sub { font-size: 12px; line-height: 1.3; margin: 0 0 9px; opacity: 0.85; }
+  .hc-qr { width: 1.85in; height: 1.85in; background: #fff; border-radius: 10px; }
   .hc-qr svg { width: 100%; height: 100%; display: block; }
-  .hc-scan { font-weight: 800; font-size: 14px; margin: 12px 0 2px; }
+  .hc-scan { font-weight: 800; font-size: 14px; margin: 8px 0 2px; }
   .hc-free { display: block; font-weight: 600; font-size: 12px; opacity: 0.85; margin-top: 1px; }
   .hc-url { font-size: 12.5px; font-weight: 700; opacity: 0.9; overflow-wrap: normal; word-break: normal; }
-  .hc-list { list-style: none; margin: 12px auto 0; padding: 0; font-size: 12px; line-height: 1.65; font-weight: 700; display: inline-block; text-align: left; }
+  .hc-list { list-style: none; margin: 8px auto 0; padding: 0; font-size: 11.5px; line-height: 1.4; font-weight: 700; display: inline-block; text-align: left; }
   .hc-list li::before { content: '\\2713'; color: #A6782F; margin-right: 6px; }
-  .hc-list { margin-bottom: 10px; }
+  .hc-list { margin-bottom: 6px; }
   .hc-valley { font-size: 11.5px; line-height: 1.35; margin: 9px 0 0; opacity: 0.9; }
   .hc-has-logo { padding-bottom: 0.22in; }
   .hc-has-logo .hc-qr { width: 1.8in; height: 1.8in; }
