@@ -35970,6 +35970,13 @@ const HOTEL_EMAIL_UTM = (slug) => `utm_source=hotel_email&utm_medium=email&utm_c
 // enough to matter to a guest. They are listed, labelled, after the places open now.
 // Ski hills (2026-11-27, Dayton): a guest at Big White, Silver Star, Apex or Baldy is not near a beach, so the guest page
 // and card never promise one. In the ski months the outdoors row also drops the summer-only places (hiking, lakes, reservoirs).
+// Winter day-trip photos (2026-11-27, Dayton): in the ski months a day-trip card shows a real winter photo of the town, never the
+// summer valley or marina. A town with no winter photo shows no picture rather than a summer one. All from Wikimedia Commons.
+const HOTEL_WINTER_PHOTOS = Object.freeze({
+  kelowna: { src: '/images/regions/winter/kelowna.jpg', credit: 'Kelowna: Accuruss, CC BY-SA 3.0', url: 'https://commons.wikimedia.org/wiki/File:Kelowna_City_Park_with_Okanagan_Lake_and_west_kelowna_and_rose_valley_and_mountains_in_snow.jpg' },
+  naramata: { src: '/images/regions/winter/naramata.jpg', credit: 'Naramata: Ben Cappellacci, CC BY 2.0', url: 'https://commons.wikimedia.org/wiki/File:Winter_view_from_Lock_%26_Worth_Winery.jpg' },
+  'lake-country': { src: '/images/regions/winter/lake-country.jpg', credit: 'Lake Country: Extemporalist, CC0', url: 'https://commons.wikimedia.org/wiki/File:Overlooking_the_Lake_by_Okanagan_Centre_on_a_Late_Winter_Morning.png' },
+});
 const HOTEL_SKI_REGIONS = ['big-white', 'silverstar', 'apex', 'baldy'];
 function hotelIsSkiHill(hotel) { return !!hotel && HOTEL_SKI_REGIONS.includes(hotel.region); }
 function hotelIsSkiMonth(now = new Date()) { const m = Number(new Date(now).toLocaleString('en-CA', { month: 'numeric', timeZone: 'America/Vancouver' })) - 1; return m >= 10 || m <= 3; }
@@ -36430,6 +36437,7 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-events { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
   body.hotel-page .ht-event { display: flex; flex-direction: column; gap: 3px; min-height: 44px; padding: 0 0 12px; overflow: hidden; border-radius: 14px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: var(--ref-navy, #1B2B3A); text-decoration: none; }
   body.hotel-page .ht-more { margin: 10px 0 0; }
+  body.hotel-page .ht-credits { margin: 8px 0 0; font-size: 0.72rem; opacity: 0.7; }
   body.hotel-page .ht-hh { margin: 4px 12px 0; font-size: 0.8rem; font-weight: 700; color: #7a4b00; }
   body.hotel-page .ht-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 12px 0; }
   body.hotel-page .ht-tags span { padding: 1px 7px; border-radius: 999px; background: #f3efe6; font-size: 0.72rem; font-weight: 700; }
@@ -36492,7 +36500,8 @@ ${renderGolfHeaderHtml()}
   </section>` : ''}
   ${dayTrips.length ? `<section class="ht-section" aria-labelledby="ht-trips">
     <h2 id="ht-trips">Day trips from ${escapeHtml(town)}</h2>
-    <ul class="ht-trips">${dayTrips.map((t) => { const rp = regionPhoto(t.region); return `<li><a class="ht-trip" href="/${t.region}" data-ht-cta="day-trip">${rp ? `<img src="${escapeHtml(rp.card)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">About ${t.drive} min drive</span><span class="ht-name">${escapeHtml(t.label)}</span></a></li>`; }).join('')}</ul>
+    <ul class="ht-trips">${dayTrips.map((t) => { const wp = hotelIsSkiMonth(now) ? HOTEL_WINTER_PHOTOS[t.region] : null; const rp = hotelIsSkiMonth(now) ? (wp ? { card: wp.src } : null) : regionPhoto(t.region); return `<li><a class="ht-trip" href="/${t.region}" data-ht-cta="day-trip">${rp ? `<img src="${escapeHtml(rp.card)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">About ${t.drive} min drive</span><span class="ht-name">${escapeHtml(t.label)}</span></a></li>`; }).join('')}</ul>
+    ${hotelIsSkiMonth(now) && dayTrips.some((t) => HOTEL_WINTER_PHOTOS[t.region]) ? `<p class="ht-credits">Photos: ${dayTrips.filter((t) => HOTEL_WINTER_PHOTOS[t.region]).map((t) => `<a href="${HOTEL_WINTER_PHOTOS[t.region].url}" rel="noopener">${escapeHtml(HOTEL_WINTER_PHOTOS[t.region].credit)}</a>`).join(', ')}.</p>` : ''}
   </section>` : ''}
   ${guides.length ? `<section class="ht-section" aria-labelledby="ht-guides">
     <h2 id="ht-guides">Our guides for this part of the valley</h2>
