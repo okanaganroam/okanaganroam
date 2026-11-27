@@ -36534,8 +36534,8 @@ ${renderAnalyticsHeadHtml('hotel')}
   @media (max-width: 640px) {
     body.hotel-page .ht-filters { flex-wrap: nowrap; overflow-x: auto; margin-right: -16px; padding-right: 16px; scrollbar-width: none; }
     body.hotel-page .ht-filters button { flex: 0 0 auto; }
-    body.hotel-page .ht-intro + .ht-actions { flex-wrap: nowrap; gap: 8px; overflow-x: auto; scrollbar-width: none; }
-    body.hotel-page .ht-intro + .ht-actions a { flex: 0 0 auto; min-height: 42px; padding: 0 14px; font-size: 0.92rem; }
+    body.hotel-page .ht-actions { flex-wrap: nowrap; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+    body.hotel-page .ht-actions a { flex: 0 0 auto; min-height: 42px; padding: 0 14px; font-size: 0.92rem; }
     body.hotel-page .ht-actions a[data-ht-cta="trip"] { display: none; }
     body.hotel-page .ht-list { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; margin: 0 -16px; padding: 0 16px 6px; }
     body.hotel-page .ht-card { flex: 0 0 62%; scroll-snap-align: start; }
