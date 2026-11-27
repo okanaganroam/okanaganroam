@@ -6262,6 +6262,13 @@ test('HTTP routes: region, category, venue, guide, and 404 all respond correctly
     }
   }
 
+  // A plain visit to the POST-only planner address goes to the planner page, not a 404.
+  {
+    const res = await fetch(`${base}/api/trip/plan`, { redirect: 'manual' });
+    assert.equal(res.status, 302);
+    assert.equal(res.headers.get('location'), '/trip');
+  }
+
   // ---- POST /api/trip/parse (Build My Trip, Stage 3) -----------------------
   // The route's default provider is now the FREE deterministic parser
   // (deterministicTripParserProvider), not OpenAI -- so a well-formed

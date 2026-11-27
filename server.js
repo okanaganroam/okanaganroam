@@ -84268,6 +84268,12 @@ const server = http.createServer(async (req, res) => {
       return sendJSON(res, 200, parsed.value);
     }
 
+    // A plain visit (GET/HEAD) to the planner's POST-only address, from a crawler or a reload: send it to the planner page.
+    if (pathname === '/api/trip/plan' && (method === 'GET' || method === 'HEAD')) {
+      res.writeHead(302, { Location: '/trip', 'X-Robots-Tag': 'noindex', 'Cache-Control': 'no-store' });
+      return res.end();
+    }
+
     // POST /api/trip/plan -- Build My Trip planner (Phase 3). Read-only:
     // interprets the request and returns recommendations, an outing or a
     // day-by-day plan built only from verified venue data (or What's On
