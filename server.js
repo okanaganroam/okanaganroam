@@ -36534,8 +36534,8 @@ ${renderAnalyticsHeadHtml('hotel')}
   @media (max-width: 640px) {
     body.hotel-page .ht-filters { flex-wrap: nowrap; overflow-x: auto; margin-right: -16px; padding-right: 16px; scrollbar-width: none; }
     body.hotel-page .ht-filters button { flex: 0 0 auto; }
-    body.hotel-page .ht-intro + .ht-actions { flex-wrap: nowrap; gap: 8px; overflow-x: auto; scrollbar-width: none; }
-    body.hotel-page .ht-intro + .ht-actions a { flex: 0 0 auto; min-height: 42px; padding: 0 14px; font-size: 0.92rem; }
+    body.hotel-page .ht-actions { flex-wrap: nowrap; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+    body.hotel-page .ht-actions a { flex: 0 0 auto; min-height: 42px; padding: 0 14px; font-size: 0.92rem; }
     body.hotel-page .ht-actions a[data-ht-cta="trip"] { display: none; }
     body.hotel-page .ht-list { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; margin: 0 -16px; padding: 0 16px 6px; }
     body.hotel-page .ht-card { flex: 0 0 62%; scroll-snap-align: start; }
@@ -36552,9 +36552,9 @@ ${renderAnalyticsHeadHtml('hotel')}
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main">
   <div class="ht-wrap">
-  ${(() => { const hh = HOTEL_HERO_PHOTOS[hotel.region]; const hp = hotelIsSkiHill(hotel) && hotelIsSkiMonth(now) ? (hh ? { src800: hh.src, alt: hh.alt, pos: hh.pos, credit: hh.credit } : regionPhoto(hotel.region)) : null; return hp ? `<div class="ht-hero"><img src="${escapeHtml(hp.src800)}" alt="${escapeHtml(hp.alt || '')}" width="1500" height="600"${hp.pos ? ` style="object-position:${escapeHtml(hp.pos)}"` : ''}><div class="ht-hero-text"><p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>${hotelConditionsHtml(hotel, now, 'tiles')}</div></div>${hotelConditionsHtml(hotel, now, 'src')}` : `<p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>${hotelConditionsHtml(hotel, now)}`; })()}
+  ${(() => { const hh = HOTEL_HERO_PHOTOS[hotel.region]; const hp = hotelIsSkiHill(hotel) && hotelIsSkiMonth(now) ? (hh ? { src800: hh.src, alt: hh.alt, pos: hh.pos, credit: hh.credit } : regionPhoto(hotel.region)) : null; return hp ? `<div class="ht-hero"><img src="${escapeHtml(hp.src800)}" alt="${escapeHtml(hp.alt || '')}" width="1500" height="600"${hp.pos ? ` style="object-position:${escapeHtml(hp.pos)}"` : ''}><div class="ht-hero-text"><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>${hotelConditionsHtml(hotel, now, 'tiles')}</div></div>${hotelConditionsHtml(hotel, now, 'src')}` : `<p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>${hotelConditionsHtml(hotel, now)}`; })()}
     ${hotelSeasonNoteHtml(hotel, now)}
-  <p class="ht-intro">${hotelIsRental(hotel) ? `What's open around ${escapeHtml(town)} right now` : `What's open near ${escapeHtml(hotel.name)} right now, closest first`}.</p>
+  ${hotelIsSkiHill(hotel) && hotelIsSkiMonth(now) ? '' : `<p class="ht-intro">${hotelIsRental(hotel) ? `What's open around ${escapeHtml(town)} right now` : `What's open near ${escapeHtml(hotel.name)} right now, closest first`}.</p>`}
   <div class="ht-actions">
     <a class="ht-primary" href="/trip" data-ht-cta="trip">Build My Trip</a>
     <a href="/map?f=in.${hotel.region}" data-ht-cta="map">Map of what's open</a>
