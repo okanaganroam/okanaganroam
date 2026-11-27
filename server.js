@@ -35978,7 +35978,7 @@ function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map(), 
   const used = new Set();
   const ski = hotelIsSkiHill(hotel), skiMonth = ski && hotelIsSkiMonth(now);
   return HOTEL_PAGE_GROUPS.map((g0) => {
-    const g = ski && g0.key === 'do' ? { ...g0, title: 'Outdoors and things to do', types: ['outdoor'] } : g0;
+    const g = ski && g0.key === 'do' ? { ...g0, title: 'Outdoors and things to do', types: ['outdoor'] } : ski && g0.key === 'activities' ? { ...g0, title: 'Tours and activities' } : g0;
     const rows = venues
       .filter((v) => g.types.includes(v.type) && !(skiMonth && g.key === 'do' && HOTEL_SUMMER_ONLY.test(v.name || '')) && v.slug && CATEGORY_SLUGS[v.type] && (!closedIds.has(v.id) || opensSoon.has(v.id)) && !(g.skipName && g.skipName.test(v.name || '')))
       .map((v) => ({ v, km: venueDistanceKm(hotel, v) }))
@@ -35991,7 +35991,7 @@ function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map(), 
     const picked = [...near.filter(isFirst), ...near.filter((x) => !isFirst(x) && isOpen(x)), ...near.filter((x) => !isFirst(x) && !isOpen(x))].slice(0, g.limit)
       .filter((x) => !used.has(x.v.id) && used.add(x.v.id));
     return { ...g, items: picked };
-  }).filter((g) => g.items.length);
+  }).filter((g) => g.items.length).sort((a, b) => (ski ? (b.key === 'activities') - (a.key === 'activities') : 0));
 }
 // Ski hill guest pages before opening day (2026-11-25, Dayton): most places on the hill say "Opens Dec 3", which can
 // read like a broken page to a guest who scans the QR card before the season. One line says when the lifts open and
