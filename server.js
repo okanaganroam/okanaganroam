@@ -36014,7 +36014,7 @@ const HOTEL_SUMMER_ONLY = /\b(summer|beach(es)?|swim(ming)?|boat(ing)?|cruises?|
 // At a ski hill in the ski months, warm-weather activities go too: golf and disc golf, hiking, mountain biking, rafting, lakes.
 const HOTEL_SKI_SUMMER = /\b(lake|golf|disc golf|hik(e|es|ing)|mountain bik(e|es|ing)|bike park|zip ?lines?|rafting|canoe(ing)?|skate ?parks?|skatepark|pickleball|tennis|bmx|kart(plex)?|pump ?track|rock garden|rose garden|channel walk)\b/i;
 // At a ski hill in the ski months the outdoors row keeps only the places that make sense in snow (2026-11-27, Dayton: Apex was offering summer parks and trails).
-const HOTEL_SKI_WINTER_OK = /\b(ski|skiing|snow\w*|nordic|skat(e|es|ing)|tube|tubing|sleigh|sled(ding)?|toboggan\w*|cross[- ]country|ice|winter|fat ?bike|resort|mountain|provincial park)\b/i;
+const HOTEL_SKI_WINTER_OK = /\b(ski|skiing|snow\w*|nordic|skat(e|es|ing)|tube|tubing|sleigh|sled(ding)?|toboggan\w*|cross[- ]country|ice|winter|fat ?bike|resort|provincial park)\b/i;
 // And the other way round (May-Oct): snow and ice activities are not offered in the warm months.
 const HOTEL_WINTER_ONLY = /\b(ski(s|ing)?|snow\w*|sleigh|sled(ding)?|nordic|tube park|toboggan\w*|ice[- ]skating|skating rink|outdoor rink|curling)\b/i;
 function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map(), now = new Date()) {
