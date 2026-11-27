@@ -36012,6 +36012,38 @@ function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map(), 
     return { ...g, items: picked, more };
   }).filter((g) => g.items.length).sort((a, b) => (ski ? (b.key === 'activities') - (a.key === 'activities') : 0));
 }
+// Live mountain conditions for a ski hill guest page (2026-11-27, Dayton): temperature, snow base, 24 h snowfall and lifts
+// running, read from the resort's own public snow report page and kept for 15 minutes. The page never waits on it: a
+// stale or missing reading simply hides the strip. Big White only for now.
+const HOTEL_CONDITIONS = { 'big-white': { url: 'https://www.bigwhite.com/mountain-conditions', name: 'Big White' } };
+const hotelConditionsCache = new Map();
+function parseBigWhiteConditions(html) {
+  const t = String(html || '').replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const m = t.match(/Winter Summer\s*(-?\d+)\s*\u00b0C\s*-?\d+\s*\u00b0C\s*Weather[\s\S]{0,40}?(\d+)\s*CM\s*\d+\s*CM\s*Snow Base[\s\S]{0,40}?(\d+)\s*CM\s*\d+\s*CM\s*24hr Snowfall[\s\S]{0,40}?(\d+)\s+\d+\s*Runs Open[\s\S]{0,40}?(\d+)\s+\d+\s*Lifts Running/i);
+  return m ? { tempC: Number(m[1]), baseCm: Number(m[2]), newCm: Number(m[3]), runs: Number(m[4]), lifts: Number(m[5]) } : null;
+}
+function hotelConditions(region) {
+  const cfg = HOTEL_CONDITIONS[region];
+  if (!cfg) return null;
+  const c = hotelConditionsCache.get(region) || { at: 0, data: null, busy: false };
+  hotelConditionsCache.set(region, c);
+  const age = Date.now() - c.at;
+  if (age > 15 * 60 * 1000 && !c.busy && !process.env.NODE_TEST_CONTEXT) {
+    c.busy = true;
+    fetch(cfg.url, { headers: { 'User-Agent': 'okanaganroam-guest-page' }, signal: AbortSignal.timeout(8000) })
+      .then((r) => (r.ok ? r.text() : ''))
+      .then((h) => { const d = parseBigWhiteConditions(h); c.at = d ? Date.now() : Date.now() - 10 * 60 * 1000; if (d) c.data = d; })
+      .catch(() => { c.at = Date.now() - 10 * 60 * 1000; })
+      .finally(() => { c.busy = false; });
+  }
+  return c.data && Date.now() - (c.at || 0) < 3 * 60 * 60 * 1000 ? { ...c.data, url: cfg.url, name: cfg.name } : null;
+}
+function hotelConditionsHtml(hotel, now = new Date()) {
+  const c = hotelConditions(hotel.region);
+  if (!c) return '';
+  const tile = (big, small) => `<div class="ht-cond"><strong>${escapeHtml(big)}</strong><span>${escapeHtml(small)}</span></div>`;
+  return `<div class="ht-conds" role="group" aria-label="${escapeHtml(c.name)} conditions now">${tile(`${c.tempC}\u00b0C`, 'At the village')}${tile(`${c.baseCm} cm`, 'Snow base')}${tile(`${c.newCm} cm`, 'New snow, 24 h')}${(() => { const f = SKI_RESORT_SEASON[hotel.region]; return f && skiSeasonState(f, todayLocal(now)) === 'soon' ? tile(formatLocalDateShort(f.opens, { weekday: false }), 'Lifts open') : tile(String(c.lifts), c.lifts === 1 ? 'Lift running' : 'Lifts running'); })()}</div><p class="ht-credits ht-conds-src">Reported by <a href="${escapeHtml(c.url)}" rel="noopener">${escapeHtml(c.name)}</a>, updated through the day.</p>`;
+}
 // Ski hill guest pages before opening day (2026-11-25, Dayton): most places on the hill say "Opens Dec 3", which can
 // read like a broken page to a guest who scans the QR card before the season. One line says when the lifts open and
 // that the village is open meanwhile. Only for a hotel on a ski hill with a season in SKI_RESORT_SEASON, only while
@@ -36020,7 +36052,7 @@ function hotelSeasonNoteHtml(hotel, now = new Date()) {
   const f = SKI_RESORT_SEASON[hotel && hotel.region];
   if (!f || skiSeasonState(f, todayLocal(now)) !== 'soon' || !f.statusSoon) return '';
   const town = REGION_LABELS[hotel.region] || hotel.region;
-  return `<p class="ht-season" role="note"><strong>${escapeHtml(town)} lifts: ${escapeHtml(f.statusSoon)}.</strong> ${escapeHtml(f.noteSoon || '')} The places marked "Open now" below are open today.</p>`;
+  return `<p class="ht-season" role="note"><strong>Lifts: ${escapeHtml(f.statusSoon)}.</strong> The village is open meanwhile.</p>`;
 }
 function hotelAwayText(km) {
   return km <= 1.2 ? `${Math.max(1, Math.round(km * 12))} min walk` : `${Math.round(km * 1.6 + 2)} min drive`;
@@ -36414,6 +36446,18 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-wrap { max-width: 980px; margin: 0 auto; }
   body.hotel-page .ht-kicker { margin: 0 0 4px; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.7; }
   body.hotel-page h1 { margin: 0 0 8px; }
+  body.hotel-page .ht-hero { position: relative; margin: 0 0 14px; border-radius: 16px; overflow: hidden; background: #1B2B3A; }
+  body.hotel-page .ht-hero img { display: block; width: 100%; height: 220px; object-fit: cover; object-position: 50% 70%; }
+  body.hotel-page .ht-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(14,24,34,0.82), rgba(14,24,34,0.05) 65%); }
+  body.hotel-page .ht-hero-text { position: absolute; left: 16px; right: 16px; bottom: 14px; z-index: 1; color: #fff; }
+  body.hotel-page .ht-hero-text .ht-kicker { color: rgba(255,255,255,0.85); margin: 0 0 4px; }
+  body.hotel-page .ht-hero-text h1 { color: #fff; margin: 0; font-size: clamp(1.5rem, 6vw, 2.3rem); text-shadow: 0 1px 8px rgba(0,0,0,0.35); }
+  body.hotel-page .ht-conds { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0 0 6px; }
+  body.hotel-page .ht-cond { background: #fff; border: 1px solid rgba(27,43,58,0.14); border-radius: 12px; padding: 10px 4px; text-align: center; display: flex; flex-direction: column; gap: 2px; }
+  body.hotel-page .ht-cond strong { font-size: 1.2rem; line-height: 1.1; color: var(--ref-navy, #1B2B3A); }
+  body.hotel-page .ht-cond span { font-size: 0.68rem; font-weight: 700; opacity: 0.75; }
+  body.hotel-page .ht-conds-src { margin: 0 0 12px; }
+  body.hotel-page .ht-season { margin: 0 0 8px; padding: 8px 12px; font-size: 0.9rem; }
   body.hotel-page .ht-intro { margin: 0 0 18px; max-width: 640px; opacity: 0.85; }
   body.hotel-page .ht-season { margin: 0 0 14px; max-width: 640px; padding: 10px 14px; border-radius: 12px; background: #eef2f7; color: var(--ref-navy, #1B2B3A); font-size: 0.95rem; }
   body.hotel-page .ht-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 8px; }
@@ -36476,10 +36520,10 @@ ${renderAnalyticsHeadHtml('hotel')}
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main">
   <div class="ht-wrap">
-  <p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p>
-  <h1>${escapeHtml(hotelTitleLine(hotel))}</h1>
+  ${(() => { const hp = hotelIsSkiHill(hotel) && hotelIsSkiMonth(now) ? regionPhoto(hotel.region) : null; return hp ? `<div class="ht-hero"><img src="${escapeHtml(hp.src800)}" alt="${escapeHtml(hp.alt || '')}" width="800" height="400"><div class="ht-hero-text"><p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1></div></div>` : `<p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>`; })()}
+  ${hotelConditionsHtml(hotel, now)}
   ${hotelSeasonNoteHtml(hotel, now)}
-  <p class="ht-intro">${hotelIsRental(hotel) ? `What's open around ${escapeHtml(town)} right now` : `What's open near ${escapeHtml(hotel.name)} right now, closest first`}. Tap <strong>Add to trip</strong> on anything you like and Build My Trip turns it into a plan.</p>
+  <p class="ht-intro">${hotelIsRental(hotel) ? `What's open around ${escapeHtml(town)} right now` : `What's open near ${escapeHtml(hotel.name)} right now, closest first`}.</p>
   <div class="ht-actions">
     <a class="ht-primary" href="/trip" data-ht-cta="trip">Build My Trip</a>
     <a href="/map?f=in.${hotel.region}" data-ht-cta="map">Map of what's open</a>
