@@ -36514,17 +36514,26 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-actions a:active { transform: scale(0.97); }
   body.hotel-page .ht-filters button { transition: background .15s ease, color .15s ease; border-color: rgba(27,43,58,0.25); }
   body.hotel-page .ht-events-more summary { background: #fff; border-color: rgba(27,43,58,0.25); }
-  body.hotel-page .ht-valley { background: #1B2B3A; color: #fff; border-radius: 22px; padding: 22px 18px; }
-  body.hotel-page .ht-valley h2, body.hotel-page .ht-valley .ht-intro { color: #fff; opacity: 1; }
-  body.hotel-page .ht-valley .ht-actions a { background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.3); }
-  body.hotel-page .ht-valley .ht-actions a.ht-primary { background: #E3B341; color: #1B2B3A; border-color: #E3B341; }
-  body.hotel-page .ht-valley .ht-towns a { background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.25); }
+  body.hotel-page .ht-valley { background: linear-gradient(160deg, #1B2B3A, #24425a); color: #fff; border-radius: 22px; padding: 24px 18px 20px; box-shadow: 0 10px 28px rgba(14,24,34,0.25); }
+  body.hotel-page .ht-valley h2 { color: #fff; margin: 0 0 4px; font-size: 1.45rem; }
+  body.hotel-page .ht-valley-sub { margin: 0 0 18px; color: rgba(255,255,255,0.78); font-size: 0.95rem; }
+  body.hotel-page .ht-valley-cta { display: flex; align-items: center; justify-content: center; min-height: 54px; padding: 0 16px; border-radius: 16px; background: #E3B341; color: #1B2B3A; font-weight: 800; font-size: 1.02rem; text-align: center; text-decoration: none; box-shadow: 0 6px 16px rgba(0,0,0,0.25); }
+  body.hotel-page .ht-valley-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 12px 0 0; }
+  body.hotel-page .ht-valley-grid a { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 76px; padding: 10px 6px; border-radius: 16px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18); color: #fff; font-weight: 800; font-size: 0.95rem; text-decoration: none; }
+  body.hotel-page .ht-valley-grid i { font-style: normal; font-size: 1.4rem; line-height: 1; }
+  @media (min-width: 700px) { body.hotel-page .ht-valley-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  body.hotel-page .ht-valley-towns { margin: 16px 0 0; border-top: 1px solid rgba(255,255,255,0.18); padding-top: 12px; }
+  body.hotel-page .ht-valley-towns summary { cursor: pointer; font-weight: 800; min-height: 40px; display: flex; align-items: center; justify-content: space-between; list-style: none; }
+  body.hotel-page .ht-valley-towns summary::-webkit-details-marker { display: none; }
+  body.hotel-page .ht-valley-towns summary::after { content: '+'; font-size: 1.4rem; opacity: 0.8; }
+  body.hotel-page .ht-valley-towns[open] summary::after { content: '\\2212'; }
+  body.hotel-page .ht-valley .ht-towns { margin: 8px 0 0; gap: 8px; }
+  body.hotel-page .ht-valley .ht-towns a { background: rgba(255,255,255,0.1); color: #fff; border-color: rgba(255,255,255,0.22); min-height: 36px; font-size: 0.9rem; }
+  body.hotel-page .ht-valley-all { display: inline-block; margin: 12px 0 0; color: #E3B341; font-weight: 800; text-decoration: none; }
   @media (max-width: 860px) {
     body.hotel-page .ht-actions.ht-quick { display: grid; grid-template-columns: 1fr 1fr; overflow: visible; gap: 10px; }
     body.hotel-page .ht-actions.ht-quick a i { display: block; margin: 0 0 2px; }
     body.hotel-page .ht-actions.ht-quick a { flex: none; flex-direction: column; justify-content: center; padding-top: 8px; padding-bottom: 8px; line-height: 1.15; min-height: 52px; padding: 0 8px; border-radius: 16px; background: #fff; border: 0; box-shadow: 0 1px 2px rgba(27,43,58,0.08), 0 6px 16px rgba(27,43,58,0.09); font-size: 0.9rem; text-align: center; }
-    body.hotel-page .ht-valley .ht-actions { flex-wrap: wrap; overflow: visible; }
-    body.hotel-page .ht-valley .ht-actions a { flex: 0 1 auto; }
   }
   body.hotel-page .ht-conds-src { margin: 0 0 12px; }
   body.hotel-page .ht-credits-fold { margin: 6px 0 0; font-size: 0.7rem; opacity: 0.55; }
@@ -36630,16 +36639,19 @@ ${renderGolfHeaderHtml()}
   </section>` : ''}
   <section class="ht-section ht-valley" aria-labelledby="ht-valley">
     <h2 id="ht-valley">The whole Okanagan, in your pocket</h2>
-    <p class="ht-intro">Open-now times, events and the trip planner for every town from Osoyoos to Vernon. Free, nothing to sign up for. Save this page to your home screen for the rest of your trip.</p>
-    <div class="ht-actions">
-      <a class="ht-primary" href="/trip" data-ht-cta="valley-trip">Plan a trip anywhere in the Okanagan</a>
-      <a href="/map" data-ht-cta="valley-map">Roam Now: what's open near me</a>
-      <a href="/whats-on" data-ht-cta="valley-whats-on">What's On, valley-wide</a>
-      <a href="/map?show=happy-hour" data-ht-cta="valley-hh">Happy hours on the map</a>
-      <a href="/hidden-gems" data-ht-cta="valley-gems">Hidden gems</a>
-      <a href="/destinations" data-ht-cta="valley-destinations">Browse every town</a>
+    <p class="ht-valley-sub">Free. Nothing to sign up for. Save this page to your home screen.</p>
+    <a class="ht-valley-cta" href="/trip" data-ht-cta="valley-trip">Plan a trip anywhere in the Okanagan</a>
+    <div class="ht-valley-grid">
+      <a href="/map" data-ht-cta="valley-map"><i aria-hidden="true">\ud83d\udccd</i><span>Open near me</span></a>
+      <a href="/whats-on" data-ht-cta="valley-whats-on"><i aria-hidden="true">\ud83c\udf89</i><span>What's On</span></a>
+      <a href="/map?show=happy-hour" data-ht-cta="valley-hh"><i aria-hidden="true">\ud83c\udf7b</i><span>Happy hours</span></a>
+      <a href="/hidden-gems" data-ht-cta="valley-gems"><i aria-hidden="true">\ud83d\udc8e</i><span>Hidden gems</span></a>
     </div>
-    <ul class="ht-towns" aria-label="Browse by town">${Object.keys(REGION_LABELS).filter((r) => !SKI_RESORT_REGIONS.has(r)).map((r) => `<li><a href="/${r}" data-ht-cta="town">${escapeHtml(REGION_LABELS[r])}</a></li>`).join('')}</ul>
+    <details class="ht-valley-towns">
+      <summary>Browse by town</summary>
+      <ul class="ht-towns" aria-label="Browse by town">${Object.keys(REGION_LABELS).filter((r) => !SKI_RESORT_REGIONS.has(r)).map((r) => `<li><a href="/${r}" data-ht-cta="town">${escapeHtml(REGION_LABELS[r])}</a></li>`).join('')}</ul>
+      <a class="ht-valley-all" href="/destinations" data-ht-cta="valley-destinations">See every town \u2192</a>
+    </details>
   </section>
   </div>
   </main>
