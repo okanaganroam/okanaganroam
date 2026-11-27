@@ -36126,7 +36126,7 @@ function hotelConditionsHtml(hotel, now = new Date(), part = 'all') {
   if (soon && sf.opens) parts.push(tile(formatLocalDateShort(sf.opens, { weekday: false }), 'Lifts open', '\ud83d\udea1'));
   else if (Number.isFinite(c.lifts)) parts.push(tile(c.liftsOf ? `${c.lifts} of ${c.liftsOf}` : String(c.lifts), c.liftsOf ? 'Lifts running' : (c.lifts === 1 ? 'Lift running' : 'Lifts running'), '\ud83d\udea1'));
   if (parts.length < 4) parts.push(`<a class="ht-cond ht-cond-link" href="${escapeHtml(c.url)}" rel="noopener" target="_blank"><i aria-hidden="true">\ud83d\udcca</i><strong>Live</strong><span>Snow report \u2192</span></a>`);
-  const tiles = `<div class="ht-conds" role="group" aria-label="${escapeHtml(c.name)} conditions now">${parts.join('')}</div>`;
+  const tiles = `<div class="ht-conds" style="grid-template-columns:repeat(${parts.length},minmax(0,1fr))" role="group" aria-label="${escapeHtml(c.name)} conditions now">${parts.join('')}</div>`;
   const src = `<p class="ht-credits ht-conds-src">Reported by <a href="${escapeHtml(c.url)}" rel="noopener">${escapeHtml(c.name)}</a>, updated through the day.</p>`;
   return part === 'tiles' ? tiles : part === 'src' ? src : tiles + src;
 }
