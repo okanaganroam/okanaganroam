@@ -35973,14 +35973,22 @@ const HOTEL_EMAIL_UTM = (slug) => `utm_source=hotel_email&utm_medium=email&utm_c
 const HOTEL_SKI_REGIONS = ['big-white', 'silverstar', 'apex', 'baldy'];
 function hotelIsSkiHill(hotel) { return !!hotel && HOTEL_SKI_REGIONS.includes(hotel.region); }
 function hotelIsSkiMonth(now = new Date()) { const m = Number(new Date(now).toLocaleString('en-CA', { month: 'numeric', timeZone: 'America/Vancouver' })) - 1; return m >= 10 || m <= 3; }
-const HOTEL_SUMMER_ONLY = /\b(summer|beach(es)?|swim(ming)?|boat(ing)?|kayak|paddle|reservoir|lake ?shore|waterfront)\b/i;
+// Summer-only places by name (2026-11-27, Dayton): in the ski months (Nov-Apr) no guest page offers beaches, boat tours,
+// camping or lake recreation sites; at a ski hill a lake is left out too.
+const HOTEL_SUMMER_ONLY = /\b(summer|beach(es)?|swim(ming)?|boat(ing)?|cruises?|tiki|kayak(s|ing)?|paddle(board(ing)?)?|sup|reservoir|lake ?shore|waterfront|marina|splash|water ?(park|slide|sports?)|jet ?ski|wake ?board(ing)?|camp(ground|ing|site)s?|recreation site)\b/i;
+// At a ski hill in the ski months, warm-weather activities go too: golf and disc golf, hiking, mountain biking, rafting, lakes.
+const HOTEL_SKI_SUMMER = /\b(lake|golf|disc golf|hik(e|es|ing)|mountain bik(e|es|ing)|bike park|zip ?lines?|rafting|canoe(ing)?)\b/i;
+// And the other way round (May-Oct): snow and ice activities are not offered in the warm months.
+const HOTEL_WINTER_ONLY = /\b(ski(s|ing)?|snow\w*|sleigh|sled(ding)?|nordic|tube park|toboggan\w*|ice[- ]skating|skating rink|outdoor rink|curling)\b/i;
 function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map(), now = new Date()) {
   const used = new Set();
-  const ski = hotelIsSkiHill(hotel), skiMonth = ski && hotelIsSkiMonth(now);
+  const ski = hotelIsSkiHill(hotel), winter = hotelIsSkiMonth(now);
+  // The right season only (2026-11-27 rule, Dayton): nothing for the wrong season is offered on a guest page.
+  const outOfSeason = (v) => (winter ? (HOTEL_SUMMER_ONLY.test(v.name || '') || (ski && (HOTEL_SKI_SUMMER.test(v.name || '') || v.type === 'golf'))) : HOTEL_WINTER_ONLY.test(v.name || ''));
   return HOTEL_PAGE_GROUPS.map((g0) => {
-    const g = ski && g0.key === 'do' ? { ...g0, title: 'Outdoors and things to do', types: ['outdoor'] } : ski && g0.key === 'activities' ? { ...g0, title: 'Tours and activities' } : g0;
+    const g = g0.key === 'do' && (ski || winter) ? { ...g0, title: ski ? 'Outdoors and things to do' : 'Parks, trails and outdoors', types: ['outdoor'] } : ski && g0.key === 'activities' ? { ...g0, title: 'Tours and activities' } : g0;
     const rows = venues
-      .filter((v) => g.types.includes(v.type) && !(skiMonth && g.key === 'do' && HOTEL_SUMMER_ONLY.test(v.name || '')) && v.slug && CATEGORY_SLUGS[v.type] && (!closedIds.has(v.id) || opensSoon.has(v.id)) && !(g.skipName && g.skipName.test(v.name || '')))
+      .filter((v) => g.types.includes(v.type) && !((g.key === 'do' || g.key === 'activities') && outOfSeason(v)) && v.slug && CATEGORY_SLUGS[v.type] && (!closedIds.has(v.id) || opensSoon.has(v.id)) && !(g.skipName && g.skipName.test(v.name || '')))
       .map((v) => ({ v, km: venueDistanceKm(hotel, v) }))
       .filter((x) => x.km !== null && x.km <= g.maxKm)
       .sort((a, b) => a.km - b.km);
@@ -36592,7 +36600,7 @@ function renderHotelCard(hotel) {
   <div class="hc-qr" id="hcQr" data-target="${escapeHtml(target)}" role="img" aria-label="QR code for ${escapeHtml(shown)}"></div>
   <div class="hc-scan">Scan with your phone camera <span class="hc-free">Free, no app.</span></div>
   <div class="hc-url">okanaganroam.com/near/<wbr>${escapeHtml(hotel.slug)}</div>
-  <ul class="hc-list"><li>${hotelIsRental(hotel) ? 'Map of what\'s near you' : "What's open near you right now"}</li><li>Happy hours &amp; drink deals</li><li>Tours, events &amp; rainy-day ideas</li><li>${hotelIsSkiHill(hotel) ? 'Day trips down to Kelowna &amp; the valley' : 'Wineries, beaches &amp; day trips, valley-wide'}</li><li>Free <strong>Build My Trip</strong> planner</li></ul>
+  <ul class="hc-list"><li>${hotelIsRental(hotel) ? 'Map of what\'s near you' : "What's open near you right now"}</li><li>Happy hours &amp; drink deals</li><li>Tours, events &amp; rainy-day ideas</li><li>${hotelIsSkiHill(hotel) ? 'Day trips down to Kelowna &amp; the valley' : 'Wineries, outdoors &amp; day trips, valley-wide'}</li><li>Free <strong>Build My Trip</strong> planner</li></ul>
   <div class="hc-foot${hotelLogo(hotel) ? ' hc-foot-logo' : ''}">${hotelLogo(hotel) ? `<span>Compliments of</span><img class="hc-logo" src="${escapeHtml(hotelLogo(hotel))}" alt="${escapeHtml(hotel.name)}">` : `Compliments of ${escapeHtml(hotel.name)}`}</div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>

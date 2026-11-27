@@ -37,13 +37,14 @@ test('hotel groups: closest first, each group within its distance, closed places
     at(9, 'restaurant', 0.0005, { slug: null }), // no page: never listed
   ];
   const closed = new Set([8]);
-  let groups = app.hotelPageGroups(HOTEL, venues, NO_INFO, closed);
+  const JULY = new Date('2026-07-10T18:00:00Z');
+  let groups = app.hotelPageGroups(HOTEL, venues, NO_INFO, closed, new Map(), JULY);
   assert.deepEqual(groups.map((g) => g.key), ['eat', 'wine', 'do']);
   assert.deepEqual(groups[0].items.map((x) => x.v.id), [2, 1], 'cafe 111 m before restaurant 444 m; far pub and closed restaurant left out');
   assert.deepEqual(groups[1].items.map((x) => x.v.id), [4]);
   assert.deepEqual(groups[2].items.map((x) => x.v.id), [6, 7]);
   // An open place leads its group even when it is a little farther away.
-  groups = app.hotelPageGroups(HOTEL, venues, { openIds: new Set([1]), byId: new Map() }, closed);
+  groups = app.hotelPageGroups(HOTEL, venues, { openIds: new Set([1]), byId: new Map() }, closed, new Map(), JULY);
   assert.deepEqual(groups[0].items.map((x) => x.v.id), [1, 2]);
   // A group with nothing nearby is dropped, not shown empty.
   assert.deepEqual(app.hotelPageGroups(HOTEL, [at(1, 'cafe', 0.001)], NO_INFO, new Set()).map((g) => g.key), ['eat']);
@@ -161,7 +162,7 @@ test('ski hill guest pages (2026-11-25): before opening day a note says when the
 
 test('hotel groups (2026-11-25): indoor places get their own rainy-day row, apart from outdoor things to do', () => {
   const venues = [at(1, 'indoor', 0.002), at(2, 'outdoor', 0.002), at(3, 'beach', 0.003)];
-  const groups = app.hotelPageGroups(HOTEL, venues, NO_INFO, new Set());
+  const groups = app.hotelPageGroups(HOTEL, venues, NO_INFO, new Set(), new Map(), new Date('2026-07-10T18:00:00Z'));
   assert.deepEqual(groups.map((g) => g.key), ['do', 'indoor']);
   assert.deepEqual(groups[0].items.map((x) => x.v.id).sort(), [2, 3]);
   assert.deepEqual(groups[1].items.map((x) => x.v.id), [1]);
@@ -219,13 +220,13 @@ test('ski hill guest pages (2026-11-27): no beaches promised at Big White; summe
   assert.equal(winter.title, 'Outdoors and things to do');
   assert.deepEqual(winter.items.map((x) => x.v.id), [4], 'beach, summer hiking and reservoir are left out in winter');
   const summer = app.hotelPageGroups(SKI, venues, NO_INFO, new Set(), new Map(), new Date('2026-07-10T18:00:00Z')).find((g) => g.key === 'do');
-  assert.deepEqual(summer.items.map((x) => x.v.id), [2, 3, 4], 'summer keeps hiking and the reservoir, but still no beach');
-  const beachy = app.hotelPageGroups(HOTEL, venues, NO_INFO, new Set(), new Map(), new Date('2026-12-10T18:00:00Z')).find((g) => g.key === 'do');
+  assert.deepEqual(summer.items.map((x) => x.v.id), [2, 3], 'summer keeps hiking and the reservoir, but no beach and no ice rink');
+  const beachy = app.hotelPageGroups(HOTEL, venues, NO_INFO, new Set(), new Map(), new Date('2026-07-10T18:00:00Z')).find((g) => g.key === 'do');
   assert.equal(beachy.title, 'Beaches, parks and outdoors');
-  assert.ok(beachy.items.some((x) => x.v.id === 1), 'a lake town still lists its beach');
+  assert.ok(beachy.items.some((x) => x.v.id === 1), 'a lake town lists its beach in summer');
   const card = app.renderHotelCard(SKI);
   assert.ok(!/beach/i.test(card), 'the ski hill card never says beach');
-  assert.ok(app.renderHotelCard(HOTEL).includes('Wineries, beaches &amp; day trips'));
+  assert.ok(app.renderHotelCard(HOTEL).includes('Wineries, outdoors &amp; day trips'));
 });
 
 test('ski hill guest pages (2026-11-27): tours and activities lead; other pages keep their order', () => {
@@ -235,4 +236,22 @@ test('ski hill guest pages (2026-11-27): tours and activities lead; other pages 
   assert.deepEqual(ski.map((g) => g.key), ['activities', 'eat', 'do']);
   assert.equal(ski[0].title, 'Tours and activities');
   assert.deepEqual(app.hotelPageGroups(HOTEL, venues, NO_INFO, new Set()).map((g) => g.key), ['eat', 'do', 'activities']);
+});
+
+test('season rule (2026-11-27): only what suits the season is offered, on every guest page', () => {
+  const SKI = { slug: 'ski-test', name: 'Ski Test', region: 'big-white', kind: 'rental', latitude: HOTEL.latitude, longitude: HOTEL.longitude };
+  const WINTER = new Date('2026-12-10T18:00:00Z'), SUMMER = new Date('2026-07-10T18:00:00Z');
+  const venues = [
+    at(1, 'outdoor', 0.001, { name: 'Hydraulic Lake Recreation Site' }), at(2, 'outdoor', 0.002, { name: 'Big White Disc Golf Course' }),
+    at(3, 'outdoor', 0.003, { name: 'Sleigh Rides' }), at(4, 'beach', 0.004, { name: 'Gyro Beach' }), at(5, 'outdoor', 0.005, { name: 'Riverside Campground' }),
+    at(6, 'tour', 0.006, { name: 'Tiki Time Tours' }), at(7, 'tour', 0.007, { name: 'Snowmobile Tours' }), at(8, 'golf', 0.008, { name: 'Big White Golf Club' }),
+    at(9, 'outdoor', 0.009, { name: 'Rotary Marsh Park' }), at(10, 'tour', 0.01, { name: 'Wine Tours' }),
+  ];
+  const ids = (hotel, now, key) => (app.hotelPageGroups(hotel, venues, NO_INFO, new Set(), new Map(), now).find((g) => g.key === key) || { items: [] }).items.map((x) => x.v.id).sort((a, b) => a - b);
+  assert.deepEqual(ids(SKI, WINTER, 'do'), [3, 9], 'ski hill in winter: the sleigh rides and a park (no lake, disc golf, beach, camping)');
+  assert.deepEqual(ids(SKI, WINTER, 'activities'), [7, 10], 'ski hill in winter: no boat tour, no golf course');
+  assert.deepEqual(ids(HOTEL, WINTER, 'do'), [2, 3, 9], 'a lake town in winter: no beach, lake site or campground');
+  assert.deepEqual(ids(HOTEL, WINTER, 'activities'), [7, 8, 10], 'a lake town in winter: no boat tour');
+  assert.deepEqual(ids(HOTEL, SUMMER, 'do'), [1, 2, 4, 5, 9], 'summer: no sleigh rides');
+  assert.deepEqual(ids(HOTEL, SUMMER, 'activities'), [6, 8, 10], 'summer: no snowmobile tours');
 });
