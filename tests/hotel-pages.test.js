@@ -206,3 +206,24 @@ test('guest page events (2026-11-26): season-long fixture series stay off the sh
   for (const n of ['Osoyoos Coyotes Home Games 2026\u201327', 'Penticton Vees Schedule 2026\u201327: Home Games', 'UBCO Heat Men\'s Volleyball 2026\u201327 Season']) assert.ok(app.HOTEL_EVENT_SKIP.test(n), n);
   for (const n of ['Fire & Ice Disco Brunch', 'Christmas Faire', 'Kelowna Chiefs vs Oliver Outlaws', 'Polar Bear Dip']) assert.ok(!app.HOTEL_EVENT_SKIP.test(n), n);
 });
+
+test('ski hill guest pages (2026-11-27): no beaches promised at Big White; summer-only places drop out in the ski months', () => {
+  const SKI = { slug: 'ski-test', name: 'Ski Test', region: 'big-white', kind: 'rental', latitude: HOTEL.latitude, longitude: HOTEL.longitude };
+  assert.equal(app.hotelIsSkiHill(SKI), true);
+  assert.equal(app.hotelIsSkiHill(HOTEL), false);
+  const venues = [
+    at(1, 'beach', 0.001, { name: 'Sunset Beach' }), at(2, 'outdoor', 0.002, { name: 'Big White Summer Hiking Trails' }),
+    at(3, 'outdoor', 0.003, { name: 'McCulloch Reservoir Recreation Site' }), at(4, 'outdoor', 0.004, { name: 'Happy Valley Ice Skating Rink' }),
+  ];
+  const winter = app.hotelPageGroups(SKI, venues, NO_INFO, new Set(), new Map(), new Date('2026-12-10T18:00:00Z')).find((g) => g.key === 'do');
+  assert.equal(winter.title, 'Outdoors and things to do');
+  assert.deepEqual(winter.items.map((x) => x.v.id), [4], 'beach, summer hiking and reservoir are left out in winter');
+  const summer = app.hotelPageGroups(SKI, venues, NO_INFO, new Set(), new Map(), new Date('2026-07-10T18:00:00Z')).find((g) => g.key === 'do');
+  assert.deepEqual(summer.items.map((x) => x.v.id), [2, 3, 4], 'summer keeps hiking and the reservoir, but still no beach');
+  const beachy = app.hotelPageGroups(HOTEL, venues, NO_INFO, new Set(), new Map(), new Date('2026-12-10T18:00:00Z')).find((g) => g.key === 'do');
+  assert.equal(beachy.title, 'Beaches, parks and outdoors');
+  assert.ok(beachy.items.some((x) => x.v.id === 1), 'a lake town still lists its beach');
+  const card = app.renderHotelCard(SKI);
+  assert.ok(!/beach/i.test(card), 'the ski hill card never says beach');
+  assert.ok(app.renderHotelCard(HOTEL).includes('Wineries, beaches &amp; day trips'));
+});
