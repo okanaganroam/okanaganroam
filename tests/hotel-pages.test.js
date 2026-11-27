@@ -246,6 +246,7 @@ test('season rule (2026-11-27): only what suits the season is offered, on every 
     at(3, 'outdoor', 0.003, { name: 'Sleigh Rides' }), at(4, 'beach', 0.004, { name: 'Gyro Beach' }), at(5, 'outdoor', 0.005, { name: 'Riverside Campground' }),
     at(6, 'tour', 0.006, { name: 'Tiki Time Tours' }), at(7, 'tour', 0.007, { name: 'Snowmobile Tours' }), at(8, 'golf', 0.008, { name: 'Big White Golf Club' }),
     at(9, 'outdoor', 0.009, { name: 'Rotary Marsh Park' }), at(10, 'tour', 0.01, { name: 'Wine Tours' }),
+    at(11, 'tour', 0.011, { name: 'Luxury Lake Tours' }),
   ];
   const ids = (hotel, now, key) => (app.hotelPageGroups(hotel, venues, NO_INFO, new Set(), new Map(), now).find((g) => g.key === key) || { items: [] }).items.map((x) => x.v.id).sort((a, b) => a - b);
   assert.deepEqual(ids(SKI, WINTER, 'do'), [3, 9], 'ski hill in winter: the sleigh rides and a park (no lake, disc golf, beach, camping)');
@@ -253,5 +254,5 @@ test('season rule (2026-11-27): only what suits the season is offered, on every 
   assert.deepEqual(ids(HOTEL, WINTER, 'do'), [2, 3, 9], 'a lake town in winter: no beach, lake site or campground');
   assert.deepEqual(ids(HOTEL, WINTER, 'activities'), [7, 8, 10], 'a lake town in winter: no boat tour');
   assert.deepEqual(ids(HOTEL, SUMMER, 'do'), [1, 2, 4, 9], 'summer: no sleigh rides (campgrounds were already left out)');
-  assert.deepEqual(ids(HOTEL, SUMMER, 'activities'), [6, 8, 10], 'summer: no snowmobile tours');
+  assert.deepEqual(ids(HOTEL, SUMMER, 'activities'), [6, 8, 10, 11], 'summer: no snowmobile tours');
 });
