@@ -35984,9 +35984,12 @@ const HOTEL_EMAIL_UTM = (slug) => `utm_source=hotel_email&utm_medium=email&utm_c
 // Winter day-trip photos (2026-11-27, Dayton): in the ski months a day-trip card shows a real winter photo of the town, never the
 // summer valley or marina. A town with no winter photo shows no picture rather than a summer one. All from Wikimedia Commons.
 const HOTEL_WINTER_PHOTOS = Object.freeze({
-  kelowna: { src: '/images/regions/winter/kelowna.jpg', credit: 'Kelowna: Accuruss, CC BY-SA 3.0', url: 'https://commons.wikimedia.org/wiki/File:Kelowna_City_Park_with_Okanagan_Lake_and_west_kelowna_and_rose_valley_and_mountains_in_snow.jpg' },
+  kelowna: { src: '/images/regions/winter/kelowna-2711.jpg', credit: 'Kelowna: Russ Dionne, CC BY-SA 3.0', url: 'https://commons.wikimedia.org/wiki/File:Outdoor_skate_rink_Kelowna_002.jpg' },
+  'west-kelowna': { src: '/images/regions/winter/west-kelowna-2711.jpg', credit: 'West Kelowna: Visit Westside', url: 'https://www.visitwestside.com/five-picks-for-winter-in-west-kelowna' },
+  penticton: { src: '/images/regions/winter/penticton-2711.jpg', credit: 'Penticton: BCHL / Gord Goble', url: 'https://explore-mag.com/pentictons-winter-playground-is-the-best-for-snowy-adventures/' },
+  summerland: { src: '/images/regions/winter/summerland-2711.jpg', credit: 'Summerland: Kettle Valley Steam Railway', url: 'https://infotel.ca/newsitem/summerlands-christmas-express-the-ultimate-holiday-experience/it101423' },
   naramata: { src: '/images/regions/winter/naramata.jpg', credit: 'Naramata: Ben Cappellacci, CC BY 2.0', url: 'https://commons.wikimedia.org/wiki/File:Winter_view_from_Lock_%26_Worth_Winery.jpg' },
-  'lake-country': { src: '/images/regions/winter/lake-country.jpg', credit: 'Lake Country: Extemporalist, CC0', url: 'https://commons.wikimedia.org/wiki/File:Overlooking_the_Lake_by_Okanagan_Centre_on_a_Late_Winter_Morning.png' },
+  'lake-country': { src: '/images/regions/winter/lake-country-2711.jpg', credit: 'Lake Country: Okanagan Rail Trail', url: 'https://okanaganrailtrail.ca/?p=807' },
 });
 // Header photo for a ski hill guest page (2026-11-27, Dayton): the Big White village clock tower in its new blue-grey paint on a sunny winter day (2026-11 upload on
 // bigwhite.com, Big White's own photo; Dayton has permission to use it).
@@ -36054,11 +36057,13 @@ function hotelConditions(region) {
   }
   return c.data && Date.now() - (c.at || 0) < 3 * 60 * 60 * 1000 ? { ...c.data, url: cfg.url, name: cfg.name } : null;
 }
-function hotelConditionsHtml(hotel, now = new Date()) {
+function hotelConditionsHtml(hotel, now = new Date(), part = 'all') {
   const c = hotelConditions(hotel.region);
   if (!c) return '';
   const tile = (big, small) => `<div class="ht-cond"><strong>${escapeHtml(big)}</strong><span>${escapeHtml(small)}</span></div>`;
-  return `<div class="ht-conds" role="group" aria-label="${escapeHtml(c.name)} conditions now">${tile(`${c.tempC}\u00b0C`, 'At the village')}${tile(`${c.baseCm} cm`, 'Snow base')}${tile(`${c.newCm} cm`, 'New snow, 24 h')}${(() => { const f = SKI_RESORT_SEASON[hotel.region]; return f && skiSeasonState(f, todayLocal(now)) === 'soon' ? tile(formatLocalDateShort(f.opens, { weekday: false }), 'Lifts open') : tile(String(c.lifts), c.lifts === 1 ? 'Lift running' : 'Lifts running'); })()}</div><p class="ht-credits ht-conds-src">Reported by <a href="${escapeHtml(c.url)}" rel="noopener">${escapeHtml(c.name)}</a>, updated through the day.</p>`;
+  const tiles = `<div class="ht-conds" role="group" aria-label="${escapeHtml(c.name)} conditions now">${tile(`${c.tempC}\u00b0C`, 'At the village')}${tile(`${c.baseCm} cm`, 'Snow base')}${tile(`${c.newCm} cm`, 'New snow, 24 h')}${(() => { const f = SKI_RESORT_SEASON[hotel.region]; return f && skiSeasonState(f, todayLocal(now)) === 'soon' ? tile(formatLocalDateShort(f.opens, { weekday: false }), 'Lifts open') : tile(String(c.lifts), c.lifts === 1 ? 'Lift running' : 'Lifts running'); })()}</div>`;
+  const src = `<p class="ht-credits ht-conds-src">Reported by <a href="${escapeHtml(c.url)}" rel="noopener">${escapeHtml(c.name)}</a>, updated through the day.</p>`;
+  return part === 'tiles' ? tiles : part === 'src' ? src : tiles + src;
 }
 // Ski hill guest pages before opening day (2026-11-25, Dayton): most places on the hill say "Opens Dec 3", which can
 // read like a broken page to a guest who scans the QR card before the season. One line says when the lifts open and
@@ -36069,6 +36074,11 @@ function hotelSeasonNoteHtml(hotel, now = new Date()) {
   if (!f || skiSeasonState(f, todayLocal(now)) !== 'soon' || !f.statusSoon) return '';
   const town = REGION_LABELS[hotel.region] || hotel.region;
   return `<p class="ht-season" role="note"><strong>Lifts: ${escapeHtml(f.statusSoon)}.</strong> The village is open meanwhile.</p>`;
+}
+if (!process.env.NODE_TEST_CONTEXT) {
+  // Keep the reading warm so the first scan after a restart already shows it (2026-11-27, Dayton saw no strip).
+  setTimeout(() => { try { hotelConditions('big-white'); } catch (e) {} }, 5000).unref();
+  setInterval(() => { try { hotelConditions('big-white'); } catch (e) {} }, 10 * 60 * 1000).unref();
 }
 function hotelAwayText(km) {
   return km <= 1.2 ? `${Math.max(1, Math.round(km * 12))} min walk` : `${Math.round(km * 1.6 + 2)} min drive`;
@@ -36475,6 +36485,10 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-cond strong { font-size: 1.2rem; line-height: 1.1; color: var(--ref-navy, #1B2B3A); }
   body.hotel-page .ht-cond span { font-size: 0.68rem; font-weight: 700; opacity: 0.75; }
   body.hotel-page .ht-conds-src { margin: 0 0 12px; }
+  body.hotel-page .ht-hero-text .ht-conds { margin: 10px 0 0; gap: 6px; }
+  body.hotel-page .ht-hero-text .ht-cond { background: rgba(14,24,34,0.55); border: 1px solid rgba(255,255,255,0.28); padding: 7px 2px; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+  body.hotel-page .ht-hero-text .ht-cond strong { color: #fff; font-size: 1.05rem; }
+  body.hotel-page .ht-hero-text .ht-cond span { color: #fff; font-size: 0.62rem; }
   body.hotel-page .ht-season { margin: 0 0 8px; padding: 8px 12px; font-size: 0.9rem; }
   body.hotel-page .ht-intro { margin: 0 0 18px; max-width: 640px; opacity: 0.85; }
   body.hotel-page .ht-season { margin: 0 0 14px; max-width: 640px; padding: 10px 14px; border-radius: 12px; background: #eef2f7; color: var(--ref-navy, #1B2B3A); font-size: 0.95rem; }
@@ -36538,9 +36552,8 @@ ${renderAnalyticsHeadHtml('hotel')}
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main">
   <div class="ht-wrap">
-  ${(() => { const hh = HOTEL_HERO_PHOTOS[hotel.region]; const hp = hotelIsSkiHill(hotel) && hotelIsSkiMonth(now) ? (hh ? { src800: hh.src, alt: hh.alt, pos: hh.pos, credit: hh.credit } : regionPhoto(hotel.region)) : null; return hp ? `<div class="ht-hero"><img src="${escapeHtml(hp.src800)}" alt="${escapeHtml(hp.alt || '')}" width="1500" height="600"${hp.pos ? ` style="object-position:${escapeHtml(hp.pos)}"` : ''}>${hp.credit ? `<span class="ht-hero-credit">Photo: ${escapeHtml(hp.credit)}</span>` : ''}<div class="ht-hero-text"><p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1></div></div>` : `<p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>`; })()}
-  ${hotelConditionsHtml(hotel, now)}
-  ${hotelSeasonNoteHtml(hotel, now)}
+  ${(() => { const hh = HOTEL_HERO_PHOTOS[hotel.region]; const hp = hotelIsSkiHill(hotel) && hotelIsSkiMonth(now) ? (hh ? { src800: hh.src, alt: hh.alt, pos: hh.pos, credit: hh.credit } : regionPhoto(hotel.region)) : null; return hp ? `<div class="ht-hero"><img src="${escapeHtml(hp.src800)}" alt="${escapeHtml(hp.alt || '')}" width="1500" height="600"${hp.pos ? ` style="object-position:${escapeHtml(hp.pos)}"` : ''}><div class="ht-hero-text"><p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>${hotelConditionsHtml(hotel, now, 'tiles')}</div></div>${hotelConditionsHtml(hotel, now, 'src')}` : `<p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>${hotelConditionsHtml(hotel, now)}`; })()}
+    ${hotelSeasonNoteHtml(hotel, now)}
   <p class="ht-intro">${hotelIsRental(hotel) ? `What's open around ${escapeHtml(town)} right now` : `What's open near ${escapeHtml(hotel.name)} right now, closest first`}.</p>
   <div class="ht-actions">
     <a class="ht-primary" href="/trip" data-ht-cta="trip">Build My Trip</a>
@@ -36563,7 +36576,7 @@ ${renderGolfHeaderHtml()}
   ${dayTrips.length ? `<section class="ht-section" aria-labelledby="ht-trips">
     <h2 id="ht-trips">Day trips from ${escapeHtml(town)}</h2>
     <ul class="ht-trips">${dayTrips.map((t) => { const wp = hotelIsSkiMonth(now) ? HOTEL_WINTER_PHOTOS[t.region] : null; const rp = hotelIsSkiMonth(now) ? (wp ? { card: wp.src } : null) : regionPhoto(t.region); return `<li><a class="ht-trip" href="/${t.region}" data-ht-cta="day-trip">${rp ? `<img src="${escapeHtml(rp.card)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">About ${t.drive} min drive</span><span class="ht-name">${escapeHtml(t.label)}</span></a></li>`; }).join('')}</ul>
-    ${hotelIsSkiMonth(now) && dayTrips.some((t) => HOTEL_WINTER_PHOTOS[t.region]) ? `<p class="ht-credits">Photos: ${dayTrips.filter((t) => HOTEL_WINTER_PHOTOS[t.region]).map((t) => `<a href="${HOTEL_WINTER_PHOTOS[t.region].url}" rel="noopener">${escapeHtml(HOTEL_WINTER_PHOTOS[t.region].credit)}</a>`).join(', ')}.</p>` : ''}
+    ${hotelIsSkiMonth(now) && dayTrips.some((t) => HOTEL_WINTER_PHOTOS[t.region]) ? `<p class="ht-credits">Photos: ${hotelIsSkiHill(hotel) && HOTEL_HERO_PHOTOS[hotel.region] ? `${escapeHtml(HOTEL_HERO_PHOTOS[hotel.region].credit)}, ` : ''}${dayTrips.filter((t) => HOTEL_WINTER_PHOTOS[t.region]).map((t) => `<a href="${HOTEL_WINTER_PHOTOS[t.region].url}" rel="noopener">${escapeHtml(HOTEL_WINTER_PHOTOS[t.region].credit)}</a>`).join(', ')}.</p>` : ''}
   </section>` : ''}
   ${guides.length ? `<section class="ht-section" aria-labelledby="ht-guides">
     <h2 id="ht-guides">Our guides for this part of the valley</h2>
