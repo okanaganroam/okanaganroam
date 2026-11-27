@@ -35975,7 +35975,7 @@ function hotelIsSkiHill(hotel) { return !!hotel && HOTEL_SKI_REGIONS.includes(ho
 function hotelIsSkiMonth(now = new Date()) { const m = Number(new Date(now).toLocaleString('en-CA', { month: 'numeric', timeZone: 'America/Vancouver' })) - 1; return m >= 10 || m <= 3; }
 // Summer-only places by name (2026-11-27, Dayton): in the ski months (Nov-Apr) no guest page offers beaches, boat tours,
 // camping or lake recreation sites; at a ski hill a lake is left out too.
-const HOTEL_SUMMER_ONLY = /\b(summer|beach(es)?|swim(ming)?|boat(ing)?|cruises?|tiki|kayak(s|ing)?|paddle(board(ing)?)?|sup|reservoir|lake ?shore|waterfront|marina|splash|water ?(park|slide|sports?)|jet ?ski|wake ?board(ing)?|camp(ground|ing|site)s?|recreation site)\b/i;
+const HOTEL_SUMMER_ONLY = /\b(summer|beach(es)?|swim(ming)?|boat(ing)?|cruises?|tiki|kayak(s|ing)?|paddle(board(ing)?)?|sup|reservoir|lake ?shore|waterfront|marina|splash|water ?(park|slide|sports?)|jet ?ski|wake ?board(ing)?|camp(ground|ing|site)s?|recreation site|lake tours?|lake cruises?)\b/i;
 // At a ski hill in the ski months, warm-weather activities go too: golf and disc golf, hiking, mountain biking, rafting, lakes.
 const HOTEL_SKI_SUMMER = /\b(lake|golf|disc golf|hik(e|es|ing)|mountain bik(e|es|ing)|bike park|zip ?lines?|rafting|canoe(ing)?)\b/i;
 // And the other way round (May-Oct): snow and ice activities are not offered in the warm months.
