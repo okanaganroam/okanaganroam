@@ -36071,6 +36071,19 @@ async function hotelFetchTempC(cfg) {
   const v = t && t.data && t.data.instant && t.data.instant.details && t.data.instant.details.air_temperature;
   return Number.isFinite(v) ? Math.round(v) : null;
 }
+async function hotelFetchModelSnow(cfg) {
+  const j = await hotelFetchJson(`https://api.open-meteo.com/v1/forecast?latitude=${cfg.lat}&longitude=${cfg.lon}&elevation=${cfg.alt}&hourly=snow_depth,snowfall&past_days=1&forecast_days=1&timezone=UTC`);
+  const h = j && j.hourly;
+  if (!h || !Array.isArray(h.time)) return null;
+  const nowIso = new Date().toISOString().slice(0, 13);
+  let idx = h.time.findIndex((t) => String(t).slice(0, 13) === nowIso);
+  if (idx < 0) idx = Math.max(0, h.time.length - 25);
+  const depth = Number(h.snow_depth[idx]);
+  if (!Number.isFinite(depth)) return null;
+  let fresh = 0;
+  for (let i = Math.max(0, idx - 23); i <= idx; i += 1) fresh += Number(h.snowfall[i]) || 0;
+  return { baseCm: Math.round(depth * 100), newCm: Math.round(fresh) };
+}
 async function hotelFetchConditions(region, cfg) {
   if (cfg.kind === 'bigwhite') {
     const r = await fetch(cfg.url, { headers: { 'User-Agent': 'okanaganroam-guest-page' }, signal: AbortSignal.timeout(8000) });
@@ -36095,6 +36108,15 @@ async function hotelFetchConditions(region, cfg) {
     }));
   }
   await Promise.allSettled(jobs);
+  // 2026-11-27 (Dayton): every ski hill shows the same four tiles as SilverStar. Where the resort's own report cannot be read
+  // (Apex blocks automated reads, Baldy shows zero before it opens), snow base and 24 h snowfall come from the Open-Meteo
+  // weather model for the village; the credit line says so.
+  if (cfg.kind !== 'silverstar' && !(out.baseCm > 0)) {
+    try {
+      const m = await hotelFetchModelSnow(cfg);
+      if (m) { out.baseCm = m.baseCm; out.newCm = m.newCm; out.modeled = true; }
+    } catch (e) {}
+  }
   return out.tempC !== null || out.baseCm !== null ? out : null;
 }
 function hotelConditions(region) {
@@ -36125,9 +36147,11 @@ function hotelConditionsHtml(hotel, now = new Date(), part = 'all') {
   if (snowOn && Number.isFinite(c.newCm)) parts.push(tile(`${c.newCm} cm`, 'Fresh, 24 h', '\ud83c\udf28\ufe0f'));
   if (soon && sf.opens) parts.push(tile(formatLocalDateShort(sf.opens, { weekday: false }), 'Lifts open', '\ud83d\udea1'));
   else if (Number.isFinite(c.lifts)) parts.push(tile(c.liftsOf ? `${c.lifts} of ${c.liftsOf}` : String(c.lifts), c.liftsOf ? 'Lifts running' : (c.lifts === 1 ? 'Lift running' : 'Lifts running'), '\ud83d\udea1'));
-  if (parts.length < 4) parts.push(`<a class="ht-cond ht-cond-link" href="${escapeHtml(c.url)}" rel="noopener" target="_blank"><i aria-hidden="true">\ud83d\udcca</i><strong>Live</strong><span>Snow report \u2192</span></a>`);
+  if (parts.length < 4) parts.push(`<a class="ht-cond ht-cond-link" href="${escapeHtml(c.url)}" rel="noopener" target="_blank"><i aria-hidden="true">\ud83d\udea1</i><strong>Lifts</strong><span>Live status \u2192</span></a>`);
   const tiles = `<div class="ht-conds" style="grid-template-columns:repeat(${parts.length},minmax(0,1fr))" role="group" aria-label="${escapeHtml(c.name)} conditions now">${parts.join('')}</div>`;
-  const src = `<p class="ht-credits ht-conds-src">Reported by <a href="${escapeHtml(c.url)}" rel="noopener">${escapeHtml(c.name)}</a>, updated through the day.</p>`;
+  const src = c.modeled
+    ? `<p class="ht-credits ht-conds-src">Snow depth and snowfall are a weather-model estimate for the village; see <a href="${escapeHtml(c.url)}" rel="noopener">${escapeHtml(c.name)}</a> for the official report.</p>`
+    : `<p class="ht-credits ht-conds-src">Reported by <a href="${escapeHtml(c.url)}" rel="noopener">${escapeHtml(c.name)}</a>, updated through the day.</p>`;
   return part === 'tiles' ? tiles : part === 'src' ? src : tiles + src;
 }
 // Ski hill guest pages before opening day (2026-11-25, Dayton): most places on the hill say "Opens Dec 3", which can
