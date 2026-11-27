@@ -36485,6 +36485,8 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-cond strong { font-size: 1.2rem; line-height: 1.1; color: var(--ref-navy, #1B2B3A); }
   body.hotel-page .ht-cond span { font-size: 0.68rem; font-weight: 700; opacity: 0.75; }
   body.hotel-page .ht-conds-src { margin: 0 0 12px; }
+  body.hotel-page .ht-credits-fold { margin: 6px 0 0; font-size: 0.7rem; opacity: 0.55; }
+  body.hotel-page .ht-credits-fold summary { cursor: pointer; }
   body.hotel-page .ht-hero-text .ht-conds { margin: 10px 0 0; gap: 6px; }
   body.hotel-page .ht-hero-text .ht-cond { background: rgba(14,24,34,0.55); border: 1px solid rgba(255,255,255,0.28); padding: 7px 2px; -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
   body.hotel-page .ht-hero-text .ht-cond strong { color: #fff; font-size: 1.05rem; }
@@ -36552,8 +36554,8 @@ ${renderAnalyticsHeadHtml('hotel')}
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main">
   <div class="ht-wrap">
-  ${(() => { const hh = HOTEL_HERO_PHOTOS[hotel.region]; const hp = hotelIsSkiHill(hotel) && hotelIsSkiMonth(now) ? (hh ? { src800: hh.src, alt: hh.alt, pos: hh.pos, credit: hh.credit } : regionPhoto(hotel.region)) : null; return hp ? `<div class="ht-hero"><img src="${escapeHtml(hp.src800)}" alt="${escapeHtml(hp.alt || '')}" width="1500" height="600"${hp.pos ? ` style="object-position:${escapeHtml(hp.pos)}"` : ''}><div class="ht-hero-text"><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>${hotelConditionsHtml(hotel, now, 'tiles')}</div></div>${hotelConditionsHtml(hotel, now, 'src')}` : `<p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>${hotelConditionsHtml(hotel, now)}`; })()}
-    ${hotelSeasonNoteHtml(hotel, now)}
+  ${(() => { const hh = HOTEL_HERO_PHOTOS[hotel.region]; const hp = hotelIsSkiHill(hotel) && hotelIsSkiMonth(now) ? (hh ? { src800: hh.src, alt: hh.alt, pos: hh.pos, credit: hh.credit } : regionPhoto(hotel.region)) : null; return hp ? `<div class="ht-hero"><img src="${escapeHtml(hp.src800)}" alt="${escapeHtml(hp.alt || '')}" width="1500" height="600"${hp.pos ? ` style="object-position:${escapeHtml(hp.pos)}"` : ''}><div class="ht-hero-text"><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>${hotelConditionsHtml(hotel, now, 'tiles')}</div></div>` : `<p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>${hotelConditionsHtml(hotel, now)}`; })()}
+    ${hotelConditionsHtml(hotel, now, 'tiles') ? '' : hotelSeasonNoteHtml(hotel, now)}
   ${hotelIsSkiHill(hotel) && hotelIsSkiMonth(now) ? '' : `<p class="ht-intro">${hotelIsRental(hotel) ? `What's open around ${escapeHtml(town)} right now` : `What's open near ${escapeHtml(hotel.name)} right now, closest first`}.</p>`}
   <div class="ht-actions">
     <a class="ht-primary" href="/trip" data-ht-cta="trip">Build My Trip</a>
@@ -36576,7 +36578,7 @@ ${renderGolfHeaderHtml()}
   ${dayTrips.length ? `<section class="ht-section" aria-labelledby="ht-trips">
     <h2 id="ht-trips">Day trips from ${escapeHtml(town)}</h2>
     <ul class="ht-trips">${dayTrips.map((t) => { const wp = hotelIsSkiMonth(now) ? HOTEL_WINTER_PHOTOS[t.region] : null; const rp = hotelIsSkiMonth(now) ? (wp ? { card: wp.src } : null) : regionPhoto(t.region); return `<li><a class="ht-trip" href="/${t.region}" data-ht-cta="day-trip">${rp ? `<img src="${escapeHtml(rp.card)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">About ${t.drive} min drive</span><span class="ht-name">${escapeHtml(t.label)}</span></a></li>`; }).join('')}</ul>
-    ${hotelIsSkiMonth(now) && dayTrips.some((t) => HOTEL_WINTER_PHOTOS[t.region]) ? `<p class="ht-credits">Photos: ${hotelIsSkiHill(hotel) && HOTEL_HERO_PHOTOS[hotel.region] ? `${escapeHtml(HOTEL_HERO_PHOTOS[hotel.region].credit)}, ` : ''}${dayTrips.filter((t) => HOTEL_WINTER_PHOTOS[t.region]).map((t) => `<a href="${HOTEL_WINTER_PHOTOS[t.region].url}" rel="noopener">${escapeHtml(HOTEL_WINTER_PHOTOS[t.region].credit)}</a>`).join(', ')}.</p>` : ''}
+    ${hotelIsSkiMonth(now) && dayTrips.some((t) => HOTEL_WINTER_PHOTOS[t.region]) ? `<details class="ht-credits-fold"><summary>Photo credits</summary><p class="ht-credits">${hotelIsSkiHill(hotel) && HOTEL_HERO_PHOTOS[hotel.region] ? `${escapeHtml(HOTEL_HERO_PHOTOS[hotel.region].credit)}, ` : ''}${dayTrips.filter((t) => HOTEL_WINTER_PHOTOS[t.region]).map((t) => `<a href="${HOTEL_WINTER_PHOTOS[t.region].url}" rel="noopener">${escapeHtml(HOTEL_WINTER_PHOTOS[t.region].credit)}</a>`).join(', ')}.</p></details>` : ''}
   </section>` : ''}
   ${guides.length ? `<section class="ht-section" aria-labelledby="ht-guides">
     <h2 id="ht-guides">Our guides for this part of the valley</h2>
