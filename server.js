@@ -36471,6 +36471,20 @@ function hotelGuideIcon(heading) {
   if (/things to do|month|january|february|december|weekend|rainy/.test(h)) return '\u{1F4C5}';
   return '\u2728';
 }
+// Every card says when the place is open or opens next (2026-11-27, Dayton): the live status when it has one, otherwise
+// read straight from the listed hours; a place with no hours says so and points to its own page.
+function hotelHoursLine(v, status, now) {
+  if (status && status.state && status.text) return status.text;
+  try {
+    if (v.hours && hoursModule) {
+      const raw = hoursWithExtras(v, now);
+      const clock = okanaganClock(now);
+      const label = hoursModule.hoursStatusLabel(hoursModule.statusAt(hoursModule.parseHours(raw), clock), clock);
+      if (label && label.text && label.state !== 'unknown') return label.text;
+    }
+  } catch (e) { /* fall through */ }
+  return 'Hours on their page';
+}
 function renderHotelPage(hotel, now = new Date()) {
   const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all().map(rowToVenue);
   const notOperating = advisoryNotOperatingIds();
@@ -36481,6 +36495,9 @@ function renderHotelPage(hotel, now = new Date()) {
   const opensSoon = new Map();
   for (const [id, st] of getSeasonStates(now)) {
     if (!st || (st.kind !== 'closed' && st.kind !== 'temp_closed')) continue;
+    // A ski hill that is open now (2026-11-27, Dayton): its places no longer wait on "Opens for the ski season"; their hours show.
+    const hillOpen = SKI_RESORT_REGIONS.has(hotel.region) && SKI_RESORT_SEASON[hotel.region] && skiSeasonState(SKI_RESORT_SEASON[hotel.region], today0) === 'open';
+    if (hillOpen && st.kind === 'closed' && regionOf.get(id) === hotel.region && !(seasonRows.get(id) || {}).reopens_date) continue;
     closedIds.add(id);
     // Closed for the season, back within HOTEL_OPENS_SOON_DAYS: listed as "Opens <date>". On a ski hill, a hill place
     // closed for the season with no date yet opens with the hill: "Opens for the ski season" (hotel on that hill only).
@@ -36531,7 +36548,7 @@ function renderHotelPage(hotel, now = new Date()) {
       hh = d && d.en && d.en.length ? happyHourDealsCompact(d.en, 2) : '';
     }
     return `<li class="ht-card" data-venue-id="${v.id}" data-flags="${flags.join(' ')}">
-      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(typeLabel)}${hotelIsRental(hotel) ? '' : ` · ${escapeHtml(hotelAwayText(km))}`}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : ''}${hh ? `<span class="ht-hh">Happy hour: ${escapeHtml(hh)}</span>` : ''}${tags.length ? `<span class="ht-tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}</a>
+      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(typeLabel)}${hotelIsRental(hotel) ? '' : ` · ${escapeHtml(hotelAwayText(km))}`}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : `<span class="ht-soon">${escapeHtml(hotelHoursLine(v, status, now))}</span>`}${hh ? `<span class="ht-hh">Happy hour: ${escapeHtml(hh)}</span>` : ''}${tags.length ? `<span class="ht-tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}</a>
       <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(`Add ${v.name} to trip`)}">${APP_TRIP_LABEL_HTML}</button>
     </li>`;
   };
@@ -36634,8 +36651,8 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-link img { width: 100%; height: 120px; object-fit: cover; display: block; margin: 0 0 8px; }
   body.hotel-page .ht-meta { font-size: 0.78rem; font-weight: 700; opacity: 0.7; padding: 0 12px; }
   body.hotel-page .ht-name { font-weight: 800; padding: 0 12px; overflow-wrap: anywhere; }
-  body.hotel-page .ht-open { align-self: flex-start; margin: 4px 12px 0; padding: 2px 8px; border-radius: 999px; background: #e6f4ea; color: #1e6b34; font-size: 0.78rem; font-weight: 800; }
-  body.hotel-page .ht-soon { align-self: flex-start; margin: 4px 12px 0; padding: 2px 8px; border-radius: 999px; background: #eef2f7; color: #1B2B3A; font-size: 0.78rem; font-weight: 800; }
+  body.hotel-page .ht-open { align-self: flex-start; margin: 4px 12px 0; padding: 2px 8px; border-radius: 999px; background: #e6f4ea; color: #1e6b34; font-size: 0.78rem; font-weight: 800; max-width: calc(100% - 24px); box-sizing: border-box; line-height: 1.3; overflow-wrap: anywhere; }
+  body.hotel-page .ht-soon { align-self: flex-start; margin: 4px 12px 0; padding: 2px 8px; border-radius: 999px; background: #eef2f7; color: #1B2B3A; font-size: 0.78rem; font-weight: 800; max-width: calc(100% - 24px); box-sizing: border-box; line-height: 1.3; overflow-wrap: anywhere; }
   body.hotel-page .ht-card .trip-btn { margin: 6px 12px 12px; align-self: flex-start; }
   body.hotel-page .ht-events-more { margin: 12px 0 0; }
   body.hotel-page .ht-events-more summary { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--ref-navy, #1B2B3A); font-weight: 800; cursor: pointer; list-style: none; }
