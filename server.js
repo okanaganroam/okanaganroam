@@ -35977,6 +35977,11 @@ const HOTEL_WINTER_PHOTOS = Object.freeze({
   naramata: { src: '/images/regions/winter/naramata.jpg', credit: 'Naramata: Ben Cappellacci, CC BY 2.0', url: 'https://commons.wikimedia.org/wiki/File:Winter_view_from_Lock_%26_Worth_Winery.jpg' },
   'lake-country': { src: '/images/regions/winter/lake-country.jpg', credit: 'Lake Country: Extemporalist, CC0', url: 'https://commons.wikimedia.org/wiki/File:Overlooking_the_Lake_by_Okanagan_Centre_on_a_Late_Winter_Morning.png' },
 });
+// Header photo for a ski hill guest page (2026-11-27, Dayton): the Big White village clock tower in its new blue-grey paint on a sunny winter day (2026-11 upload on
+// bigwhite.com, Big White's own photo; Dayton has permission to use it).
+const HOTEL_HERO_PHOTOS = Object.freeze({
+  'big-white': { src: '/images/regions/winter/big-white-village.jpg', alt: 'The Big White village clock tower and plaza on a sunny winter day, with snowy mountains behind', credit: 'Big White Ski Resort', pos: '42% 0%' },
+});
 const HOTEL_SKI_REGIONS = ['big-white', 'silverstar', 'apex', 'baldy'];
 function hotelIsSkiHill(hotel) { return !!hotel && HOTEL_SKI_REGIONS.includes(hotel.region); }
 function hotelIsSkiMonth(now = new Date()) { const m = Number(new Date(now).toLocaleString('en-CA', { month: 'numeric', timeZone: 'America/Vancouver' })) - 1; return m >= 10 || m <= 3; }
@@ -36447,8 +36452,10 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-kicker { margin: 0 0 4px; font-size: 0.8rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.7; }
   body.hotel-page h1 { margin: 0 0 8px; }
   body.hotel-page .ht-hero { position: relative; margin: 0 0 14px; border-radius: 16px; overflow: hidden; background: #1B2B3A; }
-  body.hotel-page .ht-hero img { display: block; width: 100%; height: 220px; object-fit: cover; object-position: 50% 70%; }
+  body.hotel-page .ht-hero img { display: block; width: 100%; height: 260px; object-fit: cover; object-position: 50% 70%; }
+  @media (min-width: 700px) { body.hotel-page .ht-hero img { height: 400px; } }
   body.hotel-page .ht-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(14,24,34,0.82), rgba(14,24,34,0.05) 65%); }
+  body.hotel-page .ht-hero-credit { position: absolute; top: 8px; right: 10px; z-index: 1; font-size: 0.65rem; font-weight: 700; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.6); }
   body.hotel-page .ht-hero-text { position: absolute; left: 16px; right: 16px; bottom: 14px; z-index: 1; color: #fff; }
   body.hotel-page .ht-hero-text .ht-kicker { color: rgba(255,255,255,0.85); margin: 0 0 4px; }
   body.hotel-page .ht-hero-text h1 { color: #fff; margin: 0; font-size: clamp(1.5rem, 6vw, 2.3rem); text-shadow: 0 1px 8px rgba(0,0,0,0.35); }
@@ -36520,7 +36527,7 @@ ${renderAnalyticsHeadHtml('hotel')}
 ${renderGolfHeaderHtml()}
   <main class="wrap-wide golf-main" id="main">
   <div class="ht-wrap">
-  ${(() => { const hp = hotelIsSkiHill(hotel) && hotelIsSkiMonth(now) ? regionPhoto(hotel.region) : null; return hp ? `<div class="ht-hero"><img src="${escapeHtml(hp.src800)}" alt="${escapeHtml(hp.alt || '')}" width="800" height="400"><div class="ht-hero-text"><p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1></div></div>` : `<p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>`; })()}
+  ${(() => { const hh = HOTEL_HERO_PHOTOS[hotel.region]; const hp = hotelIsSkiHill(hotel) && hotelIsSkiMonth(now) ? (hh ? { src800: hh.src, alt: hh.alt, pos: hh.pos, credit: hh.credit } : regionPhoto(hotel.region)) : null; return hp ? `<div class="ht-hero"><img src="${escapeHtml(hp.src800)}" alt="${escapeHtml(hp.alt || '')}" width="1500" height="600"${hp.pos ? ` style="object-position:${escapeHtml(hp.pos)}"` : ''}>${hp.credit ? `<span class="ht-hero-credit">Photo: ${escapeHtml(hp.credit)}</span>` : ''}<div class="ht-hero-text"><p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1></div></div>` : `<p class="ht-kicker">${escapeHtml(town)} · for guests of ${escapeHtml(hotel.name)}</p><h1>${escapeHtml(hotelTitleLine(hotel))}</h1>`; })()}
   ${hotelConditionsHtml(hotel, now)}
   ${hotelSeasonNoteHtml(hotel, now)}
   <p class="ht-intro">${hotelIsRental(hotel) ? `What's open around ${escapeHtml(town)} right now` : `What's open near ${escapeHtml(hotel.name)} right now, closest first`}.</p>
