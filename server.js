@@ -36040,7 +36040,7 @@ function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map(), 
     const rest = rows.filter((x) => !shown.has(x.v.id) && !used.has(x.v.id) && !isFirst(x));
     const more = [...rest.filter(isOpen), ...rest.filter((x) => !isOpen(x))].slice(0, 40);
     return { ...g, items: picked, more };
-  }).filter((g) => g.items.length >= (ski && g.key === 'wine' ? 3 : 1)).sort((a, b) => (ski ? ['eat', 'activities'].concat(['wine', 'do', 'indoor']).indexOf(a.key) - ['eat', 'activities'].concat(['wine', 'do', 'indoor']).indexOf(b.key) : 0));
+  }).filter((g) => g.items.length && !(ski && g.key === 'wine')).sort((a, b) => (ski ? ['eat', 'activities'].concat(['wine', 'do', 'indoor']).indexOf(a.key) - ['eat', 'activities'].concat(['wine', 'do', 'indoor']).indexOf(b.key) : 0));
 }
 // Live mountain conditions for a ski hill guest page (2026-11-27, Dayton): temperature, snow base, 24 h snowfall and lifts
 // running, read from the resort's own public snow report page and kept for 15 minutes. The page never waits on it: a
@@ -36696,13 +36696,13 @@ ${renderGolfHeaderHtml()}
     <a href="/map?f=in.${hotel.region}" data-ht-cta="map"><i aria-hidden="true">\ud83d\uddfa\ufe0f</i>Map of what's open</a>
     <a href="/${hotel.region}/events" data-ht-cta="whats-on"><i aria-hidden="true">\ud83c\udf89</i>What's On in ${escapeHtml(town)}</a>
   </div>
-  ${tourRow}
   ${filters.length ? `<div class="ht-filters" role="group" aria-label="Show only"><button type="button" data-ht-filter="all" aria-pressed="true">Everything</button>${filters.map((f) => `<button type="button" data-ht-filter="${f.key}" aria-pressed="false">${escapeHtml(f.label)}</button>`).join('')}</div><p class="ht-none" id="htNone" hidden>Nothing nearby matches that right now. Try another filter.</p>` : ''}
   ${groups.map((g) => `<section class="ht-section ht-group" aria-labelledby="ht-${g.key}">
     <h2 id="ht-${g.key}">${escapeHtml(g.title)}</h2>
     <ul class="ht-list">${g.items.map(({ v, km }) => card(v, km)).join('')}</ul>
     ${g.more && g.more.length ? `<details class="ht-events-more ht-places-more"><summary>View all ${g.more.length + g.items.length} ${escapeHtml(g.key === 'eat' ? 'places to eat and drink' : g.title.toLowerCase())}</summary><ul class="ht-list ht-list-more">${g.more.map(({ v, km }) => card(v, km)).join('')}</ul></details>` : ''}
   </section>`).join('\n  ')}
+  ${tourRow}
   ${events.length ? `<section class="ht-section" aria-labelledby="ht-events">
     <h2 id="ht-events">${escapeHtml(eventsTitle)}</h2>
     <ul class="ht-events">${events.slice(0, HOTEL_EVENTS_SHOWN).map(eventItem).join('')}</ul>
