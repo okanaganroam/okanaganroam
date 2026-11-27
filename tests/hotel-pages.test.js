@@ -201,3 +201,8 @@ test('guest page rows (2026-11-26): campgrounds and RV resorts are not "outdoors
   const act = groups.find((g) => g.key === 'activities');
   assert.deepEqual(act.items.map((x) => x.v.id), [4, 3], 'the tour leads even though the sport place is closer');
 });
+
+test('guest page events (2026-11-26): season-long fixture series stay off the short list', () => {
+  for (const n of ['Osoyoos Coyotes Home Games 2026\u201327', 'Penticton Vees Schedule 2026\u201327: Home Games', 'UBCO Heat Men\'s Volleyball 2026\u201327 Season']) assert.ok(app.HOTEL_EVENT_SKIP.test(n), n);
+  for (const n of ['Fire & Ice Disco Brunch', 'Christmas Faire', 'Kelowna Chiefs vs Oliver Outlaws', 'Polar Bear Dip']) assert.ok(!app.HOTEL_EVENT_SKIP.test(n), n);
+});
