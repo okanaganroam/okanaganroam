@@ -35968,11 +35968,19 @@ const HOTEL_EMAIL_UTM = (slug) => `utm_source=hotel_email&utm_medium=email&utm_c
 // distance. Pure apart from the venue rows passed in, so tests can call it with fixtures.
 // opensSoon: venue id -> label ("Opens Nov 26", "Opens for the ski season") for places closed only until a date close
 // enough to matter to a guest. They are listed, labelled, after the places open now.
-function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map()) {
+// Ski hills (2026-11-27, Dayton): a guest at Big White, Silver Star, Apex or Baldy is not near a beach, so the guest page
+// and card never promise one. In the ski months the outdoors row also drops the summer-only places (hiking, lakes, reservoirs).
+const HOTEL_SKI_REGIONS = ['big-white', 'silverstar', 'apex', 'baldy'];
+function hotelIsSkiHill(hotel) { return !!hotel && HOTEL_SKI_REGIONS.includes(hotel.region); }
+function hotelIsSkiMonth(now = new Date()) { const m = Number(new Date(now).toLocaleString('en-CA', { month: 'numeric', timeZone: 'America/Vancouver' })) - 1; return m >= 10 || m <= 3; }
+const HOTEL_SUMMER_ONLY = /\b(summer|beach(es)?|swim(ming)?|boat(ing)?|kayak|paddle|reservoir|lake ?shore|waterfront)\b/i;
+function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map(), now = new Date()) {
   const used = new Set();
-  return HOTEL_PAGE_GROUPS.map((g) => {
+  const ski = hotelIsSkiHill(hotel), skiMonth = ski && hotelIsSkiMonth(now);
+  return HOTEL_PAGE_GROUPS.map((g0) => {
+    const g = ski && g0.key === 'do' ? { ...g0, title: 'Outdoors and things to do', types: ['outdoor'] } : g0;
     const rows = venues
-      .filter((v) => g.types.includes(v.type) && v.slug && CATEGORY_SLUGS[v.type] && (!closedIds.has(v.id) || opensSoon.has(v.id)) && !(g.skipName && g.skipName.test(v.name || '')))
+      .filter((v) => g.types.includes(v.type) && !(skiMonth && g.key === 'do' && HOTEL_SUMMER_ONLY.test(v.name || '')) && v.slug && CATEGORY_SLUGS[v.type] && (!closedIds.has(v.id) || opensSoon.has(v.id)) && !(g.skipName && g.skipName.test(v.name || '')))
       .map((v) => ({ v, km: venueDistanceKm(hotel, v) }))
       .filter((x) => x.km !== null && x.km <= g.maxKm)
       .sort((a, b) => a.km - b.km);
@@ -36322,7 +36330,7 @@ function renderHotelPage(hotel, now = new Date()) {
     else if (!row.reopens_date && SKI_RESORT_REGIONS.has(hotel.region) && regionOf.get(id) === hotel.region) opensSoon.set(id, 'Opens for the ski season');
   }
   const info = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now);
-  const groups = hotelPageGroups(hotel, venues, info, closedIds, opensSoon);
+  const groups = hotelPageGroups(hotel, venues, info, closedIds, opensSoon, now);
   const town = REGION_LABELS[hotel.region] || hotel.region;
   const today = todayLocal(now);
   const weekEnd = new Date(`${today}T12:00:00Z`); weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
@@ -36342,6 +36350,8 @@ function renderHotelPage(hotel, now = new Date()) {
   } catch (err) { events = []; }
   const tourRow = hotelTourRowHtml(hotel, venues, closedIds, now);
   const dayTrips = hotelDayTrips(hotel, venues);
+  // A ski hill's day-trip lines leave out the lake and beach wording (see HOTEL_SKI_REGIONS).
+  const townLine = (r) => { const l = HOTEL_TOWN_LINES[r] || ''; return hotelIsSkiHill(hotel) ? l.replace(/with beaches and /i, 'with ').replace(/,? beaches,?( and)? /i, (m, and) => (and ? ' and ' : ' ')).replace(/\s{2,}/g, ' ') : l; };
   const guides = hotelGuides([hotel.region, ...dayTrips.slice(0, 4).map((t) => t.region)]);
   const filterKeys = new Set();
   for (const g of groups) for (const { v } of g.items) for (const f of hotelVenueFlags(v, info.byId.get(v.id) && info.byId.get(v.id).state === 'open')) filterKeys.add(f);
@@ -36462,7 +36472,7 @@ ${renderGolfHeaderHtml()}
   </section>` : ''}
   ${dayTrips.length ? `<section class="ht-section" aria-labelledby="ht-trips">
     <h2 id="ht-trips">Day trips from ${escapeHtml(town)}</h2>
-    <ul class="ht-trips">${dayTrips.map((t) => `<li><a class="ht-trip" href="/${t.region}" data-ht-cta="day-trip"><span class="ht-meta">About ${t.drive} min drive</span><span class="ht-name">${escapeHtml(t.label)}</span><span>${escapeHtml(HOTEL_TOWN_LINES[t.region] || '')}${HOTEL_TOWN_LINES[t.region] ? ' \u00b7 ' : ''}${t.count} places</span></a></li>`).join('')}</ul>
+    <ul class="ht-trips">${dayTrips.map((t) => `<li><a class="ht-trip" href="/${t.region}" data-ht-cta="day-trip"><span class="ht-meta">About ${t.drive} min drive</span><span class="ht-name">${escapeHtml(t.label)}</span><span>${escapeHtml(townLine(t.region))}${townLine(t.region) ? ' \u00b7 ' : ''}${t.count} places</span></a></li>`).join('')}</ul>
   </section>` : ''}
   ${guides.length ? `<section class="ht-section" aria-labelledby="ht-guides">
     <h2 id="ht-guides">Our guides for this part of the valley</h2>
@@ -36582,7 +36592,7 @@ function renderHotelCard(hotel) {
   <div class="hc-qr" id="hcQr" data-target="${escapeHtml(target)}" role="img" aria-label="QR code for ${escapeHtml(shown)}"></div>
   <div class="hc-scan">Scan with your phone camera <span class="hc-free">Free, no app.</span></div>
   <div class="hc-url">okanaganroam.com/near/<wbr>${escapeHtml(hotel.slug)}</div>
-  <ul class="hc-list"><li>${hotelIsRental(hotel) ? 'Map of what\'s near you' : "What's open near you right now"}</li><li>Happy hours &amp; drink deals</li><li>Tours, events &amp; rainy-day ideas</li><li>Wineries, beaches &amp; day trips, valley-wide</li><li>Free <strong>Build My Trip</strong> planner</li></ul>
+  <ul class="hc-list"><li>${hotelIsRental(hotel) ? 'Map of what\'s near you' : "What's open near you right now"}</li><li>Happy hours &amp; drink deals</li><li>Tours, events &amp; rainy-day ideas</li><li>${hotelIsSkiHill(hotel) ? 'Day trips down to Kelowna &amp; the valley' : 'Wineries, beaches &amp; day trips, valley-wide'}</li><li>Free <strong>Build My Trip</strong> planner</li></ul>
   <div class="hc-foot${hotelLogo(hotel) ? ' hc-foot-logo' : ''}">${hotelLogo(hotel) ? `<span>Compliments of</span><img class="hc-logo" src="${escapeHtml(hotelLogo(hotel))}" alt="${escapeHtml(hotel.name)}">` : `Compliments of ${escapeHtml(hotel.name)}`}</div>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
@@ -86424,7 +86434,7 @@ module.exports = {
   cardBadgeChipsHtml, cardBadgeExpected, guideDatesFor, guideBylineHtml,
   // Hotel QR pages (2026-10-20)
   hotelTourRowHtml, weekendBookingPick, renderWeekendBookHop, tourPickContext,
-  HOTEL_EVENT_SKIP, hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelTitleLine, hotelPageGroups, hotelDayTrips, hotelVenueFlags, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
+  HOTEL_EVENT_SKIP, hotelList, findHotel, hotelLogo, hotelIsRental, hotelHeadline, hotelTitleLine, hotelPageGroups, hotelIsSkiHill, hotelDayTrips, hotelVenueFlags, renderHotelPage, renderHotelCard, HOTEL_PAGE_GROUPS, HOTEL_QR_UTM, HOTEL_EMAIL_UTM,
   // IndexNow (2026-10-20, IndexNow)
   INDEXNOW_KEY, INDEXNOW_MAX_URLS, buildSitemapXml, listSitemapUrls, indexNowSubmit, createIndexNowQueue, indexNowQueue, indexNowQueueUrls,
   indexNowEnabled, indexNowIsProductionRequest, indexNowCleanUrls, indexNowVenueUrl, indexNowVenueChanged, indexNowEventChanged,
