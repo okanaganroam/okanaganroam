@@ -36080,8 +36080,11 @@ if (!process.env.NODE_TEST_CONTEXT) {
   setTimeout(() => { try { hotelConditions('big-white'); } catch (e) {} }, 5000).unref();
   setInterval(() => { try { hotelConditions('big-white'); } catch (e) {} }, 10 * 60 * 1000).unref();
 }
+// Travel times read like a person said them (2026-11-27, Dayton: "42 min" sounds like a machine): 10 minutes and over round
+// up to the next 5 (42 -> 45, 49 -> 50); under 10 stay as they are.
+function friendlyMinutes(n) { n = Math.max(1, Math.round(n)); return n < 10 ? n : Math.ceil(n / 5) * 5; }
 function hotelAwayText(km) {
-  return km <= 1.2 ? `${Math.max(1, Math.round(km * 12))} min walk` : `${Math.round(km * 1.6 + 2)} min drive`;
+  return km <= 1.2 ? `${friendlyMinutes(km * 12)} min walk` : `${friendlyMinutes(km * 1.6 + 2)} min drive`;
 }
 // ---------- Bookable tour picks (2026-11-21, tour-picks.js) ----------
 // The "Book a tour" row at the end of a hotel guest page, and the weekend email's one bookable pick. Only Viator
@@ -36372,7 +36375,7 @@ function hotelDayTrips(hotel, venues, maxKm = 80, limit = 6) {
     if (region === hotel.region || !REGION_LABELS[region] || s.n < 5) continue;
     const km = venueDistanceKm(hotel, { latitude: s.lat / s.n, longitude: s.lng / s.n });
     if (km === null || km > maxKm) continue;
-    out.push({ region, label: REGION_LABELS[region], km, drive: Math.round(km * 0.9 + 4), count: s.n });
+    out.push({ region, label: REGION_LABELS[region], km, drive: friendlyMinutes(km * 0.9 + 4), count: s.n });
   }
   return out.sort((a, b) => a.km - b.km).slice(0, limit);
 }
@@ -49448,8 +49451,8 @@ function renderVenuePageBody(venue, relatedVenues, nearbyVenues, venueGuidePages
     if (pool.length < 2) return '';
     pool.forEach(({ v }) => nearbyStripIds.add(v.id));
     const away = (km) => (km <= 1.2
-      ? L(`${Math.max(1, Math.round(km * 12))} min walk`, `${Math.max(1, Math.round(km * 12))} min à pied`)
-      : L(`${Math.round(km * 1.6 + 2)} min drive`, `${Math.round(km * 1.6 + 2)} min en voiture`));
+      ? L(`${friendlyMinutes(km * 12)} min walk`, `${friendlyMinutes(km * 12)} min à pied`)
+      : L(`${friendlyMinutes(km * 1.6 + 2)} min drive`, `${friendlyMinutes(km * 1.6 + 2)} min en voiture`));
     const cardItems = pool.map(({ v, km }) => {
       const typeLabel = (v.type === 'golf' && sportKindSingular(v, fr)) || ((fr ? CATEGORY_LABELS_FR : CATEGORY_LABELS)[v.type] || {}).singular || v.type; // sport test 3: a simulator or range card says its kind
       const href = fr && venueHasFrench(v) ? venuePagePath(v, 'fr') : `/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}`;
